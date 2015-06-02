@@ -1,46 +1,60 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Tue, 2 Jun 2015 19:15:36 +0200
-Subject: [PATCH v2 2/2] clk: at91: add Flexcom clock
-In-Reply-To: <20150602190435.4698a4db@bbrezillon>
-References: <cover.1433264017.git.cyrille.pitchen@atmel.com>
- <62cb26952d0688c6f37ad84d253d5302818a20ae.1433264017.git.cyrille.pitchen@atmel.com>
- <20150602190435.4698a4db@bbrezillon>
-Message-ID: <20150602171536.GG1715@piout.net>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Tue, 2 Jun 2015 18:16:45 +0100
+Subject: [PATCH for-v4.2 1/4] of/fdt: split off FDT self reservation from
+ memreserve processing
+In-Reply-To: <CAKv+Gu8W2w3jCc2iLn0S90qaOJkfMPTZFR7U5E2Ovw1f-iwLfQ@mail.gmail.com>
+References: <1433158834-25238-1-git-send-email-ard.biesheuvel@linaro.org>
+ <1433158834-25238-2-git-send-email-ard.biesheuvel@linaro.org>
+ <20150601173330.GE14192@e104818-lin.cambridge.arm.com>
+ <CAKv+Gu8W2w3jCc2iLn0S90qaOJkfMPTZFR7U5E2Ovw1f-iwLfQ@mail.gmail.com>
+Message-ID: <20150602171644.GD3080@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/06/2015 at 19:04:35 +0200, Boris Brezillon wrote :
-> Hi Cyrille,
+On Mon, Jun 01, 2015 at 09:36:28PM +0200, Ard Biesheuvel wrote:
+> On 1 June 2015 at 19:33, Catalin Marinas <catalin.marinas@arm.com> wrote:
+> > On Mon, Jun 01, 2015 at 01:40:31PM +0200, Ard Biesheuvel wrote:
+> >> This splits off the reservation of the memory occupied by the FDT
+> >> binary itself from the processing of the memory reservations it
+> >> contains. This is necessary because the physical address of the FDT,
+> >> which is needed to perform the reservation, may not be known to the
+> >> FDT driver core, i.e., it may be mapped outside the linear direct
+> >> mapping, in which case __pa() returns a bogus value.
+> >>
+> >> Cc: Russell King <linux@arm.linux.org.uk>
+> >> Cc: Benjamin Herrenschmidt <benh@kernel.crashing.org>
+> >> Cc: Paul Mackerras <paulus@samba.org>
+> >> Acked-by: Rob Herring <robh@kernel.org>
+> >> Acked-by: Mark Rutland <mark.rutland@arm.com>
+> >> Acked-by: Catalin Marinas <catalin.marinas@arm.com>
+> >> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> >> ---
+> >>  arch/arm/mm/init.c         |  1 +
+> >>  arch/arm64/mm/init.c       |  1 +
+> >>  arch/powerpc/kernel/prom.c |  1 +
+> >>  drivers/of/fdt.c           | 19 ++++++++++++++-----
+> >>  include/linux/of_fdt.h     |  2 ++
+> >>  5 files changed, 19 insertions(+), 5 deletions(-)
+> >
+> > I'm happy to take this patch (already acked by the DT maintainers)
+> > through the arm64 tree but it would be good to have an ack from the arch
+> > maintainers as well (i.e. Russell, Ben, Paul).
 > 
-> On Tue, 2 Jun 2015 18:57:19 +0200
-> Cyrille Pitchen <cyrille.pitchen@atmel.com> wrote:
+> OK, fair enough,
 > 
-> > This driver supports the new Atmel Flexcom. The Flexcom is a wrapper which
-> > integrates one SPI controller, one I2C controller and one USART. Only one
-> > function can be enabled at a time. This driver selects the function once for
-> > all, when the Flexcom is probed, according to the value of the new
-> > "atmel,flexcom-mode" device tree property.
-> > 
-> > This driver has chosen to present the Flexcom to the system as a clock so the
-> > implementation is seamless for the existing Atmel SPI, I2C and USART drivers.
+> @Ben, Paul
+> @Russell
 > 
-> Could detail a bit more why you chose to represent this flexcom IP as
-> a clock device ?
-> 
-> I don't like to use this 'DT should represent real hardware' argument,
-> but to me, it looks like you're trying to use a false hardware
-> representation to avoid changing the peripheral drivers code, which is
-> wrong since the DT is supposed to represent the hardware blocks.
-> 
-> How about representing the flexcom as an MFD instead ?
-> 
+> Could you please indicate whether or not you have any objections to this patch?
 
-It should probably be represented as an MFD. The MFD driver will parse
-the chosen configuration and the probe the correct driver. You can have
-a look at the recent ST LPC driver from Lee.
+I'm going to push this patch into -next via the arm64 tree. If there are
+objections before the merging window, please let me know (looking at the
+previous commits adding early_init_fdt_scan_reserved_mem(), they were
+only acked by the DT maintainers).
 
+I merged this series of 4 patches.
+
+Thanks.
 
 -- 
-Alexandre Belloni, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+Catalin
