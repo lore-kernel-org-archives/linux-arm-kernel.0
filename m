@@ -1,79 +1,67 @@
-From: hanjun.guo@linaro.org (Hanjun Guo)
-Date: Tue, 02 Jun 2015 20:24:24 +0800
-Subject: [PATCH 00/11] Add self-probe infrastructure and stacked irqdomain
- support for ACPI based GICv2/3 init
-In-Reply-To: <1431953961-22706-1-git-send-email-hanjun.guo@linaro.org>
-References: <1431953961-22706-1-git-send-email-hanjun.guo@linaro.org>
-Message-ID: <556DA078.4020901@linaro.org>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Tue,  2 Jun 2015 20:29:11 +0800
+Subject: [PATCH 2/3] ARM: dts: sun8i: Add support for USB controllers on
+ A23/A33
+In-Reply-To: <1433248152-13753-1-git-send-email-wens@csie.org>
+References: <1433248152-13753-1-git-send-email-wens@csie.org>
+Message-ID: <1433248152-13753-3-git-send-email-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Marc,
+A23/A33 has one pair of EHCI/OHCI USB controllers. There are 2 USB PHYs,
+one for the USB OTG controller, one for the EHCI/OHCI pair. The latter
+may also support HSIC, though none of the available boards utilize this,
+so this is not supported yet.
 
-Ping, could you comment on if we are on the right direction
-for this patch set? much appreciated.
+Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+---
+ arch/arm/boot/dts/sun8i-a23-a33.dtsi | 34 ++++++++++++++++++++++++++++++++++
+ 1 file changed, 34 insertions(+)
 
-Thanks
-Hanjun
-
-On 2015?05?18? 20:59, Hanjun Guo wrote:
-> This patch set introduce self-probe infrastructure to init IRQ
-> controllers and stacked irqdomain support for ACPI based GICv2/3
-> init.
->
-> The self-probe infrastructure for ACPI GIC init is similar as
-> IRQCHIP_DECLARE() and based on the GIC version support in ACPI
-> MADT table.
->
-> We introduce acpi_irq_domain for GICv2/3 core domain to support
-> stacked irqdomain, and pass the gsi (global system interrupt) as
-> the agument (void *arg) for gic_irq_domain_alloc(), then we can
-> alloc virqs via acpi_register_gsi() with stacked irqdomain.
->
-> In order to make ACPI related GIC init code slef-contained, I
-> consolidated all the GIC init code into drivers/irqchip/irq-gic-acpi.c.
->
-> update from RFC version:
->   - Consolidate all the GIC init code into drivers/irqchip/irq-gic-acpi.c
->
-> Hanjun Guo (8):
->    irqchip / GIC: Add GIC version support in ACPI MADT
->    irqchip / GIC / ACPI: Use IRQCHIP_ACPI_DECLARE to simplify GICv2 init
->      code
->    irqchip / gic: Add stacked irqdomain support for ACPI based GICv2 init
->    ACPI / gsi: Add gsi_mutex to synchronize
->      acpi_register_gsi()/acpi_unregister_gsi()
->    irqchip / GICv3: Add ACPI support for GICv3+ initialization
->    irqchip / GICv3: Add stacked irqdomain support for ACPI based init
->    irqchip / GICv2 / ACPI: Consolidate GICv2 ACPI related init code
->    irqchip / GICv3 / ACPI: Consolidate GICv3 ACPI related init code
->
-> Tomasz Nowicki (3):
->    ACPICA: Introduce GIC version for arm based system
->    ACPI / irqchip: Add self-probe infrastructure to initialize IRQ
->      controller
->    irqchip / GICv3: Refactor gic_of_init() for GICv3 driver
->
->   arch/arm64/Kconfig                   |   1 +
->   arch/arm64/include/asm/irq.h         |  13 --
->   arch/arm64/kernel/acpi.c             |  25 ---
->   drivers/acpi/Makefile                |   1 +
->   drivers/acpi/gsi.c                   |  41 +++--
->   drivers/acpi/irq.c                   |  40 +++++
->   drivers/irqchip/Kconfig              |   3 +
->   drivers/irqchip/Makefile             |   1 +
->   drivers/irqchip/irq-gic-acpi.c       | 318 +++++++++++++++++++++++++++++++++++
->   drivers/irqchip/irq-gic-v3.c         | 149 +++++++++-------
->   drivers/irqchip/irq-gic.c            | 129 ++------------
->   drivers/irqchip/irqchip.h            |  12 ++
->   include/acpi/actbl1.h                |  17 +-
->   include/asm-generic/vmlinux.lds.h    |  13 ++
->   include/linux/acpi.h                 |  14 ++
->   include/linux/acpi_irq.h             |   4 +-
->   include/linux/irqchip/arm-gic-acpi.h |  13 +-
->   include/linux/irqchip/arm-gic-v3.h   |  10 ++
->   include/linux/mod_devicetable.h      |   7 +
->   19 files changed, 577 insertions(+), 234 deletions(-)
->   create mode 100644 drivers/acpi/irq.c
->   create mode 100644 drivers/irqchip/irq-gic-acpi.c
->
+diff --git a/arch/arm/boot/dts/sun8i-a23-a33.dtsi b/arch/arm/boot/dts/sun8i-a23-a33.dtsi
+index 7abd0ae3143d..4f1ca44a81f1 100644
+--- a/arch/arm/boot/dts/sun8i-a23-a33.dtsi
++++ b/arch/arm/boot/dts/sun8i-a23-a33.dtsi
+@@ -332,6 +332,40 @@
+ 			#size-cells = <0>;
+ 		};
+ 
++		usbphy: phy at 01c19400 {
++			compatible = "allwinner,sun8i-a23-usb-phy";
++			reg = <0x01c19400 0x10>, <0x01c1a800 0x4>;
++			reg-names = "phy_ctrl", "pmu1";
++			clocks = <&usb_clk 8>, <&usb_clk 9>;
++			clock-names = "usb0_phy", "usb1_phy";
++			resets = <&usb_clk 0>, <&usb_clk 1>;
++			reset-names = "usb0_reset", "usb1_reset";
++			status = "disabled";
++			#phy-cells = <1>;
++		};
++
++		ehci0: usb at 01c1a000 {
++			compatible = "allwinner,sun8i-a23-ehci", "generic-ehci";
++			reg = <0x01c1a000 0x100>;
++			interrupts = <GIC_SPI 72 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&ahb1_gates 26>;
++			resets = <&ahb1_rst 26>;
++			phys = <&usbphy 1>;
++			phy-names = "usb";
++			status = "disabled";
++		};
++
++		ohci0: usb at 01c1a400 {
++			compatible = "allwinner,sun8i-a23-ohci", "generic-ohci";
++			reg = <0x01c1a400 0x100>;
++			interrupts = <GIC_SPI 73 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&ahb1_gates 29>, <&usb_clk 16>;
++			resets = <&ahb1_rst 29>;
++			phys = <&usbphy 1>;
++			phy-names = "usb";
++			status = "disabled";
++		};
++
+ 		pio: pinctrl at 01c20800 {
+ 			/* compatible gets set in SoC specific dtsi file */
+ 			reg = <0x01c20800 0x400>;
+-- 
+2.1.4
