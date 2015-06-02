@@ -1,32 +1,49 @@
-From: ijc@debian.org (Ian Campbell)
-Date: Tue, 02 Jun 2015 08:14:52 +0100
-Subject: QNAP TS-419: sata_mv fails to initialise with "can't set global
- reset"
-In-Reply-To: <20150601210702.GN22739@lunn.ch>
-References: <1433068534.5748.276.camel@debian.org>
- <20150601025050.GB11354@lunn.ch> <1433192857.5748.288.camel@debian.org>
- <20150601210702.GN22739@lunn.ch>
-Message-ID: <1433229292.5748.291.camel@debian.org>
+From: t-kristo@ti.com (Tero Kristo)
+Date: Tue, 2 Jun 2015 10:15:25 +0300
+Subject: [PATCH] ARM: dts: AM35xx: fix system control module clocks
+In-Reply-To: <alpine.DEB.2.02.1506012122050.14902@utopia.booyaka.com>
+References: <alpine.DEB.2.02.1506010546510.14902@utopia.booyaka.com>
+ <1433172627-28052-1-git-send-email-t-kristo@ti.com>
+ <556C8ED5.5050000@myspectrum.nl> <20150601173126.GY30984@atomide.com>
+ <alpine.DEB.2.02.1506011733180.14902@utopia.booyaka.com>
+ <20150601180429.GA30984@atomide.com> <20150601180658.GB30984@atomide.com>
+ <alpine.DEB.2.02.1506012122050.14902@utopia.booyaka.com>
+Message-ID: <556D580D.1000600@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2015-06-01 at 23:07 +0200, Andrew Lunn wrote:
-> On Mon, Jun 01, 2015 at 10:07:37PM +0100, Ian Campbell wrote:
-> > On Mon, 2015-06-01 at 04:50 +0200, Andrew Lunn wrote:
-> > > You might also want to try 
-> > > 
-> > > http://comments.gmane.org/gmane.linux.ports.arm.kernel/416589
-> > > 
-> > > In particular the first patch.
-> > 
-> > That did the trick, thanks!
-> 
-> Great.
-> 
-> A tested-by: for that patch will help grease the path into the kernel.
+On 06/02/2015 12:26 AM, Paul Walmsley wrote:
+> On Mon, 1 Jun 2015, Tony Lindgren wrote:
+>
+>> * Tony Lindgren <tony@atomide.com> [150601 11:06]:
+>>> * Paul Walmsley <paul@pwsan.com> [150601 10:45]:
+>>>>
+>>>> See for example the "Build warnings from toolchain", "Kernel warnings
+>>>> during boot to userspace", "Kernel warnings during PM test", and "Obsolete
+>>>> Kconfig symbols" sections here:
+>>>>
+>>>> http://www.pwsan.com/omap/testlogs/test_v4.1-rc6/20150601012139/README.txt
+>>>
+>>> OK somehow 3517evm is listed under "skip" there?
+>>
+>> Oh I see you have two 3517 devices there, never mind.
+>>
+>> Hmm now I'm wondering what the panda es warnings listed there are..
+>
+> http://www.pwsan.com/omap/testlogs/test_v4.1-rc6/20150601012139/boot/4430es2panda/4430es2panda_log.txt
+>
+> Looked to me like an OMAP4430 ES2.2 bug.  I recall discussing it with
+> someone with an ES2.3 Pandaboard and they said it didn't show up.  So I
+> asked TI at the time if there was an erratum for it; apparently not.  So I
+> think we may need to add in another hardware bug workaround flag to the
+> OMAP integration code...
+>
+> - Paul
+>
 
-I think it's already been applied to Gregory's tree, but I replied with
-a T-b anyway.
+Don't know about pandaboard ES2.2, but this doesn't show up on SDP4430 
+es2.3 at least. Do you know which clockdomain is in question there? It 
+could just be a race someplace in the usecounting system that shows up 
+on that specific SoC.
 
-Thanks again,
-Ian.
+-Tero
