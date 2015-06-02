@@ -1,83 +1,63 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Tue, 2 Jun 2015 16:41:26 +0200
-Subject: [PATCH 0/8] ARM: mvebu: Add support for RAID6 PQ offloading
-In-Reply-To: <CAPcyv4i06Mwis_CSrKV1Yo6crD1vrjb9it6RtYdtwbgOOY9a4g@mail.gmail.com>
-References: <1431445063-20226-1-git-send-email-maxime.ripard@free-electrons.com>
- <CAPcyv4gshyaji2HarAeOg3XOiNnmGwnSOMuFGWpuDu8ZTGg=jw@mail.gmail.com>
- <20150513091733.GW10961@lukather>
- <CAPcyv4jv=xWHbrO=rKhnWt9zFn8vkhS2J5mJiCBKKwESdUk5tg@mail.gmail.com>
- <20150518091454.GP4004@lukather>
- <CAPcyv4jbW=B_mYfx5HfKckLYeWctfC-9jYeDf0Z1APvQZfHj6Q@mail.gmail.com>
- <20150526094511.GP8557@lukather>
- <CAPcyv4i06Mwis_CSrKV1Yo6crD1vrjb9it6RtYdtwbgOOY9a4g@mail.gmail.com>
-Message-ID: <20150602144126.GZ23777@lukather>
+From: balbi@ti.com (Felipe Balbi)
+Date: Tue, 2 Jun 2015 09:45:28 -0500
+Subject: [PATCH v4 0/2] Remaining sunxi musb patches
+In-Reply-To: <556D57BD.90502@redhat.com>
+References: <1433088626-8858-1-git-send-email-hdegoede@redhat.com>
+ <79fc4306-a621-43b8-b347-e42a27beb134@googlegroups.com>
+ <20150601183447.GF26081@saruman.tx.rr.com>
+ <556D57BD.90502@redhat.com>
+Message-ID: <20150602144528.GA9623@saruman.tx.rr.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 26, 2015 at 09:31:03AM -0700, Dan Williams wrote:
-> > If you mean, "give me a hand, you can start there", then yeah, I can
-> > do that.
+Hi,
+
+On Tue, Jun 02, 2015 at 09:14:05AM +0200, Hans de Goede wrote:
+> >>>Here is an updated version of the remaining (not yet merged in Felipe's
+> >>>tree)
+> >>>sunxi musb patches.
+> >>>
+> >>>The "phy-sun4i-usb: Add full support for usb0 phy / OTG" patch has been
+> >>>updated with a small bug-fix and is ready for merging.
+> >>>
+> >>>The "musb: Add support for the Allwinner sunxi musb" patch has been
+> >>>updated
+> >>>to use the latest version of Maxime's sunxi sram controller driver. This
+> >>>one has a compile-time dependency on Maxime's sunxi sram controller
+> >>>driver,
+> >>>so it cannot be merged until that is merged.
+> >>>
+> >>
+> >>
+> >>Arnd has just merged the updated sram controller into the next branch
+> >>of the soc-drivers repo, so both these patches are now ready to merge.
 > >
-> >> I'm not happy about not having had the time to do this rework myself.
-> >> Linux is better off with this api deprecated.
-> >
-> > You're not talking about deprecating it, you're talking about removing
-> > it entirely.
+> >all right, so for v4.3 merge window there will be no issues in queues
+> >the two remaining patches. Thanks
 > 
-> True, and adding more users makes that removal more difficult.  I'm
-> willing to help out on the design and review for this work, I just
-> can't commit to doing the implementation and testing.
-> 
-> I think it looks something like this:
-> 
-> At init time the raid456 driver probes for offload resources It can
-> discover several scenarios:
-> 
-> 1/ "the ioatdma case": raid channels that have all the necessary
-> operations (copy, xor/pq, xor/pq check).  In this case we'll never
-> need to perform a channel switch.  Potentially the cpu never touches
-> the stripe cache in this case and we can maintain a static dma mapping
-> for the entire lifespan of a struct stripe_head.
-> 
-> 2/ "the channel switch case":  All the necessary offload resources are
-> available but span multiple devices.  In this case we need to wait for
-> channel1 to complete an operation before channel2 can start.  This
-> case is complicated by the fact that different channels may need their
-> own dma mappings.  In the simplest case channels can share the same
-> mapping and raid456 needs to wait for channel completions.  I think we
-> can do a better job than the async_tx api here as raid456 should
-> probably poll for completions after each stripe processing batch.
-> Taking an interrupt per channel-switch event seems like excessive
-> overhead.
-> 
-> 3/ "the co-op case": We have a xor/pq offload resource, but copy and
-> check operations require the cpu to touch the stripe cache.  In this
-> case we need to use the dma_sync_*_for_cpu()/dma_sync_*_for_device()
-> to pass buffers back and forth between device and cpu ownership.  This
-> shares some of the complexity of waiting for completions with scenario
-> 2.
-> 
-> Which scenario does your implementation fall into?  Maybe we can focus
-> on that one and leave the other scenarios for other dmaengine
-> maintainers to jump in an implement?
+> So I take it that it is too late to get these 2 into 4.2 ? I've a bunch
+> of (small) follow up patches coming up to enable support for the musb
+> controller on new boards, merging those would be easier if these were
+> already merged. And there also is a largish set of sunxi dts patches
+> actually enabling the musb code which is sorta waiting for merging
+> these 2 (waiting for the dt binding to be stable).
 
->From my limited understanding of RAID and PQ computations, it would be
-3 with a twist.
+DTS should not have to wait. If we know what the compatible should look
+like, you can send your DTS upstream no problem. There will just be a
+few devices which will not trigger a driver probe, but that's just fine.
 
-Our hardware controller supports xor and PQ, but the checks and
-recovering data is not supported (we're not able to offload async_mult
-and async_sum_product).
+> If this is not going to make 4.2, can you and Kishon at least review
+> them and let me know of they will get merged for 4.3 as is (baring
+> any merge issues) ?
 
-Maxime
+Sure, that I can do, no issues.
 
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+balbi
 -------------- next part --------------
 A non-text attachment was scrubbed...
 Name: signature.asc
 Type: application/pgp-signature
 Size: 819 bytes
 Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150602/54ee2b65/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150602/e443db59/attachment.sig>
