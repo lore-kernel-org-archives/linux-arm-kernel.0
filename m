@@ -1,48 +1,44 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Tue, 02 Jun 2015 15:38:43 +0200
-Subject: QNAP TS-419: sata_mv fails to initialise with "can't set global
- reset"
-In-Reply-To: <1433229292.5748.291.camel@debian.org>
-References: <1433068534.5748.276.camel@debian.org>	
- <20150601025050.GB11354@lunn.ch> <1433192857.5748.288.camel@debian.org>	
- <20150601210702.GN22739@lunn.ch> <1433229292.5748.291.camel@debian.org>
-Message-ID: <556DB1E3.3060304@free-electrons.com>
+From: afaerber@suse.de (=?UTF-8?B?QW5kcmVhcyBGw6RyYmVy?=)
+Date: Tue, 02 Jun 2015 22:38:42 +0900
+Subject: [PATCH v4 5/5] ARM: dts: Add LEDs to exynos5410-odroidxu
+In-Reply-To: <556DA96A.90800@samsung.com>
+References: <1426456834-6308-1-git-send-email-afaerber@suse.de>
+ <1426456834-6308-6-git-send-email-afaerber@suse.de>
+ <556DA96A.90800@samsung.com>
+Message-ID: <556DB1E2.5080607@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/06/2015 09:14, Ian Campbell wrote:
-> On Mon, 2015-06-01 at 23:07 +0200, Andrew Lunn wrote:
->> On Mon, Jun 01, 2015 at 10:07:37PM +0100, Ian Campbell wrote:
->>> On Mon, 2015-06-01 at 04:50 +0200, Andrew Lunn wrote:
->>>> You might also want to try 
->>>>
->>>> http://comments.gmane.org/gmane.linux.ports.arm.kernel/416589
->>>>
->>>> In particular the first patch.
->>>
->>> That did the trick, thanks!
->>
->> Great.
->>
->> A tested-by: for that patch will help grease the path into the kernel.
+Am 02.06.2015 um 22:02 schrieb Krzysztof Kozlowski:
+> W dniu 16.03.2015 o 07:00, Andreas F?rber pisze:
+>> Signed-off-by: Hakjoo Kim <ruppi.kim@hardkernel.com>
+>> Signed-off-by: Andreas F?rber <afaerber@suse.de>
+>> ---
+>>  v2 -> v3: Unchanged
+>>  
+>>  v1 -> v2:
+>>  * Filled in Sob from Hakjoo Kim
+>>  
+>>  arch/arm/boot/dts/exynos5410-odroidxu.dts | 25 +++++++++++++++++++++++++
+>>  1 file changed, 25 insertions(+)
 > 
-> I think it's already been applied to Gregory's tree, but I replied with
-> a T-b anyway.
+> What is the rationale behind doing this in separate patch, not as part
+> of 2/5? You can just add new board DTS with all of its features at once,
+> but maybe I am missing something?
 
-Yes and it was already pull in the arm-soc tree.
+This patch depends on the pinctrl driver, 2/5 on nothing.
 
-However thanks for testing it.
+By keeping it a separate patch it was intended to go in more quickly
+(clear fail there ;)) and it's easier to review the actual changes -
+squashing is always easier than picking apart.
 
-Gregory
+Thanks for your review! Both me and Ben have follow-ups once this moves
+forward.
 
-> 
-> Thanks again,
-> Ian.
-> 
-
+Kind regards,
+Andreas
 
 -- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+SUSE Linux GmbH, Maxfeldstr. 5, 90409 N?rnberg, Germany
+GF: Felix Imend?rffer, Jane Smithard, Dilip Upmanyu, Graham Norton; HRB
+21284 (AG N?rnberg)
