@@ -1,39 +1,44 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 3 Jun 2015 00:52:39 +0100
-Subject: [PATCH] ARM: socfpga: add smp_ops.cpu_kill to make kexec/kdump
- available
-In-Reply-To: <556E3F03.5040008@hitachi.com>
-References: <20150529053844.31162.43927.stgit@arietta>
- <20150529083339.GG2067@n2100.arm.linux.org.uk>
- <XNM1$3$0$0$$3$3$3$A$0000051U556d3fe3@hitachi.com>
- <20150602083804.GX2067@n2100.arm.linux.org.uk>
- <556E3F03.5040008@hitachi.com>
-Message-ID: <20150602235239.GB7557@n2100.arm.linux.org.uk>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Wed, 03 Jun 2015 08:55:55 +0900
+Subject: [PATCH v4 5/5] ARM: dts: Add LEDs to exynos5410-odroidxu
+In-Reply-To: <556DB1E2.5080607@suse.de>
+References: <1426456834-6308-1-git-send-email-afaerber@suse.de>
+ <1426456834-6308-6-git-send-email-afaerber@suse.de>
+ <556DA96A.90800@samsung.com> <556DB1E2.5080607@suse.de>
+Message-ID: <556E428B.8070008@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 03, 2015 at 08:40:51AM +0900, Hiraku Toyooka wrote:
-> Hello, Russell,
+On 02.06.2015 22:38, Andreas F?rber wrote:
+> Am 02.06.2015 um 22:02 schrieb Krzysztof Kozlowski:
+>> W dniu 16.03.2015 o 07:00, Andreas F?rber pisze:
+>>> Signed-off-by: Hakjoo Kim <ruppi.kim@hardkernel.com>
+>>> Signed-off-by: Andreas F?rber <afaerber@suse.de>
+>>> ---
+>>>  v2 -> v3: Unchanged
+>>>  
+>>>  v1 -> v2:
+>>>  * Filled in Sob from Hakjoo Kim
+>>>  
+>>>  arch/arm/boot/dts/exynos5410-odroidxu.dts | 25 +++++++++++++++++++++++++
+>>>  1 file changed, 25 insertions(+)
+>>
+>> What is the rationale behind doing this in separate patch, not as part
+>> of 2/5? You can just add new board DTS with all of its features at once,
+>> but maybe I am missing something?
 > 
-> On 2015/06/02 17:38, Russell King - ARM Linux wrote:
-> > I wasn't thinking of SPIs and PPIs, but SGIs - the IPI interrupts coming
-> > from the boot CPU.
+> This patch depends on the pinctrl driver, 2/5 on nothing.
 > 
-> All tasks in a CPU going offline are migrated to other CPUs(finally
-> CPU0) and the rq is marked with offline before the CPU entering WFI
-> loop. So IPI is not sent to the secondary CPU.
-> 
-> > If you have a way to reset CPU0, why are you not using this for hotplug
-> > when a CPU is hot-unplugged?
-> 
-> I think you mean "way to reset CPU1". If so, the reason is an increase
-> in power consumption in usual hotplug. This is discussed before between
-> Alan Tull and you. (https://lkml.org/lkml/2014/9/25/37)
+> By keeping it a separate patch it was intended to go in more quickly
+> (clear fail there ;)) and it's easier to review the actual changes -
+> squashing is always easier than picking apart.
 
-Please put a comment in your hotplug code describing this, so I'm
-not likely to ask again (and I don't have to remember that I've
-asked the question.)  Thanks.
+OK, I'm fine with it.
 
--- 
-FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
-according to speedtest.net.
+The patch looks good:
+Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+
+Can you resend everything with the change in chosen/console?
+
+Best regards,
+Krzysztof
