@@ -1,49 +1,79 @@
-From: iivanov@mm-sol.com (Ivan T. Ivanov)
-Date: Tue, 02 Jun 2015 15:15:47 +0300
-Subject: [PATCH V2 1/1] ARM: dts: imx7d: add cortex-a7 coresight component
-In-Reply-To: <20150602105407.GB2067@n2100.arm.linux.org.uk>
-References: <1433192081-1131-1-git-send-email-Frank.Li@freescale.com>
- <1433237208.6844.22.camel@mm-sol.com>
- <20150602105407.GB2067@n2100.arm.linux.org.uk>
-Message-ID: <1433247347.6844.25.camel@mm-sol.com>
+From: hanjun.guo@linaro.org (Hanjun Guo)
+Date: Tue, 02 Jun 2015 20:24:24 +0800
+Subject: [PATCH 00/11] Add self-probe infrastructure and stacked irqdomain
+ support for ACPI based GICv2/3 init
+In-Reply-To: <1431953961-22706-1-git-send-email-hanjun.guo@linaro.org>
+References: <1431953961-22706-1-git-send-email-hanjun.guo@linaro.org>
+Message-ID: <556DA078.4020901@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Marc,
 
-On Tue, 2015-06-02 at 11:54 +0100, Russell King - ARM Linux wrote:
-> On Tue, Jun 02, 2015 at 12:26:48PM +0300, Ivan T. Ivanov wrote:
-> > Hi,
-> > 
-> > On Tue, 2015-06-02 at 04:54 +0800, Frank.Li at freescale.com wrote:
-> > > +
-> > > +???????etm at 3007d000 {
-> > > +               compatible = "arm,coresight-etm3x", "arm,primecell";
-> > > +               reg = <0x3007d000 0x1000>;
-> > > +
-> > > +               /* System will hang if added nosmp in kernel command line
-> > > +                       * without arm,primecell-periphid because amba bus try to
-> > > +                       * read id and core1 power off at this time.
-> > > +                       */
-> > > +               arm,primecell-periphid =  <0xbb956>;
-> > 
-> > I do have similar problem, but in my case it is APB clock which is
-> > missing during device creation time. And I don't know how to fix it.
-> > 
-> > Adding Russell King as he's the maintainer of the arm,primecell bus.
-> 
-> If it was possible to postpone reading the ID until probe time, then
-> that's how I'd suggest to fix this problem, but unfortunately it isn't.
-> We need to know the device's ID by the time the bus ->match function
-> is called.
+Ping, could you comment on if we are on the right direction
+for this patch set? much appreciated.
 
-I have tried to read device ID again and again on every bus ->match until
-succeed. with hope that driver which provide APB clock will be probed
-in between, and this solve problem for me. But as Stephen Boyd point me,
-this way uevent used for module auto loading will be broken. So no joy.
+Thanks
+Hanjun
 
-> Short of modifying the driver core (which isn't going to be popular)
-> I don't see an easy solution to this problem.
-> 
-
-Thanks,
-Ivan
+On 2015?05?18? 20:59, Hanjun Guo wrote:
+> This patch set introduce self-probe infrastructure to init IRQ
+> controllers and stacked irqdomain support for ACPI based GICv2/3
+> init.
+>
+> The self-probe infrastructure for ACPI GIC init is similar as
+> IRQCHIP_DECLARE() and based on the GIC version support in ACPI
+> MADT table.
+>
+> We introduce acpi_irq_domain for GICv2/3 core domain to support
+> stacked irqdomain, and pass the gsi (global system interrupt) as
+> the agument (void *arg) for gic_irq_domain_alloc(), then we can
+> alloc virqs via acpi_register_gsi() with stacked irqdomain.
+>
+> In order to make ACPI related GIC init code slef-contained, I
+> consolidated all the GIC init code into drivers/irqchip/irq-gic-acpi.c.
+>
+> update from RFC version:
+>   - Consolidate all the GIC init code into drivers/irqchip/irq-gic-acpi.c
+>
+> Hanjun Guo (8):
+>    irqchip / GIC: Add GIC version support in ACPI MADT
+>    irqchip / GIC / ACPI: Use IRQCHIP_ACPI_DECLARE to simplify GICv2 init
+>      code
+>    irqchip / gic: Add stacked irqdomain support for ACPI based GICv2 init
+>    ACPI / gsi: Add gsi_mutex to synchronize
+>      acpi_register_gsi()/acpi_unregister_gsi()
+>    irqchip / GICv3: Add ACPI support for GICv3+ initialization
+>    irqchip / GICv3: Add stacked irqdomain support for ACPI based init
+>    irqchip / GICv2 / ACPI: Consolidate GICv2 ACPI related init code
+>    irqchip / GICv3 / ACPI: Consolidate GICv3 ACPI related init code
+>
+> Tomasz Nowicki (3):
+>    ACPICA: Introduce GIC version for arm based system
+>    ACPI / irqchip: Add self-probe infrastructure to initialize IRQ
+>      controller
+>    irqchip / GICv3: Refactor gic_of_init() for GICv3 driver
+>
+>   arch/arm64/Kconfig                   |   1 +
+>   arch/arm64/include/asm/irq.h         |  13 --
+>   arch/arm64/kernel/acpi.c             |  25 ---
+>   drivers/acpi/Makefile                |   1 +
+>   drivers/acpi/gsi.c                   |  41 +++--
+>   drivers/acpi/irq.c                   |  40 +++++
+>   drivers/irqchip/Kconfig              |   3 +
+>   drivers/irqchip/Makefile             |   1 +
+>   drivers/irqchip/irq-gic-acpi.c       | 318 +++++++++++++++++++++++++++++++++++
+>   drivers/irqchip/irq-gic-v3.c         | 149 +++++++++-------
+>   drivers/irqchip/irq-gic.c            | 129 ++------------
+>   drivers/irqchip/irqchip.h            |  12 ++
+>   include/acpi/actbl1.h                |  17 +-
+>   include/asm-generic/vmlinux.lds.h    |  13 ++
+>   include/linux/acpi.h                 |  14 ++
+>   include/linux/acpi_irq.h             |   4 +-
+>   include/linux/irqchip/arm-gic-acpi.h |  13 +-
+>   include/linux/irqchip/arm-gic-v3.h   |  10 ++
+>   include/linux/mod_devicetable.h      |   7 +
+>   19 files changed, 577 insertions(+), 234 deletions(-)
+>   create mode 100644 drivers/acpi/irq.c
+>   create mode 100644 drivers/irqchip/irq-gic-acpi.c
+>
