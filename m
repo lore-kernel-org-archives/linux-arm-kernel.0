@@ -1,67 +1,107 @@
-From: bintian.wang@huawei.com (Bintian)
-Date: Tue, 2 Jun 2015 18:55:20 +0800
-Subject: [PATCH v9 4/6] Documentation: DT: PL011: hi6220: add compatible
- string for Hisilicon designed UART
-In-Reply-To: <CACRpkdav_5x6RC9F++ErvqGyxDCF-=kap7-jCsO4zZ6QGVLfBQ@mail.gmail.com>
-References: <1432950661-23060-1-git-send-email-bintian.wang@huawei.com>	<1432950661-23060-5-git-send-email-bintian.wang@huawei.com>
- <CACRpkdav_5x6RC9F++ErvqGyxDCF-=kap7-jCsO4zZ6QGVLfBQ@mail.gmail.com>
-Message-ID: <556D8B98.2040703@huawei.com>
+From: huawei.libin@huawei.com (Li Bin)
+Date: Tue, 2 Jun 2015 19:00:13 +0800
+Subject: [RFC PATCH 0/5] livepatch: add support on arm64
+In-Reply-To: <556D11C5.1010705@linaro.org>
+References: <1432792265-24076-1-git-send-email-huawei.libin@huawei.com>
+ <5568FDD2.2040005@hitachi.com> <556D11C5.1010705@linaro.org>
+Message-ID: <556D8CBD.8060105@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2015/6/2 16:59, Linus Walleij wrote:
-> On Sat, May 30, 2015 at 3:50 AM, Bintian Wang <bintian.wang@huawei.com> wrote:
->
->> Hisilicon does some performance enhancements based on PL011(e.g. larger
->> FIFO length), so add one compatible string "hisilicon,hi6220-uart" for
->
-> That compatible string in the commit message is not even
-> the same as in the patch.
-The UART0 is PL011 compatible, the UART1/2 have some performance
-enhancements features, so based on Mark's suggestion and I add this
-compatible string just for future use.
-
->
->> future optimisations or workarounds works.
+On 2015/6/2 10:15, AKASHI Takahiro wrote:
+> On 05/30/2015 09:01 AM, Masami Hiramatsu wrote:
+>> On 2015/05/28 14:51, Li Bin wrote:
+>>> This patchset propose a method for gcc -mfentry feature(profile
+>>> before prologue) implementation for arm64, and propose the livepatch
+>>> implementation for arm64 based on this feature.
+>>> The gcc implementation about this feature will be post to the gcc
+>>> community soon.
+>>>
+>>> With this -mfentry feature, the entry of each function like:
+>>>
+>>> foo:
+>>>      mov x9, x30
+>>>      bl __fentry__
+>>>      mov x30, x9
+>>>      [prologue]
+>>>      ...
+>>>
+>>> The x9 is a callee corruptible register, and the __fentry__ function
+>>> is responsible to protect all registers, so it can be used to protect
+>>> the x30. And the added two instructions which is register mov operation
+>>> have ralatively small impact on performance.
 >>
->> Signed-off-by: Bintian Wang <bintian.wang@huawei.com>
->> Suggested-by: Mark Rutland <mark.rutland@arm.com>
->
-> Maybe I missed out on the earlier conversation, but do you
-> mean that the PrimeCell ID has not been properly set up
-> to something unique in this HiSilicon version of the PL011
-> block?
->
-> Even if so: do not override the compatible string like this,
-> that is not the PrimeCell style.
->
-> Define an 8 bit vendor ID (like tha ASCII for 'H' 0x48
-> or whatever) and encode it for these variants, if the
-> hardware is just using the ARM default PrimeCell
-> ID, override it in the device tree like Broadcom
-> are doing in arch/arm/boot/dts/bcm2835.dtsi:
->
-> arm,primecell-periphid = <0x00241011>;
->
-> Maybe yours would be:
->
-> arm,primecell-periphid = <0x00048011>;
->
-> For a first HiSilicon variant, then do some
-> <include/linux/amba/bus.h>:
->
-> enum amba_vendor {
->          AMBA_VENDOR_ARM = 0x41,
-> +       AMBA_VENDOR_HISILICON = 0x48,
->
-> Then patch drivers/tty/serial/amba_pl011.c to add vendor_hisilicon
-> and a match table for 0x00048011 just like everyone else.
+>> Hm, this implementation looks good to me :)
+>> This also enables us to KPROBES_ON_FTRACE too.
+> 
+> Even if x9 is a callee-saved register, there is no way to restore its original
+> value in setting up a pt_regs in ftrace_reg_caller.
 
-Thanks and BR,
+Hi, Takahiro AKASHI
 
-Bintian
-> Yours,
-> Linus Walleij
->
+Firstly, x9 is not a callee-saved but a caller-saved register(or being called
+corruptible register).
+Secondly, I think x9 is already protected properly, please reference the patch:
+[PATCH 1/5] livepatch: ftrace: arm64: Add support for DYNAMIC_FTRACE_WITH_REGS
+[PATCH 3/5] livepatch: ftrace: arm64: Add support for -mfentry on arm64
+
+> It's not the right thing for KPROBES_ON_FTRACE, is it?
+> 
+> Saving Link register in stack is not a big deal since the overhead of ftrace
+> is much bigger.
+
+Performance overhead is only one aspect of the problem, and more importantly,
+even worse is that it would break the arm64 ABI rules.
+
+Thanks,
+	Li Bin
+> 
+> -Takahiro AKASHI
+> 
+> 
+>> Thanks,
+>>
+>>>
+>>> This patchset has been tested on arm64 platform.
+>>>
+>>> Li Bin (4):
+>>>    livepatch: ftrace: arm64: Add support for DYNAMIC_FTRACE_WITH_REGS
+>>>    livepatch: ftrace: add ftrace_function_stub_ip function
+>>>    livepatch: ftrace: arm64: Add support for -mfentry on arm64
+>>>    livepatch: arm64: add support for livepatch on arm64
+>>>
+>>> Xie XiuQi (1):
+>>>    livepatch: arm64: support relocation in a module
+>>>
+>>>   arch/arm64/Kconfig                 |    5 +
+>>>   arch/arm64/include/asm/ftrace.h    |    9 +
+>>>   arch/arm64/include/asm/livepatch.h |   45 +++++
+>>>   arch/arm64/kernel/Makefile         |    1 +
+>>>   arch/arm64/kernel/arm64ksyms.c     |    4 +
+>>>   arch/arm64/kernel/entry-ftrace.S   |  154 +++++++++++++++-
+>>>   arch/arm64/kernel/ftrace.c         |   28 +++-
+>>>   arch/arm64/kernel/livepatch.c      |   41 ++++
+>>>   arch/arm64/kernel/module.c         |  355 ++++++++++++++++++------------------
+>>>   include/linux/ftrace.h             |    1 +
+>>>   kernel/livepatch/core.c            |   17 ++-
+>>>   kernel/trace/ftrace.c              |   32 ++++
+>>>   scripts/recordmcount.pl            |    2 +-
+>>>   13 files changed, 508 insertions(+), 186 deletions(-)
+>>>   create mode 100644 arch/arm64/include/asm/livepatch.h
+>>>   create mode 100644 arch/arm64/kernel/livepatch.c
+>>>
+>>> --
+>>> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
+>>> the body of a message to majordomo at vger.kernel.org
+>>> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+>>> Please read the FAQ at  http://www.tux.org/lkml/
+>>>
+>>
+>>
+> --
+> To unsubscribe from this list: send the line "unsubscribe live-patching" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> 
 > .
->
+> 
