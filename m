@@ -1,52 +1,43 @@
-From: vaibhav.hiremath@linaro.org (Vaibhav Hiremath)
-Date: Tue, 02 Jun 2015 22:29:23 +0530
-Subject: [PATCH 12/12] i2c: pxa: enable/disable i2c module across msg xfer
-In-Reply-To: <556DDF43.4050804@linaro.org>
-References: <1432818224-17070-1-git-send-email-vaibhav.hiremath@linaro.org>
- <1432818224-17070-13-git-send-email-vaibhav.hiremath@linaro.org>
- <20150528132312.GC2067@n2100.arm.linux.org.uk> <556DDF43.4050804@linaro.org>
-Message-ID: <556DE0EB.1010609@linaro.org>
+From: boris.brezillon@free-electrons.com (Boris Brezillon)
+Date: Tue, 2 Jun 2015 19:04:35 +0200
+Subject: [PATCH v2 2/2] clk: at91: add Flexcom clock
+In-Reply-To: <62cb26952d0688c6f37ad84d253d5302818a20ae.1433264017.git.cyrille.pitchen@atmel.com>
+References: <cover.1433264017.git.cyrille.pitchen@atmel.com>
+ <62cb26952d0688c6f37ad84d253d5302818a20ae.1433264017.git.cyrille.pitchen@atmel.com>
+Message-ID: <20150602190435.4698a4db@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Cyrille,
+
+On Tue, 2 Jun 2015 18:57:19 +0200
+Cyrille Pitchen <cyrille.pitchen@atmel.com> wrote:
+
+> This driver supports the new Atmel Flexcom. The Flexcom is a wrapper which
+> integrates one SPI controller, one I2C controller and one USART. Only one
+> function can be enabled at a time. This driver selects the function once for
+> all, when the Flexcom is probed, according to the value of the new
+> "atmel,flexcom-mode" device tree property.
+> 
+> This driver has chosen to present the Flexcom to the system as a clock so the
+> implementation is seamless for the existing Atmel SPI, I2C and USART drivers.
+
+Could detail a bit more why you chose to represent this flexcom IP as
+a clock device ?
+
+I don't like to use this 'DT should represent real hardware' argument,
+but to me, it looks like you're trying to use a false hardware
+representation to avoid changing the peripheral drivers code, which is
+wrong since the DT is supposed to represent the hardware blocks.
+
+How about representing the flexcom as an MFD instead ?
+
+Best Regards,
+
+Boris
 
 
-On Tuesday 02 June 2015 10:22 PM, Vaibhav Hiremath wrote:
->
->
-> On Thursday 28 May 2015 06:53 PM, Russell King - ARM Linux wrote:
->> On Thu, May 28, 2015 at 06:33:44PM +0530, Vaibhav Hiremath wrote:
->>> From: Yi Zhang <yizhang@marvell.com>
->>>
->>> Enable i2c module/unit before transmission and disable when it finishes.
->>>
->>> why?
->>> It's because the i2c bus may be distrubed if the slave device,
->>> typically a touch, powers on.
->>
->> "disturbed"
->>
->> I'd recommend that this is a DT property - not every platform is going to
->> want this, and as there is rudimentary I2C slave support in this driver,
->> this change breaks that.
->>
->
-> I would take it as two different comments here, and I believe you also
-> meant same,
->
-> 1. Not breaking I2C slave support
->
-> Not sure whether enabling/disabling module in ISR would suffice here.
-> To be specific, in the functions i2c_pxa_slave_start() &
-> i2c_pxa_slave_stop()
->
->
-
-Please ignore this option, as enable is important to generate interrupt
-on slave start.
-
-I will add DT property with clear note on SLAVE support issue, so that
-it can be disabled and SLAVE support should work as is.
-
-Thanks,
-Vaibhav
+-- 
+Boris Brezillon, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
