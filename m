@@ -1,43 +1,40 @@
 From: dinguyen@opensource.altera.com (Dinh Nguyen)
-Date: Tue, 2 Jun 2015 14:22:54 -0500
-Subject: [PATCHv6 0/2] socfpga: support suspend to ram*
-In-Reply-To: <1433270139-7042-1-git-send-email-atull@opensource.altera.com>
-References: <1433270139-7042-1-git-send-email-atull@opensource.altera.com>
-Message-ID: <556E028E.2080800@opensource.altera.com>
+Date: Tue, 2 Jun 2015 14:31:24 -0500
+Subject: [PATCH 2/2] ARM: socfpga: socrates: add gpio-leds
+In-Reply-To: <5568BBCB.8040605@opensource.altera.com>
+References: <1432909983-19821-1-git-send-email-s.trumtrar@pengutronix.de>
+ <1432909983-19821-2-git-send-email-s.trumtrar@pengutronix.de>
+ <5568BBCB.8040605@opensource.altera.com>
+Message-ID: <556E048C.3040903@opensource.altera.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/02/2015 01:35 PM, Alan Tull wrote:
-> Support suspend to ram on socfpga.
->   * allocate space in ocram using sram driver.
->   * Add a function in ocram to place DDR in self-refresh
->     and suspend.
->   * Prevent suspend if EDAC is enabled.
->   * Add a device tree binding document for the Altera
->     SOCFPGA SDRAM controller that is used to put DDR in
->     self-refresh mode.
+On 05/29/2015 02:19 PM, Dinh Nguyen wrote:
+> On 05/29/2015 09:33 AM, Steffen Trumtrar wrote:
+>> The SOCrates has three HPS LEDs that can be turned on/off via gpio.
+>> Use the first one has heartbeat and add the other two as free LEDs.
+>>
+>> Signed-off-by: Steffen Trumtrar <s.trumtrar@pengutronix.de>
+>> ---
+>>  arch/arm/boot/dts/socfpga_cyclone5_socrates.dts | 23 +++++++++++++++++++++++
+>>  1 file changed, 23 insertions(+)
+>>
+>> diff --git a/arch/arm/boot/dts/socfpga_cyclone5_socrates.dts b/arch/arm/boot/dts/socfpga_cyclone5_socrates.dts
+>> index a81f33deaa3a..019dd2fea208 100644
+>> --- a/arch/arm/boot/dts/socfpga_cyclone5_socrates.dts
+>> +++ b/arch/arm/boot/dts/socfpga_cyclone5_socrates.dts
+>> @@ -30,6 +30,9 @@
+>>  		device_type = "memory";
+>>  		reg = <0x0 0x40000000>; /* 1GB */
+>>  	};
+>> +
+>> +	leds: gpio-leds {
 > 
-> Alan Tull (2):
->   ARM: socfpga: support suspend to ram
->   ARM: socfpga: dts: add sdram controller dt binding doc
-> 
->  .../arm/altera/socfpga-sdram-controller.txt        |   12 ++
->  arch/arm/mach-socfpga/Kconfig                      |   10 +-
->  arch/arm/mach-socfpga/Makefile                     |    1 +
->  arch/arm/mach-socfpga/core.h                       |    6 +-
->  arch/arm/mach-socfpga/pm.c                         |  149 ++++++++++++++++++++
->  arch/arm/mach-socfpga/self-refresh.S               |  136 ++++++++++++++++++
->  arch/arm/mach-socfpga/socfpga.c                    |    6 +-
->  drivers/edac/altera_edac.c                         |   20 +++
->  8 files changed, 337 insertions(+), 3 deletions(-)
->  create mode 100644 Documentation/devicetree/bindings/arm/altera/socfpga-sdram-controller.txt
->  create mode 100644 arch/arm/mach-socfpga/pm.c
->  create mode 100644 arch/arm/mach-socfpga/self-refresh.S
-> 
+> Wonder if you should just place all the led nodes under here instead of
+> under the "&leds"?
+> 	
 
+patch applied as is.
 
-Applied.
-
-Thanks Alan!
-
+Thanks,
 Dinh
