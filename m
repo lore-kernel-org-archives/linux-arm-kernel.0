@@ -1,23 +1,65 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 2 Jun 2015 11:07:04 +0200
-Subject: [PATCH 1/2] pinctrl: mediatek: Fix bug of ies/smt setting for
- mt8173.
-In-Reply-To: <1432719835-18939-2-git-send-email-hongzhou.yang@mediatek.com>
-References: <1432719835-18939-1-git-send-email-hongzhou.yang@mediatek.com>
- <1432719835-18939-2-git-send-email-hongzhou.yang@mediatek.com>
-Message-ID: <CACRpkdZOPjF_EioqJnoAVbE7jivHQjHR=p0R+2FFB_oCAfcHiA@mail.gmail.com>
+From: fransklaver@gmail.com (Frans Klaver)
+Date: Tue, 2 Jun 2015 11:07:50 +0200
+Subject: [PATCH] ARM: avoid cmpxchg warning in kernel/acct.c
+In-Reply-To: <2137098.src0nTNAZ2@wuerfel>
+References: <2137098.src0nTNAZ2@wuerfel>
+Message-ID: <CAH6sp9PQDW5USP3r8g8ERn+n+AncsU9bNga9kj+n828KfKGspQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 27, 2015 at 11:43 AM, Hongzhou Yang
-<hongzhou.yang@mediatek.com> wrote:
-
-> Add ies/smt support for MSDC3.
-> Also fix ies bug for pin 106 and 107.
+On Tue, May 12, 2015 at 11:29 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+> A recent change in kernel/acct.c added a new warning for many
+> configurations on ARM:
 >
-> Signed-off-by: Hongzhou Yang <hongzhou.yang@mediatek.com>
+> kernel/acct.c: In function 'acct_pin_kill':
+> arch/arm/include/asm/cmpxchg.h:122:3: warning: value computed is not used [-Wunused-value]
+>   ((__typeof__(*(ptr)))__cmpxchg_local_generic((ptr), (unsigned long)(o),\
+>
+> The code is in fact correct, it's just a cmpxchg() call that intentionally
+> ignores the result, and no other code does that. The warning does not
+> show up on x86 because of the way that its cmpxchg() macro is written.
+>
+> This changes the ARM implementation to use a similar construct with a
+> compound expression instead of a typecast, which causes the compiler to
+> not complain about an unused result.
+>
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> Fixes: 3b994d98a815 ("get rid of the second argument of acct_kill()")
+> ---
+> This helps build some of the ARM defconfigs without warnings once more.
+>
+> diff --git a/arch/arm/include/asm/cmpxchg.h b/arch/arm/include/asm/cmpxchg.h
+> index abb2c3769b01..04be894f7c4e 100644
+> --- a/arch/arm/include/asm/cmpxchg.h
+> +++ b/arch/arm/include/asm/cmpxchg.h
+> @@ -119,8 +119,8 @@ static inline unsigned long __xchg(unsigned long x, volatile void *ptr, int size
+>   * them available.
+>   */
+>  #define cmpxchg_local(ptr, o, n)                                              \
+> -       ((__typeof__(*(ptr)))__cmpxchg_local_generic((ptr), (unsigned long)(o),\
+> -                       (unsigned long)(n), sizeof(*(ptr))))
+> +       ({(__typeof__(*(ptr)))__cmpxchg_local_generic((ptr), (unsigned long)(o),\
+> +                       (unsigned long)(n), sizeof(*(ptr)));})
+>  #define cmpxchg64_local(ptr, o, n) __cmpxchg64_local_generic((ptr), (o), (n))
+>
+>  #ifndef CONFIG_SMP
+> @@ -202,10 +202,10 @@ static inline unsigned long __cmpxchg_mb(volatile void *ptr, unsigned long old,
+>  }
+>
+>  #define cmpxchg(ptr,o,n)                                               \
+> -       ((__typeof__(*(ptr)))__cmpxchg_mb((ptr),                        \
+> +       ({(__typeof__(*(ptr)))__cmpxchg_mb((ptr),                       \
+>                                           (unsigned long)(o),           \
+>                                           (unsigned long)(n),           \
+> -                                         sizeof(*(ptr))))
+> +                                         sizeof(*(ptr)));})
+>
+>  static inline unsigned long __cmpxchg_local(volatile void *ptr,
+>                                             unsigned long old,
+>
+>
 
-Patch applied.
+Works for me.
 
-Yours,
-Linus Walleij
+Thanks,
+Frans
