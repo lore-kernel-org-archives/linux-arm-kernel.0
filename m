@@ -1,47 +1,59 @@
-From: michael@smart-africa.com (Michael van der Westhuizen)
-Date: Tue, 2 Jun 2015 17:21:11 +0200
-Subject: [PATCH v2] arm: tcm: Don't crash when TCM banks are protected by
- TrustZone
-In-Reply-To: <20150602145254.GE2067@n2100.arm.linux.org.uk>
-References: <1432805760-4590-1-git-send-email-michael@smart-africa.com>
- <1432821287-31436-1-git-send-email-michael@smart-africa.com>
- <CACRpkdY4sZQr+VzMKzU2Rtm7sP2zMztBioCPQRJjq=VjyapAEA@mail.gmail.com>
- <20150602145254.GE2067@n2100.arm.linux.org.uk>
-Message-ID: <E0CBFB71-15B1-4C83-8B97-AF1C5CA48B98@smart-africa.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Tue, 2 Jun 2015 17:22:26 +0200
+Subject: [PATCH v4 1/2] phy-sun4i-usb: Add full support for usb0 phy / OTG
+In-Reply-To: <556C25B7.80708@redhat.com>
+References: <1433088626-8858-1-git-send-email-hdegoede@redhat.com>
+ <1433088626-8858-2-git-send-email-hdegoede@redhat.com>
+ <20150601092249.GF17267@lukather> <556C25B7.80708@redhat.com>
+Message-ID: <20150602152226.GB23777@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi,
 
-> On 02 Jun 2015, at 4:52 PM, Russell King - ARM Linux <linux@arm.linux.org.uk> wrote:
+On Mon, Jun 01, 2015 at 11:28:23AM +0200, Hans de Goede wrote:
+> On 01-06-15 11:22, Maxime Ripard wrote:
+> >On Sun, May 31, 2015 at 06:10:25PM +0200, Hans de Goede wrote:
+> >>+	/* We either want both gpio pins or neither (when in host mode) */
+> >>+	if (!data->id_det_gpio != !data->vbus_det_gpio) {
+> >>+		dev_err(dev, "failed to get id or vbus detect pin\n");
+> >>+		return -ENODEV;
+> >>+	}
+> >
+> >The fact that the driver expects both to be set if one is should be in
+> >the binding documentation.
 > 
-> On Tue, Jun 02, 2015 at 01:16:38PM +0200, Linus Walleij wrote:
->>> +static int __init tcm_handler(struct pt_regs *regs, unsigned int instr)
->>> +{
->>> +       regs->uregs[(instr >> 12) & 0xf] = 0;
->>> +       regs->ARM_pc += 4;
->>> +       return 0;
->>> +}
->> 
->> Is the action here totally obvious to everyone except me?
->> I guess it is masking off something and advancing past a
->> failed instruction but whatdoIknow. Can you put in a small comment
->> above the function or something?
-> 
-> I know what it's doing :)
-> 
-> It's storing '0' into the destination register of the faulted MRC
-> instruction, and advancing past the instruction.  So, an undef fault
-> on either:
-> 
-> 	mrc	15, 0, rX, cr9, cr1, {0}
-> 	mrc	15, 0, rX, cr9, cr1, {1}
-> 
-> causes them to return zero.
+> That would be behavior description, and I've always been told that the
+> binding should only document the hardware description, not the behavior.
 
-It?s almost depressing how quickly you grokked that!
+Yes, that's true, but here it looks more like there's no point of
+having one without the other.
 
-I?ve addressed the comments from Linus is a v3 patch that crossed this mail in-flight.
+Pretty much like interrupt-parent and interrupt. A single one doesn't
+really make much sense without the other.
 
-Given your explanation I now fear I may have over-documented!
+And I don't think saying that you would need some additional
+properties when in device mode rather than in host mode is really
+documenting a behaviour. It does change things at a hardware level
+too.
 
-Michael
+> Also this may change in the future as we add support for more boards,
+> e.g. the cubieboard seems to be unable to turn vbus off ever, so vbus-det
+> will always read as 1 / high, making it rather useless. This is something
+> which I still need to figure out how to deal with.
+
+We can always figure it out in due time.
+
+Maxime
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150602/dde4cac1/attachment.sig>
