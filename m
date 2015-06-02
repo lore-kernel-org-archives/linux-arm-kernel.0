@@ -1,56 +1,20 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 2 Jun 2015 13:28:35 +0200
-Subject: [PATCH 02/21] ARM: tegra: Add gpio-ranges property
-In-Reply-To: <5564CC84.1030700@wwwdotorg.org>
-References: <1432565608-26036-1-git-send-email-tomeu.vizoso@collabora.com>
- <1432565608-26036-3-git-send-email-tomeu.vizoso@collabora.com>
- <5564CC84.1030700@wwwdotorg.org>
-Message-ID: <CACRpkdbtCDQLaPhWFT0a7NdJmxYzRvhU_efgUh2ZXhbc+FHg3g@mail.gmail.com>
+Date: Tue, 2 Jun 2015 13:29:56 +0200
+Subject: [PATCH] pinctrl: zynq: add static to zynq_pins
+In-Reply-To: <1432817843-6038-1-git-send-email-yamada.masahiro@socionext.com>
+References: <1432817843-6038-1-git-send-email-yamada.masahiro@socionext.com>
+Message-ID: <CACRpkdYx_HYC8Wa-7nxQ-5-5Rki5z-62djVWnPn8dfrSCmZ_Aw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 26, 2015 at 9:41 PM, Stephen Warren <swarren@wwwdotorg.org> wrote:
-> On 05/25/2015 08:53 AM, Tomeu Vizoso wrote:
->>
->> Specify how the GPIOs map to the pins in T124, so the dependency is
->> explicit.
->>
->> Signed-off-by: Tomeu Vizoso <tomeu.vizoso@collabora.com>
->> ---
->>   arch/arm/boot/dts/tegra124.dtsi | 1 +
->>   1 file changed, 1 insertion(+)
->>
->> diff --git a/arch/arm/boot/dts/tegra124.dtsi
->> b/arch/arm/boot/dts/tegra124.dtsi
->> index 13cc7ca..5d1d35f 100644
->> --- a/arch/arm/boot/dts/tegra124.dtsi
->> +++ b/arch/arm/boot/dts/tegra124.dtsi
->> @@ -254,6 +254,7 @@
->>                 gpio-controller;
->>                 #interrupt-cells = <2>;
->>                 interrupt-controller;
->> +               gpio-ranges = <&pinmux 0 0 250>;
+On Thu, May 28, 2015 at 2:57 PM, Masahiro Yamada
+<yamada.masahiro@socionext.com> wrote:
+
+> This array is only referenced in this file.
 >
->
-> We should be consistent between SoCs. Why not make the same change for all
-> Tegra SoCs?
+> Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
 
-Agreed.
-
-> I think this change will cause the GPIO subsystem to call into the pinctrl
-> subsystem and create/add/register a new GPIO<->pinctrl range structure. The
-> pinctrl driver already does this, so I think we'll end up with two duplicate
-> entries in the pinctrl device's gpio_ranges list. This probably won't cause
-> a problem, but I wanted to make sure you'd thought about it to make sure.
-
-That sounds like duplication indeed, I would expect that first a patch
-adds the ranges to the dts[i] files and then a second patch delete the
-same ranges from the pinctrl driver then, if these shall come in from
-the device tree.
-
-With GPIO ranges being possible to register from the pin controller,
-gpio chip and also the device tree, things get a bit complex
-admittedly :/ sorry for this, just choose one.
+Patch applied.
 
 Yours,
 Linus Walleij
