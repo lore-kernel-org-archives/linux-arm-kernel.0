@@ -1,37 +1,32 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 2 Jun 2015 16:35:48 +0100
-Subject: [PATCH v2] arm: tcm: Don't crash when TCM banks are protected by
- TrustZone
-In-Reply-To: <E0CBFB71-15B1-4C83-8B97-AF1C5CA48B98@smart-africa.com>
-References: <1432805760-4590-1-git-send-email-michael@smart-africa.com>
- <1432821287-31436-1-git-send-email-michael@smart-africa.com>
- <CACRpkdY4sZQr+VzMKzU2Rtm7sP2zMztBioCPQRJjq=VjyapAEA@mail.gmail.com>
- <20150602145254.GE2067@n2100.arm.linux.org.uk>
- <E0CBFB71-15B1-4C83-8B97-AF1C5CA48B98@smart-africa.com>
-Message-ID: <20150602153548.GG2067@n2100.arm.linux.org.uk>
+From: wsa@the-dreams.de (Wolfram Sang)
+Date: Wed, 3 Jun 2015 00:36:28 +0900
+Subject: [PATCH v3 0/6] i2c: at91: add support to FIFOs and alternative
+ command
+In-Reply-To: <20150602152647.GA2806@odux.rfo.atmel.com>
+References: <cover.1433250713.git.cyrille.pitchen@atmel.com>
+ <20150602152647.GA2806@odux.rfo.atmel.com>
+Message-ID: <20150602153622.GB2661@katana>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 02, 2015 at 05:21:11PM +0200, Michael van der Westhuizen wrote:
-> It?s almost depressing how quickly you grokked that!
 
-Quite simple really:
+> If you send a new version, could you add stable in Cc to patch 3/6:
 
-$ cat > t.s
-.word 0xee190f11
-.word 0xee190f31
-$ arm-linux-as -o t.o t.s
-$ arm-linux-objdump -d t.o
-...
-00000000 <.text>:
-   0:   ee190f11        mrc     15, 0, r0, cr9, cr1, {0}
-   4:   ee190f31        mrc     15, 0, r0, cr9, cr1, {1}
+No need to send a new version just because of an additional ack. I can
+apply that. However...
 
-Those two words being the values which fit the word and mask you
-specified, omitting the usual location for Rd (which is normally bits
-12:16 in ARM instructions).  Of course, a couple more words would
-confirm that.
+> Cc: stable at vger.kernel.org #3.10 and later
+> If not, Wolfram could you do it please?
 
--- 
-FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
-according to speedtest.net.
+The problem with 3/6 is that it seems to depend on 1/6 which is a
+cleanup patch. If cleaning up is not essential for the bugfix, the
+latter should be done first. To avoid exactly this problem.
+
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150603/7f8670ee/attachment.sig>
