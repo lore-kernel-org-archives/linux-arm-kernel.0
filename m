@@ -1,43 +1,71 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 2 Jun 2015 10:16:28 +0200
-Subject: [PATCH 1/2 v2] ARM64: juno: add GPIO keys
-In-Reply-To: <20150601164341.GE2175@e106497-lin.cambridge.arm.com>
-References: <1432629650-19559-1-git-send-email-linus.walleij@linaro.org>
- <20150526093734.GB2175@e106497-lin.cambridge.arm.com>
- <CACRpkdbm9LxaWQa=SQAhOKYVncPoFiKv_M6cN1oUEqctiR5=pQ@mail.gmail.com>
- <20150527144052.GF2175@e106497-lin.cambridge.arm.com>
- <CACRpkdaem5kTvgiswkp7SB+nJntDpV1Ycai1hzm2kWcpA+rKSA@mail.gmail.com>
- <20150601164341.GE2175@e106497-lin.cambridge.arm.com>
-Message-ID: <CACRpkdaQBxt6t8hosym5x0p5trfE93y8bac6HtqVaX0GvLdheQ@mail.gmail.com>
+From: ludovic.desroches@atmel.com (Ludovic Desroches)
+Date: Tue, 2 Jun 2015 10:18:17 +0200
+Subject: [PATCH v2 0/5] i2c: at91: add support to FIFOs and alternative
+ command
+In-Reply-To: <cover.1433173031.git.cyrille.pitchen@atmel.com>
+References: <cover.1433173031.git.cyrille.pitchen@atmel.com>
+Message-ID: <20150602081817.GM25118@odux.rfo.atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 1, 2015 at 6:43 PM, Liviu Dudau <Liviu.Dudau@arm.com> wrote:
-> On Mon, Jun 01, 2015 at 10:02:10AM +0100, Linus Walleij wrote:
+Hi Cyrille,
 
-> I have tested the patches on my Juno R0, so you can add my
->
-> Acked-by: Liviu Dudau <Liviu.Dudau@arm.com>
+Could you split the patch about the new alternative command mode?
 
-OK thanks!
+Reading some comments in your code, you also fixes bad management of the
+interrupt flags. It would be great if we can send this as fixes for previous
+kernels.
 
->> > UEFI firmware (version a4c2dfb284a55e73f34c48f5944a438006384f04 built at 17:44:48 on Jan 13 2015)
->>
->> I'm using U-Boot, of course ;)
->
-> Should I, too? :)
+Thanks
 
-I think it's very convenient especially if you just want to boot the kernel off
-TFTP like with most reference designs. I compile a U-Boot with a command
-string like so as default:
-set serverip 192.168.1.32 ; set ipaddr 192.168.1.35 ; tftpboot
-0x80000000 Image ; tftpboot 0x83000000 juno.dtb ; booti 0x80000000 -
-0x83000000
+Ludovic
 
-Then I can just compile a kernel I want to test and reboot and it
-will download and boot whatever I just compiled quick and nice
-with no keyboard interaction.
-http://www.df.lth.se/~triad/krad/junoboard/
-
-Yours,
-Linus Walleij
+On Mon, Jun 01, 2015 at 05:49:10PM +0200, Cyrille Pitchen wrote:
+> ChangeLog
+> 
+> v2:
+> - fix typo in comment for AT91_TWI_SVEN.
+> - document new device tree bindings like "atmel,fifo-size".
+> - explicitly set the has_alt_cmd boolean to false to already existing chip
+> configs.
+> - use the BIT() macro to define the register bits and do a little cleanup in a
+> dedicated patch.
+> - reword some comments to better explain why the TXCOMP interrupt is no longer
+> enabled in at91_do_twi_transfer() but later in
+> at91_twi_write_data_dma_callback() to avoid a race condition when DMA is used.
+> - remove useless TXCOMP interrupt enable line in at91_twi_write_next_byte()
+> since this interrupt is also enabled by at91_do_twi_transfer() for PIO
+> transfers.
+> 
+> v1:
+> This series of patches adds support of two new features which will be
+> introduced with Atmel sama5d2x SoC.
+> 
+> First, the alternative command mode eases the sending of STOP conditions.
+> Before starting an I2C transaction, the size data to be transfered is
+> written into the new Alternative Command Register. For each byte transferred,
+> the I2C controller decreases this counter and automatically sends a STOP
+> condition when the counter value reaches 0, that is to say when the last byte
+> of the transaction has been sent/received. So there is no longer need to set
+> the STOP bit into the Control Register.
+> 
+> Then the use of FIFOs allows to reduce number I/O accesses: for instance,
+> the TX FIFO allows to write up to 4 data in a single access to the Transmit
+> Holding Register. Also the RX FIFO allows to read up to 4 data in a single
+> access to the Receive Holding Register. Currently only DMA transfers take
+> advantage of FIFOs.
+> 
+> Cyrille Pitchen (5):
+>   i2c: at91: use BIT() macro to define register bits
+>   i2c: at91: update documentation for DT bindings
+>   i2c: at91: add support for new alternative command mode
+>   i2c: at91: print hardware version
+>   i2c: at91: add support to FIFOs
+> 
+>  Documentation/devicetree/bindings/i2c/i2c-at91.txt |  29 +-
+>  drivers/i2c/busses/i2c-at91.c                      | 350 +++++++++++++++++----
+>  2 files changed, 318 insertions(+), 61 deletions(-)
+> 
+> -- 
+> 1.8.2.2
+> 
