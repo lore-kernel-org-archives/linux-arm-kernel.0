@@ -1,76 +1,34 @@
-From: t-kristo@ti.com (Tero Kristo)
-Date: Tue, 2 Jun 2015 11:22:35 +0300
-Subject: [PATCH 3/5] ARM: dts: DRA7: Add TBCLK for PWMSS
-In-Reply-To: <1433159614-437-4-git-send-email-vigneshr@ti.com>
-References: <1433159614-437-1-git-send-email-vigneshr@ti.com>
- <1433159614-437-4-git-send-email-vigneshr@ti.com>
-Message-ID: <556D67CB.8090309@ti.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Tue, 2 Jun 2015 10:24:26 +0200
+Subject: [PATCH 1/2] clk: sunxi: Add support for the usb-clk on sun8i a23
+ and a33 SoCs
+In-Reply-To: <1433183008-13086-1-git-send-email-hdegoede@redhat.com>
+References: <1433183008-13086-1-git-send-email-hdegoede@redhat.com>
+Message-ID: <20150602082426.GQ23777@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/01/2015 02:53 PM, Vignesh R wrote:
-> tbclk is used by ehrpwm to generate PWM waveform on DRA7 SoC. Add Linux
-> clock to control ehrpwm tbclk.
+On Mon, Jun 01, 2015 at 08:23:27PM +0200, Hans de Goede wrote:
+> The usb-clk on sun8i a23 and a33 SoCs is similar to the ones found
+> on sun6i-a31 SoCs but instead of a 3th phy the a23 / a33 have a hsic
+> interface which gets enabled by almost the same bits as used on
+> the a31 for the 3th phy, but not exactly the same bits so we need
+> a new compatible for this.
+> 
+> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
 
-Care to add TRM reference here?
+Applied with Julian spelling fix.
 
--Tero
+Maxime
 
->
-> Signed-off-by: Vignesh R <vigneshr@ti.com>
-> ---
->   arch/arm/boot/dts/dra7.dtsi          |  5 +++++
->   arch/arm/boot/dts/dra7xx-clocks.dtsi | 26 ++++++++++++++++++++++++++
->   2 files changed, 31 insertions(+)
->
-> diff --git a/arch/arm/boot/dts/dra7.dtsi b/arch/arm/boot/dts/dra7.dtsi
-> index f03a091cd076..387c76ca41f9 100644
-> --- a/arch/arm/boot/dts/dra7.dtsi
-> +++ b/arch/arm/boot/dts/dra7.dtsi
-> @@ -131,6 +131,11 @@
->   							regulator-max-microvolt = <3000000>;
->   						};
->   					};
-> +
-> +					scm_conf_clocks: clocks {
-> +						#address-cells = <1>;
-> +						#size-cells = <0>;
-> +					};
->   				};
->
->   				dra7_pmx_core: pinmux at 1400 {
-> diff --git a/arch/arm/boot/dts/dra7xx-clocks.dtsi b/arch/arm/boot/dts/dra7xx-clocks.dtsi
-> index 3b933f74d000..92452d61cf58 100644
-> --- a/arch/arm/boot/dts/dra7xx-clocks.dtsi
-> +++ b/arch/arm/boot/dts/dra7xx-clocks.dtsi
-> @@ -2136,3 +2136,29 @@
->   		clocks = <&dpll_usb_ck>;
->   	};
->   };
-> +
-> +&scm_conf_clocks {
-> +       ehrpwm0_tbclk: ehrpwm0_tbclk {
-> +		#clock-cells = <0>;
-> +		compatible = "ti,gate-clock";
-> +		clocks = <&l4_root_clk_div>;
-> +		ti,bit-shift = <20>;
-> +		reg = <0x0558>;
-> +	};
-> +
-> +	ehrpwm1_tbclk: ehrpwm1_tbclk {
-> +		#clock-cells = <0>;
-> +		compatible = "ti,gate-clock";
-> +		clocks = <&l4_root_clk_div>;
-> +		ti,bit-shift = <21>;
-> +		reg = <0x0558>;
-> +	};
-> +
-> +	ehrpwm2_tbclk: ehrpwm2_tbclk {
-> +		#clock-cells = <0>;
-> +		compatible = "ti,gate-clock";
-> +		clocks = <&l4_root_clk_div>;
-> +		ti,bit-shift = <22>;
-> +		reg = <0x0558>;
-> +	};
-> +};
->
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150602/7d3de016/attachment.sig>
