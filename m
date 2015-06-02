@@ -1,93 +1,123 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Tue, 2 Jun 2015 10:21:55 +0200
-Subject: [PATCH v2 3/6] ARM: dts: sun8i: Add sun8i-a23-a33 dtsi
-In-Reply-To: <556D6487.4010207@redhat.com>
-References: <1432997706-20172-1-git-send-email-hdegoede@redhat.com>
- <1432997706-20172-4-git-send-email-hdegoede@redhat.com>
- <20150602075120.GL23777@lukather> <556D6487.4010207@redhat.com>
-Message-ID: <20150602082155.GP23777@lukather>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Tue, 2 Jun 2015 10:25:22 +0200
+Subject: Please revert 3eea8b5d68c801fec788b411582b803463834752 as it
+ breaks touchscreen on n900.
+In-Reply-To: <20150601213213.GB14395@dtor-ws>
+References: <20150529202123.GY2026@saruman.tx.rr.com>
+ <20150529202954.GA26494@localhost> <20150529203456.GC22083@amd>
+ <20150601095556.GH17267@lukather> <20150601140605.GA26908@amd>
+ <20150601145825.GA20557@lukather> <20150601152111.GA14015@amd>
+ <20150601174730.GA30024@dtor-ws> <20150601212226.GH23777@lukather>
+ <20150601213213.GB14395@dtor-ws>
+Message-ID: <20150602082521.GA14955@amd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 02, 2015 at 10:08:39AM +0200, Hans de Goede wrote:
-> Hi,
+On Mon 2015-06-01 14:32:13, Dmitry Torokhov wrote:
+> On Mon, Jun 01, 2015 at 11:22:26PM +0200, Maxime Ripard wrote:
+> > Hi Dmitry,
+> > 
+> > On Mon, Jun 01, 2015 at 10:47:30AM -0700, Dmitry Torokhov wrote:
+> > > On Mon, Jun 01, 2015 at 05:21:11PM +0200, Pavel Machek wrote:
+> > > > 
+> > > > 
+> > > > > > > > The 3eea8b5d68c801fec788b411582b803463834752 is just bad.
+> > > > > > > 
+> > > > > > > You were very welcome to review this patch at the time and/or suggest
+> > > > > > > a fix that pleases everyone.
+> > > > > > 
+> > > > > > You should be the one that should suggest fixes, as you broke it in
+> > > > > > the first place. But clearly you don't understand that.
+> > > > > 
+> > > > > You actually never asked for a fix, and went head first calling this
+> > > > > patch "bad" and asking for nothing but reverting it.
+> > > > 
+> > > > Date: Fri, 29 May 2015 21:08:16 +0200
+> > > > Subject: 4.1 touchscreen regression on n900 -- pinpointed [was Re:
+> > > > linux-n900
+> > > > ...
+> > > > Maxime, can you suggest a fix?
+> > > 
+> > > How about we do something like below (it needs a small edt-ft5x06 fixup
+> > > that I'll send separately). Not tested.
+> > > 
+> > > Thanks.
+> > > 
+> > > -- 
+> > > Dmitry
+> > > 
+> > > 
+> > > Input: improve parsing OF parameters for touchscreens
+> > > 
+> > > From: Dmitry Torokhov <dmitry.torokhov@gmail.com>
+> > > 
+> > > When applying touchscreen parameters specified in device tree let's make
+> > > sure we keep whatever setup was done by the driver and not reset the
+> > > missing values to zero.
+> > > 
+> > > Reported-by: Pavel Machek <pavel@ucw.cz>
+> > > Signed-off-by: Dmitry Torokhov <dmitry.torokhov@gmail.com>
+> > > ---
+> > >  drivers/input/touchscreen/edt-ft5x06.c     |    2 -
+> > >  drivers/input/touchscreen/of_touchscreen.c |   67 ++++++++++++++++++----------
+> > >  drivers/input/touchscreen/tsc2005.c        |    2 -
+> > >  include/linux/input/touchscreen.h          |    5 +-
+> > >  4 files changed, 48 insertions(+), 28 deletions(-)
+> > > 
+> > > diff --git a/drivers/input/touchscreen/edt-ft5x06.c b/drivers/input/touchscreen/edt-ft5x06.c
+> > > index 29d179a..394b1de 100644
+> > > --- a/drivers/input/touchscreen/edt-ft5x06.c
+> > > +++ b/drivers/input/touchscreen/edt-ft5x06.c
+> > > @@ -1041,7 +1041,7 @@ static int edt_ft5x06_ts_probe(struct i2c_client *client,
+> > >  			     0, tsdata->num_y * 64 - 1, 0, 0);
+> > >  
+> > >  	if (!pdata)
+> > > -		touchscreen_parse_of_params(input);
+> > > +		touchscreen_parse_of_params(input, true);
+> > >  
+> > >  	error = input_mt_init_slots(input, MAX_SUPPORT_POINTS, INPUT_MT_DIRECT);
+> > >  	if (error) {
+> > > diff --git a/drivers/input/touchscreen/of_touchscreen.c b/drivers/input/touchscreen/of_touchscreen.c
+> > > index b82b520..c132624 100644
+> > > --- a/drivers/input/touchscreen/of_touchscreen.c
+> > > +++ b/drivers/input/touchscreen/of_touchscreen.c
+> > > @@ -14,14 +14,22 @@
+> > >  #include <linux/input/mt.h>
+> > >  #include <linux/input/touchscreen.h>
+> > >  
+> > > -static u32 of_get_optional_u32(struct device_node *np,
+> > > -			       const char *property)
+> > > +static bool touchscreen_get_property_u32(struct device_node *np,
+> > > +					 const char *property,
+> > > +					 unsigned int default_value,
+> > > +					 unsigned int *value)
+> > >  {
+> > >  	u32 val = 0;
+> > > +	int error;
+> > >  
+> > > -	of_property_read_u32(np, property, &val);
+> > > +	error = of_property_read_u32(np, property, &val);
+> > > +	if (error) {
+> > > +		*value = default_value;
+> > > +		return false;
+> > > +	}
+> > >  
+> > > -	return val;
+> > > +	*value = val;
+> > > +	return true;
+> > 
+> > This looks good.
+> > 
+> > However, of_property_read_u32 already does the right thing here by not
+> > update val if the property is not found.
 > 
-> On 02-06-15 09:51, Maxime Ripard wrote:
-> >On Sat, May 30, 2015 at 04:55:03PM +0200, Hans de Goede wrote:
-> >>From: Vishnu Patekar <vishnupatekar0510@gmail.com>
-> >>
-> >>Rename sun8i-a23.dtsi to sun8i-a23-a33.dtsi as the base dtsi for the A33
-> >>is 99% the same and add a new sun8i-a23.dtsi including sun8i-a23-a33.dtsi
-> >>and setting the few things not shared with the A33 (mbus-clk, pio
-> >>compatible and interrupts).
-> >>
-> >>Signed-off-by: Vishnu Patekar <vishnupatekar0510@gmail.com>
-> >>Signed-off-by: Hans de Goede <hdegoede@redhat.com>
-> >
-> >Fixed the conflicts and applied.
-> >
-> >Also judging from a quick look at the datasheet, the A33 doesn't seem
-> >to have that clock gates tree but rather one similar to the H3's. That
-> >will probably mean we'll have to move out the gates from this DTSI at
-> >some point.
-> 
-> Heuh...
-> 
-> Ok so I've done a full bit for bit comparison of the 2 datasheets for
-> the clk gates, mostly they are mostly the same and the registers seem to
-> just be renamed.
-> 
-> The only differences are:
-> 
-> 01c200060 (AHB1 MODULE CLOCK GATING REGISTER 0 / Bus Clock Gating Register 0):
-> 
-> Only A33 has bit 5 SS gating
-> 
-> 01c200064 (AHB1 MODULE CLOCK GATING REGISTER 1 / Bus Clock Gating Register 1):
-> 
-> Only A33 has bit 26 SAT gating, note that if we add support for this we
-> must add it as a needed clock to the simplefb node
-> 
-> Only A33 has bit 21 MSGBOX_GATING
-> 
-> 01c200068 (APB1 MODULE CLOCK GATING REGISTER / Bus Clock Gating Register 2):
-> 
-> No differences
-> 
-> 01c20006c (APB2 MODULE CLOCK GATING REGISTER / Bus Clock Gating Register 3):
-> 
-> No differences
-> 
-> 
-> So you are right that in the near future we should add a separate compatible
-> + clk driver or the ahb1_gates on the A33, but it does not seem that there is
-> the issue of one gate register having multiple parents like on the H3. Or maybe
-> the H3 does also not have that issue, and this is a misinterpretation of
-> the H3 datasheet ?
+> I know but it is not documented anywhere (as far as I know) so I'd
+> rather not rely on the implementation detail that might change in the
+> future. This is not a hot path so extra assignment should not hurt.
 
-I might have been misguided by the clock name (AHB1, APB1,
-etc... gates vs bus gates).
-
-If it's just as simple as that, then yeah, we'll probably don't need
-the H3 bus gates driver for this.
-
-> Note I do not know what the actual parent clock for the new gates is, but
-> it stands to reason that it is AHB1, I've been unable to find anything to
-> confirm or deny this.
-
-That's always something we can change if we find that it's not the
-case.
-
-Maxime
-
+Seriously? Submit a patch documenting it, instead of writing strange
+code. I bet everyone and their dog relies on it.
+									Pavel
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150602/ce9ced6c/attachment.sig>
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
