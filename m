@@ -1,25 +1,31 @@
-From: wsa@the-dreams.de (Wolfram Sang)
-Date: Wed, 3 Jun 2015 03:02:18 +0900
-Subject: [PATCH 05/12] i2c: pxa: Add bus reset functionality
-In-Reply-To: <556DEE6C.1060300@linaro.org>
-References: <1432818224-17070-1-git-send-email-vaibhav.hiremath@linaro.org>
- <1432818224-17070-6-git-send-email-vaibhav.hiremath@linaro.org>
- <20150602173341.GA1494@katana> <556DEA90.3010001@linaro.org>
- <20150602174818.GC1494@katana> <556DEE6C.1060300@linaro.org>
-Message-ID: <20150602180217.GE1494@katana>
+From: aleksey.makarov@caviumnetworks.com (Aleksey Makarov)
+Date: Tue, 2 Jun 2015 11:00:27 -0700
+Subject: [PATCH 10/10] net: thunderx: use GFP_KERNEL in thread context
+In-Reply-To: <1433268028-23992-1-git-send-email-aleksey.makarov@caviumnetworks.com>
+References: <1433268028-23992-1-git-send-email-aleksey.makarov@caviumnetworks.com>
+Message-ID: <1433268028-23992-11-git-send-email-aleksey.makarov@caviumnetworks.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+GFP_KERNEL should be used in the thread context
 
-> can you please also review the RFC which I submitted few days back?
+Signed-off-by: Aleksey Makarov <aleksey.makarov@caviumnetworks.com>
+---
+ drivers/net/ethernet/cavium/thunder/nicvf_queues.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-They are added to the queue and will be reviewed when the time comes. I
-won't make any promises.
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150603/8a94d773/attachment.sig>
+diff --git a/drivers/net/ethernet/cavium/thunder/nicvf_queues.c b/drivers/net/ethernet/cavium/thunder/nicvf_queues.c
+index 2ed7d1b..d69d228 100644
+--- a/drivers/net/ethernet/cavium/thunder/nicvf_queues.c
++++ b/drivers/net/ethernet/cavium/thunder/nicvf_queues.c
+@@ -356,7 +356,7 @@ static int nicvf_init_snd_queue(struct nicvf *nic,
+ 		return err;
+ 
+ 	sq->desc = sq->dmem.base;
+-	sq->skbuff = kcalloc(q_len, sizeof(u64), GFP_ATOMIC);
++	sq->skbuff = kcalloc(q_len, sizeof(u64), GFP_KERNEL);
+ 	if (!sq->skbuff)
+ 		return -ENOMEM;
+ 	sq->head = 0;
+-- 
+2.4.1
