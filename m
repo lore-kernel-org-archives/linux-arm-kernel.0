@@ -1,26 +1,57 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Tue, 2 Jun 2015 09:03:15 +0200
-Subject: [PATCH 2/2] ARM: multi_v7_defconfig: Enable shmobile r8a7793/gose
- platform
-In-Reply-To: <1433208877-3284-3-git-send-email-horms+renesas@verge.net.au>
-References: <1433208877-3284-1-git-send-email-horms+renesas@verge.net.au>
- <1433208877-3284-3-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <CAMuHMdXrU3L777K41t8sZLhV1VoGhUbBPYY6-YRar=gi6wLYfw@mail.gmail.com>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Tue, 02 Jun 2015 09:14:05 +0200
+Subject: [PATCH v4 0/2] Remaining sunxi musb patches
+In-Reply-To: <20150601183447.GF26081@saruman.tx.rr.com>
+References: <1433088626-8858-1-git-send-email-hdegoede@redhat.com>
+ <79fc4306-a621-43b8-b347-e42a27beb134@googlegroups.com>
+ <20150601183447.GF26081@saruman.tx.rr.com>
+Message-ID: <556D57BD.90502@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 2, 2015 at 3:34 AM, Simon Horman <horms+renesas@verge.net.au> wrote:
-> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+Hi,
 
-Acked-by: Geert Uytterhoeven <geert+renesas@glider.be>
+On 01-06-15 20:34, Felipe Balbi wrote:
+> On Mon, Jun 01, 2015 at 11:30:45AM -0700, Hans de Goede wrote:
+>> Hi,
+>>
+>> On Sunday, May 31, 2015 at 6:10:32 PM UTC+2, Hans de Goede wrote:
+>>>
+>>> Hi Kishon & Felipe,
+>>>
+>>> Here is an updated version of the remaining (not yet merged in Felipe's
+>>> tree)
+>>> sunxi musb patches.
+>>>
+>>> The "phy-sun4i-usb: Add full support for usb0 phy / OTG" patch has been
+>>> updated with a small bug-fix and is ready for merging.
+>>>
+>>> The "musb: Add support for the Allwinner sunxi musb" patch has been
+>>> updated
+>>> to use the latest version of Maxime's sunxi sram controller driver. This
+>>> one has a compile-time dependency on Maxime's sunxi sram controller
+>>> driver,
+>>> so it cannot be merged until that is merged.
+>>>
+>>
+>>
+>> Arnd has just merged the updated sram controller into the next branch
+>> of the soc-drivers repo, so both these patches are now ready to merge.
+>
+> all right, so for v4.3 merge window there will be no issues in queues
+> the two remaining patches. Thanks
 
-Gr{oetje,eeting}s,
+So I take it that it is too late to get these 2 into 4.2 ? I've a bunch
+of (small) follow up patches coming up to enable support for the musb
+controller on new boards, merging those would be easier if these were
+already merged. And there also is a largish set of sunxi dts patches
+actually enabling the musb code which is sorta waiting for merging
+these 2 (waiting for the dt binding to be stable).
 
-                        Geert
+If this is not going to make 4.2, can you and Kishon at least review
+them and let me know of they will get merged for 4.3 as is (baring
+any merge issues) ?
 
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+Regards,
 
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+Hans
