@@ -1,60 +1,42 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Tue, 2 Jun 2015 18:16:45 +0100
-Subject: [PATCH for-v4.2 1/4] of/fdt: split off FDT self reservation from
- memreserve processing
-In-Reply-To: <CAKv+Gu8W2w3jCc2iLn0S90qaOJkfMPTZFR7U5E2Ovw1f-iwLfQ@mail.gmail.com>
-References: <1433158834-25238-1-git-send-email-ard.biesheuvel@linaro.org>
- <1433158834-25238-2-git-send-email-ard.biesheuvel@linaro.org>
- <20150601173330.GE14192@e104818-lin.cambridge.arm.com>
- <CAKv+Gu8W2w3jCc2iLn0S90qaOJkfMPTZFR7U5E2Ovw1f-iwLfQ@mail.gmail.com>
-Message-ID: <20150602171644.GD3080@e104818-lin.cambridge.arm.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Tue,  2 Jun 2015 10:22:15 -0700
+Subject: [GIT PULL 1/3] omap device tree changes for v4.2, part 2
+Message-ID: <pull-1433265658-688305>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 01, 2015 at 09:36:28PM +0200, Ard Biesheuvel wrote:
-> On 1 June 2015 at 19:33, Catalin Marinas <catalin.marinas@arm.com> wrote:
-> > On Mon, Jun 01, 2015 at 01:40:31PM +0200, Ard Biesheuvel wrote:
-> >> This splits off the reservation of the memory occupied by the FDT
-> >> binary itself from the processing of the memory reservations it
-> >> contains. This is necessary because the physical address of the FDT,
-> >> which is needed to perform the reservation, may not be known to the
-> >> FDT driver core, i.e., it may be mapped outside the linear direct
-> >> mapping, in which case __pa() returns a bogus value.
-> >>
-> >> Cc: Russell King <linux@arm.linux.org.uk>
-> >> Cc: Benjamin Herrenschmidt <benh@kernel.crashing.org>
-> >> Cc: Paul Mackerras <paulus@samba.org>
-> >> Acked-by: Rob Herring <robh@kernel.org>
-> >> Acked-by: Mark Rutland <mark.rutland@arm.com>
-> >> Acked-by: Catalin Marinas <catalin.marinas@arm.com>
-> >> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-> >> ---
-> >>  arch/arm/mm/init.c         |  1 +
-> >>  arch/arm64/mm/init.c       |  1 +
-> >>  arch/powerpc/kernel/prom.c |  1 +
-> >>  drivers/of/fdt.c           | 19 ++++++++++++++-----
-> >>  include/linux/of_fdt.h     |  2 ++
-> >>  5 files changed, 19 insertions(+), 5 deletions(-)
-> >
-> > I'm happy to take this patch (already acked by the DT maintainers)
-> > through the arm64 tree but it would be good to have an ack from the arch
-> > maintainers as well (i.e. Russell, Ben, Paul).
-> 
-> OK, fair enough,
-> 
-> @Ben, Paul
-> @Russell
-> 
-> Could you please indicate whether or not you have any objections to this patch?
+The following changes since commit 52dfcbfc94833b0192d439127ee9ff46023cdbb2:
 
-I'm going to push this patch into -next via the arm64 tree. If there are
-objections before the merging window, please let me know (looking at the
-previous commits adding early_init_fdt_scan_reserved_mem(), they were
-only acked by the DT maintainers).
+  ARM: dts: am335x-evm: add mmc3 and wlan definitions to dts (2015-05-21 12:05:59 -0700)
 
-I merged this series of 4 patches.
+are available in the git repository at:
 
-Thanks.
+  git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v4.2/dt-pt2
 
--- 
-Catalin
+for you to fetch changes up to 8584d4fcab2222e2501e1c95b4d063cd4a76891d:
+
+  ARM: dts: am335x-sl50: Add Toby-Churchill SL50 board support. (2015-05-28 09:49:50 -0700)
+
+----------------------------------------------------------------
+Few more omap device tree changes for v4.2 merge window:
+
+- Add dm9000 Ethernet support to omap3-devkit8000
+
+- Add Toby-Churchill SL50 board support
+
+- Add vendor prefix for Toby Churchill Ltd
+
+----------------------------------------------------------------
+Anthoine Bourgeois (1):
+      ARM: dts: omap3-devkit8000: Add dm9000 support
+
+Enric Balletbo i Serra (2):
+      of: Add vendor prefix for Toby Churchill Ltd.
+      ARM: dts: am335x-sl50: Add Toby-Churchill SL50 board support.
+
+ .../devicetree/bindings/vendor-prefixes.txt        |   1 +
+ arch/arm/boot/dts/Makefile                         |   1 +
+ arch/arm/boot/dts/am335x-sl50.dts                  | 482 +++++++++++++++++++++
+ arch/arm/boot/dts/omap3-devkit8000.dts             |  41 ++
+ 4 files changed, 525 insertions(+)
+ create mode 100644 arch/arm/boot/dts/am335x-sl50.dts
