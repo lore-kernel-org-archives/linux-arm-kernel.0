@@ -1,61 +1,68 @@
 From: cyrille.pitchen@atmel.com (Cyrille Pitchen)
-Date: Tue, 2 Jun 2015 15:18:30 +0200
-Subject: [PATCH v3 0/6] i2c: at91: add support to FIFOs and alternative command
-Message-ID: <cover.1433250713.git.cyrille.pitchen@atmel.com>
+Date: Tue, 2 Jun 2015 15:18:31 +0200
+Subject: [PATCH v3 1/6] i2c: at91: use BIT() macro to define register bits
+In-Reply-To: <cover.1433250713.git.cyrille.pitchen@atmel.com>
+References: <cover.1433250713.git.cyrille.pitchen@atmel.com>
+Message-ID: <9eee076e269551ab177de5e278f2c0d84bc38670.1433250713.git.cyrille.pitchen@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-ChangeLog
+This patch just fixes typo before applying later patches which will use
+register bits with index above 16.
 
-v3:
-- fix braces {} coding style issue
-- split the alternative command patch into 2 patches: the first one fixes
-  a race condition whereas the second one is the actual alternative command
-  patch
+Signed-off-by: Cyrille Pitchen <cyrille.pitchen@atmel.com>
+---
+ drivers/i2c/busses/i2c-at91.c | 29 +++++++++++++++--------------
+ 1 file changed, 15 insertions(+), 14 deletions(-)
 
-v2:
-- fix typo in comment for AT91_TWI_SVEN.
-- document new device tree bindings like "atmel,fifo-size".
-- explicitly set the has_alt_cmd boolean to false to already existing chip
-  configs.
-- use the BIT() macro to define the register bits and do a little cleanup in a
-  dedicated patch.
-- reword some comments to better explain why the TXCOMP interrupt is no longer
-  enabled in at91_do_twi_transfer() but later in
-  at91_twi_write_data_dma_callback() to avoid a race condition when DMA is used.
-- remove useless TXCOMP interrupt enable line in at91_twi_write_next_byte()
-  since this interrupt is also enabled by at91_do_twi_transfer() for PIO
-  transfers.
-
-v1:
-This series of patches adds support of two new features which will be
-introduced with Atmel sama5d2x SoC.
-
-First, the alternative command mode eases the sending of STOP conditions.
-Before starting an I2C transaction, the size data to be transfered is
-written into the new Alternative Command Register. For each byte transferred,
-the I2C controller decreases this counter and automatically sends a STOP
-condition when the counter value reaches 0, that is to say when the last byte
-of the transaction has been sent/received. So there is no longer need to set
-the STOP bit into the Control Register.
-
-Then the use of FIFOs allows to reduce number I/O accesses: for instance,
-the TX FIFO allows to write up to 4 data in a single access to the Transmit
-Holding Register. Also the RX FIFO allows to read up to 4 data in a single
-access to the Receive Holding Register. Currently only DMA transfers take
-advantage of FIFOs.
-
-Cyrille Pitchen (6):
-  i2c: at91: use BIT() macro to define register bits
-  i2c: at91: update documentation for DT bindings
-  i2c: at91: fix a race condition when using the DMA controller
-  i2c: at91: add support for new alternative command mode
-  i2c: at91: print hardware version
-  i2c: at91: add support to FIFOs
-
- Documentation/devicetree/bindings/i2c/i2c-at91.txt |  29 +-
- drivers/i2c/busses/i2c-at91.c                      | 354 +++++++++++++++++----
- 2 files changed, 321 insertions(+), 62 deletions(-)
-
+diff --git a/drivers/i2c/busses/i2c-at91.c b/drivers/i2c/busses/i2c-at91.c
+index ff23d1b..6344942 100644
+--- a/drivers/i2c/busses/i2c-at91.c
++++ b/drivers/i2c/busses/i2c-at91.c
+@@ -41,29 +41,30 @@
+ 
+ /* AT91 TWI register definitions */
+ #define	AT91_TWI_CR		0x0000	/* Control Register */
+-#define	AT91_TWI_START		0x0001	/* Send a Start Condition */
+-#define	AT91_TWI_STOP		0x0002	/* Send a Stop Condition */
+-#define	AT91_TWI_MSEN		0x0004	/* Master Transfer Enable */
+-#define	AT91_TWI_SVDIS		0x0020	/* Slave Transfer Disable */
+-#define	AT91_TWI_QUICK		0x0040	/* SMBus quick command */
+-#define	AT91_TWI_SWRST		0x0080	/* Software Reset */
++#define	AT91_TWI_START		BIT(0)	/* Send a Start Condition */
++#define	AT91_TWI_STOP		BIT(1)	/* Send a Stop Condition */
++#define	AT91_TWI_MSEN		BIT(2)	/* Master Transfer Enable */
++#define	AT91_TWI_MSDIS		BIT(3)	/* Master Transfer Disable */
++#define	AT91_TWI_SVEN		BIT(4)	/* Slave Transfer Enable */
++#define	AT91_TWI_SVDIS		BIT(5)	/* Slave Transfer Disable */
++#define	AT91_TWI_QUICK		BIT(6)	/* SMBus quick command */
++#define	AT91_TWI_SWRST		BIT(7)	/* Software Reset */
+ 
+ #define	AT91_TWI_MMR		0x0004	/* Master Mode Register */
+ #define	AT91_TWI_IADRSZ_1	0x0100	/* Internal Device Address Size */
+-#define	AT91_TWI_MREAD		0x1000	/* Master Read Direction */
++#define	AT91_TWI_MREAD		BIT(12)	/* Master Read Direction */
+ 
+ #define	AT91_TWI_IADR		0x000c	/* Internal Address Register */
+ 
+ #define	AT91_TWI_CWGR		0x0010	/* Clock Waveform Generator Reg */
+ 
+ #define	AT91_TWI_SR		0x0020	/* Status Register */
+-#define	AT91_TWI_TXCOMP		0x0001	/* Transmission Complete */
+-#define	AT91_TWI_RXRDY		0x0002	/* Receive Holding Register Ready */
+-#define	AT91_TWI_TXRDY		0x0004	/* Transmit Holding Register Ready */
+-
+-#define	AT91_TWI_OVRE		0x0040	/* Overrun Error */
+-#define	AT91_TWI_UNRE		0x0080	/* Underrun Error */
+-#define	AT91_TWI_NACK		0x0100	/* Not Acknowledged */
++#define	AT91_TWI_TXCOMP		BIT(0)	/* Transmission Complete */
++#define	AT91_TWI_RXRDY		BIT(1)	/* Receive Holding Register Ready */
++#define	AT91_TWI_TXRDY		BIT(2)	/* Transmit Holding Register Ready */
++#define	AT91_TWI_OVRE		BIT(6)	/* Overrun Error */
++#define	AT91_TWI_UNRE		BIT(7)	/* Underrun Error */
++#define	AT91_TWI_NACK		BIT(8)	/* Not Acknowledged */
+ 
+ #define	AT91_TWI_IER		0x0024	/* Interrupt Enable Register */
+ #define	AT91_TWI_IDR		0x0028	/* Interrupt Disable Register */
 -- 
 1.8.2.2
