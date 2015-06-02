@@ -1,74 +1,60 @@
 From: aleksey.makarov@caviumnetworks.com (Aleksey Makarov)
-Date: Tue, 2 Jun 2015 11:00:24 -0700
-Subject: [PATCH 07/10] net: thunderx: fix nicvf_set_rxfh()
+Date: Tue, 2 Jun 2015 11:00:26 -0700
+Subject: [PATCH 09/10] net: thunderx: check if memory allocation was successful
 In-Reply-To: <1433268028-23992-1-git-send-email-aleksey.makarov@caviumnetworks.com>
 References: <1433268028-23992-1-git-send-email-aleksey.makarov@caviumnetworks.com>
-Message-ID: <1433268028-23992-8-git-send-email-aleksey.makarov@caviumnetworks.com>
+Message-ID: <1433268028-23992-10-git-send-email-aleksey.makarov@caviumnetworks.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This fixes a copypaste bug that was discovered by a static analysis
-tool:
+This fixes a coccinelle warning:
 
-The patch 4863dea3fab0: "net: Adding support for Cavium ThunderX
-network controller" from May 26, 2015, leads to the following static
-checker warning:
+coccinelle warnings: (new ones prefixed by >>)
 
-        drivers/net/ethernet/cavium/thunder/nicvf_ethtool.c:517
-nicvf_set_rxfh()
-        warn: we tested 'hkey' before and it was 'false'
+>> drivers/net/ethernet/cavium/thunder/nicvf_queues.c:360:1-11: alloc
+>> with no test, possible model on line 367
 
-drivers/net/ethernet/cavium/thunder/nicvf_ethtool.c
-   506          /* We do not allow change in unsupported parameters */
-   507          if (hkey ||
-                    ^^^^
-We return here.
+vim +360 drivers/net/ethernet/cavium/thunder/nicvf_queues.c
 
-   508              (hfunc != ETH_RSS_HASH_NO_CHANGE && hfunc !=
-ETH_RSS_HASH_TOP))
-   509                  return -EOPNOTSUPP;
-   510
-   511          rss->enable = true;
-   512          if (indir) {
-   513                  for (idx = 0; idx < rss->rss_size; idx++)
-   514                          rss->ind_tbl[idx] = indir[idx];
-   515          }
-   516
-   517          if (hkey) {
-                    ^^^^
-So this is dead code.
+   354		err = nicvf_alloc_q_desc_mem(nic, &sq->dmem, q_len,
+SND_QUEUE_DESC_SIZE,
+   355					     NICVF_SQ_BASE_ALIGN_BYTES);
+   356		if (err)
+   357			return err;
+   358
+   359		sq->desc = sq->dmem.base;
+ > 360		sq->skbuff = kcalloc(q_len, sizeof(u64), GFP_ATOMIC);
+   361		sq->head = 0;
+   362		sq->tail = 0;
+   363		atomic_set(&sq->free_cnt, q_len - 1);
+   364		sq->thresh = SND_QUEUE_THRESH;
+   365
+   366		/* Preallocate memory for TSO segment's header */
+ > 367		sq->tso_hdrs = dma_alloc_coherent(&nic->pdev->dev,
+   368						  q_len *
+TSO_HEADER_SIZE,
+   369						  &sq->tso_hdrs_phys,
+GFP_KERNEL);
+   370		if (!sq->tso_hdrs)
 
-   518                  memcpy(rss->key, hkey, RSS_HASH_KEY_SIZE *
-sizeof(u64));
-   519                  nicvf_set_rss_key(nic);
-   520          }
-   521
-   522          nicvf_config_rss(nic);
-   523          return 0;
-   524  }
-
-regards,
-dan carpenter
-
-Reported-by: Dan Carpenter <dan.carpenter@oracle.com>
+Reported-by: kbuild test robot <fengguang.wu@intel.com>
 Signed-off-by: Aleksey Makarov <aleksey.makarov@caviumnetworks.com>
 ---
- drivers/net/ethernet/cavium/thunder/nicvf_ethtool.c | 3 +--
- 1 file changed, 1 insertion(+), 2 deletions(-)
+ drivers/net/ethernet/cavium/thunder/nicvf_queues.c | 2 ++
+ 1 file changed, 2 insertions(+)
 
-diff --git a/drivers/net/ethernet/cavium/thunder/nicvf_ethtool.c b/drivers/net/ethernet/cavium/thunder/nicvf_ethtool.c
-index 0fc4a53..16bd2d7 100644
---- a/drivers/net/ethernet/cavium/thunder/nicvf_ethtool.c
-+++ b/drivers/net/ethernet/cavium/thunder/nicvf_ethtool.c
-@@ -504,8 +504,7 @@ static int nicvf_set_rxfh(struct net_device *dev, const u32 *indir,
- 	}
+diff --git a/drivers/net/ethernet/cavium/thunder/nicvf_queues.c b/drivers/net/ethernet/cavium/thunder/nicvf_queues.c
+index 8929029..2ed7d1b 100644
+--- a/drivers/net/ethernet/cavium/thunder/nicvf_queues.c
++++ b/drivers/net/ethernet/cavium/thunder/nicvf_queues.c
+@@ -357,6 +357,8 @@ static int nicvf_init_snd_queue(struct nicvf *nic,
  
- 	/* We do not allow change in unsupported parameters */
--	if (hkey ||
--	    (hfunc != ETH_RSS_HASH_NO_CHANGE && hfunc != ETH_RSS_HASH_TOP))
-+	if (hfunc != ETH_RSS_HASH_NO_CHANGE && hfunc != ETH_RSS_HASH_TOP)
- 		return -EOPNOTSUPP;
- 
- 	rss->enable = true;
+ 	sq->desc = sq->dmem.base;
+ 	sq->skbuff = kcalloc(q_len, sizeof(u64), GFP_ATOMIC);
++	if (!sq->skbuff)
++		return -ENOMEM;
+ 	sq->head = 0;
+ 	sq->tail = 0;
+ 	atomic_set(&sq->free_cnt, q_len - 1);
 -- 
 2.4.1
