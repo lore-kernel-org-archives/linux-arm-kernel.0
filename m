@@ -1,59 +1,79 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Tue, 2 Jun 2015 17:22:26 +0200
-Subject: [PATCH v4 1/2] phy-sun4i-usb: Add full support for usb0 phy / OTG
-In-Reply-To: <556C25B7.80708@redhat.com>
-References: <1433088626-8858-1-git-send-email-hdegoede@redhat.com>
- <1433088626-8858-2-git-send-email-hdegoede@redhat.com>
- <20150601092249.GF17267@lukather> <556C25B7.80708@redhat.com>
-Message-ID: <20150602152226.GB23777@lukather>
+From: ludovic.desroches@atmel.com (Ludovic Desroches)
+Date: Tue, 2 Jun 2015 17:26:47 +0200
+Subject: [PATCH v3 0/6] i2c: at91: add support to FIFOs and alternative
+ command
+In-Reply-To: <cover.1433250713.git.cyrille.pitchen@atmel.com>
+References: <cover.1433250713.git.cyrille.pitchen@atmel.com>
+Message-ID: <20150602152647.GA2806@odux.rfo.atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Cyrille,
 
-On Mon, Jun 01, 2015 at 11:28:23AM +0200, Hans de Goede wrote:
-> On 01-06-15 11:22, Maxime Ripard wrote:
-> >On Sun, May 31, 2015 at 06:10:25PM +0200, Hans de Goede wrote:
-> >>+	/* We either want both gpio pins or neither (when in host mode) */
-> >>+	if (!data->id_det_gpio != !data->vbus_det_gpio) {
-> >>+		dev_err(dev, "failed to get id or vbus detect pin\n");
-> >>+		return -ENODEV;
-> >>+	}
-> >
-> >The fact that the driver expects both to be set if one is should be in
-> >the binding documentation.
+For the whole serie:
+Acked-by: Ludovic Desroches <ludovic.desroches@atmel.com>
+
+If you send a new version, could you add stable in Cc to patch 3/6:
+Cc: stable at vger.kernel.org #3.10 and later
+If not, Wolfram could you do it please?
+
+Thanks
+
+Ludovic
+
+On Tue, Jun 02, 2015 at 03:18:30PM +0200, Cyrille Pitchen wrote:
+> ChangeLog
 > 
-> That would be behavior description, and I've always been told that the
-> binding should only document the hardware description, not the behavior.
-
-Yes, that's true, but here it looks more like there's no point of
-having one without the other.
-
-Pretty much like interrupt-parent and interrupt. A single one doesn't
-really make much sense without the other.
-
-And I don't think saying that you would need some additional
-properties when in device mode rather than in host mode is really
-documenting a behaviour. It does change things at a hardware level
-too.
-
-> Also this may change in the future as we add support for more boards,
-> e.g. the cubieboard seems to be unable to turn vbus off ever, so vbus-det
-> will always read as 1 / high, making it rather useless. This is something
-> which I still need to figure out how to deal with.
-
-We can always figure it out in due time.
-
-Maxime
-
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150602/dde4cac1/attachment.sig>
+> v3:
+> - fix braces {} coding style issue
+> - split the alternative command patch into 2 patches: the first one fixes
+>   a race condition whereas the second one is the actual alternative command
+>   patch
+> 
+> v2:
+> - fix typo in comment for AT91_TWI_SVEN.
+> - document new device tree bindings like "atmel,fifo-size".
+> - explicitly set the has_alt_cmd boolean to false to already existing chip
+>   configs.
+> - use the BIT() macro to define the register bits and do a little cleanup in a
+>   dedicated patch.
+> - reword some comments to better explain why the TXCOMP interrupt is no longer
+>   enabled in at91_do_twi_transfer() but later in
+>   at91_twi_write_data_dma_callback() to avoid a race condition when DMA is used.
+> - remove useless TXCOMP interrupt enable line in at91_twi_write_next_byte()
+>   since this interrupt is also enabled by at91_do_twi_transfer() for PIO
+>   transfers.
+> 
+> v1:
+> This series of patches adds support of two new features which will be
+> introduced with Atmel sama5d2x SoC.
+> 
+> First, the alternative command mode eases the sending of STOP conditions.
+> Before starting an I2C transaction, the size data to be transfered is
+> written into the new Alternative Command Register. For each byte transferred,
+> the I2C controller decreases this counter and automatically sends a STOP
+> condition when the counter value reaches 0, that is to say when the last byte
+> of the transaction has been sent/received. So there is no longer need to set
+> the STOP bit into the Control Register.
+> 
+> Then the use of FIFOs allows to reduce number I/O accesses: for instance,
+> the TX FIFO allows to write up to 4 data in a single access to the Transmit
+> Holding Register. Also the RX FIFO allows to read up to 4 data in a single
+> access to the Receive Holding Register. Currently only DMA transfers take
+> advantage of FIFOs.
+> 
+> Cyrille Pitchen (6):
+>   i2c: at91: use BIT() macro to define register bits
+>   i2c: at91: update documentation for DT bindings
+>   i2c: at91: fix a race condition when using the DMA controller
+>   i2c: at91: add support for new alternative command mode
+>   i2c: at91: print hardware version
+>   i2c: at91: add support to FIFOs
+> 
+>  Documentation/devicetree/bindings/i2c/i2c-at91.txt |  29 +-
+>  drivers/i2c/busses/i2c-at91.c                      | 354 +++++++++++++++++----
+>  2 files changed, 321 insertions(+), 62 deletions(-)
+> 
+> -- 
+> 1.8.2.2
+> 
