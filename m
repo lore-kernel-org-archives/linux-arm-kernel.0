@@ -1,21 +1,48 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Tue, 2 Jun 2015 23:36:58 +0200
-Subject: [PATCH v2] ARM: dts: sun8i: Add dts file for the GA10H-A33 tablet
-In-Reply-To: <1433275682-10886-1-git-send-email-hdegoede@redhat.com>
-References: <1433275682-10886-1-git-send-email-hdegoede@redhat.com>
-Message-ID: <20150602213658.GE23777@lukather>
+Date: Tue, 2 Jun 2015 23:49:46 +0200
+Subject: [PATCH] ARM: dts: sun6i: Add a dts file for the Mele A1000G quad
+ top set box
+In-Reply-To: <556DF6DB.8040601@redhat.com>
+References: <1433170979-13725-1-git-send-email-hdegoede@redhat.com>
+ <20150602155816.GC23777@lukather> <556DF6DB.8040601@redhat.com>
+Message-ID: <20150602214946.GF23777@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 02, 2015 at 10:08:01PM +0200, Hans de Goede wrote:
-> Hi Maxime,
+On Tue, Jun 02, 2015 at 08:32:59PM +0200, Hans de Goede wrote:
+> Hi,
 > 
-> I forgot to test and update the tabletkeys setting, even though that was
-> the whole reason for not sending this file before.
+> On 06/02/2015 05:58 PM, Maxime Ripard wrote:
+> >On Mon, Jun 01, 2015 at 05:02:59PM +0200, Hans de Goede wrote:
+> >>The Mele A1000G-quad and the Mele M9 have the same PCB, sofar we've been using
+> >>the same dts for both models. Unfortunately this does not work for the otg
+> >>controller, on the M9 this is routed to a micro-usb connector on the outside,
+> >>while as on the A1000G-quad it is connected to an usb to sata bridge
+> >>(which is not populated on the M9 pcb).
+> >>
+> >>This commit adds a new dts for the Mele-A1000G-quad to allow using
+> >>different otg controller settings on the 2 boards.
+> >>
+> >>Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+> >>---
+> >>  arch/arm/boot/dts/Makefile                                        | 1 +
+> >>  arch/arm/boot/dts/{sun6i-a31-m9.dts => sun6i-a31-a1000g-quad.dts} | 4 ++--
+> >
+> >Didn't we say that we were trying to set the vendor name in the DTs
+> >now, at least for the new ones?
 > 
-> This v2 has a fixed tabletkeys section.
+> I think we said that Paul would write a proposal to standardize
+> naming for future boards, but that never materialized.
+> 
+> >I can fix this and apply it if it's ok for you.
+> 
+> I'm fine with throwing -mele- in there, or not, what ever you
+> prefer.
 
-Applied, thanks!
+Ok, applied and fixed the name.
+
+This is probably going to be the last patch pulled for 4.2, unless
+something important shows up in the next few days.
 
 Maxime
 
@@ -29,4 +56,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 819 bytes
 Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150602/9a3fa4ea/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150602/8cf8a62b/attachment.sig>
