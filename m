@@ -1,64 +1,90 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Tue,  2 Jun 2015 10:22:17 -0700
-Subject: [GIT PULL 3/3] omap soc changes for v4.2
-In-Reply-To: <pull-1433265658-688305>
-References: <pull-1433265658-688305>
-Message-ID: <pull-1433265658-688305-3>
+From: gregory.0xf0@gmail.com (Gregory Fong)
+Date: Tue, 2 Jun 2015 10:27:16 -0700
+Subject: [PATCH v2 4/6] gpio: brcmstb: Allow GPIOs to be wakeup sources
+In-Reply-To: <20150530004343.GX27753@ld-irv-0074>
+References: <1432865650-4062-1-git-send-email-gregory.0xf0@gmail.com>
+ <1432865650-4062-5-git-send-email-gregory.0xf0@gmail.com>
+ <20150530004343.GX27753@ld-irv-0074>
+Message-ID: <CADtm3G6fd3=xPL-LSMCahoR2X+R60ryPrnVVy589MO3vyfj9VA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit e26081808edadfd257c6c9d81014e3b25e9a6118:
+On Fri, May 29, 2015 at 5:43 PM, Brian Norris
+<computersforpeace@gmail.com> wrote:
+> On Thu, May 28, 2015 at 07:14:08PM -0700, Gregory Fong wrote:
+>> Several drivers (e.g. gpio-keys) allow for GPIOs to be configured as
+>> wakeup sources, and this GPIO controller supports that through a
+>> separate interrupt path.
+>>
+>> The de-facto standard DT property "wakeup-source" is checked, since
+>> that indicates whether the GPIO controller hardware can wake.  Uses
+>> the IRQCHIP_MASK_ON_SUSPEND irq_chip flag because UPG GIO doesn't have
+>> any of its own wakeup source configuration.
+>>
+>> Signed-off-by: Gregory Fong <gregory.0xf0@gmail.com>
+>> ---
+>> New in v2.
+>>
+>>  drivers/gpio/gpio-brcmstb.c | 53 +++++++++++++++++++++++++++++++++++++++++++++
+>>  1 file changed, 53 insertions(+)
+>>
+>> diff --git a/drivers/gpio/gpio-brcmstb.c b/drivers/gpio/gpio-brcmstb.c
+>> index b9962ff..2598c1e 100644
+>> --- a/drivers/gpio/gpio-brcmstb.c
+>> +++ b/drivers/gpio/gpio-brcmstb.c
+>> [...]
+>> @@ -369,6 +396,32 @@ static int brcmstb_gpio_irq_setup(struct platform_device *pdev,
+>>       priv->irq_chip.irq_mask = brcmstb_gpio_irq_mask;
+>>       priv->irq_chip.irq_unmask = brcmstb_gpio_irq_unmask;
+>>       priv->irq_chip.irq_set_type = brcmstb_gpio_irq_set_type;
+>> +
+>> +     /* Ensures that all non-wakeup IRQs are disabled at suspend */
+>> +     priv->irq_chip.flags = IRQCHIP_MASK_ON_SUSPEND;
+>> +
+>> +     if (IS_ENABLED(CONFIG_PM_SLEEP) &&
+>> +                     of_get_property(np, "wakeup-source", NULL)) {
+>
+> of_property_read_bool()?
 
-  Linux 4.1-rc4 (2015-05-18 10:13:47 -0700)
+Will change.
 
-are available in the git repository at:
+>
+>> +             priv->parent_wake_irq = platform_get_irq(pdev, 1);
+>> +             if (priv->parent_wake_irq < 0)  {
+>> +                     dev_warn(dev,
+>> +                             "Couldn't get wake IRQ - GPIOs will not be able to wake from sleep");
+>> +             } else {
+>> +                     int err = devm_request_irq(dev, priv->parent_wake_irq,
+>> +                                     brcmstb_gpio_wake_irq_handler, 0,
+>> +                                     "brcmstb-gpio-wake", priv);
+>> +
+>> +                     if (err < 0) {
+>> +                             dev_err(dev, "Couldn't request wake IRQ");
+>> +                             return err;
+>> +                     }
+>> +
+>> +                     device_set_wakeup_capable(dev, true);
+>> +                     device_wakeup_enable(dev);
+>
+> Might want to move these two lines above the devm_request_irq(), so that
+> you're ready to record PM events immediately at probe time. This is
+> important when waking from S5 states, where we sometimes want to be able
+> to check the /sys/devices/.../wakeup_count stats to see what woke us up.
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v4.2/soc-pt1-take2
+Makes sense.  We'll also need a reboot notifier for S5 to work.
 
-for you to fetch changes up to 436bbc12452c23b9e7385f3fcabc82fdd387a55a:
+>
+>> +                     priv->irq_chip.irq_set_wake = brcmstb_gpio_irq_set_wake;
+>> +             }
+>> +     }
+>> +
+>>       priv->irq_domain =
+>>               irq_domain_add_linear(np, priv->num_gpios,
+>>                                     &brcmstb_gpio_irq_domain_ops,
+>
+> With that:
+>
+> Reviewed-by: Brian Norris <computersforpeace@gmail.com>
 
-  Merge tag 'for-v4.2/omap-hwmod-a' of git://git.kernel.org/pub/scm/linux/kernel/git/pjw/omap-pending into omap-for-v4.2/soc (2015-06-02 07:42:43 -0700)
-
-----------------------------------------------------------------
-Omap hwmod changes for v4.2 via Paul Walmsley <paul@pwsan.com>:
-
-Several OMAP2+ hwmod changes for v4.2.  One patch cleans up a nasty
-interaction between the OMAP GPMC and the hwmod code when debugging is
-enabled.  IP block integration data has been added for the AM43xx EMIF
-RAM controller.  There's also a fix for the omap-aes driver when used in
-QEMU.  And finally, some changes to the OMAP3 hwmod code to support the
-use of the security IP blocks (AES and SHA) on GP devices, or when they've
-specifically been enabled in the DT data.
-
-Basic build, boot, and power management test results are here:
-
-http://www.pwsan.com/omap/testlogs/omap-hwmod-a-for-v4.2/20150601192349/
-
-----------------------------------------------------------------
-Dave Gerlach (1):
-      ARM: OMAP: AM43xx hwmod: Add data for am43xx emif hwmod
-
-Pali Roh?r (2):
-      ARM: OMAP2+: Return correct error values from device and hwmod
-      ARM: OMAP3: Fix crypto support for HS devices
-
-Tony Lindgren (2):
-      memory: omap-gpmc: Add Kconfig option for debug
-      Merge tag 'for-v4.2/omap-hwmod-a' of git://git.kernel.org/.../pjw/omap-pending into omap-for-v4.2/soc
-
- arch/arm/mach-omap2/omap_device.c                  |  30 +++---
- arch/arm/mach-omap2/omap_hwmod.c                   |  10 +-
- arch/arm/mach-omap2/omap_hwmod.h                   |   6 ++
- arch/arm/mach-omap2/omap_hwmod_2xxx_ipblock_data.c |  12 +--
- .../mach-omap2/omap_hwmod_33xx_43xx_common_data.h  |   1 +
- .../mach-omap2/omap_hwmod_33xx_43xx_ipblock_data.c |  16 ++-
- arch/arm/mach-omap2/omap_hwmod_33xx_data.c         |  13 ---
- arch/arm/mach-omap2/omap_hwmod_3xxx_data.c         | 119 +++++++++++++++++----
- arch/arm/mach-omap2/omap_hwmod_43xx_data.c         |  22 ++++
- arch/arm/mach-omap2/omap_hwmod_44xx_data.c         |  11 +-
- arch/arm/mach-omap2/omap_hwmod_7xx_data.c          |   4 +-
- arch/arm/mach-omap2/omap_hwmod_81xx_data.c         |   2 +
- arch/arm/mach-omap2/prcm43xx.h                     |   2 +
- drivers/memory/Kconfig                             |   8 ++
- drivers/memory/omap-gpmc.c                         |   6 +-
- 15 files changed, 184 insertions(+), 78 deletions(-)
+Thanks,
+Gregory
