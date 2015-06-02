@@ -1,73 +1,41 @@
-From: hdegoede@redhat.com (Hans de Goede)
-Date: Tue, 02 Jun 2015 10:08:39 +0200
-Subject: [PATCH v2 3/6] ARM: dts: sun8i: Add sun8i-a23-a33 dtsi
-In-Reply-To: <20150602075120.GL23777@lukather>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Tue, 2 Jun 2015 10:14:59 +0200
+Subject: [PATCH v2 6/6] ARM: sun8i: dts: Add Ippo-q8h v1.2 with A33 and
+ 1024x600 lcd support
+In-Reply-To: <1432997706-20172-7-git-send-email-hdegoede@redhat.com>
 References: <1432997706-20172-1-git-send-email-hdegoede@redhat.com>
- <1432997706-20172-4-git-send-email-hdegoede@redhat.com>
- <20150602075120.GL23777@lukather>
-Message-ID: <556D6487.4010207@redhat.com>
+ <1432997706-20172-7-git-send-email-hdegoede@redhat.com>
+Message-ID: <20150602081459.GO23777@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Sat, May 30, 2015 at 04:55:06PM +0200, Hans de Goede wrote:
+> The Ippo-q8h is a tablet circuit board commonly found in cheap Android
+> tablets. The v1.2 version can be used with either an A23 or A33 SoC.
+> 
+> This adds a dts file for the v1.2 board with an A33 SoC and a 1024x600
+> LCD screen (most of these tablets have a 800x480 screen).
 
-On 02-06-15 09:51, Maxime Ripard wrote:
-> On Sat, May 30, 2015 at 04:55:03PM +0200, Hans de Goede wrote:
->> From: Vishnu Patekar <vishnupatekar0510@gmail.com>
->>
->> Rename sun8i-a23.dtsi to sun8i-a23-a33.dtsi as the base dtsi for the A33
->> is 99% the same and add a new sun8i-a23.dtsi including sun8i-a23-a33.dtsi
->> and setting the few things not shared with the A33 (mbus-clk, pio
->> compatible and interrupts).
->>
->> Signed-off-by: Vishnu Patekar <vishnupatekar0510@gmail.com>
->> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
->
-> Fixed the conflicts and applied.
->
-> Also judging from a quick look at the datasheet, the A33 doesn't seem
-> to have that clock gates tree but rather one similar to the H3's. That
-> will probably mean we'll have to move out the gates from this DTSI at
-> some point.
+I think the difference between the resolution here is more of a case
+for the DT quirks interface:
+https://lkml.org/lkml/2015/2/18/258
 
-Heuh...
+Do you know if there's some way to autodetect the two board versions
+(like a board id somewhere in an EEPROM)?
 
-Ok so I've done a full bit for bit comparison of the 2 datasheets for
-the clk gates, mostly they are mostly the same and the registers seem to
-just be renamed.
+If not, then maybe u-boot can simply add that board compatible to the
+list, and we'll base our logic on that when we'll need it.
 
-The only differences are:
+Maxime
 
-01c200060 (AHB1 MODULE CLOCK GATING REGISTER 0 / Bus Clock Gating Register 0):
-
-Only A33 has bit 5 SS gating
-
-01c200064 (AHB1 MODULE CLOCK GATING REGISTER 1 / Bus Clock Gating Register 1):
-
-Only A33 has bit 26 SAT gating, note that if we add support for this we
-must add it as a needed clock to the simplefb node
-
-Only A33 has bit 21 MSGBOX_GATING
-
-01c200068 (APB1 MODULE CLOCK GATING REGISTER / Bus Clock Gating Register 2):
-
-No differences
-
-01c20006c (APB2 MODULE CLOCK GATING REGISTER / Bus Clock Gating Register 3):
-
-No differences
-
-
-So you are right that in the near future we should add a separate compatible
-+ clk driver or the ahb1_gates on the A33, but it does not seem that there is
-the issue of one gate register having multiple parents like on the H3. Or maybe
-the H3 does also not have that issue, and this is a misinterpretation of
-the H3 datasheet ?
-
-Note I do not know what the actual parent clock for the new gates is, but
-it stands to reason that it is AHB1, I've been unable to find anything to
-confirm or deny this.
-
-Regards,
-
-Hans
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150602/5112db89/attachment-0001.sig>
