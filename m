@@ -1,52 +1,69 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 2 Jun 2015 10:48:50 +0200
-Subject: [PATCH 00/21] On-demand device registration
-In-Reply-To: <1432565608-26036-1-git-send-email-tomeu.vizoso@collabora.com>
-References: <1432565608-26036-1-git-send-email-tomeu.vizoso@collabora.com>
-Message-ID: <CACRpkdasLwMfEHGMRd1X3K_DU7NMPreE8TMwqqDTg8k9wj=wJQ@mail.gmail.com>
+From: vaibhav.hiremath@linaro.org (Vaibhav Hiremath)
+Date: Tue, 02 Jun 2015 14:21:40 +0530
+Subject: [PATCH 2/4] mfd: 88pm800: use irq_mode to configure interrupt
+ status reg clear method
+In-Reply-To: <20150601083159.GD3329@x1>
+References: <1432937962-4537-1-git-send-email-vaibhav.hiremath@linaro.org>
+ <1432937962-4537-3-git-send-email-vaibhav.hiremath@linaro.org>
+ <20150601083159.GD3329@x1>
+Message-ID: <556D6E9C.4050402@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 25, 2015 at 4:53 PM, Tomeu Vizoso
-<tomeu.vizoso@collabora.com> wrote:
 
-> have looked into ordered probing as a
-> better way of solving this than moving nodes around in the DT or playing with
-> initcall levels.
+
+On Monday 01 June 2015 02:01 PM, Lee Jones wrote:
+> On Sat, 30 May 2015, Vaibhav Hiremath wrote:
 >
-> While reading the thread [1] that Alexander Holler started with his series to
-> make probing order deterministic, it occurred to me that it should be possible
-> to achieve the same by registering devices as they are referenced by other
-> devices.
+>>  From the spec, bit 1 of reg 0xe (page 0): IN_CLEAR_MODE controls the
+>> method of clearing interrupt status register of 88pm800;
+>>
+>>    0: clear on read
+>>    1: clear on write
+>>
+>> Signed-off-by: zhaoy <zhaoy@marvell.com>
+>
+> This signed-off is not acceptable.
+>
+> No nicknames.  Full names only.
+>
 
-This is pretty cool, but a too local solution to a global problem.
-
-Deferred probe and initcall reordering, silly as they may seem,
-does not require you to use device tree.
-
-The real solution, which I think I pointed out already when we
-added deferred probe, is to put dependency graphs in the drivers
-and have the kernel device driver core percolate dependecies by
-walking the graph on probing driver, removing driver (usually the
-inverse use case), [runtime] suspend and [runtime] resumeing
-a driver. Possibly the dependencies will even be different
-depending on use case.
-
-This is what systemd is doing in userspace for starting services:
-ask for your dependencies and wait for them if they are not
-there. So drivers ask for resources and wait for them. It also
-needs to be abstract, so for example we need to be able to
-hang on regulator_get() until the driver is up and providing that
-regulator, and as long as everything is in slowpath it should
-be OK. (And vice versa mutatis mutandis for clk, gpio, pin
-control, interrupts (!) and DMA channels for example.)
+I just carry forwarded the signoff from original commit.
+Let me find his complete signoff and add it to this patch.
 
 
-So if this should be solved it should be solved in an abstract way
-in the device driver core available for all, then have calls calling
-out to DT, ACPI, possibly even PCI or USB (as these
-enumerate devices themselves) to obtain a certain
-dependency.
+>> Signed-off-by: Vaibhav Hiremath <vaibhav.hiremath@linaro.org>
+>> ---
+>>   drivers/mfd/88pm800.c       | 4 +++-
+>>   include/linux/mfd/88pm80x.h | 2 ++
+>>   2 files changed, 5 insertions(+), 1 deletion(-)
+>>
+>> diff --git a/drivers/mfd/88pm800.c b/drivers/mfd/88pm800.c
+>> index 06ee058..8ea4467 100644
+>> --- a/drivers/mfd/88pm800.c
+>> +++ b/drivers/mfd/88pm800.c
+>> @@ -391,7 +391,8 @@ static int device_irq_init_800(struct pm80x_chip *chip)
+>>   	    PM800_WAKEUP2_INV_INT | PM800_WAKEUP2_INT_CLEAR |
+>>   	    PM800_WAKEUP2_INT_MASK;
+>>
+>> -	data = PM800_WAKEUP2_INT_CLEAR;
+>> +	data = (chip->irq_mode) ?
+>> +		PM800_WAKEUP2_INT_WRITE_CLEAR : PM800_WAKEUP2_INT_READ_CLEAR;
+>
+> These variable names are terrible.  'irq_mode' as a bool tells me
+> nothing.
+>
+> What does; irq_mode = 'yes' and irq_mode = 'no' mean?  If I didn't
+> read the remainder of the code, I would assume if it was 'yes' then
+> the device was in IRQ Mode and if not, it would be in PIO or Polling
+> mode, but that's not what it means at all is it?
+>
+> As for 'data', well, isn't everything data?
+>
 
-Yours,
-Linus Walleij
+
+I will rename it.
+
+
+Thanks,
+Vaibhav
