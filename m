@@ -1,171 +1,94 @@
-From: d.eppel@samsung.com (Damian Eppel)
-Date: Tue, 02 Jun 2015 13:11:45 +0200
-Subject: [PATCH v3] clocksource: exynos_mct: fix for sleeping in atomic ctx
- handling cpu hotplug notif.
-In-Reply-To: <1426151496-5509-1-git-send-email-d.eppel@samsung.com>
-References: <1426151496-5509-1-git-send-email-d.eppel@samsung.com>
-Message-ID: <1433243505-3236-1-git-send-email-d.eppel@samsung.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Tue, 2 Jun 2015 13:16:38 +0200
+Subject: [PATCH v2] arm: tcm: Don't crash when TCM banks are protected by
+ TrustZone
+In-Reply-To: <1432821287-31436-1-git-send-email-michael@smart-africa.com>
+References: <1432805760-4590-1-git-send-email-michael@smart-africa.com>
+ <1432821287-31436-1-git-send-email-michael@smart-africa.com>
+Message-ID: <CACRpkdY4sZQr+VzMKzU2Rtm7sP2zMztBioCPQRJjq=VjyapAEA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This is to fix an issue of sleeping in atomic context when processing
-hotplug notifications in Exynos MCT(Multi-Core Timer).
-The issue was reproducible on Exynos 3250 (Rinato board) and Exynos 5420
-(Arndale Octa board).
+On Thu, May 28, 2015 at 3:54 PM, Michael van der Westhuizen
+<michael@smart-africa.com> wrote:
 
-Whilst testing cpu hotplug events on kernel configured with DEBUG_PREEMPT
-and DEBUG_ATOMIC_SLEEP we get following BUG message, caused by calling
-request_irq() and free_irq() in the context of hotplug notification
-(which is in this case atomic context).
+> Fixes the TCM initialisation code to handle TCM banks that are
+> present but inaccessible due to TrustZone configuration.  This is
+> the default case when enabling the non-secure world.  It may also
+> be the case that that the user decided to use TCM for TrustZone.
+>
+> This change has exposed a bug in handling of TCM where no TCM bank
+> was usable (the 0 size TCM case).  This change addresses the
+> resulting hang.
+>
+> This code only handles the ARMv6 TCMTR register format, and will not
+> work correctly on boards that use the ARMv7 (or any other) format.
+> This is handled by performing an early exit from the initialisation
+> function when the TCMTR reports any format other than v6.
+>
+> Signed-off-by: Michael van der Westhuizen <michael@smart-africa.com>
+> Cc: Linus Walleij <linus.walleij@linaro.org>
+> Cc: Russell King <rmk+kernel@arm.linux.org.uk>
+> Cc: Dave Martin <Dave.Martin@arm.com>
+> ---
+>
+> Changes in v2:
+>   - Mark the TCM undefined hook data structure as __initdata, since
+>     that's what it is.
+>   - Ensure that we're dealing with an ARMv6 TCMTR format.
 
-root at target:~# echo 0 > /sys/devices/system/cpu/cpu1/online
+OK...
 
-[   25.157867] IRQ18 no longer affine to CPU1
-...
-[   25.158445] CPU1: shutdown
+> +#define TCMTR_FORMAT_MASK 0xe0000000U
+>
+>  static struct gen_pool *tcm_pool;
+>  static bool dtcm_present;
+> @@ -175,6 +178,21 @@ static int __init setup_tcm_bank(u8 type, u8 bank, u8 banks,
+>         return 0;
+>  }
+>
+> +static int __init tcm_handler(struct pt_regs *regs, unsigned int instr)
+> +{
+> +       regs->uregs[(instr >> 12) & 0xf] = 0;
+> +       regs->ARM_pc += 4;
+> +       return 0;
+> +}
 
-root at target:~# echo 1 > /sys/devices/system/cpu/cpu1/online
+Is the action here totally obvious to everyone except me?
+I guess it is masking off something and advancing past a
+failed instruction but whatdoIknow. Can you put in a small comment
+above the function or something?
 
-[   40.785859] CPU1: Software reset
-[   40.786660] BUG: sleeping function called from invalid context at mm/slub.c:1241
-[   40.786668] in_atomic(): 1, irqs_disabled(): 128, pid: 0, name: swapper/1
-[   40.786678] Preemption disabled at:[<  (null)>]   (null)
-[   40.786681]
-[   40.786692] CPU: 1 PID: 0 Comm: swapper/1 Not tainted 3.19.0-rc4-00024-g7dca860 #36
-[   40.786698] Hardware name: SAMSUNG EXYNOS (Flattened Device Tree)
-[   40.786728] [<c0014a00>] (unwind_backtrace) from [<c0011980>] (show_stack+0x10/0x14)
-[   40.786747] [<c0011980>] (show_stack) from [<c0449ba0>] (dump_stack+0x70/0xbc)
-[   40.786767] [<c0449ba0>] (dump_stack) from [<c00c6124>] (kmem_cache_alloc+0xd8/0x170)
-[   40.786785] [<c00c6124>] (kmem_cache_alloc) from [<c005d6f8>] (request_threaded_irq+0x64/0x128)
-[   40.786804] [<c005d6f8>] (request_threaded_irq) from [<c0350b8c>] (exynos4_local_timer_setup+0xc0/0x13c)
-[   40.786820] [<c0350b8c>] (exynos4_local_timer_setup) from [<c0350ca8>] (exynos4_mct_cpu_notify+0x30/0xa8)
-[   40.786838] [<c0350ca8>] (exynos4_mct_cpu_notify) from [<c003b330>] (notifier_call_chain+0x44/0x84)
-[   40.786857] [<c003b330>] (notifier_call_chain) from [<c0022fd4>] (__cpu_notify+0x28/0x44)
-[   40.786873] [<c0022fd4>] (__cpu_notify) from [<c0013714>] (secondary_start_kernel+0xec/0x150)
-[   40.786886] [<c0013714>] (secondary_start_kernel) from [<40008764>] (0x40008764)
+> +static struct undef_hook tcm_hook __initdata = {
+> +       .instr_mask     = 0xffff0fdf,
+> +       .instr_val      = 0xee190f11,
+> +       .cpsr_mask      = MODE_MASK,
+> +       .cpsr_val       = SVC_MODE,
+> +       .fn             = tcm_handler
+> +};
 
-Solution:
-Clockevent irqs cannot be requested/freed every time cpu is
-hot-plugged/unplugged as CPU_STARTING/CPU_DYING notifications
-that signals hotplug or unplug events are sent with both preemption
-and local interrupts disabled. Since request_irq() may sleep it is
-moved to the initialization stage and performed for all possible
-cpus prior putting them online. Then, in the case of hotplug event
-the irq asociated with the given cpu will simply be enabled.
-Similarly on cpu unplug event the interrupt is not freed but just
-disabled.
+Likewise here. Why not #define instruction 0xee190f11
+so it is a bit more readable? I guess this instruction will
+be trapped and handled by the hook but it'd be nice
+to know what instruction it is and how it comes to
+be issued.
 
-Note that after successful request_irq() call for a clockevent device
-associated to given cpu the requested irq is disabled (via disable_irq()).
-That is to make things symmetric as we expect hotplug event as a next
-thing (which will enable irq again). This should not pose any problems
-because at the time of requesting irq the clockevent device is not
-fully initialized yet, therefore should not produce interrupts at that point.
+> +               /* This means that the DTCM sizes were 0 or the DTCM banks
+> +                * were inaccessible due to TrustZone configuration */
 
-For disabling an irq at cpu unplug notification disable_irq_nosync() is
-chosen which is a non-blocking function. This again shouldn't be a problem as
-prior sending CPU_DYING notification interrupts are migrated away
-from the cpu.
+Nitpick:
 
-Fixes: 7114cd749a12 ("clocksource: exynos_mct: use (request/free)_irq calls for local timer registration")
-Signed-off-by: Damian Eppel <d.eppel@samsung.com>
-Cc: <stable@vger.kernel.org>
-Reported-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
-Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
-Tested-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
-(Tested on Arndale Octa Board)
-Tested-by: Marcin Jabrzyk <m.jabrzyk@samsung.com>
-(Tested on Rinato B2 (Exynos 3250) board)
----
+/*
+ * I prefer the comments like so: blank line after the
+ * first slash-star, and sole star-slash on the last line.
+ */
 
-Notes:
-    Changes since v1:
-    	o added Krzysztof's and Marcin's Reviewed-by / Tested-by
-    	  with information about the test HW.
-    
-    Changes since v2:
-    	o requesting mct_irq already in disabled state instead of
-    	  calling disable_irq() right after request_irq().
+> +               /* This means that the ITCM sizes were 0 or the ITCM banks
+> +                * were inaccessible due to TrustZone configuration */
 
- drivers/clocksource/exynos_mct.c | 43 ++++++++++++++++++++++++++++------------
- 1 file changed, 30 insertions(+), 13 deletions(-)
+Dito
 
-diff --git a/drivers/clocksource/exynos_mct.c b/drivers/clocksource/exynos_mct.c
-index 83564c9..c844616 100644
---- a/drivers/clocksource/exynos_mct.c
-+++ b/drivers/clocksource/exynos_mct.c
-@@ -466,15 +466,12 @@ static int exynos4_local_timer_setup(struct clock_event_device *evt)
- 	exynos4_mct_write(TICK_BASE_CNT, mevt->base + MCT_L_TCNTB_OFFSET);
- 
- 	if (mct_int_type == MCT_INT_SPI) {
--		evt->irq = mct_irqs[MCT_L0_IRQ + cpu];
--		if (request_irq(evt->irq, exynos4_mct_tick_isr,
--				IRQF_TIMER | IRQF_NOBALANCING,
--				evt->name, mevt)) {
--			pr_err("exynos-mct: cannot register IRQ %d\n",
--				evt->irq);
-+
-+		if (evt->irq == -1)
- 			return -EIO;
--		}
--		irq_force_affinity(mct_irqs[MCT_L0_IRQ + cpu], cpumask_of(cpu));
-+
-+		irq_force_affinity(evt->irq, cpumask_of(cpu));
-+		enable_irq(evt->irq);
- 	} else {
- 		enable_percpu_irq(mct_irqs[MCT_L0_IRQ], 0);
- 	}
-@@ -487,10 +484,12 @@ static int exynos4_local_timer_setup(struct clock_event_device *evt)
- static void exynos4_local_timer_stop(struct clock_event_device *evt)
- {
- 	evt->set_mode(CLOCK_EVT_MODE_UNUSED, evt);
--	if (mct_int_type == MCT_INT_SPI)
--		free_irq(evt->irq, this_cpu_ptr(&percpu_mct_tick));
--	else
-+	if (mct_int_type == MCT_INT_SPI) {
-+		if (evt->irq != -1)
-+			disable_irq_nosync(evt->irq);
-+	} else {
- 		disable_percpu_irq(mct_irqs[MCT_L0_IRQ]);
-+	}
- }
- 
- static int exynos4_mct_cpu_notify(struct notifier_block *self,
-@@ -522,7 +521,7 @@ static struct notifier_block exynos4_mct_cpu_nb = {
- 
- static void __init exynos4_timer_resources(struct device_node *np, void __iomem *base)
- {
--	int err;
-+	int err, cpu;
- 	struct mct_clock_event_device *mevt = this_cpu_ptr(&percpu_mct_tick);
- 	struct clk *mct_clk, *tick_clk;
- 
-@@ -549,7 +548,25 @@ static void __init exynos4_timer_resources(struct device_node *np, void __iomem
- 		WARN(err, "MCT: can't request IRQ %d (%d)\n",
- 		     mct_irqs[MCT_L0_IRQ], err);
- 	} else {
--		irq_set_affinity(mct_irqs[MCT_L0_IRQ], cpumask_of(0));
-+		for_each_possible_cpu(cpu) {
-+			int mct_irq = mct_irqs[MCT_L0_IRQ + cpu];
-+			struct mct_clock_event_device *pcpu_mevt =
-+				per_cpu_ptr(&percpu_mct_tick, cpu);
-+
-+			pcpu_mevt->evt.irq = -1;
-+
-+			irq_set_status_flags(mct_irq, IRQ_NOAUTOEN);
-+			if (request_irq(mct_irq,
-+					exynos4_mct_tick_isr,
-+					IRQF_TIMER | IRQF_NOBALANCING,
-+					pcpu_mevt->name, pcpu_mevt)) {
-+				pr_err("exynos-mct: cannot register IRQ (cpu%d)\n",
-+									cpu);
-+
-+				continue;
-+			}
-+			pcpu_mevt->evt.irq = mct_irq;
-+		}
- 	}
- 
- 	err = register_cpu_notifier(&exynos4_mct_cpu_nb);
--- 
-1.9.1
+Apart from that it looks good to me.
+
+Yours,
+Linus Walleij
