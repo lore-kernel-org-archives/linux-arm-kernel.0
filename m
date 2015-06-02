@@ -1,30 +1,16 @@
-From: stefan@agner.ch (Stefan Agner)
-Date: Tue, 02 Jun 2015 21:42:41 +0200
-Subject: [PATCH v2] ARM: nommu: avoid deprecated source register on mov
-In-Reply-To: <1432337148-9894-1-git-send-email-stefan@agner.ch>
-References: <1432337148-9894-1-git-send-email-stefan@agner.ch>
-Message-ID: <597f1a12eb3962fcb569982659ee3196@agner.ch>
+From: davem@davemloft.net (David Miller)
+Date: Tue, 02 Jun 2015 12:56:28 -0700 (PDT)
+Subject: [PATCH 00/10] net: thunderx: fix problems reported by static
+ check tools
+In-Reply-To: <1433268028-23992-1-git-send-email-aleksey.makarov@caviumnetworks.com>
+References: <1433268028-23992-1-git-send-email-aleksey.makarov@caviumnetworks.com>
+Message-ID: <20150602.125628.1220979588327153119.davem@davemloft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2015-05-23 01:25, Stefan Agner wrote:
-> In Thumb2 mode, the stack register r13 is deprecated if the
-> destination register is the program counter (r15). Similar to
-> head.S, head-nommu.S uses r13 to store the return address used
-> after configuring the CPU's CP15 register. However, since we do
-> not enable a MMU, there will be no address switch and it is
-> possible to use branch with link instruction to call
-> __after_proc_init.
-> 
-> Avoid using r13 completely by using bl to call __after_proc_init
-> and get rid of __secondary_switched.
-> 
-> Beside removing unnecessary complexity, this also fixes a
-> compiler warning when compiling a !MMU kernel:
-> Warning: Use of r13 as a source register is deprecated when r15
-> is the destination register.
+From: Aleksey Makarov <aleksey.makarov@caviumnetworks.com>
+Date: Tue, 2 Jun 2015 11:00:17 -0700
 
-Submitted this patch to the patch tracking system, ID 8383/1.
+> These are fixes for the problems that were reported by static check tools.
 
---
-Stefan
+Series applied, thanks.
