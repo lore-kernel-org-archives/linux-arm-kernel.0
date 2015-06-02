@@ -1,48 +1,119 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Tue,  2 Jun 2015 14:31:49 +0200
-Subject: [PATCH 04/11] clocksource/drivers/exynos_mct: Remove old platform
- mct_init()
-In-Reply-To: <1433248316-26320-1-git-send-email-daniel.lezcano@linaro.org>
-References: <556DA1E5.1030601@linaro.org>
- <1433248316-26320-1-git-send-email-daniel.lezcano@linaro.org>
-Message-ID: <1433248316-26320-4-git-send-email-daniel.lezcano@linaro.org>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Tue, 02 Jun 2015 21:43:16 +0900
+Subject: [PATCH v4 2/5] ARM: dts: Prepare exynos5410-odroidxu device tree
+In-Reply-To: <5506B02D.3000400@suse.de>
+References: <1426456834-6308-1-git-send-email-afaerber@suse.de>	<1426456834-6308-3-git-send-email-afaerber@suse.de>
+ <CABxcv==cnFQ75qaykfkOcFo8FNqkzVswu8iYOB3riZJT9=4U_Q@mail.gmail.com>
+ <5506B02D.3000400@suse.de>
+Message-ID: <556DA4E4.1060303@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+W dniu 16.03.2015 o 19:27, Andreas F?rber pisze:
+> Hi Javier,
+> 
+> Am 16.03.2015 um 08:56 schrieb Javier Martinez Canillas:
+>> On Sun, Mar 15, 2015 at 11:00 PM, Andreas F?rber <afaerber@suse.de> wrote:
+>>> Derived from exynos5410-smdk5410.dts.
+>>>
+>>> Signed-off-by: Andreas F?rber <afaerber@suse.de>
+>>> ---
+>>>  v1 -> v2 -> v3: Unchanged
+> 
+> Forgot to update the in-patch changelogs: v4 is unchanged as well
+> 
+>>>
+>>>  arch/arm/boot/dts/Makefile                |  1 +
+>>>  arch/arm/boot/dts/exynos5410-odroidxu.dts | 78 +++++++++++++++++++++++++++++++
+>>>  2 files changed, 79 insertions(+)
+>>>  create mode 100644 arch/arm/boot/dts/exynos5410-odroidxu.dts
+>>>
+>>> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+>>> index a1c776b8dcec..b040737edcbc 100644
+>>> --- a/arch/arm/boot/dts/Makefile
+>>> +++ b/arch/arm/boot/dts/Makefile
+>>> @@ -103,6 +103,7 @@ dtb-$(CONFIG_ARCH_EXYNOS5) += \
+>>>         exynos5250-snow.dtb \
+>>>         exynos5250-spring.dtb \
+>>>         exynos5260-xyref5260.dtb \
+>>> +       exynos5410-odroidxu.dtb \
+>>>         exynos5410-smdk5410.dtb \
+>>>         exynos5420-arndale-octa.dtb \
+>>>         exynos5420-peach-pit.dtb \
+>>> diff --git a/arch/arm/boot/dts/exynos5410-odroidxu.dts b/arch/arm/boot/dts/exynos5410-odroidxu.dts
+>>> new file mode 100644
+>>> index 000000000000..97310bb727e2
+>>> --- /dev/null
+>>> +++ b/arch/arm/boot/dts/exynos5410-odroidxu.dts
+>>> @@ -0,0 +1,78 @@
+>>> +/*
+>>> + * Hardkernel ODROID-XU device tree source
+>>> + *
+>>> + * Copyright (c) 2014 SUSE LINUX Products GmbH
+>>> + *
+>>> + * Based on exynos5410-smdk5410.dts:
+>>> + *
+>>> + * Copyright (c) 2013 Samsung Electronics Co., Ltd.
+>>> + *             http://www.samsung.com
+>>> + *
+>>> + * This program is free software; you can redistribute it and/or modify
+>>> + * it under the terms of the GNU General Public License version 2 as
+>>> + * published by the Free Software Foundation.
+>>> +*/
+>>> +
+>>> +/dts-v1/;
+>>> +#include "exynos5410.dtsi"
+>>> +/ {
+>>> +       model = "ODROID-XU based on EXYNOS5410";
+>>> +       compatible = "hardkernel,odroid-xu", "samsung,exynos5410", "samsung,exynos5";
+>>> +
+>>> +       memory {
+>>> +               reg = <0x40000000 0x80000000>;
+>>> +       };
+>>> +
+>>> +       chosen {
+>>> +               bootargs = "console=ttySAC2,115200";
+>>> +       };
+>>> +
+>>
+>> After commit a208ffd251d0 ("of: Enable console on serial ports
+>> specified by /chosen/stdout-path") the kernel is able to know what
+>> serial console to use if the DT defined an stdout-path property so
+>> should be preferred instead of using a console= parameter.
+>>
+>> I'll post today a series to change that on all exynos5 boards so you
+>> can base on that.
+> 
+> Okay, if no one else does, I could update smdk5410 before splitting.
 
-Since commit 228e3023eb04 ("Merge tag 'mct-exynos-for-v3.10' of ...") the
-mct_init() was superseded by mct_init_dt() and is not referenced
-anywhere. Remove it.
+Could you do this? At least for new board if you cannot test it on SMDK5410.
 
-Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
-Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
----
- drivers/clocksource/exynos_mct.c | 12 ------------
- 1 file changed, 12 deletions(-)
+> 
+>>> +       fin_pll: xxti {
+>>> +               compatible = "fixed-clock";
+>>> +               clock-frequency = <24000000>;
+>>> +               clock-output-names = "fin_pll";
+>>> +               #clock-cells = <0>;
+>>> +       };
+>>> +
+>>
+>> I think this should be defined in exynos5410.dtsi instead since is an
+>> IP block in the SoC and referenced in the .dts using a label to change
+>> the clock-frequency in the board.
+> 
+> I hope you understood that this is a literal copy of smdk5410, so I'm
+> not going to make random changes here. If the Samsung guys want to make
+> this change for smdk5410, then fine, but otherwise - like for Snow and
+> Spring - I want to keep the diff -u low between the two.
 
-diff --git a/drivers/clocksource/exynos_mct.c b/drivers/clocksource/exynos_mct.c
-index 8b2a9fc..935b059 100644
---- a/drivers/clocksource/exynos_mct.c
-+++ b/drivers/clocksource/exynos_mct.c
-@@ -560,18 +560,6 @@ out_irq:
- 	free_percpu_irq(mct_irqs[MCT_L0_IRQ], &percpu_mct_tick);
- }
- 
--void __init mct_init(void __iomem *base, int irq_g0, int irq_l0, int irq_l1)
--{
--	mct_irqs[MCT_G0_IRQ] = irq_g0;
--	mct_irqs[MCT_L0_IRQ] = irq_l0;
--	mct_irqs[MCT_L1_IRQ] = irq_l1;
--	mct_int_type = MCT_INT_SPI;
--
--	exynos4_timer_resources(NULL, base);
--	exynos4_clocksource_init();
--	exynos4_clockevent_init();
--}
--
- static void __init mct_init_dt(struct device_node *np, unsigned int int_type)
- {
- 	u32 nr_irqs, i;
--- 
-1.9.1
+Moving the node to DTSI won't change the DTB for boards so the change is
+safe. However to me it looks unusual that exynos5410.dtsi references
+fin_pll phandle which is defined in the board.
+
+However Kukjin mentioned that it is fine so it is okay with me also.
+
+The rest looks fine, so:
+Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+
+Best regards,
+Krzysztof
