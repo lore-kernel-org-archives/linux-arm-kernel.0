@@ -1,117 +1,94 @@
-From: howard.chen@linaro.org (Howard Chen)
-Date: Tue, 2 Jun 2015 15:17:27 +0800
-Subject: [PATCH v3] ARM: dts: mt8173: support arm64 cpuidle-dt
-In-Reply-To: <20150529145552.GD18512@red-moon>
-References: <1432882906-7940-1-git-send-email-howard.chen@linaro.org>
- <20150529145552.GD18512@red-moon>
-Message-ID: <CAJ+MC=5oORYein5Z12Nb3vLDC4DLoyqUEyqZH95=LQWHBP23Sw@mail.gmail.com>
+From: monstr@monstr.eu (Michal Simek)
+Date: Tue, 02 Jun 2015 09:20:28 +0200
+Subject: [PATCH v2] ARM: l2c: Add support for the "arm, shared-override"
+ property
+In-Reply-To: <20150515135513.GH19345@e104818-lin.cambridge.arm.com>
+References: <1430990831-23825-1-git-send-email-geert+renesas@glider.be>
+ <20150507160257.GA11067@e104818-lin.cambridge.arm.com>
+ <20150515101028.GH2067@n2100.arm.linux.org.uk>
+ <20150515135513.GH19345@e104818-lin.cambridge.arm.com>
+Message-ID: <556D593C.1090002@monstr.eu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 29 May 2015 at 22:55, Lorenzo Pieralisi <lorenzo.pieralisi@arm.com> wrote:
-> On Fri, May 29, 2015 at 08:01:46AM +0100, Howard Chen wrote:
->> This patch adds an idle-states node to describe the mt8173 idle states and
->> also adds references to the idle-states node in all CPU nodes.
+On 05/15/2015 03:55 PM, Catalin Marinas wrote:
+> On Fri, May 15, 2015 at 11:10:28AM +0100, Russell King - ARM Linux wrote:
+>> On Thu, May 07, 2015 at 05:02:57PM +0100, Catalin Marinas wrote:
+>>> On Thu, May 07, 2015 at 11:27:11AM +0200, Geert Uytterhoeven wrote:
+>>>> diff --git a/Documentation/devicetree/bindings/arm/l2cc.txt b/Documentation/devicetree/bindings/arm/l2cc.txt
+>>>> index 0dbabe9a6b0abb91..2484aed78c86546d 100644
+>>>> --- a/Documentation/devicetree/bindings/arm/l2cc.txt
+>>>> +++ b/Documentation/devicetree/bindings/arm/l2cc.txt
+>>>> @@ -67,6 +67,12 @@ Optional properties:
+>>>>    disable if zero.
+>>>>  - arm,prefetch-offset : Override prefetch offset value. Valid values are
+>>>>    0-7, 15, 23, and 31.
+>>>> +- arm,shared-override : The default behavior of the pl310 cache controller with
+>>>> +  respect to the shareable attribute is to transform "normal memory
+>>>> +  non-cacheable transactions" into "cacheable no allocate" (for reads) or
+>>>> +  "write through no write allocate" (for writes).
+>>>> +  On systems where this may cause DMA buffer corruption, this property must be
+>>>> +  specified to indicate that such transforms are precluded.
+>>>>  
+>>>>  Example:
+>>>>  
+>>>> diff --git a/arch/arm/mm/cache-l2x0.c b/arch/arm/mm/cache-l2x0.c
+>>>> index e309c8f35af5af61..86d0e7461e5b0b18 100644
+>>>> --- a/arch/arm/mm/cache-l2x0.c
+>>>> +++ b/arch/arm/mm/cache-l2x0.c
+>>>> @@ -1149,6 +1149,11 @@ static void __init l2c310_of_parse(const struct device_node *np,
+>>>>  		}
+>>>>  	}
+>>>>  
+>>>> +	if (of_property_read_bool(np, "arm,shared-override")) {
+>>>> +		*aux_val |= L2C_AUX_CTRL_SHARED_OVERRIDE;
+>>>> +		*aux_mask &= ~L2C_AUX_CTRL_SHARED_OVERRIDE;
+>>>> +	}
+>>>> +
+>>>>  	prefetch = l2x0_saved_regs.prefetch_ctrl;
+>>>>  
+>>>>  	ret = of_property_read_u32(np, "arm,double-linefill", &val);
+>>>
+>>> It looks fine to me.
+>>>
+>>> Acked-by: Catalin Marinas <catalin.marinas@arm.com>
+>>>
+>>> (even better if a subsequent patch adds this property to all the dts
+>>> files containing "arm,pl310" ;))
 >>
->> Signed-off-by: Howard Chen <howard.chen@linaro.org>
->> ---
-> You should have added a list of incremental changes (v1->v2->v3) here
-> otherwise there is no point in adding a patch version, we are not
-> supposed to remember what you have changed.
->
-OK.
+>> Even better would be for the boot loader/firmware to set the bit.
+> 
+> In an ideal world, I agree. But, arguably, we already set other bits in
+> the PL310 AUXCTRL register (and related cache controllers, just look at
+> the l2cc.txt bindings).
+> 
+> If you want to rely on firmware, can we at least check this bit and
+> print a warning? Or go a step further and refuse to enable PL310 when
+> this bit is clear? Otherwise coherent (non-cacheable) DMA operations are
+> not safe.
+> 
 
->>  arch/arm64/boot/dts/mediatek/mt8173.dtsi | 18 ++++++++++++++++++
->>  1 file changed, 18 insertions(+)
->>
->> diff --git a/arch/arm64/boot/dts/mediatek/mt8173.dtsi b/arch/arm64/boot/dts/mediatek/mt8173.dtsi
->> index 924fdb6..47e8d56 100644
->> --- a/arch/arm64/boot/dts/mediatek/mt8173.dtsi
->> +++ b/arch/arm64/boot/dts/mediatek/mt8173.dtsi
->> @@ -49,6 +49,8 @@
->>                       device_type = "cpu";
->>                       compatible = "arm,cortex-a53";
->>                       reg = <0x000>;
->> +                     enable-method = "psci";
->> +                     cpu-idle-states = <&CPU_SLEEP_0>;
->>               };
->>
->>               cpu1: cpu at 1 {
->> @@ -56,6 +58,7 @@
->>                       compatible = "arm,cortex-a53";
->>                       reg = <0x001>;
->>                       enable-method = "psci";
->> +                     cpu-idle-states = <&CPU_SLEEP_0>;
->>               };
->>
->>               cpu2: cpu at 100 {
->> @@ -63,6 +66,7 @@
->>                       compatible = "arm,cortex-a57";
->>                       reg = <0x100>;
->>                       enable-method = "psci";
->> +                     cpu-idle-states = <&CPU_SLEEP_0>;
->>               };
->>
->>               cpu3: cpu at 101 {
->> @@ -70,6 +74,20 @@
->>                       compatible = "arm,cortex-a57";
->>                       reg = <0x101>;
->>                       enable-method = "psci";
->> +                     cpu-idle-states = <&CPU_SLEEP_0>;
->> +             };
->> +
->> +             idle-states {
->> +                     entry-method = "arm,psci";
->> +
->> +                     CPU_SLEEP_0: cpu-sleep-0 {
->> +                             compatible = "arm,idle-state";
->
-> UltraNit: please move local-timer-stop here to keep the property ordering
-> as in the bindings.
-OK.
+Any update on this one? I have the patch for Zynq pending and I want to
+have any resolution on this in this generic way or simply by enabling it
+via aux_mask as is here.
+https://lkml.org/lkml/2015/5/12/51
+This patch can be reverted when this generic solution reach mainline.
 
->
-> More importantly, IIRC the idle state was not local-timer-stop in v2,
+Thanks,
+Michal
 
-My original idea is to hand over to a general purpose timer when the
-local timer stops, however, Danienl Lezcano naked this and points out cases
-that it may misbehave. So I fall back to the generic approach which uses the
-broadcast timer on the v3 patch.
-
-> what changed in the interim ? v1->v2 the cluster idle state disappeared,
-
-The cluster idle won't be available in the near future and possibly never will,
-while the C1 state is ready and stable, so I split the C1 part out.
-
-> now the local timer seems to stop when it was not before (and that is
-> the same HW), I hope things are settled now.
->
-> https://lkml.org/lkml/2015/4/7/76
->
->> +                             arm,psci-suspend-param = <0x0010000>;
->
-> Move this property as last on the list, let's keep the generic
-> properties first.
-OK.
-
->
->> +                             entry-latency-us = <639>;
->> +                             exit-latency-us = <680>;
->> +                             min-residency-us = <1088>;
->> +                             local-timer-stop;
->> +                     };
->>               };
->>       };
->
-> I guess there is no hope of seeing the cluster state restored (?).
->
-> I would like some explanation regarding local-timer-stop change, apart
-> from that you can add:
->
-> Acked-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-
-Many thanks for your review and all the great comments.
+-- 
+Michal Simek, Ing. (M.Eng), OpenPGP -> KeyID: FE3D1F91
+w: www.monstr.eu p: +42-0-721842854
+Maintainer of Linux kernel - Microblaze cpu - http://www.monstr.eu/fdt/
+Maintainer of Linux kernel - Xilinx Zynq ARM architecture
+Microblaze U-BOOT custodian and responsible for u-boot arm zynq platform
 
 
-Regards,
-Howard
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150602/4f0ac9e0/attachment.sig>
