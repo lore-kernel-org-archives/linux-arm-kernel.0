@@ -1,49 +1,41 @@
-From: dingel@linux.vnet.ibm.com (Dominik Dingel)
-Date: Tue, 2 Jun 2015 09:46:40 +0200
-Subject: [PATCH 0/5] Remove s390 sw-emulated hugepages and cleanup
-In-Reply-To: <556C0B5D.40205@de.ibm.com>
-References: <1432813957-46874-1-git-send-email-dingel@linux.vnet.ibm.com>
- <556C0B5D.40205@de.ibm.com>
-Message-ID: <20150602094640.4fedc046@BR9TG4T3.de.ibm.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Tue, 2 Jun 2015 09:51:20 +0200
+Subject: [PATCH v2 3/6] ARM: dts: sun8i: Add sun8i-a23-a33 dtsi
+In-Reply-To: <1432997706-20172-4-git-send-email-hdegoede@redhat.com>
+References: <1432997706-20172-1-git-send-email-hdegoede@redhat.com>
+ <1432997706-20172-4-git-send-email-hdegoede@redhat.com>
+Message-ID: <20150602075120.GL23777@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 01 Jun 2015 09:35:57 +0200
-Christian Borntraeger <borntraeger@de.ibm.com> wrote:
-
-> Am 28.05.2015 um 13:52 schrieb Dominik Dingel:
-> > Hi everyone,
-> > 
-> > there is a potential bug with KVM and hugetlbfs if the hardware does not
-> > support hugepages (EDAT1).
-> > We fix this by making EDAT1 a hard requirement for hugepages and 
-> > therefore removing and simplifying code.
+On Sat, May 30, 2015 at 04:55:03PM +0200, Hans de Goede wrote:
+> From: Vishnu Patekar <vishnupatekar0510@gmail.com>
 > 
-> The cleanup itself is nice and probably the right thing to do. 
-> Emulating large pages makes the code more complex and asks for
-> trouble (as outlined above)
+> Rename sun8i-a23.dtsi to sun8i-a23-a33.dtsi as the base dtsi for the A33
+> is 99% the same and add a new sun8i-a23.dtsi including sun8i-a23-a33.dtsi
+> and setting the few things not shared with the A33 (mbus-clk, pio
+> compatible and interrupts).
 > 
-> The only downside that I see is that z/VM as of today does not
-> announce EDAT1 for its guests so the "emulated" large pages for
-> hugetlbfs would be useful in that case. The current code allocates
-> the page table only once and shares it for all mappers - which is
-> useful for some big databases that spawn hundreds of processes with
-> shared mappings of several hundred GBs. In these cases we do save
-> a decent amount of page table memory. 
+> Signed-off-by: Vishnu Patekar <vishnupatekar0510@gmail.com>
+> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
 
-To limit the damage done, we could always allocate page tables with pgstes for that case.
-That would allow one guest manipulating another guests storage keys,
-but at least would prevent random memory overwrites in the host.
+Fixed the conflicts and applied.
 
-Another thing we could do, make software emulated large pages a kernel config option
-and only if KVM is not selected allow it, visa versa.
+Also judging from a quick look at the datasheet, the A33 doesn't seem
+to have that clock gates tree but rather one similar to the H3's. That
+will probably mean we'll have to move out the gates from this DTSI at
+some point.
 
-@Martin what do you think?
+Maxime
 
-Thanks,
-	Dominik
-
-> Not sure if that case is actually important, though.
-> 
-> Christian
-> 
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150602/b43e1c69/attachment.sig>
