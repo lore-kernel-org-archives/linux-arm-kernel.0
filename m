@@ -1,32 +1,75 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Tue, 2 Jun 2015 12:54:21 -0700
-Subject: [PATCH 3/6] PM / OPP: Support adjusting OPP voltages at runtime
-In-Reply-To: <20150602045026.GC10443@linux>
-References: <1433209679-31389-1-git-send-email-sboyd@codeaurora.org>
- <1433209679-31389-4-git-send-email-sboyd@codeaurora.org>
- <20150602045026.GC10443@linux>
-Message-ID: <20150602195421.GA11764@codeaurora.org>
+From: tony@atomide.com (Tony Lindgren)
+Date: Tue, 2 Jun 2015 12:58:42 -0700
+Subject: [PATCH 2/2] ARM: dts: am4372: Add emif node
+In-Reply-To: <20150602192228.GF9623@saruman.tx.rr.com>
+References: <1430933133-33412-1-git-send-email-d-gerlach@ti.com>
+ <1430933133-33412-3-git-send-email-d-gerlach@ti.com>
+ <20150602192228.GF9623@saruman.tx.rr.com>
+Message-ID: <20150602195841.GM30984@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/02, Viresh Kumar wrote:
-> On 01-06-15, 18:47, Stephen Boyd wrote:
-> > +int dev_pm_opp_adjust_voltage(struct device *dev, unsigned long freq,
-> > +		   unsigned long u_volt);
+* Felipe Balbi <balbi@ti.com> [150602 12:26]:
+> On Wed, May 06, 2015 at 12:25:33PM -0500, Dave Gerlach wrote:
+> > Add node for TI AM4372 EMIF.
+> > 
+> > Signed-off-by: Dave Gerlach <d-gerlach@ti.com>
 > 
-> > +static inline int dev_pm_opp_adjust_voltage(struct device *dev,
-> > +		unsigned long freq, unsigned long u_volt)
-> 
-> The 'u' of 'unsigned' isn't aligned to the opening curly brace. Try
-> running with checkpatch --strict and you will see some warnings.
-> 
-> Otherwise,
-> 
-> Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
-> 
+> Tony, this patch fixes the regression I just reported at [1], care to
+> pick this one up ?
 
-Will do. Thanks.
+OK thanks yes tag this for v4.2 fixes.
 
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+Regards,
+
+Tony
+ 
+> Tested-by: Felipe Balbi <balbi@ti.com>
+> Acked-by: Felipe Balbi <balbi@ti.com>
+> 
+> [1] http://marc.info/?l=linux-omap&m=143327283632248&w=2
+> 
+> > ---
+> >  Documentation/devicetree/bindings/memory-controllers/ti/emif.txt | 1 +
+> >  arch/arm/boot/dts/am4372.dtsi                                    | 6 ++++++
+> >  2 files changed, 7 insertions(+)
+> > 
+> > diff --git a/Documentation/devicetree/bindings/memory-controllers/ti/emif.txt b/Documentation/devicetree/bindings/memory-controllers/ti/emif.txt
+> > index 938f8e1..0db6047 100644
+> > --- a/Documentation/devicetree/bindings/memory-controllers/ti/emif.txt
+> > +++ b/Documentation/devicetree/bindings/memory-controllers/ti/emif.txt
+> > @@ -8,6 +8,7 @@ of the EMIF IP and memory parts attached to it.
+> >  Required properties:
+> >  - compatible	: Should be of the form "ti,emif-<ip-rev>" where <ip-rev>
+> >    is the IP revision of the specific EMIF instance.
+> > +		  For am437x should be ti,emif-am4372.
+> >  
+> >  - phy-type	: <u32> indicating the DDR phy type. Following are the
+> >    allowed values
+> > diff --git a/arch/arm/boot/dts/am4372.dtsi b/arch/arm/boot/dts/am4372.dtsi
+> > index c80a3e2..9521a38 100644
+> > --- a/arch/arm/boot/dts/am4372.dtsi
+> > +++ b/arch/arm/boot/dts/am4372.dtsi
+> > @@ -132,6 +132,12 @@
+> >  			};
+> >  		};
+> >  
+> > +		emif: emif at 4c000000 {
+> > +			compatible = "ti,emif-am4372";
+> > +			reg = <0x4c000000 0x1000000>;
+> > +			ti,hwmods = "emif";
+> > +		};
+> > +
+> >  		edma: edma at 49000000 {
+> >  			compatible = "ti,edma3";
+> >  			ti,hwmods = "tpcc", "tptc0", "tptc1", "tptc2";
+> > -- 
+> > 2.3.6
+> > 
+> > --
+> > To unsubscribe from this list: send the line "unsubscribe linux-omap" in
+> > the body of a message to majordomo at vger.kernel.org
+> > More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> 
+> -- 
+> balbi
