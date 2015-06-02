@@ -1,92 +1,48 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 2 Jun 2015 15:52:54 +0100
-Subject: [PATCH v2] arm: tcm: Don't crash when TCM banks are protected by
- TrustZone
-In-Reply-To: <CACRpkdY4sZQr+VzMKzU2Rtm7sP2zMztBioCPQRJjq=VjyapAEA@mail.gmail.com>
-References: <1432805760-4590-1-git-send-email-michael@smart-africa.com>
- <1432821287-31436-1-git-send-email-michael@smart-africa.com>
- <CACRpkdY4sZQr+VzMKzU2Rtm7sP2zMztBioCPQRJjq=VjyapAEA@mail.gmail.com>
-Message-ID: <20150602145254.GE2067@n2100.arm.linux.org.uk>
+From: tony@atomide.com (Tony Lindgren)
+Date: Tue, 2 Jun 2015 07:54:14 -0700
+Subject: [GIT PULL] ARM: OMAP2+: hwmod code and data changes for v4.2
+In-Reply-To: <alpine.DEB.2.02.1506020321510.14902@utopia.booyaka.com>
+References: <alpine.DEB.2.02.1506020321510.14902@utopia.booyaka.com>
+Message-ID: <20150602145413.GK30984@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 02, 2015 at 01:16:38PM +0200, Linus Walleij wrote:
-> > +static int __init tcm_handler(struct pt_regs *regs, unsigned int instr)
-> > +{
-> > +       regs->uregs[(instr >> 12) & 0xf] = 0;
-> > +       regs->ARM_pc += 4;
-> > +       return 0;
-> > +}
+* Paul Walmsley <paul@pwsan.com> [150601 20:24]:
+> -----BEGIN PGP SIGNED MESSAGE-----
+> Hash: SHA1
 > 
-> Is the action here totally obvious to everyone except me?
-> I guess it is masking off something and advancing past a
-> failed instruction but whatdoIknow. Can you put in a small comment
-> above the function or something?
-
-I know what it's doing :)
-
-It's storing '0' into the destination register of the faulted MRC
-instruction, and advancing past the instruction.  So, an undef fault
-on either:
-
-	mrc	15, 0, rX, cr9, cr1, {0}
-	mrc	15, 0, rX, cr9, cr1, {1}
-
-causes them to return zero.
-
-> > +static struct undef_hook tcm_hook __initdata = {
-> > +       .instr_mask     = 0xffff0fdf,
-> > +       .instr_val      = 0xee190f11,
-> > +       .cpsr_mask      = MODE_MASK,
-> > +       .cpsr_val       = SVC_MODE,
-> > +       .fn             = tcm_handler
-> > +};
+> Hi Tony,
 > 
-> Likewise here. Why not #define instruction 0xee190f11
-> so it is a bit more readable? I guess this instruction will
-> be trapped and handled by the hook but it'd be nice
-> to know what instruction it is and how it comes to
-> be issued.
+> The following changes since commit e26081808edadfd257c6c9d81014e3b25e9a6118:
+> 
+>   Linux 4.1-rc4 (2015-05-18 10:13:47 -0700)
+> 
+> are available in the git repository at:
+> 
+>   git://git.kernel.org/pub/scm/linux/kernel/git/pjw/omap-pending.git tags/for-v4.2/omap-hwmod-a
+> 
+> for you to fetch changes up to a55a744582e0dc106537ba5e508c340c39cfe454:
+> 
+>   ARM: OMAP3: Fix crypto support for HS devices (2015-06-01 19:23:04 -0600)
+> 
+> The branch contains a AM43xx hwmod data change, and thus is based on
+> v4.1-rc4 to avoid merge conflicts.
+> 
+> - ----------------------------------------------------------------
+> ARM: OMAP2+: hwmod code and data changes for v4.2
+> 
+> Several OMAP2+ hwmod changes for v4.2.  One patch cleans up a nasty
+> interaction between the OMAP GPMC and the hwmod code when debugging is
+> enabled.  IP block integration data has been added for the AM43xx EMIF
+> RAM controller.  There's also a fix for the omap-aes driver when used in
+> QEMU.  And finally, some changes to the OMAP3 hwmod code to support the
+> use of the security IP blocks (AES and SHA) on GP devices, or when they've
+> specifically been enabled in the DT data.
+> 
+> Basic build, boot, and power management test results are here:
+> 
+> http://www.pwsan.com/omap/testlogs/omap-hwmod-a-for-v4.2/20150601192349/
 
-We typically don't do that for instructions, otherwise we end up with
-loads of problems such as how to represent the difference between these:
+Thanks pulling into omap-for-v4.2/soc.
 
-	ldr	rd, [rn, #4]
-	ldr	rd, [rn], #4
-
-You could use: LDR_Rd_Rn_4 but then how do you indicate the difference
-between the pre-indexed and the post-indexed instruction.
-
-In this case, it's these _two_ instructions being trapped:
-
-	mrc	15, 0, rX, cr9, cr1, {0}
-	mrc	15, 0, rX, cr9, cr1, {1}
-
-where we don't care what register 'rX' is, and we only care about those
-two, and not:
-
-	mrc	15, 0, rX, cr9, cr1, {2}
-	mrc	15, 0, rX, cr9, cr1, {3}
-	...
-
-So, if you can come up with some #define which represents just two
-instructions in a class but not the others... err, nope, didn't think so.
-
-Since the test is also:
-
-	(actual_instruction & mask) == value
-
-encoding the value without its mask value is pretty pointless and is
-in fact ambiguous.  For example, a definition for a STR instruction
-with the load bit clear in the mask matches both LDR and STR, so
-while a definition for the STR instruction may seem useful, unless you
-also have some way to encode the mask as well, it's pretty pointless,
-and is in fact misleading if used with a mask which clears bit 20.
-
-So it's quite reasonable to use the numeric encoding here, since
-interpreting the instruction value without taking account of the mask
-is pretty stupid.
-
--- 
-FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
-according to speedtest.net.
+Tony
