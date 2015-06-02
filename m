@@ -1,11 +1,11 @@
 From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Tue, 2 Jun 2015 09:02:50 +0200
-Subject: [PATCH 1/2] ARM: shmobile: Enable gose board in multiplatform
- defconfig
-In-Reply-To: <1433208877-3284-2-git-send-email-horms+renesas@verge.net.au>
+Date: Tue, 2 Jun 2015 09:03:15 +0200
+Subject: [PATCH 2/2] ARM: multi_v7_defconfig: Enable shmobile r8a7793/gose
+ platform
+In-Reply-To: <1433208877-3284-3-git-send-email-horms+renesas@verge.net.au>
 References: <1433208877-3284-1-git-send-email-horms+renesas@verge.net.au>
- <1433208877-3284-2-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <CAMuHMdUWj4qfAU6S_EZJCe4j8-ds8yxu9U-nw_9zVkAP5vrEsw@mail.gmail.com>
+ <1433208877-3284-3-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <CAMuHMdXrU3L777K41t8sZLhV1VoGhUbBPYY6-YRar=gi6wLYfw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
