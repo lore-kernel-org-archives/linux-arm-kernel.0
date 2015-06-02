@@ -1,75 +1,17 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 2 Jun 2015 12:58:42 -0700
-Subject: [PATCH 2/2] ARM: dts: am4372: Add emif node
-In-Reply-To: <20150602192228.GF9623@saruman.tx.rr.com>
-References: <1430933133-33412-1-git-send-email-d-gerlach@ti.com>
- <1430933133-33412-3-git-send-email-d-gerlach@ti.com>
- <20150602192228.GF9623@saruman.tx.rr.com>
-Message-ID: <20150602195841.GM30984@atomide.com>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Tue,  2 Jun 2015 22:08:01 +0200
+Subject: [PATCH v2] ARM: dts: sun8i: Add dts file for the GA10H-A33 tablet
+Message-ID: <1433275682-10886-1-git-send-email-hdegoede@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Felipe Balbi <balbi@ti.com> [150602 12:26]:
-> On Wed, May 06, 2015 at 12:25:33PM -0500, Dave Gerlach wrote:
-> > Add node for TI AM4372 EMIF.
-> > 
-> > Signed-off-by: Dave Gerlach <d-gerlach@ti.com>
-> 
-> Tony, this patch fixes the regression I just reported at [1], care to
-> pick this one up ?
+Hi Maxime,
 
-OK thanks yes tag this for v4.2 fixes.
+I forgot to test and update the tabletkeys setting, even though that was
+the whole reason for not sending this file before.
+
+This v2 has a fixed tabletkeys section.
 
 Regards,
 
-Tony
- 
-> Tested-by: Felipe Balbi <balbi@ti.com>
-> Acked-by: Felipe Balbi <balbi@ti.com>
-> 
-> [1] http://marc.info/?l=linux-omap&m=143327283632248&w=2
-> 
-> > ---
-> >  Documentation/devicetree/bindings/memory-controllers/ti/emif.txt | 1 +
-> >  arch/arm/boot/dts/am4372.dtsi                                    | 6 ++++++
-> >  2 files changed, 7 insertions(+)
-> > 
-> > diff --git a/Documentation/devicetree/bindings/memory-controllers/ti/emif.txt b/Documentation/devicetree/bindings/memory-controllers/ti/emif.txt
-> > index 938f8e1..0db6047 100644
-> > --- a/Documentation/devicetree/bindings/memory-controllers/ti/emif.txt
-> > +++ b/Documentation/devicetree/bindings/memory-controllers/ti/emif.txt
-> > @@ -8,6 +8,7 @@ of the EMIF IP and memory parts attached to it.
-> >  Required properties:
-> >  - compatible	: Should be of the form "ti,emif-<ip-rev>" where <ip-rev>
-> >    is the IP revision of the specific EMIF instance.
-> > +		  For am437x should be ti,emif-am4372.
-> >  
-> >  - phy-type	: <u32> indicating the DDR phy type. Following are the
-> >    allowed values
-> > diff --git a/arch/arm/boot/dts/am4372.dtsi b/arch/arm/boot/dts/am4372.dtsi
-> > index c80a3e2..9521a38 100644
-> > --- a/arch/arm/boot/dts/am4372.dtsi
-> > +++ b/arch/arm/boot/dts/am4372.dtsi
-> > @@ -132,6 +132,12 @@
-> >  			};
-> >  		};
-> >  
-> > +		emif: emif at 4c000000 {
-> > +			compatible = "ti,emif-am4372";
-> > +			reg = <0x4c000000 0x1000000>;
-> > +			ti,hwmods = "emif";
-> > +		};
-> > +
-> >  		edma: edma at 49000000 {
-> >  			compatible = "ti,edma3";
-> >  			ti,hwmods = "tpcc", "tptc0", "tptc1", "tptc2";
-> > -- 
-> > 2.3.6
-> > 
-> > --
-> > To unsubscribe from this list: send the line "unsubscribe linux-omap" in
-> > the body of a message to majordomo at vger.kernel.org
-> > More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> 
-> -- 
-> balbi
+Hans
