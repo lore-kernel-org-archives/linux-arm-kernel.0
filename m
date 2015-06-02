@@ -1,732 +1,400 @@
-From: stefan@agner.ch (Stefan Agner)
-Date: Tue, 02 Jun 2015 11:01:50 +0200
-Subject: [PATCH v4 1/6] mtd: nand: =?UTF-8?Q?vf=36=31=30=5Fnfc=3A=20Fr?=
- =?UTF-8?Q?eescale=20NFC=20for=20VF=36=31=30=2C=20MPC=35=31=32=35=20and=20?=
- =?UTF-8?Q?others?=
-In-Reply-To: <20150602013205.GA4917@ld-irv-0074>
-References: <1427300909-20825-1-git-send-email-stefan@agner.ch>
- <1427300909-20825-2-git-send-email-stefan@agner.ch>
- <20150602013205.GA4917@ld-irv-0074>
-Message-ID: <59f0d64e160e7b8dabaf086d368d00c4@agner.ch>
+From: rsahu@apm.com (Rameshwar Prasad Sahu)
+Date: Tue,  2 Jun 2015 14:33:33 +0530
+Subject: [PATCH] dmaengine: xgene-dma: Fix "incorrect type in assignement"
+ warnings
+Message-ID: <1433235813-3225-1-git-send-email-rsahu@apm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Brian,
+This patch fixes sparse warnings like incorrect type in assignment
+(different base types), cast to restricted __le64.
 
-Thanks for the review!
+Reported-by: kbuild test robot <fengguang.wu@intel.com>
+Signed-off-by: Rameshwar Prasad Sahu <rsahu@apm.com>
+---
+ drivers/dma/xgene-dma.c | 173 ++++++++++++++++++------------------------------
+ 1 file changed, 66 insertions(+), 107 deletions(-)
 
-FYI, in between I have some patches pending which enable ONFI and some
-other minor improvements. Those changes already went upstream in U-Boot,
-I will port them to the Linux version.
+diff --git a/drivers/dma/xgene-dma.c b/drivers/dma/xgene-dma.c
+index f52e3750..620fd55ec 100755
+--- a/drivers/dma/xgene-dma.c
++++ b/drivers/dma/xgene-dma.c
+@@ -124,32 +124,8 @@
+ #define XGENE_DMA_DESC_ELERR_POS		46
+ #define XGENE_DMA_DESC_RTYPE_POS		56
+ #define XGENE_DMA_DESC_LERR_POS			60
+-#define XGENE_DMA_DESC_FLYBY_POS		4
+ #define XGENE_DMA_DESC_BUFLEN_POS		48
+ #define XGENE_DMA_DESC_HOENQ_NUM_POS		48
+-
+-#define XGENE_DMA_DESC_NV_SET(m)		\
+-	(((u64 *)(m))[0] |= XGENE_DMA_DESC_NV_BIT)
+-#define XGENE_DMA_DESC_IN_SET(m)		\
+-	(((u64 *)(m))[0] |= XGENE_DMA_DESC_IN_BIT)
+-#define XGENE_DMA_DESC_RTYPE_SET(m, v)		\
+-	(((u64 *)(m))[0] |= ((u64)(v) << XGENE_DMA_DESC_RTYPE_POS))
+-#define XGENE_DMA_DESC_BUFADDR_SET(m, v)	\
+-	(((u64 *)(m))[0] |= (v))
+-#define XGENE_DMA_DESC_BUFLEN_SET(m, v)		\
+-	(((u64 *)(m))[0] |= ((u64)(v) << XGENE_DMA_DESC_BUFLEN_POS))
+-#define XGENE_DMA_DESC_C_SET(m)			\
+-	(((u64 *)(m))[1] |= XGENE_DMA_DESC_C_BIT)
+-#define XGENE_DMA_DESC_FLYBY_SET(m, v)		\
+-	(((u64 *)(m))[2] |= ((v) << XGENE_DMA_DESC_FLYBY_POS))
+-#define XGENE_DMA_DESC_MULTI_SET(m, v, i)	\
+-	(((u64 *)(m))[2] |= ((u64)(v) << (((i) + 1) * 8)))
+-#define XGENE_DMA_DESC_DR_SET(m)		\
+-	(((u64 *)(m))[2] |= XGENE_DMA_DESC_DR_BIT)
+-#define XGENE_DMA_DESC_DST_ADDR_SET(m, v)	\
+-	(((u64 *)(m))[3] |= (v))
+-#define XGENE_DMA_DESC_H0ENQ_NUM_SET(m, v)	\
+-	(((u64 *)(m))[3] |= ((u64)(v) << XGENE_DMA_DESC_HOENQ_NUM_POS))
+ #define XGENE_DMA_DESC_ELERR_RD(m)		\
+ 	(((m) >> XGENE_DMA_DESC_ELERR_POS) & 0x3)
+ #define XGENE_DMA_DESC_LERR_RD(m)		\
+@@ -158,14 +134,7 @@
+ 	(((elerr) << 4) | (lerr))
 
-Hence the next version will also include those changes...
+ /* X-Gene DMA descriptor empty s/w signature */
+-#define XGENE_DMA_DESC_EMPTY_INDEX		0
+ #define XGENE_DMA_DESC_EMPTY_SIGNATURE		~0ULL
+-#define XGENE_DMA_DESC_SET_EMPTY(m)		\
+-	(((u64 *)(m))[XGENE_DMA_DESC_EMPTY_INDEX] =	\
+-	 XGENE_DMA_DESC_EMPTY_SIGNATURE)
+-#define XGENE_DMA_DESC_IS_EMPTY(m)		\
+-	(((u64 *)(m))[XGENE_DMA_DESC_EMPTY_INDEX] ==	\
+-	 XGENE_DMA_DESC_EMPTY_SIGNATURE)
 
-FWIW, the U-boot thread:
-http://thread.gmane.org/gmane.comp.boot-loaders.u-boot/220416
+ /* X-Gene DMA configurable parameters defines */
+ #define XGENE_DMA_RING_NUM		512
+@@ -184,7 +153,7 @@
+ #define XGENE_DMA_XOR_ALIGNMENT		6	/* 64 Bytes */
+ #define XGENE_DMA_MAX_XOR_SRC		5
+ #define XGENE_DMA_16K_BUFFER_LEN_CODE	0x0
+-#define XGENE_DMA_INVALID_LEN_CODE	0x7800
++#define XGENE_DMA_INVALID_LEN_CODE	0x7800000000000000ULL
 
+ /* X-Gene DMA descriptor error codes */
+ #define ERR_DESC_AXI			0x01
+@@ -214,10 +183,10 @@
+ #define ERR_DESC_SRC_INT		0xB
 
-On 2015-06-02 03:32, Brian Norris wrote:
-> Hi Stefan,
-> 
-> Late review...
-> 
-> On Wed, Mar 25, 2015 at 05:28:24PM +0100, Stefan Agner wrote:
->> This driver supports Freescale NFC (NAND flash controller) found on
->> Vybrid (VF610), MPC5125, MCF54418 and Kinetis K70.
->>
->> Limitations:
->> - DMA and pipelining not used
->> - Pages larger than 2k are not supported
->> - No hardware ECC
->>
->> The driver has only been tested on Vybrid (VF610).
->>
->> Signed-off-by: Bill Pringlemeir <bpringlemeir@nbsps.com>
->> Signed-off-by: Stefan Agner <stefan@agner.ch>
->> ---
->>  MAINTAINERS                  |   6 +
->>  drivers/mtd/nand/Kconfig     |  12 +
->>  drivers/mtd/nand/Makefile    |   1 +
->>  drivers/mtd/nand/vf610_nfc.c | 686 +++++++++++++++++++++++++++++++++++++++++++
->>  4 files changed, 705 insertions(+)
->>  create mode 100644 drivers/mtd/nand/vf610_nfc.c
->>
-> ...
->> diff --git a/drivers/mtd/nand/vf610_nfc.c b/drivers/mtd/nand/vf610_nfc.c
->> new file mode 100644
->> index 0000000..23c1510
->> --- /dev/null
->> +++ b/drivers/mtd/nand/vf610_nfc.c
->> @@ -0,0 +1,686 @@
->> +/*
->> + * Copyright 2009-2015 Freescale Semiconductor, Inc. and others
->> + *
->> + * Description: MPC5125, VF610, MCF54418 and Kinetis K70 Nand driver.
->> + * Jason ported to M54418TWR and MVFA5 (VF610).
->> + * Authors: Stefan Agner <stefan.agner@toradex.com>
->> + *          Bill Pringlemeir <bpringlemeir@nbsps.com>
->> + *          Shaohui Xie <b21989@freescale.com>
->> + *          Jason Jin <Jason.jin@freescale.com>
->> + *
->> + * Based on original driver mpc5121_nfc.c.
-> 
-> It's not supremely obvious to me: what's the relationship between these
-> drivers? How similar is the IP, if at all?
+ /* X-Gene DMA flyby operation code */
+-#define FLYBY_2SRC_XOR			0x8
+-#define FLYBY_3SRC_XOR			0x9
+-#define FLYBY_4SRC_XOR			0xA
+-#define FLYBY_5SRC_XOR			0xB
++#define FLYBY_2SRC_XOR			0x80
++#define FLYBY_3SRC_XOR			0x90
++#define FLYBY_4SRC_XOR			0xA0
++#define FLYBY_5SRC_XOR			0xB0
 
-I think this is the driver the initial authors templated from (Jason,
-Shaohui).
+ /* X-Gene DMA SW descriptor flags */
+ #define XGENE_DMA_FLAG_64B_DESC		BIT(0)
+@@ -238,10 +207,10 @@
+ 	dev_err(chan->dev, "%s: " fmt, chan->name, ##arg)
 
-It appears to me that the NFC in MPC5121 is a remote relative of this
-IP: There are some register which are named similar, but usually the
-layout is quite different. Also the command sequencing seems to be
-handled differently...
+ struct xgene_dma_desc_hw {
+-	u64 m0;
+-	u64 m1;
+-	u64 m2;
+-	u64 m3;
++	__le64 m0;
++	__le64 m1;
++	__le64 m2;
++	__le64 m3;
+ };
 
-Note that Bill Pringlemeir shares this opinion, as he stated in a thread
-related to his initial RFC patch submission:
-http://thread.gmane.org/gmane.linux.drivers.mtd/49878/focus=49885
+ enum xgene_dma_ring_cfgsize {
+@@ -388,18 +357,11 @@ static bool is_pq_enabled(struct xgene_dma *pdma)
+ 	return !(val & XGENE_DMA_PQ_DISABLE_MASK);
+ }
 
+-static void xgene_dma_cpu_to_le64(u64 *desc, int count)
+-{
+-	int i;
+-
+-	for (i = 0; i < count; i++)
+-		desc[i] = cpu_to_le64(desc[i]);
+-}
+-
+-static u16 xgene_dma_encode_len(u32 len)
++static u64 xgene_dma_encode_len(size_t len)
+ {
+ 	return (len < XGENE_DMA_MAX_BYTE_CNT) ?
+-		len : XGENE_DMA_16K_BUFFER_LEN_CODE;
++		((u64)len << XGENE_DMA_DESC_BUFLEN_POS) :
++		XGENE_DMA_16K_BUFFER_LEN_CODE;
+ }
 
-<snip>
->> +static inline void vf610_nfc_memcpy(void *dst, const void *src, size_t n)
->> +{
->> +	/*
->> +	 * Use this accessor for the interal SRAM buffers. On ARM we can
->> +	 * treat the SRAM buffer as if its memory, hence use memcpy
-> 
-> s/its/it's/
-> or
-> s/its/it is/
-> 
->> +	 */
->> +	memcpy(dst, src, n);
-> 
-> I'm not clear on all the reasoning in your comment. Is this really
-> specific to ARM, that you can treat SRAM like memory? If so, should this
-> driver have some dependency on ARM?
+ static u8 xgene_dma_encode_xor_flyby(u32 src_cnt)
+@@ -424,34 +386,50 @@ static u32 xgene_dma_ring_desc_cnt(struct xgene_dma_ring *ring)
+ 	return XGENE_DMA_RING_DESC_CNT(ring_state);
+ }
 
-I do not have a PowerPC here, so I can't test it actually. My guess
-would be that the PowerPC will behave similar and hence allow to use
-memcpy too.
+-static void xgene_dma_set_src_buffer(void *ext8, size_t *len,
++static void xgene_dma_set_src_buffer(__le64 *ext8, size_t *len,
+ 				     dma_addr_t *paddr)
+ {
+ 	size_t nbytes = (*len < XGENE_DMA_MAX_BYTE_CNT) ?
+ 			*len : XGENE_DMA_MAX_BYTE_CNT;
 
-This memcpy encapsulation was suggested by Bill, and I think it makes
-sense since the SRAM is part of the IP register map, it _could_ probably
-behave different than normal SRAM and hence need special treatment...
-However, at least on ARM memcpy works fine (and we can make use of the
-assembler optimized variants of it).
+-	XGENE_DMA_DESC_BUFADDR_SET(ext8, *paddr);
+-	XGENE_DMA_DESC_BUFLEN_SET(ext8, xgene_dma_encode_len(nbytes));
++	*ext8 |= cpu_to_le64(*paddr);
++	*ext8 |= cpu_to_le64(xgene_dma_encode_len(nbytes));
+ 	*len -= nbytes;
+ 	*paddr += nbytes;
+ }
 
-I will alter the comment to read somewhat like:
-/*
- * Use this accessor for the internal SRAM buffers. On ARM platforms,
-it's
- * known that the driver can treat the SRAM buffer as if it's memory.
-Other
- * platform might need to treat that buffer differently.
- *
- * For the time being, use memcpy
- */
+-static void xgene_dma_invalidate_buffer(void *ext8)
++static void xgene_dma_invalidate_buffer(__le64 *ext8)
+ {
+-	XGENE_DMA_DESC_BUFLEN_SET(ext8, XGENE_DMA_INVALID_LEN_CODE);
++	*ext8 |= cpu_to_le64(XGENE_DMA_INVALID_LEN_CODE);
+ }
 
+-static void *xgene_dma_lookup_ext8(u64 *desc, int idx)
++static __le64 *xgene_dma_lookup_ext8(struct xgene_dma_desc_hw *desc, int idx)
+ {
+-	return (idx % 2) ? (desc + idx - 1) : (desc + idx + 1);
++	switch (idx) {
++	case 0:
++		return &desc->m1;
++	case 1:
++		return &desc->m0;
++	case 2:
++		return &desc->m3;
++	case 3:
++		return &desc->m2;
++	default:
++		pr_err("Invalid dma descriptor index\n");
++	}
++
++	return NULL;
+ }
 
-> 
-> Also, if you're really trying to handle iomem, it makes sense to
-> annotate the 2nd argument with __iomem. Then sparse will only complain
-> on the memcpy(), which has a proper comment explanation, rather than on
-> every call site for vf610_nfc_memcpy(). i.e.:
-> 
-> static inline void vf610_nfc_memcpy(void *dst, const void __iomem *src,
-> 				    size_t n)
-> 
+-static void xgene_dma_init_desc(void *desc, u16 dst_ring_num)
++static void xgene_dma_init_desc(struct xgene_dma_desc_hw *desc,
++				u16 dst_ring_num)
+ {
+-	XGENE_DMA_DESC_C_SET(desc); /* Coherent IO */
+-	XGENE_DMA_DESC_IN_SET(desc);
+-	XGENE_DMA_DESC_H0ENQ_NUM_SET(desc, dst_ring_num);
+-	XGENE_DMA_DESC_RTYPE_SET(desc, XGENE_DMA_RING_OWNER_DMA);
++	desc->m0 |= cpu_to_le64(XGENE_DMA_DESC_IN_BIT);
++	desc->m0 |= cpu_to_le64((u64)XGENE_DMA_RING_OWNER_DMA <<
++				XGENE_DMA_DESC_RTYPE_POS);
++	desc->m1 |= cpu_to_le64(XGENE_DMA_DESC_C_BIT);
++	desc->m3 |= cpu_to_le64((u64)dst_ring_num <<
++				XGENE_DMA_DESC_HOENQ_NUM_POS);
+ }
 
-Agreed.
+ static void xgene_dma_prep_cpy_desc(struct xgene_dma_chan *chan,
+@@ -459,7 +437,7 @@ static void xgene_dma_prep_cpy_desc(struct xgene_dma_chan *chan,
+ 				    dma_addr_t dst, dma_addr_t src,
+ 				    size_t len)
+ {
+-	void *desc1, *desc2;
++	struct xgene_dma_desc_hw *desc1, *desc2;
+ 	int i;
 
+ 	/* Get 1st descriptor */
+@@ -467,23 +445,21 @@ static void xgene_dma_prep_cpy_desc(struct xgene_dma_chan *chan,
+ 	xgene_dma_init_desc(desc1, chan->tx_ring.dst_ring_num);
 
->> +}
->> +
->> +/* Clear flags for upcoming command */
->> +static inline void vf610_nfc_clear_status(struct vf610_nfc *nfc)
->> +{
->> +	void __iomem *reg = nfc->regs + NFC_IRQ_STATUS;
->> +	u32 tmp = __raw_readl(reg);
-> 
-> Why are you using __raw_xxx variants here, whereas you use readl() in
-> others? The __raw_xxx variants do not have the normal endian awareness,
-> nor do they have implicit I/O barriers. I'd bet you should be using the
-> {read,write}l_relaxed() or {read,write}l(), depending on whether this is
-> performance critical and you handle the consistency issues elsewhere.
-> 
-> (Same comment applies to all the __raw_xxx usages in this driver, I
-> think.)
-> 
->> +
->> +	tmp |= CMD_DONE_CLEAR_BIT | IDLE_CLEAR_BIT;
->> +	__raw_writel(tmp, reg);
->> +}
->> +
->> +static inline void vf610_nfc_done(struct vf610_nfc *nfc)
->> +{
->> +	int rv;
->> +
->> +	/*
->> +	 * Barrier is needed after this write. This write need
->> +	 * to be done before reading the next register the first
->> +	 * time.
->> +	 * vf610_nfc_set implicates such a barrier by using writel
->> +	 * to write to the register.
->> +	 */
->> +	vf610_nfc_set(nfc, NFC_IRQ_STATUS, IDLE_EN_BIT);
->> +	vf610_nfc_set(nfc, NFC_FLASH_CMD2, START_BIT);
->> +
->> +	if (!(vf610_nfc_read(nfc, NFC_IRQ_STATUS) & IDLE_IRQ_BIT)) {
->> +		rv = wait_event_timeout(nfc->irq_waitq,
->> +			(vf610_nfc_read(nfc, NFC_IRQ_STATUS) & IDLE_IRQ_BIT),
->> +					NFC_TIMEOUT);
-> 
-> This looks like you're doing a standard IRQ-based wait-for-completion,
-> except that you're also including some extra register polling. Would
-> this work just as well using a struct completion
-> (wait_for_completion_timeout() and complete())? Or is the register poll
-> necessary?
-> 
->> +		if (!rv)
->> +			dev_warn(nfc->dev, "Timeout while waiting for BUSY.\n");
->> +	}
->> +	vf610_nfc_clear_status(nfc);
->> +}
->> +
->> +static u8 vf610_nfc_get_id(struct vf610_nfc *nfc, int col)
->> +{
->> +	u32 flash_id;
->> +
->> +	if (col < 4) {
->> +		flash_id = vf610_nfc_read(nfc, NFC_FLASH_STATUS1);
->> +		return (flash_id >> (3-col)*8) & 0xff;
-> 
-> Add spaces around the arithmetic, please.
-> 
->> +	} else {
->> +		flash_id = vf610_nfc_read(nfc, NFC_FLASH_STATUS2);
->> +		return flash_id >> 24;
->> +	}
->> +}
->> +
->> +static u8 vf610_nfc_get_status(struct vf610_nfc *nfc)
->> +{
->> +	return vf610_nfc_read(nfc, NFC_FLASH_STATUS2) & STATUS_BYTE1_MASK;
->> +}
->> +
->> +static void vf610_nfc_send_command(struct vf610_nfc *nfc, u32 cmd_byte1,
->> +				   u32 cmd_code)
->> +{
->> +	void __iomem *reg = nfc->regs + NFC_FLASH_CMD2;
->> +	u32 tmp;
->> +
->> +	vf610_nfc_clear_status(nfc);
->> +
->> +	tmp = __raw_readl(reg);
->> +	tmp &= ~(CMD_BYTE1_MASK | CMD_CODE_MASK | BUFNO_MASK);
->> +	tmp |= cmd_byte1 << CMD_BYTE1_SHIFT;
->> +	tmp |= cmd_code << CMD_CODE_SHIFT;
->> +	__raw_writel(tmp, reg);
->> +}
->> +
->> +static void vf610_nfc_send_commands(struct vf610_nfc *nfc, u32 cmd_byte1,
->> +				    u32 cmd_byte2, u32 cmd_code)
->> +{
->> +	void __iomem *reg = nfc->regs + NFC_FLASH_CMD1;
->> +	u32 tmp;
->> +
->> +	vf610_nfc_send_command(nfc, cmd_byte1, cmd_code);
->> +
->> +	tmp = __raw_readl(reg);
->> +	tmp &= ~CMD_BYTE2_MASK;
->> +	tmp |= cmd_byte2 << CMD_BYTE2_SHIFT;
->> +	__raw_writel(tmp, reg);
->> +}
->> +
->> +static irqreturn_t vf610_nfc_irq(int irq, void *data)
->> +{
->> +	struct mtd_info *mtd = data;
->> +	struct vf610_nfc *nfc = mtd_to_nfc(mtd);
->> +
->> +	vf610_nfc_clear(nfc, NFC_IRQ_STATUS, IDLE_EN_BIT);
->> +	wake_up(&nfc->irq_waitq);
->> +
->> +	return IRQ_HANDLED;
->> +}
->> +
->> +static void vf610_nfc_addr_cycle(struct vf610_nfc *nfc, int column, int page)
->> +{
->> +	if (column != -1) {
->> +		if (nfc->chip.options | NAND_BUSWIDTH_16)
-> 
-> smatch caught a hard-to-spot one here:
-> 
-> drivers/mtd/nand/vf610_nfc.c:335 vf610_nfc_addr_cycle() warn:
-> suspicious bitop condition [smatch]
-> 
-> You probably meant:
-> 
-> 		if (nfc->chip.options & NAND_BUSWIDTH_16)
-> 
->> +			column = column/2;
->> +		vf610_nfc_set_field(nfc, NFC_COL_ADDR, COL_ADDR_MASK,
->> +				    COL_ADDR_SHIFT, column);
->> +	}
->> +	if (page != -1)
->> +		vf610_nfc_set_field(nfc, NFC_ROW_ADDR, ROW_ADDR_MASK,
->> +				    ROW_ADDR_SHIFT, page);
->> +}
->> +
->> +static inline void vf610_nfc_transfer_size(void __iomem *regbase, int size)
->> +{
->> +	__raw_writel(size, regbase + NFC_SECTOR_SIZE);
->> +}
->> +
->> +static void vf610_nfc_command(struct mtd_info *mtd, unsigned command,
->> +			      int column, int page)
->> +{
->> +	struct vf610_nfc *nfc = mtd_to_nfc(mtd);
->> +
->> +	nfc->column     = max(column, 0);
->> +	nfc->spareonly	= 0;
->> +	nfc->alt_buf	= 0;
->> +
->> +	switch (command) {
->> +	case NAND_CMD_PAGEPROG:
->> +		nfc->page = -1;
->> +		vf610_nfc_transfer_size(nfc->regs, nfc->page_sz);
->> +		vf610_nfc_send_commands(nfc, NAND_CMD_SEQIN,
->> +					command, PROGRAM_PAGE_CMD_CODE);
->> +		vf610_nfc_addr_cycle(nfc, column, page);
->> +		break;
->> +
->> +	case NAND_CMD_RESET:
->> +		vf610_nfc_transfer_size(nfc->regs, 0);
->> +		vf610_nfc_send_command(nfc, command, RESET_CMD_CODE);
->> +		break;
->> +	/*
->> +	 * NFC does not support sub-page reads and writes,
->> +	 * so emulate them using full page transfers.
->> +	 */
->> +	case NAND_CMD_READOOB:
->> +		nfc->spareonly = 1;
->> +	case NAND_CMD_SEQIN: /* Pre-read for partial writes. */
->> +	case NAND_CMD_READ0:
->> +		column = 0;
->> +		/* Already read? */
->> +		if (nfc->page == page)
->> +			return;
->> +		nfc->page = page;
->> +		vf610_nfc_transfer_size(nfc->regs, nfc->page_sz);
->> +		vf610_nfc_send_commands(nfc, NAND_CMD_READ0,
->> +					NAND_CMD_READSTART, READ_PAGE_CMD_CODE);
->> +		vf610_nfc_addr_cycle(nfc, column, page);
->> +		break;
->> +
->> +	case NAND_CMD_ERASE1:
->> +		nfc->page = -1;
->> +		vf610_nfc_transfer_size(nfc->regs, 0);
->> +		vf610_nfc_send_commands(nfc, command,
->> +				  NAND_CMD_ERASE2, ERASE_CMD_CODE);
->> +		vf610_nfc_addr_cycle(nfc, column, page);
->> +		break;
->> +
->> +	case NAND_CMD_READID:
->> +		nfc->alt_buf = ALT_BUF_ID;
->> +		vf610_nfc_transfer_size(nfc->regs, 0);
->> +		vf610_nfc_send_command(nfc, command, READ_ID_CMD_CODE);
->> +		break;
->> +
->> +	case NAND_CMD_STATUS:
->> +		nfc->alt_buf = ALT_BUF_STAT;
->> +		vf610_nfc_transfer_size(nfc->regs, 0);
->> +		vf610_nfc_send_command(nfc, command, STATUS_READ_CMD_CODE);
->> +		break;
->> +	default:
->> +		return;
->> +	}
->> +
->> +	vf610_nfc_done(nfc);
->> +}
->> +
->> +static inline void vf610_nfc_read_spare(struct mtd_info *mtd, void *buf,
->> +					int len)
->> +{
->> +	struct vf610_nfc *nfc = mtd_to_nfc(mtd);
->> +
->> +	len = min_t(uint, mtd->oobsize, len);
->> +	if (len > 0)
->> +		vf610_nfc_memcpy(buf, nfc->regs + mtd->writesize, len);
->> +}
->> +
->> +static void vf610_nfc_read_buf(struct mtd_info *mtd, u_char *buf, int len)
->> +{
->> +	struct vf610_nfc *nfc = mtd_to_nfc(mtd);
->> +	uint c = nfc->column;
->> +	uint l;
->> +
->> +	/* Handle main area */
->> +	if (!nfc->spareonly) {
->> +		l = min_t(uint, len, mtd->writesize - c);
->> +		nfc->column += l;
->> +
->> +		if (!nfc->alt_buf)
->> +			vf610_nfc_memcpy(buf, nfc->regs + NFC_MAIN_AREA(0) + c, l);
->> +		else
->> +			if (nfc->alt_buf & ALT_BUF_ID)
->> +				*buf = vf610_nfc_get_id(nfc, c);
->> +			else
->> +				*buf = vf610_nfc_get_status(nfc);
->> +
->> +		buf += l;
->> +		len -= l;
->> +	}
->> +
->> +	/* Handle spare area access */
->> +	if (len) {
->> +		nfc->column += len;
->> +		vf610_nfc_read_spare(mtd, buf, len);
->> +	}
->> +}
->> +
->> +static void vf610_nfc_write_buf(struct mtd_info *mtd, const uint8_t *buf, int len)
->> +{
->> +	struct vf610_nfc *nfc = mtd_to_nfc(mtd);
->> +	uint c = nfc->column;
->> +	uint l;
->> +
->> +	l = min_t(uint, len, mtd->writesize + mtd->oobsize - c);
->> +	nfc->column += l;
->> +	vf610_nfc_memcpy(nfc->regs + NFC_MAIN_AREA(0) + c, buf, l);
->> +}
->> +
->> +static uint8_t vf610_nfc_read_byte(struct mtd_info *mtd)
->> +{
->> +	u8 tmp;
->> +
->> +	vf610_nfc_read_buf(mtd, &tmp, sizeof(tmp));
->> +	return tmp;
->> +}
->> +
->> +static u16 vf610_nfc_read_word(struct mtd_info *mtd)
->> +{
->> +	u16 tmp;
->> +
->> +	vf610_nfc_read_buf(mtd, (u_char *)&tmp, sizeof(tmp));
->> +	return tmp;
->> +}
->> +
->> +/* If not provided, upper layers apply a fixed delay. */
->> +static int vf610_nfc_dev_ready(struct mtd_info *mtd)
->> +{
->> +	/* NFC handles R/B internally; always ready.  */
->> +	return 1;
->> +}
->> +
->> +/*
->> + * This function supports Vybrid only (MPC5125 would have full RB and four CS)
->> + */
->> +static void vf610_nfc_select_chip(struct mtd_info *mtd, int chip)
->> +{
->> +#ifdef CONFIG_SOC_VF610
->> +	struct vf610_nfc *nfc = mtd_to_nfc(mtd);
->> +	u32 tmp = vf610_nfc_read(nfc, NFC_ROW_ADDR);
->> +
->> +	tmp &= ~(ROW_ADDR_CHIP_SEL_RB_MASK | ROW_ADDR_CHIP_SEL_MASK);
->> +	tmp |= 1 << ROW_ADDR_CHIP_SEL_RB_SHIFT;
->> +
->> +	if (chip == 0)
->> +		tmp |= 1 << ROW_ADDR_CHIP_SEL_SHIFT;
->> +	else if (chip == 1)
->> +		tmp |= 2 << ROW_ADDR_CHIP_SEL_SHIFT;
->> +
->> +	vf610_nfc_write(nfc, NFC_ROW_ADDR, tmp);
->> +#endif
->> +}
->> +
->> +#ifdef CONFIG_OF_MTD
-> 
-> Don't use CONFIG_OF_MTD. Maybe CONFIG_OF, but even that doesn't seem
-> necessary. The table is tiny, and the code should fail gracefully (and
-> reduce to pretty simple / negligible code) if you don't have OF enabled.
-> 
->> +static const struct of_device_id vf610_nfc_dt_ids[] = {
->> +	{ .compatible = "fsl,vf610-nfc" },
->> +	{ .compatible = "fsl,mpc5125-nfc" },
->> +	{ /* sentinel */ }
->> +};
->> +MODULE_DEVICE_TABLE(of, vf610_nfc_dt_ids);
->> +
->> +static int vf610_nfc_probe_dt(struct device *dev, struct vf610_nfc_config *cfg)
->> +{
->> +	struct device_node *np = dev->of_node;
->> +	int buswidth;
->> +
->> +	if (!np)
->> +		return 1;
-> 
-> Try:
-> 
-> 		return -EINVAL;
-> 
->> +
->> +	cfg->flash_bbt = of_get_nand_on_flash_bbt(np);
->> +
->> +	buswidth = of_get_nand_bus_width(np);
->> +	if (buswidth < 0)
->> +		return buswidth;
-> 
-> This function should mostly come for free as part of this:
-> 
-> commit 5844feeaa4154d1c46d3462c7a4653d22356d8b4
-> Author: Brian Norris <computersforpeace@gmail.com>
-> Date:   Fri Jan 23 00:22:27 2015 -0800
-> 
->     mtd: nand: add common DT init code
-> 
-> in l2-mtd.git and linux-next.git. Can you try just assigning chip->dn
-> instead?
-> 
->> +
->> +	cfg->width = buswidth;
->> +
->> +	return 0;
->> +}
->> +#else
->> +static int vf610_nfc_probe_dt(struct device *dev, struct vf610_nfc_config *cfg)
->> +{
->> +	return 0;
-> 
-> Really? I doubt you want to silently do nothing if you don't have OF
-> enabled. It seems to make more sense to just kill the #ifdef, and have
-> the registration fail on either the '!np' case or the
-> 'of_get_nand_bus_width(np) returns -ENOSYS' case.
+ 	/* Set destination address */
+-	XGENE_DMA_DESC_DR_SET(desc1);
+-	XGENE_DMA_DESC_DST_ADDR_SET(desc1, dst);
++	desc1->m2 |= cpu_to_le64(XGENE_DMA_DESC_DR_BIT);
++	desc1->m3 |= cpu_to_le64(dst);
 
-The driver might be used on a platform which does not support DT
-(ColdFire). However, I don't think anyone tried and I guess it doesn't
-work as is, hence the driver would need an update anyway. So I'm fine
-with just returning with an error in the non-DT case...
+ 	/* Set 1st source address */
+-	xgene_dma_set_src_buffer(desc1 + 8, &len, &src);
++	xgene_dma_set_src_buffer(&desc1->m1, &len, &src);
 
-> 
->> +}
->> +#endif
->> +
->> +static int vf610_nfc_init_controller(struct vf610_nfc *nfc)
->> +{
->> +	struct vf610_nfc_config *cfg = &nfc->cfg;
->> +
->> +	if (cfg->width == 16)
->> +		vf610_nfc_set(nfc, NFC_FLASH_CONFIG, CONFIG_16BIT);
->> +	else
->> +		vf610_nfc_clear(nfc, NFC_FLASH_CONFIG, CONFIG_16BIT);
->> +
->> +	/* Set configuration register. */
->> +	vf610_nfc_clear(nfc, NFC_FLASH_CONFIG, CONFIG_ADDR_AUTO_INCR_BIT);
->> +	vf610_nfc_clear(nfc, NFC_FLASH_CONFIG, CONFIG_BUFNO_AUTO_INCR_BIT);
->> +	vf610_nfc_clear(nfc, NFC_FLASH_CONFIG, CONFIG_BOOT_MODE_BIT);
->> +	vf610_nfc_clear(nfc, NFC_FLASH_CONFIG, CONFIG_DMA_REQ_BIT);
->> +	vf610_nfc_set(nfc, NFC_FLASH_CONFIG, CONFIG_FAST_FLASH_BIT);
->> +
->> +	/* PAGE_CNT = 1 */
->> +	vf610_nfc_set_field(nfc, NFC_FLASH_CONFIG, CONFIG_PAGE_CNT_MASK,
->> +			    CONFIG_PAGE_CNT_SHIFT, 1);
->> +
->> +	return 0;
->> +}
->> +
->> +static int vf610_nfc_probe(struct platform_device *pdev)
->> +{
->> +	struct vf610_nfc *nfc;
->> +	struct resource *res;
->> +	struct mtd_info *mtd;
->> +	struct nand_chip *chip;
->> +	struct vf610_nfc_config *cfg;
->> +	int err = 0;
->> +	int irq;
->> +
->> +	nfc = devm_kzalloc(&pdev->dev, sizeof(*nfc), GFP_KERNEL);
->> +	if (!nfc)
->> +		return -ENOMEM;
->> +
->> +	cfg = &nfc->cfg;
->> +
->> +	nfc->dev = &pdev->dev;
->> +	nfc->page = -1;
->> +	mtd = &nfc->mtd;
->> +	chip = &nfc->chip;
->> +
->> +	mtd->priv = chip;
->> +	mtd->owner = THIS_MODULE;
->> +	mtd->dev.parent = nfc->dev;
->> +	mtd->name = DRV_NAME;
->> +
->> +	err = vf610_nfc_probe_dt(nfc->dev, cfg);
->> +	if (err)
->> +		return -ENODEV;
->> +
->> +	irq = platform_get_irq(pdev, 0);
->> +	if (irq <= 0)
->> +		return -EINVAL;
->> +
->> +	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
->> +	nfc->regs = devm_ioremap_resource(nfc->dev, res);
->> +	if (IS_ERR(nfc->regs))
->> +		return PTR_ERR(nfc->regs);
->> +
->> +	nfc->clk = devm_clk_get(&pdev->dev, NULL);
->> +	if (IS_ERR(nfc->clk))
->> +		return PTR_ERR(nfc->clk);
->> +
->> +	err = clk_prepare_enable(nfc->clk);
->> +	if (err) {
->> +		dev_err(nfc->dev, "Unable to enable clock!\n");
->> +		return err;
->> +	}
->> +
->> +	if (cfg->width == 16)
->> +		chip->options |= NAND_BUSWIDTH_16;
->> +	else
->> +		chip->options &= ~NAND_BUSWIDTH_16;
-> 
-> Is the else clause needed? Also, you'll get the above for free with the
-> aforementioned commit ("mtd: nand: add common DT init code").
-> 
->> +
->> +	chip->dev_ready = vf610_nfc_dev_ready;
->> +	chip->cmdfunc = vf610_nfc_command;
->> +	chip->read_byte = vf610_nfc_read_byte;
->> +	chip->read_word = vf610_nfc_read_word;
->> +	chip->read_buf = vf610_nfc_read_buf;
->> +	chip->write_buf = vf610_nfc_write_buf;
->> +	chip->select_chip = vf610_nfc_select_chip;
->> +
->> +	/* Bad block options. */
->> +	if (cfg->flash_bbt)
->> +		chip->bbt_options = NAND_BBT_USE_FLASH | NAND_BBT_NO_OOB |
->> +				    NAND_BBT_CREATE;
-> 
-> You probably don't need NAND_BBT_CREATE here. It's added automatically
-> to the BBT descriptors in nand_bbt.c.
-> 
-> You can also get the NAND_BBT_USE_FLASH part for free from the
-> aforementioned patch ("mtd: nand: add common DT init code").
-> 
->> +
->> +	init_waitqueue_head(&nfc->irq_waitq);
->> +
->> +	err = devm_request_irq(nfc->dev, irq, vf610_nfc_irq, 0, DRV_NAME, mtd);
->> +	if (err) {
->> +		dev_err(nfc->dev, "Error requesting IRQ!\n");
->> +		goto error;
->> +	}
->> +
->> +	nfc->page_sz = PAGE_2K + OOB_64;
->> +	nfc->page_sz += cfg->width == 16 ? 1 : 0;
->> +
->> +	vf610_nfc_init_controller(nfc);
->> +
->> +	/* first scan to find the device and get the page size */
->> +	if (nand_scan_ident(mtd, 1, NULL)) {
->> +		err = -ENXIO;
->> +		goto error;
->> +	}
->> +
->> +	chip->ecc.mode = NAND_ECC_SOFT; /* default */
->> +
->> +	nfc->page_sz = mtd->writesize + mtd->oobsize;
->> +
->> +	/* Single buffer only, max 256 OOB minus ECC status */
->> +	if (nfc->page_sz > PAGE_2K + 256 - 8) {
->> +		dev_err(nfc->dev, "Unsupported flash page size\n");
->> +		err = -ENXIO;
->> +		goto error;
->> +	}
->> +	nfc->page_sz += cfg->width == 16 ? 1 : 0;
->> +
->> +	/* second phase scan */
->> +	if (nand_scan_tail(mtd)) {
->> +		err = -ENXIO;
->> +		goto error;
->> +	}
->> +
->> +	/* Register device in MTD */
->> +	mtd_device_parse_register(mtd, NULL,
->> +		&(struct mtd_part_parser_data){
->> +			.of_node = pdev->dev.of_node,
->> +		},
->> +		NULL, 0);
-> 
-> Please check the return code of mtd_device_parse_register().
-> 
->> +
->> +	platform_set_drvdata(pdev, mtd);
-> 
-> If you move this up, then you can do:
-> 
-> 	return mtd_device_parse_register(...);
-> 
->> +
->> +	return 0;
->> +
->> +error:
->> +	clk_disable_unprepare(nfc->clk);
->> +	return err;
->> +}
->> +
->> +static int vf610_nfc_remove(struct platform_device *pdev)
->> +{
->> +	struct mtd_info *mtd = platform_get_drvdata(pdev);
->> +	struct vf610_nfc *nfc = mtd_to_nfc(mtd);
->> +
->> +	nand_release(mtd);
->> +	clk_disable_unprepare(nfc->clk);
->> +	return 0;
->> +}
->> +
->> +#ifdef CONFIG_PM_SLEEP
->> +static int vf610_nfc_suspend(struct device *dev)
->> +{
->> +	struct mtd_info *mtd = dev_get_drvdata(dev);
->> +	struct vf610_nfc *nfc = mtd_to_nfc(mtd);
->> +
->> +	clk_disable_unprepare(nfc->clk);
->> +	return 0;
->> +}
->> +
->> +static int vf610_nfc_resume(struct device *dev)
->> +{
->> +	struct mtd_info *mtd = dev_get_drvdata(dev);
->> +	struct vf610_nfc *nfc = mtd_to_nfc(mtd);
->> +
->> +	pinctrl_pm_select_default_state(dev);
->> +
->> +	clk_prepare_enable(nfc->clk);
->> +
->> +	vf610_nfc_init_controller(nfc);
->> +	return 0;
->> +}
->> +#endif
->> +
->> +static SIMPLE_DEV_PM_OPS(vf610_nfc_pm_ops, vf610_nfc_suspend, vf610_nfc_resume);
->> +
->> +static struct platform_driver vf610_nfc_driver = {
->> +	.driver		= {
->> +		.name	= DRV_NAME,
->> +		.of_match_table = vf610_nfc_dt_ids,
->> +		.pm	= &vf610_nfc_pm_ops,
->> +	},
->> +	.probe		= vf610_nfc_probe,
->> +	.remove		= vf610_nfc_remove,
->> +};
->> +
->> +module_platform_driver(vf610_nfc_driver);
->> +
->> +MODULE_AUTHOR("Freescale Semiconductor, Inc.");
->> +MODULE_DESCRIPTION("Freescale VF610/MPC5125 NFC MTD NAND driver");
->> +MODULE_LICENSE("GPL");
+-	if (len <= 0) {
+-		desc2 = NULL;
+-		goto skip_additional_src;
+-	}
++	if (!len)
++		return;
 
+ 	/*
+ 	 * We need to split this source buffer,
+ 	 * and need to use 2nd descriptor
+ 	 */
+ 	desc2 = &desc_sw->desc2;
+-	XGENE_DMA_DESC_NV_SET(desc1);
++	desc1->m0 |= cpu_to_le64(XGENE_DMA_DESC_NV_BIT);
 
-Otherwise agreed, will look into implementing your changes and rebase
-the driver on-top of l2-mtd.git/linux-next.git.
+ 	/* Set 2nd to 5th source address */
+ 	for (i = 0; i < 4 && len; i++)
+@@ -496,12 +472,6 @@ static void xgene_dma_prep_cpy_desc(struct xgene_dma_chan *chan,
 
+ 	/* Updated flag that we have prepared 64B descriptor */
+ 	desc_sw->flags |= XGENE_DMA_FLAG_64B_DESC;
+-
+-skip_additional_src:
+-	/* Hardware stores descriptor in little endian format */
+-	xgene_dma_cpu_to_le64(desc1, 4);
+-	if (desc2)
+-		xgene_dma_cpu_to_le64(desc2, 4);
+ }
+
+ static void xgene_dma_prep_xor_desc(struct xgene_dma_chan *chan,
+@@ -510,7 +480,7 @@ static void xgene_dma_prep_xor_desc(struct xgene_dma_chan *chan,
+ 				    u32 src_cnt, size_t *nbytes,
+ 				    const u8 *scf)
+ {
+-	void *desc1, *desc2;
++	struct xgene_dma_desc_hw *desc1, *desc2;
+ 	size_t len = *nbytes;
+ 	int i;
+
+@@ -521,28 +491,24 @@ static void xgene_dma_prep_xor_desc(struct xgene_dma_chan *chan,
+ 	xgene_dma_init_desc(desc1, chan->tx_ring.dst_ring_num);
+
+ 	/* Set destination address */
+-	XGENE_DMA_DESC_DR_SET(desc1);
+-	XGENE_DMA_DESC_DST_ADDR_SET(desc1, *dst);
++	desc1->m2 |= cpu_to_le64(XGENE_DMA_DESC_DR_BIT);
++	desc1->m3 |= cpu_to_le64(*dst);
+
+ 	/* We have multiple source addresses, so need to set NV bit*/
+-	XGENE_DMA_DESC_NV_SET(desc1);
++	desc1->m0 |= cpu_to_le64(XGENE_DMA_DESC_NV_BIT);
+
+ 	/* Set flyby opcode */
+-	XGENE_DMA_DESC_FLYBY_SET(desc1, xgene_dma_encode_xor_flyby(src_cnt));
++	desc1->m2 |= cpu_to_le64(xgene_dma_encode_xor_flyby(src_cnt));
+
+ 	/* Set 1st to 5th source addresses */
+ 	for (i = 0; i < src_cnt; i++) {
+ 		len = *nbytes;
+-		xgene_dma_set_src_buffer((i == 0) ? (desc1 + 8) :
++		xgene_dma_set_src_buffer((i == 0) ? &desc1->m1 :
+ 					 xgene_dma_lookup_ext8(desc2, i - 1),
+ 					 &len, &src[i]);
+-		XGENE_DMA_DESC_MULTI_SET(desc1, scf[i], i);
++		desc1->m2 |= cpu_to_le64((scf[i] << ((i + 1) * 8)));
+ 	}
+
+-	/* Hardware stores descriptor in little endian format */
+-	xgene_dma_cpu_to_le64(desc1, 4);
+-	xgene_dma_cpu_to_le64(desc2, 4);
+-
+ 	/* Update meta data */
+ 	*nbytes = len;
+ 	*dst += XGENE_DMA_MAX_BYTE_CNT;
+@@ -738,7 +704,7 @@ static int xgene_chan_xfer_request(struct xgene_dma_ring *ring,
+  * xgene_chan_xfer_ld_pending - push any pending transactions to hw
+  * @chan : X-Gene DMA channel
+  *
+- * LOCKING: must hold chan->desc_lock
++ * LOCKING: must hold chan->lock
+  */
+ static void xgene_chan_xfer_ld_pending(struct xgene_dma_chan *chan)
+ {
+@@ -808,7 +774,8 @@ static void xgene_dma_cleanup_descriptors(struct xgene_dma_chan *chan)
+ 		desc_hw = &ring->desc_hw[ring->head];
+
+ 		/* Check if this descriptor has been completed */
+-		if (unlikely(XGENE_DMA_DESC_IS_EMPTY(desc_hw)))
++		if (unlikely(le64_to_cpu(desc_hw->m0) ==
++			     XGENE_DMA_DESC_EMPTY_SIGNATURE))
+ 			break;
+
+ 		if (++ring->head == ring->slots)
+@@ -842,7 +809,7 @@ static void xgene_dma_cleanup_descriptors(struct xgene_dma_chan *chan)
+ 		iowrite32(-1, ring->cmd);
+
+ 		/* Mark this hw descriptor as processed */
+-		XGENE_DMA_DESC_SET_EMPTY(desc_hw);
++		desc_hw->m0 = cpu_to_le64(XGENE_DMA_DESC_EMPTY_SIGNATURE);
+
+ 		xgene_dma_run_tx_complete_actions(chan, desc_sw);
+
+@@ -889,7 +856,7 @@ static int xgene_dma_alloc_chan_resources(struct dma_chan *dchan)
+  * @chan: X-Gene DMA channel
+  * @list: the list to free
+  *
+- * LOCKING: must hold chan->desc_lock
++ * LOCKING: must hold chan->lock
+  */
+ static void xgene_dma_free_desc_list(struct xgene_dma_chan *chan,
+ 				     struct list_head *list)
+@@ -900,15 +867,6 @@ static void xgene_dma_free_desc_list(struct xgene_dma_chan *chan,
+ 		xgene_dma_clean_descriptor(chan, desc);
+ }
+
+-static void xgene_dma_free_tx_desc_list(struct xgene_dma_chan *chan,
+-					struct list_head *list)
+-{
+-	struct xgene_dma_desc_sw *desc, *_desc;
+-
+-	list_for_each_entry_safe(desc, _desc, list, node)
+-		xgene_dma_clean_descriptor(chan, desc);
+-}
+-
+ static void xgene_dma_free_chan_resources(struct dma_chan *dchan)
+ {
+ 	struct xgene_dma_chan *chan = to_dma_chan(dchan);
+@@ -985,7 +943,7 @@ fail:
+ 	if (!first)
+ 		return NULL;
+
+-	xgene_dma_free_tx_desc_list(chan, &first->tx_list);
++	xgene_dma_free_desc_list(chan, &first->tx_list);
+ 	return NULL;
+ }
+
+@@ -1093,7 +1051,7 @@ fail:
+ 	if (!first)
+ 		return NULL;
+
+-	xgene_dma_free_tx_desc_list(chan, &first->tx_list);
++	xgene_dma_free_desc_list(chan, &first->tx_list);
+ 	return NULL;
+ }
+
+@@ -1141,7 +1099,7 @@ fail:
+ 	if (!first)
+ 		return NULL;
+
+-	xgene_dma_free_tx_desc_list(chan, &first->tx_list);
++	xgene_dma_free_desc_list(chan, &first->tx_list);
+ 	return NULL;
+ }
+
+@@ -1218,7 +1176,7 @@ fail:
+ 	if (!first)
+ 		return NULL;
+
+-	xgene_dma_free_tx_desc_list(chan, &first->tx_list);
++	xgene_dma_free_desc_list(chan, &first->tx_list);
+ 	return NULL;
+ }
+
+@@ -1316,7 +1274,6 @@ static void xgene_dma_setup_ring(struct xgene_dma_ring *ring)
+ {
+ 	void *ring_cfg = ring->state;
+ 	u64 addr = ring->desc_paddr;
+-	void *desc;
+ 	u32 i, val;
+
+ 	ring->slots = ring->size / XGENE_DMA_RING_WQ_DESC_SIZE;
+@@ -1358,8 +1315,10 @@ static void xgene_dma_setup_ring(struct xgene_dma_ring *ring)
+
+ 	/* Set empty signature to DMA Rx ring descriptors */
+ 	for (i = 0; i < ring->slots; i++) {
++		struct xgene_dma_desc_hw *desc;
++
+ 		desc = &ring->desc_hw[i];
+-		XGENE_DMA_DESC_SET_EMPTY(desc);
++		desc->m0 = cpu_to_le64(XGENE_DMA_DESC_EMPTY_SIGNATURE);
+ 	}
+
+ 	/* Enable DMA Rx ring interrupt */
 --
-Stefan
+1.8.2.1
