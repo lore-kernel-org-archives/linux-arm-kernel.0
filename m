@@ -1,54 +1,105 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Tue, 2 Jun 2015 11:28:56 +0200
-Subject: [PATCH v2] arm/arm64: KVM: Properly account for guest CPU time
-In-Reply-To: <556C601C.4000501@de.ibm.com>
-References: <1432838950-28774-1-git-send-email-christoffer.dall@linaro.org>
- <556C0E22.9090401@de.ibm.com> <20150601090817.GA18722@cbox>
- <556C240F.5070501@de.ibm.com> <20150601133558.GA20286@cbox>
- <556C601C.4000501@de.ibm.com>
-Message-ID: <20150602092856.GB7783@cbox>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Tue, 2 Jun 2015 10:33:23 +0100
+Subject: [PATCH 4/4] mfd: 88pm800: allocate pdata->rtc if not allocated
+ earlier
+In-Reply-To: <556D71F6.4030608@linaro.org>
+References: <1432937962-4537-1-git-send-email-vaibhav.hiremath@linaro.org>
+ <1432937962-4537-5-git-send-email-vaibhav.hiremath@linaro.org>
+ <20150601082200.GC3329@x1> <556D3A14.6050505@linaro.org>
+ <20150602074004.GH3329@x1> <556D71F6.4030608@linaro.org>
+Message-ID: <20150602093323.GI3329@x1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 01, 2015 at 03:37:32PM +0200, Christian Borntraeger wrote:
-> Am 01.06.2015 um 15:35 schrieb Christoffer Dall:
-> > On Mon, Jun 01, 2015 at 11:21:19AM +0200, Christian Borntraeger wrote:
-> >> Am 01.06.2015 um 11:08 schrieb Christoffer Dall:
-> >>
-> >>>>>
-> >>>>> Second, looking at the ppc and mips code, they seem to also call
-> >>>>> kvm_guest_exit() before enabling interrupts, so I don't understand how
-> >>>>> guest CPU time accounting works on those architectures.
+On Tue, 02 Jun 2015, Vaibhav Hiremath wrote:
+> On Tuesday 02 June 2015 01:10 PM, Lee Jones wrote:
+> >On Tue, 02 Jun 2015, Vaibhav Hiremath wrote:
+> >>On Monday 01 June 2015 01:52 PM, Lee Jones wrote:
+> >>>On Sat, 30 May 2015, Vaibhav Hiremath wrote:
+> >>>
+> >>>>RTC in pmic 88PM800 can run even the core is powered off, and user
+> >>>>can set alarm in RTC. When the alarm is timed out, the PMIC will power up
+> >>>>the core, and the whole system will boot up. And during PMIC driver probe,
+> >>>>it will read some register to find out whether this boot is caused by RTC
+> >>>>timeout or not, and pass on this information to the RTC driver.
 > >>>>
-> >>>> Not an expert here, but I assume mips has the same logic as arm so if your
-> >>>> patch is right for arm its probably also for mips.
+> >>>>So we need rtc platform data to be existed in PMIC driver to pass this
+> >>>>information.
 > >>>>
-> >>>> powerpc looks similar to what s390 does (not using the tick, instead it uses
-> >>>> a hw-timer) so this should be fine.
+> >>>>Signed-off-by: Chao Xie <chao.xie@marvell.com>
+> >>>>Signed-off-by: Vaibhav Hiremath <vaibhav.hiremath@linaro.org>
+> >>>>---
+> >>>>  drivers/mfd/88pm800.c | 19 +++++++++++++++++++
+> >>>>  1 file changed, 19 insertions(+)
 > >>>>
-> >>> I wonder if we can simply enable HAVE_VIRT_CPU_ACCOUNTING_GEN and get
-> >>> this for free which would avoid the need for this patch?
+> >>>>diff --git a/drivers/mfd/88pm800.c b/drivers/mfd/88pm800.c
+> >>>>index 8ea4467..34546a1 100644
+> >>>>--- a/drivers/mfd/88pm800.c
+> >>>>+++ b/drivers/mfd/88pm800.c
+> >>>>@@ -586,6 +586,25 @@ static int pm800_probe(struct i2c_client *client,
+> >>>>  			return ret;
+> >>>>  	}
+> >>>>
+> >>>>+	/*
+> >>>>+	 * RTC in pmic can run even the core is powered off, and user can set
+> >>>>+	 * alarm in RTC. When the alarm is time out, the PMIC will power up
+> >>>>+	 * the core, and the whole system will boot up. When PMIC driver is
+> >>>>+	 * probed, it will read out some register to find out whether this
+> >>>>+	 * boot is caused by RTC timeout or not, and it need pass this
+> >>>>+	 * information to RTC driver.
+> >>>>+	 * So we need rtc platform data to be existed to pass this information.
+> >>>>+	 */
+> >>>>+	if (!pdata->rtc) {
+> >>>>+		pdata->rtc = devm_kzalloc(&client->dev,
+> >>>>+					  sizeof(*(pdata->rtc)), GFP_KERNEL);
+> >>>>+		if (!pdata->rtc) {
+> >>>>+			dev_err(&client->dev,
+> >>>>+					"failed to allocate memory for rtc\n");
+> >>>>+			return -ENOMEM;
+> >>>>+		}
+> >>>>+	}
+> >>>>+
+> >>>
+> >>>Where is this memory first used?
+> >>>
 > >>
-> >> Asssuming that HAVE_VIRT_CPU_ACCOUNTING_GEN behaves similar to 
-> >> HAVE_VIRT_CPU_ACCOUNTING on s390/power in respect to not rely on ticks
-> >> - yes it might work out. Can you give it a try?
+> >>In the same file, look for field "rtc_wakeup".
 > >>
-> > Adding HAVE_VIRT_CPU_ACCOUNTING_GEN to arch/arm64/Kconfig works, but has
-> > no effect unless you also enable CONFIG_NO_HZ_FULL, so that hardly feels
-> > like a fix since it would be a shame to force users to use this config
-> > option to report CPU usage correctly.
-> > 
-> > I'm not entirely sure what the history and meaning behind these configs
-> > are, so maybe there is an entirely different rework needed here.  It
-> > seems logical that you could simply sample the counter at entry/exit of
-> > the guest, but if there is nowhere to store this data without
-> > NO_HZ_FULL+VIRT_CPU_ACCOUNTING_GEN then I guess that would be why?
+> >>FYI,
+> >>
+> >>This field is used in two files,
+> >>
+> >>drivers/mfd/88pm800.c
+> >>and
+> >>drivers/rtc/rtc-88pm800.c	[sets the "platform_data" field]
+> >
+> >Then were is the platform_data field subsequently used?
 > 
-> Given Paolos response that irq_disable/enable is faster than save/restore
-> at least on x86 your v2 patch might actually be the right thing to do.
-> 
-Thanks, I think so too, but we should enable
-HAVE_VIRT_CPU_ACCOUNTING_GEN for arm64 as well, assuming there are no
-mysterious side affects of doing so.
+> Currently not used, but it is for future use, where we would be
+> interested to know that the wakeup is really from reset or RTC wakeup.
 
--Christoffer
+Well it was introduced 3 years ago, so the chances of it being "used
+in the future" are probably pretty low.  Unless of course, you are
+planning on submitting that code.  In which case, you can add this
+patch to that set and I can re-review it then.
+
+> >Looking at the RTC platform data declaration I see:
+> >
+> >struct pm80x_rtc_pdata {
+> >     int             vrtc;
+> >     int             rtc_wakeup;
+> >};
+> >
+> >Is 'vrtc' even used?  If so, where?
+> 
+> No, it is not.
+
+So either submit a patch-set that makes use of them, or let me know
+that you're not going to do that and I'll remove it altogether.
+Likewise for rtc_wakeup.
+
+-- 
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
