@@ -1,55 +1,56 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 2 Jun 2015 12:24:24 +0100
-Subject: [PATCH v9 4/6] Documentation: DT: PL011: hi6220: add compatible
- string for Hisilicon designed UART
-In-Reply-To: <556D8B98.2040703@huawei.com>
-References: <1432950661-23060-1-git-send-email-bintian.wang@huawei.com>
- <1432950661-23060-5-git-send-email-bintian.wang@huawei.com>
- <CACRpkdav_5x6RC9F++ErvqGyxDCF-=kap7-jCsO4zZ6QGVLfBQ@mail.gmail.com>
- <556D8B98.2040703@huawei.com>
-Message-ID: <20150602112424.GC2067@n2100.arm.linux.org.uk>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Tue, 2 Jun 2015 13:28:35 +0200
+Subject: [PATCH 02/21] ARM: tegra: Add gpio-ranges property
+In-Reply-To: <5564CC84.1030700@wwwdotorg.org>
+References: <1432565608-26036-1-git-send-email-tomeu.vizoso@collabora.com>
+ <1432565608-26036-3-git-send-email-tomeu.vizoso@collabora.com>
+ <5564CC84.1030700@wwwdotorg.org>
+Message-ID: <CACRpkdbtCDQLaPhWFT0a7NdJmxYzRvhU_efgUh2ZXhbc+FHg3g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 02, 2015 at 06:55:20PM +0800, Bintian wrote:
-> On 2015/6/2 16:59, Linus Walleij wrote:
-> >On Sat, May 30, 2015 at 3:50 AM, Bintian Wang <bintian.wang@huawei.com> wrote:
-> >
-> >>Hisilicon does some performance enhancements based on PL011(e.g. larger
-> >>FIFO length), so add one compatible string "hisilicon,hi6220-uart" for
-> >
-> >That compatible string in the commit message is not even
-> >the same as in the patch.
-> The UART0 is PL011 compatible, the UART1/2 have some performance
-> enhancements features, so based on Mark's suggestion and I add this
-> compatible string just for future use.
+On Tue, May 26, 2015 at 9:41 PM, Stephen Warren <swarren@wwwdotorg.org> wrote:
+> On 05/25/2015 08:53 AM, Tomeu Vizoso wrote:
+>>
+>> Specify how the GPIOs map to the pins in T124, so the dependency is
+>> explicit.
+>>
+>> Signed-off-by: Tomeu Vizoso <tomeu.vizoso@collabora.com>
+>> ---
+>>   arch/arm/boot/dts/tegra124.dtsi | 1 +
+>>   1 file changed, 1 insertion(+)
+>>
+>> diff --git a/arch/arm/boot/dts/tegra124.dtsi
+>> b/arch/arm/boot/dts/tegra124.dtsi
+>> index 13cc7ca..5d1d35f 100644
+>> --- a/arch/arm/boot/dts/tegra124.dtsi
+>> +++ b/arch/arm/boot/dts/tegra124.dtsi
+>> @@ -254,6 +254,7 @@
+>>                 gpio-controller;
+>>                 #interrupt-cells = <2>;
+>>                 interrupt-controller;
+>> +               gpio-ranges = <&pinmux 0 0 250>;
+>
+>
+> We should be consistent between SoCs. Why not make the same change for all
+> Tegra SoCs?
 
-Please don't submit it with this series.
+Agreed.
 
-This patch should not be part of this series, it should be part of the
-series which modifies the PL011 driver, so it can be reviewed along with
-those changes.
+> I think this change will cause the GPIO subsystem to call into the pinctrl
+> subsystem and create/add/register a new GPIO<->pinctrl range structure. The
+> pinctrl driver already does this, so I think we'll end up with two duplicate
+> entries in the pinctrl device's gpio_ranges list. This probably won't cause
+> a problem, but I wanted to make sure you'd thought about it to make sure.
 
-Until then, I'm going to NAK this patch.
+That sounds like duplication indeed, I would expect that first a patch
+adds the ranges to the dts[i] files and then a second patch delete the
+same ranges from the pinctrl driver then, if these shall come in from
+the device tree.
 
-The thing that worries me though is that the subject line says this
-is a "Hisilicon *designed* UART".  If Hisilicon _designed_ this UART,
-presumably they have changed the *vendor* field of the UART ID _not_
-to indicate that ARM Ltd designed it?
+With GPIO ranges being possible to register from the pin controller,
+gpio chip and also the device tree, things get a bit complex
+admittedly :/ sorry for this, just choose one.
 
-If they've merely modified the parameters, and given the ARM Ltd PL011
-a larger fifo, then there isn't really much of a problem - we've been
-here before, except the vendor has had a real vendor ID for the field
-(in the case of ST), plus we've had different FIFO lengths for ARM
-hardware too (32 bytes instead of 16 for revision 3 and above.)
-
-Lastly, if you're not having to modify the PL011 driver in any way,
-you don't need to have a compatible.  In any case, you _shouldn't_ for
-AMBA devices.  AMBA does not match drivers based on OF compatible
-strings, so using OF compatible strings with the AMBA bus is just wrong.
-The AMBA compatible strings are there so that the generic OF code knows
-how to create the devices.
-
--- 
-FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
-according to speedtest.net.
+Yours,
+Linus Walleij
