@@ -1,171 +1,268 @@
-From: cyrille.pitchen@atmel.com (Cyrille Pitchen)
-Date: Tue, 2 Jun 2015 16:18:24 +0200
-Subject: [PATCH linux-next 4/4] tty/serial: at91: use 32bit writes into TX
- FIFO when DMA is enabled
-In-Reply-To: <cover.1433253787.git.cyrille.pitchen@atmel.com>
-References: <cover.1433253787.git.cyrille.pitchen@atmel.com>
-Message-ID: <675c5e624438e31ee371ce940513fbbba941c21e.1433253787.git.cyrille.pitchen@atmel.com>
+From: mathieu.poirier@linaro.org (Mathieu Poirier)
+Date: Tue, 2 Jun 2015 08:36:49 -0600
+Subject: [PATCH V2 1/1] ARM: dts: imx7d: add cortex-a7 coresight component
+In-Reply-To: <1433192081-1131-1-git-send-email-Frank.Li@freescale.com>
+References: <1433192081-1131-1-git-send-email-Frank.Li@freescale.com>
+Message-ID: <CANLsYkzwBGELPxxDG364oSzC9YcQZp5+2w_L_5uRaZL10vRyLA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-For now this improvement is only used with TX DMA transfers. The data
-width must be set properly when configuring the DMA controller. Also
-the FIFO configuration must be set to match the DMA transfer data
-width:
-TXRDYM (Transmitter Ready Mode) and RXRDYM (Receiver Ready Mode) must
-be set into the FIFO Mode Register. These values are used by the
-USART to trigger the DMA controller. In single data mode they are not
-used and should be reset to 0.
-So the TXRDYM bits are changed to FOUR_DATA; then USART triggers the
-DMA controller when at least 4 data can be written into the TX FIFO
-througth the THR. On the other hand the RXRDYM bits are left unchanged
-to ONE_DATA.
+On 1 June 2015 at 14:54,  <Frank.Li@freescale.com> wrote:
+> From: Frank Li <Frank.Li@freescale.com>
+>
+> Added etm, etb, funnel and replicator
+>
+> usage example:
+>
+>     echo 1 >/sys/bus/coresight/devices/30086000.etr/enable_sink
+>     echo 1 >/sys/bus/coresight/devices/3007c000.etm/enable_source
+>
+>         coresight-tmc 30086000.etr: TMC enabled
+>         coresight-replicator replicator.1: REPLICATOR enabled
+>         coresight-tmc 30084000.tmc: TMC enabled
+>         coresight-funnel 30083000.funnel: FUNNEL inport 0 enabled
+>         coresight-funnel 30041000.funnel: FUNNEL inport 0 enabled
+>         coresight-etm3x 3007c000.etm: ETM tracing enabled
+>
+>     etm enable here.
+>     trace data save at /dev/30086000.etr
+>
+>     cat /dev/30086000.etr > trace.data
+>
+>         coresight-tmc 30086000.etr: TMC read start
+>         coresight-tmc 30086000.etr: TMC read end
+>
+>     use ptm2human(https://github.com/hwangcc23/ptm2human) to show trace data
+>
+>     ptm2human -i trace.data
+>
+> Signed-off-by: Frank Li <Frank.Li@freescale.com>
+> ---
+> Change from V1 to V2
+>  - remove "0" after @
+>  - add comments about unused funnel input port
+>  - add comments about add  arm,primecell-periphid
+>
+>  arch/arm/boot/dts/imx7d.dtsi | 202 +++++++++++++++++++++++++++++++++++++++++++
+>  1 file changed, 202 insertions(+)
+>
+> diff --git a/arch/arm/boot/dts/imx7d.dtsi b/arch/arm/boot/dts/imx7d.dtsi
+> index b4cd8fd..d715501 100644
+> --- a/arch/arm/boot/dts/imx7d.dtsi
+> +++ b/arch/arm/boot/dts/imx7d.dtsi
+> @@ -121,6 +121,208 @@
+>                 clock-output-names = "osc";
+>         };
+>
+> +       etr at 30086000 {
+> +               compatible = "arm,coresight-tmc", "arm,primecell";
+> +               reg = <0x30086000 0x1000>;
+> +
+> +               clocks = <&clks IMX7D_MAIN_AXI_ROOT_CLK>;
+> +               clock-names = "apb_pclk";
+> +
+> +               port {
+> +                       etr_in_port: endpoint {
+> +                               slave-mode;
+> +                               remote-endpoint = <&replicator_out_port1>;
+> +                       };
+> +               };
+> +       };
+> +
+> +       tpiu at 30087000 {
+> +               compatible = "arm,coresight-tpiu", "arm,primecell";
+> +               reg = <0x30087000 0x1000>;
+> +
+> +               clocks = <&clks IMX7D_MAIN_AXI_ROOT_CLK>;
+> +               clock-names = "apb_pclk";
+> +               port {
+> +                       tpiu_in_port: endpoint at 0 {
+> +                               slave-mode;
+> +                               remote-endpoint = <&replicator_out_port1>;
+> +                       };
+> +               };
+> +       };
+> +
+> +       replicator {
+> +               /* non-configurable replicators don't show up on the
+> +                * AMBA bus.  As such no need to add "arm,primecell"
+> +                */
+> +               compatible = "arm,coresight-replicator";
+> +
+> +               ports {
+> +                       #address-cells = <1>;
+> +                       #size-cells = <0>;
+> +
+> +                       /* replicator output ports */
+> +                       port at 0 {
+> +                               reg = <0>;
+> +                               replicator_out_port0: endpoint {
+> +                                       remote-endpoint = <&tpiu_in_port>;
+> +                               };
+> +                       };
+> +
+> +                       port at 1 {
+> +                               reg = <1>;
+> +                               replicator_out_port1: endpoint {
+> +                                       remote-endpoint = <&etr_in_port>;
+> +                               };
+> +                       };
+> +
+> +                       /* replicator input port */
+> +                       port at 2 {
+> +                               reg = <0>;
+> +                               replicator_in_port0: endpoint {
+> +                                       slave-mode;
+> +                                       remote-endpoint = <&etf_out_port>;
+> +                               };
+> +                       };
+> +               };
+> +       };
+> +
+> +       etf at 30084000 {
+> +               compatible = "arm,coresight-tmc", "arm,primecell";
+> +               reg = <0x30084000 0x1000>;
+> +               clocks = <&clks IMX7D_MAIN_AXI_ROOT_CLK>;
+> +               clock-names = "apb_pclk";
+> +
+> +               ports {
+> +                       #address-cells = <1>;
+> +                       #size-cells = <0>;
+> +
+> +                       port at 0 {
+> +                               reg = <0>;
+> +                               etf_in_port: endpoint {
+> +                                       slave-mode;
+> +                                       remote-endpoint = <&hugo_funnel_out_port0>;
+> +                               };
+> +                       };
+> +
+> +                       port at 1 {
+> +                               reg = <0>;
+> +                               etf_out_port: endpoint {
+> +                                       remote-endpoint = <&replicator_in_port0>;
+> +                               };
+> +                       };
+> +               };
+> +       };
+> +
+> +       funnel at 30083000 {
+> +               compatible = "arm,coresight-funnel", "arm,primecell";
+> +               reg = <0x30083000 0x1000>;
+> +               clocks = <&clks IMX7D_MAIN_AXI_ROOT_CLK>;
+> +               clock-names = "apb_pclk";
+> +
+> +               ports {
+> +                       #address-cells = <1>;
+> +                       #size-cells = <0>;
+> +
+> +                       /* funnel input ports */
+> +                       port at 0 {
+> +                               reg = <0>;
+> +                               hugo_funnel_in_port0: endpoint {
+> +                                       slave-mode;
+> +                                       remote-endpoint = <&ca_funnel_out_port0>;
+> +                               };
+> +                       };
+> +
+> +                       port at 1 {
+> +                               reg = <1>;
+> +                               hugo_funnel_in_port1: endpoint {
+> +                                       slave-mode; /* M4 input */
+> +                               };
+> +                       };
+> +
+> +                       port at 2 {
+> +                               reg = <0>;
+> +                               hugo_funnel_out_port0: endpoint {
+> +                                       remote-endpoint = <&etf_in_port>;
+> +                               };
+> +                       };
+> +
+> +                       /* the other input ports are not connect to anything */
+> +               };
+> +       };
+> +
+> +       funnel at 30041000 {
+> +               compatible = "arm,coresight-funnel", "arm,primecell";
+> +               reg = <0x30041000 0x1000>;
+> +               clocks = <&clks IMX7D_MAIN_AXI_ROOT_CLK>;
+> +               clock-names = "apb_pclk";
+> +
+> +               ports {
+> +                       #address-cells = <1>;
+> +                       #size-cells = <0>;
+> +
+> +                       /* funnel input ports */
+> +                       port at 0 {
+> +                               reg = <0>;
+> +                               ca_funnel_in_port0: endpoint {
+> +                                       slave-mode;
+> +                                       remote-endpoint = <&etm0_out_port>;
+> +                               };
+> +                       };
+> +
+> +                       port at 1 {
+> +                               reg = <1>;
+> +                               ca_funnel_in_port1: endpoint {
+> +                                       slave-mode;
+> +                                       remote-endpoint = <&etm1_out_port>;
+> +                               };
+> +                       };
+> +
+> +                       /* funnel output port */
+> +                       port at 2 {
+> +                               reg = <0>;
+> +                               ca_funnel_out_port0: endpoint {
+> +                                       remote-endpoint = <&hugo_funnel_in_port0>;
+> +                               };
+> +                       };
+> +
+> +                       /* the other input ports are not connect to anything */
+> +               };
+> +       };
+> +
+> +       etm at 3007c000 {
+> +               compatible = "arm,coresight-etm3x", "arm,primecell";
+> +               reg = <0x3007c000 0x1000>;
+> +               cpu = <&cpu0>;
+> +               clocks = <&clks IMX7D_MAIN_AXI_ROOT_CLK>;
+> +               clock-names = "apb_pclk";
+> +
+> +               port {
+> +                       etm0_out_port: endpoint {
+> +                               remote-endpoint = <&ca_funnel_in_port0>;
+> +                       };
+> +               };
+> +       };
+> +
+> +       etm at 3007d000 {
+> +               compatible = "arm,coresight-etm3x", "arm,primecell";
+> +               reg = <0x3007d000 0x1000>;
+> +
+> +               /* System will hang if added nosmp in kernel command line
+> +                * without arm,primecell-periphid because amba bus try to
+> +                * read id and core1 power off at this time.
+> +                */
+> +               arm,primecell-periphid =  <0xbb956>;
+> +               cpu = <&cpu1>;
+> +               clocks = <&clks IMX7D_MAIN_AXI_ROOT_CLK>;
+> +               clock-names = "apb_pclk";
+> +
+> +               port {
+> +                       etm1_out_port: endpoint {
+> +                               remote-endpoint = <&ca_funnel_in_port1>;
+> +                       };
+> +               };
+> +       };
+> +
+>         soc {
+>                 #address-cells = <1>;
+>                 #size-cells = <1>;
+> --
+> 1.9.1
+>
 
-Atmel eXtended DMA controller allows us to set a different data width
-for each part of a scatter-gather transfer. So when calling
-dmaengine_slave_config() to configure the TX path, we just need to set
-dst_addr_width to the maximum data width. Then DMA writes into THR are
-split into up to two parts. The first part carries the first data to
-be sent and has a length equal to the greatest multiple of 4 (bytes)
-lower than or equal to the total length of the TX DMA transfer. The
-second part carries the trailing data (up to 3 bytes). The first part
-is written by the DMA into THR using 32 bit accesses, whereas 8bit
-accesses are used for the second part.
-
-When DMA is not use, we think a single 32bit access isn't worth the
-overhead of testing whether multiple data mode is used then splitting
-the 4 read bytes.
-
-Signed-off-by: Cyrille Pitchen <cyrille.pitchen@atmel.com>
-
-Conflicts:
-	drivers/tty/serial/atmel_serial.c
----
- drivers/tty/serial/atmel_serial.c | 66 ++++++++++++++++++++++++++++++---------
- 1 file changed, 51 insertions(+), 15 deletions(-)
-
-diff --git a/drivers/tty/serial/atmel_serial.c b/drivers/tty/serial/atmel_serial.c
-index 8a32f7c..fe8a3fd 100644
---- a/drivers/tty/serial/atmel_serial.c
-+++ b/drivers/tty/serial/atmel_serial.c
-@@ -176,6 +176,7 @@ struct atmel_uart_port {
- 	unsigned int		irq_status;
- 	unsigned int		irq_status_prev;
- 	unsigned int		status_change;
-+	unsigned int		tx_len;
- 
- 	struct circ_buf		rx_ring;
- 
-@@ -743,10 +744,10 @@ static void atmel_complete_tx_dma(void *arg)
- 
- 	if (chan)
- 		dmaengine_terminate_all(chan);
--	xmit->tail += sg_dma_len(&atmel_port->sg_tx);
-+	xmit->tail += atmel_port->tx_len;
- 	xmit->tail &= UART_XMIT_SIZE - 1;
- 
--	port->icount.tx += sg_dma_len(&atmel_port->sg_tx);
-+	port->icount.tx += atmel_port->tx_len;
- 
- 	spin_lock_irq(&atmel_port->lock_tx);
- 	async_tx_ack(atmel_port->desc_tx);
-@@ -794,7 +795,9 @@ static void atmel_tx_dma(struct uart_port *port)
- 	struct circ_buf *xmit = &port->state->xmit;
- 	struct dma_chan *chan = atmel_port->chan_tx;
- 	struct dma_async_tx_descriptor *desc;
--	struct scatterlist *sg = &atmel_port->sg_tx;
-+	struct scatterlist sgl[2], *sg, *sg_tx = &atmel_port->sg_tx;
-+	unsigned int tx_len, part1_len, part2_len, sg_len;
-+	dma_addr_t phys_addr;
- 
- 	/* Make sure we have an idle channel */
- 	if (atmel_port->desc_tx != NULL)
-@@ -810,18 +813,46 @@ static void atmel_tx_dma(struct uart_port *port)
- 		 * Take the port lock to get a
- 		 * consistent xmit buffer state.
- 		 */
--		sg->offset = xmit->tail & (UART_XMIT_SIZE - 1);
--		sg_dma_address(sg) = (sg_dma_address(sg) &
--					~(UART_XMIT_SIZE - 1))
--					+ sg->offset;
--		sg_dma_len(sg) = CIRC_CNT_TO_END(xmit->head,
--						xmit->tail,
--						UART_XMIT_SIZE);
--		BUG_ON(!sg_dma_len(sg));
-+		tx_len = CIRC_CNT_TO_END(xmit->head,
-+					 xmit->tail,
-+					 UART_XMIT_SIZE);
-+
-+		if (atmel_port->fifo_size) {
-+			/* multi data mode */
-+			part1_len = (tx_len & ~0x3); /* DWORD access */
-+			part2_len = (tx_len & 0x3); /* BYTE access */
-+		} else {
-+			/* single data (legacy) mode */
-+			part1_len = 0;
-+			part2_len = tx_len; /* BYTE access only */
-+		}
-+
-+		sg_init_table(sgl, 2);
-+		sg_len = 0;
-+		phys_addr = sg_dma_address(sg_tx) + xmit->tail;
-+		if (part1_len) {
-+			sg = &sgl[sg_len++];
-+			sg_dma_address(sg) = phys_addr;
-+			sg_dma_len(sg) = part1_len;
-+
-+			phys_addr += part1_len;
-+		}
-+
-+		if (part2_len) {
-+			sg = &sgl[sg_len++];
-+			sg_dma_address(sg) = phys_addr;
-+			sg_dma_len(sg) = part2_len;
-+		}
-+
-+		/*
-+		 * save tx_len so atmel_complete_tx_dma() will increase
-+		 * xmit->tail correctly
-+		 */
-+		atmel_port->tx_len = tx_len;
- 
- 		desc = dmaengine_prep_slave_sg(chan,
--					       sg,
--					       1,
-+					       sgl,
-+					       sg_len,
- 					       DMA_MEM_TO_DEV,
- 					       DMA_PREP_INTERRUPT |
- 					       DMA_CTRL_ACK);
-@@ -830,7 +861,7 @@ static void atmel_tx_dma(struct uart_port *port)
- 			return;
- 		}
- 
--		dma_sync_sg_for_device(port->dev, sg, 1, DMA_TO_DEVICE);
-+		dma_sync_sg_for_device(port->dev, sg_tx, 1, DMA_TO_DEVICE);
- 
- 		atmel_port->desc_tx = desc;
- 		desc->callback = atmel_complete_tx_dma;
-@@ -890,7 +921,9 @@ static int atmel_prepare_tx_dma(struct uart_port *port)
- 	/* Configure the slave DMA */
- 	memset(&config, 0, sizeof(config));
- 	config.direction = DMA_MEM_TO_DEV;
--	config.dst_addr_width = DMA_SLAVE_BUSWIDTH_1_BYTE;
-+	config.dst_addr_width = (atmel_port->fifo_size) ?
-+				DMA_SLAVE_BUSWIDTH_4_BYTES :
-+				DMA_SLAVE_BUSWIDTH_1_BYTE;
- 	config.dst_addr = port->mapbase + ATMEL_US_THR;
- 	config.dst_maxburst = 1;
- 
-@@ -1823,6 +1856,9 @@ static int atmel_startup(struct uart_port *port)
- 			    ATMEL_US_RXFCLR |
- 			    ATMEL_US_TXFLCLR);
- 
-+		if (atmel_use_dma_tx(port))
-+			txrdym = ATMEL_US_FOUR_DATA;
-+
- 		fmr = ATMEL_US_TXRDYM(txrdym) | ATMEL_US_RXRDYM(rxrdym);
- 		if (atmel_port->rts_high &&
- 		    atmel_port->rts_low)
--- 
-1.8.2.2
+I am good with this patch and would take it in my tree but I simply
+can't find "imx7d.dtsi" anywhere.  Who is the maintainer, where is the
+tree?
