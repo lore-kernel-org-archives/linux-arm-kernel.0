@@ -1,128 +1,44 @@
-From: vaibhav.hiremath@linaro.org (Vaibhav Hiremath)
-Date: Tue, 02 Jun 2015 15:19:38 +0530
-Subject: [PATCH 4/4] mfd: 88pm800: allocate pdata->rtc if not allocated
- earlier
-In-Reply-To: <20150602093323.GI3329@x1>
-References: <1432937962-4537-1-git-send-email-vaibhav.hiremath@linaro.org>
- <1432937962-4537-5-git-send-email-vaibhav.hiremath@linaro.org>
- <20150601082200.GC3329@x1> <556D3A14.6050505@linaro.org>
- <20150602074004.GH3329@x1> <556D71F6.4030608@linaro.org>
- <20150602093323.GI3329@x1>
-Message-ID: <556D7C32.9080806@linaro.org>
+From: wei.liu2@citrix.com (Wei Liu)
+Date: Tue, 2 Jun 2015 10:52:37 +0100
+Subject: [Xen-devel] "tcp: refine TSO autosizing" causes performance
+ regression on Xen
+In-Reply-To: <1429188136.7346.198.camel@edumazet-glaptop2.roam.corp.google.com>
+References: <552E9E8D.1080000@eu.citrix.com>
+ <1429118948.7346.114.camel@edumazet-glaptop2.roam.corp.google.com>
+ <552EA2BC.5000707@eu.citrix.com>
+ <1429120373.7346.125.camel@edumazet-glaptop2.roam.corp.google.com>
+ <552EA844.5010308@eu.citrix.com>
+ <1429121979.7346.138.camel@edumazet-glaptop2.roam.corp.google.com>
+ <552F7936.9070205@eu.citrix.com> <552F7EF4.9030107@iogearbox.net>
+ <552F887A.4060708@eu.citrix.com>
+ <1429188136.7346.198.camel@edumazet-glaptop2.roam.corp.google.com>
+Message-ID: <20150602095237.GL19403@zion.uk.xensource.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Eric
 
+Sorry for coming late to the discussion.
 
-On Tuesday 02 June 2015 03:03 PM, Lee Jones wrote:
-> On Tue, 02 Jun 2015, Vaibhav Hiremath wrote:
->> On Tuesday 02 June 2015 01:10 PM, Lee Jones wrote:
->>> On Tue, 02 Jun 2015, Vaibhav Hiremath wrote:
->>>> On Monday 01 June 2015 01:52 PM, Lee Jones wrote:
->>>>> On Sat, 30 May 2015, Vaibhav Hiremath wrote:
->>>>>
->>>>>> RTC in pmic 88PM800 can run even the core is powered off, and user
->>>>>> can set alarm in RTC. When the alarm is timed out, the PMIC will power up
->>>>>> the core, and the whole system will boot up. And during PMIC driver probe,
->>>>>> it will read some register to find out whether this boot is caused by RTC
->>>>>> timeout or not, and pass on this information to the RTC driver.
->>>>>>
->>>>>> So we need rtc platform data to be existed in PMIC driver to pass this
->>>>>> information.
->>>>>>
->>>>>> Signed-off-by: Chao Xie <chao.xie@marvell.com>
->>>>>> Signed-off-by: Vaibhav Hiremath <vaibhav.hiremath@linaro.org>
->>>>>> ---
->>>>>>   drivers/mfd/88pm800.c | 19 +++++++++++++++++++
->>>>>>   1 file changed, 19 insertions(+)
->>>>>>
->>>>>> diff --git a/drivers/mfd/88pm800.c b/drivers/mfd/88pm800.c
->>>>>> index 8ea4467..34546a1 100644
->>>>>> --- a/drivers/mfd/88pm800.c
->>>>>> +++ b/drivers/mfd/88pm800.c
->>>>>> @@ -586,6 +586,25 @@ static int pm800_probe(struct i2c_client *client,
->>>>>>   			return ret;
->>>>>>   	}
->>>>>>
->>>>>> +	/*
->>>>>> +	 * RTC in pmic can run even the core is powered off, and user can set
->>>>>> +	 * alarm in RTC. When the alarm is time out, the PMIC will power up
->>>>>> +	 * the core, and the whole system will boot up. When PMIC driver is
->>>>>> +	 * probed, it will read out some register to find out whether this
->>>>>> +	 * boot is caused by RTC timeout or not, and it need pass this
->>>>>> +	 * information to RTC driver.
->>>>>> +	 * So we need rtc platform data to be existed to pass this information.
->>>>>> +	 */
->>>>>> +	if (!pdata->rtc) {
->>>>>> +		pdata->rtc = devm_kzalloc(&client->dev,
->>>>>> +					  sizeof(*(pdata->rtc)), GFP_KERNEL);
->>>>>> +		if (!pdata->rtc) {
->>>>>> +			dev_err(&client->dev,
->>>>>> +					"failed to allocate memory for rtc\n");
->>>>>> +			return -ENOMEM;
->>>>>> +		}
->>>>>> +	}
->>>>>> +
->>>>>
->>>>> Where is this memory first used?
->>>>>
->>>>
->>>> In the same file, look for field "rtc_wakeup".
->>>>
->>>> FYI,
->>>>
->>>> This field is used in two files,
->>>>
->>>> drivers/mfd/88pm800.c
->>>> and
->>>> drivers/rtc/rtc-88pm800.c	[sets the "platform_data" field]
->>>
->>> Then were is the platform_data field subsequently used?
->>
->> Currently not used, but it is for future use, where we would be
->> interested to know that the wakeup is really from reset or RTC wakeup.
->
-> Well it was introduced 3 years ago, so the chances of it being "used
-> in the future" are probably pretty low.  Unless of course, you are
-> planning on submitting that code.  In which case, you can add this
-> patch to that set and I can re-review it then.
->
->>> Looking at the RTC platform data declaration I see:
->>>
->>> struct pm80x_rtc_pdata {
->>>      int             vrtc;
->>>      int             rtc_wakeup;
->>> };
->>>
->>> Is 'vrtc' even used?  If so, where?
->>
->> No, it is not.
->
-> So either submit a patch-set that makes use of them, or let me know
-> that you're not going to do that and I'll remove it altogether.
-> Likewise for rtc_wakeup.
->
+On Thu, Apr 16, 2015 at 05:42:16AM -0700, Eric Dumazet wrote:
+> On Thu, 2015-04-16 at 11:01 +0100, George Dunlap wrote:
+> 
+> > He suggested that after he'd been prodded by 4 more e-mails in which two
+> > of us guessed what he was trying to get at.  That's what I was
+> > complaining about.
+> 
+> My big complain is that I suggested to test to double the sysctl, which
+> gave good results.
+> 
 
-I am ok with vrtc field, we can remove it.
+Do I understand correctly that it's acceptable to you to double the size
+of the buffer? If so I will send a patch to do that.
 
-But,
-I would recommend _not_ to remove rtc_wakeup, as it may not be used 
-immediately, but still have logical significance.
+Wei.
 
-Consuming rtc_wakeup in the code is dependant on overall power
-management support, which is always long pole for development. As you
-would have seen, we have just started with baseport for pxa1928 and I
-am starting on upstreaming driver part.
-
-
- From hardware perspective, this is important feature, where it indicate
-whether the boot was triggered by reset assertion or by RTC wakeup. So
-as of now from driver perspective I feel no harm to have one field for
-this.
-
-
-Finally, its your call. I will let you decide.
-The field can be added later when it actually gets consumed.
-
-Thanks,
-Vaibhav
+> Then you provided a patch using a 8x factor. How does that sound ?
+> 
+> Next time I ask a raise, I should try a 8x factor as well, who knows,
+> it might be accepted.
+> 
+> 
