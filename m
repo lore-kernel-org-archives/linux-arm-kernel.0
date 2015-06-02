@@ -1,39 +1,43 @@
-From: gregory.0xf0@gmail.com (Gregory Fong)
-Date: Tue, 2 Jun 2015 10:27:45 -0700
-Subject: [PATCH v2 4/6] gpio: brcmstb: Allow GPIOs to be wakeup sources
-In-Reply-To: <CACRpkdYnZ9nYHPoUsmgLUtKhB2Us0c_scAYsZVJJQK2orKcpVA@mail.gmail.com>
-References: <1432865650-4062-1-git-send-email-gregory.0xf0@gmail.com>
- <1432865650-4062-5-git-send-email-gregory.0xf0@gmail.com>
- <CACRpkdYnZ9nYHPoUsmgLUtKhB2Us0c_scAYsZVJJQK2orKcpVA@mail.gmail.com>
-Message-ID: <CADtm3G6N-DAYivc_33ReEpu0foi8yt1YdtLGttj9LBjUOmP5RQ@mail.gmail.com>
+From: antoine.tenart@free-electrons.com (Antoine Tenart)
+Date: Tue,  2 Jun 2015 19:32:26 +0200
+Subject: [PATCH 2/7] Documentation: bindings: document the clocks for
+ pxa3xx-nand
+In-Reply-To: <1433266351-22587-1-git-send-email-antoine.tenart@free-electrons.com>
+References: <1433266351-22587-1-git-send-email-antoine.tenart@free-electrons.com>
+Message-ID: <1433266351-22587-3-git-send-email-antoine.tenart@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 2, 2015 at 6:45 AM, Linus Walleij <linus.walleij@linaro.org> wrote:
-> On Fri, May 29, 2015 at 4:14 AM, Gregory Fong <gregory.0xf0@gmail.com> wrote:
->
->> Several drivers (e.g. gpio-keys) allow for GPIOs to be configured as
->> wakeup sources, and this GPIO controller supports that through a
->> separate interrupt path.
->>
->> The de-facto standard DT property "wakeup-source" is checked, since
->> that indicates whether the GPIO controller hardware can wake.  Uses
->> the IRQCHIP_MASK_ON_SUSPEND irq_chip flag because UPG GIO doesn't have
->> any of its own wakeup source configuration.
->>
->> Signed-off-by: Gregory Fong <gregory.0xf0@gmail.com>
->
-> (...)
->> +       if (enable)
->> +               enable_irq_wake(priv->parent_wake_irq);
->> +       else
->> +               disable_irq_wake(priv->parent_wake_irq);
->> +       return 0;
->
-> No error handling? If the code assumes these calls will
-> always succeed, atleast write that in a comment.
+The pxa3xx nand driver requires at least one clock to probe correctly.
+A second one, named 'ecc' can be specified if needed. Add the
+corresponding documentation.
 
-Will add error handling.
+Signed-off-by: Antoine Tenart <antoine.tenart@free-electrons.com>
+---
+ Documentation/devicetree/bindings/mtd/pxa3xx-nand.txt | 4 ++++
+ 1 file changed, 4 insertions(+)
 
-Thanks,
-Gregory
+diff --git a/Documentation/devicetree/bindings/mtd/pxa3xx-nand.txt b/Documentation/devicetree/bindings/mtd/pxa3xx-nand.txt
+index 4f833e3c4f51..ad30a02f1346 100644
+--- a/Documentation/devicetree/bindings/mtd/pxa3xx-nand.txt
++++ b/Documentation/devicetree/bindings/mtd/pxa3xx-nand.txt
+@@ -8,6 +8,8 @@ Required properties:
+  - reg: 		The register base for the controller
+  - interrupts:		The interrupt to map
+  - #address-cells:	Set to <1> if the node includes partitions
++ - clocks:		A phandle to the clocks
++ - clock-names:		'nfc' and 'ecc'. The 'nfc' clock is mandatory.
+ 
+ Optional properties:
+ 
+@@ -32,6 +34,8 @@ Example:
+ 		compatible = "marvell,pxa3xx-nand";
+ 		reg = <0x43100000 90>;
+ 		interrupts = <45>;
++		clocks = <&gateclk 11>;
++		clock-names = "nfc";
+ 		#address-cells = <1>;
+ 
+ 		marvell,nand-enable-arbiter;
+-- 
+2.4.2
