@@ -1,63 +1,92 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Tue, 2 Jun 2015 09:45:28 -0500
-Subject: [PATCH v4 0/2] Remaining sunxi musb patches
-In-Reply-To: <556D57BD.90502@redhat.com>
-References: <1433088626-8858-1-git-send-email-hdegoede@redhat.com>
- <79fc4306-a621-43b8-b347-e42a27beb134@googlegroups.com>
- <20150601183447.GF26081@saruman.tx.rr.com>
- <556D57BD.90502@redhat.com>
-Message-ID: <20150602144528.GA9623@saruman.tx.rr.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 2 Jun 2015 15:52:54 +0100
+Subject: [PATCH v2] arm: tcm: Don't crash when TCM banks are protected by
+ TrustZone
+In-Reply-To: <CACRpkdY4sZQr+VzMKzU2Rtm7sP2zMztBioCPQRJjq=VjyapAEA@mail.gmail.com>
+References: <1432805760-4590-1-git-send-email-michael@smart-africa.com>
+ <1432821287-31436-1-git-send-email-michael@smart-africa.com>
+ <CACRpkdY4sZQr+VzMKzU2Rtm7sP2zMztBioCPQRJjq=VjyapAEA@mail.gmail.com>
+Message-ID: <20150602145254.GE2067@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Tue, Jun 02, 2015 at 09:14:05AM +0200, Hans de Goede wrote:
-> >>>Here is an updated version of the remaining (not yet merged in Felipe's
-> >>>tree)
-> >>>sunxi musb patches.
-> >>>
-> >>>The "phy-sun4i-usb: Add full support for usb0 phy / OTG" patch has been
-> >>>updated with a small bug-fix and is ready for merging.
-> >>>
-> >>>The "musb: Add support for the Allwinner sunxi musb" patch has been
-> >>>updated
-> >>>to use the latest version of Maxime's sunxi sram controller driver. This
-> >>>one has a compile-time dependency on Maxime's sunxi sram controller
-> >>>driver,
-> >>>so it cannot be merged until that is merged.
-> >>>
-> >>
-> >>
-> >>Arnd has just merged the updated sram controller into the next branch
-> >>of the soc-drivers repo, so both these patches are now ready to merge.
-> >
-> >all right, so for v4.3 merge window there will be no issues in queues
-> >the two remaining patches. Thanks
+On Tue, Jun 02, 2015 at 01:16:38PM +0200, Linus Walleij wrote:
+> > +static int __init tcm_handler(struct pt_regs *regs, unsigned int instr)
+> > +{
+> > +       regs->uregs[(instr >> 12) & 0xf] = 0;
+> > +       regs->ARM_pc += 4;
+> > +       return 0;
+> > +}
 > 
-> So I take it that it is too late to get these 2 into 4.2 ? I've a bunch
-> of (small) follow up patches coming up to enable support for the musb
-> controller on new boards, merging those would be easier if these were
-> already merged. And there also is a largish set of sunxi dts patches
-> actually enabling the musb code which is sorta waiting for merging
-> these 2 (waiting for the dt binding to be stable).
+> Is the action here totally obvious to everyone except me?
+> I guess it is masking off something and advancing past a
+> failed instruction but whatdoIknow. Can you put in a small comment
+> above the function or something?
 
-DTS should not have to wait. If we know what the compatible should look
-like, you can send your DTS upstream no problem. There will just be a
-few devices which will not trigger a driver probe, but that's just fine.
+I know what it's doing :)
 
-> If this is not going to make 4.2, can you and Kishon at least review
-> them and let me know of they will get merged for 4.3 as is (baring
-> any merge issues) ?
+It's storing '0' into the destination register of the faulted MRC
+instruction, and advancing past the instruction.  So, an undef fault
+on either:
 
-Sure, that I can do, no issues.
+	mrc	15, 0, rX, cr9, cr1, {0}
+	mrc	15, 0, rX, cr9, cr1, {1}
+
+causes them to return zero.
+
+> > +static struct undef_hook tcm_hook __initdata = {
+> > +       .instr_mask     = 0xffff0fdf,
+> > +       .instr_val      = 0xee190f11,
+> > +       .cpsr_mask      = MODE_MASK,
+> > +       .cpsr_val       = SVC_MODE,
+> > +       .fn             = tcm_handler
+> > +};
+> 
+> Likewise here. Why not #define instruction 0xee190f11
+> so it is a bit more readable? I guess this instruction will
+> be trapped and handled by the hook but it'd be nice
+> to know what instruction it is and how it comes to
+> be issued.
+
+We typically don't do that for instructions, otherwise we end up with
+loads of problems such as how to represent the difference between these:
+
+	ldr	rd, [rn, #4]
+	ldr	rd, [rn], #4
+
+You could use: LDR_Rd_Rn_4 but then how do you indicate the difference
+between the pre-indexed and the post-indexed instruction.
+
+In this case, it's these _two_ instructions being trapped:
+
+	mrc	15, 0, rX, cr9, cr1, {0}
+	mrc	15, 0, rX, cr9, cr1, {1}
+
+where we don't care what register 'rX' is, and we only care about those
+two, and not:
+
+	mrc	15, 0, rX, cr9, cr1, {2}
+	mrc	15, 0, rX, cr9, cr1, {3}
+	...
+
+So, if you can come up with some #define which represents just two
+instructions in a class but not the others... err, nope, didn't think so.
+
+Since the test is also:
+
+	(actual_instruction & mask) == value
+
+encoding the value without its mask value is pretty pointless and is
+in fact ambiguous.  For example, a definition for a STR instruction
+with the load bit clear in the mask matches both LDR and STR, so
+while a definition for the STR instruction may seem useful, unless you
+also have some way to encode the mask as well, it's pretty pointless,
+and is in fact misleading if used with a mask which clears bit 20.
+
+So it's quite reasonable to use the numeric encoding here, since
+interpreting the instruction value without taking account of the mask
+is pretty stupid.
 
 -- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150602/e443db59/attachment.sig>
+FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
+according to speedtest.net.
