@@ -1,29 +1,27 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 2 Jun 2015 17:57:53 +0200
-Subject: [GIT PULL 3/4] ARM: imx: device tree changes for 4.2
-In-Reply-To: <CAOMZO5B_74HgFZqiRWrJXs6BSStfJHB6wicjdUQ4MTAk=SvG=Q@mail.gmail.com>
-References: <1433145206-2508-1-git-send-email-shawn.guo@linaro.org>
- <20150602033337.GA7571@dragon>
- <CAOMZO5B_74HgFZqiRWrJXs6BSStfJHB6wicjdUQ4MTAk=SvG=Q@mail.gmail.com>
-Message-ID: <201506021757.54099.arnd@arndb.de>
+From: wsa@the-dreams.de (Wolfram Sang)
+Date: Wed, 3 Jun 2015 00:58:34 +0900
+Subject: [PATCH v3 0/6] i2c: at91: add support to FIFOs and alternative
+ command
+In-Reply-To: <20150602155222.GB2806@odux.rfo.atmel.com>
+References: <cover.1433250713.git.cyrille.pitchen@atmel.com>
+ <20150602152647.GA2806@odux.rfo.atmel.com>
+ <20150602153622.GB2661@katana>
+ <20150602155222.GB2806@odux.rfo.atmel.com>
+Message-ID: <20150602155833.GF2661@katana>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 02 June 2015, Fabio Estevam wrote:
-> Spam Status: Spamassassin 0% probability of being spam.
-> 
-> Full report:
-> No, score=-2.7 required=5.0 tests=BAYES_00,DKIM_SIGNED, DKIM_VALID,DKIM_VALID_AU,FREEMAIL_FROM,RCVD_IN_DNSWL_LOW,UNPARSEABLE_RELAY autolearn=unavailable version=3.3.1  
-> On Tue, Jun 2, 2015 at 12:33 AM, Shawn Guo <shawn.guo@linaro.org> wrote:
-> 
-> > So here is my changes to fix all the errors reported by Stephen, except
-> > 'SZ_4K' one.  Let me know if it's preferred or we'd like to drop
-> > COMPILE_TEST and simply depend on ARCH_MXC.
-> 
-> I would say that we could drop COMPILE_TEST and use 'depends on
-> ARCH_MXC' instead.
 
-Including COMPILE_TEST is generally a good idea, because it enables automatic
-checking by build bots, e.g. the coverity bot that runs x86-64 allmodconfig.
+> I was thinking the same so I have tried to cherry-pick the patch on a 3.10.79
+> and it didn't cause any conflicts so I thought it could be sent to stable as
+> is.
 
-	Arnd
+OK, so reducing context seems to help. Thanks for checking!
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150603/7a6524de/attachment.sig>
