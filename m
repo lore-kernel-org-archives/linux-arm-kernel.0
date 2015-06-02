@@ -1,48 +1,75 @@
-From: hdegoede@redhat.com (Hans de Goede)
-Date: Tue, 02 Jun 2015 12:10:00 +0200
-Subject: [PATCH 0/3] ARM: dts: sun8i-a33: Support for Sinlinx SinA33 dev
- board
-In-Reply-To: <1433239443-738-1-git-send-email-wens@csie.org>
-References: <1433239443-738-1-git-send-email-wens@csie.org>
-Message-ID: <556D80F8.5050106@redhat.com>
+From: tomeu.vizoso@collabora.com (Tomeu Vizoso)
+Date: Tue, 2 Jun 2015 12:14:06 +0200
+Subject: [PATCH 00/21] On-demand device registration
+In-Reply-To: <CACRpkdasLwMfEHGMRd1X3K_DU7NMPreE8TMwqqDTg8k9wj=wJQ@mail.gmail.com>
+References: <1432565608-26036-1-git-send-email-tomeu.vizoso@collabora.com>
+ <CACRpkdasLwMfEHGMRd1X3K_DU7NMPreE8TMwqqDTg8k9wj=wJQ@mail.gmail.com>
+Message-ID: <CAAObsKCP-C+TY8Wkk6bQzxZeGYL9X01trtjxfaYp--ZnH07C+w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On 02-06-15 12:04, Chen-Yu Tsai wrote:
-> Hi Maxime,
+On 2 June 2015 at 10:48, Linus Walleij <linus.walleij@linaro.org> wrote:
+> On Mon, May 25, 2015 at 4:53 PM, Tomeu Vizoso
+> <tomeu.vizoso@collabora.com> wrote:
 >
-> This series enables support for the Sinlinx SinA33 dev board. This
-> is a core/daughter board SDK kit from Chinese vendor Sinlinx. The
-> core board itself does not have any special connectivity, so I
-> didn't split them into 2 files.
+>> have looked into ordered probing as a
+>> better way of solving this than moving nodes around in the DT or playing with
+>> initcall levels.
+>>
+>> While reading the thread [1] that Alexander Holler started with his series to
+>> make probing order deterministic, it occurred to me that it should be possible
+>> to achieve the same by registering devices as they are referenced by other
+>> devices.
 >
-> The series is based on Vishnu/Hans' A33 series (v2). As the last
-> (dts) patch was not merged yet, there might be a conflict in
-> dts/Makefile.
+> This is pretty cool, but a too local solution to a global problem.
 >
-> Patch 1 adds a pinmux setting for uart0 on PB pins. This is new on
-> A33, and is much better than using R_UART for console on A23, as
-> we can also see messages from BROM/boot0 when developing, and also
-> use the same earlyprintk settings as other sunxi platforms.
+> Deferred probe and initcall reordering, silly as they may seem,
+> does not require you to use device tree.
 >
-> Patch 2 adds a pinmux setting for 8 bit eMMC on mmc2.
-> mmc2 also has a reset pin, though I'm not sure if our mmc driver
-> actually uses it. Not using it seems to work anyway.
+> The real solution, which I think I pointed out already when we
+> added deferred probe, is to put dependency graphs in the drivers
+
+By this you mean something like what Thierry suggested here?
+
+http://article.gmane.org/gmane.linux.kernel/1774623
+
+> and have the kernel device driver core percolate dependecies by
+> walking the graph on probing driver, removing driver (usually the
+> inverse use case), [runtime] suspend and [runtime] resumeing
+> a driver. Possibly the dependencies will even be different
+> depending on use case.
 >
-> Patch 3 adds the dts file for the SinA33 dev board. Just the basic
-> set of features are enabled: UART console, MMC, LRADC.
+> This is what systemd is doing in userspace for starting services:
+> ask for your dependencies and wait for them if they are not
+> there. So drivers ask for resources and wait for them. It also
+> needs to be abstract, so for example we need to be able to
+> hang on regulator_get() until the driver is up and providing that
+> regulator, and as long as everything is in slowpath it should
+> be OK. (And vice versa mutatis mutandis for clk, gpio, pin
+> control, interrupts (!) and DMA channels for example.)
 
-Cool stuff, looks good to me. Note I plan on adding support for
-the musb and usb-host on the A33 tonight, I've a 10" tablet which
-has both an otg and a host usb port.
+I understood above that you propose probing devices in order, but now
+you mention that resource getters would block until the dependency is
+fulfilled which confuses me because if we are probing in order then
+all dependencies would be fulfilled before the device in question gets
+probed.
 
-I'm not sure if I'll post the series for this right away as I'm
-still waiting on some dependencies to get merged first, but keep
-an eye out on my sunxi-wip tree as something should show up there
-tonight (CET).
+> So if this should be solved it should be solved in an abstract way
+> in the device driver core available for all, then have calls calling
+> out to DT, ACPI, possibly even PCI or USB (as these
+> enumerate devices themselves) to obtain a certain
+> dependency.
 
-Regards,
+Yeah, I was planning looking into this now that I got it working with
+async probing.
 
-Hans
+Thanks,
+
+Tomeu
+
+> Yours,
+> Linus Walleij
+> _______________________________________________
+> dri-devel mailing list
+> dri-devel at lists.freedesktop.org
+> http://lists.freedesktop.org/mailman/listinfo/dri-devel
