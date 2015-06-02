@@ -1,27 +1,134 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 2 Jun 2015 10:43:06 +0100
-Subject: [PATCH v9 4/6] Documentation: DT: PL011: hi6220: add compatible
- string for Hisilicon designed UART
-In-Reply-To: <556D73B6.4090608@arm.com>
-References: <1432950661-23060-1-git-send-email-bintian.wang@huawei.com>
- <1432950661-23060-5-git-send-email-bintian.wang@huawei.com>
- <CACRpkdav_5x6RC9F++ErvqGyxDCF-=kap7-jCsO4zZ6QGVLfBQ@mail.gmail.com>
- <556D73B6.4090608@arm.com>
-Message-ID: <20150602094305.GA2067@n2100.arm.linux.org.uk>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Tue, 2 Jun 2015 11:44:47 +0200
+Subject: Please revert 3eea8b5d68c801fec788b411582b803463834752 as it
+ breaks touchscreen on n900.
+In-Reply-To: <20150601213213.GB14395@dtor-ws>
+References: <20150529202123.GY2026@saruman.tx.rr.com>
+ <20150529202954.GA26494@localhost> <20150529203456.GC22083@amd>
+ <20150601095556.GH17267@lukather> <20150601140605.GA26908@amd>
+ <20150601145825.GA20557@lukather> <20150601152111.GA14015@amd>
+ <20150601174730.GA30024@dtor-ws> <20150601212226.GH23777@lukather>
+ <20150601213213.GB14395@dtor-ws>
+Message-ID: <20150602094447.GW23777@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 02, 2015 at 10:13:26AM +0100, Marc Zyngier wrote:
-> That feels weird. This amba_vendor enum is not under control of the DT
-> author, nor the kernel. This is a set of codes that are managed by a
-> third party (probably ARM). What if some company with a name starting
-> with 'H' (Hilarious Inc?) comes up with some actual HW and ends up
-> conflicting with the above?
+On Mon, Jun 01, 2015 at 02:32:13PM -0700, Dmitry Torokhov wrote:
+> On Mon, Jun 01, 2015 at 11:22:26PM +0200, Maxime Ripard wrote:
+> > Hi Dmitry,
+> > 
+> > On Mon, Jun 01, 2015 at 10:47:30AM -0700, Dmitry Torokhov wrote:
+> > > On Mon, Jun 01, 2015 at 05:21:11PM +0200, Pavel Machek wrote:
+> > > > 
+> > > > 
+> > > > > > > > The 3eea8b5d68c801fec788b411582b803463834752 is just bad.
+> > > > > > > 
+> > > > > > > You were very welcome to review this patch at the time and/or suggest
+> > > > > > > a fix that pleases everyone.
+> > > > > > 
+> > > > > > You should be the one that should suggest fixes, as you broke it in
+> > > > > > the first place. But clearly you don't understand that.
+> > > > > 
+> > > > > You actually never asked for a fix, and went head first calling this
+> > > > > patch "bad" and asking for nothing but reverting it.
+> > > > 
+> > > > Date: Fri, 29 May 2015 21:08:16 +0200
+> > > > Subject: 4.1 touchscreen regression on n900 -- pinpointed [was Re:
+> > > > linux-n900
+> > > > ...
+> > > > Maxime, can you suggest a fix?
+> > > 
+> > > How about we do something like below (it needs a small edt-ft5x06 fixup
+> > > that I'll send separately). Not tested.
+> > > 
+> > > Thanks.
+> > > 
+> > > -- 
+> > > Dmitry
+> > > 
+> > > 
+> > > Input: improve parsing OF parameters for touchscreens
+> > > 
+> > > From: Dmitry Torokhov <dmitry.torokhov@gmail.com>
+> > > 
+> > > When applying touchscreen parameters specified in device tree let's make
+> > > sure we keep whatever setup was done by the driver and not reset the
+> > > missing values to zero.
+> > > 
+> > > Reported-by: Pavel Machek <pavel@ucw.cz>
+> > > Signed-off-by: Dmitry Torokhov <dmitry.torokhov@gmail.com>
+> > > ---
+> > >  drivers/input/touchscreen/edt-ft5x06.c     |    2 -
+> > >  drivers/input/touchscreen/of_touchscreen.c |   67 ++++++++++++++++++----------
+> > >  drivers/input/touchscreen/tsc2005.c        |    2 -
+> > >  include/linux/input/touchscreen.h          |    5 +-
+> > >  4 files changed, 48 insertions(+), 28 deletions(-)
+> > > 
+> > > diff --git a/drivers/input/touchscreen/edt-ft5x06.c b/drivers/input/touchscreen/edt-ft5x06.c
+> > > index 29d179a..394b1de 100644
+> > > --- a/drivers/input/touchscreen/edt-ft5x06.c
+> > > +++ b/drivers/input/touchscreen/edt-ft5x06.c
+> > > @@ -1041,7 +1041,7 @@ static int edt_ft5x06_ts_probe(struct i2c_client *client,
+> > >  			     0, tsdata->num_y * 64 - 1, 0, 0);
+> > >  
+> > >  	if (!pdata)
+> > > -		touchscreen_parse_of_params(input);
+> > > +		touchscreen_parse_of_params(input, true);
+> > >  
+> > >  	error = input_mt_init_slots(input, MAX_SUPPORT_POINTS, INPUT_MT_DIRECT);
+> > >  	if (error) {
+> > > diff --git a/drivers/input/touchscreen/of_touchscreen.c b/drivers/input/touchscreen/of_touchscreen.c
+> > > index b82b520..c132624 100644
+> > > --- a/drivers/input/touchscreen/of_touchscreen.c
+> > > +++ b/drivers/input/touchscreen/of_touchscreen.c
+> > > @@ -14,14 +14,22 @@
+> > >  #include <linux/input/mt.h>
+> > >  #include <linux/input/touchscreen.h>
+> > >  
+> > > -static u32 of_get_optional_u32(struct device_node *np,
+> > > -			       const char *property)
+> > > +static bool touchscreen_get_property_u32(struct device_node *np,
+> > > +					 const char *property,
+> > > +					 unsigned int default_value,
+> > > +					 unsigned int *value)
+> > >  {
+> > >  	u32 val = 0;
+> > > +	int error;
+> > >  
+> > > -	of_property_read_u32(np, property, &val);
+> > > +	error = of_property_read_u32(np, property, &val);
+> > > +	if (error) {
+> > > +		*value = default_value;
+> > > +		return false;
+> > > +	}
+> > >  
+> > > -	return val;
+> > > +	*value = val;
+> > > +	return true;
+> > 
+> > This looks good.
+> > 
+> > However, of_property_read_u32 already does the right thing here by not
+> > update val if the property is not found.
+> 
+> I know but it is not documented anywhere (as far as I know) so I'd
+> rather not rely on the implementation detail that might change in the
+> future. This is not a hot path so extra assignment should not hurt.
 
-Presumably, HiSilicon have their own vendor code already, which
-presumably would be required for them to have a license to modify
-ARM IP.
+It is actually: http://lxr.free-electrons.com/source/drivers/of/base.c#L1231
+
+But you're right that it's mostly a cosmetic change.
+
+Maxime
 
 -- 
-FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
-according to speedtest.net.
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150602/79e21402/attachment-0001.sig>
