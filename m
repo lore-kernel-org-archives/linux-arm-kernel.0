@@ -1,23 +1,23 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Tue,  2 Jun 2015 10:34:37 +0900
-Subject: [PATCH 2/2] ARM: multi_v7_defconfig: Enable shmobile r8a7793/gose
- platform
+Date: Tue,  2 Jun 2015 10:34:36 +0900
+Subject: [PATCH 1/2] ARM: shmobile: Enable gose board in multiplatform
+ defconfig
 In-Reply-To: <1433208877-3284-1-git-send-email-horms+renesas@verge.net.au>
 References: <1433208877-3284-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <1433208877-3284-3-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <1433208877-3284-2-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/configs/multi_v7_defconfig | 1 +
+ arch/arm/configs/shmobile_defconfig | 1 +
  1 file changed, 1 insertion(+)
 
-diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
-index 0d6d6984eb71..ffe3346529f9 100644
---- a/arch/arm/configs/multi_v7_defconfig
-+++ b/arch/arm/configs/multi_v7_defconfig
-@@ -72,6 +72,7 @@ CONFIG_ARCH_R8A7740=y
+diff --git a/arch/arm/configs/shmobile_defconfig b/arch/arm/configs/shmobile_defconfig
+index b58618e2d13c..4a6a1b2b8e03 100644
+--- a/arch/arm/configs/shmobile_defconfig
++++ b/arch/arm/configs/shmobile_defconfig
+@@ -18,6 +18,7 @@ CONFIG_ARCH_R8A7778=y
  CONFIG_ARCH_R8A7779=y
  CONFIG_ARCH_R8A7790=y
  CONFIG_ARCH_R8A7791=y
