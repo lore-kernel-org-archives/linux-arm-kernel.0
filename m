@@ -1,111 +1,49 @@
-From: majun258@huawei.com (majun (F))
-Date: Tue, 2 Jun 2015 19:54:16 +0800
-Subject: [PATCH 4/4]:dt-binding:Documents the mbigen bindings
-In-Reply-To: <20150601100431.GC22406@leverpostej>
-References: <55692C36.1000309@huawei.com> <20150601100431.GC22406@leverpostej>
-Message-ID: <556D9968.6050903@huawei.com>
+From: iivanov@mm-sol.com (Ivan T. Ivanov)
+Date: Tue, 02 Jun 2015 15:15:47 +0300
+Subject: [PATCH V2 1/1] ARM: dts: imx7d: add cortex-a7 coresight component
+In-Reply-To: <20150602105407.GB2067@n2100.arm.linux.org.uk>
+References: <1433192081-1131-1-git-send-email-Frank.Li@freescale.com>
+ <1433237208.6844.22.camel@mm-sol.com>
+ <20150602105407.GB2067@n2100.arm.linux.org.uk>
+Message-ID: <1433247347.6844.25.camel@mm-sol.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
+On Tue, 2015-06-02 at 11:54 +0100, Russell King - ARM Linux wrote:
+> On Tue, Jun 02, 2015 at 12:26:48PM +0300, Ivan T. Ivanov wrote:
+> > Hi,
+> > 
+> > On Tue, 2015-06-02 at 04:54 +0800, Frank.Li at freescale.com wrote:
+> > > +
+> > > +???????etm at 3007d000 {
+> > > +               compatible = "arm,coresight-etm3x", "arm,primecell";
+> > > +               reg = <0x3007d000 0x1000>;
+> > > +
+> > > +               /* System will hang if added nosmp in kernel command line
+> > > +                       * without arm,primecell-periphid because amba bus try to
+> > > +                       * read id and core1 power off at this time.
+> > > +                       */
+> > > +               arm,primecell-periphid =  <0xbb956>;
+> > 
+> > I do have similar problem, but in my case it is APB clock which is
+> > missing during device creation time. And I don't know how to fix it.
+> > 
+> > Adding Russell King as he's the maintainer of the arm,primecell bus.
+> 
+> If it was possible to postpone reading the ID until probe time, then
+> that's how I'd suggest to fix this problem, but unfortunately it isn't.
+> We need to know the device's ID by the time the bus ->match function
+> is called.
 
-? 2015/6/1 18:04, Mark Rutland ??:
-> On Sat, May 30, 2015 at 04:19:18AM +0100, majun (F) wrote:
->> Add the mbigen msi interrupt controller bindings document
->>
->>
->> Signed-off-by: Ma Jun <majun258@huawei.com>
->> ---
->>  Documentation/devicetree/bindings/arm/mbigen.txt |   51 ++++++++++++++++++++++
->>  1 files changed, 51 insertions(+), 0 deletions(-)
->>  create mode 100755 Documentation/devicetree/bindings/arm/mbigen.txt
->>
->> diff --git a/Documentation/devicetree/bindings/arm/mbigen.txt b/Documentation/devicetree/bindings/arm/mbigen.txt
->> new file mode 100755
->> index 0000000..d442b31
->> --- /dev/null
->> +++ b/Documentation/devicetree/bindings/arm/mbigen.txt
->> @@ -0,0 +1,51 @@
->> +Hisilicon mbigen device tree bindings.
->> +=======================================
->> +
->> +Mbigen means: message based interrupt generator.
->> +
->> +MBI is kind of msi interrupt only used on Non-PCI devices.
->> +
->> +To reduce the wired interrupt number connected to GIC,
->> +Hisilicon designed mbigen to collect and generate interrupt.
->> +
->> +
->> +Non-pci devices can connect to mbigen and gnerate the inteerrupt
->> +by wirtting ITS register.
-> 
-> Typos.
-> 
->> +
->> +The mbigen and devices connect to mbigen have the following properties:
->> +
->> +
->> +Mbigen required properties:
->> +-------------------------------------------
->> +-compatible: Should be "hisilicon,mbi-gen"
->> +-msi-parent: should specified the ITS mbigen connected
->> +-interrupt controller: Identifies the node as an interrupt controller
->> +- #interrupt-cells : Specifies the number of cells needed to encode an
->> +  interrupt source. The value is 2 for now.
-> 
-> The precise format of these cells needs to be specified, at this point
-> in the binding document.
->
-ok, i will fix this in next version
+I have tried to read device ID again and again on every bus ->match until
+succeed. with hope that driver which provide APB clock will be probed
+in between, and this solve problem for me. But as Stephen Boyd point me,
+this way uevent used for module auto loading will be broken. So no joy.
 
-> Why do you say "The value is 2 for now"? Do you expect this to grow in
-> future? If so, why?
+> Short of modifying the driver core (which isn't going to be popular)
+> I don't see an easy solution to this problem.
 > 
-Because the hardware design will be changed in the near future, to compatible
-with these chips, this value need to change either.
 
->> +- reg: Specifies the base physical address and size of the ITS
->> +  registers.
-> 
-> This doesn't sound right. This isn't the ITS, so it shouldn't refer to
-> the ITS registers in this manner.
-> 
-> Does the mbigen not have its own set of registers?
-> 
-> Thanks,
-> Mark.
-> 
-yes, you are right, it should be mbigen register.
->> +
->> +Examples:
->> +
->> +	mbigen_pa: interrupt-controller at 4c030000 {
->> +			compatible = "hisilicon,mbi-gen";
->> +			msi-parent = <&its_pa>;
->> +			interrupt-controller;
->> +			#interrupt-cells = <2>;
->> +			reg = <0x4c030000 0x10000>;
->> +		};
->> +
->> +Device connect to mbigen required properties:
->> +----------------------------------------------------
->> +-interrupt-parent: Specifies the mbigen node which device connected.
->> +-interrupts:specifies the interrupt source.The first cell is hwirq num, the
->> +  second number is trigger type.
->> +
->> +Examples:
->> +	usb0: ehci at a1000000 {
->> +		compatible = "generic-ehci";
->> +		interrupt-parent = <&mbigen_pa>;
->> +		reg = <0xa1000000 0x10000>;
->> +		interrupts = <20 4>;
->> +	};
->> +
->> -- 
->> 1.7.1
->>
->>
-> 
-> .
-> 
+Thanks,
+Ivan
