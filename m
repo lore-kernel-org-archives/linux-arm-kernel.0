@@ -1,30 +1,32 @@
 From: ijc@debian.org (Ian Campbell)
-Date: Tue, 02 Jun 2015 08:14:11 +0100
-Subject: [PATCH 1/3] bus: mvebu-mbus: do not set WIN_CTRL_SYNCBARRIER on
- non io-coherent platforms.
-In-Reply-To: <1432802414-12355-2-git-send-email-thomas.petazzoni@free-electrons.com>
-References: <1432802414-12355-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1432802414-12355-2-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1433229251.5748.290.camel@debian.org>
+Date: Tue, 02 Jun 2015 08:14:52 +0100
+Subject: QNAP TS-419: sata_mv fails to initialise with "can't set global
+ reset"
+In-Reply-To: <20150601210702.GN22739@lunn.ch>
+References: <1433068534.5748.276.camel@debian.org>
+ <20150601025050.GB11354@lunn.ch> <1433192857.5748.288.camel@debian.org>
+ <20150601210702.GN22739@lunn.ch>
+Message-ID: <1433229292.5748.291.camel@debian.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2015-05-28 at 10:40 +0200, Thomas Petazzoni wrote:
-> From: Nicolas Schichan <nschichan@freebox.fr>
+On Mon, 2015-06-01 at 23:07 +0200, Andrew Lunn wrote:
+> On Mon, Jun 01, 2015 at 10:07:37PM +0100, Ian Campbell wrote:
+> > On Mon, 2015-06-01 at 04:50 +0200, Andrew Lunn wrote:
+> > > You might also want to try 
+> > > 
+> > > http://comments.gmane.org/gmane.linux.ports.arm.kernel/416589
+> > > 
+> > > In particular the first patch.
+> > 
+> > That did the trick, thanks!
 > 
-> Commit a0b5cd4ac2d6 ("bus: mvebu-mbus: use automatic I/O
-> synchronization barriers") enabled the usage of automatic I/O
-> synchronization barriers by enabling bit WIN_CTRL_SYNCBARRIER in the
-> control registers of MBus windows, but on non io-coherent platforms
-> (orion5x, kirkwood and dove) the WIN_CTRL_SYNCBARRIER bit in
-> the window control register is either reserved (all windows except 6
-> and 7) or enables read-only protection (windows 6 and 7).
+> Great.
 > 
-> Signed-off-by: Nicolas Schichan <nschichan@freebox.fr>
-> Reviewed-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-> Cc: <stable@vger.kernel.org> # v4.0+
-> Fixes: a0b5cd4ac2d6 ("bus: mvebu-mbus: use automatic I/O synchronization barriers")
-> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+> A tested-by: for that patch will help grease the path into the kernel.
 
-Tested-by: Ian Campbell <ijc@debian.org> (On QNAP TS-419P, it fixed SATA
-reset issue)
+I think it's already been applied to Gregory's tree, but I replied with
+a T-b anyway.
+
+Thanks again,
+Ian.
