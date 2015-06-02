@@ -1,38 +1,29 @@
-From: wsa@the-dreams.de (Wolfram Sang)
-Date: Wed, 3 Jun 2015 02:55:33 +0900
-Subject: [PATCH v2] i2c: designware: Avoid unnecessary resuming during
- system suspend
-In-Reply-To: <1432132393-693-1-git-send-email-jszhang@marvell.com>
-References: <1432132393-693-1-git-send-email-jszhang@marvell.com>
-Message-ID: <20150602175532.GD1494@katana>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Tue, 2 Jun 2015 10:56:54 -0700
+Subject: [PATCH 0/6] Support CPR on MSM8916
+In-Reply-To: <20150602105328.GJ14071@sirena.org.uk>
+References: <1433209679-31389-1-git-send-email-sboyd@codeaurora.org>
+ <20150602105328.GJ14071@sirena.org.uk>
+Message-ID: <20150602175654.GA24349@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 20, 2015 at 10:33:13PM +0800, Jisheng Zhang wrote:
-> Commit 1fc2fe204cb9 ("i2c: designware: Add runtime PM hooks") adds
-> runtime pm support using the same ops for system pm and runtime pm.
-> When suspend to ram, the i2c host may have been runtime suspended, thus
-> i2c_dw_disable() hangs.
+On 06/02, Mark Brown wrote:
+> On Mon, Jun 01, 2015 at 06:47:53PM -0700, Stephen Boyd wrote:
 > 
-> Previously, I fixed this issue by separating ops for system pm and
-> runtime pm, then in the system suspend/resume path, runtime pm apis are
-> used to ensure the device is at correct state.
+> > Stephen Boyd (6):
+> >   regulator: core: Don't spew backtraces on duplicate sysfs
+> >   regulator: core: Print at debug level on debugfs creation failure
 > 
-> But as Mika Westerberg pointed out: it sounds a bit silly to resume the
-> device just because you want to call i2c_dw_disable() for it before
-> suspending again. He then suggested an elegant solution which keeps the
-> device runtime suspended during system suspend with the help of
-> 'dev->power.direct_complete'. This patch adopted this solution, and in
-> fact Mika provided the main code.
-> 
-> Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
+> These two patches don't seem to be tied to the rest of the series at all
+> (they certainly trigger already for some systems).
 
-Fixed the 80 char thingie and applied to for-next, thanks!
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150603/2f6101dd/attachment.sig>
+The series causes these warning to trigger on devices with CPR
+and these patches silence them. So it is related, but the patches
+aren't necessary for compilation. They should go through the
+regulator tree, if that's what you're asking.
+
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
