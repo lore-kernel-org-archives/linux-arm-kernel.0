@@ -1,31 +1,35 @@
-From: ludovic.desroches@atmel.com (Ludovic Desroches)
-Date: Tue, 2 Jun 2015 17:52:22 +0200
-Subject: [PATCH v3 0/6] i2c: at91: add support to FIFOs and alternative
- command
-In-Reply-To: <20150602153622.GB2661@katana>
-References: <cover.1433250713.git.cyrille.pitchen@atmel.com>
- <20150602152647.GA2806@odux.rfo.atmel.com>
- <20150602153622.GB2661@katana>
-Message-ID: <20150602155222.GB2806@odux.rfo.atmel.com>
+From: antoine.tenart@free-electrons.com (Antoine Tenart)
+Date: Tue,  2 Jun 2015 17:53:37 +0200
+Subject: [PATCH 0/4] mtd: pxa3xx_nand: rework the timing setup
+Message-ID: <1433260421-18002-1-git-send-email-antoine.tenart@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 03, 2015 at 12:36:28AM +0900, Wolfram Sang wrote:
-> 
-> > If you send a new version, could you add stable in Cc to patch 3/6:
-> 
-> No need to send a new version just because of an additional ack. I can
-> apply that. However...
-> 
-> > Cc: stable at vger.kernel.org #3.10 and later
-> > If not, Wolfram could you do it please?
-> 
-> The problem with 3/6 is that it seems to depend on 1/6 which is a
-> cleanup patch. If cleaning up is not essential for the bugfix, the
-> latter should be done first. To avoid exactly this problem.
-> 
-> 
+Hi,
 
-I was thinking the same so I have tried to cherry-pick the patch on a 3.10.79
-and it didn't cause any conflicts so I thought it could be sent to stable as
-is.
+This series was part of a bigger one[1], which was split into smaller
+ones as asked by Ezequiel[2].
+
+The aim here is to use the nand framework to setup the timings,
+while keeping the old in-driver way of configuration timings for
+compatibility reasons.
+
+Since the series was split up:
+        - reworked the ndcr setup
+        - removed the read_id_bytes update after device detection
+
+[1] https://lkml.org/lkml/2015/5/11/495
+[2] https://lkml.org/lkml/2015/5/16/309
+
+Antoine Tenart (4):
+  mtd: pxa3xx_nand: add a default chunk size
+  mtd: pxa3xx_nand: add helpers to setup the timings
+  mtd: pxa3xx_nand: rework flash detection and timing setup
+  mtd: pxa3xx_nand: clean up the pxa3xx timings
+
+ drivers/mtd/nand/pxa3xx_nand.c                | 251 ++++++++++++++------------
+ include/linux/platform_data/mtd-nand-pxa3xx.h |  11 +-
+ 2 files changed, 143 insertions(+), 119 deletions(-)
+
+-- 
+2.4.2
