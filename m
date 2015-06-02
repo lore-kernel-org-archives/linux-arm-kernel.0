@@ -1,55 +1,111 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Tue, 2 Jun 2015 13:55:37 +0200
-Subject: [PATCH v2] arm/arm64: KVM: Properly account for guest CPU time
-In-Reply-To: <20150602092759.GA7783@cbox>
-References: <1432838950-28774-1-git-send-email-christoffer.dall@linaro.org>
- <5568E987.5010702@samsung.com> <20150531065923.GB763@cbox>
- <556C7EC6.3010105@samsung.com> <20150602092759.GA7783@cbox>
-Message-ID: <20150602115537.GA12347@cbox>
+From: majun258@huawei.com (majun (F))
+Date: Tue, 2 Jun 2015 19:54:16 +0800
+Subject: [PATCH 4/4]:dt-binding:Documents the mbigen bindings
+In-Reply-To: <20150601100431.GC22406@leverpostej>
+References: <55692C36.1000309@huawei.com> <20150601100431.GC22406@leverpostej>
+Message-ID: <556D9968.6050903@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[replying to myself]
 
-On Tue, Jun 02, 2015 at 11:27:59AM +0200, Christoffer Dall wrote:
 
-[..]
+? 2015/6/1 18:04, Mark Rutland ??:
+> On Sat, May 30, 2015 at 04:19:18AM +0100, majun (F) wrote:
+>> Add the mbigen msi interrupt controller bindings document
+>>
+>>
+>> Signed-off-by: Ma Jun <majun258@huawei.com>
+>> ---
+>>  Documentation/devicetree/bindings/arm/mbigen.txt |   51 ++++++++++++++++++++++
+>>  1 files changed, 51 insertions(+), 0 deletions(-)
+>>  create mode 100755 Documentation/devicetree/bindings/arm/mbigen.txt
+>>
+>> diff --git a/Documentation/devicetree/bindings/arm/mbigen.txt b/Documentation/devicetree/bindings/arm/mbigen.txt
+>> new file mode 100755
+>> index 0000000..d442b31
+>> --- /dev/null
+>> +++ b/Documentation/devicetree/bindings/arm/mbigen.txt
+>> @@ -0,0 +1,51 @@
+>> +Hisilicon mbigen device tree bindings.
+>> +=======================================
+>> +
+>> +Mbigen means: message based interrupt generator.
+>> +
+>> +MBI is kind of msi interrupt only used on Non-PCI devices.
+>> +
+>> +To reduce the wired interrupt number connected to GIC,
+>> +Hisilicon designed mbigen to collect and generate interrupt.
+>> +
+>> +
+>> +Non-pci devices can connect to mbigen and gnerate the inteerrupt
+>> +by wirtting ITS register.
+> 
+> Typos.
+> 
+>> +
+>> +The mbigen and devices connect to mbigen have the following properties:
+>> +
+>> +
+>> +Mbigen required properties:
+>> +-------------------------------------------
+>> +-compatible: Should be "hisilicon,mbi-gen"
+>> +-msi-parent: should specified the ITS mbigen connected
+>> +-interrupt controller: Identifies the node as an interrupt controller
+>> +- #interrupt-cells : Specifies the number of cells needed to encode an
+>> +  interrupt source. The value is 2 for now.
+> 
+> The precise format of these cells needs to be specified, at this point
+> in the binding document.
+>
+ok, i will fix this in next version
 
-> > > 
-> > > If this patch is incorrect, then how does it work on x86, where
-> > > handle_external_intr() is called (with a barrier in between) before
-> > > kvm_guest_exit(), and where handle_external_intr() is simply
-> > > local_irq_enable() on SVM and something more complicated on VMX ?
-> > > 
-> > > Finally, how exactly is preemption latency added here?   Won't IRQ
-> > > processing run with higher priority than any task on your system, so the
-> > > order of (1) process pending IRQs (2) call schedule if needed is still
-> > > preserved here, but we call kvm_guest_exit() between (1) and (2) instead
-> > > of before (1).
-> > 
-> > I may be missing something, but on return from interrupt with preempt
-> > disabled we can't take the need resched path. And need to return
-> > to KVM no?
+> Why do you say "The value is 2 for now"? Do you expect this to grow in
+> future? If so, why?
 > 
-> preempt_enable() will call __preempt_schedule() and cause preemption
-> there, so you're talking about adding these lines of latency:
-> 
-> 	kvm_guest_exit();
-> 	trace_kvm_exit(kvm_vcpu_trap_get_class(vcpu), *vcpu_pc(vcpu));
-> 
-> And these were called with interrupts disabled before, so I don't see
-> the issue??
-> 
-> However, your question is making me think whether we have a race in the
-> current code on fully preemptible kernels, if we get preempted before
-> calling kvm_timer_sync_hwstate() and kvm_vgic_sync_hwstate(), then we
-> could potentially schedule another vcpu on this core and loose/corrupt
-> state, can we not?  We probably need to check for this in
-> kvm_vcpu_load/kvm_vcpu_put.  I need to think more about if this is a
-> real issue or if I'm seeing ghosts.
-> 
-I've thought about it and I don't think there's a race because those
-functions don't access the hardware directly, but only manipulate
-per-vcpu data structures.
+Because the hardware design will be changed in the near future, to compatible
+with these chips, this value need to change either.
 
--Christoffer
+>> +- reg: Specifies the base physical address and size of the ITS
+>> +  registers.
+> 
+> This doesn't sound right. This isn't the ITS, so it shouldn't refer to
+> the ITS registers in this manner.
+> 
+> Does the mbigen not have its own set of registers?
+> 
+> Thanks,
+> Mark.
+> 
+yes, you are right, it should be mbigen register.
+>> +
+>> +Examples:
+>> +
+>> +	mbigen_pa: interrupt-controller at 4c030000 {
+>> +			compatible = "hisilicon,mbi-gen";
+>> +			msi-parent = <&its_pa>;
+>> +			interrupt-controller;
+>> +			#interrupt-cells = <2>;
+>> +			reg = <0x4c030000 0x10000>;
+>> +		};
+>> +
+>> +Device connect to mbigen required properties:
+>> +----------------------------------------------------
+>> +-interrupt-parent: Specifies the mbigen node which device connected.
+>> +-interrupts:specifies the interrupt source.The first cell is hwirq num, the
+>> +  second number is trigger type.
+>> +
+>> +Examples:
+>> +	usb0: ehci at a1000000 {
+>> +		compatible = "generic-ehci";
+>> +		interrupt-parent = <&mbigen_pa>;
+>> +		reg = <0xa1000000 0x10000>;
+>> +		interrupts = <20 4>;
+>> +	};
+>> +
+>> -- 
+>> 1.7.1
+>>
+>>
+> 
+> .
+> 
