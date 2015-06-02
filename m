@@ -1,67 +1,83 @@
-From: guohanjun@huawei.com (Hanjun Guo)
-Date: Tue, 2 Jun 2015 14:46:06 +0800
-Subject: [Patch v4 0/8] Consolidate ACPI PCI root common code into ACPI
- core
-In-Reply-To: <1433225576-8215-1-git-send-email-jiang.liu@linux.intel.com>
-References: <1433225576-8215-1-git-send-email-jiang.liu@linux.intel.com>
-Message-ID: <556D512E.9020209@huawei.com>
+From: t-kristo@ti.com (Tero Kristo)
+Date: Tue, 2 Jun 2015 09:56:39 +0300
+Subject: [PATCHv4 01/10] arm: dra7: add DESHDCP clock
+In-Reply-To: <1433139798-23450-2-git-send-email-tomi.valkeinen@ti.com>
+References: <1433139798-23450-1-git-send-email-tomi.valkeinen@ti.com>
+ <1433139798-23450-2-git-send-email-tomi.valkeinen@ti.com>
+Message-ID: <556D53A7.9090302@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2015/6/2 14:12, Jiang Liu wrote:
-> This patch set consolidates common code to support ACPI PCI root on x86
-> and IA64 platforms into ACPI core, to reproduce duplicated code and
-> simplify maintenance. And a patch set based on this to support ACPI based
-> PCIe host bridge on ARM64 has been posted at:
+On 06/01/2015 09:23 AM, Tomi Valkeinen wrote:
+> Add a new Linux clock for DRA7 based SoCs to control DESHDCP clock.
+>
+> Signed-off-by: Tomi Valkeinen <tomi.valkeinen@ti.com>
 
-https://lkml.org/lkml/2015/5/26/207
+Acked-by: Tero Kristo <t-kristo@ti.com>
 
-And yes, it works on ARM64 too with legacy interrupts (INT#A/B/C/D) with ACPI _PRT
-method (MSI is in developing).
-
-Thanks
-Hanjun
-
+> ---
+>   arch/arm/boot/dts/dra7.dtsi               |  5 +++++
+>   arch/arm/boot/dts/dra7xx-clocks.dtsi      | 10 ++++++++++
+>   arch/arm/mach-omap2/omap_hwmod_7xx_data.c |  1 +
+>   drivers/clk/ti/clk-7xx.c                  |  1 +
+>   4 files changed, 17 insertions(+)
 >
-> It's based on latest mainstream kernel. It passes Fengguang's 0day test
-> suite and has been tested on two IA64 platforms and one x86 platform.
+> diff --git a/arch/arm/boot/dts/dra7.dtsi b/arch/arm/boot/dts/dra7.dtsi
+> index 5332b57b4950..db0890a36e96 100644
+> --- a/arch/arm/boot/dts/dra7.dtsi
+> +++ b/arch/arm/boot/dts/dra7.dtsi
+> @@ -131,6 +131,11 @@
+>   							regulator-max-microvolt = <3000000>;
+>   						};
+>   					};
+> +
+> +					scm_conf_clocks: clocks {
+> +						#address-cells = <1>;
+> +						#size-cells = <0>;
+> +					};
+>   				};
 >
-> V3->V4:
-> 1) Add patch[05/08] support solve building issue on ARM64
-> 2) Solve an implicitly pointer cast issue.
-> 3) Rebase to latest mainstream kernel
+>   				dra7_pmx_core: pinmux at 1400 {
+> diff --git a/arch/arm/boot/dts/dra7xx-clocks.dtsi b/arch/arm/boot/dts/dra7xx-clocks.dtsi
+> index 3b933f74d000..470f39c4e326 100644
+> --- a/arch/arm/boot/dts/dra7xx-clocks.dtsi
+> +++ b/arch/arm/boot/dts/dra7xx-clocks.dtsi
+> @@ -2136,3 +2136,13 @@
+>   		clocks = <&dpll_usb_ck>;
+>   	};
+>   };
+> +
+> +&scm_conf_clocks {
+> +	dss_deshdcp_clk: dss_deshdcp_clk {
+> +		#clock-cells = <0>;
+> +		compatible = "ti,gate-clock";
+> +		clocks = <&l3_iclk_div>;
+> +		ti,bit-shift = <0>;
+> +		reg = <0x558>;
+> +	};
+> +};
+> diff --git a/arch/arm/mach-omap2/omap_hwmod_7xx_data.c b/arch/arm/mach-omap2/omap_hwmod_7xx_data.c
+> index 0e64c2fac0b5..817dbd87ce67 100644
+> --- a/arch/arm/mach-omap2/omap_hwmod_7xx_data.c
+> +++ b/arch/arm/mach-omap2/omap_hwmod_7xx_data.c
+> @@ -438,6 +438,7 @@ static struct omap_hwmod_opt_clk dss_opt_clks[] = {
+>   	{ .role = "video2_clk", .clk = "dss_video2_clk" },
+>   	{ .role = "video1_clk", .clk = "dss_video1_clk" },
+>   	{ .role = "hdmi_clk", .clk = "dss_hdmi_clk" },
+> +	{ .role = "hdcp_clk", .clk = "dss_deshdcp_clk" },
+>   };
 >
-> V2->V3:
-> 1. Move memory allocation/free from ACPI core into arch
-> 2. Kill the field 'segment' in struct pci_root_info on x86
+>   static struct omap_hwmod dra7xx_dss_hwmod = {
+> diff --git a/drivers/clk/ti/clk-7xx.c b/drivers/clk/ti/clk-7xx.c
+> index 5d2217ae4478..2dd956b9affa 100644
+> --- a/drivers/clk/ti/clk-7xx.c
+> +++ b/drivers/clk/ti/clk-7xx.c
+> @@ -305,6 +305,7 @@ static struct ti_dt_clk dra7xx_clks[] = {
+>   	DT_CLK("4882c000.timer", "timer_sys_ck", "timer_sys_clk_div"),
+>   	DT_CLK("4882e000.timer", "timer_sys_ck", "timer_sys_clk_div"),
+>   	DT_CLK(NULL, "sys_clkin", "sys_clkin1"),
+> +	DT_CLK(NULL, "dss_deshdcp_clk", "dss_deshdcp_clk"),
+>   	{ .node_name = NULL },
+>   };
 >
-> Thanks!
-> Gerry
->
-> Hanjun Guo (1):
->   ARM64 / PCI: introduce struct pci_controller for ACPI
->
-> Jiang Liu (7):
->   ACPI/PCI: Enhance ACPI core to support sparse IO space
->   ia64/PCI/ACPI: Use common ACPI resource parsing interface for host
->     bridge
->   ia64/PCI: Use common struct resource_entry to replace struct
->     iospace_resource
->   x86/PCI: Rename struct pci_sysdata as struct pci_controller
->   PCI/ACPI: Consolidate common PCI host bridge code into ACPI core
->   x86/PCI/ACPI: Use common interface to support PCI host bridge
->   ia64/PCI/ACPI: Use common interface to support PCI host bridge
->
->  arch/arm64/include/asm/pci.h  |   10 ++
->  arch/ia64/include/asm/pci.h   |    5 -
->  arch/ia64/pci/pci.c           |  364 +++++++++++------------------------------
->  arch/x86/include/asm/pci.h    |   13 +-
->  arch/x86/include/asm/pci_64.h |    4 +-
->  arch/x86/pci/acpi.c           |  295 ++++++++++-----------------------
->  arch/x86/pci/common.c         |    2 +-
->  drivers/acpi/pci_root.c       |  200 ++++++++++++++++++++++
->  drivers/acpi/resource.c       |    9 +-
->  include/linux/ioport.h        |    1 +
->  include/linux/pci-acpi.h      |   23 +++
->  11 files changed, 432 insertions(+), 494 deletions(-)
 >
