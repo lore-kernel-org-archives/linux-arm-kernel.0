@@ -1,77 +1,45 @@
-From: mturquette@linaro.org (Michael Turquette)
-Date: Wed, 03 Jun 2015 16:11:36 -0700
-Subject: [PATCHv3 00/27] ARM: OMAP2+: clock code move under clk driver
-In-Reply-To: <556EF42A.9000207@ti.com>
-References: <1432566032-10860-1-git-send-email-t-kristo@ti.com>
- <20150526160557.GD16525@atomide.com> <20150526163216.GF16525@atomide.com>
- <20150526163931.GO26599@saruman.tx.rr.com> <55660D5B.8020607@ti.com>
- <20150527231536.GD30984@atomide.com> <556EF42A.9000207@ti.com>
-Message-ID: <20150603231136.6017.65683@quantum>
+From: kgene@kernel.org (Kukjin Kim)
+Date: Thu, 04 Jun 2015 08:11:46 +0900
+Subject: [PATCH 0/6] Exynos SYSMMU (IOMMU) dts and arch updates
+In-Reply-To: <556C4342.6060506@samsung.com>
+References: <1432041645-11172-1-git-send-email-m.szyprowski@samsung.com>
+ <1433153450-3680-1-git-send-email-m.szyprowski@samsung.com>
+ <556C4342.6060506@samsung.com>
+Message-ID: <556F89B2.9010607@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Tero Kristo (2015-06-03 05:33:46)
-> On 05/28/2015 02:15 AM, Tony Lindgren wrote:
-> > * Tero Kristo <t-kristo@ti.com> [150527 11:32]:
-> >> On 05/26/2015 07:39 PM, Felipe Balbi wrote:
-> >>> On Tue, May 26, 2015 at 09:32:16AM -0700, Tony Lindgren wrote:
-> >>>> * Tony Lindgren <tony@atomide.com> [150526 09:08]:
-> >>>>> * Tero Kristo <t-kristo@ti.com> [150525 08:01]:
-> >>>>>> Hi,
-> >>>>>>
-> >>>>>> As requested, posting v3 with somewhat changed diff parameters and
-> >>>>>> diffstat attached. Just some minor Makefile changes compared to v2,
-> >>>>>> these were discussed under that set.
-> >>>>>>
-> >>>>>> Set has been pushed to:
-> >>>>>> - tree: https://github.com/t-kristo/linux-pm.git
-> >>>>>> - branch: for-4.2/ti-clk-move
-> >>>>>
-> >>>>> Looks like this causes a build error for at least omap2 only .config:
-> >>>>>
-> >>>>> drivers/clk/ti/dpll3xxx.o:(.rodata+0x1c): multiple definition of `clkhwops_omap3_dpll'
-> >>>>> drivers/clk/ti/dpll.o:(.rodata+0x0): first defined here
-> >>>>>
-> >>>>> You may want to create a file selecting ARCH_OMAP2PLUS=y, then point
-> >>>>> KCONFIG_ALLCONFIG to that file for make randconfig. Then just build
-> >>>>> randconfigs :) Usually the issues like this are exposed within few
-> >>>>> randconfig builds, some take longer if the options have dependencies.
-> >>>
-> >>> alternatively, just clone the repository at [1] and use the example
-> >>> script provided in README.md.
-> >>>
-> >>> [1] https://github.com/felipebalbi/omap-seeds
-> >>>
-> >>
-> >> Ok, I pushed an updated branch named: for-4.2/ti-clk-move-v4
-> >>
-> >> This definitely compiles with OMAP2 / OMAP3 / OMAP4 / OMAP5 / DRA7 / AM33xx
-> >> / AM43xx only setups (tried it out.)
-> >
-> > Thanks yeah seems to work for me now.
-> >
-> > Regards,
-> >
-> > Tony
-> >
+On 06/01/15 20:34, Krzysztof Kozlowski wrote:
+> W dniu 01.06.2015 o 19:10, Marek Szyprowski pisze:
+>> Hello,
+>>
+>> Main changes for Exynos SYSMMU (IOMMU) driver has been finally scheduled
+>> for merging - see
+>> https://git.kernel.org/cgit/linux/kernel/git/joro/iommu.git/commit/?h=next
+>> In meantime there have been quite a lot of changes related to Exynos DTS
+>> files queued for merging and my patches don't apply anymore. To ease
+>> merge process I've decided to rebased all Exynos SYSMMU dts changes onto
+>> latest exynos next tree from: https://github.com/krzk/linux dt-for-next
+>>
+>> While rebasing I've fixes a few spotted issues: some nodes still used
+>> old 'samsung,power-domain' properties (now replaced with 'power-domains')
+>> and added properties to jpeg codec merged recently.
+>>
 > 
-> Question to Mike / Stephen, any chance of getting this in during the 4.2 
-> merge anymore seeing we are already at 4.1-rc6?
+> Thanks for rebasing this stuff.
 > 
-> I can send a pull request if yes. Otherwise I just wait until we are 
-> past the next merge.
+Same here ;-)
 
-Hi Tero,
-
-I'd like more time for any regressions this introduces to be fixed, so
-lets push back to next merge window. The always-wrong-but-never-by-much
-crystal ball[0] predicts June 14. This is less than two weeks away, so
-the wait should be short.
-
-[0] http://phb-crystal-ball.org/
-
-Thanks,
-Mike
-
+> I picked whole patchset with Javier's tested-by. I'll send it to Kukjin
+> later or directly to arm-soc (depending what will happen with last pull
+> request).
 > 
-> -Tero
+> Kukjin, you mentioned that you will do something with this patchset the
+> previous weekend. Since then nothing happened so I am not sure what are
+> your plans... Can you share them? Do you want to pick it by yourself, do
+> you have any comments or maybe you need something from our side? (I
+> checked the patches and they look fine)
+> 
+Done, thanks.
+
+- Kukjin
