@@ -1,31 +1,136 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 3 Jun 2015 14:46:24 +0200
-Subject: [PATCH 0/3] GPIO support for BRCMSTB
-In-Reply-To: <20150602162830.GI2067@n2100.arm.linux.org.uk>
-References: <1430901477-10678-1-git-send-email-gregory.0xf0@gmail.com>
- <CACRpkda3EDa7YdzeT6FQ=cQw1RrDath7pQsCos-JeB2y4r18gw@mail.gmail.com>
- <CADtm3G45-u82Rp_0dHf2EfdMokf8E4FaQ84PHnocpvXxU+5_+g@mail.gmail.com>
- <CACRpkdaTYAr-7K5_QZh1CyeyA1224obqEB2Sz8UHZmrWcfv+ow@mail.gmail.com>
- <CADtm3G4ao=3sHx2F1+V9rwS=jWf6ZdEQi4d24HxQ6MEc+CQ8CQ@mail.gmail.com>
- <CACRpkdY_-zq-1srBC213MK_RoVvPsfTpRTQyx-4yRvCOV5JdxQ@mail.gmail.com>
- <20150602162830.GI2067@n2100.arm.linux.org.uk>
-Message-ID: <CACRpkdbDYGyX4-7U4rx3vzH2do7e=3U2qeqa=2j11E6z1Bqqyw@mail.gmail.com>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Wed, 3 Jun 2015 13:49:41 +0100
+Subject: [Patch v4 5/8] ARM64/PCI/ACPI: Introduce struct pci_controller
+ for ACPI
+In-Reply-To: <556ED51C.4070302@linux.intel.com>
+References: <1433225576-8215-1-git-send-email-jiang.liu@linux.intel.com>
+ <1433225576-8215-6-git-send-email-jiang.liu@linux.intel.com>
+ <20150602093525.GA23543@red-moon> <556EBE6D.90907@linaro.org>
+ <556ECA93.7040800@linux.intel.com>
+ <20150603100343.GA27917@red-moon>
+ <556ED51C.4070302@linux.intel.com>
+Message-ID: <20150603124940.GA28247@red-moon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 2, 2015 at 6:28 PM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> On Tue, Jun 02, 2015 at 11:05:21AM +0200, Linus Walleij wrote:
->> ... and have the
->> IRQ handler return IRQ_NONE if the IRQ comes from this
->> bank, or IRQ_HANDLED if it has handled an IRQ from its own
->> space.
->
-> I'm not sure that's worded correctly or not, but... fwiw, all IRQ handlers
-> _should_ be returning IRQ_NONE if the IRQ does not belong to them whether
-> or not they're shared handlers.
+On Wed, Jun 03, 2015 at 11:21:16AM +0100, Jiang Liu wrote:
+> On 2015/6/3 18:03, Lorenzo Pieralisi wrote:
+> > On Wed, Jun 03, 2015 at 10:36:19AM +0100, Jiang Liu wrote:
+> >> On 2015/6/3 16:44, Hanjun Guo wrote:
+> >>> On 2015???06???02??? 17:35, Lorenzo Pieralisi wrote:
+> >>>> On Tue, Jun 02, 2015 at 07:12:53AM +0100, Jiang Liu wrote:
+> >>>>> From: Hanjun Guo <hanjun.guo@linaro.org>
+> >>>>>
+> >>>>> ARM64 ACPI based PCI host bridge init needs a arch dependent
+> >>>>> struct pci_controller to accommodate common PCI host bridge
+> >>>>> code which is introduced later, or it will lead to compile
+> >>>>> errors on ARM64.
+> >>>>>
+> >>>>> Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
+> >>>>> Tested-by: Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com>
+> >>>>> CC: Arnd Bergmann <arnd@arndb.de>
+> >>>>> CC: Catalin Marinas <catalin.marinas@arm.com>
+> >>>>> CC: Liviu Dudau <Liviu.Dudau@arm.com>
+> >>>>> CC: Lorenzo Pieralisi <Lorenzo.Pieralisi@arm.com>
+> >>>>> CC: Will Deacon <will.deacon@arm.com>
+> >>>>> Signed-off-by: Jiang Liu <jiang.liu@linux.intel.com>
+> >>>>> ---
+> >>>>>   arch/arm64/include/asm/pci.h |   10 ++++++++++
+> >>>>>   1 file changed, 10 insertions(+)
+> >>>>>
+> >>>>> diff --git a/arch/arm64/include/asm/pci.h b/arch/arm64/include/asm/pci.h
+> >>>>> index b008a72f8bc0..70884957f253 100644
+> >>>>> --- a/arch/arm64/include/asm/pci.h
+> >>>>> +++ b/arch/arm64/include/asm/pci.h
+> >>>>> @@ -10,6 +10,16 @@
+> >>>>>   #include <asm-generic/pci-bridge.h>
+> >>>>>   #include <asm-generic/pci-dma-compat.h>
+> >>>>>
+> >>>>> +struct acpi_device;
+> >>>>> +
+> >>>>> +struct pci_controller {
+> >>>>> +#ifdef CONFIG_ACPI
+> >>>>> +    struct acpi_device *companion;    /* ACPI companion device */
+> >>>>> +#endif
+> >>>>> +    int        segment;    /* PCI domain */
+> >>>>> +    int        node;        /* NUMA node */
+> >>>>> +};
+> >>>>
+> >>>> There is nothing ARM64 specific in this structure. The only
+> >>>> reason I see you want to keep it arch specific is the iommu
+> >>>> pointer on x86,
+> >>>
+> >>> And also plarform_data for IA64 too.
+> >>>
+> >>>> but I think we should find a way to make
+> >>>> the common bits shared across archs (ie the struct above) and
+> >>>> add (maybe a void*) to the generic struct to cater for arch
+> >>>> specific data.
+> >>>>
+> >>>> Thoughts ?
+> >>>
+> >>> We discussed this already, it has limitations to make it
+> >>> common to all archs, I think the limitation are:
+> >>>
+> >>>   - struct pci_controller are also used for other archs
+> >>>     such as PowerPC and Tile, they will not use it for
+> >>>     ACPI purpose, so we can not used for all archs.
+> >>>
+> >>>   - if we let struct pci_controller defined only for archs
+> >>>     using ACPI, such as introduce it in linux/acpi.h, we still
+> >>>     can not satisfy that the struct pci_controller is not
+> >>>     only used for ACPI case on x86, it will be used for
+> >>>     non-ACPI too.
+> >>>
+> >>> So it's pretty difficult to share it with across archs to me,
+> >>> any more ideas?
+> >> Hi Hanjun and Lorenzo,
+> >> 	As mentioned by Hanjun, I have no idea yet about how to
+> >> consolidating "struct pci_controller" further. One possible
+> >> way is to move "struct pci_controller" related code into
+> >> arch, but apparently that will reduce code reusing.
+> > 
+> > I guess you can't move that struct pci_controller to generic code
+> > since it is present on other archs too (with completely different
+> > members).
+> > 
+> > What you can do is creating a new struct (ie same purpose of pci_controller
+> > with a different name) common to all archs that contains the common bits
+> > + a void* data that contains arch specific data, and convert x86 and ia64
+> > to using it.
+> > 
+> > It is weird to be forced to declare a pci_controller structure in arm64
+> > code with 0 arch specific data in it.
+> 
+> Hi Lorenzo,
+> 	I have thought to consolidate pci_controller for x86 and ia64,
+> but that will make the change set much more bigger. How about to
+> consolidate pci_controller by another patch set. That will be easier
+> for review.
 
-Yup that's right. Sorry for being unclear.
+Agreed, but with this set you are forcing arm64 to define pci_controller
+as pci_bus sysdata and I am not really keen on that, there are already
+function calls in the arm64 pci layer that are there to make ACPI
+compile and it is a bit annoying, instead of removing them we are
+adding arch stuff on top.
 
-Yours,
-Linus Walleij
+How about passing a void* pointer (ie that is what pci_create_root_bus
+expects) to acpi_pci_root_create through a member in acpi_pci_root_info
+(I mean acpi_pci_root_info replaces the controller member with a void*
+where you can add x86/ia64 pci_controller) ?
+
+I understand this forces you to alloc the pci_controller in arch code,
+but that's not a big deal right ? This way you can drop the
+pci_controller struct from arm64 (I do not even know if it will ever
+be needed, by looking at Hanjun's code, the bits of code that
+need the pci_controller can be moved to generic PCI layer).
+
+https://lkml.org/lkml/2015/5/26/215
+
+This way we can add the generic struct we discussed later
+(pci_controller refactoring), I agree it is going to be a bigger
+change but at least you do not force something into arm64 that we do
+not even know if it is required.
+
+Thanks anyway for putting this series together.
+Lorenzo
