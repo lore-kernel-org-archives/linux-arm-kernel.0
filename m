@@ -1,70 +1,148 @@
-From: cyrille.pitchen@atmel.com (Cyrille Pitchen)
-Date: Wed, 3 Jun 2015 18:25:16 +0200
-Subject: [PATCH v5 0/6] i2c: at91: add support to FIFOs and alternative command
-Message-ID: <cover.1433348016.git.cyrille.pitchen@atmel.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed,  3 Jun 2015 09:23:18 -0700
+Subject: [PATCH 09/12] ARM: dts: Add minimal clocks for dm814x
+In-Reply-To: <1433348601-8966-1-git-send-email-tony@atomide.com>
+References: <1433348601-8966-1-git-send-email-tony@atomide.com>
+Message-ID: <1433348601-8966-10-git-send-email-tony@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-ChangeLog
+Use fixed clocks until we have a clock driver for the PLL.
+The mux and divider composite clocks work the same way
+as on dm816x and am335x.
 
-v5:
-- print I2C controller version in an already existing dev_info() instead of
-  adding a new one.
+Cc: Matthijs van Duin <matthijsvanduin@gmail.com>
+Signed-off-by: Tony Lindgren <tony@atomide.com>
+---
+ arch/arm/boot/dts/dm814x-clocks.dtsi | 109 +++++++++++++++++++++++++++++++++++
+ arch/arm/boot/dts/dm814x.dtsi        |   2 +
+ 2 files changed, 111 insertions(+)
+ create mode 100644 arch/arm/boot/dts/dm814x-clocks.dtsi
 
-v4:
-- replace 0x%x by %#x when printing I2C controller version
-- change the order of patches: the race condition bug fix becomes the first
-  patch so it be can more easily applied to older kernels.
-
-v3:
-- fix braces {} coding style issue
-- split the alternative command patch into 2 patches: the first one fixes
-  a race condition whereas the second one is the actual alternative command
-  patch
-
-v2:
-- fix typo in comment for AT91_TWI_SVEN.
-- document new device tree bindings like "atmel,fifo-size".
-- explicitly set the has_alt_cmd boolean to false to already existing chip
-  configs.
-- use the BIT() macro to define the register bits and do a little cleanup in a
-  dedicated patch.
-- reword some comments to better explain why the TXCOMP interrupt is no longer
-  enabled in at91_do_twi_transfer() but later in
-  at91_twi_write_data_dma_callback() to avoid a race condition when DMA is used.
-- remove useless TXCOMP interrupt enable line in at91_twi_write_next_byte()
-  since this interrupt is also enabled by at91_do_twi_transfer() for PIO
-  transfers.
-
-v1:
-This series of patches adds support of two new features which will be
-introduced with Atmel sama5d2x SoC.
-
-First, the alternative command mode eases the sending of STOP conditions.
-Before starting an I2C transaction, the size data to be transfered is
-written into the new Alternative Command Register. For each byte transferred,
-the I2C controller decreases this counter and automatically sends a STOP
-condition when the counter value reaches 0, that is to say when the last byte
-of the transaction has been sent/received. So there is no longer need to set
-the STOP bit into the Control Register.
-
-Then the use of FIFOs allows to reduce number I/O accesses: for instance,
-the TX FIFO allows to write up to 4 data in a single access to the Transmit
-Holding Register. Also the RX FIFO allows to read up to 4 data in a single
-access to the Receive Holding Register. Currently only DMA transfers take
-advantage of FIFOs.
-
-Cyrille Pitchen (6):
-  i2c: at91: fix a race condition when using the DMA controller
-  i2c: at91: use BIT() macro to define register bits
-  i2c: at91: update documentation for DT bindings
-  i2c: at91: add support for new alternative command mode
-  i2c: at91: print hardware version
-  i2c: at91: add support to FIFOs
-
- Documentation/devicetree/bindings/i2c/i2c-at91.txt |  29 +-
- drivers/i2c/busses/i2c-at91.c                      | 356 +++++++++++++++++----
- 2 files changed, 322 insertions(+), 63 deletions(-)
-
+diff --git a/arch/arm/boot/dts/dm814x-clocks.dtsi b/arch/arm/boot/dts/dm814x-clocks.dtsi
+new file mode 100644
+index 0000000..ef1e8e7
+--- /dev/null
++++ b/arch/arm/boot/dts/dm814x-clocks.dtsi
+@@ -0,0 +1,109 @@
++/*
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ */
++
++&scm_clocks {
++
++	tclkin_ck: tclkin_ck {
++		#clock-cells = <0>;
++		compatible = "fixed-clock";
++		clock-frequency = <32768>;
++	};
++
++	devosc_ck: devosc_ck {
++		#clock-cells = <0>;
++		compatible = "fixed-clock";
++		clock-frequency = <20000000>;
++	};
++
++	/* Optional auxosc, 20 - 30 MHz range, assume 27 MHz by default */
++	auxosc_ck: auxosc_ck {
++		#clock-cells = <0>;
++		compatible = "fixed-clock";
++		clock-frequency = <27000000>;
++	};
++
++	mpu_ck: mpu_ck {
++		#clock-cells = <0>;
++		compatible = "fixed-clock";
++		clock-frequency = <1000000000>;
++	};
++
++	sysclk4_ck: sysclk4_ck {
++		#clock-cells = <0>;
++		compatible = "fixed-clock";
++		clock-frequency = <222000000>;
++	};
++
++	sysclk6_ck: sysclk6_ck {
++		#clock-cells = <0>;
++		compatible = "fixed-clock";
++		clock-frequency = <100000000>;
++	};
++
++	sysclk10_ck: sysclk10_ck {
++		#clock-cells = <0>;
++		compatible = "fixed-clock";
++		clock-frequency = <48000000>;
++	};
++
++	sysclk18_ck: sysclk18_ck {
++		#clock-cells = <0>;
++		compatible = "fixed-clock";
++		clock-frequency = <32768>;
++	};
++
++        cpsw_125mhz_gclk: cpsw_125mhz_gclk {
++		#clock-cells = <0>;
++		compatible = "fixed-clock";
++		clock-frequency = <125000000>;
++	};
++
++	cpsw_cpts_rft_clk: cpsw_cpts_rft_clk {
++		#clock-cells = <0>;
++		compatible = "fixed-clock";
++		clock-frequency = <250000000>;
++	};
++
++};
++
++&pllss_clocks {
++
++	aud_clkin0_ck: aud_clkin0_ck {
++		#clock-cells = <0>;
++		compatible = "fixed-clock";
++		clock-frequency = <20000000>;
++	};
++
++	aud_clkin1_ck: aud_clkin1_ck {
++		#clock-cells = <0>;
++		compatible = "fixed-clock";
++		clock-frequency = <20000000>;
++	};
++
++	aud_clkin2_ck: aud_clkin2_ck {
++		#clock-cells = <0>;
++		compatible = "fixed-clock";
++		clock-frequency = <20000000>;
++	};
++
++	timer1_mux_ck: timer1_mux_ck {
++		#clock-cells = <0>;
++		compatible = "ti,mux-clock";
++		clocks = <&sysclk18_ck &aud_clkin0_ck &aud_clkin1_ck
++			  &aud_clkin2_ck &devosc_ck &auxosc_ck &tclkin_ck>;
++		ti,bit-shift = <3>;
++		reg = <0x2e0>;
++	};
++
++	timer2_mux_ck: timer2_mux_ck {
++		#clock-cells = <0>;
++		compatible = "ti,mux-clock";
++		clocks = <&sysclk18_ck &aud_clkin0_ck &aud_clkin1_ck
++			  &aud_clkin2_ck &devosc_ck &auxosc_ck &tclkin_ck>;
++		ti,bit-shift = <6>;
++		reg = <0x2e0>;
++	};
++};
+diff --git a/arch/arm/boot/dts/dm814x.dtsi b/arch/arm/boot/dts/dm814x.dtsi
+index f3077e3..972c9c9 100644
+--- a/arch/arm/boot/dts/dm814x.dtsi
++++ b/arch/arm/boot/dts/dm814x.dtsi
+@@ -329,3 +329,5 @@
+ 		};
+ 	};
+ };
++
++#include "dm814x-clocks.dtsi"
 -- 
-1.8.2.2
+2.1.4
