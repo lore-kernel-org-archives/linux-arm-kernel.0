@@ -1,84 +1,63 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Wed, 3 Jun 2015 11:45:35 +0200
-Subject: [PATCH v2 6/6] ARM: sun8i: dts: Add Ippo-q8h v1.2 with A33 and
- 1024x600 lcd support
-In-Reply-To: <556D6955.8030708@redhat.com>
-References: <1432997706-20172-1-git-send-email-hdegoede@redhat.com>
- <1432997706-20172-7-git-send-email-hdegoede@redhat.com>
- <20150602081459.GO23777@lukather> <556D6955.8030708@redhat.com>
-Message-ID: <20150603094535.GI23777@lukather>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 3 Jun 2015 10:52:41 +0100
+Subject: [PATCH] arm64: fix missing syscall trace exit
+In-Reply-To: <556E5454.9080400@redhat.com>
+References: <20150601102448.GG1641@arm.com>
+ <1433293304-26539-1-git-send-email-jistone@redhat.com>
+ <556E5454.9080400@redhat.com>
+Message-ID: <20150603095241.GD17581@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 02, 2015 at 10:29:09AM +0200, Hans de Goede wrote:
-> Hi,
+On Wed, Jun 03, 2015 at 02:11:48AM +0100, Josh Stone wrote:
+> On 06/02/2015 06:01 PM, Josh Stone wrote:
+> > If a syscall is entered without TIF_SYSCALL_TRACE set, then it goes on
+> > the fast path.  It's then possible to have TIF_SYSCALL_TRACE added in
+> > the middle of the syscall, but ret_fast_syscall doesn't check this flag
+> > again.  This causes a ptrace syscall-exit-stop to be missed.
+> > 
+> > For instance, from a PTRACE_EVENT_FORK reported during do_fork, the
+> > tracer might resume with PTRACE_SYSCALL, setting TIF_SYSCALL_TRACE.
+> > Now the completion of the fork should have a syscall-exit-stop.
+> > 
+> > Russell King fixed this on arm by re-checking _TIF_SYSCALL_WORK in the
+> > fast exit path.  Do the same on arm64.
+> > 
+> > Cc: Catalin Marinas <catalin.marinas@arm.com>
+> > Cc: Will Deacon <will.deacon@arm.com>
+> > Cc: Russell King <rmk@arm.linux.org.uk>
+> > Signed-off-by: Josh Stone <jistone@redhat.com>
+> > ---
+> >  arch/arm64/kernel/entry.S | 4 +++-
+> >  1 file changed, 3 insertions(+), 1 deletion(-)
+> > 
+> > diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
+> > index 959fe8733560..a547a3e8a198 100644
+> > --- a/arch/arm64/kernel/entry.S
+> > +++ b/arch/arm64/kernel/entry.S
+> > @@ -608,7 +608,9 @@ ENDPROC(cpu_switch_to)
+> >   */
+> >  ret_fast_syscall:
+> >  	disable_irq				// disable interrupts
+> > -	ldr	x1, [tsk, #TI_FLAGS]
+> > +	ldr	x1, [tsk, #TI_FLAGS]		// re-check for syscall tracing
+> > +	and	x2, x1, #_TIF_SYSCALL_WORK
+> > +	cbnz	x2, __sys_trace_return
+> >  	and	x2, x1, #_TIF_WORK_MASK
+> >  	cbnz	x2, fast_work_pending
+> >  	enable_step_tsk x1, x2
 > 
-> On 02-06-15 10:14, Maxime Ripard wrote:
-> >On Sat, May 30, 2015 at 04:55:06PM +0200, Hans de Goede wrote:
-> >>The Ippo-q8h is a tablet circuit board commonly found in cheap Android
-> >>tablets. The v1.2 version can be used with either an A23 or A33 SoC.
-> >>
-> >>This adds a dts file for the v1.2 board with an A33 SoC and a 1024x600
-> >>LCD screen (most of these tablets have a 800x480 screen).
-> >
-> >I think the difference between the resolution here is more of a case
-> >for the DT quirks interface:
-> >https://lkml.org/lkml/2015/2/18/258
-> 
-> I would expect the only difference between the 2 dts files to be the
-> node describing the lcd panel, so yes that makes somewhat sense.
-> 
-> >Do you know if there's some way to autodetect the two board versions
-> >(like a board id somewhere in an EEPROM)?
-> 
-> No, AFAIK there is no way to tell the difference. There is no eeprom no
-> the board, and we really cannot rely on the nand contents.
+> I do have one concern about this, also in Russell's ARM patch.  Is it
+> really ok to branch to __sys_trace_return with interrupts disabled?
 
-Ok.
+I think you're right to be concerned!
 
-> >If not, then maybe u-boot can simply add that board compatible to the
-> >list, and we'll base our logic on that when we'll need it.
-> 
-> That means extra logic in u-boot, and on the kernel side, for what
-> benefit exactly? Such logic would make sense if there was one u-boot
-> image which runtime adjusted itself, but that is not an option.
+> I didn't hit any issue from that, but my testcase only exercises this
+> path once each run.  So that might have just been lucky not to hit any
+> gross scenario...
 
-For what benefit? One kernel image which runtime adjusts itself. It's
-especially possible if u-boot's image is not, which seems to be what
-you're saying.
+Did you try enabling all the audit stuff? It looks like that can call
+into the scheduler, so I think we should be running the tracing callbacks
+with interrupts enabled (and it looks like x86 do this on the exit path).
 
-> And we can avoid copy and paste on the dts side by putting all
-> the common stuff in a common file and including that, I believe
-> that that is better (KISS = better) since we've no way to runtime
-> do the right thing AFAICT.
-
-My concern is about the ever-growing number of DTS that just are small
-variations of one or the other. What about the time when we'll
-discover that this board has a variant that has an emmc, and some that
-don't have any button, or the i2c bus 2 not wired, and one other that
-doesn't have any HDMI?
-
-Do we really want to have a dts called
-sun8i-a33-q8h-emmc-lcd800x600-nohdmi-noi2c2-nobuttons.dts?
-
-Especially when we will have the one that we include here that will
-not have followed this convention because it was introduced before
-that, and that we have a way to deal with this nicely?
-
-You chose to consider the DTS names an ABI, the best way to handle
-this is to have a DTS as generic as possible, and leave all these
-small variations outside of the name.
-
-Maxime
-
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150603/cf19263b/attachment.sig>
+Will
