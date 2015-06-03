@@ -1,60 +1,51 @@
 From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Wed,  3 Jun 2015 14:24:02 +0200
-Subject: [PATCH v2 00/16] AT91 DT for 4.2
-Message-ID: <1433334258-14741-1-git-send-email-alexandre.belloni@free-electrons.com>
+Date: Wed,  3 Jun 2015 14:24:03 +0200
+Subject: [PATCH v2 01/16] ARM: at91/dt: at91sam9rl: fix rtc node
+In-Reply-To: <1433334258-14741-1-git-send-email-alexandre.belloni@free-electrons.com>
+References: <1433334258-14741-1-git-send-email-alexandre.belloni@free-electrons.com>
+Message-ID: <1433334258-14741-2-git-send-email-alexandre.belloni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+The RTC lives at 0xfffffe00. Also reorder the node properly.
 
-A dt series for 4.2:
- - Fix at91sam9rl RTC node and use it on at91sam9rlek
- - correct stdout-path for the various kizboxes
- - add stdout-path to the atme evaluation boards
- - add  Acme arietta g25 device tree
+Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+---
+ arch/arm/boot/dts/at91sam9rl.dtsi | 15 ++++++++-------
+ 1 file changed, 8 insertions(+), 7 deletions(-)
 
-Changes in v2:
- - renamed the ariette device tree
- - added an aliases node to the arietta device tree
-
-Alexandre Belloni (16):
-  ARM: at91/dt: at91sam9rl: fix rtc node
-  ARM: at91/dt: at91sam9rlek: add RTC
-  ARM: at91/dt: kizbox: use stdout-path
-  ARM: at91/dt: at91rm9200ek: use stdout-path
-  ARM: at91/dt: at91sam9261ek: use stdout-path
-  ARM: at91/dt: at91sam9263ek: use stdout-path
-  ARM: at91/dt: at91sam9g20ek: use stdout-path
-  ARM: at91/dt: at91sam9m10g45ek use stdout-path
-  ARM: at91/dt: at91sam9n12ek: use stdout-path
-  ARM: at91/dt: at91sam9rlek: use stdout-path
-  ARM: at91/dt: at91sam9x5ek: use stdout-path
-  ARM: at91/dt: sama5d3xek: use stdout-path
-  ARM: at91/dt: sama5d3 xplained: use stdout-path
-  ARM: at91/dt: sama5d4ek: use stdout-path
-  ARM: at91/dt: sama5d4 xplained: use stdout-path
-  ARM: at91/dt: Add Acme Arietta G25
-
- arch/arm/boot/dts/Makefile                  |  1 +
- arch/arm/boot/dts/at91-ariettag25.dts       | 79 +++++++++++++++++++++++++++++
- arch/arm/boot/dts/at91-kizbox.dts           |  2 +-
- arch/arm/boot/dts/at91-kizbox2.dts          |  2 +-
- arch/arm/boot/dts/at91-kizboxmini.dts       |  2 +-
- arch/arm/boot/dts/at91-sama5d3_xplained.dts |  2 +-
- arch/arm/boot/dts/at91-sama5d4_xplained.dts |  3 +-
- arch/arm/boot/dts/at91-sama5d4ek.dts        |  3 +-
- arch/arm/boot/dts/at91rm9200ek.dts          |  4 ++
- arch/arm/boot/dts/at91sam9261ek.dts         |  3 +-
- arch/arm/boot/dts/at91sam9263ek.dts         |  3 +-
- arch/arm/boot/dts/at91sam9g20ek_common.dtsi |  3 +-
- arch/arm/boot/dts/at91sam9m10g45ek.dts      |  3 +-
- arch/arm/boot/dts/at91sam9n12ek.dts         |  3 +-
- arch/arm/boot/dts/at91sam9rl.dtsi           | 15 +++---
- arch/arm/boot/dts/at91sam9rlek.dts          |  7 ++-
- arch/arm/boot/dts/at91sam9x5ek.dtsi         |  3 +-
- arch/arm/boot/dts/sama5d3xcm.dtsi           |  3 +-
- 18 files changed, 120 insertions(+), 21 deletions(-)
- create mode 100644 arch/arm/boot/dts/at91-ariettag25.dts
-
+diff --git a/arch/arm/boot/dts/at91sam9rl.dtsi b/arch/arm/boot/dts/at91sam9rl.dtsi
+index ebfd5ce9cb38..c9920c64791c 100644
+--- a/arch/arm/boot/dts/at91sam9rl.dtsi
++++ b/arch/arm/boot/dts/at91sam9rl.dtsi
+@@ -1065,13 +1065,6 @@
+ 				};
+ 			};
+ 
+-			rtc at fffffeb0 {
+-				compatible = "atmel,at91rm9200-rtc";
+-				reg = <0xfffffeb0 0x40>;
+-				interrupts = <1 IRQ_TYPE_LEVEL_HIGH 7>;
+-				status = "disabled";
+-			};
+-
+ 			rtc at fffffd20 {
+ 				compatible = "atmel,at91sam9260-rtt";
+ 				reg = <0xfffffd20 0x10>;
+@@ -1085,6 +1078,14 @@
+ 				reg = <0xfffffd60 0x10>;
+ 				status = "disabled";
+ 			};
++
++			rtc at fffffe00 {
++				compatible = "atmel,at91rm9200-rtc";
++				reg = <0xfffffe00 0x40>;
++				interrupts = <1 IRQ_TYPE_LEVEL_HIGH 7>;
++				status = "disabled";
++			};
++
+ 		};
+ 	};
+ 
 -- 
 2.1.4
