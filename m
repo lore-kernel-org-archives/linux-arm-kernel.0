@@ -1,35 +1,19 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Tue, 2 Jun 2015 17:11:20 -0700
-Subject: [PATCH v2 1/2] ARM: Add cpu_resume_arm() for firmwares that
- resume in ARM state
-In-Reply-To: <20150602234048.GA7557@n2100.arm.linux.org.uk>
-References: <1433272378-8470-1-git-send-email-sboyd@codeaurora.org>
- <1433272378-8470-2-git-send-email-sboyd@codeaurora.org>
- <20150602234048.GA7557@n2100.arm.linux.org.uk>
-Message-ID: <20150603001120.GA4534@codeaurora.org>
+From: horms@verge.net.au (Simon Horman)
+Date: Wed, 3 Jun 2015 09:32:50 +0900
+Subject: [PATCH 1/2] ARM: shmobile: Enable gose board in multiplatform
+ defconfig
+In-Reply-To: <CAMuHMdUWj4qfAU6S_EZJCe4j8-ds8yxu9U-nw_9zVkAP5vrEsw@mail.gmail.com>
+References: <1433208877-3284-1-git-send-email-horms+renesas@verge.net.au>
+ <1433208877-3284-2-git-send-email-horms+renesas@verge.net.au>
+ <CAMuHMdUWj4qfAU6S_EZJCe4j8-ds8yxu9U-nw_9zVkAP5vrEsw@mail.gmail.com>
+Message-ID: <20150603003249.GC30703@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/03, Russell King - ARM Linux wrote:
-> On Tue, Jun 02, 2015 at 12:12:57PM -0700, Stephen Boyd wrote:
-> > Some platforms always enter the kernel in the ARM state even if
-> > the kernel is compiled for THUMB2. Add a small wrapper on top of
-> > cpu_resume() that switches into THUMB2 state.
-> > 
-> > This fixes a problem reported by Kevin Hilman on next-20150601
-> > where the ifc6410 fails to boot a THUMB2 kernel because the
-> > platform's firmware always enters the kernel in ARM mode from
-> > deep idle states.
+On Tue, Jun 02, 2015 at 09:02:50AM +0200, Geert Uytterhoeven wrote:
+> On Tue, Jun 2, 2015 at 3:34 AM, Simon Horman <horms+renesas@verge.net.au> wrote:
+> > Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 > 
-> I think this bit of the commit message isn't quite correct: this will
-> only resolve the boot problem with a T2 kernel when the failing platform
-> is converted to use the cpu_resume_arm() entry point.
-> 
-> Apart from that, the patch looks good to me, thanks.
+> Acked-by: Geert Uytterhoeven <geert+renesas@glider.be>
 
-Sure, it could say "This provides the functionality to fix a problem
-reported by..."
-
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+Thanks, I have queued up both patches of this series for v4.3.
