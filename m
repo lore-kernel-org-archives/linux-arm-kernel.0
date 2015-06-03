@@ -1,71 +1,167 @@
-From: wangzhou1@hisilicon.com (Zhou Wang)
-Date: Wed, 3 Jun 2015 16:35:42 +0800
-Subject: [PATCH v2 4/4] Documentation: DT: Add Hisilicon PCIe host binding
-In-Reply-To: <1433320542-49576-1-git-send-email-wangzhou1@hisilicon.com>
-References: <1433320542-49576-1-git-send-email-wangzhou1@hisilicon.com>
-Message-ID: <1433320542-49576-5-git-send-email-wangzhou1@hisilicon.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 3 Jun 2015 09:41:15 +0100
+Subject: [Linaro-mm-sig] [RFCv3 2/2] dma-buf: add helpers for sharing
+ attacher constraints with dma-parms
+In-Reply-To: <556EA13B.7080306@xs4all.nl>
+References: <1422347154-15258-1-git-send-email-sumit.semwal@linaro.org>
+ <1422347154-15258-2-git-send-email-sumit.semwal@linaro.org>
+ <54DB12B5.4080000@samsung.com>
+ <20150211111258.GP8656@n2100.arm.linux.org.uk>
+ <54DB4908.10004@samsung.com>
+ <20150211162312.GR8656@n2100.arm.linux.org.uk>
+ <CAO_48GHf=Zt7Ju=N=FAVfaudApSV+rSfb+Wou7L1Dh3egULm9g@mail.gmail.com>
+ <556EA13B.7080306@xs4all.nl>
+Message-ID: <20150603084115.GC7557@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds related DTS binding document for Hisilicon PCIe host driver.
+On Wed, Jun 03, 2015 at 08:39:55AM +0200, Hans Verkuil wrote:
+> Hi Sumit,
+> 
+> On 05/05/2015 04:41 PM, Sumit Semwal wrote:
+> > Hi Russell, everyone,
+> > 
+> > First up, sincere apologies for being awol for sometime; had some
+> > personal / medical things to take care of, and then I thought I'd wait
+> > for the merge window to get over before beginning to discuss this
+> > again.
+> > 
+> > On 11 February 2015 at 21:53, Russell King - ARM Linux
+> > <linux@arm.linux.org.uk> wrote:
+> >> On Wed, Feb 11, 2015 at 01:20:24PM +0100, Marek Szyprowski wrote:
+> >>> Hello,
+> >>>
+> >>> On 2015-02-11 12:12, Russell King - ARM Linux wrote:
+> >>>> Which is a damn good reason to NAK it - by that admission, it's a half-baked
+> >>>> idea.
+> >>>>
+> >>>> If all we want to know is whether the importer can accept only contiguous
+> >>>> memory or not, make a flag to do that, and allow the exporter to test this
+> >>>> flag.  Don't over-engineer this to make it _seem_ like it can do something
+> >>>> that it actually totally fails with.
+> >>>>
+> >>>> As I've already pointed out, there's a major problem if you have already
+> >>>> had a less restrictive attachment which has an active mapping, and a new
+> >>>> more restrictive attachment comes along later.
+> >>>>
+> >>>> It seems from Rob's descriptions that we also need another flag in the
+> >>>> importer to indicate whether it wants to have a valid struct page in the
+> >>>> scatter list, or whether it (correctly) uses the DMA accessors on the
+> >>>> scatter list - so that exporters can reject importers which are buggy.
+> >>>
+> >>> Okay, but flag-based approach also have limitations.
+> >>
+> >> Yes, the flag-based approach doesn't let you describe in detail what
+> >> the importer can accept - which, given the issues that I've raised
+> >> is a *good* thing.  We won't be misleading anyone into thinking that
+> >> we can do something that's really half-baked, and which we have no
+> >> present requirement for.
+> >>
+> >> This is precisely what Linus talks about when he says "don't over-
+> >> engineer" - if we over-engineer this, we end up with something that
+> >> sort-of works, and that's a bad thing.
+> >>
+> >> The Keep It Simple approach here makes total sense - what are our
+> >> current requirements - to be able to say that an importer can only accept:
+> >>   - contiguous memory rather than a scatterlist
+> >>   - scatterlists with struct page pointers
+> >>
+> >> Does solving that need us to compare all the constraints of each and
+> >> every importer, possibly ending up with constraints which can't be
+> >> satisfied?  No.  Does the flag approach satisfy the requirements?  Yes.
+> >>
+> > 
+> > So, for basic constraint-sharing, we'll just go with the flag based
+> > approach, with a flag (best place for it is still dev->dma_params I
+> > suppose) for denoting contiguous or scatterlist. Is that agreed, then?
+> > Also, with this idea, of course, there won't be any helpers for trying
+> > to calculate constraints; it would be totally the exporter's
+> > responsibility to handle it via the attach() dma_buf_op if it wishes
+> > to.
+> 
+> What's wrong with the proposed max_segment_count? Many media devices do
+> have a limited max_segment_count and that should be taken into account.
 
-Signed-off-by: Zhou Wang <wangzhou1@hisilicon.com>
----
- .../devicetree/bindings/pci/hisilicon-pcie.txt     | 46 ++++++++++++++++++++++
- 1 file changed, 46 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/pci/hisilicon-pcie.txt
+So what happens if you have a dma_buf exporter, and several dma_buf
+importers.  One dma_buf importer attaches to the exporter, and asks
+for the buffer, and starts making use of the buffer.  This export has
+many scatterlist segments.
 
-diff --git a/Documentation/devicetree/bindings/pci/hisilicon-pcie.txt b/Documentation/devicetree/bindings/pci/hisilicon-pcie.txt
-new file mode 100644
-index 0000000..6c9b827
---- /dev/null
-+++ b/Documentation/devicetree/bindings/pci/hisilicon-pcie.txt
-@@ -0,0 +1,46 @@
-+Hisilicon PCIe host bridge DT description
-+
-+Hisilicon PCIe host controller is based on Designware PCI core.
-+It shares common functions with PCIe Designware core driver and inherits
-+common properties defined in
-+Documentation/devicetree/bindings/pci/designware-pci.txt.
-+
-+Additional properties are described here:
-+
-+Required properties:
-+- compatible: Should contain "hisilicon,hip05-pcie".
-+- reg: Should contain rc_dbi, subctrl, config registers location and length.
-+- reg-names: Must include the following entries:
-+  "rc_dbi": controller configuration registers;
-+  "subctrl": whole PCIe hosts configuration registers;
-+  "config": PCIe configuration space registers.
-+- msi-parent: Should be its_pcie which is an its receiving MSI interrupts.
-+- port-id: Should be 0, 1, 2 or 3.
-+
-+Optional properties:
-+- status: Either "ok" or "disabled".
-+- dma-coherent: Present if dma operations are coherent.
-+
-+Example:
-+	pcie at 0xb0080000 {
-+		compatible = "hisilicon,hip05-pcie", "snps,dw-pcie";
-+		reg = <0 0xb0080000 0 0x10000>, <0 0xb0000000 0 0x10000>,
-+		      <0x220 0x00000000 0 0x2000>;
-+		reg-names = "rc_dbi", "subctrl", "config";
-+		bus-range = <0  15>;
-+		msi-parent = <&its_pcie>;
-+		#address-cells = <3>;
-+		#size-cells = <2>;
-+		device_type = "pci";
-+		dma-coherent;
-+		ranges = <0x82000000 0 0x00000000 0x220 0x00000000 0 0x10000000>;
-+		num-lanes = <8>;
-+		port-id = <1>;
-+		#interrupts-cells = <1>;
-+		interrupts-map-mask = <0xf800 0 0 7>;
-+		interrupts-map = <0x0 0 0 1 &mbigen_pcie 1 10
-+				  0x0 0 0 2 &mbigen_pcie 2 11
-+				  0x0 0 0 3 &mbigen_pcie 3 12
-+				  0x0 0 0 4 &mbigen_pcie 4 13>;
-+		status = "ok";
-+	};
+Another dma_buf importer attaches to the same buffer, and now asks for
+the buffer, but the number of scatterlist segments exceeds it's
+requirement.
+
+You can't reallocate the buffer because it's in-use by another importer.
+There is no way to revoke the buffer from the other importer.  So there
+is no way to satisfy this importer's requirements.
+
+What I'm showing is that the idea that exporting these parameters fixes
+some problem is just an illusion - it may work for the single importer
+case, but doesn't for the multiple importer case.
+
+Importers really have two choices here: either they accept what the
+exporter is giving them, or they reject it.
+
+The other issue here is that DMA scatterlists are _not_ really that
+determinable in terms of number of entries when it comes to systems with
+system IOMMUs.  System IOMMUs, which should be integrated into the DMA
+API, are permitted to coalesce entries in the physical page range.  For
+example:
+
+	nsg = 128;
+	n = dma_map_sg(dev, sg, nsg, DMA_TO_DEVICE);
+
+Here, n might be 4 if the system IOMMU has been able to coalesce the 128
+entries down to 4 IOMMU entries - and that means for DMA purposes, only
+the first four scatterlist entries should be walked (this is why
+dma_map_sg() returns a positive integer when mapping.)
+
+Each struct device has a set of parameters which control how the IOMMU
+entries are coalesced:
+
+struct device_dma_parameters {
+        /*
+         * a low level driver may set these to teach IOMMU code about
+         * sg limitations.
+         */
+        unsigned int max_segment_size;
+        unsigned long segment_boundary_mask;
+};
+
+and this is independent of the dma_buf API.  This doesn't indicate the
+maximum number of segments, but as I've shown above, it's not something
+that you can say "I want a scatterlist for this memory with only 32
+segments" so it's totally unclear how an exporter would limit that.
+
+The only thing an exporter could do would be to fail the export if the
+buffer didn't end up having fewer than the requested scatterlist entries,
+which is something the importer can do too.
+
+> One of the main problems end-users are faced with today is that they do not
+> know which device should be the exporter of buffers and which should be the
+> importer. This depends on the constraints and right now applications have
+> no way of knowing this. It's nuts that this hasn't been addressed yet since
+> it is the main complaint I am getting.
+
+IT's nuts that we've ended up in this situation in the first place.  This
+was bound to happen as soon as the dma_buf sharing was introduced, because
+it immediately introduced this problem.  I don't think there is any easy
+solution to it, and what's being proposed with flags and other stuff is
+just trying to paper over the problem.
+
+What you're actually asking is that each dmabuf exporting subsystem needs
+to publish their DMA parameters to userspace, and userspace then gets to
+decide which dmabuf exporter should be used.
+
+That's not a dmabuf problem, that's a subsystem problem, but even so, we
+don't have a standardised way to export that information (and I'd suspect
+that it would be very difficult to get agreements between subsystems on
+a standard ioctl and/or data structure.)  In my experience, getting cross-
+subsystem agreement in the kernel with anything is very difficult, you
+normally end up with 60% of people agreeing, and the other 40% going off
+and doing something completely different because they object to it
+(figures vary, 90% of all statistics are made up on the spot!)
+
 -- 
-1.9.1
+FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
+according to speedtest.net.
