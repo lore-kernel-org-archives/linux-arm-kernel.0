@@ -1,64 +1,52 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed,  3 Jun 2015 14:36:23 +0100
-Subject: [PATCH] arm64: Rework alternate sequence for ARM erratum 845719
-Message-ID: <1433338583-16445-1-git-send-email-marc.zyngier@arm.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Wed, 3 Jun 2015 14:42:10 +0100
+Subject: [PATCH 2/4] video: fbdev: imxfb: Constify platform_device_id
+In-Reply-To: <556EEABD.6020902@ti.com>
+References: <1430494721-30793-1-git-send-email-k.kozlowski.k@gmail.com>
+ <1430494721-30793-2-git-send-email-k.kozlowski.k@gmail.com>
+ <20150505082807.GV4047@x1> <556EE743.5030405@ti.com>
+ <20150603115050.GB12304@x1> <556EEABD.6020902@ti.com>
+Message-ID: <20150603134210.GC12304@x1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The workaround for erratum 845719 is currently using
-a branch between two alternate sequences, which is
-quite fragile, and that we are going to break as we
-rework the alternative code.
+On Wed, 03 Jun 2015, Tomi Valkeinen wrote:
+> On 03/06/15 14:50, Lee Jones wrote:
+> > On Wed, 03 Jun 2015, Tomi Valkeinen wrote:
+> > 
+> >> Hi Lee,
+> >>
+> >> On 05/05/15 11:28, Lee Jones wrote:
+> >>> On Sat, 02 May 2015, Krzysztof Kozlowski wrote:
+> >>>
+> >>>> The platform_device_id is not modified by the driver and core uses it as
+> >>>> const.
+> >>>>
+> >>>> Signed-off-by: Krzysztof Kozlowski <k.kozlowski.k@gmail.com>
+> >>>> ---
+> >>>>  drivers/video/fbdev/imxfb.c | 2 +-
+> >>>>  1 file changed, 1 insertion(+), 1 deletion(-)
+> >>>
+> >>> Applied, thanks.
+> >>
+> >> You applied the fbdev changes in this series also, not only the
+> >> backlight changes?
+> > 
+> > Ah, yes I did.  I assumed they were all due for Backlight.
+> > 
+> > Would you like me to un-apply the non-Backlight patches?
+> 
+> If you can easily remove them, yes.
+> 
+> But chances for conflict are quite minimal, so if you already have a
+> pile of commits on top of these, it's fine if they go via backlight tree.
 
-This patch reworks the workaround to fit in a single
-alternative sequence. The generated code itself is
-unchanged.
+I can easily remove them, no problem.
 
-Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
----
- arch/arm64/kernel/entry.S | 27 +++++++++++++++------------
- 1 file changed, 15 insertions(+), 12 deletions(-)
+Consider them unapplied.
 
-diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
-index 00df926..d369ccf 100644
---- a/arch/arm64/kernel/entry.S
-+++ b/arch/arm64/kernel/entry.S
-@@ -124,21 +124,24 @@
- 	msr	sp_el0, x23
- 
- #ifdef CONFIG_ARM64_ERRATUM_845719
--	alternative_insn						\
--	"nop",								\
--	"tbz x22, #4, 1f",						\
--	ARM64_WORKAROUND_845719
-+
-+#undef SEQUENCE_ORG
-+#undef SEQUENCE_ALT
-+
- #ifdef CONFIG_PID_IN_CONTEXTIDR
--	alternative_insn						\
--	"nop; nop",							\
--	"mrs x29, contextidr_el1; msr contextidr_el1, x29; 1:",		\
--	ARM64_WORKAROUND_845719
-+
-+#define SEQUENCE_ORG	"nop ; nop ; nop"
-+#define SEQUENCE_ALT	"tbz x22, #4, 1f ; mrs x29, contextidr_el1; msr contextidr_el1, x29; 1:"
-+
- #else
--	alternative_insn						\
--	"nop",								\
--	"msr contextidr_el1, xzr; 1:",					\
--	ARM64_WORKAROUND_845719
-+
-+#define SEQUENCE_ORG	"nop ; nop"
-+#define SEQUENCE_ALT	"tbz x22, #4, 1f ; msr contextidr_el1, xzr; 1:"
-+
- #endif
-+
-+	alternative_insn SEQUENCE_ORG, SEQUENCE_ALT, ARM64_WORKAROUND_845719
-+
- #endif
- 	.endif
- 	msr	elr_el1, x21			// set up the return data
 -- 
-2.1.4
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
