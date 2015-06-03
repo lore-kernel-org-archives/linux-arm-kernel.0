@@ -1,69 +1,24 @@
-From: mturquette@linaro.org (Michael Turquette)
-Date: Wed, 03 Jun 2015 09:31:39 -0700
-Subject: [PATCH v8 2/7] clk: hi6220: Document devicetree bindings for
- hi6220 clock
-In-Reply-To: <1432865319-20413-3-git-send-email-bintian.wang@huawei.com>
-References: <1432865319-20413-1-git-send-email-bintian.wang@huawei.com>
- <1432865319-20413-3-git-send-email-bintian.wang@huawei.com>
-Message-ID: <20150603163139.6017.73279@quantum>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 3 Jun 2015 18:04:57 +0100
+Subject: stand-alone kvmtool
+In-Reply-To: <54EB622E.3020700@iki.fi>
+References: <54DDD465.3050300@arm.com> <20150218155042.GF22017@arm.com>
+ <54EB622E.3020700@iki.fi>
+Message-ID: <20150603170457.GL17581@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Bintian Wang (2015-05-28 19:08:34)
-> Document DT files bindings for Hisilicon hi6220 clock.
+On Mon, Feb 23, 2015 at 05:23:58PM +0000, Pekka Enberg wrote:
+> On 2/18/15 5:50 PM, Will Deacon wrote:
+> > Thanks for doing this. Since it looks unlikely that kvmtool will ever be
+> > merged back into the kernel tree, it makes sense to cut the dependency
+> > in my opinion.
 > 
-> Signed-off-by: Bintian Wang <bintian.wang@huawei.com>
-> Acked-by: Haojian Zhuang <haojian.zhuang@linaro.org>
-> Suggested-by: Arnd Bergmann <arnd@arndb.de>
-> Acked-by: Stephen Boyd <sboyd@codeaurora.org>
+> I am certainly OK with a standalone repository which preserves the 
+> history. Will, would you like to take over the proposed new repository 
+> and put it somewhere on git.kernel.org, perhaps?
 
-Acked-by: Michael Turquette <mturquette@linaro.org>
+Finally got around to this with Andre's help, so I'll post a separate
+mail advertising it.
 
-> ---
->  .../devicetree/bindings/clock/hi6220-clock.txt     | 34 ++++++++++++++++++++++
->  1 file changed, 34 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/clock/hi6220-clock.txt
-> 
-> diff --git a/Documentation/devicetree/bindings/clock/hi6220-clock.txt b/Documentation/devicetree/bindings/clock/hi6220-clock.txt
-> new file mode 100644
-> index 0000000..53ddb19
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/clock/hi6220-clock.txt
-> @@ -0,0 +1,34 @@
-> +* Hisilicon Hi6220 Clock Controller
-> +
-> +Clock control registers reside in different Hi6220 system controllers,
-> +please refer the following document to know more about the binding rules
-> +for these system controllers:
-> +
-> +Documentation/devicetree/bindings/arm/hisilicon/hisilicon.txt
-> +
-> +Required Properties:
-> +
-> +- compatible: the compatible should be one of the following strings to
-> +       indicate the clock controller functionality.
-> +
-> +       - "hisilicon,hi6220-aoctrl"
-> +       - "hisilicon,hi6220-sysctrl"
-> +       - "hisilicon,hi6220-mediactrl"
-> +       - "hisilicon,hi6220-pmctrl"
-> +
-> +- reg: physical base address of the controller and length of memory mapped
-> +  region.
-> +
-> +- #clock-cells: should be 1.
-> +
-> +For example:
-> +       sys_ctrl: sys_ctrl {
-> +               compatible = "hisilicon,hi6220-sysctrl", "syscon";
-> +               reg = <0x0 0xf7030000 0x0 0x2000>;
-> +               #clock-cells = <1>;
-> +       };
-> +
-> +Each clock is assigned an identifier and client nodes use this identifier
-> +to specify the clock which they consume.
-> +
-> +All these identifier could be found in <dt-bindings/clock/hi6220-clock.h>.
-> -- 
-> 1.9.1
-> 
+Will
