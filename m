@@ -1,46 +1,60 @@
-From: hramrach@gmail.com (Michal Suchanek)
-Date: 3 Jun 2015 21:26:42 -0000
-Subject: [PATCH 11/11] dt: Exynos: add Snow SPI NOR node.
-In-Reply-To: <cover.1433364398.git.hramrach@gmail.com>
-References: <cover.1433364398.git.hramrach@gmail.com>
-Message-ID: <3234c12c90eabbeeb6d33604a324231937e309ec.1433364398.git.hramrach@gmail.com>
+From: balbi@ti.com (Felipe Balbi)
+Date: Wed, 3 Jun 2015 16:28:21 -0500
+Subject: [RFC/NOT FOR MERGING] HACK: add global/private timers for A9
+In-Reply-To: <20150603210455.GD6042@saruman.tx.rr.com>
+References: <1433363565-17725-1-git-send-email-balbi@ti.com>
+ <2466648.WjMxjIpAUG@wuerfel>
+ <20150603210455.GD6042@saruman.tx.rr.com>
+Message-ID: <20150603212821.GH6042@saruman.tx.rr.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Snow has onboard SPI NOR flash which contains the bootloader.
+On Wed, Jun 03, 2015 at 04:04:55PM -0500, Felipe Balbi wrote:
+> On Wed, Jun 03, 2015 at 10:55:27PM +0200, Arnd Bergmann wrote:
+> > On Wednesday 03 June 2015 15:32:45 Felipe Balbi wrote:
+> > > 
+> > > Hi Tony and Russell,
+> > > 
+> > > AM43xx, even though it's a single processor A9, it still has TWD and global
+> > > timer. I was doing some profiling with RT v4.0 and latency is 3.5x lower just
+> > > by switching from gptimer to twd/global.
+> > > 
+> > > The only problem is that currently, is_smp() check prevents me from using twd
+> > > with AM43xx (that's why it's commented below, for testing purposes).
+> > > 
+> > > In the hopes that we can start a, hopefully, small thread around the subject,
+> > > I'm sending this HACK which I used to get TWD and global timer enabled so I
+> > > could measure latencies with cyclictest.
+> > > 
+> > > Is it so that TWD shouldn't be available on UP integrations of ARM's Cortex-A
+> > > processors ?
+> > > 
+> > > 
+> > 
+> > I wondered about this recently when looking at something unrelated
+> > and noticed that the check had been introduced as part of
+> > 904464b91eca8 ("ARM: 7655/1: smp_twd: make twd_local_timer_of_register()
+> > no-op for nosmp").
+> > 
+> > I suspect this was just the wrong fix at the time, and that the
+> > real culprit is either alloc_percpu() or request_percpu_irq()
+> > getting called too early on a machine without SMP support.
+> > 
+> > Possibly the problem is already resolved independently, if you
+> > didn't run into it.
+> 
+> no, no splats, nothing at all. See [1]
+> 
+> [1] http://hastebin.com/helekubutu
 
-Add DT node for this flash chip. The flash is rated 133MHz but the pl330
-controller can transfer only up to 128 bytes at this speed so use more
-conservative settings. Even at 40MHz pl330 can transfer at most 64k with
-the current driver.
+Adding Shawn
 
-Signed-off-by: Michal Suchanek <hramrach@gmail.com>
----
- arch/arm/boot/dts/exynos5250-snow.dts | 12 ++++++++++++
- 1 file changed, 12 insertions(+)
-
-diff --git a/arch/arm/boot/dts/exynos5250-snow.dts b/arch/arm/boot/dts/exynos5250-snow.dts
-index 1fa72cf..38e4cda 100644
---- a/arch/arm/boot/dts/exynos5250-snow.dts
-+++ b/arch/arm/boot/dts/exynos5250-snow.dts
-@@ -691,6 +691,18 @@
- 	num-cs = <1>;
- 	cs-gpios = <&gpa2 5 0>;
- 	status = "okay";
-+		flash: m25p80 at 0 {
-+			#address-cells = <1>;
-+			#size-cells = <1>;
-+			compatible = "jedec,spi-nor";
-+			reg = <0>;
-+			spi-max-frequency = <40000000>;
-+			linux,max_tx_len = <65536>;
-+			m25p,fast-read;
-+			controller-data {
-+				samsung,spi-feedback-delay = <0>;
-+			};
-+		};
- };
- 
- &usbdrd_dwc3 {
 -- 
-2.1.4
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150603/5c457aaf/attachment.sig>
