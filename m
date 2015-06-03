@@ -1,309 +1,224 @@
 From: wangzhou1@hisilicon.com (Zhou Wang)
-Date: Wed, 3 Jun 2015 16:35:41 +0800
-Subject: [PATCH v2 3/4] PCI: hisi: Add PCIe host support for Hisilicon Soc
- Hip05
+Date: Wed, 3 Jun 2015 16:35:39 +0800
+Subject: [PATCH v2 1/4] ARM/PCI: remove align_resource callback in
+ pcibios_align_resource
 In-Reply-To: <1433320542-49576-1-git-send-email-wangzhou1@hisilicon.com>
 References: <1433320542-49576-1-git-send-email-wangzhou1@hisilicon.com>
-Message-ID: <1433320542-49576-4-git-send-email-wangzhou1@hisilicon.com>
+Message-ID: <1433320542-49576-2-git-send-email-wangzhou1@hisilicon.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds PCIe host support for Hisilicon Soc Hip05.
+This patch had added by Arnd Bergmann during last reviewing of v1 patchset[1].
 
+PCI core codes call pcibios_align_resource(). In ARM specific one, it will
+dereference pci_sys_data and call sys->align_resource. If we try to unify ARM
+and ARM64 PCIe API in pcie-designware. it will bring kernel crash when run into
+this dereferencing.
+
+However, in ARM there is only pci-mvebu which implements align_resource. So
+add align_resource call back in pci_host_bridge structure and override
+pcibios_align_resource with it.
+
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 Signed-off-by: Zhou Wang <wangzhou1@hisilicon.com>
----
- drivers/pci/host/Kconfig     |   5 +
- drivers/pci/host/Makefile    |   1 +
- drivers/pci/host/pcie-hisi.c | 258 +++++++++++++++++++++++++++++++++++++++++++
- 3 files changed, 264 insertions(+)
- create mode 100644 drivers/pci/host/pcie-hisi.c
+Tested-by: Fabrice Gasnier <fabrice.gasnier@st.com>
 
-diff --git a/drivers/pci/host/Kconfig b/drivers/pci/host/Kconfig
-index 1dfb567..486d822 100644
---- a/drivers/pci/host/Kconfig
-+++ b/drivers/pci/host/Kconfig
-@@ -125,4 +125,9 @@ config PCIE_IPROC_PLATFORM
- 	  Say Y here if you want to use the Broadcom iProc PCIe controller
- 	  through the generic platform bus interface
+[1] http://www.spinics.net/lists/linux-pci/msg41671.html
+---
+ arch/arm/kernel/bios32.c     |  4 ----
+ drivers/pci/host/pci-mvebu.c | 47 ++++++++++++++++++++++++++++----------------
+ drivers/pci/setup-res.c      | 27 ++++++++++++++++++++-----
+ include/linux/pci.h          |  3 +++
+ 4 files changed, 55 insertions(+), 26 deletions(-)
+
+diff --git a/arch/arm/kernel/bios32.c b/arch/arm/kernel/bios32.c
+index fcbbbb1..47588dc 100644
+--- a/arch/arm/kernel/bios32.c
++++ b/arch/arm/kernel/bios32.c
+@@ -468,7 +468,6 @@ static void pcibios_init_hw(struct device *parent, struct hw_pci *hw,
+ 		sys->busnr   = busnr;
+ 		sys->swizzle = hw->swizzle;
+ 		sys->map_irq = hw->map_irq;
+-		sys->align_resource = hw->align_resource;
+ 		INIT_LIST_HEAD(&sys->resources);
  
-+config PCI_HISI
-+	depends on OF && ARM64
-+	bool "Hisilicon Soc HIP05 PCIe controller"
-+	select PCIE_DW
+ 		if (hw->private_data)
+@@ -597,9 +596,6 @@ resource_size_t pcibios_align_resource(void *data, const struct resource *res,
+ 
+ 	start = (start + align - 1) & ~(align - 1);
+ 
+-	if (sys->align_resource)
+-		return sys->align_resource(dev, res, start, size, align);
+-
+ 	return start;
+ }
+ 
+diff --git a/drivers/pci/host/pci-mvebu.c b/drivers/pci/host/pci-mvebu.c
+index 1ab8635..155d05f 100644
+--- a/drivers/pci/host/pci-mvebu.c
++++ b/drivers/pci/host/pci-mvebu.c
+@@ -22,6 +22,8 @@
+ #include <linux/of_pci.h>
+ #include <linux/of_platform.h>
+ 
++#include "../pci.h" /* HACK to see pci_find_host_bridge */
 +
- endmenu
-diff --git a/drivers/pci/host/Makefile b/drivers/pci/host/Makefile
-index f733b4e..562142e 100644
---- a/drivers/pci/host/Makefile
-+++ b/drivers/pci/host/Makefile
-@@ -15,3 +15,4 @@ obj-$(CONFIG_PCI_LAYERSCAPE) += pci-layerscape.o
- obj-$(CONFIG_PCI_VERSATILE) += pci-versatile.o
- obj-$(CONFIG_PCIE_IPROC) += pcie-iproc.o
- obj-$(CONFIG_PCIE_IPROC_PLATFORM) += pcie-iproc-platform.o
-+obj-$(CONFIG_PCI_HISI) += pcie-hisi.o
-diff --git a/drivers/pci/host/pcie-hisi.c b/drivers/pci/host/pcie-hisi.c
-new file mode 100644
-index 0000000..2a4d72e
---- /dev/null
-+++ b/drivers/pci/host/pcie-hisi.c
-@@ -0,0 +1,258 @@
-+/*
-+ * PCIe host controller driver for Hisilicon Hip05 SoCs
-+ *
-+ * Copyright (C) 2015 Hisilicon Co., Ltd. http://www.hisilicon.com
-+ *
-+ * Author: Zhou Wang <wangzhou1@hisilicon.com>
-+ *         Dacai Zhu <zhudacai@hisilicon.com>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ */
-+#include <linux/interrupt.h>
-+#include <linux/module.h>
-+#include <linux/of.h>
-+#include <linux/of_pci.h>
-+#include <linux/platform_device.h>
-+
-+#include "pcie-designware.h"
-+
-+#define PCIE_SUBCTRL_MODE_REG                           0x2800
-+#define PCIE_SUBCTRL_SYS_STATE4_REG                     0x6818
-+#define PCIE_SLV_DBI_MODE                               0x0
-+#define PCIE_SLV_SYSCTRL_MODE                           0x1
-+#define PCIE_SLV_CONTENT_MODE                           0x2
-+#define PCIE_SLV_MSI_ASID                               0x10
-+#define PCIE_LTSSM_LINKUP_STATE                         0x11
-+#define PCIE_LTSSM_STATE_MASK                           0x3F
-+#define PCIE_MSI_ASID_ENABLE                            (0x1 << 12)
-+#define PCIE_MSI_ASID_VALUE                             (0x1 << 16)
-+#define PCIE_MSI_TRANS_ENABLE                           (0x1 << 12)
-+#define PCIE_MSI_TRANS_REG                              0x1c8
-+#define PCIE_MSI_LOW_ADDRESS                            0x1b4
-+#define PCIE_MSI_HIGH_ADDRESS                           0x1c4
-+#define PCIE_MSI_ADDRESS_VAL                            0xb7010040
-+
-+#define to_hisi_pcie(x)	container_of(x, struct hisi_pcie, pp)
-+
-+struct hisi_pcie {
-+	void __iomem *subctrl_base;
-+	void __iomem *reg_base;
-+	struct msi_controller *msi;
-+	u32 port_id;
-+	struct pcie_port pp;
-+};
-+
-+static inline void hisi_pcie_subctrl_writel(struct hisi_pcie *pcie,
-+					    u32 val, u32 reg)
+ /*
+  * PCIe unit register offsets.
+  */
+@@ -751,27 +753,20 @@ static int mvebu_pcie_setup(int nr, struct pci_sys_data *sys)
+ 	return 1;
+ }
+ 
+-static struct pci_bus *mvebu_pcie_scan_bus(int nr, struct pci_sys_data *sys)
++static resource_size_t mvebu_pcie_align_resource(void *data,
++						 const struct resource *res,
++						 resource_size_t size,
++						 resource_size_t align)
+ {
+-	struct mvebu_pcie *pcie = sys_to_pcie(sys);
+-	struct pci_bus *bus;
++	struct pci_dev *dev = data;
+ 
+-	bus = pci_create_root_bus(&pcie->pdev->dev, sys->busnr,
+-				  &mvebu_pcie_ops, sys, &sys->resources);
+-	if (!bus)
+-		return NULL;
++	resource_size_t start = res->start;
+ 
+-	pci_scan_child_bus(bus);
++	if (res->flags & IORESOURCE_IO && start & 0x300)
++		start = (start + 0x3ff) & ~0x3ff;
+ 
+-	return bus;
+-}
++	start = (start + align - 1) & ~(align - 1);
+ 
+-static resource_size_t mvebu_pcie_align_resource(struct pci_dev *dev,
+-						 const struct resource *res,
+-						 resource_size_t start,
+-						 resource_size_t size,
+-						 resource_size_t align)
+-{
+ 	if (dev->bus->number != 0)
+ 		return start;
+ 
+@@ -796,6 +791,25 @@ static resource_size_t mvebu_pcie_align_resource(struct pci_dev *dev,
+ 		return start;
+ }
+ 
++static struct pci_bus *mvebu_pcie_scan_bus(int nr, struct pci_sys_data *sys)
 +{
-+	writel(val, pcie->subctrl_base + reg);
++	struct mvebu_pcie *pcie = sys_to_pcie(sys);
++	struct pci_host_bridge *phb;
++	struct pci_bus *bus;
++
++	bus = pci_create_root_bus(&pcie->pdev->dev, sys->busnr,
++				  &mvebu_pcie_ops, sys, &sys->resources);
++	if (!bus)
++		return NULL;
++
++	phb = pci_find_host_bridge(bus);
++	phb->align_resource = mvebu_pcie_align_resource;
++
++	pci_scan_child_bus(bus);
++
++	return bus;
 +}
 +
-+static inline u32 hisi_pcie_subctrl_readl(struct hisi_pcie *pcie, u32 reg)
-+{
-+	return readl(pcie->subctrl_base + reg);
-+}
+ static void mvebu_pcie_enable(struct mvebu_pcie *pcie)
+ {
+ 	struct hw_pci hw;
+@@ -812,7 +826,6 @@ static void mvebu_pcie_enable(struct mvebu_pcie *pcie)
+ 	hw.scan           = mvebu_pcie_scan_bus;
+ 	hw.map_irq        = of_irq_parse_and_map_pci;
+ 	hw.ops            = &mvebu_pcie_ops;
+-	hw.align_resource = mvebu_pcie_align_resource;
+ 
+ 	pci_common_init(&hw);
+ }
+diff --git a/drivers/pci/setup-res.c b/drivers/pci/setup-res.c
+index 232f925..73abca7 100644
+--- a/drivers/pci/setup-res.c
++++ b/drivers/pci/setup-res.c
+@@ -200,7 +200,11 @@ static int pci_revert_fw_address(struct resource *res, struct pci_dev *dev,
+ }
+ 
+ static int __pci_assign_resource(struct pci_bus *bus, struct pci_dev *dev,
+-		int resno, resource_size_t size, resource_size_t align)
++		int resno, resource_size_t size, resource_size_t align,
++		resource_size_t (*alignf)(void *,
++					  const struct resource *,
++					  resource_size_t,
++					  resource_size_t))
+ {
+ 	struct resource *res = dev->resource + resno;
+ 	resource_size_t min;
+@@ -217,7 +221,7 @@ static int __pci_assign_resource(struct pci_bus *bus, struct pci_dev *dev,
+ 	 */
+ 	ret = pci_bus_alloc_resource(bus, res, size, align, min,
+ 				     IORESOURCE_PREFETCH | IORESOURCE_MEM_64,
+-				     pcibios_align_resource, dev);
++				     alignf, dev);
+ 	if (ret == 0)
+ 		return 0;
+ 
+@@ -229,7 +233,7 @@ static int __pci_assign_resource(struct pci_bus *bus, struct pci_dev *dev,
+ 	     (IORESOURCE_PREFETCH | IORESOURCE_MEM_64)) {
+ 		ret = pci_bus_alloc_resource(bus, res, size, align, min,
+ 					     IORESOURCE_PREFETCH,
+-					     pcibios_align_resource, dev);
++					     alignf, dev);
+ 		if (ret == 0)
+ 			return 0;
+ 	}
+@@ -242,7 +246,7 @@ static int __pci_assign_resource(struct pci_bus *bus, struct pci_dev *dev,
+ 	 */
+ 	if (res->flags & (IORESOURCE_PREFETCH | IORESOURCE_MEM_64))
+ 		ret = pci_bus_alloc_resource(bus, res, size, align, min, 0,
+-					     pcibios_align_resource, dev);
++					     alignf, dev);
+ 
+ 	return ret;
+ }
+@@ -251,10 +255,23 @@ static int _pci_assign_resource(struct pci_dev *dev, int resno,
+ 				resource_size_t size, resource_size_t min_align)
+ {
+ 	struct pci_bus *bus;
++	struct pci_host_bridge *phb;
++	resource_size_t (*alignf)(void *,
++				  const struct resource *,
++				  resource_size_t,
++				  resource_size_t);
+ 	int ret;
+ 
+ 	bus = dev->bus;
+-	while ((ret = __pci_assign_resource(bus, dev, resno, size, min_align))) {
++	phb = pci_find_host_bridge(bus);
 +
-+static inline void hisi_pcie_apb_writel(struct hisi_pcie *pcie,
-+					u32 val, u32 reg)
-+{
-+	writel(val, pcie->reg_base + reg);
-+}
++	if (phb->align_resource)
++		alignf = phb->align_resource;
++	else
++		alignf = pcibios_align_resource;
 +
-+static inline u32 hisi_pcie_apb_readl(struct hisi_pcie *pcie, u32 reg)
-+{
-+	return readl(pcie->reg_base + reg);
-+}
-+
-+/*
-+ * Change mode to indicate the same reg_base to base of PCIe host configure
-+ * registers, base of RC configure space or base of vmid/asid context table
-+ */
-+static void hisi_pcie_change_apb_mode(struct hisi_pcie *pcie, u32 mode)
-+{
-+	u32 val;
-+	u32 bit_mask;
-+	u32 bit_shift;
-+	u32 port_id = pcie->port_id;
-+	u32 reg = PCIE_SUBCTRL_MODE_REG + 0x100 * port_id;
-+
-+	if ((port_id == 1) || (port_id == 2)) {
-+		bit_mask = 0xc;
-+		bit_shift = 0x2;
-+	} else {
-+		bit_mask = 0x6;
-+		bit_shift = 0x1;
-+	}
-+
-+	val = hisi_pcie_subctrl_readl(pcie, reg);
-+	val = (val & (~bit_mask)) | (mode << bit_shift);
-+	hisi_pcie_subctrl_writel(pcie, val, reg);
-+}
-+
-+/* Configure vmid/asid table in PCIe host */
-+static void hisi_pcie_config_context(struct hisi_pcie *pcie)
-+{
-+	int i;
-+
-+	hisi_pcie_change_apb_mode(pcie, PCIE_SLV_CONTENT_MODE);
-+
-+	/*
-+	 * init vmid and asid tables for all PCIes device as 0
-+	 * vmid table: 0 ~ 0x3ff, asid table: 0x400 ~ 0x7ff
-+	 */
-+	for (i = 0; i < 0x800; i++)
-+		hisi_pcie_apb_writel(pcie, 0x0, i * 4);
-+
-+	hisi_pcie_change_apb_mode(pcie, PCIE_SLV_SYSCTRL_MODE);
-+
-+	hisi_pcie_apb_writel(pcie, PCIE_MSI_ADDRESS_VAL, PCIE_MSI_LOW_ADDRESS);
-+	hisi_pcie_apb_writel(pcie, 0x0, PCIE_MSI_HIGH_ADDRESS);
-+	hisi_pcie_apb_writel(pcie, PCIE_MSI_ASID_ENABLE | PCIE_MSI_ASID_VALUE,
-+			     PCIE_SLV_MSI_ASID);
-+	hisi_pcie_apb_writel(pcie, PCIE_MSI_TRANS_ENABLE, PCIE_MSI_TRANS_REG);
-+
-+	hisi_pcie_change_apb_mode(pcie, PCIE_SLV_DBI_MODE);
-+}
-+
-+static int hisi_pcie_link_up(struct pcie_port *pp)
-+{
-+	u32 val;
-+
-+	struct hisi_pcie *hisi_pcie = to_hisi_pcie(pp);
-+
-+	val = hisi_pcie_subctrl_readl(hisi_pcie, PCIE_SUBCTRL_SYS_STATE4_REG +
-+				      0x100 * hisi_pcie->port_id);
-+
-+	return ((val & PCIE_LTSSM_STATE_MASK) == PCIE_LTSSM_LINKUP_STATE);
-+}
-+
-+static
-+int hisi_pcie_msi_host_init(struct pcie_port *pp, struct msi_controller *chip)
-+{
-+	struct device_node *msi_node;
-+	struct msi_controller *msi;
-+	struct device_node *np = pp->dev->of_node;
-+	struct hisi_pcie *hisi_pcie = to_hisi_pcie(pp);
-+
-+	msi_node = of_parse_phandle(np, "msi-parent", 0);
-+	if (!msi_node) {
-+		pr_err("failed to find msi-parent\n");
-+		return -ENODEV;
-+	}
-+
-+	msi = of_pci_find_msi_chip_by_node(msi_node);
-+	hisi_pcie->msi = msi;
-+
-+	pp->irq_domain = msi->domain;
-+
-+	return 0;
-+}
-+
-+static struct pcie_host_ops hisi_pcie_host_ops = {
-+	.link_up = hisi_pcie_link_up,
-+	.msi_host_init = hisi_pcie_msi_host_init,
-+};
-+
-+static int __init hisi_add_pcie_port(struct pcie_port *pp,
-+				     struct platform_device *pdev)
-+{
-+	int ret;
-+	u32 port_id;
-+	struct resource busn;
-+
-+	struct hisi_pcie *hisi_pcie = to_hisi_pcie(pp);
-+
-+	if (of_property_read_u32(pdev->dev.of_node, "port-id", &port_id)) {
-+		dev_err(&pdev->dev, "failed to read port-id\n");
-+		return -EINVAL;
-+	}
-+	if (port_id > 3) {
-+		dev_err(&pdev->dev, "Invalid port-id\n");
-+		return -EINVAL;
-+	}
-+
-+	hisi_pcie->port_id = port_id;
-+
-+	if (of_pci_parse_bus_range(pdev->dev.of_node, &busn)) {
-+		dev_err(&pdev->dev, "failed to parse bus-ranges\n");
-+		return -EINVAL;
-+	}
-+
-+	pp->root_bus_nr = busn.start;
-+	pp->ops = &hisi_pcie_host_ops;
-+
-+	hisi_pcie_config_context(hisi_pcie);
-+
-+	ret = dw_pcie_host_init(pp);
-+	if (ret) {
-+		dev_err(&pdev->dev, "failed to initialize host\n");
-+		return ret;
-+	}
-+
-+	return 0;
-+}
-+
-+static int __init hisi_pcie_probe(struct platform_device *pdev)
-+{
-+	struct hisi_pcie *hisi_pcie;
-+	struct pcie_port *pp;
-+	struct resource *reg;
-+	struct resource *subctrl;
-+	int ret;
-+
-+	hisi_pcie = devm_kzalloc(&pdev->dev, sizeof(*hisi_pcie), GFP_KERNEL);
-+	if (!hisi_pcie)
-+		return -ENOMEM;
-+
-+	pp = &hisi_pcie->pp;
-+	pp->dev = &pdev->dev;
-+
-+	subctrl = platform_get_resource_byname(pdev, IORESOURCE_MEM, "subctrl");
-+	hisi_pcie->subctrl_base = devm_ioremap_nocache(&pdev->dev,
-+					subctrl->start, resource_size(subctrl));
-+	if (IS_ERR(hisi_pcie->subctrl_base)) {
-+		dev_err(pp->dev, "cannot get subctrl base\n");
-+		return PTR_ERR(hisi_pcie->subctrl_base);
-+	}
-+
-+	reg = platform_get_resource_byname(pdev, IORESOURCE_MEM, "rc_dbi");
-+	hisi_pcie->reg_base = devm_ioremap_resource(&pdev->dev, reg);
-+	if (IS_ERR(hisi_pcie->reg_base)) {
-+		dev_err(pp->dev, "cannot get reg base\n");
-+		return PTR_ERR(hisi_pcie->reg_base);
-+	}
-+
-+	hisi_pcie->pp.dbi_base = hisi_pcie->reg_base;
-+
-+	ret = hisi_add_pcie_port(pp, pdev);
-+	if (ret < 0)
-+		return ret;
-+
-+	platform_set_drvdata(pdev, hisi_pcie);
-+
-+	return ret;
-+}
-+
-+static const struct of_device_id hisi_pcie_of_match[] = {
-+	{.compatible = "hisilicon,hip05-pcie",},
-+	{},
-+};
-+
-+MODULE_DEVICE_TABLE(of, hisi_pcie_of_match);
-+
-+static struct platform_driver hisi_pcie_driver = {
-+	.probe  = hisi_pcie_probe,
-+	.driver = {
-+		   .name = "hisi-pcie",
-+		   .owner = THIS_MODULE,
-+		   .of_match_table = hisi_pcie_of_match,
-+	},
-+};
-+
-+module_platform_driver(hisi_pcie_driver);
-+
-+MODULE_AUTHOR("Zhou Wang <wangzhou1@huawei.com>");
-+MODULE_AUTHOR("Dacai Zhu <zhudacai@huawei.com>");
-+MODULE_LICENSE("GPL v2");
++	while ((ret = __pci_assign_resource(bus, dev, resno, size,
++					    min_align, alignf))) {
+ 		if (!bus->parent || !bus->self->transparent)
+ 			break;
+ 		bus = bus->parent;
+diff --git a/include/linux/pci.h b/include/linux/pci.h
+index 353db8d..39e48fc 100644
+--- a/include/linux/pci.h
++++ b/include/linux/pci.h
+@@ -404,6 +404,9 @@ struct pci_host_bridge {
+ 	struct device dev;
+ 	struct pci_bus *bus;		/* root bus */
+ 	struct list_head windows;	/* resource_entry */
++	resource_size_t (*align_resource)(void *data,
++			 const struct resource *res,
++			 resource_size_t size, resource_size_t align);
+ 	void (*release_fn)(struct pci_host_bridge *);
+ 	void *release_data;
+ 	unsigned int ignore_reset_delay:1;	/* for entire hierarchy */
 -- 
 1.9.1
