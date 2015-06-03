@@ -1,224 +1,332 @@
 From: wangzhou1@hisilicon.com (Zhou Wang)
-Date: Wed, 3 Jun 2015 16:35:39 +0800
-Subject: [PATCH v2 1/4] ARM/PCI: remove align_resource callback in
- pcibios_align_resource
+Date: Wed, 3 Jun 2015 16:35:40 +0800
+Subject: [PATCH v2 2/4] PCI: designware: Add ARM64 support
 In-Reply-To: <1433320542-49576-1-git-send-email-wangzhou1@hisilicon.com>
 References: <1433320542-49576-1-git-send-email-wangzhou1@hisilicon.com>
-Message-ID: <1433320542-49576-2-git-send-email-wangzhou1@hisilicon.com>
+Message-ID: <1433320542-49576-3-git-send-email-wangzhou1@hisilicon.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch had added by Arnd Bergmann during last reviewing of v1 patchset[1].
+This patch tries to unify ARM32 and ARM64 PCIe in designware driver. Delete
+function dw_pcie_setup, dw_pcie_scan_bus, dw_pcie_map_irq and struct hw_pci,
+move related operations to dw_pcie_host_init. Also set pp->root_bus_nr = 0 in
+each PCIe host driver which is based on pcie-designware.
 
-PCI core codes call pcibios_align_resource(). In ARM specific one, it will
-dereference pci_sys_data and call sys->align_resource. If we try to unify ARM
-and ARM64 PCIe API in pcie-designware. it will bring kernel crash when run into
-this dereferencing.
+I am not very clear about I/O resource management:
+>	if (global_io_offset < SZ_1M && pp->io_size > 0) {
+>		pci_ioremap_io(global_io_offset, pp->io_base);
+>		global_io_offset += SZ_64K;
+>		pci_add_resource_offset(&res, &pp->io,
+>					global_io_offset - pp->io_bus_addr);
+>	}
+so just move steps in dw_pcie_setup to dw_pcie_host_init.
 
-However, in ARM there is only pci-mvebu which implements align_resource. So
-add align_resource call back in pci_host_bridge structure and override
-pcibios_align_resource with it.
+I have compiled the driver with multi_v7_defconfig. However, I don't have
+ARM32 PCIe related board to do test. It will be appreciated if someone could
+help to test it.
 
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 Signed-off-by: Zhou Wang <wangzhou1@hisilicon.com>
 Tested-by: Fabrice Gasnier <fabrice.gasnier@st.com>
-
-[1] http://www.spinics.net/lists/linux-pci/msg41671.html
 ---
- arch/arm/kernel/bios32.c     |  4 ----
- drivers/pci/host/pci-mvebu.c | 47 ++++++++++++++++++++++++++++----------------
- drivers/pci/setup-res.c      | 27 ++++++++++++++++++++-----
- include/linux/pci.h          |  3 +++
- 4 files changed, 55 insertions(+), 26 deletions(-)
+ drivers/pci/host/pci-dra7xx.c      |   1 +
+ drivers/pci/host/pci-exynos.c      |   2 +-
+ drivers/pci/host/pci-imx6.c        |   2 +-
+ drivers/pci/host/pci-keystone.c    |   2 +-
+ drivers/pci/host/pci-layerscape.c  |   2 +-
+ drivers/pci/host/pcie-designware.c | 128 +++++++++++++++----------------------
+ drivers/pci/host/pcie-spear13xx.c  |   2 +-
+ 7 files changed, 56 insertions(+), 83 deletions(-)
 
-diff --git a/arch/arm/kernel/bios32.c b/arch/arm/kernel/bios32.c
-index fcbbbb1..47588dc 100644
---- a/arch/arm/kernel/bios32.c
-+++ b/arch/arm/kernel/bios32.c
-@@ -468,7 +468,6 @@ static void pcibios_init_hw(struct device *parent, struct hw_pci *hw,
- 		sys->busnr   = busnr;
- 		sys->swizzle = hw->swizzle;
- 		sys->map_irq = hw->map_irq;
--		sys->align_resource = hw->align_resource;
- 		INIT_LIST_HEAD(&sys->resources);
+diff --git a/drivers/pci/host/pci-dra7xx.c b/drivers/pci/host/pci-dra7xx.c
+index 2d57e19..5c8b6ab 100644
+--- a/drivers/pci/host/pci-dra7xx.c
++++ b/drivers/pci/host/pci-dra7xx.c
+@@ -280,6 +280,7 @@ static int __init dra7xx_add_pcie_port(struct dra7xx_pcie *dra7xx,
  
- 		if (hw->private_data)
-@@ -597,9 +596,6 @@ resource_size_t pcibios_align_resource(void *data, const struct resource *res,
+ 	pp = &dra7xx->pp;
+ 	pp->dev = dev;
++	pp->root_bus_nr = 0;
+ 	pp->ops = &dra7xx_pcie_host_ops;
  
- 	start = (start + align - 1) & ~(align - 1);
- 
--	if (sys->align_resource)
--		return sys->align_resource(dev, res, start, size, align);
--
- 	return start;
- }
- 
-diff --git a/drivers/pci/host/pci-mvebu.c b/drivers/pci/host/pci-mvebu.c
-index 1ab8635..155d05f 100644
---- a/drivers/pci/host/pci-mvebu.c
-+++ b/drivers/pci/host/pci-mvebu.c
-@@ -22,6 +22,8 @@
- #include <linux/of_pci.h>
- #include <linux/of_platform.h>
- 
-+#include "../pci.h" /* HACK to see pci_find_host_bridge */
-+
- /*
-  * PCIe unit register offsets.
-  */
-@@ -751,27 +753,20 @@ static int mvebu_pcie_setup(int nr, struct pci_sys_data *sys)
- 	return 1;
- }
- 
--static struct pci_bus *mvebu_pcie_scan_bus(int nr, struct pci_sys_data *sys)
-+static resource_size_t mvebu_pcie_align_resource(void *data,
-+						 const struct resource *res,
-+						 resource_size_t size,
-+						 resource_size_t align)
- {
--	struct mvebu_pcie *pcie = sys_to_pcie(sys);
--	struct pci_bus *bus;
-+	struct pci_dev *dev = data;
- 
--	bus = pci_create_root_bus(&pcie->pdev->dev, sys->busnr,
--				  &mvebu_pcie_ops, sys, &sys->resources);
--	if (!bus)
--		return NULL;
-+	resource_size_t start = res->start;
- 
--	pci_scan_child_bus(bus);
-+	if (res->flags & IORESOURCE_IO && start & 0x300)
-+		start = (start + 0x3ff) & ~0x3ff;
- 
--	return bus;
--}
-+	start = (start + align - 1) & ~(align - 1);
- 
--static resource_size_t mvebu_pcie_align_resource(struct pci_dev *dev,
--						 const struct resource *res,
--						 resource_size_t start,
--						 resource_size_t size,
--						 resource_size_t align)
--{
- 	if (dev->bus->number != 0)
- 		return start;
- 
-@@ -796,6 +791,25 @@ static resource_size_t mvebu_pcie_align_resource(struct pci_dev *dev,
- 		return start;
- }
- 
-+static struct pci_bus *mvebu_pcie_scan_bus(int nr, struct pci_sys_data *sys)
-+{
-+	struct mvebu_pcie *pcie = sys_to_pcie(sys);
-+	struct pci_host_bridge *phb;
-+	struct pci_bus *bus;
-+
-+	bus = pci_create_root_bus(&pcie->pdev->dev, sys->busnr,
-+				  &mvebu_pcie_ops, sys, &sys->resources);
-+	if (!bus)
-+		return NULL;
-+
-+	phb = pci_find_host_bridge(bus);
-+	phb->align_resource = mvebu_pcie_align_resource;
-+
-+	pci_scan_child_bus(bus);
-+
-+	return bus;
-+}
-+
- static void mvebu_pcie_enable(struct mvebu_pcie *pcie)
- {
- 	struct hw_pci hw;
-@@ -812,7 +826,6 @@ static void mvebu_pcie_enable(struct mvebu_pcie *pcie)
- 	hw.scan           = mvebu_pcie_scan_bus;
- 	hw.map_irq        = of_irq_parse_and_map_pci;
- 	hw.ops            = &mvebu_pcie_ops;
--	hw.align_resource = mvebu_pcie_align_resource;
- 
- 	pci_common_init(&hw);
- }
-diff --git a/drivers/pci/setup-res.c b/drivers/pci/setup-res.c
-index 232f925..73abca7 100644
---- a/drivers/pci/setup-res.c
-+++ b/drivers/pci/setup-res.c
-@@ -200,7 +200,11 @@ static int pci_revert_fw_address(struct resource *res, struct pci_dev *dev,
- }
- 
- static int __pci_assign_resource(struct pci_bus *bus, struct pci_dev *dev,
--		int resno, resource_size_t size, resource_size_t align)
-+		int resno, resource_size_t size, resource_size_t align,
-+		resource_size_t (*alignf)(void *,
-+					  const struct resource *,
-+					  resource_size_t,
-+					  resource_size_t))
- {
- 	struct resource *res = dev->resource + resno;
- 	resource_size_t min;
-@@ -217,7 +221,7 @@ static int __pci_assign_resource(struct pci_bus *bus, struct pci_dev *dev,
- 	 */
- 	ret = pci_bus_alloc_resource(bus, res, size, align, min,
- 				     IORESOURCE_PREFETCH | IORESOURCE_MEM_64,
--				     pcibios_align_resource, dev);
-+				     alignf, dev);
- 	if (ret == 0)
- 		return 0;
- 
-@@ -229,7 +233,7 @@ static int __pci_assign_resource(struct pci_bus *bus, struct pci_dev *dev,
- 	     (IORESOURCE_PREFETCH | IORESOURCE_MEM_64)) {
- 		ret = pci_bus_alloc_resource(bus, res, size, align, min,
- 					     IORESOURCE_PREFETCH,
--					     pcibios_align_resource, dev);
-+					     alignf, dev);
- 		if (ret == 0)
- 			return 0;
+ 	pp->irq = platform_get_irq(pdev, 1);
+diff --git a/drivers/pci/host/pci-exynos.c b/drivers/pci/host/pci-exynos.c
+index c139237..4b6db6c 100644
+--- a/drivers/pci/host/pci-exynos.c
++++ b/drivers/pci/host/pci-exynos.c
+@@ -534,7 +534,7 @@ static int __init exynos_add_pcie_port(struct pcie_port *pp,
+ 		}
  	}
-@@ -242,7 +246,7 @@ static int __pci_assign_resource(struct pci_bus *bus, struct pci_dev *dev,
- 	 */
- 	if (res->flags & (IORESOURCE_PREFETCH | IORESOURCE_MEM_64))
- 		ret = pci_bus_alloc_resource(bus, res, size, align, min, 0,
--					     pcibios_align_resource, dev);
-+					     alignf, dev);
  
- 	return ret;
- }
-@@ -251,10 +255,23 @@ static int _pci_assign_resource(struct pci_dev *dev, int resno,
- 				resource_size_t size, resource_size_t min_align)
+-	pp->root_bus_nr = -1;
++	pp->root_bus_nr = 0;
+ 	pp->ops = &exynos_pcie_host_ops;
+ 
+ 	ret = dw_pcie_host_init(pp);
+diff --git a/drivers/pci/host/pci-imx6.c b/drivers/pci/host/pci-imx6.c
+index fdb9536..c4a80c5 100644
+--- a/drivers/pci/host/pci-imx6.c
++++ b/drivers/pci/host/pci-imx6.c
+@@ -541,7 +541,7 @@ static int __init imx6_add_pcie_port(struct pcie_port *pp,
+ 		}
+ 	}
+ 
+-	pp->root_bus_nr = -1;
++	pp->root_bus_nr = 0;
+ 	pp->ops = &imx6_pcie_host_ops;
+ 
+ 	ret = dw_pcie_host_init(pp);
+diff --git a/drivers/pci/host/pci-keystone.c b/drivers/pci/host/pci-keystone.c
+index 75333b0..df91f5e 100644
+--- a/drivers/pci/host/pci-keystone.c
++++ b/drivers/pci/host/pci-keystone.c
+@@ -312,7 +312,7 @@ static int __init ks_add_pcie_port(struct keystone_pcie *ks_pcie,
+ 			return ret;
+ 	}
+ 
+-	pp->root_bus_nr = -1;
++	pp->root_bus_nr = 0;
+ 	pp->ops = &keystone_pcie_host_ops;
+ 	ret = ks_dw_pcie_host_init(ks_pcie, ks_pcie->msi_intc_np);
+ 	if (ret) {
+diff --git a/drivers/pci/host/pci-layerscape.c b/drivers/pci/host/pci-layerscape.c
+index 4a6e62f..5c7a9c4 100644
+--- a/drivers/pci/host/pci-layerscape.c
++++ b/drivers/pci/host/pci-layerscape.c
+@@ -101,7 +101,7 @@ static int ls_add_pcie_port(struct ls_pcie *pcie)
+ 	pp = &pcie->pp;
+ 	pp->dev = pcie->dev;
+ 	pp->dbi_base = pcie->dbi;
+-	pp->root_bus_nr = -1;
++	pp->root_bus_nr = 0;
+ 	pp->ops = &ls_pcie_host_ops;
+ 
+ 	ret = dw_pcie_host_init(pp);
+diff --git a/drivers/pci/host/pcie-designware.c b/drivers/pci/host/pcie-designware.c
+index 2e9f84f..b3f0ac7 100644
+--- a/drivers/pci/host/pcie-designware.c
++++ b/drivers/pci/host/pcie-designware.c
+@@ -11,6 +11,7 @@
+  * published by the Free Software Foundation.
+  */
+ 
++#include <linux/hardirq.h>
+ #include <linux/irq.h>
+ #include <linux/irqdomain.h>
+ #include <linux/kernel.h>
+@@ -67,17 +68,10 @@
+ #define PCIE_ATU_FUNC(x)		(((x) & 0x7) << 16)
+ #define PCIE_ATU_UPPER_TARGET		0x91C
+ 
+-static struct hw_pci dw_pci;
++static struct pci_ops dw_pcie_ops;
+ 
+ static unsigned long global_io_offset;
+ 
+-static inline struct pcie_port *sys_to_pcie(struct pci_sys_data *sys)
+-{
+-	BUG_ON(!sys->private_data);
+-
+-	return sys->private_data;
+-}
+-
+ int dw_pcie_cfg_read(void __iomem *addr, int where, int size, u32 *val)
  {
- 	struct pci_bus *bus;
-+	struct pci_host_bridge *phb;
-+	resource_size_t (*alignf)(void *,
-+				  const struct resource *,
-+				  resource_size_t,
-+				  resource_size_t);
+ 	*val = readl(addr);
+@@ -238,7 +232,7 @@ static void dw_pcie_msi_set_irq(struct pcie_port *pp, int irq)
+ static int assign_irq(int no_irqs, struct msi_desc *desc, int *pos)
+ {
+ 	int irq, pos0, i;
+-	struct pcie_port *pp = sys_to_pcie(desc->dev->bus->sysdata);
++	struct pcie_port *pp = desc->dev->bus->sysdata;
+ 
+ 	pos0 = bitmap_find_free_region(pp->msi_irq_in_use, MAX_MSI_IRQS,
+ 				       order_base_2(no_irqs));
+@@ -281,7 +275,7 @@ static int dw_msi_setup_irq(struct msi_controller *chip, struct pci_dev *pdev,
+ {
+ 	int irq, pos;
+ 	struct msi_msg msg;
+-	struct pcie_port *pp = sys_to_pcie(pdev->bus->sysdata);
++	struct pcie_port *pp = pdev->bus->sysdata;
+ 
+ 	if (desc->msi_attrib.is_msix)
+ 		return -EINVAL;
+@@ -310,7 +304,7 @@ static void dw_msi_teardown_irq(struct msi_controller *chip, unsigned int irq)
+ {
+ 	struct irq_data *data = irq_get_irq_data(irq);
+ 	struct msi_desc *msi = irq_data_get_msi(data);
+-	struct pcie_port *pp = sys_to_pcie(msi->dev->bus->sysdata);
++	struct pcie_port *pp = msi->dev->bus->sysdata;
+ 
+ 	clear_irq_range(pp, irq, 1, data->hwirq);
+ }
+@@ -342,13 +336,15 @@ static const struct irq_domain_ops msi_domain_ops = {
+ 	.map = dw_pcie_msi_map,
+ };
+ 
+-int dw_pcie_host_init(struct pcie_port *pp)
++int __init dw_pcie_host_init(struct pcie_port *pp)
+ {
+ 	struct device_node *np = pp->dev->of_node;
+ 	struct platform_device *pdev = to_platform_device(pp->dev);
+ 	struct of_pci_range range;
+ 	struct of_pci_range_parser parser;
++	struct pci_bus *bus;
+ 	struct resource *cfg_res;
++	LIST_HEAD(res);
+ 	u32 val, na, ns;
+ 	const __be32 *addrp;
+ 	int i, index, ret;
+@@ -502,15 +498,49 @@ int dw_pcie_host_init(struct pcie_port *pp)
+ 	val |= PORT_LOGIC_SPEED_CHANGE;
+ 	dw_pcie_wr_own_conf(pp, PCIE_LINK_WIDTH_SPEED_CONTROL, 4, val);
+ 
+-#ifdef CONFIG_PCI_MSI
+-	dw_pcie_msi_chip.dev = pp->dev;
+-	dw_pci.msi_ctrl = &dw_pcie_msi_chip;
++#ifdef CONFIG_ARM
++	/*
++	 * FIXME: we should really be able to use
++	 * of_pci_get_host_bridge_resources on arm32 as well,
++	 * but the conversion needs some more testing
++	 */
++	if (global_io_offset < SZ_1M && pp->io_size > 0) {
++		pci_ioremap_io(global_io_offset, pp->io_base);
++		global_io_offset += SZ_64K;
++		pci_add_resource_offset(&res, &pp->io,
++					global_io_offset - pp->io_bus_addr);
++	}
++	pci_add_resource_offset(&res, &pp->mem,
++				pp->mem.start - pp->mem_bus_addr);
++	pci_add_resource(&res, &pp->busn);
++#else
++	ret = of_pci_get_host_bridge_resources(np, 0, 0xff, &res, &pp->io_base);
++	if (ret)
++		return ret;
++#endif
++
++	bus = pci_create_root_bus(pp->dev, pp->root_bus_nr, &dw_pcie_ops,
++			      pp, &res);
++	if (!bus)
++		return -ENOMEM;
++
++#ifdef CONFIG_GENERIC_MSI_IRQ_DOMAIN
++	bus->msi = container_of(&pp->irq_domain, struct msi_controller, domain);
++#else
++	bus->msi = &dw_pcie_msi_chip;
+ #endif
+ 
+-	dw_pci.nr_controllers = 1;
+-	dw_pci.private_data = (void **)&pp;
++	pci_scan_child_bus(bus);
++	if (pp->ops->scan_bus)
++		pp->ops->scan_bus(pp);
+ 
+-	pci_common_init_dev(pp->dev, &dw_pci);
++#ifdef CONFIG_ARM
++	/* support old dtbs that incorrectly describe IRQs */
++	pci_fixup_irqs(pci_common_swizzle, of_irq_parse_and_map_pci);
++#endif
++
++	pci_assign_unassigned_bus_resources(bus);
++	pci_bus_add_devices(bus);
+ 
+ 	return 0;
+ }
+@@ -653,7 +683,7 @@ static int dw_pcie_valid_config(struct pcie_port *pp,
+ static int dw_pcie_rd_conf(struct pci_bus *bus, u32 devfn, int where,
+ 			int size, u32 *val)
+ {
+-	struct pcie_port *pp = sys_to_pcie(bus->sysdata);
++	struct pcie_port *pp = bus->sysdata;
  	int ret;
  
- 	bus = dev->bus;
--	while ((ret = __pci_assign_resource(bus, dev, resno, size, min_align))) {
-+	phb = pci_find_host_bridge(bus);
-+
-+	if (phb->align_resource)
-+		alignf = phb->align_resource;
-+	else
-+		alignf = pcibios_align_resource;
-+
-+	while ((ret = __pci_assign_resource(bus, dev, resno, size,
-+					    min_align, alignf))) {
- 		if (!bus->parent || !bus->self->transparent)
- 			break;
- 		bus = bus->parent;
-diff --git a/include/linux/pci.h b/include/linux/pci.h
-index 353db8d..39e48fc 100644
---- a/include/linux/pci.h
-+++ b/include/linux/pci.h
-@@ -404,6 +404,9 @@ struct pci_host_bridge {
- 	struct device dev;
- 	struct pci_bus *bus;		/* root bus */
- 	struct list_head windows;	/* resource_entry */
-+	resource_size_t (*align_resource)(void *data,
-+			 const struct resource *res,
-+			 resource_size_t size, resource_size_t align);
- 	void (*release_fn)(struct pci_host_bridge *);
- 	void *release_data;
- 	unsigned int ignore_reset_delay:1;	/* for entire hierarchy */
+ 	if (dw_pcie_valid_config(pp, bus, PCI_SLOT(devfn)) == 0) {
+@@ -677,7 +707,7 @@ static int dw_pcie_rd_conf(struct pci_bus *bus, u32 devfn, int where,
+ static int dw_pcie_wr_conf(struct pci_bus *bus, u32 devfn,
+ 			int where, int size, u32 val)
+ {
+-	struct pcie_port *pp = sys_to_pcie(bus->sysdata);
++	struct pcie_port *pp = bus->sysdata;
+ 	int ret;
+ 
+ 	if (dw_pcie_valid_config(pp, bus, PCI_SLOT(devfn)) == 0)
+@@ -701,64 +731,6 @@ static struct pci_ops dw_pcie_ops = {
+ 	.write = dw_pcie_wr_conf,
+ };
+ 
+-static int dw_pcie_setup(int nr, struct pci_sys_data *sys)
+-{
+-	struct pcie_port *pp;
+-
+-	pp = sys_to_pcie(sys);
+-
+-	if (global_io_offset < SZ_1M && pp->io_size > 0) {
+-		sys->io_offset = global_io_offset - pp->io_bus_addr;
+-		pci_ioremap_io(global_io_offset, pp->io_base);
+-		global_io_offset += SZ_64K;
+-		pci_add_resource_offset(&sys->resources, &pp->io,
+-					sys->io_offset);
+-	}
+-
+-	sys->mem_offset = pp->mem.start - pp->mem_bus_addr;
+-	pci_add_resource_offset(&sys->resources, &pp->mem, sys->mem_offset);
+-	pci_add_resource(&sys->resources, &pp->busn);
+-
+-	return 1;
+-}
+-
+-static struct pci_bus *dw_pcie_scan_bus(int nr, struct pci_sys_data *sys)
+-{
+-	struct pci_bus *bus;
+-	struct pcie_port *pp = sys_to_pcie(sys);
+-
+-	pp->root_bus_nr = sys->busnr;
+-	bus = pci_create_root_bus(pp->dev, sys->busnr,
+-				  &dw_pcie_ops, sys, &sys->resources);
+-	if (!bus)
+-		return NULL;
+-
+-	pci_scan_child_bus(bus);
+-
+-	if (bus && pp->ops->scan_bus)
+-		pp->ops->scan_bus(pp);
+-
+-	return bus;
+-}
+-
+-static int dw_pcie_map_irq(const struct pci_dev *dev, u8 slot, u8 pin)
+-{
+-	struct pcie_port *pp = sys_to_pcie(dev->bus->sysdata);
+-	int irq;
+-
+-	irq = of_irq_parse_and_map_pci(dev, slot, pin);
+-	if (!irq)
+-		irq = pp->irq;
+-
+-	return irq;
+-}
+-
+-static struct hw_pci dw_pci = {
+-	.setup		= dw_pcie_setup,
+-	.scan		= dw_pcie_scan_bus,
+-	.map_irq	= dw_pcie_map_irq,
+-};
+-
+ void dw_pcie_setup_rc(struct pcie_port *pp)
+ {
+ 	u32 val;
+diff --git a/drivers/pci/host/pcie-spear13xx.c b/drivers/pci/host/pcie-spear13xx.c
+index 020d788..e78ddf8 100644
+--- a/drivers/pci/host/pcie-spear13xx.c
++++ b/drivers/pci/host/pcie-spear13xx.c
+@@ -287,7 +287,7 @@ static int spear13xx_add_pcie_port(struct pcie_port *pp,
+ 		return ret;
+ 	}
+ 
+-	pp->root_bus_nr = -1;
++	pp->root_bus_nr = 0;
+ 	pp->ops = &spear13xx_pcie_host_ops;
+ 
+ 	ret = dw_pcie_host_init(pp);
 -- 
 1.9.1
