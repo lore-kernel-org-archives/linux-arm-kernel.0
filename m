@@ -1,33 +1,151 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Wed,  3 Jun 2015 14:24:08 +0200
-Subject: [PATCH v2 06/16] ARM: at91/dt: at91sam9263ek: use stdout-path
-In-Reply-To: <1433334258-14741-1-git-send-email-alexandre.belloni@free-electrons.com>
-References: <1433334258-14741-1-git-send-email-alexandre.belloni@free-electrons.com>
-Message-ID: <1433334258-14741-7-git-send-email-alexandre.belloni@free-electrons.com>
+From: vigneshr@ti.com (Vignesh R)
+Date: Wed, 3 Jun 2015 17:21:24 +0530
+Subject: [PATCH v2 5/5] ARM: dts: DRA7: Add dt nodes for PWMSS
+In-Reply-To: <1433332284-10766-1-git-send-email-vigneshr@ti.com>
+References: <1433332284-10766-1-git-send-email-vigneshr@ti.com>
+Message-ID: <1433332284-10766-6-git-send-email-vigneshr@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use stdout-path to specify the console and remove the console argument from
-the kernel command line.
+Add PWMSS device tree nodes for DRA7 SoC family and add documentation
+for dt bindings.
 
-Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+Signed-off-by: Vignesh R <vigneshr@ti.com>
 ---
- arch/arm/boot/dts/at91sam9263ek.dts | 3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
+ .../devicetree/bindings/pwm/pwm-tiehrpwm.txt       |  8 +++
+ .../devicetree/bindings/pwm/pwm-tipwmss.txt        | 17 +++++-
+ arch/arm/boot/dts/dra7.dtsi                        | 64 ++++++++++++++++++++++
+ 3 files changed, 88 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm/boot/dts/at91sam9263ek.dts b/arch/arm/boot/dts/at91sam9263ek.dts
-index 5cf93eecd8f1..23381276ffb8 100644
---- a/arch/arm/boot/dts/at91sam9263ek.dts
-+++ b/arch/arm/boot/dts/at91sam9263ek.dts
-@@ -13,7 +13,8 @@
- 	compatible = "atmel,at91sam9263ek", "atmel,at91sam9263", "atmel,at91sam9";
+diff --git a/Documentation/devicetree/bindings/pwm/pwm-tiehrpwm.txt b/Documentation/devicetree/bindings/pwm/pwm-tiehrpwm.txt
+index 9c100b2c5b23..25d91ae57de5 100644
+--- a/Documentation/devicetree/bindings/pwm/pwm-tiehrpwm.txt
++++ b/Documentation/devicetree/bindings/pwm/pwm-tiehrpwm.txt
+@@ -4,6 +4,7 @@ Required properties:
+ - compatible: Must be "ti,<soc>-ehrpwm".
+   for am33xx - compatible = "ti,am33xx-ehrpwm";
+   for da850  - compatible = "ti,da850-ehrpwm", "ti,am33xx-ehrpwm";
++  for dra7xx - compatible = "ti,dra7xx-ehrpwm", "ti,am33xx-ehrpwm";
+ - #pwm-cells: should be 3. See pwm.txt in this directory for a description of
+   the cells format. The only third cell flag supported by this binding is
+   PWM_POLARITY_INVERTED.
+@@ -27,3 +28,10 @@ ehrpwm0: ehrpwm at 0 { /* EHRPWM on da850 */
+ 	#pwm-cells = <3>;
+ 	reg = <0x300000 0x2000>;
+ };
++
++ehrpwm0: ehrpwm at 0 { /* EHRPWM on dra7xx */
++	compatible = "ti,dra7xx-ehrpwm", "ti,am33xx-ehrpwm";
++	#pwm-cells = <3>;
++	reg = <0x48440200 0x80>;
++	ti,hwmods = "ehrpwm0";
++};
+diff --git a/Documentation/devicetree/bindings/pwm/pwm-tipwmss.txt b/Documentation/devicetree/bindings/pwm/pwm-tipwmss.txt
+index f7eae77f8354..9270ce6b2da2 100644
+--- a/Documentation/devicetree/bindings/pwm/pwm-tipwmss.txt
++++ b/Documentation/devicetree/bindings/pwm/pwm-tipwmss.txt
+@@ -1,7 +1,9 @@
+ TI SOC based PWM Subsystem
  
- 	chosen {
--		bootargs = "mem=64M console=ttyS0,115200 root=/dev/mtdblock5 rw rootfstype=ubifs";
-+		bootargs = "mem=64M root=/dev/mtdblock5 rw rootfstype=ubifs";
-+		stdout-path = "serial0:115200n8";
+ Required properties:
+-- compatible: Must be "ti,am33xx-pwmss";
++- compatible: Must be "ti,<soc>-pwmss".
++  for am33xx - compatible = "ti,am33xx-pwmss"
++  for dra7xx - compatible = "ti,dra7xx-pwmss", "ti,am33xx-pwmss"
+ - reg: physical base address and size of the registers map.
+ - address-cells: Specify the number of u32 entries needed in child nodes.
+ 		  Should set to 1.
+@@ -29,3 +31,16 @@ pwmss0: pwmss at 48300000 {
+ 
+ 	/* child nodes go here */
+ };
++
++epwmss0: epwmss at 4843e000 { /* On DRA7xx */
++	compatible = "ti,dra7xx-pwmss", "ti,am33xx-pwmss";
++	reg = <0x4843e000 0x30>;
++	ti,hwmods = "epwmss0";
++	#address-cells = <1>;
++	#size-cells = <1>;
++	ranges = <0x4843e100  0x4843e100 0x80	/* ECAP */
++		  0x4843e180  0x4843e180 0x80	/* EQEP */
++		  0x4843e200  0x4843e200 0x80>; /* EHRPWM */
++
++	/* child nodes go here */
++};
+diff --git a/arch/arm/boot/dts/dra7.dtsi b/arch/arm/boot/dts/dra7.dtsi
+index 387c76ca41f9..98a9203d6992 100644
+--- a/arch/arm/boot/dts/dra7.dtsi
++++ b/arch/arm/boot/dts/dra7.dtsi
+@@ -1474,6 +1474,70 @@
+ 			clocks = <&sys_clkin1>;
+ 			status = "disabled";
+ 		};
++
++		epwmss0: epwmss at 4843e000 {
++			compatible = "ti,dra7xx-pwmss", "ti,am33xx-pwmss";
++			reg = <0x4843e000 0x30>;
++			ti,hwmods = "epwmss0";
++			#address-cells = <1>;
++			#size-cells = <1>;
++			status = "disabled";
++			ranges = <0x4843e100  0x4843e100 0x80  /* ECAP */
++				  0x4843e180  0x4843e180 0x80  /* EQEP */
++				  0x4843e200  0x4843e200 0x80>;/* EHRPWM */
++
++			ehrpwm0: ehrpwm at 4843e200 {
++				compatible = "ti,dra7xx-ehrpwm",
++					     "ti,am33xx-ehrpwm";
++				#pwm-cells = <3>;
++				reg = <0x4843e200 0x80>;
++				ti,hwmods = "ehrpwm0";
++				status = "disabled";
++			};
++		};
++
++		epwmss1: epwmss at 48440000 {
++			compatible = "ti,dra7xx-pwmss", "ti,am33xx-pwmss";
++			reg = <0x48440000 0x30>;
++			ti,hwmods = "epwmss1";
++			#address-cells = <1>;
++			#size-cells = <1>;
++			status = "disabled";
++			ranges = <0x48440100  0x48440100  0x80   /* ECAP */
++				  0x48440180  0x48440180  0x80   /* EQEP */
++				  0x48440200  0x48440200  0x80>; /* EHRPWM */
++
++			ehrpwm1: ehrpwm at 48440200 {
++				compatible = "ti,dra7xx-ehrpwm",
++					     "ti,am33xx-ehrpwm";
++				#pwm-cells = <3>;
++				reg = <0x48440200 0x80>;
++				ti,hwmods = "ehrpwm1";
++				status = "disabled";
++			};
++		};
++
++		epwmss2: epwmss at 48442000 {
++			compatible = "ti,dra7xx-pwmss", "ti,am33xx-pwmss";
++			reg = <0x48442000 0x30>;
++			ti,hwmods = "epwmss2";
++			#address-cells = <1>;
++			#size-cells = <1>;
++			status = "disabled";
++
++			ranges = <0x48442100  0x48442100  0x80   /* ECAP */
++				  0x48442180  0x48442180  0x80   /* EQEP */
++				  0x48442200  0x48442200  0x80>; /* EHRPWM */
++
++			ehrpwm2: ehrpwm at 48442200 {
++				compatible = "ti,dra7xx-ehrpwm",
++					     "ti,am33xx-ehrpwm";
++				#pwm-cells = <3>;
++				reg = <0x48442200 0x80>;
++				ti,hwmods = "ehrpwm2";
++				status = "disabled";
++			};
++		};
  	};
  
- 	memory {
+ 	thermal_zones: thermal-zones {
 -- 
-2.1.4
+2.4.1
