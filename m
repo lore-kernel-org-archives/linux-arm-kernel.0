@@ -1,34 +1,60 @@
-From: vigneshr@ti.com (Vignesh R)
-Date: Wed, 3 Jun 2015 17:21:20 +0530
-Subject: [PATCH v2 1/5] ARM: OMAP2+: DRA7: clockdomain: change
- l4per2_7xx_clkdm to SW_WKUP
-In-Reply-To: <1433332284-10766-1-git-send-email-vigneshr@ti.com>
-References: <1433332284-10766-1-git-send-email-vigneshr@ti.com>
-Message-ID: <1433332284-10766-2-git-send-email-vigneshr@ti.com>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Wed,  3 Jun 2015 14:24:02 +0200
+Subject: [PATCH v2 00/16] AT91 DT for 4.2
+Message-ID: <1433334258-14741-1-git-send-email-alexandre.belloni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Legacy IPs like PWMSS, present under l4per2_7xx_clkdm, cannot support
-smart-idle when its clock domain is in HW_AUTO on DRA7 SoCs. Hence,
-program clock domain to SW_WKUP.
+Hi,
 
-Signed-off-by: Vignesh R <vigneshr@ti.com>
----
- arch/arm/mach-omap2/clockdomains7xx_data.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+A dt series for 4.2:
+ - Fix at91sam9rl RTC node and use it on at91sam9rlek
+ - correct stdout-path for the various kizboxes
+ - add stdout-path to the atme evaluation boards
+ - add  Acme arietta g25 device tree
 
-diff --git a/arch/arm/mach-omap2/clockdomains7xx_data.c b/arch/arm/mach-omap2/clockdomains7xx_data.c
-index 57d5df0c1fbd..7581e036bda6 100644
---- a/arch/arm/mach-omap2/clockdomains7xx_data.c
-+++ b/arch/arm/mach-omap2/clockdomains7xx_data.c
-@@ -331,7 +331,7 @@ static struct clockdomain l4per2_7xx_clkdm = {
- 	.dep_bit	  = DRA7XX_L4PER2_STATDEP_SHIFT,
- 	.wkdep_srcs	  = l4per2_wkup_sleep_deps,
- 	.sleepdep_srcs	  = l4per2_wkup_sleep_deps,
--	.flags		  = CLKDM_CAN_HWSUP_SWSUP,
-+	.flags		  = CLKDM_CAN_SWSUP,
- };
- 
- static struct clockdomain mpu0_7xx_clkdm = {
+Changes in v2:
+ - renamed the ariette device tree
+ - added an aliases node to the arietta device tree
+
+Alexandre Belloni (16):
+  ARM: at91/dt: at91sam9rl: fix rtc node
+  ARM: at91/dt: at91sam9rlek: add RTC
+  ARM: at91/dt: kizbox: use stdout-path
+  ARM: at91/dt: at91rm9200ek: use stdout-path
+  ARM: at91/dt: at91sam9261ek: use stdout-path
+  ARM: at91/dt: at91sam9263ek: use stdout-path
+  ARM: at91/dt: at91sam9g20ek: use stdout-path
+  ARM: at91/dt: at91sam9m10g45ek use stdout-path
+  ARM: at91/dt: at91sam9n12ek: use stdout-path
+  ARM: at91/dt: at91sam9rlek: use stdout-path
+  ARM: at91/dt: at91sam9x5ek: use stdout-path
+  ARM: at91/dt: sama5d3xek: use stdout-path
+  ARM: at91/dt: sama5d3 xplained: use stdout-path
+  ARM: at91/dt: sama5d4ek: use stdout-path
+  ARM: at91/dt: sama5d4 xplained: use stdout-path
+  ARM: at91/dt: Add Acme Arietta G25
+
+ arch/arm/boot/dts/Makefile                  |  1 +
+ arch/arm/boot/dts/at91-ariettag25.dts       | 79 +++++++++++++++++++++++++++++
+ arch/arm/boot/dts/at91-kizbox.dts           |  2 +-
+ arch/arm/boot/dts/at91-kizbox2.dts          |  2 +-
+ arch/arm/boot/dts/at91-kizboxmini.dts       |  2 +-
+ arch/arm/boot/dts/at91-sama5d3_xplained.dts |  2 +-
+ arch/arm/boot/dts/at91-sama5d4_xplained.dts |  3 +-
+ arch/arm/boot/dts/at91-sama5d4ek.dts        |  3 +-
+ arch/arm/boot/dts/at91rm9200ek.dts          |  4 ++
+ arch/arm/boot/dts/at91sam9261ek.dts         |  3 +-
+ arch/arm/boot/dts/at91sam9263ek.dts         |  3 +-
+ arch/arm/boot/dts/at91sam9g20ek_common.dtsi |  3 +-
+ arch/arm/boot/dts/at91sam9m10g45ek.dts      |  3 +-
+ arch/arm/boot/dts/at91sam9n12ek.dts         |  3 +-
+ arch/arm/boot/dts/at91sam9rl.dtsi           | 15 +++---
+ arch/arm/boot/dts/at91sam9rlek.dts          |  7 ++-
+ arch/arm/boot/dts/at91sam9x5ek.dtsi         |  3 +-
+ arch/arm/boot/dts/sama5d3xcm.dtsi           |  3 +-
+ 18 files changed, 120 insertions(+), 21 deletions(-)
+ create mode 100644 arch/arm/boot/dts/at91-ariettag25.dts
+
 -- 
-2.4.1
+2.1.4
