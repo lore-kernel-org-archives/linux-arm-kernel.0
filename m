@@ -1,36 +1,51 @@
-From: tomi.valkeinen@ti.com (Tomi Valkeinen)
-Date: Wed, 3 Jun 2015 14:26:27 +0300
-Subject: [PATCHv4 10/10] arm/dts: am57xx-beagle-x15.dts: add HDMI
-In-Reply-To: <20150601215115.GH30984@atomide.com>
-References: <1433139798-23450-1-git-send-email-tomi.valkeinen@ti.com>
- <1433139798-23450-11-git-send-email-tomi.valkeinen@ti.com>
- <20150601215115.GH30984@atomide.com>
-Message-ID: <556EE463.6000502@ti.com>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Wed,  3 Jun 2015 19:34:10 +0800
+Subject: [PATCH v2] MAINTAINERS: update Shawn's email to use kernel.org one
+Message-ID: <1433331250-8702-1-git-send-email-shawnguo@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+From: Shawn Guo <shawn.guo@linaro.org>
 
+Update my mailbox to use kernel.org one for handling kernel community
+maintenance traffic.
 
-On 02/06/15 00:51, Tony Lindgren wrote:
-> * Tomi Valkeinen <tomi.valkeinen@ti.com> [150531 23:25]:
->> AM57xx Beagle X15 has a HDMI output. This patch adds the device tree
->> nodes required for HDMI.
-> 
-> This one does not seem to apply to linux next, did not look
-> further where it conflicts.
+Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+---
+Changes since v1:
+ - Update the commit log a bit
 
-Looks like the change was also in -rc6. I've rebased my patches on -rc6,
-and added the acks:
+Hi Arnd,
 
-git://git.kernel.org/pub/scm/linux/kernel/git/tomba/linux.git dra7-dss-arch
+I'm ready to switch the maintainer mailbox to kernel.org now.  Please
+help apply the patch.  Thanks.
 
- Tomi
+Shawn
 
+ MAINTAINERS | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150603/c0b62de2/attachment.sig>
+diff --git a/MAINTAINERS b/MAINTAINERS
+index 2e5bbc0d68b2..a53e42fcba84 100644
+--- a/MAINTAINERS
++++ b/MAINTAINERS
+@@ -1030,7 +1030,7 @@ F:	arch/arm/include/asm/hardware/dec21285.h
+ F:	arch/arm/mach-footbridge/
+ 
+ ARM/FREESCALE IMX / MXC ARM ARCHITECTURE
+-M:	Shawn Guo <shawn.guo@linaro.org>
++M:	Shawn Guo <shawnguo@kernel.org>
+ M:	Sascha Hauer <kernel@pengutronix.de>
+ L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
+ S:	Maintained
+@@ -1041,7 +1041,7 @@ F:	arch/arm/boot/dts/imx*
+ F:	arch/arm/configs/imx*_defconfig
+ 
+ ARM/FREESCALE VYBRID ARM ARCHITECTURE
+-M:	Shawn Guo <shawn.guo@linaro.org>
++M:	Shawn Guo <shawnguo@kernel.org>
+ M:	Sascha Hauer <kernel@pengutronix.de>
+ R:	Stefan Agner <stefan@agner.ch>
+ L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
+-- 
+1.9.1
