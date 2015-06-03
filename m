@@ -1,42 +1,56 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 03 Jun 2015 22:55:27 +0200
-Subject: [RFC/NOT FOR MERGING] HACK: add global/private timers for A9
-In-Reply-To: <1433363565-17725-1-git-send-email-balbi@ti.com>
-References: <1433363565-17725-1-git-send-email-balbi@ti.com>
-Message-ID: <2466648.WjMxjIpAUG@wuerfel>
+From: paul.gortmaker@windriver.com (Paul Gortmaker)
+Date: Wed, 3 Jun 2015 16:59:30 -0400
+Subject: [PATCH 4/7] drivers/cpufreq: Convert non-modular drivers to use
+ builtin_driver_register
+In-Reply-To: <20150512070444.GE32300@linux>
+References: <1431287385-1526-1-git-send-email-paul.gortmaker@windriver.com>
+ <1431287385-1526-5-git-send-email-paul.gortmaker@windriver.com>
+ <20150512070444.GE32300@linux>
+Message-ID: <20150603205930.GO29898@windriver.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 03 June 2015 15:32:45 Felipe Balbi wrote:
-> 
-> Hi Tony and Russell,
-> 
-> AM43xx, even though it's a single processor A9, it still has TWD and global
-> timer. I was doing some profiling with RT v4.0 and latency is 3.5x lower just
-> by switching from gptimer to twd/global.
-> 
-> The only problem is that currently, is_smp() check prevents me from using twd
-> with AM43xx (that's why it's commented below, for testing purposes).
-> 
-> In the hopes that we can start a, hopefully, small thread around the subject,
-> I'm sending this HACK which I used to get TWD and global timer enabled so I
-> could measure latencies with cyclictest.
-> 
-> Is it so that TWD shouldn't be available on UP integrations of ARM's Cortex-A
-> processors ?
-> 
-> 
+[Re: [PATCH 4/7] drivers/cpufreq: Convert non-modular drivers to use builtin_driver_register] On 12/05/2015 (Tue 12:34) Viresh Kumar wrote:
 
-I wondered about this recently when looking at something unrelated
-and noticed that the check had been introduced as part of
-904464b91eca8 ("ARM: 7655/1: smp_twd: make twd_local_timer_of_register()
-no-op for nosmp").
+> On 10-05-15, 15:49, Paul Gortmaker wrote:
+> > These files depend on Kconfig options all of which are a bool, so
+> > we use the appropriate registration function, which avoids us
+> > relying on an implicit inclusion of <module.h> which we are
+> > doing currently.
+> > 
+> > While this currently works, we really don't want to be including
+> > the module.h header in non-modular code, which we'd be forced
+> > to do, pending some upcoming code relocation from init.h into
+> > module.h.  So we fix it now by using the non-modular equivalent.
+> > 
+> > Cc: "Rafael J. Wysocki" <rjw@rjwysocki.net>
+> > Cc: Viresh Kumar <viresh.kumar@linaro.org>
+> > Cc: Kukjin Kim <kgene@kernel.org>
+> > Cc: linux-pm at vger.kernel.org
+> > Cc: linux-arm-kernel at lists.infradead.org
+> > Signed-off-by: Paul Gortmaker <paul.gortmaker@windriver.com>
+> > ---
+> >  drivers/cpufreq/exynos-cpufreq.c  | 2 +-
+> 
+> Exynos can be compiled as a module:
+> 
+> drivers/cpufreq/Kconfig.arm:
+> 
+> config ARM_EXYNOS_CPUFREQ
+> 	tristate "SAMSUNG EXYNOS CPUfreq Driver"
+> 	depends on CPU_EXYNOS4210 || SOC_EXYNOS4212 || SOC_EXYNOS4412 || SOC_EXYNOS5250
 
-I suspect this was just the wrong fix at the time, and that the
-real culprit is either alloc_percpu() or request_percpu_irq()
-getting called too early on a machine without SMP support.
+Thanks -- I think I managed to confuse myself into thinking it was
+builtin always, courtesy of the "-y" in this Makefile line...
 
-Possibly the problem is already resolved independently, if you
-didn't run into it.
+arm-exynos-cpufreq-y                    := exynos-cpufreq.o
 
-	Arnd
+I'll drop the exynos chunk from this patch and fix the implicit module.h
+exynos usage in a new follow on patch, both to be sent shortly.
+
+Paul.
+--
+
+> 
+> --
+> viresh
