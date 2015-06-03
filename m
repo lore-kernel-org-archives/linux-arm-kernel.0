@@ -1,89 +1,44 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Wed, 3 Jun 2015 09:52:43 +0800
-Subject: [PATCH 2/3] ARM: dts: sun8i: Add support for USB controllers on
- A23/A33
-In-Reply-To: <556E0181.2010009@redhat.com>
-References: <1433248152-13753-1-git-send-email-wens@csie.org>
- <1433248152-13753-3-git-send-email-wens@csie.org>
- <556E0181.2010009@redhat.com>
-Message-ID: <CAGb2v64v7bD6-MEBKmXag6F3CA1CO3ff2CGRaRW2b9zOC82zzw@mail.gmail.com>
+From: dinh.linux@gmail.com (dinh.linux at gmail.com)
+Date: Tue,  2 Jun 2015 21:11:33 -0500
+Subject: [GIT PULL] SoCFPGA updates for v4.2, part 2
+Message-ID: <1433297493-3760-1-git-send-email-dinh.linux@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 3, 2015 at 3:18 AM, Hans de Goede <hdegoede@redhat.com> wrote:
-> Hi,
->
-> On 06/02/2015 02:29 PM, Chen-Yu Tsai wrote:
->>
->> A23/A33 has one pair of EHCI/OHCI USB controllers. There are 2 USB PHYs,
->> one for the USB OTG controller, one for the EHCI/OHCI pair. The latter
->> may also support HSIC, though none of the available boards utilize this,
->> so this is not supported yet.
->>
->> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
->
->
-> Thanks, I've applied this one (minus the phy node which belongs in
-> sun8i-a23.dtsi as it is a23 specific) to my sunxi-wip branch, and if it
-> is ok with you I will take care of upstreaming this further.
+Hi Arnd, Kevin, Olof:
 
-OK with me. Thanks!
+Please pull in this patch for v4.2.
 
-ChenYu
+Thanks,
+Dinh
 
->> ---
->>   arch/arm/boot/dts/sun8i-a23-a33.dtsi | 34
->> ++++++++++++++++++++++++++++++++++
->>   1 file changed, 34 insertions(+)
->>
->> diff --git a/arch/arm/boot/dts/sun8i-a23-a33.dtsi
->> b/arch/arm/boot/dts/sun8i-a23-a33.dtsi
->> index 7abd0ae3143d..4f1ca44a81f1 100644
->> --- a/arch/arm/boot/dts/sun8i-a23-a33.dtsi
->> +++ b/arch/arm/boot/dts/sun8i-a23-a33.dtsi
->> @@ -332,6 +332,40 @@
->>                         #size-cells = <0>;
->>                 };
->>
->> +               usbphy: phy at 01c19400 {
->> +                       compatible = "allwinner,sun8i-a23-usb-phy";
->> +                       reg = <0x01c19400 0x10>, <0x01c1a800 0x4>;
->> +                       reg-names = "phy_ctrl", "pmu1";
->> +                       clocks = <&usb_clk 8>, <&usb_clk 9>;
->> +                       clock-names = "usb0_phy", "usb1_phy";
->> +                       resets = <&usb_clk 0>, <&usb_clk 1>;
->> +                       reset-names = "usb0_reset", "usb1_reset";
->> +                       status = "disabled";
->> +                       #phy-cells = <1>;
->> +               };
->> +
->> +               ehci0: usb at 01c1a000 {
->> +                       compatible = "allwinner,sun8i-a23-ehci",
->> "generic-ehci";
->> +                       reg = <0x01c1a000 0x100>;
->> +                       interrupts = <GIC_SPI 72 IRQ_TYPE_LEVEL_HIGH>;
->> +                       clocks = <&ahb1_gates 26>;
->> +                       resets = <&ahb1_rst 26>;
->> +                       phys = <&usbphy 1>;
->> +                       phy-names = "usb";
->> +                       status = "disabled";
->> +               };
->> +
->> +               ohci0: usb at 01c1a400 {
->> +                       compatible = "allwinner,sun8i-a23-ohci",
->> "generic-ohci";
->> +                       reg = <0x01c1a400 0x100>;
->> +                       interrupts = <GIC_SPI 73 IRQ_TYPE_LEVEL_HIGH>;
->> +                       clocks = <&ahb1_gates 29>, <&usb_clk 16>;
->> +                       resets = <&ahb1_rst 29>;
->> +                       phys = <&usbphy 1>;
->> +                       phy-names = "usb";
->> +                       status = "disabled";
->> +               };
->> +
->>                 pio: pinctrl at 01c20800 {
->>                         /* compatible gets set in SoC specific dtsi file
->> */
->>                         reg = <0x01c20800 0x400>;
->>
->
+The following changes since commit c65b99f046843d2455aa231747b5a07a999a9f3d:
+
+  Linux 4.1-rc6 (2015-05-31 19:01:07 -0700)
+
+are available in the git repository at:
+
+  git at gitolite.kernel.org:pub/scm/linux/kernel/git/dinguyen/linux.git socfpga_updates_for_v4.2_part2
+
+for you to fetch changes up to a6cb1af402026c44eec5760036715acad1077b56:
+
+  ARM: socfpga: support suspend to ram (2015-06-02 14:05:22 -0500)
+
+----------------------------------------------------------------
+SoCFPGA update for v4.2, part 2
+- Add support for suspend to RAM
+
+----------------------------------------------------------------
+Alan Tull (1):
+      ARM: socfpga: support suspend to ram
+
+ arch/arm/mach-socfpga/Kconfig        |  10 ++-
+ arch/arm/mach-socfpga/Makefile       |   1 +
+ arch/arm/mach-socfpga/core.h         |   6 +-
+ arch/arm/mach-socfpga/pm.c           | 149 +++++++++++++++++++++++++++++++++++
+ arch/arm/mach-socfpga/self-refresh.S | 136 ++++++++++++++++++++++++++++++++
+ arch/arm/mach-socfpga/socfpga.c      |   6 +-
+ drivers/edac/altera_edac.c           |  20 +++++
+ 7 files changed, 325 insertions(+), 3 deletions(-)
+ create mode 100644 arch/arm/mach-socfpga/pm.c
+ create mode 100644 arch/arm/mach-socfpga/self-refresh.S
