@@ -1,63 +1,54 @@
-From: t-kristo@ti.com (Tero Kristo)
-Date: Wed, 3 Jun 2015 15:33:46 +0300
-Subject: [PATCHv3 00/27] ARM: OMAP2+: clock code move under clk driver
-In-Reply-To: <20150527231536.GD30984@atomide.com>
-References: <1432566032-10860-1-git-send-email-t-kristo@ti.com>
- <20150526160557.GD16525@atomide.com> <20150526163216.GF16525@atomide.com>
- <20150526163931.GO26599@saruman.tx.rr.com> <55660D5B.8020607@ti.com>
- <20150527231536.GD30984@atomide.com>
-Message-ID: <556EF42A.9000207@ti.com>
+From: rmk+kernel@arm.linux.org.uk (Russell King)
+Date: Wed, 03 Jun 2015 13:35:20 +0100
+Subject: [PATCH RFC 2/2] ARM: add soc memory barrier extension
+Message-ID: <E1Z07tA-0001TV-As@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/28/2015 02:15 AM, Tony Lindgren wrote:
-> * Tero Kristo <t-kristo@ti.com> [150527 11:32]:
->> On 05/26/2015 07:39 PM, Felipe Balbi wrote:
->>> On Tue, May 26, 2015 at 09:32:16AM -0700, Tony Lindgren wrote:
->>>> * Tony Lindgren <tony@atomide.com> [150526 09:08]:
->>>>> * Tero Kristo <t-kristo@ti.com> [150525 08:01]:
->>>>>> Hi,
->>>>>>
->>>>>> As requested, posting v3 with somewhat changed diff parameters and
->>>>>> diffstat attached. Just some minor Makefile changes compared to v2,
->>>>>> these were discussed under that set.
->>>>>>
->>>>>> Set has been pushed to:
->>>>>> - tree: https://github.com/t-kristo/linux-pm.git
->>>>>> - branch: for-4.2/ti-clk-move
->>>>>
->>>>> Looks like this causes a build error for at least omap2 only .config:
->>>>>
->>>>> drivers/clk/ti/dpll3xxx.o:(.rodata+0x1c): multiple definition of `clkhwops_omap3_dpll'
->>>>> drivers/clk/ti/dpll.o:(.rodata+0x0): first defined here
->>>>>
->>>>> You may want to create a file selecting ARCH_OMAP2PLUS=y, then point
->>>>> KCONFIG_ALLCONFIG to that file for make randconfig. Then just build
->>>>> randconfigs :) Usually the issues like this are exposed within few
->>>>> randconfig builds, some take longer if the options have dependencies.
->>>
->>> alternatively, just clone the repository at [1] and use the example
->>> script provided in README.md.
->>>
->>> [1] https://github.com/felipebalbi/omap-seeds
->>>
->>
->> Ok, I pushed an updated branch named: for-4.2/ti-clk-move-v4
->>
->> This definitely compiles with OMAP2 / OMAP3 / OMAP4 / OMAP5 / DRA7 / AM33xx
->> / AM43xx only setups (tried it out.)
->
-> Thanks yeah seems to work for me now.
->
-> Regards,
->
-> Tony
->
+Add an extension to the heavy barrier code to allow a SoC specific
+memory barrier function to be provided.  This is needed for platforms
+where the interconnect has weak ordering, and thus needs assistance
+to ensure that memory writes are properly visible in the correct order
+to other parts of the system.
 
-Question to Mike / Stephen, any chance of getting this in during the 4.2 
-merge anymore seeing we are already at 4.1-rc6?
+Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+---
+ arch/arm/include/asm/barrier.h | 1 +
+ arch/arm/mm/flush.c            | 4 ++++
+ 2 files changed, 5 insertions(+)
 
-I can send a pull request if yes. Otherwise I just wait until we are 
-past the next merge.
-
--Tero
+diff --git a/arch/arm/include/asm/barrier.h b/arch/arm/include/asm/barrier.h
+index 646539a903a2..1676007d9549 100644
+--- a/arch/arm/include/asm/barrier.h
++++ b/arch/arm/include/asm/barrier.h
+@@ -37,6 +37,7 @@
+ #endif
+ 
+ #ifdef CONFIG_ARM_HEAVY_MB
++extern void (*soc_mb)(void);
+ extern void arm_heavy_mb(void);
+ #define __arm_heavy_mb(x...) do { dsb(x); arm_heavy_mb(); } while (0)
+ #else
+diff --git a/arch/arm/mm/flush.c b/arch/arm/mm/flush.c
+index ce6c2960d5ac..1ec8e7590fc6 100644
+--- a/arch/arm/mm/flush.c
++++ b/arch/arm/mm/flush.c
+@@ -22,12 +22,16 @@
+ #include "mm.h"
+ 
+ #ifdef CONFIG_ARM_HEAVY_MB
++void (*soc_mb)(void);
++
+ void arm_heavy_mb(void)
+ {
+ #ifdef CONFIG_OUTER_CACHE_SYNC
+ 	if (outer_cache.sync)
+ 		outer_cache.sync();
+ #endif
++	if (soc_mb)
++		soc_mb();
+ }
+ EXPORT_SYMBOL(arm_heavy_mb);
+ #endif
+-- 
+2.1.0
