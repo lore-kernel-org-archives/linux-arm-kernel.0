@@ -1,53 +1,82 @@
-From: jistone@redhat.com (Josh Stone)
-Date: Tue, 02 Jun 2015 18:11:48 -0700
-Subject: [PATCH] arm64: fix missing syscall trace exit
-In-Reply-To: <1433293304-26539-1-git-send-email-jistone@redhat.com>
-References: <20150601102448.GG1641@arm.com>
- <1433293304-26539-1-git-send-email-jistone@redhat.com>
-Message-ID: <556E5454.9080400@redhat.com>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Wed, 3 Jun 2015 09:49:57 +0800
+Subject: [linux-sunxi] Re: [PATCH 1/3] phy: sun4i-usb: Add support for
+ sun8i A23/A33
+In-Reply-To: <556E00CA.2000309@redhat.com>
+References: <1433248152-13753-1-git-send-email-wens@csie.org>
+ <1433248152-13753-2-git-send-email-wens@csie.org>
+ <556E00CA.2000309@redhat.com>
+Message-ID: <CAGb2v65NYoKcFn5kKtKoHs2vvWroMeecH2qtjH=MtnafuwdxCw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/02/2015 06:01 PM, Josh Stone wrote:
-> If a syscall is entered without TIF_SYSCALL_TRACE set, then it goes on
-> the fast path.  It's then possible to have TIF_SYSCALL_TRACE added in
-> the middle of the syscall, but ret_fast_syscall doesn't check this flag
-> again.  This causes a ptrace syscall-exit-stop to be missed.
-> 
-> For instance, from a PTRACE_EVENT_FORK reported during do_fork, the
-> tracer might resume with PTRACE_SYSCALL, setting TIF_SYSCALL_TRACE.
-> Now the completion of the fork should have a syscall-exit-stop.
-> 
-> Russell King fixed this on arm by re-checking _TIF_SYSCALL_WORK in the
-> fast exit path.  Do the same on arm64.
-> 
-> Cc: Catalin Marinas <catalin.marinas@arm.com>
-> Cc: Will Deacon <will.deacon@arm.com>
-> Cc: Russell King <rmk@arm.linux.org.uk>
-> Signed-off-by: Josh Stone <jistone@redhat.com>
-> ---
->  arch/arm64/kernel/entry.S | 4 +++-
->  1 file changed, 3 insertions(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
-> index 959fe8733560..a547a3e8a198 100644
-> --- a/arch/arm64/kernel/entry.S
-> +++ b/arch/arm64/kernel/entry.S
-> @@ -608,7 +608,9 @@ ENDPROC(cpu_switch_to)
->   */
->  ret_fast_syscall:
->  	disable_irq				// disable interrupts
-> -	ldr	x1, [tsk, #TI_FLAGS]
-> +	ldr	x1, [tsk, #TI_FLAGS]		// re-check for syscall tracing
-> +	and	x2, x1, #_TIF_SYSCALL_WORK
-> +	cbnz	x2, __sys_trace_return
->  	and	x2, x1, #_TIF_WORK_MASK
->  	cbnz	x2, fast_work_pending
->  	enable_step_tsk x1, x2
+Hi,
 
-I do have one concern about this, also in Russell's ARM patch.  Is it
-really ok to branch to __sys_trace_return with interrupts disabled?
+On Wed, Jun 3, 2015 at 3:15 AM, Hans de Goede <hdegoede@redhat.com> wrote:
+> Hi,
+>
+> On 06/02/2015 02:29 PM, Chen-Yu Tsai wrote:
+>>
+>> A23/A33 have separate reset lines for each PHY, like on sun6i,
+>> but only 2 PHYs instead of 3. Add a new compatible for this.
+>>
+>> There is also an HSIC PHY, but no hardware that uses it exists.
+>>
+>> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+>
+>
+> Heh, I've pretty much written the exact same patch (not that
+> it was much work):
+>
+> https://github.com/jwrdegoede/linux-sunxi/commit/bc062354f5e0ec75047859d7c2ee3fa04594d29c
+>
+> Note though that:
+>
+> 1) In order to get the disconnect threshold correct you also need:
+>
+> https://github.com/jwrdegoede/linux-sunxi/commit/f7dabee14450cd93e6d0b01f4b6ab065a55955e3
+>
+> 2) This will only work properly for the A23 not for the A33 on the A33 the
+> phyctl reg
+> sits at a different offset, see:
+>
+> https://github.com/allwinner-zh/linux-3.4-sunxi/blob/master/drivers/usb/host/sunxi_hci.c#L49
+>
+> So I've written a separate patch (on top of the a23 one, to add control for
+> the A33 phy:
+> https://github.com/jwrdegoede/linux-sunxi/commit/b4536a92ede3187450b0f1c27c11c1f80fc66fc8
 
-I didn't hit any issue from that, but my testcase only exercises this
-path once each run.  So that might have just been lucky not to hit any
-gross scenario...
+Interesting... It seems to just work without the above 2 one my A33.
+Disconnect seems fine as well, though I've not done any stress testing.
+
+Since you have much more experience with USB than I do, I leave this
+to you.
+
+> Note I also have patches to add support for the musb on sun6i (no sram
+> controller for the
+> otg sram, needs reset controller poking) this also works for the a23, and a
+> separate patch
+> for the a33 which needs some special handling again.
+
+Yes, I've seen them in your sunxi-wip branch.
+
+> So how to move forward with this? I believe that it is best if I finish my
+> work on this
+> and post a series to Felipe and Kishon to apply on top of the 2 still
+> outstanding
+> phy-sun4i-usb / musb-sunxi patches.
+
+IIRC those will not make 4.2.
+
+> As for the dts patches, those I plan to bundle with the dts patches I
+> already have
+> pending for otg support for sunxi in general.
+>
+> Does that work for you ?
+
+Yes. Thanks! I'll pick the patches from your branch to test,
+or just wait until you post them.
+
+
+Regards
+ChenYu
