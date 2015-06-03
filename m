@@ -1,23 +1,37 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Wed, 3 Jun 2015 13:20:05 +0100
-Subject: [PATCH 1/6] regulator: core: Don't spew backtraces on duplicate
- sysfs
-In-Reply-To: <1433209679-31389-2-git-send-email-sboyd@codeaurora.org>
-References: <1433209679-31389-1-git-send-email-sboyd@codeaurora.org>
- <1433209679-31389-2-git-send-email-sboyd@codeaurora.org>
-Message-ID: <20150603122005.GL14071@sirena.org.uk>
+From: vigneshr@ti.com (Vignesh R)
+Date: Wed, 3 Jun 2015 17:21:19 +0530
+Subject: [PATCH v2 0/5] Add support for PWMSS on DRA7
+Message-ID: <1433332284-10766-1-git-send-email-vigneshr@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 01, 2015 at 06:47:54PM -0700, Stephen Boyd wrote:
-> We don't consider a failure to add the sysfs node as a problem,
-> so use sysfs_create_link_nowarn() so that we don't print a
 
-Applied, thanks.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150603/4eaccb5d/attachment.sig>
+Hi,
+
+This patch series adds support for PWMSS on DRA7. The IP is same as that
+present in AM33XX and AM43XX.
+The first patch changes clock domain in which PWMSS is present
+(l4per2_7xx_clkdm) to SW_WKUP. This is because legacy IPs like PWM
+does'nt support HW_AUTO prorperly. Hence, switch clock domain to
+SW_WKUP. This is based on the input from the hardware team.
+The rest of the patches add hwmod and dt entries and enable PWMSS on
+DRA7 based SoCs.
+
+Vignesh R (5):
+  ARM: OMAP2+: DRA7: clockdomain: change l4per2_7xx_clkdm to SW_WKUP
+  ARM: OMAP2+: DRA7: Add hwmod entries for PWMSS
+  ARM: dts: DRA7: Add TBCLK for PWMSS
+  clk: ti: DRA7: Add tbclk data for ehrpwm
+  ARM: dts: DRA7: Add dt nodes for PWMSS
+
+ .../devicetree/bindings/pwm/pwm-tiehrpwm.txt       |   8 +
+ .../devicetree/bindings/pwm/pwm-tipwmss.txt        |  17 +-
+ arch/arm/boot/dts/dra7.dtsi                        |  69 ++++++
+ arch/arm/boot/dts/dra7xx-clocks.dtsi               |  26 +++
+ arch/arm/mach-omap2/clockdomains7xx_data.c         |   2 +-
+ arch/arm/mach-omap2/omap_hwmod_7xx_data.c          | 239 +++++++++++++++++++
+ drivers/clk/ti/clk-7xx.c                           |   3 +
+ 7 files changed, 362 insertions(+), 2 deletions(-)
+
+-- 
+2.4.1
