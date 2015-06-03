@@ -1,61 +1,33 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Wed,  3 Jun 2015 14:24:05 +0200
-Subject: [PATCH v2 03/16] ARM: at91/dt: kizbox: use stdout-path
-In-Reply-To: <1433334258-14741-1-git-send-email-alexandre.belloni@free-electrons.com>
-References: <1433334258-14741-1-git-send-email-alexandre.belloni@free-electrons.com>
-Message-ID: <1433334258-14741-4-git-send-email-alexandre.belloni@free-electrons.com>
+From: vigneshr@ti.com (Vignesh R)
+Date: Wed, 3 Jun 2015 17:21:23 +0530
+Subject: [PATCH v2 4/5] clk: ti: DRA7: Add tbclk data for ehrpwm
+In-Reply-To: <1433332284-10766-1-git-send-email-vigneshr@ti.com>
+References: <1433332284-10766-1-git-send-email-vigneshr@ti.com>
+Message-ID: <1433332284-10766-5-git-send-email-vigneshr@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The kizbox dts are using the deprecated linux,stdout-path. Replace those by
-stdout-path.
+tbclk is needed by ehrpwm to generate pwm waveforms. Hence, register
+the required clock information.
 
-Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
-Acked-by: Ga?l PORTAY <g.portay@overkiz.com>
+Signed-off-by: Vignesh R <vigneshr@ti.com>
 ---
- arch/arm/boot/dts/at91-kizbox.dts     | 2 +-
- arch/arm/boot/dts/at91-kizbox2.dts    | 2 +-
- arch/arm/boot/dts/at91-kizboxmini.dts | 2 +-
- 3 files changed, 3 insertions(+), 3 deletions(-)
+ drivers/clk/ti/clk-7xx.c | 3 +++
+ 1 file changed, 3 insertions(+)
 
-diff --git a/arch/arm/boot/dts/at91-kizbox.dts b/arch/arm/boot/dts/at91-kizbox.dts
-index b567b5ff908f..d9b71065916d 100644
---- a/arch/arm/boot/dts/at91-kizbox.dts
-+++ b/arch/arm/boot/dts/at91-kizbox.dts
-@@ -16,7 +16,7 @@
- 
- 	chosen {
- 		bootargs = "ubi.mtd=ubi";
--		linux,stdout-path = &dbgu;
-+		stdout-path = &dbgu;
- 	};
- 
- 	memory {
-diff --git a/arch/arm/boot/dts/at91-kizbox2.dts b/arch/arm/boot/dts/at91-kizbox2.dts
-index a458e3791bb1..f0b1563cb3f1 100644
---- a/arch/arm/boot/dts/at91-kizbox2.dts
-+++ b/arch/arm/boot/dts/at91-kizbox2.dts
-@@ -15,7 +15,7 @@
- 
- 	chosen {
- 		bootargs = "ubi.mtd=ubi";
--		linux,stdout-path = &dbgu;
-+		stdout-path = &dbgu;
- 	};
- 
- 	memory {
-diff --git a/arch/arm/boot/dts/at91-kizboxmini.dts b/arch/arm/boot/dts/at91-kizboxmini.dts
-index 4611f227d8d0..9f72b4932634 100644
---- a/arch/arm/boot/dts/at91-kizboxmini.dts
-+++ b/arch/arm/boot/dts/at91-kizboxmini.dts
-@@ -15,7 +15,7 @@
- 
- 	chosen {
- 		bootargs = "ubi.mtd=ubi";
--		linux,stdout-path = &dbgu;
-+		stdout-path = &dbgu;
- 	};
- 
- 	memory {
+diff --git a/drivers/clk/ti/clk-7xx.c b/drivers/clk/ti/clk-7xx.c
+index 5d2217ae4478..366be43d15fe 100644
+--- a/drivers/clk/ti/clk-7xx.c
++++ b/drivers/clk/ti/clk-7xx.c
+@@ -304,6 +304,9 @@ static struct ti_dt_clk dra7xx_clks[] = {
+ 	DT_CLK("4882a000.timer", "timer_sys_ck", "timer_sys_clk_div"),
+ 	DT_CLK("4882c000.timer", "timer_sys_ck", "timer_sys_clk_div"),
+ 	DT_CLK("4882e000.timer", "timer_sys_ck", "timer_sys_clk_div"),
++	DT_CLK("4843e200.ehrpwm", "tbclk", "ehrpwm0_tbclk"),
++	DT_CLK("48440200.ehrpwm", "tbclk", "ehrpwm1_tbclk"),
++	DT_CLK("48442200.ehrpwm", "tbclk", "ehrpwm2_tbclk"),
+ 	DT_CLK(NULL, "sys_clkin", "sys_clkin1"),
+ 	{ .node_name = NULL },
+ };
 -- 
-2.1.4
+2.4.1
