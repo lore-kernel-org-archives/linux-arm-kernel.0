@@ -1,82 +1,66 @@
-From: hanjun.guo@linaro.org (Hanjun Guo)
-Date: Wed, 03 Jun 2015 16:44:29 +0800
-Subject: [Patch v4 5/8] ARM64/PCI/ACPI: Introduce struct pci_controller
- for ACPI
-In-Reply-To: <20150602093525.GA23543@red-moon>
-References: <1433225576-8215-1-git-send-email-jiang.liu@linux.intel.com>
- <1433225576-8215-6-git-send-email-jiang.liu@linux.intel.com>
- <20150602093525.GA23543@red-moon>
-Message-ID: <556EBE6D.90907@linaro.org>
+From: cyrille.pitchen@atmel.com (Cyrille Pitchen)
+Date: Wed, 3 Jun 2015 10:59:07 +0200
+Subject: [PATCH v4 0/6] i2c: at91: add support to FIFOs and alternative command
+Message-ID: <cover.1433321260.git.cyrille.pitchen@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2015?06?02? 17:35, Lorenzo Pieralisi wrote:
-> On Tue, Jun 02, 2015 at 07:12:53AM +0100, Jiang Liu wrote:
->> From: Hanjun Guo <hanjun.guo@linaro.org>
->>
->> ARM64 ACPI based PCI host bridge init needs a arch dependent
->> struct pci_controller to accommodate common PCI host bridge
->> code which is introduced later, or it will lead to compile
->> errors on ARM64.
->>
->> Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
->> Tested-by: Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com>
->> CC: Arnd Bergmann <arnd@arndb.de>
->> CC: Catalin Marinas <catalin.marinas@arm.com>
->> CC: Liviu Dudau <Liviu.Dudau@arm.com>
->> CC: Lorenzo Pieralisi <Lorenzo.Pieralisi@arm.com>
->> CC: Will Deacon <will.deacon@arm.com>
->> Signed-off-by: Jiang Liu <jiang.liu@linux.intel.com>
->> ---
->>   arch/arm64/include/asm/pci.h |   10 ++++++++++
->>   1 file changed, 10 insertions(+)
->>
->> diff --git a/arch/arm64/include/asm/pci.h b/arch/arm64/include/asm/pci.h
->> index b008a72f8bc0..70884957f253 100644
->> --- a/arch/arm64/include/asm/pci.h
->> +++ b/arch/arm64/include/asm/pci.h
->> @@ -10,6 +10,16 @@
->>   #include <asm-generic/pci-bridge.h>
->>   #include <asm-generic/pci-dma-compat.h>
->>
->> +struct acpi_device;
->> +
->> +struct pci_controller {
->> +#ifdef CONFIG_ACPI
->> +	struct acpi_device *companion;	/* ACPI companion device */
->> +#endif
->> +	int		segment;	/* PCI domain */
->> +	int		node;		/* NUMA node */
->> +};
->
-> There is nothing ARM64 specific in this structure. The only
-> reason I see you want to keep it arch specific is the iommu
-> pointer on x86,
+ChangeLog
 
-And also plarform_data for IA64 too.
+v4:
+- replace 0x%x by %#x when printing I2C controller version
+- change the order of patches: the race condition bug fix becomes the first
+  patch so it be can more easily applied to older kernels.
 
-> but I think we should find a way to make
-> the common bits shared across archs (ie the struct above) and
-> add (maybe a void*) to the generic struct to cater for arch
-> specific data.
->
-> Thoughts ?
+v3:
+- fix braces {} coding style issue
+- split the alternative command patch into 2 patches: the first one fixes
+  a race condition whereas the second one is the actual alternative command
+  patch
 
-We discussed this already, it has limitations to make it
-common to all archs, I think the limitation are:
+v2:
+- fix typo in comment for AT91_TWI_SVEN.
+- document new device tree bindings like "atmel,fifo-size".
+- explicitly set the has_alt_cmd boolean to false to already existing chip
+  configs.
+- use the BIT() macro to define the register bits and do a little cleanup in a
+  dedicated patch.
+- reword some comments to better explain why the TXCOMP interrupt is no longer
+  enabled in at91_do_twi_transfer() but later in
+  at91_twi_write_data_dma_callback() to avoid a race condition when DMA is used.
+- remove useless TXCOMP interrupt enable line in at91_twi_write_next_byte()
+  since this interrupt is also enabled by at91_do_twi_transfer() for PIO
+  transfers.
 
-   - struct pci_controller are also used for other archs
-     such as PowerPC and Tile, they will not use it for
-     ACPI purpose, so we can not used for all archs.
+v1:
+This series of patches adds support of two new features which will be
+introduced with Atmel sama5d2x SoC.
 
-   - if we let struct pci_controller defined only for archs
-     using ACPI, such as introduce it in linux/acpi.h, we still
-     can not satisfy that the struct pci_controller is not
-     only used for ACPI case on x86, it will be used for
-     non-ACPI too.
+First, the alternative command mode eases the sending of STOP conditions.
+Before starting an I2C transaction, the size data to be transfered is
+written into the new Alternative Command Register. For each byte transferred,
+the I2C controller decreases this counter and automatically sends a STOP
+condition when the counter value reaches 0, that is to say when the last byte
+of the transaction has been sent/received. So there is no longer need to set
+the STOP bit into the Control Register.
 
-So it's pretty difficult to share it with across archs to me,
-any more ideas?
+Then the use of FIFOs allows to reduce number I/O accesses: for instance,
+the TX FIFO allows to write up to 4 data in a single access to the Transmit
+Holding Register. Also the RX FIFO allows to read up to 4 data in a single
+access to the Receive Holding Register. Currently only DMA transfers take
+advantage of FIFOs.
 
-Thanks
-Hanjun
+Cyrille Pitchen (6):
+  i2c: at91: fix a race condition when using the DMA controller
+  i2c: at91: use BIT() macro to define register bits
+  i2c: at91: update documentation for DT bindings
+  i2c: at91: add support for new alternative command mode
+  i2c: at91: print hardware version
+  i2c: at91: add support to FIFOs
+
+ Documentation/devicetree/bindings/i2c/i2c-at91.txt |  29 +-
+ drivers/i2c/busses/i2c-at91.c                      | 354 +++++++++++++++++----
+ 2 files changed, 321 insertions(+), 62 deletions(-)
+
+-- 
+1.8.2.2
