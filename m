@@ -1,58 +1,69 @@
-From: wsa@the-dreams.de (Wolfram Sang)
-Date: Thu, 4 Jun 2015 00:19:22 +0900
-Subject: [PATCH v4 5/6] i2c: at91: print hardware version
-In-Reply-To: <03bf4d8906d12a87fee7238764074bc5687972be.1433321260.git.cyrille.pitchen@atmel.com>
-References: <cover.1433321260.git.cyrille.pitchen@atmel.com>
- <03bf4d8906d12a87fee7238764074bc5687972be.1433321260.git.cyrille.pitchen@atmel.com>
-Message-ID: <20150603151921.GA2873@katana>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 3 Jun 2015 08:42:13 -0700
+Subject: [PATCHv4 06/10] ARM: OMAP: display: change compat names to array
+In-Reply-To: <1433139798-23450-7-git-send-email-tomi.valkeinen@ti.com>
+References: <1433139798-23450-1-git-send-email-tomi.valkeinen@ti.com>
+ <1433139798-23450-7-git-send-email-tomi.valkeinen@ti.com>
+Message-ID: <20150603154213.GO30984@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 03, 2015 at 11:04:26AM +0200, Cyrille Pitchen wrote:
-> The probe() function now prints the hardware version of the I2C
-> controller.
+* Tomi Valkeinen <tomi.valkeinen@ti.com> [150531 23:25]:
+> Simplify the DSS detection logic by creating a list of the omapdss
+> compat strings, instead of checking each separately with an 'if'.
 > 
-> Signed-off-by: Cyrille Pitchen <cyrille.pitchen@atmel.com>
+> Signed-off-by: Tomi Valkeinen <tomi.valkeinen@ti.com>
 
-Kernel has already very much printout, so I don't see the gain in adding
-another one. At least, combine it with the other printout we have
-already, but I wonder what new information will be in here? We should
-know from the compatible binding which version we serve? Is it really
-needed? Helpful for the user?
+Acked-by: Tony Lindgren <tonY@atomide.com>
 
 > ---
->  drivers/i2c/busses/i2c-at91.c | 4 ++++
->  1 file changed, 4 insertions(+)
+>  arch/arm/mach-omap2/display.c | 29 ++++++++++++++---------------
+>  1 file changed, 14 insertions(+), 15 deletions(-)
 > 
-> diff --git a/drivers/i2c/busses/i2c-at91.c b/drivers/i2c/busses/i2c-at91.c
-> index 67b4f15..cbe6684 100644
-> --- a/drivers/i2c/busses/i2c-at91.c
-> +++ b/drivers/i2c/busses/i2c-at91.c
-> @@ -85,6 +85,8 @@
->  #define	AT91_TWI_ACR_DATAL(len)	((len) & 0xff)
->  #define	AT91_TWI_ACR_DIR	BIT(8)
+> diff --git a/arch/arm/mach-omap2/display.c b/arch/arm/mach-omap2/display.c
+> index f492ae147c6a..9868d0bc7805 100644
+> --- a/arch/arm/mach-omap2/display.c
+> +++ b/arch/arm/mach-omap2/display.c
+> @@ -568,25 +568,24 @@ void __init omapdss_early_init_of(void)
 >  
-> +#define	AT91_TWI_VER		0x00fc	/* Version Register */
-> +
->  struct at91_twi_pdata {
->  	unsigned clk_max_div;
->  	unsigned clk_offset;
-> @@ -872,6 +874,8 @@ static int at91_twi_probe(struct platform_device *pdev)
->  			return rc;
->  	}
+>  }
 >  
-> +	dev_info(dev->dev, "version: %#x\n", at91_twi_read(dev, AT91_TWI_VER));
+> +static const char * const omapdss_compat_names[] __initconst = {
+> +	"ti,omap2-dss",
+> +	"ti,omap3-dss",
+> +	"ti,omap4-dss",
+> +	"ti,omap5-dss",
+> +};
 > +
->  	rc = of_property_read_u32(dev->dev->of_node, "clock-frequency",
->  			&bus_clk_rate);
->  	if (rc)
+>  struct device_node * __init omapdss_find_dss_of_node(void)
+>  {
+>  	struct device_node *node;
+> +	int i;
+>  
+> -	node = of_find_compatible_node(NULL, NULL, "ti,omap2-dss");
+> -	if (node)
+> -		return node;
+> -
+> -	node = of_find_compatible_node(NULL, NULL, "ti,omap3-dss");
+> -	if (node)
+> -		return node;
+> -
+> -	node = of_find_compatible_node(NULL, NULL, "ti,omap4-dss");
+> -	if (node)
+> -		return node;
+> -
+> -	node = of_find_compatible_node(NULL, NULL, "ti,omap5-dss");
+> -	if (node)
+> -		return node;
+> +	for (i = 0; i < ARRAY_SIZE(omapdss_compat_names); ++i) {
+> +		node = of_find_compatible_node(NULL, NULL,
+> +			omapdss_compat_names[i]);
+> +		if (node)
+> +			return node;
+> +	}
+>  
+>  	return NULL;
+>  }
 > -- 
-> 1.8.2.2
+> 2.1.4
 > 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150604/ff6d2718/attachment.sig>
