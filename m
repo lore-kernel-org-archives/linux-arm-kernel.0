@@ -1,77 +1,115 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Wed, 3 Jun 2015 14:16:48 +0800
-Subject: [PATCH v2 05/12] ARM: imx: setup tctl register in device
- specific function
-In-Reply-To: <CAMAWPa-BYPnsqSxQ_VTa37a=Xg8xgrSQkzQgX+_65koZCNxBEg@mail.gmail.com>
-References: <1432308599-28643-1-git-send-email-shawn.guo@linaro.org>
- <1432308599-28643-6-git-send-email-shawn.guo@linaro.org>
- <CAMAWPa-1MPgzT1GJQx4SjmfQpj9zdwsAw-qvLWZjVhoM66nHsQ@mail.gmail.com>
- <20150602011139.GP16165@dragon>
- <CAMAWPa-BYPnsqSxQ_VTa37a=Xg8xgrSQkzQgX+_65koZCNxBEg@mail.gmail.com>
-Message-ID: <20150603061648.GA20344@dragon>
+From: appana.durga.rao@xilinx.com (Appana Durga Kedareswara Rao)
+Date: Wed, 3 Jun 2015 06:21:26 +0000
+Subject: [PATCH v4 1/2] dma: Add Xilinx Central DMA DT Binding
+ Documentation
+In-Reply-To: <1432228194-6760-1-git-send-email-appanad@xilinx.com>
+References: <1432228194-6760-1-git-send-email-appanad@xilinx.com>
+Message-ID: <C246CAC1457055469EF09E3A7AC4E11A49A8B5A9@XAP-PVEXMBX01.xlnx.xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 02, 2015 at 08:56:02AM -0700, Kevin Hilman wrote:
-> I'm just using multi_v7_defconfig, and BROKEN is not set, but that
-> driver is still built because it's explicitly selected by ARCH_MXC:
-> 
-> $ git describe
-> next-20150601
-> $ rm build/.config
-> $ make ARCH=arm CROSS_COMPILE=arm-linux-gnueabi- O=build multi_v7_defconfig
-> make[1]: Entering directory `/work/kernel/next/build'
->   GEN     ./Makefile
-> arch/arm/configs/multi_v7_defconfig:603:warning: override: reassigning
-> to symbol COMMON_CLK_QCOM
-> warning: (ARCH_MXC) selects CLKSRC_IMX_GPT which has unmet direct
-> dependencies (OF && BROKEN)
-> warning: (ARCH_MXC) selects CLKSRC_IMX_GPT which has unmet direct
-> dependencies (OF && BROKEN)
-> #
-> # configuration written to .config
-> #
-> make[1]: Leaving directory `/work/kernel/next/build'
-> $ grep CLKSRC_IMX_GPT build/.config
-> CONFIG_CLKSRC_IMX_GPT=y
-> $
+Ping!
 
-Yes, you're right.  It's broken on i.MX6DL/S indeed.  The cause is that
-i.MX6DL/S DTBs are using the same GPT compatible string as i.MX6Q.  It
-effectively makes kernel select an incorrect GPT device type on
-i.MX6DL/S.  We will need to update i.MX6DL/S device tree to use
-a correct compatible string.  But to keep the existing DTBs continue
-working, we need the following change.  As I'm asked by Arnd to rebase
-my branch, I would like fold the changes into the original patch to
-save the git bisect issue.
 
-Thanks for the bug report, and sorry for the breakage.
+> -----Original Message-----
+> From: Kedareswara rao Appana [mailto:appana.durga.rao at xilinx.com]
+> Sent: Thursday, May 21, 2015 10:40 PM
+> To: robh+dt at kernel.org; pawel.moll at arm.com; mark.rutland at arm.com;
+> ijc+devicetree at hellion.org.uk; Michal Simek; galak at codeaurora.org;
+> appand at xilinx.com; Soren Brinkmann
+> Cc: devicetree at vger.kernel.org; linux-arm-kernel at lists.infradead.org; linux-
+> kernel at vger.kernel.org; Appana Durga Kedareswara Rao; Srikanth Thokala
+> Subject: [PATCH v4 1/2] dma: Add Xilinx Central DMA DT Binding
+> Documentation
+>
+> Device-tree binding documentation of Xilinx Central DMA Engine.
+>
+> Signed-off-by: Srikanth Thokala <sthokal@xilinx.com>
+> Signed-off-by: Kedareswara rao Appana <appanad@xilinx.com>
+> ---
+> This patch is rebased on the commit
+> Merge tag 'nfs-for-4.1-2' of git://git.linux-nfs.org/projects/trondmy/linux-nfs
+>
+> Changes in v4:
+> - None.
+> Changes in v3:
+> - Used proper alignment for all the properties.
+> Changes in v2:
+> - Change property 'xlnx,data-width' to 'xlnx,datawidth' in the description
+>   to match the implementation.
+>
+>  .../devicetree/bindings/dma/xilinx/xilinx_cdma.txt | 54
+> ++++++++++++++++++++++
+>  1 file changed, 54 insertions(+)
+>  create mode 100644
+> Documentation/devicetree/bindings/dma/xilinx/xilinx_cdma.txt
+>
+> diff --git a/Documentation/devicetree/bindings/dma/xilinx/xilinx_cdma.txt
+> b/Documentation/devicetree/bindings/dma/xilinx/xilinx_cdma.txt
+> new file mode 100644
+> index 0000000..d1637de
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/dma/xilinx/xilinx_cdma.txt
+> @@ -0,0 +1,54 @@
+> +Xilinx AXI CDMA engine, it does transfers between memory-mapped
+> source
+> +address and a memory-mapped destination address.
+> +
+> +Required properties:
+> +- compatible         : Should be "xlnx,axi-cdma-1.00.a"
+> +- #dma-cells         : Should be <1>, see "dmas" property below
+> +- reg                        : Should contain cdma registers location and length.
+> +- dma-channel child node: Should have only one channel
+> +
+> +Optional properties:
+> +- xlnx,include-sg    : Tells whether configured for Scatter-mode in
+> +                       the hardware.
+> +
+> +Required child node properties:
+> +- compatible         : It should be "xlnx,axi-cdma-channel".
+> +- interrupts         : Should contain per channel CDMA interrupts.
+> +- xlnx,datawidth     : Should contain the stream data width, take values
+> +                       {32,64...1024}.
+> +
+> +Option child node properties:
+> +- xlnx,include-dre   : Tells whether hardware is configured for Data
+> +                       Realignment Engine.
+> +
+> +Example:
+> +++++++++
+> +
+> +axi_cdma_0: axicdma at 7e200000 {
+> +       compatible = "xlnx,axi-cdma-1.00.a";
+> +       #dma_cells = <1>;
+> +       reg = < 0x7e200000 0x10000 >;
+> +       dma-channel at 7e200000 {
+> +               compatible = "xlnx,axi-cdma-channel";
+> +               interrupts = < 0 55 4 >;
+> +               xlnx,datawidth = <0x40>;
+> +       } ;
+> +} ;
+> +
+> +
+> +* DMA client
+> +
+> +Required properties:
+> +- dmas               : a list of <[Central DMA device phandle] [Channel
+> ID]> pairs,
+> +               where Channel ID is '0' for write/tx and '1' for read/rx
+> +                  channel.
+> +- dma-names  : a list of DMA channel names, one per "dmas" entry
+> +
+> +Example:
+> +++++++++
+> +
+> +cdmatest_0: cdmatest at 0 {
+> +       compatible ="xlnx,axi-cdma-test-1.00.a";
+> +       dmas = <&axi_cdma_0 0>;
+> +       dma-names = "cdma";
+> +} ;
+> --
+> 2.1.2
 
-Shawn
 
------8<------------------
 
-diff --git a/drivers/clocksource/timer-imx-gpt.c b/drivers/clocksource/timer-imx-gpt.c
-index a98d1104b3fd..e41b021b9d62 100644
---- a/drivers/clocksource/timer-imx-gpt.c
-+++ b/drivers/clocksource/timer-imx-gpt.c
-@@ -508,7 +508,18 @@ static void __init imx21_timer_init_dt(struct device_node *np)
- 
- static void __init imx31_timer_init_dt(struct device_node *np)
- {
--       mxc_timer_init_dt(np, GPT_TYPE_IMX31);
-+       enum imx_gpt_type type = GPT_TYPE_IMX31;
-+
-+       /*
-+        * We were using the same compatible string for i.MX6Q/D and i.MX6DL/S
-+        * GPT device, while they actually have different programming model.
-+        * This is a workaround to keep the existing i.MX6DL/S DTBs continue
-+        * working with the new kernel.
-+        */
-+       if (of_machine_is_compatible("fsl,imx6dl"))
-+               type = GPT_TYPE_IMX6DL;
-+
-+       mxc_timer_init_dt(np, type);
- }
- 
- static void __init imx6dl_timer_init_dt(struct device_node *np)
+This email and any attachments are intended for the sole use of the named recipient(s) and contain(s) confidential information that may be proprietary, privileged or copyrighted under applicable law. If you are not the intended recipient, do not read, copy, or forward this email message or any attachments. Delete this email message and any attachments immediately.
