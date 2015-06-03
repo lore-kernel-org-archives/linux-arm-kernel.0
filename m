@@ -1,57 +1,194 @@
-From: khilman@kernel.org (Kevin Hilman)
-Date: Wed, 03 Jun 2015 10:41:29 -0700
-Subject: [PATCH v2 05/12] ARM: imx: setup tctl register in device specific
- function
-In-Reply-To: <20150603061648.GA20344@dragon> (Shawn Guo's message of "Wed, 3
- Jun 2015 14:16:48 +0800")
-References: <1432308599-28643-1-git-send-email-shawn.guo@linaro.org>
- <1432308599-28643-6-git-send-email-shawn.guo@linaro.org>
- <CAMAWPa-1MPgzT1GJQx4SjmfQpj9zdwsAw-qvLWZjVhoM66nHsQ@mail.gmail.com>
- <20150602011139.GP16165@dragon>
- <CAMAWPa-BYPnsqSxQ_VTa37a=Xg8xgrSQkzQgX+_65koZCNxBEg@mail.gmail.com>
- <20150603061648.GA20344@dragon>
-Message-ID: <7heglsadva.fsf@deeprootsystems.com>
+From: lina.iyer@linaro.org (Lina Iyer)
+Date: Wed, 3 Jun 2015 12:38:59 -0600
+Subject: [RFC/PATCH V2] PM / Domains: Remove intermediate states from the
+ power off sequence
+In-Reply-To: <1432735844-21629-1-git-send-email-ulf.hansson@linaro.org>
+References: <1432735844-21629-1-git-send-email-ulf.hansson@linaro.org>
+Message-ID: <20150603183859.GR32700@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Shawn Guo <shawnguo@kernel.org> writes:
-
-> On Tue, Jun 02, 2015 at 08:56:02AM -0700, Kevin Hilman wrote:
->> I'm just using multi_v7_defconfig, and BROKEN is not set, but that
->> driver is still built because it's explicitly selected by ARCH_MXC:
->> 
->> $ git describe
->> next-20150601
->> $ rm build/.config
->> $ make ARCH=arm CROSS_COMPILE=arm-linux-gnueabi- O=build multi_v7_defconfig
->> make[1]: Entering directory `/work/kernel/next/build'
->>   GEN     ./Makefile
->> arch/arm/configs/multi_v7_defconfig:603:warning: override: reassigning
->> to symbol COMMON_CLK_QCOM
->> warning: (ARCH_MXC) selects CLKSRC_IMX_GPT which has unmet direct
->> dependencies (OF && BROKEN)
->> warning: (ARCH_MXC) selects CLKSRC_IMX_GPT which has unmet direct
->> dependencies (OF && BROKEN)
->> #
->> # configuration written to .config
->> #
->> make[1]: Leaving directory `/work/kernel/next/build'
->> $ grep CLKSRC_IMX_GPT build/.config
->> CONFIG_CLKSRC_IMX_GPT=y
->> $
+On Wed, May 27 2015 at 08:11 -0600, Ulf Hansson wrote:
+>Genpd's ->runtime_suspend() (assigned to pm_genpd_runtime_suspend())
+>doesn't immediately walk the hierarchy of ->runtime_suspend() callbacks.
+>Instead, pm_genpd_runtime_suspend() calls pm_genpd_poweroff() which
+>postpones that until *all* the devices in the genpd are runtime suspended.
 >
-> Yes, you're right.  It's broken on i.MX6DL/S indeed.  The cause is that
-> i.MX6DL/S DTBs are using the same GPT compatible string as i.MX6Q.  It
-> effectively makes kernel select an incorrect GPT device type on
-> i.MX6DL/S.  We will need to update i.MX6DL/S device tree to use
-> a correct compatible string.  But to keep the existing DTBs continue
-> working, we need the following change.  As I'm asked by Arnd to rebase
-> my branch, I would like fold the changes into the original patch to
-> save the git bisect issue.
+>When pm_genpd_poweroff() discovers that the last device in the genpd is
+>about to be runtime suspended, it calls __pm_genpd_save_device() for *all*
+>the devices in the genpd sequentially. Furthermore,
+>__pm_genpd_save_device() invokes the ->start() callback, walks the
+>hierarchy of the ->runtime_suspend() callbacks and invokes the ->stop()
+>callback. This causes a "thundering herd" problem.
+>
+>Let's address this issue by having pm_genpd_runtime_suspend() immediately
+>walk the hierarchy of the ->runtime_suspend() callbacks, instead of
+>postponing that to the power off sequence via pm_genpd_poweroff(). If the
+>selected ->runtime_suspend() callback doesn't return an error code, call
+>pm_genpd_poweroff() to see if it's feasible to also power off the PM
+>domain.
+>
+>Adopting this change enables us to simplify parts of the code in genpd,
+>for example the locking mechanism. Additionally, it gives some positive
+>side effects, as described below.
+>
+>i)
+>One device's ->runtime_resume() latency is no longer affected by other
+>devices' latencies in a genpd.
+>
+>The complexity genpd has to support the option to abort the power off
+>sequence suffers from latency issues. More precisely, a device that is
+>requested to be runtime resumed, may end up waiting for
+>__pm_genpd_save_device() to complete its operations for *another* device.
+>That's because pm_genpd_poweroff() can't confirm an abort request while it
+>waits for __pm_genpd_save_device() to return.
+>
+>As this patch removes the intermediate states in pm_genpd_poweroff() while
+>powering off the PM domain, we no longer need the ability to abort that
+>sequence.
+>
+>ii)
+>Make pm_runtime[_status]_suspended() reliable when used with genpd.
+>
+>Until the last device in a genpd becomes idle, pm_genpd_runtime_suspend()
+>will return 0 without actually walking the hierarchy of the
+>->runtime_suspend() callbacks. However, by returning 0 the runtime PM core
+>considers the device as runtime_suspended, so
+>pm_runtime[_status]_suspended() will return true, even though the device
+>isn't (yet) runtime suspended.
+>
+>After this patch, since pm_genpd_runtime_suspend() immediately walks the
+>hierarchy of the ->runtime_suspend() callbacks,
+>pm_runtime[_status]_suspended() will accurately reflect the status of the
+>device.
+>
+>iii)
+>Enable fine-grained PM through runtime PM callbacks in drivers/subsystems.
+>
+>There are currently cases were drivers/subsystems implements runtime PM
+>callbacks to deploy fine-grained PM (e.g. gate clocks, move pinctrl to
+>power-save state, etc.). While using the genpd, pm_genpd_runtime_suspend()
+>postpones invoking these callbacks until *all* the devices in the genpd
+>are runtime suspended. In essence, one runtime resumed device prevents
+>fine-grained PM for other devices within the same genpd.
+>
+>After this patch, since pm_genpd_runtime_suspend() immediately walks the
+>hierarchy of the ->runtime_suspend() callbacks, fine-grained PM is enabled
+>throughout all the levels of runtime PM callbacks.
+>
+>Unfortunately this patch also comes with a drawback, as described in the
+>summary below.
+>
+>Driver's/subsystem's runtime PM callbacks may be invoked even when the
+>genpd hasn't actually powered off the PM domain, potentially introducing
+>unnecessary latency.
+>
+>However, in most cases, saving/restoring register contexts for devices are
+>typically fast operations or can be optimized in device specific ways
+>(e.g. shadow copies of register contents in memory, device-specific checks
+>to see if context has been lost before restoring context, etc.).
+>
+>Still, in some cases the driver/subsystem may suffer from latency if
+>runtime PM is used in a very fine-grained manner (e.g. for each IO request
+>or xfer). To prevent that extra overhead, the driver/subsystem may deploy
+>the runtime PM autosuspend feature.
+>
+>Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
+>---
+>
+>Changes in v2:
+>	Updated the changelog and the commit message header.
+>	Header for v1 was "PM / Domains: Minimize latencies by not delaying
+>	save/restore".
+>
+>---
 
-I tried your patch on top of next-20150529 (where I originally found the
-issue) and it gets my wandboard dual and solo booting again.
+<...>
 
-Tested-by: Kevin Hilman <khilman@linaro.org>
+> static int __pm_genpd_poweron(struct generic_pm_domain *genpd)
+>-	__releases(&genpd->lock) __acquires(&genpd->lock)
+> {
+> 	struct gpd_link *link;
+>-	DEFINE_WAIT(wait);
+> 	int ret = 0;
+>
+>-	/* If the domain's master is being waited for, we have to wait too. */
+>-	for (;;) {
+>-		prepare_to_wait(&genpd->status_wait_queue, &wait,
+>-				TASK_UNINTERRUPTIBLE);
+>-		if (genpd->status != GPD_STATE_WAIT_MASTER)
+>-			break;
+>-		mutex_unlock(&genpd->lock);
+>-
+>-		schedule();
+>-
+>-		mutex_lock(&genpd->lock);
+>-	}
+>-	finish_wait(&genpd->status_wait_queue, &wait);
+>-
+> 	if (genpd->status == GPD_STATE_ACTIVE
+> 	    || (genpd->prepared_count > 0 && genpd->suspend_power_off))
+> 		return 0;
+>
+>-	if (genpd->status != GPD_STATE_POWER_OFF) {
+>-		genpd_set_active(genpd);
+>-		return 0;
+>-	}
+>-
+> 	if (genpd->cpuidle_data) {
+> 		cpuidle_pause_and_lock();
+> 		genpd->cpuidle_data->idle_state->disabled = true;
+>@@ -285,20 +229,8 @@ static int __pm_genpd_poweron(struct generic_pm_domain *genpd)
+> 	 */
+> 	list_for_each_entry(link, &genpd->slave_links, slave_node) {
+> 		genpd_sd_counter_inc(link->master);
+>-		genpd->status = GPD_STATE_WAIT_MASTER;
+>-
+>-		mutex_unlock(&genpd->lock);
+>
+> 		ret = pm_genpd_poweron(link->master);
+>-
+>-		mutex_lock(&genpd->lock);
+>-
+>-		/*
+>-		 * The "wait for parent" status is guaranteed not to change
+>-		 * while the master is powering on.
+>-		 */
+>-		genpd->status = GPD_STATE_POWER_OFF;
+>-		wake_up_all(&genpd->status_wait_queue);
+> 		if (ret) {
+> 			genpd_sd_counter_dec(link->master);
+> 			goto err;
+>@@ -310,14 +242,15 @@ static int __pm_genpd_poweron(struct generic_pm_domain *genpd)
+> 		goto err;
+>
+>  out:
+>-	genpd_set_active(genpd);
+>-
+>+	genpd->status = GPD_STATE_ACTIVE;
+> 	return 0;
+>
+>  err:
+> 	list_for_each_entry_continue_reverse(link, &genpd->slave_links, slave_node)
+> 		genpd_sd_counter_dec(link->master);
+>
+>+	/* In case we powered on a master, try to power it off again. */
+>+	pm_genpd_poweroff_unused();
+>
+This is an expensive operation, it locks the list and for each domain
+tries to power off the domain. You probably only need to traverse up the
+hierarchy of this domain to ensure that the parents domains do not
+remain unnecessarily powered on in this error clause.
 
-Kevin
+Also, the function uses mutex_locks to lock the genpd list. In the
+atomic genpd that I am proposing [1], we cannot call this function when
+the domain power_on fails.
+
+We probably need a function to recursively traverse the related domains
+and power them down. Probably look at a different place to
+opportunistically power down unused domains.
+
+Thanks,
+Lina
+
+[1]. http://www.spinics.net/lists/arm-kernel/msg423430.html
