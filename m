@@ -1,38 +1,70 @@
-From: tomi.valkeinen@ti.com (Tomi Valkeinen)
-Date: Wed, 3 Jun 2015 14:38:43 +0300
-Subject: [PATCH 2/4] video: fbdev: imxfb: Constify platform_device_id
-In-Reply-To: <20150505082807.GV4047@x1>
-References: <1430494721-30793-1-git-send-email-k.kozlowski.k@gmail.com>
- <1430494721-30793-2-git-send-email-k.kozlowski.k@gmail.com>
- <20150505082807.GV4047@x1>
-Message-ID: <556EE743.5030405@ti.com>
+From: jonathanh@nvidia.com (Jon Hunter)
+Date: Wed, 3 Jun 2015 12:44:48 +0100
+Subject: [PATCH] ARM: tegra: Enable CPUFreq support for Tegra124
+ Chromebooks
+In-Reply-To: <1433331821-9648-1-git-send-email-jonathanh@nvidia.com>
+References: <1433331821-9648-1-git-send-email-jonathanh@nvidia.com>
+Message-ID: <556EE8B0.2060205@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Lee,
+Adding LAKML. Jon
 
-On 05/05/15 11:28, Lee Jones wrote:
-> On Sat, 02 May 2015, Krzysztof Kozlowski wrote:
+On 03/06/15 12:43, Jon Hunter wrote:
+> Add the device-tree DFLL clock node and CPU regulator phandle for
+> tegra124 chromebooks to enable CPUFreq support on these boards.
 > 
->> The platform_device_id is not modified by the driver and core uses it as
->> const.
->>
->> Signed-off-by: Krzysztof Kozlowski <k.kozlowski.k@gmail.com>
->> ---
->>  drivers/video/fbdev/imxfb.c | 2 +-
->>  1 file changed, 1 insertion(+), 1 deletion(-)
+> Signed-off-by: Jon Hunter <jonathanh@nvidia.com>
 > 
-> Applied, thanks.
-
-You applied the fbdev changes in this series also, not only the
-backlight changes?
-
- Tomi
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150603/c312ae26/attachment.sig>
+> ---
+> This has been tested on a tegra124 nyan-big by using the userspace
+> CPUFreq governor with a simple CPU benchmark to measure the time taken
+> for the test to execute.
+> 
+> The tegra124 chromebooks use the same ams,as3722 PMIC as the Jetson TK1
+> board and hence, this change is based upon that for the Jetson TK1.
+> 
+>  arch/arm/boot/dts/tegra124-nyan.dtsi | 15 ++++++++++++++-
+>  1 file changed, 14 insertions(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm/boot/dts/tegra124-nyan.dtsi b/arch/arm/boot/dts/tegra124-nyan.dtsi
+> index a9aec23e06f2..40c23a0b7cfc 100644
+> --- a/arch/arm/boot/dts/tegra124-nyan.dtsi
+> +++ b/arch/arm/boot/dts/tegra124-nyan.dtsi
+> @@ -159,7 +159,7 @@
+>  				vin-ldo9-10-supply = <&vdd_5v0_sys>;
+>  				vin-ldo11-supply = <&vdd_3v3_run>;
+>  
+> -				sd0 {
+> +				vdd_cpu: sd0 {
+>  					regulator-name = "+VDD_CPU_AP";
+>  					regulator-min-microvolt = <700000>;
+>  					regulator-max-microvolt = <1350000>;
+> @@ -397,6 +397,13 @@
+>  		non-removable;
+>  	};
+>  
+> +	/* CPU DFLL clock */
+> +	clock at 0,70110000 {
+> +		status = "okay";
+> +		vdd-cpu-supply = <&vdd_cpu>;
+> +		nvidia,i2c-fs-rate = <400000>;
+> +	};
+> +
+>  	ahub at 0,70300000 {
+>  		i2s at 0,70301100 {
+>  			status = "okay";
+> @@ -487,6 +494,12 @@
+>  		};
+>  	};
+>  
+> +	cpus {
+> +		cpu at 0 {
+> +			vdd-cpu-supply = <&vdd_cpu>;
+> +		};
+> +	};
+> +
+>  	gpio-keys {
+>  		compatible = "gpio-keys";
+>  
+> 
