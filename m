@@ -1,68 +1,357 @@
-From: cyrille.pitchen@atmel.com (Cyrille Pitchen)
-Date: Wed, 3 Jun 2015 18:25:18 +0200
-Subject: [PATCH v5 2/6] i2c: at91: use BIT() macro to define register bits
-In-Reply-To: <cover.1433348016.git.cyrille.pitchen@atmel.com>
-References: <cover.1433348016.git.cyrille.pitchen@atmel.com>
-Message-ID: <45e14b45987fd18986aebfa08c67044433149457.1433348016.git.cyrille.pitchen@atmel.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed,  3 Jun 2015 09:23:17 -0700
+Subject: [PATCH 08/12] ARM: dts: Add minimal dm814x support
+In-Reply-To: <1433348601-8966-1-git-send-email-tony@atomide.com>
+References: <1433348601-8966-1-git-send-email-tony@atomide.com>
+Message-ID: <1433348601-8966-9-git-send-email-tony@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch just fixes typo before applying later patches which will use
-register bits with index above 16.
+Add minimal dm814x support.
 
-Signed-off-by: Cyrille Pitchen <cyrille.pitchen@atmel.com>
+Cc: Matthijs van Duin <matthijsvanduin@gmail.com>
+Signed-off-by: Tony Lindgren <tony@atomide.com>
 ---
- drivers/i2c/busses/i2c-at91.c | 29 +++++++++++++++--------------
- 1 file changed, 15 insertions(+), 14 deletions(-)
+ arch/arm/boot/dts/dm814x.dtsi | 331 ++++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 331 insertions(+)
+ create mode 100644 arch/arm/boot/dts/dm814x.dtsi
 
-diff --git a/drivers/i2c/busses/i2c-at91.c b/drivers/i2c/busses/i2c-at91.c
-index 9bd10a9..0e88b68 100644
---- a/drivers/i2c/busses/i2c-at91.c
-+++ b/drivers/i2c/busses/i2c-at91.c
-@@ -41,29 +41,30 @@
- 
- /* AT91 TWI register definitions */
- #define	AT91_TWI_CR		0x0000	/* Control Register */
--#define	AT91_TWI_START		0x0001	/* Send a Start Condition */
--#define	AT91_TWI_STOP		0x0002	/* Send a Stop Condition */
--#define	AT91_TWI_MSEN		0x0004	/* Master Transfer Enable */
--#define	AT91_TWI_SVDIS		0x0020	/* Slave Transfer Disable */
--#define	AT91_TWI_QUICK		0x0040	/* SMBus quick command */
--#define	AT91_TWI_SWRST		0x0080	/* Software Reset */
-+#define	AT91_TWI_START		BIT(0)	/* Send a Start Condition */
-+#define	AT91_TWI_STOP		BIT(1)	/* Send a Stop Condition */
-+#define	AT91_TWI_MSEN		BIT(2)	/* Master Transfer Enable */
-+#define	AT91_TWI_MSDIS		BIT(3)	/* Master Transfer Disable */
-+#define	AT91_TWI_SVEN		BIT(4)	/* Slave Transfer Enable */
-+#define	AT91_TWI_SVDIS		BIT(5)	/* Slave Transfer Disable */
-+#define	AT91_TWI_QUICK		BIT(6)	/* SMBus quick command */
-+#define	AT91_TWI_SWRST		BIT(7)	/* Software Reset */
- 
- #define	AT91_TWI_MMR		0x0004	/* Master Mode Register */
- #define	AT91_TWI_IADRSZ_1	0x0100	/* Internal Device Address Size */
--#define	AT91_TWI_MREAD		0x1000	/* Master Read Direction */
-+#define	AT91_TWI_MREAD		BIT(12)	/* Master Read Direction */
- 
- #define	AT91_TWI_IADR		0x000c	/* Internal Address Register */
- 
- #define	AT91_TWI_CWGR		0x0010	/* Clock Waveform Generator Reg */
- 
- #define	AT91_TWI_SR		0x0020	/* Status Register */
--#define	AT91_TWI_TXCOMP		0x0001	/* Transmission Complete */
--#define	AT91_TWI_RXRDY		0x0002	/* Receive Holding Register Ready */
--#define	AT91_TWI_TXRDY		0x0004	/* Transmit Holding Register Ready */
--
--#define	AT91_TWI_OVRE		0x0040	/* Overrun Error */
--#define	AT91_TWI_UNRE		0x0080	/* Underrun Error */
--#define	AT91_TWI_NACK		0x0100	/* Not Acknowledged */
-+#define	AT91_TWI_TXCOMP		BIT(0)	/* Transmission Complete */
-+#define	AT91_TWI_RXRDY		BIT(1)	/* Receive Holding Register Ready */
-+#define	AT91_TWI_TXRDY		BIT(2)	/* Transmit Holding Register Ready */
-+#define	AT91_TWI_OVRE		BIT(6)	/* Overrun Error */
-+#define	AT91_TWI_UNRE		BIT(7)	/* Underrun Error */
-+#define	AT91_TWI_NACK		BIT(8)	/* Not Acknowledged */
- 
- #define	AT91_TWI_INT_MASK \
- 	(AT91_TWI_TXCOMP | AT91_TWI_RXRDY | AT91_TWI_TXRDY | AT91_TWI_NACK)
+diff --git a/arch/arm/boot/dts/dm814x.dtsi b/arch/arm/boot/dts/dm814x.dtsi
+new file mode 100644
+index 0000000..f3077e3
+--- /dev/null
++++ b/arch/arm/boot/dts/dm814x.dtsi
+@@ -0,0 +1,331 @@
++/*
++ * This file is licensed under the terms of the GNU General Public License
++ * version 2.  This program is licensed "as is" without any warranty of any
++ * kind, whether express or implied.
++ */
++
++#include <dt-bindings/gpio/gpio.h>
++#include <dt-bindings/pinctrl/omap.h>
++
++#include "skeleton.dtsi"
++
++/ {
++	compatible = "ti,dm814";
++	interrupt-parent = <&intc>;
++
++	aliases {
++		i2c0 = &i2c1;
++		i2c1 = &i2c2;
++		serial0 = &uart1;
++		serial1 = &uart2;
++		serial2 = &uart3;
++		ethernet0 = &cpsw_emac0;
++		ethernet1 = &cpsw_emac1;
++	};
++
++	cpus {
++		#address-cells = <1>;
++		#size-cells = <0>;
++		cpu at 0 {
++			compatible = "arm,cortex-a8";
++			device_type = "cpu";
++			reg = <0>;
++		};
++	};
++
++	pmu {
++		compatible = "arm,cortex-a8-pmu";
++		interrupts = <3>;
++	};
++
++	/*
++	 * The soc node represents the soc top level view. It is used for IPs
++	 * that are not memory mapped in the MPU view or for the MPU itself.
++	 */
++	soc {
++		compatible = "ti,omap-infra";
++		mpu {
++			compatible = "ti,omap3-mpu";
++			ti,hwmods = "mpu";
++		};
++	};
++
++	ocp {
++		compatible = "simple-bus";
++		#address-cells = <1>;
++		#size-cells = <1>;
++		ranges;
++		ti,hwmods = "l3_main";
++
++		/*
++		 * See TRM "Table 1-317. L4LS Instance Summary", just deduct
++		 * 0x1000 from the 1-317 addresses to get the device address
++		 */
++		l4ls: l4ls at 48000000 {
++			compatible = "ti,dm814-l4ls", "simple-bus";
++			#address-cells = <1>;
++			#size-cells = <1>;
++			ranges = <0 0x48000000 0x2000000>;
++
++			i2c1: i2c at 28000 {
++				compatible = "ti,omap4-i2c";
++				#address-cells = <1>;
++				#size-cells = <0>;
++				ti,hwmods = "i2c1";
++				reg = <0x28000 0x1000>;
++				interrupts = <70>;
++			};
++
++			elm: elm at 80000 {
++				compatible = "ti,814-elm";
++				ti,hwmods = "elm";
++				reg = <0x80000 0x2000>;
++				interrupts = <4>;
++			};
++
++			gpio1: gpio at 32000 {
++				compatible = "ti,omap4-gpio";
++				ti,hwmods = "gpio1";
++				ti,gpio-always-on;
++				reg = <0x32000 0x2000>;
++				interrupts = <96>;
++				gpio-controller;
++				#gpio-cells = <2>;
++				interrupt-controller;
++				#interrupt-cells = <2>;
++			};
++
++			gpio2: gpio at 4c000 {
++				compatible = "ti,omap4-gpio";
++				ti,hwmods = "gpio2";
++				ti,gpio-always-on;
++				reg = <0x4c000 0x2000>;
++				interrupts = <98>;
++				gpio-controller;
++				#gpio-cells = <2>;
++				interrupt-controller;
++				#interrupt-cells = <2>;
++			};
++
++			i2c2: i2c at 2a000 {
++				compatible = "ti,omap4-i2c";
++				#address-cells = <1>;
++				#size-cells = <0>;
++				ti,hwmods = "i2c2";
++				reg = <0x2a000 0x1000>;
++				interrupts = <71>;
++			};
++
++			mcspi1: spi at 30000 {
++				compatible = "ti,omap4-mcspi";
++				reg = <0x30000 0x1000>;
++				#address-cells = <1>;
++				#size-cells = <0>;
++				interrupts = <65>;
++				ti,spi-num-cs = <4>;
++				ti,hwmods = "mcspi1";
++				dmas = <&edma 16 &edma 17
++					&edma 18 &edma 19>;
++				dma-names = "tx0", "rx0", "tx1", "rx1";
++			};
++
++			timer1: timer at 2e000 {
++				compatible = "ti,dm814-timer";
++				reg = <0x2e000 0x2000>;
++				interrupts = <67>;
++				ti,hwmods = "timer1";
++				ti,timer-alwon;
++			};
++
++			uart1: uart at 20000 {
++				compatible = "ti,omap3-uart";
++				ti,hwmods = "uart1";
++				reg = <0x20000 0x2000>;
++				clock-frequency = <48000000>;
++				interrupts = <72>;
++				dmas = <&edma 26 &edma 27>;
++				dma-names = "tx", "rx";
++			};
++
++			uart2: uart at 22000 {
++				compatible = "ti,omap3-uart";
++				ti,hwmods = "uart2";
++				reg = <0x22000 0x2000>;
++				clock-frequency = <48000000>;
++				interrupts = <73>;
++				dmas = <&edma 28 &edma 29>;
++				dma-names = "tx", "rx";
++			};
++
++			uart3: uart at 24000 {
++				compatible = "ti,omap3-uart";
++				ti,hwmods = "uart3";
++				reg = <0x24000 0x2000>;
++				clock-frequency = <48000000>;
++				interrupts = <74>;
++				dmas = <&edma 30 &edma 31>;
++				dma-names = "tx", "rx";
++			};
++
++			timer2: timer at 40000 {
++				compatible = "ti,dm814-timer";
++				reg = <0x40000 0x2000>;
++				interrupts = <68>;
++				ti,hwmods = "timer2";
++			};
++
++			timer3: timer at 42000 {
++				compatible = "ti,dm814-timer";
++				reg = <0x42000 0x2000>;
++				interrupts = <69>;
++				ti,hwmods = "timer3";
++			};
++
++			control: control at 160000 {
++				compatible = "ti,dm814-scm", "simple-bus";
++				reg = <0x160000 0x16d000>;
++				#address-cells = <1>;
++				#size-cells = <1>;
++				ranges = <0 0x160000 0x16d000>;
++
++				scm_conf: scm_conf at 0 {
++					compatible = "syscon";
++					reg = <0x0 0x800>;
++					#address-cells = <1>;
++					#size-cells = <1>;
++
++					scm_clocks: clocks {
++						#address-cells = <1>;
++						#size-cells = <0>;
++					};
++
++					scm_clockdomains: clockdomains {
++					};
++				};
++
++				pincntl: pinmux at 800 {
++					compatible = "pinctrl-single";
++					reg = <0x800 0xc38>;
++					#address-cells = <1>;
++					#size-cells = <0>;
++					pinctrl-single,register-width = <32>;
++					pinctrl-single,function-mask = <0x300ff>;
++				};
++			};
++
++			prcm: prcm at 180000 {
++				compatible = "ti,dm814-prcm", "simple-bus";
++				reg = <0x180000 0x4000>;
++
++				prcm_clocks: clocks {
++					#address-cells = <1>;
++					#size-cells = <0>;
++				};
++
++				prcm_clockdomains: clockdomains {
++				};
++			};
++
++			pllss: pllss at 1c5000 {
++				compatible = "ti,dm814-pllss", "simple-bus";
++				reg = <0x1c5000 0x2000>;
++
++				pllss_clocks: clocks {
++					#address-cells = <1>;
++					#size-cells = <0>;
++				};
++
++				pllss_clockdomains: clockdomains {
++				};
++			};
++
++			wdt1: wdt at 1c7000 {
++				compatible = "ti,omap3-wdt";
++				ti,hwmods = "wd_timer";
++				reg = <0x1c7000 0x1000>;
++				interrupts = <91>;
++			};
++		};
++
++		intc: interrupt-controller at 48200000 {
++			compatible = "ti,dm814-intc";
++			interrupt-controller;
++			#interrupt-cells = <1>;
++			reg = <0x48200000 0x1000>;
++		};
++
++		edma: edma at 49000000 {
++			compatible = "ti,edma3";
++			ti,hwmods = "tpcc", "tptc0", "tptc1", "tptc2";
++			reg =	<0x49000000 0x10000>,
++				<0x44e10f90 0x40>;
++			interrupts = <12 13 14>;
++			#dma-cells = <1>;
++		};
++
++		/* See TRM "Table 1-318. L4HS Instance Summary" */
++		l4hs: l4hs at 4a000000 {
++			compatible = "ti,dm814-l4hs", "simple-bus";
++			#address-cells = <1>;
++			#size-cells = <1>;
++			ranges = <0 0x4a000000 0x1b4040>;
++		};
++
++		/* REVISIT: Move to live under l4hs once driver is fixed */
++		mac: ethernet at 4a100000 {
++			compatible = "ti,cpsw";
++			ti,hwmods = "cpgmac0";
++			clocks = <&cpsw_125mhz_gclk>, <&cpsw_cpts_rft_clk>;
++			clock-names = "fck", "cpts";
++			cpdma_channels = <8>;
++			ale_entries = <1024>;
++			bd_ram_size = <0x2000>;
++			no_bd_ram = <0>;
++			rx_descs = <64>;
++			mac_control = <0x20>;
++			slaves = <2>;
++			active_slave = <0>;
++			cpts_clock_mult = <0x80000000>;
++			cpts_clock_shift = <29>;
++			reg = <0x4a100000 0x800
++			       0x4a100900 0x100>;
++			#address-cells = <1>;
++			#size-cells = <1>;
++			interrupt-parent = <&intc>;
++			/*
++			 * c0_rx_thresh_pend
++			 * c0_rx_pend
++			 * c0_tx_pend
++			 * c0_misc_pend
++			 */
++			interrupts = <40 41 42 43>;
++			ranges;
++			syscon = <&scm_conf>;
++
++			davinci_mdio: mdio at 4a100800 {
++				compatible = "ti,davinci_mdio";
++				#address-cells = <1>;
++				#size-cells = <0>;
++				ti,hwmods = "davinci_mdio";
++				bus_freq = <1000000>;
++				reg = <0x4a100800 0x100>;
++			};
++
++			cpsw_emac0: slave at 4a100200 {
++				/* Filled in by U-Boot */
++				mac-address = [ 00 00 00 00 00 00 ];
++			};
++
++			cpsw_emac1: slave at 4a100300 {
++				/* Filled in by U-Boot */
++				mac-address = [ 00 00 00 00 00 00 ];
++			};
++
++			phy_sel: cpsw-phy-sel at 0x48160650 {
++				compatible = "ti,am3352-cpsw-phy-sel";
++				reg= <0x48160650 0x4>;
++				reg-names = "gmii-sel";
++			};
++		};
++	};
++};
 -- 
-1.8.2.2
+2.1.4
