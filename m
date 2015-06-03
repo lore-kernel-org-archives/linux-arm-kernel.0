@@ -1,46 +1,71 @@
-From: jistone@redhat.com (Josh Stone)
-Date: Wed, 03 Jun 2015 13:03:49 -0700
-Subject: [PATCH] arm64: fix missing syscall trace exit
-In-Reply-To: <20150603095241.GD17581@arm.com>
-References: <20150601102448.GG1641@arm.com>
- <1433293304-26539-1-git-send-email-jistone@redhat.com>
- <556E5454.9080400@redhat.com> <20150603095241.GD17581@arm.com>
-Message-ID: <556F5DA5.2050207@redhat.com>
+From: ahs3@redhat.com (Al Stone)
+Date: Wed, 03 Jun 2015 14:27:30 -0600
+Subject: [Patch v4 0/8] Consolidate ACPI PCI root common code into ACPI
+ core
+In-Reply-To: <1433225576-8215-1-git-send-email-jiang.liu@linux.intel.com>
+References: <1433225576-8215-1-git-send-email-jiang.liu@linux.intel.com>
+Message-ID: <556F6332.2040501@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/03/2015 02:52 AM, Will Deacon wrote:
-> On Wed, Jun 03, 2015 at 02:11:48AM +0100, Josh Stone wrote:
->> On 06/02/2015 06:01 PM, Josh Stone wrote:
->>>  ret_fast_syscall:
->>>  	disable_irq				// disable interrupts
->>> -	ldr	x1, [tsk, #TI_FLAGS]
->>> +	ldr	x1, [tsk, #TI_FLAGS]		// re-check for syscall tracing
->>> +	and	x2, x1, #_TIF_SYSCALL_WORK
->>> +	cbnz	x2, __sys_trace_return
->>>  	and	x2, x1, #_TIF_WORK_MASK
->>>  	cbnz	x2, fast_work_pending
->>>  	enable_step_tsk x1, x2
->>
->> I do have one concern about this, also in Russell's ARM patch.  Is it
->> really ok to branch to __sys_trace_return with interrupts disabled?
-> 
-> I think you're right to be concerned!
-> 
->> I didn't hit any issue from that, but my testcase only exercises this
->> path once each run.  So that might have just been lucky not to hit any
->> gross scenario...
-> 
-> Did you try enabling all the audit stuff? It looks like that can call
-> into the scheduler, so I think we should be running the tracing callbacks
-> with interrupts enabled (and it looks like x86 do this on the exit path).
+On 06/02/2015 12:12 AM, Jiang Liu wrote:
+> This patch set consolidates common code to support ACPI PCI root on x86
+> and IA64 platforms into ACPI core, to reproduce duplicated code and
+> simplify maintenance. And a patch set based on this to support ACPI based
+> PCIe host bridge on ARM64 has been posted at:
 
-This particular path only applies if you entered the syscall *without*
-any tracing, which is what makes it pretty much a oneshot.  You'd have
-to arrange for audit enabling in the middle of a syscall to see it.  My
-ptrace test is easier because working from PTRACE_EVENT_FORK is always
-in the middle of the fork syscall.
+Link is missing (or it's a typo of some flavor).
 
-But anyway, I agree interrupts should be enabled -- I'll work on this.
-Then after __sys_trace_return jumps to ret_from_user, they'll be
-disabled again.  Likewise for arm32 jumping to ret_slow_syscall.
+> It's based on latest mainstream kernel. It passes Fengguang's 0day test
+> suite and has been tested on two IA64 platforms and one x86 platform.
+> 
+> V3->V4:
+> 1) Add patch[05/08] support solve building issue on ARM64
+> 2) Solve an implicitly pointer cast issue.
+> 3) Rebase to latest mainstream kernel
+> 
+> V2->V3:
+> 1. Move memory allocation/free from ACPI core into arch
+> 2. Kill the field 'segment' in struct pci_root_info on x86
+> 
+> Thanks!
+> Gerry
+> 
+> Hanjun Guo (1):
+>   ARM64 / PCI: introduce struct pci_controller for ACPI
+> 
+> Jiang Liu (7):
+>   ACPI/PCI: Enhance ACPI core to support sparse IO space
+>   ia64/PCI/ACPI: Use common ACPI resource parsing interface for host
+>     bridge
+>   ia64/PCI: Use common struct resource_entry to replace struct
+>     iospace_resource
+>   x86/PCI: Rename struct pci_sysdata as struct pci_controller
+>   PCI/ACPI: Consolidate common PCI host bridge code into ACPI core
+>   x86/PCI/ACPI: Use common interface to support PCI host bridge
+>   ia64/PCI/ACPI: Use common interface to support PCI host bridge
+> 
+>  arch/arm64/include/asm/pci.h  |   10 ++
+>  arch/ia64/include/asm/pci.h   |    5 -
+>  arch/ia64/pci/pci.c           |  364 +++++++++++------------------------------
+>  arch/x86/include/asm/pci.h    |   13 +-
+>  arch/x86/include/asm/pci_64.h |    4 +-
+>  arch/x86/pci/acpi.c           |  295 ++++++++++-----------------------
+>  arch/x86/pci/common.c         |    2 +-
+>  drivers/acpi/pci_root.c       |  200 ++++++++++++++++++++++
+>  drivers/acpi/resource.c       |    9 +-
+>  include/linux/ioport.h        |    1 +
+>  include/linux/pci-acpi.h      |   23 +++
+>  11 files changed, 432 insertions(+), 494 deletions(-)
+> 
+
+
+-- 
+ciao,
+al
+-----------------------------------
+Al Stone
+Software Engineer
+Red Hat, Inc.
+ahs3 at redhat.com
+-----------------------------------
