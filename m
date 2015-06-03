@@ -1,58 +1,50 @@
-From: marex@denx.de (Marek Vasut)
-Date: Thu, 4 Jun 2015 01:03:09 +0200
-Subject: [PATCH 08/11] MTD: m25p80: Add option to limit SPI transfer size.
-In-Reply-To: <8fc4b9f5291a509c4c35782a1337bf536f1019af.1433364398.git.hramrach@gmail.com>
-References: <cover.1433364398.git.hramrach@gmail.com>
- <8fc4b9f5291a509c4c35782a1337bf536f1019af.1433364398.git.hramrach@gmail.com>
-Message-ID: <201506040103.09555.marex@denx.de>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Wed, 3 Jun 2015 16:44:27 -0700
+Subject: [PATCH 5/5] [RFC] ARM: timer-sp: Use of_clk_get_parent_count()
+ instead of open coding
+In-Reply-To: <1432891549-23295-6-git-send-email-geert+renesas@glider.be>
+References: <1432891549-23295-1-git-send-email-geert+renesas@glider.be>
+ <1432891549-23295-6-git-send-email-geert+renesas@glider.be>
+Message-ID: <20150603234426.GB490@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday, June 03, 2015 at 11:26:41 PM, Michal Suchanek wrote:
-> On sunxi the SPI controller currently does not have DMA support and fails
-> any transfer larger than 63 bytes.
-> 
-> On Exynos the pl330 DMA controller fails any transfer larger than 64kb
-> when using slower speed like 40MHz and any transfer larger than 128bytes
-> when running at 133MHz.
-
-This smells more like some corruption of the data on the bus or something
-even more obscure.
-
-> The best thing is that in both cases the controller can just lock up and
-> never finish potentially leaving the hardware in unusable state.
-> 
-> So it is required that the m25p80 driver actively prevents doing
-> transfers that are too large for the current driver state on a
-> particular piece of hardware.
-> 
-> Signed-off-by: Michal Suchanek <hramrach@gmail.com>
-> 
-> --
-> 
-> Update commit message and documentation text.
+On 05/29, Geert Uytterhoeven wrote:
+> Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
 > ---
->  .../devicetree/bindings/mtd/jedec,spi-nor.txt      |  6 ++++++
->  drivers/mtd/devices/m25p80.c                       | 24
-> ++++++++++++++++++++-- 2 files changed, 28 insertions(+), 2 deletions(-)
+> This is an RFC, as it depends on "[RFC] clk: Provide dummy
+> of_clk_get_parent_count() for !OF/!CCF".
+> ---
+>  arch/arm/common/timer-sp.c | 3 ++-
+>  1 file changed, 2 insertions(+), 1 deletion(-)
 > 
-> diff --git a/Documentation/devicetree/bindings/mtd/jedec,spi-nor.txt
-> b/Documentation/devicetree/bindings/mtd/jedec,spi-nor.txt index
-> 2bee681..4e63ae8 100644
-> --- a/Documentation/devicetree/bindings/mtd/jedec,spi-nor.txt
-> +++ b/Documentation/devicetree/bindings/mtd/jedec,spi-nor.txt
-> @@ -19,6 +19,12 @@ Optional properties:
->                     all chips and support for it can not be detected at
-> runtime. Refer to your chips' datasheet to check if this is supported by
-> your chip.
-> +- linux,max_tx_len : With some SPI controller drivers possible transfer
-> size is +                     limited. This may be hardware or driver bug.
-> +                     Transfer data in chunks no larger than this value. +
->                     Using this option may severely degrade performance and
-> +                     possibly flash memory life when max_tx_len is
-> smaller than +                     flash page size (typically 256 bytes)
+> diff --git a/arch/arm/common/timer-sp.c b/arch/arm/common/timer-sp.c
+> index 19211324772f387c..be87a5d480ffb655 100644
+> --- a/arch/arm/common/timer-sp.c
+> +++ b/arch/arm/common/timer-sp.c
+> @@ -21,6 +21,7 @@
+>  #include <linux/clk.h>
+>  #include <linux/clocksource.h>
+>  #include <linux/clockchips.h>
+> +#include <linux/clk-provider.h>
 
-Will we need similar patch for all other SPI slave drivers, like SPI NAND ?
+This looks weird. This is not a clock provider.
 
-Best regards,
-Marek Vasut
+>  #include <linux/err.h>
+>  #include <linux/interrupt.h>
+>  #include <linux/irq.h>
+> @@ -234,7 +235,7 @@ static void __init sp804_of_init(struct device_node *np)
+>  		clk1 = NULL;
+>  
+>  	/* Get the 2nd clock if the timer has 3 timer clocks */
+> -	if (of_count_phandle_with_args(np, "clocks", "#clock-cells") == 3) {
+> +	if (of_clk_get_parent_count(np) == 3) {
+
+So maybe it means if we want to expose of_clk_get_parent_count()
+we should move it to some other header file (of_clk.h?). And then
+maybe we should always compile said helpers if OF=y and
+HAVE_CLK=y.
+
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
