@@ -1,32 +1,40 @@
-From: pratyush.anand@gmail.com (Pratyush Anand)
-Date: Wed, 3 Jun 2015 17:15:52 +0530
-Subject: [PATCH Part1 v11 3/5] PCI: designware: Use pci_scan_root_bus()
- for simplicity
-In-Reply-To: <000301d09888$09d01370$1d703a50$@com>
-References: <000301d09888$09d01370$1d703a50$@com>
-Message-ID: <CAHM4w1mGB1GET6s-rkLs-0=Cqc4-zEm5q9-i8vxpFGgjf-V8JA@mail.gmail.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Wed, 3 Jun 2015 12:50:50 +0100
+Subject: [PATCH 2/4] video: fbdev: imxfb: Constify platform_device_id
+In-Reply-To: <556EE743.5030405@ti.com>
+References: <1430494721-30793-1-git-send-email-k.kozlowski.k@gmail.com>
+ <1430494721-30793-2-git-send-email-k.kozlowski.k@gmail.com>
+ <20150505082807.GV4047@x1> <556EE743.5030405@ti.com>
+Message-ID: <20150603115050.GB12304@x1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 27, 2015 at 7:48 PM, Jingoo Han <jingoohan1@gmail.com> wrote:
-> On Tue, 28 Apr 2015 15:01:37 +0800, Yijing Wang wrote:
->
->> Pci_bus_add_devices() was ripped out of pci_scan_root_bus().
->> Now pci_scan_root_bus() == pci_create_root_bus() +
->> pci_scan_child_bus() if busn resource is supplied.
->> Designware added the busn resource to resources list
->> in dw_pcie_setup(). So it should be safe to use
->> pci_scan_root_bus() instead.
->>
->> Signed-off-by: Yijing Wang <wangyijing@huawei.com>
->> CC: Mohit Kumar <mohit.kumar@st.com>
->> CC: Jingoo Han <jg1.han@samsung.com>
->
-> +cc: Pratyush Anand, Lucas Stach
->
-> Acked-by: Jingoo Han <jingoohan1@gmail.com>
+On Wed, 03 Jun 2015, Tomi Valkeinen wrote:
 
+> Hi Lee,
+> 
+> On 05/05/15 11:28, Lee Jones wrote:
+> > On Sat, 02 May 2015, Krzysztof Kozlowski wrote:
+> > 
+> >> The platform_device_id is not modified by the driver and core uses it as
+> >> const.
+> >>
+> >> Signed-off-by: Krzysztof Kozlowski <k.kozlowski.k@gmail.com>
+> >> ---
+> >>  drivers/video/fbdev/imxfb.c | 2 +-
+> >>  1 file changed, 1 insertion(+), 1 deletion(-)
+> > 
+> > Applied, thanks.
+> 
+> You applied the fbdev changes in this series also, not only the
+> backlight changes?
 
+Ah, yes I did.  I assumed they were all due for Backlight.
 
-Looks fine to me:
-Acked-by: Pratyush Anand <pratyush.anand@gmail.com>
+Would you like me to un-apply the non-Backlight patches?
+
+-- 
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
