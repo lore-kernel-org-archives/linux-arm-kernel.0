@@ -1,41 +1,47 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Wed, 03 Jun 2015 22:08:40 +0300
-Subject: [PATCH 02/12] ARM: OMAP2+: Fix scrm compatible for dm814x
-In-Reply-To: <1433348601-8966-3-git-send-email-tony@atomide.com>
-References: <1433348601-8966-1-git-send-email-tony@atomide.com>
- <1433348601-8966-3-git-send-email-tony@atomide.com>
-Message-ID: <556F50B8.6000903@cogentembedded.com>
+From: paul.gortmaker@windriver.com (Paul Gortmaker)
+Date: Wed, 3 Jun 2015 15:09:38 -0400
+Subject: [PATCH] drivers/clk: convert sunxi/clk-mod0.c to use
+ builtin_platform_driver
+In-Reply-To: <1431287385-1526-1-git-send-email-paul.gortmaker@windriver.com>
+References: <1431287385-1526-1-git-send-email-paul.gortmaker@windriver.com>
+Message-ID: <1433358578-9579-1-git-send-email-paul.gortmaker@windriver.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+This driver builds based on obj-y and hence will not ever be
+modular.  Change it to use the non-modular registration so that it
+won't suffer a compile fail once a header move places the modular
+registration within the module.h file.
 
-On 06/03/2015 07:23 PM, Tony Lindgren wrote:
+Cc: "Emilio L?pez" <emilio@elopez.com.ar>
+Cc: Mike Turquette <mturquette@linaro.org>
+Cc: Stephen Boyd <sboyd@codeaurora.org>
+Cc: Maxime Ripard <maxime.ripard@free-electrons.com>
+Cc: linux-clk at vger.kernel.org
+Cc: linux-arm-kernel at lists.infradead.org
+Signed-off-by: Paul Gortmaker <paul.gortmaker@windriver.com>
+---
 
-> Fix scrm compatible for dm814x.
+[appending this to the builtin_platform_driver series of commits; see
+ https://lkml.kernel.org/r/1431287385-1526-1-git-send-email-paul.gortmaker at windriver.com
+ for original series posting.  The final header move can be found at:
+ https://lkml.kernel.org/r/1433276168-21550-1-git-send-email-paul.gortmaker at windriver.com ]
 
-    So, scrm...
+ drivers/clk/sunxi/clk-mod0.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-> Cc: Matthijs van Duin <matthijsvanduin@gmail.com>
-> Signed-off-by: Tony Lindgren <tony@atomide.com>
-> ---
->   arch/arm/mach-omap2/control.c | 1 +
->   1 file changed, 1 insertion(+)
->
-> diff --git a/arch/arm/mach-omap2/control.c b/arch/arm/mach-omap2/control.c
-> index af95a62..364925c 100644
-> --- a/arch/arm/mach-omap2/control.c
-> +++ b/arch/arm/mach-omap2/control.c
-> @@ -649,6 +649,7 @@ static const struct of_device_id omap_scrm_dt_match_table[] = {
->   	{ .compatible = "ti,am4-scm", .data = &ctrl_data },
->   	{ .compatible = "ti,omap2-scm", .data = &omap2_ctrl_data },
->   	{ .compatible = "ti,omap3-scm", .data = &omap2_ctrl_data },
-> +	{ .compatible = "ti,dm814-scm", .data = &ctrl_data },
-
-    ... or scm? :-)
-
->   	{ .compatible = "ti,dm816-scrm", .data = &ctrl_data },
->   	{ .compatible = "ti,omap4-scm-core", .data = &ctrl_data },
->   	{ .compatible = "ti,omap5-scm-core", .data = &ctrl_data },
-
-WBR, Sergei
+diff --git a/drivers/clk/sunxi/clk-mod0.c b/drivers/clk/sunxi/clk-mod0.c
+index ec8f5a1fca09..9d028aec58e5 100644
+--- a/drivers/clk/sunxi/clk-mod0.c
++++ b/drivers/clk/sunxi/clk-mod0.c
+@@ -128,7 +128,7 @@ static struct platform_driver sun4i_a10_mod0_clk_driver = {
+ 	},
+ 	.probe = sun4i_a10_mod0_clk_probe,
+ };
+-module_platform_driver(sun4i_a10_mod0_clk_driver);
++builtin_platform_driver(sun4i_a10_mod0_clk_driver);
+ 
+ static const struct factors_data sun9i_a80_mod0_data __initconst = {
+ 	.enable = 31,
+-- 
+2.2.1
