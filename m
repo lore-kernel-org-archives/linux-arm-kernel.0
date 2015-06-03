@@ -1,46 +1,57 @@
-From: jistone@redhat.com (Josh Stone)
-Date: Tue,  2 Jun 2015 18:01:44 -0700
-Subject: [PATCH] arm64: fix missing syscall trace exit
-In-Reply-To: <20150601102448.GG1641@arm.com>
-References: <20150601102448.GG1641@arm.com>
-Message-ID: <1433293304-26539-1-git-send-email-jistone@redhat.com>
+From: kgene@kernel.org (Kukjin Kim)
+Date: Wed, 03 Jun 2015 10:04:12 +0900
+Subject: [PATCH 2/2] ARM: multi_v7_defconfig: Enable display on Trats2board
+In-Reply-To: <6222475.TyjQftkmuB@wuerfel>
+References: <1432255718-11695-1-git-send-email-k.kozlowski@samsung.com>
+ <555EF2B5.1000504@collabora.co.uk> <555FE392.5030409@kernel.org>
+ <6222475.TyjQftkmuB@wuerfel>
+Message-ID: <556E528C.6020806@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-If a syscall is entered without TIF_SYSCALL_TRACE set, then it goes on
-the fast path.  It's then possible to have TIF_SYSCALL_TRACE added in
-the middle of the syscall, but ret_fast_syscall doesn't check this flag
-again.  This causes a ptrace syscall-exit-stop to be missed.
+On 05/24/15 05:27, Arnd Bergmann wrote:
+> On Saturday 23 May 2015 11:18:58 Kukjin Kim wrote:
+>> On 05/22/15 18:11, Javier Martinez Canillas wrote:
+>>> Hello Krzysztof,
+>>>
+>>> On 05/22/2015 02:48 AM, Krzysztof Kozlowski wrote:
+>>>> Enable the Exynos DSI and S6E8AA0 panel for full X11 display on Trats2.
+>>>>
+>>>> Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+>>>> ---
+>>>>  arch/arm/configs/multi_v7_defconfig | 2 ++
+>>>>  1 file changed, 2 insertions(+)
+>>>>
+>>>> diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
+>>>> index 0848337a2a01..e9785020aab1 100644
+>>>> --- a/arch/arm/configs/multi_v7_defconfig
+>>>> +++ b/arch/arm/configs/multi_v7_defconfig
+>>>> @@ -413,10 +413,12 @@ CONFIG_DRM=y
+>>>>  CONFIG_DRM_PTN3460=m
+>>>>  CONFIG_DRM_PS8622=m
+>>>>  CONFIG_DRM_EXYNOS=m
+>>>> +CONFIG_DRM_EXYNOS_DSI=y
+>>>>  CONFIG_DRM_EXYNOS_FIMD=y
+>>>>  CONFIG_DRM_EXYNOS_HDMI=y
+>>>>  CONFIG_DRM_RCAR_DU=m
+>>>>  CONFIG_DRM_TEGRA=y
+>>>> +CONFIG_DRM_PANEL_S6E8AA0=m
+>>>>  CONFIG_DRM_PANEL_SIMPLE=y
+>>>>  CONFIG_FB_ARMCLCD=y
+>>>>  CONFIG_FB_WM8505=y
+>>>>
+>>>
+>>> Reviewed-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
+>>>
+>> Looks good to me and this would be handled by arm-soc guys directly 
+>>
+>> Acked-by: Kukjin Kim <kgene@kernel.org>
+>>
+> 
+> I'd actually prefer if you could put this into the same branch as your
+> other defconfig changes. We'll handle any conflicts when merging that in.
+> 
+OK, done.
 
-For instance, from a PTRACE_EVENT_FORK reported during do_fork, the
-tracer might resume with PTRACE_SYSCALL, setting TIF_SYSCALL_TRACE.
-Now the completion of the fork should have a syscall-exit-stop.
-
-Russell King fixed this on arm by re-checking _TIF_SYSCALL_WORK in the
-fast exit path.  Do the same on arm64.
-
-Cc: Catalin Marinas <catalin.marinas@arm.com>
-Cc: Will Deacon <will.deacon@arm.com>
-Cc: Russell King <rmk@arm.linux.org.uk>
-Signed-off-by: Josh Stone <jistone@redhat.com>
----
- arch/arm64/kernel/entry.S | 4 +++-
- 1 file changed, 3 insertions(+), 1 deletion(-)
-
-diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
-index 959fe8733560..a547a3e8a198 100644
---- a/arch/arm64/kernel/entry.S
-+++ b/arch/arm64/kernel/entry.S
-@@ -608,7 +608,9 @@ ENDPROC(cpu_switch_to)
-  */
- ret_fast_syscall:
- 	disable_irq				// disable interrupts
--	ldr	x1, [tsk, #TI_FLAGS]
-+	ldr	x1, [tsk, #TI_FLAGS]		// re-check for syscall tracing
-+	and	x2, x1, #_TIF_SYSCALL_WORK
-+	cbnz	x2, __sys_trace_return
- 	and	x2, x1, #_TIF_WORK_MASK
- 	cbnz	x2, fast_work_pending
- 	enable_step_tsk x1, x2
--- 
-2.4.1
+Thanks,
+Kukjin
