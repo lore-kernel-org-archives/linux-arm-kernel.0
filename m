@@ -1,106 +1,60 @@
 From: hdegoede@redhat.com (Hans de Goede)
-Date: Wed, 03 Jun 2015 09:20:44 +0200
-Subject: [linux-sunxi] Re: [PATCH 1/3] phy: sun4i-usb: Add support for
- sun8i A23/A33
-In-Reply-To: <CAGb2v65NYoKcFn5kKtKoHs2vvWroMeecH2qtjH=MtnafuwdxCw@mail.gmail.com>
-References: <1433248152-13753-1-git-send-email-wens@csie.org>
- <1433248152-13753-2-git-send-email-wens@csie.org>
- <556E00CA.2000309@redhat.com>
- <CAGb2v65NYoKcFn5kKtKoHs2vvWroMeecH2qtjH=MtnafuwdxCw@mail.gmail.com>
-Message-ID: <556EAACC.3030808@redhat.com>
+Date: Wed, 03 Jun 2015 09:22:35 +0200
+Subject: [linux-sunxi] Re: [PATCH] ARM: dts: sun6i: Add a dts file for
+ the Mele A1000G quad top set box
+In-Reply-To: <20150602214946.GF23777@lukather>
+References: <1433170979-13725-1-git-send-email-hdegoede@redhat.com>
+ <20150602155816.GC23777@lukather> <556DF6DB.8040601@redhat.com>
+ <20150602214946.GF23777@lukather>
+Message-ID: <556EAB3B.1050708@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi,
 
-On 03-06-15 03:49, Chen-Yu Tsai wrote:
-> Hi,
->
-> On Wed, Jun 3, 2015 at 3:15 AM, Hans de Goede <hdegoede@redhat.com> wrote:
+On 02-06-15 23:49, Maxime Ripard wrote:
+> On Tue, Jun 02, 2015 at 08:32:59PM +0200, Hans de Goede wrote:
 >> Hi,
 >>
->> On 06/02/2015 02:29 PM, Chen-Yu Tsai wrote:
+>> On 06/02/2015 05:58 PM, Maxime Ripard wrote:
+>>> On Mon, Jun 01, 2015 at 05:02:59PM +0200, Hans de Goede wrote:
+>>>> The Mele A1000G-quad and the Mele M9 have the same PCB, sofar we've been using
+>>>> the same dts for both models. Unfortunately this does not work for the otg
+>>>> controller, on the M9 this is routed to a micro-usb connector on the outside,
+>>>> while as on the A1000G-quad it is connected to an usb to sata bridge
+>>>> (which is not populated on the M9 pcb).
+>>>>
+>>>> This commit adds a new dts for the Mele-A1000G-quad to allow using
+>>>> different otg controller settings on the 2 boards.
+>>>>
+>>>> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+>>>> ---
+>>>>   arch/arm/boot/dts/Makefile                                        | 1 +
+>>>>   arch/arm/boot/dts/{sun6i-a31-m9.dts => sun6i-a31-a1000g-quad.dts} | 4 ++--
 >>>
->>> A23/A33 have separate reset lines for each PHY, like on sun6i,
->>> but only 2 PHYs instead of 3. Add a new compatible for this.
->>>
->>> There is also an HSIC PHY, but no hardware that uses it exists.
->>>
->>> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+>>> Didn't we say that we were trying to set the vendor name in the DTs
+>>> now, at least for the new ones?
 >>
+>> I think we said that Paul would write a proposal to standardize
+>> naming for future boards, but that never materialized.
 >>
->> Heh, I've pretty much written the exact same patch (not that
->> it was much work):
+>>> I can fix this and apply it if it's ok for you.
 >>
->> https://github.com/jwrdegoede/linux-sunxi/commit/bc062354f5e0ec75047859d7c2ee3fa04594d29c
->>
->> Note though that:
->>
->> 1) In order to get the disconnect threshold correct you also need:
->>
->> https://github.com/jwrdegoede/linux-sunxi/commit/f7dabee14450cd93e6d0b01f4b6ab065a55955e3
->>
->> 2) This will only work properly for the A23 not for the A33 on the A33 the
->> phyctl reg
->> sits at a different offset, see:
->>
->> https://github.com/allwinner-zh/linux-3.4-sunxi/blob/master/drivers/usb/host/sunxi_hci.c#L49
->>
->> So I've written a separate patch (on top of the a23 one, to add control for
->> the A33 phy:
->> https://github.com/jwrdegoede/linux-sunxi/commit/b4536a92ede3187450b0f1c27c11c1f80fc66fc8
+>> I'm fine with throwing -mele- in there, or not, what ever you
+>> prefer.
 >
-> Interesting... It seems to just work without the above 2 one my A33.
-> Disconnect seems fine as well, though I've not done any stress testing.
+> Ok, applied and fixed the name.
 >
-> Since you have much more experience with USB than I do, I leave this
-> to you.
+> This is probably going to be the last patch pulled for 4.2, unless
+> something important shows up in the next few days.
 
-TBH I'm just duplicating what allwinner is doing here, so I'm not that much
-of an expert either. As for why things are working fine for you, likely the
-phy default settings are good enough in most cases. It could even be that
-the allwinner kernel code is wrong (although I remember having seen
-the same exceptions for A33 in the bootloader code), and that my version
-of the code is actually relying on the defaults being good enough.
+That is fine with me, the only thing which I've pending on the dts
+side is a hole lot of musb related patches which belong in 4.3 anyways.
 
-In the end it boils down to just trusting that the allwinner code is
-doing the right thing.
+What about the "ARM: dts: sun8i: Add Ippo-q8h v1.2 with A33 and 1024x600 lcd support"
+commit? You had a remark on doing that differently to which I replied,
+so that one is still in limbo a bit...
 
->> Note I also have patches to add support for the musb on sun6i (no sram
->> controller for the
->> otg sram, needs reset controller poking) this also works for the a23, and a
->> separate patch
->> for the a33 which needs some special handling again.
->
-> Yes, I've seen them in your sunxi-wip branch.
->
->> So how to move forward with this? I believe that it is best if I finish my
->> work on this
->> and post a series to Felipe and Kishon to apply on top of the 2 still
->> outstanding
->> phy-sun4i-usb / musb-sunxi patches.
->
-> IIRC those will not make 4.2.
-
-Right.
-
->> As for the dts patches, those I plan to bundle with the dts patches I
->> already have
->> pending for otg support for sunxi in general.
->>
->> Does that work for you ?
->
-> Yes. Thanks! I'll pick the patches from your branch to test,
-> or just wait until you post them.
-
-Ok.
-
-REgards,
+Regards,
 
 Hans
-
->
->
-> Regards
-> ChenYu
->
