@@ -1,47 +1,84 @@
-From: stefan@agner.ch (Stefan Agner)
-Date: Wed, 03 Jun 2015 11:45:50 +0200
-Subject: [PATCH v4 1/6] mtd: nand: =?UTF-8?Q?vf=36=31=30=5Fnfc=3A=20Fr?=
- =?UTF-8?Q?eescale=20NFC=20for=20VF=36=31=30=2C=20MPC=35=31=32=35=20and=20?=
- =?UTF-8?Q?others?=
-In-Reply-To: <20150603081059.GA6944@breakpoint.cc>
-References: <1427300909-20825-1-git-send-email-stefan@agner.ch>
- <1427300909-20825-2-git-send-email-stefan@agner.ch>
- <20150603081059.GA6944@breakpoint.cc>
-Message-ID: <821b4731043fef279b6a82b920707982@agner.ch>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Wed, 3 Jun 2015 11:45:35 +0200
+Subject: [PATCH v2 6/6] ARM: sun8i: dts: Add Ippo-q8h v1.2 with A33 and
+ 1024x600 lcd support
+In-Reply-To: <556D6955.8030708@redhat.com>
+References: <1432997706-20172-1-git-send-email-hdegoede@redhat.com>
+ <1432997706-20172-7-git-send-email-hdegoede@redhat.com>
+ <20150602081459.GO23777@lukather> <556D6955.8030708@redhat.com>
+Message-ID: <20150603094535.GI23777@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2015-06-03 10:10, Sebastian Andrzej Siewior wrote:
-> On 2015-03-25 17:28:24 [+0100], Stefan Agner wrote:
->> diff --git a/drivers/mtd/nand/vf610_nfc.c b/drivers/mtd/nand/vf610_nfc.c
->> new file mode 100644
->> index 0000000..23c1510
->> --- /dev/null
->> +++ b/drivers/mtd/nand/vf610_nfc.c
-> ?
->> +static void vf610_nfc_addr_cycle(struct vf610_nfc *nfc, int column, int page)
->> +{
->> +	if (column != -1) {
->> +		if (nfc->chip.options | NAND_BUSWIDTH_16)
->> +			column = column/2;
->> +		vf610_nfc_set_field(nfc, NFC_COL_ADDR, COL_ADDR_MASK,
->> +				    COL_ADDR_SHIFT, column);
->> +	}
->> +	if (page != -1)
->> +		vf610_nfc_set_field(nfc, NFC_ROW_ADDR, ROW_ADDR_MASK,
->> +				    ROW_ADDR_SHIFT, page);
->> +}
+On Tue, Jun 02, 2015 at 10:29:09AM +0200, Hans de Goede wrote:
+> Hi,
 > 
-> Do you have here also a different NAND layout on your boot-page vs
-> remaining pages? The mpc5125 has this different layout.
+> On 02-06-15 10:14, Maxime Ripard wrote:
+> >On Sat, May 30, 2015 at 04:55:06PM +0200, Hans de Goede wrote:
+> >>The Ippo-q8h is a tablet circuit board commonly found in cheap Android
+> >>tablets. The v1.2 version can be used with either an A23 or A33 SoC.
+> >>
+> >>This adds a dts file for the v1.2 board with an A33 SoC and a 1024x600
+> >>LCD screen (most of these tablets have a 800x480 screen).
+> >
+> >I think the difference between the resolution here is more of a case
+> >for the DT quirks interface:
+> >https://lkml.org/lkml/2015/2/18/258
+> 
+> I would expect the only difference between the 2 dts files to be the
+> node describing the lcd panel, so yes that makes somewhat sense.
+> 
+> >Do you know if there's some way to autodetect the two board versions
+> >(like a board id somewhere in an EEPROM)?
+> 
+> No, AFAIK there is no way to tell the difference. There is no eeprom no
+> the board, and we really cannot rely on the nand contents.
 
-There is the boot configuration block which uses a Parity 13/8
-algorithm, is it that you are referring to? The format parity is in the
-main area, hence it doesn't clash with the HW ECC of the controller. One
-can use normal NAND write functions to write this page. See the
-implementation in our downstream U-Boot:
+Ok.
 
-http://git.toradex.com/cgit/u-boot-toradex.git/commit/?h=2015.04-toradex-next&id=b004926168f3bc15f9e26f14c16ae60a252b1304
+> >If not, then maybe u-boot can simply add that board compatible to the
+> >list, and we'll base our logic on that when we'll need it.
+> 
+> That means extra logic in u-boot, and on the kernel side, for what
+> benefit exactly? Such logic would make sense if there was one u-boot
+> image which runtime adjusted itself, but that is not an option.
 
---
-Stefan
+For what benefit? One kernel image which runtime adjusts itself. It's
+especially possible if u-boot's image is not, which seems to be what
+you're saying.
+
+> And we can avoid copy and paste on the dts side by putting all
+> the common stuff in a common file and including that, I believe
+> that that is better (KISS = better) since we've no way to runtime
+> do the right thing AFAICT.
+
+My concern is about the ever-growing number of DTS that just are small
+variations of one or the other. What about the time when we'll
+discover that this board has a variant that has an emmc, and some that
+don't have any button, or the i2c bus 2 not wired, and one other that
+doesn't have any HDMI?
+
+Do we really want to have a dts called
+sun8i-a33-q8h-emmc-lcd800x600-nohdmi-noi2c2-nobuttons.dts?
+
+Especially when we will have the one that we include here that will
+not have followed this convention because it was introduced before
+that, and that we have a way to deal with this nicely?
+
+You chose to consider the DTS names an ABI, the best way to handle
+this is to have a DTS as generic as possible, and leave all these
+small variations outside of the name.
+
+Maxime
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150603/cf19263b/attachment.sig>
