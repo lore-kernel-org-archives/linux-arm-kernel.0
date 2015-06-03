@@ -1,257 +1,340 @@
-From: ludovic.desroches@atmel.com (Ludovic Desroches)
-Date: Wed, 3 Jun 2015 16:52:27 +0200
-Subject: [PATCH 2/2] dmaengine: at_xdmac: rework slave configuration part
-In-Reply-To: <1433343154-5613-1-git-send-email-ludovic.desroches@atmel.com>
-References: <1433343154-5613-1-git-send-email-ludovic.desroches@atmel.com>
-Message-ID: <1433343154-5613-2-git-send-email-ludovic.desroches@atmel.com>
+From: mcoquelin.stm32@gmail.com (Maxime Coquelin)
+Date: Wed,  3 Jun 2015 16:54:02 +0200
+Subject: [PATCH RESEND v9] ARM: dts: Introduce STM32F429 MCU
+Message-ID: <1433343242-1425-1-git-send-email-mcoquelin.stm32@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Rework slave configuration part in order to more report wrong errors
-about the configuration.
-Only maxburst and addr width values are checked when doing the slave
-configuration. The validity of the channel configuration is done at
-prepare time.
+The STMicrolectornics's STM32F429 MCU has the following main features:
+ - Cortex-M4 core running up to @180MHz
+ - 2MB internal flash, 256KBytes internal RAM
+ - FMC controller to connect SDRAM, NOR and NAND memories
+ - SD/MMC/SDIO support
+ - Ethernet controller
+ - USB OTFG FS & HS controllers
+ - I2C, SPI, CAN busses support
+ - Several 16 & 32 bits general purpose timers
+ - Serial Audio interface
+ - LCD controller
 
-Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com>
-Cc: stable at vger.kernel.org # 4.0 and later
+Tested-by: Chanwoo Choi <cw00.choi@samsung.com>
+Signed-off-by: Maxime Coquelin <mcoquelin.stm32@gmail.com>
 ---
- drivers/dma/at_xdmac.c | 156 ++++++++++++++++++++++++++++++-------------------
- 1 file changed, 96 insertions(+), 60 deletions(-)
+ arch/arm/boot/dts/Makefile            |   1 +
+ arch/arm/boot/dts/stm32f429-disco.dts |  71 +++++++++++
+ arch/arm/boot/dts/stm32f429.dtsi      | 214 ++++++++++++++++++++++++++++++++++
+ 3 files changed, 286 insertions(+)
+ create mode 100644 arch/arm/boot/dts/stm32f429-disco.dts
+ create mode 100644 arch/arm/boot/dts/stm32f429.dtsi
 
-diff --git a/drivers/dma/at_xdmac.c b/drivers/dma/at_xdmac.c
-index 4a7e9c6..7614c5c 100644
---- a/drivers/dma/at_xdmac.c
-+++ b/drivers/dma/at_xdmac.c
-@@ -174,6 +174,8 @@
- #define AT_XDMAC_MBR_UBC_NDV3		(0x3 << 27)	/* Next Descriptor View 3 */
- 
- #define AT_XDMAC_MAX_CHAN	0x20
-+#define AT_XDMAC_MAX_CSIZE	16	/* 16 data */
-+#define AT_XDMAC_MAX_DWIDTH	8	/* 64 bits */
- 
- #define AT_XDMAC_DMA_BUSWIDTHS\
- 	(BIT(DMA_SLAVE_BUSWIDTH_UNDEFINED) |\
-@@ -192,20 +194,17 @@ struct at_xdmac_chan {
- 	struct dma_chan			chan;
- 	void __iomem			*ch_regs;
- 	u32				mask;		/* Channel Mask */
--	u32				cfg[2];		/* Channel Configuration Register */
--	#define	AT_XDMAC_DEV_TO_MEM_CFG	0		/* Predifined dev to mem channel conf */
--	#define	AT_XDMAC_MEM_TO_DEV_CFG	1		/* Predifined mem to dev channel conf */
-+	u32				cfg;		/* Channel Configuration Register */
- 	u8				perid;		/* Peripheral ID */
- 	u8				perif;		/* Peripheral Interface */
- 	u8				memif;		/* Memory Interface */
--	u32				per_src_addr;
--	u32				per_dst_addr;
- 	u32				save_cc;
- 	u32				save_cim;
- 	u32				save_cnda;
- 	u32				save_cndc;
- 	unsigned long			status;
- 	struct tasklet_struct		tasklet;
-+	struct dma_slave_config		sconfig;
- 
- 	spinlock_t			lock;
- 
-@@ -528,61 +527,94 @@ static struct dma_chan *at_xdmac_xlate(struct of_phandle_args *dma_spec,
- 	return chan;
- }
- 
-+static int at_xdmac_compute_chan_conf(struct dma_chan *chan,
-+				      enum dma_transfer_direction direction)
-+{
-+	struct at_xdmac_chan	*atchan = to_at_xdmac_chan(chan);
-+	int			csize, dwidth;
-+
-+	if (direction == DMA_DEV_TO_MEM) {
-+		atchan->cfg =
-+			AT91_XDMAC_DT_PERID(atchan->perid)
-+			| AT_XDMAC_CC_DAM_INCREMENTED_AM
-+			| AT_XDMAC_CC_SAM_FIXED_AM
-+			| AT_XDMAC_CC_DIF(atchan->memif)
-+			| AT_XDMAC_CC_SIF(atchan->perif)
-+			| AT_XDMAC_CC_SWREQ_HWR_CONNECTED
-+			| AT_XDMAC_CC_DSYNC_PER2MEM
-+			| AT_XDMAC_CC_MBSIZE_SIXTEEN
-+			| AT_XDMAC_CC_TYPE_PER_TRAN;
-+		csize = ffs(atchan->sconfig.src_maxburst) - 1;
-+		if (csize < 0) {
-+			dev_err(chan2dev(chan), "invalid src maxburst value\n");
-+			return -EINVAL;
-+		}
-+		atchan->cfg |= AT_XDMAC_CC_CSIZE(csize);
-+		dwidth = ffs(atchan->sconfig.src_addr_width) - 1;
-+		if (dwidth < 0) {
-+			dev_err(chan2dev(chan), "invalid src addr width value\n");
-+			return -EINVAL;
-+		}
-+		atchan->cfg |= AT_XDMAC_CC_DWIDTH(dwidth);
-+	} else if (direction == DMA_MEM_TO_DEV) {
-+		atchan->cfg =
-+			AT91_XDMAC_DT_PERID(atchan->perid)
-+			| AT_XDMAC_CC_DAM_FIXED_AM
-+			| AT_XDMAC_CC_SAM_INCREMENTED_AM
-+			| AT_XDMAC_CC_DIF(atchan->perif)
-+			| AT_XDMAC_CC_SIF(atchan->memif)
-+			| AT_XDMAC_CC_SWREQ_HWR_CONNECTED
-+			| AT_XDMAC_CC_DSYNC_MEM2PER
-+			| AT_XDMAC_CC_MBSIZE_SIXTEEN
-+			| AT_XDMAC_CC_TYPE_PER_TRAN;
-+		csize = ffs(atchan->sconfig.dst_maxburst) - 1;
-+		if (csize < 0) {
-+			dev_err(chan2dev(chan), "invalid src maxburst value\n");
-+			return -EINVAL;
-+		}
-+		atchan->cfg |= AT_XDMAC_CC_CSIZE(csize);
-+		dwidth = ffs(atchan->sconfig.dst_addr_width) - 1;
-+		if (dwidth < 0) {
-+			dev_err(chan2dev(chan), "invalid dst addr width value\n");
-+			return -EINVAL;
-+		}
-+		atchan->cfg |= AT_XDMAC_CC_DWIDTH(dwidth);
-+	}
-+
-+	dev_dbg(chan2dev(chan),	"%s: cfg=0x%08x\n", __func__, atchan->cfg);
-+
-+	return 0;
-+}
-+
+diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+index 6e029ed..c4f22d5 100644
+--- a/arch/arm/boot/dts/Makefile
++++ b/arch/arm/boot/dts/Makefile
+@@ -532,6 +532,7 @@ dtb-$(CONFIG_ARCH_STI) += \
+ 	stih416-b2020.dtb \
+ 	stih416-b2020e.dtb \
+ 	stih418-b2199.dtb
++dtb-$(CONFIG_ARCH_STM32)+= stm32f429-disco.dtb
+ dtb-$(CONFIG_MACH_SUN4I) += \
+ 	sun4i-a10-a1000.dtb \
+ 	sun4i-a10-ba10-tvbox.dtb \
+diff --git a/arch/arm/boot/dts/stm32f429-disco.dts b/arch/arm/boot/dts/stm32f429-disco.dts
+new file mode 100644
+index 0000000..6b9aa59
+--- /dev/null
++++ b/arch/arm/boot/dts/stm32f429-disco.dts
+@@ -0,0 +1,71 @@
 +/*
-+ * Only check that maxburst and addr width values are supported by the
-+ * the controller but not that the configuration is good to perform the
-+ * transfer since we don't know the direction at this stage.
++ * Copyright 2015 - Maxime Coquelin <mcoquelin.stm32@gmail.com>
++ *
++ * This file is dual-licensed: you can use it either under the terms
++ * of the GPL or the X11 license, at your option. Note that this dual
++ * licensing only applies to this file, and not this project as a
++ * whole.
++ *
++ *  a) This file is free software; you can redistribute it and/or
++ *     modify it under the terms of the GNU General Public License as
++ *     published by the Free Software Foundation; either version 2 of the
++ *     License, or (at your option) any later version.
++ *
++ *     This file is distributed in the hope that it will be useful,
++ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
++ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ *     GNU General Public License for more details.
++ *
++ *     You should have received a copy of the GNU General Public
++ *     License along with this file; if not, write to the Free
++ *     Software Foundation, Inc., 51 Franklin St, Fifth Floor, Boston,
++ *     MA 02110-1301 USA
++ *
++ * Or, alternatively,
++ *
++ *  b) Permission is hereby granted, free of charge, to any person
++ *     obtaining a copy of this software and associated documentation
++ *     files (the "Software"), to deal in the Software without
++ *     restriction, including without limitation the rights to use,
++ *     copy, modify, merge, publish, distribute, sublicense, and/or
++ *     sell copies of the Software, and to permit persons to whom the
++ *     Software is furnished to do so, subject to the following
++ *     conditions:
++ *
++ *     The above copyright notice and this permission notice shall be
++ *     included in all copies or substantial portions of the Software.
++ *
++ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
++ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
++ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
++ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
++ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
++ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
++ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
++ *     OTHER DEALINGS IN THE SOFTWARE.
 + */
-+static int at_xdmac_check_slave_config(struct dma_slave_config *sconfig)
-+{
-+	if ((sconfig->src_maxburst > AT_XDMAC_MAX_CSIZE)
-+	    || (sconfig->dst_maxburst > AT_XDMAC_MAX_CSIZE))
-+		return -EINVAL;
 +
-+	if ((sconfig->src_addr_width > AT_XDMAC_MAX_DWIDTH)
-+	    || (sconfig->dst_addr_width > AT_XDMAC_MAX_DWIDTH))
-+		return -EINVAL;
++/dts-v1/;
++#include "stm32f429.dtsi"
 +
-+	return 0;
-+}
++/ {
++	model = "STMicroelectronics STM32F429i-DISCO board";
++	compatible = "st,stm32f429i-disco", "st,stm32f429";
 +
- static int at_xdmac_set_slave_config(struct dma_chan *chan,
- 				      struct dma_slave_config *sconfig)
- {
- 	struct at_xdmac_chan	*atchan = to_at_xdmac_chan(chan);
--	u8 dwidth;
--	int csize;
- 
--	atchan->cfg[AT_XDMAC_DEV_TO_MEM_CFG] =
--		AT91_XDMAC_DT_PERID(atchan->perid)
--		| AT_XDMAC_CC_DAM_INCREMENTED_AM
--		| AT_XDMAC_CC_SAM_FIXED_AM
--		| AT_XDMAC_CC_DIF(atchan->memif)
--		| AT_XDMAC_CC_SIF(atchan->perif)
--		| AT_XDMAC_CC_SWREQ_HWR_CONNECTED
--		| AT_XDMAC_CC_DSYNC_PER2MEM
--		| AT_XDMAC_CC_MBSIZE_SIXTEEN
--		| AT_XDMAC_CC_TYPE_PER_TRAN;
--	csize = at_xdmac_csize(sconfig->src_maxburst);
--	if (csize < 0) {
--		dev_err(chan2dev(chan), "invalid src maxburst value\n");
-+	if (at_xdmac_check_slave_config(sconfig)) {
-+		dev_err(chan2dev(chan), "invalid slave configuration\n");
- 		return -EINVAL;
- 	}
--	atchan->cfg[AT_XDMAC_DEV_TO_MEM_CFG] |= AT_XDMAC_CC_CSIZE(csize);
--	dwidth = ffs(sconfig->src_addr_width) - 1;
--	atchan->cfg[AT_XDMAC_DEV_TO_MEM_CFG] |= AT_XDMAC_CC_DWIDTH(dwidth);
--
--
--	atchan->cfg[AT_XDMAC_MEM_TO_DEV_CFG] =
--		AT91_XDMAC_DT_PERID(atchan->perid)
--		| AT_XDMAC_CC_DAM_FIXED_AM
--		| AT_XDMAC_CC_SAM_INCREMENTED_AM
--		| AT_XDMAC_CC_DIF(atchan->perif)
--		| AT_XDMAC_CC_SIF(atchan->memif)
--		| AT_XDMAC_CC_SWREQ_HWR_CONNECTED
--		| AT_XDMAC_CC_DSYNC_MEM2PER
--		| AT_XDMAC_CC_MBSIZE_SIXTEEN
--		| AT_XDMAC_CC_TYPE_PER_TRAN;
--	csize = at_xdmac_csize(sconfig->dst_maxburst);
--	if (csize < 0) {
--		dev_err(chan2dev(chan), "invalid src maxburst value\n");
--		return -EINVAL;
--	}
--	atchan->cfg[AT_XDMAC_MEM_TO_DEV_CFG] |= AT_XDMAC_CC_CSIZE(csize);
--	dwidth = ffs(sconfig->dst_addr_width) - 1;
--	atchan->cfg[AT_XDMAC_MEM_TO_DEV_CFG] |= AT_XDMAC_CC_DWIDTH(dwidth);
--
--	/* Src and dst addr are needed to configure the link list descriptor. */
--	atchan->per_src_addr = sconfig->src_addr;
--	atchan->per_dst_addr = sconfig->dst_addr;
- 
--	dev_dbg(chan2dev(chan),
--		"%s: cfg[dev2mem]=0x%08x, cfg[mem2dev]=0x%08x, per_src_addr=0x%08x, per_dst_addr=0x%08x\n",
--		__func__, atchan->cfg[AT_XDMAC_DEV_TO_MEM_CFG],
--		atchan->cfg[AT_XDMAC_MEM_TO_DEV_CFG],
--		atchan->per_src_addr, atchan->per_dst_addr);
-+	memcpy(&atchan->sconfig, sconfig, sizeof(atchan->sconfig));
- 
- 	return 0;
- }
-@@ -616,6 +648,9 @@ at_xdmac_prep_slave_sg(struct dma_chan *chan, struct scatterlist *sgl,
- 	/* Protect dma_sconfig field that can be modified by set_slave_conf. */
- 	spin_lock_irqsave(&atchan->lock, irqflags);
- 
-+	if (at_xdmac_compute_chan_conf(chan, direction))
-+		goto spin_unlock;
++	chosen {
++		bootargs = "console=ttyS0,115200 root=/dev/ram rdinit=/linuxrc";
++		linux,stdout-path = &usart1;
++	};
 +
- 	/* Prepare descriptors. */
- 	for_each_sg(sgl, sg, sg_len, i) {
- 		struct at_xdmac_desc	*desc = NULL;
-@@ -640,14 +675,13 @@ at_xdmac_prep_slave_sg(struct dma_chan *chan, struct scatterlist *sgl,
- 
- 		/* Linked list descriptor setup. */
- 		if (direction == DMA_DEV_TO_MEM) {
--			desc->lld.mbr_sa = atchan->per_src_addr;
-+			desc->lld.mbr_sa = atchan->sconfig.src_addr;
- 			desc->lld.mbr_da = mem;
--			desc->lld.mbr_cfg = atchan->cfg[AT_XDMAC_DEV_TO_MEM_CFG];
- 		} else {
- 			desc->lld.mbr_sa = mem;
--			desc->lld.mbr_da = atchan->per_dst_addr;
--			desc->lld.mbr_cfg = atchan->cfg[AT_XDMAC_MEM_TO_DEV_CFG];
-+			desc->lld.mbr_da = atchan->sconfig.dst_addr;
- 		}
-+		desc->lld.mbr_cfg = atchan->cfg;
- 		dwidth = at_xdmac_get_dwidth(desc->lld.mbr_cfg);
- 		fixed_dwidth = IS_ALIGNED(len, 1 << dwidth)
- 			       ? at_xdmac_get_dwidth(desc->lld.mbr_cfg)
-@@ -711,6 +745,9 @@ at_xdmac_prep_dma_cyclic(struct dma_chan *chan, dma_addr_t buf_addr,
- 		return NULL;
- 	}
- 
-+	if (at_xdmac_compute_chan_conf(chan, direction))
-+		return NULL;
++	memory {
++		reg = <0x90000000 0x800000>;
++	};
 +
- 	for (i = 0; i < periods; i++) {
- 		struct at_xdmac_desc	*desc = NULL;
- 
-@@ -729,14 +766,13 @@ at_xdmac_prep_dma_cyclic(struct dma_chan *chan, dma_addr_t buf_addr,
- 			__func__, desc, &desc->tx_dma_desc.phys);
- 
- 		if (direction == DMA_DEV_TO_MEM) {
--			desc->lld.mbr_sa = atchan->per_src_addr;
-+			desc->lld.mbr_sa = atchan->sconfig.src_addr;
- 			desc->lld.mbr_da = buf_addr + i * period_len;
--			desc->lld.mbr_cfg = atchan->cfg[AT_XDMAC_DEV_TO_MEM_CFG];
- 		} else {
- 			desc->lld.mbr_sa = buf_addr + i * period_len;
--			desc->lld.mbr_da = atchan->per_dst_addr;
--			desc->lld.mbr_cfg = atchan->cfg[AT_XDMAC_MEM_TO_DEV_CFG];
-+			desc->lld.mbr_da = atchan->sconfig.dst_addr;
- 		}
-+		desc->lld.mbr_cfg = atchan->cfg;
- 		desc->lld.mbr_ubc = AT_XDMAC_MBR_UBC_NDV1
- 			| AT_XDMAC_MBR_UBC_NDEN
- 			| AT_XDMAC_MBR_UBC_NSEN
++	aliases {
++		serial0 = &usart1;
++	};
++};
++
++&usart1 {
++	status = "okay";
++};
+diff --git a/arch/arm/boot/dts/stm32f429.dtsi b/arch/arm/boot/dts/stm32f429.dtsi
+new file mode 100644
+index 0000000..aa73b4f
+--- /dev/null
++++ b/arch/arm/boot/dts/stm32f429.dtsi
+@@ -0,0 +1,214 @@
++/*
++ * Copyright 2015 - Maxime Coquelin <mcoquelin.stm32@gmail.com>
++ *
++ * This file is dual-licensed: you can use it either under the terms
++ * of the GPL or the X11 license, at your option. Note that this dual
++ * licensing only applies to this file, and not this project as a
++ * whole.
++ *
++ *  a) This file is free software; you can redistribute it and/or
++ *     modify it under the terms of the GNU General Public License as
++ *     published by the Free Software Foundation; either version 2 of the
++ *     License, or (at your option) any later version.
++ *
++ *     This file is distributed in the hope that it will be useful,
++ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
++ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ *     GNU General Public License for more details.
++ *
++ *     You should have received a copy of the GNU General Public
++ *     License along with this file; if not, write to the Free
++ *     Software Foundation, Inc., 51 Franklin St, Fifth Floor, Boston,
++ *     MA 02110-1301 USA
++ *
++ * Or, alternatively,
++ *
++ *  b) Permission is hereby granted, free of charge, to any person
++ *     obtaining a copy of this software and associated documentation
++ *     files (the "Software"), to deal in the Software without
++ *     restriction, including without limitation the rights to use,
++ *     copy, modify, merge, publish, distribute, sublicense, and/or
++ *     sell copies of the Software, and to permit persons to whom the
++ *     Software is furnished to do so, subject to the following
++ *     conditions:
++ *
++ *     The above copyright notice and this permission notice shall be
++ *     included in all copies or substantial portions of the Software.
++ *
++ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
++ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
++ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
++ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
++ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
++ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
++ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
++ *     OTHER DEALINGS IN THE SOFTWARE.
++ */
++
++#include "armv7-m.dtsi"
++
++/ {
++	clocks {
++		clk_sysclk: clk-sysclk {
++			#clock-cells = <0>;
++			compatible = "fixed-clock";
++			clock-frequency = <180000000>;
++		};
++
++		clk_hclk: clk-hclk {
++			#clock-cells = <0>;
++			compatible = "fixed-clock";
++			clock-frequency = <180000000>;
++		};
++
++		clk_pclk1: clk-pclk1 {
++			#clock-cells = <0>;
++			compatible = "fixed-clock";
++			clock-frequency = <45000000>;
++		};
++
++		clk_pclk2: clk-pclk2 {
++			#clock-cells = <0>;
++			compatible = "fixed-clock";
++			clock-frequency = <90000000>;
++		};
++
++		clk_pmtr1: clk-pmtr1 {
++			#clock-cells = <0>;
++			compatible = "fixed-clock";
++			clock-frequency = <90000000>;
++		};
++
++		clk_pmtr2: clk-pmtr2 {
++			#clock-cells = <0>;
++			compatible = "fixed-clock";
++			clock-frequency = <180000000>;
++		};
++
++		clk_systick: clk-systick {
++			compatible = "fixed-factor-clock";
++			clocks = <&clk_hclk>;
++			#clock-cells = <0>;
++			clock-div = <8>;
++			clock-mult = <1>;
++		};
++	};
++
++	soc {
++		timer2: timer at 40000000 {
++			compatible = "st,stm32-timer";
++			reg = <0x40000000 0x400>;
++			interrupts = <28>;
++			clocks = <&clk_pmtr1>;
++			status = "disabled";
++		};
++
++		timer3: timer at 40000400 {
++			compatible = "st,stm32-timer";
++			reg = <0x40000400 0x400>;
++			interrupts = <29>;
++			clocks = <&clk_pmtr1>;
++			status = "disabled";
++		};
++
++		timer4: timer at 40000800 {
++			compatible = "st,stm32-timer";
++			reg = <0x40000800 0x400>;
++			interrupts = <30>;
++			clocks = <&clk_pmtr1>;
++			status = "disabled";
++		};
++
++		timer5: timer at 40000c00 {
++			compatible = "st,stm32-timer";
++			reg = <0x40000c00 0x400>;
++			interrupts = <50>;
++			clocks = <&clk_pmtr1>;
++		};
++
++		timer6: timer at 40001000 {
++			compatible = "st,stm32-timer";
++			reg = <0x40001000 0x400>;
++			interrupts = <54>;
++			clocks = <&clk_pmtr1>;
++			status = "disabled";
++		};
++
++		timer7: timer at 40001400 {
++			compatible = "st,stm32-timer";
++			reg = <0x40001400 0x400>;
++			interrupts = <55>;
++			clocks = <&clk_pmtr1>;
++			status = "disabled";
++		};
++
++		usart2: serial at 40004400 {
++			compatible = "st,stm32-usart", "st,stm32-uart";
++			reg = <0x40004400 0x400>;
++			interrupts = <38>;
++			clocks = <&clk_pclk1>;
++			status = "disabled";
++		};
++
++		usart3: serial at 40004800 {
++			compatible = "st,stm32-usart", "st,stm32-uart";
++			reg = <0x40004800 0x400>;
++			interrupts = <39>;
++			clocks = <&clk_pclk1>;
++			status = "disabled";
++		};
++
++		usart4: serial at 40004c00 {
++			compatible = "st,stm32-uart";
++			reg = <0x40004c00 0x400>;
++			interrupts = <52>;
++			clocks = <&clk_pclk1>;
++			status = "disabled";
++		};
++
++		usart5: serial at 40005000 {
++			compatible = "st,stm32-uart";
++			reg = <0x40005000 0x400>;
++			interrupts = <53>;
++			clocks = <&clk_pclk1>;
++			status = "disabled";
++		};
++
++		usart7: serial at 40007800 {
++			compatible = "st,stm32-usart", "st,stm32-uart";
++			reg = <0x40007800 0x400>;
++			interrupts = <82>;
++			clocks = <&clk_pclk1>;
++			status = "disabled";
++		};
++
++		usart8: serial at 40007c00 {
++			compatible = "st,stm32-usart", "st,stm32-uart";
++			reg = <0x40007c00 0x400>;
++			interrupts = <83>;
++			clocks = <&clk_pclk1>;
++			status = "disabled";
++		};
++
++		usart1: serial at 40011000 {
++			compatible = "st,stm32-usart", "st,stm32-uart";
++			reg = <0x40011000 0x400>;
++			interrupts = <37>;
++			clocks = <&clk_pclk2>;
++			status = "disabled";
++		};
++
++		usart6: serial at 40011400 {
++			compatible = "st,stm32-usart", "st,stm32-uart";
++			reg = <0x40011400 0x400>;
++			interrupts = <71>;
++			clocks = <&clk_pclk2>;
++			status = "disabled";
++		};
++	};
++};
++
++&systick {
++	clocks = <&clk_systick>;
++	status = "okay";
++};
 -- 
-2.2.0
+1.9.1
