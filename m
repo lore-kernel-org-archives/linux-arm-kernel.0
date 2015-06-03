@@ -1,79 +1,69 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed,  3 Jun 2015 09:23:21 -0700
-Subject: [PATCH 12/12] ARM: OMAP2+: Add custom abort handler for t410
-In-Reply-To: <1433348601-8966-1-git-send-email-tony@atomide.com>
-References: <1433348601-8966-1-git-send-email-tony@atomide.com>
-Message-ID: <1433348601-8966-13-git-send-email-tony@atomide.com>
+From: mturquette@linaro.org (Michael Turquette)
+Date: Wed, 03 Jun 2015 09:31:39 -0700
+Subject: [PATCH v8 2/7] clk: hi6220: Document devicetree bindings for
+ hi6220 clock
+In-Reply-To: <1432865319-20413-3-git-send-email-bintian.wang@huawei.com>
+References: <1432865319-20413-1-git-send-email-bintian.wang@huawei.com>
+ <1432865319-20413-3-git-send-email-bintian.wang@huawei.com>
+Message-ID: <20150603163139.6017.73279@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Similar to commit fdf4850cb5b2 ("ARM: BCM5301X: workaround suppress fault"),
-let's add custom handling for the aborts on t410 that prevent booting:
+Quoting Bintian Wang (2015-05-28 19:08:34)
+> Document DT files bindings for Hisilicon hi6220 clock.
+> 
+> Signed-off-by: Bintian Wang <bintian.wang@huawei.com>
+> Acked-by: Haojian Zhuang <haojian.zhuang@linaro.org>
+> Suggested-by: Arnd Bergmann <arnd@arndb.de>
+> Acked-by: Stephen Boyd <sboyd@codeaurora.org>
 
-Unhandled fault: imprecise external abort (0xc06) at 0xee091fb0
-pgd = ee4bc000
-[ee091fb0] *pgd=ae00041e(bad)
-Kernel panic - not syncing: Attempted to kill init! exitcode=0x00000007
+Acked-by: Michael Turquette <mturquette@linaro.org>
 
-Cc: Matthijs van Duin <matthijsvanduin@gmail.com>
-Signed-off-by: Tony Lindgren <tony@atomide.com>
----
- arch/arm/mach-omap2/pdata-quirks.c | 29 +++++++++++++++++++++++++++++
- 1 file changed, 29 insertions(+)
-
-diff --git a/arch/arm/mach-omap2/pdata-quirks.c b/arch/arm/mach-omap2/pdata-quirks.c
-index af11511..3d1e219 100644
---- a/arch/arm/mach-omap2/pdata-quirks.c
-+++ b/arch/arm/mach-omap2/pdata-quirks.c
-@@ -18,6 +18,9 @@
- #include <linux/platform_data/pinctrl-single.h>
- #include <linux/platform_data/iommu-omap.h>
- 
-+#include <asm/siginfo.h>
-+#include <asm/signal.h>
-+
- #include "common.h"
- #include "common-board-devices.h"
- #include "dss-common.h"
-@@ -249,6 +252,29 @@ static void __init omap3_tao3530_legacy_init(void)
- }
- #endif /* CONFIG_ARCH_OMAP3 */
- 
-+#ifdef CONFIG_SOC_TI81XX
-+static int fault_fixed_up;
-+
-+static int t410_abort_handler(unsigned long addr, unsigned int fsr,
-+			      struct pt_regs *regs)
-+{
-+	if ((fsr == 0x406 || fsr == 0xc06) && !fault_fixed_up) {
-+		pr_warn("External imprecise Data abort at addr=%#lx, fsr=%#x ignored.\n",
-+			addr, fsr);
-+		fault_fixed_up = 1;
-+		return 0;
-+	}
-+
-+	return 1;
-+}
-+
-+static void __init t410_abort_init(void)
-+{
-+	hook_fault_code(16 + 6, t410_abort_handler, SIGBUS, BUS_OBJERR,
-+			"imprecise external abort");
-+}
-+#endif
-+
- #if defined(CONFIG_ARCH_OMAP4) || defined(CONFIG_SOC_OMAP5)
- static struct iommu_platform_data omap4_iommu_pdata = {
- 	.reset_name = "mmu_cache",
-@@ -360,6 +386,9 @@ static struct pdata_init pdata_quirks[] __initdata = {
- 	{ "ti,am3517-evm", am3517_evm_legacy_init, },
- 	{ "technexion,omap3-tao3530", omap3_tao3530_legacy_init, },
- #endif
-+#ifdef CONFIG_SOC_TI81XX
-+	{ "hp,t410", t410_abort_init, },
-+#endif
- #ifdef CONFIG_SOC_OMAP5
- 	{ "ti,omap5-uevm", omap5_uevm_legacy_init, },
- #endif
--- 
-2.1.4
+> ---
+>  .../devicetree/bindings/clock/hi6220-clock.txt     | 34 ++++++++++++++++++++++
+>  1 file changed, 34 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/clock/hi6220-clock.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/clock/hi6220-clock.txt b/Documentation/devicetree/bindings/clock/hi6220-clock.txt
+> new file mode 100644
+> index 0000000..53ddb19
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/clock/hi6220-clock.txt
+> @@ -0,0 +1,34 @@
+> +* Hisilicon Hi6220 Clock Controller
+> +
+> +Clock control registers reside in different Hi6220 system controllers,
+> +please refer the following document to know more about the binding rules
+> +for these system controllers:
+> +
+> +Documentation/devicetree/bindings/arm/hisilicon/hisilicon.txt
+> +
+> +Required Properties:
+> +
+> +- compatible: the compatible should be one of the following strings to
+> +       indicate the clock controller functionality.
+> +
+> +       - "hisilicon,hi6220-aoctrl"
+> +       - "hisilicon,hi6220-sysctrl"
+> +       - "hisilicon,hi6220-mediactrl"
+> +       - "hisilicon,hi6220-pmctrl"
+> +
+> +- reg: physical base address of the controller and length of memory mapped
+> +  region.
+> +
+> +- #clock-cells: should be 1.
+> +
+> +For example:
+> +       sys_ctrl: sys_ctrl {
+> +               compatible = "hisilicon,hi6220-sysctrl", "syscon";
+> +               reg = <0x0 0xf7030000 0x0 0x2000>;
+> +               #clock-cells = <1>;
+> +       };
+> +
+> +Each clock is assigned an identifier and client nodes use this identifier
+> +to specify the clock which they consume.
+> +
+> +All these identifier could be found in <dt-bindings/clock/hi6220-clock.h>.
+> -- 
+> 1.9.1
+> 
