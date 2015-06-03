@@ -1,44 +1,35 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Wed, 03 Jun 2015 08:55:55 +0900
-Subject: [PATCH v4 5/5] ARM: dts: Add LEDs to exynos5410-odroidxu
-In-Reply-To: <556DB1E2.5080607@suse.de>
-References: <1426456834-6308-1-git-send-email-afaerber@suse.de>
- <1426456834-6308-6-git-send-email-afaerber@suse.de>
- <556DA96A.90800@samsung.com> <556DB1E2.5080607@suse.de>
-Message-ID: <556E428B.8070008@samsung.com>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Tue, 2 Jun 2015 17:11:20 -0700
+Subject: [PATCH v2 1/2] ARM: Add cpu_resume_arm() for firmwares that
+ resume in ARM state
+In-Reply-To: <20150602234048.GA7557@n2100.arm.linux.org.uk>
+References: <1433272378-8470-1-git-send-email-sboyd@codeaurora.org>
+ <1433272378-8470-2-git-send-email-sboyd@codeaurora.org>
+ <20150602234048.GA7557@n2100.arm.linux.org.uk>
+Message-ID: <20150603001120.GA4534@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02.06.2015 22:38, Andreas F?rber wrote:
-> Am 02.06.2015 um 22:02 schrieb Krzysztof Kozlowski:
->> W dniu 16.03.2015 o 07:00, Andreas F?rber pisze:
->>> Signed-off-by: Hakjoo Kim <ruppi.kim@hardkernel.com>
->>> Signed-off-by: Andreas F?rber <afaerber@suse.de>
->>> ---
->>>  v2 -> v3: Unchanged
->>>  
->>>  v1 -> v2:
->>>  * Filled in Sob from Hakjoo Kim
->>>  
->>>  arch/arm/boot/dts/exynos5410-odroidxu.dts | 25 +++++++++++++++++++++++++
->>>  1 file changed, 25 insertions(+)
->>
->> What is the rationale behind doing this in separate patch, not as part
->> of 2/5? You can just add new board DTS with all of its features at once,
->> but maybe I am missing something?
+On 06/03, Russell King - ARM Linux wrote:
+> On Tue, Jun 02, 2015 at 12:12:57PM -0700, Stephen Boyd wrote:
+> > Some platforms always enter the kernel in the ARM state even if
+> > the kernel is compiled for THUMB2. Add a small wrapper on top of
+> > cpu_resume() that switches into THUMB2 state.
+> > 
+> > This fixes a problem reported by Kevin Hilman on next-20150601
+> > where the ifc6410 fails to boot a THUMB2 kernel because the
+> > platform's firmware always enters the kernel in ARM mode from
+> > deep idle states.
 > 
-> This patch depends on the pinctrl driver, 2/5 on nothing.
+> I think this bit of the commit message isn't quite correct: this will
+> only resolve the boot problem with a T2 kernel when the failing platform
+> is converted to use the cpu_resume_arm() entry point.
 > 
-> By keeping it a separate patch it was intended to go in more quickly
-> (clear fail there ;)) and it's easier to review the actual changes -
-> squashing is always easier than picking apart.
+> Apart from that, the patch looks good to me, thanks.
 
-OK, I'm fine with it.
+Sure, it could say "This provides the functionality to fix a problem
+reported by..."
 
-The patch looks good:
-Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
-
-Can you resend everything with the change in chosen/console?
-
-Best regards,
-Krzysztof
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
