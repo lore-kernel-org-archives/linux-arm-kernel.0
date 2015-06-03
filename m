@@ -1,80 +1,77 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Wed, 03 Jun 2015 15:43:34 -0700
-Subject: [RFC/PATCH 4/6] OPP: Allow notifiers to call
- dev_pm_opp_get_{voltage, freq} RCU-free
-In-Reply-To: <556D2369.2000603@samsung.com>
-References: <1433209679-31389-1-git-send-email-sboyd@codeaurora.org>
- <1433209679-31389-5-git-send-email-sboyd@codeaurora.org>
- <556D2369.2000603@samsung.com>
-Message-ID: <556F8316.2000109@codeaurora.org>
+From: mturquette@linaro.org (Michael Turquette)
+Date: Wed, 03 Jun 2015 16:11:36 -0700
+Subject: [PATCHv3 00/27] ARM: OMAP2+: clock code move under clk driver
+In-Reply-To: <556EF42A.9000207@ti.com>
+References: <1432566032-10860-1-git-send-email-t-kristo@ti.com>
+ <20150526160557.GD16525@atomide.com> <20150526163216.GF16525@atomide.com>
+ <20150526163931.GO26599@saruman.tx.rr.com> <55660D5B.8020607@ti.com>
+ <20150527231536.GD30984@atomide.com> <556EF42A.9000207@ti.com>
+Message-ID: <20150603231136.6017.65683@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/01/2015 08:30 PM, Krzysztof Kozlowski wrote:
-> On 02.06.2015 10:47, Stephen Boyd wrote:
->> We pass the dev_pm_opp structure to OPP notifiers but the users
->> of the notifier need to surround calls to dev_pm_opp_get_*() with
->> RCU read locks to avoid lockdep warnings. The notifier is already
->> called with the dev_opp's srcu lock held, so it should be safe to
->> assume the devm_pm_opp structure is already protected inside the
->> notifier. Update the lockdep check for this.
->>
->> Cc: Krzysztof Kozlowski <k.kozlowski@samsung.com>
->> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
->> ---
->>
->> This is probably wrong, but it's what I had to hack up
->> to be able to use the OPP functions from within the notifier
->> to figure out the new values of the OPP without having to take
->> an RCU read lock.
->>
->>   drivers/base/power/opp.c | 19 +++++++++++--------
->>   1 file changed, 11 insertions(+), 8 deletions(-)
->>
->> diff --git a/drivers/base/power/opp.c b/drivers/base/power/opp.c
->> index b997a7eabcd4..6d75022c6a0e 100644
->> --- a/drivers/base/power/opp.c
->> +++ b/drivers/base/power/opp.c
->> @@ -108,9 +108,10 @@ static LIST_HEAD(dev_opp_list);
->>   /* Lock to allow exclusive modification to the device and opp lists */
->>   static DEFINE_MUTEX(dev_opp_list_lock);
->>   
->> -#define opp_rcu_lockdep_assert()					\
->> +#define opp_rcu_lockdep_assert(s)					\
->>   do {									\
->>   	rcu_lockdep_assert(rcu_read_lock_held() ||			\
->> +				(s && srcu_read_lock_held(s)) || 	\
->>   				lockdep_is_held(&dev_opp_list_lock),	\
->>   			   "Missing rcu_read_lock() or "		\
->>   			   "dev_opp_list_lock protection");		\
->> @@ -169,9 +170,10 @@ unsigned long dev_pm_opp_get_voltage(struct dev_pm_opp *opp)
->>   	struct dev_pm_opp *tmp_opp;
->>   	unsigned long v = 0;
->>   
->> -	opp_rcu_lockdep_assert();
->> +	opp_rcu_lockdep_assert(&opp->dev_opp->srcu_head.srcu);
->>   
->> -	tmp_opp = rcu_dereference(opp);
->> +	tmp_opp = srcu_dereference_check(opp, &opp->dev_opp->srcu_head.srcu,
->> +					 rcu_read_lock_held());
-> It looks strange. The notifier's SRCU is part of device_opp but here we
-> want to protect the dev_pm_opp.
->
-> Because of this difference I am not sure that it is safe having around
-> this a srcu_read_lock() from notifiers instead of rcu_read_lock().
->
->
+Quoting Tero Kristo (2015-06-03 05:33:46)
+> On 05/28/2015 02:15 AM, Tony Lindgren wrote:
+> > * Tero Kristo <t-kristo@ti.com> [150527 11:32]:
+> >> On 05/26/2015 07:39 PM, Felipe Balbi wrote:
+> >>> On Tue, May 26, 2015 at 09:32:16AM -0700, Tony Lindgren wrote:
+> >>>> * Tony Lindgren <tony@atomide.com> [150526 09:08]:
+> >>>>> * Tero Kristo <t-kristo@ti.com> [150525 08:01]:
+> >>>>>> Hi,
+> >>>>>>
+> >>>>>> As requested, posting v3 with somewhat changed diff parameters and
+> >>>>>> diffstat attached. Just some minor Makefile changes compared to v2,
+> >>>>>> these were discussed under that set.
+> >>>>>>
+> >>>>>> Set has been pushed to:
+> >>>>>> - tree: https://github.com/t-kristo/linux-pm.git
+> >>>>>> - branch: for-4.2/ti-clk-move
+> >>>>>
+> >>>>> Looks like this causes a build error for at least omap2 only .config:
+> >>>>>
+> >>>>> drivers/clk/ti/dpll3xxx.o:(.rodata+0x1c): multiple definition of `clkhwops_omap3_dpll'
+> >>>>> drivers/clk/ti/dpll.o:(.rodata+0x0): first defined here
+> >>>>>
+> >>>>> You may want to create a file selecting ARCH_OMAP2PLUS=y, then point
+> >>>>> KCONFIG_ALLCONFIG to that file for make randconfig. Then just build
+> >>>>> randconfigs :) Usually the issues like this are exposed within few
+> >>>>> randconfig builds, some take longer if the options have dependencies.
+> >>>
+> >>> alternatively, just clone the repository at [1] and use the example
+> >>> script provided in README.md.
+> >>>
+> >>> [1] https://github.com/felipebalbi/omap-seeds
+> >>>
+> >>
+> >> Ok, I pushed an updated branch named: for-4.2/ti-clk-move-v4
+> >>
+> >> This definitely compiles with OMAP2 / OMAP3 / OMAP4 / OMAP5 / DRA7 / AM33xx
+> >> / AM43xx only setups (tried it out.)
+> >
+> > Thanks yeah seems to work for me now.
+> >
+> > Regards,
+> >
+> > Tony
+> >
+> 
+> Question to Mike / Stephen, any chance of getting this in during the 4.2 
+> merge anymore seeing we are already at 4.1-rc6?
+> 
+> I can send a pull request if yes. Otherwise I just wait until we are 
+> past the next merge.
 
-Yeah I'm not sure, and I'll have to spend more time to figure out what's 
-going on, hence the RFC. Does it make sense to allow the notifiers to 
-call these functions without rcu_read_lock() though? It certainly looks 
-strange to call rcu_read_lock() with a pointer that is handed to the 
-notifier.
+Hi Tero,
 
-It also seems that rcu_dereference() will take care of calling 
-rcu_read_lock_held() for us so having an opp_rcu_lockdep_assert() here 
-is redundant.
+I'd like more time for any regressions this introduces to be fixed, so
+lets push back to next merge window. The always-wrong-but-never-by-much
+crystal ball[0] predicts June 14. This is less than two weeks away, so
+the wait should be short.
 
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+[0] http://phb-crystal-ball.org/
+
+Thanks,
+Mike
+
+> 
+> -Tero
