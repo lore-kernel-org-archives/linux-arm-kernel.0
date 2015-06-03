@@ -1,45 +1,135 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 3 Jun 2015 12:38:07 -0700
-Subject: [PATCH 02/12] ARM: OMAP2+: Fix scrm compatible for dm814x
-In-Reply-To: <556F50B8.6000903@cogentembedded.com>
-References: <1433348601-8966-1-git-send-email-tony@atomide.com>
- <1433348601-8966-3-git-send-email-tony@atomide.com>
- <556F50B8.6000903@cogentembedded.com>
-Message-ID: <20150603193806.GW30984@atomide.com>
+From: grygorii.strashko@linaro.org (Grygorii.Strashko@linaro.org)
+Date: Wed, 03 Jun 2015 22:57:24 +0300
+Subject: [PATCH 00/21] On-demand device registration
+In-Reply-To: <CAL_Jsq+EWLEJhRudTGAwYsOg4tX2-pGhygeQGHae9RL8rBpMiA@mail.gmail.com>
+References: <1432565608-26036-1-git-send-email-tomeu.vizoso@collabora.com>
+ <CAL_Jsq+EWLEJhRudTGAwYsOg4tX2-pGhygeQGHae9RL8rBpMiA@mail.gmail.com>
+Message-ID: <556F5C24.1030101@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Sergei Shtylyov <sergei.shtylyov@cogentembedded.com> [150603 12:10]:
-> Hello.
-> 
-> On 06/03/2015 07:23 PM, Tony Lindgren wrote:
-> 
-> >Fix scrm compatible for dm814x.
-> 
->    So, scrm...
-> 
-> >Cc: Matthijs van Duin <matthijsvanduin@gmail.com>
-> >Signed-off-by: Tony Lindgren <tony@atomide.com>
-> >---
-> >  arch/arm/mach-omap2/control.c | 1 +
-> >  1 file changed, 1 insertion(+)
-> >
-> >diff --git a/arch/arm/mach-omap2/control.c b/arch/arm/mach-omap2/control.c
-> >index af95a62..364925c 100644
-> >--- a/arch/arm/mach-omap2/control.c
-> >+++ b/arch/arm/mach-omap2/control.c
-> >@@ -649,6 +649,7 @@ static const struct of_device_id omap_scrm_dt_match_table[] = {
-> >  	{ .compatible = "ti,am4-scm", .data = &ctrl_data },
-> >  	{ .compatible = "ti,omap2-scm", .data = &omap2_ctrl_data },
-> >  	{ .compatible = "ti,omap3-scm", .data = &omap2_ctrl_data },
-> >+	{ .compatible = "ti,dm814-scm", .data = &ctrl_data },
-> 
->    ... or scm? :-)
-> 
-> >  	{ .compatible = "ti,dm816-scrm", .data = &ctrl_data },
-> >  	{ .compatible = "ti,omap4-scm-core", .data = &ctrl_data },
-> >  	{ .compatible = "ti,omap5-scm-core", .data = &ctrl_data },
+Hi Tomeu,
 
-Thanks, yeah we should standardize on scm.
+On 05/28/2015 07:33 AM, Rob Herring wrote:
+> On Mon, May 25, 2015 at 9:53 AM, Tomeu Vizoso <tomeu.vizoso@collabora.com> wrote:
+>> I have a problem with the panel on my Tegra Chromebook taking longer than
+>> expected to be ready during boot (St?phane Marchesin reported what is
+>> basically the same issue in [0]), and have looked into ordered probing as a
+>> better way of solving this than moving nodes around in the DT or playing with
+>> initcall levels.
+>>
+>> While reading the thread [1] that Alexander Holler started with his series to
+>> make probing order deterministic, it occurred to me that it should be possible
+>> to achieve the same by registering devices as they are referenced by other
+>> devices.
+> 
+> I like the concept and novel approach.
+> 
+>> This basically reuses the information that is already implicit in the probe()
+>> implementations, saving us from refactoring existing drivers or adding
+>> information to DTBs.
+>>
+>> Something I'm not completely happy with is that I have had to move the call to
+>> of_platform_populate after all platform drivers have been registered.
+>> Otherwise I don't see how I could register drivers on demand as we don't have
+>> yet each driver's compatible strings.
+> 
+> Yeah, this is the opposite of what we'd really like. Ideally, we would
+> have a solution that works for modules too. However, we're no worse
+> off. We pretty much build-in dependencies to avoid module ordering
+> problems.
+> 
+> Perhaps we need to make the probing on-demand rather than simply on
+> device<->driver match occurring.
+> 
+>> For machs that don't move of_platform_populate() to a later point, these
+>> patches shouldn't cause any problems but it's not guaranteed that we'll avoid
+>> all the deferred probes as some drivers may not be registered yet.
+> 
+> Ideally, of_platform_populate is not explicitly called by each
+> platform. So I think we need to make this work for the default case.
+> 
+>> I have tested this on boards with Tegra, iMX.6 and Exynos SoCs, and these
+>> patches were enough to eliminate all the deferred probes.
+>>
+>> With this series I get the kernel to output to the panel in 0.5s, instead of 2.8s.
+> 
+> That's certainly compelling.
 
-Tony
+I've found your idea about moving device registration later during System boot
+very interesting so I've decided to try it on dra7-evem (TI) :).
+It's good to know time during Kernel boot when we can assume that all drivers are
+ready for probing, so there are more ways to control probing order.
+
+Pls, Note here that TI OMAP2+ mach is not pure DT mach - it's combination of
+DT and not DT devices/drivers.
+
+Ok. So What was done...
+
+LKML Linux 4.1-rc3 (a simple case)
+1) use your patches 3/4 as reference (only these two patches :)
+2) move of_platform_populate later at device_initcall_sync time
+Boot time reduction ~0.4 sec
+
+
+TI Android Kernel 3.14 (NOT a simple case)
+1) use your patches 3/4 as reference (only these two patches :)
+2) move of_platform_populate later at device_initcall_sync time
+3) make it to boot (not sure I've fixed all issues, but those which
+   break the System boot):
+ - split non-DT and DT devices registration in platform code;
+ - keep non-DT devices registration from .init_machine() [arch_initcall]
+ - move DT-devices registration at device_initcall_sync time
+ - fix drivers which use platform_driver_probe().
+   Note. Now there are at about ~190 occurrences of this macro in Kernel.
+ - re-order few devices in DT (4 devices)
+ - fix one driver which uses of_find_device_by_node() wrongly
+   Note. This API is used some times with assumption that
+   requested dev has been probed already.
+Boot time reduction ~0.3 sec. Probing of some devices are still deferred.
+
+TI Android Kernel 3.14 + of_platform_device_ensure
+1) backport of_platform_device_ensure() (also need patches 
+   "of: Introduce device tree node flag helpers" and 
+   "of: Keep track of populated platform devices")
+2) back-port all your patches which uses of_platform_device_ensure()
+3) make it to boot:
+   - drop patch dma: of: Probe DMA controllers on demand
+   - fix deadlock in regulator core:
+   regulator_dev_lookup() called from regulator_register() in K3.14
+4) get rid of deferred probes - add of_platform_device_ensure() calls in:
+   - drivers/video/fbdev/omap2/dss/output.c
+   - drivers/extcon/extcon-class.c
+
+ Boot time reduction: NONE !?
+
+
+So few comments from above:
+- registering devices later during the System boot may improve boot time.
+  But resolving of all deferred probes may NOT improve boot time ;) 
+  Have you seen smth like this?
+
+- usage of of_platform_device_ensure() will require continuous fixing of Kernel :(
+
+- late_initcall is not (as for me not safe) a good time to register devices. A lot
+  of platforms/subsystems/frameworks perform their final initialization or clean-up
+  steps, with assumption that System mostly ready to work. For example, CPUIdle/CPUFreq
+  are allowed and other PM staff. CPUIdle and driver's probing are not friends.
+
+What would be nice to have for now in my opinion:
+- some useful place to move device population code.
+  May be machine_desc->init_device_sync() callback.
+- some optional feature in DTC which will allow to re-arrange DT nodes for levels 0(root)
+  and 1(simple-bus) using standard or widely used bindings (gpio, regulators, clocks, dma,
+  pinctrl, irqs).
+
+Additional note:
+- Changing device's registration order will change devices's order in
+ dpm_list (drivers/base/power/main.c) and devices_kset list
+ (drivers/base/core.c). This might potentially affect on suspend [1] and shutdown. 
+[1] https://lkml.org/lkml/2014/12/12/324
+
+
+-- 
+regards,
+-grygorii
