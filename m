@@ -1,65 +1,97 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Wed, 3 Jun 2015 15:31:56 +0200
-Subject: [PATCH 0/2] get pinctrl more flexible for per pin muxing
- controllers
-In-Reply-To: <1430729776-27797-1-git-send-email-ludovic.desroches@atmel.com>
-References: <1430729776-27797-1-git-send-email-ludovic.desroches@atmel.com>
-Message-ID: <556F01CC.8020305@atmel.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Wed, 03 Jun 2015 14:36:09 +0100
+Subject: [PATCH v2 0/4] arm64: alternative patching rework
+In-Reply-To: <20150602175902.GF3080@e104818-lin.cambridge.arm.com>
+References: <1433152062-21907-1-git-send-email-marc.zyngier@arm.com>
+ <20150602174715.GE3080@e104818-lin.cambridge.arm.com>
+ <20150602175902.GF3080@e104818-lin.cambridge.arm.com>
+Message-ID: <556F02C9.9020706@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le 04/05/2015 10:56, Ludovic Desroches a ?crit :
-> Hi,
+Hi Catalin,
+
+On 02/06/15 18:59, Catalin Marinas wrote:
+> On Tue, Jun 02, 2015 at 06:47:15PM +0100, Catalin Marinas wrote:
+>> On Mon, Jun 01, 2015 at 10:47:38AM +0100, Marc Zyngier wrote:
+>>> The current alternative instruction framework is not kind to branches,
+>>> potentially leading to all kind of hacks in the code that uses
+>>> alternatives. This series expands it to deal with immediate and
+>>> conditional branches.
+>>>
+>>> This is a rewrite of fef7f2b20103, which got reverted in b9a95e85bbc
+>>> as it was breaking unsuspecting branches inside an alternate
+>>> sequence. It now also deals with conditional branches (instead of just
+>>> asserting a BUG).
+>>>
+>>> Another nit is addressed by the last patch, where GAS gets confused by
+>>> the combinaison of a .inst directive (as used by the msr_s/mrs_s
+>>> pseudo-instruction), a label, and a .if directive evaluating said
+>>> label. As this is exactly what the alternative framework uses to
+>>> detect length mismatch, this patch reverts to using a pair of .org
+>>> directives in a creative way. To make this a bit easier,
+>>> alternative-asm.h is folded into alternative.h.
+>>>
+>>> This has been tested on v4.1-rc5.
+>>>
+>>> Marc Zyngier (4):
+>>>   arm64: insn: Add aarch64_{get,set}_branch_offset
+>>>   arm64: alternative: Allow immediate branch as alternative instruction
+>>>   arm64: alternative: Merge alternative-asm.h into alternative.h
+>>>   arm64: alternative: Work around .inst assembler bugs
+>>
+>> Applied, thanks.
 > 
-> The way pins, groups and functions are tied is too constraining for some
-> controllers. It concerns mainly the ones we don't care about groups and
-> functions, each pin can be muxed to any functions.
-> The goal of these two patches is too remove some of the constraints.
+> Applied, but not pushed out yet. Testing on Juno gives:
 > 
-> I have added the prototype of a pin controller and device tree to show the
-> way I want to use these changes. I couldn't test it on boards using generic
-> pinconf so I am not sure that I don't break something...
+> alternatives: patching kernel code
+> BUG: failure at /work/Linux/linux-2.6-aarch64/arch/arm64/kernel/alternative.c:59/branch_insn_requires_update()!
+> Kernel panic - not syncing: BUG!
+> CPU: 0 PID: 10 Comm: migration/0 Not tainted 4.1.0-rc4+ #224
+> Hardware name: Juno (DT)
+> Call trace:
+> [<ffffffc00008992c>] dump_backtrace+0x0/0x11c
+> [<ffffffc000089a58>] show_stack+0x10/0x1c
+> [<ffffffc0005b49b4>] dump_stack+0x88/0xc8
+> [<ffffffc0005b38a8>] panic+0xe0/0x220
+> [<ffffffc00008e3b0>] __apply_alternatives+0x1ac/0x1cc
+> [<ffffffc000123aa8>] multi_cpu_stop+0xf8/0x120
+> [<ffffffc000123d60>] cpu_stopper_thread+0xb0/0x148
+> [<ffffffc0000d12ec>] smpboot_thread_fn+0x150/0x274
+> [<ffffffc0000cdedc>] kthread+0xd8/0xf0
+> SMP: failed to stop secondary CPUs
 > 
 > 
-> Ludovic Desroches (4):
->   pinctrl: change function behavior for per pin muxing controllers
->   pinctrl: introduce complex pin description
+> I haven't investigated yet, I'll have a look tomorrow.
 
-Linus,
+I reproduced this. Two issues:
 
-Ludovic sent this series nearly one month ago. It was posted after a RFC
-series on the same topic two months ago. As we don't see any comment on
-neither of them we assume that it's okay to include them.
+- the workaround for CONFIG_ARM64_ERRATUM_845719 is written with two 
+alternate sequences, and the first one branches in to the second. 
+Exactly what this series disallows... I'll post a rewrite of this 
+sequence in a minute.
 
-So, is it possible for you to merge these 2 patches in
-pinmux/pinconf-generic? The driver making use of this work, which was
-marked a "PROTO" in the series sent by Ludovic, is being finalized and
-sent: it would be good to have it working early.
+- there is a small bug that the above also triggers, as it branches 
+just *after* the last instruction of the sequence. This doesn't 
+generate any relocation problem, and can be accepted. Can you fold the 
+patchlet below into the second patch of the series?
 
-Best regards,
+diff --git a/arch/arm64/kernel/alternative.c b/arch/arm64/kernel/alternative.c
+index df4bf15..221b983 100644
+--- a/arch/arm64/kernel/alternative.c
++++ b/arch/arm64/kernel/alternative.c
+@@ -49,7 +49,7 @@ static bool branch_insn_requires_update(struct alt_instr *alt, unsigned long pc)
+                return 1;
+ 
+        replptr = (unsigned long)ALT_REPL_PTR(alt);
+-       if (pc >= replptr && pc < (replptr + alt->alt_len))
++       if (pc >= replptr && pc <= (replptr + alt->alt_len))
+                return 0;
+ 
+        /*
 
+Thanks,
 
->   pinctrl: rough draft for a future controller
->   ARM: at91/dt: proto dt
-> 
->  arch/arm/boot/dts/Makefile                 |   1 +
->  arch/arm/boot/dts/at91-sama5d4ek_proto.dts | 243 ++++++++++
->  arch/arm/boot/dts/sama5d4_proto-pinfunc.h  | 463 +++++++++++++++++++
->  arch/arm/boot/dts/sama5d4_proto.dtsi       | 716 +++++++++++++++++++++++++++++
->  drivers/pinctrl/Kconfig                    |  10 +
->  drivers/pinctrl/Makefile                   |   1 +
->  drivers/pinctrl/pinconf-generic.c          |  44 +-
->  drivers/pinctrl/pinctrl-at91-pio4.c        | 625 +++++++++++++++++++++++++
->  drivers/pinctrl/pinmux.c                   |  58 +--
->  include/linux/pinctrl/pinctrl.h            |   6 +
->  include/linux/pinctrl/pinmux.h             |   3 +
->  11 files changed, 2134 insertions(+), 36 deletions(-)
->  create mode 100644 arch/arm/boot/dts/at91-sama5d4ek_proto.dts
->  create mode 100644 arch/arm/boot/dts/sama5d4_proto-pinfunc.h
->  create mode 100644 arch/arm/boot/dts/sama5d4_proto.dtsi
->  create mode 100644 drivers/pinctrl/pinctrl-at91-pio4.c
-> 
-
-
+	M.
 -- 
-Nicolas Ferre
+Jazz is not dead. It just smells funny...
