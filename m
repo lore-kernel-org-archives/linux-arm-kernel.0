@@ -1,35 +1,37 @@
-From: mark.yao@rock-chips.com (Mark yao)
-Date: Wed, 03 Jun 2015 11:40:33 +0800
-Subject: [PATCH v2] drm/rockchip: Add BGR formats to VOP
-In-Reply-To: <CAAFQd5A1HTV+LdkTSeQrjX=MpQEseY9-NF5PySJq_B+rrmTMkw@mail.gmail.com>
-References: <1431341739-12523-1-git-send-email-tfiga@chromium.org>
- <CAAFQd5A1HTV+LdkTSeQrjX=MpQEseY9-NF5PySJq_B+rrmTMkw@mail.gmail.com>
-Message-ID: <556E7731.6020403@rock-chips.com>
+From: gregory.0xf0@gmail.com (Gregory Fong)
+Date: Tue, 2 Jun 2015 21:13:19 -0700
+Subject: [PATCH 0/3] GPIO support for BRCMSTB
+In-Reply-To: <CACRpkdY_-zq-1srBC213MK_RoVvPsfTpRTQyx-4yRvCOV5JdxQ@mail.gmail.com>
+References: <1430901477-10678-1-git-send-email-gregory.0xf0@gmail.com>
+ <CACRpkda3EDa7YdzeT6FQ=cQw1RrDath7pQsCos-JeB2y4r18gw@mail.gmail.com>
+ <CADtm3G45-u82Rp_0dHf2EfdMokf8E4FaQ84PHnocpvXxU+5_+g@mail.gmail.com>
+ <CACRpkdaTYAr-7K5_QZh1CyeyA1224obqEB2Sz8UHZmrWcfv+ow@mail.gmail.com>
+ <CADtm3G4ao=3sHx2F1+V9rwS=jWf6ZdEQi4d24HxQ6MEc+CQ8CQ@mail.gmail.com>
+ <CACRpkdY_-zq-1srBC213MK_RoVvPsfTpRTQyx-4yRvCOV5JdxQ@mail.gmail.com>
+Message-ID: <CADtm3G7mKJ6b9Koy0DeTAVUeJyhS9Lw+AzEvKf-xmFXTmAuG2w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2015?05?30? 02:56, Tomasz Figa wrote:
-> On Mon, May 11, 2015 at 7:55 PM, Tomasz Figa <tfiga@chromium.org> wrote:
->> VOP can support BGR formats in all windows thanks to red/blue swap option
->> provided in WINx_CTRL0 registers. This patch enables support for
->> ABGR8888, XBGR8888, BGR888 and BGR565 formats by using this feature.
->>
->> Signed-off-by: Tomasz Figa <tfiga@chromium.org>
->> ---
->>   drivers/gpu/drm/rockchip/rockchip_drm_vop.c | 33 +++++++++++++++++++++++++++++
->>   1 file changed, 33 insertions(+)
->>
->> Changes since v1:
->> (https://patchwork.kernel.org/patch/6369531/)
->>   - Fixed register addresses for win2/3 and hwc (reported by Mark Yao).
-> Gentle ping.
-Applied to my drm-next:-)
-> Best regards,
-> Tomasz
+On Tue, Jun 2, 2015 at 2:05 AM, Linus Walleij <linus.walleij@linaro.org> wrote:
+> On Wed, May 27, 2015 at 5:26 AM, Gregory Fong <gregory.0xf0@gmail.com> wrote:
+>> I've now actually attempted to use the gpiolib irqchip code.  This
+>> driver can't directly use gpiochip_irqchip_add() because of the
+>> multiple gpiochip : one irqchip map.  At first, I thought it might be
+>> possible to simply add a new argument (or break things into a helper
+>> function) to allow setting the associated IRQ domain, but then I can't
+>> use the generic map and unmap functions which expect the irq_domain
+>> host_data member to be struct gpiochip *, which makes no sense in this
+>> case.  That puts me right back to implementing a special version of
+>> the map and unmap function.
 >
->
+> I see.
 >
 
+I think I was wrong, it isn't actually necessary to have a single
+irq_chip as long as all of the IRQs use the same handler.  I have a
+preliminary implementation doing that instead that seems to work fine.
+Once I've had a chance to verify that it works in all cases, will post
+that as v3.
 
--- 
-?ark Yao
+Cheers,
+Gregory
