@@ -1,68 +1,99 @@
-From: tj@kernel.org (Tejun Heo)
-Date: Wed, 3 Jun 2015 14:44:22 +0900
-Subject: [PATCH v4 3/3] AHCI: Add generic MSI-X interrupt support to SATA
- PCI driver
-In-Reply-To: <1433073319-13796-4-git-send-email-rric@kernel.org>
-References: <1433073319-13796-1-git-send-email-rric@kernel.org>
- <1433073319-13796-4-git-send-email-rric@kernel.org>
-Message-ID: <20150603054422.GD20091@mtj.duckdns.org>
+From: hverkuil@xs4all.nl (Hans Verkuil)
+Date: Wed, 03 Jun 2015 08:13:59 +0200
+Subject: [Linaro-mm-sig] [RFCv3 1/2] device: add
+ dma_params->max_segment_count
+In-Reply-To: <1422347154-15258-1-git-send-email-sumit.semwal@linaro.org>
+References: <1422347154-15258-1-git-send-email-sumit.semwal@linaro.org>
+Message-ID: <556E9B27.20006@xs4all.nl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello, Robert.
+Hi Sumit, Rob,
 
-Maybe qualifying the subject that it's only for single IRQ would be a
-good idea?
+Is there any reason why this patch hasn't been merged yet? It makes perfect
+sense to me and I would really like to use this in the media drivers.
 
-> @@ -52,6 +53,7 @@
+Many DMA engines do have a limit to the number of segments (obviously
+a max count of 1 being the most common limitation, but other limits are
+definitely possible), so this patch seems a no-brainer to me.
+
+So:
+
+Acked-by: Hans Verkuil <hans.verkuil@cisco.com>
+
+Regards,
+
+	Hans
+
+On 01/27/2015 09:25 AM, Sumit Semwal wrote:
+> From: Rob Clark <robdclark@gmail.com>
+> 
+> For devices which have constraints about maximum number of segments in
+> an sglist.  For example, a device which could only deal with contiguous
+> buffers would set max_segment_count to 1.
+> 
+> The initial motivation is for devices sharing buffers via dma-buf,
+> to allow the buffer exporter to know the constraints of other
+> devices which have attached to the buffer.  The dma_mask and fields
+> in 'struct device_dma_parameters' tell the exporter everything else
+> that is needed, except whether the importer has constraints about
+> maximum number of segments.
+> 
+> Signed-off-by: Rob Clark <robdclark@gmail.com>
+>  [sumits: Minor updates wrt comments]
+> Signed-off-by: Sumit Semwal <sumit.semwal@linaro.org>
+> ---
+> 
+> v3: include Robin Murphy's fix[1] for handling '0' as a value for
+>      max_segment_count
+> v2: minor updates wrt comments on the first version
+> 
+> [1]: http://article.gmane.org/gmane.linux.kernel.iommu/8175/
+> 
+>  include/linux/device.h      |  1 +
+>  include/linux/dma-mapping.h | 19 +++++++++++++++++++
+>  2 files changed, 20 insertions(+)
+> 
+> diff --git a/include/linux/device.h b/include/linux/device.h
+> index fb506738f7b7..a32f9b67315c 100644
+> --- a/include/linux/device.h
+> +++ b/include/linux/device.h
+> @@ -647,6 +647,7 @@ struct device_dma_parameters {
+>  	 * sg limitations.
+>  	 */
+>  	unsigned int max_segment_size;
+> +	unsigned int max_segment_count;    /* INT_MAX for unlimited */
+>  	unsigned long segment_boundary_mask;
+>  };
 >  
->  enum {
->  	AHCI_PCI_BAR_STA2X11	= 0,
-> +	AHCI_PCI_BAR_CAVIUM	= 0,
->  	AHCI_PCI_BAR_ENMOTUS	= 2,
->  	AHCI_PCI_BAR_STANDARD	= 5,
-
-I thought I already asked but please separate out CAVIUM specific
-changes from msix implementation and follow up with why cavium depends
-on msix support.
-
-> +static int ahci_init_msix(struct pci_dev *pdev, unsigned int n_ports,
-> +			  struct ahci_host_priv *hpriv)
+> diff --git a/include/linux/dma-mapping.h b/include/linux/dma-mapping.h
+> index c3007cb4bfa6..d3351a36d5ec 100644
+> --- a/include/linux/dma-mapping.h
+> +++ b/include/linux/dma-mapping.h
+> @@ -154,6 +154,25 @@ static inline unsigned int dma_set_max_seg_size(struct device *dev,
+>  		return -EIO;
+>  }
+>  
+> +#define DMA_SEGMENTS_MAX_SEG_COUNT ((unsigned int) INT_MAX)
+> +
+> +static inline unsigned int dma_get_max_seg_count(struct device *dev)
 > +{
-
-Please add a comment describing that it's for single msix only and why
-that'd be necessary for certain controllers.
-
-...
-> +	/*
-> +	 * Per-port msix interrupts are not supported. Assume single
-> +	 * port interrupts for:
-> +	 *
-> +	 *  n_ports == 1, or
-> +	 *  nvec < n_ports.
-> +	 *
-> +	 * We also need to check for n_ports != 0 which is implicitly
-> +	 * covered here since nvec > 0.
-> +	 */
-> +	if (n_ports != 1 && nvec >= n_ports) {
-> +		rc = -ENOSYS;
-> +		goto fail;
+> +	if (dev->dma_parms && dev->dma_parms->max_segment_count)
+> +		return dev->dma_parms->max_segment_count;
+> +	return DMA_SEGMENTS_MAX_SEG_COUNT;
+> +}
+> +
+> +static inline int dma_set_max_seg_count(struct device *dev,
+> +						unsigned int count)
+> +{
+> +	if (dev->dma_parms) {
+> +		dev->dma_parms->max_segment_count = count;
+> +		return 0;
 > +	}
-
-Didn't I ask this one too the last time?  Can you explain why we can't
-initialize single IRQ mode if nvec >= n_ports?
-
-> @@ -1260,6 +1339,10 @@ static int ahci_init_interrupts(struct pci_dev *pdev, unsigned int n_ports,
->  	if (nvec >= 0)
->  		return nvec;
->  
-> +	nvec = ahci_init_msix(pdev, n_ports, hpriv);
-> +	if (nvec >= 0)
-> +		return nvec;
-
-Please add a comment explaining why we're doing msix after msi.
-
-Thanks.
-
--- 
-tejun
+> +	return -EIO;
+> +}
+> +
+>  static inline unsigned long dma_get_seg_boundary(struct device *dev)
+>  {
+>  	return dev->dma_parms ?
+> 
