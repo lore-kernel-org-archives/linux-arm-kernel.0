@@ -1,63 +1,101 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 3 Jun 2015 10:52:41 +0100
-Subject: [PATCH] arm64: fix missing syscall trace exit
-In-Reply-To: <556E5454.9080400@redhat.com>
-References: <20150601102448.GG1641@arm.com>
- <1433293304-26539-1-git-send-email-jistone@redhat.com>
- <556E5454.9080400@redhat.com>
-Message-ID: <20150603095241.GD17581@arm.com>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Wed, 3 Jun 2015 11:03:43 +0100
+Subject: [Patch v4 5/8] ARM64/PCI/ACPI: Introduce struct pci_controller
+ for ACPI
+In-Reply-To: <556ECA93.7040800@linux.intel.com>
+References: <1433225576-8215-1-git-send-email-jiang.liu@linux.intel.com>
+ <1433225576-8215-6-git-send-email-jiang.liu@linux.intel.com>
+ <20150602093525.GA23543@red-moon> <556EBE6D.90907@linaro.org>
+ <556ECA93.7040800@linux.intel.com>
+Message-ID: <20150603100343.GA27917@red-moon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 03, 2015 at 02:11:48AM +0100, Josh Stone wrote:
-> On 06/02/2015 06:01 PM, Josh Stone wrote:
-> > If a syscall is entered without TIF_SYSCALL_TRACE set, then it goes on
-> > the fast path.  It's then possible to have TIF_SYSCALL_TRACE added in
-> > the middle of the syscall, but ret_fast_syscall doesn't check this flag
-> > again.  This causes a ptrace syscall-exit-stop to be missed.
+On Wed, Jun 03, 2015 at 10:36:19AM +0100, Jiang Liu wrote:
+> On 2015/6/3 16:44, Hanjun Guo wrote:
+> > On 2015???06???02??? 17:35, Lorenzo Pieralisi wrote:
+> >> On Tue, Jun 02, 2015 at 07:12:53AM +0100, Jiang Liu wrote:
+> >>> From: Hanjun Guo <hanjun.guo@linaro.org>
+> >>>
+> >>> ARM64 ACPI based PCI host bridge init needs a arch dependent
+> >>> struct pci_controller to accommodate common PCI host bridge
+> >>> code which is introduced later, or it will lead to compile
+> >>> errors on ARM64.
+> >>>
+> >>> Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
+> >>> Tested-by: Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com>
+> >>> CC: Arnd Bergmann <arnd@arndb.de>
+> >>> CC: Catalin Marinas <catalin.marinas@arm.com>
+> >>> CC: Liviu Dudau <Liviu.Dudau@arm.com>
+> >>> CC: Lorenzo Pieralisi <Lorenzo.Pieralisi@arm.com>
+> >>> CC: Will Deacon <will.deacon@arm.com>
+> >>> Signed-off-by: Jiang Liu <jiang.liu@linux.intel.com>
+> >>> ---
+> >>>   arch/arm64/include/asm/pci.h |   10 ++++++++++
+> >>>   1 file changed, 10 insertions(+)
+> >>>
+> >>> diff --git a/arch/arm64/include/asm/pci.h b/arch/arm64/include/asm/pci.h
+> >>> index b008a72f8bc0..70884957f253 100644
+> >>> --- a/arch/arm64/include/asm/pci.h
+> >>> +++ b/arch/arm64/include/asm/pci.h
+> >>> @@ -10,6 +10,16 @@
+> >>>   #include <asm-generic/pci-bridge.h>
+> >>>   #include <asm-generic/pci-dma-compat.h>
+> >>>
+> >>> +struct acpi_device;
+> >>> +
+> >>> +struct pci_controller {
+> >>> +#ifdef CONFIG_ACPI
+> >>> +    struct acpi_device *companion;    /* ACPI companion device */
+> >>> +#endif
+> >>> +    int        segment;    /* PCI domain */
+> >>> +    int        node;        /* NUMA node */
+> >>> +};
+> >>
+> >> There is nothing ARM64 specific in this structure. The only
+> >> reason I see you want to keep it arch specific is the iommu
+> >> pointer on x86,
 > > 
-> > For instance, from a PTRACE_EVENT_FORK reported during do_fork, the
-> > tracer might resume with PTRACE_SYSCALL, setting TIF_SYSCALL_TRACE.
-> > Now the completion of the fork should have a syscall-exit-stop.
+> > And also plarform_data for IA64 too.
 > > 
-> > Russell King fixed this on arm by re-checking _TIF_SYSCALL_WORK in the
-> > fast exit path.  Do the same on arm64.
+> >> but I think we should find a way to make
+> >> the common bits shared across archs (ie the struct above) and
+> >> add (maybe a void*) to the generic struct to cater for arch
+> >> specific data.
+> >>
+> >> Thoughts ?
 > > 
-> > Cc: Catalin Marinas <catalin.marinas@arm.com>
-> > Cc: Will Deacon <will.deacon@arm.com>
-> > Cc: Russell King <rmk@arm.linux.org.uk>
-> > Signed-off-by: Josh Stone <jistone@redhat.com>
-> > ---
-> >  arch/arm64/kernel/entry.S | 4 +++-
-> >  1 file changed, 3 insertions(+), 1 deletion(-)
+> > We discussed this already, it has limitations to make it
+> > common to all archs, I think the limitation are:
 > > 
-> > diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
-> > index 959fe8733560..a547a3e8a198 100644
-> > --- a/arch/arm64/kernel/entry.S
-> > +++ b/arch/arm64/kernel/entry.S
-> > @@ -608,7 +608,9 @@ ENDPROC(cpu_switch_to)
-> >   */
-> >  ret_fast_syscall:
-> >  	disable_irq				// disable interrupts
-> > -	ldr	x1, [tsk, #TI_FLAGS]
-> > +	ldr	x1, [tsk, #TI_FLAGS]		// re-check for syscall tracing
-> > +	and	x2, x1, #_TIF_SYSCALL_WORK
-> > +	cbnz	x2, __sys_trace_return
-> >  	and	x2, x1, #_TIF_WORK_MASK
-> >  	cbnz	x2, fast_work_pending
-> >  	enable_step_tsk x1, x2
-> 
-> I do have one concern about this, also in Russell's ARM patch.  Is it
-> really ok to branch to __sys_trace_return with interrupts disabled?
+> >   - struct pci_controller are also used for other archs
+> >     such as PowerPC and Tile, they will not use it for
+> >     ACPI purpose, so we can not used for all archs.
+> > 
+> >   - if we let struct pci_controller defined only for archs
+> >     using ACPI, such as introduce it in linux/acpi.h, we still
+> >     can not satisfy that the struct pci_controller is not
+> >     only used for ACPI case on x86, it will be used for
+> >     non-ACPI too.
+> > 
+> > So it's pretty difficult to share it with across archs to me,
+> > any more ideas?
+> Hi Hanjun and Lorenzo,
+> 	As mentioned by Hanjun, I have no idea yet about how to
+> consolidating "struct pci_controller" further. One possible
+> way is to move "struct pci_controller" related code into
+> arch, but apparently that will reduce code reusing.
 
-I think you're right to be concerned!
+I guess you can't move that struct pci_controller to generic code
+since it is present on other archs too (with completely different
+members).
 
-> I didn't hit any issue from that, but my testcase only exercises this
-> path once each run.  So that might have just been lucky not to hit any
-> gross scenario...
+What you can do is creating a new struct (ie same purpose of pci_controller
+with a different name) common to all archs that contains the common bits
++ a void* data that contains arch specific data, and convert x86 and ia64
+to using it.
 
-Did you try enabling all the audit stuff? It looks like that can call
-into the scheduler, so I think we should be running the tracing callbacks
-with interrupts enabled (and it looks like x86 do this on the exit path).
+It is weird to be forced to declare a pci_controller structure in arm64
+code with 0 arch specific data in it.
 
-Will
+Lorenzo
