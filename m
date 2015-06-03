@@ -1,70 +1,32 @@
-From: jonathanh@nvidia.com (Jon Hunter)
-Date: Wed, 3 Jun 2015 12:44:48 +0100
-Subject: [PATCH] ARM: tegra: Enable CPUFreq support for Tegra124
- Chromebooks
-In-Reply-To: <1433331821-9648-1-git-send-email-jonathanh@nvidia.com>
-References: <1433331821-9648-1-git-send-email-jonathanh@nvidia.com>
-Message-ID: <556EE8B0.2060205@nvidia.com>
+From: pratyush.anand@gmail.com (Pratyush Anand)
+Date: Wed, 3 Jun 2015 17:15:52 +0530
+Subject: [PATCH Part1 v11 3/5] PCI: designware: Use pci_scan_root_bus()
+ for simplicity
+In-Reply-To: <000301d09888$09d01370$1d703a50$@com>
+References: <000301d09888$09d01370$1d703a50$@com>
+Message-ID: <CAHM4w1mGB1GET6s-rkLs-0=Cqc4-zEm5q9-i8vxpFGgjf-V8JA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Adding LAKML. Jon
+On Wed, May 27, 2015 at 7:48 PM, Jingoo Han <jingoohan1@gmail.com> wrote:
+> On Tue, 28 Apr 2015 15:01:37 +0800, Yijing Wang wrote:
+>
+>> Pci_bus_add_devices() was ripped out of pci_scan_root_bus().
+>> Now pci_scan_root_bus() == pci_create_root_bus() +
+>> pci_scan_child_bus() if busn resource is supplied.
+>> Designware added the busn resource to resources list
+>> in dw_pcie_setup(). So it should be safe to use
+>> pci_scan_root_bus() instead.
+>>
+>> Signed-off-by: Yijing Wang <wangyijing@huawei.com>
+>> CC: Mohit Kumar <mohit.kumar@st.com>
+>> CC: Jingoo Han <jg1.han@samsung.com>
+>
+> +cc: Pratyush Anand, Lucas Stach
+>
+> Acked-by: Jingoo Han <jingoohan1@gmail.com>
 
-On 03/06/15 12:43, Jon Hunter wrote:
-> Add the device-tree DFLL clock node and CPU regulator phandle for
-> tegra124 chromebooks to enable CPUFreq support on these boards.
-> 
-> Signed-off-by: Jon Hunter <jonathanh@nvidia.com>
-> 
-> ---
-> This has been tested on a tegra124 nyan-big by using the userspace
-> CPUFreq governor with a simple CPU benchmark to measure the time taken
-> for the test to execute.
-> 
-> The tegra124 chromebooks use the same ams,as3722 PMIC as the Jetson TK1
-> board and hence, this change is based upon that for the Jetson TK1.
-> 
->  arch/arm/boot/dts/tegra124-nyan.dtsi | 15 ++++++++++++++-
->  1 file changed, 14 insertions(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm/boot/dts/tegra124-nyan.dtsi b/arch/arm/boot/dts/tegra124-nyan.dtsi
-> index a9aec23e06f2..40c23a0b7cfc 100644
-> --- a/arch/arm/boot/dts/tegra124-nyan.dtsi
-> +++ b/arch/arm/boot/dts/tegra124-nyan.dtsi
-> @@ -159,7 +159,7 @@
->  				vin-ldo9-10-supply = <&vdd_5v0_sys>;
->  				vin-ldo11-supply = <&vdd_3v3_run>;
->  
-> -				sd0 {
-> +				vdd_cpu: sd0 {
->  					regulator-name = "+VDD_CPU_AP";
->  					regulator-min-microvolt = <700000>;
->  					regulator-max-microvolt = <1350000>;
-> @@ -397,6 +397,13 @@
->  		non-removable;
->  	};
->  
-> +	/* CPU DFLL clock */
-> +	clock at 0,70110000 {
-> +		status = "okay";
-> +		vdd-cpu-supply = <&vdd_cpu>;
-> +		nvidia,i2c-fs-rate = <400000>;
-> +	};
-> +
->  	ahub at 0,70300000 {
->  		i2s at 0,70301100 {
->  			status = "okay";
-> @@ -487,6 +494,12 @@
->  		};
->  	};
->  
-> +	cpus {
-> +		cpu at 0 {
-> +			vdd-cpu-supply = <&vdd_cpu>;
-> +		};
-> +	};
-> +
->  	gpio-keys {
->  		compatible = "gpio-keys";
->  
-> 
+
+
+Looks fine to me:
+Acked-by: Pratyush Anand <pratyush.anand@gmail.com>
