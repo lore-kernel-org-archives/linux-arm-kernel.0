@@ -1,69 +1,86 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Wed, 3 Jun 2015 16:54:45 -0500
-Subject: [RFC/NOT FOR MERGING] HACK: add global/private timers for A9
-In-Reply-To: <556F7493.2060602@codeaurora.org>
-References: <1433363565-17725-1-git-send-email-balbi@ti.com>
- <2466648.WjMxjIpAUG@wuerfel>
- <20150603210455.GD6042@saruman.tx.rr.com>
- <20150603212821.GH6042@saruman.tx.rr.com>
- <556F7493.2060602@codeaurora.org>
-Message-ID: <20150603215445.GK6042@saruman.tx.rr.com>
+From: mturquette@linaro.org (Michael Turquette)
+Date: Wed, 03 Jun 2015 15:17:56 -0700
+Subject: [PATCH v2] clk: mvebu: add missing CESA gate clk
+In-Reply-To: <55646B50.9060709@free-electrons.com>
+References: <1432644177-16152-1-git-send-email-boris.brezillon@free-electrons.com>
+ <55646B50.9060709@free-electrons.com>
+Message-ID: <20150603221756.6017.93987@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Wed, Jun 03, 2015 at 02:41:39PM -0700, Stephen Boyd wrote:
-> >>>>AM43xx, even though it's a single processor A9, it still has TWD and global
-> >>>>timer. I was doing some profiling with RT v4.0 and latency is 3.5x lower just
-> >>>>by switching from gptimer to twd/global.
-> >>>>
-> >>>>The only problem is that currently, is_smp() check prevents me from using twd
-> >>>>with AM43xx (that's why it's commented below, for testing purposes).
-> >>>>
-> >>>>In the hopes that we can start a, hopefully, small thread around the subject,
-> >>>>I'm sending this HACK which I used to get TWD and global timer enabled so I
-> >>>>could measure latencies with cyclictest.
-> >>>>
-> >>>>Is it so that TWD shouldn't be available on UP integrations of ARM's Cortex-A
-> >>>>processors ?
-> >>>>
-> >>>>
-> >>>I wondered about this recently when looking at something unrelated
-> >>>and noticed that the check had been introduced as part of
-> >>>904464b91eca8 ("ARM: 7655/1: smp_twd: make twd_local_timer_of_register()
-> >>>no-op for nosmp").
-> >>>
-> >>>I suspect this was just the wrong fix at the time, and that the
-> >>>real culprit is either alloc_percpu() or request_percpu_irq()
-> >>>getting called too early on a machine without SMP support.
-> >>>
-> >>>Possibly the problem is already resolved independently, if you
-> >>>didn't run into it.
-> >>no, no splats, nothing at all. See [1]
-> >>
-> >>[1] http://hastebin.com/helekubutu
-> >Adding Shawn
-> >
+Quoting Gregory CLEMENT (2015-05-26 05:47:12)
+> Hi Boris,
 > 
-> Mason was also interested in doing this. See [2]. From what I could tell
-> back then, commit 904464b91eca8 was working around the local timer APIs that
-> no longer exist.
+> On 26/05/2015 14:42, Boris Brezillon wrote:
+> > Even if not documented in the datasheet, the Armada 370 SoC can actually
+> > gate the CESA (crypto engine) clock.
+> > Add an entry in the gating_desc table to be able to reference the CESA
+> > gateclk in the crypto node.
+> > 
+> > Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
 > 
-> [2] http://thread.gmane.org/gmane.linux.ports.arm.kernel/389931/focus=392348
+> 
+> Acked-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
 
-A lot of good information on that thread, thanks. Seems like getting
-twd/global timer working would also have some effect on context
-switching, perhaps ?
+Applied.
 
-cheers
+Regards,
+Mike
 
--- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150603/c65b9710/attachment.sig>
+> 
+> 
+> Thanks,
+> 
+> Gregory
+> 
+> > ---
+> > Hi,
+> > 
+> > Sorry for the noise, but since the changes in this patch are quite
+> > straightforward, I'm directly sending a v2 addressing Gregory's comments
+> > (instead of waiting for more reviews).
+> > 
+> > Best Regards,
+> > 
+> > Boris
+> > 
+> > Changes since v1:
+> >  - update the DT bindings doc
+> >  - change the clock name to be consistent with other SoCs
+> > 
+> >  Documentation/devicetree/bindings/clock/mvebu-gated-clock.txt | 1 +
+> >  drivers/clk/mvebu/armada-370.c                                | 1 +
+> >  2 files changed, 2 insertions(+)
+> > 
+> > diff --git a/Documentation/devicetree/bindings/clock/mvebu-gated-clock.txt b/Documentation/devicetree/bindings/clock/mvebu-gated-clock.txt
+> > index 31c7c0c..660e649 100644
+> > --- a/Documentation/devicetree/bindings/clock/mvebu-gated-clock.txt
+> > +++ b/Documentation/devicetree/bindings/clock/mvebu-gated-clock.txt
+> > @@ -19,6 +19,7 @@ ID  Clock   Peripheral
+> >  9    pex1    PCIe Cntrl 1
+> >  15   sata0   SATA Host 0
+> >  17   sdio    SDHCI Host
+> > +23   crypto  CESA (crypto engine)
+> >  25   tdm     Time Division Mplx
+> >  28   ddr     DDR Cntrl
+> >  30   sata1   SATA Host 0
+> > diff --git a/drivers/clk/mvebu/armada-370.c b/drivers/clk/mvebu/armada-370.c
+> > index 756f0f3..c19fd77 100644
+> > --- a/drivers/clk/mvebu/armada-370.c
+> > +++ b/drivers/clk/mvebu/armada-370.c
+> > @@ -163,6 +163,7 @@ static const struct clk_gating_soc_desc a370_gating_desc[] __initconst = {
+> >       { "pex1", "pex1_en", 9, 0 },
+> >       { "sata0", NULL, 15, 0 },
+> >       { "sdio", NULL, 17, 0 },
+> > +     { "crypto", NULL, 23, 0 },
+> >       { "tdm", NULL, 25, 0 },
+> >       { "ddr", NULL, 28, CLK_IGNORE_UNUSED },
+> >       { "sata1", NULL, 30, 0 },
+> > 
+> 
+> 
+> -- 
+> Gregory Clement, Free Electrons
+> Kernel, drivers, real-time and embedded Linux
+> development, consulting, training and support.
+> http://free-electrons.com
