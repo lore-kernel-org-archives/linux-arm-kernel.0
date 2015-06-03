@@ -1,93 +1,58 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Wed, 3 Jun 2015 16:19:21 +0100
-Subject: [PATCHv3 11/12] ARM: migrate to common PSCI client code
-In-Reply-To: <20150527171747.GB23176@leverpostej>
-References: <1432648350-5454-1-git-send-email-mark.rutland@arm.com>
- <1432648350-5454-12-git-send-email-mark.rutland@arm.com>
- <CAL_JsqJG=k=z5+p55YVzmdFBjcGSX2t3ct337kYRd6c5HG5H3g@mail.gmail.com>
- <20150527171747.GB23176@leverpostej>
-Message-ID: <20150603151921.GB599@leverpostej>
+From: wsa@the-dreams.de (Wolfram Sang)
+Date: Thu, 4 Jun 2015 00:19:22 +0900
+Subject: [PATCH v4 5/6] i2c: at91: print hardware version
+In-Reply-To: <03bf4d8906d12a87fee7238764074bc5687972be.1433321260.git.cyrille.pitchen@atmel.com>
+References: <cover.1433321260.git.cyrille.pitchen@atmel.com>
+ <03bf4d8906d12a87fee7238764074bc5687972be.1433321260.git.cyrille.pitchen@atmel.com>
+Message-ID: <20150603151921.GA2873@katana>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rob,
-
-On Wed, May 27, 2015 at 06:17:47PM +0100, Mark Rutland wrote:
-> On Wed, May 27, 2015 at 05:46:47PM +0100, Rob Herring wrote:
-> > On Tue, May 26, 2015 at 8:52 AM, Mark Rutland <mark.rutland@arm.com> wrote:
-> > > Now that the common PSCI client code has been factored out to
-> > > drivers/firmware, and made safe for 32-bit use, move the 32-bit ARM code
-> > > over to it. This results in a moderate reduction of duplicated lines,
-> > > and will prevent further duplication as the PSCI client code is updated
-> > > for PSCI 1.0 and beyond.
-> > >
-> > > The two legacy platform users of the PSCI invocation code are updated to
-> > > account for interface changes. In both cases the power state parameter
-> > > is changed to an opaque u32 token in preparation for PSCI 1.0 power
-> > > state changes.
-
-Other than the changes you requested below, are you happy with the
-patch?
-
-Are you happy to ack the patch with those changes folded in?
-
-Mark.
-
-> > >  static int highbank_suspend_finish(unsigned long val)
-> > >  {
-> > > -       const struct psci_power_state ps = {
-> > > -               .type = PSCI_POWER_STATE_TYPE_POWER_DOWN,
-> > > -               .affinity_level = 1,
-> > > -       };
-> > > -
-> > > +       u32 ps = 0x01010000; /* Aff1 power down */
-> > 
-> > Why not just pass directly instead of sticking in a variable first.
+On Wed, Jun 03, 2015 at 11:04:26AM +0200, Cyrille Pitchen wrote:
+> The probe() function now prints the hardware version of the I2C
+> controller.
 > 
-> No particular reason. I'll fold it in.
+> Signed-off-by: Cyrille Pitchen <cyrille.pitchen@atmel.com>
+
+Kernel has already very much printout, so I don't see the gain in adding
+another one. At least, combine it with the other printout we have
+already, but I wonder what new information will be in here? We should
+know from the compatible binding which version we serve? Is it really
+needed? Helpful for the user?
+
+> ---
+>  drivers/i2c/busses/i2c-at91.c | 4 ++++
+>  1 file changed, 4 insertions(+)
+> 
+> diff --git a/drivers/i2c/busses/i2c-at91.c b/drivers/i2c/busses/i2c-at91.c
+> index 67b4f15..cbe6684 100644
+> --- a/drivers/i2c/busses/i2c-at91.c
+> +++ b/drivers/i2c/busses/i2c-at91.c
+> @@ -85,6 +85,8 @@
+>  #define	AT91_TWI_ACR_DATAL(len)	((len) & 0xff)
+>  #define	AT91_TWI_ACR_DIR	BIT(8)
 >  
-> > >         return psci_ops.cpu_suspend(ps, __pa(cpu_resume));
-> > >  }
-> > >
-> > > diff --git a/drivers/cpuidle/cpuidle-calxeda.c b/drivers/cpuidle/cpuidle-calxeda.c
-> > > index 9445e6c..d010da8f 100644
-> > > --- a/drivers/cpuidle/cpuidle-calxeda.c
-> > > +++ b/drivers/cpuidle/cpuidle-calxeda.c
-> > > @@ -25,15 +25,14 @@
-> > >  #include <linux/init.h>
-> > >  #include <linux/mm.h>
-> > >  #include <linux/platform_device.h>
-> > > +#include <linux/psci.h>
-> > > +
-> > >  #include <asm/cpuidle.h>
-> > >  #include <asm/suspend.h>
-> > > -#include <asm/psci.h>
-> > >
-> > >  static int calxeda_idle_finish(unsigned long val)
-> > >  {
-> > > -       const struct psci_power_state ps = {
-> > > -               .type = PSCI_POWER_STATE_TYPE_POWER_DOWN,
-> > > -       };
-> > > +       u32 ps = 0x00010000; /* Aff0 power down */
-> > 
-> > ditto.
+> +#define	AT91_TWI_VER		0x00fc	/* Version Register */
+> +
+>  struct at91_twi_pdata {
+>  	unsigned clk_max_div;
+>  	unsigned clk_offset;
+> @@ -872,6 +874,8 @@ static int at91_twi_probe(struct platform_device *pdev)
+>  			return rc;
+>  	}
+>  
+> +	dev_info(dev->dev, "version: %#x\n", at91_twi_read(dev, AT91_TWI_VER));
+> +
+>  	rc = of_property_read_u32(dev->dev->of_node, "clock-frequency",
+>  			&bus_clk_rate);
+>  	if (rc)
+> -- 
+> 1.8.2.2
 > 
-> Likewise.
-> 
-> Thanks,
-> Mark.
-> 
-> > 
-> > >         return psci_ops.cpu_suspend(ps, __pa(cpu_resume));
-> > >  }
-> > >
-> > > --
-> > > 1.9.1
-> > >
-> > 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> 
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150604/ff6d2718/attachment.sig>
