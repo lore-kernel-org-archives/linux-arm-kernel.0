@@ -1,87 +1,65 @@
 From: dinh.linux@gmail.com (dinh.linux at gmail.com)
-Date: Tue,  2 Jun 2015 21:14:02 -0500
-Subject: [PATCH 2/2] ARM: socfpga: add CPU_METHOD_OF_DECLARE for Arria 10
+Date: Tue,  2 Jun 2015 21:14:01 -0500
+Subject: [PATCH 1/2] ARM: socfpga: use CPU_METHOD_OF_DECLARE for
+ socfpga_cyclone5
 In-Reply-To: <1433297642-3818-1-git-send-email-dinh.linux@gmail.com>
 References: <1433297642-3818-1-git-send-email-dinh.linux@gmail.com>
-Message-ID: <1433297642-3818-3-git-send-email-dinh.linux@gmail.com>
+Message-ID: <1433297642-3818-2-git-send-email-dinh.linux@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Dinh Nguyen <dinguyen@opensource.altera.com>
 
-Add boot_secondary implementation for the Arria10 platform. Bringing up
-the secondary core on the Arria 10 platform is pretty similar to the
-Cyclone/Arria 5 platform, with the exception of the following differences:
-
-- Register offset to bringup CPU1 out of reset is different.
-- The cpu1-start-addr for Arria10 contains an additional nibble.
+Convert cyclone5/arria5 to use CPU_METHOD_OF_DECLARE for smp operations.
 
 Signed-off-by: Dinh Nguyen <dinguyen@opensource.altera.com>
 ---
- arch/arm/mach-socfpga/core.h    |  2 ++
- arch/arm/mach-socfpga/platsmp.c | 32 ++++++++++++++++++++++++++++++++
- 2 files changed, 34 insertions(+)
+ arch/arm/mach-socfpga/core.h    | 1 -
+ arch/arm/mach-socfpga/platsmp.c | 4 +++-
+ arch/arm/mach-socfpga/socfpga.c | 1 -
+ 3 files changed, 3 insertions(+), 3 deletions(-)
 
 diff --git a/arch/arm/mach-socfpga/core.h b/arch/arm/mach-socfpga/core.h
-index 38e5cbf..27e7c65 100644
+index 5913bbb..38e5cbf 100644
 --- a/arch/arm/mach-socfpga/core.h
 +++ b/arch/arm/mach-socfpga/core.h
-@@ -25,6 +25,8 @@
- #define SOCFPGA_RSTMGR_MODPERRST	0x14
- #define SOCFPGA_RSTMGR_BRGMODRST	0x1c
+@@ -39,7 +39,6 @@ extern void socfpga_sysmgr_init(void);
+ extern void __iomem *sys_manager_base_addr;
+ extern void __iomem *rst_manager_base_addr;
  
-+#define SOCFPGA_A10_RSTMGR_MODMPURST	0x20
-+
- /* System Manager bits */
- #define RSTMGR_CTRL_SWCOLDRSTREQ	0x1	/* Cold Reset */
- #define RSTMGR_CTRL_SWWARMRSTREQ	0x2	/* Warm Reset */
+-extern struct smp_operations socfpga_smp_ops;
+ extern char secondary_trampoline, secondary_trampoline_end;
+ 
+ extern unsigned long socfpga_cpu1start_addr;
 diff --git a/arch/arm/mach-socfpga/platsmp.c b/arch/arm/mach-socfpga/platsmp.c
-index b84c1a1..5454e9c 100644
+index 7886eae..b84c1a1 100644
 --- a/arch/arm/mach-socfpga/platsmp.c
 +++ b/arch/arm/mach-socfpga/platsmp.c
-@@ -54,6 +54,29 @@ static int socfpga_boot_secondary(unsigned int cpu, struct task_struct *idle)
- 	return 0;
+@@ -83,10 +83,12 @@ static void socfpga_cpu_die(unsigned int cpu)
+ 		cpu_do_idle();
  }
  
-+static int socfpga_a10_boot_secondary(unsigned int cpu, struct task_struct *idle)
-+{
-+	int trampoline_size = &secondary_trampoline_end - &secondary_trampoline;
-+
-+	if (socfpga_cpu1start_addr) {
-+		writel(RSTMGR_MPUMODRST_CPU1, rst_manager_base_addr +
-+		       SOCFPGA_A10_RSTMGR_MODMPURST);
-+		memcpy(phys_to_virt(0), &secondary_trampoline, trampoline_size);
-+
-+		writel(virt_to_phys(socfpga_secondary_startup),
-+		       sys_manager_base_addr + (socfpga_cpu1start_addr & 0x00000fff));
-+
-+		flush_cache_all();
-+		smp_wmb();
-+		outer_clean_range(0, trampoline_size);
-+
-+		/* This will release CPU #1 out of reset. */
-+		writel(0, rst_manager_base_addr + SOCFPGA_A10_RSTMGR_MODMPURST);
-+	}
-+
-+	return 0;
-+}
-+
- static void __init socfpga_smp_prepare_cpus(unsigned int max_cpus)
- {
- 	struct device_node *np;
-@@ -91,4 +114,13 @@ static struct smp_operations socfpga_smp_ops __initdata = {
+-struct smp_operations socfpga_smp_ops __initdata = {
++static struct smp_operations socfpga_smp_ops __initdata = {
+ 	.smp_prepare_cpus	= socfpga_smp_prepare_cpus,
+ 	.smp_boot_secondary	= socfpga_boot_secondary,
+ #ifdef CONFIG_HOTPLUG_CPU
+ 	.cpu_die		= socfpga_cpu_die,
  #endif
  };
- 
-+static struct smp_operations socfpga_a10_smp_ops __initdata = {
-+	.smp_prepare_cpus	= socfpga_smp_prepare_cpus,
-+	.smp_boot_secondary	= socfpga_a10_boot_secondary,
-+#ifdef CONFIG_HOTPLUG_CPU
-+	.cpu_die		= socfpga_cpu_die,
-+#endif
-+};
 +
- CPU_METHOD_OF_DECLARE(socfpga_smp, "altr,socfpga-smp", &socfpga_smp_ops);
-+CPU_METHOD_OF_DECLARE(socfpga_a10_smp, "altr,socfpga-a10-smp", &socfpga_a10_smp_ops);
++CPU_METHOD_OF_DECLARE(socfpga_smp, "altr,socfpga-smp", &socfpga_smp_ops);
+diff --git a/arch/arm/mach-socfpga/socfpga.c b/arch/arm/mach-socfpga/socfpga.c
+index b63dec6..a154920 100644
+--- a/arch/arm/mach-socfpga/socfpga.c
++++ b/arch/arm/mach-socfpga/socfpga.c
+@@ -78,7 +78,6 @@ static const char *altera_dt_match[] = {
+ DT_MACHINE_START(SOCFPGA, "Altera SOCFPGA")
+ 	.l2c_aux_val	= 0,
+ 	.l2c_aux_mask	= ~0,
+-	.smp		= smp_ops(socfpga_smp_ops),
+ 	.init_irq	= socfpga_init_irq,
+ 	.restart	= socfpga_cyclone5_restart,
+ 	.dt_compat	= altera_dt_match,
 -- 
 1.9.1.315.g3f09db0
