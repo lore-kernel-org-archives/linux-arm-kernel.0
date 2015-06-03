@@ -1,40 +1,45 @@
-From: robert.jarzmik@free.fr (Robert Jarzmik)
-Date: Wed, 03 Jun 2015 21:23:58 +0200
-Subject: [PATCH 1/7] mtd: pxa3xx_nand: add a non mandatory ECC clock
-In-Reply-To: <1433266351-22587-2-git-send-email-antoine.tenart@free-electrons.com>
- (Antoine Tenart's message of "Tue, 2 Jun 2015 19:32:25 +0200")
-References: <1433266351-22587-1-git-send-email-antoine.tenart@free-electrons.com>
- <1433266351-22587-2-git-send-email-antoine.tenart@free-electrons.com>
-Message-ID: <87bngw61f5.fsf@belgarion.home>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 3 Jun 2015 12:38:07 -0700
+Subject: [PATCH 02/12] ARM: OMAP2+: Fix scrm compatible for dm814x
+In-Reply-To: <556F50B8.6000903@cogentembedded.com>
+References: <1433348601-8966-1-git-send-email-tony@atomide.com>
+ <1433348601-8966-3-git-send-email-tony@atomide.com>
+ <556F50B8.6000903@cogentembedded.com>
+Message-ID: <20150603193806.GW30984@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Antoine Tenart <antoine.tenart@free-electrons.com> writes:
+* Sergei Shtylyov <sergei.shtylyov@cogentembedded.com> [150603 12:10]:
+> Hello.
+> 
+> On 06/03/2015 07:23 PM, Tony Lindgren wrote:
+> 
+> >Fix scrm compatible for dm814x.
+> 
+>    So, scrm...
+> 
+> >Cc: Matthijs van Duin <matthijsvanduin@gmail.com>
+> >Signed-off-by: Tony Lindgren <tony@atomide.com>
+> >---
+> >  arch/arm/mach-omap2/control.c | 1 +
+> >  1 file changed, 1 insertion(+)
+> >
+> >diff --git a/arch/arm/mach-omap2/control.c b/arch/arm/mach-omap2/control.c
+> >index af95a62..364925c 100644
+> >--- a/arch/arm/mach-omap2/control.c
+> >+++ b/arch/arm/mach-omap2/control.c
+> >@@ -649,6 +649,7 @@ static const struct of_device_id omap_scrm_dt_match_table[] = {
+> >  	{ .compatible = "ti,am4-scm", .data = &ctrl_data },
+> >  	{ .compatible = "ti,omap2-scm", .data = &omap2_ctrl_data },
+> >  	{ .compatible = "ti,omap3-scm", .data = &omap2_ctrl_data },
+> >+	{ .compatible = "ti,dm814-scm", .data = &ctrl_data },
+> 
+>    ... or scm? :-)
+> 
+> >  	{ .compatible = "ti,dm816-scrm", .data = &ctrl_data },
+> >  	{ .compatible = "ti,omap4-scm-core", .data = &ctrl_data },
+> >  	{ .compatible = "ti,omap5-scm-core", .data = &ctrl_data },
 
-> Some controllers (as the coming Berlin nand controller) need to enable
-> an ECC clock. Add support for this clock in the pxa3xx nand driver, and
-> leave it as non mandatory.
-> -	info->clk = devm_clk_get(&pdev->dev, NULL);
-> +	info->clk = devm_clk_get(&pdev->dev, "nfc");
->  	if (IS_ERR(info->clk)) {
-> -		dev_err(&pdev->dev, "failed to get nand clock\n");
-> -		return PTR_ERR(info->clk);
-> +		info->clk = devm_clk_get(&pdev->dev, NULL);
-> +
-> +		if (IS_ERR(info->clk)) {
-> +			dev_err(&pdev->dev, "failed to get nand clock\n");
-> +			return PTR_ERR(info->clk);
-> +		}
-I suppose this is done to keep the compatibility with existing pxa3xx/berlin
-clock code, which was defined without a con_id. More specifically I'm thinking
-of the function clk_find().
+Thanks, yeah we should standardize on scm.
 
-Now maybe it would be cleaner to keep you "nfc" change, remove the failback plan
-with NULL as an con_id, and change the clock providers. I cannot speak for
-berlin/others, but for pxa3xx, this is one 3 hunks change in :
- - drivers/clk/pxa/clk-pxa3xx.c
-
-Cheers.
-
---
-Robert
+Tony
