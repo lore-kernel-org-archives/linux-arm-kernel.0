@@ -1,47 +1,54 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 3 Jun 2015 13:44:08 -0700
-Subject: [RFC/NOT FOR MERGING] HACK: add global/private timers for A9
-In-Reply-To: <1433363565-17725-1-git-send-email-balbi@ti.com>
-References: <1433363565-17725-1-git-send-email-balbi@ti.com>
-Message-ID: <20150603204407.GX30984@atomide.com>
+From: paul.gortmaker@windriver.com (Paul Gortmaker)
+Date: Wed, 3 Jun 2015 16:52:57 -0400
+Subject: [PATCH staging] drivers/hwtracing: fix coresight-replicator-qcom
+ implicit <module.h> usage
+Message-ID: <1433364777-29651-1-git-send-email-paul.gortmaker@windriver.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Felipe Balbi <balbi@ti.com> [150603 13:36]:
-> 
-> AM43xx, even though it's a single processor A9, it still has TWD and global
-> timer. I was doing some profiling with RT v4.0 and latency is 3.5x lower just
-> by switching from gptimer to twd/global.
-> 
-> The only problem is that currently, is_smp() check prevents me from using twd
-> with AM43xx (that's why it's commented below, for testing purposes).
-> 
-> In the hopes that we can start a, hopefully, small thread around the subject,
-> I'm sending this HACK which I used to get TWD and global timer enabled so I
-> could measure latencies with cyclictest.
-> 
-> Is it so that TWD shouldn't be available on UP integrations of ARM's Cortex-A
-> processors ?
+In commit 620cf787c121f39b5223e43bad3d1b7c66ecead5 ("coresight: replicator:
+Add Qualcomm CoreSight Replicator driver") this driver was added.
 
-> --- a/arch/arm/kernel/smp_twd.c
-> +++ b/arch/arm/kernel/smp_twd.c
-> @@ -388,8 +389,10 @@ static void __init twd_local_timer_of_register(struct device_node *np)
->  {
->  	int err;
->  
-> +#if 0
->  	if (!is_smp() || !setup_max_cpus)
->  		return;
-> +#endif
->  
->  	twd_ppi = irq_of_parse_and_map(np, 0);
->  	if (!twd_ppi) {
+It uses module_amba_driver(replicator_driver) to register itself with
+the system -- which is just an alias for module_driver.  This currently
+works by relying on getting that via init.h but we are planning to move
+that code[1] to module.h -- at which time this will fail to compile since
+it does not include module.h currently, resulting in:
 
-Why don't you just check for the c-a9 revision here? If it's the
-UP processor then allow twd?
+drivers/hwtracing/coresight/coresight-replicator-qcom.c:214:1: error: type defaults to 'int' in declaration of 'module_init' [-Werror=implicit-int]
+drivers/hwtracing/coresight/coresight-replicator-qcom.c:214:1: error: type defaults to 'int' in declaration of 'module_exit' [-Werror=implicit-int]
 
-Similar to what's done in global_timer_of_register?
+In the future, the amba support may want to create another alias that
+uses builtin_driver[2] for cases like this which are using bool Kconfig
+triggers, but for now we just fix the implicit include.
 
-Regards,
+[1] https://lkml.kernel.org/r/1433276168-21550-1-git-send-email-paul.gortmaker at windriver.com
+[2] https://lkml.kernel.org/r/1431287385-1526-1-git-send-email-paul.gortmaker at windriver.com
 
-Tony
+Cc: Pratik Patel <pratikp@codeaurora.org>
+Cc: Ivan T. Ivanov <ivan.ivanov@linaro.org>
+Cc: Mathieu Poirier <mathieu.poirier@linaro.org>
+Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+Signed-off-by: Paul Gortmaker <paul.gortmaker@windriver.com>
+---
+
+[Note: Commit 620cf787c121 is only in linux-next trees via staging-next;
+ this fixes a next build fail when staging-next is merged with [1] above.]
+
+ drivers/hwtracing/coresight/coresight-replicator-qcom.c | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/drivers/hwtracing/coresight/coresight-replicator-qcom.c b/drivers/hwtracing/coresight/coresight-replicator-qcom.c
+index deacea49af36..584059e9e866 100644
+--- a/drivers/hwtracing/coresight/coresight-replicator-qcom.c
++++ b/drivers/hwtracing/coresight/coresight-replicator-qcom.c
+@@ -15,6 +15,7 @@
+ #include <linux/clk.h>
+ #include <linux/coresight.h>
+ #include <linux/device.h>
++#include <linux/module.h>
+ #include <linux/err.h>
+ #include <linux/init.h>
+ #include <linux/io.h>
+-- 
+2.2.1
