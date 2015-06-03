@@ -1,45 +1,54 @@
-From: paul.gortmaker@windriver.com (Paul Gortmaker)
-Date: Wed, 3 Jun 2015 17:18:18 -0400
-Subject: [PATCH] drivers/cpufreq: include <module.h> for modular
- exynos-cpufreq.c code
-In-Reply-To: <1430444867-22342-1-git-send-email-paul.gortmaker@windriver.com>
-References: <1430444867-22342-1-git-send-email-paul.gortmaker@windriver.com>
-Message-ID: <1433366298-30016-1-git-send-email-paul.gortmaker@windriver.com>
+From: hramrach@gmail.com (Michal Suchanek)
+Date: 3 Jun 2015 21:26:39 -0000
+Subject: [PATCH 00/11] Enable access to SPI NOR flash on Samsung Snow board
+Message-ID: <cover.1433364398.git.hramrach@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This file is built off of a tristate Kconfig option ("ARM_EXYNOS_CPUFREQ")
-and also contains modular function calls so it should explicitly include
-module.h to avoid compile breakage during pending header shuffles.
+Hello,
 
-Cc: "Rafael J. Wysocki" <rjw@rjwysocki.net>
-Cc: Viresh Kumar <viresh.kumar@linaro.org>
-Cc: Kukjin Kim <kgene@kernel.org>
-Cc: Krzysztof Kozlowski <k.kozlowski@samsung.com>
-Cc: linux-pm at vger.kernel.org
-Cc: linux-arm-kernel at lists.infradead.org
-Cc: linux-samsung-soc at vger.kernel.org
-Signed-off-by: Paul Gortmaker <paul.gortmaker@windriver.com>
----
+this patch series makes it possible to access the SPI NOR flash in the Samsung
+XE303 'Snow' Chromebook.
 
-[ patch will be appended to the implicit include fixup series, see:
-  https://lkml.kernel.org/r/1430444867-22342-1-git-send-email-paul.gortmaker at windriver.com
-  for the original series posting.]
+Unfortunately not all issues are resolved. To work around an issue with the
+pl330 dma engine I respun the patch for limiting transfer size in m25p80
+driver.
 
- drivers/cpufreq/exynos-cpufreq.c | 1 +
- 1 file changed, 1 insertion(+)
+As the flash does not contain any sane filesystem and is only likely to be
+accessed with mtd_debug or similar tool the limit of the dma engine is easily
+reached. Filesystems using shorter data transfers are less likely to be
+affected.
 
-diff --git a/drivers/cpufreq/exynos-cpufreq.c b/drivers/cpufreq/exynos-cpufreq.c
-index 82d2fbb20f7e..4c157302365f 100644
---- a/drivers/cpufreq/exynos-cpufreq.c
-+++ b/drivers/cpufreq/exynos-cpufreq.c
-@@ -10,6 +10,7 @@
- */
- 
- #include <linux/kernel.h>
-+#include <linux/module.h>
- #include <linux/err.h>
- #include <linux/clk.h>
- #include <linux/io.h>
+Thanks
+
+Michal
+
+
+
+Michal Suchanek (11):
+  ARM: dt: Add SPI CS on Samsung Snow board.
+  mtd: spi-nor: Add GD25LQ32C 1.8V SPI NOR flash ID
+  mtd: add debug prints to mtdpart partition parser.
+  mtd: ofpart: do not fail probe when no partitions exist
+  mtd: mtdpart: Do not fail mtd probe when parsing partitions fails.
+  mtd: spi-nor: rework spi nor read and write.
+  mtd: spi-nor: rework write loop
+  MTD: m25p80: Add option to limit SPI transfer size.
+  dma: pl330: fix wording in mcbufsz message
+  spi: add more debug prints in s3c64xx
+  dt: Exynos: add Snow SPI NOR node.
+
+ .../devicetree/bindings/mtd/jedec,spi-nor.txt      |  6 ++
+ arch/arm/boot/dts/exynos5250-snow.dts              | 15 +++-
+ drivers/dma/pl330.c                                |  4 +-
+ drivers/mtd/devices/m25p80.c                       | 57 +++++++++++----
+ drivers/mtd/mtdpart.c                              |  9 ++-
+ drivers/mtd/ofpart.c                               |  4 +-
+ drivers/mtd/spi-nor/fsl-quadspi.c                  | 29 ++++----
+ drivers/mtd/spi-nor/spi-nor.c                      | 80 ++++++++++++----------
+ drivers/spi/spi-s3c64xx.c                          | 30 ++++++++
+ include/linux/mtd/spi-nor.h                        |  8 +--
+ 10 files changed, 166 insertions(+), 76 deletions(-)
+
 -- 
-2.2.1
+2.1.4
