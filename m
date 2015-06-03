@@ -1,31 +1,93 @@
 From: hramrach@gmail.com (Michal Suchanek)
-Date: 3 Jun 2015 21:26:40 -0000
-Subject: [PATCH 02/11] mtd: spi-nor: Add GD25LQ32C 1.8V SPI NOR flash ID
+Date: 3 Jun 2015 21:26:41 -0000
+Subject: [PATCH 07/11] mtd: spi-nor: rework write loop
 In-Reply-To: <cover.1433364398.git.hramrach@gmail.com>
 References: <cover.1433364398.git.hramrach@gmail.com>
-Message-ID: <d96c00e9007a13819719af96094b258d77df4bde.1433364398.git.hramrach@gmail.com>
+Message-ID: <df028a8d9cff88f0acecb950839255a6ede492d0.1433364398.git.hramrach@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This 1.8V SPI NOR flash is found on ARM Chromebook XE303C and reads
-something like 25LQ32VIG in the middle.
+The write loop assumes that what is passed to write() is what gets
+written. When write() writes less than page size at once data is dropped
+on the floor. Check the amount of data writen.
 
 Signed-off-by: Michal Suchanek <hramrach@gmail.com>
 ---
- drivers/mtd/spi-nor/spi-nor.c | 1 +
- 1 file changed, 1 insertion(+)
+ drivers/mtd/spi-nor/spi-nor.c | 48 ++++++++++++++-----------------------------
+ 1 file changed, 15 insertions(+), 33 deletions(-)
 
 diff --git a/drivers/mtd/spi-nor/spi-nor.c b/drivers/mtd/spi-nor/spi-nor.c
-index 14a5d23..7bcc584 100644
+index c851bb5..76f4970 100644
 --- a/drivers/mtd/spi-nor/spi-nor.c
 +++ b/drivers/mtd/spi-nor/spi-nor.c
-@@ -552,6 +552,7 @@ static const struct spi_device_id spi_nor_ids[] = {
+@@ -823,7 +823,7 @@ static int spi_nor_write(struct mtd_info *mtd, loff_t to, size_t len,
+ 	size_t *retlen, const u_char *buf)
+ {
+ 	struct spi_nor *nor = mtd_to_spi_nor(mtd);
+-	u32 page_offset, page_size, i;
++	size_t page_offset, page_remain, i;
+ 	int ret;
  
- 	/* GigaDevice */
- 	{ "gd25q32", INFO(0xc84016, 0, 64 * 1024,  64, SECT_4K) },
-+	{ "gd25lq32c", INFO(0xc86016, 0, 64 * 1024,  64, SECT_4K) },
- 	{ "gd25q64", INFO(0xc84017, 0, 64 * 1024, 128, SECT_4K) },
- 	{ "gd25q128", INFO(0xc84018, 0, 64 * 1024, 256, SECT_4K) },
+ 	dev_dbg(nor->dev, "to 0x%08x, len %zd\n", (u32)to, len);
+@@ -832,45 +832,27 @@ static int spi_nor_write(struct mtd_info *mtd, loff_t to, size_t len,
+ 	if (ret)
+ 		return ret;
  
+-	write_enable(nor);
+-
+-	page_offset = to & (nor->page_size - 1);
++	for (i = 0; i < len; ) {
++		int written;
+ 
+-	/* do all the bytes fit onto one page? */
+-	if (page_offset + len <= nor->page_size) {
+-		ret = nor->write(nor, to, len, buf);
+-		if (ret < 0)
+-			goto write_err;
+-		*retlen += ret;
+-	} else {
++		page_offset = to & (nor->page_size - 1);
+ 		/* the size of data remaining on the first page */
+-		page_size = nor->page_size - page_offset;
+-		nor->write(nor, to, page_size, buf);
++		page_remain = min_t(size_t,
++				    nor->page_size - page_offset, len - i);
++
++		write_enable(nor);
++		ret = nor->write(nor, to + i, page_remain, buf + i);
+ 		if (ret < 0)
+ 			goto write_err;
+-		*retlen += ret;
+-
+-		/* write everything in nor->page_size chunks */
+-		for (i = ret; i < len; ) {
+-			page_size = len - i;
+-			if (page_size > nor->page_size)
+-				page_size = nor->page_size;
+-
+-			ret = spi_nor_wait_till_ready(nor);
+-			if (ret)
+-				goto write_err;
++		written = ret;
+ 
+-			write_enable(nor);
+-
+-			ret = nor->write(nor, to + i, page_size, buf + i);
+-			if (ret < 0)
+-				goto write_err;
+-			*retlen += ret;
+-			i += ret;
+-		}
++		ret = spi_nor_wait_till_ready(nor);
++		if (ret)
++			goto write_err;
++		*retlen += written;
++		i += written;
+ 	}
+ 
+-	ret = spi_nor_wait_till_ready(nor);
+ write_err:
+ 	spi_nor_unlock_and_unprep(nor, SPI_NOR_OPS_WRITE);
+ 	return ret;
 -- 
 2.1.4
