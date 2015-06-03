@@ -1,86 +1,93 @@
-From: mturquette@linaro.org (Michael Turquette)
-Date: Wed, 03 Jun 2015 15:17:56 -0700
-Subject: [PATCH v2] clk: mvebu: add missing CESA gate clk
-In-Reply-To: <55646B50.9060709@free-electrons.com>
-References: <1432644177-16152-1-git-send-email-boris.brezillon@free-electrons.com>
- <55646B50.9060709@free-electrons.com>
-Message-ID: <20150603221756.6017.93987@quantum>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 3 Jun 2015 15:26:20 -0700
+Subject: [RFC/NOT FOR MERGING] HACK: add global/private timers for A9
+In-Reply-To: <1433363565-17725-1-git-send-email-balbi@ti.com>
+References: <1433363565-17725-1-git-send-email-balbi@ti.com>
+Message-ID: <20150603222619.GY30984@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Gregory CLEMENT (2015-05-26 05:47:12)
-> Hi Boris,
-> 
-> On 26/05/2015 14:42, Boris Brezillon wrote:
-> > Even if not documented in the datasheet, the Armada 370 SoC can actually
-> > gate the CESA (crypto engine) clock.
-> > Add an entry in the gating_desc table to be able to reference the CESA
-> > gateclk in the crypto node.
-> > 
-> > Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
-> 
-> 
-> Acked-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+* Felipe Balbi <balbi@ti.com> [150603 13:36]:
+> --- a/arch/arm/mach-omap2/timer.c
+> +++ b/arch/arm/mach-omap2/timer.c
+> @@ -655,20 +655,18 @@ static OMAP_SYS_32K_TIMER_INIT(4, 1, "timer_32k_ck", "ti,timer-alwon",
+>  static DEFINE_TWD_LOCAL_TIMER(twd_local_timer, OMAP44XX_LOCAL_TWD_BASE, 29);
+>  void __init omap4_local_timer_init(void)
+>  {
+> +	int err;
+> +
+>  	omap4_sync32k_timer_init();
+>  	/* Local timers are not supprted on OMAP4430 ES1.0 */
+> -	if (omap_rev() != OMAP4430_REV_ES1_0) {
+> -		int err;
+> -
+> -		if (of_have_populated_dt()) {
+> -			clocksource_of_init();
+> -			return;
+> -		}
+> -
+> -		err = twd_local_timer_register(&twd_local_timer);
+> -		if (err)
+> -			pr_err("twd_local_timer_register failed %d\n", err);
+> +	if (of_have_populated_dt()) {
+> +		clocksource_of_init();
+> +		return;
+>  	}
+> +
+> +	err = twd_local_timer_register(&twd_local_timer);
+> +	if (err)
+> +		pr_err("twd_local_timer_register failed %d\n", err);
+>  }
+>  #else
+>  void __init omap4_local_timer_init(void)
 
-Applied.
+Looks like can get rid of even more code here, see the patch below.
 
 Regards,
-Mike
 
-> 
-> 
-> Thanks,
-> 
-> Gregory
-> 
-> > ---
-> > Hi,
-> > 
-> > Sorry for the noise, but since the changes in this patch are quite
-> > straightforward, I'm directly sending a v2 addressing Gregory's comments
-> > (instead of waiting for more reviews).
-> > 
-> > Best Regards,
-> > 
-> > Boris
-> > 
-> > Changes since v1:
-> >  - update the DT bindings doc
-> >  - change the clock name to be consistent with other SoCs
-> > 
-> >  Documentation/devicetree/bindings/clock/mvebu-gated-clock.txt | 1 +
-> >  drivers/clk/mvebu/armada-370.c                                | 1 +
-> >  2 files changed, 2 insertions(+)
-> > 
-> > diff --git a/Documentation/devicetree/bindings/clock/mvebu-gated-clock.txt b/Documentation/devicetree/bindings/clock/mvebu-gated-clock.txt
-> > index 31c7c0c..660e649 100644
-> > --- a/Documentation/devicetree/bindings/clock/mvebu-gated-clock.txt
-> > +++ b/Documentation/devicetree/bindings/clock/mvebu-gated-clock.txt
-> > @@ -19,6 +19,7 @@ ID  Clock   Peripheral
-> >  9    pex1    PCIe Cntrl 1
-> >  15   sata0   SATA Host 0
-> >  17   sdio    SDHCI Host
-> > +23   crypto  CESA (crypto engine)
-> >  25   tdm     Time Division Mplx
-> >  28   ddr     DDR Cntrl
-> >  30   sata1   SATA Host 0
-> > diff --git a/drivers/clk/mvebu/armada-370.c b/drivers/clk/mvebu/armada-370.c
-> > index 756f0f3..c19fd77 100644
-> > --- a/drivers/clk/mvebu/armada-370.c
-> > +++ b/drivers/clk/mvebu/armada-370.c
-> > @@ -163,6 +163,7 @@ static const struct clk_gating_soc_desc a370_gating_desc[] __initconst = {
-> >       { "pex1", "pex1_en", 9, 0 },
-> >       { "sata0", NULL, 15, 0 },
-> >       { "sdio", NULL, 17, 0 },
-> > +     { "crypto", NULL, 23, 0 },
-> >       { "tdm", NULL, 25, 0 },
-> >       { "ddr", NULL, 28, CLK_IGNORE_UNUSED },
-> >       { "sata1", NULL, 30, 0 },
-> > 
-> 
-> 
-> -- 
-> Gregory Clement, Free Electrons
-> Kernel, drivers, real-time and embedded Linux
-> development, consulting, training and support.
-> http://free-electrons.com
+Tony
+
+8< ------------------------
+From: Tony Lindgren <tony@atomide.com>
+Date: Wed, 3 Jun 2015 14:40:40 -0700
+Subject: [PATCH] ARM: OMAP2+: Clean up omap4_local_timer_init
+
+Inspired by a patch from Felipe Balbi <balbi@ti.com>, we can
+now get rid of most the code in omap4_local_timer_init.
+
+Omap4 is now device tree only.. And we have not properly supported
+omap4 ES1.0 revision for a really long time AFAIK.
+
+Let's just remove all that code to simplify things. This assumes
+we have arm,cortex-a9-twd-timer entry in the omap4.dtsi file, which
+we do.
+
+Signed-off-by: Tony Lindgren <tony@atomide.com>
+
+--- a/arch/arm/mach-omap2/timer.c
++++ b/arch/arm/mach-omap2/timer.c
+@@ -649,23 +649,10 @@ static OMAP_SYS_32K_TIMER_INIT(4, 1, "timer_32k_ck", "ti,timer-alwon",
+ 
+ #ifdef CONFIG_ARCH_OMAP4
+ #ifdef CONFIG_HAVE_ARM_TWD
+-static DEFINE_TWD_LOCAL_TIMER(twd_local_timer, OMAP44XX_LOCAL_TWD_BASE, 29);
+ void __init omap4_local_timer_init(void)
+ {
+ 	omap4_sync32k_timer_init();
+-	/* Local timers are not supprted on OMAP4430 ES1.0 */
+-	if (omap_rev() != OMAP4430_REV_ES1_0) {
+-		int err;
+-
+-		if (of_have_populated_dt()) {
+-			clocksource_of_init();
+-			return;
+-		}
+-
+-		err = twd_local_timer_register(&twd_local_timer);
+-		if (err)
+-			pr_err("twd_local_timer_register failed %d\n", err);
+-	}
++	clocksource_of_init();
+ }
+ #else
+ void __init omap4_local_timer_init(void)
