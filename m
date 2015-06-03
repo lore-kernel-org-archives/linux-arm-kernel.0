@@ -1,60 +1,57 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Wed, 3 Jun 2015 16:28:21 -0500
-Subject: [RFC/NOT FOR MERGING] HACK: add global/private timers for A9
-In-Reply-To: <20150603210455.GD6042@saruman.tx.rr.com>
-References: <1433363565-17725-1-git-send-email-balbi@ti.com>
- <2466648.WjMxjIpAUG@wuerfel>
- <20150603210455.GD6042@saruman.tx.rr.com>
-Message-ID: <20150603212821.GH6042@saruman.tx.rr.com>
+From: lee@kernel.org (Lee Jones)
+Date: Wed, 3 Jun 2015 22:30:46 +0100
+Subject: [PATCH v6 1/3] dt/bindings: Add binding for the Raspberry Pi
+ firmware driver
+In-Reply-To: <1432928535-27522-1-git-send-email-eric@anholt.net>
+References: <1432928535-27522-1-git-send-email-eric@anholt.net>
+Message-ID: <20150603213046.GE12304@x1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 03, 2015 at 04:04:55PM -0500, Felipe Balbi wrote:
-> On Wed, Jun 03, 2015 at 10:55:27PM +0200, Arnd Bergmann wrote:
-> > On Wednesday 03 June 2015 15:32:45 Felipe Balbi wrote:
-> > > 
-> > > Hi Tony and Russell,
-> > > 
-> > > AM43xx, even though it's a single processor A9, it still has TWD and global
-> > > timer. I was doing some profiling with RT v4.0 and latency is 3.5x lower just
-> > > by switching from gptimer to twd/global.
-> > > 
-> > > The only problem is that currently, is_smp() check prevents me from using twd
-> > > with AM43xx (that's why it's commented below, for testing purposes).
-> > > 
-> > > In the hopes that we can start a, hopefully, small thread around the subject,
-> > > I'm sending this HACK which I used to get TWD and global timer enabled so I
-> > > could measure latencies with cyclictest.
-> > > 
-> > > Is it so that TWD shouldn't be available on UP integrations of ARM's Cortex-A
-> > > processors ?
-> > > 
-> > > 
-> > 
-> > I wondered about this recently when looking at something unrelated
-> > and noticed that the check had been introduced as part of
-> > 904464b91eca8 ("ARM: 7655/1: smp_twd: make twd_local_timer_of_register()
-> > no-op for nosmp").
-> > 
-> > I suspect this was just the wrong fix at the time, and that the
-> > real culprit is either alloc_percpu() or request_percpu_irq()
-> > getting called too early on a machine without SMP support.
-> > 
-> > Possibly the problem is already resolved independently, if you
-> > didn't run into it.
-> 
-> no, no splats, nothing at all. See [1]
-> 
-> [1] http://hastebin.com/helekubutu
+What's going on here?  This is unlike you.
 
-Adding Shawn
+> This driver will provide support for calls into the firmware that will
+> be used by other drivers like cpufreq and vc4.
+> 
+> v2: Improve commit message, point to mailbox.txt for how mboxes work.
+> v3: Use Lee's suggestion for mailbox phandle docs, fix spelling of
+>     "raspberry".
+> v4: Change the compatible string to "raspberrypi,bcm2835-firmware"
+>     (requested by Lee, agreed by Stephen)
 
--- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150603/5c457aaf/attachment.sig>
+Perhaps this should have culminated in a Suggested-by.
+
+The change-log should be below the "---".
+
+> Acked-by: Stephen Warren <swarren@wwwdotorg.org>
+
+Where's your SoB?
+
+> ---
+>  .../bindings/arm/bcm/raspberrypi,bcm2835-firmware.txt      | 14 ++++++++++++++
+>  1 file changed, 14 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/arm/bcm/raspberrypi,bcm2835-firmware.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/arm/bcm/raspberrypi,bcm2835-firmware.txt b/Documentation/devicetree/bindings/arm/bcm/raspberrypi,bcm2835-firmware.txt
+> new file mode 100644
+> index 0000000..5fb1868
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/arm/bcm/raspberrypi,bcm2835-firmware.txt
+> @@ -0,0 +1,14 @@
+> +Raspberry Pi VideoCore firmware driver
+> +
+> +Required properties:
+> +
+> +- compatible:		Should be "rasbperrypi,bcm2835-firmware"
+
+Spelling.
+
+> +- mboxes:		Phandle to the firmware device's Mailbox.
+> +			  (See: ../mailbox/mailbox.txt for more information)
+> +
+> +Example:
+> +
+> +firmware {
+> +	compatible = "raspberrypi,bcm2835-firmware";
+> +	mboxes = <&mailbox>;
+> +};
