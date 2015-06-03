@@ -1,57 +1,39 @@
 From: lee@kernel.org (Lee Jones)
-Date: Wed, 3 Jun 2015 22:30:46 +0100
-Subject: [PATCH v6 1/3] dt/bindings: Add binding for the Raspberry Pi
- firmware driver
-In-Reply-To: <1432928535-27522-1-git-send-email-eric@anholt.net>
+Date: Wed, 3 Jun 2015 22:35:29 +0100
+Subject: [PATCH v6 2/3] ARM: bcm2835: Add the Raspberry Pi firmware driver
+In-Reply-To: <87vbf75n2l.fsf@eliezer.anholt.net>
 References: <1432928535-27522-1-git-send-email-eric@anholt.net>
-Message-ID: <20150603213046.GE12304@x1>
+ <1432928535-27522-2-git-send-email-eric@anholt.net>
+ <1433148509.2361.35.camel@x220> <87vbf75n2l.fsf@eliezer.anholt.net>
+Message-ID: <20150603213529.GF12304@x1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-What's going on here?  This is unlike you.
+On Mon, 01 Jun 2015, Eric Anholt wrote:
 
-> This driver will provide support for calls into the firmware that will
-> be used by other drivers like cpufreq and vc4.
+> Paul Bolle <pebolle@tiscali.nl> writes:
 > 
-> v2: Improve commit message, point to mailbox.txt for how mboxes work.
-> v3: Use Lee's suggestion for mailbox phandle docs, fix spelling of
->     "raspberry".
-> v4: Change the compatible string to "raspberrypi,bcm2835-firmware"
->     (requested by Lee, agreed by Stephen)
-
-Perhaps this should have culminated in a Suggested-by.
-
-The change-log should be below the "---".
-
-> Acked-by: Stephen Warren <swarren@wwwdotorg.org>
-
-Where's your SoB?
-
-> ---
->  .../bindings/arm/bcm/raspberrypi,bcm2835-firmware.txt      | 14 ++++++++++++++
->  1 file changed, 14 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/arm/bcm/raspberrypi,bcm2835-firmware.txt
+> > On Fri, 2015-05-29 at 12:42 -0700, Eric Anholt wrote:
+> >> This gives us a function for making mailbox property channel requests
+> >> of the firmware, which is most notable in that it will let us get and
+> >> set clock rates.
 > 
-> diff --git a/Documentation/devicetree/bindings/arm/bcm/raspberrypi,bcm2835-firmware.txt b/Documentation/devicetree/bindings/arm/bcm/raspberrypi,bcm2835-firmware.txt
-> new file mode 100644
-> index 0000000..5fb1868
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/arm/bcm/raspberrypi,bcm2835-firmware.txt
-> @@ -0,0 +1,14 @@
-> +Raspberry Pi VideoCore firmware driver
-> +
-> +Required properties:
-> +
-> +- compatible:		Should be "rasbperrypi,bcm2835-firmware"
+> >> v6: Drop the try_module_get/module_put stuff, since all clients will
+> >>     be referencing our symbols in order to call those functions,
+> >>     anyway.  Fix the kerneldoc comments for the changes in v5.
+> >
+> > (This style of commit explanation is getting quite common. I must say I
+> > rather dislike it. I think people should just update the entire commit
+> > explanation when needed, and not simply paste any changes at the end of
+> > it, thereby forcing the the reader to determine which older parts are
+> > actually overruled by newer parts. Besides, many, or maybe even most, of
+> > the changes are really not interesting enough to keep in the commit
+> > explanation.)
+> 
+> It was a slip-up that I didn't move it below the '---'this time (I
+> changed my workflow a bit, and missed the step).  I was assuming that
+> Lee would just trim them on pulling in the changes.
 
-Spelling.
-
-> +- mboxes:		Phandle to the firmware device's Mailbox.
-> +			  (See: ../mailbox/mailbox.txt for more information)
-> +
-> +Example:
-> +
-> +firmware {
-> +	compatible = "raspberrypi,bcm2835-firmware";
-> +	mboxes = <&mailbox>;
-> +};
+I'm not the Firmware Maintainer, but I'm sure whoever is will be happy
+to remove the changelog.  But Paul is correct, the commit should be
+updated.
