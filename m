@@ -1,47 +1,31 @@
-From: lorenx4@gmail.com (Lorenzo Nava)
-Date: Wed,  3 Jun 2015 19:15:45 +0200
-Subject: [RFC PATCH v2] arm DMA: Fix allocation from CMA for coherent DMA
-Message-ID: <1433351745-3646-1-git-send-email-lorenx4@gmail.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 3 Jun 2015 18:25:08 +0100
+Subject: [ANNOUNCE] Stand-alone kvmtool repository
+Message-ID: <20150603172508.GM17581@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch allows the use of CMA for DMA coherent memory allocation.
-At the moment if the input parameter "is_coherent" is set to true 
-the allocation is not made using the CMA, which I think is not the 
-desired behaviour.
+Hi all,
 
-Signed-off-by: Lorenzo Nava <lorenx4@xxxxxxxx>
----
-Changes in v2:
- correct __arm_dma_free() according to __dma_alloc() allocation
----
- arch/arm/mm/dma-mapping.c |    6 +++---
- 1 file changed, 3 insertions(+), 3 deletions(-)
+Thanks to a tonne of help (and friendly nagging!) from Andre, I'm
+pleased to announce a stand-alone repository for kvmtool:
 
-diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
-index 7e7583d..15643b9 100644
---- a/arch/arm/mm/dma-mapping.c
-+++ b/arch/arm/mm/dma-mapping.c
-@@ -645,9 +645,9 @@ static void *__dma_alloc(struct device *dev, size_t size, dma_addr_t *handle,
- 	size = PAGE_ALIGN(size);
- 	want_vaddr = !dma_get_attr(DMA_ATTR_NO_KERNEL_MAPPING, attrs);
- 
--	if (is_coherent || nommu())
-+	if (nommu())
- 		addr = __alloc_simple_buffer(dev, size, gfp, &page);
--	else if (!(gfp & __GFP_WAIT))
-+	else if (!is_coherent && !(gfp & __GFP_WAIT))
- 		addr = __alloc_from_pool(size, &page);
- 	else if (!dev_get_cma_area(dev))
- 		addr = __alloc_remap_buffer(dev, size, gfp, prot, &page, caller, want_vaddr);
-@@ -735,7 +735,7 @@ static void __arm_dma_free(struct device *dev, size_t size, void *cpu_addr,
- 
- 	size = PAGE_ALIGN(size);
- 
--	if (is_coherent || nommu()) {
-+	if (nommu()) {
- 		__dma_free_buffer(page, size);
- 	} else if (__free_from_pool(cpu_addr, size)) {
- 		return;
--- 
-1.7.10.4
+  git://git.kernel.org/pub/scm/linux/kernel/git/will/kvmtool.git
+
+This is a follow-up from a previous thread[1] where we concluded that
+this was the right way to go. As requested, the original git history is
+preserved but is *not* bisectable since we don't include the kernel tree
+in the history. For a bisectable history, the original github repo[2]
+should be used instead.
+
+For now, it's living in my area of kernel.org since (a) I already had a
+fork there and (b) the patch traffic is pretty low for the project. If
+there is sufficient development interest, I can move it somewhere more
+appropriate for shared maintenance (e.g. under virt/kvm/).
+
+Anyway, please give it a spin and send patches when it falls over ;)
+
+Will
+
+[1] https://lkml.org/lkml/2015/2/23/393
+[2] git://github.com/penberg/linux-kvm.git
