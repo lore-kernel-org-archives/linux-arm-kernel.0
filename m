@@ -1,67 +1,70 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed,  3 Jun 2015 09:23:20 -0700
-Subject: [PATCH 11/12] ARM: dts: Add minimal support for HP T410
-In-Reply-To: <1433348601-8966-1-git-send-email-tony@atomide.com>
-References: <1433348601-8966-1-git-send-email-tony@atomide.com>
-Message-ID: <1433348601-8966-12-git-send-email-tony@atomide.com>
+From: cyrille.pitchen@atmel.com (Cyrille Pitchen)
+Date: Wed, 3 Jun 2015 18:25:16 +0200
+Subject: [PATCH v5 0/6] i2c: at91: add support to FIFOs and alternative command
+Message-ID: <cover.1433348016.git.cyrille.pitchen@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add minimal support for HP T410.
+ChangeLog
 
-Cc: Matthijs van Duin <matthijsvanduin@gmail.com>
-Signed-off-by: Tony Lindgren <tony@atomide.com>
----
- arch/arm/boot/dts/Makefile        |  1 +
- arch/arm/boot/dts/dm8148-t410.dts | 28 ++++++++++++++++++++++++++++
- 2 files changed, 29 insertions(+)
- create mode 100644 arch/arm/boot/dts/dm8148-t410.dts
+v5:
+- print I2C controller version in an already existing dev_info() instead of
+  adding a new one.
 
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index 9884c23..eca95eb 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -405,6 +405,7 @@ dtb-$(CONFIG_ARCH_OMAP3) += \
- 	omap3-zoom3.dtb
- dtb-$(CONFIG_SOC_TI81XX) += \
- 	dm8148-evm.dtb \
-+	dm8148-t410.dtb \
- 	dm8168-evm.dtb
- dtb-$(CONFIG_SOC_AM33XX) += \
- 	am335x-base0033.dtb \
-diff --git a/arch/arm/boot/dts/dm8148-t410.dts b/arch/arm/boot/dts/dm8148-t410.dts
-new file mode 100644
-index 0000000..8c4bbc7
---- /dev/null
-+++ b/arch/arm/boot/dts/dm8148-t410.dts
-@@ -0,0 +1,28 @@
-+/*
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ */
-+/dts-v1/;
-+
-+#include "dm814x.dtsi"
-+
-+/ {
-+	model = "DM8148 EVM";
-+	compatible = "hp,t410", "ti,dm8148";
-+
-+	memory {
-+		device_type = "memory";
-+		reg = <0x80000000 0x40000000>;	/* 1 GB */
-+	};
-+};
-+
-+&cpsw_emac0 {
-+	phy_id = <&davinci_mdio>, <0>;
-+	phy-mode = "mii";
-+};
-+
-+&cpsw_emac1 {
-+	phy_id = <&davinci_mdio>, <1>;
-+	phy-mode = "mii";
-+};
+v4:
+- replace 0x%x by %#x when printing I2C controller version
+- change the order of patches: the race condition bug fix becomes the first
+  patch so it be can more easily applied to older kernels.
+
+v3:
+- fix braces {} coding style issue
+- split the alternative command patch into 2 patches: the first one fixes
+  a race condition whereas the second one is the actual alternative command
+  patch
+
+v2:
+- fix typo in comment for AT91_TWI_SVEN.
+- document new device tree bindings like "atmel,fifo-size".
+- explicitly set the has_alt_cmd boolean to false to already existing chip
+  configs.
+- use the BIT() macro to define the register bits and do a little cleanup in a
+  dedicated patch.
+- reword some comments to better explain why the TXCOMP interrupt is no longer
+  enabled in at91_do_twi_transfer() but later in
+  at91_twi_write_data_dma_callback() to avoid a race condition when DMA is used.
+- remove useless TXCOMP interrupt enable line in at91_twi_write_next_byte()
+  since this interrupt is also enabled by at91_do_twi_transfer() for PIO
+  transfers.
+
+v1:
+This series of patches adds support of two new features which will be
+introduced with Atmel sama5d2x SoC.
+
+First, the alternative command mode eases the sending of STOP conditions.
+Before starting an I2C transaction, the size data to be transfered is
+written into the new Alternative Command Register. For each byte transferred,
+the I2C controller decreases this counter and automatically sends a STOP
+condition when the counter value reaches 0, that is to say when the last byte
+of the transaction has been sent/received. So there is no longer need to set
+the STOP bit into the Control Register.
+
+Then the use of FIFOs allows to reduce number I/O accesses: for instance,
+the TX FIFO allows to write up to 4 data in a single access to the Transmit
+Holding Register. Also the RX FIFO allows to read up to 4 data in a single
+access to the Receive Holding Register. Currently only DMA transfers take
+advantage of FIFOs.
+
+Cyrille Pitchen (6):
+  i2c: at91: fix a race condition when using the DMA controller
+  i2c: at91: use BIT() macro to define register bits
+  i2c: at91: update documentation for DT bindings
+  i2c: at91: add support for new alternative command mode
+  i2c: at91: print hardware version
+  i2c: at91: add support to FIFOs
+
+ Documentation/devicetree/bindings/i2c/i2c-at91.txt |  29 +-
+ drivers/i2c/busses/i2c-at91.c                      | 356 +++++++++++++++++----
+ 2 files changed, 322 insertions(+), 63 deletions(-)
+
 -- 
-2.1.4
+1.8.2.2
