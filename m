@@ -1,31 +1,44 @@
-From: robert.jarzmik@free.fr (Robert Jarzmik)
-Date: Wed, 03 Jun 2015 21:12:28 +0200
-Subject: [PATCH 2/7] Documentation: bindings: document the clocks for
- pxa3xx-nand
-In-Reply-To: <1433266351-22587-3-git-send-email-antoine.tenart@free-electrons.com>
- (Antoine Tenart's message of "Tue, 2 Jun 2015 19:32:26 +0200")
-References: <1433266351-22587-1-git-send-email-antoine.tenart@free-electrons.com>
- <1433266351-22587-3-git-send-email-antoine.tenart@free-electrons.com>
-Message-ID: <87fv6861yb.fsf@belgarion.home>
+From: vaibhav.hiremath@linaro.org (Vaibhav Hiremath)
+Date: Thu, 04 Jun 2015 00:46:54 +0530
+Subject: [PATCH 05/12] i2c: pxa: Add bus reset functionality
+In-Reply-To: <CACRpkdaxWsi8t6aUFJK-KCmQF1gEOLiOE8=fgDRxQDSi4G6FgQ@mail.gmail.com>
+References: <1432818224-17070-1-git-send-email-vaibhav.hiremath@linaro.org>	<1432818224-17070-6-git-send-email-vaibhav.hiremath@linaro.org>
+ <CACRpkdaxWsi8t6aUFJK-KCmQF1gEOLiOE8=fgDRxQDSi4G6FgQ@mail.gmail.com>
+Message-ID: <556F52A6.3060104@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Antoine Tenart <antoine.tenart@free-electrons.com> writes:
 
-> The pxa3xx nand driver requires at least one clock to probe correctly.
-> A second one, named 'ecc' can be specified if needed. Add the
-> corresponding documentation.
-Is it mandatory, really ?
-The code does :
-	info->clk = devm_clk_get(&pdev->dev, NULL);
-	if (IS_ERR(info->clk)) {
-		dev_err(&pdev->dev, "failed to get nand clock\n");
-		return PTR_ERR(info->clk);
-	}
 
-info->clk can very well be NULL, can't it ?
+On Tuesday 02 June 2015 06:42 PM, Linus Walleij wrote:
+> On Thu, May 28, 2015 at 3:03 PM, Vaibhav Hiremath
+> <vaibhav.hiremath@linaro.org> wrote:
+>
+>> From: Rob Herring <robh@kernel.org>
+>>
+>> Since there is some problematic i2c slave devices on some
+>> platforms such as dkb (sometimes), it will drop down sda
+>> and make i2c bus hang, at that time, it need to config
+>> scl/sda into gpio to simulate "stop" sequence to recover
+>> i2c bus, so add this interface.
+>>
+>> Signed-off-by: Leilei Shang <shangll@marvell.com>
+>> Signed-off-by: Rob Herring <robh@kernel.org>
+>> [vaibhav.hiremath at linaro.org: Updated Changelog]
+>> Signed-off-by: Vaibhav Hiremath <vaibhav.hiremath@linaro.org>
+>>
+>> Signed-off-by: Vaibhav Hiremath <vaibhav.hiremath@linaro.org>
+>
+> Double signed-off?
+>
 
-Cheers.
+Thanks for your review.
 
---
-Robert
+Based on review comments on the list, i will have to change this patch
+to use generic gpio reset implementation available in i2c-core.
+
+Having said that, I am still sure whether GPIO lib (request/free)
+would handle pinctrl configuration.
+
+Thanks,
+vaibhav
