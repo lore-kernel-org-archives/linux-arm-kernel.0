@@ -1,78 +1,80 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Wed, 3 Jun 2015 10:10:06 +0530
-Subject: [PATCH V6 1/3] OPP: Add new bindings to address shortcomings of
- existing bindings
-In-Reply-To: <20150602183120.GB24349@codeaurora.org>
-References: <cover.1432797343.git.viresh.kumar@linaro.org>
- <96d49e7e6747c1a65c5f285d70600795126641cc.1432797343.git.viresh.kumar@linaro.org>
- <20150602183120.GB24349@codeaurora.org>
-Message-ID: <20150603044006.GB4527@linux>
+From: robh@kernel.org (Rob Herring)
+Date: Wed, 3 Jun 2015 00:31:58 -0500
+Subject: [PATCH v4 0/6] SA1100/PXA RTC clean-up
+In-Reply-To: <877fs5k9ps.fsf@belgarion.home>
+References: <1431529350-4597-1-git-send-email-robh@kernel.org>
+ <87pp62jdpj.fsf@belgarion.home>
+ <CAL_JsqJ-VMQHXFF9Gxf5mmPjYXZ6gyktYFjgvxAHRx-Kmuoq8A@mail.gmail.com>
+ <877fs5k9ps.fsf@belgarion.home>
+Message-ID: <CAL_JsqKWNNH4stY+CNtKCiE7qcwDYaxZc36-iqqe1ddmG82g1Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02-06-15, 11:31, Stephen Boyd wrote:
-> Also, is there already code written to handle these new
-> bindings in the OPP library? If not, it would be good to write
-> some to flush out any problems that may be lurking in actual
-> implementation.
+On Mon, May 18, 2015 at 1:43 PM, Robert Jarzmik <robert.jarzmik@free.fr> wrote:
+> Rob Herring <robh@kernel.org> writes:
+>
+>> On Fri, May 15, 2015 at 6:13 AM, Robert Jarzmik <robert.jarzmik@free.fr> wrote:
+>>> Rob Herring <robh@kernel.org> writes:
+>>>
+>>>> A git branch is here[4]. I've tested sa1100-rtc on PXA1928. I need help
+>>>> testing on PXA27x/3xx.
+>>> Hi Rob,
+>>>
+>>> I tested on PXA27x. It works for the boards which used pxa-rtc.
+>>> For the others, their defconfig become broken, because the pxa boards with
+>>> sa1100-rtc do not work anymore. And of course no .config manipulation will fix
+>>> this, because PXA architecture is denied the sa1100-rtc driver.
+>>
+>> Ah, I didn't realize there is a mixture of use.
+>>
+>> I could just do something like this instead of removing
+>> sa1100_device_rtc registration:
+>>
+>> #ifndef CONFIG_RTC_DRV_PXA
+>>        &sa1100_device_rtc,
+>> #else
+>>         &pxa_device_rtc,
+>> #endif
+> I ... don't like that much, especially when you consider both rtc might be
+> modules for example. I rather like that patch in pxa as they are.
+>
+> I'm rather in a mood for a more aggressive approach :
+>
+>  - you fire an incremental patch to patch the 10 defconfigs on PXA architecture
+>    (pxa27x and pxa3xx)
 
-I had written code earlier for V2 or something, but then we went back
-to the improvements in bindings and I stopped writing code for it.
+Here's the breakdown of configs which enable SA1100 RTC only. Only the
+last 6 need to change by my count:
 
-http://marc.info/?i=cover.1423642246.git.viresh.kumar%40linaro.org
+pxa25x
+arch/arm/configs/h5000_defconfig
+arch/arm/configs/xcep_defconfig
+arch/arm/configs/viper_defconfig
 
-But that just requires to be updated a bit now. Will do that once I am
-sure the bindings are all good now, with all Acks and RBYs.
+pxa255/270
+arch/arm/configs/cm_x2xx_defconfig
 
-> > +
-> > +Example 1: Single cluster Dual-core ARM cortex A9, switch DVFS states together.
-> > +
-> > +/ {
-> > +	cpus {
-> > +		#address-cells = <1>;
-> > +		#size-cells = <0>;
-> > +
-> > +		cpu at 0 {
-> > +			compatible = "arm,cortex-a9";
-> > +			reg = <0>;
-> > +			next-level-cache = <&L2>;
-> > +			clocks = <&clk_controller 0>;
-> > +			clock-names = "cpu";
-> > +			opp-supply = <&cpu_supply0>;
-> 
-> opp-supply isn't mentioned anywhere. Is that intentional? Is it
+pxa270
+arch/arm/configs/em_x270_defconfig
+arch/arm/configs/magician_defconfig
+arch/arm/configs/palmz72_defconfig
+arch/arm/configs/pcm027_defconfig
+arch/arm/configs/trizeps4_defconfig
 
-This should have been 'cpu-supply' instead.
+>  - in this patch, you replace 's/CONFIG_RTC_DRV_SA1100/CONFIG_RTC_DRV_PXA/'
+>  - you send this patch to the maintainers and me
+>  - you explain in the commit message that from a userland perspective, nothing
+>    changes, except that the RTC IP will change, and any dependency on a
 
-> supposed to be cpu-supply still?
+The IP does not change here. rtc0 is still going to be the SA1100 RTC
+being registered first. The only change will be the addition of rtc1.
 
-Yes.
+>    bootloader fidling with RTC should be considered as a source of regression.
 
-> It isn't clear to me from the
-> previous discussion where this all ended up, but I'm not sure how
-> the in-kernel API is going to match up regulators with OPPs. I
-> mean, how are we going to ask the OPP library what the
-> min/max/target voltage is at a particular frequency when we have
-> multiple regulators? Is that some string based interface? 
-> 
-> 	dev_pm_opp_get_voltage(name, &target, &min, &max);
-> 
-> Or a regulator pointer interface?
-> 
-> 	dev_pm_opp_get_voltage(regulator, &target, &min, &max);
+I'm not sure that I follow.
 
-Probably this.
+>    Moreover the first reboot will have the wrong date, until it is set.
 
-> Or something else? Does this mean the OPP library is going to get
-> the CPU device to request the opp-supply from the CPU node?
+Only for rtc1, right?
 
-Maybe yes. That will clarify more with more code in place.
-
-> Furthermore, why don't we care about opp-clocks? Are clocks
-> somehow special?
-
-There shouldn't be opp-supply in the first place and so no need of
-opp-clocks as well.
-
--- 
-viresh
+Rob
