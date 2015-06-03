@@ -1,51 +1,38 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Wed,  3 Jun 2015 19:34:10 +0800
-Subject: [PATCH v2] MAINTAINERS: update Shawn's email to use kernel.org one
-Message-ID: <1433331250-8702-1-git-send-email-shawnguo@kernel.org>
+From: tomi.valkeinen@ti.com (Tomi Valkeinen)
+Date: Wed, 3 Jun 2015 14:38:43 +0300
+Subject: [PATCH 2/4] video: fbdev: imxfb: Constify platform_device_id
+In-Reply-To: <20150505082807.GV4047@x1>
+References: <1430494721-30793-1-git-send-email-k.kozlowski.k@gmail.com>
+ <1430494721-30793-2-git-send-email-k.kozlowski.k@gmail.com>
+ <20150505082807.GV4047@x1>
+Message-ID: <556EE743.5030405@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Shawn Guo <shawn.guo@linaro.org>
+Hi Lee,
 
-Update my mailbox to use kernel.org one for handling kernel community
-maintenance traffic.
+On 05/05/15 11:28, Lee Jones wrote:
+> On Sat, 02 May 2015, Krzysztof Kozlowski wrote:
+> 
+>> The platform_device_id is not modified by the driver and core uses it as
+>> const.
+>>
+>> Signed-off-by: Krzysztof Kozlowski <k.kozlowski.k@gmail.com>
+>> ---
+>>  drivers/video/fbdev/imxfb.c | 2 +-
+>>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> Applied, thanks.
 
-Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
----
-Changes since v1:
- - Update the commit log a bit
+You applied the fbdev changes in this series also, not only the
+backlight changes?
 
-Hi Arnd,
+ Tomi
 
-I'm ready to switch the maintainer mailbox to kernel.org now.  Please
-help apply the patch.  Thanks.
-
-Shawn
-
- MAINTAINERS | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
-
-diff --git a/MAINTAINERS b/MAINTAINERS
-index 2e5bbc0d68b2..a53e42fcba84 100644
---- a/MAINTAINERS
-+++ b/MAINTAINERS
-@@ -1030,7 +1030,7 @@ F:	arch/arm/include/asm/hardware/dec21285.h
- F:	arch/arm/mach-footbridge/
- 
- ARM/FREESCALE IMX / MXC ARM ARCHITECTURE
--M:	Shawn Guo <shawn.guo@linaro.org>
-+M:	Shawn Guo <shawnguo@kernel.org>
- M:	Sascha Hauer <kernel@pengutronix.de>
- L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
- S:	Maintained
-@@ -1041,7 +1041,7 @@ F:	arch/arm/boot/dts/imx*
- F:	arch/arm/configs/imx*_defconfig
- 
- ARM/FREESCALE VYBRID ARM ARCHITECTURE
--M:	Shawn Guo <shawn.guo@linaro.org>
-+M:	Shawn Guo <shawnguo@kernel.org>
- M:	Sascha Hauer <kernel@pengutronix.de>
- R:	Stefan Agner <stefan@agner.ch>
- L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
--- 
-1.9.1
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150603/c312ae26/attachment.sig>
