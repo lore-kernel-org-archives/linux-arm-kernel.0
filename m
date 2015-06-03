@@ -1,103 +1,203 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Wed,  3 Jun 2015 09:23:12 -0700
-Subject: [PATCH 03/12] ARM: OMAP2+: Add minimal clockdomains for dm814x
+Date: Wed,  3 Jun 2015 09:23:13 -0700
+Subject: [PATCH 04/12] ARM: OMAP2+: Add custom prwdm_operations for 81xx to
+ support dm814x
 In-Reply-To: <1433348601-8966-1-git-send-email-tony@atomide.com>
 References: <1433348601-8966-1-git-send-email-tony@atomide.com>
-Message-ID: <1433348601-8966-4-git-send-email-tony@atomide.com>
+Message-ID: <1433348601-8966-5-git-send-email-tony@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-For now, let's just add the ones shared with dm816x.
-The dm814x specific ones can be added as they are tested.
+Looking at the TI kernel tree I noticed that dm81xx need custom
+ti81xx_pwrdm_operations. Let's also change dm816x over to use them
+as the registers are different for dm81xx compared to others.
 
 Cc: Matthijs van Duin <matthijsvanduin@gmail.com>
 Cc: Paul Walmsley <paul@pwsan.com>
 Cc: Tero Kristo <t-kristo@ti.com>
 Signed-off-by: Tony Lindgren <tony@atomide.com>
 ---
- arch/arm/mach-omap2/clockdomain.h           |  3 ++-
- arch/arm/mach-omap2/clockdomains81xx_data.c | 23 ++++++++++++++++++++---
- arch/arm/mach-omap2/io.c                    |  4 ++--
- 3 files changed, 24 insertions(+), 6 deletions(-)
+ arch/arm/mach-omap2/powerdomains3xxx_data.c | 122 +++++++++++++++++++++++++++-
+ arch/arm/mach-omap2/prcm-common.h           |   6 ++
+ 2 files changed, 125 insertions(+), 3 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/clockdomain.h b/arch/arm/mach-omap2/clockdomain.h
-index 77bab5f..2c398ce 100644
---- a/arch/arm/mach-omap2/clockdomain.h
-+++ b/arch/arm/mach-omap2/clockdomain.h
-@@ -216,7 +216,8 @@ extern void __init omap242x_clockdomains_init(void);
- extern void __init omap243x_clockdomains_init(void);
- extern void __init omap3xxx_clockdomains_init(void);
- extern void __init am33xx_clockdomains_init(void);
--extern void __init ti81xx_clockdomains_init(void);
-+extern void __init ti814x_clockdomains_init(void);
-+extern void __init ti816x_clockdomains_init(void);
- extern void __init omap44xx_clockdomains_init(void);
- extern void __init omap54xx_clockdomains_init(void);
- extern void __init dra7xx_clockdomains_init(void);
-diff --git a/arch/arm/mach-omap2/clockdomains81xx_data.c b/arch/arm/mach-omap2/clockdomains81xx_data.c
-index ce2a820..53442c8 100644
---- a/arch/arm/mach-omap2/clockdomains81xx_data.c
-+++ b/arch/arm/mach-omap2/clockdomains81xx_data.c
-@@ -165,7 +165,24 @@ static struct clockdomain default_l3_slow_816x_clkdm = {
- 	.flags		= CLKDM_CAN_SWSUP,
+diff --git a/arch/arm/mach-omap2/powerdomains3xxx_data.c b/arch/arm/mach-omap2/powerdomains3xxx_data.c
+index 70bc706..7829d27 100644
+--- a/arch/arm/mach-omap2/powerdomains3xxx_data.c
++++ b/arch/arm/mach-omap2/powerdomains3xxx_data.c
+@@ -349,6 +349,41 @@ static struct powerdomain device_81xx_pwrdm = {
+ 	.voltdm		  = { .name = "core" },
  };
  
--static struct clockdomain *clockdomains_ti81xx[] __initdata = {
-+static struct clockdomain *clockdomains_ti814x[] __initdata = {
-+	&alwon_l3_slow_81xx_clkdm,
-+	&alwon_l3_med_81xx_clkdm,
-+	&alwon_l3_fast_81xx_clkdm,
-+	&alwon_ethernet_81xx_clkdm,
-+	&mmu_81xx_clkdm,
-+	&mmu_cfg_81xx_clkdm,
-+	NULL,
++static struct powerdomain gem_814x_pwrdm = {
++	.name		= "gem_pwrdm",
++	.prcm_offs	= TI814X_PRM_DSP_MOD,
++	.pwrsts		= PWRSTS_OFF_ON,
++	.voltdm		= { .name = "dsp" },
 +};
 +
-+void __init ti814x_clockdomains_init(void)
-+{
-+	clkdm_register_platform_funcs(&am33xx_clkdm_operations);
-+	clkdm_register_clkdms(clockdomains_ti814x);
-+	clkdm_complete_init();
-+}
++static struct powerdomain ivahd_814x_pwrdm = {
++	.name		= "ivahd_pwrdm",
++	.prcm_offs	= TI814X_PRM_HDVICP_MOD,
++	.pwrsts		= PWRSTS_OFF_ON,
++	.voltdm		= { .name = "iva" },
++};
 +
-+static struct clockdomain *clockdomains_ti816x[] __initdata = {
- 	&alwon_mpu_816x_clkdm,
- 	&alwon_l3_slow_81xx_clkdm,
- 	&alwon_l3_med_81xx_clkdm,
-@@ -185,10 +202,10 @@ static struct clockdomain *clockdomains_ti81xx[] __initdata = {
- 	NULL,
++static struct powerdomain hdvpss_814x_pwrdm = {
++	.name		= "hdvpss_pwrdm",
++	.prcm_offs	= TI814X_PRM_HDVPSS_MOD,
++	.pwrsts		= PWRSTS_OFF_ON,
++	.voltdm		= { .name = "dsp" },
++};
++
++static struct powerdomain sgx_814x_pwrdm = {
++	.name		= "sgx_pwrdm",
++	.prcm_offs	= TI814X_PRM_GFX_MOD,
++	.pwrsts		= PWRSTS_OFF_ON,
++	.voltdm		= { .name = "core" },
++};
++
++static struct powerdomain isp_814x_pwrdm = {
++	.name		= "isp_pwrdm",
++	.prcm_offs	= TI814X_PRM_ISP_MOD,
++	.pwrsts		= PWRSTS_OFF_ON,
++	.voltdm		= { .name = "core" },
++};
++
+ static struct powerdomain active_816x_pwrdm = {
+ 	.name		  = "active_pwrdm",
+ 	.prcm_offs	  = TI816X_PRM_ACTIVE_MOD,
+@@ -448,7 +483,18 @@ static struct powerdomain *powerdomains_am35x[] __initdata = {
+ 	NULL
  };
  
--void __init ti81xx_clockdomains_init(void)
-+void __init ti816x_clockdomains_init(void)
+-static struct powerdomain *powerdomains_ti81xx[] __initdata = {
++static struct powerdomain *powerdomains_ti814x[] __initdata = {
++	&alwon_81xx_pwrdm,
++	&device_81xx_pwrdm,
++	&gem_814x_pwrdm,
++	&ivahd_814x_pwrdm,
++	&hdvpss_814x_pwrdm,
++	&sgx_814x_pwrdm,
++	&isp_814x_pwrdm,
++	NULL
++};
++
++static struct powerdomain *powerdomains_ti816x[] __initdata = {
+ 	&alwon_81xx_pwrdm,
+ 	&device_81xx_pwrdm,
+ 	&active_816x_pwrdm,
+@@ -460,6 +506,73 @@ static struct powerdomain *powerdomains_ti81xx[] __initdata = {
+ 	NULL
+ };
+ 
++/* TI81XX specific ops */
++#define TI81XX_PM_PWSTCTRL				0x0000
++#define TI81XX_RM_RSTCTRL				0x0010
++#define TI81XX_PM_PWSTST				0x0004
++
++static int ti81xx_pwrdm_set_next_pwrst(struct powerdomain *pwrdm, u8 pwrst)
++{
++	omap2_prm_rmw_mod_reg_bits(OMAP_POWERSTATE_MASK,
++				   (pwrst << OMAP_POWERSTATE_SHIFT),
++				   pwrdm->prcm_offs, TI81XX_PM_PWSTCTRL);
++	return 0;
++}
++
++static int ti81xx_pwrdm_read_next_pwrst(struct powerdomain *pwrdm)
++{
++	return omap2_prm_read_mod_bits_shift(pwrdm->prcm_offs,
++					     TI81XX_PM_PWSTCTRL,
++					     OMAP_POWERSTATE_MASK);
++}
++
++static int ti81xx_pwrdm_read_pwrst(struct powerdomain *pwrdm)
++{
++	return omap2_prm_read_mod_bits_shift(pwrdm->prcm_offs,
++		(pwrdm->prcm_offs == TI814X_PRM_GFX_MOD) ? TI81XX_RM_RSTCTRL :
++					     TI81XX_PM_PWSTST,
++					     OMAP_POWERSTATEST_MASK);
++}
++
++static int ti81xx_pwrdm_read_logic_pwrst(struct powerdomain *pwrdm)
++{
++	return omap2_prm_read_mod_bits_shift(pwrdm->prcm_offs,
++		(pwrdm->prcm_offs == TI814X_PRM_GFX_MOD) ? TI81XX_RM_RSTCTRL :
++					     TI81XX_PM_PWSTST,
++					     OMAP3430_LOGICSTATEST_MASK);
++}
++
++static int ti81xx_pwrdm_wait_transition(struct powerdomain *pwrdm)
++{
++	u32 c = 0;
++
++	while ((omap2_prm_read_mod_reg(pwrdm->prcm_offs,
++		(pwrdm->prcm_offs == TI814X_PRM_GFX_MOD) ? TI81XX_RM_RSTCTRL :
++				       TI81XX_PM_PWSTST) &
++		OMAP_INTRANSITION_MASK) &&
++		(c++ < PWRDM_TRANSITION_BAILOUT))
++			udelay(1);
++
++	if (c > PWRDM_TRANSITION_BAILOUT) {
++		pr_err("powerdomain: %s timeout waiting for transition\n",
++		       pwrdm->name);
++		return -EAGAIN;
++	}
++
++	pr_debug("powerdomain: completed transition in %d loops\n", c);
++
++	return 0;
++}
++
++/* For dm814x we need to fix up fix GFX pwstst and rstctrl reg offsets */
++static struct pwrdm_ops ti81xx_pwrdm_operations = {
++	.pwrdm_set_next_pwrst	= ti81xx_pwrdm_set_next_pwrst,
++	.pwrdm_read_next_pwrst	= ti81xx_pwrdm_read_next_pwrst,
++	.pwrdm_read_pwrst	= ti81xx_pwrdm_read_pwrst,
++	.pwrdm_read_logic_pwrst	= ti81xx_pwrdm_read_logic_pwrst,
++	.pwrdm_wait_transition	= ti81xx_pwrdm_wait_transition,
++};
++
+ void __init omap3xxx_powerdomains_init(void)
  {
- 	clkdm_register_platform_funcs(&am33xx_clkdm_operations);
--	clkdm_register_clkdms(clockdomains_ti81xx);
-+	clkdm_register_clkdms(clockdomains_ti816x);
- 	clkdm_complete_init();
- }
- #endif
-diff --git a/arch/arm/mach-omap2/io.c b/arch/arm/mach-omap2/io.c
-index 820dde8..6779a9f 100644
---- a/arch/arm/mach-omap2/io.c
-+++ b/arch/arm/mach-omap2/io.c
-@@ -554,7 +554,7 @@ void __init ti814x_init_early(void)
- 	omap2_prcm_base_init();
- 	omap3xxx_voltagedomains_init();
- 	omap3xxx_powerdomains_init();
--	ti81xx_clockdomains_init();
-+	ti814x_clockdomains_init();
- 	ti81xx_hwmod_init();
- 	omap_hwmod_init_postsetup();
- 	if (of_have_populated_dt())
-@@ -571,7 +571,7 @@ void __init ti816x_init_early(void)
- 	omap2_prcm_base_init();
- 	omap3xxx_voltagedomains_init();
- 	omap3xxx_powerdomains_init();
--	ti81xx_clockdomains_init();
-+	ti816x_clockdomains_init();
- 	ti81xx_hwmod_init();
- 	omap_hwmod_init_postsetup();
- 	if (of_have_populated_dt())
+ 	unsigned int rev;
+@@ -467,15 +580,18 @@ void __init omap3xxx_powerdomains_init(void)
+ 	if (!cpu_is_omap34xx() && !cpu_is_ti81xx())
+ 		return;
+ 
+-	pwrdm_register_platform_funcs(&omap3_pwrdm_operations);
++	pwrdm_register_platform_funcs(&ti81xx_pwrdm_operations);
+ 
+ 	rev = omap_rev();
+ 
+ 	if (rev == AM35XX_REV_ES1_0 || rev == AM35XX_REV_ES1_1) {
+ 		pwrdm_register_pwrdms(powerdomains_am35x);
++	} else if (rev == TI8148_REV_ES1_0 || rev == TI8148_REV_ES2_0 ||
++		   rev == TI8148_REV_ES2_1) {
++		pwrdm_register_pwrdms(powerdomains_ti814x);
+ 	} else if (rev == TI8168_REV_ES1_0 || rev == TI8168_REV_ES1_1
+ 			|| rev == TI8168_REV_ES2_0 || rev == TI8168_REV_ES2_1) {
+-		pwrdm_register_pwrdms(powerdomains_ti81xx);
++		pwrdm_register_pwrdms(powerdomains_ti816x);
+ 	} else {
+ 		pwrdm_register_pwrdms(powerdomains_omap3430_common);
+ 
+diff --git a/arch/arm/mach-omap2/prcm-common.h b/arch/arm/mach-omap2/prcm-common.h
+index 6ae0b3a..0ae9466 100644
+--- a/arch/arm/mach-omap2/prcm-common.h
++++ b/arch/arm/mach-omap2/prcm-common.h
+@@ -51,6 +51,12 @@
+ /*
+  * TI81XX PRM module offsets
+  */
++#define TI814X_PRM_DSP_MOD				0x0a00
++#define TI814X_PRM_HDVICP_MOD				0x0c00
++#define TI814X_PRM_ISP_MOD				0x0d00
++#define TI814X_PRM_HDVPSS_MOD				0x0e00
++#define TI814X_PRM_GFX_MOD				0x0f00
++
+ #define TI81XX_PRM_DEVICE_MOD			0x0000
+ #define TI816X_PRM_ACTIVE_MOD			0x0a00
+ #define TI81XX_PRM_DEFAULT_MOD			0x0b00
 -- 
 2.1.4
