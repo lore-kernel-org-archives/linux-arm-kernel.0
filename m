@@ -1,29 +1,55 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 4 Jun 2015 10:33:34 +0200
-Subject: [PATCH resend] pinctrl: sunxi: Add allwinner A33 PIO controller
- support
-In-Reply-To: <1433236120-11249-2-git-send-email-hdegoede@redhat.com>
-References: <1433236120-11249-1-git-send-email-hdegoede@redhat.com>
- <1433236120-11249-2-git-send-email-hdegoede@redhat.com>
-Message-ID: <CACRpkdZPcLaSPmZ8Bqd-xsVns+xeq_m8J0QpPcB2W0wNKXvO4g@mail.gmail.com>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Thu, 4 Jun 2015 10:34:24 +0200
+Subject: [PATCH] mmc: sdhci-pxav3: fix device wakeup initialization
+In-Reply-To: <1433241515-2093-1-git-send-email-jszhang@marvell.com>
+References: <1433241515-2093-1-git-send-email-jszhang@marvell.com>
+Message-ID: <CAPDyKFrEkzTso9KciqoufFknMeHDxWS6s8FPVuzk6Kq66PzjPA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 2, 2015 at 11:08 AM, Hans de Goede <hdegoede@redhat.com> wrote:
-
-> From: Vishnu Patekar <vishnupatekar0510@gmail.com>
+On 2 June 2015 at 12:38, Jisheng Zhang <jszhang@marvell.com> wrote:
+> MMC_PM_KEEP_POWER doesn't imply MMC_PM_WAKE_SDIO_IRQ, we should only
+> enable device wake up when MMC_PM_WAKE_SDIO_IRQ is set. And "pm_flags"
+> is the requested pm features, we should not set it in the host driver.
 >
-> A33 PIO has 7 ports which starts from PB and has two interrupt ports.
+> At the same time, device wakeup is disabled by default, so there's no
+> need to disable device wakeup explicitly.
 >
-> Signed-off-by: Vishnu Patekar <vishnupatekar0510@gmail.com>
-> Acked-by: Hans de Goede <hdegoede@redhat.com>
-> Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+> This patch fixes the warning as following:
+>
+> [   64.616651] ------------[ cut here ]------------
+> [   64.616665] WARNING: CPU: 0 PID: 79 at linux/kernel/irq/manage.c:603 irq_set_irq_wake+0xf0/0x11c()
+> [   64.616667] Unbalanced IRQ 87 wake disable
+>
+> Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
 
-Patch applied.
+Thanks, applied.
 
-BTW: is your name Hans de G?de and you just gave up trying
-to get UTF-8 right, or is it really spelled like so?
+Kind regards
+Uffe
 
-Yours,
-Linus Walleij
+> ---
+>  drivers/mmc/host/sdhci-pxav3.c | 6 +-----
+>  1 file changed, 1 insertion(+), 5 deletions(-)
+>
+> diff --git a/drivers/mmc/host/sdhci-pxav3.c b/drivers/mmc/host/sdhci-pxav3.c
+> index 01cb2d3..9cd5fc6 100644
+> --- a/drivers/mmc/host/sdhci-pxav3.c
+> +++ b/drivers/mmc/host/sdhci-pxav3.c
+> @@ -457,12 +457,8 @@ static int sdhci_pxav3_probe(struct platform_device *pdev)
+>
+>         platform_set_drvdata(pdev, host);
+>
+> -       if (host->mmc->pm_caps & MMC_PM_KEEP_POWER) {
+> +       if (host->mmc->pm_caps & MMC_PM_WAKE_SDIO_IRQ)
+>                 device_init_wakeup(&pdev->dev, 1);
+> -               host->mmc->pm_flags |= MMC_PM_WAKE_SDIO_IRQ;
+> -       } else {
+> -               device_init_wakeup(&pdev->dev, 0);
+> -       }
+>
+>         pm_runtime_put_autosuspend(&pdev->dev);
+>
+> --
+> 2.1.4
+>
