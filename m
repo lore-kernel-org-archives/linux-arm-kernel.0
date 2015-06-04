@@ -1,68 +1,63 @@
 From: ivan.ivanov@linaro.org (Ivan T. Ivanov)
-Date: Thu,  4 Jun 2015 12:19:02 +0300
-Subject: [PATCH 3/7] arm64: dts: qcom: Add msm8916 sdhci configuration nodes
+Date: Thu,  4 Jun 2015 12:19:03 +0300
+Subject: [PATCH 4/7] arm64: dts: qcom: Add msm8916 USB configuration nodes
 In-Reply-To: <1433409546-23995-1-git-send-email-ivan.ivanov@linaro.org>
 References: <1433409546-23995-1-git-send-email-ivan.ivanov@linaro.org>
-Message-ID: <1433409546-23995-4-git-send-email-ivan.ivanov@linaro.org>
+Message-ID: <1433409546-23995-5-git-send-email-ivan.ivanov@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
+Add Host, Device and OTG configuration nodes.
 
-Add sdhci1 and sdhci2 device configuration nodes.
-
-Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
 Signed-off-by: Ivan T. Ivanov <ivan.ivanov@linaro.org>
 ---
- arch/arm64/boot/dts/qcom/msm8916.dtsi | 34 +++++++++++++++++++++++++++++++++-
- 1 file changed, 33 insertions(+), 1 deletion(-)
+ arch/arm64/boot/dts/qcom/msm8916.dtsi | 39 +++++++++++++++++++++++++++++++++++
+ 1 file changed, 39 insertions(+)
 
 diff --git a/arch/arm64/boot/dts/qcom/msm8916.dtsi b/arch/arm64/boot/dts/qcom/msm8916.dtsi
-index 6681c65..9ff0eb4 100644
+index 9ff0eb4..5911de0 100644
 --- a/arch/arm64/boot/dts/qcom/msm8916.dtsi
 +++ b/arch/arm64/boot/dts/qcom/msm8916.dtsi
-@@ -24,7 +24,10 @@
- 	#address-cells = <2>;
- 	#size-cells = <2>;
-
--	aliases { };
-+	aliases {
-+		sdhc1 = &sdhc_1; /* SDC1 eMMC slot */
-+		sdhc2 = &sdhc_2; /* SDC2 SD card slot */
-+	};
-
- 	chosen { };
-
-@@ -236,6 +239,35 @@
+@@ -268,6 +268,45 @@
  			status = "disabled";
  		};
 
-+		sdhc_1: sdhci at 07824000 {
-+			compatible = "qcom,sdhci-msm-v4";
-+			reg = <0x07824900 0x11c>, <0x07824000 0x800>;
-+			reg-names = "hc_mem", "core_mem";
-+
-+			interrupts = <0 123 0>, <0 138 0>;
-+			interrupt-names = "hc_irq", "pwr_irq";
-+			clocks = <&gcc GCC_SDCC1_APPS_CLK>,
-+				 <&gcc GCC_SDCC1_AHB_CLK>;
-+			clock-names = "core", "iface";
-+			bus-width = <8>;
-+			non-removable;
++		usb_dev: usb at 78d9000 {
++			compatible = "qcom,ci-hdrc";
++			reg = <0x78d9000 0x400>;
++			dr_mode = "peripheral";
++			interrupts = <GIC_SPI 134 IRQ_TYPE_NONE>;
++			usb-phy = <&usb_otg>;
 +			status = "disabled";
 +		};
 +
-+		sdhc_2: sdhci at 07864000 {
-+			compatible = "qcom,sdhci-msm-v4";
-+			reg = <0x07864900 0x11c>, <0x07864000 0x800>;
-+			reg-names = "hc_mem", "core_mem";
++		usb_host: ehci at 78d9000 {
++			compatible = "qcom,ehci-host";
++			reg = <0x78d9000 0x400>;
++			interrupts = <GIC_SPI 134 IRQ_TYPE_NONE>;
++			usb-phy = <&usb_otg>;
++			status = "disabled";
++		};
 +
-+			interrupts = <0 125 0>, <0 221 0>;
-+			interrupt-names = "hc_irq", "pwr_irq";
-+			clocks = <&gcc GCC_SDCC2_APPS_CLK>,
-+				 <&gcc GCC_SDCC2_AHB_CLK>;
-+			clock-names = "core", "iface";
-+			bus-width = <4>;
++		usb_otg: phy at 78d9000 {
++			compatible = "qcom,usb-otg-snps";
++			reg = <0x78d9000 0x400>;
++			interrupts = <GIC_SPI 134 IRQ_TYPE_EDGE_BOTH>,
++				     <GIC_SPI 140 IRQ_TYPE_EDGE_RISING>;
++
++			qcom,vdd-levels = <1 5 7>;
++			qcom,phy-init-sequence = <0x44 0x6B 0x24 0x13>;
++			dr_mode = "peripheral";
++			qcom,otg-control = <2>; // PMIC
++
++			clocks = <&gcc GCC_USB_HS_AHB_CLK>,
++				 <&gcc GCC_USB_HS_SYSTEM_CLK>,
++				 <&gcc GCC_USB2A_PHY_SLEEP_CLK>;
++			clock-names = "iface", "core", "sleep";
++
++			resets = <&gcc GCC_USB2A_PHY_BCR>,
++				 <&gcc GCC_USB_HS_BCR>;
++			reset-names = "phy", "link";
 +			status = "disabled";
 +		};
 +
