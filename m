@@ -1,46 +1,51 @@
-From: tthayer@opensource.altera.com (Thor Thayer)
-Date: Thu, 4 Jun 2015 16:34:49 -0500
-Subject: [PATCHv2 2/4] edac, altera: Refactor EDAC for Altera CycloneV SoC.
-In-Reply-To: <55706E25.8050105@opensource.altera.com>
-References: <1433428128-7292-1-git-send-email-tthayer@opensource.altera.com>
- <1433428128-7292-3-git-send-email-tthayer@opensource.altera.com>
- <55706E25.8050105@opensource.altera.com>
-Message-ID: <5570C479.7010902@opensource.altera.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 4 Jun 2015 14:46:51 -0700
+Subject: [RFC/NOT FOR MERGING] HACK: add global/private timers for A9
+In-Reply-To: <20150604203732.GI5710@saruman.tx.rr.com>
+References: <1433363565-17725-1-git-send-email-balbi@ti.com>
+ <2466648.WjMxjIpAUG@wuerfel>
+ <20150603210455.GD6042@saruman.tx.rr.com>
+ <20150603212821.GH6042@saruman.tx.rr.com>
+ <556F7493.2060602@codeaurora.org>
+ <20150603215445.GK6042@saruman.tx.rr.com> <55701E93.60303@free.fr>
+ <20150604200850.GF5710@saruman.tx.rr.com> <5570B5E8.90300@free.fr>
+ <20150604203732.GI5710@saruman.tx.rr.com>
+Message-ID: <20150604214650.GB30984@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+* Felipe Balbi <balbi@ti.com> [150604 13:41]:
+> On Thu, Jun 04, 2015 at 10:32:40PM +0200, Mason wrote:
+> > On 04/06/2015 22:08, Felipe Balbi wrote:
+> > 
+> > > On Thu, Jun 04, 2015 at 11:46:59AM +0200, Mason wrote:
+> > >> Also, check /proc/timer_list for a "Broadcast device". If you don't
+> > >> define one, the TWD timers are set to periodic mode, with hrtimers
+> > >> disabled.
+> > > 
+> > > Did you manage to turn global timer into Broadcast device ?
+> > 
+> > Disclaimer: I am a kernel noob, take everything I say with
+> > a rock of salt.
+> > 
+> > As far as I can see, the global timer code doesn't handle
+> > frequency changes, whereas the TWD code does.
+> 
+> All right, but TWD has C3STOP and that prevents it from being used as
+> broadcast device.
+> 
+> Tony Lindgren had the idea of implementing a timer switch during idle
+> and that could help us strip the kernel off of C3STOP feature flag. That
+> means we might be able to use TWD as broadcast until CPU decides to
+> idle, at which point we need to switch to a different timer.
 
-On 06/04/2015 10:26 AM, Dinh Nguyen wrote:
-> On 06/04/2015 09:28 AM, tthayer at opensource.altera.com wrote:
->> From: Thor Thayer <tthayer@opensource.altera.com>
->>
->> The Arria10 SOC uses a completely different SDRAM controller from the
->> earlier CycloneV and ArriaV SoCs. This patch abstracts the SDRAM bits
->> for the CycloneV/ArriaV SoCs in preparation for the Arria10 support.
->>
->> Signed-off-by: Thor Thayer <tthayer@opensource.altera.com>
->> ---
->> v2: Make c5_data static.
->> ---
->>   drivers/edac/altera_edac.c |  194 ++++++++++++++++++++------------------------
->>   drivers/edac/altera_edac.h |  116 ++++++++++++++++++++++++++
->>   2 files changed, 206 insertions(+), 104 deletions(-)
->>   create mode 100644 drivers/edac/altera_edac.h
->>
->> diff --git a/drivers/edac/altera_edac.c b/drivers/edac/altera_edac.c
->> index a9e7c69..a8350f6 100644
->> --- a/drivers/edac/altera_edac.c
->> +++ b/drivers/edac/altera_edac.c
->
-> What branch are you basing this patch on? I get the following error when
-> applied to both v4.1-rc6, linux-next, and linux-edac/linux-next.
->
-> Applying: edac, altera: Refactor EDAC for Altera CycloneV SoC.
-> error: patch failed: drivers/edac/altera_edac.c:400
-> error: drivers/edac/altera_edac.c: patch does not apply
-> Patch failed at 0001 edac, altera: Refactor EDAC for Altera CycloneV SoC.
->
-> Dinh
->
+Yeah I'm looking at adding clocksource_pm_enter/exit() to allow also
+changing the clocksource to a different one for idle.. Will post some
+patches after investigating it a bit further.
 
-OK. I'll refactor and resend. I was using Altera's internal for-next branch.
+Changing the clockevent for idle already works just fine based on
+tick_broadcast_enable() + tick_broadcast_enter/exit().
+
+Regards,
+
+Tony
