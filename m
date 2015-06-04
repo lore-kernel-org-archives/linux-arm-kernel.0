@@ -1,78 +1,70 @@
-From: jiang.liu@linux.intel.com (Jiang Liu)
-Date: Thu, 04 Jun 2015 14:41:47 +0800
-Subject: [Patch v4 0/8] Consolidate ACPI PCI root common code into ACPI
- core
-In-Reply-To: <556FF0AD.6000901@linaro.org>
-References: <1433225576-8215-1-git-send-email-jiang.liu@linux.intel.com>
- <556F6332.2040501@redhat.com> <556FAFEF.6040802@linux.intel.com>
- <556FF0AD.6000901@linaro.org>
-Message-ID: <556FF32B.9010900@linux.intel.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Thu, 4 Jun 2015 08:42:59 +0200
+Subject: [PATCH 08/11] MTD: m25p80: Add option to limit SPI transfer size.
+In-Reply-To: <8fc4b9f5291a509c4c35782a1337bf536f1019af.1433364398.git.hramrach@gmail.com>
+References: <cover.1433364398.git.hramrach@gmail.com>
+ <8fc4b9f5291a509c4c35782a1337bf536f1019af.1433364398.git.hramrach@gmail.com>
+Message-ID: <CAMuHMdVT2M7pPHDDHmoNF_zVXhz1PUm5PiYxDKcAjSAcfSDiZg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2015/6/4 14:31, Hanjun Guo wrote:
-> Hi Jiang,
-> 
-> On 2015?06?04? 09:54, Jiang Liu wrote:
->> On 2015/6/4 4:27, Al Stone wrote:
->>> On 06/02/2015 12:12 AM, Jiang Liu wrote:
->>>> This patch set consolidates common code to support ACPI PCI root on x86
->>>> and IA64 platforms into ACPI core, to reproduce duplicated code and
->>>> simplify maintenance. And a patch set based on this to support ACPI
->>>> based
->>>> PCIe host bridge on ARM64 has been posted at:
->>>
->>> Link is missing (or it's a typo of some flavor).
->> HI Al,
->>     Sorry, I missed the link. It has been posted at:
->> https://lkml.org/lkml/2015/5/26/207
-> 
-> I failed to get io resources for PCI hostbridge  when I was testing PCI
-> on ARM64 QEMU, I debugged this for quite a while, and finally found out
-> that ACPI resource parsing for IO is not suitable for ARM64, because io
-> space for x86 is 64K, but 16M for ARM64.
-> 
-> This issue is only found when the firmware representing the io resource
-> using the type ACPI_RESOURCE_TYPE_ADDRESS32, so the io address will
-> greater than 64k.
-> 
-> In drivers/acpi/resource.c:
-> 
-> static void acpi_dev_ioresource_flags(struct resource *res, u64 len,
->                                       u8 io_decode, u8 translation_type)
-> {
->         res->flags = IORESOURCE_IO;
-> 
-> [...]
-> 
->         if (res->end >= 0x10003)
->                 res->flags |= IORESOURCE_DISABLED | IORESOURCE_UNSET;
-> 
-> [...]
-> }
-> 
-> so the code will filter out res->end >= 0x10003, and in my case, it will
-> more than 64K, so we can't get the IO resources.
-> 
-> I got a question, why we use if (res->end >= 0x10003) here?
-> I mean 64k will be 0x10000, and in that case, we should use
-> if (res->end >= 0x10000) here, not 0x10003, any history behind that?
+On Wed, Jun 3, 2015 at 11:26 PM, Michal Suchanek <hramrach@gmail.com> wrote:
+> On sunxi the SPI controller currently does not have DMA support and fails
+> any transfer larger than 63 bytes.
 
-Hi Hanjun,
-This is a special tricky for x86. You may read a dword(four bytes) from
-IO port 0xffff, so the effective io port space is 0x10003 bytes.
+This is a driver limitation, not a hardware limitation.
 
-> 
-> This is not the problem of this patch set, but need updating
-> the core ACPI resource parsing code, I'm working on that. I'm
-> just wondering there is no special IO space on IA64, how this works
-> on IA64?
-There is special handling for IO port on IA64. IA64 io ports are
-actually memory-mapped, and there may be multiple 64K IO port spaces.
-For example, each PCI domain may have its own 64k memory-mapped
-IO space.
-Thanks!
-Gerry
-> 
-> Thanks
-> Hanjun
+> On Exynos the pl330 DMA controller fails any transfer larger than 64kb
+> when using slower speed like 40MHz and any transfer larger than 128bytes
+> when running at 133MHz.
+
+This may be a driver bug.
+
+> The best thing is that in both cases the controller can just lock up and
+> never finish potentially leaving the hardware in unusable state.
+>
+> So it is required that the m25p80 driver actively prevents doing
+> transfers that are too large for the current driver state on a
+> particular piece of hardware.
+
+OK.
+
+> Signed-off-by: Michal Suchanek <hramrach@gmail.com>
+>
+> --
+>
+> Update commit message and documentation text.
+> ---
+>  .../devicetree/bindings/mtd/jedec,spi-nor.txt      |  6 ++++++
+>  drivers/mtd/devices/m25p80.c                       | 24 ++++++++++++++++++++--
+>  2 files changed, 28 insertions(+), 2 deletions(-)
+>
+> diff --git a/Documentation/devicetree/bindings/mtd/jedec,spi-nor.txt b/Documentation/devicetree/bindings/mtd/jedec,spi-nor.txt
+> index 2bee681..4e63ae8 100644
+> --- a/Documentation/devicetree/bindings/mtd/jedec,spi-nor.txt
+> +++ b/Documentation/devicetree/bindings/mtd/jedec,spi-nor.txt
+> @@ -19,6 +19,12 @@ Optional properties:
+>                     all chips and support for it can not be detected at runtime.
+>                     Refer to your chips' datasheet to check if this is supported
+>                     by your chip.
+> +- linux,max_tx_len : With some SPI controller drivers possible transfer size is
+> +                     limited. This may be hardware or driver bug.
+> +                     Transfer data in chunks no larger than this value.
+> +                     Using this option may severely degrade performance and
+> +                     possibly flash memory life when max_tx_len is smaller than
+> +                     flash page size (typically 256 bytes)
+
+DT describes the hardware, not buggy drivers.
+
+So IMHO this doesn't belong in DT, but it can be a field in struct spi_master.
+
+Gr{oetje,eeting}s,
+
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
