@@ -1,25 +1,24 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Thu, 4 Jun 2015 09:18:20 +0800
-Subject: [PATCH v2 05/12] ARM: imx: setup tctl register in device
- specific function
-In-Reply-To: <7heglsadva.fsf@deeprootsystems.com>
-References: <1432308599-28643-1-git-send-email-shawn.guo@linaro.org>
- <1432308599-28643-6-git-send-email-shawn.guo@linaro.org>
- <CAMAWPa-1MPgzT1GJQx4SjmfQpj9zdwsAw-qvLWZjVhoM66nHsQ@mail.gmail.com>
- <20150602011139.GP16165@dragon>
- <CAMAWPa-BYPnsqSxQ_VTa37a=Xg8xgrSQkzQgX+_65koZCNxBEg@mail.gmail.com>
- <20150603061648.GA20344@dragon>
- <7heglsadva.fsf@deeprootsystems.com>
-Message-ID: <20150604011820.GA17189@dragon>
+From: jiang.liu@linux.intel.com (Jiang Liu)
+Date: Thu, 04 Jun 2015 09:54:55 +0800
+Subject: [Patch v4 0/8] Consolidate ACPI PCI root common code into ACPI
+ core
+In-Reply-To: <556F6332.2040501@redhat.com>
+References: <1433225576-8215-1-git-send-email-jiang.liu@linux.intel.com>
+ <556F6332.2040501@redhat.com>
+Message-ID: <556FAFEF.6040802@linux.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 03, 2015 at 10:41:29AM -0700, Kevin Hilman wrote:
-> I tried your patch on top of next-20150529 (where I originally found the
-> issue) and it gets my wandboard dual and solo booting again.
+On 2015/6/4 4:27, Al Stone wrote:
+> On 06/02/2015 12:12 AM, Jiang Liu wrote:
+>> This patch set consolidates common code to support ACPI PCI root on x86
+>> and IA64 platforms into ACPI core, to reproduce duplicated code and
+>> simplify maintenance. And a patch set based on this to support ACPI based
+>> PCIe host bridge on ARM64 has been posted at:
 > 
-> Tested-by: Kevin Hilman <khilman@linaro.org>
-
-Thanks for confirming, Kevin.
-
-Shawn
+> Link is missing (or it's a typo of some flavor).
+HI Al,
+	Sorry, I missed the link. It has been posted at:
+https://lkml.org/lkml/2015/5/26/207
+Thanks!
+Gerry
