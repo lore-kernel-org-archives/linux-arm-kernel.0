@@ -1,64 +1,48 @@
-From: ivan.ivanov@linaro.org (Ivan T. Ivanov)
-Date: Thu,  4 Jun 2015 12:19:05 +0300
-Subject: [PATCH 6/7] arm64: dts: qcom: Fix apq8016-sbc board USB related pin
- definitions
-In-Reply-To: <1433409546-23995-1-git-send-email-ivan.ivanov@linaro.org>
-References: <1433409546-23995-1-git-send-email-ivan.ivanov@linaro.org>
-Message-ID: <1433409546-23995-7-git-send-email-ivan.ivanov@linaro.org>
+From: anurag.kumar.vulisha@xilinx.com (Anurag Kumar Vulisha)
+Date: Thu, 4 Jun 2015 09:22:07 +0000
+Subject: [patch] gpio: Added GPIO support to ZynqMP SoC
+In-Reply-To: <CACRpkdZpvr4NfH43FvoHdfKaqqDGMHJU5=UHEzOpLV9xC4vaTw@mail.gmail.com>
+References: <1433160019-11157-1-git-send-email-anuragku@xilinx.com>
+ <CACRpkdZpvr4NfH43FvoHdfKaqqDGMHJU5=UHEzOpLV9xC4vaTw@mail.gmail.com>
+Message-ID: <3802E9A6666DF54886E2B9CBF743BA98011EBF75@XAP-PVEXMBX01.xlnx.xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-USB2513B HUB reset line is connected to PMIC GPIO3 not GPIO1.
+Hi Linus,
 
-Fix TC7USB40MU Dual SPDT Switch select input line control, which is
-connected to PMIC GPIO4 not GPIO2 and disable the pin. It is not used
-for now.
+> -----Original Message-----
+> From: Linus Walleij [mailto:linus.walleij at linaro.org]
+> Sent: Thursday, June 04, 2015 1:38 PM
+> To: Anurag Kumar Vulisha
+> Cc: Alexandre Courbot; Michal Simek; Soren Brinkmann; linux-
+> gpio at vger.kernel.org; linux-kernel at vger.kernel.org; linux-arm-
+> kernel at lists.infradead.org; Punnaiah Choudary Kalluri; Srikanth Vemula;
+> Anirudha Sarangi; Anurag Kumar Vulisha
+> Subject: Re: [patch] gpio: Added GPIO support to ZynqMP SoC
+>
+> On Mon, Jun 1, 2015 at 2:00 PM, Anurag Kumar Vulisha
+> <anurag.kumar.vulisha@xilinx.com> wrote:
+>
+> > Added support to ZynqMP SoC on the existing zynq gpio driver.
+> >
+> > Signed-off-by: Anurag Kumar Vulisha <anuragku@xilinx.com>
+>
+> > +static const struct of_device_id zynq_gpio_of_match[] = {
+> > +       { .compatible = "xlnx,zynq-gpio-1.0", .data = (void *)&zynq_gpio_def
+> },
+> > +       { .compatible = "xlnx,zynqmp-gpio-1.0",
+> > +                                       .data = (void
+> > +*)&zynqmp_gpio_def },
+>
+> Is there a separate patch adding this to the device tree bindings in
+> Documentation/devicetree/bindings/gpio/gpio-zynq.txt?
+>
+> Else please include it in this patch.
 
-Remove user LEDs definitions, because they clash with above numbers.
+I will include the device-tree bindings and send the patch as v2.
 
-Signed-off-by: Ivan T. Ivanov <ivan.ivanov@linaro.org>
----
- .../arm64/boot/dts/qcom/apq8016-sbc-pmic-pins.dtsi | 22 ++++++++--------------
- 1 file changed, 8 insertions(+), 14 deletions(-)
+Thanks,
+Anurag Kumar V
 
-diff --git a/arch/arm64/boot/dts/qcom/apq8016-sbc-pmic-pins.dtsi b/arch/arm64/boot/dts/qcom/apq8016-sbc-pmic-pins.dtsi
-index 37ca2ed..b568c49 100644
---- a/arch/arm64/boot/dts/qcom/apq8016-sbc-pmic-pins.dtsi
-+++ b/arch/arm64/boot/dts/qcom/apq8016-sbc-pmic-pins.dtsi
-@@ -2,26 +2,20 @@
 
- &pm8916_gpios {
-
--	pm8916_gpios_default: default {
--		usb_hub_reset_pm {
--			pins = "gpio1";
--			function = PMIC_GPIO_FUNC_NORMAL;
--			output-low;
--		};
--		usb_sw_sel_pm {
--			pins = "gpio2";
--			function = PMIC_GPIO_FUNC_NORMAL;
--			input-disable;
--		};
--		usr_led_3_ctrl {
-+	usb_hub_reset_pm: usb_hub_reset_pm {
-+		pinconf {
- 			pins = "gpio3";
- 			function = PMIC_GPIO_FUNC_NORMAL;
- 			output-low;
- 		};
--		usr_led_4_ctrl {
-+	};
-+
-+	usb_sw_sel_pm: usb_sw_sel_pm {
-+		pinconf {
- 			pins = "gpio4";
- 			function = PMIC_GPIO_FUNC_NORMAL;
--			output-low;
-+			power-source = <PM8916_GPIO_VPH>;
-+			input-disable;
- 		};
- 	};
- };
---
-1.9.1
+This email and any attachments are intended for the sole use of the named recipient(s) and contain(s) confidential information that may be proprietary, privileged or copyrighted under applicable law. If you are not the intended recipient, do not read, copy, or forward this email message or any attachments. Delete this email message and any attachments immediately.
