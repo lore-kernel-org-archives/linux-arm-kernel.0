@@ -1,23 +1,48 @@
 From: arun@gumstix.com (Arun Bharadwaj)
-Date: Thu,  4 Jun 2015 11:08:16 -0700
-Subject: [PATCH 0/3] ARM: dts: Changes for Gumstix Pepper dts
-Message-ID: <1433441299-18887-1-git-send-email-arun@gumstix.com>
+Date: Thu,  4 Jun 2015 11:08:17 -0700
+Subject: [PATCH 1/3] ARM: dts: Correct audio input route & set mic bias
+In-Reply-To: <1433441299-18887-1-git-send-email-arun@gumstix.com>
+References: <1433441299-18887-1-git-send-email-arun@gumstix.com>
+Message-ID: <1433441299-18887-2-git-send-email-arun@gumstix.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-These 3 patches are included to fix the following issues
-with pepper device tree source. The patches are based against
-linux-omap/master.
+From: Adam YH Lee <adam.yh.lee@gmail.com>
 
-Adam YH Lee (2):
-  ARM: dts: Correct audio input route & set mic bias
-  ARM: dts: configure regulators for Gumstix Pepper
+Audio-in was incorrectly routed to Line In. It should be Mic3L as per
+schematic.
 
-Arun Bharadwaj (1):
-  ARM: dts: Fix frequency scaling on Gumstix Pepper.
+Using mic-bias voltage at 2.0v (<0x1>) does not work for some reason. There
+is no voltage seen on micbias (R127). Mic-bias voltage of 2.5v (<0x2>) works.
+I see voltage of 2.475v across GND and micbias.
 
- arch/arm/boot/dts/am335x-pepper.dts | 20 +++++++++++++++++---
- 1 file changed, 17 insertions(+), 3 deletions(-)
+With these changes, I can record audio with a pair of proliferate TRRS earbuds.
 
+Signed-off-by: Ash Charles <ashcharles@gmail.com>
+---
+ arch/arm/boot/dts/am335x-pepper.dts | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
+
+diff --git a/arch/arm/boot/dts/am335x-pepper.dts b/arch/arm/boot/dts/am335x-pepper.dts
+index 0d35ab6..473d8ee 100644
+--- a/arch/arm/boot/dts/am335x-pepper.dts
++++ b/arch/arm/boot/dts/am335x-pepper.dts
+@@ -74,6 +74,7 @@
+ 	audio_codec: tlv320aic3106 at 1b {
+ 		compatible = "ti,tlv320aic3106";
+ 		reg = <0x1b>;
++		ai3x-micbias-vg = <0x2>;
+ 	};
+ 
+ 	accel: lis331dlh at 1d {
+@@ -153,7 +154,7 @@
+ 	ti,audio-routing =
+ 		"Headphone Jack",	"HPLOUT",
+ 		"Headphone Jack",	"HPROUT",
+-		"LINE1L",		"Line In";
++		"MIC3L",		"Mic3L Switch";
+ };
+ 
+ &mcasp0 {
 -- 
 2.1.4
