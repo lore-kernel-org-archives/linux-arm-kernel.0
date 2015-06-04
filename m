@@ -1,10 +1,10 @@
 From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Thu, 4 Jun 2015 11:56:35 -0700
-Subject: [PATCH 11/14] ARM: berlin: move BG2CD clock node
-In-Reply-To: <1431735823-28006-12-git-send-email-sebastian.hesselbarth@gmail.com>
+Date: Thu, 4 Jun 2015 11:56:51 -0700
+Subject: [PATCH 12/14] ARM: berlin: move BG2Q clock node
+In-Reply-To: <1431735823-28006-13-git-send-email-sebastian.hesselbarth@gmail.com>
 References: <1431735823-28006-1-git-send-email-sebastian.hesselbarth@gmail.com>
- <1431735823-28006-12-git-send-email-sebastian.hesselbarth@gmail.com>
-Message-ID: <20150604185635.GC676@codeaurora.org>
+ <1431735823-28006-13-git-send-email-sebastian.hesselbarth@gmail.com>
+Message-ID: <20150604185651.GD676@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
