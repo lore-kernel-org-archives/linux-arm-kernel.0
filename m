@@ -1,60 +1,109 @@
-From: Dave.Martin@arm.com (Dave Martin)
-Date: Thu, 4 Jun 2015 11:40:31 +0100
-Subject: [PATCH v3] arm: tcm: Don't crash when TCM banks are protected by
- TrustZone
-In-Reply-To: <1433257803-25318-1-git-send-email-michael@smart-africa.com>
-References: <1432821287-31436-1-git-send-email-michael@smart-africa.com>
- <1433257803-25318-1-git-send-email-michael@smart-africa.com>
-Message-ID: <20150604104031.GB10388@e103592.cambridge.arm.com>
+From: alex.bennee@linaro.org (Alex =?utf-8?Q?Benn=C3=A9e?=)
+Date: Thu, 04 Jun 2015 11:46:28 +0100
+Subject: [PATCH] KVM: arm64: fix misleading comments in save/restore
+In-Reply-To: <557029A9.1010303@arm.com>
+References: <1432806186-27993-1-git-send-email-alex.bennee@linaro.org>
+ <20150604093436.GC7657@cbox> <55702205.7000908@arm.com>
+ <87eglrbwr2.fsf@linaro.org> <557029A9.1010303@arm.com>
+Message-ID: <87bngvbvjv.fsf@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 02, 2015 at 05:10:03PM +0200, Michael van der Westhuizen wrote:
-> Fixes the TCM initialisation code to handle TCM banks that are
-> present but inaccessible due to TrustZone configuration.  This is
-> the default case when enabling the non-secure world.  It may also
-> be the case that that the user decided to use TCM for TrustZone.
-> 
-> This change has exposed a bug in handling of TCM where no TCM bank
-> was usable (the 0 size TCM case).  This change addresses the
-> resulting hang.
 
-[...]
+Marc Zyngier <marc.zyngier@arm.com> writes:
 
-> + *
-> + * Encoding this as per A8.8.107 of DDI0406C, Encoding T1/A1, yields:
-> + *  1111 1111 1111 1111 0000 1111 1101 1111 Required Mask
-> + *  1110 1110 0001 1001 ???? 1111 0001 0001 mrc p15, 0, XX, c9, c1, 0
-> + *  1110 1110 0001 1001 ???? 1111 0011 0001 mrc p15, 0, XX, c9, c1, 1
-> + *  [  ] [  ] [ ]| [  ] [  ] [  ] [ ]| +--- CRm
-> + *    |    |   | |   |    |    |   | +----- SBO
-> + *    |    |   | |   |    |    |   +------- opc2
-> + *    |    |   | |   |    |    +----------- coproc
-> + *    |    |   | |   |    +---------------- Rt
-> + *    |    |   | |   +--------------------- CRn
-> + *    |    |   | +------------------------- SBO
-> + *    |    |   +--------------------------- opc1
-> + *    |    +------------------------------- instruction
-> + *    +------------------------------------ condition
-> + */
-> +#define TCM_REGION_READ_MASK		0xffff0fdf
-> +#define TCM_REGION_READ_INSTR		0xee190f11
-> +#define DEST_REG_SHIFT			12
-> +#define DEST_REG_MASK			0xf
+> On 04/06/15 11:20, Alex Benn?e wrote:
+>> 
+>> Marc Zyngier <marc.zyngier@arm.com> writes:
+>> 
+>>> On 04/06/15 10:34, Christoffer Dall wrote:
+>>>> On Thu, May 28, 2015 at 10:43:06AM +0100, Alex Benn?e wrote:
+>>>>> The elr_el2 and spsr_el2 registers in fact contain the processor state
+>>>>> before entry into the hypervisor code.
+>>>>
+>>>> be careful with your use of the hypervisor, in the KVM design the
+>>>> hypervisor is split across EL1 and EL2.
+>> 
+>> "before entry into EL2."
+>> 
+>>>>
+>>>>> In the case of guest state it
+>>>>> could be in either el0 or el1.
+>>>>
+>>>> true
+>>>>
+>>>>>
+>>>>> Signed-off-by: Alex Benn?e <alex.bennee@linaro.org>
+>>>>> ---
+>>>>>  arch/arm64/kvm/hyp.S | 8 ++++----
+>>>>>  1 file changed, 4 insertions(+), 4 deletions(-)
+>>>>>
+>>>>> diff --git a/arch/arm64/kvm/hyp.S b/arch/arm64/kvm/hyp.S
+>>>>> index d755922..1940a4c 100644
+>>>>> --- a/arch/arm64/kvm/hyp.S
+>>>>> +++ b/arch/arm64/kvm/hyp.S
+>>>>> @@ -50,8 +50,8 @@
+>>>>>  	stp	x29, lr, [x3, #80]
+>>>>>  
+>>>>>  	mrs	x19, sp_el0
+>>>>> -	mrs	x20, elr_el2		// EL1 PC
+>>>>> -	mrs	x21, spsr_el2		// EL1 pstate
+>>>>> +	mrs	x20, elr_el2		// PC before hyp entry
+>>>>> +	mrs	x21, spsr_el2		// pstate before hyp entry
+>>>>>  
+>>>>>  	stp	x19, x20, [x3, #96]
+>>>>>  	str	x21, [x3, #112]
+>>>>> @@ -82,8 +82,8 @@
+>>>>>  	ldr	x21, [x3, #16]
+>>>>>  
+>>>>>  	msr	sp_el0, x19
+>>>>> -	msr	elr_el2, x20 				// EL1 PC
+>>>>> -	msr	spsr_el2, x21 				// EL1 pstate
+>>>>> +	msr	elr_el2, x20 		// PC to restore
+>>>>> +	msr	spsr_el2, x21 		// pstate to restore
+>>>>
+>>>> I don't feel like 'to restore' is much more meaningful here.
+>>>>
+>>>> I would actually vote for removin the comments all together, since one
+>>>> should really understand the code as opposed to the comments when
+>>>> reading this kind of stuff.
+>>>>
+>>>> Meh, I'm not sure.  Your patch is definitely better than doing nothing.
+>>>>
+>>>> Marc?
+>>>
+>>> While I definitely agree that people should pay more attention to the
+>>> code rather than blindly trusting comments, I still think there is some
+>>> value in disambiguating the exception entry/return, because this bit of
+>>> code assumes some intimate knowledge of the ARMv8 exception model.
+>>>
+>>> As for the comments themselves, I'd rather have some wording that
+>>> clearly indicate that we're dealing with guest information, i.e:
+>>>
+>>> 	mrs	x20, elr_el2		// Guest PC
+>>> 	mrs	x21, spsr_el2		// Guest pstate
+>>>
+>>> (and the same for the exception return). The "before hyp entry" and "to
+>>> restore" are not really useful (all the registers we are
+>>> saving/restoring fall into these categories). What I wanted to convey
+>>> here was that despite using an EL2 register, we are dealing with guest
+>>> registers.
+>> 
+>> Which would be great it we were. However the code is used to
+>> save/restore the host context as well as the guest context hence my
+>> weasely words. 
+>
+> Gahhh. You're right. I'm spending too much time on the VHE code these
+> days. Guess I'll stick to the weasel words then. Can you respin it with
+> Christoffer's comment addressed?
 
-What happens in a Thumb-2 kernel?
+Sure. Do you want it separated from the guest debug series or will you
+be happy to take it with it when ready?
 
-I think it is safe, since Thumb-2 kernel implies v7, and v7 mandates the
-TCMTR.  Even if we did get an Undef, the code in traps.c rearranges the
-bits of the offending insn into the "correct" order, and it so happens
-that this also makes the encoding for MRC/MCR instructions identical
-between ARM and Thumb.
+>
+> Thanks,
+>
+> 	M.
 
-For some other random instruction these assumptions may not hold, so
-it is worth adding brief comment in case people blindly use this code
-as a template for something else.
-
-[...]
-
-Cheers
----Dave
+-- 
+Alex Benn?e
