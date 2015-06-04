@@ -1,41 +1,25 @@
-From: khilman@kernel.org (Kevin Hilman)
-Date: Wed, 03 Jun 2015 18:08:37 -0700
-Subject: [PATCH] ARM: multi_v7_defconfig: enable usb3503
-In-Reply-To: <1426254866-24772-1-git-send-email-riku.voipio@linaro.org> (riku
- voipio's message of "Fri, 13 Mar 2015 15:54:26 +0200")
-References: <1426254866-24772-1-git-send-email-riku.voipio@linaro.org>
-Message-ID: <7hsia846wa.fsf@deeprootsystems.com>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Thu, 4 Jun 2015 09:18:20 +0800
+Subject: [PATCH v2 05/12] ARM: imx: setup tctl register in device
+ specific function
+In-Reply-To: <7heglsadva.fsf@deeprootsystems.com>
+References: <1432308599-28643-1-git-send-email-shawn.guo@linaro.org>
+ <1432308599-28643-6-git-send-email-shawn.guo@linaro.org>
+ <CAMAWPa-1MPgzT1GJQx4SjmfQpj9zdwsAw-qvLWZjVhoM66nHsQ@mail.gmail.com>
+ <20150602011139.GP16165@dragon>
+ <CAMAWPa-BYPnsqSxQ_VTa37a=Xg8xgrSQkzQgX+_65koZCNxBEg@mail.gmail.com>
+ <20150603061648.GA20344@dragon>
+ <7heglsadva.fsf@deeprootsystems.com>
+Message-ID: <20150604011820.GA17189@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-riku.voipio at linaro.org writes:
+On Wed, Jun 03, 2015 at 10:41:29AM -0700, Kevin Hilman wrote:
+> I tried your patch on top of next-20150529 (where I originally found the
+> issue) and it gets my wandboard dual and solo booting again.
+> 
+> Tested-by: Kevin Hilman <khilman@linaro.org>
 
-> From: Riku Voipio <riku.voipio@linaro.org>
->
-> CONFIG_USB_HSIC_USB3503 is needed by exynos5250-arndale for the on-board
-> asix network controller. Enable it so networking works with
-> multi_v7_defconfig out of box like it does with exynos_defconfig.
->
-> USB3503 is also referenced from exynos4412-odroidu3.dts and
-> exynos5250-spring.dts so this patch should improve
-> multi_v7_defconfig on those platforms as well.
->
-> Signed-off-by: Riku Voipio <riku.voipio@linaro.org>
+Thanks for confirming, Kevin.
 
-Tyler pointed me to this in order to get arndale networking on mainline,
-but looks like this might need to be revisited for current mainline.  
-
-I tested this and it doesn't work because as of commit 7de7c6717f2c
-(ARM: multi_v7_defconfig: Enable Exynos USB PHY) the PHY that this
-depends on is built as a module in multi_v7_config, so having this
-driver built-in doesn't help.  Even after the PHY driver is loaded, this
-driver will not detect the hardware.
-
-So instead, I think this driver should be built as a module as well.
-Testing that, I can get networking by doing loading both the phy and
-this driver after boot:
-
- # modprobe phy-exynos-usb2
- # modprobe usb3503
-
-Kevin
+Shawn
