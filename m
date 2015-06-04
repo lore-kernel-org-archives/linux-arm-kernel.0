@@ -1,155 +1,111 @@
-From: jun.nie@linaro.org (Jun Nie)
-Date: Thu,  4 Jun 2015 11:21:03 +0800
-Subject: [PATCH v6 4/4] ARM: zx: Add basic defconfig support for ZX296702
-In-Reply-To: <1433388063-13682-1-git-send-email-jun.nie@linaro.org>
-References: <1433388063-13682-1-git-send-email-jun.nie@linaro.org>
-Message-ID: <1433388063-13682-5-git-send-email-jun.nie@linaro.org>
+From: balbi@ti.com (Felipe Balbi)
+Date: Wed, 3 Jun 2015 22:45:56 -0500
+Subject: [RFC/NOT FOR MERGING] HACK: add global/private timers for A9
+In-Reply-To: <20150603222619.GY30984@atomide.com>
+References: <1433363565-17725-1-git-send-email-balbi@ti.com>
+ <20150603222619.GY30984@atomide.com>
+Message-ID: <20150604034550.GA25075@saruman.tx.rr.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add basic defconfig support to zx SOC, including uart, mmc
- and other common config
+Hi,
 
-Signed-off-by: Jun Nie <jun.nie@linaro.org>
----
- arch/arm/configs/zx_defconfig | 129 ++++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 129 insertions(+)
- create mode 100644 arch/arm/configs/zx_defconfig
+On Wed, Jun 03, 2015 at 03:26:20PM -0700, Tony Lindgren wrote:
+> * Felipe Balbi <balbi@ti.com> [150603 13:36]:
+> > --- a/arch/arm/mach-omap2/timer.c
+> > +++ b/arch/arm/mach-omap2/timer.c
+> > @@ -655,20 +655,18 @@ static OMAP_SYS_32K_TIMER_INIT(4, 1, "timer_32k_ck", "ti,timer-alwon",
+> >  static DEFINE_TWD_LOCAL_TIMER(twd_local_timer, OMAP44XX_LOCAL_TWD_BASE, 29);
+> >  void __init omap4_local_timer_init(void)
+> >  {
+> > +	int err;
+> > +
+> >  	omap4_sync32k_timer_init();
+> >  	/* Local timers are not supprted on OMAP4430 ES1.0 */
+> > -	if (omap_rev() != OMAP4430_REV_ES1_0) {
+> > -		int err;
+> > -
+> > -		if (of_have_populated_dt()) {
+> > -			clocksource_of_init();
+> > -			return;
+> > -		}
+> > -
+> > -		err = twd_local_timer_register(&twd_local_timer);
+> > -		if (err)
+> > -			pr_err("twd_local_timer_register failed %d\n", err);
+> > +	if (of_have_populated_dt()) {
+> > +		clocksource_of_init();
+> > +		return;
+> >  	}
+> > +
+> > +	err = twd_local_timer_register(&twd_local_timer);
+> > +	if (err)
+> > +		pr_err("twd_local_timer_register failed %d\n", err);
+> >  }
+> >  #else
+> >  void __init omap4_local_timer_init(void)
+> 
+> Looks like can get rid of even more code here, see the patch below.
+> 
+> Regards,
+> 
+> Tony
+> 
+> 8< ------------------------
+> From: Tony Lindgren <tony@atomide.com>
+> Date: Wed, 3 Jun 2015 14:40:40 -0700
+> Subject: [PATCH] ARM: OMAP2+: Clean up omap4_local_timer_init
+> 
+> Inspired by a patch from Felipe Balbi <balbi@ti.com>, we can
+> now get rid of most the code in omap4_local_timer_init.
+> 
+> Omap4 is now device tree only.. And we have not properly supported
+> omap4 ES1.0 revision for a really long time AFAIK.
+> 
+> Let's just remove all that code to simplify things. This assumes
+> we have arm,cortex-a9-twd-timer entry in the omap4.dtsi file, which
+> we do.
+> 
+> Signed-off-by: Tony Lindgren <tony@atomide.com>
 
-diff --git a/arch/arm/configs/zx_defconfig b/arch/arm/configs/zx_defconfig
-new file mode 100644
-index 0000000..b200bb0
---- /dev/null
-+++ b/arch/arm/configs/zx_defconfig
-@@ -0,0 +1,129 @@
-+CONFIG_EXPERIMENTAL=y
-+CONFIG_SYSVIPC=y
-+CONFIG_NO_HZ=y
-+CONFIG_HIGH_RES_TIMERS=y
-+CONFIG_LOG_BUF_SHIFT=14
-+CONFIG_CGROUPS=y
-+CONFIG_CGROUP_DEBUG=y
-+CONFIG_CGROUP_FREEZER=y
-+CONFIG_CGROUP_CPUACCT=y
-+CONFIG_RESOURCE_COUNTERS=y
-+CONFIG_CGROUP_SCHED=y
-+CONFIG_RT_GROUP_SCHED=y
-+CONFIG_NAMESPACES=y
-+CONFIG_USER_NS=y
-+CONFIG_BLK_DEV_INITRD=y
-+CONFIG_SYSCTL_SYSCALL=y
-+CONFIG_KALLSYMS_ALL=y
-+CONFIG_EMBEDDED=y
-+CONFIG_PERF_EVENTS=y
-+CONFIG_SLAB=y
-+# CONFIG_BLK_DEV_BSG is not set
-+# CONFIG_IOSCHED_CFQ is not set
-+CONFIG_ARCH_ZX=y
-+CONFIG_SOC_ZX296702=y
-+# CONFIG_SWP_EMULATE is not set
-+CONFIG_ARM_ERRATA_754322=y
-+CONFIG_ARM_ERRATA_775420=y
-+CONFIG_SMP=y
-+CONFIG_VMSPLIT_2G=y
-+CONFIG_PREEMPT=y
-+CONFIG_AEABI=y
-+CONFIG_KSM=y
-+# CONFIG_IOMMU_SUPPORT is not set
-+CONFIG_VFP=y
-+CONFIG_NEON=y
-+CONFIG_KERNEL_MODE_NEON=y
-+# CONFIG_CORE_DUMP_DEFAULT_ELF_HEADERS is not set
-+CONFIG_HIBERNATION=y
-+CONFIG_PM_RUNTIME=y
-+CONFIG_PM_DEBUG=y
-+CONFIG_SUSPEND_TIME=y
-+CONFIG_ZBOOT_ROM_TEXT=0x0
-+CONFIG_ZBOOT_ROM_BSS=0x0
-+CONFIG_CMDLINE="console=ttyAMA0,115200 debug earlyprintk root=/dev/ram rw rootwait"
-+#CONFIG_NET is not set
-+CONFIG_UEVENT_HELPER_PATH="/sbin/hotplug"
-+CONFIG_DEVTMPFS=y
-+CONFIG_DEVTMPFS_MOUNT=y
-+CONFIG_DMA_CMA=y
-+CONFIG_CMA_SIZE_MBYTES=192
-+CONFIG_BLK_DEV_LOOP=y
-+CONFIG_BLK_DEV_RAM=y
-+CONFIG_BLK_DEV_RAM_COUNT=1
-+CONFIG_BLK_DEV_RAM_SIZE=8192
-+CONFIG_UID_STAT=y
-+CONFIG_SCSI=y
-+CONFIG_BLK_DEV_SD=y
-+CONFIG_CHR_DEV_SG=y
-+CONFIG_CHR_DEV_SCH=y
-+CONFIG_SCSI_MULTI_LUN=y
-+CONFIG_MD=y
-+CONFIG_BLK_DEV_DM=y
-+CONFIG_DM_CRYPT=y
-+CONFIG_DM_UEVENT=y
-+CONFIG_DM_VERITY=y
-+CONFIG_NETDEVICES=y
-+# CONFIG_INPUT_MOUSE is not set
-+CONFIG_SERIO=y
-+CONFIG_SERIO_LIBPS2=y
-+CONFIG_SPI=y
-+CONFIG_LOGO=y
-+CONFIG_SERIAL_CORE=y
-+CONFIG_SERIAL_CORE_CONSOLE=y
-+CONFIG_CONSOLE_POLL=y
-+CONFIG_SERIAL_AMBA_PL011=y
-+CONFIG_SERIAL_AMBA_PL011_CONSOLE=y
-+CONFIG_SERIAL_OF_PLATFORM=y
-+# CONFIG_LEGACY_PTYS is not set
-+# CONFIG_HW_RANDOM is not set
-+# CONFIG_HWMON is not set
-+# CONFIG_USB_SUPPORT is not set
-+CONFIG_MMC=y
-+CONFIG_MMC_UNSAFE_RESUME=y
-+CONFIG_MMC_BLOCK_MINORS=16
-+CONFIG_MMC_DW=y
-+CONFIG_MMC_DW_IDMAC=y
-+CONFIG_EXT2_FS=y
-+CONFIG_EXT4_FS=y
-+CONFIG_EXT4_FS_POSIX_ACL=y
-+CONFIG_EXT4_FS_SECURITY=y
-+CONFIG_EXT4_DEBUG=y
-+CONFIG_FUSE_FS=y
-+CONFIG_MSDOS_FS=y
-+CONFIG_VFAT_FS=y
-+CONFIG_FAT_DEFAULT_CODEPAGE=936
-+CONFIG_TMPFS=y
-+CONFIG_TMPFS_POSIX_ACL=y
-+#CONFIG_NFS_FS is not set
-+CONFIG_NLS_CODEPAGE_936=y
-+CONFIG_NLS_ISO8859_1=y
-+CONFIG_NLS_UTF8=y
-+CONFIG_PRINTK_TIME=y
-+CONFIG_MAGIC_SYSRQ=y
-+CONFIG_DEBUG_KERNEL=y
-+CONFIG_DEBUG_INFO=y
-+CONFIG_FRAME_WARN=4096
-+CONFIG_DEBUG_FS=y
-+CONFIG_DEBUG_MEMORY_INIT=y
-+CONFIG_PANIC_TIMEOUT=5
-+# CONFIG_SCHED_DEBUG is not set
-+CONFIG_SCHEDSTATS=y
-+CONFIG_TIMER_STATS=y
-+CONFIG_DEBUG_RT_MUTEXES=y
-+CONFIG_DEBUG_SPINLOCK=y
-+CONFIG_DEBUG_MUTEXES=y
-+CONFIG_RCU_CPU_STALL_TIMEOUT=60
-+# CONFIG_FTRACE is not set
-+CONFIG_KGDB=y
-+CONFIG_KGDB_KDB=y
-+# CONFIG_ARM_UNWIND is not set
-+CONFIG_DEBUG_PREEMPT=y
-+CONFIG_DEBUG_USER=y
-+CONFIG_DEBUG_LL=y
-+CONFIG_DYNAMIC_DEBUG=y
-+CONFIG_STACKTRACE=y
-+CONFIG_DEBUG_ZTE_ZX=y
-+CONFIG_EARLY_PRINTK=y
-+CONFIG_CRYPTO_LZO=y
-+CONFIG_GPIOLIB=y
+very true
+
+Reviewed-by: Felipe Balbi <balbi@ti.com>
+
+> --- a/arch/arm/mach-omap2/timer.c
+> +++ b/arch/arm/mach-omap2/timer.c
+> @@ -649,23 +649,10 @@ static OMAP_SYS_32K_TIMER_INIT(4, 1, "timer_32k_ck", "ti,timer-alwon",
+>  
+>  #ifdef CONFIG_ARCH_OMAP4
+>  #ifdef CONFIG_HAVE_ARM_TWD
+> -static DEFINE_TWD_LOCAL_TIMER(twd_local_timer, OMAP44XX_LOCAL_TWD_BASE, 29);
+>  void __init omap4_local_timer_init(void)
+>  {
+>  	omap4_sync32k_timer_init();
+> -	/* Local timers are not supprted on OMAP4430 ES1.0 */
+> -	if (omap_rev() != OMAP4430_REV_ES1_0) {
+> -		int err;
+> -
+> -		if (of_have_populated_dt()) {
+> -			clocksource_of_init();
+> -			return;
+> -		}
+> -
+> -		err = twd_local_timer_register(&twd_local_timer);
+> -		if (err)
+> -			pr_err("twd_local_timer_register failed %d\n", err);
+> -	}
+> +	clocksource_of_init();
+>  }
+>  #else
+>  void __init omap4_local_timer_init(void)
+
 -- 
-1.9.1
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150603/ac1dcc88/attachment.sig>
