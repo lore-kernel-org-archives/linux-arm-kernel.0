@@ -1,52 +1,100 @@
-From: chaotian.jing@mediatek.com (Chaotian Jing)
-Date: Thu, 4 Jun 2015 10:54:03 +0800
-Subject: [PATCH v4 2/7] mmc: mediatek: Add Mediatek MMC driver
-In-Reply-To: <20150519111558.GD6325@pengutronix.de>
-References: <1432017411-2996-1-git-send-email-chaotian.jing@mediatek.com>
- <1432017411-2996-3-git-send-email-chaotian.jing@mediatek.com>
- <20150519111558.GD6325@pengutronix.de>
-Message-ID: <1433386443.3304.2.camel@mhfsdcap03>
+From: jun.nie@linaro.org (Jun Nie)
+Date: Thu, 4 Jun 2015 11:15:50 +0800
+Subject: [PATCH v5 2/4] clk: zx: add clock support to zx296702
+In-Reply-To: <20150603235021.GC490@codeaurora.org>
+References: <1432867178-5913-1-git-send-email-jun.nie@linaro.org>
+ <20150603235021.GC490@codeaurora.org>
+Message-ID: <CABymUCM7_QGGuQQcFZZBz6a4F3A8n5tHNMyXm51g8=-fgyybzQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2015-05-19 at 13:15 +0200, Sascha Hauer wrote:
-> On Tue, May 19, 2015 at 02:36:46PM +0800, Chaotian Jing wrote:
-> > Add Mediatek MMC driver code
-> > Support eMMC/SD/SDIO
-> > 
-> > Signed-off-by: Chaotian Jing <chaotian.jing@mediatek.com>
-> > ---
-> >  drivers/mmc/host/Kconfig  |    8 +
-> >  drivers/mmc/host/Makefile |    1 +
-> >  drivers/mmc/host/mtk-sd.c | 1422 +++++++++++++++++++++++++++++++++++++++++++++
-> >  3 files changed, 1431 insertions(+)
-> >  create mode 100644 drivers/mmc/host/mtk-sd.c
-> > 
-> > +
-> > +	host->src_clk = devm_clk_get(&pdev->dev, "source");
-> > +	if (IS_ERR(host->src_clk)) {
-> > +		ret = PTR_ERR(host->src_clk);
-> > +		goto host_free;
-> > +	}
-> > +
-> > +	host->h_clk = devm_clk_get(&pdev->dev, "hclk");
-> > +	if (IS_ERR(host->h_clk)) {
-> > +		/* host->h_clk is optional, Only for MSDC0/3 at MT8173 */
-> > +		dev_dbg(&pdev->dev,
-> > +				"Invalied hclk from the device tree!\n");
-> > +	}
-> 
-> s/Invalied/Invalid/
-> 
-> According to my reference manual the controller always needs a hclk. It
-> seems on some controllers it is just not software controllable. If
-> that's the case you should always provide a hclk to the driver and make
-> this clock mandatory.
-For MT8173, MSDC1, MSDC2's HCLK are in Infra, software cannot control
-it. So just set the HCLK to clk_null ?
+2015-06-04 7:50 GMT+08:00 Stephen Boyd <sboyd@codeaurora.org>:
+> On 05/29, Jun Nie wrote:
+>> diff --git a/drivers/clk/zte/clk-pll.c b/drivers/clk/zte/clk-pll.c
+>> new file mode 100644
+>> index 0000000..422ef25
+>> --- /dev/null
+>> +++ b/drivers/clk/zte/clk-pll.c
+>> @@ -0,0 +1,184 @@
+>> +/*
+>> + * Copyright 2014 Linaro Ltd.
+>> + * Copyright (C) 2014 ZTE Corporation.
+>> + *
+>> + * This program is free software; you can redistribute it and/or modify
+>> + * it under the terms of the GNU General Public License version 2 as
+>> + * published by the Free Software Foundation.
+>> + */
+>> +
+>> +#include <linux/clk.h>
+>
+> Do you need this include?
+Test shows I do not need it :)
+>
+>> +#include <linux/clk-provider.h>
+>> +#include <linux/err.h>
+>> +#include <linux/io.h>
+>> +#include <linux/iopoll.h>
+>> +#include <linux/slab.h>
+>> +#include <linux/spinlock.h>
+> [...]
+>> +
+>> +static int hw_to_idx(struct clk_zx_pll *zx_pll)
+>> +{
+>> +     const struct zx_pll_config *config = zx_pll->lookup_table;
+>> +     u32 hw_cfg0, hw_cfg1;
+>> +     int i;
+>> +
+>> +     hw_cfg0 = readl_relaxed(zx_pll->reg_base);
+>> +     hw_cfg1 = readl_relaxed(zx_pll->reg_base + CFG0_CFG1_OFFSET);
+>> +
+>> +     /* For matching the value in lookup table */
+>> +     hw_cfg0 &= ~LOCK_FLAG;
+>> +     hw_cfg0 |= POWER_DOWN;
+>> +
+>> +     for (i = 0; i < zx_pll->count; i++) {
+>> +             if (hw_cfg0 == config[i].cfg0 && hw_cfg1 == config[i].cfg1)
+>> +                     return i;
+>> +     }
+>> +
+>> +     return -1;
+>
+> How about a real error code? -EINVAL?
+Sure. Will change it.
 
-If it is, will set HCLK to clk_null at next revision, and the same
-changes will make for MT8135.
-> 
-> Sascha
-> 
+>
+>> +}
+>> +
+> [...]
+>> +
+>> +static int zx_pll_enable(struct clk_hw *hw)
+>> +{
+>> +     struct clk_zx_pll *zx_pll = to_clk_zx_pll(hw);
+>> +     unsigned long timeout = jiffies + msecs_to_jiffies(500);
+>> +     u32 reg;
+>> +
+>> +     reg = readl_relaxed(zx_pll->reg_base);
+>> +     writel_relaxed(reg & ~POWER_DOWN, zx_pll->reg_base);
+>> +
+>> +     return readl_relaxed_poll_timeout(zx_pll->reg_base, reg,
+>> +                                       reg & LOCK_FLAG, 0, 100);
+>> +
+>
+> This is odd. A return and then more code?
+Forget to remove redundant code after test. Will delete.
+
+>
+>> +     while (!(readl_relaxed(zx_pll->reg_base) & LOCK_FLAG)) {
+>> +             if (time_after(jiffies, timeout)) {
+>> +                     pr_err("clk %s enable timeout\n",
+>> +                             __clk_get_name(hw->clk));
+>> +                     break;
+>> +             }
+>> +     }
+>> +
+>> +     return 0;
+>> +}
+>> +
+>
+> --
+> Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+> a Linux Foundation Collaborative Project
