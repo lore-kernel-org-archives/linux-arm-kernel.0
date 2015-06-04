@@ -1,22 +1,46 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Thu, 4 Jun 2015 14:27:25 -0700
-Subject: [PATCH] clk: make several parent names const
-In-Reply-To: <1432802751-6397-1-git-send-email-u.kleine-koenig@pengutronix.de>
-References: <1432802751-6397-1-git-send-email-u.kleine-koenig@pengutronix.de>
-Message-ID: <20150604212725.GR676@codeaurora.org>
+From: tthayer@opensource.altera.com (Thor Thayer)
+Date: Thu, 4 Jun 2015 16:34:49 -0500
+Subject: [PATCHv2 2/4] edac, altera: Refactor EDAC for Altera CycloneV SoC.
+In-Reply-To: <55706E25.8050105@opensource.altera.com>
+References: <1433428128-7292-1-git-send-email-tthayer@opensource.altera.com>
+ <1433428128-7292-3-git-send-email-tthayer@opensource.altera.com>
+ <55706E25.8050105@opensource.altera.com>
+Message-ID: <5570C479.7010902@opensource.altera.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/28, Uwe Kleine-K?nig wrote:
-> Since commit 2893c379461a ("clk: make strings in parent name arrays
-> const") the name of parent clocks can be const. So add more const in
-> several clock drivers.
-> 
-> Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
-> ---
 
-Applied to clk-next
+On 06/04/2015 10:26 AM, Dinh Nguyen wrote:
+> On 06/04/2015 09:28 AM, tthayer at opensource.altera.com wrote:
+>> From: Thor Thayer <tthayer@opensource.altera.com>
+>>
+>> The Arria10 SOC uses a completely different SDRAM controller from the
+>> earlier CycloneV and ArriaV SoCs. This patch abstracts the SDRAM bits
+>> for the CycloneV/ArriaV SoCs in preparation for the Arria10 support.
+>>
+>> Signed-off-by: Thor Thayer <tthayer@opensource.altera.com>
+>> ---
+>> v2: Make c5_data static.
+>> ---
+>>   drivers/edac/altera_edac.c |  194 ++++++++++++++++++++------------------------
+>>   drivers/edac/altera_edac.h |  116 ++++++++++++++++++++++++++
+>>   2 files changed, 206 insertions(+), 104 deletions(-)
+>>   create mode 100644 drivers/edac/altera_edac.h
+>>
+>> diff --git a/drivers/edac/altera_edac.c b/drivers/edac/altera_edac.c
+>> index a9e7c69..a8350f6 100644
+>> --- a/drivers/edac/altera_edac.c
+>> +++ b/drivers/edac/altera_edac.c
+>
+> What branch are you basing this patch on? I get the following error when
+> applied to both v4.1-rc6, linux-next, and linux-edac/linux-next.
+>
+> Applying: edac, altera: Refactor EDAC for Altera CycloneV SoC.
+> error: patch failed: drivers/edac/altera_edac.c:400
+> error: drivers/edac/altera_edac.c: patch does not apply
+> Patch failed at 0001 edac, altera: Refactor EDAC for Altera CycloneV SoC.
+>
+> Dinh
+>
 
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+OK. I'll refactor and resend. I was using Altera's internal for-next branch.
