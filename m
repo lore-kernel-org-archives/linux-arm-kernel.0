@@ -1,151 +1,108 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Thu, 4 Jun 2015 12:23:08 +0200
-Subject: [PATCH v5 08/12] KVM: arm64: re-factor hyp.S debug register code
-In-Reply-To: <1432891828-4816-9-git-send-email-alex.bennee@linaro.org>
-References: <1432891828-4816-1-git-send-email-alex.bennee@linaro.org>
- <1432891828-4816-9-git-send-email-alex.bennee@linaro.org>
-Message-ID: <20150604102308.GD7657@cbox>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Thu, 4 Jun 2015 11:22:53 +0100
+Subject: [PATCH 05/11] x86, pci, acpi: Move arch-agnostic MMCONFIG (aka
+ ECAM) and ACPI code out of arch/x86/ directory
+In-Reply-To: <55701A31.808@linaro.org>
+References: <1432644564-24746-1-git-send-email-hanjun.guo@linaro.org>
+ <1432644564-24746-6-git-send-email-hanjun.guo@linaro.org>
+ <20150526170817.GU1565@arm.com> <55657B02.5090805@linaro.org>
+ <20150602133215.GC23650@red-moon> <55701A31.808@linaro.org>
+Message-ID: <20150604102253.GA31773@red-moon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 29, 2015 at 10:30:24AM +0100, Alex Benn?e wrote:
-> This is a pre-cursor to sharing the code with the guest debug support.
-> This replaces the big macro that fishes data out of a fixed location
-> with a more general helper macro to restore a set of debug registers. It
-> uses macro substitution so it can be re-used for debug control and value
-> registers. It does however rely on the debug registers being 64 bit
-> aligned (as they happen to be in the hyp ABI).
+Hi Hanjun,
+
+On Thu, Jun 04, 2015 at 10:28:17AM +0100, Hanjun Guo wrote:
+> Hi Lorenzo,
 > 
-> Signed-off-by: Alex Benn?e <alex.bennee@linaro.org>
+> On 2015???06???02??? 21:32, Lorenzo Pieralisi wrote:
+> > On Wed, May 27, 2015 at 09:06:26AM +0100, Tomasz Nowicki wrote:
+> >> On 26.05.2015 19:08, Will Deacon wrote:
+> >>> On Tue, May 26, 2015 at 01:49:18PM +0100, Hanjun Guo wrote:
+> >>>> From: Tomasz Nowicki <tomasz.nowicki@linaro.org>
+> >>>>
+> >>>> ECAM standard and MCFG table are architecture independent and it makes
+> >>>> sense to share common code across all architectures. Both are going to
+> >>>> corresponding files - ecam.c and mcfg.c
+> >>>>
+> >>>> While we are here, rename pci_parse_mcfg to acpi_parse_mcfg.
+> >>>> We already have acpi_parse_mcfg prototype which is used nowhere.
+> >>>> At the same time, we need pci_parse_mcfg been global so acpi_parse_mcfg
+> >>>> can be used perfectly here.
+> >>>>
+> >>>> Signed-off-by: Tomasz Nowicki <tomasz.nowicki@linaro.org>
+> >>>> Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
+> >>>> Tested-by: Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com>
+> >>>> ---
+> >>>>    arch/x86/Kconfig               |   3 +
+> >>>>    arch/x86/include/asm/pci_x86.h |  33 ------
+> >>>>    arch/x86/pci/acpi.c            |   1 +
+> >>>>    arch/x86/pci/mmconfig-shared.c | 244 +---------------------------------------
+> >>>>    arch/x86/pci/mmconfig_32.c     |   1 +
+> >>>>    arch/x86/pci/mmconfig_64.c     |   1 +
+> >>>>    arch/x86/pci/numachip.c        |   1 +
+> >>>>    drivers/acpi/Makefile          |   1 +
+> >>>>    drivers/acpi/mcfg.c            |  57 ++++++++++
+> >>>>    drivers/pci/Kconfig            |   7 ++
+> >>>>    drivers/pci/Makefile           |   5 +
+> >>>>    drivers/pci/ecam.c             | 245 +++++++++++++++++++++++++++++++++++++++++
+> >>>
+> >>> Why can't we make use of the ECAM implementation used by pci-host-generic
+> >>> and drivers/pci/access.c?
+> >>
+> >> We had that question when I had posted MMCFG patch set separately,
+> >> please see:
+> >> https://lkml.org/lkml/2015/3/11/492
+> >
+> > Yes, but the real question is, why do we need to have PCI config space
+> > up and running before a bus struct is even created ? I think the reason is
+> > the PCI configuration address space format (ACPI 6.0, Table 5-27, page
+> > 108):
+> >
+> > "PCI Configuration space addresses must be confined to devices on
+> > PCI Segment Group 0, bus 0. This restriction exists to accommodate
+> > access to fixed hardware prior to PCI bus enumeration".
+> >
+> > On HW reduced platforms I do not even think this is required at all,
+> > we have to look into this to avoid code duplication that might well
+> > turn out useless.
 > 
-> ---
-> v3:
->   - return to the patch series
->   - add save and restore targets
->   - change register use and document
-> v4:
->   - keep original setup/restore names
->   - don't use split u32/u64 structure yet
-> ---
->  arch/arm64/kvm/hyp.S | 519 ++++++++++++++-------------------------------------
->  1 file changed, 140 insertions(+), 379 deletions(-)
+> This is only for the fixed hardware, which will be not available for
+> ARM64 (reduced hardware mode), but in Generic Hardware Programming
+> Model, we using OEM-provided ACPI Machine Language (AML) code to access
+> generic hardware registers, this will be available for reduced hardware
+> too.
 > 
-> diff --git a/arch/arm64/kvm/hyp.S b/arch/arm64/kvm/hyp.S
-> index 74e63d8..9c4897d 100644
-> --- a/arch/arm64/kvm/hyp.S
-> +++ b/arch/arm64/kvm/hyp.S
+> So in ACPI spec, it says: (ACPI 6.0 page 66, last paragraph)
+> 
+> ACPI defines eight address spaces that may be accessed by generic
+> hardware implementations. These include:
+> * System I/O space
+> * System memory space
+> * PCI configuration space
+> * Embedded controller space
+> * System Management Bus (SMBus) space
+> * CMOS
+> * PCI BAR Target
+> * IPMI space
+> 
+> So if any device using the PCI address space for control, such
+> as a system reset control device, its address space can be reside
+> in PCI configuration space (who can prevent a OEM do that crazy
+> thing? :) ), and it should be accessible before the PCI bus is
+> created.
 
-
-[...]
-
-> @@ -465,195 +318,52 @@
->  	msr	mdscr_el1,	x25
->  .endm
->  
-> -.macro restore_debug
-> -	// x2: base address for cpu context
-> -	// x3: tmp register
-> -
-> -	mrs	x26, id_aa64dfr0_el1
-> -	ubfx	x24, x26, #12, #4	// Extract BRPs
-> -	ubfx	x25, x26, #20, #4	// Extract WRPs
-> -	mov	w26, #15
-> -	sub	w24, w26, w24		// How many BPs to skip
-> -	sub	w25, w26, w25		// How many WPs to skip
-> -
-> -	add	x3, x2, #CPU_SYSREG_OFFSET(DBGBCR0_EL1)
-> +.macro restore_debug type
-> +        // x4: pointer to register set
-> +        // x5: number of registers to skip
-
-nit: use tabs instead of spaces here...
-
-> +	// x6..x22 trashed
->  
-
-[...]
-
-> @@ -887,12 +597,63 @@ __restore_sysregs:
->  	restore_sysregs
->  	ret
->  
-> +/* Save debug state */
->  __save_debug:
-> -	save_debug
-> +	// x0: base address for vcpu context
-> +	// x2: ptr to current CPU context
-> +	// x4/x5: trashed
-
-I had a bunch of questions here which I think you missed last time
-around:
- 1. why do we need the vcpu context?
- 2. what does 'current' mean here?
- 3. you're also trashing everything that save_debug trashes, so x4/5,
-    x6-x22 trashed would be more correct
-
-> +
-> +	mrs	x26, id_aa64dfr0_el1
-> +	ubfx	x24, x26, #12, #4	// Extract BRPs
-> +	ubfx	x25, x26, #20, #4	// Extract WRPs
-> +	mov	w26, #15
-> +	sub	w24, w26, w24		// How many BPs to skip
-> +	sub	w25, w26, w25		// How many WPs to skip
-> +
-> +	mov     x5, x24
-> +	add	x4, x2, #CPU_SYSREG_OFFSET(DBGBCR0_EL1)
-> +	save_debug dbgbcr
-> +	add	x4, x2, #CPU_SYSREG_OFFSET(DBGBVR0_EL1)
-> +	save_debug dbgbvr
-> +
-> +	mov     x5, x25
-> +	add	x4, x2, #CPU_SYSREG_OFFSET(DBGWCR0_EL1)
-> +	save_debug dbgwcr
-> +	add	x4, x2, #CPU_SYSREG_OFFSET(DBGWVR0_EL1)
-> +	save_debug dbgwvr
-> +
-> +	mrs	x21, mdccint_el1
-> +	str	x21, [x2, #CPU_SYSREG_OFFSET(MDCCINT_EL1)]
->  	ret
->  
-> +/* Restore debug state */
->  __restore_debug:
-> -	restore_debug
-> +	// x0: base address for cpu context
-> +	// x2: ptr to current CPU context
-> +	// x4/x5: trashed
-
-and you missed these comments too, basically same stuff, but why was it
-'cpu' here and not 'vcpu' like above?
-
-note again, that you're explicitly touching x24, xx25, and x26 here as
-well, so shouldn't they be listed as trashed?
-
-> +
-> +	mrs	x26, id_aa64dfr0_el1
-> +	ubfx	x24, x26, #12, #4	// Extract BRPs
-> +	ubfx	x25, x26, #20, #4	// Extract WRPs
-> +	mov	w26, #15
-> +	sub	w24, w26, w24		// How many BPs to skip
-> +	sub	w25, w26, w25		// How many WPs to skip
-> +
-> +	mov     x5, x24
-> +	add	x4, x2, #CPU_SYSREG_OFFSET(DBGBCR0_EL1)
-> +	restore_debug dbgbcr
-> +	add	x4, x2, #CPU_SYSREG_OFFSET(DBGBVR0_EL1)
-> +	restore_debug dbgbvr
-> +
-> +	mov     x5, x25
-> +	add	x4, x2, #CPU_SYSREG_OFFSET(DBGWCR0_EL1)
-> +	restore_debug dbgwcr
-> +	add	x4, x2, #CPU_SYSREG_OFFSET(DBGWVR0_EL1)
-> +	restore_debug dbgwvr
-> +
-> +	ldr	x21, [x2, #CPU_SYSREG_OFFSET(MDCCINT_EL1)]
-> +	msr	mdccint_el1, x21
-> +
->  	ret
->  
->  __save_fpsimd:
+Us, by changing attitude and questioning features whose usefulness
+is questionable. I will look into this and raise the point, I am not
+thrilled by the idea of adding another set of PCI accessor functions
+and drivers because we have to access a register through PCI before
+enumerating the bus (and on arm64 this is totally useless since
+we are not meant to support fixed HW anyway). Maybe we can make acpica
+code use a "special" stub (ACPI specific, PCI configuration space address
+space has restrictions anyway), I have to review this set in its
+entirety to see how to do that (and I would kindly ask you to do
+it too, before saying it is not possible to implement it).
 
 Thanks,
--Christoffer
+Lorenzo
