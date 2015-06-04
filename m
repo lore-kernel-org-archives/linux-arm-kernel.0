@@ -1,10 +1,10 @@
 From: jiang.liu@linux.intel.com (Jiang Liu)
-Date: Thu,  4 Jun 2015 12:13:15 +0800
-Subject: [RFT v2 05/48] gpio: Use irq_desc_get_xxx() to avoid redundant lookup
- of irq_desc
+Date: Thu,  4 Jun 2015 12:13:16 +0800
+Subject: [RFT v2 06/48] pinctrl: Use irq_desc_get_xxx() to avoid redundant
+ lookup of irq_desc
 In-Reply-To: <1433391238-19471-1-git-send-email-jiang.liu@linux.intel.com>
 References: <1433391238-19471-1-git-send-email-jiang.liu@linux.intel.com>
-Message-ID: <1433391238-19471-6-git-send-email-jiang.liu@linux.intel.com>
+Message-ID: <1433391238-19471-7-git-send-email-jiang.liu@linux.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -14,173 +14,397 @@ already have a pointer to corresponding irq_desc.
 Signed-off-by: Jiang Liu <jiang.liu@linux.intel.com>
 Acked-by: Linus Walleij <linus.walleij@linaro.org>
 ---
- drivers/gpio/gpio-bcm-kona.c   |    2 +-
- drivers/gpio/gpio-dwapb.c      |    2 +-
- drivers/gpio/gpio-mvebu.c      |    2 +-
- drivers/gpio/gpio-mxc.c        |    6 +++---
- drivers/gpio/gpio-mxs.c        |    2 +-
- drivers/gpio/gpio-omap.c       |    2 +-
- drivers/gpio/gpio-tegra.c      |    4 +---
- drivers/gpio/gpio-timberdale.c |    5 +++--
- drivers/gpio/gpio-vf610.c      |    2 +-
- drivers/gpio/gpio-zynq.c       |    2 +-
- 10 files changed, 14 insertions(+), 15 deletions(-)
+ drivers/pinctrl/intel/pinctrl-cherryview.c    |    2 +-
+ drivers/pinctrl/intel/pinctrl-intel.c         |    2 +-
+ drivers/pinctrl/mediatek/pinctrl-mtk-common.c |    4 ++--
+ drivers/pinctrl/nomadik/pinctrl-nomadik.c     |   12 +++++-------
+ drivers/pinctrl/pinctrl-amd.c                 |    2 +-
+ drivers/pinctrl/pinctrl-at91.c                |    2 +-
+ drivers/pinctrl/pinctrl-coh901.c              |    4 ++--
+ drivers/pinctrl/pinctrl-rockchip.c            |    4 ++--
+ drivers/pinctrl/pinctrl-single.c              |    2 +-
+ drivers/pinctrl/pinctrl-st.c                  |    6 +++---
+ drivers/pinctrl/qcom/pinctrl-msm.c            |    2 +-
+ drivers/pinctrl/samsung/pinctrl-exynos.c      |    8 ++++----
+ drivers/pinctrl/samsung/pinctrl-s3c24xx.c     |   18 +++++++++---------
+ drivers/pinctrl/samsung/pinctrl-s3c64xx.c     |   22 ++++++++++------------
+ drivers/pinctrl/sirf/pinctrl-sirf.c           |    2 +-
+ drivers/pinctrl/sunxi/pinctrl-sunxi.c         |    4 ++--
+ 16 files changed, 46 insertions(+), 50 deletions(-)
 
-diff --git a/drivers/gpio/gpio-bcm-kona.c b/drivers/gpio/gpio-bcm-kona.c
-index b164ce837b43..2e7a8c66fe57 100644
---- a/drivers/gpio/gpio-bcm-kona.c
-+++ b/drivers/gpio/gpio-bcm-kona.c
-@@ -432,7 +432,7 @@ static void bcm_kona_gpio_irq_handler(unsigned int irq, struct irq_desc *desc)
- 	void __iomem *reg_base;
- 	int bit, bank_id;
- 	unsigned long sta;
--	struct bcm_kona_gpio_bank *bank = irq_get_handler_data(irq);
-+	struct bcm_kona_gpio_bank *bank = irq_desc_get_handler_data(desc);
- 	struct irq_chip *chip = irq_desc_get_chip(desc);
- 
- 	chained_irq_enter(chip, desc);
-diff --git a/drivers/gpio/gpio-dwapb.c b/drivers/gpio/gpio-dwapb.c
-index 58faf04fce5d..649be07a845d 100644
---- a/drivers/gpio/gpio-dwapb.c
-+++ b/drivers/gpio/gpio-dwapb.c
-@@ -149,7 +149,7 @@ static u32 dwapb_do_irq(struct dwapb_gpio *gpio)
- 
- static void dwapb_irq_handler(u32 irq, struct irq_desc *desc)
+diff --git a/drivers/pinctrl/intel/pinctrl-cherryview.c b/drivers/pinctrl/intel/pinctrl-cherryview.c
+index 82f691eeeec4..878e798bcb56 100644
+--- a/drivers/pinctrl/intel/pinctrl-cherryview.c
++++ b/drivers/pinctrl/intel/pinctrl-cherryview.c
+@@ -1368,7 +1368,7 @@ static void chv_gpio_irq_handler(unsigned irq, struct irq_desc *desc)
  {
--	struct dwapb_gpio *gpio = irq_get_handler_data(irq);
-+	struct dwapb_gpio *gpio = irq_desc_get_handler_data(desc);
- 	struct irq_chip *chip = irq_desc_get_chip(desc);
+ 	struct gpio_chip *gc = irq_desc_get_handler_data(desc);
+ 	struct chv_pinctrl *pctrl = gpiochip_to_pinctrl(gc);
+-	struct irq_chip *chip = irq_get_chip(irq);
++	struct irq_chip *chip = irq_desc_get_chip(desc);
+ 	unsigned long pending;
+ 	u32 intr_line;
  
- 	dwapb_do_irq(gpio);
-diff --git a/drivers/gpio/gpio-mvebu.c b/drivers/gpio/gpio-mvebu.c
-index 1a54205860f5..a8c302ef7bc4 100644
---- a/drivers/gpio/gpio-mvebu.c
-+++ b/drivers/gpio/gpio-mvebu.c
-@@ -460,7 +460,7 @@ static int mvebu_gpio_irq_set_type(struct irq_data *d, unsigned int type)
- 
- static void mvebu_gpio_irq_handler(unsigned int irq, struct irq_desc *desc)
+diff --git a/drivers/pinctrl/intel/pinctrl-intel.c b/drivers/pinctrl/intel/pinctrl-intel.c
+index 00768e53deec..a40681097402 100644
+--- a/drivers/pinctrl/intel/pinctrl-intel.c
++++ b/drivers/pinctrl/intel/pinctrl-intel.c
+@@ -840,7 +840,7 @@ static void intel_gpio_irq_handler(unsigned irq, struct irq_desc *desc)
  {
--	struct mvebu_gpio_chip *mvchip = irq_get_handler_data(irq);
-+	struct mvebu_gpio_chip *mvchip = irq_desc_get_handler_data(desc);
- 	struct irq_chip *chip = irq_desc_get_chip(desc);
- 	u32 cause, type;
+ 	struct gpio_chip *gc = irq_desc_get_handler_data(desc);
+ 	struct intel_pinctrl *pctrl = gpiochip_to_pinctrl(gc);
+-	struct irq_chip *chip = irq_get_chip(irq);
++	struct irq_chip *chip = irq_desc_get_chip(desc);
  	int i;
-diff --git a/drivers/gpio/gpio-mxc.c b/drivers/gpio/gpio-mxc.c
-index 9f7446a7ac64..f10948c04f7c 100644
---- a/drivers/gpio/gpio-mxc.c
-+++ b/drivers/gpio/gpio-mxc.c
-@@ -275,8 +275,8 @@ static void mxc_gpio_irq_handler(struct mxc_gpio_port *port, u32 irq_stat)
- static void mx3_gpio_irq_handler(u32 irq, struct irq_desc *desc)
- {
- 	u32 irq_stat;
--	struct mxc_gpio_port *port = irq_get_handler_data(irq);
--	struct irq_chip *chip = irq_get_chip(irq);
-+	struct mxc_gpio_port *port = irq_desc_get_handler_data(desc);
-+	struct irq_chip *chip = irq_desc_get_chip(desc);
  
  	chained_irq_enter(chip, desc);
+diff --git a/drivers/pinctrl/mediatek/pinctrl-mtk-common.c b/drivers/pinctrl/mediatek/pinctrl-mtk-common.c
+index 474812e2b0cb..fd05ca6125b0 100644
+--- a/drivers/pinctrl/mediatek/pinctrl-mtk-common.c
++++ b/drivers/pinctrl/mediatek/pinctrl-mtk-common.c
+@@ -1018,8 +1018,8 @@ mtk_eint_debounce_process(struct mtk_pinctrl *pctl, int index)
  
-@@ -292,7 +292,7 @@ static void mx2_gpio_irq_handler(u32 irq, struct irq_desc *desc)
+ static void mtk_eint_irq_handler(unsigned irq, struct irq_desc *desc)
  {
- 	u32 irq_msk, irq_stat;
- 	struct mxc_gpio_port *port;
+-	struct irq_chip *chip = irq_get_chip(irq);
+-	struct mtk_pinctrl *pctl = irq_get_handler_data(irq);
++	struct irq_chip *chip = irq_desc_get_chip(desc);
++	struct mtk_pinctrl *pctl = irq_desc_get_handler_data(desc);
+ 	unsigned int status, eint_num;
+ 	int offset, index, virq;
+ 	const struct mtk_eint_offsets *eint_offsets =
+diff --git a/drivers/pinctrl/nomadik/pinctrl-nomadik.c b/drivers/pinctrl/nomadik/pinctrl-nomadik.c
+index a6a22054c0ba..902f53b855bf 100644
+--- a/drivers/pinctrl/nomadik/pinctrl-nomadik.c
++++ b/drivers/pinctrl/nomadik/pinctrl-nomadik.c
+@@ -854,10 +854,9 @@ static struct irq_chip nmk_gpio_irq_chip = {
+ 	.flags		= IRQCHIP_MASK_ON_SUSPEND,
+ };
+ 
+-static void __nmk_gpio_irq_handler(unsigned int irq, struct irq_desc *desc,
+-				   u32 status)
++static void __nmk_gpio_irq_handler(struct irq_desc *desc, u32 status)
+ {
+-	struct irq_chip *host_chip = irq_get_chip(irq);
++	struct irq_chip *host_chip = irq_desc_get_chip(desc);
+ 	struct gpio_chip *chip = irq_desc_get_handler_data(desc);
+ 
+ 	chained_irq_enter(host_chip, desc);
+@@ -882,17 +881,16 @@ static void nmk_gpio_irq_handler(unsigned int irq, struct irq_desc *desc)
+ 	status = readl(nmk_chip->addr + NMK_GPIO_IS);
+ 	clk_disable(nmk_chip->clk);
+ 
+-	__nmk_gpio_irq_handler(irq, desc, status);
++	__nmk_gpio_irq_handler(desc, status);
+ }
+ 
+-static void nmk_gpio_latent_irq_handler(unsigned int irq,
+-					   struct irq_desc *desc)
++static void nmk_gpio_latent_irq_handler(unsigned int irq, struct irq_desc *desc)
+ {
+ 	struct gpio_chip *chip = irq_desc_get_handler_data(desc);
+ 	struct nmk_gpio_chip *nmk_chip = container_of(chip, struct nmk_gpio_chip, chip);
+ 	u32 status = nmk_chip->get_latent_status(nmk_chip->bank);
+ 
+-	__nmk_gpio_irq_handler(irq, desc, status);
++	__nmk_gpio_irq_handler(desc, status);
+ }
+ 
+ /* I/O Functions */
+diff --git a/drivers/pinctrl/pinctrl-amd.c b/drivers/pinctrl/pinctrl-amd.c
+index 7de3b64bf142..639cd77c1fbb 100644
+--- a/drivers/pinctrl/pinctrl-amd.c
++++ b/drivers/pinctrl/pinctrl-amd.c
+@@ -501,7 +501,7 @@ static void amd_gpio_irq_handler(unsigned int irq, struct irq_desc *desc)
+ 	u64 reg64;
+ 	int handled = 0;
+ 	unsigned long flags;
 -	struct irq_chip *chip = irq_get_chip(irq);
 +	struct irq_chip *chip = irq_desc_get_chip(desc);
+ 	struct gpio_chip *gc = irq_desc_get_handler_data(desc);
+ 	struct amd_gpio *gpio_dev = to_amd_gpio(gc);
  
- 	chained_irq_enter(chip, desc);
+diff --git a/drivers/pinctrl/pinctrl-at91.c b/drivers/pinctrl/pinctrl-at91.c
+index 2f797cb7e205..92d5f9ec1cce 100644
+--- a/drivers/pinctrl/pinctrl-at91.c
++++ b/drivers/pinctrl/pinctrl-at91.c
+@@ -1581,7 +1581,7 @@ static struct irq_chip gpio_irqchip = {
  
-diff --git a/drivers/gpio/gpio-mxs.c b/drivers/gpio/gpio-mxs.c
-index 84cbda6acdda..039c7d50e64f 100644
---- a/drivers/gpio/gpio-mxs.c
-+++ b/drivers/gpio/gpio-mxs.c
-@@ -157,7 +157,7 @@ static void mxs_flip_edge(struct mxs_gpio_port *port, u32 gpio)
- static void mxs_gpio_irq_handler(u32 irq, struct irq_desc *desc)
+ static void gpio_irq_handler(unsigned irq, struct irq_desc *desc)
  {
- 	u32 irq_stat;
--	struct mxs_gpio_port *port = irq_get_handler_data(irq);
-+	struct mxs_gpio_port *port = irq_desc_get_handler_data(desc);
+-	struct irq_chip *chip = irq_get_chip(irq);
++	struct irq_chip *chip = irq_desc_get_chip(desc);
+ 	struct gpio_chip *gpio_chip = irq_desc_get_handler_data(desc);
+ 	struct at91_gpio_chip *at91_gpio = container_of(gpio_chip,
+ 					   struct at91_gpio_chip, chip);
+diff --git a/drivers/pinctrl/pinctrl-coh901.c b/drivers/pinctrl/pinctrl-coh901.c
+index 29cbbab8c3a6..9579442a221d 100644
+--- a/drivers/pinctrl/pinctrl-coh901.c
++++ b/drivers/pinctrl/pinctrl-coh901.c
+@@ -521,8 +521,8 @@ static struct irq_chip u300_gpio_irqchip = {
  
- 	desc->irq_data.chip->irq_ack(&desc->irq_data);
- 
-diff --git a/drivers/gpio/gpio-omap.c b/drivers/gpio/gpio-omap.c
-index b232397ad7ec..acbf3feff1e2 100644
---- a/drivers/gpio/gpio-omap.c
-+++ b/drivers/gpio/gpio-omap.c
-@@ -719,7 +719,7 @@ static void omap_gpio_irq_handler(unsigned int irq, struct irq_desc *desc)
- 	struct gpio_bank *bank;
- 	int unmasked = 0;
- 	struct irq_chip *irqchip = irq_desc_get_chip(desc);
+ static void u300_gpio_irq_handler(unsigned irq, struct irq_desc *desc)
+ {
+-	struct irq_chip *parent_chip = irq_get_chip(irq);
 -	struct gpio_chip *chip = irq_get_handler_data(irq);
++	struct irq_chip *parent_chip = irq_desc_get_chip(desc);
 +	struct gpio_chip *chip = irq_desc_get_handler_data(desc);
+ 	struct u300_gpio *gpio = to_u300_gpio(chip);
+ 	struct u300_gpio_port *port = &gpio->ports[irq - chip->base];
+ 	int pinoffset = port->number << 3; /* get the right stride */
+diff --git a/drivers/pinctrl/pinctrl-rockchip.c b/drivers/pinctrl/pinctrl-rockchip.c
+index dee7d5f06c60..97a4a3dddb30 100644
+--- a/drivers/pinctrl/pinctrl-rockchip.c
++++ b/drivers/pinctrl/pinctrl-rockchip.c
+@@ -1396,8 +1396,8 @@ static const struct gpio_chip rockchip_gpiolib_chip = {
  
- 	chained_irq_enter(irqchip, desc);
- 
-diff --git a/drivers/gpio/gpio-tegra.c b/drivers/gpio/gpio-tegra.c
-index 1741981d53c8..89ed8a56eb0b 100644
---- a/drivers/gpio/gpio-tegra.c
-+++ b/drivers/gpio/gpio-tegra.c
-@@ -268,16 +268,14 @@ static void tegra_gpio_irq_shutdown(struct irq_data *d)
- 
- static void tegra_gpio_irq_handler(unsigned int irq, struct irq_desc *desc)
+ static void rockchip_irq_demux(unsigned int irq, struct irq_desc *desc)
  {
--	struct tegra_gpio_bank *bank;
- 	int port;
- 	int pin;
- 	int unmasked = 0;
- 	struct irq_chip *chip = irq_desc_get_chip(desc);
-+	struct tegra_gpio_bank *bank = irq_desc_get_handler_data(desc);
+-	struct irq_chip *chip = irq_get_chip(irq);
+-	struct rockchip_pin_bank *bank = irq_get_handler_data(irq);
++	struct irq_chip *chip = irq_desc_get_chip(desc);
++	struct rockchip_pin_bank *bank = irq_desc_get_handler_data(desc);
+ 	u32 pend;
+ 
+ 	dev_dbg(bank->drvdata->dev, "got irq for bank %s\n", bank->name);
+diff --git a/drivers/pinctrl/pinctrl-single.c b/drivers/pinctrl/pinctrl-single.c
+index 13b45f297727..a8db57db5f5b 100644
+--- a/drivers/pinctrl/pinctrl-single.c
++++ b/drivers/pinctrl/pinctrl-single.c
+@@ -1684,7 +1684,7 @@ static void pcs_irq_chain_handler(unsigned int irq, struct irq_desc *desc)
+ 	struct pcs_soc_data *pcs_soc = irq_desc_get_handler_data(desc);
+ 	struct irq_chip *chip;
+ 
+-	chip = irq_get_chip(irq);
++	chip = irq_desc_get_chip(desc);
+ 	chained_irq_enter(chip, desc);
+ 	pcs_irq_handle(pcs_soc);
+ 	/* REVISIT: export and add handle_bad_irq(irq, desc)? */
+diff --git a/drivers/pinctrl/pinctrl-st.c b/drivers/pinctrl/pinctrl-st.c
+index 65bf73b70e34..a4f8d38ed7be 100644
+--- a/drivers/pinctrl/pinctrl-st.c
++++ b/drivers/pinctrl/pinctrl-st.c
+@@ -1463,7 +1463,7 @@ static void __gpio_irq_handler(struct st_gpio_bank *bank)
+ static void st_gpio_irq_handler(unsigned irq, struct irq_desc *desc)
+ {
+ 	/* interrupt dedicated per bank */
+-	struct irq_chip *chip = irq_get_chip(irq);
++	struct irq_chip *chip = irq_desc_get_chip(desc);
+ 	struct gpio_chip *gc = irq_desc_get_handler_data(desc);
+ 	struct st_gpio_bank *bank = gpio_chip_to_bank(gc);
+ 
+@@ -1474,8 +1474,8 @@ static void st_gpio_irq_handler(unsigned irq, struct irq_desc *desc)
+ 
+ static void st_gpio_irqmux_handler(unsigned irq, struct irq_desc *desc)
+ {
+-	struct irq_chip *chip = irq_get_chip(irq);
+-	struct st_pinctrl *info = irq_get_handler_data(irq);
++	struct irq_chip *chip = irq_desc_get_chip(desc);
++	struct st_pinctrl *info = irq_desc_get_handler_data(desc);
+ 	unsigned long status;
+ 	int n;
+ 
+diff --git a/drivers/pinctrl/qcom/pinctrl-msm.c b/drivers/pinctrl/qcom/pinctrl-msm.c
+index f3d800f796c2..7439d19af0dd 100644
+--- a/drivers/pinctrl/qcom/pinctrl-msm.c
++++ b/drivers/pinctrl/qcom/pinctrl-msm.c
+@@ -769,7 +769,7 @@ static void msm_gpio_irq_handler(unsigned int irq, struct irq_desc *desc)
+ 	struct gpio_chip *gc = irq_desc_get_handler_data(desc);
+ 	const struct msm_pingroup *g;
+ 	struct msm_pinctrl *pctrl = to_msm_pinctrl(gc);
+-	struct irq_chip *chip = irq_get_chip(irq);
++	struct irq_chip *chip = irq_desc_get_chip(desc);
+ 	int irq_pin;
+ 	int handled = 0;
+ 	u32 val;
+diff --git a/drivers/pinctrl/samsung/pinctrl-exynos.c b/drivers/pinctrl/samsung/pinctrl-exynos.c
+index 0b7afa50121a..66fb5ee5a8ae 100644
+--- a/drivers/pinctrl/samsung/pinctrl-exynos.c
++++ b/drivers/pinctrl/samsung/pinctrl-exynos.c
+@@ -422,9 +422,9 @@ static const struct of_device_id exynos_wkup_irq_ids[] = {
+ /* interrupt handler for wakeup interrupts 0..15 */
+ static void exynos_irq_eint0_15(unsigned int irq, struct irq_desc *desc)
+ {
+-	struct exynos_weint_data *eintd = irq_get_handler_data(irq);
++	struct exynos_weint_data *eintd = irq_desc_get_handler_data(desc);
+ 	struct samsung_pin_bank *bank = eintd->bank;
+-	struct irq_chip *chip = irq_get_chip(irq);
++	struct irq_chip *chip = irq_desc_get_chip(desc);
+ 	int eint_irq;
  
  	chained_irq_enter(chip, desc);
+@@ -454,8 +454,8 @@ static inline void exynos_irq_demux_eint(unsigned long pend,
+ /* interrupt handler for wakeup interrupt 16 */
+ static void exynos_irq_demux_eint16_31(unsigned int irq, struct irq_desc *desc)
+ {
+-	struct irq_chip *chip = irq_get_chip(irq);
+-	struct exynos_muxed_weint_data *eintd = irq_get_handler_data(irq);
++	struct irq_chip *chip = irq_desc_get_chip(desc);
++	struct exynos_muxed_weint_data *eintd = irq_desc_get_handler_data(desc);
+ 	struct samsung_pinctrl_drv_data *d = eintd->banks[0]->drvdata;
+ 	unsigned long pend;
+ 	unsigned long mask;
+diff --git a/drivers/pinctrl/samsung/pinctrl-s3c24xx.c b/drivers/pinctrl/samsung/pinctrl-s3c24xx.c
+index f1993f42114c..8d5b36e0af80 100644
+--- a/drivers/pinctrl/samsung/pinctrl-s3c24xx.c
++++ b/drivers/pinctrl/samsung/pinctrl-s3c24xx.c
+@@ -243,7 +243,7 @@ static struct irq_chip s3c2410_eint0_3_chip = {
+ static void s3c2410_demux_eint0_3(unsigned int irq, struct irq_desc *desc)
+ {
+ 	struct irq_data *data = irq_desc_get_irq_data(desc);
+-	struct s3c24xx_eint_data *eint_data = irq_get_handler_data(irq);
++	struct s3c24xx_eint_data *eint_data = irq_desc_get_handler_data(desc);
+ 	unsigned int virq;
  
--	bank = irq_get_handler_data(irq);
+ 	/* the first 4 eints have a simple 1 to 1 mapping */
+@@ -297,9 +297,9 @@ static struct irq_chip s3c2412_eint0_3_chip = {
+ 
+ static void s3c2412_demux_eint0_3(unsigned int irq, struct irq_desc *desc)
+ {
+-	struct irq_chip *chip = irq_get_chip(irq);
++	struct s3c24xx_eint_data *eint_data = irq_desc_get_handler_data(desc);
+ 	struct irq_data *data = irq_desc_get_irq_data(desc);
+-	struct s3c24xx_eint_data *eint_data = irq_get_handler_data(irq);
++	struct irq_chip *chip = irq_data_get_irq_chip(data);
+ 	unsigned int virq;
+ 
+ 	chained_irq_enter(chip, desc);
+@@ -357,11 +357,11 @@ static struct irq_chip s3c24xx_eint_chip = {
+ 	.irq_set_type	= s3c24xx_eint_type,
+ };
+ 
+-static inline void s3c24xx_demux_eint(unsigned int irq, struct irq_desc *desc,
++static inline void s3c24xx_demux_eint(struct irq_desc *desc,
+ 				      u32 offset, u32 range)
+ {
+-	struct irq_chip *chip = irq_get_chip(irq);
+-	struct s3c24xx_eint_data *data = irq_get_handler_data(irq);
++	struct s3c24xx_eint_data *data = irq_desc_get_handler_data(desc);
++	struct irq_chip *chip = irq_desc_get_irq_chip(desc);
+ 	struct samsung_pinctrl_drv_data *d = data->drvdata;
+ 	unsigned int pend, mask;
+ 
+@@ -374,7 +374,7 @@ static inline void s3c24xx_demux_eint(unsigned int irq, struct irq_desc *desc,
+ 	pend &= range;
+ 
+ 	while (pend) {
+-		unsigned int virq;
++		unsigned int virq, irq;
+ 
+ 		irq = __ffs(pend);
+ 		pend &= ~(1 << irq);
+@@ -390,12 +390,12 @@ static inline void s3c24xx_demux_eint(unsigned int irq, struct irq_desc *desc,
+ 
+ static void s3c24xx_demux_eint4_7(unsigned int irq, struct irq_desc *desc)
+ {
+-	s3c24xx_demux_eint(irq, desc, 0, 0xf0);
++	s3c24xx_demux_eint(desc, 0, 0xf0);
+ }
+ 
+ static void s3c24xx_demux_eint8_23(unsigned int irq, struct irq_desc *desc)
+ {
+-	s3c24xx_demux_eint(irq, desc, 8, 0xffff00);
++	s3c24xx_demux_eint(desc, 8, 0xffff00);
+ }
+ 
+ static irq_flow_handler_t s3c2410_eint_handlers[NUM_EINT_IRQ] = {
+diff --git a/drivers/pinctrl/samsung/pinctrl-s3c64xx.c b/drivers/pinctrl/samsung/pinctrl-s3c64xx.c
+index 7756c1e9e763..fd241d2dd165 100644
+--- a/drivers/pinctrl/samsung/pinctrl-s3c64xx.c
++++ b/drivers/pinctrl/samsung/pinctrl-s3c64xx.c
+@@ -410,8 +410,8 @@ static const struct irq_domain_ops s3c64xx_gpio_irqd_ops = {
+ 
+ static void s3c64xx_eint_gpio_irq(unsigned int irq, struct irq_desc *desc)
+ {
+-	struct irq_chip *chip = irq_get_chip(irq);
+-	struct s3c64xx_eint_gpio_data *data = irq_get_handler_data(irq);
++	struct irq_chip *chip = irq_desc_get_chip(desc);
++	struct s3c64xx_eint_gpio_data *data = irq_desc_get_handler_data(desc);
+ 	struct samsung_pinctrl_drv_data *drvdata = data->drvdata;
+ 
+ 	chained_irq_enter(chip, desc);
+@@ -600,11 +600,10 @@ static struct irq_chip s3c64xx_eint0_irq_chip = {
+ 	.irq_set_type	= s3c64xx_eint0_irq_set_type,
+ };
+ 
+-static inline void s3c64xx_irq_demux_eint(unsigned int irq,
+-					struct irq_desc *desc, u32 range)
++static inline void s3c64xx_irq_demux_eint(struct irq_desc *desc, u32 range)
+ {
+-	struct irq_chip *chip = irq_get_chip(irq);
+-	struct s3c64xx_eint0_data *data = irq_get_handler_data(irq);
++	struct irq_chip *chip = irq_desc_get_chip(desc);
++	struct s3c64xx_eint0_data *data = irq_desc_get_handler_data(desc);
+ 	struct samsung_pinctrl_drv_data *drvdata = data->drvdata;
+ 	unsigned int pend, mask;
+ 
+@@ -617,11 +616,10 @@ static inline void s3c64xx_irq_demux_eint(unsigned int irq,
+ 	pend &= range;
+ 
+ 	while (pend) {
+-		unsigned int virq;
++		unsigned int virq, irq;
+ 
+ 		irq = fls(pend) - 1;
+ 		pend &= ~(1 << irq);
 -
- 	for (port = 0; port < 4; port++) {
- 		int gpio = tegra_gpio_compose(bank->bank, port, 0);
- 		unsigned long sta = tegra_gpio_readl(GPIO_INT_STA(gpio)) &
-diff --git a/drivers/gpio/gpio-timberdale.c b/drivers/gpio/gpio-timberdale.c
-index e8f97e03c9bb..2b8baf1ea16e 100644
---- a/drivers/gpio/gpio-timberdale.c
-+++ b/drivers/gpio/gpio-timberdale.c
-@@ -194,11 +194,12 @@ out:
+ 		virq = irq_linear_revmap(data->domains[irq], data->pins[irq]);
+ 		/*
+ 		 * Something must be really wrong if an unmapped EINT
+@@ -637,22 +635,22 @@ static inline void s3c64xx_irq_demux_eint(unsigned int irq,
  
- static void timbgpio_irq(unsigned int irq, struct irq_desc *desc)
+ static void s3c64xx_demux_eint0_3(unsigned int irq, struct irq_desc *desc)
  {
--	struct timbgpio *tgpio = irq_get_handler_data(irq);
-+	struct timbgpio *tgpio = irq_desc_get_handler_data(desc);
-+	struct irq_data *data = irq_desc_get_irq_data(desc);
- 	unsigned long ipr;
- 	int offset;
+-	s3c64xx_irq_demux_eint(irq, desc, 0xf);
++	s3c64xx_irq_demux_eint(desc, 0xf);
+ }
  
--	desc->irq_data.chip->irq_ack(irq_get_irq_data(irq));
-+	data->chip->irq_ack(data);
- 	ipr = ioread32(tgpio->membase + TGPIO_IPR);
- 	iowrite32(ipr, tgpio->membase + TGPIO_ICR);
- 
-diff --git a/drivers/gpio/gpio-vf610.c b/drivers/gpio/gpio-vf610.c
-index 7bd9f209ffa8..fa344388f4da 100644
---- a/drivers/gpio/gpio-vf610.c
-+++ b/drivers/gpio/gpio-vf610.c
-@@ -120,7 +120,7 @@ static int vf610_gpio_direction_output(struct gpio_chip *chip, unsigned gpio,
- 
- static void vf610_gpio_irq_handler(u32 irq, struct irq_desc *desc)
+ static void s3c64xx_demux_eint4_11(unsigned int irq, struct irq_desc *desc)
  {
--	struct vf610_gpio_port *port = irq_get_handler_data(irq);
-+	struct vf610_gpio_port *port = irq_desc_get_handler_data(desc);
- 	struct irq_chip *chip = irq_desc_get_chip(desc);
- 	int pin;
- 	unsigned long irq_isfr;
-diff --git a/drivers/gpio/gpio-zynq.c b/drivers/gpio/gpio-zynq.c
-index aea6075e5b2e..70e3a568b1cb 100644
---- a/drivers/gpio/gpio-zynq.c
-+++ b/drivers/gpio/gpio-zynq.c
-@@ -499,7 +499,7 @@ static void zynq_gpio_irqhandler(unsigned int irq, struct irq_desc *desc)
- {
- 	u32 int_sts, int_enb;
- 	unsigned int bank_num;
--	struct zynq_gpio *gpio = irq_get_handler_data(irq);
-+	struct zynq_gpio *gpio = irq_desc_get_handler_data(desc);
- 	struct irq_chip *irqchip = irq_desc_get_chip(desc);
+-	s3c64xx_irq_demux_eint(irq, desc, 0xff0);
++	s3c64xx_irq_demux_eint(desc, 0xff0);
+ }
  
- 	chained_irq_enter(irqchip, desc);
+ static void s3c64xx_demux_eint12_19(unsigned int irq, struct irq_desc *desc)
+ {
+-	s3c64xx_irq_demux_eint(irq, desc, 0xff000);
++	s3c64xx_irq_demux_eint(desc, 0xff000);
+ }
+ 
+ static void s3c64xx_demux_eint20_27(unsigned int irq, struct irq_desc *desc)
+ {
+-	s3c64xx_irq_demux_eint(irq, desc, 0xff00000);
++	s3c64xx_irq_demux_eint(desc, 0xff00000);
+ }
+ 
+ static irq_flow_handler_t s3c64xx_eint0_handlers[NUM_EINT0_IRQ] = {
+diff --git a/drivers/pinctrl/sirf/pinctrl-sirf.c b/drivers/pinctrl/sirf/pinctrl-sirf.c
+index e2efbbae4061..46cafde08ebf 100644
+--- a/drivers/pinctrl/sirf/pinctrl-sirf.c
++++ b/drivers/pinctrl/sirf/pinctrl-sirf.c
+@@ -552,7 +552,7 @@ static void sirfsoc_gpio_handle_irq(unsigned int irq, struct irq_desc *desc)
+ 	struct sirfsoc_gpio_bank *bank;
+ 	u32 status, ctrl;
+ 	int idx = 0;
+-	struct irq_chip *chip = irq_get_chip(irq);
++	struct irq_chip *chip = irq_desc_get_chip(desc);
+ 	int i;
+ 
+ 	for (i = 0; i < SIRFSOC_GPIO_NO_OF_BANKS; i++) {
+diff --git a/drivers/pinctrl/sunxi/pinctrl-sunxi.c b/drivers/pinctrl/sunxi/pinctrl-sunxi.c
+index f8e171b76693..563cec6dc24e 100644
+--- a/drivers/pinctrl/sunxi/pinctrl-sunxi.c
++++ b/drivers/pinctrl/sunxi/pinctrl-sunxi.c
+@@ -711,8 +711,8 @@ static struct irq_chip sunxi_pinctrl_level_irq_chip = {
+ 
+ static void sunxi_pinctrl_irq_handler(unsigned irq, struct irq_desc *desc)
+ {
+-	struct irq_chip *chip = irq_get_chip(irq);
+-	struct sunxi_pinctrl *pctl = irq_get_handler_data(irq);
++	struct irq_chip *chip = irq_desc_get_chip(desc);
++	struct sunxi_pinctrl *pctl = irq_desc_get_handler_data(desc);
+ 	unsigned long bank, reg, val;
+ 
+ 	for (bank = 0; bank < pctl->desc->irq_banks; bank++)
 -- 
 1.7.10.4
