@@ -1,50 +1,58 @@
-From: treding@nvidia.com (Thierry Reding)
-Date: Thu, 4 Jun 2015 10:49:03 +0200
-Subject: [linux-next] compile fail with "soc/tegra: fuse: Unify Tegra20
- and Tegra30 drivers"
-In-Reply-To: <20150603160808.GM29898@windriver.com>
-References: <20150603160808.GM29898@windriver.com>
-Message-ID: <20150604084902.GL29060@ulmo.nvidia.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Thu, 4 Jun 2015 11:02:12 +0200
+Subject: [PATCH v4 2/7] mmc: mediatek: Add Mediatek MMC driver
+In-Reply-To: <1433386443.3304.2.camel@mhfsdcap03>
+References: <1432017411-2996-1-git-send-email-chaotian.jing@mediatek.com>
+ <1432017411-2996-3-git-send-email-chaotian.jing@mediatek.com>
+ <20150519111558.GD6325@pengutronix.de>
+ <1433386443.3304.2.camel@mhfsdcap03>
+Message-ID: <20150604090212.GY6325@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 03, 2015 at 12:08:08PM -0400, Paul Gortmaker wrote:
-> Hi Thierry,
-> 
-> This commit:
-> 
->   commit 436b6428b9cc97f61721f335eb9d8010751a337e
->   Author: Thierry Reding <treding@nvidia.com>
->   Date:   Wed Apr 29 16:54:04 2015 +0200
-> 
->     soc/tegra: fuse: Unify Tegra20 and Tegra30 drivers
-> 
-> in linux-next, in combination with my pending init cleanup
-> 
-> http://marc.info/?l=linux-kernel&m=143327626201054&w=2
-> 
-> will cause a compile fail because 43b642 is relying on an
-> implicit include of <linux/module.h> to provide the fcn for:
-> 
->    +module_platform_driver(tegra_fuse_driver);
-> 
-> which in turn causes:
-> 
-> drivers/soc/tegra/fuse/fuse-tegra.c:171:1: error: type defaults to 'int' in declaration of 'module_init' [-Werror=implicit-int]
-> drivers/soc/tegra/fuse/fuse-tegra.c:171:1: error: type defaults to 'int' in declaration of 'module_exit' [-Werror=implicit-int]
-> 
-> Can you add the include to your tree please?  I think it makes
-> more sense to be there vs. me preemptively adding it to mine.
+On Thu, Jun 04, 2015 at 10:54:03AM +0800, Chaotian Jing wrote:
+> On Tue, 2015-05-19 at 13:15 +0200, Sascha Hauer wrote:
+> > On Tue, May 19, 2015 at 02:36:46PM +0800, Chaotian Jing wrote:
+> > > Add Mediatek MMC driver code
+> > > Support eMMC/SD/SDIO
+> > > 
+> > > Signed-off-by: Chaotian Jing <chaotian.jing@mediatek.com>
+> > > ---
+> > >  drivers/mmc/host/Kconfig  |    8 +
+> > >  drivers/mmc/host/Makefile |    1 +
+> > >  drivers/mmc/host/mtk-sd.c | 1422 +++++++++++++++++++++++++++++++++++++++++++++
+> > >  3 files changed, 1431 insertions(+)
+> > >  create mode 100644 drivers/mmc/host/mtk-sd.c
+> > > 
+> > > +
+> > > +	host->src_clk = devm_clk_get(&pdev->dev, "source");
+> > > +	if (IS_ERR(host->src_clk)) {
+> > > +		ret = PTR_ERR(host->src_clk);
+> > > +		goto host_free;
+> > > +	}
+> > > +
+> > > +	host->h_clk = devm_clk_get(&pdev->dev, "hclk");
+> > > +	if (IS_ERR(host->h_clk)) {
+> > > +		/* host->h_clk is optional, Only for MSDC0/3 at MT8173 */
+> > > +		dev_dbg(&pdev->dev,
+> > > +				"Invalied hclk from the device tree!\n");
+> > > +	}
+> > 
+> > s/Invalied/Invalid/
+> > 
+> > According to my reference manual the controller always needs a hclk. It
+> > seems on some controllers it is just not software controllable. If
+> > that's the case you should always provide a hclk to the driver and make
+> > this clock mandatory.
+> For MT8173, MSDC1, MSDC2's HCLK are in Infra, software cannot control
+> it. So just set the HCLK to clk_null ?
 
-I've squashed a patch from Paul Walmsley into the offending commit and
-pushed a new for-next branch of the Tegra tree, so this should be fixed
-in the next iteration.
+Yes, please.
 
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150604/8f9f61e4/attachment.sig>
+Sascha
+
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
