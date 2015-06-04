@@ -1,62 +1,79 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Thu, 4 Jun 2015 11:34:36 +0200
-Subject: [PATCH] KVM: arm64: fix misleading comments in save/restore
-In-Reply-To: <1432806186-27993-1-git-send-email-alex.bennee@linaro.org>
-References: <1432806186-27993-1-git-send-email-alex.bennee@linaro.org>
-Message-ID: <20150604093436.GC7657@cbox>
+From: hramrach@gmail.com (Michal Suchanek)
+Date: Thu, 4 Jun 2015 11:33:37 +0200
+Subject: [PATCH 10/11] spi: add more debug prints in s3c64xx
+In-Reply-To: <20150604091634.GY14071@sirena.org.uk>
+References: <cover.1433364398.git.hramrach@gmail.com>
+ <305830ebf9c0ae98c4f6e0ebbdec7414d6762b36.1433364398.git.hramrach@gmail.com>
+ <20150604091634.GY14071@sirena.org.uk>
+Message-ID: <CAOMqctQxn6UY2DJ9Syp6Ay9SYKLgdU+8EjiTK_48-R3dZ8PcvA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 28, 2015 at 10:43:06AM +0100, Alex Benn?e wrote:
-> The elr_el2 and spsr_el2 registers in fact contain the processor state
-> before entry into the hypervisor code.
+Hello,
 
-be careful with your use of the hypervisor, in the KVM design the
-hypervisor is split across EL1 and EL2.
+On 4 June 2015 at 11:16, Mark Brown <broonie@kernel.org> wrote:
+> On Wed, Jun 03, 2015 at 09:26:42PM -0000, Michal Suchanek wrote:
+>> The SPI NOR transfers mysteriously fail so add more debug prints about
+>> SPI transactions.
+>
+> Please try to only send patches to relevant people - the list of
+> recipients for this is so large that it only barely fits on a single
+> screen in my mail client.
+>
+> Also for this patch (which just adds some trace) there isn't any clear
+> reason for it to be sent as part of the series at all, it doesn't help
+> deliver the functionality and doesn't depend on the rest of the series.
 
-> In the case of guest state it
-> could be in either el0 or el1.
+I used this patch to add missing information to dmesg output so I
+could diagnose the SPI failures so I think it is relevant.
 
-true
+The failure is reported by the s3c64xx but the root cause is pl330 not
+finishing a DMA transfer.
 
-> 
-> Signed-off-by: Alex Benn?e <alex.bennee@linaro.org>
-> ---
->  arch/arm64/kvm/hyp.S | 8 ++++----
->  1 file changed, 4 insertions(+), 4 deletions(-)
-> 
-> diff --git a/arch/arm64/kvm/hyp.S b/arch/arm64/kvm/hyp.S
-> index d755922..1940a4c 100644
-> --- a/arch/arm64/kvm/hyp.S
-> +++ b/arch/arm64/kvm/hyp.S
-> @@ -50,8 +50,8 @@
->  	stp	x29, lr, [x3, #80]
->  
->  	mrs	x19, sp_el0
-> -	mrs	x20, elr_el2		// EL1 PC
-> -	mrs	x21, spsr_el2		// EL1 pstate
-> +	mrs	x20, elr_el2		// PC before hyp entry
-> +	mrs	x21, spsr_el2		// pstate before hyp entry
->  
->  	stp	x19, x20, [x3, #96]
->  	str	x21, [x3, #112]
-> @@ -82,8 +82,8 @@
->  	ldr	x21, [x3, #16]
->  
->  	msr	sp_el0, x19
-> -	msr	elr_el2, x20 				// EL1 PC
-> -	msr	spsr_el2, x21 				// EL1 pstate
-> +	msr	elr_el2, x20 		// PC to restore
-> +	msr	spsr_el2, x21 		// pstate to restore
+It is non-obvious that this is the issue. The information that a call
+to pl330 failed is only available in the s3c64xx driver and not SPI
+core so I think there is no reasonable way to debug this issue other
+than adding prints in s3c64xx. This issue is not completely resolved
+or even well tested (I have only single board to test with) so these
+prints remain relevant in my view.
 
-I don't feel like 'to restore' is much more meaningful here.
+>
+>> --- a/drivers/spi/spi-s3c64xx.c
+>> +++ b/drivers/spi/spi-s3c64xx.c
+>> @@ -18,6 +18,7 @@
+>>  #include <linux/interrupt.h>
+>>  #include <linux/delay.h>
+>>  #include <linux/clk.h>
+>> +#include <linux/clk-provider.h>
+>
+> Whatever you're doing here this indicates that there's a very big
+> abstraction problem going on.
 
-I would actually vote for removin the comments all together, since one
-should really understand the code as opposed to the comments when
-reading this kind of stuff.
+I wanted to print a clock name in case the information was relevant
+for the issue at hand.
 
-Meh, I'm not sure.  Your patch is definitely better than doing nothing.
+To print a clock name you AFAICT need this header. I think this is an
+abstraction problem in the clock framework. Fixing the abstraction
+problem with clock framework would only grow the list of recipients
+which is already so long you complain about it.
 
-Marc?
+It turns out that in this case the clock was not at fault so I did not
+need the clock name in the end.
 
--Christoffer
+>
+>> +     pr_debug("%s %s %s waiting for %ims transferring %zubytes@%iHz",
+>> +              __func__, sdd->pdev ? dev_name(&sdd->pdev->dev) : NULL,
+>> +              dev_name(&sdd->master->dev),
+>> +              ms, xfer->len, sdd->cur_speed);
+>
+> I'd say dev_dbg() but more generally this is just tracing things that
+> seem to be already covered by the trace points already present in the
+> core, the same goes for most of the rest of it.  If there's things
+> missing from the existing trace it seems better to add to it.
+
+There is master and slave device involved but it's certainly possible
+to use dev_dbg on one of them and pass the other as string.
+
+Thanks
+
+Michal
