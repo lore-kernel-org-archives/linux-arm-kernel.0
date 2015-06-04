@@ -1,111 +1,50 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Wed, 3 Jun 2015 22:45:56 -0500
-Subject: [RFC/NOT FOR MERGING] HACK: add global/private timers for A9
-In-Reply-To: <20150603222619.GY30984@atomide.com>
-References: <1433363565-17725-1-git-send-email-balbi@ti.com>
- <20150603222619.GY30984@atomide.com>
-Message-ID: <20150604034550.GA25075@saruman.tx.rr.com>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Thu, 04 Jun 2015 12:51:07 +0900
+Subject: [PATCH 0/6] Exynos SYSMMU (IOMMU) dts and arch updates
+In-Reply-To: <556F89B2.9010607@kernel.org>
+References: <1432041645-11172-1-git-send-email-m.szyprowski@samsung.com>
+ <1433153450-3680-1-git-send-email-m.szyprowski@samsung.com>
+ <556C4342.6060506@samsung.com> <556F89B2.9010607@kernel.org>
+Message-ID: <556FCB2B.8090406@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On 04.06.2015 08:11, Kukjin Kim wrote:
+> On 06/01/15 20:34, Krzysztof Kozlowski wrote:
+>> W dniu 01.06.2015 o 19:10, Marek Szyprowski pisze:
+>>> Hello,
+>>>
+>>> Main changes for Exynos SYSMMU (IOMMU) driver has been finally scheduled
+>>> for merging - see
+>>> https://git.kernel.org/cgit/linux/kernel/git/joro/iommu.git/commit/?h=next
+>>> In meantime there have been quite a lot of changes related to Exynos DTS
+>>> files queued for merging and my patches don't apply anymore. To ease
+>>> merge process I've decided to rebased all Exynos SYSMMU dts changes onto
+>>> latest exynos next tree from: https://github.com/krzk/linux dt-for-next
+>>>
+>>> While rebasing I've fixes a few spotted issues: some nodes still used
+>>> old 'samsung,power-domain' properties (now replaced with 'power-domains')
+>>> and added properties to jpeg codec merged recently.
+>>>
+>>
+>> Thanks for rebasing this stuff.
+>>
+> Same here ;-)
+> 
+>> I picked whole patchset with Javier's tested-by. I'll send it to Kukjin
+>> later or directly to arm-soc (depending what will happen with last pull
+>> request).
+>>
+>> Kukjin, you mentioned that you will do something with this patchset the
+>> previous weekend. Since then nothing happened so I am not sure what are
+>> your plans... Can you share them? Do you want to pick it by yourself, do
+>> you have any comments or maybe you need something from our side? (I
+>> checked the patches and they look fine)
+>>
+> Done, thanks.
 
-On Wed, Jun 03, 2015 at 03:26:20PM -0700, Tony Lindgren wrote:
-> * Felipe Balbi <balbi@ti.com> [150603 13:36]:
-> > --- a/arch/arm/mach-omap2/timer.c
-> > +++ b/arch/arm/mach-omap2/timer.c
-> > @@ -655,20 +655,18 @@ static OMAP_SYS_32K_TIMER_INIT(4, 1, "timer_32k_ck", "ti,timer-alwon",
-> >  static DEFINE_TWD_LOCAL_TIMER(twd_local_timer, OMAP44XX_LOCAL_TWD_BASE, 29);
-> >  void __init omap4_local_timer_init(void)
-> >  {
-> > +	int err;
-> > +
-> >  	omap4_sync32k_timer_init();
-> >  	/* Local timers are not supprted on OMAP4430 ES1.0 */
-> > -	if (omap_rev() != OMAP4430_REV_ES1_0) {
-> > -		int err;
-> > -
-> > -		if (of_have_populated_dt()) {
-> > -			clocksource_of_init();
-> > -			return;
-> > -		}
-> > -
-> > -		err = twd_local_timer_register(&twd_local_timer);
-> > -		if (err)
-> > -			pr_err("twd_local_timer_register failed %d\n", err);
-> > +	if (of_have_populated_dt()) {
-> > +		clocksource_of_init();
-> > +		return;
-> >  	}
-> > +
-> > +	err = twd_local_timer_register(&twd_local_timer);
-> > +	if (err)
-> > +		pr_err("twd_local_timer_register failed %d\n", err);
-> >  }
-> >  #else
-> >  void __init omap4_local_timer_init(void)
-> 
-> Looks like can get rid of even more code here, see the patch below.
-> 
-> Regards,
-> 
-> Tony
-> 
-> 8< ------------------------
-> From: Tony Lindgren <tony@atomide.com>
-> Date: Wed, 3 Jun 2015 14:40:40 -0700
-> Subject: [PATCH] ARM: OMAP2+: Clean up omap4_local_timer_init
-> 
-> Inspired by a patch from Felipe Balbi <balbi@ti.com>, we can
-> now get rid of most the code in omap4_local_timer_init.
-> 
-> Omap4 is now device tree only.. And we have not properly supported
-> omap4 ES1.0 revision for a really long time AFAIK.
-> 
-> Let's just remove all that code to simplify things. This assumes
-> we have arm,cortex-a9-twd-timer entry in the omap4.dtsi file, which
-> we do.
-> 
-> Signed-off-by: Tony Lindgren <tony@atomide.com>
+Thank you, I tested the for-next branch on some of my boards and
+everything looked fine.
 
-very true
-
-Reviewed-by: Felipe Balbi <balbi@ti.com>
-
-> --- a/arch/arm/mach-omap2/timer.c
-> +++ b/arch/arm/mach-omap2/timer.c
-> @@ -649,23 +649,10 @@ static OMAP_SYS_32K_TIMER_INIT(4, 1, "timer_32k_ck", "ti,timer-alwon",
->  
->  #ifdef CONFIG_ARCH_OMAP4
->  #ifdef CONFIG_HAVE_ARM_TWD
-> -static DEFINE_TWD_LOCAL_TIMER(twd_local_timer, OMAP44XX_LOCAL_TWD_BASE, 29);
->  void __init omap4_local_timer_init(void)
->  {
->  	omap4_sync32k_timer_init();
-> -	/* Local timers are not supprted on OMAP4430 ES1.0 */
-> -	if (omap_rev() != OMAP4430_REV_ES1_0) {
-> -		int err;
-> -
-> -		if (of_have_populated_dt()) {
-> -			clocksource_of_init();
-> -			return;
-> -		}
-> -
-> -		err = twd_local_timer_register(&twd_local_timer);
-> -		if (err)
-> -			pr_err("twd_local_timer_register failed %d\n", err);
-> -	}
-> +	clocksource_of_init();
->  }
->  #else
->  void __init omap4_local_timer_init(void)
-
--- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150603/ac1dcc88/attachment.sig>
+Best regards,
+Krzysztof
