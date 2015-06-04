@@ -1,49 +1,31 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Thu, 4 Jun 2015 23:02:25 +0000 (UTC)
-Subject: [PATCH v2 1/2] clk: change clk_ops' ->round_rate() prototype
-In-Reply-To: <1430407809-31147-2-git-send-email-boris.brezillon@free-electrons.com>
-References: <1430407809-31147-1-git-send-email-boris.brezillon@free-electrons.com>
- <1430407809-31147-2-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <alpine.DEB.2.02.1506042258530.12316@utopia.booyaka.com>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Thu, 4 Jun 2015 16:07:17 -0700
+Subject: [PATCH v3 0/3] clk: meson: Add clock controller
+In-Reply-To: <1433157235-17275-1-git-send-email-carlo@caione.org>
+References: <1433157235-17275-1-git-send-email-carlo@caione.org>
+Message-ID: <20150604230717.GE8099@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi folks
-
-just a brief comment on this one:
-
-On Thu, 30 Apr 2015, Boris Brezillon wrote:
-
-> Clock rates are stored in an unsigned long field, but ->round_rate()
-> (which returns a rounded rate from a requested one) returns a long
-> value (errors are reported using negative error codes), which can lead
-> to long overflow if the clock rate exceed 2Ghz.
+On 06/01, Carlo Caione wrote:
+> From: Carlo Caione <carlo@endlessm.com>
 > 
-> Change ->round_rate() prototype to return 0 or an error code, and pass the
-> requested rate as a pointer so that it can be adjusted depending on
-> hardware capabilities.
+> This patchset introduces preliminary support for the clock controller
+> found on Amlogic MesonX SoCs and enables it for the Meson8b.
+> 
+> DTS patches with support for Meson8b SoCs will follow.
+> 
 
-...
+Did you want to send the dts changes through arm-soc? Do they
+depend on the header file that is included here? clk-next is not
+stable and shouldn't be pulled into other developer's trees, so
+if we need some stable commit to give off to arm-soc for v4.2
+we need to know soon. Or we can split the header file off into a
+different patch and send it through both arm-soc and clk tree.
 
-> diff --git a/Documentation/clk.txt b/Documentation/clk.txt
-> index 0e4f90a..fca8b7a 100644
-> --- a/Documentation/clk.txt
-> +++ b/Documentation/clk.txt
-> @@ -68,8 +68,8 @@ the operations defined in clk.h:
->  		int		(*is_enabled)(struct clk_hw *hw);
->  		unsigned long	(*recalc_rate)(struct clk_hw *hw,
->  						unsigned long parent_rate);
-> -		long		(*round_rate)(struct clk_hw *hw,
-> -						unsigned long rate,
-> +		int		(*round_rate)(struct clk_hw *hw,
-> +						unsigned long *rate,
->  						unsigned long *parent_rate);
->  		long		(*determine_rate)(struct clk_hw *hw,
->  						unsigned long rate,
+Otherwise the patches look good. I fixed up the __init markings
+on some functions which were in the wrong place.
 
-I'd suggest that we should probably go straight to 64-bit rates.  There 
-are already plenty of clock sources that can generate rates higher than 
-4GiHz.
-
-
-- Paul
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
