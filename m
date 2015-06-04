@@ -1,44 +1,33 @@
-From: g.portay@overkiz.com (=?UTF-8?B?R2HDq2wgUE9SVEFZ?=)
-Date: Thu, 04 Jun 2015 10:13:58 +0200
-Subject: [PATCH] ARM: at91/dts: kizbox: fix mismatch LED PWM device
-In-Reply-To: <55700621.4080900@atmel.com>
-References: <1433324663-20208-1-git-send-email-g.portay@overkiz.com>
- <55700621.4080900@atmel.com>
-Message-ID: <557008C6.60900@overkiz.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Thu, 4 Jun 2015 10:22:37 +0200
+Subject: [RFC] pinctrl: pinctrl-imx: implement suspend/resume
+In-Reply-To: <1433171567-24571-1-git-send-email-stefan@agner.ch>
+References: <1433171567-24571-1-git-send-email-stefan@agner.ch>
+Message-ID: <CACRpkdaR3B8_Bbo+bBy=ZyDaNMc2OwWftZ5YL9PiH9gYwYS6Mw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/06/2015 10:02, Nicolas Ferre wrote:
-> Le 03/06/2015 11:44, Ga?l PORTAY a ?crit :
->> The network_red LED uses the 4th PWM device.
->>
->> Signed-off-by: Ga?l PORTAY <g.portay@overkiz.com>
->
-> Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
->
-> And stacked on at91-4.2-dt.
->
-> Bye,
->
->> ---
->>   arch/arm/boot/dts/at91-kizbox.dts | 2 +-
->>   1 file changed, 1 insertion(+), 1 deletion(-)
->>
->> diff --git a/arch/arm/boot/dts/at91-kizbox.dts b/arch/arm/boot/dts/at91-kizbox.dts
->> index a0e63ff..cf1628f 100644
->> --- a/arch/arm/boot/dts/at91-kizbox.dts
->> +++ b/arch/arm/boot/dts/at91-kizbox.dts
->> @@ -205,7 +205,7 @@
->>
->>   		network_red {
->>   			label = "pwm:red:network";
->> -			pwms = <&tcb_pwm 3 10000000 PWM_POLARITY_INVERTED>;
->> +			pwms = <&tcb_pwm 4 10000000 PWM_POLARITY_INVERTED>;
->>   			max-brightness = <255>;
->>   			linux,default-trigger = "default-on";
->>   		};
->>
->
->
+On Mon, Jun 1, 2015 at 5:12 PM, Stefan Agner <stefan@agner.ch> wrote:
 
-Thanks Nico
+> In some SoC's using the IMX pin controller, the IP looses its state
+> when entering lowest power modes. Enhance the driver with suspend/
+> resume functions restoring the pin states.
+
+(...)
+
+This is weird:
+
+> +       for (i = 0; i < info->ninput_regs; i++)
+> +               writel(ipctl->input_regs[i], ipctl->base +
+> +                               info->input_regs_offset + i * sizeof(u32 *));
+
+sizeof(u32 *)?
+
+Don't you mean sizeof(u32).
+
+sizeof(u32 *) will be 4 bytes on a 32bit system, 8 bytes on a
+64bit system ... but I think your registers are always
+32 bits, 4 bytes, apart.
+
+Yours,
+Linus Walleij
