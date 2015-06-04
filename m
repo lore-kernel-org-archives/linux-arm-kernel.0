@@ -1,33 +1,61 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 4 Jun 2015 10:22:37 +0200
-Subject: [RFC] pinctrl: pinctrl-imx: implement suspend/resume
-In-Reply-To: <1433171567-24571-1-git-send-email-stefan@agner.ch>
-References: <1433171567-24571-1-git-send-email-stefan@agner.ch>
-Message-ID: <CACRpkdaR3B8_Bbo+bBy=ZyDaNMc2OwWftZ5YL9PiH9gYwYS6Mw@mail.gmail.com>
+From: hramrach@gmail.com (Michal Suchanek)
+Date: Thu, 4 Jun 2015 10:31:45 +0200
+Subject: [PATCH 08/11] MTD: m25p80: Add option to limit SPI transfer size.
+In-Reply-To: <CAMuHMdVT2M7pPHDDHmoNF_zVXhz1PUm5PiYxDKcAjSAcfSDiZg@mail.gmail.com>
+References: <cover.1433364398.git.hramrach@gmail.com>
+ <8fc4b9f5291a509c4c35782a1337bf536f1019af.1433364398.git.hramrach@gmail.com>
+ <CAMuHMdVT2M7pPHDDHmoNF_zVXhz1PUm5PiYxDKcAjSAcfSDiZg@mail.gmail.com>
+Message-ID: <CAOMqctS6KNrTATB6MYCZLBnZUQmX=e0qQvGf78YtLaF8pkibhQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 1, 2015 at 5:12 PM, Stefan Agner <stefan@agner.ch> wrote:
+On 4 June 2015 at 08:42, Geert Uytterhoeven <geert@linux-m68k.org> wrote:
+> On Wed, Jun 3, 2015 at 11:26 PM, Michal Suchanek <hramrach@gmail.com> wrote:
+>> On sunxi the SPI controller currently does not have DMA support and fails
+>> any transfer larger than 63 bytes.
+>
+> This is a driver limitation, not a hardware limitation.
+>
+>> On Exynos the pl330 DMA controller fails any transfer larger than 64kb
+>> when using slower speed like 40MHz and any transfer larger than 128bytes
+>> when running at 133MHz.
+>
+> This may be a driver bug.
+>
+>> The best thing is that in both cases the controller can just lock up and
+>> never finish potentially leaving the hardware in unusable state.
+>>
+>> So it is required that the m25p80 driver actively prevents doing
+>> transfers that are too large for the current driver state on a
+>> particular piece of hardware.
+>
+> OK.
+>
 
-> In some SoC's using the IMX pin controller, the IP looses its state
-> when entering lowest power modes. Enhance the driver with suspend/
-> resume functions restoring the pin states.
+> DT describes the hardware, not buggy drivers.
+>
+> So IMHO this doesn't belong in DT, but it can be a field in struct spi_master.
+>
 
-(...)
+Unfortunately, this cannot be a field in struct spi_master. The value
+can and does vary with device configuration and device configuration
+is only available in DT.
 
-This is weird:
+For example, on the Snow board one working configuration is
 
-> +       for (i = 0; i < info->ninput_regs; i++)
-> +               writel(ipctl->input_regs[i], ipctl->base +
-> +                               info->input_regs_offset + i * sizeof(u32 *));
+40MHz spi bus speed, feedback delay 0 and maximum transfer size 64k.
 
-sizeof(u32 *)?
+Another working configuration is 133MHz bus speed, feedback delay 3,
+and maximum transfer size 128 bytes.
 
-Don't you mean sizeof(u32).
+You might want to try to run the bus at 60MHz or 80MHz and then the
+values would probably again be different.
 
-sizeof(u32 *) will be 4 bytes on a 32bit system, 8 bytes on a
-64bit system ... but I think your registers are always
-32 bits, 4 bytes, apart.
+The first two values are set in DT so the logical place for setting
+the third is also in DT.
 
-Yours,
-Linus Walleij
+Otherwise you would need some in-kernel table of these settings.
+
+Thanks
+
+Michal
