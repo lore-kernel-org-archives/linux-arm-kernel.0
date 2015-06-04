@@ -1,113 +1,71 @@
-From: jiang.liu@linux.intel.com (Jiang Liu)
-Date: Thu,  4 Jun 2015 12:13:58 +0800
-Subject: [RFT v2 48/48] genirq,
- drivers: Kill the first parameter 'irq' of irq_flow_handler_t
-In-Reply-To: <1433391238-19471-1-git-send-email-jiang.liu@linux.intel.com>
-References: <1433391238-19471-1-git-send-email-jiang.liu@linux.intel.com>
-Message-ID: <1433391238-19471-49-git-send-email-jiang.liu@linux.intel.com>
+From: hramrach@gmail.com (Michal Suchanek)
+Date: Thu, 4 Jun 2015 06:31:45 +0200
+Subject: [PATCH 08/11] MTD: m25p80: Add option to limit SPI transfer size.
+In-Reply-To: <201506040103.09555.marex@denx.de>
+References: <cover.1433364398.git.hramrach@gmail.com>
+ <8fc4b9f5291a509c4c35782a1337bf536f1019af.1433364398.git.hramrach@gmail.com>
+ <201506040103.09555.marex@denx.de>
+Message-ID: <CAOMqctQeg0Sj1pGOQsK1nNB6=-H9koH_5nrXYBq_NKeVt369dw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now most IRQ flow handlers make no use of the first parameter 'irq'.
-And for those who do make use of 'irq', we could easily get the irq
-number through irq_desc->irq_data->irq. So kill the first parameter
-'irq' of irq_flow_handler_t.
+On 4 June 2015 at 01:03, Marek Vasut <marex@denx.de> wrote:
+> On Wednesday, June 03, 2015 at 11:26:41 PM, Michal Suchanek wrote:
+>> On sunxi the SPI controller currently does not have DMA support and fails
+>> any transfer larger than 63 bytes.
+>>
+>> On Exynos the pl330 DMA controller fails any transfer larger than 64kb
+>> when using slower speed like 40MHz and any transfer larger than 128bytes
+>> when running at 133MHz.
+>
+> This smells more like some corruption of the data on the bus or something
+> even more obscure.
 
-To ease review, I have split the changes into several parts, though
-they should be merge as one to support bisecting.
+If the data was corrupted you would get corrupted data and not
+transfer failure. AFAIK there is no checksum or anything. I actually
+do get corrupted data when I use wrong feedback delay setting.
 
-Signed-off-by: Jiang Liu <jiang.liu@linux.intel.com>
----
- drivers/dma/ipu/ipu_irq.c       |    4 ++--
- drivers/gpu/ipu-v3/ipu-common.c |    4 ++--
- drivers/pci/host/pci-keystone.c |    5 ++---
- drivers/spmi/spmi-pmic-arb.c    |    2 +-
- 4 files changed, 7 insertions(+), 8 deletions(-)
+>
+>> The best thing is that in both cases the controller can just lock up and
+>> never finish potentially leaving the hardware in unusable state.
+>>
+>> So it is required that the m25p80 driver actively prevents doing
+>> transfers that are too large for the current driver state on a
+>> particular piece of hardware.
+>>
+>> Signed-off-by: Michal Suchanek <hramrach@gmail.com>
+>>
+>> --
+>>
+>> Update commit message and documentation text.
+>> ---
+>>  .../devicetree/bindings/mtd/jedec,spi-nor.txt      |  6 ++++++
+>>  drivers/mtd/devices/m25p80.c                       | 24
+>> ++++++++++++++++++++-- 2 files changed, 28 insertions(+), 2 deletions(-)
+>>
+>> diff --git a/Documentation/devicetree/bindings/mtd/jedec,spi-nor.txt
+>> b/Documentation/devicetree/bindings/mtd/jedec,spi-nor.txt index
+>> 2bee681..4e63ae8 100644
+>> --- a/Documentation/devicetree/bindings/mtd/jedec,spi-nor.txt
+>> +++ b/Documentation/devicetree/bindings/mtd/jedec,spi-nor.txt
+>> @@ -19,6 +19,12 @@ Optional properties:
+>>                     all chips and support for it can not be detected at
+>> runtime. Refer to your chips' datasheet to check if this is supported by
+>> your chip.
+>> +- linux,max_tx_len : With some SPI controller drivers possible transfer
+>> size is +                     limited. This may be hardware or driver bug.
+>> +                     Transfer data in chunks no larger than this value. +
+>>                     Using this option may severely degrade performance and
+>> +                     possibly flash memory life when max_tx_len is
+>> smaller than +                     flash page size (typically 256 bytes)
+>
+> Will we need similar patch for all other SPI slave drivers, like SPI NAND ?
 
-diff --git a/drivers/dma/ipu/ipu_irq.c b/drivers/dma/ipu/ipu_irq.c
-index 84083c93fe70..4791a7630f97 100644
---- a/drivers/dma/ipu/ipu_irq.c
-+++ b/drivers/dma/ipu/ipu_irq.c
-@@ -266,7 +266,7 @@ int ipu_irq_unmap(unsigned int source)
- }
- 
- /* Chained IRQ handler for IPU error interrupt */
--static void ipu_irq_err(unsigned int __irq, struct irq_desc *desc)
-+static void ipu_irq_err(struct irq_desc *desc)
- {
- 	struct ipu *ipu = irq_desc_get_handler_data(desc);
- 	u32 status;
-@@ -308,7 +308,7 @@ static void ipu_irq_err(unsigned int __irq, struct irq_desc *desc)
- }
- 
- /* Chained IRQ handler for IPU function interrupt */
--static void ipu_irq_fn(unsigned int __irq, struct irq_desc *desc)
-+static void ipu_irq_fn(struct irq_desc *desc)
- {
- 	struct ipu *ipu = irq_desc_get_handler_data(desc);
- 	u32 status;
-diff --git a/drivers/gpu/ipu-v3/ipu-common.c b/drivers/gpu/ipu-v3/ipu-common.c
-index 7022825b7a2c..1125b03c36af 100644
---- a/drivers/gpu/ipu-v3/ipu-common.c
-+++ b/drivers/gpu/ipu-v3/ipu-common.c
-@@ -912,7 +912,7 @@ static void ipu_irq_handle(struct ipu_soc *ipu, const int *regs, int num_regs)
- 	}
- }
- 
--static void ipu_irq_handler(unsigned int irq, struct irq_desc *desc)
-+static void ipu_irq_handler(struct irq_desc *desc)
- {
- 	struct ipu_soc *ipu = irq_desc_get_handler_data(desc);
- 	struct irq_chip *chip = irq_desc_get_chip(desc);
-@@ -925,7 +925,7 @@ static void ipu_irq_handler(unsigned int irq, struct irq_desc *desc)
- 	chained_irq_exit(chip, desc);
- }
- 
--static void ipu_err_irq_handler(unsigned int irq, struct irq_desc *desc)
-+static void ipu_err_irq_handler(struct irq_desc *desc)
- {
- 	struct ipu_soc *ipu = irq_desc_get_handler_data(desc);
- 	struct irq_chip *chip = irq_desc_get_chip(desc);
-diff --git a/drivers/pci/host/pci-keystone.c b/drivers/pci/host/pci-keystone.c
-index 98862768f1da..72eca81f2f67 100644
---- a/drivers/pci/host/pci-keystone.c
-+++ b/drivers/pci/host/pci-keystone.c
-@@ -112,7 +112,7 @@ static int ks_pcie_establish_link(struct keystone_pcie *ks_pcie)
- 	return 0;
- }
- 
--static void ks_pcie_msi_irq_handler(unsigned int __irq, struct irq_desc *desc)
-+static void ks_pcie_msi_irq_handler(struct irq_desc *desc)
- {
- 	unsigned int irq = irq_desc_get_irq(desc);
- 	struct keystone_pcie *ks_pcie = irq_desc_get_handler_data(desc);
-@@ -134,13 +134,12 @@ static void ks_pcie_msi_irq_handler(unsigned int __irq, struct irq_desc *desc)
- 
- /**
-  * ks_pcie_legacy_irq_handler() - Handle legacy interrupt
-- * @irq: IRQ line for legacy interrupts
-  * @desc: Pointer to irq descriptor
-  *
-  * Traverse through pending legacy interrupts and invoke handler for each. Also
-  * takes care of interrupt controller level mask/ack operation.
-  */
--static void ks_pcie_legacy_irq_handler(unsigned int __irq, struct irq_desc *desc)
-+static void ks_pcie_legacy_irq_handler(struct irq_desc *desc)
- {
- 	unsigned int irq = irq_desc_get_irq(desc);
- 	struct keystone_pcie *ks_pcie = irq_desc_get_handler_data(desc);
-diff --git a/drivers/spmi/spmi-pmic-arb.c b/drivers/spmi/spmi-pmic-arb.c
-index b32cb0a813cb..d7e7846917ae 100644
---- a/drivers/spmi/spmi-pmic-arb.c
-+++ b/drivers/spmi/spmi-pmic-arb.c
-@@ -451,7 +451,7 @@ static void periph_interrupt(struct spmi_pmic_arb_dev *pa, u8 apid)
- 	}
- }
- 
--static void pmic_arb_chained_irq(unsigned int irq, struct irq_desc *desc)
-+static void pmic_arb_chained_irq(struct irq_desc *desc)
- {
- 	struct spmi_pmic_arb_dev *pa = irq_desc_get_handler_data(desc);
- 	struct irq_chip *chip = irq_desc_get_chip(desc);
--- 
-1.7.10.4
+Probably. Some SPI slave drivers already do have similar option. In
+general it cannot be expected that you can reliably transfer
+arbitrarily large data over SPI it seems. However, if the nand driver
+transfers data a page at a time it should be fine.
+
+Thanks
+
+Michal
