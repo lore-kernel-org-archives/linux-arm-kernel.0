@@ -1,11 +1,11 @@
 From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Thu, 4 Jun 2015 13:53:02 -0700
-Subject: [PATCH 3/5] clk: ti: Use of_clk_get_parent_count() instead of
+Date: Thu, 4 Jun 2015 13:53:08 -0700
+Subject: [PATCH 2/5] clk: st: Use of_clk_get_parent_count() instead of
  open coding
-In-Reply-To: <1432891549-23295-4-git-send-email-geert+renesas@glider.be>
+In-Reply-To: <1432891549-23295-3-git-send-email-geert+renesas@glider.be>
 References: <1432891549-23295-1-git-send-email-geert+renesas@glider.be>
- <1432891549-23295-4-git-send-email-geert+renesas@glider.be>
-Message-ID: <20150604205302.GK676@codeaurora.org>
+ <1432891549-23295-3-git-send-email-geert+renesas@glider.be>
+Message-ID: <20150604205308.GL676@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
