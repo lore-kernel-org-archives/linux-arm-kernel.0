@@ -1,36 +1,113 @@
-From: peter.maydell@linaro.org (Peter Maydell)
-Date: Thu, 4 Jun 2015 12:35:31 +0100
-Subject: [PATCH v5 0/6] QEMU support for KVM Guest Debug on arm64
-In-Reply-To: <1432912764-7073-1-git-send-email-alex.bennee@linaro.org>
-References: <1432912764-7073-1-git-send-email-alex.bennee@linaro.org>
-Message-ID: <CAFEAcA_prABrrwx5LQ6T0A1cG-jvfuJYeZE6kTqKO+5jWrqn1A@mail.gmail.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Thu,  4 Jun 2015 13:41:12 +0200
+Subject: [PATCH] ARM64: juno: add GPIO keys
+Message-ID: <1433418072-10319-1-git-send-email-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 29 May 2015 at 16:19, Alex Benn?e <alex.bennee@linaro.org> wrote:
-> You may be wondering what happened to v3 and v4. They do exist but
-> they didn't change much from the the original patches as I've been
-> mostly looking the kernel side of the equation. So in summary the
-> changes are:
->
->   - updates to the kernel ABI
->   - don't fall over on kernels without debug support
->   - better logging, syncing and use of internals.h
->   - debug exception re-injection for guest events*
+The Juno board has two keys connected to a PL061 GPIO block,
+in accordance to DDI0524B "ARM Versatile Express Juno Development
+Platform" revision 1.0, table 2-4 "GPIO (0) and GPIO (1) used
+for additional user key entry". By trial-and-error I found that
+these are connected to the two keys named "power" and "home"
+on the motherboard.
 
-Some generic remarks (which we've talked about in irc):
+Register the GPIO block and these two keys in the device tree
+using the PL061 GPIO driver and the generic gpio keys.
 
- * does this correctly handle single step over emulated MMIO insns?
-   how about single step over insns emulated in the kernel
-   without trapping out to userspace? (eg some of the sysregs)
-   kvm_skip_instr() doesn't seem to update PSTATE.SS...
- * the kernel currently does kvm_skip_instr() before the
-   emulated MMIO exit, not afterwards. That feels conceptually
-   the wrong way round -- are there any interesting corner cases
-   we would get wrong currently but that naturally fall out in
-   the wash if it's done afterwards?
- * what about debugging a 32-bit guest which uses the 32-bit
-   ARM/Thumb bkpt insns?
+- Map POWER, HOME, VOL+ and VOL- to the obvious input events.
+- Map RLOCK to KEY_SCREENLOCK/KEY_COFFEE unless someone can
+  explain better what this is for.
+- Map the NMI button to KEY_SYSREQ as this is used like so
+  in the SYSREQ debugging hack.
 
-thanks
--- PMM
+Acked-by: Liviu Dudau <Liviu.Dudau@arm.com>
+Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+---
+Hi ARM SoC folks, please apply this patch directly to
+the DT branch for ARM64. This is a resend of the v2 version
+with Liviu's ACK.
+---
+ arch/arm64/boot/dts/arm/juno-motherboard.dtsi | 61 +++++++++++++++++++++++++++
+ 1 file changed, 61 insertions(+)
+
+diff --git a/arch/arm64/boot/dts/arm/juno-motherboard.dtsi b/arch/arm64/boot/dts/arm/juno-motherboard.dtsi
+index 351c95bda89e..fde0cfad09de 100644
+--- a/arch/arm64/boot/dts/arm/juno-motherboard.dtsi
++++ b/arch/arm64/boot/dts/arm/juno-motherboard.dtsi
+@@ -54,6 +54,55 @@
+ 				regulator-always-on;
+ 			};
+ 
++			gpio_keys {
++				compatible = "gpio-keys";
++				#address-cells = <1>;
++				#size-cells = <0>;
++
++				button at 1 {
++					debounce_interval = <50>;
++					wakeup = <1>;
++					linux,code = <116>;
++					label = "POWER";
++					gpios = <&iofpga_gpio0 0 0x4>;
++				};
++				button at 2 {
++					debounce_interval = <50>;
++					wakeup = <1>;
++					linux,code = <102>;
++					label = "HOME";
++					gpios = <&iofpga_gpio0 1 0x4>;
++				};
++				button at 3 {
++					debounce_interval = <50>;
++					wakeup = <1>;
++					linux,code = <152>;
++					label = "RLOCK";
++					gpios = <&iofpga_gpio0 2 0x4>;
++				};
++				button at 4 {
++					debounce_interval = <50>;
++					wakeup = <1>;
++					linux,code = <115>;
++					label = "VOL+";
++					gpios = <&iofpga_gpio0 3 0x4>;
++				};
++				button at 5 {
++					debounce_interval = <50>;
++					wakeup = <1>;
++					linux,code = <114>;
++					label = "VOL-";
++					gpios = <&iofpga_gpio0 4 0x4>;
++				};
++				button at 6 {
++					debounce_interval = <50>;
++					wakeup = <1>;
++					linux,code = <99>;
++					label = "NMI";
++					gpios = <&iofpga_gpio0 5 0x4>;
++				};
++			};
++
+ 			ethernet at 2,00000000 {
+ 				compatible = "smsc,lan9118", "smsc,lan9115";
+ 				reg = <2 0x00000000 0x10000>;
+@@ -148,5 +197,17 @@
+ 					clocks = <&soc_smc50mhz>;
+ 					clock-names = "apb_pclk";
+ 				};
++
++				iofpga_gpio0: gpio at 1d0000 {
++					compatible = "arm,pl061", "arm,primecell";
++					reg = <0x1d0000 0x1000>;
++					interrupts = <6>;
++					clocks = <&soc_smc50mhz>;
++					clock-names = "apb_pclk";
++					gpio-controller;
++					#gpio-cells = <2>;
++					interrupt-controller;
++					#interrupt-cells = <2>;
++				};
+ 			};
+ 		};
+-- 
+1.9.3
