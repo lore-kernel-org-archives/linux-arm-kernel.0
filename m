@@ -1,45 +1,83 @@
-From: javier@dowhile0.org (Javier Martinez Canillas)
-Date: Thu, 4 Jun 2015 08:20:55 +0200
-Subject: [RFT v2 45/48] genirq,
- gpio: Kill the first parameter 'irq' of irq_flow_handler_t
-In-Reply-To: <1433391238-19471-46-git-send-email-jiang.liu@linux.intel.com>
-References: <1433391238-19471-1-git-send-email-jiang.liu@linux.intel.com>
- <1433391238-19471-46-git-send-email-jiang.liu@linux.intel.com>
-Message-ID: <CABxcv==u4XqozhR9=aXohGKy-qV696Rv74GqsgeUh0KUEoByEA@mail.gmail.com>
+From: yizhang@marvell.com (Yi Zhang)
+Date: Thu, 4 Jun 2015 14:29:24 +0800
+Subject: [PATCH 12/12] i2c: pxa: enable/disable i2c module across msg xfer
+In-Reply-To: <556DE0EB.1010609@linaro.org>
+References: <1432818224-17070-1-git-send-email-vaibhav.hiremath@linaro.org>
+ <1432818224-17070-13-git-send-email-vaibhav.hiremath@linaro.org>
+ <20150528132312.GC2067@n2100.arm.linux.org.uk>
+ <556DDF43.4050804@linaro.org> <556DE0EB.1010609@linaro.org>
+Message-ID: <20150604062924.GA10576@yizhang>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Jiang,
+On Wed, Jun 03, 2015 at 12:59:23AM +0800, Vaibhav Hiremath wrote:
+> 
+> 
+> On Tuesday 02 June 2015 10:22 PM, Vaibhav Hiremath wrote:
+> >
+> >
+> > On Thursday 28 May 2015 06:53 PM, Russell King - ARM Linux wrote:
+> >> On Thu, May 28, 2015 at 06:33:44PM +0530, Vaibhav Hiremath wrote:
+> >>> From: Yi Zhang <yizhang@marvell.com>
+> >>>
+> >>> Enable i2c module/unit before transmission and disable when it finishes.
+> >>>
+> >>> why?
+> >>> It's because the i2c bus may be distrubed if the slave device,
+> >>> typically a touch, powers on.
+> >>
+> >> "disturbed"
+> >>
+> >> I'd recommend that this is a DT property - not every platform is going to
+> >> want this, and as there is rudimentary I2C slave support in this driver,
+> >> this change breaks that.
+> >>
+> >
+> > I would take it as two different comments here, and I believe you also
+> > meant same,
+> >
+> > 1. Not breaking I2C slave support
+> >
+> > Not sure whether enabling/disabling module in ISR would suffice here.
+> > To be specific, in the functions i2c_pxa_slave_start() &
+> > i2c_pxa_slave_stop()
+> >
+> >
+> 
+> Please ignore this option, as enable is important to generate interrupt
+> on slave start.
 
-On Thu, Jun 4, 2015 at 6:13 AM, Jiang Liu <jiang.liu@linux.intel.com> wrote:
-> Now most IRQ flow handlers make no use of the first parameter 'irq'.
-> And for those who do make use of 'irq', we could easily get the irq
-> number through irq_desc->irq_data->irq. So kill the first parameter
-> 'irq' of irq_flow_handler_t.
->
-> To ease review, I have split the changes into several parts, though
-> they should be merge as one to support bisecting.
->
-> Signed-off-by: Jiang Liu <jiang.liu@linux.intel.com>
-> ---
->  drivers/gpio/gpio-altera.c     |    6 ++----
->  drivers/gpio/gpio-bcm-kona.c   |    2 +-
->  drivers/gpio/gpio-davinci.c    |    2 +-
->  drivers/gpio/gpio-dwapb.c      |    2 +-
->  drivers/gpio/gpio-ep93xx.c     |    4 ++--
->  drivers/gpio/gpio-intel-mid.c  |    2 +-
->  drivers/gpio/gpio-lynxpoint.c  |    2 +-
->  drivers/gpio/gpio-mpc8xxx.c    |    2 +-
->  drivers/gpio/gpio-msic.c       |    2 +-
->  drivers/gpio/gpio-msm-v2.c     |    2 +-
->  drivers/gpio/gpio-mvebu.c      |    2 +-
->  drivers/gpio/gpio-mxc.c        |    4 ++--
->  drivers/gpio/gpio-mxs.c        |    2 +-
->  drivers/gpio/gpio-omap.c       |    2 +-
+  Hi, Vaibhav:
 
-For gpio-omap:
+  sorry there is something wrong with my mailbox, so I list the LCR/WCR
+  information here, hoping not to confuse you;
 
-Acked-by: Javier Martinez Canillas <javier@dowhile0.org>
+  LCR: it's used to minor adjustments to the SCL, increasing it
+  decreases the SCL frequency, vice versa;
+  yes, it has relation with the I2C input clock:
+  if input_clk = 32MHz, LCR = 0x0804_1c96
+     LCR[SLV] = 0x096, bit 8~0
+     LCR[FLV] = 0xe,   bit 17~9
+     LCR[HLVH] = 0x1,  bit 26~18
+     LCR[HLVL] = 0x1,  bit 31~27
+  if input_clk = 52MHz,   LCR = 0x081c_60f9
+  if input_clk = 62.4MHz, LCR = 0x082c_8330
 
-Best regards,
-Javier
+  WCR: it's used to control setup and hold timing during slave mode
+  WCR[31: 15], reserved, always write 0;
+  WCR[14: 10], default 0x5, and should not be changed
+  WCR[9: 5], default 0x1, and should not be changed
+  WCR[4:0], default 0x1a, if input_clk = 33MHz, it's 0x0a;
+                          if input_clk = 66MHz, it's 0x14;
+
+  hope it's helpful;
+
+  ---
+  Yi Zhang <yizhang@marvell.com>
+
+> 
+> I will add DT property with clear note on SLAVE support issue, so that
+> it can be disabled and SLAVE support should work as is.
+> 
+> Thanks,
+> Vaibhav
