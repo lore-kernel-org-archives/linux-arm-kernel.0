@@ -1,47 +1,28 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Thu, 4 Jun 2015 10:06:28 +0200
-Subject: [PATCH] ARM: at91: dt: sama5d4ek: mci0 uses slot 0
-In-Reply-To: <1432806916-23579-1-git-send-email-ludovic.desroches@atmel.com>
-References: <1432806916-23579-1-git-send-email-ludovic.desroches@atmel.com>
-Message-ID: <55700704.2020907@atmel.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Thu, 4 Jun 2015 10:07:57 +0200
+Subject: [patch] gpio: Added GPIO support to ZynqMP SoC
+In-Reply-To: <1433160019-11157-1-git-send-email-anuragku@xilinx.com>
+References: <1433160019-11157-1-git-send-email-anuragku@xilinx.com>
+Message-ID: <CACRpkdZpvr4NfH43FvoHdfKaqqDGMHJU5=UHEzOpLV9xC4vaTw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le 28/05/2015 11:55, Ludovic Desroches a ?crit :
-> mci0 uses slot 0 not 1.
-> 
-> Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com>
-> Fixes: 7a4752677c44 ("ARM: at91: dt: add device tree file for SAMA5D4ek
-> board")
+On Mon, Jun 1, 2015 at 2:00 PM, Anurag Kumar Vulisha
+<anurag.kumar.vulisha@xilinx.com> wrote:
 
-Yes:
-Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+> Added support to ZynqMP SoC on the existing zynq gpio driver.
+>
+> Signed-off-by: Anurag Kumar Vulisha <anuragku@xilinx.com>
 
-Queued in at91-4.2-dt.
+> +static const struct of_device_id zynq_gpio_of_match[] = {
+> +       { .compatible = "xlnx,zynq-gpio-1.0", .data = (void *)&zynq_gpio_def },
+> +       { .compatible = "xlnx,zynqmp-gpio-1.0",
+> +                                       .data = (void *)&zynqmp_gpio_def },
 
-Thanks, bye.
+Is there a separate patch adding this to the device tree
+bindings in Documentation/devicetree/bindings/gpio/gpio-zynq.txt?
 
-> ---
->  arch/arm/boot/dts/at91-sama5d4ek.dts | 4 ++--
->  1 file changed, 2 insertions(+), 2 deletions(-)
-> 
-> diff --git a/arch/arm/boot/dts/at91-sama5d4ek.dts b/arch/arm/boot/dts/at91-sama5d4ek.dts
-> index 89ef4a5..45e7761 100644
-> --- a/arch/arm/boot/dts/at91-sama5d4ek.dts
-> +++ b/arch/arm/boot/dts/at91-sama5d4ek.dts
-> @@ -108,8 +108,8 @@
->  			mmc0: mmc at f8000000 {
->  				pinctrl-names = "default";
->  				pinctrl-0 = <&pinctrl_mmc0_clk_cmd_dat0 &pinctrl_mmc0_dat1_3 &pinctrl_mmc0_cd>;
-> -				slot at 1 {
-> -					reg = <1>;
-> +				slot at 0 {
-> +					reg = <0>;
->  					bus-width = <4>;
->  					cd-gpios = <&pioE 5 0>;
->  				};
-> 
+Else please include it in this patch.
 
-
--- 
-Nicolas Ferre
+Yours,
+Linus Walleij
