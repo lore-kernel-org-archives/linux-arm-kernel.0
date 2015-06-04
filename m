@@ -1,68 +1,49 @@
 From: ivan.ivanov@linaro.org (Ivan T. Ivanov)
-Date: Thu,  4 Jun 2015 12:19:03 +0300
-Subject: [PATCH 4/7] arm64: dts: qcom: Add msm8916 USB configuration nodes
+Date: Thu,  4 Jun 2015 12:19:04 +0300
+Subject: [PATCH 5/7] arm64: dts: qcom: apq8016-sbc: Don't hog client driver
+ pins
 In-Reply-To: <1433409546-23995-1-git-send-email-ivan.ivanov@linaro.org>
 References: <1433409546-23995-1-git-send-email-ivan.ivanov@linaro.org>
-Message-ID: <1433409546-23995-5-git-send-email-ivan.ivanov@linaro.org>
+Message-ID: <1433409546-23995-6-git-send-email-ivan.ivanov@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add Host, Device and OTG configuration nodes.
+Hogging pins from pinctrl driver prevents client drivers
+to probe.
 
 Signed-off-by: Ivan T. Ivanov <ivan.ivanov@linaro.org>
 ---
- arch/arm64/boot/dts/qcom/msm8916.dtsi | 39 +++++++++++++++++++++++++++++++++++
- 1 file changed, 39 insertions(+)
+ arch/arm64/boot/dts/qcom/apq8016-sbc-pmic-pins.dtsi | 3 ---
+ arch/arm64/boot/dts/qcom/apq8016-sbc-soc-pins.dtsi  | 3 ---
+ 2 files changed, 6 deletions(-)
 
-diff --git a/arch/arm64/boot/dts/qcom/msm8916.dtsi b/arch/arm64/boot/dts/qcom/msm8916.dtsi
-index 9ff0eb4..5911de0 100644
---- a/arch/arm64/boot/dts/qcom/msm8916.dtsi
-+++ b/arch/arm64/boot/dts/qcom/msm8916.dtsi
-@@ -268,6 +268,45 @@
- 			status = "disabled";
- 		};
+diff --git a/arch/arm64/boot/dts/qcom/apq8016-sbc-pmic-pins.dtsi b/arch/arm64/boot/dts/qcom/apq8016-sbc-pmic-pins.dtsi
+index 535532b..37ca2ed 100644
+--- a/arch/arm64/boot/dts/qcom/apq8016-sbc-pmic-pins.dtsi
++++ b/arch/arm64/boot/dts/qcom/apq8016-sbc-pmic-pins.dtsi
+@@ -2,9 +2,6 @@
 
-+		usb_dev: usb at 78d9000 {
-+			compatible = "qcom,ci-hdrc";
-+			reg = <0x78d9000 0x400>;
-+			dr_mode = "peripheral";
-+			interrupts = <GIC_SPI 134 IRQ_TYPE_NONE>;
-+			usb-phy = <&usb_otg>;
-+			status = "disabled";
-+		};
-+
-+		usb_host: ehci at 78d9000 {
-+			compatible = "qcom,ehci-host";
-+			reg = <0x78d9000 0x400>;
-+			interrupts = <GIC_SPI 134 IRQ_TYPE_NONE>;
-+			usb-phy = <&usb_otg>;
-+			status = "disabled";
-+		};
-+
-+		usb_otg: phy at 78d9000 {
-+			compatible = "qcom,usb-otg-snps";
-+			reg = <0x78d9000 0x400>;
-+			interrupts = <GIC_SPI 134 IRQ_TYPE_EDGE_BOTH>,
-+				     <GIC_SPI 140 IRQ_TYPE_EDGE_RISING>;
-+
-+			qcom,vdd-levels = <1 5 7>;
-+			qcom,phy-init-sequence = <0x44 0x6B 0x24 0x13>;
-+			dr_mode = "peripheral";
-+			qcom,otg-control = <2>; // PMIC
-+
-+			clocks = <&gcc GCC_USB_HS_AHB_CLK>,
-+				 <&gcc GCC_USB_HS_SYSTEM_CLK>,
-+				 <&gcc GCC_USB2A_PHY_SLEEP_CLK>;
-+			clock-names = "iface", "core", "sleep";
-+
-+			resets = <&gcc GCC_USB2A_PHY_BCR>,
-+				 <&gcc GCC_USB_HS_BCR>;
-+			reset-names = "phy", "link";
-+			status = "disabled";
-+		};
-+
- 		intc: interrupt-controller at b000000 {
- 			compatible = "qcom,msm-qgic2";
- 			interrupt-controller;
+ &pm8916_gpios {
+
+-	pinctrl-names = "default";
+-	pinctrl-0 = <&pm8916_gpios_default>;
+-
+ 	pm8916_gpios_default: default {
+ 		usb_hub_reset_pm {
+ 			pins = "gpio1";
+diff --git a/arch/arm64/boot/dts/qcom/apq8016-sbc-soc-pins.dtsi b/arch/arm64/boot/dts/qcom/apq8016-sbc-soc-pins.dtsi
+index 5f7023f..27087cf 100644
+--- a/arch/arm64/boot/dts/qcom/apq8016-sbc-soc-pins.dtsi
++++ b/arch/arm64/boot/dts/qcom/apq8016-sbc-soc-pins.dtsi
+@@ -3,9 +3,6 @@
+
+ &msmgpio {
+
+-	pinctrl-names = "default";
+-	pinctrl-0 = <&soc_gpios_default>;
+-
+ 	soc_gpios_default: default {
+ 		usr_led_1_ctrl_default: usr_led_1_ctrl_default {
+ 			pins = "gpio21";
 --
 1.9.1
