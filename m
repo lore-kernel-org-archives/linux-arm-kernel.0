@@ -1,105 +1,37 @@
-From: yangyingliang@huawei.com (Yang Yingliang)
-Date: Thu, 4 Jun 2015 17:35:04 +0800
-Subject: [RFC PATCH] arm64: Image: Allow the appending of a device tree binary
-Message-ID: <1433410504-11628-1-git-send-email-yangyingliang@huawei.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Thu, 4 Jun 2015 10:42:48 +0100
+Subject: [PATCH 10/11] spi: add more debug prints in s3c64xx
+In-Reply-To: <CAMuHMdWHPm6exq4O3CNvVuiZOgLHuxyCrR548BFmbOPikvNRLw@mail.gmail.com>
+References: <cover.1433364398.git.hramrach@gmail.com>
+ <305830ebf9c0ae98c4f6e0ebbdec7414d6762b36.1433364398.git.hramrach@gmail.com>
+ <20150604091634.GY14071@sirena.org.uk>
+ <CAMuHMdWHPm6exq4O3CNvVuiZOgLHuxyCrR548BFmbOPikvNRLw@mail.gmail.com>
+Message-ID: <20150604094248.GA14071@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch provides the ability to boot using a device tree that is appended
-to the raw binary Image (e.g. cat Image <filename>.dtb > Image_w_dtb).
+On Thu, Jun 04, 2015 at 11:30:15AM +0200, Geert Uytterhoeven wrote:
+> On Thu, Jun 4, 2015 at 11:16 AM, Mark Brown <broonie@kernel.org> wrote:
+> >> --- a/drivers/spi/spi-s3c64xx.c
+> >> +++ b/drivers/spi/spi-s3c64xx.c
+> >> @@ -18,6 +18,7 @@
+> >>  #include <linux/interrupt.h>
+> >>  #include <linux/delay.h>
+> >>  #include <linux/clk.h>
+> >> +#include <linux/clk-provider.h>
 
-Both BE and LE conditions are tested.
+> > Whatever you're doing here this indicates that there's a very big
+> > abstraction problem going on.
 
-Got references from e2a6a3aa ("ARM: zImage: Allow the appending of a device tree binary").
+> I guess it's needed for __clk_get_name(), which can be avoided by using
+> the "%pC" printf format specifier instead.
 
-Signed-off-by: Yang Yingliang <yangyingliang@huawei.com>
----
- arch/arm64/Kconfig              | 11 +++++++++++
- arch/arm64/kernel/head.S        | 12 ++++++++++++
- arch/arm64/kernel/vmlinux.lds.S | 17 +++++++++++++++++
- 3 files changed, 40 insertions(+)
-
-diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-index 7796af4..d402448 100644
---- a/arch/arm64/Kconfig
-+++ b/arch/arm64/Kconfig
-@@ -660,6 +660,17 @@ endmenu
- 
- menu "Boot options"
- 
-+config ARM64_APPENDED_DTB
-+	bool "Use appended device tree blob to Image"
-+	depends on OF
-+	help
-+	  With this option, the boot code will look for a device tree binary
-+	  (DTB) appended to Image
-+	  (e.g. cat Image <filename>.dtb > Image_w_dtb).
-+
-+	  With this option, the size of Image will be extended to be 2MB aligned.
-+	  The 2MB memory followed by Image is used for FDT blob.
-+
- config CMDLINE
- 	string "Default kernel command string"
- 	default ""
-diff --git a/arch/arm64/kernel/head.S b/arch/arm64/kernel/head.S
-index 19f915e..ac00c8a 100644
---- a/arch/arm64/kernel/head.S
-+++ b/arch/arm64/kernel/head.S
-@@ -274,6 +274,18 @@ ENDPROC(preserve_boot_args)
-  * The dtb must be 8-byte aligned and live in the first 512M of memory.
-  */
- __vet_fdt:
-+#ifdef CONFIG_ARM64_APPENDED_DTB
-+	ldr	x21, =_edata
-+	add	x21, x21, x28
-+	ldr	w0, [x21]
-+#ifndef __AARCH64EB__
-+	ldr	w1, =0xedfe0dd0		// FDT magic word
-+#else
-+	ldr	w1, =0xd00dfeed
-+#endif
-+	cmp	w0, w1
-+	b.ne	1f			// no FDT found
-+#endif
- 	tst	x21, #0x7
- 	b.ne	1f
- 	cmp	x21, x24
-diff --git a/arch/arm64/kernel/vmlinux.lds.S b/arch/arm64/kernel/vmlinux.lds.S
-index a2c2986..c71bac3 100644
---- a/arch/arm64/kernel/vmlinux.lds.S
-+++ b/arch/arm64/kernel/vmlinux.lds.S
-@@ -54,6 +54,18 @@ PECOFF_FILE_ALIGNMENT = 0x200;
- #define PECOFF_EDATA_PADDING
- #endif
- 
-+/*
-+ * Set FDT pointer 2MB aligned to ensure
-+ * it don't cross a 2-megabyte boundary.
-+ */
-+FDT_FILE_ALIGNMENT = (1 << 21);
-+#ifdef CONFIG_ARM64_APPENDED_DTB
-+#define FDT_EDATA_PADDING	\
-+	.fdt_edata_padding : { BYTE(0); . = ALIGN(FDT_FILE_ALIGNMENT); }
-+#else
-+#define FDT_EDATA_PADDING
-+#endif
-+
- #ifdef CONFIG_DEBUG_ALIGN_RODATA
- #define ALIGN_DEBUG_RO			. = ALIGN(1<<SECTION_SHIFT);
- #define ALIGN_DEBUG_RO_MIN(min)		ALIGN_DEBUG_RO
-@@ -149,8 +161,13 @@ SECTIONS
- 	_sdata = .;
- 	RW_DATA_SECTION(64, PAGE_SIZE, THREAD_SIZE)
- 	PECOFF_EDATA_PADDING
-+	FDT_EDATA_PADDING	/* 2MB aligned */
- 	_edata = .;
- 
-+#ifdef CONFIG_ARM64_APPENDED_DTB
-+	. += (1 << 21);		/* maximum 2MB for FDT blob */
-+#endif
-+
- 	BSS_SECTION(0, 0, 0)
- 
- 	. = ALIGN(PAGE_SIZE);
--- 
-1.8.0
+Right, or by adding an externally usable API - the point is that using
+internal functions in a client driver is a big red flag.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150604/64516a5f/attachment-0001.sig>
