@@ -1,231 +1,258 @@
-From: Dave.Martin@arm.com (Dave Martin)
-Date: Thu, 4 Jun 2015 14:43:37 +0100
-Subject: [PATCH v4] arm: tcm: Don't crash when TCM banks are protected by
- TrustZone
-In-Reply-To: <1433419121-18726-1-git-send-email-michael@smart-africa.com>
-References: <1433257803-25318-1-git-send-email-michael@smart-africa.com>
- <1433419121-18726-1-git-send-email-michael@smart-africa.com>
-Message-ID: <20150604134337.GC10388@e103592.cambridge.arm.com>
+From: alex.bennee@linaro.org (Alex =?utf-8?Q?Benn=C3=A9e?=)
+Date: Thu, 04 Jun 2015 14:46:39 +0100
+Subject: [PATCH v5 07/12] KVM: arm64: guest debug,
+ add support for single-step
+In-Reply-To: <20150604110752.GI7657@cbox>
+References: <1432891828-4816-1-git-send-email-alex.bennee@linaro.org>
+ <1432891828-4816-8-git-send-email-alex.bennee@linaro.org>
+ <20150604110752.GI7657@cbox>
+Message-ID: <87a8wfbn7k.fsf@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 04, 2015 at 01:58:41PM +0200, Michael van der Westhuizen wrote:
-> Fixes the TCM initialisation code to handle TCM banks that are
-> present but inaccessible due to TrustZone configuration.  This is
-> the default case when enabling the non-secure world.  It may also
-> be the case that that the user decided to use TCM for TrustZone.
-> 
-> This change has exposed a bug in handling of TCM where no TCM bank
-> was usable (the 0 size TCM case).  This change addresses the
-> resulting hang.
-> 
-> This code only handles the ARMv6 TCMTR register format, and will not
-> work correctly on boards that use the ARMv7 (or any other) format.
-> This is handled by performing an early exit from the initialisation
-> function when the TCMTR reports any format other than v6.
-> 
-> Signed-off-by: Michael van der Westhuizen <michael@smart-africa.com>
-> Cc: Linus Walleij <linus.walleij@linaro.org>
-> Cc: Russell King <rmk+kernel@arm.linux.org.uk>
-> Cc: Dave Martin <Dave.Martin@arm.com>
 
-Reviewed-by: Dave Martin <Dave.Martin@arm.com>
+Christoffer Dall <christoffer.dall@linaro.org> writes:
 
-> ---
-> 
-> Changes in v4:
->   - Clarify that the instruction encoding for unconditional MRC
->     happens to be identical between ARM and Thumb-2 modes.
-> 
-> Changes in v3:
->   - Add some documentation about the undefined handler hook and
->     how the values used in that hook are derived.
->   - Use symbolic values for the handler instruction and mask.
->   - Use symbolic values for the shift-and-mask operation that
->     extracts the destination register for the trapped operation.
->   - Reformat added comments to match the style in the remainder
->     of the file.
-> 
-> Changes in v2:
->   - Mark the TCM undefined hook data structure as __initdata, since
->     that's what it is.
->   - Ensure that we're dealing with an ARMv6 TCMTR format.
-> 
->  arch/arm/kernel/tcm.c | 104 ++++++++++++++++++++++++++++++++++++++++++++++++--
->  1 file changed, 101 insertions(+), 3 deletions(-)
-> 
-> diff --git a/arch/arm/kernel/tcm.c b/arch/arm/kernel/tcm.c
-> index 7a3be1d..b10e136 100644
-> --- a/arch/arm/kernel/tcm.c
-> +++ b/arch/arm/kernel/tcm.c
-> @@ -17,6 +17,9 @@
->  #include <asm/mach/map.h>
->  #include <asm/memory.h>
->  #include <asm/system_info.h>
-> +#include <asm/traps.h>
-> +
-> +#define TCMTR_FORMAT_MASK	0xe0000000U
->  
->  static struct gen_pool *tcm_pool;
->  static bool dtcm_present;
-> @@ -176,6 +179,77 @@ static int __init setup_tcm_bank(u8 type, u8 bank, u8 banks,
->  }
->  
->  /*
-> + * When we are running in the non-secure world and the secure world
-> + * has not explicitly given us access to the TCM we will get an
-> + * undefined error when reading the TCM region register in the
-> + * setup_tcm_bank function (above).
-> + *
-> + * There are two variants of this register read that we need to trap,
-> + * the read for the data TCM and the read for the instruction TCM:
-> + *  c0370628:       ee196f11        mrc     15, 0, r6, cr9, cr1, {0}
-> + *  c0370674:       ee196f31        mrc     15, 0, r6, cr9, cr1, {1}
-> + *
-> + * Our undef hook mask explicitly matches all fields of the encoded
-> + * instruction other than the destination register.  The mask also
-> + * only allows operand 2 to have the values 0 or 1.
-> + *
-> + * The undefined hook is defined as __init and __initdata, and therefore
-> + * must be removed before tcm_init returns.
-> + *
-> + * In this particular case (MRC with ARM condition code ALways) the
-> + * Thumb-2 and ARM instruction encoding are identical, so this hook
-> + * will work on a Thumb-2 kernel.
-> + *
-> + * See A8.8.107, DDI0406C_C ARM Architecture Reference Manual, Encoding
-> + * T1/A1 for the bit-by-bit details.
-> + *
-> + *  mrc   p15, 0, XX, c9, c1, 0
-> + *  mrc   p15, 0, XX, c9, c1, 1
-> + *   |  |  |   |   |   |   |  +---- opc2           0|1 = 000|001
-> + *   |  |  |   |   |   |   +------- CRm              0 = 0001
-> + *   |  |  |   |   |   +----------- CRn              0 = 1001
-> + *   |  |  |   |   +--------------- Rt               ? = ????
-> + *   |  |  |   +------------------- opc1             0 =  000
-> + *   |  |  +----------------------- coproc          15 = 1111
-> + *   |  +-------------------------- condition   ALways = 1110
-> + *   +----------------------------- instruction    MRC = 1110
-> + *
-> + * Encoding this as per A8.8.107 of DDI0406C, Encoding T1/A1, yields:
-> + *  1111 1111 1111 1111 0000 1111 1101 1111 Required Mask
-> + *  1110 1110 0001 1001 ???? 1111 0001 0001 mrc p15, 0, XX, c9, c1, 0
-> + *  1110 1110 0001 1001 ???? 1111 0011 0001 mrc p15, 0, XX, c9, c1, 1
-> + *  [  ] [  ] [ ]| [  ] [  ] [  ] [ ]| +--- CRm
-> + *    |    |   | |   |    |    |   | +----- SBO
-> + *    |    |   | |   |    |    |   +------- opc2
-> + *    |    |   | |   |    |    +----------- coproc
-> + *    |    |   | |   |    +---------------- Rt
-> + *    |    |   | |   +--------------------- CRn
-> + *    |    |   | +------------------------- SBO
-> + *    |    |   +--------------------------- opc1
-> + *    |    +------------------------------- instruction
-> + *    +------------------------------------ condition
-> + */
-> +#define TCM_REGION_READ_MASK		0xffff0fdf
-> +#define TCM_REGION_READ_INSTR		0xee190f11
-> +#define DEST_REG_SHIFT			12
-> +#define DEST_REG_MASK			0xf
-> +
-> +static int __init tcm_handler(struct pt_regs *regs, unsigned int instr)
-> +{
-> +	regs->uregs[(instr >> DEST_REG_SHIFT) & DEST_REG_MASK] = 0;
-> +	regs->ARM_pc += 4;
-> +	return 0;
-> +}
-> +
-> +static struct undef_hook tcm_hook __initdata = {
-> +	.instr_mask	= TCM_REGION_READ_MASK,
-> +	.instr_val	= TCM_REGION_READ_INSTR,
-> +	.cpsr_mask	= MODE_MASK,
-> +	.cpsr_val	= SVC_MODE,
-> +	.fn		= tcm_handler
-> +};
-> +
-> +/*
->   * This initializes the TCM memory
->   */
->  void __init tcm_init(void)
-> @@ -204,9 +278,18 @@ void __init tcm_init(void)
->  	}
->  
->  	tcm_status = read_cpuid_tcmstatus();
-> +
-> +	/*
-> +	 * This code only supports v6-compatible TCMTR implementations.
-> +	 */
-> +	if (tcm_status & TCMTR_FORMAT_MASK)
-> +		return;
-> +
->  	dtcm_banks = (tcm_status >> 16) & 0x03;
->  	itcm_banks = (tcm_status & 0x03);
->  
-> +	register_undef_hook(&tcm_hook);
-> +
->  	/* Values greater than 2 for D/ITCM banks are "reserved" */
->  	if (dtcm_banks > 2)
->  		dtcm_banks = 0;
-> @@ -218,7 +301,7 @@ void __init tcm_init(void)
->  		for (i = 0; i < dtcm_banks; i++) {
->  			ret = setup_tcm_bank(0, i, dtcm_banks, &dtcm_end);
->  			if (ret)
-> -				return;
-> +				goto unregister;
->  		}
->  		/* This means you compiled more code than fits into DTCM */
->  		if (dtcm_code_sz > (dtcm_end - DTCM_OFFSET)) {
-> @@ -227,6 +310,12 @@ void __init tcm_init(void)
->  				dtcm_code_sz, (dtcm_end - DTCM_OFFSET));
->  			goto no_dtcm;
->  		}
-> +		/*
-> +		 * This means that the DTCM sizes were 0 or the DTCM banks
-> +		 * were inaccessible due to TrustZone configuration.
-> +		 */
-> +		if (!(dtcm_end - DTCM_OFFSET))
-> +			goto no_dtcm;
->  		dtcm_res.end = dtcm_end - 1;
->  		request_resource(&iomem_resource, &dtcm_res);
->  		dtcm_iomap[0].length = dtcm_end - DTCM_OFFSET;
-> @@ -250,15 +339,21 @@ no_dtcm:
->  		for (i = 0; i < itcm_banks; i++) {
->  			ret = setup_tcm_bank(1, i, itcm_banks, &itcm_end);
->  			if (ret)
-> -				return;
-> +				goto unregister;
->  		}
->  		/* This means you compiled more code than fits into ITCM */
->  		if (itcm_code_sz > (itcm_end - ITCM_OFFSET)) {
->  			pr_info("CPU ITCM: %u bytes of code compiled to "
->  				"ITCM but only %lu bytes of ITCM present\n",
->  				itcm_code_sz, (itcm_end - ITCM_OFFSET));
-> -			return;
-> +			goto unregister;
->  		}
-> +		/*
-> +		 * This means that the ITCM sizes were 0 or the ITCM banks
-> +		 * were inaccessible due to TrustZone configuration.
-> +		 */
-> +		if (!(itcm_end - ITCM_OFFSET))
-> +			goto unregister;
->  		itcm_res.end = itcm_end - 1;
->  		request_resource(&iomem_resource, &itcm_res);
->  		itcm_iomap[0].length = itcm_end - ITCM_OFFSET;
-> @@ -275,6 +370,9 @@ no_dtcm:
->  		pr_info("CPU ITCM: %u bytes of code compiled to ITCM but no "
->  			"ITCM banks present in CPU\n", itcm_code_sz);
->  	}
-> +
-> +unregister:
-> +	unregister_undef_hook(&tcm_hook);
->  }
->  
->  /*
-> -- 
-> 2.1.4
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> On Fri, May 29, 2015 at 10:30:23AM +0100, Alex Benn?e wrote:
+>> This adds support for single-stepping the guest. To do this we need to
+>> manipulate the guests PSTATE.SS and MDSCR_EL1.SS bits which we do in the
+>> kvm_arm_setup/clear_debug() so we don't affect the apparent state of the
+>> guest. Additionally while the host is debugging the guest we suppress
+>> the ability of the guest to single-step itself.
+>
+> I feel like there should be a slightly more elaborate explanation of
+> exactly what works and what doesn't work when the guest is single
+> stepping something and which choices we've made for supporting or not
+> supporting this.
+
+OK, I shall put bit more explanation. I was trying to avoid too much
+exposition in the commit comments vs the code.
+
+>
+>> 
+>> Signed-off-by: Alex Benn?e <alex.bennee@linaro.org>
+>> 
+>> ---
+>> v2
+>>   - Move pstate/mdscr manipulation into C
+>>   - don't export guest_debug to assembly
+>>   - add accessor for saved_debug regs
+>>   - tweak save/restore of mdscr_el1
+>> v3
+>>   - don't save PC in debug information struct
+>>   - rename debug_saved_regs->guest_debug_state
+>>   - save whole value, only use bits in restore
+>>   - add save/restore_guest-debug_regs helper functions
+>>   - simplify commit message for clarity
+>>   - rm vcpu_debug_saved_reg access fn
+>> v4
+>>   - added more comments based on suggestions
+>>   - guest_debug_state->guest_debug_preserved
+>>   - no point masking restore, we will trap out
+>> v5
+>>   - more comments
+>>   - don't bother preserving pstate.ss
+>
+> it would have been good if there was some comment explaining the reason
+> for this change.
+>
+>> ---
+>>  arch/arm/kvm/arm.c                |  4 ++-
+>>  arch/arm64/include/asm/kvm_host.h | 11 ++++++++
+>>  arch/arm64/kvm/debug.c            | 58 ++++++++++++++++++++++++++++++++++++---
+>>  arch/arm64/kvm/handle_exit.c      |  2 ++
+>>  4 files changed, 70 insertions(+), 5 deletions(-)
+>> 
+>> diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
+>> index 064c105..9b3ed6d 100644
+>> --- a/arch/arm/kvm/arm.c
+>> +++ b/arch/arm/kvm/arm.c
+>> @@ -302,7 +302,9 @@ void kvm_arch_vcpu_put(struct kvm_vcpu *vcpu)
+>>  	kvm_arm_set_running_vcpu(NULL);
+>>  }
+>>  
+>> -#define KVM_GUESTDBG_VALID_MASK (KVM_GUESTDBG_ENABLE | KVM_GUESTDBG_USE_SW_BP)
+>> +#define KVM_GUESTDBG_VALID_MASK (KVM_GUESTDBG_ENABLE |    \
+>> +			    KVM_GUESTDBG_USE_SW_BP | \
+>> +			    KVM_GUESTDBG_SINGLESTEP)
+>>  
+>>  /**
+>>   * kvm_arch_vcpu_ioctl_set_guest_debug - set up guest debugging
+>> diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
+>> index 7cb99b5..e2db6a6 100644
+>> --- a/arch/arm64/include/asm/kvm_host.h
+>> +++ b/arch/arm64/include/asm/kvm_host.h
+>> @@ -123,6 +123,17 @@ struct kvm_vcpu_arch {
+>>  	 * here.
+>>  	 */
+>>  
+>> +	/*
+>> +	 * Guest registers we preserve during guest debugging.
+>> +	 *
+>> +	 * These shadow registers are updated by the kvm_handle_sys_reg
+>> +	 * trap handler if the guest accesses or updates them while we
+>> +	 * are using guest debug.
+>> +	 */
+>> +	struct {
+>> +		u32	mdscr_el1;
+>> +	} guest_debug_preserved;
+>> +
+>>  	/* Don't run the guest */
+>>  	bool pause;
+>>  
+>> diff --git a/arch/arm64/kvm/debug.c b/arch/arm64/kvm/debug.c
+>> index 8d1bfa4..10a6baa 100644
+>> --- a/arch/arm64/kvm/debug.c
+>> +++ b/arch/arm64/kvm/debug.c
+>> @@ -19,11 +19,41 @@
+>>  
+>>  #include <linux/kvm_host.h>
+>>  
+>> +#include <asm/debug-monitors.h>
+>> +#include <asm/kvm_asm.h>
+>>  #include <asm/kvm_arm.h>
+>> +#include <asm/kvm_emulate.h>
+>> +
+>> +/* These are the bits of MDSCR_EL1 we may manipulate */
+>> +#define MDSCR_EL1_DEBUG_MASK	(DBG_MDSCR_SS | \
+>> +				DBG_MDSCR_KDE | \
+>> +				DBG_MDSCR_MDE)
+>>  
+>>  static DEFINE_PER_CPU(u32, mdcr_el2);
+>>  
+>>  /**
+>> + * save/restore_guest_debug_regs
+>> + *
+>> + * For some debug operations we need to tweak some guest registers. As
+>> + * a result we need to save the state of those registers before we
+>> + * make those modifications. This does get confused if the guest
+>> + * attempts to control single step while being debugged. It will start
+>> + * working again once it is no longer being debugged by the host.
+>
+> What gets confused and what starts working?
+
+Maybe I should cut from "This does get..." and put more explanation in
+the single step comment later.
+
+>
+>> + *
+>> + * Guest access to MDSCR_EL1 is trapped by the hypervisor and handled
+>> + * after we have restored the preserved value to the main context.
+>> + */
+>> +static void save_guest_debug_regs(struct kvm_vcpu *vcpu)
+>> +{
+>> +	vcpu->arch.guest_debug_preserved.mdscr_el1 = vcpu_sys_reg(vcpu, MDSCR_EL1);
+>> +}
+>> +
+>> +static void restore_guest_debug_regs(struct kvm_vcpu *vcpu)
+>> +{
+>> +	vcpu_sys_reg(vcpu, MDSCR_EL1) = vcpu->arch.guest_debug_preserved.mdscr_el1;
+>> +}
+>> +
+>> +/**
+>>   * kvm_arm_init_debug - grab what we need for debug
+>>   *
+>>   * Currently the sole task of this function is to retrieve the initial
+>> @@ -38,7 +68,6 @@ void kvm_arm_init_debug(void)
+>>  	__this_cpu_write(mdcr_el2, kvm_call_hyp(__kvm_get_mdcr_el2));
+>>  }
+>>  
+>> -
+>>  /**
+>>   * kvm_arm_setup_debug - set up debug related stuff
+>>   *
+>> @@ -73,12 +102,33 @@ void kvm_arm_setup_debug(struct kvm_vcpu *vcpu)
+>>  	if (trap_debug)
+>>  		vcpu->arch.mdcr_el2 |= MDCR_EL2_TDA;
+>>  
+>> -	/* Trap breakpoints? */
+>> -	if (vcpu->guest_debug & KVM_GUESTDBG_USE_SW_BP)
+>> +	/* Is Guest debugging in effect? */
+>> +	if (vcpu->guest_debug) {
+>>  		vcpu->arch.mdcr_el2 |= MDCR_EL2_TDE;
+>> +
+>> +		/* Save guest debug state */
+>> +		save_guest_debug_regs(vcpu);
+>> +
+>> +		/*
+>> +		 * Single Step (ARM ARM D2.12.3 The software step state
+>> +		 * machine)
+>> +		 *
+>> +		 * If we are doing Single Step we need to manipulate
+>> +		 * MDSCR_EL1.SS and PSTATE.SS. If not we need to
+>> +		 * suppress the guests ability to trigger single step
+>> +		 * exceptions as otherwise the host will deal with them.
+>
+> is this because if you are doing any kind of guest debugging, we trap
+> all debug exceptions to EL2 and therefore single-stepping in the guest
+> won't work anyway and the host doesn't know what to do with such
+> exceptions?
+
+Correct. As MDCR_EL2.TDE is in effect everything gets routed to EL2. For
+breakpoints this is not a major problem as we have all the details
+for user space to re-inject the exception if required. However for
+single-step it means we get an exception as soon as the guest enables
+MDSCR_EL1.SS even if it doesn't have MDSCR_EL1.KDE enabled. The guest
+would only be expecting the single step to kick in when it eret's to EL0
+setting PSTATE.SS.
+
+In future we could consider getting userspace to singlestep the guest
+out of the kernel until it goes over the eret but this is starting to
+get hairy.
+
+>
+> I would feel slightly better if the comment assured me this doesn't
+> outright break something, but ok...
+
+Well nothing breaks per-se but if you have a GDB session in the guest
+you'll wonder why "start" and the various breaks don't trigger. They
+actually will but the host GDB then tries to SS over them and we
+continue on until the host has stopped doing any sort of debug.
+
+>
+>> +		 */
+>> +		if (vcpu->guest_debug & KVM_GUESTDBG_SINGLESTEP) {
+>> +			*vcpu_cpsr(vcpu) |=  DBG_SPSR_SS;
+>> +			vcpu_sys_reg(vcpu, MDSCR_EL1) |= DBG_MDSCR_SS;
+>> +		} else {
+>> +			vcpu_sys_reg(vcpu, MDSCR_EL1) &= ~DBG_MDSCR_SS;
+>> +		}
+>> +	}
+>>  }
+>>  
+>>  void kvm_arm_clear_debug(struct kvm_vcpu *vcpu)
+>>  {
+>> -	/* Nothing to do yet */
+>> +	if (vcpu->guest_debug)
+>> +		restore_guest_debug_regs(vcpu);
+>>  }
+>> diff --git a/arch/arm64/kvm/handle_exit.c b/arch/arm64/kvm/handle_exit.c
+>> index 27f38a9..e9de13e 100644
+>> --- a/arch/arm64/kvm/handle_exit.c
+>> +++ b/arch/arm64/kvm/handle_exit.c
+>> @@ -103,6 +103,7 @@ static int kvm_handle_guest_debug(struct kvm_vcpu *vcpu, struct kvm_run *run)
+>>  	run->debug.arch.hsr = hsr;
+>>  
+>>  	switch (hsr >> ESR_ELx_EC_SHIFT) {
+>> +	case ESR_ELx_EC_SOFTSTP_LOW:
+>>  	case ESR_ELx_EC_BKPT32:
+>>  	case ESR_ELx_EC_BRK64:
+>>  		break;
+>> @@ -130,6 +131,7 @@ static exit_handle_fn arm_exit_handlers[] = {
+>>  	[ESR_ELx_EC_SYS64]	= kvm_handle_sys_reg,
+>>  	[ESR_ELx_EC_IABT_LOW]	= kvm_handle_guest_abort,
+>>  	[ESR_ELx_EC_DABT_LOW]	= kvm_handle_guest_abort,
+>> +	[ESR_ELx_EC_SOFTSTP_LOW]= kvm_handle_guest_debug,
+>>  	[ESR_ELx_EC_BKPT32]	= kvm_handle_guest_debug,
+>>  	[ESR_ELx_EC_BRK64]	= kvm_handle_guest_debug,
+>>  };
+>> -- 
+>> 2.4.1
+>> 
+>
+> As for the code of this patch:
+>
+> Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
+
+-- 
+Alex Benn?e
