@@ -1,53 +1,71 @@
-From: vinod.koul@intel.com (Vinod Koul)
-Date: Thu, 4 Jun 2015 21:22:01 +0530
-Subject: [PATCH 1/2] dmaengine: at_xdmac: lock fixes
-In-Reply-To: <20150604150946.GA17733@odux.rfo.atmel.com>
-References: <1433343154-5613-1-git-send-email-ludovic.desroches@atmel.com>
- <20150604141938.GO3140@localhost>
- <20150604150946.GA17733@odux.rfo.atmel.com>
-Message-ID: <20150604155201.GP3140@localhost>
+From: msalter@redhat.com (Mark Salter)
+Date: Thu, 04 Jun 2015 11:51:45 -0400
+Subject: [Patch v4 0/8] Consolidate ACPI PCI root common code into ACPI
+ core
+In-Reply-To: <556FF32B.9010900@linux.intel.com>
+References: <1433225576-8215-1-git-send-email-jiang.liu@linux.intel.com>
+ <556F6332.2040501@redhat.com> <556FAFEF.6040802@linux.intel.com>
+ <556FF0AD.6000901@linaro.org> <556FF32B.9010900@linux.intel.com>
+Message-ID: <1433433105.24429.30.camel@deneb.redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 04, 2015 at 05:09:46PM +0200, Ludovic Desroches wrote:
-> > > @@ -591,11 +592,13 @@ at_xdmac_prep_slave_sg(struct dma_chan *chan, struct scatterlist *sgl,
-> > >  		       unsigned int sg_len, enum dma_transfer_direction direction,
-> > >  		       unsigned long flags, void *context)
-> > >  {
-> > > -	struct at_xdmac_chan	*atchan = to_at_xdmac_chan(chan);
-> > > -	struct at_xdmac_desc	*first = NULL, *prev = NULL;
-> > > -	struct scatterlist	*sg;
-> > > -	int			i;
-> > > -	unsigned int		xfer_size = 0;
-> > > +	struct at_xdmac_chan		*atchan = to_at_xdmac_chan(chan);
-> > > +	struct at_xdmac_desc		*first = NULL, *prev = NULL;
-> > > +	struct scatterlist		*sg;
-> > > +	int				i;
-> > > +	unsigned int			xfer_size = 0;
-> > > +	unsigned long			irqflags;
-> > > +	struct dma_async_tx_descriptor	*ret = NULL;
-> > This doesnt comply with stable rules, and you should not keep this in fixes
-> > either :(
+On Thu, 2015-06-04 at 14:41 +0800, Jiang Liu wrote:
+> On 2015/6/4 14:31, Hanjun Guo wrote:
+> > Hi Jiang,
 > > 
-> >   - It cannot contain any "trivial" fixes in it (spelling changes,
-> >     whitespace cleanups, etc).
+> > On 2015?06?04? 09:54, Jiang Liu wrote:
+> >> On 2015/6/4 4:27, Al Stone wrote:
+> >>> On 06/02/2015 12:12 AM, Jiang Liu wrote:
+> >>>> This patch set consolidates common code to support ACPI PCI root on x86
+> >>>> and IA64 platforms into ACPI core, to reproduce duplicated code and
+> >>>> simplify maintenance. And a patch set based on this to support ACPI
+> >>>> based
+> >>>> PCIe host bridge on ARM64 has been posted at:
+> >>>
+> >>> Link is missing (or it's a typo of some flavor).
+> >> HI Al,
+> >>     Sorry, I missed the link. It has been posted at:
+> >> https://lkml.org/lkml/2015/5/26/207
+> > 
+> > I failed to get io resources for PCI hostbridge  when I was testing PCI
+> > on ARM64 QEMU, I debugged this for quite a while, and finally found out
+> > that ACPI resource parsing for IO is not suitable for ARM64, because io
+> > space for x86 is 64K, but 16M for ARM64.
+> > 
+> > This issue is only found when the firmware representing the io resource
+> > using the type ACPI_RESOURCE_TYPE_ADDRESS32, so the io address will
+> > greater than 64k.
+> > 
+> > In drivers/acpi/resource.c:
+> > 
+> > static void acpi_dev_ioresource_flags(struct resource *res, u64 len,
+> >                                       u8 io_decode, u8 translation_type)
+> > {
+> >         res->flags = IORESOURCE_IO;
+> > 
+> > [...]
+> > 
+> >         if (res->end >= 0x10003)
+> >                 res->flags |= IORESOURCE_DISABLED | IORESOURCE_UNSET;
+> > 
+> > [...]
+> > }
+> > 
+> > so the code will filter out res->end >= 0x10003, and in my case, it will
+> > more than 64K, so we can't get the IO resources.
+> > 
+> > I got a question, why we use if (res->end >= 0x10003) here?
+> > I mean 64k will be 0x10000, and in that case, we should use
+> > if (res->end >= 0x10000) here, not 0x10003, any history behind that?
 > 
-> Ok I understand, so what is the way to manage this case? I did
-> "whitespace cleanup" because of
-> +   struct dma_async_tx_descriptor  *ret = NULL;
-> which breaks previous indentation, so in my mind it was not cleanup.
+> Hi Hanjun,
+> This is a special tricky for x86. You may read a dword(four bytes) from
+> IO port 0xffff, so the effective io port space is 0x10003 bytes.
 > 
-> Do I need to send you a patch to correct identation due to this fix or to send
-> a specific patch for stable without identation change?
-I think only adding the last line should do, in whatever indentation you
-prefer
 
-Later on if you want to align them to whatever alignment you prefer send a
-follow on patch
-
-Also on 2nd patch, it looks good, but was wondering if you could split it
-up. This will help folks backporting the changes to stable as well
-
-Thanks
--- 
-~Vinod
+Is there something in ACPI spec which would limit PCI IO space to 64K?
+PCI itself allows 32-bit IO addresses and at least some arm64 platforms
+use PCI bus addresses above 64K for IO transactions. From a PCI view,
+the (res->end >= 0x10003) check doesn't make sense. Am I missing
+something?
