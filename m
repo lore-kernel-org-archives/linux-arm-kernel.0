@@ -1,62 +1,77 @@
 From: jiang.liu@linux.intel.com (Jiang Liu)
-Date: Thu,  4 Jun 2015 12:13:19 +0800
-Subject: [RFT v2 09/48] ARM,
- irq: Use irq_desc_get_xxx() to avoid redundant lookup of irq_desc
+Date: Thu,  4 Jun 2015 12:13:23 +0800
+Subject: [RFT v2 13/48] keystone,
+ irq: Use irq_data_get_xxx() to avoid redundant lookup of irq_data
 In-Reply-To: <1433391238-19471-1-git-send-email-jiang.liu@linux.intel.com>
 References: <1433391238-19471-1-git-send-email-jiang.liu@linux.intel.com>
-Message-ID: <1433391238-19471-10-git-send-email-jiang.liu@linux.intel.com>
+Message-ID: <1433391238-19471-14-git-send-email-jiang.liu@linux.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use irq_desc_get_xxx() to avoid redundant lookup of irq_desc while we
-already have a pointer to corresponding irq_desc.
+Use irq_data_get_xxx() to avoid redundant lookup of irq_data while we
+already have a pointer to corresponding irq_data.
 
 Signed-off-by: Jiang Liu <jiang.liu@linux.intel.com>
-Acked-by: Russell King <rmk+kernel@arm.linux.org.uk>
 ---
- arch/arm/common/locomo.c   |    2 +-
- arch/arm/common/sa1111.c   |    2 +-
- arch/arm/plat-orion/gpio.c |    2 +-
- 3 files changed, 3 insertions(+), 3 deletions(-)
+ drivers/pci/host/pci-keystone-dw.c |   15 ++++++---------
+ 1 file changed, 6 insertions(+), 9 deletions(-)
 
-diff --git a/arch/arm/common/locomo.c b/arch/arm/common/locomo.c
-index b55c3625d7ee..02af4a07ceca 100644
---- a/arch/arm/common/locomo.c
-+++ b/arch/arm/common/locomo.c
-@@ -140,7 +140,7 @@ static struct locomo_dev_info locomo_devices[] = {
- 
- static void locomo_handler(unsigned int irq, struct irq_desc *desc)
+diff --git a/drivers/pci/host/pci-keystone-dw.c b/drivers/pci/host/pci-keystone-dw.c
+index f34892e0edb4..e42d077039d3 100644
+--- a/drivers/pci/host/pci-keystone-dw.c
++++ b/drivers/pci/host/pci-keystone-dw.c
+@@ -104,14 +104,13 @@ static void ks_dw_pcie_msi_irq_ack(struct irq_data *d)
  {
--	struct locomo *lchip = irq_get_chip_data(irq);
-+	struct locomo *lchip = irq_desc_get_chip_data(desc);
- 	int req, i;
+ 	u32 offset, reg_offset, bit_pos;
+ 	struct keystone_pcie *ks_pcie;
+-	unsigned int irq = d->irq;
+ 	struct msi_desc *msi;
+ 	struct pcie_port *pp;
  
- 	/* Acknowledge the parent IRQ */
-diff --git a/arch/arm/common/sa1111.c b/arch/arm/common/sa1111.c
-index 5cc779c8e9c6..0d0844fa54c2 100644
---- a/arch/arm/common/sa1111.c
-+++ b/arch/arm/common/sa1111.c
-@@ -200,7 +200,7 @@ static void
- sa1111_irq_handler(unsigned int irq, struct irq_desc *desc)
+-	msi = irq_get_msi_desc(irq);
++	msi = irq_data_get_msi_desc(d);
+ 	pp = sys_to_pcie(msi->dev->bus->sysdata);
+ 	ks_pcie = to_keystone_pcie(pp);
+-	offset = irq - irq_linear_revmap(pp->irq_domain, 0);
++	offset = d->irq - irq_linear_revmap(pp->irq_domain, 0);
+ 	update_reg_offset_bit_pos(offset, &reg_offset, &bit_pos);
+ 
+ 	writel(BIT(bit_pos),
+@@ -142,15 +141,14 @@ void ks_dw_pcie_msi_clear_irq(struct pcie_port *pp, int irq)
+ static void ks_dw_pcie_msi_irq_mask(struct irq_data *d)
  {
- 	unsigned int stat0, stat1, i;
--	struct sa1111 *sachip = irq_get_handler_data(irq);
-+	struct sa1111 *sachip = irq_desc_get_handler_data(desc);
- 	void __iomem *mapbase = sachip->base + SA1111_INTC;
+ 	struct keystone_pcie *ks_pcie;
+-	unsigned int irq = d->irq;
+ 	struct msi_desc *msi;
+ 	struct pcie_port *pp;
+ 	u32 offset;
  
- 	stat0 = sa1111_readl(mapbase + SA1111_INTSTATCLR0);
-diff --git a/arch/arm/plat-orion/gpio.c b/arch/arm/plat-orion/gpio.c
-index 5168a52a17f9..caba04340619 100644
---- a/arch/arm/plat-orion/gpio.c
-+++ b/arch/arm/plat-orion/gpio.c
-@@ -409,7 +409,7 @@ static int gpio_irq_set_type(struct irq_data *d, u32 type)
+-	msi = irq_get_msi_desc(irq);
++	msi = irq_data_get_msi_desc(d);
+ 	pp = sys_to_pcie(msi->dev->bus->sysdata);
+ 	ks_pcie = to_keystone_pcie(pp);
+-	offset = irq - irq_linear_revmap(pp->irq_domain, 0);
++	offset = d->irq - irq_linear_revmap(pp->irq_domain, 0);
  
- static void gpio_irq_handler(unsigned irq, struct irq_desc *desc)
+ 	/* Mask the end point if PVM implemented */
+ 	if (IS_ENABLED(CONFIG_PCI_MSI)) {
+@@ -164,15 +162,14 @@ static void ks_dw_pcie_msi_irq_mask(struct irq_data *d)
+ static void ks_dw_pcie_msi_irq_unmask(struct irq_data *d)
  {
--	struct orion_gpio_chip *ochip = irq_get_handler_data(irq);
-+	struct orion_gpio_chip *ochip = irq_desc_get_handler_data(desc);
- 	u32 cause, type;
- 	int i;
+ 	struct keystone_pcie *ks_pcie;
+-	unsigned int irq = d->irq;
+ 	struct msi_desc *msi;
+ 	struct pcie_port *pp;
+ 	u32 offset;
  
+-	msi = irq_get_msi_desc(irq);
++	msi = irq_data_get_msi_desc(d);
+ 	pp = sys_to_pcie(msi->dev->bus->sysdata);
+ 	ks_pcie = to_keystone_pcie(pp);
+-	offset = irq - irq_linear_revmap(pp->irq_domain, 0);
++	offset = d->irq - irq_linear_revmap(pp->irq_domain, 0);
+ 
+ 	/* Mask the end point if PVM implemented */
+ 	if (IS_ENABLED(CONFIG_PCI_MSI)) {
 -- 
 1.7.10.4
