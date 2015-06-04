@@ -1,154 +1,68 @@
 From: ivan.ivanov@linaro.org (Ivan T. Ivanov)
-Date: Thu,  4 Jun 2015 12:19:01 +0300
-Subject: [PATCH 2/7] arm64: dts: qcom: Add msm8916 BLSP device nodes
+Date: Thu,  4 Jun 2015 12:19:02 +0300
+Subject: [PATCH 3/7] arm64: dts: qcom: Add msm8916 sdhci configuration nodes
 In-Reply-To: <1433409546-23995-1-git-send-email-ivan.ivanov@linaro.org>
 References: <1433409546-23995-1-git-send-email-ivan.ivanov@linaro.org>
-Message-ID: <1433409546-23995-3-git-send-email-ivan.ivanov@linaro.org>
+Message-ID: <1433409546-23995-4-git-send-email-ivan.ivanov@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add device nodes for SPI1, SPI2, SPI3, I2C4, SPI5, SPI6 and
-BAM(DMA) engine connected to them.
+From: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
 
-Signed-off-by: Stanimir Varbanov <stanimir.varbanov@linaro.org>
+Add sdhci1 and sdhci2 device configuration nodes.
+
+Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
 Signed-off-by: Ivan T. Ivanov <ivan.ivanov@linaro.org>
 ---
- arch/arm64/boot/dts/qcom/msm8916.dtsi | 128 ++++++++++++++++++++++++++++++++++
- 1 file changed, 128 insertions(+)
+ arch/arm64/boot/dts/qcom/msm8916.dtsi | 34 +++++++++++++++++++++++++++++++++-
+ 1 file changed, 33 insertions(+), 1 deletion(-)
 
 diff --git a/arch/arm64/boot/dts/qcom/msm8916.dtsi b/arch/arm64/boot/dts/qcom/msm8916.dtsi
-index 9ab9a92..6681c65 100644
+index 6681c65..9ff0eb4 100644
 --- a/arch/arm64/boot/dts/qcom/msm8916.dtsi
 +++ b/arch/arm64/boot/dts/qcom/msm8916.dtsi
-@@ -108,6 +108,134 @@
+@@ -24,7 +24,10 @@
+ 	#address-cells = <2>;
+ 	#size-cells = <2>;
+
+-	aliases { };
++	aliases {
++		sdhc1 = &sdhc_1; /* SDC1 eMMC slot */
++		sdhc2 = &sdhc_2; /* SDC2 SD card slot */
++	};
+
+ 	chosen { };
+
+@@ -236,6 +239,35 @@
  			status = "disabled";
  		};
 
-+		blsp_dma: dma at 7884000 {
-+			compatible = "qcom,bam-v1.7.0";
-+			reg = <0x07884000 0x23000>;
-+			interrupts = <GIC_SPI 238 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&gcc GCC_BLSP1_AHB_CLK>;
-+			clock-names = "bam_clk";
-+			#dma-cells = <1>;
-+			qcom,ee = <0>;
-+			status = "disabled";
-+		};
++		sdhc_1: sdhci at 07824000 {
++			compatible = "qcom,sdhci-msm-v4";
++			reg = <0x07824900 0x11c>, <0x07824000 0x800>;
++			reg-names = "hc_mem", "core_mem";
 +
-+		blsp_spi1: spi at 78b5000 {
-+			compatible = "qcom,spi-qup-v2.2.1";
-+			reg = <0x078b5000 0x600>;
-+			interrupts = <GIC_SPI 95 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&gcc GCC_BLSP1_QUP1_SPI_APPS_CLK>,
-+				 <&gcc GCC_BLSP1_AHB_CLK>;
++			interrupts = <0 123 0>, <0 138 0>;
++			interrupt-names = "hc_irq", "pwr_irq";
++			clocks = <&gcc GCC_SDCC1_APPS_CLK>,
++				 <&gcc GCC_SDCC1_AHB_CLK>;
 +			clock-names = "core", "iface";
-+			dmas = <&blsp_dma 5>, <&blsp_dma 4>;
-+			dma-names = "rx", "tx";
-+			pinctrl-names = "default", "sleep";
-+			pinctrl-0 = <&spi1_default>;
-+			pinctrl-1 = <&spi1_sleep>;
-+			#address-cells = <1>;
-+			#size-cells = <0>;
++			bus-width = <8>;
++			non-removable;
 +			status = "disabled";
 +		};
 +
-+		blsp_spi2: spi at 78b6000 {
-+			compatible = "qcom,spi-qup-v2.2.1";
-+			reg = <0x078b6000 0x600>;
-+			interrupts = <GIC_SPI 96 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&gcc GCC_BLSP1_QUP2_SPI_APPS_CLK>,
-+				 <&gcc GCC_BLSP1_AHB_CLK>;
++		sdhc_2: sdhci at 07864000 {
++			compatible = "qcom,sdhci-msm-v4";
++			reg = <0x07864900 0x11c>, <0x07864000 0x800>;
++			reg-names = "hc_mem", "core_mem";
++
++			interrupts = <0 125 0>, <0 221 0>;
++			interrupt-names = "hc_irq", "pwr_irq";
++			clocks = <&gcc GCC_SDCC2_APPS_CLK>,
++				 <&gcc GCC_SDCC2_AHB_CLK>;
 +			clock-names = "core", "iface";
-+			dmas = <&blsp_dma 7>, <&blsp_dma 6>;
-+			dma-names = "rx", "tx";
-+			pinctrl-names = "default", "sleep";
-+			pinctrl-0 = <&spi2_default>;
-+			pinctrl-1 = <&spi2_sleep>;
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			status = "disabled";
-+		};
-+
-+		blsp_spi3: spi at 78b7000 {
-+			compatible = "qcom,spi-qup-v2.2.1";
-+			reg = <0x078b7000 0x600>;
-+			interrupts = <GIC_SPI 97 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&gcc GCC_BLSP1_QUP3_SPI_APPS_CLK>,
-+				 <&gcc GCC_BLSP1_AHB_CLK>;
-+			clock-names = "core", "iface";
-+			dmas = <&blsp_dma 9>, <&blsp_dma 8>;
-+			dma-names = "rx", "tx";
-+			pinctrl-names = "default", "sleep";
-+			pinctrl-0 = <&spi3_default>;
-+			pinctrl-1 = <&spi3_sleep>;
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			status = "disabled";
-+		};
-+
-+		blsp_spi4: spi at 78b8000 {
-+			compatible = "qcom,spi-qup-v2.2.1";
-+			reg = <0x078b8000 0x600>;
-+			interrupts = <GIC_SPI 98 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&gcc GCC_BLSP1_QUP4_SPI_APPS_CLK>,
-+				 <&gcc GCC_BLSP1_AHB_CLK>;
-+			clock-names = "core", "iface";
-+			dmas = <&blsp_dma 11>, <&blsp_dma 10>;
-+			dma-names = "rx", "tx";
-+			pinctrl-names = "default", "sleep";
-+			pinctrl-0 = <&spi4_default>;
-+			pinctrl-1 = <&spi4_sleep>;
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			status = "disabled";
-+		};
-+
-+		blsp_spi5: spi at 78b9000 {
-+			compatible = "qcom,spi-qup-v2.2.1";
-+			reg = <0x078b9000 0x600>;
-+			interrupts = <GIC_SPI 99 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&gcc GCC_BLSP1_QUP5_SPI_APPS_CLK>,
-+				 <&gcc GCC_BLSP1_AHB_CLK>;
-+			clock-names = "core", "iface";
-+			dmas = <&blsp_dma 13>, <&blsp_dma 12>;
-+			dma-names = "rx", "tx";
-+			pinctrl-names = "default", "sleep";
-+			pinctrl-0 = <&spi5_default>;
-+			pinctrl-1 = <&spi5_sleep>;
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			status = "disabled";
-+		};
-+
-+		blsp_spi6: spi at 78ba000 {
-+			compatible = "qcom,spi-qup-v2.2.1";
-+			reg = <0x078ba000 0x600>;
-+			interrupts = <GIC_SPI 100 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&gcc GCC_BLSP1_QUP6_SPI_APPS_CLK>,
-+				 <&gcc GCC_BLSP1_AHB_CLK>;
-+			clock-names = "core", "iface";
-+			dmas = <&blsp_dma 15>, <&blsp_dma 14>;
-+			dma-names = "rx", "tx";
-+			pinctrl-names = "default", "sleep";
-+			pinctrl-0 = <&spi6_default>;
-+			pinctrl-1 = <&spi6_sleep>;
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			status = "disabled";
-+		};
-+
-+		blsp_i2c4: i2c at 78b8000 {
-+			compatible = "qcom,i2c-qup-v2.2.1";
-+			reg = <0x78b8000 0x1000>;
-+			interrupts = <GIC_SPI 98 0>;
-+			clocks = <&gcc GCC_BLSP1_AHB_CLK>,
-+				<&gcc GCC_BLSP1_QUP4_I2C_APPS_CLK>;
-+			clock-names = "iface", "core";
-+			pinctrl-names = "default", "sleep";
-+			pinctrl-0 = <&i2c4_default>;
-+			pinctrl-1 = <&i2c4_sleep>;
-+			#address-cells = <1>;
-+			#size-cells = <0>;
++			bus-width = <4>;
 +			status = "disabled";
 +		};
 +
