@@ -1,235 +1,59 @@
-From: Tirumalesh.Chalamarla@caviumnetworks.com (Chalamarla, Tirumalesh)
-Date: Thu, 4 Jun 2015 22:19:30 +0000
-Subject: Master-aware devices and sideband ID data
-In-Reply-To: <20150601102208.GD22406@leverpostej>
-References: <20150324155007.GC23005@leverpostej>
- <26BE36EF-2C5B-4DA6-8950-8FEBB031ED1B@caviumnetworks.com>
- <20150527173953.GC23176@leverpostej>
- <E342D737-5DD5-48C7-BB01-B83C29CB6E31@caviumnetworks.com>
- <20150601102208.GD22406@leverpostej>
-Message-ID: <158EFC9F-FCAF-44D3-AD40-804EDFE0CE25@caviumnetworks.com>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Thu, 4 Jun 2015 15:20:57 -0700
+Subject: [RFC/NOT FOR MERGING] HACK: add global/private timers for A9
+In-Reply-To: <20150604202943.GH5710@saruman.tx.rr.com>
+References: <1433363565-17725-1-git-send-email-balbi@ti.com>
+ <2466648.WjMxjIpAUG@wuerfel>
+ <20150603210455.GD6042@saruman.tx.rr.com>
+ <20150603212821.GH6042@saruman.tx.rr.com>
+ <556F7493.2060602@codeaurora.org>
+ <20150603215445.GK6042@saruman.tx.rr.com> <55701E93.60303@free.fr>
+ <20150604200850.GF5710@saruman.tx.rr.com>
+ <20150604201825.GG5710@saruman.tx.rr.com>
+ <20150604202943.GH5710@saruman.tx.rr.com>
+Message-ID: <20150604222057.GA8099@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-> On Jun 1, 2015, at 3:22 AM, Mark Rutland <mark.rutland@arm.com> wrote:
+On 06/04, Felipe Balbi wrote:
+> On Thu, Jun 04, 2015 at 03:18:25PM -0500, Felipe Balbi wrote:
+> > On Thu, Jun 04, 2015 at 03:08:50PM -0500, Felipe Balbi wrote:
+> > > Hi,
+> > > 
+> > > On Thu, Jun 04, 2015 at 11:46:59AM +0200, Mason wrote:
+> > > > Also, check /proc/timer_list for a "Broadcast device". If you don't
+> > > > define one, the TWD timers are set to periodic mode, with hrtimers
+> > > > disabled.
+> > > 
+> > > Did you manage to turn global timer into Broadcast device ?
+> > 
+> > arm_global_timer is marked PERCPU, so it will never be chosen as
+> > broadcast.
 > 
-> On Fri, May 29, 2015 at 06:46:07PM +0100, Chalamarla, Tirumalesh wrote:
->> 
->>> On May 27, 2015, at 10:39 AM, Mark Rutland <mark.rutland@arm.com> wrote:
->>> 
->>> On Tue, May 26, 2015 at 11:20:59PM +0100, Chalamarla, Tirumalesh wrote:
->>>> This is some thing we also like to see in ITS and SMMU drivers. 
->>>>> On Mar 24, 2015, at 8:50 AM, Mark Rutland <mark.rutland@arm.com> wrote:
->>>>> 
->>>>> Hi all,
->>>>> 
->>>>> For some devices, identification of particular masters is critical to
->>>>> their operation (e.g. IOMMUs, MSI controllers). The identity of masters
->>>>> is determined from sideband signals on the bus, and it may or may not be
->>>>> possible to probe and/or configure this information. Worse still, these
->>>>> information may be rewritten by intermediate buses, so the
->>>>> information for a given master may differ at different points in the bus
->>>>> hierarchy.
->>>>> 
->>>>> We currently describe this master information for devices attached to
->>>>> IOMMUs, with a master ID being encoded in the iommu-cells. However this
->>>>> only covers the ID between the master and its IOMMU(s), and we don't
->>>>> currently have a mechanism to describe the master IDs as they are seen
->>>>> by devices beyond the IOMMU(s), or in the absence of any IOMMU(s).
->>>>> 
->>>>> The following are example of master IDs:
->>>>> * PCIe Requester IDs (RIDs) (bus:device.function AKA BDF)
->>>>> * SMMU Stream IDs (SIDs)
->>>>> * GICv3 ITS Device IDs (DIDs)
->>>>> 
->>>>> In the case of a system with PCIe, SMMU and GICv3, the master IDs are
->>>>> rewritten in a chain of RID=>SID=>DID, as in the following diagram:
->>>>> 
->>>>> +-------------+
->>>>> | PCIe master |
->>>>> +-------------+
->>>>>  ||
->>>>>  || Requester ID (RID)
->>>>>  || Probeable from RC.
->>>>>  \/
->>>>> +-------------------+
->>>>> | PCIe Root Complex |
->>>>> +-------------------+
->>>>>  ||
->>>>>  || SMMU Stream ID (SID)
->>>>>  || Derived from RID, static non-probeable mapping.
->>>>>  \/
->>>>> +--------------+
->>>>> | SMMU (IOMMU) |
->>>>> +--------------+
->>>>>  ||
->>>>>  || ITS Device ID (DID)
->>>>>  || Derived from SID, static non-probeable mapping.
->>>>>  \/
->>>>> +----------------------------+
->>>>> | GICv3 ITS (MSI controller) |
->>>>> +----------------------------+
->>>>> 
->>>>> In simpler cases, you might have a simpler set of master ID
->>>>> translations, e.g. just a DID:
->>>>> 
->>>>> +-----------------+
->>>>> | Platform device |
->>>>> +-----------------+
->>>>>  ||
->>>>>  || ITS Device ID (DID)
->>>>>  || Hard-wired on the bus.
->>>>>  \/
->>>>> +----------------------------+
->>>>> | GICv3 ITS (MSI controller) |
->>>>> +----------------------------+
->>>>> 
->>>>> Ignoring current bindings for the moment, I can see how we can describe
->>>>> this with a generic master id-binding, with master-id-map along the
->>>>> lines of interrupt-map, with a tuple format like:
->>>>> <child-id-base child-id-length parent parent-id-base>
->>>>> 
->>>>> For the PCIe example, this would look something like the following (with
->>>>> properties omitted for brevity):
->>>>> 
->>>>> PCI: pci at af000000 {
->>>>> 	...
->>>>> 	
->>>>> 	/* Requester ID of PCIe endpoints, implicit at runtime */
->>>>> 	master-id-cells = <1>;
->>>>> 
->>>>> 	/* RIDS idmapped to SIDS @ SMMU */
->>>>> 	master-id-map = <0 0x10000 &SMMU 0>;
->>>>> }
->>>>> 
->>>>> SMMU: iommu at bf000000 {
->>>>> 	...
->>>>> 
->>>>> 	/* SID, derived from RID */
->>>>> 	master-id-cells = <1>;
->>>>> 
->>>>> 	/* 
->>>>> 	 * For some reason the high bit of the ID was negated.
->>>>> 	 */
->>>>> 	master-id-map = <0x0000 0x8000 &ITS 0x0 0x8000>,
->>>>> 	                <0x8000 0x8000 &ITS 0x0 0x0000>;
->>>>> 
->>>>> };
->>>>> 
->>>>> ITS: its at cf000000 {
->>>>> 	...
->>>>> 
->>>>> 	/* DID, derived from SID */
->>>>> 	master-id-cells = <2>;
->>>>> 
->>>>> 	/* 
->>>>> 	 * Master traffic not propagated beyond this point, so no
->>>>> 	 * master-id-ranges
->>>>> 	 */
->>>>> };
->>>> 
->>>> I think it is nice to have max IDs supported by masters. so that drivers can check and enforce.  
->>> 
->>> The set of IDs that we expect to transform (i.e. those masters use)
->>> would be implicit in the first master-id-map from a master. In the PCI
->>> example above, no master is expected to generate an ID outside of the
->>> range 0-0x10000 inclusive (and that's all the SMMU would see).
->>> 
->>> For devices which are not hotpluggable, the nodes for those devices
->>> would describe the specific set of IDs they use.
->>> 
->>> Generally, between a master and a slave there might not be one
->>> contiguous set of valid IDs as these may be rewritten along the way (as
->>> happens at the SMMU between the PCI root complex and the ITS in the
->>> example above).
->>> 
->>> Which drivers do you think need this information? What exactly are they
->>> trying to check and enforce?
->>> 
->> 
->> I think, i miss understood by the names, so it is not base it is some thing like
->> 
->> x => f(x) => y           (and f(x) is bitwise | )
->> 
->> ok now i see it. 
+> Perhaps this is acceptable ?
 > 
-> It's subtraction and addition rather than bitwise ORing.
-> 
-> Consider a SID 0x8040 entering the SMMU. This falls in the range
-> described by the SMMU's second master-id-map entry (I've added brackets
-> to separate each entry:
-> 
-> <(0x8000) (0x8000) (&ITS) (0x0 0x0000)>
-> 
-> As 0x8040 falls in the range described by the first two elements, we kow
-> we can translate the ID to calculate the ID at the ITS. To do so, we
-> subtract the child-id-base (0x8000), and add the parent-id-base (0x0
-> 0x0000). That give us 0x0 0x0040 as our ITS device ID.
-
-fine.
-> 
->>>>> For the simpler case, this would look something like:
->>>>> 
->>>>> DEV: device at af000000 {
->>>>> 	master-id-cells = <1>;
->>>>> 	master-ids = <0xf>, <0xb>;
->>>>> 	master-id-map = <0 0xf &ITS 0 0>;
->>>>> };
->>>>> 
->>>>> ITS: its at cf000000 {
->>>>> 	...
->>>>> 
->>>>> 	/* DID */
->>>>> 	master-id-cells = <2>;
->>>>> };
->>>>> 
->>>> Is this is not depending heavily on discover order, how do drivers
->>>> know which device to get which ID. is it implicitly assumed in
->>>> discovery order? 
->>> 
->>> I'm not sure I follow the question. Could you elaborate?
->>> 
->>>> what happens to hot pluggable devices.  
->>> 
->>> It would be necessary to be able to discover the ID assigned to the
->>> device by the hotpluggable bus. For example, this could depend on which
->>> slot the device is plugged into.
->>> 
->>> If you can't discover the ID associated with a hotpluggable device from
->>> the bus it is plugged into I can't see how hotplug could work.
->>> 
->>> From that point on I would expect the ID transformations to be static as
->>> in the example.
->>> 
->> 
->> what if i have an SMMU with two ITS masters and i want to decide which
->> one to use based on runtime like which CPU i am serving.
->> 
->> i am thinking in terms go NUMA based systems, where my pci device is
->> on node 0, if the interrupt is targeted to CPU on node 1, i would like
->> to use ITS1, otherwise 
->> ITS0. 
-> 
-> The binding can express that both these translation paths exist. For
-> example, on the SMMU node you could have:
-> 
-> master-id-map = <0x0000 0x8000 &ITS_1 0x0 0x0000>,
->                <0x0000 0x8000 &ITS_2 0x0 0x0000>;
-> 
-> Which would mean that master IDs are idmapped to both ITS instances.
-> 
->> is it possible to specify some thing like that or do you think its is
->> best to leave to ITS driver. 
-> 
-> It's possible to specify that the paths exist. I expect that software
-> would select which to use at runtime.
+> diff --git a/drivers/clocksource/arm_global_timer.c b/drivers/clocksource/arm_global_timer.c
+> index e6833771a716..8c0170ac367d 100644
+> --- a/drivers/clocksource/arm_global_timer.c
+> +++ b/drivers/clocksource/arm_global_timer.c
+> @@ -169,8 +169,9 @@ static int gt_clockevents_init(struct clock_event_device *clk)
+>  	int cpu = smp_processor_id();
+>  
+>  	clk->name = "arm_global_timer";
+> -	clk->features = CLOCK_EVT_FEAT_PERIODIC | CLOCK_EVT_FEAT_ONESHOT |
+> -		CLOCK_EVT_FEAT_PERCPU;
+> +	clk->features = CLOCK_EVT_FEAT_PERIODIC | CLOCK_EVT_FEAT_ONESHOT;
+> +	if (is_smp() || setup_max_cpus)
+> +		clk->features |= CLOCK_EVT_FEAT_PERCPU;
+>  	clk->set_mode = gt_clockevent_set_mode;
+>  	clk->set_next_event = gt_clockevent_set_next_event;
+>  	clk->cpumask = cpumask_of(cpu);
 > 
 
-My worry is how to define any priorities/preferences between masters. 
-in general the proposal looks reasonable.
+What is this doing? Allowing the global timer to become the
+broadcast timer? Can you share all the clockevents that are being
+registered in the system and what ratings and features they have?
 
-Thanks,
-Tirumalesh.   
-> Thanks,
-> Mark.
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
