@@ -1,53 +1,44 @@
-From: vaibhav.hiremath@linaro.org (Vaibhav Hiremath)
-Date: Thu, 04 Jun 2015 11:16:09 +0530
-Subject: [PATCH 04/12] i2c: pxa: Add support for pxa910/988 & new
- configuration features
-In-Reply-To: <20150604023146.GF6696@yizhang>
-References: <1432818224-17070-1-git-send-email-vaibhav.hiremath@linaro.org>
- <1432818224-17070-5-git-send-email-vaibhav.hiremath@linaro.org>
- <874mmvyvzw.fsf@belgarion.home> <20150604023146.GF6696@yizhang>
-Message-ID: <556FE621.8060502@linaro.org>
+From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
+Date: Thu, 4 Jun 2015 14:52:58 +0900
+Subject: [PATCH v4 3/7] selftests/kdbus: install kdbus-test
+In-Reply-To: <554A772C.8000904@osg.samsung.com>
+References: <1429656651-9427-1-git-send-email-tyler.baker@linaro.org>
+ <554A772C.8000904@osg.samsung.com>
+Message-ID: <20150604055258.GA1588@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Wed, May 06, 2015 at 02:18:52PM -0600, Shuah Khan wrote:
+> On 04/21/2015 04:50 PM, Tyler Baker wrote:
+> > Set TEST_PROGS so that kdbus-test is installed.
+> > 
+> > Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+> > Acked-by: Michael Ellerman <mpe@ellerman.id.au>
+> > Signed-off-by: Tyler Baker <tyler.baker@linaro.org>
+> > ---
+> >  tools/testing/selftests/kdbus/Makefile | 2 ++
+> >  1 file changed, 2 insertions(+)
+> > 
+> > diff --git a/tools/testing/selftests/kdbus/Makefile b/tools/testing/selftests/kdbus/Makefile
+> > index de8242f..94ea75b 100644
+> > --- a/tools/testing/selftests/kdbus/Makefile
+> > +++ b/tools/testing/selftests/kdbus/Makefile
+> > @@ -41,6 +41,8 @@ include ../lib.mk
+> >  kdbus-test: $(OBJS)
+> >  	$(CC) $(CFLAGS) $^ $(LDLIBS) -o $@
+> >  
+> > +TEST_PROGS := kdbus-test
+> > +
+> >  run_tests:
+> >  	./kdbus-test --tap
+> >  
+> > 
+> 
+> Please hang on to this for a bit until kdbus makes it in.
+> For now I can't apply this one.
 
+I've applied it to my kdbus repo now.
 
-On Thursday 04 June 2015 08:01 AM, Yi Zhang wrote:
-> On Fri, May 29, 2015 at 10:22:27PM +0200, Robert Jarzmik wrote:
->> Vaibhav Hiremath <vaibhav.hiremath@linaro.org> writes:
->>
->>> @@ -167,6 +184,8 @@ struct pxa_i2c {
->>>   #define _ICR(i2c)	((i2c)->reg_icr)
->>>   #define _ISR(i2c)	((i2c)->reg_isr)
->>>   #define _ISAR(i2c)	((i2c)->reg_isar)
->>> +#define _ILCR(i2c)	((i2c)->reg_ilcr)
->>> +#define _IWCR(i2c)	((i2c)->reg_iwcr)
->>>
->>>   /*
->>>    * I2C Slave mode address
->>> @@ -467,11 +486,16 @@ static void i2c_pxa_reset(struct pxa_i2c *i2c)
->>>   	if (i2c->reg_isar)
->>>   		writel(i2c->slave_addr, _ISAR(i2c));
->>>   #endif
->>> -
->> Not in this patch.
->>
->>>   	/* set control register values */
->>>   	writel(I2C_ICR_INIT | (i2c->fast_mode ? ICR_FM : 0), _ICR(i2c));
->>>   	writel(readl(_ICR(i2c)) | (i2c->high_mode ? ICR_HS : 0), _ICR(i2c));
->>>
->>> +	if (i2c->ilcr)
->>> +		writel(i2c->ilcr, _ILCR(i2c));
->>> +	if (i2c->iwcr)
->>> +		writel(i2c->iwcr, _IWCR(i2c));
->>> +	udelay(2);
->> This is a magical 2us. Where does it come from ?
->
->    This delay can be removed, if writing LCR and WCR before enabling this
->    i2c controller, it's safe enough; and they should not be changed when
->    there is bus activity.
+thanks,
 
-I have already removed it in my next version.
-
-Thanks,
-Vaibhav
+greg k-h
