@@ -1,50 +1,97 @@
 From: geert+renesas@glider.be (Geert Uytterhoeven)
-Date: Thu,  4 Jun 2015 20:53:31 +0200
-Subject: [PATCH/RFC 05/15] ARM: shmobile: r8a7793 dtsi: Add L2
- cache-controller node
+Date: Thu,  4 Jun 2015 20:53:37 +0200
+Subject: [PATCH/RFC 11/15] ARM: shmobile: r8a7779 dtsi: Add SYSC PM domains
 In-Reply-To: <1433444021-22167-1-git-send-email-geert+renesas@glider.be>
 References: <1433444021-22167-1-git-send-email-geert+renesas@glider.be>
-Message-ID: <1433444021-22167-6-git-send-email-geert+renesas@glider.be>
+Message-ID: <1433444021-22167-12-git-send-email-geert+renesas@glider.be>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add a device node for the L2 cache:
-  - The L2 cache for the Cortex-A15 CPU cores is 1 MiB large (organized
-    as 64 KiB x 16 ways), and requires the following settings:
-      - Tag RAM latency: 3 cycles,
-      - Data RAM latency: 4 cycles,
-      - Data RAM setup: 0 cycles.
+Add a device node for the System Controller, with subnodes that
+represent the hardware power area hierarchy.
+Hook up ARM CPU cores 1-3 to their respective PM domains.
+Note that ARM CPU core 0 cannot be shut off.
 
 Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
 ---
-What are the DT bindings for a Cortex-A15 L2 cache controller?
----
- arch/arm/boot/dts/r8a7793.dtsi | 13 +++++++++++++
- 1 file changed, 13 insertions(+)
+ arch/arm/boot/dts/r8a7779.dtsi | 48 ++++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 48 insertions(+)
 
-diff --git a/arch/arm/boot/dts/r8a7793.dtsi b/arch/arm/boot/dts/r8a7793.dtsi
-index f337634888de7800..cf153b9c2367a211 100644
---- a/arch/arm/boot/dts/r8a7793.dtsi
-+++ b/arch/arm/boot/dts/r8a7793.dtsi
-@@ -41,6 +41,19 @@
+diff --git a/arch/arm/boot/dts/r8a7779.dtsi b/arch/arm/boot/dts/r8a7779.dtsi
+index d75f46a539749eae..fbcf02c09fa5b57c 100644
+--- a/arch/arm/boot/dts/r8a7779.dtsi
++++ b/arch/arm/boot/dts/r8a7779.dtsi
+@@ -34,18 +34,21 @@
+ 			compatible = "arm,cortex-a9";
+ 			reg = <1>;
+ 			clock-frequency = <1000000000>;
++			power-domains = <&pd_arm1>;
+ 		};
+ 		cpu at 2 {
+ 			device_type = "cpu";
+ 			compatible = "arm,cortex-a9";
+ 			reg = <2>;
+ 			clock-frequency = <1000000000>;
++			power-domains = <&pd_arm2>;
+ 		};
+ 		cpu at 3 {
+ 			device_type = "cpu";
+ 			compatible = "arm,cortex-a9";
+ 			reg = <3>;
+ 			clock-frequency = <1000000000>;
++			power-domains = <&pd_arm3>;
  		};
  	};
  
-+	L2_CA15: cache-controller at 0 {
-+		compatible = "cache";
+@@ -569,4 +572,49 @@
+ 				"mmc1", "mmc0";
+ 		};
+ 	};
 +
-+		arm,data-latency = <4 4 0>;
-+		arm,tag-latency = <3 3 3>;
-+		cache-unified;
-+		cache-level = <2>;
-+		cache-size = <0x100000>;
-+		cache-sets = <2048>;
-+		cache-block-size = <32>;
-+		cache-line-size = <32>;
++	sysc: system-controller at ffd85000 {
++		compatible = "renesas,sysc-r8a7779", "renesas,sysc-rcar";
++		reg = <0 0xffd85000 0 0x0200>;
++
++		pm-domains {
++			#address-cells = <2>;
++			#size-cells = <0>;
++
++			pd_arm1: cpu at 1 {
++				reg = <1 0x41>;
++				#power-domain-cells = <0>;
++			};
++
++			pd_arm2: cpu at 2 {
++				reg = <2 0x42>;
++				#power-domain-cells = <0>;
++			};
++
++			pd_arm3: cpu at 3 {
++				reg = <3 0x43>;
++				#power-domain-cells = <0>;
++			};
++
++			pd_sh: sh at 16 {
++				reg = <16 0x80>;
++				#power-domain-cells = <0>;
++			};
++
++			pd_sgx: sgx at 20 {
++				reg = <20 0xc0>;
++				#power-domain-cells = <0>;
++			};
++
++			pd_vdp: vdp at 21 {
++				reg = <21 0x100>;
++				#power-domain-cells = <0>;
++			};
++
++			pd_imp: imp at 24 {
++				reg = <24 0x140>;
++				#power-domain-cells = <0>;
++			};
++		};
 +	};
-+
- 	gic: interrupt-controller at f1001000 {
- 		compatible = "arm,cortex-a15-gic";
- 		#interrupt-cells = <3>;
+ };
 -- 
 1.9.1
