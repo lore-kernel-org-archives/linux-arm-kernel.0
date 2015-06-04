@@ -1,84 +1,53 @@
-From: t-kristo@ti.com (Tero Kristo)
-Date: Thu, 4 Jun 2015 08:26:09 +0300
-Subject: [PATCHv3 00/27] ARM: OMAP2+: clock code move under clk driver
-In-Reply-To: <20150603231136.6017.65683@quantum>
-References: <1432566032-10860-1-git-send-email-t-kristo@ti.com>
- <20150526160557.GD16525@atomide.com> <20150526163216.GF16525@atomide.com>
- <20150526163931.GO26599@saruman.tx.rr.com> <55660D5B.8020607@ti.com>
- <20150527231536.GD30984@atomide.com> <556EF42A.9000207@ti.com>
- <20150603231136.6017.65683@quantum>
-Message-ID: <556FE171.5010000@ti.com>
+From: vaibhav.hiremath@linaro.org (Vaibhav Hiremath)
+Date: Thu, 04 Jun 2015 11:16:09 +0530
+Subject: [PATCH 04/12] i2c: pxa: Add support for pxa910/988 & new
+ configuration features
+In-Reply-To: <20150604023146.GF6696@yizhang>
+References: <1432818224-17070-1-git-send-email-vaibhav.hiremath@linaro.org>
+ <1432818224-17070-5-git-send-email-vaibhav.hiremath@linaro.org>
+ <874mmvyvzw.fsf@belgarion.home> <20150604023146.GF6696@yizhang>
+Message-ID: <556FE621.8060502@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/04/2015 02:11 AM, Michael Turquette wrote:
-> Quoting Tero Kristo (2015-06-03 05:33:46)
->> On 05/28/2015 02:15 AM, Tony Lindgren wrote:
->>> * Tero Kristo <t-kristo@ti.com> [150527 11:32]:
->>>> On 05/26/2015 07:39 PM, Felipe Balbi wrote:
->>>>> On Tue, May 26, 2015 at 09:32:16AM -0700, Tony Lindgren wrote:
->>>>>> * Tony Lindgren <tony@atomide.com> [150526 09:08]:
->>>>>>> * Tero Kristo <t-kristo@ti.com> [150525 08:01]:
->>>>>>>> Hi,
->>>>>>>>
->>>>>>>> As requested, posting v3 with somewhat changed diff parameters and
->>>>>>>> diffstat attached. Just some minor Makefile changes compared to v2,
->>>>>>>> these were discussed under that set.
->>>>>>>>
->>>>>>>> Set has been pushed to:
->>>>>>>> - tree: https://github.com/t-kristo/linux-pm.git
->>>>>>>> - branch: for-4.2/ti-clk-move
->>>>>>>
->>>>>>> Looks like this causes a build error for at least omap2 only .config:
->>>>>>>
->>>>>>> drivers/clk/ti/dpll3xxx.o:(.rodata+0x1c): multiple definition of `clkhwops_omap3_dpll'
->>>>>>> drivers/clk/ti/dpll.o:(.rodata+0x0): first defined here
->>>>>>>
->>>>>>> You may want to create a file selecting ARCH_OMAP2PLUS=y, then point
->>>>>>> KCONFIG_ALLCONFIG to that file for make randconfig. Then just build
->>>>>>> randconfigs :) Usually the issues like this are exposed within few
->>>>>>> randconfig builds, some take longer if the options have dependencies.
->>>>>
->>>>> alternatively, just clone the repository at [1] and use the example
->>>>> script provided in README.md.
->>>>>
->>>>> [1] https://github.com/felipebalbi/omap-seeds
->>>>>
->>>>
->>>> Ok, I pushed an updated branch named: for-4.2/ti-clk-move-v4
->>>>
->>>> This definitely compiles with OMAP2 / OMAP3 / OMAP4 / OMAP5 / DRA7 / AM33xx
->>>> / AM43xx only setups (tried it out.)
->>>
->>> Thanks yeah seems to work for me now.
->>>
->>> Regards,
->>>
->>> Tony
->>>
->>
->> Question to Mike / Stephen, any chance of getting this in during the 4.2
->> merge anymore seeing we are already at 4.1-rc6?
->>
->> I can send a pull request if yes. Otherwise I just wait until we are
->> past the next merge.
->
-> Hi Tero,
->
-> I'd like more time for any regressions this introduces to be fixed, so
-> lets push back to next merge window. The always-wrong-but-never-by-much
-> crystal ball[0] predicts June 14. This is less than two weeks away, so
-> the wait should be short.
 
-Ok, I'll rebase this against rc1 and send a pull-request once we have it.
 
--Tero
-
->
-> [0] http://phb-crystal-ball.org/
->
-> Thanks,
-> Mike
->
+On Thursday 04 June 2015 08:01 AM, Yi Zhang wrote:
+> On Fri, May 29, 2015 at 10:22:27PM +0200, Robert Jarzmik wrote:
+>> Vaibhav Hiremath <vaibhav.hiremath@linaro.org> writes:
 >>
->> -Tero
+>>> @@ -167,6 +184,8 @@ struct pxa_i2c {
+>>>   #define _ICR(i2c)	((i2c)->reg_icr)
+>>>   #define _ISR(i2c)	((i2c)->reg_isr)
+>>>   #define _ISAR(i2c)	((i2c)->reg_isar)
+>>> +#define _ILCR(i2c)	((i2c)->reg_ilcr)
+>>> +#define _IWCR(i2c)	((i2c)->reg_iwcr)
+>>>
+>>>   /*
+>>>    * I2C Slave mode address
+>>> @@ -467,11 +486,16 @@ static void i2c_pxa_reset(struct pxa_i2c *i2c)
+>>>   	if (i2c->reg_isar)
+>>>   		writel(i2c->slave_addr, _ISAR(i2c));
+>>>   #endif
+>>> -
+>> Not in this patch.
+>>
+>>>   	/* set control register values */
+>>>   	writel(I2C_ICR_INIT | (i2c->fast_mode ? ICR_FM : 0), _ICR(i2c));
+>>>   	writel(readl(_ICR(i2c)) | (i2c->high_mode ? ICR_HS : 0), _ICR(i2c));
+>>>
+>>> +	if (i2c->ilcr)
+>>> +		writel(i2c->ilcr, _ILCR(i2c));
+>>> +	if (i2c->iwcr)
+>>> +		writel(i2c->iwcr, _IWCR(i2c));
+>>> +	udelay(2);
+>> This is a magical 2us. Where does it come from ?
+>
+>    This delay can be removed, if writing LCR and WCR before enabling this
+>    i2c controller, it's safe enough; and they should not be changed when
+>    there is bus activity.
+
+I have already removed it in my next version.
+
+Thanks,
+Vaibhav
