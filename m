@@ -1,60 +1,87 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 4 Jun 2015 10:49:21 +0100
-Subject: [PATCHv3 11/12] ARM: migrate to common PSCI client code
-In-Reply-To: <20150603151625.GA599@leverpostej>
-References: <1432648350-5454-1-git-send-email-mark.rutland@arm.com>
- <1432648350-5454-12-git-send-email-mark.rutland@arm.com>
- <20150603151625.GA599@leverpostej>
-Message-ID: <20150604094921.GH7557@n2100.arm.linux.org.uk>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Thu, 04 Jun 2015 11:01:41 +0100
+Subject: [PATCH] KVM: arm64: fix misleading comments in save/restore
+In-Reply-To: <20150604093436.GC7657@cbox>
+References: <1432806186-27993-1-git-send-email-alex.bennee@linaro.org>
+ <20150604093436.GC7657@cbox>
+Message-ID: <55702205.7000908@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 03, 2015 at 04:16:39PM +0100, Mark Rutland wrote:
-> Hi Russell,
+On 04/06/15 10:34, Christoffer Dall wrote:
+> On Thu, May 28, 2015 at 10:43:06AM +0100, Alex Benn?e wrote:
+>> The elr_el2 and spsr_el2 registers in fact contain the processor state
+>> before entry into the hypervisor code.
 > 
-> On Tue, May 26, 2015 at 02:52:29PM +0100, Mark Rutland wrote:
-> > Now that the common PSCI client code has been factored out to
-> > drivers/firmware, and made safe for 32-bit use, move the 32-bit ARM code
-> > over to it. This results in a moderate reduction of duplicated lines,
-> > and will prevent further duplication as the PSCI client code is updated
-> > for PSCI 1.0 and beyond.
-> > 
-> > The two legacy platform users of the PSCI invocation code are updated to
-> > account for interface changes. In both cases the power state parameter
-> > is changed to an opaque u32 token in preparation for PSCI 1.0 power
-> > state changes.
-> > 
-> > Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-> > Acked-by: Catalin Marinas <catalin.marinas@arm.com>
-> > Cc: Ashwin Chaugule <ashwin.chaugule@linaro.org>
-> > Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-> > Cc: Rob Herring <robh@kernel.org>
-> > Cc: Russell King <rmk+kernel@arm.linux.org.uk>
-> > Cc: Will Deacon <will.deacon@arm.com>
-> > ---
-> >  arch/arm/Kconfig                  |   1 +
-> >  arch/arm/include/asm/psci.h       |  23 ---
-> >  arch/arm/kernel/Makefile          |   2 +-
-> >  arch/arm/kernel/psci.c            | 299 --------------------------------------
-> >  arch/arm/kernel/psci_smp.c        |  29 +++-
-> >  arch/arm/kernel/setup.c           |   3 +-
-> >  arch/arm/mach-highbank/highbank.c |   2 +-
-> >  arch/arm/mach-highbank/pm.c       |   8 +-
-> >  drivers/cpuidle/cpuidle-calxeda.c |   7 +-
-> >  9 files changed, 32 insertions(+), 342 deletions(-)
-> >  delete mode 100644 arch/arm/kernel/psci.c
+> be careful with your use of the hypervisor, in the KVM design the
+> hypervisor is split across EL1 and EL2.
 > 
-> Do you have any objections to the arch/arm changes in this patch?
+>> In the case of guest state it
+>> could be in either el0 or el1.
 > 
-> If not, could I please have your ack?
+> true
 > 
-> As there are arm, arm64, and drivers changes in the series I was hoping
-> this could all go via arm-soc.
+>>
+>> Signed-off-by: Alex Benn?e <alex.bennee@linaro.org>
+>> ---
+>>  arch/arm64/kvm/hyp.S | 8 ++++----
+>>  1 file changed, 4 insertions(+), 4 deletions(-)
+>>
+>> diff --git a/arch/arm64/kvm/hyp.S b/arch/arm64/kvm/hyp.S
+>> index d755922..1940a4c 100644
+>> --- a/arch/arm64/kvm/hyp.S
+>> +++ b/arch/arm64/kvm/hyp.S
+>> @@ -50,8 +50,8 @@
+>>  	stp	x29, lr, [x3, #80]
+>>  
+>>  	mrs	x19, sp_el0
+>> -	mrs	x20, elr_el2		// EL1 PC
+>> -	mrs	x21, spsr_el2		// EL1 pstate
+>> +	mrs	x20, elr_el2		// PC before hyp entry
+>> +	mrs	x21, spsr_el2		// pstate before hyp entry
+>>  
+>>  	stp	x19, x20, [x3, #96]
+>>  	str	x21, [x3, #112]
+>> @@ -82,8 +82,8 @@
+>>  	ldr	x21, [x3, #16]
+>>  
+>>  	msr	sp_el0, x19
+>> -	msr	elr_el2, x20 				// EL1 PC
+>> -	msr	spsr_el2, x21 				// EL1 pstate
+>> +	msr	elr_el2, x20 		// PC to restore
+>> +	msr	spsr_el2, x21 		// pstate to restore
+> 
+> I don't feel like 'to restore' is much more meaningful here.
+> 
+> I would actually vote for removin the comments all together, since one
+> should really understand the code as opposed to the comments when
+> reading this kind of stuff.
+> 
+> Meh, I'm not sure.  Your patch is definitely better than doing nothing.
+> 
+> Marc?
 
-If you want me to do something, please ensure that you send stuff _To:_
-me, not _Cc:_ me... I can't say when I'll be able to look at them today,
-but hopefully tomorrow.
+While I definitely agree that people should pay more attention to the
+code rather than blindly trusting comments, I still think there is some
+value in disambiguating the exception entry/return, because this bit of
+code assumes some intimate knowledge of the ARMv8 exception model.
 
+As for the comments themselves, I'd rather have some wording that
+clearly indicate that we're dealing with guest information, i.e:
+
+	mrs	x20, elr_el2		// Guest PC
+	mrs	x21, spsr_el2		// Guest pstate
+
+(and the same for the exception return). The "before hyp entry" and "to
+restore" are not really useful (all the registers we are
+saving/restoring fall into these categories). What I wanted to convey
+here was that despite using an EL2 register, we are dealing with guest
+registers.
+
+Would this address your concerns?
+
+Thanks,
+
+	M.
 -- 
-FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
-according to speedtest.net.
+Jazz is not dead. It just smells funny...
