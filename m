@@ -1,70 +1,97 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Thu, 4 Jun 2015 08:42:59 +0200
-Subject: [PATCH 08/11] MTD: m25p80: Add option to limit SPI transfer size.
-In-Reply-To: <8fc4b9f5291a509c4c35782a1337bf536f1019af.1433364398.git.hramrach@gmail.com>
-References: <cover.1433364398.git.hramrach@gmail.com>
- <8fc4b9f5291a509c4c35782a1337bf536f1019af.1433364398.git.hramrach@gmail.com>
-Message-ID: <CAMuHMdVT2M7pPHDDHmoNF_zVXhz1PUm5PiYxDKcAjSAcfSDiZg@mail.gmail.com>
+From: boris.brezillon@free-electrons.com (Boris Brezillon)
+Date: Thu, 4 Jun 2015 08:44:34 +0200
+Subject: [PATCH v3] clk: change clk_ops' ->determine_rate() prototype
+In-Reply-To: <20150603233728.GA490@codeaurora.org>
+References: <1432138345-19044-1-git-send-email-boris.brezillon@free-electrons.com>
+ <20150603233728.GA490@codeaurora.org>
+Message-ID: <20150604084434.48939141@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 3, 2015 at 11:26 PM, Michal Suchanek <hramrach@gmail.com> wrote:
-> On sunxi the SPI controller currently does not have DMA support and fails
-> any transfer larger than 63 bytes.
+Hi Stefen,
 
-This is a driver limitation, not a hardware limitation.
+On Wed, 3 Jun 2015 16:37:28 -0700
+Stephen Boyd <sboyd@codeaurora.org> wrote:
 
-> On Exynos the pl330 DMA controller fails any transfer larger than 64kb
-> when using slower speed like 40MHz and any transfer larger than 128bytes
-> when running at 133MHz.
+> On 05/20, Boris Brezillon wrote:
+> > Clock rates are stored in an unsigned long field, but ->determine_rate()
+> > (which returns a rounded rate from a requested one) returns a long
+> > value (errors are reported using negative error codes), which can lead
+> > to long overflow if the clock rate exceed 2Ghz.
+> > 
+> > Change ->determine_rate() prototype to return 0 or an error code, and pass
+> > a pointer to a clk_rate_request structure containing the expected target
+> > rate and the rate constraints imposed by clk users.
+> > 
+> > The clk_rate_request structure might be extended in the future to contain
+> > other kind of constraints like the rounding policy, the maximum clock
+> > inaccuracy or other things that are not yet supported by the CCF
+> > (power consumption constraints ?).
+> > 
+> > Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+> > 
+> > CC: Jonathan Corbet <corbet@lwn.net>
+> > CC: Tony Lindgren <tony@atomide.com>
+> > CC: Ralf Baechle <ralf@linux-mips.org>
+> > CC: "Emilio L?pez" <emilio@elopez.com.ar>
+> > CC: Maxime Ripard <maxime.ripard@free-electrons.com>
+> > CC: Tero Kristo <t-kristo@ti.com>
+> > CC: linux-doc at vger.kernel.org
+> > CC: linux-kernel at vger.kernel.org
+> > CC: linux-arm-kernel at lists.infradead.org
+> > CC: linux-omap at vger.kernel.org
+> > CC: linux-mips at linux-mips.org
+> > ---
+> > 
+> > Hi Stephen,
+> > 
+> > This patch is based on clk-next and contains the changes you suggested
+> > in your previous review.
+> > 
+> > It was tested on sama5d4 and compile tested on several ARM platforms
+> > (those enabled in multi_v7_defconfig).
+> > 
+> 
+> Thanks. I think we should wait until the next -rc1 drops to apply the
+> patch for the next merge window. That will make it least likely to conflict
+> with other trees, and we can provide it on a stable branch should there
+> be clock providers going through other trees somewhere. Please
+> remind me if I forget.
 
-This may be a driver bug.
+No problem.
 
-> The best thing is that in both cases the controller can just lock up and
-> never finish potentially leaving the hardware in unusable state.
->
-> So it is required that the m25p80 driver actively prevents doing
-> transfers that are too large for the current driver state on a
-> particular piece of hardware.
+> 
+> > @@ -1186,15 +1191,21 @@ EXPORT_SYMBOL_GPL(__clk_determine_rate);
+> >   */
+> >  unsigned long __clk_round_rate(struct clk *clk, unsigned long rate)
+> >  {
+> > -	unsigned long min_rate;
+> > -	unsigned long max_rate;
+> > +
+> > +	struct clk_rate_request req;
+> > +	int ret;
+> >  
+> >  	if (!clk)
+> >  		return 0;
+> >  
+> > -	clk_core_get_boundaries(clk->core, &min_rate, &max_rate);
+> > +	clk_core_get_boundaries(clk->core, &req.min_rate, &req.max_rate);
+> > +	req.rate = rate;
+> > +
+> > +	ret = clk_core_round_rate_nolock(clk->core, &req);
+> > +	if (ret)
+> > +		return ret;
+> 
+> This returns a negative int for unsigned long. Is that intentional?
 
-OK.
+Nope, should be replaced by 'return 0;'.
 
-> Signed-off-by: Michal Suchanek <hramrach@gmail.com>
->
-> --
->
-> Update commit message and documentation text.
-> ---
->  .../devicetree/bindings/mtd/jedec,spi-nor.txt      |  6 ++++++
->  drivers/mtd/devices/m25p80.c                       | 24 ++++++++++++++++++++--
->  2 files changed, 28 insertions(+), 2 deletions(-)
->
-> diff --git a/Documentation/devicetree/bindings/mtd/jedec,spi-nor.txt b/Documentation/devicetree/bindings/mtd/jedec,spi-nor.txt
-> index 2bee681..4e63ae8 100644
-> --- a/Documentation/devicetree/bindings/mtd/jedec,spi-nor.txt
-> +++ b/Documentation/devicetree/bindings/mtd/jedec,spi-nor.txt
-> @@ -19,6 +19,12 @@ Optional properties:
->                     all chips and support for it can not be detected at runtime.
->                     Refer to your chips' datasheet to check if this is supported
->                     by your chip.
-> +- linux,max_tx_len : With some SPI controller drivers possible transfer size is
-> +                     limited. This may be hardware or driver bug.
-> +                     Transfer data in chunks no larger than this value.
-> +                     Using this option may severely degrade performance and
-> +                     possibly flash memory life when max_tx_len is smaller than
-> +                     flash page size (typically 256 bytes)
+Thanks,
 
-DT describes the hardware, not buggy drivers.
+Boris
 
-So IMHO this doesn't belong in DT, but it can be a field in struct spi_master.
 
-Gr{oetje,eeting}s,
-
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+-- 
+Boris Brezillon, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
