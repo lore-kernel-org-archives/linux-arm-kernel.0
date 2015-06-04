@@ -1,40 +1,45 @@
 From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Thu, 4 Jun 2015 10:02:41 +0200
-Subject: [PATCH] ARM: at91/dts: kizbox: fix mismatch LED PWM device
-In-Reply-To: <1433324663-20208-1-git-send-email-g.portay@overkiz.com>
-References: <1433324663-20208-1-git-send-email-g.portay@overkiz.com>
-Message-ID: <55700621.4080900@atmel.com>
+Date: Thu, 4 Jun 2015 10:06:28 +0200
+Subject: [PATCH] ARM: at91: dt: sama5d4ek: mci0 uses slot 0
+In-Reply-To: <1432806916-23579-1-git-send-email-ludovic.desroches@atmel.com>
+References: <1432806916-23579-1-git-send-email-ludovic.desroches@atmel.com>
+Message-ID: <55700704.2020907@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le 03/06/2015 11:44, Ga?l PORTAY a ?crit :
-> The network_red LED uses the 4th PWM device.
+Le 28/05/2015 11:55, Ludovic Desroches a ?crit :
+> mci0 uses slot 0 not 1.
 > 
-> Signed-off-by: Ga?l PORTAY <g.portay@overkiz.com>
+> Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com>
+> Fixes: 7a4752677c44 ("ARM: at91: dt: add device tree file for SAMA5D4ek
+> board")
 
+Yes:
 Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
 
-And stacked on at91-4.2-dt.
+Queued in at91-4.2-dt.
 
-Bye,
+Thanks, bye.
 
 > ---
->  arch/arm/boot/dts/at91-kizbox.dts | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
+>  arch/arm/boot/dts/at91-sama5d4ek.dts | 4 ++--
+>  1 file changed, 2 insertions(+), 2 deletions(-)
 > 
-> diff --git a/arch/arm/boot/dts/at91-kizbox.dts b/arch/arm/boot/dts/at91-kizbox.dts
-> index a0e63ff..cf1628f 100644
-> --- a/arch/arm/boot/dts/at91-kizbox.dts
-> +++ b/arch/arm/boot/dts/at91-kizbox.dts
-> @@ -205,7 +205,7 @@
->  
->  		network_red {
->  			label = "pwm:red:network";
-> -			pwms = <&tcb_pwm 3 10000000 PWM_POLARITY_INVERTED>;
-> +			pwms = <&tcb_pwm 4 10000000 PWM_POLARITY_INVERTED>;
->  			max-brightness = <255>;
->  			linux,default-trigger = "default-on";
->  		};
+> diff --git a/arch/arm/boot/dts/at91-sama5d4ek.dts b/arch/arm/boot/dts/at91-sama5d4ek.dts
+> index 89ef4a5..45e7761 100644
+> --- a/arch/arm/boot/dts/at91-sama5d4ek.dts
+> +++ b/arch/arm/boot/dts/at91-sama5d4ek.dts
+> @@ -108,8 +108,8 @@
+>  			mmc0: mmc at f8000000 {
+>  				pinctrl-names = "default";
+>  				pinctrl-0 = <&pinctrl_mmc0_clk_cmd_dat0 &pinctrl_mmc0_dat1_3 &pinctrl_mmc0_cd>;
+> -				slot at 1 {
+> -					reg = <1>;
+> +				slot at 0 {
+> +					reg = <0>;
+>  					bus-width = <4>;
+>  					cd-gpios = <&pioE 5 0>;
+>  				};
 > 
 
 
