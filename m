@@ -1,37 +1,51 @@
-From: slash.tmp@free.fr (Mason)
-Date: Thu, 04 Jun 2015 22:32:40 +0200
-Subject: [RFC/NOT FOR MERGING] HACK: add global/private timers for A9
-In-Reply-To: <20150604200850.GF5710@saruman.tx.rr.com>
-References: <1433363565-17725-1-git-send-email-balbi@ti.com>
- <2466648.WjMxjIpAUG@wuerfel> <20150603210455.GD6042@saruman.tx.rr.com>
- <20150603212821.GH6042@saruman.tx.rr.com> <556F7493.2060602@codeaurora.org>
- <20150603215445.GK6042@saruman.tx.rr.com> <55701E93.60303@free.fr>
- <20150604200850.GF5710@saruman.tx.rr.com>
-Message-ID: <5570B5E8.90300@free.fr>
+From: holler@ahsoftware.de (Alexander Holler)
+Date: Thu, 04 Jun 2015 22:39:31 +0200
+Subject: [PATCH 00/21] On-demand device registration
+In-Reply-To: <556F5C24.1030101@linaro.org>
+References: <1432565608-26036-1-git-send-email-tomeu.vizoso@collabora.com>
+ <CAL_Jsq+EWLEJhRudTGAwYsOg4tX2-pGhygeQGHae9RL8rBpMiA@mail.gmail.com>
+ <556F5C24.1030101@linaro.org>
+Message-ID: <5570B783.1050808@ahsoftware.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/06/2015 22:08, Felipe Balbi wrote:
+Am 03.06.2015 um 21:57 schrieb Grygorii.Strashko at linaro.org:
 
-> On Thu, Jun 04, 2015 at 11:46:59AM +0200, Mason wrote:
->> Also, check /proc/timer_list for a "Broadcast device". If you don't
->> define one, the TWD timers are set to periodic mode, with hrtimers
->> disabled.
-> 
-> Did you manage to turn global timer into Broadcast device ?
+...
 
-Disclaimer: I am a kernel noob, take everything I say with
-a rock of salt.
+> So few comments from above:
+> - registering devices later during the System boot may improve boot time.
+>   But resolving of all deferred probes may NOT improve boot time ;) 
+>   Have you seen smth like this?
 
-As far as I can see, the global timer code doesn't handle
-frequency changes, whereas the TWD code does.
+If someone is out for boot time reduction, I think one of the best ways
+would by making driver initialization parallel. Keep in mind that all
+linked in drivers currently are initialized in series.
 
-Yet all these timers are clocked by PERIPHCLK, which is defined
-as CPUCLK / N. So if a platform enables cpufreq, CPUCLK will
-vary, meaning PERIPHCLK will vary. I don't see how the global
-timer can work in that situation.
+As it seems to have been forgotten or overread, I've mentioned in my
+series of patches last year that, with a few changes, it's possible to
+let the algorithm I've used (dfs) to spit out all drivers which can be
+initialized in parallel.
 
-cf. also this recent thread:
-http://thread.gmane.org/gmane.linux.kernel.cpufreq/15770
+But as I'm not paid for the work I've done and just did it out of
+curiosity, interest or how ever you want name it, I haven't spend any
+more time into that topic, especially as I'm missing the necessary
+connections to get patches into the kernel. ;)
 
-Regards.
+But, as said, it's easy (at least if aren't getting panic when it comes
+to a bit of algorithm theory) to get a list drivers you can start in
+parallel if you have such a complete list of dependencies as DT already
+offers. Just look at the pictures generate by dtc (using my patches),
+you will see, they already show which drivers can be initialized in
+parallel.
+
+So it would be easy to use e.g. all cores already very early at boot to
+initialize drivers, not just after init got started. Besides that the
+w?rgaround of defered init (which, btw. leads devs to supress error
+messages, which is especially bad if you are searching a problem) isn't
+needed anymore if you have a list of dependecies (however you get it,
+I've used DT because the dependencies already are all there).
+
+Regards,
+
+Alexander Holler
