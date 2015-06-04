@@ -1,115 +1,205 @@
-From: hanjun.guo@linaro.org (Hanjun Guo)
-Date: Thu, 04 Jun 2015 20:28:45 +0800
-Subject: [PATCH 05/11] x86, pci, acpi: Move arch-agnostic MMCONFIG (aka
- ECAM) and ACPI code out of arch/x86/ directory
-In-Reply-To: <20150604102253.GA31773@red-moon>
-References: <1432644564-24746-1-git-send-email-hanjun.guo@linaro.org>
- <1432644564-24746-6-git-send-email-hanjun.guo@linaro.org>
- <20150526170817.GU1565@arm.com> <55657B02.5090805@linaro.org>
- <20150602133215.GC23650@red-moon> <55701A31.808@linaro.org>
- <20150604102253.GA31773@red-moon>
-Message-ID: <5570447D.3020705@linaro.org>
+From: yong.wu@mediatek.com (Yong Wu)
+Date: Thu, 4 Jun 2015 20:29:52 +0800
+Subject: [PATCH 3/4] arm64: Add IOMMU dma_ops
+In-Reply-To: <cd32131caab8833f48180ee1df79c9da020c5a48.1432735420.git.robin.murphy@arm.com>
+References: <cover.1432735420.git.robin.murphy@arm.com>
+ <cd32131caab8833f48180ee1df79c9da020c5a48.1432735420.git.robin.murphy@arm.com>
+Message-ID: <1433420992.4270.86.camel@mhfsdcap03>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2015?06?04? 18:22, Lorenzo Pieralisi wrote:
-> Hi Hanjun,
->
-> On Thu, Jun 04, 2015 at 10:28:17AM +0100, Hanjun Guo wrote:
->> Hi Lorenzo,
->>
->> On 2015???06???02??? 21:32, Lorenzo Pieralisi wrote:
->>> On Wed, May 27, 2015 at 09:06:26AM +0100, Tomasz Nowicki wrote:
->>>> On 26.05.2015 19:08, Will Deacon wrote:
->>>>> On Tue, May 26, 2015 at 01:49:18PM +0100, Hanjun Guo wrote:
->>>>>> From: Tomasz Nowicki <tomasz.nowicki@linaro.org>
->>>>>>
->>>>>> ECAM standard and MCFG table are architecture independent and it makes
->>>>>> sense to share common code across all architectures. Both are going to
->>>>>> corresponding files - ecam.c and mcfg.c
->>>>>>
->>>>>> While we are here, rename pci_parse_mcfg to acpi_parse_mcfg.
->>>>>> We already have acpi_parse_mcfg prototype which is used nowhere.
->>>>>> At the same time, we need pci_parse_mcfg been global so acpi_parse_mcfg
->>>>>> can be used perfectly here.
->>>>>>
->>>>>> Signed-off-by: Tomasz Nowicki <tomasz.nowicki@linaro.org>
->>>>>> Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
->>>>>> Tested-by: Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com>
->>>>>> ---
->>>>>>     arch/x86/Kconfig               |   3 +
->>>>>>     arch/x86/include/asm/pci_x86.h |  33 ------
->>>>>>     arch/x86/pci/acpi.c            |   1 +
->>>>>>     arch/x86/pci/mmconfig-shared.c | 244 +---------------------------------------
->>>>>>     arch/x86/pci/mmconfig_32.c     |   1 +
->>>>>>     arch/x86/pci/mmconfig_64.c     |   1 +
->>>>>>     arch/x86/pci/numachip.c        |   1 +
->>>>>>     drivers/acpi/Makefile          |   1 +
->>>>>>     drivers/acpi/mcfg.c            |  57 ++++++++++
->>>>>>     drivers/pci/Kconfig            |   7 ++
->>>>>>     drivers/pci/Makefile           |   5 +
->>>>>>     drivers/pci/ecam.c             | 245 +++++++++++++++++++++++++++++++++++++++++
->>>>>
->>>>> Why can't we make use of the ECAM implementation used by pci-host-generic
->>>>> and drivers/pci/access.c?
->>>>
->>>> We had that question when I had posted MMCFG patch set separately,
->>>> please see:
->>>> https://lkml.org/lkml/2015/3/11/492
->>>
->>> Yes, but the real question is, why do we need to have PCI config space
->>> up and running before a bus struct is even created ? I think the reason is
->>> the PCI configuration address space format (ACPI 6.0, Table 5-27, page
->>> 108):
->>>
->>> "PCI Configuration space addresses must be confined to devices on
->>> PCI Segment Group 0, bus 0. This restriction exists to accommodate
->>> access to fixed hardware prior to PCI bus enumeration".
->>>
->>> On HW reduced platforms I do not even think this is required at all,
->>> we have to look into this to avoid code duplication that might well
->>> turn out useless.
->>
->> This is only for the fixed hardware, which will be not available for
->> ARM64 (reduced hardware mode), but in Generic Hardware Programming
->> Model, we using OEM-provided ACPI Machine Language (AML) code to access
->> generic hardware registers, this will be available for reduced hardware
->> too.
->>
->> So in ACPI spec, it says: (ACPI 6.0 page 66, last paragraph)
->>
->> ACPI defines eight address spaces that may be accessed by generic
->> hardware implementations. These include:
->> * System I/O space
->> * System memory space
->> * PCI configuration space
->> * Embedded controller space
->> * System Management Bus (SMBus) space
->> * CMOS
->> * PCI BAR Target
->> * IPMI space
->>
->> So if any device using the PCI address space for control, such
->> as a system reset control device, its address space can be reside
->> in PCI configuration space (who can prevent a OEM do that crazy
->> thing? :) ), and it should be accessible before the PCI bus is
->> created.
->
-> Us, by changing attitude and questioning features whose usefulness
-> is questionable. I will look into this and raise the point, I am not
-> thrilled by the idea of adding another set of PCI accessor functions
-> and drivers because we have to access a register through PCI before
-> enumerating the bus (and on arm64 this is totally useless since
-> we are not meant to support fixed HW anyway). Maybe we can make acpica
-> code use a "special" stub (ACPI specific, PCI configuration space address
-> space has restrictions anyway), I have to review this set in its
-> entirety to see how to do that (and I would kindly ask you to do
-> it too, before saying it is not possible to implement it).
+Hi Robin,
+     Sorry to disturb you. When prepare iommu based on this dma-v3. I
+meet some problem about how to use the dma-iommu.
+     I list some sample code like below:
+//========
+int mtk_iommu_of_xlate(struct device *dev, struct of_phandle_args *args)
+{
+        if (args->args_count != 2) {            
+                return -EINVAL;
+        }
 
-I'm willing to do that, actually, if we don't need a mechanism to
-access PCI config space before the bus is created, the code can be
-simplified a lot.
+        /* save the private data from args  
+         * the private data is larbid and portid in our platform */
+        priv->larbid = args->args[0];
+        priv->portid = args->args[1];
 
-Thanks for your help and patient.
+        /*list the private data */
+        list_add_tail(&priv->client, &head->client);
 
-Hanjun
+        /* save the list to dev->archdata->iommu */
+        ...
+}
+static int mtk_iommu_init_fn(struct device_node *np)
+{
+        of_iommu_set_ops(np, &mtk_iommu_ops);   
+        return 0;
+}
+
+IOMMU_OF_DECLARE(mtkm4u, "mediatek,mt8173-m4u", mtk_iommu_init_fn);
+//=======
+
+Question :
+  1: if there are 2 client devices use iommu, it will be like this in
+dtsi,
+                disp:testiommu at 1400c000 {
+                        compatible = "mediatek,mt8173-test";
+                        iommus = <&iommu M4U_LARB0_ID 0>,
+                                 <&iommu M4U_LARB1_ID 3>;
+                };
+                disp1:testiommu at 1400D000 {
+                        compatible = "mediatek,mt8173-disptest1";
+                        iommus = <&iommu M4U_LARB0_ID 8>, 
+                                 <&iommu M4U_LARB1_ID 2>;
+                };
+    Then both devices will enter arch_setup_dma_ops and their parameter
+"struct iommu_ops *" is not zero, then it will create two
+dma-iommu-domain.
+    If we expect all the client device share a iommu domain, then how
+should i do?
+
+2. iommu_dma_attach_device will be called automatically in the notify
+"__iommu_attach_notifier". But it run before the probe of our iommu
+device.
+    Then we can't write the register to enable iommu in *_attach_device
+because we have not parsed the dtsi at that time.
+   ->I have tried to move parse dtsi into mtk_iommu_of_xlate, in order
+to read/write register in attach_device.
+But it will be warning like this:
+(150604_09:43:41.094)WARNING: CPU: 0 PID: 1
+at /proj/mtk40525/upstreamdev/chromebook_kernelonly/kernel/mediatek/drivers/base/dd.c:286 driver_probe_device+0x25c/0x29c()
+
+3.In mtk_iommu_probe, we can't get "struct iommu_domain *" from the
+current iommu device, we should use it while devm_request_irq.
+I have to use the global variable here?!
+
+4.If I don't implement the of_xlate and IOMMU_OF_DECLARE, I call
+iommu_dma_create_domain in the mtk_iommu_probe, but I can not
+get the "iommu_dma_ops" which is static in arch/arm64/mm/dma-mapping.c
+to assign to dev->archdata->dma_ops for the iommu client device.
+
+If i miss something, please tell me and help give some suggestion.
+Thanks very much.
+
+On Wed, 2015-05-27 at 15:09 +0100, Robin Murphy wrote:
+> Taking some inspiration from the arch/arm code, implement the
+> arch-specific side of the DMA mapping ops using the new IOMMU-DMA layer.
+> 
+> Whilst proliferating per-device private IOMMU data via dev->archdata is
+> less than ideal, it will do the job for now, especially since we can't
+> easily handle the kind of problematic system topologies in the current
+> IOMMU API anyway.
+> 
+> Signed-off-by: Robin Murphy <robin.murphy@arm.com>
+> ---
+>  arch/arm64/include/asm/device.h      |   3 +
+>  arch/arm64/include/asm/dma-mapping.h |  14 ++
+>  arch/arm64/mm/dma-mapping.c          | 342 +++++++++++++++++++++++++++++++++++
+>  include/linux/dma-iommu.h            |   4 +-
+>  4 files changed, 361 insertions(+), 2 deletions(-)
+> 
+[snip]
+> +struct iommu_dma_notifier_data {
+> +	struct list_head list;
+> +	struct device *dev;
+> +	struct iommu_dma_domain *dma_domain;
+> +};
+> +static LIST_HEAD(iommu_dma_masters);
+> +static DEFINE_MUTEX(iommu_dma_notifier_lock);
+> +
+> +static int __iommu_attach_notifier(struct notifier_block *nb,
+> +				   unsigned long action, void *data)
+> +{
+> +	struct iommu_dma_notifier_data *master, *tmp;
+> +
+> +	if (action != BUS_NOTIFY_ADD_DEVICE)
+> +		return 0;
+> +	/*
+> +	 * We expect the list to only contain the most recent addition,
+> +	 * which *should* be the same device as @data, so just process the
+> +	 * whole thing blindly. If any previous attachments did happen to
+> +	 * fail, they get a free retry since the domains are still live.
+> +	 */
+> +	mutex_lock(&iommu_dma_notifier_lock);
+> +	list_for_each_entry_safe(master, tmp, &iommu_dma_masters, list) {
+> +		if (iommu_dma_attach_device(master->dev, master->dma_domain)) {
+> +			pr_warn("Failed to attach device %s to IOMMU mapping; retaining platform DMA ops\n",
+> +				dev_name(master->dev));
+> +		} else {
+> +			master->dev->archdata.dma_ops = &iommu_dma_ops;
+> +			/* it's safe to drop the initial refcount now */
+> +			iommu_dma_release_domain(master->dma_domain);
+> +			list_del(&master->list);
+> +			kfree(master);
+> +		}
+> +	}
+> +	mutex_unlock(&iommu_dma_notifier_lock);
+> +	return 0;
+> +}
+> +
+> +static int register_iommu_dma_ops_notifier(struct bus_type *bus)
+> +{
+> +	int ret;
+> +	struct notifier_block *nb = kzalloc(sizeof(*nb), GFP_KERNEL);
+> +
+> +	/*
+> +	 * The device must be attached to a domain before its driver probe,
+> +	 * in case the driver allocates DMA buffers immediately. However, most
+> +	 * IOMMU drivers are currently configuring groups in their add_device
+> +	 * callback, so the attach should happen after that. Since the IOMMU
+> +	 * core uses a bus notifier for add_device, do the same but with a
+> +	 * stupidly low priority to ensure the appropriate ordering.
+> +	 *
+> +	 * This can hopefully all go away once we have default domains in the
+> +	 * IOMMU core.
+> +	 */
+> +	nb->notifier_call = __iommu_attach_notifier;
+> +	nb->priority = INT_MIN;
+> +
+> +	ret = bus_register_notifier(bus, nb);
+> +	if (ret) {
+> +		pr_warn("Failed to register DMA domain notifier; IOMMU DMA ops unavailable on bus '%s'\n",
+> +			bus->name);
+> +		kfree(nb);
+> +	}
+> +	return ret;
+> +}
+> +
+> +static int __init arm64_iommu_dma_init(void)
+> +{
+> +	int ret;
+> +
+> +	ret = iommu_dma_init();
+> +	if (!ret)
+> +		ret = register_iommu_dma_ops_notifier(&platform_bus_type);
+> +	if (!ret)
+> +		ret = register_iommu_dma_ops_notifier(&amba_bustype);
+> +	return ret;
+> +}
+> +arch_initcall(arm64_iommu_dma_init);
+> +
+> +static void __iommu_setup_dma_ops(struct device *dev, u64 dma_base, u64 size,
+> +				  const struct iommu_ops *ops)
+> +{
+> +	struct iommu_dma_notifier_data *iommudata;
+> +
+> +	if (!ops)
+> +		return;
+> +
+> +	iommudata = kzalloc(sizeof(*iommudata), GFP_KERNEL);
+> +	if (!iommudata)
+> +		return;
+> +
+> +	iommudata->dev = dev;
+> +	iommudata->dma_domain = iommu_dma_create_domain(ops, dma_base, size);
+> +	if (!iommudata->dma_domain) {
+> +		pr_warn("Failed to create %llu-byte IOMMU mapping for device %s\n",
+> +				size, dev_name(dev));
+> +		kfree(iommudata);
+> +		return;
+> +	}
+> +	mutex_lock(&iommu_dma_notifier_lock);
+> +	list_add(&iommudata->list, &iommu_dma_masters);
+> +	mutex_unlock(&iommu_dma_notifier_lock);
+> +}
+> +
