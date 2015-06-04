@@ -1,71 +1,78 @@
-From: msalter@redhat.com (Mark Salter)
-Date: Thu, 04 Jun 2015 11:51:45 -0400
-Subject: [Patch v4 0/8] Consolidate ACPI PCI root common code into ACPI
- core
-In-Reply-To: <556FF32B.9010900@linux.intel.com>
-References: <1433225576-8215-1-git-send-email-jiang.liu@linux.intel.com>
- <556F6332.2040501@redhat.com> <556FAFEF.6040802@linux.intel.com>
- <556FF0AD.6000901@linaro.org> <556FF32B.9010900@linux.intel.com>
-Message-ID: <1433433105.24429.30.camel@deneb.redhat.com>
+From: manabian@gmail.com (Joachim Eastwood)
+Date: Thu, 4 Jun 2015 17:58:07 +0200
+Subject: [PATCH v2 1/2] mtd: spi-nor: add driver for NXP SPI Flash
+ Interface (SPIFI)
+In-Reply-To: <5570692E.2050603@vanguardiasur.com.ar>
+References: <1433106362-6032-1-git-send-email-manabian@gmail.com>
+ <1433106362-6032-2-git-send-email-manabian@gmail.com>
+ <5570692E.2050603@vanguardiasur.com.ar>
+Message-ID: <CAGhQ9VzU+J1ZT45e-yZ+BAmyZvLUm1cyXE2T__O_4gGjtHrX-w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2015-06-04 at 14:41 +0800, Jiang Liu wrote:
-> On 2015/6/4 14:31, Hanjun Guo wrote:
-> > Hi Jiang,
-> > 
-> > On 2015?06?04? 09:54, Jiang Liu wrote:
-> >> On 2015/6/4 4:27, Al Stone wrote:
-> >>> On 06/02/2015 12:12 AM, Jiang Liu wrote:
-> >>>> This patch set consolidates common code to support ACPI PCI root on x86
-> >>>> and IA64 platforms into ACPI core, to reproduce duplicated code and
-> >>>> simplify maintenance. And a patch set based on this to support ACPI
-> >>>> based
-> >>>> PCIe host bridge on ARM64 has been posted at:
-> >>>
-> >>> Link is missing (or it's a typo of some flavor).
-> >> HI Al,
-> >>     Sorry, I missed the link. It has been posted at:
-> >> https://lkml.org/lkml/2015/5/26/207
-> > 
-> > I failed to get io resources for PCI hostbridge  when I was testing PCI
-> > on ARM64 QEMU, I debugged this for quite a while, and finally found out
-> > that ACPI resource parsing for IO is not suitable for ARM64, because io
-> > space for x86 is 64K, but 16M for ARM64.
-> > 
-> > This issue is only found when the firmware representing the io resource
-> > using the type ACPI_RESOURCE_TYPE_ADDRESS32, so the io address will
-> > greater than 64k.
-> > 
-> > In drivers/acpi/resource.c:
-> > 
-> > static void acpi_dev_ioresource_flags(struct resource *res, u64 len,
-> >                                       u8 io_decode, u8 translation_type)
-> > {
-> >         res->flags = IORESOURCE_IO;
-> > 
-> > [...]
-> > 
-> >         if (res->end >= 0x10003)
-> >                 res->flags |= IORESOURCE_DISABLED | IORESOURCE_UNSET;
-> > 
-> > [...]
-> > }
-> > 
-> > so the code will filter out res->end >= 0x10003, and in my case, it will
-> > more than 64K, so we can't get the IO resources.
-> > 
-> > I got a question, why we use if (res->end >= 0x10003) here?
-> > I mean 64k will be 0x10000, and in that case, we should use
-> > if (res->end >= 0x10000) here, not 0x10003, any history behind that?
-> 
-> Hi Hanjun,
-> This is a special tricky for x86. You may read a dword(four bytes) from
-> IO port 0xffff, so the effective io port space is 0x10003 bytes.
-> 
+On 4 June 2015 at 17:05, Ezequiel Garcia <ezequiel@vanguardiasur.com.ar> wrote:
+> Joachim,
+>
+> I tested the driver and found an issue with it.
+>
+> On 05/31/2015 06:06 PM, Joachim Eastwood wrote:
+>> +
+>> +     spifi->mtd.priv  = &spifi->nor;
+>> +     spifi->nor.mtd   = &spifi->mtd;
+>> +     spifi->nor.dev   = spifi->dev;
+>> +     spifi->nor.priv  = spifi;
+>> +     spifi->nor.read  = nxp_spifi_read;
+>> +     spifi->nor.write = nxp_spifi_write;
+>> +     spifi->nor.erase = nxp_spifi_erase;
+>> +     spifi->nor.read_reg  = nxp_spifi_read_reg;
+>> +     spifi->nor.write_reg = nxp_spifi_write_reg;
+>> +
+>> +     ret = of_modalias_node(np, modalias, sizeof(modalias));
+>> +     if (ret < 0) {
+>> +             dev_err(spifi->dev, "unable to get device modalias\n");
+>> +             return ret;
+>> +     }
+>> +
+>> +     /*
+>> +      * The first read on a hard reset isn't reliable so do a
+>> +      * dummy read of the id before calling spi_nor_scan().
+>> +      * The reason for this problem is unknown.
+>> +      *
+>> +      * The official NXP spifilib uses more or less the same
+>> +      * workaround that is applied here by reading the device
+>> +      * id multiple times.
+>> +      */
+>> +     nxp_spifi_dummy_id_read(&spifi->nor);
+>> +
+>
+> Actually, I think there's an issue here. See how m25p80 deals
+> with modalias:
+>
+>         [..]
+>         else if (!strcmp(spi->modalias, "spi-nor"))
+>                 flash_name = NULL; /* auto-detect */
+>         else
+>                 flash_name = spi->modalias;
+>
+>         ret = spi_nor_scan(nor, flash_name, mode);
+>         if (ret)
+>                 return ret;
+>
+> I think the "auto-detect" quirk is really needed, or you are will
+> otherwise fail to probe with the generic "jedec,spi-nor" compatible
+> string.
 
-Is there something in ACPI spec which would limit PCI IO space to 64K?
-PCI itself allows 32-bit IO addresses and at least some arm64 platforms
-use PCI bus addresses above 64K for IO transactions. From a PCI view,
-the (res->end >= 0x10003) check doesn't make sense. Am I missing
-something?
+I see.
+
+Seem easy enough to fix. I'll send out new version after doing some
+more tests here.
+
+Note that this code was copied from fsl-quadspi so I assume it has the
+same problem.
+
+
+Thanks for testing and catching the issue, Ezequiel.
+
+
+regards,
+Joachim Eastwood
