@@ -1,108 +1,45 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Thu, 4 Jun 2015 11:22:53 +0100
-Subject: [PATCH 05/11] x86, pci, acpi: Move arch-agnostic MMCONFIG (aka
- ECAM) and ACPI code out of arch/x86/ directory
-In-Reply-To: <55701A31.808@linaro.org>
-References: <1432644564-24746-1-git-send-email-hanjun.guo@linaro.org>
- <1432644564-24746-6-git-send-email-hanjun.guo@linaro.org>
- <20150526170817.GU1565@arm.com> <55657B02.5090805@linaro.org>
- <20150602133215.GC23650@red-moon> <55701A31.808@linaro.org>
-Message-ID: <20150604102253.GA31773@red-moon>
+From: broonie@kernel.org (Mark Brown)
+Date: Thu, 4 Jun 2015 11:26:21 +0100
+Subject: [PATCH 10/11] spi: add more debug prints in s3c64xx
+In-Reply-To: <CAOMqctQxn6UY2DJ9Syp6Ay9SYKLgdU+8EjiTK_48-R3dZ8PcvA@mail.gmail.com>
+References: <cover.1433364398.git.hramrach@gmail.com>
+ <305830ebf9c0ae98c4f6e0ebbdec7414d6762b36.1433364398.git.hramrach@gmail.com>
+ <20150604091634.GY14071@sirena.org.uk>
+ <CAOMqctQxn6UY2DJ9Syp6Ay9SYKLgdU+8EjiTK_48-R3dZ8PcvA@mail.gmail.com>
+Message-ID: <20150604102621.GB14071@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Hanjun,
+On Thu, Jun 04, 2015 at 11:33:37AM +0200, Michal Suchanek wrote:
+> On 4 June 2015 at 11:16, Mark Brown <broonie@kernel.org> wrote:
 
-On Thu, Jun 04, 2015 at 10:28:17AM +0100, Hanjun Guo wrote:
-> Hi Lorenzo,
-> 
-> On 2015???06???02??? 21:32, Lorenzo Pieralisi wrote:
-> > On Wed, May 27, 2015 at 09:06:26AM +0100, Tomasz Nowicki wrote:
-> >> On 26.05.2015 19:08, Will Deacon wrote:
-> >>> On Tue, May 26, 2015 at 01:49:18PM +0100, Hanjun Guo wrote:
-> >>>> From: Tomasz Nowicki <tomasz.nowicki@linaro.org>
-> >>>>
-> >>>> ECAM standard and MCFG table are architecture independent and it makes
-> >>>> sense to share common code across all architectures. Both are going to
-> >>>> corresponding files - ecam.c and mcfg.c
-> >>>>
-> >>>> While we are here, rename pci_parse_mcfg to acpi_parse_mcfg.
-> >>>> We already have acpi_parse_mcfg prototype which is used nowhere.
-> >>>> At the same time, we need pci_parse_mcfg been global so acpi_parse_mcfg
-> >>>> can be used perfectly here.
-> >>>>
-> >>>> Signed-off-by: Tomasz Nowicki <tomasz.nowicki@linaro.org>
-> >>>> Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
-> >>>> Tested-by: Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com>
-> >>>> ---
-> >>>>    arch/x86/Kconfig               |   3 +
-> >>>>    arch/x86/include/asm/pci_x86.h |  33 ------
-> >>>>    arch/x86/pci/acpi.c            |   1 +
-> >>>>    arch/x86/pci/mmconfig-shared.c | 244 +---------------------------------------
-> >>>>    arch/x86/pci/mmconfig_32.c     |   1 +
-> >>>>    arch/x86/pci/mmconfig_64.c     |   1 +
-> >>>>    arch/x86/pci/numachip.c        |   1 +
-> >>>>    drivers/acpi/Makefile          |   1 +
-> >>>>    drivers/acpi/mcfg.c            |  57 ++++++++++
-> >>>>    drivers/pci/Kconfig            |   7 ++
-> >>>>    drivers/pci/Makefile           |   5 +
-> >>>>    drivers/pci/ecam.c             | 245 +++++++++++++++++++++++++++++++++++++++++
-> >>>
-> >>> Why can't we make use of the ECAM implementation used by pci-host-generic
-> >>> and drivers/pci/access.c?
-> >>
-> >> We had that question when I had posted MMCFG patch set separately,
-> >> please see:
-> >> https://lkml.org/lkml/2015/3/11/492
-> >
-> > Yes, but the real question is, why do we need to have PCI config space
-> > up and running before a bus struct is even created ? I think the reason is
-> > the PCI configuration address space format (ACPI 6.0, Table 5-27, page
-> > 108):
-> >
-> > "PCI Configuration space addresses must be confined to devices on
-> > PCI Segment Group 0, bus 0. This restriction exists to accommodate
-> > access to fixed hardware prior to PCI bus enumeration".
-> >
-> > On HW reduced platforms I do not even think this is required at all,
-> > we have to look into this to avoid code duplication that might well
-> > turn out useless.
-> 
-> This is only for the fixed hardware, which will be not available for
-> ARM64 (reduced hardware mode), but in Generic Hardware Programming
-> Model, we using OEM-provided ACPI Machine Language (AML) code to access
-> generic hardware registers, this will be available for reduced hardware
-> too.
-> 
-> So in ACPI spec, it says: (ACPI 6.0 page 66, last paragraph)
-> 
-> ACPI defines eight address spaces that may be accessed by generic
-> hardware implementations. These include:
-> * System I/O space
-> * System memory space
-> * PCI configuration space
-> * Embedded controller space
-> * System Management Bus (SMBus) space
-> * CMOS
-> * PCI BAR Target
-> * IPMI space
-> 
-> So if any device using the PCI address space for control, such
-> as a system reset control device, its address space can be reside
-> in PCI configuration space (who can prevent a OEM do that crazy
-> thing? :) ), and it should be accessible before the PCI bus is
-> created.
+> > Also for this patch (which just adds some trace) there isn't any clear
+> > reason for it to be sent as part of the series at all, it doesn't help
+> > deliver the functionality and doesn't depend on the rest of the series.
 
-Us, by changing attitude and questioning features whose usefulness
-is questionable. I will look into this and raise the point, I am not
-thrilled by the idea of adding another set of PCI accessor functions
-and drivers because we have to access a register through PCI before
-enumerating the bus (and on arm64 this is totally useless since
-we are not meant to support fixed HW anyway). Maybe we can make acpica
-code use a "special" stub (ACPI specific, PCI configuration space address
-space has restrictions anyway), I have to review this set in its
-entirety to see how to do that (and I would kindly ask you to do
-it too, before saying it is not possible to implement it).
+> I used this patch to add missing information to dmesg output so I
+> could diagnose the SPI failures so I think it is relevant.
 
-Thanks,
-Lorenzo
+The fact that you used this to debug problems is not relevant to any fix
+you might have developed for those problems; the fix can be explained
+without needing to know how you got there.  Similarly the debugging is
+hopefully useful in general without needing to know which particular
+problem prompted it's creation.
+
+> To print a clock name you AFAICT need this header. I think this is an
+> abstraction problem in the clock framework. Fixing the abstraction
+> problem with clock framework would only grow the list of recipients
+> which is already so long you complain about it.
+
+This is a bit of a warning sign that the series isn't very focused.
+It's also just not good practice, sending patches with obvious problems
+(especially obvious problems that aren't clearly flagged up as something
+temporary) will frustrate reviewers and can often lead to other issues
+being obscured.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150604/f2edb94c/attachment.sig>
