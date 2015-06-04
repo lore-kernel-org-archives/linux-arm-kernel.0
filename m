@@ -1,76 +1,40 @@
-From: marex@denx.de (Marek Vasut)
-Date: Thu, 4 Jun 2015 17:28:50 +0200
-Subject: [PATCH 04/11] mtd: ofpart: do not fail probe when no partitions
- exist
-In-Reply-To: <CAOMqctTB2AYOQZUc9o-R4PF1DQ-HY0RfSw5T-T28r5uP2s=qZA@mail.gmail.com>
-References: <cover.1433364398.git.hramrach@gmail.com>
- <201506040058.52882.marex@denx.de>
- <CAOMqctTB2AYOQZUc9o-R4PF1DQ-HY0RfSw5T-T28r5uP2s=qZA@mail.gmail.com>
-Message-ID: <201506041728.50227.marex@denx.de>
+From: dinguyen@opensource.altera.com (Dinh Nguyen)
+Date: Thu, 4 Jun 2015 10:26:29 -0500
+Subject: [PATCHv2 2/4] edac, altera: Refactor EDAC for Altera CycloneV SoC.
+In-Reply-To: <1433428128-7292-3-git-send-email-tthayer@opensource.altera.com>
+References: <1433428128-7292-1-git-send-email-tthayer@opensource.altera.com>
+ <1433428128-7292-3-git-send-email-tthayer@opensource.altera.com>
+Message-ID: <55706E25.8050105@opensource.altera.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday, June 04, 2015 at 06:54:00 AM, Michal Suchanek wrote:
-> On 4 June 2015 at 00:58, Marek Vasut <marex@denx.de> wrote:
-> > On Wednesday, June 03, 2015 at 11:26:40 PM, Michal Suchanek wrote:
-> >> On Exynos it is necessary to set SPI controller parameters that apply to
-> >> a SPI slave in a DT subnode of the slave device. The ofpart code returns
-> >> an error when there are subnodes of the SPI flash but no partitions are
-> >> found. Change this condition to a warning so that flash without
-> >> partitions can be accessed on Exynos.
-> > 
-> > I have to admit the rationale for this patch is not very clear to me,
-> > sorry. Can you please explain this a bit more ?
+On 06/04/2015 09:28 AM, tthayer at opensource.altera.com wrote:
+> From: Thor Thayer <tthayer@opensource.altera.com>
 > 
-> This is how the DT entry for SPI slave looks with s3c64xx:
-> flash: m25p80 at 0 {
->         #address-cells = <1>;
->         #size-cells = <1>;
->         compatible = "jedec,spi-nor";
->         reg = <0>;
->         spi-max-frequency = <40000000>;
->         linux,max_tx_len = <65536>;
+> The Arria10 SOC uses a completely different SDRAM controller from the
+> earlier CycloneV and ArriaV SoCs. This patch abstracts the SDRAM bits
+> for the CycloneV/ArriaV SoCs in preparation for the Arria10 support.
+> 
+> Signed-off-by: Thor Thayer <tthayer@opensource.altera.com>
+> ---
+> v2: Make c5_data static.
+> ---
+>  drivers/edac/altera_edac.c |  194 ++++++++++++++++++++------------------------
+>  drivers/edac/altera_edac.h |  116 ++++++++++++++++++++++++++
+>  2 files changed, 206 insertions(+), 104 deletions(-)
+>  create mode 100644 drivers/edac/altera_edac.h
+> 
+> diff --git a/drivers/edac/altera_edac.c b/drivers/edac/altera_edac.c
+> index a9e7c69..a8350f6 100644
+> --- a/drivers/edac/altera_edac.c
+> +++ b/drivers/edac/altera_edac.c
 
-SIDENOTE: I thought this was actually added by your patch #8 in this
-series. The underscores in the name of the property are not really
-consistent with the rest of the names.
+What branch are you basing this patch on? I get the following error when
+applied to both v4.1-rc6, linux-next, and linux-edac/linux-next.
 
->         m25p,fast-read;
->         controller-data {
->             samsung,spi-feedback-delay = <0>;
->         };
->     };
-> 
-> this is example of flash partitions:
-> flash at 0 {
->         #address-cells = <1>;
->         #size-cells = <1>;
-> 
->         partition at 0 {
->                 label = "u-boot";
->                 reg = <0x0000000 0x100000>;
->                 read-only;
->         };
-> 
->         uimage at 100000 {
->                 reg = <0x0100000 0x200000>;
->         };
-> };
-> 
-> The parser ignores any flash without subnodes and returns 0 (no
-> partititon). When there is a subnode it assumes the flash is
-> partitioned and tries to parse the subnodes as partitions. When there
-> are subnodes and none parses as partition an error is returned. As
-> shown above it is valid to have subnodes on unpartitioned flash.
->
-> When an error is returned from a partition parser the mtdpart code
-> passes on this error to the flash probe function and the proble of the
-> flash fails.
+Applying: edac, altera: Refactor EDAC for Altera CycloneV SoC.
+error: patch failed: drivers/edac/altera_edac.c:400
+error: drivers/edac/altera_edac.c: patch does not apply
+Patch failed at 0001 edac, altera: Refactor EDAC for Altera CycloneV SoC.
 
-What does /proc/mtd tell you when you have no partitions defined
-in the DT ? It should provide you with the entire MTD device and
-the code shouldn't even try to parse any OF partitions, since you
-don't have any.
-
-Best regards,
-Marek Vasut
+Dinh
