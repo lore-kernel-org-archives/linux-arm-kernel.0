@@ -1,49 +1,96 @@
-From: lina.iyer@linaro.org (Lina Iyer)
-Date: Thu, 4 Jun 2015 10:15:10 -0600
-Subject: [PATCH v2 2/2] soc: qcom: spm: Fix idle on THUMB2 kernels
-In-Reply-To: <1433272378-8470-3-git-send-email-sboyd@codeaurora.org>
-References: <1433272378-8470-1-git-send-email-sboyd@codeaurora.org>
- <1433272378-8470-3-git-send-email-sboyd@codeaurora.org>
-Message-ID: <20150604161510.GS32700@linaro.org>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Thu,  4 Jun 2015 21:50:30 +0530
+Subject: [PATCH V7 0/3] OPP: Introduce OPP (V2) bindings
+Message-ID: <cover.1433434659.git.viresh.kumar@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 02 2015 at 13:13 -0600, Stephen Boyd wrote:
->The ifc6410 firmware always enters the kernel in ARM state from
->deep idle. Use the cpu_resume_arm() wrapper instead of
->cpu_resume() to property switch into the THUMB2 state when we
->wake up from idle.
->
->This fixes a problem reported by Kevin Hilman on next-20150601
->where the ifc6410 fails to boot a THUMB2 kernel because the
->platform's firmware always enters the kernel in ARM mode from
->deep idle states.
->
->Reported-by: Kevin Hilman <khilman@linaro.org>
->Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
->Cc: Lina Iyer <lina.iyer@linaro.org>
->Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+Hi,
 
-Reviewd-by: Lina Iyer <lina.iyer@linaro.org>
+V6->V7:
+- s/opp-supply/cpu-supply (Stephen B)
 
->---
-> drivers/soc/qcom/spm.c | 2 +-
-> 1 file changed, 1 insertion(+), 1 deletion(-)
->
->diff --git a/drivers/soc/qcom/spm.c b/drivers/soc/qcom/spm.c
->index b562af816c0a..b04b05a0904e 100644
->--- a/drivers/soc/qcom/spm.c
->+++ b/drivers/soc/qcom/spm.c
->@@ -260,7 +260,7 @@ static int __init qcom_cpuidle_init(struct device_node *cpu_node, int cpu)
-> 		/* We have atleast one power down mode */
-> 		cpumask_clear(&mask);
-> 		cpumask_set_cpu(cpu, &mask);
->-		qcom_scm_set_warm_boot_addr(cpu_resume, &mask);
->+		qcom_scm_set_warm_boot_addr(cpu_resume_arm, &mask);
-> 	}
->
-> 	per_cpu(qcom_idle_ops, cpu) = fns;
->-- 
->The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
->a Linux Foundation Collaborative Project
->
+V5->V6:
+- Acks/RBY from Rob and Nishanth added
+- Lots of rewording suggested by Nishanth
+- OPP Descriptor node is named OPP Table node now and so 'opp' is
+  replaced by 'opp_table' in examples, as suggested by Nishanth.
+- OPP entries are named as 'oppX' instead of 'entry*' as suggested by
+  Nishanth.
+- Phandles to slow and fast OPPs in 2/3 are named appropriately.
+
+V4->V5:
+- opp-microamp fixed and rewritten as per Mark's suggestions.
+- shared-opp renamed as opp-shared, as that's the convention for other
+  properties.
+- Dropped "[V4 3/3] OPP: Add 'opp-next' in operating-points-v2 bindings"
+  as that was NAK'd by Mike T..
+- Added [V5 3/3] based on Nishanth's suggestions.
+- Added an example for 2/3, multiple OPP nodes.
+- Other minor formatting..
+- Existing binding: "operating-points" isn't deprecated now as platforms
+  looking for simple bindings should be allowed to use them.
+- opp-khz is changed to opp-hz, examples updated.
+- turbo-mode explained
+
+V3->V4:
+- Dropped code changes as we are still concerned about bindings.
+- separated out into three patches, some of which might be NAK'd. :)
+- The first patch presents basic OPP stuff that was reviewed earlier. It
+  also has support for multiple regulators, with values for both current
+  and voltage.
+- Second patch is based on a special concern that Stephen had about
+  multiple OPP tables, one of which the parsing code will select at
+  runtime.
+- Third one separates out 'opp-next' or Intermediate freq support as
+  Mike T. had few concerns over it. He wanted the clock driver to take
+  care of this and so do not want it to be passed by DT and used by
+  cpufreq. Also, there were concerns like the platform may not want to
+  choose intermediate frequency as a target frequency for longer runs,
+  which wasn't prevented in earlier bindings.  And so it is kept
+  separate to be NAK'd quietly, without much disturbances.
+
+  ---------------x-------------------x------------------------
+
+Current OPP (Operating performance point) device tree bindings have been
+insufficient due to the inflexible nature of the original bindings. Over
+time, we have realized that Operating Performance Point definitions and
+usage is varied depending on the SoC and a "single size (just frequency,
+voltage) fits all" model which the original bindings attempted and
+failed.
+
+The proposed next generation of the bindings addresses by providing a
+expandable binding for OPPs and introduces the following common
+shortcomings seen with the original bindings:
+
+- Getting clock/voltage/current rails sharing information between CPUs.
+  Shared by all cores vs independent clock per core vs shared clock per
+  cluster.
+
+- Support for specifying current levels along with voltages.
+
+- Support for multiple regulators.
+
+- Support for turbo modes.
+
+- Other per OPP settings: transition latencies, disabled status, etc.?
+
+- Expandability of OPPs in future.
+
+This patchset introduces new bindings "operating-points-v2" to get these
+problems solved. Refer to the bindings for more details.
+
+We now have multiple versions of OPP binding and only one of them should
+be used per device.
+
+
+Viresh Kumar (3):
+  OPP: Add new bindings to address shortcomings of existing bindings
+  OPP: Allow multiple OPP tables to be passed via DT
+  OPP: Add binding for 'opp-suspend'
+
+ Documentation/devicetree/bindings/power/opp.txt | 439 +++++++++++++++++++++++-
+ 1 file changed, 435 insertions(+), 4 deletions(-)
+
+-- 
+2.4.0
