@@ -1,46 +1,50 @@
-From: ben@smart-cactus.org (Ben Gamari)
-Date: Thu, 04 Jun 2015 15:28:55 -0400
-Subject: Exynos 5410 support (was [PATCH 6/6] ARM: dts: exynos5420: add
- sysmmu nodes)
-In-Reply-To: <556CAE98.1080906@smart-cactus.org>
-References: <1432041645-11172-1-git-send-email-m.szyprowski@samsung.com>
- <1433153450-3680-1-git-send-email-m.szyprowski@samsung.com>
- <1433153450-3680-7-git-send-email-m.szyprowski@samsung.com>
- <556CAE98.1080906@smart-cactus.org>
-Message-ID: <5570A6F7.6010305@smart-cactus.org>
+From: geert+renesas@glider.be (Geert Uytterhoeven)
+Date: Thu,  4 Jun 2015 20:53:30 +0200
+Subject: [PATCH/RFC 04/15] ARM: shmobile: r8a7791 dtsi: Add L2
+ cache-controller node
+In-Reply-To: <1433444021-22167-1-git-send-email-geert+renesas@glider.be>
+References: <1433444021-22167-1-git-send-email-geert+renesas@glider.be>
+Message-ID: <1433444021-22167-5-git-send-email-geert+renesas@glider.be>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Add a device node for the L2 cache:
+  - The L2 cache for the Cortex-A15 CPU cores is 1 MiB large (organized
+    as 64 KiB x 16 ways), and requires the following settings:
+      - Tag RAM latency: 3 cycles,
+      - Data RAM latency: 4 cycles,
+      - Data RAM setup: 0 cycles.
 
+Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+---
+What are the DT bindings for a Cortex-A15 L2 cache controller?
+---
+ arch/arm/boot/dts/r8a7791.dtsi | 13 +++++++++++++
+ 1 file changed, 13 insertions(+)
 
-On 06/01/2015 03:12 PM, Ben Gamari wrote:
-> On 06/01/2015 06:10 AM, Marek Szyprowski wrote:
->> This patch adds System MMU nodes to all defined devices that are specific
->> to Exynos5420/5800/5422 series.
->
-> Apologies in advance if Thunderbird mangles this message; my usual mail
-> configuration has suffered an unfortunate run-in with a mug of tea.
->
-> As someone who has devoted a few weekends trying to make the mainline
-> kernel usable on an Odroid XU2, I can't help but notice that nearly
-> every patchset that has hit this list recently excludes the Exynos 541x
-> devices, including series which appear to go out of their way to support
-> older devices. I would attribute this to the lack of publicly accessible
-> documentation, but many of these patches are coming from Samsung
-> employees.  Worse, the few patches that have been submitted for the 5410
-> have languished in queue-purgatory. What is going on with support for
-> this silicon?
->
-> These devices really aren't that old but if Samsung insists that they
-> aren't worth putting engineering time towards then perhaps they could at
-> least release documentation? The Hardkernel folks are on the record[2]
-> as saying there was a document under review. Perhaps this document could
-> be quickly trimmed into a disclosable state? Even a quick-and-dirty
-> documentation release would help my efforts substantially.
->
-Could someone from Samsung please provide some sort of feedback here? It 
-would be greatly appreciated.
-
-Thanks,
-
-- Ben
+diff --git a/arch/arm/boot/dts/r8a7791.dtsi b/arch/arm/boot/dts/r8a7791.dtsi
+index b657c7e7363e3d99..8013223448b5b464 100644
+--- a/arch/arm/boot/dts/r8a7791.dtsi
++++ b/arch/arm/boot/dts/r8a7791.dtsi
+@@ -69,6 +69,19 @@
+ 		};
+ 	};
+ 
++	L2_CA15: cache-controller at 0 {
++		compatible = "cache";
++
++		arm,data-latency = <4 4 0>;
++		arm,tag-latency = <3 3 3>;
++		cache-unified;
++		cache-level = <2>;
++		cache-size = <0x100000>;
++		cache-sets = <2048>;
++		cache-block-size = <32>;
++		cache-line-size = <32>;
++	};
++
+ 	gic: interrupt-controller at f1001000 {
+ 		compatible = "arm,cortex-a15-gic";
+ 		#interrupt-cells = <3>;
+-- 
+1.9.1
