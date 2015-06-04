@@ -1,143 +1,105 @@
-From: tanzilli@acmesystems.it (Sergio Tanzilli)
-Date: Thu, 4 Jun 2015 11:40:35 +0200
-Subject: [PATCH v2 16/16] ARM: at91/dt: Add Acme Arietta G25
-In-Reply-To: <557005E6.3090403@atmel.com>
-References: <1433334258-14741-1-git-send-email-alexandre.belloni@free-electrons.com>
- <1433334258-14741-17-git-send-email-alexandre.belloni@free-electrons.com>
- <557005E6.3090403@atmel.com>
-Message-ID: <CAG+hDbtgJjVy63iqea5S-5w0L_KoLiQnCK4fTSx9w22hPcHLLw@mail.gmail.com>
+From: yangyingliang@huawei.com (Yang Yingliang)
+Date: Thu, 4 Jun 2015 17:35:04 +0800
+Subject: [RFC PATCH] arm64: Image: Allow the appending of a device tree binary
+Message-ID: <1433410504-11628-1-git-send-email-yangyingliang@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Sure thanks :-)
+This patch provides the ability to boot using a device tree that is appended
+to the raw binary Image (e.g. cat Image <filename>.dtb > Image_w_dtb).
 
-Sergio Tanzilli
+Both BE and LE conditions are tested.
 
-On 4 June 2015 at 10:01, Nicolas Ferre <nicolas.ferre@atmel.com> wrote:
-> Le 03/06/2015 14:24, Alexandre Belloni a ?crit :
->> Add a minimum Device Tree for Acme Arietta G25.
->> http://acme.systems/arietta
->>
->> Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
->> Cc: Sergio Tanzilli <tanzilli@acmesystems.it>
->
-> BTW Sergio, can I add your "Acked-by" tag?
->
-> Bye,
->
->> ---
->>  arch/arm/boot/dts/Makefile            |  1 +
->>  arch/arm/boot/dts/at91-ariettag25.dts | 79 +++++++++++++++++++++++++++++++++++
->>  2 files changed, 80 insertions(+)
->>  create mode 100644 arch/arm/boot/dts/at91-ariettag25.dts
->>
->> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
->> index 8c3da289a00b..b224a3a56f09 100644
->> --- a/arch/arm/boot/dts/Makefile
->> +++ b/arch/arm/boot/dts/Makefile
->> @@ -31,6 +31,7 @@ dtb-$(CONFIG_SOC_SAM_V4_V5) += \
->>       at91sam9n12ek.dtb \
->>       at91sam9rlek.dtb \
->>       at91-ariag25.dtb \
->> +     at91-ariettag25.dtb \
->>       at91-cosino_mega2560.dtb \
->>       at91-kizboxmini.dtb \
->>       at91sam9g15ek.dtb \
->> diff --git a/arch/arm/boot/dts/at91-ariettag25.dts b/arch/arm/boot/dts/at91-ariettag25.dts
->> new file mode 100644
->> index 000000000000..c514502081d2
->> --- /dev/null
->> +++ b/arch/arm/boot/dts/at91-ariettag25.dts
->> @@ -0,0 +1,79 @@
->> +/*
->> + * Device Tree file for Arietta G25
->> + * This device tree is minimal, to activate more peripherals, see:
->> + * http://dts.acmesystems.it/arietta/
->> + */
->> +/dts-v1/;
->> +#include "at91sam9g25.dtsi"
->> +/ {
->> +     model = "Acme Systems Arietta G25";
->> +     compatible = "acme,ariettag25", "atmel,at91sam9x5", "atmel,at91sam9";
->> +
->> +     aliases {
->> +             serial0 = &dbgu;
->> +     };
->> +
->> +     chosen {
->> +             stdout-path = "serial0:115200n8";
->> +     };
->> +
->> +     memory {
->> +             reg = <0x20000000 0x8000000>;
->> +     };
->> +
->> +     clocks {
->> +             slow_xtal {
->> +                     clock-frequency = <32768>;
->> +             };
->> +
->> +             main_xtal {
->> +                     clock-frequency = <12000000>;
->> +             };
->> +     };
->> +
->> +     ahb {
->> +             apb {
->> +                     mmc0: mmc at f0008000 {
->> +                             pinctrl-0 = <
->> +                               &pinctrl_mmc0_slot0_clk_cmd_dat0
->> +                               &pinctrl_mmc0_slot0_dat1_3>;
->> +                             status = "okay";
->> +
->> +                             slot at 0 {
->> +                                     reg = <0>;
->> +                                     bus-width = <4>;
->> +                             };
->> +                     };
->> +
->> +                     usb2: gadget at f803c000 {
->> +                             status = "okay";
->> +                     };
->> +
->> +                     dbgu: serial at fffff200 {
->> +                             status = "okay";
->> +                     };
->> +
->> +                     rtc at fffffeb0 {
->> +                             status = "okay";
->> +                     };
->> +             };
->> +
->> +             usb0: ohci at 00600000 {
->> +                     status = "okay";
->> +                     num-ports = <3>;
->> +             };
->> +
->> +             usb1: ehci at 00700000 {
->> +                     status = "okay";
->> +             };
->> +     };
->> +
->> +     leds {
->> +             compatible = "gpio-leds";
->> +             arietta_led {
->> +                     label = "arietta_led";
->> +                     gpios = <&pioB 8 GPIO_ACTIVE_HIGH>; /* PB8 */
->> +                     linux,default-trigger = "heartbeat";
->> +             };
->> +     };
->> +};
->>
->
->
-> --
-> Nicolas Ferre
+Got references from e2a6a3aa ("ARM: zImage: Allow the appending of a device tree binary").
 
+Signed-off-by: Yang Yingliang <yangyingliang@huawei.com>
+---
+ arch/arm64/Kconfig              | 11 +++++++++++
+ arch/arm64/kernel/head.S        | 12 ++++++++++++
+ arch/arm64/kernel/vmlinux.lds.S | 17 +++++++++++++++++
+ 3 files changed, 40 insertions(+)
 
-
+diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+index 7796af4..d402448 100644
+--- a/arch/arm64/Kconfig
++++ b/arch/arm64/Kconfig
+@@ -660,6 +660,17 @@ endmenu
+ 
+ menu "Boot options"
+ 
++config ARM64_APPENDED_DTB
++	bool "Use appended device tree blob to Image"
++	depends on OF
++	help
++	  With this option, the boot code will look for a device tree binary
++	  (DTB) appended to Image
++	  (e.g. cat Image <filename>.dtb > Image_w_dtb).
++
++	  With this option, the size of Image will be extended to be 2MB aligned.
++	  The 2MB memory followed by Image is used for FDT blob.
++
+ config CMDLINE
+ 	string "Default kernel command string"
+ 	default ""
+diff --git a/arch/arm64/kernel/head.S b/arch/arm64/kernel/head.S
+index 19f915e..ac00c8a 100644
+--- a/arch/arm64/kernel/head.S
++++ b/arch/arm64/kernel/head.S
+@@ -274,6 +274,18 @@ ENDPROC(preserve_boot_args)
+  * The dtb must be 8-byte aligned and live in the first 512M of memory.
+  */
+ __vet_fdt:
++#ifdef CONFIG_ARM64_APPENDED_DTB
++	ldr	x21, =_edata
++	add	x21, x21, x28
++	ldr	w0, [x21]
++#ifndef __AARCH64EB__
++	ldr	w1, =0xedfe0dd0		// FDT magic word
++#else
++	ldr	w1, =0xd00dfeed
++#endif
++	cmp	w0, w1
++	b.ne	1f			// no FDT found
++#endif
+ 	tst	x21, #0x7
+ 	b.ne	1f
+ 	cmp	x21, x24
+diff --git a/arch/arm64/kernel/vmlinux.lds.S b/arch/arm64/kernel/vmlinux.lds.S
+index a2c2986..c71bac3 100644
+--- a/arch/arm64/kernel/vmlinux.lds.S
++++ b/arch/arm64/kernel/vmlinux.lds.S
+@@ -54,6 +54,18 @@ PECOFF_FILE_ALIGNMENT = 0x200;
+ #define PECOFF_EDATA_PADDING
+ #endif
+ 
++/*
++ * Set FDT pointer 2MB aligned to ensure
++ * it don't cross a 2-megabyte boundary.
++ */
++FDT_FILE_ALIGNMENT = (1 << 21);
++#ifdef CONFIG_ARM64_APPENDED_DTB
++#define FDT_EDATA_PADDING	\
++	.fdt_edata_padding : { BYTE(0); . = ALIGN(FDT_FILE_ALIGNMENT); }
++#else
++#define FDT_EDATA_PADDING
++#endif
++
+ #ifdef CONFIG_DEBUG_ALIGN_RODATA
+ #define ALIGN_DEBUG_RO			. = ALIGN(1<<SECTION_SHIFT);
+ #define ALIGN_DEBUG_RO_MIN(min)		ALIGN_DEBUG_RO
+@@ -149,8 +161,13 @@ SECTIONS
+ 	_sdata = .;
+ 	RW_DATA_SECTION(64, PAGE_SIZE, THREAD_SIZE)
+ 	PECOFF_EDATA_PADDING
++	FDT_EDATA_PADDING	/* 2MB aligned */
+ 	_edata = .;
+ 
++#ifdef CONFIG_ARM64_APPENDED_DTB
++	. += (1 << 21);		/* maximum 2MB for FDT blob */
++#endif
++
+ 	BSS_SECTION(0, 0, 0)
+ 
+ 	. = ALIGN(PAGE_SIZE);
 -- 
-Sergio Tanzilli
-tanzilli at acmesystems.it
-Acme Systems srl
-http://www.acmesystems.it
+1.8.0
