@@ -1,50 +1,31 @@
-From: dinguyen@opensource.altera.com (Dinh Nguyen)
-Date: Thu, 4 Jun 2015 17:35:06 -0500
-Subject: [PATCHv6 0/2] socfpga: support suspend to ram*
-In-Reply-To: <556E028E.2080800@opensource.altera.com>
-References: <1433270139-7042-1-git-send-email-atull@opensource.altera.com>
- <556E028E.2080800@opensource.altera.com>
-Message-ID: <5570D29A.2030007@opensource.altera.com>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Thu, 4 Jun 2015 15:50:33 -0700
+Subject: [PATCH] drivers/clk: convert sunxi/clk-mod0.c to use
+ builtin_platform_driver
+In-Reply-To: <1433358578-9579-1-git-send-email-paul.gortmaker@windriver.com>
+References: <1431287385-1526-1-git-send-email-paul.gortmaker@windriver.com>
+ <1433358578-9579-1-git-send-email-paul.gortmaker@windriver.com>
+Message-ID: <20150604225033.GD8099@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Alan,
-
-On 06/02/2015 02:22 PM, Dinh Nguyen wrote:
-> On 06/02/2015 01:35 PM, Alan Tull wrote:
->> Support suspend to ram on socfpga.
->>   * allocate space in ocram using sram driver.
->>   * Add a function in ocram to place DDR in self-refresh
->>     and suspend.
->>   * Prevent suspend if EDAC is enabled.
->>   * Add a device tree binding document for the Altera
->>     SOCFPGA SDRAM controller that is used to put DDR in
->>     self-refresh mode.
->>
->> Alan Tull (2):
->>   ARM: socfpga: support suspend to ram
->>   ARM: socfpga: dts: add sdram controller dt binding doc
->>
->>  .../arm/altera/socfpga-sdram-controller.txt        |   12 ++
->>  arch/arm/mach-socfpga/Kconfig                      |   10 +-
->>  arch/arm/mach-socfpga/Makefile                     |    1 +
->>  arch/arm/mach-socfpga/core.h                       |    6 +-
->>  arch/arm/mach-socfpga/pm.c                         |  149 ++++++++++++++++++++
->>  arch/arm/mach-socfpga/self-refresh.S               |  136 ++++++++++++++++++
->>  arch/arm/mach-socfpga/socfpga.c                    |    6 +-
->>  drivers/edac/altera_edac.c                         |   20 +++
->>  8 files changed, 337 insertions(+), 3 deletions(-)
->>  create mode 100644 Documentation/devicetree/bindings/arm/altera/socfpga-sdram-controller.txt
->>  create mode 100644 arch/arm/mach-socfpga/pm.c
->>  create mode 100644 arch/arm/mach-socfpga/self-refresh.S
->>
+On 06/03, Paul Gortmaker wrote:
+> This driver builds based on obj-y and hence will not ever be
+> modular.  Change it to use the non-modular registration so that it
+> won't suffer a compile fail once a header move places the modular
+> registration within the module.h file.
 > 
-> 
-> Applied.
-> 
+> Cc: "Emilio L?pez" <emilio@elopez.com.ar>
+> Cc: Mike Turquette <mturquette@linaro.org>
+> Cc: Stephen Boyd <sboyd@codeaurora.org>
+> Cc: Maxime Ripard <maxime.ripard@free-electrons.com>
+> Cc: linux-clk at vger.kernel.org
+> Cc: linux-arm-kernel at lists.infradead.org
+> Signed-off-by: Paul Gortmaker <paul.gortmaker@windriver.com>
+> ---
 
-I had to un-apply this patch because I noticed that it's touching
-drivers/edac/altera_edac.c. This part should be a separate patch and
-need to go through linux-edac.
+Acked-by: Stephen Boyd <sboyd@codeaurora.org>
 
-Dinh
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
