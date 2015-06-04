@@ -1,111 +1,58 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu, 04 Jun 2015 11:50:11 +0100
-Subject: [PATCH] KVM: arm64: fix misleading comments in save/restore
-In-Reply-To: <87bngvbvjv.fsf@linaro.org>
-References: <1432806186-27993-1-git-send-email-alex.bennee@linaro.org>
- <20150604093436.GC7657@cbox> <55702205.7000908@arm.com>
- <87eglrbwr2.fsf@linaro.org> <557029A9.1010303@arm.com>
- <87bngvbvjv.fsf@linaro.org>
-Message-ID: <55702D63.1050402@arm.com>
+From: hramrach@gmail.com (Michal Suchanek)
+Date: Thu, 4 Jun 2015 12:52:19 +0200
+Subject: [PATCH 10/11] spi: add more debug prints in s3c64xx
+In-Reply-To: <20150604102621.GB14071@sirena.org.uk>
+References: <cover.1433364398.git.hramrach@gmail.com>
+ <305830ebf9c0ae98c4f6e0ebbdec7414d6762b36.1433364398.git.hramrach@gmail.com>
+ <20150604091634.GY14071@sirena.org.uk>
+ <CAOMqctQxn6UY2DJ9Syp6Ay9SYKLgdU+8EjiTK_48-R3dZ8PcvA@mail.gmail.com>
+ <20150604102621.GB14071@sirena.org.uk>
+Message-ID: <CAOMqctRFXWT3m8H4YBH0tzQAL3Y2NUs6XCo2LiF1R0Xz+iWUzw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/06/15 11:46, Alex Benn?e wrote:
-> 
-> Marc Zyngier <marc.zyngier@arm.com> writes:
-> 
->> On 04/06/15 11:20, Alex Benn?e wrote:
->>>
->>> Marc Zyngier <marc.zyngier@arm.com> writes:
->>>
->>>> On 04/06/15 10:34, Christoffer Dall wrote:
->>>>> On Thu, May 28, 2015 at 10:43:06AM +0100, Alex Benn?e wrote:
->>>>>> The elr_el2 and spsr_el2 registers in fact contain the processor state
->>>>>> before entry into the hypervisor code.
->>>>>
->>>>> be careful with your use of the hypervisor, in the KVM design the
->>>>> hypervisor is split across EL1 and EL2.
->>>
->>> "before entry into EL2."
->>>
->>>>>
->>>>>> In the case of guest state it
->>>>>> could be in either el0 or el1.
->>>>>
->>>>> true
->>>>>
->>>>>>
->>>>>> Signed-off-by: Alex Benn?e <alex.bennee@linaro.org>
->>>>>> ---
->>>>>>  arch/arm64/kvm/hyp.S | 8 ++++----
->>>>>>  1 file changed, 4 insertions(+), 4 deletions(-)
->>>>>>
->>>>>> diff --git a/arch/arm64/kvm/hyp.S b/arch/arm64/kvm/hyp.S
->>>>>> index d755922..1940a4c 100644
->>>>>> --- a/arch/arm64/kvm/hyp.S
->>>>>> +++ b/arch/arm64/kvm/hyp.S
->>>>>> @@ -50,8 +50,8 @@
->>>>>>  	stp	x29, lr, [x3, #80]
->>>>>>  
->>>>>>  	mrs	x19, sp_el0
->>>>>> -	mrs	x20, elr_el2		// EL1 PC
->>>>>> -	mrs	x21, spsr_el2		// EL1 pstate
->>>>>> +	mrs	x20, elr_el2		// PC before hyp entry
->>>>>> +	mrs	x21, spsr_el2		// pstate before hyp entry
->>>>>>  
->>>>>>  	stp	x19, x20, [x3, #96]
->>>>>>  	str	x21, [x3, #112]
->>>>>> @@ -82,8 +82,8 @@
->>>>>>  	ldr	x21, [x3, #16]
->>>>>>  
->>>>>>  	msr	sp_el0, x19
->>>>>> -	msr	elr_el2, x20 				// EL1 PC
->>>>>> -	msr	spsr_el2, x21 				// EL1 pstate
->>>>>> +	msr	elr_el2, x20 		// PC to restore
->>>>>> +	msr	spsr_el2, x21 		// pstate to restore
->>>>>
->>>>> I don't feel like 'to restore' is much more meaningful here.
->>>>>
->>>>> I would actually vote for removin the comments all together, since one
->>>>> should really understand the code as opposed to the comments when
->>>>> reading this kind of stuff.
->>>>>
->>>>> Meh, I'm not sure.  Your patch is definitely better than doing nothing.
->>>>>
->>>>> Marc?
->>>>
->>>> While I definitely agree that people should pay more attention to the
->>>> code rather than blindly trusting comments, I still think there is some
->>>> value in disambiguating the exception entry/return, because this bit of
->>>> code assumes some intimate knowledge of the ARMv8 exception model.
->>>>
->>>> As for the comments themselves, I'd rather have some wording that
->>>> clearly indicate that we're dealing with guest information, i.e:
->>>>
->>>> 	mrs	x20, elr_el2		// Guest PC
->>>> 	mrs	x21, spsr_el2		// Guest pstate
->>>>
->>>> (and the same for the exception return). The "before hyp entry" and "to
->>>> restore" are not really useful (all the registers we are
->>>> saving/restoring fall into these categories). What I wanted to convey
->>>> here was that despite using an EL2 register, we are dealing with guest
->>>> registers.
->>>
->>> Which would be great it we were. However the code is used to
->>> save/restore the host context as well as the guest context hence my
->>> weasely words. 
->>
->> Gahhh. You're right. I'm spending too much time on the VHE code these
->> days. Guess I'll stick to the weasel words then. Can you respin it with
->> Christoffer's comment addressed?
-> 
-> Sure. Do you want it separated from the guest debug series or will you
-> be happy to take it with it when ready?
+On 4 June 2015 at 12:26, Mark Brown <broonie@kernel.org> wrote:
+> On Thu, Jun 04, 2015 at 11:33:37AM +0200, Michal Suchanek wrote:
+>> On 4 June 2015 at 11:16, Mark Brown <broonie@kernel.org> wrote:
+>
+>> > Also for this patch (which just adds some trace) there isn't any clear
+>> > reason for it to be sent as part of the series at all, it doesn't help
+>> > deliver the functionality and doesn't depend on the rest of the series.
+>
+>> I used this patch to add missing information to dmesg output so I
+>> could diagnose the SPI failures so I think it is relevant.
+>
+> The fact that you used this to debug problems is not relevant to any fix
+> you might have developed for those problems; the fix can be explained
+> without needing to know how you got there.  Similarly the debugging is
+> hopefully useful in general without needing to know which particular
+> problem prompted it's creation.
 
-I'll take it now, no need to wait on the whole debug series to fix this.
+Yes, this patch should be meaningful on its own.
 
-Thanks,
+The ultimate purpose of this patch series is to make the SPI NOR flash
+chip usable on boards of which I have 1 sample. If the results on
+boards other than mine happen to be different the debug prints will be
+useful for users of this flash chip.
 
-	M.
--- 
-Jazz is not dead. It just smells funny...
+There is no code interdependency with the other patches so if it's
+preferred I can send patches like this separately.
+
+>
+>> To print a clock name you AFAICT need this header. I think this is an
+>> abstraction problem in the clock framework. Fixing the abstraction
+>> problem with clock framework would only grow the list of recipients
+>> which is already so long you complain about it.
+>
+> This is a bit of a warning sign that the series isn't very focused.
+> It's also just not good practice, sending patches with obvious problems
+> (especially obvious problems that aren't clearly flagged up as something
+> temporary) will frustrate reviewers and can often lead to other issues
+> being obscured.
+
+As has been pointed out public interface already exists for getting
+the clock name so the issue here is cosmetic.
+
+Thanks
+
+Michal
