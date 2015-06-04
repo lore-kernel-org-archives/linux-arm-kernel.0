@@ -1,42 +1,69 @@
-From: slash.tmp@free.fr (Mason)
-Date: Thu, 04 Jun 2015 23:00:06 +0200
-Subject: [RFC/NOT FOR MERGING] HACK: add global/private timers for A9
-In-Reply-To: <20150604203732.GI5710@saruman.tx.rr.com>
-References: <1433363565-17725-1-git-send-email-balbi@ti.com>
- <2466648.WjMxjIpAUG@wuerfel> <20150603210455.GD6042@saruman.tx.rr.com>
- <20150603212821.GH6042@saruman.tx.rr.com> <556F7493.2060602@codeaurora.org>
- <20150603215445.GK6042@saruman.tx.rr.com> <55701E93.60303@free.fr>
- <20150604200850.GF5710@saruman.tx.rr.com> <5570B5E8.90300@free.fr>
- <20150604203732.GI5710@saruman.tx.rr.com>
-Message-ID: <5570BC56.1090305@free.fr>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Thu, 4 Jun 2015 14:02:12 -0700
+Subject: [PATCH 0/5] Add Mediatek MT8173 subsystem clocks support
+In-Reply-To: <20150529062345.GY6325@pengutronix.de>
+References: <1432192376-6712-1-git-send-email-jamesjj.liao@mediatek.com>
+ <20150528132452.GI26575@pengutronix.de>
+ <1432867649.15597.46.camel@mtksdaap41>
+ <20150529062345.GY6325@pengutronix.de>
+Message-ID: <20150604210212.GM676@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/06/2015 22:37, Felipe Balbi wrote:
-> On Thu, Jun 04, 2015 at 10:32:40PM +0200, Mason wrote:
->> On 04/06/2015 22:08, Felipe Balbi wrote:
->>
->>> On Thu, Jun 04, 2015 at 11:46:59AM +0200, Mason wrote:
->>>> Also, check /proc/timer_list for a "Broadcast device". If you don't
->>>> define one, the TWD timers are set to periodic mode, with hrtimers
->>>> disabled.
->>>
->>> Did you manage to turn global timer into Broadcast device ?
->>
->> Disclaimer: I am a kernel noob, take everything I say with
->> a rock of salt.
->>
->> As far as I can see, the global timer code doesn't handle
->> frequency changes, whereas the TWD code does.
+On 05/29, Sascha Hauer wrote:
+> On Fri, May 29, 2015 at 10:47:29AM +0800, James Liao wrote:
+> > Hi Sascha,
+> > 
+> > > And really the driver matching "mediatek,mt8173-vencsys" should register
+> > > the necessary clocks and reset lines and call of_platform_populate on
+> > > the subnodes. The driver should also be a real driver, not something
+> > > matched by CLK_OF_DECLARE. The "mediatek,mt8173-vencsys" driver now has
+> > > the possibility to manage the toplevel vencsys unit, do runtime pm, turn
+> > > the whole thing off and on. Using CCF for abstracting these clocks may
+> > > be the right thing, but I believe that we should keep the code for the
+> > > toplevel vencsys register space together in a single file and not put
+> > > the clk bits in drivers/clk/mediatek/mt8173.c, the reset bits in
+> > > drivers/reset/ and the remaining misc stuff in drivers/soc/mediatek/.
+> > > 
+> > > So I think we should have a drivers/soc/mediatek/mtk-vencsys.c which
+> > > is a regular driver, calls clk_register() for its clocks, calls
+> > > reset_controller_register() for the reset bits, provides plain functions
+> > > for the remaining bits which are not handled by any Linux framework.
+> > > Finally of_platform_populate will register the child devices.
+> > > 
+> > > I showed this using the vencsys example, but it's the same for vdecsys,
+> > > vencltsys, imgsys and mmsys.
+> > 
+> > So you agree to manage these subsystem clocks in CCF, but they should be
+> > provided by their own (globalcon) drivers, right?
 > 
-> All right, but TWD has C3STOP and that prevents it from being used as
-> broadcast device.
+> Yes. I previously got the impression that the subsystem clocks are not
+> directly associated to the larbs, but needed to be handled by the larb
+> code due to some side effect. Now that I saw that the larbs are directly
+> in the subsystem register space it all makes sense.
+> 
+> Note that the way Mediatek SoCs are designed around sub modules is bit
+> unusual and does not fit very well in the Linux directory structure.
+> Normally SoCs have a single clocks controller which controls all clocks
+> in the SoC. Then you often have a reset controller providing reset lines
+> in the SoC. In this case it's clear that the clk driver goes to
+> drivers/clk/, the reset controller driver to drivers/reset/. Mediatek
+> SoCs instead have several blocks, each with its own clock and reset
+> controller. Splitting each block up into parts in drivers/clk/ and
+> drivers/reset/ leads to quite a code fragmentation.
+> This is my opinion, it would be great to hear something from others.
+> Matthias? I'd like to avoid running into a direction that is not
+> acceptable in the end.
 
-AFAICT, my platform doesn't stop the local timers in low-power
-mode, so I just dropped the CLOCK_EVT_FEAT_C3STOP flag.
+We already have drivers registering clocks and resets under
+drivers/clk, so it's not unheard of. An alternative solution is
+to make child devices for the clock part and the reset part at
+runtime in the toplevel driver for the vencsys device (don't do
+any sort of DT description for this) and use regmap to mediate
+the register accesses and locking. That way we can put the clk
+driver in drivers/clk/, the reset driver in drivers/reset, etc.
+so that logically related code is grouped.
 
-There's even a patch approved by Arnd somewhere in the thread,
-although he did recommend I should investigate to understand
-the problem better.
-
-Regards.
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
