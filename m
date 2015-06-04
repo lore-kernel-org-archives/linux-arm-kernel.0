@@ -1,75 +1,60 @@
-From: slash.tmp@free.fr (Mason)
-Date: Thu, 04 Jun 2015 11:46:59 +0200
-Subject: [RFC/NOT FOR MERGING] HACK: add global/private timers for A9
-In-Reply-To: <20150603215445.GK6042@saruman.tx.rr.com>
-References: <1433363565-17725-1-git-send-email-balbi@ti.com>
- <2466648.WjMxjIpAUG@wuerfel> <20150603210455.GD6042@saruman.tx.rr.com>
- <20150603212821.GH6042@saruman.tx.rr.com> <556F7493.2060602@codeaurora.org>
- <20150603215445.GK6042@saruman.tx.rr.com>
-Message-ID: <55701E93.60303@free.fr>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 4 Jun 2015 10:49:21 +0100
+Subject: [PATCHv3 11/12] ARM: migrate to common PSCI client code
+In-Reply-To: <20150603151625.GA599@leverpostej>
+References: <1432648350-5454-1-git-send-email-mark.rutland@arm.com>
+ <1432648350-5454-12-git-send-email-mark.rutland@arm.com>
+ <20150603151625.GA599@leverpostej>
+Message-ID: <20150604094921.GH7557@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/06/2015 23:54, Felipe Balbi wrote:
-
-> On Wed, Jun 03, 2015 at 02:41:39PM -0700, Stephen Boyd wrote:
->>>>>> AM43xx, even though it's a single processor A9, it still has TWD and global
->>>>>> timer. I was doing some profiling with RT v4.0 and latency is 3.5x lower just
->>>>>> by switching from gptimer to twd/global.
->>>>>>
->>>>>> The only problem is that currently, is_smp() check prevents me from using twd
->>>>>> with AM43xx (that's why it's commented below, for testing purposes).
->>>>>>
->>>>>> In the hopes that we can start a, hopefully, small thread around the subject,
->>>>>> I'm sending this HACK which I used to get TWD and global timer enabled so I
->>>>>> could measure latencies with cyclictest.
->>>>>>
->>>>>> Is it so that TWD shouldn't be available on UP integrations of ARM's Cortex-A
->>>>>> processors ?
->>>>>>
->>>>>>
->>>>> I wondered about this recently when looking at something unrelated
->>>>> and noticed that the check had been introduced as part of
->>>>> 904464b91eca8 ("ARM: 7655/1: smp_twd: make twd_local_timer_of_register()
->>>>> no-op for nosmp").
->>>>>
->>>>> I suspect this was just the wrong fix at the time, and that the
->>>>> real culprit is either alloc_percpu() or request_percpu_irq()
->>>>> getting called too early on a machine without SMP support.
->>>>>
->>>>> Possibly the problem is already resolved independently, if you
->>>>> didn't run into it.
->>>> no, no splats, nothing at all. See [1]
->>>>
->>>> [1] http://hastebin.com/helekubutu
->>> Adding Shawn
->>>
->>
->> Mason was also interested in doing this. See [2]. From what I could tell
->> back then, commit 904464b91eca8 was working around the local timer APIs that
->> no longer exist.
->>
->> [2] http://thread.gmane.org/gmane.linux.ports.arm.kernel/389931/focus=392348
+On Wed, Jun 03, 2015 at 04:16:39PM +0100, Mark Rutland wrote:
+> Hi Russell,
 > 
-> A lot of good information on that thread, thanks. Seems like getting
-> twd/global timer working would also have some effect on context
-> switching, perhaps ?
+> On Tue, May 26, 2015 at 02:52:29PM +0100, Mark Rutland wrote:
+> > Now that the common PSCI client code has been factored out to
+> > drivers/firmware, and made safe for 32-bit use, move the 32-bit ARM code
+> > over to it. This results in a moderate reduction of duplicated lines,
+> > and will prevent further duplication as the PSCI client code is updated
+> > for PSCI 1.0 and beyond.
+> > 
+> > The two legacy platform users of the PSCI invocation code are updated to
+> > account for interface changes. In both cases the power state parameter
+> > is changed to an opaque u32 token in preparation for PSCI 1.0 power
+> > state changes.
+> > 
+> > Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+> > Acked-by: Catalin Marinas <catalin.marinas@arm.com>
+> > Cc: Ashwin Chaugule <ashwin.chaugule@linaro.org>
+> > Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+> > Cc: Rob Herring <robh@kernel.org>
+> > Cc: Russell King <rmk+kernel@arm.linux.org.uk>
+> > Cc: Will Deacon <will.deacon@arm.com>
+> > ---
+> >  arch/arm/Kconfig                  |   1 +
+> >  arch/arm/include/asm/psci.h       |  23 ---
+> >  arch/arm/kernel/Makefile          |   2 +-
+> >  arch/arm/kernel/psci.c            | 299 --------------------------------------
+> >  arch/arm/kernel/psci_smp.c        |  29 +++-
+> >  arch/arm/kernel/setup.c           |   3 +-
+> >  arch/arm/mach-highbank/highbank.c |   2 +-
+> >  arch/arm/mach-highbank/pm.c       |   8 +-
+> >  drivers/cpuidle/cpuidle-calxeda.c |   7 +-
+> >  9 files changed, 32 insertions(+), 342 deletions(-)
+> >  delete mode 100644 arch/arm/kernel/psci.c
+> 
+> Do you have any objections to the arch/arm changes in this patch?
+> 
+> If not, could I please have your ack?
+> 
+> As there are arm, arm64, and drivers changes in the series I was hoping
+> this could all go via arm-soc.
 
-Hello,
+If you want me to do something, please ensure that you send stuff _To:_
+me, not _Cc:_ me... I can't say when I'll be able to look at them today,
+but hopefully tomorrow.
 
-In my case, I need to support two platforms:
-
-  single core Cortex A9 MPCore
-    dual core Cortex A9 MPCore
-
-However, as the MPCore moniker implies, even the single core platform
-is "SMP capable". (I think this only means an SCU is available?)
-
-Thus, I worked around the issue by using the same SMP kernel for both
-platforms; which is why I didn't push any patch.
-
-Also, check /proc/timer_list for a "Broadcast device". If you don't
-define one, the TWD timers are set to periodic mode, with hrtimers
-disabled.
-
-Regards.
+-- 
+FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
+according to speedtest.net.
