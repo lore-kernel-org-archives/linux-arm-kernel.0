@@ -1,87 +1,139 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu, 04 Jun 2015 11:01:41 +0100
-Subject: [PATCH] KVM: arm64: fix misleading comments in save/restore
-In-Reply-To: <20150604093436.GC7657@cbox>
-References: <1432806186-27993-1-git-send-email-alex.bennee@linaro.org>
- <20150604093436.GC7657@cbox>
-Message-ID: <55702205.7000908@arm.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Thu, 4 Jun 2015 11:04:50 +0100
+Subject: [RFC PATCH] arm64: Image: Allow the appending of a device tree
+ binary
+In-Reply-To: <1433410504-11628-1-git-send-email-yangyingliang@huawei.com>
+References: <1433410504-11628-1-git-send-email-yangyingliang@huawei.com>
+Message-ID: <20150604100450.GC599@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/06/15 10:34, Christoffer Dall wrote:
-> On Thu, May 28, 2015 at 10:43:06AM +0100, Alex Benn?e wrote:
->> The elr_el2 and spsr_el2 registers in fact contain the processor state
->> before entry into the hypervisor code.
-> 
-> be careful with your use of the hypervisor, in the KVM design the
-> hypervisor is split across EL1 and EL2.
-> 
->> In the case of guest state it
->> could be in either el0 or el1.
-> 
-> true
-> 
->>
->> Signed-off-by: Alex Benn?e <alex.bennee@linaro.org>
->> ---
->>  arch/arm64/kvm/hyp.S | 8 ++++----
->>  1 file changed, 4 insertions(+), 4 deletions(-)
->>
->> diff --git a/arch/arm64/kvm/hyp.S b/arch/arm64/kvm/hyp.S
->> index d755922..1940a4c 100644
->> --- a/arch/arm64/kvm/hyp.S
->> +++ b/arch/arm64/kvm/hyp.S
->> @@ -50,8 +50,8 @@
->>  	stp	x29, lr, [x3, #80]
->>  
->>  	mrs	x19, sp_el0
->> -	mrs	x20, elr_el2		// EL1 PC
->> -	mrs	x21, spsr_el2		// EL1 pstate
->> +	mrs	x20, elr_el2		// PC before hyp entry
->> +	mrs	x21, spsr_el2		// pstate before hyp entry
->>  
->>  	stp	x19, x20, [x3, #96]
->>  	str	x21, [x3, #112]
->> @@ -82,8 +82,8 @@
->>  	ldr	x21, [x3, #16]
->>  
->>  	msr	sp_el0, x19
->> -	msr	elr_el2, x20 				// EL1 PC
->> -	msr	spsr_el2, x21 				// EL1 pstate
->> +	msr	elr_el2, x20 		// PC to restore
->> +	msr	spsr_el2, x21 		// pstate to restore
-> 
-> I don't feel like 'to restore' is much more meaningful here.
-> 
-> I would actually vote for removin the comments all together, since one
-> should really understand the code as opposed to the comments when
-> reading this kind of stuff.
-> 
-> Meh, I'm not sure.  Your patch is definitely better than doing nothing.
-> 
-> Marc?
+Hi,
 
-While I definitely agree that people should pay more attention to the
-code rather than blindly trusting comments, I still think there is some
-value in disambiguating the exception entry/return, because this bit of
-code assumes some intimate knowledge of the ARMv8 exception model.
+On Thu, Jun 04, 2015 at 10:35:04AM +0100, Yang Yingliang wrote:
+> This patch provides the ability to boot using a device tree that is appended
+> to the raw binary Image (e.g. cat Image <filename>.dtb > Image_w_dtb).
+> 
+> Both BE and LE conditions are tested.
+> 
+> Got references from e2a6a3aa ("ARM: zImage: Allow the appending of a device tree binary").
 
-As for the comments themselves, I'd rather have some wording that
-clearly indicate that we're dealing with guest information, i.e:
+NAK for this as it stands. I really don't want to see appended DTB for
+arm64.
 
-	mrs	x20, elr_el2		// Guest PC
-	mrs	x21, spsr_el2		// Guest pstate
+We needed it for arm because old bootloaders didn't know how to pass a
+DTB to the kernel. For arm64 DTB has always been a requirement, so
+there's no legacy bootloader to support, and the rationale from arm does
+not apply.
 
-(and the same for the exception return). The "before hyp entry" and "to
-restore" are not really useful (all the registers we are
-saving/restoring fall into these categories). What I wanted to convey
-here was that despite using an EL2 register, we are dealing with guest
-registers.
-
-Would this address your concerns?
+Adding appended DTB to arm64 encourages the broken assumption that
+kernel and DTB are intimately coupled. It relies on arbitrary
+limitations that are difficult and/or impossible to change in future in
+a compatible fashion (e.g. the 2M carveout you make for the DT to live
+in), and also makes it hard to replace either the kernel or DTB becuase
+in the resulting Image there's no clear distinction between the two.
+It's simply far too fragile.
 
 Thanks,
+Mark.
 
-	M.
--- 
-Jazz is not dead. It just smells funny...
+> 
+> Signed-off-by: Yang Yingliang <yangyingliang@huawei.com>
+> ---
+>  arch/arm64/Kconfig              | 11 +++++++++++
+>  arch/arm64/kernel/head.S        | 12 ++++++++++++
+>  arch/arm64/kernel/vmlinux.lds.S | 17 +++++++++++++++++
+>  3 files changed, 40 insertions(+)
+> 
+> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+> index 7796af4..d402448 100644
+> --- a/arch/arm64/Kconfig
+> +++ b/arch/arm64/Kconfig
+> @@ -660,6 +660,17 @@ endmenu
+>  
+>  menu "Boot options"
+>  
+> +config ARM64_APPENDED_DTB
+> +	bool "Use appended device tree blob to Image"
+> +	depends on OF
+> +	help
+> +	  With this option, the boot code will look for a device tree binary
+> +	  (DTB) appended to Image
+> +	  (e.g. cat Image <filename>.dtb > Image_w_dtb).
+> +
+> +	  With this option, the size of Image will be extended to be 2MB aligned.
+> +	  The 2MB memory followed by Image is used for FDT blob.
+> +
+>  config CMDLINE
+>  	string "Default kernel command string"
+>  	default ""
+> diff --git a/arch/arm64/kernel/head.S b/arch/arm64/kernel/head.S
+> index 19f915e..ac00c8a 100644
+> --- a/arch/arm64/kernel/head.S
+> +++ b/arch/arm64/kernel/head.S
+> @@ -274,6 +274,18 @@ ENDPROC(preserve_boot_args)
+>   * The dtb must be 8-byte aligned and live in the first 512M of memory.
+>   */
+>  __vet_fdt:
+> +#ifdef CONFIG_ARM64_APPENDED_DTB
+> +	ldr	x21, =_edata
+> +	add	x21, x21, x28
+> +	ldr	w0, [x21]
+> +#ifndef __AARCH64EB__
+> +	ldr	w1, =0xedfe0dd0		// FDT magic word
+> +#else
+> +	ldr	w1, =0xd00dfeed
+> +#endif
+> +	cmp	w0, w1
+> +	b.ne	1f			// no FDT found
+> +#endif
+>  	tst	x21, #0x7
+>  	b.ne	1f
+>  	cmp	x21, x24
+> diff --git a/arch/arm64/kernel/vmlinux.lds.S b/arch/arm64/kernel/vmlinux.lds.S
+> index a2c2986..c71bac3 100644
+> --- a/arch/arm64/kernel/vmlinux.lds.S
+> +++ b/arch/arm64/kernel/vmlinux.lds.S
+> @@ -54,6 +54,18 @@ PECOFF_FILE_ALIGNMENT = 0x200;
+>  #define PECOFF_EDATA_PADDING
+>  #endif
+>  
+> +/*
+> + * Set FDT pointer 2MB aligned to ensure
+> + * it don't cross a 2-megabyte boundary.
+> + */
+> +FDT_FILE_ALIGNMENT = (1 << 21);
+> +#ifdef CONFIG_ARM64_APPENDED_DTB
+> +#define FDT_EDATA_PADDING	\
+> +	.fdt_edata_padding : { BYTE(0); . = ALIGN(FDT_FILE_ALIGNMENT); }
+> +#else
+> +#define FDT_EDATA_PADDING
+> +#endif
+> +
+>  #ifdef CONFIG_DEBUG_ALIGN_RODATA
+>  #define ALIGN_DEBUG_RO			. = ALIGN(1<<SECTION_SHIFT);
+>  #define ALIGN_DEBUG_RO_MIN(min)		ALIGN_DEBUG_RO
+> @@ -149,8 +161,13 @@ SECTIONS
+>  	_sdata = .;
+>  	RW_DATA_SECTION(64, PAGE_SIZE, THREAD_SIZE)
+>  	PECOFF_EDATA_PADDING
+> +	FDT_EDATA_PADDING	/* 2MB aligned */
+>  	_edata = .;
+>  
+> +#ifdef CONFIG_ARM64_APPENDED_DTB
+> +	. += (1 << 21);		/* maximum 2MB for FDT blob */
+> +#endif
+> +
+>  	BSS_SECTION(0, 0, 0)
+>  
+>  	. = ALIGN(PAGE_SIZE);
+> -- 
+> 1.8.0
+> 
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
