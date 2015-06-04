@@ -1,54 +1,62 @@
 From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Thu, 4 Jun 2015 11:37:52 -0700
-Subject: [PATCH V7 1/3] OPP: Add new bindings to address shortcomings of
- existing bindings
-In-Reply-To: <d83c0b6b1768c7229384216329b607d13886aa02.1433434659.git.viresh.kumar@linaro.org>
-References: <cover.1433434659.git.viresh.kumar@linaro.org>
- <d83c0b6b1768c7229384216329b607d13886aa02.1433434659.git.viresh.kumar@linaro.org>
-Message-ID: <20150604183752.GI490@codeaurora.org>
+Date: Thu, 4 Jun 2015 11:42:54 -0700
+Subject: [PATCH 05/12] ARM: OMAP2+: Add support for initializing dm814x
+ clocks
+In-Reply-To: <1433348601-8966-6-git-send-email-tony@atomide.com>
+References: <1433348601-8966-1-git-send-email-tony@atomide.com>
+ <1433348601-8966-6-git-send-email-tony@atomide.com>
+Message-ID: <20150604184254.GJ490@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/04, Viresh Kumar wrote:
-> Current OPP (Operating performance point) device tree bindings have been
-> insufficient due to the inflexible nature of the original bindings. Over
-> time, we have realized that Operating Performance Point definitions and
-> usage is varied depending on the SoC and a "single size (just frequency,
-> voltage) fits all" model which the original bindings attempted and
-> failed.
-> 
-> The proposed next generation of the bindings addresses by providing a
-> expandable binding for OPPs and introduces the following common
-> shortcomings seen with the original bindings:
-> 
-> - Getting clock/voltage/current rails sharing information between CPUs.
->   Shared by all cores vs independent clock per core vs shared clock per
->   cluster.
-> 
-> - Support for specifying current levels along with voltages.
-> 
-> - Support for multiple regulators.
-> 
-> - Support for turbo modes.
-> 
-> - Other per OPP settings: transition latencies, disabled status, etc.?
-> 
-> - Expandability of OPPs in future.
-> 
-> This patch introduces new bindings "operating-points-v2" to get these problems
-> solved. Refer to the bindings for more details.
-> 
-> We now have multiple versions of OPP binding and only one of them should
-> be used per device.
-> 
-> Reviewed-by: Rob Herring <robh@kernel.org>
-> Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
+On 06/03, Tony Lindgren wrote:
+> diff --git a/drivers/clk/ti/clk-814x.c b/drivers/clk/ti/clk-814x.c
+> new file mode 100644
+> index 0000000..bd2353c
+> --- /dev/null
+> +++ b/drivers/clk/ti/clk-814x.c
+> @@ -0,0 +1,36 @@
+> +/*
+> + * This program is free software; you can redistribute it and/or
+> + * modify it under the terms of the GNU General Public License as
+> + * published by the Free Software Foundation version 2.
+> + */
+> +
+> +#include <linux/kernel.h>
+> +#include <linux/list.h>
 
-Ok. I'm still interested to see if this binding will have to
-change to support how multiple regulators will be matched up with
-the device using the OPP. But for now,
+Is list.h used?
 
-Reviewed-by: Stephen Boyd <sboyd@codeaurora.org>
+> +#include <linux/clk-provider.h>
+> +#include <linux/clk/ti.h>
+> +
+> +static struct ti_dt_clk dm814_clks[] = {
+> +	DT_CLK(NULL, "devosc_ck", "devosc_ck"),
+> +	DT_CLK(NULL, "mpu_ck", "mpu_ck"),
+> +	DT_CLK(NULL, "sysclk4_ck", "sysclk4_ck"),
+> +	DT_CLK(NULL, "sysclk6_ck", "sysclk6_ck"),
+> +	DT_CLK(NULL, "sysclk10_ck", "sysclk10_ck"),
+> +	DT_CLK(NULL, "sysclk18_ck", "sysclk18_ck"),
+> +	DT_CLK(NULL, "timer_sys_ck", "devosc_ck"),
+> +	DT_CLK(NULL, "cpsw_125mhz_gclk", "cpsw_125mhz_gclk"),
+> +	DT_CLK(NULL, "cpsw_cpts_rft_clk", "cpsw_cpts_rft_clk"),
+> +	{ .node_name = NULL },
+> +};
+> +
+> +static const char *enable_init_clks[] = {
+> +};
+
+delete?
+
+> +
+> +int __init dm814x_dt_clk_init(void)
+> +{
+> +	ti_dt_clocks_register(dm814_clks);
+> +	omap2_clk_disable_autoidle_all();
+> +	omap2_clk_enable_init_clocks(enable_init_clks,
+> +				     ARRAY_SIZE(enable_init_clks));
+
+And pass NULL and 0 here?
 
 -- 
 Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
