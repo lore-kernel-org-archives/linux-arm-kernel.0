@@ -1,10 +1,10 @@
 From: jiang.liu@linux.intel.com (Jiang Liu)
-Date: Thu,  4 Jun 2015 12:13:55 +0800
-Subject: [RFT v2 45/48] genirq,
- gpio: Kill the first parameter 'irq' of irq_flow_handler_t
+Date: Thu,  4 Jun 2015 12:13:56 +0800
+Subject: [RFT v2 46/48] genirq,
+ irqchip: Kill the first parameter 'irq' of irq_flow_handler_t
 In-Reply-To: <1433391238-19471-1-git-send-email-jiang.liu@linux.intel.com>
 References: <1433391238-19471-1-git-send-email-jiang.liu@linux.intel.com>
-Message-ID: <1433391238-19471-46-git-send-email-jiang.liu@linux.intel.com>
+Message-ID: <1433391238-19471-47-git-send-email-jiang.liu@linux.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -17,354 +17,339 @@ To ease review, I have split the changes into several parts, though
 they should be merge as one to support bisecting.
 
 Signed-off-by: Jiang Liu <jiang.liu@linux.intel.com>
+Acked-by: Ralf Baechle <ralf@linux-mips.org>
 ---
- drivers/gpio/gpio-altera.c     |    6 ++----
- drivers/gpio/gpio-bcm-kona.c   |    2 +-
- drivers/gpio/gpio-davinci.c    |    2 +-
- drivers/gpio/gpio-dwapb.c      |    2 +-
- drivers/gpio/gpio-ep93xx.c     |    4 ++--
- drivers/gpio/gpio-intel-mid.c  |    2 +-
- drivers/gpio/gpio-lynxpoint.c  |    2 +-
- drivers/gpio/gpio-mpc8xxx.c    |    2 +-
- drivers/gpio/gpio-msic.c       |    2 +-
- drivers/gpio/gpio-msm-v2.c     |    2 +-
- drivers/gpio/gpio-mvebu.c      |    2 +-
- drivers/gpio/gpio-mxc.c        |    4 ++--
- drivers/gpio/gpio-mxs.c        |    2 +-
- drivers/gpio/gpio-omap.c       |    2 +-
- drivers/gpio/gpio-pl061.c      |    2 +-
- drivers/gpio/gpio-pxa.c        |    2 +-
- drivers/gpio/gpio-sa1100.c     |    2 +-
- drivers/gpio/gpio-tegra.c      |    2 +-
- drivers/gpio/gpio-timberdale.c |    2 +-
- drivers/gpio/gpio-tz1090.c     |    4 ++--
- drivers/gpio/gpio-vf610.c      |    2 +-
- drivers/gpio/gpio-zynq.c       |    2 +-
- 22 files changed, 26 insertions(+), 28 deletions(-)
+ drivers/irqchip/exynos-combiner.c    |    4 ++--
+ drivers/irqchip/irq-armada-370-xp.c  |    3 +--
+ drivers/irqchip/irq-bcm7038-l1.c     |    2 +-
+ drivers/irqchip/irq-bcm7120-l2.c     |    2 +-
+ drivers/irqchip/irq-brcmstb-l2.c     |    4 ++--
+ drivers/irqchip/irq-dw-apb-ictl.c    |    2 +-
+ drivers/irqchip/irq-gic.c            |    2 +-
+ drivers/irqchip/irq-imgpdc.c         |    4 ++--
+ drivers/irqchip/irq-keystone.c       |    2 +-
+ drivers/irqchip/irq-metag-ext.c      |    3 +--
+ drivers/irqchip/irq-metag.c          |    3 +--
+ drivers/irqchip/irq-mips-gic.c       |    2 +-
+ drivers/irqchip/irq-mmp.c            |    2 +-
+ drivers/irqchip/irq-orion.c          |    2 +-
+ drivers/irqchip/irq-s3c24xx.c        |    2 +-
+ drivers/irqchip/irq-sunxi-nmi.c      |    2 +-
+ drivers/irqchip/irq-tb10x.c          |    2 +-
+ drivers/irqchip/irq-versatile-fpga.c |    4 ++--
+ drivers/irqchip/irq-vic.c            |    2 +-
+ drivers/irqchip/spear-shirq.c        |    2 +-
+ 20 files changed, 24 insertions(+), 27 deletions(-)
 
-diff --git a/drivers/gpio/gpio-altera.c b/drivers/gpio/gpio-altera.c
-index 449fb46cb8a0..985c3bd9a03e 100644
---- a/drivers/gpio/gpio-altera.c
-+++ b/drivers/gpio/gpio-altera.c
-@@ -200,8 +200,7 @@ static int altera_gpio_direction_output(struct gpio_chip *gc,
- 	return 0;
+diff --git a/drivers/irqchip/exynos-combiner.c b/drivers/irqchip/exynos-combiner.c
+index 039ceb46fcc0..2bf152307bac 100644
+--- a/drivers/irqchip/exynos-combiner.c
++++ b/drivers/irqchip/exynos-combiner.c
+@@ -60,7 +60,7 @@ static void combiner_unmask_irq(struct irq_data *data)
+ 	__raw_writel(mask, combiner_base(data) + COMBINER_ENABLE_SET);
  }
  
--static void altera_gpio_irq_edge_handler(unsigned int irq,
--					struct irq_desc *desc)
-+static void altera_gpio_irq_edge_handler(struct irq_desc *desc)
+-static void combiner_handle_cascade_irq(unsigned int irq, struct irq_desc *desc)
++static void combiner_handle_cascade_irq(struct irq_desc *desc)
  {
- 	struct altera_gpio_chip *altera_gc;
- 	struct irq_chip *chip;
-@@ -230,8 +229,7 @@ static void altera_gpio_irq_edge_handler(unsigned int irq,
- }
- 
- 
--static void altera_gpio_irq_leveL_high_handler(unsigned int irq,
--					      struct irq_desc *desc)
-+static void altera_gpio_irq_leveL_high_handler(struct irq_desc *desc)
- {
- 	struct altera_gpio_chip *altera_gc;
- 	struct irq_chip *chip;
-diff --git a/drivers/gpio/gpio-bcm-kona.c b/drivers/gpio/gpio-bcm-kona.c
-index 2e7a8c66fe57..6471892f4f83 100644
---- a/drivers/gpio/gpio-bcm-kona.c
-+++ b/drivers/gpio/gpio-bcm-kona.c
-@@ -427,7 +427,7 @@ static int bcm_kona_gpio_irq_set_type(struct irq_data *d, unsigned int type)
- 	return 0;
- }
- 
--static void bcm_kona_gpio_irq_handler(unsigned int irq, struct irq_desc *desc)
-+static void bcm_kona_gpio_irq_handler(struct irq_desc *desc)
- {
- 	void __iomem *reg_base;
- 	int bit, bank_id;
-diff --git a/drivers/gpio/gpio-davinci.c b/drivers/gpio/gpio-davinci.c
-index 9a738f5d409b..a2bd82f61822 100644
---- a/drivers/gpio/gpio-davinci.c
-+++ b/drivers/gpio/gpio-davinci.c
-@@ -327,7 +327,7 @@ static struct irq_chip gpio_irqchip = {
- };
- 
- static void
--gpio_irq_handler(unsigned __irq, struct irq_desc *desc)
-+gpio_irq_handler(struct irq_desc *desc)
- {
- 	unsigned int irq = irq_desc_get_irq(desc);
- 	struct davinci_gpio_regs __iomem *g;
-diff --git a/drivers/gpio/gpio-dwapb.c b/drivers/gpio/gpio-dwapb.c
-index 649be07a845d..bf7cb1be756d 100644
---- a/drivers/gpio/gpio-dwapb.c
-+++ b/drivers/gpio/gpio-dwapb.c
-@@ -147,7 +147,7 @@ static u32 dwapb_do_irq(struct dwapb_gpio *gpio)
- 	return ret;
- }
- 
--static void dwapb_irq_handler(u32 irq, struct irq_desc *desc)
-+static void dwapb_irq_handler(struct irq_desc *desc)
- {
- 	struct dwapb_gpio *gpio = irq_desc_get_handler_data(desc);
+ 	struct combiner_chip_data *chip_data = irq_desc_get_handler_data(desc);
  	struct irq_chip *chip = irq_desc_get_chip(desc);
-diff --git a/drivers/gpio/gpio-ep93xx.c b/drivers/gpio/gpio-ep93xx.c
-index e507baa6e3a2..03648a8a6f8e 100644
---- a/drivers/gpio/gpio-ep93xx.c
-+++ b/drivers/gpio/gpio-ep93xx.c
-@@ -78,7 +78,7 @@ static void ep93xx_gpio_int_debounce(unsigned int irq, bool enable)
- 		EP93XX_GPIO_REG(int_debounce_register_offset[port]));
- }
+@@ -81,7 +81,7 @@ static void combiner_handle_cascade_irq(unsigned int irq, struct irq_desc *desc)
+ 	cascade_irq = irq_find_mapping(combiner_irq_domain, combiner_irq);
  
--static void ep93xx_gpio_ab_irq_handler(unsigned int irq, struct irq_desc *desc)
-+static void ep93xx_gpio_ab_irq_handler(struct irq_desc *desc)
- {
- 	unsigned char status;
- 	int i;
-@@ -100,7 +100,7 @@ static void ep93xx_gpio_ab_irq_handler(unsigned int irq, struct irq_desc *desc)
- 	}
- }
+ 	if (unlikely(!cascade_irq))
+-		handle_bad_irq(irq, desc);
++		handle_bad_irq(desc);
+ 	else
+ 		generic_handle_irq(cascade_irq);
  
--static void ep93xx_gpio_f_irq_handler(unsigned int __irq, struct irq_desc *desc)
-+static void ep93xx_gpio_f_irq_handler(struct irq_desc *desc)
- {
- 	/*
- 	 * map discontiguous hw irq range to continuous sw irq range:
-diff --git a/drivers/gpio/gpio-intel-mid.c b/drivers/gpio/gpio-intel-mid.c
-index aa28c65eb6b4..70097472b02c 100644
---- a/drivers/gpio/gpio-intel-mid.c
-+++ b/drivers/gpio/gpio-intel-mid.c
-@@ -301,7 +301,7 @@ static const struct pci_device_id intel_gpio_ids[] = {
- };
- MODULE_DEVICE_TABLE(pci, intel_gpio_ids);
- 
--static void intel_mid_irq_handler(unsigned irq, struct irq_desc *desc)
-+static void intel_mid_irq_handler(struct irq_desc *desc)
- {
- 	struct gpio_chip *gc = irq_desc_get_handler_data(desc);
- 	struct intel_mid_gpio *priv = to_intel_gpio_priv(gc);
-diff --git a/drivers/gpio/gpio-lynxpoint.c b/drivers/gpio/gpio-lynxpoint.c
-index 127c755b38dc..23e884aefe36 100644
---- a/drivers/gpio/gpio-lynxpoint.c
-+++ b/drivers/gpio/gpio-lynxpoint.c
-@@ -234,7 +234,7 @@ static int lp_gpio_direction_output(struct gpio_chip *chip,
- 	return 0;
- }
- 
--static void lp_gpio_irq_handler(unsigned hwirq, struct irq_desc *desc)
-+static void lp_gpio_irq_handler(struct irq_desc *desc)
- {
- 	struct irq_data *data = irq_desc_get_irq_data(desc);
- 	struct gpio_chip *gc = irq_desc_get_handler_data(desc);
-diff --git a/drivers/gpio/gpio-mpc8xxx.c b/drivers/gpio/gpio-mpc8xxx.c
-index a65b75161aa4..281dea4d2e39 100644
---- a/drivers/gpio/gpio-mpc8xxx.c
-+++ b/drivers/gpio/gpio-mpc8xxx.c
-@@ -185,7 +185,7 @@ static int mpc8xxx_gpio_to_irq(struct gpio_chip *gc, unsigned offset)
- 		return -ENXIO;
- }
- 
--static void mpc8xxx_gpio_irq_cascade(unsigned int irq, struct irq_desc *desc)
-+static void mpc8xxx_gpio_irq_cascade(struct irq_desc *desc)
- {
- 	struct mpc8xxx_gpio_chip *mpc8xxx_gc = irq_desc_get_handler_data(desc);
- 	struct irq_chip *chip = irq_desc_get_chip(desc);
-diff --git a/drivers/gpio/gpio-msic.c b/drivers/gpio/gpio-msic.c
-index 01acf0a8cdb1..35b3046d1c7d 100644
---- a/drivers/gpio/gpio-msic.c
-+++ b/drivers/gpio/gpio-msic.c
-@@ -232,7 +232,7 @@ static struct irq_chip msic_irqchip = {
- 	.irq_bus_sync_unlock	= msic_bus_sync_unlock,
- };
- 
--static void msic_gpio_irq_handler(unsigned irq, struct irq_desc *desc)
-+static void msic_gpio_irq_handler(struct irq_desc *desc)
- {
- 	struct irq_data *data = irq_desc_get_irq_data(desc);
- 	struct msic_gpio *mg = irq_data_get_irq_handler_data(data);
-diff --git a/drivers/gpio/gpio-msm-v2.c b/drivers/gpio/gpio-msm-v2.c
-index 52ff18229fdc..f4a69e005409 100644
---- a/drivers/gpio/gpio-msm-v2.c
-+++ b/drivers/gpio/gpio-msm-v2.c
-@@ -313,7 +313,7 @@ static int msm_gpio_irq_set_type(struct irq_data *d, unsigned int flow_type)
-  * which have been set as summary IRQ lines and which are triggered,
-  * and to call their interrupt handlers.
-  */
--static void msm_summary_irq_handler(unsigned int irq, struct irq_desc *desc)
-+static void msm_summary_irq_handler(struct irq_desc *desc)
- {
- 	unsigned long i;
- 	struct irq_chip *chip = irq_desc_get_chip(desc);
-diff --git a/drivers/gpio/gpio-mvebu.c b/drivers/gpio/gpio-mvebu.c
-index a8c302ef7bc4..5b12549e3d6c 100644
---- a/drivers/gpio/gpio-mvebu.c
-+++ b/drivers/gpio/gpio-mvebu.c
-@@ -458,7 +458,7 @@ static int mvebu_gpio_irq_set_type(struct irq_data *d, unsigned int type)
- 	return 0;
- }
- 
--static void mvebu_gpio_irq_handler(unsigned int irq, struct irq_desc *desc)
-+static void mvebu_gpio_irq_handler(struct irq_desc *desc)
- {
- 	struct mvebu_gpio_chip *mvchip = irq_desc_get_handler_data(desc);
- 	struct irq_chip *chip = irq_desc_get_chip(desc);
-diff --git a/drivers/gpio/gpio-mxc.c b/drivers/gpio/gpio-mxc.c
-index f10948c04f7c..1f5186002326 100644
---- a/drivers/gpio/gpio-mxc.c
-+++ b/drivers/gpio/gpio-mxc.c
-@@ -272,7 +272,7 @@ static void mxc_gpio_irq_handler(struct mxc_gpio_port *port, u32 irq_stat)
- }
- 
- /* MX1 and MX3 has one interrupt *per* gpio port */
--static void mx3_gpio_irq_handler(u32 irq, struct irq_desc *desc)
-+static void mx3_gpio_irq_handler(struct irq_desc *desc)
- {
- 	u32 irq_stat;
- 	struct mxc_gpio_port *port = irq_desc_get_handler_data(desc);
-@@ -288,7 +288,7 @@ static void mx3_gpio_irq_handler(u32 irq, struct irq_desc *desc)
- }
- 
- /* MX2 has one interrupt *for all* gpio ports */
--static void mx2_gpio_irq_handler(u32 irq, struct irq_desc *desc)
-+static void mx2_gpio_irq_handler(struct irq_desc *desc)
- {
- 	u32 irq_msk, irq_stat;
- 	struct mxc_gpio_port *port;
-diff --git a/drivers/gpio/gpio-mxs.c b/drivers/gpio/gpio-mxs.c
-index 039c7d50e64f..e5b286e9f016 100644
---- a/drivers/gpio/gpio-mxs.c
-+++ b/drivers/gpio/gpio-mxs.c
-@@ -154,7 +154,7 @@ static void mxs_flip_edge(struct mxs_gpio_port *port, u32 gpio)
- }
- 
- /* MXS has one interrupt *per* gpio port */
--static void mxs_gpio_irq_handler(u32 irq, struct irq_desc *desc)
-+static void mxs_gpio_irq_handler(struct irq_desc *desc)
- {
- 	u32 irq_stat;
- 	struct mxs_gpio_port *port = irq_desc_get_handler_data(desc);
-diff --git a/drivers/gpio/gpio-omap.c b/drivers/gpio/gpio-omap.c
-index acbf3feff1e2..7f764d786efe 100644
---- a/drivers/gpio/gpio-omap.c
-+++ b/drivers/gpio/gpio-omap.c
-@@ -711,7 +711,7 @@ static void omap_gpio_free(struct gpio_chip *chip, unsigned offset)
-  * line's interrupt handler has been run, we may miss some nested
-  * interrupts.
-  */
--static void omap_gpio_irq_handler(unsigned int irq, struct irq_desc *desc)
-+static void omap_gpio_irq_handler(struct irq_desc *desc)
- {
- 	void __iomem *isr_reg = NULL;
- 	u32 isr;
-diff --git a/drivers/gpio/gpio-pl061.c b/drivers/gpio/gpio-pl061.c
-index 04756130437f..229ef653e0f8 100644
---- a/drivers/gpio/gpio-pl061.c
-+++ b/drivers/gpio/gpio-pl061.c
-@@ -187,7 +187,7 @@ static int pl061_irq_type(struct irq_data *d, unsigned trigger)
- 	return 0;
- }
- 
--static void pl061_irq_handler(unsigned irq, struct irq_desc *desc)
-+static void pl061_irq_handler(struct irq_desc *desc)
- {
- 	unsigned long pending;
- 	int offset;
-diff --git a/drivers/gpio/gpio-pxa.c b/drivers/gpio/gpio-pxa.c
-index cdbbcf0faf9d..a6d51338b86e 100644
---- a/drivers/gpio/gpio-pxa.c
-+++ b/drivers/gpio/gpio-pxa.c
-@@ -401,7 +401,7 @@ static int pxa_gpio_irq_type(struct irq_data *d, unsigned int type)
- 	return 0;
- }
- 
--static void pxa_gpio_demux_handler(unsigned int irq, struct irq_desc *desc)
-+static void pxa_gpio_demux_handler(struct irq_desc *desc)
- {
- 	struct pxa_gpio_chip *c;
- 	int loop, gpio, gpio_base, n;
-diff --git a/drivers/gpio/gpio-sa1100.c b/drivers/gpio/gpio-sa1100.c
-index b8c59635fb55..80a3380565c1 100644
---- a/drivers/gpio/gpio-sa1100.c
-+++ b/drivers/gpio/gpio-sa1100.c
-@@ -173,7 +173,7 @@ static struct irq_domain *sa1100_gpio_irqdomain;
-  * and call the handler.
-  */
- static void
--sa1100_gpio_handler(unsigned int __irq, struct irq_desc *desc)
-+sa1100_gpio_handler(struct irq_desc *desc)
- {
- 	unsigned int mask;
- 
-diff --git a/drivers/gpio/gpio-tegra.c b/drivers/gpio/gpio-tegra.c
-index 89ed8a56eb0b..bfd5f39d1bc3 100644
---- a/drivers/gpio/gpio-tegra.c
-+++ b/drivers/gpio/gpio-tegra.c
-@@ -266,7 +266,7 @@ static void tegra_gpio_irq_shutdown(struct irq_data *d)
- 	gpiochip_unlock_as_irq(&tegra_gpio_chip, gpio);
- }
- 
--static void tegra_gpio_irq_handler(unsigned int irq, struct irq_desc *desc)
-+static void tegra_gpio_irq_handler(struct irq_desc *desc)
- {
- 	int port;
- 	int pin;
-diff --git a/drivers/gpio/gpio-timberdale.c b/drivers/gpio/gpio-timberdale.c
-index 2b8baf1ea16e..107094139ec4 100644
---- a/drivers/gpio/gpio-timberdale.c
-+++ b/drivers/gpio/gpio-timberdale.c
-@@ -192,7 +192,7 @@ out:
- 	return ret;
- }
- 
--static void timbgpio_irq(unsigned int irq, struct irq_desc *desc)
-+static void timbgpio_irq(struct irq_desc *desc)
- {
- 	struct timbgpio *tgpio = irq_desc_get_handler_data(desc);
- 	struct irq_data *data = irq_desc_get_irq_data(desc);
-diff --git a/drivers/gpio/gpio-tz1090.c b/drivers/gpio/gpio-tz1090.c
-index 445660adc898..58dfa595dbd7 100644
---- a/drivers/gpio/gpio-tz1090.c
-+++ b/drivers/gpio/gpio-tz1090.c
-@@ -375,7 +375,7 @@ static int gpio_set_irq_wake(struct irq_data *data, unsigned int on)
- #define gpio_set_irq_wake NULL
+diff --git a/drivers/irqchip/irq-armada-370-xp.c b/drivers/irqchip/irq-armada-370-xp.c
+index 40b5fe99a1d5..fa26eb1b4f17 100644
+--- a/drivers/irqchip/irq-armada-370-xp.c
++++ b/drivers/irqchip/irq-armada-370-xp.c
+@@ -448,8 +448,7 @@ static void armada_370_xp_handle_msi_irq(struct pt_regs *regs, bool is_chained)
+ static void armada_370_xp_handle_msi_irq(struct pt_regs *r, bool b) {}
  #endif
  
--static void tz1090_gpio_irq_handler(unsigned int irq, struct irq_desc *desc)
-+static void tz1090_gpio_irq_handler(struct irq_desc *desc)
+-static void armada_370_xp_mpic_handle_cascade_irq(unsigned int irq,
+-						  struct irq_desc *desc)
++static void armada_370_xp_mpic_handle_cascade_irq(struct irq_desc *desc)
  {
- 	irq_hw_number_t hw;
- 	unsigned int irq_stat, irq_no;
-@@ -400,7 +400,7 @@ static void tz1090_gpio_irq_handler(unsigned int irq, struct irq_desc *desc)
- 				== IRQ_TYPE_EDGE_BOTH)
- 			tz1090_gpio_irq_next_edge(bank, hw);
- 
--		generic_handle_irq_desc(irq_no, child_desc);
-+		generic_handle_irq_desc(child_desc);
- 	}
- }
- 
-diff --git a/drivers/gpio/gpio-vf610.c b/drivers/gpio/gpio-vf610.c
-index fa344388f4da..18d0ae80dc4a 100644
---- a/drivers/gpio/gpio-vf610.c
-+++ b/drivers/gpio/gpio-vf610.c
-@@ -118,7 +118,7 @@ static int vf610_gpio_direction_output(struct gpio_chip *chip, unsigned gpio,
- 	return pinctrl_gpio_direction_output(chip->base + gpio);
- }
- 
--static void vf610_gpio_irq_handler(u32 irq, struct irq_desc *desc)
-+static void vf610_gpio_irq_handler(struct irq_desc *desc)
- {
- 	struct vf610_gpio_port *port = irq_desc_get_handler_data(desc);
  	struct irq_chip *chip = irq_desc_get_chip(desc);
-diff --git a/drivers/gpio/gpio-zynq.c b/drivers/gpio/gpio-zynq.c
-index 70e3a568b1cb..92d91d3b6dd7 100644
---- a/drivers/gpio/gpio-zynq.c
-+++ b/drivers/gpio/gpio-zynq.c
-@@ -495,7 +495,7 @@ static void zynq_gpio_handle_bank_irq(struct zynq_gpio *gpio,
-  * application for that pin.
-  * Note: A bug is reported if no handler is set for the gpio pin.
-  */
--static void zynq_gpio_irqhandler(unsigned int irq, struct irq_desc *desc)
-+static void zynq_gpio_irqhandler(struct irq_desc *desc)
+ 	unsigned long irqmap, irqn, irqsrc, cpuid;
+diff --git a/drivers/irqchip/irq-bcm7038-l1.c b/drivers/irqchip/irq-bcm7038-l1.c
+index d3b8c8be15f6..9ad6540bd57e 100644
+--- a/drivers/irqchip/irq-bcm7038-l1.c
++++ b/drivers/irqchip/irq-bcm7038-l1.c
+@@ -116,7 +116,7 @@ static inline void l1_writel(u32 val, void __iomem *reg)
+ 		writel(val, reg);
+ }
+ 
+-static void bcm7038_l1_irq_handle(unsigned int irq, struct irq_desc *desc)
++static void bcm7038_l1_irq_handle(struct irq_desc *desc)
  {
- 	u32 int_sts, int_enb;
- 	unsigned int bank_num;
+ 	struct bcm7038_l1_chip *intc = irq_desc_get_handler_data(desc);
+ 	struct bcm7038_l1_cpu *cpu;
+diff --git a/drivers/irqchip/irq-bcm7120-l2.c b/drivers/irqchip/irq-bcm7120-l2.c
+index 3ba5cc780fcb..4ee0d839009e 100644
+--- a/drivers/irqchip/irq-bcm7120-l2.c
++++ b/drivers/irqchip/irq-bcm7120-l2.c
+@@ -52,7 +52,7 @@ struct bcm7120_l2_intc_data {
+ 	const __be32 *map_mask_prop;
+ };
+ 
+-static void bcm7120_l2_intc_irq_handle(unsigned int irq, struct irq_desc *desc)
++static void bcm7120_l2_intc_irq_handle(struct irq_desc *desc)
+ {
+ 	struct bcm7120_l2_intc_data *b = irq_desc_get_handler_data(desc);
+ 	struct irq_chip *chip = irq_desc_get_chip(desc);
+diff --git a/drivers/irqchip/irq-brcmstb-l2.c b/drivers/irqchip/irq-brcmstb-l2.c
+index 994c01fdb4b5..ab3d0c52ea5a 100644
+--- a/drivers/irqchip/irq-brcmstb-l2.c
++++ b/drivers/irqchip/irq-brcmstb-l2.c
+@@ -51,7 +51,7 @@ struct brcmstb_l2_intc_data {
+ 	u32 saved_mask; /* for suspend/resume */
+ };
+ 
+-static void brcmstb_l2_intc_irq_handle(unsigned int __irq, struct irq_desc *desc)
++static void brcmstb_l2_intc_irq_handle(struct irq_desc *desc)
+ {
+ 	struct brcmstb_l2_intc_data *b = irq_desc_get_handler_data(desc);
+ 	struct irq_chip_generic *gc = irq_get_domain_generic_chip(b->domain, 0);
+@@ -65,7 +65,7 @@ static void brcmstb_l2_intc_irq_handle(unsigned int __irq, struct irq_desc *desc
+ 
+ 	if (status == 0) {
+ 		raw_spin_lock(&desc->lock);
+-		handle_bad_irq(__irq, desc);
++		handle_bad_irq(desc);
+ 		raw_spin_unlock(&desc->lock);
+ 		goto out;
+ 	}
+diff --git a/drivers/irqchip/irq-dw-apb-ictl.c b/drivers/irqchip/irq-dw-apb-ictl.c
+index cddcd3b75f00..7a00d7822228 100644
+--- a/drivers/irqchip/irq-dw-apb-ictl.c
++++ b/drivers/irqchip/irq-dw-apb-ictl.c
+@@ -26,7 +26,7 @@
+ #define APB_INT_FINALSTATUS_L	0x30
+ #define APB_INT_FINALSTATUS_H	0x34
+ 
+-static void dw_apb_ictl_handler(unsigned int irq, struct irq_desc *desc)
++static void dw_apb_ictl_handler(struct irq_desc *desc)
+ {
+ 	struct irq_chip *chip = irq_desc_get_chip(desc);
+ 	struct irq_chip_generic *gc = irq_desc_get_handler_data(desc);
+diff --git a/drivers/irqchip/irq-gic.c b/drivers/irqchip/irq-gic.c
+index 6c8a5a7fb4a0..e24d240a8fe8 100644
+--- a/drivers/irqchip/irq-gic.c
++++ b/drivers/irqchip/irq-gic.c
+@@ -286,7 +286,7 @@ static void __exception_irq_entry gic_handle_irq(struct pt_regs *regs)
+ 	} while (1);
+ }
+ 
+-static void gic_handle_cascade_irq(unsigned int irq, struct irq_desc *desc)
++static void gic_handle_cascade_irq(struct irq_desc *desc)
+ {
+ 	struct gic_chip_data *chip_data = irq_desc_get_handler_data(desc);
+ 	struct irq_chip *chip = irq_desc_get_chip(desc);
+diff --git a/drivers/irqchip/irq-imgpdc.c b/drivers/irqchip/irq-imgpdc.c
+index d94eb43f252a..5d8a482100f7 100644
+--- a/drivers/irqchip/irq-imgpdc.c
++++ b/drivers/irqchip/irq-imgpdc.c
+@@ -218,7 +218,7 @@ static int pdc_irq_set_wake(struct irq_data *data, unsigned int on)
+ 	return 0;
+ }
+ 
+-static void pdc_intc_perip_isr(unsigned int __irq, struct irq_desc *desc)
++static void pdc_intc_perip_isr(struct irq_desc *desc)
+ {
+ 	unsigned int irq = irq_desc_get_irq(desc);
+ 	struct pdc_intc_priv *priv;
+@@ -240,7 +240,7 @@ found:
+ 	generic_handle_irq(irq_no);
+ }
+ 
+-static void pdc_intc_syswake_isr(unsigned int irq, struct irq_desc *desc)
++static void pdc_intc_syswake_isr(struct irq_desc *desc)
+ {
+ 	struct pdc_intc_priv *priv;
+ 	unsigned int syswake, irq_no;
+diff --git a/drivers/irqchip/irq-keystone.c b/drivers/irqchip/irq-keystone.c
+index 8b05603d3be0..820e346ccae6 100644
+--- a/drivers/irqchip/irq-keystone.c
++++ b/drivers/irqchip/irq-keystone.c
+@@ -84,7 +84,7 @@ static void keystone_irq_ack(struct irq_data *d)
+ 	/* nothing to do here */
+ }
+ 
+-static void keystone_irq_handler(unsigned irq, struct irq_desc *desc)
++static void keystone_irq_handler(struct irq_desc *desc)
+ {
+ 	struct keystone_irq_device *kirq = irq_desc_get_handler_data(desc);
+ 	unsigned long pending;
+diff --git a/drivers/irqchip/irq-metag-ext.c b/drivers/irqchip/irq-metag-ext.c
+index 52e501d8c8f0..f4b46643f2d2 100644
+--- a/drivers/irqchip/irq-metag-ext.c
++++ b/drivers/irqchip/irq-metag-ext.c
+@@ -436,7 +436,6 @@ static int meta_intc_irq_set_type(struct irq_data *data, unsigned int flow_type)
+ 
+ /**
+  * meta_intc_irq_demux() - external irq de-multiplexer
+- * @irq:	the virtual interrupt number
+  * @desc:	the interrupt description structure for this irq
+  *
+  * The cpu receives an interrupt on TR2 when a SoC interrupt has occurred. It is
+@@ -446,7 +445,7 @@ static int meta_intc_irq_set_type(struct irq_data *data, unsigned int flow_type)
+  * Whilst using TR2 to detect external interrupts is a software convention it is
+  * (hopefully) unlikely to change.
+  */
+-static void meta_intc_irq_demux(unsigned int irq, struct irq_desc *desc)
++static void meta_intc_irq_demux(struct irq_desc *desc)
+ {
+ 	struct meta_intc_priv *priv = &meta_intc_priv;
+ 	irq_hw_number_t hw;
+diff --git a/drivers/irqchip/irq-metag.c b/drivers/irqchip/irq-metag.c
+index c16c186d97d3..f806a61d6660 100644
+--- a/drivers/irqchip/irq-metag.c
++++ b/drivers/irqchip/irq-metag.c
+@@ -213,14 +213,13 @@ static int metag_internal_irq_set_affinity(struct irq_data *data,
+ 
+ /*
+  *	metag_internal_irq_demux - irq de-multiplexer
+- *	@irq:	the interrupt number
+  *	@desc:	the interrupt description structure for this irq
+  *
+  *	The cpu receives an interrupt on TR1 when an interrupt has
+  *	occurred. It is this function's job to demux this irq and
+  *	figure out exactly which trigger needs servicing.
+  */
+-static void metag_internal_irq_demux(unsigned int irq, struct irq_desc *desc)
++static void metag_internal_irq_demux(struct irq_desc *desc)
+ {
+ 	struct metag_internal_irq_priv *priv = irq_desc_get_handler_data(desc);
+ 	irq_hw_number_t hw;
+diff --git a/drivers/irqchip/irq-mips-gic.c b/drivers/irqchip/irq-mips-gic.c
+index fb2e64b1f414..36d6b457e8e9 100644
+--- a/drivers/irqchip/irq-mips-gic.c
++++ b/drivers/irqchip/irq-mips-gic.c
+@@ -510,7 +510,7 @@ static void __gic_irq_dispatch(void)
+ 	gic_handle_shared_int();
+ }
+ 
+-static void gic_irq_dispatch(unsigned int irq, struct irq_desc *desc)
++static void gic_irq_dispatch(struct irq_desc *desc)
+ {
+ 	__gic_irq_dispatch();
+ }
+diff --git a/drivers/irqchip/irq-mmp.c b/drivers/irqchip/irq-mmp.c
+index 44febf10be2f..bde3bbd245a4 100644
+--- a/drivers/irqchip/irq-mmp.c
++++ b/drivers/irqchip/irq-mmp.c
+@@ -130,7 +130,7 @@ struct irq_chip icu_irq_chip = {
+ 	.irq_unmask	= icu_unmask_irq,
+ };
+ 
+-static void icu_mux_irq_demux(unsigned int __irq, struct irq_desc *desc)
++static void icu_mux_irq_demux(struct irq_desc *desc)
+ {
+ 	unsigned int irq = irq_desc_get_irq(desc);
+ 	struct irq_domain *domain;
+diff --git a/drivers/irqchip/irq-orion.c b/drivers/irqchip/irq-orion.c
+index 58e034db0e7c..9e5a36cd1b8f 100644
+--- a/drivers/irqchip/irq-orion.c
++++ b/drivers/irqchip/irq-orion.c
+@@ -107,7 +107,7 @@ IRQCHIP_DECLARE(orion_intc, "marvell,orion-intc", orion_irq_init);
+ #define ORION_BRIDGE_IRQ_CAUSE	0x00
+ #define ORION_BRIDGE_IRQ_MASK	0x04
+ 
+-static void orion_bridge_irq_handler(unsigned int irq, struct irq_desc *desc)
++static void orion_bridge_irq_handler(struct irq_desc *desc)
+ {
+ 	struct irq_domain *d = irq_desc_get_handler_data(desc);
+ 
+diff --git a/drivers/irqchip/irq-s3c24xx.c b/drivers/irqchip/irq-s3c24xx.c
+index efca6390aa87..e8d88f6ffe73 100644
+--- a/drivers/irqchip/irq-s3c24xx.c
++++ b/drivers/irqchip/irq-s3c24xx.c
+@@ -299,7 +299,7 @@ static struct irq_chip s3c_irq_eint0t4 = {
+ 	.irq_set_type	= s3c_irqext0_type,
+ };
+ 
+-static void s3c_irq_demux(unsigned int irq, struct irq_desc *desc)
++static void s3c_irq_demux(struct irq_desc *desc)
+ {
+ 	struct irq_chip *chip = irq_desc_get_chip(desc);
+ 	struct s3c_irq_data *irq_data = irq_desc_get_chip_data(desc);
+diff --git a/drivers/irqchip/irq-sunxi-nmi.c b/drivers/irqchip/irq-sunxi-nmi.c
+index 2eaa9d9df241..4e16ccd398f8 100644
+--- a/drivers/irqchip/irq-sunxi-nmi.c
++++ b/drivers/irqchip/irq-sunxi-nmi.c
+@@ -58,7 +58,7 @@ static inline u32 sunxi_sc_nmi_read(struct irq_chip_generic *gc, u32 off)
+ 	return irq_reg_readl(gc, off);
+ }
+ 
+-static void sunxi_sc_nmi_handle_irq(unsigned int irq, struct irq_desc *desc)
++static void sunxi_sc_nmi_handle_irq(struct irq_desc *desc)
+ {
+ 	struct irq_domain *domain = irq_desc_get_handler_data(desc);
+ 	struct irq_chip *chip = irq_desc_get_chip(desc);
+diff --git a/drivers/irqchip/irq-tb10x.c b/drivers/irqchip/irq-tb10x.c
+index 117cf25c6cfe..bdcc39218d46 100644
+--- a/drivers/irqchip/irq-tb10x.c
++++ b/drivers/irqchip/irq-tb10x.c
+@@ -97,7 +97,7 @@ static int tb10x_irq_set_type(struct irq_data *data, unsigned int flow_type)
+ 	return IRQ_SET_MASK_OK;
+ }
+ 
+-static void tb10x_irq_cascade(unsigned int irq, struct irq_desc *desc)
++static void tb10x_irq_cascade(struct irq_desc *desc)
+ {
+ 	struct irq_domain *domain = irq_desc_get_handler_data(desc);
+ 
+diff --git a/drivers/irqchip/irq-versatile-fpga.c b/drivers/irqchip/irq-versatile-fpga.c
+index efbfd425d2e0..6ce21c1e9fff 100644
+--- a/drivers/irqchip/irq-versatile-fpga.c
++++ b/drivers/irqchip/irq-versatile-fpga.c
+@@ -66,13 +66,13 @@ static void fpga_irq_unmask(struct irq_data *d)
+ 	writel(mask, f->base + IRQ_ENABLE_SET);
+ }
+ 
+-static void fpga_irq_handle(unsigned int __irq, struct irq_desc *desc)
++static void fpga_irq_handle(struct irq_desc *desc)
+ {
+ 	struct fpga_irq_data *f = irq_desc_get_handler_data(desc);
+ 	u32 status = readl(f->base + IRQ_STATUS);
+ 
+ 	if (status == 0) {
+-		do_bad_IRQ(__irq, desc);
++		do_bad_IRQ(desc);
+ 		return;
+ 	}
+ 
+diff --git a/drivers/irqchip/irq-vic.c b/drivers/irqchip/irq-vic.c
+index 54089debf2dc..9f090e4284e4 100644
+--- a/drivers/irqchip/irq-vic.c
++++ b/drivers/irqchip/irq-vic.c
+@@ -226,7 +226,7 @@ static int handle_one_vic(struct vic_device *vic, struct pt_regs *regs)
+ 	return handled;
+ }
+ 
+-static void vic_handle_irq_cascaded(unsigned int irq, struct irq_desc *desc)
++static void vic_handle_irq_cascaded(struct irq_desc *desc)
+ {
+ 	u32 stat, hwirq;
+ 	struct irq_chip *host_chip = irq_desc_get_chip(desc);
+diff --git a/drivers/irqchip/spear-shirq.c b/drivers/irqchip/spear-shirq.c
+index fb68ee9c0424..1396f0fad479 100644
+--- a/drivers/irqchip/spear-shirq.c
++++ b/drivers/irqchip/spear-shirq.c
+@@ -183,7 +183,7 @@ static struct spear_shirq *spear320_shirq_blocks[] = {
+ 	&spear320_shirq_intrcomm_ras,
+ };
+ 
+-static void shirq_handler(unsigned irq, struct irq_desc *desc)
++static void shirq_handler(struct irq_desc *desc)
+ {
+ 	struct spear_shirq *shirq = irq_desc_get_handler_data(desc);
+ 	u32 pend;
 -- 
 1.7.10.4
