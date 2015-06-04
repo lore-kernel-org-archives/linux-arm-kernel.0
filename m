@@ -1,59 +1,49 @@
-From: geert+renesas@glider.be (Geert Uytterhoeven)
-Date: Thu,  4 Jun 2015 20:53:34 +0200
-Subject: [PATCH/RFC 08/15] ARM: shmobile: r8a7791 dtsi: Add L1 cache
- information to CPU nodes
-In-Reply-To: <1433444021-22167-1-git-send-email-geert+renesas@glider.be>
-References: <1433444021-22167-1-git-send-email-geert+renesas@glider.be>
-Message-ID: <1433444021-22167-9-git-send-email-geert+renesas@glider.be>
+From: labbott@fedoraproject.org (Laura Abbott)
+Date: Thu,  4 Jun 2015 12:15:49 -0700
+Subject: [PATCH] arm: Update memblock limit after mapping lowmem
+Message-ID: <1433445349-12497-1-git-send-email-labbott@fedoraproject.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Describe the L1 instruction and data caches in the CPU nodes:
-  - The L1 caches for the Cortex-A15 CPU cores are organized as 16 KiB x
-    2 ways.
 
-Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+The memblock limit is currently used in find_limits
+to find the bounds for ZONE_NORMAL. The memblock
+limit may need to be rounded down a PMD size to ensure
+allocations are fully mapped though. This has the side
+effect of reducing the amount of memory in ZONE_NORMAL.
+Once all lowmem is mapped, it's safe to change the memblock
+limit back to include the unaligned section. Adjust the
+memblock limit after lowmem mapping is complete.
+
+Before:
+ # cat /proc/zoneinfo | grep managed
+        managed  62907
+        managed  424
+
+After:
+ # cat /proc/zoneinfo | grep managed
+        managed  63331
+
+Signed-off-by: Laura Abbott <labbott@fedoraproject.org>
 ---
- arch/arm/boot/dts/r8a7791.dtsi | 20 ++++++++++++++++++++
- 1 file changed, 20 insertions(+)
+This is a replacement for
+'arm: Don't use memblock limit for the lowmem bound' which
+doesn't actually work on NOMMU systems.
+---
+ arch/arm/mm/mmu.c | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/arch/arm/boot/dts/r8a7791.dtsi b/arch/arm/boot/dts/r8a7791.dtsi
-index 8013223448b5b464..4e4011a2978bcfce 100644
---- a/arch/arm/boot/dts/r8a7791.dtsi
-+++ b/arch/arm/boot/dts/r8a7791.dtsi
-@@ -52,6 +52,16 @@
- 			clocks = <&cpg_clocks R8A7791_CLK_Z>;
- 			clock-latency = <300000>; /* 300 us */
- 
-+			i-cache-size = <0x8000>;
-+			i-cache-sets = <512>;
-+			i-cache-block-size = <32>;
-+			i-cache-line-size = <32>;
-+			d-cache-size = <0x8000>;
-+			d-cache-sets = <512>;
-+			d-cache-block-size = <32>;
-+			d-cache-line-size = <32>;
-+			next-level-cache = <&L2_CA15>;
-+
- 			/* kHz - uV - OPPs unknown yet */
- 			operating-points = <1500000 1000000>,
- 					   <1312500 1000000>,
-@@ -66,6 +76,16 @@
- 			compatible = "arm,cortex-a15";
- 			reg = <1>;
- 			clock-frequency = <1500000000>;
-+
-+			i-cache-size = <0x8000>;
-+			i-cache-sets = <512>;
-+			i-cache-block-size = <32>;
-+			i-cache-line-size = <32>;
-+			d-cache-size = <0x8000>;
-+			d-cache-sets = <512>;
-+			d-cache-block-size = <32>;
-+			d-cache-line-size = <32>;
-+			next-level-cache = <&L2_CA15>;
- 		};
- 	};
- 
+diff --git a/arch/arm/mm/mmu.c b/arch/arm/mm/mmu.c
+index 7186382..904d153 100644
+--- a/arch/arm/mm/mmu.c
++++ b/arch/arm/mm/mmu.c
+@@ -1519,6 +1519,7 @@ void __init paging_init(const struct machine_desc *mdesc)
+ 	build_mem_type_table();
+ 	prepare_page_table();
+ 	map_lowmem();
++	memblock_set_current_limit(arm_lowmem_limit);
+ 	dma_contiguous_remap();
+ 	devicemaps_init(mdesc);
+ 	kmap_init();
 -- 
-1.9.1
+2.4.1
