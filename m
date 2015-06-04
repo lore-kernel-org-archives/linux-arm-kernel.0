@@ -1,80 +1,68 @@
-From: ludovic.desroches@atmel.com (Ludovic Desroches)
-Date: Thu, 4 Jun 2015 08:02:49 +0200
-Subject: [PATCH v5 0/6] i2c: at91: add support to FIFOs and alternative
- command
-In-Reply-To: <cover.1433348016.git.cyrille.pitchen@atmel.com>
-References: <cover.1433348016.git.cyrille.pitchen@atmel.com>
-Message-ID: <20150604060249.GB11060@odux.rfo.atmel.com>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Thu, 04 Jun 2015 15:10:22 +0900
+Subject: [PATCH 0/6] Exynos SYSMMU (IOMMU) dts and arch updates
+In-Reply-To: <556FCB2B.8090406@samsung.com>
+References: <1432041645-11172-1-git-send-email-m.szyprowski@samsung.com>
+ <1433153450-3680-1-git-send-email-m.szyprowski@samsung.com>
+ <556C4342.6060506@samsung.com> <556F89B2.9010607@kernel.org>
+ <556FCB2B.8090406@samsung.com>
+Message-ID: <556FEBCE.9050604@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-For the whole set of patches:
-Acked-by: Ludovic Desroches
+On 04.06.2015 12:51, Krzysztof Kozlowski wrote:
+> On 04.06.2015 08:11, Kukjin Kim wrote:
+>> On 06/01/15 20:34, Krzysztof Kozlowski wrote:
+>>> W dniu 01.06.2015 o 19:10, Marek Szyprowski pisze:
+>>>> Hello,
+>>>>
+>>>> Main changes for Exynos SYSMMU (IOMMU) driver has been finally scheduled
+>>>> for merging - see
+>>>> https://git.kernel.org/cgit/linux/kernel/git/joro/iommu.git/commit/?h=next
+>>>> In meantime there have been quite a lot of changes related to Exynos DTS
+>>>> files queued for merging and my patches don't apply anymore. To ease
+>>>> merge process I've decided to rebased all Exynos SYSMMU dts changes onto
+>>>> latest exynos next tree from: https://github.com/krzk/linux dt-for-next
+>>>>
+>>>> While rebasing I've fixes a few spotted issues: some nodes still used
+>>>> old 'samsung,power-domain' properties (now replaced with 'power-domains')
+>>>> and added properties to jpeg codec merged recently.
+>>>>
+>>>
+>>> Thanks for rebasing this stuff.
+>>>
+>> Same here ;-)
+>>
+>>> I picked whole patchset with Javier's tested-by. I'll send it to Kukjin
+>>> later or directly to arm-soc (depending what will happen with last pull
+>>> request).
+>>>
+>>> Kukjin, you mentioned that you will do something with this patchset the
+>>> previous weekend. Since then nothing happened so I am not sure what are
+>>> your plans... Can you share them? Do you want to pick it by yourself, do
+>>> you have any comments or maybe you need something from our side? (I
+>>> checked the patches and they look fine)
+>>>
+>> Done, thanks.
+> 
+> Thank you, I tested the for-next branch on some of my boards and
+> everything looked fine.
 
-Thanks Cyrille
+Oh, something wrong happened on some of configs/boards:
 
-On Wed, Jun 03, 2015 at 06:25:16PM +0200, Cyrille Pitchen wrote:
-> ChangeLog
-> 
-> v5:
-> - print I2C controller version in an already existing dev_info() instead of
->   adding a new one.
-> 
-> v4:
-> - replace 0x%x by %#x when printing I2C controller version
-> - change the order of patches: the race condition bug fix becomes the first
->   patch so it be can more easily applied to older kernels.
-> 
-> v3:
-> - fix braces {} coding style issue
-> - split the alternative command patch into 2 patches: the first one fixes
->   a race condition whereas the second one is the actual alternative command
->   patch
-> 
-> v2:
-> - fix typo in comment for AT91_TWI_SVEN.
-> - document new device tree bindings like "atmel,fifo-size".
-> - explicitly set the has_alt_cmd boolean to false to already existing chip
->   configs.
-> - use the BIT() macro to define the register bits and do a little cleanup in a
->   dedicated patch.
-> - reword some comments to better explain why the TXCOMP interrupt is no longer
->   enabled in at91_do_twi_transfer() but later in
->   at91_twi_write_data_dma_callback() to avoid a race condition when DMA is used.
-> - remove useless TXCOMP interrupt enable line in at91_twi_write_next_byte()
->   since this interrupt is also enabled by at91_do_twi_transfer() for PIO
->   transfers.
-> 
-> v1:
-> This series of patches adds support of two new features which will be
-> introduced with Atmel sama5d2x SoC.
-> 
-> First, the alternative command mode eases the sending of STOP conditions.
-> Before starting an I2C transaction, the size data to be transfered is
-> written into the new Alternative Command Register. For each byte transferred,
-> the I2C controller decreases this counter and automatically sends a STOP
-> condition when the counter value reaches 0, that is to say when the last byte
-> of the transaction has been sent/received. So there is no longer need to set
-> the STOP bit into the Control Register.
-> 
-> Then the use of FIFOs allows to reduce number I/O accesses: for instance,
-> the TX FIFO allows to write up to 4 data in a single access to the Transmit
-> Holding Register. Also the RX FIFO allows to read up to 4 data in a single
-> access to the Receive Holding Register. Currently only DMA transfers take
-> advantage of FIFOs.
-> 
-> Cyrille Pitchen (6):
->   i2c: at91: fix a race condition when using the DMA controller
->   i2c: at91: use BIT() macro to define register bits
->   i2c: at91: update documentation for DT bindings
->   i2c: at91: add support for new alternative command mode
->   i2c: at91: print hardware version
->   i2c: at91: add support to FIFOs
-> 
->  Documentation/devicetree/bindings/i2c/i2c-at91.txt |  29 +-
->  drivers/i2c/busses/i2c-at91.c                      | 356 +++++++++++++++++----
->  2 files changed, 322 insertions(+), 63 deletions(-)
-> 
-> -- 
-> 1.8.2.2
-> 
+Arndale Octa: multi_v7_defconfig
+Last tests on samsung tree fail:
+1.
+http://kernelci.org/boot/exynos5420-arndale-octa_rootfs:nfs/job/samsung/kernel/v4.1-rc6-146-g1c07c562d9d5/defconfig/multi_v7_defconfig/lab/lab-tbaker/?_id=556fbaee59b5146b5cda4447
+2.
+http://kernelci.org/boot/exynos5420-arndale-octa_rootfs:nfs/job/samsung/kernel/v4.1-rc6-137-g1730fe10f4a8/defconfig/multi_v7_defconfig/lab/lab-tbaker/?_id=556e948659b5144e74da4445
+
+Odroid XU3: multi_v7_defconfig
+Last commit fails:
+http://kernelci.org/boot/exynos5422-odroidxu3_rootfs:nfs/job/samsung/kernel/v4.1-rc6-146-g1c07c562d9d5/defconfig/multi_v7_defconfig/lab/lab-tbaker/?_id=556fbb2d59b5146b63da4449
+
+I can test tonight on Odroid XU3 but I don't have access to Arndale Octa
+board. Maybe guys from SRPOL could test it?
+
+Best regards,
+Krzysztof
