@@ -1,79 +1,143 @@
-From: hramrach@gmail.com (Michal Suchanek)
-Date: Thu, 4 Jun 2015 11:33:37 +0200
-Subject: [PATCH 10/11] spi: add more debug prints in s3c64xx
-In-Reply-To: <20150604091634.GY14071@sirena.org.uk>
-References: <cover.1433364398.git.hramrach@gmail.com>
- <305830ebf9c0ae98c4f6e0ebbdec7414d6762b36.1433364398.git.hramrach@gmail.com>
- <20150604091634.GY14071@sirena.org.uk>
-Message-ID: <CAOMqctQxn6UY2DJ9Syp6Ay9SYKLgdU+8EjiTK_48-R3dZ8PcvA@mail.gmail.com>
+From: tanzilli@acmesystems.it (Sergio Tanzilli)
+Date: Thu, 4 Jun 2015 11:40:35 +0200
+Subject: [PATCH v2 16/16] ARM: at91/dt: Add Acme Arietta G25
+In-Reply-To: <557005E6.3090403@atmel.com>
+References: <1433334258-14741-1-git-send-email-alexandre.belloni@free-electrons.com>
+ <1433334258-14741-17-git-send-email-alexandre.belloni@free-electrons.com>
+ <557005E6.3090403@atmel.com>
+Message-ID: <CAG+hDbtgJjVy63iqea5S-5w0L_KoLiQnCK4fTSx9w22hPcHLLw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+Sure thanks :-)
 
-On 4 June 2015 at 11:16, Mark Brown <broonie@kernel.org> wrote:
-> On Wed, Jun 03, 2015 at 09:26:42PM -0000, Michal Suchanek wrote:
->> The SPI NOR transfers mysteriously fail so add more debug prints about
->> SPI transactions.
+Sergio Tanzilli
+
+On 4 June 2015 at 10:01, Nicolas Ferre <nicolas.ferre@atmel.com> wrote:
+> Le 03/06/2015 14:24, Alexandre Belloni a ?crit :
+>> Add a minimum Device Tree for Acme Arietta G25.
+>> http://acme.systems/arietta
+>>
+>> Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+>> Cc: Sergio Tanzilli <tanzilli@acmesystems.it>
 >
-> Please try to only send patches to relevant people - the list of
-> recipients for this is so large that it only barely fits on a single
-> screen in my mail client.
+> BTW Sergio, can I add your "Acked-by" tag?
 >
-> Also for this patch (which just adds some trace) there isn't any clear
-> reason for it to be sent as part of the series at all, it doesn't help
-> deliver the functionality and doesn't depend on the rest of the series.
-
-I used this patch to add missing information to dmesg output so I
-could diagnose the SPI failures so I think it is relevant.
-
-The failure is reported by the s3c64xx but the root cause is pl330 not
-finishing a DMA transfer.
-
-It is non-obvious that this is the issue. The information that a call
-to pl330 failed is only available in the s3c64xx driver and not SPI
-core so I think there is no reasonable way to debug this issue other
-than adding prints in s3c64xx. This issue is not completely resolved
-or even well tested (I have only single board to test with) so these
-prints remain relevant in my view.
-
+> Bye,
 >
->> --- a/drivers/spi/spi-s3c64xx.c
->> +++ b/drivers/spi/spi-s3c64xx.c
->> @@ -18,6 +18,7 @@
->>  #include <linux/interrupt.h>
->>  #include <linux/delay.h>
->>  #include <linux/clk.h>
->> +#include <linux/clk-provider.h>
+>> ---
+>>  arch/arm/boot/dts/Makefile            |  1 +
+>>  arch/arm/boot/dts/at91-ariettag25.dts | 79 +++++++++++++++++++++++++++++++++++
+>>  2 files changed, 80 insertions(+)
+>>  create mode 100644 arch/arm/boot/dts/at91-ariettag25.dts
+>>
+>> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+>> index 8c3da289a00b..b224a3a56f09 100644
+>> --- a/arch/arm/boot/dts/Makefile
+>> +++ b/arch/arm/boot/dts/Makefile
+>> @@ -31,6 +31,7 @@ dtb-$(CONFIG_SOC_SAM_V4_V5) += \
+>>       at91sam9n12ek.dtb \
+>>       at91sam9rlek.dtb \
+>>       at91-ariag25.dtb \
+>> +     at91-ariettag25.dtb \
+>>       at91-cosino_mega2560.dtb \
+>>       at91-kizboxmini.dtb \
+>>       at91sam9g15ek.dtb \
+>> diff --git a/arch/arm/boot/dts/at91-ariettag25.dts b/arch/arm/boot/dts/at91-ariettag25.dts
+>> new file mode 100644
+>> index 000000000000..c514502081d2
+>> --- /dev/null
+>> +++ b/arch/arm/boot/dts/at91-ariettag25.dts
+>> @@ -0,0 +1,79 @@
+>> +/*
+>> + * Device Tree file for Arietta G25
+>> + * This device tree is minimal, to activate more peripherals, see:
+>> + * http://dts.acmesystems.it/arietta/
+>> + */
+>> +/dts-v1/;
+>> +#include "at91sam9g25.dtsi"
+>> +/ {
+>> +     model = "Acme Systems Arietta G25";
+>> +     compatible = "acme,ariettag25", "atmel,at91sam9x5", "atmel,at91sam9";
+>> +
+>> +     aliases {
+>> +             serial0 = &dbgu;
+>> +     };
+>> +
+>> +     chosen {
+>> +             stdout-path = "serial0:115200n8";
+>> +     };
+>> +
+>> +     memory {
+>> +             reg = <0x20000000 0x8000000>;
+>> +     };
+>> +
+>> +     clocks {
+>> +             slow_xtal {
+>> +                     clock-frequency = <32768>;
+>> +             };
+>> +
+>> +             main_xtal {
+>> +                     clock-frequency = <12000000>;
+>> +             };
+>> +     };
+>> +
+>> +     ahb {
+>> +             apb {
+>> +                     mmc0: mmc at f0008000 {
+>> +                             pinctrl-0 = <
+>> +                               &pinctrl_mmc0_slot0_clk_cmd_dat0
+>> +                               &pinctrl_mmc0_slot0_dat1_3>;
+>> +                             status = "okay";
+>> +
+>> +                             slot at 0 {
+>> +                                     reg = <0>;
+>> +                                     bus-width = <4>;
+>> +                             };
+>> +                     };
+>> +
+>> +                     usb2: gadget at f803c000 {
+>> +                             status = "okay";
+>> +                     };
+>> +
+>> +                     dbgu: serial at fffff200 {
+>> +                             status = "okay";
+>> +                     };
+>> +
+>> +                     rtc at fffffeb0 {
+>> +                             status = "okay";
+>> +                     };
+>> +             };
+>> +
+>> +             usb0: ohci at 00600000 {
+>> +                     status = "okay";
+>> +                     num-ports = <3>;
+>> +             };
+>> +
+>> +             usb1: ehci at 00700000 {
+>> +                     status = "okay";
+>> +             };
+>> +     };
+>> +
+>> +     leds {
+>> +             compatible = "gpio-leds";
+>> +             arietta_led {
+>> +                     label = "arietta_led";
+>> +                     gpios = <&pioB 8 GPIO_ACTIVE_HIGH>; /* PB8 */
+>> +                     linux,default-trigger = "heartbeat";
+>> +             };
+>> +     };
+>> +};
+>>
 >
-> Whatever you're doing here this indicates that there's a very big
-> abstraction problem going on.
-
-I wanted to print a clock name in case the information was relevant
-for the issue at hand.
-
-To print a clock name you AFAICT need this header. I think this is an
-abstraction problem in the clock framework. Fixing the abstraction
-problem with clock framework would only grow the list of recipients
-which is already so long you complain about it.
-
-It turns out that in this case the clock was not at fault so I did not
-need the clock name in the end.
-
 >
->> +     pr_debug("%s %s %s waiting for %ims transferring %zubytes@%iHz",
->> +              __func__, sdd->pdev ? dev_name(&sdd->pdev->dev) : NULL,
->> +              dev_name(&sdd->master->dev),
->> +              ms, xfer->len, sdd->cur_speed);
->
-> I'd say dev_dbg() but more generally this is just tracing things that
-> seem to be already covered by the trace points already present in the
-> core, the same goes for most of the rest of it.  If there's things
-> missing from the existing trace it seems better to add to it.
+> --
+> Nicolas Ferre
 
-There is master and slave device involved but it's certainly possible
-to use dev_dbg on one of them and pass the other as string.
 
-Thanks
 
-Michal
+-- 
+Sergio Tanzilli
+tanzilli at acmesystems.it
+Acme Systems srl
+http://www.acmesystems.it
