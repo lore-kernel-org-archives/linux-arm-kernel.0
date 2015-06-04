@@ -1,85 +1,81 @@
-From: hanjun.guo@linaro.org (Hanjun Guo)
-Date: Thu, 04 Jun 2015 15:02:56 +0800
-Subject: [Patch v4 0/8] Consolidate ACPI PCI root common code into ACPI
- core
-In-Reply-To: <556FF32B.9010900@linux.intel.com>
-References: <1433225576-8215-1-git-send-email-jiang.liu@linux.intel.com>
- <556F6332.2040501@redhat.com> <556FAFEF.6040802@linux.intel.com>
- <556FF0AD.6000901@linaro.org> <556FF32B.9010900@linux.intel.com>
-Message-ID: <556FF820.5070405@linaro.org>
+From: howard.chen@linaro.org (Howard Chen)
+Date: Thu,  4 Jun 2015 15:13:37 +0800
+Subject: [PATCH v4] ARM: dts: mt8173: support arm64 cpuidle-dt
+Message-ID: <1433402017-7711-1-git-send-email-howard.chen@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2015?06?04? 14:41, Jiang Liu wrote:
-> On 2015/6/4 14:31, Hanjun Guo wrote:
->> Hi Jiang,
->>
->> On 2015?06?04? 09:54, Jiang Liu wrote:
->>> On 2015/6/4 4:27, Al Stone wrote:
->>>> On 06/02/2015 12:12 AM, Jiang Liu wrote:
->>>>> This patch set consolidates common code to support ACPI PCI root on x86
->>>>> and IA64 platforms into ACPI core, to reproduce duplicated code and
->>>>> simplify maintenance. And a patch set based on this to support ACPI
->>>>> based
->>>>> PCIe host bridge on ARM64 has been posted at:
->>>>
->>>> Link is missing (or it's a typo of some flavor).
->>> HI Al,
->>>      Sorry, I missed the link. It has been posted at:
->>> https://lkml.org/lkml/2015/5/26/207
->>
->> I failed to get io resources for PCI hostbridge  when I was testing PCI
->> on ARM64 QEMU, I debugged this for quite a while, and finally found out
->> that ACPI resource parsing for IO is not suitable for ARM64, because io
->> space for x86 is 64K, but 16M for ARM64.
->>
->> This issue is only found when the firmware representing the io resource
->> using the type ACPI_RESOURCE_TYPE_ADDRESS32, so the io address will
->> greater than 64k.
->>
->> In drivers/acpi/resource.c:
->>
->> static void acpi_dev_ioresource_flags(struct resource *res, u64 len,
->>                                        u8 io_decode, u8 translation_type)
->> {
->>          res->flags = IORESOURCE_IO;
->>
->> [...]
->>
->>          if (res->end >= 0x10003)
->>                  res->flags |= IORESOURCE_DISABLED | IORESOURCE_UNSET;
->>
->> [...]
->> }
->>
->> so the code will filter out res->end >= 0x10003, and in my case, it will
->> more than 64K, so we can't get the IO resources.
->>
->> I got a question, why we use if (res->end >= 0x10003) here?
->> I mean 64k will be 0x10000, and in that case, we should use
->> if (res->end >= 0x10000) here, not 0x10003, any history behind that?
->
-> Hi Hanjun,
-> This is a special tricky for x86. You may read a dword(four bytes) from
-> IO port 0xffff, so the effective io port space is 0x10003 bytes.
+This patch adds an idle-states node to describe the mt8173 idle states and
+also adds references to the idle-states node in all CPU nodes.
 
-Thanks for the explanation, how about add a patch to comment on it?
-if it's ok to you and will improve the code readability, I can prepare
-one.
+Changes:
 
->
->>
->> This is not the problem of this patch set, but need updating
->> the core ACPI resource parsing code, I'm working on that. I'm
->> just wondering there is no special IO space on IA64, how this works
->> on IA64?
-> There is special handling for IO port on IA64. IA64 io ports are
-> actually memory-mapped, and there may be multiple 64K IO port spaces.
-> For example, each PCI domain may have its own 64k memory-mapped
-> IO space.
+v4:
+- Refine the property ordering.
 
-That's the case for ARM64 too, I will review the IA64 code for
-reference, great thanks for the help and explanation :)
+v3:
+- Add the local-timer-stop property.
 
-Thanks
-Hanjun
+v2:
+- Remove the change to the PSCI version.
+- Remove the cluster idle state.
+- Fine tune the latency properties of the idle state.
+
+Signed-off-by: Howard Chen <howard.chen@linaro.org>
+Acked-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+---
+ arch/arm64/boot/dts/mediatek/mt8173.dtsi | 18 ++++++++++++++++++
+ 1 file changed, 18 insertions(+)
+
+diff --git a/arch/arm64/boot/dts/mediatek/mt8173.dtsi b/arch/arm64/boot/dts/mediatek/mt8173.dtsi
+index 27237a1..5587375 100644
+--- a/arch/arm64/boot/dts/mediatek/mt8173.dtsi
++++ b/arch/arm64/boot/dts/mediatek/mt8173.dtsi
+@@ -49,6 +49,8 @@
+ 			device_type = "cpu";
+ 			compatible = "arm,cortex-a53";
+ 			reg = <0x000>;
++			enable-method = "psci";
++			cpu-idle-states = <&CPU_SLEEP_0>;
+ 		};
+ 
+ 		cpu1: cpu at 1 {
+@@ -56,6 +58,7 @@
+ 			compatible = "arm,cortex-a53";
+ 			reg = <0x001>;
+ 			enable-method = "psci";
++			cpu-idle-states = <&CPU_SLEEP_0>;
+ 		};
+ 
+ 		cpu2: cpu at 100 {
+@@ -63,6 +66,7 @@
+ 			compatible = "arm,cortex-a57";
+ 			reg = <0x100>;
+ 			enable-method = "psci";
++			cpu-idle-states = <&CPU_SLEEP_0>;
+ 		};
+ 
+ 		cpu3: cpu at 101 {
+@@ -70,6 +74,20 @@
+ 			compatible = "arm,cortex-a57";
+ 			reg = <0x101>;
+ 			enable-method = "psci";
++			cpu-idle-states = <&CPU_SLEEP_0>;
++		};
++
++		idle-states {
++			entry-method = "arm,psci";
++
++			CPU_SLEEP_0: cpu-sleep-0 {
++				compatible = "arm,idle-state";
++				local-timer-stop;
++				entry-latency-us = <639>;
++				exit-latency-us = <680>;
++				min-residency-us = <1088>;
++				arm,psci-suspend-param = <0x0010000>;
++			};
+ 		};
+ 	};
+ 
+-- 
+1.9.1
