@@ -1,28 +1,44 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 4 Jun 2015 10:07:57 +0200
-Subject: [patch] gpio: Added GPIO support to ZynqMP SoC
-In-Reply-To: <1433160019-11157-1-git-send-email-anuragku@xilinx.com>
-References: <1433160019-11157-1-git-send-email-anuragku@xilinx.com>
-Message-ID: <CACRpkdZpvr4NfH43FvoHdfKaqqDGMHJU5=UHEzOpLV9xC4vaTw@mail.gmail.com>
+From: g.portay@overkiz.com (=?UTF-8?B?R2HDq2wgUE9SVEFZ?=)
+Date: Thu, 04 Jun 2015 10:13:58 +0200
+Subject: [PATCH] ARM: at91/dts: kizbox: fix mismatch LED PWM device
+In-Reply-To: <55700621.4080900@atmel.com>
+References: <1433324663-20208-1-git-send-email-g.portay@overkiz.com>
+ <55700621.4080900@atmel.com>
+Message-ID: <557008C6.60900@overkiz.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 1, 2015 at 2:00 PM, Anurag Kumar Vulisha
-<anurag.kumar.vulisha@xilinx.com> wrote:
-
-> Added support to ZynqMP SoC on the existing zynq gpio driver.
+On 04/06/2015 10:02, Nicolas Ferre wrote:
+> Le 03/06/2015 11:44, Ga?l PORTAY a ?crit :
+>> The network_red LED uses the 4th PWM device.
+>>
+>> Signed-off-by: Ga?l PORTAY <g.portay@overkiz.com>
 >
-> Signed-off-by: Anurag Kumar Vulisha <anuragku@xilinx.com>
+> Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+>
+> And stacked on at91-4.2-dt.
+>
+> Bye,
+>
+>> ---
+>>   arch/arm/boot/dts/at91-kizbox.dts | 2 +-
+>>   1 file changed, 1 insertion(+), 1 deletion(-)
+>>
+>> diff --git a/arch/arm/boot/dts/at91-kizbox.dts b/arch/arm/boot/dts/at91-kizbox.dts
+>> index a0e63ff..cf1628f 100644
+>> --- a/arch/arm/boot/dts/at91-kizbox.dts
+>> +++ b/arch/arm/boot/dts/at91-kizbox.dts
+>> @@ -205,7 +205,7 @@
+>>
+>>   		network_red {
+>>   			label = "pwm:red:network";
+>> -			pwms = <&tcb_pwm 3 10000000 PWM_POLARITY_INVERTED>;
+>> +			pwms = <&tcb_pwm 4 10000000 PWM_POLARITY_INVERTED>;
+>>   			max-brightness = <255>;
+>>   			linux,default-trigger = "default-on";
+>>   		};
+>>
+>
+>
 
-> +static const struct of_device_id zynq_gpio_of_match[] = {
-> +       { .compatible = "xlnx,zynq-gpio-1.0", .data = (void *)&zynq_gpio_def },
-> +       { .compatible = "xlnx,zynqmp-gpio-1.0",
-> +                                       .data = (void *)&zynqmp_gpio_def },
-
-Is there a separate patch adding this to the device tree
-bindings in Documentation/devicetree/bindings/gpio/gpio-zynq.txt?
-
-Else please include it in this patch.
-
-Yours,
-Linus Walleij
+Thanks Nico
