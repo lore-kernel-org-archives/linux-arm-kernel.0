@@ -1,27 +1,62 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Thu, 4 Jun 2015 11:56:53 +0100
-Subject: [PATCH 10/11] spi: add more debug prints in s3c64xx
-In-Reply-To: <CAOMqctRFXWT3m8H4YBH0tzQAL3Y2NUs6XCo2LiF1R0Xz+iWUzw@mail.gmail.com>
-References: <cover.1433364398.git.hramrach@gmail.com>
- <305830ebf9c0ae98c4f6e0ebbdec7414d6762b36.1433364398.git.hramrach@gmail.com>
- <20150604091634.GY14071@sirena.org.uk>
- <CAOMqctQxn6UY2DJ9Syp6Ay9SYKLgdU+8EjiTK_48-R3dZ8PcvA@mail.gmail.com>
- <20150604102621.GB14071@sirena.org.uk>
- <CAOMqctRFXWT3m8H4YBH0tzQAL3Y2NUs6XCo2LiF1R0Xz+iWUzw@mail.gmail.com>
-Message-ID: <20150604105653.GD14071@sirena.org.uk>
+From: peter.maydell@linaro.org (Peter Maydell)
+Date: Thu, 4 Jun 2015 11:59:17 +0100
+Subject: [PATCH v5 4/6] target-arm: kvm - support for single step
+In-Reply-To: <1432912764-7073-5-git-send-email-alex.bennee@linaro.org>
+References: <1432912764-7073-1-git-send-email-alex.bennee@linaro.org>
+ <1432912764-7073-5-git-send-email-alex.bennee@linaro.org>
+Message-ID: <CAFEAcA9nTR_UfNyZB4h5VhnFFZKQGDG=rrw-M-=aPUcmmGr4Ug@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 04, 2015 at 12:52:19PM +0200, Michal Suchanek wrote:
+On 29 May 2015 at 16:19, Alex Benn?e <alex.bennee@linaro.org> wrote:
+> This adds support for single-step. There isn't much to do on the QEMU
+> side as after we set-up the request for single step via the debug ioctl
+> it is all handled within the kernel.
+>
+> Signed-off-by: Alex Benn?e <alex.bennee@linaro.org>
+>
+> ---
+> v2
+>   - convert to using HSR_EC
+> v3
+>   - use internals.h definitions
+> ---
+>  target-arm/kvm.c | 10 ++++++++++
+>  1 file changed, 10 insertions(+)
+>
+> diff --git a/target-arm/kvm.c b/target-arm/kvm.c
+> index c3bad6f..de2865a 100644
+> --- a/target-arm/kvm.c
+> +++ b/target-arm/kvm.c
+> @@ -528,6 +528,13 @@ static int kvm_handle_debug(CPUState *cs, struct kvm_run *run)
+>      kvm_cpu_synchronize_state(cs);
+>
+>      switch (hsr_ec) {
+> +    case EC_SOFTWARESTEP:
+> +        if (cs->singlestep_enabled) {
+> +            return true;
+> +        } else {
+> +            error_report("Came out of SINGLE STEP when not enabled");
 
-> There is no code interdependency with the other patches so if it's
-> preferred I can send patches like this separately.
+All-caps there is a bit odd.
 
-Yes, that's better practice.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150604/0ad5f1a4/attachment.sig>
+> +        }
+> +        break;
+>      case EC_AA64_BKPT:
+>          if (kvm_find_sw_breakpoint(cs, env->pc)) {
+>              return true;
+> @@ -588,6 +595,9 @@ int kvm_arch_on_sigbus(int code, void *addr)
+>
+>  void kvm_arch_update_guest_debug(CPUState *cs, struct kvm_guest_debug *dbg)
+>  {
+> +    if (cs->singlestep_enabled) {
+> +        dbg->control |= KVM_GUESTDBG_ENABLE | KVM_GUESTDBG_SINGLESTEP;
+> +    }
+>      if (kvm_sw_breakpoints_active(cs)) {
+>          dbg->control |= KVM_GUESTDBG_ENABLE | KVM_GUESTDBG_USE_SW_BP;
+>      }
+
+Again, is there a guard somewhere to prevent us trying to enable
+singlestep if the kernel doesn't support it?
+
+-- PMM
