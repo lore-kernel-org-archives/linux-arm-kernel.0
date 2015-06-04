@@ -1,44 +1,55 @@
-From: arun@gumstix.com (Arun Bharadwaj)
-Date: Thu,  4 Jun 2015 11:08:19 -0700
-Subject: [PATCH 3/3] ARM: dts: Fix frequency scaling on Gumstix Pepper.
-In-Reply-To: <1433441299-18887-1-git-send-email-arun@gumstix.com>
-References: <1433441299-18887-1-git-send-email-arun@gumstix.com>
-Message-ID: <1433441299-18887-4-git-send-email-arun@gumstix.com>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Thu, 4 Jun 2015 11:14:04 -0700
+Subject: [PATCH 5/5] [RFC] ARM: timer-sp: Use of_clk_get_parent_count()
+ instead of open coding
+In-Reply-To: <CAMuHMdXRQbBJWLCiDgx=vRcj=MS5BAQ6gskfcMGZzW1gKa6J8g@mail.gmail.com>
+References: <1432891549-23295-1-git-send-email-geert+renesas@glider.be>
+ <1432891549-23295-6-git-send-email-geert+renesas@glider.be>
+ <20150603234426.GB490@codeaurora.org>
+ <CAMuHMdXRQbBJWLCiDgx=vRcj=MS5BAQ6gskfcMGZzW1gKa6J8g@mail.gmail.com>
+Message-ID: <20150604181404.GF490@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The device tree for Gumstix Pepper has DCDC2 and
-DCDC3 correctly labelled but the upper limit values
-are wrong. The confusion is due to the hardware
-quirk where the DCDC2 and DCDC3 wires are flipped
-in Pepper.
+On 06/04, Geert Uytterhoeven wrote:
+> Hi Stephen,
+> 
+> On Thu, Jun 4, 2015 at 1:44 AM, Stephen Boyd <sboyd@codeaurora.org> wrote:
+> > On 05/29, Geert Uytterhoeven wrote:
+> >> Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+> >>  #include <linux/err.h>
+> >>  #include <linux/interrupt.h>
+> >>  #include <linux/irq.h>
+> >> @@ -234,7 +235,7 @@ static void __init sp804_of_init(struct device_node *np)
+> >>               clk1 = NULL;
+> >>
+> >>       /* Get the 2nd clock if the timer has 3 timer clocks */
+> >> -     if (of_count_phandle_with_args(np, "clocks", "#clock-cells") == 3) {
+> >> +     if (of_clk_get_parent_count(np) == 3) {
+> >
+> > So maybe it means if we want to expose of_clk_get_parent_count()
+> > we should move it to some other header file (of_clk.h?). And then
+> > maybe we should always compile said helpers if OF=y and
+> > HAVE_CLK=y.
+> 
+> That makes sense.
+> 
+> Currently we have lots of of_clk_*() in <linux/clk-provider.h>, and a few
+> of_clk_get*() in <inux/clk.h>.
+> And the mysterious of_clk_set_defaults() in <linux/clk/clk-conf.h>.
+> 
+> All of_clk_get*() could be moved to a new <linux/of_clk.h>.
+> 
+> Alternatively, of_clk_get_parent_count() could just move to <linux/clk.h>?
 
-Signed-off-by: Arun Bharadwaj <arun@gumstix.com>
----
- arch/arm/boot/dts/am335x-pepper.dts | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+Hmm... of_clk_*() functions that return a struct clk * or work
+with a struct clk * should stay within clk.h. But these ones in
+clk-provider.h should probably move to a new of_clk.h file:
 
-diff --git a/arch/arm/boot/dts/am335x-pepper.dts b/arch/arm/boot/dts/am335x-pepper.dts
-index 99f855d..37b95f6 100644
---- a/arch/arm/boot/dts/am335x-pepper.dts
-+++ b/arch/arm/boot/dts/am335x-pepper.dts
-@@ -448,7 +448,7 @@
- 			/* VDD_CORE voltage limits 0.95V - 1.26V with +/-4% tolerance */
- 			regulator-name = "vdd_core";
- 			regulator-min-microvolt = <925000>;
--			regulator-max-microvolt = <1325000>;
-+			regulator-max-microvolt = <1150000>;
- 			regulator-boot-on;
- 			regulator-always-on;
- 		};
-@@ -457,7 +457,7 @@
- 			/* VDD_MPU voltage limits 0.95V - 1.1V with +/-4% tolerance */
- 			regulator-name = "vdd_mpu";
- 			regulator-min-microvolt = <925000>;
--			regulator-max-microvolt = <1150000>;
-+			regulator-max-microvolt = <1325000>;
- 			regulator-boot-on;
- 			regulator-always-on;
- 		};
+	of_clk_get_parent_count
+	of_clk_get_parent_name
+	of_clk_init
+
 -- 
-2.1.4
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
