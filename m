@@ -1,53 +1,66 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Thu, 04 Jun 2015 13:52:57 +0900
-Subject: [RFT v2 36/48] genirq,
- arm: Kill the first parameter 'irq' of irq_flow_handler_t
-In-Reply-To: <1433391238-19471-37-git-send-email-jiang.liu@linux.intel.com>
-References: <1433391238-19471-1-git-send-email-jiang.liu@linux.intel.com>
- <1433391238-19471-37-git-send-email-jiang.liu@linux.intel.com>
-Message-ID: <556FD9A9.8090704@samsung.com>
+From: hramrach@gmail.com (Michal Suchanek)
+Date: Thu, 4 Jun 2015 06:54:00 +0200
+Subject: [PATCH 04/11] mtd: ofpart: do not fail probe when no partitions
+ exist
+In-Reply-To: <201506040058.52882.marex@denx.de>
+References: <cover.1433364398.git.hramrach@gmail.com>
+ <36e315552c849a4d22ac0fcff7958f6ffcafb160.1433364398.git.hramrach@gmail.com>
+ <201506040058.52882.marex@denx.de>
+Message-ID: <CAOMqctTB2AYOQZUc9o-R4PF1DQ-HY0RfSw5T-T28r5uP2s=qZA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04.06.2015 13:13, Jiang Liu wrote:
-> Now most IRQ flow handlers make no use of the first parameter 'irq'.
-> And for those who do make use of 'irq', we could easily get the irq
-> number through irq_desc->irq_data->irq. So kill the first parameter
-> 'irq' of irq_flow_handler_t.
-> 
-> To ease review, I have split the changes into several parts, though
-> they should be merge as one to support bisecting.
-> 
-> Signed-off-by: Jiang Liu <jiang.liu@linux.intel.com>
-> Signed-off-by: Hans Ulli Kroll <ulli.kroll@googlemail.com>
-> ---
->  arch/arm/common/it8152.c               |    2 +-
->  arch/arm/common/locomo.c               |    2 +-
->  arch/arm/common/sa1111.c               |    4 ++--
->  arch/arm/include/asm/hardware/it8152.h |    2 +-
->  arch/arm/include/asm/mach/irq.h        |    4 ++--
->  arch/arm/mach-dove/irq.c               |    4 ++--
->  arch/arm/mach-footbridge/isa-irq.c     |    4 ++--
->  arch/arm/mach-gemini/gpio.c            |    2 +-
->  arch/arm/mach-imx/3ds_debugboard.c     |    2 +-
->  arch/arm/mach-imx/mach-mx31ads.c       |    2 +-
->  arch/arm/mach-iop13xx/msi.c            |    2 +-
->  arch/arm/mach-lpc32xx/irq.c            |    4 ++--
->  arch/arm/mach-netx/generic.c           |    2 +-
->  arch/arm/mach-omap1/fpga.c             |    2 +-
->  arch/arm/mach-omap2/prm_common.c       |    2 +-
->  arch/arm/mach-pxa/balloon3.c           |    2 +-
->  arch/arm/mach-pxa/cm-x2xx-pci.c        |    4 ++--
->  arch/arm/mach-pxa/lpd270.c             |    2 +-
->  arch/arm/mach-pxa/pcm990-baseboard.c   |    2 +-
->  arch/arm/mach-pxa/viper.c              |    2 +-
->  arch/arm/mach-pxa/zeus.c               |    2 +-
->  arch/arm/mach-rpc/ecard.c              |    2 +-
->  arch/arm/mach-s3c24xx/bast-irq.c       |    3 +--
->  arch/arm/mach-s3c64xx/common.c         |    8 ++++----
+On 4 June 2015 at 00:58, Marek Vasut <marex@denx.de> wrote:
+> On Wednesday, June 03, 2015 at 11:26:40 PM, Michal Suchanek wrote:
+>> On Exynos it is necessary to set SPI controller parameters that apply to
+>> a SPI slave in a DT subnode of the slave device. The ofpart code returns
+>> an error when there are subnodes of the SPI flash but no partitions are
+>> found. Change this condition to a warning so that flash without
+>> partitions can be accessed on Exynos.
+>
+> I have to admit the rationale for this patch is not very clear to me, sorry.
+> Can you please explain this a bit more ?
 
-For s3c24xx/s3c64xx:
-Acked-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+This is how the DT entry for SPI slave looks with s3c64xx:
+flash: m25p80 at 0 {
+        #address-cells = <1>;
+        #size-cells = <1>;
+        compatible = "jedec,spi-nor";
+        reg = <0>;
+        spi-max-frequency = <40000000>;
+        linux,max_tx_len = <65536>;
+        m25p,fast-read;
+        controller-data {
+            samsung,spi-feedback-delay = <0>;
+        };
+    };
 
-Best regards,
-Krzysztof
+this is example of flash partitions:
+flash at 0 {
+        #address-cells = <1>;
+        #size-cells = <1>;
+
+        partition at 0 {
+                label = "u-boot";
+                reg = <0x0000000 0x100000>;
+                read-only;
+        };
+
+        uimage at 100000 {
+                reg = <0x0100000 0x200000>;
+        };
+};
+
+The parser ignores any flash without subnodes and returns 0 (no
+partititon). When there is a subnode it assumes the flash is
+partitioned and tries to parse the subnodes as partitions. When there
+are subnodes and none parses as partition an error is returned. As
+shown above it is valid to have subnodes on unpartitioned flash.
+
+When an error is returned from a partition parser the mtdpart code
+passes on this error to the flash probe function and the proble of the
+flash fails.
+
+Thanks
+
+Michal
