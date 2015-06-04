@@ -1,60 +1,66 @@
-From: jiri.prchal@aksignal.cz (=?UTF-8?B?SmnFmcOtIFByY2hhbA==?=)
-Date: Thu, 04 Jun 2015 13:33:03 +0200
-Subject: [BUG] at91: serial: something wrong with using DMA
-In-Reply-To: <556D611A.5090004@aksignal.cz>
-References: <555C8B79.4030900@aksignal.cz> <556563CE.3090506@aksignal.cz>
- <556D611A.5090004@aksignal.cz>
-Message-ID: <5570376F.7050406@aksignal.cz>
+From: michael@smart-africa.com (Michael van der Westhuizen)
+Date: Thu, 4 Jun 2015 13:35:00 +0200
+Subject: [PATCH v3] arm: tcm: Don't crash when TCM banks are protected by
+ TrustZone
+In-Reply-To: <20150604104031.GB10388@e103592.cambridge.arm.com>
+References: <1432821287-31436-1-git-send-email-michael@smart-africa.com>
+ <1433257803-25318-1-git-send-email-michael@smart-africa.com>
+ <20150604104031.GB10388@e103592.cambridge.arm.com>
+Message-ID: <39149A87-253B-41E5-9BD8-B8B648439AC8@smart-africa.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi,
-writing again, I made small tester to see what is happening. There is loop ttyS3 to ttyS2.
 
-/ # uname -a
-Linux prchal 3.18.0-linux4sam_4.7_cpm9g25+ #2 PREEMPT Thu May 21 14:29:51 CEST 2015 armv5tejl GNU/Linux
-/ #  testtty -i /dev/ttyS2 -o /dev/ttyS3 -b 512
-[ 9657.789789] atmel_usart f801c000.serial: using dma0chan4 for rx DMA transfers
-[ 9657.798798] atmel_usart f801c000.serial: using dma0chan5 for tx DMA transfers
-[ 9657.807807] atmel_usart f8020000.serial: using dma0chan6 for rx DMA transfers
-[ 9657.816816] atmel_usart f8020000.serial: using dma0chan7 for tx DMA transfers
-Write to /dev/ttyS3 = 512 B.
-Read from /dev/ttyS2 = 512 B. Total = 512 B.
-Write to /dev/ttyS3 = 512 B.
-Read from /dev/ttyS2 = 512 B. Total = 1024 B.
-Write to /dev/ttyS3 = 512 B.
-Read from /dev/ttyS2 = 512 B. Total = 1536 B.
-Write to /dev/ttyS3 = 512 B.
-Read from /dev/ttyS2 = 512 B. Total = 2048 B.
-Write to /dev/ttyS3 = 512 B.
-Read from /dev/ttyS2 = 0 B, error! Total = 2048 B.
-Write to /dev/ttyS3 = 512 B.
-Read from /dev/ttyS2 = 0 B, error! Total = 2048 B.
-Write to /dev/ttyS3 = 512 B.
-Read from /dev/ttyS2 = 0 B, error! Total = 2048 B.
-Write to /dev/ttyS3 = 512 B.
-Read from /dev/ttyS2 = 2048 B, error! Total = 4096 B.
-Write to /dev/ttyS3 = 512 B.
-Read from /dev/ttyS2 = 512 B. Total = 4608 B.
-Write to /dev/ttyS3 = 512 B.
-Read from /dev/ttyS2 = 512 B. Total = 5120 B.
-Write to /dev/ttyS3 = 512 B.
-Read from /dev/ttyS2 = 512 B. Total = 5632 B.
-Write to /dev/ttyS3 = 512 B.
-Read from /dev/ttyS2 = 512 B. Total = 6144 B.
+> On 04 Jun 2015, at 12:40 PM, Dave Martin <Dave.Martin@arm.com> wrote:
+> 
+> On Tue, Jun 02, 2015 at 05:10:03PM +0200, Michael van der Westhuizen wrote:
+>> Fixes the TCM initialisation code to handle TCM banks that are
+>> present but inaccessible due to TrustZone configuration.  This is
+>> the default case when enabling the non-secure world.  It may also
+>> be the case that that the user decided to use TCM for TrustZone.
+>> 
+>> This change has exposed a bug in handling of TCM where no TCM bank
+>> was usable (the 0 size TCM case).  This change addresses the
+>> resulting hang.
+> 
+> [...]
+> 
+>> + *
+>> + * Encoding this as per A8.8.107 of DDI0406C, Encoding T1/A1, yields:
+>> + *  1111 1111 1111 1111 0000 1111 1101 1111 Required Mask
+>> + *  1110 1110 0001 1001 ???? 1111 0001 0001 mrc p15, 0, XX, c9, c1, 0
+>> + *  1110 1110 0001 1001 ???? 1111 0011 0001 mrc p15, 0, XX, c9, c1, 1
+>> + *  [  ] [  ] [ ]| [  ] [  ] [  ] [ ]| +--- CRm
+>> + *    |    |   | |   |    |    |   | +----- SBO
+>> + *    |    |   | |   |    |    |   +------- opc2
+>> + *    |    |   | |   |    |    +----------- coproc
+>> + *    |    |   | |   |    +---------------- Rt
+>> + *    |    |   | |   +--------------------- CRn
+>> + *    |    |   | +------------------------- SBO
+>> + *    |    |   +--------------------------- opc1
+>> + *    |    +------------------------------- instruction
+>> + *    +------------------------------------ condition
+>> + */
+>> +#define TCM_REGION_READ_MASK		0xffff0fdf
+>> +#define TCM_REGION_READ_INSTR		0xee190f11
+>> +#define DEST_REG_SHIFT			12
+>> +#define DEST_REG_MASK			0xf
+> 
+> What happens in a Thumb-2 kernel?
+> 
+> I think it is safe, since Thumb-2 kernel implies v7, and v7 mandates the
+> TCMTR.  Even if we did get an Undef, the code in traps.c rearranges the
+> bits of the offending insn into the "correct" order, and it so happens
+> that this also makes the encoding for MRC/MCR instructions identical
+> between ARM and Thumb.
+> 
+> For some other random instruction these assumptions may not hold, so
+> it is worth adding brief comment in case people blindly use this code
+> as a template for something else.
 
-and repeated...
+In this particular case, the T1 and A1 encodings are identical.
 
-I can send testtty source code if you like.
+I?ll make that clear, and also make it clear that this is not necessarily a general case.
 
-
-On 2.6.2015 09:54, Ji?? Prchal wrote:
-> Hi,
-> we made some research how it "doesn't" work.
-> Just after the ttyS is opened it gives data in each read as it received them (44 B). No select, just read, VMIN = 0
-> VTIME = 1. But after 2048 B in total received since open it stopped giving data (read returns 0) until next 2048 B
-> received and then read gives all of the next 2048 B and so on.
-> In kernel 3.18.13 it works fine, in 4.x or 3.18.0-linux4sam no.
-> What we do wrong?
-> Jiri
->
+Michael
