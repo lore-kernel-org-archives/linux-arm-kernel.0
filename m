@@ -1,35 +1,25 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 4 Jun 2015 10:20:26 -0700
-Subject: next-20150604 build: 2 failures 37 warnings (next-20150604)
-In-Reply-To: <20150604171004.GZ30984@atomide.com>
-References: <E1Z0YIL-0008Ma-5O@optimist> <20150604170112.GM14071@sirena.org.uk>
- <20150604171004.GZ30984@atomide.com>
-Message-ID: <20150604172026.GA30984@atomide.com>
+From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
+Date: Thu, 4 Jun 2015 10:23:24 -0700
+Subject: [PATCH v0] gpio_keys: fix gpio key driver to proper support GIC
+ interrupt
+In-Reply-To: <1433402712-21399-1-git-send-email-yvo@apm.com>
+References: <1433402712-21399-1-git-send-email-yvo@apm.com>
+Message-ID: <20150604172324.GA9074@dtor-ws>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Tony Lindgren <tony@atomide.com> [150604 10:11]:
-> * Mark Brown <broonie@kernel.org> [150604 10:03]:
-> > On Thu, Jun 04, 2015 at 05:47:05PM +0100, Build bot for Mark Brown wrote:
-> > 
-> > > 	arm-allmodconfig
-> > > ../drivers/tty/serial/8250/8250_omap.c:586:20: error: redefinition of 'omap8250_irq'
-> > 
-> > Current -next fails to build an ARM allmodconfig (and possibly other
-> > things) due to 9e91597f24234 and 9809889c708eb (serial: 8250_omap:
-> > provide complete custom startup & shutdown callbacks) which appear to be
-> > the same commit that's been applied twice somehow.  Not sure what's
-> > going on there...
-> 
-> Sounds like I'm using an old commit in one of my pending branches,
-> will check immediately.
+Hi Y,
+On Thu, Jun 04, 2015 at 02:25:12PM +0700, Y Vo wrote:
+> GIC is designed to support two of trigger mechanisms - active level
+> high or edge rising. But in the gpio_keys driver, it tries to use both
+> edge rising and edge falling trigger. This patch fixes the gpio_keys
+> driver to request only the edge rising event when failed to configure the
+> interrupt.
 
-Greg, there's now commit 9809889c708e in tty-linus and commit
-9e91597f2423 in tty-next.
+How do we get notified of button release if we only get interrupt on
+rising edge?
 
-I gues I'll drop my omap-for-v4.2/wakeirq branch from linux
-next for now.
+Thanks.
 
-Regards,
-
-Tony
+-- 
+Dmitry
