@@ -1,32 +1,58 @@
-From: dinguyen@opensource.altera.com (Dinh Nguyen)
-Date: Thu, 4 Jun 2015 17:27:28 -0500
-Subject: [PATCHv2 2/4] edac, altera: Refactor EDAC for Altera CycloneV SoC.
-In-Reply-To: <20150604220609.GK3795@pd.tnic>
-References: <1433428128-7292-1-git-send-email-tthayer@opensource.altera.com>
- <1433428128-7292-3-git-send-email-tthayer@opensource.altera.com>
- <55706E25.8050105@opensource.altera.com>
- <5570C479.7010902@opensource.altera.com> <20150604220609.GK3795@pd.tnic>
-Message-ID: <5570D0D0.9030803@opensource.altera.com>
+From: dinh.linux@gmail.com (Dinh Nguyen)
+Date: Thu, 4 Jun 2015 17:37:31 -0500
+Subject: [GIT PULL] SoCFPGA updates for v4.2, part 2
+In-Reply-To: <1433297493-3760-1-git-send-email-dinh.linux@gmail.com>
+References: <1433297493-3760-1-git-send-email-dinh.linux@gmail.com>
+Message-ID: <CADhT+wcATtNuJjj3bA8wjywGkZ-P4BT6sbmDvz-S2t-K5vOY8Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/04/2015 05:06 PM, Borislav Petkov wrote:
-> On Thu, Jun 04, 2015 at 04:34:49PM -0500, Thor Thayer wrote:
->> OK. I'll refactor and resend. I was using Altera's internal for-next branch.
-> 
-> Use this one:
-> 
-> git://git.kernel.org/pub/scm/linux/kernel/git/bp/bp.git#for-next
-> 
+Hi Arnd, Kevin, Olof:
 
-This is my mistake. I applied Alan Tull's patch for suspend-to-ram which
-also touches drivers/edac/altera_edac.c.
+On Tue, Jun 2, 2015 at 9:11 PM,  <dinh.linux@gmail.com> wrote:
+> Hi Arnd, Kevin, Olof:
+>
+> Please pull in this patch for v4.2.
+>
+> Thanks,
+> Dinh
+>
+> The following changes since commit c65b99f046843d2455aa231747b5a07a999a9f3d:
+>
+>   Linux 4.1-rc6 (2015-05-31 19:01:07 -0700)
+>
+> are available in the git repository at:
+>
+>   git at gitolite.kernel.org:pub/scm/linux/kernel/git/dinguyen/linux.git socfpga_updates_for_v4.2_part2
+>
+> for you to fetch changes up to a6cb1af402026c44eec5760036715acad1077b56:
+>
+>   ARM: socfpga: support suspend to ram (2015-06-02 14:05:22 -0500)
+>
+> ----------------------------------------------------------------
+> SoCFPGA update for v4.2, part 2
+> - Add support for suspend to RAM
+>
+> ----------------------------------------------------------------
+> Alan Tull (1):
+>       ARM: socfpga: support suspend to ram
+>
+>  arch/arm/mach-socfpga/Kconfig        |  10 ++-
+>  arch/arm/mach-socfpga/Makefile       |   1 +
+>  arch/arm/mach-socfpga/core.h         |   6 +-
+>  arch/arm/mach-socfpga/pm.c           | 149 +++++++++++++++++++++++++++++++++++
+>  arch/arm/mach-socfpga/self-refresh.S | 136 ++++++++++++++++++++++++++++++++
+>  arch/arm/mach-socfpga/socfpga.c      |   6 +-
+>  drivers/edac/altera_edac.c           |  20 +++++
+>  7 files changed, 325 insertions(+), 3 deletions(-)
+>  create mode 100644 arch/arm/mach-socfpga/pm.c
+>  create mode 100644 arch/arm/mach-socfpga/self-refresh.S
 
-https://git.kernel.org/cgit/linux/kernel/git/dinguyen/linux.git/commit/?h=socfpga_for_next_arria10&id=d44a92eb044f4cc1abf34a790d647e9fa356d7b0
+Please ignore this pull request. I just realized that it's touching
+drivers/edac/altera_edac.c which should be a separate patch and go
+through linux-edac.
 
-I think I will have to ask Alan to split up his patch and send the part
-that touches altera_edac.c to linux-edac.
+Sorry for the inconvenience.
 
-Sorry about the confusion.
-
+Thanks,
 Dinh
