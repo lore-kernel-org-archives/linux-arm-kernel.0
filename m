@@ -1,218 +1,132 @@
-From: tharvey@gateworks.com (Tim Harvey)
-Date: Thu,  4 Jun 2015 13:16:00 -0700
-Subject: [PATCH v2 2/2] ARM: dts: ventana: Add ext-reset support
-In-Reply-To: <1433448960-9257-1-git-send-email-tharvey@gateworks.com>
-References: <1432853677-5150-1-git-send-email-tharvey@gateworks.com>
- <1433448960-9257-1-git-send-email-tharvey@gateworks.com>
-Message-ID: <1433448960-9257-3-git-send-email-tharvey@gateworks.com>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Thu, 4 Jun 2015 13:20:09 -0700
+Subject: [PATCH v3 3/5] clk: add support for clocks provided by
+ SCP(System Control Processor)
+In-Reply-To: <1432720398-5701-4-git-send-email-sudeep.holla@arm.com>
+References: <1432720398-5701-1-git-send-email-sudeep.holla@arm.com>
+ <1432720398-5701-4-git-send-email-sudeep.holla@arm.com>
+Message-ID: <20150604202009.GI676@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Gateworks Ventana boards have a PMIC that can be used to regulate the
-CPU voltage rails for DVFS support. In order to ensure this PMIC is properly
-reset the watchdog needs to be configured to assert its external reset
-signal.
+On 05/27, Sudeep Holla wrote:
+> +
+> +#include <linux/clk-provider.h>
+> +#include <linux/device.h>
+> +#include <linux/err.h>
+> +#include <linux/of.h>
+> +#include <linux/module.h>
+> +#include <linux/of_platform.h>
+> +#include <linux/scpi_protocol.h>
+> +
+> +struct scpi_clk {
+> +	u32 id;
+> +	const char *name;
+> +	struct clk_hw hw;
+> +	struct scpi_dvfs_info *info;
+> +	unsigned long rate_min;
+> +	unsigned long rate_max;
+> +};
+> +
+> +#define to_scpi_clk(clk) container_of(clk, struct scpi_clk, hw)
+> +
+> +static struct scpi_ops *scpi_ops;
 
-Additionally the pad used for WDOG_B needs to be configured which we add to
-iomux.
+Why do we need this singleton? Can we put this pointer into scpi_clk?
 
-Cc: Markus Pargmann <mpa@pengutronix.de>
-Signed-off-by: Tim Harvey <tharvey@gateworks.com>
----
-v2:
- - moved pinctl to wdog group instead of hog
- - updated property name
+> +
+> +static unsigned long scpi_clk_recalc_rate(struct clk_hw *hw,
+> +					  unsigned long parent_rate)
+> +{
+> +	struct scpi_clk *clk = to_scpi_clk(hw);
+> +
+> +	return scpi_ops->clk_get_val(clk->id);
+> +}
+> +
+> +static long scpi_clk_round_rate(struct clk_hw *hw, unsigned long rate,
+> +				unsigned long *parent_rate)
+> +{
+> +	struct scpi_clk *clk = to_scpi_clk(hw);
+> +
+> +	if (WARN_ON(clk->rate_min && rate < clk->rate_min))
+> +		rate = clk->rate_min;
+> +	if (WARN_ON(clk->rate_max && rate > clk->rate_max))
+> +		rate = clk->rate_max;
+> +
+> +	return rate;
+> +}
 
-Signed-off-by: Tim Harvey <tharvey@gateworks.com>
----
- arch/arm/boot/dts/imx6qdl-gw51xx.dtsi | 12 ++++++++++++
- arch/arm/boot/dts/imx6qdl-gw52xx.dtsi | 12 ++++++++++++
- arch/arm/boot/dts/imx6qdl-gw53xx.dtsi | 13 +++++++++++++
- arch/arm/boot/dts/imx6qdl-gw54xx.dtsi | 17 +++++++++++++++++
- arch/arm/boot/dts/imx6qdl-gw551x.dtsi | 12 ++++++++++++
- arch/arm/boot/dts/imx6qdl-gw552x.dtsi | 12 ++++++++++++
- 6 files changed, 78 insertions(+)
+Hm.. this seems really generic. It might be better to support a
+way to tell the framework to limit the min/max rate that's
+accepted for a clk. That could be done later though.
 
-diff --git a/arch/arm/boot/dts/imx6qdl-gw51xx.dtsi b/arch/arm/boot/dts/imx6qdl-gw51xx.dtsi
-index f2867c4..8146452 100644
---- a/arch/arm/boot/dts/imx6qdl-gw51xx.dtsi
-+++ b/arch/arm/boot/dts/imx6qdl-gw51xx.dtsi
-@@ -210,6 +210,12 @@
- 	status = "okay";
- };
- 
-+&wdog1 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_wdog>;
-+	ext-reset-output;
-+};
-+
- &iomuxc {
- 	imx6qdl-gw51xx {
- 		pinctrl_enet: enetgrp {
-@@ -329,5 +335,11 @@
- 				MX6QDL_PAD_EIM_D22__GPIO3_IO22		0x1b0b0 /* OTG_PWR_EN */
- 			>;
- 		};
-+
-+		pinctrl_wdog: wdoggrp {
-+			fsl,pins = <
-+				MX6QDL_PAD_DISP0_DAT8__WDOG1_B		0x1b0b0
-+			>;
-+		};
- 	};
- };
-diff --git a/arch/arm/boot/dts/imx6qdl-gw52xx.dtsi b/arch/arm/boot/dts/imx6qdl-gw52xx.dtsi
-index b5756c2..e4752a7 100644
---- a/arch/arm/boot/dts/imx6qdl-gw52xx.dtsi
-+++ b/arch/arm/boot/dts/imx6qdl-gw52xx.dtsi
-@@ -323,6 +323,12 @@
- 	status = "okay";
- };
- 
-+&wdog1 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_wdog>;
-+	ext-reset-output;
-+};
-+
- &iomuxc {
- 	imx6qdl-gw52xx {
- 		pinctrl_audmux: audmuxgrp {
-@@ -472,5 +478,11 @@
- 				MX6QDL_PAD_SD3_DAT5__GPIO7_IO00	0x1b0b0 /* CD */
- 			>;
- 		};
-+
-+		pinctrl_wdog: wdoggrp {
-+			fsl,pins = <
-+				MX6QDL_PAD_DISP0_DAT8__WDOG1_B		0x1b0b0
-+			>;
-+		};
- 	};
- };
-diff --git a/arch/arm/boot/dts/imx6qdl-gw53xx.dtsi b/arch/arm/boot/dts/imx6qdl-gw53xx.dtsi
-index 86f03c1..7061e75 100644
---- a/arch/arm/boot/dts/imx6qdl-gw53xx.dtsi
-+++ b/arch/arm/boot/dts/imx6qdl-gw53xx.dtsi
-@@ -329,7 +329,14 @@
- 	status = "okay";
- };
- 
-+&wdog1 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_wdog>;
-+	ext-reset-output;
-+};
-+
- &iomuxc {
-+
- 	imx6qdl-gw53xx {
- 		pinctrl_audmux: audmuxgrp {
- 			fsl,pins = <
-@@ -479,5 +486,11 @@
- 				MX6QDL_PAD_SD3_DAT5__GPIO7_IO00		0x1b0b0 /* CD */
- 			>;
- 		};
-+
-+		pinctrl_wdog: wdoggrp {
-+			fsl,pins = <
-+				MX6QDL_PAD_DISP0_DAT8__WDOG1_B		0x1b0b0
-+			>;
-+		};
- 	};
- };
-diff --git a/arch/arm/boot/dts/imx6qdl-gw54xx.dtsi b/arch/arm/boot/dts/imx6qdl-gw54xx.dtsi
-index 4a8d97f..98439e1 100644
---- a/arch/arm/boot/dts/imx6qdl-gw54xx.dtsi
-+++ b/arch/arm/boot/dts/imx6qdl-gw54xx.dtsi
-@@ -422,6 +422,17 @@
- 	status = "okay";
- };
- 
-+&wdog1 {
-+	status = "disabled";
-+};
-+
-+&wdog2 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_wdog>;
-+	ext-reset-output;
-+	status = "okay";
-+};
-+
- &iomuxc {
- 	imx6qdl-gw54xx {
- 		pinctrl_audmux: audmuxgrp {
-@@ -570,5 +581,11 @@
- 				MX6QDL_PAD_SD3_DAT3__SD3_DATA3		0x17059
- 			>;
- 		};
-+
-+		pinctrl_wdog: wdoggrp {
-+			fsl,pins = <
-+				MX6QDL_PAD_SD1_DAT3__WDOG2_B		0x1b0b0
-+			>;
-+		};
- 	};
- };
-diff --git a/arch/arm/boot/dts/imx6qdl-gw551x.dtsi b/arch/arm/boot/dts/imx6qdl-gw551x.dtsi
-index d1866a0..0924b6b 100644
---- a/arch/arm/boot/dts/imx6qdl-gw551x.dtsi
-+++ b/arch/arm/boot/dts/imx6qdl-gw551x.dtsi
-@@ -227,6 +227,12 @@
- 	status = "okay";
- };
- 
-+&wdog1 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_wdog>;
-+	ext-reset-output;
-+};
-+
- &iomuxc {
- 	imx6qdl-gw51xx {
- 		pinctrl_flexcan1: flexcan1grp {
-@@ -310,5 +316,11 @@
- 				MX6QDL_PAD_GPIO_1__USB_OTG_ID		0x17059
- 			>;
- 		};
-+
-+		pinctrl_wdog: wdoggrp {
-+			fsl,pins = <
-+				MX6QDL_PAD_DISP0_DAT8__WDOG1_B		0x1b0b0
-+			>;
-+		};
- 	};
- };
-diff --git a/arch/arm/boot/dts/imx6qdl-gw552x.dtsi b/arch/arm/boot/dts/imx6qdl-gw552x.dtsi
-index 5c6587f..4ba859f 100644
---- a/arch/arm/boot/dts/imx6qdl-gw552x.dtsi
-+++ b/arch/arm/boot/dts/imx6qdl-gw552x.dtsi
-@@ -185,6 +185,12 @@
- 	status = "okay";
- };
- 
-+&wdog1 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_wdog>;
-+	ext-reset-output;
-+};
-+
- &iomuxc {
- 	imx6qdl-gw552x {
- 		pinctrl_gpio_leds: gpioledsgrp {
-@@ -263,5 +269,11 @@
- 				MX6QDL_PAD_KEY_ROW1__UART5_RX_DATA	0x1b0b1
- 			>;
-                 };
-+
-+		pinctrl_wdog: wdoggrp {
-+			fsl,pins = <
-+				MX6QDL_PAD_DISP0_DAT8__WDOG1_B		0x1b0b0
-+			>;
-+		};
- 	};
- };
+> +
+> +static int scpi_clk_set_rate(struct clk_hw *hw, unsigned long rate,
+> +			     unsigned long parent_rate)
+> +{
+> +	struct scpi_clk *clk = to_scpi_clk(hw);
+> +
+> +	return scpi_ops->clk_set_val(clk->id, rate);
+> +}
+> +
+[..]
+> +
+> +static int scpi_clk_add(struct device *dev, struct device_node *np)
+> +{
+> +	struct clk **clks;
+> +	int idx, count;
+> +	struct clk_onecell_data *clk_data;
+> +
+> +	count = of_property_count_strings(np, "clock-output-names");
+> +	if (count < 0) {
+> +		dev_err(dev, "%s: invalid clock output count\n", np->name);
+> +		return -EINVAL;
+> +	}
+> +
+> +	clk_data = devm_kmalloc(dev, sizeof(*clk_data), GFP_KERNEL);
+> +	if (!clk_data)
+> +		return -ENOMEM;
+> +
+> +	clks = devm_kcalloc(dev, count, sizeof(*clks), GFP_KERNEL);
+> +	if (!clks)
+> +		return -ENOMEM;
+> +
+> +	for (idx = 0; idx < count; idx++) {
+> +		struct scpi_clk *sclk;
+> +		u32 val;
+> +
+> +		sclk = devm_kzalloc(dev, sizeof(*sclk), GFP_KERNEL);
+> +		if (!sclk)
+> +			return -ENOMEM;
+> +
+> +		if (of_property_read_string_index(np, "clock-output-names",
+> +						  idx, &sclk->name)) {
+> +			dev_err(dev, "invalid clock name @ %s\n", np->name);
+> +			return -EINVAL;
+> +		}
+> +
+> +		if (of_property_read_u32_index(np, "clock-indices",
+> +					       idx, &val)) {
+> +			dev_err(dev, "invalid clock index @ %s\n", np->name);
+> +			return -EINVAL;
+> +		}
+> +
+> +		sclk->id = val;
+> +
+> +		clks[idx] = scpi_clk_ops_init(dev, np, sclk);
+> +		if (IS_ERR_OR_NULL(clks[idx]))
+> +			dev_err(dev, "failed to register clock '%s'\n",
+> +				sclk->name);
+> +		else
+> +			dev_dbg(dev, "Registered clock '%s'\n", sclk->name);
+> +	}
+> +
+> +	clk_data->clks = clks;
+> +	clk_data->clk_num = idx;
+> +	of_clk_add_provider(np, of_clk_src_onecell_get, clk_data);
+
+And if of_clk_add_provider() fails?
+
 -- 
-1.9.1
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
