@@ -1,90 +1,44 @@
 From: arun@gumstix.com (Arun Bharadwaj)
-Date: Thu,  4 Jun 2015 11:08:18 -0700
-Subject: [PATCH 2/3] ARM: dts: configure regulators for Gumstix Pepper
+Date: Thu,  4 Jun 2015 11:08:19 -0700
+Subject: [PATCH 3/3] ARM: dts: Fix frequency scaling on Gumstix Pepper.
 In-Reply-To: <1433441299-18887-1-git-send-email-arun@gumstix.com>
 References: <1433441299-18887-1-git-send-email-arun@gumstix.com>
-Message-ID: <1433441299-18887-3-git-send-email-arun@gumstix.com>
+Message-ID: <1433441299-18887-4-git-send-email-arun@gumstix.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Adam YH Lee <adam.yh.lee@gmail.com>
+The device tree for Gumstix Pepper has DCDC2 and
+DCDC3 correctly labelled but the upper limit values
+are wrong. The confusion is due to the hardware
+quirk where the DCDC2 and DCDC3 wires are flipped
+in Pepper.
 
-Boot process is halting in midway because some of the necessary voltage
-regulators are deemed unused and subsequently powered off, leading to
-a completely unresponsive system.
-
-Most of the device nodes had correct voltage regulator attachments.
-Yet these nodes had to set stricter enforcement on them through
-'regulator-boot-on' and 'regulator-always-on' to function correctly.
-
-Signed-off-by: Ash Charles <ashcharles@gmail.com>
+Signed-off-by: Arun Bharadwaj <arun@gumstix.com>
 ---
- arch/arm/boot/dts/am335x-pepper.dts | 13 +++++++++++++
- 1 file changed, 13 insertions(+)
+ arch/arm/boot/dts/am335x-pepper.dts | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
 diff --git a/arch/arm/boot/dts/am335x-pepper.dts b/arch/arm/boot/dts/am335x-pepper.dts
-index 473d8ee..99f855d 100644
+index 99f855d..37b95f6 100644
 --- a/arch/arm/boot/dts/am335x-pepper.dts
 +++ b/arch/arm/boot/dts/am335x-pepper.dts
-@@ -415,6 +415,7 @@
- 
- &v3v3c_reg {
- 	regulator-name = "v3v3c_reg";
-+	regulator-boot-on;
- 	regulator-min-microvolt = <3300000>;
- 	regulator-max-microvolt = <3300000>;
- 	vin-supply = <&vbat>;
-@@ -439,6 +440,8 @@
- 	regulators {
- 		dcdc1_reg: regulator at 0 {
- 			/* VDD_1V8 system supply */
-+			regulator-name = "vdds_dpr";
-+			regulator-always-on;
- 		};
- 
- 		dcdc2_reg: regulator at 1 {
-@@ -447,6 +450,7 @@
+@@ -448,7 +448,7 @@
+ 			/* VDD_CORE voltage limits 0.95V - 1.26V with +/-4% tolerance */
+ 			regulator-name = "vdd_core";
  			regulator-min-microvolt = <925000>;
- 			regulator-max-microvolt = <1325000>;
+-			regulator-max-microvolt = <1325000>;
++			regulator-max-microvolt = <1150000>;
  			regulator-boot-on;
-+			regulator-always-on;
- 		};
- 
- 		dcdc3_reg: regulator at 2 {
-@@ -455,25 +459,34 @@
- 			regulator-min-microvolt = <925000>;
- 			regulator-max-microvolt = <1150000>;
- 			regulator-boot-on;
-+			regulator-always-on;
- 		};
- 
- 		ldo1_reg: regulator at 3 {
- 			/* VRTC 1.8V always-on supply */
-+			regulator-name = "vrtc,vdds";
  			regulator-always-on;
  		};
- 
- 		ldo2_reg: regulator at 4 {
- 			/* 3.3V rail */
-+			regulator-name = "vdd_3v3aux";
-+			regulator-always-on;
+@@ -457,7 +457,7 @@
+ 			/* VDD_MPU voltage limits 0.95V - 1.1V with +/-4% tolerance */
+ 			regulator-name = "vdd_mpu";
+ 			regulator-min-microvolt = <925000>;
+-			regulator-max-microvolt = <1150000>;
++			regulator-max-microvolt = <1325000>;
+ 			regulator-boot-on;
+ 			regulator-always-on;
  		};
- 
- 		ldo3_reg: regulator at 5 {
- 			/* VDD_3V3A 3.3V rail */
-+			regulator-name = "vdd_3v3a";
- 			regulator-min-microvolt = <3300000>;
- 			regulator-max-microvolt = <3300000>;
-+			regulator-boot-on;
-+			regulator-always-on;
- 		};
- 
- 		ldo4_reg: regulator at 6 {
- 			/* VDD_3V3B 3.3V rail */
-+			regulator-name = "vdd_3v3b";
-+			regulator-always-on;
- 		};
- 	};
- };
 -- 
 2.1.4
