@@ -1,43 +1,33 @@
-From: tomi.valkeinen@ti.com (Tomi Valkeinen)
-Date: Thu, 4 Jun 2015 09:13:58 +0300
-Subject: [PATCHv4 10/10] arm/dts: am57xx-beagle-x15.dts: add HDMI
-In-Reply-To: <20150603171627.GU30984@atomide.com>
-References: <1433139798-23450-1-git-send-email-tomi.valkeinen@ti.com>
- <1433139798-23450-11-git-send-email-tomi.valkeinen@ti.com>
- <20150601215115.GH30984@atomide.com> <556EE463.6000502@ti.com>
- <20150603154438.GS30984@atomide.com> <556F24E6.7040003@ti.com>
- <20150603161008.GT30984@atomide.com> <20150603171627.GU30984@atomide.com>
-Message-ID: <556FECA6.6060408@ti.com>
+From: javier@dowhile0.org (Javier Martinez Canillas)
+Date: Thu, 4 Jun 2015 08:20:12 +0200
+Subject: [RFT v2 05/48] gpio: Use irq_desc_get_xxx() to avoid redundant
+ lookup of irq_desc
+In-Reply-To: <1433391238-19471-6-git-send-email-jiang.liu@linux.intel.com>
+References: <1433391238-19471-1-git-send-email-jiang.liu@linux.intel.com>
+ <1433391238-19471-6-git-send-email-jiang.liu@linux.intel.com>
+Message-ID: <CABxcv==Gg7GOzyo5kAEC5ezQpsTMPo=Bi0H4rfRUY5iQJ4oSTQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hello Jiang,
 
+On Thu, Jun 4, 2015 at 6:13 AM, Jiang Liu <jiang.liu@linux.intel.com> wrote:
+> Use irq_desc_get_xxx() to avoid redundant lookup of irq_desc while we
+> already have a pointer to corresponding irq_desc.
+>
+> Signed-off-by: Jiang Liu <jiang.liu@linux.intel.com>
+> Acked-by: Linus Walleij <linus.walleij@linaro.org>
+> ---
+>  drivers/gpio/gpio-bcm-kona.c   |    2 +-
+>  drivers/gpio/gpio-dwapb.c      |    2 +-
+>  drivers/gpio/gpio-mvebu.c      |    2 +-
+>  drivers/gpio/gpio-mxc.c        |    6 +++---
+>  drivers/gpio/gpio-mxs.c        |    2 +-
+>  drivers/gpio/gpio-omap.c       |    2 +-
 
-On 03/06/15 20:16, Tony Lindgren wrote:
+For gpio-omap:
 
->>>> OK, since there are no other merge conflicts that I'm aware of,
->>>> it's best that you merge the whole branch. I've acked the patches,
->>>> so for this one too:
->>>
->>> Ok, I can do that, but isn't this more linux-arm stuff? All the driver
->>> side code is already in the mainline.
->>
->> Yes but we're getting so late into merge window that I'd rather not
->> take it for v4.2 at this point. And it's all DSS related.
->>
->> Please make sure you get an ack for the drivers/clk/omap change from
->> Mike or Stephen though.
-> 
-> Naturally I mean "getting so close to the merge window" above :)
+Acked-by: Javier Martinez Canillas <javier@dowhile0.org>
 
-Thanks everyone. I've pushed this to fbdev for-next.
-
- Tomi
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150604/b9e7fb6c/attachment.sig>
+Best regards,
+Javier
