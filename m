@@ -1,77 +1,145 @@
 From: jiang.liu@linux.intel.com (Jiang Liu)
-Date: Thu,  4 Jun 2015 12:13:23 +0800
-Subject: [RFT v2 13/48] keystone,
- irq: Use irq_data_get_xxx() to avoid redundant lookup of irq_data
+Date: Thu,  4 Jun 2015 12:13:31 +0800
+Subject: [RFT v2 21/48] ARM,
+ irq: Prepare for killing the first parameter 'irq' of
+ irq_flow_handler_t
 In-Reply-To: <1433391238-19471-1-git-send-email-jiang.liu@linux.intel.com>
 References: <1433391238-19471-1-git-send-email-jiang.liu@linux.intel.com>
-Message-ID: <1433391238-19471-14-git-send-email-jiang.liu@linux.intel.com>
+Message-ID: <1433391238-19471-22-git-send-email-jiang.liu@linux.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use irq_data_get_xxx() to avoid redundant lookup of irq_data while we
-already have a pointer to corresponding irq_data.
+Change irq flow handlers to prepare for killing the first parameter 'irq'
+of irq_flow_handler_t.
 
 Signed-off-by: Jiang Liu <jiang.liu@linux.intel.com>
 ---
- drivers/pci/host/pci-keystone-dw.c |   15 ++++++---------
- 1 file changed, 6 insertions(+), 9 deletions(-)
+ arch/arm/common/locomo.c             |    9 +++------
+ arch/arm/mach-dove/irq.c             |    5 +++--
+ arch/arm/mach-pxa/balloon3.c         |    3 +--
+ arch/arm/mach-pxa/lpd270.c           |    4 +---
+ arch/arm/mach-pxa/pcm990-baseboard.c |    3 +--
+ arch/arm/mach-pxa/viper.c            |    6 ++----
+ arch/arm/mach-pxa/zeus.c             |    6 ++----
+ 7 files changed, 13 insertions(+), 23 deletions(-)
 
-diff --git a/drivers/pci/host/pci-keystone-dw.c b/drivers/pci/host/pci-keystone-dw.c
-index f34892e0edb4..e42d077039d3 100644
---- a/drivers/pci/host/pci-keystone-dw.c
-+++ b/drivers/pci/host/pci-keystone-dw.c
-@@ -104,14 +104,13 @@ static void ks_dw_pcie_msi_irq_ack(struct irq_data *d)
+diff --git a/arch/arm/common/locomo.c b/arch/arm/common/locomo.c
+index 02af4a07ceca..d4a62ff39576 100644
+--- a/arch/arm/common/locomo.c
++++ b/arch/arm/common/locomo.c
+@@ -151,12 +151,9 @@ static void locomo_handler(unsigned int irq, struct irq_desc *desc)
+ 
+ 	if (req) {
+ 		/* generate the next interrupt(s) */
+-		irq = lchip->irq_base;
+-		for (i = 0; i <= 3; i++, irq++) {
+-			if (req & (0x0100 << i)) {
+-				generic_handle_irq(irq);
+-			}
+-
++		for (i = 0; i <= 3; i++) {
++			if (req & (0x0100 << i))
++				generic_handle_irq(lchip->irq_base + i);
+ 		}
+ 	}
+ }
+diff --git a/arch/arm/mach-dove/irq.c b/arch/arm/mach-dove/irq.c
+index 4a5a7aedcb76..6d0f0b12f95a 100644
+--- a/arch/arm/mach-dove/irq.c
++++ b/arch/arm/mach-dove/irq.c
+@@ -69,13 +69,14 @@ static struct irq_chip pmu_irq_chip = {
+ 	.irq_ack	= pmu_irq_ack,
+ };
+ 
+-static void pmu_irq_handler(unsigned int irq, struct irq_desc *desc)
++static void pmu_irq_handler(unsigned int __irq, struct irq_desc *desc)
  {
- 	u32 offset, reg_offset, bit_pos;
- 	struct keystone_pcie *ks_pcie;
--	unsigned int irq = d->irq;
- 	struct msi_desc *msi;
- 	struct pcie_port *pp;
+ 	unsigned long cause = readl(PMU_INTERRUPT_CAUSE);
++	unsigned int irq;
  
--	msi = irq_get_msi_desc(irq);
-+	msi = irq_data_get_msi_desc(d);
- 	pp = sys_to_pcie(msi->dev->bus->sysdata);
- 	ks_pcie = to_keystone_pcie(pp);
--	offset = irq - irq_linear_revmap(pp->irq_domain, 0);
-+	offset = d->irq - irq_linear_revmap(pp->irq_domain, 0);
- 	update_reg_offset_bit_pos(offset, &reg_offset, &bit_pos);
+ 	cause &= readl(PMU_INTERRUPT_MASK);
+ 	if (cause == 0) {
+-		do_bad_IRQ(irq, desc);
++		do_bad_IRQ(__irq, desc);
+ 		return;
+ 	}
  
- 	writel(BIT(bit_pos),
-@@ -142,15 +141,14 @@ void ks_dw_pcie_msi_clear_irq(struct pcie_port *pp, int irq)
- static void ks_dw_pcie_msi_irq_mask(struct irq_data *d)
- {
- 	struct keystone_pcie *ks_pcie;
--	unsigned int irq = d->irq;
- 	struct msi_desc *msi;
- 	struct pcie_port *pp;
- 	u32 offset;
+diff --git a/arch/arm/mach-pxa/balloon3.c b/arch/arm/mach-pxa/balloon3.c
+index d897292712eb..6897095b4f11 100644
+--- a/arch/arm/mach-pxa/balloon3.c
++++ b/arch/arm/mach-pxa/balloon3.c
+@@ -510,8 +510,7 @@ static void balloon3_irq_handler(unsigned int irq, struct irq_desc *desc)
+ 		}
  
--	msi = irq_get_msi_desc(irq);
-+	msi = irq_data_get_msi_desc(d);
- 	pp = sys_to_pcie(msi->dev->bus->sysdata);
- 	ks_pcie = to_keystone_pcie(pp);
--	offset = irq - irq_linear_revmap(pp->irq_domain, 0);
-+	offset = d->irq - irq_linear_revmap(pp->irq_domain, 0);
+ 		while (pending) {
+-			irq = BALLOON3_IRQ(0) + __ffs(pending);
+-			generic_handle_irq(irq);
++			generic_handle_irq(BALLOON3_IRQ(0) + __ffs(pending));
+ 			pending &= pending - 1;
+ 		}
+ 		pending = __raw_readl(BALLOON3_INT_CONTROL_REG) &
+diff --git a/arch/arm/mach-pxa/lpd270.c b/arch/arm/mach-pxa/lpd270.c
+index eaee2c20b189..6f7baa0bcb09 100644
+--- a/arch/arm/mach-pxa/lpd270.c
++++ b/arch/arm/mach-pxa/lpd270.c
+@@ -129,9 +129,7 @@ static void lpd270_irq_handler(unsigned int irq, struct irq_desc *desc)
+ 		/* clear useless edge notification */
+ 		desc->irq_data.chip->irq_ack(&desc->irq_data);
+ 		if (likely(pending)) {
+-			irq = LPD270_IRQ(0) + __ffs(pending);
+-			generic_handle_irq(irq);
+-
++			generic_handle_irq(LPD270_IRQ(0) + __ffs(pending));
+ 			pending = __raw_readw(LPD270_INT_STATUS) &
+ 						lpd270_irq_enabled;
+ 		}
+diff --git a/arch/arm/mach-pxa/pcm990-baseboard.c b/arch/arm/mach-pxa/pcm990-baseboard.c
+index 2897da2a5df6..c0eb6732ca10 100644
+--- a/arch/arm/mach-pxa/pcm990-baseboard.c
++++ b/arch/arm/mach-pxa/pcm990-baseboard.c
+@@ -295,8 +295,7 @@ static void pcm990_irq_handler(unsigned int irq, struct irq_desc *desc)
+ 		/* clear our parent IRQ */
+ 		desc->irq_data.chip->irq_ack(&desc->irq_data);
+ 		if (likely(pending)) {
+-			irq = PCM027_IRQ(0) + __ffs(pending);
+-			generic_handle_irq(irq);
++			generic_handle_irq(PCM027_IRQ(0) + __ffs(pending));
+ 		}
+ 		pending = ~pcm990_cpld_readb(PCM990_CTRL_INTSETCLR);
+ 		pending &= pcm990_irq_enabled;
+diff --git a/arch/arm/mach-pxa/viper.c b/arch/arm/mach-pxa/viper.c
+index de3b08073fe7..0632e089b0a5 100644
+--- a/arch/arm/mach-pxa/viper.c
++++ b/arch/arm/mach-pxa/viper.c
+@@ -286,10 +286,8 @@ static void viper_irq_handler(unsigned int irq, struct irq_desc *desc)
+ 		 * so ack the interrupt by hand */
+ 		desc->irq_data.chip->irq_ack(&desc->irq_data);
  
- 	/* Mask the end point if PVM implemented */
- 	if (IS_ENABLED(CONFIG_PCI_MSI)) {
-@@ -164,15 +162,14 @@ static void ks_dw_pcie_msi_irq_mask(struct irq_data *d)
- static void ks_dw_pcie_msi_irq_unmask(struct irq_data *d)
- {
- 	struct keystone_pcie *ks_pcie;
--	unsigned int irq = d->irq;
- 	struct msi_desc *msi;
- 	struct pcie_port *pp;
- 	u32 offset;
+-		if (likely(pending)) {
+-			irq = viper_bit_to_irq(__ffs(pending));
+-			generic_handle_irq(irq);
+-		}
++		if (likely(pending))
++			generic_handle_irq(viper_bit_to_irq(__ffs(pending)));
+ 		pending = viper_irq_pending();
+ 	} while (pending);
+ }
+diff --git a/arch/arm/mach-pxa/zeus.c b/arch/arm/mach-pxa/zeus.c
+index ac2ae5c71ab4..e5338ea857a4 100644
+--- a/arch/arm/mach-pxa/zeus.c
++++ b/arch/arm/mach-pxa/zeus.c
+@@ -115,10 +115,8 @@ static void zeus_irq_handler(unsigned int irq, struct irq_desc *desc)
+ 		 * so ack the interrupt by hand */
+ 		desc->irq_data.chip->irq_ack(&desc->irq_data);
  
--	msi = irq_get_msi_desc(irq);
-+	msi = irq_data_get_msi_desc(d);
- 	pp = sys_to_pcie(msi->dev->bus->sysdata);
- 	ks_pcie = to_keystone_pcie(pp);
--	offset = irq - irq_linear_revmap(pp->irq_domain, 0);
-+	offset = d->irq - irq_linear_revmap(pp->irq_domain, 0);
- 
- 	/* Mask the end point if PVM implemented */
- 	if (IS_ENABLED(CONFIG_PCI_MSI)) {
+-		if (likely(pending)) {
+-			irq = zeus_bit_to_irq(__ffs(pending));
+-			generic_handle_irq(irq);
+-		}
++		if (likely(pending))
++			generic_handle_irq(zeus_bit_to_irq(__ffs(pending)));
+ 		pending = zeus_irq_pending();
+ 	} while (pending);
+ }
 -- 
 1.7.10.4
