@@ -1,51 +1,50 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Thu, 4 Jun 2015 07:58:24 +0530
-Subject: [PATCH v2] drivers/cpufreq: Convert non-modular
- s5pv210-cpufreq.c to use builtin_platform_driver
-In-Reply-To: <1433365966-29850-1-git-send-email-paul.gortmaker@windriver.com>
-References: <20150512070444.GE32300@linux>
- <1433365966-29850-1-git-send-email-paul.gortmaker@windriver.com>
-Message-ID: <20150604022824.GC6811@linux>
+From: yizhang@mx0a-0016f401.pphosted.com (Yi Zhang)
+Date: Thu, 4 Jun 2015 10:31:46 +0800
+Subject: [PATCH 04/12] i2c: pxa: Add support for pxa910/988 & new
+ configuration features
+In-Reply-To: <874mmvyvzw.fsf@belgarion.home>
+References: <1432818224-17070-1-git-send-email-vaibhav.hiremath@linaro.org>
+ <1432818224-17070-5-git-send-email-vaibhav.hiremath@linaro.org>
+ <874mmvyvzw.fsf@belgarion.home>
+Message-ID: <20150604023146.GF6696@yizhang>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03-06-15, 17:12, Paul Gortmaker wrote:
-> This file depends on a Kconfig option which is a bool, so
-> we use the appropriate registration function, which avoids us
-> relying on an implicit inclusion of <module.h> which we are
-> doing currently.
+On Fri, May 29, 2015 at 10:22:27PM +0200, Robert Jarzmik wrote:
+> Vaibhav Hiremath <vaibhav.hiremath@linaro.org> writes:
 > 
-> While this currently works, we really don't want to be including
-> the module.h header in non-modular code, which we'd be forced
-> to do, pending some upcoming code relocation from init.h into
-> module.h.  So we fix it now by using the non-modular equivalent.
+> > @@ -167,6 +184,8 @@ struct pxa_i2c {
+> >  #define _ICR(i2c)	((i2c)->reg_icr)
+> >  #define _ISR(i2c)	((i2c)->reg_isr)
+> >  #define _ISAR(i2c)	((i2c)->reg_isar)
+> > +#define _ILCR(i2c)	((i2c)->reg_ilcr)
+> > +#define _IWCR(i2c)	((i2c)->reg_iwcr)
+> >  
+> >  /*
+> >   * I2C Slave mode address
+> > @@ -467,11 +486,16 @@ static void i2c_pxa_reset(struct pxa_i2c *i2c)
+> >  	if (i2c->reg_isar)
+> >  		writel(i2c->slave_addr, _ISAR(i2c));
+> >  #endif
+> > -
+> Not in this patch.
 > 
-> Cc: "Rafael J. Wysocki" <rjw@rjwysocki.net>
-> Cc: Viresh Kumar <viresh.kumar@linaro.org>
-> Cc: Kukjin Kim <kgene@kernel.org>
-> Cc: linux-pm at vger.kernel.org
-> Cc: linux-arm-kernel at lists.infradead.org
-> Signed-off-by: Paul Gortmaker <paul.gortmaker@windriver.com>
-> ---
-> 
-> [v2: drop exnyos part from patch, since it really was modular and
->  instead needs its implicit include fixed.]
-> 
->  drivers/cpufreq/s5pv210-cpufreq.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/drivers/cpufreq/s5pv210-cpufreq.c b/drivers/cpufreq/s5pv210-cpufreq.c
-> index b0dac7d6ba31..9e231f52150c 100644
-> --- a/drivers/cpufreq/s5pv210-cpufreq.c
-> +++ b/drivers/cpufreq/s5pv210-cpufreq.c
-> @@ -659,4 +659,4 @@ static struct platform_driver s5pv210_cpufreq_platdrv = {
->  	},
->  	.probe = s5pv210_cpufreq_probe,
->  };
-> -module_platform_driver(s5pv210_cpufreq_platdrv);
-> +builtin_platform_driver(s5pv210_cpufreq_platdrv);
+> >  	/* set control register values */
+> >  	writel(I2C_ICR_INIT | (i2c->fast_mode ? ICR_FM : 0), _ICR(i2c));
+> >  	writel(readl(_ICR(i2c)) | (i2c->high_mode ? ICR_HS : 0), _ICR(i2c));
+> >  
+> > +	if (i2c->ilcr)
+> > +		writel(i2c->ilcr, _ILCR(i2c));
+> > +	if (i2c->iwcr)
+> > +		writel(i2c->iwcr, _IWCR(i2c));
+> > +	udelay(2);
+> This is a magical 2us. Where does it come from ?
 
-Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
-
--- 
-viresh
+  This delay can be removed, if writing LCR and WCR before enabling this
+  i2c controller, it's safe enough; and they should not be changed when
+  there is bus activity.
+> 
+> Cheers.
+> 
+> -- 
+> Robert
