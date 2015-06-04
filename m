@@ -1,101 +1,60 @@
-From: hramrach@gmail.com (Michal Suchanek)
-Date: Thu, 4 Jun 2015 17:40:58 +0200
-Subject: [PATCH 04/11] mtd: ofpart: do not fail probe when no partitions
- exist
-In-Reply-To: <201506041728.50227.marex@denx.de>
-References: <cover.1433364398.git.hramrach@gmail.com>
- <201506040058.52882.marex@denx.de>
- <CAOMqctTB2AYOQZUc9o-R4PF1DQ-HY0RfSw5T-T28r5uP2s=qZA@mail.gmail.com>
- <201506041728.50227.marex@denx.de>
-Message-ID: <CAOMqctQTxVZspcocDsNP6GzsRw5-0zPqkNScS8PzNvkFjBWatQ@mail.gmail.com>
+From: mathieu.poirier@linaro.org (Mathieu Poirier)
+Date: Thu, 4 Jun 2015 09:48:09 -0600
+Subject: [PATCH staging] drivers/hwtracing: fix coresight-replicator-qcom
+ implicit <module.h> usage
+In-Reply-To: <1433364777-29651-1-git-send-email-paul.gortmaker@windriver.com>
+References: <1433364777-29651-1-git-send-email-paul.gortmaker@windriver.com>
+Message-ID: <CANLsYkxOjHh21RC7P83Co-V71-pd0M4kYDQWfEeC_fdaNfHjAA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 4 June 2015 at 17:28, Marek Vasut <marex@denx.de> wrote:
-> On Thursday, June 04, 2015 at 06:54:00 AM, Michal Suchanek wrote:
->> On 4 June 2015 at 00:58, Marek Vasut <marex@denx.de> wrote:
->> > On Wednesday, June 03, 2015 at 11:26:40 PM, Michal Suchanek wrote:
->> >> On Exynos it is necessary to set SPI controller parameters that apply to
->> >> a SPI slave in a DT subnode of the slave device. The ofpart code returns
->> >> an error when there are subnodes of the SPI flash but no partitions are
->> >> found. Change this condition to a warning so that flash without
->> >> partitions can be accessed on Exynos.
->> >
->> > I have to admit the rationale for this patch is not very clear to me,
->> > sorry. Can you please explain this a bit more ?
->>
->> This is how the DT entry for SPI slave looks with s3c64xx:
->> flash: m25p80 at 0 {
->>         #address-cells = <1>;
->>         #size-cells = <1>;
->>         compatible = "jedec,spi-nor";
->>         reg = <0>;
->>         spi-max-frequency = <40000000>;
->>         linux,max_tx_len = <65536>;
+On 3 June 2015 at 14:52, Paul Gortmaker <paul.gortmaker@windriver.com> wrote:
+> In commit 620cf787c121f39b5223e43bad3d1b7c66ecead5 ("coresight: replicator:
+> Add Qualcomm CoreSight Replicator driver") this driver was added.
 >
-> SIDENOTE: I thought this was actually added by your patch #8 in this
-> series. The underscores in the name of the property are not really
-> consistent with the rest of the names.
+> It uses module_amba_driver(replicator_driver) to register itself with
+> the system -- which is just an alias for module_driver.  This currently
+> works by relying on getting that via init.h but we are planning to move
+> that code[1] to module.h -- at which time this will fail to compile since
+> it does not include module.h currently, resulting in:
 >
->>         m25p,fast-read;
->>         controller-data {
->>             samsung,spi-feedback-delay = <0>;
->>         };
->>     };
->>
->> this is example of flash partitions:
->> flash at 0 {
->>         #address-cells = <1>;
->>         #size-cells = <1>;
->>
->>         partition at 0 {
->>                 label = "u-boot";
->>                 reg = <0x0000000 0x100000>;
->>                 read-only;
->>         };
->>
->>         uimage at 100000 {
->>                 reg = <0x0100000 0x200000>;
->>         };
->> };
->>
->> The parser ignores any flash without subnodes and returns 0 (no
->> partititon). When there is a subnode it assumes the flash is
->> partitioned and tries to parse the subnodes as partitions. When there
->> are subnodes and none parses as partition an error is returned. As
->> shown above it is valid to have subnodes on unpartitioned flash.
->>
->> When an error is returned from a partition parser the mtdpart code
->> passes on this error to the flash probe function and the proble of the
->> flash fails.
+> drivers/hwtracing/coresight/coresight-replicator-qcom.c:214:1: error: type defaults to 'int' in declaration of 'module_init' [-Werror=implicit-int]
+> drivers/hwtracing/coresight/coresight-replicator-qcom.c:214:1: error: type defaults to 'int' in declaration of 'module_exit' [-Werror=implicit-int]
 >
-> What does /proc/mtd tell you when you have no partitions defined
-> in the DT ? It should provide you with the entire MTD device and
-> the code shouldn't even try to parse any OF partitions, since you
-> don't have any.
+> In the future, the amba support may want to create another alias that
+> uses builtin_driver[2] for cases like this which are using bool Kconfig
+> triggers, but for now we just fix the implicit include.
+>
+> [1] https://lkml.kernel.org/r/1433276168-21550-1-git-send-email-paul.gortmaker at windriver.com
+> [2] https://lkml.kernel.org/r/1431287385-1526-1-git-send-email-paul.gortmaker at windriver.com
+>
+> Cc: Pratik Patel <pratikp@codeaurora.org>
+> Cc: Ivan T. Ivanov <ivan.ivanov@linaro.org>
+> Cc: Mathieu Poirier <mathieu.poirier@linaro.org>
+> Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+> Signed-off-by: Paul Gortmaker <paul.gortmaker@windriver.com>
+> ---
+>
+> [Note: Commit 620cf787c121 is only in linux-next trees via staging-next;
+>  this fixes a next build fail when staging-next is merged with [1] above.]
+>
+>  drivers/hwtracing/coresight/coresight-replicator-qcom.c | 1 +
+>  1 file changed, 1 insertion(+)
+>
+> diff --git a/drivers/hwtracing/coresight/coresight-replicator-qcom.c b/drivers/hwtracing/coresight/coresight-replicator-qcom.c
+> index deacea49af36..584059e9e866 100644
+> --- a/drivers/hwtracing/coresight/coresight-replicator-qcom.c
+> +++ b/drivers/hwtracing/coresight/coresight-replicator-qcom.c
+> @@ -15,6 +15,7 @@
+>  #include <linux/clk.h>
+>  #include <linux/coresight.h>
+>  #include <linux/device.h>
+> +#include <linux/module.h>
+>  #include <linux/err.h>
+>  #include <linux/init.h>
+>  #include <linux/io.h>
+> --
+> 2.2.1
+>
 
-mtdinfo shows I have no mtd devices and the log shows that probe
-failed unless I patch the kernel.
-
-When there is *support* for of partitions the ofparser is run on mtd
-probe. If it fails because it considers
-
->>         controller-data {
->>             samsung,spi-feedback-delay = <0>;
->>         };
-
-an invalid partition and does not find any valid partition the probe fails.
-
-There are two problems here
-
-1) the above is not invalid. It just is not a partition. The parser
-should not fail seeing this
-
-2) the mtd probe should not fail when a partition parser fails and
-should present the unpartitioned device
-
-Both are addressed in separate patches.
-
-Thanks
-
-Michal
+Acked-by: Mathieu Poirier <mathieu.poirier@linaro.org>
