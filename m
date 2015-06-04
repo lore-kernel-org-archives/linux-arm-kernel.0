@@ -1,31 +1,49 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Thu, 4 Jun 2015 15:50:33 -0700
-Subject: [PATCH] drivers/clk: convert sunxi/clk-mod0.c to use
- builtin_platform_driver
-In-Reply-To: <1433358578-9579-1-git-send-email-paul.gortmaker@windriver.com>
-References: <1431287385-1526-1-git-send-email-paul.gortmaker@windriver.com>
- <1433358578-9579-1-git-send-email-paul.gortmaker@windriver.com>
-Message-ID: <20150604225033.GD8099@codeaurora.org>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Thu, 4 Jun 2015 23:02:25 +0000 (UTC)
+Subject: [PATCH v2 1/2] clk: change clk_ops' ->round_rate() prototype
+In-Reply-To: <1430407809-31147-2-git-send-email-boris.brezillon@free-electrons.com>
+References: <1430407809-31147-1-git-send-email-boris.brezillon@free-electrons.com>
+ <1430407809-31147-2-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <alpine.DEB.2.02.1506042258530.12316@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/03, Paul Gortmaker wrote:
-> This driver builds based on obj-y and hence will not ever be
-> modular.  Change it to use the non-modular registration so that it
-> won't suffer a compile fail once a header move places the modular
-> registration within the module.h file.
+Hi folks
+
+just a brief comment on this one:
+
+On Thu, 30 Apr 2015, Boris Brezillon wrote:
+
+> Clock rates are stored in an unsigned long field, but ->round_rate()
+> (which returns a rounded rate from a requested one) returns a long
+> value (errors are reported using negative error codes), which can lead
+> to long overflow if the clock rate exceed 2Ghz.
 > 
-> Cc: "Emilio L?pez" <emilio@elopez.com.ar>
-> Cc: Mike Turquette <mturquette@linaro.org>
-> Cc: Stephen Boyd <sboyd@codeaurora.org>
-> Cc: Maxime Ripard <maxime.ripard@free-electrons.com>
-> Cc: linux-clk at vger.kernel.org
-> Cc: linux-arm-kernel at lists.infradead.org
-> Signed-off-by: Paul Gortmaker <paul.gortmaker@windriver.com>
-> ---
+> Change ->round_rate() prototype to return 0 or an error code, and pass the
+> requested rate as a pointer so that it can be adjusted depending on
+> hardware capabilities.
 
-Acked-by: Stephen Boyd <sboyd@codeaurora.org>
+...
 
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+> diff --git a/Documentation/clk.txt b/Documentation/clk.txt
+> index 0e4f90a..fca8b7a 100644
+> --- a/Documentation/clk.txt
+> +++ b/Documentation/clk.txt
+> @@ -68,8 +68,8 @@ the operations defined in clk.h:
+>  		int		(*is_enabled)(struct clk_hw *hw);
+>  		unsigned long	(*recalc_rate)(struct clk_hw *hw,
+>  						unsigned long parent_rate);
+> -		long		(*round_rate)(struct clk_hw *hw,
+> -						unsigned long rate,
+> +		int		(*round_rate)(struct clk_hw *hw,
+> +						unsigned long *rate,
+>  						unsigned long *parent_rate);
+>  		long		(*determine_rate)(struct clk_hw *hw,
+>  						unsigned long rate,
+
+I'd suggest that we should probably go straight to 64-bit rates.  There 
+are already plenty of clock sources that can generate rates higher than 
+4GiHz.
+
+
+- Paul
