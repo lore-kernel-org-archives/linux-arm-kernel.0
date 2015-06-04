@@ -1,88 +1,82 @@
-From: andre.przywara@arm.com (Andre Przywara)
-Date: Thu,  4 Jun 2015 16:20:45 +0100
-Subject: [PATCH] kvmtool: don't use PCI config space IRQ line field
-Message-ID: <1433431245-23227-1-git-send-email-andre.przywara@arm.com>
+From: marex@denx.de (Marek Vasut)
+Date: Thu, 4 Jun 2015 17:15:12 +0200
+Subject: [PATCH 08/11] MTD: m25p80: Add option to limit SPI transfer size.
+In-Reply-To: <CAOMqctQeg0Sj1pGOQsK1nNB6=-H9koH_5nrXYBq_NKeVt369dw@mail.gmail.com>
+References: <cover.1433364398.git.hramrach@gmail.com>
+ <201506040103.09555.marex@denx.de>
+ <CAOMqctQeg0Sj1pGOQsK1nNB6=-H9koH_5nrXYBq_NKeVt369dw@mail.gmail.com>
+Message-ID: <201506041715.12904.marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In PCI config space there is an interrupt line field (offset 0x3f),
-which is used to initially communicate the IRQ line number from
-firmware to the OS. _Hardware_ should never use this information,
-as the OS is free to write any information in there.
-But kvmtool uses this number when it triggers IRQs in the guest,
-which fails starting with Linux 3.19-rc1, where the PCI layer starts
-writing the virtual IRQ number in there.
+On Thursday, June 04, 2015 at 06:31:45 AM, Michal Suchanek wrote:
+> On 4 June 2015 at 01:03, Marek Vasut <marex@denx.de> wrote:
+> > On Wednesday, June 03, 2015 at 11:26:41 PM, Michal Suchanek wrote:
+> >> On sunxi the SPI controller currently does not have DMA support and
+> >> fails any transfer larger than 63 bytes.
+> >> 
+> >> On Exynos the pl330 DMA controller fails any transfer larger than 64kb
+> >> when using slower speed like 40MHz and any transfer larger than 128bytes
+> >> when running at 133MHz.
+> > 
+> > This smells more like some corruption of the data on the bus or something
+> > even more obscure.
+> 
+> If the data was corrupted you would get corrupted data and not
+> transfer failure. AFAIK there is no checksum or anything. I actually
+> do get corrupted data when I use wrong feedback delay setting.
 
-Fix that by storing the IRQ number in a separate field in
-struct virtio_pci, which is independent from the PCI config space
-and cannot be influenced by the guest.
-This fixes ARM/ARM64 guests using PCI with newer kernels.
+OK
 
-Signed-off-by: Andre Przywara <andre.przywara@arm.com>
----
- include/kvm/virtio-pci.h | 8 ++++++++
- virtio/pci.c             | 9 ++++++---
- 2 files changed, 14 insertions(+), 3 deletions(-)
+> >> The best thing is that in both cases the controller can just lock up and
+> >> never finish potentially leaving the hardware in unusable state.
 
-diff --git a/include/kvm/virtio-pci.h b/include/kvm/virtio-pci.h
-index c795ce7..b70cadd 100644
---- a/include/kvm/virtio-pci.h
-+++ b/include/kvm/virtio-pci.h
-@@ -30,6 +30,14 @@ struct virtio_pci {
- 	u8			isr;
- 	u32			features;
- 
-+	/*
-+	 * We cannot rely on the INTERRUPT_LINE byte in the config space once
-+	 * we have run guest code, as the OS is allowed to use that field
-+	 * as a scratch pad to communicate between driver and PCI layer.
-+	 * So store our legacy interrupt line number in here for internal use.
-+	 */
-+	u8			legacy_irq_line;
-+
- 	/* MSI-X */
- 	u16			config_vector;
- 	u32			config_gsi;
-diff --git a/virtio/pci.c b/virtio/pci.c
-index 7556239..e17e5a9 100644
---- a/virtio/pci.c
-+++ b/virtio/pci.c
-@@ -141,7 +141,7 @@ static bool virtio_pci__io_in(struct ioport *ioport, struct kvm_cpu *vcpu, u16 p
- 		break;
- 	case VIRTIO_PCI_ISR:
- 		ioport__write8(data, vpci->isr);
--		kvm__irq_line(kvm, vpci->pci_hdr.irq_line, VIRTIO_IRQ_LOW);
-+		kvm__irq_line(kvm, vpci->legacy_irq_line, VIRTIO_IRQ_LOW);
- 		vpci->isr = VIRTIO_IRQ_LOW;
- 		break;
- 	default:
-@@ -299,7 +299,7 @@ int virtio_pci__signal_vq(struct kvm *kvm, struct virtio_device *vdev, u32 vq)
- 			kvm__irq_trigger(kvm, vpci->gsis[vq]);
- 	} else {
- 		vpci->isr = VIRTIO_IRQ_HIGH;
--		kvm__irq_trigger(kvm, vpci->pci_hdr.irq_line);
-+		kvm__irq_trigger(kvm, vpci->legacy_irq_line);
- 	}
- 	return 0;
- }
-@@ -323,7 +323,7 @@ int virtio_pci__signal_config(struct kvm *kvm, struct virtio_device *vdev)
- 			kvm__irq_trigger(kvm, vpci->config_gsi);
- 	} else {
- 		vpci->isr = VIRTIO_PCI_ISR_CONFIG;
--		kvm__irq_trigger(kvm, vpci->pci_hdr.irq_line);
-+		kvm__irq_trigger(kvm, vpci->legacy_irq_line);
- 	}
- 
- 	return 0;
-@@ -422,6 +422,9 @@ int virtio_pci__init(struct kvm *kvm, void *dev, struct virtio_device *vdev,
- 	if (r < 0)
- 		goto free_msix_mmio;
- 
-+	/* save the IRQ that device__register() has allocated */
-+	vpci->legacy_irq_line = vpci->pci_hdr.irq_line;
-+
- 	return 0;
- 
- free_msix_mmio:
--- 
-2.3.5
+[...]
+
+> >> --- a/Documentation/devicetree/bindings/mtd/jedec,spi-nor.txt
+> >> +++ b/Documentation/devicetree/bindings/mtd/jedec,spi-nor.txt
+> >> 
+> >> @@ -19,6 +19,12 @@ Optional properties:
+> >>                     all chips and support for it can not be detected at
+> >> 
+> >> runtime. Refer to your chips' datasheet to check if this is supported by
+> >> your chip.
+> >> +- linux,max_tx_len : With some SPI controller drivers possible transfer
+> >> size is +                     limited. This may be hardware or driver
+> >> bug. +                     Transfer data in chunks no larger than this
+> >> value. +
+> >> 
+> >>                     Using this option may severely degrade performance
+> >>                     and
+> >> 
+> >> +                     possibly flash memory life when max_tx_len is
+> >> smaller than +                     flash page size (typically 256 bytes)
+> > 
+> > Will we need similar patch for all other SPI slave drivers, like SPI NAND
+> > ?
+> 
+> Probably. Some SPI slave drivers already do have similar option.
+
+So the SPI device drivers are implementing workarounds for buggy SPI hosts,
+even if those SPI devices themselves don't suffer from such limitations. Yes,
+this seems like the seriously wrong thing to do.
+
+> In general it cannot be expected that you can reliably transfer
+> arbitrarily large data over SPI it seems.
+
+This is what should be expected because this is how the bus is supposed
+to work in fact. You can transfer an arbitrary amount of data over SPI
+bus.
+
+If some driver has a limitation, it's that (bus, dma) driver which needs
+to implement a fix or a workaround.
+
+> However, if the nand driver transfers data a page at a time it should
+> be fine.
+
+... until someone issues multi-block read, in which case it all falls
+down like a house of cards. It is impossible to build a reliable system
+on "should" and similar assumptions ; the driver must be solid.
+
+Best regards,
+Marek Vasut
