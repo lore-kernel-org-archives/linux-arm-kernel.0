@@ -1,132 +1,37 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Thu, 4 Jun 2015 13:20:09 -0700
-Subject: [PATCH v3 3/5] clk: add support for clocks provided by
- SCP(System Control Processor)
-In-Reply-To: <1432720398-5701-4-git-send-email-sudeep.holla@arm.com>
-References: <1432720398-5701-1-git-send-email-sudeep.holla@arm.com>
- <1432720398-5701-4-git-send-email-sudeep.holla@arm.com>
-Message-ID: <20150604202009.GI676@codeaurora.org>
+From: balbi@ti.com (Felipe Balbi)
+Date: Thu, 4 Jun 2015 15:18:25 -0500
+Subject: [RFC/NOT FOR MERGING] HACK: add global/private timers for A9
+In-Reply-To: <20150604200850.GF5710@saruman.tx.rr.com>
+References: <1433363565-17725-1-git-send-email-balbi@ti.com>
+ <2466648.WjMxjIpAUG@wuerfel>
+ <20150603210455.GD6042@saruman.tx.rr.com>
+ <20150603212821.GH6042@saruman.tx.rr.com>
+ <556F7493.2060602@codeaurora.org>
+ <20150603215445.GK6042@saruman.tx.rr.com> <55701E93.60303@free.fr>
+ <20150604200850.GF5710@saruman.tx.rr.com>
+Message-ID: <20150604201825.GG5710@saruman.tx.rr.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/27, Sudeep Holla wrote:
-> +
-> +#include <linux/clk-provider.h>
-> +#include <linux/device.h>
-> +#include <linux/err.h>
-> +#include <linux/of.h>
-> +#include <linux/module.h>
-> +#include <linux/of_platform.h>
-> +#include <linux/scpi_protocol.h>
-> +
-> +struct scpi_clk {
-> +	u32 id;
-> +	const char *name;
-> +	struct clk_hw hw;
-> +	struct scpi_dvfs_info *info;
-> +	unsigned long rate_min;
-> +	unsigned long rate_max;
-> +};
-> +
-> +#define to_scpi_clk(clk) container_of(clk, struct scpi_clk, hw)
-> +
-> +static struct scpi_ops *scpi_ops;
+On Thu, Jun 04, 2015 at 03:08:50PM -0500, Felipe Balbi wrote:
+> Hi,
+> 
+> On Thu, Jun 04, 2015 at 11:46:59AM +0200, Mason wrote:
+> > Also, check /proc/timer_list for a "Broadcast device". If you don't
+> > define one, the TWD timers are set to periodic mode, with hrtimers
+> > disabled.
+> 
+> Did you manage to turn global timer into Broadcast device ?
 
-Why do we need this singleton? Can we put this pointer into scpi_clk?
-
-> +
-> +static unsigned long scpi_clk_recalc_rate(struct clk_hw *hw,
-> +					  unsigned long parent_rate)
-> +{
-> +	struct scpi_clk *clk = to_scpi_clk(hw);
-> +
-> +	return scpi_ops->clk_get_val(clk->id);
-> +}
-> +
-> +static long scpi_clk_round_rate(struct clk_hw *hw, unsigned long rate,
-> +				unsigned long *parent_rate)
-> +{
-> +	struct scpi_clk *clk = to_scpi_clk(hw);
-> +
-> +	if (WARN_ON(clk->rate_min && rate < clk->rate_min))
-> +		rate = clk->rate_min;
-> +	if (WARN_ON(clk->rate_max && rate > clk->rate_max))
-> +		rate = clk->rate_max;
-> +
-> +	return rate;
-> +}
-
-Hm.. this seems really generic. It might be better to support a
-way to tell the framework to limit the min/max rate that's
-accepted for a clk. That could be done later though.
-
-> +
-> +static int scpi_clk_set_rate(struct clk_hw *hw, unsigned long rate,
-> +			     unsigned long parent_rate)
-> +{
-> +	struct scpi_clk *clk = to_scpi_clk(hw);
-> +
-> +	return scpi_ops->clk_set_val(clk->id, rate);
-> +}
-> +
-[..]
-> +
-> +static int scpi_clk_add(struct device *dev, struct device_node *np)
-> +{
-> +	struct clk **clks;
-> +	int idx, count;
-> +	struct clk_onecell_data *clk_data;
-> +
-> +	count = of_property_count_strings(np, "clock-output-names");
-> +	if (count < 0) {
-> +		dev_err(dev, "%s: invalid clock output count\n", np->name);
-> +		return -EINVAL;
-> +	}
-> +
-> +	clk_data = devm_kmalloc(dev, sizeof(*clk_data), GFP_KERNEL);
-> +	if (!clk_data)
-> +		return -ENOMEM;
-> +
-> +	clks = devm_kcalloc(dev, count, sizeof(*clks), GFP_KERNEL);
-> +	if (!clks)
-> +		return -ENOMEM;
-> +
-> +	for (idx = 0; idx < count; idx++) {
-> +		struct scpi_clk *sclk;
-> +		u32 val;
-> +
-> +		sclk = devm_kzalloc(dev, sizeof(*sclk), GFP_KERNEL);
-> +		if (!sclk)
-> +			return -ENOMEM;
-> +
-> +		if (of_property_read_string_index(np, "clock-output-names",
-> +						  idx, &sclk->name)) {
-> +			dev_err(dev, "invalid clock name @ %s\n", np->name);
-> +			return -EINVAL;
-> +		}
-> +
-> +		if (of_property_read_u32_index(np, "clock-indices",
-> +					       idx, &val)) {
-> +			dev_err(dev, "invalid clock index @ %s\n", np->name);
-> +			return -EINVAL;
-> +		}
-> +
-> +		sclk->id = val;
-> +
-> +		clks[idx] = scpi_clk_ops_init(dev, np, sclk);
-> +		if (IS_ERR_OR_NULL(clks[idx]))
-> +			dev_err(dev, "failed to register clock '%s'\n",
-> +				sclk->name);
-> +		else
-> +			dev_dbg(dev, "Registered clock '%s'\n", sclk->name);
-> +	}
-> +
-> +	clk_data->clks = clks;
-> +	clk_data->clk_num = idx;
-> +	of_clk_add_provider(np, of_clk_src_onecell_get, clk_data);
-
-And if of_clk_add_provider() fails?
+arm_global_timer is marked PERCPU, so it will never be chosen as
+broadcast.
 
 -- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150604/4c188369/attachment-0001.sig>
