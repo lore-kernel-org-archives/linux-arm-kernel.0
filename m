@@ -1,48 +1,94 @@
-From: anurag.kumar.vulisha@xilinx.com (Anurag Kumar Vulisha)
-Date: Thu, 4 Jun 2015 09:22:07 +0000
-Subject: [patch] gpio: Added GPIO support to ZynqMP SoC
-In-Reply-To: <CACRpkdZpvr4NfH43FvoHdfKaqqDGMHJU5=UHEzOpLV9xC4vaTw@mail.gmail.com>
-References: <1433160019-11157-1-git-send-email-anuragku@xilinx.com>
- <CACRpkdZpvr4NfH43FvoHdfKaqqDGMHJU5=UHEzOpLV9xC4vaTw@mail.gmail.com>
-Message-ID: <3802E9A6666DF54886E2B9CBF743BA98011EBF75@XAP-PVEXMBX01.xlnx.xilinx.com>
+From: hanjun.guo@linaro.org (Hanjun Guo)
+Date: Thu, 04 Jun 2015 17:28:17 +0800
+Subject: [PATCH 05/11] x86, pci, acpi: Move arch-agnostic MMCONFIG (aka
+ ECAM) and ACPI code out of arch/x86/ directory
+In-Reply-To: <20150602133215.GC23650@red-moon>
+References: <1432644564-24746-1-git-send-email-hanjun.guo@linaro.org>
+ <1432644564-24746-6-git-send-email-hanjun.guo@linaro.org>
+ <20150526170817.GU1565@arm.com> <55657B02.5090805@linaro.org>
+ <20150602133215.GC23650@red-moon>
+Message-ID: <55701A31.808@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Linus,
+Hi Lorenzo,
 
-> -----Original Message-----
-> From: Linus Walleij [mailto:linus.walleij at linaro.org]
-> Sent: Thursday, June 04, 2015 1:38 PM
-> To: Anurag Kumar Vulisha
-> Cc: Alexandre Courbot; Michal Simek; Soren Brinkmann; linux-
-> gpio at vger.kernel.org; linux-kernel at vger.kernel.org; linux-arm-
-> kernel at lists.infradead.org; Punnaiah Choudary Kalluri; Srikanth Vemula;
-> Anirudha Sarangi; Anurag Kumar Vulisha
-> Subject: Re: [patch] gpio: Added GPIO support to ZynqMP SoC
+On 2015?06?02? 21:32, Lorenzo Pieralisi wrote:
+> On Wed, May 27, 2015 at 09:06:26AM +0100, Tomasz Nowicki wrote:
+>> On 26.05.2015 19:08, Will Deacon wrote:
+>>> On Tue, May 26, 2015 at 01:49:18PM +0100, Hanjun Guo wrote:
+>>>> From: Tomasz Nowicki <tomasz.nowicki@linaro.org>
+>>>>
+>>>> ECAM standard and MCFG table are architecture independent and it makes
+>>>> sense to share common code across all architectures. Both are going to
+>>>> corresponding files - ecam.c and mcfg.c
+>>>>
+>>>> While we are here, rename pci_parse_mcfg to acpi_parse_mcfg.
+>>>> We already have acpi_parse_mcfg prototype which is used nowhere.
+>>>> At the same time, we need pci_parse_mcfg been global so acpi_parse_mcfg
+>>>> can be used perfectly here.
+>>>>
+>>>> Signed-off-by: Tomasz Nowicki <tomasz.nowicki@linaro.org>
+>>>> Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
+>>>> Tested-by: Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com>
+>>>> ---
+>>>>    arch/x86/Kconfig               |   3 +
+>>>>    arch/x86/include/asm/pci_x86.h |  33 ------
+>>>>    arch/x86/pci/acpi.c            |   1 +
+>>>>    arch/x86/pci/mmconfig-shared.c | 244 +---------------------------------------
+>>>>    arch/x86/pci/mmconfig_32.c     |   1 +
+>>>>    arch/x86/pci/mmconfig_64.c     |   1 +
+>>>>    arch/x86/pci/numachip.c        |   1 +
+>>>>    drivers/acpi/Makefile          |   1 +
+>>>>    drivers/acpi/mcfg.c            |  57 ++++++++++
+>>>>    drivers/pci/Kconfig            |   7 ++
+>>>>    drivers/pci/Makefile           |   5 +
+>>>>    drivers/pci/ecam.c             | 245 +++++++++++++++++++++++++++++++++++++++++
+>>>
+>>> Why can't we make use of the ECAM implementation used by pci-host-generic
+>>> and drivers/pci/access.c?
+>>
+>> We had that question when I had posted MMCFG patch set separately,
+>> please see:
+>> https://lkml.org/lkml/2015/3/11/492
 >
-> On Mon, Jun 1, 2015 at 2:00 PM, Anurag Kumar Vulisha
-> <anurag.kumar.vulisha@xilinx.com> wrote:
+> Yes, but the real question is, why do we need to have PCI config space
+> up and running before a bus struct is even created ? I think the reason is
+> the PCI configuration address space format (ACPI 6.0, Table 5-27, page
+> 108):
 >
-> > Added support to ZynqMP SoC on the existing zynq gpio driver.
-> >
-> > Signed-off-by: Anurag Kumar Vulisha <anuragku@xilinx.com>
+> "PCI Configuration space addresses must be confined to devices on
+> PCI Segment Group 0, bus 0. This restriction exists to accommodate
+> access to fixed hardware prior to PCI bus enumeration".
 >
-> > +static const struct of_device_id zynq_gpio_of_match[] = {
-> > +       { .compatible = "xlnx,zynq-gpio-1.0", .data = (void *)&zynq_gpio_def
-> },
-> > +       { .compatible = "xlnx,zynqmp-gpio-1.0",
-> > +                                       .data = (void
-> > +*)&zynqmp_gpio_def },
->
-> Is there a separate patch adding this to the device tree bindings in
-> Documentation/devicetree/bindings/gpio/gpio-zynq.txt?
->
-> Else please include it in this patch.
+> On HW reduced platforms I do not even think this is required at all,
+> we have to look into this to avoid code duplication that might well
+> turn out useless.
 
-I will include the device-tree bindings and send the patch as v2.
+This is only for the fixed hardware, which will be not available for
+ARM64 (reduced hardware mode), but in Generic Hardware Programming
+Model, we using OEM-provided ACPI Machine Language (AML) code to access
+generic hardware registers, this will be available for reduced hardware
+too.
 
-Thanks,
-Anurag Kumar V
+So in ACPI spec, it says: (ACPI 6.0 page 66, last paragraph)
 
+ACPI defines eight address spaces that may be accessed by generic
+hardware implementations. These include:
+? System I/O space
+? System memory space
+? PCI configuration space
+? Embedded controller space
+? System Management Bus (SMBus) space
+? CMOS
+? PCI BAR Target
+? IPMI space
 
-This email and any attachments are intended for the sole use of the named recipient(s) and contain(s) confidential information that may be proprietary, privileged or copyrighted under applicable law. If you are not the intended recipient, do not read, copy, or forward this email message or any attachments. Delete this email message and any attachments immediately.
+So if any device using the PCI address space for control, such
+as a system reset control device, its address space can be reside
+in PCI configuration space (who can prevent a OEM do that crazy
+thing? :) ), and it should be accessible before the PCI bus is
+created.
+
+Thanks
+Hanjun
