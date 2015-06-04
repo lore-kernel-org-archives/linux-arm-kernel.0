@@ -1,41 +1,45 @@
-From: javier@dowhile0.org (Javier Martinez Canillas)
-Date: Thu, 4 Jun 2015 08:52:30 +0200
-Subject: [PATCH 01/11] ARM: dt: Add SPI CS on Samsung Snow board.
-In-Reply-To: <d47abe28c751b54b839d9340269a2c06a6e23a6c.1433364398.git.hramrach@gmail.com>
-References: <cover.1433364398.git.hramrach@gmail.com>
- <d47abe28c751b54b839d9340269a2c06a6e23a6c.1433364398.git.hramrach@gmail.com>
-Message-ID: <CABxcv==e1NzDHkZgNU=AH0cG=yj3Fbbnozp63z5niaE5qf3r6w@mail.gmail.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Thu, 4 Jun 2015 08:59:37 +0200
+Subject: [RFT v2 00/48] Refine irq interfaces to reduce number of
+ parameters
+In-Reply-To: <1433391238-19471-1-git-send-email-jiang.liu@linux.intel.com>
+References: <1433391238-19471-1-git-send-email-jiang.liu@linux.intel.com>
+Message-ID: <CAMuHMdUfGMU3m35xWD9vE1RNW80jjHx_KLM3a4GWq=JfuGcGBw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Michal,
+Hi Gerry,
 
-On Wed, Jun 3, 2015 at 11:26 PM, Michal Suchanek <hramrach@gmail.com> wrote:
-> Although there is only one choice of chipselect it is necessary to
-> specify it. The driver cannot claim the gpio otherwise.
->
-> Signed-off-by: Michal Suchanek <hramrach@gmail.com>
-> ---
->  arch/arm/boot/dts/exynos5250-snow.dts | 3 ++-
->  1 file changed, 2 insertions(+), 1 deletion(-)
->
-> diff --git a/arch/arm/boot/dts/exynos5250-snow.dts b/arch/arm/boot/dts/exynos5250-snow.dts
-> index 1eca97e..1fa72cf 100644
-> --- a/arch/arm/boot/dts/exynos5250-snow.dts
-> +++ b/arch/arm/boot/dts/exynos5250-snow.dts
-> @@ -687,9 +687,10 @@
->  };
->
->  &spi_1 {
-> -       status = "okay";
->         samsung,spi-src-clk = <0>;
->         num-cs = <1>;
-> +       cs-gpios = <&gpa2 5 0>;
-> +       status = "okay";
+On Thu, Jun 4, 2015 at 6:13 AM, Jiang Liu <jiang.liu@linux.intel.com> wrote:
+> You may get the patch set from:
 
-Why are you changing the position of the status property? AFAIK the
-convention is to have this property at the beginning of the device
-node.
+Missing link?
 
-Best regards,
-Javier
+> The patch set passes Fengguang's 0day test suites as below. And tests
+> with other platforms and configurations will be appreciated:)
+> ----------------------------------------------------------
+> configs tested: 95
+
+[...]
+
+> m68k                          amiga_defconfig
+> m68k                       m5475evb_defconfig
+> m68k                          multi_defconfig
+
+For Fengguang: amiga_defconfig is a subset of multi_defconfig.
+But sun3_defconfig is distinct, as Sun-3 has a different MMU and thus support
+for it cannot be included in multi-platform kernels.
+So I think you better replace amiga_defconfig by sun3_defconfig for build tests.
+
+Thanks!
+
+Gr{oetje,eeting}s,
+
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
