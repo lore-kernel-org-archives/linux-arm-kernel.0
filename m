@@ -1,97 +1,164 @@
 From: geert+renesas@glider.be (Geert Uytterhoeven)
-Date: Thu,  4 Jun 2015 20:53:37 +0200
-Subject: [PATCH/RFC 11/15] ARM: shmobile: r8a7779 dtsi: Add SYSC PM domains
+Date: Thu,  4 Jun 2015 20:53:33 +0200
+Subject: [PATCH/RFC 07/15] ARM: shmobile: r8a7790 dtsi: Add L1 cache
+ information to CPU nodes
 In-Reply-To: <1433444021-22167-1-git-send-email-geert+renesas@glider.be>
 References: <1433444021-22167-1-git-send-email-geert+renesas@glider.be>
-Message-ID: <1433444021-22167-12-git-send-email-geert+renesas@glider.be>
+Message-ID: <1433444021-22167-8-git-send-email-geert+renesas@glider.be>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add a device node for the System Controller, with subnodes that
-represent the hardware power area hierarchy.
-Hook up ARM CPU cores 1-3 to their respective PM domains.
-Note that ARM CPU core 0 cannot be shut off.
+Describe the L1 instruction and data caches in the CPU nodes:
+  - The L1 caches for the Cortex-A15 CPU cores, and the L1 instruction
+    caches for the Cortex-A7 CPU cores are organized as 16 KiB x 2
+    ways,
+  - The L1 data caches for the Cortex-A7 CPU cores are organized as 8
+    KiB x 4 ways.
 
 Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
 ---
- arch/arm/boot/dts/r8a7779.dtsi | 48 ++++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 48 insertions(+)
+ arch/arm/boot/dts/r8a7790.dtsi | 80 ++++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 80 insertions(+)
 
-diff --git a/arch/arm/boot/dts/r8a7779.dtsi b/arch/arm/boot/dts/r8a7779.dtsi
-index d75f46a539749eae..fbcf02c09fa5b57c 100644
---- a/arch/arm/boot/dts/r8a7779.dtsi
-+++ b/arch/arm/boot/dts/r8a7779.dtsi
-@@ -34,18 +34,21 @@
- 			compatible = "arm,cortex-a9";
+diff --git a/arch/arm/boot/dts/r8a7790.dtsi b/arch/arm/boot/dts/r8a7790.dtsi
+index 729172090f865e4d..bc98bb6cff635ae5 100644
+--- a/arch/arm/boot/dts/r8a7790.dtsi
++++ b/arch/arm/boot/dts/r8a7790.dtsi
+@@ -53,6 +53,16 @@
+ 			clocks = <&cpg_clocks R8A7790_CLK_Z>;
+ 			clock-latency = <300000>; /* 300 us */
+ 
++			i-cache-size = <0x8000>;
++			i-cache-sets = <512>;
++			i-cache-block-size = <32>;
++			i-cache-line-size = <32>;
++			d-cache-size = <0x8000>;
++			d-cache-sets = <512>;
++			d-cache-block-size = <32>;
++			d-cache-line-size = <32>;
++			next-level-cache = <&L2_CA15>;
++
+ 			/* kHz - uV - OPPs unknown yet */
+ 			operating-points = <1400000 1000000>,
+ 					   <1225000 1000000>,
+@@ -67,6 +77,16 @@
+ 			compatible = "arm,cortex-a15";
  			reg = <1>;
- 			clock-frequency = <1000000000>;
-+			power-domains = <&pd_arm1>;
+ 			clock-frequency = <1300000000>;
++
++			i-cache-size = <0x8000>;
++			i-cache-sets = <512>;
++			i-cache-block-size = <32>;
++			i-cache-line-size = <32>;
++			d-cache-size = <0x8000>;
++			d-cache-sets = <512>;
++			d-cache-block-size = <32>;
++			d-cache-line-size = <32>;
++			next-level-cache = <&L2_CA15>;
  		};
- 		cpu at 2 {
- 			device_type = "cpu";
- 			compatible = "arm,cortex-a9";
+ 
+ 		cpu2: cpu at 2 {
+@@ -74,6 +94,16 @@
+ 			compatible = "arm,cortex-a15";
  			reg = <2>;
- 			clock-frequency = <1000000000>;
-+			power-domains = <&pd_arm2>;
+ 			clock-frequency = <1300000000>;
++
++			i-cache-size = <0x8000>;
++			i-cache-sets = <512>;
++			i-cache-block-size = <32>;
++			i-cache-line-size = <32>;
++			d-cache-size = <0x8000>;
++			d-cache-sets = <512>;
++			d-cache-block-size = <32>;
++			d-cache-line-size = <32>;
++			next-level-cache = <&L2_CA15>;
  		};
- 		cpu at 3 {
- 			device_type = "cpu";
- 			compatible = "arm,cortex-a9";
+ 
+ 		cpu3: cpu at 3 {
+@@ -81,6 +111,16 @@
+ 			compatible = "arm,cortex-a15";
  			reg = <3>;
- 			clock-frequency = <1000000000>;
-+			power-domains = <&pd_arm3>;
+ 			clock-frequency = <1300000000>;
++
++			i-cache-size = <0x8000>;
++			i-cache-sets = <512>;
++			i-cache-block-size = <32>;
++			i-cache-line-size = <32>;
++			d-cache-size = <0x8000>;
++			d-cache-sets = <512>;
++			d-cache-block-size = <32>;
++			d-cache-line-size = <32>;
++			next-level-cache = <&L2_CA15>;
+ 		};
+ 
+ 		cpu4: cpu at 4 {
+@@ -88,6 +128,16 @@
+ 			compatible = "arm,cortex-a7";
+ 			reg = <0x100>;
+ 			clock-frequency = <780000000>;
++
++			i-cache-size = <0x8000>;
++			i-cache-sets = <512>;
++			i-cache-block-size = <32>;
++			i-cache-line-size = <32>;
++			d-cache-size = <0x8000>;
++			d-cache-sets = <256>;
++			d-cache-block-size = <32>;
++			d-cache-line-size = <32>;
++			next-level-cache = <&L2_CA7>;
+ 		};
+ 
+ 		cpu5: cpu at 5 {
+@@ -95,6 +145,16 @@
+ 			compatible = "arm,cortex-a7";
+ 			reg = <0x101>;
+ 			clock-frequency = <780000000>;
++
++			i-cache-size = <0x8000>;
++			i-cache-sets = <512>;
++			i-cache-block-size = <32>;
++			i-cache-line-size = <32>;
++			d-cache-size = <0x8000>;
++			d-cache-sets = <256>;
++			d-cache-block-size = <32>;
++			d-cache-line-size = <32>;
++			next-level-cache = <&L2_CA7>;
+ 		};
+ 
+ 		cpu6: cpu at 6 {
+@@ -102,6 +162,16 @@
+ 			compatible = "arm,cortex-a7";
+ 			reg = <0x102>;
+ 			clock-frequency = <780000000>;
++
++			i-cache-size = <0x8000>;
++			i-cache-sets = <512>;
++			i-cache-block-size = <32>;
++			i-cache-line-size = <32>;
++			d-cache-size = <0x8000>;
++			d-cache-sets = <256>;
++			d-cache-block-size = <32>;
++			d-cache-line-size = <32>;
++			next-level-cache = <&L2_CA7>;
+ 		};
+ 
+ 		cpu7: cpu at 7 {
+@@ -109,6 +179,16 @@
+ 			compatible = "arm,cortex-a7";
+ 			reg = <0x103>;
+ 			clock-frequency = <780000000>;
++
++			i-cache-size = <0x8000>;
++			i-cache-sets = <512>;
++			i-cache-block-size = <32>;
++			i-cache-line-size = <32>;
++			d-cache-size = <0x8000>;
++			d-cache-sets = <256>;
++			d-cache-block-size = <32>;
++			d-cache-line-size = <32>;
++			next-level-cache = <&L2_CA7>;
  		};
  	};
  
-@@ -569,4 +572,49 @@
- 				"mmc1", "mmc0";
- 		};
- 	};
-+
-+	sysc: system-controller at ffd85000 {
-+		compatible = "renesas,sysc-r8a7779", "renesas,sysc-rcar";
-+		reg = <0 0xffd85000 0 0x0200>;
-+
-+		pm-domains {
-+			#address-cells = <2>;
-+			#size-cells = <0>;
-+
-+			pd_arm1: cpu at 1 {
-+				reg = <1 0x41>;
-+				#power-domain-cells = <0>;
-+			};
-+
-+			pd_arm2: cpu at 2 {
-+				reg = <2 0x42>;
-+				#power-domain-cells = <0>;
-+			};
-+
-+			pd_arm3: cpu at 3 {
-+				reg = <3 0x43>;
-+				#power-domain-cells = <0>;
-+			};
-+
-+			pd_sh: sh at 16 {
-+				reg = <16 0x80>;
-+				#power-domain-cells = <0>;
-+			};
-+
-+			pd_sgx: sgx at 20 {
-+				reg = <20 0xc0>;
-+				#power-domain-cells = <0>;
-+			};
-+
-+			pd_vdp: vdp at 21 {
-+				reg = <21 0x100>;
-+				#power-domain-cells = <0>;
-+			};
-+
-+			pd_imp: imp at 24 {
-+				reg = <24 0x140>;
-+				#power-domain-cells = <0>;
-+			};
-+		};
-+	};
- };
 -- 
 1.9.1
