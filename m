@@ -1,24 +1,29 @@
-From: jiang.liu@linux.intel.com (Jiang Liu)
-Date: Thu, 04 Jun 2015 09:54:55 +0800
-Subject: [Patch v4 0/8] Consolidate ACPI PCI root common code into ACPI
- core
-In-Reply-To: <556F6332.2040501@redhat.com>
-References: <1433225576-8215-1-git-send-email-jiang.liu@linux.intel.com>
- <556F6332.2040501@redhat.com>
-Message-ID: <556FAFEF.6040802@linux.intel.com>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Thu, 04 Jun 2015 11:00:58 +0900
+Subject: [PATCH] drivers/cpufreq: include <module.h> for modular
+ exynos-cpufreq.c code
+In-Reply-To: <1433366298-30016-1-git-send-email-paul.gortmaker@windriver.com>
+References: <1430444867-22342-1-git-send-email-paul.gortmaker@windriver.com>
+ <1433366298-30016-1-git-send-email-paul.gortmaker@windriver.com>
+Message-ID: <556FB15A.8010409@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2015/6/4 4:27, Al Stone wrote:
-> On 06/02/2015 12:12 AM, Jiang Liu wrote:
->> This patch set consolidates common code to support ACPI PCI root on x86
->> and IA64 platforms into ACPI core, to reproduce duplicated code and
->> simplify maintenance. And a patch set based on this to support ACPI based
->> PCIe host bridge on ARM64 has been posted at:
+On 04.06.2015 06:18, Paul Gortmaker wrote:
+> This file is built off of a tristate Kconfig option ("ARM_EXYNOS_CPUFREQ")
+> and also contains modular function calls so it should explicitly include
+> module.h to avoid compile breakage during pending header shuffles.
 > 
-> Link is missing (or it's a typo of some flavor).
-HI Al,
-	Sorry, I missed the link. It has been posted at:
-https://lkml.org/lkml/2015/5/26/207
-Thanks!
-Gerry
+> Cc: "Rafael J. Wysocki" <rjw@rjwysocki.net>
+> Cc: Viresh Kumar <viresh.kumar@linaro.org>
+> Cc: Kukjin Kim <kgene@kernel.org>
+> Cc: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+> Cc: linux-pm at vger.kernel.org
+> Cc: linux-arm-kernel at lists.infradead.org
+> Cc: linux-samsung-soc at vger.kernel.org
+> Signed-off-by: Paul Gortmaker <paul.gortmaker@windriver.com>
+
+Acked-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+
+Best regards,
+Krzysztof
