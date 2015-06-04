@@ -1,48 +1,90 @@
 From: arun@gumstix.com (Arun Bharadwaj)
-Date: Thu,  4 Jun 2015 11:08:17 -0700
-Subject: [PATCH 1/3] ARM: dts: Correct audio input route & set mic bias
+Date: Thu,  4 Jun 2015 11:08:18 -0700
+Subject: [PATCH 2/3] ARM: dts: configure regulators for Gumstix Pepper
 In-Reply-To: <1433441299-18887-1-git-send-email-arun@gumstix.com>
 References: <1433441299-18887-1-git-send-email-arun@gumstix.com>
-Message-ID: <1433441299-18887-2-git-send-email-arun@gumstix.com>
+Message-ID: <1433441299-18887-3-git-send-email-arun@gumstix.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Adam YH Lee <adam.yh.lee@gmail.com>
 
-Audio-in was incorrectly routed to Line In. It should be Mic3L as per
-schematic.
+Boot process is halting in midway because some of the necessary voltage
+regulators are deemed unused and subsequently powered off, leading to
+a completely unresponsive system.
 
-Using mic-bias voltage at 2.0v (<0x1>) does not work for some reason. There
-is no voltage seen on micbias (R127). Mic-bias voltage of 2.5v (<0x2>) works.
-I see voltage of 2.475v across GND and micbias.
-
-With these changes, I can record audio with a pair of proliferate TRRS earbuds.
+Most of the device nodes had correct voltage regulator attachments.
+Yet these nodes had to set stricter enforcement on them through
+'regulator-boot-on' and 'regulator-always-on' to function correctly.
 
 Signed-off-by: Ash Charles <ashcharles@gmail.com>
 ---
- arch/arm/boot/dts/am335x-pepper.dts | 3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
+ arch/arm/boot/dts/am335x-pepper.dts | 13 +++++++++++++
+ 1 file changed, 13 insertions(+)
 
 diff --git a/arch/arm/boot/dts/am335x-pepper.dts b/arch/arm/boot/dts/am335x-pepper.dts
-index 0d35ab6..473d8ee 100644
+index 473d8ee..99f855d 100644
 --- a/arch/arm/boot/dts/am335x-pepper.dts
 +++ b/arch/arm/boot/dts/am335x-pepper.dts
-@@ -74,6 +74,7 @@
- 	audio_codec: tlv320aic3106 at 1b {
- 		compatible = "ti,tlv320aic3106";
- 		reg = <0x1b>;
-+		ai3x-micbias-vg = <0x2>;
+@@ -415,6 +415,7 @@
+ 
+ &v3v3c_reg {
+ 	regulator-name = "v3v3c_reg";
++	regulator-boot-on;
+ 	regulator-min-microvolt = <3300000>;
+ 	regulator-max-microvolt = <3300000>;
+ 	vin-supply = <&vbat>;
+@@ -439,6 +440,8 @@
+ 	regulators {
+ 		dcdc1_reg: regulator at 0 {
+ 			/* VDD_1V8 system supply */
++			regulator-name = "vdds_dpr";
++			regulator-always-on;
+ 		};
+ 
+ 		dcdc2_reg: regulator at 1 {
+@@ -447,6 +450,7 @@
+ 			regulator-min-microvolt = <925000>;
+ 			regulator-max-microvolt = <1325000>;
+ 			regulator-boot-on;
++			regulator-always-on;
+ 		};
+ 
+ 		dcdc3_reg: regulator at 2 {
+@@ -455,25 +459,34 @@
+ 			regulator-min-microvolt = <925000>;
+ 			regulator-max-microvolt = <1150000>;
+ 			regulator-boot-on;
++			regulator-always-on;
+ 		};
+ 
+ 		ldo1_reg: regulator at 3 {
+ 			/* VRTC 1.8V always-on supply */
++			regulator-name = "vrtc,vdds";
+ 			regulator-always-on;
+ 		};
+ 
+ 		ldo2_reg: regulator at 4 {
+ 			/* 3.3V rail */
++			regulator-name = "vdd_3v3aux";
++			regulator-always-on;
+ 		};
+ 
+ 		ldo3_reg: regulator at 5 {
+ 			/* VDD_3V3A 3.3V rail */
++			regulator-name = "vdd_3v3a";
+ 			regulator-min-microvolt = <3300000>;
+ 			regulator-max-microvolt = <3300000>;
++			regulator-boot-on;
++			regulator-always-on;
+ 		};
+ 
+ 		ldo4_reg: regulator at 6 {
+ 			/* VDD_3V3B 3.3V rail */
++			regulator-name = "vdd_3v3b";
++			regulator-always-on;
+ 		};
  	};
- 
- 	accel: lis331dlh at 1d {
-@@ -153,7 +154,7 @@
- 	ti,audio-routing =
- 		"Headphone Jack",	"HPLOUT",
- 		"Headphone Jack",	"HPROUT",
--		"LINE1L",		"Line In";
-+		"MIC3L",		"Mic3L Switch";
  };
- 
- &mcasp0 {
 -- 
 2.1.4
