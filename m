@@ -1,34 +1,68 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Fri, 5 Jun 2015 00:22:08 +0200
-Subject: [PATCH 2/2] rtc: mxc: add support of device tree
-In-Reply-To: <5570C26D.5080204@gmail.com>
-References: <1431729330-7625-1-git-send-email-tremyfr@gmail.com>
- <1431729330-7625-3-git-send-email-tremyfr@gmail.com>
- <20150528120601.GO2185@piout.net> <5570C26D.5080204@gmail.com>
-Message-ID: <20150604222208.GE713@piout.net>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 4 Jun 2015 15:28:24 -0700
+Subject: [PATCH 05/12] ARM: OMAP2+: Add support for initializing dm814x
+ clocks
+In-Reply-To: <20150604184254.GJ490@codeaurora.org>
+References: <1433348601-8966-1-git-send-email-tony@atomide.com>
+ <1433348601-8966-6-git-send-email-tony@atomide.com>
+ <20150604184254.GJ490@codeaurora.org>
+Message-ID: <20150604222823.GC30984@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/06/2015 at 23:26:05 +0200, Philippe Reynes wrote :
-> I'll do it in the next version of this patch.
-> >>+	} else
-> >>+		pdata->devtype = pdev->id_entry->driver_data;
-> >>
-> >
+* Stephen Boyd <sboyd@codeaurora.org> [150604 11:44]:
+> On 06/03, Tony Lindgren wrote:
+> > diff --git a/drivers/clk/ti/clk-814x.c b/drivers/clk/ti/clk-814x.c
+> > new file mode 100644
+> > index 0000000..bd2353c
+> > --- /dev/null
+> > +++ b/drivers/clk/ti/clk-814x.c
+> > @@ -0,0 +1,36 @@
+> > +/*
+> > + * This program is free software; you can redistribute it and/or
+> > + * modify it under the terms of the GNU General Public License as
+> > + * published by the Free Software Foundation version 2.
+> > + */
+> > +
+> > +#include <linux/kernel.h>
+> > +#include <linux/list.h>
 > 
-> Do you prefer that I wait the clock driver has move to drivers/clk/imx
-> (as requested by Shawn) before sending a v2 ?
+> Is list.h used?
 > 
+> > +#include <linux/clk-provider.h>
+> > +#include <linux/clk/ti.h>
+> > +
+> > +static struct ti_dt_clk dm814_clks[] = {
+> > +	DT_CLK(NULL, "devosc_ck", "devosc_ck"),
+> > +	DT_CLK(NULL, "mpu_ck", "mpu_ck"),
+> > +	DT_CLK(NULL, "sysclk4_ck", "sysclk4_ck"),
+> > +	DT_CLK(NULL, "sysclk6_ck", "sysclk6_ck"),
+> > +	DT_CLK(NULL, "sysclk10_ck", "sysclk10_ck"),
+> > +	DT_CLK(NULL, "sysclk18_ck", "sysclk18_ck"),
+> > +	DT_CLK(NULL, "timer_sys_ck", "devosc_ck"),
+> > +	DT_CLK(NULL, "cpsw_125mhz_gclk", "cpsw_125mhz_gclk"),
+> > +	DT_CLK(NULL, "cpsw_cpts_rft_clk", "cpsw_cpts_rft_clk"),
+> > +	{ .node_name = NULL },
+> > +};
+> > +
+> > +static const char *enable_init_clks[] = {
+> > +};
+> 
+> delete?
+> 
+> > +
+> > +int __init dm814x_dt_clk_init(void)
+> > +{
+> > +	ti_dt_clocks_register(dm814_clks);
+> > +	omap2_clk_disable_autoidle_all();
+> > +	omap2_clk_enable_init_clocks(enable_init_clks,
+> > +				     ARRAY_SIZE(enable_init_clks));
+> 
+> And pass NULL and 0 here?
 
-It would have been good to get the clock change in 4.2 but it is already
-late in the cycle now so I'm not sure it can go in. That would have
-removed the dependency.
+Sure will remove, we can add those back once the PLL parts are
+working and if/when some boot time clocks are needed.
 
-The other solution is to merge everything through Shawn's tree.
+Thanks.
 
-Anyway, you can send the patches, we'll handle that part :)
-
--- 
-Alexandre Belloni, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+Tony
