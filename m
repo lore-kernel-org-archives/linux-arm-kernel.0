@@ -1,139 +1,76 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Thu, 4 Jun 2015 11:04:50 +0100
-Subject: [RFC PATCH] arm64: Image: Allow the appending of a device tree
- binary
-In-Reply-To: <1433410504-11628-1-git-send-email-yangyingliang@huawei.com>
-References: <1433410504-11628-1-git-send-email-yangyingliang@huawei.com>
-Message-ID: <20150604100450.GC599@leverpostej>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 4 Jun 2015 11:06:25 +0100
+Subject: [PATCH] arm64: fix missing syscall trace exit
+In-Reply-To: <556E5454.9080400@redhat.com>
+References: <20150601102448.GG1641@arm.com>
+ <1433293304-26539-1-git-send-email-jistone@redhat.com>
+ <556E5454.9080400@redhat.com>
+Message-ID: <20150604100625.GI7557@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Tue, Jun 02, 2015 at 06:11:48PM -0700, Josh Stone wrote:
+> On 06/02/2015 06:01 PM, Josh Stone wrote:
+> > If a syscall is entered without TIF_SYSCALL_TRACE set, then it goes on
+> > the fast path.  It's then possible to have TIF_SYSCALL_TRACE added in
+> > the middle of the syscall, but ret_fast_syscall doesn't check this flag
+> > again.  This causes a ptrace syscall-exit-stop to be missed.
+> > 
+> > For instance, from a PTRACE_EVENT_FORK reported during do_fork, the
+> > tracer might resume with PTRACE_SYSCALL, setting TIF_SYSCALL_TRACE.
+> > Now the completion of the fork should have a syscall-exit-stop.
+> > 
+> > Russell King fixed this on arm by re-checking _TIF_SYSCALL_WORK in the
+> > fast exit path.  Do the same on arm64.
+> > 
+> > Cc: Catalin Marinas <catalin.marinas@arm.com>
+> > Cc: Will Deacon <will.deacon@arm.com>
+> > Cc: Russell King <rmk@arm.linux.org.uk>
+> > Signed-off-by: Josh Stone <jistone@redhat.com>
+> > ---
+> >  arch/arm64/kernel/entry.S | 4 +++-
+> >  1 file changed, 3 insertions(+), 1 deletion(-)
+> > 
+> > diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
+> > index 959fe8733560..a547a3e8a198 100644
+> > --- a/arch/arm64/kernel/entry.S
+> > +++ b/arch/arm64/kernel/entry.S
+> > @@ -608,7 +608,9 @@ ENDPROC(cpu_switch_to)
+> >   */
+> >  ret_fast_syscall:
+> >  	disable_irq				// disable interrupts
+> > -	ldr	x1, [tsk, #TI_FLAGS]
+> > +	ldr	x1, [tsk, #TI_FLAGS]		// re-check for syscall tracing
+> > +	and	x2, x1, #_TIF_SYSCALL_WORK
+> > +	cbnz	x2, __sys_trace_return
+> >  	and	x2, x1, #_TIF_WORK_MASK
+> >  	cbnz	x2, fast_work_pending
+> >  	enable_step_tsk x1, x2
+> 
+> I do have one concern about this, also in Russell's ARM patch.  Is it
+> really ok to branch to __sys_trace_return with interrupts disabled?
 
-On Thu, Jun 04, 2015 at 10:35:04AM +0100, Yang Yingliang wrote:
-> This patch provides the ability to boot using a device tree that is appended
-> to the raw binary Image (e.g. cat Image <filename>.dtb > Image_w_dtb).
-> 
-> Both BE and LE conditions are tested.
-> 
-> Got references from e2a6a3aa ("ARM: zImage: Allow the appending of a device tree binary").
+I'm not that happy to hear that you have concerns over the patch after
+hurrying its submission into the -rc kernels.
 
-NAK for this as it stands. I really don't want to see appended DTB for
-arm64.
+> I didn't hit any issue from that, but my testcase only exercises this
+> path once each run.  So that might have just been lucky not to hit any
+> gross scenario...
 
-We needed it for arm because old bootloaders didn't know how to pass a
-DTB to the kernel. For arm64 DTB has always been a requirement, so
-there's no legacy bootloader to support, and the rationale from arm does
-not apply.
+It would've been good to have tested that _prior_ to me pushing the patch
+into mainline and having the stable trees pick it up.  This kind of thing
+can potentially de-stabilise the kernel.
 
-Adding appended DTB to arm64 encourages the broken assumption that
-kernel and DTB are intimately coupled. It relies on arbitrary
-limitations that are difficult and/or impossible to change in future in
-a compatible fashion (e.g. the 2M carveout you make for the DT to live
-in), and also makes it hard to replace either the kernel or DTB becuase
-in the resulting Image there's no clear distinction between the two.
-It's simply far too fragile.
+I had thought you'd have tested with audit and other stuff enabled (I
+don't use that stuff, and I'm clueless about how to use it.)
 
-Thanks,
-Mark.
+Surely, if you're tracing a child, and you start tracing on the exit
+path of a syscall, the child should sleep - and as sleeping with IRQs
+disabled is not allowed, there should've been a warning if this path
+was hit.  I think this brings into question whether that path was
+actually hit during testing.  I hope you tried running a kernel with
+the usual suite of debugging options enabled?
 
-> 
-> Signed-off-by: Yang Yingliang <yangyingliang@huawei.com>
-> ---
->  arch/arm64/Kconfig              | 11 +++++++++++
->  arch/arm64/kernel/head.S        | 12 ++++++++++++
->  arch/arm64/kernel/vmlinux.lds.S | 17 +++++++++++++++++
->  3 files changed, 40 insertions(+)
-> 
-> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-> index 7796af4..d402448 100644
-> --- a/arch/arm64/Kconfig
-> +++ b/arch/arm64/Kconfig
-> @@ -660,6 +660,17 @@ endmenu
->  
->  menu "Boot options"
->  
-> +config ARM64_APPENDED_DTB
-> +	bool "Use appended device tree blob to Image"
-> +	depends on OF
-> +	help
-> +	  With this option, the boot code will look for a device tree binary
-> +	  (DTB) appended to Image
-> +	  (e.g. cat Image <filename>.dtb > Image_w_dtb).
-> +
-> +	  With this option, the size of Image will be extended to be 2MB aligned.
-> +	  The 2MB memory followed by Image is used for FDT blob.
-> +
->  config CMDLINE
->  	string "Default kernel command string"
->  	default ""
-> diff --git a/arch/arm64/kernel/head.S b/arch/arm64/kernel/head.S
-> index 19f915e..ac00c8a 100644
-> --- a/arch/arm64/kernel/head.S
-> +++ b/arch/arm64/kernel/head.S
-> @@ -274,6 +274,18 @@ ENDPROC(preserve_boot_args)
->   * The dtb must be 8-byte aligned and live in the first 512M of memory.
->   */
->  __vet_fdt:
-> +#ifdef CONFIG_ARM64_APPENDED_DTB
-> +	ldr	x21, =_edata
-> +	add	x21, x21, x28
-> +	ldr	w0, [x21]
-> +#ifndef __AARCH64EB__
-> +	ldr	w1, =0xedfe0dd0		// FDT magic word
-> +#else
-> +	ldr	w1, =0xd00dfeed
-> +#endif
-> +	cmp	w0, w1
-> +	b.ne	1f			// no FDT found
-> +#endif
->  	tst	x21, #0x7
->  	b.ne	1f
->  	cmp	x21, x24
-> diff --git a/arch/arm64/kernel/vmlinux.lds.S b/arch/arm64/kernel/vmlinux.lds.S
-> index a2c2986..c71bac3 100644
-> --- a/arch/arm64/kernel/vmlinux.lds.S
-> +++ b/arch/arm64/kernel/vmlinux.lds.S
-> @@ -54,6 +54,18 @@ PECOFF_FILE_ALIGNMENT = 0x200;
->  #define PECOFF_EDATA_PADDING
->  #endif
->  
-> +/*
-> + * Set FDT pointer 2MB aligned to ensure
-> + * it don't cross a 2-megabyte boundary.
-> + */
-> +FDT_FILE_ALIGNMENT = (1 << 21);
-> +#ifdef CONFIG_ARM64_APPENDED_DTB
-> +#define FDT_EDATA_PADDING	\
-> +	.fdt_edata_padding : { BYTE(0); . = ALIGN(FDT_FILE_ALIGNMENT); }
-> +#else
-> +#define FDT_EDATA_PADDING
-> +#endif
-> +
->  #ifdef CONFIG_DEBUG_ALIGN_RODATA
->  #define ALIGN_DEBUG_RO			. = ALIGN(1<<SECTION_SHIFT);
->  #define ALIGN_DEBUG_RO_MIN(min)		ALIGN_DEBUG_RO
-> @@ -149,8 +161,13 @@ SECTIONS
->  	_sdata = .;
->  	RW_DATA_SECTION(64, PAGE_SIZE, THREAD_SIZE)
->  	PECOFF_EDATA_PADDING
-> +	FDT_EDATA_PADDING	/* 2MB aligned */
->  	_edata = .;
->  
-> +#ifdef CONFIG_ARM64_APPENDED_DTB
-> +	. += (1 << 21);		/* maximum 2MB for FDT blob */
-> +#endif
-> +
->  	BSS_SECTION(0, 0, 0)
->  
->  	. = ALIGN(PAGE_SIZE);
-> -- 
-> 1.8.0
-> 
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> 
+-- 
+FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
+according to speedtest.net.
