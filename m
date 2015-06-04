@@ -1,410 +1,186 @@
 From: jiang.liu@linux.intel.com (Jiang Liu)
-Date: Thu,  4 Jun 2015 12:13:10 +0800
-Subject: [RFT v2 00/48] Refine irq interfaces to reduce number of parameters
-Message-ID: <1433391238-19471-1-git-send-email-jiang.liu@linux.intel.com>
+Date: Thu,  4 Jun 2015 12:13:15 +0800
+Subject: [RFT v2 05/48] gpio: Use irq_desc_get_xxx() to avoid redundant lookup
+ of irq_desc
+In-Reply-To: <1433391238-19471-1-git-send-email-jiang.liu@linux.intel.com>
+References: <1433391238-19471-1-git-send-email-jiang.liu@linux.intel.com>
+Message-ID: <1433391238-19471-6-git-send-email-jiang.liu@linux.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Many irq core interfaces pass both 'struct irq_desc *desc' and 'int irq'
-to identify an irq. But that's a little overhead, either 'irq_desc' or
-'irq' could identify an irq. We could get 'irq_desc' from 'irq' by
-irq_to_desc() and get 'irq' from 'irq_desc' through irq_desc->irq_data.irq.
-So this patch set aims to reduce number of parameters of irq related
-interfaces by passing in either 'irq' or 'irq_desc" but not both.
-Hope this helps to simplify interfaces and improve performance.
+Use irq_desc_get_xxx() to avoid redundant lookup of irq_desc while we
+already have a pointer to corresponding irq_desc.
 
-This patch set is based the patch set to refine struct irq_data, which
-has been posted at:
+Signed-off-by: Jiang Liu <jiang.liu@linux.intel.com>
+Acked-by: Linus Walleij <linus.walleij@linaro.org>
+---
+ drivers/gpio/gpio-bcm-kona.c   |    2 +-
+ drivers/gpio/gpio-dwapb.c      |    2 +-
+ drivers/gpio/gpio-mvebu.c      |    2 +-
+ drivers/gpio/gpio-mxc.c        |    6 +++---
+ drivers/gpio/gpio-mxs.c        |    2 +-
+ drivers/gpio/gpio-omap.c       |    2 +-
+ drivers/gpio/gpio-tegra.c      |    4 +---
+ drivers/gpio/gpio-timberdale.c |    5 +++--
+ drivers/gpio/gpio-vf610.c      |    2 +-
+ drivers/gpio/gpio-zynq.c       |    2 +-
+ 10 files changed, 14 insertions(+), 15 deletions(-)
 
-The patch set could be split into five parts:
-1) Patch 1-2 is following-on cleanup work for 
-2) Patch 3-14 optimize irq handlers by avoiding redundant calling of 
-   irq_to_desc() when we already have a pointer to corresponding irq_desc.
-3) Patch 15-20 reduce number of parameters of irq core functions.
-4) Patch 21-34 prepare for killing the first parameter 'irq' of
-   irq_flow_handler_t
-5) Patch 35-48 kill the first parameter 'irq' of irq_flow_handler_t.
-   All these patches should be combined as one big patch to support
-   bisecting, they have been split for easy review only.
-
-With all these patches applied, a tree-wide 'grep -R "struct irq_desc" *'
-shows that there are only four functions left who take both 'irq' and
-'irq_desc' as parameters:
-kernel/irq/manage.c:__setup_irq(unsigned int irq, struct irq_desc *desc, struct irqaction *new)
-kernel/irq/debug.h:static inline void print_irq_desc(unsigned int irq, struct irq_desc *desc)
-kernel/irq/irqdesc.c:static void desc_set_defaults(unsigned int irq, struct irq_desc *desc, int node,
-kernel/irq/irqdesc.c:static void irq_insert_desc(unsigned int irq, struct irq_desc *desc)
-
-They are all pretty safe, it's a good sign that we have done a clean
-conversion. Thomas suggested to use coci scripts verify conversion result,
-it's a little hard for me and will ask for help from Julia later.
-
-You may get the patch set from:
-The patch set passes Fengguang's 0day test suites as below. And tests
-with other platforms and configurations will be appreciated:)
-----------------------------------------------------------
-configs tested: 95
-
-alpha                               defconfig
-parisc                            allnoconfig
-parisc                         b180_defconfig
-parisc                        c3000_defconfig
-parisc                              defconfig
-i386                   randconfig-a0-06031710
-i386                   randconfig-a1-06031710
-x86_64                             acpi-redef
-x86_64                           allyesdebian
-x86_64                                nfsroot
-x86_64                            allnoconfig
-x86_64                                   rhel
-sh                                allnoconfig
-sh                          rsk7269_defconfig
-sh                  sh7785lcr_32bit_defconfig
-sh                            titan_defconfig
-ia64                             alldefconfig
-ia64                              allnoconfig
-ia64                                defconfig
-powerpc                           allnoconfig
-powerpc                             defconfig
-powerpc                       ppc64_defconfig
-i386                             alldefconfig
-i386                             allmodconfig
-i386                              allnoconfig
-i386                                defconfig
-mips                              allnoconfig
-mips                      fuloong2e_defconfig
-mips                                   jz4740
-mips                                     txx9
-x86_64                     randconfig-i0-0603
-x86_64                     randconfig-i1-0603
-sparc                               defconfig
-sparc64                           allnoconfig
-sparc64                             defconfig
-microblaze                      mmu_defconfig
-microblaze                    nommu_defconfig
-i386                       randconfig-i0-0603
-i386                       randconfig-i1-0603
-i386                             allyesconfig
-blackfin                BF526-EZBRD_defconfig
-blackfin                BF533-EZKIT_defconfig
-blackfin            BF561-EZKIT-SMP_defconfig
-blackfin                  TCM-BF537_defconfig
-cris                 etrax-100lx_v2_defconfig
-i386                       randconfig-n0-0603
-i386                       randconfig-n1-0603
-x86_64                                    lkp
-arm                               allnoconfig
-arm                         at91_dt_defconfig
-arm                                  at_hdmac
-arm                                    ep93xx
-arm                       imx_v6_v7_defconfig
-arm                                  iop-adma
-arm                          marzen_defconfig
-arm                          prima2_defconfig
-arm                                    sa1100
-arm                                   samsung
-arm                                        sh
-arm                       spear13xx_defconfig
-m68k                          amiga_defconfig
-m68k                       m5475evb_defconfig
-m68k                          multi_defconfig
-x86_64                           allmodconfig
-x86_64               randconfig-x000-06031659
-x86_64               randconfig-x001-06031659
-x86_64               randconfig-x002-06031659
-x86_64               randconfig-x003-06031659
-x86_64               randconfig-x004-06031659
-x86_64               randconfig-x005-06031659
-x86_64               randconfig-x006-06031659
-x86_64               randconfig-x007-06031659
-x86_64               randconfig-x008-06031659
-x86_64               randconfig-x009-06031659
-i386                       randconfig-r0-0603
-i386                       randconfig-r1-0603
-avr32                      atngw100_defconfig
-avr32                     atstk1006_defconfig
-frv                                 defconfig
-mn10300                     asb2364_defconfig
-openrisc                    or1ksim_defconfig
-tile                         tilegx_defconfig
-um                             i386_defconfig
-um                           x86_64_defconfig
-i386                 randconfig-x000-06031736
-i386                 randconfig-x001-06031736
-i386                 randconfig-x002-06031736
-i386                 randconfig-x003-06031736
-i386                 randconfig-x004-06031736
-i386                 randconfig-x005-06031736
-i386                 randconfig-x006-06031736
-i386                 randconfig-x007-06031736
-i386                 randconfig-x008-06031736
-i386                 randconfig-x009-06031736
-x86_64                 randconfig-x0-06031736
-
-Thanks!
-Gerry
-
-Jiang Liu (48):
-  genirq: Clean up outdated comments related to include/linux/irqdesc.h
-  genirq: Kill never used irq_node()
-  MIPS, irq: Use irq_desc_get_xxx() to avoid redundant lookup of
-    irq_desc
-  powerpc, irq: Use irq_desc_get_xxx() to avoid redundant lookup of
-    irq_desc
-  gpio: Use irq_desc_get_xxx() to avoid redundant lookup of irq_desc
-  pinctrl: Use irq_desc_get_xxx() to avoid redundant lookup of irq_desc
-  avr32, irq: Use irq_desc_get_xxx() to avoid redundant lookup of
-    irq_desc
-  mfd: Use irq_desc_get_xxx() to avoid redundant lookup of irq_desc
-  ARM, irq: Use irq_desc_get_xxx() to avoid redundant lookup of
-    irq_desc
-  irqchip: Use irq_desc_get_xxx() to avoid redundant lookup of irq_desc
-  ipu: Use irq_desc_get_xxx() to avoid redundant lookup of irq_desc
-  sh: intc: Use irq_desc_get_xxx() to avoid redundant lookup of
-    irq_desc
-  keystone, irq: Use irq_data_get_xxx() to avoid redundant lookup of
-    irq_data
-  spmi: Use irq_desc_get_xxx() to avoid redundant lookup of irq_desc
-  genirq: Kill the parameter 'irq' of kstat_incr_irqs_this_cpu()
-  genirq: Introduce helper irq_desc_get_irq()
-  genirq: Kill the parameter 'irq' of check_irq_resend()
-  genirq: Kill the parameter 'irq' of note_interrupt()
-  genirq: Change prototypes of register_irq_proc() and friends
-  genirq: Kill the parameter 'irq' of setup_affinity()
-  ARM, irq: Prepare for killing the first parameter 'irq' of
-    irq_flow_handler_t
-  blackfin, irq: Prepare for killing the first parameter 'irq' of
-    irq_flow_handler_t
-  c6x, irq: Prepare for killing the first parameter 'irq' of
-    irq_flow_handler_t
-  m68k, irq: Prepare for killing the first parameter 'irq' of
-    irq_flow_handler_t
-  mips, irq: Prepare for killing the first parameter 'irq' of
-    irq_flow_handler_t
-  powerpc, irq: Prepare for killing the first parameter 'irq' of
-    irq_flow_handler_t
-  sh, irq: Prepare for killing the first parameter 'irq' of
-    irq_flow_handler_t
-  unicore32, irq: Prepare for killing the first parameter 'irq' of
-    irq_flow_handler_t
-  ipu: Prepare for killing the first parameter 'irq' of
-    irq_flow_handler_t
-  gpio: Prepare for killing the first parameter 'irq' of
-    irq_flow_handler_t
-  irqchip: Prepare for killing the first parameter 'irq' of
-    irq_flow_handler_t
-  mfd: Prepare for killing the first parameter 'irq' of
-    irq_flow_handler_t
-  PCI/keystone: Prepare for killing the first parameter 'irq' of
-    irq_flow_handler_t
-  pinctrl: Prepare for killing the first parameter 'irq' of
-    irq_flow_handler_t
-  genirq: Kill the first parameter 'irq' of irq_flow_handler_t
-  genirq, arm: Kill the first parameter 'irq' of irq_flow_handler_t
-  genirq, blackfin: Kill the first parameter 'irq' of
-    irq_flow_handler_t
-  genirq, powerpc: Kill the first parameter 'irq' of irq_flow_handler_t
-  genirq, mips: Kill the first parameter 'irq' of irq_flow_handler_t
-  genirq, m68k: Kill the first parameter 'irq' of irq_flow_handler_t
-  genirq, x86: Kill the first parameter 'irq' of irq_flow_handler_t
-  genirq, sh: Kill the first parameter 'irq' of irq_flow_handler_t
-  genirq, arch: Kill the first parameter 'irq' of irq_flow_handler_t
-  genirq, pinctrl: Kill the first parameter 'irq' of irq_flow_handler_t
-  genirq, gpio: Kill the first parameter 'irq' of irq_flow_handler_t
-  genirq, irqchip: Kill the first parameter 'irq' of irq_flow_handler_t
-  genirq, mfd: Kill the first parameter 'irq' of irq_flow_handler_t
-  genirq, drivers: Kill the first parameter 'irq' of irq_flow_handler_t
-
- arch/alpha/kernel/irq.c                         |    2 +-
- arch/arm/common/it8152.c                        |    2 +-
- arch/arm/common/locomo.c                        |   13 ++---
- arch/arm/common/sa1111.c                        |    6 +--
- arch/arm/include/asm/hardware/it8152.h          |    2 +-
- arch/arm/include/asm/mach/irq.h                 |    4 +-
- arch/arm/mach-dove/irq.c                        |    5 +-
- arch/arm/mach-footbridge/isa-irq.c              |    4 +-
- arch/arm/mach-gemini/gpio.c                     |    2 +-
- arch/arm/mach-imx/3ds_debugboard.c              |    2 +-
- arch/arm/mach-imx/mach-mx31ads.c                |    2 +-
- arch/arm/mach-iop13xx/msi.c                     |    2 +-
- arch/arm/mach-lpc32xx/irq.c                     |    4 +-
- arch/arm/mach-netx/generic.c                    |    2 +-
- arch/arm/mach-omap1/fpga.c                      |    2 +-
- arch/arm/mach-omap2/prm_common.c                |    2 +-
- arch/arm/mach-pxa/balloon3.c                    |    5 +-
- arch/arm/mach-pxa/cm-x2xx-pci.c                 |    4 +-
- arch/arm/mach-pxa/lpd270.c                      |    6 +--
- arch/arm/mach-pxa/pcm990-baseboard.c            |    5 +-
- arch/arm/mach-pxa/viper.c                       |    8 ++-
- arch/arm/mach-pxa/zeus.c                        |    8 ++-
- arch/arm/mach-rpc/ecard.c                       |    2 +-
- arch/arm/mach-s3c24xx/bast-irq.c                |    3 +-
- arch/arm/mach-s3c64xx/common.c                  |    8 +--
- arch/arm/mach-sa1100/neponset.c                 |    2 +-
- arch/arm/plat-orion/gpio.c                      |    4 +-
- arch/avr32/mach-at32ap/extint.c                 |    2 +-
- arch/avr32/mach-at32ap/pio.c                    |    4 +-
- arch/blackfin/include/asm/irq_handler.h         |    4 +-
- arch/blackfin/kernel/ipipe.c                    |    4 +-
- arch/blackfin/mach-bf537/ints-priority.c        |    8 ++-
- arch/blackfin/mach-common/ints-priority.c       |    8 ++-
- arch/c6x/platforms/megamod-pic.c                |    9 ++--
- arch/m68k/amiga/amiints.c                       |    8 +--
- arch/m68k/coldfire/intc-5272.c                  |    4 +-
- arch/m68k/include/asm/irq.h                     |    3 +-
- arch/m68k/include/asm/mac_via.h                 |    2 +-
- arch/m68k/mac/baboon.c                          |    2 +-
- arch/m68k/mac/oss.c                             |    4 +-
- arch/m68k/mac/psc.c                             |    3 +-
- arch/m68k/mac/via.c                             |    6 +--
- arch/mips/alchemy/common/irq.c                  |    4 +-
- arch/mips/alchemy/devboards/bcsr.c              |    3 +-
- arch/mips/ath25/ar2315.c                        |    4 +-
- arch/mips/ath25/ar5312.c                        |    4 +-
- arch/mips/ath79/irq.c                           |   11 ++--
- arch/mips/cavium-octeon/octeon-irq.c            |   12 +++--
- arch/mips/include/asm/netlogic/common.h         |    4 +-
- arch/mips/jz4740/gpio.c                         |    2 +-
- arch/mips/netlogic/common/smp.c                 |    4 +-
- arch/mips/pci/pci-ar2315.c                      |    4 +-
- arch/mips/pci/pci-ar71xx.c                      |    4 +-
- arch/mips/pci/pci-ar724x.c                      |    4 +-
- arch/mips/pci/pci-rt3883.c                      |    8 ++-
- arch/mips/ralink/irq.c                          |    4 +-
- arch/powerpc/include/asm/qe_ic.h                |   23 ++++----
- arch/powerpc/include/asm/tsi108_pci.h           |    2 +-
- arch/powerpc/platforms/512x/mpc5121_ads_cpld.c  |    4 +-
- arch/powerpc/platforms/52xx/media5200.c         |    2 +-
- arch/powerpc/platforms/52xx/mpc52xx_gpt.c       |    4 +-
- arch/powerpc/platforms/82xx/pq2ads-pci-pic.c    |    2 +-
- arch/powerpc/platforms/85xx/common.c            |    2 +-
- arch/powerpc/platforms/85xx/mpc85xx_cds.c       |    5 +-
- arch/powerpc/platforms/85xx/mpc85xx_ds.c        |    2 +-
- arch/powerpc/platforms/85xx/socrates_fpga_pic.c |    4 +-
- arch/powerpc/platforms/86xx/pic.c               |    2 +-
- arch/powerpc/platforms/8xx/m8xx_setup.c         |    2 +-
- arch/powerpc/platforms/cell/axon_msi.c          |    4 +-
- arch/powerpc/platforms/cell/interrupt.c         |    3 +-
- arch/powerpc/platforms/cell/spider-pic.c        |    2 +-
- arch/powerpc/platforms/chrp/setup.c             |    2 +-
- arch/powerpc/platforms/embedded6xx/hlwd-pic.c   |    5 +-
- arch/powerpc/platforms/embedded6xx/mvme5100.c   |    2 +-
- arch/powerpc/platforms/pseries/setup.c          |    2 +-
- arch/powerpc/sysdev/ge/ge_pic.c                 |    2 +-
- arch/powerpc/sysdev/ge/ge_pic.h                 |    2 +-
- arch/powerpc/sysdev/mpic.c                      |    2 +-
- arch/powerpc/sysdev/qe_lib/qe_ic.c              |    4 +-
- arch/powerpc/sysdev/tsi108_pci.c                |    2 +-
- arch/powerpc/sysdev/uic.c                       |    4 +-
- arch/powerpc/sysdev/xics/xics-common.c          |    2 +-
- arch/powerpc/sysdev/xilinx_intc.c               |    2 +-
- arch/sh/boards/mach-se/7343/irq.c               |    4 +-
- arch/sh/boards/mach-se/7722/irq.c               |    4 +-
- arch/sh/boards/mach-se/7724/irq.c               |    4 +-
- arch/sh/boards/mach-x3proto/gpio.c              |    4 +-
- arch/sh/cchips/hd6446x/hd64461.c                |    2 +-
- arch/sparc/kernel/leon_kernel.c                 |    2 +-
- arch/sparc/kernel/leon_pci_grpci1.c             |    2 +-
- arch/sparc/kernel/leon_pci_grpci2.c             |    2 +-
- arch/tile/kernel/pci_gx.c                       |    4 +-
- arch/unicore32/kernel/irq.c                     |    5 +-
- arch/x86/kernel/irq_32.c                        |   13 +++--
- arch/x86/kernel/irq_64.c                        |    2 +-
- arch/x86/lguest/boot.c                          |    2 +-
- drivers/dma/ipu/ipu_irq.c                       |    8 +--
- drivers/gpio/gpio-altera.c                      |    6 +--
- drivers/gpio/gpio-bcm-kona.c                    |    4 +-
- drivers/gpio/gpio-davinci.c                     |    3 +-
- drivers/gpio/gpio-dwapb.c                       |    4 +-
- drivers/gpio/gpio-ep93xx.c                      |    5 +-
- drivers/gpio/gpio-intel-mid.c                   |    2 +-
- drivers/gpio/gpio-lynxpoint.c                   |    2 +-
- drivers/gpio/gpio-mpc8xxx.c                     |    2 +-
- drivers/gpio/gpio-msic.c                        |    2 +-
- drivers/gpio/gpio-msm-v2.c                      |    2 +-
- drivers/gpio/gpio-mvebu.c                       |    4 +-
- drivers/gpio/gpio-mxc.c                         |   10 ++--
- drivers/gpio/gpio-mxs.c                         |    4 +-
- drivers/gpio/gpio-omap.c                        |    4 +-
- drivers/gpio/gpio-pl061.c                       |    2 +-
- drivers/gpio/gpio-pxa.c                         |    2 +-
- drivers/gpio/gpio-sa1100.c                      |    5 +-
- drivers/gpio/gpio-tegra.c                       |    6 +--
- drivers/gpio/gpio-timberdale.c                  |    7 +--
- drivers/gpio/gpio-tz1090.c                      |    4 +-
- drivers/gpio/gpio-vf610.c                       |    4 +-
- drivers/gpio/gpio-zynq.c                        |    4 +-
- drivers/gpu/ipu-v3/ipu-common.c                 |    8 +--
- drivers/irqchip/exynos-combiner.c               |    8 +--
- drivers/irqchip/irq-armada-370-xp.c             |    5 +-
- drivers/irqchip/irq-bcm7038-l1.c                |    2 +-
- drivers/irqchip/irq-bcm7120-l2.c                |    2 +-
- drivers/irqchip/irq-brcmstb-l2.c                |    7 +--
- drivers/irqchip/irq-dw-apb-ictl.c               |    6 +--
- drivers/irqchip/irq-gic.c                       |    6 +--
- drivers/irqchip/irq-imgpdc.c                    |    5 +-
- drivers/irqchip/irq-keystone.c                  |    6 +--
- drivers/irqchip/irq-metag-ext.c                 |    3 +-
- drivers/irqchip/irq-metag.c                     |    3 +-
- drivers/irqchip/irq-mips-gic.c                  |    2 +-
- drivers/irqchip/irq-mmp.c                       |    3 +-
- drivers/irqchip/irq-orion.c                     |    4 +-
- drivers/irqchip/irq-s3c24xx.c                   |    6 +--
- drivers/irqchip/irq-sunxi-nmi.c                 |    4 +-
- drivers/irqchip/irq-tb10x.c                     |    4 +-
- drivers/irqchip/irq-versatile-fpga.c            |    6 +--
- drivers/irqchip/irq-vic.c                       |    2 +-
- drivers/irqchip/spear-shirq.c                   |    4 +-
- drivers/mfd/asic3.c                             |    2 +-
- drivers/mfd/ezx-pcap.c                          |    4 +-
- drivers/mfd/htc-egpio.c                         |    2 +-
- drivers/mfd/jz4740-adc.c                        |    2 +-
- drivers/mfd/max8997-irq.c                       |    8 +--
- drivers/mfd/mt6397-core.c                       |    8 +--
- drivers/mfd/pm8921-core.c                       |    2 +-
- drivers/mfd/t7l66xb.c                           |    4 +-
- drivers/mfd/tc6393xb.c                          |    4 +-
- drivers/mfd/twl6030-irq.c                       |    2 +-
- drivers/mfd/ucb1x00-core.c                      |    4 +-
- drivers/pci/host/pci-keystone-dw.c              |   15 +++---
- drivers/pci/host/pci-keystone.c                 |    7 +--
- drivers/pinctrl/bcm/pinctrl-cygnus-gpio.c       |    2 +-
- drivers/pinctrl/intel/pinctrl-baytrail.c        |    2 +-
- drivers/pinctrl/intel/pinctrl-cherryview.c      |    4 +-
- drivers/pinctrl/intel/pinctrl-intel.c           |    4 +-
- drivers/pinctrl/mediatek/pinctrl-mtk-common.c   |    6 +--
- drivers/pinctrl/nomadik/pinctrl-nomadik.c       |   14 +++--
- drivers/pinctrl/pinctrl-adi2.c                  |    3 +-
- drivers/pinctrl/pinctrl-amd.c                   |    8 +--
- drivers/pinctrl/pinctrl-at91.c                  |    4 +-
- drivers/pinctrl/pinctrl-coh901.c                |    7 +--
- drivers/pinctrl/pinctrl-rockchip.c              |    8 +--
- drivers/pinctrl/pinctrl-single.c                |    4 +-
- drivers/pinctrl/pinctrl-st.c                    |   10 ++--
- drivers/pinctrl/qcom/pinctrl-msm.c              |    6 +--
- drivers/pinctrl/samsung/pinctrl-exynos.c        |   12 ++---
- drivers/pinctrl/samsung/pinctrl-s3c24xx.c       |   26 ++++-----
- drivers/pinctrl/samsung/pinctrl-s3c64xx.c       |   32 ++++++-----
- drivers/pinctrl/sirf/pinctrl-sirf.c             |    7 +--
- drivers/pinctrl/spear/pinctrl-plgpio.c          |    2 +-
- drivers/pinctrl/sunxi/pinctrl-sunxi.c           |    7 +--
- drivers/sh/intc/core.c                          |    4 +-
- drivers/sh/intc/virq.c                          |   18 ++++---
- drivers/spmi/spmi-pmic-arb.c                    |    6 +--
- include/linux/irq.h                             |   20 ++++---
- include/linux/irqdesc.h                         |   12 +++--
- include/linux/irqhandler.h                      |    2 +-
- include/linux/irqnr.h                           |    6 ---
- kernel/irq/chip.c                               |   44 +++++++--------
- kernel/irq/handle.c                             |    8 +--
- kernel/irq/internals.h                          |   29 +++++-----
- kernel/irq/irqdesc.c                            |    6 +--
- kernel/irq/manage.c                             |   66 ++++++++++++-----------
- kernel/irq/pm.c                                 |   12 ++---
- kernel/irq/proc.c                               |   16 +++---
- kernel/irq/resend.c                             |    4 +-
- kernel/irq/spurious.c                           |   33 ++++++------
- 189 files changed, 543 insertions(+), 565 deletions(-)
-
+diff --git a/drivers/gpio/gpio-bcm-kona.c b/drivers/gpio/gpio-bcm-kona.c
+index b164ce837b43..2e7a8c66fe57 100644
+--- a/drivers/gpio/gpio-bcm-kona.c
++++ b/drivers/gpio/gpio-bcm-kona.c
+@@ -432,7 +432,7 @@ static void bcm_kona_gpio_irq_handler(unsigned int irq, struct irq_desc *desc)
+ 	void __iomem *reg_base;
+ 	int bit, bank_id;
+ 	unsigned long sta;
+-	struct bcm_kona_gpio_bank *bank = irq_get_handler_data(irq);
++	struct bcm_kona_gpio_bank *bank = irq_desc_get_handler_data(desc);
+ 	struct irq_chip *chip = irq_desc_get_chip(desc);
+ 
+ 	chained_irq_enter(chip, desc);
+diff --git a/drivers/gpio/gpio-dwapb.c b/drivers/gpio/gpio-dwapb.c
+index 58faf04fce5d..649be07a845d 100644
+--- a/drivers/gpio/gpio-dwapb.c
++++ b/drivers/gpio/gpio-dwapb.c
+@@ -149,7 +149,7 @@ static u32 dwapb_do_irq(struct dwapb_gpio *gpio)
+ 
+ static void dwapb_irq_handler(u32 irq, struct irq_desc *desc)
+ {
+-	struct dwapb_gpio *gpio = irq_get_handler_data(irq);
++	struct dwapb_gpio *gpio = irq_desc_get_handler_data(desc);
+ 	struct irq_chip *chip = irq_desc_get_chip(desc);
+ 
+ 	dwapb_do_irq(gpio);
+diff --git a/drivers/gpio/gpio-mvebu.c b/drivers/gpio/gpio-mvebu.c
+index 1a54205860f5..a8c302ef7bc4 100644
+--- a/drivers/gpio/gpio-mvebu.c
++++ b/drivers/gpio/gpio-mvebu.c
+@@ -460,7 +460,7 @@ static int mvebu_gpio_irq_set_type(struct irq_data *d, unsigned int type)
+ 
+ static void mvebu_gpio_irq_handler(unsigned int irq, struct irq_desc *desc)
+ {
+-	struct mvebu_gpio_chip *mvchip = irq_get_handler_data(irq);
++	struct mvebu_gpio_chip *mvchip = irq_desc_get_handler_data(desc);
+ 	struct irq_chip *chip = irq_desc_get_chip(desc);
+ 	u32 cause, type;
+ 	int i;
+diff --git a/drivers/gpio/gpio-mxc.c b/drivers/gpio/gpio-mxc.c
+index 9f7446a7ac64..f10948c04f7c 100644
+--- a/drivers/gpio/gpio-mxc.c
++++ b/drivers/gpio/gpio-mxc.c
+@@ -275,8 +275,8 @@ static void mxc_gpio_irq_handler(struct mxc_gpio_port *port, u32 irq_stat)
+ static void mx3_gpio_irq_handler(u32 irq, struct irq_desc *desc)
+ {
+ 	u32 irq_stat;
+-	struct mxc_gpio_port *port = irq_get_handler_data(irq);
+-	struct irq_chip *chip = irq_get_chip(irq);
++	struct mxc_gpio_port *port = irq_desc_get_handler_data(desc);
++	struct irq_chip *chip = irq_desc_get_chip(desc);
+ 
+ 	chained_irq_enter(chip, desc);
+ 
+@@ -292,7 +292,7 @@ static void mx2_gpio_irq_handler(u32 irq, struct irq_desc *desc)
+ {
+ 	u32 irq_msk, irq_stat;
+ 	struct mxc_gpio_port *port;
+-	struct irq_chip *chip = irq_get_chip(irq);
++	struct irq_chip *chip = irq_desc_get_chip(desc);
+ 
+ 	chained_irq_enter(chip, desc);
+ 
+diff --git a/drivers/gpio/gpio-mxs.c b/drivers/gpio/gpio-mxs.c
+index 84cbda6acdda..039c7d50e64f 100644
+--- a/drivers/gpio/gpio-mxs.c
++++ b/drivers/gpio/gpio-mxs.c
+@@ -157,7 +157,7 @@ static void mxs_flip_edge(struct mxs_gpio_port *port, u32 gpio)
+ static void mxs_gpio_irq_handler(u32 irq, struct irq_desc *desc)
+ {
+ 	u32 irq_stat;
+-	struct mxs_gpio_port *port = irq_get_handler_data(irq);
++	struct mxs_gpio_port *port = irq_desc_get_handler_data(desc);
+ 
+ 	desc->irq_data.chip->irq_ack(&desc->irq_data);
+ 
+diff --git a/drivers/gpio/gpio-omap.c b/drivers/gpio/gpio-omap.c
+index b232397ad7ec..acbf3feff1e2 100644
+--- a/drivers/gpio/gpio-omap.c
++++ b/drivers/gpio/gpio-omap.c
+@@ -719,7 +719,7 @@ static void omap_gpio_irq_handler(unsigned int irq, struct irq_desc *desc)
+ 	struct gpio_bank *bank;
+ 	int unmasked = 0;
+ 	struct irq_chip *irqchip = irq_desc_get_chip(desc);
+-	struct gpio_chip *chip = irq_get_handler_data(irq);
++	struct gpio_chip *chip = irq_desc_get_handler_data(desc);
+ 
+ 	chained_irq_enter(irqchip, desc);
+ 
+diff --git a/drivers/gpio/gpio-tegra.c b/drivers/gpio/gpio-tegra.c
+index 1741981d53c8..89ed8a56eb0b 100644
+--- a/drivers/gpio/gpio-tegra.c
++++ b/drivers/gpio/gpio-tegra.c
+@@ -268,16 +268,14 @@ static void tegra_gpio_irq_shutdown(struct irq_data *d)
+ 
+ static void tegra_gpio_irq_handler(unsigned int irq, struct irq_desc *desc)
+ {
+-	struct tegra_gpio_bank *bank;
+ 	int port;
+ 	int pin;
+ 	int unmasked = 0;
+ 	struct irq_chip *chip = irq_desc_get_chip(desc);
++	struct tegra_gpio_bank *bank = irq_desc_get_handler_data(desc);
+ 
+ 	chained_irq_enter(chip, desc);
+ 
+-	bank = irq_get_handler_data(irq);
+-
+ 	for (port = 0; port < 4; port++) {
+ 		int gpio = tegra_gpio_compose(bank->bank, port, 0);
+ 		unsigned long sta = tegra_gpio_readl(GPIO_INT_STA(gpio)) &
+diff --git a/drivers/gpio/gpio-timberdale.c b/drivers/gpio/gpio-timberdale.c
+index e8f97e03c9bb..2b8baf1ea16e 100644
+--- a/drivers/gpio/gpio-timberdale.c
++++ b/drivers/gpio/gpio-timberdale.c
+@@ -194,11 +194,12 @@ out:
+ 
+ static void timbgpio_irq(unsigned int irq, struct irq_desc *desc)
+ {
+-	struct timbgpio *tgpio = irq_get_handler_data(irq);
++	struct timbgpio *tgpio = irq_desc_get_handler_data(desc);
++	struct irq_data *data = irq_desc_get_irq_data(desc);
+ 	unsigned long ipr;
+ 	int offset;
+ 
+-	desc->irq_data.chip->irq_ack(irq_get_irq_data(irq));
++	data->chip->irq_ack(data);
+ 	ipr = ioread32(tgpio->membase + TGPIO_IPR);
+ 	iowrite32(ipr, tgpio->membase + TGPIO_ICR);
+ 
+diff --git a/drivers/gpio/gpio-vf610.c b/drivers/gpio/gpio-vf610.c
+index 7bd9f209ffa8..fa344388f4da 100644
+--- a/drivers/gpio/gpio-vf610.c
++++ b/drivers/gpio/gpio-vf610.c
+@@ -120,7 +120,7 @@ static int vf610_gpio_direction_output(struct gpio_chip *chip, unsigned gpio,
+ 
+ static void vf610_gpio_irq_handler(u32 irq, struct irq_desc *desc)
+ {
+-	struct vf610_gpio_port *port = irq_get_handler_data(irq);
++	struct vf610_gpio_port *port = irq_desc_get_handler_data(desc);
+ 	struct irq_chip *chip = irq_desc_get_chip(desc);
+ 	int pin;
+ 	unsigned long irq_isfr;
+diff --git a/drivers/gpio/gpio-zynq.c b/drivers/gpio/gpio-zynq.c
+index aea6075e5b2e..70e3a568b1cb 100644
+--- a/drivers/gpio/gpio-zynq.c
++++ b/drivers/gpio/gpio-zynq.c
+@@ -499,7 +499,7 @@ static void zynq_gpio_irqhandler(unsigned int irq, struct irq_desc *desc)
+ {
+ 	u32 int_sts, int_enb;
+ 	unsigned int bank_num;
+-	struct zynq_gpio *gpio = irq_get_handler_data(irq);
++	struct zynq_gpio *gpio = irq_desc_get_handler_data(desc);
+ 	struct irq_chip *irqchip = irq_desc_get_chip(desc);
+ 
+ 	chained_irq_enter(irqchip, desc);
 -- 
 1.7.10.4
