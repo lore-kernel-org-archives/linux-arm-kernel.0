@@ -1,60 +1,53 @@
-From: mathieu.poirier@linaro.org (Mathieu Poirier)
-Date: Thu, 4 Jun 2015 09:48:09 -0600
-Subject: [PATCH staging] drivers/hwtracing: fix coresight-replicator-qcom
- implicit <module.h> usage
-In-Reply-To: <1433364777-29651-1-git-send-email-paul.gortmaker@windriver.com>
-References: <1433364777-29651-1-git-send-email-paul.gortmaker@windriver.com>
-Message-ID: <CANLsYkxOjHh21RC7P83Co-V71-pd0M4kYDQWfEeC_fdaNfHjAA@mail.gmail.com>
+From: vinod.koul@intel.com (Vinod Koul)
+Date: Thu, 4 Jun 2015 21:22:01 +0530
+Subject: [PATCH 1/2] dmaengine: at_xdmac: lock fixes
+In-Reply-To: <20150604150946.GA17733@odux.rfo.atmel.com>
+References: <1433343154-5613-1-git-send-email-ludovic.desroches@atmel.com>
+ <20150604141938.GO3140@localhost>
+ <20150604150946.GA17733@odux.rfo.atmel.com>
+Message-ID: <20150604155201.GP3140@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 3 June 2015 at 14:52, Paul Gortmaker <paul.gortmaker@windriver.com> wrote:
-> In commit 620cf787c121f39b5223e43bad3d1b7c66ecead5 ("coresight: replicator:
-> Add Qualcomm CoreSight Replicator driver") this driver was added.
->
-> It uses module_amba_driver(replicator_driver) to register itself with
-> the system -- which is just an alias for module_driver.  This currently
-> works by relying on getting that via init.h but we are planning to move
-> that code[1] to module.h -- at which time this will fail to compile since
-> it does not include module.h currently, resulting in:
->
-> drivers/hwtracing/coresight/coresight-replicator-qcom.c:214:1: error: type defaults to 'int' in declaration of 'module_init' [-Werror=implicit-int]
-> drivers/hwtracing/coresight/coresight-replicator-qcom.c:214:1: error: type defaults to 'int' in declaration of 'module_exit' [-Werror=implicit-int]
->
-> In the future, the amba support may want to create another alias that
-> uses builtin_driver[2] for cases like this which are using bool Kconfig
-> triggers, but for now we just fix the implicit include.
->
-> [1] https://lkml.kernel.org/r/1433276168-21550-1-git-send-email-paul.gortmaker at windriver.com
-> [2] https://lkml.kernel.org/r/1431287385-1526-1-git-send-email-paul.gortmaker at windriver.com
->
-> Cc: Pratik Patel <pratikp@codeaurora.org>
-> Cc: Ivan T. Ivanov <ivan.ivanov@linaro.org>
-> Cc: Mathieu Poirier <mathieu.poirier@linaro.org>
-> Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-> Signed-off-by: Paul Gortmaker <paul.gortmaker@windriver.com>
-> ---
->
-> [Note: Commit 620cf787c121 is only in linux-next trees via staging-next;
->  this fixes a next build fail when staging-next is merged with [1] above.]
->
->  drivers/hwtracing/coresight/coresight-replicator-qcom.c | 1 +
->  1 file changed, 1 insertion(+)
->
-> diff --git a/drivers/hwtracing/coresight/coresight-replicator-qcom.c b/drivers/hwtracing/coresight/coresight-replicator-qcom.c
-> index deacea49af36..584059e9e866 100644
-> --- a/drivers/hwtracing/coresight/coresight-replicator-qcom.c
-> +++ b/drivers/hwtracing/coresight/coresight-replicator-qcom.c
-> @@ -15,6 +15,7 @@
->  #include <linux/clk.h>
->  #include <linux/coresight.h>
->  #include <linux/device.h>
-> +#include <linux/module.h>
->  #include <linux/err.h>
->  #include <linux/init.h>
->  #include <linux/io.h>
-> --
-> 2.2.1
->
+On Thu, Jun 04, 2015 at 05:09:46PM +0200, Ludovic Desroches wrote:
+> > > @@ -591,11 +592,13 @@ at_xdmac_prep_slave_sg(struct dma_chan *chan, struct scatterlist *sgl,
+> > >  		       unsigned int sg_len, enum dma_transfer_direction direction,
+> > >  		       unsigned long flags, void *context)
+> > >  {
+> > > -	struct at_xdmac_chan	*atchan = to_at_xdmac_chan(chan);
+> > > -	struct at_xdmac_desc	*first = NULL, *prev = NULL;
+> > > -	struct scatterlist	*sg;
+> > > -	int			i;
+> > > -	unsigned int		xfer_size = 0;
+> > > +	struct at_xdmac_chan		*atchan = to_at_xdmac_chan(chan);
+> > > +	struct at_xdmac_desc		*first = NULL, *prev = NULL;
+> > > +	struct scatterlist		*sg;
+> > > +	int				i;
+> > > +	unsigned int			xfer_size = 0;
+> > > +	unsigned long			irqflags;
+> > > +	struct dma_async_tx_descriptor	*ret = NULL;
+> > This doesnt comply with stable rules, and you should not keep this in fixes
+> > either :(
+> > 
+> >   - It cannot contain any "trivial" fixes in it (spelling changes,
+> >     whitespace cleanups, etc).
+> 
+> Ok I understand, so what is the way to manage this case? I did
+> "whitespace cleanup" because of
+> +   struct dma_async_tx_descriptor  *ret = NULL;
+> which breaks previous indentation, so in my mind it was not cleanup.
+> 
+> Do I need to send you a patch to correct identation due to this fix or to send
+> a specific patch for stable without identation change?
+I think only adding the last line should do, in whatever indentation you
+prefer
 
-Acked-by: Mathieu Poirier <mathieu.poirier@linaro.org>
+Later on if you want to align them to whatever alignment you prefer send a
+follow on patch
+
+Also on 2nd patch, it looks good, but was wondering if you could split it
+up. This will help folks backporting the changes to stable as well
+
+Thanks
+-- 
+~Vinod
