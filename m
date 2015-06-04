@@ -1,82 +1,54 @@
 From: marex@denx.de (Marek Vasut)
-Date: Thu, 4 Jun 2015 17:15:12 +0200
-Subject: [PATCH 08/11] MTD: m25p80: Add option to limit SPI transfer size.
-In-Reply-To: <CAOMqctQeg0Sj1pGOQsK1nNB6=-H9koH_5nrXYBq_NKeVt369dw@mail.gmail.com>
+Date: Thu, 4 Jun 2015 17:20:54 +0200
+Subject: [PATCH 11/11] dt: Exynos: add Snow SPI NOR node.
+In-Reply-To: <556FB222.2070406@samsung.com>
 References: <cover.1433364398.git.hramrach@gmail.com>
- <201506040103.09555.marex@denx.de>
- <CAOMqctQeg0Sj1pGOQsK1nNB6=-H9koH_5nrXYBq_NKeVt369dw@mail.gmail.com>
-Message-ID: <201506041715.12904.marex@denx.de>
+ <3234c12c90eabbeeb6d33604a324231937e309ec.1433364398.git.hramrach@gmail.com>
+ <556FB222.2070406@samsung.com>
+Message-ID: <201506041720.54666.marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday, June 04, 2015 at 06:31:45 AM, Michal Suchanek wrote:
-> On 4 June 2015 at 01:03, Marek Vasut <marex@denx.de> wrote:
-> > On Wednesday, June 03, 2015 at 11:26:41 PM, Michal Suchanek wrote:
-> >> On sunxi the SPI controller currently does not have DMA support and
-> >> fails any transfer larger than 63 bytes.
-> >> 
-> >> On Exynos the pl330 DMA controller fails any transfer larger than 64kb
-> >> when using slower speed like 40MHz and any transfer larger than 128bytes
-> >> when running at 133MHz.
+On Thursday, June 04, 2015 at 04:04:18 AM, Krzysztof Kozlowski wrote:
+> On 04.06.2015 06:26, Michal Suchanek wrote:
+> > The Snow has onboard SPI NOR flash which contains the bootloader.
 > > 
-> > This smells more like some corruption of the data on the bus or something
-> > even more obscure.
-> 
-> If the data was corrupted you would get corrupted data and not
-> transfer failure. AFAIK there is no checksum or anything. I actually
-> do get corrupted data when I use wrong feedback delay setting.
-
-OK
-
-> >> The best thing is that in both cases the controller can just lock up and
-> >> never finish potentially leaving the hardware in unusable state.
-
-[...]
-
-> >> --- a/Documentation/devicetree/bindings/mtd/jedec,spi-nor.txt
-> >> +++ b/Documentation/devicetree/bindings/mtd/jedec,spi-nor.txt
-> >> 
-> >> @@ -19,6 +19,12 @@ Optional properties:
-> >>                     all chips and support for it can not be detected at
-> >> 
-> >> runtime. Refer to your chips' datasheet to check if this is supported by
-> >> your chip.
-> >> +- linux,max_tx_len : With some SPI controller drivers possible transfer
-> >> size is +                     limited. This may be hardware or driver
-> >> bug. +                     Transfer data in chunks no larger than this
-> >> value. +
-> >> 
-> >>                     Using this option may severely degrade performance
-> >>                     and
-> >> 
-> >> +                     possibly flash memory life when max_tx_len is
-> >> smaller than +                     flash page size (typically 256 bytes)
+> > Add DT node for this flash chip. The flash is rated 133MHz but the pl330
+> > controller can transfer only up to 128 bytes at this speed so use more
+> > conservative settings. Even at 40MHz pl330 can transfer at most 64k with
+> > the current driver.
 > > 
-> > Will we need similar patch for all other SPI slave drivers, like SPI NAND
-> > ?
+> > Signed-off-by: Michal Suchanek <hramrach@gmail.com>
+> > ---
+> > 
+> >  arch/arm/boot/dts/exynos5250-snow.dts | 12 ++++++++++++
+> >  1 file changed, 12 insertions(+)
+> > 
+> > diff --git a/arch/arm/boot/dts/exynos5250-snow.dts
+> > b/arch/arm/boot/dts/exynos5250-snow.dts index 1fa72cf..38e4cda 100644
+> > --- a/arch/arm/boot/dts/exynos5250-snow.dts
+> > +++ b/arch/arm/boot/dts/exynos5250-snow.dts
+> > @@ -691,6 +691,18 @@
+> > 
+> >  	num-cs = <1>;
+> >  	cs-gpios = <&gpa2 5 0>;
+> >  	status = "okay";
+> > 
+> > +		flash: m25p80 at 0 {
 > 
-> Probably. Some SPI slave drivers already do have similar option.
+> The indentation looks odd. This should be at the same level as "status".
+> 
+> > +			#address-cells = <1>;
+> > +			#size-cells = <1>;
+> > +			compatible = "jedec,spi-nor";
+> > +			reg = <0>;
+> > +			spi-max-frequency = <40000000>;
+> 
+> So actually you wanted 133 MHz but as a workaround for DMA issue you use
+> 40 MHz, right? Could you add here a small TODO note in comment about it?
 
-So the SPI device drivers are implementing workarounds for buggy SPI hosts,
-even if those SPI devices themselves don't suffer from such limitations. Yes,
-this seems like the seriously wrong thing to do.
-
-> In general it cannot be expected that you can reliably transfer
-> arbitrarily large data over SPI it seems.
-
-This is what should be expected because this is how the bus is supposed
-to work in fact. You can transfer an arbitrary amount of data over SPI
-bus.
-
-If some driver has a limitation, it's that (bus, dma) driver which needs
-to implement a fix or a workaround.
-
-> However, if the nand driver transfers data a page at a time it should
-> be fine.
-
-... until someone issues multi-block read, in which case it all falls
-down like a house of cards. It is impossible to build a reliable system
-on "should" and similar assumptions ; the driver must be solid.
+I disagree. There is a problem, the problem should actually be analyzed and 
+fixed, not just postponed with some TODO nonsense.
 
 Best regards,
 Marek Vasut
