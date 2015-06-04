@@ -1,127 +1,40 @@
 From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Thu, 4 Jun 2015 10:01:42 +0200
-Subject: [PATCH v2 16/16] ARM: at91/dt: Add Acme Arietta G25
-In-Reply-To: <1433334258-14741-17-git-send-email-alexandre.belloni@free-electrons.com>
-References: <1433334258-14741-1-git-send-email-alexandre.belloni@free-electrons.com>
- <1433334258-14741-17-git-send-email-alexandre.belloni@free-electrons.com>
-Message-ID: <557005E6.3090403@atmel.com>
+Date: Thu, 4 Jun 2015 10:02:41 +0200
+Subject: [PATCH] ARM: at91/dts: kizbox: fix mismatch LED PWM device
+In-Reply-To: <1433324663-20208-1-git-send-email-g.portay@overkiz.com>
+References: <1433324663-20208-1-git-send-email-g.portay@overkiz.com>
+Message-ID: <55700621.4080900@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le 03/06/2015 14:24, Alexandre Belloni a ?crit :
-> Add a minimum Device Tree for Acme Arietta G25.
-> http://acme.systems/arietta
+Le 03/06/2015 11:44, Ga?l PORTAY a ?crit :
+> The network_red LED uses the 4th PWM device.
 > 
-> Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
-> Cc: Sergio Tanzilli <tanzilli@acmesystems.it>
+> Signed-off-by: Ga?l PORTAY <g.portay@overkiz.com>
 
-BTW Sergio, can I add your "Acked-by" tag?
+Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+
+And stacked on at91-4.2-dt.
 
 Bye,
 
 > ---
->  arch/arm/boot/dts/Makefile            |  1 +
->  arch/arm/boot/dts/at91-ariettag25.dts | 79 +++++++++++++++++++++++++++++++++++
->  2 files changed, 80 insertions(+)
->  create mode 100644 arch/arm/boot/dts/at91-ariettag25.dts
+>  arch/arm/boot/dts/at91-kizbox.dts | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
 > 
-> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-> index 8c3da289a00b..b224a3a56f09 100644
-> --- a/arch/arm/boot/dts/Makefile
-> +++ b/arch/arm/boot/dts/Makefile
-> @@ -31,6 +31,7 @@ dtb-$(CONFIG_SOC_SAM_V4_V5) += \
->  	at91sam9n12ek.dtb \
->  	at91sam9rlek.dtb \
->  	at91-ariag25.dtb \
-> +	at91-ariettag25.dtb \
->  	at91-cosino_mega2560.dtb \
->  	at91-kizboxmini.dtb \
->  	at91sam9g15ek.dtb \
-> diff --git a/arch/arm/boot/dts/at91-ariettag25.dts b/arch/arm/boot/dts/at91-ariettag25.dts
-> new file mode 100644
-> index 000000000000..c514502081d2
-> --- /dev/null
-> +++ b/arch/arm/boot/dts/at91-ariettag25.dts
-> @@ -0,0 +1,79 @@
-> +/*
-> + * Device Tree file for Arietta G25
-> + * This device tree is minimal, to activate more peripherals, see:
-> + * http://dts.acmesystems.it/arietta/
-> + */
-> +/dts-v1/;
-> +#include "at91sam9g25.dtsi"
-> +/ {
-> +	model = "Acme Systems Arietta G25";
-> +	compatible = "acme,ariettag25", "atmel,at91sam9x5", "atmel,at91sam9";
-> +
-> +	aliases {
-> +		serial0 = &dbgu;
-> +	};
-> +
-> +	chosen {
-> +		stdout-path = "serial0:115200n8";
-> +	};
-> +
-> +	memory {
-> +		reg = <0x20000000 0x8000000>;
-> +	};
-> +
-> +	clocks {
-> +		slow_xtal {
-> +			clock-frequency = <32768>;
-> +		};
-> +
-> +		main_xtal {
-> +			clock-frequency = <12000000>;
-> +		};
-> +	};
-> +
-> +	ahb {
-> +		apb {
-> +			mmc0: mmc at f0008000 {
-> +				pinctrl-0 = <
-> +				  &pinctrl_mmc0_slot0_clk_cmd_dat0
-> +				  &pinctrl_mmc0_slot0_dat1_3>;
-> +				status = "okay";
-> +
-> +				slot at 0 {
-> +					reg = <0>;
-> +					bus-width = <4>;
-> +				};
-> +			};
-> +
-> +			usb2: gadget at f803c000 {
-> +				status = "okay";
-> +			};
-> +
-> +			dbgu: serial at fffff200 {
-> +				status = "okay";
-> +			};
-> +
-> +			rtc at fffffeb0 {
-> +				status = "okay";
-> +			};
-> +		};
-> +
-> +		usb0: ohci at 00600000 {
-> +			status = "okay";
-> +			num-ports = <3>;
-> +		};
-> +
-> +		usb1: ehci at 00700000 {
-> +			status = "okay";
-> +		};
-> +	};
-> +
-> +	leds {
-> +		compatible = "gpio-leds";
-> +		arietta_led {
-> +			label = "arietta_led";
-> +			gpios = <&pioB 8 GPIO_ACTIVE_HIGH>; /* PB8 */
-> +			linux,default-trigger = "heartbeat";
-> +		};
-> +	};
-> +};
+> diff --git a/arch/arm/boot/dts/at91-kizbox.dts b/arch/arm/boot/dts/at91-kizbox.dts
+> index a0e63ff..cf1628f 100644
+> --- a/arch/arm/boot/dts/at91-kizbox.dts
+> +++ b/arch/arm/boot/dts/at91-kizbox.dts
+> @@ -205,7 +205,7 @@
+>  
+>  		network_red {
+>  			label = "pwm:red:network";
+> -			pwms = <&tcb_pwm 3 10000000 PWM_POLARITY_INVERTED>;
+> +			pwms = <&tcb_pwm 4 10000000 PWM_POLARITY_INVERTED>;
+>  			max-brightness = <255>;
+>  			linux,default-trigger = "default-on";
+>  		};
 > 
 
 
