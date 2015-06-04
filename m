@@ -1,78 +1,49 @@
-From: manabian@gmail.com (Joachim Eastwood)
-Date: Thu, 4 Jun 2015 17:58:07 +0200
-Subject: [PATCH v2 1/2] mtd: spi-nor: add driver for NXP SPI Flash
- Interface (SPIFI)
-In-Reply-To: <5570692E.2050603@vanguardiasur.com.ar>
-References: <1433106362-6032-1-git-send-email-manabian@gmail.com>
- <1433106362-6032-2-git-send-email-manabian@gmail.com>
- <5570692E.2050603@vanguardiasur.com.ar>
-Message-ID: <CAGhQ9VzU+J1ZT45e-yZ+BAmyZvLUm1cyXE2T__O_4gGjtHrX-w@mail.gmail.com>
+From: lina.iyer@linaro.org (Lina Iyer)
+Date: Thu, 4 Jun 2015 10:15:10 -0600
+Subject: [PATCH v2 2/2] soc: qcom: spm: Fix idle on THUMB2 kernels
+In-Reply-To: <1433272378-8470-3-git-send-email-sboyd@codeaurora.org>
+References: <1433272378-8470-1-git-send-email-sboyd@codeaurora.org>
+ <1433272378-8470-3-git-send-email-sboyd@codeaurora.org>
+Message-ID: <20150604161510.GS32700@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 4 June 2015 at 17:05, Ezequiel Garcia <ezequiel@vanguardiasur.com.ar> wrote:
-> Joachim,
+On Tue, Jun 02 2015 at 13:13 -0600, Stephen Boyd wrote:
+>The ifc6410 firmware always enters the kernel in ARM state from
+>deep idle. Use the cpu_resume_arm() wrapper instead of
+>cpu_resume() to property switch into the THUMB2 state when we
+>wake up from idle.
 >
-> I tested the driver and found an issue with it.
+>This fixes a problem reported by Kevin Hilman on next-20150601
+>where the ifc6410 fails to boot a THUMB2 kernel because the
+>platform's firmware always enters the kernel in ARM mode from
+>deep idle states.
 >
-> On 05/31/2015 06:06 PM, Joachim Eastwood wrote:
->> +
->> +     spifi->mtd.priv  = &spifi->nor;
->> +     spifi->nor.mtd   = &spifi->mtd;
->> +     spifi->nor.dev   = spifi->dev;
->> +     spifi->nor.priv  = spifi;
->> +     spifi->nor.read  = nxp_spifi_read;
->> +     spifi->nor.write = nxp_spifi_write;
->> +     spifi->nor.erase = nxp_spifi_erase;
->> +     spifi->nor.read_reg  = nxp_spifi_read_reg;
->> +     spifi->nor.write_reg = nxp_spifi_write_reg;
->> +
->> +     ret = of_modalias_node(np, modalias, sizeof(modalias));
->> +     if (ret < 0) {
->> +             dev_err(spifi->dev, "unable to get device modalias\n");
->> +             return ret;
->> +     }
->> +
->> +     /*
->> +      * The first read on a hard reset isn't reliable so do a
->> +      * dummy read of the id before calling spi_nor_scan().
->> +      * The reason for this problem is unknown.
->> +      *
->> +      * The official NXP spifilib uses more or less the same
->> +      * workaround that is applied here by reading the device
->> +      * id multiple times.
->> +      */
->> +     nxp_spifi_dummy_id_read(&spifi->nor);
->> +
+>Reported-by: Kevin Hilman <khilman@linaro.org>
+>Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+>Cc: Lina Iyer <lina.iyer@linaro.org>
+>Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+
+Reviewd-by: Lina Iyer <lina.iyer@linaro.org>
+
+>---
+> drivers/soc/qcom/spm.c | 2 +-
+> 1 file changed, 1 insertion(+), 1 deletion(-)
 >
-> Actually, I think there's an issue here. See how m25p80 deals
-> with modalias:
+>diff --git a/drivers/soc/qcom/spm.c b/drivers/soc/qcom/spm.c
+>index b562af816c0a..b04b05a0904e 100644
+>--- a/drivers/soc/qcom/spm.c
+>+++ b/drivers/soc/qcom/spm.c
+>@@ -260,7 +260,7 @@ static int __init qcom_cpuidle_init(struct device_node *cpu_node, int cpu)
+> 		/* We have atleast one power down mode */
+> 		cpumask_clear(&mask);
+> 		cpumask_set_cpu(cpu, &mask);
+>-		qcom_scm_set_warm_boot_addr(cpu_resume, &mask);
+>+		qcom_scm_set_warm_boot_addr(cpu_resume_arm, &mask);
+> 	}
 >
->         [..]
->         else if (!strcmp(spi->modalias, "spi-nor"))
->                 flash_name = NULL; /* auto-detect */
->         else
->                 flash_name = spi->modalias;
+> 	per_cpu(qcom_idle_ops, cpu) = fns;
+>-- 
+>The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+>a Linux Foundation Collaborative Project
 >
->         ret = spi_nor_scan(nor, flash_name, mode);
->         if (ret)
->                 return ret;
->
-> I think the "auto-detect" quirk is really needed, or you are will
-> otherwise fail to probe with the generic "jedec,spi-nor" compatible
-> string.
-
-I see.
-
-Seem easy enough to fix. I'll send out new version after doing some
-more tests here.
-
-Note that this code was copied from fsl-quadspi so I assume it has the
-same problem.
-
-
-Thanks for testing and catching the issue, Ezequiel.
-
-
-regards,
-Joachim Eastwood
