@@ -1,76 +1,292 @@
-From: lina.iyer@linaro.org (Lina Iyer)
-Date: Thu, 4 Jun 2015 10:49:14 -0600
-Subject: [GIT PULL] qcom SoC changes for 4.2-1
-In-Reply-To: <20150601191352.GI32700@linaro.org>
-References: <alpine.DEB.2.02.1505261449220.26936@galak-ubuntu.qualcomm.com>
- <alpine.DEB.2.02.1505281055020.17861@galak-ubuntu.qualcomm.com>
- <2248044.jBzoST62A5@wuerfel> <3126465.IVbQcV0VyT@wuerfel>
- <289B1418-D152-4456-8492-5A106363D92E@codeaurora.org>
- <20150601191352.GI32700@linaro.org>
-Message-ID: <20150604164914.GT32700@linaro.org>
+From: grygorii.strashko@linaro.org (Grygorii.Strashko@linaro.org)
+Date: Thu, 04 Jun 2015 19:51:28 +0300
+Subject: [PATCH 00/21] On-demand device registration
+In-Reply-To: <CAAObsKAFQrm-maqzadCELi2JVt5jd+yoqCbDpu5OP7gkSk8gcA@mail.gmail.com>
+References: <1432565608-26036-1-git-send-email-tomeu.vizoso@collabora.com>
+ <CAL_Jsq+EWLEJhRudTGAwYsOg4tX2-pGhygeQGHae9RL8rBpMiA@mail.gmail.com>
+ <556F5C24.1030101@linaro.org>
+ <CAAObsKAFQrm-maqzadCELi2JVt5jd+yoqCbDpu5OP7gkSk8gcA@mail.gmail.com>
+Message-ID: <55708210.7070007@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 01 2015 at 13:13 -0600, Lina Iyer wrote:
->On Mon, Jun 01 2015 at 13:04 -0600, Kumar Gala wrote:
->>
->>>On Jun 1, 2015, at 1:35 PM, Arnd Bergmann <arnd@arndb.de> wrote:
->>>
->>>On Friday 29 May 2015 14:42:01 Arnd Bergmann wrote:
->>>>On Thursday 28 May 2015 10:55:39 Kumar Gala wrote:
->>>>>Qualcomm ARM Based SoC Updates for v4.2-1
->>>>>
->>>>>* Added Subsystem Power Manager (SPM) driver
->>>>>* Split out 32-bit specific SCM code
->>>>>* Added HDCP SCM call
->>>>>
->>>>>
+On 06/04/2015 11:39 AM, Tomeu Vizoso wrote:
+> On 3 June 2015 at 21:57, Grygorii.Strashko at linaro.org
+> <grygorii.strashko@linaro.org> wrote:
+>> On 05/28/2015 07:33 AM, Rob Herring wrote:
+>>> On Mon, May 25, 2015 at 9:53 AM, Tomeu Vizoso <tomeu.vizoso@collabora.com> wrote:
+>>>> I have a problem with the panel on my Tegra Chromebook taking longer than
+>>>> expected to be ready during boot (St?phane Marchesin reported what is
+>>>> basically the same issue in [0]), and have looked into ordered probing as a
+>>>> better way of solving this than moving nodes around in the DT or playing with
+>>>> initcall levels.
 >>>>
->>>>Pulled into next/drivers, thanks!
+>>>> While reading the thread [1] that Alexander Holler started with his series to
+>>>> make probing order deterministic, it occurred to me that it should be possible
+>>>> to achieve the same by registering devices as they are referenced by other
+>>>> devices.
+>>>
+>>> I like the concept and novel approach.
+>>>
+>>>> This basically reuses the information that is already implicit in the probe()
+>>>> implementations, saving us from refactoring existing drivers or adding
+>>>> information to DTBs.
 >>>>
+>>>> Something I'm not completely happy with is that I have had to move the call to
+>>>> of_platform_populate after all platform drivers have been registered.
+>>>> Otherwise I don't see how I could register drivers on demand as we don't have
+>>>> yet each driver's compatible strings.
 >>>
->>>I've had to apply this patch on top of our for-next branch to make it
->>>build for randconfig.
+>>> Yeah, this is the opposite of what we'd really like. Ideally, we would
+>>> have a solution that works for modules too. However, we're no worse
+>>> off. We pretty much build-in dependencies to avoid module ordering
+>>> problems.
 >>>
->>>Can you check that this makes sense?
+>>> Perhaps we need to make the probing on-demand rather than simply on
+>>> device<->driver match occurring.
 >>>
->>>	Arnd
+>>>> For machs that don't move of_platform_populate() to a later point, these
+>>>> patches shouldn't cause any problems but it's not guaranteed that we'll avoid
+>>>> all the deferred probes as some drivers may not be registered yet.
+>>>
+>>> Ideally, of_platform_populate is not explicitly called by each
+>>> platform. So I think we need to make this work for the default case.
+>>>
+>>>> I have tested this on boards with Tegra, iMX.6 and Exynos SoCs, and these
+>>>> patches were enough to eliminate all the deferred probes.
+>>>>
+>>>> With this series I get the kernel to output to the panel in 0.5s, instead of 2.8s.
+>>>
+>>> That's certainly compelling.
 >>
->>The QCOM_SCM makes sense, Lina can comment on the ARM_CPU_SUSPEND bit, but seems reasonable to me.
->>
->Make sense to have both the selects below.
->
->I will test it and report.
->
-I dont see a problem with these changes.
+>> I've found your idea about moving device registration later during System boot
+>> very interesting so I've decided to try it on dra7-evem (TI) :).
+>> It's good to know time during Kernel boot when we can assume that all drivers are
+>> ready for probing, so there are more ways to control probing order.
+> 
+> Thanks, though right now I'm following Rob's suggestion and only delay
+> probing, not registration. The patch is really simple (applies on
+> linux-next, with async probing):
+> 
+> diff --git a/drivers/base/dd.c b/drivers/base/dd.c
+> index 8da8e07..7e6b1e1 100644
+> --- a/drivers/base/dd.c
+> +++ b/drivers/base/dd.c
+> @@ -407,6 +407,11 @@ int driver_probe_device(struct device_driver
+> *drv, struct device *dev)
+>          if (!device_is_registered(dev))
+>                  return -ENODEV;
+> 
+> +       if (!driver_deferred_probe_enable) {
+> +               driver_deferred_probe_add(dev);
+> +               return 0;
+> +       }
+> +
+>          pr_debug("bus: '%s': %s: matched device %s with driver %s\n",
+>                   drv->bus->name, __func__, dev_name(dev), drv->name);
+> 
+> @@ -585,7 +590,7 @@ EXPORT_SYMBOL_GPL(device_attach);
+> 
+>   void device_initial_probe(struct device *dev)
+>   {
+> -       __device_attach(dev, true);
+> +       __device_attach(dev, driver_deferred_probe_enable);
+>   }
+> 
+>   static int __driver_attach(struct device *dev, void *data)
 
->Thanks,
->Lina
->
->>- k
+Can't boot my 3.14 kernel with this change :( Most probably,
+the problem is related to platform_driver_probe() usage :(
+Have no time to play with it now :(, but recommend you to check also
+earlyprintk, last log message I can see:
+[    1.435522] bootconsole [earlycon0] disabled
+
+But, nice try ;) Seems -EPROBE_DEFER is reality of life which
+has to be accepted as is.
+
+> 
+>> Pls, Note here that TI OMAP2+ mach is not pure DT mach - it's combination of
+>> DT and not DT devices/drivers.
 >>
->>>
->>>diff --git a/drivers/soc/qcom/Kconfig b/drivers/soc/qcom/Kconfig
->>>index 5eea374c8fa6..01aa2fd3514d 100644
->>>--- a/drivers/soc/qcom/Kconfig
->>>+++ b/drivers/soc/qcom/Kconfig
->>>@@ -13,6 +13,8 @@ config QCOM_GSBI
->>>config QCOM_PM
->>>	bool "Qualcomm Power Management"
->>>	depends on ARCH_QCOM && !ARM64
->>>+	select QCOM_SCM
->>>+	select ARM_CPU_SUSPEND
->>>	help
->>>	  QCOM Platform specific power driver to manage cores and L2 low power
->>>	  modes. It interface with various system drivers to put the cores in
->>>
->>>--
->>>To unsubscribe from this list: send the line "unsubscribe linux-arm-msm" in
->>>the body of a message to majordomo at vger.kernel.org
->>>More majordomo info at  http://vger.kernel.org/majordomo-info.html
+>> Ok. So What was done...
 >>
->>-- 
->>Qualcomm Innovation Center, Inc.
->>The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
->>a Linux Foundation Collaborative Project
+>> LKML Linux 4.1-rc3 (a simple case)
+>> 1) use your patches 3/4 as reference (only these two patches :)
+>> 2) move of_platform_populate later at device_initcall_sync time
+>> Boot time reduction ~0.4 sec
+> 
+> I'm a bit surprised at such a big improvement. May I ask how you are
+> measuring it?
+
+Ah. My measurements are not precise. I've just tracking time of message
+"[    4.110756] Freeing unused kernel memory: 344K (c0994000 - c09ea000)"
+
+> 
+>> TI Android Kernel 3.14 (NOT a simple case)
+>> 1) use your patches 3/4 as reference (only these two patches :)
+>> 2) move of_platform_populate later at device_initcall_sync time
+>> 3) make it to boot (not sure I've fixed all issues, but those which
+>>     break the System boot):
+>>   - split non-DT and DT devices registration in platform code;
+>>   - keep non-DT devices registration from .init_machine() [arch_initcall]
+>>   - move DT-devices registration at device_initcall_sync time
+>>   - fix drivers which use platform_driver_probe().
+>>     Note. Now there are at about ~190 occurrences of this macro in Kernel.
+>>   - re-order few devices in DT (4 devices)
+>>   - fix one driver which uses of_find_device_by_node() wrongly
+>>     Note. This API is used some times with assumption that
+>>     requested dev has been probed already.
+>> Boot time reduction ~0.3 sec. Probing of some devices are still deferred.
+> 
+> I got no deferred probes on a pandaboard with just these changes:
+> 
+> https://git.collabora.com/cgit/user/tomeu/linux.git/commit/?id=1586c6f50b3d3c65dc219a3cdc3327d798cabca6
+
+As I've mentioned I tried TI Android Kernel 3.14 where all DRA7 SoC features are enabled.
+It is very close to production SW. LKML, by default, enables
+mostly nothing and not all features are supported. 
+In my prev exercise I was able to boot till Android GUI and it has worked :)
+
+Also, cool statistic - really_probe() was called 136 times for me
+(successful execution of dev->bus->probe() and drv->probe()).
+
+> 
+>> TI Android Kernel 3.14 + of_platform_device_ensure
+>> 1) backport of_platform_device_ensure() (also need patches
+>>     "of: Introduce device tree node flag helpers" and
+>>     "of: Keep track of populated platform devices")
+>> 2) back-port all your patches which uses of_platform_device_ensure()
+>> 3) make it to boot:
+>>     - drop patch dma: of: Probe DMA controllers on demand
+>>     - fix deadlock in regulator core:
+>>     regulator_dev_lookup() called from regulator_register() in K3.14
+>> 4) get rid of deferred probes - add of_platform_device_ensure() calls in:
+>>     - drivers/video/fbdev/omap2/dss/output.c
+>>     - drivers/extcon/extcon-class.c
 >>
+>>   Boot time reduction: NONE !?
+>>
+>> So few comments from above:
+>> - registering devices later during the System boot may improve boot time.
+>>    But resolving of all deferred probes may NOT improve boot time ;)
+>>    Have you seen smth like this?
+> 
+> Yeah, I don't really expect for on-demand probing to improve boot time
+> much in the general case, as drivers tend to first acquire resources
+> (and defer probe if needed) and only then access hardware and wait for
+> stuff to happen.
+> 
+> The main advantage of ordered/ondemand probing is that it is much
+> easier to see the order in which devices will be bound. In my case
+> this is useful because one could get one device (eg. the drm panel) to
+> probe very early by just moving that node to the beginning of the DT.
+> With deferred probe, one would have to figure out all the dependencies
+> and shuffle them around in the DT.
+> 
+> Another advantage (but not the one why I'm doing this work) is that in
+> general a driver's probe will be called only once per device, and if
+> it fails then we can be almost certain that something is wrong. This
+> should aid in debugging as right now one has to take into account the
+> several reasons why a device might defer its probe.
+> 
+> Depending on what work your drivers do in your platform, enabling
+> async probing for all of them may have a noticeable impact though.
+> 
+>> - usage of of_platform_device_ensure() will require continuous fixing of Kernel :(
+> 
+> You mean adding those calls to more subsystems?
+
+Exactly. Each time new framework will be introduced or reworked (or even for some drivers),
+because each of them implement its own of_get_xxx() API. 
+
+> 
+>> - late_initcall is not (as for me not safe) a good time to register devices. A lot
+>>    of platforms/subsystems/frameworks perform their final initialization or clean-up
+>>    steps, with assumption that System mostly ready to work. For example, CPUIdle/CPUFreq
+>>    are allowed and other PM staff. CPUIdle and driver's probing are not friends.
+> 
+> Yeah, I was expecting to find more problems due to this, but the
+> platforms I tested on didn't show any. Do you have pointers to
+> concrete issues?
+
+No. This observation comes from my working experience with OMAP4 devices where
+lowest possible CPUIdle state was mostly equal to Device-OFF state. 
+Fast search has allowed me to find possible source of issues in code - I'm pretty sure
+smth. similar can be found in other ARM maches:
+- arch/arm/mach-omap2/omap_device.c -> omap_device_late_init().
+
+> 
+>> What would be nice to have for now in my opinion:
+>> - some useful place to move device population code.
+>>    May be machine_desc->init_device_sync() callback.
+> 
+> I'm looking at leave device registration where it currently is and
+> just add devices to the deferred list until we get to late_initcall,
+> where we would start to actually probe them. Seems promising for now.
+> 
+>> - some optional feature in DTC which will allow to re-arrange DT nodes for levels 0(root)
+>>    and 1(simple-bus) using standard or widely used bindings (gpio, regulators, clocks, dma,
+>>    pinctrl, irqs).
+> 
+> Could you extend on this, please?
+
+This is actually mostly the same idea as was mentioned by Rob Clark 
+http://www.spinics.net/lists/arm-kernel/msg423485.html
+
+
+For example, mmc1 probe will be deferred always for below DT,
+but if we put evm_3v3_sw before ocp and exchange mmc1 and i2c1
+- mmc1 will be probed without deferring.
+Potentially, It can be done in DTC where we do not have so strict limits
+as for Kernel code. 
+
+Soc file:
+/ { /* root - level 0 */
+	ocp { /* simple-bus - level 1 */
+		compatible =  "simple-bus";
+
+		mmc1: mmc at 4809c000 {
+			compatible = "mmc";
+		...
+		}
+
+		i2c1: i2c at 48070000 {
+			compatible = "i2c";
+		}
+	}
+}
+
+board file:
+#include "SoC.dtsi"
+
+/ {
+	evm_3v3_sw: fixedregulator-evm_3v3_sw {
+		compatible = "regulator-fixed";
+		regulator-name = "evm_3v3_sw";
+		regulator-min-microvolt = <3300000>;
+		regulator-max-microvolt = <3300000>;
+	};
+};
+
+&i2c1 {
+	pcf_gpio_21: gpio at 21 {
+		compatible = "ti,pcf8575";
+		reg = <0x21>;
+		lines-initial-states = <0x1408>;
+		gpio-controller;
+		#gpio-cells = <2>;
+	};
+}
+
+&mmc1 {
+	status = "okay";
+	vmmc-supply = <&evm_3v3_sw>;
+	bus-width = <4>;
+	cd-gpios = <&pcf_gpio_21 5 0>;
+};
+	
+
+
+-- 
+regards,
+-grygorii
