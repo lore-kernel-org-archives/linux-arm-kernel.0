@@ -1,50 +1,50 @@
-From: yizhang@mx0a-0016f401.pphosted.com (Yi Zhang)
-Date: Thu, 4 Jun 2015 10:31:46 +0800
-Subject: [PATCH 04/12] i2c: pxa: Add support for pxa910/988 & new
- configuration features
-In-Reply-To: <874mmvyvzw.fsf@belgarion.home>
-References: <1432818224-17070-1-git-send-email-vaibhav.hiremath@linaro.org>
- <1432818224-17070-5-git-send-email-vaibhav.hiremath@linaro.org>
- <874mmvyvzw.fsf@belgarion.home>
-Message-ID: <20150604023146.GF6696@yizhang>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Thu, 4 Jun 2015 08:02:20 +0530
+Subject: [PATCH] drivers/cpufreq: include <module.h> for modular
+ exynos-cpufreq.c code
+In-Reply-To: <1433366298-30016-1-git-send-email-paul.gortmaker@windriver.com>
+References: <1430444867-22342-1-git-send-email-paul.gortmaker@windriver.com>
+ <1433366298-30016-1-git-send-email-paul.gortmaker@windriver.com>
+Message-ID: <20150604023220.GD6811@linux>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 29, 2015 at 10:22:27PM +0200, Robert Jarzmik wrote:
-> Vaibhav Hiremath <vaibhav.hiremath@linaro.org> writes:
+On 03-06-15, 17:18, Paul Gortmaker wrote:
+> This file is built off of a tristate Kconfig option ("ARM_EXYNOS_CPUFREQ")
+> and also contains modular function calls so it should explicitly include
+> module.h to avoid compile breakage during pending header shuffles.
 > 
-> > @@ -167,6 +184,8 @@ struct pxa_i2c {
-> >  #define _ICR(i2c)	((i2c)->reg_icr)
-> >  #define _ISR(i2c)	((i2c)->reg_isr)
-> >  #define _ISAR(i2c)	((i2c)->reg_isar)
-> > +#define _ILCR(i2c)	((i2c)->reg_ilcr)
-> > +#define _IWCR(i2c)	((i2c)->reg_iwcr)
-> >  
-> >  /*
-> >   * I2C Slave mode address
-> > @@ -467,11 +486,16 @@ static void i2c_pxa_reset(struct pxa_i2c *i2c)
-> >  	if (i2c->reg_isar)
-> >  		writel(i2c->slave_addr, _ISAR(i2c));
-> >  #endif
-> > -
-> Not in this patch.
+> Cc: "Rafael J. Wysocki" <rjw@rjwysocki.net>
+> Cc: Viresh Kumar <viresh.kumar@linaro.org>
+> Cc: Kukjin Kim <kgene@kernel.org>
+> Cc: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+> Cc: linux-pm at vger.kernel.org
+> Cc: linux-arm-kernel at lists.infradead.org
+> Cc: linux-samsung-soc at vger.kernel.org
+> Signed-off-by: Paul Gortmaker <paul.gortmaker@windriver.com>
+> ---
 > 
-> >  	/* set control register values */
-> >  	writel(I2C_ICR_INIT | (i2c->fast_mode ? ICR_FM : 0), _ICR(i2c));
-> >  	writel(readl(_ICR(i2c)) | (i2c->high_mode ? ICR_HS : 0), _ICR(i2c));
-> >  
-> > +	if (i2c->ilcr)
-> > +		writel(i2c->ilcr, _ILCR(i2c));
-> > +	if (i2c->iwcr)
-> > +		writel(i2c->iwcr, _IWCR(i2c));
-> > +	udelay(2);
-> This is a magical 2us. Where does it come from ?
+> [ patch will be appended to the implicit include fixup series, see:
+>   https://lkml.kernel.org/r/1430444867-22342-1-git-send-email-paul.gortmaker at windriver.com
+>   for the original series posting.]
+> 
+>  drivers/cpufreq/exynos-cpufreq.c | 1 +
+>  1 file changed, 1 insertion(+)
+> 
+> diff --git a/drivers/cpufreq/exynos-cpufreq.c b/drivers/cpufreq/exynos-cpufreq.c
+> index 82d2fbb20f7e..4c157302365f 100644
+> --- a/drivers/cpufreq/exynos-cpufreq.c
+> +++ b/drivers/cpufreq/exynos-cpufreq.c
+> @@ -10,6 +10,7 @@
+>  */
+>  
+>  #include <linux/kernel.h>
+> +#include <linux/module.h>
+>  #include <linux/err.h>
+>  #include <linux/clk.h>
+>  #include <linux/io.h>
 
-  This delay can be removed, if writing LCR and WCR before enabling this
-  i2c controller, it's safe enough; and they should not be changed when
-  there is bus activity.
-> 
-> Cheers.
-> 
-> -- 
-> Robert
+Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
+
+-- 
+viresh
