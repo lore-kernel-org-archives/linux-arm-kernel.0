@@ -1,60 +1,54 @@
 From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Thu, 4 Jun 2015 11:27:39 -0700
-Subject: [PATCH v6 0/4] Add basic ZTE zx296702 SOC support
-In-Reply-To: <1433388063-13682-1-git-send-email-jun.nie@linaro.org>
-References: <1433388063-13682-1-git-send-email-jun.nie@linaro.org>
-Message-ID: <20150604182739.GH490@codeaurora.org>
+Date: Thu, 4 Jun 2015 11:37:52 -0700
+Subject: [PATCH V7 1/3] OPP: Add new bindings to address shortcomings of
+ existing bindings
+In-Reply-To: <d83c0b6b1768c7229384216329b607d13886aa02.1433434659.git.viresh.kumar@linaro.org>
+References: <cover.1433434659.git.viresh.kumar@linaro.org>
+ <d83c0b6b1768c7229384216329b607d13886aa02.1433434659.git.viresh.kumar@linaro.org>
+Message-ID: <20150604183752.GI490@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/04, Jun Nie wrote:
-> Changes vs v5:
->   - Remove redundant code and polish return value in clock driver.
+On 06/04, Viresh Kumar wrote:
+> Current OPP (Operating performance point) device tree bindings have been
+> insufficient due to the inflexible nature of the original bindings. Over
+> time, we have realized that Operating Performance Point definitions and
+> usage is varied depending on the SoC and a "single size (just frequency,
+> voltage) fits all" model which the original bindings attempted and
+> failed.
 > 
-> Changes vs v4:
->   - Fix issues in clock driver that Stephen found.
->   - Remove initramfs in defconfig to avoid overriding test config.
->   - Drop patches that already merged into ARM next/soc.
+> The proposed next generation of the bindings addresses by providing a
+> expandable binding for OPPs and introduces the following common
+> shortcomings seen with the original bindings:
 > 
-> Jun Nie (4):
->   dt-bindings: Add #defines for ZTE ZX296702 clocks
->   clk: zx: add clock support to zx296702
->   ARM: dts: zx: add an initial zx296702 dts and doc
->   ARM: zx: Add basic defconfig support for ZX296702
+> - Getting clock/voltage/current rails sharing information between CPUs.
+>   Shared by all cores vs independent clock per core vs shared clock per
+>   cluster.
+> 
+> - Support for specifying current levels along with voltages.
+> 
+> - Support for multiple regulators.
+> 
+> - Support for turbo modes.
+> 
+> - Other per OPP settings: transition latencies, disabled status, etc.?
+> 
+> - Expandability of OPPs in future.
+> 
+> This patch introduces new bindings "operating-points-v2" to get these problems
+> solved. Refer to the bindings for more details.
+> 
+> We now have multiple versions of OPP binding and only one of them should
+> be used per device.
+> 
+> Reviewed-by: Rob Herring <robh@kernel.org>
+> Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
 
-clk patch looks ok. If this doesn't go into 4.2 please consider
-sending the clk driver through the clk tree.
+Ok. I'm still interested to see if this binding will have to
+change to support how multiple regulators will be matched up with
+the device using the OPP. But for now,
 
-> 
->  Documentation/devicetree/bindings/arm/zte.txt      |  15 +
->  .../devicetree/bindings/clock/zx296702-clk.txt     |  35 ++
->  Documentation/devicetree/bindings/serial/pl011.txt |   2 +-
->  .../devicetree/bindings/vendor-prefixes.txt        |   1 +
->  arch/arm/boot/dts/Makefile                         |   1 +
->  arch/arm/boot/dts/zx296702-ad1.dts                 |  48 ++
->  arch/arm/boot/dts/zx296702.dtsi                    | 139 +++++
->  arch/arm/configs/zx_defconfig                      | 129 ++++
->  drivers/clk/Makefile                               |   1 +
->  drivers/clk/zte/Makefile                           |   2 +
->  drivers/clk/zte/clk-pll.c                          | 172 ++++++
->  drivers/clk/zte/clk-zx296702.c                     | 657 +++++++++++++++++++++
->  drivers/clk/zte/clk.h                              |  32 +
->  include/dt-bindings/clock/zx296702-clock.h         | 170 ++++++
->  14 files changed, 1403 insertions(+), 1 deletion(-)
->  create mode 100644 Documentation/devicetree/bindings/arm/zte.txt
->  create mode 100644 Documentation/devicetree/bindings/clock/zx296702-clk.txt
->  create mode 100644 arch/arm/boot/dts/zx296702-ad1.dts
->  create mode 100644 arch/arm/boot/dts/zx296702.dtsi
->  create mode 100644 arch/arm/configs/zx_defconfig
->  create mode 100644 drivers/clk/zte/Makefile
->  create mode 100644 drivers/clk/zte/clk-pll.c
->  create mode 100644 drivers/clk/zte/clk-zx296702.c
->  create mode 100644 drivers/clk/zte/clk.h
->  create mode 100644 include/dt-bindings/clock/zx296702-clock.h
-> 
-> -- 
-> 1.9.1
-> 
+Reviewed-by: Stephen Boyd <sboyd@codeaurora.org>
 
 -- 
 Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
