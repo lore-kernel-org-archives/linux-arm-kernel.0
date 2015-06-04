@@ -1,54 +1,44 @@
 From: marex@denx.de (Marek Vasut)
-Date: Thu, 4 Jun 2015 17:20:54 +0200
-Subject: [PATCH 11/11] dt: Exynos: add Snow SPI NOR node.
-In-Reply-To: <556FB222.2070406@samsung.com>
+Date: Thu, 4 Jun 2015 17:29:35 +0200
+Subject: [PATCH 00/11] Enable access to SPI NOR flash on Samsung Snow board
+In-Reply-To: <CAOMqctRkoQrP7wAgXfWXHb2fbi2-6VayHRx5DgUKn6Djz0qtQQ@mail.gmail.com>
 References: <cover.1433364398.git.hramrach@gmail.com>
- <3234c12c90eabbeeb6d33604a324231937e309ec.1433364398.git.hramrach@gmail.com>
- <556FB222.2070406@samsung.com>
-Message-ID: <201506041720.54666.marex@denx.de>
+ <201506040053.29482.marex@denx.de>
+ <CAOMqctRkoQrP7wAgXfWXHb2fbi2-6VayHRx5DgUKn6Djz0qtQQ@mail.gmail.com>
+Message-ID: <201506041729.35645.marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday, June 04, 2015 at 04:04:18 AM, Krzysztof Kozlowski wrote:
-> On 04.06.2015 06:26, Michal Suchanek wrote:
-> > The Snow has onboard SPI NOR flash which contains the bootloader.
+On Thursday, June 04, 2015 at 06:21:32 AM, Michal Suchanek wrote:
+> On 4 June 2015 at 00:53, Marek Vasut <marex@denx.de> wrote:
+> > On Wednesday, June 03, 2015 at 11:26:39 PM, Michal Suchanek wrote:
+> >> Hello,
 > > 
-> > Add DT node for this flash chip. The flash is rated 133MHz but the pl330
-> > controller can transfer only up to 128 bytes at this speed so use more
-> > conservative settings. Even at 40MHz pl330 can transfer at most 64k with
-> > the current driver.
+> > Hi,
 > > 
-> > Signed-off-by: Michal Suchanek <hramrach@gmail.com>
-> > ---
+> >> this patch series makes it possible to access the SPI NOR flash in the
+> >> Samsung XE303 'Snow' Chromebook.
+> >> 
+> >> Unfortunately not all issues are resolved. To work around an issue with
+> >> the pl330 dma engine I respun the patch for limiting transfer size in
+> >> m25p80 driver.
 > > 
-> >  arch/arm/boot/dts/exynos5250-snow.dts | 12 ++++++++++++
-> >  1 file changed, 12 insertions(+)
+> > Looks like fixing a bug at the wrong place to me ...
 > > 
-> > diff --git a/arch/arm/boot/dts/exynos5250-snow.dts
-> > b/arch/arm/boot/dts/exynos5250-snow.dts index 1fa72cf..38e4cda 100644
-> > --- a/arch/arm/boot/dts/exynos5250-snow.dts
-> > +++ b/arch/arm/boot/dts/exynos5250-snow.dts
-> > @@ -691,6 +691,18 @@
+> >> As the flash does not contain any sane filesystem and is only likely to
+> >> be accessed with mtd_debug or similar tool the limit of the dma engine
+> >> is easily reached. Filesystems using shorter data transfers are less
+> >> likely to be affected.
 > > 
-> >  	num-cs = <1>;
-> >  	cs-gpios = <&gpa2 5 0>;
-> >  	status = "okay";
-> > 
-> > +		flash: m25p80 at 0 {
+> > Sounds like the DMA engine driver should be fixed.
 > 
-> The indentation looks odd. This should be at the same level as "status".
+> I looked at the pl330 datasheet and don't see anything obviusly wrong
+> with the pl330 driver in Linux.
 > 
-> > +			#address-cells = <1>;
-> > +			#size-cells = <1>;
-> > +			compatible = "jedec,spi-nor";
-> > +			reg = <0>;
-> > +			spi-max-frequency = <40000000>;
-> 
-> So actually you wanted 133 MHz but as a workaround for DMA issue you use
-> 40 MHz, right? Could you add here a small TODO note in comment about it?
+> Ideally it would be fixed but I have no idea what's wrong with it.
 
-I disagree. There is a problem, the problem should actually be analyzed and 
-fixed, not just postponed with some TODO nonsense.
+Ask maybe Catalin from ARM to help you -- he might be able to point you
+to the right hardware guy.
 
 Best regards,
 Marek Vasut
