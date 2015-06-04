@@ -1,70 +1,127 @@
 From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Thu, 4 Jun 2015 09:58:35 +0200
-Subject: [PATCH v2 00/16] AT91 DT for 4.2
-In-Reply-To: <1433334258-14741-1-git-send-email-alexandre.belloni@free-electrons.com>
+Date: Thu, 4 Jun 2015 10:01:42 +0200
+Subject: [PATCH v2 16/16] ARM: at91/dt: Add Acme Arietta G25
+In-Reply-To: <1433334258-14741-17-git-send-email-alexandre.belloni@free-electrons.com>
 References: <1433334258-14741-1-git-send-email-alexandre.belloni@free-electrons.com>
-Message-ID: <5570052B.3070808@atmel.com>
+ <1433334258-14741-17-git-send-email-alexandre.belloni@free-electrons.com>
+Message-ID: <557005E6.3090403@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Le 03/06/2015 14:24, Alexandre Belloni a ?crit :
-> Hi,
+> Add a minimum Device Tree for Acme Arietta G25.
+> http://acme.systems/arietta
 > 
-> A dt series for 4.2:
->  - Fix at91sam9rl RTC node and use it on at91sam9rlek
->  - correct stdout-path for the various kizboxes
->  - add stdout-path to the atme evaluation boards
->  - add  Acme arietta g25 device tree
-> 
-> Changes in v2:
->  - renamed the ariette device tree
->  - added an aliases node to the arietta device tree
-> 
-> Alexandre Belloni (16):
->   ARM: at91/dt: at91sam9rl: fix rtc node
->   ARM: at91/dt: at91sam9rlek: add RTC
->   ARM: at91/dt: kizbox: use stdout-path
->   ARM: at91/dt: at91rm9200ek: use stdout-path
->   ARM: at91/dt: at91sam9261ek: use stdout-path
->   ARM: at91/dt: at91sam9263ek: use stdout-path
->   ARM: at91/dt: at91sam9g20ek: use stdout-path
->   ARM: at91/dt: at91sam9m10g45ek use stdout-path
->   ARM: at91/dt: at91sam9n12ek: use stdout-path
->   ARM: at91/dt: at91sam9rlek: use stdout-path
->   ARM: at91/dt: at91sam9x5ek: use stdout-path
->   ARM: at91/dt: sama5d3xek: use stdout-path
->   ARM: at91/dt: sama5d3 xplained: use stdout-path
->   ARM: at91/dt: sama5d4ek: use stdout-path
->   ARM: at91/dt: sama5d4 xplained: use stdout-path
->   ARM: at91/dt: Add Acme Arietta G25
+> Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+> Cc: Sergio Tanzilli <tanzilli@acmesystems.it>
 
-All seems good:
-Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+BTW Sergio, can I add your "Acked-by" tag?
 
-I stack the series on top of at91-4.2-dt branch and add it to at91-next.
+Bye,
 
-Thanks, bye.
-
->  arch/arm/boot/dts/Makefile                  |  1 +
->  arch/arm/boot/dts/at91-ariettag25.dts       | 79 +++++++++++++++++++++++++++++
->  arch/arm/boot/dts/at91-kizbox.dts           |  2 +-
->  arch/arm/boot/dts/at91-kizbox2.dts          |  2 +-
->  arch/arm/boot/dts/at91-kizboxmini.dts       |  2 +-
->  arch/arm/boot/dts/at91-sama5d3_xplained.dts |  2 +-
->  arch/arm/boot/dts/at91-sama5d4_xplained.dts |  3 +-
->  arch/arm/boot/dts/at91-sama5d4ek.dts        |  3 +-
->  arch/arm/boot/dts/at91rm9200ek.dts          |  4 ++
->  arch/arm/boot/dts/at91sam9261ek.dts         |  3 +-
->  arch/arm/boot/dts/at91sam9263ek.dts         |  3 +-
->  arch/arm/boot/dts/at91sam9g20ek_common.dtsi |  3 +-
->  arch/arm/boot/dts/at91sam9m10g45ek.dts      |  3 +-
->  arch/arm/boot/dts/at91sam9n12ek.dts         |  3 +-
->  arch/arm/boot/dts/at91sam9rl.dtsi           | 15 +++---
->  arch/arm/boot/dts/at91sam9rlek.dts          |  7 ++-
->  arch/arm/boot/dts/at91sam9x5ek.dtsi         |  3 +-
->  arch/arm/boot/dts/sama5d3xcm.dtsi           |  3 +-
->  18 files changed, 120 insertions(+), 21 deletions(-)
+> ---
+>  arch/arm/boot/dts/Makefile            |  1 +
+>  arch/arm/boot/dts/at91-ariettag25.dts | 79 +++++++++++++++++++++++++++++++++++
+>  2 files changed, 80 insertions(+)
 >  create mode 100644 arch/arm/boot/dts/at91-ariettag25.dts
+> 
+> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+> index 8c3da289a00b..b224a3a56f09 100644
+> --- a/arch/arm/boot/dts/Makefile
+> +++ b/arch/arm/boot/dts/Makefile
+> @@ -31,6 +31,7 @@ dtb-$(CONFIG_SOC_SAM_V4_V5) += \
+>  	at91sam9n12ek.dtb \
+>  	at91sam9rlek.dtb \
+>  	at91-ariag25.dtb \
+> +	at91-ariettag25.dtb \
+>  	at91-cosino_mega2560.dtb \
+>  	at91-kizboxmini.dtb \
+>  	at91sam9g15ek.dtb \
+> diff --git a/arch/arm/boot/dts/at91-ariettag25.dts b/arch/arm/boot/dts/at91-ariettag25.dts
+> new file mode 100644
+> index 000000000000..c514502081d2
+> --- /dev/null
+> +++ b/arch/arm/boot/dts/at91-ariettag25.dts
+> @@ -0,0 +1,79 @@
+> +/*
+> + * Device Tree file for Arietta G25
+> + * This device tree is minimal, to activate more peripherals, see:
+> + * http://dts.acmesystems.it/arietta/
+> + */
+> +/dts-v1/;
+> +#include "at91sam9g25.dtsi"
+> +/ {
+> +	model = "Acme Systems Arietta G25";
+> +	compatible = "acme,ariettag25", "atmel,at91sam9x5", "atmel,at91sam9";
+> +
+> +	aliases {
+> +		serial0 = &dbgu;
+> +	};
+> +
+> +	chosen {
+> +		stdout-path = "serial0:115200n8";
+> +	};
+> +
+> +	memory {
+> +		reg = <0x20000000 0x8000000>;
+> +	};
+> +
+> +	clocks {
+> +		slow_xtal {
+> +			clock-frequency = <32768>;
+> +		};
+> +
+> +		main_xtal {
+> +			clock-frequency = <12000000>;
+> +		};
+> +	};
+> +
+> +	ahb {
+> +		apb {
+> +			mmc0: mmc at f0008000 {
+> +				pinctrl-0 = <
+> +				  &pinctrl_mmc0_slot0_clk_cmd_dat0
+> +				  &pinctrl_mmc0_slot0_dat1_3>;
+> +				status = "okay";
+> +
+> +				slot at 0 {
+> +					reg = <0>;
+> +					bus-width = <4>;
+> +				};
+> +			};
+> +
+> +			usb2: gadget at f803c000 {
+> +				status = "okay";
+> +			};
+> +
+> +			dbgu: serial at fffff200 {
+> +				status = "okay";
+> +			};
+> +
+> +			rtc at fffffeb0 {
+> +				status = "okay";
+> +			};
+> +		};
+> +
+> +		usb0: ohci at 00600000 {
+> +			status = "okay";
+> +			num-ports = <3>;
+> +		};
+> +
+> +		usb1: ehci at 00700000 {
+> +			status = "okay";
+> +		};
+> +	};
+> +
+> +	leds {
+> +		compatible = "gpio-leds";
+> +		arietta_led {
+> +			label = "arietta_led";
+> +			gpios = <&pioB 8 GPIO_ACTIVE_HIGH>; /* PB8 */
+> +			linux,default-trigger = "heartbeat";
+> +		};
+> +	};
+> +};
 > 
 
 
