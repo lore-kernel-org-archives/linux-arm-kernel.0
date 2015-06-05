@@ -1,259 +1,153 @@
-From: maitysanchayan@gmail.com (Sanchayan Maity)
-Date: Fri,  5 Jun 2015 14:52:38 +0530
-Subject: [PATCH v5 2/2] soc: Add driver for Freescale Vybrid Platform
-In-Reply-To: <cover.1433494491.git.maitysanchayan@gmail.com>
-References: <cover.1433494491.git.maitysanchayan@gmail.com>
-Message-ID: <d702301bce77fb08dd6556e93b553485f3e84b73.1433494491.git.maitysanchayan@gmail.com>
+From: daniel.thompson@linaro.org (Daniel Thompson)
+Date: Fri, 05 Jun 2015 10:36:27 +0100
+Subject: [RFC PATCH 2/3] clk: stm32: Add clock driver for STM32F4[23]xxx
+ devices
+In-Reply-To: <20150604220725.GT676@codeaurora.org>
+References: <1432327273-6810-1-git-send-email-daniel.thompson@linaro.org>
+ <1432327273-6810-3-git-send-email-daniel.thompson@linaro.org>
+ <20150604220725.GT676@codeaurora.org>
+Message-ID: <55716D9B.4040209@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This adds a SoC driver to be used by the Freescale Vybrid SoC's.
-We create the "fsl" directory for holding the different Freescale
-designs. Driver utilises syscon to get the various register values
-needed. After this sysfs exposes some SoC specific properties as
-below:
+On 04/06/15 23:07, Stephen Boyd wrote:
+> On 05/22, Daniel Thompson wrote:
+>> +
+>> +#include <linux/clk.h>
+>
+> Are you using this include?
+>
+>> +#include <linux/clkdev.h>
+>
+> Are you using this include?
 
-> cd /sys/devices/soc0
-> ls
-family     machine    power      revision   soc_id     subsystem  uevent
-> cat family
-Freescale Vybrid VF610
-> cat machine
-Freescale Vybrid
-> cat revision
-00000013
-> cat soc_id
-df6472a60c1c39d4
+Not very much?
 
-Signed-off-by: Sanchayan Maity <maitysanchayan@gmail.com>
----
- drivers/soc/Kconfig         |   1 +
- drivers/soc/Makefile        |   1 +
- drivers/soc/fsl/Kconfig     |  10 +++
- drivers/soc/fsl/Makefile    |   1 +
- drivers/soc/fsl/soc-vf610.c | 166 ++++++++++++++++++++++++++++++++++++++++++++
- 5 files changed, 179 insertions(+)
- create mode 100644 drivers/soc/fsl/Kconfig
- create mode 100644 drivers/soc/fsl/Makefile
- create mode 100644 drivers/soc/fsl/soc-vf610.c
+Turns out I was relying on these to get kzalloc() defined but there are 
+better headers for me to use for that!
 
-diff --git a/drivers/soc/Kconfig b/drivers/soc/Kconfig
-index d8bde82..8b4dd2b 100644
---- a/drivers/soc/Kconfig
-+++ b/drivers/soc/Kconfig
-@@ -1,5 +1,6 @@
- menu "SOC (System On Chip) specific Drivers"
- 
-+source "drivers/soc/fsl/Kconfig"
- source "drivers/soc/mediatek/Kconfig"
- source "drivers/soc/qcom/Kconfig"
- source "drivers/soc/ti/Kconfig"
-diff --git a/drivers/soc/Makefile b/drivers/soc/Makefile
-index 70042b2..142676e 100644
---- a/drivers/soc/Makefile
-+++ b/drivers/soc/Makefile
-@@ -2,6 +2,7 @@
- # Makefile for the Linux Kernel SOC specific device drivers.
- #
- 
-+obj-$(CONFIG_SOC_VF610)        += fsl/
- obj-$(CONFIG_ARCH_MEDIATEK)	+= mediatek/
- obj-$(CONFIG_ARCH_QCOM)		+= qcom/
- obj-$(CONFIG_ARCH_TEGRA)	+= tegra/
-diff --git a/drivers/soc/fsl/Kconfig b/drivers/soc/fsl/Kconfig
-new file mode 100644
-index 0000000..5752f77
---- /dev/null
-+++ b/drivers/soc/fsl/Kconfig
-@@ -0,0 +1,10 @@
-+#
-+# Freescale SoC drivers
-+
-+config SOC_BUS_VF610
-+	   tristate "SoC bus device for the Freescale Vybrid platform"
-+	   depends on SOC_VF610
-+	   select SOC_BUS
-+	   help
-+	     Include support for the SoC bus on the Freescale Vybrid platform
-+		 providing some sysfs information about the module variant.
-diff --git a/drivers/soc/fsl/Makefile b/drivers/soc/fsl/Makefile
-new file mode 100644
-index 0000000..3d6b331
---- /dev/null
-+++ b/drivers/soc/fsl/Makefile
-@@ -0,0 +1 @@
-+obj-$(CONFIG_SOC_BUS_VF610)		+= soc-vf610.o
-diff --git a/drivers/soc/fsl/soc-vf610.c b/drivers/soc/fsl/soc-vf610.c
-new file mode 100644
-index 0000000..d66360e
---- /dev/null
-+++ b/drivers/soc/fsl/soc-vf610.c
-@@ -0,0 +1,166 @@
-+/*
-+ * Copyright 2015 Toradex AG
-+ *
-+ * Author: Sanchayan Maity <sanchayan.maity@toradex.com>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2, as
-+ * published by the Free Software Foundation.
-+ *
-+ */
-+
-+#include <linux/mfd/syscon.h>
-+#include <linux/of_platform.h>
-+#include <linux/regmap.h>
-+#include <linux/random.h>
-+#include <linux/slab.h>
-+#include <linux/sys_soc.h>
-+
-+#define DRIVER_NAME "vf610-soc-bus"
-+
-+#define MSCM_CPxCOUNT_OFFSET   0x0000002C
-+#define MSCM_CPxCFG1_OFFSET    0x00000014
-+
-+struct vf610_soc {
-+	struct device *dev;
-+	struct soc_device_attribute *soc_dev_attr;
-+	struct soc_device *soc_dev;
-+};
-+
-+static int vf610_soc_probe(struct platform_device *pdev)
-+{
-+	struct vf610_soc *info;
-+	struct regmap *ocotp_regmap, *mscm_regmap, *rom_regmap;
-+	struct device *dev = &pdev->dev;
-+	struct device_node *node = pdev->dev.of_node;
-+	struct device_node *soc_node;
-+	struct of_phandle_args pargs;
-+	char soc_type[] = "xx0";
-+	u32 cfg0_offset, cfg1_offset, rom_rev_offset;
-+	u32 soc_id1, soc_id2, rom_rev;
-+	u32 cpxcount, cpxcfg1;
-+	u64 soc_id;
-+	int ret;
-+
-+	info = devm_kzalloc(&pdev->dev, sizeof(struct vf610_soc), GFP_KERNEL);
-+	if (!info)
-+		return -ENOMEM;
-+
-+	info->dev = &pdev->dev;
-+	platform_set_drvdata(pdev, info);
-+
-+	mscm_regmap = syscon_node_to_regmap(node);
-+	if (IS_ERR(mscm_regmap)) {
-+		dev_err(dev, "regmap lookup for mscm failed\n");
-+		return PTR_ERR(mscm_regmap);
-+	}
-+
-+	soc_node = of_find_node_by_path("/soc");
-+
-+	ret = of_parse_phandle_with_fixed_args(soc_node,
-+					"ocotp-cfg", 2, 0, &pargs);
-+	if (ret) {
-+		dev_err(dev, "lookup failed for ocotp-cfg node %d\n", ret);
-+		return ret;
-+	}
-+
-+	ocotp_regmap = syscon_node_to_regmap(pargs.np);
-+	if (IS_ERR(ocotp_regmap)) {
-+		of_node_put(pargs.np);
-+		dev_err(dev, "regmap lookup for ocotp failed\n");
-+		return PTR_ERR(ocotp_regmap);
-+	}
-+
-+	cfg0_offset = pargs.args[0];
-+	cfg1_offset = pargs.args[1];
-+	of_node_put(pargs.np);
-+
-+	ret = of_parse_phandle_with_fixed_args(soc_node,
-+					"rom-revision", 1, 0, &pargs);
-+	if (ret) {
-+		dev_err(dev, "lookup failed for rom-revision node %d\n", ret);
-+		return ret;
-+	}
-+
-+	rom_regmap = syscon_node_to_regmap(pargs.np);
-+	if (IS_ERR(rom_regmap)) {
-+		of_node_put(pargs.np);
-+		dev_err(dev, "regmap lookup for ocrom failed\n");
-+		return PTR_ERR(rom_regmap);
-+	}
-+
-+	rom_rev_offset = pargs.args[0];
-+	of_node_put(pargs.np);
-+
-+	ret = regmap_read(ocotp_regmap, cfg0_offset, &soc_id1);
-+	if (ret)
-+		return -ENODEV;
-+
-+	ret = regmap_read(ocotp_regmap, cfg1_offset, &soc_id2);
-+	if (ret)
-+		return -ENODEV;
-+
-+	soc_id = (u64) soc_id1 << 32 | soc_id2;
-+	add_device_randomness(&soc_id, sizeof(soc_id));
-+
-+	ret = regmap_read(mscm_regmap, MSCM_CPxCOUNT_OFFSET, &cpxcount);
-+	if (ret)
-+		return -ENODEV;
-+
-+	ret = regmap_read(mscm_regmap, MSCM_CPxCFG1_OFFSET, &cpxcfg1);
-+	if (ret)
-+		return -ENODEV;
-+
-+	soc_type[0] = cpxcount ? '6' : '5'; /* Dual Core => VF6x0 */
-+	soc_type[1] = cpxcfg1 ? '1' : '0'; /* L2 Cache => VFx10 */
-+
-+	ret = regmap_read(rom_regmap, rom_rev_offset, &rom_rev);
-+	if (ret)
-+		return -ENODEV;
-+
-+	info->soc_dev_attr = devm_kzalloc(&pdev->dev,
-+				sizeof(info->soc_dev_attr), GFP_KERNEL);
-+	if (!info->soc_dev_attr)
-+		return -ENOMEM;
-+
-+	info->soc_dev_attr->machine = devm_kasprintf(&pdev->dev,
-+				GFP_KERNEL, "Freescale Vybrid");
-+	info->soc_dev_attr->soc_id = devm_kasprintf(&pdev->dev,
-+				GFP_KERNEL, "%016llx", soc_id);
-+	info->soc_dev_attr->family = devm_kasprintf(&pdev->dev,
-+				GFP_KERNEL, "Freescale Vybrid VF%s",
-+				soc_type);
-+	info->soc_dev_attr->revision = devm_kasprintf(&pdev->dev,
-+				GFP_KERNEL, "%08x", rom_rev);
-+
-+	info->soc_dev = soc_device_register(info->soc_dev_attr);
-+	if (IS_ERR(info->soc_dev))
-+		return -ENODEV;
-+
-+	return 0;
-+}
-+
-+static int vf610_soc_remove(struct platform_device *pdev)
-+{
-+	struct vf610_soc *info = platform_get_drvdata(pdev);
-+
-+	if (info->soc_dev)
-+		soc_device_unregister(info->soc_dev);
-+
-+	return 0;
-+}
-+
-+static const struct of_device_id vf610_soc_bus_match[] = {
-+	{ .compatible = "fsl,vf610-mscm-cpucfg", },
-+	{ /* sentinel */ }
-+};
-+
-+static struct platform_driver vf610_soc_driver = {
-+	.probe          = vf610_soc_probe,
-+	.remove         = vf610_soc_remove,
-+	.driver         = {
-+		.name   = DRIVER_NAME,
-+		.of_match_table = vf610_soc_bus_match,
-+	},
-+};
-+module_platform_driver(vf610_soc_driver);
--- 
-2.4.2
+>
+>> +#include <linux/err.h>
+>> +#include <linux/io.h>
+>> +#include <linux/clk-provider.h>
+>> +#include <linux/spinlock.h>
+>> +#include <linux/of.h>
+>> +#include <linux/of_address.h>
+>> +
+>> +#include <linux/debugfs.h>
+>
+> Are you using this include?
+
+No (this is already gone in v2).
+
+
+>> +static long clk_apb_mul_round_rate(struct clk_hw *hw, unsigned long rate,
+>> +				   unsigned long *prate)
+>> +{
+>> +	struct clk_apb_mul *am = to_clk_apb_mul(hw);
+>> +	unsigned long mult = 1;
+>> +
+>> +	if (readl(base + STM32F4_RCC_CFGR) & BIT(am->bit_idx))
+>> +		mult *= 2;
+>
+> Isn't this the same as mult = 2? I guess we could rely on the
+> compiler to figure out this one.
+
+I'll fix this.
+
+
+>> +
+>> +	if (__clk_get_flags(hw->clk) & CLK_SET_RATE_PARENT) {
+>> +		unsigned long best_parent = rate / mult;
+>> +
+>> +		*prate =
+>> +		    __clk_round_rate(__clk_get_parent(hw->clk), best_parent);
+>> +	}
+>> +
+>> +	return *prate * mult;
+>> +}
+>> +
+>> +static int clk_apb_mul_set_rate(struct clk_hw *hw, unsigned long rate,
+>> +				 unsigned long parent_rate)
+>> +{
+>
+> Why don't we need to do anything here?
+
+This clock cannot change its own rate. It is very nearly a fixed factor 
+clock but with the additional quirk that the "fixed" factor changes 
+depending upon the rate of the parent clock.
+
+This is the same implementation as clk-fixed-factor. I concluded that it 
+returns success because round rate should always result in the set rate 
+for this clock being a nop.
+
+
+>> +	return 0;
+>> +}
+>> +
+>> +static struct clk_ops clk_apb_mul_factor_ops = {
+>
+> const?
+
+Makes sense...
+
+You want a patch for clk-fixed-factor too?
+
+
+>> +struct clk *clk_register_apb_mul(struct device *dev, const char *name,
+>> +				 const char *parent_name, unsigned long flags,
+>> +				 u8 bit_idx)
+>> +{
+>> +	struct clk_apb_mul *am;
+>> +	struct clk_init_data init;
+>> +	struct clk *clk;
+>> +
+>> +	am = kzalloc(sizeof(*am), GFP_KERNEL);
+>> +	if (!am)
+>> +		return ERR_PTR(-ENOMEM);
+>> +
+>> +	am->bit_idx = bit_idx;
+>> +	am->hw.init = &init;
+>> +
+>> +	init.name = name;
+>> +	init.ops = &clk_apb_mul_factor_ops;
+>> +	init.flags = flags | CLK_IS_BASIC;
+>
+> Is it basic?
+
+Tough question.
+
+The absence of this flag appears grants arch code permission to use 
+secret backdoors to do "weird stuff" but making special assumptions 
+about the type of the clock. This clock keeps its implementation private 
+so noone outside the compilation unit can usefully cast it.
+
+However, it also looks like only omap2 is the only platform that makes 
+these special assumptions so when this code is run on STM32 there is 
+nothing to actually consume the CLK_IS_BASIC flag at runtime.
+
+In other words the flag is useless but, I think, also correctly applied.
+
+I'd be happy to remove it if anyone disagrees with the guesswork above.
+
+Alternatively, I could write a patch to *invert* CLK_IS_BASIC and rename 
+it CLK_CASTABLE on the grounds that only the people doing "weird stuff" 
+should have to care about this flag at all. Any interest in that?
+
+
+>> +	init.parent_names = &parent_name;
+>> +	init.num_parents = 1;
+>> +
+>> +	clk = clk_register(dev, &am->hw);
+>> +
+>> +	if (IS_ERR(clk))
+>> +		kfree(am);
+>> +
+>> +	return clk;
+>> +}
+>> +
+>> +static const char __initdata *sys_parents[] =   { "hsi", NULL, "pll" };
+>
+> __initdata goes after the []
+
+Thanks. I'll fix this.
