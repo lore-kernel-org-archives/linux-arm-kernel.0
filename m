@@ -1,32 +1,31 @@
-From: fkan@apm.com (Feng Kan)
-Date: Thu, 4 Jun 2015 20:37:50 -0700
-Subject: [PATCH v0] gpio_keys: fix gpio key driver to proper support GIC
- interrupt
-In-Reply-To: <20150604172324.GA9074@dtor-ws>
-References: <1433402712-21399-1-git-send-email-yvo@apm.com>
- <20150604172324.GA9074@dtor-ws>
-Message-ID: <CAL85gmC2oHVKzgfNFXRzSzigQu++OJv-TpwzeN5fC-5s3U0U-Q@mail.gmail.com>
+From: fengguang.wu@intel.com (Fengguang Wu)
+Date: Fri, 5 Jun 2015 11:53:13 +0800
+Subject: [RFT v2 00/48] Refine irq interfaces to reduce number of
+ parameters
+In-Reply-To: <CAMuHMdUfGMU3m35xWD9vE1RNW80jjHx_KLM3a4GWq=JfuGcGBw@mail.gmail.com>
+References: <1433391238-19471-1-git-send-email-jiang.liu@linux.intel.com>
+ <CAMuHMdUfGMU3m35xWD9vE1RNW80jjHx_KLM3a4GWq=JfuGcGBw@mail.gmail.com>
+Message-ID: <20150605035313.GA7707@wfg-t540p.sh.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 4, 2015 at 10:23 AM, Dmitry Torokhov
-<dmitry.torokhov@gmail.com> wrote:
-> Hi Y,
-> On Thu, Jun 04, 2015 at 02:25:12PM +0700, Y Vo wrote:
->> GIC is designed to support two of trigger mechanisms - active level
->> high or edge rising. But in the gpio_keys driver, it tries to use both
->> edge rising and edge falling trigger. This patch fixes the gpio_keys
->> driver to request only the edge rising event when failed to configure the
->> interrupt.
->
-> How do we get notified of button release if we only get interrupt on
-> rising edge?
+> > The patch set passes Fengguang's 0day test suites as below. And tests
+> > with other platforms and configurations will be appreciated:)
+> > ----------------------------------------------------------
+> > configs tested: 95
+> 
+> [...]
+> 
+> > m68k                          amiga_defconfig
+> > m68k                       m5475evb_defconfig
+> > m68k                          multi_defconfig
+> 
+> For Fengguang: amiga_defconfig is a subset of multi_defconfig.
+> But sun3_defconfig is distinct, as Sun-3 has a different MMU and thus support
+> for it cannot be included in multi-platform kernels.
+> So I think you better replace amiga_defconfig by sun3_defconfig for build tests.
 
-On the arm gic, only the rising edge is supported. So key press can
-only be defined
-as rising edge and no key release.
->
-> Thanks.
->
-> --
-> Dmitry
+Got it and changed the code accordingly, thank you for the suggestion!
+
+Thanks,
+Fengguang
