@@ -1,67 +1,38 @@
-From: jonas.jensen@gmail.com (Jonas Jensen)
-Date: Fri,  5 Jun 2015 15:46:18 +0200
-Subject: [PATCH] net: moxa: fix TX overrun memory leak
-Message-ID: <1433511978-17666-1-git-send-email-jonas.jensen@gmail.com>
+From: dinguyen@opensource.altera.com (Dinh Nguyen)
+Date: Fri, 5 Jun 2015 08:57:07 -0500
+Subject: [PATCHv2 2/4] edac, altera: Refactor EDAC for Altera CycloneV SoC.
+In-Reply-To: <20150605091731.GA3679@pd.tnic>
+References: <1433428128-7292-1-git-send-email-tthayer@opensource.altera.com>
+ <1433428128-7292-3-git-send-email-tthayer@opensource.altera.com>
+ <55706E25.8050105@opensource.altera.com>
+ <5570C479.7010902@opensource.altera.com> <20150604220609.GK3795@pd.tnic>
+ <5570D0D0.9030803@opensource.altera.com> <20150605091731.GA3679@pd.tnic>
+Message-ID: <5571AAB3.2000005@opensource.altera.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-moxart_mac_start_xmit() doesn't care where tx_tail is, tx_head can
-catch and pass tx_tail, which is bad because moxart_tx_finished()
-isn't guaranteed to catch up on freeing resources from tx_tail.
+Hi Boris,
 
-Add a check in moxart_mac_start_xmit(), exit to make sure tx_head
-never passes tx_tail.
+On 6/5/15 4:17 AM, Borislav Petkov wrote:
+> On Thu, Jun 04, 2015 at 05:27:28PM -0500, Dinh Nguyen wrote:
+>> This is my mistake. I applied Alan Tull's patch for suspend-to-ram which
+>> also touches drivers/edac/altera_edac.c.
+>>
+>> https://git.kernel.org/cgit/linux/kernel/git/dinguyen/linux.git/commit/?h=socfpga_for_next_arria10&id=d44a92eb044f4cc1abf34a790d647e9fa356d7b0
+>>
+>> I think I will have to ask Alan to split up his patch and send the part
+>> that touches altera_edac.c to linux-edac.
+> 
+> Nah, that's fine. If it is that hunk adding altr_sdram_prepare(), he can
+> simply add my ACK for the EDAC bits:
+> 
+> Acked-by: Borislav Petkov <bp@suse.de>
+> 
 
-Move tx_head and place tx_tail within spinlock, avoiding read-write
-race that could happen when interrupts hit at the wrong moment.
+Thanks alot for doing that! But I have sent you a separate patch for
+this. It would have caused a merge conflict for v4.2 if I left the
+suspend-to-ram patch as is.
 
-Addresses https://bugzilla.kernel.org/show_bug.cgi?id=99451
+Thanks,
 
-Signed-off-by: Jonas Jensen <jonas.jensen@gmail.com>
----
-
-Notes:
-    Applies to next-20150604
-
- drivers/net/ethernet/moxa/moxart_ether.c | 14 ++++++++++++--
- 1 file changed, 12 insertions(+), 2 deletions(-)
-
-diff --git a/drivers/net/ethernet/moxa/moxart_ether.c b/drivers/net/ethernet/moxa/moxart_ether.c
-index becbb5f..e0af86c 100644
---- a/drivers/net/ethernet/moxa/moxart_ether.c
-+++ b/drivers/net/ethernet/moxa/moxart_ether.c
-@@ -25,6 +25,7 @@
- #include <linux/of_irq.h>
- #include <linux/crc32.h>
- #include <linux/crc32c.h>
-+#include <linux/circ_buf.h>
- 
- #include "moxart_ether.h"
- 
-@@ -312,13 +313,22 @@ static int moxart_mac_start_xmit(struct sk_buff *skb, struct net_device *ndev)
- 	struct moxart_mac_priv_t *priv = netdev_priv(ndev);
- 	void __iomem *desc;
- 	unsigned int len;
--	unsigned int tx_head = priv->tx_head;
-+	unsigned int tx_head, tx_tail;
- 	u32 txdes1;
- 	int ret = NETDEV_TX_BUSY;
- 
-+	spin_lock_irq(&priv->txlock);
-+
-+	tx_head = priv->tx_head;
-+	tx_tail = priv->tx_tail;
-+
- 	desc = priv->tx_desc_base + (TX_REG_DESC_SIZE * tx_head);
- 
--	spin_lock_irq(&priv->txlock);
-+	if (CIRC_SPACE(tx_head, tx_tail, TX_DESC_NUM) == 0) {
-+		priv->stats.tx_dropped++;
-+		goto out_unlock;
-+	}
-+
- 	if (readl(desc + TX_REG_OFFSET_DESC0) & TX_DESC0_DMA_OWN) {
- 		net_dbg_ratelimited("no TX space for packet\n");
- 		priv->stats.tx_dropped++;
--- 
-1.8.2.1
+Dinh
