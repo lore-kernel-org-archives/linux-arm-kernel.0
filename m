@@ -1,34 +1,44 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 5 Jun 2015 10:05:34 +0100
-Subject: Master-aware devices and sideband ID data
-In-Reply-To: <158EFC9F-FCAF-44D3-AD40-804EDFE0CE25@caviumnetworks.com>
-References: <20150324155007.GC23005@leverpostej>
- <26BE36EF-2C5B-4DA6-8950-8FEBB031ED1B@caviumnetworks.com>
- <20150527173953.GC23176@leverpostej>
- <E342D737-5DD5-48C7-BB01-B83C29CB6E31@caviumnetworks.com>
- <20150601102208.GD22406@leverpostej>
- <158EFC9F-FCAF-44D3-AD40-804EDFE0CE25@caviumnetworks.com>
-Message-ID: <20150605090534.GC1198@arm.com>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Fri, 05 Jun 2015 10:13:16 +0100
+Subject: [PATCH v3 4/5] clk: scpi: add support for cpufreq virtual device
+In-Reply-To: <20150604211904.GO676@codeaurora.org>
+References: <1432720398-5701-1-git-send-email-sudeep.holla@arm.com>
+ <1432720398-5701-5-git-send-email-sudeep.holla@arm.com>
+ <20150604211904.GO676@codeaurora.org>
+Message-ID: <5571682C.4040908@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 04, 2015 at 11:19:30PM +0100, Chalamarla, Tirumalesh wrote:
-> > On Jun 1, 2015, at 3:22 AM, Mark Rutland <mark.rutland@arm.com> wrote:
-> > It's possible to specify that the paths exist. I expect that software
-> > would select which to use at runtime.
-> > 
-> My worry is how to define any priorities/preferences between masters. 
-> in general the proposal looks reasonable.
 
-I agree that the proposal looks reasonable (in terms of the ability to
-describe the sort of topologies that we will face) but I still don't
-understand what I need to do in e.g. my IOMMU driver to support this
-binding whilst continuing to support the existing iommus binding, which
-is relied upon to configure dma-mapping.
 
-Mark: how do you see this co-existing/merging with the current bindings?
-I don't think it's practical to throw away what we have and move over to
-something totally different all in one go, but there clearly *is* benefit
-in your proposal over the existing scheme.
+On 04/06/15 22:19, Stephen Boyd wrote:
+> On 05/27, Sudeep Holla wrote:
+>> The clocks for the CPUs are provided by SCP and are managed by this
+>> clock driver. So the cpufreq device needs to be added only after the
+>> clock get registered and removed when this driver is unloaded.
+>>
+>> This patch manages the cpufreq virtual device based on the clock
+>> availability.
+>>
+>> Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
+>> Cc: Mike Turquette <mturquette@linaro.org>
+>> Cc: Stephen Boyd <sboyd@codeaurora.org>
+>> Cc: Liviu Dudau <Liviu.Dudau@arm.com>
+>> Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+>> Cc: Jon Medhurst (Tixy) <tixy@linaro.org>
+>> Cc: linux-clk at vger.kernel.org
+>> ---
+>
+> Acked-by: Stephen Boyd <sboyd@codeaurora.org>
+>
+>
 
-Will
+Thanks
+
+> I guess there's no better place for this right now.
+>
+
+True
+
+Regards,
+Sudeep
