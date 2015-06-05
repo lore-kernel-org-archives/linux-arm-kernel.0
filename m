@@ -1,114 +1,436 @@
-From: jistone@redhat.com (Josh Stone)
-Date: Thu, 04 Jun 2015 16:17:56 -0700
-Subject: [PATCH] arm64: fix missing syscall trace exit
-In-Reply-To: <55708783.2090909@redhat.com>
-References: <20150601102448.GG1641@arm.com>
- <1433293304-26539-1-git-send-email-jistone@redhat.com>
- <556E5454.9080400@redhat.com> <20150604100625.GI7557@n2100.arm.linux.org.uk>
- <55708783.2090909@redhat.com>
-Message-ID: <5570DCA4.3050600@redhat.com>
+From: dja@axtens.net (Daniel Axtens)
+Date: Fri, 05 Jun 2015 10:22:53 +1000
+Subject: [RFT v2 00/48] Refine irq interfaces to reduce number of
+ parameters
+In-Reply-To: <1433391238-19471-1-git-send-email-jiang.liu@linux.intel.com>
+References: <1433391238-19471-1-git-send-email-jiang.liu@linux.intel.com>
+Message-ID: <1433463773.7208.0.camel@axtens.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/04/2015 10:14 AM, Josh Stone wrote:
-> Whether that exact path is reached -- I think so.  I ran my test on a
-> distro kernel to see the failure, then applied only this fix and ran
-> again, could no longer see failure.
+Hi Gerry,
+
+You seem to be missing the links where I can grab this patch set from,
+as indicated below. Is there somewhere I can pull this from to make it a
+bit easier for me to build?
+
+(Sorry if I've missed this elsewhere in the thread!)
+
+Thanks in advance,
+Daniel
+
+On Thu, 2015-06-04 at 12:13 +0800, Jiang Liu wrote:
+> Many irq core interfaces pass both 'struct irq_desc *desc' and 'int irq'
+> to identify an irq. But that's a little overhead, either 'irq_desc' or
+> 'irq' could identify an irq. We could get 'irq_desc' from 'irq' by
+> irq_to_desc() and get 'irq' from 'irq_desc' through irq_desc->irq_data.irq.
+> So this patch set aims to reduce number of parameters of irq related
+> interfaces by passing in either 'irq' or 'irq_desc" but not both.
+> Hope this helps to simplify interfaces and improve performance.
 > 
-> I can try a systemtap or ftrace kprobe on ret_fast_syscall to be sure
-> that path is reached.
+> This patch set is based the patch set to refine struct irq_data, which
+> has been posted at:
+Here
+> 
+> The patch set could be split into five parts:
+> 1) Patch 1-2 is following-on cleanup work for 
+> 2) Patch 3-14 optimize irq handlers by avoiding redundant calling of 
+>    irq_to_desc() when we already have a pointer to corresponding irq_desc.
+> 3) Patch 15-20 reduce number of parameters of irq core functions.
+> 4) Patch 21-34 prepare for killing the first parameter 'irq' of
+>    irq_flow_handler_t
+> 5) Patch 35-48 kill the first parameter 'irq' of irq_flow_handler_t.
+>    All these patches should be combined as one big patch to support
+>    bisecting, they have been split for easy review only.
+> 
+> With all these patches applied, a tree-wide 'grep -R "struct irq_desc" *'
+> shows that there are only four functions left who take both 'irq' and
+> 'irq_desc' as parameters:
+> kernel/irq/manage.c:__setup_irq(unsigned int irq, struct irq_desc *desc, struct irqaction *new)
+> kernel/irq/debug.h:static inline void print_irq_desc(unsigned int irq, struct irq_desc *desc)
+> kernel/irq/irqdesc.c:static void desc_set_defaults(unsigned int irq, struct irq_desc *desc, int node,
+> kernel/irq/irqdesc.c:static void irq_insert_desc(unsigned int irq, struct irq_desc *desc)
+> 
+> They are all pretty safe, it's a good sign that we have done a clean
+> conversion. Thomas suggested to use coci scripts verify conversion result,
+> it's a little hard for me and will ask for help from Julia later.
+> 
+> You may get the patch set from:
+Here
 
-I haven't gotten an ARM system yet.  ARM64 doesn't have kprobes, so I
-can't directly probe ret_fast_syscall, but I did use the sched_switch
-tracepoint to confirm that the thread_info flags didn't contain any
-tracing flags until the moment I set PTRACE_SYSCALL, so it ought to be
-on that fast path.
+> The patch set passes Fengguang's 0day test suites as below. And tests
+> with other platforms and configurations will be appreciated:)
+> ----------------------------------------------------------
+> configs tested: 95
+> 
+> alpha                               defconfig
+> parisc                            allnoconfig
+> parisc                         b180_defconfig
+> parisc                        c3000_defconfig
+> parisc                              defconfig
+> i386                   randconfig-a0-06031710
+> i386                   randconfig-a1-06031710
+> x86_64                             acpi-redef
+> x86_64                           allyesdebian
+> x86_64                                nfsroot
+> x86_64                            allnoconfig
+> x86_64                                   rhel
+> sh                                allnoconfig
+> sh                          rsk7269_defconfig
+> sh                  sh7785lcr_32bit_defconfig
+> sh                            titan_defconfig
+> ia64                             alldefconfig
+> ia64                              allnoconfig
+> ia64                                defconfig
+> powerpc                           allnoconfig
+> powerpc                             defconfig
+> powerpc                       ppc64_defconfig
+> i386                             alldefconfig
+> i386                             allmodconfig
+> i386                              allnoconfig
+> i386                                defconfig
+> mips                              allnoconfig
+> mips                      fuloong2e_defconfig
+> mips                                   jz4740
+> mips                                     txx9
+> x86_64                     randconfig-i0-0603
+> x86_64                     randconfig-i1-0603
+> sparc                               defconfig
+> sparc64                           allnoconfig
+> sparc64                             defconfig
+> microblaze                      mmu_defconfig
+> microblaze                    nommu_defconfig
+> i386                       randconfig-i0-0603
+> i386                       randconfig-i1-0603
+> i386                             allyesconfig
+> blackfin                BF526-EZBRD_defconfig
+> blackfin                BF533-EZKIT_defconfig
+> blackfin            BF561-EZKIT-SMP_defconfig
+> blackfin                  TCM-BF537_defconfig
+> cris                 etrax-100lx_v2_defconfig
+> i386                       randconfig-n0-0603
+> i386                       randconfig-n1-0603
+> x86_64                                    lkp
+> arm                               allnoconfig
+> arm                         at91_dt_defconfig
+> arm                                  at_hdmac
+> arm                                    ep93xx
+> arm                       imx_v6_v7_defconfig
+> arm                                  iop-adma
+> arm                          marzen_defconfig
+> arm                          prima2_defconfig
+> arm                                    sa1100
+> arm                                   samsung
+> arm                                        sh
+> arm                       spear13xx_defconfig
+> m68k                          amiga_defconfig
+> m68k                       m5475evb_defconfig
+> m68k                          multi_defconfig
+> x86_64                           allmodconfig
+> x86_64               randconfig-x000-06031659
+> x86_64               randconfig-x001-06031659
+> x86_64               randconfig-x002-06031659
+> x86_64               randconfig-x003-06031659
+> x86_64               randconfig-x004-06031659
+> x86_64               randconfig-x005-06031659
+> x86_64               randconfig-x006-06031659
+> x86_64               randconfig-x007-06031659
+> x86_64               randconfig-x008-06031659
+> x86_64               randconfig-x009-06031659
+> i386                       randconfig-r0-0603
+> i386                       randconfig-r1-0603
+> avr32                      atngw100_defconfig
+> avr32                     atstk1006_defconfig
+> frv                                 defconfig
+> mn10300                     asb2364_defconfig
+> openrisc                    or1ksim_defconfig
+> tile                         tilegx_defconfig
+> um                             i386_defconfig
+> um                           x86_64_defconfig
+> i386                 randconfig-x000-06031736
+> i386                 randconfig-x001-06031736
+> i386                 randconfig-x002-06031736
+> i386                 randconfig-x003-06031736
+> i386                 randconfig-x004-06031736
+> i386                 randconfig-x005-06031736
+> i386                 randconfig-x006-06031736
+> i386                 randconfig-x007-06031736
+> i386                 randconfig-x008-06031736
+> i386                 randconfig-x009-06031736
+> x86_64                 randconfig-x0-06031736
+> 
+> Thanks!
+> Gerry
+> 
+> Jiang Liu (48):
+>   genirq: Clean up outdated comments related to include/linux/irqdesc.h
+>   genirq: Kill never used irq_node()
+>   MIPS, irq: Use irq_desc_get_xxx() to avoid redundant lookup of
+>     irq_desc
+>   powerpc, irq: Use irq_desc_get_xxx() to avoid redundant lookup of
+>     irq_desc
+>   gpio: Use irq_desc_get_xxx() to avoid redundant lookup of irq_desc
+>   pinctrl: Use irq_desc_get_xxx() to avoid redundant lookup of irq_desc
+>   avr32, irq: Use irq_desc_get_xxx() to avoid redundant lookup of
+>     irq_desc
+>   mfd: Use irq_desc_get_xxx() to avoid redundant lookup of irq_desc
+>   ARM, irq: Use irq_desc_get_xxx() to avoid redundant lookup of
+>     irq_desc
+>   irqchip: Use irq_desc_get_xxx() to avoid redundant lookup of irq_desc
+>   ipu: Use irq_desc_get_xxx() to avoid redundant lookup of irq_desc
+>   sh: intc: Use irq_desc_get_xxx() to avoid redundant lookup of
+>     irq_desc
+>   keystone, irq: Use irq_data_get_xxx() to avoid redundant lookup of
+>     irq_data
+>   spmi: Use irq_desc_get_xxx() to avoid redundant lookup of irq_desc
+>   genirq: Kill the parameter 'irq' of kstat_incr_irqs_this_cpu()
+>   genirq: Introduce helper irq_desc_get_irq()
+>   genirq: Kill the parameter 'irq' of check_irq_resend()
+>   genirq: Kill the parameter 'irq' of note_interrupt()
+>   genirq: Change prototypes of register_irq_proc() and friends
+>   genirq: Kill the parameter 'irq' of setup_affinity()
+>   ARM, irq: Prepare for killing the first parameter 'irq' of
+>     irq_flow_handler_t
+>   blackfin, irq: Prepare for killing the first parameter 'irq' of
+>     irq_flow_handler_t
+>   c6x, irq: Prepare for killing the first parameter 'irq' of
+>     irq_flow_handler_t
+>   m68k, irq: Prepare for killing the first parameter 'irq' of
+>     irq_flow_handler_t
+>   mips, irq: Prepare for killing the first parameter 'irq' of
+>     irq_flow_handler_t
+>   powerpc, irq: Prepare for killing the first parameter 'irq' of
+>     irq_flow_handler_t
+>   sh, irq: Prepare for killing the first parameter 'irq' of
+>     irq_flow_handler_t
+>   unicore32, irq: Prepare for killing the first parameter 'irq' of
+>     irq_flow_handler_t
+>   ipu: Prepare for killing the first parameter 'irq' of
+>     irq_flow_handler_t
+>   gpio: Prepare for killing the first parameter 'irq' of
+>     irq_flow_handler_t
+>   irqchip: Prepare for killing the first parameter 'irq' of
+>     irq_flow_handler_t
+>   mfd: Prepare for killing the first parameter 'irq' of
+>     irq_flow_handler_t
+>   PCI/keystone: Prepare for killing the first parameter 'irq' of
+>     irq_flow_handler_t
+>   pinctrl: Prepare for killing the first parameter 'irq' of
+>     irq_flow_handler_t
+>   genirq: Kill the first parameter 'irq' of irq_flow_handler_t
+>   genirq, arm: Kill the first parameter 'irq' of irq_flow_handler_t
+>   genirq, blackfin: Kill the first parameter 'irq' of
+>     irq_flow_handler_t
+>   genirq, powerpc: Kill the first parameter 'irq' of irq_flow_handler_t
+>   genirq, mips: Kill the first parameter 'irq' of irq_flow_handler_t
+>   genirq, m68k: Kill the first parameter 'irq' of irq_flow_handler_t
+>   genirq, x86: Kill the first parameter 'irq' of irq_flow_handler_t
+>   genirq, sh: Kill the first parameter 'irq' of irq_flow_handler_t
+>   genirq, arch: Kill the first parameter 'irq' of irq_flow_handler_t
+>   genirq, pinctrl: Kill the first parameter 'irq' of irq_flow_handler_t
+>   genirq, gpio: Kill the first parameter 'irq' of irq_flow_handler_t
+>   genirq, irqchip: Kill the first parameter 'irq' of irq_flow_handler_t
+>   genirq, mfd: Kill the first parameter 'irq' of irq_flow_handler_t
+>   genirq, drivers: Kill the first parameter 'irq' of irq_flow_handler_t
+> 
+>  arch/alpha/kernel/irq.c                         |    2 +-
+>  arch/arm/common/it8152.c                        |    2 +-
+>  arch/arm/common/locomo.c                        |   13 ++---
+>  arch/arm/common/sa1111.c                        |    6 +--
+>  arch/arm/include/asm/hardware/it8152.h          |    2 +-
+>  arch/arm/include/asm/mach/irq.h                 |    4 +-
+>  arch/arm/mach-dove/irq.c                        |    5 +-
+>  arch/arm/mach-footbridge/isa-irq.c              |    4 +-
+>  arch/arm/mach-gemini/gpio.c                     |    2 +-
+>  arch/arm/mach-imx/3ds_debugboard.c              |    2 +-
+>  arch/arm/mach-imx/mach-mx31ads.c                |    2 +-
+>  arch/arm/mach-iop13xx/msi.c                     |    2 +-
+>  arch/arm/mach-lpc32xx/irq.c                     |    4 +-
+>  arch/arm/mach-netx/generic.c                    |    2 +-
+>  arch/arm/mach-omap1/fpga.c                      |    2 +-
+>  arch/arm/mach-omap2/prm_common.c                |    2 +-
+>  arch/arm/mach-pxa/balloon3.c                    |    5 +-
+>  arch/arm/mach-pxa/cm-x2xx-pci.c                 |    4 +-
+>  arch/arm/mach-pxa/lpd270.c                      |    6 +--
+>  arch/arm/mach-pxa/pcm990-baseboard.c            |    5 +-
+>  arch/arm/mach-pxa/viper.c                       |    8 ++-
+>  arch/arm/mach-pxa/zeus.c                        |    8 ++-
+>  arch/arm/mach-rpc/ecard.c                       |    2 +-
+>  arch/arm/mach-s3c24xx/bast-irq.c                |    3 +-
+>  arch/arm/mach-s3c64xx/common.c                  |    8 +--
+>  arch/arm/mach-sa1100/neponset.c                 |    2 +-
+>  arch/arm/plat-orion/gpio.c                      |    4 +-
+>  arch/avr32/mach-at32ap/extint.c                 |    2 +-
+>  arch/avr32/mach-at32ap/pio.c                    |    4 +-
+>  arch/blackfin/include/asm/irq_handler.h         |    4 +-
+>  arch/blackfin/kernel/ipipe.c                    |    4 +-
+>  arch/blackfin/mach-bf537/ints-priority.c        |    8 ++-
+>  arch/blackfin/mach-common/ints-priority.c       |    8 ++-
+>  arch/c6x/platforms/megamod-pic.c                |    9 ++--
+>  arch/m68k/amiga/amiints.c                       |    8 +--
+>  arch/m68k/coldfire/intc-5272.c                  |    4 +-
+>  arch/m68k/include/asm/irq.h                     |    3 +-
+>  arch/m68k/include/asm/mac_via.h                 |    2 +-
+>  arch/m68k/mac/baboon.c                          |    2 +-
+>  arch/m68k/mac/oss.c                             |    4 +-
+>  arch/m68k/mac/psc.c                             |    3 +-
+>  arch/m68k/mac/via.c                             |    6 +--
+>  arch/mips/alchemy/common/irq.c                  |    4 +-
+>  arch/mips/alchemy/devboards/bcsr.c              |    3 +-
+>  arch/mips/ath25/ar2315.c                        |    4 +-
+>  arch/mips/ath25/ar5312.c                        |    4 +-
+>  arch/mips/ath79/irq.c                           |   11 ++--
+>  arch/mips/cavium-octeon/octeon-irq.c            |   12 +++--
+>  arch/mips/include/asm/netlogic/common.h         |    4 +-
+>  arch/mips/jz4740/gpio.c                         |    2 +-
+>  arch/mips/netlogic/common/smp.c                 |    4 +-
+>  arch/mips/pci/pci-ar2315.c                      |    4 +-
+>  arch/mips/pci/pci-ar71xx.c                      |    4 +-
+>  arch/mips/pci/pci-ar724x.c                      |    4 +-
+>  arch/mips/pci/pci-rt3883.c                      |    8 ++-
+>  arch/mips/ralink/irq.c                          |    4 +-
+>  arch/powerpc/include/asm/qe_ic.h                |   23 ++++----
+>  arch/powerpc/include/asm/tsi108_pci.h           |    2 +-
+>  arch/powerpc/platforms/512x/mpc5121_ads_cpld.c  |    4 +-
+>  arch/powerpc/platforms/52xx/media5200.c         |    2 +-
+>  arch/powerpc/platforms/52xx/mpc52xx_gpt.c       |    4 +-
+>  arch/powerpc/platforms/82xx/pq2ads-pci-pic.c    |    2 +-
+>  arch/powerpc/platforms/85xx/common.c            |    2 +-
+>  arch/powerpc/platforms/85xx/mpc85xx_cds.c       |    5 +-
+>  arch/powerpc/platforms/85xx/mpc85xx_ds.c        |    2 +-
+>  arch/powerpc/platforms/85xx/socrates_fpga_pic.c |    4 +-
+>  arch/powerpc/platforms/86xx/pic.c               |    2 +-
+>  arch/powerpc/platforms/8xx/m8xx_setup.c         |    2 +-
+>  arch/powerpc/platforms/cell/axon_msi.c          |    4 +-
+>  arch/powerpc/platforms/cell/interrupt.c         |    3 +-
+>  arch/powerpc/platforms/cell/spider-pic.c        |    2 +-
+>  arch/powerpc/platforms/chrp/setup.c             |    2 +-
+>  arch/powerpc/platforms/embedded6xx/hlwd-pic.c   |    5 +-
+>  arch/powerpc/platforms/embedded6xx/mvme5100.c   |    2 +-
+>  arch/powerpc/platforms/pseries/setup.c          |    2 +-
+>  arch/powerpc/sysdev/ge/ge_pic.c                 |    2 +-
+>  arch/powerpc/sysdev/ge/ge_pic.h                 |    2 +-
+>  arch/powerpc/sysdev/mpic.c                      |    2 +-
+>  arch/powerpc/sysdev/qe_lib/qe_ic.c              |    4 +-
+>  arch/powerpc/sysdev/tsi108_pci.c                |    2 +-
+>  arch/powerpc/sysdev/uic.c                       |    4 +-
+>  arch/powerpc/sysdev/xics/xics-common.c          |    2 +-
+>  arch/powerpc/sysdev/xilinx_intc.c               |    2 +-
+>  arch/sh/boards/mach-se/7343/irq.c               |    4 +-
+>  arch/sh/boards/mach-se/7722/irq.c               |    4 +-
+>  arch/sh/boards/mach-se/7724/irq.c               |    4 +-
+>  arch/sh/boards/mach-x3proto/gpio.c              |    4 +-
+>  arch/sh/cchips/hd6446x/hd64461.c                |    2 +-
+>  arch/sparc/kernel/leon_kernel.c                 |    2 +-
+>  arch/sparc/kernel/leon_pci_grpci1.c             |    2 +-
+>  arch/sparc/kernel/leon_pci_grpci2.c             |    2 +-
+>  arch/tile/kernel/pci_gx.c                       |    4 +-
+>  arch/unicore32/kernel/irq.c                     |    5 +-
+>  arch/x86/kernel/irq_32.c                        |   13 +++--
+>  arch/x86/kernel/irq_64.c                        |    2 +-
+>  arch/x86/lguest/boot.c                          |    2 +-
+>  drivers/dma/ipu/ipu_irq.c                       |    8 +--
+>  drivers/gpio/gpio-altera.c                      |    6 +--
+>  drivers/gpio/gpio-bcm-kona.c                    |    4 +-
+>  drivers/gpio/gpio-davinci.c                     |    3 +-
+>  drivers/gpio/gpio-dwapb.c                       |    4 +-
+>  drivers/gpio/gpio-ep93xx.c                      |    5 +-
+>  drivers/gpio/gpio-intel-mid.c                   |    2 +-
+>  drivers/gpio/gpio-lynxpoint.c                   |    2 +-
+>  drivers/gpio/gpio-mpc8xxx.c                     |    2 +-
+>  drivers/gpio/gpio-msic.c                        |    2 +-
+>  drivers/gpio/gpio-msm-v2.c                      |    2 +-
+>  drivers/gpio/gpio-mvebu.c                       |    4 +-
+>  drivers/gpio/gpio-mxc.c                         |   10 ++--
+>  drivers/gpio/gpio-mxs.c                         |    4 +-
+>  drivers/gpio/gpio-omap.c                        |    4 +-
+>  drivers/gpio/gpio-pl061.c                       |    2 +-
+>  drivers/gpio/gpio-pxa.c                         |    2 +-
+>  drivers/gpio/gpio-sa1100.c                      |    5 +-
+>  drivers/gpio/gpio-tegra.c                       |    6 +--
+>  drivers/gpio/gpio-timberdale.c                  |    7 +--
+>  drivers/gpio/gpio-tz1090.c                      |    4 +-
+>  drivers/gpio/gpio-vf610.c                       |    4 +-
+>  drivers/gpio/gpio-zynq.c                        |    4 +-
+>  drivers/gpu/ipu-v3/ipu-common.c                 |    8 +--
+>  drivers/irqchip/exynos-combiner.c               |    8 +--
+>  drivers/irqchip/irq-armada-370-xp.c             |    5 +-
+>  drivers/irqchip/irq-bcm7038-l1.c                |    2 +-
+>  drivers/irqchip/irq-bcm7120-l2.c                |    2 +-
+>  drivers/irqchip/irq-brcmstb-l2.c                |    7 +--
+>  drivers/irqchip/irq-dw-apb-ictl.c               |    6 +--
+>  drivers/irqchip/irq-gic.c                       |    6 +--
+>  drivers/irqchip/irq-imgpdc.c                    |    5 +-
+>  drivers/irqchip/irq-keystone.c                  |    6 +--
+>  drivers/irqchip/irq-metag-ext.c                 |    3 +-
+>  drivers/irqchip/irq-metag.c                     |    3 +-
+>  drivers/irqchip/irq-mips-gic.c                  |    2 +-
+>  drivers/irqchip/irq-mmp.c                       |    3 +-
+>  drivers/irqchip/irq-orion.c                     |    4 +-
+>  drivers/irqchip/irq-s3c24xx.c                   |    6 +--
+>  drivers/irqchip/irq-sunxi-nmi.c                 |    4 +-
+>  drivers/irqchip/irq-tb10x.c                     |    4 +-
+>  drivers/irqchip/irq-versatile-fpga.c            |    6 +--
+>  drivers/irqchip/irq-vic.c                       |    2 +-
+>  drivers/irqchip/spear-shirq.c                   |    4 +-
+>  drivers/mfd/asic3.c                             |    2 +-
+>  drivers/mfd/ezx-pcap.c                          |    4 +-
+>  drivers/mfd/htc-egpio.c                         |    2 +-
+>  drivers/mfd/jz4740-adc.c                        |    2 +-
+>  drivers/mfd/max8997-irq.c                       |    8 +--
+>  drivers/mfd/mt6397-core.c                       |    8 +--
+>  drivers/mfd/pm8921-core.c                       |    2 +-
+>  drivers/mfd/t7l66xb.c                           |    4 +-
+>  drivers/mfd/tc6393xb.c                          |    4 +-
+>  drivers/mfd/twl6030-irq.c                       |    2 +-
+>  drivers/mfd/ucb1x00-core.c                      |    4 +-
+>  drivers/pci/host/pci-keystone-dw.c              |   15 +++---
+>  drivers/pci/host/pci-keystone.c                 |    7 +--
+>  drivers/pinctrl/bcm/pinctrl-cygnus-gpio.c       |    2 +-
+>  drivers/pinctrl/intel/pinctrl-baytrail.c        |    2 +-
+>  drivers/pinctrl/intel/pinctrl-cherryview.c      |    4 +-
+>  drivers/pinctrl/intel/pinctrl-intel.c           |    4 +-
+>  drivers/pinctrl/mediatek/pinctrl-mtk-common.c   |    6 +--
+>  drivers/pinctrl/nomadik/pinctrl-nomadik.c       |   14 +++--
+>  drivers/pinctrl/pinctrl-adi2.c                  |    3 +-
+>  drivers/pinctrl/pinctrl-amd.c                   |    8 +--
+>  drivers/pinctrl/pinctrl-at91.c                  |    4 +-
+>  drivers/pinctrl/pinctrl-coh901.c                |    7 +--
+>  drivers/pinctrl/pinctrl-rockchip.c              |    8 +--
+>  drivers/pinctrl/pinctrl-single.c                |    4 +-
+>  drivers/pinctrl/pinctrl-st.c                    |   10 ++--
+>  drivers/pinctrl/qcom/pinctrl-msm.c              |    6 +--
+>  drivers/pinctrl/samsung/pinctrl-exynos.c        |   12 ++---
+>  drivers/pinctrl/samsung/pinctrl-s3c24xx.c       |   26 ++++-----
+>  drivers/pinctrl/samsung/pinctrl-s3c64xx.c       |   32 ++++++-----
+>  drivers/pinctrl/sirf/pinctrl-sirf.c             |    7 +--
+>  drivers/pinctrl/spear/pinctrl-plgpio.c          |    2 +-
+>  drivers/pinctrl/sunxi/pinctrl-sunxi.c           |    7 +--
+>  drivers/sh/intc/core.c                          |    4 +-
+>  drivers/sh/intc/virq.c                          |   18 ++++---
+>  drivers/spmi/spmi-pmic-arb.c                    |    6 +--
+>  include/linux/irq.h                             |   20 ++++---
+>  include/linux/irqdesc.h                         |   12 +++--
+>  include/linux/irqhandler.h                      |    2 +-
+>  include/linux/irqnr.h                           |    6 ---
+>  kernel/irq/chip.c                               |   44 +++++++--------
+>  kernel/irq/handle.c                             |    8 +--
+>  kernel/irq/internals.h                          |   29 +++++-----
+>  kernel/irq/irqdesc.c                            |    6 +--
+>  kernel/irq/manage.c                             |   66 ++++++++++++-----------
+>  kernel/irq/pm.c                                 |   12 ++---
+>  kernel/irq/proc.c                               |   16 +++---
+>  kernel/irq/resend.c                             |    4 +-
+>  kernel/irq/spurious.c                           |   33 ++++++------
+>  189 files changed, 543 insertions(+), 565 deletions(-)
+> 
 
-Plus I confirmed again that without those two lines in ret_fast_syscall
-it still fails my test, and succeeds with them, so I can't see how it
-could be anything but this path.
-
-> Because I was working from a distro kernel, it didn't have debugging
-> options, no.  I'll go run that now, including both arm and arm64 if I
-> can find available systems...
-
-Now I booted an arm64 machine into kernel v4.1-rc6-52-gff25ea8 plus my
-__sys_trace_return patch, and I enabled debug options.  I get a lot of
-might_sleep errors from xgbe_tx_timer (below), but this happens even
-without my patch.
-
-I get no kernel debug errors or warnings from my test, except that it
-records the SIGSEGV termination (which is by design).  I even threw a
-loop inside the test to hammer it more -- all clean.
-
-Still, I don't think it's right to trace with interrupts disabled, so
-here's a version which enables them again first.  How does this look?
-
-diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
-index 959fe87..988bea4 100644
---- a/arch/arm64/kernel/entry.S
-+++ b/arch/arm64/kernel/entry.S
-@@ -608,11 +608,16 @@ ENDPROC(cpu_switch_to)
-  */
- ret_fast_syscall:
-        disable_irq                             // disable interrupts
--       ldr     x1, [tsk, #TI_FLAGS]
-+       ldr     x1, [tsk, #TI_FLAGS]            // re-check for syscall tracing
-+       and     x2, x1, #_TIF_SYSCALL_WORK
-+       cbnz    x2, ret_fast_syscall_trace
-        and     x2, x1, #_TIF_WORK_MASK
-        cbnz    x2, fast_work_pending
-        enable_step_tsk x1, x2
-        kernel_exit 0, ret = 1
-+ret_fast_syscall_trace:
-+       enable_irq                              // enable interrupts
-+       b       __sys_trace_return
- 
- /*
-  * Ok, we need to do extra processing, enter the slow path.
 
 
-===
-
-Off topic, here's the xgbe_tx_timer BUG.  As I mentioned, this happens
-even on a vanilla kernel, before I've run any of my tests.  I think this
-is a legitimate bug to call disable_irq() from a softirq timer.
-
-  disable_irq -> synchronize_irq -> wait_event -> might_sleep
-
-[   19.841911] BUG: sleeping function called from invalid context at kernel/irq/manage.c:110
-[   19.850081] in_atomic(): 1, irqs_disabled(): 0, pid: 1133, name: sed
-[   19.856434] INFO: lockdep is turned off.
-[   19.860349] CPU: 3 PID: 1133 Comm: sed Tainted: G        W       4.1.0-rc6-orig+ #5
-[   19.867999] Hardware name: Default string Default string/Default string, BIOS ROD0080B 03/18/2015
-[   19.876865] Call trace:
-[   19.879306] [<fffffe0000096e08>] dump_backtrace+0x0/0x16c
-[   19.884702] [<fffffe0000096f84>] show_stack+0x10/0x1c
-[   19.889746] [<fffffe000071408c>] dump_stack+0x84/0xbc
-[   19.894796] [<fffffe00000eab28>] ___might_sleep+0x15c/0x248
-[   19.900360] [<fffffe00000ead7c>] __might_sleep+0x54/0x94
-[   19.905685] [<fffffe0000121ee4>] synchronize_irq+0x2c/0x88
-[   19.911167] [<fffffe00001221ec>] disable_irq+0x1c/0x2c
-[   19.916304] [<fffffe00004d8fec>] xgbe_tx_timer+0x64/0x90
-[   19.921606] [<fffffe00001344b4>] call_timer_fn+0xd4/0x48c
-[   19.927002] [<fffffe00001351fc>] run_timer_softirq+0x240/0x440
-[   19.932833] [<fffffe00000c5014>] __do_softirq+0x118/0x608
-[   19.938221] [<fffffe00000c584c>] irq_exit+0x9c/0xdc
-[   19.943094] [<fffffe0000121200>] __handle_domain_irq+0x68/0xb4
-[   19.948916] [<fffffe0000090398>] gic_handle_irq+0x30/0x7c
-[   19.954310] Exception stack(0xfffffe001ef4bb20 to 0xfffffe001ef4bc40)
-[   19.960742] bb20: d6b401c0 fffffe03 01ea7600 fffffe00 1ef4bc60 fffffe00 00117a80 fffffe00
-[   19.968913] bb40: d6b401f0 fffffe03 0095f450 fffffe00 01ea7610 fffffe00 00000000 00000000
-[   19.977088] bb60: 1ef4bc10 fffffe00 1ef4bbe0 fffffe00 0109d468 fffffe00 00000000 00000000
-[   19.985262] bb80: d4a96880 fffffe03 00000000 00000000 1ef4bc80 fffffe00 00000000 756e694c
-[   19.993436] bba0: 00000006 00000004 00010000 00000000 98343c1c 000003ff 98343b44 000003ff
-[   20.001603] bbc0: 00226d00 fffffe00 983440dc 000003ff 00000000 00000000 d6b401c0 fffffe03
-[   20.009776] bbe0: 01ea7600 fffffe00 00fc0000 fffffe00 00fc2000 fffffe00 00fff3a0 fffffe00
-[   20.017950] bc00: 00000015 00000000 0000011a 00000000 00000038 00000000 00742000 fffffe00
-[   20.026125] bc20: 1ef48000 fffffe00 1ef4bc60 fffffe00 00228dd4 fffffe00 1ef4bc60 fffffe00
-[   20.034299] [<fffffe0000092ce8>] el1_irq+0x68/0x100
-[   20.039173] [<fffffe0000228dd0>] get_empty_filp+0xf8/0x1ec
-[   20.044658] [<fffffe00002363ec>] path_openat+0x34/0x644
-[   20.049874] [<fffffe0000237b18>] do_filp_open+0x2c/0x88
-[   20.055095] [<fffffe0000226bf8>] do_sys_open+0x13c/0x21c
-[   20.060397] [<fffffe0000226d0c>] SyS_openat+0xc/0x18
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 860 bytes
+Desc: This is a digitally signed message part
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150605/415101c9/attachment.sig>
