@@ -1,76 +1,67 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 5 Jun 2015 14:30:41 +0100
-Subject: [PATCH v2 5/6] iommu/mediatek: Add mt8173 IOMMU driver
-In-Reply-To: <1431683009-18158-6-git-send-email-yong.wu@mediatek.com>
-References: <1431683009-18158-1-git-send-email-yong.wu@mediatek.com>
- <1431683009-18158-6-git-send-email-yong.wu@mediatek.com>
-Message-ID: <20150605133040.GH1198@arm.com>
+From: jonas.jensen@gmail.com (Jonas Jensen)
+Date: Fri,  5 Jun 2015 15:46:18 +0200
+Subject: [PATCH] net: moxa: fix TX overrun memory leak
+Message-ID: <1433511978-17666-1-git-send-email-jonas.jensen@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 15, 2015 at 10:43:28AM +0100, Yong Wu wrote:
-> This patch adds support for mediatek m4u (MultiMedia Memory Management Unit).
+moxart_mac_start_xmit() doesn't care where tx_tail is, tx_head can
+catch and pass tx_tail, which is bad because moxart_tx_finished()
+isn't guaranteed to catch up on freeing resources from tx_tail.
 
-After looking at the page table code, I thought I'd come and check your
-TLB invalidate code here.
+Add a check in moxart_mac_start_xmit(), exit to make sure tx_head
+never passes tx_tail.
 
-> +static void mtk_iommu_tlb_flush_all(void *cookie)
-> +{
-> +       struct mtk_iommu_domain *domain = cookie;
-> +       u32 val;
-> +
-> +       val = F_INVLD_EN1 | F_INVLD_EN0;
-> +       writel(val, domain->imuinfo->base + REG_MMU_INV_SEL);
-> +       writel(F_ALL_INVLD, domain->imuinfo->base + REG_MMU_INVALIDATE);
-> +}
-> +
-> +static void mtk_iommu_tlb_add_flush(unsigned long iova, size_t size,
-> +                                   bool leaf, void *cookie)
-> +{
-> +       struct mtk_iommu_domain *domain = cookie;
-> +       void __iomem *m4u_base = domain->imuinfo->base;
-> +       unsigned int iova_start = iova, iova_end = iova + size - 1;
-> +       int ret;
-> +       u32 val;
-> +
-> +       val = F_INVLD_EN1 | F_INVLD_EN0;
-> +       writel(val, m4u_base + REG_MMU_INV_SEL);
-> +
-> +       writel(iova_start, m4u_base + REG_MMU_INVLD_START_A);
-> +       writel(iova_end, m4u_base + REG_MMU_INVLD_END_A);
-> +       writel(F_MMU_INV_RANGE, m4u_base + REG_MMU_INVALIDATE);
-> +
-> +       ret = readl_poll_timeout_atomic(m4u_base + REG_MMU_CPE_DONE, val,
-> +                                       val != 0, 10, 1000000);
-> +       if (ret) {
-> +               dev_warn(domain->imuinfo->dev, "Invalid tlb don't done\n");
-> +               mtk_iommu_tlb_flush_all(cookie);
-> +       }
-> +       writel(0, m4u_base + REG_MMU_CPE_DONE);
-> +}
+Move tx_head and place tx_tail within spinlock, avoiding read-write
+race that could happen when interrupts hit at the wrong moment.
 
-You don't need to wait for completion here if you can implement a proper
-->tlb_sync callback.
+Addresses https://bugzilla.kernel.org/show_bug.cgi?id=99451
 
-> +static void mtk_iommu_flush_pgtable(void *ptr, size_t size, void *cookie)
-> +{
-> +       /*
-> +        * After delete arch_setup_dma_ops,
-> +        * This will be replaced with dma_map_page
-> +        */
-> +        __dma_flush_range(ptr, ptr + size);
-> +}
+Signed-off-by: Jonas Jensen <jonas.jensen@gmail.com>
+---
 
-This should give you the necessary barriers to ensure visibility of the
-updated page tables, so you can use the _relaxed io accessors for the
-other TLB functions.
+Notes:
+    Applies to next-20150604
 
-> +static struct iommu_gather_ops mtk_iommu_gather_ops = {
-> +       .tlb_flush_all = mtk_iommu_tlb_flush_all,
-> +       .tlb_add_flush = mtk_iommu_tlb_add_flush,
-> +       .tlb_sync = mtk_iommu_tlb_flush_all,
+ drivers/net/ethernet/moxa/moxart_ether.c | 14 ++++++++++++--
+ 1 file changed, 12 insertions(+), 2 deletions(-)
 
-sync isn't required to flush anything; it's just supposed to wait for
-any outstanding invalidation (i.e. from tlb_add_flush) to complete.
-
-Will
+diff --git a/drivers/net/ethernet/moxa/moxart_ether.c b/drivers/net/ethernet/moxa/moxart_ether.c
+index becbb5f..e0af86c 100644
+--- a/drivers/net/ethernet/moxa/moxart_ether.c
++++ b/drivers/net/ethernet/moxa/moxart_ether.c
+@@ -25,6 +25,7 @@
+ #include <linux/of_irq.h>
+ #include <linux/crc32.h>
+ #include <linux/crc32c.h>
++#include <linux/circ_buf.h>
+ 
+ #include "moxart_ether.h"
+ 
+@@ -312,13 +313,22 @@ static int moxart_mac_start_xmit(struct sk_buff *skb, struct net_device *ndev)
+ 	struct moxart_mac_priv_t *priv = netdev_priv(ndev);
+ 	void __iomem *desc;
+ 	unsigned int len;
+-	unsigned int tx_head = priv->tx_head;
++	unsigned int tx_head, tx_tail;
+ 	u32 txdes1;
+ 	int ret = NETDEV_TX_BUSY;
+ 
++	spin_lock_irq(&priv->txlock);
++
++	tx_head = priv->tx_head;
++	tx_tail = priv->tx_tail;
++
+ 	desc = priv->tx_desc_base + (TX_REG_DESC_SIZE * tx_head);
+ 
+-	spin_lock_irq(&priv->txlock);
++	if (CIRC_SPACE(tx_head, tx_tail, TX_DESC_NUM) == 0) {
++		priv->stats.tx_dropped++;
++		goto out_unlock;
++	}
++
+ 	if (readl(desc + TX_REG_OFFSET_DESC0) & TX_DESC0_DMA_OWN) {
+ 		net_dbg_ratelimited("no TX space for packet\n");
+ 		priv->stats.tx_dropped++;
+-- 
+1.8.2.1
