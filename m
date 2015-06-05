@@ -1,77 +1,106 @@
 From: eric.auger@linaro.org (Eric Auger)
-Date: Fri,  5 Jun 2015 17:06:28 +0200
-Subject: [PATCH v2 0/4] VFIO platform reset
-Message-ID: <1433516792-16397-1-git-send-email-eric.auger@linaro.org>
+Date: Fri,  5 Jun 2015 17:06:31 +0200
+Subject: [PATCH v2 3/4] VFIO: platform: populate the reset function on probe
+In-Reply-To: <1433516792-16397-1-git-send-email-eric.auger@linaro.org>
+References: <1433516792-16397-1-git-send-email-eric.auger@linaro.org>
+Message-ID: <1433516792-16397-4-git-send-email-eric.auger@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In situations where the userspace driver is stopped abnormally and the
-VFIO platform device is released, the assigned HW device currently is
-left running. As a consequence the HW device might continue issuing IRQs
-and performing DMA accesses.
+The reset function lookup happens on vfio-platform probe. The reset
+module load is requested  and a reference to the function symbol is
+hold. The reference is released on vfio-platform remove.
 
-On release, no physical IRQ handler is setup anymore. Also the DMA buffers
-are unmapped leading to IOMMU aborts. So there is no serious consequence.
+Signed-off-by: Eric Auger <eric.auger@linaro.org>
 
-However when assigning that HW device again to another userspace driver,
-this latter might face some unexpected IRQs and DMA accesses, which are
-the result of the previous assignment.
+---
 
-In virtualization use-case, a VM newly granted with that HW device may be
-impacted by the assignment of that device to a previous VM:
-- IRQs may be injected very early when booting the new guest, even before
-  the guest driver has initialized leading to possible driver state
-  inconsistency.
-- DMA accesses may hit the newly mapped VM address space at addresses that
-  may jeopardize the integrity of the newly installed VM.
-
-Obviously the criticity depends on the assigned HW device.
-
-As opposed to PCI, there is no standard mechanism to reset the platform
-device.
-
-This series proposes to implement device specific reset functions in
-separate vfio reset modules (in-kernel or external). The vfio-platform
-driver holds a whitelist of implemented triplets (compat string, module
-name, function name). When the vfio-platform driver is probed it identifies
-the fellow reset module/function matching the compat string of the
-device, if any, and forces the load of this reset module.
-
-A first reset module is provided: the vfio-platform-calxedaxgmac
-module which implements a basic reset for the Calxeda xgmac.
-
-The series can be found at
-https://git.linaro.org/people/eric.auger/linux.git/shortlog/refs/heads/v4.1-rc6-reset-v2
-
-History:
 v1 -> v2:
-- much simplified compared to v1 although principle of external modules is
-  kept: removed mechanism of dynamic registration of reset functions
-- list is replaced by whitelist lookup table
-- name of the reset function also stored in the lookup table
-- autoload of reset modules
+- [get,put]_reset now is called once on probe/remove
+- use request_module to automatically load the reset module that
+  matches the compatibility string
+- lookup table is used instead of list
+- remove registration mechanism: reset function name is stored in the
+  lookup table.
+- use device_property_read_string instead of
+  device_property_read_string_array
+---
+ drivers/vfio/platform/vfio_platform_common.c | 48 +++++++++++++++++++++++++++-
+ 1 file changed, 47 insertions(+), 1 deletion(-)
 
-RFC -> PATCH v1:
-- solution now based on a lookup list instead of specialized driver
-
-
-Eric Auger (4):
-  VFIO: platform: add reset struct and lookup table
-  VFIO: platform: add reset callback
-  VFIO: platform: populate the reset function on probe
-  VFIO: platform: Calxeda xgmac reset module
-
- drivers/vfio/platform/Kconfig                      |  2 +
- drivers/vfio/platform/Makefile                     |  2 +
- drivers/vfio/platform/reset/Kconfig                |  7 ++
- drivers/vfio/platform/reset/Makefile               |  5 ++
- .../platform/reset/vfio_platform_calxedaxgmac.c    | 98 ++++++++++++++++++++++
- drivers/vfio/platform/vfio_platform_common.c       | 75 ++++++++++++++++-
- drivers/vfio/platform/vfio_platform_private.h      | 14 ++++
- 7 files changed, 200 insertions(+), 3 deletions(-)
- create mode 100644 drivers/vfio/platform/reset/Kconfig
- create mode 100644 drivers/vfio/platform/reset/Makefile
- create mode 100644 drivers/vfio/platform/reset/vfio_platform_calxedaxgmac.c
-
+diff --git a/drivers/vfio/platform/vfio_platform_common.c b/drivers/vfio/platform/vfio_platform_common.c
+index 995929b..d474d6a 100644
+--- a/drivers/vfio/platform/vfio_platform_common.c
++++ b/drivers/vfio/platform/vfio_platform_common.c
+@@ -31,6 +31,47 @@ static const struct vfio_platform_reset_combo reset_lookup_table[] = {
+ 	},
+ };
+ 
++static int vfio_platform_get_reset(struct vfio_platform_device *vdev,
++				   struct device *dev)
++{
++	const char *compat;
++	const struct vfio_platform_reset_combo *iter = reset_lookup_table;
++	int (*reset)(struct vfio_platform_device *);
++	int ret;
++
++	vdev->type = VFIO_PLATFORM_RESET_TYPE_MAX;
++	ret = device_property_read_string(dev, "compatible", &compat);
++	if (ret)
++		return ret;
++
++	while (iter->type < VFIO_PLATFORM_RESET_TYPE_MAX) {
++		if (!strcmp(iter->compat, compat)) {
++			request_module(iter->module_name);
++			reset = __symbol_get(iter->reset_function_name);
++			if (reset) {
++				vdev->type = iter->type;
++				vdev->reset = reset;
++				return 0;
++			}
++		}
++		iter++;
++	}
++	return -1;
++}
++
++static void vfio_platform_put_reset(struct vfio_platform_device *vdev)
++{
++	const struct vfio_platform_reset_combo *iter = reset_lookup_table;
++
++	while (iter->type < VFIO_PLATFORM_RESET_TYPE_MAX) {
++		if (iter->type == vdev->type) {
++			__symbol_put(iter->reset_function_name);
++			return;
++		}
++		iter++;
++	}
++}
++
+ static int vfio_platform_regions_init(struct vfio_platform_device *vdev)
+ {
+ 	int cnt = 0, i;
+@@ -519,6 +560,8 @@ int vfio_platform_probe_common(struct vfio_platform_device *vdev,
+ 		return ret;
+ 	}
+ 
++	vfio_platform_get_reset(vdev, dev);
++
+ 	mutex_init(&vdev->igate);
+ 
+ 	return 0;
+@@ -530,8 +573,11 @@ struct vfio_platform_device *vfio_platform_remove_common(struct device *dev)
+ 	struct vfio_platform_device *vdev;
+ 
+ 	vdev = vfio_del_group_dev(dev);
+-	if (vdev)
++
++	if (vdev) {
++		vfio_platform_put_reset(vdev);
+ 		iommu_group_put(dev->iommu_group);
++	}
+ 
+ 	return vdev;
+ }
 -- 
 1.9.1
