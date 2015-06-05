@@ -1,63 +1,61 @@
-From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Fri, 05 Jun 2015 19:07:34 +0200
-Subject: [PATCH v4 3/3] ARM: dts: rockchip: add hdmi analog power supplies to
- rk3288 boards
-In-Reply-To: <1707049.JEvfTcofKv@diego>
-References: <1707049.JEvfTcofKv@diego>
-Message-ID: <2174509.z9PNBvxjWd@diego>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Fri, 05 Jun 2015 18:10:13 +0100
+Subject: [PATCH v3 3/5] clk: add support for clocks provided by SCP(System
+ Control Processor)
+In-Reply-To: <55716DA4.2090003@arm.com>
+References: <1432720398-5701-1-git-send-email-sudeep.holla@arm.com>
+ <1432720398-5701-4-git-send-email-sudeep.holla@arm.com>
+ <20150604202009.GI676@codeaurora.org> <55716DA4.2090003@arm.com>
+Message-ID: <5571D7F5.1030405@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the recently added hdmi power supplies to evb and firefly boards.
 
-Signed-off-by: Heiko Stuebner <heiko@sntech.de>
----
-changes since v3:
-- add entries for popmetal board
 
- arch/arm/boot/dts/rk3288-evb.dtsi     | 2 ++
- arch/arm/boot/dts/rk3288-firefly.dtsi | 2 ++
- arch/arm/boot/dts/rk3288-popmetal.dts | 2 ++
- 3 files changed, 6 insertions(+)
+On 05/06/15 10:36, Sudeep Holla wrote:
+>
+>
+> On 04/06/15 21:20, Stephen Boyd wrote:
+>> On 05/27, Sudeep Holla wrote:
 
-diff --git a/arch/arm/boot/dts/rk3288-evb.dtsi b/arch/arm/boot/dts/rk3288-evb.dtsi
-index 844a6fb..a57fbe3 100644
---- a/arch/arm/boot/dts/rk3288-evb.dtsi
-+++ b/arch/arm/boot/dts/rk3288-evb.dtsi
-@@ -172,6 +172,8 @@
- };
- 
- &hdmi {
- 	ddc-i2c-bus = <&i2c5>;
-+	vp-supply = <&vdd10_lcd>;
-+	vph-supply = <&vcc18_lcd>;
- 	status = "okay";
- };
-diff --git a/arch/arm/boot/dts/rk3288-firefly.dtsi b/arch/arm/boot/dts/rk3288-firefly.dtsi
-index 0b42372..68068d9 100644
---- a/arch/arm/boot/dts/rk3288-firefly.dtsi
-+++ b/arch/arm/boot/dts/rk3288-firefly.dtsi
-@@ -196,6 +196,8 @@
- };
- 
- &hdmi {
- 	ddc-i2c-bus = <&i2c5>;
-+	vp-supply = <&vdd10_lcd>;
-+	vph-supply = <&vcc18_lcd>;
- 	status = "okay";
- };
-diff --git a/arch/arm/boot/dts/rk3288-popmetal.dts b/arch/arm/boot/dts/rk3288-popmetal.dts
-index d582811..98f4d77 100644
---- a/arch/arm/boot/dts/rk3288-popmetal.dts
-+++ b/arch/arm/boot/dts/rk3288-popmetal.dts
-@@ -141,6 +141,8 @@
- 
- &hdmi {
- 	ddc-i2c-bus = <&i2c5>;
-+	vp-supply = <&vdd10_lcd>;
-+	vph-supply = <&vcc18_lcd>;
- 	status = "okay";
- };
- 
--- 
-2.1.4
+[...]
+
+>>> +
+>>> +static unsigned long scpi_clk_recalc_rate(struct clk_hw *hw,
+>>> +					  unsigned long parent_rate)
+>>> +{
+>>> +	struct scpi_clk *clk = to_scpi_clk(hw);
+>>> +
+>>> +	return scpi_ops->clk_get_val(clk->id);
+>>> +}
+>>> +
+>>> +static long scpi_clk_round_rate(struct clk_hw *hw, unsigned long rate,
+>>> +				unsigned long *parent_rate)
+>>> +{
+>>> +	struct scpi_clk *clk = to_scpi_clk(hw);
+>>> +
+>>> +	if (WARN_ON(clk->rate_min && rate < clk->rate_min))
+>>> +		rate = clk->rate_min;
+>>> +	if (WARN_ON(clk->rate_max && rate > clk->rate_max))
+>>> +		rate = clk->rate_max;
+>>> +
+>>> +	return rate;
+>>> +}
+>>
+>> Hm.. this seems really generic. It might be better to support a
+>> way to tell the framework to limit the min/max rate that's
+>> accepted for a clk. That could be done later though.
+>>
+>
+> True, framework have some boundary checks in place. I will check if
+> I can use it with minimum changes to the core. If not, we can take this
+> up later as you suggested.
+>
+
+I found that the framework already provides clk_set_rate_range for this
+purpose. Sorry for missing this earlier(seems like that's added quite
+recently in v4.0). I think I still need to retain round_rate as the core
+framework insists.
+
+Regards,
+Sudeep
