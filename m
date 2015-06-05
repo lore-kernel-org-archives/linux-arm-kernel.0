@@ -1,92 +1,147 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Fri, 5 Jun 2015 13:05:54 -0500
-Subject: [PATCH v2 0/4] VFIO platform reset
-In-Reply-To: <1433516792-16397-1-git-send-email-eric.auger@linaro.org>
-References: <1433516792-16397-1-git-send-email-eric.auger@linaro.org>
-Message-ID: <CAL_JsqK4dm_Kmoys6+qxJrwFpo0K3gatVQxZiNPoWCduQKqj8w@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 5 Jun 2015 19:29:47 +0100
+Subject: [PATCH v3 2/3] ARM: rockchip: ensure CPU to enter WFI/WFE state
+In-Reply-To: <CAD=FV=UMkFtOFYpY+MUZOegnmFLdW3ZgNivwdHChv0MLr50sVQ@mail.gmail.com>
+References: <1433517104-7595-1-git-send-email-wxt@rock-chips.com>
+ <1433517104-7595-3-git-send-email-wxt@rock-chips.com>
+ <CAD=FV=UMkFtOFYpY+MUZOegnmFLdW3ZgNivwdHChv0MLr50sVQ@mail.gmail.com>
+Message-ID: <20150605182947.GN7557@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 5, 2015 at 10:06 AM, Eric Auger <eric.auger@linaro.org> wrote:
-> In situations where the userspace driver is stopped abnormally and the
-> VFIO platform device is released, the assigned HW device currently is
-> left running. As a consequence the HW device might continue issuing IRQs
-> and performing DMA accesses.
->
-> On release, no physical IRQ handler is setup anymore. Also the DMA buffers
-> are unmapped leading to IOMMU aborts. So there is no serious consequence.
->
-> However when assigning that HW device again to another userspace driver,
-> this latter might face some unexpected IRQs and DMA accesses, which are
-> the result of the previous assignment.
+On Fri, Jun 05, 2015 at 10:49:14AM -0700, Doug Anderson wrote:
+> On Fri, Jun 5, 2015 at 8:11 AM, Caesar Wang <wxt@rock-chips.com> wrote:
+> > In idle mode, core1/2/3 of Cortex-A17 should be either power off or in
+> > WFI/WFE state.
+> > we can delay 1ms to ensure the CPU enter WFI/WFE state.
+> >
+> > Signed-off-by: Caesar Wang <wxt@rock-chips.com>
+> > ---
+> >
+> >  arch/arm/mach-rockchip/platsmp.c | 3 +++
+> >  1 file changed, 3 insertions(+)
+> >
+> > diff --git a/arch/arm/mach-rockchip/platsmp.c b/arch/arm/mach-rockchip/platsmp.c
+> > index 25da16f..6672fdd 100644
+> > --- a/arch/arm/mach-rockchip/platsmp.c
+> > +++ b/arch/arm/mach-rockchip/platsmp.c
+> > @@ -325,6 +325,9 @@ static void __init rockchip_smp_prepare_cpus(unsigned int max_cpus)
+> >  #ifdef CONFIG_HOTPLUG_CPU
+> >  static int rockchip_cpu_kill(unsigned int cpu)
+> >  {
+> > +       /* ensure CPU can enter the WFI/WFE state */
+> > +       mdelay(1);
+> 
+> This is a pretty weak assurance.  Is there any stronger assurance you
+> can give that we're in WFI/WFE state and won't come out of it?
+> 
+> Do you actually see problems if you power off a CPU when it's not in
+> WFI/WFE state?
 
-In general, shouldn't it just be a requirement that the drivers handle
-this condition. You have the same problem with firmware/bootloaders
-leaving h/w not in reset state or kexec'ing to a new kernel.
+I really don't like to see platforms pulling crap tricks in their
+CPU hotunplug code like this.  If there's something wrong with the
+generic code, then the generic code needs to be fixed, not worked
+around in platform code.
 
-Rob
+> ...so I _think_ I see the path that is happening here and what you're
+> trying to handle.  Specifically, I see:
+> 
+> On dying CPU:
+> 1. cpu_die() calls 'complete(&cpu_died)'
+> 2. cpu_die() calls 'smp_ops.cpu_die(cpu)' AKA rockchip_cpu_die()
+> 3. rockchip_cpu_die() does a bit more cache flushing before looping in
+> cpu_do_idle()
+> 
+> The problem is that the moment the completion happens in step #1 above
+> the dying CPU can be killed.  ...so you're trying to make sure the
+> dying CPU makes it to cpu_do_idle().  In that case a fixed mdelay(1)
+> might be OK since the time that the CPU takes to run through a few
+> instructions (with no interrupts) is pretty predictable.  It would be
+> really nice if the commit message went through all this, though.
+> 
+> ...but is there any chance that cpu_do_idle() could somehow return?
+> We shouldn't send any events since we've marked the core offline, but
+> perhaps some per-core interrupt (arch timer?) that didn't get
+> migrated?
 
-> In virtualization use-case, a VM newly granted with that HW device may be
-> impacted by the assignment of that device to a previous VM:
-> - IRQs may be injected very early when booting the new guest, even before
->   the guest driver has initialized leading to possible driver state
->   inconsistency.
-> - DMA accesses may hit the newly mapped VM address space at addresses that
->   may jeopardize the integrity of the newly installed VM.
->
-> Obviously the criticity depends on the assigned HW device.
->
-> As opposed to PCI, there is no standard mechanism to reset the platform
-> device.
->
-> This series proposes to implement device specific reset functions in
-> separate vfio reset modules (in-kernel or external). The vfio-platform
-> driver holds a whitelist of implemented triplets (compat string, module
-> name, function name). When the vfio-platform driver is probed it identifies
-> the fellow reset module/function matching the compat string of the
-> device, if any, and forces the load of this reset module.
->
-> A first reset module is provided: the vfio-platform-calxedaxgmac
-> module which implements a basic reset for the Calxeda xgmac.
->
-> The series can be found at
-> https://git.linaro.org/people/eric.auger/linux.git/shortlog/refs/heads/v4.1-rc6-reset-v2
->
-> History:
-> v1 -> v2:
-> - much simplified compared to v1 although principle of external modules is
->   kept: removed mechanism of dynamic registration of reset functions
-> - list is replaced by whitelist lookup table
-> - name of the reset function also stored in the lookup table
-> - autoload of reset modules
->
-> RFC -> PATCH v1:
-> - solution now based on a lookup list instead of specialized driver
->
->
-> Eric Auger (4):
->   VFIO: platform: add reset struct and lookup table
->   VFIO: platform: add reset callback
->   VFIO: platform: populate the reset function on probe
->   VFIO: platform: Calxeda xgmac reset module
->
->  drivers/vfio/platform/Kconfig                      |  2 +
->  drivers/vfio/platform/Makefile                     |  2 +
->  drivers/vfio/platform/reset/Kconfig                |  7 ++
->  drivers/vfio/platform/reset/Makefile               |  5 ++
->  .../platform/reset/vfio_platform_calxedaxgmac.c    | 98 ++++++++++++++++++++++
->  drivers/vfio/platform/vfio_platform_common.c       | 75 ++++++++++++++++-
->  drivers/vfio/platform/vfio_platform_private.h      | 14 ++++
->  7 files changed, 200 insertions(+), 3 deletions(-)
->  create mode 100644 drivers/vfio/platform/reset/Kconfig
->  create mode 100644 drivers/vfio/platform/reset/Makefile
->  create mode 100644 drivers/vfio/platform/reset/vfio_platform_calxedaxgmac.c
->
-> --
-> 1.9.1
->
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+How this is supposed to work is:
+
+	CPU requesting death		CPU dying
+	stop_machine(take_down_cpu)
+					take_down_cpu()
+					-__cpu_disable()
+					- platform_cpu_disable()
+					- marks CPU offline
+					- migrates IRQs away
+					- caches flushed
+					- tlbs flushed
+	__cpu_die()			- processes migrated away
+	-wait_for_completion_timeout()	-timekeeping migrated away
+					returns to idle loop
+					arch_cpu_idle_dead()
+					-cpu_die()
+					- idle_task_exit()
+					- flush_cache_louis()
+
+At this point, dirty cache lines which matter are flushed from the
+dying CPUs cache.  However, we still need the dying CPU to be
+coherent for the next step, which is to issue the completion.
+
+					- complete()
+					- flush_cache_louis()
+
+At some point during the above, the completion becomes visible to
+the other CPU, and it continues its execution.
+
+	-pr_notice()
+	-platform_cpu_kill()		- smp_ops.cpu_die()
+
+The precise ordering of smp_ops.cpu_die() vs platform_cpu_kill() is
+pretty much indeterminant, and is subject to scheduling effects which
+could delay the requesting CPU.
+
+Now, the problem is, from what ARM has been saying, that cache lines
+can get migrated to the dying CPU which may contain the "master" copy
+of the data, which means that when the dying CPU actually exits
+coherency, that data is lost to the rest of the system.
+
+Ideally, what we would like to do is to exit coherency earlier, and
+then have some notification mechanism between the dying CPU and the
+rest of the system to say that it's finished exiting coherency.
+However, we face several issues.
+
+1) v7_coherency_exit() is specific to v7 CPUs and can't be used by
+   generic code.
+
+2) we have no way to perform that notification reliably once
+   coherency has been exited.
+
+There's other reasons we need to change the notification mechanism,
+one of them is that completions use RCU, and RCU isn't actually valid
+in this context - and we can't make it valid because the dying CPU
+might loose power at any moment after it's called complete().
+
+Paul McKenny created what was a generic infrastructure for this
+notification, but I object to it on principle using atomic_t... and
+if we've exited coherency (as we would want to), it won't work
+because it makes use of atomic_cmpxchg() on the dying CPU.
+
+I've been working on a solution to use an IPI to notify from the
+dying CPU, but that's fraught because of the separation of the IRQ
+controller code from the architecture code, and we now have spinlocks
+in the IPI-raising path due to the big.LITTLE stuff - and spinlocks
+need coherency to be working.
+
+So, we're actually in a very sticky position over taking CPUs offline.
+It seems to be something that the ARM architecture and kernel
+architecture doesn't actually allow to be done safely.  So much so,
+that in a similar way to the original Keystone 2 physical address
+switch, I'm tempted to make taking a CPU offline taint the kernel!
+
+We're going to end up with tainted kernels through this path when Paul
+pushes his RCU correctness patches anyway anyway, so it's just a
+matter of the inevitable taint happening sooner or later.
+
+-- 
+FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
+according to speedtest.net.
