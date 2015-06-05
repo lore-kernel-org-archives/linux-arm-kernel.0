@@ -1,233 +1,80 @@
-From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Fri, 05 Jun 2015 11:46:21 +0200
-Subject: [PATCH 1/3] ARM: rockchip: fix the CPU soft reset
-In-Reply-To: <55716512.9050603@rock-chips.com>
-References: <1433479677-18086-1-git-send-email-wxt@rock-chips.com>
- <1604172.FydsUUUXNY@diego> <55716512.9050603@rock-chips.com>
-Message-ID: <26548754.3lOPTtJQ55@diego>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Fri, 5 Jun 2015 11:04:58 +0100
+Subject: [PATCHv3 11/12] ARM: migrate to common PSCI client code
+In-Reply-To: <20150604094529.GB8346@e104818-lin.cambridge.arm.com>
+References: <1432648350-5454-1-git-send-email-mark.rutland@arm.com>
+ <1432648350-5454-12-git-send-email-mark.rutland@arm.com>
+ <20150603151625.GA599@leverpostej>
+ <20150604094529.GB8346@e104818-lin.cambridge.arm.com>
+Message-ID: <20150605100458.GD599@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Freitag, 5. Juni 2015, 17:00:02 schrieb Caesar Wang:
-> Heiko,
+On Thu, Jun 04, 2015 at 10:45:30AM +0100, Catalin Marinas wrote:
+> Hi Mark,
 > 
-> ? 2015?06?05? 16:45, Heiko St?bner ??:
-> > Hi Caesar,
+> On Wed, Jun 03, 2015 at 04:16:39PM +0100, Mark Rutland wrote:
+> > On Tue, May 26, 2015 at 02:52:29PM +0100, Mark Rutland wrote:
+> > > Now that the common PSCI client code has been factored out to
+> > > drivers/firmware, and made safe for 32-bit use, move the 32-bit ARM code
+> > > over to it. This results in a moderate reduction of duplicated lines,
+> > > and will prevent further duplication as the PSCI client code is updated
+> > > for PSCI 1.0 and beyond.
+> > > 
+> > > The two legacy platform users of the PSCI invocation code are updated to
+> > > account for interface changes. In both cases the power state parameter
+> > > is changed to an opaque u32 token in preparation for PSCI 1.0 power
+> > > state changes.
+> > > 
+> > > Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+> > > Acked-by: Catalin Marinas <catalin.marinas@arm.com>
+> > > Cc: Ashwin Chaugule <ashwin.chaugule@linaro.org>
+> > > Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+> > > Cc: Rob Herring <robh@kernel.org>
+> > > Cc: Russell King <rmk+kernel@arm.linux.org.uk>
+> > > Cc: Will Deacon <will.deacon@arm.com>
+> > > ---
+> > >  arch/arm/Kconfig                  |   1 +
+> > >  arch/arm/include/asm/psci.h       |  23 ---
+> > >  arch/arm/kernel/Makefile          |   2 +-
+> > >  arch/arm/kernel/psci.c            | 299 --------------------------------------
+> > >  arch/arm/kernel/psci_smp.c        |  29 +++-
+> > >  arch/arm/kernel/setup.c           |   3 +-
+> > >  arch/arm/mach-highbank/highbank.c |   2 +-
+> > >  arch/arm/mach-highbank/pm.c       |   8 +-
+> > >  drivers/cpuidle/cpuidle-calxeda.c |   7 +-
+> > >  9 files changed, 32 insertions(+), 342 deletions(-)
+> > >  delete mode 100644 arch/arm/kernel/psci.c
 > > 
+> > Do you have any objections to the arch/arm changes in this patch?
 > > 
-> > thanks for investigating this.
+> > If not, could I please have your ack?
 > > 
-> > Am Freitag, 5. Juni 2015, 12:47:55 schrieb Caesar Wang:
-> >> In general, the correct flow is:
-> >> 
-> >> cpu off:
-> >>      reset_control_assert
-> >>      regmap_update_bits(pmu, PMU_PWRDN_CON, BIT(pd), BIT(pd))
-> >> 
-> >> cpu on:
-> >>      regmap_update_bits(pmu, PMU_PWRDN_CON, BIT(pd), 0)
-> >>      reset_control_deassert
-> >> 
-> >> You can repro it with bringing CPU up and down.
-> >> Says:(test scripts)
-> >> 
-> >>      cd /sys/devices/system/cpu/
-> >>      for i in $(seq 1000); do
-> >>      echo "================= $i ============"
-> >>      
-> >>          for j in $(seq 100); do
-> >>          
-> >>              while [[ "$(cat cpu1/online)$(cat cpu2/online)$(cat
-> >> 
-> >> cpu3/online)" != "000" ]]; do echo 0 > cpu1/online
-> >> 
-> >>                  echo 0 > cpu2/online
-> >>                  echo 0 > cpu3/online
-> >>              
-> >>              done
-> >>              while [[ "$(cat cpu1/online)$(cat cpu2/online)$(cat
-> >> 
-> >> cpu3/online)" != "111" ]]; do echo 1 > cpu1/online
-> >> 
-> >>                  echo 1 > cpu2/online
-> >>                  echo 1 > cpu3/online
-> >>              
-> >>              done
-> >>          
-> >>          done
-> >>      
-> >>      done
-> >> 
-> >> The following is reproducile log:
-> >> [34466.186812] PM: noirq suspend of devices complete after 0.669 msecs
-> >> [34466.186824] Disabling non-boot CPUs ...
-> >> [34466.187509] CPU1: shutdown
-> >> [34466.188672] CPU2: shutdown
-> >> [34473.736627] Kernel panic - not syncing: Watchdog detected hard LOCKUP
-> >> on
-> >> cpu 0 [34473.736646] CPU: 3 PID: 0 Comm: swapper/3 Not tainted 3.14.0 #1
-> >> [34473.736687] [<c010dfb0>] (unwind_backtrace) from [<c010a460>]
-> >> (show_stack+0x20/0x24) [34473.736711] [<c010a460>] (show_stack) from
-> >> [<c0630670>] (dump_stack+0x70/0x8c) [34473.736731] [<c0630670>]
-> >> (dump_stack) from [<c062fa0c>] (panic+0xa8/0x1fc) [34473.736754]
-> >> [<c062fa0c>] (panic) from [<c0191efc>] (watchdog_timer_fn+0x234/0x26c)
-> >> [34473.736777] [<c0191efc>] (watchdog_timer_fn) from [<c014103c>]
-> >> (__run_hrtimer+0x118/0x1e0) [34473.736797] [<c014103c>] (__run_hrtimer)
-> >> from [<c0141c04>] (hrtimer_interrupt+0x148/0x2a0) [34473.736820]
-> >> [<c0141c04>] (hrtimer_interrupt) from [<c04d9994>]
-> >> (arch_timer_handler_phys+0x38/0x48) [34473.736844] [<c04d9994>]
-> >> (arch_timer_handler_phys) from [<c016acc4>]
-> >> (handle_percpu_devid_irq+0xb8/0x124) [34473.736867] [<c016acc4>]
-> >> (handle_percpu_devid_irq) from [<c0166a30>]
-> >> (generic_handle_irq+0x30/0x40)
-> >> [34473.736887] [<c0166a30>] (generic_handle_irq) from [<c0166d28>]
-> >> (__handle_domain_irq+0x8c/0xb0) [34473.736905] [<c0166d28>]
-> >> (__handle_domain_irq) from [<c01003a0>] (gic_handle_irq+0x48/0x6c)
-> >> [34473.736922] [<c01003a0>] (gic_handle_irq) from [<c010b040>]
-> >> (__irq_svc+0x40/0x50) [34473.736936] Exception stack(0xee127f70 to
-> >> 0xee127fb8)
-> >> [34473.736948] 7f60:                                     ffffffed
-> >> 00000000
-> >> 2dd6d000 00000000 [34473.736964] 7f80: ee126000 00000015 c0b46bac
-> >> c0b46bac
-> >> 0000406a 410fc0d1 00000000 ee127fc4 [34473.736979] 7fa0: ee127fb8
-> >> ee127fb8
-> >> c0107038 c010703c 600f0013 ffffffff [34473.736995] [<c010b040>]
-> >> (__irq_svc)
-> >> from [<c010703c>] (arch_cpu_idle+0x40/0x48) [34473.737013] [<c010703c>]
-> >> (arch_cpu_idle) from [<c0166978>] (cpu_startup_entry+0x170/0x1d0)
-> >> [34473.737031] [<c0166978>] (cpu_startup_entry) from [<c010c254>]
-> >> (secondary_start_kernel+0x138/0x160) [34473.737059] [<c010c254>]
-> >> (secondary_start_kernel) from [<00100464>] (0x100464) [34474.903740] SMP:
-> >> failed to stop secondary CPUs
-> >> [34476.099964] SMP: failed to stop secondary CPUs
-> >> ...
-> >> 
-> >> Signed-off-by: Caesar Wang <wxt@rock-chips.com>
-> >> ---
-> >> 
-> >>   arch/arm/mach-rockchip/platsmp.c | 13 +++++--------
-> >>   1 file changed, 5 insertions(+), 8 deletions(-)
-> >> 
-> >> diff --git a/arch/arm/mach-rockchip/platsmp.c
-> >> b/arch/arm/mach-rockchip/platsmp.c index 5b4ca3c..1230d3d 100644
-> >> --- a/arch/arm/mach-rockchip/platsmp.c
-> >> +++ b/arch/arm/mach-rockchip/platsmp.c
-> >> @@ -88,20 +88,17 @@ static int pmu_set_power_domain(int pd, bool on)
-> >> 
-> >>   			return PTR_ERR(rstc);
-> >>   		
-> >>   		}
-> >> 
-> >> -		if (on)
-> >> +		if (on) {
-> >> +			regmap_update_bits(pmu, PMU_PWRDN_CON, BIT(pd), val);
-> >> 
-> >>   			reset_control_deassert(rstc);
-> >> 
-> >> -		else
-> >> +		} else {
-> >> 
-> >>   			reset_control_assert(rstc);
-> >> 
-> >> +			regmap_update_bits(pmu, PMU_PWRDN_CON, BIT(pd), val);
-> >> +		}
-> > 
-> > you're loosing the return value of regmap_update_bits here, I guess it
-> > should look like below?
-> > 
-> > 		if (on) {
-> > 		
-> > 			ret = regmap_update_bits(pmu, PMU_PWRDN_CON, BIT(pd), val);
+> > As there are arm, arm64, and drivers changes in the series I was hoping
+> > this could all go via arm-soc.
 > 
-> I search the kernel, Nobody do that return value.
+> If we don't hear from Russell by the end of today, I propose that we
+> merge patches 1-8 in the arm64 tree (mostly fixes for PSCI). This series
+> is blocking other developments like PSCI 1.0, so I really want to get
+> parts of it merged in 4.2.
 
-counter-example:
-http://lxr.free-electrons.com/source/drivers/phy/phy-exynos5250-sata.c#L76
-;-)
+I've pushed the first 8 patches to my arm64/psci-rework branch [1]. I've
+pushed the whole series with the tags provided today to psci/rework [2].
 
-> Need we are that?
-> I will fix it on next patch if it's need.
+I tried a merge with the arm64 for-next/core branch locally, and got a
+trivial conflict in smp.c against the changes in "arm64: Use common
+outgoing-CPU-notification code". Hopefully that's easy to fix up
+locally.
 
-yes, while not very probable, it is nevertheless still good practice to handle 
-it. But when chaning the logic as we observed below, the regmap update part 
-can already stay how it is now, as you can simply do something like:
+> BTW, can we skip patch 11 in this series and still allow
+> drivers/firmware/psci.c only for arm64, with the aim of moving the arm32
+> code later?
 
-if (!on)
-	reset_control_assert(rstc);
+We could, though I would prefer to have the two unified from the
+beginning.
 
-regmap_update_bits
-wait_for_pd
+Thanks,
+Mark.
 
-if (on)
-	reset_control_deassert(rstc);
-
-
-Heiko
-
-> > 			if (ret < 0) {
-> > 			
-> > 				pr_err("%s: could not update power domain\n", __func__);
-> > 				
-> > 		  		reset_control_put(rstc);
-> > 				
-> > 				return ret;
-> > 			
-> > 			}
-> > 			
-> > 			reset_control_deassert(rstc);
-> > 		
-> > 		} else {
-> > 		
-> > 			reset_control_assert(rstc);
-> > 			
-> > 			ret = regmap_update_bits(pmu, PMU_PWRDN_CON, BIT(pd), val);
-> > 			if (ret < 0) {
-> > 			
-> > 				pr_err("%s: could not update power domain\n", __func__);
-> > 				
-> > 		  		reset_control_put(rstc);
-> > 				
-> > 				return ret;
-> > 			
-> > 			}
-> > 		
-> > 		}
-> > 		
-> >>   		reset_control_put(rstc);
-> >>   	
-> >>   	}
-> >> 
-> >> -	ret = regmap_update_bits(pmu, PMU_PWRDN_CON, BIT(pd), val);
-> >> -	if (ret < 0) {
-> >> -		pr_err("%s: could not update power domain\n", __func__);
-> >> -		return ret;
-> >> -	}
-> >> -
-> >> 
-> >>   	ret = -1;
-> >>   	while (ret != on) {
-> >>   	
-> >>   		ret = pmu_power_domain_is_on(pd);
-> > 
-> > second question - with this patch, what happens actually is
-> > 
-> >   cpu off:
-> >       reset_control_assert
-> >       regmap_update_bits(pmu, PMU_PWRDN_CON, BIT(pd), BIT(pd))
-> >       wait_for_power_domain_to_turn_off
-> >   
-> >   cpu on:
-> >       regmap_update_bits(pmu, PMU_PWRDN_CON, BIT(pd), 0)
-> >       reset_control_deassert
-> >       wait_for_power_domain_to_turn_on
-> > 
-> > So shouldn't the deassertion of the reset happen after the powerdomain
-> > sucessfull turned on? Like
-> > 
-> >   cpu on:
-> >       regmap_update_bits(pmu, PMU_PWRDN_CON, BIT(pd), 0)
-> >       wait_for_power_domain_to_turn_on
-> >       reset_control_deassert
-> 
-> You are right.
+[1] git://git.kernel.org/pub/scm/linux/kernel/git/mark/linux.git arm64/psci-rework
+[2] git://git.kernel.org/pub/scm/linux/kernel/git/mark/linux.git psci/rework
