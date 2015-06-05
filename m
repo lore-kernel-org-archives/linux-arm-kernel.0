@@ -1,63 +1,45 @@
-From: wxt@rock-chips.com (Caesar Wang)
-Date: Fri, 05 Jun 2015 14:58:18 +0800
-Subject: [PATCH 2/3] ARM: rockchip: ensure CPU to enter WIF state
-In-Reply-To: <5571427B.1040406@rock-chips.com>
-References: <1433479677-18086-1-git-send-email-wxt@rock-chips.com>
- <1433479677-18086-3-git-send-email-wxt@rock-chips.com>
- <5571427B.1040406@rock-chips.com>
-Message-ID: <5571488A.5040609@rock-chips.com>
+From: carlo@caione.org (Carlo Caione)
+Date: Fri, 5 Jun 2015 09:37:49 +0200
+Subject: [PATCH v3 0/3] clk: meson: Add clock controller
+In-Reply-To: <20150604230717.GE8099@codeaurora.org>
+References: <1433157235-17275-1-git-send-email-carlo@caione.org>
+ <20150604230717.GE8099@codeaurora.org>
+Message-ID: <CAOQ7t2YtMrX9QQHGiCvoPb9SSdvBvzXSu4e7wnzC7eCdUaiWwg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-? 2015?06?05? 14:32, Kever Yang ??:
-> Hi Caesar,
->
-> Subject typo WIF/WFI.
-OK
-
->
-> On 06/05/2015 12:47 PM, Caesar Wang wrote:
->> In idle mode, core1/2/3 of Cortex-A17 should be either power off or in
->> WFI/WFE state.
->> we can delay 1ms to ensure the CPU enter WFI state.
+On Fri, Jun 5, 2015 at 1:07 AM, Stephen Boyd <sboyd@codeaurora.org> wrote:
+> On 06/01, Carlo Caione wrote:
+>> From: Carlo Caione <carlo@endlessm.com>
 >>
->> Signed-off-by: Caesar Wang <wxt@rock-chips.com>
->> ---
+>> This patchset introduces preliminary support for the clock controller
+>> found on Amlogic MesonX SoCs and enables it for the Meson8b.
 >>
->>   arch/arm/mach-rockchip/platsmp.c | 3 +++
->>   1 file changed, 3 insertions(+)
+>> DTS patches with support for Meson8b SoCs will follow.
 >>
->> diff --git a/arch/arm/mach-rockchip/platsmp.c 
->> b/arch/arm/mach-rockchip/platsmp.c
->> index 1230d3d..978c357 100644
->> --- a/arch/arm/mach-rockchip/platsmp.c
->> +++ b/arch/arm/mach-rockchip/platsmp.c
->> @@ -316,6 +316,9 @@ static void __init 
->> rockchip_smp_prepare_cpus(unsigned int max_cpus)
->>   #ifdef CONFIG_HOTPLUG_CPU
->>   static int rockchip_cpu_kill(unsigned int cpu)
->>   {
->> +    /* ensure CPU can enter the WFI/WFE state */
->> +    mdelay(1);
->> +
-> Does it matter if core is not in WFI state when we want to power down it?
 >
-As HuangTao suggestion,
+> Did you want to send the dts changes through arm-soc?
 
-In gerenal, we need enter the WFI state when core power down, right?
-That will be more better if the hardware can judge the state.
+(adding Arnd in CC) this is what I have done in the past but I have no
+strong preference.
 
-Anyway, we can delay 1ms or more to wait the WFI state.
-That should be more better, right?
+> Do they depend on the header file that is included here?
 
-> Thanks,
-> - Kever
->>       pmu_set_power_domain(0 + cpu, false);
->>       return 1;
->>   }
->
->
->
->
+Yes, they do.
+
+> clk-next is not
+> stable and shouldn't be pulled into other developer's trees, so
+> if we need some stable commit to give off to arm-soc for v4.2
+> we need to know soon. Or we can split the header file off into a
+> different patch and send it through both arm-soc and clk tree.
+
+Again whatever is more preferable to the maintainers. Just let me know
+so I can rearrange the DTS patchset.
+
+> Otherwise the patches look good. I fixed up the __init markings
+> on some functions which were in the wrong place.
+
+Thank you,
+
+-- 
+Carlo Caione
