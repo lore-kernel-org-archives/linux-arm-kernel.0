@@ -1,81 +1,56 @@
-From: robert.jarzmik@free.fr (Robert Jarzmik)
-Date: Fri, 05 Jun 2015 21:43:04 +0200
-Subject: [PATCH v4 0/6] SA1100/PXA RTC clean-up
-In-Reply-To: <CAL_JsqKWNNH4stY+CNtKCiE7qcwDYaxZc36-iqqe1ddmG82g1Q@mail.gmail.com>
- (Rob Herring's message of "Wed, 3 Jun 2015 00:31:58 -0500")
-References: <1431529350-4597-1-git-send-email-robh@kernel.org>
- <87pp62jdpj.fsf@belgarion.home>
- <CAL_JsqJ-VMQHXFF9Gxf5mmPjYXZ6gyktYFjgvxAHRx-Kmuoq8A@mail.gmail.com>
- <877fs5k9ps.fsf@belgarion.home>
- <CAL_JsqKWNNH4stY+CNtKCiE7qcwDYaxZc36-iqqe1ddmG82g1Q@mail.gmail.com>
-Message-ID: <871thq54c7.fsf@belgarion.home>
+From: dianders@chromium.org (Doug Anderson)
+Date: Fri, 5 Jun 2015 13:24:40 -0700
+Subject: [PATCH v3 2/3] ARM: rockchip: ensure CPU to enter WFI/WFE state
+In-Reply-To: <20150605182947.GN7557@n2100.arm.linux.org.uk>
+References: <1433517104-7595-1-git-send-email-wxt@rock-chips.com>
+ <1433517104-7595-3-git-send-email-wxt@rock-chips.com>
+ <CAD=FV=UMkFtOFYpY+MUZOegnmFLdW3ZgNivwdHChv0MLr50sVQ@mail.gmail.com>
+ <20150605182947.GN7557@n2100.arm.linux.org.uk>
+Message-ID: <CAD=FV=UamkH+RHmHHVzGKZda_w0teGBdfcH-LbCKqyp2q1OVqA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Rob Herring <robh@kernel.org> writes:
+Russell,
 
->> I'm rather in a mood for a more aggressive approach :
->>
->>  - you fire an incremental patch to patch the 10 defconfigs on PXA architecture
->>    (pxa27x and pxa3xx)
->
-> Here's the breakdown of configs which enable SA1100 RTC only. Only the
-> last 6 need to change by my count:
->
-> pxa25x
-> arch/arm/configs/h5000_defconfig
-> arch/arm/configs/xcep_defconfig
-> arch/arm/configs/viper_defconfig
->
-> pxa255/270
-> arch/arm/configs/cm_x2xx_defconfig
->
-> pxa270
-> arch/arm/configs/em_x270_defconfig
-> arch/arm/configs/magician_defconfig
-> arch/arm/configs/palmz72_defconfig
-> arch/arm/configs/pcm027_defconfig
-> arch/arm/configs/trizeps4_defconfig
-And arch/arm/configs/jornada720_defconfig I counted wrongly as it's sa1100.
-So I agree with your list of last 6 defconfigs.
+On Fri, Jun 5, 2015 at 11:29 AM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> 1) v7_coherency_exit() is specific to v7 CPUs and can't be used by
+>    generic code.
 
->>  - in this patch, you replace 's/CONFIG_RTC_DRV_SA1100/CONFIG_RTC_DRV_PXA/'
->>  - you send this patch to the maintainers and me
->>  - you explain in the commit message that from a userland perspective, nothing
->>    changes, except that the RTC IP will change, and any dependency on a
->
-> The IP does not change here. rtc0 is still going to be the SA1100 RTC
-> being registered first. The only change will be the addition of rtc1.
-For boards which were only using rtc-pxa.c (as mioa701 for example), they relied
-on the fact that rtc0 == pxa_rtc. Their time is stored in PXA IP. Therefore,
-each of their hwclock will end up on sa1100-rtc instead of pxa-rtc.
+Oh, I see.  So (I think) you're saying that perhaps the reason that
+Caesar needed his patch was that he needed the dying processor to
+execute v7_exit_coherency_flush(), NOT that he needed the dying
+processor to be in WFI/WFE.  That actually makes a lot more sense to
+me!  :)  Thanks a lot for pointing that out, it's very helpful.
 
-So for these boards, ie. for all boards where only rtc-pxa.c was used, the IP
-addressed changes from a casual userspace perspective.
 
->>    bootloader fidling with RTC should be considered as a source of regression.
->
-> I'm not sure that I follow.
-Let's talk about how a double boot windows + linux box works.
-The bootloader ensures that :
- - sa1100-rtc holds the number of seconds since the OS start (think jiffies)
- - pxa-rtc holds the wall clock time
+> So, we're actually in a very sticky position over taking CPUs offline.
+> It seems to be something that the ARM architecture and kernel
+> architecture doesn't actually allow to be done safely.  So much so,
+> that in a similar way to the original Keystone 2 physical address
+> switch, I'm tempted to make taking a CPU offline taint the kernel!
 
-Upon each reboot, sa1100-rtc is checked to see how much time has passed. If an
-"oustanding number" is detected, for example 10 years, the firmware resets the
-data partition.
+Wow, that's going to suck.  So if you want to suspend / resume you
+need to taint your kernel.  So much for saving the planet by going
+into suspend...  ...or are you thinking that it won't taint the kernel
+when the kernel takes CPUs offline for suspend/resume purposes?  ...or
+are you thinking you've some solution that works for suspend/resume
+that doesn't work for the general cpu offlining problem?  I'd be very
+interested to hear...
 
-Now think what will happen when this change will be commited, upon the first
-reboot after the linux kernel has change sa1100-rtc time.
 
->>    Moreover the first reboot will have the wrong date, until it is set.
-> Only for rtc1, right?
-Yes, right, unless the bootloader logic is ... over-engineered.
+I know I'm not a maintainer, but if I were and I knew that lots of
+smart people had thought about the problem of CPU offlining and they
+didn't have a solution and I could make my platform 99.99999999%
+reliable by allowing a very safe mdelay(1) where I had a pretty strong
+guarantee that the 1ms was enough time, I would probably accept that
+code...
 
-All of this to say maintainers should be forwarned at least. After that, up to
-them to react.
 
-Cheers.
+So since I'm not a maintainer and I certainly couldn't ack such code,
+I would certainly be happy to add my Reviewed-by to Caesar's patch if
+he changed it mention that he needed to make sure that
+v7_exit_coherency_flush() in rockchip_cpu_die() executed in time.
 
--- 
-Robert
+
+-Doug
