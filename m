@@ -1,79 +1,82 @@
 From: eric.auger@linaro.org (Eric Auger)
-Date: Fri,  5 Jun 2015 17:06:29 +0200
-Subject: [PATCH v2 1/4] VFIO: platform: add reset struct and lookup table
-In-Reply-To: <1433516792-16397-1-git-send-email-eric.auger@linaro.org>
-References: <1433516792-16397-1-git-send-email-eric.auger@linaro.org>
-Message-ID: <1433516792-16397-2-git-send-email-eric.auger@linaro.org>
+Date: Fri,  5 Jun 2015 17:21:49 +0200
+Subject: [PATCH] KVM: arm/arm64: Enable the KVM-VFIO device
+Message-ID: <1433517709-6872-1-git-send-email-eric.auger@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch introduces the vfio_platform_reset_combo struct that
-stores all the information useful to handle the reset modality:
-compat string, name of the reset function, name of the module that
-implements the reset function. A lookup table of such structures
-is added, currently containing a single sentinel element. A new
-type field is added in vfio_platform_device to store what kind of
-reset is associated to the device, if any.
+From: Kim Phillips <kim.phillips@linaro.org>
 
+The KVM-VFIO device is used by the QEMU VFIO device. It is used to
+record the list of in-use VFIO groups so that KVM can manipulate
+them.
+
+Signed-off-by: Kim Phillips <kim.phillips@linaro.org>
 Signed-off-by: Eric Auger <eric.auger@linaro.org>
----
- drivers/vfio/platform/vfio_platform_common.c  |  6 ++++++
- drivers/vfio/platform/vfio_platform_private.h | 12 ++++++++++++
- 2 files changed, 18 insertions(+)
 
-diff --git a/drivers/vfio/platform/vfio_platform_common.c b/drivers/vfio/platform/vfio_platform_common.c
-index abcff7a..d970776 100644
---- a/drivers/vfio/platform/vfio_platform_common.c
-+++ b/drivers/vfio/platform/vfio_platform_common.c
-@@ -25,6 +25,12 @@
+---
+
+- previously included in KVM-VFIO IRQ forward control v6 series.
+  Rationale to put it aside is the unavailability of the kvm-vfio device
+  causes produces a warning when launching the QEMU VFIO platform device
+  that can puzzle some users (although not blocking):
+  "Failed to create KVM VFIO device: No such device"
+---
+ arch/arm/kvm/Kconfig    | 1 +
+ arch/arm/kvm/Makefile   | 2 +-
+ arch/arm64/kvm/Kconfig  | 1 +
+ arch/arm64/kvm/Makefile | 2 +-
+ 4 files changed, 4 insertions(+), 2 deletions(-)
+
+diff --git a/arch/arm/kvm/Kconfig b/arch/arm/kvm/Kconfig
+index f1f79d1..bfb915d 100644
+--- a/arch/arm/kvm/Kconfig
++++ b/arch/arm/kvm/Kconfig
+@@ -28,6 +28,7 @@ config KVM
+ 	select KVM_GENERIC_DIRTYLOG_READ_PROTECT
+ 	select SRCU
+ 	select MMU_NOTIFIER
++	select KVM_VFIO
+ 	select HAVE_KVM_EVENTFD
+ 	select HAVE_KVM_IRQFD
+ 	depends on ARM_VIRT_EXT && ARM_LPAE && ARM_ARCH_TIMER
+diff --git a/arch/arm/kvm/Makefile b/arch/arm/kvm/Makefile
+index 139e46c..c5eef02c 100644
+--- a/arch/arm/kvm/Makefile
++++ b/arch/arm/kvm/Makefile
+@@ -15,7 +15,7 @@ AFLAGS_init.o := -Wa,-march=armv7-a$(plus_virt)
+ AFLAGS_interrupts.o := -Wa,-march=armv7-a$(plus_virt)
  
- static DEFINE_MUTEX(driver_lock);
+ KVM := ../../../virt/kvm
+-kvm-arm-y = $(KVM)/kvm_main.o $(KVM)/coalesced_mmio.o $(KVM)/eventfd.o
++kvm-arm-y = $(KVM)/kvm_main.o $(KVM)/coalesced_mmio.o $(KVM)/eventfd.o $(KVM)/vfio.o
  
-+static const struct vfio_platform_reset_combo reset_lookup_table[] = {
-+	{
-+		.type = VFIO_PLATFORM_RESET_TYPE_MAX
-+	},
-+};
-+
- static int vfio_platform_regions_init(struct vfio_platform_device *vdev)
- {
- 	int cnt = 0, i;
-diff --git a/drivers/vfio/platform/vfio_platform_private.h b/drivers/vfio/platform/vfio_platform_private.h
-index 5d31e04..d864124 100644
---- a/drivers/vfio/platform/vfio_platform_private.h
-+++ b/drivers/vfio/platform/vfio_platform_private.h
-@@ -49,6 +49,10 @@ struct vfio_platform_region {
- 	void __iomem		*ioaddr;
- };
+ obj-y += kvm-arm.o init.o interrupts.o
+ obj-y += arm.o handle_exit.o guest.o mmu.o emulate.o reset.o
+diff --git a/arch/arm64/kvm/Kconfig b/arch/arm64/kvm/Kconfig
+index 5105e29..bfffe8f 100644
+--- a/arch/arm64/kvm/Kconfig
++++ b/arch/arm64/kvm/Kconfig
+@@ -28,6 +28,7 @@ config KVM
+ 	select KVM_ARM_HOST
+ 	select KVM_GENERIC_DIRTYLOG_READ_PROTECT
+ 	select SRCU
++	select KVM_VFIO
+ 	select HAVE_KVM_EVENTFD
+ 	select HAVE_KVM_IRQFD
+ 	---help---
+diff --git a/arch/arm64/kvm/Makefile b/arch/arm64/kvm/Makefile
+index d5904f8..f90f4aa 100644
+--- a/arch/arm64/kvm/Makefile
++++ b/arch/arm64/kvm/Makefile
+@@ -11,7 +11,7 @@ ARM=../../../arch/arm/kvm
  
-+enum vfio_platform_reset_type {
-+	VFIO_PLATFORM_RESET_TYPE_MAX /* last element */,
-+};
-+
- struct vfio_platform_device {
- 	struct vfio_platform_region	*regions;
- 	u32				num_regions;
-@@ -56,6 +60,7 @@ struct vfio_platform_device {
- 	u32				num_irqs;
- 	int				refcnt;
- 	struct mutex			igate;
-+	enum vfio_platform_reset_type	type;
+ obj-$(CONFIG_KVM_ARM_HOST) += kvm.o
  
- 	/*
- 	 * These fields should be filled by the bus specific binder
-@@ -69,6 +74,13 @@ struct vfio_platform_device {
- 	int	(*get_irq)(struct vfio_platform_device *vdev, int i);
- };
+-kvm-$(CONFIG_KVM_ARM_HOST) += $(KVM)/kvm_main.o $(KVM)/coalesced_mmio.o $(KVM)/eventfd.o
++kvm-$(CONFIG_KVM_ARM_HOST) += $(KVM)/kvm_main.o $(KVM)/coalesced_mmio.o $(KVM)/eventfd.o $(KVM)/vfio.o
+ kvm-$(CONFIG_KVM_ARM_HOST) += $(ARM)/arm.o $(ARM)/mmu.o $(ARM)/mmio.o
+ kvm-$(CONFIG_KVM_ARM_HOST) += $(ARM)/psci.o $(ARM)/perf.o
  
-+struct vfio_platform_reset_combo {
-+	enum vfio_platform_reset_type type;
-+	char *compat;
-+	char *reset_function_name;
-+	char *module_name;
-+};
-+
- extern int vfio_platform_probe_common(struct vfio_platform_device *vdev,
- 				      struct device *dev);
- extern struct vfio_platform_device *vfio_platform_remove_common
 -- 
 1.9.1
