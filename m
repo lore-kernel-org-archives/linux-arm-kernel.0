@@ -1,60 +1,44 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Fri, 5 Jun 2015 13:02:01 +0200
-Subject: [PATCH v3 1/2] drm/bridge: dw-hdmi: support optional supply
- regulators
-In-Reply-To: <2619686.csNBBFyt8W@phil>
-References: <4184159.j0iXe39dFB@phil>
- <2619686.csNBBFyt8W@phil>
-Message-ID: <20150605110159.GA16254@ulmo.nvidia.com>
+From: bp@alien8.de (Borislav Petkov)
+Date: Fri, 5 Jun 2015 13:02:56 +0200
+Subject: [PATCHv2 0/4] Add Altera Arria10 EDAC Support
+In-Reply-To: <1433428128-7292-1-git-send-email-tthayer@opensource.altera.com>
+References: <1433428128-7292-1-git-send-email-tthayer@opensource.altera.com>
+Message-ID: <20150605110255.GE3679@pd.tnic>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 23, 2015 at 07:17:49PM +0100, Heiko Stuebner wrote:
-> Hi Philipp,
+On Thu, Jun 04, 2015 at 09:28:44AM -0500, tthayer at opensource.altera.com wrote:
+> From: Thor Thayer <tthayer@opensource.altera.com>
 > 
-> Am Donnerstag, 12. M?rz 2015, 21:45:19 schrieb Heiko Stuebner:
-> > At least the Rockchip variant of the dw_hdmi can have controllable power
-> > supplies providing 1.0 and 1.8V. Therefore add the possibility for the
-> > generic bridge driver to enable supplies provided by the hw-specific
-> > drivers.
-> > 
-> > Signed-off-by: Heiko Stuebner <heiko@sntech.de>
+> This series of patches adds support for the Arria10 EDAC. The
+> SDRAM controller and ECC registers are significantly different
+> from the CycloneV/ArriaV but common areas could be abstracted.
 > 
-> does this look ok now?
+> Thor Thayer (4):
+>   edac, altera: Generalize driver to use DT Memory size
+>   edac, altera: Refactor EDAC for Altera CycloneV SoC.
+>   edac, altera: Addition of Arria10 EDAC
+>   arm: socfpga: dts: Arria10 SDRAM EDAC DTS additions.
 > 
-> And as we talked about in Chemnitz, who will be taking such bridge-related 
-> changes, as you mentioned some last bridge-patches going through Thierry.
+>  .../bindings/arm/altera/socfpga-sdram-edac.txt     |    2 +-
+>  arch/arm/boot/dts/socfpga_arria10.dtsi             |   11 +
+>  drivers/edac/altera_edac.c                         |  364 ++++++++++++--------
+>  drivers/edac/altera_edac.h                         |  201 +++++++++++
+>  4 files changed, 437 insertions(+), 141 deletions(-)
+>  create mode 100644 drivers/edac/altera_edac.h
 
-Sorry, I had completely missed this.
+Ok, all applied, no need to redo them.
 
-> > ---
-> > changes since v2:
-> > - rename supplies to the names found in the hdmi IP databook
-> > changes since v1:
-> > - follow suggestion from Russell King to keep regulator handling local
-> >   to the rockchip implementation for the time being and only generalize
-> >   when a real second implementation needs regulator handling
-> > 
-> >  .../devicetree/bindings/drm/bridge/dw_hdmi.txt     |  5 ++++
-> >  drivers/gpu/drm/rockchip/dw_hdmi-rockchip.c        | 32
-> > +++++++++++++++++++++- 2 files changed, 36 insertions(+), 1 deletion(-)
-> > 
-> > diff --git a/Documentation/devicetree/bindings/drm/bridge/dw_hdmi.txt
-> > b/Documentation/devicetree/bindings/drm/bridge/dw_hdmi.txt index
-> > a905c14..bb74640 100644
-> > --- a/Documentation/devicetree/bindings/drm/bridge/dw_hdmi.txt
-> > +++ b/Documentation/devicetree/bindings/drm/bridge/dw_hdmi.txt
-> > @@ -22,6 +22,11 @@ Optional properties
-> >  - ddc-i2c-bus: phandle of an I2C controller used for DDC EDID probing
-> >  - clocks, clock-names: phandle to the HDMI CEC clock, name should be "cec"
-> > 
-> > +Optional supplies:
-> > +rockchip,rk3288-dw-hdmi handles two optional power supplies:
-> > +- vp-supply: 1.0V power supply
-> > +- vph-supply: 1.8V power supply
+altera_edac still builds ok with the cross compiler here but you should
+doublecheck my final result just in case:
 
-If this is specific to the Rockchip implementation, shouldn't this go
-into Documentation/devicetree/bindings/video/dw_hdmi-rockchip.txt? It
-could then simply go into the Rockchip DRM tree.
+git://git.kernel.org/pub/scm/linux/kernel/git/bp/bp.git#for-next
 
-Thierry
+Thanks.
+
+-- 
+Regards/Gruss,
+    Boris.
+
+ECO tip #101: Trim your mails when you reply.
+--
