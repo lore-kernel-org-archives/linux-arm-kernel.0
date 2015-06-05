@@ -1,16 +1,32 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Thu, 04 Jun 2015 21:14:48 -0600
-Subject: [PATCH v7 2/3] ARM: bcm2835: Add the Raspberry Pi firmware driver
-In-Reply-To: <1433448707-18104-2-git-send-email-eric@anholt.net>
-References: <1433448707-18104-1-git-send-email-eric@anholt.net>
- <1433448707-18104-2-git-send-email-eric@anholt.net>
-Message-ID: <55711428.4080506@wwwdotorg.org>
+From: fkan@apm.com (Feng Kan)
+Date: Thu, 4 Jun 2015 20:37:50 -0700
+Subject: [PATCH v0] gpio_keys: fix gpio key driver to proper support GIC
+ interrupt
+In-Reply-To: <20150604172324.GA9074@dtor-ws>
+References: <1433402712-21399-1-git-send-email-yvo@apm.com>
+ <20150604172324.GA9074@dtor-ws>
+Message-ID: <CAL85gmC2oHVKzgfNFXRzSzigQu++OJv-TpwzeN5fC-5s3U0U-Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/04/2015 02:11 PM, Eric Anholt wrote:
-> This gives us a function for making mailbox property channel requests
-> of the firmware, which is most notable in that it will let us get and
-> set clock rates.
+On Thu, Jun 4, 2015 at 10:23 AM, Dmitry Torokhov
+<dmitry.torokhov@gmail.com> wrote:
+> Hi Y,
+> On Thu, Jun 04, 2015 at 02:25:12PM +0700, Y Vo wrote:
+>> GIC is designed to support two of trigger mechanisms - active level
+>> high or edge rising. But in the gpio_keys driver, it tries to use both
+>> edge rising and edge falling trigger. This patch fixes the gpio_keys
+>> driver to request only the edge rising event when failed to configure the
+>> interrupt.
+>
+> How do we get notified of button release if we only get interrupt on
+> rising edge?
 
-Acked-by: Stephen Warren <swarren@wwwdotorg.org>
+On the arm gic, only the rising edge is supported. So key press can
+only be defined
+as rising edge and no key release.
+>
+> Thanks.
+>
+> --
+> Dmitry
