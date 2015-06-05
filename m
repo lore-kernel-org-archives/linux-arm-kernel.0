@@ -1,61 +1,65 @@
-From: Dave.Martin@arm.com (Dave Martin)
-Date: Fri,  5 Jun 2015 15:07:47 +0100
-Subject: [PATCH] serial/amba-pl011: Disable interrupts around TX softirq
-Message-ID: <1433513267-24163-1-git-send-email-Dave.Martin@arm.com>
+From: atull@opensource.altera.com (atull)
+Date: Fri, 5 Jun 2015 09:11:23 -0500
+Subject: [PATCHv6 0/2] socfpga: support suspend to ram*
+In-Reply-To: <CADhT+wc+w6QvUmtD_ie2_hfb_uowpfwM0YHDeasXE86MKOjA8A@mail.gmail.com>
+References: <1433270139-7042-1-git-send-email-atull@opensource.altera.com>
+ <556E028E.2080800@opensource.altera.com>
+ <5570D29A.2030007@opensource.altera.com>
+ <CADhT+wc+w6QvUmtD_ie2_hfb_uowpfwM0YHDeasXE86MKOjA8A@mail.gmail.com>
+Message-ID: <alpine.DEB.2.02.1506050910460.20527@linuxheads99>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-pl011_tx_softirq() currently uses spin_{,un}lock(), which are not
-sufficient to inhibit pl011_int() from being triggered by a local
-IRQ and trying to re-take the same lock.  This can lead to
-deadlocks.
+On Fri, 5 Jun 2015, Dinh Nguyen wrote:
 
-This patch uses the _irq() locking variants instead to ensure that
-pl011_int() handling for a given port is deferred until any
-pl011_tx_softirq() work for that port is complete.
+> On Thu, Jun 4, 2015 at 5:35 PM, Dinh Nguyen
+> <dinguyen@opensource.altera.com> wrote:
+> > Hi Alan,
+> >
+> > On 06/02/2015 02:22 PM, Dinh Nguyen wrote:
+> >> On 06/02/2015 01:35 PM, Alan Tull wrote:
+> >>> Support suspend to ram on socfpga.
+> >>>   * allocate space in ocram using sram driver.
+> >>>   * Add a function in ocram to place DDR in self-refresh
+> >>>     and suspend.
+> >>>   * Prevent suspend if EDAC is enabled.
+> >>>   * Add a device tree binding document for the Altera
+> >>>     SOCFPGA SDRAM controller that is used to put DDR in
+> >>>     self-refresh mode.
+> >>>
+> >>> Alan Tull (2):
+> >>>   ARM: socfpga: support suspend to ram
+> >>>   ARM: socfpga: dts: add sdram controller dt binding doc
+> >>>
+> >>>  .../arm/altera/socfpga-sdram-controller.txt        |   12 ++
+> >>>  arch/arm/mach-socfpga/Kconfig                      |   10 +-
+> >>>  arch/arm/mach-socfpga/Makefile                     |    1 +
+> >>>  arch/arm/mach-socfpga/core.h                       |    6 +-
+> >>>  arch/arm/mach-socfpga/pm.c                         |  149 ++++++++++++++++++++
+> >>>  arch/arm/mach-socfpga/self-refresh.S               |  136 ++++++++++++++++++
+> >>>  arch/arm/mach-socfpga/socfpga.c                    |    6 +-
+> >>>  drivers/edac/altera_edac.c                         |   20 +++
+> >>>  8 files changed, 337 insertions(+), 3 deletions(-)
+> >>>  create mode 100644 Documentation/devicetree/bindings/arm/altera/socfpga-sdram-controller.txt
+> >>>  create mode 100644 arch/arm/mach-socfpga/pm.c
+> >>>  create mode 100644 arch/arm/mach-socfpga/self-refresh.S
+> >>>
+> >>
+> >>
+> >> Applied.
+> >>
+> >
+> > I had to un-apply this patch because I noticed that it's touching
+> > drivers/edac/altera_edac.c. This part should be a separate patch and
+> > need to go through linux-edac.
+> >
+> 
+> Nevermind on this, I got an ack-by from Borislav Petkov for the edac
+> part. No need to split the patch up.
+> 
+> Dinh
+> 
 
-Signed-off-by: Dave Martin <Dave.Martin@arm.com>
----
+Sorry for the trouble and Thanks!
 
-Another candidate for v4.1 if possible (sorry!) -- I thought this change
-was already in, but it went astray when I was refactoring.
-
-This patch conflicts with tty-next like the previous patch, since it
-fixes code that is removed by tty-next.  The correct resolution for
-the resulting merge conflict is to keep the code from tty-next.
-
-
-I am not 100% certain yet whether some rare deadlocks that Robin is
-seeing are caused by this issue, or whether this patch fixes them --
-he's testing atm.
-
-The patch is straightforward and using non _irq() locking in a workitem
-that expects the lock to protect against interrupt handlers on the same
-CPU is clearly wrong.
-
-
-Cheers
----Dave
-
-
- drivers/tty/serial/amba-pl011.c |    4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
-
-diff --git a/drivers/tty/serial/amba-pl011.c b/drivers/tty/serial/amba-pl011.c
-index 763eb20..0cc622a 100644
---- a/drivers/tty/serial/amba-pl011.c
-+++ b/drivers/tty/serial/amba-pl011.c
-@@ -1360,9 +1360,9 @@ static void pl011_tx_softirq(struct work_struct *work)
- 	struct uart_amba_port *uap =
- 		container_of(dwork, struct uart_amba_port, tx_softirq_work);
- 
--	spin_lock(&uap->port.lock);
-+	spin_lock_irq(&uap->port.lock);
- 	while (pl011_tx_chars(uap)) ;
--	spin_unlock(&uap->port.lock);
-+	spin_unlock_irq(&uap->port.lock);
- }
- 
- static void pl011_tx_irq_seen(struct uart_amba_port *uap)
--- 
-1.7.10.4
+Alan
