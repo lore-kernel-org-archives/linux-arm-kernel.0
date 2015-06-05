@@ -1,40 +1,73 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Fri, 5 Jun 2015 13:39:51 +0200
-Subject: [PATCH/RFC 1/2] ARM: multi_v7_defconfig: Make drm support modular
-In-Reply-To: <2568731.dqdEiMuDro@wuerfel>
-References: <1432905926-31606-1-git-send-email-geert@linux-m68k.org>
- <2568731.dqdEiMuDro@wuerfel>
-Message-ID: <20150605113949.GA26607@ulmo.nvidia.com>
+From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
+Date: Fri, 05 Jun 2015 14:16:40 +0200
+Subject: [PATCH v3 1/2] drm/bridge: dw-hdmi: support optional supply
+ regulators
+In-Reply-To: <20150605110159.GA16254@ulmo.nvidia.com>
+References: <4184159.j0iXe39dFB@phil> <2619686.csNBBFyt8W@phil>
+ <20150605110159.GA16254@ulmo.nvidia.com>
+Message-ID: <23123577.mOoqGCAPdL@diego>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 29, 2015 at 05:41:34PM +0200, Arnd Bergmann wrote:
-> On Friday 29 May 2015 15:25:25 Geert Uytterhoeven wrote:
-> > From: Geert Uytterhoeven <geert+renesas@glider.be>
+Hi Thierry
+
+Am Freitag, 5. Juni 2015, 13:02:01 schrieb Thierry Reding:
+> On Mon, Mar 23, 2015 at 07:17:49PM +0100, Heiko Stuebner wrote:
+> > Hi Philipp,
 > > 
-> > Make drm support modular to reduce kernel size (-620 KiB):
+> > Am Donnerstag, 12. M?rz 2015, 21:45:19 schrieb Heiko Stuebner:
+> > > At least the Rockchip variant of the dw_hdmi can have controllable power
+> > > supplies providing 1.0 and 1.8V. Therefore add the possibility for the
+> > > generic bridge driver to enable supplies provided by the hw-specific
+> > > drivers.
+> > > 
+> > > Signed-off-by: Heiko Stuebner <heiko@sntech.de>
 > > 
-> >        text    data     bss     dec     hex   filename
-> >     12211122 1392076  338520 13941718  d4bbd6 vmlinux.before
-> >     11581470 1387196  338264 13306930  cb0c32 vmlinux.after
+> > does this look ok now?
 > > 
-> > Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
-> > ---
-> > Slightly controversial:
-> >   - Does anyone need drm for boot testing?
+> > And as we talked about in Chemnitz, who will be taking such bridge-related
+> > changes, as you mentioned some last bridge-patches going through Thierry.
 > 
-> Only the tegra driver is affected, so let's ask the tegra
-> maintainers.
+> Sorry, I had completely missed this.
+> 
+> > > ---
+> > > changes since v2:
+> > > - rename supplies to the names found in the hdmi IP databook
+> > > changes since v1:
+> > > - follow suggestion from Russell King to keep regulator handling local
+> > > 
+> > >   to the rockchip implementation for the time being and only generalize
+> > >   when a real second implementation needs regulator handling
+> > >  
+> > >  .../devicetree/bindings/drm/bridge/dw_hdmi.txt     |  5 ++++
+> > >  drivers/gpu/drm/rockchip/dw_hdmi-rockchip.c        | 32
+> > > 
+> > > +++++++++++++++++++++- 2 files changed, 36 insertions(+), 1 deletion(-)
+> > > 
+> > > diff --git a/Documentation/devicetree/bindings/drm/bridge/dw_hdmi.txt
+> > > b/Documentation/devicetree/bindings/drm/bridge/dw_hdmi.txt index
+> > > a905c14..bb74640 100644
+> > > --- a/Documentation/devicetree/bindings/drm/bridge/dw_hdmi.txt
+> > > +++ b/Documentation/devicetree/bindings/drm/bridge/dw_hdmi.txt
+> > > @@ -22,6 +22,11 @@ Optional properties
+> > > 
+> > >  - ddc-i2c-bus: phandle of an I2C controller used for DDC EDID probing
+> > >  - clocks, clock-names: phandle to the HDMI CEC clock, name should be
+> > >  "cec"
+> > > 
+> > > +Optional supplies:
+> > > +rockchip,rk3288-dw-hdmi handles two optional power supplies:
+> > > +- vp-supply: 1.0V power supply
+> > > +- vph-supply: 1.8V power supply
+> 
+> If this is specific to the Rockchip implementation, shouldn't this go
+> into Documentation/devicetree/bindings/video/dw_hdmi-rockchip.txt? It
+> could then simply go into the Rockchip DRM tree.
 
-As a matter of fact I do most of the DRM testing on boot using the
-built-in driver. However I can do that easily using tegra_defconfig so
-I'm fine with this change.
+actually, we determined that the supply names are universal to the IP (both in 
+imx and rockchip and probably more if there are more users out there). Just 
+Russell requested that we don't pollute the generic code until necessary, as 
+it looks like the supply of those is somehow handled internally on the imx.
 
-Acked-by: Thierry Reding <treding@nvidia.com>
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150605/adbb4a75/attachment.sig>
+
+Heiko
