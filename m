@@ -1,57 +1,53 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Fri, 5 Jun 2015 17:19:30 +0200
-Subject: [ehci-orion] ETIMEOUT with ehci_setup()'s ehci_halt()
-In-Reply-To: <5571B38E.7080505@keymile.com>
-References: <5571B38E.7080505@keymile.com>
-Message-ID: <20150605151930.GA16909@lunn.ch>
+From: xuwei5@hisilicon.com (Wei Xu)
+Date: Fri, 5 Jun 2015 16:24:27 +0100
+Subject: [GIT PULL]Hisilicon 64-bit soc hi6220 DT changes for 4.2
+Message-ID: <5571BF2B.5080500@hisilicon.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 05, 2015 at 04:34:54PM +0200, Valentin Longchamp wrote:
-> Hello,
-> 
-> I am currently bringing up the USB 2.0 Host controller of the Bobcat's (98DX4122
-> Marvell switch) internal kirkwood CPU on a variation of Keymile's km_kirwood
-> hardware (kirkwood-km_kirkwood.dts).
-> 
-> When the driver registers its hcd, it fails with a timemout as it can be seen in
-> the below log:
-> 
-> > root at kmcoge5un:~# dmesg -n 8
-> > root at kmcoge5un:~# insmod ehci-orion.ko 
-> > ehci-orion: EHCI orion driver
-> > Initializing Orion-SoC USB Host Controller
-> > orion-ehci f1050000.ehci: EHCI Host Controller
-> > orion-ehci f1050000.ehci: new USB bus registered, assigned bus number 1
-> > orion-ehci f1050000.ehci: reset hcs_params 0x10011 dbg=0 ind cc=0 pcc=0 ordered ports=1
-> > orion-ehci f1050000.ehci: reset hcc_params 0006 thresh 0 uframes 256/512/1024 park
-> > orion-ehci f1050000.ehci: park 0
-> > orion-ehci f1050000.ehci: reset command 0080002 (park)=0 ithresh=8 period=1024 Reset HALT
-> > orion-ehci f1050000.ehci: can't setup
-> > orion-ehci f1050000.ehci: USB bus 1 deregistered
-> > orion-ehci f1050000.ehci: init f1050000.ehci fail, -110
-> > orion-ehci: probe of f1050000.ehci failed with error -110
-> 
-> This is very similar to this problem, except that it always happens:
-> https://lkml.org/lkml/2012/6/4/381
-> 
-> I have cornered it out to the last handshake() call of the ehci_halt() call,
-> that should set the controller in the HALT state. If I comment this handshake()
-> call out, the registration is fine and the controller then looks OK (I don't
-> have a hardware with a real USB bus to further test it yet).
-> 
-> My current idea is that maybe a reset or an initialization may be missing, but I
-> wanted to ask if anybody already has seen a similar behavior with the various
-> hardware platform supported by ehci-orion ?
+Hi Arnd, Hi Olof, Hi Kevin,
 
-Hi Valentin
+Please help to pull the following changes.
+Thanks!
 
-I don't remember seeing any problems like this on any kirkwood
-devices.
+Best Regards,
+Wei
 
-Do you know what phy the 98DX4122 uses? The ehci-orion.c has some code
-for handling the Orion5X USB phy. I also think u-boot might also have
-some code. Sebastian might know more, i think he implemented USB
-support for barebox.
+---
 
-	Andrew
+The following changes since commit b787f68c36d49bb1d9236f403813641efa74a031:
+
+  Linux 4.1-rc1 (2015-04-26 17:59:10 -0700)
+
+are available in the git repository at:
+
+  git://github.com/hisilicon/linux-hisi.git tags/hi6620-dt-for-4.2
+
+for you to fetch changes up to 86e8f528ef325843d9b01ee6d00823e667cab5e2:
+
+  arm64: dts: Add dts files for Hisilicon Hi6220 SoC (2015-06-05 15:30:06 +0100)
+
+----------------------------------------------------------------
+ARM64: DT: Hisilicon hi6220 soc and hikey board updates for 4.2
+
+- Added the devicetree bindings document for hi6220 SoC
+- Added the devicetree bindings document for hi6220 clock
+- Added dts files for hi6220 SoC and hikey board
+
+----------------------------------------------------------------
+Bintian Wang (3):
+      arm64: hi6220: Document devicetree bindings for Hisilicon hi6220 SoC
+      clk: hi6220: Document devicetree bindings for hi6220 clock
+      arm64: dts: Add dts files for Hisilicon Hi6220 SoC
+
+ Documentation/devicetree/bindings/arm/hisilicon/hisilicon.txt |  87 +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+ Documentation/devicetree/bindings/clock/hi6220-clock.txt      |  34 +++++++++++++++++++++++++++
+ arch/arm64/boot/dts/Makefile                                  |   1 +
+ arch/arm64/boot/dts/hisilicon/Makefile                        |   5 ++++
+ arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts                |  31 +++++++++++++++++++++++++
+ arch/arm64/boot/dts/hisilicon/hi6220.dtsi                     | 171 +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+ 6 files changed, 329 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/clock/hi6220-clock.txt
+ create mode 100644 arch/arm64/boot/dts/hisilicon/Makefile
+ create mode 100644 arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts
+ create mode 100644 arch/arm64/boot/dts/hisilicon/hi6220.dtsi
