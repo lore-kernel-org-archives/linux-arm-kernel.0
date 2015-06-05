@@ -1,82 +1,57 @@
-From: eric.auger@linaro.org (Eric Auger)
-Date: Fri,  5 Jun 2015 17:21:49 +0200
-Subject: [PATCH] KVM: arm/arm64: Enable the KVM-VFIO device
-Message-ID: <1433517709-6872-1-git-send-email-eric.auger@linaro.org>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Fri, 5 Jun 2015 17:19:30 +0200
+Subject: [ehci-orion] ETIMEOUT with ehci_setup()'s ehci_halt()
+In-Reply-To: <5571B38E.7080505@keymile.com>
+References: <5571B38E.7080505@keymile.com>
+Message-ID: <20150605151930.GA16909@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Kim Phillips <kim.phillips@linaro.org>
+On Fri, Jun 05, 2015 at 04:34:54PM +0200, Valentin Longchamp wrote:
+> Hello,
+> 
+> I am currently bringing up the USB 2.0 Host controller of the Bobcat's (98DX4122
+> Marvell switch) internal kirkwood CPU on a variation of Keymile's km_kirwood
+> hardware (kirkwood-km_kirkwood.dts).
+> 
+> When the driver registers its hcd, it fails with a timemout as it can be seen in
+> the below log:
+> 
+> > root at kmcoge5un:~# dmesg -n 8
+> > root at kmcoge5un:~# insmod ehci-orion.ko 
+> > ehci-orion: EHCI orion driver
+> > Initializing Orion-SoC USB Host Controller
+> > orion-ehci f1050000.ehci: EHCI Host Controller
+> > orion-ehci f1050000.ehci: new USB bus registered, assigned bus number 1
+> > orion-ehci f1050000.ehci: reset hcs_params 0x10011 dbg=0 ind cc=0 pcc=0 ordered ports=1
+> > orion-ehci f1050000.ehci: reset hcc_params 0006 thresh 0 uframes 256/512/1024 park
+> > orion-ehci f1050000.ehci: park 0
+> > orion-ehci f1050000.ehci: reset command 0080002 (park)=0 ithresh=8 period=1024 Reset HALT
+> > orion-ehci f1050000.ehci: can't setup
+> > orion-ehci f1050000.ehci: USB bus 1 deregistered
+> > orion-ehci f1050000.ehci: init f1050000.ehci fail, -110
+> > orion-ehci: probe of f1050000.ehci failed with error -110
+> 
+> This is very similar to this problem, except that it always happens:
+> https://lkml.org/lkml/2012/6/4/381
+> 
+> I have cornered it out to the last handshake() call of the ehci_halt() call,
+> that should set the controller in the HALT state. If I comment this handshake()
+> call out, the registration is fine and the controller then looks OK (I don't
+> have a hardware with a real USB bus to further test it yet).
+> 
+> My current idea is that maybe a reset or an initialization may be missing, but I
+> wanted to ask if anybody already has seen a similar behavior with the various
+> hardware platform supported by ehci-orion ?
 
-The KVM-VFIO device is used by the QEMU VFIO device. It is used to
-record the list of in-use VFIO groups so that KVM can manipulate
-them.
+Hi Valentin
 
-Signed-off-by: Kim Phillips <kim.phillips@linaro.org>
-Signed-off-by: Eric Auger <eric.auger@linaro.org>
+I don't remember seeing any problems like this on any kirkwood
+devices.
 
----
+Do you know what phy the 98DX4122 uses? The ehci-orion.c has some code
+for handling the Orion5X USB phy. I also think u-boot might also have
+some code. Sebastian might know more, i think he implemented USB
+support for barebox.
 
-- previously included in KVM-VFIO IRQ forward control v6 series.
-  Rationale to put it aside is the unavailability of the kvm-vfio device
-  causes produces a warning when launching the QEMU VFIO platform device
-  that can puzzle some users (although not blocking):
-  "Failed to create KVM VFIO device: No such device"
----
- arch/arm/kvm/Kconfig    | 1 +
- arch/arm/kvm/Makefile   | 2 +-
- arch/arm64/kvm/Kconfig  | 1 +
- arch/arm64/kvm/Makefile | 2 +-
- 4 files changed, 4 insertions(+), 2 deletions(-)
-
-diff --git a/arch/arm/kvm/Kconfig b/arch/arm/kvm/Kconfig
-index f1f79d1..bfb915d 100644
---- a/arch/arm/kvm/Kconfig
-+++ b/arch/arm/kvm/Kconfig
-@@ -28,6 +28,7 @@ config KVM
- 	select KVM_GENERIC_DIRTYLOG_READ_PROTECT
- 	select SRCU
- 	select MMU_NOTIFIER
-+	select KVM_VFIO
- 	select HAVE_KVM_EVENTFD
- 	select HAVE_KVM_IRQFD
- 	depends on ARM_VIRT_EXT && ARM_LPAE && ARM_ARCH_TIMER
-diff --git a/arch/arm/kvm/Makefile b/arch/arm/kvm/Makefile
-index 139e46c..c5eef02c 100644
---- a/arch/arm/kvm/Makefile
-+++ b/arch/arm/kvm/Makefile
-@@ -15,7 +15,7 @@ AFLAGS_init.o := -Wa,-march=armv7-a$(plus_virt)
- AFLAGS_interrupts.o := -Wa,-march=armv7-a$(plus_virt)
- 
- KVM := ../../../virt/kvm
--kvm-arm-y = $(KVM)/kvm_main.o $(KVM)/coalesced_mmio.o $(KVM)/eventfd.o
-+kvm-arm-y = $(KVM)/kvm_main.o $(KVM)/coalesced_mmio.o $(KVM)/eventfd.o $(KVM)/vfio.o
- 
- obj-y += kvm-arm.o init.o interrupts.o
- obj-y += arm.o handle_exit.o guest.o mmu.o emulate.o reset.o
-diff --git a/arch/arm64/kvm/Kconfig b/arch/arm64/kvm/Kconfig
-index 5105e29..bfffe8f 100644
---- a/arch/arm64/kvm/Kconfig
-+++ b/arch/arm64/kvm/Kconfig
-@@ -28,6 +28,7 @@ config KVM
- 	select KVM_ARM_HOST
- 	select KVM_GENERIC_DIRTYLOG_READ_PROTECT
- 	select SRCU
-+	select KVM_VFIO
- 	select HAVE_KVM_EVENTFD
- 	select HAVE_KVM_IRQFD
- 	---help---
-diff --git a/arch/arm64/kvm/Makefile b/arch/arm64/kvm/Makefile
-index d5904f8..f90f4aa 100644
---- a/arch/arm64/kvm/Makefile
-+++ b/arch/arm64/kvm/Makefile
-@@ -11,7 +11,7 @@ ARM=../../../arch/arm/kvm
- 
- obj-$(CONFIG_KVM_ARM_HOST) += kvm.o
- 
--kvm-$(CONFIG_KVM_ARM_HOST) += $(KVM)/kvm_main.o $(KVM)/coalesced_mmio.o $(KVM)/eventfd.o
-+kvm-$(CONFIG_KVM_ARM_HOST) += $(KVM)/kvm_main.o $(KVM)/coalesced_mmio.o $(KVM)/eventfd.o $(KVM)/vfio.o
- kvm-$(CONFIG_KVM_ARM_HOST) += $(ARM)/arm.o $(ARM)/mmu.o $(ARM)/mmio.o
- kvm-$(CONFIG_KVM_ARM_HOST) += $(ARM)/psci.o $(ARM)/perf.o
- 
--- 
-1.9.1
+	Andrew
