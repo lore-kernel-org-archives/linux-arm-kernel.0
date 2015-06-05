@@ -1,55 +1,73 @@
 From: hdegoede@redhat.com (Hans de Goede)
-Date: Fri,  5 Jun 2015 20:53:35 +0200
-Subject: [PATCH 1/7] phy-sun4i-usb: Swap check for disconnect threshold
+Date: Fri,  5 Jun 2015 20:53:36 +0200
+Subject: [PATCH 2/7] phy-sun4i-usb: Add support for the usb-phys on the
+ sun8i-a23 SoC
 In-Reply-To: <1433530421-12197-1-git-send-email-hdegoede@redhat.com>
 References: <1433530421-12197-1-git-send-email-hdegoede@redhat.com>
-Message-ID: <1433530421-12197-2-git-send-email-hdegoede@redhat.com>
+Message-ID: <1433530421-12197-3-git-send-email-hdegoede@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Before this commit the code for determining the disconnect threshold was
-checking for "allwinner,sun4i-a10-usb-phy" or "allwinner,sun6i-a31-usb-phy"
-assuming that those where the exception and then newer SoCs would use a
-disconnect threshold of 2 like sun7i does. But it turns out that newer
-SoCs use a disconnect threshold of 3 and sun5i and sun7i are the
-exceptions, so check for those instead.
-
-Here are the settings from the various Allwinner SDK sources:
- sun4i-a10: USBC_Phy_Write(usbc_no, 0x2a, 3, 2);
- sun5i-a13: USBC_Phy_Write(usbc_no, 0x2a, 2, 2);
- sun6i-a31: USBC_Phy_Write(usbc_no, 0x2a, 3, 2);
- sun7i-a20: USBC_Phy_Write(usbc_no, 0x2a, 2, 2);
- sun8i-a23: USBC_Phy_Write(usbc_no, 0x2a, 3, 2);
- sun8i-h3:  USBC_Phy_Write(usbc_no, 0x2a, 3, 2);
- sun9i-a80: USBC_Phy_Write(usbc_no, 0x2a, 3, 2);
-
-Note this commit makes no functional changes as currently we only support
-sun4i - sun7i.
+The usb-phys on the sun8i-a23 SoC have the same setup wrt clocks as on the
+sun6i-a31 SoC, but there are only 2 instead of 3 like on the sun5i-a13 SoC.
 
 Signed-off-by: Hans de Goede <hdegoede@redhat.com>
 ---
- drivers/phy/phy-sun4i-usb.c | 8 ++++----
- 1 file changed, 4 insertions(+), 4 deletions(-)
+ Documentation/devicetree/bindings/phy/sun4i-usb-phy.txt | 2 ++
+ drivers/phy/phy-sun4i-usb.c                             | 7 +++++--
+ 2 files changed, 7 insertions(+), 2 deletions(-)
 
+diff --git a/Documentation/devicetree/bindings/phy/sun4i-usb-phy.txt b/Documentation/devicetree/bindings/phy/sun4i-usb-phy.txt
+index 557fa99..f0c640a 100644
+--- a/Documentation/devicetree/bindings/phy/sun4i-usb-phy.txt
++++ b/Documentation/devicetree/bindings/phy/sun4i-usb-phy.txt
+@@ -7,6 +7,7 @@ Required properties:
+   * allwinner,sun5i-a13-usb-phy
+   * allwinner,sun6i-a31-usb-phy
+   * allwinner,sun7i-a20-usb-phy
++  * allwinner,sun8i-a23-usb-phy
+ - reg : a list of offset + length pairs
+ - reg-names :
+   * "phy_ctrl"
+@@ -17,6 +18,7 @@ Required properties:
+ - clock-names :
+   * "usb_phy" for sun4i, sun5i or sun7i
+   * "usb0_phy", "usb1_phy" and "usb2_phy" for sun6i
++  * "usb0_phy", "usb1_phy" for sun8i
+ - resets : a list of phandle + reset specifier pairs
+ - reset-names :
+   * "usb0_reset"
 diff --git a/drivers/phy/phy-sun4i-usb.c b/drivers/phy/phy-sun4i-usb.c
-index b45d707..0df1c4f 100644
+index 0df1c4f..7d96414 100644
 --- a/drivers/phy/phy-sun4i-usb.c
 +++ b/drivers/phy/phy-sun4i-usb.c
-@@ -437,11 +437,11 @@ static int sun4i_usb_phy_probe(struct platform_device *pdev)
+@@ -432,7 +432,8 @@ static int sun4i_usb_phy_probe(struct platform_device *pdev)
+ 	data->extcon.supported_cable = data->extcon_cable_names;
+ 	data->extcon.dev.parent = dev;
+ 
+-	if (of_device_is_compatible(np, "allwinner,sun5i-a13-usb-phy"))
++	if (of_device_is_compatible(np, "allwinner,sun5i-a13-usb-phy") ||
++	    of_device_is_compatible(np, "allwinner,sun8i-a23-usb-phy"))
+ 		data->num_phys = 2;
  	else
  		data->num_phys = 3;
+@@ -443,7 +444,8 @@ static int sun4i_usb_phy_probe(struct platform_device *pdev)
+ 	else
+ 		data->disc_thresh = 3;
  
--	if (of_device_is_compatible(np, "allwinner,sun4i-a10-usb-phy") ||
--	    of_device_is_compatible(np, "allwinner,sun6i-a31-usb-phy"))
--		data->disc_thresh = 3;
--	else
-+	if (of_device_is_compatible(np, "allwinner,sun5i-a13-usb-phy") ||
-+	    of_device_is_compatible(np, "allwinner,sun7i-a20-usb-phy"))
- 		data->disc_thresh = 2;
-+	else
-+		data->disc_thresh = 3;
- 
- 	if (of_device_is_compatible(np, "allwinner,sun6i-a31-usb-phy"))
+-	if (of_device_is_compatible(np, "allwinner,sun6i-a31-usb-phy"))
++	if (of_device_is_compatible(np, "allwinner,sun6i-a31-usb-phy") ||
++	    of_device_is_compatible(np, "allwinner,sun8i-a23-usb-phy"))
  		dedicated_clocks = true;
+ 	else
+ 		dedicated_clocks = false;
+@@ -583,6 +585,7 @@ static const struct of_device_id sun4i_usb_phy_of_match[] = {
+ 	{ .compatible = "allwinner,sun5i-a13-usb-phy" },
+ 	{ .compatible = "allwinner,sun6i-a31-usb-phy" },
+ 	{ .compatible = "allwinner,sun7i-a20-usb-phy" },
++	{ .compatible = "allwinner,sun8i-a23-usb-phy" },
+ 	{ },
+ };
+ MODULE_DEVICE_TABLE(of, sun4i_usb_phy_of_match);
 -- 
 2.4.2
