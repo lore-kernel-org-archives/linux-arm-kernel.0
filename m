@@ -1,58 +1,42 @@
-From: soren.brinkmann@xilinx.com (=?utf-8?B?U8O2cmVu?= Brinkmann)
-Date: Fri, 5 Jun 2015 09:00:17 -0700
-Subject: [LINUX RFC V2 1/2] devicetree: Add DT bindings documentation for
- Zynq Ultrascale+ MPSoC GQSPI controller
-In-Reply-To: <1433509653-15142-1-git-send-email-ranjit.waghmode@xilinx.com>
-References: <1433509653-15142-1-git-send-email-ranjit.waghmode@xilinx.com>
-Message-ID: <20150605160017.GA8863@xsjsorenbubuntu>
+From: xuwei5@hisilicon.com (Wei Xu)
+Date: Fri, 5 Jun 2015 17:01:59 +0100
+Subject: [GIT PULL v2]Hisilicon 64-bit SoC changes for 4.2
+Message-ID: <5571C7F7.9090702@hisilicon.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2015-06-05 at 06:37PM +0530, Ranjit Waghmode wrote:
-> Add bindings documentation for GQSPI controller driver used by
-> Zynq Ultrascale+ MPSoC
-> 
-> Signed-off-by: Ranjit Waghmode <ranjit.waghmode@xilinx.com>
-> ---
-> No changes in v2
-> ---
->  .../devicetree/bindings/spi/spi-zynqmp-qspi.txt    | 26 ++++++++++++++++++++++
->  1 file changed, 26 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/spi/spi-zynqmp-qspi.txt
-> 
-> diff --git a/Documentation/devicetree/bindings/spi/spi-zynqmp-qspi.txt b/Documentation/devicetree/bindings/spi/spi-zynqmp-qspi.txt
-> new file mode 100644
-> index 0000000..cec6330
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/spi/spi-zynqmp-qspi.txt
-> @@ -0,0 +1,26 @@
-> +Xilinx Zynq UltraScale+ MPSoC GQSPI controller Device Tree Bindings
-> +-------------------------------------------------------------------
-> +
-> +Required properties:
-> +- compatible		: Should be "xlnx,zynqmp-qspi-1.0".
-> +- reg			: Physical base address and size of GQSPI registers map.
-> +- interrupts		: Property with a value describing the interrupt
-> +			  number.
-> +- interrupt-parent	: Must be core interrupt controller.
-> +- clock-names		: List of input clock names - "ref_clk", "pclk"
-> +			  (See clock bindings for details).
-> +- clocks		: Clock phandles (see clock bindings for details).
-> +
-> +Optional properties:
-> +- num-cs		: Number of chip selects used.
-> +
-> +Example:
-> +	qspi: spi at ff0f0000 {
-> +		compatible = "xlnx,zynqmp-qspi-1.0";
-> +		clock-names = "ref_clk", "pclk";
-> +		clocks = <&misc_clk &misc_clk>;
-> +		interrupts = <0 15 4>;
-> +		interrupt-parent = <&gic>;
-> +		num-cs = <1>;
-> +		reg = <0x0 0xff0f0000 0x1000 0x0 0xc0000000 0x8000000>;
+Hi Arnd, Hi Olof, Hi Kevin,
 
-Please make this
-  reg = <0x0 0xff0f0000 0x1000>, <0x0 0xc0000000 0x8000000>;
+Please help to pull the following changes.
+Sorry for the late pull request.
+Thanks!
 
-  	S?ren
+Best Regards,
+Wei
+
+---
+
+The following changes since commit b787f68c36d49bb1d9236f403813641efa74a031:
+
+  Linux 4.1-rc1 (2015-04-26 17:59:10 -0700)
+
+are available in the git repository at:
+
+  git://github.com/hisilicon/linux-hisi.git tags/hi6220-soc-for-4.2
+
+for you to fetch changes up to 85fe946e8c8485d868edcbdcef78f04e4a259a6a:
+
+  arm64: Enable Hisilicon ARMv8 SoC family in Kconfig and defconfig (2015-06-05 16:01:17 +0100)
+
+----------------------------------------------------------------
+ARM64: Hisilicon ARM64 SoC Updates for V4.2
+
+- Added Hisilicon ARM64 SoC family support in Kconfig and defconfig
+
+----------------------------------------------------------------
+Bintian Wang (1):
+      arm64: Enable Hisilicon ARMv8 SoC family in Kconfig and defconfig
+
+ arch/arm64/Kconfig           | 5 +++++
+ arch/arm64/configs/defconfig | 1 +
+ 2 files changed, 6 insertions(+)
