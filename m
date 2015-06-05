@@ -1,106 +1,21 @@
-From: eric.auger@linaro.org (Eric Auger)
-Date: Fri,  5 Jun 2015 17:06:31 +0200
-Subject: [PATCH v2 3/4] VFIO: platform: populate the reset function on probe
-In-Reply-To: <1433516792-16397-1-git-send-email-eric.auger@linaro.org>
-References: <1433516792-16397-1-git-send-email-eric.auger@linaro.org>
-Message-ID: <1433516792-16397-4-git-send-email-eric.auger@linaro.org>
+From: wxt@rock-chips.com (Caesar Wang)
+Date: Fri,  5 Jun 2015 23:11:41 +0800
+Subject: [PATCH v3 0/3]     ARM: rockchip: fix the SMP
+Message-ID: <1433517104-7595-1-git-send-email-wxt@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The reset function lookup happens on vfio-platform probe. The reset
-module load is requested  and a reference to the function symbol is
-hold. The reference is released on vfio-platform remove.
+    Verified on url =
+    https://chromium.googlesource.com/chromiumos/third_party/kernel/+/chromeos-3.14
 
-Signed-off-by: Eric Auger <eric.auger@linaro.org>
 
----
+Caesar Wang (3):
+  ARM: rockchip: fix the CPU soft reset
+  ARM: rockchip: ensure CPU to enter WFI/WFE state
+  ARM: rockchip: fix the SMP code style
 
-v1 -> v2:
-- [get,put]_reset now is called once on probe/remove
-- use request_module to automatically load the reset module that
-  matches the compatibility string
-- lookup table is used instead of list
-- remove registration mechanism: reset function name is stored in the
-  lookup table.
-- use device_property_read_string instead of
-  device_property_read_string_array
----
- drivers/vfio/platform/vfio_platform_common.c | 48 +++++++++++++++++++++++++++-
- 1 file changed, 47 insertions(+), 1 deletion(-)
+ arch/arm/mach-rockchip/platsmp.c | 36 +++++++++++++++++++++++-------------
+ 1 file changed, 23 insertions(+), 13 deletions(-)
 
-diff --git a/drivers/vfio/platform/vfio_platform_common.c b/drivers/vfio/platform/vfio_platform_common.c
-index 995929b..d474d6a 100644
---- a/drivers/vfio/platform/vfio_platform_common.c
-+++ b/drivers/vfio/platform/vfio_platform_common.c
-@@ -31,6 +31,47 @@ static const struct vfio_platform_reset_combo reset_lookup_table[] = {
- 	},
- };
- 
-+static int vfio_platform_get_reset(struct vfio_platform_device *vdev,
-+				   struct device *dev)
-+{
-+	const char *compat;
-+	const struct vfio_platform_reset_combo *iter = reset_lookup_table;
-+	int (*reset)(struct vfio_platform_device *);
-+	int ret;
-+
-+	vdev->type = VFIO_PLATFORM_RESET_TYPE_MAX;
-+	ret = device_property_read_string(dev, "compatible", &compat);
-+	if (ret)
-+		return ret;
-+
-+	while (iter->type < VFIO_PLATFORM_RESET_TYPE_MAX) {
-+		if (!strcmp(iter->compat, compat)) {
-+			request_module(iter->module_name);
-+			reset = __symbol_get(iter->reset_function_name);
-+			if (reset) {
-+				vdev->type = iter->type;
-+				vdev->reset = reset;
-+				return 0;
-+			}
-+		}
-+		iter++;
-+	}
-+	return -1;
-+}
-+
-+static void vfio_platform_put_reset(struct vfio_platform_device *vdev)
-+{
-+	const struct vfio_platform_reset_combo *iter = reset_lookup_table;
-+
-+	while (iter->type < VFIO_PLATFORM_RESET_TYPE_MAX) {
-+		if (iter->type == vdev->type) {
-+			__symbol_put(iter->reset_function_name);
-+			return;
-+		}
-+		iter++;
-+	}
-+}
-+
- static int vfio_platform_regions_init(struct vfio_platform_device *vdev)
- {
- 	int cnt = 0, i;
-@@ -519,6 +560,8 @@ int vfio_platform_probe_common(struct vfio_platform_device *vdev,
- 		return ret;
- 	}
- 
-+	vfio_platform_get_reset(vdev, dev);
-+
- 	mutex_init(&vdev->igate);
- 
- 	return 0;
-@@ -530,8 +573,11 @@ struct vfio_platform_device *vfio_platform_remove_common(struct device *dev)
- 	struct vfio_platform_device *vdev;
- 
- 	vdev = vfio_del_group_dev(dev);
--	if (vdev)
-+
-+	if (vdev) {
-+		vfio_platform_put_reset(vdev);
- 		iommu_group_put(dev->iommu_group);
-+	}
- 
- 	return vdev;
- }
 -- 
 1.9.1
