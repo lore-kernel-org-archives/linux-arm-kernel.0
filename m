@@ -1,53 +1,37 @@
-From: bjorn.andersson@sonymobile.com (Bjorn Andersson)
-Date: Fri, 5 Jun 2015 15:52:25 -0700
-Subject: [PATCH 3/3] ARM: dts: qcom: Replace gpio node with pinctrl node
-In-Reply-To: <1433544745-325-1-git-send-email-bjorn.andersson@sonymobile.com>
-References: <1433544745-325-1-git-send-email-bjorn.andersson@sonymobile.com>
-Message-ID: <1433544745-325-4-git-send-email-bjorn.andersson@sonymobile.com>
+From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
+Date: Sat, 06 Jun 2015 01:03:25 +0200
+Subject: [PATCH v3 1/2] drm/bridge: dw-hdmi: support optional supply
+ regulators
+In-Reply-To: <20150605122311.GA759@ulmo.nvidia.com>
+References: <4184159.j0iXe39dFB@phil> <23123577.mOoqGCAPdL@diego>
+ <20150605122311.GA759@ulmo.nvidia.com>
+Message-ID: <1590039.lzO65vr8K7@diego>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Replace the standalone gpio driver with pinctrl-msm as we now have
-msm8660 support there.
+Hi Thierry
 
-Signed-off-by: Bjorn Andersson <bjorn.andersson@sonymobile.com>
----
- arch/arm/boot/dts/qcom-msm8660.dtsi | 11 ++++++-----
- 1 file changed, 6 insertions(+), 5 deletions(-)
+Am Freitag, 5. Juni 2015, 14:23:14 schrieb Thierry Reding:
+> On Fri, Jun 05, 2015 at 02:16:40PM +0200, Heiko St?bner wrote:
+> > > If this is specific to the Rockchip implementation, shouldn't this go
+> > > into Documentation/devicetree/bindings/video/dw_hdmi-rockchip.txt? It
+> > > could then simply go into the Rockchip DRM tree.
+> > 
+> > actually, we determined that the supply names are universal to the IP
+> > (both in imx and rockchip and probably more if there are more users out
+> > there). Just Russell requested that we don't pollute the generic code
+> > until necessary, as it looks like the supply of those is somehow handled
+> > internally on the imx.
+> If it's universal then there should be no need to mention the Rockchip
+> compatible specifically. Also, it might be better to submit this as two
+> separate patches, one for the binding and another for the driver.
+> 
+> I could extract the DT binding piece myself and apply only that, then
+> somebody else can apply the Rockchip change to that driver separately.
 
-diff --git a/arch/arm/boot/dts/qcom-msm8660.dtsi b/arch/arm/boot/dts/qcom-msm8660.dtsi
-index 20bbd19b996e..28bba8b09854 100644
---- a/arch/arm/boot/dts/qcom-msm8660.dtsi
-+++ b/arch/arm/boot/dts/qcom-msm8660.dtsi
-@@ -62,15 +62,16 @@
- 			cpu-offset = <0x40000>;
- 		};
- 
--		msmgpio: gpio at 800000 {
--			compatible = "qcom,msm-gpio";
--			reg = <0x00800000 0x4000>;
-+		tlmm: pinctrl at 800000 {
-+			compatible = "qcom,msm8660-pinctrl";
-+			reg = <0x800000 0x4000>;
-+
- 			gpio-controller;
- 			#gpio-cells = <2>;
--			ngpio = <173>;
- 			interrupts = <0 16 0x4>;
- 			interrupt-controller;
- 			#interrupt-cells = <2>;
-+
- 		};
- 
- 		gcc: clock-controller at 900000 {
-@@ -110,7 +111,7 @@
- 
- 			pmicintc: pmic at 0 {
- 				compatible = "qcom,pm8058";
--				interrupt-parent = <&msmgpio>;
-+				interrupt-parent = <&tlmm>;
- 				interrupts = <88 8>;
- 				#interrupt-cells = <2>;
- 				interrupt-controller;
--- 
-1.8.2.2
+so I've sent a v4 where the dt-binding is split off (and without the Rockchip 
+specific text), so if you want to take patch1, Mark could take patch2 and I 
+would take the dts changes in patch3.
+
+
+Heiko
