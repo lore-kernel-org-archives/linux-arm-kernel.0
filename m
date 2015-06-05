@@ -1,49 +1,64 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Fri,  5 Jun 2015 19:42:46 +0100
-Subject: [PATCH 3/8] regulator: pwm-regulator: Remove superfluous is_enabled
- check
+Date: Fri,  5 Jun 2015 19:42:48 +0100
+Subject: [PATCH 5/8] regulator: pwm-regulator: Don't assign structure
+ attributes right away
 In-Reply-To: <1433529771-24496-1-git-send-email-lee.jones@linaro.org>
 References: <1433529771-24496-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1433529771-24496-4-git-send-email-lee.jones@linaro.org>
+Message-ID: <1433529771-24496-6-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The core framework already takes care of this.
+Perhaps this is just personal preference, but ...
+
+This patch introduces a new local variable to receive and test regulator
+initialisation data.  It simplifies and cleans up the code making it
+that little bit easier to read and maintain.  The local value is assigned
+to the structure attribute when all the others are.  This is the way we
+usually do things.
+
+Prevents this kind of nonsense:
+
+	this->is->just.silly = fetch_silly_value(&pointer);
+	if (!this->is->just.silly) {
+		printk("Silly value failed: %d\n", this->is->just.silly);
+		return this->is->just.silly;
+	}
 
 Signed-off-by: Lee Jones <lee.jones@linaro.org>
 ---
- drivers/regulator/pwm-regulator.c | 12 ++++--------
- 1 file changed, 4 insertions(+), 8 deletions(-)
+ drivers/regulator/pwm-regulator.c | 8 +++++---
+ 1 file changed, 5 insertions(+), 3 deletions(-)
 
 diff --git a/drivers/regulator/pwm-regulator.c b/drivers/regulator/pwm-regulator.c
-index 4a071b6..36f9684 100644
+index ae32086..779ecf9 100644
 --- a/drivers/regulator/pwm-regulator.c
 +++ b/drivers/regulator/pwm-regulator.c
-@@ -23,7 +23,6 @@
- struct pwm_regulator_data {
- 	struct pwm_voltages *duty_cycle_table;
- 	struct pwm_device *pwm;
--	bool enabled;
- 	int state;
- };
+@@ -96,6 +96,7 @@ static struct regulator_desc pwm_regulator_desc = {
  
-@@ -60,13 +59,10 @@ static int pwm_regulator_set_voltage_sel(struct regulator_dev *dev,
- 
- 	drvdata->state = selector;
- 
--	if (!drvdata->enabled) {
--		ret = pwm_enable(drvdata->pwm);
--		if (ret) {
--			dev_err(&dev->dev, "Failed to enable PWM\n");
--			return ret;
--		}
--		drvdata->enabled = true;
-+	ret = pwm_enable(drvdata->pwm);
-+	if (ret) {
-+		dev_err(&dev->dev, "Failed to enable PWM\n");
-+		return ret;
+ static int pwm_regulator_probe(struct platform_device *pdev)
+ {
++	const struct regulator_init_data *init_data;
+ 	struct pwm_regulator_data *drvdata;
+ 	struct property *prop;
+ 	struct regulator_dev *regulator;
+@@ -142,14 +143,15 @@ static int pwm_regulator_probe(struct platform_device *pdev)
+ 		return ret;
  	}
  
- 	return 0;
+-	config.init_data = of_get_regulator_init_data(&pdev->dev, np,
+-						      &pwm_regulator_desc);
+-	if (!config.init_data)
++	init_data = of_get_regulator_init_data(&pdev->dev, np,
++					       &pwm_regulator_desc);
++	if (init_data)
+ 		return -ENOMEM;
+ 
+ 	config.of_node = np;
+ 	config.dev = &pdev->dev;
+ 	config.driver_data = drvdata;
++	config.init_data = init_data;
+ 
+ 	drvdata->pwm = devm_pwm_get(&pdev->dev, NULL);
+ 	if (IS_ERR(drvdata->pwm)) {
 -- 
 1.9.1
