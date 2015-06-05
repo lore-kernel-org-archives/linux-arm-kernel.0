@@ -1,65 +1,36 @@
 From: hdegoede@redhat.com (Hans de Goede)
-Date: Fri,  5 Jun 2015 21:02:12 +0200
-Subject: [PATCH 09/20] ARM: dts: sun4i: Enable USB DRC on the Cubieboard
+Date: Fri,  5 Jun 2015 21:02:14 +0200
+Subject: [PATCH 11/20] ARM: dts: sun6i: Enable USB DRC on the Mele A1000G quad
 In-Reply-To: <1433530943-12599-1-git-send-email-hdegoede@redhat.com>
 References: <1433530943-12599-1-git-send-email-hdegoede@redhat.com>
-Message-ID: <1433530943-12599-10-git-send-email-hdegoede@redhat.com>
+Message-ID: <1433530943-12599-12-git-send-email-hdegoede@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enable the otg/drc usb controller on the Cubieboard. Note that the
-5V of the otg is directly connected to the general 5V, so we only use
-the id pin.
+The Mele A1000G-quad has an usb to sata bridge connected to its otg
+controller, this commit enables support for this. Since the otg is
+hardwired to the sata bridge it gets enabled in host only mode.
 
 Signed-off-by: Hans de Goede <hdegoede@redhat.com>
 ---
- arch/arm/boot/dts/sun4i-a10-cubieboard.dts | 19 +++++++++++++++++++
- 1 file changed, 19 insertions(+)
+ arch/arm/boot/dts/sun6i-a31-mele-a1000g-quad.dts | 5 +++++
+ 1 file changed, 5 insertions(+)
 
-diff --git a/arch/arm/boot/dts/sun4i-a10-cubieboard.dts b/arch/arm/boot/dts/sun4i-a10-cubieboard.dts
-index 9afb4e0..046a84d 100644
---- a/arch/arm/boot/dts/sun4i-a10-cubieboard.dts
-+++ b/arch/arm/boot/dts/sun4i-a10-cubieboard.dts
-@@ -155,6 +155,10 @@
- 	status = "okay";
- };
- 
-+&otg_sram {
-+	status = "okay";
-+};
-+
- &pio {
- 	led_pins_cubieboard: led_pins at 0 {
- 		allwinner,pins = "PH20", "PH21";
-@@ -162,6 +166,13 @@
- 		allwinner,drive = <SUN4I_PINCTRL_20_MA>;
- 		allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
- 	};
-+
-+	usb0_id_detect_pin: usb0_id_detect_pin at 0 {
-+		allwinner,pins = "PH4";
-+		allwinner,function = "gpio_in";
-+		allwinner,drive = <SUN4I_PINCTRL_10_MA>;
-+		allwinner,pull = <SUN4I_PINCTRL_PULL_UP>;
-+	};
- };
- 
- &reg_ahci_5v {
-@@ -216,7 +227,15 @@
+diff --git a/arch/arm/boot/dts/sun6i-a31-mele-a1000g-quad.dts b/arch/arm/boot/dts/sun6i-a31-mele-a1000g-quad.dts
+index 4404f37..4dd70cc 100644
+--- a/arch/arm/boot/dts/sun6i-a31-mele-a1000g-quad.dts
++++ b/arch/arm/boot/dts/sun6i-a31-mele-a1000g-quad.dts
+@@ -143,6 +143,11 @@
  	status = "okay";
  };
  
 +&usb_otg {
-+	dr_mode = "otg";
++	dr_mode = "host";
 +	status = "okay";
 +};
 +
  &usbphy {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&usb0_id_detect_pin>;
-+	usb0_id_det-gpio = <&pio 7 4 GPIO_ACTIVE_HIGH>; /* PH4 */
  	usb1_vbus-supply = <&reg_usb1_vbus>;
- 	usb2_vbus-supply = <&reg_usb2_vbus>;
  	status = "okay";
 -- 
 2.4.2
