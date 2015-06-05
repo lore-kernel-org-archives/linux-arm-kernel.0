@@ -1,61 +1,32 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Fri, 05 Jun 2015 18:10:13 +0100
-Subject: [PATCH v3 3/5] clk: add support for clocks provided by SCP(System
- Control Processor)
-In-Reply-To: <55716DA4.2090003@arm.com>
-References: <1432720398-5701-1-git-send-email-sudeep.holla@arm.com>
- <1432720398-5701-4-git-send-email-sudeep.holla@arm.com>
- <20150604202009.GI676@codeaurora.org> <55716DA4.2090003@arm.com>
-Message-ID: <5571D7F5.1030405@arm.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Fri, 5 Jun 2015 18:16:52 +0100
+Subject: next-20150604 build: 2 failures 37 warnings (next-20150604)
+In-Reply-To: <20150605104900.GA5346@kroah.com>
+References: <E1Z0YIL-0008Ma-5O@optimist> <20150604170112.GM14071@sirena.org.uk>
+ <20150604171004.GZ30984@atomide.com>
+ <20150604172026.GA30984@atomide.com>
+ <20150605104900.GA5346@kroah.com>
+Message-ID: <20150605171652.GB14071@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Fri, Jun 05, 2015 at 07:49:00PM +0900, Greg Kroah-Hartman wrote:
+> On Thu, Jun 04, 2015 at 10:20:26AM -0700, Tony Lindgren wrote:
 
+> > Greg, there's now commit 9809889c708e in tty-linus and commit
+> > 9e91597f2423 in tty-next.
 
-On 05/06/15 10:36, Sudeep Holla wrote:
->
->
-> On 04/06/15 21:20, Stephen Boyd wrote:
->> On 05/27, Sudeep Holla wrote:
+> Yes, I can't go back and remove the one in tty-next, I'm guessing when
+> they are merged there is an issue.  I'll look into that after Linus
+> pulls in my tty-linus tree.
 
-[...]
-
->>> +
->>> +static unsigned long scpi_clk_recalc_rate(struct clk_hw *hw,
->>> +					  unsigned long parent_rate)
->>> +{
->>> +	struct scpi_clk *clk = to_scpi_clk(hw);
->>> +
->>> +	return scpi_ops->clk_get_val(clk->id);
->>> +}
->>> +
->>> +static long scpi_clk_round_rate(struct clk_hw *hw, unsigned long rate,
->>> +				unsigned long *parent_rate)
->>> +{
->>> +	struct scpi_clk *clk = to_scpi_clk(hw);
->>> +
->>> +	if (WARN_ON(clk->rate_min && rate < clk->rate_min))
->>> +		rate = clk->rate_min;
->>> +	if (WARN_ON(clk->rate_max && rate > clk->rate_max))
->>> +		rate = clk->rate_max;
->>> +
->>> +	return rate;
->>> +}
->>
->> Hm.. this seems really generic. It might be better to support a
->> way to tell the framework to limit the min/max rate that's
->> accepted for a clk. That could be done later though.
->>
->
-> True, framework have some boundary checks in place. I will check if
-> I can use it with minimum changes to the core. If not, we can take this
-> up later as you suggested.
->
-
-I found that the framework already provides clk_set_rate_range for this
-purpose. Sorry for missing this earlier(seems like that's added quite
-recently in v4.0). I think I still need to retain round_rate as the core
-framework insists.
-
-Regards,
-Sudeep
+Yeah, git isn't always spectacularly good at resolving add/add if
+there's context changes between two things in a merge - it sometimes
+ends up double adding things.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150605/bb03e390/attachment.sig>
