@@ -1,24 +1,24 @@
 From: hdegoede@redhat.com (Hans de Goede)
-Date: Fri,  5 Jun 2015 21:02:17 +0200
-Subject: [PATCH 14/20] ARM: dts: sun7i: Enable USB DRC on A20-OLinuxIno-Micro
+Date: Fri,  5 Jun 2015 21:02:16 +0200
+Subject: [PATCH 13/20] ARM: dts: sun7i: Enable USB DRC on A20-OLinuxIno-Lime
 In-Reply-To: <1433530943-12599-1-git-send-email-hdegoede@redhat.com>
 References: <1433530943-12599-1-git-send-email-hdegoede@redhat.com>
-Message-ID: <1433530943-12599-15-git-send-email-hdegoede@redhat.com>
+Message-ID: <1433530943-12599-14-git-send-email-hdegoede@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enable the otg/drc usb controller on the A20-OLinuxIno-Micro.
+Enable the otg/drc usb controller on the A20-OLinuxIno-Lime.
 
 Signed-off-by: Hans de Goede <hdegoede@redhat.com>
 ---
- arch/arm/boot/dts/sun7i-a20-olinuxino-micro.dts | 32 +++++++++++++++++++++++++
+ arch/arm/boot/dts/sun7i-a20-olinuxino-lime.dts | 32 ++++++++++++++++++++++++++
  1 file changed, 32 insertions(+)
 
-diff --git a/arch/arm/boot/dts/sun7i-a20-olinuxino-micro.dts b/arch/arm/boot/dts/sun7i-a20-olinuxino-micro.dts
-index 00f8f25..c5d70ca 100644
---- a/arch/arm/boot/dts/sun7i-a20-olinuxino-micro.dts
-+++ b/arch/arm/boot/dts/sun7i-a20-olinuxino-micro.dts
-@@ -215,6 +215,10 @@
+diff --git a/arch/arm/boot/dts/sun7i-a20-olinuxino-lime.dts b/arch/arm/boot/dts/sun7i-a20-olinuxino-lime.dts
+index 769726d..0423708 100644
+--- a/arch/arm/boot/dts/sun7i-a20-olinuxino-lime.dts
++++ b/arch/arm/boot/dts/sun7i-a20-olinuxino-lime.dts
+@@ -135,6 +135,10 @@
  	status = "okay";
  };
  
@@ -27,9 +27,9 @@ index 00f8f25..c5d70ca 100644
 +};
 +
  &pio {
- 	mmc3_cd_pin_olinuxinom: mmc3_cd_pin at 0 {
- 		allwinner,pins = "PH11";
-@@ -229,12 +233,30 @@
+ 	ahci_pwr_pin_olinuxinolime: ahci_pwr_pin at 1 {
+ 		allwinner,pins = "PC3";
+@@ -149,6 +153,20 @@
  		allwinner,drive = <SUN4I_PINCTRL_20_MA>;
  		allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
  	};
@@ -50,6 +50,7 @@ index 00f8f25..c5d70ca 100644
  };
  
  &reg_ahci_5v {
+@@ -157,6 +175,10 @@
  	status = "okay";
  };
  
@@ -60,7 +61,7 @@ index 00f8f25..c5d70ca 100644
  &reg_usb1_vbus {
  	status = "okay";
  };
-@@ -275,7 +297,17 @@
+@@ -171,7 +193,17 @@
  	status = "okay";
  };
  
