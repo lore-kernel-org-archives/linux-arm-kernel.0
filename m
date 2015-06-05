@@ -1,39 +1,30 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Fri, 5 Jun 2015 10:37:03 +0800
-Subject: [PATCH v6 0/4] Add basic ZTE zx296702 SOC support
-In-Reply-To: <20150604182739.GH490@codeaurora.org>
-References: <1433388063-13682-1-git-send-email-jun.nie@linaro.org>
- <20150604182739.GH490@codeaurora.org>
-Message-ID: <20150605023703.GD17189@dragon>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Fri, 5 Jun 2015 08:11:24 +0530
+Subject: [PATCH V7 1/3] OPP: Add new bindings to address shortcomings of
+ existing bindings
+In-Reply-To: <20150604183752.GI490@codeaurora.org>
+References: <cover.1433434659.git.viresh.kumar@linaro.org>
+ <d83c0b6b1768c7229384216329b607d13886aa02.1433434659.git.viresh.kumar@linaro.org>
+ <20150604183752.GI490@codeaurora.org>
+Message-ID: <20150605024124.GA9448@linux>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Stephen,
+On 04-06-15, 11:37, Stephen Boyd wrote:
+> Ok. I'm still interested to see if this binding will have to
+> change to support how multiple regulators will be matched up with
+> the device using the OPP.
 
-On Thu, Jun 04, 2015 at 11:27:39AM -0700, Stephen Boyd wrote:
-> On 06/04, Jun Nie wrote:
-> > Changes vs v5:
-> >   - Remove redundant code and polish return value in clock driver.
-> > 
-> > Changes vs v4:
-> >   - Fix issues in clock driver that Stephen found.
-> >   - Remove initramfs in defconfig to avoid overriding test config.
-> >   - Drop patches that already merged into ARM next/soc.
-> > 
-> > Jun Nie (4):
-> >   dt-bindings: Add #defines for ZTE ZX296702 clocks
-> >   clk: zx: add clock support to zx296702
-> >   ARM: dts: zx: add an initial zx296702 dts and doc
-> >   ARM: zx: Add basic defconfig support for ZX296702
+I can understand your concern here, but getting everything working
+on the first attempt would be difficult to write/review.. There will at
+least be 5-7 patches just for getting the very basic v2 bindings
+coded. And so we can get all that coded slowly and steadily.
+
+> But for now,
 > 
-> clk patch looks ok. If this doesn't go into 4.2 please consider
-> sending the clk driver through the clk tree.
+> Reviewed-by: Stephen Boyd <sboyd@codeaurora.org>
 
-Can you please either take the clk part through your tree for 4.2, or
-give the permission that we send everything through arm-soc tree for
-4.2?  Otherwise, it will take such a long time to get the series merged,
-i.e. you will take clk part for 4.3 and the dts part which depends on
-clk part can only possibly land on mainline at 4.4, if I understand your
-comment correctly.
+Thanks. Finally :)
 
-Shawn
+-- 
+viresh
