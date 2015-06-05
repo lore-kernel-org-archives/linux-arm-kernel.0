@@ -1,115 +1,46 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Fri, 5 Jun 2015 19:47:11 +0100
-Subject: [PATCH 8/8] dt: regulator: pwm-regulator: Re-write bindings
-In-Reply-To: <1433529771-24496-9-git-send-email-lee.jones@linaro.org>
-References: <1433529771-24496-1-git-send-email-lee.jones@linaro.org>
- <1433529771-24496-9-git-send-email-lee.jones@linaro.org>
-Message-ID: <20150605184711.GG7058@x1>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Fri, 05 Jun 2015 11:53:09 -0700
+Subject: [PATCH 1/2] arm64: perf: Don't use of_node after putting it
+In-Reply-To: <20150605144539.GC7420@arm.com>
+References: <1433364818-6682-1-git-send-email-sboyd@codeaurora.org>
+ <20150605144539.GC7420@arm.com>
+Message-ID: <5571F015.9080109@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Whoops, nearly forgot the DT folks.
+On 06/05/2015 07:45 AM, Will Deacon wrote:
+> On Wed, Jun 03, 2015 at 09:53:37PM +0100, Stephen Boyd wrote:
+>>   arch/arm64/kernel/perf_event.c | 3 ++-
+>>   1 file changed, 2 insertions(+), 1 deletion(-)
+>>
+>> diff --git a/arch/arm64/kernel/perf_event.c b/arch/arm64/kernel/perf_event.c
+>> index 702591f6180a..8af7784a8e35 100644
+>> --- a/arch/arm64/kernel/perf_event.c
+>> +++ b/arch/arm64/kernel/perf_event.c
+>> @@ -1340,12 +1340,13 @@ static int armpmu_device_probe(struct platform_device *pdev)
+>>   			if (arch_find_n_match_cpu_physical_id(dn, cpu, NULL))
+>>   				break;
+>>   
+>> -		of_node_put(dn);
+>>   		if (cpu >= nr_cpu_ids) {
+>>   			pr_warn("Failed to find logical CPU for %s\n",
+>>   				dn->name);
+>> +			of_node_put(dn);
+>>   			break;
+>>   		}
+>> +		of_node_put(dn);
+>>   
+>>   		irqs[i] = cpu;
+>>   	}
+> Yeah, I agree this needs changing but given (a) the CPU node isn't going
+> to disappear and (b) this patch will conflict horribly with my queue for
+> 4.2, do you mind if I sit on this until after the merge window (as a fix
+> for 4.2)?
+>
+>
 
-Sorry chaps.
-
-> * Add support for continuous-voltage mode
-> * Put more meat on the bones with regards to voltage-table mode
-> * Sort out formatting for ease of consumption
-> 
-> Signed-off-by: Lee Jones <lee.jones@linaro.org>
-> ---
->  .../bindings/regulator/pwm-regulator.txt           | 66 ++++++++++++++++++----
->  1 file changed, 54 insertions(+), 12 deletions(-)
-> 
-> diff --git a/Documentation/devicetree/bindings/regulator/pwm-regulator.txt b/Documentation/devicetree/bindings/regulator/pwm-regulator.txt
-> index ce91f61..9a8269f 100644
-> --- a/Documentation/devicetree/bindings/regulator/pwm-regulator.txt
-> +++ b/Documentation/devicetree/bindings/regulator/pwm-regulator.txt
-> @@ -1,27 +1,69 @@
-> -pwm regulator bindings
-> +Bindings for the Generic PWM Regulator
-> +======================================
-> +
-> +Currently supports 2 modes of operation:
-> +
-> +voltage-table:		When in this mode, a voltage table (See below) of predefined
-> +			voltage <=> duty-cycle values must be provided via DT.
-> +			Limitations are that the regulator can only operate at the
-> +			voltages supplied in the table.  Intermediary duty-cycle
-> +			values which would normally allow finer grained voltage
-> +			selection are ignored and rendered useless.  Although more
-> +			control is given to the user if the assumptions made in
-> +			continuous-voltage mode do not reign true.
-> +
-> +continuous-voltage:	This mode uses the regulator's maximum and minimum supplied
-> +			voltages specified in the regulator-{min,max}-microvolt
-> +			properties to calculate appropriate duty-cycle values.  This
-> +			allows for a much more fine grained solution when compared
-> +			with voltage-table mode above.  This solution does make an
-> +			assumption that a %50 duty-cycle value will cause the
-> +			regulator voltage to run at half way between the supplied
-> +			max_uV and min_uV values.
->  
->  Required properties:
-> -- compatible: Should be "pwm-regulator"
-> -- pwms: OF device-tree PWM specification (see PWM binding pwm.txt)
-> -- voltage-table: voltage and duty table, include 2 members in each set of
-> -  brackets, first one is voltage(unit: uv), the next is duty(unit: percent)
-> +--------------------
-> +- compatible:		Should be "pwm-regulator"
-> +
-> +- pwms:			PWM specification (See: ../pwm/pwm.txt)
-> +
-> +One of these must be provided:
-> +- voltage-table: 	Voltage and Duty-Cycle table consisting of 2 cells
-> +			    First cell is voltage in microvolts (uV)
-> +			    Second cell is duty-cycle in percent (%)
-> +
-> +- max-duty-cycle:	Maximum Duty-Cycle value -- this will normally be 255 (0xff)
-> +			for an 8 bit PMU device
->  
-> -Any property defined as part of the core regulator binding defined in
-> -regulator.txt can also be used.
-> +If both are provided, the current default is voltage-table mode.
->  
-> -Example:
-> +Any property defined as part of the core regulator binding can also be used.
-> +(See: ../regulator/regulator.txt)
-> +
-> +Continuous Voltage Example:
->  	pwm_regulator {
->  		compatible = "pwm-regulator;
->  		pwms = <&pwm1 0 8448 0>;
-> +		regulator-min-microvolt = <1016000>;
-> +		regulator-max-microvolt = <1114000>;
-> +		regulator-name = "vdd_logic";
-> +
-> +		max-duty-cycle = <255>; /* 8bit PWM */
-> +	};
->  
-> +Voltage Table Example:
-> +	pwm_regulator {
-> +		compatible = "pwm-regulator;
-> +		pwms = <&pwm1 0 8448 0>;
-> +		regulator-min-microvolt = <1016000>;
-> +		regulator-max-microvolt = <1114000>;
-> +		regulator-name = "vdd_logic";
-> +
-> +			      /* Voltage Duty-Cycle */
->  		voltage-table = <1114000 0>,
->  				<1095000 10>,
->  				<1076000 20>,
->  				<1056000 30>,
->  				<1036000 40>,
->  				<1016000 50>;
-> -
-> -		regulator-min-microvolt = <1016000>;
-> -		regulator-max-microvolt = <1114000>;
-> -		regulator-name = "vdd_logic";
->  	};
+Sure, no problem.
 
 -- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
