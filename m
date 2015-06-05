@@ -1,89 +1,41 @@
 From: hdegoede@redhat.com (Hans de Goede)
-Date: Fri,  5 Jun 2015 20:53:41 +0200
-Subject: [PATCH 7/7] musb: sunxi: Add support for musb controller in A33 SoC
-In-Reply-To: <1433530421-12197-1-git-send-email-hdegoede@redhat.com>
-References: <1433530421-12197-1-git-send-email-hdegoede@redhat.com>
-Message-ID: <1433530421-12197-8-git-send-email-hdegoede@redhat.com>
+Date: Fri,  5 Jun 2015 21:02:05 +0200
+Subject: [PATCH 02/20] ARM: dts: sun5i: Add USB Dual Role Controller
+In-Reply-To: <1433530943-12599-1-git-send-email-hdegoede@redhat.com>
+References: <1433530943-12599-1-git-send-email-hdegoede@redhat.com>
+Message-ID: <1433530943-12599-3-git-send-email-hdegoede@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The A33 SoC uses the same musb controller as found on the A31 and later,
-but allwinner has removed the configdata register, this commit adds special
-handling for this.
+Add a node for the otg/drc usb controller to sun5i-a1*.dtsi.
 
 Signed-off-by: Hans de Goede <hdegoede@redhat.com>
 ---
- .../devicetree/bindings/usb/allwinner,sun4i-a10-musb.txt  |  3 ++-
- drivers/usb/musb/sunxi.c                                  | 15 +++++++++++++++
- 2 files changed, 17 insertions(+), 1 deletion(-)
+ arch/arm/boot/dts/sun5i.dtsi | 12 ++++++++++++
+ 1 file changed, 12 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/usb/allwinner,sun4i-a10-musb.txt b/Documentation/devicetree/bindings/usb/allwinner,sun4i-a10-musb.txt
-index c5ef893..fff87c8 100644
---- a/Documentation/devicetree/bindings/usb/allwinner,sun4i-a10-musb.txt
-+++ b/Documentation/devicetree/bindings/usb/allwinner,sun4i-a10-musb.txt
-@@ -2,7 +2,8 @@ Allwinner sun4i A10 musb DRC/OTG controller
- -------------------------------------------
+diff --git a/arch/arm/boot/dts/sun5i.dtsi b/arch/arm/boot/dts/sun5i.dtsi
+index 54b0978..53d3ead 100644
+--- a/arch/arm/boot/dts/sun5i.dtsi
++++ b/arch/arm/boot/dts/sun5i.dtsi
+@@ -416,6 +416,18 @@
+ 			#size-cells = <0>;
+ 		};
  
- Required properties:
-- - compatible      : "allwinner,sun4i-a10-musb" or "allwinner,sun6i-a31-musb"
-+ - compatible      : "allwinner,sun4i-a10-musb", "allwinner,sun6i-a31-musb"
-+                     or "allwinner,sun8i-a33-musb"
-  - reg             : mmio address range of the musb controller
-  - clocks          : clock specifier for the musb controller ahb gate clock
-  - reset           : reset specifier for the ahb reset (A31 and newer only)
-diff --git a/drivers/usb/musb/sunxi.c b/drivers/usb/musb/sunxi.c
-index 8eccbb7..b0fdd83 100644
---- a/drivers/usb/musb/sunxi.c
-+++ b/drivers/usb/musb/sunxi.c
-@@ -73,6 +73,7 @@
- #define SUNXI_MUSB_FL_PHY_ON			4
- #define SUNXI_MUSB_FL_HAS_SRAM			5
- #define SUNXI_MUSB_FL_HAS_RESET			6
-+#define SUNXI_MUSB_FL_NO_CONFIGDATA		7
- 
- /* Our read/write methods need access and do not get passed in a musb ref :| */
- struct musb *sunxi_musb;
-@@ -370,6 +371,8 @@ static u32 sunxi_musb_busctl_offset(u8 epnum, u16 offset)
- 
- static u8 sunxi_musb_readb(const void __iomem *addr, unsigned offset)
- {
-+	struct sunxi_glue *glue;
++		usb_otg: usb at 01c13000 {
++			compatible = "allwinner,sun4i-a10-musb";
++			reg = <0x01c13000 0x0400>;
++			clocks = <&ahb_gates 0>;
++			interrupts = <38>;
++			interrupt-names = "mc";
++			phys = <&usbphy 0>;
++			phy-names = "usb";
++			allwinner,sram = <&otg_sram 1>;
++			status = "disabled";
++		};
 +
- 	if (addr == sunxi_musb->mregs) {
- 		/* generic control or fifo control reg access */
- 		switch (offset) {
-@@ -392,6 +395,12 @@ static u8 sunxi_musb_readb(const void __iomem *addr, unsigned offset)
- 		case MUSB_RXFIFOSZ:
- 			return readb(addr + SUNXI_MUSB_RXFIFOSZ);
- 		case MUSB_CONFIGDATA + 0x10: /* See musb_read_configdata() */
-+			glue = dev_get_drvdata(sunxi_musb->controller->parent);
-+			/* A33 saves a reg, and we get to hardcode this */
-+			if (test_bit(SUNXI_MUSB_FL_NO_CONFIGDATA,
-+				     &glue->flags))
-+				return 0xde;
-+
- 			return readb(addr + SUNXI_MUSB_CONFIGDATA);
- 		/* Offset for these is fixed by sunxi_musb_busctl_offset() */
- 		case SUNXI_MUSB_TXFUNCADDR:
-@@ -636,6 +645,11 @@ static int sunxi_musb_probe(struct platform_device *pdev)
- 	if (of_device_is_compatible(np, "allwinner,sun6i-a31-musb"))
- 		set_bit(SUNXI_MUSB_FL_HAS_RESET, &glue->flags);
- 
-+	if (of_device_is_compatible(np, "allwinner,sun8i-a33-musb")) {
-+		set_bit(SUNXI_MUSB_FL_HAS_RESET, &glue->flags);
-+		set_bit(SUNXI_MUSB_FL_NO_CONFIGDATA, &glue->flags);
-+	}
-+
- 	glue->clk = devm_clk_get(&pdev->dev, NULL);
- 	if (IS_ERR(glue->clk)) {
- 		dev_err(&pdev->dev, "Error getting clock: %ld\n",
-@@ -716,6 +730,7 @@ static int sunxi_musb_remove(struct platform_device *pdev)
- static const struct of_device_id sunxi_musb_match[] = {
- 	{ .compatible = "allwinner,sun4i-a10-musb", },
- 	{ .compatible = "allwinner,sun6i-a31-musb", },
-+	{ .compatible = "allwinner,sun8i-a33-musb", },
- 	{}
- };
- 
+ 		usbphy: phy at 01c13400 {
+ 			#phy-cells = <1>;
+ 			compatible = "allwinner,sun5i-a13-usb-phy";
 -- 
 2.4.2
