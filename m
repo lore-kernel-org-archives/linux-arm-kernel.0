@@ -1,22 +1,52 @@
 From: lee@kernel.org (Lee Jones)
-Date: Fri, 5 Jun 2015 20:21:35 +0100
-Subject: [PATCH v7 2/3] ARM: bcm2835: Add the Raspberry Pi firmware driver
-In-Reply-To: <55711428.4080506@wwwdotorg.org>
+Date: Fri, 5 Jun 2015 20:23:53 +0100
+Subject: [PATCH v7 1/3] dt/bindings: Add binding for the Raspberry Pi
+ firmware driver
+In-Reply-To: <1433448707-18104-1-git-send-email-eric@anholt.net>
 References: <1433448707-18104-1-git-send-email-eric@anholt.net>
- <1433448707-18104-2-git-send-email-eric@anholt.net>
- <55711428.4080506@wwwdotorg.org>
-Message-ID: <20150605192135.GA3301@x1>
+Message-ID: <20150605192353.GB3301@x1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 04 Jun 2015, Stephen Warren wrote:
+On Thu, 04 Jun 2015, Eric Anholt wrote:
 
-> On 06/04/2015 02:11 PM, Eric Anholt wrote:
-> > This gives us a function for making mailbox property channel requests
-> > of the firmware, which is most notable in that it will let us get and
-> > set clock rates.
+> This driver will provide support for calls into the firmware that will
+> be used by other drivers like cpufreq and vc4.
 > 
 > Acked-by: Stephen Warren <swarren@wwwdotorg.org>
+> Signed-off-by: Eric Anholt <eric@anholt.net>
+> ---
+> 
+> v2: Improve commit message, point to mailbox.txt for how mboxes work.
+> v3: Use Lee's suggestion for mailbox phandle docs, fix spelling of
+>     "raspberry".
+> v4: Change the compatible string to "raspberrypi,bcm2835-firmware"
+>     (requested by Lee, agreed by Stephen)
+> v5: Add missing s-o-b, fix spelling.
+> 
+>  .../bindings/arm/bcm/raspberrypi,bcm2835-firmware.txt      | 14 ++++++++++++++
+>  1 file changed, 14 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/arm/bcm/raspberrypi,bcm2835-firmware.txt
 
-Does anyone know how drivers/firmware/ is managed?  I don't seem to be
-able to find a maintainer/supporter listed in MAINTAINERS.
+Applied for v4.2, thanks.
+
+> diff --git a/Documentation/devicetree/bindings/arm/bcm/raspberrypi,bcm2835-firmware.txt b/Documentation/devicetree/bindings/arm/bcm/raspberrypi,bcm2835-firmware.txt
+> new file mode 100644
+> index 0000000..6824b31
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/arm/bcm/raspberrypi,bcm2835-firmware.txt
+> @@ -0,0 +1,14 @@
+> +Raspberry Pi VideoCore firmware driver
+> +
+> +Required properties:
+> +
+> +- compatible:		Should be "raspberrypi,bcm2835-firmware"
+> +- mboxes:		Phandle to the firmware device's Mailbox.
+> +			  (See: ../mailbox/mailbox.txt for more information)
+> +
+> +Example:
+> +
+> +firmware {
+> +	compatible = "raspberrypi,bcm2835-firmware";
+> +	mboxes = <&mailbox>;
+> +};
