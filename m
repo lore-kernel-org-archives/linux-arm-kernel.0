@@ -1,47 +1,43 @@
-From: yh.huang@mediatek.com (YH Huang)
-Date: Fri, 5 Jun 2015 14:15:29 +0800
-Subject: [PATCH v2 0/2] Add MediaTek display PWM driver
-In-Reply-To: <1432520091.23308.5.camel@mtksdaap41>
-References: <1432214964-40644-1-git-send-email-yh.huang@mediatek.com>
- <1432520091.23308.5.camel@mtksdaap41>
-Message-ID: <1433484929.17376.17.camel@mtksdaap41>
+From: kever.yang@rock-chips.com (Kever Yang)
+Date: Fri, 05 Jun 2015 14:32:27 +0800
+Subject: [PATCH 2/3] ARM: rockchip: ensure CPU to enter WIF state
+In-Reply-To: <1433479677-18086-3-git-send-email-wxt@rock-chips.com>
+References: <1433479677-18086-1-git-send-email-wxt@rock-chips.com>
+ <1433479677-18086-3-git-send-email-wxt@rock-chips.com>
+Message-ID: <5571427B.1040406@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2015-05-25 at 10:14 +0800, Yingjoe Chen wrote:
-> On Thu, 2015-05-21 at 21:29 +0800, YH Huang wrote:
+Hi Caesar,
 
-This patch series add the use of display PWM driver and documentation 
-for Mediatek SoCs. The driver is used to support the backlight of 
-the panel. This is based on v4.1-rc1. 
+Subject typo WIF/WFI.
 
-> > YH Huang (2):
-> >   dt-bindings: pwm: add MediaTek display PWM bindings
-> >   pwm: add MediaTek display PWM driver support
-> > 
-> >  .../devicetree/bindings/pwm/pwm-mtk-disp.txt       |  25 +++
-> >  drivers/pwm/Kconfig                                |  10 +
-> >  drivers/pwm/Makefile                               |   1 +
-> >  drivers/pwm/pwm-mtk-disp.c                         | 228 +++++++++++++++++++++
-> >  4 files changed, 264 insertions(+)
-> >  create mode 100644 Documentation/devicetree/bindings/pwm/pwm-mtk-disp.txt
-> >  create mode 100644 drivers/pwm/pwm-mtk-disp.c
-> 
-> Hi YH,
-> 
-> It would be easier for reviewer if you have a summary here on what you
-> have changed compare to last version.
-> Also, please add patch series summary even for v2, it remind reviewer
-> what this series is about.
-> 
-> Joe.C
-> 
+On 06/05/2015 12:47 PM, Caesar Wang wrote:
+> In idle mode, core1/2/3 of Cortex-A17 should be either power off or in
+> WFI/WFE state.
+> we can delay 1ms to ensure the CPU enter WFI state.
+>
+> Signed-off-by: Caesar Wang <wxt@rock-chips.com>
+> ---
+>
+>   arch/arm/mach-rockchip/platsmp.c | 3 +++
+>   1 file changed, 3 insertions(+)
+>
+> diff --git a/arch/arm/mach-rockchip/platsmp.c b/arch/arm/mach-rockchip/platsmp.c
+> index 1230d3d..978c357 100644
+> --- a/arch/arm/mach-rockchip/platsmp.c
+> +++ b/arch/arm/mach-rockchip/platsmp.c
+> @@ -316,6 +316,9 @@ static void __init rockchip_smp_prepare_cpus(unsigned int max_cpus)
+>   #ifdef CONFIG_HOTPLUG_CPU
+>   static int rockchip_cpu_kill(unsigned int cpu)
+>   {
+> +	/* ensure CPU can enter the WFI/WFE state */
+> +	mdelay(1);
+> +
+Does it matter if core is not in WFI state when we want to power down it?
 
-The patch v2 is refined with everybody's suggestions.
-It is much readable and consistent.
-
-If anyone has any suggestions, please just let me know.
-Thank you.
-
-Regards,
-YH Huang
+Thanks,
+- Kever
+>   	pmu_set_power_domain(0 + cpu, false);
+>   	return 1;
+>   }
