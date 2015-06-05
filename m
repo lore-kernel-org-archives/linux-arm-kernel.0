@@ -1,1202 +1,682 @@
-From: ranjit.waghmode@xilinx.com (Ranjit Waghmode)
-Date: Fri, 5 Jun 2015 18:37:33 +0530
-Subject: [LINUX RFC V2 2/2] spi: Add support for Zynq Ultrascale+ MPSoC GQSPI
- controller
-In-Reply-To: <1433509653-15142-1-git-send-email-ranjit.waghmode@xilinx.com>
-References: <1433509653-15142-1-git-send-email-ranjit.waghmode@xilinx.com>
-Message-ID: <1433509653-15142-2-git-send-email-ranjit.waghmode@xilinx.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Fri, 5 Jun 2015 14:12:01 +0100
+Subject: [PATCH v2 3/6] iommu: add ARM short descriptor page table
+ allocator.
+In-Reply-To: <1431683009-18158-4-git-send-email-yong.wu@mediatek.com>
+References: <1431683009-18158-1-git-send-email-yong.wu@mediatek.com>
+ <1431683009-18158-4-git-send-email-yong.wu@mediatek.com>
+Message-ID: <20150605131201.GF1198@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds support for GQSPI controller driver used by
-Zynq Ultrascale+ MPSoC
+Hello,
 
-Signed-off-by: Ranjit Waghmode <ranjit.waghmode@xilinx.com>
----
-Here is the v2 series.
+Thanks for the patch, it's good to see another user of the generic
+IO page-table code. However, I have quite a lot of comments on the code.
 
-Following comments are not taken care in this version:
+On Fri, May 15, 2015 at 10:43:26AM +0100, Yong Wu wrote:
+> This patch is for ARM Short Descriptor Format.It has 2-levels
+> pagetable and the allocator supports 4K/64K/1M/16M.
+>
+> Signed-off-by: Yong Wu <yong.wu@mediatek.com>
+> ---
+>  drivers/iommu/Kconfig                |   7 +
+>  drivers/iommu/Makefile               |   1 +
+>  drivers/iommu/io-pgtable-arm-short.c | 490 +++++++++++++++++++++++++++++++++++
+>  drivers/iommu/io-pgtable.c           |   4 +
+>  drivers/iommu/io-pgtable.h           |   6 +
+>  5 files changed, 508 insertions(+)
+>  create mode 100644 drivers/iommu/io-pgtable-arm-short.c
 
-a) Comment from Mark Brown regarding DMA manual mapping-
-This QSPI DMA only supports RX and not TX.
-Additionally, as Mark pointed out partial DMA transfer
-length also needs some work in core.
-So we will plan to do both in the core later. For now, I'm
-keeping this DMA internal to the driver.
+For some reason, I ended up reviewing this back-to-front (i.e. starting
+with the init code), so apologies if the comments feel like they were
+written in reverse.
 
-b) Comment from Soren regarding the PM-
-Suggestion by Soren regarding PM will be taken care later.
+> diff --git a/drivers/iommu/Kconfig b/drivers/iommu/Kconfig
+> index 1ae4e54..3d2eac6 100644
+> --- a/drivers/iommu/Kconfig
+> +++ b/drivers/iommu/Kconfig
+> @@ -39,6 +39,13 @@ config IOMMU_IO_PGTABLE_LPAE_SELFTEST
+>
+>           If unsure, say N here.
+>
+> +config IOMMU_IO_PGTABLE_SHORT
+> +       bool "ARMv7/v8 Short Descriptor Format"
+> +       select IOMMU_IO_PGTABLE
 
-v2 changes:
-- Replacing all readl/writel calls with respective
-  zynqmp_gqspi_read/write wrappers
-- Renamed function zynqmp_gqspi_selectflash to zynqmp_gqspi_selectslave
-- Renamed formal parameters of the function zynqmp_gqspi_selectslave
-- Updated all default cases of switch statements
-- Removed typecasting of variable data in zynqmp_qspi_copy_read_data()
-- Added return code check around clk_enable() calls
-- Factored the clk_get_rate() API outside the loop
-- Added generic fifo entry in zynqmp_qspi_chipselect() function to
-  assure the CS assert and CS de-assert
-- To assure an endianness, added memcpy() in zynqmp_qspi_filltxfifo() function
-- For making sure that there is no HW setting during the transfer via
-  setup(), Moved function call of zynqmp_qspi_setup_transfer() to
-  zynqmp_qspi_filltxfifo() function.
-- Set master->num_chipselect to default value instead of reading it via
-  device-tree
----
- drivers/spi/Kconfig            |    6 +
- drivers/spi/Makefile           |    1 +
- drivers/spi/spi-zynqmp-gqspi.c | 1115 ++++++++++++++++++++++++++++++++++++++++
- 3 files changed, 1122 insertions(+)
- create mode 100755 drivers/spi/spi-zynqmp-gqspi.c
+depends on ARM || ARM64 || COMPILE_TEST
 
-diff --git a/drivers/spi/Kconfig b/drivers/spi/Kconfig
-index 72b0590..4406a85 100644
---- a/drivers/spi/Kconfig
-+++ b/drivers/spi/Kconfig
-@@ -610,6 +610,12 @@ config SPI_XTENSA_XTFPGA
- 	  16 bit words in SPI mode 0, automatically asserting CS on transfer
- 	  start and deasserting on end.
+> +       help
+> +         Enable support for the ARM Short descriptor pagetable format.
+> +         It has 2-levels pagetable and The allocator supports 4K/64K/1M/16M.
 
-+config SPI_ZYNQMP_GQSPI
-+	tristate "Xilinx ZynqMP GQSPI controller"
-+	depends on SPI_MASTER
-+	help
-+	  Enables Xilinx GQSPI controller driver for Zynq UltraScale+ MPSoC.
-+
- config SPI_NUC900
- 	tristate "Nuvoton NUC900 series SPI"
- 	depends on ARCH_W90X900
-diff --git a/drivers/spi/Makefile b/drivers/spi/Makefile
-index d8cbf65..52db832 100644
---- a/drivers/spi/Makefile
-+++ b/drivers/spi/Makefile
-@@ -89,3 +89,4 @@ obj-$(CONFIG_SPI_TXX9)			+= spi-txx9.o
- obj-$(CONFIG_SPI_XCOMM)		+= spi-xcomm.o
- obj-$(CONFIG_SPI_XILINX)		+= spi-xilinx.o
- obj-$(CONFIG_SPI_XTENSA_XTFPGA)		+= spi-xtensa-xtfpga.o
-+obj-$(CONFIG_SPI_ZYNQMP_GQSPI)		+= spi-zynqmp-gqspi.o
-diff --git a/drivers/spi/spi-zynqmp-gqspi.c b/drivers/spi/spi-zynqmp-gqspi.c
-new file mode 100755
-index 0000000..c428d51
---- /dev/null
-+++ b/drivers/spi/spi-zynqmp-gqspi.c
-@@ -0,0 +1,1115 @@
-+/*
-+ * Xilinx Zynq UltraScale+ MPSoC Quad-SPI (QSPI) controller driver
-+ * (master mode only)
-+ *
-+ * Copyright (C) 2009 - 2015 Xilinx, Inc.
-+ *
-+ * This program is free software; you can redistribute it and/or modify it
-+ * under the terms of the GNU General Public License version 2 as published
-+ * by the Free Software Foundation; either version 2 of the License, or
-+ * (at your option) any later version.
-+ */
-+
-+#include <linux/clk.h>
-+#include <linux/delay.h>
-+#include <linux/dma-mapping.h>
-+#include <linux/dmaengine.h>
-+#include <linux/interrupt.h>
-+#include <linux/io.h>
-+#include <linux/module.h>
-+#include <linux/of_irq.h>
-+#include <linux/of_address.h>
-+#include <linux/platform_device.h>
-+#include <linux/spi/spi.h>
-+#include <linux/spinlock.h>
-+#include <linux/workqueue.h>
-+
-+/* Generic QSPI register offsets */
-+#define GQSPI_CONFIG_OFST		0x00000100
-+#define GQSPI_ISR_OFST			0x00000104
-+#define GQSPI_IDR_OFST			0x0000010C
-+#define GQSPI_IER_OFST			0x00000108
-+#define GQSPI_IMASK_OFST		0x00000110
-+#define GQSPI_EN_OFST			0x00000114
-+#define GQSPI_TXD_OFST			0x0000011C
-+#define GQSPI_RXD_OFST			0x00000120
-+#define GQSPI_TX_THRESHOLD_OFST		0x00000128
-+#define GQSPI_RX_THRESHOLD_OFST		0x0000012C
-+#define GQSPI_LPBK_DLY_ADJ_OFST		0x00000138
-+#define GQSPI_GEN_FIFO_OFST		0x00000140
-+#define GQSPI_SEL_OFST			0x00000144
-+#define GQSPI_GF_THRESHOLD_OFST		0x00000150
-+#define GQSPI_FIFO_CTRL_OFST		0x0000014C
-+#define GQSPI_QSPIDMA_DST_CTRL_OFST	0x0000080C
-+#define GQSPI_QSPIDMA_DST_SIZE_OFST	0x00000804
-+#define GQSPI_QSPIDMA_DST_STS_OFST	0x00000808
-+#define GQSPI_QSPIDMA_DST_I_STS_OFST	0x00000814
-+#define GQSPI_QSPIDMA_DST_I_EN_OFST	0x00000818
-+#define GQSPI_QSPIDMA_DST_I_DIS_OFST	0x0000081C
-+#define GQSPI_QSPIDMA_DST_I_MASK_OFST	0x00000820
-+#define GQSPI_QSPIDMA_DST_ADDR_OFST	0x00000800
-+#define GQSPI_QSPIDMA_DST_ADDR_MSB_OFST 0x00000828
-+
-+/* GQSPI register bit masks */
-+#define GQSPI_SEL_MASK				0x00000001
-+#define GQSPI_EN_MASK				0x00000001
-+#define GQSPI_LPBK_DLY_ADJ_USE_LPBK_MASK	0x00000020
-+#define GQSPI_ISR_WR_TO_CLR_MASK		0x00000002
-+#define GQSPI_IDR_ALL_MASK			0x00000FBE
-+#define GQSPI_CFG_MODE_EN_MASK			0xC0000000
-+#define GQSPI_CFG_GEN_FIFO_START_MODE_MASK	0x20000000
-+#define GQSPI_CFG_ENDIAN_MASK			0x04000000
-+#define GQSPI_CFG_EN_POLL_TO_MASK		0x00100000
-+#define GQSPI_CFG_WP_HOLD_MASK			0x00080000
-+#define GQSPI_CFG_BAUD_RATE_DIV_MASK		0x00000038
-+#define GQSPI_CFG_CLK_PHA_MASK			0x00000004
-+#define GQSPI_CFG_CLK_POL_MASK			0x00000002
-+#define GQSPI_CFG_START_GEN_FIFO_MASK		0x10000000
-+#define GQSPI_GENFIFO_IMM_DATA_MASK		0x000000FF
-+#define GQSPI_GENFIFO_DATA_XFER			0x00000100
-+#define GQSPI_GENFIFO_EXP			0x00000200
-+#define GQSPI_GENFIFO_MODE_SPI			0x00000400
-+#define GQSPI_GENFIFO_MODE_DUALSPI		0x00000800
-+#define GQSPI_GENFIFO_MODE_QUADSPI		0x00000C00
-+#define GQSPI_GENFIFO_MODE_MASK			0x00000C00
-+#define GQSPI_GENFIFO_CS_LOWER			0x00001000
-+#define GQSPI_GENFIFO_CS_UPPER			0x00002000
-+#define GQSPI_GENFIFO_BUS_LOWER			0x00004000
-+#define GQSPI_GENFIFO_BUS_UPPER			0x00008000
-+#define GQSPI_GENFIFO_BUS_BOTH			0x0000C000
-+#define GQSPI_GENFIFO_BUS_MASK			0x0000C000
-+#define GQSPI_GENFIFO_TX			0x00010000
-+#define GQSPI_GENFIFO_RX			0x00020000
-+#define GQSPI_GENFIFO_STRIPE			0x00040000
-+#define GQSPI_GENFIFO_POLL			0x00080000
-+#define GQSPI_GENFIFO_EXP_START			0x00000100
-+#define GQSPI_FIFO_CTRL_RST_RX_FIFO_MASK	0x00000004
-+#define GQSPI_FIFO_CTRL_RST_TX_FIFO_MASK	0x00000002
-+#define GQSPI_FIFO_CTRL_RST_GEN_FIFO_MASK	0x00000001
-+#define GQSPI_ISR_RXEMPTY_MASK			0x00000800
-+#define GQSPI_ISR_GENFIFOFULL_MASK		0x00000400
-+#define GQSPI_ISR_GENFIFONOT_FULL_MASK		0x00000200
-+#define GQSPI_ISR_TXEMPTY_MASK			0x00000100
-+#define GQSPI_ISR_GENFIFOEMPTY_MASK		0x00000080
-+#define GQSPI_ISR_RXFULL_MASK			0x00000020
-+#define GQSPI_ISR_RXNEMPTY_MASK			0x00000010
-+#define GQSPI_ISR_TXFULL_MASK			0x00000008
-+#define GQSPI_ISR_TXNOT_FULL_MASK		0x00000004
-+#define GQSPI_ISR_POLL_TIME_EXPIRE_MASK		0x00000002
-+#define GQSPI_IER_TXNOT_FULL_MASK		0x00000004
-+#define GQSPI_IER_RXEMPTY_MASK			0x00000800
-+#define GQSPI_IER_POLL_TIME_EXPIRE_MASK		0x00000002
-+#define GQSPI_IER_RXNEMPTY_MASK			0x00000010
-+#define GQSPI_IER_GENFIFOEMPTY_MASK		0x00000080
-+#define GQSPI_IER_TXEMPTY_MASK			0x00000100
-+#define GQSPI_QSPIDMA_DST_INTR_ALL_MASK		0x000000FE
-+#define GQSPI_QSPIDMA_DST_STS_WTC		0x0000E000
-+#define GQSPI_CFG_MODE_EN_DMA_MASK		0x80000000
-+#define GQSPI_ISR_IDR_MASK			0x00000994
-+#define GQSPI_QSPIDMA_DST_I_EN_DONE_MASK	0x00000002
-+#define GQSPI_QSPIDMA_DST_I_STS_DONE_MASK	0x00000002
-+#define GQSPI_IRQ_MASK				0x00000980
-+
-+#define GQSPI_CFG_BAUD_RATE_DIV_SHIFT		3
-+#define GQSPI_GENFIFO_CS_SETUP			0x4
-+#define GQSPI_GENFIFO_CS_HOLD			0x3
-+#define GQSPI_TXD_DEPTH				64
-+#define GQSPI_RX_FIFO_THRESHOLD			32
-+#define GQSPI_RX_FIFO_FILL	(GQSPI_RX_FIFO_THRESHOLD * 4)
-+#define GQSPI_TX_FIFO_THRESHOLD_RESET_VAL	32
-+#define GQSPI_TX_FIFO_FILL	(GQSPI_TXD_DEPTH -\
-+				GQSPI_TX_FIFO_THRESHOLD_RESET_VAL)
-+#define GQSPI_GEN_FIFO_THRESHOLD_RESET_VAL	0X10
-+#define GQSPI_QSPIDMA_DST_CTRL_RESET_VAL	0x803FFA00
-+#define GQSPI_SELECT_FLASH_CS_LOWER		0x1
-+#define GQSPI_SELECT_FLASH_CS_UPPER		0x2
-+#define GQSPI_SELECT_FLASH_CS_BOTH		0x3
-+#define GQSPI_SELECT_FLASH_BUS_LOWER		0x1
-+#define GQSPI_SELECT_FLASH_BUS_UPPER		0x2
-+#define GQSPI_SELECT_FLASH_BUS_BOTH		0x3
-+#define GQSPI_BAUD_DIV_MAX	7	/* Baud rate divisor maximum */
-+#define GQSPI_BAUD_DIV_SHIFT	2	/* Baud rate divisor shift */
-+#define GQSPI_SELECT_MODE_SPI		0x1
-+#define GQSPI_SELECT_MODE_DUALSPI	0x2
-+#define GQSPI_SELECT_MODE_QUADSPI	0x4
-+#define GQSPI_DMA_UNALIGN		0x3
-+#define GQSPI_DEFAULT_NUM_CS	1	/* Default number of chip selects */
-+
-+enum mode_type {GQSPI_MODE_IO, GQSPI_MODE_DMA};
-+
-+/**
-+ * struct zynqmp_qspi - Defines qspi driver instance
-+ * @regs:		Virtual address of the QSPI controller registers
-+ * @refclk:		Pointer to the peripheral clock
-+ * @pclk:		Pointer to the APB clock
-+ * @irq:		IRQ number
-+ * @dev:		Pointer to struct device
-+ * @txbuf:		Pointer to the TX buffer
-+ * @rxbuf:		Pointer to the RX buffer
-+ * @bytes_to_transfer:	Number of bytes left to transfer
-+ * @bytes_to_receive:	Number of bytes left to receive
-+ * @genfifocs:		Used for chip select
-+ * @genfifobus:		Used to select the upper or lower bus
-+ * @dma_rx_bytes:	Remaining bytes to receive by DMA mode
-+ * @dma_addr:		DMA address after mapping the kernel buffer
-+ * @genfifoentry:	Used for storing the genfifoentry instruction.
-+ * @mode:		Defines the mode in which QSPI is operating
-+ */
-+struct zynqmp_qspi {
-+	void __iomem *regs;
-+	struct clk *refclk;
-+	struct clk *pclk;
-+	int irq;
-+	struct device *dev;
-+	const void *txbuf;
-+	void *rxbuf;
-+	int bytes_to_transfer;
-+	int bytes_to_receive;
-+	u32 genfifocs;
-+	u32 genfifobus;
-+	u32 dma_rx_bytes;
-+	dma_addr_t dma_addr;
-+	u32 genfifoentry;
-+	enum mode_type mode;
-+};
-+
-+/**
-+ * zynqmp_gqspi_read:	For GQSPI controller read operation
-+ * @xqspi:	Pointer to the zynqmp_qspi structure
-+ * @offset:	Offset from where to read
-+ */
-+static u32 zynqmp_gqspi_read(struct zynqmp_qspi *xqspi, u32 offset)
-+{
-+	return readl_relaxed(xqspi->regs + offset);
-+}
-+
-+/**
-+ * zynqmp_gqspi_write:	For GQSPI controller write operation
-+ * @xqspi:	Pointer to the zynqmp_qspi structure
-+ * @offset:	Offset where to write
-+ * @val:	Value to be written
-+ */
-+static inline void zynqmp_gqspi_write(struct zynqmp_qspi *xqspi, u32 offset,
-+				      u32 val)
-+{
-+	writel_relaxed(val, (xqspi->regs + offset));
-+}
-+
-+/**
-+ * zynqmp_gqspi_selectslave:	For selection of slave device
-+ * @instanceptr:	Pointer to the zynqmp_qspi structure
-+ * @flashcs:	For chip select
-+ * @flashbus:	To check which bus is selected- upper or lower
-+ */
-+static void zynqmp_gqspi_selectslave(struct zynqmp_qspi *instanceptr,
-+				     u8 slavecs, u8 slavebus)
-+{
-+	/*
-+	 * Bus and CS lines selected here will be updated in the instance and
-+	 * used for subsequent GENFIFO entries during transfer.
-+	 */
-+
-+	/* Choose slave select line */
-+	switch (slavecs) {
-+	case GQSPI_SELECT_FLASH_CS_BOTH:
-+		instanceptr->genfifocs = GQSPI_GENFIFO_CS_LOWER |
-+			GQSPI_GENFIFO_CS_UPPER;
-+	case GQSPI_SELECT_FLASH_CS_UPPER:
-+		instanceptr->genfifocs = GQSPI_GENFIFO_CS_UPPER;
-+		break;
-+	case GQSPI_SELECT_FLASH_CS_LOWER:
-+		instanceptr->genfifocs = GQSPI_GENFIFO_CS_LOWER;
-+		break;
-+	default:
-+		dev_warn(instanceptr->dev, "Invalid slave select\n");
-+	}
-+
-+	/* Choose the bus */
-+	switch (slavebus) {
-+	case GQSPI_SELECT_FLASH_BUS_BOTH:
-+		instanceptr->genfifobus = GQSPI_GENFIFO_BUS_LOWER |
-+			GQSPI_GENFIFO_BUS_UPPER;
-+		break;
-+	case GQSPI_SELECT_FLASH_BUS_UPPER:
-+		instanceptr->genfifobus = GQSPI_GENFIFO_BUS_UPPER;
-+		break;
-+	case GQSPI_SELECT_FLASH_BUS_LOWER:
-+		instanceptr->genfifobus = GQSPI_GENFIFO_BUS_LOWER;
-+		break;
-+	default:
-+		dev_warn(instanceptr->dev, "Invalid slave bus\n");
-+	}
-+}
-+
-+/**
-+ * zynqmp_qspi_init_hw:	Initialize the hardware
-+ * @xqspi:	Pointer to the zynqmp_qspi structure
-+ *
-+ * The default settings of the QSPI controller's configurable parameters on
-+ * reset are
-+ *	- Master mode
-+ *	- TX threshold set to 1
-+ *	- RX threshold set to 1
-+ *	- Flash memory interface mode enabled
-+ * This function performs the following actions
-+ *	- Disable and clear all the interrupts
-+ *	- Enable manual slave select
-+ *	- Enable manual start
-+ *	- Deselect all the chip select lines
-+ *	- Set the little endian mode of TX FIFO and
-+ *	- Enable the QSPI controller
-+ */
-+static void zynqmp_qspi_init_hw(struct zynqmp_qspi *xqspi)
-+{
-+	u32 config_reg;
-+
-+	/* Select the GQSPI mode */
-+	zynqmp_gqspi_write(xqspi, GQSPI_SEL_OFST, GQSPI_SEL_MASK);
-+	/* Clear and disable interrupts */
-+	zynqmp_gqspi_write(xqspi, GQSPI_ISR_OFST,
-+			   zynqmp_gqspi_read(xqspi, GQSPI_ISR_OFST) |
-+			   GQSPI_ISR_WR_TO_CLR_MASK);
-+	/* Clear the DMA STS */
-+	zynqmp_gqspi_write(xqspi, GQSPI_QSPIDMA_DST_I_STS_OFST,
-+			   zynqmp_gqspi_read(xqspi,
-+					     GQSPI_QSPIDMA_DST_I_STS_OFST));
-+	zynqmp_gqspi_write(xqspi, GQSPI_QSPIDMA_DST_STS_OFST,
-+			   zynqmp_gqspi_read(xqspi,
-+					     GQSPI_QSPIDMA_DST_STS_OFST) |
-+					     GQSPI_QSPIDMA_DST_STS_WTC);
-+	zynqmp_gqspi_write(xqspi, GQSPI_IDR_OFST, GQSPI_IDR_ALL_MASK);
-+	zynqmp_gqspi_write(xqspi,
-+			   GQSPI_QSPIDMA_DST_I_DIS_OFST,
-+			   GQSPI_QSPIDMA_DST_INTR_ALL_MASK);
-+	/* Disable the GQSPI */
-+	zynqmp_gqspi_write(xqspi, GQSPI_EN_OFST, 0x0);
-+	config_reg = zynqmp_gqspi_read(xqspi, GQSPI_CONFIG_OFST);
-+	config_reg &= ~GQSPI_CFG_MODE_EN_MASK;
-+	/* Manual start */
-+	config_reg |= GQSPI_CFG_GEN_FIFO_START_MODE_MASK;
-+	/* Little endian by default */
-+	config_reg &= ~GQSPI_CFG_ENDIAN_MASK;
-+	/* Disable poll time out */
-+	config_reg &= ~GQSPI_CFG_EN_POLL_TO_MASK;
-+	/* Set hold bit */
-+	config_reg |= GQSPI_CFG_WP_HOLD_MASK;
-+	/* Clear pre-scalar by default */
-+	config_reg &= ~GQSPI_CFG_BAUD_RATE_DIV_MASK;
-+	/* CPHA 0 */
-+	config_reg &= ~GQSPI_CFG_CLK_PHA_MASK;
-+	/* CPOL 0 */
-+	config_reg &= ~GQSPI_CFG_CLK_POL_MASK;
-+	zynqmp_gqspi_write(xqspi, GQSPI_CONFIG_OFST, config_reg);
-+
-+	/* Clear the TX and RX FIFO */
-+	zynqmp_gqspi_write(xqspi, GQSPI_FIFO_CTRL_OFST,
-+			   GQSPI_FIFO_CTRL_RST_RX_FIFO_MASK |
-+			   GQSPI_FIFO_CTRL_RST_TX_FIFO_MASK |
-+			   GQSPI_FIFO_CTRL_RST_GEN_FIFO_MASK);
-+	/* Set by default to allow for high frequencies */
-+	zynqmp_gqspi_write(xqspi, GQSPI_LPBK_DLY_ADJ_OFST,
-+			   zynqmp_gqspi_read(xqspi, GQSPI_LPBK_DLY_ADJ_OFST) |
-+			   GQSPI_LPBK_DLY_ADJ_USE_LPBK_MASK);
-+	/* Reset thresholds */
-+	zynqmp_gqspi_write(xqspi, GQSPI_TX_THRESHOLD_OFST,
-+			   GQSPI_TX_FIFO_THRESHOLD_RESET_VAL);
-+	zynqmp_gqspi_write(xqspi, GQSPI_RX_THRESHOLD_OFST,
-+			   GQSPI_RX_FIFO_THRESHOLD);
-+	zynqmp_gqspi_write(xqspi, GQSPI_GF_THRESHOLD_OFST,
-+			   GQSPI_GEN_FIFO_THRESHOLD_RESET_VAL);
-+	zynqmp_gqspi_selectslave(xqspi,
-+				 GQSPI_SELECT_FLASH_CS_LOWER,
-+				 GQSPI_SELECT_FLASH_BUS_LOWER);
-+	/* Initialize DMA */
-+	zynqmp_gqspi_write(xqspi,
-+			GQSPI_QSPIDMA_DST_CTRL_OFST,
-+			GQSPI_QSPIDMA_DST_CTRL_RESET_VAL);
-+
-+	/* Enable the GQSPI */
-+	zynqmp_gqspi_write(xqspi, GQSPI_EN_OFST, GQSPI_EN_MASK);
-+}
-+
-+/**
-+ * zynqmp_qspi_copy_read_data:	Copy data to RX buffer
-+ * @xqspi:	Pointer to the zynqmp_qspi structure
-+ * @data:	The variable where data is stored
-+ * @size:	Number of bytes to be copied from data to RX buffer
-+ */
-+static void zynqmp_qspi_copy_read_data(struct zynqmp_qspi *xqspi,
-+				       ulong data, u8 size)
-+{
-+	memcpy(xqspi->rxbuf, &data, size);
-+	xqspi->rxbuf += size;
-+	xqspi->bytes_to_receive -= size;
-+}
-+
-+/**
-+ * zynqmp_prepare_transfer_hardware:	Prepares hardware for transfer.
-+ * @master:	Pointer to the spi_master structure which provides
-+ *		information about the controller.
-+ *
-+ * This function enables SPI master controller.
-+ *
-+ * Return:	On success 0; return error value otherwise
-+ */
-+static int zynqmp_prepare_transfer_hardware(struct spi_master *master)
-+{
-+	struct zynqmp_qspi *xqspi = spi_master_get_devdata(master);
-+	int ret;
-+
-+	ret = clk_enable(xqspi->refclk);
-+	if (ret)
-+		goto clk_err;
-+
-+	ret = clk_enable(xqspi->pclk);
-+	if (ret)
-+		goto clk_err;
-+
-+	zynqmp_gqspi_write(xqspi, GQSPI_EN_OFST, GQSPI_EN_MASK);
-+	return 0;
-+clk_err:
-+	return ret;
-+}
-+
-+/**
-+ * zynqmp_unprepare_transfer_hardware:	Relaxes hardware after transfer
-+ * @master:	Pointer to the spi_master structure which provides
-+ *		information about the controller.
-+ *
-+ * This function disables the SPI master controller.
-+ *
-+ * Return:	Always 0
-+ */
-+static int zynqmp_unprepare_transfer_hardware(struct spi_master *master)
-+{
-+	struct zynqmp_qspi *xqspi = spi_master_get_devdata(master);
-+
-+	zynqmp_gqspi_write(xqspi, GQSPI_EN_OFST, 0x0);
-+	clk_disable(xqspi->refclk);
-+	clk_disable(xqspi->pclk);
-+	return 0;
-+}
-+
-+/**
-+ * zynqmp_qspi_chipselect:	Select or deselect the chip select line
-+ * @qspi:	Pointer to the spi_device structure
-+ * @is_high:	Select(0) or deselect (1) the chip select line
-+ */
-+static void zynqmp_qspi_chipselect(struct spi_device *qspi, bool is_high)
-+{
-+	struct zynqmp_qspi *xqspi = spi_master_get_devdata(qspi->master);
-+	u32 genfifoentry = 0x0, statusreg, timeout;
-+
-+	genfifoentry |= GQSPI_GENFIFO_MODE_SPI;
-+	genfifoentry |= xqspi->genfifobus;
-+
-+	if (!is_high) {
-+		genfifoentry |= xqspi->genfifocs;
-+		genfifoentry |= GQSPI_GENFIFO_CS_SETUP;
-+	} else {
-+		genfifoentry |= GQSPI_GENFIFO_CS_HOLD;
-+	}
-+
-+	zynqmp_gqspi_write(xqspi, GQSPI_GEN_FIFO_OFST, genfifoentry);
-+
-+	/* Dummy generic FIFO entry */
-+	zynqmp_gqspi_write(xqspi, GQSPI_GEN_FIFO_OFST, 0x0);
-+
-+	/* Manually start the generic FIFO command */
-+	zynqmp_gqspi_write(xqspi, GQSPI_CONFIG_OFST,
-+			zynqmp_gqspi_read(xqspi, GQSPI_CONFIG_OFST) |
-+			GQSPI_CFG_START_GEN_FIFO_MASK);
-+	timeout = 10000;
-+	/* Wait until the generic FIFO command is empty */
-+	do {
-+		statusreg = zynqmp_gqspi_read(xqspi, GQSPI_ISR_OFST);
-+		timeout--;
-+	} while (!(statusreg &
-+		   GQSPI_ISR_GENFIFOEMPTY_MASK) &&
-+		 (statusreg & GQSPI_ISR_TXEMPTY_MASK) && timeout);
-+	if (!timeout)
-+		dev_err(xqspi->dev, "Chip select timed out\n");
-+}
-+
-+/**
-+ * zynqmp_qspi_setup_transfer:	Configure QSPI controller for specified
-+ *				transfer
-+ * @qspi:	Pointer to the spi_device structure
-+ * @transfer:	Pointer to the spi_transfer structure which provides
-+ *		information about next transfer setup parameters
-+ *
-+ * Sets the operational mode of QSPI controller for the next QSPI transfer and
-+ * sets the requested clock frequency.
-+ *
-+ * Return:	Always 0
-+ *
-+ * Note:
-+ *	If the requested frequency is not an exact match with what can be
-+ *	obtained using the pre-scalar value, the driver sets the clock
-+ *	frequency which is lower than the requested frequency (maximum lower)
-+ *	for the transfer.
-+ *
-+ *	If the requested frequency is higher or lower than that is supported
-+ *	by the QSPI controller the driver will set the highest or lowest
-+ *	frequency supported by controller.
-+ */
-+static int zynqmp_qspi_setup_transfer(struct spi_device *qspi,
-+				      struct spi_transfer *transfer)
-+{
-+	struct zynqmp_qspi *xqspi = spi_master_get_devdata(qspi->master);
-+	ulong clk_rate;
-+	u32 config_reg, req_hz, baud_rate_val = 0;
-+
-+	if (transfer)
-+		req_hz = transfer->speed_hz;
-+	else
-+		req_hz = qspi->max_speed_hz;
-+
-+	/* Set the clock frequency */
-+	/* If req_hz == 0, default to lowest speed */
-+	clk_rate = clk_get_rate(xqspi->refclk);
-+
-+	while ((baud_rate_val < GQSPI_BAUD_DIV_MAX) &&
-+	       (clk_rate /
-+		(GQSPI_BAUD_DIV_SHIFT << baud_rate_val)) > req_hz)
-+		baud_rate_val++;
-+
-+	config_reg = zynqmp_gqspi_read(xqspi, GQSPI_CONFIG_OFST);
-+
-+	/* Set the QSPI clock phase and clock polarity */
-+	config_reg &= (~GQSPI_CFG_CLK_PHA_MASK) & (~GQSPI_CFG_CLK_POL_MASK);
-+
-+	if (qspi->mode & SPI_CPHA)
-+		config_reg |= GQSPI_CFG_CLK_PHA_MASK;
-+	if (qspi->mode & SPI_CPOL)
-+		config_reg |= GQSPI_CFG_CLK_POL_MASK;
-+
-+	config_reg &= ~GQSPI_CFG_BAUD_RATE_DIV_MASK;
-+	config_reg |= (baud_rate_val << GQSPI_CFG_BAUD_RATE_DIV_SHIFT);
-+	zynqmp_gqspi_write(xqspi, GQSPI_CONFIG_OFST, config_reg);
-+	return 0;
-+}
-+
-+/**
-+ * zynqmp_qspi_setup:	Configure the QSPI controller
-+ * @qspi:	Pointer to the spi_device structure
-+ *
-+ * Sets the operational mode of QSPI controller for the next QSPI transfer,
-+ * baud rate and divisor value to setup the requested qspi clock.
-+ *
-+ * Return:	0 Always
-+ */
-+static int zynqmp_qspi_setup(struct spi_device *qspi)
-+{
-+	if (qspi->master->busy)
-+		return -EBUSY;
-+	return 0;
-+}
-+
-+/**
-+ * zynqmp_qspi_filltxfifo:	Fills the TX FIFO as long as there is room in
-+ *				the FIFO or the bytes required to be
-+ *				transmitted.
-+ * @xqspi:	Pointer to the zynqmp_qspi structure
-+ * @size:	Number of bytes to be copied from TX buffer to TX FIFO
-+ */
-+static void zynqmp_qspi_filltxfifo(struct zynqmp_qspi *xqspi, int size)
-+{
-+	u32 count = 0, intermediate;
-+
-+	while ((xqspi->bytes_to_transfer > 0) && (count < size)) {
-+		memcpy(&intermediate, xqspi->txbuf, 4);
-+		zynqmp_gqspi_write(xqspi, GQSPI_TXD_OFST, intermediate);
-+
-+		if (xqspi->bytes_to_transfer >= 4) {
-+			xqspi->txbuf += 4;
-+			xqspi->bytes_to_transfer -= 4;
-+		} else {
-+			xqspi->txbuf += xqspi->bytes_to_transfer;
-+			xqspi->bytes_to_transfer = 0;
-+		}
-+		count++;
-+	}
-+}
-+
-+/**
-+ * zynqmp_qspi_readrxfifo:	Fills the RX FIFO as long as there is room in
-+ *				the FIFO.
-+ * @xqspi:	Pointer to the zynqmp_qspi structure
-+ * @size:	Number of bytes to be copied from RX buffer to RX FIFO
-+ */
-+static void zynqmp_qspi_readrxfifo(struct zynqmp_qspi *xqspi, u32 size)
-+{
-+	ulong data;
-+	int count = 0;
-+
-+	while ((count < size) && (xqspi->bytes_to_receive > 0)) {
-+		if (xqspi->bytes_to_receive >= 4) {
-+			(*(u32 *) xqspi->rxbuf) =
-+			zynqmp_gqspi_read(xqspi, GQSPI_RXD_OFST);
-+			xqspi->rxbuf += 4;
-+			xqspi->bytes_to_receive -= 4;
-+			count += 4;
-+		} else {
-+			data = zynqmp_gqspi_read(xqspi, GQSPI_RXD_OFST);
-+			count += xqspi->bytes_to_receive;
-+			zynqmp_qspi_copy_read_data(xqspi, data,
-+						   xqspi->bytes_to_receive);
-+			xqspi->bytes_to_receive = 0;
-+		}
-+	}
-+}
-+
-+/**
-+ * zynqmp_process_dma_irq:	Handler for DMA done interrupt of QSPI
-+ *				controller
-+ * @xqspi:	zynqmp_qspi instance pointer
-+ *
-+ * This function handles DMA interrupt only.
-+ */
-+static void zynqmp_process_dma_irq(struct zynqmp_qspi *xqspi)
-+{
-+	u32 config_reg, genfifoentry;
-+
-+	dma_unmap_single(xqspi->dev, xqspi->dma_addr,
-+				xqspi->dma_rx_bytes, DMA_FROM_DEVICE);
-+	xqspi->rxbuf += xqspi->dma_rx_bytes;
-+	xqspi->bytes_to_receive -= xqspi->dma_rx_bytes;
-+	xqspi->dma_rx_bytes = 0;
-+
-+	/* Disabling the DMA interrupts */
-+	zynqmp_gqspi_write(xqspi, GQSPI_QSPIDMA_DST_I_DIS_OFST,
-+					GQSPI_QSPIDMA_DST_I_EN_DONE_MASK);
-+
-+	if (xqspi->bytes_to_receive > 0) {
-+		/* Switch to IO mode,for remaining bytes to receive */
-+		config_reg = zynqmp_gqspi_read(xqspi, GQSPI_CONFIG_OFST);
-+		config_reg &= ~GQSPI_CFG_MODE_EN_MASK;
-+		zynqmp_gqspi_write(xqspi, GQSPI_CONFIG_OFST, config_reg);
-+
-+		/* Initiate the transfer of remaining bytes */
-+		genfifoentry = xqspi->genfifoentry;
-+		genfifoentry |= xqspi->bytes_to_receive;
-+		zynqmp_gqspi_write(xqspi, GQSPI_GEN_FIFO_OFST, genfifoentry);
-+
-+		/* Dummy generic FIFO entry */
-+		zynqmp_gqspi_write(xqspi, GQSPI_GEN_FIFO_OFST, 0x0);
-+
-+		/* Manual start */
-+		zynqmp_gqspi_write(xqspi, GQSPI_CONFIG_OFST,
-+			(zynqmp_gqspi_read(xqspi, GQSPI_CONFIG_OFST) |
-+			GQSPI_CFG_START_GEN_FIFO_MASK));
-+
-+		/* Enable the RX interrupts for IO mode */
-+		zynqmp_gqspi_write(xqspi, GQSPI_IER_OFST,
-+				GQSPI_IER_GENFIFOEMPTY_MASK |
-+				GQSPI_IER_RXNEMPTY_MASK |
-+				GQSPI_IER_RXEMPTY_MASK);
-+	}
-+}
-+
-+/**
-+ * zynqmp_qspi_irq:	Interrupt service routine of the QSPI controller
-+ * @irq:	IRQ number
-+ * @dev_id:	Pointer to the xqspi structure
-+ *
-+ * This function handles TX empty only.
-+ * On TX empty interrupt this function reads the received data from RX FIFO
-+ * and fills the TX FIFO if there is any data remaining to be transferred.
-+ *
-+ * Return:	IRQ_HANDLED when interrupt is handled
-+ *		IRQ_NONE otherwise.
-+ */
-+static irqreturn_t zynqmp_qspi_irq(int irq, void *dev_id)
-+{
-+	struct spi_master *master = dev_id;
-+	struct zynqmp_qspi *xqspi = spi_master_get_devdata(master);
-+	int ret = IRQ_NONE;
-+	u32 status, mask, dma_status = 0;
-+
-+	status = zynqmp_gqspi_read(xqspi, GQSPI_ISR_OFST);
-+	zynqmp_gqspi_write(xqspi, GQSPI_ISR_OFST, status);
-+	mask = (status & ~(zynqmp_gqspi_read(xqspi, GQSPI_IMASK_OFST)));
-+
-+	/* Read and clear DMA status */
-+	if (xqspi->mode == GQSPI_MODE_DMA) {
-+		dma_status =
-+			zynqmp_gqspi_read(xqspi, GQSPI_QSPIDMA_DST_I_STS_OFST);
-+		zynqmp_gqspi_write(xqspi, GQSPI_QSPIDMA_DST_I_STS_OFST,
-+								dma_status);
-+	}
-+
-+	if (mask & GQSPI_ISR_TXNOT_FULL_MASK) {
-+		zynqmp_qspi_filltxfifo(xqspi, GQSPI_TX_FIFO_FILL);
-+		ret = IRQ_HANDLED;
-+	}
-+
-+	if (dma_status & GQSPI_QSPIDMA_DST_I_STS_DONE_MASK) {
-+		zynqmp_process_dma_irq(xqspi);
-+		ret = IRQ_HANDLED;
-+	} else if (!(mask & GQSPI_IER_RXEMPTY_MASK) &&
-+			(mask & GQSPI_IER_GENFIFOEMPTY_MASK)) {
-+		zynqmp_qspi_readrxfifo(xqspi, GQSPI_RX_FIFO_FILL);
-+		ret = IRQ_HANDLED;
-+	}
-+
-+	if ((xqspi->bytes_to_receive == 0) && (xqspi->bytes_to_transfer == 0)
-+			&& ((status & GQSPI_IRQ_MASK) == GQSPI_IRQ_MASK)) {
-+		zynqmp_gqspi_write(xqspi, GQSPI_IDR_OFST, GQSPI_ISR_IDR_MASK);
-+		spi_finalize_current_transfer(master);
-+		ret = IRQ_HANDLED;
-+	}
-+	return ret;
-+}
-+
-+/**
-+ * zynqmp_qspi_selectspimode:	Selects SPI mode - x1 or x2 or x4.
-+ * @xqspi:	xqspi is a pointer to the GQSPI instance
-+ * @spimode:	spimode - SPI or DUAL or QUAD.
-+ * Return:	Mask to set desired SPI mode in GENFIFO entry.
-+ */
-+static inline u32 zynqmp_qspi_selectspimode(struct zynqmp_qspi *xqspi,
-+						u8 spimode)
-+{
-+	u32 mask = 0;
-+
-+	switch (spimode) {
-+	case GQSPI_SELECT_MODE_DUALSPI:
-+		mask = GQSPI_GENFIFO_MODE_DUALSPI;
-+		break;
-+	case GQSPI_SELECT_MODE_QUADSPI:
-+		mask = GQSPI_GENFIFO_MODE_QUADSPI;
-+		break;
-+	case GQSPI_SELECT_MODE_SPI:
-+		mask = GQSPI_GENFIFO_MODE_SPI;
-+		break;
-+	default:
-+		dev_warn(xqspi->dev, "Invalid SPI mode\n");
-+	}
-+
-+	return mask;
-+}
-+
-+/**
-+ * zynq_qspi_setuprxdma:	This function sets up the RX DMA operation
-+ * @xqspi:	xqspi is a pointer to the GQSPI instance.
-+ */
-+static void zynq_qspi_setuprxdma(struct zynqmp_qspi *xqspi)
-+{
-+	u32 rx_bytes, rx_rem, config_reg;
-+	dma_addr_t addr;
-+	u64 dma_align =  (u64)(uintptr_t)xqspi->rxbuf;
-+
-+	if ((xqspi->bytes_to_receive < 8) ||
-+		((dma_align & GQSPI_DMA_UNALIGN) != 0x0)) {
-+		/* Setting to IO mode */
-+		config_reg = zynqmp_gqspi_read(xqspi, GQSPI_CONFIG_OFST);
-+		config_reg &= ~GQSPI_CFG_MODE_EN_MASK;
-+		zynqmp_gqspi_write(xqspi, GQSPI_CONFIG_OFST, config_reg);
-+		xqspi->mode = GQSPI_MODE_IO;
-+		xqspi->dma_rx_bytes = 0;
-+		return;
-+	}
-+
-+	rx_rem = xqspi->bytes_to_receive % 4;
-+	rx_bytes = (xqspi->bytes_to_receive - rx_rem);
-+
-+	addr = dma_map_single(xqspi->dev, (void *)xqspi->rxbuf,
-+						rx_bytes, DMA_FROM_DEVICE);
-+	if (dma_mapping_error(xqspi->dev, addr))
-+		dev_err(xqspi->dev, "ERR:rxdma:memory not mapped\n");
-+
-+	xqspi->dma_rx_bytes = rx_bytes;
-+	xqspi->dma_addr = addr;
-+	zynqmp_gqspi_write(xqspi, GQSPI_QSPIDMA_DST_ADDR_OFST,
-+				(u32)(addr & 0xffffffff));
-+	addr = ((addr >> 16) >> 16);
-+	zynqmp_gqspi_write(xqspi, GQSPI_QSPIDMA_DST_ADDR_MSB_OFST,
-+				((u32)addr) & 0xfff);
-+
-+	/* Enabling the DMA mode */
-+	config_reg = zynqmp_gqspi_read(xqspi, GQSPI_CONFIG_OFST);
-+	config_reg &= ~GQSPI_CFG_MODE_EN_MASK;
-+	config_reg |= GQSPI_CFG_MODE_EN_DMA_MASK;
-+	zynqmp_gqspi_write(xqspi, GQSPI_CONFIG_OFST, config_reg);
-+
-+	/* Switch to DMA mode */
-+	xqspi->mode = GQSPI_MODE_DMA;
-+
-+	/* Write the number of bytes to transfer */
-+	zynqmp_gqspi_write(xqspi, GQSPI_QSPIDMA_DST_SIZE_OFST, rx_bytes);
-+}
-+
-+/**
-+ * zynqmp_qspi_txrxsetup:	This function checks the TX/RX buffers in
-+ *				the transfer and sets up the GENFIFO entries,
-+ *				TX FIFO as required.
-+ * @xqspi:	xqspi is a pointer to the GQSPI instance.
-+ * @transfer:	It is a pointer to the structure containing transfer data.
-+ * @genfifoentry:	genfifoentry is pointer to the variable in which
-+ *			GENFIFO	mask is returned to calling function
-+ */
-+static void zynqmp_qspi_txrxsetup(struct zynqmp_qspi *xqspi,
-+				  struct spi_transfer *transfer,
-+				  u32 *genfifoentry)
-+{
-+	u32 config_reg;
-+
-+	/* Transmit */
-+	if ((xqspi->txbuf != NULL) && (xqspi->rxbuf == NULL)) {
-+		/* Setup data to be TXed */
-+		*genfifoentry &= ~GQSPI_GENFIFO_RX;
-+		*genfifoentry |= GQSPI_GENFIFO_DATA_XFER;
-+		*genfifoentry |= GQSPI_GENFIFO_TX;
-+		*genfifoentry |=
-+			zynqmp_qspi_selectspimode(xqspi, transfer->tx_nbits);
-+		xqspi->bytes_to_transfer = transfer->len;
-+		if (xqspi->mode == GQSPI_MODE_DMA) {
-+			config_reg = zynqmp_gqspi_read(xqspi,
-+							GQSPI_CONFIG_OFST);
-+			config_reg &= ~GQSPI_CFG_MODE_EN_MASK;
-+			zynqmp_gqspi_write(xqspi, GQSPI_CONFIG_OFST,
-+								config_reg);
-+			xqspi->mode = GQSPI_MODE_IO;
-+		}
-+		zynqmp_qspi_filltxfifo(xqspi, GQSPI_TXD_DEPTH);
-+		/* Discard RX data */
-+		xqspi->bytes_to_receive = 0;
-+	} else if ((xqspi->txbuf == NULL) && (xqspi->rxbuf != NULL)) {
-+		/* Receive */
-+
-+		/* TX auto fill */
-+		*genfifoentry &= ~GQSPI_GENFIFO_TX;
-+		/* Setup RX */
-+		*genfifoentry |= GQSPI_GENFIFO_DATA_XFER;
-+		*genfifoentry |= GQSPI_GENFIFO_RX;
-+		*genfifoentry |=
-+			zynqmp_qspi_selectspimode(xqspi, transfer->rx_nbits);
-+		xqspi->bytes_to_transfer = 0;
-+		xqspi->bytes_to_receive = transfer->len;
-+		zynq_qspi_setuprxdma(xqspi);
-+	}
-+}
-+
-+/**
-+ * zynqmp_qspi_start_transfer:	Initiates the QSPI transfer
-+ * @master:	Pointer to the spi_master structure which provides
-+ *		information about the controller.
-+ * @qspi:	Pointer to the spi_device structure
-+ * @transfer:	Pointer to the spi_transfer structure which provide information
-+ *		about next transfer parameters
-+ *
-+ * This function fills the TX FIFO, starts the QSPI transfer, and waits for the
-+ * transfer to be completed.
-+ *
-+ * Return:	Number of bytes transferred in the last transfer
-+ */
-+static int zynqmp_qspi_start_transfer(struct spi_master *master,
-+				      struct spi_device *qspi,
-+				      struct spi_transfer *transfer)
-+{
-+	struct zynqmp_qspi *xqspi = spi_master_get_devdata(master);
-+	u32 genfifoentry = 0x0, transfer_len;
-+
-+	xqspi->txbuf = transfer->tx_buf;
-+	xqspi->rxbuf = transfer->rx_buf;
-+
-+	zynqmp_qspi_setup_transfer(qspi, transfer);
-+
-+	genfifoentry |= xqspi->genfifocs;
-+	genfifoentry |= xqspi->genfifobus;
-+
-+	zynqmp_qspi_txrxsetup(xqspi, transfer, &genfifoentry);
-+
-+	if (xqspi->mode == GQSPI_MODE_DMA)
-+		transfer_len = xqspi->dma_rx_bytes;
-+	else
-+		transfer_len = transfer->len;
-+
-+	xqspi->genfifoentry = genfifoentry;
-+	if ((transfer_len) < GQSPI_GENFIFO_IMM_DATA_MASK) {
-+		genfifoentry &= ~GQSPI_GENFIFO_IMM_DATA_MASK;
-+		genfifoentry |= transfer_len;
-+		zynqmp_gqspi_write(xqspi, GQSPI_GEN_FIFO_OFST, genfifoentry);
-+	} else {
-+		int tempcount = transfer_len;
-+		u32 exponent = 8;	/* 2^8 = 256 */
-+		u8 imm_data = tempcount & 0xFF;
-+
-+		tempcount &= ~(tempcount & 0xFF);
-+		/* Immediate entry */
-+		if (tempcount != 0) {
-+			/* Exponent entries */
-+			genfifoentry |= GQSPI_GENFIFO_EXP;
-+			while (tempcount != 0) {
-+				if (tempcount & GQSPI_GENFIFO_EXP_START) {
-+					genfifoentry &=
-+					    ~GQSPI_GENFIFO_IMM_DATA_MASK;
-+					genfifoentry |= exponent;
-+					zynqmp_gqspi_write(xqspi,
-+							   GQSPI_GEN_FIFO_OFST,
-+							   genfifoentry);
-+				}
-+				tempcount = tempcount >> 1;
-+				exponent++;
-+			}
-+		}
-+		if (imm_data != 0) {
-+			genfifoentry &= ~GQSPI_GENFIFO_EXP;
-+			genfifoentry &= ~GQSPI_GENFIFO_IMM_DATA_MASK;
-+			genfifoentry |= (u8) (imm_data & 0xFF);
-+			zynqmp_gqspi_write(xqspi,
-+					   GQSPI_GEN_FIFO_OFST, genfifoentry);
-+		}
-+	}
-+
-+	if ((xqspi->mode == GQSPI_MODE_IO) &&
-+			(xqspi->rxbuf != NULL)) {
-+		/* Dummy generic FIFO entry */
-+		zynqmp_gqspi_write(xqspi, GQSPI_GEN_FIFO_OFST, 0x0);
-+	}
-+
-+	/* Since we are using manual mode */
-+	zynqmp_gqspi_write(xqspi, GQSPI_CONFIG_OFST,
-+			   zynqmp_gqspi_read(xqspi, GQSPI_CONFIG_OFST) |
-+			   GQSPI_CFG_START_GEN_FIFO_MASK);
-+
-+	if (xqspi->txbuf != NULL)
-+		/* Enable interrupts for TX */
-+		zynqmp_gqspi_write(xqspi, GQSPI_IER_OFST,
-+				   GQSPI_IER_TXEMPTY_MASK |
-+					GQSPI_IER_GENFIFOEMPTY_MASK |
-+					GQSPI_IER_TXNOT_FULL_MASK);
-+
-+	if (xqspi->rxbuf != NULL) {
-+		/* Enable interrupts for RX */
-+		if (xqspi->mode == GQSPI_MODE_DMA) {
-+			/* Enable DMA interrupts */
-+			zynqmp_gqspi_write(xqspi,
-+					GQSPI_QSPIDMA_DST_I_EN_OFST,
-+					GQSPI_QSPIDMA_DST_I_EN_DONE_MASK);
-+		} else {
-+			zynqmp_gqspi_write(xqspi, GQSPI_IER_OFST,
-+					GQSPI_IER_GENFIFOEMPTY_MASK |
-+					GQSPI_IER_RXNEMPTY_MASK |
-+					GQSPI_IER_RXEMPTY_MASK);
-+		}
-+	}
-+
-+	return transfer->len;
-+}
-+
-+/**
-+ * zynqmp_qspi_suspend:	Suspend method for the QSPI driver
-+ * @_dev:	Address of the platform_device structure
-+ *
-+ * This function stops the QSPI driver queue and disables the QSPI controller
-+ *
-+ * Return:	Always 0
-+ */
-+static int __maybe_unused zynqmp_qspi_suspend(struct device *dev)
-+{
-+	struct platform_device *pdev = container_of(dev,
-+						    struct platform_device,
-+						    dev);
-+	struct spi_master *master = platform_get_drvdata(pdev);
-+
-+	spi_master_suspend(master);
-+
-+	zynqmp_unprepare_transfer_hardware(master);
-+
-+	return 0;
-+}
-+
-+/**
-+ * zynqmp_qspi_resume:	Resume method for the QSPI driver
-+ * @dev:	Address of the platform_device structure
-+ *
-+ * The function starts the QSPI driver queue and initializes the QSPI
-+ * controller
-+ *
-+ * Return:	0 on success and error value on error
-+ */
-+static int __maybe_unused zynqmp_qspi_resume(struct device *dev)
-+{
-+	struct platform_device *pdev = container_of(dev,
-+						    struct platform_device,
-+						    dev);
-+	struct spi_master *master = platform_get_drvdata(pdev);
-+	struct zynqmp_qspi *xqspi = spi_master_get_devdata(master);
-+	int ret = 0;
-+
-+	ret = clk_enable(xqspi->pclk);
-+	if (ret) {
-+		dev_err(dev, "Cannot enable APB clock.\n");
-+		return ret;
-+	}
-+
-+	ret = clk_enable(xqspi->refclk);
-+	if (ret) {
-+		dev_err(dev, "Cannot enable device clock.\n");
-+		clk_disable(xqspi->pclk);
-+		return ret;
-+	}
-+
-+	spi_master_resume(master);
-+
-+	return 0;
-+}
-+
-+static SIMPLE_DEV_PM_OPS(zynqmp_qspi_dev_pm_ops, zynqmp_qspi_suspend,
-+			 zynqmp_qspi_resume);
-+
-+/**
-+ * zynqmp_qspi_probe:	Probe method for the QSPI driver
-+ * @pdev:	Pointer to the platform_device structure
-+ *
-+ * This function initializes the driver data structures and the hardware.
-+ *
-+ * Return:	0 on success and error value on failure
-+ */
-+static int zynqmp_qspi_probe(struct platform_device *pdev)
-+{
-+	int ret = 0;
-+	struct spi_master *master;
-+	struct zynqmp_qspi *xqspi;
-+	struct resource *res;
-+	struct device *dev = &pdev->dev;
-+
-+	master = spi_alloc_master(&pdev->dev, sizeof(*xqspi));
-+	if (!master)
-+		return -ENOMEM;
-+
-+	xqspi = spi_master_get_devdata(master);
-+	master->dev.of_node = pdev->dev.of_node;
-+	platform_set_drvdata(pdev, master);
-+
-+	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-+	xqspi->regs = devm_ioremap_resource(&pdev->dev, res);
-+	if (IS_ERR(xqspi->regs)) {
-+		ret = PTR_ERR(xqspi->regs);
-+		goto remove_master;
-+	}
-+
-+	xqspi->dev = dev;
-+	xqspi->pclk = devm_clk_get(&pdev->dev, "pclk");
-+	if (IS_ERR(xqspi->pclk)) {
-+		dev_err(dev, "pclk clock not found.\n");
-+		ret = PTR_ERR(xqspi->pclk);
-+		goto remove_master;
-+	}
-+
-+	xqspi->refclk = devm_clk_get(&pdev->dev, "ref_clk");
-+	if (IS_ERR(xqspi->refclk)) {
-+		dev_err(dev, "ref_clk clock not found.\n");
-+		ret = PTR_ERR(xqspi->refclk);
-+		goto remove_master;
-+	}
-+
-+	ret = clk_prepare_enable(xqspi->pclk);
-+	if (ret) {
-+		dev_err(dev, "Unable to enable APB clock.\n");
-+		goto remove_master;
-+	}
-+
-+	ret = clk_prepare_enable(xqspi->refclk);
-+	if (ret) {
-+		dev_err(dev, "Unable to enable device clock.\n");
-+		goto clk_dis_pclk;
-+	}
-+
-+	/* QSPI controller initializations */
-+	zynqmp_qspi_init_hw(xqspi);
-+
-+	xqspi->irq = platform_get_irq(pdev, 0);
-+	if (xqspi->irq <= 0) {
-+		ret = -ENXIO;
-+		dev_err(dev, "irq resource not found\n");
-+		goto remove_master;
-+	}
-+	ret = devm_request_irq(&pdev->dev, xqspi->irq, zynqmp_qspi_irq,
-+			       0, pdev->name, master);
-+	if (ret != 0) {
-+		ret = -ENXIO;
-+		dev_err(dev, "request_irq failed\n");
-+		goto remove_master;
-+	}
-+
-+	master->num_chipselect = GQSPI_DEFAULT_NUM_CS;
-+
-+	master->setup = zynqmp_qspi_setup;
-+	master->set_cs = zynqmp_qspi_chipselect;
-+	master->transfer_one = zynqmp_qspi_start_transfer;
-+	master->prepare_transfer_hardware = zynqmp_prepare_transfer_hardware;
-+	master->unprepare_transfer_hardware =
-+					zynqmp_unprepare_transfer_hardware;
-+	master->max_speed_hz = clk_get_rate(xqspi->refclk) / 2;
-+	master->bits_per_word_mask = SPI_BPW_MASK(8);
-+	master->mode_bits = SPI_CPOL | SPI_CPHA | SPI_RX_DUAL | SPI_RX_QUAD |
-+			    SPI_TX_DUAL | SPI_TX_QUAD;
-+
-+	if (master->dev.parent == NULL)
-+		master->dev.parent = &master->dev;
-+
-+	ret = spi_register_master(master);
-+	if (ret)
-+		goto clk_dis_all;
-+
-+	return 0;
-+
-+clk_dis_all:
-+	clk_disable_unprepare(xqspi->refclk);
-+clk_dis_pclk:
-+	clk_disable_unprepare(xqspi->pclk);
-+remove_master:
-+	spi_master_put(master);
-+
-+	return ret;
-+}
-+
-+/**
-+ * zynqmp_qspi_remove:	Remove method for the QSPI driver
-+ * @pdev:	Pointer to the platform_device structure
-+ *
-+ * This function is called if a device is physically removed from the system or
-+ * if the driver module is being unloaded. It frees all resources allocated to
-+ * the device.
-+ *
-+ * Return:	0 Always
-+ */
-+static int zynqmp_qspi_remove(struct platform_device *pdev)
-+{
-+	struct spi_master *master = platform_get_drvdata(pdev);
-+	struct zynqmp_qspi *xqspi = spi_master_get_devdata(master);
-+
-+	zynqmp_gqspi_write(xqspi, GQSPI_EN_OFST, 0x0);
-+	clk_disable_unprepare(xqspi->refclk);
-+	clk_disable_unprepare(xqspi->pclk);
-+
-+	spi_unregister_master(master);
-+
-+	return 0;
-+}
-+
-+static const struct of_device_id zynqmp_qspi_of_match[] = {
-+	{ .compatible = "xlnx,zynqmp-qspi-1.0", },
-+	{ /* End of table */ }
-+};
-+
-+MODULE_DEVICE_TABLE(of, zynqmp_qspi_of_match);
-+
-+static struct platform_driver zynqmp_qspi_driver = {
-+	.probe = zynqmp_qspi_probe,
-+	.remove = zynqmp_qspi_remove,
-+	.driver = {
-+		.name = "zynqmp-qspi",
-+		.of_match_table = zynqmp_qspi_of_match,
-+		.pm = &zynqmp_qspi_dev_pm_ops,
-+	},
-+};
-+
-+module_platform_driver(zynqmp_qspi_driver);
-+
-+MODULE_AUTHOR("Xilinx, Inc.");
-+MODULE_DESCRIPTION("Xilinx Zynqmp QSPI driver");
-+MODULE_LICENSE("GPL");
---
-2.1.2
+The second sentence is worded rather strangely.
+
+> +
+>  endmenu
+>
+>  config IOMMU_IOVA
+> diff --git a/drivers/iommu/io-pgtable-arm-short.c b/drivers/iommu/io-pgtable-arm-short.c
+> new file mode 100644
+> index 0000000..cc286ce5
+> --- /dev/null
+> +++ b/drivers/iommu/io-pgtable-arm-short.c
+> @@ -0,0 +1,490 @@
+> +/*
+> + * Copyright (c) 2014-2015 MediaTek Inc.
+> + * Author: Yong Wu <yong.wu@mediatek.com>
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> + *
+> + * This program is distributed in the hope that it will be useful,
+> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + * GNU General Public License for more details.
+> + */
+> +#define pr_fmt(fmt)    "arm-short-desc io-pgtable: "fmt
+> +
+> +#include <linux/err.h>
+> +#include <linux/mm.h>
+> +#include <linux/iommu.h>
+> +#include <linux/errno.h>
+> +
+> +#include "io-pgtable.h"
+> +
+> +typedef u32 arm_short_iopte;
+> +
+> +struct arm_short_io_pgtable {
+> +       struct io_pgtable       iop;
+> +       struct kmem_cache       *ptekmem;
+> +       size_t                  pgd_size;
+> +       void                    *pgd;
+> +};
+> +
+> +#define io_pgtable_short_to_data(x)                            \
+> +       container_of((x), struct arm_short_io_pgtable, iop)
+> +
+> +#define io_pgtable_ops_to_pgtable(x)                           \
+> +       container_of((x), struct io_pgtable, ops)
+> +
+> +#define io_pgtable_short_ops_to_data(x)                                \
+> +       io_pgtable_short_to_data(io_pgtable_ops_to_pgtable(x))
+> +
+
+These are private macros, so I think you can drop the "short" part to,
+err, keep them short.
+
+> +#define ARM_SHORT_MAX_ADDR_BITS                        32
+> +
+> +#define ARM_SHORT_PGDIR_SHIFT                  20
+> +#define ARM_SHORT_PAGE_SHIFT                   12
+> +#define ARM_SHORT_PTRS_PER_PTE                 256
+> +#define ARM_SHORT_BYTES_PER_PTE                        1024
+
+Isn't that ARM_SHORT_PTRS_PER_PTE * sizeof(arm_short_iopte)?
+
+> +/* 1 level pagetable */
+> +#define ARM_SHORT_F_PGD_TYPE_PAGE              (0x1)
+
+I think you're using PAGE and PGTABLE interchangeably, which is really
+confusing to read.
+
+> +#define ARM_SHORT_F_PGD_TYPE_PAGE_MSK          (0x3)
+
+This is the TYPE mask.
+
+> +#define ARM_SHORT_F_PGD_TYPE_SECTION           (0x2)
+> +#define ARM_SHORT_F_PGD_TYPE_SUPERSECTION      (0x2 | (1 << 18))
+
+Are you sure this is correct? afaict, bit 0 is PXN, so you should actually
+be using bit 18 to distinguihs sections and supersections.
+
+> +#define ARM_SHORT_F_PGD_TYPE_SECTION_MSK       (0x3 | (1 << 18))
+> +#define ARM_SHORT_F_PGD_TYPE_IS_PAGE(pgd)      (((pgd) & 0x3) == 1)
+
+Use your TYPE mask here.
+
+> +#define ARM_SHORT_F_PGD_TYPE_IS_SECTION(pgd)           \
+> +       (((pgd) & ARM_SHORT_F_PGD_TYPE_SECTION_MSK)     \
+> +               == ARM_SHORT_F_PGD_TYPE_SECTION)
+> +#define ARM_SHORT_F_PGD_TYPE_IS_SUPERSECTION(pgd)      \
+> +       (((pgd) & ARM_SHORT_F_PGD_TYPE_SECTION_MSK)     \
+> +               == ARM_SHORT_F_PGD_TYPE_SUPERSECTION)
+> +
+> +#define ARM_SHORT_F_PGD_B_BIT                  BIT(2)
+> +#define ARM_SHORT_F_PGD_C_BIT                  BIT(3)
+> +#define ARM_SHORT_F_PGD_IMPLE_BIT              BIT(9)
+> +#define ARM_SHORT_F_PGD_S_BIT                  BIT(16)
+> +#define ARM_SHORT_F_PGD_NG_BIT                 BIT(17)
+> +#define ARM_SHORT_F_PGD_NS_BIT_PAGE            BIT(3)
+> +#define ARM_SHORT_F_PGD_NS_BIT_SECTION         BIT(19)
+> +
+> +#define ARM_SHORT_F_PGD_PA_PAGETABLE_MSK       0xfffffc00
+> +#define ARM_SHORT_F_PGD_PA_SECTION_MSK         0xfff00000
+> +#define ARM_SHORT_F_PGD_PA_SUPERSECTION_MSK    0xff000000
+> +
+> +/* 2 level pagetable */
+> +#define ARM_SHORT_F_PTE_TYPE_GET(val)          ((val) & 0x3)
+> +#define ARM_SHORT_F_PTE_TYPE_LARGE             BIT(0)
+
+Careful here, small pages can have bit 0 set for XN.
+
+> +#define ARM_SHORT_F_PTE_TYPE_SMALL             BIT(1)
+> +#define ARM_SHORT_F_PTE_B_BIT                  BIT(2)
+> +#define ARM_SHORT_F_PTE_C_BIT                  BIT(3)
+> +#define ARM_SHORT_F_PTE_IMPLE_BIT              BIT(9)
+> +#define ARM_SHORT_F_PTE_S_BIT                  BIT(10)
+> +#define ARM_SHORT_F_PTE_PA_LARGE_MSK            0xffff0000
+> +#define ARM_SHORT_F_PTE_PA_SMALL_MSK            0xfffff000
+
+I think you can drop the '_F' parts of all these macros.
+
+> +#define ARM_SHORT_PGD_IDX(a)                   ((a) >> ARM_SHORT_PGDIR_SHIFT)
+> +#define ARM_SHORT_PTE_IDX(a)                   \
+> +       (((a) >> ARM_SHORT_PAGE_SHIFT) & 0xff)
+
+The 0xff comes from ARM_SHORT_PTRS_PER_PTE, right? I think you should fix
+your definitions so that these are all derived from each other rather than
+open-coding the constants.
+
+> +#define ARM_SHORT_GET_PTE_VA(pgd)              \
+> +       (phys_to_virt((unsigned long)pgd & ARM_SHORT_F_PGD_PA_PAGETABLE_MSK))
+> +
+> +static arm_short_iopte *
+> +arm_short_get_pte_in_pgd(arm_short_iopte curpgd, unsigned int iova)
+> +{
+> +       arm_short_iopte *pte;
+> +
+> +       pte = ARM_SHORT_GET_PTE_VA(curpgd);
+> +       pte += ARM_SHORT_PTE_IDX(iova);
+> +       return pte;
+> +}
+> +
+> +static arm_short_iopte *
+> +arm_short_supersection_start(arm_short_iopte *pgd)
+> +{
+> +       return (arm_short_iopte *)(round_down((unsigned long)pgd, (16 * 4)));
+> +}
+
+More magic numbers that should be derived from your global constants.
+
+> +static int _arm_short_check_free_pte(struct arm_short_io_pgtable *data,
+> +                                    arm_short_iopte *pgd)
+> +{
+> +       arm_short_iopte *pte;
+> +       int i;
+> +
+> +       pte = ARM_SHORT_GET_PTE_VA(*pgd);
+> +
+> +       for (i = 0; i < ARM_SHORT_PTRS_PER_PTE; i++) {
+> +               if (pte[i] != 0)
+> +                       return 1;
+
+-EEXIST?
+
+> +       }
+> +
+> +       /* Free PTE */
+> +       kmem_cache_free(data->ptekmem, pte);
+> +       *pgd = 0;
+
+I don't think this is safe, as there's a window where the page table
+walker can see the freed pte memory.
+
+> +
+> +       return 0;
+> +}
+> +
+> +static int arm_short_unmap(struct io_pgtable_ops *ops, unsigned long iova,
+> +                          size_t size)
+> +{
+> +       struct arm_short_io_pgtable *data = io_pgtable_short_ops_to_data(ops);
+> +       arm_short_iopte *pgd;
+> +       unsigned long iova_start = iova;
+> +       unsigned long long end_plus_1 = iova + size;
+> +       const struct iommu_gather_ops *tlb = data->iop.cfg.tlb;
+> +       void *cookie = data->iop.cookie;
+> +       int ret;
+> +
+> +       do {
+> +               pgd = (arm_short_iopte *)data->pgd + ARM_SHORT_PGD_IDX(iova);
+> +
+> +               if (ARM_SHORT_F_PGD_TYPE_IS_PAGE(*pgd)) {
+> +                       arm_short_iopte *pte;
+> +                       unsigned int pte_offset;
+> +                       unsigned int num_to_clean;
+> +
+> +                       pte_offset = ARM_SHORT_PTE_IDX(iova);
+> +                       num_to_clean =
+> +                           min((unsigned int)((end_plus_1 - iova) / PAGE_SIZE),
+> +                               (ARM_SHORT_PTRS_PER_PTE - pte_offset));
+> +
+> +                       pte = arm_short_get_pte_in_pgd(*pgd, iova);
+> +
+> +                       memset(pte, 0, num_to_clean * sizeof(arm_short_iopte));
+> +
+> +                       ret = _arm_short_check_free_pte(data, pgd);
+> +                       if (ret == 1)/* pte is not freed, need to flush pte */
+> +                               tlb->flush_pgtable(
+> +                                       pte,
+> +                                       num_to_clean * sizeof(arm_short_iopte),
+> +                                       cookie);
+> +                       else
+> +                               tlb->flush_pgtable(pgd, sizeof(arm_short_iopte),
+> +                                                  cookie);
+
+Hopefully this can be cleaned up when you remove the outer loop and you
+can use the size parameter to figure out which level to unmap.
+
+> +                       iova += num_to_clean << PAGE_SHIFT;
+> +               } else if (ARM_SHORT_F_PGD_TYPE_IS_SECTION(*pgd)) {
+> +                       *pgd = 0;
+> +
+> +                       tlb->flush_pgtable(pgd, sizeof(arm_short_iopte),
+> +                                          cookie);
+> +                       iova += SZ_1M;
+
+Again, these sizes can be derived from other page table properties that
+you have.
+
+> +               } else if (ARM_SHORT_F_PGD_TYPE_IS_SUPERSECTION(*pgd)) {
+> +                       arm_short_iopte *start;
+> +
+> +                       start = arm_short_supersection_start(pgd);
+> +                       if (unlikely(start != pgd))
+> +                               pr_warn("%s:suppersection start isn't aligned.iova=0x%lx,pgd=0x%x\n",
+> +                                       __func__, iova, *pgd);
+> +
+> +                       memset(start, 0, 16 * sizeof(arm_short_iopte));
+> +
+> +                       tlb->flush_pgtable(start, 16 * sizeof(arm_short_iopte),
+> +                                          cookie);
+> +
+> +                       iova = (iova + SZ_16M) & (~(SZ_16M - 1));
+
+See later, but I think supersections should not be assumed by default.
+
+> +               } else {
+> +                       break;
+> +               }
+> +       } while (iova < end_plus_1 && iova);
+
+I don't think you need this loop -- unmap will be called in page-sized
+chunks (where page-size refers to units as advertised in your IOMMU's
+pgsize_bitmap). The tricky part is when somebody unmaps a subset of a
+previous mapping that ended up using something like a section. You need
+to handle that here by splitting blocks@level 1 into a table and
+allocating a level 2.
+
+> +
+> +       tlb->tlb_add_flush(iova_start, size, true, cookie);
+> +
+> +       return 0;
+
+You need to return the size of the region that you managed to unmap, so
+0 isn't right here.
+
+> +}
+> +
+> +static arm_short_iopte __arm_short_pte_port(unsigned int prot, bool large)
+> +{
+> +       arm_short_iopte pteprot;
+> +
+> +       pteprot = ARM_SHORT_F_PTE_S_BIT;
+> +
+> +       pteprot |= large ? ARM_SHORT_F_PTE_TYPE_LARGE :
+> +                               ARM_SHORT_F_PTE_TYPE_SMALL;
+> +
+> +       if (prot & IOMMU_CACHE)
+> +               pteprot |=  ARM_SHORT_F_PTE_B_BIT | ARM_SHORT_F_PTE_C_BIT;
+
+Where do you set TEX[0] for write-allocate?
+
+> +       return pteprot;
+> +}
+> +
+> +static arm_short_iopte __arm_short_pgd_port(int prot, bool super)
+> +{
+> +       arm_short_iopte pgdprot;
+> +
+> +       pgdprot = ARM_SHORT_F_PGD_S_BIT;
+> +       pgdprot |= super ? ARM_SHORT_F_PGD_TYPE_SUPERSECTION :
+> +                               ARM_SHORT_F_PGD_TYPE_SECTION;
+> +       if (prot & IOMMU_CACHE)
+> +               pgdprot |= ARM_SHORT_F_PGD_C_BIT | ARM_SHORT_F_PGD_B_BIT;
+> +
+> +       return pgdprot;
+> +}
+> +
+> +static int _arm_short_map_page(struct arm_short_io_pgtable *data,
+> +                              unsigned int iova, phys_addr_t pa,
+> +                              unsigned int prot, bool largepage)
+> +{
+> +       arm_short_iopte *pgd = data->pgd;
+> +       arm_short_iopte *pte;
+> +       arm_short_iopte pgdprot, pteprot;
+> +       arm_short_iopte mask = largepage ? ARM_SHORT_F_PTE_PA_LARGE_MSK :
+> +                                               ARM_SHORT_F_PTE_PA_SMALL_MSK;
+> +       int i, ptenum = largepage ? 16 : 1;
+> +       bool ptenew = false;
+> +       void *pte_new_va;
+> +       void *cookie = data->iop.cookie;
+> +
+> +       if ((iova | pa) & (~mask)) {
+> +               pr_err("IOVA|PA Not Aligned(iova=0x%x pa=0x%pa type=%s)\n",
+> +                      iova, &pa, largepage ? "large page" : "small page");
+> +               return -EINVAL;
+> +       }
+> +
+> +       pgdprot = ARM_SHORT_F_PGD_TYPE_PAGE;
+> +       if (data->iop.cfg.quirks & IO_PGTABLE_QUIRK_ARM_NS)
+> +               pgdprot |= ARM_SHORT_F_PGD_NS_BIT_PAGE;
+> +
+> +       pgd += ARM_SHORT_PGD_IDX(iova);
+> +
+> +       if (!(*pgd)) {
+> +               pte_new_va = kmem_cache_zalloc(data->ptekmem, GFP_KERNEL);
+> +               if (unlikely(!pte_new_va)) {
+> +                       pr_err("Failed to alloc pte\n");
+> +                       return -ENOMEM;
+> +               }
+> +
+> +               /* Check pte alignment -- must 1K align */
+> +               if (unlikely((unsigned long)pte_new_va &
+> +                            (ARM_SHORT_BYTES_PER_PTE - 1))) {
+> +                       pr_err("The new pte is not aligned! (va=0x%p)\n",
+> +                              pte_new_va);
+> +                       kmem_cache_free(data->ptekmem, (void *)pte_new_va);
+> +                       return -ENOMEM;
+> +               }
+
+How are you enforcing this alignment?
+
+> +               ptenew = true;
+> +               *pgd = virt_to_phys(pte_new_va) | pgdprot;
+> +               kmemleak_ignore(pte_new_va);
+
+Maybe you should be using alloc_pages instead of your kmem_cache (I mention
+this again later on).
+
+> +               data->iop.cfg.tlb->flush_pgtable(pgd, sizeof(arm_short_iopte),
+> +                                                cookie);
+> +       } else {
+> +               /* Someone else may have allocated for this pgd */
+> +               if (((*pgd) & (~ARM_SHORT_F_PGD_PA_PAGETABLE_MSK)) != pgdprot) {
+> +                       pr_err("The prot of old pgd is not Right!iova=0x%x pgd=0x%x pgprot=0x%x\n",
+> +                              iova, (*pgd), pgdprot);
+
+You can probably just WARN here, as I do in the LPAE code. It shows a bug
+in the caller of the API.
+
+> +                       return -EEXIST;
+> +               }
+> +       }
+> +
+> +       pteprot = (arm_short_iopte)pa;
+> +       pteprot |= __arm_short_pte_port(prot, largepage);
+> +
+> +       pte = arm_short_get_pte_in_pgd(*pgd, iova);
+> +
+> +       pr_debug("iova:0x%x,pte:0x%p(0x%x),prot:0x%x-%s\n",
+> +                iova, pte, ARM_SHORT_PTE_IDX(iova), pteprot,
+> +                largepage ? "large page" : "small page");
+> +
+> +       for (i = 0; i < ptenum; i++) {
+> +               if (pte[i]) {
+> +                       pr_err("The To-Map pte exists!(iova=0x%x pte=0x%x i=%d)\n",
+> +                              iova, pte[i], i);
+> +                       goto err_out;
+> +               }
+> +               pte[i] = pteprot;
+> +       }
+
+I don't think you need this loop; you should only be given a page size,
+like with unmap.
+
+> +
+> +       data->iop.cfg.tlb->flush_pgtable(pte, ptenum * sizeof(arm_short_iopte),
+> +                                        cookie);
+> +       return 0;
+> +
+> + err_out:
+> +       for (i--; i >= 0; i--)
+> +               pte[i] = 0;
+> +       if (ptenew)
+> +               kmem_cache_free(data->ptekmem, pte_new_va);
+> +       return -EEXIST;
+> +}
+> +
+> +static int _arm_short_map_section(struct arm_short_io_pgtable *data,
+> +                                 unsigned int iova, phys_addr_t pa,
+> +                                 int prot, bool supersection)
+> +{
+> +       arm_short_iopte pgprot;
+> +       arm_short_iopte mask = supersection ?
+> +                               ARM_SHORT_F_PGD_PA_SUPERSECTION_MSK :
+> +                               ARM_SHORT_F_PGD_PA_SECTION_MSK;
+> +       arm_short_iopte *pgd = data->pgd;
+> +       int i;
+> +       unsigned int pgdnum = supersection ? 16 : 1;
+> +
+> +       if ((iova | pa) & (~mask)) {
+> +               pr_err("IOVA|PA Not Aligned(iova=0x%x pa=0x%pa type=%s)\n",
+> +                      iova, &pa, supersection ? "supersection" : "section");
+> +               return -EINVAL;
+> +       }
+> +
+> +       pgprot = (arm_short_iopte)pa;
+> +
+> +       if (data->iop.cfg.quirks & IO_PGTABLE_QUIRK_ARM_NS)
+> +               pgprot |= ARM_SHORT_F_PGD_NS_BIT_SECTION;
+> +
+> +       pgprot |= __arm_short_pgd_port(prot, supersection);
+> +
+> +       pgd += ARM_SHORT_PGD_IDX(iova);
+> +
+> +       pr_debug("iova:0x%x,pgd:0x%p(0x%p+0x%x),value:0x%x-%s\n",
+> +                iova, pgd, data->pgd, ARM_SHORT_PGD_IDX(iova),
+> +                pgprot, supersection ? "supersection" : "section");
+> +
+> +       for (i = 0; i < pgdnum; i++) {
+> +               if (unlikely(*pgd)) {
+> +                       pr_err("The To-Map pdg exists!(iova=0x%x pgd=0x%x i=%d)\n",
+> +                              iova, pgd[i], i);
+> +                       goto err_out;
+> +               }
+> +               pgd[i] = pgprot;
+> +       }
+
+Similar comments here.
+
+> +       data->iop.cfg.tlb->flush_pgtable(pgd,
+> +                                        pgdnum * sizeof(arm_short_iopte),
+> +                                        data->iop.cookie);
+> +       return 0;
+> +
+> + err_out:
+> +       for (i--; i >= 0; i--)
+> +               pgd[i] = 0;
+> +       return -EEXIST;
+> +}
+> +
+> +static int arm_short_map(struct io_pgtable_ops *ops, unsigned long iova,
+> +                        phys_addr_t paddr, size_t size, int prot)
+> +{
+> +       struct arm_short_io_pgtable *data = io_pgtable_short_ops_to_data(ops);
+> +       const struct iommu_gather_ops *tlb = data->iop.cfg.tlb;
+> +       int ret;
+> +
+> +       if (!(prot & (IOMMU_READ | IOMMU_WRITE)))
+> +               return -EINVAL;
+
+Why? You could have (another) quirk to select the access model and you
+should be able to implement read+write, read-only no-exec and no-access.
+
+> +       if (size == SZ_4K) {/* most case */
+> +               ret = _arm_short_map_page(data, iova, paddr, prot, false);
+> +       } else if (size == SZ_64K) {
+> +               ret = _arm_short_map_page(data, iova, paddr, prot, true);
+> +       } else if (size == SZ_1M) {
+> +               ret = _arm_short_map_section(data, iova, paddr, prot, false);
+> +       } else if (size == SZ_16M) {
+> +               ret = _arm_short_map_section(data, iova, paddr, prot, true);
+> +       } else {
+> +               ret = -EINVAL;
+> +       }
+
+Use a switch statement here?
+
+> +       tlb->tlb_add_flush(iova, size, true, data->iop.cookie);
+> +       return ret;
+> +}
+> +
+> +static struct io_pgtable *
+> +arm_short_alloc_pgtable(struct io_pgtable_cfg *cfg, void *cookie)
+> +{
+> +       struct arm_short_io_pgtable *data;
+> +
+> +       if (cfg->ias != 32)
+> +               return NULL;
+
+I think you just need to check '>'; VAs smaller than 32-bit can still
+be translated.
+
+> +       if (cfg->oas > ARM_SHORT_MAX_ADDR_BITS)
+> +               return NULL;
+
+What benefit does ARM_SHORT_MAX_ADDR_BITS offer? Why not just '32'?
+
+> +
+> +       cfg->pgsize_bitmap &= SZ_4K | SZ_64K | SZ_1M | SZ_16M;
+
+We can't support supersections unconditionally. Please add a quirk for
+this, as it relies on IOMMU support.
+
+> +       data = kzalloc(sizeof(*data), GFP_KERNEL);
+> +       if (!data)
+> +               return NULL;
+> +
+> +       data->pgd_size = SZ_16K;
+> +
+> +       data->pgd = alloc_pages_exact(data->pgd_size, GFP_KERNEL | __GFP_ZERO);
+> +       if (!data->pgd)
+> +               goto out_free_data;
+> +
+> +       cfg->tlb->flush_pgtable(data->pgd, data->pgd_size, cookie);
+
+We may as well postpone this flush to the end of the function, given that
+we can still fail at this point.
+
+> +       /* kmem for pte */
+> +       data->ptekmem = kmem_cache_create("short-descriptor-pte",
+
+A better name would be "io-pgtable-arm-short", however, why can't you
+just use GFP_ATOMIC in your pte allocations and do away with the cache
+altogether? Also, what happens if you try to allocate multiple caches
+with the same name?
+
+> +                                          ARM_SHORT_BYTES_PER_PTE,
+> +                                          ARM_SHORT_BYTES_PER_PTE,
+> +                                          0, NULL);
+> +
+> +       if (IS_ERR_OR_NULL(data->ptekmem)) {
+
+I think you just need a NULL check here.
+
+> +               pr_err("Failed to Create cached mem for PTE %ld\n",
+> +                      PTR_ERR(data->ptekmem));
+
+I don't think this error is particularly useful.
+
+> +               goto out_free_pte;
+> +       }
+> +
+> +       /* TTBRs */
+> +       cfg->arm_short_cfg.ttbr[0] = virt_to_phys(data->pgd);
+> +       cfg->arm_short_cfg.ttbr[1] = 0;
+> +
+> +       cfg->arm_short_cfg.tcr = 0;
+> +
+> +       data->iop.ops = (struct io_pgtable_ops) {
+> +               .map            = arm_short_map,
+> +               .unmap          = arm_short_unmap,
+> +               .iova_to_phys   = arm_short_iova_to_phys,
+> +       };
+> +
+> +       return &data->iop;
+> +
+> +out_free_pte:
+> +       free_pages_exact(data->pgd, data->pgd_size);
+> +out_free_data:
+> +       kfree(data);
+> +       return NULL;
+> +}
+> +
+> +static void arm_short_free_pgtable(struct io_pgtable *iop)
+> +{
+> +       struct arm_short_io_pgtable *data = io_pgtable_short_to_data(iop);
+> +
+> +       kmem_cache_destroy(data->ptekmem);
+> +       free_pages_exact(data->pgd, data->pgd_size);
+> +       kfree(data);
+> +}
+> +
+> +struct io_pgtable_init_fns io_pgtable_arm_short_init_fns = {
+> +       .alloc  = arm_short_alloc_pgtable,
+> +       .free   = arm_short_free_pgtable,
+> +};
+> +
+> diff --git a/drivers/iommu/io-pgtable.c b/drivers/iommu/io-pgtable.c
+> index 6436fe2..14a9b3a 100644
+> --- a/drivers/iommu/io-pgtable.c
+> +++ b/drivers/iommu/io-pgtable.c
+> @@ -28,6 +28,7 @@ extern struct io_pgtable_init_fns io_pgtable_arm_32_lpae_s1_init_fns;
+>  extern struct io_pgtable_init_fns io_pgtable_arm_32_lpae_s2_init_fns;
+>  extern struct io_pgtable_init_fns io_pgtable_arm_64_lpae_s1_init_fns;
+>  extern struct io_pgtable_init_fns io_pgtable_arm_64_lpae_s2_init_fns;
+> +extern struct io_pgtable_init_fns io_pgtable_arm_short_init_fns;
+>
+>  static const struct io_pgtable_init_fns *
+>  io_pgtable_init_table[IO_PGTABLE_NUM_FMTS] =
+> @@ -38,6 +39,9 @@ io_pgtable_init_table[IO_PGTABLE_NUM_FMTS] =
+>         [ARM_64_LPAE_S1] = &io_pgtable_arm_64_lpae_s1_init_fns,
+>         [ARM_64_LPAE_S2] = &io_pgtable_arm_64_lpae_s2_init_fns,
+>  #endif
+> +#ifdef CONFIG_IOMMU_IO_PGTABLE_SHORT
+> +       [ARM_SHORT_DESC] = &io_pgtable_arm_short_init_fns,
+> +#endif
+>  };
+>
+>  struct io_pgtable_ops *alloc_io_pgtable_ops(enum io_pgtable_fmt fmt,
+> diff --git a/drivers/iommu/io-pgtable.h b/drivers/iommu/io-pgtable.h
+> index 10e32f6..47efaab 100644
+> --- a/drivers/iommu/io-pgtable.h
+> +++ b/drivers/iommu/io-pgtable.h
+> @@ -9,6 +9,7 @@ enum io_pgtable_fmt {
+>         ARM_32_LPAE_S2,
+>         ARM_64_LPAE_S1,
+>         ARM_64_LPAE_S2,
+> +       ARM_SHORT_DESC,
+>         IO_PGTABLE_NUM_FMTS,
+>  };
+>
+> @@ -62,6 +63,11 @@ struct io_pgtable_cfg {
+>                         u64     vttbr;
+>                         u64     vtcr;
+>                 } arm_lpae_s2_cfg;
+> +
+> +               struct {
+> +                       u64     ttbr[2];
+> +                       u64     tcr;
+> +               } arm_short_cfg;
+
+I appreciate that you're not using TEX remapping, but could we include
+the NMRR and PRRR registers here (we can just zero them) too, please?
+That makes it easier to support a TEX_REMAP quick later on and also sets
+them to a known value.
+
+Also, any chance of some self-tests?
+
+Will
