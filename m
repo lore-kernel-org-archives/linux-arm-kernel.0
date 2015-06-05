@@ -1,60 +1,47 @@
-From: wxt@rock-chips.com (Caesar Wang)
-Date: Fri,  5 Jun 2015 12:47:57 +0800
-Subject: [PATCH 3/3] ARM: rockchip: fix the SMP code style
-In-Reply-To: <1433479677-18086-1-git-send-email-wxt@rock-chips.com>
-References: <1433479677-18086-1-git-send-email-wxt@rock-chips.com>
-Message-ID: <1433479677-18086-4-git-send-email-wxt@rock-chips.com>
+From: yh.huang@mediatek.com (YH Huang)
+Date: Fri, 5 Jun 2015 14:15:29 +0800
+Subject: [PATCH v2 0/2] Add MediaTek display PWM driver
+In-Reply-To: <1432520091.23308.5.camel@mtksdaap41>
+References: <1432214964-40644-1-git-send-email-yh.huang@mediatek.com>
+ <1432520091.23308.5.camel@mtksdaap41>
+Message-ID: <1433484929.17376.17.camel@mtksdaap41>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use the below scripts to check:
-scripts/checkpatch.pl -f arch/arm/mach-rockchip/platsmp.c
+On Mon, 2015-05-25 at 10:14 +0800, Yingjoe Chen wrote:
+> On Thu, 2015-05-21 at 21:29 +0800, YH Huang wrote:
 
-Signed-off-by: Caesar Wang <wxt@rock-chips.com>
----
+This patch series add the use of display PWM driver and documentation 
+for Mediatek SoCs. The driver is used to support the backlight of 
+the panel. This is based on v4.1-rc1. 
 
- arch/arm/mach-rockchip/platsmp.c | 8 ++++----
- 1 file changed, 4 insertions(+), 4 deletions(-)
+> > YH Huang (2):
+> >   dt-bindings: pwm: add MediaTek display PWM bindings
+> >   pwm: add MediaTek display PWM driver support
+> > 
+> >  .../devicetree/bindings/pwm/pwm-mtk-disp.txt       |  25 +++
+> >  drivers/pwm/Kconfig                                |  10 +
+> >  drivers/pwm/Makefile                               |   1 +
+> >  drivers/pwm/pwm-mtk-disp.c                         | 228 +++++++++++++++++++++
+> >  4 files changed, 264 insertions(+)
+> >  create mode 100644 Documentation/devicetree/bindings/pwm/pwm-mtk-disp.txt
+> >  create mode 100644 drivers/pwm/pwm-mtk-disp.c
+> 
+> Hi YH,
+> 
+> It would be easier for reviewer if you have a summary here on what you
+> have changed compare to last version.
+> Also, please add patch series summary even for v2, it remind reviewer
+> what this series is about.
+> 
+> Joe.C
+> 
 
-diff --git a/arch/arm/mach-rockchip/platsmp.c b/arch/arm/mach-rockchip/platsmp.c
-index 978c357..7eea805 100644
---- a/arch/arm/mach-rockchip/platsmp.c
-+++ b/arch/arm/mach-rockchip/platsmp.c
-@@ -104,7 +104,7 @@ static int pmu_set_power_domain(int pd, bool on)
- 		ret = pmu_power_domain_is_on(pd);
- 		if (ret < 0) {
- 			pr_err("%s: could not read power domain state\n",
--				 __func__);
-+			       __func__);
- 			return ret;
- 		}
- 	}
-@@ -128,7 +128,7 @@ static int __cpuinit rockchip_boot_secondary(unsigned int cpu,
- 
- 	if (cpu >= ncores) {
- 		pr_err("%s: cpu %d outside maximum number of cpus %d\n",
--							__func__, cpu, ncores);
-+		       __func__, cpu, ncores);
- 		return -ENXIO;
- 	}
- 
-@@ -147,7 +147,7 @@ static int __cpuinit rockchip_boot_secondary(unsigned int cpu,
- 		 * */
- 		udelay(10);
- 		writel(virt_to_phys(rockchip_secondary_startup),
--			sram_base_addr + 8);
-+		       sram_base_addr + 8);
- 		writel(0xDEADBEAF, sram_base_addr + 4);
- 		dsb_sev();
- 	}
-@@ -326,7 +326,7 @@ static int rockchip_cpu_kill(unsigned int cpu)
- static void rockchip_cpu_die(unsigned int cpu)
- {
- 	v7_exit_coherency_flush(louis);
--	while(1)
-+	while (1)
- 		cpu_do_idle();
- }
- #endif
--- 
-1.9.1
+The patch v2 is refined with everybody's suggestions.
+It is much readable and consistent.
+
+If anyone has any suggestions, please just let me know.
+Thank you.
+
+Regards,
+YH Huang
