@@ -1,78 +1,73 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Fri, 5 Jun 2015 11:35:38 +0100
-Subject: [PATCHv3 11/12] ARM: migrate to common PSCI client code
-In-Reply-To: <20150605100458.GD599@leverpostej>
-References: <1432648350-5454-1-git-send-email-mark.rutland@arm.com>
- <1432648350-5454-12-git-send-email-mark.rutland@arm.com>
- <20150603151625.GA599@leverpostej>
- <20150604094529.GB8346@e104818-lin.cambridge.arm.com>
- <20150605100458.GD599@leverpostej>
-Message-ID: <20150605103537.GB15197@e104818-lin.cambridge.arm.com>
+From: yh.huang@mediatek.com (YH Huang)
+Date: Fri, 5 Jun 2015 18:45:34 +0800
+Subject: [PATCH v2 0/2] Add MediaTek display PWM driver
+In-Reply-To: <CABuKBeLaVXxqBgy7AMoZ73+GoUknC6Zq=fJdcyZZjP5VYRZSkg@mail.gmail.com>
+References: <1432214964-40644-1-git-send-email-yh.huang@mediatek.com>
+ <1432520091.23308.5.camel@mtksdaap41>
+ <1433484929.17376.17.camel@mtksdaap41>
+ <CABuKBeLaVXxqBgy7AMoZ73+GoUknC6Zq=fJdcyZZjP5VYRZSkg@mail.gmail.com>
+Message-ID: <1433501134.17376.23.camel@mtksdaap41>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 05, 2015 at 11:04:58AM +0100, Mark Rutland wrote:
-> On Thu, Jun 04, 2015 at 10:45:30AM +0100, Catalin Marinas wrote:
-> > On Wed, Jun 03, 2015 at 04:16:39PM +0100, Mark Rutland wrote:
-> > > On Tue, May 26, 2015 at 02:52:29PM +0100, Mark Rutland wrote:
-> > > > Now that the common PSCI client code has been factored out to
-> > > > drivers/firmware, and made safe for 32-bit use, move the 32-bit ARM code
-> > > > over to it. This results in a moderate reduction of duplicated lines,
-> > > > and will prevent further duplication as the PSCI client code is updated
-> > > > for PSCI 1.0 and beyond.
-> > > > 
-> > > > The two legacy platform users of the PSCI invocation code are updated to
-> > > > account for interface changes. In both cases the power state parameter
-> > > > is changed to an opaque u32 token in preparation for PSCI 1.0 power
-> > > > state changes.
-> > > > 
-> > > > Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-> > > > Acked-by: Catalin Marinas <catalin.marinas@arm.com>
-> > > > Cc: Ashwin Chaugule <ashwin.chaugule@linaro.org>
-> > > > Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-> > > > Cc: Rob Herring <robh@kernel.org>
-> > > > Cc: Russell King <rmk+kernel@arm.linux.org.uk>
-> > > > Cc: Will Deacon <will.deacon@arm.com>
-> > > > ---
-> > > >  arch/arm/Kconfig                  |   1 +
-> > > >  arch/arm/include/asm/psci.h       |  23 ---
-> > > >  arch/arm/kernel/Makefile          |   2 +-
-> > > >  arch/arm/kernel/psci.c            | 299 --------------------------------------
-> > > >  arch/arm/kernel/psci_smp.c        |  29 +++-
-> > > >  arch/arm/kernel/setup.c           |   3 +-
-> > > >  arch/arm/mach-highbank/highbank.c |   2 +-
-> > > >  arch/arm/mach-highbank/pm.c       |   8 +-
-> > > >  drivers/cpuidle/cpuidle-calxeda.c |   7 +-
-> > > >  9 files changed, 32 insertions(+), 342 deletions(-)
-> > > >  delete mode 100644 arch/arm/kernel/psci.c
-> > > 
-> > > Do you have any objections to the arch/arm changes in this patch?
-> > > 
-> > > If not, could I please have your ack?
-> > > 
-> > > As there are arm, arm64, and drivers changes in the series I was hoping
-> > > this could all go via arm-soc.
-> > 
-> > If we don't hear from Russell by the end of today, I propose that we
-> > merge patches 1-8 in the arm64 tree (mostly fixes for PSCI). This series
-> > is blocking other developments like PSCI 1.0, so I really want to get
-> > parts of it merged in 4.2.
+On Fri, 2015-06-05 at 10:39 +0200, Matthias Brugger wrote:
+> Hi YH,
 > 
-> I've pushed the first 8 patches to my arm64/psci-rework branch [1].
-...
-> [1] git://git.kernel.org/pub/scm/linux/kernel/git/mark/linux.git arm64/psci-rework
+> 2015-06-05 8:15 GMT+02:00 YH Huang <yh.huang@mediatek.com>:
+> > On Mon, 2015-05-25 at 10:14 +0800, Yingjoe Chen wrote:
+> >> On Thu, 2015-05-21 at 21:29 +0800, YH Huang wrote:
+> >
+> > This patch series add the use of display PWM driver and documentation
+> > for Mediatek SoCs. The driver is used to support the backlight of
+> > the panel. This is based on v4.1-rc1.
 
-Thanks. I pulled this into the arm64 for-next/core branch.
+Change in v2:
+1. Rewrite descriptions for driver in kconfig to make it much clear.
+2. Rename the driver from "pwm-mediatek-disp" to "pwm-mtk-disp".
+3. Disable clocks in the error path.
+4. Change the shift values in decimal instead of hex.
+5. Rename and add some variables or function name for consistency and
+readability.
+6. Drop unnecessary parentheses, spaces, variables and add newlines to
+make the code easiler to read.
 
-> I've pushed the whole series with the tags provided today to
-> psci/rework [2].
-...
-> [2] git://git.kernel.org/pub/scm/linux/kernel/git/mark/linux.git psci/rework
+> >
+> >> > YH Huang (2):
+> >> >   dt-bindings: pwm: add MediaTek display PWM bindings
+> >> >   pwm: add MediaTek display PWM driver support
+> >> >
+> >> >  .../devicetree/bindings/pwm/pwm-mtk-disp.txt       |  25 +++
+> >> >  drivers/pwm/Kconfig                                |  10 +
+> >> >  drivers/pwm/Makefile                               |   1 +
+> >> >  drivers/pwm/pwm-mtk-disp.c                         | 228 +++++++++++++++++++++
+> >> >  4 files changed, 264 insertions(+)
+> >> >  create mode 100644 Documentation/devicetree/bindings/pwm/pwm-mtk-disp.txt
+> >> >  create mode 100644 drivers/pwm/pwm-mtk-disp.c
+> >>
+> >> Hi YH,
+> >>
+> >> It would be easier for reviewer if you have a summary here on what you
+> >> have changed compare to last version.
+> >> Also, please add patch series summary even for v2, it remind reviewer
+> >> what this series is about.
+> >>
+> >> Joe.C
+> >>
+> >
+> > The patch v2 is refined with everybody's suggestions.
+> > It is much readable and consistent.
+> 
+> I suppose that Yingjoe wanted to emphasis that for the reviewer it is
+> much easier if you describe the changes you made from v1 to v2.
+> You can find an example (random pick from the mailing list) here:
+> http://lists.infradead.org/pipermail/linux-mediatek/2015-May/000572.html
+> 
+> Thanks,
+> Matthias
+> 
 
-As long as you don't rebase arm64/psci-rework, you can send this branch
-to arm-soc once Russell acks the arm part.
+I have added the change lists.
+Thank you.
 
-Thanks.
-
--- 
-Catalin
+Regards,
+YH Huang
