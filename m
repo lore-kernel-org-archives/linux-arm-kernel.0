@@ -1,32 +1,49 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Fri,  5 Jun 2015 19:42:43 +0100
-Subject: [PATCH 0/8] regulator: pwm-regulator: Introduce continuous-mode
-Message-ID: <1433529771-24496-1-git-send-email-lee.jones@linaro.org>
+Date: Fri,  5 Jun 2015 19:42:46 +0100
+Subject: [PATCH 3/8] regulator: pwm-regulator: Remove superfluous is_enabled
+ check
+In-Reply-To: <1433529771-24496-1-git-send-email-lee.jones@linaro.org>
+References: <1433529771-24496-1-git-send-email-lee.jones@linaro.org>
+Message-ID: <1433529771-24496-4-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Continuous mode uses the PWM regulator's maximum and minimum supplied
-voltages specified in the regulator-{min,max}-microvolt properties to
-calculate appropriate duty-cycle values.  This allows for a much more
-fine grained solution when compared with voltage-table mode, which
-this driver already supports.  This solution does make an assumption
-that a %50 duty-cycle value will cause the regulator voltage to run
-at half way between the supplied max_uV and min_uV values.
+The core framework already takes care of this.
 
-Lee Jones (8):
-  ARM: STi: STiH407: Add PWM Regulator node
-  regulator: pwm-regulator: Remove unnecessary descriptor attribute from ddata
-  regulator: pwm-regulator: Remove superfluous is_enabled check
-  regulator: pwm-regulator: Diffientiate between dev (device) and rdev (regulator_dev)
-  regulator: pwm-regulator: Don't assign structure attributes right away
-  regulator: pwm-regulator: Separate voltage-table initialisation
-  regulator: pwm-regulator: Add support for continuous-voltage
-  regulator: pwm-regulator: Re-write bindings
+Signed-off-by: Lee Jones <lee.jones@linaro.org>
+---
+ drivers/regulator/pwm-regulator.c | 12 ++++--------
+ 1 file changed, 4 insertions(+), 8 deletions(-)
 
- .../bindings/regulator/pwm-regulator.txt           |  66 ++++--
- arch/arm/boot/dts/stih407-family.dtsi              |  11 +
- drivers/regulator/pwm-regulator.c                  | 222 +++++++++++++++------
- 3 files changed, 229 insertions(+), 70 deletions(-)
-
+diff --git a/drivers/regulator/pwm-regulator.c b/drivers/regulator/pwm-regulator.c
+index 4a071b6..36f9684 100644
+--- a/drivers/regulator/pwm-regulator.c
++++ b/drivers/regulator/pwm-regulator.c
+@@ -23,7 +23,6 @@
+ struct pwm_regulator_data {
+ 	struct pwm_voltages *duty_cycle_table;
+ 	struct pwm_device *pwm;
+-	bool enabled;
+ 	int state;
+ };
+ 
+@@ -60,13 +59,10 @@ static int pwm_regulator_set_voltage_sel(struct regulator_dev *dev,
+ 
+ 	drvdata->state = selector;
+ 
+-	if (!drvdata->enabled) {
+-		ret = pwm_enable(drvdata->pwm);
+-		if (ret) {
+-			dev_err(&dev->dev, "Failed to enable PWM\n");
+-			return ret;
+-		}
+-		drvdata->enabled = true;
++	ret = pwm_enable(drvdata->pwm);
++	if (ret) {
++		dev_err(&dev->dev, "Failed to enable PWM\n");
++		return ret;
+ 	}
+ 
+ 	return 0;
 -- 
 1.9.1
