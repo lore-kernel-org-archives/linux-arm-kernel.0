@@ -1,64 +1,137 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Fri,  5 Jun 2015 19:42:48 +0100
-Subject: [PATCH 5/8] regulator: pwm-regulator: Don't assign structure
- attributes right away
+Date: Fri,  5 Jun 2015 19:42:49 +0100
+Subject: [PATCH 6/8] regulator: pwm-regulator: Separate voltage-table
+ initialisation
 In-Reply-To: <1433529771-24496-1-git-send-email-lee.jones@linaro.org>
 References: <1433529771-24496-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1433529771-24496-6-git-send-email-lee.jones@linaro.org>
+Message-ID: <1433529771-24496-7-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Perhaps this is just personal preference, but ...
-
-This patch introduces a new local variable to receive and test regulator
-initialisation data.  It simplifies and cleans up the code making it
-that little bit easier to read and maintain.  The local value is assigned
-to the structure attribute when all the others are.  This is the way we
-usually do things.
-
-Prevents this kind of nonsense:
-
-	this->is->just.silly = fetch_silly_value(&pointer);
-	if (!this->is->just.silly) {
-		printk("Silly value failed: %d\n", this->is->just.silly);
-		return this->is->just.silly;
-	}
+Take this out of the main .probe() routine in order to facilitate the
+introduction of different ways to obtain 'duty cycle' information.
 
 Signed-off-by: Lee Jones <lee.jones@linaro.org>
 ---
- drivers/regulator/pwm-regulator.c | 8 +++++---
- 1 file changed, 5 insertions(+), 3 deletions(-)
+ drivers/regulator/pwm-regulator.c | 77 +++++++++++++++++++++++----------------
+ 1 file changed, 45 insertions(+), 32 deletions(-)
 
 diff --git a/drivers/regulator/pwm-regulator.c b/drivers/regulator/pwm-regulator.c
-index ae32086..779ecf9 100644
+index 779ecf9..5a18437 100644
 --- a/drivers/regulator/pwm-regulator.c
 +++ b/drivers/regulator/pwm-regulator.c
-@@ -96,6 +96,7 @@ static struct regulator_desc pwm_regulator_desc = {
+@@ -78,8 +78,7 @@ static int pwm_regulator_list_voltage(struct regulator_dev *rdev,
  
+ 	return drvdata->duty_cycle_table[selector].uV;
+ }
+-
+-static struct regulator_ops pwm_regulator_voltage_ops = {
++static struct regulator_ops pwm_regulator_voltage_table_ops = {
+ 	.set_voltage_sel = pwm_regulator_set_voltage_sel,
+ 	.get_voltage_sel = pwm_regulator_get_voltage_sel,
+ 	.list_voltage    = pwm_regulator_list_voltage,
+@@ -88,21 +87,56 @@ static struct regulator_ops pwm_regulator_voltage_ops = {
+ 
+ static struct regulator_desc pwm_regulator_desc = {
+ 	.name		= "pwm-regulator",
+-	.ops		= &pwm_regulator_voltage_ops,
+ 	.type		= REGULATOR_VOLTAGE,
+ 	.owner		= THIS_MODULE,
+ 	.supply_name    = "pwm",
+ };
+ 
++static int pwm_regulator_init_table(struct platform_device *pdev,
++				    struct pwm_regulator_data *drvdata)
++{
++	struct device_node *np = pdev->dev.of_node;
++	struct pwm_voltages *duty_cycle_table;
++	int length;
++	int ret;
++
++	of_find_property(np, "voltage-table", &length);
++
++	if ((length < sizeof(*duty_cycle_table)) ||
++	    (length % sizeof(*duty_cycle_table))) {
++		dev_err(&pdev->dev,
++			"voltage-table length(%d) is invalid\n",
++			length);
++		return -EINVAL;
++	}
++
++	duty_cycle_table = devm_kzalloc(&pdev->dev, length, GFP_KERNEL);
++	if (!duty_cycle_table)
++		return -ENOMEM;
++
++	ret = of_property_read_u32_array(np, "voltage-table",
++					 (u32 *)duty_cycle_table,
++					 length / sizeof(u32));
++	if (ret) {
++		dev_err(&pdev->dev, "Failed to read voltage-table\n");
++		return ret;
++	}
++
++	drvdata->duty_cycle_table	= duty_cycle_table;
++	pwm_regulator_desc.ops		= &pwm_regulator_voltage_table_ops;
++	pwm_regulator_desc.n_voltages	= length / sizeof(*duty_cycle_table);
++
++	return 0;
++}
++
  static int pwm_regulator_probe(struct platform_device *pdev)
  {
-+	const struct regulator_init_data *init_data;
+ 	const struct regulator_init_data *init_data;
  	struct pwm_regulator_data *drvdata;
- 	struct property *prop;
+-	struct property *prop;
  	struct regulator_dev *regulator;
-@@ -142,14 +143,15 @@ static int pwm_regulator_probe(struct platform_device *pdev)
- 		return ret;
- 	}
+ 	struct regulator_config config = { };
+ 	struct device_node *np = pdev->dev.of_node;
+-	int length, ret;
++	int ret;
  
--	config.init_data = of_get_regulator_init_data(&pdev->dev, np,
--						      &pwm_regulator_desc);
--	if (!config.init_data)
-+	init_data = of_get_regulator_init_data(&pdev->dev, np,
-+					       &pwm_regulator_desc);
-+	if (init_data)
+ 	if (!np) {
+ 		dev_err(&pdev->dev, "Device Tree node missing\n");
+@@ -113,36 +147,15 @@ static int pwm_regulator_probe(struct platform_device *pdev)
+ 	if (!drvdata)
  		return -ENOMEM;
  
- 	config.of_node = np;
- 	config.dev = &pdev->dev;
- 	config.driver_data = drvdata;
-+	config.init_data = init_data;
+-	/* determine the number of voltage-table */
+-	prop = of_find_property(np, "voltage-table", &length);
+-	if (!prop) {
+-		dev_err(&pdev->dev, "No voltage-table\n");
+-		return -EINVAL;
+-	}
+-
+-	if ((length < sizeof(*drvdata->duty_cycle_table)) ||
+-	    (length % sizeof(*drvdata->duty_cycle_table))) {
+-		dev_err(&pdev->dev, "voltage-table length(%d) is invalid\n",
+-			length);
++	if (of_find_property(np, "voltage-table", NULL)) {
++		ret = pwm_regulator_init_table(pdev, drvdata);
++		if (ret)
++			return ret;
++	} else {
++		dev_err(&pdev->dev, "No \"voltage-table\" supplied\n");
+ 		return -EINVAL;
+ 	}
  
- 	drvdata->pwm = devm_pwm_get(&pdev->dev, NULL);
- 	if (IS_ERR(drvdata->pwm)) {
+-	pwm_regulator_desc.n_voltages = length / sizeof(*drvdata->duty_cycle_table);
+-
+-	drvdata->duty_cycle_table = devm_kzalloc(&pdev->dev,
+-						 length, GFP_KERNEL);
+-	if (!drvdata->duty_cycle_table)
+-		return -ENOMEM;
+-
+-	/* read voltage table from DT property */
+-	ret = of_property_read_u32_array(np, "voltage-table",
+-					 (u32 *)drvdata->duty_cycle_table,
+-					 length / sizeof(u32));
+-	if (ret < 0) {
+-		dev_err(&pdev->dev, "read voltage-table failed\n");
+-		return ret;
+-	}
+-
+ 	init_data = of_get_regulator_init_data(&pdev->dev, np,
+ 					       &pwm_regulator_desc);
+ 	if (init_data)
 -- 
 1.9.1
