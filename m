@@ -1,38 +1,61 @@
-From: dinguyen@opensource.altera.com (Dinh Nguyen)
-Date: Fri, 5 Jun 2015 08:57:07 -0500
-Subject: [PATCHv2 2/4] edac, altera: Refactor EDAC for Altera CycloneV SoC.
-In-Reply-To: <20150605091731.GA3679@pd.tnic>
-References: <1433428128-7292-1-git-send-email-tthayer@opensource.altera.com>
- <1433428128-7292-3-git-send-email-tthayer@opensource.altera.com>
- <55706E25.8050105@opensource.altera.com>
- <5570C479.7010902@opensource.altera.com> <20150604220609.GK3795@pd.tnic>
- <5570D0D0.9030803@opensource.altera.com> <20150605091731.GA3679@pd.tnic>
-Message-ID: <5571AAB3.2000005@opensource.altera.com>
+From: Dave.Martin@arm.com (Dave Martin)
+Date: Fri,  5 Jun 2015 15:07:47 +0100
+Subject: [PATCH] serial/amba-pl011: Disable interrupts around TX softirq
+Message-ID: <1433513267-24163-1-git-send-email-Dave.Martin@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Boris,
+pl011_tx_softirq() currently uses spin_{,un}lock(), which are not
+sufficient to inhibit pl011_int() from being triggered by a local
+IRQ and trying to re-take the same lock.  This can lead to
+deadlocks.
 
-On 6/5/15 4:17 AM, Borislav Petkov wrote:
-> On Thu, Jun 04, 2015 at 05:27:28PM -0500, Dinh Nguyen wrote:
->> This is my mistake. I applied Alan Tull's patch for suspend-to-ram which
->> also touches drivers/edac/altera_edac.c.
->>
->> https://git.kernel.org/cgit/linux/kernel/git/dinguyen/linux.git/commit/?h=socfpga_for_next_arria10&id=d44a92eb044f4cc1abf34a790d647e9fa356d7b0
->>
->> I think I will have to ask Alan to split up his patch and send the part
->> that touches altera_edac.c to linux-edac.
-> 
-> Nah, that's fine. If it is that hunk adding altr_sdram_prepare(), he can
-> simply add my ACK for the EDAC bits:
-> 
-> Acked-by: Borislav Petkov <bp@suse.de>
-> 
+This patch uses the _irq() locking variants instead to ensure that
+pl011_int() handling for a given port is deferred until any
+pl011_tx_softirq() work for that port is complete.
 
-Thanks alot for doing that! But I have sent you a separate patch for
-this. It would have caused a merge conflict for v4.2 if I left the
-suspend-to-ram patch as is.
+Signed-off-by: Dave Martin <Dave.Martin@arm.com>
+---
 
-Thanks,
+Another candidate for v4.1 if possible (sorry!) -- I thought this change
+was already in, but it went astray when I was refactoring.
 
-Dinh
+This patch conflicts with tty-next like the previous patch, since it
+fixes code that is removed by tty-next.  The correct resolution for
+the resulting merge conflict is to keep the code from tty-next.
+
+
+I am not 100% certain yet whether some rare deadlocks that Robin is
+seeing are caused by this issue, or whether this patch fixes them --
+he's testing atm.
+
+The patch is straightforward and using non _irq() locking in a workitem
+that expects the lock to protect against interrupt handlers on the same
+CPU is clearly wrong.
+
+
+Cheers
+---Dave
+
+
+ drivers/tty/serial/amba-pl011.c |    4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/drivers/tty/serial/amba-pl011.c b/drivers/tty/serial/amba-pl011.c
+index 763eb20..0cc622a 100644
+--- a/drivers/tty/serial/amba-pl011.c
++++ b/drivers/tty/serial/amba-pl011.c
+@@ -1360,9 +1360,9 @@ static void pl011_tx_softirq(struct work_struct *work)
+ 	struct uart_amba_port *uap =
+ 		container_of(dwork, struct uart_amba_port, tx_softirq_work);
+ 
+-	spin_lock(&uap->port.lock);
++	spin_lock_irq(&uap->port.lock);
+ 	while (pl011_tx_chars(uap)) ;
+-	spin_unlock(&uap->port.lock);
++	spin_unlock_irq(&uap->port.lock);
+ }
+ 
+ static void pl011_tx_irq_seen(struct uart_amba_port *uap)
+-- 
+1.7.10.4
