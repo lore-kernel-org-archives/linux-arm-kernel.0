@@ -1,46 +1,55 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Fri, 05 Jun 2015 11:53:09 -0700
-Subject: [PATCH 1/2] arm64: perf: Don't use of_node after putting it
-In-Reply-To: <20150605144539.GC7420@arm.com>
-References: <1433364818-6682-1-git-send-email-sboyd@codeaurora.org>
- <20150605144539.GC7420@arm.com>
-Message-ID: <5571F015.9080109@codeaurora.org>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Fri,  5 Jun 2015 20:53:35 +0200
+Subject: [PATCH 1/7] phy-sun4i-usb: Swap check for disconnect threshold
+In-Reply-To: <1433530421-12197-1-git-send-email-hdegoede@redhat.com>
+References: <1433530421-12197-1-git-send-email-hdegoede@redhat.com>
+Message-ID: <1433530421-12197-2-git-send-email-hdegoede@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/05/2015 07:45 AM, Will Deacon wrote:
-> On Wed, Jun 03, 2015 at 09:53:37PM +0100, Stephen Boyd wrote:
->>   arch/arm64/kernel/perf_event.c | 3 ++-
->>   1 file changed, 2 insertions(+), 1 deletion(-)
->>
->> diff --git a/arch/arm64/kernel/perf_event.c b/arch/arm64/kernel/perf_event.c
->> index 702591f6180a..8af7784a8e35 100644
->> --- a/arch/arm64/kernel/perf_event.c
->> +++ b/arch/arm64/kernel/perf_event.c
->> @@ -1340,12 +1340,13 @@ static int armpmu_device_probe(struct platform_device *pdev)
->>   			if (arch_find_n_match_cpu_physical_id(dn, cpu, NULL))
->>   				break;
->>   
->> -		of_node_put(dn);
->>   		if (cpu >= nr_cpu_ids) {
->>   			pr_warn("Failed to find logical CPU for %s\n",
->>   				dn->name);
->> +			of_node_put(dn);
->>   			break;
->>   		}
->> +		of_node_put(dn);
->>   
->>   		irqs[i] = cpu;
->>   	}
-> Yeah, I agree this needs changing but given (a) the CPU node isn't going
-> to disappear and (b) this patch will conflict horribly with my queue for
-> 4.2, do you mind if I sit on this until after the merge window (as a fix
-> for 4.2)?
->
->
+Before this commit the code for determining the disconnect threshold was
+checking for "allwinner,sun4i-a10-usb-phy" or "allwinner,sun6i-a31-usb-phy"
+assuming that those where the exception and then newer SoCs would use a
+disconnect threshold of 2 like sun7i does. But it turns out that newer
+SoCs use a disconnect threshold of 3 and sun5i and sun7i are the
+exceptions, so check for those instead.
 
-Sure, no problem.
+Here are the settings from the various Allwinner SDK sources:
+ sun4i-a10: USBC_Phy_Write(usbc_no, 0x2a, 3, 2);
+ sun5i-a13: USBC_Phy_Write(usbc_no, 0x2a, 2, 2);
+ sun6i-a31: USBC_Phy_Write(usbc_no, 0x2a, 3, 2);
+ sun7i-a20: USBC_Phy_Write(usbc_no, 0x2a, 2, 2);
+ sun8i-a23: USBC_Phy_Write(usbc_no, 0x2a, 3, 2);
+ sun8i-h3:  USBC_Phy_Write(usbc_no, 0x2a, 3, 2);
+ sun9i-a80: USBC_Phy_Write(usbc_no, 0x2a, 3, 2);
 
+Note this commit makes no functional changes as currently we only support
+sun4i - sun7i.
+
+Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+---
+ drivers/phy/phy-sun4i-usb.c | 8 ++++----
+ 1 file changed, 4 insertions(+), 4 deletions(-)
+
+diff --git a/drivers/phy/phy-sun4i-usb.c b/drivers/phy/phy-sun4i-usb.c
+index b45d707..0df1c4f 100644
+--- a/drivers/phy/phy-sun4i-usb.c
++++ b/drivers/phy/phy-sun4i-usb.c
+@@ -437,11 +437,11 @@ static int sun4i_usb_phy_probe(struct platform_device *pdev)
+ 	else
+ 		data->num_phys = 3;
+ 
+-	if (of_device_is_compatible(np, "allwinner,sun4i-a10-usb-phy") ||
+-	    of_device_is_compatible(np, "allwinner,sun6i-a31-usb-phy"))
+-		data->disc_thresh = 3;
+-	else
++	if (of_device_is_compatible(np, "allwinner,sun5i-a13-usb-phy") ||
++	    of_device_is_compatible(np, "allwinner,sun7i-a20-usb-phy"))
+ 		data->disc_thresh = 2;
++	else
++		data->disc_thresh = 3;
+ 
+ 	if (of_device_is_compatible(np, "allwinner,sun6i-a31-usb-phy"))
+ 		dedicated_clocks = true;
 -- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+2.4.2
