@@ -1,87 +1,92 @@
-From: kgene@kernel.org (Kukjin Kim)
-Date: Sat, 06 Jun 2015 03:05:43 +0900
-Subject: [GIT PULL 5/5] Samsung mach updates for v4.2
-Message-ID: <5571E4F7.40706@kernel.org>
+From: robherring2@gmail.com (Rob Herring)
+Date: Fri, 5 Jun 2015 13:05:54 -0500
+Subject: [PATCH v2 0/4] VFIO platform reset
+In-Reply-To: <1433516792-16397-1-git-send-email-eric.auger@linaro.org>
+References: <1433516792-16397-1-git-send-email-eric.auger@linaro.org>
+Message-ID: <CAL_JsqK4dm_Kmoys6+qxJrwFpo0K3gatVQxZiNPoWCduQKqj8w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Fri, Jun 5, 2015 at 10:06 AM, Eric Auger <eric.auger@linaro.org> wrote:
+> In situations where the userspace driver is stopped abnormally and the
+> VFIO platform device is released, the assigned HW device currently is
+> left running. As a consequence the HW device might continue issuing IRQs
+> and performing DMA accesses.
+>
+> On release, no physical IRQ handler is setup anymore. Also the DMA buffers
+> are unmapped leading to IOMMU aborts. So there is no serious consequence.
+>
+> However when assigning that HW device again to another userspace driver,
+> this latter might face some unexpected IRQs and DMA accesses, which are
+> the result of the previous assignment.
 
-Here is Samsung mach updates for v4.2 and this is based on v4.1-rc4
-because of dependencies with previous Samsung fixes during -rc
+In general, shouldn't it just be a requirement that the drivers handle
+this condition. You have the same problem with firmware/bootloaders
+leaving h/w not in reset state or kexec'ing to a new kernel.
 
-Please pull and if any problems, please let me know.
+Rob
 
-Thanks,
-Kukjin
-
-
-The following changes since commit e26081808edadfd257c6c9d81014e3b25e9a6118:
-
-  Linux 4.1-rc4 (2015-05-18 10:13:47 -0700)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git
-tags/samsung-mach-1
-
-for you to fetch changes up to 2be2a3ff42a52e926cbd1cc1d376a161a9a73667:
-
-  ARM: EXYNOS: register power domain driver from core_initcall
-(2015-06-06 02:18:03 +0900)
-
-----------------------------------------------------------------
-Samsung updates for v4.2
-
-- add failure(exception) handling
-  : of_iomap(), of_find_device_by_node() and kstrdup()
-
-- add common poweroff to use PS_HOLD based for all of exynos SoCs
-- add exnos_get/set_boot_addr() helper
-- constify platform_device_id and irq_domain_ops
-- get current parent clock for power domain on/off
-- use core_initcall to register power domain driver
-- make exynos_core_restart() less verbose
-
-- add support coupled CPUidle for exynos3250
-
-- fix exynos_boot_secondary() return value on timeout
-- fix clk_enable() in s3c24xx adc
-- fix missing of_node_put() for power domains
-
-----------------------------------------------------------------
-Bartlomiej Zolnierkiewicz (5):
-      ARM: EXYNOS: fix exynos_boot_secondary() return value on timeout
-      ARM: EXYNOS: make exynos_core_restart() less verbose
-      ARM: EXYNOS: add exynos_set_boot_addr() helper
-      ARM: EXYNOS: add exynos_get_boot_addr() helper
-      ARM: EXYNOS: add coupled cpuidle support for Exynos3250
-
-Krzysztof Kozlowski (6):
-      ARM: EXYNOS: Handle of of_iomap() failure
-      ARM: EXYNOS: Handle of_find_device_by_node() and kstrdup() failures
-      ARM: EXYNOS: Add missing of_node_put() when parsing power domains
-      ARM: EXYNOS: Get current parent clock for power domain on/off
-      ARM: EXYNOS: Constify irq_domain_ops
-      ARM: SAMSUNG: Constify platform_device_id
-
-Marek Szyprowski (2):
-      ARM: EXYNOS: use PS_HOLD based poweroff for all supported SoCs
-      ARM: EXYNOS: register power domain driver from core_initcall
-
-Sergiy Kibrik (1):
-      ARM: SAMSUNG: fix clk_enable() WARNing in S3C24XX ADC
-
- .../bindings/arm/exynos/power_domain.txt           |  7 +-
- arch/arm/include/asm/firmware.h                    |  4 +
- arch/arm/mach-exynos/common.h                      |  4 +-
- arch/arm/mach-exynos/exynos.c                      |  3 +-
- arch/arm/mach-exynos/firmware.c                    | 18 +++++
- arch/arm/mach-exynos/platsmp.c                     | 86
-+++++++++++++++-------
- arch/arm/mach-exynos/pm.c                          | 51 +++++++++++--
- arch/arm/mach-exynos/pm_domains.c                  | 53 ++++++++-----
- arch/arm/mach-exynos/pmu.c                         |  6 +-
- arch/arm/mach-exynos/suspend.c                     |  2 +-
- arch/arm/plat-samsung/adc.c                        |  6 +-
- 11 files changed, 173 insertions(+), 67 deletions(-)
+> In virtualization use-case, a VM newly granted with that HW device may be
+> impacted by the assignment of that device to a previous VM:
+> - IRQs may be injected very early when booting the new guest, even before
+>   the guest driver has initialized leading to possible driver state
+>   inconsistency.
+> - DMA accesses may hit the newly mapped VM address space at addresses that
+>   may jeopardize the integrity of the newly installed VM.
+>
+> Obviously the criticity depends on the assigned HW device.
+>
+> As opposed to PCI, there is no standard mechanism to reset the platform
+> device.
+>
+> This series proposes to implement device specific reset functions in
+> separate vfio reset modules (in-kernel or external). The vfio-platform
+> driver holds a whitelist of implemented triplets (compat string, module
+> name, function name). When the vfio-platform driver is probed it identifies
+> the fellow reset module/function matching the compat string of the
+> device, if any, and forces the load of this reset module.
+>
+> A first reset module is provided: the vfio-platform-calxedaxgmac
+> module which implements a basic reset for the Calxeda xgmac.
+>
+> The series can be found at
+> https://git.linaro.org/people/eric.auger/linux.git/shortlog/refs/heads/v4.1-rc6-reset-v2
+>
+> History:
+> v1 -> v2:
+> - much simplified compared to v1 although principle of external modules is
+>   kept: removed mechanism of dynamic registration of reset functions
+> - list is replaced by whitelist lookup table
+> - name of the reset function also stored in the lookup table
+> - autoload of reset modules
+>
+> RFC -> PATCH v1:
+> - solution now based on a lookup list instead of specialized driver
+>
+>
+> Eric Auger (4):
+>   VFIO: platform: add reset struct and lookup table
+>   VFIO: platform: add reset callback
+>   VFIO: platform: populate the reset function on probe
+>   VFIO: platform: Calxeda xgmac reset module
+>
+>  drivers/vfio/platform/Kconfig                      |  2 +
+>  drivers/vfio/platform/Makefile                     |  2 +
+>  drivers/vfio/platform/reset/Kconfig                |  7 ++
+>  drivers/vfio/platform/reset/Makefile               |  5 ++
+>  .../platform/reset/vfio_platform_calxedaxgmac.c    | 98 ++++++++++++++++++++++
+>  drivers/vfio/platform/vfio_platform_common.c       | 75 ++++++++++++++++-
+>  drivers/vfio/platform/vfio_platform_private.h      | 14 ++++
+>  7 files changed, 200 insertions(+), 3 deletions(-)
+>  create mode 100644 drivers/vfio/platform/reset/Kconfig
+>  create mode 100644 drivers/vfio/platform/reset/Makefile
+>  create mode 100644 drivers/vfio/platform/reset/vfio_platform_calxedaxgmac.c
+>
+> --
+> 1.9.1
+>
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
