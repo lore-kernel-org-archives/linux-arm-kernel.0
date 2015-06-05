@@ -1,40 +1,22 @@
-From: hdegoede@redhat.com (Hans de Goede)
-Date: Fri,  5 Jun 2015 21:02:19 +0200
-Subject: [PATCH 16/20] ARM: dts: sun8i: Enable USB DRC on Ippo Q8H-A23 tablets
-In-Reply-To: <1433530943-12599-1-git-send-email-hdegoede@redhat.com>
-References: <1433530943-12599-1-git-send-email-hdegoede@redhat.com>
-Message-ID: <1433530943-12599-17-git-send-email-hdegoede@redhat.com>
+From: lee@kernel.org (Lee Jones)
+Date: Fri, 5 Jun 2015 20:21:35 +0100
+Subject: [PATCH v7 2/3] ARM: bcm2835: Add the Raspberry Pi firmware driver
+In-Reply-To: <55711428.4080506@wwwdotorg.org>
+References: <1433448707-18104-1-git-send-email-eric@anholt.net>
+ <1433448707-18104-2-git-send-email-eric@anholt.net>
+ <55711428.4080506@wwwdotorg.org>
+Message-ID: <20150605192135.GA3301@x1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enable the otg controller on Ippo Q8H tablets, for now it is enabled
-in host-only mode, because true OTG support requires support for
-detecting and enabling Vbus through the axp221 pmic.
+On Thu, 04 Jun 2015, Stephen Warren wrote:
 
-For this to work the Vbus on the port must be enabled by u-boot,
-or a powered hub must be used.
+> On 06/04/2015 02:11 PM, Eric Anholt wrote:
+> > This gives us a function for making mailbox property channel requests
+> > of the firmware, which is most notable in that it will let us get and
+> > set clock rates.
+> 
+> Acked-by: Stephen Warren <swarren@wwwdotorg.org>
 
-Signed-off-by: Hans de Goede <hdegoede@redhat.com>
----
- arch/arm/boot/dts/sun8i-a23-ippo-q8h-v5.dts | 9 +++++++++
- 1 file changed, 9 insertions(+)
-
-diff --git a/arch/arm/boot/dts/sun8i-a23-ippo-q8h-v5.dts b/arch/arm/boot/dts/sun8i-a23-ippo-q8h-v5.dts
-index 95134c6..8d9da68 100644
---- a/arch/arm/boot/dts/sun8i-a23-ippo-q8h-v5.dts
-+++ b/arch/arm/boot/dts/sun8i-a23-ippo-q8h-v5.dts
-@@ -125,3 +125,12 @@
- 	pinctrl-0 = <&r_uart_pins_a>;
- 	status = "okay";
- };
-+
-+&usb_otg {
-+	dr_mode = "host";
-+	status = "okay";
-+};
-+
-+&usbphy {
-+	status = "okay";
-+};
--- 
-2.4.2
+Does anyone know how drivers/firmware/ is managed?  I don't seem to be
+able to find a maintainer/supporter listed in MAINTAINERS.
