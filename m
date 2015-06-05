@@ -1,54 +1,40 @@
-From: jeroen@myspectrum.nl (Jeroen Hofstee)
-Date: Fri, 05 Jun 2015 10:04:10 +0200
-Subject: [PATCH] ARM: dts: AM35xx: fix system control module clocks
-In-Reply-To: <5571576E.6020207@myspectrum.nl>
-References: <alpine.DEB.2.02.1506010546510.14902@utopia.booyaka.com>
- <1433172627-28052-1-git-send-email-t-kristo@ti.com>
- <556C8ED5.5050000@myspectrum.nl> <20150601173126.GY30984@atomide.com>
- <alpine.DEB.2.02.1506011733180.14902@utopia.booyaka.com>
- <5571576E.6020207@myspectrum.nl>
-Message-ID: <557157FA.7080305@myspectrum.nl>
+From: wangzhou1@hisilicon.com (Zhou Wang)
+Date: Fri, 5 Jun 2015 16:13:24 +0800
+Subject: [PATCH v2 3/4] PCI: hisi: Add PCIe host support for Hisilicon
+ Soc Hip05
+In-Reply-To: <55705163.3070201@arm.com>
+References: <1433320542-49576-1-git-send-email-wangzhou1@hisilicon.com>
+ <1433320542-49576-4-git-send-email-wangzhou1@hisilicon.com>
+ <55705163.3070201@arm.com>
+Message-ID: <55715A24.1030007@hisilicon.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On 2015/6/4 21:23, James Morse wrote:
+> On 03/06/15 09:35, Zhou Wang wrote:
+>> diff --git a/drivers/pci/host/pcie-hisi.c b/drivers/pci/host/pcie-hisi.c
+>> new file mode 100644
+>> index 0000000..2a4d72e
+>> --- /dev/null
+>> +++ b/drivers/pci/host/pcie-hisi.c
+> 
+> New file? Please update MAINTAINERS.
+> (Also add your new Documentation file in patch 4/4 with that patch)
+> 
+> 
+> Thanks,
+> 
+> James
 
-On 05-06-15 10:01, Jeroen Hofstee wrote:
-> Hello Paul,
->
-> On 01-06-15 19:44, Paul Walmsley wrote:
->> The best way to make this work IMHO would be for us not to accept any 
->> new
->> feature addition patches as long as there are warnings reported in the
->> test results.  The only real exception that I would foresee is if those
->> warnings are due to something outside of our control, e.g., a crappy
->> bootloader, as I suspect the USB_OTG initiator warnings are for the
->> CM-T3517.
->>
->
-> I doubt this is related to the bootloader. I have the suspicion that 
-> is actually
-> a bug in linux but only triggered depending on whether the ROMcode setup
-> the USB OTG or not. Here is some data to backup my statement:
->
-> Linux booting without USB_OTG error trap
-> md 480022F0 1
-> 480022f0: 0000032f                               /...
-> md 48002580 1
-> 48002580: 0f00b7a2                               ....
->
-> bit USBOTG_PHY_RESET is 0 -> out of reset
->
->
-> USB_OTG sees memory hole
-> md 480022F0 1
-> 480022f0: 0000030f    ....
-> md 48002580 1
-> 48002580: 0f00c71e    ....
->
-> USBOTG_PHY_RESET is 1 -> still in reset when booting linux.
->
-> Does that match with how your am3517 boards boot?
->
+Ok, wil add this patch next version.
 
-ps. the dumped register are CONTROL.CONTROL_STATUS and 
-CONTROL.CONTROL_DEVCONF2.
+Thanks,
+ZHou
+
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-pci" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> 
+> .
+> 
