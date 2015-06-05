@@ -1,49 +1,95 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Fri, 5 Jun 2015 12:07:44 -0700
-Subject: [PATCH v6 0/4] Add basic ZTE zx296702 SOC support
-In-Reply-To: <20150605023703.GD17189@dragon>
-References: <1433388063-13682-1-git-send-email-jun.nie@linaro.org>
- <20150604182739.GH490@codeaurora.org>
- <20150605023703.GD17189@dragon>
-Message-ID: <20150605190744.GB648@codeaurora.org>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Fri, 05 Jun 2015 21:15:09 +0200
+Subject: [PATCH 15/20] ARM: dts: sun7i: Enable USB DRC on Bananapi
+ (BROKEN!)
+In-Reply-To: <1433530943-12599-16-git-send-email-hdegoede@redhat.com>
+References: <1433530943-12599-1-git-send-email-hdegoede@redhat.com>
+ <1433530943-12599-16-git-send-email-hdegoede@redhat.com>
+Message-ID: <5571F53D.1090104@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/05, Shawn Guo wrote:
-> Hi Stephen,
-> 
-> On Thu, Jun 04, 2015 at 11:27:39AM -0700, Stephen Boyd wrote:
-> > On 06/04, Jun Nie wrote:
-> > > Changes vs v5:
-> > >   - Remove redundant code and polish return value in clock driver.
-> > > 
-> > > Changes vs v4:
-> > >   - Fix issues in clock driver that Stephen found.
-> > >   - Remove initramfs in defconfig to avoid overriding test config.
-> > >   - Drop patches that already merged into ARM next/soc.
-> > > 
-> > > Jun Nie (4):
-> > >   dt-bindings: Add #defines for ZTE ZX296702 clocks
-> > >   clk: zx: add clock support to zx296702
-> > >   ARM: dts: zx: add an initial zx296702 dts and doc
-> > >   ARM: zx: Add basic defconfig support for ZX296702
-> > 
-> > clk patch looks ok. If this doesn't go into 4.2 please consider
-> > sending the clk driver through the clk tree.
-> 
-> Can you please either take the clk part through your tree for 4.2, or
-> give the permission that we send everything through arm-soc tree for
-> 4.2?  Otherwise, it will take such a long time to get the series merged,
-> i.e. you will take clk part for 4.3 and the dts part which depends on
-> clk part can only possibly land on mainline at 4.4, if I understand your
-> comment correctly.
+Hi,
 
-I was saying that if this isn't going to be accepted into arm-soc
-because it's too close to the next merge window, then we can take
-it through the clk tree next time. Looks like Arnd is ready to
-take it though and I've already given Reviewed-by so it should be
-good to go through arm-soc.
+On 05-06-15 21:02, Hans de Goede wrote:
+> Enable the otg/drc usb controller on the Bananapi.
+>
+> This is based on the fex file settings which claim that vbus-det is
+> PH5, but this does not work and the schematic shows that it is actually
+> connected to gpio1 of the axp209, so we cannot add otg support for the
+> bananapi until we get support for the axp209 gpio pins in the kernel.
+>
+> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
 
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+This one obviously should not have been part of this set, please
+ignore this one.
+
+Thanks,
+
+Hans
+
+
+> ---
+>   arch/arm/boot/dts/sun7i-a20-bananapi.dts | 32 ++++++++++++++++++++++++++++++++
+>   1 file changed, 32 insertions(+)
+>
+> diff --git a/arch/arm/boot/dts/sun7i-a20-bananapi.dts b/arch/arm/boot/dts/sun7i-a20-bananapi.dts
+> index 9f7b472..ce318bf 100644
+> --- a/arch/arm/boot/dts/sun7i-a20-bananapi.dts
+> +++ b/arch/arm/boot/dts/sun7i-a20-bananapi.dts
+> @@ -159,7 +159,25 @@
+>   	status = "okay";
+>   };
+>
+> +&otg_sram {
+> +	status = "okay";
+> +};
+> +
+>   &pio {
+> +	usb0_id_detect_pin: usb0_id_detect_pin at 0 {
+> +		allwinner,pins = "PH4";
+> +		allwinner,function = "gpio_in";
+> +		allwinner,drive = <SUN4I_PINCTRL_10_MA>;
+> +		allwinner,pull = <SUN4I_PINCTRL_PULL_UP>;
+> +	};
+> +
+> +	usb0_vbus_detect_pin: usb0_vbus_detect_pin at 0 {
+> +		allwinner,pins = "PH5";
+> +		allwinner,function = "gpio_in";
+> +		allwinner,drive = <SUN4I_PINCTRL_10_MA>;
+> +		allwinner,pull = <SUN4I_PINCTRL_PULL_DOWN>;
+> +	};
+> +
+>   	mmc0_cd_pin_bananapi: mmc0_cd_pin at 0 {
+>   		allwinner,pins = "PH10";
+>   		allwinner,function = "gpio_in";
+> @@ -182,6 +200,10 @@
+>   	};
+>   };
+>
+> +&reg_usb0_vbus {
+> +	status = "okay";
+> +};
+> +
+>   &reg_usb1_vbus {
+>   	status = "okay";
+>   };
+> @@ -216,7 +238,17 @@
+>   	status = "okay";
+>   };
+>
+> +&usb_otg {
+> +	dr_mode = "otg";
+> +	status = "okay";
+> +};
+> +
+>   &usbphy {
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&usb0_id_detect_pin>, <&usb0_vbus_detect_pin>;
+> +	usb0_id_det-gpio = <&pio 7 4 GPIO_ACTIVE_HIGH>; /* PH4 */
+> +	usb0_vbus_det-gpio = <&pio 7 5 GPIO_ACTIVE_HIGH>; /* PH5 */
+> +	usb0_vbus-supply = <&reg_usb0_vbus>;
+>   	usb1_vbus-supply = <&reg_usb1_vbus>;
+>   	usb2_vbus-supply = <&reg_usb2_vbus>;
+>   	status = "okay";
+>
