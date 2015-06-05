@@ -1,85 +1,59 @@
 From: gregory.0xf0@gmail.com (Gregory Fong)
-Date: Thu,  4 Jun 2015 18:58:36 -0700
-Subject: [PATCH 1/3] ARM: Add default SPARSEMEM settings
+Date: Thu,  4 Jun 2015 18:58:38 -0700
+Subject: [PATCH 3/3] ARM: Allow either FLATMEM or SPARSEMEM on the
+ multiplatform build
 In-Reply-To: <1433469518-8472-1-git-send-email-gregory.0xf0@gmail.com>
 References: <1433469518-8472-1-git-send-email-gregory.0xf0@gmail.com>
-Message-ID: <1433469518-8472-2-git-send-email-gregory.0xf0@gmail.com>
+Message-ID: <1433469518-8472-4-git-send-email-gregory.0xf0@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Kevin Cernekee <cernekee@gmail.com>
+ARMv7 chips with LPAE can often benefit from SPARSEMEM, as portions of
+system memory can be located deep in the 36-bit address space.  Allow
+FLATMEM or SPARSEMEM to be selectable at compile time; FLATMEM remains
+the default.
 
-We can still override these settings via mach/memory.h, but let's provide
-sensible defaults so that SPARSEMEM is available in the multiplatform
-kernels.
+This is based on Kevin's "[PATCH 3/3] ARM: Allow either FLATMEM or
+SPARSEMEM on the multi-v7 build" from [1] and shamelessly rips off his
+commit message text above.  As Arnd pointed out at [2] there doesn't
+seem to be any reason to tie this specifically to ARMv7, so this has
+been changed to apply to all multiplatform kernels.
 
-Two platforms currently use SECTION_SIZE_BITS < 28, but are expected to
-work with 28 (albeit slightly less efficiently if not all banks are
-populated):
+[1] http://lists.infradead.org/pipermail/linux-arm-kernel/2014-September/286837.html
+[2] http://lists.infradead.org/pipermail/linux-arm-kernel/2014-October/298950.html
 
- - mach-rpc: uses 26 bits.  Based on mach/hardware.h it looks like this
-   platform puts RAM@0x1000_0000 - 0x1fff_ffff, and I/O below
-   0x1000_0000.
-
- - mach-sa1100: uses 27 bits.  mach/memory.h indicates that RAM occupies
-   the entire range of 0xc000_0000 - 0xdfff_ffff.
-
-But Arnd says in that rpc and sa1100 will never have to use the
-default since they cannot be part of a multiplatform kernel, and that
-is unlikely to change.
-
-Several platforms need MAX_PHYSMEM_BITS >= 36 so we'll pick that as the
-minimum.  Anything higher and we'll fail the SECTIONS_WIDTH + NODES_WIDTH +
-ZONES_WIDTH test in <linux/mm.h>.
-
-Some analysis from Russell King at
-http://lists.infradead.org/pipermail/linux-arm-kernel/2014-October/298957.html:
-
-  I think this is fine in as far as it goes - this means we end up with
-  256 entries in the mem_section array which means it occupies one page,
-  which I think is acceptable overhead.
-
-  The other thing to be aware of here is the obvious:
-
-  #if (MAX_ORDER - 1 + PAGE_SHIFT) > SECTION_SIZE_BITS
-  #error Allocator MAX_ORDER exceeds SECTION_SIZE
-  #endif
-
-  Which means that with 28 bits of section, that's a maximum allocator
-  order of 16.  We appear to allow FORCE_MAX_ZONEORDER to be set up to
-  64 in the case of shmobile, which doesn't seem like a sensible upper
-  limit - and certainly isn't when sparsemem is enabled.
-
-  Given this, I think that FORCE_MAX_ZONEORDER's help, and the
-  dependencies probably could do with some improvement to make the
-  issues more transparent.
-
-Signed-off-by: Kevin Cernekee <cernekee@gmail.com>
-Acked-by: Arnd Bergmann <arnd@arndb.de>
-[gregory.0xf0: added notes from Arnd and Russell]
+Cc: Kevin Cernekee <cernekee@gmail.com>
 Signed-off-by: Gregory Fong <gregory.0xf0@gmail.com>
 ---
- arch/arm/include/asm/sparsemem.h | 7 ++++---
- 1 file changed, 4 insertions(+), 3 deletions(-)
+I don't have any platforms other than armv7 handily set up to test SPARSEMEM,
+so any testing would be appreciated.  FLATMEM is still the default so at least
+nobody will see anything change unless they deliberately switch.
 
-diff --git a/arch/arm/include/asm/sparsemem.h b/arch/arm/include/asm/sparsemem.h
-index 0009861..73e5e85 100644
---- a/arch/arm/include/asm/sparsemem.h
-+++ b/arch/arm/include/asm/sparsemem.h
-@@ -15,10 +15,11 @@
-  * Eg, if you have 2 banks of up to 64MB at 0x80000000, 0x84000000,
-  * then MAX_PHYSMEM_BITS is 32, SECTION_SIZE_BITS is 26.
-  *
-- * Define these in your mach/memory.h.
-+ * These can be overridden in your mach/memory.h.
-  */
--#if !defined(SECTION_SIZE_BITS) || !defined(MAX_PHYSMEM_BITS)
--#error Sparsemem is not supported on this platform
-+#if !defined(MAX_PHYSMEM_BITS) || !defined(SECTION_SIZE_BITS)
-+#define MAX_PHYSMEM_BITS	36
-+#define SECTION_SIZE_BITS	28
- #endif
+ arch/arm/Kconfig | 5 +++++
+ 1 file changed, 5 insertions(+)
+
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index 5998b53..21e25bd 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -317,6 +317,8 @@ choice
+ config ARCH_MULTIPLATFORM
+ 	bool "Allow multiple platforms to be selected"
+ 	depends on MMU
++	select ARCH_FLATMEM_ENABLE
++	select ARCH_SPARSEMEM_ENABLE
+ 	select ARCH_WANT_OPTIONAL_GPIOLIB
+ 	select ARM_HAS_SG_CHAIN
+ 	select ARM_PATCH_PHYS_VIRT
+@@ -1625,6 +1627,9 @@ config OABI_COMPAT
+ config ARCH_HAS_HOLES_MEMORYMODEL
+ 	bool
  
- #endif
++config ARCH_FLATMEM_ENABLE
++	bool
++
+ config ARCH_SPARSEMEM_ENABLE
+ 	bool
+ 
 -- 
 1.9.1
