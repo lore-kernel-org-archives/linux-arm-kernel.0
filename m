@@ -1,57 +1,76 @@
-From: dinh.linux@gmail.com (Dinh Nguyen)
-Date: Fri, 5 Jun 2015 08:14:52 -0500
-Subject: [PATCHv6 0/2] socfpga: support suspend to ram*
-In-Reply-To: <5570D29A.2030007@opensource.altera.com>
-References: <1433270139-7042-1-git-send-email-atull@opensource.altera.com>
- <556E028E.2080800@opensource.altera.com>
- <5570D29A.2030007@opensource.altera.com>
-Message-ID: <CADhT+wc+w6QvUmtD_ie2_hfb_uowpfwM0YHDeasXE86MKOjA8A@mail.gmail.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Fri, 5 Jun 2015 14:30:41 +0100
+Subject: [PATCH v2 5/6] iommu/mediatek: Add mt8173 IOMMU driver
+In-Reply-To: <1431683009-18158-6-git-send-email-yong.wu@mediatek.com>
+References: <1431683009-18158-1-git-send-email-yong.wu@mediatek.com>
+ <1431683009-18158-6-git-send-email-yong.wu@mediatek.com>
+Message-ID: <20150605133040.GH1198@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 4, 2015 at 5:35 PM, Dinh Nguyen
-<dinguyen@opensource.altera.com> wrote:
-> Hi Alan,
->
-> On 06/02/2015 02:22 PM, Dinh Nguyen wrote:
->> On 06/02/2015 01:35 PM, Alan Tull wrote:
->>> Support suspend to ram on socfpga.
->>>   * allocate space in ocram using sram driver.
->>>   * Add a function in ocram to place DDR in self-refresh
->>>     and suspend.
->>>   * Prevent suspend if EDAC is enabled.
->>>   * Add a device tree binding document for the Altera
->>>     SOCFPGA SDRAM controller that is used to put DDR in
->>>     self-refresh mode.
->>>
->>> Alan Tull (2):
->>>   ARM: socfpga: support suspend to ram
->>>   ARM: socfpga: dts: add sdram controller dt binding doc
->>>
->>>  .../arm/altera/socfpga-sdram-controller.txt        |   12 ++
->>>  arch/arm/mach-socfpga/Kconfig                      |   10 +-
->>>  arch/arm/mach-socfpga/Makefile                     |    1 +
->>>  arch/arm/mach-socfpga/core.h                       |    6 +-
->>>  arch/arm/mach-socfpga/pm.c                         |  149 ++++++++++++++++++++
->>>  arch/arm/mach-socfpga/self-refresh.S               |  136 ++++++++++++++++++
->>>  arch/arm/mach-socfpga/socfpga.c                    |    6 +-
->>>  drivers/edac/altera_edac.c                         |   20 +++
->>>  8 files changed, 337 insertions(+), 3 deletions(-)
->>>  create mode 100644 Documentation/devicetree/bindings/arm/altera/socfpga-sdram-controller.txt
->>>  create mode 100644 arch/arm/mach-socfpga/pm.c
->>>  create mode 100644 arch/arm/mach-socfpga/self-refresh.S
->>>
->>
->>
->> Applied.
->>
->
-> I had to un-apply this patch because I noticed that it's touching
-> drivers/edac/altera_edac.c. This part should be a separate patch and
-> need to go through linux-edac.
->
+On Fri, May 15, 2015 at 10:43:28AM +0100, Yong Wu wrote:
+> This patch adds support for mediatek m4u (MultiMedia Memory Management Unit).
 
-Nevermind on this, I got an ack-by from Borislav Petkov for the edac
-part. No need to split the patch up.
+After looking at the page table code, I thought I'd come and check your
+TLB invalidate code here.
 
-Dinh
+> +static void mtk_iommu_tlb_flush_all(void *cookie)
+> +{
+> +       struct mtk_iommu_domain *domain = cookie;
+> +       u32 val;
+> +
+> +       val = F_INVLD_EN1 | F_INVLD_EN0;
+> +       writel(val, domain->imuinfo->base + REG_MMU_INV_SEL);
+> +       writel(F_ALL_INVLD, domain->imuinfo->base + REG_MMU_INVALIDATE);
+> +}
+> +
+> +static void mtk_iommu_tlb_add_flush(unsigned long iova, size_t size,
+> +                                   bool leaf, void *cookie)
+> +{
+> +       struct mtk_iommu_domain *domain = cookie;
+> +       void __iomem *m4u_base = domain->imuinfo->base;
+> +       unsigned int iova_start = iova, iova_end = iova + size - 1;
+> +       int ret;
+> +       u32 val;
+> +
+> +       val = F_INVLD_EN1 | F_INVLD_EN0;
+> +       writel(val, m4u_base + REG_MMU_INV_SEL);
+> +
+> +       writel(iova_start, m4u_base + REG_MMU_INVLD_START_A);
+> +       writel(iova_end, m4u_base + REG_MMU_INVLD_END_A);
+> +       writel(F_MMU_INV_RANGE, m4u_base + REG_MMU_INVALIDATE);
+> +
+> +       ret = readl_poll_timeout_atomic(m4u_base + REG_MMU_CPE_DONE, val,
+> +                                       val != 0, 10, 1000000);
+> +       if (ret) {
+> +               dev_warn(domain->imuinfo->dev, "Invalid tlb don't done\n");
+> +               mtk_iommu_tlb_flush_all(cookie);
+> +       }
+> +       writel(0, m4u_base + REG_MMU_CPE_DONE);
+> +}
+
+You don't need to wait for completion here if you can implement a proper
+->tlb_sync callback.
+
+> +static void mtk_iommu_flush_pgtable(void *ptr, size_t size, void *cookie)
+> +{
+> +       /*
+> +        * After delete arch_setup_dma_ops,
+> +        * This will be replaced with dma_map_page
+> +        */
+> +        __dma_flush_range(ptr, ptr + size);
+> +}
+
+This should give you the necessary barriers to ensure visibility of the
+updated page tables, so you can use the _relaxed io accessors for the
+other TLB functions.
+
+> +static struct iommu_gather_ops mtk_iommu_gather_ops = {
+> +       .tlb_flush_all = mtk_iommu_tlb_flush_all,
+> +       .tlb_add_flush = mtk_iommu_tlb_add_flush,
+> +       .tlb_sync = mtk_iommu_tlb_flush_all,
+
+sync isn't required to flush anything; it's just supposed to wait for
+any outstanding invalidation (i.e. from tlb_add_flush) to complete.
+
+Will
