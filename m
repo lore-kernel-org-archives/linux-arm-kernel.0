@@ -1,171 +1,95 @@
 From: hdegoede@redhat.com (Hans de Goede)
-Date: Fri,  5 Jun 2015 20:53:40 +0200
-Subject: [PATCH 6/7] musb: sunxi: Add support for musb controller in A31 SoC
+Date: Fri,  5 Jun 2015 20:53:39 +0200
+Subject: [PATCH 5/7] musb: sunxi: Remove special MUSB_SUN4I flag for clearing
+ ep0 addr on disconnect
 In-Reply-To: <1433530421-12197-1-git-send-email-hdegoede@redhat.com>
 References: <1433530421-12197-1-git-send-email-hdegoede@redhat.com>
-Message-ID: <1433530421-12197-7-git-send-email-hdegoede@redhat.com>
+Message-ID: <1433530421-12197-6-git-send-email-hdegoede@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The A31 SoC uses the same musb controller as found in earlier SoCs, but it
-is hooked up slightly different. Its SRAM is private and no longer controlled
-through the SRAM controller, and its reset is controlled via a separate
-reset controller. This commit adds support for this setup.
+We can cleanly handle this inside the sunxi glue, instead of adding special
+casing to the core, but setting ep0 addr to 0 on a reset interrupt.
 
 Signed-off-by: Hans de Goede <hdegoede@redhat.com>
 ---
- .../bindings/usb/allwinner,sun4i-a10-musb.txt      |  3 +-
- drivers/usb/musb/sunxi.c                           | 50 +++++++++++++++++++---
- 2 files changed, 46 insertions(+), 7 deletions(-)
+ drivers/usb/musb/musb_core.h    | 1 -
+ drivers/usb/musb/musb_gadget.c  | 6 ------
+ drivers/usb/musb/musb_virthub.c | 6 ------
+ drivers/usb/musb/sunxi.c        | 8 +++++++-
+ 4 files changed, 7 insertions(+), 14 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/usb/allwinner,sun4i-a10-musb.txt b/Documentation/devicetree/bindings/usb/allwinner,sun4i-a10-musb.txt
-index 21dfc7f..c5ef893 100644
---- a/Documentation/devicetree/bindings/usb/allwinner,sun4i-a10-musb.txt
-+++ b/Documentation/devicetree/bindings/usb/allwinner,sun4i-a10-musb.txt
-@@ -2,9 +2,10 @@ Allwinner sun4i A10 musb DRC/OTG controller
- -------------------------------------------
+diff --git a/drivers/usb/musb/musb_core.h b/drivers/usb/musb/musb_core.h
+index 30a3123..b1cb2c3 100644
+--- a/drivers/usb/musb/musb_core.h
++++ b/drivers/usb/musb/musb_core.h
+@@ -169,7 +169,6 @@ struct musb_io;
+  */
+ struct musb_platform_ops {
  
- Required properties:
-- - compatible      : "allwinner,sun4i-a10-musb"
-+ - compatible      : "allwinner,sun4i-a10-musb" or "allwinner,sun6i-a31-musb"
-  - reg             : mmio address range of the musb controller
-  - clocks          : clock specifier for the musb controller ahb gate clock
-+ - reset           : reset specifier for the ahb reset (A31 and newer only)
-  - interrupts      : interrupt to which the musb controller is connected
-  - interrupt-names : must be "mc"
-  - phys            : phy specifier for the otg phy
+-#define MUSB_SUN4I		BIT(7)
+ #define MUSB_DMA_UX500		BIT(6)
+ #define MUSB_DMA_CPPI41		BIT(5)
+ #define MUSB_DMA_CPPI		BIT(4)
+diff --git a/drivers/usb/musb/musb_gadget.c b/drivers/usb/musb/musb_gadget.c
+index ec2e908..4c481cd 100644
+--- a/drivers/usb/musb/musb_gadget.c
++++ b/drivers/usb/musb/musb_gadget.c
+@@ -2003,12 +2003,6 @@ void musb_g_disconnect(struct musb *musb)
+ 		spin_lock(&musb->lock);
+ 	}
+ 
+-	/* On sunxi ep0 FADDR must be 0 when (re)entering peripheral mode */
+-	if (musb->io.quirks & MUSB_SUN4I) {
+-		musb_ep_select(musb->mregs, 0);
+-		musb_writeb(musb->mregs, MUSB_FADDR, 0);
+-	}
+-
+ 	switch (musb->xceiv->otg->state) {
+ 	default:
+ 		dev_dbg(musb->controller, "Unhandled disconnect %s, setting a_idle\n",
+diff --git a/drivers/usb/musb/musb_virthub.c b/drivers/usb/musb/musb_virthub.c
+index fe98623..30842bc 100644
+--- a/drivers/usb/musb/musb_virthub.c
++++ b/drivers/usb/musb/musb_virthub.c
+@@ -226,12 +226,6 @@ void musb_root_disconnect(struct musb *musb)
+ 	usb_hcd_poll_rh_status(musb->hcd);
+ 	musb->is_active = 0;
+ 
+-	/* On sunxi ep0 FADDR must be 0 when (re)entering peripheral mode */
+-	if (musb->io.quirks & MUSB_SUN4I) {
+-		musb_ep_select(musb->mregs, 0);
+-		musb_writeb(musb->mregs, MUSB_FADDR, 0);
+-	}
+-
+ 	switch (musb->xceiv->otg->state) {
+ 	case OTG_STATE_A_SUSPEND:
+ 		if (otg->host->b_hnp_enable) {
 diff --git a/drivers/usb/musb/sunxi.c b/drivers/usb/musb/sunxi.c
-index 8fc39af..8eccbb7 100644
+index 5db882f..8fc39af 100644
 --- a/drivers/usb/musb/sunxi.c
 +++ b/drivers/usb/musb/sunxi.c
-@@ -26,6 +26,7 @@
- #include <linux/of.h>
- #include <linux/phy/phy-sun4i-usb.h>
- #include <linux/platform_device.h>
-+#include <linux/reset.h>
- #include <linux/soc/sunxi/sunxi_sram.h>
- #include <linux/usb/musb.h>
- #include <linux/usb/of.h>
-@@ -70,6 +71,8 @@
- #define SUNXI_MUSB_FL_HOSTMODE_PEND		2
- #define SUNXI_MUSB_FL_VBUS_ON			3
- #define SUNXI_MUSB_FL_PHY_ON			4
-+#define SUNXI_MUSB_FL_HAS_SRAM			5
-+#define SUNXI_MUSB_FL_HAS_RESET			6
- 
- /* Our read/write methods need access and do not get passed in a musb ref :| */
- struct musb *sunxi_musb;
-@@ -78,6 +81,7 @@ struct sunxi_glue {
- 	struct device		*dev;
- 	struct platform_device	*musb;
- 	struct clk		*clk;
-+	struct reset_control	*rst;
- 	struct phy		*phy;
- 	struct platform_device	*usb_phy;
- 	struct usb_phy		*xceiv;
-@@ -229,14 +233,22 @@ static int sunxi_musb_init(struct musb *musb)
- 	musb->phy = glue->phy;
- 	musb->xceiv = glue->xceiv;
- 
--	ret = sunxi_sram_claim(musb->controller->parent);
--	if (ret)
--		return ret;
-+	if (test_bit(SUNXI_MUSB_FL_HAS_SRAM, &glue->flags)) {
-+		ret = sunxi_sram_claim(musb->controller->parent);
-+		if (ret)
-+			return ret;
-+	}
- 
- 	ret = clk_prepare_enable(glue->clk);
- 	if (ret)
- 		goto error_sram_release;
- 
-+	if (test_bit(SUNXI_MUSB_FL_HAS_RESET, &glue->flags)) {
-+		ret = reset_control_deassert(glue->rst);
-+		if (ret)
-+			goto error_clk_disable;
-+	}
-+
- 	writeb(SUNXI_MUSB_VEND0_PIO_MODE, musb->mregs + SUNXI_MUSB_VEND0);
- 
- 	/* Register interest before calling phy_init() */
-@@ -246,7 +258,7 @@ static int sunxi_musb_init(struct musb *musb)
- 					extcon_cable_name[EXTCON_USB_HOST],
- 					&glue->host_nb);
- 		if (ret)
--			goto error_clk_disable;
-+			goto error_reset_assert;
+@@ -183,6 +183,12 @@ static irqreturn_t sunxi_musb_interrupt(int irq, void *__hci)
+ 		musb->int_usb |= MUSB_INTR_DISCONNECT;
  	}
  
- 	ret = phy_init(glue->phy);
-@@ -274,10 +286,14 @@ error_phy_exit:
- error_unregister_interest:
- 	if (musb->port_mode == MUSB_PORT_MODE_DUAL_ROLE)
- 		extcon_unregister_interest(&glue->host_cable_nb);
-+error_reset_assert:
-+	if (test_bit(SUNXI_MUSB_FL_HAS_RESET, &glue->flags))
-+		reset_control_assert(glue->rst);
- error_clk_disable:
- 	clk_disable_unprepare(glue->clk);
- error_sram_release:
--	sunxi_sram_release(musb->controller->parent);
-+	if (test_bit(SUNXI_MUSB_FL_HAS_SRAM, &glue->flags))
-+		sunxi_sram_release(musb->controller->parent);
- 	return ret;
- }
- 
-@@ -296,8 +312,12 @@ static int sunxi_musb_exit(struct musb *musb)
- 	if (musb->port_mode == MUSB_PORT_MODE_DUAL_ROLE)
- 		extcon_unregister_interest(&glue->host_cable_nb);
- 
-+	if (test_bit(SUNXI_MUSB_FL_HAS_RESET, &glue->flags))
-+		reset_control_assert(glue->rst);
-+
- 	clk_disable_unprepare(glue->clk);
--	sunxi_sram_release(musb->controller->parent);
-+	if (test_bit(SUNXI_MUSB_FL_HAS_SRAM, &glue->flags))
-+		sunxi_sram_release(musb->controller->parent);
- 
- 	return 0;
- }
-@@ -610,6 +630,12 @@ static int sunxi_musb_probe(struct platform_device *pdev)
- 	INIT_WORK(&glue->work, sunxi_musb_work);
- 	glue->host_nb.notifier_call = sunxi_musb_host_notifier;
- 
-+	if (of_device_is_compatible(np, "allwinner,sun4i-a10-musb"))
-+		set_bit(SUNXI_MUSB_FL_HAS_SRAM, &glue->flags);
-+
-+	if (of_device_is_compatible(np, "allwinner,sun6i-a31-musb"))
-+		set_bit(SUNXI_MUSB_FL_HAS_RESET, &glue->flags);
-+
- 	glue->clk = devm_clk_get(&pdev->dev, NULL);
- 	if (IS_ERR(glue->clk)) {
- 		dev_err(&pdev->dev, "Error getting clock: %ld\n",
-@@ -617,6 +643,17 @@ static int sunxi_musb_probe(struct platform_device *pdev)
- 		return PTR_ERR(glue->clk);
- 	}
- 
-+	if (test_bit(SUNXI_MUSB_FL_HAS_RESET, &glue->flags)) {
-+		glue->rst = devm_reset_control_get(&pdev->dev, NULL);
-+		if (IS_ERR(glue->rst)) {
-+			if (PTR_ERR(glue->rst) == -EPROBE_DEFER)
-+				return -EPROBE_DEFER;
-+			dev_err(&pdev->dev, "Error getting reset %ld\n",
-+				PTR_ERR(glue->rst));
-+			return PTR_ERR(glue->rst);
-+		}
++	if ((musb->int_usb & MUSB_INTR_RESET) && !is_host_active(musb)) {
++		/* ep0 FADDR must be 0 when (re)entering peripheral mode */
++		musb_ep_select(musb->mregs, 0);
++		musb_writeb(musb->mregs, MUSB_FADDR, 0);
 +	}
 +
- 	glue->phy = devm_phy_get(&pdev->dev, "usb");
- 	if (IS_ERR(glue->phy)) {
- 		if (PTR_ERR(glue->phy) == -EPROBE_DEFER)
-@@ -678,6 +715,7 @@ static int sunxi_musb_remove(struct platform_device *pdev)
+ 	musb->int_tx = readw(musb->mregs + SUNXI_MUSB_INTRTX);
+ 	if (musb->int_tx)
+ 		writew(musb->int_tx, musb->mregs + SUNXI_MUSB_INTRTX);
+@@ -519,7 +525,7 @@ static void sunxi_musb_writew(void __iomem *addr, unsigned offset, u16 data)
+ }
  
- static const struct of_device_id sunxi_musb_match[] = {
- 	{ .compatible = "allwinner,sun4i-a10-musb", },
-+	{ .compatible = "allwinner,sun6i-a31-musb", },
- 	{}
- };
- 
+ static const struct musb_platform_ops sunxi_musb_ops = {
+-	.quirks		= MUSB_INDEXED_EP | MUSB_SUN4I,
++	.quirks		= MUSB_INDEXED_EP,
+ 	.init		= sunxi_musb_init,
+ 	.exit		= sunxi_musb_exit,
+ 	.enable		= sunxi_musb_enable,
 -- 
 2.4.2
