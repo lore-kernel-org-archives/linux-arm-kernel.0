@@ -1,177 +1,103 @@
-From: rric@kernel.org (Robert Richter)
-Date: Fri,  5 Jun 2015 19:49:25 +0200
-Subject: [PATCH v5 1/2] ahci: Add generic MSI-X support for single interrupts
- to SATA PCI driver
-In-Reply-To: <1433526566-21136-1-git-send-email-rric@kernel.org>
-References: <1433526566-21136-1-git-send-email-rric@kernel.org>
-Message-ID: <1433526566-21136-2-git-send-email-rric@kernel.org>
+From: thomas.lendacky@amd.com (Tom Lendacky)
+Date: Fri, 5 Jun 2015 12:52:20 -0500
+Subject: [PATCH] arm64: fix missing syscall trace exit
+In-Reply-To: <20150605153816.GG7420@arm.com>
+References: <20150601102448.GG1641@arm.com>
+ <1433293304-26539-1-git-send-email-jistone@redhat.com>
+ <556E5454.9080400@redhat.com> <20150604100625.GI7557@n2100.arm.linux.org.uk>
+ <55708783.2090909@redhat.com> <5570DCA4.3050600@redhat.com>
+ <20150605153816.GG7420@arm.com>
+Message-ID: <5571E1D4.4070602@amd.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Robert Richter <rrichter@cavium.com>
+On 06/05/2015 10:38 AM, Will Deacon wrote:
+> On Fri, Jun 05, 2015 at 12:17:56AM +0100, Josh Stone wrote:
+>> Still, I don't think it's right to trace with interrupts disabled, so
+>> here's a version which enables them again first.  How does this look?
+>>
+>> diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
+>> index 959fe87..988bea4 100644
+>> --- a/arch/arm64/kernel/entry.S
+>> +++ b/arch/arm64/kernel/entry.S
+>> @@ -608,11 +608,16 @@ ENDPROC(cpu_switch_to)
+>>    */
+>>   ret_fast_syscall:
+>>          disable_irq                             // disable interrupts
+>> -       ldr     x1, [tsk, #TI_FLAGS]
+>> +       ldr     x1, [tsk, #TI_FLAGS]            // re-check for syscall tracing
+>> +       and     x2, x1, #_TIF_SYSCALL_WORK
+>> +       cbnz    x2, ret_fast_syscall_trace
+>>          and     x2, x1, #_TIF_WORK_MASK
+>>          cbnz    x2, fast_work_pending
+>>          enable_step_tsk x1, x2
+>>          kernel_exit 0, ret = 1
+>> +ret_fast_syscall_trace:
+>> +       enable_irq                              // enable interrupts
+>> +       b       __sys_trace_return
+>>
+>>   /*
+>>    * Ok, we need to do extra processing, enter the slow path.
+>
+> Looks good to me. Can you post as a stand-alone patch, with commit message
+> etc please?
+>
+>> Off topic, here's the xgbe_tx_timer BUG.  As I mentioned, this happens
+>> even on a vanilla kernel, before I've run any of my tests.  I think this
+>> is a legitimate bug to call disable_irq() from a softirq timer.
+>
+> Adding Tom, as he maintains the AMD xgbe driver (assuming that's what is
+> exploding here). I'm guessing you need s/disable_irq/disable_irq_nosync/.
+>
 
-This patch adds generic MSI-X support for single interrupts to the
-SATA PCI driver. MSI-X support is needed for host controller that only
-have MSI-X support implemented, but no MSI or intx. This patch only
-adds support for single interrupts, multiple per-port MSI-X interrupts
-are not yet implemented.
+Yup, that would be the problem. I'll submit a fix to the netdev mailing
+list.
 
-The new implementation still initializes MSIs first. Only if that
-fails, the code tries to enable MSI-X. If that fails too, setup is
-continued with intx interrupts.
+Josh, are you ok if I include you on a reported-by in the patch?
 
-To not break other chips by this generic code change, there are the
-following precautions:
+Thanks,
+Tom
 
- * Interrupt ranges are not enabled at all.
-
- * Only single interrupt mode is enabled for msix cap devices. Thus,
-   only one interrupt will be setup.
-
- * During the discussion with Tejun we agreed to change the init
-   sequence from msix-msi-intx to msi-msix-intx. Thus, if a device
-   offers msi and init does not fail, the msix init code will not be
-   executed. This is equivalent to current code.
-
-With this, the code only setups single mode msix as a last resort if
-msi fails. No interrupt range is enabled at all. Only one interrupt
-will be enabled.
-
-Changes of the patch series:
-
-v5:
- * updated patch subject that the patch only implements single IRQ
- * moved Cavium specific code to a separate patch
- * detect Cavium ThunderX device with PCI_CLASS_STORAGE_SATA_AHCI
-   instead of vendor/dev id
- * added more comments to the code
- * enable single msix support for all kind of devices (removing strict
-   check)
- * rebased onto update libata/for-4.2 with patch 1, 2 applied
-
-v4:
- * removed implementation of ahci_init_intx()
- * improved patch descriptions
- * rebased onto libata/for-4.2
-
-v3:
- * store irq number in struct ahci_host_priv
- * change initialization order from msix-msi-intx to msi-msix-intx
- * improve comments in ahci_init_msix()
- * improve error message in ahci_init_msix()
- * do not enable MSI-X if MSI is actively disabled for the device
-
-v2:
- * determine irq vector from pci_dev->msi_list
-
-Based on a patch from Sunil Goutham <sgoutham@cavium.com>.
-
-Signed-off-by: Robert Richter <rrichter@cavium.com>
----
- drivers/ata/ahci.c | 77 ++++++++++++++++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 77 insertions(+)
-
-diff --git a/drivers/ata/ahci.c b/drivers/ata/ahci.c
-index a3c66c3bb76e..f300aa583678 100644
---- a/drivers/ata/ahci.c
-+++ b/drivers/ata/ahci.c
-@@ -42,6 +42,7 @@
- #include <linux/device.h>
- #include <linux/dmi.h>
- #include <linux/gfp.h>
-+#include <linux/msi.h>
- #include <scsi/scsi_host.h>
- #include <scsi/scsi_cmnd.h>
- #include <linux/libata.h>
-@@ -1201,6 +1202,71 @@ static inline void ahci_gtf_filter_workaround(struct ata_host *host)
- {}
- #endif
- 
-+static struct msi_desc *msix_get_desc(struct pci_dev *dev, u16 entry)
-+{
-+	struct msi_desc *desc;
-+
-+	list_for_each_entry(desc, &dev->msi_list, list) {
-+		if (desc->msi_attrib.entry_nr == entry)
-+			return desc;
-+	}
-+
-+	return NULL;
-+}
-+
-+/*
-+ * MSI-X support is needed for host controller that only have MSI-X
-+ * support implemented, but no MSI or intx. For now, function
-+ * ahci_init_msix() only implements single MSI-X support, but not
-+ * multiple MSI-X per-port interrupts.
-+ */
-+static int ahci_init_msix(struct pci_dev *pdev, unsigned int n_ports,
-+			  struct ahci_host_priv *hpriv)
-+{
-+	struct msi_desc *desc;
-+	int rc, nvec;
-+	struct msix_entry entry = {};
-+
-+	/* Do not init MSI-X if MSI is disabled for the device */
-+	if (hpriv->flags & AHCI_HFLAG_NO_MSI)
-+		return -ENODEV;
-+
-+	nvec = pci_msix_vec_count(pdev);
-+	if (nvec < 0)
-+		return nvec;
-+
-+	if (!nvec) {
-+		rc = -ENODEV;
-+		goto fail;
-+	}
-+
-+	/*
-+	 * There can exist more than one vector (e.g. for error
-+	 * detection or hdd hotplug). Then the first vector is used,
-+	 * all others are ignored. Only enable the first entry here
-+	 * (entry.entry = 0).
-+	 */
-+	rc = pci_enable_msix_exact(pdev, &entry, 1);
-+	if (rc < 0)
-+		goto fail;
-+
-+	desc = msix_get_desc(pdev, 0);	/* first entry */
-+	if (!desc) {
-+		rc = -EINVAL;
-+		goto fail;
-+	}
-+
-+	hpriv->irq = desc->irq;
-+
-+	return 1;
-+fail:
-+	dev_err(&pdev->dev,
-+		"failed to enable MSI-X with error %d, # of vectors: %d\n",
-+		rc, nvec);
-+
-+	return rc;
-+}
-+
- static int ahci_init_msi(struct pci_dev *pdev, unsigned int n_ports,
- 			struct ahci_host_priv *hpriv)
- {
-@@ -1260,6 +1326,17 @@ static int ahci_init_interrupts(struct pci_dev *pdev, unsigned int n_ports,
- 	if (nvec >= 0)
- 		return nvec;
- 
-+	/*
-+	 * Only setup single mode MSI-X as a last resort if MSI fails:
-+	 * Initialize MSI-X after MSI and only if that fails, continue
-+	 * with intx interrupts on failure. Thus, MSI-X code is not
-+	 * executed if a device offers MSI and its initialization does
-+	 * not fail.
-+	 */
-+	nvec = ahci_init_msix(pdev, n_ports, hpriv);
-+	if (nvec >= 0)
-+		return nvec;
-+
- 	/* lagacy intx interrupts */
- 	pci_intx(pdev, 1);
- 	hpriv->irq = pdev->irq;
--- 
-2.1.1
+> Will
+>
+>>    disable_irq -> synchronize_irq -> wait_event -> might_sleep
+>>
+>> [   19.841911] BUG: sleeping function called from invalid context at kernel/irq/manage.c:110
+>> [   19.850081] in_atomic(): 1, irqs_disabled(): 0, pid: 1133, name: sed
+>> [   19.856434] INFO: lockdep is turned off.
+>> [   19.860349] CPU: 3 PID: 1133 Comm: sed Tainted: G        W       4.1.0-rc6-orig+ #5
+>> [   19.867999] Hardware name: Default string Default string/Default string, BIOS ROD0080B 03/18/2015
+>> [   19.876865] Call trace:
+>> [   19.879306] [<fffffe0000096e08>] dump_backtrace+0x0/0x16c
+>> [   19.884702] [<fffffe0000096f84>] show_stack+0x10/0x1c
+>> [   19.889746] [<fffffe000071408c>] dump_stack+0x84/0xbc
+>> [   19.894796] [<fffffe00000eab28>] ___might_sleep+0x15c/0x248
+>> [   19.900360] [<fffffe00000ead7c>] __might_sleep+0x54/0x94
+>> [   19.905685] [<fffffe0000121ee4>] synchronize_irq+0x2c/0x88
+>> [   19.911167] [<fffffe00001221ec>] disable_irq+0x1c/0x2c
+>> [   19.916304] [<fffffe00004d8fec>] xgbe_tx_timer+0x64/0x90
+>> [   19.921606] [<fffffe00001344b4>] call_timer_fn+0xd4/0x48c
+>> [   19.927002] [<fffffe00001351fc>] run_timer_softirq+0x240/0x440
+>> [   19.932833] [<fffffe00000c5014>] __do_softirq+0x118/0x608
+>> [   19.938221] [<fffffe00000c584c>] irq_exit+0x9c/0xdc
+>> [   19.943094] [<fffffe0000121200>] __handle_domain_irq+0x68/0xb4
+>> [   19.948916] [<fffffe0000090398>] gic_handle_irq+0x30/0x7c
+>> [   19.954310] Exception stack(0xfffffe001ef4bb20 to 0xfffffe001ef4bc40)
+>> [   19.960742] bb20: d6b401c0 fffffe03 01ea7600 fffffe00 1ef4bc60 fffffe00 00117a80 fffffe00
+>> [   19.968913] bb40: d6b401f0 fffffe03 0095f450 fffffe00 01ea7610 fffffe00 00000000 00000000
+>> [   19.977088] bb60: 1ef4bc10 fffffe00 1ef4bbe0 fffffe00 0109d468 fffffe00 00000000 00000000
+>> [   19.985262] bb80: d4a96880 fffffe03 00000000 00000000 1ef4bc80 fffffe00 00000000 756e694c
+>> [   19.993436] bba0: 00000006 00000004 00010000 00000000 98343c1c 000003ff 98343b44 000003ff
+>> [   20.001603] bbc0: 00226d00 fffffe00 983440dc 000003ff 00000000 00000000 d6b401c0 fffffe03
+>> [   20.009776] bbe0: 01ea7600 fffffe00 00fc0000 fffffe00 00fc2000 fffffe00 00fff3a0 fffffe00
+>> [   20.017950] bc00: 00000015 00000000 0000011a 00000000 00000038 00000000 00742000 fffffe00
+>> [   20.026125] bc20: 1ef48000 fffffe00 1ef4bc60 fffffe00 00228dd4 fffffe00 1ef4bc60 fffffe00
+>> [   20.034299] [<fffffe0000092ce8>] el1_irq+0x68/0x100
+>> [   20.039173] [<fffffe0000228dd0>] get_empty_filp+0xf8/0x1ec
+>> [   20.044658] [<fffffe00002363ec>] path_openat+0x34/0x644
+>> [   20.049874] [<fffffe0000237b18>] do_filp_open+0x2c/0x88
+>> [   20.055095] [<fffffe0000226bf8>] do_sys_open+0x13c/0x21c
+>> [   20.060397] [<fffffe0000226d0c>] SyS_openat+0xc/0x18
+>>
+>>
+>>
