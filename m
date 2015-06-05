@@ -1,41 +1,16 @@
-From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Fri, 5 Jun 2015 12:06:06 +0900
-Subject: [RFT v2 06/48] pinctrl: Use irq_desc_get_xxx() to avoid redundant
- lookup of irq_desc
-In-Reply-To: <1433391238-19471-7-git-send-email-jiang.liu@linux.intel.com>
-References: <1433391238-19471-1-git-send-email-jiang.liu@linux.intel.com>
- <1433391238-19471-7-git-send-email-jiang.liu@linux.intel.com>
-Message-ID: <CA+Ln22Euot24co7qKLTej43j3Z2BS-p5WhjRq9WgRb-+U=Tyqw@mail.gmail.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Thu, 04 Jun 2015 21:14:48 -0600
+Subject: [PATCH v7 2/3] ARM: bcm2835: Add the Raspberry Pi firmware driver
+In-Reply-To: <1433448707-18104-2-git-send-email-eric@anholt.net>
+References: <1433448707-18104-1-git-send-email-eric@anholt.net>
+ <1433448707-18104-2-git-send-email-eric@anholt.net>
+Message-ID: <55711428.4080506@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On 06/04/2015 02:11 PM, Eric Anholt wrote:
+> This gives us a function for making mailbox property channel requests
+> of the firmware, which is most notable in that it will let us get and
+> set clock rates.
 
-2015-06-04 13:13 GMT+09:00 Jiang Liu <jiang.liu@linux.intel.com>:
-> Use irq_desc_get_xxx() to avoid redundant lookup of irq_desc while we
-> already have a pointer to corresponding irq_desc.
->
-> Signed-off-by: Jiang Liu <jiang.liu@linux.intel.com>
-> Acked-by: Linus Walleij <linus.walleij@linaro.org>
-> ---
->  drivers/pinctrl/intel/pinctrl-cherryview.c    |    2 +-
->  drivers/pinctrl/intel/pinctrl-intel.c         |    2 +-
->  drivers/pinctrl/mediatek/pinctrl-mtk-common.c |    4 ++--
->  drivers/pinctrl/nomadik/pinctrl-nomadik.c     |   12 +++++-------
->  drivers/pinctrl/pinctrl-amd.c                 |    2 +-
->  drivers/pinctrl/pinctrl-at91.c                |    2 +-
->  drivers/pinctrl/pinctrl-coh901.c              |    4 ++--
->  drivers/pinctrl/pinctrl-rockchip.c            |    4 ++--
->  drivers/pinctrl/pinctrl-single.c              |    2 +-
->  drivers/pinctrl/pinctrl-st.c                  |    6 +++---
->  drivers/pinctrl/qcom/pinctrl-msm.c            |    2 +-
->  drivers/pinctrl/samsung/pinctrl-exynos.c      |    8 ++++----
->  drivers/pinctrl/samsung/pinctrl-s3c24xx.c     |   18 +++++++++---------
->  drivers/pinctrl/samsung/pinctrl-s3c64xx.c     |   22 ++++++++++------------
-
-For Samsung stuff:
-
-Acked-by: Tomasz Figa <tomasz.figa@gmail.com>
-
-Best regards,
-Tomasz
+Acked-by: Stephen Warren <swarren@wwwdotorg.org>
