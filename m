@@ -1,25 +1,28 @@
 From: hdegoede@redhat.com (Hans de Goede)
-Date: Fri,  5 Jun 2015 21:02:22 +0200
-Subject: [PATCH 19/20] ARM: dts: sun8i: Enable USB host on GA10H-A33 tablets
+Date: Fri,  5 Jun 2015 21:02:23 +0200
+Subject: [PATCH 20/20] ARM: dts: sun8i: sina33: Enable USB hosts
 In-Reply-To: <1433530943-12599-1-git-send-email-hdegoede@redhat.com>
 References: <1433530943-12599-1-git-send-email-hdegoede@redhat.com>
-Message-ID: <1433530943-12599-20-git-send-email-hdegoede@redhat.com>
+Message-ID: <1433530943-12599-21-git-send-email-hdegoede@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The GA10H tablets not only have an otg connector, but also a normal
-usb host connector, enabled support for this.
+From: Chen-Yu Tsai <wens@csie.org>
 
+The Sina33 SDK board exposes the EHCI/OHCI USB host pair.
+VBUS for this port is always on and non-controllable.
+
+Signed-off-by: Chen-Yu Tsai <wens@csie.org>
 Signed-off-by: Hans de Goede <hdegoede@redhat.com>
 ---
- arch/arm/boot/dts/sun8i-a33-ga10h-v1.1.dts | 8 ++++++++
- 1 file changed, 8 insertions(+)
+ arch/arm/boot/dts/sun8i-a33-sinlinx-sina33.dts | 13 +++++++++++++
+ 1 file changed, 13 insertions(+)
 
-diff --git a/arch/arm/boot/dts/sun8i-a33-ga10h-v1.1.dts b/arch/arm/boot/dts/sun8i-a33-ga10h-v1.1.dts
-index 7520e06..1aefc67 100644
---- a/arch/arm/boot/dts/sun8i-a33-ga10h-v1.1.dts
-+++ b/arch/arm/boot/dts/sun8i-a33-ga10h-v1.1.dts
-@@ -61,6 +61,10 @@
+diff --git a/arch/arm/boot/dts/sun8i-a33-sinlinx-sina33.dts b/arch/arm/boot/dts/sun8i-a33-sinlinx-sina33.dts
+index 5788c29..1d5390d 100644
+--- a/arch/arm/boot/dts/sun8i-a33-sinlinx-sina33.dts
++++ b/arch/arm/boot/dts/sun8i-a33-sinlinx-sina33.dts
+@@ -63,6 +63,10 @@
  	};
  };
  
@@ -27,11 +30,11 @@ index 7520e06..1aefc67 100644
 +	status = "okay";
 +};
 +
- &i2c0 {
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&i2c0_pins_a>;
-@@ -109,6 +113,10 @@
+ &lradc {
+ 	vref-supply = <&reg_vcc3v0>;
  	status = "okay";
+@@ -113,6 +117,10 @@
+ 	allwinner,pull = <SUN4I_PINCTRL_PULL_UP>;
  };
  
 +&ohci0 {
@@ -39,7 +42,16 @@ index 7520e06..1aefc67 100644
 +};
 +
  &pio {
- 	mmc0_cd_pin_q8h: mmc0_cd_pin at 0 {
+ 	mmc0_cd_pin_sina33: mmc0_cd_pin at 0 {
  		allwinner,pins = "PB4";
+@@ -127,3 +135,8 @@
+ 	pinctrl-0 = <&uart0_pins_b>;
+ 	status = "okay";
+ };
++
++&usbphy {
++	status = "okay";
++	usb1_vbus-supply = <&reg_vcc5v0>; /* USB1 VBUS is always on */
++};
 -- 
 2.4.2
