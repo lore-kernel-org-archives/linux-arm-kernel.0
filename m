@@ -1,147 +1,128 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 5 Jun 2015 19:29:47 +0100
-Subject: [PATCH v3 2/3] ARM: rockchip: ensure CPU to enter WFI/WFE state
-In-Reply-To: <CAD=FV=UMkFtOFYpY+MUZOegnmFLdW3ZgNivwdHChv0MLr50sVQ@mail.gmail.com>
-References: <1433517104-7595-1-git-send-email-wxt@rock-chips.com>
- <1433517104-7595-3-git-send-email-wxt@rock-chips.com>
- <CAD=FV=UMkFtOFYpY+MUZOegnmFLdW3ZgNivwdHChv0MLr50sVQ@mail.gmail.com>
-Message-ID: <20150605182947.GN7557@n2100.arm.linux.org.uk>
+From: timur@codeaurora.org (Timur Tabi)
+Date: Fri, 5 Jun 2015 13:35:24 -0500
+Subject: [PATCH] ARM64: TTY: hvc_dcc: Add support for ARM64 dcc
+In-Reply-To: <20140617095155.GD13020@arm.com>
+References: <1402957778-13830-1-git-send-email-abhimany@codeaurora.org>
+ <20140617095155.GD13020@arm.com>
+Message-ID: <CAOZdJXWSr=DNEQ9WiL+qhosGDx2y0Tgz4zcwMXFvRE0k6iodjA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 05, 2015 at 10:49:14AM -0700, Doug Anderson wrote:
-> On Fri, Jun 5, 2015 at 8:11 AM, Caesar Wang <wxt@rock-chips.com> wrote:
-> > In idle mode, core1/2/3 of Cortex-A17 should be either power off or in
-> > WFI/WFE state.
-> > we can delay 1ms to ensure the CPU enter WFI/WFE state.
-> >
-> > Signed-off-by: Caesar Wang <wxt@rock-chips.com>
-> > ---
-> >
-> >  arch/arm/mach-rockchip/platsmp.c | 3 +++
-> >  1 file changed, 3 insertions(+)
-> >
-> > diff --git a/arch/arm/mach-rockchip/platsmp.c b/arch/arm/mach-rockchip/platsmp.c
-> > index 25da16f..6672fdd 100644
-> > --- a/arch/arm/mach-rockchip/platsmp.c
-> > +++ b/arch/arm/mach-rockchip/platsmp.c
-> > @@ -325,6 +325,9 @@ static void __init rockchip_smp_prepare_cpus(unsigned int max_cpus)
-> >  #ifdef CONFIG_HOTPLUG_CPU
-> >  static int rockchip_cpu_kill(unsigned int cpu)
-> >  {
-> > +       /* ensure CPU can enter the WFI/WFE state */
-> > +       mdelay(1);
-> 
-> This is a pretty weak assurance.  Is there any stronger assurance you
-> can give that we're in WFI/WFE state and won't come out of it?
-> 
-> Do you actually see problems if you power off a CPU when it's not in
-> WFI/WFE state?
+On Tue, Jun 17, 2014 at 4:51 AM, Will Deacon <will.deacon@arm.com> wrote:
+> On Mon, Jun 16, 2014 at 11:29:38PM +0100, Abhimanyu Kapur wrote:
+>> Add support for debug communications channel based
+>> hvc console for arm64 cpus.
 
-I really don't like to see platforms pulling crap tricks in their
-CPU hotunplug code like this.  If there's something wrong with the
-generic code, then the generic code needs to be fixed, not worked
-around in platform code.
+I know it's been a year since this patch was posted, but I'm working
+on re-submitting it.  Unfortunately, I can't answer most of your
+questions, but I want to try to fix this patch up and get it accepted.
 
-> ...so I _think_ I see the path that is happening here and what you're
-> trying to handle.  Specifically, I see:
-> 
-> On dying CPU:
-> 1. cpu_die() calls 'complete(&cpu_died)'
-> 2. cpu_die() calls 'smp_ops.cpu_die(cpu)' AKA rockchip_cpu_die()
-> 3. rockchip_cpu_die() does a bit more cache flushing before looping in
-> cpu_do_idle()
-> 
-> The problem is that the moment the completion happens in step #1 above
-> the dying CPU can be killed.  ...so you're trying to make sure the
-> dying CPU makes it to cpu_do_idle().  In that case a fixed mdelay(1)
-> might be OK since the time that the CPU takes to run through a few
-> instructions (with no interrupts) is pretty predictable.  It would be
-> really nice if the commit message went through all this, though.
-> 
-> ...but is there any chance that cpu_do_idle() could somehow return?
-> We shouldn't send any events since we've marked the core offline, but
-> perhaps some per-core interrupt (arch timer?) that didn't get
-> migrated?
+> Should we be setting MDSCR_EL1.TDCC to prevent userspace access to the DCC?
 
-How this is supposed to work is:
+I personally don't know enough about ARM to answer that question, but
+it does makes sense that we don't want userspace to access the DCC
+registers.  Where would MDSCR_EL1.TDCC be set?  Should we add it to
+hvc_dcc_init()?
 
-	CPU requesting death		CPU dying
-	stop_machine(take_down_cpu)
-					take_down_cpu()
-					-__cpu_disable()
-					- platform_cpu_disable()
-					- marks CPU offline
-					- migrates IRQs away
-					- caches flushed
-					- tlbs flushed
-	__cpu_die()			- processes migrated away
-	-wait_for_completion_timeout()	-timekeeping migrated away
-					returns to idle loop
-					arch_cpu_idle_dead()
-					-cpu_die()
-					- idle_task_exit()
-					- flush_cache_louis()
+>> Signed-off-by: Abhimanyu Kapur <abhimany@codeaurora.org>
+>> ---
+>>  arch/arm64/include/asm/dcc.h | 41 +++++++++++++++++++++++++++++++++++++++++
+>>  drivers/tty/hvc/Kconfig      |  2 +-
+>>  2 files changed, 42 insertions(+), 1 deletion(-)
+>>  create mode 100644 arch/arm64/include/asm/dcc.h
+>>
+>> diff --git a/arch/arm64/include/asm/dcc.h b/arch/arm64/include/asm/dcc.h
+>> new file mode 100644
+>> index 0000000..ef74324
+>> --- /dev/null
+>> +++ b/arch/arm64/include/asm/dcc.h
+>> @@ -0,0 +1,41 @@
+>> +/* Copyright (c) 2014 The Linux Foundation. All rights reserved.
+>> + *
+>> + * This program is free software; you can redistribute it and/or modify
+>> + * it under the terms of the GNU General Public License version 2 and
+>> + * only version 2 as published by the Free Software Foundation.
+>> + *
+>> + * This program is distributed in the hope that it will be useful,
+>> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+>> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+>> + * GNU General Public License for more details.
+>> + */
+>> +
+>> +#include <asm/barrier.h>
+>> +
+>> +static inline u32 __dcc_getstatus(void)
+>> +{
+>> +     u32 __ret;
+>
+> Can this result in the mrs receiving a W register?
 
-At this point, dirty cache lines which matter are flushed from the
-dying CPUs cache.  However, we still need the dying CPU to be
-coherent for the next step, which is to issue the completion.
+Another question I can't answer.  I understand what you're saying, but
+I don't know what to do about it.
 
-					- complete()
-					- flush_cache_louis()
+>> +     asm volatile("mrs %0, mdccsr_el0" : "=r" (__ret)
+>> +                     : : "cc");
+>
+> Why the CC clobber? Why volatile?
 
-At some point during the above, the completion becomes visible to
-the other CPU, and it continues its execution.
+I don't think we need the CC clobber, but the volatiles do appear to
+be important.  Without that, DCC does not work.
 
-	-pr_notice()
-	-platform_cpu_kill()		- smp_ops.cpu_die()
+>> +
+>> +     return __ret;
+>> +}
+>> +
+>> +static inline char __dcc_getchar(void)
+>> +{
+>> +     char __c;
+>> +
+>> +     asm volatile("mrs %0, dbgdtrrx_el0" : "=r" (__c));
+>> +     isb();
+>
+> Why the isb and why volatile??
 
-The precise ordering of smp_ops.cpu_die() vs platform_cpu_kill() is
-pretty much indeterminant, and is subject to scheduling effects which
-could delay the requesting CPU.
+The driver does appear to work without the isb, but there's a reason
+it was added.  On ARM32, reading/writing the DCC register is
+apparently a context change:
 
-Now, the problem is, from what ARM has been saying, that cache lines
-can get migrated to the dying CPU which may contain the "master" copy
-of the data, which means that when the dying CPU actually exits
-coherency, that data is lost to the rest of the system.
+http://www.serverphorums.com/read.php?12,395361
 
-Ideally, what we would like to do is to exit coherency earlier, and
-then have some notification mechanism between the dying CPU and the
-rest of the system to say that it's finished exiting coherency.
-However, we face several issues.
+I don't know if the same thing is true on ARM64.  However, I don't
+understand why reading/writing the DCC register is a context change on
+ARM32.
 
-1) v7_coherency_exit() is specific to v7 CPUs and can't be used by
-   generic code.
+>> +
+>> +     return __c;
+>> +}
+>> +
+>> +static inline void __dcc_putchar(char c)
+>> +{
+>> +     asm volatile("msr dbgdtrtx_el0, %0"
+>> +                     : /* No output register */
+>> +                     : "r" (c));
+>
+> Can you guarantee that GCC hasn't put junk in the upper bits of c?
 
-2) we have no way to perform that notification reliably once
-   coherency has been exited.
+Should I change the prototype to:
 
-There's other reasons we need to change the notification mechanism,
-one of them is that completions use RCU, and RCU isn't actually valid
-in this context - and we can't make it valid because the dying CPU
-might loose power at any moment after it's called complete().
+static inline void __dcc_putchar(unsigned int c)
 
-Paul McKenny created what was a generic infrastructure for this
-notification, but I object to it on principle using atomic_t... and
-if we've exited coherency (as we would want to), it won't work
-because it makes use of atomic_cmpxchg() on the dying CPU.
 
-I've been working on a solution to use an IPI to notify from the
-dying CPU, but that's fraught because of the separation of the IRQ
-controller code from the architecture code, and we now have spinlocks
-in the IPI-raising path due to the big.LITTLE stuff - and spinlocks
-need coherency to be working.
+>
+>> +     isb();
+>
+> Why the isb?
+>
+> Will
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
 
-So, we're actually in a very sticky position over taking CPUs offline.
-It seems to be something that the ARM architecture and kernel
-architecture doesn't actually allow to be done safely.  So much so,
-that in a similar way to the original Keystone 2 physical address
-switch, I'm tempted to make taking a CPU offline taint the kernel!
 
-We're going to end up with tainted kernels through this path when Paul
-pushes his RCU correctness patches anyway anyway, so it's just a
-matter of the inevitable taint happening sooner or later.
 
 -- 
-FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
-according to speedtest.net.
+Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+a Linux Foundation Collaborative Project.
