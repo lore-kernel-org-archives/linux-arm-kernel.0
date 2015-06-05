@@ -1,28 +1,53 @@
 From: bjorn.andersson@sonymobile.com (Bjorn Andersson)
-Date: Fri, 5 Jun 2015 15:52:22 -0700
-Subject: [PATCH 0/3] Pinctrl support for msm8660
-Message-ID: <1433544745-325-1-git-send-email-bjorn.andersson@sonymobile.com>
+Date: Fri, 5 Jun 2015 15:52:25 -0700
+Subject: [PATCH 3/3] ARM: dts: qcom: Replace gpio node with pinctrl node
+In-Reply-To: <1433544745-325-1-git-send-email-bjorn.andersson@sonymobile.com>
+References: <1433544745-325-1-git-send-email-bjorn.andersson@sonymobile.com>
+Message-ID: <1433544745-325-4-git-send-email-bjorn.andersson@sonymobile.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Per your request Linus, happy birthday!
+Replace the standalone gpio driver with pinctrl-msm as we now have
+msm8660 support there.
 
-Regards,
-Bjorn
+Signed-off-by: Bjorn Andersson <bjorn.andersson@sonymobile.com>
+---
+ arch/arm/boot/dts/qcom-msm8660.dtsi | 11 ++++++-----
+ 1 file changed, 6 insertions(+), 5 deletions(-)
 
-Bjorn Andersson (3):
-  pinctrl: qcom: Add MSM8660 pinctrl definitions
-  pinctrl: dt-binding: Add DT binding documentation for MSM8660
-  ARM: dts: qcom: Replace gpio node with pinctrl node
-
- .../bindings/pinctrl/qcom,msm8660-pinctrl.txt      |  90 ++
- arch/arm/boot/dts/qcom-msm8660.dtsi                |  11 +-
- drivers/pinctrl/qcom/Kconfig                       |   8 +
- drivers/pinctrl/qcom/Makefile                      |   1 +
- drivers/pinctrl/qcom/pinctrl-msm8660.c             | 984 +++++++++++++++++++++
- 5 files changed, 1089 insertions(+), 5 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/pinctrl/qcom,msm8660-pinctrl.txt
- create mode 100644 drivers/pinctrl/qcom/pinctrl-msm8660.c
-
+diff --git a/arch/arm/boot/dts/qcom-msm8660.dtsi b/arch/arm/boot/dts/qcom-msm8660.dtsi
+index 20bbd19b996e..28bba8b09854 100644
+--- a/arch/arm/boot/dts/qcom-msm8660.dtsi
++++ b/arch/arm/boot/dts/qcom-msm8660.dtsi
+@@ -62,15 +62,16 @@
+ 			cpu-offset = <0x40000>;
+ 		};
+ 
+-		msmgpio: gpio at 800000 {
+-			compatible = "qcom,msm-gpio";
+-			reg = <0x00800000 0x4000>;
++		tlmm: pinctrl at 800000 {
++			compatible = "qcom,msm8660-pinctrl";
++			reg = <0x800000 0x4000>;
++
+ 			gpio-controller;
+ 			#gpio-cells = <2>;
+-			ngpio = <173>;
+ 			interrupts = <0 16 0x4>;
+ 			interrupt-controller;
+ 			#interrupt-cells = <2>;
++
+ 		};
+ 
+ 		gcc: clock-controller at 900000 {
+@@ -110,7 +111,7 @@
+ 
+ 			pmicintc: pmic at 0 {
+ 				compatible = "qcom,pm8058";
+-				interrupt-parent = <&msmgpio>;
++				interrupt-parent = <&tlmm>;
+ 				interrupts = <88 8>;
+ 				#interrupt-cells = <2>;
+ 				interrupt-controller;
 -- 
 1.8.2.2
