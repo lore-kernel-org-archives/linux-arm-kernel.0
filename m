@@ -1,47 +1,109 @@
-From: dianders@chromium.org (Doug Anderson)
-Date: Fri, 5 Jun 2015 13:58:14 -0700
-Subject: [PATCH v4 3/3] ARM: rockchip: fix the SMP code style
-In-Reply-To: <1433523923-4755-4-git-send-email-wxt@rock-chips.com>
-References: <1433523923-4755-1-git-send-email-wxt@rock-chips.com>
- <1433523923-4755-4-git-send-email-wxt@rock-chips.com>
-Message-ID: <CAD=FV=Xj-j2Fnnch99rzvKpvsrpgaz6ukfM+X87O20B-nHbjkQ@mail.gmail.com>
+From: bhelgaas@google.com (Bjorn Helgaas)
+Date: Fri, 5 Jun 2015 16:05:00 -0500
+Subject: [PATCH v10 0/4] PCI: X-Gene: Add APM X-Gene v1 MSI/MSIX
+ termination driver
+In-Reply-To: <cover.1432922451.git.dhdang@apm.com>
+References: <5566CC58.8080400@arm.com>
+ <cover.1432922451.git.dhdang@apm.com>
+Message-ID: <20150605210500.GQ3631@google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Caesar,
+On Fri, May 29, 2015 at 11:24:28AM -0700, Duc Dang wrote:
+> This patch set adds MSI/MSIX termination driver support for APM X-Gene v1 SoC.
+> APM X-Gene v1 SoC supports its own implementation of MSI, which is not compliant
+> to GIC V2M specification for MSI Termination.
+> 
+> There is single MSI block in X-Gene v1 SOC which serves all 5 PCIe ports.
+> This MSI block supports 2048 MSI termination ports coalesced into 16 physical
+> HW IRQ lines and shared across all 5 PCIe ports. Starting from version 5 of
+> this patch series, the total MSI vectors this driver supports is reduced to 256
+> to maintain the correct set_affinity behavior for each MSI.
+> 
+> v10 changes:
+> 	1. Remove inline in helper functions
+> 	2. Simplify hwirq_to_cpu implementation
+> 
+> v9 changes:
+>         1. Add more helpers for manipulating MSI messages
+>         2. Improve code readability
+>         3. Make PCI_XGENE_MSI selectable
+> 
+> v8 changes:
+>         1. Add helper to read MSI registers
+>         2. Resample interrupt status of the same group after handling interrupts
+>            in that group
+>         3. Error handling in case fail to allocate CPU mask for affinity setting
+> 
+> v7 changes:
+>         1. Add more error handling cases
+>         2. Clear spurious interrupts that may happen during driver probe
+>         3. Not using free_irq for chained irqs
+>         4. Improve GIC IRQ number look up in chained handler
+> 
+> v6 changes:
+>         1. Correctly allocate MSI with bitmap_find_next_zero_area
+>         2. Add notifier for CPU hotplug case
+>         3. Driver clean up
+>         4. Add more detailed information into device tree binding document
+>            and move the device tree binding patch before the driver/dts patch
+> 
+> v5 changes:
+>         1. Implement set_affinity for each MSI by statically allocating 2
+> 	   MSI GIC IRQs for each X-Gene CPU core and moving MSI vectors around
+> 	   these GIC IRQs to steer them to target CPU core. As a consequence,
+> 	   the total MSI vectors that X-Gene v1 supports is reduced to 256.
+> 
+> v4 changes:
+>         1. Remove affinity setting for each MSI
+>         2. Add description about register layout, MSI termination address
+> 	   and data
+>         3. Correct total number of MSI vectors to 2048
+>         4. Clean up error messages
+>         5. Remove unused module code
+> 
+> v3 changes:
+>         1. Implement MSI support using PCI MSI IRQ domain
+>         2. Only use msi_controller to store IRQ domain
+> 
+> v2 changes:
+>         1. Use msi_controller structure
+>         2. Remove arch hooks arch_teardown_msi_irqs and arch_setup_msi_irqs
+> 
+>  .../devicetree/bindings/pci/xgene-pci-msi.txt      |  68 +++
+>  MAINTAINERS                                        |   8 +
+>  arch/arm64/boot/dts/apm/apm-storm.dtsi             |  27 +
+>  drivers/pci/host/Kconfig                           |  10 +
+>  drivers/pci/host/Makefile                          |   1 +
+>  drivers/pci/host/pci-xgene-msi.c                   | 595 +++++++++++++++++++++
+>  drivers/pci/host/pci-xgene.c                       |  21 +
+>  7 files changed, 730 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/pci/xgene-pci-msi.txt
+>  create mode 100644 drivers/pci/host/pci-xgene-msi.c
 
-On Fri, Jun 5, 2015 at 10:05 AM, Caesar Wang <wxt@rock-chips.com> wrote:
-> Use the below scripts to check:
-> scripts/checkpatch.pl -f --subject arch/arm/mach-rockchip/platsmp.c
-> Although there is a check, it's no matter.
->
-> CHECK: usleep_range is preferred over udelay; see
-> Documentation/timers/timers-howto.txt
-> +167udelay(10);
-> total: 0 errors, 0 warnings, 1 checks, 362 lines checked
->
->  Changes in v4:
->     - Add reset_control_put(rstc) for the non-error case.
->     - Fix commit information in PATCH [1/3]
->
->  Changes in v3:
->     - FIx the PATCH v2, it doesn't work on chromium 3.14.
->
->  Changes in v2:
->     - As Kever points out, Fix the subject typo WIF/WFI in PATCH [2/3].
->     - As Heiko suggestion, re-adjust the cpu on/off flow in PATCH [1/3].
->     - Use the checkpatch.pl -f --subjective to check in PATCH [3/3].
+I applied these to pci/host-xgene for v4.2, thanks!
 
-The change log should (ideally) be with each patch.  If that's too
-hard and you want to put it in one place, please put it in the cover
-letter (the 0/3 email).
+I squashed the doc, driver, and maintainer updates into a single patch with
+the following changelog:
 
-Also: the change log should be "below the cut".  That is, it should be
-below the "---" and above the diffstat.
+PCI: xgene: Add APM X-Gene v1 PCIe MSI/MSIX termination driver
 
-Other than those problems:
+APM X-Gene v1 SoC supports its own implementation of MSI, which is not 
+compliant to GIC V2M specification for MSI Termination.
 
-Reviewed-by: Douglas Anderson <dianders@chromium.org>
+There is a single MSI block in X-Gene v1 SOC which serves all 5 PCIe ports.
+This MSI block supports 2048 MSI termination ports coalesced into 16
+physical HW IRQ lines and shared across all 5 PCIe ports.
 
+As there are only 16 HW IRQs to serve 2048 MSI vectors, to support
+set_affinity correctly for each MSI vectors, the 16 HW IRQs are statically
+allocated to 8 X-Gene v1 cores (2 HW IRQs for each cores).  To steer MSI 
+interrupt to target CPU, MSI vector is moved around these HW IRQs lines.
+With this approach, the total MSI vectors this driver supports is reduced
+to 256.
 
--Doug
+[bhelgaas: squash doc, driver, maintainer update]
+Signed-off-by: Duc Dang <dhdang@apm.com>
+Signed-off-by: Tanmay Inamdar <tinamdar@apm.com>
+Signed-off-by: Bjorn Helgaas <bhelgaas@google.com>
+Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
