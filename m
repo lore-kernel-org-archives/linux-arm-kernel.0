@@ -1,28 +1,41 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Thu, 04 Jun 2015 20:59:51 -0600
-Subject: [PATCH v2 2/2] mmc: sdhci-bcm2835: Actually enable the clock
-In-Reply-To: <1432933572-8695-2-git-send-email-eric@anholt.net>
-References: <1432933572-8695-1-git-send-email-eric@anholt.net>
- <1432933572-8695-2-git-send-email-eric@anholt.net>
-Message-ID: <557110A7.8070705@wwwdotorg.org>
+From: tomasz.figa@gmail.com (Tomasz Figa)
+Date: Fri, 5 Jun 2015 12:06:06 +0900
+Subject: [RFT v2 06/48] pinctrl: Use irq_desc_get_xxx() to avoid redundant
+ lookup of irq_desc
+In-Reply-To: <1433391238-19471-7-git-send-email-jiang.liu@linux.intel.com>
+References: <1433391238-19471-1-git-send-email-jiang.liu@linux.intel.com>
+ <1433391238-19471-7-git-send-email-jiang.liu@linux.intel.com>
+Message-ID: <CA+Ln22Euot24co7qKLTej43j3Z2BS-p5WhjRq9WgRb-+U=Tyqw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/29/2015 03:06 PM, Eric Anholt wrote:
-> We're currently using a fixed frequency clock specified in the DT, so
-> enabling is a no-op.  However, the RPi firmware-based clocks driver
-> can actually disable unused clocks, so when switching to use it we
-> ended up losing our MMC clock once all devices were probed.
+Hi,
 
-> diff --git a/drivers/mmc/host/sdhci-bcm2835.c b/drivers/mmc/host/sdhci-bcm2835.c
+2015-06-04 13:13 GMT+09:00 Jiang Liu <jiang.liu@linux.intel.com>:
+> Use irq_desc_get_xxx() to avoid redundant lookup of irq_desc while we
+> already have a pointer to corresponding irq_desc.
+>
+> Signed-off-by: Jiang Liu <jiang.liu@linux.intel.com>
+> Acked-by: Linus Walleij <linus.walleij@linaro.org>
+> ---
+>  drivers/pinctrl/intel/pinctrl-cherryview.c    |    2 +-
+>  drivers/pinctrl/intel/pinctrl-intel.c         |    2 +-
+>  drivers/pinctrl/mediatek/pinctrl-mtk-common.c |    4 ++--
+>  drivers/pinctrl/nomadik/pinctrl-nomadik.c     |   12 +++++-------
+>  drivers/pinctrl/pinctrl-amd.c                 |    2 +-
+>  drivers/pinctrl/pinctrl-at91.c                |    2 +-
+>  drivers/pinctrl/pinctrl-coh901.c              |    4 ++--
+>  drivers/pinctrl/pinctrl-rockchip.c            |    4 ++--
+>  drivers/pinctrl/pinctrl-single.c              |    2 +-
+>  drivers/pinctrl/pinctrl-st.c                  |    6 +++---
+>  drivers/pinctrl/qcom/pinctrl-msm.c            |    2 +-
+>  drivers/pinctrl/samsung/pinctrl-exynos.c      |    8 ++++----
+>  drivers/pinctrl/samsung/pinctrl-s3c24xx.c     |   18 +++++++++---------
+>  drivers/pinctrl/samsung/pinctrl-s3c64xx.c     |   22 ++++++++++------------
 
-> +	ret = clk_prepare_enable(pltfm_host->clk);
-> +	if (ret) {
-> +		dev_err(&pdev->dev, "failed to enable host clk\n");
-> +		goto err;
-> +	}
+For Samsung stuff:
 
-Given that pltfm_host is a "struct sdhci_pltfm_host" i.e. a type
-defined/handled by sdhci-pltfm.c , I'm rather surprised that
-sdhci-pltfm.c doesn't do this itself. Wouldn't it make sense for it to
-do so?
+Acked-by: Tomasz Figa <tomasz.figa@gmail.com>
+
+Best regards,
+Tomasz
