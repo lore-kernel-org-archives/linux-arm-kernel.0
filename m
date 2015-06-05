@@ -1,153 +1,146 @@
-From: daniel.thompson@linaro.org (Daniel Thompson)
-Date: Fri, 05 Jun 2015 10:36:27 +0100
-Subject: [RFC PATCH 2/3] clk: stm32: Add clock driver for STM32F4[23]xxx
- devices
-In-Reply-To: <20150604220725.GT676@codeaurora.org>
-References: <1432327273-6810-1-git-send-email-daniel.thompson@linaro.org>
- <1432327273-6810-3-git-send-email-daniel.thompson@linaro.org>
- <20150604220725.GT676@codeaurora.org>
-Message-ID: <55716D9B.4040209@linaro.org>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Fri, 05 Jun 2015 10:36:36 +0100
+Subject: [PATCH v3 3/5] clk: add support for clocks provided by SCP(System
+ Control Processor)
+In-Reply-To: <20150604202009.GI676@codeaurora.org>
+References: <1432720398-5701-1-git-send-email-sudeep.holla@arm.com>
+ <1432720398-5701-4-git-send-email-sudeep.holla@arm.com>
+ <20150604202009.GI676@codeaurora.org>
+Message-ID: <55716DA4.2090003@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/06/15 23:07, Stephen Boyd wrote:
-> On 05/22, Daniel Thompson wrote:
+
+
+On 04/06/15 21:20, Stephen Boyd wrote:
+> On 05/27, Sudeep Holla wrote:
 >> +
->> +#include <linux/clk.h>
->
-> Are you using this include?
->
->> +#include <linux/clkdev.h>
->
-> Are you using this include?
-
-Not very much?
-
-Turns out I was relying on these to get kzalloc() defined but there are 
-better headers for me to use for that!
-
->
->> +#include <linux/err.h>
->> +#include <linux/io.h>
 >> +#include <linux/clk-provider.h>
->> +#include <linux/spinlock.h>
+>> +#include <linux/device.h>
+>> +#include <linux/err.h>
 >> +#include <linux/of.h>
->> +#include <linux/of_address.h>
+>> +#include <linux/module.h>
+>> +#include <linux/of_platform.h>
+>> +#include <linux/scpi_protocol.h>
 >> +
->> +#include <linux/debugfs.h>
+>> +struct scpi_clk {
+>> +	u32 id;
+>> +	const char *name;
+>> +	struct clk_hw hw;
+>> +	struct scpi_dvfs_info *info;
+>> +	unsigned long rate_min;
+>> +	unsigned long rate_max;
+>> +};
+>> +
+>> +#define to_scpi_clk(clk) container_of(clk, struct scpi_clk, hw)
+>> +
+>> +static struct scpi_ops *scpi_ops;
 >
-> Are you using this include?
+> Why do we need this singleton? Can we put this pointer into scpi_clk?
+>
 
-No (this is already gone in v2).
+Yes I will move it.
 
-
->> +static long clk_apb_mul_round_rate(struct clk_hw *hw, unsigned long rate,
->> +				   unsigned long *prate)
+>> +
+>> +static unsigned long scpi_clk_recalc_rate(struct clk_hw *hw,
+>> +					  unsigned long parent_rate)
 >> +{
->> +	struct clk_apb_mul *am = to_clk_apb_mul(hw);
->> +	unsigned long mult = 1;
+>> +	struct scpi_clk *clk = to_scpi_clk(hw);
 >> +
->> +	if (readl(base + STM32F4_RCC_CFGR) & BIT(am->bit_idx))
->> +		mult *= 2;
+>> +	return scpi_ops->clk_get_val(clk->id);
+>> +}
+>> +
+>> +static long scpi_clk_round_rate(struct clk_hw *hw, unsigned long rate,
+>> +				unsigned long *parent_rate)
+>> +{
+>> +	struct scpi_clk *clk = to_scpi_clk(hw);
+>> +
+>> +	if (WARN_ON(clk->rate_min && rate < clk->rate_min))
+>> +		rate = clk->rate_min;
+>> +	if (WARN_ON(clk->rate_max && rate > clk->rate_max))
+>> +		rate = clk->rate_max;
+>> +
+>> +	return rate;
+>> +}
 >
-> Isn't this the same as mult = 2? I guess we could rely on the
-> compiler to figure out this one.
+> Hm.. this seems really generic. It might be better to support a
+> way to tell the framework to limit the min/max rate that's
+> accepted for a clk. That could be done later though.
+>
 
-I'll fix this.
-
+True, framework have some boundary checks in place. I will check if
+I can use it with minimum changes to the core. If not, we can take this
+up later as you suggested.
 
 >> +
->> +	if (__clk_get_flags(hw->clk) & CLK_SET_RATE_PARENT) {
->> +		unsigned long best_parent = rate / mult;
+>> +static int scpi_clk_set_rate(struct clk_hw *hw, unsigned long rate,
+>> +			     unsigned long parent_rate)
+>> +{
+>> +	struct scpi_clk *clk = to_scpi_clk(hw);
 >> +
->> +		*prate =
->> +		    __clk_round_rate(__clk_get_parent(hw->clk), best_parent);
+>> +	return scpi_ops->clk_set_val(clk->id, rate);
+>> +}
+>> +
+> [..]
+>> +
+>> +static int scpi_clk_add(struct device *dev, struct device_node *np)
+>> +{
+>> +	struct clk **clks;
+>> +	int idx, count;
+>> +	struct clk_onecell_data *clk_data;
+>> +
+>> +	count = of_property_count_strings(np, "clock-output-names");
+>> +	if (count < 0) {
+>> +		dev_err(dev, "%s: invalid clock output count\n", np->name);
+>> +		return -EINVAL;
 >> +	}
 >> +
->> +	return *prate * mult;
->> +}
+>> +	clk_data = devm_kmalloc(dev, sizeof(*clk_data), GFP_KERNEL);
+>> +	if (!clk_data)
+>> +		return -ENOMEM;
 >> +
->> +static int clk_apb_mul_set_rate(struct clk_hw *hw, unsigned long rate,
->> +				 unsigned long parent_rate)
->> +{
+>> +	clks = devm_kcalloc(dev, count, sizeof(*clks), GFP_KERNEL);
+>> +	if (!clks)
+>> +		return -ENOMEM;
+>> +
+>> +	for (idx = 0; idx < count; idx++) {
+>> +		struct scpi_clk *sclk;
+>> +		u32 val;
+>> +
+>> +		sclk = devm_kzalloc(dev, sizeof(*sclk), GFP_KERNEL);
+>> +		if (!sclk)
+>> +			return -ENOMEM;
+>> +
+>> +		if (of_property_read_string_index(np, "clock-output-names",
+>> +						  idx, &sclk->name)) {
+>> +			dev_err(dev, "invalid clock name @ %s\n", np->name);
+>> +			return -EINVAL;
+>> +		}
+>> +
+>> +		if (of_property_read_u32_index(np, "clock-indices",
+>> +					       idx, &val)) {
+>> +			dev_err(dev, "invalid clock index @ %s\n", np->name);
+>> +			return -EINVAL;
+>> +		}
+>> +
+>> +		sclk->id = val;
+>> +
+>> +		clks[idx] = scpi_clk_ops_init(dev, np, sclk);
+>> +		if (IS_ERR_OR_NULL(clks[idx]))
+>> +			dev_err(dev, "failed to register clock '%s'\n",
+>> +				sclk->name);
+>> +		else
+>> +			dev_dbg(dev, "Registered clock '%s'\n", sclk->name);
+>> +	}
+>> +
+>> +	clk_data->clks = clks;
+>> +	clk_data->clk_num = idx;
+>> +	of_clk_add_provider(np, of_clk_src_onecell_get, clk_data);
 >
-> Why don't we need to do anything here?
-
-This clock cannot change its own rate. It is very nearly a fixed factor 
-clock but with the additional quirk that the "fixed" factor changes 
-depending upon the rate of the parent clock.
-
-This is the same implementation as clk-fixed-factor. I concluded that it 
-returns success because round rate should always result in the set rate 
-for this clock being a nop.
-
-
->> +	return 0;
->> +}
->> +
->> +static struct clk_ops clk_apb_mul_factor_ops = {
+> And if of_clk_add_provider() fails?
 >
-> const?
 
-Makes sense...
+Ah, my bad, will fix it.
 
-You want a patch for clk-fixed-factor too?
-
-
->> +struct clk *clk_register_apb_mul(struct device *dev, const char *name,
->> +				 const char *parent_name, unsigned long flags,
->> +				 u8 bit_idx)
->> +{
->> +	struct clk_apb_mul *am;
->> +	struct clk_init_data init;
->> +	struct clk *clk;
->> +
->> +	am = kzalloc(sizeof(*am), GFP_KERNEL);
->> +	if (!am)
->> +		return ERR_PTR(-ENOMEM);
->> +
->> +	am->bit_idx = bit_idx;
->> +	am->hw.init = &init;
->> +
->> +	init.name = name;
->> +	init.ops = &clk_apb_mul_factor_ops;
->> +	init.flags = flags | CLK_IS_BASIC;
->
-> Is it basic?
-
-Tough question.
-
-The absence of this flag appears grants arch code permission to use 
-secret backdoors to do "weird stuff" but making special assumptions 
-about the type of the clock. This clock keeps its implementation private 
-so noone outside the compilation unit can usefully cast it.
-
-However, it also looks like only omap2 is the only platform that makes 
-these special assumptions so when this code is run on STM32 there is 
-nothing to actually consume the CLK_IS_BASIC flag at runtime.
-
-In other words the flag is useless but, I think, also correctly applied.
-
-I'd be happy to remove it if anyone disagrees with the guesswork above.
-
-Alternatively, I could write a patch to *invert* CLK_IS_BASIC and rename 
-it CLK_CASTABLE on the grounds that only the people doing "weird stuff" 
-should have to care about this flag at all. Any interest in that?
-
-
->> +	init.parent_names = &parent_name;
->> +	init.num_parents = 1;
->> +
->> +	clk = clk_register(dev, &am->hw);
->> +
->> +	if (IS_ERR(clk))
->> +		kfree(am);
->> +
->> +	return clk;
->> +}
->> +
->> +static const char __initdata *sys_parents[] =   { "hsi", NULL, "pll" };
->
-> __initdata goes after the []
-
-Thanks. I'll fix this.
+Regards,
+Sudeep
