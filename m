@@ -1,58 +1,65 @@
 From: hdegoede@redhat.com (Hans de Goede)
-Date: Fri,  5 Jun 2015 21:02:10 +0200
-Subject: [PATCH 07/20] ARM: dts: sun8i: Add support for USB controllers on
- A23/A33
+Date: Fri,  5 Jun 2015 21:02:12 +0200
+Subject: [PATCH 09/20] ARM: dts: sun4i: Enable USB DRC on the Cubieboard
 In-Reply-To: <1433530943-12599-1-git-send-email-hdegoede@redhat.com>
 References: <1433530943-12599-1-git-send-email-hdegoede@redhat.com>
-Message-ID: <1433530943-12599-8-git-send-email-hdegoede@redhat.com>
+Message-ID: <1433530943-12599-10-git-send-email-hdegoede@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Chen-Yu Tsai <wens@csie.org>
+Enable the otg/drc usb controller on the Cubieboard. Note that the
+5V of the otg is directly connected to the general 5V, so we only use
+the id pin.
 
-A23/A33 has one pair of EHCI/OHCI USB controllers. There are 2 USB PHYs,
-one for the USB OTG controller, one for the EHCI/OHCI pair. The latter
-may also support HSIC, though none of the available boards utilize this,
-so this is not supported yet.
-
-Signed-off-by: Chen-Yu Tsai <wens@csie.org>
 Signed-off-by: Hans de Goede <hdegoede@redhat.com>
 ---
- arch/arm/boot/dts/sun8i-a23-a33.dtsi | 22 ++++++++++++++++++++++
- 1 file changed, 22 insertions(+)
+ arch/arm/boot/dts/sun4i-a10-cubieboard.dts | 19 +++++++++++++++++++
+ 1 file changed, 19 insertions(+)
 
-diff --git a/arch/arm/boot/dts/sun8i-a23-a33.dtsi b/arch/arm/boot/dts/sun8i-a23-a33.dtsi
-index 7abd0ae..b9e4d56 100644
---- a/arch/arm/boot/dts/sun8i-a23-a33.dtsi
-+++ b/arch/arm/boot/dts/sun8i-a23-a33.dtsi
-@@ -332,6 +332,28 @@
- 			#size-cells = <0>;
- 		};
+diff --git a/arch/arm/boot/dts/sun4i-a10-cubieboard.dts b/arch/arm/boot/dts/sun4i-a10-cubieboard.dts
+index 9afb4e0..046a84d 100644
+--- a/arch/arm/boot/dts/sun4i-a10-cubieboard.dts
++++ b/arch/arm/boot/dts/sun4i-a10-cubieboard.dts
+@@ -155,6 +155,10 @@
+ 	status = "okay";
+ };
  
-+		ehci0: usb at 01c1a000 {
-+			compatible = "allwinner,sun8i-a23-ehci", "generic-ehci";
-+			reg = <0x01c1a000 0x100>;
-+			interrupts = <GIC_SPI 72 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&ahb1_gates 26>;
-+			resets = <&ahb1_rst 26>;
-+			phys = <&usbphy 1>;
-+			phy-names = "usb";
-+			status = "disabled";
-+		};
++&otg_sram {
++	status = "okay";
++};
 +
-+		ohci0: usb at 01c1a400 {
-+			compatible = "allwinner,sun8i-a23-ohci", "generic-ohci";
-+			reg = <0x01c1a400 0x100>;
-+			interrupts = <GIC_SPI 73 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&ahb1_gates 29>, <&usb_clk 16>;
-+			resets = <&ahb1_rst 29>;
-+			phys = <&usbphy 1>;
-+			phy-names = "usb";
-+			status = "disabled";
-+		};
+ &pio {
+ 	led_pins_cubieboard: led_pins at 0 {
+ 		allwinner,pins = "PH20", "PH21";
+@@ -162,6 +166,13 @@
+ 		allwinner,drive = <SUN4I_PINCTRL_20_MA>;
+ 		allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
+ 	};
 +
- 		pio: pinctrl at 01c20800 {
- 			/* compatible gets set in SoC specific dtsi file */
- 			reg = <0x01c20800 0x400>;
++	usb0_id_detect_pin: usb0_id_detect_pin at 0 {
++		allwinner,pins = "PH4";
++		allwinner,function = "gpio_in";
++		allwinner,drive = <SUN4I_PINCTRL_10_MA>;
++		allwinner,pull = <SUN4I_PINCTRL_PULL_UP>;
++	};
+ };
+ 
+ &reg_ahci_5v {
+@@ -216,7 +227,15 @@
+ 	status = "okay";
+ };
+ 
++&usb_otg {
++	dr_mode = "otg";
++	status = "okay";
++};
++
+ &usbphy {
++	pinctrl-names = "default";
++	pinctrl-0 = <&usb0_id_detect_pin>;
++	usb0_id_det-gpio = <&pio 7 4 GPIO_ACTIVE_HIGH>; /* PH4 */
+ 	usb1_vbus-supply = <&reg_usb1_vbus>;
+ 	usb2_vbus-supply = <&reg_usb2_vbus>;
+ 	status = "okay";
 -- 
 2.4.2
