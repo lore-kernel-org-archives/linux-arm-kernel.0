@@ -1,36 +1,49 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri,  5 Jun 2015 09:42:25 +0200
-Subject: [PATCH] ARM: nomadik: set proper compatible for accelerometer
-Message-ID: <1433490145-2936-1-git-send-email-linus.walleij@linaro.org>
+From: linux-arm@myspectrum.nl (Jeroen Hofstee)
+Date: Fri, 05 Jun 2015 10:01:50 +0200
+Subject: [PATCH] ARM: dts: AM35xx: fix system control module clocks
+In-Reply-To: <alpine.DEB.2.02.1506011733180.14902@utopia.booyaka.com>
+References: <alpine.DEB.2.02.1506010546510.14902@utopia.booyaka.com>
+ <1433172627-28052-1-git-send-email-t-kristo@ti.com>
+ <556C8ED5.5050000@myspectrum.nl> <20150601173126.GY30984@atomide.com>
+ <alpine.DEB.2.02.1506011733180.14902@utopia.booyaka.com>
+Message-ID: <5571576E.6020207@myspectrum.nl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Adjust device tree entry to the proper registered compatible
-string for LIS3LV02DL.
+Hello Paul,
 
-Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
----
-Hi ARM SoC people, please apply this directly for -next on the
-DT branch. It makes the accelerometer work on the Nomadik.
----
- arch/arm/boot/dts/ste-nomadik-stn8815.dtsi | 5 +++--
- 1 file changed, 3 insertions(+), 2 deletions(-)
+On 01-06-15 19:44, Paul Walmsley wrote:
+> The best way to make this work IMHO would be for us not to accept any new
+> feature addition patches as long as there are warnings reported in the
+> test results.  The only real exception that I would foresee is if those
+> warnings are due to something outside of our control, e.g., a crappy
+> bootloader, as I suspect the USB_OTG initiator warnings are for the
+> CM-T3517.
+>
 
-diff --git a/arch/arm/boot/dts/ste-nomadik-stn8815.dtsi b/arch/arm/boot/dts/ste-nomadik-stn8815.dtsi
-index f182f6538e90..9a5f2ba139b7 100644
---- a/arch/arm/boot/dts/ste-nomadik-stn8815.dtsi
-+++ b/arch/arm/boot/dts/ste-nomadik-stn8815.dtsi
-@@ -722,8 +722,9 @@
- 			   reg = <0x1a>;
- 		};
- 		lis3lv02dl at 1d {
--			   compatible = "st,lis3lv02dl";
--			   reg = <0x1d>;
-+			/* Accelerometer */
-+			compatible = "st,lis3lv02dl-accel";
-+			reg = <0x1d>;
- 		};
- 	};
- 
--- 
-2.4.2
+I doubt this is related to the bootloader. I have the suspicion that is 
+actually
+a bug in linux but only triggered depending on whether the ROMcode setup
+the USB OTG or not. Here is some data to backup my statement:
+
+Linux booting without USB_OTG error trap
+md 480022F0 1
+480022f0: 0000032f                               /...
+md 48002580 1
+48002580: 0f00b7a2                               ....
+
+bit USBOTG_PHY_RESET is 0 -> out of reset
+
+
+USB_OTG sees memory hole
+md 480022F0 1
+480022f0: 0000030f    ....
+md 48002580 1
+48002580: 0f00c71e    ....
+
+USBOTG_PHY_RESET is 1 -> still in reset when booting linux.
+
+Does that match with how your am3517 boards boot?
+
+Regards,
+Jeroen
