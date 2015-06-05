@@ -1,55 +1,95 @@
-From: jistone@redhat.com (Josh Stone)
-Date: Fri,  5 Jun 2015 14:28:03 -0700
-Subject: [PATCH] arm64: fix missing syscall trace exit
-In-Reply-To: <20150605153816.GG7420@arm.com>
-References: <20150605153816.GG7420@arm.com>
-Message-ID: <1433539683-29539-1-git-send-email-jistone@redhat.com>
+From: robh@kernel.org (Rob Herring)
+Date: Fri, 5 Jun 2015 16:28:00 -0500
+Subject: [PATCH v4 0/6] SA1100/PXA RTC clean-up
+In-Reply-To: <871thq54c7.fsf@belgarion.home>
+References: <1431529350-4597-1-git-send-email-robh@kernel.org>
+ <87pp62jdpj.fsf@belgarion.home>
+ <CAL_JsqJ-VMQHXFF9Gxf5mmPjYXZ6gyktYFjgvxAHRx-Kmuoq8A@mail.gmail.com>
+ <877fs5k9ps.fsf@belgarion.home>
+ <CAL_JsqKWNNH4stY+CNtKCiE7qcwDYaxZc36-iqqe1ddmG82g1Q@mail.gmail.com>
+ <871thq54c7.fsf@belgarion.home>
+Message-ID: <CAL_JsqJnj+JLFoUmE6COqhr83_H0n1=Bdk_wYnMZEzsZRu=aew@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-If a syscall is entered without TIF_SYSCALL_TRACE set, then it goes on
-the fast path.  It's then possible to have TIF_SYSCALL_TRACE added in
-the middle of the syscall, but ret_fast_syscall doesn't check this flag
-again.  This causes a ptrace syscall-exit-stop to be missed.
+On Fri, Jun 5, 2015 at 2:43 PM, Robert Jarzmik <robert.jarzmik@free.fr> wrote:
+> Rob Herring <robh@kernel.org> writes:
+>
+>>> I'm rather in a mood for a more aggressive approach :
+>>>
+>>>  - you fire an incremental patch to patch the 10 defconfigs on PXA architecture
+>>>    (pxa27x and pxa3xx)
+>>
+>> Here's the breakdown of configs which enable SA1100 RTC only. Only the
+>> last 6 need to change by my count:
+>>
+>> pxa25x
+>> arch/arm/configs/h5000_defconfig
+>> arch/arm/configs/xcep_defconfig
+>> arch/arm/configs/viper_defconfig
+>>
+>> pxa255/270
+>> arch/arm/configs/cm_x2xx_defconfig
+>>
+>> pxa270
+>> arch/arm/configs/em_x270_defconfig
+>> arch/arm/configs/magician_defconfig
+>> arch/arm/configs/palmz72_defconfig
+>> arch/arm/configs/pcm027_defconfig
+>> arch/arm/configs/trizeps4_defconfig
+> And arch/arm/configs/jornada720_defconfig I counted wrongly as it's sa1100.
+> So I agree with your list of last 6 defconfigs.
+>
+>>>  - in this patch, you replace 's/CONFIG_RTC_DRV_SA1100/CONFIG_RTC_DRV_PXA/'
+>>>  - you send this patch to the maintainers and me
+>>>  - you explain in the commit message that from a userland perspective, nothing
+>>>    changes, except that the RTC IP will change, and any dependency on a
+>>
+>> The IP does not change here. rtc0 is still going to be the SA1100 RTC
+>> being registered first. The only change will be the addition of rtc1.
+> For boards which were only using rtc-pxa.c (as mioa701 for example), they relied
+> on the fact that rtc0 == pxa_rtc. Their time is stored in PXA IP. Therefore,
+> each of their hwclock will end up on sa1100-rtc instead of pxa-rtc.
+>
+> So for these boards, ie. for all boards where only rtc-pxa.c was used, the IP
+> addressed changes from a casual userspace perspective.
 
-For instance, from a PTRACE_EVENT_FORK reported during do_fork, the
-tracer might resume with PTRACE_SYSCALL, setting TIF_SYSCALL_TRACE.
-Now the completion of the fork should have a syscall-exit-stop.
+Okay, so this is the case where the time will be wrong.
 
-Russell King fixed this on arm by re-checking _TIF_SYSCALL_WORK in the
-fast exit path.  Do the same on arm64.
+I could remove the select of the sa1100-rtc and do an empty function
+for sa1100_rtc_init. This would preserve current behavior.
 
-v2: Re-enable interrupts before branching to __sys_trace_return.
+>
+>>>    bootloader fidling with RTC should be considered as a source of regression.
+>>
+>> I'm not sure that I follow.
+> Let's talk about how a double boot windows + linux box works.
+> The bootloader ensures that :
+>  - sa1100-rtc holds the number of seconds since the OS start (think jiffies)
+>  - pxa-rtc holds the wall clock time
+>
+> Upon each reboot, sa1100-rtc is checked to see how much time has passed. If an
+> "oustanding number" is detected, for example 10 years, the firmware resets the
+> data partition.
+>
+> Now think what will happen when this change will be commited, upon the first
+> reboot after the linux kernel has change sa1100-rtc time.
 
-Cc: Catalin Marinas <catalin.marinas@arm.com>
-Cc: Will Deacon <will.deacon@arm.com>
-Cc: Russell King <rmk+kernel@arm.linux.org.uk>
-Signed-off-by: Josh Stone <jistone@redhat.com>
----
- arch/arm64/kernel/entry.S | 7 ++++++-
- 1 file changed, 6 insertions(+), 1 deletion(-)
+That would be bad. But on these platforms, the kernel has been using
+both RTCs right? Presumably on platforms only using 1 of the RTCs, the
+bootloader does not touch the RTCs.
 
-diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
-index 959fe8733560..988bea43dc74 100644
---- a/arch/arm64/kernel/entry.S
-+++ b/arch/arm64/kernel/entry.S
-@@ -608,11 +608,16 @@ ENDPROC(cpu_switch_to)
-  */
- ret_fast_syscall:
- 	disable_irq				// disable interrupts
--	ldr	x1, [tsk, #TI_FLAGS]
-+	ldr	x1, [tsk, #TI_FLAGS]		// re-check for syscall tracing
-+	and	x2, x1, #_TIF_SYSCALL_WORK
-+	cbnz	x2, ret_fast_syscall_trace
- 	and	x2, x1, #_TIF_WORK_MASK
- 	cbnz	x2, fast_work_pending
- 	enable_step_tsk x1, x2
- 	kernel_exit 0, ret = 1
-+ret_fast_syscall_trace:
-+	enable_irq				// enable interrupts
-+	b	__sys_trace_return
- 
- /*
-  * Ok, we need to do extra processing, enter the slow path.
--- 
-2.4.1
+Rob
+
+>
+>>>    Moreover the first reboot will have the wrong date, until it is set.
+>> Only for rtc1, right?
+> Yes, right, unless the bootloader logic is ... over-engineered.
+>
+> All of this to say maintainers should be forwarned at least. After that, up to
+> them to react.
+>
+> Cheers.
+>
+> --
+> Robert
