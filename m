@@ -1,68 +1,40 @@
-From: wxt@rock-chips.com (Caesar Wang)
-Date: Fri,  5 Jun 2015 19:39:22 +0800
-Subject: [PATCH v2 3/3] ARM: rockchip: fix the SMP code style
-In-Reply-To: <1433504362-7549-1-git-send-email-wxt@rock-chips.com>
-References: <1433504362-7549-1-git-send-email-wxt@rock-chips.com>
-Message-ID: <1433504362-7549-4-git-send-email-wxt@rock-chips.com>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Fri, 5 Jun 2015 13:39:51 +0200
+Subject: [PATCH/RFC 1/2] ARM: multi_v7_defconfig: Make drm support modular
+In-Reply-To: <2568731.dqdEiMuDro@wuerfel>
+References: <1432905926-31606-1-git-send-email-geert@linux-m68k.org>
+ <2568731.dqdEiMuDro@wuerfel>
+Message-ID: <20150605113949.GA26607@ulmo.nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use the below scripts to check:
-scripts/checkpatch.pl -f --subject arch/arm/mach-rockchip/platsmp.c
-Although there is a check, it's no matter.
+On Fri, May 29, 2015 at 05:41:34PM +0200, Arnd Bergmann wrote:
+> On Friday 29 May 2015 15:25:25 Geert Uytterhoeven wrote:
+> > From: Geert Uytterhoeven <geert+renesas@glider.be>
+> > 
+> > Make drm support modular to reduce kernel size (-620 KiB):
+> > 
+> >        text    data     bss     dec     hex   filename
+> >     12211122 1392076  338520 13941718  d4bbd6 vmlinux.before
+> >     11581470 1387196  338264 13306930  cb0c32 vmlinux.after
+> > 
+> > Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+> > ---
+> > Slightly controversial:
+> >   - Does anyone need drm for boot testing?
+> 
+> Only the tegra driver is affected, so let's ask the tegra
+> maintainers.
 
-CHECK: usleep_range is preferred over udelay; see
-Documentation/timers/timers-howto.txt
-+167udelay(10);
-total: 0 errors, 0 warnings, 1 checks, 362 lines checked
+As a matter of fact I do most of the DRM testing on boot using the
+built-in driver. However I can do that easily using tegra_defconfig so
+I'm fine with this change.
 
- Changes in v2:
-    - As Kever points out, Fix the subject typo WIF/WFI in PATCH [2/3].
-    - As Heiko suggestion, re-adjust the cpu on/off flow in PATCH [1/3].
-    - Use the checkpatch.pl -f --subjective to check in PATCH [3/3].
-
-Signed-off-by: Caesar Wang <wxt@rock-chips.com>
----
-
- arch/arm/mach-rockchip/platsmp.c | 7 ++++---
- 1 file changed, 4 insertions(+), 3 deletions(-)
-
-diff --git a/arch/arm/mach-rockchip/platsmp.c b/arch/arm/mach-rockchip/platsmp.c
-index 17b3473..fc50e1f 100644
---- a/arch/arm/mach-rockchip/platsmp.c
-+++ b/arch/arm/mach-rockchip/platsmp.c
-@@ -147,7 +147,7 @@ static int __cpuinit rockchip_boot_secondary(unsigned int cpu,
- 
- 	if (cpu >= ncores) {
- 		pr_err("%s: cpu %d outside maximum number of cpus %d\n",
--							__func__, cpu, ncores);
-+		       __func__, cpu, ncores);
- 		return -ENXIO;
- 	}
- 
-@@ -166,7 +166,7 @@ static int __cpuinit rockchip_boot_secondary(unsigned int cpu,
- 		 * */
- 		udelay(10);
- 		writel(virt_to_phys(rockchip_secondary_startup),
--			sram_base_addr + 8);
-+		       sram_base_addr + 8);
- 		writel(0xDEADBEAF, sram_base_addr + 4);
- 		dsb_sev();
- 	}
-@@ -345,7 +345,7 @@ static int rockchip_cpu_kill(unsigned int cpu)
- static void rockchip_cpu_die(unsigned int cpu)
- {
- 	v7_exit_coherency_flush(louis);
--	while(1)
-+	while (1)
- 		cpu_do_idle();
- }
- #endif
-@@ -358,4 +358,5 @@ static struct smp_operations rockchip_smp_ops __initdata = {
- 	.cpu_die		= rockchip_cpu_die,
- #endif
- };
-+
- CPU_METHOD_OF_DECLARE(rk3066_smp, "rockchip,rk3066-smp", &rockchip_smp_ops);
--- 
-1.9.1
+Acked-by: Thierry Reding <treding@nvidia.com>
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150605/adbb4a75/attachment.sig>
