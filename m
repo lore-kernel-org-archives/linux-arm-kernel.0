@@ -1,38 +1,60 @@
-From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
-Date: Fri, 5 Jun 2015 19:49:00 +0900
-Subject: next-20150604 build: 2 failures 37 warnings (next-20150604)
-In-Reply-To: <20150604172026.GA30984@atomide.com>
-References: <E1Z0YIL-0008Ma-5O@optimist> <20150604170112.GM14071@sirena.org.uk>
- <20150604171004.GZ30984@atomide.com>
- <20150604172026.GA30984@atomide.com>
-Message-ID: <20150605104900.GA5346@kroah.com>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Fri, 5 Jun 2015 13:02:01 +0200
+Subject: [PATCH v3 1/2] drm/bridge: dw-hdmi: support optional supply
+ regulators
+In-Reply-To: <2619686.csNBBFyt8W@phil>
+References: <4184159.j0iXe39dFB@phil>
+ <2619686.csNBBFyt8W@phil>
+Message-ID: <20150605110159.GA16254@ulmo.nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 04, 2015 at 10:20:26AM -0700, Tony Lindgren wrote:
-> * Tony Lindgren <tony@atomide.com> [150604 10:11]:
-> > * Mark Brown <broonie@kernel.org> [150604 10:03]:
-> > > On Thu, Jun 04, 2015 at 05:47:05PM +0100, Build bot for Mark Brown wrote:
-> > > 
-> > > > 	arm-allmodconfig
-> > > > ../drivers/tty/serial/8250/8250_omap.c:586:20: error: redefinition of 'omap8250_irq'
-> > > 
-> > > Current -next fails to build an ARM allmodconfig (and possibly other
-> > > things) due to 9e91597f24234 and 9809889c708eb (serial: 8250_omap:
-> > > provide complete custom startup & shutdown callbacks) which appear to be
-> > > the same commit that's been applied twice somehow.  Not sure what's
-> > > going on there...
-> > 
-> > Sounds like I'm using an old commit in one of my pending branches,
-> > will check immediately.
+On Mon, Mar 23, 2015 at 07:17:49PM +0100, Heiko Stuebner wrote:
+> Hi Philipp,
 > 
-> Greg, there's now commit 9809889c708e in tty-linus and commit
-> 9e91597f2423 in tty-next.
+> Am Donnerstag, 12. M?rz 2015, 21:45:19 schrieb Heiko Stuebner:
+> > At least the Rockchip variant of the dw_hdmi can have controllable power
+> > supplies providing 1.0 and 1.8V. Therefore add the possibility for the
+> > generic bridge driver to enable supplies provided by the hw-specific
+> > drivers.
+> > 
+> > Signed-off-by: Heiko Stuebner <heiko@sntech.de>
+> 
+> does this look ok now?
+> 
+> And as we talked about in Chemnitz, who will be taking such bridge-related 
+> changes, as you mentioned some last bridge-patches going through Thierry.
 
-Yes, I can't go back and remove the one in tty-next, I'm guessing when
-they are merged there is an issue.  I'll look into that after Linus
-pulls in my tty-linus tree.
+Sorry, I had completely missed this.
 
-thanks,
+> > ---
+> > changes since v2:
+> > - rename supplies to the names found in the hdmi IP databook
+> > changes since v1:
+> > - follow suggestion from Russell King to keep regulator handling local
+> >   to the rockchip implementation for the time being and only generalize
+> >   when a real second implementation needs regulator handling
+> > 
+> >  .../devicetree/bindings/drm/bridge/dw_hdmi.txt     |  5 ++++
+> >  drivers/gpu/drm/rockchip/dw_hdmi-rockchip.c        | 32
+> > +++++++++++++++++++++- 2 files changed, 36 insertions(+), 1 deletion(-)
+> > 
+> > diff --git a/Documentation/devicetree/bindings/drm/bridge/dw_hdmi.txt
+> > b/Documentation/devicetree/bindings/drm/bridge/dw_hdmi.txt index
+> > a905c14..bb74640 100644
+> > --- a/Documentation/devicetree/bindings/drm/bridge/dw_hdmi.txt
+> > +++ b/Documentation/devicetree/bindings/drm/bridge/dw_hdmi.txt
+> > @@ -22,6 +22,11 @@ Optional properties
+> >  - ddc-i2c-bus: phandle of an I2C controller used for DDC EDID probing
+> >  - clocks, clock-names: phandle to the HDMI CEC clock, name should be "cec"
+> > 
+> > +Optional supplies:
+> > +rockchip,rk3288-dw-hdmi handles two optional power supplies:
+> > +- vp-supply: 1.0V power supply
+> > +- vph-supply: 1.8V power supply
 
-greg k-h
+If this is specific to the Rockchip implementation, shouldn't this go
+into Documentation/devicetree/bindings/video/dw_hdmi-rockchip.txt? It
+could then simply go into the Rockchip DRM tree.
+
+Thierry
