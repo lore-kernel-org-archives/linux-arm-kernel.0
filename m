@@ -1,46 +1,72 @@
-From: samuel.thibault@ens-lyon.org (Samuel Thibault)
-Date: Fri, 5 Jun 2015 20:58:06 +0530
-Subject: [PATCHv7 0/2] INPUT: Route keyboard LEDs through the generic
- LEDs layer
-In-Reply-To: <CAKdAkRSk4t2PKHB33f0=V2-zAhV9LXABp1TQ9NsiFLBQet66BQ@mail.gmail.com>
-References: <20150217191527.GA9594@type.youpi.perso.aquilenet.fr>
- <201504012200.07408@pali>
- <20150401211140.GI2901@type.youpi.perso.aquilenet.fr>
- <20150402144410.GB18125@amd> <20150423165544.GG7646@pali>
- <CAKdAkRSk4t2PKHB33f0=V2-zAhV9LXABp1TQ9NsiFLBQet66BQ@mail.gmail.com>
-Message-ID: <20150605152806.GE2267@type>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Fri, 05 Jun 2015 19:03:42 +0100
+Subject: [PATCH] serial/amba-pl011: Disable interrupts around TX softirq
+In-Reply-To: <1433513267-24163-1-git-send-email-Dave.Martin@arm.com>
+References: <1433513267-24163-1-git-send-email-Dave.Martin@arm.com>
+Message-ID: <5571E47E.5020800@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+On 05/06/15 15:07, Dave P Martin wrote:
+> pl011_tx_softirq() currently uses spin_{,un}lock(), which are not
+> sufficient to inhibit pl011_int() from being triggered by a local
+> IRQ and trying to re-take the same lock.  This can lead to
+> deadlocks.
+>
+> This patch uses the _irq() locking variants instead to ensure that
+> pl011_int() handling for a given port is deferred until any
+> pl011_tx_softirq() work for that port is complete.
+>
+> Signed-off-by: Dave Martin <Dave.Martin@arm.com>
+> ---
+>
+> Another candidate for v4.1 if possible (sorry!) -- I thought this change
+> was already in, but it went astray when I was refactoring.
+>
+> This patch conflicts with tty-next like the previous patch, since it
+> fixes code that is removed by tty-next.  The correct resolution for
+> the resulting merge conflict is to keep the code from tty-next.
+>
+>
+> I am not 100% certain yet whether some rare deadlocks that Robin is
+> seeing are caused by this issue, or whether this patch fixes them --
+> he's testing atm.
 
-Dmitry Torokhov, le Thu 23 Apr 2015 10:04:49 -0700, a ?crit :
-> One thing that I know we'd have to fix is that input device must be
-> "opened" before we can engage it, right now LED interface violates
-> this requirement.
+FWIW, I've been running Juno in a startup/shutdown loop with a very 
+noisy systemd all afternoon and haven't hit a problem yet with this 
+patch applied. Testing without this patch yesterday I saw 3 or 4 lockdep 
+splats in about the same amount of time. I'll leave it going over the 
+weekend just to make sure, though.
 
-What do you mean precisely by "engage"?  In the following, I guess
-actually calling dev->event(EV_LED)
+Robin.
 
-> It works right now because keyboard handler attaches
-> to most input devices with LEDs early enough for it to be
-> unnoticeable, but it does not mean that it is correct. It might be as
-> easy as calling input_open() unconditionally if devices has LEDs.
-
-This seems like only a workaround, perhaps it should rather be leds.c
-which checks for dev->users before calling dev->event(EV_LED)?
-
-> Another issue is that I do not think we should be introducing virtual
-> VT leds. I believe LEDs should belong to real devices;
-
-But then how to fix console-setup's bug? (it was actually the starter
-for all this work)
-
-See http://bugs.debian.org/514464
-
-console-setup needs a way to tell which kbd modifier should toggle the
-capslock LED on all the keyboards used by the VT. Thus the point of VT
-leds, which people can use to decide the LED behavior of all keyboards,
-including hotplugged ones etc.
-
-Samuel
+>
+> The patch is straightforward and using non _irq() locking in a workitem
+> that expects the lock to protect against interrupt handlers on the same
+> CPU is clearly wrong.
+>
+>
+> Cheers
+> ---Dave
+>
+>
+>   drivers/tty/serial/amba-pl011.c |    4 ++--
+>   1 file changed, 2 insertions(+), 2 deletions(-)
+>
+> diff --git a/drivers/tty/serial/amba-pl011.c b/drivers/tty/serial/amba-pl011.c
+> index 763eb20..0cc622a 100644
+> --- a/drivers/tty/serial/amba-pl011.c
+> +++ b/drivers/tty/serial/amba-pl011.c
+> @@ -1360,9 +1360,9 @@ static void pl011_tx_softirq(struct work_struct *work)
+>   	struct uart_amba_port *uap =
+>   		container_of(dwork, struct uart_amba_port, tx_softirq_work);
+>
+> -	spin_lock(&uap->port.lock);
+> +	spin_lock_irq(&uap->port.lock);
+>   	while (pl011_tx_chars(uap)) ;
+> -	spin_unlock(&uap->port.lock);
+> +	spin_unlock_irq(&uap->port.lock);
+>   }
+>
+>   static void pl011_tx_irq_seen(struct uart_amba_port *uap)
+>
