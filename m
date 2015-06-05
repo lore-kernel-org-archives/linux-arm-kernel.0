@@ -1,80 +1,79 @@
-From: wxt@rock-chips.com (Caesar Wang)
-Date: Fri,  5 Jun 2015 23:11:44 +0800
-Subject: [PATCH v3 3/3] ARM: rockchip: fix the SMP code style
-In-Reply-To: <1433517104-7595-1-git-send-email-wxt@rock-chips.com>
-References: <1433517104-7595-1-git-send-email-wxt@rock-chips.com>
-Message-ID: <1433517104-7595-4-git-send-email-wxt@rock-chips.com>
+From: eric.auger@linaro.org (Eric Auger)
+Date: Fri,  5 Jun 2015 17:06:29 +0200
+Subject: [PATCH v2 1/4] VFIO: platform: add reset struct and lookup table
+In-Reply-To: <1433516792-16397-1-git-send-email-eric.auger@linaro.org>
+References: <1433516792-16397-1-git-send-email-eric.auger@linaro.org>
+Message-ID: <1433516792-16397-2-git-send-email-eric.auger@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use the below scripts to check:
-scripts/checkpatch.pl -f --subject arch/arm/mach-rockchip/platsmp.c
-Although there is a check, it's no matter.
+This patch introduces the vfio_platform_reset_combo struct that
+stores all the information useful to handle the reset modality:
+compat string, name of the reset function, name of the module that
+implements the reset function. A lookup table of such structures
+is added, currently containing a single sentinel element. A new
+type field is added in vfio_platform_device to store what kind of
+reset is associated to the device, if any.
 
-CHECK: usleep_range is preferred over udelay; see
-Documentation/timers/timers-howto.txt
-+167udelay(10);
-total: 0 errors, 0 warnings, 1 checks, 362 lines checked
-
- Changes in v3:
-    - FIx the PATCH v2, it doesn't work on chromium 3.14.
-
- Changes in v2:
-    - As Kever points out, Fix the subject typo WIF/WFI in PATCH [2/3].
-    - As Heiko suggestion, re-adjust the cpu on/off flow in PATCH [1/3].
-    - Use the checkpatch.pl -f --subjective to check in PATCH [3/3].
-
-Signed-off-by: Caesar Wang <wxt@rock-chips.com>
+Signed-off-by: Eric Auger <eric.auger@linaro.org>
 ---
+ drivers/vfio/platform/vfio_platform_common.c  |  6 ++++++
+ drivers/vfio/platform/vfio_platform_private.h | 12 ++++++++++++
+ 2 files changed, 18 insertions(+)
 
- arch/arm/mach-rockchip/platsmp.c | 9 +++++----
- 1 file changed, 5 insertions(+), 4 deletions(-)
-
-diff --git a/arch/arm/mach-rockchip/platsmp.c b/arch/arm/mach-rockchip/platsmp.c
-index 6672fdd..ac9173e 100644
---- a/arch/arm/mach-rockchip/platsmp.c
-+++ b/arch/arm/mach-rockchip/platsmp.c
-@@ -113,7 +113,7 @@ static int pmu_set_power_domain(int pd, bool on)
- 		ret = pmu_power_domain_is_on(pd);
- 		if (ret < 0) {
- 			pr_err("%s: could not read power domain state\n",
--				 __func__);
-+			       __func__);
- 			return ret;
- 		}
- 	}
-@@ -137,7 +137,7 @@ static int __cpuinit rockchip_boot_secondary(unsigned int cpu,
+diff --git a/drivers/vfio/platform/vfio_platform_common.c b/drivers/vfio/platform/vfio_platform_common.c
+index abcff7a..d970776 100644
+--- a/drivers/vfio/platform/vfio_platform_common.c
++++ b/drivers/vfio/platform/vfio_platform_common.c
+@@ -25,6 +25,12 @@
  
- 	if (cpu >= ncores) {
- 		pr_err("%s: cpu %d outside maximum number of cpus %d\n",
--							__func__, cpu, ncores);
-+		       __func__, cpu, ncores);
- 		return -ENXIO;
- 	}
+ static DEFINE_MUTEX(driver_lock);
  
-@@ -156,7 +156,7 @@ static int __cpuinit rockchip_boot_secondary(unsigned int cpu,
- 		 * */
- 		udelay(10);
- 		writel(virt_to_phys(rockchip_secondary_startup),
--			sram_base_addr + 8);
-+		       sram_base_addr + 8);
- 		writel(0xDEADBEAF, sram_base_addr + 4);
- 		dsb_sev();
- 	}
-@@ -335,7 +335,7 @@ static int rockchip_cpu_kill(unsigned int cpu)
- static void rockchip_cpu_die(unsigned int cpu)
- {
- 	v7_exit_coherency_flush(louis);
--	while(1)
-+	while (1)
- 		cpu_do_idle();
- }
- #endif
-@@ -348,4 +348,5 @@ static struct smp_operations rockchip_smp_ops __initdata = {
- 	.cpu_die		= rockchip_cpu_die,
- #endif
- };
++static const struct vfio_platform_reset_combo reset_lookup_table[] = {
++	{
++		.type = VFIO_PLATFORM_RESET_TYPE_MAX
++	},
++};
 +
- CPU_METHOD_OF_DECLARE(rk3066_smp, "rockchip,rk3066-smp", &rockchip_smp_ops);
+ static int vfio_platform_regions_init(struct vfio_platform_device *vdev)
+ {
+ 	int cnt = 0, i;
+diff --git a/drivers/vfio/platform/vfio_platform_private.h b/drivers/vfio/platform/vfio_platform_private.h
+index 5d31e04..d864124 100644
+--- a/drivers/vfio/platform/vfio_platform_private.h
++++ b/drivers/vfio/platform/vfio_platform_private.h
+@@ -49,6 +49,10 @@ struct vfio_platform_region {
+ 	void __iomem		*ioaddr;
+ };
+ 
++enum vfio_platform_reset_type {
++	VFIO_PLATFORM_RESET_TYPE_MAX /* last element */,
++};
++
+ struct vfio_platform_device {
+ 	struct vfio_platform_region	*regions;
+ 	u32				num_regions;
+@@ -56,6 +60,7 @@ struct vfio_platform_device {
+ 	u32				num_irqs;
+ 	int				refcnt;
+ 	struct mutex			igate;
++	enum vfio_platform_reset_type	type;
+ 
+ 	/*
+ 	 * These fields should be filled by the bus specific binder
+@@ -69,6 +74,13 @@ struct vfio_platform_device {
+ 	int	(*get_irq)(struct vfio_platform_device *vdev, int i);
+ };
+ 
++struct vfio_platform_reset_combo {
++	enum vfio_platform_reset_type type;
++	char *compat;
++	char *reset_function_name;
++	char *module_name;
++};
++
+ extern int vfio_platform_probe_common(struct vfio_platform_device *vdev,
+ 				      struct device *dev);
+ extern struct vfio_platform_device *vfio_platform_remove_common
 -- 
 1.9.1
