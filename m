@@ -1,47 +1,138 @@
-From: khilman@kernel.org (Kevin Hilman)
-Date: Fri, 05 Jun 2015 16:49:08 -0700
-Subject: [RFC 1/7] thermal: qcom: tsens: Add a skeletal tsens drivers
-In-Reply-To: <1429796773-7151-2-git-send-email-rnayak@codeaurora.org>
- (Rajendra Nayak's message of "Thu, 23 Apr 2015 19:16:07 +0530")
-References: <1429796773-7151-1-git-send-email-rnayak@codeaurora.org>
- <1429796773-7151-2-git-send-email-rnayak@codeaurora.org>
-Message-ID: <7hpp59zpfv.fsf@deeprootsystems.com>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Fri, 5 Jun 2015 17:10:26 -0700
+Subject: [RFC PATCH 2/3] clk: stm32: Add clock driver for STM32F4[23]xxx
+ devices
+In-Reply-To: <55716D9B.4040209@linaro.org>
+References: <1432327273-6810-1-git-send-email-daniel.thompson@linaro.org>
+ <1432327273-6810-3-git-send-email-daniel.thompson@linaro.org>
+ <20150604220725.GT676@codeaurora.org> <55716D9B.4040209@linaro.org>
+Message-ID: <20150606001026.GA29237@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rajendra,
+On 06/05, Daniel Thompson wrote:
+> On 04/06/15 23:07, Stephen Boyd wrote:
+> >On 05/22, Daniel Thompson wrote:
+> >>+#include <linux/clkdev.h>
+> >
+> >Are you using this include?
+> 
+> Not very much?
+> 
+> Turns out I was relying on these to get kzalloc() defined but there
+> are better headers for me to use for that!
 
-Rajendra Nayak <rnayak@codeaurora.org> writes:
+Hah ok. We should delete some of those arch specific clkdev.h
+files...
 
-> tsens is qualcomms' thermal temperature sensor device. It
-> supports reading temperatures from multiple thermal sensors
-> present on various QCOM SoCs.
-> Calibration data is generally read from a eeprom device.
->
-> Add a skeleton driver with all the necessary abstractions so
-> a variety of qcom device families which support tsens can
-> add driver extensions.
->
-> Also add the required device tree bindings which can be used
-> to descibe the tsens device in DT.
->
-> Signed-off-by: Rajendra Nayak <rnayak@codeaurora.org>
+> 
+> >
+> >>+#include <linux/err.h>
+> >>+#include <linux/io.h>
+> >>+#include <linux/clk-provider.h>
+> >>+#include <linux/spinlock.h>
+> >>+#include <linux/of.h>
+> >>+#include <linux/of_address.h>
+> >>+
+> >>+#include <linux/debugfs.h>
+> >
+> >Are you using this include?
+> 
+> No (this is already gone in v2).
 
-[...]
+Oh hrm.. I must have missed v2.
 
-> +	ret = tmdev->ops->calibrate(tmdev);
-> +	if (ret < 0) {
-> +		dev_err(&pdev->dev, "tsens calibration failed\n");
-> +		return ret;
-> +	}
+> 
+> >>+
+> >>+	if (__clk_get_flags(hw->clk) & CLK_SET_RATE_PARENT) {
+> >>+		unsigned long best_parent = rate / mult;
+> >>+
+> >>+		*prate =
+> >>+		    __clk_round_rate(__clk_get_parent(hw->clk), best_parent);
+> >>+	}
+> >>+
+> >>+	return *prate * mult;
+> >>+}
+> >>+
+> >>+static int clk_apb_mul_set_rate(struct clk_hw *hw, unsigned long rate,
+> >>+				 unsigned long parent_rate)
+> >>+{
+> >
+> >Why don't we need to do anything here?
+> 
+> This clock cannot change its own rate. It is very nearly a fixed
+> factor clock but with the additional quirk that the "fixed" factor
+> changes depending upon the rate of the parent clock.
+> 
+> This is the same implementation as clk-fixed-factor. I concluded
+> that it returns success because round rate should always result in
+> the set rate for this clock being a nop.
 
-I was trying this series on linux-next with Srini's eeprom v4 and my
-first attempt was to build the eeprom, qfprom and tsens drivers as
-built-in.  Unfortunately, the tsens driver probed before the
-eeprom/qfprom driver so failed here with the "calibration failed"
-message.
+Ok. A comment here would be helpful in the future. We probably
+ought to have a comment in clk-fixed-factor as well.
 
-Building things as modules worked better, but you might want to take a
-look at possibly using -EPROBE_DEFER here?
+> 
+> 
+> >>+	return 0;
+> >>+}
+> >>+
+> >>+static struct clk_ops clk_apb_mul_factor_ops = {
+> >
+> >const?
+> 
+> Makes sense...
+> 
+> You want a patch for clk-fixed-factor too?
 
-Kevin
+Sure.
+
+> 
+> 
+> >>+struct clk *clk_register_apb_mul(struct device *dev, const char *name,
+> >>+				 const char *parent_name, unsigned long flags,
+> >>+				 u8 bit_idx)
+> >>+{
+> >>+	struct clk_apb_mul *am;
+> >>+	struct clk_init_data init;
+> >>+	struct clk *clk;
+> >>+
+> >>+	am = kzalloc(sizeof(*am), GFP_KERNEL);
+> >>+	if (!am)
+> >>+		return ERR_PTR(-ENOMEM);
+> >>+
+> >>+	am->bit_idx = bit_idx;
+> >>+	am->hw.init = &init;
+> >>+
+> >>+	init.name = name;
+> >>+	init.ops = &clk_apb_mul_factor_ops;
+> >>+	init.flags = flags | CLK_IS_BASIC;
+> >
+> >Is it basic?
+> 
+> Tough question.
+> 
+> The absence of this flag appears grants arch code permission to use
+> secret backdoors to do "weird stuff" but making special assumptions
+> about the type of the clock. This clock keeps its implementation
+> private so noone outside the compilation unit can usefully cast it.
+> 
+> However, it also looks like only omap2 is the only platform that
+> makes these special assumptions so when this code is run on STM32
+> there is nothing to actually consume the CLK_IS_BASIC flag at
+> runtime.
+> 
+> In other words the flag is useless but, I think, also correctly applied.
+> 
+> I'd be happy to remove it if anyone disagrees with the guesswork above.
+> 
+> Alternatively, I could write a patch to *invert* CLK_IS_BASIC and
+> rename it CLK_CASTABLE on the grounds that only the people doing
+> "weird stuff" should have to care about this flag at all. Any
+> interest in that?
+
+No I think we should delete CLK_IS_BASIC. So please remove it
+unless you actually need it.
+
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
