@@ -1,22 +1,50 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Sat, 6 Jun 2015 09:38:20 +0800
-Subject: [PATCH v6 0/4] Add basic ZTE zx296702 SOC support
-In-Reply-To: <20150605190744.GB648@codeaurora.org>
-References: <1433388063-13682-1-git-send-email-jun.nie@linaro.org>
- <20150604182739.GH490@codeaurora.org>
- <20150605023703.GD17189@dragon>
- <20150605190744.GB648@codeaurora.org>
-Message-ID: <20150606013820.GA12021@tiger>
+From: ulli.kroll@googlemail.com (Hans Ulli Kroll)
+Date: Sat,  6 Jun 2015 05:57:23 +0200
+Subject: [PATCH 1/6] ARM:Gemini:move timer register definitions into the right
+ place
+In-Reply-To: <1433563048-21922-1-git-send-email-ulli.kroll@googlemail.com>
+References: <1433563048-21922-1-git-send-email-ulli.kroll@googlemail.com>
+Message-ID: <1433563048-21922-2-git-send-email-ulli.kroll@googlemail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 05, 2015 at 12:07:44PM -0700, Stephen Boyd wrote:
-> I was saying that if this isn't going to be accepted into arm-soc
-> because it's too close to the next merge window, then we can take
-> it through the clk tree next time. Looks like Arnd is ready to
-> take it though and I've already given Reviewed-by so it should be
-> good to go through arm-soc.
+We need the offset for the timer registers in driver only.
+So move this out of hardware.h
 
-Thanks for clarification, Stephen.
+Signed-off-by: Hans Ulli Kroll <ulli.kroll@googlemail.com>
+---
+ arch/arm/mach-gemini/include/mach/hardware.h | 3 ---
+ arch/arm/mach-gemini/time.c                  | 4 ++++
+ 2 files changed, 4 insertions(+), 3 deletions(-)
 
-Shawn
+diff --git a/arch/arm/mach-gemini/include/mach/hardware.h b/arch/arm/mach-gemini/include/mach/hardware.h
+index 98e7b0f..f0390f1 100644
+--- a/arch/arm/mach-gemini/include/mach/hardware.h
++++ b/arch/arm/mach-gemini/include/mach/hardware.h
+@@ -57,9 +57,6 @@
+ #define GEMINI_USB1_BASE	0x69000000
+ #define GEMINI_BIG_ENDIAN_BASE	0x80000000
+ 
+-#define GEMINI_TIMER1_BASE	GEMINI_TIMER_BASE
+-#define GEMINI_TIMER2_BASE	(GEMINI_TIMER_BASE + 0x10)
+-#define GEMINI_TIMER3_BASE	(GEMINI_TIMER_BASE + 0x20)
+ 
+ /*
+  * UART Clock when System clk is 150MHz
+diff --git a/arch/arm/mach-gemini/time.c b/arch/arm/mach-gemini/time.c
+index 0a63c4d2..d0bbd2f 100644
+--- a/arch/arm/mach-gemini/time.c
++++ b/arch/arm/mach-gemini/time.c
+@@ -19,6 +19,10 @@
+ /*
+  * Register definitions for the timers
+  */
++#define GEMINI_TIMER1_BASE		GEMINI_TIMER_BASE
++#define GEMINI_TIMER2_BASE		(GEMINI_TIMER_BASE + 0x10)
++#define GEMINI_TIMER3_BASE		(GEMINI_TIMER_BASE + 0x20)
++
+ #define TIMER_COUNT(BASE_ADDR)		(BASE_ADDR  + 0x00)
+ #define TIMER_LOAD(BASE_ADDR)		(BASE_ADDR  + 0x04)
+ #define TIMER_MATCH1(BASE_ADDR)		(BASE_ADDR  + 0x08)
+-- 
+2.4.2
