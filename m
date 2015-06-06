@@ -1,38 +1,51 @@
-From: khilman@kernel.org (Kevin Hilman)
-Date: Fri, 05 Jun 2015 17:25:19 -0700
-Subject: [RFC 0/7] qcom: Add support for tsens driver
-In-Reply-To: <1429796773-7151-1-git-send-email-rnayak@codeaurora.org>
- (Rajendra Nayak's message of "Thu, 23 Apr 2015 19:16:06 +0530")
-References: <1429796773-7151-1-git-send-email-rnayak@codeaurora.org>
-Message-ID: <7hvbf1y974.fsf@deeprootsystems.com>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Fri, 5 Jun 2015 17:45:54 -0700
+Subject: [PATCH v3 0/3] clk: meson: Add clock controller
+In-Reply-To: <CAOQ7t2YtMrX9QQHGiCvoPb9SSdvBvzXSu4e7wnzC7eCdUaiWwg@mail.gmail.com>
+References: <1433157235-17275-1-git-send-email-carlo@caione.org>
+ <20150604230717.GE8099@codeaurora.org>
+ <CAOQ7t2YtMrX9QQHGiCvoPb9SSdvBvzXSu4e7wnzC7eCdUaiWwg@mail.gmail.com>
+Message-ID: <20150606004554.GB29237@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[+ Javi, Punit for power_allocator questions ]
+On 06/05, Carlo Caione wrote:
+> On Fri, Jun 5, 2015 at 1:07 AM, Stephen Boyd <sboyd@codeaurora.org> wrote:
+> > On 06/01, Carlo Caione wrote:
+> >> From: Carlo Caione <carlo@endlessm.com>
+> >>
+> >> This patchset introduces preliminary support for the clock controller
+> >> found on Amlogic MesonX SoCs and enables it for the Meson8b.
+> >>
+> >> DTS patches with support for Meson8b SoCs will follow.
+> >>
+> >
+> > Did you want to send the dts changes through arm-soc?
+> 
+> (adding Arnd in CC) this is what I have done in the past but I have no
+> strong preference.
+> 
+> > Do they depend on the header file that is included here?
+> 
+> Yes, they do.
+> 
+> > clk-next is not
+> > stable and shouldn't be pulled into other developer's trees, so
+> > if we need some stable commit to give off to arm-soc for v4.2
+> > we need to know soon. Or we can split the header file off into a
+> > different patch and send it through both arm-soc and clk tree.
+> 
+> Again whatever is more preferable to the maintainers. Just let me know
+> so I can rearrange the DTS patchset.
+> 
 
-Hi Rajendra,
+I'd prefer not to send dts changes through the clk tree either. I
+looked for the dts changes on the list but I couldn't find them.
 
-Rajendra Nayak <rnayak@codeaurora.org> writes:
+I've put these patches on a 'clk-meson8b' branch and merged it
+into clk-next. We won't rewrite clk-meson8b so you can use it for
+a stable baseline to send to arm-soc if needed.
 
-> This is an attempt to have a single tsens driver for
-> the different versions of the tsens IP that exist, on
-> different qcom msm/apq SoCs.
-> Support is added for msm8916, msm8960 and msm8974 families.
-> Based on top of the latest eeprom framework patches [1]
-
-Curious how are you testing this?  with which thermal governor?
-
-I'm experimenting with the new thermal power_allocator governor
-currently in linux-next, and was hoping to use this to test it, but I'm
-noticing it doesn't work with the power_allocator governor.
-
-The first thing is that the power_allator goveror expects each thermal
-zone to have a sustainable-power property in the DT, which this series
-doesn't provide.  Hacking some dummy values in there to see what happens
-next, I then hit the "thermal zone cpu-thermal0 has wrong trip setup for
-power allocator" error from the power_allocator driver.
-
-I stopped there as that made it clear this isn't yet ready to be used
-with the power_allocator governor.
-
-Kevin
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
