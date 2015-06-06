@@ -1,63 +1,271 @@
-From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Sat, 06 Jun 2015 14:17:44 +0200
-Subject: [ehci-orion] ETIMEOUT with ehci_setup()'s ehci_halt()
-In-Reply-To: <20150605151930.GA16909@lunn.ch>
-References: <5571B38E.7080505@keymile.com> <20150605151930.GA16909@lunn.ch>
-Message-ID: <5572E4E8.2060405@gmail.com>
+From: stefan@agner.ch (Stefan Agner)
+Date: Sat,  6 Jun 2015 14:31:28 +0200
+Subject: [PATCH v3] ARM: early fixmap support for earlycon
+Message-ID: <1433593888-7142-1-git-send-email-stefan@agner.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05.06.2015 17:19, Andrew Lunn wrote:
-> On Fri, Jun 05, 2015 at 04:34:54PM +0200, Valentin Longchamp wrote:
->> I am currently bringing up the USB 2.0 Host controller of the Bobcat's (98DX4122
->> Marvell switch) internal kirkwood CPU on a variation of Keymile's km_kirwood
->> hardware (kirkwood-km_kirkwood.dts).
->>
->> When the driver registers its hcd, it fails with a timemout as it can be seen in
->> the below log:
->>
->>> root at kmcoge5un:~# dmesg -n 8
->>> root at kmcoge5un:~# insmod ehci-orion.ko
->>> ehci-orion: EHCI orion driver
->>> Initializing Orion-SoC USB Host Controller
->>> orion-ehci f1050000.ehci: EHCI Host Controller
->>> orion-ehci f1050000.ehci: new USB bus registered, assigned bus number 1
->>> orion-ehci f1050000.ehci: reset hcs_params 0x10011 dbg=0 ind cc=0 pcc=0 ordered ports=1
->>> orion-ehci f1050000.ehci: reset hcc_params 0006 thresh 0 uframes 256/512/1024 park
->>> orion-ehci f1050000.ehci: park 0
->>> orion-ehci f1050000.ehci: reset command 0080002 (park)=0 ithresh=8 period=1024 Reset HALT
->>> orion-ehci f1050000.ehci: can't setup
->>> orion-ehci f1050000.ehci: USB bus 1 deregistered
->>> orion-ehci f1050000.ehci: init f1050000.ehci fail, -110
->>> orion-ehci: probe of f1050000.ehci failed with error -110
->>
->> This is very similar to this problem, except that it always happens:
->> https://lkml.org/lkml/2012/6/4/381
->>
->> I have cornered it out to the last handshake() call of the ehci_halt() call,
->> that should set the controller in the HALT state. If I comment this handshake()
->> call out, the registration is fine and the controller then looks OK (I don't
->> have a hardware with a real USB bus to further test it yet).
+Add early fixmap support, initially to support permanent, fixed
+mapping support for early console. A temporary, early pte is
+created which is migrated to a permanent mapping in paging_init.
+This is also needed since the attributes may change as the memory
+types are initialized. The 3MiB range of fixmap spans two pte
+tables, but currently only one pte is created for early fixmap
+support.
 
-Valentin,
+Re-add FIX_KMAP_BEGIN to the index calculation in highmem.c since
+the index for kmap does not start at zero anymore. This reverts
+4221e2e6b316 ("ARM: 8031/1: fixmap: remove FIX_KMAP_BEGIN and
+FIX_KMAP_END") to some extent.
 
-can you specify what "real USB bus" means? Does your current hardware
-support USB host or device with anything connected to it?
+Cc: Mark Salter <msalter@redhat.com>
+Cc: Russell King <linux@arm.linux.org.uk>
+Cc: Kees Cook <keescook@chromium.org>
+Cc: Laura Abbott <lauraa@codeaurora.org>
+Cc: Arnd Bergmann <arnd@arndb.de>
+Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+Signed-off-by: Rob Herring <robh@kernel.org>
+Signed-off-by: Stefan Agner <stefan@agner.ch>
+---
+Changes since v2:
+- Rebased and tested on rmk/for-next
+- Flush TLB's when clearing the temporary PMD in early_fixmap_shutdown
 
->> My current idea is that maybe a reset or an initialization may be missing, but I
->> wanted to ask if anybody already has seen a similar behavior with the various
->> hardware platform supported by ehci-orion ?
+Changes since v1 (RFC):
+- Rebased and tested on v3.19-rc5
+- Spelling errors in comments and commit message
+- Added Rob's SOB
 
-You might want to tryout chipidea DRC too. We do need some mvebu boiler
-plate code to setup mbus registers but the IP definitely is chipidea.
+ arch/arm/Kconfig              |  3 ++
+ arch/arm/include/asm/fixmap.h | 13 +++++++-
+ arch/arm/kernel/setup.c       |  3 ++
+ arch/arm/mm/highmem.c         |  6 ++--
+ arch/arm/mm/mmu.c             | 78 +++++++++++++++++++++++++++++++++++++++++--
+ 5 files changed, 96 insertions(+), 7 deletions(-)
 
-> Do you know what phy the 98DX4122 uses? The ehci-orion.c has some code
-> for handling the Orion5X USB phy. I also think u-boot might also have
-> some code. Sebastian might know more, i think he implemented USB
-> support for barebox.
-
- From my experiments with MVEBU usb phy's I recall that (at least on
-Armada 370/XP) ehci-orion will hang the system if PHYs are not setup by
-bootloader. I cannot recall what happened on KW.
-
-Sebastian
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index d0950ce..ef164a7 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -186,6 +186,9 @@ config ARCH_HAS_ILOG2_U64
+ config ARCH_HAS_BANDGAP
+ 	bool
+ 
++config FIX_EARLYCON_MEM
++	def_bool y
++
+ config GENERIC_HWEIGHT
+ 	bool
+ 	default y
+diff --git a/arch/arm/include/asm/fixmap.h b/arch/arm/include/asm/fixmap.h
+index 0415eae..2d8b12b 100644
+--- a/arch/arm/include/asm/fixmap.h
++++ b/arch/arm/include/asm/fixmap.h
+@@ -6,9 +6,13 @@
+ #define FIXADDR_TOP		(FIXADDR_END - PAGE_SIZE)
+ 
+ #include <asm/kmap_types.h>
++#include <asm/pgtable.h>
+ 
+ enum fixed_addresses {
+-	FIX_KMAP_BEGIN,
++	FIX_EARLYCON_MEM_BASE,
++	__end_of_permanent_fixed_addresses,
++
++	FIX_KMAP_BEGIN = __end_of_permanent_fixed_addresses,
+ 	FIX_KMAP_END = FIX_KMAP_BEGIN + (KM_TYPE_NR * NR_CPUS) - 1,
+ 
+ 	/* Support writing RO kernel text via kprobes, jump labels, etc. */
+@@ -18,7 +22,14 @@ enum fixed_addresses {
+ 	__end_of_fixed_addresses
+ };
+ 
++#define FIXMAP_PAGE_COMMON	(L_PTE_YOUNG | L_PTE_PRESENT | L_PTE_XN | L_PTE_DIRTY)
++
++#define FIXMAP_PAGE_NORMAL	(FIXMAP_PAGE_COMMON | L_PTE_MT_WRITEBACK)
++#define FIXMAP_PAGE_IO		(FIXMAP_PAGE_COMMON | L_PTE_MT_DEV_SHARED | L_PTE_SHARED)
++#define FIXMAP_PAGE_NOCACHE	FIXMAP_PAGE_IO
++
+ void __set_fixmap(enum fixed_addresses idx, phys_addr_t phys, pgprot_t prot);
++void __init early_fixmap_init(void);
+ 
+ #include <asm-generic/fixmap.h>
+ 
+diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
+index e6d8c76..6f03beb 100644
+--- a/arch/arm/kernel/setup.c
++++ b/arch/arm/kernel/setup.c
+@@ -37,6 +37,7 @@
+ #include <asm/cpu.h>
+ #include <asm/cputype.h>
+ #include <asm/elf.h>
++#include <asm/fixmap.h>
+ #include <asm/procinfo.h>
+ #include <asm/psci.h>
+ #include <asm/sections.h>
+@@ -953,6 +954,8 @@ void __init setup_arch(char **cmdline_p)
+ 	strlcpy(cmd_line, boot_command_line, COMMAND_LINE_SIZE);
+ 	*cmdline_p = cmd_line;
+ 
++	early_fixmap_init();
++
+ 	parse_early_param();
+ 
+ #ifdef CONFIG_MMU
+diff --git a/arch/arm/mm/highmem.c b/arch/arm/mm/highmem.c
+index b98895d..c7097f9 100644
+--- a/arch/arm/mm/highmem.c
++++ b/arch/arm/mm/highmem.c
+@@ -78,7 +78,7 @@ void *kmap_atomic(struct page *page)
+ 
+ 	type = kmap_atomic_idx_push();
+ 
+-	idx = type + KM_TYPE_NR * smp_processor_id();
++	idx = FIX_KMAP_BEGIN + type + KM_TYPE_NR * smp_processor_id();
+ 	vaddr = __fix_to_virt(idx);
+ #ifdef CONFIG_DEBUG_HIGHMEM
+ 	/*
+@@ -105,7 +105,7 @@ void __kunmap_atomic(void *kvaddr)
+ 
+ 	if (kvaddr >= (void *)FIXADDR_START) {
+ 		type = kmap_atomic_idx();
+-		idx = type + KM_TYPE_NR * smp_processor_id();
++		idx = FIX_KMAP_BEGIN + type + KM_TYPE_NR * smp_processor_id();
+ 
+ 		if (cache_is_vivt())
+ 			__cpuc_flush_dcache_area((void *)vaddr, PAGE_SIZE);
+@@ -135,7 +135,7 @@ void *kmap_atomic_pfn(unsigned long pfn)
+ 		return page_address(page);
+ 
+ 	type = kmap_atomic_idx_push();
+-	idx = type + KM_TYPE_NR * smp_processor_id();
++	idx = FIX_KMAP_BEGIN + type + KM_TYPE_NR * smp_processor_id();
+ 	vaddr = __fix_to_virt(idx);
+ #ifdef CONFIG_DEBUG_HIGHMEM
+ 	BUG_ON(!pte_none(get_fixmap_pte(vaddr)));
+diff --git a/arch/arm/mm/mmu.c b/arch/arm/mm/mmu.c
+index 6ca7d9a..d3e9702 100644
+--- a/arch/arm/mm/mmu.c
++++ b/arch/arm/mm/mmu.c
+@@ -357,6 +357,47 @@ const struct mem_type *get_mem_type(unsigned int type)
+ }
+ EXPORT_SYMBOL(get_mem_type);
+ 
++static pte_t *(*pte_offset_fixmap)(pmd_t *dir, unsigned long addr);
++
++static pte_t bm_pte[PTRS_PER_PTE + PTE_HWTABLE_PTRS]
++	__aligned(PTE_HWTABLE_OFF + PTE_HWTABLE_SIZE) __initdata;
++
++static pte_t * __init pte_offset_early_fixmap(pmd_t *dir, unsigned long addr)
++{
++	return &bm_pte[pte_index(addr)];
++}
++
++static pte_t *pte_offset_late_fixmap(pmd_t *dir, unsigned long addr)
++{
++	return pte_offset_kernel(dir, addr);
++}
++
++static inline pmd_t * __init fixmap_pmd(unsigned long addr)
++{
++	pgd_t *pgd = pgd_offset_k(addr);
++	pud_t *pud = pud_offset(pgd, addr);
++	pmd_t *pmd = pmd_offset(pud, addr);
++
++	return pmd;
++}
++
++void __init early_fixmap_init(void)
++{
++	pmd_t *pmd;
++
++	/*
++	 * The early fixmap range spans multiple pmds, for which
++	 * we are not prepared:
++	 */
++	BUILD_BUG_ON((__fix_to_virt(__end_of_permanent_fixed_addresses) >> PMD_SHIFT)
++		     != FIXADDR_TOP >> PMD_SHIFT);
++
++	pmd = fixmap_pmd(FIXADDR_TOP);
++	pmd_populate_kernel(&init_mm, pmd, bm_pte);
++
++	pte_offset_fixmap = &pte_offset_early_fixmap;
++}
++
+ /*
+  * To avoid TLB flush broadcasts, this uses local_flush_tlb_kernel_range().
+  * As a result, this can only be called with preemption disabled, as under
+@@ -365,7 +406,7 @@ EXPORT_SYMBOL(get_mem_type);
+ void __set_fixmap(enum fixed_addresses idx, phys_addr_t phys, pgprot_t prot)
+ {
+ 	unsigned long vaddr = __fix_to_virt(idx);
+-	pte_t *pte = pte_offset_kernel(pmd_off_k(vaddr), vaddr);
++	pte_t *pte = pte_offset_fixmap(pmd_off_k(vaddr), vaddr);
+ 
+ 	/* Make sure fixmap region does not exceed available allocation. */
+ 	BUILD_BUG_ON(FIXADDR_START + (__end_of_fixed_addresses * PAGE_SIZE) >
+@@ -855,7 +896,7 @@ static void __init create_mapping(struct map_desc *md)
+ 	}
+ 
+ 	if ((md->type == MT_DEVICE || md->type == MT_ROM) &&
+-	    md->virtual >= PAGE_OFFSET &&
++	    md->virtual >= PAGE_OFFSET && md->virtual < FIXADDR_START &&
+ 	    (md->virtual < VMALLOC_START || md->virtual >= VMALLOC_END)) {
+ 		pr_warn("BUG: mapping for 0x%08llx at 0x%08lx out of vmalloc space\n",
+ 			(long long)__pfn_to_phys((u64)md->pfn), md->virtual);
+@@ -1231,7 +1272,7 @@ static void __init devicemaps_init(const struct machine_desc *mdesc)
+ 
+ 	early_trap_init(vectors);
+ 
+-	for (addr = VMALLOC_START; addr; addr += PMD_SIZE)
++	for (addr = VMALLOC_START; addr < FIXADDR_START; addr += PMD_SIZE)
+ 		pmd_clear(pmd_off_k(addr));
+ 
+ 	/*
+@@ -1483,6 +1524,36 @@ void __init early_paging_init(const struct machine_desc *mdesc)
+ 
+ #endif
+ 
++static void __init early_fixmap_shutdown(void)
++{
++	int i;
++	unsigned long va = fix_to_virt(__end_of_permanent_fixed_addresses - 1);
++
++	pte_offset_fixmap = &pte_offset_late_fixmap;
++	pmd_clear(fixmap_pmd(va));
++	local_flush_tlb_kernel_page(va);
++
++	for (i = 0; i < __end_of_permanent_fixed_addresses; i++) {
++		pte_t *pte;
++		struct map_desc map;
++
++		map.virtual = fix_to_virt(i);
++		pte = pte_offset_early_fixmap(pmd_off_k(map.virtual), map.virtual);
++
++		/* Only i/o device mappings are supported ATM */
++		if (pte_none(*pte) ||
++		    (pte_val(*pte) & L_PTE_MT_MASK) != L_PTE_MT_DEV_SHARED)
++			continue;
++
++		map.pfn = pte_pfn(*pte);
++		map.type = MT_DEVICE;
++		map.length = PAGE_SIZE;
++
++		create_mapping(&map);
++	}
++}
++
++
+ /*
+  * paging_init() sets up the page tables, initialises the zone memory
+  * maps, and sets up the zero page, bad page and bad page tables.
+@@ -1495,6 +1566,7 @@ void __init paging_init(const struct machine_desc *mdesc)
+ 	prepare_page_table();
+ 	map_lowmem();
+ 	dma_contiguous_remap();
++	early_fixmap_shutdown();
+ 	devicemaps_init(mdesc);
+ 	kmap_init();
+ 	tcm_init();
+-- 
+2.4.2
