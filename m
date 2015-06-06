@@ -1,76 +1,53 @@
 From: robert.jarzmik@free.fr (Robert Jarzmik)
-Date: Sat,  6 Jun 2015 23:09:10 +0200
-Subject: [PATCH 3/6] ARM: dts: pxa: add dma pxamci nodes to pxa3xx
+Date: Sat,  6 Jun 2015 23:09:13 +0200
+Subject: [PATCH 6/6] ARM: dts: pxa: add the usb host controller
 In-Reply-To: <1433624953-28165-1-git-send-email-robert.jarzmik@free.fr>
 References: <1433624953-28165-1-git-send-email-robert.jarzmik@free.fr>
-Message-ID: <1433624953-28165-3-git-send-email-robert.jarzmik@free.fr>
+Message-ID: <1433624953-28165-6-git-send-email-robert.jarzmik@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the 3 possible mmc controllers on pxa3xx SoCs to the devicetree
-description. Add the dma and clocks to the device-tree description of
-pxa27x and pxa3xx at the same time.
+Add the usb host controller to pxa27x and pxa3xx.
 
 Signed-off-by: Robert Jarzmik <robert.jarzmik@free.fr>
 ---
- arch/arm/boot/dts/pxa2xx.dtsi |  4 ++++
- arch/arm/boot/dts/pxa3xx.dtsi | 33 +++++++++++++++++++++++++++++++++
- 2 files changed, 37 insertions(+)
+ arch/arm/boot/dts/pxa27x.dtsi | 8 ++++++++
+ arch/arm/boot/dts/pxa3xx.dtsi | 8 ++++++++
+ 2 files changed, 16 insertions(+)
 
-diff --git a/arch/arm/boot/dts/pxa2xx.dtsi b/arch/arm/boot/dts/pxa2xx.dtsi
-index 71a0cd7..5e5af07 100644
---- a/arch/arm/boot/dts/pxa2xx.dtsi
-+++ b/arch/arm/boot/dts/pxa2xx.dtsi
-@@ -128,6 +128,10 @@
- 			compatible = "marvell,pxa-mmc";
- 			reg = <0x41100000 0x1000>;
- 			interrupts = <23>;
-+			clocks = <&clks CLK_MMC>;
-+			dmas = <&pdma 21 3
-+				&pdma 22 3>;
-+			dma-names = "rx", "tx";
- 			status = "disabled";
+diff --git a/arch/arm/boot/dts/pxa27x.dtsi b/arch/arm/boot/dts/pxa27x.dtsi
+index 94cf80f..7f75272 100644
+--- a/arch/arm/boot/dts/pxa27x.dtsi
++++ b/arch/arm/boot/dts/pxa27x.dtsi
+@@ -26,6 +26,14 @@
+ 			clocks = <&clks CLK_NONE>;
  		};
  
++		pxa27x_ohci: ohci at 4c000000 {
++			compatible = "marvell,pxa-ohci";
++			reg = <0x4c000000 0x10000>;
++			interrupts = <3>;
++			clocks = <&clks CLK_USBHOST>;
++			status = "disabled";
++		};
++
+ 		pwm0: pwm at 40b00000 {
+ 			compatible = "marvell,pxa270-pwm", "marvell,pxa250-pwm";
+ 			reg = <0x40b00000 0x10>;
 diff --git a/arch/arm/boot/dts/pxa3xx.dtsi b/arch/arm/boot/dts/pxa3xx.dtsi
-index d90489b..29aeac5 100644
+index 29aeac5..67bd4fe 100644
 --- a/arch/arm/boot/dts/pxa3xx.dtsi
 +++ b/arch/arm/boot/dts/pxa3xx.dtsi
-@@ -53,6 +53,39 @@
- 			interrupt-controller;
- 			#interrupt-cells = <0x2>;
+@@ -86,6 +86,14 @@
+ 			dma-names = "rx", "tx";
+ 			status = "disabled";
  		};
 +
-+		mmc0: mmc at 41100000 {
-+			compatible = "marvell,pxa-mmc";
-+			reg = <0x41100000 0x1000>;
-+			interrupts = <23>;
-+			clocks = <&clks CLK_MMC>;
-+			dmas = <&pdma 21 3
-+				&pdma 22 3>;
-+			dma-names = "rx", "tx";
-+			status = "disabled";
-+		};
-+
-+		mmc1: mmc at 42000000 {
-+			compatible = "marvell,pxa-mmc";
-+			reg = <0x42000000 0x1000>;
-+			interrupts = <41>;
-+			clocks = <&clks CLK_MMC1>;
-+			dmas = <&pdma 93 3
-+				&pdma 94 3>;
-+			dma-names = "rx", "tx";
-+			status = "disabled";
-+		};
-+
-+		mmc2: mmc at 42500000 {
-+			compatible = "marvell,pxa-mmc";
-+			reg = <0x42500000 0x1000>;
-+			interrupts = <55>;
-+			clocks = <&clks CLK_MMC2>;
-+			dmas = <&pdma 46 3
-+				&pdma 47 3>;
-+			dma-names = "rx", "tx";
++		pxa3xx_ohci: ohci at 4c000000 {
++			compatible = "marvell,pxa-ohci";
++			reg = <0x4c000000 0x10000>;
++			interrupts = <3>;
++			clocks = <&clks CLK_USBHOST>;
 +			status = "disabled";
 +		};
  	};
