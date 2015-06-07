@@ -1,81 +1,87 @@
-From: linux.amoon@gmail.com (Anand Moon)
-Date: Sun, 7 Jun 2015 08:20:45 +0530
-Subject: [PATCH] ARM: dts: odroidxu3: Enable USB3 regulators
-In-Reply-To: <CANAwSgTk=YwH23F4981j6z9m4+=_Yrratz6BRSQU7PmPHGT0Bg@mail.gmail.com>
-References: <1432803494-3516-1-git-send-email-linux.amoon@gmail.com>
- <5566DDA6.1080508@samsung.com>
- <CANAwSgTk=YwH23F4981j6z9m4+=_Yrratz6BRSQU7PmPHGT0Bg@mail.gmail.com>
-Message-ID: <CANAwSgR7a6dQ=yspvwqW2qyvPZ6OhXyAxdZORmhwUnH01ATh6Q@mail.gmail.com>
+From: wxt@rock-chips.com (Caesar Wang)
+Date: Sun, 07 Jun 2015 10:51:54 +0800
+Subject: [PATCH v4 1/3] ARM: rockchip: fix the CPU soft reset
+In-Reply-To: <CAD=FV=XGOVpAA5+NQ8O910T=CPrYKfTseBXfNbR4EkenzDECaQ@mail.gmail.com>
+References: <1433523923-4755-1-git-send-email-wxt@rock-chips.com>	<1433523923-4755-2-git-send-email-wxt@rock-chips.com>
+ <CAD=FV=XGOVpAA5+NQ8O910T=CPrYKfTseBXfNbR4EkenzDECaQ@mail.gmail.com>
+Message-ID: <5573B1CA.1050204@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 30 May 2015 at 19:23, Anand Moon <linux.amoon@gmail.com> wrote:
-> On 28 May 2015 at 14:49, Krzysztof Kozlowski <k.kozlowski@samsung.com> wrote:
->> On 28.05.2015 17:58, Anand Moon wrote:
->>> Enable regulator for usbdrd3_0 and usbdrd3_1
->>>>From the schematic pin diagram USB3_0 and USB3_1
->>> is regulated by LDO9 and LD011.
->>
->> Please reformat statement above to proper sentence(s) without ">" before
->> "From".
->>
->>>
->>> Fix the boot message of failed.
->>> [    3.503539] exynos-dwc3 usb at 12000000: Looking up vdd33-supply from device tree
->>> [    3.503556] exynos-dwc3 usb at 12000000: Looking up vdd33-supply property in node /usb at 12000000 failed
->>> [    3.503568] usb at 12000000 supply vdd33 not found, using dummy regulator
->>> [    3.509154] exynos-dwc3 usb at 12000000: Looking up vdd10-supply from device tree
->>> [    3.509170] exynos-dwc3 usb at 12000000: Looking up vdd10-supply property in node /usb at 12000000 failed
->>> [    3.509181] usb at 12000000 supply vdd10 not found, using dummy regulator
->>> [    3.917548] exynos-dwc3 usb at 12400000: Looking up vdd33-supply from device tree
->>> [    3.917565] exynos-dwc3 usb at 12400000: Looking up vdd33-supply property in node /usb at 12400000 failed
->>> [    3.917578] usb at 12400000 supply vdd33 not found, using dummy regulator
->>> [    3.922731] exynos-dwc3 usb at 12400000: Looking up vdd10-supply from device tree
->>> [    3.922747] exynos-dwc3 usb at 12400000: Looking up vdd10-supply property in node /usb at 12400000 failed
->>>
->>> ---
->>> This patch is based on Krzysztof github branch work-next/odroid-xu3-s2mps11-irq
->>> ---
->>
->> I mentioned this already on previous postings. Let's make an exercise.
->> Please:
->> 1. Save your email as mbox format (from mailer).
->> 2. Go to a GIT repo with kernel and checkout base branch.
->> 3. git am 0001-the-name-of-file.mbox
->> 4. git show
->>
->> Do you see the signed-off-by in commit?
->>
->> The patch itself looks good, thanks for fixing this. Just please fix the
->> issues with commit message.
->>
->> By the way:
->> 1. The always-on from LDO9 could be probably removed if the ehci-exynos
->> driver had regulator consumer implemented.
->> 2. The Documentation/devicetree/bindings/usb/exynos-usb.txt (or dwc.txt)
->> should proably mention the vdd-supply property.
->
-> Hi Krzysztof,
->
-> https://patchwork.kernel.org/patch/4420061/
-> https://patchwork.kernel.org/patch/4420071/
->
-> These patch are missing for this changes to make it work correctly.
->
-> Can you share you thought on this.
->
-> -Anand Moon
->
->> Best regards,
->> Krzysztof
->>
->>
 
-Hi Krzysztof
 
-Do you want me to resend this. Along with above.
+? 2015?06?06? 04:55, Doug Anderson ??:
+> Caesar,
+>
+> On Fri, Jun 5, 2015 at 10:05 AM, Caesar Wang <wxt@rock-chips.com> wrote:
+>> +               if (!on)
+>> +                       reset_control_assert(rstc);
+>> +
+>> +               ret = regmap_update_bits(pmu, PMU_PWRDN_CON, BIT(pd), val);
+>> +               if (ret < 0) {
+>> +                       pr_err("%s: could not update power domain\n", __func__);
+>> +                       reset_control_put(rstc);
+>> +                       return ret;
+>> +               }
+>> +
+>>                  if (on)
+>>                          reset_control_deassert(rstc);
+>> -               else
+>> -                       reset_control_assert(rstc);
+> As Heiko indicated in the previous patchset, he thought it would be
+> nice to move the 'pmu_power_domain_is_on(pd)' to before you deasserted
+> reset.  ...but then I pointed out that you tested that in patch set #2
+> and it didn't work.
+>
+> Talking to Heiko offline he thought that perhaps you could make
+> 'pmu_power_domain_is_on(pd)' work if you increased your 'udelay(10);'
+> in rockchip_boot_secondary().  Perhaps the old
+> 'pmu_power_domain_is_on' was acting like an extra bit of delay and
+> that's why moving it broke things.
+>
+>
+> I actually went back and tested patch set #2 and it worked for me, so
+> I couldn't test Heiko's theory.  Could you go and reproduce the
+> problem with patch set #2 again and then try increasing the udelay()
+> and see if your problems go away?  If that works, it might be a
+> slightly better solution.  Note that I think Heiko had a slightly
+> cleaner version of your patch set #2 that he posted in response to
+> your patch set #3.
 
-https://patchwork.kernel.org/patch/4420061/
-https://patchwork.kernel.org/patch/4420071/
+@@ -150,13 +159,15 @@ static int __cpuinit 
+rockchip_boot_secondary(unsigned int cpu,
+                  * sram_base_addr + 4: 0xdeadbeaf
+                  * sram_base_addr + 8: start address for pc
+                  * */
+-               udelay(10);
++               udelay(20);
 
--Anand Moon
+I increased the 'udelay(20)' or 'udelay(50)' in rockchip_boot_secondary().
+Set#2 also can repro this issue over 22600 cycles with testing scripts. 
+(about 1 hours)
+
+log:
+================= 226 ============
+[ 4069.134419] CPU1: shutdown
+[ 4069.164431] CPU2: shutdown
+[ 4069.204475] CPU3: shutdown
+......
+[ 4072.454453] CPU1: shutdown
+[ 4072.504436] CPU2: shutdown
+[ 4072.554426] CPU3: shutdown
+[ 4072.577827] CPU1: Booted secondary processor
+[ 4072.582611] CPU2: Booted secondary processor
+[ 4072.587426] CPU3: Booted secondary processor
+<hang>
+
+The set #4 will be better work.
+
+>
+> -Doug
+>
+>
+>
+
+-- 
+Thanks,
+- Caesar
