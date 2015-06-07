@@ -1,47 +1,123 @@
-From: stefan@agner.ch (Stefan Agner)
-Date: Sun,  7 Jun 2015 21:46:10 +0200
-Subject: [PATCH] dmaengine: fsl-edma: clear pending interrupts on
- initialization
-Message-ID: <1433706370-3867-1-git-send-email-stefan@agner.ch>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Sun, 7 Jun 2015 19:56:42 +0000 (UTC)
+Subject: [PATCH] ARM: dts: AM35xx: fix system control module clocks
+In-Reply-To: <557411DC.9020109@myspectrum.nl>
+References: <alpine.DEB.2.02.1506010546510.14902@utopia.booyaka.com>
+ <1433172627-28052-1-git-send-email-t-kristo@ti.com>
+ <556C8ED5.5050000@myspectrum.nl> <20150601173126.GY30984@atomide.com>
+ <alpine.DEB.2.02.1506011733180.14902@utopia.booyaka.com>
+ <5571576E.6020207@myspectrum.nl> <557157FA.7080305@myspectrum.nl>
+ <557411DC.9020109@myspectrum.nl>
+Message-ID: <alpine.DEB.2.02.1506071952490.15153@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Clear pending interrupts before requesting interrupts and move
-interrupt initialization after channels have been initialized.
-This avoids a NULL pointer dereference panic when using kexec
-while DMA requests were running.
+Hi Jeroen,
 
-Signed-off-by: Stefan Agner <stefan@agner.ch>
----
- drivers/dma/fsl-edma.c | 9 +++++----
- 1 file changed, 5 insertions(+), 4 deletions(-)
+On Sun, 7 Jun 2015, Jeroen Hofstee wrote:
 
-diff --git a/drivers/dma/fsl-edma.c b/drivers/dma/fsl-edma.c
-index 09e2842..915eec3 100644
---- a/drivers/dma/fsl-edma.c
-+++ b/drivers/dma/fsl-edma.c
-@@ -881,10 +881,6 @@ static int fsl_edma_probe(struct platform_device *pdev)
- 
- 	}
- 
--	ret = fsl_edma_irq_init(pdev, fsl_edma);
--	if (ret)
--		return ret;
--
- 	fsl_edma->big_endian = of_property_read_bool(np, "big-endian");
- 
- 	INIT_LIST_HEAD(&fsl_edma->dma_dev.channels);
-@@ -900,6 +896,11 @@ static int fsl_edma_probe(struct platform_device *pdev)
- 		fsl_edma_chan_mux(fsl_chan, 0, false);
- 	}
- 
-+	edma_writel(fsl_edma, ~0, fsl_edma->membase + EDMA_INTR);
-+	ret = fsl_edma_irq_init(pdev, fsl_edma);
-+	if (ret)
-+		return ret;
-+
- 	dma_cap_set(DMA_PRIVATE, fsl_edma->dma_dev.cap_mask);
- 	dma_cap_set(DMA_SLAVE, fsl_edma->dma_dev.cap_mask);
- 	dma_cap_set(DMA_CYCLIC, fsl_edma->dma_dev.cap_mask);
--- 
-2.4.2
+> Hello Paul,
+> 
+> On 05-06-15 10:04, Jeroen Hofstee wrote:
+> > 
+> > On 05-06-15 10:01, Jeroen Hofstee wrote:
+> > > 
+> > > On 01-06-15 19:44, Paul Walmsley wrote:
+> > > > The best way to make this work IMHO would be for us not to accept any
+> > > > new
+> > > > feature addition patches as long as there are warnings reported in the
+> > > > test results.  The only real exception that I would foresee is if those
+> > > > warnings are due to something outside of our control, e.g., a crappy
+> > > > bootloader, as I suspect the USB_OTG initiator warnings are for the
+> > > > CM-T3517.
+> > > > 
+> > > 
+> > > I doubt this is related to the bootloader. I have the suspicion that is
+> > > actually
+> > > a bug in linux but only triggered depending on whether the ROMcode setup
+> > > the USB OTG or not. Here is some data to backup my statement:
+> > > 
+> 
+> Turns out my suspicion was wrong. This is what I know at the moment,
+> depending on the bootpins, u-boot will trigger a bad access when loading
+> a file over ethernet, but only the first time. Clearing the pending interrupt
+> before booting linux make the "USB_OTG address hole seen" go away.
+
+Oh, too bad.  I had been hoping that you were right and that I was wrong 
+;-)  I'll try this on the CM-T3517 here.
+
+I'd like to solicit your opinion on what to do here.  I wonder if, in the 
+L3 bus drivers, we should simply report, in a line or two, if any bus 
+errors were logged before the kernel starts?  That would help discriminate 
+between problems that the kernel is responsible for, vs. problems that 
+occur earlier in the boot process.  Any thoughts?
+
+Thanks for all your investigation, by the way, it's much appreciated.
+
+
+regards,
+
+- Paul
+
+
+> 
+> Regards,
+> Jeroen
+> 
+> U-Boot 2015.04-00098-g487ee34-dirty (Jun 05 2015 - 13:14:48)
+> 
+> AM35XX-GP ES2.0, CPU-OPP2, L3-165MHz, Max CPU Clock 600 Mhz
+> ccgx + LPDDR/NAND
+> I2C:   ready
+> DRAM:  256 MiB
+> NAND:  512 MiB
+> MMC:   OMAP SD/MMC: 0
+> In:    serial
+> Out:   serial
+> Err:   serial
+> Die ID #2276000100000000014e0fb21500b024
+> Net: DaVinci-EMAC
+> Hit any key to stop autoboot:  0
+> ccgx=> echo $clear_l3_int
+> mw 68004428 0x11000000; mw 6800442C 0x00000000; mw 68004458 0xFFFFFFFF; mw
+> 6800445C 0xFFFFFFFF
+> ccgx=> md 0x68000510 2
+> 68000510: 00000000 00000000                      ........
+> ccgx=> tftp ccgx/zImage; tftp 80000000 ccgx/am3517-ccgx.dtb;
+> Using DaVinci-EMAC device
+> TFTP from server 10.0.0.103; our IP address is 10.0.0.250
+> Filename 'ccgx/zImage'.
+> Load address: 0x80300000
+> Loading: #################################################################
+> #################################################################
+> #################################################################
+> #################################################################
+> #################################################################
+> #################################################################
+> #################################################################
+> #################################################################
+> #################################################################
+> #################################################################
+> #################################################################
+> #################################################################
+>          ##########
+>          863.3 KiB/s
+> done
+> Bytes transferred = 4040072 (3da588 hex)
+> Using DaVinci-EMAC device
+> TFTP from server 10.0.0.103; our IP address is 10.0.0.250
+> Filename 'ccgx/am3517-ccgx.dtb'.
+> Load address: 0x80000000
+> Loading: ###########
+>          825.2 KiB/s
+> done
+> Bytes transferred = 54112 (d360 hex)
+> ccgx=> md 0x68000510 2
+> 68000510: 04000000 00000000                      ........
+> ccgx=> run clear_l3_int
+> ccgx=> md 0x68000510 2
+> 68000510: 00000000 00000000                      ........
+> ccgx=> boot
+> 
+> # USB_OTG error is gone...
+> 
