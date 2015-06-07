@@ -1,37 +1,61 @@
-From: linux.amoon@gmail.com (Anand Moon)
-Date: Mon,  8 Jun 2015 02:33:41 +0930
-Subject: [PATCHv2 2/2] ARM: exynos_defconfig: Enable CONFIG_LEDS_PWM for
- Odroid-XU3
-In-Reply-To: <1433696621-4763-1-git-send-email-linux.amoon@gmail.com>
-References: <1433696621-4763-1-git-send-email-linux.amoon@gmail.com>
-Message-ID: <1433696621-4763-2-git-send-email-linux.amoon@gmail.com>
+From: stefan@agner.ch (Stefan Agner)
+Date: Sun, 07 Jun 2015 21:23:03 +0200
+Subject: [PATCH v5 2/2] ARM: dts: add property for maximum ADC clock
+ frequencies
+In-Reply-To: <557477BE.5050108@kernel.org>
+References: <1432730872-14325-1-git-send-email-stefan@agner.ch>
+ <1432730872-14325-3-git-send-email-stefan@agner.ch>
+ <557477BE.5050108@kernel.org>
+Message-ID: <b32971379e0b8dcc60620716d3d79aed@agner.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enable CONFIG_LEDS_PWM amd CONFIG_LEDS_TRIGGER_HEARTBEAT for
-Odroid-XU3 board.
+On 2015-06-07 18:56, Jonathan Cameron wrote:
+> On 27/05/15 13:47, Stefan Agner wrote:
+>> The ADC clock frequency is limited depending on modes used. Add
+>> device tree property which allow to set the mode used and the
+>> maximum frequency ratings for the instance. These allows to
+>> set the ADC clock to a frequency which is within specification
+>> according to the actual mode used.
+>>
+>> Acked-by: Fugang Duan <B38611@freescale.com>
+>> Signed-off-by: Stefan Agner <stefan@agner.ch>
+> I'm happy to take this via IIO if people want me to, otherwise give
+> it's connection to the previous patch that I just applied,
 
-Signed-off-by: Anand Moon <linux.amoon@gmail.com>
----
- arch/arm/configs/exynos_defconfig | 6 ++++++
- 1 file changed, 6 insertions(+)
+I guess the chances for conflicts are rather small. I don't have any
+preferences, Shawn?
 
-diff --git a/arch/arm/configs/exynos_defconfig b/arch/arm/configs/exynos_defconfig
-index 1b7253b..2bbdf80 100644
---- a/arch/arm/configs/exynos_defconfig
-+++ b/arch/arm/configs/exynos_defconfig
-@@ -165,6 +165,12 @@ CONFIG_MMC_SDHCI_S3C_DMA=y
- CONFIG_MMC_DW=y
- CONFIG_MMC_DW_IDMAC=y
- CONFIG_MMC_DW_EXYNOS=y
-+CONFIG_NEW_LEDS=y
-+CONFIG_LEDS_CLASS=m
-+CONFIG_LEDS_PWM=m
-+CONFIG_LEDS_TRIGGERS=y
-+CONFIG_LEDS_TRIGGER_TIMER=m
-+CONFIG_LEDS_TRIGGER_HEARTBEAT=m
- CONFIG_RTC_CLASS=y
- CONFIG_RTC_DRV_MAX77686=y
- CONFIG_RTC_DRV_MAX77802=y
--- 
-2.4.3
+--
+Stefan
+
+> 
+> Acked-by: Jonathan Cameron <jic23@kernel.org>
+> 
+>> ---
+>>  arch/arm/boot/dts/vfxxx.dtsi | 4 ++++
+>>  1 file changed, 4 insertions(+)
+>>
+>> diff --git a/arch/arm/boot/dts/vfxxx.dtsi b/arch/arm/boot/dts/vfxxx.dtsi
+>> index a29c7ce..c6609bd 100644
+>> --- a/arch/arm/boot/dts/vfxxx.dtsi
+>> +++ b/arch/arm/boot/dts/vfxxx.dtsi
+>> @@ -189,6 +189,8 @@
+>>  				clocks = <&clks VF610_CLK_ADC0>;
+>>  				clock-names = "adc";
+>>  				status = "disabled";
+>> +				fsl,adck-max-frequency = <30000000>, <40000000>,
+>> +							<20000000>;
+>>  			};
+>>
+>>  			wdoga5: wdog at 4003e000 {
+>> @@ -387,6 +389,8 @@
+>>  				clocks = <&clks VF610_CLK_ADC1>;
+>>  				clock-names = "adc";
+>>  				status = "disabled";
+>> +				fsl,adck-max-frequency = <30000000>, <40000000>,
+>> +							<20000000>;
+>>  			};
+>>
+>>  			esdhc1: esdhc at 400b2000 {
+>>
