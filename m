@@ -1,165 +1,183 @@
-From: linux.amoon@gmail.com (Anand Moon)
-Date: Sun,  7 Jun 2015 22:50:42 +0930
-Subject: [RESEND 2/2] usb: ohci-exynos: Make provision for vdd regulators
-In-Reply-To: <1433683242-3945-1-git-send-email-linux.amoon@gmail.com>
-References: <1433683242-3945-1-git-send-email-linux.amoon@gmail.com>
-Message-ID: <1433683242-3945-2-git-send-email-linux.amoon@gmail.com>
+From: zhichao.huang@linaro.org (zichao)
+Date: Sun, 07 Jun 2015 21:40:58 +0800
+Subject: [PATCH v2 01/11] KVM: arm: plug guest debug exploit
+In-Reply-To: <556C3A68.8050903@arm.com>
+References: <1433046432-1824-1-git-send-email-zhichao.huang@linaro.org>
+ <1433046432-1824-2-git-send-email-zhichao.huang@linaro.org>
+ <556C3A68.8050903@arm.com>
+Message-ID: <557449EA.7040003@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Facilitate getting required 3.3V and 1.0V VDD supply for
-OHCI controller on Exynos.
+Hi, Marc,
 
-With patches for regulators' nodes merged in 3.15:
-c8c253f ARM: dts: Add regulator entries to smdk5420
-275dcd2 ARM: dts: add max77686 pmic node for smdk5250,
-the exynos systems turn on only minimal number of regulators.
+On 2015/6/1 18:56, Marc Zyngier wrote:
+> Hi Zhichao,
+> 
+> On 31/05/15 05:27, Zhichao Huang wrote:
+>> Hardware debugging in guests is not intercepted currently, it means
+>> that a malicious guest can bring down the entire machine by writing
+>> to the debug registers.
+>>
+>> This patch enable trapping of all debug registers, preventing the guests
+>> to mess with the host state.
+>>
+>> However, it is a precursor for later patches which will need to do
+>> more to world switch debug states while necessary.
+>>
+>> Cc: <stable@vger.kernel.org>
+>> Signed-off-by: Zhichao Huang <zhichao.huang@linaro.org>
+>> ---
+>>  arch/arm/include/asm/kvm_coproc.h |  3 +-
+>>  arch/arm/kvm/coproc.c             | 60 +++++++++++++++++++++++++++++++++++----
+>>  arch/arm/kvm/handle_exit.c        |  4 +--
+>>  arch/arm/kvm/interrupts_head.S    |  2 +-
+>>  4 files changed, 59 insertions(+), 10 deletions(-)
+>>
+>> diff --git a/arch/arm/include/asm/kvm_coproc.h b/arch/arm/include/asm/kvm_coproc.h
+>> index 4917c2f..e74ab0f 100644
+>> --- a/arch/arm/include/asm/kvm_coproc.h
+>> +++ b/arch/arm/include/asm/kvm_coproc.h
+>> @@ -31,7 +31,8 @@ void kvm_register_target_coproc_table(struct kvm_coproc_target_table *table);
+>>  int kvm_handle_cp10_id(struct kvm_vcpu *vcpu, struct kvm_run *run);
+>>  int kvm_handle_cp_0_13_access(struct kvm_vcpu *vcpu, struct kvm_run *run);
+>>  int kvm_handle_cp14_load_store(struct kvm_vcpu *vcpu, struct kvm_run *run);
+>> -int kvm_handle_cp14_access(struct kvm_vcpu *vcpu, struct kvm_run *run);
+>> +int kvm_handle_cp14_32(struct kvm_vcpu *vcpu, struct kvm_run *run);
+>> +int kvm_handle_cp14_64(struct kvm_vcpu *vcpu, struct kvm_run *run);
+>>  int kvm_handle_cp15_32(struct kvm_vcpu *vcpu, struct kvm_run *run);
+>>  int kvm_handle_cp15_64(struct kvm_vcpu *vcpu, struct kvm_run *run);
+>>  
+>> diff --git a/arch/arm/kvm/coproc.c b/arch/arm/kvm/coproc.c
+>> index f3d88dc..2e12760 100644
+>> --- a/arch/arm/kvm/coproc.c
+>> +++ b/arch/arm/kvm/coproc.c
+>> @@ -91,12 +91,6 @@ int kvm_handle_cp14_load_store(struct kvm_vcpu *vcpu, struct kvm_run *run)
+>>  	return 1;
+>>  }
+>>  
+>> -int kvm_handle_cp14_access(struct kvm_vcpu *vcpu, struct kvm_run *run)
+>> -{
+>> -	kvm_inject_undefined(vcpu);
+>> -	return 1;
+>> -}
+>> -
+>>  static void reset_mpidr(struct kvm_vcpu *vcpu, const struct coproc_reg *r)
+>>  {
+>>  	/*
+>> @@ -519,6 +513,60 @@ int kvm_handle_cp15_32(struct kvm_vcpu *vcpu, struct kvm_run *run)
+>>  	return emulate_cp15(vcpu, &params);
+>>  }
+>>  
+>> +/**
+>> + * kvm_handle_cp14_64 -- handles a mrrc/mcrr trap on a guest CP14 access
+>> + * @vcpu: The VCPU pointer
+>> + * @run:  The kvm_run struct
+>> + */
+>> +int kvm_handle_cp14_64(struct kvm_vcpu *vcpu, struct kvm_run *run)
+>> +{
+>> +	struct coproc_params params;
+>> +
+>> +	params.CRn = (kvm_vcpu_get_hsr(vcpu) >> 1) & 0xf;
+>> +	params.Rt1 = (kvm_vcpu_get_hsr(vcpu) >> 5) & 0xf;
+>> +	params.is_write = ((kvm_vcpu_get_hsr(vcpu) & 1) == 0);
+>> +	params.is_64bit = true;
+>> +
+>> +	params.Op1 = (kvm_vcpu_get_hsr(vcpu) >> 16) & 0xf;
+>> +	params.Op2 = 0;
+>> +	params.Rt2 = (kvm_vcpu_get_hsr(vcpu) >> 10) & 0xf;
+>> +	params.CRm = 0;
+>> +
+>> +	/* raz_wi */
+>> +	(void)pm_fake(vcpu, &params, NULL);
+>> +
+>> +	/* handled */
+>> +	kvm_skip_instr(vcpu, kvm_vcpu_trap_il_is32bit(vcpu));
+>> +	return 1;
+>> +}
+>> +
+>> +/**
+>> + * kvm_handle_cp14_32 -- handles a mrc/mcr trap on a guest CP14 access
+>> + * @vcpu: The VCPU pointer
+>> + * @run:  The kvm_run struct
+>> + */
+>> +int kvm_handle_cp14_32(struct kvm_vcpu *vcpu, struct kvm_run *run)
+>> +{
+>> +	struct coproc_params params;
+>> +
+>> +	params.CRm = (kvm_vcpu_get_hsr(vcpu) >> 1) & 0xf;
+>> +	params.Rt1 = (kvm_vcpu_get_hsr(vcpu) >> 5) & 0xf;
+>> +	params.is_write = ((kvm_vcpu_get_hsr(vcpu) & 1) == 0);
+>> +	params.is_64bit = false;
+>> +
+>> +	params.CRn = (kvm_vcpu_get_hsr(vcpu) >> 10) & 0xf;
+>> +	params.Op1 = (kvm_vcpu_get_hsr(vcpu) >> 14) & 0x7;
+>> +	params.Op2 = (kvm_vcpu_get_hsr(vcpu) >> 17) & 0x7;
+>> +	params.Rt2 = 0;
+>> +
+>> +	/* raz_wi */
+>> +	(void)pm_fake(vcpu, &params, NULL);
+>> +
+>> +	/* handled */
+>> +	kvm_skip_instr(vcpu, kvm_vcpu_trap_il_is32bit(vcpu));
+>> +	return 1;
+>> +}
+>> +
+>>  /******************************************************************************
+>>   * Userspace API
+>>   *****************************************************************************/
+>> diff --git a/arch/arm/kvm/handle_exit.c b/arch/arm/kvm/handle_exit.c
+>> index 95f12b2..357ad1b 100644
+>> --- a/arch/arm/kvm/handle_exit.c
+>> +++ b/arch/arm/kvm/handle_exit.c
+>> @@ -104,9 +104,9 @@ static exit_handle_fn arm_exit_handlers[] = {
+>>  	[HSR_EC_WFI]		= kvm_handle_wfx,
+>>  	[HSR_EC_CP15_32]	= kvm_handle_cp15_32,
+>>  	[HSR_EC_CP15_64]	= kvm_handle_cp15_64,
+>> -	[HSR_EC_CP14_MR]	= kvm_handle_cp14_access,
+>> +	[HSR_EC_CP14_MR]	= kvm_handle_cp14_32,
+>>  	[HSR_EC_CP14_LS]	= kvm_handle_cp14_load_store,
+>> -	[HSR_EC_CP14_64]	= kvm_handle_cp14_access,
+>> +	[HSR_EC_CP14_64]	= kvm_handle_cp14_64,
+>>  	[HSR_EC_CP_0_13]	= kvm_handle_cp_0_13_access,
+>>  	[HSR_EC_CP10_ID]	= kvm_handle_cp10_id,
+>>  	[HSR_EC_SVC_HYP]	= handle_svc_hyp,
+>> diff --git a/arch/arm/kvm/interrupts_head.S b/arch/arm/kvm/interrupts_head.S
+>> index 35e4a3a..a9f3a56 100644
+>> --- a/arch/arm/kvm/interrupts_head.S
+>> +++ b/arch/arm/kvm/interrupts_head.S
+>> @@ -607,7 +607,7 @@ ARM_BE8(rev	r6, r6  )
+>>   * (hardware reset value is 0) */
+>>  .macro set_hdcr operation
+>>  	mrc	p15, 4, r2, c1, c1, 1
+>> -	ldr	r3, =(HDCR_TPM|HDCR_TPMCR)
+>> +	ldr	r3, =(HDCR_TPM|HDCR_TPMCR|HDCR_TDRA|HDCR_TDOSA|HDCR_TDA)
+> 
+> There is a small problem here. Imagine the host has programmed a
+> watchpoint on some VA. We switch to the guest, and then access the same
+> VA. At that stage, the guest will take the debug exception. That's
+> really not pretty.
+> 
 
-Until now, the VDD regulator supplies were either turned on
-by the bootloader, or the regulators were enabled by default
-in the kernel, so that the controller drivers did not need to
-care about turning on these regulators on their own.
-This was rather bad about these controller drivers.
-So ensuring now that the controller driver requests the necessary
-VDD regulators (if available, unless there are direct VDD rails),
-and enable them so as to make them working.
+I've thought about it and I think there maybe OK, because when we switch from the
+host to the guest, the context_switch() in host must be called first, and then
+the host will switch debug registers, and the guest will not see the watchpoint
+the host programmed before.
 
-Signed-off-by: Vivek Gautam <gautam.vivek@samsung.com>
-Signed-off-by: Anand Moon <linux.amoon@gmail.com>
-Cc: Jingoo Han <jg1.han@samsung.com>
-Cc: Alan Stern <stern@rowland.harvard.edu>
----
-Initial version of this patch was part of following series, though
-they are not dependent on each other, resubmitting after rebasing.
+Or am I missing some circumstances here?
 
-http://lists.infradead.org/pipermail/linux-arm-kernel/2014-June/266419.html
----
- .../devicetree/bindings/usb/exynos-usb.txt         |  4 ++
- drivers/usb/host/ohci-exynos.c                     | 55 +++++++++++++++++++++-
- 2 files changed, 58 insertions(+), 1 deletion(-)
-
-diff --git a/Documentation/devicetree/bindings/usb/exynos-usb.txt b/Documentation/devicetree/bindings/usb/exynos-usb.txt
-index 776fa03..3883baa 100644
---- a/Documentation/devicetree/bindings/usb/exynos-usb.txt
-+++ b/Documentation/devicetree/bindings/usb/exynos-usb.txt
-@@ -63,6 +63,10 @@ Required properties:
- 			      port 2 is HSIC phy1
- 	- phys: from the *Generic PHY* bindings, specifying phy used by port.
- 
-+Optional properties:
-+ - vdd33-supply: handle to 3.3V Vdd supply regulator for the controller.
-+ - vdd10-supply: handle to 1.0V Vdd supply regulator for the controller.
-+
- Example:
- 	usb at 12120000 {
- 		compatible = "samsung,exynos4210-ohci";
-diff --git a/drivers/usb/host/ohci-exynos.c b/drivers/usb/host/ohci-exynos.c
-index 2cd105b..ce757ea 100644
---- a/drivers/usb/host/ohci-exynos.c
-+++ b/drivers/usb/host/ohci-exynos.c
-@@ -18,6 +18,7 @@
- #include <linux/module.h>
- #include <linux/of.h>
- #include <linux/platform_device.h>
-+#include <linux/regulator/consumer.h>
- #include <linux/phy/phy.h>
- #include <linux/usb.h>
- #include <linux/usb/hcd.h>
-@@ -36,6 +37,8 @@ static struct hc_driver __read_mostly exynos_ohci_hc_driver;
- struct exynos_ohci_hcd {
- 	struct clk *clk;
- 	struct phy *phy[PHY_NUMBER];
-+	struct regulator *vdd33;
-+	struct regulator *vdd10;
- };
- 
- static int exynos_ohci_get_phy(struct device *dev,
-@@ -139,7 +142,27 @@ static int exynos_ohci_probe(struct platform_device *pdev)
- 
- 	err = exynos_ohci_get_phy(&pdev->dev, exynos_ohci);
- 	if (err)
--		goto fail_clk;
-+		goto fail_regulator1;
-+
-+	exynos_ohci->vdd33 = devm_regulator_get_optional(&pdev->dev, "vdd33");
-+	if (!IS_ERR(exynos_ohci->vdd33)) {
-+		err = regulator_enable(exynos_ohci->vdd33);
-+		if (err) {
-+			dev_err(&pdev->dev,
-+				"Failed to enable 3.3V Vdd supply\n");
-+			goto fail_regulator1;
-+		}
-+	}
-+
-+	exynos_ohci->vdd10 = devm_regulator_get_optional(&pdev->dev, "vdd10");
-+	if (!IS_ERR(exynos_ohci->vdd10)) {
-+		err = regulator_enable(exynos_ohci->vdd10);
-+		if (err) {
-+			dev_err(&pdev->dev,
-+				"Failed to enable 1.0V Vdd supply\n");
-+			goto fail_regulator2;
-+		}
-+	}
- 
- skip_phy:
- 	exynos_ohci->clk = devm_clk_get(&pdev->dev, "usbhost");
-@@ -191,6 +214,10 @@ fail_add_hcd:
- fail_io:
- 	clk_disable_unprepare(exynos_ohci->clk);
- fail_clk:
-+	regulator_disable(exynos_ohci->vdd10);
-+fail_regulator2:
-+	regulator_disable(exynos_ohci->vdd33);
-+fail_regulator1:
- 	usb_put_hcd(hcd);
- 	return err;
- }
-@@ -206,6 +233,11 @@ static int exynos_ohci_remove(struct platform_device *pdev)
- 
- 	clk_disable_unprepare(exynos_ohci->clk);
- 
-+	if (!IS_ERR(exynos_ohci->vdd33))
-+		regulator_disable(exynos_ohci->vdd33);
-+	if (!IS_ERR(exynos_ohci->vdd10))
-+		regulator_disable(exynos_ohci->vdd10);
-+
- 	usb_put_hcd(hcd);
- 
- 	return 0;
-@@ -234,6 +266,11 @@ static int exynos_ohci_suspend(struct device *dev)
- 
- 	clk_disable_unprepare(exynos_ohci->clk);
- 
-+	if (!IS_ERR(exynos_ohci->vdd33))
-+		regulator_disable(exynos_ohci->vdd33);
-+	if (!IS_ERR(exynos_ohci->vdd10))
-+		regulator_disable(exynos_ohci->vdd10);
-+
- 	return 0;
- }
- 
-@@ -243,6 +280,22 @@ static int exynos_ohci_resume(struct device *dev)
- 	struct exynos_ohci_hcd *exynos_ohci	= to_exynos_ohci(hcd);
- 	int ret;
- 
-+	if (!IS_ERR(exynos_ohci->vdd33)) {
-+		ret = regulator_enable(exynos_ohci->vdd33);
-+		if (ret) {
-+			dev_err(dev, "Failed to enable 3.3V Vdd supply\n");
-+			return ret;
-+		}
-+	}
-+
-+	if (!IS_ERR(exynos_ohci->vdd10)) {
-+		ret = regulator_enable(exynos_ohci->vdd10);
-+		if (ret) {
-+			dev_err(dev, "Failed to enable 1.0V Vdd supply\n");
-+			return ret;
-+		}
-+	}
-+
- 	clk_prepare_enable(exynos_ohci->clk);
- 
- 	ret = exynos_ohci_phy_enable(dev);
--- 
-2.4.3
+> I think using HDCR_TDE as well should sort it, effectively preventing
+> the exception from being delivered to the guest, but you will need to
+> handle this on the HYP side. Performance wise, this is also really horrible.
+> 
+> A better way would be to disable the host's BPs/WPs if any is enabled.
+> 
+>>  	.if \operation == vmentry
+>>  	orr	r2, r2, r3		@ Trap some perfmon accesses
+>>  	.else
+>>
+> 
+> Thanks,
+> 
+> 	M.
+> 
