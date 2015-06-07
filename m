@@ -1,45 +1,41 @@
 From: jic23@kernel.org (Jonathan Cameron)
-Date: Sun, 07 Jun 2015 16:29:03 +0100
-Subject: [PATCH] iio: adc: xilinx-xadc: Convert to raw spinlock
-In-Reply-To: <20150518211728.GC4275@linutronix.de>
-References: <1431013090-18996-1-git-send-email-xander.huff@ni.com>
- <20150514171038.GG13442@linutronix.de> <55552570.5050407@ni.com>
- <20150518211728.GC4275@linutronix.de>
-Message-ID: <5574633F.7090004@kernel.org>
+Date: Sun, 07 Jun 2015 17:49:26 +0100
+Subject: [PATCH v2 2/2] iio: adc: xilinx-xadc: Add label as an optional
+ argument for aux channels
+In-Reply-To: <1432135352-29848-2-git-send-email-xander.huff@ni.com>
+References: <555B78A3.2030202@metafoo.de>
+ <1432135352-29848-1-git-send-email-xander.huff@ni.com>
+ <1432135352-29848-2-git-send-email-xander.huff@ni.com>
+Message-ID: <55747616.1010901@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 18/05/15 22:17, Sebastian Andrzej Siewior wrote:
-> * Xander Huff | 2015-05-14 17:45:04 [-0500]:
+On 20/05/15 16:22, Xander Huff wrote:
+> To better facilitate user-mode access to optional aux channels, allow
+> device trees to specify a custom label for defined channels.
 > 
->> With no other processes running, I got the following results after a
->> couple of hours on one of our devices:
->>
->> admin at Xander-roboRIO:~# cyclictest -S -m -p 98
->> # /dev/cpu_dma_latency set to 0us
->> policy: fifo: loadavg: 0.01 0.07 0.12 1/176 1473
->>
->> T: 0 ( 1373) P:98 I:1000 C:6503872 Min:      9 Act:   13 Avg:   13 Max:      51
->> T: 1 ( 1374) P:98 I:1500 C:4335914 Min:      9 Act:   12 Avg:   13 Max:      49
->>
->> With a VI reading all default handles (raw, offset, scale,
->> sampling_frequency) in /sys/bus/iio/devices/iio:device0 constantly in
->> a while loop, I got the following results after a couple hours on the
->> same device:
->>
->> admin at Xander-roboRIO:~# cyclictest -S -m -p 98
->> # /dev/cpu_dma_latency set to 0us
->> policy: fifo: loadavg: 6.93 7.30 7.47 3/182 1530
->>
->> T: 0 ( 1487) P:98 I:1000 C:4497008 Min:     11 Act:   20 Avg:   21 Max:      69
->> T: 1 ( 1488) P:98 I:1500 C:2998005 Min:     11 Act:   20 Avg:   22 Max:      59
+> Signed-off-by: Xander Huff <xander.huff@ni.com>
+> Reviewed-by: Joe Hershberger <joe.hershberger@ni.com>
+> Reviewed-by: Josh Cartwright <joshc@ni.com>
+> ---
+>  drivers/iio/adc/xilinx-xadc-core.c | 3 +++
+>  1 file changed, 3 insertions(+)
 > 
-> So there is an increase. And there is even a for-loop and I don't know
-> how deep it is nested. Anyway, do you think it is worth it or would it
-> be better to get rid of the raw-locks and simply push everything into
-> threaded context?
+> diff --git a/drivers/iio/adc/xilinx-xadc-core.c b/drivers/iio/adc/xilinx-xadc-core.c
+> index ce93bd8..bda4241 100644
+> --- a/drivers/iio/adc/xilinx-xadc-core.c
+> +++ b/drivers/iio/adc/xilinx-xadc-core.c
+> @@ -1119,6 +1119,9 @@ static int xadc_parse_dt(struct iio_dev *indio_dev, struct device_node *np,
+>  			if (ret || reg > 16)
+>  				continue;
+>  
+> +			of_property_read_string(child, "label",
+> +						&chan->extend_name);
+> +
+>  			if (of_property_read_bool(child, "xlnx,bipolar"))
+>  				chan->scan_type.sign = 's';
+>  
 > 
-Certainly seems likely to be a better way forward to me but I don't
-really mind either way.
-
-J
+I think what Lars was suggesting was a change to the IIO side of this rather than
+just changing the device tree binding.  Perhaps an additional per channel attribute
+called _label which would allow for board specific labelling?
