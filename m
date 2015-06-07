@@ -1,59 +1,29 @@
-From: dianders@chromium.org (Doug Anderson)
-Date: Sat, 6 Jun 2015 20:43:04 -0700
-Subject: [PATCH v4 1/3] ARM: rockchip: fix the CPU soft reset
-In-Reply-To: <5573B1CA.1050204@rock-chips.com>
-References: <1433523923-4755-1-git-send-email-wxt@rock-chips.com>
- <1433523923-4755-2-git-send-email-wxt@rock-chips.com>
- <CAD=FV=XGOVpAA5+NQ8O910T=CPrYKfTseBXfNbR4EkenzDECaQ@mail.gmail.com>
- <5573B1CA.1050204@rock-chips.com>
-Message-ID: <CAD=FV=VswV+MAgYr084VOxQynHrL1fdwnVb4b_W_bHUZgoW4mg@mail.gmail.com>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Sun, 7 Jun 2015 12:51:26 +0900
+Subject: [PATCH] ARM: dts: odroidxu3: Enable USB3 regulators
+In-Reply-To: <CANAwSgR7a6dQ=yspvwqW2qyvPZ6OhXyAxdZORmhwUnH01ATh6Q@mail.gmail.com>
+References: <1432803494-3516-1-git-send-email-linux.amoon@gmail.com>
+ <5566DDA6.1080508@samsung.com>
+ <CANAwSgTk=YwH23F4981j6z9m4+=_Yrratz6BRSQU7PmPHGT0Bg@mail.gmail.com>
+ <CANAwSgR7a6dQ=yspvwqW2qyvPZ6OhXyAxdZORmhwUnH01ATh6Q@mail.gmail.com>
+Message-ID: <CAJKOXPeARffLrqz87cqX6FYFVU5tumO12+CrUMUw-3+nW2wc0w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Caesar,
-
-On Sat, Jun 6, 2015 at 7:51 PM, Caesar Wang <wxt@rock-chips.com> wrote:
-> @@ -150,13 +159,15 @@ static int __cpuinit rockchip_boot_secondary(unsigned
-> int cpu,
->                  * sram_base_addr + 4: 0xdeadbeaf
->                  * sram_base_addr + 8: start address for pc
->                  * */
-> -               udelay(10);
-> +               udelay(20);
+2015-06-07 11:50 GMT+09:00 Anand Moon <linux.amoon@gmail.com>:
 >
-> I increased the 'udelay(20)' or 'udelay(50)' in rockchip_boot_secondary().
-> Set#2 also can repro this issue over 22600 cycles with testing scripts.
-> (about 1 hours)
+> Hi Krzysztof
 >
-> log:
-> ================= 226 ============
-> [ 4069.134419] CPU1: shutdown
-> [ 4069.164431] CPU2: shutdown
-> [ 4069.204475] CPU3: shutdown
-> ......
-> [ 4072.454453] CPU1: shutdown
-> [ 4072.504436] CPU2: shutdown
-> [ 4072.554426] CPU3: shutdown
-> [ 4072.577827] CPU1: Booted secondary processor
-> [ 4072.582611] CPU2: Booted secondary processor
-> [ 4072.587426] CPU3: Booted secondary processor
-> <hang>
+> Do you want me to resend this. Along with above.
 >
-> The set #4 will be better work.
+> https://patchwork.kernel.org/patch/4420061/
+> https://patchwork.kernel.org/patch/4420071/
 
-OK, I'm OK with this, but I'd like to get Heiko's opinion.
+If Vivek is not planning to continue to work on them then sure, please
+take care of them and resend. Then I'll review them.
 
-Also:
-* Just for kicks, does mdelay(1) work?  I know that's 100x more than
-udelay(10), but previously we were actually looping waiting for the
-power domain, right?  ...so maybe the old code used to introduce a
-pretty big delay.
+If you have any other patches which were not applied recently, then
+please rebase and resend. There were some changes in Odroid DTS.
 
-* Does anyone from the chip design team have any idea why patch set #4
-works but patch set #2 doesn't?  I know it's Sunday morning in China
-right now, but maybe you could ask Monday?
-
-
-Thanks!
-
--Doug
+Best regards,
+Krzysztof
