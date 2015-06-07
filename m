@@ -1,29 +1,47 @@
-From: davem@davemloft.net (David Miller)
-Date: Sun, 07 Jun 2015 15:21:04 -0700 (PDT)
-Subject: [PATCH] net: ll_temac: Remove sparse warnings
-In-Reply-To: <343ee9fccc37629414209d4c05077eb52aed8ed2.1433494150.git.michal.simek@xilinx.com>
-References: <343ee9fccc37629414209d4c05077eb52aed8ed2.1433494150.git.michal.simek@xilinx.com>
-Message-ID: <20150607.152104.1816869275923133948.davem@davemloft.net>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Sun,  7 Jun 2015 20:41:07 -0300
+Subject: [PATCH] ARM: dts: imx6sl-warp: Add the SD2_RESET pin
+Message-ID: <1433720467-9070-1-git-send-email-festevam@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Michal Simek <michal.simek@xilinx.com>
-Date: Fri,  5 Jun 2015 10:49:17 +0200
+From: Fabio Estevam <fabio.estevam@freescale.com>
 
-> Remove sparse warnings:
-> drivers/net/ethernet/xilinx/ll_temac_main.c:65:16: warning: cast removes
-> address space of expression
-> drivers/net/ethernet/xilinx/ll_temac_main.c:70:9: warning: cast removes
-> address space of expression
-> drivers/net/ethernet/xilinx/ll_temac_main.c:127:16: warning: cast
-> removes address space of expression
-> drivers/net/ethernet/xilinx/ll_temac_main.c:137:9: warning: cast removes
-> address space of expression
-> drivers/net/ethernet/xilinx/ll_temac_main.c:409:3: warning: symbol
-> 'temac_options' was not declared. Should it be static?
-> drivers/net/ethernet/xilinx/ll_temac_main.c:590:6: warning: symbol
-> 'temac_adjust_link' was not declared. Should it be static?
-> 
-> Signed-off-by: Michal Simek <michal.simek@xilinx.com>
+imx6sl-warp has SD2_RESET pin connected to the eMMC reset line,
+so add this pin to the usdhc2 group.
 
-Applied, thank you.
+Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+---
+ arch/arm/boot/dts/imx6sl-warp.dts | 3 +++
+ 1 file changed, 3 insertions(+)
+
+diff --git a/arch/arm/boot/dts/imx6sl-warp.dts b/arch/arm/boot/dts/imx6sl-warp.dts
+index 0da906b..401a6b3 100644
+--- a/arch/arm/boot/dts/imx6sl-warp.dts
++++ b/arch/arm/boot/dts/imx6sl-warp.dts
+@@ -158,6 +158,7 @@
+ 				MX6SL_PAD_SD2_DAT5__SD2_DATA5		0x417059
+ 				MX6SL_PAD_SD2_DAT6__SD2_DATA6		0x417059
+ 				MX6SL_PAD_SD2_DAT7__SD2_DATA7		0x417059
++				MX6SL_PAD_SD2_RST__SD2_RESET		0x417059
+ 			>;
+ 		};
+ 
+@@ -173,6 +174,7 @@
+ 				MX6SL_PAD_SD2_DAT5__SD2_DATA5		0x4170b9
+ 				MX6SL_PAD_SD2_DAT6__SD2_DATA6		0x4170b9
+ 				MX6SL_PAD_SD2_DAT7__SD2_DATA7		0x4170b9
++				MX6SL_PAD_SD2_RST__SD2_RESET		0x4170b9
+ 			>;
+ 		};
+ 
+@@ -188,6 +190,7 @@
+ 				MX6SL_PAD_SD2_DAT5__SD2_DATA5		0x4170f9
+ 				MX6SL_PAD_SD2_DAT6__SD2_DATA6		0x4170f9
+ 				MX6SL_PAD_SD2_DAT7__SD2_DATA7		0x4170f9
++				MX6SL_PAD_SD2_RST__SD2_RESET		0x4170f9
+ 			>;
+ 		};
+ 
+-- 
+1.9.1
