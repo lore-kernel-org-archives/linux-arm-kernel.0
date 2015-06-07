@@ -1,74 +1,100 @@
-From: wxt@rock-chips.com (Caesar Wang)
-Date: Sun, 07 Jun 2015 13:51:24 +0800
-Subject: [PATCH v4 1/3] ARM: rockchip: fix the CPU soft reset
-In-Reply-To: <CAD=FV=VswV+MAgYr084VOxQynHrL1fdwnVb4b_W_bHUZgoW4mg@mail.gmail.com>
-References: <1433523923-4755-1-git-send-email-wxt@rock-chips.com>	<1433523923-4755-2-git-send-email-wxt@rock-chips.com>	<CAD=FV=XGOVpAA5+NQ8O910T=CPrYKfTseBXfNbR4EkenzDECaQ@mail.gmail.com>	<5573B1CA.1050204@rock-chips.com>
- <CAD=FV=VswV+MAgYr084VOxQynHrL1fdwnVb4b_W_bHUZgoW4mg@mail.gmail.com>
-Message-ID: <5573DBDC.2010204@rock-chips.com>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Sun, 07 Jun 2015 17:35:10 +0900
+Subject: [PATCH RFC 1/3] PM / Domains: Allocate memory outside domain locks
+In-Reply-To: <1433456946-53296-2-git-send-email-lina.iyer@linaro.org>
+References: <1433456946-53296-1-git-send-email-lina.iyer@linaro.org>
+ <1433456946-53296-2-git-send-email-lina.iyer@linaro.org>
+Message-ID: <5574023E.6060808@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+W dniu 05.06.2015 o 07:29, Lina Iyer pisze:
+> In order for domains to be powered on/off in irq locked context, the
+> domain locks could either be a spinlock or a mutex, depending on the
+> domain. In preparation for atomic support, allocate domain data outside
+> the domain locks, so the allocation calls dont have to be context
+> sensitive.
+> 
+> Cc: Ulf Hansson <ulf.hansson@linaro.org>
+> Cc: Rafael J. Wysocki <rjw@rjwysocki.net>
+> Cc: Kevin Hilman <khilman@linaro.org>
+> Signed-off-by: Lina Iyer <lina.iyer@linaro.org>
+> ---
+>  drivers/base/power/domain.c | 25 ++++++++++++-------------
+>  1 file changed, 12 insertions(+), 13 deletions(-)
+> 
+> diff --git a/drivers/base/power/domain.c b/drivers/base/power/domain.c
+> index 3b3367b..dfd7595 100644
+> --- a/drivers/base/power/domain.c
+> +++ b/drivers/base/power/domain.c
+> @@ -1367,13 +1367,17 @@ int pm_genpd_remove_device(struct generic_pm_domain *genpd,
+>  int pm_genpd_add_subdomain(struct generic_pm_domain *genpd,
+>  			   struct generic_pm_domain *subdomain)
+>  {
+> -	struct gpd_link *link;
+> +	struct gpd_link *link, *itr;
+>  	int ret = 0;
+>  
+>  	if (IS_ERR_OR_NULL(genpd) || IS_ERR_OR_NULL(subdomain)
+>  	    || genpd == subdomain)
+>  		return -EINVAL;
+>  
+> +	link = kzalloc(sizeof(*link), GFP_KERNEL);
+> +	if (!link)
+> +		return -ENOMEM;
+> +
+>  	mutex_lock(&genpd->lock);
+>  	mutex_lock_nested(&subdomain->lock, SINGLE_DEPTH_NESTING);
+>  
+> @@ -1383,18 +1387,13 @@ int pm_genpd_add_subdomain(struct generic_pm_domain *genpd,
+>  		goto out;
+>  	}
+>  
+> -	list_for_each_entry(link, &genpd->master_links, master_node) {
+> -		if (link->slave == subdomain && link->master == genpd) {
+> +	list_for_each_entry(itr, &genpd->master_links, master_node) {
+> +		if (itr->slave == subdomain && itr->master == genpd) {
+>  			ret = -EINVAL;
+>  			goto out;
+>  		}
+>  	}
+>  
+> -	link = kzalloc(sizeof(*link), GFP_KERNEL);
+> -	if (!link) {
+> -		ret = -ENOMEM;
+> -		goto out;
+> -	}
+>  	link->master = genpd;
+>  	list_add_tail(&link->master_node, &genpd->master_links);
+>  	link->slave = subdomain;
+> @@ -1496,17 +1495,17 @@ int pm_genpd_attach_cpuidle(struct generic_pm_domain *genpd, int state)
+>  	if (IS_ERR_OR_NULL(genpd) || state < 0)
+>  		return -EINVAL;
+>  
+> +	cpuidle_data = kzalloc(sizeof(*cpuidle_data), GFP_KERNEL);
+> +	if (!cpuidle_data)
+> +		return -ENOMEM;
+> +
+>  	mutex_lock(&genpd->lock);
+>  
+>  	if (genpd->cpuidle_data) {
+>  		ret = -EEXIST;
+>  		goto out;
 
+I think you must update the error paths. In this case the kfree() is
+missing.
 
-? 2015?06?07? 11:43, Doug Anderson ??:
-> Caesar,
->
-> On Sat, Jun 6, 2015 at 7:51 PM, Caesar Wang <wxt@rock-chips.com> wrote:
->> @@ -150,13 +159,15 @@ static int __cpuinit rockchip_boot_secondary(unsigned
->> int cpu,
->>                   * sram_base_addr + 4: 0xdeadbeaf
->>                   * sram_base_addr + 8: start address for pc
->>                   * */
->> -               udelay(10);
->> +               udelay(20);
->>
->> I increased the 'udelay(20)' or 'udelay(50)' in rockchip_boot_secondary().
->> Set#2 also can repro this issue over 22600 cycles with testing scripts.
->> (about 1 hours)
->>
->> log:
->> ================= 226 ============
->> [ 4069.134419] CPU1: shutdown
->> [ 4069.164431] CPU2: shutdown
->> [ 4069.204475] CPU3: shutdown
->> ......
->> [ 4072.454453] CPU1: shutdown
->> [ 4072.504436] CPU2: shutdown
->> [ 4072.554426] CPU3: shutdown
->> [ 4072.577827] CPU1: Booted secondary processor
->> [ 4072.582611] CPU2: Booted secondary processor
->> [ 4072.587426] CPU3: Booted secondary processor
->> <hang>
->>
->> The set #4 will be better work.
-> OK, I'm OK with this, but I'd like to get Heiko's opinion.
->
-> Also:
-> * Just for kicks, does mdelay(1) work?  I know that's 100x more than
-OK, it should delay more time.
+Best regards,
+Krzysztof
 
-the mdelay(1) can be work over 50000 cycles, so that should be work.
-
-
-Perhaps, can we use 'usleep_range(500, 1000)' to work.
-Heiko, do you agree with it?
-
-> udelay(10), but previously we were actually looping waiting for the
-> power domain, right?  ...so maybe the old code used to introduce a
-> pretty big delay.
->
-> * Does anyone from the chip design team have any idea why patch set #4
-> works but patch set #2 doesn't?  I know it's Sunday morning in China
-> right now, but maybe you could ask Monday?
->
->
-> Thanks!
->
-> -Doug
->
->
->
-
--- 
-Thanks,
-- Caesar
+>  	}
+> -	cpuidle_data = kzalloc(sizeof(*cpuidle_data), GFP_KERNEL);
+> -	if (!cpuidle_data) {
+> -		ret = -ENOMEM;
+> -		goto out;
+> -	}
+> +
+>  	cpuidle_drv = cpuidle_driver_ref();
+>  	if (!cpuidle_drv) {
+>  		ret = -ENODEV;
+> 
