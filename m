@@ -1,61 +1,47 @@
 From: stefan@agner.ch (Stefan Agner)
-Date: Sun, 07 Jun 2015 21:23:03 +0200
-Subject: [PATCH v5 2/2] ARM: dts: add property for maximum ADC clock
- frequencies
-In-Reply-To: <557477BE.5050108@kernel.org>
-References: <1432730872-14325-1-git-send-email-stefan@agner.ch>
- <1432730872-14325-3-git-send-email-stefan@agner.ch>
- <557477BE.5050108@kernel.org>
-Message-ID: <b32971379e0b8dcc60620716d3d79aed@agner.ch>
+Date: Sun,  7 Jun 2015 21:46:10 +0200
+Subject: [PATCH] dmaengine: fsl-edma: clear pending interrupts on
+ initialization
+Message-ID: <1433706370-3867-1-git-send-email-stefan@agner.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2015-06-07 18:56, Jonathan Cameron wrote:
-> On 27/05/15 13:47, Stefan Agner wrote:
->> The ADC clock frequency is limited depending on modes used. Add
->> device tree property which allow to set the mode used and the
->> maximum frequency ratings for the instance. These allows to
->> set the ADC clock to a frequency which is within specification
->> according to the actual mode used.
->>
->> Acked-by: Fugang Duan <B38611@freescale.com>
->> Signed-off-by: Stefan Agner <stefan@agner.ch>
-> I'm happy to take this via IIO if people want me to, otherwise give
-> it's connection to the previous patch that I just applied,
+Clear pending interrupts before requesting interrupts and move
+interrupt initialization after channels have been initialized.
+This avoids a NULL pointer dereference panic when using kexec
+while DMA requests were running.
 
-I guess the chances for conflicts are rather small. I don't have any
-preferences, Shawn?
+Signed-off-by: Stefan Agner <stefan@agner.ch>
+---
+ drivers/dma/fsl-edma.c | 9 +++++----
+ 1 file changed, 5 insertions(+), 4 deletions(-)
 
---
-Stefan
-
-> 
-> Acked-by: Jonathan Cameron <jic23@kernel.org>
-> 
->> ---
->>  arch/arm/boot/dts/vfxxx.dtsi | 4 ++++
->>  1 file changed, 4 insertions(+)
->>
->> diff --git a/arch/arm/boot/dts/vfxxx.dtsi b/arch/arm/boot/dts/vfxxx.dtsi
->> index a29c7ce..c6609bd 100644
->> --- a/arch/arm/boot/dts/vfxxx.dtsi
->> +++ b/arch/arm/boot/dts/vfxxx.dtsi
->> @@ -189,6 +189,8 @@
->>  				clocks = <&clks VF610_CLK_ADC0>;
->>  				clock-names = "adc";
->>  				status = "disabled";
->> +				fsl,adck-max-frequency = <30000000>, <40000000>,
->> +							<20000000>;
->>  			};
->>
->>  			wdoga5: wdog at 4003e000 {
->> @@ -387,6 +389,8 @@
->>  				clocks = <&clks VF610_CLK_ADC1>;
->>  				clock-names = "adc";
->>  				status = "disabled";
->> +				fsl,adck-max-frequency = <30000000>, <40000000>,
->> +							<20000000>;
->>  			};
->>
->>  			esdhc1: esdhc at 400b2000 {
->>
+diff --git a/drivers/dma/fsl-edma.c b/drivers/dma/fsl-edma.c
+index 09e2842..915eec3 100644
+--- a/drivers/dma/fsl-edma.c
++++ b/drivers/dma/fsl-edma.c
+@@ -881,10 +881,6 @@ static int fsl_edma_probe(struct platform_device *pdev)
+ 
+ 	}
+ 
+-	ret = fsl_edma_irq_init(pdev, fsl_edma);
+-	if (ret)
+-		return ret;
+-
+ 	fsl_edma->big_endian = of_property_read_bool(np, "big-endian");
+ 
+ 	INIT_LIST_HEAD(&fsl_edma->dma_dev.channels);
+@@ -900,6 +896,11 @@ static int fsl_edma_probe(struct platform_device *pdev)
+ 		fsl_edma_chan_mux(fsl_chan, 0, false);
+ 	}
+ 
++	edma_writel(fsl_edma, ~0, fsl_edma->membase + EDMA_INTR);
++	ret = fsl_edma_irq_init(pdev, fsl_edma);
++	if (ret)
++		return ret;
++
+ 	dma_cap_set(DMA_PRIVATE, fsl_edma->dma_dev.cap_mask);
+ 	dma_cap_set(DMA_SLAVE, fsl_edma->dma_dev.cap_mask);
+ 	dma_cap_set(DMA_CYCLIC, fsl_edma->dma_dev.cap_mask);
+-- 
+2.4.2
