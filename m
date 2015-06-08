@@ -1,65 +1,62 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon,  8 Jun 2015 18:03:57 +0100
-Subject: [PATCH 02/10] arm/arm64: KVM: Move vgic handling to a non-preemptible
- section
+Date: Mon,  8 Jun 2015 18:03:56 +0100
+Subject: [PATCH 01/10] arm/arm64: KVM: Fix ordering of timer/GIC on guest entry
 In-Reply-To: <1433783045-8002-1-git-send-email-marc.zyngier@arm.com>
 References: <1433783045-8002-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1433783045-8002-3-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1433783045-8002-2-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As we're about to introduce some serious GIC-poking to the vgic code,
-it is important to make sure that we're going to poke the part of
-the GIC that belongs to the CPU we're about to run on (otherwise,
-we'd end up with some unexpected interrupts firing)...
+As we now inject the timer interrupt when we're about to enter
+the guest, it makes a lot more sense to make sure this happens
+before the vgic code queues the pending interrupts.
 
-Introducing a non-preemptible section in kvm_arch_vcpu_ioctl_run
-prevents the problem from occuring.
+Otherwise, we get the interrupt on the following exit, which is
+not great for latency (and leads to all kind of bizarre issues
+when using with active interrupts at the HW level).
 
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm/kvm/arm.c | 13 +++++++++++++
- 1 file changed, 13 insertions(+)
+ arch/arm/kvm/arm.c | 8 +++++---
+ 1 file changed, 5 insertions(+), 3 deletions(-)
 
 diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
-index 46db690..4986300 100644
+index d9631ec..46db690 100644
 --- a/arch/arm/kvm/arm.c
 +++ b/arch/arm/kvm/arm.c
-@@ -529,8 +529,18 @@ int kvm_arch_vcpu_ioctl_run(struct kvm_vcpu *vcpu, struct kvm_run *run)
+@@ -529,9 +529,10 @@ int kvm_arch_vcpu_ioctl_run(struct kvm_vcpu *vcpu, struct kvm_run *run)
  		if (vcpu->arch.pause)
  			vcpu_pause(vcpu);
  
-+		/*
-+		 * Disarming the timer must be done with in a
-+		 * preemptible context, as this call may sleep.
-+		 */
+-		kvm_vgic_flush_hwstate(vcpu);
  		kvm_timer_flush_hwstate(vcpu);
  
-+		/*
-+		 * Preparing the interrupts to be injected also
-+		 * involves poking the GIC, which must be done in a
-+		 * non-preemptible context.
-+		 */
-+		preempt_disable();
- 		kvm_vgic_flush_hwstate(vcpu);
- 
++		kvm_vgic_flush_hwstate(vcpu);
++
  		local_irq_disable();
-@@ -546,6 +556,7 @@ int kvm_arch_vcpu_ioctl_run(struct kvm_vcpu *vcpu, struct kvm_run *run)
+ 
+ 		/*
+@@ -544,8 +545,8 @@ int kvm_arch_vcpu_ioctl_run(struct kvm_vcpu *vcpu, struct kvm_run *run)
+ 
  		if (ret <= 0 || need_new_vmid_gen(vcpu->kvm)) {
  			local_irq_enable();
+-			kvm_timer_sync_hwstate(vcpu);
  			kvm_vgic_sync_hwstate(vcpu);
-+			preempt_enable();
- 			kvm_timer_sync_hwstate(vcpu);
++			kvm_timer_sync_hwstate(vcpu);
  			continue;
  		}
-@@ -580,6 +591,8 @@ int kvm_arch_vcpu_ioctl_run(struct kvm_vcpu *vcpu, struct kvm_run *run)
  
+@@ -577,9 +578,10 @@ int kvm_arch_vcpu_ioctl_run(struct kvm_vcpu *vcpu, struct kvm_run *run)
+ 		 * Back from guest
+ 		 *************************************************************/
+ 
+-		kvm_timer_sync_hwstate(vcpu);
  		kvm_vgic_sync_hwstate(vcpu);
  
-+		preempt_enable();
++		kvm_timer_sync_hwstate(vcpu);
 +
- 		kvm_timer_sync_hwstate(vcpu);
- 
  		ret = handle_exit(vcpu, run, ret);
+ 	}
+ 
 -- 
 2.1.4
