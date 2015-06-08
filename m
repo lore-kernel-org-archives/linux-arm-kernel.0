@@ -1,83 +1,61 @@
-From: rjui@broadcom.com (Ray Jui)
-Date: Mon, 8 Jun 2015 09:09:04 -0700
-Subject: [PATCH 4/6] clocksource: bcm_kona: Migrate to new 'set-state'
- interface
-In-Reply-To: <37f46a2101da7435343810d9fa94cfae716c377a.1433768426.git.viresh.kumar@linaro.org>
-References: <cover.1433768426.git.viresh.kumar@linaro.org>
- <37f46a2101da7435343810d9fa94cfae716c377a.1433768426.git.viresh.kumar@linaro.org>
-Message-ID: <5575BE20.6020102@broadcom.com>
+From: l.majewski@samsung.com (Lukasz Majewski)
+Date: Mon, 08 Jun 2015 18:14:59 +0200
+Subject: [PATCH] thermal: exynos: Disable the regulator on probe failure
+In-Reply-To: <1433727349-23330-1-git-send-email-k.kozlowski@samsung.com>
+References: <1433727349-23330-1-git-send-email-k.kozlowski@samsung.com>
+Message-ID: <20150608181459.454c9067@amdc2363>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Viresh,
+Hi Krzysztof,
 
-On 6/8/2015 6:40 AM, Viresh Kumar wrote:
-> Migrate bcm_kona driver to the new 'set-state' interface provided by
-> the clockevents core, the earlier 'set-mode' interface is marked
-> obsolete now.
+> During probe the regulator (if present) was enabled but not disabled
+> in case of failure. So an unsuccessful probe lead to enabling the
+> regulator which was actually not needed because the device was not
+> enabled.
 > 
-> This also enables us to implement callbacks for new states of clockevent
-> devices, for example: ONESHOT_STOPPED.
+> Additionally each deferred probe lead to increase of regulator enable
+> count so it would not be effectively disabled during removal of the
+> device.
+
+Thanks for catching this.
+
 > 
-> Cc: Florian Fainelli <f.fainelli@gmail.com>
-> Cc: Ray Jui <rjui@broadcom.com>
-> Cc: Scott Branden <sbranden@broadcom.com>
-> Cc: bcm-kernel-feedback-list at broadcom.com
-> Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
+> Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+> Fixes: 498d22f616f6 ("thermal: exynos: Support for TMU regulator
+> defined at device tree") Cc: <stable@vger.kernel.org>
+> 
 > ---
->  drivers/clocksource/bcm_kona_timer.c | 24 ++++++++++++------------
->  1 file changed, 12 insertions(+), 12 deletions(-)
 > 
-> diff --git a/drivers/clocksource/bcm_kona_timer.c b/drivers/clocksource/bcm_kona_timer.c
-> index f1e33d08dd83..4efca5f7d443 100644
-> --- a/drivers/clocksource/bcm_kona_timer.c
-> +++ b/drivers/clocksource/bcm_kona_timer.c
-> @@ -127,25 +127,25 @@ static int kona_timer_set_next_event(unsigned long clc,
->  	return 0;
->  }
->  
-> -static void kona_timer_set_mode(enum clock_event_mode mode,
-> -			     struct clock_event_device *unused)
-> +static int cona_timer_shutdown(struct clock_event_device *evt)
-
-There's a typo here. It's "kona" not "cona"
-
->  {
-> -	switch (mode) {
-> -	case CLOCK_EVT_MODE_ONESHOT:
-> -		/* by default mode is one shot don't do any thing */
-> -		break;
-> -	case CLOCK_EVT_MODE_UNUSED:
-> -	case CLOCK_EVT_MODE_SHUTDOWN:
-> -	default:
-> -		kona_timer_disable_and_clear(timers.tmr_regs);
-> -	}
-> +	kona_timer_disable_and_clear(timers.tmr_regs);
-> +	return 0;
-> +}
-> +
-> +static int cona_timer_set_oneshot(struct clock_event_device *evt)
-
-Same typo.
-
-> +{
-> +	/* By default mode is one shot, don't do any thing */
-> +	return 0;
->  }
->  
->  static struct clock_event_device kona_clockevent_timer = {
->  	.name = "timer 1",
->  	.features = CLOCK_EVT_FEAT_ONESHOT,
->  	.set_next_event = kona_timer_set_next_event,
-> -	.set_mode = kona_timer_set_mode
-> +	.set_state_shutdown = cona_timer_shutdown,
-> +	.set_state_oneshot = cona_timer_set_oneshot,
-> +	.tick_resume = cona_timer_shutdown,
->  };
->  
->  static void __init kona_timer_clockevents_init(void)
+> I am not entirely convinced that this should go to stable. Leaving a
+> regulator enabled in case of probe failure (no exynos TMU device) or
+> after deferred probe (regulator won't be disabled during device
+> removal) is not a critical issue, just leaks power.
+> ---
+>  drivers/thermal/samsung/exynos_tmu.c | 2 ++
+>  1 file changed, 2 insertions(+)
 > 
+> diff --git a/drivers/thermal/samsung/exynos_tmu.c
+> b/drivers/thermal/samsung/exynos_tmu.c index
+> 531f4b179871..13c3aceed19d 100644 ---
+> a/drivers/thermal/samsung/exynos_tmu.c +++
+> b/drivers/thermal/samsung/exynos_tmu.c @@ -1392,6 +1392,8 @@
+> err_clk_sec: if (!IS_ERR(data->clk_sec))
+>  		clk_unprepare(data->clk_sec);
+>  err_sensor:
+> +	if (!IS_ERR_OR_NULL(data->regulator))
+> +		regulator_disable(data->regulator);
+>  	thermal_zone_of_sensor_unregister(&pdev->dev, data->tzd);
+>  
+>  	return ret;
 
-Thanks,
+Acked-by: Lukasz Majewski <l.majewski@samsung.com>
 
-Ray
+I will test it and afterwards add to samsung-thermal tree.
+
+-- 
+Best regards,
+
+Lukasz Majewski
+
+Samsung R&D Institute Poland (SRPOL) | Linux Platform Group
