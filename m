@@ -1,86 +1,65 @@
-From: punnaiah.choudary.kalluri@xilinx.com (Punnaiah Choudary Kalluri)
-Date: Mon, 8 Jun 2015 22:27:07 +0530
-Subject: [PATCH 1/2] Documentation: dt: Add Xilinx zynqmp dma device tree
- binding documentation
-Message-ID: <1433782628-23748-1-git-send-email-punnaia@xilinx.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Mon,  8 Jun 2015 18:03:57 +0100
+Subject: [PATCH 02/10] arm/arm64: KVM: Move vgic handling to a non-preemptible
+ section
+In-Reply-To: <1433783045-8002-1-git-send-email-marc.zyngier@arm.com>
+References: <1433783045-8002-1-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1433783045-8002-3-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Device-tree binding documentation for Xilinx zynqmp dma engine used in
-Zynq UltraScale+ MPSoC.
+As we're about to introduce some serious GIC-poking to the vgic code,
+it is important to make sure that we're going to poke the part of
+the GIC that belongs to the CPU we're about to run on (otherwise,
+we'd end up with some unexpected interrupts firing)...
 
-Signed-off-by: Punnaiah Choudary Kalluri <punnaia@xilinx.com>
+Introducing a non-preemptible section in kvm_arch_vcpu_ioctl_run
+prevents the problem from occuring.
+
+Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- .../devicetree/bindings/dma/xilinx/zynqmp_dma.txt  |   61 ++++++++++++++++++++
- 1 files changed, 61 insertions(+), 0 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/dma/xilinx/zynqmp_dma.txt
+ arch/arm/kvm/arm.c | 13 +++++++++++++
+ 1 file changed, 13 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/dma/xilinx/zynqmp_dma.txt b/Documentation/devicetree/bindings/dma/xilinx/zynqmp_dma.txt
-new file mode 100644
-index 0000000..e4f92b9
---- /dev/null
-+++ b/Documentation/devicetree/bindings/dma/xilinx/zynqmp_dma.txt
-@@ -0,0 +1,61 @@
-+Xilinx ZynqMP DMA engine, it does support memory to memory transfers,
-+memory to device and device to memory transfers. It also has flow
-+control and rate control support for slave/peripheral dma access.
+diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
+index 46db690..4986300 100644
+--- a/arch/arm/kvm/arm.c
++++ b/arch/arm/kvm/arm.c
+@@ -529,8 +529,18 @@ int kvm_arch_vcpu_ioctl_run(struct kvm_vcpu *vcpu, struct kvm_run *run)
+ 		if (vcpu->arch.pause)
+ 			vcpu_pause(vcpu);
+ 
++		/*
++		 * Disarming the timer must be done with in a
++		 * preemptible context, as this call may sleep.
++		 */
+ 		kvm_timer_flush_hwstate(vcpu);
+ 
++		/*
++		 * Preparing the interrupts to be injected also
++		 * involves poking the GIC, which must be done in a
++		 * non-preemptible context.
++		 */
++		preempt_disable();
+ 		kvm_vgic_flush_hwstate(vcpu);
+ 
+ 		local_irq_disable();
+@@ -546,6 +556,7 @@ int kvm_arch_vcpu_ioctl_run(struct kvm_vcpu *vcpu, struct kvm_run *run)
+ 		if (ret <= 0 || need_new_vmid_gen(vcpu->kvm)) {
+ 			local_irq_enable();
+ 			kvm_vgic_sync_hwstate(vcpu);
++			preempt_enable();
+ 			kvm_timer_sync_hwstate(vcpu);
+ 			continue;
+ 		}
+@@ -580,6 +591,8 @@ int kvm_arch_vcpu_ioctl_run(struct kvm_vcpu *vcpu, struct kvm_run *run)
+ 
+ 		kvm_vgic_sync_hwstate(vcpu);
+ 
++		preempt_enable();
 +
-+Required properties:
-+- compatible: Should be "xlnx,zynqmp-dma-1.0"
-+- #dma-cells: Should be <1>, a single cell holding a line request number
-+- reg: Memory map for module access
-+- interrupt-parent: Interrupt controller the interrupt is routed through
-+- interrupts: Should contain DMA channel interrupt
-+- xlnx,bus-width: AXI buswidth in bits. Should contain 128 or 64
-+
-+Optional properties:
-+- xlnx,include-sg: Indicates the controller to operate in simple or scatter
-+		   gather dma mode
-+- xlnx,ratectrl: Scheduling interval in terms of clock cycles for
-+		 source AXI transaction
-+- xlnx,overfetch: Tells whether the channel is allowed to over fetch the data
-+- xlnx,src-issue: Number of AXI outstanding transactions on source side
-+- xlnx,desc-axi-cohrnt: Tells whether the AXI transactions generated for the
-+			descriptor read are marked Non-coherent
-+- xlnx,src-axi-cohrnt: Tells whether the AXI transactions generated for the
-+			source descriptor payload are marked Non-coherent
-+- xlnx,dst-axi-cohrnt: Tells whether the AXI transactions generated for the
-+			dst descriptor payload are marked Non-coherent
-+- xlnx,desc-axi-qos: AXI QOS bits to be used for descriptor fetch
-+- xlnx,src-axi-qos: AXI QOS bits to be used for data read
-+- xlnx,dst-axi-qos: AXI QOS bits to be used for data write
-+- xlnx,desc-axi-cache: AXI cache bits to be used for descriptor fetch.
-+- xlnx,desc-axi-cache: AXI cache bits to be used for data read
-+- xlnx,desc-axi-cache: AXI cache bits to be used for data write
-+- xlnx,src-burst-len: AXI length for data read. Support only power of 2 values
-+		      i.e 1,2,4,8 and 16
-+- xlnx,dst-burst-len: AXI length for data write. Support only power of 2 values
-+		      i.e 1,2,4,8 and 16
-+
-+Example:
-+++++++++
-+fpd_dma_chan1: dma at FD500000 {
-+	compatible = "xlnx,zynqmp-dma-1.0";
-+	reg = <0x0 0xFD500000 0x1000>;
-+	#dma_cells = <1>;
-+	interrupt-parent = <&gic>;
-+	interrupts = <0 117 4>;
-+	xlnx,bus-width = <128>;
-+	xlnx,include-sg;
-+	xlnx,overfetch;
-+	xlnx,ratectrl = <0>;
-+	xlnx,src-issue = <16>;
-+	xlnx,desc-axi-cohrnt;
-+	xlnx,src-axi-cohrnt;
-+	xlnx,dst-axi-cohrnt;
-+	xlnx,desc-axi-qos = <0>;
-+	xlnx,desc-axi-cache = <0>;
-+	xlnx,src-axi-qos = <0>;
-+	xlnx,src-axi-cache = <2>;
-+	xlnx,dst-axi-qos = <0>;
-+	xlnx,dst-axi-cache = <2>;
-+	xlnx,src-burst-len = <4>;
-+	xlnx,dst-burst-len = <4>;
-+};
+ 		kvm_timer_sync_hwstate(vcpu);
+ 
+ 		ret = handle_exit(vcpu, run, ret);
 -- 
-1.7.4
+2.1.4
