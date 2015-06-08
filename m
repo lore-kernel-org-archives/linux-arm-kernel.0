@@ -1,189 +1,54 @@
-From: caesar.wang@rock-chips.com (Caesar Wang)
-Date: Tue, 09 Jun 2015 05:54:23 +0800
-Subject: [PATCH v5 1/3] ARM: rockchip: fix the CPU soft reset
-In-Reply-To: <20150608092416.GV7557@n2100.arm.linux.org.uk>
-References: <1433747496-7642-1-git-send-email-wxt@rock-chips.com>
- <1433747496-7642-2-git-send-email-wxt@rock-chips.com>
- <20150608092416.GV7557@n2100.arm.linux.org.uk>
-Message-ID: <55760F0F.9010302@rock-chips.com>
+From: jeroen@myspectrum.nl (Jeroen Hofstee)
+Date: Tue, 09 Jun 2015 00:00:20 +0200
+Subject: [PATCH] ARM: dts: AM35xx: fix system control module clocks
+In-Reply-To: <alpine.DEB.2.02.1506080234271.15153@utopia.booyaka.com>
+References: <alpine.DEB.2.02.1506010546510.14902@utopia.booyaka.com>
+ <1433172627-28052-1-git-send-email-t-kristo@ti.com>
+ <556C8ED5.5050000@myspectrum.nl> <20150601173126.GY30984@atomide.com>
+ <alpine.DEB.2.02.1506011733180.14902@utopia.booyaka.com>
+ <5571576E.6020207@myspectrum.nl> <557157FA.7080305@myspectrum.nl>
+ <557411DC.9020109@myspectrum.nl>
+ <alpine.DEB.2.02.1506071952490.15153@utopia.booyaka.com>
+ <alpine.DEB.2.02.1506080234271.15153@utopia.booyaka.com>
+Message-ID: <55761074.2080109@myspectrum.nl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hello Paul, +Menon (since you asked about the USB_OTG trap),
 
-
-? 2015?06?08? 17:24, Russell King - ARM Linux ??:
-> On Mon, Jun 08, 2015 at 03:11:34PM +0800, Caesar Wang wrote:
->> We need different orderings when turning a core on and turning a core
->> off.  In one case we need to assert reset before turning power off.
->> In ther other case we need to turn power on and the deassert reset.
->>
->> In general, the correct flow is:
->>
->> CPU off:
->>      reset_control_assert
->>      regmap_update_bits(pmu, PMU_PWRDN_CON, BIT(pd), BIT(pd))
->>      wait_for_power_domain_to_turn_off
->> CPU on:
->>      regmap_update_bits(pmu, PMU_PWRDN_CON, BIT(pd), 0)
->>      wait_for_power_domain_to_turn_on
->>      reset_control_deassert
->>
->> This is needed for stressing CPU up/down, as per:
->>      cd /sys/devices/system/cpu/
->>      for i in $(seq 10000); do
->>          echo "================= $i ============"
->>          for j in $(seq 100); do
->>              while [[ "$(cat cpu1/online)$(cat cpu2/online)$(cat cpu3/online)" != "000"" ]]
->>                  echo 0 > cpu1/online
->>                  echo 0 > cpu2/online
->>                  echo 0 > cpu3/online
->>              done
->>              while [[ "$(cat cpu1/online)$(cat cpu2/online)$(cat cpu3/online)" != "111" ]]; do
->>                  echo 1 > cpu1/online
->>                  echo 1 > cpu2/online
->>                  echo 1 > cpu3/online
->>              done
->>          done
->>      done
->>
->> The following is reproducile log:
-> "reproducable"
+On 08-06-15 04:38, Paul Walmsley wrote:
+> Hi Jeroen,
 >
->>      [34466.186812] PM: noirq suspend of devices complete after 0.669 msecs
->>      [34466.186824] Disabling non-boot CPUs ...
->>      [34466.187509] CPU1: shutdown
->>      [34466.188672] CPU2: shutdown
->>      [34473.736627] Kernel panic - not syncing:Watchdog detected hard LOCKUP on cpu 0
->>      .......
->> or others similar log:
->>      .......
->>      [ 4072.454453] CPU1: shutdown
->>      [ 4072.504436] CPU2: shutdown
->>      [ 4072.554426] CPU3: shutdown
->>      [ 4072.577827] CPU1: Booted secondary processor
->>      [ 4072.582611] CPU2: Booted secondary processor
->>      [ 4072.587426] CPU3: Booted secondary processor
->>      <hang>
+> On Sun, 7 Jun 2015, Paul Walmsley wrote:
+>
+>> On Sun, 7 Jun 2015, Jeroen Hofstee wrote:
 >>
->> Signed-off-by: Caesar Wang <wxt@rock-chips.com>
->> Reviewed-by: Doug Anderson <dianders@chromium.org>
->>
->> Changes in v5:
->>      - back to v2 cpu on/off flow, As Heiko point out in patch v3.
->>      - delay more time in rockchip_boot_secondary().
->>      From CPU up/down tests, Needed more time to complete CPU process.
->>      In order to ensure a more, Here that be delayed 1ms.
->>
->> Changes in v4:
->>      - Add reset_control_put(rstc) for the non-error case.
->>
->> Changes in v3:
->>      - FIx the PATCH v2, it doesn't work on chromium 3.14.
->>
->> Changes in v2:
->>      - As Heiko suggestion, re-adjust the cpu on/off flow.
->>      CPU off:
->>      reset_control_assert
->>      regmap_update_bits(pmu, PMU_PWRDN_CON, BIT(pd), BIT(pd))
->>      wait_for_power_domain_to_turn_off
->>      CPU on:
->>      regmap_update_bits(pmu, PMU_PWRDN_CON, BIT(pd), 0)
->>      wait_for_power_domain_to_turn_on
->>      reset_control_deassert
->>
->> ---
->>
->>   arch/arm/mach-rockchip/platsmp.c | 18 ++++++++++--------
->>   1 file changed, 10 insertions(+), 8 deletions(-)
->>
->> diff --git a/arch/arm/mach-rockchip/platsmp.c b/arch/arm/mach-rockchip/platsmp.c
->> index 5b4ca3c..bd40852 100644
->> --- a/arch/arm/mach-rockchip/platsmp.c
->> +++ b/arch/arm/mach-rockchip/platsmp.c
->> @@ -72,6 +72,7 @@ static struct reset_control *rockchip_get_core_reset(int cpu)
->>   static int pmu_set_power_domain(int pd, bool on)
->>   {
->>   	u32 val = (on) ? 0 : BIT(pd);
->> +	struct reset_control *rstc = rockchip_get_core_reset(pd);
->>   	int ret;
->>   
->>   	/*
->> @@ -80,20 +81,15 @@ static int pmu_set_power_domain(int pd, bool on)
->>   	 * processor is powered down.
->>   	 */
->>   	if (read_cpuid_part() != ARM_CPU_PART_CORTEX_A9) {
->> -		struct reset_control *rstc = rockchip_get_core_reset(pd);
->> -
->> +		/* We only require the reset on the RK3288 at the moment */
->>   		if (IS_ERR(rstc)) {
->>   			pr_err("%s: could not get reset control for core %d\n",
->>   			       __func__, pd);
->>   			return PTR_ERR(rstc);
->>   		}
->>   
->> -		if (on)
->> -			reset_control_deassert(rstc);
->> -		else
->> +		if (!on)
->>   			reset_control_assert(rstc);
->> -
->> -		reset_control_put(rstc);
->>   	}
->>   
->>   	ret = regmap_update_bits(pmu, PMU_PWRDN_CON, BIT(pd), val);
->> @@ -112,6 +108,12 @@ static int pmu_set_power_domain(int pd, bool on)
->>   		}
->>   	}
->>   
->> +	if (read_cpuid_part() != ARM_CPU_PART_CORTEX_A9 && on)
->> +		reset_control_deassert(rstc);
->> +
->> +	if (!IS_ERR(rstc))
->> +		reset_control_put(rstc);
->> +
->>   	return 0;
->>   }
->>   
->> @@ -148,7 +150,7 @@ static int __cpuinit rockchip_boot_secondary(unsigned int cpu,
->>   		 * sram_base_addr + 4: 0xdeadbeaf
->>   		 * sram_base_addr + 8: start address for pc
->>   		 * */
->> -		udelay(10);
->> +		mdelay(1);
-> The reason for this delay needs a comment, as it's not obvious why you
-> would need to delay before writing to the SRAM.  Also documenting in
-> a comment why the delay is necessary would be good.
+>>>
+>>> Turns out my suspicion was wrong. This is what I know at the moment,
+>>> depending on the bootpins, u-boot will trigger a bad access when loading
+>>> a file over ethernet, but only the first time. Clearing the pending interrupt
+>>> before booting linux make the "USB_OTG address hole seen" go away.
+>> Oh, too bad.  I had been hoping that you were right and that I was wrong
+>> ;-)  I'll try this on the CM-T3517 here.
+> I used your debugging technique here and was able to reproduce your
+> results - with one difference:
+>
+> http://www.pwsan.com/omap/testlogs/test_v4.1-rc6/20150607194102/boot/cmt3517/cmt3517_log.txt
+>
+> The interconnect error was logged upon the first interaction with the
+> network.  In my case this was with the U-boot 'dhcp' command.  The pending
+> interrupt bit was cleared before loading the kernel via tftp, and the
+> interrupt bit was not set again, even after a tftp load.
 >
 
-Sorry for delay, I wait a better solution for this.
-We don't need any 10us delay or 1m delay, I think.
+I sent a patch to u-boot to disable the offending line, see [1]. It would be
+interesting to know if it can also result in valid, accidental memory 
+adjustments,
+before the invalid one, but I haven't checked that yet.
 
--		udelay(10);
+Regards,
+Jeroen
 
-+        while (readl(sram_base_addr + 4 ) != 1); //lock =1
+[1] https://patchwork.ozlabs.org/patch/481751/
 
-
-We need do that if i'm correct from the bootrom code.
-Tested are pass over 120000 cycles on today, I will wait more testing 
-cycles to confirm that's ok.
-
-
-
--- 
-**************************************************************************************
-???    Caesar Wang
-Product R&D Dept.III
-Fuzhou Rockchip Electronics Co.Ltd
-Addr?  NO.18 Building, A District, Fuzhou Software Park,Gulou District,Fuzhou, Fujian,China(Fuzhou Headquarters)
-               21F,Malata Building,Kejizhongyi Avenue,Nanshan District,Shenzhen  (Shenzhen Office)
-Tel?+86-591-83991906/07 - 8221
-Mobile:+86 15059456742
-E-mail : wxt at rock-chips.com
-***************************************************************************************
-***************************************************************************************
-IMPORTANT NOTICE: This email is from Fuzhou Rockchip Electronics Co., Ltd .The contents of this email and any attachments may
-contain information that is privileged, confidential and/or exempt from disclosure under applicable law and relevant NDA.
-If you are not the intended recipient, you are hereby notified that any disclosure, copying, distribution, or use of the
-information is STRICTLY PROHIBITED. Please immediately contact the sender as soon as possible and destroy the material
-in its entirety in any format. Thank you.
-***************************************************************************************
+p.s. the USB_OTG trap is actually a musb / emac / camera trap on an am3517.
