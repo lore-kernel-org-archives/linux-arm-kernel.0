@@ -1,93 +1,43 @@
-From: rjui@broadcom.com (Ray Jui)
-Date: Mon, 8 Jun 2015 10:10:49 -0700
-Subject: [PATCH 4/6] clocksource: bcm_kona: Migrate to new 'set-state'
- interface
-In-Reply-To: <5575C33A.1080102@broadcom.com>
-References: <cover.1433768426.git.viresh.kumar@linaro.org>
- <37f46a2101da7435343810d9fa94cfae716c377a.1433768426.git.viresh.kumar@linaro.org>
- <5575BE20.6020102@broadcom.com> <20150608162242.GA4198@linux>
- <5575C33A.1080102@broadcom.com>
-Message-ID: <5575CC99.8010600@broadcom.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Mon, 08 Jun 2015 18:13:58 +0100
+Subject: [PATCH 00/13] arm64: KVM: GICv3 ITS emulation
+In-Reply-To: <02ae01d0a1d9$732d2ce0$598786a0$@samsung.com>
+References: <1432893209-27313-1-git-send-email-andre.przywara@arm.com>
+ <01ad01d0a1b7$d4d4fe40$7e7efac0$@samsung.com> <557550F0.5070106@arm.com>
+ <02ae01d0a1d9$732d2ce0$598786a0$@samsung.com>
+Message-ID: <5575CD56.5020109@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Forgot to ACK the patch...
+On 08/06/15 11:54, Pavel Fedin wrote:
+>  Hi!
+> 
+>> I'm afraid this is not enough. A write to GICR_TRANSLATER (DID+EID)
+>> results in a (LPI,CPU) pair. Can you easily express the CPU part in
+>> irqfd (this is a genuine question, I'm not familiar enough with that
+>> part of the core)?
+> 
+>  But... As far as i could understand, LPI is added to a collection as a part of setup. And
+> collection actually represents a destination CPU, doesn't it? And we can't have multiple
+> LPIs sharing the same number and going to different CPUs. Or am i wrong? Unfortunately i
+> don't have GICv3 arch reference manual.
 
-On 6/8/2015 9:30 AM, Ray Jui wrote:
-> This patch looks fine to me.
-> 
-> Thanks,
-> 
-> Ray
-> 
-> On 6/8/2015 9:22 AM, Viresh Kumar wrote:
->> On 08-06-15, 09:09, Ray Jui wrote:
->>> There's a typo here. It's "kona" not "cona"
->>
->> Crap, how does this look:
->>
->> From: Viresh Kumar <viresh.kumar@linaro.org>
->> Date: Fri, 27 Feb 2015 13:39:52 +0530
->> Subject: [PATCH] clocksource: bcm_kona: Migrate to new 'set-state' interface
->>
->> Migrate bcm_kona driver to the new 'set-state' interface provided by
->> the clockevents core, the earlier 'set-mode' interface is marked
->> obsolete now.
->>
->> This also enables us to implement callbacks for new states of clockevent
->> devices, for example: ONESHOT_STOPPED.
->>
->> Cc: Florian Fainelli <f.fainelli@gmail.com>
->> Cc: Ray Jui <rjui@broadcom.com>
->> Cc: Scott Branden <sbranden@broadcom.com>
->> Cc: bcm-kernel-feedback-list at broadcom.com
->> Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
->> ---
->>  drivers/clocksource/bcm_kona_timer.c | 24 ++++++++++++------------
->>  1 file changed, 12 insertions(+), 12 deletions(-)
->>
->> diff --git a/drivers/clocksource/bcm_kona_timer.c b/drivers/clocksource/bcm_kona_timer.c
->> index f1e33d08dd83..9df3f1e3fd0e 100644
->> --- a/drivers/clocksource/bcm_kona_timer.c
->> +++ b/drivers/clocksource/bcm_kona_timer.c
->> @@ -127,25 +127,25 @@ static int kona_timer_set_next_event(unsigned long clc,
->>  	return 0;
->>  }
->>  
->> -static void kona_timer_set_mode(enum clock_event_mode mode,
->> -			     struct clock_event_device *unused)
->> +static int kona_timer_shutdown(struct clock_event_device *evt)
->>  {
->> -	switch (mode) {
->> -	case CLOCK_EVT_MODE_ONESHOT:
->> -		/* by default mode is one shot don't do any thing */
->> -		break;
->> -	case CLOCK_EVT_MODE_UNUSED:
->> -	case CLOCK_EVT_MODE_SHUTDOWN:
->> -	default:
->> -		kona_timer_disable_and_clear(timers.tmr_regs);
->> -	}
->> +	kona_timer_disable_and_clear(timers.tmr_regs);
->> +	return 0;
->> +}
->> +
->> +static int kona_timer_set_oneshot(struct clock_event_device *evt)
->> +{
->> +	/* By default mode is one shot, don't do any thing */
->> +	return 0;
->>  }
->>  
->>  static struct clock_event_device kona_clockevent_timer = {
->>  	.name = "timer 1",
->>  	.features = CLOCK_EVT_FEAT_ONESHOT,
->>  	.set_next_event = kona_timer_set_next_event,
->> -	.set_mode = kona_timer_set_mode
->> +	.set_state_shutdown = kona_timer_shutdown,
->> +	.set_state_oneshot = kona_timer_set_oneshot,
->> +	.tick_resume = kona_timer_shutdown,
->>  };
->>  
->>  static void __init kona_timer_clockevents_init(void)
->>
+This is true to some extent. But the point is that the result of the
+translation is both an LPI and a CPU. My question was how you would
+indicate convey the notion of a target vcpu when using irqfd. As far as
+I know this doesn't really fit, unless we start introducing the dreaded
+GSI routing...
 
-Acked-by: Ray Jui <rjui@broadcom.com>
+Do we really want to go down that road?
+
+>> Another concern
+>> would be the support of GICv4, which relies on the command queue
+>> handling to be handled in the kernel
+> 
+>  Wow, i didn't know about GICv4.
+
+I wish I didn't know about it.
+
+	M.
+-- 
+Jazz is not dead. It just smells funny...
