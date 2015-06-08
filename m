@@ -1,60 +1,44 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Mon, 8 Jun 2015 08:41:13 +0200
-Subject: [PATCH V2 2/3] tty: serial: fsl_lpuart: remove RTS/CTS control
- from set/get_mctrl
-In-Reply-To: <1433136067-20644-3-git-send-email-bhuvanchandra.dv@toradex.com>
-References: <1433136067-20644-1-git-send-email-bhuvanchandra.dv@toradex.com>
- <1433136067-20644-3-git-send-email-bhuvanchandra.dv@toradex.com>
-Message-ID: <20150608064113.GX18985@pengutronix.de>
+From: javier@dowhile0.org (Javier Martinez Canillas)
+Date: Mon, 8 Jun 2015 08:42:52 +0200
+Subject: [RESEND 1/2] usb: ehci-exynos: Make provision for vdd regulators
+In-Reply-To: <CAJKOXPfDmt5VMqr-P+OpWy1+jz675CFRPmtS_N0HjN4tWxfwtA@mail.gmail.com>
+References: <1433683242-3945-1-git-send-email-linux.amoon@gmail.com>
+ <5574F97A.5030104@samsung.com>
+ <CANAwSgTjx8uxyOTW8uuiqrcNzF+UwLMmML2OcDgG5Ku_56=vJQ@mail.gmail.com>
+ <CAJKOXPfDmt5VMqr-P+OpWy1+jz675CFRPmtS_N0HjN4tWxfwtA@mail.gmail.com>
+Message-ID: <CABxcv=kMi1dveFOWq6JVEAGTtZLCVHcCcWLyLZzJLaYTx0M3fw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hello,
 
-On Mon, Jun 01, 2015 at 10:51:06AM +0530, Bhuvanchandra DV wrote:
-> The LPUART does not provide manual control of RTS/CTS signals,
-> those can only be controlled by the hardware directly. Therefore
-> manual control of those signals through mctrl can not be provided.
-> The current implementation enables/disables the automatic control,
-> which is not what mctrl should do, hence remove the incorrect
-> implementation.
-> 
-> Signed-off-by: Bhuvanchandra DV <bhuvanchandra.dv@toradex.com>
-> ---
->  drivers/tty/serial/fsl_lpuart.c | 63 +++++------------------------------------
->  1 file changed, 7 insertions(+), 56 deletions(-)
-> 
-> diff --git a/drivers/tty/serial/fsl_lpuart.c b/drivers/tty/serial/fsl_lpuart.c
-> index 08ce76f..532cfb7 100644
-> --- a/drivers/tty/serial/fsl_lpuart.c
-> +++ b/drivers/tty/serial/fsl_lpuart.c
-> @@ -822,64 +822,15 @@ static unsigned int lpuart32_tx_empty(struct uart_port *port)
->  
->  static unsigned int lpuart_get_mctrl(struct uart_port *port)
->  {
-> -	unsigned int temp = 0;
-> -	unsigned char reg;
-> -
-> -	reg = readb(port->membase + UARTMODEM);
-> -	if (reg & UARTMODEM_TXCTSE)
-> -		temp |= TIOCM_CTS;
-> -
-> -	if (reg & UARTMODEM_RXRTSE)
-> -		temp |= TIOCM_RTS;
-> -
-> -	return temp;
->From reading the commit log I would expect that you only touch the
-set_mctrl function, but not get_mctrl. Assuming your code change is
-right, can you mention this in the commit log please? The bits
-UARTMODEM_TXCTSE and UARTMODEM_RXRTSE only control the automatic mode?
+On Mon, Jun 8, 2015 at 7:14 AM, Krzysztof Kozlowski
+<k.kozlowski@samsung.com> wrote:
 
-What is the problem you're fixing here? I'm not sure how such an UART
-should be handled, but I imagine that you want to make use of automatic
-mode in some cases. Greg?
+[...]
 
-Best regards
-Uwe
+>
+> To summarize my point of view:
+> 1. Unless Vivek's says otherwise, please give him the credits with
+> proper "from" field.
+> 2. Issues mentioned in previous mail should be addressed (missing
+> IS_ERR(), how disabling the regulator during suspend affects waking
+> up).
+> 3. The patchset must be tested, even after rebasing.
+>
 
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Agreed with all the points.
+
+Anand,
+
+An easy way to preserve authorship when rebasing patches is to use the
+git command author option. As an example you can execute the following
+command:
+
+$ git commit -a -s --author='Vivek Gautam <gautam.vivek@samsung.com>'
+
+> Best regards,
+> Krzysztof
+
+Best regards,
+Javier
