@@ -1,47 +1,95 @@
-From: l.majewski@samsung.com (Lukasz Majewski)
-Date: Mon, 08 Jun 2015 17:11:16 +0200
-Subject: [PATCHv2 2/2] ARM: exynos_defconfig: Enable CONFIG_LEDS_PWM for
- Odroid-XU3
-In-Reply-To: <1433696621-4763-2-git-send-email-linux.amoon@gmail.com>
-References: <1433696621-4763-1-git-send-email-linux.amoon@gmail.com>
- <1433696621-4763-2-git-send-email-linux.amoon@gmail.com>
-Message-ID: <20150608171116.258b0f42@amdc2363>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Mon, 8 Jun 2015 16:14:43 +0100
+Subject: [PATCH 05/11] x86, pci, acpi: Move arch-agnostic MMCONFIG (aka
+ ECAM) and ACPI code out of arch/x86/ directory
+In-Reply-To: <557504A2.3060203@linaro.org>
+References: <1432644564-24746-1-git-send-email-hanjun.guo@linaro.org>
+ <1432644564-24746-6-git-send-email-hanjun.guo@linaro.org>
+ <20150526170817.GU1565@arm.com> <55657B02.5090805@linaro.org>
+ <20150602133215.GC23650@red-moon> <55701A31.808@linaro.org>
+ <20150604102253.GA31773@red-moon> <5570447D.3020705@linaro.org>
+ <557504A2.3060203@linaro.org>
+Message-ID: <20150608151443.GA16151@red-moon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Anand,
+On Mon, Jun 08, 2015 at 03:57:38AM +0100, Hanjun Guo wrote:
 
-> Enable CONFIG_LEDS_PWM amd CONFIG_LEDS_TRIGGER_HEARTBEAT for
-> Odroid-XU3 board.
+[...]
+
+> >>>>>> Why can't we make use of the ECAM implementation used by
+> >>>>>> pci-host-generic
+> >>>>>> and drivers/pci/access.c?
+> >>>>>
+> >>>>> We had that question when I had posted MMCFG patch set separately,
+> >>>>> please see:
+> >>>>> https://lkml.org/lkml/2015/3/11/492
+> >>>>
+> >>>> Yes, but the real question is, why do we need to have PCI config space
+> >>>> up and running before a bus struct is even created ? I think the
+> >>>> reason is
+> >>>> the PCI configuration address space format (ACPI 6.0, Table 5-27, page
+> >>>> 108):
+> >>>>
+> >>>> "PCI Configuration space addresses must be confined to devices on
+> >>>> PCI Segment Group 0, bus 0. This restriction exists to accommodate
+> >>>> access to fixed hardware prior to PCI bus enumeration".
+> >>>>
+> >>>> On HW reduced platforms I do not even think this is required at all,
+> >>>> we have to look into this to avoid code duplication that might well
+> >>>> turn out useless.
+> >>>
+> >>> This is only for the fixed hardware, which will be not available for
+> >>> ARM64 (reduced hardware mode), but in Generic Hardware Programming
+> >>> Model, we using OEM-provided ACPI Machine Language (AML) code to access
+> >>> generic hardware registers, this will be available for reduced hardware
+> >>> too.
+> >>>
+> >>> So in ACPI spec, it says: (ACPI 6.0 page 66, last paragraph)
+> >>>
+> >>> ACPI defines eight address spaces that may be accessed by generic
+> >>> hardware implementations. These include:
+> >>> * System I/O space
+> >>> * System memory space
+> >>> * PCI configuration space
+> >>> * Embedded controller space
+> >>> * System Management Bus (SMBus) space
+> >>> * CMOS
+> >>> * PCI BAR Target
+> >>> * IPMI space
+> >>>
+> >>> So if any device using the PCI address space for control, such
+> >>> as a system reset control device, its address space can be reside
+> >>> in PCI configuration space (who can prevent a OEM do that crazy
+> >>> thing? :) ), and it should be accessible before the PCI bus is
+> >>> created.
+> >>
+> >> Us, by changing attitude and questioning features whose usefulness
+> >> is questionable. I will look into this and raise the point, I am not
+> >> thrilled by the idea of adding another set of PCI accessor functions
+> >> and drivers because we have to access a register through PCI before
+> >> enumerating the bus (and on arm64 this is totally useless since
+> >> we are not meant to support fixed HW anyway). Maybe we can make acpica
+> >> code use a "special" stub (ACPI specific, PCI configuration space address
+> >> space has restrictions anyway), I have to review this set in its
+> >> entirety to see how to do that (and I would kindly ask you to do
+> >> it too, before saying it is not possible to implement it).
+> >
+> > I'm willing to do that, actually, if we don't need a mechanism to
+> > access PCI config space before the bus is created, the code can be
+> > simplified a lot.
 > 
-> Signed-off-by: Anand Moon <linux.amoon@gmail.com>
-> ---
->  arch/arm/configs/exynos_defconfig | 6 ++++++
->  1 file changed, 6 insertions(+)
-> 
-> diff --git a/arch/arm/configs/exynos_defconfig
-> b/arch/arm/configs/exynos_defconfig index 1b7253b..2bbdf80 100644
-> --- a/arch/arm/configs/exynos_defconfig
-> +++ b/arch/arm/configs/exynos_defconfig
-> @@ -165,6 +165,12 @@ CONFIG_MMC_SDHCI_S3C_DMA=y
->  CONFIG_MMC_DW=y
->  CONFIG_MMC_DW_IDMAC=y
->  CONFIG_MMC_DW_EXYNOS=y
-> +CONFIG_NEW_LEDS=y
-> +CONFIG_LEDS_CLASS=m
-> +CONFIG_LEDS_PWM=m
-> +CONFIG_LEDS_TRIGGERS=y
-> +CONFIG_LEDS_TRIGGER_TIMER=m
-> +CONFIG_LEDS_TRIGGER_HEARTBEAT=m
->  CONFIG_RTC_CLASS=y
->  CONFIG_RTC_DRV_MAX77686=y
->  CONFIG_RTC_DRV_MAX77802=y
+> After more investigation on the spec and the ACPI core code, I'm
+> still not convinced that accessing to PCI config space before PCI
+> bus creating is impossible, also there is no enough ARM64 hardware
+> to prove that too. But I think we can go in this way, reuse the
+> ECAM implementation by pci-host-generic for now, and implement the PCI
+> accessor functions before enumerating PCI bus when needed in the
+> future, does it make sense?
 
-Reviewed-by: Lukasz Majewski <l.majewski@samsung.com>
+You mean we rewrite the patch to make sure we can use the PCI host generic
+driver with MCFG and we leave the acpica PCI config call empty stubs on
+arm64 (as they are now) ?
 
--- 
-Best regards,
-
-Lukasz Majewski
-
-Samsung R&D Institute Poland (SRPOL) | Linux Platform Group
+Thanks,
+Lorenzo
