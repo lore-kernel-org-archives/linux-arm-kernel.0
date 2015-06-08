@@ -1,58 +1,67 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Mon, 8 Jun 2015 08:56:57 +0200
-Subject: [PATCH v4] Thermal cleanups and hardware trip points
-In-Reply-To: <1432128046-12921-1-git-send-email-s.hauer@pengutronix.de>
-References: <1432128046-12921-1-git-send-email-s.hauer@pengutronix.de>
-Message-ID: <20150608065657.GL26575@pengutronix.de>
+From: javier@dowhile0.org (Javier Martinez Canillas)
+Date: Mon, 8 Jun 2015 09:00:38 +0200
+Subject: [RESEND 1/2] usb: ehci-exynos: Make provision for vdd regulators
+In-Reply-To: <CAJKOXPc+XKnZbDcdPgyGeaRD+wU2ef0AqiGwWjhJfCbX27c06A@mail.gmail.com>
+References: <1433683242-3945-1-git-send-email-linux.amoon@gmail.com>
+ <5574F97A.5030104@samsung.com>
+ <CANAwSgTjx8uxyOTW8uuiqrcNzF+UwLMmML2OcDgG5Ku_56=vJQ@mail.gmail.com>
+ <CAJKOXPfDmt5VMqr-P+OpWy1+jz675CFRPmtS_N0HjN4tWxfwtA@mail.gmail.com>
+ <CABxcv=kMi1dveFOWq6JVEAGTtZLCVHcCcWLyLZzJLaYTx0M3fw@mail.gmail.com>
+ <CAJKOXPc+XKnZbDcdPgyGeaRD+wU2ef0AqiGwWjhJfCbX27c06A@mail.gmail.com>
+Message-ID: <CABxcv==89MBuB9f7Zf_jO_wa4nr6ADYqfx8N+A4SeZJ-ccmBEw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Eduardo, Rui,
+Hello Krzysztof,
 
-Any feedback to this series?
+On Mon, Jun 8, 2015 at 8:52 AM, Krzysztof Kozlowski
+<k.kozlowski@samsung.com> wrote:
+> 2015-06-08 15:42 GMT+09:00 Javier Martinez Canillas <javier@dowhile0.org>:
+>> Hello,
+>>
+>> On Mon, Jun 8, 2015 at 7:14 AM, Krzysztof Kozlowski
+>> <k.kozlowski@samsung.com> wrote:
+>>
+>> [...]
+>>
+>>>
+>>> To summarize my point of view:
+>>> 1. Unless Vivek's says otherwise, please give him the credits with
+>>> proper "from" field.
+>>> 2. Issues mentioned in previous mail should be addressed (missing
+>>> IS_ERR(), how disabling the regulator during suspend affects waking
+>>> up).
+>>> 3. The patchset must be tested, even after rebasing.
+>>>
+>>
+>> Agreed with all the points.
+>>
+>> Anand,
+>>
+>> An easy way to preserve authorship when rebasing patches is to use the
+>> git command author option. As an example you can execute the following
+>> command:
+>>
+>> $ git commit -a -s --author='Vivek Gautam <gautam.vivek@samsung.com>'
+>
+> By default "git am" and "git format-patch" preserve the author of a
+> patch so usually this step is not necessary. Unless the patch is
+> applied in a different way... :)
+>
 
-Thanks
-  Sascha
+That is correct but if an old patch still applies cleanly on top of
+current's tree, then there is no need to do a rebase right? ;-)
 
-On Wed, May 20, 2015 at 03:20:30PM +0200, Sascha Hauer wrote:
-> This series adds support for hardware trip points. It picks up earlier
-> work from Mikko Perttunen. Mikko implemented hardware trip points as part
-> of the device tree support. It was suggested back then to move the
-> functionality to the thermal core instead of putting more code into the
-> device tree support. This series does exactly that.
-> 
-> The majority of the patches are cleanups and fixes. Patch 11 introduces
-> hardware tracked trip points and finally a driver for the Mediatek
-> thermal controller is introduced as the first user.
-> 
-> All comments welcome
-> 
-> Changes since v3:
-> - Fix some missing function type changes in int3400_thermal.c,
->   processor_thermal_device.c, kirkwood_thermal.c and exynos_tmu.c
-> - Add better description for set_trips callback
-> - update the interrupt triggers also when the trip points change
-> - Add missing MODULE_* tags
-> - Broaden temperature range in the Mediatek driver so that we can be sure
->   the measured temperatures are really out of the desired range
-> 
-> Changes since v2:
-> - Add Mediatek thermal controller driver as first user for hardware trip
->   points
-> 
-> Changes since v1:
-> - Use int instead of unsigned long consistently for temperatures
-> - Instead of misfixing the emulation code add a comment how the
->   code is meant
-> - Add doc entry for .set_trips callback
-> - initialize prev_low_trip/prev_high_trip properly
-> - get tz->lock before calling thermal_zone_set_trips()
-> 
-> 
-> 
+I mean, git am is not as smart as the patch command for example to
+detect when the line numbers mentioned in the patch are incorrect and
+does not attempt to find the correct place to apply each hunk of the
+patch (at least by default, I don't know if there is an option).
 
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Which IIUC is what Anand had to do so in that case you need to
+manually commit again but using the original patch author.
+
+> Best regards,
+> Krzysztof
+
+Best regards,
+Javier
