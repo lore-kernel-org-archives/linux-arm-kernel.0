@@ -1,49 +1,103 @@
-From: julia.lawall@lip6.fr (Julia Lawall)
-Date: Mon, 8 Jun 2015 11:01:35 +0200 (CEST)
-Subject: [PATCH] ARM: pxa: ssp: Use devm_ioremap_resource instead of
- devm_ioremap
-In-Reply-To: <1433753632-28534-1-git-send-email-firogm@gmail.com>
-References: <1433753632-28534-1-git-send-email-firogm@gmail.com>
-Message-ID: <alpine.DEB.2.10.1506081100150.2660@hadrien>
+From: gautam.vivek@samsung.com (Vivek Gautam)
+Date: Mon, 08 Jun 2015 10:58:47 +0530
+Subject: [RESEND 1/2] usb: ehci-exynos: Make provision for vdd regulators
+In-Reply-To: <CAJKOXPfDmt5VMqr-P+OpWy1+jz675CFRPmtS_N0HjN4tWxfwtA@mail.gmail.com>
+References: <1433683242-3945-1-git-send-email-linux.amoon@gmail.com>
+ <5574F97A.5030104@samsung.com>
+ <CANAwSgTjx8uxyOTW8uuiqrcNzF+UwLMmML2OcDgG5Ku_56=vJQ@mail.gmail.com>
+ <CAJKOXPfDmt5VMqr-P+OpWy1+jz675CFRPmtS_N0HjN4tWxfwtA@mail.gmail.com>
+Message-ID: <44B5E2FDCD3244AAA418BB8EC28FEA25@sisodomain.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> @@ -182,21 +182,12 @@ static int pxa_ssp_probe(struct platform_device *pdev)
->  		return -ENODEV;
->  	}
+Hi,
 
-Actually, the code up here is a check that res is not null.  You can drop
-that as well.  devm_ioremap_resource checks the same thing.
 
-julia
+
+On Monday, June 08, 2015 10:44 AM, "Krzysztof Kozlowski" 
+<k.kozlowski@samsung.com> wrote:
+
+my apologies for being late in replying to this thread.
+
+> 2015-06-08 13:21 GMT+09:00 Anand Moon <linux.amoon@gmail.com>:
+>> Hi Krzysztof ,
+>>
+>> On 8 June 2015 at 07:40, Krzysztof Kozlowski <k.kozlowski@samsung.com> 
+>> wrote:
+>>> On 07.06.2015 22:20, Anand Moon wrote:
+>>>> Facilitate getting required 3.3V and 1.0V VDD supply for
+>>>> EHCI controller on Exynos.
+>>>>
+>>>> With the patches for regulators' nodes merged in 3.15:
+>>>> c8c253f ARM: dts: Add regulator entries to smdk5420
+>>>> 275dcd2 ARM: dts: add max77686 pmic node for smdk5250,
+>>>> the exynos systems turn on only minimal number of regulators.
+>>>>
+>>>> Until now, the VDD regulator supplies were either turned on
+>>>> by the bootloader, or the regulators were enabled by default
+>>>> in the kernel, so that the controller drivers did not need to
+>>>> care about turning on these regulators on their own.
+>>>> This was rather bad about these controller drivers.
+>>>> So ensuring now that the controller driver requests the necessary
+>>>> VDD regulators (if available, unless there are direct VDD rails),
+>>>> and enable them so as to make them working.
+>>>>
+>>>> Signed-off-by: Vivek Gautam <gautam.vivek@samsung.com>
+>>>> Signed-off-by: Anand Moon <linux.amoon@gmail.com>
+>>>> Cc: Jingoo Han <jg1.han@samsung.com>
+>>>> Cc: Alan Stern <stern@rowland.harvard.edu>
+>>>> ---
+>>>> Initial version of this patch was part of following series, though
+>>>> they are not dependent on each other, resubmitting after rebasing.
+>>>>
+>>>> http://lists.infradead.org/pipermail/linux-arm-kernel/2014-June/266418.html
+>>>
+>>> So you just took Vivek's patch along with all the credits... That is not
+>>> how we usually do this.
+>>>
+>>> I would expect that rebasing a patch won't change the author unless this
+>>> is fine with Vivek.
+>>>
+>>
+>> Sorry If I have done some mistake on my part.
+>> I just looked at below mail chain. Before I send it.
+>>
+>> http://www.spinics.net/lists/linux-samsung-soc/msg44136.html
+>
+> I don't get it. The patch you are referring to has a proper "From"
+> field. So please use it as an example.
+>
+>>
+>> I don't want to take any credit out of it. I just re-base on the new 
+>> kernel.
+Perhaps, you would have maintained the authorship !
+
+>> I could not test this patch as it meant for exynos5440 boards.
+>
+> Are you sure? I think the driver is used on almost all of Exynos SoCs
+> (Exynos4, Exynos5250, Exynos542x).
+
+That's correct, as pointed by Krzysztof Kozlowski, the driver is same for 
+Exynos4 and Exynos5 series
+of SoCs.
+
+> Untested code should not go to the kernel. Additionally you should
+> mark it as not-tested. Marking such patch as non-tested could help you
+> finding some independent tests (tests performed by someone else).
+>
+> To summarize my point of view:
+> 1. Unless Vivek's says otherwise, please give him the credits with
+> proper "from" field.
+> 2. Issues mentioned in previous mail should be addressed (missing
+> IS_ERR(), how disabling the regulator during suspend affects waking
+> up).
+> 3. The patchset must be tested, even after rebasing.
+
+Unfortunately, I got busy  with a different project and lost track of the 
+patches posted upstream.
+If it's not too late I can post a rebased version of the patch with previous 
+review comments addressed.
 
 >
-> -	res = devm_request_mem_region(dev, res->start, resource_size(res),
-> -				      pdev->name);
-> -	if (res == NULL) {
-> -		dev_err(dev, "failed to request memory resource\n");
-> -		return -EBUSY;
-> -	}
-> +	ssp->mmio_base = devm_ioremap_resource(dev, res);
-> +	if (IS_ERR(ssp->mmio_base))
-> +		return PTR_ERR(ssp->mmio_base);
->
->  	ssp->phys_base = res->start;
->
-> -	ssp->mmio_base = devm_ioremap(dev, res->start, resource_size(res));
-> -	if (ssp->mmio_base == NULL) {
-> -		dev_err(dev, "failed to ioremap() registers\n");
-> -		return -ENODEV;
-> -	}
-> -
->  	ssp->irq = platform_get_irq(pdev, 0);
->  	if (ssp->irq < 0) {
->  		dev_err(dev, "no IRQ resource defined\n");
-> --
-> 2.4.2
->
-> --
-> To unsubscribe from this list: send the line "unsubscribe kernel-janitors" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
->
+> Best regards,
+> Krzysztof 
