@@ -1,66 +1,48 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 8 Jun 2015 11:21:05 +0100
-Subject: [PATCH] arm64: fix missing syscall trace exit
-In-Reply-To: <1433539683-29539-1-git-send-email-jistone@redhat.com>
-References: <20150605153816.GG7420@arm.com>
- <1433539683-29539-1-git-send-email-jistone@redhat.com>
-Message-ID: <20150608102104.GB1654@arm.com>
+From: vinod.koul@intel.com (Vinod Koul)
+Date: Mon, 8 Jun 2015 16:04:47 +0530
+Subject: [PATCH v2 3/5] dmaengine: mv_xor: add support for a38x command
+ in descriptor mode
+In-Reply-To: <1432645656-20504-4-git-send-email-maxime.ripard@free-electrons.com>
+References: <1432645656-20504-1-git-send-email-maxime.ripard@free-electrons.com>
+ <1432645656-20504-4-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <20150608103447.GE28601@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Josh,
-
-Thanks for the patch.
-
-On Fri, Jun 05, 2015 at 10:28:03PM +0100, Josh Stone wrote:
-> If a syscall is entered without TIF_SYSCALL_TRACE set, then it goes on
-> the fast path.  It's then possible to have TIF_SYSCALL_TRACE added in
-> the middle of the syscall, but ret_fast_syscall doesn't check this flag
-> again.  This causes a ptrace syscall-exit-stop to be missed.
+On Tue, May 26, 2015 at 03:07:34PM +0200, Maxime Ripard wrote:
+> From: Lior Amsalem <alior@marvell.com>
 > 
-> For instance, from a PTRACE_EVENT_FORK reported during do_fork, the
-> tracer might resume with PTRACE_SYSCALL, setting TIF_SYSCALL_TRACE.
-> Now the completion of the fork should have a syscall-exit-stop.
+> The Marvell Armada 38x SoC introduce new features to the XOR engine,
+> especially the fact that the engine mode (MEMCPY/XOR/PQ/etc) can be part of
+> the descriptor and not set through the controller registers.
 > 
-> Russell King fixed this on arm by re-checking _TIF_SYSCALL_WORK in the
-> fast exit path.  Do the same on arm64.
+> This new feature allows mixing of different commands (even PQ) on the same
+> channel/chain without the need to stop the engine to reconfigure the engine
+> mode.
 > 
-> v2: Re-enable interrupts before branching to __sys_trace_return.
-
-Please don't include the changelog in the commit message.
-
-> Cc: Catalin Marinas <catalin.marinas@arm.com>
-> Cc: Will Deacon <will.deacon@arm.com>
-> Cc: Russell King <rmk+kernel@arm.linux.org.uk>
-> Signed-off-by: Josh Stone <jistone@redhat.com>
+> Refactor the driver to be able to use that new feature on the Armada 38x,
+> while keeping the old behaviour on the older SoCs.
+> 
+> Signed-off-by: Lior Amsalem <alior@marvell.com>
+> Reviewed-by: Ofer Heifetz <oferh@marvell.com>
+> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 > ---
->  arch/arm64/kernel/entry.S | 7 ++++++-
->  1 file changed, 6 insertions(+), 1 deletion(-)
+>  Documentation/devicetree/bindings/dma/mv-xor.txt |  2 +-
+>  drivers/dma/mv_xor.c                             | 82 ++++++++++++++++++++----
+>  drivers/dma/mv_xor.h                             |  7 ++
+>  3 files changed, 76 insertions(+), 15 deletions(-)
 > 
-> diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
-> index 959fe8733560..988bea43dc74 100644
-> --- a/arch/arm64/kernel/entry.S
-> +++ b/arch/arm64/kernel/entry.S
-> @@ -608,11 +608,16 @@ ENDPROC(cpu_switch_to)
->   */
->  ret_fast_syscall:
->  	disable_irq				// disable interrupts
-> -	ldr	x1, [tsk, #TI_FLAGS]
-> +	ldr	x1, [tsk, #TI_FLAGS]		// re-check for syscall tracing
-> +	and	x2, x1, #_TIF_SYSCALL_WORK
-> +	cbnz	x2, ret_fast_syscall_trace
->  	and	x2, x1, #_TIF_WORK_MASK
->  	cbnz	x2, fast_work_pending
->  	enable_step_tsk x1, x2
->  	kernel_exit 0, ret = 1
-> +ret_fast_syscall_trace:
-> +	enable_irq				// enable interrupts
-> +	b	__sys_trace_return
+> diff --git a/Documentation/devicetree/bindings/dma/mv-xor.txt b/Documentation/devicetree/bindings/dma/mv-xor.txt
+> index 7c6cb7fcecd2..cc29c35266e2 100644
+> --- a/Documentation/devicetree/bindings/dma/mv-xor.txt
+> +++ b/Documentation/devicetree/bindings/dma/mv-xor.txt
+> @@ -1,7 +1,7 @@
+>  * Marvell XOR engines
+>  
+>  Required properties:
+> -- compatible: Should be "marvell,orion-xor"
+> +- compatible: Should be "marvell,orion-xor" or "marvell,armada-380-xor"
+marvell,armada-380-xor doesnt seem to exist in binding ?
 
-Looks good to me:
-
-  Reviewed-by: Will Deacon <will.deacon@arm.com>
-
-I assume this can wait until 4.2?
-
-Will
+-- 
+~Vinod
