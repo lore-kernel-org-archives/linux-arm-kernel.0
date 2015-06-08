@@ -1,45 +1,38 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Mon, 08 Jun 2015 10:35:49 +0900
-Subject: [PATCH] thermal: exynos: Disable the regulator on probe failure
-Message-ID: <1433727349-23330-1-git-send-email-k.kozlowski@samsung.com>
+From: gnurou@gmail.com (Alexandre Courbot)
+Date: Mon, 8 Jun 2015 11:09:42 +0900
+Subject: [PATCH/RFC 1/2] ARM: multi_v7_defconfig: Make drm support modular
+In-Reply-To: <20150605113949.GA26607@ulmo.nvidia.com>
+References: <1432905926-31606-1-git-send-email-geert@linux-m68k.org>
+ <2568731.dqdEiMuDro@wuerfel> <20150605113949.GA26607@ulmo.nvidia.com>
+Message-ID: <CAAVeFuJqcye_MRoJ7vLwnyB0B1ZhEnY2Y8ZV3N50LhBV3gc4Jg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-During probe the regulator (if present) was enabled but not disabled in
-case of failure. So an unsuccessful probe lead to enabling the
-regulator which was actually not needed because the device was not
-enabled.
+On Fri, Jun 5, 2015 at 8:39 PM, Thierry Reding <thierry.reding@gmail.com> wrote:
+> On Fri, May 29, 2015 at 05:41:34PM +0200, Arnd Bergmann wrote:
+>> On Friday 29 May 2015 15:25:25 Geert Uytterhoeven wrote:
+>> > From: Geert Uytterhoeven <geert+renesas@glider.be>
+>> >
+>> > Make drm support modular to reduce kernel size (-620 KiB):
+>> >
+>> >        text    data     bss     dec     hex   filename
+>> >     12211122 1392076  338520 13941718  d4bbd6 vmlinux.before
+>> >     11581470 1387196  338264 13306930  cb0c32 vmlinux.after
+>> >
+>> > Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+>> > ---
+>> > Slightly controversial:
+>> >   - Does anyone need drm for boot testing?
+>>
+>> Only the tegra driver is affected, so let's ask the tegra
+>> maintainers.
+>
+> As a matter of fact I do most of the DRM testing on boot using the
+> built-in driver. However I can do that easily using tegra_defconfig so
+> I'm fine with this change.
+>
+> Acked-by: Thierry Reding <treding@nvidia.com>
 
-Additionally each deferred probe lead to increase of regulator enable
-count so it would not be effectively disabled during removal of the
-device.
+Looks good to me to, Nouveau works better as a module anyway. :)
 
-Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
-Fixes: 498d22f616f6 ("thermal: exynos: Support for TMU regulator defined at device tree")
-Cc: <stable@vger.kernel.org>
-
----
-
-I am not entirely convinced that this should go to stable. Leaving a
-regulator enabled in case of probe failure (no exynos TMU device) or
-after deferred probe (regulator won't be disabled during device removal)
-is not a critical issue, just leaks power.
----
- drivers/thermal/samsung/exynos_tmu.c | 2 ++
- 1 file changed, 2 insertions(+)
-
-diff --git a/drivers/thermal/samsung/exynos_tmu.c b/drivers/thermal/samsung/exynos_tmu.c
-index 531f4b179871..13c3aceed19d 100644
---- a/drivers/thermal/samsung/exynos_tmu.c
-+++ b/drivers/thermal/samsung/exynos_tmu.c
-@@ -1392,6 +1392,8 @@ err_clk_sec:
- 	if (!IS_ERR(data->clk_sec))
- 		clk_unprepare(data->clk_sec);
- err_sensor:
-+	if (!IS_ERR_OR_NULL(data->regulator))
-+		regulator_disable(data->regulator);
- 	thermal_zone_of_sensor_unregister(&pdev->dev, data->tzd);
- 
- 	return ret;
--- 
-1.9.1
+Acked-by: Alexandre Courbot <acourbot@nvidia.com>
