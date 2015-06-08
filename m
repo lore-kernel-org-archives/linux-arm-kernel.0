@@ -1,51 +1,98 @@
-From: vinod.koul@intel.com (Vinod Koul)
-Date: Mon, 8 Jun 2015 16:30:52 +0530
-Subject: [PATCH v2 1/3] dmaengine: at_xdmac: lock fixes
-In-Reply-To: <1433752399-26231-1-git-send-email-ludovic.desroches@atmel.com>
-References: <1433751820-26142-1-git-send-email-ludovic.desroches@atmel.com>
- <1433752399-26231-1-git-send-email-ludovic.desroches@atmel.com>
-Message-ID: <20150608110052.GG28601@localhost>
+From: r.schwebel@pengutronix.de (Robert Schwebel)
+Date: Mon, 8 Jun 2015 12:59:57 +0200
+Subject: EDMA oftree entry for AM335x
+In-Reply-To: <20150506143951.GG21061@atomide.com>
+References: <20150504064323.GU15254@pengutronix.de>
+ <20150504141103.GD24469@atomide.com> <5548CB54.1040302@ti.com>
+ <20150505145828.GB21061@atomide.com> <5549F95B.8090905@ti.com>
+ <20150506143951.GG21061@atomide.com>
+Message-ID: <20150608105957.GT26523@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 08, 2015 at 10:33:14AM +0200, Ludovic Desroches wrote:
-> Using _bh variant for spin locks causes this kind of warning:
-> Starting logging: ------------[ cut here ]------------
-> WARNING: CPU: 0 PID: 3 at /ssd_drive/linux/kernel/softirq.c:151
-> __local_bh_enable_ip+0xe8/0xf4()
-> Modules linked in:
-> CPU: 0 PID: 3 Comm: ksoftirqd/0 Not tainted 4.1.0-rc2+ #94
-> Hardware name: Atmel SAMA5
-> [<c0013c04>] (unwind_backtrace) from [<c00118a4>] (show_stack+0x10/0x14)
-> [<c00118a4>] (show_stack) from [<c001bbcc>]
-> (warn_slowpath_common+0x80/0xac)
-> [<c001bbcc>] (warn_slowpath_common) from [<c001bc14>]
-> (warn_slowpath_null+0x1c/0x24)
-> [<c001bc14>] (warn_slowpath_null) from [<c001e28c>]
-> (__local_bh_enable_ip+0xe8/0xf4)
-> [<c001e28c>] (__local_bh_enable_ip) from [<c01fdbd0>]
-> (at_xdmac_device_terminate_all+0xf4/0x100)
-> [<c01fdbd0>] (at_xdmac_device_terminate_all) from [<c02221a4>]
-> (atmel_complete_tx_dma+0x34/0xf4)
-> [<c02221a4>] (atmel_complete_tx_dma) from [<c01fe4ac>]
-> (at_xdmac_tasklet+0x14c/0x1ac)
-> [<c01fe4ac>] (at_xdmac_tasklet) from [<c001de58>]
-> (tasklet_action+0x68/0xb4)
-> [<c001de58>] (tasklet_action) from [<c001dfdc>]
-> (__do_softirq+0xfc/0x238)
-> [<c001dfdc>] (__do_softirq) from [<c001e140>] (run_ksoftirqd+0x28/0x34)
-> [<c001e140>] (run_ksoftirqd) from [<c0033a3c>]
-> (smpboot_thread_fn+0x138/0x18c)
-> [<c0033a3c>] (smpboot_thread_fn) from [<c0030e7c>] (kthread+0xdc/0xf0)
-> [<c0030e7c>] (kthread) from [<c000f480>] (ret_from_fork+0x14/0x34)
-> ---[ end trace b57b14a99c1d8812 ]---
+On Wed, May 06, 2015 at 07:39:52AM -0700, Tony Lindgren wrote:
+> > In different SoC we can have different number of CCs (OMAP-L138 has two) and
+> > each CC can have different number of TCs associated with. In AM335x we have
+> > one CC with 3 TC, in OMAP-L138 we have two CC, CC0 has 2 TC, CC1 has 1 TC. The
+> > TCs are used to set priorities, you can assign the priorities to the TCs and
+> > you can choose to assign the transfer (channel) to a give TC.
 > 
-> It comes from the fact that devices can called some code from the DMA
-> controller with irq disabled. _bh variant is not intended to be used in
-> this case since it can enable irqs. Switch to irqsave/irqrestore variant to
-> avoid this situation.
+> OK
+>  
+> > >> And yes, both TC and CCs can generate interrupts.
+> > > 
+> > > Do the TCs have a shared interrupt that could be handled by
+> > > each TC instance?
+> > 
+> > Separate IRQ lines to the ARM core, but we do not handle them right now.
+> 
+> OK
+>  
+> > >> So it is not straight forward to separate the TC from the CC driver (edma3).
+> > > 
+> > > It seems pm runtime for these four separate modules needs to be
+> > > done at the CC driver level if it can't be done separately for
+> > > each instance.
+> > 
+> > The current eDMA stack is not really flexible on this IMHO.
+> > I think the way forward would be something like this in DT:
+> > 
+> > edma_cc: edma_cc at 49000000 {
+> > 	compatible = "ti,edma3-cc";
+> > 	ti,hwmods = "tpcc"
+> > 	reg =	<0x49000000 0x10000>,
+> > 		<0x44e10f90 0x40>;
+> > 	interrupts = <12 13 14>;
+> > 	#dma-cells = <1>;
+> > 
+> > 	edma3_tc0: edma3_tc0 at 49800000 {
+> > 		compatible = "ti,edma3-tc";
+> > 		ti,hwmods = "tptc0"
+> > 	};
+> > 
+> > 	edma3_tc1: edma3_tc1 at 49900000 {
+> > 		compatible = "ti,edma3-tc";
+> > 		ti,hwmods = "tptc1"
+> > 	};
+> > 
+> > 	edma3_tc2: edma3_tc2 at 49a00000 {
+> > 		compatible = "ti,edma3-tc";
+> > 		ti,hwmods = "tptc2"
+> > 	};
+> > };
+> 
+> Yeah that would be an improvment and remove the blockers for further
+> hwmod work. It would still be better to have the TC probe separately
+> and register with CC rather than combining separate elements in DT
+> in a way that does not represent the hardare. There's a 7MB reserved
+> block inbetween there..
+>  
+> > The driver for ti,edma3-tc would be pretty minimal, doing only pm_runtime only
+> > and from the CC driver we could just set the runtime status for the the TC
+> > which we are about to submit work and decrement the runtime when the work is
+> > done. If not work is needed for the TC it can be shot down.
+> 
+> OK
+>  
+> > But this would need significant amount of work which can be done when we get
+> > rid of the legacy (arch/arm/common/edma.c) and move to dmaengine only mode.
+> 
+> That may never happen considering that davinci is using it too.. It's
+> best to not count on that happening anytime soon at least.
 
-Applied, thanks
+So my current understanding is that we have the situation that the
+kernel warns about the oftree being wrong, but isn't able to handle an
+oftree that would be right.
 
+Shouldn't the warning being added when the kernel driver supports that
+new mechanism?
+
+I had a warning free mainline kernel without patches on my customer
+hardware before, so this smells a bit like a regression ... :-/
+
+rsc
 -- 
-~Vinod
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
