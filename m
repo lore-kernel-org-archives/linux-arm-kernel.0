@@ -1,38 +1,43 @@
-From: p.fedin@samsung.com (Pavel Fedin)
-Date: Mon, 08 Jun 2015 09:53:30 +0300
-Subject: [PATCH 00/13] arm64: KVM: GICv3 ITS emulation
-In-Reply-To: <1432893209-27313-1-git-send-email-andre.przywara@arm.com>
-References: <1432893209-27313-1-git-send-email-andre.przywara@arm.com>
-Message-ID: <01ad01d0a1b7$d4d4fe40$7e7efac0$@samsung.com>
+From: javier@dowhile0.org (Javier Martinez Canillas)
+Date: Mon, 8 Jun 2015 08:54:44 +0200
+Subject: [PATCH] thermal: exynos: Disable the regulator on probe failure
+In-Reply-To: <1433727349-23330-1-git-send-email-k.kozlowski@samsung.com>
+References: <1433727349-23330-1-git-send-email-k.kozlowski@samsung.com>
+Message-ID: <CABxcv=me__Nor+grdD+GaGJNZT5hRt6Tq7VBN1=yNzj+qw-zww@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
- Hello everybody!
+Hello Krzysztof,
 
-> The GICv3 ITS (Interrupt Translation Service) is a part of the
-> ARM GICv3 interrupt controller used for implementing MSIs.
-> It specifies a new kind of interrupts (LPIs), which are mapped to
-> establish a connection between a device, its MSI payload value and
-> the target processor the IRQ is eventually delivered to.
-> In order to allow using MSIs in an ARM64 KVM guest, we emulate this
-> ITS widget in the kernel.
+On Mon, Jun 8, 2015 at 3:35 AM, Krzysztof Kozlowski
+<k.kozlowski@samsung.com> wrote:
+> During probe the regulator (if present) was enabled but not disabled in
+> case of failure. So an unsuccessful probe lead to enabling the
+> regulator which was actually not needed because the device was not
+> enabled.
+>
+> Additionally each deferred probe lead to increase of regulator enable
+> count so it would not be effectively disabled during removal of the
+> device.
+>
+> Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+> Fixes: 498d22f616f6 ("thermal: exynos: Support for TMU regulator defined at device tree")
+> Cc: <stable@vger.kernel.org>
+>
 
- I have tested the patch and got some more ideas for future extension...
+Reviewed-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
 
- First of all, it would be nice to have a possibility to directly inject LPIs by number.
-This will be useful for irqfd support in qemu.
- Next, irqfd support currently poses a problem. We need to somehow know IRQ number from
-MSI-X data (device ID plus event ID). ITS has all this information, so it would be nice to
-be able to query for the translation from within userspace. The question is - how to do
-it? Should we add some ioctl for this purpose? Currently i am experimenting with extra
-KVM_TRANSLATE_MSI ioctl which, given MSI data, would return LPI number.
- Actually before your patch came out i have almost done the same thing. But instead i
-decided to implement ITS in qemu while leaving LPI handling to kernel. In this case my
-qemu would have everything needed.
- By the way, why did you decide to put everything into kernel? Yes, in-kernel emulation is
-faster, but ITS is not accessed frequently.
+> ---
+>
+> I am not entirely convinced that this should go to stable. Leaving a
+> regulator enabled in case of probe failure (no exynos TMU device) or
+> after deferred probe (regulator won't be disabled during device removal)
+> is not a critical issue, just leaks power.
 
-Kind regards,
-Pavel Fedin
-Expert Engineer
-Samsung Electronics Research center Russia
+
+Yes, as you said leaving the regulator enabled is not critical but
+OTOH is a very small patch and is fixing a very evident bug so I think
+it's OK.
+
+Best regards,
+Javier
