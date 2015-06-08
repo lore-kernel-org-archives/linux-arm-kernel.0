@@ -1,65 +1,79 @@
-From: xose.vazquez@gmail.com (Xose Vazquez Perez)
-Date: Mon, 08 Jun 2015 15:09:22 +0200
-Subject: Generic kernel features that need architecture(arm64) support
-Message-ID: <55759402.6030708@gmail.com>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Mon, 08 Jun 2015 22:21:46 +0900
+Subject: [RESEND 1/2] usb: ehci-exynos: Make provision for vdd regulators
+In-Reply-To: <CANAwSgTi114wO63-sx=UmbxPerqKvstq=coVyqhRkzX44CDe_w@mail.gmail.com>
+References: <1433683242-3945-1-git-send-email-linux.amoon@gmail.com>
+ <5574F97A.5030104@samsung.com>
+ <CANAwSgTjx8uxyOTW8uuiqrcNzF+UwLMmML2OcDgG5Ku_56=vJQ@mail.gmail.com>
+ <CAJKOXPfDmt5VMqr-P+OpWy1+jz675CFRPmtS_N0HjN4tWxfwtA@mail.gmail.com>
+ <44B5E2FDCD3244AAA418BB8EC28FEA25@sisodomain.com>
+ <CANAwSgTi114wO63-sx=UmbxPerqKvstq=coVyqhRkzX44CDe_w@mail.gmail.com>
+Message-ID: <557596EA.50103@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+W dniu 08.06.2015 o 19:20, Anand Moon pisze:
+> On 8 June 2015 at 10:58, Vivek Gautam <gautam.vivek@samsung.com> wrote:
+>> Hi,
+>>
 
-If there is anything wrong, please report it in this thread:
-https://marc.info/?t=143332955700003
+(...)
 
+>>
+>> On Monday, June 08, 2015 10:44 AM, "Krzysztof Kozlowski"
+>> <k.kozlowski@samsung.com> wrote:
+>>
+>>> Untested code should not go to the kernel. Additionally you should
+>>> mark it as not-tested. Marking such patch as non-tested could help you
+>>> finding some independent tests (tests performed by someone else).
+>>>
+>>> To summarize my point of view:
+>>> 1. Unless Vivek's says otherwise, please give him the credits with
+>>> proper "from" field.
+>>> 2. Issues mentioned in previous mail should be addressed (missing
+>>> IS_ERR(), how disabling the regulator during suspend affects waking
+>>> up).
+>>> 3. The patchset must be tested, even after rebasing.
+>>
+>>
+>> Unfortunately, I got busy  with a different project and lost track of the
+>> patches posted upstream.
+>> If it's not too late I can post a rebased version of the patch with previous
+>> review comments addressed.
+>>
+>>>
+>>> Best regards,
+>>> Krzysztof
+>>
+>>
+> 
+> Hi All,
+> 
+> I have learned my lesson not to interfere in others work.
+> It will never happen from my side again.
+> 
+> Please accept my apology.
 
-The meaning of entries in the tables is:
+Sure, no problem. Mistakes happen (I make a lot of them too), just learn
+from them.
 
-    | ok |  # feature supported by the architecture
-    |TODO|  # feature not yet supported by the architecture
-    | .. |  # feature cannot be supported by the hardware
+Javier explained what was the proper way to do this - retain original
+author of the patch. Your signed-off-by was correct.
 
-#
-# Kernel feature support matrix of the 'arm64' architecture:
-#
-     sched/ numa-balancing       :  ..  |        ARCH_SUPPORTS_NUMA_BALANCING #  arch supports NUMA balancing
-      time/ irq-time-acct        :  ..  |            HAVE_IRQ_TIME_ACCOUNTING #  arch supports precise IRQ time accounting
-        vm/ numa-memblock        :  ..  |              HAVE_MEMBLOCK_NODE_MAP #  arch supports NUMA aware memblocks
-      core/ BPF-JIT              :  ok  |                        HAVE_BPF_JIT #  arch supports BPF JIT optimizations
-      core/ generic-idle-thread  :  ok  |             GENERIC_SMP_IDLE_THREAD #  arch makes use of the generic SMP idle thread facility
-      core/ jump-labels          :  ok  |                HAVE_ARCH_JUMP_LABEL #  arch supports live patched, high efficiency branches
-      core/ tracehook            :  ok  |                 HAVE_ARCH_TRACEHOOK #  arch supports tracehook (ptrace) register handling APIs
-     debug/ gcov-profile-all     :  ok  |           ARCH_HAS_GCOV_PROFILE_ALL #  arch supports whole-kernel GCOV code coverage profiling
-     debug/ kgdb                 :  ok  |                      HAVE_ARCH_KGDB #  arch supports the kGDB kernel debugger
-     debug/ stackprotector       :  ok  |              HAVE_CC_STACKPROTECTOR #  arch supports compiler driven stack overflow protection
-        io/ dma-api-debug        :  ok  |                  HAVE_DMA_API_DEBUG #  arch supports DMA debug facilities
-        io/ dma-contiguous       :  ok  |                 HAVE_DMA_CONTIGUOUS #  arch supports the DMA CMA (continuous memory allocator)
-        io/ dma_map_attrs        :  ok  |                      HAVE_DMA_ATTRS #  arch provides dma_*map*_attrs() APIs
-        io/ sg-chain             :  ok  |                   ARCH_HAS_SG_CHAIN #  arch supports chained scatter-gather lists
-   locking/ lockdep              :  ok  |                     LOCKDEP_SUPPORT #  arch supports the runtime locking correctness debug facility
-      perf/ perf-regs            :  ok  |                      HAVE_PERF_REGS #  arch supports perf events register access
-      perf/ perf-stackdump       :  ok  |           HAVE_PERF_USER_STACK_DUMP #  arch supports perf events stack dumps
-   seccomp/ seccomp-filter       :  ok  |            HAVE_ARCH_SECCOMP_FILTER #  arch supports seccomp filters
-      time/ arch-tick-broadcast  :  ok  |             ARCH_HAS_TICK_BROADCAST #  arch provides tick_broadcast()
-      time/ clockevents          :  ok  |                 GENERIC_CLOCKEVENTS #  arch support generic clock events
-      time/ context-tracking     :  ok  |               HAVE_CONTEXT_TRACKING #  arch supports context tracking for NO_HZ_FULL
-      time/ modern-timekeeping   :  ok  |            !ARCH_USES_GETTIMEOFFSET #  arch does not use arch_gettimeoffset() anymore
-      time/ virt-cpuacct         :  ok  |            HAVE_VIRT_CPU_ACCOUNTING #  arch supports precise virtual CPU time accounting
-        vm/ ELF-ASLR             :  ok  |              ARCH_HAS_ELF_RANDOMIZE #  arch randomizes the stack, heap and binary images of ELF binaries
-        vm/ pmdp_splitting_flush :  ok  |    __HAVE_ARCH_PMDP_SPLITTING_FLUSH #  arch supports the pmdp_splitting_flush() VM API
-        vm/ pte_special          :  ok  |             __HAVE_ARCH_PTE_SPECIAL #  arch supports the pte_special()/pte_mkspecial() VM APIs
-        vm/ THP                  :  ok  |      HAVE_ARCH_TRANSPARENT_HUGEPAGE #  arch supports transparent hugepages
-     debug/ KASAN                : TODO |                     HAVE_ARCH_KASAN #  arch supports the KASAN runtime memory checker
-     debug/ kprobes              : TODO |                        HAVE_KPROBES #  arch supports live patched kernel probe
-     debug/ kprobes-on-ftrace    : TODO |              HAVE_KPROBES_ON_FTRACE #  arch supports combined kprobes and ftrace live patching
-     debug/ kretprobes           : TODO |                     HAVE_KRETPROBES #  arch supports kernel function-return probes
-     debug/ optprobes            : TODO |                      HAVE_OPTPROBES #  arch supports live patched optprobes
-     debug/ uprobes              : TODO |               ARCH_SUPPORTS_UPROBES #  arch supports live patched user probes
-     debug/ user-ret-profiler    : TODO |           HAVE_USER_RETURN_NOTIFIER #  arch supports user-space return from system call profiler
-       lib/ strncasecmp          : TODO |             __HAVE_ARCH_STRNCASECMP #  arch provides an optimized strncasecmp() function
-   locking/ cmpxchg-local        : TODO |                  HAVE_CMPXCHG_LOCAL #  arch supports the this_cpu_cmpxchg() API
-   locking/ queued-rwlocks       : TODO |             ARCH_USE_QUEUED_RWLOCKS #  arch supports queued rwlocks
-   locking/ queued-spinlocks     : TODO |           ARCH_USE_QUEUED_SPINLOCKS #  arch supports queued spinlocks
-   locking/ rwsem-optimized      : TODO |               Optimized asm/rwsem.h #  arch provides optimized rwsem APIs
-      perf/ kprobes-event        : TODO |      HAVE_REGS_AND_STACK_ACCESS_API #  arch supports kprobes with perf events
-        vm/ huge-vmap            : TODO |                 HAVE_ARCH_HUGE_VMAP #  arch supports the ioremap_pud_enabled() and ioremap_pmd_enabled() VM APIs
-        vm/ ioremap_prot         : TODO |                   HAVE_IOREMAP_PROT #  arch has ioremap_prot()
-        vm/ PG_uncached          : TODO |               ARCH_USES_PG_UNCACHED #  arch supports the PG_uncached page flag
+In fact the kernel SubmittingPatches is worth reading from time to time:
+https://www.kernel.org/doc/Documentation/SubmittingPatches
+Under chapter 11th ("Sign your work") in paragraph starting with "If you
+are a subsystem or branch maintainer" - it explains how to mention
+changes when modifying someone's else patch.
+
+You can also look at example from Bartlomiej, how hge did this when he
+took Thomas' patches:
+https://lkml.org/lkml/2015/4/3/387
+However his case is kind of special because he made such a lot of
+changes and made such huge effort that in my humble opinion he could
+take the authorship of patch. But in this case the changelog is huge.
+And he tested it. Extensively. However he did not change the author of
+patches :) and you can just look at this work as an example.
+
+Best regards,
+Krzysztof
