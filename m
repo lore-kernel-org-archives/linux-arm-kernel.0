@@ -1,73 +1,34 @@
 From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Mon, 08 Jun 2015 10:11:38 +0900
-Subject: [PATCH 1/2] power_supply: max17042: Add OF support for setting
+Date: Mon, 08 Jun 2015 10:11:39 +0900
+Subject: [PATCH 2/2] ARM: dts: Set max17047 over heat and over voltage
  thresholds
-Message-ID: <1433725899-13849-1-git-send-email-k.kozlowski@samsung.com>
+In-Reply-To: <1433725899-13849-1-git-send-email-k.kozlowski@samsung.com>
+References: <1433725899-13849-1-git-send-email-k.kozlowski@samsung.com>
+Message-ID: <1433725899-13849-2-git-send-email-k.kozlowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The commit edd4ab055931 ("power: max17042_battery: add HEALTH and TEMP_*
-properties support") added support for setting voltage and temperature
-thresholds with platform data. For DeviceTree default of 0 was always
-used.
-
-This caused reporting battery health always as over voltage or
-over heated.
+Add some safe values for over head and over voltage. The Trats2 uses 3.8
+V battery and during testing it operated properly under 4.48 V.
 
 Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
-Fixes: edd4ab055931 ("power: max17042_battery: add HEALTH and TEMP_* properties support")
 ---
- .../devicetree/bindings/power_supply/max17042_battery.txt   | 13 +++++++++++++
- drivers/power/max17042_battery.c                            |  9 +++++++++
- 2 files changed, 22 insertions(+)
+ arch/arm/boot/dts/exynos4412-trats2.dts | 3 +++
+ 1 file changed, 3 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/power_supply/max17042_battery.txt b/Documentation/devicetree/bindings/power_supply/max17042_battery.txt
-index 5bc9b685cf8a..3f3894aaeebc 100644
---- a/Documentation/devicetree/bindings/power_supply/max17042_battery.txt
-+++ b/Documentation/devicetree/bindings/power_supply/max17042_battery.txt
-@@ -9,10 +9,23 @@ Optional properties :
-                          (datasheet-recommended value is 10000).
-    Defining this property enables current-sense functionality.
- 
-+Optional threshold properties :
-+ If skipped the condition won't be reported.
-+ - maxim,cold-temp :      Temperature threshold to report battery
-+                          as cold (in tenths of degree Celsius).
-+ - maxim,over-heat-temp : Temperature threshold to report battery
-+                          as over heated (in tenths of degree Celsius).
-+ - maxim,dead-volt :      Voltage threshold to report battery
-+                          as dead (in mV).
-+ - maxim,over-volt :      Voltage threshold to report battery
-+                          as over voltage (in mV).
+diff --git a/arch/arm/boot/dts/exynos4412-trats2.dts b/arch/arm/boot/dts/exynos4412-trats2.dts
+index 0b228ee14c64..8a87d39a28a0 100644
+--- a/arch/arm/boot/dts/exynos4412-trats2.dts
++++ b/arch/arm/boot/dts/exynos4412-trats2.dts
+@@ -595,6 +595,9 @@
+ 			interrupt-parent = <&gpx2>;
+ 			interrupts = <3 IRQ_TYPE_EDGE_FALLING>;
+ 			reg = <0x36>;
 +
- Example:
- 
- 	battery-charger at 36 {
- 		compatible = "maxim,max17042";
- 		reg = <0x36>;
- 		maxim,rsns-microohm = <10000>;
-+		maxim,over-heat-temp = <600>;
-+		maxim,over-volt = <4300>;
++			maxim,over-heat-temp = <700>;
++			maxim,over-volt = <4500>;
+ 		};
  	};
-diff --git a/drivers/power/max17042_battery.c b/drivers/power/max17042_battery.c
-index 62908eba2763..a8e16364c2aa 100644
---- a/drivers/power/max17042_battery.c
-+++ b/drivers/power/max17042_battery.c
-@@ -818,6 +818,15 @@ max17042_get_pdata(struct device *dev)
- 		pdata->enable_current_sense = true;
- 	}
  
-+	if (of_property_read_s32(np, "maxim,cold-temp", &pdata->temp_min))
-+		pdata->temp_min = INT_MIN;
-+	if (of_property_read_s32(np, "maxim,over-heat-temp", &pdata->temp_max))
-+		pdata->temp_max = INT_MAX;
-+	if (of_property_read_s32(np, "maxim,dead-volt", &pdata->vmin))
-+		pdata->vmin = INT_MIN;
-+	if (of_property_read_s32(np, "maxim,over-volt", &pdata->vmax))
-+		pdata->vmax = INT_MAX;
-+
- 	return pdata;
- }
- #else
 -- 
 1.9.1
