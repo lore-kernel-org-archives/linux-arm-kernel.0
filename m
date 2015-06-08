@@ -1,70 +1,50 @@
-From: joshc@ni.com (Josh Cartwright)
-Date: Mon, 8 Jun 2015 08:49:14 -0500
-Subject: [PATCH v2 2/2] iio: adc: xilinx-xadc: Add label as an optional
- argument for aux channels
-In-Reply-To: <55747616.1010901@kernel.org>
-References: <555B78A3.2030202@metafoo.de>
- <1432135352-29848-1-git-send-email-xander.huff@ni.com>
- <1432135352-29848-2-git-send-email-xander.huff@ni.com>
- <55747616.1010901@kernel.org>
-Message-ID: <20150608134914.GF633@jcartwri.amer.corp.natinst.com>
+From: tixy@linaro.org (Jon Medhurst (Tixy))
+Date: Mon, 08 Jun 2015 14:51:19 +0100
+Subject: [PATCH v4 6/8] arm64: dts: add SRAM, MHU mailbox and SCPI
+ support on Juno
+In-Reply-To: <1433760002-24120-7-git-send-email-sudeep.holla@arm.com>
+References: <1433760002-24120-1-git-send-email-sudeep.holla@arm.com>
+ <1433760002-24120-7-git-send-email-sudeep.holla@arm.com>
+Message-ID: <1433771479.2882.44.camel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jun 07, 2015 at 05:49:26PM +0100, Jonathan Cameron wrote:
-> On 20/05/15 16:22, Xander Huff wrote:
-> > To better facilitate user-mode access to optional aux channels, allow
-> > device trees to specify a custom label for defined channels.
-> > 
-> > Signed-off-by: Xander Huff <xander.huff@ni.com>
-> > Reviewed-by: Joe Hershberger <joe.hershberger@ni.com>
-> > Reviewed-by: Josh Cartwright <joshc@ni.com>
-> > ---
-> >  drivers/iio/adc/xilinx-xadc-core.c | 3 +++
-> >  1 file changed, 3 insertions(+)
-> > 
-> > diff --git a/drivers/iio/adc/xilinx-xadc-core.c b/drivers/iio/adc/xilinx-xadc-core.c
-> > index ce93bd8..bda4241 100644
-> > --- a/drivers/iio/adc/xilinx-xadc-core.c
-> > +++ b/drivers/iio/adc/xilinx-xadc-core.c
-> > @@ -1119,6 +1119,9 @@ static int xadc_parse_dt(struct iio_dev *indio_dev, struct device_node *np,
-> >  			if (ret || reg > 16)
-> >  				continue;
-> >  
-> > +			of_property_read_string(child, "label",
-> > +						&chan->extend_name);
-> > +
-> >  			if (of_property_read_bool(child, "xlnx,bipolar"))
-> >  				chan->scan_type.sign = 's';
-> >  
-> > 
-> I think what Lars was suggesting was a change to the IIO side of this rather than
-> just changing the device tree binding.
+On Mon, 2015-06-08 at 11:40 +0100, Sudeep Holla wrote:
+[...]
+> +
+> +	scpi {
+> +		compatible = "arm,scpi";
+> +		mboxes = <&mailbox 1>;
+> +		shmem = <&cpu_scp_hpri>;
+> +
+> +		clocks {
+> +			compatible = "arm,scpi-clocks";
+> +
+> +			scpi_dvfs: scpi_clocks at 0 {
+> +				compatible = "arm,scpi-dvfs-clocks";
+> +				#clock-cells = <1>;
+> +				clock-indices = <0>, <1>, <2>;
+> +				clock-output-names = "vbig", "vlittle", "vgpu";
 
-I'm not so sure.  His observation was just that the typical name of
-these properties is 'label', which I think makes sense and is commonly
-used.
+>From where do the clock names derive? They look more like names for
+voltage domains rather than clocks. My (admittedly very old) Juno docs,
+have the clocks as ATLCLK, APLCLK and GPUCLK.
 
-Naming things is hard.
+> +			};
+> +			scpi_clk: scpi_clocks at 3 {
+> +				compatible = "arm,scpi-variable-clocks";
+> +				#clock-cells = <1>;
+> +				clock-indices = <3>, <4>;
+> +				clock-output-names = "pxlclk0", "pxlclk1";
 
-Perhaps, though, an improvement may be made if we lifted this out of the
-xadc driver and moved it into the IIO core (I can't imagine that this
-driver is the only one representing each channel with a separate node in
-DT).
+Can we also have clock index 5, name 'i2s_clk', for used by audio?
+(I don't know what other clocks the SCP currently supports, but audio is
+one being currently used by the out-of-tree code).
 
-> Perhaps an additional per channel attribute called _label which would
-> allow for board specific labelling?
+Also, I believe that both display outputs share the same clock, and so
+pxlclk0 and pxlclk1 can't be controlled independently. But I guess these
+device-tree entries are for the interface to the SCP firmware, not the
+hardware, and if that pretends the clocks are independent...
 
-This would seem a bit odd in DT-land; if a user wanted a different label
-name for their board, they would just rename it in their device tree for
-that board.  Fortunately, with the structured dtsi include files, this
-is pretty painless to do.
-
-  Josh
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150608/962be065/attachment.sig>
+-- 
+Tixy
