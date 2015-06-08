@@ -1,42 +1,30 @@
-From: firogm@gmail.com (Firo Yang)
-Date: Mon,  8 Jun 2015 14:19:06 +0800
-Subject: [PATCH] ARM: pxa: ssp: remove unnessary free for devm_xxx
-Message-ID: <1433744346-14095-1-git-send-email-firogm@gmail.com>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Mon, 8 Jun 2015 08:30:52 +0200
+Subject: [PATCH v0] gpio_keys: fix gpio key driver to proper support GIC
+ interrupt
+In-Reply-To: <1433402712-21399-1-git-send-email-yvo@apm.com>
+References: <1433402712-21399-1-git-send-email-yvo@apm.com>
+Message-ID: <20150608063052.GW18985@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-A Coccinelle warning.
-It's not necessary to free memory allocated with devm_xxx
-and using these free functions maybe lead to a double free that
-will corrupt the resource subsys. So, I just remove them.
+Hello,
 
-Signed-off-by: Firo Yang <firogm@gmail.com>
----
- arch/arm/plat-pxa/ssp.c | 8 --------
- 1 file changed, 8 deletions(-)
+On Thu, Jun 04, 2015 at 02:25:12PM +0700, Y Vo wrote:
+> GIC is designed to support two of trigger mechanisms - active level
+> high or edge rising. But in the gpio_keys driver, it tries to use both
+> edge rising and edge falling trigger. This patch fixes the gpio_keys
+> driver to request only the edge rising event when failed to configure the
+> interrupt.
+Is it possible to fix that in the GIC driver? I.e. let it switch the
+trigger direction to falling when it fired for raising?
 
-diff --git a/arch/arm/plat-pxa/ssp.c b/arch/arm/plat-pxa/ssp.c
-index ad9529c..f3f1431 100644
---- a/arch/arm/plat-pxa/ssp.c
-+++ b/arch/arm/plat-pxa/ssp.c
-@@ -239,18 +239,10 @@ static int pxa_ssp_remove(struct platform_device *pdev)
- 	if (ssp == NULL)
- 		return -ENODEV;
- 
--	iounmap(ssp->mmio_base);
--
--	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
--	release_mem_region(res->start, resource_size(res));
--
--	clk_put(ssp->clk);
--
- 	mutex_lock(&ssp_lock);
- 	list_del(&ssp->node);
- 	mutex_unlock(&ssp_lock);
- 
--	kfree(ssp);
- 	return 0;
- }
- 
+This would require to read out the current level, not sure this is
+possible?!
+
+Best regards
+Uwe
+
 -- 
-2.4.2
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
