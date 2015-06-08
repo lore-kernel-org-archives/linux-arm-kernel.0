@@ -1,88 +1,90 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Mon, 08 Jun 2015 11:34:45 +0100
-Subject: [PATCH] serial/amba-pl011: Disable interrupts around TX softirq
-In-Reply-To: <5571E47E.5020800@arm.com>
-References: <1433513267-24163-1-git-send-email-Dave.Martin@arm.com>
- <5571E47E.5020800@arm.com>
-Message-ID: <55756FC5.5000801@arm.com>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Mon,  8 Jun 2015 11:39:54 +0100
+Subject: [PATCH v4 0/8] ARM64: juno: add SCPI mailbox protocol,
+ clock and CPUFreq support
+Message-ID: <1433760002-24120-1-git-send-email-sudeep.holla@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/06/15 19:03, Robin Murphy wrote:
-> On 05/06/15 15:07, Dave P Martin wrote:
->> pl011_tx_softirq() currently uses spin_{,un}lock(), which are not
->> sufficient to inhibit pl011_int() from being triggered by a local
->> IRQ and trying to re-take the same lock.  This can lead to
->> deadlocks.
->>
->> This patch uses the _irq() locking variants instead to ensure that
->> pl011_int() handling for a given port is deferred until any
->> pl011_tx_softirq() work for that port is complete.
->>
->> Signed-off-by: Dave Martin <Dave.Martin@arm.com>
->> ---
->>
->> Another candidate for v4.1 if possible (sorry!) -- I thought this change
->> was already in, but it went astray when I was refactoring.
->>
->> This patch conflicts with tty-next like the previous patch, since it
->> fixes code that is removed by tty-next.  The correct resolution for
->> the resulting merge conflict is to keep the code from tty-next.
->>
->>
->> I am not 100% certain yet whether some rare deadlocks that Robin is
->> seeing are caused by this issue, or whether this patch fixes them --
->> he's testing atm.
->
-> FWIW, I've been running Juno in a startup/shutdown loop with a very
-> noisy systemd all afternoon and haven't hit a problem yet with this
-> patch applied. Testing without this patch yesterday I saw 3 or 4 lockdep
-> splats in about the same amount of time. I'll leave it going over the
-> weekend just to make sure, though.
+Hi,
 
-Having still seen nothing over several hundred more reboot cycles, I'm 
-satisfied that the irq vs. softirq race explains the deadlock and that 
-this patch fixes it, so;
+This patch series adds support for:
+  1. SCPI(System Control and Power Interface) mailbox protocol driver.
+     It uses ARM MHU mailbox controller driver on Juno but can work with
+     any mailbox controllers using standard mailbox APIs
+  2. Add support for clocks provided by SCP firmware through the SCPI
+     interface
+  3. Using the existing arm_big_little cpufreq driver and the newly
+     added SCPI clock driver, it also adds support for CPU DVFS on
+     ARM64 JUNO development platforms.
 
-Tested-by: Robin Murphy <robin.murphy@arm.com>
+The SCPI protocol document is available @[1],[2]
 
->
-> Robin.
->
->>
->> The patch is straightforward and using non _irq() locking in a workitem
->> that expects the lock to protect against interrupt handlers on the same
->> CPU is clearly wrong.
->>
->>
->> Cheers
->> ---Dave
->>
->>
->>    drivers/tty/serial/amba-pl011.c |    4 ++--
->>    1 file changed, 2 insertions(+), 2 deletions(-)
->>
->> diff --git a/drivers/tty/serial/amba-pl011.c b/drivers/tty/serial/amba-pl011.c
->> index 763eb20..0cc622a 100644
->> --- a/drivers/tty/serial/amba-pl011.c
->> +++ b/drivers/tty/serial/amba-pl011.c
->> @@ -1360,9 +1360,9 @@ static void pl011_tx_softirq(struct work_struct *work)
->>    	struct uart_amba_port *uap =
->>    		container_of(dwork, struct uart_amba_port, tx_softirq_work);
->>
->> -	spin_lock(&uap->port.lock);
->> +	spin_lock_irq(&uap->port.lock);
->>    	while (pl011_tx_chars(uap)) ;
->> -	spin_unlock(&uap->port.lock);
->> +	spin_unlock_irq(&uap->port.lock);
->>    }
->>
->>    static void pl011_tx_irq_seen(struct uart_amba_port *uap)
->>
->
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->
+Changes v3->v4:
+	- Updated the SCPI binding based on MarkR's feedback
+	- Updated SCPI clock driver to incorporate Stephen Boyd's review
+	  comments + used clk_set_rate_range to limit the clock range
+	- Since no major changes are expected in SCPI DT, updated the
+	  Juno DTS to support SCPI and dependent device nodes. The DT
+	  patches are based on Liviu's recent Juno[3]
+
+Changes v2->v3:
+	- Minor fix in SCPI driver and added Tixy's reviewed-by tag
+	- Updated scpi clock driver to incorporate all the comments from
+	  Stephen
+	- Added Viresh's ack
+
+Changes v1->v2:
+	- Updated the token handling in scpi driver as per Tixy's
+	  suggestion along with other review comments
+	- Removed multiple drivers in scpi clock as Lorenzo suggested
+	- Added free_opp_table in scpi-cpufreq as Viresh suggested
+	- Separated the DT binding document
+	- Moved SCPI protocol driver to drivers/firmware
+
+Regards,
+Sudeep
+
+[1] http://community.arm.com/servlet/JiveServlet/download/8401-45-18326/DUI0922B_scp_message_interface.pdf
+[2] https://wiki.linaro.org/ARM/Juno?action=AttachFile&do=get&target=DUI0922B_scp_message_interface.pdf
+[3] http://www.spinics.net/lists/arm-kernel/msg420945.html
+v1: https://lkml.org/lkml/2015/4/27/232
+v2: https://lkml.org/lkml/2015/5/14/470
+v3: https://lkml.org/lkml/2015/5/27/220
+
+Sudeep Holla (8):
+  Documentation: add DT binding for ARM System Control and Power
+    Interface(SCPI) protocol
+  firmware: add support for ARM System Control and Power Interface(SCPI)
+    protocol
+  clk: add support for clocks provided by SCP(System Control Processor)
+  clk: scpi: add support for cpufreq virtual device
+  cpufreq: arm_big_little: add SCPI interface driver
+  arm64: dts: add SRAM, MHU mailbox and SCPI support on Juno
+  arm64: dts: add CPU topology on Juno
+  arm64: dts: add clock support for all the cpus
+
+ Documentation/devicetree/bindings/arm/arm,scpi.txt | 156 +++++
+ arch/arm64/boot/dts/arm/juno-base.dtsi             |  31 +
+ arch/arm64/boot/dts/arm/juno-clocks.dtsi           |  23 +
+ arch/arm64/boot/dts/arm/juno-r1.dts                |  32 +
+ arch/arm64/boot/dts/arm/juno.dts                   |  32 +
+ drivers/clk/Kconfig                                |  10 +
+ drivers/clk/Makefile                               |   1 +
+ drivers/clk/clk-scpi.c                             | 299 +++++++++
+ drivers/cpufreq/Kconfig.arm                        |   9 +
+ drivers/cpufreq/Makefile                           |   1 +
+ drivers/cpufreq/scpi-cpufreq.c                     | 124 ++++
+ drivers/firmware/Kconfig                           |  19 +
+ drivers/firmware/Makefile                          |   1 +
+ drivers/firmware/arm_scpi.c                        | 709 +++++++++++++++++++++
+ include/linux/scpi_protocol.h                      |  62 ++
+ 15 files changed, 1509 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/arm/arm,scpi.txt
+ create mode 100644 drivers/clk/clk-scpi.c
+ create mode 100644 drivers/cpufreq/scpi-cpufreq.c
+ create mode 100644 drivers/firmware/arm_scpi.c
+ create mode 100644 include/linux/scpi_protocol.h
+
+-- 
+1.9.1
