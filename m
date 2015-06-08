@@ -1,9 +1,10 @@
 From: carlo@caione.org (Carlo Caione)
-Date: Mon,  8 Jun 2015 10:52:23 +0200
-Subject: [PATCH 2/4] of: documentation: add bindings documentation for Meson8b
+Date: Mon,  8 Jun 2015 10:52:22 +0200
+Subject: [PATCH 1/4] of: documentation: Add vedor prefix for Hardkernel and
+ Tronfy
 In-Reply-To: <1433753545-7980-1-git-send-email-carlo@caione.org>
 References: <1433753545-7980-1-git-send-email-carlo@caione.org>
-Message-ID: <1433753545-7980-3-git-send-email-carlo@caione.org>
+Message-ID: <1433753545-7980-2-git-send-email-carlo@caione.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -11,25 +12,28 @@ From: Carlo Caione <carlo@endlessm.com>
 
 Signed-off-by: Carlo Caione <carlo@endlessm.com>
 ---
- Documentation/devicetree/bindings/arm/amlogic.txt | 6 ++++++
- 1 file changed, 6 insertions(+)
+ Documentation/devicetree/bindings/vendor-prefixes.txt | 2 ++
+ 1 file changed, 2 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/arm/amlogic.txt b/Documentation/devicetree/bindings/arm/amlogic.txt
-index 973884a..b1a6444 100644
---- a/Documentation/devicetree/bindings/arm/amlogic.txt
-+++ b/Documentation/devicetree/bindings/arm/amlogic.txt
-@@ -9,6 +9,12 @@ Boards with the Amlogic Meson8 SoC shall have the following properties:
-   Required root node property:
-     compatible: "amlogic,meson8";
- 
-+Boards with the Amlogic Meson8b SoC shall have the following properties:
-+  Required root node property:
-+    compatible: "amlogic,meson8b";
-+
- Board compatible values:
-   - "geniatech,atv1200"
-   - "minix,neo-x8"
-+  - "tronfy,mxq"
-+  - "hardkernel,odroid-c1"
+diff --git a/Documentation/devicetree/bindings/vendor-prefixes.txt b/Documentation/devicetree/bindings/vendor-prefixes.txt
+index 8033919..7de1637 100644
+--- a/Documentation/devicetree/bindings/vendor-prefixes.txt
++++ b/Documentation/devicetree/bindings/vendor-prefixes.txt
+@@ -90,6 +90,7 @@ gumstix	Gumstix, Inc.
+ gw	Gateworks Corporation
+ hannstar	HannStar Display Corporation
+ haoyu	Haoyu Microelectronic Co. Ltd.
++hardkernel	Hardkernel Co. Ltd.
+ himax	Himax Technologies, Inc.
+ hisilicon	Hisilicon Limited.
+ hit	Hitachi Ltd.
+@@ -195,6 +196,7 @@ tlm	Trusted Logic Mobility
+ toradex	Toradex AG
+ toshiba	Toshiba Corporation
+ toumaz	Toumaz
++tronfy	Tronfy
+ truly	Truly Semiconductors Limited
+ usi	Universal Scientific Industrial Co., Ltd.
+ v3	V3 Semiconductor
 -- 
 1.9.1
