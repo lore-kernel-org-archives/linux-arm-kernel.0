@@ -1,51 +1,74 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 8 Jun 2015 19:47:01 +0100
-Subject: Moan: usage of __iormb() and __iowmb() outside of asm/io.h
-Message-ID: <20150608184701.GA7557@n2100.arm.linux.org.uk>
+From: stefan@agner.ch (Stefan Agner)
+Date: Mon, 08 Jun 2015 22:07:09 +0200
+Subject: [PATCH v5 1/2] iio: adc: vf610: implement configurable conversion
+ modes
+In-Reply-To: <CAL_JsqK0YxgJ-k8kSs6XQj9n3FSg4QBd-GdFEfcafH7Cm4NreQ@mail.gmail.com>
+References: <1432730872-14325-1-git-send-email-stefan@agner.ch>
+ <1432730872-14325-2-git-send-email-stefan@agner.ch>
+ <CAL_JsqK0YxgJ-k8kSs6XQj9n3FSg4QBd-GdFEfcafH7Cm4NreQ@mail.gmail.com>
+Message-ID: <14d469dedae9de1ce519fe90401e526e@agner.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Guys,
+On 2015-06-08 19:49, Rob Herring wrote:
+> On Wed, May 27, 2015 at 7:47 AM, Stefan Agner <stefan@agner.ch> wrote:
+>> Support configurable conversion mode through sysfs. So far, the
+>> mode used was low-power, which is enabled by default now. Beside
+>> that, the modes normal and high-speed are selectable as well.
+>>
+>> Use the new device tree property which specifies the maximum ADC
+>> conversion clock frequencies. Depending on the mode used, the
+>> available resulting conversion frequency are calculated
+>> dynamically.
+>>
+>> Acked-by: Fugang Duan <B38611@freescale.com>
+>> Signed-off-by: Stefan Agner <stefan@agner.ch>
+>> ---
+>>  Documentation/ABI/testing/sysfs-bus-iio-vf610      |   7 +
+>>  .../devicetree/bindings/iio/adc/vf610-adc.txt      |   9 ++
+>>  drivers/iio/adc/vf610_adc.c                        | 146 +++++++++++++++------
+>>  3 files changed, 120 insertions(+), 42 deletions(-)
+>>  create mode 100644 Documentation/ABI/testing/sysfs-bus-iio-vf610
+>>
+>> diff --git a/Documentation/ABI/testing/sysfs-bus-iio-vf610 b/Documentation/ABI/testing/sysfs-bus-iio-vf610
+>> new file mode 100644
+>> index 0000000..ecbc1f4
+>> --- /dev/null
+>> +++ b/Documentation/ABI/testing/sysfs-bus-iio-vf610
+>> @@ -0,0 +1,7 @@
+>> +What:          /sys/bus/iio/devices/iio:deviceX/conversion_mode
+>> +KernelVersion: 4.2
+>> +Contact:       linux-iio at vger.kernel.org
+>> +Description:
+>> +               Specifies the hardware conversion mode used. The three
+>> +               available modes are "normal", "high-speed" and "low-power",
+>> +               where the last is the default mode.
+>> diff --git a/Documentation/devicetree/bindings/iio/adc/vf610-adc.txt b/Documentation/devicetree/bindings/iio/adc/vf610-adc.txt
+>> index 1a4a43d..3eb40e2 100644
+>> --- a/Documentation/devicetree/bindings/iio/adc/vf610-adc.txt
+>> +++ b/Documentation/devicetree/bindings/iio/adc/vf610-adc.txt
+>> @@ -11,6 +11,13 @@ Required properties:
+>>  - clock-names: Must contain "adc", matching entry in the clocks property.
+>>  - vref-supply: The regulator supply ADC reference voltage.
+>>
+>> +Recommended properties:
+>> +- fsl,adck-max-frequency: Maximum frequencies according to datasheets operating
+>> +  requirements. Three values are required, depending on conversion mode:
+>> +  - Frequency in normal mode (ADLPC=0, ADHSC=0)
+>> +  - Frequency in high-speed mode (ADLPC=0, ADHSC=1)
+>> +  - Frequency in low-power mode (ADLPC=1, ADHSC=0)
+> 
+> Why is this "adck" rather than "adc"?
 
-I notice that we have users of __iormb() and __iowmb() outside of asm/io.h:
+That is the name of the clock according to the reference manual and data
+sheet.
 
-drivers/clocksource/timer-keystone.c:   __iowmb();
-drivers/dma/cppi41.c:                   __iormb();
-drivers/dma/cppi41.c:   __iowmb();
-drivers/dma/cppi41.c:           __iowmb();
-drivers/dma/cppi41.c:                   __iormb();
-drivers/soc/ti/knav_qmss_queue.c:       __iowmb();
+> How is this related to today's patch adding min-sample-time?
 
-These are not official kernel barriers - the only reason they exist in
-asm/io.h is purely to provide a barrier implementation _for_ creating
-the accessors _in_ asm/io.h, which are macros, and therefore these
-macros need to stay around for the same scope as those accessors.
+It is related in that this clock is the base to calculate the sampling
+time, but otherwise not really related. Afaik, not respecting the
+maximum clock frequency is probably more a issue for the SAR part of the
+ADC.
 
-As with all details which are an architecture matter, they are subject
-to the whims of the architecture maintainer to provide whatever semantics
-for them that the architecture maintainer deems fit: there is no official
-requirement for anything of that nature to do anything, and no guarantee
-that anything such a detail does today it will do so tomorrow.
-
-This is why only official interfaces should be used, and if they do not
-satisfy the requirements, then new official interfaces need to be 
-proposed.  Don't ever poke about with stuff that's an architecture
-implementation detail.
-
-We've been here before with some of the cache flushing code - and people
-have been burnt by it.
-
-I do wish that people would see the difference between stuff which is
-implemented to facilitate the implementation of an architecture detail
-vs something which is provided for everyone's use.
-
-I'm working on a patch which will completely remove these from view.
-I would strongly suggest that these uses are removed from the above
-code as a matter of urgency.
-
-(Thankfully, it looks like it's only TI OMAP related code which has the
-issue right now.)
-
--- 
-FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
-according to speedtest.net.
+--
+Stefan
