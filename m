@@ -1,79 +1,103 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Mon, 8 Jun 2015 14:14:52 +0900
-Subject: [RESEND 1/2] usb: ehci-exynos: Make provision for vdd regulators
-In-Reply-To: <CANAwSgTjx8uxyOTW8uuiqrcNzF+UwLMmML2OcDgG5Ku_56=vJQ@mail.gmail.com>
-References: <1433683242-3945-1-git-send-email-linux.amoon@gmail.com>
- <5574F97A.5030104@samsung.com>
- <CANAwSgTjx8uxyOTW8uuiqrcNzF+UwLMmML2OcDgG5Ku_56=vJQ@mail.gmail.com>
-Message-ID: <CAJKOXPfDmt5VMqr-P+OpWy1+jz675CFRPmtS_N0HjN4tWxfwtA@mail.gmail.com>
+From: gangchen@rdamicro.com (Chen Gang)
+Date: Mon, 08 Jun 2015 13:30:18 +0800
+Subject: [PATCH 1/1] ARM : missing corrupted reg in __do_div_asm
+In-Reply-To: <1433225609-7148-1-git-send-email-gangchen@rdamicro.com>
+References: </home/gachen/Re: [PATCH 1_1] ARM:r0 is also corrupted after
+ calling __do_div64..eml>
+ <1433225609-7148-1-git-send-email-gangchen@rdamicro.com>
+Message-ID: <5575286A.1080002@rdamicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2015-06-08 13:21 GMT+09:00 Anand Moon <linux.amoon@gmail.com>:
-> Hi Krzysztof ,
+Hi,
+
+     I tried to make a test program to illustrate the patch.
+
+Without the patch, the log shows
+"[250970.715392] remains1 is 2, remains2 is 0"
+And the remains2 is wrong
+
+With the patch, the log is
+"[250977.724181] remains1 is 2, remains2 is 4".
+now both remains1 and remains2 are correct.
+
+I compared the output assembly and it showed in the faulty version,
+r0 ( I am using little endian system) is not reload after the
+first do_div and before the second do_div call in function mydiv64.
+
+
+
+Br, Chen Gang
+
+#include <asm/div64.h>
+#include <linux/init.h>
+#include <linux/printk.h>
+
+typedef unsigned long long ull;
+
+void mydiv64(ull tt, unsigned base1, unsigned base2,
+         unsigned *rems1, unsigned *rems2)
+{
+     ull t = tt;
+     *rems1 = do_div(t, base1);
+     *rems2 = do_div(tt, base2);
+     return ;
+}
+
+static int __init div_test(void)
+{
+     ull t;
+     unsigned int remains1;
+     unsigned int remains2;
+     unsigned base1, base2;
+
+     t = 100;
+     base1 = 7;
+     base2 = 8;
+
+     mydiv64(t, base1, base2, &remains1, &remains2);
+     printk(KERN_ERR"remains1 is %d, remains2 is %d\n",
+             remains1, remains2);
+
+     return -1;
+}
+
+static void __exit div_test_exit(void)
+{
+}
+
+module_init(div_test);
+module_exit(div_test_exit);
+
+On 06/02/2015 02:13 PM, Chen Gang wrote:
+> __xl (r0 in little endian system, or R1 in big endian system) is corrupted
+> after calling __do_div64 and compiler is not informed about this in
+> macro __do_div_asm. If n is used again afterwards, __xl won't be
+> reloaded and n will contain incorrect value.
+> ---
+>   arch/arm/include/asm/div64.h | 10 ++++++----
+>   1 file changed, 6 insertions(+), 4 deletions(-)
 >
-> On 8 June 2015 at 07:40, Krzysztof Kozlowski <k.kozlowski@samsung.com> wrote:
->> On 07.06.2015 22:20, Anand Moon wrote:
->>> Facilitate getting required 3.3V and 1.0V VDD supply for
->>> EHCI controller on Exynos.
->>>
->>> With the patches for regulators' nodes merged in 3.15:
->>> c8c253f ARM: dts: Add regulator entries to smdk5420
->>> 275dcd2 ARM: dts: add max77686 pmic node for smdk5250,
->>> the exynos systems turn on only minimal number of regulators.
->>>
->>> Until now, the VDD regulator supplies were either turned on
->>> by the bootloader, or the regulators were enabled by default
->>> in the kernel, so that the controller drivers did not need to
->>> care about turning on these regulators on their own.
->>> This was rather bad about these controller drivers.
->>> So ensuring now that the controller driver requests the necessary
->>> VDD regulators (if available, unless there are direct VDD rails),
->>> and enable them so as to make them working.
->>>
->>> Signed-off-by: Vivek Gautam <gautam.vivek@samsung.com>
->>> Signed-off-by: Anand Moon <linux.amoon@gmail.com>
->>> Cc: Jingoo Han <jg1.han@samsung.com>
->>> Cc: Alan Stern <stern@rowland.harvard.edu>
->>> ---
->>> Initial version of this patch was part of following series, though
->>> they are not dependent on each other, resubmitting after rebasing.
->>>
->>> http://lists.infradead.org/pipermail/linux-arm-kernel/2014-June/266418.html
->>
->> So you just took Vivek's patch along with all the credits... That is not
->> how we usually do this.
->>
->> I would expect that rebasing a patch won't change the author unless this
->> is fine with Vivek.
->>
->
-> Sorry If I have done some mistake on my part.
-> I just looked at below mail chain. Before I send it.
->
-> http://www.spinics.net/lists/linux-samsung-soc/msg44136.html
-
-I don't get it. The patch you are referring to has a proper "From"
-field. So please use it as an example.
-
->
-> I don't want to take any credit out of it. I just re-base on the new kernel.
-> I could not test this patch as it meant for exynos5440 boards.
-
-Are you sure? I think the driver is used on almost all of Exynos SoCs
-(Exynos4, Exynos5250, Exynos542x).
-
-Untested code should not go to the kernel. Additionally you should
-mark it as not-tested. Marking such patch as non-tested could help you
-finding some independent tests (tests performed by someone else).
-
-To summarize my point of view:
-1. Unless Vivek's says otherwise, please give him the credits with
-proper "from" field.
-2. Issues mentioned in previous mail should be addressed (missing
-IS_ERR(), how disabling the regulator during suspend affects waking
-up).
-3. The patchset must be tested, even after rebasing.
-
-Best regards,
-Krzysztof
+> diff --git a/arch/arm/include/asm/div64.h b/arch/arm/include/asm/div64.h
+> index 662c7bd..fa9489e 100644
+> --- a/arch/arm/include/asm/div64.h
+> +++ b/arch/arm/include/asm/div64.h
+> @@ -34,12 +34,14 @@
+>   	register unsigned long long __n   asm("r0") = n;	\
+>   	register unsigned long long __res asm("r2");		\
+>   	register unsigned int __rem       asm(__xh);		\
+> +	register unsigned int __clobber   asm(__xl);		\
+>   	asm(	__asmeq("%0", __xh)				\
+> -		__asmeq("%1", "r2")				\
+> -		__asmeq("%2", "r0")				\
+> -		__asmeq("%3", "r4")				\
+> +		__asmeq("%1", __xl)				\
+> +		__asmeq("%2", "r2")				\
+> +		__asmeq("%3", "r0")				\
+> +		__asmeq("%4", "r4")				\
+>   		"bl	__do_div64"				\
+> -		: "=r" (__rem), "=r" (__res)			\
+> +		: "=r" (__rem), "=r" (__clobber), "=r" (__res)  \
+>   		: "r" (__n), "r" (__base)			\
+>   		: "ip", "lr", "cc");				\
+>   	n = __res;						\
