@@ -1,89 +1,51 @@
-From: khilman@kernel.org (Kevin Hilman)
-Date: Mon, 08 Jun 2015 11:39:14 -0700
-Subject: [GIT PULL] ARM: SoC fixes for v4.1-rc8
-Message-ID: <7hr3pmt57x.fsf@deeprootsystems.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 8 Jun 2015 19:47:01 +0100
+Subject: Moan: usage of __iormb() and __iowmb() outside of asm/io.h
+Message-ID: <20150608184701.GA7557@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit c65b99f046843d2455aa231747b5a07a999a9f3d:
+Guys,
 
-  Linux 4.1-rc6 (2015-05-31 19:01:07 -0700)
+I notice that we have users of __iormb() and __iowmb() outside of asm/io.h:
 
-are available in the git repository at:
+drivers/clocksource/timer-keystone.c:   __iowmb();
+drivers/dma/cppi41.c:                   __iormb();
+drivers/dma/cppi41.c:   __iowmb();
+drivers/dma/cppi41.c:           __iowmb();
+drivers/dma/cppi41.c:                   __iormb();
+drivers/soc/ti/knav_qmss_queue.c:       __iowmb();
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc.git tags/fixes-for-linus
+These are not official kernel barriers - the only reason they exist in
+asm/io.h is purely to provide a barrier implementation _for_ creating
+the accessors _in_ asm/io.h, which are macros, and therefore these
+macros need to stay around for the same scope as those accessors.
 
-for you to fetch changes up to 0a68c6bc7ce9d4855f3130f9eff8ff774b597531:
+As with all details which are an architecture matter, they are subject
+to the whims of the architecture maintainer to provide whatever semantics
+for them that the architecture maintainer deems fit: there is no official
+requirement for anything of that nature to do anything, and no guarantee
+that anything such a detail does today it will do so tomorrow.
 
-  Merge tag 'omap-for-v4.1/fixes-rc6' of git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap into fixes (2015-06-08 10:32:55 -0700)
+This is why only official interfaces should be used, and if they do not
+satisfy the requirements, then new official interfaces need to be 
+proposed.  Don't ever poke about with stuff that's an architecture
+implementation detail.
 
-----------------------------------------------------------------
-ARM: SoC fixes for v4.1-rc
+We've been here before with some of the cache flushing code - and people
+have been burnt by it.
 
-About 10 days worth of small bug fixes, and the (hopefully) final
-round fixes for from arm-soc land for the -rc cycle.  Nothing special
-to note, but here's a brief summary of fixes by SoC type:
+I do wish that people would see the difference between stuff which is
+implemented to facilitate the implementation of an architecture detail
+vs something which is provided for everyone's use.
 
-- OMAP: small set of misc. DT fixes; boot fix for THUMB2 kernel
-- mediatek: PMIC fixes; DT fix for model name
-- exynos: wakeup interupt fixes for 3250
-- mvebu: revert mbus patch which broke DMA masters
+I'm working on a patch which will completely remove these from view.
+I would strongly suggest that these uses are removed from the above
+code as a matter of urgency.
 
-----------------------------------------------------------------
-Arnd Bergmann (4):
-      Merge tag 'v4.1-next-soc' of https://github.com/mbgg/linux-mediatek into fixes
-      Merge tag 'mvebu-fixes-4.1-3' of git://git.infradead.org/linux-mvebu into fixes
-      Merge tag 'samsung-fixes-4.1-4' of https://github.com/krzk/linux into fixes
-      Merge tag 'v4.1-next-arm64-fixes' of https://github.com/mbgg/linux-mediatek into fixes
+(Thankfully, it looks like it's only TI OMAP related code which has the
+issue right now.)
 
-Imre Kaloz (1):
-      ARM: mvebu: armada-xp-linksys-mamba: Disable internal RTC
-
-Kevin Hilman (1):
-      Merge tag 'omap-for-v4.1/fixes-rc6' of git://git.kernel.org/.../tmlind/linux-omap into fixes
-
-Marc Zyngier (1):
-      ARM: exynos: Fix wake-up interrupts for Exynos3250
-
-Matthias Brugger (1):
-      soc: mediatek: Add compile dependency to pmic-wrapper
-
-Matthijs van Duin (1):
-      ARM: dts: am335x-boneblack: disable RTC-only sleep to avoid hardware damage
-
-Nicolas Schichan (1):
-      bus: mvebu-mbus: do not set WIN_CTRL_SYNCBARRIER on non io-coherent platforms.
-
-Pavel Machek (1):
-      ARM: dts: Fix n900 dts file to work around 4.1 touchscreen regression on n900
-
-Sascha Hauer (2):
-      soc: mediatek: PMIC wrap: Fix clock rate handling
-      soc: mediatek: PMIC wrap: Fix register state machine handling
-
-Tero Kristo (1):
-      ARM: dts: AM35xx: fix system control module clocks
-
-Thomas Petazzoni (1):
-      Revert "bus: mvebu-mbus: make sure SDRAM CS for DMA don't overlap the MBus bridge window"
-
-Tony Lindgren (2):
-      ARM: OMAP3: Fix booting with thumb2 kernel
-      ARM: dts: Fix dm816x to use right compatible flag for MUSB
-
-Yingjoe Chen (1):
-      arm64: dts: mt8173-evb: fix model name
-
- Documentation/devicetree/bindings/input/touchscreen/tsc2005.txt |   4 +--
- arch/arm/boot/dts/am335x-bone-common.dtsi                       |  19 ++++++++++
- arch/arm/boot/dts/am35xx-clocks.dtsi                            |  14 ++++----
- arch/arm/boot/dts/armada-xp-linksys-mamba.dts                   |   5 +++
- arch/arm/boot/dts/dm816x.dtsi                                   |   4 +--
- arch/arm/boot/dts/omap3-n900.dts                                |   4 +--
- arch/arm/mach-exynos/suspend.c                                  |   4 +--
- arch/arm/mach-omap2/sleep34xx.S                                 |  22 ++----------
- arch/arm64/boot/dts/mediatek/mt8173-evb.dts                     |   3 +-
- drivers/bus/mvebu-mbus.c                                        | 109 ++++++++++------------------------------------------------
- drivers/soc/mediatek/Kconfig                                    |   1 +
- drivers/soc/mediatek/mtk-pmic-wrap.c                            |  54 +++++------------------------
- 12 files changed, 72 insertions(+), 171 deletions(-)
+-- 
+FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
+according to speedtest.net.
