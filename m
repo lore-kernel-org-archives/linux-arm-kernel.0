@@ -1,43 +1,60 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 8 Jun 2015 15:32:09 +0200
-Subject: [PATCH v9 4/6] Documentation: DT: PL011: hi6220: add compatible
- string for Hisilicon designed UART
-In-Reply-To: <556D73B6.4090608@arm.com>
-References: <1432950661-23060-1-git-send-email-bintian.wang@huawei.com>
- <1432950661-23060-5-git-send-email-bintian.wang@huawei.com>
- <CACRpkdav_5x6RC9F++ErvqGyxDCF-=kap7-jCsO4zZ6QGVLfBQ@mail.gmail.com>
- <556D73B6.4090608@arm.com>
-Message-ID: <CACRpkdZ-z0sESSmB=Smng1ra+1Uv4DEt1=kqZm0vMK8+vknHDQ@mail.gmail.com>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Mon,  8 Jun 2015 19:10:41 +0530
+Subject: [PATCH 0/6] clockevent: Migrate to new 'set-state' interface
+Message-ID: <cover.1433768426.git.viresh.kumar@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 2, 2015 at 11:13 AM, Marc Zyngier <marc.zyngier@arm.com> wrote:
-> On 02/06/15 09:59, Linus Walleij wrote:
+Hi Thomas/Daniel,
 
->> enum amba_vendor {
->>         AMBA_VENDOR_ARM = 0x41,
->> +       AMBA_VENDOR_HISILICON = 0x48,
->>
->> Then patch drivers/tty/serial/amba_pl011.c to add vendor_hisilicon
->> and a match table for 0x00048011 just like everyone else.
->
-> That feels weird. This amba_vendor enum is not under control of the DT
-> author, nor the kernel. This is a set of codes that are managed by a
-> third party (probably ARM). What if some company with a name starting
-> with 'H' (Hilarious Inc?) comes up with some actual HW and ends up
-> conflicting with the above?
+This series converts few clockevent drivers to the new set-state
+interface. This would enable these drivers to use new states (like:
+ONESHOT_STOPPED, etc.) of a clockevent device (if required), as the
+set-mode interface is marked obsolete now and wouldn't be expanded to
+handle new states.
 
-Sorry, as indicated by
-commit db4fa45ed3182d8206af241811dfc99369ffa849
-"spi: pl022: Add support for chip select extension"
-bits [6:0] should be the JEP106 manufacturer identity code.
+Once all the drivers are migrated to the new interface in future, we can
+remove the code supporting '->mode' in clockevents core.
 
-Not that I know how you get such a code. Hardware which is
-modified and does not set the JEP106 ID code is buggy I
-guess.
+Drivers converted in this series are selected based on the diff they
+generate. These are different diffs we shall have for most of the
+drivers and any suggestions/improvements for these patches will be
+applied to other drivers as well.
 
-Anyways, the pattern we have to handle this is to use that ID
-code.
+This is based of tip/master from few days back due to dependency on
+clockevent_state_*() helpers.
 
-Yours,
-Linus Walleij
+Only the first patch is tested on hardware, others are ONLY compile
+tested.
+
+Cc: Andres Salomon <dilinger@queued.net>
+Cc: bcm-kernel-feedback-list at broadcom.com
+Cc: Florian Fainelli <f.fainelli@gmail.com>
+Cc: Lee Jones <lee@kernel.org>
+Cc: Magnus Damm <magnus.damm@gmail.com>
+Cc: Marc Zyngier <marc.zyngier@arm.com>
+Cc: Maxime Coquelin <maxime.coquelin@st.com>
+Cc: Patrice Chotard <patrice.chotard@st.com>
+Cc: Ray Jui <rjui@broadcom.com>
+Cc: Scott Branden <sbranden@broadcom.com>
+Cc: Srinivas Kandagatla <srinivas.kandagatla@gmail.com>
+Cc: Stephen Warren <swarren@wwwdotorg.org>
+
+Viresh Kumar (6):
+  clocksource: arm_arch_timer: Migrate to new 'set-state' interface
+  clocksource: arm_global_timer: Migrate to new 'set-state' interface
+  clocksource: bcm2835: Migrate to new 'set-state' interface
+  clocksource: bcm_kona: Migrate to new 'set-state' interface
+  clocksource: cs5535: Migrate to new 'set-state' interface
+  clocksource: em_sti: Migrate to new 'set-state' interface
+
+ drivers/clocksource/arm_arch_timer.c   | 61 +++++++++++++++++-----------------
+ drivers/clocksource/arm_global_timer.c | 37 ++++++++++-----------
+ drivers/clocksource/bcm2835_timer.c    | 17 +++-------
+ drivers/clocksource/bcm_kona_timer.c   | 24 ++++++-------
+ drivers/clocksource/cs5535-clockevt.c  | 24 +++++++------
+ drivers/clocksource/em_sti.c           | 39 ++++++++--------------
+ 6 files changed, 92 insertions(+), 110 deletions(-)
+
+-- 
+2.4.0
