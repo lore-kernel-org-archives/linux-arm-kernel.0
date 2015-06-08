@@ -1,28 +1,61 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 8 Jun 2015 10:12:44 +0100
-Subject: [PATCH V2 2/3] tty: serial: fsl_lpuart: remove RTS/CTS control
- from set/get_mctrl
-In-Reply-To: <1433136067-20644-3-git-send-email-bhuvanchandra.dv@toradex.com>
-References: <1433136067-20644-1-git-send-email-bhuvanchandra.dv@toradex.com>
- <1433136067-20644-3-git-send-email-bhuvanchandra.dv@toradex.com>
-Message-ID: <20150608091244.GS7557@n2100.arm.linux.org.uk>
+From: firogm@gmail.com (Firo Yang)
+Date: Mon,  8 Jun 2015 17:16:57 +0800
+Subject: [PATCH v2] ARM: pxa: ssp: Use devm_ioremap_resource instead of
+ devm_ioremap
+Message-ID: <1433755017-30159-1-git-send-email-firogm@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 01, 2015 at 10:51:06AM +0530, Bhuvanchandra DV wrote:
-> +    /*
-> +     * CTS/RTS can _only_ be handled
-> +     * automatically by the hardware.
-> +     */
+Using devm_ioremap_resource() API to simplify the code.
 
-That's really not acceptable.  You need to do something here so that you
-can _force_ RTS to be deasserted when the kernel buffers fill up - be
-that by stopping reading characters and letting the FIFO fill up or
-something of that ilk.
+Signed-off-by: Firo Yang <firogm@gmail.com>
+---
+According to Julia's advices:
 
-Ignoring the rest of the flow control system in the kernel is not really
-acceptable.
+The patch "[PATCH v2] ARM: pxa: ssp: remove unnessary free for devm_xxx"
+submited by Firo Yang should be discard. It was obsoleted by
+"[PATCH] ARM: pxa: ssp: remove unnessary free for devm_xxx"
+and
+"[PATCH v2] ARM: pxa: ssp: Use devm_ioremap_resource instead of devm_ioremap"
 
+I am not sure whether it was clear. If there is any doubt, please
+ email me.
+ arch/arm/plat-pxa/ssp.c | 20 +++-----------------
+ 1 file changed, 3 insertions(+), 17 deletions(-)
+
+diff --git a/arch/arm/plat-pxa/ssp.c b/arch/arm/plat-pxa/ssp.c
+index ad9529c..d8f331c 100644
+--- a/arch/arm/plat-pxa/ssp.c
++++ b/arch/arm/plat-pxa/ssp.c
+@@ -177,26 +177,12 @@ static int pxa_ssp_probe(struct platform_device *pdev)
+ 	}
+ 
+ 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+-	if (res == NULL) {
+-		dev_err(dev, "no memory resource defined\n");
+-		return -ENODEV;
+-	}
+-
+-	res = devm_request_mem_region(dev, res->start, resource_size(res),
+-				      pdev->name);
+-	if (res == NULL) {
+-		dev_err(dev, "failed to request memory resource\n");
+-		return -EBUSY;
+-	}
++	ssp->mmio_base = devm_ioremap_resource(dev, res);
++	if (IS_ERR(ssp->mmio_base))
++		return PTR_ERR(ssp->mmio_base);
+ 
+ 	ssp->phys_base = res->start;
+ 
+-	ssp->mmio_base = devm_ioremap(dev, res->start, resource_size(res));
+-	if (ssp->mmio_base == NULL) {
+-		dev_err(dev, "failed to ioremap() registers\n");
+-		return -ENODEV;
+-	}
+-
+ 	ssp->irq = platform_get_irq(pdev, 0);
+ 	if (ssp->irq < 0) {
+ 		dev_err(dev, "no IRQ resource defined\n");
 -- 
-FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
-according to speedtest.net.
+2.4.2
