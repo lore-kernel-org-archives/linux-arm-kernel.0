@@ -1,45 +1,57 @@
-From: carlo@caione.org (Carlo Caione)
-Date: Mon,  8 Jun 2015 10:52:25 +0200
-Subject: [PATCH 4/4] ARM: meson: Enable Meson8b SoCs
-In-Reply-To: <1433753545-7980-1-git-send-email-carlo@caione.org>
-References: <1433753545-7980-1-git-send-email-carlo@caione.org>
-Message-ID: <1433753545-7980-5-git-send-email-carlo@caione.org>
+From: firogm@gmail.com (Firo Yang)
+Date: Mon,  8 Jun 2015 16:53:52 +0800
+Subject: [PATCH] ARM: pxa: ssp: Use devm_ioremap_resource instead of
+ devm_ioremap
+Message-ID: <1433753632-28534-1-git-send-email-firogm@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Carlo Caione <carlo@endlessm.com>
+Using devm_ioremap_resource() API to simplify the code.
 
-Signed-off-by: Carlo Caione <carlo@endlessm.com>
+Signed-off-by: Firo Yang <firogm@gmail.com>
 ---
- arch/arm/mach-meson/Kconfig | 5 +++++
- arch/arm/mach-meson/meson.c | 1 +
- 2 files changed, 6 insertions(+)
+According to Julia's advices:
 
-diff --git a/arch/arm/mach-meson/Kconfig b/arch/arm/mach-meson/Kconfig
-index 0743e20..5d56f86 100644
---- a/arch/arm/mach-meson/Kconfig
-+++ b/arch/arm/mach-meson/Kconfig
-@@ -19,4 +19,9 @@ config MACH_MESON8
- 	default ARCH_MESON
- 	select MESON6_TIMER
+The patch "[PATCH v2] ARM: pxa: ssp: remove unnessary free for devm_xxx"
+submited by Firo Yang should be discard. It was obsoleted by
+"[PATCH] ARM: pxa: ssp: remove unnessary free for devm_xxx"
+and 
+"[PATCH] ARM: pxa: ssp: Use devm_ioremap_resource instead of devm_ioremap"
+
+I am not sure whether it was clear. If there is any doubt, please
+ email me.
+
+ arch/arm/plat-pxa/ssp.c | 15 +++------------
+ 1 file changed, 3 insertions(+), 12 deletions(-)
+
+diff --git a/arch/arm/plat-pxa/ssp.c b/arch/arm/plat-pxa/ssp.c
+index ad9529c..8fd5245 100644
+--- a/arch/arm/plat-pxa/ssp.c
++++ b/arch/arm/plat-pxa/ssp.c
+@@ -182,21 +182,12 @@ static int pxa_ssp_probe(struct platform_device *pdev)
+ 		return -ENODEV;
+ 	}
  
-+config MACH_MESON8B
-+	bool "Amlogic Meson8b SoCs support"
-+	default ARCH_MESON
-+	select MESON6_TIMER
-+
- endif
-diff --git a/arch/arm/mach-meson/meson.c b/arch/arm/mach-meson/meson.c
-index 5d6affe..4e23571 100644
---- a/arch/arm/mach-meson/meson.c
-+++ b/arch/arm/mach-meson/meson.c
-@@ -19,6 +19,7 @@
- static const char * const meson_common_board_compat[] = {
- 	"amlogic,meson6",
- 	"amlogic,meson8",
-+	"amlogic,meson8b",
- 	NULL,
- };
+-	res = devm_request_mem_region(dev, res->start, resource_size(res),
+-				      pdev->name);
+-	if (res == NULL) {
+-		dev_err(dev, "failed to request memory resource\n");
+-		return -EBUSY;
+-	}
++	ssp->mmio_base = devm_ioremap_resource(dev, res);
++	if (IS_ERR(ssp->mmio_base))
++		return PTR_ERR(ssp->mmio_base);
  
+ 	ssp->phys_base = res->start;
+ 
+-	ssp->mmio_base = devm_ioremap(dev, res->start, resource_size(res));
+-	if (ssp->mmio_base == NULL) {
+-		dev_err(dev, "failed to ioremap() registers\n");
+-		return -ENODEV;
+-	}
+-
+ 	ssp->irq = platform_get_irq(pdev, 0);
+ 	if (ssp->irq < 0) {
+ 		dev_err(dev, "no IRQ resource defined\n");
 -- 
-1.9.1
+2.4.2
