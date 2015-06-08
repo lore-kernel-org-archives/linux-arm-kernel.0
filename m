@@ -1,60 +1,63 @@
-From: khilman@kernel.org (Kevin Hilman)
-Date: Mon, 08 Jun 2015 10:38:27 -0700
-Subject: [GIT PULL] omap fixes for v4.1,
- urgent fix to avoid potential hardware damage
-In-Reply-To: <20150601205952.GF30984@atomide.com> (Tony Lindgren's message of
- "Mon, 1 Jun 2015 13:59:53 -0700")
-References: <20150601205952.GF30984@atomide.com>
-Message-ID: <7h7frew164.fsf@deeprootsystems.com>
+From: robherring2@gmail.com (Rob Herring)
+Date: Mon, 8 Jun 2015 12:49:46 -0500
+Subject: [PATCH v5 1/2] iio: adc: vf610: implement configurable conversion
+ modes
+In-Reply-To: <1432730872-14325-2-git-send-email-stefan@agner.ch>
+References: <1432730872-14325-1-git-send-email-stefan@agner.ch>
+ <1432730872-14325-2-git-send-email-stefan@agner.ch>
+Message-ID: <CAL_JsqK0YxgJ-k8kSs6XQj9n3FSg4QBd-GdFEfcafH7Cm4NreQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Tony Lindgren <tony@atomide.com> writes:
+On Wed, May 27, 2015 at 7:47 AM, Stefan Agner <stefan@agner.ch> wrote:
+> Support configurable conversion mode through sysfs. So far, the
+> mode used was low-power, which is enabled by default now. Beside
+> that, the modes normal and high-speed are selectable as well.
+>
+> Use the new device tree property which specifies the maximum ADC
+> conversion clock frequencies. Depending on the mode used, the
+> available resulting conversion frequency are calculated
+> dynamically.
+>
+> Acked-by: Fugang Duan <B38611@freescale.com>
+> Signed-off-by: Stefan Agner <stefan@agner.ch>
+> ---
+>  Documentation/ABI/testing/sysfs-bus-iio-vf610      |   7 +
+>  .../devicetree/bindings/iio/adc/vf610-adc.txt      |   9 ++
+>  drivers/iio/adc/vf610_adc.c                        | 146 +++++++++++++++------
+>  3 files changed, 120 insertions(+), 42 deletions(-)
+>  create mode 100644 Documentation/ABI/testing/sysfs-bus-iio-vf610
+>
+> diff --git a/Documentation/ABI/testing/sysfs-bus-iio-vf610 b/Documentation/ABI/testing/sysfs-bus-iio-vf610
+> new file mode 100644
+> index 0000000..ecbc1f4
+> --- /dev/null
+> +++ b/Documentation/ABI/testing/sysfs-bus-iio-vf610
+> @@ -0,0 +1,7 @@
+> +What:          /sys/bus/iio/devices/iio:deviceX/conversion_mode
+> +KernelVersion: 4.2
+> +Contact:       linux-iio at vger.kernel.org
+> +Description:
+> +               Specifies the hardware conversion mode used. The three
+> +               available modes are "normal", "high-speed" and "low-power",
+> +               where the last is the default mode.
+> diff --git a/Documentation/devicetree/bindings/iio/adc/vf610-adc.txt b/Documentation/devicetree/bindings/iio/adc/vf610-adc.txt
+> index 1a4a43d..3eb40e2 100644
+> --- a/Documentation/devicetree/bindings/iio/adc/vf610-adc.txt
+> +++ b/Documentation/devicetree/bindings/iio/adc/vf610-adc.txt
+> @@ -11,6 +11,13 @@ Required properties:
+>  - clock-names: Must contain "adc", matching entry in the clocks property.
+>  - vref-supply: The regulator supply ADC reference voltage.
+>
+> +Recommended properties:
+> +- fsl,adck-max-frequency: Maximum frequencies according to datasheets operating
+> +  requirements. Three values are required, depending on conversion mode:
+> +  - Frequency in normal mode (ADLPC=0, ADHSC=0)
+> +  - Frequency in high-speed mode (ADLPC=0, ADHSC=1)
+> +  - Frequency in low-power mode (ADLPC=1, ADHSC=0)
 
-> Hi,
->
-> Here's a pull request to fix potential hardware breaking configuration
-> on BeagleBones. For the other fixes, apologies for these coming in so
-> late, seems that people have been busy finding regressions.
->
-> Regards,
->
-> Tony
->
->
-> The following changes since commit f25bf74c8862efdc30453d16d60cf22958a4873e:
->
->   ARM: dts: Fix WLAN interrupt line for AM335x EVM-SK (2015-05-20 10:00:10 -0700)
->
-> are available in the git repository at:
->
->   git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v4.1/fixes-rc6
->
-> for you to fetch changes up to 7a6cb0abe1aa63334f3ded6d2b6c8eca80e72302:
->
->   ARM: dts: am335x-boneblack: disable RTC-only sleep to avoid hardware damage (2015-06-01 12:48:23 -0700)
->
-> ----------------------------------------------------------------
-> Omap fixes for the -rc cycle, including a fix for potential hardware
-> breakage on BeagleBones:
->
-> - BeagleBones don't support RTC-only mode, it can cause hardware
->   damage if system-power-controller is specified without
->   ti,pmic-shutdown-controller
->
-> - Fix a recent regression to am3517 SoCs caused by the recent clock
->   move that was not noticed until now despite automated boot
->   testing
->
-> - Fix a regression for n900 touchscreen triggered by recent
->   recent input changes
->
-> - Fix compatible property for dm816x USB to avoid errors with
->   USB Ethernet
->
-> - Fix oops for omap3 when built with CONFIG_THUMB2_KERNEL
->
+Why is this "adck" rather than "adc"?
 
-Thanks, applied to fixes. 
+How is this related to today's patch adding min-sample-time?
 
-Kevin
+Rob
