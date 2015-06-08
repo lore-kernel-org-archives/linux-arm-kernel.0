@@ -1,49 +1,36 @@
-From: cyrille.pitchen@atmel.com (Cyrille Pitchen)
-Date: Mon, 8 Jun 2015 18:07:43 +0200
-Subject: [PATCH v2 2/3] spi: atmel: update DT bindings documentation
-In-Reply-To: <cover.1433779081.git.cyrille.pitchen@atmel.com>
-References: <cover.1433779081.git.cyrille.pitchen@atmel.com>
-Message-ID: <6f071506877a9986d1f30902339993f922387a74.1433779081.git.cyrille.pitchen@atmel.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Mon, 8 Jun 2015 18:07:23 +0200
+Subject: [PATCH v2 0/3] Fixes for at_xdmac
+In-Reply-To: <1433751820-26142-1-git-send-email-ludovic.desroches@atmel.com>
+References: <1433751820-26142-1-git-send-email-ludovic.desroches@atmel.com>
+Message-ID: <5575BDBB.5000503@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-- add new property "atmel,fifo-size"
-- change "cs-gpios" to optional for SPI controller version >= 2.
+Le 08/06/2015 10:23, Ludovic Desroches a ?crit :
+> Hi Vinod,
+> 
+> I have updated patch 1 as you requested.
+> 
+> About patch 2, I don't really find how to split it. I have applied it on 4.0.4
+> without any conflicts so backport will not be an issue.
+> 
+> 
+> Changes from v1:
+> - remove indentation fixes from patch for stable and put it in another one.
+> 
+> Ludovic Desroches (3):
+>   dmaengine: at_xdmac: lock fixes
+>   dmaengine: at_xdmac: rework slave configuration part
+>   dmaengine: at_xdmac: fix indentation
 
-Signed-off-by: Cyrille Pitchen <cyrille.pitchen@atmel.com>
----
- Documentation/devicetree/bindings/spi/spi_atmel.txt | 8 +++++++-
- 1 file changed, 7 insertions(+), 1 deletion(-)
+For the record, as I added the tags to the previous version:
+Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
 
-diff --git a/Documentation/devicetree/bindings/spi/spi_atmel.txt b/Documentation/devicetree/bindings/spi/spi_atmel.txt
-index 4f8184d..7ef7f6bc 100644
---- a/Documentation/devicetree/bindings/spi/spi_atmel.txt
-+++ b/Documentation/devicetree/bindings/spi/spi_atmel.txt
-@@ -4,11 +4,16 @@ Required properties:
- - compatible : should be "atmel,at91rm9200-spi".
- - reg: Address and length of the register set for the device
- - interrupts: Should contain spi interrupt
--- cs-gpios: chipselects
-+- cs-gpios: chipselects (optional for SPI controller version >= 2 with the
-+  Alternative Command Mode).
- - clock-names: tuple listing input clock names.
- 	Required elements: "spi_clk"
- - clocks: phandles to input clocks.
- 
-+Optional properties:
-+- atmel,fifo-size: maximum number of data the RX and TX FIFOs can store for FIFO
-+  capable SPI controllers.
-+
- Example:
- 
- spi1: spi at fffcc000 {
-@@ -20,6 +25,7 @@ spi1: spi at fffcc000 {
- 	clocks = <&spi1_clk>;
- 	clock-names = "spi_clk";
- 	cs-gpios = <&pioB 3 0>;
-+	atmel,fifo-size = <32>;
- 	status = "okay";
- 
- 	mmc-slot at 0 {
+>  drivers/dma/at_xdmac.c | 241 +++++++++++++++++++++++++++++--------------------
+>  1 file changed, 144 insertions(+), 97 deletions(-)
+> 
+
+
 -- 
-1.8.2.2
+Nicolas Ferre
