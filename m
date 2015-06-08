@@ -1,103 +1,30 @@
-From: hanjun.guo@linaro.org (Hanjun Guo)
-Date: Mon, 08 Jun 2015 11:59:46 +0800
-Subject: [Patch v4 0/8] Consolidate ACPI PCI root common code into ACPI
- core
-In-Reply-To: <55707CF2.9070604@linux.intel.com>
-References: <1433225576-8215-1-git-send-email-jiang.liu@linux.intel.com>	
- <556F6332.2040501@redhat.com> <556FAFEF.6040802@linux.intel.com>	
- <556FF0AD.6000901@linaro.org> <556FF32B.9010900@linux.intel.com>
- <1433433105.24429.30.camel@deneb.redhat.com>
- <55707CF2.9070604@linux.intel.com>
-Message-ID: <55751332.50409@linaro.org>
+From: rnayak@codeaurora.org (Rajendra Nayak)
+Date: Mon, 08 Jun 2015 09:32:38 +0530
+Subject: [RFC 1/7] thermal: qcom: tsens: Add a skeletal tsens drivers
+In-Reply-To: <7hpp59zpfv.fsf@deeprootsystems.com>
+References: <1429796773-7151-1-git-send-email-rnayak@codeaurora.org>	<1429796773-7151-2-git-send-email-rnayak@codeaurora.org>
+ <7hpp59zpfv.fsf@deeprootsystems.com>
+Message-ID: <557513DE.2050505@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2015?06?05? 00:29, Jiang Liu wrote:
-> On 2015/6/4 23:51, Mark Salter wrote:
->> On Thu, 2015-06-04 at 14:41 +0800, Jiang Liu wrote:
->>> On 2015/6/4 14:31, Hanjun Guo wrote:
->>>> Hi Jiang,
->>>>
->>>> On 2015?06?04? 09:54, Jiang Liu wrote:
->>>>> On 2015/6/4 4:27, Al Stone wrote:
->>>>>> On 06/02/2015 12:12 AM, Jiang Liu wrote:
->>>>>>> This patch set consolidates common code to support ACPI PCI root on x86
->>>>>>> and IA64 platforms into ACPI core, to reproduce duplicated code and
->>>>>>> simplify maintenance. And a patch set based on this to support ACPI
->>>>>>> based
->>>>>>> PCIe host bridge on ARM64 has been posted at:
->>>>>>
->>>>>> Link is missing (or it's a typo of some flavor).
->>>>> HI Al,
->>>>>      Sorry, I missed the link. It has been posted at:
->>>>> https://lkml.org/lkml/2015/5/26/207
->>>>
->>>> I failed to get io resources for PCI hostbridge  when I was testing PCI
->>>> on ARM64 QEMU, I debugged this for quite a while, and finally found out
->>>> that ACPI resource parsing for IO is not suitable for ARM64, because io
->>>> space for x86 is 64K, but 16M for ARM64.
->>>>
->>>> This issue is only found when the firmware representing the io resource
->>>> using the type ACPI_RESOURCE_TYPE_ADDRESS32, so the io address will
->>>> greater than 64k.
->>>>
->>>> In drivers/acpi/resource.c:
->>>>
->>>> static void acpi_dev_ioresource_flags(struct resource *res, u64 len,
->>>>                                        u8 io_decode, u8 translation_type)
->>>> {
->>>>          res->flags = IORESOURCE_IO;
->>>>
->>>> [...]
->>>>
->>>>          if (res->end >= 0x10003)
->>>>                  res->flags |= IORESOURCE_DISABLED | IORESOURCE_UNSET;
->>>>
->>>> [...]
->>>> }
->>>>
->>>> so the code will filter out res->end >= 0x10003, and in my case, it will
->>>> more than 64K, so we can't get the IO resources.
->>>>
->>>> I got a question, why we use if (res->end >= 0x10003) here?
->>>> I mean 64k will be 0x10000, and in that case, we should use
->>>> if (res->end >= 0x10000) here, not 0x10003, any history behind that?
->>>
->>> Hi Hanjun,
->>> This is a special tricky for x86. You may read a dword(four bytes) from
->>> IO port 0xffff, so the effective io port space is 0x10003 bytes.
->>>
->>
->> Is there something in ACPI spec which would limit PCI IO space to 64K?
->> PCI itself allows 32-bit IO addresses and at least some arm64 platforms
->> use PCI bus addresses above 64K for IO transactions. From a PCI view,
->> the (res->end >= 0x10003) check doesn't make sense. Am I missing
->> something?
-> HI Mark,
-> 	Something interesting here. According to my understanding,
-> the actually limitations are
-> 1) the maximum size for each IO port space is 64k,
-> 2) each PCI segment may only have one IO port space assigned at most.
+Hi Kevin,
+
 >
-> Other than those, it's flexible for system designer to:
-> 1) have multiple IO port spaces, each is 64K at most.
-> 2) CPU may use MMIO transactions to access PCI IO space, and PCI host
->     bridge will do the translation from CPU side MMIO address to PCI side
->     IO port address.
+> I was trying this series on linux-next with Srini's eeprom v4 and my
+> first attempt was to build the eeprom, qfprom and tsens drivers as
+> built-in.  Unfortunately, the tsens driver probed before the
+> eeprom/qfprom driver so failed here with the "calibration failed"
+> message.
 >
-> For example, we may have following configuration on IA64 platforms:
-> 1) CPU side physical address [0x100000000-0x100010000] maps to IO space
->     [0x00000-0x10000] on PCI segment 0
-> 2) CPU side physical address [0x100010000-0x100020000] maps to IO space
->     [0x00000-0x10000] on PCI segment 1
-> And ACPI resource descriptor provides 'translation_offset' to support
-> such an usage case. Hope this helps:)
+> Building things as modules worked better, but you might want to take a
+> look at possibly using -EPROBE_DEFER here?
 
-Hi Jiang,
+The driver does return -EPROBE_DEFER in case the calibration fails
+when tsens is probed before qfprom. It does however also show the
+error message "calibration failed" which is a little misleading and
+needs fixing. What target were you trying this on? I will give it a
+try again to make sure things work.
 
-It seems the translation_offset for IA64 is assuming to zero in this
-patch set, which have regressions if we use DworldIO() with offset
-to report io port resources, am I missing something?
-
-Thanks
-Hanjun
+regards,
+Rajendra
