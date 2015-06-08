@@ -1,44 +1,126 @@
-From: eddie.huang@mediatek.com (Eddie Huang)
-Date: Mon, 8 Jun 2015 18:15:46 +0800
-Subject: [PATCH 2/3] spi: mediatek: Add spi bus for Mediatek MT8173
-In-Reply-To: <20150515092543.GY2761@sirena.org.uk>
-References: <1431075343-7887-1-git-send-email-leilk.liu@mediatek.com>
- <1431075343-7887-3-git-send-email-leilk.liu@mediatek.com>
- <20150508175306.GG2761@sirena.org.uk> <1431434356.2128.9.camel@mhfsdcap03>
- <20150512160540.GB3066@sirena.org.uk> <1431675522.2128.13.camel@mhfsdcap03>
- <20150515092543.GY2761@sirena.org.uk>
-Message-ID: <1433758546.19786.16.camel@mtksdaap41>
+From: linux.amoon@gmail.com (Anand Moon)
+Date: Mon, 8 Jun 2015 15:50:06 +0530
+Subject: [RESEND 1/2] usb: ehci-exynos: Make provision for vdd regulators
+In-Reply-To: <44B5E2FDCD3244AAA418BB8EC28FEA25@sisodomain.com>
+References: <1433683242-3945-1-git-send-email-linux.amoon@gmail.com>
+ <5574F97A.5030104@samsung.com>
+ <CANAwSgTjx8uxyOTW8uuiqrcNzF+UwLMmML2OcDgG5Ku_56=vJQ@mail.gmail.com>
+ <CAJKOXPfDmt5VMqr-P+OpWy1+jz675CFRPmtS_N0HjN4tWxfwtA@mail.gmail.com>
+ <44B5E2FDCD3244AAA418BB8EC28FEA25@sisodomain.com>
+Message-ID: <CANAwSgTi114wO63-sx=UmbxPerqKvstq=coVyqhRkzX44CDe_w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mark,
+On 8 June 2015 at 10:58, Vivek Gautam <gautam.vivek@samsung.com> wrote:
+> Hi,
+>
+>
+>
+> On Monday, June 08, 2015 10:44 AM, "Krzysztof Kozlowski"
+> <k.kozlowski@samsung.com> wrote:
+>
+> my apologies for being late in replying to this thread.
+>
+>> 2015-06-08 13:21 GMT+09:00 Anand Moon <linux.amoon@gmail.com>:
+>>>
+>>> Hi Krzysztof ,
+>>>
+>>> On 8 June 2015 at 07:40, Krzysztof Kozlowski <k.kozlowski@samsung.com>
+>>> wrote:
+>>>>
+>>>> On 07.06.2015 22:20, Anand Moon wrote:
+>>>>>
+>>>>> Facilitate getting required 3.3V and 1.0V VDD supply for
+>>>>> EHCI controller on Exynos.
+>>>>>
+>>>>> With the patches for regulators' nodes merged in 3.15:
+>>>>> c8c253f ARM: dts: Add regulator entries to smdk5420
+>>>>> 275dcd2 ARM: dts: add max77686 pmic node for smdk5250,
+>>>>> the exynos systems turn on only minimal number of regulators.
+>>>>>
+>>>>> Until now, the VDD regulator supplies were either turned on
+>>>>> by the bootloader, or the regulators were enabled by default
+>>>>> in the kernel, so that the controller drivers did not need to
+>>>>> care about turning on these regulators on their own.
+>>>>> This was rather bad about these controller drivers.
+>>>>> So ensuring now that the controller driver requests the necessary
+>>>>> VDD regulators (if available, unless there are direct VDD rails),
+>>>>> and enable them so as to make them working.
+>>>>>
+>>>>> Signed-off-by: Vivek Gautam <gautam.vivek@samsung.com>
+>>>>> Signed-off-by: Anand Moon <linux.amoon@gmail.com>
+>>>>> Cc: Jingoo Han <jg1.han@samsung.com>
+>>>>> Cc: Alan Stern <stern@rowland.harvard.edu>
+>>>>> ---
+>>>>> Initial version of this patch was part of following series, though
+>>>>> they are not dependent on each other, resubmitting after rebasing.
+>>>>>
+>>>>>
+>>>>> http://lists.infradead.org/pipermail/linux-arm-kernel/2014-June/266418.html
+>>>>
+>>>>
+>>>> So you just took Vivek's patch along with all the credits... That is not
+>>>> how we usually do this.
+>>>>
+>>>> I would expect that rebasing a patch won't change the author unless this
+>>>> is fine with Vivek.
+>>>>
+>>>
+>>> Sorry If I have done some mistake on my part.
+>>> I just looked at below mail chain. Before I send it.
+>>>
+>>> http://www.spinics.net/lists/linux-samsung-soc/msg44136.html
+>>
+>>
+>> I don't get it. The patch you are referring to has a proper "From"
+>> field. So please use it as an example.
+>>
+>>>
+>>> I don't want to take any credit out of it. I just re-base on the new
+>>> kernel.
+>
+> Perhaps, you would have maintained the authorship !
+>
+>>> I could not test this patch as it meant for exynos5440 boards.
+>>
+>>
+>> Are you sure? I think the driver is used on almost all of Exynos SoCs
+>> (Exynos4, Exynos5250, Exynos542x).
+>
+>
+> That's correct, as pointed by Krzysztof Kozlowski, the driver is same for
+> Exynos4 and Exynos5 series
+> of SoCs.
+>
+>> Untested code should not go to the kernel. Additionally you should
+>> mark it as not-tested. Marking such patch as non-tested could help you
+>> finding some independent tests (tests performed by someone else).
+>>
+>> To summarize my point of view:
+>> 1. Unless Vivek's says otherwise, please give him the credits with
+>> proper "from" field.
+>> 2. Issues mentioned in previous mail should be addressed (missing
+>> IS_ERR(), how disabling the regulator during suspend affects waking
+>> up).
+>> 3. The patchset must be tested, even after rebasing.
+>
+>
+> Unfortunately, I got busy  with a different project and lost track of the
+> patches posted upstream.
+> If it's not too late I can post a rebased version of the patch with previous
+> review comments addressed.
+>
+>>
+>> Best regards,
+>> Krzysztof
+>
+>
 
-On Fri, 2015-05-15 at 17:25 +0800, Mark Brown wrote:
-> On Fri, May 15, 2015 at 03:38:42PM +0800, leilk liu wrote:
-> > On Tue, 2015-05-12 at 17:05 +0100, Mark Brown wrote:
-> 
-> > > Implement can_dma() - look for drivers providing that for examples.
-> 
-> > MTK spi hardware uses the dmaengine in spi controller. According to
-> > datasheet, spi driver just need to enable dma register bit and write a
-> > physical address to relevant dma address register, so I think it may be
-> > complex while the driver supports can_dma.
-> 
-> That's how a very large proportion of devices that work with DMA are
-> done - why would this be complicated?  All can_dma() does is report if
-> DMA is possible.
+Hi All,
 
-In include/linux/spi/spi.h, it describes if can_dma() exists and returns
-true, dma_tx and dma_rx must be set.But Medaitek SPI controller has its
-own dma hardware, which means this dma resides in the same base address
-range with SPI controller, and only used by SPI, so we don't implement
-generic DMA driver, such that can't provide dma channel and assign to
-dmx_tx, dmx_rx parameter. We think it's strange to implement generic dma
-driver for dma that only used by specific hardware.Can we just provide
-can_dma() function and return false ? But I think it's a little odd that
-there actually has dma. So can we just skip can_dma() function let it be
-NULL ?
+I have learned my lesson not to interfere in others work.
+It will never happen from my side again.
 
-Eddie
-Thanks
- 
+Please accept my apology.
+
+-Anand Moon
