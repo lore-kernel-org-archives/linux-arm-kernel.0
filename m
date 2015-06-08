@@ -1,61 +1,41 @@
-From: santosh.shilimkar@oracle.com (santosh shilimkar)
-Date: Mon, 08 Jun 2015 08:26:19 -0700
-Subject: [GIT PULL] ARM: Keystone updates for v4.2
-In-Reply-To: <1432310314-5090-1-git-send-email-ssantosh@kernel.org>
-References: <1432310314-5090-1-git-send-email-ssantosh@kernel.org>
-Message-ID: <5575B41B.6060706@oracle.com>
+From: vinod.koul@intel.com (Vinod Koul)
+Date: Mon, 8 Jun 2015 21:04:49 +0530
+Subject: [PATCH v6] dma: Add Xilinx AXI Direct Memory Access Engine
+ driver support
+In-Reply-To: <C246CAC1457055469EF09E3A7AC4E11A49A8CBD8@XAP-PVEXMBX01.xlnx.xilinx.com>
+References: <1432228025-6515-1-git-send-email-appanad@xilinx.com>
+ <C246CAC1457055469EF09E3A7AC4E11A49A8B5C7@XAP-PVEXMBX01.xlnx.xilinx.com>
+ <20150608111402.GK28601@localhost>
+ <C246CAC1457055469EF09E3A7AC4E11A49A8CBD8@XAP-PVEXMBX01.xlnx.xilinx.com>
+Message-ID: <20150608153449.GP28601@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Ping !!
+On Mon, Jun 08, 2015 at 11:28:25AM +0000, Appana Durga Kedareswara Rao wrote:
+> Hi Vinod,
+> 
+> 
+> > -----Original Message-----
+> > From: Vinod Koul [mailto:vinod.koul at intel.com]
+> > Sent: Monday, June 08, 2015 4:44 PM
+> > To: Appana Durga Kedareswara Rao
+> > Cc: Appana Durga Kedareswara Rao; dan.j.williams at intel.com; Michal Simek;
+> > Soren Brinkmann; Punnaiah Choudary Kalluri; dmaengine at vger.kernel.org;
+> > linux-arm-kernel at lists.infradead.org; linux-kernel at vger.kernel.org; Srikanth
+> > Thokala
+> > Subject: Re: [PATCH v6] dma: Add Xilinx AXI Direct Memory Access Engine
+> > driver support
+> >
+> > On Wed, Jun 03, 2015 at 06:22:36AM +0000, Appana Durga Kedareswara Rao
+> > wrote:
+> > > Ping!
+> > ???
+> >
+> > You seem to have a question from Paul pending on this and other patch
+> 
+> Sorry somehow I forgot to reply to those patches and I pinged again.
+> Now I replied to those patches.
+Okay please update the patches and resend...
 
-On 5/22/2015 8:58 AM, Santosh Shilimkar wrote:
-> Please pull keystone update for 4.2. Since there was just one
-> config update, sending it along with dts changes. The MMU
-> switching series which includes few keystone arch update will
-> go via RMK's tree because of dependencies with core code.
->
-> The following changes since commit b787f68c36d49bb1d9236f403813641efa74a031:
->
->    Linux 4.1-rc1 (2015-04-26 17:59:10 -0700)
->
-> are available in the git repository at:
->
->    git://git.kernel.org/pub/scm/linux/kernel/git/ssantosh/linux-keystone.git tags/keystone-for-4.2
->
-> for you to fetch changes up to b8c80afb65a0bcf55875194ce8cc9cea69aed845:
->
->    ARM: dts: k2l: fix the netcp range size (2015-05-22 08:52:15 -0700)
->
-> ----------------------------------------------------------------
-> ARM: Keystone updates for v4.2
->
-> Update contains:
->          - Keystone EVM(s) dts files updates to add NETCP driver.
->          - config update to enable NETCP driver by default.
->
-> ----------------------------------------------------------------
-> Murali Karicheri (7):
->        ARM: keystone: defconfig: enable netcp driver by default
->        ARM: dts: k2hk-evm: Add device bindings for netcp driver
->        ARM: dts: k2e-evm: Add device bindings for netcp driver
->        ARM: dts: k2l-evm: Add device bindings for netcp driver
->        ARM: dts: k2hk: fix the netcp range size
->        ARM: dts: k2e: fix the netcp range size
->        ARM: dts: k2l: fix the netcp range size
->
->   arch/arm/boot/dts/k2e-evm.dts       |   1 +
->   arch/arm/boot/dts/k2e-netcp.dtsi    | 206 +++++++++++++++++++++++++++++++++++
->   arch/arm/boot/dts/k2e.dtsi          |   1 +
->   arch/arm/boot/dts/k2hk-evm.dts      |   1 +
->   arch/arm/boot/dts/k2hk-netcp.dtsi   | 208 ++++++++++++++++++++++++++++++++++++
->   arch/arm/boot/dts/k2hk.dtsi         |   1 +
->   arch/arm/boot/dts/k2l-evm.dts       |   1 +
->   arch/arm/boot/dts/k2l-netcp.dtsi    | 189 ++++++++++++++++++++++++++++++++
->   arch/arm/boot/dts/k2l.dtsi          |   1 +
->   arch/arm/configs/keystone_defconfig |   6 ++
->   10 files changed, 615 insertions(+)
->   create mode 100644 arch/arm/boot/dts/k2e-netcp.dtsi
->   create mode 100644 arch/arm/boot/dts/k2hk-netcp.dtsi
->   create mode 100644 arch/arm/boot/dts/k2l-netcp.dtsi
->
+-- 
+~Vinod
