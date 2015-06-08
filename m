@@ -1,74 +1,88 @@
-From: rjw@rjwysocki.net (Rafael J. Wysocki)
-Date: Tue, 09 Jun 2015 01:30:35 +0200
-Subject: [PATCH] cpufreq:exynos-cpufreq - Fix for memory leak in case SOC
- name does not match.
-In-Reply-To: <20150608103100.57f0473b@amdc2363>
-References: <1432519780-2910-1-git-send-email-shailendra.capricorn@gmail.com>
- <20150525073149.GF9992@linux> <20150608103100.57f0473b@amdc2363>
-Message-ID: <8344426.BL3KyufMos@vostro.rjw.lan>
+From: drake@endlessm.com (Daniel Drake)
+Date: Mon, 8 Jun 2015 17:15:06 -0600
+Subject: [PATCH] mmc: meson: Add driver for the SD/MMC host found on
+ Amlogic MesonX SoCs
+In-Reply-To: <1433783342-31243-1-git-send-email-carlo@caione.org>
+References: <1433783342-31243-1-git-send-email-carlo@caione.org>
+Message-ID: <CAD8Lp45c1GS=xYU3=6g1sdrP_afy7r=TgqL--FKjWbbwL=cReA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday, June 08, 2015 10:31:00 AM Lukasz Majewski wrote:
-> Hi Viresh,
-> 
-> > On 25-05-15, 07:39, Shailendra Verma wrote:
-> > > During probe free the memory allocated to "exynos_info" in case of
-> > > unknown SOC type.
-> > > 
-> > > Signed-off-by: Shailendra Verma <shailendra.capricorn@gmail.com>
-> > > ---
-> > >  drivers/cpufreq/exynos-cpufreq.c |    6 ++++--
-> > >  1 file changed, 4 insertions(+), 2 deletions(-)
-> > > 
-> > > diff --git a/drivers/cpufreq/exynos-cpufreq.c
-> > > b/drivers/cpufreq/exynos-cpufreq.c index 82d2fbb..8682378 100644
-> > > --- a/drivers/cpufreq/exynos-cpufreq.c
-> > > +++ b/drivers/cpufreq/exynos-cpufreq.c
-> > > @@ -182,7 +182,7 @@ static int exynos_cpufreq_probe(struct
-> > > platform_device *pdev) ret = exynos5250_cpufreq_init(exynos_info);
-> > >  	} else {
-> > >  		pr_err("%s: Unknown SoC type\n", __func__);
-> > > -		return -ENODEV;
-> > > +		ret = -ENODEV;
-> > >  	}
-> > >  
-> > >  	if (ret)
-> > > @@ -190,12 +190,14 @@ static int exynos_cpufreq_probe(struct
-> > > platform_device *pdev) 
-> > >  	if (exynos_info->set_freq == NULL) {
-> > >  		dev_err(&pdev->dev, "No set_freq function
-> > > (ERR)\n");
-> > > +		ret = -EINVAL;
-> > >  		goto err_vdd_arm;
-> > >  	}
-> > >  
-> > >  	arm_regulator = regulator_get(NULL, "vdd_arm");
-> > >  	if (IS_ERR(arm_regulator)) {
-> > >  		dev_err(&pdev->dev, "failed to get resource
-> > > vdd_arm\n");
-> > > +		ret = -EINVAL;
-> > >  		goto err_vdd_arm;
-> > >  	}
-> > >  
-> > > @@ -227,7 +229,7 @@ err_cpufreq_reg:
-> > >  	regulator_put(arm_regulator);
-> > >  err_vdd_arm:
-> > >  	kfree(exynos_info);
-> > > -	return -EINVAL;
-> > > +	return ret;
-> > >  }
-> > >  
-> > >  static struct platform_driver exynos_cpufreq_platdrv = {
-> > 
-> > Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
-> > 
-> 
-> Acked-by: Lukasz Majewski <l.majewski@samsung.com>
+Hi Carlo,
 
-I'm assuming that it will go it through the Samsung tree.
+On Mon, Jun 8, 2015 at 11:09 AM, Carlo Caione <carlo@caione.org> wrote:
+> From: Carlo Caione <carlo@endlessm.com>
+>
+> Add a driver for the SD/MMC host found on the Amlogic MesonX SoCs. It
+> is an MMC controller which provides an interface between the
+> application processor and various memory cards. It supports the SD
+> specification v2.0 and the eMMC specification v4.41. It also supports
+> SDSC, SDHC and SDXC memory card default speed.
 
+Nice work, thanks for this!
 
--- 
-I speak only for myself.
-Rafael J. Wysocki, Intel Open Source Technology Center.
+> This patch adds also the bindinding documentation.
+
+"binding" typo
+
+> +static void meson_mmc_request(struct mmc_host *mmc, struct mmc_request *mrq)
+> +{
+> +       struct meson_mmc_host *host = mmc_priv(mmc);
+> +       struct mmc_command *cmd = mrq->cmd;
+> +       struct mmc_data *data = mrq->data;
+> +       unsigned long flags;
+> +
+> +       spin_lock_irqsave(&host->lock, flags);
+> +
+> +       if (host->state != STATE_IDLE) {
+> +               dev_dbg(mmc_dev(mmc), "%s() rejected, state %u\n",
+> +                       __func__, host->state);
+> +               mrq->cmd->error = -EAGAIN;
+> +               spin_unlock_irqrestore(&host->lock, flags);
+> +               mmc_request_done(mmc, mrq);
+> +               return;
+> +       }
+> +
+> +       if (host->ferror) {
+> +               cmd->error = host->ferror;
+> +               spin_unlock_irqrestore(&host->lock, flags);
+> +               mmc_request_done(mmc, mrq);
+> +               return;
+> +       }
+> +
+> +       dev_dbg(mmc_dev(mmc), "CMD%d(%08x) arg %x len %d flags %08x\n",
+> +               cmd->opcode & 0x3f, cmd->opcode, cmd->arg,
+> +               mrq->data ? mrq->data->blksz * mrq->data->blocks : 0,
+> +               mrq->cmd->flags);
+> +
+> +       /* Filter out CMD 5/52/53 */
+> +       if (cmd->opcode == SD_IO_SEND_OP_COND ||
+> +           cmd->opcode == SD_IO_RW_DIRECT ||
+> +           cmd->opcode == SD_IO_RW_EXTENDED) {
+> +               dev_dbg(mmc_dev(host->mmc), "CMD%d not supported\n", cmd->opcode);
+> +               cmd->error = -EINVAL;
+> +               spin_unlock_irqrestore(&host->lock, flags);
+> +               mmc_request_done(mmc, mrq);
+> +               return;
+> +       }
+> +
+> +       host->state = STATE_REQUEST;
+> +
+> +       if (data) {
+> +               meson_mmc_map_dma(host, data, data->flags);
+> +               writel(host->sg_dma, host->base + SDIO_ADDR);
+
+As the sg_dma buffer is constant, can you do this register write just
+once at probe time? I wonder if we really need to do it on each
+request.
+
+Or, going deeper, I wonder if we can avoid this bounce buffer
+entirely. Can you try setting mmc->max_segs to 1 then passing the
+single data segment directly to the hardware with
+   writel(sg_dma_address(data->sg), host->base + SDIO_ADDR)
+
+If that turns out to be more complicated then it sounds, then feel
+free to push it off to a later driver revision.
+
+Thanks!
+Daniel
