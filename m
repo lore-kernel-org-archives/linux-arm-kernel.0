@@ -1,193 +1,141 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Mon,  8 Jun 2015 11:39:59 +0100
-Subject: [PATCH v4 5/8] cpufreq: arm_big_little: add SCPI interface driver
-In-Reply-To: <1433760002-24120-1-git-send-email-sudeep.holla@arm.com>
-References: <1433760002-24120-1-git-send-email-sudeep.holla@arm.com>
-Message-ID: <1433760002-24120-6-git-send-email-sudeep.holla@arm.com>
+From: gautam.vivek@samsung.com (Vivek Gautam)
+Date: Mon, 08 Jun 2015 16:16:25 +0530
+Subject: [RESEND 1/2] usb: ehci-exynos: Make provision for vdd regulators
+In-Reply-To: <CANAwSgTi114wO63-sx=UmbxPerqKvstq=coVyqhRkzX44CDe_w@mail.gmail.com>
+References: <1433683242-3945-1-git-send-email-linux.amoon@gmail.com>
+ <5574F97A.5030104@samsung.com>
+ <CANAwSgTjx8uxyOTW8uuiqrcNzF+UwLMmML2OcDgG5Ku_56=vJQ@mail.gmail.com>
+ <CAJKOXPfDmt5VMqr-P+OpWy1+jz675CFRPmtS_N0HjN4tWxfwtA@mail.gmail.com>
+ <44B5E2FDCD3244AAA418BB8EC28FEA25@sisodomain.com>
+ <CANAwSgTi114wO63-sx=UmbxPerqKvstq=coVyqhRkzX44CDe_w@mail.gmail.com>
+Message-ID: <BF5C6ACC7D2C4E51BF0CAAA7B164B6CA@sisodomain.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On some ARM based systems, a separate Cortex-M based System Control
-Processor(SCP) provides the overall power, clock, reset and system
-control including CPU DVFS. SCPI Message Protocol is used to
-communicate with the SCPI.
+Hi,
 
-This patch adds a interface driver for adding OPPs and registering
-the arm_big_little cpufreq driver for such systems.
 
-Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
-Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
-Cc: Viresh Kumar <viresh.kumar@linaro.org>
-Cc: "Rafael J. Wysocki" <rjw@rjwysocki.net>
-Cc: linux-pm at vger.kernel.org
----
- drivers/cpufreq/Kconfig.arm    |   9 +++
- drivers/cpufreq/Makefile       |   1 +
- drivers/cpufreq/scpi-cpufreq.c | 124 +++++++++++++++++++++++++++++++++++++++++
- 3 files changed, 134 insertions(+)
- create mode 100644 drivers/cpufreq/scpi-cpufreq.c
+On Monday, June 08, 2015 3:50 PM, "Anand Moon" <linux.amoon@gmail.com>
 
-diff --git a/drivers/cpufreq/Kconfig.arm b/drivers/cpufreq/Kconfig.arm
-index 611cb09239eb..6419b17b89dd 100644
---- a/drivers/cpufreq/Kconfig.arm
-+++ b/drivers/cpufreq/Kconfig.arm
-@@ -24,6 +24,15 @@ config ARM_VEXPRESS_SPC_CPUFREQ
-           This add the CPUfreq driver support for Versatile Express
- 	  big.LITTLE platforms using SPC for power management.
- 
-+config ARM_SCPI_CPUFREQ
-+        tristate "SCPI based CPUfreq driver"
-+	depends on ARM_BIG_LITTLE_CPUFREQ && ARM_SCPI_PROTOCOL
-+        help
-+	  This adds the CPUfreq driver support for ARM big.LITTLE platforms
-+	  using SCPI protocol for CPU power management.
-+
-+	  This driver uses SCPI Message Protocol driver to interact with the
-+	  firmware providing the CPU DVFS functionality.
- 
- config ARM_EXYNOS_CPUFREQ
- 	tristate "SAMSUNG EXYNOS CPUfreq Driver"
-diff --git a/drivers/cpufreq/Makefile b/drivers/cpufreq/Makefile
-index cdce92ae2e8b..02fc9f849d4b 100644
---- a/drivers/cpufreq/Makefile
-+++ b/drivers/cpufreq/Makefile
-@@ -79,6 +79,7 @@ obj-$(CONFIG_ARM_SA1110_CPUFREQ)	+= sa1110-cpufreq.o
- obj-$(CONFIG_ARM_SPEAR_CPUFREQ)		+= spear-cpufreq.o
- obj-$(CONFIG_ARM_TEGRA_CPUFREQ)		+= tegra-cpufreq.o
- obj-$(CONFIG_ARM_VEXPRESS_SPC_CPUFREQ)	+= vexpress-spc-cpufreq.o
-+obj-$(CONFIG_ARM_SCPI_CPUFREQ)		+= scpi-cpufreq.o
- 
- ##################################################################################
- # PowerPC platform drivers
-diff --git a/drivers/cpufreq/scpi-cpufreq.c b/drivers/cpufreq/scpi-cpufreq.c
-new file mode 100644
-index 000000000000..2c3b16fd3a01
---- /dev/null
-+++ b/drivers/cpufreq/scpi-cpufreq.c
-@@ -0,0 +1,124 @@
-+/*
-+ * System Control and Power Interface (SCPI) based CPUFreq Interface driver
-+ *
-+ * It provides necessary ops to arm_big_little cpufreq driver.
-+ *
-+ * Copyright (C) 2015 ARM Ltd.
-+ * Sudeep Holla <sudeep.holla@arm.com>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ *
-+ * This program is distributed "as is" WITHOUT ANY WARRANTY of any
-+ * kind, whether express or implied; without even the implied warranty
-+ * of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
-+ * GNU General Public License for more details.
-+ */
-+
-+#define pr_fmt(fmt) KBUILD_MODNAME ": " fmt
-+
-+#include <linux/cpufreq.h>
-+#include <linux/module.h>
-+#include <linux/platform_device.h>
-+#include <linux/pm_opp.h>
-+#include <linux/scpi_protocol.h>
-+#include <linux/types.h>
-+
-+#include "arm_big_little.h"
-+
-+static struct scpi_ops *scpi_ops;
-+
-+static struct scpi_dvfs_info *scpi_get_dvfs_info(struct device *cpu_dev)
-+{
-+	u8 domain = topology_physical_package_id(cpu_dev->id);
-+
-+	if (domain < 0)
-+		return ERR_PTR(-EINVAL);
-+	return scpi_ops->dvfs_get_info(domain);
-+}
-+
-+static int scpi_opp_table_ops(struct device *cpu_dev, bool remove)
-+{
-+	int idx, ret = 0;
-+	struct scpi_opp *opp;
-+	struct scpi_dvfs_info *info = scpi_get_dvfs_info(cpu_dev);
-+
-+	if (IS_ERR(info))
-+		return PTR_ERR(info);
-+
-+	if (!info->opps)
-+		return -EIO;
-+
-+	for (opp = info->opps, idx = 0; idx < info->count; idx++, opp++) {
-+		if (remove)
-+			dev_pm_opp_remove(cpu_dev, opp->freq);
-+		else
-+			ret = dev_pm_opp_add(cpu_dev, opp->freq,
-+					     opp->m_volt * 1000);
-+		if (ret) {
-+			dev_warn(cpu_dev, "failed to add opp %uHz %umV\n",
-+				 opp->freq, opp->m_volt);
-+			while (idx-- > 0)
-+				dev_pm_opp_remove(cpu_dev, (--opp)->freq);
-+			return ret;
-+		}
-+	}
-+	return ret;
-+}
-+
-+static int scpi_get_transition_latency(struct device *cpu_dev)
-+{
-+	struct scpi_dvfs_info *info = scpi_get_dvfs_info(cpu_dev);
-+
-+	if (IS_ERR(info))
-+		return PTR_ERR(info);
-+	return info->latency;
-+}
-+
-+static int scpi_init_opp_table(struct device *cpu_dev)
-+{
-+	return scpi_opp_table_ops(cpu_dev, false);
-+}
-+
-+static void scpi_free_opp_table(struct device *cpu_dev)
-+{
-+	scpi_opp_table_ops(cpu_dev, true);
-+}
-+
-+static struct cpufreq_arm_bL_ops scpi_cpufreq_ops = {
-+	.name	= "scpi",
-+	.get_transition_latency = scpi_get_transition_latency,
-+	.init_opp_table = scpi_init_opp_table,
-+	.free_opp_table = scpi_free_opp_table,
-+};
-+
-+static int scpi_cpufreq_probe(struct platform_device *pdev)
-+{
-+	scpi_ops = get_scpi_ops();
-+	if (!scpi_ops)
-+		return -EIO;
-+
-+	return bL_cpufreq_register(&scpi_cpufreq_ops);
-+}
-+
-+static int scpi_cpufreq_remove(struct platform_device *pdev)
-+{
-+	bL_cpufreq_unregister(&scpi_cpufreq_ops);
-+	scpi_ops = NULL;
-+	return 0;
-+}
-+
-+static struct platform_driver scpi_cpufreq_platdrv = {
-+	.driver = {
-+		.name	= "scpi-cpufreq",
-+		.owner	= THIS_MODULE,
-+	},
-+	.probe		= scpi_cpufreq_probe,
-+	.remove		= scpi_cpufreq_remove,
-+};
-+module_platform_driver(scpi_cpufreq_platdrv);
-+
-+MODULE_AUTHOR("Sudeep Holla <sudeep.holla@arm.com>");
-+MODULE_DESCRIPTION("ARM SCPI CPUFreq interface driver");
-+MODULE_LICENSE("GPL v2");
--- 
-1.9.1
+> On 8 June 2015 at 10:58, Vivek Gautam <gautam.vivek@samsung.com> wrote:
+>> Hi,
+>>
+>>
+>>
+>> On Monday, June 08, 2015 10:44 AM, "Krzysztof Kozlowski"
+>> <k.kozlowski@samsung.com> wrote:
+>>
+>> my apologies for being late in replying to this thread.
+>>
+>>> 2015-06-08 13:21 GMT+09:00 Anand Moon <linux.amoon@gmail.com>:
+>>>>
+>>>> Hi Krzysztof ,
+>>>>
+>>>> On 8 June 2015 at 07:40, Krzysztof Kozlowski <k.kozlowski@samsung.com>
+>>>> wrote:
+>>>>>
+>>>>> On 07.06.2015 22:20, Anand Moon wrote:
+>>>>>>
+>>>>>> Facilitate getting required 3.3V and 1.0V VDD supply for
+>>>>>> EHCI controller on Exynos.
+>>>>>>
+>>>>>> With the patches for regulators' nodes merged in 3.15:
+>>>>>> c8c253f ARM: dts: Add regulator entries to smdk5420
+>>>>>> 275dcd2 ARM: dts: add max77686 pmic node for smdk5250,
+>>>>>> the exynos systems turn on only minimal number of regulators.
+>>>>>>
+>>>>>> Until now, the VDD regulator supplies were either turned on
+>>>>>> by the bootloader, or the regulators were enabled by default
+>>>>>> in the kernel, so that the controller drivers did not need to
+>>>>>> care about turning on these regulators on their own.
+>>>>>> This was rather bad about these controller drivers.
+>>>>>> So ensuring now that the controller driver requests the necessary
+>>>>>> VDD regulators (if available, unless there are direct VDD rails),
+>>>>>> and enable them so as to make them working.
+>>>>>>
+>>>>>> Signed-off-by: Vivek Gautam <gautam.vivek@samsung.com>
+>>>>>> Signed-off-by: Anand Moon <linux.amoon@gmail.com>
+>>>>>> Cc: Jingoo Han <jg1.han@samsung.com>
+>>>>>> Cc: Alan Stern <stern@rowland.harvard.edu>
+>>>>>> ---
+>>>>>> Initial version of this patch was part of following series, though
+>>>>>> they are not dependent on each other, resubmitting after rebasing.
+>>>>>>
+>>>>>>
+>>>>>> http://lists.infradead.org/pipermail/linux-arm-kernel/2014-June/266418.html
+>>>>>
+>>>>>
+>>>>> So you just took Vivek's patch along with all the credits... That is 
+>>>>> not
+>>>>> how we usually do this.
+>>>>>
+>>>>> I would expect that rebasing a patch won't change the author unless 
+>>>>> this
+>>>>> is fine with Vivek.
+>>>>>
+>>>>
+>>>> Sorry If I have done some mistake on my part.
+>>>> I just looked at below mail chain. Before I send it.
+>>>>
+>>>> http://www.spinics.net/lists/linux-samsung-soc/msg44136.html
+>>>
+>>>
+>>> I don't get it. The patch you are referring to has a proper "From"
+>>> field. So please use it as an example.
+>>>
+>>>>
+>>>> I don't want to take any credit out of it. I just re-base on the new
+>>>> kernel.
+>>
+>> Perhaps, you would have maintained the authorship !
+>>
+>>>> I could not test this patch as it meant for exynos5440 boards.
+>>>
+>>>
+>>> Are you sure? I think the driver is used on almost all of Exynos SoCs
+>>> (Exynos4, Exynos5250, Exynos542x).
+>>
+>>
+>> That's correct, as pointed by Krzysztof Kozlowski, the driver is same for
+>> Exynos4 and Exynos5 series
+>> of SoCs.
+>>
+>>> Untested code should not go to the kernel. Additionally you should
+>>> mark it as not-tested. Marking such patch as non-tested could help you
+>>> finding some independent tests (tests performed by someone else).
+>>>
+>>> To summarize my point of view:
+>>> 1. Unless Vivek's says otherwise, please give him the credits with
+>>> proper "from" field.
+>>> 2. Issues mentioned in previous mail should be addressed (missing
+>>> IS_ERR(), how disabling the regulator during suspend affects waking
+>>> up).
+>>> 3. The patchset must be tested, even after rebasing.
+>>
+>>
+>> Unfortunately, I got busy  with a different project and lost track of the
+>> patches posted upstream.
+>> If it's not too late I can post a rebased version of the patch with 
+>> previous
+>> review comments addressed.
+>>
+>>>
+>>> Best regards,
+>>> Krzysztof
+>>
+>>
+>
+> Hi All,
+>
+> I have learned my lesson not to interfere in others work.
+> It will never happen from my side again.
+>
+> Please accept my apology.
+
+Please don't apologise. It's just a part of learning; learning how linux 
+mainlining works.
+Hope you understand. :-)
+
+
+thanks
+Vivek 
