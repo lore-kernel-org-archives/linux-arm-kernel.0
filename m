@@ -1,91 +1,67 @@
-From: dianders@chromium.org (Doug Anderson)
-Date: Mon, 8 Jun 2015 13:52:15 -0700
-Subject: [PATCH v3 2/3] ARM: rockchip: ensure CPU to enter WFI/WFE state
-In-Reply-To: <55752067.2040108@rock-chips.com>
-References: <1433517104-7595-1-git-send-email-wxt@rock-chips.com>
- <1433517104-7595-3-git-send-email-wxt@rock-chips.com>
- <CAD=FV=UMkFtOFYpY+MUZOegnmFLdW3ZgNivwdHChv0MLr50sVQ@mail.gmail.com>
- <20150605182947.GN7557@n2100.arm.linux.org.uk>
- <CAD=FV=UamkH+RHmHHVzGKZda_w0teGBdfcH-LbCKqyp2q1OVqA@mail.gmail.com>
- <55752067.2040108@rock-chips.com>
-Message-ID: <CAD=FV=W3Ot0vymVguuE5YwENjmFVaFOxXoNODdu7UwzErGxTxA@mail.gmail.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Mon, 8 Jun 2015 22:53:51 +0200
+Subject: [PATCH v2 3/5] dmaengine: mv_xor: add support for a38x command
+ in descriptor mode
+In-Reply-To: <20150608103447.GE28601@localhost>
+References: <1432645656-20504-1-git-send-email-maxime.ripard@free-electrons.com>
+ <1432645656-20504-4-git-send-email-maxime.ripard@free-electrons.com>
+ <20150608103447.GE28601@localhost>
+Message-ID: <20150608205351.GC23777@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Caesar,
+Hi Vinod,
 
-On Sun, Jun 7, 2015 at 9:56 PM, Caesar Wang <wxt@rock-chips.com> wrote:
-> OK.
-> The dying processor to execute v7_exit_coherency_flush(),not that the dying
-> processor to be in WFI/WFE.
+On Mon, Jun 08, 2015 at 04:04:47PM +0530, Vinod Koul wrote:
+> On Tue, May 26, 2015 at 03:07:34PM +0200, Maxime Ripard wrote:
+> > From: Lior Amsalem <alior@marvell.com>
+> > 
+> > The Marvell Armada 38x SoC introduce new features to the XOR engine,
+> > especially the fact that the engine mode (MEMCPY/XOR/PQ/etc) can be part of
+> > the descriptor and not set through the controller registers.
+> > 
+> > This new feature allows mixing of different commands (even PQ) on the same
+> > channel/chain without the need to stop the engine to reconfigure the engine
+> > mode.
+> > 
+> > Refactor the driver to be able to use that new feature on the Armada 38x,
+> > while keeping the old behaviour on the older SoCs.
+> > 
+> > Signed-off-by: Lior Amsalem <alior@marvell.com>
+> > Reviewed-by: Ofer Heifetz <oferh@marvell.com>
+> > Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> > ---
+> >  Documentation/devicetree/bindings/dma/mv-xor.txt |  2 +-
+> >  drivers/dma/mv_xor.c                             | 82 ++++++++++++++++++++----
+> >  drivers/dma/mv_xor.h                             |  7 ++
+> >  3 files changed, 76 insertions(+), 15 deletions(-)
+> > 
+> > diff --git a/Documentation/devicetree/bindings/dma/mv-xor.txt b/Documentation/devicetree/bindings/dma/mv-xor.txt
+> > index 7c6cb7fcecd2..cc29c35266e2 100644
+> > --- a/Documentation/devicetree/bindings/dma/mv-xor.txt
+> > +++ b/Documentation/devicetree/bindings/dma/mv-xor.txt
+> > @@ -1,7 +1,7 @@
+> >  * Marvell XOR engines
+> >  
+> >  Required properties:
+> > -- compatible: Should be "marvell,orion-xor"
+> > +- compatible: Should be "marvell,orion-xor" or "marvell,armada-380-xor"
 >
-> It's needed to enter WFI/WFE state from the ARM refer document when CPU
-> down.
->
-> But......
->
-> Here is my test: (won't to enter the WFI state)
-> @@ -331,8 +331,8 @@ static int rockchip_cpu_kill(unsigned int cpu)
->  static void rockchip_cpu_die(unsigned int cpu)
->  {
->         v7_exit_coherency_flush(louis);
-> -       while (1)
-> -               cpu_do_idle();
-> +       while (1);
-> +               //cpu_do_idle();
->  }
->
-> echo 0 > /sys/module/printk/parameters/console_suspend
-> echo 1 > /sys/power/pm_print_times
-> echo mem > sys/power/state
->
-> You can play anything
-> or do some test for CPU up/down:
->
-> cd /sys/devices/system/cpu/
-> for i in $(seq 10000); do
->   echo "================= $i ============"
->   for j in $(seq 100); do
->     while [[ "$(cat cpu1/online)$(cat cpu2/online)$(cat cpu3/online)" !=
-> "000" ]]; do
->
->       echo 0 > cpu1/online
->       echo 0 > cpu2/online
->       echo 0 > cpu3/online
->     done
->     while [[ "$(cat cpu1/online)$(cat cpu2/online)$(cat cpu3/online)" !=
-> "111" ]]; do
->       echo 1 > cpu1/online
->       echo 1 > cpu2/online
->       echo 1 > cpu3/online
->     done
->   done
-> done
-> Sometimes,the system will be restart when do the about test.
+> marvell,armada-380-xor doesnt seem to exist in binding ?
 
-I assume you meant the _above_ test.  So it sometimes works and
-sometimes doesn't?  Strange...
+I'm not sure what you mean, this patch precisely adds that compatible
+to the bindings documentation.
 
-> I'm no sure what's happen, That maybe abnormal won't to enter the WFI state.
+Maxime
 
-Good test.  I think I understood what you said above: basically if you
-don't get to the WFI state then the system will sometimes restart.
-
-I guess that seems a little strange to me since I would have thought
-that since you assert "reset" to the CPU before you power it off it
-wouldn't matter a whole lot what state the system was in.  The
-processor has exited concurrency and isn't touching any memory, so
-nothing it does should be hurting anyone.  ...but I also am only
-guessing about how all this works / trying to use common sense.  If we
-really need to be in WFI/WFE then I guess that's what we need to do.
-
-It still makes me nervous to say both that we "need to be in WFI" and
-that we have a loop around cpu_do_idle().  The loop implies that
-cpu_do_idle() might return sometimes.  That would be OK, except now
-we've learned that if we happen to kill the CPU while we're executing
-the loop that it might crash the system.  That's pretty non-ideal.  I
-know the chances are incredibly unlikely, but still something that
-worries me...
-
-
--Doug
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150608/acaef5d5/attachment.sig>
