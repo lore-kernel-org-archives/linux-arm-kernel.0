@@ -1,65 +1,105 @@
-From: ludovic.desroches@atmel.com (Ludovic Desroches)
-Date: Mon, 8 Jun 2015 15:55:48 +0200
-Subject: [PATCH] ARM: at91/dt: sama5d4: fix dma conf for aes,
- sha and tdes nodes
-Message-ID: <1433771754-4999-1-git-send-email-ludovic.desroches@atmel.com>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Mon, 8 Jun 2015 16:02:58 +0200
+Subject: [PATCH v3 1/2] drm/bridge: dw-hdmi: support optional supply
+ regulators
+In-Reply-To: <20150605231058.GQ7557@n2100.arm.linux.org.uk>
+References: <4184159.j0iXe39dFB@phil> <2619686.csNBBFyt8W@phil>
+ <20150605110159.GA16254@ulmo.nvidia.com>
+ <23123577.mOoqGCAPdL@diego>
+ <20150605231058.GQ7557@n2100.arm.linux.org.uk>
+Message-ID: <20150608140256.GA10354@ulmo.nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The xdmac channel configuration is done in one cell not two. This error
-prevents from probing devices correctly.
+On Sat, Jun 06, 2015 at 12:10:58AM +0100, Russell King - ARM Linux wrote:
+> On Fri, Jun 05, 2015 at 02:16:40PM +0200, Heiko St?bner wrote:
+> > Hi Thierry
+> > 
+> > Am Freitag, 5. Juni 2015, 13:02:01 schrieb Thierry Reding:
+> > > If this is specific to the Rockchip implementation, shouldn't this go
+> > > into Documentation/devicetree/bindings/video/dw_hdmi-rockchip.txt? It
+> > > could then simply go into the Rockchip DRM tree.
+> > 
+> > actually, we determined that the supply names are universal to the IP
+> > (both in imx and rockchip and probably more if there are more users
+> > out there). Just Russell requested that we don't pollute the generic
+> > code until necessary, as it looks like the supply of those is somehow
+> > handled internally on the imx.
+> 
+> Why do you think it's universal?
+> 
+> Let's start from the beginning, before we create something that's not
+> representative of the hardware.
+> 
+> dw_hdmi actually drives two pieces of hardware - the HDMI transmitter,
+> and a separate hardware block, the HDMI phy.
+> 
+> There are at least two possible HDMI phys referenced in the iMX
+> documentation - there is one called HEAC which doesn't appear in iMX
+> devices afaik, and the one which does, which is a 3D phy.
 
-Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com>
-Fixes: 83906783b766 ("ARM: at91/dt: sama5d4: add aes, sha and tdes nodes")
-Cc: stable at vger.kernel.org # 4.1
----
- arch/arm/boot/dts/sama5d4.dtsi | 20 ++++++++++----------
- 1 file changed, 10 insertions(+), 10 deletions(-)
+I'm not sure I understand correctly. Are these PHYs exchangeable? Does
+the DesignWare IP provide them or could they be provided separately? I
+see register definitions for a "source" PHY and a "master" PHY, where
+the latter seems to be an I2C controller rather than a PHY. Perhaps it
+is used to communicate with an external PHY?
 
-diff --git a/arch/arm/boot/dts/sama5d4.dtsi b/arch/arm/boot/dts/sama5d4.dtsi
-index 6b1bb58..51ddec4 100644
---- a/arch/arm/boot/dts/sama5d4.dtsi
-+++ b/arch/arm/boot/dts/sama5d4.dtsi
-@@ -1125,10 +1125,10 @@
- 				compatible = "atmel,at91sam9g46-aes";
- 				reg = <0xfc044000 0x100>;
- 				interrupts = <12 IRQ_TYPE_LEVEL_HIGH 0>;
--				dmas = <&dma0 (AT91_XDMAC_DT_MEM_IF(0) | AT91_XDMAC_DT_PER_IF(1))
--					AT91_XDMAC_DT_PERID(41)>,
--				       <&dma0 (AT91_XDMAC_DT_MEM_IF(0) | AT91_XDMAC_DT_PER_IF(1))
--					AT91_XDMAC_DT_PERID(40)>;
-+				dmas = <&dma0 (AT91_XDMAC_DT_MEM_IF(0) | AT91_XDMAC_DT_PER_IF(1)
-+					| AT91_XDMAC_DT_PERID(41))>,
-+				       <&dma0 (AT91_XDMAC_DT_MEM_IF(0) | AT91_XDMAC_DT_PER_IF(1)
-+					| AT91_XDMAC_DT_PERID(40))>;
- 				dma-names = "tx", "rx";
- 				clocks = <&aes_clk>;
- 				clock-names = "aes_clk";
-@@ -1139,10 +1139,10 @@
- 				compatible = "atmel,at91sam9g46-tdes";
- 				reg = <0xfc04c000 0x100>;
- 				interrupts = <14 IRQ_TYPE_LEVEL_HIGH 0>;
--				dmas = <&dma0 (AT91_XDMAC_DT_MEM_IF(0) | AT91_XDMAC_DT_PER_IF(1))
--					AT91_XDMAC_DT_PERID(42)>,
--				       <&dma0 (AT91_XDMAC_DT_MEM_IF(0) | AT91_XDMAC_DT_PER_IF(1))
--					AT91_XDMAC_DT_PERID(43)>;
-+				dmas = <&dma0 (AT91_XDMAC_DT_MEM_IF(0) | AT91_XDMAC_DT_PER_IF(1)
-+					| AT91_XDMAC_DT_PERID(42))>,
-+				       <&dma0 (AT91_XDMAC_DT_MEM_IF(0) | AT91_XDMAC_DT_PER_IF(1)
-+					| AT91_XDMAC_DT_PERID(43))>;
- 				dma-names = "tx", "rx";
- 				clocks = <&tdes_clk>;
- 				clock-names = "tdes_clk";
-@@ -1153,8 +1153,8 @@
- 				compatible = "atmel,at91sam9g46-sha";
- 				reg = <0xfc050000 0x100>;
- 				interrupts = <15 IRQ_TYPE_LEVEL_HIGH 0>;
--				dmas = <&dma0 (AT91_XDMAC_DT_MEM_IF(0) | AT91_XDMAC_DT_PER_IF(1))
--					AT91_XDMAC_DT_PERID(44)>;
-+				dmas = <&dma0 (AT91_XDMAC_DT_MEM_IF(0) | AT91_XDMAC_DT_PER_IF(1)
-+					| AT91_XDMAC_DT_PERID(44))>;
- 				dma-names = "tx";
- 				clocks = <&sha_clk>;
- 				clock-names = "sha_clk";
--- 
-2.2.0
+Can somebody give me a quick summary (or point me to documentation) on
+how this works?
+
+> The 3D phy top level IO diagram does have VPH and VP power supplies,
+> but it also has VP_FILT0, VP_FILT1, VP_FILT2, VP_FILT3 and GD labelled
+> up as "Power supply signals".  Where they connect to in the rest of the
+> system - or whether they are connected - is undocumented.
+> 
+> The HDMI transmitter itself is not documented what it's supplies
+> actually are.
+> 
+> So, what we currently have in DT for dw_hdmi is something which doesn't
+> _quite_ reflect the hardware right now, and to go adding VP and VPH
+> supplies to the generic binding is wrong - it doesn't follow the
+> hardware structure detailed in the iMX documentation I have.
+> 
+> As the Rockchip documentation is not available, I can't comment whether
+> it would be current proposal is appropriate for Rockchip or not, which
+> is why I haven't commented on this other than saying that it's not
+> appropriate to be a generic dw_hdmi binding.
+> 
+> If we wanted to model this correctly, then for iMX, I would suggest
+> that the HDMI phy should be modelled in DT, and _all_ the six VP*
+> supplies are modelled - and we should assume that "GD" is a "power
+> good" signal, though we don't know that for certain.
+
+Perhaps VP_FILT* are sourced from the same supply as VP, so maybe we
+don't have to care at the DT level?
+
+> What we also don't know on iMX6 is what voltages any of these are
+> supplied with.
+
+A rather common nuisance with these licensed IP blocks is that some of
+the details may be hidden in SoC glue, resulting in the interface being
+different on each SoC. Given all of the above it sounds like i.MX could
+have some internal glue to supply VP and VPH and there'd be no sensible
+way to represent them in DT.
+
+> So, as we don't have much certainty here, and we know that adding it
+> to what is the HDMI transmitter would be wrong, I'd suggest not
+> modelling it in a generic way at present.
+
+Does DesignWare by any chance offer documentation about the IP? If not I
+agree that the safest thing to do for now would be to make this Rockchip
+specific. If it should prove to be generic after all (in which case i.MX
+would seem to provide SoC glue to supply them) we can still promote the
+supplies to be generic. They'd need to be optional to handle the i.MX,
+though. Or perhaps a dummy regulator could be referenced, representing
+the SoC-internal supply to the block. Maybe there even is a (SoC-
+specific) way to control this internal regulator?
+
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150608/a9533e31/attachment.sig>
