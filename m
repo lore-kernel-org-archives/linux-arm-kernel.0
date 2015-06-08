@@ -1,236 +1,87 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Mon, 8 Jun 2015 13:35:24 +0200
-Subject: [PATCH v2] arm/arm64: KVM: Properly account for guest CPU time
-In-Reply-To: <557194E7.5020102@samsung.com>
-References: <1432838950-28774-1-git-send-email-christoffer.dall@linaro.org>
- <5568E987.5010702@samsung.com> <20150531065923.GB763@cbox>
- <556C7EC6.3010105@samsung.com> <20150602092759.GA7783@cbox>
- <557194E7.5020102@samsung.com>
-Message-ID: <20150608113524.GA2001@cbox>
+From: valentin.longchamp@keymile.com (Valentin Longchamp)
+Date: Mon, 08 Jun 2015 13:46:29 +0200
+Subject: [ehci-orion] ETIMEOUT with ehci_setup()'s ehci_halt()
+In-Reply-To: <5572E4E8.2060405@gmail.com>
+References: <5571B38E.7080505@keymile.com> <20150605151930.GA16909@lunn.ch>
+ <5572E4E8.2060405@gmail.com>
+Message-ID: <55758095.2030609@keymile.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 05, 2015 at 05:24:07AM -0700, Mario Smarduch wrote:
-> On 06/02/2015 02:27 AM, Christoffer Dall wrote:
-> > On Mon, Jun 01, 2015 at 08:48:22AM -0700, Mario Smarduch wrote:
-> >> On 05/30/2015 11:59 PM, Christoffer Dall wrote:
-> >>> Hi Mario,
-> >>>
-> >>> On Fri, May 29, 2015 at 03:34:47PM -0700, Mario Smarduch wrote:
-> >>>> On 05/28/2015 11:49 AM, Christoffer Dall wrote:
-> >>>>> Until now we have been calling kvm_guest_exit after re-enabling
-> >>>>> interrupts when we come back from the guest, but this has the
-> >>>>> unfortunate effect that CPU time accounting done in the context of timer
-> >>>>> interrupts occurring while the guest is running doesn't properly notice
-> >>>>> that the time since the last tick was spent in the guest.
-> >>>>>
-> >>>>> Inspired by the comment in the x86 code, move the kvm_guest_exit() call
-> >>>>> below the local_irq_enable() call and change __kvm_guest_exit() to
-> >>>>> kvm_guest_exit(), because we are now calling this function with
-> >>>>> interrupts enabled.  We have to now explicitly disable preemption and
-> >>>>> not enable preemption before we've called kvm_guest_exit(), since
-> >>>>> otherwise we could be preempted and everything happening before we
-> >>>>> eventually get scheduled again would be accounted for as guest time.
-> >>>>>
-> >>>>> At the same time, move the trace_kvm_exit() call outside of the atomic
-> >>>>> section, since there is no reason for us to do that with interrupts
-> >>>>> disabled.
-> >>>>>
-> >>>>> Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
-> >>>>> ---
-> >>>>> This patch is based on kvm/queue, because it has the kvm_guest_enter/exit
-> >>>>> rework recently posted by Christian Borntraeger.  I hope I got the logic
-> >>>>> of this right, there were 2 slightly worrying facts about this:
-> >>>>>
-> >>>>> First, we now enable and disable and enable interrupts on each exit
-> >>>>> path, but I couldn't see any performance overhead on hackbench - yes the
-> >>>>> only benchmark we care about.
-> >>>>>
-> >>>>> Second, looking at the ppc and mips code, they seem to also call
-> >>>>> kvm_guest_exit() before enabling interrupts, so I don't understand how
-> >>>>> guest CPU time accounting works on those architectures.
-> >>>>>
-> >>>>> Changes since v1:
-> >>>>>  - Tweak comment and commit text based on Marc's feedback.
-> >>>>>  - Explicitly disable preemption and enable it only after kvm_guest_exit().
-> >>>>>
-> >>>>>  arch/arm/kvm/arm.c | 21 +++++++++++++++++----
-> >>>>>  1 file changed, 17 insertions(+), 4 deletions(-)
-> >>>>>
-> >>>>> diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
-> >>>>> index e41cb11..fe8028d 100644
-> >>>>> --- a/arch/arm/kvm/arm.c
-> >>>>> +++ b/arch/arm/kvm/arm.c
-> >>>>> @@ -532,6 +532,7 @@ int kvm_arch_vcpu_ioctl_run(struct kvm_vcpu *vcpu, struct kvm_run *run)
-> >>>>>  		kvm_vgic_flush_hwstate(vcpu);
-> >>>>>  		kvm_timer_flush_hwstate(vcpu);
-> >>>>>  
-> >>>>> +		preempt_disable();
-> >>>>>  		local_irq_disable();
-> >>>>>  
-> >>>>>  		/*
-> >>>>> @@ -544,6 +545,7 @@ int kvm_arch_vcpu_ioctl_run(struct kvm_vcpu *vcpu, struct kvm_run *run)
-> >>>>>  
-> >>>>>  		if (ret <= 0 || need_new_vmid_gen(vcpu->kvm)) {
-> >>>>>  			local_irq_enable();
-> >>>>> +			preempt_enable();
-> >>>>>  			kvm_timer_sync_hwstate(vcpu);
-> >>>>>  			kvm_vgic_sync_hwstate(vcpu);
-> >>>>>  			continue;
-> >>>>> @@ -559,8 +561,10 @@ int kvm_arch_vcpu_ioctl_run(struct kvm_vcpu *vcpu, struct kvm_run *run)
-> >>>>>  		ret = kvm_call_hyp(__kvm_vcpu_run, vcpu);
-> >>>>>  
-> >>>>>  		vcpu->mode = OUTSIDE_GUEST_MODE;
-> >>>>> -		__kvm_guest_exit();
-> >>>>> -		trace_kvm_exit(kvm_vcpu_trap_get_class(vcpu), *vcpu_pc(vcpu));
-> >>>>> +		/*
-> >>>>> +		 * Back from guest
-> >>>>> +		 *************************************************************/
-> >>>>> +
-> >>>>>  		/*
-> >>>>>  		 * We may have taken a host interrupt in HYP mode (ie
-> >>>>>  		 * while executing the guest). This interrupt is still
-> >>>>> @@ -574,8 +578,17 @@ int kvm_arch_vcpu_ioctl_run(struct kvm_vcpu *vcpu, struct kvm_run *run)
-> >>>>>  		local_irq_enable();
-> >>>>>  
-> >>>>>  		/*
-> >>>>> -		 * Back from guest
-> >>>>> -		 *************************************************************/
-> >>>>> +		 * We do local_irq_enable() before calling kvm_guest_exit() so
-> >>>>> +		 * that if a timer interrupt hits while running the guest we
-> >>>>> +		 * account that tick as being spent in the guest.  We enable
-> >>>>> +		 * preemption after calling kvm_guest_exit() so that if we get
-> >>>>> +		 * preempted we make sure ticks after that is not counted as
-> >>>>> +		 * guest time.
-> >>>>> +		 */
-> >>>>> +		kvm_guest_exit();
-> >>>>> +		trace_kvm_exit(kvm_vcpu_trap_get_class(vcpu), *vcpu_pc(vcpu));
-> >>>>> +		preempt_enable();
-> >>>>> +
-> >>>>>  
-> >>>>>  		kvm_timer_sync_hwstate(vcpu);
-> >>>>>  		kvm_vgic_sync_hwstate(vcpu);
-> >>>>>
-> >>>>
-> >>>> Hi Christoffer,
-> >>>>  so currently we take a snap shot when we enter the guest
-> >>>> (tsk->vtime_snap) and upon exit add the time we spent in
-> >>>> the guest and update accrued time, which appears correct.
-> >>>
-> >>> not on arm64, because we don't select HAVE_VIRT_CPU_ACCOUNTING_GEN.  Or
-> >>> am I missing something obvious here?
-> >> I see what you mean we can't use cycle based accounting to accrue
-> >> Guest time.
-> >>
-> > 
-> > See other thread, we can enable this in the config but it still only
-> > works with NO_HZ_FULL.
-> > 
-> >>>
-> >>>>
-> >>>> With this patch it appears that interrupts running
-> >>>> in host mode are accrued to Guest time, and additional preemption
-> >>>> latency is added.
-> >>>>
-> >>> It is true that interrupt processing in host mode (if they hit on a CPU
-> >>> when it is running a guest) are accrued to guest time, but without this
-> >>> patch on current arm64 we accrue no CPU time to guest time at all, which
-> >>> is hardly more correct.
-> >> Yes if only ticks are supported then it's definitely better!
-> >>
-> >> Nevertheless with high interrupt rate it will complicate root causing
-> >> issues, a lot of that time will go to guest.
-> > 
-> > That sounds like a separate fix to me; if there's an existing mechanism
-> > to account for time spent on hw IRQs and it is somehow invalidated by
-> > the PF_VCPU flag being set, then that feels wrong, at least how arm64
-> > works, but it doesn't make this patch less correct.
+On 06/06/2015 02:17 PM, Sebastian Hesselbarth wrote:
+> On 05.06.2015 17:19, Andrew Lunn wrote:
+>> On Fri, Jun 05, 2015 at 04:34:54PM +0200, Valentin Longchamp wrote:
+>>> I am currently bringing up the USB 2.0 Host controller of the Bobcat's (98DX4122
+>>> Marvell switch) internal kirkwood CPU on a variation of Keymile's km_kirwood
+>>> hardware (kirkwood-km_kirkwood.dts).
+>>>
+>>> When the driver registers its hcd, it fails with a timemout as it can be seen in
+>>> the below log:
+>>>
+>>>> root at kmcoge5un:~# dmesg -n 8
+>>>> root at kmcoge5un:~# insmod ehci-orion.ko
+>>>> ehci-orion: EHCI orion driver
+>>>> Initializing Orion-SoC USB Host Controller
+>>>> orion-ehci f1050000.ehci: EHCI Host Controller
+>>>> orion-ehci f1050000.ehci: new USB bus registered, assigned bus number 1
+>>>> orion-ehci f1050000.ehci: reset hcs_params 0x10011 dbg=0 ind cc=0 pcc=0 ordered ports=1
+>>>> orion-ehci f1050000.ehci: reset hcc_params 0006 thresh 0 uframes 256/512/1024 park
+>>>> orion-ehci f1050000.ehci: park 0
+>>>> orion-ehci f1050000.ehci: reset command 0080002 (park)=0 ithresh=8 period=1024 Reset HALT
+>>>> orion-ehci f1050000.ehci: can't setup
+>>>> orion-ehci f1050000.ehci: USB bus 1 deregistered
+>>>> orion-ehci f1050000.ehci: init f1050000.ehci fail, -110
+>>>> orion-ehci: probe of f1050000.ehci failed with error -110
+>>>
+>>> This is very similar to this problem, except that it always happens:
+>>> https://lkml.org/lkml/2012/6/4/381
+>>>
+>>> I have cornered it out to the last handshake() call of the ehci_halt() call,
+>>> that should set the controller in the HALT state. If I comment this handshake()
+>>> call out, the registration is fine and the controller then looks OK (I don't
+>>> have a hardware with a real USB bus to further test it yet).
 > 
-> Tracing through the code (account_system_time()) it appears if the
-> timer fires while an IRQ runs, tick are accounted to host IRQ
-> mode (CPUTIME_IRQ). Otherwise it's accrued to guest. Under heavy
-> interrupt load it's likely guest will mis some ticks, it appears
-> it's the reverse of what I initially thought but in practice
-> guest time should be ok as far as ticks go.
+> Valentin,
 > 
-> > 
-> >>
-> >>>
-> >>> If this patch is incorrect, then how does it work on x86, where
-> >>> handle_external_intr() is called (with a barrier in between) before
-> >>> kvm_guest_exit(), and where handle_external_intr() is simply
-> >>> local_irq_enable() on SVM and something more complicated on VMX ?
-> >>>
-> >>> Finally, how exactly is preemption latency added here?   Won't IRQ
-> >>> processing run with higher priority than any task on your system, so the
-> >>> order of (1) process pending IRQs (2) call schedule if needed is still
-> >>> preserved here, but we call kvm_guest_exit() between (1) and (2) instead
-> >>> of before (1).
-> >>
-> >> I may be missing something, but on return from interrupt with preempt
-> >> disabled we can't take the need resched path. And need to return
-> >> to KVM no?
-> > 
-> > preempt_enable() will call __preempt_schedule() and cause preemption
-> > there, so you're talking about adding these lines of latency:t
-> > 
-> > 	kvm_guest_exit();
-> > 	trace_kvm_exit(kvm_vcpu_trap_get_class(vcpu), *vcpu_pc(vcpu));
-> 
-> On return from IRQ this should execute - and el1_preempt won't
-> get called.
-> 
-> #ifdef CONFIG_PREEMPT
->         get_thread_info tsk
->         ldr     w24, [tsk, #TI_PREEMPT]         // get preempt count
->         cbnz    w24, 1f                         // preempt count != 0
->         ldr     x0, [tsk, #TI_FLAGS]            // get flags
->         tbz     x0, #TIF_NEED_RESCHED, 1f       // needs rescheduling?
->         bl      el1_preempt
-> 1:
-> #endif
-> 
+> can you specify what "real USB bus" means? Does your current hardware
+> support USB host or device with anything connected to it?
 
-I understand that, but then you call preempt_enable right after which
-calls __preempt_schedule() which has the same affect as that asm snippet
-you pasted here.
+No. The current hardware I am testing on does not support USB since the USB bus
+is not "wired" at all, there is no phy present (this maybe causes a problem ?).
+What I test is if the ehci-orion USB host driver is able to register with and
+configure the USB host controller present in the SoC, in order to prepare things
+for when the hardware is available.
+
+Hopefully I get some new hardware prototypes where the USB bus is complete this
+week so that I can test on the real setup.
 
 > 
-> > 
-> > And these were called with interrupts disabled before, so I don't see
-> > the issue??
-> > 
-> > However, your question is making me think whether we have a race in the
-> > current code on fully preemptible kernels, if we get preempted before
-> > calling kvm_timer_sync_hwstate() and kvm_vgic_sync_hwstate(), then we
-> > could potentially schedule another vcpu on this core and loose/corrupt
-> > state, can we not?  We probably need to check for this in
-> > kvm_vcpu_load/kvm_vcpu_put.  I need to think more about if this is a
-> > real issue or if I'm seeing ghosts.
+>>> My current idea is that maybe a reset or an initialization may be missing, but I
+>>> wanted to ask if anybody already has seen a similar behavior with the various
+>>> hardware platform supported by ehci-orion ?
 > 
-> Yes appears like it could be an issue in PREEMPT mode.
+> You might want to tryout chipidea DRC too. We do need some mvebu boiler
+> plate code to setup mbus registers but the IP definitely is chipidea.
 
-see separate mail, I don't believe this to be an issue anymore.
+OK, that's good to know, I will have a look at this driver and maybe I can find
+a few differences there. ehci-orion is however stil the driver to use with this
+platform, right ?
 
-> > 
-> >>>
-> >>> It is entirely possible that I'm missing the mark here and everything
-> >>> gets solved by enabling HAVE_VIRT_CPU_ACCOUNTING_GEN or we need some
-> >>> extra logic?
-> >>
-> >> I think something to look into for us, taking a low issue to high level
-> >> application - for state machine based type of applications (I guess like
-> >> NFV) it cause problems  to root cause issues, a lot of activities
-> >> run between ticks. For VM cycle based accounting is probably a must
-> >> in that case.
-> >>
-> > Would you run with NO_HZ_FULL in this case?  Because then we should just
-> > enable HAVE_VIRT_CPU_ACCOUNTING_GEN, and I think that would be a good
-> > start.
-> It may have a use case to run an isolated vCPU, but in general any mode
-> may be used (,NO_HZ, even low PERIODIC).
 > 
-ok, but I still think it would be more correct to have this patch than
-not to.
+>> Do you know what phy the 98DX4122 uses? The ehci-orion.c has some code
+>> for handling the Orion5X USB phy. I also think u-boot might also have
+>> some code. Sebastian might know more, i think he implemented USB
+>> support for barebox.
+> 
+>  From my experiments with MVEBU usb phy's I recall that (at least on
+> Armada 370/XP) ehci-orion will hang the system if PHYs are not setup by
+> bootloader. I cannot recall what happened on KW.
+> 
 
--Christoffer
+I tried to look if I found something in u-boot regarding USB and Kirkwood and
+found nothing else that the USB_EHCI_MARVELL. With it enabled, u-boot is able to
+init the controller and scan the "empty" bus, but it then does not help the
+kernel to later probe the ehci-orion driver: it does not more that
+ehci_orion_conf_mbus_windows() from ehci-orion).
+
+Valentin
