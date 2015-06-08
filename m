@@ -1,81 +1,37 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon,  8 Jun 2015 18:04:04 +0100
-Subject: [PATCH 09/10] KVM: arm/arm64: timer: Allow the timer to control the
- active state
+Date: Mon,  8 Jun 2015 18:04:00 +0100
+Subject: [PATCH 05/10] KVM: arm/arm64: vgic: Relax vgic_can_sample_irq for
+ edge IRQs
 In-Reply-To: <1433783045-8002-1-git-send-email-marc.zyngier@arm.com>
 References: <1433783045-8002-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1433783045-8002-10-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1433783045-8002-6-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In order to remove the crude hack where we sneak the masked bit
-into the timer's control register, make use of the phys_irq_map
-API control the active state of the interrupt.
+We only set the irq_queued flag for level interrupts, meaning
+that "!vgic_irq_is_queued(vcpu, irq)" is a good enough predicate
+for all interrupts.
+
+This will allow us to inject edge HW interrupts, for which the
+state ACTIVE+PENDING is not allowed.
 
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- include/kvm/arm_arch_timer.h |  3 +++
- virt/kvm/arm/arch_timer.c    | 13 +++++++++++--
- 2 files changed, 14 insertions(+), 2 deletions(-)
+ virt/kvm/arm/vgic.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/include/kvm/arm_arch_timer.h b/include/kvm/arm_arch_timer.h
-index e596675..9feebf1 100644
---- a/include/kvm/arm_arch_timer.h
-+++ b/include/kvm/arm_arch_timer.h
-@@ -52,6 +52,9 @@ struct arch_timer_cpu {
+diff --git a/virt/kvm/arm/vgic.c b/virt/kvm/arm/vgic.c
+index 78fb820..59ed7a3 100644
+--- a/virt/kvm/arm/vgic.c
++++ b/virt/kvm/arm/vgic.c
+@@ -377,7 +377,7 @@ void vgic_cpu_irq_clear(struct kvm_vcpu *vcpu, int irq)
  
- 	/* Timer IRQ */
- 	const struct kvm_irq_level	*irq;
-+
-+	/* VGIC mapping */
-+	struct irq_phys_map		*map;
- };
- 
- int kvm_timer_hyp_init(void);
-diff --git a/virt/kvm/arm/arch_timer.c b/virt/kvm/arm/arch_timer.c
-index 98c95f2..b9fff78 100644
---- a/virt/kvm/arm/arch_timer.c
-+++ b/virt/kvm/arm/arch_timer.c
-@@ -64,7 +64,7 @@ static void kvm_timer_inject_irq(struct kvm_vcpu *vcpu)
- 	int ret;
- 	struct arch_timer_cpu *timer = &vcpu->arch.timer_cpu;
- 
--	timer->cntv_ctl |= ARCH_TIMER_CTRL_IT_MASK;
-+	vgic_set_phys_irq_active(timer->map, true);
- 	ret = kvm_vgic_inject_irq(vcpu->kvm, vcpu->vcpu_id,
- 				  timer->irq->irq,
- 				  timer->irq->level);
-@@ -117,7 +117,8 @@ bool kvm_timer_should_fire(struct kvm_vcpu *vcpu)
- 	cycle_t cval, now;
- 
- 	if ((timer->cntv_ctl & ARCH_TIMER_CTRL_IT_MASK) ||
--		!(timer->cntv_ctl & ARCH_TIMER_CTRL_ENABLE))
-+	    !(timer->cntv_ctl & ARCH_TIMER_CTRL_ENABLE) ||
-+	    vgic_get_phys_irq_active(timer->map))
- 		return false;
- 
- 	cval = timer->cntv_cval;
-@@ -196,6 +197,13 @@ void kvm_timer_vcpu_reset(struct kvm_vcpu *vcpu,
- 	 * vcpu timer irq number when the vcpu is reset.
- 	 */
- 	timer->irq = irq;
-+
-+	/*
-+	 * Tell the VGIC that the virtual interrupt is tied to a
-+	 * physical interrupt. We do that once per VCPU.
-+	 */
-+	timer->map = vgic_map_phys_irq(vcpu, irq->irq, host_vtimer_irq);
-+	WARN_ON(!timer->map);
+ static bool vgic_can_sample_irq(struct kvm_vcpu *vcpu, int irq)
+ {
+-	return vgic_irq_is_edge(vcpu, irq) || !vgic_irq_is_queued(vcpu, irq);
++	return !vgic_irq_is_queued(vcpu, irq);
  }
  
- void kvm_timer_vcpu_init(struct kvm_vcpu *vcpu)
-@@ -335,6 +343,7 @@ void kvm_timer_vcpu_terminate(struct kvm_vcpu *vcpu)
- 	struct arch_timer_cpu *timer = &vcpu->arch.timer_cpu;
- 
- 	timer_disarm(timer);
-+	vgic_unmap_phys_irq(vcpu, timer->map);
- }
- 
- void kvm_timer_enable(struct kvm *kvm)
+ /**
 -- 
 2.1.4
