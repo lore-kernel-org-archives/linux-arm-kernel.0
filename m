@@ -1,126 +1,66 @@
-From: linux.amoon@gmail.com (Anand Moon)
-Date: Mon, 8 Jun 2015 15:50:06 +0530
-Subject: [RESEND 1/2] usb: ehci-exynos: Make provision for vdd regulators
-In-Reply-To: <44B5E2FDCD3244AAA418BB8EC28FEA25@sisodomain.com>
-References: <1433683242-3945-1-git-send-email-linux.amoon@gmail.com>
- <5574F97A.5030104@samsung.com>
- <CANAwSgTjx8uxyOTW8uuiqrcNzF+UwLMmML2OcDgG5Ku_56=vJQ@mail.gmail.com>
- <CAJKOXPfDmt5VMqr-P+OpWy1+jz675CFRPmtS_N0HjN4tWxfwtA@mail.gmail.com>
- <44B5E2FDCD3244AAA418BB8EC28FEA25@sisodomain.com>
-Message-ID: <CANAwSgTi114wO63-sx=UmbxPerqKvstq=coVyqhRkzX44CDe_w@mail.gmail.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 8 Jun 2015 11:21:05 +0100
+Subject: [PATCH] arm64: fix missing syscall trace exit
+In-Reply-To: <1433539683-29539-1-git-send-email-jistone@redhat.com>
+References: <20150605153816.GG7420@arm.com>
+ <1433539683-29539-1-git-send-email-jistone@redhat.com>
+Message-ID: <20150608102104.GB1654@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 8 June 2015 at 10:58, Vivek Gautam <gautam.vivek@samsung.com> wrote:
-> Hi,
->
->
->
-> On Monday, June 08, 2015 10:44 AM, "Krzysztof Kozlowski"
-> <k.kozlowski@samsung.com> wrote:
->
-> my apologies for being late in replying to this thread.
->
->> 2015-06-08 13:21 GMT+09:00 Anand Moon <linux.amoon@gmail.com>:
->>>
->>> Hi Krzysztof ,
->>>
->>> On 8 June 2015 at 07:40, Krzysztof Kozlowski <k.kozlowski@samsung.com>
->>> wrote:
->>>>
->>>> On 07.06.2015 22:20, Anand Moon wrote:
->>>>>
->>>>> Facilitate getting required 3.3V and 1.0V VDD supply for
->>>>> EHCI controller on Exynos.
->>>>>
->>>>> With the patches for regulators' nodes merged in 3.15:
->>>>> c8c253f ARM: dts: Add regulator entries to smdk5420
->>>>> 275dcd2 ARM: dts: add max77686 pmic node for smdk5250,
->>>>> the exynos systems turn on only minimal number of regulators.
->>>>>
->>>>> Until now, the VDD regulator supplies were either turned on
->>>>> by the bootloader, or the regulators were enabled by default
->>>>> in the kernel, so that the controller drivers did not need to
->>>>> care about turning on these regulators on their own.
->>>>> This was rather bad about these controller drivers.
->>>>> So ensuring now that the controller driver requests the necessary
->>>>> VDD regulators (if available, unless there are direct VDD rails),
->>>>> and enable them so as to make them working.
->>>>>
->>>>> Signed-off-by: Vivek Gautam <gautam.vivek@samsung.com>
->>>>> Signed-off-by: Anand Moon <linux.amoon@gmail.com>
->>>>> Cc: Jingoo Han <jg1.han@samsung.com>
->>>>> Cc: Alan Stern <stern@rowland.harvard.edu>
->>>>> ---
->>>>> Initial version of this patch was part of following series, though
->>>>> they are not dependent on each other, resubmitting after rebasing.
->>>>>
->>>>>
->>>>> http://lists.infradead.org/pipermail/linux-arm-kernel/2014-June/266418.html
->>>>
->>>>
->>>> So you just took Vivek's patch along with all the credits... That is not
->>>> how we usually do this.
->>>>
->>>> I would expect that rebasing a patch won't change the author unless this
->>>> is fine with Vivek.
->>>>
->>>
->>> Sorry If I have done some mistake on my part.
->>> I just looked at below mail chain. Before I send it.
->>>
->>> http://www.spinics.net/lists/linux-samsung-soc/msg44136.html
->>
->>
->> I don't get it. The patch you are referring to has a proper "From"
->> field. So please use it as an example.
->>
->>>
->>> I don't want to take any credit out of it. I just re-base on the new
->>> kernel.
->
-> Perhaps, you would have maintained the authorship !
->
->>> I could not test this patch as it meant for exynos5440 boards.
->>
->>
->> Are you sure? I think the driver is used on almost all of Exynos SoCs
->> (Exynos4, Exynos5250, Exynos542x).
->
->
-> That's correct, as pointed by Krzysztof Kozlowski, the driver is same for
-> Exynos4 and Exynos5 series
-> of SoCs.
->
->> Untested code should not go to the kernel. Additionally you should
->> mark it as not-tested. Marking such patch as non-tested could help you
->> finding some independent tests (tests performed by someone else).
->>
->> To summarize my point of view:
->> 1. Unless Vivek's says otherwise, please give him the credits with
->> proper "from" field.
->> 2. Issues mentioned in previous mail should be addressed (missing
->> IS_ERR(), how disabling the regulator during suspend affects waking
->> up).
->> 3. The patchset must be tested, even after rebasing.
->
->
-> Unfortunately, I got busy  with a different project and lost track of the
-> patches posted upstream.
-> If it's not too late I can post a rebased version of the patch with previous
-> review comments addressed.
->
->>
->> Best regards,
->> Krzysztof
->
->
+Hi Josh,
 
-Hi All,
+Thanks for the patch.
 
-I have learned my lesson not to interfere in others work.
-It will never happen from my side again.
+On Fri, Jun 05, 2015 at 10:28:03PM +0100, Josh Stone wrote:
+> If a syscall is entered without TIF_SYSCALL_TRACE set, then it goes on
+> the fast path.  It's then possible to have TIF_SYSCALL_TRACE added in
+> the middle of the syscall, but ret_fast_syscall doesn't check this flag
+> again.  This causes a ptrace syscall-exit-stop to be missed.
+> 
+> For instance, from a PTRACE_EVENT_FORK reported during do_fork, the
+> tracer might resume with PTRACE_SYSCALL, setting TIF_SYSCALL_TRACE.
+> Now the completion of the fork should have a syscall-exit-stop.
+> 
+> Russell King fixed this on arm by re-checking _TIF_SYSCALL_WORK in the
+> fast exit path.  Do the same on arm64.
+> 
+> v2: Re-enable interrupts before branching to __sys_trace_return.
 
-Please accept my apology.
+Please don't include the changelog in the commit message.
 
--Anand Moon
+> Cc: Catalin Marinas <catalin.marinas@arm.com>
+> Cc: Will Deacon <will.deacon@arm.com>
+> Cc: Russell King <rmk+kernel@arm.linux.org.uk>
+> Signed-off-by: Josh Stone <jistone@redhat.com>
+> ---
+>  arch/arm64/kernel/entry.S | 7 ++++++-
+>  1 file changed, 6 insertions(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
+> index 959fe8733560..988bea43dc74 100644
+> --- a/arch/arm64/kernel/entry.S
+> +++ b/arch/arm64/kernel/entry.S
+> @@ -608,11 +608,16 @@ ENDPROC(cpu_switch_to)
+>   */
+>  ret_fast_syscall:
+>  	disable_irq				// disable interrupts
+> -	ldr	x1, [tsk, #TI_FLAGS]
+> +	ldr	x1, [tsk, #TI_FLAGS]		// re-check for syscall tracing
+> +	and	x2, x1, #_TIF_SYSCALL_WORK
+> +	cbnz	x2, ret_fast_syscall_trace
+>  	and	x2, x1, #_TIF_WORK_MASK
+>  	cbnz	x2, fast_work_pending
+>  	enable_step_tsk x1, x2
+>  	kernel_exit 0, ret = 1
+> +ret_fast_syscall_trace:
+> +	enable_irq				// enable interrupts
+> +	b	__sys_trace_return
+
+Looks good to me:
+
+  Reviewed-by: Will Deacon <will.deacon@arm.com>
+
+I assume this can wait until 4.2?
+
+Will
