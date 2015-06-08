@@ -1,67 +1,34 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 8 Jun 2015 22:53:51 +0200
-Subject: [PATCH v2 3/5] dmaengine: mv_xor: add support for a38x command
- in descriptor mode
-In-Reply-To: <20150608103447.GE28601@localhost>
-References: <1432645656-20504-1-git-send-email-maxime.ripard@free-electrons.com>
- <1432645656-20504-4-git-send-email-maxime.ripard@free-electrons.com>
- <20150608103447.GE28601@localhost>
-Message-ID: <20150608205351.GC23777@lukather>
+From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
+Date: Mon, 8 Jun 2015 13:56:32 -0700
+Subject: next-20150604 build: 2 failures 37 warnings (next-20150604)
+In-Reply-To: <20150605171652.GB14071@sirena.org.uk>
+References: <E1Z0YIL-0008Ma-5O@optimist> <20150604170112.GM14071@sirena.org.uk>
+ <20150604171004.GZ30984@atomide.com>
+ <20150604172026.GA30984@atomide.com>
+ <20150605104900.GA5346@kroah.com>
+ <20150605171652.GB14071@sirena.org.uk>
+Message-ID: <20150608205632.GB11211@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Vinod,
+On Fri, Jun 05, 2015 at 06:16:52PM +0100, Mark Brown wrote:
+> On Fri, Jun 05, 2015 at 07:49:00PM +0900, Greg Kroah-Hartman wrote:
+> > On Thu, Jun 04, 2015 at 10:20:26AM -0700, Tony Lindgren wrote:
+> 
+> > > Greg, there's now commit 9809889c708e in tty-linus and commit
+> > > 9e91597f2423 in tty-next.
+> 
+> > Yes, I can't go back and remove the one in tty-next, I'm guessing when
+> > they are merged there is an issue.  I'll look into that after Linus
+> > pulls in my tty-linus tree.
+> 
+> Yeah, git isn't always spectacularly good at resolving add/add if
+> there's context changes between two things in a merge - it sometimes
+> ends up double adding things.
 
-On Mon, Jun 08, 2015 at 04:04:47PM +0530, Vinod Koul wrote:
-> On Tue, May 26, 2015 at 03:07:34PM +0200, Maxime Ripard wrote:
-> > From: Lior Amsalem <alior@marvell.com>
-> > 
-> > The Marvell Armada 38x SoC introduce new features to the XOR engine,
-> > especially the fact that the engine mode (MEMCPY/XOR/PQ/etc) can be part of
-> > the descriptor and not set through the controller registers.
-> > 
-> > This new feature allows mixing of different commands (even PQ) on the same
-> > channel/chain without the need to stop the engine to reconfigure the engine
-> > mode.
-> > 
-> > Refactor the driver to be able to use that new feature on the Armada 38x,
-> > while keeping the old behaviour on the older SoCs.
-> > 
-> > Signed-off-by: Lior Amsalem <alior@marvell.com>
-> > Reviewed-by: Ofer Heifetz <oferh@marvell.com>
-> > Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-> > ---
-> >  Documentation/devicetree/bindings/dma/mv-xor.txt |  2 +-
-> >  drivers/dma/mv_xor.c                             | 82 ++++++++++++++++++++----
-> >  drivers/dma/mv_xor.h                             |  7 ++
-> >  3 files changed, 76 insertions(+), 15 deletions(-)
-> > 
-> > diff --git a/Documentation/devicetree/bindings/dma/mv-xor.txt b/Documentation/devicetree/bindings/dma/mv-xor.txt
-> > index 7c6cb7fcecd2..cc29c35266e2 100644
-> > --- a/Documentation/devicetree/bindings/dma/mv-xor.txt
-> > +++ b/Documentation/devicetree/bindings/dma/mv-xor.txt
-> > @@ -1,7 +1,7 @@
-> >  * Marvell XOR engines
-> >  
-> >  Required properties:
-> > -- compatible: Should be "marvell,orion-xor"
-> > +- compatible: Should be "marvell,orion-xor" or "marvell,armada-380-xor"
->
-> marvell,armada-380-xor doesnt seem to exist in binding ?
+Ok, I've now merged these branches together, if someone can verify that
+my tty-next branch is correct, that would be great.
 
-I'm not sure what you mean, this patch precisely adds that compatible
-to the bindings documentation.
+thanks,
 
-Maxime
-
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150608/acaef5d5/attachment.sig>
+greg k-h
