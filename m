@@ -1,61 +1,51 @@
-From: l.majewski@samsung.com (Lukasz Majewski)
-Date: Mon, 08 Jun 2015 18:14:59 +0200
-Subject: [PATCH] thermal: exynos: Disable the regulator on probe failure
-In-Reply-To: <1433727349-23330-1-git-send-email-k.kozlowski@samsung.com>
-References: <1433727349-23330-1-git-send-email-k.kozlowski@samsung.com>
-Message-ID: <20150608181459.454c9067@amdc2363>
+From: peter.griffin@linaro.org (Peter Griffin)
+Date: Mon,  8 Jun 2015 17:16:57 +0100
+Subject: [PATCH 0/2]  Add code to release secondary cores from holding pen.
+Message-ID: <1433780219-1245-1-git-send-email-peter.griffin@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Krzysztof,
+Hi Maxime,
 
-> During probe the regulator (if present) was enabled but not disabled
-> in case of failure. So an unsuccessful probe lead to enabling the
-> regulator which was actually not needed because the device was not
-> enabled.
-> 
-> Additionally each deferred probe lead to increase of regulator enable
-> count so it would not be effectively disabled during removal of the
-> device.
+This patchset adds in the necessary code to manage the holding pen for STi
+platforms.
 
-Thanks for catching this.
+Due to all the STi upstream devs using JTAG to boot the STi boards, there
+is currently a SMP bug when booting upstream kernels via u-boot where
+only the primary core is brought up.
 
-> 
-> Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
-> Fixes: 498d22f616f6 ("thermal: exynos: Support for TMU regulator
-> defined at device tree") Cc: <stable@vger.kernel.org>
-> 
-> ---
-> 
-> I am not entirely convinced that this should go to stable. Leaving a
-> regulator enabled in case of probe failure (no exynos TMU device) or
-> after deferred probe (regulator won't be disabled during device
-> removal) is not a critical issue, just leaks power.
-> ---
->  drivers/thermal/samsung/exynos_tmu.c | 2 ++
->  1 file changed, 2 insertions(+)
-> 
-> diff --git a/drivers/thermal/samsung/exynos_tmu.c
-> b/drivers/thermal/samsung/exynos_tmu.c index
-> 531f4b179871..13c3aceed19d 100644 ---
-> a/drivers/thermal/samsung/exynos_tmu.c +++
-> b/drivers/thermal/samsung/exynos_tmu.c @@ -1392,6 +1392,8 @@
-> err_clk_sec: if (!IS_ERR(data->clk_sec))
->  		clk_unprepare(data->clk_sec);
->  err_sensor:
-> +	if (!IS_ERR_OR_NULL(data->regulator))
-> +		regulator_disable(data->regulator);
->  	thermal_zone_of_sensor_unregister(&pdev->dev, data->tzd);
->  
->  	return ret;
+This hasn't been noticed until now because when booting via JTAG the
+stlinux_arm_boot script sets the PC of the secondary cores directly.
 
-Acked-by: Lukasz Majewski <l.majewski@samsung.com>
+I can't test this on a STiH418 platform, as I don't have one, but a similar
+DT change will be required there as well. I'm not sure if u-boot uses
+the same SBC DMEM offset by default or not.
 
-I will test it and afterwards add to samsung-thermal tree.
+With these patches applied booting via u-boot now works correctly.
+
+[    0.045456] CPU: Testing write buffer coherency: ok
+[    0.045597] CPU0: thread -1, cpu 0, socket 0, mpidr 80000000
+[    0.045734] Setting up static identity map for 0x40209000 - 0x40209098
+[    0.065047] CPU1: thread -1, cpu 1, socket 0, mpidr 80000001
+[    0.065081] Brought up 2 CPUs
+[    0.065089] SMP: Total of 2 processors activated (5983.43 BogoMIPS).
+[    0.065092] CPU: All CPU(s) started in SVC mode.
+
+IMHO these should be considered for the next -rc.
+
+regards,
+
+Peter.
+
+Peter Griffin (2):
+  ARM: STi: Add code to release secondary cores from holding pen.
+  ARM: STi: DT: STiH407: Add cpu-release-addr dt property.
+
+ arch/arm/boot/dts/stih407-family.dtsi |  4 +++
+ arch/arm/mach-sti/headsmp.S           |  1 +
+ arch/arm/mach-sti/platsmp.c           | 56 +++++++++++++++++++++++++++++++++--
+ arch/arm/mach-sti/smp.h               |  2 ++
+ 4 files changed, 60 insertions(+), 3 deletions(-)
 
 -- 
-Best regards,
-
-Lukasz Majewski
-
-Samsung R&D Institute Poland (SRPOL) | Linux Platform Group
+1.9.1
