@@ -1,54 +1,54 @@
-From: jeroen@myspectrum.nl (Jeroen Hofstee)
-Date: Tue, 09 Jun 2015 00:00:20 +0200
-Subject: [PATCH] ARM: dts: AM35xx: fix system control module clocks
-In-Reply-To: <alpine.DEB.2.02.1506080234271.15153@utopia.booyaka.com>
-References: <alpine.DEB.2.02.1506010546510.14902@utopia.booyaka.com>
- <1433172627-28052-1-git-send-email-t-kristo@ti.com>
- <556C8ED5.5050000@myspectrum.nl> <20150601173126.GY30984@atomide.com>
- <alpine.DEB.2.02.1506011733180.14902@utopia.booyaka.com>
- <5571576E.6020207@myspectrum.nl> <557157FA.7080305@myspectrum.nl>
- <557411DC.9020109@myspectrum.nl>
- <alpine.DEB.2.02.1506071952490.15153@utopia.booyaka.com>
- <alpine.DEB.2.02.1506080234271.15153@utopia.booyaka.com>
-Message-ID: <55761074.2080109@myspectrum.nl>
+From: khilman@kernel.org (Kevin Hilman)
+Date: Mon, 08 Jun 2015 15:03:04 -0700
+Subject: [PATCH v2 1/2] ARM: Add cpu_resume_arm() for firmwares that
+ resume in ARM state
+In-Reply-To: <55760B6D.7090302@codeaurora.org> (Stephen Boyd's message of
+ "Mon, 08 Jun 2015 14:38:53 -0700")
+References: <1433272378-8470-1-git-send-email-sboyd@codeaurora.org>
+ <1433272378-8470-2-git-send-email-sboyd@codeaurora.org>
+ <20150602234048.GA7557@n2100.arm.linux.org.uk>
+ <20150603001120.GA4534@codeaurora.org>
+ <7h3821ubpf.fsf@deeprootsystems.com> <55760B6D.7090302@codeaurora.org>
+Message-ID: <7htwuhsvs7.fsf@deeprootsystems.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Paul, +Menon (since you asked about the USB_OTG trap),
+Stephen Boyd <sboyd@codeaurora.org> writes:
 
-On 08-06-15 04:38, Paul Walmsley wrote:
-> Hi Jeroen,
->
-> On Sun, 7 Jun 2015, Paul Walmsley wrote:
->
->> On Sun, 7 Jun 2015, Jeroen Hofstee wrote:
+> On 06/08/2015 02:33 PM, Kevin Hilman wrote:
+>> Stephen Boyd <sboyd@codeaurora.org> writes:
 >>
->>>
->>> Turns out my suspicion was wrong. This is what I know at the moment,
->>> depending on the bootpins, u-boot will trigger a bad access when loading
->>> a file over ethernet, but only the first time. Clearing the pending interrupt
->>> before booting linux make the "USB_OTG address hole seen" go away.
->> Oh, too bad.  I had been hoping that you were right and that I was wrong
->> ;-)  I'll try this on the CM-T3517 here.
-> I used your debugging technique here and was able to reproduce your
-> results - with one difference:
+>>> On 06/03, Russell King - ARM Linux wrote:
+>>>> On Tue, Jun 02, 2015 at 12:12:57PM -0700, Stephen Boyd wrote:
+>>>>> Some platforms always enter the kernel in the ARM state even if
+>>>>> the kernel is compiled for THUMB2. Add a small wrapper on top of
+>>>>> cpu_resume() that switches into THUMB2 state.
+>>>>>
+>>>>> This fixes a problem reported by Kevin Hilman on next-20150601
+>>>>> where the ifc6410 fails to boot a THUMB2 kernel because the
+>>>>> platform's firmware always enters the kernel in ARM mode from
+>>>>> deep idle states.
+>>>> I think this bit of the commit message isn't quite correct: this will
+>>>> only resolve the boot problem with a T2 kernel when the failing platform
+>>>> is converted to use the cpu_resume_arm() entry point.
+>>>>
+>>>> Apart from that, the patch looks good to me, thanks.
+>>> Sure, it could say "This provides the functionality to fix a problem
+>>> reported by..."
+>> Stephen, are you planning to submit this through Russell's patch
+>> tracker?  or...
+>>
+>> Russell, should we take this through arm-soc along with PATCH 2/2 which
+>> depends on this one?
+>>
 >
-> http://www.pwsan.com/omap/testlogs/test_v4.1-rc6/20150607194102/boot/cmt3517/cmt3517_log.txt
->
-> The interconnect error was logged upon the first interaction with the
-> network.  In my case this was with the U-boot 'dhcp' command.  The pending
-> interrupt bit was cleared before loading the kernel via tftp, and the
-> interrupt bit was not set again, even after a tftp load.
->
+> I'm happy to see it be applied by arm-soc maintainers directly given
+> that Russell said "the patch looks good to me". The commit text needs a
+> slight reword here though, so I can resubmit the patches to arm-soc if
+> you like.
 
-I sent a patch to u-boot to disable the offending line, see [1]. It would be
-interesting to know if it can also result in valid, accidental memory 
-adjustments,
-before the invalid one, but I haven't checked that yet.
+Go ahead and respin/resubmit, and I can get them ready, but I'll wait
+for an official word or acked-by from Russell before taking them both
+through arm-soc.
 
-Regards,
-Jeroen
-
-[1] https://patchwork.ozlabs.org/patch/481751/
-
-p.s. the USB_OTG trap is actually a musb / emac / camera trap on an am3517.
+Kevin
