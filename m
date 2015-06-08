@@ -1,28 +1,34 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Tue, 09 Jun 2015 08:56:08 +0900
-Subject: [PATCHv2 2/2] ARM: exynos_defconfig: Enable CONFIG_LEDS_PWM for
- Odroid-XU3
-In-Reply-To: <1433696621-4763-2-git-send-email-linux.amoon@gmail.com>
-References: <1433696621-4763-1-git-send-email-linux.amoon@gmail.com>
- <1433696621-4763-2-git-send-email-linux.amoon@gmail.com>
-Message-ID: <55762B98.1080409@samsung.com>
+From: eric@anholt.net (Eric Anholt)
+Date: Mon,  8 Jun 2015 16:58:58 -0700
+Subject: [PATCH v3 5/7] ARM: bcm2835: Drop the fixed sys_pclk.
+In-Reply-To: <1433807940-15328-1-git-send-email-eric@anholt.net>
+References: <1433807940-15328-1-git-send-email-eric@anholt.net>
+Message-ID: <1433807940-15328-5-git-send-email-eric@anholt.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08.06.2015 02:03, Anand Moon wrote:
-> Enable CONFIG_LEDS_PWM amd CONFIG_LEDS_TRIGGER_HEARTBEAT for
-> Odroid-XU3 board.
+Nothing uses it, and I can't find any evidence that anything ever has.
 
-I am a little confused.
+Signed-off-by: Eric Anholt <eric@anholt.net>
+---
+ drivers/clk/clk-bcm2835.c | 5 -----
+ 1 file changed, 5 deletions(-)
 
-This is v2.
-
-I found version 3, a little different:
-http://www.spinics.net/lists/linux-samsung-soc/msg44406.html
-(which
-
-Where is the changelog? Which one is newer? Should we drop the v3?
-While at it, can you add information WHY do you want to enable LEDS?
-
-Best regards,
-Krzysztof
+diff --git a/drivers/clk/clk-bcm2835.c b/drivers/clk/clk-bcm2835.c
+index 6b950ca..dd295e4 100644
+--- a/drivers/clk/clk-bcm2835.c
++++ b/drivers/clk/clk-bcm2835.c
+@@ -32,11 +32,6 @@ void __init bcm2835_init_clocks(void)
+ 	struct clk *clk;
+ 	int ret;
+ 
+-	clk = clk_register_fixed_rate(NULL, "sys_pclk", NULL, CLK_IS_ROOT,
+-					250000000);
+-	if (IS_ERR(clk))
+-		pr_err("sys_pclk not registered\n");
+-
+ 	clk = clk_register_fixed_rate(NULL, "apb_pclk", NULL, CLK_IS_ROOT,
+ 					126000000);
+ 	if (IS_ERR(clk))
+-- 
+2.1.4
