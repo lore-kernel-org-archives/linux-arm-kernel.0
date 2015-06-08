@@ -1,42 +1,60 @@
-From: ludovic.desroches@atmel.com (Ludovic Desroches)
-Date: Mon, 8 Jun 2015 10:33:16 +0200
-Subject: [PATCH v2 3/3] dmaengine: at_xdmac: fix indentation
-In-Reply-To: <1433752399-26231-1-git-send-email-ludovic.desroches@atmel.com>
-References: <1433751820-26142-1-git-send-email-ludovic.desroches@atmel.com>
- <1433752399-26231-1-git-send-email-ludovic.desroches@atmel.com>
-Message-ID: <1433752399-26231-3-git-send-email-ludovic.desroches@atmel.com>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Mon, 8 Jun 2015 10:37:09 +0200
+Subject: [PATCH RESEND v7 2/2] mmc: host: sdhci: Add support to disable
+ SDR104/SDR50/DDR50 based on capability register 0.
+In-Reply-To: <CAOHikRCXuJryKgo7pjehi-SyosE1Rr2zFjc+9yWJwke_ib=Azw@mail.gmail.com>
+References: <1432197817-22110-1-git-send-email-stripathi@apm.com>
+ <1432197817-22110-3-git-send-email-stripathi@apm.com>
+ <CAPDyKFpxkNF9C8AOJ6+18CEcpZTKycPR0i5OuwPRr1Zc+VPJ5Q@mail.gmail.com>
+ <CAOHikRASDmy7PwFjqmX7JAjW52DYR+d3RkE3yd_45NN5sHK7Pg@mail.gmail.com>
+ <CAOHikRBB9Uyh4Z34_pFTdmA0A-vnV09zTi8iYEU+01XvmzSr_A@mail.gmail.com>
+ <20150605145323.GA15110@shlinux1.ap.freescale.net>
+ <CAOHikRCXuJryKgo7pjehi-SyosE1Rr2zFjc+9yWJwke_ib=Azw@mail.gmail.com>
+Message-ID: <CAPDyKFqk1_B-wH0Z2QwfxftJy8LLH6Ey9cg56eFxAj7zmeFmOg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Fix indentation.
+[...]
 
-Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com>
----
- drivers/dma/at_xdmac.c | 12 ++++++------
- 1 file changed, 6 insertions(+), 6 deletions(-)
+>> >
+>> >    Can you test this patch  on imx SoC ?
+>> >
+>>
+>> (Your email have some format issue.)
+>
+> Yeah missed to sent in plain text mode.
+>
+>>
+>> I have tested this patch and it does not break imx SoC.
+>> You can add my tag.
+>> Tested-by: Dong Aisheng <aisheng.dong@freescale.com>
+>
+> Thanks Dong !!
+>
+>>
+>> However, it looks to me SDHCI_CAN_VDD_180 is only indicating the host VDD
+>> capabiliies, not IO voltage capability.
 
-diff --git a/drivers/dma/at_xdmac.c b/drivers/dma/at_xdmac.c
-index e5dd730..7614c5c 100644
---- a/drivers/dma/at_xdmac.c
-+++ b/drivers/dma/at_xdmac.c
-@@ -624,12 +624,12 @@ at_xdmac_prep_slave_sg(struct dma_chan *chan, struct scatterlist *sgl,
- 		       unsigned int sg_len, enum dma_transfer_direction direction,
- 		       unsigned long flags, void *context)
- {
--	struct at_xdmac_chan	*atchan = to_at_xdmac_chan(chan);
--	struct at_xdmac_desc	*first = NULL, *prev = NULL;
--	struct scatterlist	*sg;
--	int			i;
--	unsigned int		xfer_size = 0;
--	unsigned long		irqflags;
-+	struct at_xdmac_chan		*atchan = to_at_xdmac_chan(chan);
-+	struct at_xdmac_desc		*first = NULL, *prev = NULL;
-+	struct scatterlist		*sg;
-+	int				i;
-+	unsigned int			xfer_size = 0;
-+	unsigned long			irqflags;
- 	struct dma_async_tx_descriptor	*ret = NULL;
- 
- 	if (!sgl)
--- 
-2.2.0
+I think Dong is correct. I don't think SDHCI_CAN_VDD_180 is not
+related to UHS modes at all.
+
+At least the name of the field (SDHCI_CAN_VDD_180) indicates it's
+about VDD/VCC, the core power and not the IO voltage.
+
+> Are you sure on this ?? If SDHCI host VDD is  1.8V then the cards are
+> also capable to operate at 1.8V ? Didn't understand what you mean by
+> IO voltage capability
+>
+>
+>> SD3.0 cards require 1.8v IO voltage support.
+>> So should this bit affect SD3.0 support?
+>
+> The preset value resgister says that  SDR modes requires 1.8V and we
+> disable the modes based on capability or quirk.
+
+It requires 1.8V *IO voltage*, not VDD/VCC.
+
+[...]
+
+Kind regards
+Uffe
