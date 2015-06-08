@@ -1,98 +1,70 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Mon,  8 Jun 2015 19:10:47 +0530
-Subject: [PATCH 6/6] clocksource: em_sti: Migrate to new 'set-state' interface
-In-Reply-To: <cover.1433768426.git.viresh.kumar@linaro.org>
-References: <cover.1433768426.git.viresh.kumar@linaro.org>
-Message-ID: <a2be865369ac18c3fb9e014514f4be4d6fc9ebae.1433768426.git.viresh.kumar@linaro.org>
+From: joshc@ni.com (Josh Cartwright)
+Date: Mon, 8 Jun 2015 08:49:14 -0500
+Subject: [PATCH v2 2/2] iio: adc: xilinx-xadc: Add label as an optional
+ argument for aux channels
+In-Reply-To: <55747616.1010901@kernel.org>
+References: <555B78A3.2030202@metafoo.de>
+ <1432135352-29848-1-git-send-email-xander.huff@ni.com>
+ <1432135352-29848-2-git-send-email-xander.huff@ni.com>
+ <55747616.1010901@kernel.org>
+Message-ID: <20150608134914.GF633@jcartwri.amer.corp.natinst.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Migrate em_sti driver to the new 'set-state' interface provided by
-the clockevents core, the earlier 'set-mode' interface is marked
-obsolete now.
+On Sun, Jun 07, 2015 at 05:49:26PM +0100, Jonathan Cameron wrote:
+> On 20/05/15 16:22, Xander Huff wrote:
+> > To better facilitate user-mode access to optional aux channels, allow
+> > device trees to specify a custom label for defined channels.
+> > 
+> > Signed-off-by: Xander Huff <xander.huff@ni.com>
+> > Reviewed-by: Joe Hershberger <joe.hershberger@ni.com>
+> > Reviewed-by: Josh Cartwright <joshc@ni.com>
+> > ---
+> >  drivers/iio/adc/xilinx-xadc-core.c | 3 +++
+> >  1 file changed, 3 insertions(+)
+> > 
+> > diff --git a/drivers/iio/adc/xilinx-xadc-core.c b/drivers/iio/adc/xilinx-xadc-core.c
+> > index ce93bd8..bda4241 100644
+> > --- a/drivers/iio/adc/xilinx-xadc-core.c
+> > +++ b/drivers/iio/adc/xilinx-xadc-core.c
+> > @@ -1119,6 +1119,9 @@ static int xadc_parse_dt(struct iio_dev *indio_dev, struct device_node *np,
+> >  			if (ret || reg > 16)
+> >  				continue;
+> >  
+> > +			of_property_read_string(child, "label",
+> > +						&chan->extend_name);
+> > +
+> >  			if (of_property_read_bool(child, "xlnx,bipolar"))
+> >  				chan->scan_type.sign = 's';
+> >  
+> > 
+> I think what Lars was suggesting was a change to the IIO side of this rather than
+> just changing the device tree binding.
 
-This also enables us to implement callbacks for new states of clockevent
-devices, for example: ONESHOT_STOPPED.
+I'm not so sure.  His observation was just that the typical name of
+these properties is 'label', which I think makes sense and is commonly
+used.
 
-NOTE: This also drops a special check:
+Naming things is hard.
 
-	if (old_mode == CLOCK_EVT_MODE_ONESHOT)
-		em_sti_stop(p, USER_CLOCKEVENT);
+Perhaps, though, an improvement may be made if we lifted this out of the
+xadc driver and moved it into the IIO core (I can't imagine that this
+driver is the only one representing each channel with a separate node in
+DT).
 
-as it doesn't look like that important. This driver only supports
-ONESHOT and we can only move only to SHUTDOWN from ONESHOT and.
-Also on second call (on shutdown), em_sti_stop() would return without
-disabling the device again.
+> Perhaps an additional per channel attribute called _label which would
+> allow for board specific labelling?
 
-Cc: Magnus Damm <magnus.damm@gmail.com>
-Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
----
- drivers/clocksource/em_sti.c | 39 ++++++++++++++-------------------------
- 1 file changed, 14 insertions(+), 25 deletions(-)
+This would seem a bit odd in DT-land; if a user wanted a different label
+name for their board, they would just rename it in their device tree for
+that board.  Fortunately, with the structured dtsi include files, this
+is pretty painless to do.
 
-diff --git a/drivers/clocksource/em_sti.c b/drivers/clocksource/em_sti.c
-index dc3c6ee04aaa..7a97a34dba70 100644
---- a/drivers/clocksource/em_sti.c
-+++ b/drivers/clocksource/em_sti.c
-@@ -251,33 +251,21 @@ static struct em_sti_priv *ced_to_em_sti(struct clock_event_device *ced)
- 	return container_of(ced, struct em_sti_priv, ced);
- }
- 
--static void em_sti_clock_event_mode(enum clock_event_mode mode,
--				    struct clock_event_device *ced)
-+static int em_sti_clock_event_shutdown(struct clock_event_device *ced)
- {
- 	struct em_sti_priv *p = ced_to_em_sti(ced);
-+	em_sti_stop(p, USER_CLOCKEVENT);
-+	return 0;
-+}
- 
--	/* deal with old setting first */
--	switch (ced->mode) {
--	case CLOCK_EVT_MODE_ONESHOT:
--		em_sti_stop(p, USER_CLOCKEVENT);
--		break;
--	default:
--		break;
--	}
-+static int em_sti_clock_event_set_oneshot(struct clock_event_device *ced)
-+{
-+	struct em_sti_priv *p = ced_to_em_sti(ced);
- 
--	switch (mode) {
--	case CLOCK_EVT_MODE_ONESHOT:
--		dev_info(&p->pdev->dev, "used for oneshot clock events\n");
--		em_sti_start(p, USER_CLOCKEVENT);
--		clockevents_config(&p->ced, p->rate);
--		break;
--	case CLOCK_EVT_MODE_SHUTDOWN:
--	case CLOCK_EVT_MODE_UNUSED:
--		em_sti_stop(p, USER_CLOCKEVENT);
--		break;
--	default:
--		break;
--	}
-+	dev_info(&p->pdev->dev, "used for oneshot clock events\n");
-+	em_sti_start(p, USER_CLOCKEVENT);
-+	clockevents_config(&p->ced, p->rate);
-+	return 0;
- }
- 
- static int em_sti_clock_event_next(unsigned long delta,
-@@ -303,11 +291,12 @@ static void em_sti_register_clockevent(struct em_sti_priv *p)
- 	ced->rating = 200;
- 	ced->cpumask = cpu_possible_mask;
- 	ced->set_next_event = em_sti_clock_event_next;
--	ced->set_mode = em_sti_clock_event_mode;
-+	ced->set_state_shutdown = em_sti_clock_event_shutdown;
-+	ced->set_state_oneshot = em_sti_clock_event_set_oneshot;
- 
- 	dev_info(&p->pdev->dev, "used for clock events\n");
- 
--	/* Register with dummy 1 Hz value, gets updated in ->set_mode() */
-+	/* Register with dummy 1 Hz value, gets updated in ->set_state_oneshot() */
- 	clockevents_config_and_register(ced, 1, 2, 0xffffffff);
- }
- 
--- 
-2.4.0
+  Josh
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150608/962be065/attachment.sig>
