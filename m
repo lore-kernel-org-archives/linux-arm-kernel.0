@@ -1,210 +1,112 @@
-From: maitysanchayan@gmail.com (maitysanchayan at gmail.com)
-Date: Mon, 8 Jun 2015 10:09:41 +0530
-Subject: [PATCH v5 2/2] soc: Add driver for Freescale Vybrid Platform
-In-Reply-To: <1433586367.10861.52.camel@x220>
-References: <cover.1433494491.git.maitysanchayan@gmail.com>
- <d702301bce77fb08dd6556e93b553485f3e84b73.1433494491.git.maitysanchayan@gmail.com>
- <1433586367.10861.52.camel@x220>
-Message-ID: <20150608043940.GB3497@Sanchayan-Arch.toradex.int>
+From: wxt@rock-chips.com (Caesar Wang)
+Date: Mon, 08 Jun 2015 12:56:07 +0800
+Subject: [PATCH v3 2/3] ARM: rockchip: ensure CPU to enter WFI/WFE state
+In-Reply-To: <CAD=FV=UamkH+RHmHHVzGKZda_w0teGBdfcH-LbCKqyp2q1OVqA@mail.gmail.com>
+References: <1433517104-7595-1-git-send-email-wxt@rock-chips.com>	<1433517104-7595-3-git-send-email-wxt@rock-chips.com>	<CAD=FV=UMkFtOFYpY+MUZOegnmFLdW3ZgNivwdHChv0MLr50sVQ@mail.gmail.com>	<20150605182947.GN7557@n2100.arm.linux.org.uk>
+ <CAD=FV=UamkH+RHmHHVzGKZda_w0teGBdfcH-LbCKqyp2q1OVqA@mail.gmail.com>
+Message-ID: <55752067.2040108@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Paul,
 
-On 15-06-06 12:26:07, Paul Bolle wrote:
-> On Fri, 2015-06-05 at 14:52 +0530, Sanchayan Maity wrote:
-> > --- /dev/null
-> > +++ b/drivers/soc/fsl/Kconfig
-> 
-> > +config SOC_BUS_VF610
-> > +	   tristate "SoC bus device for the Freescale Vybrid platform"
-> > +	   depends on SOC_VF610
-> > +	   select SOC_BUS
-> > +	   help
-> > +	     Include support for the SoC bus on the Freescale Vybrid platform
-> > +		 providing some sysfs information about the module variant.
-> 
-> > --- /dev/null
-> > +++ b/drivers/soc/fsl/Makefile
-> 
-> > +obj-$(CONFIG_SOC_BUS_VF610)		+= soc-vf610.o
-> 
-> > --- /dev/null
-> > +++ b/drivers/soc/fsl/soc-vf610.c
-> > @@ -0,0 +1,166 @@
-> > +/*
-> > + * Copyright 2015 Toradex AG
-> > + *
-> > + * Author: Sanchayan Maity <sanchayan.maity@toradex.com>
-> > + *
-> > + * This program is free software; you can redistribute it and/or modify
-> > + * it under the terms of the GNU General Public License version 2, as
-> > + * published by the Free Software Foundation.
-> > + *
-> > + */
-> > +
-> > +#include <linux/mfd/syscon.h>
-> > +#include <linux/of_platform.h>
-> > +#include <linux/regmap.h>
-> > +#include <linux/random.h>
-> > +#include <linux/slab.h>
-> > +#include <linux/sys_soc.h>
-> > +
-> > +#define DRIVER_NAME "vf610-soc-bus"
-> > +
-> > +#define MSCM_CPxCOUNT_OFFSET   0x0000002C
-> > +#define MSCM_CPxCFG1_OFFSET    0x00000014
-> > +
-> > +struct vf610_soc {
-> > +	struct device *dev;
-> > +	struct soc_device_attribute *soc_dev_attr;
-> > +	struct soc_device *soc_dev;
-> > +};
-> > +
-> > +static int vf610_soc_probe(struct platform_device *pdev)
-> > +{
-> > +	struct vf610_soc *info;
-> > +	struct regmap *ocotp_regmap, *mscm_regmap, *rom_regmap;
-> > +	struct device *dev = &pdev->dev;
-> > +	struct device_node *node = pdev->dev.of_node;
-> > +	struct device_node *soc_node;
-> > +	struct of_phandle_args pargs;
-> > +	char soc_type[] = "xx0";
-> > +	u32 cfg0_offset, cfg1_offset, rom_rev_offset;
-> > +	u32 soc_id1, soc_id2, rom_rev;
-> > +	u32 cpxcount, cpxcfg1;
-> > +	u64 soc_id;
-> > +	int ret;
-> > +
-> > +	info = devm_kzalloc(&pdev->dev, sizeof(struct vf610_soc), GFP_KERNEL);
-> > +	if (!info)
-> > +		return -ENOMEM;
-> > +
-> > +	info->dev = &pdev->dev;
-> > +	platform_set_drvdata(pdev, info);
-> > +
-> > +	mscm_regmap = syscon_node_to_regmap(node);
-> > +	if (IS_ERR(mscm_regmap)) {
-> > +		dev_err(dev, "regmap lookup for mscm failed\n");
-> > +		return PTR_ERR(mscm_regmap);
-> > +	}
-> > +
-> > +	soc_node = of_find_node_by_path("/soc");
-> > +
-> > +	ret = of_parse_phandle_with_fixed_args(soc_node,
-> > +					"ocotp-cfg", 2, 0, &pargs);
-> > +	if (ret) {
-> > +		dev_err(dev, "lookup failed for ocotp-cfg node %d\n", ret);
-> > +		return ret;
-> > +	}
-> > +
-> > +	ocotp_regmap = syscon_node_to_regmap(pargs.np);
-> > +	if (IS_ERR(ocotp_regmap)) {
-> > +		of_node_put(pargs.np);
-> > +		dev_err(dev, "regmap lookup for ocotp failed\n");
-> > +		return PTR_ERR(ocotp_regmap);
-> > +	}
-> > +
-> > +	cfg0_offset = pargs.args[0];
-> > +	cfg1_offset = pargs.args[1];
-> > +	of_node_put(pargs.np);
-> > +
-> > +	ret = of_parse_phandle_with_fixed_args(soc_node,
-> > +					"rom-revision", 1, 0, &pargs);
-> > +	if (ret) {
-> > +		dev_err(dev, "lookup failed for rom-revision node %d\n", ret);
-> > +		return ret;
-> > +	}
-> > +
-> > +	rom_regmap = syscon_node_to_regmap(pargs.np);
-> > +	if (IS_ERR(rom_regmap)) {
-> > +		of_node_put(pargs.np);
-> > +		dev_err(dev, "regmap lookup for ocrom failed\n");
-> > +		return PTR_ERR(rom_regmap);
-> > +	}
-> > +
-> > +	rom_rev_offset = pargs.args[0];
-> > +	of_node_put(pargs.np);
-> > +
-> > +	ret = regmap_read(ocotp_regmap, cfg0_offset, &soc_id1);
-> > +	if (ret)
-> > +		return -ENODEV;
-> > +
-> > +	ret = regmap_read(ocotp_regmap, cfg1_offset, &soc_id2);
-> > +	if (ret)
-> > +		return -ENODEV;
-> > +
-> > +	soc_id = (u64) soc_id1 << 32 | soc_id2;
-> > +	add_device_randomness(&soc_id, sizeof(soc_id));
-> > +
-> > +	ret = regmap_read(mscm_regmap, MSCM_CPxCOUNT_OFFSET, &cpxcount);
-> > +	if (ret)
-> > +		return -ENODEV;
-> > +
-> > +	ret = regmap_read(mscm_regmap, MSCM_CPxCFG1_OFFSET, &cpxcfg1);
-> > +	if (ret)
-> > +		return -ENODEV;
-> > +
-> > +	soc_type[0] = cpxcount ? '6' : '5'; /* Dual Core => VF6x0 */
-> > +	soc_type[1] = cpxcfg1 ? '1' : '0'; /* L2 Cache => VFx10 */
-> > +
-> > +	ret = regmap_read(rom_regmap, rom_rev_offset, &rom_rev);
-> > +	if (ret)
-> > +		return -ENODEV;
-> > +
-> > +	info->soc_dev_attr = devm_kzalloc(&pdev->dev,
-> > +				sizeof(info->soc_dev_attr), GFP_KERNEL);
-> > +	if (!info->soc_dev_attr)
-> > +		return -ENOMEM;
-> > +
-> > +	info->soc_dev_attr->machine = devm_kasprintf(&pdev->dev,
-> > +				GFP_KERNEL, "Freescale Vybrid");
-> > +	info->soc_dev_attr->soc_id = devm_kasprintf(&pdev->dev,
-> > +				GFP_KERNEL, "%016llx", soc_id);
-> > +	info->soc_dev_attr->family = devm_kasprintf(&pdev->dev,
-> > +				GFP_KERNEL, "Freescale Vybrid VF%s",
-> > +				soc_type);
-> > +	info->soc_dev_attr->revision = devm_kasprintf(&pdev->dev,
-> > +				GFP_KERNEL, "%08x", rom_rev);
-> > +
-> > +	info->soc_dev = soc_device_register(info->soc_dev_attr);
-> > +	if (IS_ERR(info->soc_dev))
-> > +		return -ENODEV;
-> > +
-> > +	return 0;
-> > +}
-> > +
-> > +static int vf610_soc_remove(struct platform_device *pdev)
-> > +{
-> > +	struct vf610_soc *info = platform_get_drvdata(pdev);
-> > +
-> > +	if (info->soc_dev)
-> > +		soc_device_unregister(info->soc_dev);
-> > +
-> > +	return 0;
-> > +}
-> > +
-> > +static const struct of_device_id vf610_soc_bus_match[] = {
-> > +	{ .compatible = "fsl,vf610-mscm-cpucfg", },
-> > +	{ /* sentinel */ }
-> > +};
-> > +
-> > +static struct platform_driver vf610_soc_driver = {
-> > +	.probe          = vf610_soc_probe,
-> > +	.remove         = vf610_soc_remove,
-> > +	.driver         = {
-> > +		.name   = DRIVER_NAME,
-> > +		.of_match_table = vf610_soc_bus_match,
-> > +	},
-> > +};
-> > +module_platform_driver(vf610_soc_driver);
-> 
-> The Kconfig symbol is tristate now, but all module specific code is gone
-> from this file (ie, MODULE_DEVICE_TABLE, MODULE_DESCRIPTION and
-> MODULE_LICENSE). Why's that?
 
-Sorry that this crept in. It is a mistake on my part. Will fix.
+? 2015?06?06? 04:24, Doug Anderson ??:
+> Russell,
+>
+> On Fri, Jun 5, 2015 at 11:29 AM, Russell King - ARM Linux
+> <linux@arm.linux.org.uk> wrote:
+>> 1) v7_coherency_exit() is specific to v7 CPUs and can't be used by
+>>     generic code.
+> Oh, I see.  So (I think) you're saying that perhaps the reason that
+> Caesar needed his patch was that he needed the dying processor to
+> execute v7_exit_coherency_flush(), NOT that he needed the dying
+> processor to be in WFI/WFE.  That actually makes a lot more sense to
+> me!  :)  Thanks a lot for pointing that out, it's very helpful.
+>
+>
+>> So, we're actually in a very sticky position over taking CPUs offline.
+>> It seems to be something that the ARM architecture and kernel
+>> architecture doesn't actually allow to be done safely.  So much so,
+>> that in a similar way to the original Keystone 2 physical address
+>> switch, I'm tempted to make taking a CPU offline taint the kernel!
+> Wow, that's going to suck.  So if you want to suspend / resume you
+> need to taint your kernel.  So much for saving the planet by going
+> into suspend...  ...or are you thinking that it won't taint the kernel
+> when the kernel takes CPUs offline for suspend/resume purposes?  ...or
+> are you thinking you've some solution that works for suspend/resume
+> that doesn't work for the general cpu offlining problem?  I'd be very
+> interested to hear...
+>
+>
+> I know I'm not a maintainer, but if I were and I knew that lots of
+> smart people had thought about the problem of CPU offlining and they
+> didn't have a solution and I could make my platform 99.99999999%
+> reliable by allowing a very safe mdelay(1) where I had a pretty strong
+> guarantee that the 1ms was enough time, I would probably accept that
+> code...
+>
+>
+> So since I'm not a maintainer and I certainly couldn't ack such code,
+> I would certainly be happy to add my Reviewed-by to Caesar's patch if
+> he changed it mention that he needed to make sure that
+> v7_exit_coherency_flush() in rockchip_cpu_die() executed in time.
 
-Thank you for the feedback.
+OK.
+The dying processor to execute v7_exit_coherency_flush(),not that the 
+dying processor to be in WFI/WFE.
 
-- Sanchayan.
+It's needed to enter WFI/WFE state from the ARM refer document when CPU 
+down.
+
+But......
+
+Here is my test: (won't to enter the WFI state)
+@@ -331,8 +331,8 @@ static int rockchip_cpu_kill(unsigned int cpu)
+  static void rockchip_cpu_die(unsigned int cpu)
+  {
+         v7_exit_coherency_flush(louis);
+-       while (1)
+-               cpu_do_idle();
++       while (1);
++               //cpu_do_idle();
+  }
+
+echo 0 > /sys/module/printk/parameters/console_suspend
+echo 1 > /sys/power/pm_print_times
+echo mem > sys/power/state
+
+You can play anything
+or do some test for CPU up/down:
+
+cd /sys/devices/system/cpu/
+for i in $(seq 10000); do
+   echo "================= $i ============"
+   for j in $(seq 100); do
+     while [[ "$(cat cpu1/online)$(cat cpu2/online)$(cat cpu3/online)" 
+!= "000" ]]; do
+
+       echo 0 > cpu1/online
+       echo 0 > cpu2/online
+       echo 0 > cpu3/online
+     done
+     while [[ "$(cat cpu1/online)$(cat cpu2/online)$(cat cpu3/online)" 
+!= "111" ]]; do
+       echo 1 > cpu1/online
+       echo 1 > cpu2/online
+       echo 1 > cpu3/online
+     done
+   done
+done
+Sometimes,the system will be restart when do the about test.
+I'm no sure what's happen, That maybe abnormal won't to enter the WFI 
+state.
+
+>
+> -Doug
+>
+>
+>
+
+-- 
+Thanks,
+- Caesar
