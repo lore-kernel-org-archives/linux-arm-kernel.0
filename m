@@ -1,22 +1,22 @@
 From: broonie@kernel.org (Mark Brown)
-Date: Mon, 8 Jun 2015 19:11:37 +0100
-Subject: [PATCH 2/8] regulator: pwm-regulator: Remove unnecessary
- descriptor attribute from ddata
-In-Reply-To: <1433529771-24496-3-git-send-email-lee.jones@linaro.org>
+Date: Mon, 8 Jun 2015 19:11:44 +0100
+Subject: [PATCH 3/8] regulator: pwm-regulator: Remove superfluous
+ is_enabled check
+In-Reply-To: <1433529771-24496-4-git-send-email-lee.jones@linaro.org>
 References: <1433529771-24496-1-git-send-email-lee.jones@linaro.org>
- <1433529771-24496-3-git-send-email-lee.jones@linaro.org>
-Message-ID: <20150608181137.GT14071@sirena.org.uk>
+ <1433529771-24496-4-git-send-email-lee.jones@linaro.org>
+Message-ID: <20150608181144.GU14071@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 05, 2015 at 07:42:45PM +0100, Lee Jones wrote:
-> The Regulator Device keeps a full copy of it's own, which can be easily accessed.
+On Fri, Jun 05, 2015 at 07:42:46PM +0100, Lee Jones wrote:
+> The core framework already takes care of this.
 
-Applied, thanks.  Please keep your commit logs under 80 columns.
+Applied, thanks.
 -------------- next part --------------
 A non-text attachment was scrubbed...
 Name: signature.asc
 Type: application/pgp-signature
 Size: 473 bytes
 Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150608/59cef120/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150608/f5defc90/attachment.sig>
