@@ -1,44 +1,56 @@
-From: rnayak@codeaurora.org (Rajendra Nayak)
-Date: Mon, 08 Jun 2015 09:59:27 +0530
-Subject: [RFC 0/7] qcom: Add support for tsens driver
-In-Reply-To: <7hvbf1y974.fsf@deeprootsystems.com>
-References: <1429796773-7151-1-git-send-email-rnayak@codeaurora.org>
- <7hvbf1y974.fsf@deeprootsystems.com>
-Message-ID: <55751A27.6030306@codeaurora.org>
+From: maitysanchayan@gmail.com (maitysanchayan at gmail.com)
+Date: Mon, 8 Jun 2015 10:07:53 +0530
+Subject: [PATCH v5 1/2] ARM: dts: vfxxx: Add OCOTP and OCROM nodes
+In-Reply-To: <20150606115833.GP23777@lukather>
+References: <cover.1433494491.git.maitysanchayan@gmail.com>
+ <fd4fcd83d901b2563ddbce84b339f42778c71260.1433494491.git.maitysanchayan@gmail.com>
+ <20150606115833.GP23777@lukather>
+Message-ID: <20150608043753.GA3497@Sanchayan-Arch.toradex.int>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Kevin,
+Hello Maxime,
 
-> Curious how are you testing this?  with which thermal governor?
+On 15-06-06 13:58:33, Maxime Ripard wrote:
+> Hi,
+> 
+> On Fri, Jun 05, 2015 at 02:52:37PM +0530, Sanchayan Maity wrote:
+> > Add a device tree node for the On-Chip One Time Programmable
+> > Controller (OCOTP) and the On-Chip ROM.
+> > 
+> > Signed-off-by: Sanchayan Maity <maitysanchayan@gmail.com>
+> > ---
+> >  arch/arm/boot/dts/vfxxx.dtsi | 12 ++++++++++++
+> >  1 file changed, 12 insertions(+)
+> > 
+> > diff --git a/arch/arm/boot/dts/vfxxx.dtsi b/arch/arm/boot/dts/vfxxx.dtsi
+> > index 2f4b04d..ed9b6b8 100644
+> > --- a/arch/arm/boot/dts/vfxxx.dtsi
+> > +++ b/arch/arm/boot/dts/vfxxx.dtsi
+> > @@ -56,6 +56,13 @@
+> >  		compatible = "simple-bus";
+> >  		interrupt-parent = <&mscm_ir>;
+> >  		ranges;
+> > +		ocotp-cfg = <&ocotp 0x410 0x420>;
+> > +		rom-revision = <&ocrom 0x80>;
+> > +
+> > +		ocrom: ocrom {
+> > +			compatible = "fsl,vf610-ocrom", "syscon";
+> > +			reg = <0x00000000 0x18000>;
+> > +		};
+> 
+> Shouldn't that use the new nvmem framework currently being discussed,
+> instead of defining custom bindings?
 
-I have been mostly testing this with step wise on the db410c target
-board.
+I am aware of those nvmem framework patches by Srinivas, however from what
+I can see that framework has not been merged yet atleast from the mail
+chain that I see for v5 of the patchset so I have not properly looked into
+that. Mark Brown did apply the regmap patches to his tree, but has the rest
+of the framework been merged or is it expected to be merged?
 
->
-> I'm experimenting with the new thermal power_allocator governor
-> currently in linux-next, and was hoping to use this to test it, but I'm
-> noticing it doesn't work with the power_allocator governor.
->
-> The first thing is that the power_allator goveror expects each thermal
-> zone to have a sustainable-power property in the DT, which this series
-> doesn't provide.  Hacking some dummy values in there to see what happens
-> next, I then hit the "thermal zone cpu-thermal0 has wrong trip setup for
-> power allocator" error from the power_allocator driver.
+If it is expected to be merged and if that framework is a fit for what we
+are trying to do here and it seems so on a quick glance, then I can go with
+that. However I still did like to hear from Arnd or have some more comments
+before I go for that approach with the next respin.
 
-Right, the RFC I posted wasn't tested with IPA and hence does not have
-some of the additional properties in DT which IPA expects.
-The wrong trip setup error that you are seeing is because IPA expects
-2 passive trip points, a "switch on" trip point and a "desired
-temperature" trip point and the dts I posted with the RFC had
-just one passive trip point.
-
-I am in the process of testing this with IPA myself (on db410c mainly,
-but will also test on db8074 and IFC6410/6540 as well) and will repost
-in a few days with updated dts entries and a few other minor fixes
-to the driver itself. Let me know what target board you are
-interested to get this working on and I will make sure I test on it
-before I repost.
-
-regards,
-Rajendra
+- Sanchayan
