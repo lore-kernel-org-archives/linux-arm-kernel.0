@@ -1,34 +1,34 @@
-From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
-Date: Mon, 8 Jun 2015 13:56:32 -0700
-Subject: next-20150604 build: 2 failures 37 warnings (next-20150604)
-In-Reply-To: <20150605171652.GB14071@sirena.org.uk>
-References: <E1Z0YIL-0008Ma-5O@optimist> <20150604170112.GM14071@sirena.org.uk>
- <20150604171004.GZ30984@atomide.com>
- <20150604172026.GA30984@atomide.com>
- <20150605104900.GA5346@kroah.com>
- <20150605171652.GB14071@sirena.org.uk>
-Message-ID: <20150608205632.GB11211@kroah.com>
+From: dbaryshkov@gmail.com (Dmitry Eremin-Solenikov)
+Date: Mon,  8 Jun 2015 23:56:35 +0300
+Subject: [PATCH v5 04/17] input: locomokbd: differentiate between two Enter
+ keys
+In-Reply-To: <1433797008-6246-1-git-send-email-dbaryshkov@gmail.com>
+References: <1433797008-6246-1-git-send-email-dbaryshkov@gmail.com>
+Message-ID: <1433797008-6246-5-git-send-email-dbaryshkov@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 05, 2015 at 06:16:52PM +0100, Mark Brown wrote:
-> On Fri, Jun 05, 2015 at 07:49:00PM +0900, Greg Kroah-Hartman wrote:
-> > On Thu, Jun 04, 2015 at 10:20:26AM -0700, Tony Lindgren wrote:
-> 
-> > > Greg, there's now commit 9809889c708e in tty-linus and commit
-> > > 9e91597f2423 in tty-next.
-> 
-> > Yes, I can't go back and remove the one in tty-next, I'm guessing when
-> > they are merged there is an issue.  I'll look into that after Linus
-> > pulls in my tty-linus tree.
-> 
-> Yeah, git isn't always spectacularly good at resolving add/add if
-> there's context changes between two things in a merge - it sometimes
-> ends up double adding things.
+There are two Enter keys on collie/poodle keyboards. Make one of them to
+generate KEY_KPENTER rather than just KEY_ENTER.
 
-Ok, I've now merged these branches together, if someone can verify that
-my tty-next branch is correct, that would be great.
+Signed-off-by: Dmitry Eremin-Solenikov <dbaryshkov@gmail.com>
+Acked-by: Dmitry Torokhov <dmitry.torokhov@gmail.com>
+---
+ drivers/input/keyboard/locomokbd.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-thanks,
-
-greg k-h
+diff --git a/drivers/input/keyboard/locomokbd.c b/drivers/input/keyboard/locomokbd.c
+index 9742c79..7645053 100644
+--- a/drivers/input/keyboard/locomokbd.c
++++ b/drivers/input/keyboard/locomokbd.c
+@@ -50,7 +50,7 @@ locomokbd_keycode[LOCOMOKBD_NUMKEYS] = {
+ 	0, 0, 0, KEY_CENTER, 0, KEY_MAIL, 0, 0, 0, 0,				/* 30 - 39 */
+ 	0, 0, 0, 0, 0, 0, 0, 0, 0, KEY_RIGHT,					/* 40 - 49 */
+ 	KEY_UP, KEY_LEFT, 0, 0, KEY_P, 0, KEY_O, KEY_I, KEY_Y, KEY_T,		/* 50 - 59 */
+-	KEY_E, KEY_W, 0, 0, 0, 0, KEY_DOWN, KEY_ENTER, 0, 0,			/* 60 - 69 */
++	KEY_E, KEY_W, 0, 0, 0, 0, KEY_DOWN, KEY_KPENTER, 0, 0,			/* 60 - 69 */
+ 	KEY_BACKSPACE, 0, KEY_L, KEY_U, KEY_H, KEY_R, KEY_D, KEY_Q, 0, 0,	/* 70 - 79 */
+ 	0, 0, 0, 0, 0, 0, KEY_ENTER, KEY_RIGHTSHIFT, KEY_K, KEY_J,		/* 80 - 89 */
+ 	KEY_G, KEY_F, KEY_X, KEY_S, 0, 0, 0, 0, 0, 0,				/* 90 - 99 */
+-- 
+2.1.4
