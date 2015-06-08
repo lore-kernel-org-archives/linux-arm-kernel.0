@@ -1,34 +1,88 @@
 From: eric@anholt.net (Eric Anholt)
-Date: Mon,  8 Jun 2015 16:58:58 -0700
-Subject: [PATCH v3 5/7] ARM: bcm2835: Drop the fixed sys_pclk.
-In-Reply-To: <1433807940-15328-1-git-send-email-eric@anholt.net>
-References: <1433807940-15328-1-git-send-email-eric@anholt.net>
-Message-ID: <1433807940-15328-5-git-send-email-eric@anholt.net>
+Date: Mon,  8 Jun 2015 16:58:54 -0700
+Subject: [PATCH v3 1/7] dt/bindings: Add binding for the Raspberry Pi clock
+ provider
+Message-ID: <1433807940-15328-1-git-send-email-eric@anholt.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Nothing uses it, and I can't find any evidence that anything ever has.
+The hardware clocks are not controllable by the ARM, so we have to
+make requests to the firmware to do so from the VPU side.  This will
+let us replace fixed clocks in our DT with actual clock control (and
+correct frequency information).
+
+v2: Include the dt-bindings header in this commit instead of the next
+    one.  Make the clock indices match the firmware clock IDs.  Rename
+    the binding's compat string.  Move the firmware phandle to be
+    under a vendor-specific namespace.
 
 Signed-off-by: Eric Anholt <eric@anholt.net>
 ---
- drivers/clk/clk-bcm2835.c | 5 -----
- 1 file changed, 5 deletions(-)
+ .../clock/raspberrypi,bcm2835-firmware-clocks.txt  | 25 ++++++++++++++++++++++
+ include/dt-bindings/clk/raspberrypi.h              | 23 ++++++++++++++++++++
+ 2 files changed, 48 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/clock/raspberrypi,bcm2835-firmware-clocks.txt
+ create mode 100644 include/dt-bindings/clk/raspberrypi.h
 
-diff --git a/drivers/clk/clk-bcm2835.c b/drivers/clk/clk-bcm2835.c
-index 6b950ca..dd295e4 100644
---- a/drivers/clk/clk-bcm2835.c
-+++ b/drivers/clk/clk-bcm2835.c
-@@ -32,11 +32,6 @@ void __init bcm2835_init_clocks(void)
- 	struct clk *clk;
- 	int ret;
- 
--	clk = clk_register_fixed_rate(NULL, "sys_pclk", NULL, CLK_IS_ROOT,
--					250000000);
--	if (IS_ERR(clk))
--		pr_err("sys_pclk not registered\n");
--
- 	clk = clk_register_fixed_rate(NULL, "apb_pclk", NULL, CLK_IS_ROOT,
- 					126000000);
- 	if (IS_ERR(clk))
+diff --git a/Documentation/devicetree/bindings/clock/raspberrypi,bcm2835-firmware-clocks.txt b/Documentation/devicetree/bindings/clock/raspberrypi,bcm2835-firmware-clocks.txt
+new file mode 100644
+index 0000000..0972602
+--- /dev/null
++++ b/Documentation/devicetree/bindings/clock/raspberrypi,bcm2835-firmware-clocks.txt
+@@ -0,0 +1,25 @@
++Raspberry Pi firmware clock provider.
++
++The Raspberry Pi architecture doesn't provide direct access to the
++CLOCKMAN peripheral from the ARM side, so Linux has to make requests
++to the VPU firmware to program them.
++
++This binding uses the common clock binding:
++Documentation/devicetree/bindings/clock/clock-bindings.txt
++
++Required properties:
++- compatible:		Should be "raspberrypi,bcm2835-firmware-clocks"
++
++- #clock-cells:		Shall have value <1>.  The permitted clock-specifier
++			  values can be found in
++			  include/dt-bindings/clk/raspberrypi.h.
++
++- raspberrypi,firmware:	Phandle to the firmware driver node.
++
++Example:
++
++firmware_clocks: firmware-clocks {
++	compatible = "raspberrypi,bcm2835-firmware-clocks";
++	#clock-cells = <1>;
++	raspberrypi,firmware = <&firmware>;
++};
+diff --git a/include/dt-bindings/clk/raspberrypi.h b/include/dt-bindings/clk/raspberrypi.h
+new file mode 100644
+index 0000000..ceec90f
+--- /dev/null
++++ b/include/dt-bindings/clk/raspberrypi.h
+@@ -0,0 +1,23 @@
++#/*
++ *  Copyright ? 2015 Broadcom
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ */
++
++#ifndef _DT_BINDINGS_CLK_RASPBERRYPI_H
++#define _DT_BINDINGS_CLK_RASPBERRYPI_H
++
++#define RPI_CLOCK_EMMC	1
++#define RPI_CLOCK_UART0	2
++#define RPI_CLOCK_ARM	3
++#define RPI_CLOCK_CORE	4
++#define RPI_CLOCK_V3D	5
++#define RPI_CLOCK_H264	6
++#define RPI_CLOCK_ISP	7
++#define RPI_CLOCK_SDRAM	8
++#define RPI_CLOCK_PIXEL	9
++#define RPI_CLOCK_PWM	10
++
++#endif
 -- 
 2.1.4
