@@ -1,127 +1,81 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon,  8 Jun 2015 18:04:02 +0100
-Subject: [PATCH 07/10] KVM: arm/arm64: vgic: Allow HW interrupts to be queued
- to a guest
+Date: Mon,  8 Jun 2015 18:04:04 +0100
+Subject: [PATCH 09/10] KVM: arm/arm64: timer: Allow the timer to control the
+ active state
 In-Reply-To: <1433783045-8002-1-git-send-email-marc.zyngier@arm.com>
 References: <1433783045-8002-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1433783045-8002-8-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1433783045-8002-10-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-To allow a HW interrupt to be injected into a guest, we lookup the
-guest virtual interrupt in the irq_phys_map rbtree, and if we have
-a match, encode both interrupts in the LR.
-
-We also mark the interrupt as "active" at the host distributor level.
-
-On guest EOI on the virtual interrupt, the host interrupt will be
-deactivated.
+In order to remove the crude hack where we sneak the masked bit
+into the timer's control register, make use of the phys_irq_map
+API control the active state of the interrupt.
 
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- virt/kvm/arm/vgic.c | 71 ++++++++++++++++++++++++++++++++++++++++++++++++++---
- 1 file changed, 68 insertions(+), 3 deletions(-)
+ include/kvm/arm_arch_timer.h |  3 +++
+ virt/kvm/arm/arch_timer.c    | 13 +++++++++++--
+ 2 files changed, 14 insertions(+), 2 deletions(-)
 
-diff --git a/virt/kvm/arm/vgic.c b/virt/kvm/arm/vgic.c
-index c6604f2..495ac7d 100644
---- a/virt/kvm/arm/vgic.c
-+++ b/virt/kvm/arm/vgic.c
-@@ -1120,6 +1120,26 @@ static void vgic_queue_irq_to_lr(struct kvm_vcpu *vcpu, int irq,
- 	if (!vgic_irq_is_edge(vcpu, irq))
- 		vlr.state |= LR_EOI_INT;
+diff --git a/include/kvm/arm_arch_timer.h b/include/kvm/arm_arch_timer.h
+index e596675..9feebf1 100644
+--- a/include/kvm/arm_arch_timer.h
++++ b/include/kvm/arm_arch_timer.h
+@@ -52,6 +52,9 @@ struct arch_timer_cpu {
  
-+	if (vlr.irq >= VGIC_NR_SGIS) {
-+		struct irq_phys_map *map;
-+		map = vgic_irq_map_search(vcpu, irq);
+ 	/* Timer IRQ */
+ 	const struct kvm_irq_level	*irq;
 +
-+		if (map) {
-+			int ret;
++	/* VGIC mapping */
++	struct irq_phys_map		*map;
+ };
+ 
+ int kvm_timer_hyp_init(void);
+diff --git a/virt/kvm/arm/arch_timer.c b/virt/kvm/arm/arch_timer.c
+index 98c95f2..b9fff78 100644
+--- a/virt/kvm/arm/arch_timer.c
++++ b/virt/kvm/arm/arch_timer.c
+@@ -64,7 +64,7 @@ static void kvm_timer_inject_irq(struct kvm_vcpu *vcpu)
+ 	int ret;
+ 	struct arch_timer_cpu *timer = &vcpu->arch.timer_cpu;
+ 
+-	timer->cntv_ctl |= ARCH_TIMER_CTRL_IT_MASK;
++	vgic_set_phys_irq_active(timer->map, true);
+ 	ret = kvm_vgic_inject_irq(vcpu->kvm, vcpu->vcpu_id,
+ 				  timer->irq->irq,
+ 				  timer->irq->level);
+@@ -117,7 +117,8 @@ bool kvm_timer_should_fire(struct kvm_vcpu *vcpu)
+ 	cycle_t cval, now;
+ 
+ 	if ((timer->cntv_ctl & ARCH_TIMER_CTRL_IT_MASK) ||
+-		!(timer->cntv_ctl & ARCH_TIMER_CTRL_ENABLE))
++	    !(timer->cntv_ctl & ARCH_TIMER_CTRL_ENABLE) ||
++	    vgic_get_phys_irq_active(timer->map))
+ 		return false;
+ 
+ 	cval = timer->cntv_cval;
+@@ -196,6 +197,13 @@ void kvm_timer_vcpu_reset(struct kvm_vcpu *vcpu,
+ 	 * vcpu timer irq number when the vcpu is reset.
+ 	 */
+ 	timer->irq = irq;
 +
-+			BUG_ON(!map->active);
-+			vlr.hwirq = map->phys_irq;
-+			vlr.state |= LR_HW;
-+			vlr.state &= ~LR_EOI_INT;
-+
-+			ret = irq_set_irqchip_state(map->irq,
-+						    IRQCHIP_STATE_ACTIVE,
-+						    true);
-+			vgic_irq_set_queued(vcpu, irq);
-+			WARN_ON(ret);
-+		}
-+	}
-+
- 	vgic_set_lr(vcpu, lr_nr, vlr);
- 	vgic_sync_lr_elrsr(vcpu, lr_nr, vlr);
++	/*
++	 * Tell the VGIC that the virtual interrupt is tied to a
++	 * physical interrupt. We do that once per VCPU.
++	 */
++	timer->map = vgic_map_phys_irq(vcpu, irq->irq, host_vtimer_irq);
++	WARN_ON(!timer->map);
  }
-@@ -1344,6 +1364,35 @@ static bool vgic_process_maintenance(struct kvm_vcpu *vcpu)
- 	return level_pending;
+ 
+ void kvm_timer_vcpu_init(struct kvm_vcpu *vcpu)
+@@ -335,6 +343,7 @@ void kvm_timer_vcpu_terminate(struct kvm_vcpu *vcpu)
+ 	struct arch_timer_cpu *timer = &vcpu->arch.timer_cpu;
+ 
+ 	timer_disarm(timer);
++	vgic_unmap_phys_irq(vcpu, timer->map);
  }
  
-+/* Return 1 if HW interrupt went from active to inactive, and 0 otherwise */
-+static int vgic_sync_hwirq(struct kvm_vcpu *vcpu, struct vgic_lr vlr)
-+{
-+	struct irq_phys_map *map;
-+	int ret;
-+
-+	if (!(vlr.state & LR_HW))
-+		return 0;
-+
-+	map = vgic_irq_map_search(vcpu, vlr.irq);
-+	BUG_ON(!map || !map->active);
-+
-+	ret = irq_get_irqchip_state(map->irq,
-+				    IRQCHIP_STATE_ACTIVE,
-+				    &map->active);
-+
-+	WARN_ON(ret);
-+
-+	if (map->active) {
-+		ret = irq_set_irqchip_state(map->irq,
-+					    IRQCHIP_STATE_ACTIVE,
-+					    false);
-+		WARN_ON(ret);
-+		return 0;
-+	}
-+
-+	return 1;
-+}
-+
- /* Sync back the VGIC state after a guest run */
- static void __kvm_vgic_sync_hwstate(struct kvm_vcpu *vcpu)
- {
-@@ -1358,14 +1407,30 @@ static void __kvm_vgic_sync_hwstate(struct kvm_vcpu *vcpu)
- 	elrsr = vgic_get_elrsr(vcpu);
- 	elrsr_ptr = u64_to_bitmask(&elrsr);
- 
--	/* Clear mappings for empty LRs */
--	for_each_set_bit(lr, elrsr_ptr, vgic->nr_lr) {
-+	/* Deal with HW interrupts, and clear mappings for empty LRs */
-+	for (lr = 0; lr < vgic->nr_lr; lr++) {
- 		struct vgic_lr vlr;
- 
--		if (!test_and_clear_bit(lr, vgic_cpu->lr_used))
-+		if (!test_bit(lr, vgic_cpu->lr_used))
- 			continue;
- 
- 		vlr = vgic_get_lr(vcpu, lr);
-+		if (vgic_sync_hwirq(vcpu, vlr)) {
-+			/*
-+			 * So this is a HW interrupt that the guest
-+			 * EOI-ed. Clean the LR state and allow the
-+			 * interrupt to be queued again.
-+			 */
-+			vlr.state &= ~LR_HW;
-+			vlr.hwirq = 0;
-+			vgic_set_lr(vcpu, lr, vlr);
-+			vgic_irq_clear_queued(vcpu, vlr.irq);
-+		}
-+
-+		if (!test_bit(lr, elrsr_ptr))
-+			continue;
-+
-+		clear_bit(lr, vgic_cpu->lr_used);
- 
- 		BUG_ON(vlr.irq >= dist->nr_irqs);
- 		vgic_cpu->vgic_irq_lr_map[vlr.irq] = LR_EMPTY;
+ void kvm_timer_enable(struct kvm *kvm)
 -- 
 2.1.4
