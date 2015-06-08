@@ -1,88 +1,35 @@
-From: drake@endlessm.com (Daniel Drake)
-Date: Mon, 8 Jun 2015 17:15:06 -0600
-Subject: [PATCH] mmc: meson: Add driver for the SD/MMC host found on
- Amlogic MesonX SoCs
-In-Reply-To: <1433783342-31243-1-git-send-email-carlo@caione.org>
-References: <1433783342-31243-1-git-send-email-carlo@caione.org>
-Message-ID: <CAD8Lp45c1GS=xYU3=6g1sdrP_afy7r=TgqL--FKjWbbwL=cReA@mail.gmail.com>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Tue, 09 Jun 2015 08:50:38 +0900
+Subject: [PATCHv2 1/2] ARM: exynos_defconfig: Enable
+ CONFIG_SND_SOC_ODROIDX2 for Odroid-XU3
+In-Reply-To: <1433696621-4763-1-git-send-email-linux.amoon@gmail.com>
+References: <1433696621-4763-1-git-send-email-linux.amoon@gmail.com>
+Message-ID: <55762A4E.5090208@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Carlo,
+On 08.06.2015 02:03, Anand Moon wrote:
+> Enable CONFIG_SND_SOC_ODROIDX2 and CONFIG_SND_SIMPLE_CARD to enable
+> sound on Odroid-XU3 board.
+> 
+> Below is the output of boot log.
+> [    6.021550] max98090 5-0010: MAX98090 REVID=0x43
+> [    6.025506] random: nonblocking pool is initialized
+> [    6.047297] asoc-simple-card sound: HiFi <-> 3830000.i2s mapping ok
+> [    6.068392] s5m-rtc s2mps14-rtc: setting system clock to 2015-06-07 12:51:06 UTC (1433681466)
+> [    6.123650] ALSA device list:
+> [    6.135203]   #0: Odroid-XU3
 
-On Mon, Jun 8, 2015 at 11:09 AM, Carlo Caione <carlo@caione.org> wrote:
-> From: Carlo Caione <carlo@endlessm.com>
->
-> Add a driver for the SD/MMC host found on the Amlogic MesonX SoCs. It
-> is an MMC controller which provides an interface between the
-> application processor and various memory cards. It supports the SD
-> specification v2.0 and the eMMC specification v4.41. It also supports
-> SDSC, SDHC and SDXC memory card default speed.
+Answering the question "why" and "what is device" would be sufficient.
+You answered the first question ("enable sound") so you can just add
+second part - using the max98090 audio codec.
 
-Nice work, thanks for this!
+This whole dmesg does not bring any benefits here, especially the
+irrelevant items (like random or RTC). Could you trim the commit message?
 
-> This patch adds also the bindinding documentation.
+Beside of that it looks fine however you marked this as "v2":
+1. I cannot find v1 on Google. The title was the same?
+2. Where is changelog?
 
-"binding" typo
-
-> +static void meson_mmc_request(struct mmc_host *mmc, struct mmc_request *mrq)
-> +{
-> +       struct meson_mmc_host *host = mmc_priv(mmc);
-> +       struct mmc_command *cmd = mrq->cmd;
-> +       struct mmc_data *data = mrq->data;
-> +       unsigned long flags;
-> +
-> +       spin_lock_irqsave(&host->lock, flags);
-> +
-> +       if (host->state != STATE_IDLE) {
-> +               dev_dbg(mmc_dev(mmc), "%s() rejected, state %u\n",
-> +                       __func__, host->state);
-> +               mrq->cmd->error = -EAGAIN;
-> +               spin_unlock_irqrestore(&host->lock, flags);
-> +               mmc_request_done(mmc, mrq);
-> +               return;
-> +       }
-> +
-> +       if (host->ferror) {
-> +               cmd->error = host->ferror;
-> +               spin_unlock_irqrestore(&host->lock, flags);
-> +               mmc_request_done(mmc, mrq);
-> +               return;
-> +       }
-> +
-> +       dev_dbg(mmc_dev(mmc), "CMD%d(%08x) arg %x len %d flags %08x\n",
-> +               cmd->opcode & 0x3f, cmd->opcode, cmd->arg,
-> +               mrq->data ? mrq->data->blksz * mrq->data->blocks : 0,
-> +               mrq->cmd->flags);
-> +
-> +       /* Filter out CMD 5/52/53 */
-> +       if (cmd->opcode == SD_IO_SEND_OP_COND ||
-> +           cmd->opcode == SD_IO_RW_DIRECT ||
-> +           cmd->opcode == SD_IO_RW_EXTENDED) {
-> +               dev_dbg(mmc_dev(host->mmc), "CMD%d not supported\n", cmd->opcode);
-> +               cmd->error = -EINVAL;
-> +               spin_unlock_irqrestore(&host->lock, flags);
-> +               mmc_request_done(mmc, mrq);
-> +               return;
-> +       }
-> +
-> +       host->state = STATE_REQUEST;
-> +
-> +       if (data) {
-> +               meson_mmc_map_dma(host, data, data->flags);
-> +               writel(host->sg_dma, host->base + SDIO_ADDR);
-
-As the sg_dma buffer is constant, can you do this register write just
-once at probe time? I wonder if we really need to do it on each
-request.
-
-Or, going deeper, I wonder if we can avoid this bounce buffer
-entirely. Can you try setting mmc->max_segs to 1 then passing the
-single data segment directly to the hardware with
-   writel(sg_dma_address(data->sg), host->base + SDIO_ADDR)
-
-If that turns out to be more complicated then it sounds, then feel
-free to push it off to a later driver revision.
-
-Thanks!
-Daniel
+Best regards,
+Krzysztof
