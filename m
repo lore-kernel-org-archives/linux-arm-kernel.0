@@ -1,37 +1,69 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Mon, 8 Jun 2015 14:42:45 -0700
-Subject: [PATCH v2 00/14] ARM: shmobile: Add CPG Clock Domains
-In-Reply-To: <1432839219-475-1-git-send-email-geert+renesas@glider.be>
-References: <1432839219-475-1-git-send-email-geert+renesas@glider.be>
-Message-ID: <20150608214245.GA29640@codeaurora.org>
+From: jeroen@myspectrum.nl (Jeroen Hofstee)
+Date: Mon, 08 Jun 2015 23:43:29 +0200
+Subject: [PATCH] ARM: dts: AM35xx: fix system control module clocks
+In-Reply-To: <alpine.DEB.2.02.1506071952490.15153@utopia.booyaka.com>
+References: <alpine.DEB.2.02.1506010546510.14902@utopia.booyaka.com>
+ <1433172627-28052-1-git-send-email-t-kristo@ti.com>
+ <556C8ED5.5050000@myspectrum.nl> <20150601173126.GY30984@atomide.com>
+ <alpine.DEB.2.02.1506011733180.14902@utopia.booyaka.com>
+ <5571576E.6020207@myspectrum.nl> <557157FA.7080305@myspectrum.nl>
+ <557411DC.9020109@myspectrum.nl>
+ <alpine.DEB.2.02.1506071952490.15153@utopia.booyaka.com>
+Message-ID: <55760C81.3020602@myspectrum.nl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/28, Geert Uytterhoeven wrote:
-> 	Hi all,
-> 
-> This patch series adds Clock Domain support to the Clock Pulse Generator
-> (CPG) Module Stop (MSTP) Clocks driver using the generic PM Domain, to
-> be used on shmobile SoCs without device power domains (R-Car Gen1 and
-> Gen2, RZ).  This allows to power-manage the module clocks of SoC devices
-> that are part of the CPG Clock Domain using Runtime PM, or for system
-> suspend/resume, similar to SoCs with device power domains (SH-Mobile and
-> R-Mobile).
+Hello Paul,
 
-The clk part looks fine (although it's not really clk framework
-related). Did you want the clk patches to go through the clk tree
-though? It wasn't clear from this cover letter.
+On 07-06-15 21:56, Paul Walmsley wrote:
+> On Sun, 7 Jun 2015, Jeroen Hofstee wrote:
+>
+>>
+>> Turns out my suspicion was wrong. This is what I know at the moment,
+>> depending on the bootpins, u-boot will trigger a bad access when loading
+>> a file over ethernet, but only the first time. Clearing the pending interrupt
+>> before booting linux make the "USB_OTG address hole seen" go away.
+> Oh, too bad.  I had been hoping that you were right and that I was wrong
+> ;-)  I'll try this on the CM-T3517 here.
+>
+> I'd like to solicit your opinion on what to do here.  I wonder if, in the
+> L3 bus drivers, we should simply report, in a line or two, if any bus
+> errors were logged before the kernel starts?  That would help discriminate
+> between problems that the kernel is responsible for, vs. problems that
+> occur earlier in the boot process.  Any thoughts?
+>
 
-If not, you can have my ack on these patches:
+I am not sure this can be easily done in a general manner.  Since in general
+linux doesn't know the bootloader, it can't rely on what peripherals are 
+setup,
+so I doubt it is in general possible to store a copy of the interrupt 
+registers
+really early. Besides that, when not hacking around, I guess during the 
+really
+early boot stage it is unknown what the interrupt registers are in the 
+first place
+and which clocks are needed. And even if it could be done, if there is a 
+bug in
+that code, it would lead to bigger problems than it is trying to solve 
+(a bit weird
+backlogs).
 
->     clk: shmobile: Add CPG Clock Domain support
->   * clk: shmobile: r8a7778: Add CPG Clock Domain support
->   * clk: shmobile: r8a7779: Add CPG Clock Domain support
->     clk: shmobile: rcar-gen2: Add CPG Clock Domain support
->   * clk: shmobile: rz: Add CPG Clock Domain support
+I guess it would be easier to check these flags in u-boot right before 
+the jump
+to linux  (there is a cleanup_before_linux() or something name like 
+that). [ Or fake
+the boot and run the check as a separate command]. Unfortunately u-boot does
+not have a complete driver model, so a implementation of that in todays 
+u-boot
+will lead to a complete #ifdef CONFIG_foo mesh.
 
-Acked-by: Stephen Boyd <sboyd@codeaurora.org>
+So, if you ask me, no don't add it to linux, but to u-boot instead. But 
+likely as feature
+for a later release which can query all drivers. (and doubt this should 
+be limited to
+interrupt flags, runtime_test() could be called on all of them e.g. when 
+entering a
+command like runtime_test).
 
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+Regards,
+Jeroen
