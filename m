@@ -1,25 +1,63 @@
-From: davem@davemloft.net (David Miller)
-Date: Sun, 07 Jun 2015 19:22:02 -0700 (PDT)
-Subject: [PATCH] net: moxa: fix TX overrun memory leak
-In-Reply-To: <1433511978-17666-1-git-send-email-jonas.jensen@gmail.com>
-References: <1433511978-17666-1-git-send-email-jonas.jensen@gmail.com>
-Message-ID: <20150607.192202.705812138482774611.davem@davemloft.net>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Mon, 8 Jun 2015 02:38:47 +0000 (UTC)
+Subject: [PATCH] ARM: dts: AM35xx: fix system control module clocks
+In-Reply-To: <alpine.DEB.2.02.1506071952490.15153@utopia.booyaka.com>
+References: <alpine.DEB.2.02.1506010546510.14902@utopia.booyaka.com>
+ <1433172627-28052-1-git-send-email-t-kristo@ti.com>
+ <556C8ED5.5050000@myspectrum.nl> <20150601173126.GY30984@atomide.com>
+ <alpine.DEB.2.02.1506011733180.14902@utopia.booyaka.com>
+ <5571576E.6020207@myspectrum.nl> <557157FA.7080305@myspectrum.nl>
+ <557411DC.9020109@myspectrum.nl>
+ <alpine.DEB.2.02.1506071952490.15153@utopia.booyaka.com>
+Message-ID: <alpine.DEB.2.02.1506080234271.15153@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Jonas Jensen <jonas.jensen@gmail.com>
-Date: Fri,  5 Jun 2015 15:46:18 +0200
+Hi Jeroen,
 
->  	desc = priv->tx_desc_base + (TX_REG_DESC_SIZE * tx_head);
->  
-> -	spin_lock_irq(&priv->txlock);
-> +	if (CIRC_SPACE(tx_head, tx_tail, TX_DESC_NUM) == 0) {
-> +		priv->stats.tx_dropped++;
-> +		goto out_unlock;
-> +	}
+On Sun, 7 Jun 2015, Paul Walmsley wrote:
 
-You can't do this.
+> On Sun, 7 Jun 2015, Jeroen Hofstee wrote:
+> 
+> > On 05-06-15 10:04, Jeroen Hofstee wrote:
+> > > 
+> > > On 05-06-15 10:01, Jeroen Hofstee wrote:
+> > > > 
+> > > > On 01-06-15 19:44, Paul Walmsley wrote:
+> > > > > The best way to make this work IMHO would be for us not to accept any
+> > > > > new
+> > > > > feature addition patches as long as there are warnings reported in the
+> > > > > test results.  The only real exception that I would foresee is if those
+> > > > > warnings are due to something outside of our control, e.g., a crappy
+> > > > > bootloader, as I suspect the USB_OTG initiator warnings are for the
+> > > > > CM-T3517.
+> > > > > 
+> > > > 
+> > > > I doubt this is related to the bootloader. I have the suspicion that is
+> > > > actually
+> > > > a bug in linux but only triggered depending on whether the ROMcode setup
+> > > > the USB OTG or not. Here is some data to backup my statement:
+> > > > 
+> > 
+> > Turns out my suspicion was wrong. This is what I know at the moment,
+> > depending on the bootpins, u-boot will trigger a bad access when loading
+> > a file over ethernet, but only the first time. Clearing the pending interrupt
+> > before booting linux make the "USB_OTG address hole seen" go away.
+> 
+> Oh, too bad.  I had been hoping that you were right and that I was wrong 
+> ;-)  I'll try this on the CM-T3517 here.
 
-Whatever code creates this condition _must_ stop the TX queue
-so that the core netdevice transmit layer does not call your
-transmit method.
+I used your debugging technique here and was able to reproduce your 
+results - with one difference:
+
+http://www.pwsan.com/omap/testlogs/test_v4.1-rc6/20150607194102/boot/cmt3517/cmt3517_log.txt
+
+The interconnect error was logged upon the first interaction with the 
+network.  In my case this was with the U-boot 'dhcp' command.  The pending 
+interrupt bit was cleared before loading the kernel via tftp, and the 
+interrupt bit was not set again, even after a tftp load.
+
+
+regards,
+
+- Paul
