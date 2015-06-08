@@ -1,32 +1,51 @@
-From: p.fedin@samsung.com (Pavel Fedin)
-Date: Mon, 08 Jun 2015 13:54:09 +0300
-Subject: [PATCH 00/13] arm64: KVM: GICv3 ITS emulation
-In-Reply-To: <557550F0.5070106@arm.com>
-References: <1432893209-27313-1-git-send-email-andre.przywara@arm.com>
- <01ad01d0a1b7$d4d4fe40$7e7efac0$@samsung.com> <557550F0.5070106@arm.com>
-Message-ID: <02ae01d0a1d9$732d2ce0$598786a0$@samsung.com>
+From: vinod.koul@intel.com (Vinod Koul)
+Date: Mon, 8 Jun 2015 16:30:52 +0530
+Subject: [PATCH v2 1/3] dmaengine: at_xdmac: lock fixes
+In-Reply-To: <1433752399-26231-1-git-send-email-ludovic.desroches@atmel.com>
+References: <1433751820-26142-1-git-send-email-ludovic.desroches@atmel.com>
+ <1433752399-26231-1-git-send-email-ludovic.desroches@atmel.com>
+Message-ID: <20150608110052.GG28601@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
- Hi!
+On Mon, Jun 08, 2015 at 10:33:14AM +0200, Ludovic Desroches wrote:
+> Using _bh variant for spin locks causes this kind of warning:
+> Starting logging: ------------[ cut here ]------------
+> WARNING: CPU: 0 PID: 3 at /ssd_drive/linux/kernel/softirq.c:151
+> __local_bh_enable_ip+0xe8/0xf4()
+> Modules linked in:
+> CPU: 0 PID: 3 Comm: ksoftirqd/0 Not tainted 4.1.0-rc2+ #94
+> Hardware name: Atmel SAMA5
+> [<c0013c04>] (unwind_backtrace) from [<c00118a4>] (show_stack+0x10/0x14)
+> [<c00118a4>] (show_stack) from [<c001bbcc>]
+> (warn_slowpath_common+0x80/0xac)
+> [<c001bbcc>] (warn_slowpath_common) from [<c001bc14>]
+> (warn_slowpath_null+0x1c/0x24)
+> [<c001bc14>] (warn_slowpath_null) from [<c001e28c>]
+> (__local_bh_enable_ip+0xe8/0xf4)
+> [<c001e28c>] (__local_bh_enable_ip) from [<c01fdbd0>]
+> (at_xdmac_device_terminate_all+0xf4/0x100)
+> [<c01fdbd0>] (at_xdmac_device_terminate_all) from [<c02221a4>]
+> (atmel_complete_tx_dma+0x34/0xf4)
+> [<c02221a4>] (atmel_complete_tx_dma) from [<c01fe4ac>]
+> (at_xdmac_tasklet+0x14c/0x1ac)
+> [<c01fe4ac>] (at_xdmac_tasklet) from [<c001de58>]
+> (tasklet_action+0x68/0xb4)
+> [<c001de58>] (tasklet_action) from [<c001dfdc>]
+> (__do_softirq+0xfc/0x238)
+> [<c001dfdc>] (__do_softirq) from [<c001e140>] (run_ksoftirqd+0x28/0x34)
+> [<c001e140>] (run_ksoftirqd) from [<c0033a3c>]
+> (smpboot_thread_fn+0x138/0x18c)
+> [<c0033a3c>] (smpboot_thread_fn) from [<c0030e7c>] (kthread+0xdc/0xf0)
+> [<c0030e7c>] (kthread) from [<c000f480>] (ret_from_fork+0x14/0x34)
+> ---[ end trace b57b14a99c1d8812 ]---
+> 
+> It comes from the fact that devices can called some code from the DMA
+> controller with irq disabled. _bh variant is not intended to be used in
+> this case since it can enable irqs. Switch to irqsave/irqrestore variant to
+> avoid this situation.
 
-> I'm afraid this is not enough. A write to GICR_TRANSLATER (DID+EID)
-> results in a (LPI,CPU) pair. Can you easily express the CPU part in
-> irqfd (this is a genuine question, I'm not familiar enough with that
-> part of the core)?
+Applied, thanks
 
- But... As far as i could understand, LPI is added to a collection as a part of setup. And
-collection actually represents a destination CPU, doesn't it? And we can't have multiple
-LPIs sharing the same number and going to different CPUs. Or am i wrong? Unfortunately i
-don't have GICv3 arch reference manual.
-
-> Another concern
-> would be the support of GICv4, which relies on the command queue
-> handling to be handled in the kernel
-
- Wow, i didn't know about GICv4.
-
-Kind regards,
-Pavel Fedin
-Expert Engineer
-Samsung Electronics Research center Russia
+-- 
+~Vinod
