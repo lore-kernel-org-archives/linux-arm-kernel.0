@@ -1,30 +1,54 @@
-From: rnayak@codeaurora.org (Rajendra Nayak)
-Date: Mon, 08 Jun 2015 09:32:38 +0530
-Subject: [RFC 1/7] thermal: qcom: tsens: Add a skeletal tsens drivers
-In-Reply-To: <7hpp59zpfv.fsf@deeprootsystems.com>
-References: <1429796773-7151-1-git-send-email-rnayak@codeaurora.org>	<1429796773-7151-2-git-send-email-rnayak@codeaurora.org>
- <7hpp59zpfv.fsf@deeprootsystems.com>
-Message-ID: <557513DE.2050505@codeaurora.org>
+From: pwalmsley@nvidia.com (Paul Walmsley)
+Date: Sun, 7 Jun 2015 22:02:49 -0600
+Subject: Tegra baseline test results for v4.1-rc7
+Message-ID: <557513E9.1010302@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Kevin,
+Here are some basic Tegra test results for Linux v4.1-rc7.
+Logs and other details at:
 
->
-> I was trying this series on linux-next with Srini's eeprom v4 and my
-> first attempt was to build the eeprom, qfprom and tsens drivers as
-> built-in.  Unfortunately, the tsens driver probed before the
-> eeprom/qfprom driver so failed here with the "calibration failed"
-> message.
->
-> Building things as modules worked better, but you might want to take a
-> look at possibly using -EPROBE_DEFER here?
+     http://nvt.pwsan.com/pub/linux/testlogs/test_v4.1-rc7/20150607203104/
 
-The driver does return -EPROBE_DEFER in case the calibration fails
-when tsens is probed before qfprom. It does however also show the
-error message "calibration failed" which is a little misleading and
-needs fixing. What target were you trying this on? I will give it a
-try again to make sure things work.
 
-regards,
-Rajendra
+Test summary
+------------
+
+Build: zImage:
+     Pass: ( 2/ 2): multi_v7_defconfig, tegra_defconfig
+
+Build: Image:
+     Pass: ( 1/ 1): defconfig
+
+Boot to userspace: defconfig:
+     Pass: ( 1/ 1): qemu-vexpress64
+
+Boot to userspace: multi_v7_defconfig:
+     Pass: ( 4/ 4): tegra114-dalmore-a04, tegra124-jetson-tk1,
+		   tegra20-trimslice, tegra30-beaver
+
+Boot to userspace: tegra_defconfig:
+     Pass: ( 4/ 4): tegra114-dalmore-a04, tegra124-jetson-tk1,
+		   tegra20-trimslice, tegra30-beaver
+
+
+vmlinux object size
+(delta in bytes from test_v4.1-rc6 (c65b99f046843d2455aa231747b5a07a999a9f3d)):
+    text     data      bss    total  kernel
+      +9       -8        0       +1  defconfig
+    +377       -8        0     +369  multi_v7_defconfig
+     +21        0        0      +21  tegra_defconfig
+
+
+Boot-time memory difference
+(delta in bytes from test_v4.1-rc6 (c65b99f046843d2455aa231747b5a07a999a9f3d))
+     avail    rsrvd     high    freed                board              kconfig                  dtb
+         .        .        .        .      qemu-vexpress64            defconfig           __internal
+         .        .        .        . tegra114-dalmore-a04   multi_v7_defconfig     tegra114-dalmore
+         .        .        .        . tegra114-dalmore-a04      tegra_defconfig     tegra114-dalmore
+         .        .        .        .  tegra124-jetson-tk1   multi_v7_defconfig  tegra124-jetson-tk1
+         .        .        .        .  tegra124-jetson-tk1      tegra_defconfig  tegra124-jetson-tk1
+         .        .        .        .    tegra20-trimslice   multi_v7_defconfig    tegra20-trimslice
+         .        .        .        .    tegra20-trimslice      tegra_defconfig    tegra20-trimslice
+         .        .        .        .       tegra30-beaver   multi_v7_defconfig       tegra30-beaver
+         .        .        .        .       tegra30-beaver      tegra_defconfig       tegra30-beaver
