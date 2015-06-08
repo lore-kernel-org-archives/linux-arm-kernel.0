@@ -1,61 +1,42 @@
-From: julia.lawall@lip6.fr (Julia Lawall)
-Date: Mon, 8 Jun 2015 09:09:30 +0200 (CEST)
-Subject: [PATCH] ARM: pxa: ssp: remove unnessary free for devm_xxx
-In-Reply-To: <1433744346-14095-1-git-send-email-firogm@gmail.com>
-References: <1433744346-14095-1-git-send-email-firogm@gmail.com>
-Message-ID: <alpine.DEB.2.10.1506080908460.2660@hadrien>
+From: acourbot@nvidia.com (Alexandre Courbot)
+Date: Mon, 8 Jun 2015 16:41:32 +0900
+Subject: [PATCH] ARM: tegra: roth: Add MMC pwrseq to power wifi on
+Message-ID: <1433749292-13890-1-git-send-email-acourbot@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+The wifi chip on roth needs to have its reset deasserted in order to be
+probed. Add a mmc-pwrseq-simple to allow this to happen and get wifi
+working at boot time.
 
+Signed-off-by: Alexandre Courbot <acourbot@nvidia.com>
+---
+ arch/arm/boot/dts/tegra114-roth.dts | 6 ++++++
+ 1 file changed, 6 insertions(+)
 
-On Mon, 8 Jun 2015, Firo Yang wrote:
-
-> A Coccinelle warning.
-> It's not necessary to free memory allocated with devm_xxx
-> and using these free functions maybe lead to a double free that
-> will corrupt the resource subsys. So, I just remove them.
-
-This code could also be using devm_ioremap_resource rather than
-devm_request_mem_region and devm_ioremap.
-
-julia
-
-
->
-> Signed-off-by: Firo Yang <firogm@gmail.com>
-> ---
->  arch/arm/plat-pxa/ssp.c | 8 --------
->  1 file changed, 8 deletions(-)
->
-> diff --git a/arch/arm/plat-pxa/ssp.c b/arch/arm/plat-pxa/ssp.c
-> index ad9529c..f3f1431 100644
-> --- a/arch/arm/plat-pxa/ssp.c
-> +++ b/arch/arm/plat-pxa/ssp.c
-> @@ -239,18 +239,10 @@ static int pxa_ssp_remove(struct platform_device *pdev)
->  	if (ssp == NULL)
->  		return -ENODEV;
->
-> -	iounmap(ssp->mmio_base);
-> -
-> -	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-> -	release_mem_region(res->start, resource_size(res));
-> -
-> -	clk_put(ssp->clk);
-> -
->  	mutex_lock(&ssp_lock);
->  	list_del(&ssp->node);
->  	mutex_unlock(&ssp_lock);
->
-> -	kfree(ssp);
->  	return 0;
->  }
->
-> --
-> 2.4.2
->
-> --
-> To unsubscribe from this list: send the line "unsubscribe kernel-janitors" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
->
+diff --git a/arch/arm/boot/dts/tegra114-roth.dts b/arch/arm/boot/dts/tegra114-roth.dts
+index ea1772a686c2..04762532a178 100644
+--- a/arch/arm/boot/dts/tegra114-roth.dts
++++ b/arch/arm/boot/dts/tegra114-roth.dts
+@@ -972,6 +972,11 @@
+ 		nvidia,invert-interrupt;
+ 	};
+ 
++	sdhci0_pwrseq: sdhci0_pwrseq {
++		compatible = "mmc-pwrseq-simple";
++		reset-gpios = <&gpio TEGRA_GPIO(CC, 5) GPIO_ACTIVE_LOW>;
++	};
++
+ 	/* Wifi */
+ 	sdhci at 78000000 {
+ 		status = "okay";
+@@ -979,6 +984,7 @@
+ 		broken-cd;
+ 		keep-power-in-suspend;
+ 		cap-sdio-irq;
++		mmc-pwrseq = <&sdhci0_pwrseq>;
+ 	};
+ 
+ 	/* SD card */
+-- 
+2.4.2
