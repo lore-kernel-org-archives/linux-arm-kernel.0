@@ -1,52 +1,33 @@
-From: khilman@kernel.org (Kevin Hilman)
-Date: Mon, 08 Jun 2015 09:05:10 -0700
-Subject: [RFC 0/7] qcom: Add support for tsens driver
-In-Reply-To: <55751A27.6030306@codeaurora.org> (Rajendra Nayak's message of
- "Mon, 08 Jun 2015 09:59:27 +0530")
-References: <1429796773-7151-1-git-send-email-rnayak@codeaurora.org>
- <7hvbf1y974.fsf@deeprootsystems.com> <55751A27.6030306@codeaurora.org>
-Message-ID: <7hy4juw5hl.fsf@deeprootsystems.com>
+From: cyrille.pitchen@atmel.com (Cyrille Pitchen)
+Date: Mon, 8 Jun 2015 18:07:41 +0200
+Subject: [PATCH v2 0/3] spi: atmel: add support to FIFOs and the internal
+ chip-select
+Message-ID: <cover.1433779081.git.cyrille.pitchen@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Rajendra Nayak <rnayak@codeaurora.org> writes:
+ChangeLog
 
-> Hi Kevin,
->
->> Curious how are you testing this?  with which thermal governor?
->
-> I have been mostly testing this with step wise on the db410c target
-> board.
->
->>
->> I'm experimenting with the new thermal power_allocator governor
->> currently in linux-next, and was hoping to use this to test it, but I'm
->> noticing it doesn't work with the power_allocator governor.
->>
->> The first thing is that the power_allator goveror expects each thermal
->> zone to have a sustainable-power property in the DT, which this series
->> doesn't provide.  Hacking some dummy values in there to see what happens
->> next, I then hit the "thermal zone cpu-thermal0 has wrong trip setup for
->> power allocator" error from the power_allocator driver.
->
-> Right, the RFC I posted wasn't tested with IPA and hence does not have
-> some of the additional properties in DT which IPA expects.
-> The wrong trip setup error that you are seeing is because IPA expects
-> 2 passive trip points, a "switch on" trip point and a "desired
-> temperature" trip point and the dts I posted with the RFC had
-> just one passive trip point.
->
-> I am in the process of testing this with IPA myself (on db410c mainly,
-> but will also test on db8074 and IFC6410/6540 as well) and will repost
-> in a few days with updated dts entries and a few other minor fixes
-> to the driver itself. Let me know what target board you are
-> interested to get this working on and I will make sure I test on it
-> before I repost.
+v2:
+- read the Status Register to clear its RX FIFO Threshold Flag (RXFTHF) before
+  writing into the IER to enable the RXFTHF interrupt.
+- remove the reset of the FIFO Mode Register (FMR) at the end of transfers
+  because setting the RX FIFO Threshold to 0 also sets the RXFTHF bit in SR.
+- add a 3rd patch in the series to update the documentation of DT bindings.
 
-Great, thanks!
+v1:
+This series of patches add support to features introduced by the Atmel sama5d2x
+SoC
 
-I tried on qcom-apq8064-ifc6410 and qcom-msm8974-sony-xperia-honami, and
-would have also tried qcom-apq8084-ifc6540 but saw that Lina mentioned
-there was missing support for 8084.
+Cyrille Pitchen (3):
+  spi: atmel: add support for the internal chip-select of the spi
+    controller
+  spi: atmel: update DT bindings documentation
+  spi: atmel: add support to FIFOs
 
-Kevin
+ .../devicetree/bindings/spi/spi_atmel.txt          |   8 +-
+ drivers/spi/spi-atmel.c                            | 276 +++++++++++++++++++--
+ 2 files changed, 264 insertions(+), 20 deletions(-)
+
+-- 
+1.8.2.2
