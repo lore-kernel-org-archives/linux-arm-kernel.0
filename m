@@ -1,82 +1,53 @@
-From: Liviu.Dudau@arm.com (Liviu Dudau)
-Date: Mon, 8 Jun 2015 15:35:13 +0100
-Subject: [PATCH v4 6/8] arm64: dts: add SRAM, MHU mailbox and SCPI
- support on Juno
-In-Reply-To: <1433771479.2882.44.camel@linaro.org>
-References: <1433760002-24120-1-git-send-email-sudeep.holla@arm.com>
- <1433760002-24120-7-git-send-email-sudeep.holla@arm.com>
- <1433771479.2882.44.camel@linaro.org>
-Message-ID: <20150608143513.GI12807@e106497-lin.cambridge.arm.com>
+From: xander.huff@ni.com (Xander Huff)
+Date: Mon, 08 Jun 2015 09:44:53 -0500
+Subject: [PATCH] iio: adc: xilinx-xadc: Convert to raw spinlock
+In-Reply-To: <5574633F.7090004@kernel.org>
+References: <1431013090-18996-1-git-send-email-xander.huff@ni.com>
+ <20150514171038.GG13442@linutronix.de> <55552570.5050407@ni.com>
+ <20150518211728.GC4275@linutronix.de> <5574633F.7090004@kernel.org>
+Message-ID: <5575AA65.20907@ni.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 08, 2015 at 02:51:19PM +0100, Jon Medhurst (Tixy) wrote:
-> On Mon, 2015-06-08 at 11:40 +0100, Sudeep Holla wrote:
-> [...]
-> > +
-> > +	scpi {
-> > +		compatible = "arm,scpi";
-> > +		mboxes = <&mailbox 1>;
-> > +		shmem = <&cpu_scp_hpri>;
-> > +
-> > +		clocks {
-> > +			compatible = "arm,scpi-clocks";
-> > +
-> > +			scpi_dvfs: scpi_clocks at 0 {
-> > +				compatible = "arm,scpi-dvfs-clocks";
-> > +				#clock-cells = <1>;
-> > +				clock-indices = <0>, <1>, <2>;
-> > +				clock-output-names = "vbig", "vlittle", "vgpu";
-> 
-> From where do the clock names derive? They look more like names for
-> voltage domains rather than clocks. My (admittedly very old) Juno docs,
-> have the clocks as ATLCLK, APLCLK and GPUCLK.
-> 
-> > +			};
-> > +			scpi_clk: scpi_clocks at 3 {
-> > +				compatible = "arm,scpi-variable-clocks";
-> > +				#clock-cells = <1>;
-> > +				clock-indices = <3>, <4>;
-> > +				clock-output-names = "pxlclk0", "pxlclk1";
-> 
-> Can we also have clock index 5, name 'i2s_clk', for used by audio?
-> (I don't know what other clocks the SCP currently supports, but audio is
-> one being currently used by the out-of-tree code).
-> 
-> Also, I believe that both display outputs share the same clock, and so
-> pxlclk0 and pxlclk1 can't be controlled independently. But I guess these
-> device-tree entries are for the interface to the SCP firmware, not the
-> hardware, and if that pretends the clocks are independent...
-
-Actually, they can be independent, but the other source for clock generation
-can only be used to drive a VGA resolution.
-
-We were just debating with Sudeep on how to expose this: at the moment the SCP
-is configured so that the request for a clock frequency always succeeds even
-if the other user of the clock is active. That means that if you have 2 monitors
-connected that have different resolutions or pixel clocks then one of the
-monitor will get out of sync (unless it is a VGA monitor). On the other hand the
-HDLCD driver (or more corectly the DRM KMS one) will default to 640x480 if no
-monitor is connected to an HDMI output, meaning the clock could already be used
-but by a driver that should really be inactive. It is very hard to detect in
-which situation we are, so the usual fix is "plug the monitor into the other
-HDMI output if you have problems with single monitors".
-
-Best regards,
-Liviu
-
-> 
-> -- 
-> Tixy
-> 
-> 
+On 6/7/2015 10:29 AM, Jonathan Cameron wrote:
+> On 18/05/15 22:17, Sebastian Andrzej Siewior wrote:
+>> * Xander Huff | 2015-05-14 17:45:04 [-0500]:
+>>
+>>> With no other processes running, I got the following results after a
+>>> couple of hours on one of our devices:
+>>>
+>>> admin at Xander-roboRIO:~# cyclictest -S -m -p 98
+>>> # /dev/cpu_dma_latency set to 0us
+>>> policy: fifo: loadavg: 0.01 0.07 0.12 1/176 1473
+>>>
+>>> T: 0 ( 1373) P:98 I:1000 C:6503872 Min:      9 Act:   13 Avg:   13 Max:      51
+>>> T: 1 ( 1374) P:98 I:1500 C:4335914 Min:      9 Act:   12 Avg:   13 Max:      49
+>>>
+>>> With a VI reading all default handles (raw, offset, scale,
+>>> sampling_frequency) in /sys/bus/iio/devices/iio:device0 constantly in
+>>> a while loop, I got the following results after a couple hours on the
+>>> same device:
+>>>
+>>> admin at Xander-roboRIO:~# cyclictest -S -m -p 98
+>>> # /dev/cpu_dma_latency set to 0us
+>>> policy: fifo: loadavg: 6.93 7.30 7.47 3/182 1530
+>>>
+>>> T: 0 ( 1487) P:98 I:1000 C:4497008 Min:     11 Act:   20 Avg:   21 Max:      69
+>>> T: 1 ( 1488) P:98 I:1500 C:2998005 Min:     11 Act:   20 Avg:   22 Max:      59
+>>
+>> So there is an increase. And there is even a for-loop and I don't know
+>> how deep it is nested. Anyway, do you think it is worth it or would it
+>> be better to get rid of the raw-locks and simply push everything into
+>> threaded context?
+>>
+> Certainly seems likely to be a better way forward to me but I don't
+> really mind either way.
+>
+> J
+>
+We'll be giving Sebastian's suggestion a try, as time allows.
 
 -- 
-====================
-| I would like to |
-| fix the world,  |
-| but they're not |
-| giving me the   |
- \ source code!  /
-  ---------------
-    ?\_(?)_/?
+Xander Huff
+Staff Software Engineer
+National Instruments
