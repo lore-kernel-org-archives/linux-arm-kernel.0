@@ -1,112 +1,79 @@
-From: wxt@rock-chips.com (Caesar Wang)
-Date: Mon, 08 Jun 2015 12:56:07 +0800
-Subject: [PATCH v3 2/3] ARM: rockchip: ensure CPU to enter WFI/WFE state
-In-Reply-To: <CAD=FV=UamkH+RHmHHVzGKZda_w0teGBdfcH-LbCKqyp2q1OVqA@mail.gmail.com>
-References: <1433517104-7595-1-git-send-email-wxt@rock-chips.com>	<1433517104-7595-3-git-send-email-wxt@rock-chips.com>	<CAD=FV=UMkFtOFYpY+MUZOegnmFLdW3ZgNivwdHChv0MLr50sVQ@mail.gmail.com>	<20150605182947.GN7557@n2100.arm.linux.org.uk>
- <CAD=FV=UamkH+RHmHHVzGKZda_w0teGBdfcH-LbCKqyp2q1OVqA@mail.gmail.com>
-Message-ID: <55752067.2040108@rock-chips.com>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Mon, 8 Jun 2015 14:14:52 +0900
+Subject: [RESEND 1/2] usb: ehci-exynos: Make provision for vdd regulators
+In-Reply-To: <CANAwSgTjx8uxyOTW8uuiqrcNzF+UwLMmML2OcDgG5Ku_56=vJQ@mail.gmail.com>
+References: <1433683242-3945-1-git-send-email-linux.amoon@gmail.com>
+ <5574F97A.5030104@samsung.com>
+ <CANAwSgTjx8uxyOTW8uuiqrcNzF+UwLMmML2OcDgG5Ku_56=vJQ@mail.gmail.com>
+Message-ID: <CAJKOXPfDmt5VMqr-P+OpWy1+jz675CFRPmtS_N0HjN4tWxfwtA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-? 2015?06?06? 04:24, Doug Anderson ??:
-> Russell,
+2015-06-08 13:21 GMT+09:00 Anand Moon <linux.amoon@gmail.com>:
+> Hi Krzysztof ,
 >
-> On Fri, Jun 5, 2015 at 11:29 AM, Russell King - ARM Linux
-> <linux@arm.linux.org.uk> wrote:
->> 1) v7_coherency_exit() is specific to v7 CPUs and can't be used by
->>     generic code.
-> Oh, I see.  So (I think) you're saying that perhaps the reason that
-> Caesar needed his patch was that he needed the dying processor to
-> execute v7_exit_coherency_flush(), NOT that he needed the dying
-> processor to be in WFI/WFE.  That actually makes a lot more sense to
-> me!  :)  Thanks a lot for pointing that out, it's very helpful.
+> On 8 June 2015 at 07:40, Krzysztof Kozlowski <k.kozlowski@samsung.com> wrote:
+>> On 07.06.2015 22:20, Anand Moon wrote:
+>>> Facilitate getting required 3.3V and 1.0V VDD supply for
+>>> EHCI controller on Exynos.
+>>>
+>>> With the patches for regulators' nodes merged in 3.15:
+>>> c8c253f ARM: dts: Add regulator entries to smdk5420
+>>> 275dcd2 ARM: dts: add max77686 pmic node for smdk5250,
+>>> the exynos systems turn on only minimal number of regulators.
+>>>
+>>> Until now, the VDD regulator supplies were either turned on
+>>> by the bootloader, or the regulators were enabled by default
+>>> in the kernel, so that the controller drivers did not need to
+>>> care about turning on these regulators on their own.
+>>> This was rather bad about these controller drivers.
+>>> So ensuring now that the controller driver requests the necessary
+>>> VDD regulators (if available, unless there are direct VDD rails),
+>>> and enable them so as to make them working.
+>>>
+>>> Signed-off-by: Vivek Gautam <gautam.vivek@samsung.com>
+>>> Signed-off-by: Anand Moon <linux.amoon@gmail.com>
+>>> Cc: Jingoo Han <jg1.han@samsung.com>
+>>> Cc: Alan Stern <stern@rowland.harvard.edu>
+>>> ---
+>>> Initial version of this patch was part of following series, though
+>>> they are not dependent on each other, resubmitting after rebasing.
+>>>
+>>> http://lists.infradead.org/pipermail/linux-arm-kernel/2014-June/266418.html
+>>
+>> So you just took Vivek's patch along with all the credits... That is not
+>> how we usually do this.
+>>
+>> I would expect that rebasing a patch won't change the author unless this
+>> is fine with Vivek.
+>>
 >
+> Sorry If I have done some mistake on my part.
+> I just looked at below mail chain. Before I send it.
 >
->> So, we're actually in a very sticky position over taking CPUs offline.
->> It seems to be something that the ARM architecture and kernel
->> architecture doesn't actually allow to be done safely.  So much so,
->> that in a similar way to the original Keystone 2 physical address
->> switch, I'm tempted to make taking a CPU offline taint the kernel!
-> Wow, that's going to suck.  So if you want to suspend / resume you
-> need to taint your kernel.  So much for saving the planet by going
-> into suspend...  ...or are you thinking that it won't taint the kernel
-> when the kernel takes CPUs offline for suspend/resume purposes?  ...or
-> are you thinking you've some solution that works for suspend/resume
-> that doesn't work for the general cpu offlining problem?  I'd be very
-> interested to hear...
->
->
-> I know I'm not a maintainer, but if I were and I knew that lots of
-> smart people had thought about the problem of CPU offlining and they
-> didn't have a solution and I could make my platform 99.99999999%
-> reliable by allowing a very safe mdelay(1) where I had a pretty strong
-> guarantee that the 1ms was enough time, I would probably accept that
-> code...
->
->
-> So since I'm not a maintainer and I certainly couldn't ack such code,
-> I would certainly be happy to add my Reviewed-by to Caesar's patch if
-> he changed it mention that he needed to make sure that
-> v7_exit_coherency_flush() in rockchip_cpu_die() executed in time.
+> http://www.spinics.net/lists/linux-samsung-soc/msg44136.html
 
-OK.
-The dying processor to execute v7_exit_coherency_flush(),not that the 
-dying processor to be in WFI/WFE.
-
-It's needed to enter WFI/WFE state from the ARM refer document when CPU 
-down.
-
-But......
-
-Here is my test: (won't to enter the WFI state)
-@@ -331,8 +331,8 @@ static int rockchip_cpu_kill(unsigned int cpu)
-  static void rockchip_cpu_die(unsigned int cpu)
-  {
-         v7_exit_coherency_flush(louis);
--       while (1)
--               cpu_do_idle();
-+       while (1);
-+               //cpu_do_idle();
-  }
-
-echo 0 > /sys/module/printk/parameters/console_suspend
-echo 1 > /sys/power/pm_print_times
-echo mem > sys/power/state
-
-You can play anything
-or do some test for CPU up/down:
-
-cd /sys/devices/system/cpu/
-for i in $(seq 10000); do
-   echo "================= $i ============"
-   for j in $(seq 100); do
-     while [[ "$(cat cpu1/online)$(cat cpu2/online)$(cat cpu3/online)" 
-!= "000" ]]; do
-
-       echo 0 > cpu1/online
-       echo 0 > cpu2/online
-       echo 0 > cpu3/online
-     done
-     while [[ "$(cat cpu1/online)$(cat cpu2/online)$(cat cpu3/online)" 
-!= "111" ]]; do
-       echo 1 > cpu1/online
-       echo 1 > cpu2/online
-       echo 1 > cpu3/online
-     done
-   done
-done
-Sometimes,the system will be restart when do the about test.
-I'm no sure what's happen, That maybe abnormal won't to enter the WFI 
-state.
+I don't get it. The patch you are referring to has a proper "From"
+field. So please use it as an example.
 
 >
-> -Doug
->
->
->
+> I don't want to take any credit out of it. I just re-base on the new kernel.
+> I could not test this patch as it meant for exynos5440 boards.
 
--- 
-Thanks,
-- Caesar
+Are you sure? I think the driver is used on almost all of Exynos SoCs
+(Exynos4, Exynos5250, Exynos542x).
+
+Untested code should not go to the kernel. Additionally you should
+mark it as not-tested. Marking such patch as non-tested could help you
+finding some independent tests (tests performed by someone else).
+
+To summarize my point of view:
+1. Unless Vivek's says otherwise, please give him the credits with
+proper "from" field.
+2. Issues mentioned in previous mail should be addressed (missing
+IS_ERR(), how disabling the regulator during suspend affects waking
+up).
+3. The patchset must be tested, even after rebasing.
+
+Best regards,
+Krzysztof
