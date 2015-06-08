@@ -1,62 +1,39 @@
-From: daniel@zonque.org (Daniel Mack)
-Date: Mon, 08 Jun 2015 11:49:09 +0200
-Subject: [PATCH v3] ARM: pxa: ssp: remove unnessary free for devm_xxx
-In-Reply-To: <1433756701-32194-1-git-send-email-firogm@gmail.com>
-References: <1433756701-32194-1-git-send-email-firogm@gmail.com>
-Message-ID: <55756515.3010508@zonque.org>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Mon, 8 Jun 2015 12:03:58 +0200
+Subject: [PATCH 00/20] ARM: dts: Add USB and OTG related nodes and enable
+ on various boards
+In-Reply-To: <1433530943-12599-1-git-send-email-hdegoede@redhat.com>
+References: <1433530943-12599-1-git-send-email-hdegoede@redhat.com>
+Message-ID: <20150608100358.GW23777@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/08/2015 11:45 AM, Firo Yang wrote:
-> A Coccinelle warning.
-> It's not necessary to free memory allocated with devm_xxx
-> and using these free functions maybe lead to a double free that
-> will corrupt the resource subsys. So, I just remove them.
+Hi Hans,
+
+On Fri, Jun 05, 2015 at 09:02:03PM +0200, Hans de Goede wrote:
+> Hi Maxime,
 > 
-> Signed-off-by: Firo Yang <firogm@gmail.com>
-
-Reviewed-by: Daniel Mack <daniel@zonque.org>
-
-
-Thanks!
-Daniel
-
-
-> ---
-> In "[PATCH] ARM: pxa: ssp: remove unnessary free for devm_xxx", 
-> I forgot to remove an unused variable struct resource *res.
+> Here is a patch-set with all the otg / sun8i-usb-host related dts patches
+> I've accumulated.
 > 
->  arch/arm/plat-pxa/ssp.c | 9 ---------
->  1 file changed, 9 deletions(-)
-> 
-> diff --git a/arch/arm/plat-pxa/ssp.c b/arch/arm/plat-pxa/ssp.c
-> index ad9529c..2b92a3b 100644
-> --- a/arch/arm/plat-pxa/ssp.c
-> +++ b/arch/arm/plat-pxa/ssp.c
-> @@ -232,25 +232,16 @@ static int pxa_ssp_probe(struct platform_device *pdev)
->  
->  static int pxa_ssp_remove(struct platform_device *pdev)
->  {
-> -	struct resource *res;
->  	struct ssp_device *ssp;
->  
->  	ssp = platform_get_drvdata(pdev);
->  	if (ssp == NULL)
->  		return -ENODEV;
->  
-> -	iounmap(ssp->mmio_base);
-> -
-> -	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-> -	release_mem_region(res->start, resource_size(res));
-> -
-> -	clk_put(ssp->clk);
-> -
->  	mutex_lock(&ssp_lock);
->  	list_del(&ssp->node);
->  	mutex_unlock(&ssp_lock);
->  
-> -	kfree(ssp);
->  	return 0;
->  }
->  
-> 
+> These are intended for 4.3, and go hand in hand with the outstanding
+> musb-sunxi / phy-sun4i-usb patches, which I expect to be merged as is
+> for 4.3 .
+
+I'm fine with these patches. Do you have a branch somewhere that I can
+pull (without the one that you wanted me to drop, obviously)?
+
+Thanks,
+Maxime
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150608/77496d30/attachment.sig>
