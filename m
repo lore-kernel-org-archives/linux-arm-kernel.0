@@ -1,53 +1,101 @@
-From: javier@dowhile0.org (Javier Martinez Canillas)
-Date: Mon, 8 Jun 2015 10:12:06 +0200
-Subject: [PATCH] ARM: tegra: roth: Add MMC pwrseq to power wifi on
-In-Reply-To: <1433749292-13890-1-git-send-email-acourbot@nvidia.com>
-References: <1433749292-13890-1-git-send-email-acourbot@nvidia.com>
-Message-ID: <CABxcv=kBcr7g77jj98KQ19R_oaoTrVGjqDgQa6ghZz7CJ+t3uw@mail.gmail.com>
+From: firogm@gmail.com (Firo Yang)
+Date: Mon, 8 Jun 2015 16:19:36 +0800
+Subject: [PATCH v2] ARM: pxa: ssp: remove unnessary free for devm_xxx
+In-Reply-To: <alpine.DEB.2.10.1506081008570.2660@hadrien>
+References: <1433750803-26439-1-git-send-email-firogm@gmail.com>
+ <alpine.DEB.2.10.1506081008570.2660@hadrien>
+Message-ID: <20150608081936.GA26627@firo>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Alexandre,
-
-On Mon, Jun 8, 2015 at 9:41 AM, Alexandre Courbot <acourbot@nvidia.com> wrote:
-> The wifi chip on roth needs to have its reset deasserted in order to be
-> probed. Add a mmc-pwrseq-simple to allow this to happen and get wifi
-> working at boot time.
+On Mon, Jun 08, 2015 at 10:09:31AM +0200, Julia Lawall wrote:
+>On Mon, 8 Jun 2015, Firo Yang wrote:
 >
-> Signed-off-by: Alexandre Courbot <acourbot@nvidia.com>
-> ---
->  arch/arm/boot/dts/tegra114-roth.dts | 6 ++++++
->  1 file changed, 6 insertions(+)
+>> A Coccinelle warning.
+>> It's not necessary to free memory allocated with devm_xxx
+>> and using these free functions maybe lead to a double free that
+>> will corrupt the resource subsys. So, I just remove them.
+>>
+>> By the way, I replace devm_request_mem_region and devm_ioremap with
+>> devm_ioremap_resource as Julia's suggestion.
 >
-> diff --git a/arch/arm/boot/dts/tegra114-roth.dts b/arch/arm/boot/dts/tegra114-roth.dts
-> index ea1772a686c2..04762532a178 100644
-> --- a/arch/arm/boot/dts/tegra114-roth.dts
-> +++ b/arch/arm/boot/dts/tegra114-roth.dts
-> @@ -972,6 +972,11 @@
->                 nvidia,invert-interrupt;
->         };
+>I think they should be done separately.  The first patch fixes a bug.  The
+>second one just simplifies/modernizes the code.
+
+Ok, I will send another patch with simplified code separately.
+But, what about this patch? Will it be discared?
+
 >
-> +       sdhci0_pwrseq: sdhci0_pwrseq {
-> +               compatible = "mmc-pwrseq-simple";
-> +               reset-gpios = <&gpio TEGRA_GPIO(CC, 5) GPIO_ACTIVE_LOW>;
-> +       };
-> +
->         /* Wifi */
->         sdhci at 78000000 {
->                 status = "okay";
-> @@ -979,6 +984,7 @@
->                 broken-cd;
->                 keep-power-in-suspend;
->                 cap-sdio-irq;
-> +               mmc-pwrseq = <&sdhci0_pwrseq>;
->         };
+>julia
 >
->         /* SD card */
+>>
+>> Signed-off-by: Firo Yang <firogm@gmail.com>
+>> ---
+>>  arch/arm/plat-pxa/ssp.c | 24 +++---------------------
+>>  1 file changed, 3 insertions(+), 21 deletions(-)
+>>
+>> diff --git a/arch/arm/plat-pxa/ssp.c b/arch/arm/plat-pxa/ssp.c
+>> index ad9529c..a278ea0 100644
+>> --- a/arch/arm/plat-pxa/ssp.c
+>> +++ b/arch/arm/plat-pxa/ssp.c
+>> @@ -182,21 +182,12 @@ static int pxa_ssp_probe(struct platform_device *pdev)
+>>  		return -ENODEV;
+>>  	}
+>>
+>> -	res = devm_request_mem_region(dev, res->start, resource_size(res),
+>> -				      pdev->name);
+>> -	if (res == NULL) {
+>> -		dev_err(dev, "failed to request memory resource\n");
+>> -		return -EBUSY;
+>> -	}
+>> +	ssp->mmio_base = devm_ioremap_resource(dev, res);
+>> +	if (IS_ERR(ssp->mmio_base))
+>> +		return PTR_ERR(ssp->mmio_base);
+>>
+>>  	ssp->phys_base = res->start;
+>>
+>> -	ssp->mmio_base = devm_ioremap(dev, res->start, resource_size(res));
+>> -	if (ssp->mmio_base == NULL) {
+>> -		dev_err(dev, "failed to ioremap() registers\n");
+>> -		return -ENODEV;
+>> -	}
+>> -
+>>  	ssp->irq = platform_get_irq(pdev, 0);
+>>  	if (ssp->irq < 0) {
+>>  		dev_err(dev, "no IRQ resource defined\n");
+>> @@ -232,25 +223,16 @@ static int pxa_ssp_probe(struct platform_device *pdev)
+>>
+>>  static int pxa_ssp_remove(struct platform_device *pdev)
+>>  {
+>> -	struct resource *res;
+>>  	struct ssp_device *ssp;
+>>
+>>  	ssp = platform_get_drvdata(pdev);
+>>  	if (ssp == NULL)
+>>  		return -ENODEV;
+>>
+>> -	iounmap(ssp->mmio_base);
+>> -
+>> -	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+>> -	release_mem_region(res->start, resource_size(res));
+>> -
+>> -	clk_put(ssp->clk);
+>> -
+>>  	mutex_lock(&ssp_lock);
+>>  	list_del(&ssp->node);
+>>  	mutex_unlock(&ssp_lock);
+>>
+>> -	kfree(ssp);
+>>  	return 0;
+>>  }
+>>
+>> --
+>> 2.4.2
+>>
+>> --
+>> To unsubscribe from this list: send the line "unsubscribe kernel-janitors" in
+>> the body of a message to majordomo at vger.kernel.org
+>> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+>>
 
-I'm neither familiar with this board nor have a schematic but the
-patch looks good to me.
-
-Reviewed-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
-
-Best regards,
-Javier
+-- 
