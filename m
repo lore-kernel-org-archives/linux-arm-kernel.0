@@ -1,120 +1,66 @@
-From: firogm@gmail.com (Firo Yang)
-Date: Mon, 8 Jun 2015 16:23:21 +0800
-Subject: [PATCH v2] ARM: pxa: ssp: remove unnessary free for devm_xxx
-In-Reply-To: <alpine.DEB.2.10.1506081021170.2660@hadrien>
-References: <1433750803-26439-1-git-send-email-firogm@gmail.com>
- <alpine.DEB.2.10.1506081008570.2660@hadrien>
- <20150608081936.GA26627@firo>
- <alpine.DEB.2.10.1506081021170.2660@hadrien>
-Message-ID: <20150608082321.GB26627@firo>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Mon, 08 Jun 2015 09:23:12 +0100
+Subject: [PATCH 00/13] arm64: KVM: GICv3 ITS emulation
+In-Reply-To: <01ad01d0a1b7$d4d4fe40$7e7efac0$@samsung.com>
+References: <1432893209-27313-1-git-send-email-andre.przywara@arm.com>
+ <01ad01d0a1b7$d4d4fe40$7e7efac0$@samsung.com>
+Message-ID: <557550F0.5070106@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 08, 2015 at 10:21:41AM +0200, Julia Lawall wrote:
->On Mon, 8 Jun 2015, Firo Yang wrote:
->
->> On Mon, Jun 08, 2015 at 10:09:31AM +0200, Julia Lawall wrote:
->> >On Mon, 8 Jun 2015, Firo Yang wrote:
->> >
->> >> A Coccinelle warning.
->> >> It's not necessary to free memory allocated with devm_xxx
->> >> and using these free functions maybe lead to a double free that
->> >> will corrupt the resource subsys. So, I just remove them.
->> >>
->> >> By the way, I replace devm_request_mem_region and devm_ioremap with
->> >> devm_ioremap_resource as Julia's suggestion.
->> >
->> >I think they should be done separately.  The first patch fixes a bug.  The
->> >second one just simplifies/modernizes the code.
->>
->> Ok, I will send another patch with simplified code separately.
->> But, what about this patch? Will it be discared?
->
->Maybe you can put a comment under the --- explaining the situation.
+Hi Pavel,
 
-Sorry, --- stands for what?
->
->julia
->
->>
->> >
->> >julia
->> >
->> >>
->> >> Signed-off-by: Firo Yang <firogm@gmail.com>
->> >> ---
->> >>  arch/arm/plat-pxa/ssp.c | 24 +++---------------------
->> >>  1 file changed, 3 insertions(+), 21 deletions(-)
->> >>
->> >> diff --git a/arch/arm/plat-pxa/ssp.c b/arch/arm/plat-pxa/ssp.c
->> >> index ad9529c..a278ea0 100644
->> >> --- a/arch/arm/plat-pxa/ssp.c
->> >> +++ b/arch/arm/plat-pxa/ssp.c
->> >> @@ -182,21 +182,12 @@ static int pxa_ssp_probe(struct platform_device *pdev)
->> >>  		return -ENODEV;
->> >>  	}
->> >>
->> >> -	res = devm_request_mem_region(dev, res->start, resource_size(res),
->> >> -				      pdev->name);
->> >> -	if (res == NULL) {
->> >> -		dev_err(dev, "failed to request memory resource\n");
->> >> -		return -EBUSY;
->> >> -	}
->> >> +	ssp->mmio_base = devm_ioremap_resource(dev, res);
->> >> +	if (IS_ERR(ssp->mmio_base))
->> >> +		return PTR_ERR(ssp->mmio_base);
->> >>
->> >>  	ssp->phys_base = res->start;
->> >>
->> >> -	ssp->mmio_base = devm_ioremap(dev, res->start, resource_size(res));
->> >> -	if (ssp->mmio_base == NULL) {
->> >> -		dev_err(dev, "failed to ioremap() registers\n");
->> >> -		return -ENODEV;
->> >> -	}
->> >> -
->> >>  	ssp->irq = platform_get_irq(pdev, 0);
->> >>  	if (ssp->irq < 0) {
->> >>  		dev_err(dev, "no IRQ resource defined\n");
->> >> @@ -232,25 +223,16 @@ static int pxa_ssp_probe(struct platform_device *pdev)
->> >>
->> >>  static int pxa_ssp_remove(struct platform_device *pdev)
->> >>  {
->> >> -	struct resource *res;
->> >>  	struct ssp_device *ssp;
->> >>
->> >>  	ssp = platform_get_drvdata(pdev);
->> >>  	if (ssp == NULL)
->> >>  		return -ENODEV;
->> >>
->> >> -	iounmap(ssp->mmio_base);
->> >> -
->> >> -	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
->> >> -	release_mem_region(res->start, resource_size(res));
->> >> -
->> >> -	clk_put(ssp->clk);
->> >> -
->> >>  	mutex_lock(&ssp_lock);
->> >>  	list_del(&ssp->node);
->> >>  	mutex_unlock(&ssp_lock);
->> >>
->> >> -	kfree(ssp);
->> >>  	return 0;
->> >>  }
->> >>
->> >> --
->> >> 2.4.2
->> >>
->> >> --
->> >> To unsubscribe from this list: send the line "unsubscribe kernel-janitors" in
->> >> the body of a message to majordomo at vger.kernel.org
->> >> More majordomo info at  http://vger.kernel.org/majordomo-info.html
->> >>
->>
->> --
->> --
->> To unsubscribe from this list: send the line "unsubscribe kernel-janitors" in
->> the body of a message to majordomo at vger.kernel.org
->> More majordomo info at  http://vger.kernel.org/majordomo-info.html
->>
+On 08/06/15 07:53, Pavel Fedin wrote:
+>  Hello everybody!
+> 
+>> The GICv3 ITS (Interrupt Translation Service) is a part of the
+>> ARM GICv3 interrupt controller used for implementing MSIs.
+>> It specifies a new kind of interrupts (LPIs), which are mapped to
+>> establish a connection between a device, its MSI payload value and
+>> the target processor the IRQ is eventually delivered to.
+>> In order to allow using MSIs in an ARM64 KVM guest, we emulate this
+>> ITS widget in the kernel.
+> 
+>  I have tested the patch and got some more ideas for future extension...
+> 
+>  First of all, it would be nice to have a possibility to directly inject LPIs by number.
+> This will be useful for irqfd support in qemu.
 
+Well, that poses the question of what we emulate. We expose the
+emulation of an ITS, hence no direct access to the LPI space. What we
+could do would be allow LPI injection if not ITS is instantiated in the
+kernel. But a mix of the two is likely to in contradiction with the
+architecture.
+
+>  Next, irqfd support currently poses a problem. We need to somehow know IRQ number from
+> MSI-X data (device ID plus event ID). ITS has all this information, so it would be nice to
+> be able to query for the translation from within userspace. The question is - how to do
+> it? Should we add some ioctl for this purpose? Currently i am experimenting with extra
+> KVM_TRANSLATE_MSI ioctl which, given MSI data, would return LPI number.
+
+I'm afraid this is not enough. A write to GICR_TRANSLATER (DID+EID)
+results in a (LPI,CPU) pair. Can you easily express the CPU part in
+irqfd (this is a genuine question, I'm not familiar enough with that
+part of the core)?
+
+>  Actually before your patch came out i have almost done the same thing. But instead i
+> decided to implement ITS in qemu while leaving LPI handling to kernel. In this case my
+> qemu would have everything needed.
+>  By the way, why did you decide to put everything into kernel? Yes, in-kernel emulation is
+> faster, but ITS is not accessed frequently.
+
+It may be interesting to find out what would be the implications if we
+were to put it in userspace.
+
+The obvious one would be that we'd have to duplicate the code in both
+QEMU and kvmtool, and I don't think anyone fancies that. Another concern
+would be the support of GICv4, which relies on the command queue
+handling to be handled in the kernel (the GICv4 handling is basically a
+command translation system, and I'm not prepared to let userspace inject
+commands in the host ITS).
+
+Thanks,
+
+	M.
 -- 
+Jazz is not dead. It just smells funny...
