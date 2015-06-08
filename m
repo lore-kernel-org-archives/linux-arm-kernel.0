@@ -1,130 +1,103 @@
 From: hanjun.guo@linaro.org (Hanjun Guo)
-Date: Mon, 08 Jun 2015 10:57:38 +0800
-Subject: [PATCH 05/11] x86, pci, acpi: Move arch-agnostic MMCONFIG (aka
- ECAM) and ACPI code out of arch/x86/ directory
-In-Reply-To: <5570447D.3020705@linaro.org>
-References: <1432644564-24746-1-git-send-email-hanjun.guo@linaro.org>
- <1432644564-24746-6-git-send-email-hanjun.guo@linaro.org>
- <20150526170817.GU1565@arm.com> <55657B02.5090805@linaro.org>
- <20150602133215.GC23650@red-moon> <55701A31.808@linaro.org>
- <20150604102253.GA31773@red-moon> <5570447D.3020705@linaro.org>
-Message-ID: <557504A2.3060203@linaro.org>
+Date: Mon, 08 Jun 2015 11:59:46 +0800
+Subject: [Patch v4 0/8] Consolidate ACPI PCI root common code into ACPI
+ core
+In-Reply-To: <55707CF2.9070604@linux.intel.com>
+References: <1433225576-8215-1-git-send-email-jiang.liu@linux.intel.com>	
+ <556F6332.2040501@redhat.com> <556FAFEF.6040802@linux.intel.com>	
+ <556FF0AD.6000901@linaro.org> <556FF32B.9010900@linux.intel.com>
+ <1433433105.24429.30.camel@deneb.redhat.com>
+ <55707CF2.9070604@linux.intel.com>
+Message-ID: <55751332.50409@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2015?06?04? 20:28, Hanjun Guo wrote:
-> On 2015?06?04? 18:22, Lorenzo Pieralisi wrote:
->> Hi Hanjun,
->>
->> On Thu, Jun 04, 2015 at 10:28:17AM +0100, Hanjun Guo wrote:
->>> Hi Lorenzo,
->>>
->>> On 2015???06???02??? 21:32, Lorenzo Pieralisi wrote:
->>>> On Wed, May 27, 2015 at 09:06:26AM +0100, Tomasz Nowicki wrote:
->>>>> On 26.05.2015 19:08, Will Deacon wrote:
->>>>>> On Tue, May 26, 2015 at 01:49:18PM +0100, Hanjun Guo wrote:
->>>>>>> From: Tomasz Nowicki <tomasz.nowicki@linaro.org>
->>>>>>>
->>>>>>> ECAM standard and MCFG table are architecture independent and it
->>>>>>> makes
->>>>>>> sense to share common code across all architectures. Both are
->>>>>>> going to
->>>>>>> corresponding files - ecam.c and mcfg.c
->>>>>>>
->>>>>>> While we are here, rename pci_parse_mcfg to acpi_parse_mcfg.
->>>>>>> We already have acpi_parse_mcfg prototype which is used nowhere.
->>>>>>> At the same time, we need pci_parse_mcfg been global so
->>>>>>> acpi_parse_mcfg
->>>>>>> can be used perfectly here.
->>>>>>>
->>>>>>> Signed-off-by: Tomasz Nowicki <tomasz.nowicki@linaro.org>
->>>>>>> Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
->>>>>>> Tested-by: Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com>
->>>>>>> ---
->>>>>>>     arch/x86/Kconfig               |   3 +
->>>>>>>     arch/x86/include/asm/pci_x86.h |  33 ------
->>>>>>>     arch/x86/pci/acpi.c            |   1 +
->>>>>>>     arch/x86/pci/mmconfig-shared.c | 244
->>>>>>> +---------------------------------------
->>>>>>>     arch/x86/pci/mmconfig_32.c     |   1 +
->>>>>>>     arch/x86/pci/mmconfig_64.c     |   1 +
->>>>>>>     arch/x86/pci/numachip.c        |   1 +
->>>>>>>     drivers/acpi/Makefile          |   1 +
->>>>>>>     drivers/acpi/mcfg.c            |  57 ++++++++++
->>>>>>>     drivers/pci/Kconfig            |   7 ++
->>>>>>>     drivers/pci/Makefile           |   5 +
->>>>>>>     drivers/pci/ecam.c             | 245
->>>>>>> +++++++++++++++++++++++++++++++++++++++++
+On 2015?06?05? 00:29, Jiang Liu wrote:
+> On 2015/6/4 23:51, Mark Salter wrote:
+>> On Thu, 2015-06-04 at 14:41 +0800, Jiang Liu wrote:
+>>> On 2015/6/4 14:31, Hanjun Guo wrote:
+>>>> Hi Jiang,
+>>>>
+>>>> On 2015?06?04? 09:54, Jiang Liu wrote:
+>>>>> On 2015/6/4 4:27, Al Stone wrote:
+>>>>>> On 06/02/2015 12:12 AM, Jiang Liu wrote:
+>>>>>>> This patch set consolidates common code to support ACPI PCI root on x86
+>>>>>>> and IA64 platforms into ACPI core, to reproduce duplicated code and
+>>>>>>> simplify maintenance. And a patch set based on this to support ACPI
+>>>>>>> based
+>>>>>>> PCIe host bridge on ARM64 has been posted at:
 >>>>>>
->>>>>> Why can't we make use of the ECAM implementation used by
->>>>>> pci-host-generic
->>>>>> and drivers/pci/access.c?
->>>>>
->>>>> We had that question when I had posted MMCFG patch set separately,
->>>>> please see:
->>>>> https://lkml.org/lkml/2015/3/11/492
+>>>>>> Link is missing (or it's a typo of some flavor).
+>>>>> HI Al,
+>>>>>      Sorry, I missed the link. It has been posted at:
+>>>>> https://lkml.org/lkml/2015/5/26/207
 >>>>
->>>> Yes, but the real question is, why do we need to have PCI config space
->>>> up and running before a bus struct is even created ? I think the
->>>> reason is
->>>> the PCI configuration address space format (ACPI 6.0, Table 5-27, page
->>>> 108):
+>>>> I failed to get io resources for PCI hostbridge  when I was testing PCI
+>>>> on ARM64 QEMU, I debugged this for quite a while, and finally found out
+>>>> that ACPI resource parsing for IO is not suitable for ARM64, because io
+>>>> space for x86 is 64K, but 16M for ARM64.
 >>>>
->>>> "PCI Configuration space addresses must be confined to devices on
->>>> PCI Segment Group 0, bus 0. This restriction exists to accommodate
->>>> access to fixed hardware prior to PCI bus enumeration".
+>>>> This issue is only found when the firmware representing the io resource
+>>>> using the type ACPI_RESOURCE_TYPE_ADDRESS32, so the io address will
+>>>> greater than 64k.
 >>>>
->>>> On HW reduced platforms I do not even think this is required at all,
->>>> we have to look into this to avoid code duplication that might well
->>>> turn out useless.
+>>>> In drivers/acpi/resource.c:
+>>>>
+>>>> static void acpi_dev_ioresource_flags(struct resource *res, u64 len,
+>>>>                                        u8 io_decode, u8 translation_type)
+>>>> {
+>>>>          res->flags = IORESOURCE_IO;
+>>>>
+>>>> [...]
+>>>>
+>>>>          if (res->end >= 0x10003)
+>>>>                  res->flags |= IORESOURCE_DISABLED | IORESOURCE_UNSET;
+>>>>
+>>>> [...]
+>>>> }
+>>>>
+>>>> so the code will filter out res->end >= 0x10003, and in my case, it will
+>>>> more than 64K, so we can't get the IO resources.
+>>>>
+>>>> I got a question, why we use if (res->end >= 0x10003) here?
+>>>> I mean 64k will be 0x10000, and in that case, we should use
+>>>> if (res->end >= 0x10000) here, not 0x10003, any history behind that?
 >>>
->>> This is only for the fixed hardware, which will be not available for
->>> ARM64 (reduced hardware mode), but in Generic Hardware Programming
->>> Model, we using OEM-provided ACPI Machine Language (AML) code to access
->>> generic hardware registers, this will be available for reduced hardware
->>> too.
+>>> Hi Hanjun,
+>>> This is a special tricky for x86. You may read a dword(four bytes) from
+>>> IO port 0xffff, so the effective io port space is 0x10003 bytes.
 >>>
->>> So in ACPI spec, it says: (ACPI 6.0 page 66, last paragraph)
->>>
->>> ACPI defines eight address spaces that may be accessed by generic
->>> hardware implementations. These include:
->>> * System I/O space
->>> * System memory space
->>> * PCI configuration space
->>> * Embedded controller space
->>> * System Management Bus (SMBus) space
->>> * CMOS
->>> * PCI BAR Target
->>> * IPMI space
->>>
->>> So if any device using the PCI address space for control, such
->>> as a system reset control device, its address space can be reside
->>> in PCI configuration space (who can prevent a OEM do that crazy
->>> thing? :) ), and it should be accessible before the PCI bus is
->>> created.
 >>
->> Us, by changing attitude and questioning features whose usefulness
->> is questionable. I will look into this and raise the point, I am not
->> thrilled by the idea of adding another set of PCI accessor functions
->> and drivers because we have to access a register through PCI before
->> enumerating the bus (and on arm64 this is totally useless since
->> we are not meant to support fixed HW anyway). Maybe we can make acpica
->> code use a "special" stub (ACPI specific, PCI configuration space address
->> space has restrictions anyway), I have to review this set in its
->> entirety to see how to do that (and I would kindly ask you to do
->> it too, before saying it is not possible to implement it).
+>> Is there something in ACPI spec which would limit PCI IO space to 64K?
+>> PCI itself allows 32-bit IO addresses and at least some arm64 platforms
+>> use PCI bus addresses above 64K for IO transactions. From a PCI view,
+>> the (res->end >= 0x10003) check doesn't make sense. Am I missing
+>> something?
+> HI Mark,
+> 	Something interesting here. According to my understanding,
+> the actually limitations are
+> 1) the maximum size for each IO port space is 64k,
+> 2) each PCI segment may only have one IO port space assigned at most.
 >
-> I'm willing to do that, actually, if we don't need a mechanism to
-> access PCI config space before the bus is created, the code can be
-> simplified a lot.
+> Other than those, it's flexible for system designer to:
+> 1) have multiple IO port spaces, each is 64K at most.
+> 2) CPU may use MMIO transactions to access PCI IO space, and PCI host
+>     bridge will do the translation from CPU side MMIO address to PCI side
+>     IO port address.
+>
+> For example, we may have following configuration on IA64 platforms:
+> 1) CPU side physical address [0x100000000-0x100010000] maps to IO space
+>     [0x00000-0x10000] on PCI segment 0
+> 2) CPU side physical address [0x100010000-0x100020000] maps to IO space
+>     [0x00000-0x10000] on PCI segment 1
+> And ACPI resource descriptor provides 'translation_offset' to support
+> such an usage case. Hope this helps:)
 
-After more investigation on the spec and the ACPI core code, I'm
-still not convinced that accessing to PCI config space before PCI
-bus creating is impossible, also there is no enough ARM64 hardware
-to prove that too. But I think we can go in this way, reuse the
-ECAM implementation by pci-host-generic for now, and implement the PCI
-accessor functions before enumerating PCI bus when needed in the
-future, does it make sense?
+Hi Jiang,
+
+It seems the translation_offset for IA64 is assuming to zero in this
+patch set, which have regressions if we use DworldIO() with offset
+to report io port resources, am I missing something?
 
 Thanks
 Hanjun
