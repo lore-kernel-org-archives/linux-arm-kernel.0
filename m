@@ -1,126 +1,204 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 08 Jun 2015 18:50:08 +0100
-Subject: [PATCH v2] arm/arm64: KVM: Properly account for guest CPU time
-In-Reply-To: <1432838950-28774-1-git-send-email-christoffer.dall@linaro.org>
-References: <1432838950-28774-1-git-send-email-christoffer.dall@linaro.org>
-Message-ID: <5575D5D0.3090701@arm.com>
+From: robherring2@gmail.com (Rob Herring)
+Date: Mon, 8 Jun 2015 12:51:32 -0500
+Subject: [PATCH v1 1/2] iio: adc: Determine sampling frequencies by using
+ minimum sample time
+In-Reply-To: <0e624f1c1efff7e209c93406f5d4bc51c41a9f45.1433740528.git.maitysanchayan@gmail.com>
+References: <cover.1433740528.git.maitysanchayan@gmail.com>
+ <0e624f1c1efff7e209c93406f5d4bc51c41a9f45.1433740528.git.maitysanchayan@gmail.com>
+Message-ID: <CAL_JsqLyTo0jvC0rAKXB3ZLdMHeFjmMcCjd7i04D4jqHKUUvqQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Christoffer,
-
-On 28/05/15 19:49, Christoffer Dall wrote:
-> Until now we have been calling kvm_guest_exit after re-enabling
-> interrupts when we come back from the guest, but this has the
-> unfortunate effect that CPU time accounting done in the context of timer
-> interrupts occurring while the guest is running doesn't properly notice
-> that the time since the last tick was spent in the guest.
-> 
-> Inspired by the comment in the x86 code, move the kvm_guest_exit() call
-> below the local_irq_enable() call and change __kvm_guest_exit() to
-> kvm_guest_exit(), because we are now calling this function with
-> interrupts enabled.  We have to now explicitly disable preemption and
-> not enable preemption before we've called kvm_guest_exit(), since
-> otherwise we could be preempted and everything happening before we
-> eventually get scheduled again would be accounted for as guest time.
-> 
-> At the same time, move the trace_kvm_exit() call outside of the atomic
-> section, since there is no reason for us to do that with interrupts
-> disabled.
-> 
-> Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
+On Mon, Jun 8, 2015 at 12:42 AM, Sanchayan Maity
+<maitysanchayan@gmail.com> wrote:
+> The driver currently does not take into account the minimum sample time
+> as per the Figure 6-8 Chapter 9.1.1 12-bit ADC electrical characteristics.
+> We set a static amount of cycles instead of considering the sample time as
+> a given value, which depends on hardware characteristics.
+>
+> Determine sampling frequencies by first reading the device tree property
+> node and then calculating the required Long Sample Time Adder (LSTAdder)
+> value based on the ADC clock frequency and sample time value obtained
+> from the device tree, this LSTAdder value is then used for calculating
+> the sampling frequencies possible.
+>
+> Signed-off-by: Sanchayan Maity <maitysanchayan@gmail.com>
 > ---
-> This patch is based on kvm/queue, because it has the kvm_guest_enter/exit
-> rework recently posted by Christian Borntraeger.  I hope I got the logic
-> of this right, there were 2 slightly worrying facts about this:
-> 
-> First, we now enable and disable and enable interrupts on each exit
-> path, but I couldn't see any performance overhead on hackbench - yes the
-> only benchmark we care about.
-> 
-> Second, looking at the ppc and mips code, they seem to also call
-> kvm_guest_exit() before enabling interrupts, so I don't understand how
-> guest CPU time accounting works on those architectures.
-> 
-> Changes since v1:
->  - Tweak comment and commit text based on Marc's feedback.
->  - Explicitly disable preemption and enable it only after kvm_guest_exit().
-> 
->  arch/arm/kvm/arm.c | 21 +++++++++++++++++----
->  1 file changed, 17 insertions(+), 4 deletions(-)
-> 
-> diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
-> index e41cb11..fe8028d 100644
-> --- a/arch/arm/kvm/arm.c
-> +++ b/arch/arm/kvm/arm.c
-> @@ -532,6 +532,7 @@ int kvm_arch_vcpu_ioctl_run(struct kvm_vcpu *vcpu, struct kvm_run *run)
->  		kvm_vgic_flush_hwstate(vcpu);
->  		kvm_timer_flush_hwstate(vcpu);
->  
-> +		preempt_disable();
->  		local_irq_disable();
->  
->  		/*
-> @@ -544,6 +545,7 @@ int kvm_arch_vcpu_ioctl_run(struct kvm_vcpu *vcpu, struct kvm_run *run)
->  
->  		if (ret <= 0 || need_new_vmid_gen(vcpu->kvm)) {
->  			local_irq_enable();
-> +			preempt_enable();
->  			kvm_timer_sync_hwstate(vcpu);
->  			kvm_vgic_sync_hwstate(vcpu);
->  			continue;
-> @@ -559,8 +561,10 @@ int kvm_arch_vcpu_ioctl_run(struct kvm_vcpu *vcpu, struct kvm_run *run)
->  		ret = kvm_call_hyp(__kvm_vcpu_run, vcpu);
->  
->  		vcpu->mode = OUTSIDE_GUEST_MODE;
-> -		__kvm_guest_exit();
-> -		trace_kvm_exit(kvm_vcpu_trap_get_class(vcpu), *vcpu_pc(vcpu));
-> +		/*
-> +		 * Back from guest
-> +		 *************************************************************/
+>  .../devicetree/bindings/iio/adc/vf610-adc.txt      |  6 ++
+>  drivers/iio/adc/vf610_adc.c                        | 74 ++++++++++++++++++++--
+>  2 files changed, 76 insertions(+), 4 deletions(-)
+>
+> diff --git a/Documentation/devicetree/bindings/iio/adc/vf610-adc.txt b/Documentation/devicetree/bindings/iio/adc/vf610-adc.txt
+> index 3eb40e2..4419126 100644
+> --- a/Documentation/devicetree/bindings/iio/adc/vf610-adc.txt
+> +++ b/Documentation/devicetree/bindings/iio/adc/vf610-adc.txt
+> @@ -17,6 +17,11 @@ Recommended properties:
+>    - Frequency in normal mode (ADLPC=0, ADHSC=0)
+>    - Frequency in high-speed mode (ADLPC=0, ADHSC=1)
+>    - Frequency in low-power mode (ADLPC=1, ADHSC=0)
+> +  - fsl,min-sample-time: Minimum sampling time in nanoseconds. This value has
+
+Add a "-ns' suffix.
+
+Seems like this could be a common ADC property.
+
+> +    to be chosen according to the conversion mode and the connected analog
+> +        source resistance (R_as) and capacitance (C_as). Refer the datasheet's
+> +        operating requirements. A safe default across a wide range of R_as and
+> +        C_as as well as conversion modes is 1000ns.
+>
+>  Example:
+>  adc0: adc at 4003b000 {
+> @@ -27,5 +32,6 @@ adc0: adc at 4003b000 {
+>         clock-names = "adc";
+>         fsl,adck-max-frequency = <30000000>, <40000000>,
+>                                 <20000000>;
+> +       fsl,min-sample-time = <1000>;
+>         vref-supply = <&reg_vcc_3v3_mcu>;
+>  };
+> diff --git a/drivers/iio/adc/vf610_adc.c b/drivers/iio/adc/vf610_adc.c
+> index 480f335..bcae8fd 100644
+> --- a/drivers/iio/adc/vf610_adc.c
+> +++ b/drivers/iio/adc/vf610_adc.c
+> @@ -68,6 +68,9 @@
+>  #define VF610_ADC_CLK_DIV8             0x60
+>  #define VF610_ADC_CLK_MASK             0x60
+>  #define VF610_ADC_ADLSMP_LONG          0x10
+> +#define VF610_ADC_ADSTS_SHORT   0x100
+> +#define VF610_ADC_ADSTS_NORMAL  0x200
+> +#define VF610_ADC_ADSTS_LONG    0x300
+>  #define VF610_ADC_ADSTS_MASK           0x300
+>  #define VF610_ADC_ADLPC_EN             0x80
+>  #define VF610_ADC_ADHSC_EN             0x400
+> @@ -124,6 +127,17 @@ enum conversion_mode_sel {
+>         VF610_ADC_CONV_LOW_POWER,
+>  };
+>
+> +enum lst_adder_sel {
+> +       VF610_ADCK_CYCLES_3,
+> +       VF610_ADCK_CYCLES_5,
+> +       VF610_ADCK_CYCLES_7,
+> +       VF610_ADCK_CYCLES_9,
+> +       VF610_ADCK_CYCLES_13,
+> +       VF610_ADCK_CYCLES_17,
+> +       VF610_ADCK_CYCLES_21,
+> +       VF610_ADCK_CYCLES_25,
+> +};
 > +
->  		/*
->  		 * We may have taken a host interrupt in HYP mode (ie
->  		 * while executing the guest). This interrupt is still
-> @@ -574,8 +578,17 @@ int kvm_arch_vcpu_ioctl_run(struct kvm_vcpu *vcpu, struct kvm_run *run)
->  		local_irq_enable();
->  
->  		/*
-> -		 * Back from guest
-> -		 *************************************************************/
-> +		 * We do local_irq_enable() before calling kvm_guest_exit() so
-> +		 * that if a timer interrupt hits while running the guest we
-> +		 * account that tick as being spent in the guest.  We enable
-> +		 * preemption after calling kvm_guest_exit() so that if we get
-> +		 * preempted we make sure ticks after that is not counted as
-> +		 * guest time.
-> +		 */
-> +		kvm_guest_exit();
-> +		trace_kvm_exit(kvm_vcpu_trap_get_class(vcpu), *vcpu_pc(vcpu));
-> +		preempt_enable();
+>  struct vf610_adc_feature {
+>         enum clk_sel    clk_sel;
+>         enum vol_ref    vol_ref;
+> @@ -132,6 +146,8 @@ struct vf610_adc_feature {
+>         int     clk_div;
+>         int     sample_rate;
+>         int     res_mode;
+> +       u32 lst_adder_index;
+> +       u32 default_sample_time;
+>
+>         bool    calibration;
+>         bool    ovwren;
+> @@ -155,11 +171,13 @@ struct vf610_adc {
+>  };
+>
+>  static const u32 vf610_hw_avgs[] = { 1, 4, 8, 16, 32 };
+> +static const u32 vf610_lst_adder[] = { 3, 5, 7, 9, 13, 17, 21, 25 };
+>
+>  static inline void vf610_adc_calculate_rates(struct vf610_adc *info)
+>  {
+>         struct vf610_adc_feature *adc_feature = &info->adc_feature;
+>         unsigned long adck_rate, ipg_rate = clk_get_rate(info->clk);
+> +       u32 adck_period, lst_addr_min;
+>         int divisor, i;
+>
+>         adck_rate = info->max_adck_rate[adc_feature->conv_mode];
+> @@ -174,6 +192,19 @@ static inline void vf610_adc_calculate_rates(struct vf610_adc *info)
+>         }
+>
+>         /*
+> +        * Determine the long sample time adder value to be used based
+> +        * on the default minimum sample time provided.
+> +        */
+> +       adck_period = NSEC_PER_SEC / adck_rate;
+> +       lst_addr_min = adc_feature->default_sample_time / adck_period;
+> +       for (i = 0; i < ARRAY_SIZE(vf610_lst_adder); i++) {
+> +               if (vf610_lst_adder[i] > lst_addr_min) {
+> +                       adc_feature->lst_adder_index = i;
+> +                       break;
+> +               }
+> +       }
 > +
->  
->  		kvm_timer_sync_hwstate(vcpu);
->  		kvm_vgic_sync_hwstate(vcpu);
-> 
-
-I've been thinking about this a bit more, and I wonder if we can
-simplify it a bit. At the moment, we disable the interrupts around the
-HYP entry. But now that you have introduced preempt_disable, it looks
-like we move the local_irq_disable call to be just after
-__kvm_guest_enter, and not bother with having such a long critical section.
-
-This is possible because entering HYP mode automatically masks
-interrupts, and we restore PSTATE on exception return.
-
-I think this would slightly reduce the amount of code we run on the host
-that gets accounted to the guest.
-
-Thoughts?
-
-Thanks,
-
-	M.
-
--- 
-Jazz is not dead. It just smells funny...
+> +       /*
+>          * Calculate ADC sample frequencies
+>          * Sample time unit is ADCK cycles. ADCK clk source is ipg clock,
+>          * which is the same as bus clock.
+> @@ -182,12 +213,13 @@ static inline void vf610_adc_calculate_rates(struct vf610_adc *info)
+>          * SFCAdder: fixed to 6 ADCK cycles
+>          * AverageNum: 1, 4, 8, 16, 32 samples for hardware average.
+>          * BCT (Base Conversion Time): fixed to 25 ADCK cycles for 12 bit mode
+> -        * LSTAdder(Long Sample Time): fixed to 3 ADCK cycles
+> +        * LSTAdder(Long Sample Time): 3, 5, 7, 9, 13, 17, 21, 25 ADCK cycles
+>          */
+>         adck_rate = ipg_rate / info->adc_feature.clk_div;
+>         for (i = 0; i < ARRAY_SIZE(vf610_hw_avgs); i++)
+>                 info->sample_freq_avail[i] =
+> -                       adck_rate / (6 + vf610_hw_avgs[i] * (25 + 3));
+> +                       adck_rate / (6 + vf610_hw_avgs[i] *
+> +                        (25 + vf610_lst_adder[adc_feature->lst_adder_index]));
+>  }
+>
+>  static inline void vf610_adc_cfg_init(struct vf610_adc *info)
+> @@ -347,8 +379,40 @@ static void vf610_adc_sample_set(struct vf610_adc *info)
+>                 break;
+>         }
+>
+> -       /* Use the short sample mode */
+> -       cfg_data &= ~(VF610_ADC_ADLSMP_LONG | VF610_ADC_ADSTS_MASK);
+> +       /*
+> +        * Set ADLSMP and ADSTS based on the Long Sample Time Adder value
+> +        * determined.
+> +        */
+> +       switch (adc_feature->lst_adder_index) {
+> +       case VF610_ADCK_CYCLES_3:
+> +               break;
+> +       case VF610_ADCK_CYCLES_5:
+> +               cfg_data |= VF610_ADC_ADSTS_SHORT;
+> +               break;
+> +       case VF610_ADCK_CYCLES_7:
+> +               cfg_data |= VF610_ADC_ADSTS_NORMAL;
+> +               break;
+> +       case VF610_ADCK_CYCLES_9:
+> +               cfg_data |= VF610_ADC_ADSTS_LONG;
+> +               break;
+> +       case VF610_ADCK_CYCLES_13:
+> +               cfg_data |= VF610_ADC_ADLSMP_LONG;
+> +               break;
+> +       case VF610_ADCK_CYCLES_17:
+> +               cfg_data |= VF610_ADC_ADLSMP_LONG;
+> +               cfg_data |= VF610_ADC_ADSTS_SHORT;
+> +               break;
+> +       case VF610_ADCK_CYCLES_21:
+> +               cfg_data |= VF610_ADC_ADLSMP_LONG;
+> +               cfg_data |= VF610_ADC_ADSTS_NORMAL;
+> +               break;
+> +       case VF610_ADCK_CYCLES_25:
+> +               cfg_data |= VF610_ADC_ADLSMP_LONG;
+> +               cfg_data |= VF610_ADC_ADSTS_NORMAL;
+> +               break;
+> +       default:
+> +               dev_err(info->dev, "error in sample time select\n");
+> +       }
+>
+>         /* update hardware average selection */
+>         cfg_data &= ~VF610_ADC_AVGS_MASK;
+> @@ -712,6 +776,8 @@ static int vf610_adc_probe(struct platform_device *pdev)
+>
+>         of_property_read_u32_array(pdev->dev.of_node, "fsl,adck-max-frequency",
+>                         info->max_adck_rate, 3);
+> +       of_property_read_u32(pdev->dev.of_node, "fsl,min-sample-time",
+> +                       &info->adc_feature.default_sample_time);
+>
+>         platform_set_drvdata(pdev, indio_dev);
+>
+> --
+> 2.4.2
+>
