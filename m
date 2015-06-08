@@ -1,63 +1,54 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Mon, 8 Jun 2015 02:38:47 +0000 (UTC)
-Subject: [PATCH] ARM: dts: AM35xx: fix system control module clocks
-In-Reply-To: <alpine.DEB.2.02.1506071952490.15153@utopia.booyaka.com>
-References: <alpine.DEB.2.02.1506010546510.14902@utopia.booyaka.com>
- <1433172627-28052-1-git-send-email-t-kristo@ti.com>
- <556C8ED5.5050000@myspectrum.nl> <20150601173126.GY30984@atomide.com>
- <alpine.DEB.2.02.1506011733180.14902@utopia.booyaka.com>
- <5571576E.6020207@myspectrum.nl> <557157FA.7080305@myspectrum.nl>
- <557411DC.9020109@myspectrum.nl>
- <alpine.DEB.2.02.1506071952490.15153@utopia.booyaka.com>
-Message-ID: <alpine.DEB.2.02.1506080234271.15153@utopia.booyaka.com>
+From: yvo@apm.com (Y Vo)
+Date: Mon, 8 Jun 2015 09:48:29 +0700
+Subject: [PATCH v0] gpio_keys: fix gpio key driver to proper support GIC
+ interrupt
+In-Reply-To: <2953428.ar7Re29b0L@wuerfel>
+References: <1433402712-21399-1-git-send-email-yvo@apm.com>
+ <2953428.ar7Re29b0L@wuerfel>
+Message-ID: <CAL4ahLeMm_Qvk0BWxOYTc973_4=TPjZStgTNe5uJL53FBhMRvg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jeroen,
+On Fri, Jun 5, 2015 at 7:50 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Thursday 04 June 2015 14:25:12 Y Vo wrote:
+>> GIC is designed to support two of trigger mechanisms - active level
+>> high or edge rising. But in the gpio_keys driver, it tries to use both
+>> edge rising and edge falling trigger. This patch fixes the gpio_keys
+>> driver to request only the edge rising event when failed to configure the
+>> interrupt.
+>>
+>> Signed-off-by: Y Vo <yvo@apm.com>
+>
+> I think you want to use an 'interrupts' property instead of a 'gpios'
+> property (or possibly both), so you can pass the right polarity.
 
-On Sun, 7 Jun 2015, Paul Walmsley wrote:
+        gpio-keys {
+                compatible = "gpio-keys";
+                apm_ctrl_name = "Power Button";
+                btn2 {
+                        label = "EXT_INT2";
+                        gpios = <&sbgpio 13 0x0>;
+                        linux,code = <116>;
+                        linux,input-type = <0x1>;     /* EV_KEY */
+                };
+        };
 
-> On Sun, 7 Jun 2015, Jeroen Hofstee wrote:
-> 
-> > On 05-06-15 10:04, Jeroen Hofstee wrote:
-> > > 
-> > > On 05-06-15 10:01, Jeroen Hofstee wrote:
-> > > > 
-> > > > On 01-06-15 19:44, Paul Walmsley wrote:
-> > > > > The best way to make this work IMHO would be for us not to accept any
-> > > > > new
-> > > > > feature addition patches as long as there are warnings reported in the
-> > > > > test results.  The only real exception that I would foresee is if those
-> > > > > warnings are due to something outside of our control, e.g., a crappy
-> > > > > bootloader, as I suspect the USB_OTG initiator warnings are for the
-> > > > > CM-T3517.
-> > > > > 
-> > > > 
-> > > > I doubt this is related to the bootloader. I have the suspicion that is
-> > > > actually
-> > > > a bug in linux but only triggered depending on whether the ROMcode setup
-> > > > the USB OTG or not. Here is some data to backup my statement:
-> > > > 
-> > 
-> > Turns out my suspicion was wrong. This is what I know at the moment,
-> > depending on the bootpins, u-boot will trigger a bad access when loading
-> > a file over ethernet, but only the first time. Clearing the pending interrupt
-> > before booting linux make the "USB_OTG address hole seen" go away.
-> 
-> Oh, too bad.  I had been hoping that you were right and that I was wrong 
-> ;-)  I'll try this on the CM-T3517 here.
+         sbgpio: sbgpio at 17001000{
+                        compatible = "apm,xgene-gpio-sb";
+                        reg = <0x0 0x17001000 0x0 0x400>;
+                        #gpio-cells = <2>;
+                        gpio-controller;
+                        interrupts =    <0x0 0x28 0x1>,
+                                        <0x0 0x29 0x1>,
+                                        <0x0 0x2a 0x1>,
+                                        <0x0 0x2b 0x1>,
+                                        <0x0 0x2c 0x1>,
+                                        <0x0 0x2d 0x1>;
+                };
+I can change the polarity of interrupt in the sbgpio node, but the
+issue here is the gpio_key driver always set interrupt type to
+(irqflags = IRQF_TRIGGER_RISING | IRQF_TRIGGER_FALLING). And the GIC
+driver only support edge rising or level high. So that's our issue.
 
-I used your debugging technique here and was able to reproduce your 
-results - with one difference:
-
-http://www.pwsan.com/omap/testlogs/test_v4.1-rc6/20150607194102/boot/cmt3517/cmt3517_log.txt
-
-The interconnect error was logged upon the first interaction with the 
-network.  In my case this was with the U-boot 'dhcp' command.  The pending 
-interrupt bit was cleared before loading the kernel via tftp, and the 
-interrupt bit was not set again, even after a tftp load.
-
-
-regards,
-
-- Paul
+>
+>         Arnd
