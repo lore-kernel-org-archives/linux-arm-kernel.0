@@ -1,30 +1,41 @@
-From: weigelt@melag.de (Enrico Weigelt, metux IT consult)
-Date: Mon, 8 Jun 2015 14:26:01 +0200
-Subject: [PATCH 00/21] On-demand device registration
-In-Reply-To: <5570B783.1050808@ahsoftware.de>
-References: <1432565608-26036-1-git-send-email-tomeu.vizoso@collabora.com>
- <CAL_Jsq+EWLEJhRudTGAwYsOg4tX2-pGhygeQGHae9RL8rBpMiA@mail.gmail.com>
- <556F5C24.1030101@linaro.org> <5570B783.1050808@ahsoftware.de>
-Message-ID: <557589D9.1050008@melag.de>
+From: pi-cheng.chen@linaro.org (Pi-Cheng Chen)
+Date: Mon,  8 Jun 2015 20:29:19 +0800
+Subject: [PATCH 0/2] Add Mediatek MT8173 cpufreq driver
+Message-ID: <1433766561-1330-1-git-send-email-pi-cheng.chen@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am 04.06.2015 um 22:39 schrieb Alexander Holler:
+MT8173 is a ARMv8 based SoC with 2 clusters. All CPUs in a single cluster
+share the same power and clock domain. This series tries to add cpufreq support
+for MT8173 SoC.
 
- > As it seems to have been forgotten or overread, I've mentioned in my
-> series of patches last year that, with a few changes, it's possible to
-> let the algorithm I've used (dfs) to spit out all drivers which can be
-> initialized in parallel.
+Changes in v4:
+- Add bindings for MT8173 cpufreq driver
+- Move OPP table back into device tree
+- Address comments for last version
 
-Unfortunately, I've missed that ... could you please resend you patches?
-Boot time reduction is one of the topics on my 2do in several weeks.
+Changes in v3:
+- Implement MT8173 specific standalone cpufreq driver instead of using
+  cpufreq-dt driver
+- Define OPP table in the driver source code until new OPP binding is ready
 
+Changes in v2:
+- Add intermediate frequency support in cpufreq-dt driver
+- Use voltage scaling code of cpufreq-dt for little cluster instead of
+  implementaion in notifier of mtk-cpufreq driver
+- Code refinement for mtk-cpufreq driver
 
-cu
---
-Enrico Weigelt, metux IT consult
-+49-151-27565287
-MELAG Medizintechnik oHG Sitz Berlin Registergericht AG Charlottenburg HRA 21333 B
+Pi-Cheng Chen (2):
+  dt-bindings: mediatek: Add MT8173 cpufreq driver binding
+  cpufreq: mediatek: Add MT8173 cpufreq driver
 
-Wichtiger Hinweis: Diese Nachricht kann vertrauliche oder nur f?r einen begrenzten Personenkreis bestimmte Informationen enthalten. Sie ist ausschlie?lich f?r denjenigen bestimmt, an den sie gerichtet worden ist. Wenn Sie nicht der Adressat dieser E-Mail sind, d?rfen Sie diese nicht kopieren, weiterleiten, weitergeben oder sie ganz oder teilweise in irgendeiner Weise nutzen. Sollten Sie diese E-Mail irrt?mlich erhalten haben, so benachrichtigen Sie bitte den Absender, indem Sie auf diese Nachricht antworten. Bitte l?schen Sie in diesem Fall diese Nachricht und alle Anh?nge, ohne eine Kopie zu behalten.
-Important Notice: This message may contain confidential or privileged information. It is intended only for the person it was addressed to. If you are not the intended recipient of this email you may not copy, forward, disclose or otherwise use it or any part of it in any form whatsoever. If you received this email in error please notify the sender by replying and delete this message and any attachments without retaining a copy.
+ .../devicetree/bindings/cpufreq/cpufreq-mt8173.txt | 127 +++++
+ drivers/cpufreq/Kconfig.arm                        |   7 +
+ drivers/cpufreq/Makefile                           |   1 +
+ drivers/cpufreq/mt8173-cpufreq.c                   | 550 +++++++++++++++++++++
+ 4 files changed, 685 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/cpufreq/cpufreq-mt8173.txt
+ create mode 100644 drivers/cpufreq/mt8173-cpufreq.c
+
+-- 
+1.9.1
