@@ -1,76 +1,133 @@
-From: msalter@redhat.com (Mark Salter)
-Date: Mon, 08 Jun 2015 10:05:53 -0400
-Subject: [PATCH v3] ARM: early fixmap support for earlycon
-In-Reply-To: <CAL_JsqJbVu3sOwCb102Lgz1Mad2EAP1kpKV+fo2cxMQTZ9LBHA@mail.gmail.com>
-References: <1433593888-7142-1-git-send-email-stefan@agner.ch>
- <20150606124800.GR7557@n2100.arm.linux.org.uk>
- <25ac891cd5876d4141e03317bf0d4173@agner.ch>
- <CAL_JsqJbVu3sOwCb102Lgz1Mad2EAP1kpKV+fo2cxMQTZ9LBHA@mail.gmail.com>
-Message-ID: <1433772353.24429.66.camel@deneb.redhat.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 8 Jun 2015 15:29:26 +0100
+Subject: [PATCH v3 1/2] drm/bridge: dw-hdmi: support optional supply
+ regulators
+In-Reply-To: <20150608140256.GA10354@ulmo.nvidia.com>
+References: <4184159.j0iXe39dFB@phil> <2619686.csNBBFyt8W@phil>
+ <20150605110159.GA16254@ulmo.nvidia.com>
+ <23123577.mOoqGCAPdL@diego>
+ <20150605231058.GQ7557@n2100.arm.linux.org.uk>
+ <20150608140256.GA10354@ulmo.nvidia.com>
+Message-ID: <20150608142926.GY7557@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, 2015-06-06 at 10:29 -0500, Rob Herring wrote:
-> On Sat, Jun 6, 2015 at 8:29 AM, Stefan Agner <stefan@agner.ch> wrote:
-> > On 2015-06-06 14:48, Russell King - ARM Linux wrote:
-> >> On Sat, Jun 06, 2015 at 02:31:28PM +0200, Stefan Agner wrote:
-> > <snip>
-> >>> --- a/arch/arm/include/asm/fixmap.h
-> >>> +++ b/arch/arm/include/asm/fixmap.h
-> >>> @@ -6,9 +6,13 @@
-> >>>  #define FIXADDR_TOP         (FIXADDR_END - PAGE_SIZE)
-> >>>
-> >>>  #include <asm/kmap_types.h>
-> >>> +#include <asm/pgtable.h>
-> >>>
-> >>>  enum fixed_addresses {
-> >>> -    FIX_KMAP_BEGIN,
-> >>> +    FIX_EARLYCON_MEM_BASE,
-> >>> +    __end_of_permanent_fixed_addresses,
-> >>> +
-> >>> +    FIX_KMAP_BEGIN = __end_of_permanent_fixed_addresses,
-> >>>      FIX_KMAP_END = FIX_KMAP_BEGIN + (KM_TYPE_NR * NR_CPUS) - 1,
-> >>>
-> >>>      /* Support writing RO kernel text via kprobes, jump labels, etc. */
-> >>> @@ -18,7 +22,14 @@ enum fixed_addresses {
-> >>>      __end_of_fixed_addresses
-> >>>  };
-> >>>
-> >>> +#define FIXMAP_PAGE_COMMON  (L_PTE_YOUNG | L_PTE_PRESENT | L_PTE_XN | L_PTE_DIRTY)
-> >>> +
-> >>> +#define FIXMAP_PAGE_NORMAL  (FIXMAP_PAGE_COMMON | L_PTE_MT_WRITEBACK)
-> >>> +#define FIXMAP_PAGE_IO              (FIXMAP_PAGE_COMMON | L_PTE_MT_DEV_SHARED | L_PTE_SHARED)
-> >>> +#define FIXMAP_PAGE_NOCACHE FIXMAP_PAGE_IO
-> >>
-> >> I'm really not happy with this.  What are the expected semantics of the
-> >> set_fixmap_nocache() and set_fixmap_offset_nocache() ?  Are they there
-> >> for mapping a device, or are they there for mapping _memory_ ?
-> >>
-> >> I would prefer that FIXMAP_PAGE_NOCACHE is _not_ provided until the
-> >> semantics of that can be clarified, as there is a difference between the
-> >> two on ARM.
-> >
-> > set_fixmap_nocache is used for PCIe and IO APIC stuff, so actually IO
-> > devices. However, as far as I understand the x86 page table definitions
-> > in pgtable_types.h, IO devices are not explicitly uncached on x86. The
-> > define set_fixmap_nocache make sure IO devices are mapped uncached...
-> > Maybe set_fixmap_io_nocache instead of set_fixmap_nocache would be more
-> > appropriate...?
-> >
-> > Maybe the initial authors of the common fixmap.h have a more clear
-> > understanding of the expected semantics, Mark?
+On Mon, Jun 08, 2015 at 04:02:58PM +0200, Thierry Reding wrote:
+> On Sat, Jun 06, 2015 at 12:10:58AM +0100, Russell King - ARM Linux wrote:
+> > On Fri, Jun 05, 2015 at 02:16:40PM +0200, Heiko St?bner wrote:
+> > > Hi Thierry
+> > > 
+> > > Am Freitag, 5. Juni 2015, 13:02:01 schrieb Thierry Reding:
+> > > > If this is specific to the Rockchip implementation, shouldn't this go
+> > > > into Documentation/devicetree/bindings/video/dw_hdmi-rockchip.txt? It
+> > > > could then simply go into the Rockchip DRM tree.
+> > > 
+> > > actually, we determined that the supply names are universal to the IP
+> > > (both in imx and rockchip and probably more if there are more users
+> > > out there). Just Russell requested that we don't pollute the generic
+> > > code until necessary, as it looks like the supply of those is somehow
+> > > handled internally on the imx.
+> > 
+> > Why do you think it's universal?
+> > 
+> > Let's start from the beginning, before we create something that's not
+> > representative of the hardware.
+> > 
+> > dw_hdmi actually drives two pieces of hardware - the HDMI transmitter,
+> > and a separate hardware block, the HDMI phy.
+> > 
+> > There are at least two possible HDMI phys referenced in the iMX
+> > documentation - there is one called HEAC which doesn't appear in iMX
+> > devices afaik, and the one which does, which is a 3D phy.
 > 
-> They should be the same as ioremap and ioremap_nocache which are
-> aliases of each other on ARM. If you want RAM then you should be using
-> FIXMAP_PAGE_NORMAL. Perhaps we can come up with some error checking
-> here.
-> 
-> > Since the focus currently is on set_fixmap_io, we could define
-> > FIXMAP_PAGE_IO only for the time being...?
-> 
-> We could, but I think it is better to sort this out now.
-> 
+> I'm not sure I understand correctly. Are these PHYs exchangeable? Does
+> the DesignWare IP provide them or could they be provided separately?
 
-I agree with Rob here. AFAICT, x86 is the only arch which actually uses
-set_fixmap_nocache. Other arches created definitions for it, but all
-uses appear to depend on CONFIG_X86.
+You're asking questions we have no real answers to - all we have is the
+available documentation provided by Freescale - we don't even have the
+Rochchip documentation.
+
+>From the Freescale documentation, which documents the HDMI transmitter
+entirely separately from the HDMI phy, I would say that the IP is
+structured as two entirely separate blocks, and the chip designer is
+free to choose an appropriate phy from a range of HDMI phys.
+
+Moreover, in the feature list for the HDMI transmitter, it says (though
+this is not applicable to iMX6 - and is probably lifted from the
+Synopsis documentation):
+
+"* Option to remove pixel repetition clock from HDMI TX interface for an
+  easy integration with third party HDMI TX PHYs"
+
+So - here's the question: what do we do when we find something using the
+Synopsis design-ware HDMI transmitter with a different HDMI phy?
+
+Remember, VP, VPH, VP_FILT_* are all part of the HDMI phy according to
+the freescale documentation, and not part of the HDMI transmitter.
+
+> I
+> see register definitions for a "source" PHY and a "master" PHY, where
+> the latter seems to be an I2C controller rather than a PHY. Perhaps it
+> is used to communicate with an external PHY?
+
+I'm not sure where you get that from.  Maybe you could give a chapter
+reference?
+
+Looking deeper at this HEAC issue, that is a separate, smaller phy which
+doesn't have much to do with video - though it remains rather undocumented
+in the freescale docs.  That's only going on a block diagram near the
+start of the HDMI transmitter chapter though.
+
+> > If we wanted to model this correctly, then for iMX, I would suggest
+> > that the HDMI phy should be modelled in DT, and _all_ the six VP*
+> > supplies are modelled - and we should assume that "GD" is a "power
+> > good" signal, though we don't know that for certain.
+> 
+> Perhaps VP_FILT* are sourced from the same supply as VP, so maybe we
+> don't have to care at the DT level?
+
+We'd be guessing - and that's exactly my point.  Designing something at
+DT level based on guesswork is no way to go, especially with a generic
+bit of IP which would be re-used across multiple different platforms.
+
+> > What we also don't know on iMX6 is what voltages any of these are
+> > supplied with.
+> 
+> A rather common nuisance with these licensed IP blocks is that some of
+> the details may be hidden in SoC glue, resulting in the interface being
+> different on each SoC. Given all of the above it sounds like i.MX could
+> have some internal glue to supply VP and VPH and there'd be no sensible
+> way to represent them in DT.
+
+... or it's entirely possible that all these supplies are always fed by
+the iMX6 SoC all the time.
+
+> > So, as we don't have much certainty here, and we know that adding it
+> > to what is the HDMI transmitter would be wrong, I'd suggest not
+> > modelling it in a generic way at present.
+> 
+> Does DesignWare by any chance offer documentation about the IP? If not I
+> agree that the safest thing to do for now would be to make this Rockchip
+> specific.
+
+That's _exactly_ why I raised the point originally, and said that it should
+be Rockchip specific until we know better.  Glad you've caught up with my
+thinking. :)
+
+However, my thinking _now_ is that it shouldn't even be modelled as part
+of our HDMI transmitter DT blob, but we should be modelling the HDMI
+transmitter separately from the HDMI phy as two separate DT blobs, and
+then the HDMI phy blob gets the (possibly optional) VPH and VP supplies.
+
+What if someone designs a chip with their own HDMI phy which uses
+different supplies?
+
+This is one of the problems I have with DT - DT needs us to describe
+the hardware correctly first time around, when we may not have all the
+available facts to make proper decisions, and wrong decisions can very
+well lead to serious headaches later on because we didn't model
+something correctly - and we're stuck with the wrong decisions for ever.
+
+-- 
+FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
+according to speedtest.net.
