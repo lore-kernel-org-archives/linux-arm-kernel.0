@@ -1,170 +1,209 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Tue, 9 Jun 2015 10:07:00 +0200
-Subject: [PATCH v2 1/3] spi: atmel: add support for the internal
- chip-select of the spi controller
-In-Reply-To: <c05f4d9abfdabb62b3b3cfeb57a3f9c138b4e45d.1433779081.git.cyrille.pitchen@atmel.com>
-References: <cover.1433779081.git.cyrille.pitchen@atmel.com>
- <c05f4d9abfdabb62b3b3cfeb57a3f9c138b4e45d.1433779081.git.cyrille.pitchen@atmel.com>
-Message-ID: <55769EA4.7060602@atmel.com>
+From: dbaryshkov@gmail.com (Dmitry Eremin-Solenikov)
+Date: Tue, 9 Jun 2015 11:08:13 +0300
+Subject: [PATCH v5 02/17] leds: port locomo leds driver to new locomo core
+In-Reply-To: <20150609065730.GC2982@x1>
+References: <1433797008-6246-1-git-send-email-dbaryshkov@gmail.com>
+ <1433797008-6246-3-git-send-email-dbaryshkov@gmail.com>
+ <20150609065730.GC2982@x1>
+Message-ID: <CALT56yMkpXqurNw9xQeEBTdH5UTsrmSHTx1jbWXTb8zSWwDD6Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le 08/06/2015 18:07, Cyrille Pitchen a ?crit :
-> This patch relies on the CSAAT (Chip Select Active After Transfer) feature
-> introduced by the version 2 of the spi controller. This new mode allows to
-> use properly the internal chip-select output pin of the spi controller
-> instead of using external gpios. Consequently, the "cs-gpios" device-tree
-> property becomes optional.
-> 
-> When the new CSAAT bit is set into the Chip Select Register, the internal
-> chip-select output pin remains asserted till both the following conditions
-> become true:
-> - the LASTXFER bit is set into the Control Register (or the Transmit Data
->   Register)
-> - the Transmit Data Register and its shift register are empty.
-> 
-> WARNING: if the LASTXFER bit is set into the Control Register then new
-> data are written into the Transmit Data Register fast enough to keep its
-> shifter not empty, the chip-select output pin remains asserted. Only when
-> the shifter becomes empty, the chip-select output pin is unasserted.
-> 
-> When the CSAAT bit is clear in the Chip Select Register, the LASTXFER bit
-> is ignored in both the Control Register and the Transmit Data Register.
-> The internal chip-select output pin remains active as long as the Transmit
-> Data Register or its shift register are not empty.
-> 
-> Signed-off-by: Cyrille Pitchen <cyrille.pitchen@atmel.com>
+2015-06-09 9:57 GMT+03:00 Lee Jones <lee.jones@linaro.org>:
+> On Mon, 08 Jun 2015, Dmitry Eremin-Solenikov wrote:
+>
+>> Adapt locomo leds driver to new locomo core setup.
+>>
+>> Signed-off-by: Dmitry Eremin-Solenikov <dbaryshkov@gmail.com>
+>> Acked-by: Jacek Anaszewski <j.anaszewski@samsung.com>
+>
+> This is missing Bryan's Ack.
 
-It seems okay:
-Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+Jacek is listed as a co-maintainer of the LEDS subsystem, so I assumed
+that his acked-by is enough.
 
-Thanks.
+>
+>> ---
+>>  drivers/leds/Kconfig       |   2 +-
+>>  drivers/leds/leds-locomo.c | 117 +++++++++++++++++++++++----------------------
+>>  2 files changed, 61 insertions(+), 58 deletions(-)
+>>
+>> diff --git a/drivers/leds/Kconfig b/drivers/leds/Kconfig
+>> index 966b960..d086aac 100644
+>> --- a/drivers/leds/Kconfig
+>> +++ b/drivers/leds/Kconfig
+>> @@ -79,7 +79,7 @@ config LEDS_LM3642
+>>  config LEDS_LOCOMO
+>>       tristate "LED Support for Locomo device"
+>>       depends on LEDS_CLASS
+>> -     depends on SHARP_LOCOMO
+>> +     depends on MFD_LOCOMO
+>>       help
+>>         This option enables support for the LEDs on Sharp Locomo.
+>>         Zaurus models SL-5500 and SL-5600.
+>> diff --git a/drivers/leds/leds-locomo.c b/drivers/leds/leds-locomo.c
+>> index 80ba048..a4286e9 100644
+>> --- a/drivers/leds/leds-locomo.c
+>> +++ b/drivers/leds/leds-locomo.c
+>> @@ -9,89 +9,92 @@
+>>   */
+>>
+>>  #include <linux/kernel.h>
+>> -#include <linux/init.h>
+>> -#include <linux/module.h>
+>> -#include <linux/device.h>
+>>  #include <linux/leds.h>
+>> +#include <linux/mfd/locomo.h>
+>> +#include <linux/module.h>
+>> +#include <linux/platform_device.h>
+>> +#include <linux/regmap.h>
+>>
+>> -#include <mach/hardware.h>
+>> -#include <asm/hardware/locomo.h>
+>> +struct locomo_led {
+>> +     struct led_classdev led;
+>> +     struct regmap *regmap;
+>> +     unsigned int reg;
+>> +};
+>>
+>>  static void locomoled_brightness_set(struct led_classdev *led_cdev,
+>> -                             enum led_brightness value, int offset)
+>> -{
+>> -     struct locomo_dev *locomo_dev = LOCOMO_DEV(led_cdev->dev->parent);
+>> -     unsigned long flags;
+>> -
+>> -     local_irq_save(flags);
+>> -     if (value)
+>> -             locomo_writel(LOCOMO_LPT_TOFH, locomo_dev->mapbase + offset);
+>> -     else
+>> -             locomo_writel(LOCOMO_LPT_TOFL, locomo_dev->mapbase + offset);
+>> -     local_irq_restore(flags);
+>> -}
+>> -
+>> -static void locomoled_brightness_set0(struct led_classdev *led_cdev,
+>>                               enum led_brightness value)
+>>  {
+>> -     locomoled_brightness_set(led_cdev, value, LOCOMO_LPT0);
+>> +     struct locomo_led *led = container_of(led_cdev, struct locomo_led, led);
+>> +
+>> +     regmap_write(led->regmap, led->reg,
+>> +                     value ? LOCOMO_LPT_TOFH : LOCOMO_LPT_TOFL);
+>>  }
+>>
+>> -static void locomoled_brightness_set1(struct led_classdev *led_cdev,
+>> -                             enum led_brightness value)
+>> +static int locomo_led_register(
+>> +             struct device *dev,
+>> +             struct locomo_led *led,
+>> +             const char *name,
+>> +             const char *trigger,
+>> +             struct regmap *regmap,
+>> +             unsigned int reg)
+>>  {
+>> -     locomoled_brightness_set(led_cdev, value, LOCOMO_LPT1);
+>> +     led->led.name = name;
+>> +     led->led.flags = LED_CORE_SUSPENDRESUME;
+>> +     led->led.default_trigger = trigger;
+>> +     led->led.brightness_set = locomoled_brightness_set;
+>> +     led->regmap = regmap;
+>> +     led->reg = reg;
+>> +
+>> +     return devm_led_classdev_register(dev, &led->led);
+>>  }
+>>
+>> -static struct led_classdev locomo_led0 = {
+>> -     .name                   = "locomo:amber:charge",
+>> -     .default_trigger        = "main-battery-charging",
+>> -     .brightness_set         = locomoled_brightness_set0,
+>> -};
+>> -
+>> -static struct led_classdev locomo_led1 = {
+>> -     .name                   = "locomo:green:mail",
+>> -     .default_trigger        = "nand-disk",
+>> -     .brightness_set         = locomoled_brightness_set1,
+>> -};
+>> -
+>> -static int locomoled_probe(struct locomo_dev *ldev)
+>> +static int locomoled_probe(struct platform_device *pdev)
+>>  {
+>>       int ret;
+>> -
+>> -     ret = led_classdev_register(&ldev->dev, &locomo_led0);
+>> +     struct locomo_led *leds;
+>> +     struct regmap *regmap;
+>> +
+>> +     leds = devm_kzalloc(&pdev->dev, 2 * sizeof(*leds), GFP_KERNEL);
+>> +     if (!leds)
+>> +             return -ENOMEM;
+>> +
+>> +     regmap = dev_get_regmap(pdev->dev.parent, NULL);
+>> +     if (!regmap)
+>> +             return -ENODEV;
+>> +
+>> +     ret = locomo_led_register(
+>> +                     &pdev->dev,
+>> +                     leds,
+>> +                     "locomo:amber:charge",
+>> +                     "main-battery-charging",
+>> +                     regmap,
+>> +                     LOCOMO_LPT0);
+>>       if (ret < 0)
+>>               return ret;
+>>
+>> -     ret = led_classdev_register(&ldev->dev, &locomo_led1);
+>> +     ret = locomo_led_register(
+>> +                     &pdev->dev,
+>> +                     leds + 1,
+>> +                     "locomo:green:mail",
+>> +                     "mmc0",
+>> +                     regmap,
+>> +                     LOCOMO_LPT1);
+>>       if (ret < 0)
+>> -             led_classdev_unregister(&locomo_led0);
+>> -
+>> -     return ret;
+>> -}
+>> +             return ret;
+>>
+>> -static int locomoled_remove(struct locomo_dev *dev)
+>> -{
+>> -     led_classdev_unregister(&locomo_led0);
+>> -     led_classdev_unregister(&locomo_led1);
+>>       return 0;
+>>  }
+>>
+>> -static struct locomo_driver locomoled_driver = {
+>> -     .drv = {
+>> -             .name = "locomoled"
+>> +static struct platform_driver locomoled_driver = {
+>> +     .driver = {
+>> +             .name = "locomo-led"
+>>       },
+>> -     .devid  = LOCOMO_DEVID_LED,
+>>       .probe  = locomoled_probe,
+>> -     .remove = locomoled_remove,
+>>  };
+>>
+>> -static int __init locomoled_init(void)
+>> -{
+>> -     return locomo_driver_register(&locomoled_driver);
+>> -}
+>> -module_init(locomoled_init);
+>> +module_platform_driver(locomoled_driver);
+>>
+>>  MODULE_AUTHOR("John Lenz <lenz@cs.wisc.edu>");
+>>  MODULE_DESCRIPTION("Locomo LED driver");
+>>  MODULE_LICENSE("GPL");
+>> +MODULE_ALIAS("platform:locomo-led");
+>
+> --
+> Lee Jones
+> Linaro STMicroelectronics Landing Team Lead
+> Linaro.org ? Open source software for ARM SoCs
+> Follow Linaro: Facebook | Twitter | Blog
 
-Some additional changes might be needed: see below...
-
-
-> ---
->  drivers/spi/spi-atmel.c | 37 ++++++++++++++++++++++++++++---------
->  1 file changed, 28 insertions(+), 9 deletions(-)
-> 
-> diff --git a/drivers/spi/spi-atmel.c b/drivers/spi/spi-atmel.c
-> index a2f40b1..aa7d202 100644
-> --- a/drivers/spi/spi-atmel.c
-> +++ b/drivers/spi/spi-atmel.c
-> @@ -246,6 +246,7 @@ struct atmel_spi {
->  
->  	bool			use_dma;
->  	bool			use_pdc;
-> +	bool			use_cs_gpios;
->  	/* dmaengine data */
->  	struct atmel_spi_dma	dma;
->  
-> @@ -321,7 +322,8 @@ static void cs_activate(struct atmel_spi *as, struct spi_device *spi)
->  		}
->  
->  		mr = spi_readl(as, MR);
-> -		gpio_set_value(asd->npcs_pin, active);
-> +		if (as->use_cs_gpios)
-> +			gpio_set_value(asd->npcs_pin, active);
->  	} else {
->  		u32 cpol = (spi->mode & SPI_CPOL) ? SPI_BIT(CPOL) : 0;
->  		int i;
-> @@ -337,7 +339,7 @@ static void cs_activate(struct atmel_spi *as, struct spi_device *spi)
->  
->  		mr = spi_readl(as, MR);
->  		mr = SPI_BFINS(PCS, ~(1 << spi->chip_select), mr);
-> -		if (spi->chip_select != 0)
-> +		if (as->use_cs_gpios && spi->chip_select != 0)
->  			gpio_set_value(asd->npcs_pin, active);
->  		spi_writel(as, MR, mr);
->  	}
-
-Maybe in a debug function in cs_activate()...
-
-> @@ -366,7 +368,9 @@ static void cs_deactivate(struct atmel_spi *as, struct spi_device *spi)
->  			asd->npcs_pin, active ? " (low)" : "",
->  			mr);
->  
-> -	if (atmel_spi_is_v2(as) || spi->chip_select != 0)
-> +	if (!as->use_cs_gpios)
-> +		spi_writel(as, CR, SPI_BIT(LASTXFER));
-> +	else if (atmel_spi_is_v2(as) || spi->chip_select != 0)
->  		gpio_set_value(asd->npcs_pin, !active);
->  }
->  
-
-... as well as in cs_deactivate(), you need to change the use of
-asd->npcs_pin:
-
-        dev_dbg(&spi->dev, "activate %u%s, mr %08x\n",
-                        asd->npcs_pin, active ? " (high)" : "",
-                        mr);
-
-so that it is still relevant in the !as->use_cs_gpios case...
-
-Bye,
-
-> @@ -996,6 +1000,8 @@ static int atmel_spi_setup(struct spi_device *spi)
->  		csr |= SPI_BIT(CPOL);
->  	if (!(spi->mode & SPI_CPHA))
->  		csr |= SPI_BIT(NCPHA);
-> +	if (!as->use_cs_gpios)
-> +		csr |= SPI_BIT(CSAAT);
->  
->  	/* DLYBS is mostly irrelevant since we manage chipselect using GPIOs.
->  	 *
-> @@ -1009,7 +1015,9 @@ static int atmel_spi_setup(struct spi_device *spi)
->  	/* chipselect must have been muxed as GPIO (e.g. in board setup) */
->  	npcs_pin = (unsigned long)spi->controller_data;
->  
-> -	if (gpio_is_valid(spi->cs_gpio))
-> +	if (!as->use_cs_gpios)
-> +		npcs_pin = spi->chip_select;
-> +	else if (gpio_is_valid(spi->cs_gpio))
->  		npcs_pin = spi->cs_gpio;
->  
->  	asd = spi->controller_state;
-> @@ -1018,15 +1026,19 @@ static int atmel_spi_setup(struct spi_device *spi)
->  		if (!asd)
->  			return -ENOMEM;
->  
-> -		ret = gpio_request(npcs_pin, dev_name(&spi->dev));
-> -		if (ret) {
-> -			kfree(asd);
-> -			return ret;
-> +		if (as->use_cs_gpios) {
-> +			ret = gpio_request(npcs_pin, dev_name(&spi->dev));
-> +			if (ret) {
-> +				kfree(asd);
-> +				return ret;
-> +			}
-> +
-> +			gpio_direction_output(npcs_pin,
-> +					      !(spi->mode & SPI_CS_HIGH));
->  		}
->  
->  		asd->npcs_pin = npcs_pin;
->  		spi->controller_state = asd;
-> -		gpio_direction_output(npcs_pin, !(spi->mode & SPI_CS_HIGH));
->  	}
->  
->  	asd->csr = csr;
-> @@ -1338,6 +1350,13 @@ static int atmel_spi_probe(struct platform_device *pdev)
->  
->  	atmel_get_caps(as);
->  
-> +	as->use_cs_gpios = true;
-> +	if (atmel_spi_is_v2(as) &&
-> +	    !of_get_property(pdev->dev.of_node, "cs-gpios", NULL)) {
-> +		as->use_cs_gpios = false;
-> +		master->num_chipselect = 4;
-> +	}
-> +
->  	as->use_dma = false;
->  	as->use_pdc = false;
->  	if (as->caps.has_dma_support) {
-> 
 
 
 -- 
-Nicolas Ferre
+With best wishes
+Dmitry
