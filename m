@@ -1,80 +1,46 @@
-From: bintian.wang@huawei.com (Bintian)
-Date: Tue, 9 Jun 2015 10:30:47 +0800
-Subject: [PATCH v9 5/6] arm64: dts: Add dts files for Hisilicon Hi6220 SoC
-In-Reply-To: <557643EB.8000106@huawei.com>
-References: <1432950661-23060-1-git-send-email-bintian.wang@huawei.com>
- <1432950661-23060-6-git-send-email-bintian.wang@huawei.com>
- <20150609005521.GA21682@tiger> <557643EB.8000106@huawei.com>
-Message-ID: <55764FD7.2000805@huawei.com>
+From: linux.amoon@gmail.com (Anand Moon)
+Date: Tue, 9 Jun 2015 08:09:35 +0530
+Subject: [PATCHv2 1/2] ARM: exynos_defconfig: Enable
+ CONFIG_SND_SOC_ODROIDX2 for Odroid-XU3
+In-Reply-To: <55762A4E.5090208@samsung.com>
+References: <1433696621-4763-1-git-send-email-linux.amoon@gmail.com>
+ <55762A4E.5090208@samsung.com>
+Message-ID: <CANAwSgQchBKumr4WMZ-REMcMN-CgGfeVuJ=nd+j6DeYe2S-S0g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Arnd, Hello Olof, Hello Kevin,
+Hi,
 
-I checked the git log of Linux 4.1-rc7 from Linus, he says Linux 4.1
-will have an rc8, so we may have time to review the following two pull
-requests from Wei Xu?
-
-[GIT PULL v2]Hisilicon 64-bit SoC changes for 4.2
-[GIT PULL]Hisilicon 64-bit soc hi6220 DT changes for 4.2
-
-Thanks for your time.
-
-BR,
-
-Bintian
-
-
-On 2015/6/9 9:39, Bintian wrote:
-> Hello Shawn,
->
-> On 2015/6/9 8:55, Shawn Guo wrote:
->> A minor random comment below.
+On 9 June 2015 at 05:20, Krzysztof Kozlowski <k.kozlowski@samsung.com> wrote:
+> On 08.06.2015 02:03, Anand Moon wrote:
+>> Enable CONFIG_SND_SOC_ODROIDX2 and CONFIG_SND_SIMPLE_CARD to enable
+>> sound on Odroid-XU3 board.
 >>
->> On Sat, May 30, 2015 at 09:51:00AM +0800, Bintian Wang wrote:
->>> +        ao_ctrl: ao_ctrl {
->>> +            compatible = "hisilicon,hi6220-aoctrl", "syscon";
->>> +            reg = <0x0 0xf7800000 0x0 0x2000>;
->>> +            #clock-cells = <1>;
->>> +        };
->>> +
->>> +        sys_ctrl: sys_ctrl {
->>> +            compatible = "hisilicon,hi6220-sysctrl", "syscon";
->>> +            reg = <0x0 0xf7030000 0x0 0x2000>;
->>> +            #clock-cells = <1>;
->>> +        };
->>> +
->>> +        media_ctrl: media_ctrl {
->>> +            compatible = "hisilicon,hi6220-mediactrl", "syscon";
->>> +            reg = <0x0 0xf4410000 0x0 0x1000>;
->>> +            #clock-cells = <1>;
->>> +        };
->>> +
->>> +        pm_ctrl: pm_ctrl {
->>
->> An unit-address should be coded in the node name, when it has a 'reg'
->> property.
-> Thanks for your suggestion, Rob also gives me the same suggestion :)
+>> Below is the output of boot log.
+>> [    6.021550] max98090 5-0010: MAX98090 REVID=0x43
+>> [    6.025506] random: nonblocking pool is initialized
+>> [    6.047297] asoc-simple-card sound: HiFi <-> 3830000.i2s mapping ok
+>> [    6.068392] s5m-rtc s2mps14-rtc: setting system clock to 2015-06-07 12:51:06 UTC (1433681466)
+>> [    6.123650] ALSA device list:
+>> [    6.135203]   #0: Odroid-XU3
 >
-> In fact, I added the reg to node name in the "[GIT PULL]Hisilicon 64-bit
-> soc hi6220 DT changes for 4.2", but it seems the pull is too late for
-> kernel 4.2, I will prepare it for 4.3.
+> Answering the question "why" and "what is device" would be sufficient.
+> You answered the first question ("enable sound") so you can just add
+> second part - using the max98090 audio codec.
 >
-> Thanks,
+> This whole dmesg does not bring any benefits here, especially the
+> irrelevant items (like random or RTC). Could you trim the commit message?
 >
-> Bintian
+> Beside of that it looks fine however you marked this as "v2":
+> 1. I cannot find v1 on Google. The title was the same?
+> 2. Where is changelog?
 >
->>
->> Shawn
->>
->>> +            compatible = "hisilicon,hi6220-pmctrl", "syscon";
->>> +            reg = <0x0 0xf7032000 0x0 0x1000>;
->>> +            #clock-cells = <1>;
->>> +        };
->>
->> .
->>
->
->
-> .
->
+> Best regards,
+> Krzysztof
+
+Look like I an doom to make mistake.
+This series of patch got PATCHv2 tag,
+It's my mistake. not maintain the version of the patch.
+I will resend it.
+
+-Anand Moon
