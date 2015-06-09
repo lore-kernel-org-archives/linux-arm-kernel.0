@@ -1,93 +1,96 @@
-From: monstr@monstr.eu (Michal Simek)
-Date: Tue, 09 Jun 2015 12:41:57 +0200
-Subject: [PATCH v4 2/2] dma: Add Xilinx AXI Central Direct Memory Access
- Engine driver support
-In-Reply-To: <1433837720.16887.42.camel@x220>
-References: <1432228035-6569-1-git-send-email-appanad@xilinx.com>	
- <1432290653.27695.97.camel@x220> <557681A7.7080202@monstr.eu>	
- <alpine.DEB.2.02.1506090808500.2069@localhost6.localdomain6>	
- <55769132.6070601@monstr.eu> <1433837720.16887.42.camel@x220>
-Message-ID: <5576C2F5.3050806@monstr.eu>
+From: alex.bennee@linaro.org (Alex =?utf-8?Q?Benn=C3=A9e?=)
+Date: Tue, 09 Jun 2015 11:42:10 +0100
+Subject: [PATCH v2 02/11] KVM: arm: rename pm_fake handler to trap_raz_wi
+In-Reply-To: <1433046432-1824-3-git-send-email-zhichao.huang@linaro.org>
+References: <1433046432-1824-1-git-send-email-zhichao.huang@linaro.org>
+ <1433046432-1824-3-git-send-email-zhichao.huang@linaro.org>
+Message-ID: <87zj496u4d.fsf@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/09/2015 10:15 AM, Paul Bolle wrote:
-> On Tue, 2015-06-09 at 09:09 +0200, Michal Simek wrote:
->> On 06/09/2015 08:10 AM, Julia Lawall wrote:
->>> On Tue, 9 Jun 2015, Michal Simek wrote:
->>>> Also sort of checking for this will be great. Julia?
->>>
->>> If this requires checking the contents of comment, Coccinelle currently 
->>> can't help with that.  Perhaps an idea would be to just do a grep on the 
->>> file.  So if I find MODULE_LICENSE("GPL v2") and then grepping for "either 
->>> vresion 2" gives success, then there is a problem?  It's obviously not 
->>> foolproof, but perhaps it could be helpful.
->>
->> Having some sort of checking somewhere will be great. checkpatch?
->> zero-day testing system?
-> 
-> Mistakes I've seen made since I started checking this stuff (a few
-> months ago):
-> - typos in the license ident, say "GPLv2", "GPL V2", or "BSD": generates
-> a warning when module is loaded and taints kernel. People still get this
-> wrong. A test in checkpatch for these typos was submitted a while ago,
-> but it never got added;
 
-Any reason for that? just lost or any problem ?
+Zhichao Huang <zhichao.huang@linaro.org> writes:
 
-> - not adding MODULE_LICENSE() to a module: also generates a warning when
-> module is loaded and taints kernel. People still get this wrong;
-> - adding MODULE_LICENSE() to built-in only code: pointless at best, and
-> annoying for reviewers ("Hey, did the submitter intend to write built-in
-> only code or modular code?");
-> - using "Dual BSD/GPL" but not a trace of the BSD license blurb in
-> sight, while adding that blurb is one of the very few requirements this
-> license actually has;
-> - license mismatch, say comment blurb states "GPL v2 (or later)" but
-> MODULE_LICENSE() ident states "GPL v2" only (or vice versa): very easy
-> mistake to make, happens once or twice a week.  
+> pm_fake doesn't quite describe what the handler does (ignoring writes
+> and returning 0 for reads).
+>
+> As we're about to use it (a lot) in a different context, rename it
+> with a (admitedly cryptic) name that make sense for all users.
+>
+> Signed-off-by: Zhichao Huang <zhichao.huang@linaro.org>
 
-What do you mean by vice versa?
-GPL v2 header and MODULE_LICENSE("GPL") should be fine right?
+Reviewed-by: Alex Benn?e <alex.bennee@linaro.org>
 
-> 
-> Did I miss anything in that list?
-
-I think you miss MODULE_ALIAS problems.
-https://lkml.org/lkml/2014/3/17/301
-
-> 
-> I'm afraid that most of the above can only be caught reliably by
-> attention to detail by submitters and reviewers. That's a pity, because
-> checking for that stuff is about as boring as it gets. (What does that
-> say about me?)
-
-yep. I have never looked at the details about these license module
-stuff. But definitely great to have this list - will record it and keep
-my eye on our xilinx drivers.
-
-BTW: Some time ago we discussed SPDX License Identifier which could
-simplify license checking.
-https://lkml.org/lkml/2014/2/21/21
-
-Interesting also is that selftests are using just "Licensed under the
-GPLv2."
-
-Thanks,
-Michal
+> ---
+>  arch/arm/kvm/coproc.c | 34 ++++++++++++++++------------------
+>  1 file changed, 16 insertions(+), 18 deletions(-)
+>
+> diff --git a/arch/arm/kvm/coproc.c b/arch/arm/kvm/coproc.c
+> index 2e12760..9d283d9 100644
+> --- a/arch/arm/kvm/coproc.c
+> +++ b/arch/arm/kvm/coproc.c
+> @@ -229,7 +229,7 @@ bool access_vm_reg(struct kvm_vcpu *vcpu,
+>   * must always support PMCCNTR (the cycle counter): we just RAZ/WI for
+>   * all PM registers, which doesn't crash the guest kernel at least.
+>   */
+> -static bool pm_fake(struct kvm_vcpu *vcpu,
+> +static bool trap_raz_wi(struct kvm_vcpu *vcpu,
+>  		    const struct coproc_params *p,
+>  		    const struct coproc_reg *r)
+>  {
+> @@ -239,19 +239,19 @@ static bool pm_fake(struct kvm_vcpu *vcpu,
+>  		return read_zero(vcpu, p);
+>  }
+>  
+> -#define access_pmcr pm_fake
+> -#define access_pmcntenset pm_fake
+> -#define access_pmcntenclr pm_fake
+> -#define access_pmovsr pm_fake
+> -#define access_pmselr pm_fake
+> -#define access_pmceid0 pm_fake
+> -#define access_pmceid1 pm_fake
+> -#define access_pmccntr pm_fake
+> -#define access_pmxevtyper pm_fake
+> -#define access_pmxevcntr pm_fake
+> -#define access_pmuserenr pm_fake
+> -#define access_pmintenset pm_fake
+> -#define access_pmintenclr pm_fake
+> +#define access_pmcr trap_raz_wi
+> +#define access_pmcntenset trap_raz_wi
+> +#define access_pmcntenclr trap_raz_wi
+> +#define access_pmovsr trap_raz_wi
+> +#define access_pmselr trap_raz_wi
+> +#define access_pmceid0 trap_raz_wi
+> +#define access_pmceid1 trap_raz_wi
+> +#define access_pmccntr trap_raz_wi
+> +#define access_pmxevtyper trap_raz_wi
+> +#define access_pmxevcntr trap_raz_wi
+> +#define access_pmuserenr trap_raz_wi
+> +#define access_pmintenset trap_raz_wi
+> +#define access_pmintenclr trap_raz_wi
+>  
+>  /* Architected CP15 registers.
+>   * CRn denotes the primary register number, but is copied to the CRm in the
+> @@ -532,8 +532,7 @@ int kvm_handle_cp14_64(struct kvm_vcpu *vcpu, struct kvm_run *run)
+>  	params.Rt2 = (kvm_vcpu_get_hsr(vcpu) >> 10) & 0xf;
+>  	params.CRm = 0;
+>  
+> -	/* raz_wi */
+> -	(void)pm_fake(vcpu, &params, NULL);
+> +	(void)trap_raz_wi(vcpu, &params, NULL);
+>  
+>  	/* handled */
+>  	kvm_skip_instr(vcpu, kvm_vcpu_trap_il_is32bit(vcpu));
+> @@ -559,8 +558,7 @@ int kvm_handle_cp14_32(struct kvm_vcpu *vcpu, struct kvm_run *run)
+>  	params.Op2 = (kvm_vcpu_get_hsr(vcpu) >> 17) & 0x7;
+>  	params.Rt2 = 0;
+>  
+> -	/* raz_wi */
+> -	(void)pm_fake(vcpu, &params, NULL);
+> +	(void)trap_raz_wi(vcpu, &params, NULL);
+>  
+>  	/* handled */
+>  	kvm_skip_instr(vcpu, kvm_vcpu_trap_il_is32bit(vcpu));
 
 -- 
-Michal Simek, Ing. (M.Eng), OpenPGP -> KeyID: FE3D1F91
-w: www.monstr.eu p: +42-0-721842854
-Maintainer of Linux kernel - Microblaze cpu - http://www.monstr.eu/fdt/
-Maintainer of Linux kernel - Xilinx Zynq ARM architecture
-Microblaze U-BOOT custodian and responsible for u-boot arm zynq platform
-
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150609/646af317/attachment.sig>
+Alex Benn?e
