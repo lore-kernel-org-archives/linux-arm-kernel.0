@@ -1,58 +1,56 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 9 Jun 2015 14:09:48 +0100
-Subject: [PATCH 1/1] ARM : missing corrupted reg in __do_div_asm
-In-Reply-To: <1433225609-7148-1-git-send-email-gangchen@rdamicro.com>
-References: <1433225609-7148-1-git-send-email-gangchen@rdamicro.com>
-Message-ID: <20150609130948.GD7557@n2100.arm.linux.org.uk>
+From: alex.bennee@linaro.org (Alex =?utf-8?Q?Benn=C3=A9e?=)
+Date: Tue, 09 Jun 2015 14:12:19 +0100
+Subject: [PATCH 03/10] KVM: arm/arm64: vgic: Convert struct vgic_lr to use
+ bitfields
+In-Reply-To: <1433783045-8002-4-git-send-email-marc.zyngier@arm.com>
+References: <1433783045-8002-1-git-send-email-marc.zyngier@arm.com>
+ <1433783045-8002-4-git-send-email-marc.zyngier@arm.com>
+Message-ID: <87twuh6n64.fsf@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 02, 2015 at 02:13:29PM +0800, Chen Gang wrote:
-> __xl (r0 in little endian system, or R1 in big endian system) is corrupted
-> after calling __do_div64 and compiler is not informed about this in
-> macro __do_div_asm. If n is used again afterwards, __xl won't be
-> reloaded and n will contain incorrect value.
+
+Marc Zyngier <marc.zyngier@arm.com> writes:
+
+> As we're about to cram more information in the vgic_lr structure
+> (HW interrupt number and additional state information), we switch
+> to a layout similar to the HW's:
+>
+> - use bitfields to save space (we don't need more than 10 bits
+>   to represent the irq numbers)
+> - source CPU and HW interrupt can share the same field, as
+>   a SGI doesn't have a physical line.
+>
+> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+Reviewed-by: Alex Benn?e <alex.bennee@linaro.org>
+
 > ---
-
-This commit message needs improving.  Please either upper case both r0
-and r1 in the first line, or lower case them both.  Secondly, the Linux
-kernel has a requirement that all contributions are signed-off.  Please
-read Documentation/SubmittingPatches for information, particularly
-section 11.
-
-Other than that, the patch looks fine, thanks.
-
->  arch/arm/include/asm/div64.h | 10 ++++++----
->  1 file changed, 6 insertions(+), 4 deletions(-)
-> 
-> diff --git a/arch/arm/include/asm/div64.h b/arch/arm/include/asm/div64.h
-> index 662c7bd..fa9489e 100644
-> --- a/arch/arm/include/asm/div64.h
-> +++ b/arch/arm/include/asm/div64.h
-> @@ -34,12 +34,14 @@
->  	register unsigned long long __n   asm("r0") = n;	\
->  	register unsigned long long __res asm("r2");		\
->  	register unsigned int __rem       asm(__xh);		\
-> +	register unsigned int __clobber   asm(__xl);		\
->  	asm(	__asmeq("%0", __xh)				\
-> -		__asmeq("%1", "r2")				\
-> -		__asmeq("%2", "r0")				\
-> -		__asmeq("%3", "r4")				\
-> +		__asmeq("%1", __xl)				\
-> +		__asmeq("%2", "r2")				\
-> +		__asmeq("%3", "r0")				\
-> +		__asmeq("%4", "r4")				\
->  		"bl	__do_div64"				\
-> -		: "=r" (__rem), "=r" (__res)			\
-> +		: "=r" (__rem), "=r" (__clobber), "=r" (__res)  \
->  		: "r" (__n), "r" (__base)			\
->  		: "ip", "lr", "cc");				\
->  	n = __res;						\
-> -- 
-> 1.9.1
-> 
-> 
+>  include/kvm/arm_vgic.h | 10 +++++++---
+>  1 file changed, 7 insertions(+), 3 deletions(-)
+>
+> diff --git a/include/kvm/arm_vgic.h b/include/kvm/arm_vgic.h
+> index 133ea00..4f9fa1d 100644
+> --- a/include/kvm/arm_vgic.h
+> +++ b/include/kvm/arm_vgic.h
+> @@ -95,11 +95,15 @@ enum vgic_type {
+>  #define LR_STATE_ACTIVE		(1 << 1)
+>  #define LR_STATE_MASK		(3 << 0)
+>  #define LR_EOI_INT		(1 << 2)
+> +#define LR_HW			(1 << 3)
+>  
+>  struct vgic_lr {
+> -	u16	irq;
+> -	u8	source;
+> -	u8	state;
+> +	unsigned irq:10;
+> +	union {
+> +		unsigned hwirq:10;
+> +		unsigned source:8;
+> +	};
+> +	unsigned state:4;
+>  };
+>  
+>  struct vgic_vmcr {
 
 -- 
-FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
-according to speedtest.net.
+Alex Benn?e
