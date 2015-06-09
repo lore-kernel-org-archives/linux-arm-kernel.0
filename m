@@ -1,576 +1,1092 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Tue,  9 Jun 2015 10:47:01 +0200
-Subject: [PATCH 3/5] soc: Mediatek: Add SCPSYS power domain driver
-In-Reply-To: <1433839623-10804-1-git-send-email-s.hauer@pengutronix.de>
-References: <1433839623-10804-1-git-send-email-s.hauer@pengutronix.de>
-Message-ID: <1433839623-10804-4-git-send-email-s.hauer@pengutronix.de>
+From: appana.durga.rao@xilinx.com (Kedareswara rao Appana)
+Date: Tue, 9 Jun 2015 14:18:10 +0530
+Subject: [PATCH v5 2/2] dma: Add Xilinx AXI Central Direct Memory Access
+ Engine driver support
+Message-ID: <1433839690-5491-1-git-send-email-appanad@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This adds a power domain driver for the Mediatek SCPSYS unit.
+This is the driver for the AXI Central Direct Memory Access (AXI
+CDMA) core, which is a soft Xilinx IP core that provides high-bandwidth
+Direct Memory Access (DMA) between a memory-mapped source address and a
+memory-mapped destination address.
 
-The System Control Processor System (SCPSYS) has several power
-management related tasks in the system. The tasks include thermal
-measurement, dynamic voltage frequency scaling (DVFS), interrupt
-filter and lowlevel sleep control. The System Power Manager (SPM)
-inside the SCPSYS is for the MTCMOS power domain control.
+This module works on Zynq (ARM Based SoC) and Microblaze platforms.
 
-For now this driver only adds power domain support, the more
-advanced features are not yet supported. The driver implements
-the generic PM domain device tree bindings, the first user will
-most likely be the Mediatek AFE audio driver.
-
-Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
+Signed-off-by: Srikanth Thokala <sthokal@xilinx.com>
+Signed-off-by: Kedareswara rao Appana <appanad@xilinx.com>
 ---
- drivers/soc/mediatek/Kconfig             |   9 +
- drivers/soc/mediatek/Makefile            |   1 +
- drivers/soc/mediatek/mtk-scpsys.c        | 490 +++++++++++++++++++++++++++++++
- include/dt-bindings/power/mt8173-power.h |  15 +
- 4 files changed, 515 insertions(+)
- create mode 100644 drivers/soc/mediatek/mtk-scpsys.c
- create mode 100644 include/dt-bindings/power/mt8173-power.h
+This patch is rebased on the commit
+Merge git://git.kernel.org/pub/scm/linux/kernel/git/davem/net
 
-diff --git a/drivers/soc/mediatek/Kconfig b/drivers/soc/mediatek/Kconfig
-index e4f37a3..9a61b54 100644
---- a/drivers/soc/mediatek/Kconfig
-+++ b/drivers/soc/mediatek/Kconfig
-@@ -18,3 +18,12 @@ config MTK_PMIC_WRAP
- 	  Say yes here to add support for MediaTek PMIC Wrapper found
- 	  on different MediaTek SoCs. The PMIC wrapper is a proprietary
- 	  hardware to connect the PMIC.
-+
-+config MTK_SCPSYS
-+	bool "MediaTek SCPSYS Support"
-+	depends on ARCH_MEDIATEK || COMPILE_TEST
-+	select REGMAP
-+	select MTK_INFRACFG
+Changes in v5:
+- updated license in the driver as suggested by Paul.
+- Corrected return value in is_idle funtion.
+Changes in v4:
+- used GFP_NOWAIT instead of GFP_KERNEL during the desc allocation
+- Modified spin_lock handling moved the spin_lock to the appropriate functions
+- device_control api is removed and updated driver as per newer APi's.
+Changes in v3:
+- Check for CDMA idle condition before changing the configuration.
+- Modified the xilinx_dma.h header file location to the
+  include/linux/dma/xilinx_dma.h
+Changes in v2:
+- Rebased on 3.16-rc7.
+
+ drivers/dma/Kconfig              |  12 +
+ drivers/dma/xilinx/Makefile      |   1 +
+ drivers/dma/xilinx/xilinx_cdma.c | 988 +++++++++++++++++++++++++++++++++++++++
+ include/linux/dma/xilinx_dma.h   |  14 +
+ 4 files changed, 1015 insertions(+)
+ create mode 100644 drivers/dma/xilinx/xilinx_cdma.c
+
+diff --git a/drivers/dma/Kconfig b/drivers/dma/Kconfig
+index bda2cb0..c42cf24 100644
+--- a/drivers/dma/Kconfig
++++ b/drivers/dma/Kconfig
+@@ -492,4 +492,16 @@ config QCOM_BAM_DMA
+ 	  Enable support for the QCOM BAM DMA controller.  This controller
+ 	  provides DMA capabilities for a variety of on-chip devices.
+ 
++config XILINX_CDMA
++        tristate "Xilinx AXI CDMA Engine"
++        depends on (ARCH_ZYNQ || MICROBLAZE)
++	select DMA_ENGINE
 +	help
-+	  Say yes here to add support for the MediaTek SCPSYS power domain
-+	  driver.
-diff --git a/drivers/soc/mediatek/Makefile b/drivers/soc/mediatek/Makefile
-index 3fa940f..12998b0 100644
---- a/drivers/soc/mediatek/Makefile
-+++ b/drivers/soc/mediatek/Makefile
-@@ -1,2 +1,3 @@
- obj-$(CONFIG_MTK_INFRACFG) += mtk-infracfg.o
- obj-$(CONFIG_MTK_PMIC_WRAP) += mtk-pmic-wrap.o
-+obj-$(CONFIG_MTK_SCPSYS) += mtk-scpsys.o
-diff --git a/drivers/soc/mediatek/mtk-scpsys.c b/drivers/soc/mediatek/mtk-scpsys.c
++          Enable support for Xilinx AXI CDMA Soft IP.
++
++          The AXI CDMA is a soft IP which provides high-bandwidth
++          Direct Memory Access (DMA) between a memory-mapped source
++          address and a memory-mapped destination address using the
++          AXI4 protocol.
++
+ endif
+diff --git a/drivers/dma/xilinx/Makefile b/drivers/dma/xilinx/Makefile
+index 3c4e9f2..e1dee77 100644
+--- a/drivers/dma/xilinx/Makefile
++++ b/drivers/dma/xilinx/Makefile
+@@ -1 +1,2 @@
+ obj-$(CONFIG_XILINX_VDMA) += xilinx_vdma.o
++obj-$(CONFIG_XILINX_CDMA) += xilinx_cdma.o
+diff --git a/drivers/dma/xilinx/xilinx_cdma.c b/drivers/dma/xilinx/xilinx_cdma.c
 new file mode 100644
-index 0000000..b9eed37
+index 0000000..51c2121
 --- /dev/null
-+++ b/drivers/soc/mediatek/mtk-scpsys.c
-@@ -0,0 +1,490 @@
++++ b/drivers/dma/xilinx/xilinx_cdma.c
+@@ -0,0 +1,988 @@
 +/*
-+ * Copyright (c) 2015 Pengutronix, Sascha Hauer <kernel@pengutronix.de>
++ * DMA driver for Xilinx Central DMA Engine
 + *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
++ * Copyright (C) 2010 - 2015 Xilinx, Inc. All rights reserved.
 + *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
++ * Based on the Freescale DMA driver.
++ *
++ * Description:
++ *  The AXI CDMA, is a soft IP, which provides high-bandwidth Direct Memory
++ *  Access (DMA) between a memory-mapped source address and a memory-mapped
++ *  destination address.
++ *
++ * This is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation; either version 2 of the License, or
++ * (at your option) any later version.
 + */
-+#include <linux/clk.h>
-+#include <linux/delay.h>
++
++#include <linux/bitops.h>
++#include <linux/dmapool.h>
++#include <linux/dma/xilinx_dma.h>
++#include <linux/init.h>
++#include <linux/interrupt.h>
 +#include <linux/io.h>
-+#include <linux/kernel.h>
-+#include <linux/mfd/syscon.h>
-+#include <linux/of_device.h>
-+#include <linux/platform_device.h>
-+#include <linux/pm_domain.h>
-+#include <linux/regmap.h>
-+#include <linux/soc/mediatek/infracfg.h>
-+#include <dt-bindings/power/mt8173-power.h>
++#include <linux/module.h>
++#include <linux/of.h>
++#include <linux/of_address.h>
++#include <linux/of_dma.h>
++#include <linux/of_irq.h>
++#include <linux/of_platform.h>
++#include <linux/slab.h>
 +
-+#define SPM_VDE_PWR_CON			0x0210
-+#define SPM_MFG_PWR_CON			0x0214
-+#define SPM_VEN_PWR_CON			0x0230
-+#define SPM_ISP_PWR_CON			0x0238
-+#define SPM_DIS_PWR_CON			0x023c
-+#define SPM_VEN2_PWR_CON		0x0298
-+#define SPM_AUDIO_PWR_CON		0x029c
-+#define SPM_MFG_2D_PWR_CON		0x02c0
-+#define SPM_MFG_ASYNC_PWR_CON		0x02c4
-+#define SPM_USB_PWR_CON			0x02cc
-+#define SPM_PWR_STATUS			0x060c
-+#define SPM_PWR_STATUS_2ND		0x0610
++#include "../dmaengine.h"
 +
-+#define PWR_RST_B_BIT			BIT(0)
-+#define PWR_ISO_BIT			BIT(1)
-+#define PWR_ON_BIT			BIT(2)
-+#define PWR_ON_2ND_BIT			BIT(3)
-+#define PWR_CLK_DIS_BIT			BIT(4)
++/* Register Offsets */
++#define XILINX_CDMA_CONTROL_OFFSET     0x00
++#define XILINX_CDMA_STATUS_OFFSET      0x04
++#define XILINX_CDMA_CDESC_OFFSET       0x08
++#define XILINX_CDMA_TDESC_OFFSET       0x10
++#define XILINX_CDMA_SRCADDR_OFFSET     0x18
++#define XILINX_CDMA_DSTADDR_OFFSET     0x20
++#define XILINX_CDMA_BTT_OFFSET         0x28
 +
-+#define PWR_STATUS_DISP			BIT(3)
-+#define PWR_STATUS_MFG			BIT(4)
-+#define PWR_STATUS_ISP			BIT(5)
-+#define PWR_STATUS_VDEC			BIT(7)
-+#define PWR_STATUS_VENC_LT		BIT(20)
-+#define PWR_STATUS_VENC			BIT(21)
-+#define PWR_STATUS_MFG_2D		BIT(22)
-+#define PWR_STATUS_MFG_ASYNC		BIT(23)
-+#define PWR_STATUS_AUDIO		BIT(24)
-+#define PWR_STATUS_USB			BIT(25)
++/* General register bits definitions */
++#define XILINX_CDMA_CR_RESET           BIT(2)
++#define XILINX_CDMA_CR_SGMODE          BIT(3)
 +
-+enum clk_id {
-+	MT8173_CLK_NONE,
-+	MT8173_CLK_MM,
-+	MT8173_CLK_MFG,
-+	MT8173_CLK_MAX = MT8173_CLK_MFG,
++#define XILINX_CDMA_SR_IDLE            BIT(1)
++
++#define XILINX_CDMA_XR_IRQ_IOC_MASK    BIT(12)
++#define XILINX_CDMA_XR_IRQ_DELAY_MASK  BIT(13)
++#define XILINX_CDMA_XR_IRQ_ERROR_MASK  BIT(14)
++#define XILINX_CDMA_XR_IRQ_ALL_MASK    GENMASK(14, 12)
++
++#define XILINX_CDMA_XR_DELAY_MASK      GENMASK(31, 24)
++#define XILINX_CDMA_XR_COALESCE_MASK   GENMASK(23, 16)
++
++#define XILINX_CDMA_DELAY_MAX          GENMASK(7, 0)
++#define XILINX_CDMA_DELAY_SHIFT                24
++
++#define XILINX_CDMA_COALESCE_MAX       GENMASK(7, 0)
++#define XILINX_CDMA_COALESCE_SHIFT     16
++
++/* Delay loop counter to prevent hardware failure */
++#define XILINX_CDMA_RESET_LOOP         1000000
++
++/* Maximum transfer length */
++#define XILINX_CDMA_MAX_TRANS_LEN      GENMASK(22, 0)
++
++/**
++ * struct xilinx_cdma_desc_hw - Hardware Descriptor
++ * @next_desc: Next Descriptor Pointer @0x00
++ * @pad1: Reserved @0x04
++ * @src_addr: Source address @0x08
++ * @pad2: Reserved @0x0C
++ * @dest_addr: Destination address @0x10
++ * @pad3: Reserved @0x14
++ * @control: Control field @0x18
++ * @status: Status field @0x1C
++ */
++struct xilinx_cdma_desc_hw {
++	u32 next_desc;
++	u32 pad1;
++	u32 src_addr;
++	u32 pad2;
++	u32 dest_addr;
++	u32 pad3;
++	u32 control;
++	u32 status;
++} __aligned(64);
++
++/**
++ * struct xilinx_cdma_tx_segment - Descriptor segment
++ * @hw: Hardware descriptor
++ * @node: Node in the descriptor segments list
++ * @phys: Physical address of segment
++ */
++struct xilinx_cdma_tx_segment {
++	struct xilinx_cdma_desc_hw hw;
++	struct list_head node;
++	dma_addr_t phys;
++} __aligned(64);
++
++/**
++ * struct xilinx_cdma_tx_descriptor - Per Transaction structure
++ * @async_tx: Async transaction descriptor
++ * @segments: TX segments list
++ * @node: Node in the channel descriptors list
++ */
++struct xilinx_cdma_tx_descriptor {
++	struct dma_async_tx_descriptor async_tx;
++	struct list_head segments;
++	struct list_head node;
 +};
 +
-+struct scp_domain_data {
-+	const char *name;
-+	u32 sta_mask;
-+	int ctl_offs;
-+	u32 sram_pdn_bits;
-+	u32 sram_pdn_ack_bits;
-+	u32 bus_prot_mask;
-+	enum clk_id clk_id;
-+};
-+
-+static const struct scp_domain_data scp_domain_data[] __initconst = {
-+	[MT8173_POWER_DOMAIN_VDEC] = {
-+		.name = "vdec",
-+		.sta_mask = PWR_STATUS_VDEC,
-+		.ctl_offs = SPM_VDE_PWR_CON,
-+		.sram_pdn_bits = GENMASK(11, 8),
-+		.sram_pdn_ack_bits = GENMASK(12, 12),
-+		.clk_id = MT8173_CLK_MM,
-+	},
-+	[MT8173_POWER_DOMAIN_VENC] = {
-+		.name = "venc",
-+		.sta_mask = PWR_STATUS_VENC,
-+		.ctl_offs = SPM_VEN_PWR_CON,
-+		.sram_pdn_bits = GENMASK(11, 8),
-+		.sram_pdn_ack_bits = GENMASK(15, 12),
-+		.clk_id = MT8173_CLK_MM,
-+	},
-+	[MT8173_POWER_DOMAIN_ISP] = {
-+		.name = "isp",
-+		.sta_mask = PWR_STATUS_ISP,
-+		.ctl_offs = SPM_ISP_PWR_CON,
-+		.sram_pdn_bits = GENMASK(11, 8),
-+		.sram_pdn_ack_bits = GENMASK(13, 12),
-+		.clk_id = MT8173_CLK_MM,
-+	},
-+	[MT8173_POWER_DOMAIN_MM] = {
-+		.name = "mm",
-+		.sta_mask = PWR_STATUS_DISP,
-+		.ctl_offs = SPM_DIS_PWR_CON,
-+		.sram_pdn_bits = GENMASK(11, 8),
-+		.sram_pdn_ack_bits = GENMASK(12, 12),
-+		.clk_id = MT8173_CLK_MM,
-+		.bus_prot_mask = MT8173_TOP_AXI_PROT_EN_MM_M0 |
-+			MT8173_TOP_AXI_PROT_EN_MM_M1,
-+	},
-+	[MT8173_POWER_DOMAIN_VENC_LT] = {
-+		.name = "venc_lt",
-+		.sta_mask = PWR_STATUS_VENC_LT,
-+		.ctl_offs = SPM_VEN2_PWR_CON,
-+		.sram_pdn_bits = GENMASK(11, 8),
-+		.sram_pdn_ack_bits = GENMASK(15, 12),
-+		.clk_id = MT8173_CLK_MM,
-+	},
-+	[MT8173_POWER_DOMAIN_AUDIO] = {
-+		.name = "audio",
-+		.sta_mask = PWR_STATUS_AUDIO,
-+		.ctl_offs = SPM_AUDIO_PWR_CON,
-+		.sram_pdn_bits = GENMASK(11, 8),
-+		.sram_pdn_ack_bits = GENMASK(15, 12),
-+		.clk_id = MT8173_CLK_NONE,
-+	},
-+	[MT8173_POWER_DOMAIN_USB] = {
-+		.name = "usb",
-+		.sta_mask = PWR_STATUS_USB,
-+		.ctl_offs = SPM_USB_PWR_CON,
-+		.sram_pdn_bits = GENMASK(11, 8),
-+		.sram_pdn_ack_bits = GENMASK(15, 12),
-+		.clk_id = MT8173_CLK_NONE,
-+	},
-+	[MT8173_POWER_DOMAIN_MFG_ASYNC] = {
-+		.name = "mfg_async",
-+		.sta_mask = PWR_STATUS_MFG_ASYNC,
-+		.ctl_offs = SPM_MFG_ASYNC_PWR_CON,
-+		.sram_pdn_bits = GENMASK(11, 8),
-+		.sram_pdn_ack_bits = 0,
-+		.clk_id = MT8173_CLK_MFG,
-+	},
-+	[MT8173_POWER_DOMAIN_MFG_2D] = {
-+		.name = "mfg_2d",
-+		.sta_mask = PWR_STATUS_MFG_2D,
-+		.ctl_offs = SPM_MFG_2D_PWR_CON,
-+		.sram_pdn_bits = GENMASK(11, 8),
-+		.sram_pdn_ack_bits = GENMASK(13, 12),
-+		.clk_id = MT8173_CLK_NONE,
-+	},
-+	[MT8173_POWER_DOMAIN_MFG] = {
-+		.name = "mfg",
-+		.sta_mask = PWR_STATUS_MFG,
-+		.ctl_offs = SPM_MFG_PWR_CON,
-+		.sram_pdn_bits = GENMASK(13, 8),
-+		.sram_pdn_ack_bits = GENMASK(21, 16),
-+		.clk_id = MT8173_CLK_NONE,
-+		.bus_prot_mask = MT8173_TOP_AXI_PROT_EN_MFG_S |
-+			MT8173_TOP_AXI_PROT_EN_MFG_M0 |
-+			MT8173_TOP_AXI_PROT_EN_MFG_M1 |
-+			MT8173_TOP_AXI_PROT_EN_MFG_SNOOP_OUT,
-+	},
-+};
-+
-+#define NUM_DOMAINS	ARRAY_SIZE(scp_domain_data)
-+
-+struct scp;
-+
-+struct scp_domain {
-+	struct generic_pm_domain genpd;
-+	struct scp *scp;
-+	struct clk *clk;
-+	u32 sta_mask;
-+	void __iomem *ctl_addr;
-+	u32 sram_pdn_bits;
-+	u32 sram_pdn_ack_bits;
-+	u32 bus_prot_mask;
-+};
-+
-+struct scp {
-+	struct scp_domain domains[NUM_DOMAINS];
-+	struct genpd_onecell_data pd_data;
++/**
++ * struct xilinx_cdma_chan - Driver specific cdma channel structure
++ * @xdev: Driver specific device structure
++ * @lock: Descriptor operation lock
++ * @done_list: Complete descriptors
++ * @pending_list: Descriptors waiting
++ * @active_desc: Active descriptor
++ * @common: DMA common channel
++ * @desc_pool: Descriptors pool
++ * @dev: The dma device
++ * @irq: Channel IRQ
++ * @has_sg: Support scatter transfers
++ * @err: Channel has errors
++ * @idle: Channel status
++ * @tasklet: Cleanup work after irq
++ */
++struct xilinx_cdma_chan {
++	struct xilinx_cdma_device *xdev;
++	spinlock_t lock;
++	struct list_head done_list;
++	struct list_head pending_list;
++	struct xilinx_cdma_tx_descriptor *active_desc;
++	struct dma_chan common;
++	struct dma_pool *desc_pool;
 +	struct device *dev;
-+	void __iomem *base;
-+	struct regmap *infracfg;
-+	struct clk *clk[MT8173_CLK_MAX];
++	int irq;
++	bool has_sg;
++	int err;
++	bool idle;
++	struct tasklet_struct tasklet;
 +};
 +
-+static int scpsys_domain_is_on(struct scp_domain *scpd)
-+{
-+	struct scp *scp = scpd->scp;
++/**
++ * struct xilinx_cdma_device - CDMA device structure
++ * @regs: I/O mapped base address
++ * @dev: Device Structure
++ * @common: DMA device structure
++ * @chan: Driver specific cdma channel
++ * @has_sg: Specifies whether Scatter-Gather is present or not
++ */
++struct xilinx_cdma_device {
++	void __iomem *regs;
++	struct device *dev;
++	struct dma_device common;
++	struct xilinx_cdma_chan *chan;
++	bool has_sg;
++};
 +
-+	u32 status = readl(scp->base + SPM_PWR_STATUS) & scpd->sta_mask;
-+	u32 status2 = readl(scp->base + SPM_PWR_STATUS_2ND) & scpd->sta_mask;
++/* Macros */
++#define to_xilinx_chan(chan) \
++	container_of(chan, struct xilinx_cdma_chan, common)
++#define to_cdma_tx_descriptor(tx) \
++	container_of(tx, struct xilinx_cdma_tx_descriptor, async_tx)
++
++/* IO accessors */
++static inline void cdma_write(struct xilinx_cdma_chan *chan, u32 reg, u32 val)
++{
++	writel(val, chan->xdev->regs + reg);
++}
++
++static inline u32 cdma_read(struct xilinx_cdma_chan *chan, u32 reg)
++{
++	return readl(chan->xdev->regs + reg);
++}
++
++static inline void cdma_ctrl_clr(struct xilinx_cdma_chan *chan, u32 reg,
++				u32 clr)
++{
++	cdma_write(chan, reg, cdma_read(chan, reg) & ~clr);
++}
++
++static inline void cdma_ctrl_set(struct xilinx_cdma_chan *chan, u32 reg,
++				u32 set)
++{
++	cdma_write(chan, reg, cdma_read(chan, reg) | set);
++}
++
++/* -----------------------------------------------------------------------------
++ * Descriptors and segments alloc and free
++ */
++
++/**
++ * xilinx_cdma_alloc_tx_segment - Allocate transaction segment
++ * @chan: Driver specific cdma channel
++ *
++ * Return: The allocated segment on success and NULL on failure.
++ */
++static struct xilinx_cdma_tx_segment *
++xilinx_cdma_alloc_tx_segment(struct xilinx_cdma_chan *chan)
++{
++	struct xilinx_cdma_tx_segment *segment;
++	dma_addr_t phys;
++
++	segment = dma_pool_alloc(chan->desc_pool, GFP_ATOMIC, &phys);
++	if (!segment)
++		return NULL;
++
++	memset(segment, 0, sizeof(*segment));
++	segment->phys = phys;
++
++	return segment;
++}
++
++/**
++ * xilinx_cdma_free_tx_segment - Free transaction segment
++ * @chan: Driver specific cdma channel
++ * @segment: cdma transaction segment
++ */
++static void xilinx_cdma_free_tx_segment(struct xilinx_cdma_chan *chan,
++					struct xilinx_cdma_tx_segment *segment)
++{
++	dma_pool_free(chan->desc_pool, segment, segment->phys);
++}
++
++/**
++ * xilinx_cdma_tx_descriptor - Allocate transaction descriptor
++ * @chan: Driver specific cdma channel
++ *
++ * Return: The allocated descriptor on success and NULL on failure.
++ */
++static struct xilinx_cdma_tx_descriptor *
++xilinx_cdma_alloc_tx_descriptor(struct xilinx_cdma_chan *chan)
++{
++	struct xilinx_cdma_tx_descriptor *desc;
++
++	desc = kzalloc(sizeof(*desc), GFP_KERNEL);
++	if (!desc)
++		return NULL;
++
++	INIT_LIST_HEAD(&desc->segments);
++
++	return desc;
++}
++
++/**
++ * xilinx_cdma_free_tx_descriptor - Free transaction descriptor
++ * @chan: Driver specific cdma channel
++ * @desc: cdma transaction descriptor
++ */
++static void
++xilinx_cdma_free_tx_descriptor(struct xilinx_cdma_chan *chan,
++			       struct xilinx_cdma_tx_descriptor *desc)
++{
++	struct xilinx_cdma_tx_segment *segment, *next;
++
++	if (!desc)
++		return;
++
++	list_for_each_entry_safe(segment, next, &desc->segments, node) {
++		list_del(&segment->node);
++		xilinx_cdma_free_tx_segment(chan, segment);
++	}
++
++	kfree(desc);
++}
++
++/**
++ * xilinx_cdma_alloc_chan_resources - Allocate channel resources
++ * @dchan: DMA channel
++ *
++ * Return: '0' on success and failure value on error
++ */
++static int xilinx_cdma_alloc_chan_resources(struct dma_chan *dchan)
++{
++	struct xilinx_cdma_chan *chan = to_xilinx_chan(dchan);
++
++	/* Has this channel already been allocated? */
++	if (chan->desc_pool)
++		return 0;
 +
 +	/*
-+	 * A domain is on when both status bits are set. If only one is set
-+	 * return an error. This happens while powering up a domain
++	 * We need the descriptor to be aligned to 64bytes
++	 * for meeting Xilinx DMA specification requirement.
 +	 */
-+
-+	if (status && status2)
-+		return true;
-+	if (!status && !status2)
-+		return false;
-+
-+	return -EINVAL;
-+}
-+
-+static int scpsys_power_on(struct generic_pm_domain *genpd)
-+{
-+	struct scp_domain *scpd = container_of(genpd, struct scp_domain, genpd);
-+	struct scp *scp = scpd->scp;
-+	unsigned long timeout;
-+	bool expired;
-+	void __iomem *ctl_addr = scpd->ctl_addr;
-+	u32 sram_pdn_ack = scpd->sram_pdn_ack_bits;
-+	u32 val;
-+	int ret;
-+
-+	if (scpd->clk) {
-+		ret = clk_prepare_enable(scpd->clk);
-+		if (ret)
-+			return ret;
-+	}
-+
-+	val = readl(ctl_addr);
-+	val |= PWR_ON_BIT;
-+	writel(val, ctl_addr);
-+	val |= PWR_ON_2ND_BIT;
-+	writel(val, ctl_addr);
-+
-+	/* wait until PWR_ACK = 1 */
-+	timeout = jiffies + HZ;
-+	expired = false;
-+	while (1) {
-+		ret = scpsys_domain_is_on(scpd);
-+		if (ret > 0)
-+			break;
-+
-+		if (expired) {
-+			ret = -ETIMEDOUT;
-+			goto out;
-+		}
-+
-+		cpu_relax();
-+
-+		if (time_after(jiffies, timeout))
-+			expired = true;
-+	}
-+
-+	val &= ~PWR_CLK_DIS_BIT;
-+	writel(val, ctl_addr);
-+
-+	val &= ~PWR_ISO_BIT;
-+	writel(val, ctl_addr);
-+
-+	val |= PWR_RST_B_BIT;
-+	writel(val, ctl_addr);
-+
-+	val &= ~scpd->sram_pdn_bits;
-+	writel(val, ctl_addr);
-+
-+	/* wait until SRAM_PDN_ACK all 0 */
-+	timeout = jiffies + HZ;
-+	expired = false;
-+	while (sram_pdn_ack && (readl(ctl_addr) & sram_pdn_ack)) {
-+
-+		if (expired) {
-+			ret = -ETIMEDOUT;
-+			goto out;
-+		}
-+
-+		cpu_relax();
-+
-+		if (time_after(jiffies, timeout))
-+			expired = true;
-+	}
-+
-+	if (scpd->bus_prot_mask) {
-+		ret = mtk_infracfg_clear_bus_protection(scp->infracfg,
-+				scpd->bus_prot_mask);
-+		if (ret)
-+			return ret;
-+	}
-+
-+	return 0;
-+out:
-+	dev_err(scp->dev, "Failed to power on domain %s\n", genpd->name);
-+
-+	return ret;
-+}
-+
-+static int scpsys_power_off(struct generic_pm_domain *genpd)
-+{
-+	struct scp_domain *scpd = container_of(genpd, struct scp_domain, genpd);
-+	struct scp *scp = scpd->scp;
-+	unsigned long timeout;
-+	bool expired;
-+	void __iomem *ctl_addr = scpd->ctl_addr;
-+	u32 pdn_ack = scpd->sram_pdn_ack_bits;
-+	u32 val;
-+	int ret;
-+
-+	if (scpd->bus_prot_mask) {
-+		ret = mtk_infracfg_set_bus_protection(scp->infracfg,
-+				scpd->bus_prot_mask);
-+		if (ret)
-+			return ret;
-+	}
-+
-+	val = readl(ctl_addr);
-+	val |= scpd->sram_pdn_bits;
-+	writel(val, ctl_addr);
-+
-+	/* wait until SRAM_PDN_ACK all 1 */
-+	timeout = jiffies + HZ;
-+	expired = false;
-+	while (pdn_ack && (readl(ctl_addr) & pdn_ack) != pdn_ack) {
-+		if (expired) {
-+			ret = -ETIMEDOUT;
-+			goto out;
-+		}
-+
-+		cpu_relax();
-+
-+		if (time_after(jiffies, timeout))
-+			expired = true;
-+	}
-+
-+	val |= PWR_ISO_BIT;
-+	writel(val, ctl_addr);
-+
-+	val &= ~PWR_RST_B_BIT;
-+	writel(val, ctl_addr);
-+
-+	val |= PWR_CLK_DIS_BIT;
-+	writel(val, ctl_addr);
-+
-+	val &= ~PWR_ON_BIT;
-+	writel(val, ctl_addr);
-+
-+	val &= ~PWR_ON_2ND_BIT;
-+	writel(val, ctl_addr);
-+
-+	/* wait until PWR_ACK = 0 */
-+	timeout = jiffies + HZ;
-+	expired = false;
-+	while (1) {
-+		ret = scpsys_domain_is_on(scpd);
-+		if (ret == 0)
-+			break;
-+
-+		if (expired) {
-+			ret = -ETIMEDOUT;
-+			goto out;
-+		}
-+
-+		cpu_relax();
-+
-+		if (time_after(jiffies, timeout))
-+			expired = true;
-+	}
-+
-+	if (scpd->clk)
-+		clk_disable_unprepare(scpd->clk);
-+
-+	return 0;
-+
-+out:
-+	dev_err(scp->dev, "Failed to power off domain %s\n", genpd->name);
-+
-+	return ret;
-+}
-+
-+static int __init scpsys_probe(struct platform_device *pdev)
-+{
-+	struct genpd_onecell_data *pd_data;
-+	struct resource *res;
-+	int i, ret;
-+	struct scp *scp;
-+
-+	scp = devm_kzalloc(&pdev->dev, sizeof(*scp), GFP_KERNEL);
-+	if (!scp)
++	chan->desc_pool = dma_pool_create("xilinx_cdma_desc_pool",
++				chan->dev,
++				sizeof(struct xilinx_cdma_tx_segment),
++				__alignof__(struct xilinx_cdma_tx_segment), 0);
++	if (!chan->desc_pool) {
++		dev_err(chan->dev,
++			"unable to allocate channel descriptor pool\n");
 +		return -ENOMEM;
-+
-+	scp->dev = &pdev->dev;
-+
-+	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-+	scp->base = devm_ioremap_resource(&pdev->dev, res);
-+	if (IS_ERR(scp->base))
-+		return PTR_ERR(scp->base);
-+
-+	pd_data = &scp->pd_data;
-+
-+	pd_data->domains = devm_kzalloc(&pdev->dev,
-+			sizeof(*pd_data->domains) * NUM_DOMAINS, GFP_KERNEL);
-+	if (!pd_data->domains)
-+		return -ENOMEM;
-+
-+	scp->clk[MT8173_CLK_MM] = devm_clk_get(&pdev->dev, "mm");
-+	if (IS_ERR(scp->clk[MT8173_CLK_MM])) {
-+		dev_err(&pdev->dev, "Failed to get mm clk: %ld\n",
-+				PTR_ERR(scp->clk[MT8173_CLK_MM]));
-+		return PTR_ERR(scp->clk[MT8173_CLK_MM]);
 +	}
 +
-+	scp->clk[MT8173_CLK_MFG] = devm_clk_get(&pdev->dev, "mfg");
-+	if (IS_ERR(scp->clk[MT8173_CLK_MFG])) {
-+		dev_err(&pdev->dev, "Failed to get mfg clk: %ld\n",
-+				PTR_ERR(scp->clk[MT8173_CLK_MFG]));
-+		return PTR_ERR(scp->clk[MT8173_CLK_MFG]);
++	dma_cookie_init(dchan);
++	return 0;
++}
++
++/**
++ * xilinx_cdma_free_desc_list - Free descriptors list
++ * @chan: Driver specific cdma channel
++ * @list: List to parse and delete the descriptor
++ */
++static void xilinx_cdma_free_desc_list(struct xilinx_cdma_chan *chan,
++				       struct list_head *list)
++{
++	struct xilinx_cdma_tx_descriptor *desc, *next;
++
++	list_for_each_entry_safe(desc, next, list, node) {
++		list_del(&desc->node);
++		xilinx_cdma_free_tx_descriptor(chan, desc);
++	}
++}
++
++/**
++ * xilinx_cdma_free_chan_resources - Free channel resources
++ * @dchan: DMA channel
++ */
++static void xilinx_cdma_free_chan_resources(struct dma_chan *dchan)
++{
++	struct xilinx_cdma_chan *chan = to_xilinx_chan(dchan);
++	unsigned long flags;
++
++	spin_lock_irqsave(&chan->lock, flags);
++	xilinx_cdma_free_desc_list(chan, &chan->done_list);
++	xilinx_cdma_free_desc_list(chan, &chan->pending_list);
++	spin_unlock_irqrestore(&chan->lock, flags);
++
++	dma_pool_destroy(chan->desc_pool);
++	chan->desc_pool = NULL;
++}
++
++/**
++ * xilinx_cdma_chan_desc_cleanup - Clean channel descriptors
++ * @chan: Driver specific cdma channel
++ */
++static void xilinx_cdma_chan_desc_cleanup(struct xilinx_cdma_chan *chan)
++{
++	struct xilinx_cdma_tx_descriptor *desc, *next;
++	unsigned long flags;
++
++	spin_lock_irqsave(&chan->lock, flags);
++
++	list_for_each_entry_safe(desc, next, &chan->done_list, node) {
++		dma_async_tx_callback callback;
++		void *callback_param;
++
++		/* Remove from the list of running transactions */
++		list_del(&desc->node);
++
++		/* Run the link descriptor callback function */
++		callback = desc->async_tx.callback;
++		callback_param = desc->async_tx.callback_param;
++		if (callback) {
++			spin_unlock_irqrestore(&chan->lock, flags);
++			callback(callback_param);
++			spin_lock_irqsave(&chan->lock, flags);
++		}
++
++		/* Run any dependencies, then free the descriptor */
++		dma_run_dependencies(&desc->async_tx);
++		xilinx_cdma_free_tx_descriptor(chan, desc);
 +	}
 +
-+	scp->infracfg = syscon_regmap_lookup_by_phandle(pdev->dev.of_node,
-+			"infracfg");
-+	if (IS_ERR(scp->infracfg)) {
-+		dev_err(&pdev->dev, "Cannot find infracfg controller: %ld\n",
-+				PTR_ERR(scp->infracfg));
-+		return PTR_ERR(scp->infracfg);
++	spin_unlock_irqrestore(&chan->lock, flags);
++}
++
++/**
++ * xilinx_tx_status - Get CDMA transaction status
++ * @dchan: DMA channel
++ * @cookie: Transaction identifier
++ * @txstate: Transaction state
++ *
++ * Return: DMA transaction status
++ */
++static enum dma_status xilinx_tx_status(struct dma_chan *dchan,
++					dma_cookie_t cookie,
++					struct dma_tx_state *txstate)
++{
++	return dma_cookie_status(dchan, cookie, txstate);
++}
++
++/**
++ * xilinx_cdma_is_idle - Check if cdma channel is idle
++ * @chan: Driver specific cdma channel
++ *
++ * Return: 'true' if idle, 'false' if not.
++ */
++static bool xilinx_cdma_is_idle(struct xilinx_cdma_chan *chan)
++{
++	return !!(cdma_read(chan, XILINX_CDMA_STATUS_OFFSET) &
++			XILINX_CDMA_SR_IDLE);
++}
++
++/**
++ * xilinx_cdma_start_transfer - Starts cdma transfer
++ * @chan: Driver specific channel struct pointer
++ */
++static void xilinx_cdma_start_transfer(struct xilinx_cdma_chan *chan)
++{
++	struct xilinx_cdma_tx_descriptor *desc;
++	struct xilinx_cdma_tx_segment *head, *tail;
++
++	if (chan->err)
++		return;
++
++	if (list_empty(&chan->pending_list))
++		return;
++
++	if (!chan->idle)
++		return;
++
++	/* If hardware is busy, cannot submit */
++	if (chan->has_sg && !xilinx_cdma_is_idle(chan)) {
++		tail = list_entry(desc->segments.prev,
++				  struct xilinx_cdma_tx_segment, node);
++		cdma_write(chan, XILINX_CDMA_TDESC_OFFSET, tail->phys);
++		goto out_free_desc;
 +	}
 +
-+	pd_data->num_domains = NUM_DOMAINS;
++	desc = list_first_entry(&chan->pending_list,
++				struct xilinx_cdma_tx_descriptor, node);
 +
-+	for (i = 0; i < NUM_DOMAINS; i++) {
-+		struct scp_domain *scpd = &scp->domains[i];
-+		struct generic_pm_domain *genpd = &scpd->genpd;
-+		const struct scp_domain_data *data = &scp_domain_data[i];
++	if (chan->has_sg) {
++		head = list_first_entry(&desc->segments,
++					struct xilinx_cdma_tx_segment, node);
++		tail = list_entry(desc->segments.prev,
++				  struct xilinx_cdma_tx_segment, node);
 +
-+		pd_data->domains[i] = genpd;
-+		scpd->scp = scp;
++		cdma_write(chan, XILINX_CDMA_CDESC_OFFSET, head->phys);
 +
-+		scpd->sta_mask = data->sta_mask;
-+		scpd->ctl_addr = scp->base + data->ctl_offs;
-+		scpd->sram_pdn_bits = data->sram_pdn_bits;
-+		scpd->sram_pdn_ack_bits = data->sram_pdn_ack_bits;
-+		scpd->bus_prot_mask = data->bus_prot_mask;
-+		if (data->clk_id != MT8173_CLK_NONE)
-+			scpd->clk = scp->clk[data->clk_id];
++		/* Update tail ptr register which will start the transfer */
++		cdma_write(chan, XILINX_CDMA_TDESC_OFFSET, tail->phys);
++	} else {
++		/* In simple mode */
++		struct xilinx_cdma_tx_segment *segment;
++		struct xilinx_cdma_desc_hw *hw;
 +
-+		genpd->name = data->name;
-+		genpd->power_off = scpsys_power_off;
-+		genpd->power_on = scpsys_power_on;
++		segment = list_first_entry(&desc->segments,
++					   struct xilinx_cdma_tx_segment,
++					   node);
 +
++		hw = &segment->hw;
++
++		cdma_write(chan, XILINX_CDMA_SRCADDR_OFFSET, hw->src_addr);
++		cdma_write(chan, XILINX_CDMA_DSTADDR_OFFSET, hw->dest_addr);
++
++		/* Start the transfer */
++		cdma_write(chan, XILINX_CDMA_BTT_OFFSET,
++				hw->control & XILINX_CDMA_MAX_TRANS_LEN);
++	}
++
++out_free_desc:
++	list_del(&desc->node);
++	chan->idle = false;
++	chan->active_desc = desc;
++}
++
++/**
++ * xilinx_cdma_issue_pending - Issue pending transactions
++ * @dchan: DMA channel
++ */
++static void xilinx_cdma_issue_pending(struct dma_chan *dchan)
++{
++	struct xilinx_cdma_chan *chan = to_xilinx_chan(dchan);
++	unsigned long flags;
++
++	spin_lock_irqsave(&chan->lock, flags);
++	xilinx_cdma_start_transfer(chan);
++	spin_unlock_irqrestore(&chan->lock, flags);
++}
++
++/**
++ * xilinx_cdma_complete_descriptor - Mark the active descriptor as complete
++ * @chan : xilinx DMA channel
++ */
++static void xilinx_cdma_complete_descriptor(struct xilinx_cdma_chan *chan)
++{
++	struct xilinx_cdma_tx_descriptor *desc;
++
++	desc = chan->active_desc;
++	if (!desc) {
++		dev_dbg(chan->dev, "no running descriptors\n");
++		return;
++	}
++
++	dma_cookie_complete(&desc->async_tx);
++	list_add_tail(&desc->node, &chan->done_list);
++
++	chan->active_desc = NULL;
++}
++
++/**
++ * xilinx_cdma_chan_reset - Reset CDMA channel
++ * @chan: Driver specific CDMA channel
++ *
++ * Return: '0' on success and failure value on error
++ */
++static int xilinx_cdma_chan_reset(struct xilinx_cdma_chan *chan)
++{
++	int loop = XILINX_CDMA_RESET_LOOP;
++	u32 tmp;
++
++	cdma_ctrl_set(chan, XILINX_CDMA_CONTROL_OFFSET,
++			XILINX_CDMA_CR_RESET);
++
++	tmp = cdma_read(chan, XILINX_CDMA_CONTROL_OFFSET) &
++			XILINX_CDMA_CR_RESET;
++
++	/* Wait for the hardware to finish reset */
++	do {
++		tmp = cdma_read(chan, XILINX_CDMA_CONTROL_OFFSET) &
++			XILINX_CDMA_CR_RESET;
++	} while (loop-- && tmp);
++
++	if (!loop) {
++		dev_err(chan->dev, "reset timeout, cr %x, sr %x\n",
++			cdma_read(chan, XILINX_CDMA_CONTROL_OFFSET),
++			cdma_read(chan, XILINX_CDMA_STATUS_OFFSET));
++		return -EBUSY;
++	}
++
++	/* Enable interrupts */
++	cdma_ctrl_set(chan, XILINX_CDMA_CONTROL_OFFSET,
++				XILINX_CDMA_XR_IRQ_ALL_MASK);
++
++	/* Enable SG Mode */
++	if (chan->has_sg)
++		cdma_ctrl_set(chan, XILINX_CDMA_CONTROL_OFFSET,
++				XILINX_CDMA_CR_SGMODE);
++	return 0;
++}
++
++/**
++ * xilinx_cdma_irq_handler - CDMA Interrupt handler
++ * @irq: IRQ number
++ * @data: Pointer to the Xilinx CDMA channel structure
++ *
++ * Return: IRQ_HANDLED/IRQ_NONE
++ */
++static irqreturn_t xilinx_cdma_irq_handler(int irq, void *data)
++{
++	struct xilinx_cdma_chan *chan = data;
++	u32 stat;
++
++	stat = cdma_read(chan, XILINX_CDMA_STATUS_OFFSET);
++	if (!(stat & XILINX_CDMA_XR_IRQ_ALL_MASK))
++		return IRQ_NONE;
++
++	/* Ack the interrupts */
++	cdma_write(chan, XILINX_CDMA_STATUS_OFFSET,
++		   XILINX_CDMA_XR_IRQ_ALL_MASK);
++
++	if (stat & XILINX_CDMA_XR_IRQ_ERROR_MASK) {
++		dev_err(chan->dev,
++			"Channel %x has errors %x, cdr %x tdr %x\n",
++			(u32)chan,
++			(u32)cdma_read(chan, XILINX_CDMA_STATUS_OFFSET),
++			(u32)cdma_read(chan, XILINX_CDMA_CDESC_OFFSET),
++			(u32)cdma_read(chan, XILINX_CDMA_TDESC_OFFSET));
++		chan->err = true;
++	}
++
++	/*
++	 * Device takes too long to do the transfer when user requires
++	 * responsiveness
++	 */
++	if (stat & XILINX_CDMA_XR_IRQ_DELAY_MASK)
++		dev_dbg(chan->dev, "Inter-packet latency too long\n");
++
++	if (stat & XILINX_CDMA_XR_IRQ_IOC_MASK) {
++		spin_lock(&chan->lock);
++		xilinx_cdma_complete_descriptor(chan);
++		chan->idle = true;
++		xilinx_cdma_start_transfer(chan);
++		spin_unlock(&chan->lock);
++	}
++
++	tasklet_schedule(&chan->tasklet);
++	return IRQ_HANDLED;
++}
++
++/**
++ * xilinx_cdma_do_tasklet - Schedule completion tasklet
++ * @data: Pointer to the Xilinx cdma channel structure
++ */
++static void xilinx_cdma_do_tasklet(unsigned long data)
++{
++	struct xilinx_cdma_chan *chan = (struct xilinx_cdma_chan *)data;
++
++	xilinx_cdma_chan_desc_cleanup(chan);
++}
++
++/**
++ * xilinx_cdma_tx_submit - Submit DMA transaction
++ * @tx: Async transaction descriptor
++ *
++ * Return: cookie value on success and failure value on error
++ */
++static dma_cookie_t xilinx_cdma_tx_submit(struct dma_async_tx_descriptor *tx)
++{
++	struct xilinx_cdma_chan *chan = to_xilinx_chan(tx->chan);
++	struct xilinx_cdma_tx_descriptor *desc = to_cdma_tx_descriptor(tx);
++	dma_cookie_t cookie;
++	unsigned long flags;
++	int err;
++
++	if (chan->err) {
 +		/*
-+		 * Initially turn on all domains to make the domains usable
-+		 * with !CONFIG_PM and to get the hardware in sync with the
-+		 * software.  The unused domains will be switched off during
-+		 * late_init time.
++		 * If reset fails, need to hard reset the system.
++		 * Channel is no longer functional
 +		 */
-+		genpd->power_on(genpd);
-+
-+		pm_genpd_init(genpd, NULL, false);
++		err = xilinx_cdma_chan_reset(chan);
++		if (err < 0)
++			return err;
 +	}
 +
-+	/*
-+	 * We are not allowed to fail here since there is no way to unregister
-+	 * a power domain. Once registered above we have to keep the domains
-+	 * valid.
-+	 */
++	spin_lock_irqsave(&chan->lock, flags);
 +
-+	ret = pm_genpd_add_subdomain(pd_data->domains[MT8173_POWER_DOMAIN_MFG_ASYNC],
-+		pd_data->domains[MT8173_POWER_DOMAIN_MFG_2D]);
-+	if (ret && IS_ENABLED(CONFIG_PM))
-+		dev_err(&pdev->dev, "Failed to add subdomain: %d\n", ret);
++	cookie = dma_cookie_assign(tx);
 +
-+	ret = pm_genpd_add_subdomain(pd_data->domains[MT8173_POWER_DOMAIN_MFG_2D],
-+		pd_data->domains[MT8173_POWER_DOMAIN_MFG]);
-+	if (ret && IS_ENABLED(CONFIG_PM))
-+		dev_err(&pdev->dev, "Failed to add subdomain: %d\n", ret);
++	/* Append the transaction to the pending transactions queue. */
++	list_add_tail(&desc->node, &chan->pending_list);
 +
-+	ret = of_genpd_add_provider_onecell(pdev->dev.of_node, pd_data);
-+	if (ret)
-+		dev_err(&pdev->dev, "Failed to add OF provider: %d\n", ret);
++	spin_unlock_irqrestore(&chan->lock, flags);
++
++	return cookie;
++}
++
++/**
++ * xilinx_cdma_prep_memcpy - prepare descriptors for a memcpy transaction
++ * @dchan: DMA channel
++ * @dma_dst: destination address
++ * @dma_src: source address
++ * @len: transfer length
++ * @flags: transfer ack flags
++ *
++ * Return: Async transaction descriptor on success and NULL on failure
++ */
++static struct dma_async_tx_descriptor *
++xilinx_cdma_prep_memcpy(struct dma_chan *dchan, dma_addr_t dma_dst,
++			dma_addr_t dma_src, size_t len, unsigned long flags)
++{
++	struct xilinx_cdma_chan *chan = to_xilinx_chan(dchan);
++	struct xilinx_cdma_desc_hw *hw;
++	struct xilinx_cdma_tx_descriptor *desc;
++	struct xilinx_cdma_tx_segment *segment, *prev;
++
++	if (!len || len > XILINX_CDMA_MAX_TRANS_LEN)
++		return NULL;
++
++	desc = xilinx_cdma_alloc_tx_descriptor(chan);
++	if (!desc)
++		return NULL;
++
++	dma_async_tx_descriptor_init(&desc->async_tx, &chan->common);
++	desc->async_tx.tx_submit = xilinx_cdma_tx_submit;
++	async_tx_ack(&desc->async_tx);
++
++	/* Allocate the link descriptor from DMA pool */
++	segment = xilinx_cdma_alloc_tx_segment(chan);
++	if (!segment)
++		goto error;
++
++	hw = &segment->hw;
++	hw->control = len;
++	hw->src_addr = dma_src;
++	hw->dest_addr = dma_dst;
++
++	/* Fill the previous next descriptor with current */
++	prev = list_last_entry(&desc->segments,
++				struct xilinx_cdma_tx_segment, node);
++	prev->hw.next_desc = segment->phys;
++
++	/* Insert the segment into the descriptor segments list. */
++	list_add_tail(&segment->node, &desc->segments);
++
++	prev = segment;
++
++	/* Link the last hardware descriptor with the first. */
++	segment = list_first_entry(&desc->segments,
++				struct xilinx_cdma_tx_segment, node);
++	prev->hw.next_desc = segment->phys;
++
++	return &desc->async_tx;
++
++error:
++	xilinx_cdma_free_tx_descriptor(chan, desc);
++	return NULL;
++}
++
++/**
++ * xilinx_cdma_terminate_all - Free the descriptors
++ * @dchan: DMA Channel pointer
++ *
++ * Return: '0' always
++ */
++static int xilinx_cdma_terminate_all(struct dma_chan *dchan)
++{
++	struct xilinx_cdma_chan *chan = to_xilinx_chan(dchan);
++	unsigned long flags;
++
++	spin_lock_irqsave(&chan->lock, flags);
++
++	/* Reset the channel */
++	xilinx_cdma_chan_reset(chan);
++
++	/* Remove and free all of the descriptors in the lists */
++	xilinx_cdma_free_desc_list(chan, &chan->pending_list);
++	xilinx_cdma_free_desc_list(chan, &chan->done_list);
++
++	spin_unlock_irqrestore(&chan->lock, flags);
 +
 +	return 0;
 +}
 +
-+static const struct of_device_id of_scpsys_match_tbl[] = {
-+	{
-+		.compatible = "mediatek,mt8173-scpsys",
-+	}, {
-+		/* sentinel */
++/**
++ * xilinx_cdma_channel_set_config - Configure cdma channel
++ * @dchan: DMA channel
++ * @cfg: cdma device configuration pointer
++ *
++ * Return: '0' on success and failure value on error
++ */
++int xilinx_cdma_channel_set_config(struct dma_chan *dchan,
++					struct xilinx_cdma_config *cfg)
++{
++	struct xilinx_cdma_chan *chan = to_xilinx_chan(dchan);
++	u32 reg = cdma_read(chan, XILINX_CDMA_CONTROL_OFFSET);
++
++	if (!xilinx_cdma_is_idle(chan))
++		return -EBUSY;
++
++	if (cfg->reset)
++		return xilinx_cdma_chan_reset(chan);
++
++	if (cfg->coalesc <= XILINX_CDMA_COALESCE_MAX) {
++		reg &= ~XILINX_CDMA_XR_COALESCE_MASK;
++		reg |= cfg->coalesc << XILINX_CDMA_COALESCE_SHIFT;
 +	}
-+};
 +
-+static struct platform_driver scpsys_drv = {
++	if (cfg->delay <= XILINX_CDMA_DELAY_MAX) {
++		reg &= ~XILINX_CDMA_XR_DELAY_MASK;
++		reg |= cfg->delay << XILINX_CDMA_DELAY_SHIFT;
++	}
++
++	cdma_write(chan, XILINX_CDMA_CONTROL_OFFSET, reg);
++
++	return 0;
++}
++EXPORT_SYMBOL(xilinx_cdma_channel_set_config);
++
++/* -----------------------------------------------------------------------------
++ * Probe and remove
++ */
++
++/**
++ * xilinx_cdma_free_channel - Channel remove function
++ * @chan: Driver specific cdma channel
++ */
++static void xilinx_cdma_free_channel(struct xilinx_cdma_chan *chan)
++{
++	/* Disable Interrupts */
++	cdma_ctrl_clr(chan, XILINX_CDMA_CONTROL_OFFSET,
++		XILINX_CDMA_XR_IRQ_ALL_MASK);
++
++	if (chan->irq > 0)
++		free_irq(chan->irq, chan);
++
++	tasklet_kill(&chan->tasklet);
++
++	list_del(&chan->common.device_node);
++}
++
++/**
++ * xilinx_cdma_chan_probe - Per Channel Probing
++ * It get channel features from the device tree entry and
++ * initialize special channel handling routines
++ *
++ * @xdev: Driver specific device structure
++ * @node: Device node
++ *
++ * Return: '0' on success and failure value on error
++ */
++static int xilinx_cdma_chan_probe(struct xilinx_cdma_device *xdev,
++					struct device_node *node)
++{
++	struct xilinx_cdma_chan *chan;
++	bool has_dre;
++	u32 value, width;
++	int err;
++
++	/* Alloc channel */
++	chan = devm_kzalloc(xdev->dev, sizeof(*chan), GFP_NOWAIT);
++	if (!chan)
++		return -ENOMEM;
++
++	chan->dev = xdev->dev;
++	chan->has_sg = xdev->has_sg;
++	chan->xdev = xdev;
++
++	spin_lock_init(&chan->lock);
++	INIT_LIST_HEAD(&chan->pending_list);
++	INIT_LIST_HEAD(&chan->done_list);
++
++	/* Retrieve the channel properties from the device tree */
++	has_dre = of_property_read_bool(node, "xlnx,include-dre");
++
++	err = of_property_read_u32(node, "xlnx,datawidth", &value);
++	if (err) {
++		dev_err(xdev->dev, "unable to read datawidth property");
++		return err;
++	}
++	width = value >> 3; /* convert bits to bytes */
++
++	/* If data width is greater than 8 bytes, DRE is not in hw */
++	if (width > 8)
++		has_dre = false;
++
++	if (!has_dre)
++		xdev->common.copy_align = fls(width - 1);
++
++	/* Request the interrupt */
++	chan->irq = irq_of_parse_and_map(node, 0);
++	err = request_irq(chan->irq, xilinx_cdma_irq_handler, IRQF_SHARED,
++				"xilinx-cdma-controller", chan);
++	if (err) {
++		dev_err(xdev->dev, "unable to request IRQ %d\n", chan->irq);
++		return err;
++	}
++
++	/* Initialize the tasklet */
++	tasklet_init(&chan->tasklet, xilinx_cdma_do_tasklet,
++				(unsigned long)chan);
++
++	/*
++	 * Initialize the DMA channel and add it to the DMA engine channels
++	 * list.
++	 */
++	chan->common.device = &xdev->common;
++
++	list_add_tail(&chan->common.device_node, &xdev->common.channels);
++	xdev->chan = chan;
++
++	/* Initialize the channel */
++	err = xilinx_cdma_chan_reset(chan);
++	if (err) {
++		dev_err(xdev->dev, "Reset channel failed\n");
++		return err;
++	}
++
++	chan->idle = true;
++
++	return 0;
++}
++
++/**
++ * of_dma_xilinx_xlate - Translation function
++ * @dma_spec: Pointer to DMA specifier as found in the device tree
++ * @ofdma: Pointer to DMA controller data
++ *
++ * Return: DMA channel pointer on success and NULL on error
++ */
++static struct dma_chan *of_dma_xilinx_xlate(struct of_phandle_args *dma_spec,
++						struct of_dma *ofdma)
++{
++	struct xilinx_cdma_device *xdev = ofdma->of_dma_data;
++
++	return dma_get_slave_channel(&xdev->chan->common);
++}
++
++/**
++ * xilinx_cdma_probe - Driver probe function
++ * @pdev: Pointer to the platform_device structure
++ *
++ * Return: '0' on success and failure value on error
++ */
++static int xilinx_cdma_probe(struct platform_device *pdev)
++{
++	struct xilinx_cdma_device *xdev;
++	struct device_node *child, *node;
++	struct resource *res;
++	int ret;
++
++	xdev = devm_kzalloc(&pdev->dev, sizeof(*xdev), GFP_KERNEL);
++	if (!xdev)
++		return -ENOMEM;
++
++	xdev->dev = &(pdev->dev);
++	INIT_LIST_HEAD(&xdev->common.channels);
++
++	node = pdev->dev.of_node;
++
++	/* Map the registers */
++	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
++	xdev->regs = devm_ioremap_resource(&pdev->dev, res);
++	if (IS_ERR(xdev->regs))
++		return PTR_ERR(xdev->regs);
++
++	/* Check if SG is enabled */
++	xdev->has_sg = of_property_read_bool(node, "xlnx,include-sg");
++
++	dma_cap_set(DMA_MEMCPY, xdev->common.cap_mask);
++	xdev->common.device_prep_dma_memcpy = xilinx_cdma_prep_memcpy;
++	xdev->common.device_terminate_all = xilinx_cdma_terminate_all;
++	xdev->common.device_issue_pending = xilinx_cdma_issue_pending;
++	xdev->common.device_alloc_chan_resources =
++			xilinx_cdma_alloc_chan_resources;
++	xdev->common.device_free_chan_resources =
++			xilinx_cdma_free_chan_resources;
++	xdev->common.device_tx_status = xilinx_tx_status;
++	xdev->common.dev = &pdev->dev;
++
++	platform_set_drvdata(pdev, xdev);
++
++	child = of_get_next_child(node, NULL);
++	if (!child) {
++		dev_err(&pdev->dev, "No channel found\n");
++		return PTR_ERR(child);
++	}
++
++	ret = xilinx_cdma_chan_probe(xdev, child);
++	if (ret) {
++		dev_err(&pdev->dev, "Probing channel failed\n");
++		goto free_chan_resources;
++	}
++
++	dma_async_device_register(&xdev->common);
++
++	ret = of_dma_controller_register(node, of_dma_xilinx_xlate, xdev);
++	if (ret) {
++		dev_err(&pdev->dev, "Unable to register DMA to DT\n");
++		dma_async_device_unregister(&xdev->common);
++		goto free_chan_resources;
++	}
++
++	dev_info(&pdev->dev, "Xilinx AXI CDMA Engine driver Probed!!\n");
++
++	return 0;
++
++free_chan_resources:
++	xilinx_cdma_free_channel(xdev->chan);
++
++	return ret;
++}
++
++/**
++ * xilinx_cdma_remove - Driver remove function
++ * @pdev: Pointer to the platform_device structure
++ *
++ * Return: Always '0'
++ */
++static int xilinx_cdma_remove(struct platform_device *pdev)
++{
++	 struct xilinx_cdma_device *xdev = platform_get_drvdata(pdev);
++
++	of_dma_controller_free(pdev->dev.of_node);
++	dma_async_device_unregister(&xdev->common);
++
++	xilinx_cdma_free_channel(xdev->chan);
++
++	return 0;
++}
++
++static const struct of_device_id xilinx_cdma_of_match[] = {
++	{ .compatible = "xlnx,axi-cdma-1.00.a", },
++	{}
++};
++MODULE_DEVICE_TABLE(of, xilinx_cdma_of_match);
++
++static struct platform_driver xilinx_cdma_driver = {
 +	.driver = {
-+		.name = "mtk-scpsys",
-+		.owner = THIS_MODULE,
-+		.of_match_table = of_match_ptr(of_scpsys_match_tbl),
++		.name = "xilinx-cdma",
++		.of_match_table = xilinx_cdma_of_match,
 +	},
++	.probe = xilinx_cdma_probe,
++	.remove = xilinx_cdma_remove,
 +};
 +
-+module_platform_driver_probe(scpsys_drv, scpsys_probe);
-diff --git a/include/dt-bindings/power/mt8173-power.h b/include/dt-bindings/power/mt8173-power.h
-new file mode 100644
-index 0000000..b34cee9
---- /dev/null
-+++ b/include/dt-bindings/power/mt8173-power.h
-@@ -0,0 +1,15 @@
-+#ifndef _DT_BINDINGS_POWER_MT8183_POWER_H
-+#define _DT_BINDINGS_POWER_MT8183_POWER_H
++module_platform_driver(xilinx_cdma_driver);
 +
-+#define MT8173_POWER_DOMAIN_VDEC	0
-+#define MT8173_POWER_DOMAIN_VENC	1
-+#define MT8173_POWER_DOMAIN_ISP		2
-+#define MT8173_POWER_DOMAIN_MM		3
-+#define MT8173_POWER_DOMAIN_VENC_LT	4
-+#define MT8173_POWER_DOMAIN_AUDIO	5
-+#define MT8173_POWER_DOMAIN_USB		6
-+#define MT8173_POWER_DOMAIN_MFG_ASYNC	7
-+#define MT8173_POWER_DOMAIN_MFG_2D	8
-+#define MT8173_POWER_DOMAIN_MFG		9
++MODULE_AUTHOR("Xilinx, Inc.");
++MODULE_DESCRIPTION("Xilinx CDMA driver");
++MODULE_LICENSE("GPL");
+diff --git a/include/linux/dma/xilinx_dma.h b/include/linux/dma/xilinx_dma.h
+index 34b98f2..90d3d0b 100644
+--- a/include/linux/dma/xilinx_dma.h
++++ b/include/linux/dma/xilinx_dma.h
+@@ -41,7 +41,21 @@ struct xilinx_vdma_config {
+ 	int ext_fsync;
+ };
+ 
++/**
++ * struct xilinx_cdma_config - CDMA Configuration structure
++ * @coalesc: Interrupt coalescing threshold
++ * @delay: Delay counter
++ * @reset: Reset Channel
++ */
++struct xilinx_cdma_config {
++	int coalesc;
++	int delay;
++	int reset;
++};
 +
-+#endif /* _DT_BINDINGS_POWER_MT8183_POWER_H */
+ int xilinx_vdma_channel_set_config(struct dma_chan *dchan,
+ 					struct xilinx_vdma_config *cfg);
++int xilinx_cdma_channel_set_config(struct dma_chan *dchan,
++					struct xilinx_cdma_config *cfg);
+ 
+ #endif
 -- 
-2.1.4
+2.1.2
