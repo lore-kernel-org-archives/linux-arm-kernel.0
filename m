@@ -1,232 +1,317 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Tue, 9 Jun 2015 19:51:33 +0100
-Subject: [PATCH v5 02/17] leds: port locomo leds driver to new locomo core
-In-Reply-To: <5576CF9A.4010701@samsung.com>
-References: <1433797008-6246-1-git-send-email-dbaryshkov@gmail.com>
- <1433797008-6246-3-git-send-email-dbaryshkov@gmail.com>
- <20150609065730.GC2982@x1>
- <CALT56yMkpXqurNw9xQeEBTdH5UTsrmSHTx1jbWXTb8zSWwDD6Q@mail.gmail.com>
- <20150609111130.GT2982@x1> <5576CF9A.4010701@samsung.com>
-Message-ID: <20150609185133.GU2982@x1>
+From: robh@kernel.org (Rob Herring)
+Date: Tue,  9 Jun 2015 13:26:31 -0500
+Subject: [PATCH 05/15] gpio: kill off set_irq_flags usage
+In-Reply-To: <1433874401-27161-1-git-send-email-robh@kernel.org>
+References: <1433874401-27161-1-git-send-email-robh@kernel.org>
+Message-ID: <1433874401-27161-6-git-send-email-robh@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 09 Jun 2015, Jacek Anaszewski wrote:
+set_irq_flags is ARM specific with custom flags which have genirq
+equivalents. Convert drivers to use the genirq interfaces directly, so we
+can kill off set_irq_flags. The translation of flags is as follows:
 
-> On 06/09/2015 01:11 PM, Lee Jones wrote:
-> >On Tue, 09 Jun 2015, Dmitry Eremin-Solenikov wrote:
-> >
-> >>2015-06-09 9:57 GMT+03:00 Lee Jones <lee.jones@linaro.org>:
-> >>>On Mon, 08 Jun 2015, Dmitry Eremin-Solenikov wrote:
-> >>>
-> >>>>Adapt locomo leds driver to new locomo core setup.
-> >>>>
-> >>>>Signed-off-by: Dmitry Eremin-Solenikov <dbaryshkov@gmail.com>
-> >>>>Acked-by: Jacek Anaszewski <j.anaszewski@samsung.com>
-> >>>
-> >>>This is missing Bryan's Ack.
-> >>
-> >>Jacek is listed as a co-maintainer of the LEDS subsystem, so I assumed
-> >>that his acked-by is enough.
-> >
-> >Ah, this is new.
-> >
-> >Congratulations Jacek.
-> 
-> Thanks.
-> 
-> >Ignore me then.
-> 
-> I think that it should go via mfd tree, as this patch adds
-> dependency on header linux/mfd/locomo.h, which is added
-> in one of the preceding patches [1] in this series.
+IRQF_VALID -> !IRQ_NOREQUEST
+IRQF_PROBE -> !IRQ_NOPROBE
+IRQF_NOAUTOEN -> IRQ_NOAUTOEN
 
-Yep, that's the plan.
+For IRQs managed by an irqdomain, the irqdomain core code handles clearing
+and setting IRQ_NOREQUEST already, so there is no need to do this in
+.map() functions and we can simply remove the set_irq_flags calls. Some
+users also set IRQ_NOPROBE and this has been maintained although it is not
+clear that is really needed. There appears to be a great deal of blind
+copy and paste of this code.
 
-> [1] [PATCH v3 01/17] mfd: add new driver for Sharp LoCoMo
-> 
-> >>>>---
-> >>>>  drivers/leds/Kconfig       |   2 +-
-> >>>>  drivers/leds/leds-locomo.c | 117 +++++++++++++++++++++++----------------------
-> >>>>  2 files changed, 61 insertions(+), 58 deletions(-)
-> >>>>
-> >>>>diff --git a/drivers/leds/Kconfig b/drivers/leds/Kconfig
-> >>>>index 966b960..d086aac 100644
-> >>>>--- a/drivers/leds/Kconfig
-> >>>>+++ b/drivers/leds/Kconfig
-> >>>>@@ -79,7 +79,7 @@ config LEDS_LM3642
-> >>>>  config LEDS_LOCOMO
-> >>>>       tristate "LED Support for Locomo device"
-> >>>>       depends on LEDS_CLASS
-> >>>>-     depends on SHARP_LOCOMO
-> >>>>+     depends on MFD_LOCOMO
-> >>>>       help
-> >>>>         This option enables support for the LEDs on Sharp Locomo.
-> >>>>         Zaurus models SL-5500 and SL-5600.
-> >>>>diff --git a/drivers/leds/leds-locomo.c b/drivers/leds/leds-locomo.c
-> >>>>index 80ba048..a4286e9 100644
-> >>>>--- a/drivers/leds/leds-locomo.c
-> >>>>+++ b/drivers/leds/leds-locomo.c
-> >>>>@@ -9,89 +9,92 @@
-> >>>>   */
-> >>>>
-> >>>>  #include <linux/kernel.h>
-> >>>>-#include <linux/init.h>
-> >>>>-#include <linux/module.h>
-> >>>>-#include <linux/device.h>
-> >>>>  #include <linux/leds.h>
-> >>>>+#include <linux/mfd/locomo.h>
-> >>>>+#include <linux/module.h>
-> >>>>+#include <linux/platform_device.h>
-> >>>>+#include <linux/regmap.h>
-> >>>>
-> >>>>-#include <mach/hardware.h>
-> >>>>-#include <asm/hardware/locomo.h>
-> >>>>+struct locomo_led {
-> >>>>+     struct led_classdev led;
-> >>>>+     struct regmap *regmap;
-> >>>>+     unsigned int reg;
-> >>>>+};
-> >>>>
-> >>>>  static void locomoled_brightness_set(struct led_classdev *led_cdev,
-> >>>>-                             enum led_brightness value, int offset)
-> >>>>-{
-> >>>>-     struct locomo_dev *locomo_dev = LOCOMO_DEV(led_cdev->dev->parent);
-> >>>>-     unsigned long flags;
-> >>>>-
-> >>>>-     local_irq_save(flags);
-> >>>>-     if (value)
-> >>>>-             locomo_writel(LOCOMO_LPT_TOFH, locomo_dev->mapbase + offset);
-> >>>>-     else
-> >>>>-             locomo_writel(LOCOMO_LPT_TOFL, locomo_dev->mapbase + offset);
-> >>>>-     local_irq_restore(flags);
-> >>>>-}
-> >>>>-
-> >>>>-static void locomoled_brightness_set0(struct led_classdev *led_cdev,
-> >>>>                               enum led_brightness value)
-> >>>>  {
-> >>>>-     locomoled_brightness_set(led_cdev, value, LOCOMO_LPT0);
-> >>>>+     struct locomo_led *led = container_of(led_cdev, struct locomo_led, led);
-> >>>>+
-> >>>>+     regmap_write(led->regmap, led->reg,
-> >>>>+                     value ? LOCOMO_LPT_TOFH : LOCOMO_LPT_TOFL);
-> >>>>  }
-> >>>>
-> >>>>-static void locomoled_brightness_set1(struct led_classdev *led_cdev,
-> >>>>-                             enum led_brightness value)
-> >>>>+static int locomo_led_register(
-> >>>>+             struct device *dev,
-> >>>>+             struct locomo_led *led,
-> >>>>+             const char *name,
-> >>>>+             const char *trigger,
-> >>>>+             struct regmap *regmap,
-> >>>>+             unsigned int reg)
-> >>>>  {
-> >>>>-     locomoled_brightness_set(led_cdev, value, LOCOMO_LPT1);
-> >>>>+     led->led.name = name;
-> >>>>+     led->led.flags = LED_CORE_SUSPENDRESUME;
-> >>>>+     led->led.default_trigger = trigger;
-> >>>>+     led->led.brightness_set = locomoled_brightness_set;
-> >>>>+     led->regmap = regmap;
-> >>>>+     led->reg = reg;
-> >>>>+
-> >>>>+     return devm_led_classdev_register(dev, &led->led);
-> >>>>  }
-> >>>>
-> >>>>-static struct led_classdev locomo_led0 = {
-> >>>>-     .name                   = "locomo:amber:charge",
-> >>>>-     .default_trigger        = "main-battery-charging",
-> >>>>-     .brightness_set         = locomoled_brightness_set0,
-> >>>>-};
-> >>>>-
-> >>>>-static struct led_classdev locomo_led1 = {
-> >>>>-     .name                   = "locomo:green:mail",
-> >>>>-     .default_trigger        = "nand-disk",
-> >>>>-     .brightness_set         = locomoled_brightness_set1,
-> >>>>-};
-> >>>>-
-> >>>>-static int locomoled_probe(struct locomo_dev *ldev)
-> >>>>+static int locomoled_probe(struct platform_device *pdev)
-> >>>>  {
-> >>>>       int ret;
-> >>>>-
-> >>>>-     ret = led_classdev_register(&ldev->dev, &locomo_led0);
-> >>>>+     struct locomo_led *leds;
-> >>>>+     struct regmap *regmap;
-> >>>>+
-> >>>>+     leds = devm_kzalloc(&pdev->dev, 2 * sizeof(*leds), GFP_KERNEL);
-> >>>>+     if (!leds)
-> >>>>+             return -ENOMEM;
-> >>>>+
-> >>>>+     regmap = dev_get_regmap(pdev->dev.parent, NULL);
-> >>>>+     if (!regmap)
-> >>>>+             return -ENODEV;
-> >>>>+
-> >>>>+     ret = locomo_led_register(
-> >>>>+                     &pdev->dev,
-> >>>>+                     leds,
-> >>>>+                     "locomo:amber:charge",
-> >>>>+                     "main-battery-charging",
-> >>>>+                     regmap,
-> >>>>+                     LOCOMO_LPT0);
-> >>>>       if (ret < 0)
-> >>>>               return ret;
-> >>>>
-> >>>>-     ret = led_classdev_register(&ldev->dev, &locomo_led1);
-> >>>>+     ret = locomo_led_register(
-> >>>>+                     &pdev->dev,
-> >>>>+                     leds + 1,
-> >>>>+                     "locomo:green:mail",
-> >>>>+                     "mmc0",
-> >>>>+                     regmap,
-> >>>>+                     LOCOMO_LPT1);
-> >>>>       if (ret < 0)
-> >>>>-             led_classdev_unregister(&locomo_led0);
-> >>>>-
-> >>>>-     return ret;
-> >>>>-}
-> >>>>+             return ret;
-> >>>>
-> >>>>-static int locomoled_remove(struct locomo_dev *dev)
-> >>>>-{
-> >>>>-     led_classdev_unregister(&locomo_led0);
-> >>>>-     led_classdev_unregister(&locomo_led1);
-> >>>>       return 0;
-> >>>>  }
-> >>>>
-> >>>>-static struct locomo_driver locomoled_driver = {
-> >>>>-     .drv = {
-> >>>>-             .name = "locomoled"
-> >>>>+static struct platform_driver locomoled_driver = {
-> >>>>+     .driver = {
-> >>>>+             .name = "locomo-led"
-> >>>>       },
-> >>>>-     .devid  = LOCOMO_DEVID_LED,
-> >>>>       .probe  = locomoled_probe,
-> >>>>-     .remove = locomoled_remove,
-> >>>>  };
-> >>>>
-> >>>>-static int __init locomoled_init(void)
-> >>>>-{
-> >>>>-     return locomo_driver_register(&locomoled_driver);
-> >>>>-}
-> >>>>-module_init(locomoled_init);
-> >>>>+module_platform_driver(locomoled_driver);
-> >>>>
-> >>>>  MODULE_AUTHOR("John Lenz <lenz@cs.wisc.edu>");
-> >>>>  MODULE_DESCRIPTION("Locomo LED driver");
-> >>>>  MODULE_LICENSE("GPL");
-> >>>>+MODULE_ALIAS("platform:locomo-led");
-> >>>
-> >>
-> >>
-> >>
-> >
-> 
-> 
+Signed-off-by: Rob Herring <robh@kernel.org>
+Cc: Michael Hennerich <michael.hennerich@analog.com>
+Cc: Linus Walleij <linus.walleij@linaro.org>
+Cc: Alexandre Courbot <gnurou@gmail.com>
+Cc: Ray Jui <rjui@broadcom.com>
+Cc: Stephen Warren <swarren@wwwdotorg.org>
+Cc: Thierry Reding <thierry.reding@gmail.com>
+Cc: linux-gpio at vger.kernel.org
+Cc: bcm-kernel-feedback-list at broadcom.com
+Cc: linux-tegra at vger.kernel.org
+---
+ drivers/gpio/gpio-adp5588.c    | 10 +---------
+ drivers/gpio/gpio-bcm-kona.c   | 15 ---------------
+ drivers/gpio/gpio-davinci.c    |  1 -
+ drivers/gpio/gpio-em.c         |  1 -
+ drivers/gpio/gpio-ep93xx.c     |  2 +-
+ drivers/gpio/gpio-grgpio.c     |  8 --------
+ drivers/gpio/gpio-mcp23s08.c   |  4 ----
+ drivers/gpio/gpio-msm-v2.c     |  1 -
+ drivers/gpio/gpio-pxa.c        |  8 ++++----
+ drivers/gpio/gpio-sa1100.c     |  2 +-
+ drivers/gpio/gpio-sta2x11.c    |  2 +-
+ drivers/gpio/gpio-tegra.c      |  1 -
+ drivers/gpio/gpio-timberdale.c |  4 +---
+ drivers/gpio/gpiolib.c         |  8 +-------
+ 14 files changed, 10 insertions(+), 57 deletions(-)
 
+diff --git a/drivers/gpio/gpio-adp5588.c b/drivers/gpio/gpio-adp5588.c
+index d3fe6a6..df7bb75 100644
+--- a/drivers/gpio/gpio-adp5588.c
++++ b/drivers/gpio/gpio-adp5588.c
+@@ -305,15 +305,7 @@ static int adp5588_irq_setup(struct adp5588_gpio *dev)
+ 		irq_set_chip_and_handler(irq, &adp5588_irq_chip,
+ 					 handle_level_irq);
+ 		irq_set_nested_thread(irq, 1);
+-#ifdef CONFIG_ARM
+-		/*
+-		 * ARM needs us to explicitly flag the IRQ as VALID,
+-		 * once we do so, it will also set the noprobe.
+-		 */
+-		set_irq_flags(irq, IRQF_VALID);
+-#else
+-		irq_set_noprobe(irq);
+-#endif
++		irq_clear_status_flags(irq, IRQ_NOREQUEST | IRQ_NOPROBE);
+ 	}
+ 
+ 	ret = request_threaded_irq(client->irq,
+diff --git a/drivers/gpio/gpio-bcm-kona.c b/drivers/gpio/gpio-bcm-kona.c
+index b164ce8..8247d27 100644
+--- a/drivers/gpio/gpio-bcm-kona.c
++++ b/drivers/gpio/gpio-bcm-kona.c
+@@ -519,11 +519,7 @@ static int bcm_kona_gpio_irq_map(struct irq_domain *d, unsigned int irq,
+ 		return ret;
+ 	irq_set_lockdep_class(irq, &gpio_lock_class);
+ 	irq_set_chip_and_handler(irq, &bcm_gpio_irq_chip, handle_simple_irq);
+-#ifdef CONFIG_ARM
+-	set_irq_flags(irq, IRQF_VALID);
+-#else
+ 	irq_set_noprobe(irq);
+-#endif
+ 
+ 	return 0;
+ }
+@@ -638,17 +634,6 @@ static int bcm_kona_gpio_probe(struct platform_device *pdev)
+ 		dev_err(dev, "Couldn't add GPIO chip -- %d\n", ret);
+ 		goto err_irq_domain;
+ 	}
+-	for (i = 0; i < chip->ngpio; i++) {
+-		int irq = bcm_kona_gpio_to_irq(chip, i);
+-		irq_set_lockdep_class(irq, &gpio_lock_class);
+-		irq_set_chip_and_handler(irq, &bcm_gpio_irq_chip,
+-					 handle_simple_irq);
+-#ifdef CONFIG_ARM
+-		set_irq_flags(irq, IRQF_VALID);
+-#else
+-		irq_set_noprobe(irq);
+-#endif
+-	}
+ 	for (i = 0; i < kona_gpio->num_bank; i++) {
+ 		bank = &kona_gpio->banks[i];
+ 		irq_set_chained_handler(bank->irq, bcm_kona_gpio_irq_handler);
+diff --git a/drivers/gpio/gpio-davinci.c b/drivers/gpio/gpio-davinci.c
+index c5e05c8..59020a6 100644
+--- a/drivers/gpio/gpio-davinci.c
++++ b/drivers/gpio/gpio-davinci.c
+@@ -422,7 +422,6 @@ davinci_gpio_irq_map(struct irq_domain *d, unsigned int irq,
+ 	irq_set_irq_type(irq, IRQ_TYPE_NONE);
+ 	irq_set_chip_data(irq, (__force void *)g);
+ 	irq_set_handler_data(irq, (void *)__gpio_mask(hw));
+-	set_irq_flags(irq, IRQF_VALID);
+ 
+ 	return 0;
+ }
+diff --git a/drivers/gpio/gpio-em.c b/drivers/gpio/gpio-em.c
+index 3cfcfc6..3a912a6 100644
+--- a/drivers/gpio/gpio-em.c
++++ b/drivers/gpio/gpio-em.c
+@@ -262,7 +262,6 @@ static int em_gio_irq_domain_map(struct irq_domain *h, unsigned int irq,
+ 
+ 	irq_set_chip_data(irq, h->host_data);
+ 	irq_set_chip_and_handler(irq, &p->irq_chip, handle_level_irq);
+-	set_irq_flags(irq, IRQF_VALID); /* kill me now */
+ 	return 0;
+ }
+ 
+diff --git a/drivers/gpio/gpio-ep93xx.c b/drivers/gpio/gpio-ep93xx.c
+index 45684f3..4d35fdc 100644
+--- a/drivers/gpio/gpio-ep93xx.c
++++ b/drivers/gpio/gpio-ep93xx.c
+@@ -234,7 +234,7 @@ static void ep93xx_gpio_init_irq(void)
+ 	     gpio_irq <= gpio_to_irq(EP93XX_GPIO_LINE_MAX_IRQ); ++gpio_irq) {
+ 		irq_set_chip_and_handler(gpio_irq, &ep93xx_gpio_irq_chip,
+ 					 handle_level_irq);
+-		set_irq_flags(gpio_irq, IRQF_VALID);
++		irq_clear_status_flags(gpio_irq, IRQ_NOREQUEST);
+ 	}
+ 
+ 	irq_set_chained_handler(IRQ_EP93XX_GPIO_AB,
+diff --git a/drivers/gpio/gpio-grgpio.c b/drivers/gpio/gpio-grgpio.c
+index 35a0277..6bdb8de 100644
+--- a/drivers/gpio/gpio-grgpio.c
++++ b/drivers/gpio/gpio-grgpio.c
+@@ -281,12 +281,7 @@ static int grgpio_irq_map(struct irq_domain *d, unsigned int irq,
+ 	irq_set_chip_data(irq, priv);
+ 	irq_set_chip_and_handler(irq, &grgpio_irq_chip,
+ 				 handle_simple_irq);
+-	irq_clear_status_flags(irq, IRQ_NOREQUEST);
+-#ifdef CONFIG_ARM
+-	set_irq_flags(irq, IRQF_VALID);
+-#else
+ 	irq_set_noprobe(irq);
+-#endif
+ 
+ 	return ret;
+ }
+@@ -301,9 +296,6 @@ static void grgpio_irq_unmap(struct irq_domain *d, unsigned int irq)
+ 	int ngpio = priv->bgc.gc.ngpio;
+ 	int i;
+ 
+-#ifdef CONFIG_ARM
+-	set_irq_flags(irq, 0);
+-#endif
+ 	irq_set_chip_and_handler(irq, NULL, NULL);
+ 	irq_set_chip_data(irq, NULL);
+ 
+diff --git a/drivers/gpio/gpio-mcp23s08.c b/drivers/gpio/gpio-mcp23s08.c
+index 2fc7ff8..73db7ec 100644
+--- a/drivers/gpio/gpio-mcp23s08.c
++++ b/drivers/gpio/gpio-mcp23s08.c
+@@ -507,11 +507,7 @@ static int mcp23s08_irq_setup(struct mcp23s08 *mcp)
+ 		irq_set_chip_data(irq, mcp);
+ 		irq_set_chip(irq, &mcp23s08_irq_chip);
+ 		irq_set_nested_thread(irq, true);
+-#ifdef CONFIG_ARM
+-		set_irq_flags(irq, IRQF_VALID);
+-#else
+ 		irq_set_noprobe(irq);
+-#endif
+ 	}
+ 	return 0;
+ }
+diff --git a/drivers/gpio/gpio-msm-v2.c b/drivers/gpio/gpio-msm-v2.c
+index 52ff182..4bbaeb36 100644
+--- a/drivers/gpio/gpio-msm-v2.c
++++ b/drivers/gpio/gpio-msm-v2.c
+@@ -363,7 +363,6 @@ static int msm_gpio_irq_domain_map(struct irq_domain *d, unsigned int irq,
+ 	irq_set_lockdep_class(irq, &msm_gpio_lock_class);
+ 	irq_set_chip_and_handler(irq, &msm_gpio_irq_chip,
+ 			handle_level_irq);
+-	set_irq_flags(irq, IRQF_VALID);
+ 
+ 	return 0;
+ }
+diff --git a/drivers/gpio/gpio-pxa.c b/drivers/gpio/gpio-pxa.c
+index cdbbcf0..55a11de 100644
+--- a/drivers/gpio/gpio-pxa.c
++++ b/drivers/gpio/gpio-pxa.c
+@@ -524,7 +524,7 @@ static int pxa_irq_domain_map(struct irq_domain *d, unsigned int irq,
+ {
+ 	irq_set_chip_and_handler(irq, &pxa_muxed_gpio_chip,
+ 				 handle_edge_irq);
+-	set_irq_flags(irq, IRQF_VALID | IRQF_PROBE);
++	irq_set_noprobe(irq);
+ 	return 0;
+ }
+ 
+@@ -643,20 +643,20 @@ static int pxa_gpio_probe(struct platform_device *pdev)
+ 			irq = gpio_to_irq(0);
+ 			irq_set_chip_and_handler(irq, &pxa_muxed_gpio_chip,
+ 						 handle_edge_irq);
+-			set_irq_flags(irq, IRQF_VALID | IRQF_PROBE);
++			irq_clear_status_flags(irq, IRQ_NOREQUEST | IRQ_NOPROBE);
+ 		}
+ 		if (irq1 > 0) {
+ 			irq = gpio_to_irq(1);
+ 			irq_set_chip_and_handler(irq, &pxa_muxed_gpio_chip,
+ 						 handle_edge_irq);
+-			set_irq_flags(irq, IRQF_VALID | IRQF_PROBE);
++			irq_clear_status_flags(irq, IRQ_NOREQUEST | IRQ_NOPROBE);
+ 		}
+ 
+ 		for (irq  = gpio_to_irq(gpio_offset);
+ 			irq <= gpio_to_irq(pxa_last_gpio); irq++) {
+ 			irq_set_chip_and_handler(irq, &pxa_muxed_gpio_chip,
+ 						 handle_edge_irq);
+-			set_irq_flags(irq, IRQF_VALID | IRQF_PROBE);
++			irq_clear_status_flags(irq, IRQ_NOREQUEST | IRQ_NOPROBE);
+ 		}
+ 	}
+ 
+diff --git a/drivers/gpio/gpio-sa1100.c b/drivers/gpio/gpio-sa1100.c
+index bec397a..dbc67d1 100644
+--- a/drivers/gpio/gpio-sa1100.c
++++ b/drivers/gpio/gpio-sa1100.c
+@@ -155,7 +155,7 @@ static int sa1100_gpio_irqdomain_map(struct irq_domain *d,
+ {
+ 	irq_set_chip_and_handler(irq, &sa1100_gpio_irq_chip,
+ 				 handle_edge_irq);
+-	set_irq_flags(irq, IRQF_VALID | IRQF_PROBE);
++	irq_set_noprobe(irq);
+ 
+ 	return 0;
+ }
+diff --git a/drivers/gpio/gpio-sta2x11.c b/drivers/gpio/gpio-sta2x11.c
+index 18579ac..55e47828 100644
+--- a/drivers/gpio/gpio-sta2x11.c
++++ b/drivers/gpio/gpio-sta2x11.c
+@@ -346,7 +346,7 @@ static void gsta_alloc_irq_chip(struct gsta_gpio *chip)
+ 			i = chip->irq_base + j;
+ 			irq_set_chip_and_handler(i, &ct->chip, ct->handler);
+ 			irq_set_chip_data(i, gc);
+-			irq_modify_status(i, IRQ_NOREQUEST | IRQ_NOPROBE, 0);
++			irq_clear_status_flags(i, IRQ_NOREQUEST | IRQ_NOPROBE);
+ 		}
+ 		gc->irq_cnt = i - gc->irq_base;
+ 	}
+diff --git a/drivers/gpio/gpio-tegra.c b/drivers/gpio/gpio-tegra.c
+index 1741981..62fdd5d 100644
+--- a/drivers/gpio/gpio-tegra.c
++++ b/drivers/gpio/gpio-tegra.c
+@@ -509,7 +509,6 @@ static int tegra_gpio_probe(struct platform_device *pdev)
+ 		irq_set_chip_data(irq, bank);
+ 		irq_set_chip_and_handler(irq, &tegra_gpio_irq_chip,
+ 					 handle_simple_irq);
+-		set_irq_flags(irq, IRQF_VALID);
+ 	}
+ 
+ 	for (i = 0; i < tegra_gpio_bank_count; i++) {
+diff --git a/drivers/gpio/gpio-timberdale.c b/drivers/gpio/gpio-timberdale.c
+index e8f97e0..166fe1c 100644
+--- a/drivers/gpio/gpio-timberdale.c
++++ b/drivers/gpio/gpio-timberdale.c
+@@ -294,9 +294,7 @@ static int timbgpio_probe(struct platform_device *pdev)
+ 		irq_set_chip_and_handler(tgpio->irq_base + i,
+ 			&timbgpio_irqchip, handle_simple_irq);
+ 		irq_set_chip_data(tgpio->irq_base + i, tgpio);
+-#ifdef CONFIG_ARM
+-		set_irq_flags(tgpio->irq_base + i, IRQF_VALID | IRQF_PROBE);
+-#endif
++		irq_clear_status_flags(tgpio->irq_base + i, IRQ_NOREQUEST | IRQ_NOPROBE);
+ 	}
+ 
+ 	irq_set_handler_data(irq, tgpio);
+diff --git a/drivers/gpio/gpiolib.c b/drivers/gpio/gpiolib.c
+index 6bc612b..efd35c0 100644
+--- a/drivers/gpio/gpiolib.c
++++ b/drivers/gpio/gpiolib.c
+@@ -477,11 +477,8 @@ static int gpiochip_irq_map(struct irq_domain *d, unsigned int irq,
+ 	/* Chips that can sleep need nested thread handlers */
+ 	if (chip->can_sleep && !chip->irq_not_threaded)
+ 		irq_set_nested_thread(irq, 1);
+-#ifdef CONFIG_ARM
+-	set_irq_flags(irq, IRQF_VALID);
+-#else
+ 	irq_set_noprobe(irq);
+-#endif
++
+ 	/*
+ 	 * No set-up of the hardware will happen if IRQ_TYPE_NONE
+ 	 * is passed as default type.
+@@ -496,9 +493,6 @@ static void gpiochip_irq_unmap(struct irq_domain *d, unsigned int irq)
+ {
+ 	struct gpio_chip *chip = d->host_data;
+ 
+-#ifdef CONFIG_ARM
+-	set_irq_flags(irq, 0);
+-#endif
+ 	if (chip->can_sleep)
+ 		irq_set_nested_thread(irq, 0);
+ 	irq_set_chip_and_handler(irq, NULL, NULL);
 -- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+2.1.0
