@@ -1,27 +1,35 @@
-From: santosh.shilimkar@oracle.com (santosh shilimkar)
-Date: Tue, 09 Jun 2015 10:34:39 -0700
-Subject: Fwd: [PATCH 1/2] clk: keystone: add support for post divider
- register for main pll
-In-Reply-To: <55770635.1040204@ti.com>
-References: <1432915453-409-1-git-send-email-m-karicheri2@ti.com>
- <55770635.1040204@ti.com>
-Message-ID: <557723AF.60001@oracle.com>
+From: daniel.thompson@linaro.org (Daniel Thompson)
+Date: Tue, 09 Jun 2015 18:37:47 +0100
+Subject: [PATCH] ARM: Re-enable TRACE_IRQFLAGS_SUPPORT on ARMv7-M
+In-Reply-To: <20150609150127.GF7557@n2100.arm.linux.org.uk>
+References: <1433802288-25508-1-git-send-email-mcoquelin.stm32@gmail.com>
+ <20150608224749.GB7557@n2100.arm.linux.org.uk>
+ <CALszF6DPzhAufUyWW-a3X7Cp4=tjSyCBM=Y4LcnWnUH=41qeoQ@mail.gmail.com>
+ <5576D0FE.10900@linaro.org> <20150609150127.GF7557@n2100.arm.linux.org.uk>
+Message-ID: <5577246B.3080602@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Murali,
-
-On 6/9/2015 8:28 AM, Murali Karicheri wrote:
-> Santosh,
+On 09/06/15 16:01, Russell King - ARM Linux wrote:
+> On Tue, Jun 09, 2015 at 12:41:50PM +0100, Daniel Thompson wrote:
+>> Does the following patch, which makes the arch_irqs_disabled()
+>> implementation from asm-generic available on arm, fix the build for you?
 >
-> Can you send a pull request to clock subsystem to be picked up for v4.2
-> and apply the dts part to keystone for the same merge window? or are we
-> too late for this?
->
-I was waiting for ack from DT folks and Mike. This has to wait for next
-one.
+> Yes, this is exactly the kind of fix for this I'm looking for.  Once
+> everyone's happy with it, it can find it's way to the patch system.
 
-Note the previous pull request isn't pulled yet in arm-soc.
+ From my side, using v4.1-rc6 plus the patch, I can build all defconfigs 
+and both versatile_defconfig and multi_v7_defconfig remain bootable (so 
+both ways through the arch #ifdef in irqflag.h).
 
-Regards,
-Santosh
+Similarly working on linux-next-20150608 plus the patch I am able to 
+build and boot Maxime's stm32 code (and show that without the patch it 
+doesn't build).
+
+ From my side I think that makes it good to go.
+
+So... in the absense of objections I will send it to the patch tracker 
+tomorrow.
+
+
+Daniel.
