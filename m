@@ -1,250 +1,293 @@
-From: kristina.martsenko@arm.com (Kristina Martsenko)
-Date: Tue,  9 Jun 2015 16:38:31 +0100
-Subject: [PATCH] arm64: dts: add device tree for ARM SMM-A53x2 on LogicTile
- Express 20MG
-Message-ID: <1433864311-2326-1-git-send-email-kristina.martsenko@arm.com>
+From: eric.auger@linaro.org (Eric Auger)
+Date: Tue, 09 Jun 2015 17:59:06 +0200
+Subject: [PATCH 09/13] KVM: arm64: handle pending bit for LPIs in ITS
+ emulation
+In-Reply-To: <1432893209-27313-10-git-send-email-andre.przywara@arm.com>
+References: <1432893209-27313-1-git-send-email-andre.przywara@arm.com>
+ <1432893209-27313-10-git-send-email-andre.przywara@arm.com>
+Message-ID: <55770D4A.9090801@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add a DTS file for the MP2 Cortex-A53 Soft Macrocell Model implemented
-on a LogicTile Express 20MG (V2F-1XV7) daughterboard. This is based on
-the version that's currently available from the ARM DTS repository [1].
+On 05/29/2015 11:53 AM, Andre Przywara wrote:
+> As the actual LPI number in a guest can be quite high, but is mostly
+> assigned using a very sparse allocation scheme, bitmaps and arrays
+> for storing the virtual interrupt status are a waste of memory.
+> We use our equivalent of the "Interrupt Translation Table Entry"
+> (ITTE) to hold this extra status information for a virtual LPI.
+> As the normal VGIC code cannot use it's fancy bitmaps to manage
+> pending interrupts, we provide a hook in the VGIC code to let the
+> ITS emulation handle the list register queueing itself.
+> LPIs are located in a separate number range (>=8192), so
+> distinguishing them is easy. With LPIs being only edge-triggered, we
+> get away with a less complex IRQ handling.
+> 
+> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
+> ---
+>  include/kvm/arm_vgic.h      |  2 ++
+>  virt/kvm/arm/its-emul.c     | 66 +++++++++++++++++++++++++++++++++++++++++++
+>  virt/kvm/arm/its-emul.h     |  3 ++
+>  virt/kvm/arm/vgic-v3-emul.c |  2 ++
+>  virt/kvm/arm/vgic.c         | 68 +++++++++++++++++++++++++++++++++------------
+>  5 files changed, 124 insertions(+), 17 deletions(-)
+> 
+> diff --git a/include/kvm/arm_vgic.h b/include/kvm/arm_vgic.h
+> index fa17df6..de19c34 100644
+> --- a/include/kvm/arm_vgic.h
+> +++ b/include/kvm/arm_vgic.h
+> @@ -147,6 +147,8 @@ struct vgic_vm_ops {
+>  	int	(*init_model)(struct kvm *);
+>  	void	(*destroy_model)(struct kvm *);
+>  	int	(*map_resources)(struct kvm *, const struct vgic_params *);
+> +	bool	(*queue_lpis)(struct kvm_vcpu *);
+> +	void	(*unqueue_lpi)(struct kvm_vcpu *, int irq);
+>  };
+>  
+>  struct vgic_io_device {
+> diff --git a/virt/kvm/arm/its-emul.c b/virt/kvm/arm/its-emul.c
+> index f0f4a9c..f75fb9e 100644
+> --- a/virt/kvm/arm/its-emul.c
+> +++ b/virt/kvm/arm/its-emul.c
+> @@ -50,8 +50,26 @@ struct its_itte {
+>  	struct its_collection *collection;
+>  	u32 lpi;
+>  	u32 event_id;
+> +	bool enabled;
+> +	unsigned long *pending;
+allocated in later patch. does not ease the review of the life cycle but
+I guess it is accepted/acceptable.
 
-[1] git://linux-arm.org/arm-dts.git
+Isn't it somehow redundant to have a bitmap here where the collection
+already indicates the target cpu id on which the LPI is pending?
 
-Signed-off-by: Kristina Martsenko <kristina.martsenko@arm.com>
----
- MAINTAINERS                                        |   1 +
- arch/arm64/boot/dts/arm/Makefile                   |   1 +
- .../boot/dts/arm/vexpress-v2f-1xv7-ca53x2.dts      | 196 +++++++++++++++++++++
- 3 files changed, 198 insertions(+)
- create mode 100644 arch/arm64/boot/dts/arm/vexpress-v2f-1xv7-ca53x2.dts
-
-diff --git a/MAINTAINERS b/MAINTAINERS
-index 9180f46..1fb07e0 100644
---- a/MAINTAINERS
-+++ b/MAINTAINERS
-@@ -1613,6 +1613,7 @@ M:	Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
- L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
- S:	Maintained
- F:	arch/arm/boot/dts/vexpress*
-+F:	arch/arm64/boot/dts/arm/vexpress*
- F:	arch/arm/mach-vexpress/
- F:	*/*/vexpress*
- F:	*/*/*/vexpress*
-diff --git a/arch/arm64/boot/dts/arm/Makefile b/arch/arm64/boot/dts/arm/Makefile
-index c5c98b9..bb3c072 100644
---- a/arch/arm64/boot/dts/arm/Makefile
-+++ b/arch/arm64/boot/dts/arm/Makefile
-@@ -1,6 +1,7 @@
- dtb-$(CONFIG_ARCH_VEXPRESS) += foundation-v8.dtb
- dtb-$(CONFIG_ARCH_VEXPRESS) += juno.dtb juno-r1.dtb
- dtb-$(CONFIG_ARCH_VEXPRESS) += rtsm_ve-aemv8a.dtb
-+dtb-$(CONFIG_ARCH_VEXPRESS) += vexpress-v2f-1xv7-ca53x2.dtb
- 
- always		:= $(dtb-y)
- subdir-y	:= $(dts-dirs)
-diff --git a/arch/arm64/boot/dts/arm/vexpress-v2f-1xv7-ca53x2.dts b/arch/arm64/boot/dts/arm/vexpress-v2f-1xv7-ca53x2.dts
-new file mode 100644
-index 0000000..bbe28aa
---- /dev/null
-+++ b/arch/arm64/boot/dts/arm/vexpress-v2f-1xv7-ca53x2.dts
-@@ -0,0 +1,196 @@
-+/*
-+ * ARM Ltd. Versatile Express
-+ *
-+ * LogicTile Express 20MG
-+ * V2F-1XV7
-+ *
-+ * Cortex-A53 (2 cores) Soft Macrocell Model
-+ *
-+ * HBI-0247C
-+ */
-+
-+/dts-v1/;
-+
-+/* In use by spinning secondaries */
-+/memreserve/ 0x80000000 0x00010000;
-+
-+#include <dt-bindings/interrupt-controller/arm-gic.h>
-+
-+/ {
-+	model = "V2F-1XV7 Cortex-A53x2 SMM";
-+	arm,hbi = <0x247>;
-+	arm,vexpress,site = <0xf>;
-+	compatible = "arm,vexpress,v2f-1xv7,ca53x2", "arm,vexpress,v2f-1xv7", "arm,vexpress";
-+	interrupt-parent = <&gic>;
-+	#address-cells = <2>;
-+	#size-cells = <2>;
-+
-+	chosen {
-+		stdout-path = "serial0:38400n8";
-+	};
-+
-+	aliases {
-+		serial0 = &v2m_serial0;
-+		serial1 = &v2m_serial1;
-+		serial2 = &v2m_serial2;
-+		serial3 = &v2m_serial3;
-+		i2c0 = &v2m_i2c_dvi;
-+		i2c1 = &v2m_i2c_pcie;
-+	};
-+
-+	cpus {
-+		#address-cells = <2>;
-+		#size-cells = <0>;
-+
-+		cpu at 0 {
-+			device_type = "cpu";
-+			compatible = "arm,cortex-a53", "arm,armv8";
-+			reg = <0 0>;
-+			next-level-cache = <&L2_0>;
-+		};
-+
-+		cpu at 1 {
-+			device_type = "cpu";
-+			compatible = "arm,cortex-a53", "arm,armv8";
-+			reg = <0 1>;
-+			enable-method = "spin-table";
-+			cpu-release-addr = <0x0 0x8000fff8>;
-+			next-level-cache = <&L2_0>;
-+		};
-+
-+		L2_0: l2-cache0 {
-+			compatible = "cache";
-+		};
-+	};
-+
-+	memory at 80000000 {
-+		device_type = "memory";
-+		reg = <0 0x80000000 0 0x80000000>; /* 2GB @ 2GB */
-+	};
-+
-+	gic: interrupt-controller at 2c001000 {
-+		compatible = "arm,gic-400";
-+		#interrupt-cells = <3>;
-+		#address-cells = <0>;
-+		interrupt-controller;
-+		reg = <0 0x2c001000 0 0x1000>,
-+		      <0 0x2c002000 0 0x2000>,
-+		      <0 0x2c004000 0 0x2000>,
-+		      <0 0x2c006000 0 0x2000>;
-+		interrupts = <GIC_PPI 9 (GIC_CPU_MASK_SIMPLE(2) | IRQ_TYPE_LEVEL_HIGH)>;
-+	};
-+
-+	timer {
-+		compatible = "arm,armv8-timer";
-+		interrupts = <GIC_PPI 13 (GIC_CPU_MASK_SIMPLE(2) | IRQ_TYPE_LEVEL_LOW)>,
-+			     <GIC_PPI 14 (GIC_CPU_MASK_SIMPLE(2) | IRQ_TYPE_LEVEL_LOW)>,
-+			     <GIC_PPI 11 (GIC_CPU_MASK_SIMPLE(2) | IRQ_TYPE_LEVEL_LOW)>,
-+			     <GIC_PPI 10 (GIC_CPU_MASK_SIMPLE(2) | IRQ_TYPE_LEVEL_LOW)>;
-+	};
-+
-+	pmu {
-+		compatible = "arm,armv8-pmuv3";
-+		interrupts = <GIC_SPI 68 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 69 IRQ_TYPE_LEVEL_HIGH>;
-+	};
-+
-+	dcc {
-+		compatible = "arm,vexpress,config-bus";
-+		arm,vexpress,config-bridge = <&v2m_sysreg>;
-+
-+		smbclk: osc at 4 {
-+			/* SMC clock */
-+			compatible = "arm,vexpress-osc";
-+			arm,vexpress-sysreg,func = <1 4>;
-+			freq-range = <40000000 40000000>;
-+			#clock-cells = <0>;
-+			clock-output-names = "smclk";
-+		};
-+
-+		volt at 0 {
-+			/* VIO to expansion board above */
-+			compatible = "arm,vexpress-volt";
-+			arm,vexpress-sysreg,func = <2 0>;
-+			regulator-name = "VIO_UP";
-+			regulator-min-microvolt = <800000>;
-+			regulator-max-microvolt = <1800000>;
-+			regulator-always-on;
-+		};
-+
-+		volt at 1 {
-+			/* 12V from power connector J6 */
-+			compatible = "arm,vexpress-volt";
-+			arm,vexpress-sysreg,func = <2 1>;
-+			regulator-name = "12";
-+			regulator-always-on;
-+		};
-+
-+		temp at 0 {
-+			/* FPGA temperature */
-+			compatible = "arm,vexpress-temp";
-+			arm,vexpress-sysreg,func = <4 0>;
-+			label = "FPGA";
-+		};
-+	};
-+
-+	smb {
-+		compatible = "simple-bus";
-+
-+		#address-cells = <2>;
-+		#size-cells = <1>;
-+		ranges = <0 0 0 0x08000000 0x04000000>,
-+			 <1 0 0 0x14000000 0x04000000>,
-+			 <2 0 0 0x18000000 0x04000000>,
-+			 <3 0 0 0x1c000000 0x04000000>,
-+			 <4 0 0 0x0c000000 0x04000000>,
-+			 <5 0 0 0x10000000 0x04000000>;
-+
-+		#interrupt-cells = <1>;
-+		interrupt-map-mask = <0 0 63>;
-+		interrupt-map = <0 0  0 &gic GIC_SPI  0 IRQ_TYPE_LEVEL_HIGH>,
-+				<0 0  1 &gic GIC_SPI  1 IRQ_TYPE_LEVEL_HIGH>,
-+				<0 0  2 &gic GIC_SPI  2 IRQ_TYPE_LEVEL_HIGH>,
-+				<0 0  3 &gic GIC_SPI  3 IRQ_TYPE_LEVEL_HIGH>,
-+				<0 0  4 &gic GIC_SPI  4 IRQ_TYPE_LEVEL_HIGH>,
-+				<0 0  5 &gic GIC_SPI  5 IRQ_TYPE_LEVEL_HIGH>,
-+				<0 0  6 &gic GIC_SPI  6 IRQ_TYPE_LEVEL_HIGH>,
-+				<0 0  7 &gic GIC_SPI  7 IRQ_TYPE_LEVEL_HIGH>,
-+				<0 0  8 &gic GIC_SPI  8 IRQ_TYPE_LEVEL_HIGH>,
-+				<0 0  9 &gic GIC_SPI  9 IRQ_TYPE_LEVEL_HIGH>,
-+				<0 0 10 &gic GIC_SPI 10 IRQ_TYPE_LEVEL_HIGH>,
-+				<0 0 11 &gic GIC_SPI 11 IRQ_TYPE_LEVEL_HIGH>,
-+				<0 0 12 &gic GIC_SPI 12 IRQ_TYPE_LEVEL_HIGH>,
-+				<0 0 13 &gic GIC_SPI 13 IRQ_TYPE_LEVEL_HIGH>,
-+				<0 0 14 &gic GIC_SPI 14 IRQ_TYPE_LEVEL_HIGH>,
-+				<0 0 15 &gic GIC_SPI 15 IRQ_TYPE_LEVEL_HIGH>,
-+				<0 0 16 &gic GIC_SPI 16 IRQ_TYPE_LEVEL_HIGH>,
-+				<0 0 17 &gic GIC_SPI 17 IRQ_TYPE_LEVEL_HIGH>,
-+				<0 0 18 &gic GIC_SPI 18 IRQ_TYPE_LEVEL_HIGH>,
-+				<0 0 19 &gic GIC_SPI 19 IRQ_TYPE_LEVEL_HIGH>,
-+				<0 0 20 &gic GIC_SPI 20 IRQ_TYPE_LEVEL_HIGH>,
-+				<0 0 21 &gic GIC_SPI 21 IRQ_TYPE_LEVEL_HIGH>,
-+				<0 0 22 &gic GIC_SPI 22 IRQ_TYPE_LEVEL_HIGH>,
-+				<0 0 23 &gic GIC_SPI 23 IRQ_TYPE_LEVEL_HIGH>,
-+				<0 0 24 &gic GIC_SPI 24 IRQ_TYPE_LEVEL_HIGH>,
-+				<0 0 25 &gic GIC_SPI 25 IRQ_TYPE_LEVEL_HIGH>,
-+				<0 0 26 &gic GIC_SPI 26 IRQ_TYPE_LEVEL_HIGH>,
-+				<0 0 27 &gic GIC_SPI 27 IRQ_TYPE_LEVEL_HIGH>,
-+				<0 0 28 &gic GIC_SPI 28 IRQ_TYPE_LEVEL_HIGH>,
-+				<0 0 29 &gic GIC_SPI 29 IRQ_TYPE_LEVEL_HIGH>,
-+				<0 0 30 &gic GIC_SPI 30 IRQ_TYPE_LEVEL_HIGH>,
-+				<0 0 31 &gic GIC_SPI 31 IRQ_TYPE_LEVEL_HIGH>,
-+				<0 0 32 &gic GIC_SPI 32 IRQ_TYPE_LEVEL_HIGH>,
-+				<0 0 33 &gic GIC_SPI 33 IRQ_TYPE_LEVEL_HIGH>,
-+				<0 0 34 &gic GIC_SPI 34 IRQ_TYPE_LEVEL_HIGH>,
-+				<0 0 35 &gic GIC_SPI 35 IRQ_TYPE_LEVEL_HIGH>,
-+				<0 0 36 &gic GIC_SPI 36 IRQ_TYPE_LEVEL_HIGH>,
-+				<0 0 37 &gic GIC_SPI 37 IRQ_TYPE_LEVEL_HIGH>,
-+				<0 0 38 &gic GIC_SPI 38 IRQ_TYPE_LEVEL_HIGH>,
-+				<0 0 39 &gic GIC_SPI 39 IRQ_TYPE_LEVEL_HIGH>,
-+				<0 0 40 &gic GIC_SPI 40 IRQ_TYPE_LEVEL_HIGH>,
-+				<0 0 41 &gic GIC_SPI 41 IRQ_TYPE_LEVEL_HIGH>,
-+				<0 0 42 &gic GIC_SPI 42 IRQ_TYPE_LEVEL_HIGH>;
-+
-+		/include/ "../../../../arm/boot/dts/vexpress-v2m-rs1.dtsi"
-+	};
-+};
--- 
-2.1.4
+Eric
+>  };
+>  
+> +#define for_each_lpi(dev, itte, kvm) \
+> +	list_for_each_entry(dev, &(kvm)->arch.vgic.its.device_list, dev_list) \
+> +		list_for_each_entry(itte, &(dev)->itt, itte_list)
+> +
+> +static struct its_itte *find_itte_by_lpi(struct kvm *kvm, int lpi)
+> +{
+> +	struct its_device *device;
+> +	struct its_itte *itte;
+> +
+> +	for_each_lpi(device, itte, kvm) {
+> +		if (itte->lpi == lpi)
+> +			return itte;
+> +	}
+> +	return NULL;
+> +}
+> +
+>  #define BASER_BASE_ADDRESS(x) ((x) & 0xfffffffff000ULL)
+>  
+>  /* distributor lock is hold by the VGIC MMIO handler */
+> @@ -145,6 +163,54 @@ static bool handle_mmio_gits_idregs(struct kvm_vcpu *vcpu,
+>  	return false;
+>  }
+>  
+> +/*
+> + * Find all enabled and pending LPIs and queue them into the list
+> + * registers.
+> + * The dist lock is held by the caller.
+> + */
+> +bool vits_queue_lpis(struct kvm_vcpu *vcpu)
+> +{
+> +	struct vgic_its *its = &vcpu->kvm->arch.vgic.its;
+> +	struct its_device *device;
+> +	struct its_itte *itte;
+> +	bool ret = true;
+> +
+> +	spin_lock(&its->lock);
+> +	for_each_lpi(device, itte, vcpu->kvm) {
+> +		if (!itte->enabled || !test_bit(vcpu->vcpu_id, itte->pending))
+> +			continue;
+> +
+> +		if (!itte->collection)
+> +			continue;
+> +
+> +		if (itte->collection->target_addr != vcpu->vcpu_id)
+> +			continue;
+> +
+> +		clear_bit(vcpu->vcpu_id, itte->pending);
+> +
+> +		ret &= vgic_queue_irq(vcpu, 0, itte->lpi);
+> +	}
+> +
+> +	spin_unlock(&its->lock);
+> +	return ret;
+> +}
+> +
+> +/* is called with the distributor lock held by the caller */
+> +void vits_unqueue_lpi(struct kvm_vcpu *vcpu, int lpi)
+> +{
+> +	struct vgic_its *its = &vcpu->kvm->arch.vgic.its;
+> +	struct its_itte *itte;
+> +
+> +	spin_lock(&its->lock);
+> +
+> +	/* Find the right ITTE and put the pending state back in there */
+> +	itte = find_itte_by_lpi(vcpu->kvm, lpi);
+> +	if (itte)
+> +		set_bit(vcpu->vcpu_id, itte->pending);
+> +
+> +	spin_unlock(&its->lock);
+> +}
+> +
+>  static int vits_handle_command(struct kvm_vcpu *vcpu, u64 *its_cmd)
+>  {
+>  	return -ENODEV;
+> diff --git a/virt/kvm/arm/its-emul.h b/virt/kvm/arm/its-emul.h
+> index 472a6d0..cc5d5ff 100644
+> --- a/virt/kvm/arm/its-emul.h
+> +++ b/virt/kvm/arm/its-emul.h
+> @@ -33,4 +33,7 @@ void vgic_enable_lpis(struct kvm_vcpu *vcpu);
+>  int vits_init(struct kvm *kvm);
+>  void vits_destroy(struct kvm *kvm);
+>  
+> +bool vits_queue_lpis(struct kvm_vcpu *vcpu);
+> +void vits_unqueue_lpi(struct kvm_vcpu *vcpu, int irq);
+> +
+>  #endif
+> diff --git a/virt/kvm/arm/vgic-v3-emul.c b/virt/kvm/arm/vgic-v3-emul.c
+> index fa81c4b..66640c2fa 100644
+> --- a/virt/kvm/arm/vgic-v3-emul.c
+> +++ b/virt/kvm/arm/vgic-v3-emul.c
+> @@ -901,6 +901,8 @@ void vgic_v3_init_emulation(struct kvm *kvm)
+>  	dist->vm_ops.init_model = vgic_v3_init_model;
+>  	dist->vm_ops.destroy_model = vgic_v3_destroy_model;
+>  	dist->vm_ops.map_resources = vgic_v3_map_resources;
+> +	dist->vm_ops.queue_lpis = vits_queue_lpis;
+> +	dist->vm_ops.unqueue_lpi = vits_unqueue_lpi;
+>  
+>  	kvm->arch.max_vcpus = KVM_MAX_VCPUS;
+>  }
+> diff --git a/virt/kvm/arm/vgic.c b/virt/kvm/arm/vgic.c
+> index 0a9236d..9f7b05f 100644
+> --- a/virt/kvm/arm/vgic.c
+> +++ b/virt/kvm/arm/vgic.c
+> @@ -97,6 +97,20 @@ static bool queue_sgi(struct kvm_vcpu *vcpu, int irq)
+>  	return vcpu->kvm->arch.vgic.vm_ops.queue_sgi(vcpu, irq);
+>  }
+>  
+> +static bool vgic_queue_lpis(struct kvm_vcpu *vcpu)
+> +{
+> +	if (vcpu->kvm->arch.vgic.vm_ops.queue_lpis)
+> +		return vcpu->kvm->arch.vgic.vm_ops.queue_lpis(vcpu);
+> +	else
+> +		return true;
+> +}
+> +
+> +static void vgic_unqueue_lpi(struct kvm_vcpu *vcpu, int irq)
+> +{
+> +	if (vcpu->kvm->arch.vgic.vm_ops.unqueue_lpi)
+> +		vcpu->kvm->arch.vgic.vm_ops.unqueue_lpi(vcpu, irq);
+> +}
+> +
+>  int kvm_vgic_map_resources(struct kvm *kvm)
+>  {
+>  	return kvm->arch.vgic.vm_ops.map_resources(kvm, vgic);
+> @@ -1149,25 +1163,33 @@ static void vgic_retire_disabled_irqs(struct kvm_vcpu *vcpu)
+>  static void vgic_queue_irq_to_lr(struct kvm_vcpu *vcpu, int irq,
+>  				 int lr_nr, int sgi_source_id)
+>  {
+> +	struct vgic_dist *dist = &vcpu->kvm->arch.vgic;
+>  	struct vgic_lr vlr;
+>  
+>  	vlr.state = 0;
+>  	vlr.irq = irq;
+>  	vlr.source = sgi_source_id;
+>  
+> -	if (vgic_irq_is_active(vcpu, irq)) {
+> -		vlr.state |= LR_STATE_ACTIVE;
+> -		kvm_debug("Set active, clear distributor: 0x%x\n", vlr.state);
+> -		vgic_irq_clear_active(vcpu, irq);
+> -		vgic_update_state(vcpu->kvm);
+> -	} else if (vgic_dist_irq_is_pending(vcpu, irq)) {
+> -		vlr.state |= LR_STATE_PENDING;
+> -		kvm_debug("Set pending: 0x%x\n", vlr.state);
+> -	}
+> -
+> -	if (!vgic_irq_is_edge(vcpu, irq))
+> -		vlr.state |= LR_EOI_INT;
+> +	/* We care only about state for SGIs/PPIs/SPIs, not for LPIs */
+> +	if (irq < dist->nr_irqs) {
+> +		if (vgic_irq_is_active(vcpu, irq)) {
+> +			vlr.state |= LR_STATE_ACTIVE;
+> +			kvm_debug("Set active, clear distributor: 0x%x\n",
+> +				  vlr.state);
+> +			vgic_irq_clear_active(vcpu, irq);
+> +			vgic_update_state(vcpu->kvm);
+> +		} else if (vgic_dist_irq_is_pending(vcpu, irq)) {
+> +			vlr.state |= LR_STATE_PENDING;
+> +			kvm_debug("Set pending: 0x%x\n", vlr.state);
+> +		}
+>  
+> +		if (!vgic_irq_is_edge(vcpu, irq))
+> +			vlr.state |= LR_EOI_INT;
+> +	} else {
+> +		/* If this is an LPI, it can only be pending */
+> +		if (irq >= 8192)
+> +			vlr.state |= LR_STATE_PENDING;
+> +	}
+>  	vgic_set_lr(vcpu, lr_nr, vlr);
+>  	vgic_sync_lr_elrsr(vcpu, lr_nr, vlr);
+>  }
+> @@ -1179,7 +1201,6 @@ static void vgic_queue_irq_to_lr(struct kvm_vcpu *vcpu, int irq,
+>   */
+>  bool vgic_queue_irq(struct kvm_vcpu *vcpu, u8 sgi_source_id, int irq)
+>  {
+> -	struct vgic_dist *dist = &vcpu->kvm->arch.vgic;
+>  	u64 elrsr = vgic_get_elrsr(vcpu);
+>  	unsigned long *elrsr_ptr = u64_to_bitmask(&elrsr);
+>  	int lr;
+> @@ -1187,7 +1208,6 @@ bool vgic_queue_irq(struct kvm_vcpu *vcpu, u8 sgi_source_id, int irq)
+>  	/* Sanitize the input... */
+>  	BUG_ON(sgi_source_id & ~7);
+>  	BUG_ON(sgi_source_id && irq >= VGIC_NR_SGIS);
+> -	BUG_ON(irq >= dist->nr_irqs);
+>  
+>  	kvm_debug("Queue IRQ%d\n", irq);
+>  
+> @@ -1267,8 +1287,12 @@ static void __kvm_vgic_flush_hwstate(struct kvm_vcpu *vcpu)
+>  			overflow = 1;
+>  	}
+>  
+> -
+> -
+> +	/*
+> +	 * LPIs are not mapped in our bitmaps, so we leave the iteration
+> +	 * to the ITS emulation code.
+> +	 */
+> +	if (!vgic_queue_lpis(vcpu))
+> +		overflow = 1;
+>  
+>  epilog:
+>  	if (overflow) {
+> @@ -1389,6 +1413,16 @@ static void __kvm_vgic_sync_hwstate(struct kvm_vcpu *vcpu)
+>  	for_each_clear_bit(lr_nr, elrsr_ptr, vgic_cpu->nr_lr) {
+>  		vlr = vgic_get_lr(vcpu, lr_nr);
+>  
+> +		/* LPIs are handled separately */
+> +		if (vlr.irq >= 8192) {
+> +			/* We just need to take care about still pending LPIs */
+> +			if (vlr.state & LR_STATE_PENDING) {
+> +				vgic_unqueue_lpi(vcpu, vlr.irq);
+> +				pending = true;
+> +			}
+> +			continue;
+> +		}
+> +
+>  		BUG_ON(!(vlr.state & LR_STATE_MASK));
+>  		pending = true;
+>  
+> @@ -1413,7 +1447,7 @@ static void __kvm_vgic_sync_hwstate(struct kvm_vcpu *vcpu)
+>  	}
+>  	vgic_update_state(vcpu->kvm);
+>  
+> -	/* vgic_update_state would not cover only-active IRQs */
+> +	/* vgic_update_state would not cover only-active IRQs or LPIs */
+>  	if (pending)
+>  		set_bit(vcpu->vcpu_id, dist->irq_pending_on_cpu);
+>  }
+> 
