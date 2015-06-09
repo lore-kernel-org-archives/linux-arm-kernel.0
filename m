@@ -1,33 +1,74 @@
-From: Haikun.Wang@freescale.com (Wang Haikun)
-Date: Tue, 9 Jun 2015 11:56:37 +0000
-Subject: [PATCH v1] arm: configs: Add Freescale LS1021A defconfig
-References: <1431951726-10992-1-git-send-email-haikun.wang@freescale.com>
- <6265444.OllNdeKdQh@wuerfel>
-Message-ID: <DM2PR0301MB0623772476D9BF44B1D7AE42F8BE0@DM2PR0301MB0623.namprd03.prod.outlook.com>
+From: pebolle@tiscali.nl (Paul Bolle)
+Date: Tue, 09 Jun 2015 13:59:35 +0200
+Subject: [PATCH v4 2/2] dma: Add Xilinx AXI Central Direct Memory Access
+ Engine driver support
+In-Reply-To: <5576C2F5.3050806@monstr.eu>
+References: <1432228035-6569-1-git-send-email-appanad@xilinx.com>
+ <1432290653.27695.97.camel@x220> <557681A7.7080202@monstr.eu>
+ <alpine.DEB.2.02.1506090808500.2069@localhost6.localdomain6>
+ <55769132.6070601@monstr.eu> <1433837720.16887.42.camel@x220>
+ <5576C2F5.3050806@monstr.eu>
+Message-ID: <1433851175.16887.83.camel@x220>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 5/20/2015 11:36 PM, Arnd Bergmann wrote:
-> On Monday 18 May 2015 20:22:06 Haikun Wang wrote:
->> Add Freescale LS1021A initial defconfig file.
->> Enable I2C, LPUART, eDMA, WDT default.
->> LS1021AQDS and LS1021ATWR boot successfully with patch.
->> Above IPs also been verified successfully.
->>
->> Signed-off-by: Haikun Wang <haikun.wang@freescale.com>
->>
->
-> Can you explain why you need a separate defconfig, aside from imx_v6_v7_defconfig
-LS1021A is different from I.MX. Also it has some special configure 
-options. So it needs a separate defconfig.
-> and multi_v7_defconfig? Please put a reason into the description above,
-> as we normally try to have only one defconfig per machine directory.
->
-> Does this machine require LPAE to function correctly?
-Yes, we need it to access 40-bit address space, such as PCIE.
+On Tue, 2015-06-09 at 12:41 +0200, Michal Simek wrote:
+> On 06/09/2015 10:15 AM, Paul Bolle wrote:
+> > Mistakes I've seen made since I started checking this stuff (a few
+> > months ago):
+> > - typos in the license ident, say "GPLv2", "GPL V2", or "BSD": generates
+> > a warning when module is loaded and taints kernel. People still get this
+> > wrong. A test in checkpatch for these typos was submitted a while ago,
+> > but it never got added;
+> 
+> Any reason for that? just lost or any problem ?
 
-Best regards,
-Wang Haikun
->
-> 	Arnd
->
+Submitter lost interest, I guess. Check
+https://lkml.org/lkml/2015/5/22/279 and note that there was no response.
+
+> > - not adding MODULE_LICENSE() to a module: also generates a warning when
+> > module is loaded and taints kernel. People still get this wrong;
+> > - adding MODULE_LICENSE() to built-in only code: pointless at best, and
+> > annoying for reviewers ("Hey, did the submitter intend to write built-in
+> > only code or modular code?");
+> > - using "Dual BSD/GPL" but not a trace of the BSD license blurb in
+> > sight, while adding that blurb is one of the very few requirements this
+> > license actually has;
+> > - license mismatch, say comment blurb states "GPL v2 (or later)" but
+> > MODULE_LICENSE() ident states "GPL v2" only (or vice versa): very easy
+> > mistake to make, happens once or twice a week.  
+> 
+> What do you mean by vice versa?
+> GPL v2 header and MODULE_LICENSE("GPL") should be fine right?
+
+Not really. The license in the comment at the top of the file is just
+GPL v2, while the MODULE_LICENSE ident adds "or later" and thus the
+right to "uplicense". So which is it: just "GPL v2" or "GPL v2 (or
+later)"? Can't say in that case.
+
+> > Did I miss anything in that list?
+> 
+> I think you miss MODULE_ALIAS problems.
+> https://lkml.org/lkml/2014/3/17/301
+
+That's outside of the license stuff, but thanks for thye pointer anyway.
+
+> > I'm afraid that most of the above can only be caught reliably by
+> > attention to detail by submitters and reviewers. That's a pity, because
+> > checking for that stuff is about as boring as it gets. (What does that
+> > say about me?)
+> 
+> yep. I have never looked at the details about these license module
+> stuff. But definitely great to have this list - will record it and keep
+> my eye on our xilinx drivers.
+> 
+> BTW: Some time ago we discussed SPDX License Identifier which could
+> simplify license checking.
+> https://lkml.org/lkml/2014/2/21/21
+
+I think I saw that fly by. Wasn't that idea shot down?
+
+Thanks,
+
+
+Paul Bolle
