@@ -1,24 +1,120 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 9 Jun 2015 16:01:28 +0100
-Subject: [PATCH] ARM: Re-enable TRACE_IRQFLAGS_SUPPORT on ARMv7-M
-In-Reply-To: <5576D0FE.10900@linaro.org>
-References: <1433802288-25508-1-git-send-email-mcoquelin.stm32@gmail.com>
- <20150608224749.GB7557@n2100.arm.linux.org.uk>
- <CALszF6DPzhAufUyWW-a3X7Cp4=tjSyCBM=Y4LcnWnUH=41qeoQ@mail.gmail.com>
- <5576D0FE.10900@linaro.org>
-Message-ID: <20150609150127.GF7557@n2100.arm.linux.org.uk>
+From: m-karicheri2@ti.com (Murali Karicheri)
+Date: Tue, 9 Jun 2015 11:25:34 -0400
+Subject: [PATCH 1/2] clk: keystone: add support for post divider register
+ for main pll
+In-Reply-To: <1432915453-409-1-git-send-email-m-karicheri2@ti.com>
+References: <1432915453-409-1-git-send-email-m-karicheri2@ti.com>
+Message-ID: <5577056E.5060009@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 09, 2015 at 12:41:50PM +0100, Daniel Thompson wrote:
-> Does the following patch, which makes the arch_irqs_disabled()
-> implementation from asm-generic available on arm, fix the build for you?
+On 05/29/2015 12:04 PM, Murali Karicheri wrote:
+> Main PLL controller has post divider bits in a separate register in
+> pll controller. Use the value from this register instead of fixed
+> divider when available.
+>
+> Signed-off-by: Murali Karicheri <m-karicheri2@ti.com>
+> ---
+>   .../devicetree/bindings/clock/keystone-pll.txt       |  8 ++++----
+>   drivers/clk/keystone/pll.c                           | 20 ++++++++++++++++++--
+>   2 files changed, 22 insertions(+), 6 deletions(-)
+>
+> diff --git a/Documentation/devicetree/bindings/clock/keystone-pll.txt b/Documentation/devicetree/bindings/clock/keystone-pll.txt
+> index 225990f..47570d2 100644
+> --- a/Documentation/devicetree/bindings/clock/keystone-pll.txt
+> +++ b/Documentation/devicetree/bindings/clock/keystone-pll.txt
+> @@ -15,8 +15,8 @@ Required properties:
+>   - compatible : shall be "ti,keystone,main-pll-clock" or "ti,keystone,pll-clock"
+>   - clocks : parent clock phandle
+>   - reg - pll control0 and pll multipler registers
+> -- reg-names : control and multiplier. The multiplier is applicable only for
+> -		main pll clock
+> +- reg-names : control, multiplier and post-divider. The multiplier and
+> +		post-divider registers are applicable only for main pll clock
+>   - fixed-postdiv : fixed post divider value. If absent, use clkod register bits
+>   		for postdiv
+>
+> @@ -25,8 +25,8 @@ Example:
+>   		#clock-cells = <0>;
+>   		compatible = "ti,keystone,main-pll-clock";
+>   		clocks = <&refclksys>;
+> -		reg = <0x02620350 4>, <0x02310110 4>;
+> -		reg-names = "control", "multiplier";
+> +		reg = <0x02620350 4>, <0x02310110 4>, <0x02310108 4>;
+> +		reg-names = "control", "multiplier", "post-divider";
+>   		fixed-postdiv = <2>;
+>   	};
+>
+> diff --git a/drivers/clk/keystone/pll.c b/drivers/clk/keystone/pll.c
+> index 0dd8a4b..4a375ea 100644
+> --- a/drivers/clk/keystone/pll.c
+> +++ b/drivers/clk/keystone/pll.c
+> @@ -37,7 +37,8 @@
+>    *	Main PLL or any other PLLs in the device such as ARM PLL, DDR PLL
+>    *	or PA PLL available on keystone2. These PLLs are controlled by
+>    *	this register. Main PLL is controlled by a PLL controller.
+> - * @pllm: PLL register map address
+> + * @pllm: PLL register map address for multiplier bits
+> + * @pllod: PLL register map address for post divider bits
+>    * @pll_ctl0: PLL controller map address
+>    * @pllm_lower_mask: multiplier lower mask
+>    * @pllm_upper_mask: multiplier upper mask
+> @@ -53,6 +54,7 @@ struct clk_pll_data {
+>   	u32 phy_pllm;
+>   	u32 phy_pll_ctl0;
+>   	void __iomem *pllm;
+> +	void __iomem *pllod;
+>   	void __iomem *pll_ctl0;
+>   	u32 pllm_lower_mask;
+>   	u32 pllm_upper_mask;
+> @@ -102,7 +104,11 @@ static unsigned long clk_pllclk_recalc(struct clk_hw *hw,
+>   		/* read post divider from od bits*/
+>   		postdiv = ((val & pll_data->clkod_mask) >>
+>   				 pll_data->clkod_shift) + 1;
+> -	else
+> +	else if (pll_data->pllod) {
+> +		postdiv = readl(pll_data->pllod);
+> +		postdiv = ((postdiv & pll_data->clkod_mask) >>
+> +				pll_data->clkod_shift) + 1;
+> +	} else
+>   		postdiv = pll_data->postdiv;
+>
+>   	rate /= (prediv + 1);
+> @@ -172,12 +178,21 @@ static void __init _of_pll_clk_init(struct device_node *node, bool pllctrl)
+>   		/* assume the PLL has output divider register bits */
+>   		pll_data->clkod_mask = CLKOD_MASK;
+>   		pll_data->clkod_shift = CLKOD_SHIFT;
+> +
+> +		/*
+> +		 * Check if there is an post-divider register. If not
+> +		 * assume od bits are part of control register.
+> +		 */
+> +		i = of_property_match_string(node, "reg-names",
+> +					     "post-divider");
+> +		pll_data->pllod = of_iomap(node, i);
+>   	}
+>
+>   	i = of_property_match_string(node, "reg-names", "control");
+>   	pll_data->pll_ctl0 = of_iomap(node, i);
+>   	if (!pll_data->pll_ctl0) {
+>   		pr_err("%s: ioremap failed\n", __func__);
+> +		iounmap(pll_data->pllod);
+>   		goto out;
+>   	}
+>
+> @@ -193,6 +208,7 @@ static void __init _of_pll_clk_init(struct device_node *node, bool pllctrl)
+>   		pll_data->pllm = of_iomap(node, i);
+>   		if (!pll_data->pllm) {
+>   			iounmap(pll_data->pll_ctl0);
+> +			iounmap(pll_data->pllod);
+>   			goto out;
+>   		}
+>   	}
+>
+Dear Maintainers?
 
-Yes, this is exactly the kind of fix for this I'm looking for.  Once
-everyone's happy with it, it can find it's way to the patch system.
-
-Thanks.
+Any comments please? If not, can this be applied?
 
 -- 
-FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
-according to speedtest.net.
+Murali Karicheri
+Linux Kernel, Keystone
