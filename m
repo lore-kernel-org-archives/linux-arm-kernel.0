@@ -1,40 +1,99 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 9 Jun 2015 22:27:09 +0100
-Subject: [PATCH 02/15] regmap: kill off set_irq_flags usage
-In-Reply-To: <20150609191211.GA14071@sirena.org.uk>
-References: <1433874401-27161-1-git-send-email-robh@kernel.org>
- <1433874401-27161-3-git-send-email-robh@kernel.org>
- <20150609191211.GA14071@sirena.org.uk>
-Message-ID: <20150609212709.GJ7557@n2100.arm.linux.org.uk>
+From: sebastian@breakpoint.cc (Sebastian Andrzej Siewior)
+Date: Tue, 9 Jun 2015 23:33:38 +0200
+Subject: [PATCH v5 1/6] mtd: nand: vf610_nfc: Freescale NFC for VF610,
+ MPC5125 and others
+In-Reply-To: <1433584416-29607-2-git-send-email-stefan@agner.ch>
+References: <1433584416-29607-1-git-send-email-stefan@agner.ch>
+ <1433584416-29607-2-git-send-email-stefan@agner.ch>
+Message-ID: <20150609213338.GD5720@breakpoint.cc>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 09, 2015 at 08:12:11PM +0100, Mark Brown wrote:
-> On Tue, Jun 09, 2015 at 01:26:28PM -0500, Rob Herring wrote:
-> 
-> > clear that is really needed. There appears to be a great deal of blind
-> > copy and paste of this code.
-> 
-> Well, I don't think it's blind - IIRC it's just that this code all
-> predates the genirq flags and ARM had the opposite default to x86 (I
-> guess because of being conservative about all the random interrupt
-> controllers you get and what might be hanging off them) so we needed to
-> do this dance to get interrupts to work.
+On 2015-06-06 11:53:31 [+0200], Stefan Agner wrote:
+> diff --git a/drivers/mtd/nand/vf610_nfc.c b/drivers/mtd/nand/vf610_nfc.c
+> new file mode 100644
+> index 0000000..bb5ee11
+> --- /dev/null
+> +++ b/drivers/mtd/nand/vf610_nfc.c
+?
+> +/* Clear flags for upcoming command */
+> +static inline void vf610_nfc_clear_status(struct vf610_nfc *nfc)
+> +{
+> +	void __iomem *reg = nfc->regs + NFC_IRQ_STATUS;
+> +	u32 tmp = readl_relaxed(reg);
+		  ^^^
+> +	tmp |= CMD_DONE_CLEAR_BIT | IDLE_CLEAR_BIT;
+> +	writel_relaxed(tmp, reg);
+	^^^
+> +}
+?
+> +static inline void vf610_nfc_done(struct vf610_nfc *nfc)
+> +{
+> +	unsigned long timeout = msecs_to_jiffies(100);
+> +
+> +	/*
+> +	 * Barrier is needed after this write. This write need
+> +	 * to be done before reading the next register the first
+> +	 * time.
+> +	 * vf610_nfc_set implicates such a barrier by using writel
+> +	 * to write to the register.
+> +	 */
+> +	vf610_nfc_set(nfc, NFC_IRQ_STATUS, IDLE_EN_BIT);
+> +	vf610_nfc_set(nfc, NFC_FLASH_CMD2, START_BIT);
+> +
+> +	if (!(vf610_nfc_read(nfc, NFC_IRQ_STATUS) & IDLE_IRQ_BIT)) {
+> +		if (!wait_for_completion_timeout(&nfc->cmd_done, timeout))
+> +			dev_warn(nfc->dev, "Timeout while waiting for BUSY.\n");
 
-It's because there exist platforms where specific IRQs are permanently
-asserted, and unexpectedly claiming such an interrupt (eg, through IRQ
-probing) would lock the system - at least before we ended up with the
-detection in genirq (which has its roots in the ARM code.)
+Can you or did you test for this timeout to happen? Something like reading from
+a sector which is BAD for instance might trigger it. Printing a warning is
+certainly a good idea.
 
-The problem is we're dealing with history here, and flipping ARM from
-defaulting to "IRQs not valid" to "All IRQs valid" is a far from
-trivial task.
+> +	}
+> +	vf610_nfc_clear_status(nfc);
+> +}
 
-I'd suggest people think carefully about applying these patches.  They
-have only been around for a matter of hours, so to rush to apply them
-when they haven't been revewied as a whole to assess whether the approach
-is the right one is rather hasty.
+?
+> +/*
+> + * This function supports Vybrid only (MPC5125 would have full RB and four CS)
+> + */
+> +static void vf610_nfc_select_chip(struct mtd_info *mtd, int chip)
+> +{
+> +#ifdef CONFIG_SOC_VF610
+> +	struct vf610_nfc *nfc = mtd_to_nfc(mtd);
+> +	u32 tmp = vf610_nfc_read(nfc, NFC_ROW_ADDR);
+> +
+> +	tmp &= ~(ROW_ADDR_CHIP_SEL_RB_MASK | ROW_ADDR_CHIP_SEL_MASK);
+> +	tmp |= 1 << ROW_ADDR_CHIP_SEL_RB_SHIFT;
+> +
+> +	if (chip == 0)
+> +		tmp |= 1 << ROW_ADDR_CHIP_SEL_SHIFT;
+> +	else if (chip == 1)
+> +		tmp |= 2 << ROW_ADDR_CHIP_SEL_SHIFT;
+> +
+> +	vf610_nfc_write(nfc, NFC_ROW_ADDR, tmp);
+> +#endif
+> +}
+> +
+> +static const struct of_device_id vf610_nfc_dt_ids[] = {
+> +	{ .compatible = "fsl,vf610-nfc" },
+> +	{ .compatible = "fsl,mpc5125-nfc" },
 
--- 
-FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
-according to speedtest.net.
+I advise against a "fsl,mpc5125-nfc" binding. First of all it is the
+same as the previous one. Second of all it was not tested at all on the
+SoC it suggests to work. Plus the chip select function has a comment hat
+it won't work on MPC5125. So it really makes no sense to add it here.
+
+I don't mind if you put the code behind CONFIG_SOC_VF610. Later (if
+someone adds additional support) it will be best to use the .data member
+to select the proper SoC support.
+
+While you add a new compatible please make sure you describe the binding
+in Documentation/devicetree/bindings (in case you did and I missed the
+patch, ignore this :))
+
+> +	{ /* sentinel */ }
+> +};
+> +MODULE_DEVICE_TABLE(of, vf610_nfc_dt_ids);
+
+Sebastian
