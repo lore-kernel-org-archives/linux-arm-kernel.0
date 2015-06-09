@@ -1,35 +1,38 @@
-From: daniel.thompson@linaro.org (Daniel Thompson)
-Date: Tue, 09 Jun 2015 18:37:47 +0100
-Subject: [PATCH] ARM: Re-enable TRACE_IRQFLAGS_SUPPORT on ARMv7-M
-In-Reply-To: <20150609150127.GF7557@n2100.arm.linux.org.uk>
-References: <1433802288-25508-1-git-send-email-mcoquelin.stm32@gmail.com>
- <20150608224749.GB7557@n2100.arm.linux.org.uk>
- <CALszF6DPzhAufUyWW-a3X7Cp4=tjSyCBM=Y4LcnWnUH=41qeoQ@mail.gmail.com>
- <5576D0FE.10900@linaro.org> <20150609150127.GF7557@n2100.arm.linux.org.uk>
-Message-ID: <5577246B.3080602@linaro.org>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Tue, 09 Jun 2015 19:00:00 +0100
+Subject: [PATCH v5 1/2] arm64: kvm: allows kvm cpu hotplug
+In-Reply-To: <1432877920-12527-2-git-send-email-takahiro.akashi@linaro.org>
+References: <1432877920-12527-1-git-send-email-takahiro.akashi@linaro.org>
+ <1432877920-12527-2-git-send-email-takahiro.akashi@linaro.org>
+Message-ID: <557729A0.1030700@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/06/15 16:01, Russell King - ARM Linux wrote:
-> On Tue, Jun 09, 2015 at 12:41:50PM +0100, Daniel Thompson wrote:
->> Does the following patch, which makes the arch_irqs_disabled()
->> implementation from asm-generic available on arm, fix the build for you?
->
-> Yes, this is exactly the kind of fix for this I'm looking for.  Once
-> everyone's happy with it, it can find it's way to the patch system.
+Hi Takahiro,
 
- From my side, using v4.1-rc6 plus the patch, I can build all defconfigs 
-and both versatile_defconfig and multi_v7_defconfig remain bootable (so 
-both ways through the arch #ifdef in irqflag.h).
+On 29/05/15 06:38, AKASHI Takahiro wrote:
+> The current kvm implementation on arm64 does cpu-specific initialization
+> at system boot, and has no way to gracefully shutdown a core in terms of
+> kvm. This prevents, especially, kexec from rebooting the system on a boot
+> core in EL2.
+> 
+> This patch adds a cpu tear-down function and also puts an existing cpu-init
+> code into a separate function, kvm_arch_hardware_disable() and
+> kvm_arch_hardware_enable() respectively.
+> We don't need arm64-specific cpu hotplug hook any more.
+> 
+> Since this patch modifies common part of code between arm and arm64, one
+> stub definition, __cpu_reset_hyp_mode(), is added on arm side to avoid
+> compiling errors.
+> 
+> Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
 
-Similarly working on linux-next-20150608 plus the patch I am able to 
-build and boot Maxime's stm32 code (and show that without the patch it 
-doesn't build).
+This is starting to look good. Any chance you or Geoff could repost the
+whole series? This would help getting a better view of the whole thing,
+and hopefully put it on track for 4.3.
 
- From my side I think that makes it good to go.
+Thanks,
 
-So... in the absense of objections I will send it to the patch tracker 
-tomorrow.
-
-
-Daniel.
+	M.
+-- 
+Jazz is not dead. It just smells funny...
