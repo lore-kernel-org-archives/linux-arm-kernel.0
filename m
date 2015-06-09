@@ -1,183 +1,51 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Tue,  9 Jun 2015 18:46:57 +0200
-Subject: [PATCH 05/34] pinctrl: mvebu: armada-xp: remove non-existing VDD
- cpu_pd functions
+Date: Tue,  9 Jun 2015 18:47:13 +0200
+Subject: [PATCH 21/34] pinctrl: mvebu: armada-370: align VDD cpu-pd pin naming
+ with datasheet
 In-Reply-To: <1433868446-11028-1-git-send-email-thomas.petazzoni@free-electrons.com>
 References: <1433868446-11028-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1433868446-11028-6-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1433868446-11028-22-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The latest version of the Armada XP datasheet no longer documents the
-VDD cpu_pd functions, which might indicate they are not working and/or
-not supported. This commit ensures the pinctrl driver matches the
-datasheet.
+For consistency with the datasheet, this commit renames the VDD
+function of the MPP4 pin.
+
+While this changes the DT compatibility, it is not considered to be a
+problem since this pin is unlikely to be used for anything but
+debugging purposes.
 
 Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-Cc: <stable@vger.kernel.org> # v3.7+
-Fixes: 463e270f766a ("pinctrl: mvebu: add pinctrl driver for Armada XP")
 ---
- .../bindings/pinctrl/marvell,armada-xp-pinctrl.txt | 26 +++++++----------
- drivers/pinctrl/mvebu/pinctrl-armada-xp.c          | 33 +++++++---------------
- 2 files changed, 20 insertions(+), 39 deletions(-)
+ .../devicetree/bindings/pinctrl/marvell,armada-370-pinctrl.txt          | 2 +-
+ drivers/pinctrl/mvebu/pinctrl-armada-370.c                              | 2 +-
+ 2 files changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/pinctrl/marvell,armada-xp-pinctrl.txt b/Documentation/devicetree/bindings/pinctrl/marvell,armada-xp-pinctrl.txt
-index 974168d..b347b85 100644
---- a/Documentation/devicetree/bindings/pinctrl/marvell,armada-xp-pinctrl.txt
-+++ b/Documentation/devicetree/bindings/pinctrl/marvell,armada-xp-pinctrl.txt
-@@ -44,13 +44,13 @@ mpp22         22       gpio, ge0(rxd6), ge1(rxctl), lcd(d22), sata0(prsnt)
- mpp23         23       gpio, ge0(rxd7), ge1(rxclk), lcd(d23), sata1(prsnt)
- mpp24         24       gpio, lcd(hsync), sata1(prsnt), tdm(rst)
- mpp25         25       gpio, lcd(vsync), sata0(prsnt), tdm(pclk)
--mpp26         26       gpio, lcd(clk), tdm(fsync), vdd(cpu1-pd)
-+mpp26         26       gpio, lcd(clk), tdm(fsync)
- mpp27         27       gpio, lcd(e), tdm(dtx), ptp(trig)
- mpp28         28       gpio, lcd(pwm), tdm(drx), ptp(evreq)
--mpp29         29       gpio, lcd(ref-clk), tdm(int0), ptp(clk), vdd(cpu0-pd)
-+mpp29         29       gpio, lcd(ref-clk), tdm(int0), ptp(clk)
- mpp30         30       gpio, tdm(int1), sd0(clk)
--mpp31         31       gpio, tdm(int2), sd0(cmd), vdd(cpu0-pd)
--mpp32         32       gpio, tdm(int3), sd0(d0), vdd(cpu1-pd)
-+mpp31         31       gpio, tdm(int2), sd0(cmd)
-+mpp32         32       gpio, tdm(int3), sd0(d0)
- mpp33         33       gpio, tdm(int4), sd0(d1), mem(bat)
- mpp34         34       gpio, tdm(int5), sd0(d2), sata0(prsnt)
- mpp35         35       gpio, tdm(int6), sd0(d3), sata1(prsnt)
-@@ -58,14 +58,11 @@ mpp36         36       gpio, spi(mosi)
- mpp37         37       gpio, spi(miso)
- mpp38         38       gpio, spi(sck)
- mpp39         39       gpio, spi(cs0)
--mpp40         40       gpio, spi(cs1), uart2(cts), lcd(vga-hsync), vdd(cpu1-pd),
--                       pcie(clkreq0)
-+mpp40         40       gpio, spi(cs1), uart2(cts), lcd(vga-hsync), pcie(clkreq0)
- mpp41         41       gpio, spi(cs2), uart2(rts), lcd(vga-vsync), sata1(prsnt),
-                        pcie(clkreq1)
--mpp42         42       gpio, uart2(rxd), uart0(cts), tdm(int7), tdm-1(timer),
--                       vdd(cpu0-pd)
--mpp43         43       gpio, uart2(txd), uart0(rts), spi(cs3), pcie(rstout),
--                       vdd(cpu2-3-pd){1}
-+mpp42         42       gpio, uart2(rxd), uart0(cts), tdm(int7), tdm-1(timer)
-+mpp43         43       gpio, uart2(txd), uart0(rts), spi(cs3), pcie(rstout)
- mpp44         44       gpio, uart2(cts), uart3(rxd), spi(cs4), pcie(clkreq2),
-                        mem(bat)
- mpp45         45       gpio, uart2(rts), uart3(txd), spi(cs5), sata1(prsnt)
-@@ -84,9 +81,9 @@ mpp51         51       gpio, dev(ad16)
- mpp52         52       gpio, dev(ad17)
- mpp53         53       gpio, dev(ad18)
- mpp54         54       gpio, dev(ad19)
--mpp55         55       gpio, dev(ad20), vdd(cpu0-pd)
--mpp56         56       gpio, dev(ad21), vdd(cpu1-pd)
--mpp57         57       gpio, dev(ad22), vdd(cpu2-3-pd){1}
-+mpp55         55       gpio, dev(ad20)
-+mpp56         56       gpio, dev(ad21)
-+mpp57         57       gpio, dev(ad22)
- mpp58         58       gpio, dev(ad23)
- mpp59         59       gpio, dev(ad24)
- mpp60         60       gpio, dev(ad25)
-@@ -96,6 +93,3 @@ mpp63         63       gpio, dev(ad28)
- mpp64         64       gpio, dev(ad29)
- mpp65         65       gpio, dev(ad30)
- mpp66         66       gpio, dev(ad31)
--
--Notes:
--* {1} vdd(cpu2-3-pd) only available on mv78460.
-diff --git a/drivers/pinctrl/mvebu/pinctrl-armada-xp.c b/drivers/pinctrl/mvebu/pinctrl-armada-xp.c
-index 7310c40..0301bd2 100644
---- a/drivers/pinctrl/mvebu/pinctrl-armada-xp.c
-+++ b/drivers/pinctrl/mvebu/pinctrl-armada-xp.c
-@@ -14,10 +14,7 @@
-  * available: mv78230, mv78260 and mv78460. From a pin muxing
-  * perspective, the mv78230 has 49 MPP pins. The mv78260 and mv78460
-  * both have 67 MPP pins (more GPIOs and address lines for the memory
-- * bus mainly). The only difference between the mv78260 and the
-- * mv78460 in terms of pin muxing is the addition of two functions on
-- * pins 43 and 56 to access the VDD of the CPU2 and 3 (mv78260 has two
-- * cores, mv78460 has four cores).
-+ * bus mainly).
-  */
- 
- #include <linux/err.h>
-@@ -182,8 +179,7 @@ static struct mvebu_mpp_mode armada_xp_mpp_modes[] = {
- 	MPP_MODE(26,
- 		 MPP_VAR_FUNCTION(0x0, "gpio", NULL,        V_MV78230_PLUS),
- 		 MPP_VAR_FUNCTION(0x3, "tdm", "fsync",      V_MV78230_PLUS),
--		 MPP_VAR_FUNCTION(0x4, "lcd", "clk",        V_MV78230_PLUS),
--		 MPP_VAR_FUNCTION(0x5, "vdd", "cpu1-pd",    V_MV78230_PLUS)),
-+		 MPP_VAR_FUNCTION(0x4, "lcd", "clk",        V_MV78230_PLUS)),
- 	MPP_MODE(27,
- 		 MPP_VAR_FUNCTION(0x0, "gpio", NULL,        V_MV78230_PLUS),
- 		 MPP_VAR_FUNCTION(0x1, "ptp", "trig",       V_MV78230_PLUS),
-@@ -198,8 +194,7 @@ static struct mvebu_mpp_mode armada_xp_mpp_modes[] = {
- 		 MPP_VAR_FUNCTION(0x0, "gpio", NULL,        V_MV78230_PLUS),
- 		 MPP_VAR_FUNCTION(0x1, "ptp", "clk",        V_MV78230_PLUS),
- 		 MPP_VAR_FUNCTION(0x3, "tdm", "int0",       V_MV78230_PLUS),
--		 MPP_VAR_FUNCTION(0x4, "lcd", "ref-clk",    V_MV78230_PLUS),
--		 MPP_VAR_FUNCTION(0x5, "vdd", "cpu0-pd",    V_MV78230_PLUS)),
-+		 MPP_VAR_FUNCTION(0x4, "lcd", "ref-clk",    V_MV78230_PLUS)),
- 	MPP_MODE(30,
- 		 MPP_VAR_FUNCTION(0x0, "gpio", NULL,        V_MV78230_PLUS),
- 		 MPP_VAR_FUNCTION(0x1, "sd0", "clk",        V_MV78230_PLUS),
-@@ -207,13 +202,11 @@ static struct mvebu_mpp_mode armada_xp_mpp_modes[] = {
- 	MPP_MODE(31,
- 		 MPP_VAR_FUNCTION(0x0, "gpio", NULL,        V_MV78230_PLUS),
- 		 MPP_VAR_FUNCTION(0x1, "sd0", "cmd",        V_MV78230_PLUS),
--		 MPP_VAR_FUNCTION(0x3, "tdm", "int2",       V_MV78230_PLUS),
--		 MPP_VAR_FUNCTION(0x5, "vdd", "cpu0-pd",    V_MV78230_PLUS)),
-+		 MPP_VAR_FUNCTION(0x3, "tdm", "int2",       V_MV78230_PLUS)),
- 	MPP_MODE(32,
- 		 MPP_VAR_FUNCTION(0x0, "gpio", NULL,        V_MV78230_PLUS),
- 		 MPP_VAR_FUNCTION(0x1, "sd0", "d0",         V_MV78230_PLUS),
--		 MPP_VAR_FUNCTION(0x3, "tdm", "int3",       V_MV78230_PLUS),
--		 MPP_VAR_FUNCTION(0x5, "vdd", "cpu1-pd",    V_MV78230_PLUS)),
-+		 MPP_VAR_FUNCTION(0x3, "tdm", "int3",       V_MV78230_PLUS)),
- 	MPP_MODE(33,
- 		 MPP_VAR_FUNCTION(0x0, "gpio", NULL,        V_MV78230_PLUS),
- 		 MPP_VAR_FUNCTION(0x1, "sd0", "d1",         V_MV78230_PLUS),
-@@ -245,7 +238,6 @@ static struct mvebu_mpp_mode armada_xp_mpp_modes[] = {
- 		 MPP_VAR_FUNCTION(0x0, "gpio", NULL,        V_MV78230_PLUS),
- 		 MPP_VAR_FUNCTION(0x1, "spi", "cs1",        V_MV78230_PLUS),
- 		 MPP_VAR_FUNCTION(0x2, "uart2", "cts",      V_MV78230_PLUS),
--		 MPP_VAR_FUNCTION(0x3, "vdd", "cpu1-pd",    V_MV78230_PLUS),
- 		 MPP_VAR_FUNCTION(0x4, "lcd", "vga-hsync",  V_MV78230_PLUS),
- 		 MPP_VAR_FUNCTION(0x5, "pcie", "clkreq0",   V_MV78230_PLUS)),
- 	MPP_MODE(41,
-@@ -260,15 +252,13 @@ static struct mvebu_mpp_mode armada_xp_mpp_modes[] = {
- 		 MPP_VAR_FUNCTION(0x1, "uart2", "rxd",      V_MV78230_PLUS),
- 		 MPP_VAR_FUNCTION(0x2, "uart0", "cts",      V_MV78230_PLUS),
- 		 MPP_VAR_FUNCTION(0x3, "tdm", "int7",       V_MV78230_PLUS),
--		 MPP_VAR_FUNCTION(0x4, "tdm-1", "timer",    V_MV78230_PLUS),
--		 MPP_VAR_FUNCTION(0x5, "vdd", "cpu0-pd",    V_MV78230_PLUS)),
-+		 MPP_VAR_FUNCTION(0x4, "tdm-1", "timer",    V_MV78230_PLUS)),
- 	MPP_MODE(43,
- 		 MPP_VAR_FUNCTION(0x0, "gpio", NULL,        V_MV78230_PLUS),
- 		 MPP_VAR_FUNCTION(0x1, "uart2", "txd",      V_MV78230_PLUS),
- 		 MPP_VAR_FUNCTION(0x2, "uart0", "rts",      V_MV78230_PLUS),
- 		 MPP_VAR_FUNCTION(0x3, "spi", "cs3",        V_MV78230_PLUS),
--		 MPP_VAR_FUNCTION(0x4, "pcie", "rstout",    V_MV78230_PLUS),
--		 MPP_VAR_FUNCTION(0x5, "vdd", "cpu2-3-pd",  V_MV78460)),
-+		 MPP_VAR_FUNCTION(0x4, "pcie", "rstout",    V_MV78230_PLUS)),
- 	MPP_MODE(44,
- 		 MPP_VAR_FUNCTION(0x0, "gpio", NULL,        V_MV78230_PLUS),
- 		 MPP_VAR_FUNCTION(0x1, "uart2", "cts",      V_MV78230_PLUS),
-@@ -319,16 +309,13 @@ static struct mvebu_mpp_mode armada_xp_mpp_modes[] = {
- 		 MPP_VAR_FUNCTION(0x1, "dev", "ad19",       V_MV78260_PLUS)),
- 	MPP_MODE(55,
- 		 MPP_VAR_FUNCTION(0x0, "gpio", NULL,        V_MV78260_PLUS),
--		 MPP_VAR_FUNCTION(0x1, "dev", "ad20",       V_MV78260_PLUS),
--		 MPP_VAR_FUNCTION(0x2, "vdd", "cpu0-pd",    V_MV78260_PLUS)),
-+		 MPP_VAR_FUNCTION(0x1, "dev", "ad20",       V_MV78260_PLUS)),
- 	MPP_MODE(56,
- 		 MPP_VAR_FUNCTION(0x0, "gpio", NULL,        V_MV78260_PLUS),
--		 MPP_VAR_FUNCTION(0x1, "dev", "ad21",       V_MV78260_PLUS),
--		 MPP_VAR_FUNCTION(0x2, "vdd", "cpu1-pd",    V_MV78260_PLUS)),
-+		 MPP_VAR_FUNCTION(0x1, "dev", "ad21",       V_MV78260_PLUS)),
- 	MPP_MODE(57,
- 		 MPP_VAR_FUNCTION(0x0, "gpio", NULL,        V_MV78260_PLUS),
--		 MPP_VAR_FUNCTION(0x1, "dev", "ad22",       V_MV78260_PLUS),
--		 MPP_VAR_FUNCTION(0x2, "vdd", "cpu2-3-pd",  V_MV78460)),
-+		 MPP_VAR_FUNCTION(0x1, "dev", "ad22",       V_MV78260_PLUS)),
- 	MPP_MODE(58,
- 		 MPP_VAR_FUNCTION(0x0, "gpio", NULL,        V_MV78260_PLUS),
- 		 MPP_VAR_FUNCTION(0x1, "dev", "ad23",       V_MV78260_PLUS)),
+diff --git a/Documentation/devicetree/bindings/pinctrl/marvell,armada-370-pinctrl.txt b/Documentation/devicetree/bindings/pinctrl/marvell,armada-370-pinctrl.txt
+index 44aedd5..3a7dc0e 100644
+--- a/Documentation/devicetree/bindings/pinctrl/marvell,armada-370-pinctrl.txt
++++ b/Documentation/devicetree/bindings/pinctrl/marvell,armada-370-pinctrl.txt
+@@ -17,7 +17,7 @@ mpp0          0        gpio, uart0(rxd)
+ mpp1          1        gpo, uart0(txd)
+ mpp2          2        gpio, i2c0(sck), uart0(txd)
+ mpp3          3        gpio, i2c0(sda), uart0(rxd)
+-mpp4          4        gpio, cpu_pd(vdd)
++mpp4          4        gpio, vdd(cpu-pd)
+ mpp5          5        gpo, ge0(txclkout), uart1(txd), spi1(clk), audio(mclk)
+ mpp6          6        gpio, ge0(txd0), sata0(prsnt), tdm(rst), audio(sdo)
+ mpp7          7        gpo, ge0(txd1), tdm(dtx), audio(lrclk)
+diff --git a/drivers/pinctrl/mvebu/pinctrl-armada-370.c b/drivers/pinctrl/mvebu/pinctrl-armada-370.c
+index 1429872..a7adb41 100644
+--- a/drivers/pinctrl/mvebu/pinctrl-armada-370.c
++++ b/drivers/pinctrl/mvebu/pinctrl-armada-370.c
+@@ -52,7 +52,7 @@ static struct mvebu_mpp_mode mv88f6710_mpp_modes[] = {
+ 	   MPP_FUNCTION(0x2, "uart0", "rxd")),
+ 	MPP_MODE(4,
+ 	   MPP_FUNCTION(0x0, "gpio", NULL),
+-	   MPP_FUNCTION(0x1, "cpu_pd", "vdd")),
++	   MPP_FUNCTION(0x1, "vdd", "cpu-pd")),
+ 	MPP_MODE(5,
+ 	   MPP_FUNCTION(0x0, "gpo", NULL),
+ 	   MPP_FUNCTION(0x1, "ge0", "txclkout"),
 -- 
 2.1.0
