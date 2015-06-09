@@ -1,108 +1,42 @@
-From: wxt@rock-chips.com (Caesar Wang)
-Date: Tue, 09 Jun 2015 08:43:56 +0800
-Subject: [PATCH v5 1/3] ARM: rockchip: fix the CPU soft reset
-In-Reply-To: <20150608094334.GX7557@n2100.arm.linux.org.uk>
-References: <1433747496-7642-1-git-send-email-wxt@rock-chips.com>
- <1433747496-7642-2-git-send-email-wxt@rock-chips.com>
- <20150608094334.GX7557@n2100.arm.linux.org.uk>
-Message-ID: <557636CC.6010809@rock-chips.com>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Tue, 9 Jun 2015 08:55:21 +0800
+Subject: [PATCH v9 5/6] arm64: dts: Add dts files for Hisilicon Hi6220 SoC
+In-Reply-To: <1432950661-23060-6-git-send-email-bintian.wang@huawei.com>
+References: <1432950661-23060-1-git-send-email-bintian.wang@huawei.com>
+ <1432950661-23060-6-git-send-email-bintian.wang@huawei.com>
+Message-ID: <20150609005521.GA21682@tiger>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+A minor random comment below.
 
+On Sat, May 30, 2015 at 09:51:00AM +0800, Bintian Wang wrote:
+> +		ao_ctrl: ao_ctrl {
+> +			compatible = "hisilicon,hi6220-aoctrl", "syscon";
+> +			reg = <0x0 0xf7800000 0x0 0x2000>;
+> +			#clock-cells = <1>;
+> +		};
+> +
+> +		sys_ctrl: sys_ctrl {
+> +			compatible = "hisilicon,hi6220-sysctrl", "syscon";
+> +			reg = <0x0 0xf7030000 0x0 0x2000>;
+> +			#clock-cells = <1>;
+> +		};
+> +
+> +		media_ctrl: media_ctrl {
+> +			compatible = "hisilicon,hi6220-mediactrl", "syscon";
+> +			reg = <0x0 0xf4410000 0x0 0x1000>;
+> +			#clock-cells = <1>;
+> +		};
+> +
+> +		pm_ctrl: pm_ctrl {
 
-? 2015?06?08? 17:43, Russell King - ARM Linux ??:
-> On Mon, Jun 08, 2015 at 03:11:34PM +0800, Caesar Wang wrote:
->> diff --git a/arch/arm/mach-rockchip/platsmp.c b/arch/arm/mach-rockchip/platsmp.c
->> index 5b4ca3c..bd40852 100644
->> --- a/arch/arm/mach-rockchip/platsmp.c
->> +++ b/arch/arm/mach-rockchip/platsmp.c
->> @@ -72,6 +72,7 @@ static struct reset_control *rockchip_get_core_reset(int cpu)
->>   static int pmu_set_power_domain(int pd, bool on)
->>   {
->>   	u32 val = (on) ? 0 : BIT(pd);
->> +	struct reset_control *rstc = rockchip_get_core_reset(pd);
->>   	int ret;
->>   
->>   	/*
->> @@ -80,20 +81,15 @@ static int pmu_set_power_domain(int pd, bool on)
->>   	 * processor is powered down.
->>   	 */
->>   	if (read_cpuid_part() != ARM_CPU_PART_CORTEX_A9) {
->> -		struct reset_control *rstc = rockchip_get_core_reset(pd);
->> -
->> +		/* We only require the reset on the RK3288 at the moment */
->>   		if (IS_ERR(rstc)) {
->>   			pr_err("%s: could not get reset control for core %d\n",
->>   			       __func__, pd);
->>   			return PTR_ERR(rstc);
->>   		}
->>   
->> -		if (on)
->> -			reset_control_deassert(rstc);
->> -		else
->> +		if (!on)
->>   			reset_control_assert(rstc);
->> -
->> -		reset_control_put(rstc);
->>   	}
-> Do we need the CPU part number check for the assertion/deassertion of
-> the reset control?  Surely the DT provides this where appropriate and
-> omits it where it's inappropriate?
->
-> If so, I'd separate out the decision whether to error out from the
-> decision whether to assert the reset control, like this:
->
-> 	if (IS_ERR(rstc) && read_cpuid_part() != ARM_CPU_PART_CORTEX_A9) {
-> 		pr_err("%s: could not get reset control for core %d\n",
-> 		       __func__, pd);
-> 		return PTR_ERR(rstc);
-> 	}
->
-> 	if (!IS_ERR(rstc) && !on)
-> 		reset_control_assert(rstc);
->
-> or maybe:
->
-> 	if (IS_ERR(rstc) && PTR_ERR(rstc) != -ENOENT) {
-> 		pr_err("%s: could not get reset control for core %d: %d\n",
-> 		       __func__, pd, PTR_ERR(rstc));
-> 		return PTR_ERR(rstc);
-> 	}
->
-> 	if (!IS_ERR(rstc) && !on)
-> 		reset_control_assert(rstc);
->
-> which lets you detect whether of_reset_control_get() failed because the
-> reset control was not present (and thus not required) vs failed for some
-> other reason - and this means that the issue of whether the reset
-> control is used is entirely up to the supplied DT file.
-Sound resonable for me.
+An unit-address should be coded in the node name, when it has a 'reg'
+property.
 
-I hope get the Heiko and Kever option.
-After all the code is uploaded by Heiko and Kever.
+Shawn
 
->>   
->>   	ret = regmap_update_bits(pmu, PMU_PWRDN_CON, BIT(pd), val);
->> @@ -112,6 +108,12 @@ static int pmu_set_power_domain(int pd, bool on)
->>   		}
->>   	}
->>   
->> +	if (read_cpuid_part() != ARM_CPU_PART_CORTEX_A9 && on)
->> +		reset_control_deassert(rstc);
->> +
->> +	if (!IS_ERR(rstc))
->> +		reset_control_put(rstc);
->> +
-> and here:
-> 	if (!IS_ERR(rstc)) {
-> 		if (on)
-> 			reset_control_deassert(rstc);
-> 		reset_control_put(rstc);
-> 	}
-Ditto.
-
-
--- 
-Thanks,
-- Caesar
+> +			compatible = "hisilicon,hi6220-pmctrl", "syscon";
+> +			reg = <0x0 0xf7032000 0x0 0x1000>;
+> +			#clock-cells = <1>;
+> +		};
