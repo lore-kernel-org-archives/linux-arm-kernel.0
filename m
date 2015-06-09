@@ -1,148 +1,144 @@
-From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Tue, 09 Jun 2015 09:46:47 +0200
-Subject: [PATCH v5 1/3] ARM: rockchip: fix the CPU soft reset
-In-Reply-To: <557636CC.6010809@rock-chips.com>
-References: <1433747496-7642-1-git-send-email-wxt@rock-chips.com>
- <20150608094334.GX7557@n2100.arm.linux.org.uk>
- <557636CC.6010809@rock-chips.com>
-Message-ID: <9253141.D1erkaHIPa@diego>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Tue, 9 Jun 2015 09:53:32 +0200
+Subject: [PATCH v3 1/2] drm/bridge: dw-hdmi: support optional supply
+ regulators
+In-Reply-To: <20150608163420.GZ7557@n2100.arm.linux.org.uk>
+References: <4184159.j0iXe39dFB@phil> <2619686.csNBBFyt8W@phil>
+ <20150605110159.GA16254@ulmo.nvidia.com>
+ <23123577.mOoqGCAPdL@diego>
+ <20150605231058.GQ7557@n2100.arm.linux.org.uk>
+ <20150608140256.GA10354@ulmo.nvidia.com>
+ <20150608142926.GY7557@n2100.arm.linux.org.uk>
+ <20150608154448.GA11103@ulmo.nvidia.com>
+ <20150608163420.GZ7557@n2100.arm.linux.org.uk>
+Message-ID: <20150609075331.GA28198@ulmo>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Dienstag, 9. Juni 2015, 08:43:56 schrieb Caesar Wang:
-> ? 2015?06?08? 17:43, Russell King - ARM Linux ??:
-> > On Mon, Jun 08, 2015 at 03:11:34PM +0800, Caesar Wang wrote:
-> >> diff --git a/arch/arm/mach-rockchip/platsmp.c
-> >> b/arch/arm/mach-rockchip/platsmp.c index 5b4ca3c..bd40852 100644
-> >> --- a/arch/arm/mach-rockchip/platsmp.c
-> >> +++ b/arch/arm/mach-rockchip/platsmp.c
-> >> @@ -72,6 +72,7 @@ static struct reset_control
-> >> *rockchip_get_core_reset(int cpu)>> 
-> >>   static int pmu_set_power_domain(int pd, bool on)
-> >>   {
-> >>   
-> >>   	u32 val = (on) ? 0 : BIT(pd);
-> >> 
-> >> +	struct reset_control *rstc = rockchip_get_core_reset(pd);
-> >> 
-> >>   	int ret;
-> >>   	
-> >>   	/*
-> >> 
-> >> @@ -80,20 +81,15 @@ static int pmu_set_power_domain(int pd, bool on)
-> >> 
-> >>   	 * processor is powered down.
-> >>   	 */
-> >>   	
-> >>   	if (read_cpuid_part() != ARM_CPU_PART_CORTEX_A9) {
-> >> 
-> >> -		struct reset_control *rstc = rockchip_get_core_reset(pd);
-> >> -
-> >> +		/* We only require the reset on the RK3288 at the moment */
-> >> 
-> >>   		if (IS_ERR(rstc)) {
-> >>   		
-> >>   			pr_err("%s: could not get reset control for core %d\n",
-> >>   			
-> >>   			       __func__, pd);
-> >>   			
-> >>   			return PTR_ERR(rstc);
-> >>   		
-> >>   		}
-> >> 
-> >> -		if (on)
-> >> -			reset_control_deassert(rstc);
-> >> -		else
-> >> +		if (!on)
-> >> 
-> >>   			reset_control_assert(rstc);
-> >> 
-> >> -
-> >> -		reset_control_put(rstc);
-> >> 
-> >>   	}
+On Mon, Jun 08, 2015 at 05:34:21PM +0100, Russell King - ARM Linux wrote:
+> On Mon, Jun 08, 2015 at 05:44:53PM +0200, Thierry Reding wrote:
+> > On Mon, Jun 08, 2015 at 03:29:26PM +0100, Russell King - ARM Linux wrote:
+> > > You're asking questions we have no real answers to - all we have is the
+> > > available documentation provided by Freescale - we don't even have the
+> > > Rochchip documentation.
+> > > 
+> > > From the Freescale documentation, which documents the HDMI transmitter
+> > > entirely separately from the HDMI phy, I would say that the IP is
+> > > structured as two entirely separate blocks, and the chip designer is
+> > > free to choose an appropriate phy from a range of HDMI phys.
 > > 
-> > Do we need the CPU part number check for the assertion/deassertion of
-> > the reset control?  Surely the DT provides this where appropriate and
-> > omits it where it's inappropriate?
-> > 
-> > If so, I'd separate out the decision whether to error out from the
-> > 
-> > decision whether to assert the reset control, like this:
-> > 	if (IS_ERR(rstc) && read_cpuid_part() != ARM_CPU_PART_CORTEX_A9) {
-> > 	
-> > 		pr_err("%s: could not get reset control for core %d\n",
-> > 		
-> > 		       __func__, pd);
-> > 		
-> > 		return PTR_ERR(rstc);
-> > 	
-> > 	}
-> > 	
-> > 	if (!IS_ERR(rstc) && !on)
-> > 	
-> > 		reset_control_assert(rstc);
-> > 
-> > or maybe:
-> > 	if (IS_ERR(rstc) && PTR_ERR(rstc) != -ENOENT) {
-> > 	
-> > 		pr_err("%s: could not get reset control for core %d: %d\n",
-> > 		
-> > 		       __func__, pd, PTR_ERR(rstc));
-> > 		
-> > 		return PTR_ERR(rstc);
-> > 	
-> > 	}
-> > 	
-> > 	if (!IS_ERR(rstc) && !on)
-> > 	
-> > 		reset_control_assert(rstc);
-> > 
-> > which lets you detect whether of_reset_control_get() failed because the
-> > reset control was not present (and thus not required) vs failed for some
-> > other reason - and this means that the issue of whether the reset
-> > control is used is entirely up to the supplied DT file.
+> > Does it associate any of the registers with the HDMI PHY? According to
+> > the register definitions in drivers/gpu/drm/bridge/dw_hdmi.h the PHY
+> > registers are interleaved with other registers that are likely part of
+> > the HDMI transmitter proper (there are things like HDCP and CEC engines
+> > in that IP as well).
 > 
-> Sound resonable for me.
+> The protocol stuff is handled by the HDMI Tx - the phy is the conversion
+> from the internal digital to the interface domain.
 > 
-> I hope get the Heiko and Kever option.
-> After all the code is uploaded by Heiko and Kever.
-
-Russell's suggestion is very nice indeed.
-
-We have reset controls for the cpu cores on all Rockchip SoCs but currently 
-only absolutely require them on the rk3288, so what Russell suggested handles 
-this nicely if we require this later for other SoCs as well (like the A7 ones) 
-.
-
-
-Heiko
-
+> I could write lots to describe it, but really, the best thing to do is
+> to download the iMX6 documentation and take a peek at it...
 > 
-> >>   	ret = regmap_update_bits(pmu, PMU_PWRDN_CON, BIT(pd), val);
-> >> 
-> >> @@ -112,6 +108,12 @@ static int pmu_set_power_domain(int pd, bool on)
-> >> 
-> >>   		}
-> >>   	
-> >>   	}
-> >> 
-> >> +	if (read_cpuid_part() != ARM_CPU_PART_CORTEX_A9 && on)
-> >> +		reset_control_deassert(rstc);
-> >> +
-> >> +	if (!IS_ERR(rstc))
-> >> +		reset_control_put(rstc);
-> >> +
+> https://community.freescale.com/docs/DOC-101840
+> 
+> Particularly, look at the HDMI 3D Phy section, the system level block
+> diagram (34.1.5.1), and 34.2.1 which has the top level I/O diagram for
+> just the 3D phy.
+> 
+> The previous section (section 33) covers the HDMI Tx.
+
+Okay, that matches the picture that's been forming in my mind after
+reading the code.
+
+> > > Moreover, in the feature list for the HDMI transmitter, it says (though
+> > > this is not applicable to iMX6 - and is probably lifted from the
+> > > Synopsis documentation):
+> > > 
+> > > "* Option to remove pixel repetition clock from HDMI TX interface for an
+> > >   easy integration with third party HDMI TX PHYs"
+> > > 
+> > > So - here's the question: what do we do when we find something using the
+> > > Synopsis design-ware HDMI transmitter with a different HDMI phy?
+> > > 
+> > > Remember, VP, VPH, VP_FILT_* are all part of the HDMI phy according to
+> > > the freescale documentation, and not part of the HDMI transmitter.
+> > > 
+> > > > I
+> > > > see register definitions for a "source" PHY and a "master" PHY, where
+> > > > the latter seems to be an I2C controller rather than a PHY. Perhaps it
+> > > > is used to communicate with an external PHY?
+> > > 
+> > > I'm not sure where you get that from.  Maybe you could give a chapter
+> > > reference?
 > > 
-> > and here:
-> > 	if (!IS_ERR(rstc)) {
-> > 	
-> > 		if (on)
-> > 		
-> > 			reset_control_deassert(rstc);
-> > 		
-> > 		reset_control_put(rstc);
-> > 	
-> > 	}
+> > That's just from skimming drivers/gpu/drm/bridge/dw_hdmi.h (register
+> > offsets 0x3000 and the following). The large gap between them and the
+> > preceding FC registers could be an additional indication that they are
+> > indeed separate IP blocks. Then again, the AUD registers start at an
+> > offset of 0x3100, so maybe it's no indication at all.
 > 
-> Ditto.
+> Ah, you're getting slightly confused.
+> 
+> All those registers are to do with the HDMI Tx itself.  The block at
+> 0x3000 to 0x3007 is to do with the HDMI Tx receiving various status
+> signals from the HDMI Phy, such as HPD, rxsense, and whether the phy
+> PLL is locked (which I'm fairly certain is mis-described, as there is
+> no output signal from the phy to indicate this, but there is a TX_READY
+> signal.)
+> 
+> The set at 0x3020-0x3032 are to do with talking to the HDMI phy over
+> the dedicated I2C interface integrated into the HDMI Tx.  All the
+> HDMI Phy registers are accessed through this I2C interface.
+
+Good, that also matches what I understood from reading the driver code.
+
+> > > What if someone designs a chip with their own HDMI phy which uses
+> > > different supplies?
+> > 
+> > That's really one more reason to write proper drivers for the PHYs. If
+> > you really ever have to deal with a different PHY chances are that more
+> > than just the supplies will be different, in which case you'd need to
+> > somehow also abstract away the interoperation between HDMI transmitter
+> > and PHY.
+> 
+> Exactly, but that didn't happen before this code moved out of
+> drivers/staging, which is rather unfortunate, but everyone was too busy
+> to put much thought into that.
+> 
+> This is one of the problems when drivers are taken from BSPs rather than
+> going away and writing something from documentation: if you start afresh,
+> you can model the code according to the documentation without any of the
+> original BSP decisions in place.  If you start from the BSP code, you
+> have a whole pile of changes you need to identify, and it's very easy to
+> overlook something, because what you have works.
+> 
+> It's something which _should_ be done nevertheless.  The problem is
+> finding someone with the time and motivation to do a good job.
+
+Interestingly, though, it seems like the PHYs for both i.MX and Rockchip
+are register-compatible because they work with the same driver code. It
+could be coincidence, or simply that they both use some standard PHY as
+provided by DW along with the HDMI transmitter IP.
+
+Most importantly, like you said, any "damage" has already been done and
+in order to keep devices working with existing DTBs we'll have to add
+fallback code for backwards-compatibility. I'm thinking instantiating
+I2C clients for drivers matching the i.MX/Rockchip code directly from
+the HDMI bridge driver if no child nodes are found in DTB.
+
+As for finding somebody with the motivation and time to do it, I suspect
+we could just wait for the next user of DW HDMI IP and let them deal
+with it. Perhaps documenting our findings in the driver would be helpful
+if that time comes.
+
+For the matter at hand, I think we all agree that keeping the supplies
+Rockchip-specific for now is the right thing to do.
+
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150609/9730932a/attachment-0001.sig>
