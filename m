@@ -1,67 +1,105 @@
 From: matthias.bgg@gmail.com (Matthias Brugger)
-Date: Tue,  9 Jun 2015 17:38:00 +0200
-Subject: [PATCH v3 0/3] clk: Add regmap support for basic clocks
-Message-ID: <1433864283-25490-1-git-send-email-matthias.bgg@gmail.com>
+Date: Tue,  9 Jun 2015 17:38:02 +0200
+Subject: [PATCH v3 2/3] clk: mediatek: Add support for clk-mux using regmap
+In-Reply-To: <1433864283-25490-1-git-send-email-matthias.bgg@gmail.com>
+References: <1433864283-25490-1-git-send-email-matthias.bgg@gmail.com>
+Message-ID: <1433864283-25490-3-git-send-email-matthias.bgg@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch set adds regmap support for the simple clock multiplexer,
-the divider clock and the clock gate.
-Regmap use, apart from a pointer to the regmap struct needs an
-offset value to know where in the regmap it has to read/write.
-We add both fields to the corresponding structs.
+This patches adds support for the mediatek clocks to be able to register
+and use a clk-mux wich relies on regmap.
 
-The driver will distinguish between a clock which is based on regmap or not
-through a flag specified in the clock hardware struct.
-The approach does not break the existing clock framework API but adds
-new functions for registering regmap clocks. Unregistering the clocks is
-independent of the use of regmap or not, so that no new functions were
-implemented.
-
-As an example user of the regmap clock multiplexer, it was implemented on
-the mt8135. When accepted it will also be applied to the other Mediatek SoCs.
-Other possible user are Qualcomm SoCs which up to now implement their own
-regmap based clock multiplexer.
-
-This patch set is based on linux next.
-To get the mt8135 eval board up and running, we need to enable the clock
-support [1] and use the two clocks for the uart port [2].
-
-Any comments welcome.
-
-[1] https://patchwork.kernel.org/patch/6261141/
-[2] https://patchwork.kernel.org/patch/6261151/
-
-Changes for v3:
-- rebase against linux-next
-- provide regmap access to all three clock types in a unified way
-
-Changes for v2:
-- use regmap_update_bits instead of read-write
-- fix flag check
-- add union in struct clk_mux
-- fix typo in commit message
-
+Signed-off-by: Matthias Brugger <matthias.bgg@gmail.com>
 ---
+ drivers/clk/mediatek/clk-mtk.c | 37 +++++++++++++++++++++++++++++++++++++
+ drivers/clk/mediatek/clk-mtk.h | 26 ++++++++++++++++++++++++++
+ 2 files changed, 63 insertions(+)
 
-Matthias Brugger (3):
-  clk: Add regmap support
-  clk: mediatek: Add support for clk-mux using regmap
-  clk: mediatek: Use regmap clk-mux for mt8135
-
- drivers/clk/Makefile              |   1 +
- drivers/clk/clk-divider.c         |  71 ++++++++++++++++++-----
- drivers/clk/clk-gate.c            |  60 ++++++++++++++++----
- drivers/clk/clk-io.c              |  62 ++++++++++++++++++++
- drivers/clk/clk-io.h              |  13 +++++
- drivers/clk/clk-mux.c             |  94 ++++++++++++++++++++++++++-----
- drivers/clk/mediatek/clk-mt8135.c |  21 +++----
- drivers/clk/mediatek/clk-mtk.c    |  37 ++++++++++++
- drivers/clk/mediatek/clk-mtk.h    |  26 +++++++++
- include/linux/clk-provider.h      | 115 +++++++++++++++++++++++++++++++++++++-
- 10 files changed, 443 insertions(+), 57 deletions(-)
- create mode 100644 drivers/clk/clk-io.c
- create mode 100644 drivers/clk/clk-io.h
-
+diff --git a/drivers/clk/mediatek/clk-mtk.c b/drivers/clk/mediatek/clk-mtk.c
+index 18444ae..cf953a8 100644
+--- a/drivers/clk/mediatek/clk-mtk.c
++++ b/drivers/clk/mediatek/clk-mtk.c
+@@ -111,6 +111,43 @@ int mtk_clk_register_gates(struct device_node *node, const struct mtk_gate *clks
+ 	return 0;
+ }
+ 
++int mtk_clk_regm_register_mux(struct device_node *node,
++		const struct mtk_regm_mux *clks, int num,
++		struct clk_onecell_data *clk_data)
++{
++	int i;
++	struct clk *clk;
++	struct regmap *regmap;
++
++	if (!clk_data)
++		return -ENOMEM;
++
++	regmap = syscon_node_to_regmap(node);
++	if (IS_ERR(regmap)) {
++		pr_err("Cannot find regmap for %s: %ld\n", node->full_name,
++				PTR_ERR(regmap));
++		return PTR_ERR(regmap);
++	}
++
++	for (i = 0; i < num; i++) {
++		const struct mtk_regm_mux *mux = &clks[i];
++
++		clk = clk_regm_register_mux(NULL, mux->name, mux->parent_names,
++					mux->num_parents, 0, regmap,
++					mux->mux_offset, mux->mux_shift,
++					mux->mux_width, mux->flags, NULL);
++		if (IS_ERR(clk)) {
++			pr_err("Failed to register clk mux %s: %ld\n",
++					mux->name, PTR_ERR(clk));
++			continue;
++		}
++
++		clk_data->clks[mux->id] = clk;
++	}
++
++	return 0;
++}
++
+ struct clk *mtk_clk_register_composite(const struct mtk_composite *mc,
+ 		void __iomem *base, spinlock_t *lock)
+ {
+diff --git a/drivers/clk/mediatek/clk-mtk.h b/drivers/clk/mediatek/clk-mtk.h
+index 9dda9d8..6fe85ca 100644
+--- a/drivers/clk/mediatek/clk-mtk.h
++++ b/drivers/clk/mediatek/clk-mtk.h
+@@ -156,6 +156,32 @@ void __init mtk_clk_register_plls(struct device_node *node,
+ 		const struct mtk_pll_data *plls, int num_plls,
+ 		struct clk_onecell_data *clk_data);
+ 
++struct mtk_regm_mux {
++	int id;
++	const char *name;
++	const char * const *parent_names;
++	u8 num_parents;
++	unsigned flags;
++	uint32_t mux_offset;
++	uint32_t mux_shift;
++	uint32_t mux_width;
++};
++
++int __init mtk_clk_regm_register_mux(struct device_node *node,
++		const struct mtk_regm_mux *clks, int num,
++		struct clk_onecell_data *clk_data);
++
++#define MUX_REGMAP(_id, _name, _parents, _offset, _shift, _width) {	\
++		.id = _id,						\
++		.name = _name,						\
++		.parent_names = _parents,				\
++		.num_parents = ARRAY_SIZE(_parents),			\
++		.flags = CLK_SET_RATE_PARENT,				\
++		.mux_offset = _offset,					\
++		.mux_shift = _shift,					\
++		.mux_width = _width,					\
++	}
++
+ #ifdef CONFIG_RESET_CONTROLLER
+ void mtk_register_reset_controller(struct device_node *np,
+ 			unsigned int num_regs, int regofs);
 -- 
 1.9.1
