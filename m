@@ -1,49 +1,49 @@
-From: pi-cheng.chen@linaro.org (Pi-Cheng Chen)
-Date: Tue, 9 Jun 2015 08:26:11 +0800
-Subject: [PATCH 0/2] Add Mediatek MT8173 cpufreq driver
-In-Reply-To: <1433766561-1330-1-git-send-email-pi-cheng.chen@linaro.org>
-References: <1433766561-1330-1-git-send-email-pi-cheng.chen@linaro.org>
-Message-ID: <CALx668XYaKca3BeYQxgNa2z68x7w8iTg8hyeeYdLtpJYc30idw@mail.gmail.com>
+From: wxt@rock-chips.com (Caesar Wang)
+Date: Tue, 09 Jun 2015 08:40:12 +0800
+Subject: [PATCH v5 2/3] ARM: rockchip: ensure CPU to enter WFI/WFE state
+In-Reply-To: <20150608092852.GW7557@n2100.arm.linux.org.uk>
+References: <1433747496-7642-1-git-send-email-wxt@rock-chips.com>
+ <1433747496-7642-3-git-send-email-wxt@rock-chips.com>
+ <20150608092852.GW7557@n2100.arm.linux.org.uk>
+Message-ID: <557635EC.7040402@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 8, 2015 at 8:29 PM, Pi-Cheng Chen <pi-cheng.chen@linaro.org> wrote:
-> MT8173 is a ARMv8 based SoC with 2 clusters. All CPUs in a single cluster
-> share the same power and clock domain. This series tries to add cpufreq support
-> for MT8173 SoC.
 
-I am sorry I forgot to add the version in the mail title.
-This is v4 of this series.
 
+? 2015?06?08? 17:28, Russell King - ARM Linux ??:
+> On Mon, Jun 08, 2015 at 03:11:35PM +0800, Caesar Wang wrote:
+>> diff --git a/arch/arm/mach-rockchip/platsmp.c b/arch/arm/mach-rockchip/platsmp.c
+>> index bd40852..5bc2a89 100644
+>> --- a/arch/arm/mach-rockchip/platsmp.c
+>> +++ b/arch/arm/mach-rockchip/platsmp.c
+>> @@ -321,6 +321,9 @@ static void __init rockchip_smp_prepare_cpus(unsigned int max_cpus)
+>>   #ifdef CONFIG_HOTPLUG_CPU
+>>   static int rockchip_cpu_kill(unsigned int cpu)
+>>   {
+>> +	/* ensure CPU can enter the WFI/WFE state */
+> I would like to see a better comment here, describing what the problem
+> is.  Maybe something like this:
 >
-> Changes in v4:
-> - Add bindings for MT8173 cpufreq driver
-> - Move OPP table back into device tree
-> - Address comments for last version
+> 	/*
+> 	 * We need a delay here to ensure that the dying CPU can finish
+> 	 * executing v7_coherency_exit() and reach the WFI/WFE state
+> 	 * prior to having the power domain disabled.
+> 	 */
 >
-> Changes in v3:
-> - Implement MT8173 specific standalone cpufreq driver instead of using
->   cpufreq-dt driver
-> - Define OPP table in the driver source code until new OPP binding is ready
->
-> Changes in v2:
-> - Add intermediate frequency support in cpufreq-dt driver
-> - Use voltage scaling code of cpufreq-dt for little cluster instead of
->   implementaion in notifier of mtk-cpufreq driver
-> - Code refinement for mtk-cpufreq driver
->
-> Pi-Cheng Chen (2):
->   dt-bindings: mediatek: Add MT8173 cpufreq driver binding
->   cpufreq: mediatek: Add MT8173 cpufreq driver
->
->  .../devicetree/bindings/cpufreq/cpufreq-mt8173.txt | 127 +++++
->  drivers/cpufreq/Kconfig.arm                        |   7 +
->  drivers/cpufreq/Makefile                           |   1 +
->  drivers/cpufreq/mt8173-cpufreq.c                   | 550 +++++++++++++++++++++
->  4 files changed, 685 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/cpufreq/cpufreq-mt8173.txt
->  create mode 100644 drivers/cpufreq/mt8173-cpufreq.c
->
-> --
-> 1.9.1
->
+> Thanks.
+
+OK,
+Thanks!
+>> +	mdelay(1);
+>> +
+>>   	pmu_set_power_domain(0 + cpu, false);
+>>   	return 1;
+>>   }
+>> -- 
+>> 1.9.1
+>>
+
+-- 
+Thanks,
+- Caesar
