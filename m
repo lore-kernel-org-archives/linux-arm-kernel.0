@@ -1,28 +1,57 @@
-From: julia.lawall@lip6.fr (Julia Lawall)
-Date: Tue, 9 Jun 2015 10:08:20 +0200 (CEST)
-Subject: [PATCH v4 2/2] dma: Add Xilinx AXI Central Direct Memory Access
- Engine driver support
-In-Reply-To: <5576956B.7050901@monstr.eu>
-References: <1432228035-6569-1-git-send-email-appanad@xilinx.com>
- <1432290653.27695.97.camel@x220> <557681A7.7080202@monstr.eu>
- <1433834507.16887.3.camel@x220> <5576956B.7050901@monstr.eu>
-Message-ID: <alpine.DEB.2.10.1506091007530.2324@hadrien>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Tue, 9 Jun 2015 10:08:01 +0200
+Subject: [PATCH v2 2/3] spi: atmel: update DT bindings documentation
+In-Reply-To: <6f071506877a9986d1f30902339993f922387a74.1433779081.git.cyrille.pitchen@atmel.com>
+References: <cover.1433779081.git.cyrille.pitchen@atmel.com>
+ <6f071506877a9986d1f30902339993f922387a74.1433779081.git.cyrille.pitchen@atmel.com>
+Message-ID: <55769EE1.4050406@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Le 08/06/2015 18:07, Cyrille Pitchen a ?crit :
+> - add new property "atmel,fifo-size"
+> - change "cs-gpios" to optional for SPI controller version >= 2.
+> 
+> Signed-off-by: Cyrille Pitchen <cyrille.pitchen@atmel.com>
+
+Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+
+> ---
+>  Documentation/devicetree/bindings/spi/spi_atmel.txt | 8 +++++++-
+>  1 file changed, 7 insertions(+), 1 deletion(-)
+> 
+> diff --git a/Documentation/devicetree/bindings/spi/spi_atmel.txt b/Documentation/devicetree/bindings/spi/spi_atmel.txt
+> index 4f8184d..7ef7f6bc 100644
+> --- a/Documentation/devicetree/bindings/spi/spi_atmel.txt
+> +++ b/Documentation/devicetree/bindings/spi/spi_atmel.txt
+> @@ -4,11 +4,16 @@ Required properties:
+>  - compatible : should be "atmel,at91rm9200-spi".
+>  - reg: Address and length of the register set for the device
+>  - interrupts: Should contain spi interrupt
+> -- cs-gpios: chipselects
+> +- cs-gpios: chipselects (optional for SPI controller version >= 2 with the
+> +  Alternative Command Mode).
+>  - clock-names: tuple listing input clock names.
+>  	Required elements: "spi_clk"
+>  - clocks: phandles to input clocks.
+>  
+> +Optional properties:
+> +- atmel,fifo-size: maximum number of data the RX and TX FIFOs can store for FIFO
+> +  capable SPI controllers.
+> +
+>  Example:
+>  
+>  spi1: spi at fffcc000 {
+> @@ -20,6 +25,7 @@ spi1: spi at fffcc000 {
+>  	clocks = <&spi1_clk>;
+>  	clock-names = "spi_clk";
+>  	cs-gpios = <&pioB 3 0>;
+> +	atmel,fifo-size = <32>;
+>  	status = "okay";
+>  
+>  	mmc-slot at 0 {
+> 
 
 
-On Tue, 9 Jun 2015, Michal Simek wrote:
-
-> On 06/09/2015 09:21 AM, Paul Bolle wrote:
-> > On Tue, 2015-06-09 at 08:03 +0200, Michal Simek wrote:
-> >> Have you sent any patch to add GPL v2+ to license.h?
-> >
-> > "GPL" already means GPL v2 or later (see include/linux/module.h).
->
-> ok. I see.
-
-So there is nothing to do?  Or are there still cases that could be
-interesting?
-
-julia
+-- 
+Nicolas Ferre
