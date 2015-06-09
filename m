@@ -1,48 +1,107 @@
 From: wxt@rock-chips.com (Caesar Wang)
-Date: Tue, 09 Jun 2015 08:40:12 +0800
-Subject: [PATCH v5 2/3] ARM: rockchip: ensure CPU to enter WFI/WFE state
-In-Reply-To: <20150608092852.GW7557@n2100.arm.linux.org.uk>
+Date: Tue, 09 Jun 2015 08:43:56 +0800
+Subject: [PATCH v5 1/3] ARM: rockchip: fix the CPU soft reset
+In-Reply-To: <20150608094334.GX7557@n2100.arm.linux.org.uk>
 References: <1433747496-7642-1-git-send-email-wxt@rock-chips.com>
- <1433747496-7642-3-git-send-email-wxt@rock-chips.com>
- <20150608092852.GW7557@n2100.arm.linux.org.uk>
-Message-ID: <557635EC.7040402@rock-chips.com>
+ <1433747496-7642-2-git-send-email-wxt@rock-chips.com>
+ <20150608094334.GX7557@n2100.arm.linux.org.uk>
+Message-ID: <557636CC.6010809@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
 
-? 2015?06?08? 17:28, Russell King - ARM Linux ??:
-> On Mon, Jun 08, 2015 at 03:11:35PM +0800, Caesar Wang wrote:
+? 2015?06?08? 17:43, Russell King - ARM Linux ??:
+> On Mon, Jun 08, 2015 at 03:11:34PM +0800, Caesar Wang wrote:
 >> diff --git a/arch/arm/mach-rockchip/platsmp.c b/arch/arm/mach-rockchip/platsmp.c
->> index bd40852..5bc2a89 100644
+>> index 5b4ca3c..bd40852 100644
 >> --- a/arch/arm/mach-rockchip/platsmp.c
 >> +++ b/arch/arm/mach-rockchip/platsmp.c
->> @@ -321,6 +321,9 @@ static void __init rockchip_smp_prepare_cpus(unsigned int max_cpus)
->>   #ifdef CONFIG_HOTPLUG_CPU
->>   static int rockchip_cpu_kill(unsigned int cpu)
+>> @@ -72,6 +72,7 @@ static struct reset_control *rockchip_get_core_reset(int cpu)
+>>   static int pmu_set_power_domain(int pd, bool on)
 >>   {
->> +	/* ensure CPU can enter the WFI/WFE state */
-> I would like to see a better comment here, describing what the problem
-> is.  Maybe something like this:
+>>   	u32 val = (on) ? 0 : BIT(pd);
+>> +	struct reset_control *rstc = rockchip_get_core_reset(pd);
+>>   	int ret;
+>>   
+>>   	/*
+>> @@ -80,20 +81,15 @@ static int pmu_set_power_domain(int pd, bool on)
+>>   	 * processor is powered down.
+>>   	 */
+>>   	if (read_cpuid_part() != ARM_CPU_PART_CORTEX_A9) {
+>> -		struct reset_control *rstc = rockchip_get_core_reset(pd);
+>> -
+>> +		/* We only require the reset on the RK3288 at the moment */
+>>   		if (IS_ERR(rstc)) {
+>>   			pr_err("%s: could not get reset control for core %d\n",
+>>   			       __func__, pd);
+>>   			return PTR_ERR(rstc);
+>>   		}
+>>   
+>> -		if (on)
+>> -			reset_control_deassert(rstc);
+>> -		else
+>> +		if (!on)
+>>   			reset_control_assert(rstc);
+>> -
+>> -		reset_control_put(rstc);
+>>   	}
+> Do we need the CPU part number check for the assertion/deassertion of
+> the reset control?  Surely the DT provides this where appropriate and
+> omits it where it's inappropriate?
 >
-> 	/*
-> 	 * We need a delay here to ensure that the dying CPU can finish
-> 	 * executing v7_coherency_exit() and reach the WFI/WFE state
-> 	 * prior to having the power domain disabled.
-> 	 */
+> If so, I'd separate out the decision whether to error out from the
+> decision whether to assert the reset control, like this:
 >
-> Thanks.
+> 	if (IS_ERR(rstc) && read_cpuid_part() != ARM_CPU_PART_CORTEX_A9) {
+> 		pr_err("%s: could not get reset control for core %d\n",
+> 		       __func__, pd);
+> 		return PTR_ERR(rstc);
+> 	}
+>
+> 	if (!IS_ERR(rstc) && !on)
+> 		reset_control_assert(rstc);
+>
+> or maybe:
+>
+> 	if (IS_ERR(rstc) && PTR_ERR(rstc) != -ENOENT) {
+> 		pr_err("%s: could not get reset control for core %d: %d\n",
+> 		       __func__, pd, PTR_ERR(rstc));
+> 		return PTR_ERR(rstc);
+> 	}
+>
+> 	if (!IS_ERR(rstc) && !on)
+> 		reset_control_assert(rstc);
+>
+> which lets you detect whether of_reset_control_get() failed because the
+> reset control was not present (and thus not required) vs failed for some
+> other reason - and this means that the issue of whether the reset
+> control is used is entirely up to the supplied DT file.
+Sound resonable for me.
 
-OK,
-Thanks!
->> +	mdelay(1);
+I hope get the Heiko and Kever option.
+After all the code is uploaded by Heiko and Kever.
+
+>>   
+>>   	ret = regmap_update_bits(pmu, PMU_PWRDN_CON, BIT(pd), val);
+>> @@ -112,6 +108,12 @@ static int pmu_set_power_domain(int pd, bool on)
+>>   		}
+>>   	}
+>>   
+>> +	if (read_cpuid_part() != ARM_CPU_PART_CORTEX_A9 && on)
+>> +		reset_control_deassert(rstc);
 >> +
->>   	pmu_set_power_domain(0 + cpu, false);
->>   	return 1;
->>   }
->> -- 
->> 1.9.1
->>
+>> +	if (!IS_ERR(rstc))
+>> +		reset_control_put(rstc);
+>> +
+> and here:
+> 	if (!IS_ERR(rstc)) {
+> 		if (on)
+> 			reset_control_deassert(rstc);
+> 		reset_control_put(rstc);
+> 	}
+Ditto.
+
 
 -- 
 Thanks,
