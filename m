@@ -1,97 +1,46 @@
-From: dann.frazier@canonical.com (Dann Frazier)
-Date: Tue, 9 Jun 2015 09:31:21 -0600
-Subject: [PATCH 2/2 RESEND] power: reset: Add syscon poweroff device node
- for APM X-Gene platform
-In-Reply-To: <CACgAJHwtCuZgZySmcvMxZHVxy__eZP02-TDbEn3FEpMx5y_LDQ@mail.gmail.com>
-References: <1433272747-27114-1-git-send-email-ttnguyen@apm.com>
- <1433272747-27114-3-git-send-email-ttnguyen@apm.com>
- <CALdTtnvQg2xmL5MqxUcvJmk_33XiEg9tnLzYvC++ZQL3j7J46g@mail.gmail.com>
- <CACgAJHwtCuZgZySmcvMxZHVxy__eZP02-TDbEn3FEpMx5y_LDQ@mail.gmail.com>
-Message-ID: <CALdTtnvwQ0W=3i-Yi73rQQ43uo1njwBoEuNQOpJ79Qoref9Yvw@mail.gmail.com>
+From: khilman@kernel.org (Kevin Hilman)
+Date: Tue, 09 Jun 2015 08:43:28 -0700
+Subject: [PATCH v2 0/3] Add code to release secondary cores from holding
+ pen.
+In-Reply-To: <1433856824-30689-1-git-send-email-peter.griffin@linaro.org>
+ (Peter Griffin's message of "Tue, 9 Jun 2015 14:33:41 +0100")
+References: <1433856824-30689-1-git-send-email-peter.griffin@linaro.org>
+Message-ID: <7hd214sx9b.fsf@deeprootsystems.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 8, 2015 at 10:34 PM, Tai Tri Nguyen <ttnguyen@apm.com> wrote:
-> Hi Dann,
->
-> On Mon, Jun 8, 2015 at 8:44 PM, Dann Frazier <dann.frazier@canonical.com> wrote:
->> On Tue, Jun 2, 2015 at 1:19 PM, Tai Nguyen <ttnguyen@apm.com> wrote:
->>> This patch adds syscon poweroff device node to support poweroff feature
->>> on APM X-Gene Mustang platform
->>
->> hey Tai,
->>  The reboot changes work just fine for me, but poweroff does not:
->>
->> [  OK  ] Reached target Final Step.
->>          Starting Power-Off...
->> reboot: Power down
->> Unable to poweroff system
->> Kernel panic - not syncing: Attempted to kill init! exitcode=0x00000000
->>
->> CPU: 0 PID: 1 Comm: systemd-shutdow Tainted: G        W       4.1.0-rc7+ #1
->> Hardware name: APM X-Gene Mustang board (DT)
->> Call trace:
->> [<ffffffc00008990c>] dump_backtrace+0x0/0x11c
->> [<ffffffc000089a38>] show_stack+0x10/0x1c
->> [<ffffffc0005b447c>] dump_stack+0x88/0xc8
->> [<ffffffc0005b3374>] panic+0xe0/0x220
->> [<ffffffc0000b5f24>] do_exit+0x990/0x994
->> [<ffffffc0000d06bc>] SyS_reboot+0x14c/0x208
->> ---[ end Kernel panic - not syncing: Attempted to kill init! exitcode=0x00000000
->>
->>   -dann
->>
->
-> Thanks for testing my patches.
-> On APM X-Gene Mustang platform, power off circuit is controlled by firmware.
-> It requires a firmware update to support power off feature.
-> May I ask what firmware version you're running on?
+Peter Griffin <peter.griffin@linaro.org> writes:
 
-Sure, 1.15.12.
+> Hi Maxime, Patrice, Srini, Kevin, Olof & Arnd,
+>
+> This patchset adds in the necessary code to manage the holding pen for STi
+> platforms.
+>
+> Due to all the STi upstream devs using JTAG to boot the STi boards, there
+> is currently a SMP bug when booting upstream kernels via u-boot where
+> only the primary core is brought up.
+>
+> This hasn't been noticed until now because when booting via JTAG the
+> stlinux_arm_boot script sets the PC of the secondary cores directly.
+>
+> With these patches applied booting via u-boot now works correctly.
+>
+> [    0.045456] CPU: Testing write buffer coherency: ok
+> [    0.045597] CPU0: thread -1, cpu 0, socket 0, mpidr 80000000
+> [    0.045734] Setting up static identity map for 0x40209000 - 0x40209098
+> [    0.065047] CPU1: thread -1, cpu 1, socket 0, mpidr 80000001
+> [    0.065081] Brought up 2 CPUs
+> [    0.065089] SMP: Total of 2 processors activated (5983.43 BogoMIPS).
+> [    0.065092] CPU: All CPU(s) started in SVC mode.
+>
+> Kevin / Olof / Arnd - Can you put this fix into the next ARM SoC fixes pull
+> request (if there is one)?
 
-  -dann
+At this stage of the cycle (we're already at -rc7) we limit things to
+strictly regression fixes, and seems this has been broken for some time,
+so I think this will have to wait for v4.2.
 
-> Tai
->
->
->>> Signed-off-by: Tai Nguyen <ttnguyen@apm.com>
->>> ---
->>>  arch/arm64/boot/dts/apm/apm-mustang.dts |   12 ++++++++++++
->>>  1 file changed, 12 insertions(+)
->>>
->>> diff --git a/arch/arm64/boot/dts/apm/apm-mustang.dts b/arch/arm64/boot/dts/apm/apm-mustang.dts
->>> index 83578e7..910d561 100644
->>> --- a/arch/arm64/boot/dts/apm/apm-mustang.dts
->>> +++ b/arch/arm64/boot/dts/apm/apm-mustang.dts
->>> @@ -23,6 +23,18 @@
->>>                 device_type = "memory";
->>>                 reg = < 0x1 0x00000000 0x0 0x80000000 >; /* Updated by bootloader */
->>>         };
->>> +
->>> +       poweroff_mbox: poweroff_mbox at 10548000 {
->>> +               compatible = "syscon";
->>> +               reg = <0x0 0x10548000 0x0 0x30>;
->>> +       };
->>> +
->>> +       poweroff: poweroff at 10548010 {
->>> +               compatible = "syscon-poweroff";
->>> +               regmap = <&poweroff_mbox>;
->>> +               offset = <0x10>;
->>> +               mask = <0x1>;
->>> +       };
->>>  };
->>>
->>>  &pcie0clk {
->>> --
->>> 1.7.9.5
->>>
->>>
->>> _______________________________________________
->>> linux-arm-kernel mailing list
->>> linux-arm-kernel at lists.infradead.org
->>> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->
->
->
-> --
-> Tai
+After addresing the comments, Maxime should queue this up for arm-soc so
+we can get it in early in the v4.2-rc cycle.
+
+Kevin
