@@ -1,91 +1,48 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Tue, 9 Jun 2015 12:12:13 +0200
-Subject: [PATCH] ARM: at91/dt: sama5d4: fix dma conf for aes, sha and
- tdes nodes
-In-Reply-To: <1433771754-4999-1-git-send-email-ludovic.desroches@atmel.com>
-References: <1433771754-4999-1-git-send-email-ludovic.desroches@atmel.com>
-Message-ID: <5576BBFD.2060605@atmel.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Tue, 9 Jun 2015 11:17:54 +0100
+Subject: Master-aware devices and sideband ID data
+In-Reply-To: <20150605090534.GC1198@arm.com>
+References: <20150324155007.GC23005@leverpostej>
+ <26BE36EF-2C5B-4DA6-8950-8FEBB031ED1B@caviumnetworks.com>
+ <20150527173953.GC23176@leverpostej>
+ <E342D737-5DD5-48C7-BB01-B83C29CB6E31@caviumnetworks.com>
+ <20150601102208.GD22406@leverpostej>
+ <158EFC9F-FCAF-44D3-AD40-804EDFE0CE25@caviumnetworks.com>
+ <20150605090534.GC1198@arm.com>
+Message-ID: <20150609101515.GA28474@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le 08/06/2015 15:55, Ludovic Desroches a ?crit :
-> The xdmac channel configuration is done in one cell not two. This error
-> prevents from probing devices correctly.
+On Fri, Jun 05, 2015 at 10:05:34AM +0100, Will Deacon wrote:
+> On Thu, Jun 04, 2015 at 11:19:30PM +0100, Chalamarla, Tirumalesh wrote:
+> > > On Jun 1, 2015, at 3:22 AM, Mark Rutland <mark.rutland@arm.com> wrote:
+> > > It's possible to specify that the paths exist. I expect that software
+> > > would select which to use at runtime.
+> > > 
+> > My worry is how to define any priorities/preferences between masters. 
+> > in general the proposal looks reasonable.
 > 
-> Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com>
-> Fixes: 83906783b766 ("ARM: at91/dt: sama5d4: add aes, sha and tdes nodes")
-> Cc: stable at vger.kernel.org # 4.1
-
-Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
-
-Arnd, Olof, Kevin,
-
-This patch is a fix concerning material that had been added to 4.1, so
-it's not exactly a regression.
-
-So, as we missed the last train to 4.1, I'd like to queue it for 4.2 but
-it's the only patch I have on top of my previous DT pull-request
-(at91-dt4, not taken by you, yet).
-
-So, should I build another pull-request (at91-dt5) or can you take this
-single patch when you pull the at91-dt4 material?
-
-BTW, here is the link to patchwork if it's easier:
-https://patchwork.kernel.org/patch/6565591/
-
-Thanks, bye,
-
-> ---
->  arch/arm/boot/dts/sama5d4.dtsi | 20 ++++++++++----------
->  1 file changed, 10 insertions(+), 10 deletions(-)
+> I agree that the proposal looks reasonable (in terms of the ability to
+> describe the sort of topologies that we will face) but I still don't
+> understand what I need to do in e.g. my IOMMU driver to support this
+> binding whilst continuing to support the existing iommus binding, which
+> is relied upon to configure dma-mapping.
 > 
-> diff --git a/arch/arm/boot/dts/sama5d4.dtsi b/arch/arm/boot/dts/sama5d4.dtsi
-> index 6b1bb58..51ddec4 100644
-> --- a/arch/arm/boot/dts/sama5d4.dtsi
-> +++ b/arch/arm/boot/dts/sama5d4.dtsi
-> @@ -1125,10 +1125,10 @@
->  				compatible = "atmel,at91sam9g46-aes";
->  				reg = <0xfc044000 0x100>;
->  				interrupts = <12 IRQ_TYPE_LEVEL_HIGH 0>;
-> -				dmas = <&dma0 (AT91_XDMAC_DT_MEM_IF(0) | AT91_XDMAC_DT_PER_IF(1))
-> -					AT91_XDMAC_DT_PERID(41)>,
-> -				       <&dma0 (AT91_XDMAC_DT_MEM_IF(0) | AT91_XDMAC_DT_PER_IF(1))
-> -					AT91_XDMAC_DT_PERID(40)>;
-> +				dmas = <&dma0 (AT91_XDMAC_DT_MEM_IF(0) | AT91_XDMAC_DT_PER_IF(1)
-> +					| AT91_XDMAC_DT_PERID(41))>,
-> +				       <&dma0 (AT91_XDMAC_DT_MEM_IF(0) | AT91_XDMAC_DT_PER_IF(1)
-> +					| AT91_XDMAC_DT_PERID(40))>;
->  				dma-names = "tx", "rx";
->  				clocks = <&aes_clk>;
->  				clock-names = "aes_clk";
-> @@ -1139,10 +1139,10 @@
->  				compatible = "atmel,at91sam9g46-tdes";
->  				reg = <0xfc04c000 0x100>;
->  				interrupts = <14 IRQ_TYPE_LEVEL_HIGH 0>;
-> -				dmas = <&dma0 (AT91_XDMAC_DT_MEM_IF(0) | AT91_XDMAC_DT_PER_IF(1))
-> -					AT91_XDMAC_DT_PERID(42)>,
-> -				       <&dma0 (AT91_XDMAC_DT_MEM_IF(0) | AT91_XDMAC_DT_PER_IF(1))
-> -					AT91_XDMAC_DT_PERID(43)>;
-> +				dmas = <&dma0 (AT91_XDMAC_DT_MEM_IF(0) | AT91_XDMAC_DT_PER_IF(1)
-> +					| AT91_XDMAC_DT_PERID(42))>,
-> +				       <&dma0 (AT91_XDMAC_DT_MEM_IF(0) | AT91_XDMAC_DT_PER_IF(1)
-> +					| AT91_XDMAC_DT_PERID(43))>;
->  				dma-names = "tx", "rx";
->  				clocks = <&tdes_clk>;
->  				clock-names = "tdes_clk";
-> @@ -1153,8 +1153,8 @@
->  				compatible = "atmel,at91sam9g46-sha";
->  				reg = <0xfc050000 0x100>;
->  				interrupts = <15 IRQ_TYPE_LEVEL_HIGH 0>;
-> -				dmas = <&dma0 (AT91_XDMAC_DT_MEM_IF(0) | AT91_XDMAC_DT_PER_IF(1))
-> -					AT91_XDMAC_DT_PERID(44)>;
-> +				dmas = <&dma0 (AT91_XDMAC_DT_MEM_IF(0) | AT91_XDMAC_DT_PER_IF(1)
-> +					| AT91_XDMAC_DT_PERID(44))>;
->  				dma-names = "tx";
->  				clocks = <&sha_clk>;
->  				clock-names = "sha_clk";
-> 
+> Mark: how do you see this co-existing/merging with the current bindings?
 
+As I mentioned in my initial mail, it's not clear to me how this can be
+reconciled with the current bindings. Everything I've been able to come
+up with so far at best ends up describing the same thing repeatedly.
 
--- 
-Nicolas Ferre
+I'll see what I can come up with. Any sugestions are welcome!
+
+> I don't think it's practical to throw away what we have and move over to
+> something totally different all in one go, but there clearly *is* benefit
+> in your proposal over the existing scheme.
+
+I can see that's probably not practical. :(
+
+Do we know what we're going to do w.r.t. IORT? That's going to require
+the kernel to be able to handle a similar description to this proposal.
+
+Mark.
