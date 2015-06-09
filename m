@@ -1,215 +1,65 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Tue, 9 Jun 2015 17:12:30 +0100
-Subject: [Patch v5 4/6] PCI/ACPI: Consolidate common PCI host bridge code
- into ACPI core
-In-Reply-To: <1433780448-18636-5-git-send-email-jiang.liu@linux.intel.com>
-References: <1433780448-18636-1-git-send-email-jiang.liu@linux.intel.com>
- <1433780448-18636-5-git-send-email-jiang.liu@linux.intel.com>
-Message-ID: <20150609161230.GC8591@red-moon>
+From: vbabka@suse.cz (Vlastimil Babka)
+Date: Tue, 09 Jun 2015 18:14:25 +0200
+Subject: [PATCH V3] mm:add VM_BUG_ON_PAGE() for page_mapcount()
+In-Reply-To: <35FD53F367049845BC99AC72306C23D103E688B313FA@CNBJMBX05.corpusers.net>
+References: <010b01d012ca$05244060$0f6cc120$@alibaba-inc.com>
+ <35FD53F367049845BC99AC72306C23D103E688B313F9@CNBJMBX05.corpusers.net>
+ <35FD53F367049845BC99AC72306C23D103E688B313FA@CNBJMBX05.corpusers.net>
+Message-ID: <557710E1.6060103@suse.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 08, 2015 at 05:20:46PM +0100, Jiang Liu wrote:
+On 12/08/2014 10:59 AM, Wang, Yalin wrote:
+> This patch add VM_BUG_ON_PAGE() for slab page,
+> because _mapcount is an union with slab struct in struct page,
+> avoid access _mapcount if this page is a slab page.
+> Also remove the unneeded bracket.
+>
+> Signed-off-by: Yalin Wang <yalin.wang@sonymobile.com>
+> ---
+>   include/linux/mm.h | 3 ++-
+>   1 file changed, 2 insertions(+), 1 deletion(-)
+>
+> diff --git a/include/linux/mm.h b/include/linux/mm.h
+> index b464611..a117527 100644
+> --- a/include/linux/mm.h
+> +++ b/include/linux/mm.h
+> @@ -449,7 +449,8 @@ static inline void page_mapcount_reset(struct page *page)
+>
+>   static inline int page_mapcount(struct page *page)
+>   {
+> -	return atomic_read(&(page)->_mapcount) + 1;
+> +	VM_BUG_ON_PAGE(PageSlab(page), page);
+> +	return atomic_read(&page->_mapcount) + 1;
+>   }
+>
 
-[...]
+I think this might theoretically trigger on the following code in 
+compaction's isolate_migratepages_block():
 
-> +static int acpi_pci_probe_root_resources(struct acpi_pci_root_info *info)
-> +{
-> +	int ret;
-> +	struct list_head *list = &info->resources;
-> +	struct acpi_device *device = info->bridge;
-> +	struct resource_entry *entry, *tmp;
-> +	unsigned long flags;
-> +
-> +	flags = IORESOURCE_IO | IORESOURCE_MEM | IORESOURCE_MEM_8AND16BIT;
+/*
+   * Migration will fail if an anonymous page is pinned in memory,
+   * so avoid taking lru_lock and isolating it unnecessarily in an
+   * admittedly racy check.
+   */
+if (!page_mapping(page) &&
+     page_count(page) > page_mapcount(page))
+	continue;
 
-Is IORESOURCE_MEM_8AND16BIT required because of some pending patches
-that will change ACPI resource filtering ? It does not seem to make
-a difference in the mainline code, AFAICT.
+This is done after PageLRU() was positive, but the lru_lock might be not 
+taken yet. So, there's some time window during which the page might have 
+been reclaimed from LRU and become a PageSlab(page). !page_mapping(page) 
+will be true in that case so it will proceed with page_mapcount(page) 
+test and trigger the VM_BUG_ON.
 
-> +	ret = acpi_dev_get_resources(device, list,
-> +				     acpi_dev_filter_resource_type_cb,
-> +				     (void *)flags);
-> +	if (ret < 0)
-> +		dev_warn(&device->dev,
-> +			 "failed to parse _CRS method, error code %d\n", ret);
-> +	else if (ret == 0)
-> +		dev_dbg(&device->dev,
-> +			"no IO and memory resources present in _CRS\n");
-> +	else {
-> +		resource_list_for_each_entry_safe(entry, tmp, list) {
-> +			if (entry->res->flags & IORESOURCE_DISABLED)
-> +				resource_list_destroy_entry(entry);
-> +			else
-> +				entry->res->name = info->name;
-> +		}
-> +		acpi_pci_root_validate_resources(&device->dev, list,
-> +						 IORESOURCE_MEM);
-> +		acpi_pci_root_validate_resources(&device->dev, list,
-> +						 IORESOURCE_IO);
-> +	}
-> +
-> +	return ret;
-> +}
-> +
-> +static void pci_acpi_root_add_resources(struct acpi_pci_root_info *info)
-> +{
-> +	struct resource_entry *entry, *tmp;
-> +	struct resource *res, *conflict, *root = NULL;
-> +
-> +	resource_list_for_each_entry_safe(entry, tmp, &info->resources) {
-> +		res = entry->res;
-> +		if (res->flags & IORESOURCE_MEM)
-> +			root = &iomem_resource;
-> +		else if (res->flags & IORESOURCE_IO)
-> +			root = &ioport_resource;
-> +		else
-> +			continue;
-> +
-> +		conflict = insert_resource_conflict(root, res);
-> +		if (conflict) {
-> +			dev_info(&info->bridge->dev,
-> +				 "ignoring host bridge window %pR (conflicts with %s %pR)\n",
-> +				 res, conflict->name, conflict);
-> +			resource_list_destroy_entry(entry);
-> +		}
-> +	}
-> +}
-> +
-> +static void __acpi_pci_root_release_info(struct acpi_pci_root_info *info)
-> +{
-> +	struct resource *res;
-> +	struct resource_entry *entry, *tmp;
-> +
-> +	if (!info)
-> +		return;
-> +
-> +	resource_list_for_each_entry_safe(entry, tmp, &info->resources) {
-> +		res = entry->res;
-> +		if (res->parent &&
-> +		    (res->flags & (IORESOURCE_MEM | IORESOURCE_IO)))
-> +			release_resource(res);
+(That test was added by DavidR year ago in commit 
+119d6d59dcc0980dcd581fdadb6b2033b512a473)
 
-> +		resource_list_destroy_entry(entry);
-> +	}
-> +
-> +	info->ops->release_info(info);
-> +}
-> +
-> +static void acpi_pci_root_release_info(struct pci_host_bridge *bridge)
-> +{
-> +	struct resource *res;
-> +	struct resource_entry *entry;
-> +
-> +	resource_list_for_each_entry(entry, &bridge->windows) {
-> +		res = entry->res;
-> +		if (res->parent &&
-> +		    (res->flags & (IORESOURCE_MEM | IORESOURCE_IO)))
-> +			release_resource(res);
-> +	}
+Vlastimil
 
-It is a question: is this loop necessary given that we are already
-releasing resources in __acpi_pci_root_release_info() ?
 
-> +	__acpi_pci_root_release_info(bridge->release_data);
-> +}
-> +
-> +struct pci_bus *acpi_pci_root_create(struct acpi_pci_root *root,
-> +				     struct acpi_pci_root_ops *ops,
-> +				     struct acpi_pci_root_info *info,
-> +				     void *sysdata, int segment, int node)
 
-I do not think you need to pass segment and node, they clutter the
-function signature when you can retrieve them from root, I would
-make them local variables and use root->segment and acpi_get_node
-in the function body to retrieve them.
 
-> +{
-> +	int ret, busnum = root->secondary.start;
-> +	struct acpi_device *device = root->device;
-> +	struct pci_bus *bus;
-> +
-> +	info->root = root;
-> +	info->bridge = device;
-> +	info->ops = ops;
-> +	INIT_LIST_HEAD(&info->resources);
-> +	snprintf(info->name, sizeof(info->name), "PCI Bus %04x:%02x",
-> +		 segment, busnum);
-> +
-> +	if (ops->init_info && ops->init_info(info))
-> +		goto out_release_info;
-> +	ret = acpi_pci_probe_root_resources(info);
-> +	if (ops->prepare_resources)
-> +		ret = ops->prepare_resources(info, ret);
 
-You go through this ret passing song and dance because we may want to
-call prepare_resources even if acpi_pci_probe_root_resource failed (on
-x86), correct ? I will have a further look at x86 and ia64 if we
-can consolidate these ops function hooks even further.
-
-Thanks,
-Lorenzo
-
-> +	if (ret < 0)
-> +		goto out_release_info;
-> +	else if (ret > 0)
-> +		pci_acpi_root_add_resources(info);
-> +	pci_add_resource(&info->resources, &root->secondary);
-> +
-> +	bus = pci_create_root_bus(NULL, busnum, ops->pci_ops,
-> +				  sysdata, &info->resources);
-> +	if (bus) {
-> +		pci_scan_child_bus(bus);
-> +		pci_set_host_bridge_release(to_pci_host_bridge(bus->bridge),
-> +					    acpi_pci_root_release_info, info);
-> +		if (node != NUMA_NO_NODE)
-> +			dev_printk(KERN_DEBUG, &bus->dev, "on NUMA node %d\n",
-> +				   node);
-> +		return bus;
-> +	}
-> +
-> +out_release_info:
-> +	__acpi_pci_root_release_info(info);
-> +	return NULL;
-> +}
-> +
->  void __init acpi_pci_root_init(void)
->  {
->  	acpi_hest_init();
-> diff --git a/include/linux/pci-acpi.h b/include/linux/pci-acpi.h
-> index a965efa52152..a76cb6f24ca1 100644
-> --- a/include/linux/pci-acpi.h
-> +++ b/include/linux/pci-acpi.h
-> @@ -52,6 +52,29 @@ static inline acpi_handle acpi_pci_get_bridge_handle(struct pci_bus *pbus)
->  	return ACPI_HANDLE(dev);
->  }
->  
-> +struct acpi_pci_root;
-> +struct acpi_pci_root_ops;
-> +
-> +struct acpi_pci_root_info {
-> +	struct acpi_pci_root		*root;
-> +	struct acpi_device		*bridge;
-> +	struct acpi_pci_root_ops	*ops;
-> +	struct list_head		resources;
-> +	char				name[16];
-> +};
-> +
-> +struct acpi_pci_root_ops {
-> +	struct pci_ops *pci_ops;
-> +	int (*init_info)(struct acpi_pci_root_info *info);
-> +	void (*release_info)(struct acpi_pci_root_info *info);
-> +	int (*prepare_resources)(struct acpi_pci_root_info *info, int status);
-> +};
-> +
-> +extern struct pci_bus *acpi_pci_root_create(struct acpi_pci_root *root,
-> +					    struct acpi_pci_root_ops *ops,
-> +					    struct acpi_pci_root_info *info,
-> +					    void *sd, int seg, int node);
-> +
->  void acpi_pci_add_bus(struct pci_bus *bus);
->  void acpi_pci_remove_bus(struct pci_bus *bus);
->  
-> -- 
-> 1.7.10.4
-> 
+>   static inline int page_count(struct page *page)
+>
