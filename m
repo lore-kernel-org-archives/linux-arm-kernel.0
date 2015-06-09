@@ -1,42 +1,20 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Tue, 9 Jun 2015 08:55:21 +0800
-Subject: [PATCH v9 5/6] arm64: dts: Add dts files for Hisilicon Hi6220 SoC
-In-Reply-To: <1432950661-23060-6-git-send-email-bintian.wang@huawei.com>
-References: <1432950661-23060-1-git-send-email-bintian.wang@huawei.com>
- <1432950661-23060-6-git-send-email-bintian.wang@huawei.com>
-Message-ID: <20150609005521.GA21682@tiger>
+From: HartleyS@visionengravers.com (Hartley Sweeten)
+Date: Tue, 9 Jun 2015 01:01:31 +0000
+Subject: [PATCH] ARM: ep93xx: simone: support for SPI-based MMC/SD cards
+In-Reply-To: <1433769759-6414-1-git-send-email-linus.walleij@linaro.org>
+References: <1433769759-6414-1-git-send-email-linus.walleij@linaro.org>
+Message-ID: <DC148C5AA1CEBA4E87973D432B1C2D883D49222D@P3PWEX4MB008.ex4.secureserver.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-A minor random comment below.
+On Monday, June 08, 2015 6:23 AM, Linus Walleij wrote:
+> From: Mika Westerberg <mika.westerberg@iki.fi>
+>
+> This includes setting up EGPIOs 0 and 9 for card detection and
+> chip select respectively. This patch is needed to mount a root
+> filesystem on the SPI-based MMC card reader found on the Sim.One.
+>
+> Signed-off-by: Mika Westerberg <mika.westerberg@iki.fi>
+> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 
-On Sat, May 30, 2015 at 09:51:00AM +0800, Bintian Wang wrote:
-> +		ao_ctrl: ao_ctrl {
-> +			compatible = "hisilicon,hi6220-aoctrl", "syscon";
-> +			reg = <0x0 0xf7800000 0x0 0x2000>;
-> +			#clock-cells = <1>;
-> +		};
-> +
-> +		sys_ctrl: sys_ctrl {
-> +			compatible = "hisilicon,hi6220-sysctrl", "syscon";
-> +			reg = <0x0 0xf7030000 0x0 0x2000>;
-> +			#clock-cells = <1>;
-> +		};
-> +
-> +		media_ctrl: media_ctrl {
-> +			compatible = "hisilicon,hi6220-mediactrl", "syscon";
-> +			reg = <0x0 0xf4410000 0x0 0x1000>;
-> +			#clock-cells = <1>;
-> +		};
-> +
-> +		pm_ctrl: pm_ctrl {
-
-An unit-address should be coded in the node name, when it has a 'reg'
-property.
-
-Shawn
-
-> +			compatible = "hisilicon,hi6220-pmctrl", "syscon";
-> +			reg = <0x0 0xf7032000 0x0 0x1000>;
-> +			#clock-cells = <1>;
-> +		};
+Reviewed-by: H Hartley Sweeten <hsweeten@visionengravers.com>
