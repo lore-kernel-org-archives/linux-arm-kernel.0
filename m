@@ -1,9 +1,9 @@
 From: robh@kernel.org (Rob Herring)
-Date: Tue,  9 Jun 2015 13:26:34 -0500
-Subject: [PATCH 08/15] memory: kill off set_irq_flags usage
+Date: Tue,  9 Jun 2015 13:26:30 -0500
+Subject: [PATCH 04/15] dma: kill off set_irq_flags usage
 In-Reply-To: <1433874401-27161-1-git-send-email-robh@kernel.org>
 References: <1433874401-27161-1-git-send-email-robh@kernel.org>
-Message-ID: <1433874401-27161-9-git-send-email-robh@kernel.org>
+Message-ID: <1433874401-27161-5-git-send-email-robh@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -23,35 +23,38 @@ clear that is really needed. There appears to be a great deal of blind
 copy and paste of this code.
 
 Signed-off-by: Rob Herring <robh@kernel.org>
-Cc: Roger Quadros <rogerq@ti.com>
-Cc: Tony Lindgren <tony@atomide.com>
-Cc: linux-omap at vger.kernel.org
+Cc: Dan Williams <dan.j.williams@intel.com>
+Cc: Vinod Koul <vinod.koul@intel.com>
+Cc: dmaengine at vger.kernel.org
 ---
- drivers/memory/omap-gpmc.c | 5 ++---
- 1 file changed, 2 insertions(+), 3 deletions(-)
+ drivers/dma/ipu/ipu_irq.c | 8 ++------
+ 1 file changed, 2 insertions(+), 6 deletions(-)
 
-diff --git a/drivers/memory/omap-gpmc.c b/drivers/memory/omap-gpmc.c
-index c94ea0d..0c833e2 100644
---- a/drivers/memory/omap-gpmc.c
-+++ b/drivers/memory/omap-gpmc.c
-@@ -1176,8 +1176,8 @@ static int gpmc_setup_irq(void)
- 		gpmc_client_irq[i].irq = gpmc_irq_start + i;
- 		irq_set_chip_and_handler(gpmc_client_irq[i].irq,
- 					&gpmc_irq_chip, handle_simple_irq);
--		set_irq_flags(gpmc_client_irq[i].irq,
--				IRQF_VALID | IRQF_NOAUTOEN);
-+		irq_modify_status(gpmc_client_irq[i].irq, IRQ_NOREQUEST,
-+				  IRQ_NOAUTOEN);
+diff --git a/drivers/dma/ipu/ipu_irq.c b/drivers/dma/ipu/ipu_irq.c
+index 2e284a4..667ebba 100644
+--- a/drivers/dma/ipu/ipu_irq.c
++++ b/drivers/dma/ipu/ipu_irq.c
+@@ -377,9 +377,7 @@ int __init ipu_irq_attach_irq(struct ipu *ipu, struct platform_device *dev)
+ 		irq_map[i].irq = irq;
+ 		irq_map[i].source = -EINVAL;
+ 		irq_set_handler(irq, handle_level_irq);
+-#ifdef CONFIG_ARM
+-		set_irq_flags(irq, IRQF_VALID | IRQF_PROBE);
+-#endif
++		irq_clear_status_flags(irq, IRQ_NOREQUEST | IRQ_NOPROBE);
  	}
  
- 	/* Disable interrupts */
-@@ -1200,7 +1200,6 @@ static int gpmc_free_irq(void)
- 	for (i = 0; i < GPMC_NR_IRQ; i++) {
- 		irq_set_handler(gpmc_client_irq[i].irq, NULL);
- 		irq_set_chip(gpmc_client_irq[i].irq, &no_irq_chip);
--		irq_modify_status(gpmc_client_irq[i].irq, 0, 0);
- 	}
+ 	irq_set_handler_data(ipu->irq_fn, ipu);
+@@ -406,9 +404,7 @@ void ipu_irq_detach_irq(struct ipu *ipu, struct platform_device *dev)
+ 	irq_set_handler_data(ipu->irq_err, NULL);
  
- 	irq_free_descs(gpmc_irq_start, GPMC_NR_IRQ);
+ 	for (irq = irq_base; irq < irq_base + CONFIG_MX3_IPU_IRQS; irq++) {
+-#ifdef CONFIG_ARM
+-		set_irq_flags(irq, 0);
+-#endif
++		irq_set_status_flags(irq, IRQ_NOREQUEST);
+ 		irq_set_chip(irq, NULL);
+ 		irq_set_chip_data(irq, NULL);
+ 	}
 -- 
 2.1.0
