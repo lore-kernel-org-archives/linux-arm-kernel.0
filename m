@@ -1,38 +1,148 @@
-From: monstr@monstr.eu (Michal Simek)
-Date: Tue, 09 Jun 2015 09:27:39 +0200
-Subject: [PATCH v4 2/2] dma: Add Xilinx AXI Central Direct Memory Access
- Engine driver support
-In-Reply-To: <1433834507.16887.3.camel@x220>
-References: <1432228035-6569-1-git-send-email-appanad@xilinx.com>	
- <1432290653.27695.97.camel@x220> <557681A7.7080202@monstr.eu>
- <1433834507.16887.3.camel@x220>
-Message-ID: <5576956B.7050901@monstr.eu>
+From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
+Date: Tue, 09 Jun 2015 09:46:47 +0200
+Subject: [PATCH v5 1/3] ARM: rockchip: fix the CPU soft reset
+In-Reply-To: <557636CC.6010809@rock-chips.com>
+References: <1433747496-7642-1-git-send-email-wxt@rock-chips.com>
+ <20150608094334.GX7557@n2100.arm.linux.org.uk>
+ <557636CC.6010809@rock-chips.com>
+Message-ID: <9253141.D1erkaHIPa@diego>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/09/2015 09:21 AM, Paul Bolle wrote:
-> On Tue, 2015-06-09 at 08:03 +0200, Michal Simek wrote:
->> Have you sent any patch to add GPL v2+ to license.h?
+Am Dienstag, 9. Juni 2015, 08:43:56 schrieb Caesar Wang:
+> ? 2015?06?08? 17:43, Russell King - ARM Linux ??:
+> > On Mon, Jun 08, 2015 at 03:11:34PM +0800, Caesar Wang wrote:
+> >> diff --git a/arch/arm/mach-rockchip/platsmp.c
+> >> b/arch/arm/mach-rockchip/platsmp.c index 5b4ca3c..bd40852 100644
+> >> --- a/arch/arm/mach-rockchip/platsmp.c
+> >> +++ b/arch/arm/mach-rockchip/platsmp.c
+> >> @@ -72,6 +72,7 @@ static struct reset_control
+> >> *rockchip_get_core_reset(int cpu)>> 
+> >>   static int pmu_set_power_domain(int pd, bool on)
+> >>   {
+> >>   
+> >>   	u32 val = (on) ? 0 : BIT(pd);
+> >> 
+> >> +	struct reset_control *rstc = rockchip_get_core_reset(pd);
+> >> 
+> >>   	int ret;
+> >>   	
+> >>   	/*
+> >> 
+> >> @@ -80,20 +81,15 @@ static int pmu_set_power_domain(int pd, bool on)
+> >> 
+> >>   	 * processor is powered down.
+> >>   	 */
+> >>   	
+> >>   	if (read_cpuid_part() != ARM_CPU_PART_CORTEX_A9) {
+> >> 
+> >> -		struct reset_control *rstc = rockchip_get_core_reset(pd);
+> >> -
+> >> +		/* We only require the reset on the RK3288 at the moment */
+> >> 
+> >>   		if (IS_ERR(rstc)) {
+> >>   		
+> >>   			pr_err("%s: could not get reset control for core %d\n",
+> >>   			
+> >>   			       __func__, pd);
+> >>   			
+> >>   			return PTR_ERR(rstc);
+> >>   		
+> >>   		}
+> >> 
+> >> -		if (on)
+> >> -			reset_control_deassert(rstc);
+> >> -		else
+> >> +		if (!on)
+> >> 
+> >>   			reset_control_assert(rstc);
+> >> 
+> >> -
+> >> -		reset_control_put(rstc);
+> >> 
+> >>   	}
+> > 
+> > Do we need the CPU part number check for the assertion/deassertion of
+> > the reset control?  Surely the DT provides this where appropriate and
+> > omits it where it's inappropriate?
+> > 
+> > If so, I'd separate out the decision whether to error out from the
+> > 
+> > decision whether to assert the reset control, like this:
+> > 	if (IS_ERR(rstc) && read_cpuid_part() != ARM_CPU_PART_CORTEX_A9) {
+> > 	
+> > 		pr_err("%s: could not get reset control for core %d\n",
+> > 		
+> > 		       __func__, pd);
+> > 		
+> > 		return PTR_ERR(rstc);
+> > 	
+> > 	}
+> > 	
+> > 	if (!IS_ERR(rstc) && !on)
+> > 	
+> > 		reset_control_assert(rstc);
+> > 
+> > or maybe:
+> > 	if (IS_ERR(rstc) && PTR_ERR(rstc) != -ENOENT) {
+> > 	
+> > 		pr_err("%s: could not get reset control for core %d: %d\n",
+> > 		
+> > 		       __func__, pd, PTR_ERR(rstc));
+> > 		
+> > 		return PTR_ERR(rstc);
+> > 	
+> > 	}
+> > 	
+> > 	if (!IS_ERR(rstc) && !on)
+> > 	
+> > 		reset_control_assert(rstc);
+> > 
+> > which lets you detect whether of_reset_control_get() failed because the
+> > reset control was not present (and thus not required) vs failed for some
+> > other reason - and this means that the issue of whether the reset
+> > control is used is entirely up to the supplied DT file.
 > 
-> "GPL" already means GPL v2 or later (see include/linux/module.h).
+> Sound resonable for me.
+> 
+> I hope get the Heiko and Kever option.
+> After all the code is uploaded by Heiko and Kever.
 
-ok. I see.
+Russell's suggestion is very nice indeed.
 
-Thanks,
-Michal
-
--- 
-Michal Simek, Ing. (M.Eng), OpenPGP -> KeyID: FE3D1F91
-w: www.monstr.eu p: +42-0-721842854
-Maintainer of Linux kernel - Microblaze cpu - http://www.monstr.eu/fdt/
-Maintainer of Linux kernel - Xilinx Zynq ARM architecture
-Microblaze U-BOOT custodian and responsible for u-boot arm zynq platform
+We have reset controls for the cpu cores on all Rockchip SoCs but currently 
+only absolutely require them on the rk3288, so what Russell suggested handles 
+this nicely if we require this later for other SoCs as well (like the A7 ones) 
+.
 
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150609/af240675/attachment.sig>
+Heiko
+
+> 
+> >>   	ret = regmap_update_bits(pmu, PMU_PWRDN_CON, BIT(pd), val);
+> >> 
+> >> @@ -112,6 +108,12 @@ static int pmu_set_power_domain(int pd, bool on)
+> >> 
+> >>   		}
+> >>   	
+> >>   	}
+> >> 
+> >> +	if (read_cpuid_part() != ARM_CPU_PART_CORTEX_A9 && on)
+> >> +		reset_control_deassert(rstc);
+> >> +
+> >> +	if (!IS_ERR(rstc))
+> >> +		reset_control_put(rstc);
+> >> +
+> > 
+> > and here:
+> > 	if (!IS_ERR(rstc)) {
+> > 	
+> > 		if (on)
+> > 		
+> > 			reset_control_deassert(rstc);
+> > 		
+> > 		reset_control_put(rstc);
+> > 	
+> > 	}
+> 
+> Ditto.
