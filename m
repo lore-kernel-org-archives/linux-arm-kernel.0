@@ -1,81 +1,82 @@
-From: eddie.huang@mediatek.com (Eddie Huang)
-Date: Tue, 9 Jun 2015 18:05:21 +0800
-Subject: [PATCH 2/3] spi: mediatek: Add spi bus for Mediatek MT8173
-In-Reply-To: <20150608175927.GO14071@sirena.org.uk>
-References: <1431075343-7887-1-git-send-email-leilk.liu@mediatek.com>
- <1431075343-7887-3-git-send-email-leilk.liu@mediatek.com>
- <20150508175306.GG2761@sirena.org.uk> <1431434356.2128.9.camel@mhfsdcap03>
- <20150512160540.GB3066@sirena.org.uk> <1431675522.2128.13.camel@mhfsdcap03>
- <20150515092543.GY2761@sirena.org.uk>
- <1433758546.19786.16.camel@mtksdaap41>
- <20150608175927.GO14071@sirena.org.uk>
-Message-ID: <1433844321.16178.6.camel@mtksdaap41>
+From: julia.lawall@lip6.fr (Julia Lawall)
+Date: Tue, 9 Jun 2015 12:05:57 +0200 (CEST)
+Subject: [PATCH v4 2/2] dma: Add Xilinx AXI Central Direct Memory Access
+ Engine driver support
+In-Reply-To: <1433837720.16887.42.camel@x220>
+References: <1432228035-6569-1-git-send-email-appanad@xilinx.com>
+ <1432290653.27695.97.camel@x220> <557681A7.7080202@monstr.eu>
+ <alpine.DEB.2.02.1506090808500.2069@localhost6.localdomain6>
+ <55769132.6070601@monstr.eu> <1433837720.16887.42.camel@x220>
+Message-ID: <alpine.DEB.2.10.1506091202370.2324@hadrien>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mark,
-
-On Mon, 2015-06-08 at 18:59 +0100, Mark Brown wrote:
-> On Mon, Jun 08, 2015 at 06:15:46PM +0800, Eddie Huang wrote:
-> > On Fri, 2015-05-15 at 17:25 +0800, Mark Brown wrote:
-> 
-> > > That's how a very large proportion of devices that work with DMA are
-> > > done - why would this be complicated?  All can_dma() does is report if
-> > > DMA is possible.
-> 
-> > In include/linux/spi/spi.h, it describes if can_dma() exists and returns
-> > true, dma_tx and dma_rx must be set.But Medaitek SPI controller has its
-> > own dma hardware, which means this dma resides in the same base address
-> > range with SPI controller, and only used by SPI, so we don't implement
-> > generic DMA driver, such that can't provide dma channel and assign to
-> > dmx_tx, dmx_rx parameter. We think it's strange to implement generic dma
-> > driver for dma that only used by specific hardware.Can we just provide
-> > can_dma() function and return false ? But I think it's a little odd that
-> > there actually has dma. So can we just skip can_dma() function let it be
-> > NULL ?
-> 
-> If it's simply the unavailbility of a struct dma_chan we must be able to
-> get a better solution than just open coding all the DMA mapping and
-> unmapping in the driver.  The only thing we actually use the channel for
-> is to get the device we need to use to do the mapping and unmapping,
-> either we need a way for devices to provide their own channels easily or
-> a way for SPI drivers to specify a device here instead of a channel.
-> The latter seems easier if a bit clunky (with having to work with both).
-
-I list two ways you mention.
-Pesudo code of your first suggestion:
-
-static int mtk_spi_probe(struct platform_device *pdev) {
-  struct dma_chan *tx_chan;
-  struct dma_device *tx_dma;
-
-  tx_chan = devm_kzalloc(&pdev->dev, sizeof(*tx_chan), GFP_KERNEL);
-  tx_dma = devm_kzalloc(&pdev->dev, sizeof(*tx_dma), GFP_KERNEL);
-
-  tx_dma->dev = &pdev->dev;
-  tx_chan->device = tx_dma;
-  master->dma_tx = tx_chan;
-  ...
-}
-
-Modification of your second suggestion:
-
---- a/drivers/spi/spi.c
-+++ b/drivers/spi/spi.c
-@@ -539,8 +539,8 @@ static int __spi_map_msg(struct spi_master *master,
-struct spi_message *msg)
-        if (!master->can_dma)
-                return 0;
-
--       tx_dev = master->dma_tx->device->dev;
--       rx_dev = master->dma_rx->device->dev;
-+       tx_dev = master->dma_tx ? master->dma_tx->device->dev :
-master->dev;
-+       rx_dev = master->dma_rx ? master->dma_rx->device->dev : master-
 
 
-Is this what you want ? Actually, I don't like first one at all.
+On Tue, 9 Jun 2015, Paul Bolle wrote:
 
+> On Tue, 2015-06-09 at 09:09 +0200, Michal Simek wrote:
+> > On 06/09/2015 08:10 AM, Julia Lawall wrote:
+> > > On Tue, 9 Jun 2015, Michal Simek wrote:
+> > >> Also sort of checking for this will be great. Julia?
+> > >
+> > > If this requires checking the contents of comment, Coccinelle currently
+> > > can't help with that.  Perhaps an idea would be to just do a grep on the
+> > > file.  So if I find MODULE_LICENSE("GPL v2") and then grepping for "either
+> > > vresion 2" gives success, then there is a problem?  It's obviously not
+> > > foolproof, but perhaps it could be helpful.
+> >
+> > Having some sort of checking somewhere will be great. checkpatch?
+> > zero-day testing system?
+>
+> Mistakes I've seen made since I started checking this stuff (a few
+> months ago):
+> - typos in the license ident, say "GPLv2", "GPL V2", or "BSD": generates
+> a warning when module is loaded and taints kernel. People still get this
+> wrong. A test in checkpatch for these typos was submitted a while ago,
+> but it never got added;
+> - not adding MODULE_LICENSE() to a module: also generates a warning when
+> module is loaded and taints kernel. People still get this wrong;
+> - adding MODULE_LICENSE() to built-in only code: pointless at best, and
+> annoying for reviewers ("Hey, did the submitter intend to write built-in
+> only code or modular code?");
+> - using "Dual BSD/GPL" but not a trace of the BSD license blurb in
+> sight, while adding that blurb is one of the very few requirements this
+> license actually has;
+> - license mismatch, say comment blurb states "GPL v2 (or later)" but
+> MODULE_LICENSE() ident states "GPL v2" only (or vice versa): very easy
+> mistake to make, happens once or twice a week.
+>
+> Did I miss anything in that list?
+>
+> I'm afraid that most of the above can only be caught reliably by
+> attention to detail by submitters and reviewers. That's a pity, because
+> checking for that stuff is about as boring as it gets. (What does that
+> say about me?)
 
-Eddie
-Thanks
+There has been some research in this direction:
+
+A sentence-matching method for automatic license identification of source
+code files
+Daniel M. German, Yuki Manabe, Katsuro Inoue
+
+The reuse of free and open source software (FOSS) components is becoming
+more prevalent. One of the major challenges in finding the right component
+is finding one that has a license that is e for its intended use. The
+license of a FOSS component is determined by the licenses of its source
+code files. In this paper, we describe the challenges of identifying the
+license under which source code is made available, and propose a
+sentence-based matching algorithm to automatically do it. We demonstrate
+the feasibility of our approach by implementing a tool named Ninka. We
+performed an evaluation that shows that Ninka outperforms other methods of
+license identification in precision and speed. We also performed an
+empirical study on 0.8 million source code files of Debian that highlight
+interesting facts about the manner in which licenses are used by FOSS.
+
+If you google for the paper title, you come across a pdf of the paper.
+
+There seems to be a tool available as well:
+
+http://ninka.turingmachine.org/
+
+julia
