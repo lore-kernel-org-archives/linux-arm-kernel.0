@@ -1,42 +1,41 @@
-From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Tue, 9 Jun 2015 14:29:41 +0200
-Subject: [PATCH v2] mtd: nand: Sunxi calculate timing cfg
-In-Reply-To: <1433849498-3270-1-git-send-email-r.spliet@ultimaker.com>
-References: <1433849498-3270-1-git-send-email-r.spliet@ultimaker.com>
-Message-ID: <20150609142941.069f468d@bbrezillon>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Tue, 09 Jun 2015 21:32:19 +0900
+Subject: [RESEND] ARM: dts: odroidxu3: Enable USB3 regulators
+In-Reply-To: <1433678028-8441-1-git-send-email-linux.amoon@gmail.com>
+References: <1433678028-8441-1-git-send-email-linux.amoon@gmail.com>
+Message-ID: <5576DCD3.2010709@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue,  9 Jun 2015 13:31:38 +0200
-Roy Spliet <r.spliet@ultimaker.com> wrote:
+W dniu 07.06.2015 o 20:53, Anand Moon pisze:
+> Enable regulator for usbdrd3_0 and usbdrd3_1.
+> Looking at the schematic pin diagram for MAX77802
+> USB3_0 and USB3_1 is regulated by LDO9 and LD011.
+> 
+> Fix the boot message of failed.
+> [    3.503539] exynos-dwc3 usb at 12000000: Looking up vdd33-supply from device tree
+> [    3.503556] exynos-dwc3 usb at 12000000: Looking up vdd33-supply property in node /usb at 12000000 failed
+> [    3.503568] usb at 12000000 supply vdd33 not found, using dummy regulator
+> [    3.509154] exynos-dwc3 usb at 12000000: Looking up vdd10-supply from device tree
+> [    3.509170] exynos-dwc3 usb at 12000000: Looking up vdd10-supply property in node /usb at 12000000 failed
+> [    3.509181] usb at 12000000 supply vdd10 not found, using dummy regulator
+> [    3.917548] exynos-dwc3 usb at 12400000: Looking up vdd33-supply from device tree
+> [    3.917565] exynos-dwc3 usb at 12400000: Looking up vdd33-supply property in node /usb at 12400000 failed
+> [    3.917578] usb at 12400000 supply vdd33 not found, using dummy regulator
+> [    3.922731] exynos-dwc3 usb at 12400000: Looking up vdd10-supply from device tree
+> [    3.922747] exynos-dwc3 usb at 12400000: Looking up vdd10-supply property in node /usb at 12400000 failed
+> 
+> Signed-off-by: Anand Moon <linux.amoon@gmail.com>
+> Tested-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+> Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+> ---
+>  arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi | 10 ++++++++++
+>  1 file changed, 10 insertions(+)
 
+Thanks, applied with minor adjustments in commit message (joined first
+three sentences into one paragraph, changed description of dmesg).
 
->  
-> +	/* T16 - T19 + tCAD */
-> +	tWB  = sunxi_nand_lookup_timing(tWB_lut, timings->tWB_max,
-> +			min_clk_period);
-> +	tADL = DIV_ROUND_UP(timings->tADL_min, min_clk_period) >> 3;
-> +	tWHR = DIV_ROUND_UP(timings->tWHR_min, min_clk_period) >> 3;
-> +	tRHW = sunxi_nand_lookup_timing(tRHW_lut, timings->tRHW_min,
-> +			min_clk_period);
-> +	tCAD = 0x7;
-> +	chip->timing_cfg = (tWB & 0x3) |
-> +			   (tADL & 0x3) << 2 |
-> +			   (tWHR & 0x3) << 4 |
-> +			   (tRHW & 0x3) << 6 |
-> +			   (tCAD & 0x7) << 8;
+I'll send later to Kukjin for 4.3 (unless he picks it also).
 
-Yet another comment: could you define a macro to create the timing_cfg
-value ?
-
-#define NFC_TIMING_CFG(tWB, tADL, tWHR, tRHW, tCAD)		\
-	((tWB) & 0x3) | (((tADL) & 0x3) << 2) |			\
-	(((tWHR) & 0x3) << 4) | (((tRHW) & 0x3) << 6) |		\
-	(((tCAD) & 0x7) << 8);
-
-
-
--- 
-Boris Brezillon, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+Best regards,
+Krzysztof
