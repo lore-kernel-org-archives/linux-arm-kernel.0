@@ -1,105 +1,166 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Tue,  9 Jun 2015 18:47:22 +0200
-Subject: [PATCH 30/34] pinctrl: mvebu: armada-38x: add ua1 functions
+Date: Tue,  9 Jun 2015 18:47:17 +0200
+Subject: [PATCH 25/34] pinctrl: mvebu: armada-xp: add spi1 function
 In-Reply-To: <1433868446-11028-1-git-send-email-thomas.petazzoni@free-electrons.com>
 References: <1433868446-11028-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1433868446-11028-31-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1433868446-11028-26-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The latest version of the Armada 38x datasheet documents several new
-UART1 related functions on various MPP pins. This commit adds the
-description of these new functions to the Armada 38x pinctrl driver as
-well as to its DT binding documentation.
+The latest Armada XP datasheet documents that some of the MPP pins can
+be used to access the second SPI bus, labelled 'spi1'. This commit
+adds the corresponding pins in the pinctrl driver and its DT binding
+documentation.
 
 Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 ---
- .../bindings/pinctrl/marvell,armada-38x-pinctrl.txt    | 12 ++++++------
- drivers/pinctrl/mvebu/pinctrl-armada-38x.c             | 18 ++++++++++++------
- 2 files changed, 18 insertions(+), 12 deletions(-)
+ .../bindings/pinctrl/marvell,armada-xp-pinctrl.txt | 26 +++++++++++++---------
+ drivers/pinctrl/mvebu/pinctrl-armada-xp.c          | 25 +++++++++++++++------
+ 2 files changed, 33 insertions(+), 18 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/pinctrl/marvell,armada-38x-pinctrl.txt b/Documentation/devicetree/bindings/pinctrl/marvell,armada-38x-pinctrl.txt
-index 278887d..4330676 100644
---- a/Documentation/devicetree/bindings/pinctrl/marvell,armada-38x-pinctrl.txt
-+++ b/Documentation/devicetree/bindings/pinctrl/marvell,armada-38x-pinctrl.txt
-@@ -60,8 +60,8 @@ mpp41         41       gpio, ua1(rxd), ge1(rxctl), ua0(cts), spi1(cs3), dev(burs
- mpp42         42       gpio, ua1(txd), ua0(rts), dev(ad7)
- mpp43         43       gpio, pcie0(clkreq), dram(vttctrl), dram(deccerr), spi1(cs2), dev(clkout), nand(rb1)
- mpp44         44       gpio, sata0(prsnt), sata1(prsnt), sata2(prsnt) [2], sata3(prsnt) [3]
--mpp45         45       gpio, ref(clk_out0), pcie0(rstout)
--mpp46         46       gpio, ref(clk_out1), pcie0(rstout)
-+mpp45         45       gpio, ref(clk_out0), pcie0(rstout), ua1(rxd)
-+mpp46         46       gpio, ref(clk_out1), pcie0(rstout), ua1(txd)
- mpp47         47       gpio, sata0(prsnt), sata1(prsnt), sata2(prsnt) [2], sata3(prsnt) [2]
- mpp48         48       gpio, sata0(prsnt), dram(vttctrl), tdm(pclk), audio(mclk), sd0(d4), pcie0(clkreq)
- mpp49         49       gpio, sata2(prsnt) [2], sata3(prsnt) [2], tdm(fsync), audio(lrclk), sd0(d5), pcie1(clkreq)
-@@ -70,10 +70,10 @@ mpp51         51       gpio, tdm(dtx), audio(sdo), dram(deccerr)
- mpp52         52       gpio, pcie0(rstout), tdm(int), audio(sdi), sd0(d6)
- mpp53         53       gpio, sata1(prsnt), sata0(prsnt), tdm(rst), audio(bclk), sd0(d7)
- mpp54         54       gpio, sata0(prsnt), sata1(prsnt), pcie0(rstout), ge0(txerr), sd0(d3)
--mpp55         55       gpio, ua1(cts), ge(mdio), pcie1(clkreq) [1], spi1(cs1), sd0(d0)
--mpp56         56       gpio, ua1(rts), ge(mdc), dram(deccerr), spi1(mosi)
--mpp57         57       gpio, spi1(sck), sd0(clk)
--mpp58         58       gpio, pcie1(clkreq) [1], i2c1(sck), pcie2(clkreq), spi1(miso), sd0(d1)
-+mpp55         55       gpio, ua1(cts), ge(mdio), pcie1(clkreq) [1], spi1(cs1), sd0(d0), ua1(rxd)
-+mpp56         56       gpio, ua1(rts), ge(mdc), dram(deccerr), spi1(mosi), ua1(txd)
-+mpp57         57       gpio, spi1(sck), sd0(clk), ua1(txd)
-+mpp58         58       gpio, pcie1(clkreq) [1], i2c1(sck), pcie2(clkreq), spi1(miso), sd0(d1), ua1(rxd)
- mpp59         59       gpio, pcie0(rstout), i2c1(sda), spi1(cs0), sd0(d2)
+diff --git a/Documentation/devicetree/bindings/pinctrl/marvell,armada-xp-pinctrl.txt b/Documentation/devicetree/bindings/pinctrl/marvell,armada-xp-pinctrl.txt
+index e8e0a27..5f64ee1 100644
+--- a/Documentation/devicetree/bindings/pinctrl/marvell,armada-xp-pinctrl.txt
++++ b/Documentation/devicetree/bindings/pinctrl/marvell,armada-xp-pinctrl.txt
+@@ -31,11 +31,11 @@ mpp9          9        gpio, ge0(rxd3), lcd(d9)
+ mpp10         10       gpio, ge0(rxctl), lcd(d10)
+ mpp11         11       gpio, ge0(rxclk), lcd(d11)
+ mpp12         12       gpio, ge0(txd4), ge1(txclkout), lcd(d12)
+-mpp13         13       gpio, ge0(txd5), ge1(txd0), lcd(d13)
+-mpp14         14       gpio, ge0(txd6), ge1(txd1), lcd(d15)
++mpp13         13       gpio, ge0(txd5), ge1(txd0), spi1(mosi), lcd(d13)
++mpp14         14       gpio, ge0(txd6), ge1(txd1), spi1(sck), lcd(d15)
+ mpp15         15       gpio, ge0(txd7), ge1(txd2), lcd(d16)
+-mpp16         16       gpio, ge0(txd7), ge1(txd3), lcd(d16)
+-mpp17         17       gpio, ge0(col), ge1(txctl), lcd(d17)
++mpp16         16       gpio, ge0(txd7), ge1(txd3), spi1(cs0), lcd(d16)
++mpp17         17       gpio, ge0(col), ge1(txctl), spi1(miso), lcd(d17)
+ mpp18         18       gpio, ge0(rxerr), ge1(rxd0), lcd(d18), ptp(trig)
+ mpp19         19       gpio, ge0(crs), ge1(rxd1), lcd(d19), ptp(evreq)
+ mpp20         20       gpio, ge0(rxd4), ge1(rxd2), lcd(d20), ptp(clk)
+@@ -58,17 +58,21 @@ mpp36         36       gpio, spi0(mosi)
+ mpp37         37       gpio, spi0(miso)
+ mpp38         38       gpio, spi0(sck)
+ mpp39         39       gpio, spi0(cs0)
+-mpp40         40       gpio, spi0(cs1), uart2(cts), lcd(vga-hsync), pcie(clkreq0)
++mpp40         40       gpio, spi0(cs1), uart2(cts), lcd(vga-hsync), pcie(clkreq0),
++                       spi1(cs1)
+ mpp41         41       gpio, spi0(cs2), uart2(rts), lcd(vga-vsync), sata1(prsnt),
+-                       pcie(clkreq1)
++                       pcie(clkreq1), spi1(cs2)
+ mpp42         42       gpio, uart2(rxd), uart0(cts), tdm(int7), tdm(timer)
+-mpp43         43       gpio, uart2(txd), uart0(rts), spi0(cs3), pcie(rstout)
++mpp43         43       gpio, uart2(txd), uart0(rts), spi0(cs3), pcie(rstout),
++                       spi1(cs3)
+ mpp44         44       gpio, uart2(cts), uart3(rxd), spi0(cs4), pcie(clkreq2),
+-                       dram(bat)
+-mpp45         45       gpio, uart2(rts), uart3(txd), spi0(cs5), sata1(prsnt)
+-mpp46         46       gpio, uart3(rts), uart1(rts), spi0(cs6), sata0(prsnt)
++                       dram(bat), spi1(cs4)
++mpp45         45       gpio, uart2(rts), uart3(txd), spi0(cs5), sata1(prsnt),
++                       spi1(cs5)
++mpp46         46       gpio, uart3(rts), uart1(rts), spi0(cs6), sata0(prsnt),
++                       spi1(cs6)
+ mpp47         47       gpio, uart3(cts), uart1(cts), spi0(cs7), pcie(clkreq3),
+-                       ref(clkout)
++                       ref(clkout), spi1(cs7)
+ mpp48         48       gpio, dev(clkout), dev(burst/last)
  
- [1]: only available on 88F6820 and 88F6828
-diff --git a/drivers/pinctrl/mvebu/pinctrl-armada-38x.c b/drivers/pinctrl/mvebu/pinctrl-armada-38x.c
-index ac8f297..370c73b 100644
---- a/drivers/pinctrl/mvebu/pinctrl-armada-38x.c
-+++ b/drivers/pinctrl/mvebu/pinctrl-armada-38x.c
-@@ -292,11 +292,13 @@ static struct mvebu_mpp_mode armada_38x_mpp_modes[] = {
+ * Marvell Armada XP (mv78260 and mv78460 only)
+diff --git a/drivers/pinctrl/mvebu/pinctrl-armada-xp.c b/drivers/pinctrl/mvebu/pinctrl-armada-xp.c
+index 74ff211..4674462 100644
+--- a/drivers/pinctrl/mvebu/pinctrl-armada-xp.c
++++ b/drivers/pinctrl/mvebu/pinctrl-armada-xp.c
+@@ -109,11 +109,13 @@ static struct mvebu_mpp_mode armada_xp_mpp_modes[] = {
+ 		 MPP_VAR_FUNCTION(0x0, "gpio", NULL,        V_MV78230_PLUS),
+ 		 MPP_VAR_FUNCTION(0x1, "ge0", "txd5",       V_MV78230_PLUS),
+ 		 MPP_VAR_FUNCTION(0x2, "ge1", "txd0",       V_MV78230_PLUS),
++		 MPP_VAR_FUNCTION(0x3, "spi1", "mosi",      V_MV78230_PLUS),
+ 		 MPP_VAR_FUNCTION(0x4, "lcd", "d13",        V_MV78230_PLUS)),
+ 	MPP_MODE(14,
+ 		 MPP_VAR_FUNCTION(0x0, "gpio", NULL,        V_MV78230_PLUS),
+ 		 MPP_VAR_FUNCTION(0x1, "ge0", "txd6",       V_MV78230_PLUS),
+ 		 MPP_VAR_FUNCTION(0x2, "ge1", "txd1",       V_MV78230_PLUS),
++		 MPP_VAR_FUNCTION(0x3, "spi1", "sck",       V_MV78230_PLUS),
+ 		 MPP_VAR_FUNCTION(0x4, "lcd", "d14",        V_MV78230_PLUS)),
+ 	MPP_MODE(15,
+ 		 MPP_VAR_FUNCTION(0x0, "gpio", NULL,        V_MV78230_PLUS),
+@@ -124,11 +126,13 @@ static struct mvebu_mpp_mode armada_xp_mpp_modes[] = {
+ 		 MPP_VAR_FUNCTION(0x0, "gpio", NULL,        V_MV78230_PLUS),
+ 		 MPP_VAR_FUNCTION(0x1, "ge0", "txclk",      V_MV78230_PLUS),
+ 		 MPP_VAR_FUNCTION(0x2, "ge1", "txd3",       V_MV78230_PLUS),
++		 MPP_VAR_FUNCTION(0x3, "spi1", "cs0",       V_MV78230_PLUS),
+ 		 MPP_VAR_FUNCTION(0x4, "lcd", "d16",        V_MV78230_PLUS)),
+ 	MPP_MODE(17,
+ 		 MPP_VAR_FUNCTION(0x0, "gpio", NULL,        V_MV78230_PLUS),
+ 		 MPP_VAR_FUNCTION(0x1, "ge0", "col",        V_MV78230_PLUS),
+ 		 MPP_VAR_FUNCTION(0x2, "ge1", "txctl",      V_MV78230_PLUS),
++		 MPP_VAR_FUNCTION(0x3, "spi1", "miso",      V_MV78230_PLUS),
+ 		 MPP_VAR_FUNCTION(0x4, "lcd", "d17",        V_MV78230_PLUS)),
+ 	MPP_MODE(18,
+ 		 MPP_VAR_FUNCTION(0x0, "gpio", NULL,        V_MV78230_PLUS),
+@@ -239,14 +243,16 @@ static struct mvebu_mpp_mode armada_xp_mpp_modes[] = {
+ 		 MPP_VAR_FUNCTION(0x1, "spi0", "cs1",       V_MV78230_PLUS),
+ 		 MPP_VAR_FUNCTION(0x2, "uart2", "cts",      V_MV78230_PLUS),
+ 		 MPP_VAR_FUNCTION(0x4, "lcd", "vga-hsync",  V_MV78230_PLUS),
+-		 MPP_VAR_FUNCTION(0x5, "pcie", "clkreq0",   V_MV78230_PLUS)),
++		 MPP_VAR_FUNCTION(0x5, "pcie", "clkreq0",   V_MV78230_PLUS),
++		 MPP_VAR_FUNCTION(0x6, "spi1", "cs1",       V_MV78230_PLUS)),
+ 	MPP_MODE(41,
+ 		 MPP_VAR_FUNCTION(0x0, "gpio", NULL,        V_MV78230_PLUS),
+ 		 MPP_VAR_FUNCTION(0x1, "spi0", "cs2",       V_MV78230_PLUS),
+ 		 MPP_VAR_FUNCTION(0x2, "uart2", "rts",      V_MV78230_PLUS),
+ 		 MPP_VAR_FUNCTION(0x3, "sata1", "prsnt",    V_MV78230_PLUS),
+ 		 MPP_VAR_FUNCTION(0x4, "lcd", "vga-vsync",  V_MV78230_PLUS),
+-		 MPP_VAR_FUNCTION(0x5, "pcie", "clkreq1",   V_MV78230_PLUS)),
++		 MPP_VAR_FUNCTION(0x5, "pcie", "clkreq1",   V_MV78230_PLUS),
++		 MPP_VAR_FUNCTION(0x6, "spi1", "cs2",       V_MV78230_PLUS)),
+ 	MPP_MODE(42,
+ 		 MPP_VAR_FUNCTION(0x0, "gpio", NULL,        V_MV78230_PLUS),
+ 		 MPP_VAR_FUNCTION(0x1, "uart2", "rxd",      V_MV78230_PLUS),
+@@ -258,33 +264,38 @@ static struct mvebu_mpp_mode armada_xp_mpp_modes[] = {
+ 		 MPP_VAR_FUNCTION(0x1, "uart2", "txd",      V_MV78230_PLUS),
+ 		 MPP_VAR_FUNCTION(0x2, "uart0", "rts",      V_MV78230_PLUS),
+ 		 MPP_VAR_FUNCTION(0x3, "spi0", "cs3",       V_MV78230_PLUS),
+-		 MPP_VAR_FUNCTION(0x4, "pcie", "rstout",    V_MV78230_PLUS)),
++		 MPP_VAR_FUNCTION(0x4, "pcie", "rstout",    V_MV78230_PLUS),
++		 MPP_VAR_FUNCTION(0x6, "spi1", "cs3",       V_MV78230_PLUS)),
+ 	MPP_MODE(44,
+ 		 MPP_VAR_FUNCTION(0x0, "gpio", NULL,        V_MV78230_PLUS),
+ 		 MPP_VAR_FUNCTION(0x1, "uart2", "cts",      V_MV78230_PLUS),
+ 		 MPP_VAR_FUNCTION(0x2, "uart3", "rxd",      V_MV78230_PLUS),
+ 		 MPP_VAR_FUNCTION(0x3, "spi0", "cs4",       V_MV78230_PLUS),
+ 		 MPP_VAR_FUNCTION(0x4, "dram", "bat",       V_MV78230_PLUS),
+-		 MPP_VAR_FUNCTION(0x5, "pcie", "clkreq2",   V_MV78230_PLUS)),
++		 MPP_VAR_FUNCTION(0x5, "pcie", "clkreq2",   V_MV78230_PLUS),
++		 MPP_VAR_FUNCTION(0x6, "spi1", "cs4",       V_MV78230_PLUS)),
  	MPP_MODE(45,
- 		 MPP_VAR_FUNCTION(0, "gpio",  NULL,         V_88F6810_PLUS),
- 		 MPP_VAR_FUNCTION(1, "ref",   "clk_out0",   V_88F6810_PLUS),
--		 MPP_VAR_FUNCTION(2, "pcie0", "rstout",     V_88F6810_PLUS)),
-+		 MPP_VAR_FUNCTION(2, "pcie0", "rstout",     V_88F6810_PLUS),
-+		 MPP_VAR_FUNCTION(6, "ua1",   "rxd",        V_88F6810_PLUS)),
+ 		 MPP_VAR_FUNCTION(0x0, "gpio", NULL,        V_MV78230_PLUS),
+ 		 MPP_VAR_FUNCTION(0x1, "uart2", "rts",      V_MV78230_PLUS),
+ 		 MPP_VAR_FUNCTION(0x2, "uart3", "txd",      V_MV78230_PLUS),
+ 		 MPP_VAR_FUNCTION(0x3, "spi0", "cs5",       V_MV78230_PLUS),
+-		 MPP_VAR_FUNCTION(0x4, "sata1", "prsnt",    V_MV78230_PLUS)),
++		 MPP_VAR_FUNCTION(0x4, "sata1", "prsnt",    V_MV78230_PLUS),
++		 MPP_VAR_FUNCTION(0x6, "spi1", "cs5",       V_MV78230_PLUS)),
  	MPP_MODE(46,
- 		 MPP_VAR_FUNCTION(0, "gpio",  NULL,         V_88F6810_PLUS),
- 		 MPP_VAR_FUNCTION(1, "ref",   "clk_out1",   V_88F6810_PLUS),
--		 MPP_VAR_FUNCTION(2, "pcie0", "rstout",     V_88F6810_PLUS)),
-+		 MPP_VAR_FUNCTION(2, "pcie0", "rstout",     V_88F6810_PLUS),
-+		 MPP_VAR_FUNCTION(6, "ua1",   "txd",        V_88F6810_PLUS)),
+ 		 MPP_VAR_FUNCTION(0x0, "gpio", NULL,        V_MV78230_PLUS),
+ 		 MPP_VAR_FUNCTION(0x1, "uart3", "rts",      V_MV78230_PLUS),
+ 		 MPP_VAR_FUNCTION(0x2, "uart1", "rts",      V_MV78230_PLUS),
+ 		 MPP_VAR_FUNCTION(0x3, "spi0", "cs6",       V_MV78230_PLUS),
+-		 MPP_VAR_FUNCTION(0x4, "sata0", "prsnt",    V_MV78230_PLUS)),
++		 MPP_VAR_FUNCTION(0x4, "sata0", "prsnt",    V_MV78230_PLUS),
++		 MPP_VAR_FUNCTION(0x6, "spi1", "cs6",       V_MV78230_PLUS)),
  	MPP_MODE(47,
- 		 MPP_VAR_FUNCTION(0, "gpio",  NULL,         V_88F6810_PLUS),
- 		 MPP_VAR_FUNCTION(1, "sata0", "prsnt",      V_88F6810_PLUS),
-@@ -356,24 +358,28 @@ static struct mvebu_mpp_mode armada_38x_mpp_modes[] = {
- 		 MPP_VAR_FUNCTION(2, "ge",    "mdio",       V_88F6810_PLUS),
- 		 MPP_VAR_FUNCTION(3, "pcie1", "clkreq",     V_88F6820_PLUS),
- 		 MPP_VAR_FUNCTION(4, "spi1",  "cs1",        V_88F6810_PLUS),
--		 MPP_VAR_FUNCTION(5, "sd0",   "d0",         V_88F6810_PLUS)),
-+		 MPP_VAR_FUNCTION(5, "sd0",   "d0",         V_88F6810_PLUS),
-+		 MPP_VAR_FUNCTION(6, "ua1",   "rxd",        V_88F6810_PLUS)),
- 	MPP_MODE(56,
- 		 MPP_VAR_FUNCTION(0, "gpio",  NULL,         V_88F6810_PLUS),
- 		 MPP_VAR_FUNCTION(1, "ua1",   "rts",        V_88F6810_PLUS),
- 		 MPP_VAR_FUNCTION(2, "ge",    "mdc",        V_88F6810_PLUS),
- 		 MPP_VAR_FUNCTION(3, "dram",  "deccerr",    V_88F6810_PLUS),
--		 MPP_VAR_FUNCTION(4, "spi1",  "mosi",       V_88F6810_PLUS)),
-+		 MPP_VAR_FUNCTION(4, "spi1",  "mosi",       V_88F6810_PLUS),
-+		 MPP_VAR_FUNCTION(6, "ua1",   "txd",        V_88F6810_PLUS)),
- 	MPP_MODE(57,
- 		 MPP_VAR_FUNCTION(0, "gpio",  NULL,         V_88F6810_PLUS),
- 		 MPP_VAR_FUNCTION(4, "spi1",  "sck",        V_88F6810_PLUS),
--		 MPP_VAR_FUNCTION(5, "sd0",   "clk",        V_88F6810_PLUS)),
-+		 MPP_VAR_FUNCTION(5, "sd0",   "clk",        V_88F6810_PLUS),
-+		 MPP_VAR_FUNCTION(6, "ua1",   "txd",        V_88F6810_PLUS)),
- 	MPP_MODE(58,
- 		 MPP_VAR_FUNCTION(0, "gpio",  NULL,         V_88F6810_PLUS),
- 		 MPP_VAR_FUNCTION(1, "pcie1", "clkreq",     V_88F6820_PLUS),
- 		 MPP_VAR_FUNCTION(2, "i2c1",  "sck",        V_88F6810_PLUS),
- 		 MPP_VAR_FUNCTION(3, "pcie2", "clkreq",     V_88F6810_PLUS),
- 		 MPP_VAR_FUNCTION(4, "spi1",  "miso",       V_88F6810_PLUS),
--		 MPP_VAR_FUNCTION(5, "sd0",   "d1",         V_88F6810_PLUS)),
-+		 MPP_VAR_FUNCTION(5, "sd0",   "d1",         V_88F6810_PLUS),
-+		 MPP_VAR_FUNCTION(6, "ua1",   "rxd",        V_88F6810_PLUS)),
- 	MPP_MODE(59,
- 		 MPP_VAR_FUNCTION(0, "gpio",  NULL,         V_88F6810_PLUS),
- 		 MPP_VAR_FUNCTION(1, "pcie0", "rstout",     V_88F6810_PLUS),
+ 		 MPP_VAR_FUNCTION(0x0, "gpio", NULL,        V_MV78230_PLUS),
+ 		 MPP_VAR_FUNCTION(0x1, "uart3", "cts",      V_MV78230_PLUS),
+ 		 MPP_VAR_FUNCTION(0x2, "uart1", "cts",      V_MV78230_PLUS),
+ 		 MPP_VAR_FUNCTION(0x3, "spi0", "cs7",       V_MV78230_PLUS),
+ 		 MPP_VAR_FUNCTION(0x4, "ref", "clkout",     V_MV78230_PLUS),
+-		 MPP_VAR_FUNCTION(0x5, "pcie", "clkreq3",   V_MV78230_PLUS)),
++		 MPP_VAR_FUNCTION(0x5, "pcie", "clkreq3",   V_MV78230_PLUS),
++		 MPP_VAR_FUNCTION(0x6, "spi1", "cs7",       V_MV78230_PLUS)),
+ 	MPP_MODE(48,
+ 		 MPP_VAR_FUNCTION(0x0, "gpio", NULL,        V_MV78230_PLUS),
+ 		 MPP_VAR_FUNCTION(0x1, "dev", "clkout",     V_MV78230_PLUS),
 -- 
 2.1.0
