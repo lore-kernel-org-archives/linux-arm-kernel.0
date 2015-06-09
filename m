@@ -1,70 +1,40 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Tue, 9 Jun 2015 22:34:56 +0200
-Subject: [PATCH 00/34] pinctrl: mvebu: numerous fixes, cleanups and
- improvements
-In-Reply-To: <20150609194705.GE16778@lunn.ch>
-References: <1433868446-11028-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <20150609170153.GC16778@lunn.ch>
- <20150609212211.625964e2@free-electrons.com>
- <20150609194705.GE16778@lunn.ch>
-Message-ID: <20150609223456.0f569869@free-electrons.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 9 Jun 2015 22:02:00 +0100
+Subject: [PATCH v5] ARM: smp: Only expose /sys/.../cpuX/online if
+ hotpluggable
+In-Reply-To: <557739AC.8000903@codeaurora.org>
+References: <1428705191-15670-1-git-send-email-sboyd@codeaurora.org>
+ <20150413134246.GS12732@n2100.arm.linux.org.uk>
+ <557739AC.8000903@codeaurora.org>
+Message-ID: <20150609210200.GI7557@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
-
-On Tue, 9 Jun 2015 21:47:05 +0200, Andrew Lunn wrote:
-
-> I read a presentation recently, "Device Tree as a stable ABI: a fairy
-> tale?"  :-)
-
-Reminds me of something :)
-
-> But we should at least try. So what is actually involved in keeping
-> backwards compatibility?
+On Tue, Jun 09, 2015 at 12:08:28PM -0700, Stephen Boyd wrote:
+> On 04/13/2015 06:42 AM, Russell King - ARM Linux wrote:
+> > On Fri, Apr 10, 2015 at 03:33:11PM -0700, Stephen Boyd wrote:
+> >> Cc: Mark Rutland <mark.rutland@arm.com>
+> >> Cc: Nicolas Pitre <nico@linaro.org>
+> >> Cc: Dave Martin <Dave.Martin@arm.com>
+> >> Acked-by: Simon Horman <horms@verge.net.au> [shmobile portion]
+> >> Tested-by: Simon Horman <horms@verge.net.au>
+> >> Cc: Magnus Damm <magnus.damm@gmail.com>
+> >> Cc: <linux-sh@vger.kernel.org>
+> >> Cc: Tyler Baker <tyler.baker@linaro.org>
+> >> Cc: Geert Uytterhoeven <geert@linux-m68k.org>
+> >> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+> > Let's see some more acks for this...
+> >
 > 
-> The two patches i pointed out have two different situations.
-> 
-> What does pinctrl do when you ask for a pin which is not a member of the
-> function? If it silently ignores it, not a problem. But i expect it
-> actually throws an error. I could be wrong here, but it looks like it
-> is the mvebu code which checks if a pin is a member of a function.  So
-> it might be possible to set the value of the val in the
-> mvebu_mpp_ctrl_setting to 0xff for the removed NAND pins, and when we
-> see such a value, print a warning about outdated DT, and "succeed"
-> rather than return an error.
+> Nobody else has acked this so far. Shall I put it in the patch tracker
+> now? Or is there someone more specific we need an ack from?
 
-This can only work if the function number is not actually used. For
-example, in the very first patch "pinctrl: mvebu: armada-38x: fix PCIe
-functions" :
+I guess if people haven't responded by now, they're never going to respond,
+and I guess we take their non-response as tacit approval for the change.
 
--		 MPP_VAR_FUNCTION(4, "pcie1", "rstout",     V_88F6820_PLUS),
-+		 MPP_VAR_FUNCTION(4, "ge0",   "txerr",      V_88F6810_PLUS),
+Maybe we ought to have tacit-acked-by: which we can add when someones
+been Cc'd and hasn't responded. :)
 
-So the function 4 used to be pcie1, which you would like to still be
-supported, but it's now actually used for ge0.
-
-To be honest, I actually prefer that people updating their kernel and
-using an old DT get an error about pin muxing, rather than having the
-driver silently ignore and have people never update their Device Tree.
-
-It's also about long term maintainability. Do we want to keep old crap
-around forever in all device drivers?
-
-> For spi -> spi0 it seems messier. So i would leave it as spi with a
-> comment, and add spi1.
-
-I'm fine with that.
-
-What about tdm2c -> tdm renaming on Armada 38x, and tdm-1 -> tdm for one
-single TDM pin on Armada XP ?
-
-I think we're hitting the limits of the DT backward compatibility: our
-description of the hardware had some bugs. What do we do? Continue to
-support bugs?
-
-Thomas
 -- 
-Thomas Petazzoni, CTO, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
+according to speedtest.net.
