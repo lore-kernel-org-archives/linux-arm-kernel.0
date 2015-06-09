@@ -1,41 +1,70 @@
-From: stefan@agner.ch (Stefan Agner)
-Date: Tue, 09 Jun 2015 22:31:07 +0200
-Subject: [PATCH v4 1/6] mtd: nand: vf610_nfc: Freescale NFC for VF610,
- MPC5125 and others
-In-Reply-To: <20150609200751.GC5720@breakpoint.cc>
-References: <1427300909-20825-1-git-send-email-stefan@agner.ch>
- <1427300909-20825-2-git-send-email-stefan@agner.ch>
- <20150603130825.GA23991@breakpoint.cc>
- <b3b09b4b8c97cbfc88fa0d5fdc5e40cd@agner.ch>
- <20150609200751.GC5720@breakpoint.cc>
-Message-ID: <16ebb290641f700f2262527f90ff1e46@agner.ch>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Tue, 9 Jun 2015 22:34:56 +0200
+Subject: [PATCH 00/34] pinctrl: mvebu: numerous fixes, cleanups and
+ improvements
+In-Reply-To: <20150609194705.GE16778@lunn.ch>
+References: <1433868446-11028-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <20150609170153.GC16778@lunn.ch>
+ <20150609212211.625964e2@free-electrons.com>
+ <20150609194705.GE16778@lunn.ch>
+Message-ID: <20150609223456.0f569869@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2015-06-09 22:07, Sebastian Andrzej Siewior wrote:
-> On 2015-06-03 17:05:16 [+0200], Stefan Agner wrote:
->> As Boris guessed correctly, the reason I used the raw variant was due to
->> performance improvements due to the barrier. However, I will use
+Hello,
+
+On Tue, 9 Jun 2015 21:47:05 +0200, Andrew Lunn wrote:
+
+> I read a presentation recently, "Device Tree as a stable ABI: a fairy
+> tale?"  :-)
+
+Reminds me of something :)
+
+> But we should at least try. So what is actually involved in keeping
+> backwards compatibility?
 > 
-> yeah, do you have any numbers by chance?
-
-Not current ones for Linux. I added this in the U-Boot variant of the
-driver.
- 
->> {read|write}l_relaxed instead, which should offer endian abstraction
->> while not having the performance penalty due to extensive barriers...
+> The two patches i pointed out have two different situations.
 > 
-> well, even those
-> |$ git grep readl_relaxed arch/powerpc/
-> |arch/powerpc/include/asm/io.h:#define readl_relaxed(addr) readl(addr)
-> 
-> have the endian swap. So an abstraction like you provided earlier
-> would be nice :)
+> What does pinctrl do when you ask for a pin which is not a member of the
+> function? If it silently ignores it, not a problem. But i expect it
+> actually throws an error. I could be wrong here, but it looks like it
+> is the mvebu code which checks if a pin is a member of a function.  So
+> it might be possible to set the value of the val in the
+> mvebu_mpp_ctrl_setting to 0xff for the removed NAND pins, and when we
+> see such a value, print a warning about outdated DT, and "succeed"
+> rather than return an error.
 
-What do you mean by that?
+This can only work if the function number is not actually used. For
+example, in the very first patch "pinctrl: mvebu: armada-38x: fix PCIe
+functions" :
 
-Btw, I sent v5 of the patchset which use the relaxed variants. As
-expected, performance did not suffer by that change on ARM.
+-		 MPP_VAR_FUNCTION(4, "pcie1", "rstout",     V_88F6820_PLUS),
++		 MPP_VAR_FUNCTION(4, "ge0",   "txerr",      V_88F6810_PLUS),
 
---
-Stefan
+So the function 4 used to be pcie1, which you would like to still be
+supported, but it's now actually used for ge0.
+
+To be honest, I actually prefer that people updating their kernel and
+using an old DT get an error about pin muxing, rather than having the
+driver silently ignore and have people never update their Device Tree.
+
+It's also about long term maintainability. Do we want to keep old crap
+around forever in all device drivers?
+
+> For spi -> spi0 it seems messier. So i would leave it as spi with a
+> comment, and add spi1.
+
+I'm fine with that.
+
+What about tdm2c -> tdm renaming on Armada 38x, and tdm-1 -> tdm for one
+single TDM pin on Armada XP ?
+
+I think we're hitting the limits of the DT backward compatibility: our
+description of the hardware had some bugs. What do we do? Continue to
+support bugs?
+
+Thomas
+-- 
+Thomas Petazzoni, CTO, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
