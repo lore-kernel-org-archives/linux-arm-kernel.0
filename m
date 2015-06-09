@@ -1,53 +1,31 @@
 From: eric@anholt.net (Eric Anholt)
-Date: Mon,  8 Jun 2015 16:58:59 -0700
-Subject: [PATCH v3 6/7] ARM: bcm2835: Use the RPi firmware clocks for uart.
+Date: Mon, 08 Jun 2015 17:03:05 -0700
+Subject: [PATCH v3 1/7] dt/bindings: Add binding for the Raspberry Pi
+ clock provider
 In-Reply-To: <1433807940-15328-1-git-send-email-eric@anholt.net>
 References: <1433807940-15328-1-git-send-email-eric@anholt.net>
-Message-ID: <1433807940-15328-6-git-send-email-eric@anholt.net>
+Message-ID: <877frdague.fsf@eliezer.anholt.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This gets us a correct apb_pclk, which previously was accidentally
-using the "20201000.uart" clock from clk-bcm2835.c, due to the
-fallback clk_get_sys() path.
+Eric Anholt <eric@anholt.net> writes:
 
-Signed-off-by: Eric Anholt <eric@anholt.net>
----
- arch/arm/boot/dts/bcm2835-rpi.dtsi | 7 +++++++
- arch/arm/boot/dts/bcm2835.dtsi     | 2 +-
- 2 files changed, 8 insertions(+), 1 deletion(-)
+> The hardware clocks are not controllable by the ARM, so we have to
+> make requests to the firmware to do so from the VPU side.  This will
+> let us replace fixed clocks in our DT with actual clock control (and
+> correct frequency information).
+>
+> v2: Include the dt-bindings header in this commit instead of the next
+>     one.  Make the clock indices match the firmware clock IDs.  Rename
+>     the binding's compat string.  Move the firmware phandle to be
+>     under a vendor-specific namespace.
 
-diff --git a/arch/arm/boot/dts/bcm2835-rpi.dtsi b/arch/arm/boot/dts/bcm2835-rpi.dtsi
-index 7cc47fb..9549eb8 100644
---- a/arch/arm/boot/dts/bcm2835-rpi.dtsi
-+++ b/arch/arm/boot/dts/bcm2835-rpi.dtsi
-@@ -1,3 +1,4 @@
-+#include <dt-bindings/clk/raspberrypi.h>
- #include "bcm2835.dtsi"
- 
- / {
-@@ -62,3 +63,9 @@
- 	status = "okay";
- 	bus-width = <4>;
- };
-+
-+&uart0 {
-+	clocks = <&firmware_clocks RPI_CLOCK_UART0>,
-+		 <&firmware_clocks RPI_CLOCK_CORE>;
-+	clock-names = "uartclk", "apb_pclk";
-+};
-diff --git a/arch/arm/boot/dts/bcm2835.dtsi b/arch/arm/boot/dts/bcm2835.dtsi
-index 32f5830..5be2862 100644
---- a/arch/arm/boot/dts/bcm2835.dtsi
-+++ b/arch/arm/boot/dts/bcm2835.dtsi
-@@ -92,7 +92,7 @@
- 			#interrupt-cells = <2>;
- 		};
- 
--		uart at 7e201000 {
-+		uart0: uart at 7e201000 {
- 			compatible = "brcm,bcm2835-pl011", "arm,pl011", "arm,primecell";
- 			reg = <0x7e201000 0x1000>;
- 			interrupts = <2 25>;
--- 
-2.1.4
+Having failed to move the versioning bits below --- again, I'm adding
+scripting to hopefully catch myself if I'm about to do it again.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 818 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150608/a70f351f/attachment.sig>
