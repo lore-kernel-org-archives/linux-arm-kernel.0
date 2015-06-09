@@ -1,97 +1,148 @@
-From: monstr@monstr.eu (Michal Simek)
-Date: Tue, 09 Jun 2015 14:12:45 +0200
-Subject: [PATCH v4 2/2] dma: Add Xilinx AXI Central Direct Memory Access
- Engine driver support
-In-Reply-To: <1433851175.16887.83.camel@x220>
-References: <1432228035-6569-1-git-send-email-appanad@xilinx.com>		
- <1432290653.27695.97.camel@x220> <557681A7.7080202@monstr.eu>		
- <alpine.DEB.2.02.1506090808500.2069@localhost6.localdomain6>		
- <55769132.6070601@monstr.eu> <1433837720.16887.42.camel@x220>	
- <5576C2F5.3050806@monstr.eu> <1433851175.16887.83.camel@x220>
-Message-ID: <5576D83D.2000006@monstr.eu>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Tue, 9 Jun 2015 14:15:09 +0200
+Subject: [PATCH v3 1/3] spi: atmel: add support for the internal
+ chip-select of the spi controller
+In-Reply-To: <c05f4d9abfdabb62b3b3cfeb57a3f9c138b4e45d.1433850255.git.cyrille.pitchen@atmel.com>
+References: <cover.1433850255.git.cyrille.pitchen@atmel.com>
+ <c05f4d9abfdabb62b3b3cfeb57a3f9c138b4e45d.1433850255.git.cyrille.pitchen@atmel.com>
+Message-ID: <5576D8CD.2090608@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/09/2015 01:59 PM, Paul Bolle wrote:
-> On Tue, 2015-06-09 at 12:41 +0200, Michal Simek wrote:
->> On 06/09/2015 10:15 AM, Paul Bolle wrote:
->>> Mistakes I've seen made since I started checking this stuff (a few
->>> months ago):
->>> - typos in the license ident, say "GPLv2", "GPL V2", or "BSD": generates
->>> a warning when module is loaded and taints kernel. People still get this
->>> wrong. A test in checkpatch for these typos was submitted a while ago,
->>> but it never got added;
->>
->> Any reason for that? just lost or any problem ?
+Le 09/06/2015 13:53, Cyrille Pitchen a ?crit :
+> This patch relies on the CSAAT (Chip Select Active After Transfer) feature
+> introduced by the version 2 of the spi controller. This new mode allows to
+> use properly the internal chip-select output pin of the spi controller
+> instead of using external gpios. Consequently, the "cs-gpios" device-tree
+> property becomes optional.
 > 
-> Submitter lost interest, I guess. Check
-> https://lkml.org/lkml/2015/5/22/279 and note that there was no response.
-
-will see.
-
-
->>> - not adding MODULE_LICENSE() to a module: also generates a warning when
->>> module is loaded and taints kernel. People still get this wrong;
->>> - adding MODULE_LICENSE() to built-in only code: pointless at best, and
->>> annoying for reviewers ("Hey, did the submitter intend to write built-in
->>> only code or modular code?");
->>> - using "Dual BSD/GPL" but not a trace of the BSD license blurb in
->>> sight, while adding that blurb is one of the very few requirements this
->>> license actually has;
->>> - license mismatch, say comment blurb states "GPL v2 (or later)" but
->>> MODULE_LICENSE() ident states "GPL v2" only (or vice versa): very easy
->>> mistake to make, happens once or twice a week.  
->>
->> What do you mean by vice versa?
->> GPL v2 header and MODULE_LICENSE("GPL") should be fine right?
+> When the new CSAAT bit is set into the Chip Select Register, the internal
+> chip-select output pin remains asserted till both the following conditions
+> become true:
+> - the LASTXFER bit is set into the Control Register (or the Transmit Data
+>   Register)
+> - the Transmit Data Register and its shift register are empty.
 > 
-> Not really. The license in the comment at the top of the file is just
-> GPL v2, while the MODULE_LICENSE ident adds "or later" and thus the
-> right to "uplicense". So which is it: just "GPL v2" or "GPL v2 (or
-> later)"? Can't say in that case.
-
-ok. Will check all our drivers we have to get it synchronized but I
-expect that a lot of drivers have problems there.
-
->>> Did I miss anything in that list?
->>
->> I think you miss MODULE_ALIAS problems.
->> https://lkml.org/lkml/2014/3/17/301
+> WARNING: if the LASTXFER bit is set into the Control Register then new
+> data are written into the Transmit Data Register fast enough to keep its
+> shifter not empty, the chip-select output pin remains asserted. Only when
+> the shifter becomes empty, the chip-select output pin is unasserted.
 > 
-> That's outside of the license stuff, but thanks for thye pointer anyway.
+> When the CSAAT bit is clear in the Chip Select Register, the LASTXFER bit
+> is ignored in both the Control Register and the Transmit Data Register.
+> The internal chip-select output pin remains active as long as the Transmit
+> Data Register or its shift register are not empty.
 > 
->>> I'm afraid that most of the above can only be caught reliably by
->>> attention to detail by submitters and reviewers. That's a pity, because
->>> checking for that stuff is about as boring as it gets. (What does that
->>> say about me?)
->>
->> yep. I have never looked at the details about these license module
->> stuff. But definitely great to have this list - will record it and keep
->> my eye on our xilinx drivers.
->>
->> BTW: Some time ago we discussed SPDX License Identifier which could
->> simplify license checking.
->> https://lkml.org/lkml/2014/2/21/21
+> Signed-off-by: Cyrille Pitchen <cyrille.pitchen@atmel.com>
+Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+
+> ---
+>  drivers/spi/spi-atmel.c | 37 ++++++++++++++++++++++++++++---------
+>  1 file changed, 28 insertions(+), 9 deletions(-)
 > 
-> I think I saw that fly by. Wasn't that idea shot down?
+> diff --git a/drivers/spi/spi-atmel.c b/drivers/spi/spi-atmel.c
+> index a2f40b1..aa7d202 100644
+> --- a/drivers/spi/spi-atmel.c
+> +++ b/drivers/spi/spi-atmel.c
+> @@ -246,6 +246,7 @@ struct atmel_spi {
+>  
+>  	bool			use_dma;
+>  	bool			use_pdc;
+> +	bool			use_cs_gpios;
+>  	/* dmaengine data */
+>  	struct atmel_spi_dma	dma;
+>  
+> @@ -321,7 +322,8 @@ static void cs_activate(struct atmel_spi *as, struct spi_device *spi)
+>  		}
+>  
+>  		mr = spi_readl(as, MR);
+> -		gpio_set_value(asd->npcs_pin, active);
+> +		if (as->use_cs_gpios)
+> +			gpio_set_value(asd->npcs_pin, active);
+>  	} else {
+>  		u32 cpol = (spi->mode & SPI_CPOL) ? SPI_BIT(CPOL) : 0;
+>  		int i;
+> @@ -337,7 +339,7 @@ static void cs_activate(struct atmel_spi *as, struct spi_device *spi)
+>  
+>  		mr = spi_readl(as, MR);
+>  		mr = SPI_BFINS(PCS, ~(1 << spi->chip_select), mr);
+> -		if (spi->chip_select != 0)
+> +		if (as->use_cs_gpios && spi->chip_select != 0)
+>  			gpio_set_value(asd->npcs_pin, active);
+>  		spi_writel(as, MR, mr);
+>  	}
+> @@ -366,7 +368,9 @@ static void cs_deactivate(struct atmel_spi *as, struct spi_device *spi)
+>  			asd->npcs_pin, active ? " (low)" : "",
+>  			mr);
+>  
+> -	if (atmel_spi_is_v2(as) || spi->chip_select != 0)
+> +	if (!as->use_cs_gpios)
+> +		spi_writel(as, CR, SPI_BIT(LASTXFER));
+> +	else if (atmel_spi_is_v2(as) || spi->chip_select != 0)
+>  		gpio_set_value(asd->npcs_pin, !active);
+>  }
+>  
+> @@ -996,6 +1000,8 @@ static int atmel_spi_setup(struct spi_device *spi)
+>  		csr |= SPI_BIT(CPOL);
+>  	if (!(spi->mode & SPI_CPHA))
+>  		csr |= SPI_BIT(NCPHA);
+> +	if (!as->use_cs_gpios)
+> +		csr |= SPI_BIT(CSAAT);
+>  
+>  	/* DLYBS is mostly irrelevant since we manage chipselect using GPIOs.
+>  	 *
+> @@ -1009,7 +1015,9 @@ static int atmel_spi_setup(struct spi_device *spi)
+>  	/* chipselect must have been muxed as GPIO (e.g. in board setup) */
+>  	npcs_pin = (unsigned long)spi->controller_data;
+>  
+> -	if (gpio_is_valid(spi->cs_gpio))
+> +	if (!as->use_cs_gpios)
+> +		npcs_pin = spi->chip_select;
+> +	else if (gpio_is_valid(spi->cs_gpio))
+>  		npcs_pin = spi->cs_gpio;
+>  
+>  	asd = spi->controller_state;
+> @@ -1018,15 +1026,19 @@ static int atmel_spi_setup(struct spi_device *spi)
+>  		if (!asd)
+>  			return -ENOMEM;
+>  
+> -		ret = gpio_request(npcs_pin, dev_name(&spi->dev));
+> -		if (ret) {
+> -			kfree(asd);
+> -			return ret;
+> +		if (as->use_cs_gpios) {
+> +			ret = gpio_request(npcs_pin, dev_name(&spi->dev));
+> +			if (ret) {
+> +				kfree(asd);
+> +				return ret;
+> +			}
+> +
+> +			gpio_direction_output(npcs_pin,
+> +					      !(spi->mode & SPI_CS_HIGH));
+>  		}
+>  
+>  		asd->npcs_pin = npcs_pin;
+>  		spi->controller_state = asd;
+> -		gpio_direction_output(npcs_pin, !(spi->mode & SPI_CS_HIGH));
+>  	}
+>  
+>  	asd->csr = csr;
+> @@ -1338,6 +1350,13 @@ static int atmel_spi_probe(struct platform_device *pdev)
+>  
+>  	atmel_get_caps(as);
+>  
+> +	as->use_cs_gpios = true;
+> +	if (atmel_spi_is_v2(as) &&
+> +	    !of_get_property(pdev->dev.of_node, "cs-gpios", NULL)) {
+> +		as->use_cs_gpios = false;
+> +		master->num_chipselect = 4;
+> +	}
+> +
+>  	as->use_dma = false;
+>  	as->use_pdc = false;
+>  	if (as->caps.has_dma_support) {
+> 
 
-Not sure about current status.
-
-Thanks,
-Michal
 
 -- 
-Michal Simek, Ing. (M.Eng), OpenPGP -> KeyID: FE3D1F91
-w: www.monstr.eu p: +42-0-721842854
-Maintainer of Linux kernel - Microblaze cpu - http://www.monstr.eu/fdt/
-Maintainer of Linux kernel - Xilinx Zynq ARM architecture
-Microblaze U-BOOT custodian and responsible for u-boot arm zynq platform
-
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150609/f1a77e7a/attachment-0001.sig>
+Nicolas Ferre
