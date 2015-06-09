@@ -1,21 +1,26 @@
 From: broonie@kernel.org (Mark Brown)
-Date: Tue, 9 Jun 2015 18:25:31 +0100
-Subject: [PATCH v3 2/3] spi: atmel: update DT bindings documentation
-In-Reply-To: <ce7c16faafaa24f5bb711115c0eea1f8992d08c3.1433850255.git.cyrille.pitchen@atmel.com>
+Date: Tue, 9 Jun 2015 18:26:00 +0100
+Subject: [PATCH v3 1/3] spi: atmel: add support for the internal
+ chip-select of the spi controller
+In-Reply-To: <c05f4d9abfdabb62b3b3cfeb57a3f9c138b4e45d.1433850255.git.cyrille.pitchen@atmel.com>
 References: <cover.1433850255.git.cyrille.pitchen@atmel.com>
- <ce7c16faafaa24f5bb711115c0eea1f8992d08c3.1433850255.git.cyrille.pitchen@atmel.com>
-Message-ID: <20150609172531.GM14071@sirena.org.uk>
+ <c05f4d9abfdabb62b3b3cfeb57a3f9c138b4e45d.1433850255.git.cyrille.pitchen@atmel.com>
+Message-ID: <20150609172600.GN14071@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 09, 2015 at 01:53:53PM +0200, Cyrille Pitchen wrote:
-> - add new property "atmel,fifo-size"
+On Tue, Jun 09, 2015 at 01:53:52PM +0200, Cyrille Pitchen wrote:
+> This patch relies on the CSAAT (Chip Select Active After Transfer) feature
+> introduced by the version 2 of the spi controller. This new mode allows to
+> use properly the internal chip-select output pin of the spi controller
+> instead of using external gpios. Consequently, the "cs-gpios" device-tree
+> property becomes optional.
 
-Why is this a property and not something we know from the IP version?
+Applied, thanks.
 -------------- next part --------------
 A non-text attachment was scrubbed...
 Name: signature.asc
 Type: application/pgp-signature
 Size: 473 bytes
 Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150609/629d1234/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150609/0464e995/attachment.sig>
