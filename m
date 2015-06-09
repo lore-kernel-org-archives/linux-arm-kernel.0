@@ -1,40 +1,45 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 9 Jun 2015 22:02:00 +0100
-Subject: [PATCH v5] ARM: smp: Only expose /sys/.../cpuX/online if
- hotpluggable
-In-Reply-To: <557739AC.8000903@codeaurora.org>
-References: <1428705191-15670-1-git-send-email-sboyd@codeaurora.org>
- <20150413134246.GS12732@n2100.arm.linux.org.uk>
- <557739AC.8000903@codeaurora.org>
-Message-ID: <20150609210200.GI7557@n2100.arm.linux.org.uk>
+From: robh@kernel.org (Rob Herring)
+Date: Tue, 9 Jun 2015 16:23:04 -0500
+Subject: [PATCH 00/15] Kill off set_irq_flags
+In-Reply-To: <20150609202834.GH7557@n2100.arm.linux.org.uk>
+References: <1433874401-27161-1-git-send-email-robh@kernel.org>
+ <20150609202834.GH7557@n2100.arm.linux.org.uk>
+Message-ID: <CAL_JsqK9MrwPS5zPhMDRS3BqhC0esZiR9YPZaMaT0=VAD4gaSw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 09, 2015 at 12:08:28PM -0700, Stephen Boyd wrote:
-> On 04/13/2015 06:42 AM, Russell King - ARM Linux wrote:
-> > On Fri, Apr 10, 2015 at 03:33:11PM -0700, Stephen Boyd wrote:
-> >> Cc: Mark Rutland <mark.rutland@arm.com>
-> >> Cc: Nicolas Pitre <nico@linaro.org>
-> >> Cc: Dave Martin <Dave.Martin@arm.com>
-> >> Acked-by: Simon Horman <horms@verge.net.au> [shmobile portion]
-> >> Tested-by: Simon Horman <horms@verge.net.au>
-> >> Cc: Magnus Damm <magnus.damm@gmail.com>
-> >> Cc: <linux-sh@vger.kernel.org>
-> >> Cc: Tyler Baker <tyler.baker@linaro.org>
-> >> Cc: Geert Uytterhoeven <geert@linux-m68k.org>
-> >> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
-> > Let's see some more acks for this...
-> >
-> 
-> Nobody else has acked this so far. Shall I put it in the patch tracker
-> now? Or is there someone more specific we need an ack from?
+On Tue, Jun 9, 2015 at 3:28 PM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Tue, Jun 09, 2015 at 01:26:26PM -0500, Rob Herring wrote:
+>> This series converts all users of ARM specific set_irq_flags to use
+>> common genirq functions. In many cases where irqdomains are used, the
+>> set_irq_flags calls were redundant, so I've removed them.
+>>
+>> This is not intended for 4.2, but if any subsystem maintainers want to
+>> pick up their subsystem's change that is fine. All but the last 2
+>> patches stand on their own. Any new drivers going into 4.2 may need a
+>> similar change, but I'm sure people are told not to use set_irq_flags in
+>> reviews. ;)
+>
+> So what are you doing about the initial state of IRQs on legacy ARM where
+> IRQs start off being un-requestable, and need the set_irq_flags() to make
+> them requestable.  I think you could be introducing a massive regression
+> by making this change.
 
-I guess if people haven't responded by now, they're never going to respond,
-and I guess we take their non-response as tacit approval for the change.
+None of that changes. The initial state is set by ARCH_IRQ_INIT_FLAGS
+which I've not changed:
 
-Maybe we ought to have tacit-acked-by: which we can add when someones
-been Cc'd and hasn't responded. :)
+#define ARCH_IRQ_INIT_FLAGS     (IRQ_NOREQUEST | IRQ_NOPROBE)
 
--- 
-FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
-according to speedtest.net.
+> Unless you can prove that this isn't the case, you shouldn't be removing
+> this stuff, especially not from legacy platforms.
+
+set_irq_flags() only does a translation from custom ARM IRQF_* flags
+to standard flags and then calls irq_modify_status(). This only
+removes the translation and users set/clear standard flags directly.
+It is a straight-forward removal of a wrapper function.
+
+I *would* like to get rid of ARCH_IRQ_INIT_FLAGS and have the same
+defaults across arches, but yes that would likely cause regressions.
+
+Rob
