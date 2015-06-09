@@ -1,160 +1,140 @@
 From: robh@kernel.org (Rob Herring)
-Date: Tue,  9 Jun 2015 13:26:26 -0500
-Subject: [PATCH 00/15] Kill off set_irq_flags
-Message-ID: <1433874401-27161-1-git-send-email-robh@kernel.org>
+Date: Tue,  9 Jun 2015 13:26:36 -0500
+Subject: [PATCH 10/15] PCI: kill off set_irq_flags usage
+In-Reply-To: <1433874401-27161-1-git-send-email-robh@kernel.org>
+References: <1433874401-27161-1-git-send-email-robh@kernel.org>
+Message-ID: <1433874401-27161-11-git-send-email-robh@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This series converts all users of ARM specific set_irq_flags to use
-common genirq functions. In many cases where irqdomains are used, the
-set_irq_flags calls were redundant, so I've removed them.
+set_irq_flags is ARM specific with custom flags which have genirq
+equivalents. Convert drivers to use the genirq interfaces directly, so we
+can kill off set_irq_flags. The translation of flags is as follows:
 
-This is not intended for 4.2, but if any subsystem maintainers want to
-pick up their subsystem's change that is fine. All but the last 2
-patches stand on their own. Any new drivers going into 4.2 may need a
-similar change, but I'm sure people are told not to use set_irq_flags in
-reviews. ;)
+IRQF_VALID -> !IRQ_NOREQUEST
+IRQF_PROBE -> !IRQ_NOPROBE
+IRQF_NOAUTOEN -> IRQ_NOAUTOEN
 
-Rob
+For IRQs managed by an irqdomain, the irqdomain core code handles clearing
+and setting IRQ_NOREQUEST already, so there is no need to do this in
+.map() functions and we can simply remove the set_irq_flags calls. Some
+users also set IRQ_NOPROBE and this has been maintained although it is not
+clear that is really needed. There appears to be a great deal of blind
+copy and paste of this code.
 
+Signed-off-by: Rob Herring <robh@kernel.org>
+Cc: Kishon Vijay Abraham I <kishon@ti.com>
+Cc: Bjorn Helgaas <bhelgaas@google.com>
+Cc: Murali Karicheri <m-karicheri2@ti.com>
+Cc: Thierry Reding <thierry.reding@gmail.com>
+Cc: Stephen Warren <swarren@wwwdotorg.org>
+Cc: Alexandre Courbot <gnurou@gmail.com>
+Cc: Jingoo Han <jingoohan1@gmail.com>
+Cc: Pratyush Anand <pratyush.anand@gmail.com>
+Cc: Simon Horman <horms@verge.net.au>
+Cc: Michal Simek <michal.simek@xilinx.com>
+Cc: "S?ren Brinkmann" <soren.brinkmann@xilinx.com>
+Cc: linux-omap at vger.kernel.org
+Cc: linux-pci at vger.kernel.org
+Cc: linux-arm-kernel at lists.infradead.org
+Cc: linux-tegra at vger.kernel.org
+Cc: linux-sh at vger.kernel.org
+---
+ drivers/pci/host/pci-dra7xx.c      | 1 -
+ drivers/pci/host/pci-keystone-dw.c | 2 --
+ drivers/pci/host/pci-tegra.c       | 1 -
+ drivers/pci/host/pcie-designware.c | 1 -
+ drivers/pci/host/pcie-rcar.c       | 1 -
+ drivers/pci/host/pcie-xilinx.c     | 2 --
+ 6 files changed, 8 deletions(-)
 
-Rob Herring (15):
-  ARM: kill off set_irq_flags usage
-  regmap: kill off set_irq_flags usage
-  clk: kill off set_irq_flags usage
-  dma: kill off set_irq_flags usage
-  gpio: kill off set_irq_flags usage
-  gpu/drm: kill off set_irq_flags usage
-  irqchip: kill off set_irq_flags usage
-  memory: kill off set_irq_flags usage
-  mfd: kill off set_irq_flags usage
-  PCI: kill off set_irq_flags usage
-  pinctrl: kill off set_irq_flags usage
-  SH: kill off set_irq_flags usage
-  tty/serial: kill off set_irq_flags usage
-  ARM: remove ununsed set_irq_flags
-  arm64: remove ununsed set_irq_flags
-
- arch/arm/common/it8152.c                      |  2 +-
- arch/arm/common/locomo.c                      |  2 +-
- arch/arm/common/sa1111.c                      |  4 ++--
- arch/arm/include/asm/hw_irq.h                 |  6 ------
- arch/arm/kernel/irq.c                         | 20 --------------------
- arch/arm/mach-davinci/cp_intc.c               |  2 +-
- arch/arm/mach-dove/irq.c                      |  2 +-
- arch/arm/mach-ebsa110/core.c                  |  2 +-
- arch/arm/mach-footbridge/common.c             |  2 +-
- arch/arm/mach-footbridge/isa-irq.c            |  8 ++++----
- arch/arm/mach-gemini/gpio.c                   |  2 +-
- arch/arm/mach-gemini/irq.c                    |  2 +-
- arch/arm/mach-imx/3ds_debugboard.c            |  2 +-
- arch/arm/mach-imx/mach-mx31ads.c              |  2 +-
- arch/arm/mach-iop13xx/irq.c                   |  2 +-
- arch/arm/mach-iop32x/irq.c                    |  2 +-
- arch/arm/mach-iop33x/irq.c                    |  2 +-
- arch/arm/mach-ixp4xx/common.c                 |  2 +-
- arch/arm/mach-ks8695/irq.c                    |  2 +-
- arch/arm/mach-lpc32xx/irq.c                   |  2 +-
- arch/arm/mach-netx/generic.c                  |  2 +-
- arch/arm/mach-omap1/fpga.c                    |  2 +-
- arch/arm/mach-omap1/irq.c                     |  2 +-
- arch/arm/mach-pxa/balloon3.c                  |  2 +-
- arch/arm/mach-pxa/irq.c                       |  1 -
- arch/arm/mach-pxa/lpd270.c                    |  2 +-
- arch/arm/mach-pxa/pcm990-baseboard.c          |  2 +-
- arch/arm/mach-pxa/pxa3xx.c                    |  2 +-
- arch/arm/mach-pxa/viper.c                     |  2 +-
- arch/arm/mach-pxa/zeus.c                      |  2 +-
- arch/arm/mach-rpc/ecard.c                     |  2 +-
- arch/arm/mach-rpc/irq.c                       | 16 ++++++++--------
- arch/arm/mach-s3c24xx/bast-irq.c              |  2 +-
- arch/arm/mach-s3c64xx/common.c                |  2 +-
- arch/arm/mach-sa1100/irq.c                    |  1 -
- arch/arm/mach-sa1100/neponset.c               |  4 ++--
- arch/arm/mach-w90x900/irq.c                   |  2 +-
- arch/arm64/include/asm/hardirq.h              |  5 -----
- drivers/base/regmap/regmap-irq.c              |  7 -------
- drivers/clk/at91/pmc.c                        |  1 -
- drivers/dma/ipu/ipu_irq.c                     |  8 ++------
- drivers/gpio/gpio-adp5588.c                   | 10 +---------
- drivers/gpio/gpio-bcm-kona.c                  | 15 ---------------
- drivers/gpio/gpio-davinci.c                   |  1 -
- drivers/gpio/gpio-em.c                        |  1 -
- drivers/gpio/gpio-ep93xx.c                    |  2 +-
- drivers/gpio/gpio-grgpio.c                    |  8 --------
- drivers/gpio/gpio-mcp23s08.c                  |  4 ----
- drivers/gpio/gpio-msm-v2.c                    |  1 -
- drivers/gpio/gpio-pxa.c                       |  8 ++++----
- drivers/gpio/gpio-sa1100.c                    |  2 +-
- drivers/gpio/gpio-sta2x11.c                   |  2 +-
- drivers/gpio/gpio-tegra.c                     |  1 -
- drivers/gpio/gpio-timberdale.c                |  4 +---
- drivers/gpio/gpiolib.c                        |  8 +-------
- drivers/gpu/drm/msm/mdp/mdp5/mdp5_irq.c       |  1 -
- drivers/gpu/ipu-v3/ipu-common.c               |  3 +--
- drivers/irqchip/exynos-combiner.c             |  2 +-
- drivers/irqchip/irq-armada-370-xp.c           |  3 +--
- drivers/irqchip/irq-bcm2835.c                 |  2 +-
- drivers/irqchip/irq-clps711x.c                |  6 +++---
- drivers/irqchip/irq-gic-v3.c                  |  5 ++---
- drivers/irqchip/irq-gic.c                     |  4 ++--
- drivers/irqchip/irq-hip04.c                   |  4 ++--
- drivers/irqchip/irq-keystone.c                |  2 +-
- drivers/irqchip/irq-mmp.c                     |  3 ---
- drivers/irqchip/irq-mxs.c                     |  1 -
- drivers/irqchip/irq-renesas-intc-irqpin.c     |  1 -
- drivers/irqchip/irq-renesas-irqc.c            |  1 -
- drivers/irqchip/irq-s3c24xx.c                 | 14 ++------------
- drivers/irqchip/irq-sun4i.c                   |  2 +-
- drivers/irqchip/irq-versatile-fpga.c          |  2 +-
- drivers/irqchip/irq-vic.c                     |  2 +-
- drivers/irqchip/irq-vt8500.c                  |  1 -
- drivers/irqchip/spear-shirq.c                 |  1 -
- drivers/memory/omap-gpmc.c                    |  5 ++---
- drivers/mfd/88pm860x-core.c                   |  4 ----
- drivers/mfd/ab8500-core.c                     |  4 ----
- drivers/mfd/arizona-irq.c                     |  7 -------
- drivers/mfd/asic3.c                           |  4 ++--
- drivers/mfd/db8500-prcmu.c                    |  1 -
- drivers/mfd/ezx-pcap.c                        |  6 +-----
- drivers/mfd/htc-egpio.c                       |  4 ++--
- drivers/mfd/htc-i2cpld.c                      |  6 +-----
- drivers/mfd/lp8788-irq.c                      |  5 -----
- drivers/mfd/max8925-core.c                    |  5 +----
- drivers/mfd/max8997-irq.c                     |  5 +----
- drivers/mfd/max8998-irq.c                     |  5 +----
- drivers/mfd/mt6397-core.c                     |  4 ----
- drivers/mfd/pm8921-core.c                     |  5 +----
- drivers/mfd/rc5t583-irq.c                     |  4 +---
- drivers/mfd/stmpe.c                           |  7 -------
- drivers/mfd/t7l66xb.c                         |  6 ------
- drivers/mfd/tc3589x.c                         |  7 -------
- drivers/mfd/tc6393xb.c                        |  4 ++--
- drivers/mfd/tps6586x.c                        |  7 -------
- drivers/mfd/tps65912-irq.c                    |  8 +-------
- drivers/mfd/twl4030-irq.c                     | 11 +----------
- drivers/mfd/twl6030-irq.c                     | 13 -------------
- drivers/mfd/ucb1x00-core.c                    |  2 +-
- drivers/mfd/wm831x-irq.c                      |  7 -------
- drivers/mfd/wm8350-irq.c                      |  8 +-------
- drivers/mfd/wm8994-irq.c                      |  7 -------
- drivers/pci/host/pci-dra7xx.c                 |  1 -
- drivers/pci/host/pci-keystone-dw.c            |  2 --
- drivers/pci/host/pci-tegra.c                  |  1 -
- drivers/pci/host/pcie-designware.c            |  1 -
- drivers/pci/host/pcie-rcar.c                  |  1 -
- drivers/pci/host/pcie-xilinx.c                |  2 --
- drivers/pinctrl/bcm/pinctrl-bcm2835.c         |  1 -
- drivers/pinctrl/mediatek/pinctrl-mtk-common.c |  2 --
- drivers/pinctrl/pinctrl-single.c              |  5 -----
- drivers/pinctrl/samsung/pinctrl-exynos.c      |  1 -
- drivers/pinctrl/samsung/pinctrl-exynos5440.c  |  1 -
- drivers/pinctrl/samsung/pinctrl-s3c24xx.c     |  2 --
- drivers/pinctrl/samsung/pinctrl-s3c64xx.c     |  2 --
- drivers/sh/intc/internals.h                   | 10 +---------
- drivers/tty/serial/serial_ks8695.c            |  2 +-
- drivers/tty/serial/sirfsoc_uart.c             |  6 +++---
- 119 files changed, 100 insertions(+), 367 deletions(-)
-
+diff --git a/drivers/pci/host/pci-dra7xx.c b/drivers/pci/host/pci-dra7xx.c
+index 2d57e19..94cbc4d 100644
+--- a/drivers/pci/host/pci-dra7xx.c
++++ b/drivers/pci/host/pci-dra7xx.c
+@@ -160,7 +160,6 @@ static int dra7xx_pcie_intx_map(struct irq_domain *domain, unsigned int irq,
+ {
+ 	irq_set_chip_and_handler(irq, &dummy_irq_chip, handle_simple_irq);
+ 	irq_set_chip_data(irq, domain->host_data);
+-	set_irq_flags(irq, IRQF_VALID);
+ 
+ 	return 0;
+ }
+diff --git a/drivers/pci/host/pci-keystone-dw.c b/drivers/pci/host/pci-keystone-dw.c
+index f34892e..f1d0749 100644
+--- a/drivers/pci/host/pci-keystone-dw.c
++++ b/drivers/pci/host/pci-keystone-dw.c
+@@ -196,7 +196,6 @@ static int ks_dw_pcie_msi_map(struct irq_domain *domain, unsigned int irq,
+ 	irq_set_chip_and_handler(irq, &ks_dw_pcie_msi_irq_chip,
+ 				 handle_level_irq);
+ 	irq_set_chip_data(irq, domain->host_data);
+-	set_irq_flags(irq, IRQF_VALID);
+ 
+ 	return 0;
+ }
+@@ -277,7 +276,6 @@ static int ks_dw_pcie_init_legacy_irq_map(struct irq_domain *d,
+ 	irq_set_chip_and_handler(irq, &ks_dw_pcie_legacy_irq_chip,
+ 				 handle_level_irq);
+ 	irq_set_chip_data(irq, d->host_data);
+-	set_irq_flags(irq, IRQF_VALID);
+ 
+ 	return 0;
+ }
+diff --git a/drivers/pci/host/pci-tegra.c b/drivers/pci/host/pci-tegra.c
+index 00e9272..36bd700 100644
+--- a/drivers/pci/host/pci-tegra.c
++++ b/drivers/pci/host/pci-tegra.c
+@@ -1263,7 +1263,6 @@ static int tegra_msi_map(struct irq_domain *domain, unsigned int irq,
+ {
+ 	irq_set_chip_and_handler(irq, &tegra_msi_irq_chip, handle_simple_irq);
+ 	irq_set_chip_data(irq, domain->host_data);
+-	set_irq_flags(irq, IRQF_VALID);
+ 
+ 	tegra_cpuidle_pcie_irqs_in_use();
+ 
+diff --git a/drivers/pci/host/pcie-designware.c b/drivers/pci/host/pcie-designware.c
+index 2e9f84f..5caa94d 100644
+--- a/drivers/pci/host/pcie-designware.c
++++ b/drivers/pci/host/pcie-designware.c
+@@ -333,7 +333,6 @@ static int dw_pcie_msi_map(struct irq_domain *domain, unsigned int irq,
+ {
+ 	irq_set_chip_and_handler(irq, &dw_msi_irq_chip, handle_simple_irq);
+ 	irq_set_chip_data(irq, domain->host_data);
+-	set_irq_flags(irq, IRQF_VALID);
+ 
+ 	return 0;
+ }
+diff --git a/drivers/pci/host/pcie-rcar.c b/drivers/pci/host/pcie-rcar.c
+index c086210..7678fe0 100644
+--- a/drivers/pci/host/pcie-rcar.c
++++ b/drivers/pci/host/pcie-rcar.c
+@@ -664,7 +664,6 @@ static int rcar_msi_map(struct irq_domain *domain, unsigned int irq,
+ {
+ 	irq_set_chip_and_handler(irq, &rcar_msi_irq_chip, handle_simple_irq);
+ 	irq_set_chip_data(irq, domain->host_data);
+-	set_irq_flags(irq, IRQF_VALID);
+ 
+ 	return 0;
+ }
+diff --git a/drivers/pci/host/pcie-xilinx.c b/drivers/pci/host/pcie-xilinx.c
+index f1a06a0..72015119 100644
+--- a/drivers/pci/host/pcie-xilinx.c
++++ b/drivers/pci/host/pcie-xilinx.c
+@@ -338,7 +338,6 @@ static int xilinx_pcie_msi_map(struct irq_domain *domain, unsigned int irq,
+ {
+ 	irq_set_chip_and_handler(irq, &xilinx_msi_irq_chip, handle_simple_irq);
+ 	irq_set_chip_data(irq, domain->host_data);
+-	set_irq_flags(irq, IRQF_VALID);
+ 
+ 	return 0;
+ }
+@@ -377,7 +376,6 @@ static int xilinx_pcie_intx_map(struct irq_domain *domain, unsigned int irq,
+ {
+ 	irq_set_chip_and_handler(irq, &dummy_irq_chip, handle_simple_irq);
+ 	irq_set_chip_data(irq, domain->host_data);
+-	set_irq_flags(irq, IRQF_VALID);
+ 
+ 	return 0;
+ }
 -- 
 2.1.0
