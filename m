@@ -1,66 +1,97 @@
-From: matthias.bgg@gmail.com (Matthias Brugger)
-Date: Tue,  9 Jun 2015 17:38:03 +0200
-Subject: [PATCH v3 3/3] clk: mediatek: Use regmap clk-mux for mt8135
-In-Reply-To: <1433864283-25490-1-git-send-email-matthias.bgg@gmail.com>
-References: <1433864283-25490-1-git-send-email-matthias.bgg@gmail.com>
-Message-ID: <1433864283-25490-4-git-send-email-matthias.bgg@gmail.com>
+From: dann.frazier@canonical.com (Dann Frazier)
+Date: Tue, 9 Jun 2015 09:31:21 -0600
+Subject: [PATCH 2/2 RESEND] power: reset: Add syscon poweroff device node
+ for APM X-Gene platform
+In-Reply-To: <CACgAJHwtCuZgZySmcvMxZHVxy__eZP02-TDbEn3FEpMx5y_LDQ@mail.gmail.com>
+References: <1433272747-27114-1-git-send-email-ttnguyen@apm.com>
+ <1433272747-27114-3-git-send-email-ttnguyen@apm.com>
+ <CALdTtnvQg2xmL5MqxUcvJmk_33XiEg9tnLzYvC++ZQL3j7J46g@mail.gmail.com>
+ <CACgAJHwtCuZgZySmcvMxZHVxy__eZP02-TDbEn3FEpMx5y_LDQ@mail.gmail.com>
+Message-ID: <CALdTtnvwQ0W=3i-Yi73rQQ43uo1njwBoEuNQOpJ79Qoref9Yvw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The pericfg controller is used by various device drivers, so that it
-is implemented via a regmap. In the actual clk implementation for
-mt8135, some clk-mux use the traditional register approach which
-acceses the register via iomem.
-This patch changes the use from iomem to the needed regmap.
+On Mon, Jun 8, 2015 at 10:34 PM, Tai Tri Nguyen <ttnguyen@apm.com> wrote:
+> Hi Dann,
+>
+> On Mon, Jun 8, 2015 at 8:44 PM, Dann Frazier <dann.frazier@canonical.com> wrote:
+>> On Tue, Jun 2, 2015 at 1:19 PM, Tai Nguyen <ttnguyen@apm.com> wrote:
+>>> This patch adds syscon poweroff device node to support poweroff feature
+>>> on APM X-Gene Mustang platform
+>>
+>> hey Tai,
+>>  The reboot changes work just fine for me, but poweroff does not:
+>>
+>> [  OK  ] Reached target Final Step.
+>>          Starting Power-Off...
+>> reboot: Power down
+>> Unable to poweroff system
+>> Kernel panic - not syncing: Attempted to kill init! exitcode=0x00000000
+>>
+>> CPU: 0 PID: 1 Comm: systemd-shutdow Tainted: G        W       4.1.0-rc7+ #1
+>> Hardware name: APM X-Gene Mustang board (DT)
+>> Call trace:
+>> [<ffffffc00008990c>] dump_backtrace+0x0/0x11c
+>> [<ffffffc000089a38>] show_stack+0x10/0x1c
+>> [<ffffffc0005b447c>] dump_stack+0x88/0xc8
+>> [<ffffffc0005b3374>] panic+0xe0/0x220
+>> [<ffffffc0000b5f24>] do_exit+0x990/0x994
+>> [<ffffffc0000d06bc>] SyS_reboot+0x14c/0x208
+>> ---[ end Kernel panic - not syncing: Attempted to kill init! exitcode=0x00000000
+>>
+>>   -dann
+>>
+>
+> Thanks for testing my patches.
+> On APM X-Gene Mustang platform, power off circuit is controlled by firmware.
+> It requires a firmware update to support power off feature.
+> May I ask what firmware version you're running on?
 
-Signed-off-by: Matthias Brugger <matthias.bgg@gmail.com>
----
- drivers/clk/mediatek/clk-mt8135.c | 21 +++++++--------------
- 1 file changed, 7 insertions(+), 14 deletions(-)
+Sure, 1.15.12.
 
-diff --git a/drivers/clk/mediatek/clk-mt8135.c b/drivers/clk/mediatek/clk-mt8135.c
-index 08b4b84..c28a9d4 100644
---- a/drivers/clk/mediatek/clk-mt8135.c
-+++ b/drivers/clk/mediatek/clk-mt8135.c
-@@ -513,11 +513,11 @@ static const char * const uart_ck_sel_parents[] __initconst = {
- 	"uart_sel",
- };
- 
--static const struct mtk_composite peri_clks[] __initconst = {
--	MUX(CLK_PERI_UART0_SEL, "uart0_ck_sel", uart_ck_sel_parents, 0x40c, 0, 1),
--	MUX(CLK_PERI_UART1_SEL, "uart1_ck_sel", uart_ck_sel_parents, 0x40c, 1, 1),
--	MUX(CLK_PERI_UART2_SEL, "uart2_ck_sel", uart_ck_sel_parents, 0x40c, 2, 1),
--	MUX(CLK_PERI_UART3_SEL, "uart3_ck_sel", uart_ck_sel_parents, 0x40c, 3, 1),
-+static const struct mtk_regm_mux peri_clks[] __initconst = {
-+	MUX_REGMAP(CLK_PERI_UART0_SEL, "uart0_ck_sel", uart_ck_sel_parents, 0x40c, 0, 1),
-+	MUX_REGMAP(CLK_PERI_UART1_SEL, "uart1_ck_sel", uart_ck_sel_parents, 0x40c, 1, 1),
-+	MUX_REGMAP(CLK_PERI_UART2_SEL, "uart2_ck_sel", uart_ck_sel_parents, 0x40c, 2, 1),
-+	MUX_REGMAP(CLK_PERI_UART3_SEL, "uart3_ck_sel", uart_ck_sel_parents, 0x40c, 3, 1),
- };
- 
- static void __init mtk_topckgen_init(struct device_node *node)
-@@ -573,20 +573,13 @@ static void __init mtk_pericfg_init(struct device_node *node)
- {
- 	struct clk_onecell_data *clk_data;
- 	int r;
--	void __iomem *base;
--
--	base = of_iomap(node, 0);
--	if (!base) {
--		pr_err("%s(): ioremap failed\n", __func__);
--		return;
--	}
- 
- 	clk_data = mtk_alloc_clk_data(CLK_PERI_NR_CLK);
- 
- 	mtk_clk_register_gates(node, peri_gates, ARRAY_SIZE(peri_gates),
- 						clk_data);
--	mtk_clk_register_composites(peri_clks, ARRAY_SIZE(peri_clks), base,
--			&mt8135_clk_lock, clk_data);
-+	mtk_clk_regm_register_mux(node, peri_clks, ARRAY_SIZE(peri_clks),
-+			clk_data);
- 
- 	r = of_clk_add_provider(node, of_clk_src_onecell_get, clk_data);
- 	if (r)
--- 
-1.9.1
+  -dann
+
+> Tai
+>
+>
+>>> Signed-off-by: Tai Nguyen <ttnguyen@apm.com>
+>>> ---
+>>>  arch/arm64/boot/dts/apm/apm-mustang.dts |   12 ++++++++++++
+>>>  1 file changed, 12 insertions(+)
+>>>
+>>> diff --git a/arch/arm64/boot/dts/apm/apm-mustang.dts b/arch/arm64/boot/dts/apm/apm-mustang.dts
+>>> index 83578e7..910d561 100644
+>>> --- a/arch/arm64/boot/dts/apm/apm-mustang.dts
+>>> +++ b/arch/arm64/boot/dts/apm/apm-mustang.dts
+>>> @@ -23,6 +23,18 @@
+>>>                 device_type = "memory";
+>>>                 reg = < 0x1 0x00000000 0x0 0x80000000 >; /* Updated by bootloader */
+>>>         };
+>>> +
+>>> +       poweroff_mbox: poweroff_mbox at 10548000 {
+>>> +               compatible = "syscon";
+>>> +               reg = <0x0 0x10548000 0x0 0x30>;
+>>> +       };
+>>> +
+>>> +       poweroff: poweroff at 10548010 {
+>>> +               compatible = "syscon-poweroff";
+>>> +               regmap = <&poweroff_mbox>;
+>>> +               offset = <0x10>;
+>>> +               mask = <0x1>;
+>>> +       };
+>>>  };
+>>>
+>>>  &pcie0clk {
+>>> --
+>>> 1.7.9.5
+>>>
+>>>
+>>> _______________________________________________
+>>> linux-arm-kernel mailing list
+>>> linux-arm-kernel at lists.infradead.org
+>>> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>
+>
+>
+> --
+> Tai
