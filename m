@@ -1,68 +1,56 @@
-From: eric.auger@linaro.org (Eric Auger)
-Date: Tue, 09 Jun 2015 10:12:30 +0200
-Subject: [PATCH 00/13] arm64: KVM: GICv3 ITS emulation
-In-Reply-To: <02ae01d0a1d9$732d2ce0$598786a0$@samsung.com>
-References: <1432893209-27313-1-git-send-email-andre.przywara@arm.com>
- <01ad01d0a1b7$d4d4fe40$7e7efac0$@samsung.com> <557550F0.5070106@arm.com>
- <02ae01d0a1d9$732d2ce0$598786a0$@samsung.com>
-Message-ID: <55769FEE.70607@linaro.org>
+From: pebolle@tiscali.nl (Paul Bolle)
+Date: Tue, 09 Jun 2015 10:15:20 +0200
+Subject: [PATCH v4 2/2] dma: Add Xilinx AXI Central Direct Memory Access
+ Engine driver support
+In-Reply-To: <55769132.6070601@monstr.eu>
+References: <1432228035-6569-1-git-send-email-appanad@xilinx.com>
+ <1432290653.27695.97.camel@x220> <557681A7.7080202@monstr.eu>
+ <alpine.DEB.2.02.1506090808500.2069@localhost6.localdomain6>
+ <55769132.6070601@monstr.eu>
+Message-ID: <1433837720.16887.42.camel@x220>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/08/2015 12:54 PM, Pavel Fedin wrote:
->  Hi!
+On Tue, 2015-06-09 at 09:09 +0200, Michal Simek wrote:
+> On 06/09/2015 08:10 AM, Julia Lawall wrote:
+> > On Tue, 9 Jun 2015, Michal Simek wrote:
+> >> Also sort of checking for this will be great. Julia?
+> > 
+> > If this requires checking the contents of comment, Coccinelle currently 
+> > can't help with that.  Perhaps an idea would be to just do a grep on the 
+> > file.  So if I find MODULE_LICENSE("GPL v2") and then grepping for "either 
+> > vresion 2" gives success, then there is a problem?  It's obviously not 
+> > foolproof, but perhaps it could be helpful.
 > 
->> I'm afraid this is not enough. A write to GICR_TRANSLATER (DID+EID)
->> results in a (LPI,CPU) pair. Can you easily express the CPU part in
->> irqfd (this is a genuine question, I'm not familiar enough with that
->> part of the core)?
+> Having some sort of checking somewhere will be great. checkpatch?
+> zero-day testing system?
 
-Currently on ARM, irqfd supports routing an host eventfd towards a
-virtual SPI:
-eventfd -> vSPI = gsi+32
-parameters of irqfd are the eventfd and the gsi.
+Mistakes I've seen made since I started checking this stuff (a few
+months ago):
+- typos in the license ident, say "GPLv2", "GPL V2", or "BSD": generates
+a warning when module is loaded and taints kernel. People still get this
+wrong. A test in checkpatch for these typos was submitted a while ago,
+but it never got added;
+- not adding MODULE_LICENSE() to a module: also generates a warning when
+module is loaded and taints kernel. People still get this wrong;
+- adding MODULE_LICENSE() to built-in only code: pointless at best, and
+annoying for reviewers ("Hey, did the submitter intend to write built-in
+only code or modular code?");
+- using "Dual BSD/GPL" but not a trace of the BSD license blurb in
+sight, while adding that blurb is one of the very few requirements this
+license actually has;
+- license mismatch, say comment blurb states "GPL v2 (or later)" but
+MODULE_LICENSE() ident states "GPL v2" only (or vice versa): very easy
+mistake to make, happens once or twice a week.  
 
-We do not implement KVM IRQ routing yet. This IRQ routing supports 2 modes:
-1) irqchip routing: eventfd -> virtual gsi -> virtual irqchip.input pin
-2) msi routing: eventfd -> virtual gsi -> virtual msi (@, data)
+Did I miss anything in that list?
 
-1) up to now we had a single virtual irqchip, vgicv2 or vgicv3 (no apic
-as in x86, ...) so irqchip routing did not sound to be helpful
-2) now we have virtual msi injection, we could use msi routing to inject
-virtual LPI's. But is it what you need for your qemu integration?
+I'm afraid that most of the above can only be caught reliably by
+attention to detail by submitters and reviewers. That's a pity, because
+checking for that stuff is about as boring as it gets. (What does that
+say about me?)
 
-Currently on QEMU side for VIRTIO-PCI with vhost back-end + GICv2m +
-irqfd, so called kvm_gsi_direct_mapping is used:
-the MSI data is extracted from the PCI virtio device MSI vector, the
-virtual gsi = MSI data - 32 and eventually irqfd is programmed with the
-eventfd and the gsi. That way MSI injection on guest is bypassed in
-irqfd mode.
+Thanks,
 
-Please let us know
 
-Best Regards
-
-Eric
-> 
->  But... As far as i could understand, LPI is added to a collection as a part of setup. And
-> collection actually represents a destination CPU, doesn't it? And we can't have multiple
-> LPIs sharing the same number and going to different CPUs. Or am i wrong? Unfortunately i
-> don't have GICv3 arch reference manual.
-> 
->> Another concern
->> would be the support of GICv4, which relies on the command queue
->> handling to be handled in the kernel
-> 
->  Wow, i didn't know about GICv4.
-> 
-> Kind regards,
-> Pavel Fedin
-> Expert Engineer
-> Samsung Electronics Research center Russia
-> 
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe kvm" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> 
+Paul Bolle
