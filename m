@@ -1,27 +1,60 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Tue, 09 Jun 2015 11:32:26 -0700
-Subject: [PATCH v2 1/2] ARM: Add cpu_resume_arm() for firmwares that resume
- in ARM state
-In-Reply-To: <20150609152959.GG7557@n2100.arm.linux.org.uk>
-References: <1433272378-8470-1-git-send-email-sboyd@codeaurora.org>
- <1433272378-8470-2-git-send-email-sboyd@codeaurora.org>
- <20150602234048.GA7557@n2100.arm.linux.org.uk>
- <20150603001120.GA4534@codeaurora.org> <7h3821ubpf.fsf@deeprootsystems.com>
- <55760B6D.7090302@codeaurora.org> <7htwuhsvs7.fsf@deeprootsystems.com>
- <20150609152959.GG7557@n2100.arm.linux.org.uk>
-Message-ID: <5577313A.9090008@codeaurora.org>
+From: robh@kernel.org (Rob Herring)
+Date: Tue,  9 Jun 2015 13:26:32 -0500
+Subject: [PATCH 06/15] gpu/drm: kill off set_irq_flags usage
+In-Reply-To: <1433874401-27161-1-git-send-email-robh@kernel.org>
+References: <1433874401-27161-1-git-send-email-robh@kernel.org>
+Message-ID: <1433874401-27161-7-git-send-email-robh@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/09/2015 08:29 AM, Russell King - ARM Linux wrote:
->
-> Stephen, if you can arrange for the patch to end up in the patch system
-> please...
->
+set_irq_flags is ARM specific with custom flags which have genirq
+equivalents. Convert drivers to use the genirq interfaces directly, so we
+can kill off set_irq_flags. The translation of flags is as follows:
 
-Sure no problem. The patch is 8389/1 in the tracker. I also fixed the
-commit text.
+IRQF_VALID -> !IRQ_NOREQUEST
+IRQF_PROBE -> !IRQ_NOPROBE
+IRQF_NOAUTOEN -> IRQ_NOAUTOEN
 
+For IRQs managed by an irqdomain, the irqdomain core code handles clearing
+and setting IRQ_NOREQUEST already, so there is no need to do this in
+.map() functions and we can simply remove the set_irq_flags calls. Some
+users also set IRQ_NOPROBE and this has been maintained although it is not
+clear that is really needed. There appears to be a great deal of blind
+copy and paste of this code.
+
+Signed-off-by: Rob Herring <robh@kernel.org>
+Cc: David Airlie <airlied@linux.ie>
+Cc: dri-devel at lists.freedesktop.org
+---
+ drivers/gpu/drm/msm/mdp/mdp5/mdp5_irq.c | 1 -
+ drivers/gpu/ipu-v3/ipu-common.c         | 3 +--
+ 2 files changed, 1 insertion(+), 3 deletions(-)
+
+diff --git a/drivers/gpu/drm/msm/mdp/mdp5/mdp5_irq.c b/drivers/gpu/drm/msm/mdp/mdp5/mdp5_irq.c
+index 33bd4c6..9a6a747 100644
+--- a/drivers/gpu/drm/msm/mdp/mdp5/mdp5_irq.c
++++ b/drivers/gpu/drm/msm/mdp/mdp5/mdp5_irq.c
+@@ -165,7 +165,6 @@ static int mdp5_hw_irqdomain_map(struct irq_domain *d,
+ 
+ 	irq_set_chip_and_handler(irq, &mdp5_hw_irq_chip, handle_level_irq);
+ 	irq_set_chip_data(irq, mdp5_kms);
+-	set_irq_flags(irq, IRQF_VALID);
+ 
+ 	return 0;
+ }
+diff --git a/drivers/gpu/ipu-v3/ipu-common.c b/drivers/gpu/ipu-v3/ipu-common.c
+index 67bab5c..eb95c94 100644
+--- a/drivers/gpu/ipu-v3/ipu-common.c
++++ b/drivers/gpu/ipu-v3/ipu-common.c
+@@ -1099,8 +1099,7 @@ static int ipu_irq_init(struct ipu_soc *ipu)
+ 	}
+ 
+ 	ret = irq_alloc_domain_generic_chips(ipu->domain, 32, 1, "IPU",
+-					     handle_level_irq, 0,
+-					     IRQF_VALID, 0);
++					     handle_level_irq, 0, 0, 0);
+ 	if (ret < 0) {
+ 		dev_err(ipu->dev, "failed to alloc generic irq chips\n");
+ 		irq_domain_remove(ipu->domain);
 -- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+2.1.0
