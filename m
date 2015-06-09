@@ -1,9 +1,9 @@
 From: robh@kernel.org (Rob Herring)
-Date: Tue,  9 Jun 2015 13:26:36 -0500
-Subject: [PATCH 10/15] PCI: kill off set_irq_flags usage
+Date: Tue,  9 Jun 2015 13:26:38 -0500
+Subject: [PATCH 12/15] SH: kill off set_irq_flags usage
 In-Reply-To: <1433874401-27161-1-git-send-email-robh@kernel.org>
 References: <1433874401-27161-1-git-send-email-robh@kernel.org>
-Message-ID: <1433874401-27161-11-git-send-email-robh@kernel.org>
+Message-ID: <1433874401-27161-13-git-send-email-robh@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -23,118 +23,33 @@ clear that is really needed. There appears to be a great deal of blind
 copy and paste of this code.
 
 Signed-off-by: Rob Herring <robh@kernel.org>
-Cc: Kishon Vijay Abraham I <kishon@ti.com>
-Cc: Bjorn Helgaas <bhelgaas@google.com>
-Cc: Murali Karicheri <m-karicheri2@ti.com>
-Cc: Thierry Reding <thierry.reding@gmail.com>
-Cc: Stephen Warren <swarren@wwwdotorg.org>
-Cc: Alexandre Courbot <gnurou@gmail.com>
-Cc: Jingoo Han <jingoohan1@gmail.com>
-Cc: Pratyush Anand <pratyush.anand@gmail.com>
 Cc: Simon Horman <horms@verge.net.au>
-Cc: Michal Simek <michal.simek@xilinx.com>
-Cc: "S?ren Brinkmann" <soren.brinkmann@xilinx.com>
-Cc: linux-omap at vger.kernel.org
-Cc: linux-pci at vger.kernel.org
-Cc: linux-arm-kernel at lists.infradead.org
-Cc: linux-tegra at vger.kernel.org
+Cc: Magnus Damm <magnus.damm@gmail.com>
 Cc: linux-sh at vger.kernel.org
 ---
- drivers/pci/host/pci-dra7xx.c      | 1 -
- drivers/pci/host/pci-keystone-dw.c | 2 --
- drivers/pci/host/pci-tegra.c       | 1 -
- drivers/pci/host/pcie-designware.c | 1 -
- drivers/pci/host/pcie-rcar.c       | 1 -
- drivers/pci/host/pcie-xilinx.c     | 2 --
- 6 files changed, 8 deletions(-)
+ drivers/sh/intc/internals.h | 10 +---------
+ 1 file changed, 1 insertion(+), 9 deletions(-)
 
-diff --git a/drivers/pci/host/pci-dra7xx.c b/drivers/pci/host/pci-dra7xx.c
-index 2d57e19..94cbc4d 100644
---- a/drivers/pci/host/pci-dra7xx.c
-+++ b/drivers/pci/host/pci-dra7xx.c
-@@ -160,7 +160,6 @@ static int dra7xx_pcie_intx_map(struct irq_domain *domain, unsigned int irq,
+diff --git a/drivers/sh/intc/internals.h b/drivers/sh/intc/internals.h
+index 7dff08e..897ffb1 100644
+--- a/drivers/sh/intc/internals.h
++++ b/drivers/sh/intc/internals.h
+@@ -99,15 +99,7 @@ static inline struct intc_desc_int *get_intc_desc(unsigned int irq)
+  */
+ static inline void activate_irq(int irq)
  {
- 	irq_set_chip_and_handler(irq, &dummy_irq_chip, handle_simple_irq);
- 	irq_set_chip_data(irq, domain->host_data);
+-#ifdef CONFIG_ARM
+-	/* ARM requires an extra step to clear IRQ_NOREQUEST, which it
+-	 * sets on behalf of every irq_chip.  Also sets IRQ_NOPROBE.
+-	 */
 -	set_irq_flags(irq, IRQF_VALID);
- 
- 	return 0;
+-#else
+-	/* same effect on other architectures */
+-	irq_set_noprobe(irq);
+-#endif
++	irq_clear_status_flags(irq, IRQ_NOREQUEST | IRQ_NOPROBE);
  }
-diff --git a/drivers/pci/host/pci-keystone-dw.c b/drivers/pci/host/pci-keystone-dw.c
-index f34892e..f1d0749 100644
---- a/drivers/pci/host/pci-keystone-dw.c
-+++ b/drivers/pci/host/pci-keystone-dw.c
-@@ -196,7 +196,6 @@ static int ks_dw_pcie_msi_map(struct irq_domain *domain, unsigned int irq,
- 	irq_set_chip_and_handler(irq, &ks_dw_pcie_msi_irq_chip,
- 				 handle_level_irq);
- 	irq_set_chip_data(irq, domain->host_data);
--	set_irq_flags(irq, IRQF_VALID);
  
- 	return 0;
- }
-@@ -277,7 +276,6 @@ static int ks_dw_pcie_init_legacy_irq_map(struct irq_domain *d,
- 	irq_set_chip_and_handler(irq, &ks_dw_pcie_legacy_irq_chip,
- 				 handle_level_irq);
- 	irq_set_chip_data(irq, d->host_data);
--	set_irq_flags(irq, IRQF_VALID);
- 
- 	return 0;
- }
-diff --git a/drivers/pci/host/pci-tegra.c b/drivers/pci/host/pci-tegra.c
-index 00e9272..36bd700 100644
---- a/drivers/pci/host/pci-tegra.c
-+++ b/drivers/pci/host/pci-tegra.c
-@@ -1263,7 +1263,6 @@ static int tegra_msi_map(struct irq_domain *domain, unsigned int irq,
- {
- 	irq_set_chip_and_handler(irq, &tegra_msi_irq_chip, handle_simple_irq);
- 	irq_set_chip_data(irq, domain->host_data);
--	set_irq_flags(irq, IRQF_VALID);
- 
- 	tegra_cpuidle_pcie_irqs_in_use();
- 
-diff --git a/drivers/pci/host/pcie-designware.c b/drivers/pci/host/pcie-designware.c
-index 2e9f84f..5caa94d 100644
---- a/drivers/pci/host/pcie-designware.c
-+++ b/drivers/pci/host/pcie-designware.c
-@@ -333,7 +333,6 @@ static int dw_pcie_msi_map(struct irq_domain *domain, unsigned int irq,
- {
- 	irq_set_chip_and_handler(irq, &dw_msi_irq_chip, handle_simple_irq);
- 	irq_set_chip_data(irq, domain->host_data);
--	set_irq_flags(irq, IRQF_VALID);
- 
- 	return 0;
- }
-diff --git a/drivers/pci/host/pcie-rcar.c b/drivers/pci/host/pcie-rcar.c
-index c086210..7678fe0 100644
---- a/drivers/pci/host/pcie-rcar.c
-+++ b/drivers/pci/host/pcie-rcar.c
-@@ -664,7 +664,6 @@ static int rcar_msi_map(struct irq_domain *domain, unsigned int irq,
- {
- 	irq_set_chip_and_handler(irq, &rcar_msi_irq_chip, handle_simple_irq);
- 	irq_set_chip_data(irq, domain->host_data);
--	set_irq_flags(irq, IRQF_VALID);
- 
- 	return 0;
- }
-diff --git a/drivers/pci/host/pcie-xilinx.c b/drivers/pci/host/pcie-xilinx.c
-index f1a06a0..72015119 100644
---- a/drivers/pci/host/pcie-xilinx.c
-+++ b/drivers/pci/host/pcie-xilinx.c
-@@ -338,7 +338,6 @@ static int xilinx_pcie_msi_map(struct irq_domain *domain, unsigned int irq,
- {
- 	irq_set_chip_and_handler(irq, &xilinx_msi_irq_chip, handle_simple_irq);
- 	irq_set_chip_data(irq, domain->host_data);
--	set_irq_flags(irq, IRQF_VALID);
- 
- 	return 0;
- }
-@@ -377,7 +376,6 @@ static int xilinx_pcie_intx_map(struct irq_domain *domain, unsigned int irq,
- {
- 	irq_set_chip_and_handler(irq, &dummy_irq_chip, handle_simple_irq);
- 	irq_set_chip_data(irq, domain->host_data);
--	set_irq_flags(irq, IRQF_VALID);
- 
- 	return 0;
- }
+ static inline int intc_handle_int_cmp(const void *a, const void *b)
 -- 
 2.1.0
