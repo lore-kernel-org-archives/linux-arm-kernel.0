@@ -1,65 +1,73 @@
-From: vbabka@suse.cz (Vlastimil Babka)
-Date: Tue, 09 Jun 2015 18:14:25 +0200
-Subject: [PATCH V3] mm:add VM_BUG_ON_PAGE() for page_mapcount()
-In-Reply-To: <35FD53F367049845BC99AC72306C23D103E688B313FA@CNBJMBX05.corpusers.net>
-References: <010b01d012ca$05244060$0f6cc120$@alibaba-inc.com>
- <35FD53F367049845BC99AC72306C23D103E688B313F9@CNBJMBX05.corpusers.net>
- <35FD53F367049845BC99AC72306C23D103E688B313FA@CNBJMBX05.corpusers.net>
-Message-ID: <557710E1.6060103@suse.cz>
+From: cyrille.pitchen@atmel.com (Cyrille Pitchen)
+Date: Tue, 9 Jun 2015 18:22:13 +0200
+Subject: [PATCH v6 0/6] i2c: at91: add support to FIFOs and alternative command
+Message-ID: <cover.1433866582.git.cyrille.pitchen@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/08/2014 10:59 AM, Wang, Yalin wrote:
-> This patch add VM_BUG_ON_PAGE() for slab page,
-> because _mapcount is an union with slab struct in struct page,
-> avoid access _mapcount if this page is a slab page.
-> Also remove the unneeded bracket.
->
-> Signed-off-by: Yalin Wang <yalin.wang@sonymobile.com>
-> ---
->   include/linux/mm.h | 3 ++-
->   1 file changed, 2 insertions(+), 1 deletion(-)
->
-> diff --git a/include/linux/mm.h b/include/linux/mm.h
-> index b464611..a117527 100644
-> --- a/include/linux/mm.h
-> +++ b/include/linux/mm.h
-> @@ -449,7 +449,8 @@ static inline void page_mapcount_reset(struct page *page)
->
->   static inline int page_mapcount(struct page *page)
->   {
-> -	return atomic_read(&(page)->_mapcount) + 1;
-> +	VM_BUG_ON_PAGE(PageSlab(page), page);
-> +	return atomic_read(&page->_mapcount) + 1;
->   }
->
+ChangeLog
 
-I think this might theoretically trigger on the following code in 
-compaction's isolate_migratepages_block():
+v6:
+- replace "at91sama5d2" by "sama5d2".
 
-/*
-   * Migration will fail if an anonymous page is pinned in memory,
-   * so avoid taking lru_lock and isolating it unnecessarily in an
-   * admittedly racy check.
-   */
-if (!page_mapping(page) &&
-     page_count(page) > page_mapcount(page))
-	continue;
+v5:
+- print I2C controller version in an already existing dev_info() instead of
+  adding a new one.
 
-This is done after PageLRU() was positive, but the lru_lock might be not 
-taken yet. So, there's some time window during which the page might have 
-been reclaimed from LRU and become a PageSlab(page). !page_mapping(page) 
-will be true in that case so it will proceed with page_mapcount(page) 
-test and trigger the VM_BUG_ON.
+v4:
+- replace 0x%x by %#x when printing I2C controller version
+- change the order of patches: the race condition bug fix becomes the first
+  patch so it be can more easily applied to older kernels.
 
-(That test was added by DavidR year ago in commit 
-119d6d59dcc0980dcd581fdadb6b2033b512a473)
+v3:
+- fix braces {} coding style issue
+- split the alternative command patch into 2 patches: the first one fixes
+  a race condition whereas the second one is the actual alternative command
+  patch
 
-Vlastimil
+v2:
+- fix typo in comment for AT91_TWI_SVEN.
+- document new device tree bindings like "atmel,fifo-size".
+- explicitly set the has_alt_cmd boolean to false to already existing chip
+  configs.
+- use the BIT() macro to define the register bits and do a little cleanup in a
+  dedicated patch.
+- reword some comments to better explain why the TXCOMP interrupt is no longer
+  enabled in at91_do_twi_transfer() but later in
+  at91_twi_write_data_dma_callback() to avoid a race condition when DMA is used.
+- remove useless TXCOMP interrupt enable line in at91_twi_write_next_byte()
+  since this interrupt is also enabled by at91_do_twi_transfer() for PIO
+  transfers.
 
+v1:
+This series of patches adds support of two new features which will be
+introduced with Atmel sama5d2x SoC.
 
+First, the alternative command mode eases the sending of STOP conditions.
+Before starting an I2C transaction, the size data to be transfered is
+written into the new Alternative Command Register. For each byte transferred,
+the I2C controller decreases this counter and automatically sends a STOP
+condition when the counter value reaches 0, that is to say when the last byte
+of the transaction has been sent/received. So there is no longer need to set
+the STOP bit into the Control Register.
 
+Then the use of FIFOs allows to reduce number I/O accesses: for instance,
+the TX FIFO allows to write up to 4 data in a single access to the Transmit
+Holding Register. Also the RX FIFO allows to read up to 4 data in a single
+access to the Receive Holding Register. Currently only DMA transfers take
+advantage of FIFOs.
 
+Cyrille Pitchen (6):
+  i2c: at91: fix a race condition when using the DMA controller
+  i2c: at91: use BIT() macro to define register bits
+  i2c: at91: update documentation for DT bindings
+  i2c: at91: add support for new alternative command mode
+  i2c: at91: print hardware version
+  i2c: at91: add support to FIFOs
 
->   static inline int page_count(struct page *page)
->
+ Documentation/devicetree/bindings/i2c/i2c-at91.txt |  30 +-
+ drivers/i2c/busses/i2c-at91.c                      | 356 +++++++++++++++++----
+ 2 files changed, 323 insertions(+), 63 deletions(-)
+
+-- 
+1.8.2.2
