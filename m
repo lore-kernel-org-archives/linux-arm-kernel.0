@@ -1,133 +1,96 @@
-From: dan.j.williams@intel.com (Dan Williams)
-Date: Tue, 09 Jun 2015 12:27:10 -0400
-Subject: [PATCH 1/2] scatterlist: use sg_phys()
-In-Reply-To: <20150609162659.21910.41681.stgit@dwillia2-desk3.amr.corp.intel.com>
-References: <20150609162659.21910.41681.stgit@dwillia2-desk3.amr.corp.intel.com>
-Message-ID: <20150609162710.21910.57295.stgit@dwillia2-desk3.amr.corp.intel.com>
+From: jiang.liu@linux.intel.com (Jiang Liu)
+Date: Wed, 10 Jun 2015 00:58:15 +0800
+Subject: [Patch v5 4/6] PCI/ACPI: Consolidate common PCI host bridge code
+ into ACPI core
+In-Reply-To: <20150609161230.GC8591@red-moon>
+References: <1433780448-18636-1-git-send-email-jiang.liu@linux.intel.com>
+ <1433780448-18636-5-git-send-email-jiang.liu@linux.intel.com>
+ <20150609161230.GC8591@red-moon>
+Message-ID: <55771B27.1060509@linux.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Coccinelle cleanup to replace open coded sg to physical address
-translations.  This is in preparation for introducing scatterlists that
-reference __pfn_t.
+On 2015/6/10 0:12, Lorenzo Pieralisi wrote:
+> On Mon, Jun 08, 2015 at 05:20:46PM +0100, Jiang Liu wrote:
+> 
+> [...]
+> 
+>> +static int acpi_pci_probe_root_resources(struct acpi_pci_root_info *info)
+>> +{
+>> +	int ret;
+>> +	struct list_head *list = &info->resources;
+>> +	struct acpi_device *device = info->bridge;
+>> +	struct resource_entry *entry, *tmp;
+>> +	unsigned long flags;
+>> +
+>> +	flags = IORESOURCE_IO | IORESOURCE_MEM | IORESOURCE_MEM_8AND16BIT;
+> 
+> Is IORESOURCE_MEM_8AND16BIT required because of some pending patches
+> that will change ACPI resource filtering ? It does not seem to make
+> a difference in the mainline code, AFAICT.
+Hi Lorenzo,
+	Sorry, the 'IORESOURCE_MEM_8AND16BIT' is leaked into this patch
+from another bugfix patch. It should be removed.
 
-// sg_phys.cocci: convert usage page_to_phys(sg_page(sg)) to sg_phys(sg)
-// usage: make coccicheck COCCI=sg_phys.cocci MODE=patch
+>> +static void acpi_pci_root_release_info(struct pci_host_bridge *bridge)
+>> +{
+>> +	struct resource *res;
+>> +	struct resource_entry *entry;
+>> +
+>> +	resource_list_for_each_entry(entry, &bridge->windows) {
+>> +		res = entry->res;
+>> +		if (res->parent &&
+>> +		    (res->flags & (IORESOURCE_MEM | IORESOURCE_IO)))
+>> +			release_resource(res);
+>> +	}
+> 
+> It is a question: is this loop necessary given that we are already
+> releasing resources in __acpi_pci_root_release_info() ?
+Function pci_create_root_bus() moves resources from info->resources list
+onto bridge->windows list, so an ACPI resource will be either on
+info->resources or bridge->windows. Thus we need to deal with both
+info->resources and bridge->windows.
 
-virtual patch
-virtual report
-virtual org
+> 
+>> +	__acpi_pci_root_release_info(bridge->release_data);
+>> +}
+>> +
+>> +struct pci_bus *acpi_pci_root_create(struct acpi_pci_root *root,
+>> +				     struct acpi_pci_root_ops *ops,
+>> +				     struct acpi_pci_root_info *info,
+>> +				     void *sysdata, int segment, int node)
+> 
+> I do not think you need to pass segment and node, they clutter the
+> function signature when you can retrieve them from root, I would
+> make them local variables and use root->segment and acpi_get_node
+> in the function body to retrieve them.
+On x86, node and segment may be overridden under certain conditions.
+For example, segment will always be 0 if 'pci_ignore_seg' is set.
 
-@@
-struct scatterlist *sg;
-@@
-
-- page_to_phys(sg_page(sg)) + sg->offset
-+ sg_phys(sg)
-
-@@
-struct scatterlist *sg;
-@@
-
-- page_to_phys(sg_page(sg))
-+ sg_phys(sg) - sg->offset
-
-Cc: Julia Lawall <Julia.Lawall@lip6.fr>
-Cc: Russell King <linux@arm.linux.org.uk>
-Cc: Michal Simek <monstr@monstr.eu>
-Cc: David Woodhouse <dwmw2@infradead.org>
-Cc: Joerg Roedel <joro@8bytes.org>
-Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-Cc: Christoph Hellwig <hch@lst.de>
-Signed-off-by: Dan Williams <dan.j.williams@intel.com>
----
- arch/arm/mm/dma-mapping.c                    |    2 +-
- arch/microblaze/kernel/dma.c                 |    2 +-
- drivers/iommu/intel-iommu.c                  |    4 ++--
- drivers/iommu/iommu.c                        |    2 +-
- drivers/staging/android/ion/ion_chunk_heap.c |    4 ++--
- 5 files changed, 7 insertions(+), 7 deletions(-)
-
-diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
-index 7e7583ddd607..9f6ff6671f01 100644
---- a/arch/arm/mm/dma-mapping.c
-+++ b/arch/arm/mm/dma-mapping.c
-@@ -1502,7 +1502,7 @@ static int __map_sg_chunk(struct device *dev, struct scatterlist *sg,
- 		return -ENOMEM;
- 
- 	for (count = 0, s = sg; count < (size >> PAGE_SHIFT); s = sg_next(s)) {
--		phys_addr_t phys = page_to_phys(sg_page(s));
-+		phys_addr_t phys = sg_phys(s) - s->offset;
- 		unsigned int len = PAGE_ALIGN(s->offset + s->length);
- 
- 		if (!is_coherent &&
-diff --git a/arch/microblaze/kernel/dma.c b/arch/microblaze/kernel/dma.c
-index ed7ba8a11822..dcb3c594d626 100644
---- a/arch/microblaze/kernel/dma.c
-+++ b/arch/microblaze/kernel/dma.c
-@@ -61,7 +61,7 @@ static int dma_direct_map_sg(struct device *dev, struct scatterlist *sgl,
- 	/* FIXME this part of code is untested */
- 	for_each_sg(sgl, sg, nents, i) {
- 		sg->dma_address = sg_phys(sg);
--		__dma_sync(page_to_phys(sg_page(sg)) + sg->offset,
-+		__dma_sync(sg_phys(sg),
- 							sg->length, direction);
- 	}
- 
-diff --git a/drivers/iommu/intel-iommu.c b/drivers/iommu/intel-iommu.c
-index 68d43beccb7e..9b9ada71e0d3 100644
---- a/drivers/iommu/intel-iommu.c
-+++ b/drivers/iommu/intel-iommu.c
-@@ -1998,7 +1998,7 @@ static int __domain_mapping(struct dmar_domain *domain, unsigned long iov_pfn,
- 			sg_res = aligned_nrpages(sg->offset, sg->length);
- 			sg->dma_address = ((dma_addr_t)iov_pfn << VTD_PAGE_SHIFT) + sg->offset;
- 			sg->dma_length = sg->length;
--			pteval = page_to_phys(sg_page(sg)) | prot;
-+			pteval = (sg_phys(sg) - sg->offset) | prot;
- 			phys_pfn = pteval >> VTD_PAGE_SHIFT;
- 		}
- 
-@@ -3302,7 +3302,7 @@ static int intel_nontranslate_map_sg(struct device *hddev,
- 
- 	for_each_sg(sglist, sg, nelems, i) {
- 		BUG_ON(!sg_page(sg));
--		sg->dma_address = page_to_phys(sg_page(sg)) + sg->offset;
-+		sg->dma_address = sg_phys(sg);
- 		sg->dma_length = sg->length;
- 	}
- 	return nelems;
-diff --git a/drivers/iommu/iommu.c b/drivers/iommu/iommu.c
-index d4f527e56679..59808fc9110d 100644
---- a/drivers/iommu/iommu.c
-+++ b/drivers/iommu/iommu.c
-@@ -1147,7 +1147,7 @@ size_t default_iommu_map_sg(struct iommu_domain *domain, unsigned long iova,
- 	min_pagesz = 1 << __ffs(domain->ops->pgsize_bitmap);
- 
- 	for_each_sg(sg, s, nents, i) {
--		phys_addr_t phys = page_to_phys(sg_page(s)) + s->offset;
-+		phys_addr_t phys = sg_phys(s);
- 
- 		/*
- 		 * We are mapping on IOMMU page boundaries, so offset within
-diff --git a/drivers/staging/android/ion/ion_chunk_heap.c b/drivers/staging/android/ion/ion_chunk_heap.c
-index 3e6ec2ee6802..b7da5d142aa9 100644
---- a/drivers/staging/android/ion/ion_chunk_heap.c
-+++ b/drivers/staging/android/ion/ion_chunk_heap.c
-@@ -81,7 +81,7 @@ static int ion_chunk_heap_allocate(struct ion_heap *heap,
- err:
- 	sg = table->sgl;
- 	for (i -= 1; i >= 0; i--) {
--		gen_pool_free(chunk_heap->pool, page_to_phys(sg_page(sg)),
-+		gen_pool_free(chunk_heap->pool, sg_phys(sg) - sg->offset,
- 			      sg->length);
- 		sg = sg_next(sg);
- 	}
-@@ -109,7 +109,7 @@ static void ion_chunk_heap_free(struct ion_buffer *buffer)
- 							DMA_BIDIRECTIONAL);
- 
- 	for_each_sg(table->sgl, sg, table->nents, i) {
--		gen_pool_free(chunk_heap->pool, page_to_phys(sg_page(sg)),
-+		gen_pool_free(chunk_heap->pool, sg_phys(sg) - sg->offset,
- 			      sg->length);
- 	}
- 	chunk_heap->allocated -= allocated_size;
+>> +{
+>> +	int ret, busnum = root->secondary.start;
+>> +	struct acpi_device *device = root->device;
+>> +	struct pci_bus *bus;
+>> +
+>> +	info->root = root;
+>> +	info->bridge = device;
+>> +	info->ops = ops;
+>> +	INIT_LIST_HEAD(&info->resources);
+>> +	snprintf(info->name, sizeof(info->name), "PCI Bus %04x:%02x",
+>> +		 segment, busnum);
+>> +
+>> +	if (ops->init_info && ops->init_info(info))
+>> +		goto out_release_info;
+>> +	ret = acpi_pci_probe_root_resources(info);
+>> +	if (ops->prepare_resources)
+>> +		ret = ops->prepare_resources(info, ret);
+> 
+> You go through this ret passing song and dance because we may want to
+> call prepare_resources even if acpi_pci_probe_root_resource failed (on
+> x86), correct ? I will have a further look at x86 and ia64 if we
+> can consolidate these ops function hooks even further.
+Yes. X86 uses flag 'pci_use_crs' to choose ACPI parsed resources or
+other method parsed resources. This provides user a way to work
+around some bios issues.
+Thanks!
+Gerry
