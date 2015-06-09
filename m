@@ -1,108 +1,133 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Tue,  9 Jun 2015 18:47:25 +0200
-Subject: [PATCH 33/34] pinctrl: mvebu: armada-39x: add missing SATA functions
-In-Reply-To: <1433868446-11028-1-git-send-email-thomas.petazzoni@free-electrons.com>
-References: <1433868446-11028-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1433868446-11028-34-git-send-email-thomas.petazzoni@free-electrons.com>
+From: dan.j.williams@intel.com (Dan Williams)
+Date: Tue, 09 Jun 2015 12:27:10 -0400
+Subject: [PATCH 1/2] scatterlist: use sg_phys()
+In-Reply-To: <20150609162659.21910.41681.stgit@dwillia2-desk3.amr.corp.intel.com>
+References: <20150609162659.21910.41681.stgit@dwillia2-desk3.amr.corp.intel.com>
+Message-ID: <20150609162710.21910.57295.stgit@dwillia2-desk3.amr.corp.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The latest version of the Armada 39x datasheet documents several new
-SATA related functions on various MPP pins. This commit adds the
-description of these new functions to the Armada 39x pinctrl driver as
-well as to its DT binding documentation.
+Coccinelle cleanup to replace open coded sg to physical address
+translations.  This is in preparation for introducing scatterlists that
+reference __pfn_t.
 
-Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+// sg_phys.cocci: convert usage page_to_phys(sg_page(sg)) to sg_phys(sg)
+// usage: make coccicheck COCCI=sg_phys.cocci MODE=patch
+
+virtual patch
+virtual report
+virtual org
+
+@@
+struct scatterlist *sg;
+@@
+
+- page_to_phys(sg_page(sg)) + sg->offset
++ sg_phys(sg)
+
+@@
+struct scatterlist *sg;
+@@
+
+- page_to_phys(sg_page(sg))
++ sg_phys(sg) - sg->offset
+
+Cc: Julia Lawall <Julia.Lawall@lip6.fr>
+Cc: Russell King <linux@arm.linux.org.uk>
+Cc: Michal Simek <monstr@monstr.eu>
+Cc: David Woodhouse <dwmw2@infradead.org>
+Cc: Joerg Roedel <joro@8bytes.org>
+Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+Cc: Christoph Hellwig <hch@lst.de>
+Signed-off-by: Dan Williams <dan.j.williams@intel.com>
 ---
- .../bindings/pinctrl/marvell,armada-39x-pinctrl.txt        | 14 +++++++++-----
- drivers/pinctrl/mvebu/pinctrl-armada-39x.c                 |  9 +++++++++
- 2 files changed, 18 insertions(+), 5 deletions(-)
+ arch/arm/mm/dma-mapping.c                    |    2 +-
+ arch/microblaze/kernel/dma.c                 |    2 +-
+ drivers/iommu/intel-iommu.c                  |    4 ++--
+ drivers/iommu/iommu.c                        |    2 +-
+ drivers/staging/android/ion/ion_chunk_heap.c |    4 ++--
+ 5 files changed, 7 insertions(+), 7 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/pinctrl/marvell,armada-39x-pinctrl.txt b/Documentation/devicetree/bindings/pinctrl/marvell,armada-39x-pinctrl.txt
-index 2e4725f..bceb6c5 100644
---- a/Documentation/devicetree/bindings/pinctrl/marvell,armada-39x-pinctrl.txt
-+++ b/Documentation/devicetree/bindings/pinctrl/marvell,armada-39x-pinctrl.txt
-@@ -31,11 +31,12 @@ mpp13	13	gpio, dev(ad15), pcie2(clkreq), led(data)
- mpp14	14	gpio, dram(vttctrl), dev(we1), ua1(txd)
- mpp15	15	gpio, pcie0(rstout), spi0(mosi), i2c1(sck)
- mpp16	16	gpio, dram(deccerr), spi0(miso), pcie0(clkreq), i2c1(sda)
--mpp17	17	gpio, ua1(rxd), spi0(sck), smi(mdio)
-+mpp17	17	gpio, ua1(rxd), spi0(sck), sata1(prsnt) [1], sata0(prsnt) [1], smi(mdio)
- mpp18	18	gpio, ua1(txd), spi0(cs0), i2c2(sck)
- mpp19	19	gpio, sata1(prsnt) [1], ua0(cts), ua1(rxd), i2c2(sda)
- mpp20	20	gpio, sata0(prsnt) [1], ua0(rts), ua1(txd), smi(mdc)
--mpp21	21	gpio, spi0(cs1), sata0(prsnt) [1], sd0(cmd), dev(bootcs), ge(rxd0)
-+mpp21	21	gpio, spi0(cs1), sata0(prsnt) [1], sd0(cmd), dev(bootcs),
-+                sata1(prsnt) [1], ge(rxd0)
- mpp22	22	gpio, spi0(mosi), dev(ad0)
- mpp23	23	gpio, spi0(sck), dev(ad2)
- mpp24	24	gpio, spi0(miso), ua0(cts), ua1(rxd), sd0(d4), dev(ready)
-@@ -58,12 +59,15 @@ mpp40	40	gpio, i2c1(sda), ua0(rts), sd0(d2), dev(ad6), ge(rxd3)
- mpp41	41	gpio, ua1(rxd), ua0(cts), spi1(cs3), dev(burst/last), nand(rb0), ge(rxctl)
- mpp42	42	gpio, ua1(txd), ua0(rts), dev(ad7)
- mpp43	43	gpio, pcie0(clkreq), dram(vttctrl), dram(deccerr), spi1(cs2), dev(clkout), nand(rb1)
--mpp44	44	gpio, sata0(prsnt) [1], sata1(prsnt) [1], led(clk)
-+mpp44	44	gpio, sata0(prsnt) [1], sata1(prsnt) [1], sata2(prsnt) [1],
-+                sata3(prsnt) [1], led(clk)
- mpp45	45	gpio, ref(clk), pcie0(rstout), ua1(rxd)
- mpp46	46	gpio, ref(clk), pcie0(rstout), ua1(txd), led(stb)
--mpp47	47	gpio, sata0(prsnt) [1], sata1(prsnt) [1], led(data)
-+mpp47	47	gpio, sata0(prsnt) [1], sata1(prsnt) [1], sata2(prsnt) [1],
-+                sata3(prsnt) [1], led(data)
- mpp48	48	gpio, sata0(prsnt) [1], dram(vttctrl), tdm(pclk) [1], audio(mclk) [1], sd0(d4), pcie0(clkreq), ua1(txd)
--mpp49	49	gpio, tdm(fsync) [1], audio(lrclk) [1], sd0(d5), ua2(rxd)
-+mpp49	49	gpio, sata2(prsnt) [1], sata3(prsnt) [1], tdm(fsync) [1],
-+                audio(lrclk) [1], sd0(d5), ua2(rxd)
- mpp50	50	gpio, pcie0(rstout), tdm(drx) [1], audio(extclk) [1], sd0(cmd), ua2(rxd)
- mpp51	51	gpio, tdm(dtx) [1], audio(sdo) [1], dram(deccerr), ua2(txd)
- mpp52	52	gpio, pcie0(rstout), tdm(int) [1], audio(sdi) [1], sd0(d6), i2c3(sck)
-diff --git a/drivers/pinctrl/mvebu/pinctrl-armada-39x.c b/drivers/pinctrl/mvebu/pinctrl-armada-39x.c
-index afab0c1..bae1199 100644
---- a/drivers/pinctrl/mvebu/pinctrl-armada-39x.c
-+++ b/drivers/pinctrl/mvebu/pinctrl-armada-39x.c
-@@ -117,6 +117,8 @@ static struct mvebu_mpp_mode armada_39x_mpp_modes[] = {
- 		 MPP_VAR_FUNCTION(0, "gpio",    NULL,       V_88F6920_PLUS),
- 		 MPP_VAR_FUNCTION(3, "ua1",     "rxd",      V_88F6920_PLUS),
- 		 MPP_VAR_FUNCTION(4, "spi0",    "sck",      V_88F6920_PLUS),
-+		 MPP_VAR_FUNCTION(5, "sata1",   "prsnt",    V_88F6928),
-+		 MPP_VAR_FUNCTION(6, "sata0",   "prsnt",    V_88F6928),
- 		 MPP_VAR_FUNCTION(7, "smi",     "mdio",     V_88F6920_PLUS)),
- 	MPP_MODE(18,
- 		 MPP_VAR_FUNCTION(0, "gpio",    NULL,       V_88F6920_PLUS),
-@@ -141,6 +143,7 @@ static struct mvebu_mpp_mode armada_39x_mpp_modes[] = {
- 		 MPP_VAR_FUNCTION(3, "sata0",   "prsnt",    V_88F6928),
- 		 MPP_VAR_FUNCTION(4, "sd0",     "cmd",      V_88F6920_PLUS),
- 		 MPP_VAR_FUNCTION(5, "dev",     "bootcs",   V_88F6920_PLUS),
-+		 MPP_VAR_FUNCTION(6, "sata1",   "prsnt",    V_88F6928),
- 		 MPP_VAR_FUNCTION(8, "ge",      "rxd0",     V_88F6920_PLUS)),
- 	MPP_MODE(22,
- 		 MPP_VAR_FUNCTION(0, "gpio",    NULL,       V_88F6920_PLUS),
-@@ -262,6 +265,8 @@ static struct mvebu_mpp_mode armada_39x_mpp_modes[] = {
- 		 MPP_VAR_FUNCTION(0, "gpio",    NULL,       V_88F6920_PLUS),
- 		 MPP_VAR_FUNCTION(1, "sata0",   "prsnt",    V_88F6928),
- 		 MPP_VAR_FUNCTION(2, "sata1",   "prsnt",    V_88F6928),
-+		 MPP_VAR_FUNCTION(3, "sata2",   "prsnt",    V_88F6928),
-+		 MPP_VAR_FUNCTION(4, "sata3",   "prsnt",    V_88F6928),
- 		 MPP_VAR_FUNCTION(7, "led",     "clk",      V_88F6920_PLUS)),
- 	MPP_MODE(45,
- 		 MPP_VAR_FUNCTION(0, "gpio",    NULL,       V_88F6920_PLUS),
-@@ -278,6 +283,8 @@ static struct mvebu_mpp_mode armada_39x_mpp_modes[] = {
- 		 MPP_VAR_FUNCTION(0, "gpio",    NULL,       V_88F6920_PLUS),
- 		 MPP_VAR_FUNCTION(1, "sata0",   "prsnt",    V_88F6928),
- 		 MPP_VAR_FUNCTION(2, "sata1",   "prsnt",    V_88F6928),
-+		 MPP_VAR_FUNCTION(3, "sata2",   "prsnt",    V_88F6928),
-+		 MPP_VAR_FUNCTION(5, "sata3",   "prsnt",    V_88F6928),
- 		 MPP_VAR_FUNCTION(7, "led",     "data",     V_88F6920_PLUS)),
- 	MPP_MODE(48,
- 		 MPP_VAR_FUNCTION(0, "gpio",    NULL,       V_88F6920_PLUS),
-@@ -290,6 +297,8 @@ static struct mvebu_mpp_mode armada_39x_mpp_modes[] = {
- 		 MPP_VAR_FUNCTION(7, "ua1",     "txd",      V_88F6920_PLUS)),
- 	MPP_MODE(49,
- 		 MPP_VAR_FUNCTION(0, "gpio",    NULL,       V_88F6920_PLUS),
-+		 MPP_VAR_FUNCTION(1, "sata2",   "prsnt",    V_88F6928),
-+		 MPP_VAR_FUNCTION(2, "sata3",   "prsnt",    V_88F6928),
- 		 MPP_VAR_FUNCTION(3, "tdm",     "fsync",    V_88F6928),
- 		 MPP_VAR_FUNCTION(4, "audio",   "lrclk",    V_88F6928),
- 		 MPP_VAR_FUNCTION(5, "sd0",     "d5",       V_88F6920_PLUS),
--- 
-2.1.0
+diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
+index 7e7583ddd607..9f6ff6671f01 100644
+--- a/arch/arm/mm/dma-mapping.c
++++ b/arch/arm/mm/dma-mapping.c
+@@ -1502,7 +1502,7 @@ static int __map_sg_chunk(struct device *dev, struct scatterlist *sg,
+ 		return -ENOMEM;
+ 
+ 	for (count = 0, s = sg; count < (size >> PAGE_SHIFT); s = sg_next(s)) {
+-		phys_addr_t phys = page_to_phys(sg_page(s));
++		phys_addr_t phys = sg_phys(s) - s->offset;
+ 		unsigned int len = PAGE_ALIGN(s->offset + s->length);
+ 
+ 		if (!is_coherent &&
+diff --git a/arch/microblaze/kernel/dma.c b/arch/microblaze/kernel/dma.c
+index ed7ba8a11822..dcb3c594d626 100644
+--- a/arch/microblaze/kernel/dma.c
++++ b/arch/microblaze/kernel/dma.c
+@@ -61,7 +61,7 @@ static int dma_direct_map_sg(struct device *dev, struct scatterlist *sgl,
+ 	/* FIXME this part of code is untested */
+ 	for_each_sg(sgl, sg, nents, i) {
+ 		sg->dma_address = sg_phys(sg);
+-		__dma_sync(page_to_phys(sg_page(sg)) + sg->offset,
++		__dma_sync(sg_phys(sg),
+ 							sg->length, direction);
+ 	}
+ 
+diff --git a/drivers/iommu/intel-iommu.c b/drivers/iommu/intel-iommu.c
+index 68d43beccb7e..9b9ada71e0d3 100644
+--- a/drivers/iommu/intel-iommu.c
++++ b/drivers/iommu/intel-iommu.c
+@@ -1998,7 +1998,7 @@ static int __domain_mapping(struct dmar_domain *domain, unsigned long iov_pfn,
+ 			sg_res = aligned_nrpages(sg->offset, sg->length);
+ 			sg->dma_address = ((dma_addr_t)iov_pfn << VTD_PAGE_SHIFT) + sg->offset;
+ 			sg->dma_length = sg->length;
+-			pteval = page_to_phys(sg_page(sg)) | prot;
++			pteval = (sg_phys(sg) - sg->offset) | prot;
+ 			phys_pfn = pteval >> VTD_PAGE_SHIFT;
+ 		}
+ 
+@@ -3302,7 +3302,7 @@ static int intel_nontranslate_map_sg(struct device *hddev,
+ 
+ 	for_each_sg(sglist, sg, nelems, i) {
+ 		BUG_ON(!sg_page(sg));
+-		sg->dma_address = page_to_phys(sg_page(sg)) + sg->offset;
++		sg->dma_address = sg_phys(sg);
+ 		sg->dma_length = sg->length;
+ 	}
+ 	return nelems;
+diff --git a/drivers/iommu/iommu.c b/drivers/iommu/iommu.c
+index d4f527e56679..59808fc9110d 100644
+--- a/drivers/iommu/iommu.c
++++ b/drivers/iommu/iommu.c
+@@ -1147,7 +1147,7 @@ size_t default_iommu_map_sg(struct iommu_domain *domain, unsigned long iova,
+ 	min_pagesz = 1 << __ffs(domain->ops->pgsize_bitmap);
+ 
+ 	for_each_sg(sg, s, nents, i) {
+-		phys_addr_t phys = page_to_phys(sg_page(s)) + s->offset;
++		phys_addr_t phys = sg_phys(s);
+ 
+ 		/*
+ 		 * We are mapping on IOMMU page boundaries, so offset within
+diff --git a/drivers/staging/android/ion/ion_chunk_heap.c b/drivers/staging/android/ion/ion_chunk_heap.c
+index 3e6ec2ee6802..b7da5d142aa9 100644
+--- a/drivers/staging/android/ion/ion_chunk_heap.c
++++ b/drivers/staging/android/ion/ion_chunk_heap.c
+@@ -81,7 +81,7 @@ static int ion_chunk_heap_allocate(struct ion_heap *heap,
+ err:
+ 	sg = table->sgl;
+ 	for (i -= 1; i >= 0; i--) {
+-		gen_pool_free(chunk_heap->pool, page_to_phys(sg_page(sg)),
++		gen_pool_free(chunk_heap->pool, sg_phys(sg) - sg->offset,
+ 			      sg->length);
+ 		sg = sg_next(sg);
+ 	}
+@@ -109,7 +109,7 @@ static void ion_chunk_heap_free(struct ion_buffer *buffer)
+ 							DMA_BIDIRECTIONAL);
+ 
+ 	for_each_sg(table->sgl, sg, table->nents, i) {
+-		gen_pool_free(chunk_heap->pool, page_to_phys(sg_page(sg)),
++		gen_pool_free(chunk_heap->pool, sg_phys(sg) - sg->offset,
+ 			      sg->length);
+ 	}
+ 	chunk_heap->allocated -= allocated_size;
