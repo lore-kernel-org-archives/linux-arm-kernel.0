@@ -1,165 +1,393 @@
 From: hdegoede@redhat.com (Hans de Goede)
-Date: Tue,  9 Jun 2015 23:37:58 +0200
-Subject: [PATCH 5/8] phy-sun4i-usb: Add support for monitoring vbus via a
- power-supply
+Date: Tue,  9 Jun 2015 23:37:57 +0200
+Subject: [PATCH 4/8] power: Add an axp20x-usb-power driver
 In-Reply-To: <1433885881-19809-1-git-send-email-hdegoede@redhat.com>
 References: <1433885881-19809-1-git-send-email-hdegoede@redhat.com>
-Message-ID: <1433885881-19809-6-git-send-email-hdegoede@redhat.com>
+Message-ID: <1433885881-19809-5-git-send-email-hdegoede@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On some boards there is no vbus_det gpio pin, instead vbus-detection for
-otg can be done via the pmic.
+This adds a driver for the usb power_supply bits of the axp20x PMICs.
 
-This commit adds support for monitoring vbus_det via the power_supply
-exported by the pmic, enabling support for otg on these boards.
+I initially started writing my own driver, before coming aware of
+Bruno Pr?mont's excellent earlier RFC with a driver for this.
 
+My driver was lacking CURRENT_MAX and VOLTAGE_MIN support Bruno's
+drvier has, so I've copied the code for those from his driver.
+
+Note that the AC-power-supply and battery charger bits will need separate
+drivers. Each one needs its own devictree child-node so that other
+devicetree nodes can reference the right power-supply, and thus each one
+will get its own mfd-cell / platform_device and platform-driver.
+
+Cc: Bruno Pr?mont <bonbons@linux-vserver.org>
 Signed-off-by: Hans de Goede <hdegoede@redhat.com>
 ---
- .../devicetree/bindings/phy/sun4i-usb-phy.txt      |  1 +
- drivers/phy/phy-sun4i-usb.c                        | 68 +++++++++++++++++++---
- 2 files changed, 62 insertions(+), 7 deletions(-)
+ .../bindings/power_supply/axp20x_usb_power.txt     |  34 +++
+ drivers/power/Kconfig                              |   7 +
+ drivers/power/Makefile                             |   1 +
+ drivers/power/axp20x_usb_power.c                   | 241 +++++++++++++++++++++
+ include/linux/mfd/axp20x.h                         |  24 ++
+ 5 files changed, 307 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/power_supply/axp20x_usb_power.txt
+ create mode 100644 drivers/power/axp20x_usb_power.c
 
-diff --git a/Documentation/devicetree/bindings/phy/sun4i-usb-phy.txt b/Documentation/devicetree/bindings/phy/sun4i-usb-phy.txt
-index 5f48979..0cebf74 100644
---- a/Documentation/devicetree/bindings/phy/sun4i-usb-phy.txt
-+++ b/Documentation/devicetree/bindings/phy/sun4i-usb-phy.txt
-@@ -29,6 +29,7 @@ Required properties:
- Optional properties:
- - usb0_id_det-gpios : gpio phandle for reading the otg id pin value
- - usb0_vbus_det-gpios : gpio phandle for detecting the presence of usb0 vbus
-+- usb0_vbus_power-supply: power-supply phandle for usb0 vbus presence detect
- - usb0_vbus-supply : regulator phandle for controller usb0 vbus
- - usb1_vbus-supply : regulator phandle for controller usb1 vbus
- - usb2_vbus-supply : regulator phandle for controller usb2 vbus
-diff --git a/drivers/phy/phy-sun4i-usb.c b/drivers/phy/phy-sun4i-usb.c
-index 4981041..85bb215 100644
---- a/drivers/phy/phy-sun4i-usb.c
-+++ b/drivers/phy/phy-sun4i-usb.c
-@@ -36,6 +36,7 @@
- #include <linux/phy/phy.h>
- #include <linux/phy/phy-sun4i-usb.h>
- #include <linux/platform_device.h>
+diff --git a/Documentation/devicetree/bindings/power_supply/axp20x_usb_power.txt b/Documentation/devicetree/bindings/power_supply/axp20x_usb_power.txt
+new file mode 100644
+index 0000000..a84d801
+--- /dev/null
++++ b/Documentation/devicetree/bindings/power_supply/axp20x_usb_power.txt
+@@ -0,0 +1,34 @@
++AXP20x USB power supply
++
++Required Properties:
++-compatible: "x-powers,axp202-usb-power-supply"
++
++This node is a subnode of the axp20x PMIC.
++
++Example:
++
++axp209: pmic at 34 {
++	compatible = "x-powers,axp209";
++	reg = <0x34>;
++	interrupt-parent = <&nmi_intc>;
++	interrupts = <0 IRQ_TYPE_LEVEL_LOW>;
++	interrupt-controller;
++	#interrupt-cells = <1>;
++
++	regulators {
++		x-powers,dcdc-freq = <1500>;
++
++		vdd_cpu: dcdc2 {
++			regulator-always-on;
++			regulator-min-microvolt = <1000000>;
++			regulator-max-microvolt = <1450000>;
++			regulator-name = "vdd-cpu";
++		};
++
++		...
++	};
++
++	usb_power_supply: usb_power_supply {
++		compatible = "x-powers,axp202-usb-power-supply";
++	};
++};
+diff --git a/drivers/power/Kconfig b/drivers/power/Kconfig
+index 4091fb0..1fee60c 100644
+--- a/drivers/power/Kconfig
++++ b/drivers/power/Kconfig
+@@ -439,6 +439,13 @@ config BATTERY_RT5033
+ 	  The fuelgauge calculates and determines the battery state of charge
+ 	  according to battery open circuit voltage.
+ 
++config AXP20X_POWER
++	tristate "AXP20x power supply driver"
++	depends on MFD_AXP20X
++	help
++	  This driver provides support for the power supply features of
++	  AXP20x PMIC.
++
+ source "drivers/power/reset/Kconfig"
+ 
+ endif # POWER_SUPPLY
+diff --git a/drivers/power/Makefile b/drivers/power/Makefile
+index b7b0181..ae0f27d 100644
+--- a/drivers/power/Makefile
++++ b/drivers/power/Makefile
+@@ -9,6 +9,7 @@ obj-$(CONFIG_GENERIC_ADC_BATTERY)	+= generic-adc-battery.o
+ 
+ obj-$(CONFIG_PDA_POWER)		+= pda_power.o
+ obj-$(CONFIG_APM_POWER)		+= apm_power.o
++obj-$(CONFIG_AXP20X_POWER)	+= axp20x_usb_power.o
+ obj-$(CONFIG_MAX8925_POWER)	+= max8925_power.o
+ obj-$(CONFIG_WM831X_BACKUP)	+= wm831x_backup.o
+ obj-$(CONFIG_WM831X_POWER)	+= wm831x_power.o
+diff --git a/drivers/power/axp20x_usb_power.c b/drivers/power/axp20x_usb_power.c
+new file mode 100644
+index 0000000..4be4c8b
+--- /dev/null
++++ b/drivers/power/axp20x_usb_power.c
+@@ -0,0 +1,241 @@
++/*
++ * AXP20x PMIC USB power supply status driver
++ *
++ * Copyright (C) 2015 Hans de Goede <hdegoede@redhat.com>
++ * Copyright (C) 2014 Bruno Pr?mont <bonbons@linux-vserver.org>
++ *
++ * This program is free software; you can redistribute it and/or modify it
++ * under  the terms of the GNU General  Public License as published by the
++ * Free Software Foundation;  either version 2 of the License, or (at your
++ * option) any later version.
++ */
++
++#include <linux/device.h>
++#include <linux/init.h>
++#include <linux/interrupt.h>
++#include <linux/kernel.h>
++#include <linux/mfd/axp20x.h>
++#include <linux/module.h>
++#include <linux/of.h>
++#include <linux/platform_device.h>
 +#include <linux/power_supply.h>
- #include <linux/regulator/consumer.h>
- #include <linux/reset.h>
- #include <linux/workqueue.h>
-@@ -111,6 +112,8 @@ struct sun4i_usb_phy_data {
- 	bool phy0_poll;
- 	struct gpio_desc *id_det_gpio;
- 	struct gpio_desc *vbus_det_gpio;
-+	struct power_supply *vbus_power_supply;
-+	struct notifier_block vbus_power_nb;
- 	int id_det_irq;
- 	int vbus_det_irq;
- 	int id_det;
-@@ -355,6 +358,30 @@ static struct phy_ops sun4i_usb_phy_ops = {
- 	.owner		= THIS_MODULE,
++#include <linux/regmap.h>
++#include <linux/slab.h>
++
++#define DRVNAME "axp20x-usb-power-supply"
++
++#define AXP20X_PWR_STATUS_VBUS_PRESENT	BIT(5)
++#define AXP20X_PWR_STATUS_VBUS_USED	BIT(4)
++
++#define AXP20X_USB_STATUS_VBUS_VALID	BIT(2)
++
++#define AXP20X_VBUS_VHOLD_uV(b)		(4000000 + (((b) >> 3) & 7) * 100000)
++#define AXP20X_VBUS_CLIMIT_MASK 	3
++#define AXP20X_VBUC_CLIMIT_900mA	0
++#define AXP20X_VBUC_CLIMIT_500mA	1
++#define AXP20X_VBUC_CLIMIT_100mA	2
++#define AXP20X_VBUC_CLIMIT_NONE		3
++
++#define AXP20X_ADC_EN1_VBUS_CURR	BIT(2)
++#define AXP20X_ADC_EN1_VBUS_VOLT	BIT(3)
++
++#define AXP20X_VBUS_MON_VBUS_VALID	BIT(3)
++
++struct axp20x_usb_power {
++	struct regmap *regmap;
++	struct power_supply *supply;
++};
++
++static irqreturn_t axp20x_usb_power_irq(int irq, void *devid)
++{
++	struct axp20x_usb_power *power = devid;
++
++	power_supply_changed(power->supply);
++
++	return IRQ_HANDLED;
++}
++
++static int axp20x_usb_power_get_property(struct power_supply *psy,
++	enum power_supply_property psp, union power_supply_propval *val)
++{
++	struct axp20x_usb_power *power = power_supply_get_drvdata(psy);
++	unsigned int input, v;
++	int r;
++
++	switch (psp) {
++	case POWER_SUPPLY_PROP_VOLTAGE_MIN:
++		r = regmap_read(power->regmap, AXP20X_VBUS_IPSOUT_MGMT, &v);
++		if (r)
++			return r;
++
++		val->intval = AXP20X_VBUS_VHOLD_uV(v);
++		return 0;
++	case POWER_SUPPLY_PROP_VOLTAGE_NOW:
++		r = axp20x_read_16bit(power->regmap, AXP20X_VBUS_V_ADC_H, 12);
++		if (r < 0)
++			return r;
++
++		val->intval = r * 1700; /* 1 step = 1.7 mV */
++		return 0;
++	case POWER_SUPPLY_PROP_CURRENT_MAX:
++		r = regmap_read(power->regmap, AXP20X_VBUS_IPSOUT_MGMT, &v);
++		if (r)
++			return r;
++
++		switch (v & AXP20X_VBUS_CLIMIT_MASK) {
++		case AXP20X_VBUC_CLIMIT_100mA:
++			val->intval = 100000;
++			break;
++		case AXP20X_VBUC_CLIMIT_500mA:
++			val->intval = 500000;
++			break;
++		case AXP20X_VBUC_CLIMIT_900mA:
++			val->intval = 900000;
++			break;
++		case AXP20X_VBUC_CLIMIT_NONE:
++			val->intval = -1;
++			break;
++		}
++		return 0;
++	case POWER_SUPPLY_PROP_CURRENT_NOW:
++		r = axp20x_read_16bit(power->regmap, AXP20X_VBUS_I_ADC_H, 12);
++		if (r < 0)
++			return r;
++
++		val->intval = r * 375; /* 1 step = 0.375 mA */
++		return 0;
++	default:
++		break;
++	}
++
++	/* All the properties below need the input-status reg value */
++	r = regmap_read(power->regmap, AXP20X_PWR_INPUT_STATUS, &input);
++	if (r)
++		return r;
++
++	switch (psp) {
++	case POWER_SUPPLY_PROP_HEALTH:
++		if (!(input & AXP20X_PWR_STATUS_VBUS_PRESENT)) {
++			val->intval = POWER_SUPPLY_HEALTH_UNKNOWN;
++			break;
++		}
++
++		r = regmap_read(power->regmap, AXP20X_USB_OTG_STATUS, &v);
++		if (r)
++			return r;
++
++		if (!(v & AXP20X_USB_STATUS_VBUS_VALID)) {
++			val->intval = POWER_SUPPLY_HEALTH_UNSPEC_FAILURE;
++			break;
++		}
++
++		val->intval = POWER_SUPPLY_HEALTH_GOOD;
++		break;
++	case POWER_SUPPLY_PROP_PRESENT:
++		val->intval = !!(input & AXP20X_PWR_STATUS_VBUS_PRESENT);
++		break;
++	case POWER_SUPPLY_PROP_ONLINE:
++		val->intval = !!(input & AXP20X_PWR_STATUS_VBUS_USED);
++		break;
++	default:
++		return -EINVAL;
++	}
++	
++	return 0;
++}
++
++static enum power_supply_property axp20x_usb_power_properties[] = {
++	POWER_SUPPLY_PROP_HEALTH,
++	POWER_SUPPLY_PROP_PRESENT,
++	POWER_SUPPLY_PROP_ONLINE,
++	POWER_SUPPLY_PROP_VOLTAGE_MIN,
++	POWER_SUPPLY_PROP_VOLTAGE_NOW,
++	POWER_SUPPLY_PROP_CURRENT_MAX,
++	POWER_SUPPLY_PROP_CURRENT_NOW,
++};
++
++static const struct power_supply_desc axp20x_usb_power_desc = {
++	.name = "axp20x-usb",
++	.type = POWER_SUPPLY_TYPE_USB,
++	.properties = axp20x_usb_power_properties,
++	.num_properties = ARRAY_SIZE(axp20x_usb_power_properties),
++	.get_property = axp20x_usb_power_get_property,
++};
++
++static int axp20x_usb_power_probe(struct platform_device *pdev)
++{
++	struct axp20x_dev *axp20x = dev_get_drvdata(pdev->dev.parent);
++	struct power_supply_config psy_cfg = {};
++	struct axp20x_usb_power *power;
++	const char *irq_names[] = { "VBUS_PLUGIN", "VBUS_REMOVAL",
++				    "VBUS_VALID", "VBUS_NOT_VALID" };
++	int i, irq, r;
++
++	if (!of_device_is_available(pdev->dev.of_node))
++		return -ENODEV;
++
++	power = devm_kzalloc(&pdev->dev, sizeof(*power), GFP_KERNEL);
++	if (!power)
++		return -ENOMEM;
++
++	power->regmap = axp20x->regmap;
++
++	/* Enable vbus valid checking */
++	r = regmap_update_bits(power->regmap, AXP20X_VBUS_MON,
++		    AXP20X_VBUS_MON_VBUS_VALID, AXP20X_VBUS_MON_VBUS_VALID);
++	if (r)
++		return r;
++
++	/* Enable vbus voltage and current measurement */
++	r = regmap_update_bits(power->regmap, AXP20X_ADC_EN1,
++			AXP20X_ADC_EN1_VBUS_CURR | AXP20X_ADC_EN1_VBUS_VOLT,
++			AXP20X_ADC_EN1_VBUS_CURR | AXP20X_ADC_EN1_VBUS_VOLT);
++	if (r)
++		return r;
++
++	psy_cfg.of_node = pdev->dev.of_node;
++	psy_cfg.drv_data = power;
++
++	power->supply = devm_power_supply_register(&pdev->dev,
++					&axp20x_usb_power_desc, &psy_cfg);
++	if (IS_ERR(power->supply))
++		return PTR_ERR(power->supply);
++
++	/* Request irqs after registering, as irqs may trigger immediately */
++	for (i = 0; i < ARRAY_SIZE(irq_names); i++) {
++		irq = platform_get_irq_byname(pdev, irq_names[i]);
++		if (irq < 0) {
++			dev_warn(&pdev->dev, "No IRQ for %s: %d\n",
++				 irq_names[i], irq);
++			continue;
++		}
++		irq = regmap_irq_get_virq(axp20x->regmap_irqc, irq);
++		r = devm_request_any_context_irq(&pdev->dev, irq,
++				axp20x_usb_power_irq, 0, DRVNAME, power);
++		if (r < 0)
++			dev_warn(&pdev->dev, "Error requesting %s IRQ: %d\n",
++				 irq_names[i], r);
++	}
++
++	return 0;
++}
++
++static const struct of_device_id axp20x_usb_power_match[] = {
++	{ .compatible = "x-powers,axp202-usb-power-supply" },
++	{ }
++};
++MODULE_DEVICE_TABLE(of, axp20x_usb_power_match);
++
++static struct platform_driver axp20x_usb_power_driver = {
++	.probe = axp20x_usb_power_probe,
++	.driver = {
++		.name = DRVNAME,
++		.of_match_table = axp20x_usb_power_match,
++	},
++};
++
++module_platform_driver(axp20x_usb_power_driver);
++
++MODULE_AUTHOR("Hans de Goede <hdegoede@redhat.com>");
++MODULE_DESCRIPTION("AXP20x PMIC USB power supply status driver");
++MODULE_LICENSE("GPL");
+diff --git a/include/linux/mfd/axp20x.h b/include/linux/mfd/axp20x.h
+index f4290ae..d7adb2e 100644
+--- a/include/linux/mfd/axp20x.h
++++ b/include/linux/mfd/axp20x.h
+@@ -11,6 +11,8 @@
+ #ifndef __LINUX_MFD_AXP20X_H
+ #define __LINUX_MFD_AXP20X_H
+ 
++#include <linux/regmap.h>
++
+ enum {
+ 	AXP202_ID = 0,
+ 	AXP209_ID,
+@@ -366,4 +368,26 @@ struct axp20x_fg_pdata {
+ 	int thermistor_curve[MAX_THERM_CURVE_SIZE][2];
  };
  
-+static int sun4i_usb_phy0_get_vbus_det(struct sun4i_usb_phy_data *data)
++/* generic helper function for reading 9-16 bit wide regs */
++static inline int axp20x_read_16bit(struct regmap *regmap,
++				    unsigned int reg, unsigned int width)
 +{
-+	if (data->vbus_det_gpio)
-+		return gpiod_get_value_cansleep(data->vbus_det_gpio);
++	unsigned int v, raw;
++	int r;
 +
-+	if (data->vbus_power_supply) {
-+		union power_supply_propval val;
-+		int r;
++	r = regmap_read(regmap, reg, &v);
++	if (r)
++		return r;
 +
-+		r = power_supply_get_property(data->vbus_power_supply,
-+					      POWER_SUPPLY_PROP_PRESENT, &val);
-+		if (r == 0)
-+			return val.intval;
-+	}
++	raw = v << (width - 8);
 +
-+	/* Fallback: report vbus as high */
-+	return 1;
++	r = regmap_read(regmap, reg + 1, &v);
++	if (r)
++		return r;
++
++	raw |= v;
++
++	return raw;
 +}
 +
-+static bool sun4i_usb_phy0_have_vbus_det(struct sun4i_usb_phy_data *data)
-+{
-+	return data->vbus_det_gpio || data->vbus_power_supply;
-+}
-+
- static void sun4i_usb_phy0_id_vbus_det_scan(struct work_struct *work)
- {
- 	struct sun4i_usb_phy_data *data =
-@@ -363,10 +390,7 @@ static void sun4i_usb_phy0_id_vbus_det_scan(struct work_struct *work)
- 	int id_det, vbus_det, id_notify = 0, vbus_notify = 0;
- 
- 	id_det = gpiod_get_value_cansleep(data->id_det_gpio);
--	if (data->vbus_det_gpio)
--		vbus_det = gpiod_get_value_cansleep(data->vbus_det_gpio);
--	else
--		vbus_det = 1; /* Report vbus as high */
-+	vbus_det = sun4i_usb_phy0_get_vbus_det(data);
- 
- 	mutex_lock(&phy0->mutex);
- 
-@@ -381,7 +405,7 @@ static void sun4i_usb_phy0_id_vbus_det_scan(struct work_struct *work)
- 		 * without vbus detection report vbus low for long enough for
- 		 * the musb-ip to end the current device session.
- 		 */
--		if (!data->vbus_det_gpio && id_det == 0) {
-+		if (!sun4i_usb_phy0_have_vbus_det(data) && id_det == 0) {
- 			sun4i_usb_phy0_set_vbus_detect(phy0, 0);
- 			msleep(200);
- 			sun4i_usb_phy0_set_vbus_detect(phy0, 1);
-@@ -408,7 +432,7 @@ static void sun4i_usb_phy0_id_vbus_det_scan(struct work_struct *work)
- 		 * without vbus detection report vbus low for long enough to
- 		 * the musb-ip to end the current host session.
- 		 */
--		if (!data->vbus_det_gpio && id_det == 1) {
-+		if (!sun4i_usb_phy0_have_vbus_det(data) && id_det == 1) {
- 			mutex_lock(&phy0->mutex);
- 			sun4i_usb_phy0_set_vbus_detect(phy0, 0);
- 			msleep(1000);
-@@ -436,6 +460,20 @@ static irqreturn_t sun4i_usb_phy0_id_vbus_det_irq(int irq, void *dev_id)
- 	return IRQ_HANDLED;
- }
- 
-+static int sun4i_usb_phy0_vbus_notify(struct notifier_block *nb,
-+				      unsigned long val, void *v)
-+{
-+	struct sun4i_usb_phy_data *data = 
-+		container_of(nb, struct sun4i_usb_phy_data, vbus_power_nb);
-+	struct power_supply *psy = v;
-+
-+	/* Properties on the vbus_power_supply changed, scan vbus_det */
-+	if (val == PSY_EVENT_PROP_CHANGED && psy == data->vbus_power_supply)
-+		mod_delayed_work(system_wq, &data->detect, DEBOUNCE_TIME);
-+
-+	return NOTIFY_OK;
-+}
-+
- static struct phy *sun4i_usb_phy_xlate(struct device *dev,
- 					struct of_phandle_args *args)
- {
-@@ -512,8 +550,24 @@ static int sun4i_usb_phy_probe(struct platform_device *pdev)
- 		data->vbus_det_gpio = NULL;
- 	}
- 
-+	if (of_find_property(np, "usb0_vbus_power-supply", NULL)) {
-+		data->vbus_power_supply = devm_power_supply_get_by_phandle(dev,
-+						     "usb0_vbus_power-supply");
-+		if (IS_ERR(data->vbus_power_supply))
-+			return PTR_ERR(data->vbus_power_supply);
-+
-+		if (!data->vbus_power_supply)
-+			return -EPROBE_DEFER;
-+
-+		data->vbus_power_nb.notifier_call = sun4i_usb_phy0_vbus_notify;
-+		data->vbus_power_nb.priority = 0;
-+		ret = power_supply_reg_notifier(&data->vbus_power_nb);
-+		if (ret)
-+			return ret;
-+	}
-+
- 	/* vbus_det without id_det makes no sense, and is not supported */
--	if (data->vbus_det_gpio && !data->id_det_gpio) {
-+	if (sun4i_usb_phy0_have_vbus_det(data) && !data->id_det_gpio) {
- 		dev_err(dev, "usb0_id_det missing or invalid\n");
- 		return -ENODEV;
- 	}
+ #endif /* __LINUX_MFD_AXP20X_H */
 -- 
 2.3.6
