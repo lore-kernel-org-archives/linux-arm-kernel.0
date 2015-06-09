@@ -1,77 +1,67 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Tue,  9 Jun 2015 18:47:10 +0200
-Subject: [PATCH 18/34] pinctrl: mvebu: armada-{370,375}: normalize audio pins
+Date: Tue,  9 Jun 2015 18:47:07 +0200
+Subject: [PATCH 15/34] pinctrl: mvebu: armada-39x: align NAND pin naming
 In-Reply-To: <1433868446-11028-1-git-send-email-thomas.petazzoni@free-electrons.com>
 References: <1433868446-11028-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1433868446-11028-19-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1433868446-11028-16-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This commit aligns the naming of the audio 'lrclk' pin accross Marvell
-SoCs.
+All SoCs use "nand" to designate NAND pins, only Armada 39x is using
+"nd", which is not consistent. This commit fixes that by renaming the
+corresponding functions.
 
-Since only the subname is changed, the DT backward compatibility is
-not affected.
+It also changes the subnames from rbn0/rbn1 to rb0/rb1, to respect the
+convention used everywhere that we don't encode the 'n' part of signal
+names.
+
+While this commit changes the main name of function, therefore
+potentially breaking the DT compatibility, this is not a problem since
+Armada 39x is a brand new SoC which isn't used in production yet.
 
 Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 ---
- .../devicetree/bindings/pinctrl/marvell,armada-370-pinctrl.txt          | 2 +-
- .../devicetree/bindings/pinctrl/marvell,armada-375-pinctrl.txt          | 2 +-
- drivers/pinctrl/mvebu/pinctrl-armada-370.c                              | 2 +-
- drivers/pinctrl/mvebu/pinctrl-armada-375.c                              | 2 +-
- 4 files changed, 4 insertions(+), 4 deletions(-)
+ .../devicetree/bindings/pinctrl/marvell,armada-39x-pinctrl.txt        | 4 ++--
+ drivers/pinctrl/mvebu/pinctrl-armada-39x.c                            | 4 ++--
+ 2 files changed, 4 insertions(+), 4 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/pinctrl/marvell,armada-370-pinctrl.txt b/Documentation/devicetree/bindings/pinctrl/marvell,armada-370-pinctrl.txt
-index 24a7450..cc0be9d 100644
---- a/Documentation/devicetree/bindings/pinctrl/marvell,armada-370-pinctrl.txt
-+++ b/Documentation/devicetree/bindings/pinctrl/marvell,armada-370-pinctrl.txt
-@@ -88,7 +88,7 @@ mpp58         58       gpio, dev(cs0), uart1(rts), tdm(int), audio(extclk),
- mpp59         59       gpo, dev(ale0), uart1(rts), uart0(rts), audio(bclk)
- mpp60         60       gpio, dev(ale1), uart1(rxd), sata0(prsnt), pcie(rstout),
-                        audio(sdi)
--mpp61         61       gpo, dev(we1), uart1(txd), audio(rclk)
-+mpp61         61       gpo, dev(we1), uart1(txd), audio(lrclk)
- mpp62         62       gpio, dev(a2), uart1(cts), tdm(drx), pcie(clkreq0),
-                        audio(mclk), uart0(cts)
- mpp63         63       gpo, spi0(sck), tclk
-diff --git a/Documentation/devicetree/bindings/pinctrl/marvell,armada-375-pinctrl.txt b/Documentation/devicetree/bindings/pinctrl/marvell,armada-375-pinctrl.txt
-index f942a00..06e5bb0 100644
---- a/Documentation/devicetree/bindings/pinctrl/marvell,armada-375-pinctrl.txt
-+++ b/Documentation/devicetree/bindings/pinctrl/marvell,armada-375-pinctrl.txt
-@@ -19,7 +19,7 @@ mpp2          2        gpio, dev(ad4), ptp(evreq), led(c0), audio(sdi)
- mpp3          3        gpio, dev(ad5), ptp(trig), led(p3), audio(mclk)
- mpp4          4        gpio, dev(ad6), spi0(miso), spi1(miso)
- mpp5          5        gpio, dev(ad7), spi0(cs2), spi1(cs2)
--mpp6          6        gpio, dev(ad0), led(p1), audio(rclk)
-+mpp6          6        gpio, dev(ad0), led(p1), audio(lrclk)
- mpp7          7        gpio, dev(ad1), ptp(clk), led(p2), audio(extclk)
- mpp8          8        gpio, dev (bootcs), spi0(cs0), spi1(cs0)
- mpp9          9        gpio, spi0(sck), spi1(sck), nand(we)
-diff --git a/drivers/pinctrl/mvebu/pinctrl-armada-370.c b/drivers/pinctrl/mvebu/pinctrl-armada-370.c
-index e295636..5337468 100644
---- a/drivers/pinctrl/mvebu/pinctrl-armada-370.c
-+++ b/drivers/pinctrl/mvebu/pinctrl-armada-370.c
-@@ -354,7 +354,7 @@ static struct mvebu_mpp_mode mv88f6710_mpp_modes[] = {
- 	   MPP_FUNCTION(0x0, "gpo", NULL),
- 	   MPP_FUNCTION(0x1, "dev", "we1"),
- 	   MPP_FUNCTION(0x2, "uart1", "txd"),
--	   MPP_FUNCTION(0x5, "audio", "rclk")),
-+	   MPP_FUNCTION(0x5, "audio", "lrclk")),
- 	MPP_MODE(62,
- 	   MPP_FUNCTION(0x0, "gpio", NULL),
- 	   MPP_FUNCTION(0x1, "dev", "a2"),
-diff --git a/drivers/pinctrl/mvebu/pinctrl-armada-375.c b/drivers/pinctrl/mvebu/pinctrl-armada-375.c
-index 4d3e235..54e9fbd 100644
---- a/drivers/pinctrl/mvebu/pinctrl-armada-375.c
-+++ b/drivers/pinctrl/mvebu/pinctrl-armada-375.c
-@@ -81,7 +81,7 @@ static struct mvebu_mpp_mode mv88f6720_mpp_modes[] = {
- 		 MPP_FUNCTION(0x0, "gpio", NULL),
- 		 MPP_FUNCTION(0x1, "dev", "ad0"),
- 		 MPP_FUNCTION(0x3, "led", "p1"),
--		 MPP_FUNCTION(0x4, "audio", "rclk"),
-+		 MPP_FUNCTION(0x4, "audio", "lrclk"),
- 		 MPP_FUNCTION(0x5, "nand", "io0")),
- 	MPP_MODE(7,
- 		 MPP_FUNCTION(0x0, "gpio", NULL),
+diff --git a/Documentation/devicetree/bindings/pinctrl/marvell,armada-39x-pinctrl.txt b/Documentation/devicetree/bindings/pinctrl/marvell,armada-39x-pinctrl.txt
+index 34af69e..b6bd9cc 100644
+--- a/Documentation/devicetree/bindings/pinctrl/marvell,armada-39x-pinctrl.txt
++++ b/Documentation/devicetree/bindings/pinctrl/marvell,armada-39x-pinctrl.txt
+@@ -55,9 +55,9 @@ mpp37	37	gpio, sd0(d3), dev(ad8), ge(rxclk)
+ mpp38	38	gpio, ref(clk), sd0(d0), dev(ad4), ge(rxd1)
+ mpp39	39	gpio, i2c1(sck), ua0(cts), sd0(d1), dev(a2), ge(rxd2)
+ mpp40	40	gpio, i2c1(sda), ua0(rts), sd0(d2), dev(ad6), ge(rxd3)
+-mpp41	41	gpio, ua1(rxd), ua0(cts), spi1(cs3), dev(burst/last), nd(rbn0), ge(rxctl)
++mpp41	41	gpio, ua1(rxd), ua0(cts), spi1(cs3), dev(burst/last), nand(rb0), ge(rxctl)
+ mpp42	42	gpio, ua1(txd), ua0(rts), dev(ad7)
+-mpp43	43	gpio, pcie0(clkreq), dram(vttctrl), dram(deccerr), spi1(cs2), dev(clkout), nd(rbn1)
++mpp43	43	gpio, pcie0(clkreq), dram(vttctrl), dram(deccerr), spi1(cs2), dev(clkout), nand(rb1)
+ mpp44	44	gpio, sata0(prsnt) [1], sata1(prsnt) [1], led(clk)
+ mpp45	45	gpio, ref(clk), pcie0(rstout), ua1(rxd)
+ mpp46	46	gpio, ref(clk), pcie0(rstout), ua1(txd), led(stb)
+diff --git a/drivers/pinctrl/mvebu/pinctrl-armada-39x.c b/drivers/pinctrl/mvebu/pinctrl-armada-39x.c
+index a5e3627..de91b35 100644
+--- a/drivers/pinctrl/mvebu/pinctrl-armada-39x.c
++++ b/drivers/pinctrl/mvebu/pinctrl-armada-39x.c
+@@ -241,7 +241,7 @@ static struct mvebu_mpp_mode armada_39x_mpp_modes[] = {
+ 		 MPP_VAR_FUNCTION(3, "ua0",     "cts",      V_88F6920_PLUS),
+ 		 MPP_VAR_FUNCTION(4, "spi1",    "cs3",      V_88F6920_PLUS),
+ 		 MPP_VAR_FUNCTION(5, "dev",     "burst/last", V_88F6920_PLUS),
+-		 MPP_VAR_FUNCTION(6, "nd",      "rbn0",     V_88F6920_PLUS),
++		 MPP_VAR_FUNCTION(6, "nand",    "rb0",      V_88F6920_PLUS),
+ 		 MPP_VAR_FUNCTION(8, "ge",      "rxctl",    V_88F6920_PLUS)),
+ 	MPP_MODE(42,
+ 		 MPP_VAR_FUNCTION(0, "gpio",    NULL,       V_88F6920_PLUS),
+@@ -255,7 +255,7 @@ static struct mvebu_mpp_mode armada_39x_mpp_modes[] = {
+ 		 MPP_VAR_FUNCTION(3, "dram",    "deccerr",  V_88F6920_PLUS),
+ 		 MPP_VAR_FUNCTION(4, "spi1",    "cs2",      V_88F6920_PLUS),
+ 		 MPP_VAR_FUNCTION(5, "dev",     "clkout",   V_88F6920_PLUS),
+-		 MPP_VAR_FUNCTION(6, "nd",      "rbn1",     V_88F6920_PLUS)),
++		 MPP_VAR_FUNCTION(6, "nand",    "rb1",      V_88F6920_PLUS)),
+ 	MPP_MODE(44,
+ 		 MPP_VAR_FUNCTION(0, "gpio",    NULL,       V_88F6920_PLUS),
+ 		 MPP_VAR_FUNCTION(1, "sata0",   "prsnt",    V_88F6928),
 -- 
 2.1.0
