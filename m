@@ -1,56 +1,44 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Tue, 9 Jun 2015 10:42:07 +0200
-Subject: [PATCH 3/5] soc: Mediatek: Add SCPSYS power domain driver
-In-Reply-To: <1432196527.21715.130.camel@x220>
-References: <1432131540-2523-1-git-send-email-s.hauer@pengutronix.de>
- <1432131540-2523-4-git-send-email-s.hauer@pengutronix.de>
- <1432196527.21715.130.camel@x220>
-Message-ID: <20150609084207.GN26575@pengutronix.de>
+From: steve.capper@linaro.org (Steve Capper)
+Date: Tue, 9 Jun 2015 09:42:30 +0100
+Subject: [PATCH] ARM: pgtable: Fix typo in the comment
+In-Reply-To: <024f01d0a280$e561f460$b025dd20$@lge.com>
+References: <024f01d0a280$e561f460$b025dd20$@lge.com>
+Message-ID: <CAPvkgC1rWZNTHu6sVkPtOpbQaQ7EdvCUCUZu7twmn2wx=O6WOQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 21, 2015 at 10:22:07AM +0200, Paul Bolle wrote:
-> On Wed, 2015-05-20 at 16:18 +0200, Sascha Hauer wrote:
-> > --- a/drivers/soc/mediatek/Kconfig
-> > +++ b/drivers/soc/mediatek/Kconfig
-> 
-> > +config MTK_SCPSYS
-> > +	bool "MediaTek SCPSYS Support"
-> > +	depends on ARCH_MEDIATEK || COMPILE_TEST
-> > +	select REGMAP
-> > +	select MTK_INFRACFG
-> > +	help
-> > +	  Say yes here to add support for the MediaTek SCPSYS power domain
-> > +	  driver.
-> 
-> > +obj-$(CONFIG_MTK_SCPSYS) += mtk-scpsys.o
-> 
-> > --- /dev/null
-> > +++ b/drivers/soc/mediatek/mtk-scpsys.c
-> 
-> > +#include <linux/module.h>
-> 
-> > +MODULE_DEVICE_TABLE(of, of_scpsys_match_tbl);
-> > +
-> > +static struct platform_driver scpsys_drv = {
-> 
-> > +		.owner = THIS_MODULE,
-> 
-> > +};
-> > +
-> > +module_platform_driver_probe(scpsys_drv, scpsys_probe);
-> 
-> (A patch was recently submitted that would allow built-in only code to
-> use builtin_platform_driver_probe(), see
-> https://lkml.org/lkml/2015/5/10/125 .)
+On 9 June 2015 at 07:52, Hyuk Myeong <hyuk.myeong@lge.com> wrote:
+> This patch fix a spelling typo in the comment in pgtable-2level.h.
+>
 
-I'll switch to this when it's available. Right now I don't want to have
-this as an additional dependency.
+Hi Hyuk,
 
-Sascha
+> Signed-off-by: Hyuk Myeong <hyuk.myeong@lge.com>
+> ---
+>  arch/arm/include/asm/pgtable-2level.h | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+>
+> diff --git a/arch/arm/include/asm/pgtable-2level.h
+> b/arch/arm/include/asm/pgtable-2level.h
+> index bfd662e..49f91be 100644
+> --- a/arch/arm/include/asm/pgtable-2level.h
+> +++ b/arch/arm/include/asm/pgtable-2level.h
+> @@ -66,7 +66,7 @@
+>   *
+>   * However, when the "young" bit is cleared, we deny access to the page
+>   * by clearing the hardware PTE.  Currently Linux does not flush the TLB
+> - * for us in this case, which means the TLB will retain the transation
+> + * for us in this case, which means the TLB will retain the transaction
 
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Don't you mean "translation" rather than "transaction"?
+
+Cheers,
+--
+Steve
+
+>   * until either the TLB entry is evicted under pressure, or a context
+>   * switch which changes the user space mapping occurs.
+>   */
+> --
+> 1.9.3
+>
