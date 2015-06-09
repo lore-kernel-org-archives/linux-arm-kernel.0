@@ -1,24 +1,75 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Tue, 9 Jun 2015 18:14:42 +0100
-Subject: [PATCH 6/8] regulator: pwm-regulator: Separate voltage-table
- initialisation
-In-Reply-To: <1433529771-24496-7-git-send-email-lee.jones@linaro.org>
-References: <1433529771-24496-1-git-send-email-lee.jones@linaro.org>
- <1433529771-24496-7-git-send-email-lee.jones@linaro.org>
-Message-ID: <20150609171442.GL14071@sirena.org.uk>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Tue, 09 Jun 2015 18:18:20 +0100
+Subject: [PATCH 1/6] ARM: kvm: psci: fix handling of unimplemented
+ functions
+In-Reply-To: <1432901799-18359-2-git-send-email-lorenzo.pieralisi@arm.com>
+References: <1432901799-18359-1-git-send-email-lorenzo.pieralisi@arm.com>
+ <1432901799-18359-2-git-send-email-lorenzo.pieralisi@arm.com>
+Message-ID: <55771FDC.3090800@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 05, 2015 at 07:42:49PM +0100, Lee Jones wrote:
-> Take this out of the main .probe() routine in order to facilitate the
-> introduction of different ways to obtain 'duty cycle' information.
+Hi Lorenzo,
 
-This and the rest of the patches are fine but seem to depend on patch 4
-- can you please rebase and resend?
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150609/b04d1fad/attachment.sig>
+On 29/05/15 13:16, Lorenzo Pieralisi wrote:
+> According to the PSCI specification and the SMC/HVC calling
+> convention, PSCI function_ids that are not implemented must
+> return NOT_SUPPORTED as return value.
+> 
+> Current KVM implementation takes an unhandled PSCI function_id
+> as an error and injects an undefined instruction into the guest
+> if PSCI implementation is called with a function_id that is not
+> handled by the resident PSCI version (ie it is not implemented),
+> which is not the behaviour expected by a guest when calling a
+> PSCI function_id that is not implemented.
+> 
+> This patch fixes this issue by returning NOT_SUPPORTED whenever
+> the kvm PSCI call is executed for a function_id that is not
+> implemented by the PSCI kvm layer.
+> 
+> Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+> Reported-by: Sudeep Holla <sudeep.holla@arm.com>
+> Cc: Christoffer Dall <christoffer.dall@linaro.org>
+> Cc: Anup Patel <anup.patel@linaro.org>
+> Cc: Marc Zyngier <marc.zyngier@arm.com>
+> ---
+>  arch/arm/kvm/psci.c | 6 +++---
+>  1 file changed, 3 insertions(+), 3 deletions(-)
+> 
+> diff --git a/arch/arm/kvm/psci.c b/arch/arm/kvm/psci.c
+> index 7e9398c..ec5943b 100644
+> --- a/arch/arm/kvm/psci.c
+> +++ b/arch/arm/kvm/psci.c
+> @@ -273,7 +273,8 @@ static int kvm_psci_0_2_call(struct kvm_vcpu *vcpu)
+>  		ret = 0;
+>  		break;
+>  	default:
+> -		return -EINVAL;
+> +		val = PSCI_RET_NOT_SUPPORTED;
+> +		break;
+>  	}
+>  
+>  	*vcpu_reg(vcpu, 0) = val;
+> @@ -295,10 +296,9 @@ static int kvm_psci_0_1_call(struct kvm_vcpu *vcpu)
+>  		break;
+>  	case KVM_PSCI_FN_CPU_SUSPEND:
+>  	case KVM_PSCI_FN_MIGRATE:
+> +	default:
+>  		val = PSCI_RET_NOT_SUPPORTED;
+>  		break;
+> -	default:
+> -		return -EINVAL;
+>  	}
+>  
+>  	*vcpu_reg(vcpu, 0) = val;
+> 
+
+Looks good to me. How do you want to proceed with this one? can I take
+it independently from the rest of the series? Or would you prefer it
+being kept as a whole?
+
+Thanks,
+
+	M.
+-- 
+Jazz is not dead. It just smells funny...
