@@ -1,85 +1,67 @@
-From: l.majewski@samsung.com (Lukasz Majewski)
-Date: Tue, 09 Jun 2015 09:07:22 +0200
-Subject: [PATCH] cpufreq:exynos-cpufreq - Fix for memory leak in case SOC
- name does not match.
-In-Reply-To: <8344426.BL3KyufMos@vostro.rjw.lan>
-References: <1432519780-2910-1-git-send-email-shailendra.capricorn@gmail.com>
- <20150525073149.GF9992@linux> <20150608103100.57f0473b@amdc2363>
- <8344426.BL3KyufMos@vostro.rjw.lan>
-Message-ID: <20150609090722.43965fa0@amdc2363>
+From: monstr@monstr.eu (Michal Simek)
+Date: Tue, 09 Jun 2015 09:09:38 +0200
+Subject: [PATCH v4 2/2] dma: Add Xilinx AXI Central Direct Memory Access
+ Engine driver support
+In-Reply-To: <alpine.DEB.2.02.1506090808500.2069@localhost6.localdomain6>
+References: <1432228035-6569-1-git-send-email-appanad@xilinx.com>
+ <1432290653.27695.97.camel@x220> <557681A7.7080202@monstr.eu>
+ <alpine.DEB.2.02.1506090808500.2069@localhost6.localdomain6>
+Message-ID: <55769132.6070601@monstr.eu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rafael,
-
-> On Monday, June 08, 2015 10:31:00 AM Lukasz Majewski wrote:
-> > Hi Viresh,
-> > 
-> > > On 25-05-15, 07:39, Shailendra Verma wrote:
-> > > > During probe free the memory allocated to "exynos_info" in case
-> > > > of unknown SOC type.
-> > > > 
-> > > > Signed-off-by: Shailendra Verma <shailendra.capricorn@gmail.com>
-> > > > ---
-> > > >  drivers/cpufreq/exynos-cpufreq.c |    6 ++++--
-> > > >  1 file changed, 4 insertions(+), 2 deletions(-)
-> > > > 
-> > > > diff --git a/drivers/cpufreq/exynos-cpufreq.c
-> > > > b/drivers/cpufreq/exynos-cpufreq.c index 82d2fbb..8682378 100644
-> > > > --- a/drivers/cpufreq/exynos-cpufreq.c
-> > > > +++ b/drivers/cpufreq/exynos-cpufreq.c
-> > > > @@ -182,7 +182,7 @@ static int exynos_cpufreq_probe(struct
-> > > > platform_device *pdev) ret =
-> > > > exynos5250_cpufreq_init(exynos_info); } else {
-> > > >  		pr_err("%s: Unknown SoC type\n", __func__);
-> > > > -		return -ENODEV;
-> > > > +		ret = -ENODEV;
-> > > >  	}
-> > > >  
-> > > >  	if (ret)
-> > > > @@ -190,12 +190,14 @@ static int exynos_cpufreq_probe(struct
-> > > > platform_device *pdev) 
-> > > >  	if (exynos_info->set_freq == NULL) {
-> > > >  		dev_err(&pdev->dev, "No set_freq function
-> > > > (ERR)\n");
-> > > > +		ret = -EINVAL;
-> > > >  		goto err_vdd_arm;
-> > > >  	}
-> > > >  
-> > > >  	arm_regulator = regulator_get(NULL, "vdd_arm");
-> > > >  	if (IS_ERR(arm_regulator)) {
-> > > >  		dev_err(&pdev->dev, "failed to get resource
-> > > > vdd_arm\n");
-> > > > +		ret = -EINVAL;
-> > > >  		goto err_vdd_arm;
-> > > >  	}
-> > > >  
-> > > > @@ -227,7 +229,7 @@ err_cpufreq_reg:
-> > > >  	regulator_put(arm_regulator);
-> > > >  err_vdd_arm:
-> > > >  	kfree(exynos_info);
-> > > > -	return -EINVAL;
-> > > > +	return ret;
-> > > >  }
-> > > >  
-> > > >  static struct platform_driver exynos_cpufreq_platdrv = {
-> > > 
-> > > Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
-> > > 
-> > 
-> > Acked-by: Lukasz Majewski <l.majewski@samsung.com>
-> 
-> I'm assuming that it will go it through the Samsung tree.
+On 06/09/2015 08:10 AM, Julia Lawall wrote:
 > 
 > 
+> On Tue, 9 Jun 2015, Michal Simek wrote:
+> 
+>> Hi Paul,
+>>
+>> On 05/22/2015 12:30 PM, Paul Bolle wrote:
+>>> Again, just a nit: a license mismatch.
+>>>
+>>> On Thu, 2015-05-21 at 22:37 +0530, Kedareswara rao Appana wrote:
+>>>
+>>>> + * This program is free software: you can redistribute it and/or modify
+>>>> + * it under the terms of the GNU General Public License as published by
+>>>> + * the Free Software Foundation, either version 2 of the License, or
+>>>> + * (at your option) any later version.
+>>>
+>>>> +MODULE_LICENSE("GPL v2");
+>>>
+>>> As I said in the message I sent a short while ago: here too I think that
+>>> either the comment at the top of this file or the ident used in the
+>>> MODULE_LICENSE() macro needs to change.
+>>
+>> This is not just the problem with this driver but with others too.
+>> Have you sent any patch to add GPL v2+ to license.h?
+>>
+>> Also sort of checking for this will be great. Julia?
+> 
+> If this requires checking the contents of comment, Coccinelle currently 
+> can't help with that.  Perhaps an idea would be to just do a grep on the 
+> file.  So if I find MODULE_LICENSE("GPL v2") and then grepping for "either 
+> vresion 2" gives success, then there is a problem?  It's obviously not 
+> foolproof, but perhaps it could be helpful.
 
-That would be the easiest way to proceed. 
+Having some sort of checking somewhere will be great. checkpatch?
+zero-day testing system?
 
-Krzystof would you like to grab this patch?
+Thanks,
+Michal
 
 -- 
-Best regards,
+Michal Simek, Ing. (M.Eng), OpenPGP -> KeyID: FE3D1F91
+w: www.monstr.eu p: +42-0-721842854
+Maintainer of Linux kernel - Microblaze cpu - http://www.monstr.eu/fdt/
+Maintainer of Linux kernel - Xilinx Zynq ARM architecture
+Microblaze U-BOOT custodian and responsible for u-boot arm zynq platform
 
-Lukasz Majewski
 
-Samsung R&D Institute Poland (SRPOL) | Linux Platform Group
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150609/a71f1c7b/attachment.sig>
