@@ -1,126 +1,257 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Tue,  9 Jun 2015 18:46:52 +0200
-Subject: [PATCH 00/34] pinctrl: mvebu: numerous fixes,
- cleanups and improvements
-Message-ID: <1433868446-11028-1-git-send-email-thomas.petazzoni@free-electrons.com>
+Date: Tue,  9 Jun 2015 18:46:53 +0200
+Subject: [PATCH 01/34] pinctrl: mvebu: armada-38x: fix PCIe functions
+In-Reply-To: <1433868446-11028-1-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1433868446-11028-1-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1433868446-11028-2-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+A new revision of the Marvell Armada 38x hardware datasheet unveiled
+that the definition of some of the PCIe functions were not
+correct. This commit fixes the pinctrl driver accordingly.
 
-This fairly long series of patches implement numerous fixes, cleanups
-and improvements to the description of the MPP pins on Armada 370,
-375, 38x, 39x and XP.
+Some PCIe functions simply do not exist, some of the PCIe functions in
+fact were corresponding to other functions, and some PCIe functions
+have been added.
 
-The original motivation was a bug report mentioning some
-inconsistencies between the Armada 38x HW datasheet and the
-corresponding pinctrl driver. Even though I had already written some
-basic Python script to extract the MPP data from the datasheet, and do
-some of the code generation steps automatically, a good part of the
-process was still manual, which means: 1/ mistakes can be made, 2/
-it's not easy to update with new versions of the datasheets that fix
-bugs in the MPP description.
+Note: the seemingly unrelated removal of spi(cs2) on MPP47 is related:
+this function is in fact implemented on MPP43, instead of a PCIe
+function.
 
-Therefore, I improved my Python scripts, and now the MPP tables in the
-pinctrl drivers are automatically generated from the datasheet HW
-information. The script in question is quite ugly, as it takes into
-account some existing inconsistencies in the formatting of the
-different pinctrl drivers, and also different naming choices between
-Linux and the HW datasheet. But nonetheless, it has been very useful
-to bring all the pinctrl drivers in sync with the datasheet, and to
-detect inconsistencies between the pinctrl drivers.
+Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+Cc: <stable@vger.kernel.org> # v3.15+
+Fixes: ca6d9a084b56f ("pinctrl: mvebu: add pin-muxing driver for the Marvell Armada 380/385")
+---
+ .../pinctrl/marvell,armada-38x-pinctrl.txt         | 38 ++++++++---------
+ drivers/pinctrl/mvebu/pinctrl-armada-38x.c         | 49 +++++++++-------------
+ 2 files changed, 39 insertions(+), 48 deletions(-)
 
-This long series of patches is the result of this work, and can be
-separated in three parts:
-
- * The "fixes", which are marked for stable because they fix some real
-   potential problems. These are patches 1 to 9 included.
-
- * The "cleanups", which are not doing anything really interesting
-   except renaming things to progressively make drivers more
-   consistent with each other and with the datasheets. These are
-   patches 10 to 24 included.
-
- * The "improvements", which are actually adding pin functions that
-   were not supported earlier, or even a new SoC completely such as
-   the Armada 395 (as part of the armada-39x driver). These are
-   patches 25 to 34 included.
-
-Some of the patches are breaking the DT backward compatibility, but
-most of them are doing that on pins that are highly unlikely to be
-used with a mainline kernel. The only real concern could be with patch
-21 that renames the function "spi" on Armada XP to "spi0" to match the
-datasheet and to prepare for the addition of the "spi1" function. If
-that is considered to be a too serious breakage, then we can imagine
-leaving "spi" for the first SPI bus and use "spi1" for the second SPI
-bus. I can rework the patch series to adjust this if deemed necessary.
-
-In some cases, I have decided to not make drivers match to not break
-the DT backward compatibility. For example, some drivers use
-uart0/uart1, while some others use ua0/ua1 (like in the Marvell
-datasheets), and I've left this inconsistency as is (my script copes
-with it).
-
-In addition to the fixes to the MPP lists themselves, two patches are
-fixing the pinctrl_gpio_range[] definitions, which were wrong for
-Armada 38x and Armada 39x.
-
-I wish you good luck when reviewing this. It was boring to do, so I
-guess it is going to be horribly boring to review :-)
-
-Best regards,
-
-Thomas
-
-Thomas Petazzoni (34):
-  pinctrl: mvebu: armada-38x: fix PCIe functions
-  pinctrl: mvebu: armada-370: fix spi0 pin description
-  pinctrl: mvebu: armada-375: remove non-existing NAND re/we pins
-  pinctrl: mvebu: armada-xp: remove non-existing NAND pins
-  pinctrl: mvebu: armada-xp: remove non-existing VDD cpu_pd functions
-  pinctrl: mvebu: armada-xp: fix functions of MPP48
-  pinctrl: mvebu: armada-375: remove incorrect space in pin description
-  pinctrl: mvebu: armada-38x: fix incorrect total number of GPIOs
-  pinctrl: mvebu: armada-39x: fix incorrect total number of GPIOs
-  pinctrl: mvebu: armada-{375,38x,39x}: normalize naming of PTP subnames
-  pinctrl: mvebu: armada-{38x,39x,xp}: normalize naming of DRAM
-    functions
-  pinctrl: mvebu: armada-39x: normalize SATA present functionality
-    naming
-  pinctrl: mvebu: armada-39x: normalize SDIO pin naming
-  pinctrl: mvebu: armada-{370,375,38x,39x}: normalize dev pins
-  pinctrl: mvebu: armada-39x: align NAND pin naming
-  pinctrl: mvebu: armada-{370,375,38x,39x,xp}: normalize TDM pins
-  pinctrl: mvebu: armada-{370,375}: normalize PCIe pins
-  pinctrl: mvebu: armada-{370,375}: normalize audio pins
-  pinctrl: mvebu: armada-{370,xp}: normalize ethernet txclkout pins
-  pinctrl: mvebu: armada-xp: fix binding documentation of ge1 pins
-  pinctrl: mvebu: armada-370: align VDD cpu-pd pin naming with datasheet
-  pinctrl: mvebu: armada-370: align spi1 clock pin naming
-  pinctrl: mvebu: armada-xp: rename spi to spi0
-  pinctrl: mvebu: armada-39x: normalize ref clock naming
-  pinctrl: mvebu: armada-xp: add spi1 function
-  pinctrl: mvebu: armada-xp: add nand rb function
-  pinctrl: mvebu: armada-xp: add dram functions
-  pinctrl: mvebu: armada-38x: add sata functions
-  pinctrl: mvebu: armada-38x: add nand functions
-  pinctrl: mvebu: armada-38x: add ua1 functions
-  pinctrl: mvebu: armada-38x: add ptp functions
-  pinctrl: mvebu: armada-39x: add missing PCIe functions
-  pinctrl: mvebu: armada-39x: add missing SATA functions
-  pinctrl: mvebu: armada-39x: add support for Armada 395 variant
-
- .../pinctrl/marvell,armada-370-pinctrl.txt         |  18 +--
- .../pinctrl/marvell,armada-375-pinctrl.txt         |  34 +++---
- .../pinctrl/marvell,armada-38x-pinctrl.txt         |  66 +++++------
- .../pinctrl/marvell,armada-39x-pinctrl.txt         |  84 +++++++------
- .../bindings/pinctrl/marvell,armada-xp-pinctrl.txt |  80 ++++++-------
- drivers/pinctrl/mvebu/pinctrl-armada-370.c         |  22 ++--
- drivers/pinctrl/mvebu/pinctrl-armada-375.c         |  50 ++++----
- drivers/pinctrl/mvebu/pinctrl-armada-38x.c         | 120 ++++++++++---------
- drivers/pinctrl/mvebu/pinctrl-armada-39x.c         | 131 ++++++++++++---------
- drivers/pinctrl/mvebu/pinctrl-armada-xp.c          |  98 +++++++--------
- 10 files changed, 363 insertions(+), 340 deletions(-)
-
+diff --git a/Documentation/devicetree/bindings/pinctrl/marvell,armada-38x-pinctrl.txt b/Documentation/devicetree/bindings/pinctrl/marvell,armada-38x-pinctrl.txt
+index b17c968..4ac138a 100644
+--- a/Documentation/devicetree/bindings/pinctrl/marvell,armada-38x-pinctrl.txt
++++ b/Documentation/devicetree/bindings/pinctrl/marvell,armada-38x-pinctrl.txt
+@@ -27,15 +27,15 @@ mpp8          8        gpio, ge0(txd1), dev(ad10)
+ mpp9          9        gpio, ge0(txd2), dev(ad11)
+ mpp10         10       gpio, ge0(txd3), dev(ad12)
+ mpp11         11       gpio, ge0(txctl), dev(ad13)
+-mpp12         12       gpio, ge0(rxd0), pcie0(rstout), pcie1(rstout) [1], spi0(cs1), dev(ad14)
+-mpp13         13       gpio, ge0(rxd1), pcie0(clkreq), pcie1(clkreq) [1], spi0(cs2), dev(ad15)
+-mpp14         14       gpio, ge0(rxd2), ptp(clk), m(vtt_ctrl), spi0(cs3), dev(wen1)
+-mpp15         15       gpio, ge0(rxd3), ge(mdc slave), pcie0(rstout), spi0(mosi), pcie1(rstout) [1]
+-mpp16         16       gpio, ge0(rxctl), ge(mdio slave), m(decc_err), spi0(miso), pcie0(clkreq)
++mpp12         12       gpio, ge0(rxd0), pcie0(rstout), spi0(cs1), dev(ad14), pcie3(clkreq)
++mpp13         13       gpio, ge0(rxd1), pcie0(clkreq), pcie1(clkreq) [1], spi0(cs2), dev(ad15), pcie2(clkreq)
++mpp14         14       gpio, ge0(rxd2), ptp(clk), m(vtt_ctrl), spi0(cs3), dev(wen1), pcie3(clkreq)
++mpp15         15       gpio, ge0(rxd3), ge(mdc slave), pcie0(rstout), spi0(mosi)
++mpp16         16       gpio, ge0(rxctl), ge(mdio slave), m(decc_err), spi0(miso), pcie0(clkreq), pcie1(clkreq) [1]
+ mpp17         17       gpio, ge0(rxclk), ptp(clk), ua1(rxd), spi0(sck), sata1(prsnt)
+-mpp18         18       gpio, ge0(rxerr), ptp(trig_gen), ua1(txd), spi0(cs0), pcie1(rstout) [1]
+-mpp19         19       gpio, ge0(col), ptp(event_req), pcie0(clkreq), sata1(prsnt), ua0(cts)
+-mpp20         20       gpio, ge0(txclk), ptp(clk), pcie1(rstout) [1], sata0(prsnt), ua0(rts)
++mpp18         18       gpio, ge0(rxerr), ptp(trig_gen), ua1(txd), spi0(cs0)
++mpp19         19       gpio, ge0(col), ptp(event_req), ge0(txerr), sata1(prsnt), ua0(cts)
++mpp20         20       gpio, ge0(txclk), ptp(clk), sata0(prsnt), ua0(rts)
+ mpp21         21       gpio, spi0(cs1), ge1(rxd0), sata0(prsnt), sd0(cmd), dev(bootcs)
+ mpp22         22       gpio, spi0(mosi), dev(ad0)
+ mpp23         23       gpio, spi0(sck), dev(ad2)
+@@ -58,23 +58,23 @@ mpp39         39       gpio, i2c1(sck), ge1(rxd2), ua0(cts), sd0(d1), dev(a2)
+ mpp40         40       gpio, i2c1(sda), ge1(rxd3), ua0(rts), sd0(d2), dev(ad6)
+ mpp41         41       gpio, ua1(rxd), ge1(rxctl), ua0(cts), spi1(cs3), dev(burst/last)
+ mpp42         42       gpio, ua1(txd), ua0(rts), dev(ad7)
+-mpp43         43       gpio, pcie0(clkreq), m(vtt_ctrl), m(decc_err), pcie0(rstout), dev(clkout)
+-mpp44         44       gpio, sata0(prsnt), sata1(prsnt), sata2(prsnt) [2], sata3(prsnt) [3], pcie0(rstout)
+-mpp45         45       gpio, ref(clk_out0), pcie0(rstout), pcie1(rstout) [1], pcie2(rstout), pcie3(rstout)
+-mpp46         46       gpio, ref(clk_out1), pcie0(rstout), pcie1(rstout) [1], pcie2(rstout), pcie3(rstout)
+-mpp47         47       gpio, sata0(prsnt), sata1(prsnt), sata2(prsnt) [2], spi1(cs2), sata3(prsnt) [2]
+-mpp48         48       gpio, sata0(prsnt), m(vtt_ctrl), tdm2c(pclk), audio(mclk), sd0(d4)
+-mpp49         49       gpio, sata2(prsnt) [2], sata3(prsnt) [2], tdm2c(fsync), audio(lrclk), sd0(d5)
+-mpp50         50       gpio, pcie0(rstout), pcie1(rstout) [1], tdm2c(drx), audio(extclk), sd0(cmd)
++mpp43         43       gpio, pcie0(clkreq), m(vtt_ctrl), m(decc_err), spi1(cs2), dev(clkout)
++mpp44         44       gpio, sata0(prsnt), sata1(prsnt), sata2(prsnt) [2], sata3(prsnt) [3]
++mpp45         45       gpio, ref(clk_out0), pcie0(rstout)
++mpp46         46       gpio, ref(clk_out1), pcie0(rstout)
++mpp47         47       gpio, sata0(prsnt), sata1(prsnt), sata2(prsnt) [2], sata3(prsnt) [2]
++mpp48         48       gpio, sata0(prsnt), m(vtt_ctrl), tdm2c(pclk), audio(mclk), sd0(d4), pcie0(clkreq)
++mpp49         49       gpio, sata2(prsnt) [2], sata3(prsnt) [2], tdm2c(fsync), audio(lrclk), sd0(d5), pcie1(clkreq)
++mpp50         50       gpio, pcie0(rstout), tdm2c(drx), audio(extclk), sd0(cmd)
+ mpp51         51       gpio, tdm2c(dtx), audio(sdo), m(decc_err)
+-mpp52         52       gpio, pcie0(rstout), pcie1(rstout) [1], tdm2c(intn), audio(sdi), sd0(d6)
++mpp52         52       gpio, pcie0(rstout), tdm2c(intn), audio(sdi), sd0(d6)
+ mpp53         53       gpio, sata1(prsnt), sata0(prsnt), tdm2c(rstn), audio(bclk), sd0(d7)
+-mpp54         54       gpio, sata0(prsnt), sata1(prsnt), pcie0(rstout), pcie1(rstout) [1], sd0(d3)
++mpp54         54       gpio, sata0(prsnt), sata1(prsnt), pcie0(rstout), ge0(txerr), sd0(d3)
+ mpp55         55       gpio, ua1(cts), ge(mdio), pcie1(clkreq) [1], spi1(cs1), sd0(d0)
+ mpp56         56       gpio, ua1(rts), ge(mdc), m(decc_err), spi1(mosi)
+ mpp57         57       gpio, spi1(sck), sd0(clk)
+ mpp58         58       gpio, pcie1(clkreq) [1], i2c1(sck), pcie2(clkreq), spi1(miso), sd0(d1)
+-mpp59         59       gpio, pcie0(rstout), i2c1(sda), pcie1(rstout) [1], spi1(cs0), sd0(d2)
++mpp59         59       gpio, pcie0(rstout), i2c1(sda), spi1(cs0), sd0(d2)
+ 
+ [1]: only available on 88F6820 and 88F6828
+ [2]: only available on 88F6828
+diff --git a/drivers/pinctrl/mvebu/pinctrl-armada-38x.c b/drivers/pinctrl/mvebu/pinctrl-armada-38x.c
+index 83bbcc7..11656c7 100644
+--- a/drivers/pinctrl/mvebu/pinctrl-armada-38x.c
++++ b/drivers/pinctrl/mvebu/pinctrl-armada-38x.c
+@@ -94,37 +94,39 @@ static struct mvebu_mpp_mode armada_38x_mpp_modes[] = {
+ 		 MPP_VAR_FUNCTION(0, "gpio",  NULL,         V_88F6810_PLUS),
+ 		 MPP_VAR_FUNCTION(1, "ge0",   "rxd0",       V_88F6810_PLUS),
+ 		 MPP_VAR_FUNCTION(2, "pcie0", "rstout",     V_88F6810_PLUS),
+-		 MPP_VAR_FUNCTION(3, "pcie1", "rstout",     V_88F6820_PLUS),
+ 		 MPP_VAR_FUNCTION(4, "spi0",  "cs1",        V_88F6810_PLUS),
+-		 MPP_VAR_FUNCTION(5, "dev",   "ad14",       V_88F6810_PLUS)),
++		 MPP_VAR_FUNCTION(5, "dev",   "ad14",       V_88F6810_PLUS),
++		 MPP_VAR_FUNCTION(6, "pcie3", "clkreq",     V_88F6810_PLUS)),
+ 	MPP_MODE(13,
+ 		 MPP_VAR_FUNCTION(0, "gpio",  NULL,         V_88F6810_PLUS),
+ 		 MPP_VAR_FUNCTION(1, "ge0",   "rxd1",       V_88F6810_PLUS),
+ 		 MPP_VAR_FUNCTION(2, "pcie0", "clkreq",     V_88F6810_PLUS),
+ 		 MPP_VAR_FUNCTION(3, "pcie1", "clkreq",     V_88F6820_PLUS),
+ 		 MPP_VAR_FUNCTION(4, "spi0",  "cs2",        V_88F6810_PLUS),
+-		 MPP_VAR_FUNCTION(5, "dev",   "ad15",       V_88F6810_PLUS)),
++		 MPP_VAR_FUNCTION(5, "dev",   "ad15",       V_88F6810_PLUS),
++		 MPP_VAR_FUNCTION(6, "pcie2", "clkreq",     V_88F6810_PLUS)),
+ 	MPP_MODE(14,
+ 		 MPP_VAR_FUNCTION(0, "gpio",  NULL,         V_88F6810_PLUS),
+ 		 MPP_VAR_FUNCTION(1, "ge0",   "rxd2",       V_88F6810_PLUS),
+ 		 MPP_VAR_FUNCTION(2, "ptp",   "clk",        V_88F6810_PLUS),
+ 		 MPP_VAR_FUNCTION(3, "m",     "vtt_ctrl",   V_88F6810_PLUS),
+ 		 MPP_VAR_FUNCTION(4, "spi0",  "cs3",        V_88F6810_PLUS),
+-		 MPP_VAR_FUNCTION(5, "dev",   "wen1",       V_88F6810_PLUS)),
++		 MPP_VAR_FUNCTION(5, "dev",   "wen1",       V_88F6810_PLUS),
++		 MPP_VAR_FUNCTION(6, "pcie3", "clkreq",     V_88F6810_PLUS)),
+ 	MPP_MODE(15,
+ 		 MPP_VAR_FUNCTION(0, "gpio",  NULL,         V_88F6810_PLUS),
+ 		 MPP_VAR_FUNCTION(1, "ge0",   "rxd3",       V_88F6810_PLUS),
+ 		 MPP_VAR_FUNCTION(2, "ge",    "mdc slave",  V_88F6810_PLUS),
+ 		 MPP_VAR_FUNCTION(3, "pcie0", "rstout",     V_88F6810_PLUS),
+-		 MPP_VAR_FUNCTION(4, "spi0",  "mosi",       V_88F6810_PLUS),
+-		 MPP_VAR_FUNCTION(5, "pcie1", "rstout",     V_88F6820_PLUS)),
++		 MPP_VAR_FUNCTION(4, "spi0",  "mosi",       V_88F6810_PLUS)),
+ 	MPP_MODE(16,
+ 		 MPP_VAR_FUNCTION(0, "gpio",  NULL,         V_88F6810_PLUS),
+ 		 MPP_VAR_FUNCTION(1, "ge0",   "rxctl",      V_88F6810_PLUS),
+ 		 MPP_VAR_FUNCTION(2, "ge",    "mdio slave", V_88F6810_PLUS),
+ 		 MPP_VAR_FUNCTION(3, "m",     "decc_err",   V_88F6810_PLUS),
+ 		 MPP_VAR_FUNCTION(4, "spi0",  "miso",       V_88F6810_PLUS),
+-		 MPP_VAR_FUNCTION(5, "pcie0", "clkreq",     V_88F6810_PLUS)),
++		 MPP_VAR_FUNCTION(5, "pcie0", "clkreq",     V_88F6810_PLUS),
++		 MPP_VAR_FUNCTION(6, "pcie1", "clkreq",     V_88F6820_PLUS)),
+ 	MPP_MODE(17,
+ 		 MPP_VAR_FUNCTION(0, "gpio",  NULL,         V_88F6810_PLUS),
+ 		 MPP_VAR_FUNCTION(1, "ge0",   "rxclk",      V_88F6810_PLUS),
+@@ -137,13 +139,12 @@ static struct mvebu_mpp_mode armada_38x_mpp_modes[] = {
+ 		 MPP_VAR_FUNCTION(1, "ge0",   "rxerr",      V_88F6810_PLUS),
+ 		 MPP_VAR_FUNCTION(2, "ptp",   "trig_gen",   V_88F6810_PLUS),
+ 		 MPP_VAR_FUNCTION(3, "ua1",   "txd",        V_88F6810_PLUS),
+-		 MPP_VAR_FUNCTION(4, "spi0",  "cs0",        V_88F6810_PLUS),
+-		 MPP_VAR_FUNCTION(5, "pcie1", "rstout",     V_88F6820_PLUS)),
++		 MPP_VAR_FUNCTION(4, "spi0",  "cs0",        V_88F6810_PLUS)),
+ 	MPP_MODE(19,
+ 		 MPP_VAR_FUNCTION(0, "gpio",  NULL,         V_88F6810_PLUS),
+ 		 MPP_VAR_FUNCTION(1, "ge0",   "col",        V_88F6810_PLUS),
+ 		 MPP_VAR_FUNCTION(2, "ptp",   "event_req",  V_88F6810_PLUS),
+-		 MPP_VAR_FUNCTION(3, "pcie0", "clkreq",     V_88F6810_PLUS),
++		 MPP_VAR_FUNCTION(3, "ge0",   "txerr",      V_88F6810_PLUS),
+ 		 MPP_VAR_FUNCTION(4, "sata1", "prsnt",      V_88F6810_PLUS),
+ 		 MPP_VAR_FUNCTION(5, "ua0",   "cts",        V_88F6810_PLUS),
+ 		 MPP_VAR_FUNCTION(6, "ua1",   "rxd",        V_88F6810_PLUS)),
+@@ -151,7 +152,6 @@ static struct mvebu_mpp_mode armada_38x_mpp_modes[] = {
+ 		 MPP_VAR_FUNCTION(0, "gpio",  NULL,         V_88F6810_PLUS),
+ 		 MPP_VAR_FUNCTION(1, "ge0",   "txclk",      V_88F6810_PLUS),
+ 		 MPP_VAR_FUNCTION(2, "ptp",   "clk",        V_88F6810_PLUS),
+-		 MPP_VAR_FUNCTION(3, "pcie1", "rstout",     V_88F6820_PLUS),
+ 		 MPP_VAR_FUNCTION(4, "sata0", "prsnt",      V_88F6810_PLUS),
+ 		 MPP_VAR_FUNCTION(5, "ua0",   "rts",        V_88F6810_PLUS),
+ 		 MPP_VAR_FUNCTION(6, "ua1",   "txd",        V_88F6810_PLUS)),
+@@ -277,35 +277,27 @@ static struct mvebu_mpp_mode armada_38x_mpp_modes[] = {
+ 		 MPP_VAR_FUNCTION(1, "pcie0", "clkreq",     V_88F6810_PLUS),
+ 		 MPP_VAR_FUNCTION(2, "m",     "vtt_ctrl",   V_88F6810_PLUS),
+ 		 MPP_VAR_FUNCTION(3, "m",     "decc_err",   V_88F6810_PLUS),
+-		 MPP_VAR_FUNCTION(4, "pcie0", "rstout",     V_88F6810_PLUS),
++		 MPP_VAR_FUNCTION(4, "spi1",  "cs2",        V_88F6810_PLUS),
+ 		 MPP_VAR_FUNCTION(5, "dev",   "clkout",     V_88F6810_PLUS)),
+ 	MPP_MODE(44,
+ 		 MPP_VAR_FUNCTION(0, "gpio",  NULL,         V_88F6810_PLUS),
+ 		 MPP_VAR_FUNCTION(1, "sata0", "prsnt",      V_88F6810_PLUS),
+ 		 MPP_VAR_FUNCTION(2, "sata1", "prsnt",      V_88F6810_PLUS),
+ 		 MPP_VAR_FUNCTION(3, "sata2", "prsnt",      V_88F6828),
+-		 MPP_VAR_FUNCTION(4, "sata3", "prsnt",      V_88F6828),
+-		 MPP_VAR_FUNCTION(5, "pcie0", "rstout",     V_88F6810_PLUS)),
++		 MPP_VAR_FUNCTION(4, "sata3", "prsnt",      V_88F6828)),
+ 	MPP_MODE(45,
+ 		 MPP_VAR_FUNCTION(0, "gpio",  NULL,         V_88F6810_PLUS),
+ 		 MPP_VAR_FUNCTION(1, "ref",   "clk_out0",   V_88F6810_PLUS),
+-		 MPP_VAR_FUNCTION(2, "pcie0", "rstout",     V_88F6810_PLUS),
+-		 MPP_VAR_FUNCTION(3, "pcie1", "rstout",     V_88F6820_PLUS),
+-		 MPP_VAR_FUNCTION(4, "pcie2", "rstout",     V_88F6810_PLUS),
+-		 MPP_VAR_FUNCTION(5, "pcie3", "rstout",     V_88F6810_PLUS)),
++		 MPP_VAR_FUNCTION(2, "pcie0", "rstout",     V_88F6810_PLUS)),
+ 	MPP_MODE(46,
+ 		 MPP_VAR_FUNCTION(0, "gpio",  NULL,         V_88F6810_PLUS),
+ 		 MPP_VAR_FUNCTION(1, "ref",   "clk_out1",   V_88F6810_PLUS),
+-		 MPP_VAR_FUNCTION(2, "pcie0", "rstout",     V_88F6810_PLUS),
+-		 MPP_VAR_FUNCTION(3, "pcie1", "rstout",     V_88F6820_PLUS),
+-		 MPP_VAR_FUNCTION(4, "pcie2", "rstout",     V_88F6810_PLUS),
+-		 MPP_VAR_FUNCTION(5, "pcie3", "rstout",     V_88F6810_PLUS)),
++		 MPP_VAR_FUNCTION(2, "pcie0", "rstout",     V_88F6810_PLUS)),
+ 	MPP_MODE(47,
+ 		 MPP_VAR_FUNCTION(0, "gpio",  NULL,         V_88F6810_PLUS),
+ 		 MPP_VAR_FUNCTION(1, "sata0", "prsnt",      V_88F6810_PLUS),
+ 		 MPP_VAR_FUNCTION(2, "sata1", "prsnt",      V_88F6810_PLUS),
+ 		 MPP_VAR_FUNCTION(3, "sata2", "prsnt",      V_88F6828),
+-		 MPP_VAR_FUNCTION(4, "spi1",  "cs2",        V_88F6810_PLUS),
+ 		 MPP_VAR_FUNCTION(5, "sata3", "prsnt",      V_88F6828)),
+ 	MPP_MODE(48,
+ 		 MPP_VAR_FUNCTION(0, "gpio",  NULL,         V_88F6810_PLUS),
+@@ -313,18 +305,19 @@ static struct mvebu_mpp_mode armada_38x_mpp_modes[] = {
+ 		 MPP_VAR_FUNCTION(2, "m",     "vtt_ctrl",   V_88F6810_PLUS),
+ 		 MPP_VAR_FUNCTION(3, "tdm2c", "pclk",       V_88F6810_PLUS),
+ 		 MPP_VAR_FUNCTION(4, "audio", "mclk",       V_88F6810_PLUS),
+-		 MPP_VAR_FUNCTION(5, "sd0",   "d4",         V_88F6810_PLUS)),
++		 MPP_VAR_FUNCTION(5, "sd0",   "d4",         V_88F6810_PLUS),
++		 MPP_VAR_FUNCTION(6, "pcie0", "clkreq",     V_88F6810_PLUS)),
+ 	MPP_MODE(49,
+ 		 MPP_VAR_FUNCTION(0, "gpio",  NULL,         V_88F6810_PLUS),
+ 		 MPP_VAR_FUNCTION(1, "sata2", "prsnt",      V_88F6828),
+ 		 MPP_VAR_FUNCTION(2, "sata3", "prsnt",      V_88F6828),
+ 		 MPP_VAR_FUNCTION(3, "tdm2c", "fsync",      V_88F6810_PLUS),
+ 		 MPP_VAR_FUNCTION(4, "audio", "lrclk",      V_88F6810_PLUS),
+-		 MPP_VAR_FUNCTION(5, "sd0",   "d5",         V_88F6810_PLUS)),
++		 MPP_VAR_FUNCTION(5, "sd0",   "d5",         V_88F6810_PLUS),
++		 MPP_VAR_FUNCTION(6, "pcie1", "clkreq",     V_88F6820_PLUS)),
+ 	MPP_MODE(50,
+ 		 MPP_VAR_FUNCTION(0, "gpio",  NULL,         V_88F6810_PLUS),
+ 		 MPP_VAR_FUNCTION(1, "pcie0", "rstout",     V_88F6810_PLUS),
+-		 MPP_VAR_FUNCTION(2, "pcie1", "rstout",     V_88F6820_PLUS),
+ 		 MPP_VAR_FUNCTION(3, "tdm2c", "drx",        V_88F6810_PLUS),
+ 		 MPP_VAR_FUNCTION(4, "audio", "extclk",     V_88F6810_PLUS),
+ 		 MPP_VAR_FUNCTION(5, "sd0",   "cmd",        V_88F6810_PLUS)),
+@@ -336,7 +329,6 @@ static struct mvebu_mpp_mode armada_38x_mpp_modes[] = {
+ 	MPP_MODE(52,
+ 		 MPP_VAR_FUNCTION(0, "gpio",  NULL,         V_88F6810_PLUS),
+ 		 MPP_VAR_FUNCTION(1, "pcie0", "rstout",     V_88F6810_PLUS),
+-		 MPP_VAR_FUNCTION(2, "pcie1", "rstout",     V_88F6820_PLUS),
+ 		 MPP_VAR_FUNCTION(3, "tdm2c", "intn",       V_88F6810_PLUS),
+ 		 MPP_VAR_FUNCTION(4, "audio", "sdi",        V_88F6810_PLUS),
+ 		 MPP_VAR_FUNCTION(5, "sd0",   "d6",         V_88F6810_PLUS)),
+@@ -352,7 +344,7 @@ static struct mvebu_mpp_mode armada_38x_mpp_modes[] = {
+ 		 MPP_VAR_FUNCTION(1, "sata0", "prsnt",      V_88F6810_PLUS),
+ 		 MPP_VAR_FUNCTION(2, "sata1", "prsnt",      V_88F6810_PLUS),
+ 		 MPP_VAR_FUNCTION(3, "pcie0", "rstout",     V_88F6810_PLUS),
+-		 MPP_VAR_FUNCTION(4, "pcie1", "rstout",     V_88F6820_PLUS),
++		 MPP_VAR_FUNCTION(4, "ge0",   "txerr",      V_88F6810_PLUS),
+ 		 MPP_VAR_FUNCTION(5, "sd0",   "d3",         V_88F6810_PLUS)),
+ 	MPP_MODE(55,
+ 		 MPP_VAR_FUNCTION(0, "gpio",  NULL,         V_88F6810_PLUS),
+@@ -382,7 +374,6 @@ static struct mvebu_mpp_mode armada_38x_mpp_modes[] = {
+ 		 MPP_VAR_FUNCTION(0, "gpio",  NULL,         V_88F6810_PLUS),
+ 		 MPP_VAR_FUNCTION(1, "pcie0", "rstout",     V_88F6810_PLUS),
+ 		 MPP_VAR_FUNCTION(2, "i2c1",  "sda",        V_88F6810_PLUS),
+-		 MPP_VAR_FUNCTION(3, "pcie1", "rstout",     V_88F6820_PLUS),
+ 		 MPP_VAR_FUNCTION(4, "spi1",  "cs0",        V_88F6810_PLUS),
+ 		 MPP_VAR_FUNCTION(5, "sd0",   "d2",         V_88F6810_PLUS)),
+ };
 -- 
 2.1.0
