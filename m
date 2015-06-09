@@ -1,40 +1,52 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 9 Jun 2015 16:29:59 +0100
-Subject: [PATCH v2 1/2] ARM: Add cpu_resume_arm() for firmwares that
- resume in ARM state
-In-Reply-To: <7htwuhsvs7.fsf@deeprootsystems.com>
-References: <1433272378-8470-1-git-send-email-sboyd@codeaurora.org>
- <1433272378-8470-2-git-send-email-sboyd@codeaurora.org>
- <20150602234048.GA7557@n2100.arm.linux.org.uk>
- <20150603001120.GA4534@codeaurora.org>
- <7h3821ubpf.fsf@deeprootsystems.com>
- <55760B6D.7090302@codeaurora.org>
- <7htwuhsvs7.fsf@deeprootsystems.com>
-Message-ID: <20150609152959.GG7557@n2100.arm.linux.org.uk>
+From: dann.frazier@canonical.com (Dann Frazier)
+Date: Tue, 9 Jun 2015 09:32:45 -0600
+Subject: [PATCH 1/2 RESEND] power: reset: Add syscon reboot device node
+ for APM X-Gene platform
+In-Reply-To: <1433272747-27114-2-git-send-email-ttnguyen@apm.com>
+References: <1433272747-27114-1-git-send-email-ttnguyen@apm.com>
+ <1433272747-27114-2-git-send-email-ttnguyen@apm.com>
+Message-ID: <CALdTtnuy91beqWQiAtr1HFt3o9=vK70zLig2=ckywD=cu8smwg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 08, 2015 at 03:03:04PM -0700, Kevin Hilman wrote:
-> Stephen Boyd <sboyd@codeaurora.org> writes:
-> > I'm happy to see it be applied by arm-soc maintainers directly given
-> > that Russell said "the patch looks good to me". The commit text needs a
-> > slight reword here though, so I can resubmit the patches to arm-soc if
-> > you like.
-> 
-> Go ahead and respin/resubmit, and I can get them ready, but I'll wait
-> for an official word or acked-by from Russell before taking them both
-> through arm-soc.
+On Tue, Jun 2, 2015 at 1:19 PM, Tai Nguyen <ttnguyen@apm.com> wrote:
+> This patch adds syscon reboot device node to support reboot feature on APM X-Gene platform
 
-I've suggested to Kevin that, as I have another patch outstanding for
-arm-soc, that I take this one into that same branch and send Kevin a
-pull for both patches.  (Esp. as I don't like sending single-patch
-pull requests.  Having two patches solves my dilema!)
+Tested-by: dann frazier <dann.frazier@canonical.com>
 
-Stephen, if you can arrange for the patch to end up in the patch system
-please...
-
-Thanks.
-
--- 
-FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
-according to speedtest.net.
+> Signed-off-by: Feng Kan  <fkan@apm.com>
+> Signed-off-by: Tai Nguyen <ttnguyen@apm.com>
+> ---
+>  arch/arm64/boot/dts/apm/apm-storm.dtsi |   12 ++++++++++++
+>  1 file changed, 12 insertions(+)
+>
+> diff --git a/arch/arm64/boot/dts/apm/apm-storm.dtsi b/arch/arm64/boot/dts/apm/apm-storm.dtsi
+> index c8d3e0e..16efcf7 100644
+> --- a/arch/arm64/boot/dts/apm/apm-storm.dtsi
+> +++ b/arch/arm64/boot/dts/apm/apm-storm.dtsi
+> @@ -710,5 +710,17 @@
+>                         dma-coherent;
+>                         clocks = <&dmaclk 0>;
+>                 };
+> +
+> +               scu: system-clk-controller at 17000000 {
+> +                       compatible = "apm,xgene-scu","syscon";
+> +                       reg = <0x0 0x17000000 0x0 0x400>;
+> +               };
+> +
+> +               reboot: reboot at 17000014 {
+> +                       compatible = "syscon-reboot";
+> +                       regmap = <&scu>;
+> +                       offset = <0x14>;
+> +                       mask = <0x1>;
+> +               };
+>         };
+>  };
+> --
+> 1.7.9.5
+>
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
