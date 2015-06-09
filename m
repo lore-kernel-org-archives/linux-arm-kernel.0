@@ -1,41 +1,44 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Tue, 09 Jun 2015 22:46:20 +0300
-Subject: [PATCH v6 5/6] i2c: at91: print hardware version
-In-Reply-To: <d1fbf4bce3b470409ef3198f551cfc3f8f22ac78.1433866582.git.cyrille.pitchen@atmel.com>
-References: <cover.1433866582.git.cyrille.pitchen@atmel.com>
- <d1fbf4bce3b470409ef3198f551cfc3f8f22ac78.1433866582.git.cyrille.pitchen@atmel.com>
-Message-ID: <5577428C.3090206@cogentembedded.com>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Tue, 9 Jun 2015 21:47:05 +0200
+Subject: [PATCH 00/34] pinctrl: mvebu: numerous fixes, cleanups and
+ improvements
+In-Reply-To: <20150609212211.625964e2@free-electrons.com>
+References: <1433868446-11028-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <20150609170153.GC16778@lunn.ch>
+ <20150609212211.625964e2@free-electrons.com>
+Message-ID: <20150609194705.GE16778@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+On Tue, Jun 09, 2015 at 09:22:11PM +0200, Thomas Petazzoni wrote:
+> But before doing that, it'd be great to have your point of on the
+> patches that actually break the DT backward compatibility. If there are
+> to be rejected anyway, I'd rather not spend more time on them.
 
-On 06/09/2015 07:22 PM, Cyrille Pitchen wrote:
+Hi Thomas
 
-> The probe() function now prints the hardware version of the I2C
-> controller.
+I read a presentation recently, "Device Tree as a stable ABI: a fairy
+tale?"  :-)
 
-> Signed-off-by: Cyrille Pitchen <cyrille.pitchen@atmel.com>
-> ---
->   drivers/i2c/busses/i2c-at91.c | 5 ++++-
->   1 file changed, 4 insertions(+), 1 deletion(-)
+But we should at least try. So what is actually involved in keeping
+backwards compatibility?
 
-> diff --git a/drivers/i2c/busses/i2c-at91.c b/drivers/i2c/busses/i2c-at91.c
-> index 817ae69..6e88b30 100644
-> --- a/drivers/i2c/busses/i2c-at91.c
-> +++ b/drivers/i2c/busses/i2c-at91.c
-[...]
-> @@ -908,7 +910,8 @@ static int at91_twi_probe(struct platform_device *pdev)
->   		return rc;
->   	}
->
-> -	dev_info(dev->dev, "AT91 i2c bus driver.\n");
-> +	dev_info(dev->dev, "AT91 i2c bus driver (version: %#x).\n",
+The two patches i pointed out have two different situations.
 
-    It looks as if you rather print the driver's version. :-)
+What does pinctrl do when you ask for a pin which is not a member of the
+function? If it silently ignores it, not a problem. But i expect it
+actually throws an error. I could be wrong here, but it looks like it
+is the mvebu code which checks if a pin is a member of a function.  So
+it might be possible to set the value of the val in the
+mvebu_mpp_ctrl_setting to 0xff for the removed NAND pins, and when we
+see such a value, print a warning about outdated DT, and "succeed"
+rather than return an error.
 
-> +		 at91_twi_read(dev, AT91_TWI_VER));
->   	return 0;
->   }
+For spi -> spi0 it seems messier. So i would leave it as spi with a
+comment, and add spi1.
 
-WBR, Sergei
+I do see value in having consistent names and matching the datasheet
+were possible. So if we can find reasonable compromises, i think these
+patches are useful.
+
+	Andrew
