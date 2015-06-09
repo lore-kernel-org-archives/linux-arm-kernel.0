@@ -1,45 +1,40 @@
-From: robh@kernel.org (Rob Herring)
-Date: Tue, 9 Jun 2015 16:23:04 -0500
-Subject: [PATCH 00/15] Kill off set_irq_flags
-In-Reply-To: <20150609202834.GH7557@n2100.arm.linux.org.uk>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 9 Jun 2015 22:27:09 +0100
+Subject: [PATCH 02/15] regmap: kill off set_irq_flags usage
+In-Reply-To: <20150609191211.GA14071@sirena.org.uk>
 References: <1433874401-27161-1-git-send-email-robh@kernel.org>
- <20150609202834.GH7557@n2100.arm.linux.org.uk>
-Message-ID: <CAL_JsqK9MrwPS5zPhMDRS3BqhC0esZiR9YPZaMaT0=VAD4gaSw@mail.gmail.com>
+ <1433874401-27161-3-git-send-email-robh@kernel.org>
+ <20150609191211.GA14071@sirena.org.uk>
+Message-ID: <20150609212709.GJ7557@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 9, 2015 at 3:28 PM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> On Tue, Jun 09, 2015 at 01:26:26PM -0500, Rob Herring wrote:
->> This series converts all users of ARM specific set_irq_flags to use
->> common genirq functions. In many cases where irqdomains are used, the
->> set_irq_flags calls were redundant, so I've removed them.
->>
->> This is not intended for 4.2, but if any subsystem maintainers want to
->> pick up their subsystem's change that is fine. All but the last 2
->> patches stand on their own. Any new drivers going into 4.2 may need a
->> similar change, but I'm sure people are told not to use set_irq_flags in
->> reviews. ;)
->
-> So what are you doing about the initial state of IRQs on legacy ARM where
-> IRQs start off being un-requestable, and need the set_irq_flags() to make
-> them requestable.  I think you could be introducing a massive regression
-> by making this change.
+On Tue, Jun 09, 2015 at 08:12:11PM +0100, Mark Brown wrote:
+> On Tue, Jun 09, 2015 at 01:26:28PM -0500, Rob Herring wrote:
+> 
+> > clear that is really needed. There appears to be a great deal of blind
+> > copy and paste of this code.
+> 
+> Well, I don't think it's blind - IIRC it's just that this code all
+> predates the genirq flags and ARM had the opposite default to x86 (I
+> guess because of being conservative about all the random interrupt
+> controllers you get and what might be hanging off them) so we needed to
+> do this dance to get interrupts to work.
 
-None of that changes. The initial state is set by ARCH_IRQ_INIT_FLAGS
-which I've not changed:
+It's because there exist platforms where specific IRQs are permanently
+asserted, and unexpectedly claiming such an interrupt (eg, through IRQ
+probing) would lock the system - at least before we ended up with the
+detection in genirq (which has its roots in the ARM code.)
 
-#define ARCH_IRQ_INIT_FLAGS     (IRQ_NOREQUEST | IRQ_NOPROBE)
+The problem is we're dealing with history here, and flipping ARM from
+defaulting to "IRQs not valid" to "All IRQs valid" is a far from
+trivial task.
 
-> Unless you can prove that this isn't the case, you shouldn't be removing
-> this stuff, especially not from legacy platforms.
+I'd suggest people think carefully about applying these patches.  They
+have only been around for a matter of hours, so to rush to apply them
+when they haven't been revewied as a whole to assess whether the approach
+is the right one is rather hasty.
 
-set_irq_flags() only does a translation from custom ARM IRQF_* flags
-to standard flags and then calls irq_modify_status(). This only
-removes the translation and users set/clear standard flags directly.
-It is a straight-forward removal of a wrapper function.
-
-I *would* like to get rid of ARCH_IRQ_INIT_FLAGS and have the same
-defaults across arches, but yes that would likely cause regressions.
-
-Rob
+-- 
+FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
+according to speedtest.net.
