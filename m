@@ -1,56 +1,137 @@
-From: andre.przywara@arm.com (Andre Przywara)
-Date: Tue,  9 Jun 2015 12:31:33 +0100
-Subject: [PATCH v2 6/8] arm: prepare for instantiating different IRQ chip
- devices
-In-Reply-To: <1433493473-4002-7-git-send-email-andre.przywara@arm.com>
-References: <1433493473-4002-7-git-send-email-andre.przywara@arm.com>
-Message-ID: <1433849493-27463-1-git-send-email-andre.przywara@arm.com>
+From: r.spliet@ultimaker.com (Roy Spliet)
+Date: Tue,  9 Jun 2015 13:31:38 +0200
+Subject: [PATCH v2] mtd: nand: Sunxi calculate timing cfg
+Message-ID: <1433849498-3270-1-git-send-email-r.spliet@ultimaker.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi, contrary to my boasting in the cover letter I managed to
-accidentially drop the fix for the GIC device initialization error
-handling Will requested from this series.
-If we fail the GIC initialization sequence at some point, we should
-make sure to not let the gic_fd initialized, so that subsequent
-accesses to the GIC device fail appropriately.
-So the fix below should be merged in, actually a part of it already
-in patch 2/8.
-If there are no further comments, I will re-spin this series with
-those fixes contained in the proper patches later this week.
+Values derived from the A83 user manual
 
-Cheers,
-Andre.
+V2: fix crippled comments
 
+Signed-off-by: Roy Spliet <r.spliet@ultimaker.com>
 ---
-diff --git a/arm/gic.c b/arm/gic.c
-index ab0f594..5fb94c1 100644
---- a/arm/gic.c
-+++ b/arm/gic.c
-@@ -89,15 +89,21 @@ static int gic__create_device(struct kvm *kvm, enum irqchip_type type)
- 		err = ioctl(gic_fd, KVM_SET_DEVICE_ATTR, &redist_attr);
- 		break;
- 	default:
--		return -ENODEV;
-+		err = -ENODEV;
-+		break;
+ drivers/mtd/nand/sunxi_nand.c | 42 +++++++++++++++++++++++++++++++++++++-----
+ 1 file changed, 37 insertions(+), 5 deletions(-)
+
+diff --git a/drivers/mtd/nand/sunxi_nand.c b/drivers/mtd/nand/sunxi_nand.c
+index 6f93b29..86de7e3 100644
+--- a/drivers/mtd/nand/sunxi_nand.c
++++ b/drivers/mtd/nand/sunxi_nand.c
+@@ -208,6 +208,7 @@ struct sunxi_nand_hw_ecc {
+  * @nand:		base NAND chip structure
+  * @mtd:		base MTD structure
+  * @clk_rate:		clk_rate required for this NAND chip
++ * @timing_cfg		TIMING_CFG register value for this NAND chip
+  * @selected:		current active CS
+  * @nsels:		number of CS lines required by the NAND chip
+  * @sels:		array of CS lines descriptions
+@@ -217,6 +218,7 @@ struct sunxi_nand_chip {
+ 	struct nand_chip nand;
+ 	struct mtd_info mtd;
+ 	unsigned long clk_rate;
++	u32 timing_cfg;
+ 	int selected;
+ 	int nsels;
+ 	struct sunxi_nand_chip_sel sels[0];
+@@ -403,6 +405,7 @@ static void sunxi_nfc_select_chip(struct mtd_info *mtd, int chip)
+ 		}
  	}
- 	if (err)
--		return err;
-+		goto out_err;
  
- 	err = ioctl(gic_fd, KVM_SET_DEVICE_ATTR, &dist_attr);
- 	if (err)
--		return err;
-+		goto out_err;
-+
-+	return err;
++	writel(sunxi_nand->timing_cfg, nfc->regs + NFC_REG_TIMING_CFG);
+ 	writel(ctl, nfc->regs + NFC_REG_CTL);
  
-+out_err:
-+	close(gic_fd);
-+	gic_fd = -1;
- 	return err;
+ 	sunxi_nand->selected = chip;
+@@ -807,10 +810,28 @@ static int sunxi_nfc_hw_syndrome_ecc_write_page(struct mtd_info *mtd,
+ 	return 0;
  }
  
++static const s32 tWB_lut[]  = {6, 12, 16, 20, -1};
++static const s32 tRHW_lut[] = {4,  8, 12, 20, -1};
++
++static s32 sunxi_nand_lookup_timing(const s32 *lut, u32 period, u32 clk_period)
++{
++	u32 clks = (period + clk_period - 1) / clk_period;
++	int i;
++
++	for (i = 0; lut[i] != -1; i++) {
++		if (clks <= lut[i])
++			return i;
++	}
++
++	/* Return max value */
++	return i - 1;
++}
++
+ static int sunxi_nand_chip_set_timings(struct sunxi_nand_chip *chip,
+ 				       const struct nand_sdr_timings *timings)
+ {
+ 	u32 min_clk_period = 0;
++	u32 tWB, tADL, tWHR, tRHW, tCAD;
+ 
+ 	/* T1 <=> tCLS */
+ 	if (timings->tCLS_min > min_clk_period)
+@@ -872,6 +893,20 @@ static int sunxi_nand_chip_set_timings(struct sunxi_nand_chip *chip,
+ 	if (timings->tWC_min > (min_clk_period * 2))
+ 		min_clk_period = DIV_ROUND_UP(timings->tWC_min, 2);
+ 
++	/* T16 - T19 + tCAD */
++	tWB  = sunxi_nand_lookup_timing(tWB_lut, timings->tWB_max,
++			min_clk_period);
++	tADL = DIV_ROUND_UP(timings->tADL_min, min_clk_period) >> 3;
++	tWHR = DIV_ROUND_UP(timings->tWHR_min, min_clk_period) >> 3;
++	tRHW = sunxi_nand_lookup_timing(tRHW_lut, timings->tRHW_min,
++			min_clk_period);
++	tCAD = 0x7;
++	chip->timing_cfg = (tWB & 0x3) |
++			   (tADL & 0x3) << 2 |
++			   (tWHR & 0x3) << 4 |
++			   (tRHW & 0x3) << 6 |
++			   (tCAD & 0x7) << 8;
++	/* \todo A83 has some more bits for CDQSS, CS, CLHZ, CCS, WC */
+ 
+ 	/* Convert min_clk_period from picoseconds to nanoseconds */
+ 	min_clk_period = DIV_ROUND_UP(min_clk_period, 1000);
+@@ -884,8 +919,6 @@ static int sunxi_nand_chip_set_timings(struct sunxi_nand_chip *chip,
+ 	 */
+ 	chip->clk_rate = (2 * NSEC_PER_SEC) / min_clk_period;
+ 
+-	/* TODO: configure T16-T19 */
+-
+ 	return 0;
+ }
+ 
+@@ -1168,6 +1201,7 @@ static int sunxi_nand_chip_init(struct device *dev, struct sunxi_nfc *nfc,
+ 
+ 	chip->nsels = nsels;
+ 	chip->selected = -1;
++	chip->timing_cfg = 0x7ff;
+ 
+ 	for (i = 0; i < nsels; i++) {
+ 		ret = of_property_read_u32_index(np, "reg", i, &tmp);
+@@ -1377,11 +1411,9 @@ static int sunxi_nfc_probe(struct platform_device *pdev)
+ 	platform_set_drvdata(pdev, nfc);
+ 
+ 	/*
+-	 * TODO: replace these magic values with proper flags as soon as we
+-	 * know what they are encoding.
++	 * TODO: replace this magic values with EDO flag
+ 	 */
+ 	writel(0x100, nfc->regs + NFC_REG_TIMING_CTL);
+-	writel(0x7ff, nfc->regs + NFC_REG_TIMING_CFG);
+ 
+ 	ret = sunxi_nand_chips_init(dev, nfc);
+ 	if (ret) {
 -- 
-2.3.5
+2.4.2
+
+
+-- 
+
+
+IMAGINE IT >> MAKE IT
+
+Meet us online at Twitter <http://twitter.com/ultimaker>, Facebook 
+<http://facebook.com/ultimaker>, Google+ <http://google.com/+Ultimaker>
+
+www.ultimaker.com
