@@ -1,315 +1,135 @@
-From: cyrille.pitchen@atmel.com (Cyrille Pitchen)
-Date: Tue, 9 Jun 2015 18:22:19 +0200
-Subject: [PATCH v6 6/6] i2c: at91: add support to FIFOs
-In-Reply-To: <cover.1433866582.git.cyrille.pitchen@atmel.com>
-References: <cover.1433866582.git.cyrille.pitchen@atmel.com>
-Message-ID: <bf30618219df1fbca1c07e1aac17efbb5024f3cb.1433866582.git.cyrille.pitchen@atmel.com>
+From: dan.j.williams@intel.com (Dan Williams)
+Date: Tue, 09 Jun 2015 12:27:15 -0400
+Subject: [PATCH 2/2] scatterlist: cleanup sg_chain() and sg_unmark_end()
+In-Reply-To: <20150609162659.21910.41681.stgit@dwillia2-desk3.amr.corp.intel.com>
+References: <20150609162659.21910.41681.stgit@dwillia2-desk3.amr.corp.intel.com>
+Message-ID: <20150609162715.21910.77696.stgit@dwillia2-desk3.amr.corp.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When FIFOs are available and enabled, the driver now configures the Atmel
-eXtended DMA Controller to perform word accesses instead of byte accesses
-when possible.
-The actual access width depends on the size of the buffer to transmit.
+Replace open coded sg_chain() and sg_unmark_end() instances with the
+aforementioned helpers.
 
-To enable FIFO support the "atmel,fifo-size" property must be set properly
-in the I2C controller node of the device tree.
-
-Signed-off-by: Cyrille Pitchen <cyrille.pitchen@atmel.com>
+Cc: Herbert Xu <herbert@gondor.apana.org.au>
+Cc: Christoph Hellwig <hch@lst.de>
+Cc: Vinod Koul <vinod.koul@intel.com>
+Cc: Linus Walleij <linus.walleij@linaro.org>
+Signed-off-by: Dan Williams <dan.j.williams@intel.com>
 ---
- drivers/i2c/busses/i2c-at91.c | 147 +++++++++++++++++++++++++++++++++++++-----
- 1 file changed, 130 insertions(+), 17 deletions(-)
+ block/blk-merge.c            |    2 +-
+ drivers/crypto/omap-sham.c   |    2 +-
+ drivers/dma/imx-dma.c        |    8 ++------
+ drivers/dma/ste_dma40.c      |    5 +----
+ drivers/mmc/card/queue.c     |    4 ++--
+ include/crypto/scatterwalk.h |    9 ++-------
+ 6 files changed, 9 insertions(+), 21 deletions(-)
 
-diff --git a/drivers/i2c/busses/i2c-at91.c b/drivers/i2c/busses/i2c-at91.c
-index 6e88b30..0d2dc7d 100644
---- a/drivers/i2c/busses/i2c-at91.c
-+++ b/drivers/i2c/busses/i2c-at91.c
-@@ -54,6 +54,8 @@
- #define	AT91_TWI_THRCLR		BIT(24) /* Transmit Holding Register Clear */
- #define	AT91_TWI_RHRCLR		BIT(25) /* Receive Holding Register Clear */
- #define	AT91_TWI_LOCKCLR	BIT(26) /* Lock Clear */
-+#define	AT91_TWI_FIFOEN		BIT(28) /* FIFO Enable */
-+#define	AT91_TWI_FIFODIS	BIT(29) /* FIFO Disable */
+diff --git a/block/blk-merge.c b/block/blk-merge.c
+index fd3fee81c23c..7bb4f260ca4b 100644
+--- a/block/blk-merge.c
++++ b/block/blk-merge.c
+@@ -266,7 +266,7 @@ int blk_rq_map_sg(struct request_queue *q, struct request *rq,
+ 		if (rq->cmd_flags & REQ_WRITE)
+ 			memset(q->dma_drain_buffer, 0, q->dma_drain_size);
  
- #define	AT91_TWI_MMR		0x0004	/* Master Mode Register */
- #define	AT91_TWI_IADRSZ_1	0x0100	/* Internal Device Address Size */
-@@ -85,6 +87,22 @@
- #define	AT91_TWI_ACR_DATAL(len)	((len) & 0xff)
- #define	AT91_TWI_ACR_DIR	BIT(8)
+-		sg->page_link &= ~0x02;
++		sg_unmark_end(sg);
+ 		sg = sg_next(sg);
+ 		sg_set_page(sg, virt_to_page(q->dma_drain_buffer),
+ 			    q->dma_drain_size,
+diff --git a/drivers/crypto/omap-sham.c b/drivers/crypto/omap-sham.c
+index 4d63e0d4da9a..df8b23e19b90 100644
+--- a/drivers/crypto/omap-sham.c
++++ b/drivers/crypto/omap-sham.c
+@@ -582,7 +582,7 @@ static int omap_sham_xmit_dma(struct omap_sham_dev *dd, dma_addr_t dma_addr,
+ 		 * the dmaengine may try to DMA the incorrect amount of data.
+ 		 */
+ 		sg_init_table(&ctx->sgl, 1);
+-		ctx->sgl.page_link = ctx->sg->page_link;
++		sg_assign_page(&ctx->sgl, sg_page(ctx->sg));
+ 		ctx->sgl.offset = ctx->sg->offset;
+ 		sg_dma_len(&ctx->sgl) = len32;
+ 		sg_dma_address(&ctx->sgl) = sg_dma_address(ctx->sg);
+diff --git a/drivers/dma/imx-dma.c b/drivers/dma/imx-dma.c
+index eed405976ea9..081fbfc87f6b 100644
+--- a/drivers/dma/imx-dma.c
++++ b/drivers/dma/imx-dma.c
+@@ -886,18 +886,14 @@ static struct dma_async_tx_descriptor *imxdma_prep_dma_cyclic(
+ 	sg_init_table(imxdmac->sg_list, periods);
  
-+#define	AT91_TWI_FMR		0x0050	/* FIFO Mode Register */
-+#define	AT91_TWI_FMR_TXRDYM(mode)	(((mode) & 0x3) << 0)
-+#define	AT91_TWI_FMR_TXRDYM_MASK	(0x3 << 0)
-+#define	AT91_TWI_FMR_RXRDYM(mode)	(((mode) & 0x3) << 4)
-+#define	AT91_TWI_FMR_RXRDYM_MASK	(0x3 << 4)
-+#define	AT91_TWI_ONE_DATA	0x0
-+#define	AT91_TWI_TWO_DATA	0x1
-+#define	AT91_TWI_FOUR_DATA	0x2
-+
-+#define	AT91_TWI_FLR		0x0054	/* FIFO Level Register */
-+
-+#define	AT91_TWI_FSR		0x0060	/* FIFO Status Register */
-+#define	AT91_TWI_FIER		0x0064	/* FIFO Interrupt Enable Register */
-+#define	AT91_TWI_FIDR		0x0068	/* FIFO Interrupt Disable Register */
-+#define	AT91_TWI_FIMR		0x006c	/* FIFO Interrupt Mask Register */
-+
- #define	AT91_TWI_VER		0x00fc	/* Version Register */
- 
- struct at91_twi_pdata {
-@@ -98,7 +116,7 @@ struct at91_twi_pdata {
- struct at91_twi_dma {
- 	struct dma_chan *chan_rx;
- 	struct dma_chan *chan_tx;
--	struct scatterlist sg;
-+	struct scatterlist sg[2];
- 	struct dma_async_tx_descriptor *data_desc;
- 	enum dma_data_direction direction;
- 	bool buf_mapped;
-@@ -121,6 +139,7 @@ struct at91_twi_dev {
- 	struct at91_twi_pdata *pdata;
- 	bool use_dma;
- 	bool recv_len_abort;
-+	u32 fifo_size;
- 	struct at91_twi_dma dma;
- };
- 
-@@ -154,6 +173,9 @@ static void at91_init_twi_bus(struct at91_twi_dev *dev)
- {
- 	at91_disable_twi_interrupts(dev);
- 	at91_twi_write(dev, AT91_TWI_CR, AT91_TWI_SWRST);
-+	/* FIFO should be enabled immediately after the software reset */
-+	if (dev->fifo_size)
-+		at91_twi_write(dev, AT91_TWI_CR, AT91_TWI_FIFOEN);
- 	at91_twi_write(dev, AT91_TWI_CR, AT91_TWI_MSEN);
- 	at91_twi_write(dev, AT91_TWI_CR, AT91_TWI_SVDIS);
- 	at91_twi_write(dev, AT91_TWI_CWGR, dev->twi_cwgr_reg);
-@@ -200,7 +222,7 @@ static void at91_twi_dma_cleanup(struct at91_twi_dev *dev)
- 		dma->xfer_in_progress = false;
- 	}
- 	if (dma->buf_mapped) {
--		dma_unmap_single(dev->dev, sg_dma_address(&dma->sg),
-+		dma_unmap_single(dev->dev, sg_dma_address(&dma->sg[0]),
- 				 dev->buf_len, dma->direction);
- 		dma->buf_mapped = false;
- 	}
-@@ -213,7 +235,8 @@ static void at91_twi_write_next_byte(struct at91_twi_dev *dev)
- 	if (dev->buf_len <= 0)
- 		return;
- 
--	at91_twi_write(dev, AT91_TWI_THR, *dev->buf);
-+	/* 8bit write works with and without FIFO */
-+	writeb_relaxed(*dev->buf, dev->base + AT91_TWI_THR);
- 
- 	/* send stop when last byte has been written */
- 	if (--dev->buf_len == 0)
-@@ -229,7 +252,7 @@ static void at91_twi_write_data_dma_callback(void *data)
- {
- 	struct at91_twi_dev *dev = (struct at91_twi_dev *)data;
- 
--	dma_unmap_single(dev->dev, sg_dma_address(&dev->dma.sg),
-+	dma_unmap_single(dev->dev, sg_dma_address(&dev->dma.sg[0]),
- 			 dev->buf_len, DMA_TO_DEVICE);
- 
- 	/*
-@@ -250,6 +273,7 @@ static void at91_twi_write_data_dma(struct at91_twi_dev *dev)
- 	struct dma_async_tx_descriptor *txdesc;
- 	struct at91_twi_dma *dma = &dev->dma;
- 	struct dma_chan *chan_tx = dma->chan_tx;
-+	unsigned int sg_len = 1;
- 
- 	if (dev->buf_len <= 0)
- 		return;
-@@ -265,10 +289,43 @@ static void at91_twi_write_data_dma(struct at91_twi_dev *dev)
- 	}
- 	dma->buf_mapped = true;
- 	at91_twi_irq_restore(dev);
--	sg_dma_len(&dma->sg) = dev->buf_len;
--	sg_dma_address(&dma->sg) = dma_addr;
- 
--	txdesc = dmaengine_prep_slave_sg(chan_tx, &dma->sg, 1, DMA_MEM_TO_DEV,
-+	if (dev->fifo_size) {
-+		size_t part1_len, part2_len;
-+		struct scatterlist *sg;
-+		unsigned fifo_mr;
-+
-+		sg_len = 0;
-+
-+		part1_len = dev->buf_len & ~0x3;
-+		if (part1_len) {
-+			sg = &dma->sg[sg_len++];
-+			sg_dma_len(sg) = part1_len;
-+			sg_dma_address(sg) = dma_addr;
-+		}
-+
-+		part2_len = dev->buf_len & 0x3;
-+		if (part2_len) {
-+			sg = &dma->sg[sg_len++];
-+			sg_dma_len(sg) = part2_len;
-+			sg_dma_address(sg) = dma_addr + part1_len;
-+		}
-+
-+		/*
-+		 * DMA controller is triggered when at least 4 data can be
-+		 * written into the TX FIFO
-+		 */
-+		fifo_mr = at91_twi_read(dev, AT91_TWI_FMR);
-+		fifo_mr &= ~AT91_TWI_FMR_TXRDYM_MASK;
-+		fifo_mr |= AT91_TWI_FMR_TXRDYM(AT91_TWI_FOUR_DATA);
-+		at91_twi_write(dev, AT91_TWI_FMR, fifo_mr);
-+	} else {
-+		sg_dma_len(&dma->sg[0]) = dev->buf_len;
-+		sg_dma_address(&dma->sg[0]) = dma_addr;
-+	}
-+
-+	txdesc = dmaengine_prep_slave_sg(chan_tx, dma->sg, sg_len,
-+					 DMA_MEM_TO_DEV,
- 					 DMA_PREP_INTERRUPT | DMA_CTRL_ACK);
- 	if (!txdesc) {
- 		dev_err(dev->dev, "dma prep slave sg failed\n");
-@@ -293,7 +350,8 @@ static void at91_twi_read_next_byte(struct at91_twi_dev *dev)
- 	if (dev->buf_len <= 0)
- 		return;
- 
--	*dev->buf = at91_twi_read(dev, AT91_TWI_RHR) & 0xff;
-+	/* 8bit read works with and without FIFO */
-+	*dev->buf = readb_relaxed(dev->base + AT91_TWI_RHR);
- 	--dev->buf_len;
- 
- 	/* return if aborting, we only needed to read RHR to clear RXRDY*/
-@@ -330,7 +388,7 @@ static void at91_twi_read_data_dma_callback(void *data)
- 	struct at91_twi_dev *dev = (struct at91_twi_dev *)data;
- 	unsigned ier = AT91_TWI_TXCOMP;
- 
--	dma_unmap_single(dev->dev, sg_dma_address(&dev->dma.sg),
-+	dma_unmap_single(dev->dev, sg_dma_address(&dev->dma.sg[0]),
- 			 dev->buf_len, DMA_FROM_DEVICE);
- 
- 	if (!dev->pdata->has_alt_cmd) {
-@@ -362,10 +420,24 @@ static void at91_twi_read_data_dma(struct at91_twi_dev *dev)
- 	}
- 	dma->buf_mapped = true;
- 	at91_twi_irq_restore(dev);
--	dma->sg.dma_address = dma_addr;
--	sg_dma_len(&dma->sg) = buf_len;
- 
--	rxdesc = dmaengine_prep_slave_sg(chan_rx, &dma->sg, 1, DMA_DEV_TO_MEM,
-+	if (dev->fifo_size && IS_ALIGNED(buf_len, 4)) {
-+		unsigned fifo_mr;
-+
-+		/*
-+		 * DMA controller is triggered when at least 4 data can be
-+		 * read from the RX FIFO
-+		 */
-+		fifo_mr = at91_twi_read(dev, AT91_TWI_FMR);
-+		fifo_mr &= ~AT91_TWI_FMR_RXRDYM_MASK;
-+		fifo_mr |= AT91_TWI_FMR_RXRDYM(AT91_TWI_FOUR_DATA);
-+		at91_twi_write(dev, AT91_TWI_FMR, fifo_mr);
-+	}
-+
-+	sg_dma_len(&dma->sg[0]) = buf_len;
-+	sg_dma_address(&dma->sg[0]) = dma_addr;
-+
-+	rxdesc = dmaengine_prep_slave_sg(chan_rx, dma->sg, 1, DMA_DEV_TO_MEM,
- 					 DMA_PREP_INTERRUPT | DMA_CTRL_ACK);
- 	if (!rxdesc) {
- 		dev_err(dev->dev, "dma prep slave sg failed\n");
-@@ -465,6 +537,21 @@ static int at91_do_twi_transfer(struct at91_twi_dev *dev)
- 	reinit_completion(&dev->cmd_complete);
- 	dev->transfer_status = 0;
- 
-+	if (dev->fifo_size) {
-+		unsigned fifo_mr = at91_twi_read(dev, AT91_TWI_FMR);
-+
-+		/* Reset FIFO mode register */
-+		fifo_mr &= ~(AT91_TWI_FMR_TXRDYM_MASK |
-+			     AT91_TWI_FMR_RXRDYM_MASK);
-+		fifo_mr |= AT91_TWI_FMR_TXRDYM(AT91_TWI_ONE_DATA);
-+		fifo_mr |= AT91_TWI_FMR_RXRDYM(AT91_TWI_ONE_DATA);
-+		at91_twi_write(dev, AT91_TWI_FMR, fifo_mr);
-+
-+		/* Flush FIFOs */
-+		at91_twi_write(dev, AT91_TWI_CR,
-+			       AT91_TWI_THRCLR | AT91_TWI_RHRCLR);
-+	}
-+
- 	if (!dev->buf_len) {
- 		at91_twi_write(dev, AT91_TWI_CR, AT91_TWI_QUICK);
- 		at91_twi_write(dev, AT91_TWI_IER, AT91_TWI_TXCOMP);
-@@ -536,7 +623,8 @@ static int at91_do_twi_transfer(struct at91_twi_dev *dev)
- 		ret = -EIO;
- 		goto error;
- 	}
--	if (has_alt_cmd && (dev->transfer_status & AT91_TWI_LOCK)) {
-+	if ((has_alt_cmd || dev->fifo_size) &&
-+	    (dev->transfer_status & AT91_TWI_LOCK)) {
- 		dev_err(dev->dev, "tx locked\n");
- 		ret = -EIO;
- 		goto error;
-@@ -555,7 +643,8 @@ error:
- 	/* first stop DMA transfer if still in progress */
- 	at91_twi_dma_cleanup(dev);
- 	/* then flush THR/FIFO and unlock TX if locked */
--	if (has_alt_cmd && (dev->transfer_status & AT91_TWI_LOCK)) {
-+	if ((has_alt_cmd || dev->fifo_size) &&
-+	    (dev->transfer_status & AT91_TWI_LOCK)) {
- 		dev_dbg(dev->dev, "unlock tx\n");
- 		at91_twi_write(dev, AT91_TWI_CR,
- 			       AT91_TWI_THRCLR | AT91_TWI_LOCKCLR);
-@@ -750,13 +839,32 @@ static int at91_twi_configure_dma(struct at91_twi_dev *dev, u32 phy_addr)
- 	int ret = 0;
- 	struct dma_slave_config slave_config;
- 	struct at91_twi_dma *dma = &dev->dma;
-+	enum dma_slave_buswidth addr_width = DMA_SLAVE_BUSWIDTH_1_BYTE;
-+
-+	/*
-+	 * The actual width of the access will be chosen in
-+	 * dmaengine_prep_slave_sg():
-+	 * for each buffer in the scatter-gather list, if its size is aligned
-+	 * to addr_width then addr_width accesses will be performed to transfer
-+	 * the buffer. On the other hand, if the buffer size is not aligned to
-+	 * addr_width then the buffer is transferred using single byte accesses.
-+	 * Please refer to the Atmel eXtended DMA controller driver.
-+	 * When FIFOs are used, the TXRDYM threshold can always be set to
-+	 * trigger the XDMAC when at least 4 data can be written into the TX
-+	 * FIFO, even if single byte accesses are performed.
-+	 * However the RXRDYM threshold must be set to fit the access width,
-+	 * deduced from buffer length, so the XDMAC is triggered properly to
-+	 * read data from the RX FIFO.
-+	 */
-+	if (dev->fifo_size)
-+		addr_width = DMA_SLAVE_BUSWIDTH_4_BYTES;
- 
- 	memset(&slave_config, 0, sizeof(slave_config));
- 	slave_config.src_addr = (dma_addr_t)phy_addr + AT91_TWI_RHR;
--	slave_config.src_addr_width = DMA_SLAVE_BUSWIDTH_1_BYTE;
-+	slave_config.src_addr_width = addr_width;
- 	slave_config.src_maxburst = 1;
- 	slave_config.dst_addr = (dma_addr_t)phy_addr + AT91_TWI_THR;
--	slave_config.dst_addr_width = DMA_SLAVE_BUSWIDTH_1_BYTE;
-+	slave_config.dst_addr_width = addr_width;
- 	slave_config.dst_maxburst = 1;
- 	slave_config.device_fc = false;
- 
-@@ -788,7 +896,7 @@ static int at91_twi_configure_dma(struct at91_twi_dev *dev, u32 phy_addr)
- 		goto error;
+ 	for (i = 0; i < periods; i++) {
+-		imxdmac->sg_list[i].page_link = 0;
+-		imxdmac->sg_list[i].offset = 0;
++		sg_set_page(&imxdmac->sg_list[i], NULL, period_len, 0);
+ 		imxdmac->sg_list[i].dma_address = dma_addr;
+ 		sg_dma_len(&imxdmac->sg_list[i]) = period_len;
+ 		dma_addr += period_len;
  	}
  
--	sg_init_table(&dma->sg, 1);
-+	sg_init_table(dma->sg, 2);
- 	dma->buf_mapped = false;
- 	dma->xfer_in_progress = false;
- 	dev->use_dma = true;
-@@ -874,6 +982,11 @@ static int at91_twi_probe(struct platform_device *pdev)
- 			return rc;
+ 	/* close the loop */
+-	imxdmac->sg_list[periods].offset = 0;
+-	sg_dma_len(&imxdmac->sg_list[periods]) = 0;
+-	imxdmac->sg_list[periods].page_link =
+-		((unsigned long)imxdmac->sg_list | 0x01) & ~0x02;
++	sg_chain(imxdmac->sg_list, periods + 1, imxdmac->sg_list);
+ 
+ 	desc->type = IMXDMA_DESC_CYCLIC;
+ 	desc->sg = imxdmac->sg_list;
+diff --git a/drivers/dma/ste_dma40.c b/drivers/dma/ste_dma40.c
+index 3c10f034d4b9..e8c00642cacb 100644
+--- a/drivers/dma/ste_dma40.c
++++ b/drivers/dma/ste_dma40.c
+@@ -2562,10 +2562,7 @@ dma40_prep_dma_cyclic(struct dma_chan *chan, dma_addr_t dma_addr,
+ 		dma_addr += period_len;
  	}
  
-+	if (!of_property_read_u32(pdev->dev.of_node, "atmel,fifo-size",
-+				  &dev->fifo_size)) {
-+		dev_info(dev->dev, "Using FIFO (%u data)\n", dev->fifo_size);
-+	}
-+
- 	rc = of_property_read_u32(dev->dev->of_node, "clock-frequency",
- 			&bus_clk_rate);
- 	if (rc)
--- 
-1.8.2.2
+-	sg[periods].offset = 0;
+-	sg_dma_len(&sg[periods]) = 0;
+-	sg[periods].page_link =
+-		((unsigned long)sg | 0x01) & ~0x02;
++	sg_chain(sg, periods + 1, sg);
+ 
+ 	txd = d40_prep_sg(chan, sg, sg, periods, direction,
+ 			  DMA_PREP_INTERRUPT);
+diff --git a/drivers/mmc/card/queue.c b/drivers/mmc/card/queue.c
+index 8efa3684aef8..fa525ee20470 100644
+--- a/drivers/mmc/card/queue.c
++++ b/drivers/mmc/card/queue.c
+@@ -469,7 +469,7 @@ static unsigned int mmc_queue_packed_map_sg(struct mmc_queue *mq,
+ 			sg_set_buf(__sg, buf + offset, len);
+ 			offset += len;
+ 			remain -= len;
+-			(__sg++)->page_link &= ~0x02;
++			sg_unmark_end(__sg++);
+ 			sg_len++;
+ 		} while (remain);
+ 	}
+@@ -477,7 +477,7 @@ static unsigned int mmc_queue_packed_map_sg(struct mmc_queue *mq,
+ 	list_for_each_entry(req, &packed->list, queuelist) {
+ 		sg_len += blk_rq_map_sg(mq->queue, req, __sg);
+ 		__sg = sg + (sg_len - 1);
+-		(__sg++)->page_link &= ~0x02;
++		sg_unmark_end(__sg++);
+ 	}
+ 	sg_mark_end(sg + (sg_len - 1));
+ 	return sg_len;
+diff --git a/include/crypto/scatterwalk.h b/include/crypto/scatterwalk.h
+index 20e4226a2e14..4529889b0f07 100644
+--- a/include/crypto/scatterwalk.h
++++ b/include/crypto/scatterwalk.h
+@@ -25,13 +25,8 @@
+ #include <linux/scatterlist.h>
+ #include <linux/sched.h>
+ 
+-static inline void scatterwalk_sg_chain(struct scatterlist *sg1, int num,
+-					struct scatterlist *sg2)
+-{
+-	sg_set_page(&sg1[num - 1], (void *)sg2, 0, 0);
+-	sg1[num - 1].page_link &= ~0x02;
+-	sg1[num - 1].page_link |= 0x01;
+-}
++#define scatterwalk_sg_chain(prv, num, sgl)	sg_chain(prv, num, sgl)
++#define scatterwalk_sg_next(sgl)		sg_next(sgl)
+ 
+ static inline void scatterwalk_crypto_chain(struct scatterlist *head,
+ 					    struct scatterlist *sg,
