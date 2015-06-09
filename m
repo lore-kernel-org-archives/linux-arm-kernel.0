@@ -1,31 +1,41 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 9 Jun 2015 21:28:34 +0100
-Subject: [PATCH 00/15] Kill off set_irq_flags
-In-Reply-To: <1433874401-27161-1-git-send-email-robh@kernel.org>
-References: <1433874401-27161-1-git-send-email-robh@kernel.org>
-Message-ID: <20150609202834.GH7557@n2100.arm.linux.org.uk>
+From: stefan@agner.ch (Stefan Agner)
+Date: Tue, 09 Jun 2015 22:31:07 +0200
+Subject: [PATCH v4 1/6] mtd: nand: vf610_nfc: Freescale NFC for VF610,
+ MPC5125 and others
+In-Reply-To: <20150609200751.GC5720@breakpoint.cc>
+References: <1427300909-20825-1-git-send-email-stefan@agner.ch>
+ <1427300909-20825-2-git-send-email-stefan@agner.ch>
+ <20150603130825.GA23991@breakpoint.cc>
+ <b3b09b4b8c97cbfc88fa0d5fdc5e40cd@agner.ch>
+ <20150609200751.GC5720@breakpoint.cc>
+Message-ID: <16ebb290641f700f2262527f90ff1e46@agner.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 09, 2015 at 01:26:26PM -0500, Rob Herring wrote:
-> This series converts all users of ARM specific set_irq_flags to use
-> common genirq functions. In many cases where irqdomains are used, the
-> set_irq_flags calls were redundant, so I've removed them.
+On 2015-06-09 22:07, Sebastian Andrzej Siewior wrote:
+> On 2015-06-03 17:05:16 [+0200], Stefan Agner wrote:
+>> As Boris guessed correctly, the reason I used the raw variant was due to
+>> performance improvements due to the barrier. However, I will use
 > 
-> This is not intended for 4.2, but if any subsystem maintainers want to
-> pick up their subsystem's change that is fine. All but the last 2
-> patches stand on their own. Any new drivers going into 4.2 may need a
-> similar change, but I'm sure people are told not to use set_irq_flags in
-> reviews. ;)
+> yeah, do you have any numbers by chance?
 
-So what are you doing about the initial state of IRQs on legacy ARM where
-IRQs start off being un-requestable, and need the set_irq_flags() to make
-them requestable.  I think you could be introducing a massive regression
-by making this change.
+Not current ones for Linux. I added this in the U-Boot variant of the
+driver.
+ 
+>> {read|write}l_relaxed instead, which should offer endian abstraction
+>> while not having the performance penalty due to extensive barriers...
+> 
+> well, even those
+> |$ git grep readl_relaxed arch/powerpc/
+> |arch/powerpc/include/asm/io.h:#define readl_relaxed(addr) readl(addr)
+> 
+> have the endian swap. So an abstraction like you provided earlier
+> would be nice :)
 
-Unless you can prove that this isn't the case, you shouldn't be removing
-this stuff, especially not from legacy platforms.
+What do you mean by that?
 
--- 
-FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
-according to speedtest.net.
+Btw, I sent v5 of the patchset which use the relaxed variants. As
+expected, performance did not suffer by that change on ARM.
+
+--
+Stefan
