@@ -1,84 +1,38 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Tue, 09 Jun 2015 16:23:25 +0900
-Subject: [PATCH] cpufreq:exynos-cpufreq - Fix for memory leak in case SOC
- name does not match.
-In-Reply-To: <20150609090722.43965fa0@amdc2363>
-References: <1432519780-2910-1-git-send-email-shailendra.capricorn@gmail.com>
- <20150525073149.GF9992@linux> <20150608103100.57f0473b@amdc2363>
- <8344426.BL3KyufMos@vostro.rjw.lan> <20150609090722.43965fa0@amdc2363>
-Message-ID: <5576946D.2070909@samsung.com>
+From: monstr@monstr.eu (Michal Simek)
+Date: Tue, 09 Jun 2015 09:27:39 +0200
+Subject: [PATCH v4 2/2] dma: Add Xilinx AXI Central Direct Memory Access
+ Engine driver support
+In-Reply-To: <1433834507.16887.3.camel@x220>
+References: <1432228035-6569-1-git-send-email-appanad@xilinx.com>	
+ <1432290653.27695.97.camel@x220> <557681A7.7080202@monstr.eu>
+ <1433834507.16887.3.camel@x220>
+Message-ID: <5576956B.7050901@monstr.eu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09.06.2015 16:07, Lukasz Majewski wrote:
-> Hi Rafael,
+On 06/09/2015 09:21 AM, Paul Bolle wrote:
+> On Tue, 2015-06-09 at 08:03 +0200, Michal Simek wrote:
+>> Have you sent any patch to add GPL v2+ to license.h?
 > 
->> On Monday, June 08, 2015 10:31:00 AM Lukasz Majewski wrote:
->>> Hi Viresh,
->>>
->>>> On 25-05-15, 07:39, Shailendra Verma wrote:
->>>>> During probe free the memory allocated to "exynos_info" in case
->>>>> of unknown SOC type.
->>>>>
->>>>> Signed-off-by: Shailendra Verma <shailendra.capricorn@gmail.com>
->>>>> ---
->>>>>  drivers/cpufreq/exynos-cpufreq.c |    6 ++++--
->>>>>  1 file changed, 4 insertions(+), 2 deletions(-)
->>>>>
->>>>> diff --git a/drivers/cpufreq/exynos-cpufreq.c
->>>>> b/drivers/cpufreq/exynos-cpufreq.c index 82d2fbb..8682378 100644
->>>>> --- a/drivers/cpufreq/exynos-cpufreq.c
->>>>> +++ b/drivers/cpufreq/exynos-cpufreq.c
->>>>> @@ -182,7 +182,7 @@ static int exynos_cpufreq_probe(struct
->>>>> platform_device *pdev) ret =
->>>>> exynos5250_cpufreq_init(exynos_info); } else {
->>>>>  		pr_err("%s: Unknown SoC type\n", __func__);
->>>>> -		return -ENODEV;
->>>>> +		ret = -ENODEV;
->>>>>  	}
->>>>>  
->>>>>  	if (ret)
->>>>> @@ -190,12 +190,14 @@ static int exynos_cpufreq_probe(struct
->>>>> platform_device *pdev) 
->>>>>  	if (exynos_info->set_freq == NULL) {
->>>>>  		dev_err(&pdev->dev, "No set_freq function
->>>>> (ERR)\n");
->>>>> +		ret = -EINVAL;
->>>>>  		goto err_vdd_arm;
->>>>>  	}
->>>>>  
->>>>>  	arm_regulator = regulator_get(NULL, "vdd_arm");
->>>>>  	if (IS_ERR(arm_regulator)) {
->>>>>  		dev_err(&pdev->dev, "failed to get resource
->>>>> vdd_arm\n");
->>>>> +		ret = -EINVAL;
->>>>>  		goto err_vdd_arm;
->>>>>  	}
->>>>>  
->>>>> @@ -227,7 +229,7 @@ err_cpufreq_reg:
->>>>>  	regulator_put(arm_regulator);
->>>>>  err_vdd_arm:
->>>>>  	kfree(exynos_info);
->>>>> -	return -EINVAL;
->>>>> +	return ret;
->>>>>  }
->>>>>  
->>>>>  static struct platform_driver exynos_cpufreq_platdrv = {
->>>>
->>>> Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
->>>>
->>>
->>> Acked-by: Lukasz Majewski <l.majewski@samsung.com>
->>
->> I'm assuming that it will go it through the Samsung tree.
->>
->>
-> 
-> That would be the easiest way to proceed. 
-> 
-> Krzystof would you like to grab this patch?
+> "GPL" already means GPL v2 or later (see include/linux/module.h).
 
-Sure, I'll take it.
+ok. I see.
 
-Best regards,
-Krzysztof
+Thanks,
+Michal
+
+-- 
+Michal Simek, Ing. (M.Eng), OpenPGP -> KeyID: FE3D1F91
+w: www.monstr.eu p: +42-0-721842854
+Maintainer of Linux kernel - Microblaze cpu - http://www.monstr.eu/fdt/
+Maintainer of Linux kernel - Xilinx Zynq ARM architecture
+Microblaze U-BOOT custodian and responsible for u-boot arm zynq platform
+
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150609/af240675/attachment.sig>
