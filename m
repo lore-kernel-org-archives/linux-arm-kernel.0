@@ -1,91 +1,165 @@
 From: hdegoede@redhat.com (Hans de Goede)
-Date: Tue,  9 Jun 2015 23:37:56 +0200
-Subject: [PATCH 3/8] power: Add devm_power_supply_get_by_phandle() helper
- function
+Date: Tue,  9 Jun 2015 23:37:58 +0200
+Subject: [PATCH 5/8] phy-sun4i-usb: Add support for monitoring vbus via a
+ power-supply
 In-Reply-To: <1433885881-19809-1-git-send-email-hdegoede@redhat.com>
 References: <1433885881-19809-1-git-send-email-hdegoede@redhat.com>
-Message-ID: <1433885881-19809-4-git-send-email-hdegoede@redhat.com>
+Message-ID: <1433885881-19809-6-git-send-email-hdegoede@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This commit adds a resource-managed version of the
-power_supply_get_by_phandle() function.
+On some boards there is no vbus_det gpio pin, instead vbus-detection for
+otg can be done via the pmic.
+
+This commit adds support for monitoring vbus_det via the power_supply
+exported by the pmic, enabling support for otg on these boards.
 
 Signed-off-by: Hans de Goede <hdegoede@redhat.com>
 ---
- drivers/power/power_supply_core.c | 39 +++++++++++++++++++++++++++++++++++++++
- include/linux/power_supply.h      |  5 +++++
- 2 files changed, 44 insertions(+)
+ .../devicetree/bindings/phy/sun4i-usb-phy.txt      |  1 +
+ drivers/phy/phy-sun4i-usb.c                        | 68 +++++++++++++++++++---
+ 2 files changed, 62 insertions(+), 7 deletions(-)
 
-diff --git a/drivers/power/power_supply_core.c b/drivers/power/power_supply_core.c
-index 2ed4a4a..59856bc 100644
---- a/drivers/power/power_supply_core.c
-+++ b/drivers/power/power_supply_core.c
-@@ -420,6 +420,45 @@ struct power_supply *power_supply_get_by_phandle(struct device_node *np,
- 	return psy;
- }
- EXPORT_SYMBOL_GPL(power_supply_get_by_phandle);
-+
-+static void devm_power_supply_put(struct device *dev, void *res)
-+{
-+	struct power_supply **psy = res;
-+
-+	power_supply_put(*psy);
-+}
-+
-+/**
-+ * devm_power_supply_get_by_phandle() - Resource managed version of
-+ *  power_supply_get_by_phandle()
-+ * @dev: Pointer to device holding phandle property
-+ * @phandle_name: Name of property holding a power supply phandle
-+ *
-+ * Return: On success returns a reference to a power supply with
-+ * matching name equals to value under @property, NULL or ERR_PTR otherwise.
-+ */
-+struct power_supply *devm_power_supply_get_by_phandle(struct device *dev,
-+						      const char *property)
-+{
-+	struct power_supply **ptr, *psy;
-+
-+	if (!dev->of_node)
-+		return ERR_PTR(-ENODEV);
-+
-+	ptr = devres_alloc(devm_power_supply_put, sizeof(*ptr), GFP_KERNEL);
-+	if (!ptr)
-+		return ERR_PTR(-ENOMEM);
-+
-+	psy = power_supply_get_by_phandle(dev->of_node, property);
-+	if (IS_ERR_OR_NULL(psy)) {
-+		devres_free(ptr);
-+	} else {
-+		*ptr = psy;
-+		devres_add(dev, ptr);
-+	}
-+	return psy;
-+}
-+EXPORT_SYMBOL_GPL(devm_power_supply_get_by_phandle);
- #endif /* CONFIG_OF */
+diff --git a/Documentation/devicetree/bindings/phy/sun4i-usb-phy.txt b/Documentation/devicetree/bindings/phy/sun4i-usb-phy.txt
+index 5f48979..0cebf74 100644
+--- a/Documentation/devicetree/bindings/phy/sun4i-usb-phy.txt
++++ b/Documentation/devicetree/bindings/phy/sun4i-usb-phy.txt
+@@ -29,6 +29,7 @@ Required properties:
+ Optional properties:
+ - usb0_id_det-gpios : gpio phandle for reading the otg id pin value
+ - usb0_vbus_det-gpios : gpio phandle for detecting the presence of usb0 vbus
++- usb0_vbus_power-supply: power-supply phandle for usb0 vbus presence detect
+ - usb0_vbus-supply : regulator phandle for controller usb0 vbus
+ - usb1_vbus-supply : regulator phandle for controller usb1 vbus
+ - usb2_vbus-supply : regulator phandle for controller usb2 vbus
+diff --git a/drivers/phy/phy-sun4i-usb.c b/drivers/phy/phy-sun4i-usb.c
+index 4981041..85bb215 100644
+--- a/drivers/phy/phy-sun4i-usb.c
++++ b/drivers/phy/phy-sun4i-usb.c
+@@ -36,6 +36,7 @@
+ #include <linux/phy/phy.h>
+ #include <linux/phy/phy-sun4i-usb.h>
+ #include <linux/platform_device.h>
++#include <linux/power_supply.h>
+ #include <linux/regulator/consumer.h>
+ #include <linux/reset.h>
+ #include <linux/workqueue.h>
+@@ -111,6 +112,8 @@ struct sun4i_usb_phy_data {
+ 	bool phy0_poll;
+ 	struct gpio_desc *id_det_gpio;
+ 	struct gpio_desc *vbus_det_gpio;
++	struct power_supply *vbus_power_supply;
++	struct notifier_block vbus_power_nb;
+ 	int id_det_irq;
+ 	int vbus_det_irq;
+ 	int id_det;
+@@ -355,6 +358,30 @@ static struct phy_ops sun4i_usb_phy_ops = {
+ 	.owner		= THIS_MODULE,
+ };
  
- int power_supply_get_property(struct power_supply *psy,
-diff --git a/include/linux/power_supply.h b/include/linux/power_supply.h
-index 75a1dd8..a99cf4f 100644
---- a/include/linux/power_supply.h
-+++ b/include/linux/power_supply.h
-@@ -286,10 +286,15 @@ extern void power_supply_put(struct power_supply *psy);
- #ifdef CONFIG_OF
- extern struct power_supply *power_supply_get_by_phandle(struct device_node *np,
- 							const char *property);
-+extern struct power_supply *devm_power_supply_get_by_phandle(
-+				    struct device *dev, const char *property);
- #else /* !CONFIG_OF */
- static inline struct power_supply *
- power_supply_get_by_phandle(struct device_node *np, const char *property)
- { return NULL; }
-+static inline struct power_supply *
-+devm_power_supply_get_by_phandle(struct device *dev, const char *property)
-+{ return NULL; }
- #endif /* CONFIG_OF */
- extern void power_supply_changed(struct power_supply *psy);
- extern int power_supply_am_i_supplied(struct power_supply *psy);
++static int sun4i_usb_phy0_get_vbus_det(struct sun4i_usb_phy_data *data)
++{
++	if (data->vbus_det_gpio)
++		return gpiod_get_value_cansleep(data->vbus_det_gpio);
++
++	if (data->vbus_power_supply) {
++		union power_supply_propval val;
++		int r;
++
++		r = power_supply_get_property(data->vbus_power_supply,
++					      POWER_SUPPLY_PROP_PRESENT, &val);
++		if (r == 0)
++			return val.intval;
++	}
++
++	/* Fallback: report vbus as high */
++	return 1;
++}
++
++static bool sun4i_usb_phy0_have_vbus_det(struct sun4i_usb_phy_data *data)
++{
++	return data->vbus_det_gpio || data->vbus_power_supply;
++}
++
+ static void sun4i_usb_phy0_id_vbus_det_scan(struct work_struct *work)
+ {
+ 	struct sun4i_usb_phy_data *data =
+@@ -363,10 +390,7 @@ static void sun4i_usb_phy0_id_vbus_det_scan(struct work_struct *work)
+ 	int id_det, vbus_det, id_notify = 0, vbus_notify = 0;
+ 
+ 	id_det = gpiod_get_value_cansleep(data->id_det_gpio);
+-	if (data->vbus_det_gpio)
+-		vbus_det = gpiod_get_value_cansleep(data->vbus_det_gpio);
+-	else
+-		vbus_det = 1; /* Report vbus as high */
++	vbus_det = sun4i_usb_phy0_get_vbus_det(data);
+ 
+ 	mutex_lock(&phy0->mutex);
+ 
+@@ -381,7 +405,7 @@ static void sun4i_usb_phy0_id_vbus_det_scan(struct work_struct *work)
+ 		 * without vbus detection report vbus low for long enough for
+ 		 * the musb-ip to end the current device session.
+ 		 */
+-		if (!data->vbus_det_gpio && id_det == 0) {
++		if (!sun4i_usb_phy0_have_vbus_det(data) && id_det == 0) {
+ 			sun4i_usb_phy0_set_vbus_detect(phy0, 0);
+ 			msleep(200);
+ 			sun4i_usb_phy0_set_vbus_detect(phy0, 1);
+@@ -408,7 +432,7 @@ static void sun4i_usb_phy0_id_vbus_det_scan(struct work_struct *work)
+ 		 * without vbus detection report vbus low for long enough to
+ 		 * the musb-ip to end the current host session.
+ 		 */
+-		if (!data->vbus_det_gpio && id_det == 1) {
++		if (!sun4i_usb_phy0_have_vbus_det(data) && id_det == 1) {
+ 			mutex_lock(&phy0->mutex);
+ 			sun4i_usb_phy0_set_vbus_detect(phy0, 0);
+ 			msleep(1000);
+@@ -436,6 +460,20 @@ static irqreturn_t sun4i_usb_phy0_id_vbus_det_irq(int irq, void *dev_id)
+ 	return IRQ_HANDLED;
+ }
+ 
++static int sun4i_usb_phy0_vbus_notify(struct notifier_block *nb,
++				      unsigned long val, void *v)
++{
++	struct sun4i_usb_phy_data *data = 
++		container_of(nb, struct sun4i_usb_phy_data, vbus_power_nb);
++	struct power_supply *psy = v;
++
++	/* Properties on the vbus_power_supply changed, scan vbus_det */
++	if (val == PSY_EVENT_PROP_CHANGED && psy == data->vbus_power_supply)
++		mod_delayed_work(system_wq, &data->detect, DEBOUNCE_TIME);
++
++	return NOTIFY_OK;
++}
++
+ static struct phy *sun4i_usb_phy_xlate(struct device *dev,
+ 					struct of_phandle_args *args)
+ {
+@@ -512,8 +550,24 @@ static int sun4i_usb_phy_probe(struct platform_device *pdev)
+ 		data->vbus_det_gpio = NULL;
+ 	}
+ 
++	if (of_find_property(np, "usb0_vbus_power-supply", NULL)) {
++		data->vbus_power_supply = devm_power_supply_get_by_phandle(dev,
++						     "usb0_vbus_power-supply");
++		if (IS_ERR(data->vbus_power_supply))
++			return PTR_ERR(data->vbus_power_supply);
++
++		if (!data->vbus_power_supply)
++			return -EPROBE_DEFER;
++
++		data->vbus_power_nb.notifier_call = sun4i_usb_phy0_vbus_notify;
++		data->vbus_power_nb.priority = 0;
++		ret = power_supply_reg_notifier(&data->vbus_power_nb);
++		if (ret)
++			return ret;
++	}
++
+ 	/* vbus_det without id_det makes no sense, and is not supported */
+-	if (data->vbus_det_gpio && !data->id_det_gpio) {
++	if (sun4i_usb_phy0_have_vbus_det(data) && !data->id_det_gpio) {
+ 		dev_err(dev, "usb0_id_det missing or invalid\n");
+ 		return -ENODEV;
+ 	}
 -- 
 2.3.6
