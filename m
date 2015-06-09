@@ -1,229 +1,136 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Tue, 9 Jun 2015 12:15:07 +0100
-Subject: [PATCH v2 2/4] PCI: designware: Add ARM64 support
-In-Reply-To: <557159B2.9090103@hisilicon.com>
-References: <1433320542-49576-1-git-send-email-wangzhou1@hisilicon.com>
- <1433320542-49576-3-git-send-email-wangzhou1@hisilicon.com>
- <5570507F.4030704@arm.com> <557159B2.9090103@hisilicon.com>
-Message-ID: <20150609111507.GB20182@red-moon>
+From: r.spliet@ultimaker.com (Roy Spliet)
+Date: Tue,  9 Jun 2015 13:27:24 +0200
+Subject: [PATCH] mtd: nand: Sunxi calculate timing cfg
+Message-ID: <1433849244-2917-1-git-send-email-r.spliet@ultimaker.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 05, 2015 at 09:11:30AM +0100, Zhou Wang wrote:
+Values derived from the A83 user manual
 
-[...]
+Signed-off-by: Roy Spliet <r.spliet@ultimaker.com>
+---
+ drivers/mtd/nand/sunxi_nand.c | 43 +++++++++++++++++++++++++++++++++++++------
+ 1 file changed, 37 insertions(+), 6 deletions(-)
 
-> >> -int dw_pcie_host_init(struct pcie_port *pp)
-> >> +int __init dw_pcie_host_init(struct pcie_port *pp)
-> >>  {
-> >>  	struct device_node *np = pp->dev->of_node;
-> >>  	struct platform_device *pdev = to_platform_device(pp->dev);
-> >>  	struct of_pci_range range;
-> >>  	struct of_pci_range_parser parser;
-> >> +	struct pci_bus *bus;
-> >>  	struct resource *cfg_res;
-> >> +	LIST_HEAD(res);
-> >>  	u32 val, na, ns;
-> >>  	const __be32 *addrp;
-> >>  	int i, index, ret;
-> >> @@ -502,15 +498,49 @@ int dw_pcie_host_init(struct pcie_port *pp)
-> >>  	val |= PORT_LOGIC_SPEED_CHANGE;
-> >>  	dw_pcie_wr_own_conf(pp, PCIE_LINK_WIDTH_SPEED_CONTROL, 4, val);
-> >>  
-> >> -#ifdef CONFIG_PCI_MSI
-> >> -	dw_pcie_msi_chip.dev = pp->dev;
-> >> -	dw_pci.msi_ctrl = &dw_pcie_msi_chip;
-> >> +#ifdef CONFIG_ARM
-> >> +	/*
-> >> +	 * FIXME: we should really be able to use
-> >> +	 * of_pci_get_host_bridge_resources on arm32 as well,
-> >> +	 * but the conversion needs some more testing
-> >> +	 */
-> >> +	if (global_io_offset < SZ_1M && pp->io_size > 0) {
-> >> +		pci_ioremap_io(global_io_offset, pp->io_base);
-> >> +		global_io_offset += SZ_64K;
-> >> +		pci_add_resource_offset(&res, &pp->io,
-> >> +					global_io_offset - pp->io_bus_addr);
-> >> +	}
-> >> +	pci_add_resource_offset(&res, &pp->mem,
-> >> +				pp->mem.start - pp->mem_bus_addr);
-> >> +	pci_add_resource(&res, &pp->busn);
-> > 
-> > I don't think this #ifdef is necessary. In the spirit of 'the conversion
-> > needs some more testing', I removed it leaving just the below arm64 code.
-> > 
-> > This worked on my Freescale i.MX6 Quad SABRE Lite Board, I went as far as
-> > scanning for wireless access points.
-> > 
-> 
-> I think it depends on which kind of PCIe device you use, if we use a PCIe device
-> with a I/O Bar, it may not work well without above code. But so far, I have not
-> met a PCIe device which must work with a I/O Bar.
+diff --git a/drivers/mtd/nand/sunxi_nand.c b/drivers/mtd/nand/sunxi_nand.c
+index 6f93b29..ec99502 100644
+--- a/drivers/mtd/nand/sunxi_nand.c
++++ b/drivers/mtd/nand/sunxi_nand.c
+@@ -194,7 +194,7 @@ struct sunxi_nand_chip_sel {
+  *
+  * @mode:	the sunxi ECC mode field deduced from ECC requirements
+  * @layout:	the OOB layout depending on the ECC requirements and the
+- *		selected ECC mode
++ *		ed ECC mode
+  */
+ struct sunxi_nand_hw_ecc {
+ 	int mode;
+@@ -217,6 +217,7 @@ struct sunxi_nand_chip {
+ 	struct nand_chip nand;
+ 	struct mtd_info mtd;
+ 	unsigned long clk_rate;
++	u32 timing_cfg;
+ 	int selected;
+ 	int nsels;
+ 	struct sunxi_nand_chip_sel sels[0];
+@@ -403,6 +404,7 @@ static void sunxi_nfc_select_chip(struct mtd_info *mtd, int chip)
+ 		}
+ 	}
+ 
++	writel(sunxi_nand->timing_cfg, nfc->regs + NFC_REG_TIMING_CFG);
+ 	writel(ctl, nfc->regs + NFC_REG_CTL);
+ 
+ 	sunxi_nand->selected = chip;
+@@ -807,10 +809,28 @@ static int sunxi_nfc_hw_syndrome_ecc_write_page(struct mtd_info *mtd,
+ 	return 0;
+ }
+ 
++static const s32 tWB_lut[]  = {6, 12, 16, 20, -1};
++static const s32 tRHW_lut[] = {4,  8, 12, 20, -1};
++
++static s32 sunxi_nand_lookup_timing(const s32 *lut, u32 period, u32 clk_period)
++{
++	u32 clks = (period + clk_period - 1) / clk_period;
++	int i;
++
++	for (i = 0; lut[i] != -1; i++) {
++		if (clks <= lut[i])
++			return i;
++	}
++
++	/* Return max value */
++	return i - 1;
++}
++
+ static int sunxi_nand_chip_set_timings(struct sunxi_nand_chip *chip,
+ 				       const struct nand_sdr_timings *timings)
+ {
+ 	u32 min_clk_period = 0;
++	u32 tWB, tADL, tWHR, tRHW, tCAD;
+ 
+ 	/* T1 <=> tCLS */
+ 	if (timings->tCLS_min > min_clk_period)
+@@ -872,6 +892,20 @@ static int sunxi_nand_chip_set_timings(struct sunxi_nand_chip *chip,
+ 	if (timings->tWC_min > (min_clk_period * 2))
+ 		min_clk_period = DIV_ROUND_UP(timings->tWC_min, 2);
+ 
++	/* T16 - T19 + tCAD */
++	tWB  = sunxi_nand_lookup_timing(tWB_lut, timings->tWB_max,
++			min_clk_period);
++	tADL = DIV_ROUND_UP(timings->tADL_min, min_clk_period) >> 3;
++	tWHR = DIV_ROUND_UP(timings->tWHR_min, min_clk_period) >> 3;
++	tRHW = sunxi_nand_lookup_timing(tRHW_lut, timings->tRHW_min,
++			min_clk_period);
++	tCAD = 0x7;
++	chip->timing_cfg = (tWB & 0x3) |
++			   (tADL & 0x3) << 2 |
++			   (tWHR & 0x3) << 4 |
++			   (tRHW & 0x3) << 6 |
++			   (tCAD & 0x7) << 8;
++	/* \todo A83 has some more bits for CDQSS, CS, CLHZ, CCS, WC */
+ 
+ 	/* Convert min_clk_period from picoseconds to nanoseconds */
+ 	min_clk_period = DIV_ROUND_UP(min_clk_period, 1000);
+@@ -884,8 +918,6 @@ static int sunxi_nand_chip_set_timings(struct sunxi_nand_chip *chip,
+ 	 */
+ 	chip->clk_rate = (2 * NSEC_PER_SEC) / min_clk_period;
+ 
+-	/* TODO: configure T16-T19 */
+-
+ 	return 0;
+ }
+ 
+@@ -1168,6 +1200,7 @@ static int sunxi_nand_chip_init(struct device *dev, struct sunxi_nfc *nfc,
+ 
+ 	chip->nsels = nsels;
+ 	chip->selected = -1;
++	chip->timing_cfg = 0x7ff;
+ 
+ 	for (i = 0; i < nsels; i++) {
+ 		ret = of_property_read_u32_index(np, "reg", i, &tmp);
+@@ -1377,11 +1410,9 @@ static int sunxi_nfc_probe(struct platform_device *pdev)
+ 	platform_set_drvdata(pdev, nfc);
+ 
+ 	/*
+-	 * TODO: replace these magic values with proper flags as soon as we
+-	 * know what they are encoding.
++	 * TODO: replace this magic values with EDO flag
+ 	 */
+ 	writel(0x100, nfc->regs + NFC_REG_TIMING_CTL);
+-	writel(0x7ff, nfc->regs + NFC_REG_TIMING_CFG);
+ 
+ 	ret = sunxi_nand_chips_init(dev, nfc);
+ 	if (ret) {
+-- 
+2.4.2
 
-There are two problems here:
 
-1) the io_base address you get from of_pci_get_host_bridge_resources
-   must be mapped using pci_remap_iospace. You are not doing this, so
-   even if you had a PCIe card with I/O bar it would not work on arm64
-   as the code stands. Remember that I/O space on arm/arm64 works as a
-   memory access with offset from PCI_IOBASE and that's the value you get
-   in the I/O resource. See:
+-- 
 
-   drivers/pci/host/pci-host-generic.c
-   drivers/pci/host/pci-versatile.c
-   drivers/pci/host/pci-xgene.c
 
-2) (1) above would sort out I/O space access for both arm and arm64 so,
-   as James said, the #ifdef is useless.
+IMAGINE IT >> MAKE IT
 
-I hope this makes things clearer.
+Meet us online at Twitter <http://twitter.com/ultimaker>, Facebook 
+<http://facebook.com/ultimaker>, Google+ <http://google.com/+Ultimaker>
 
-Thanks,
-Lorenzo
-
-> 
-> >> +#else
-> >> +	ret = of_pci_get_host_bridge_resources(np, 0, 0xff, &res, &pp->io_base);
-> > 
-> > of_pci_get_host_bridge_resources expects &pp->io_base to be a
-> > resource_size_t*, but &io_base is u64*. This generates a warning on arm
-> > with the above change. Changing the the type in
-> > drivers/pci/host/pcie-designware.h fixes this.
-> > 
-> > 
-> > Thanks,
-> > 
-> > James
-> > 
-> 
-> OK, will modify this in next version.
-> 
-> Best Regards and thanks again for your test,
-> Zhou
-> 
-> >> +	if (ret)
-> >> +		return ret;
-> >> +#endif
-> >> +
-> >> +	bus = pci_create_root_bus(pp->dev, pp->root_bus_nr, &dw_pcie_ops,
-> >> +			      pp, &res);
-> >> +	if (!bus)
-> >> +		return -ENOMEM;
-> >> +
-> >> +#ifdef CONFIG_GENERIC_MSI_IRQ_DOMAIN
-> >> +	bus->msi = container_of(&pp->irq_domain, struct msi_controller, domain);
-> >> +#else
-> >> +	bus->msi = &dw_pcie_msi_chip;
-> >>  #endif
-> >>  
-> >> -	dw_pci.nr_controllers = 1;
-> >> -	dw_pci.private_data = (void **)&pp;
-> >> +	pci_scan_child_bus(bus);
-> >> +	if (pp->ops->scan_bus)
-> >> +		pp->ops->scan_bus(pp);
-> >>  
-> >> -	pci_common_init_dev(pp->dev, &dw_pci);
-> >> +#ifdef CONFIG_ARM
-> >> +	/* support old dtbs that incorrectly describe IRQs */
-> >> +	pci_fixup_irqs(pci_common_swizzle, of_irq_parse_and_map_pci);
-> >> +#endif
-> >> +
-> >> +	pci_assign_unassigned_bus_resources(bus);
-> >> +	pci_bus_add_devices(bus);
-> >>  
-> >>  	return 0;
-> >>  }
-> >> @@ -653,7 +683,7 @@ static int dw_pcie_valid_config(struct pcie_port *pp,
-> >>  static int dw_pcie_rd_conf(struct pci_bus *bus, u32 devfn, int where,
-> >>  			int size, u32 *val)
-> >>  {
-> >> -	struct pcie_port *pp = sys_to_pcie(bus->sysdata);
-> >> +	struct pcie_port *pp = bus->sysdata;
-> >>  	int ret;
-> >>  
-> >>  	if (dw_pcie_valid_config(pp, bus, PCI_SLOT(devfn)) == 0) {
-> >> @@ -677,7 +707,7 @@ static int dw_pcie_rd_conf(struct pci_bus *bus, u32 devfn, int where,
-> >>  static int dw_pcie_wr_conf(struct pci_bus *bus, u32 devfn,
-> >>  			int where, int size, u32 val)
-> >>  {
-> >> -	struct pcie_port *pp = sys_to_pcie(bus->sysdata);
-> >> +	struct pcie_port *pp = bus->sysdata;
-> >>  	int ret;
-> >>  
-> >>  	if (dw_pcie_valid_config(pp, bus, PCI_SLOT(devfn)) == 0)
-> >> @@ -701,64 +731,6 @@ static struct pci_ops dw_pcie_ops = {
-> >>  	.write = dw_pcie_wr_conf,
-> >>  };
-> >>  
-> >> -static int dw_pcie_setup(int nr, struct pci_sys_data *sys)
-> >> -{
-> >> -	struct pcie_port *pp;
-> >> -
-> >> -	pp = sys_to_pcie(sys);
-> >> -
-> >> -	if (global_io_offset < SZ_1M && pp->io_size > 0) {
-> >> -		sys->io_offset = global_io_offset - pp->io_bus_addr;
-> >> -		pci_ioremap_io(global_io_offset, pp->io_base);
-> >> -		global_io_offset += SZ_64K;
-> >> -		pci_add_resource_offset(&sys->resources, &pp->io,
-> >> -					sys->io_offset);
-> >> -	}
-> >> -
-> >> -	sys->mem_offset = pp->mem.start - pp->mem_bus_addr;
-> >> -	pci_add_resource_offset(&sys->resources, &pp->mem, sys->mem_offset);
-> >> -	pci_add_resource(&sys->resources, &pp->busn);
-> >> -
-> >> -	return 1;
-> >> -}
-> >> -
-> >> -static struct pci_bus *dw_pcie_scan_bus(int nr, struct pci_sys_data *sys)
-> >> -{
-> >> -	struct pci_bus *bus;
-> >> -	struct pcie_port *pp = sys_to_pcie(sys);
-> >> -
-> >> -	pp->root_bus_nr = sys->busnr;
-> >> -	bus = pci_create_root_bus(pp->dev, sys->busnr,
-> >> -				  &dw_pcie_ops, sys, &sys->resources);
-> >> -	if (!bus)
-> >> -		return NULL;
-> >> -
-> >> -	pci_scan_child_bus(bus);
-> >> -
-> >> -	if (bus && pp->ops->scan_bus)
-> >> -		pp->ops->scan_bus(pp);
-> >> -
-> >> -	return bus;
-> >> -}
-> >> -
-> >> -static int dw_pcie_map_irq(const struct pci_dev *dev, u8 slot, u8 pin)
-> >> -{
-> >> -	struct pcie_port *pp = sys_to_pcie(dev->bus->sysdata);
-> >> -	int irq;
-> >> -
-> >> -	irq = of_irq_parse_and_map_pci(dev, slot, pin);
-> >> -	if (!irq)
-> >> -		irq = pp->irq;
-> >> -
-> >> -	return irq;
-> >> -}
-> >> -
-> >> -static struct hw_pci dw_pci = {
-> >> -	.setup		= dw_pcie_setup,
-> >> -	.scan		= dw_pcie_scan_bus,
-> >> -	.map_irq	= dw_pcie_map_irq,
-> >> -};
-> >> -
-> >>  void dw_pcie_setup_rc(struct pcie_port *pp)
-> >>  {
-> >>  	u32 val;
-> > 
-> > 
-> > .
-> > 
-> 
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-pci" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> 
+www.ultimaker.com
