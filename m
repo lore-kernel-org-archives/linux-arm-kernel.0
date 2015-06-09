@@ -1,52 +1,31 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Tue, 9 Jun 2015 22:18:29 +0200
-Subject: [linux-sunxi] Re: [PATCH 00/20] ARM: dts: Add USB and OTG
- related nodes and enable on various boards
-In-Reply-To: <CAOMqctRDEoPiJ95EVgs_ZRQVt=SzK9NPDJGmq3JTJF1kWscmqg@mail.gmail.com>
-References: <1433530943-12599-1-git-send-email-hdegoede@redhat.com>
- <20150608100358.GW23777@lukather>
- <CAOMqctRDEoPiJ95EVgs_ZRQVt=SzK9NPDJGmq3JTJF1kWscmqg@mail.gmail.com>
-Message-ID: <20150609201829.GA8535@lukather>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 9 Jun 2015 21:28:34 +0100
+Subject: [PATCH 00/15] Kill off set_irq_flags
+In-Reply-To: <1433874401-27161-1-git-send-email-robh@kernel.org>
+References: <1433874401-27161-1-git-send-email-robh@kernel.org>
+Message-ID: <20150609202834.GH7557@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Mon, Jun 08, 2015 at 02:56:35PM +0200, Michal Suchanek wrote:
-> Hello,
+On Tue, Jun 09, 2015 at 01:26:26PM -0500, Rob Herring wrote:
+> This series converts all users of ARM specific set_irq_flags to use
+> common genirq functions. In many cases where irqdomains are used, the
+> set_irq_flags calls were redundant, so I've removed them.
 > 
-> On 8 June 2015 at 12:03, Maxime Ripard <maxime.ripard@free-electrons.com> wrote:
-> > Hi Hans,
-> >
-> > On Fri, Jun 05, 2015 at 09:02:03PM +0200, Hans de Goede wrote:
-> >> Hi Maxime,
-> >>
-> >> Here is a patch-set with all the otg / sun8i-usb-host related dts patches
-> >> I've accumulated.
-> >>
-> >> These are intended for 4.3, and go hand in hand with the outstanding
-> >> musb-sunxi / phy-sun4i-usb patches, which I expect to be merged as is
-> >> for 4.3 .
-> >
-> > I'm fine with these patches. Do you have a branch somewhere that I can
-> > pull (without the one that you wanted me to drop, obviously)?
-> 
-> Are these before the conversion to DT label syntax or after (meaning
-> that the conversion patches got pulled somewhere already)?
+> This is not intended for 4.2, but if any subsystem maintainers want to
+> pick up their subsystem's change that is fine. All but the last 2
+> patches stand on their own. Any new drivers going into 4.2 may need a
+> similar change, but I'm sure people are told not to use set_irq_flags in
+> reviews. ;)
 
-Yes. They've been in my tree for a few monthes now, and have been in
-linux-next and arm-soc for quite some time too.
+So what are you doing about the initial state of IRQs on legacy ARM where
+IRQs start off being un-requestable, and need the set_irq_flags() to make
+them requestable.  I think you could be introducing a massive regression
+by making this change.
 
-Maxime
+Unless you can prove that this isn't the case, you shouldn't be removing
+this stuff, especially not from legacy platforms.
 
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150609/254c4bf4/attachment.sig>
+FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
+according to speedtest.net.
