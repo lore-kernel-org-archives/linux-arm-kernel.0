@@ -1,137 +1,225 @@
-From: r.spliet@ultimaker.com (Roy Spliet)
-Date: Tue,  9 Jun 2015 13:31:38 +0200
-Subject: [PATCH v2] mtd: nand: Sunxi calculate timing cfg
-Message-ID: <1433849498-3270-1-git-send-email-r.spliet@ultimaker.com>
+From: j.anaszewski@samsung.com (Jacek Anaszewski)
+Date: Tue, 09 Jun 2015 13:35:54 +0200
+Subject: [PATCH v5 02/17] leds: port locomo leds driver to new locomo core
+In-Reply-To: <20150609111130.GT2982@x1>
+References: <1433797008-6246-1-git-send-email-dbaryshkov@gmail.com>
+ <1433797008-6246-3-git-send-email-dbaryshkov@gmail.com>
+ <20150609065730.GC2982@x1>
+ <CALT56yMkpXqurNw9xQeEBTdH5UTsrmSHTx1jbWXTb8zSWwDD6Q@mail.gmail.com>
+ <20150609111130.GT2982@x1>
+Message-ID: <5576CF9A.4010701@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Values derived from the A83 user manual
+On 06/09/2015 01:11 PM, Lee Jones wrote:
+> On Tue, 09 Jun 2015, Dmitry Eremin-Solenikov wrote:
+>
+>> 2015-06-09 9:57 GMT+03:00 Lee Jones <lee.jones@linaro.org>:
+>>> On Mon, 08 Jun 2015, Dmitry Eremin-Solenikov wrote:
+>>>
+>>>> Adapt locomo leds driver to new locomo core setup.
+>>>>
+>>>> Signed-off-by: Dmitry Eremin-Solenikov <dbaryshkov@gmail.com>
+>>>> Acked-by: Jacek Anaszewski <j.anaszewski@samsung.com>
+>>>
+>>> This is missing Bryan's Ack.
+>>
+>> Jacek is listed as a co-maintainer of the LEDS subsystem, so I assumed
+>> that his acked-by is enough.
+>
+> Ah, this is new.
+>
+> Congratulations Jacek.
 
-V2: fix crippled comments
+Thanks.
 
-Signed-off-by: Roy Spliet <r.spliet@ultimaker.com>
----
- drivers/mtd/nand/sunxi_nand.c | 42 +++++++++++++++++++++++++++++++++++++-----
- 1 file changed, 37 insertions(+), 5 deletions(-)
+> Ignore me then.
 
-diff --git a/drivers/mtd/nand/sunxi_nand.c b/drivers/mtd/nand/sunxi_nand.c
-index 6f93b29..86de7e3 100644
---- a/drivers/mtd/nand/sunxi_nand.c
-+++ b/drivers/mtd/nand/sunxi_nand.c
-@@ -208,6 +208,7 @@ struct sunxi_nand_hw_ecc {
-  * @nand:		base NAND chip structure
-  * @mtd:		base MTD structure
-  * @clk_rate:		clk_rate required for this NAND chip
-+ * @timing_cfg		TIMING_CFG register value for this NAND chip
-  * @selected:		current active CS
-  * @nsels:		number of CS lines required by the NAND chip
-  * @sels:		array of CS lines descriptions
-@@ -217,6 +218,7 @@ struct sunxi_nand_chip {
- 	struct nand_chip nand;
- 	struct mtd_info mtd;
- 	unsigned long clk_rate;
-+	u32 timing_cfg;
- 	int selected;
- 	int nsels;
- 	struct sunxi_nand_chip_sel sels[0];
-@@ -403,6 +405,7 @@ static void sunxi_nfc_select_chip(struct mtd_info *mtd, int chip)
- 		}
- 	}
- 
-+	writel(sunxi_nand->timing_cfg, nfc->regs + NFC_REG_TIMING_CFG);
- 	writel(ctl, nfc->regs + NFC_REG_CTL);
- 
- 	sunxi_nand->selected = chip;
-@@ -807,10 +810,28 @@ static int sunxi_nfc_hw_syndrome_ecc_write_page(struct mtd_info *mtd,
- 	return 0;
- }
- 
-+static const s32 tWB_lut[]  = {6, 12, 16, 20, -1};
-+static const s32 tRHW_lut[] = {4,  8, 12, 20, -1};
-+
-+static s32 sunxi_nand_lookup_timing(const s32 *lut, u32 period, u32 clk_period)
-+{
-+	u32 clks = (period + clk_period - 1) / clk_period;
-+	int i;
-+
-+	for (i = 0; lut[i] != -1; i++) {
-+		if (clks <= lut[i])
-+			return i;
-+	}
-+
-+	/* Return max value */
-+	return i - 1;
-+}
-+
- static int sunxi_nand_chip_set_timings(struct sunxi_nand_chip *chip,
- 				       const struct nand_sdr_timings *timings)
- {
- 	u32 min_clk_period = 0;
-+	u32 tWB, tADL, tWHR, tRHW, tCAD;
- 
- 	/* T1 <=> tCLS */
- 	if (timings->tCLS_min > min_clk_period)
-@@ -872,6 +893,20 @@ static int sunxi_nand_chip_set_timings(struct sunxi_nand_chip *chip,
- 	if (timings->tWC_min > (min_clk_period * 2))
- 		min_clk_period = DIV_ROUND_UP(timings->tWC_min, 2);
- 
-+	/* T16 - T19 + tCAD */
-+	tWB  = sunxi_nand_lookup_timing(tWB_lut, timings->tWB_max,
-+			min_clk_period);
-+	tADL = DIV_ROUND_UP(timings->tADL_min, min_clk_period) >> 3;
-+	tWHR = DIV_ROUND_UP(timings->tWHR_min, min_clk_period) >> 3;
-+	tRHW = sunxi_nand_lookup_timing(tRHW_lut, timings->tRHW_min,
-+			min_clk_period);
-+	tCAD = 0x7;
-+	chip->timing_cfg = (tWB & 0x3) |
-+			   (tADL & 0x3) << 2 |
-+			   (tWHR & 0x3) << 4 |
-+			   (tRHW & 0x3) << 6 |
-+			   (tCAD & 0x7) << 8;
-+	/* \todo A83 has some more bits for CDQSS, CS, CLHZ, CCS, WC */
- 
- 	/* Convert min_clk_period from picoseconds to nanoseconds */
- 	min_clk_period = DIV_ROUND_UP(min_clk_period, 1000);
-@@ -884,8 +919,6 @@ static int sunxi_nand_chip_set_timings(struct sunxi_nand_chip *chip,
- 	 */
- 	chip->clk_rate = (2 * NSEC_PER_SEC) / min_clk_period;
- 
--	/* TODO: configure T16-T19 */
--
- 	return 0;
- }
- 
-@@ -1168,6 +1201,7 @@ static int sunxi_nand_chip_init(struct device *dev, struct sunxi_nfc *nfc,
- 
- 	chip->nsels = nsels;
- 	chip->selected = -1;
-+	chip->timing_cfg = 0x7ff;
- 
- 	for (i = 0; i < nsels; i++) {
- 		ret = of_property_read_u32_index(np, "reg", i, &tmp);
-@@ -1377,11 +1411,9 @@ static int sunxi_nfc_probe(struct platform_device *pdev)
- 	platform_set_drvdata(pdev, nfc);
- 
- 	/*
--	 * TODO: replace these magic values with proper flags as soon as we
--	 * know what they are encoding.
-+	 * TODO: replace this magic values with EDO flag
- 	 */
- 	writel(0x100, nfc->regs + NFC_REG_TIMING_CTL);
--	writel(0x7ff, nfc->regs + NFC_REG_TIMING_CFG);
- 
- 	ret = sunxi_nand_chips_init(dev, nfc);
- 	if (ret) {
+I think that it should go via mfd tree, as this patch adds
+dependency on header linux/mfd/locomo.h, which is added
+in one of the preceding patches [1] in this series.
+
+[1] [PATCH v3 01/17] mfd: add new driver for Sharp LoCoMo
+
+>>>> ---
+>>>>   drivers/leds/Kconfig       |   2 +-
+>>>>   drivers/leds/leds-locomo.c | 117 +++++++++++++++++++++++----------------------
+>>>>   2 files changed, 61 insertions(+), 58 deletions(-)
+>>>>
+>>>> diff --git a/drivers/leds/Kconfig b/drivers/leds/Kconfig
+>>>> index 966b960..d086aac 100644
+>>>> --- a/drivers/leds/Kconfig
+>>>> +++ b/drivers/leds/Kconfig
+>>>> @@ -79,7 +79,7 @@ config LEDS_LM3642
+>>>>   config LEDS_LOCOMO
+>>>>        tristate "LED Support for Locomo device"
+>>>>        depends on LEDS_CLASS
+>>>> -     depends on SHARP_LOCOMO
+>>>> +     depends on MFD_LOCOMO
+>>>>        help
+>>>>          This option enables support for the LEDs on Sharp Locomo.
+>>>>          Zaurus models SL-5500 and SL-5600.
+>>>> diff --git a/drivers/leds/leds-locomo.c b/drivers/leds/leds-locomo.c
+>>>> index 80ba048..a4286e9 100644
+>>>> --- a/drivers/leds/leds-locomo.c
+>>>> +++ b/drivers/leds/leds-locomo.c
+>>>> @@ -9,89 +9,92 @@
+>>>>    */
+>>>>
+>>>>   #include <linux/kernel.h>
+>>>> -#include <linux/init.h>
+>>>> -#include <linux/module.h>
+>>>> -#include <linux/device.h>
+>>>>   #include <linux/leds.h>
+>>>> +#include <linux/mfd/locomo.h>
+>>>> +#include <linux/module.h>
+>>>> +#include <linux/platform_device.h>
+>>>> +#include <linux/regmap.h>
+>>>>
+>>>> -#include <mach/hardware.h>
+>>>> -#include <asm/hardware/locomo.h>
+>>>> +struct locomo_led {
+>>>> +     struct led_classdev led;
+>>>> +     struct regmap *regmap;
+>>>> +     unsigned int reg;
+>>>> +};
+>>>>
+>>>>   static void locomoled_brightness_set(struct led_classdev *led_cdev,
+>>>> -                             enum led_brightness value, int offset)
+>>>> -{
+>>>> -     struct locomo_dev *locomo_dev = LOCOMO_DEV(led_cdev->dev->parent);
+>>>> -     unsigned long flags;
+>>>> -
+>>>> -     local_irq_save(flags);
+>>>> -     if (value)
+>>>> -             locomo_writel(LOCOMO_LPT_TOFH, locomo_dev->mapbase + offset);
+>>>> -     else
+>>>> -             locomo_writel(LOCOMO_LPT_TOFL, locomo_dev->mapbase + offset);
+>>>> -     local_irq_restore(flags);
+>>>> -}
+>>>> -
+>>>> -static void locomoled_brightness_set0(struct led_classdev *led_cdev,
+>>>>                                enum led_brightness value)
+>>>>   {
+>>>> -     locomoled_brightness_set(led_cdev, value, LOCOMO_LPT0);
+>>>> +     struct locomo_led *led = container_of(led_cdev, struct locomo_led, led);
+>>>> +
+>>>> +     regmap_write(led->regmap, led->reg,
+>>>> +                     value ? LOCOMO_LPT_TOFH : LOCOMO_LPT_TOFL);
+>>>>   }
+>>>>
+>>>> -static void locomoled_brightness_set1(struct led_classdev *led_cdev,
+>>>> -                             enum led_brightness value)
+>>>> +static int locomo_led_register(
+>>>> +             struct device *dev,
+>>>> +             struct locomo_led *led,
+>>>> +             const char *name,
+>>>> +             const char *trigger,
+>>>> +             struct regmap *regmap,
+>>>> +             unsigned int reg)
+>>>>   {
+>>>> -     locomoled_brightness_set(led_cdev, value, LOCOMO_LPT1);
+>>>> +     led->led.name = name;
+>>>> +     led->led.flags = LED_CORE_SUSPENDRESUME;
+>>>> +     led->led.default_trigger = trigger;
+>>>> +     led->led.brightness_set = locomoled_brightness_set;
+>>>> +     led->regmap = regmap;
+>>>> +     led->reg = reg;
+>>>> +
+>>>> +     return devm_led_classdev_register(dev, &led->led);
+>>>>   }
+>>>>
+>>>> -static struct led_classdev locomo_led0 = {
+>>>> -     .name                   = "locomo:amber:charge",
+>>>> -     .default_trigger        = "main-battery-charging",
+>>>> -     .brightness_set         = locomoled_brightness_set0,
+>>>> -};
+>>>> -
+>>>> -static struct led_classdev locomo_led1 = {
+>>>> -     .name                   = "locomo:green:mail",
+>>>> -     .default_trigger        = "nand-disk",
+>>>> -     .brightness_set         = locomoled_brightness_set1,
+>>>> -};
+>>>> -
+>>>> -static int locomoled_probe(struct locomo_dev *ldev)
+>>>> +static int locomoled_probe(struct platform_device *pdev)
+>>>>   {
+>>>>        int ret;
+>>>> -
+>>>> -     ret = led_classdev_register(&ldev->dev, &locomo_led0);
+>>>> +     struct locomo_led *leds;
+>>>> +     struct regmap *regmap;
+>>>> +
+>>>> +     leds = devm_kzalloc(&pdev->dev, 2 * sizeof(*leds), GFP_KERNEL);
+>>>> +     if (!leds)
+>>>> +             return -ENOMEM;
+>>>> +
+>>>> +     regmap = dev_get_regmap(pdev->dev.parent, NULL);
+>>>> +     if (!regmap)
+>>>> +             return -ENODEV;
+>>>> +
+>>>> +     ret = locomo_led_register(
+>>>> +                     &pdev->dev,
+>>>> +                     leds,
+>>>> +                     "locomo:amber:charge",
+>>>> +                     "main-battery-charging",
+>>>> +                     regmap,
+>>>> +                     LOCOMO_LPT0);
+>>>>        if (ret < 0)
+>>>>                return ret;
+>>>>
+>>>> -     ret = led_classdev_register(&ldev->dev, &locomo_led1);
+>>>> +     ret = locomo_led_register(
+>>>> +                     &pdev->dev,
+>>>> +                     leds + 1,
+>>>> +                     "locomo:green:mail",
+>>>> +                     "mmc0",
+>>>> +                     regmap,
+>>>> +                     LOCOMO_LPT1);
+>>>>        if (ret < 0)
+>>>> -             led_classdev_unregister(&locomo_led0);
+>>>> -
+>>>> -     return ret;
+>>>> -}
+>>>> +             return ret;
+>>>>
+>>>> -static int locomoled_remove(struct locomo_dev *dev)
+>>>> -{
+>>>> -     led_classdev_unregister(&locomo_led0);
+>>>> -     led_classdev_unregister(&locomo_led1);
+>>>>        return 0;
+>>>>   }
+>>>>
+>>>> -static struct locomo_driver locomoled_driver = {
+>>>> -     .drv = {
+>>>> -             .name = "locomoled"
+>>>> +static struct platform_driver locomoled_driver = {
+>>>> +     .driver = {
+>>>> +             .name = "locomo-led"
+>>>>        },
+>>>> -     .devid  = LOCOMO_DEVID_LED,
+>>>>        .probe  = locomoled_probe,
+>>>> -     .remove = locomoled_remove,
+>>>>   };
+>>>>
+>>>> -static int __init locomoled_init(void)
+>>>> -{
+>>>> -     return locomo_driver_register(&locomoled_driver);
+>>>> -}
+>>>> -module_init(locomoled_init);
+>>>> +module_platform_driver(locomoled_driver);
+>>>>
+>>>>   MODULE_AUTHOR("John Lenz <lenz@cs.wisc.edu>");
+>>>>   MODULE_DESCRIPTION("Locomo LED driver");
+>>>>   MODULE_LICENSE("GPL");
+>>>> +MODULE_ALIAS("platform:locomo-led");
+>>>
+>>
+>>
+>>
+>
+
+
 -- 
-2.4.2
-
-
--- 
-
-
-IMAGINE IT >> MAKE IT
-
-Meet us online at Twitter <http://twitter.com/ultimaker>, Facebook 
-<http://facebook.com/ultimaker>, Google+ <http://google.com/+Ultimaker>
-
-www.ultimaker.com
+Best Regards,
+Jacek Anaszewski
