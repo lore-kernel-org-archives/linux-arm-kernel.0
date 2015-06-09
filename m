@@ -1,57 +1,68 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Tue, 9 Jun 2015 10:08:01 +0200
-Subject: [PATCH v2 2/3] spi: atmel: update DT bindings documentation
-In-Reply-To: <6f071506877a9986d1f30902339993f922387a74.1433779081.git.cyrille.pitchen@atmel.com>
-References: <cover.1433779081.git.cyrille.pitchen@atmel.com>
- <6f071506877a9986d1f30902339993f922387a74.1433779081.git.cyrille.pitchen@atmel.com>
-Message-ID: <55769EE1.4050406@atmel.com>
+From: eric.auger@linaro.org (Eric Auger)
+Date: Tue, 09 Jun 2015 10:12:30 +0200
+Subject: [PATCH 00/13] arm64: KVM: GICv3 ITS emulation
+In-Reply-To: <02ae01d0a1d9$732d2ce0$598786a0$@samsung.com>
+References: <1432893209-27313-1-git-send-email-andre.przywara@arm.com>
+ <01ad01d0a1b7$d4d4fe40$7e7efac0$@samsung.com> <557550F0.5070106@arm.com>
+ <02ae01d0a1d9$732d2ce0$598786a0$@samsung.com>
+Message-ID: <55769FEE.70607@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le 08/06/2015 18:07, Cyrille Pitchen a ?crit :
-> - add new property "atmel,fifo-size"
-> - change "cs-gpios" to optional for SPI controller version >= 2.
+On 06/08/2015 12:54 PM, Pavel Fedin wrote:
+>  Hi!
 > 
-> Signed-off-by: Cyrille Pitchen <cyrille.pitchen@atmel.com>
+>> I'm afraid this is not enough. A write to GICR_TRANSLATER (DID+EID)
+>> results in a (LPI,CPU) pair. Can you easily express the CPU part in
+>> irqfd (this is a genuine question, I'm not familiar enough with that
+>> part of the core)?
 
-Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+Currently on ARM, irqfd supports routing an host eventfd towards a
+virtual SPI:
+eventfd -> vSPI = gsi+32
+parameters of irqfd are the eventfd and the gsi.
 
-> ---
->  Documentation/devicetree/bindings/spi/spi_atmel.txt | 8 +++++++-
->  1 file changed, 7 insertions(+), 1 deletion(-)
+We do not implement KVM IRQ routing yet. This IRQ routing supports 2 modes:
+1) irqchip routing: eventfd -> virtual gsi -> virtual irqchip.input pin
+2) msi routing: eventfd -> virtual gsi -> virtual msi (@, data)
+
+1) up to now we had a single virtual irqchip, vgicv2 or vgicv3 (no apic
+as in x86, ...) so irqchip routing did not sound to be helpful
+2) now we have virtual msi injection, we could use msi routing to inject
+virtual LPI's. But is it what you need for your qemu integration?
+
+Currently on QEMU side for VIRTIO-PCI with vhost back-end + GICv2m +
+irqfd, so called kvm_gsi_direct_mapping is used:
+the MSI data is extracted from the PCI virtio device MSI vector, the
+virtual gsi = MSI data - 32 and eventually irqfd is programmed with the
+eventfd and the gsi. That way MSI injection on guest is bypassed in
+irqfd mode.
+
+Please let us know
+
+Best Regards
+
+Eric
 > 
-> diff --git a/Documentation/devicetree/bindings/spi/spi_atmel.txt b/Documentation/devicetree/bindings/spi/spi_atmel.txt
-> index 4f8184d..7ef7f6bc 100644
-> --- a/Documentation/devicetree/bindings/spi/spi_atmel.txt
-> +++ b/Documentation/devicetree/bindings/spi/spi_atmel.txt
-> @@ -4,11 +4,16 @@ Required properties:
->  - compatible : should be "atmel,at91rm9200-spi".
->  - reg: Address and length of the register set for the device
->  - interrupts: Should contain spi interrupt
-> -- cs-gpios: chipselects
-> +- cs-gpios: chipselects (optional for SPI controller version >= 2 with the
-> +  Alternative Command Mode).
->  - clock-names: tuple listing input clock names.
->  	Required elements: "spi_clk"
->  - clocks: phandles to input clocks.
->  
-> +Optional properties:
-> +- atmel,fifo-size: maximum number of data the RX and TX FIFOs can store for FIFO
-> +  capable SPI controllers.
-> +
->  Example:
->  
->  spi1: spi at fffcc000 {
-> @@ -20,6 +25,7 @@ spi1: spi at fffcc000 {
->  	clocks = <&spi1_clk>;
->  	clock-names = "spi_clk";
->  	cs-gpios = <&pioB 3 0>;
-> +	atmel,fifo-size = <32>;
->  	status = "okay";
->  
->  	mmc-slot at 0 {
+>  But... As far as i could understand, LPI is added to a collection as a part of setup. And
+> collection actually represents a destination CPU, doesn't it? And we can't have multiple
+> LPIs sharing the same number and going to different CPUs. Or am i wrong? Unfortunately i
+> don't have GICv3 arch reference manual.
 > 
-
-
--- 
-Nicolas Ferre
+>> Another concern
+>> would be the support of GICv4, which relies on the command queue
+>> handling to be handled in the kernel
+> 
+>  Wow, i didn't know about GICv4.
+> 
+> Kind regards,
+> Pavel Fedin
+> Expert Engineer
+> Samsung Electronics Research center Russia
+> 
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe kvm" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> 
