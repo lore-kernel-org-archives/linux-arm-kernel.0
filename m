@@ -1,88 +1,101 @@
-From: appana.durga.rao@xilinx.com (Kedareswara rao Appana)
-Date: Tue, 9 Jun 2015 14:20:42 +0530
-Subject: [PATCH v5 1/2] dma: Add Xilinx Central DMA DT Binding Documentation
-Message-ID: <1433839842-5699-1-git-send-email-appanad@xilinx.com>
+From: eric.auger@linaro.org (Eric Auger)
+Date: Tue, 09 Jun 2015 10:51:30 +0200
+Subject: [PATCH 03/13] KVM: arm/arm64: add emulation model specific destroy
+ function
+In-Reply-To: <1432893209-27313-4-git-send-email-andre.przywara@arm.com>
+References: <1432893209-27313-1-git-send-email-andre.przywara@arm.com>
+ <1432893209-27313-4-git-send-email-andre.przywara@arm.com>
+Message-ID: <5576A912.8020005@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Device-tree binding documentation of Xilinx Central DMA Engine.
-
-Signed-off-by: Srikanth Thokala <sthokal@xilinx.com>
-Signed-off-by: Kedareswara rao Appana <appanad@xilinx.com>
----
-Changes in v5:
-- None.
-Changes in v4:
-- None.
-Changes in v3:
-- Used proper alignment for all the properties.
-Changes in v2:
-- Change property 'xlnx,data-width' to 'xlnx,datawidth' in the description
-  to match the implementation.
-
- .../devicetree/bindings/dma/xilinx/xilinx_cdma.txt | 54 ++++++++++++++++++++++
- 1 file changed, 54 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/dma/xilinx/xilinx_cdma.txt
-
-diff --git a/Documentation/devicetree/bindings/dma/xilinx/xilinx_cdma.txt b/Documentation/devicetree/bindings/dma/xilinx/xilinx_cdma.txt
-new file mode 100644
-index 0000000..d1637de
---- /dev/null
-+++ b/Documentation/devicetree/bindings/dma/xilinx/xilinx_cdma.txt
-@@ -0,0 +1,54 @@
-+Xilinx AXI CDMA engine, it does transfers between memory-mapped source
-+address and a memory-mapped destination address.
-+
-+Required properties:
-+- compatible		: Should be "xlnx,axi-cdma-1.00.a"
-+- #dma-cells		: Should be <1>, see "dmas" property below
-+- reg			: Should contain cdma registers location and length.
-+- dma-channel child node: Should have only one channel
-+
-+Optional properties:
-+- xlnx,include-sg	: Tells whether configured for Scatter-mode in
-+			  the hardware.
-+
-+Required child node properties:
-+- compatible		: It should be "xlnx,axi-cdma-channel".
-+- interrupts		: Should contain per channel CDMA interrupts.
-+- xlnx,datawidth	: Should contain the stream data width, take values
-+			  {32,64...1024}.
-+
-+Option child node properties:
-+- xlnx,include-dre	: Tells whether hardware is configured for Data
-+			  Realignment Engine.
-+
-+Example:
-+++++++++
-+
-+axi_cdma_0: axicdma at 7e200000 {
-+       compatible = "xlnx,axi-cdma-1.00.a";
-+       #dma_cells = <1>;
-+       reg = < 0x7e200000 0x10000 >;
-+       dma-channel at 7e200000 {
-+               compatible = "xlnx,axi-cdma-channel";
-+               interrupts = < 0 55 4 >;
-+               xlnx,datawidth = <0x40>;
-+       } ;
-+} ;
-+
-+
-+* DMA client
-+
-+Required properties:
-+- dmas		: a list of <[Central DMA device phandle] [Channel ID]> pairs,
-+		  where Channel ID is '0' for write/tx and '1' for read/rx
-+                  channel.
-+- dma-names	: a list of DMA channel names, one per "dmas" entry
-+
-+Example:
-+++++++++
-+
-+cdmatest_0: cdmatest at 0 {
-+       compatible ="xlnx,axi-cdma-test-1.00.a";
-+       dmas = <&axi_cdma_0 0>;
-+       dma-names = "cdma";
-+} ;
--- 
-2.1.2
+Reviewed-by: Eric Auger <eric.auger@linaro.org>
+On 05/29/2015 11:53 AM, Andre Przywara wrote:
+> Currently we destroy the VGIC emulation in one function that cares for
+> all emulated models. The ITS emulation will require some
+> differentiation, so introduce a per-emulation-model destroy method.
+> Use it for a tiny GICv3 specific code already.
+> 
+> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
+> ---
+>  include/kvm/arm_vgic.h      |  1 +
+>  virt/kvm/arm/vgic-v3-emul.c |  9 +++++++++
+>  virt/kvm/arm/vgic.c         | 11 ++++++++++-
+>  3 files changed, 20 insertions(+), 1 deletion(-)
+> 
+> diff --git a/include/kvm/arm_vgic.h b/include/kvm/arm_vgic.h
+> index 2ccfa9a..b18e2c5 100644
+> --- a/include/kvm/arm_vgic.h
+> +++ b/include/kvm/arm_vgic.h
+> @@ -144,6 +144,7 @@ struct vgic_vm_ops {
+>  	bool	(*queue_sgi)(struct kvm_vcpu *, int irq);
+>  	void	(*add_sgi_source)(struct kvm_vcpu *, int irq, int source);
+>  	int	(*init_model)(struct kvm *);
+> +	void	(*destroy_model)(struct kvm *);
+>  	int	(*map_resources)(struct kvm *, const struct vgic_params *);
+>  };
+>  
+> diff --git a/virt/kvm/arm/vgic-v3-emul.c b/virt/kvm/arm/vgic-v3-emul.c
+> index e9c3a7a..fbfdd6f 100644
+> --- a/virt/kvm/arm/vgic-v3-emul.c
+> +++ b/virt/kvm/arm/vgic-v3-emul.c
+> @@ -818,6 +818,14 @@ static int vgic_v3_init_model(struct kvm *kvm)
+>  	return 0;
+>  }
+>  
+> +static void vgic_v3_destroy_model(struct kvm *kvm)
+> +{
+> +	struct vgic_dist *dist = &kvm->arch.vgic;
+> +
+> +	kfree(dist->irq_spi_mpidr);
+> +	dist->irq_spi_mpidr = NULL;
+> +}
+> +
+>  /* GICv3 does not keep track of SGI sources anymore. */
+>  static void vgic_v3_add_sgi_source(struct kvm_vcpu *vcpu, int irq, int source)
+>  {
+> @@ -830,6 +838,7 @@ void vgic_v3_init_emulation(struct kvm *kvm)
+>  	dist->vm_ops.queue_sgi = vgic_v3_queue_sgi;
+>  	dist->vm_ops.add_sgi_source = vgic_v3_add_sgi_source;
+>  	dist->vm_ops.init_model = vgic_v3_init_model;
+> +	dist->vm_ops.destroy_model = vgic_v3_destroy_model;
+>  	dist->vm_ops.map_resources = vgic_v3_map_resources;
+>  
+>  	kvm->arch.max_vcpus = KVM_MAX_VCPUS;
+> diff --git a/virt/kvm/arm/vgic.c b/virt/kvm/arm/vgic.c
+> index 037b723..6ea30e0 100644
+> --- a/virt/kvm/arm/vgic.c
+> +++ b/virt/kvm/arm/vgic.c
+> @@ -102,6 +102,14 @@ int kvm_vgic_map_resources(struct kvm *kvm)
+>  	return kvm->arch.vgic.vm_ops.map_resources(kvm, vgic);
+>  }
+>  
+> +static void vgic_destroy_model(struct kvm *kvm)
+> +{
+> +	struct vgic_vm_ops *vm_ops = &kvm->arch.vgic.vm_ops;
+> +
+> +	if (vm_ops->destroy_model)
+> +		vm_ops->destroy_model(kvm);
+> +}
+> +
+>  /*
+>   * struct vgic_bitmap contains a bitmap made of unsigned longs, but
+>   * extracts u32s out of them.
+> @@ -1631,6 +1639,8 @@ void kvm_vgic_destroy(struct kvm *kvm)
+>  	struct kvm_vcpu *vcpu;
+>  	int i;
+>  
+> +	vgic_destroy_model(kvm);
+> +
+>  	kvm_for_each_vcpu(i, vcpu, kvm)
+>  		kvm_vgic_vcpu_destroy(vcpu);
+>  
+> @@ -1647,7 +1657,6 @@ void kvm_vgic_destroy(struct kvm *kvm)
+>  	}
+>  	kfree(dist->irq_sgi_sources);
+>  	kfree(dist->irq_spi_cpu);
+> -	kfree(dist->irq_spi_mpidr);
+>  	kfree(dist->irq_spi_target);
+>  	kfree(dist->irq_pending_on_cpu);
+>  	kfree(dist->irq_active_on_cpu);
+> 
