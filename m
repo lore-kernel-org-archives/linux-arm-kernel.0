@@ -1,91 +1,91 @@
 From: hdegoede@redhat.com (Hans de Goede)
-Date: Tue,  9 Jun 2015 23:37:55 +0200
-Subject: [PATCH 2/8] mfd: axp20x: Add a cell for the usb power_supply part of
- the axp20x PMICs
+Date: Tue,  9 Jun 2015 23:37:56 +0200
+Subject: [PATCH 3/8] power: Add devm_power_supply_get_by_phandle() helper
+ function
 In-Reply-To: <1433885881-19809-1-git-send-email-hdegoede@redhat.com>
 References: <1433885881-19809-1-git-send-email-hdegoede@redhat.com>
-Message-ID: <1433885881-19809-3-git-send-email-hdegoede@redhat.com>
+Message-ID: <1433885881-19809-4-git-send-email-hdegoede@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add a cell for the usb power_supply part of the axp20x PMICs.
+This commit adds a resource-managed version of the
+power_supply_get_by_phandle() function.
 
-Note that this cell is only for the usb power_supply part and not the
-ac-power / battery-charger / rtc-backup-bat-charger bits.
-
-Depending on the board each of those must be enabled / disabled separately
-in devicetree as most boards do not use all 4. So in dt each one needs its
-own child-node of the axp20x node. Another reason for using separate child
-nodes for each is so that other devicetree nodes can have a power-supply
-property with a phandle referencing a node representing a single
-power-supply.
-
-The decision to use a separate devicetree node for each is reflected on
-the kernel side by each getting its own mfd-cell / platform_device and
-platform-driver.
-
-Cc: Bruno Pr?mont <bonbons@linux-vserver.org>
 Signed-off-by: Hans de Goede <hdegoede@redhat.com>
 ---
- drivers/mfd/axp20x.c | 32 +++++++++++++++++++++++++++++++-
- 1 file changed, 31 insertions(+), 1 deletion(-)
+ drivers/power/power_supply_core.c | 39 +++++++++++++++++++++++++++++++++++++++
+ include/linux/power_supply.h      |  5 +++++
+ 2 files changed, 44 insertions(+)
 
-diff --git a/drivers/mfd/axp20x.c b/drivers/mfd/axp20x.c
-index 6ffbc11..47ce233 100644
---- a/drivers/mfd/axp20x.c
-+++ b/drivers/mfd/axp20x.c
-@@ -113,6 +113,30 @@ static struct resource axp20x_pek_resources[] = {
- 	},
- };
- 
-+static struct resource axp20x_usb_power_supply_resources[] = {
-+	{
-+		.name	= "VBUS_PLUGIN",
-+		.start	= AXP20X_IRQ_VBUS_PLUGIN,
-+		.end	= AXP20X_IRQ_VBUS_PLUGIN,
-+		.flags	= IORESOURCE_IRQ,
-+	}, {
-+		.name	= "VBUS_REMOVAL",
-+		.start	= AXP20X_IRQ_VBUS_REMOVAL,
-+		.end	= AXP20X_IRQ_VBUS_REMOVAL,
-+		.flags	= IORESOURCE_IRQ,
-+	}, {
-+		.name	= "VBUS_VALID",
-+		.start	= AXP20X_IRQ_VBUS_VALID,
-+		.end	= AXP20X_IRQ_VBUS_VALID,
-+		.flags	= IORESOURCE_IRQ,
-+	}, {
-+		.name	= "VBUS_NOT_VALID",
-+		.start	= AXP20X_IRQ_VBUS_NOT_VALID,
-+		.end	= AXP20X_IRQ_VBUS_NOT_VALID,
-+		.flags	= IORESOURCE_IRQ,
-+	},
-+};
+diff --git a/drivers/power/power_supply_core.c b/drivers/power/power_supply_core.c
+index 2ed4a4a..59856bc 100644
+--- a/drivers/power/power_supply_core.c
++++ b/drivers/power/power_supply_core.c
+@@ -420,6 +420,45 @@ struct power_supply *power_supply_get_by_phandle(struct device_node *np,
+ 	return psy;
+ }
+ EXPORT_SYMBOL_GPL(power_supply_get_by_phandle);
 +
- static struct resource axp22x_pek_resources[] = {
- 	{
- 		.name   = "PEK_DBR",
-@@ -165,7 +189,7 @@ static const struct regmap_config axp20x_regmap_config = {
- 	.val_bits	= 8,
- 	.wr_table	= &axp20x_writeable_table,
- 	.volatile_table	= &axp20x_volatile_table,
--	.max_register	= AXP20X_FG_RES,
-+	.max_register	= AXP20X_OCV(15),
- 	.cache_type	= REGCACHE_RBTREE,
- };
++static void devm_power_supply_put(struct device *dev, void *res)
++{
++	struct power_supply **psy = res;
++
++	power_supply_put(*psy);
++}
++
++/**
++ * devm_power_supply_get_by_phandle() - Resource managed version of
++ *  power_supply_get_by_phandle()
++ * @dev: Pointer to device holding phandle property
++ * @phandle_name: Name of property holding a power supply phandle
++ *
++ * Return: On success returns a reference to a power supply with
++ * matching name equals to value under @property, NULL or ERR_PTR otherwise.
++ */
++struct power_supply *devm_power_supply_get_by_phandle(struct device *dev,
++						      const char *property)
++{
++	struct power_supply **ptr, *psy;
++
++	if (!dev->of_node)
++		return ERR_PTR(-ENODEV);
++
++	ptr = devres_alloc(devm_power_supply_put, sizeof(*ptr), GFP_KERNEL);
++	if (!ptr)
++		return ERR_PTR(-ENOMEM);
++
++	psy = power_supply_get_by_phandle(dev->of_node, property);
++	if (IS_ERR_OR_NULL(psy)) {
++		devres_free(ptr);
++	} else {
++		*ptr = psy;
++		devres_add(dev, ptr);
++	}
++	return psy;
++}
++EXPORT_SYMBOL_GPL(devm_power_supply_get_by_phandle);
+ #endif /* CONFIG_OF */
  
-@@ -368,6 +392,12 @@ static struct mfd_cell axp20x_cells[] = {
- 		.resources		= axp20x_pek_resources,
- 	}, {
- 		.name			= "axp20x-regulator",
-+	}, {
-+		.name			= "axp20x-usb-power-supply",
-+		.of_compatible		= "x-powers,axp202-usb-power-supply",
-+		.num_resources		=
-+				ARRAY_SIZE(axp20x_usb_power_supply_resources),
-+		.resources		= axp20x_usb_power_supply_resources,
- 	},
- };
- 
+ int power_supply_get_property(struct power_supply *psy,
+diff --git a/include/linux/power_supply.h b/include/linux/power_supply.h
+index 75a1dd8..a99cf4f 100644
+--- a/include/linux/power_supply.h
++++ b/include/linux/power_supply.h
+@@ -286,10 +286,15 @@ extern void power_supply_put(struct power_supply *psy);
+ #ifdef CONFIG_OF
+ extern struct power_supply *power_supply_get_by_phandle(struct device_node *np,
+ 							const char *property);
++extern struct power_supply *devm_power_supply_get_by_phandle(
++				    struct device *dev, const char *property);
+ #else /* !CONFIG_OF */
+ static inline struct power_supply *
+ power_supply_get_by_phandle(struct device_node *np, const char *property)
+ { return NULL; }
++static inline struct power_supply *
++devm_power_supply_get_by_phandle(struct device *dev, const char *property)
++{ return NULL; }
+ #endif /* CONFIG_OF */
+ extern void power_supply_changed(struct power_supply *psy);
+ extern int power_supply_am_i_supplied(struct power_supply *psy);
 -- 
 2.3.6
