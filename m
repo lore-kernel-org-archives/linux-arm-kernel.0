@@ -1,52 +1,67 @@
-From: dann.frazier@canonical.com (Dann Frazier)
-Date: Tue, 9 Jun 2015 09:32:45 -0600
-Subject: [PATCH 1/2 RESEND] power: reset: Add syscon reboot device node
- for APM X-Gene platform
-In-Reply-To: <1433272747-27114-2-git-send-email-ttnguyen@apm.com>
-References: <1433272747-27114-1-git-send-email-ttnguyen@apm.com>
- <1433272747-27114-2-git-send-email-ttnguyen@apm.com>
-Message-ID: <CALdTtnuy91beqWQiAtr1HFt3o9=vK70zLig2=ckywD=cu8smwg@mail.gmail.com>
+From: matthias.bgg@gmail.com (Matthias Brugger)
+Date: Tue,  9 Jun 2015 17:38:00 +0200
+Subject: [PATCH v3 0/3] clk: Add regmap support for basic clocks
+Message-ID: <1433864283-25490-1-git-send-email-matthias.bgg@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 2, 2015 at 1:19 PM, Tai Nguyen <ttnguyen@apm.com> wrote:
-> This patch adds syscon reboot device node to support reboot feature on APM X-Gene platform
+This patch set adds regmap support for the simple clock multiplexer,
+the divider clock and the clock gate.
+Regmap use, apart from a pointer to the regmap struct needs an
+offset value to know where in the regmap it has to read/write.
+We add both fields to the corresponding structs.
 
-Tested-by: dann frazier <dann.frazier@canonical.com>
+The driver will distinguish between a clock which is based on regmap or not
+through a flag specified in the clock hardware struct.
+The approach does not break the existing clock framework API but adds
+new functions for registering regmap clocks. Unregistering the clocks is
+independent of the use of regmap or not, so that no new functions were
+implemented.
 
-> Signed-off-by: Feng Kan  <fkan@apm.com>
-> Signed-off-by: Tai Nguyen <ttnguyen@apm.com>
-> ---
->  arch/arm64/boot/dts/apm/apm-storm.dtsi |   12 ++++++++++++
->  1 file changed, 12 insertions(+)
->
-> diff --git a/arch/arm64/boot/dts/apm/apm-storm.dtsi b/arch/arm64/boot/dts/apm/apm-storm.dtsi
-> index c8d3e0e..16efcf7 100644
-> --- a/arch/arm64/boot/dts/apm/apm-storm.dtsi
-> +++ b/arch/arm64/boot/dts/apm/apm-storm.dtsi
-> @@ -710,5 +710,17 @@
->                         dma-coherent;
->                         clocks = <&dmaclk 0>;
->                 };
-> +
-> +               scu: system-clk-controller at 17000000 {
-> +                       compatible = "apm,xgene-scu","syscon";
-> +                       reg = <0x0 0x17000000 0x0 0x400>;
-> +               };
-> +
-> +               reboot: reboot at 17000014 {
-> +                       compatible = "syscon-reboot";
-> +                       regmap = <&scu>;
-> +                       offset = <0x14>;
-> +                       mask = <0x1>;
-> +               };
->         };
->  };
-> --
-> 1.7.9.5
->
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+As an example user of the regmap clock multiplexer, it was implemented on
+the mt8135. When accepted it will also be applied to the other Mediatek SoCs.
+Other possible user are Qualcomm SoCs which up to now implement their own
+regmap based clock multiplexer.
+
+This patch set is based on linux next.
+To get the mt8135 eval board up and running, we need to enable the clock
+support [1] and use the two clocks for the uart port [2].
+
+Any comments welcome.
+
+[1] https://patchwork.kernel.org/patch/6261141/
+[2] https://patchwork.kernel.org/patch/6261151/
+
+Changes for v3:
+- rebase against linux-next
+- provide regmap access to all three clock types in a unified way
+
+Changes for v2:
+- use regmap_update_bits instead of read-write
+- fix flag check
+- add union in struct clk_mux
+- fix typo in commit message
+
+---
+
+Matthias Brugger (3):
+  clk: Add regmap support
+  clk: mediatek: Add support for clk-mux using regmap
+  clk: mediatek: Use regmap clk-mux for mt8135
+
+ drivers/clk/Makefile              |   1 +
+ drivers/clk/clk-divider.c         |  71 ++++++++++++++++++-----
+ drivers/clk/clk-gate.c            |  60 ++++++++++++++++----
+ drivers/clk/clk-io.c              |  62 ++++++++++++++++++++
+ drivers/clk/clk-io.h              |  13 +++++
+ drivers/clk/clk-mux.c             |  94 ++++++++++++++++++++++++++-----
+ drivers/clk/mediatek/clk-mt8135.c |  21 +++----
+ drivers/clk/mediatek/clk-mtk.c    |  37 ++++++++++++
+ drivers/clk/mediatek/clk-mtk.h    |  26 +++++++++
+ include/linux/clk-provider.h      | 115 +++++++++++++++++++++++++++++++++++++-
+ 10 files changed, 443 insertions(+), 57 deletions(-)
+ create mode 100644 drivers/clk/clk-io.c
+ create mode 100644 drivers/clk/clk-io.h
+
+-- 
+1.9.1
