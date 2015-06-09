@@ -1,28 +1,56 @@
-From: pebolle@tiscali.nl (Paul Bolle)
-Date: Tue, 09 Jun 2015 10:27:44 +0200
-Subject: [PATCH v4 2/2] dma: Add Xilinx AXI Central Direct Memory Access
- Engine driver support
-In-Reply-To: <alpine.DEB.2.10.1506091007530.2324@hadrien>
-References: <1432228035-6569-1-git-send-email-appanad@xilinx.com>
- <1432290653.27695.97.camel@x220> <557681A7.7080202@monstr.eu>
- <1433834507.16887.3.camel@x220> <5576956B.7050901@monstr.eu>
- <alpine.DEB.2.10.1506091007530.2324@hadrien>
-Message-ID: <1433838464.16887.53.camel@x220>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Tue, 9 Jun 2015 10:42:07 +0200
+Subject: [PATCH 3/5] soc: Mediatek: Add SCPSYS power domain driver
+In-Reply-To: <1432196527.21715.130.camel@x220>
+References: <1432131540-2523-1-git-send-email-s.hauer@pengutronix.de>
+ <1432131540-2523-4-git-send-email-s.hauer@pengutronix.de>
+ <1432196527.21715.130.camel@x220>
+Message-ID: <20150609084207.GN26575@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2015-06-09 at 10:08 +0200, Julia Lawall wrote:
-> So there is nothing to do?  Or are there still cases that could be
-> interesting?
+On Thu, May 21, 2015 at 10:22:07AM +0200, Paul Bolle wrote:
+> On Wed, 2015-05-20 at 16:18 +0200, Sascha Hauer wrote:
+> > --- a/drivers/soc/mediatek/Kconfig
+> > +++ b/drivers/soc/mediatek/Kconfig
+> 
+> > +config MTK_SCPSYS
+> > +	bool "MediaTek SCPSYS Support"
+> > +	depends on ARCH_MEDIATEK || COMPILE_TEST
+> > +	select REGMAP
+> > +	select MTK_INFRACFG
+> > +	help
+> > +	  Say yes here to add support for the MediaTek SCPSYS power domain
+> > +	  driver.
+> 
+> > +obj-$(CONFIG_MTK_SCPSYS) += mtk-scpsys.o
+> 
+> > --- /dev/null
+> > +++ b/drivers/soc/mediatek/mtk-scpsys.c
+> 
+> > +#include <linux/module.h>
+> 
+> > +MODULE_DEVICE_TABLE(of, of_scpsys_match_tbl);
+> > +
+> > +static struct platform_driver scpsys_drv = {
+> 
+> > +		.owner = THIS_MODULE,
+> 
+> > +};
+> > +
+> > +module_platform_driver_probe(scpsys_drv, scpsys_probe);
+> 
+> (A patch was recently submitted that would allow built-in only code to
+> use builtin_platform_driver_probe(), see
+> https://lkml.org/lkml/2015/5/10/125 .)
 
-See my reply to Michal.
+I'll switch to this when it's available. Right now I don't want to have
+this as an additional dependency.
 
-I think that, unless we come up with a new, much simpler way to add
-license info to modules, we're stuck with doing the boring checks this
-currently requires. And, of course, that new way, whatever that might
-be, can probably not just replace the many thousands instances of the
-MODULE_LICENSE() macro that there currently are. People being not to
-keen on seeing their code being, well, relicensed.
+Sascha
 
-
-Paul Bolle
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
