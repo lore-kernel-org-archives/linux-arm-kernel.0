@@ -1,47 +1,58 @@
-From: dinguyen@opensource.altera.com (Dinh Nguyen)
-Date: Wed, 10 Jun 2015 18:01:46 -0500
-Subject: [GIT PULL] SoCFPGA updates for v4.2, part 2, version 2
-In-Reply-To: <CAMAWPa8wiKu-zha0gUSetnenLNjBt7OGm8NU8RCbMXoDD4qYZg@mail.gmail.com>
-References: <1433533151-6301-1-git-send-email-dinh.linux@gmail.com>
- <7hh9qfjhht.fsf@deeprootsystems.com>
- <CAMAWPa8wiKu-zha0gUSetnenLNjBt7OGm8NU8RCbMXoDD4qYZg@mail.gmail.com>
-Message-ID: <5578C1DA.6040105@opensource.altera.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 11 Jun 2015 01:08:09 +0200
+Subject: [PATCH v0] gpio_keys: fix gpio key driver to proper support GIC
+ interrupt
+In-Reply-To: <CAL4ahLeMm_Qvk0BWxOYTc973_4=TPjZStgTNe5uJL53FBhMRvg@mail.gmail.com>
+References: <1433402712-21399-1-git-send-email-yvo@apm.com>
+ <2953428.ar7Re29b0L@wuerfel>
+ <CAL4ahLeMm_Qvk0BWxOYTc973_4=TPjZStgTNe5uJL53FBhMRvg@mail.gmail.com>
+Message-ID: <1529330.QWrJO7eUSt@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/10/2015 06:03 PM, Kevin Hilman wrote:
-> On Wed, Jun 10, 2015 at 4:01 PM, Kevin Hilman <khilman@kernel.org> wrote:
->> dinh.linux at gmail.com writes:
->>
->>> Hi Arnd, Kevin, Olof,
->>>
->>> This is an updated pull request for the supend-to-ram patch that has the
->>> EDAC code removed in order to avoid a merge conflict.
->>>
->>> Thanks,
->>> Dinh
->>>
->>> The following changes since commit c65b99f046843d2455aa231747b5a07a999a9f3d:
->>>
->>>   Linux 4.1-rc6 (2015-05-31 19:01:07 -0700)
->>
->> Why v4.1-rc6?
->>
->> Are there specific dependencies there?  If not, we prefer these pulls to
->> be on older -rc tags (typically nothing past where arm-soc/master is).
->>
->> If there are no deps, could you respin this against -rc2/-rc3, or you
->> could also rebase on top of your previous socfpga_updates_for_v4.2 as
->> well (which itself is based on -rc2.)
+On Monday 08 June 2015 09:48:29 Y Vo wrote:
+> On Fri, Jun 5, 2015 at 7:50 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+> > On Thursday 04 June 2015 14:25:12 Y Vo wrote:
+> >> GIC is designed to support two of trigger mechanisms - active level
+> >> high or edge rising. But in the gpio_keys driver, it tries to use both
+> >> edge rising and edge falling trigger. This patch fixes the gpio_keys
+> >> driver to request only the edge rising event when failed to configure the
+> >> interrupt.
+> >>
+> >> Signed-off-by: Y Vo <yvo@apm.com>
+> >
+> > I think you want to use an 'interrupts' property instead of a 'gpios'
+> > property (or possibly both), so you can pass the right polarity.
 > 
-> Actually, no need to respin since this is just a single patch.  I've
-> picked it from your branch and applied it to socfpga/soc and merged
-> into next/soc.  But please keep in mind the above for future pull
-> reqs.  Thanks.
+>         gpio-keys {
+>                 compatible = "gpio-keys";
+>                 apm_ctrl_name = "Power Button";
+>                 btn2 {
+>                         label = "EXT_INT2";
+>                         gpios = <&sbgpio 13 0x0>;
+>                         linux,code = <116>;
+>                         linux,input-type = <0x1>;     /* EV_KEY */
+>                 };
+>         };
 > 
+>          sbgpio: sbgpio at 17001000{
+>                         compatible = "apm,xgene-gpio-sb";
+>                         reg = <0x0 0x17001000 0x0 0x400>;
+>                         #gpio-cells = <2>;
+>                         gpio-controller;
+>                         interrupts =    <0x0 0x28 0x1>,
+>                                         <0x0 0x29 0x1>,
+>                                         <0x0 0x2a 0x1>,
+>                                         <0x0 0x2b 0x1>,
+>                                         <0x0 0x2c 0x1>,
+>                                         <0x0 0x2d 0x1>;
+>                 };
+> I can change the polarity of interrupt in the sbgpio node, but the
+> issue here is the gpio_key driver always set interrupt type to
+> (irqflags = IRQF_TRIGGER_RISING | IRQF_TRIGGER_FALLING). And the GIC
+> driver only support edge rising or level high. So that's our issue.
 
-Ok, will do.
+No, please do as I wrote, and use an interrupts property in the gpio-keys
+node.
 
-Thanks,
-
-Dinh
+	Arnd
