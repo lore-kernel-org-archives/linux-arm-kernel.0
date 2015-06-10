@@ -1,100 +1,36 @@
 From: Suravee.Suthikulpanit@amd.com (Suravee Suthikulpanit)
-Date: Wed, 10 Jun 2015 11:08:55 -0500
-Subject: [V6 PATCH 4/7] crypto: ccp - Unify coherency checking logic with
- device_dma_is_coherent()
+Date: Wed, 10 Jun 2015 11:08:58 -0500
+Subject: [V6 PATCH 7/7] ufs: fix TRUE and FALSE re-define build error
 In-Reply-To: <1433952538-22455-1-git-send-email-Suravee.Suthikulpanit@amd.com>
 References: <1433952538-22455-1-git-send-email-Suravee.Suthikulpanit@amd.com>
-Message-ID: <1433952538-22455-5-git-send-email-Suravee.Suthikulpanit@amd.com>
+Message-ID: <1433952538-22455-8-git-send-email-Suravee.Suthikulpanit@amd.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently, the driver has separate logic to determine device coherency
-for DT vs ACPI.  This patch simplifies the code with a call to
-device_dma_is_coherent().
-
-Signed-off-by: Tom Lendacky <thomas.lendacky@amd.com>
 Signed-off-by: Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com>
+Cc: Vinayak Holikatti <vinholikatti@gmail.com>
 ---
- drivers/crypto/ccp/ccp-platform.c | 60 +--------------------------------------
- 1 file changed, 1 insertion(+), 59 deletions(-)
+ drivers/scsi/ufs/unipro.h | 8 ++++++++
+ 1 file changed, 8 insertions(+)
 
-diff --git a/drivers/crypto/ccp/ccp-platform.c b/drivers/crypto/ccp/ccp-platform.c
-index b1c20b2..e446781 100644
---- a/drivers/crypto/ccp/ccp-platform.c
-+++ b/drivers/crypto/ccp/ccp-platform.c
-@@ -90,58 +90,6 @@ static struct resource *ccp_find_mmio_area(struct ccp_device *ccp)
- 	return NULL;
- }
+diff --git a/drivers/scsi/ufs/unipro.h b/drivers/scsi/ufs/unipro.h
+index 3fc3e21..816a8a4 100644
+--- a/drivers/scsi/ufs/unipro.h
++++ b/drivers/scsi/ufs/unipro.h
+@@ -198,6 +198,14 @@ enum ufs_hs_gear_tag {
+ #define T_TC0TXMAXSDUSIZE	0x4060
+ #define T_TC1TXMAXSDUSIZE	0x4061
  
--#ifdef CONFIG_ACPI
--static int ccp_acpi_support(struct ccp_device *ccp)
--{
--	struct ccp_platform *ccp_platform = ccp->dev_specific;
--	struct acpi_device *adev = ACPI_COMPANION(ccp->dev);
--	acpi_handle handle;
--	acpi_status status;
--	unsigned long long data;
--	int cca;
--
--	/* Retrieve the device cache coherency value */
--	handle = adev->handle;
--	do {
--		status = acpi_evaluate_integer(handle, "_CCA", NULL, &data);
--		if (!ACPI_FAILURE(status)) {
--			cca = data;
--			break;
--		}
--	} while (!ACPI_FAILURE(status));
--
--	if (ACPI_FAILURE(status)) {
--		dev_err(ccp->dev, "error obtaining acpi coherency value\n");
--		return -EINVAL;
--	}
--
--	ccp_platform->coherent = !!cca;
--
--	return 0;
--}
--#else	/* CONFIG_ACPI */
--static int ccp_acpi_support(struct ccp_device *ccp)
--{
--	return -EINVAL;
--}
--#endif
--
--#ifdef CONFIG_OF
--static int ccp_of_support(struct ccp_device *ccp)
--{
--	struct ccp_platform *ccp_platform = ccp->dev_specific;
--
--	ccp_platform->coherent = of_dma_is_coherent(ccp->dev->of_node);
--
--	return 0;
--}
--#else
--static int ccp_of_support(struct ccp_device *ccp)
--{
--	return -EINVAL;
--}
--#endif
--
- static int ccp_platform_probe(struct platform_device *pdev)
- {
- 	struct ccp_device *ccp;
-@@ -182,13 +130,7 @@ static int ccp_platform_probe(struct platform_device *pdev)
- 		goto e_err;
- 	}
- 
--	if (ccp_platform->use_acpi)
--		ret = ccp_acpi_support(ccp);
--	else
--		ret = ccp_of_support(ccp);
--	if (ret)
--		goto e_err;
--
-+	ccp_platform->coherent = device_dma_is_coherent(ccp->dev);
- 	if (ccp_platform->coherent)
- 		ccp->axcache = CACHE_WB_NO_ALLOC;
- 	else
++#ifdef FALSE
++#undef FALSE
++#endif
++
++#ifdef TRUE
++#undef TRUE
++#endif
++
+ /* Boolean attribute values */
+ enum {
+ 	FALSE = 0,
 -- 
 2.1.0
