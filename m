@@ -1,54 +1,51 @@
-From: kever.yang@rock-chips.com (Kever Yang)
-Date: Wed, 10 Jun 2015 13:59:16 +0800
-Subject: [PATCH v6 2/3] ARM: rockchip: ensure CPU to enter WFI/WFE state
-In-Reply-To: <1433843400-24831-3-git-send-email-wxt@rock-chips.com>
-References: <1433843400-24831-1-git-send-email-wxt@rock-chips.com>
- <1433843400-24831-3-git-send-email-wxt@rock-chips.com>
-Message-ID: <5577D234.5000502@rock-chips.com>
+From: plaes@plaes.org (Priit Laes)
+Date: Wed, 10 Jun 2015 09:15:46 +0300
+Subject: [linux-sunxi] [PATCH 0/8] mfd/power/phy: Add support for otg
+ vbus detection via axp pmic
+In-Reply-To: <1433885881-19809-1-git-send-email-hdegoede@redhat.com>
+References: <1433885881-19809-1-git-send-email-hdegoede@redhat.com>
+Message-ID: <1433916946.6086.9.camel@plaes.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Caesar,
+On Tue, 2015-06-09 at 23:37 +0200, Hans de Goede wrote:
+> Hi All,
+> 
+> Here is a series which adds the beginning of power-supply support to
+> the axp20x pmic code. My primary reason for working on this is to
+> enable the use of the usb power-supply bits in the pmic to for vbus
+> detection on boards which do not have a vbus-det gpio, and instead
+> rely on the pmic for vbus detection.
+> 
+> After I had written most of the vbus power-supply driver code I
+> became aware of Bruno Pr?mont's (in the CC) previous work on this
+> our drivers are mostly the same, and I've borrowed some code from
+> his driver to add support for min-volt / max-curr properties.
 
-On 06/09/2015 05:49 PM, Caesar Wang wrote:
-> The patch can ensure that v7_exit_coherency_flush() in rockchip_cpu_die()
-> executed in time.
-> The mdelay(1) has enough time to fix the problem of CPU offlining.
-> That's a workaround way in rockchip hotplug code,
-> At least, we haven't a better way to solve it. Who know,
-> that maybe fixed by chip (hardware) in the future.
->
-> Signed-off-by: Caesar Wang <wxt@rock-chips.com>
->
-> ---
->
-> Changes in v6:
-> - Fix the delay 1ms describing.
-> Series-changes: 5
-> - Fix the patch decription.
-> - Add the changelog.
-> Series-changes: 2
-> - As Kever points out, Fix the subject typo WFI/WFE.
->
->   arch/arm/mach-rockchip/platsmp.c | 7 +++++++
->   1 file changed, 7 insertions(+)
->
-> diff --git a/arch/arm/mach-rockchip/platsmp.c b/arch/arm/mach-rockchip/platsmp.c
-> index b379cc8..d629206 100644
-> --- a/arch/arm/mach-rockchip/platsmp.c
-> +++ b/arch/arm/mach-rockchip/platsmp.c
-> @@ -322,6 +322,13 @@ static void __init rockchip_smp_prepare_cpus(unsigned int max_cpus)
->   #ifdef CONFIG_HOTPLUG_CPU
->   static int rockchip_cpu_kill(unsigned int cpu)
->   {
-> +	/*
-> +	 * We need a delay here to ensure that the dying CPU can finish
-> +	 * executing v7_coherency_exit() and reach the WFI/WFE state
-> +	 * prior to having the power domain disabled.
-> +	 */
-> +	mdelay(1);
-> +
->   	pmu_set_power_domain(0 + cpu, false);
->   	return 1;
->   }
-Reviewed-by: Kever Yang <kever.yang@rock-chips.com>
+This is one of the reasons why we try to keep our Mainlining Effort
+page up-to-date:
+http://linux-sunxi.org/Linux_mainlining_effort
+
+
+> 
+> The big difference between our 2 drivers is that mine driver uses
+> a devicetree child node / mfd cell per power-supply, so one for
+> each of the usb-power, ac-power / battery-charger and rtc-backup-bat
+> -charger
+> bits.
+> 
+> Depending on the board each of those must be enabled / disabled 
+> separately
+> in devicetree as most boards do not use all 4. So in dt each one 
+> needs its
+> own child-node of the axp20x node. Another reason for using separate 
+> child
+> nodes for each is so that other devicetree nodes can have a power
+> -supply
+> property with a phandle referencing a node representing a single
+> power-supply.
+> 
+> Regards,
+> 
+> Hans
+> 
