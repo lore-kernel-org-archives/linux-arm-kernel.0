@@ -1,17 +1,15 @@
 From: peter.griffin@linaro.org (Peter Griffin)
-Date: Wed, 10 Jun 2015 15:03:58 +0100
-Subject: [PATCH 1/9] ARM: STi: DT: Add STiH407 family tsin0 pinctrl
+Date: Wed, 10 Jun 2015 15:04:00 +0100
+Subject: [PATCH 3/9] ARM: STi: DT: Add STiH407 family tsin2 pinctrl
  configuration
 In-Reply-To: <1433945046-19855-1-git-send-email-peter.griffin@linaro.org>
 References: <1433945046-19855-1-git-send-email-peter.griffin@linaro.org>
-Message-ID: <1433945046-19855-2-git-send-email-peter.griffin@linaro.org>
+Message-ID: <1433945046-19855-4-git-send-email-peter.griffin@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-tsin0 and be configured as either serial or parallel. This patch
-adds the pinctrl config for both possiblities. On B2120 reference
-design tsin0 is brought out as TSA on the NIMA slot of the B2004A
-daughter board.
+tsin2 channel can be configured for either serial or parallel data
+transfer. This patch adds the pinctrl config for both possibilities.
 
 Signed-off-by: Peter Griffin <peter.griffin@linaro.org>
 ---
@@ -19,38 +17,38 @@ Signed-off-by: Peter Griffin <peter.griffin@linaro.org>
  1 file changed, 28 insertions(+)
 
 diff --git a/arch/arm/boot/dts/stih407-pinctrl.dtsi b/arch/arm/boot/dts/stih407-pinctrl.dtsi
-index 402844c..c8c8e84 100644
+index 7b1b652..6b11568 100644
 --- a/arch/arm/boot/dts/stih407-pinctrl.dtsi
 +++ b/arch/arm/boot/dts/stih407-pinctrl.dtsi
-@@ -438,6 +438,34 @@
+@@ -494,6 +494,34 @@
  					};
  				};
  			};
 +
-+			tsin0 {
-+				pinctrl_tsin0_parallel: tsin0_parallel {
++			tsin2 {
++				pinctrl_tsin2_parallel: tsin2_parallel {
 +					st,pins {
-+						DATA7 = <&pio10 4 ALT1 IN SE_NICLK_IO 0 CLK_A>;
-+						DATA6 = <&pio10 5 ALT1 IN SE_NICLK_IO 0 CLK_A>;
-+						DATA5 = <&pio10 6 ALT1 IN SE_NICLK_IO 0 CLK_A>;
-+						DATA4 = <&pio10 7 ALT1 IN SE_NICLK_IO 0 CLK_A>;
-+						DATA3 = <&pio11 0 ALT1 IN SE_NICLK_IO 0 CLK_A>;
-+						DATA2 = <&pio11 1 ALT1 IN SE_NICLK_IO 0 CLK_A>;
-+						DATA1 = <&pio11 2 ALT1 IN SE_NICLK_IO 0 CLK_A>;
-+						DATA0 = <&pio11 3 ALT1 IN SE_NICLK_IO 0 CLK_A>;
-+						CLKIN = <&pio10 3 ALT1 IN CLKNOTDATA 0 CLK_A>;
-+						VALID = <&pio10 1 ALT1 IN SE_NICLK_IO 0 CLK_A>;
-+						ERROR = <&pio10 0 ALT1 IN SE_NICLK_IO 0 CLK_A>;
-+						PKCLK = <&pio10 2 ALT1 IN SE_NICLK_IO 0 CLK_A>;
++						DATA7 = <&pio13 4 ALT1 IN SE_NICLK_IO 0 CLK_A>;
++						DATA6 = <&pio13 5 ALT2 IN SE_NICLK_IO 0 CLK_B>;
++						DATA5 = <&pio13 6 ALT2 IN SE_NICLK_IO 0 CLK_B>;
++						DATA4 = <&pio13 7 ALT2 IN SE_NICLK_IO 0 CLK_B>;
++						DATA3 = <&pio14 0 ALT2 IN SE_NICLK_IO 0 CLK_A>;
++						DATA2 = <&pio14 1 ALT2 IN SE_NICLK_IO 0 CLK_B>;
++						DATA1 = <&pio14 2 ALT2 IN SE_NICLK_IO 0 CLK_A>;
++						DATA0 = <&pio14 3 ALT2 IN SE_NICLK_IO 0 CLK_A>;
++						CLKIN = <&pio13 3 ALT1 IN CLKNOTDATA 0 CLK_A>;
++						VALID = <&pio13 1 ALT1 IN SE_NICLK_IO 0 CLK_A>;
++						ERROR = <&pio13 0 ALT1 IN SE_NICLK_IO 0 CLK_A>;
++						PKCLK = <&pio13 2 ALT1 IN SE_NICLK_IO 0 CLK_A>;
 +					};
 +				};
-+				pinctrl_tsin0_serial: tsin0_serial {
++				pinctrl_tsin2_serial: tsin2_serial {
 +					st,pins {
-+						DATA7 = <&pio10 4 ALT1 IN SE_NICLK_IO 0 CLK_A>;
-+						CLKIN = <&pio10 3 ALT1 IN CLKNOTDATA 0 CLK_A>;
-+						VALID = <&pio10 1 ALT1 IN SE_NICLK_IO 0 CLK_A>;
-+						ERROR = <&pio10 0 ALT1 IN SE_NICLK_IO 0 CLK_A>;
-+						PKCLK = <&pio10 2 ALT1 IN SE_NICLK_IO 0 CLK_A>;
++						DATA7 = <&pio13 4 ALT1 IN SE_NICLK_IO 0 CLK_A>;
++						CLKIN = <&pio13 3 ALT1 IN CLKNOTDATA 0 CLK_A>;
++						VALID = <&pio13 1 ALT1 IN SE_NICLK_IO 0 CLK_A>;
++						ERROR = <&pio13 0 ALT1 IN SE_NICLK_IO 0 CLK_A>;
++						PKCLK = <&pio13 2 ALT1 IN SE_NICLK_IO 0 CLK_A>;
 +					};
 +				};
 +			};
