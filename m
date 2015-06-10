@@ -1,30 +1,24 @@
-From: maxime.coquelin@st.com (Maxime Coquelin)
-Date: Wed, 10 Jun 2015 10:09:45 +0200
-Subject: [PATCH] ARM: STi: Remove platform call to trace_hardirqs_off()
-In-Reply-To: <1433886427-29295-1-git-send-email-peter.griffin@linaro.org>
-References: <1433886427-29295-1-git-send-email-peter.griffin@linaro.org>
-Message-ID: <5577F0C9.4040701@st.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Wed, 10 Jun 2015 10:20:06 +0200
+Subject: [PATCH 3/3] ARM: dts: qcom: Replace gpio node with pinctrl node
+In-Reply-To: <1433544745-325-4-git-send-email-bjorn.andersson@sonymobile.com>
+References: <1433544745-325-1-git-send-email-bjorn.andersson@sonymobile.com>
+ <1433544745-325-4-git-send-email-bjorn.andersson@sonymobile.com>
+Message-ID: <CACRpkdbO7J2rjdVNiPzOY_7o0j3QC9swJc_ni1Euz=coZc_+AA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Peter
+On Sat, Jun 6, 2015 at 12:52 AM, Bjorn Andersson
+<bjorn.andersson@sonymobile.com> wrote:
 
-On 06/09/2015 11:47 PM, Peter Griffin wrote:
-> Calling trace_hardirqs_off() from the platform specific
-> secondary startup code as not been necessary since Dec 2010
-> when Russell King consolidated the call into the common SMP
-> code.
+> Replace the standalone gpio driver with pinctrl-msm as we now have
+> msm8660 support there.
 >
-> 2c0136d ARM: SMP: consolidate trace_hardirqs_off() into common SMP code
->
-> Signed-off-by: Peter Griffin <peter.griffin@linaro.org>
-> ---
->   arch/arm/mach-sti/platsmp.c | 2 --
->   1 file changed, 2 deletions(-)
->
->
+> Signed-off-by: Bjorn Andersson <bjorn.andersson@sonymobile.com>
 
-Acked-by: Maxime Coquelin <maxime.coquelin@st.com>
+Acked-by: Linus Walleij <linus.walleij@linaro.org>
 
-Thanks!
-Maxime
+please funnel this through the ARM SoC tree.
+
+Yours,
+Linus Walleij
