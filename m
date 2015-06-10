@@ -1,82 +1,117 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 10 Jun 2015 23:57:44 +0100
-Subject: [PATCH v5] ARM: smp: Only expose /sys/.../cpuX/online if
- hotpluggable
-In-Reply-To: <557739AC.8000903@codeaurora.org>
-References: <1428705191-15670-1-git-send-email-sboyd@codeaurora.org>
- <20150413134246.GS12732@n2100.arm.linux.org.uk>
- <557739AC.8000903@codeaurora.org>
-Message-ID: <20150610225744.GT7557@n2100.arm.linux.org.uk>
+From: moritz.fischer@ettus.com (Moritz Fischer)
+Date: Wed, 10 Jun 2015 16:00:45 -0700
+Subject: [PATCH 2/2 RESEND] power: reset: Add syscon poweroff device node
+ for APM X-Gene platform
+In-Reply-To: <CALdTtnt+6RLD8VVx0UzQX0-5CQCL5cN1zo-USHHvqO5o25=w0A@mail.gmail.com>
+References: <1433272747-27114-1-git-send-email-ttnguyen@apm.com>
+ <1433272747-27114-3-git-send-email-ttnguyen@apm.com>
+ <CALdTtnvQg2xmL5MqxUcvJmk_33XiEg9tnLzYvC++ZQL3j7J46g@mail.gmail.com>
+ <CACgAJHwtCuZgZySmcvMxZHVxy__eZP02-TDbEn3FEpMx5y_LDQ@mail.gmail.com>
+ <CALdTtnvwQ0W=3i-Yi73rQQ43uo1njwBoEuNQOpJ79Qoref9Yvw@mail.gmail.com>
+ <CALdTtnt+6RLD8VVx0UzQX0-5CQCL5cN1zo-USHHvqO5o25=w0A@mail.gmail.com>
+Message-ID: <CAAtXAHf28He+R6m6RZyVv3AdC4jSX9byxyB37h7tSPYdSGs+Fw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 09, 2015 at 12:08:28PM -0700, Stephen Boyd wrote:
-> On 04/13/2015 06:42 AM, Russell King - ARM Linux wrote:
-> > On Fri, Apr 10, 2015 at 03:33:11PM -0700, Stephen Boyd wrote:
-> >> Writes to /sys/.../cpuX/online fail if we determine the platform
-> >> doesn't support hotplug for that CPU. Furthermore, if the cpu_die
-> >> op isn't specified the system hangs when we try to offline a CPU
-> >> and it comes right back online unexpectedly. Let's figure this
-> >> stuff out before we make the sysfs nodes so that the online file
-> >> doesn't even exist if it isn't (at least sometimes) possible to
-> >> hotplug the CPU.
-> >>
-> >> Add a new 'cpu_can_disable' op and repoint all 'cpu_disable'
-> >> implementations at it because all implementers use the op to
-> >> indicate if a CPU can be hotplugged or not in a static fashion.
-> >> With PSCI we may need to add a 'cpu_disable' op so that the
-> >> secure OS can be migrated off the CPU we're trying to hotplug.
-> >> In this case, the 'cpu_can_disable' op will indicate that all
-> >> CPUs are hotpluggable by returning true, but the 'cpu_disable' op
-> >> will make a PSCI migration call and occasionally fail, denying
-> >> the hotplug of a CPU. This shouldn't be any worse than x86 where
-> >> we may indicate that all CPUs are hotpluggable but occasionally
-> >> we can't offline a CPU due to check_irq_vectors_for_cpu_disable()
-> >> failing to find a CPU to move vectors to.
-> >>
-> >> Cc: Mark Rutland <mark.rutland@arm.com>
-> >> Cc: Nicolas Pitre <nico@linaro.org>
-> >> Cc: Dave Martin <Dave.Martin@arm.com>
-> >> Acked-by: Simon Horman <horms@verge.net.au> [shmobile portion]
-> >> Tested-by: Simon Horman <horms@verge.net.au>
-> >> Cc: Magnus Damm <magnus.damm@gmail.com>
-> >> Cc: <linux-sh@vger.kernel.org>
-> >> Cc: Tyler Baker <tyler.baker@linaro.org>
-> >> Cc: Geert Uytterhoeven <geert@linux-m68k.org>
-> >> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
-> > Let's see some more acks for this...
-> >
-> 
-> Nobody else has acked this so far. Shall I put it in the patch tracker
-> now? Or is there someone more specific we need an ack from?
+On Wed, Jun 10, 2015 at 12:13 PM, Dann Frazier
+<dann.frazier@canonical.com> wrote:
+> On Tue, Jun 9, 2015 at 9:31 AM, Dann Frazier <dann.frazier@canonical.com> wrote:
+>> On Mon, Jun 8, 2015 at 10:34 PM, Tai Tri Nguyen <ttnguyen@apm.com> wrote:
+>>> Hi Dann,
+>>>
+>>> On Mon, Jun 8, 2015 at 8:44 PM, Dann Frazier <dann.frazier@canonical.com> wrote:
+>>>> On Tue, Jun 2, 2015 at 1:19 PM, Tai Nguyen <ttnguyen@apm.com> wrote:
+>>>>> This patch adds syscon poweroff device node to support poweroff feature
+>>>>> on APM X-Gene Mustang platform
+>>>>
+>>>> hey Tai,
+>>>>  The reboot changes work just fine for me, but poweroff does not:
+>>>>
+>>>> [  OK  ] Reached target Final Step.
+>>>>          Starting Power-Off...
+>>>> reboot: Power down
+>>>> Unable to poweroff system
+>>>> Kernel panic - not syncing: Attempted to kill init! exitcode=0x00000000
+>>>>
+>>>> CPU: 0 PID: 1 Comm: systemd-shutdow Tainted: G        W       4.1.0-rc7+ #1
+>>>> Hardware name: APM X-Gene Mustang board (DT)
+>>>> Call trace:
+>>>> [<ffffffc00008990c>] dump_backtrace+0x0/0x11c
+>>>> [<ffffffc000089a38>] show_stack+0x10/0x1c
+>>>> [<ffffffc0005b447c>] dump_stack+0x88/0xc8
+>>>> [<ffffffc0005b3374>] panic+0xe0/0x220
+>>>> [<ffffffc0000b5f24>] do_exit+0x990/0x994
+>>>> [<ffffffc0000d06bc>] SyS_reboot+0x14c/0x208
+>>>> ---[ end Kernel panic - not syncing: Attempted to kill init! exitcode=0x00000000
+>>>>
+>>>>   -dann
+>>>>
+>>>
+>>> Thanks for testing my patches.
+>>> On APM X-Gene Mustang platform, power off circuit is controlled by firmware.
+>>> It requires a firmware update to support power off feature.
+>>> May I ask what firmware version you're running on?
+>>
+>> Sure, 1.15.12.
+>
+> Tai worked with me offline. For reference, this requires an updated
+> SlimPro firmware in addition to the u-boot update. Verified it works
+> for me after the update, so:
+>
+> Tested-by: dann frazier <dann.frazier@canoncial.com>
 
-The version you've put in the patch tracker is not the version you
-posted.  It contains this change:
+Looks good.
 
-diff --git a/arch/arm/mach-shmobile/common.h b/arch/arm/mach-shmobile/common.h
-index 476092b86c6e..f2c4bf437ea7 100644
---- a/arch/arm/mach-shmobile/common.h
-+++ b/arch/arm/mach-shmobile/common.h
-@@ -13,7 +13,8 @@ extern void shmobile_smp_boot(void);
- extern void shmobile_smp_sleep(void);
- extern void shmobile_smp_hook(unsigned int cpu, unsigned long fn,
- 			      unsigned long arg);
--extern int shmobile_smp_cpu_disable(unsigned int cpu);
-+extern bool shmobile_smp_cpu_can_disable(unsigned int cpu);
-+extern void shmobile_invalidate_start(void);
-
-which your original patch did not include.  The tree I'm applying to
-(-rc1) contains:
-
-extern int shmobile_smp_cpu_disable(unsigned int cpu);
-extern void shmobile_invalidate_start(void);
-
-there.  Hence git quite rightfully declines to apply the patch.
-
-Please fix.
-
-Thanks.
-
--- 
-FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
-according to speedtest.net.
+Acked-by: Moritz Fischer <moritz.fischer@ettus.com>
+>
+>>   -dann
+>>
+>>> Tai
+>>>
+>>>
+>>>>> Signed-off-by: Tai Nguyen <ttnguyen@apm.com>
+>>>>> ---
+>>>>>  arch/arm64/boot/dts/apm/apm-mustang.dts |   12 ++++++++++++
+>>>>>  1 file changed, 12 insertions(+)
+>>>>>
+>>>>> diff --git a/arch/arm64/boot/dts/apm/apm-mustang.dts b/arch/arm64/boot/dts/apm/apm-mustang.dts
+>>>>> index 83578e7..910d561 100644
+>>>>> --- a/arch/arm64/boot/dts/apm/apm-mustang.dts
+>>>>> +++ b/arch/arm64/boot/dts/apm/apm-mustang.dts
+>>>>> @@ -23,6 +23,18 @@
+>>>>>                 device_type = "memory";
+>>>>>                 reg = < 0x1 0x00000000 0x0 0x80000000 >; /* Updated by bootloader */
+>>>>>         };
+>>>>> +
+>>>>> +       poweroff_mbox: poweroff_mbox at 10548000 {
+>>>>> +               compatible = "syscon";
+>>>>> +               reg = <0x0 0x10548000 0x0 0x30>;
+>>>>> +       };
+>>>>> +
+>>>>> +       poweroff: poweroff at 10548010 {
+>>>>> +               compatible = "syscon-poweroff";
+>>>>> +               regmap = <&poweroff_mbox>;
+>>>>> +               offset = <0x10>;
+>>>>> +               mask = <0x1>;
+>>>>> +       };
+>>>>>  };
+>>>>>
+>>>>>  &pcie0clk {
+>>>>> --
+>>>>> 1.7.9.5
+>>>>>
+>>>>>
+>>>>> _______________________________________________
+>>>>> linux-arm-kernel mailing list
+>>>>> linux-arm-kernel at lists.infradead.org
+>>>>> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>>>
+>>>
+>>>
+>>> --
+>>> Tai
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> Please read the FAQ at  http://www.tux.org/lkml/
