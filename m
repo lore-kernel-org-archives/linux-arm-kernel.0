@@ -1,119 +1,63 @@
-From: daniel.thompson@linaro.org (Daniel Thompson)
-Date: Wed, 10 Jun 2015 12:24:13 +0100
-Subject: [PATCH] ARM: irqflags: Get arch_irqs_disabled from asm-generic
-Message-ID: <1433935453-22381-1-git-send-email-daniel.thompson@linaro.org>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 10 Jun 2015 12:24:34 +0100
+Subject: Moan: usage of __iormb() and __iowmb() outside of asm/io.h
+In-Reply-To: <20150610111819.GC22973@arm.com>
+References: <20150608184701.GA7557@n2100.arm.linux.org.uk>
+ <20150610111819.GC22973@arm.com>
+Message-ID: <20150610112433.GM7557@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit cb1293e2f594 ("ARM: 8375/1: disable some options on ARMv7-M")
-causes the build to on ARMv7-M machines:
+On Wed, Jun 10, 2015 at 12:18:20PM +0100, Will Deacon wrote:
+> Hi Russell,
+> 
+> On Mon, Jun 08, 2015 at 07:47:01PM +0100, Russell King - ARM Linux wrote:
+> > I notice that we have users of __iormb() and __iowmb() outside of asm/io.h:
+> > 
+> > drivers/clocksource/timer-keystone.c:   __iowmb();
+> > drivers/dma/cppi41.c:                   __iormb();
+> > drivers/dma/cppi41.c:   __iowmb();
+> > drivers/dma/cppi41.c:           __iowmb();
+> > drivers/dma/cppi41.c:                   __iormb();
+> > drivers/soc/ti/knav_qmss_queue.c:       __iowmb();
+> > 
+> > These are not official kernel barriers - the only reason they exist in
+> > asm/io.h is purely to provide a barrier implementation _for_ creating
+> > the accessors _in_ asm/io.h, which are macros, and therefore these
+> > macros need to stay around for the same scope as those accessors.
+> > 
+> > As with all details which are an architecture matter, they are subject
+> > to the whims of the architecture maintainer to provide whatever semantics
+> > for them that the architecture maintainer deems fit: there is no official
+> > requirement for anything of that nature to do anything, and no guarantee
+> > that anything such a detail does today it will do so tomorrow.
+> > 
+> > This is why only official interfaces should be used, and if they do not
+> > satisfy the requirements, then new official interfaces need to be 
+> > proposed.  Don't ever poke about with stuff that's an architecture
+> > implementation detail.
+> > 
+> > We've been here before with some of the cache flushing code - and people
+> > have been burnt by it.
+> > 
+> > I do wish that people would see the difference between stuff which is
+> > implemented to facilitate the implementation of an architecture detail
+> > vs something which is provided for everyone's use.
+> > 
+> > I'm working on a patch which will completely remove these from view.
+> > I would strongly suggest that these uses are removed from the above
+> > code as a matter of urgency.
+> 
+> I agree to removing these from view; we already have plenty of barrier
+> macros and we don't want these to proliferate outside of the arch code.
+> 
+> Any chance you could do a similar change for arm64, please (we have the
+> same macros there)?
 
-  CC      arch/arm/kernel/asm-offsets.s
-In file included from include/linux/sem.h:5:0,
-                 from include/linux/sched.h:35,
-                 from arch/arm/kernel/asm-offsets.c:14:
-include/linux/rcupdate.h: In function 'rcu_read_lock_sched_held':
-include/linux/rcupdate.h:539:2: error: implicit declaration of function
-'arch_irqs_disabled' [-Werror=implicit-function-declaration]
-  return preempt_count() != 0 || irqs_disabled();
+Yes - as you're aware, removing them from sight does cause us to decend
+into macro-hell in asm/io.h, but I think that's better than having people
+get their grubby fingers on arch internal stuff they shouldn't be touching.
 
-asm-generic/irqflags.h provides an implementation of arch_irqs_disabled().
-Lets grab an implementation from there!
-
-Suggested-by: Russell King <linux@arm.linux.org.uk>
-Signed-off-by: Daniel Thompson <daniel.thompson@linaro.org>
-Acked-by: Maxime Coquelin <maxime.coquelin@st.com>
----
-
-Notes:
-    Compile tested on v4.1-rc6 using all arch/arm/configs.
-    Boot tested on v4.1-rc6 with versatile_defconfig and multi_v7_defconfig.
-    Boot tested on linux-next-20150608 using stm32_defconfig (out-of-tree).
-
- arch/arm/include/asm/irqflags.h | 11 +++++++++++
- 1 file changed, 11 insertions(+)
-
-diff --git a/arch/arm/include/asm/irqflags.h b/arch/arm/include/asm/irqflags.h
-index 3b763d6652a0..43908146a5cf 100644
---- a/arch/arm/include/asm/irqflags.h
-+++ b/arch/arm/include/asm/irqflags.h
-@@ -20,6 +20,7 @@
-
- #if __LINUX_ARM_ARCH__ >= 6
-
-+#define arch_local_irq_save arch_local_irq_save
- static inline unsigned long arch_local_irq_save(void)
- {
- 	unsigned long flags;
-@@ -31,6 +32,7 @@ static inline unsigned long arch_local_irq_save(void)
- 	return flags;
- }
-
-+#define arch_local_irq_enable arch_local_irq_enable
- static inline void arch_local_irq_enable(void)
- {
- 	asm volatile(
-@@ -40,6 +42,7 @@ static inline void arch_local_irq_enable(void)
- 		: "memory", "cc");
- }
-
-+#define arch_local_irq_disable arch_local_irq_disable
- static inline void arch_local_irq_disable(void)
- {
- 	asm volatile(
-@@ -56,6 +59,7 @@ static inline void arch_local_irq_disable(void)
- /*
-  * Save the current interrupt enable state & disable IRQs
-  */
-+#define arch_local_irq_save arch_local_irq_save
- static inline unsigned long arch_local_irq_save(void)
- {
- 	unsigned long flags, temp;
-@@ -73,6 +77,7 @@ static inline unsigned long arch_local_irq_save(void)
- /*
-  * Enable IRQs
-  */
-+#define arch_local_irq_enable arch_local_irq_enable
- static inline void arch_local_irq_enable(void)
- {
- 	unsigned long temp;
-@@ -88,6 +93,7 @@ static inline void arch_local_irq_enable(void)
- /*
-  * Disable IRQs
-  */
-+#define arch_local_irq_disable arch_local_irq_disable
- static inline void arch_local_irq_disable(void)
- {
- 	unsigned long temp;
-@@ -135,6 +141,7 @@ static inline void arch_local_irq_disable(void)
- /*
-  * Save the current interrupt enable state.
-  */
-+#define arch_local_save_flags arch_local_save_flags
- static inline unsigned long arch_local_save_flags(void)
- {
- 	unsigned long flags;
-@@ -147,6 +154,7 @@ static inline unsigned long arch_local_save_flags(void)
- /*
-  * restore saved IRQ & FIQ state
-  */
-+#define arch_local_irq_restore arch_local_irq_restore
- static inline void arch_local_irq_restore(unsigned long flags)
- {
- 	asm volatile(
-@@ -156,10 +164,13 @@ static inline void arch_local_irq_restore(unsigned long flags)
- 		: "memory", "cc");
- }
-
-+#define arch_irqs_disabled_flags arch_irqs_disabled_flags
- static inline int arch_irqs_disabled_flags(unsigned long flags)
- {
- 	return flags & IRQMASK_I_BIT;
- }
-
-+#include <asm-generic/irqflags.h>
-+
- #endif /* ifdef __KERNEL__ */
- #endif /* ifndef __ASM_ARM_IRQFLAGS_H */
---
-2.4.2
+-- 
+FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
+according to speedtest.net.
