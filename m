@@ -1,81 +1,94 @@
-From: 21cnbao@gmail.com (Barry Song)
-Date: Thu, 11 Jun 2015 00:30:41 +0800
-Subject: [PATCH 1/2 V3] clk: sirf: add CSR atlas7 clk and reset support
-In-Reply-To: <20150521213324.GA1885@codeaurora.org>
-References: <1431675587-8637-1-git-send-email-21cnbao@gmail.com>
- <20150515183029.GL31753@codeaurora.org>
- <CAGsJ_4zwNQvvSwb49nwKzfke1V1nUCW-tDqbP4FxEr0SfmX9zA@mail.gmail.com>
- <20150521213324.GA1885@codeaurora.org>
-Message-ID: <CAGsJ_4xUk1kDnLDrRnipN+Kpm6oOe8C-4DfhdshVUmv+PKjgig@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 10 Jun 2015 17:31:21 +0100
+Subject: [PATCH 1/2] scatterlist: use sg_phys()
+In-Reply-To: <CAPcyv4gat8TG9YnHmvD_7A7RD00Urn=febCj2Uc_cVcPi+fnCg@mail.gmail.com>
+References: <20150609162659.21910.41681.stgit@dwillia2-desk3.amr.corp.intel.com>
+ <20150609162710.21910.57295.stgit@dwillia2-desk3.amr.corp.intel.com>
+ <20150610093252.GA20384@8bytes.org>
+ <CAPcyv4gat8TG9YnHmvD_7A7RD00Urn=febCj2Uc_cVcPi+fnCg@mail.gmail.com>
+Message-ID: <20150610163121.GP7557@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2015-05-22 5:33 GMT+08:00 Stephen Boyd <sboyd@codeaurora.org>:
-> On 05/16, Barry Song wrote:
->> 2015-05-16 2:30 GMT+08:00 Stephen Boyd <sboyd@codeaurora.org>:
->> > On 05/15, Barry Song wrote:
->> >> From: Zhiwu Song <Zhiwu.Song@csr.com>
->> >>
->> >> the hardware node includes both clock and reset support, so it
->> >> is named as "car".
->> >> this patch implements Flexible clocks(mux, divider, gate), Selectable
->> >> clock(mux, divider, gate), root clock(gate),leaf clock(gate), others.
->> >> it also implements the reset controller functionality.
->> >>
->> >> Signed-off-by: Zhiwu Song <Zhiwu.Song@csr.com>
->> >> Signed-off-by: Guo Zeng <Guo.Zeng@csr.com>
->> >> Signed-off-by: Barry Song <Baohua.Song@csr.com>
->> >> ---
->> >
->
-> Yes this has already been applied, but replying to the last
-> comment.
->
->> >> +
->> >> +
->> >> +CLK_OF_DECLARE(atlas7_clk, "sirf,atlas7-car", atlas7_clk_init);
->> >>
->> >
->> > I'm also curious if we actually need to use CLK_OF_DECLARE here
->> > or if could we use a platform device.
->> >
->> > Even if we need to use CLK_OF_DECLARE because some timer or other
->> > early device needs a clock, I wonder if we shouldn't also make
->> > these things into real platform drivers that register the other
->> > clocks that aren't necessary for the early boot process.
->> >
->> it seems it is a general question not only for this driver?
->
-> Yes it is.
->
->>
->> the main difficulty is maintaining the boot sequence of the platform
->> devices and other machine codes which require clocks. it seems it is
->> the easiest way to make clk ready earlier than other drivers.
->> and i don't think registering these clocks takes much boot time and
->> make boot slower at least for atlas7 platform since there is no sleep
->> and long delay in the procedure.
->
-> It isn't really about making boot time faster, it's about using
-> the proper linux device model for clock providers. That way when
-> we want to support things like suspend/resume, deferred probe,
-> devm_*(), sysfs, etc. we can use the device model instead of
-> resorting to things like syscore_ops for suspend/resume or
-> forgoing features entirely.
->
+On Wed, Jun 10, 2015 at 09:00:31AM -0700, Dan Williams wrote:
+> On Wed, Jun 10, 2015 at 2:32 AM, Joerg Roedel <joro@8bytes.org> wrote:
+> > On Tue, Jun 09, 2015 at 12:27:10PM -0400, Dan Williams wrote:
+> >> diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
+> >> index 7e7583ddd607..9f6ff6671f01 100644
+> >> --- a/arch/arm/mm/dma-mapping.c
+> >> +++ b/arch/arm/mm/dma-mapping.c
+> >> @@ -1502,7 +1502,7 @@ static int __map_sg_chunk(struct device *dev, struct scatterlist *sg,
+> >>               return -ENOMEM;
+> >>
+> >>       for (count = 0, s = sg; count < (size >> PAGE_SHIFT); s = sg_next(s)) {
+> >> -             phys_addr_t phys = page_to_phys(sg_page(s));
+> >> +             phys_addr_t phys = sg_phys(s) - s->offset;
+> >
+> > So sg_phys() turns out to be 'page_to_phys(sg_page(s)) + s->offset',
+> > which makes the above statement to:
+> >
+> >         page_to_phys(sg_page(s)) + s->offset - s->offset;
+> >
+> > The compiler will probably optimize that away, but it still doesn't look
+> > like an improvement.
+> 
+> The goal is to eventually stop leaking struct page deep into the i/o
+> stack.  Anything that relies on being able to retrieve a struct page
+> out of an sg entry needs to be converted.  I think we need a new
+> helper for this case "sg_phys_aligned()?".
 
-my feeling is if the clock controller is an internal controller which
-serve all controllers in the SoC, "deferred probe" might be yes for
-almost all HW since all HW need clock. so it seems it makes "deferred
-probe" has no meaning. clock controller seems to be 1st HW which needs
-to be ready.
+Why?  The aim of the code is not to detect whether the address is aligned
+to a page (if it were, it'd be testing for a zero s->offset, or it would
+be testing for an s->offset being a multiple of the page size.
 
-but if the clock controller is an external controller, it might be
-exactly a platform driver, or other bus-based drivers.
+Let's first understand the code that's being modified (which seems to be
+something which isn't done very much today - people seem to just like
+changing code for the hell of it.)
 
+        for (count = 0, s = sg; count < (size >> PAGE_SHIFT); s = sg_next(s)) {
+                phys_addr_t phys = page_to_phys(sg_page(s));
+                unsigned int len = PAGE_ALIGN(s->offset + s->length);
 
-> --
-> Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-> a Linux Foundation Collaborative Project
+                if (!is_coherent &&
+                        !dma_get_attr(DMA_ATTR_SKIP_CPU_SYNC, attrs))
+                        __dma_page_cpu_to_dev(sg_page(s), s->offset, s->length,
+dir);
 
--barry
+                prot = __dma_direction_to_prot(dir);
+
+                ret = iommu_map(mapping->domain, iova, phys, len, prot);
+                if (ret < 0)
+                        goto fail;
+                count += len >> PAGE_SHIFT;
+                iova += len;
+        }
+
+What it's doing is trying to map each scatterlist entry via an IOMMU.
+Unsurprisingly, IOMMUs are page based - you can't map a partial IOMMU
+page.
+
+However, what says that the IOMMU page size is the same as the host CPU
+page size - it may not be... so the above code is wrong for a completely
+different reason.
+
+What we _should_ be doing is finding out what the IOMMU minimum page
+size is, and using that in conjunction with the sg_phys() of the
+scatterlist entry to determine the start and length of the mapping
+such that the IOMMU mapping covers the range described by the scatterlist
+entry.  (iommu_map() takes arguments which must be aligned to the IOMMU
+minimum page size.)
+
+However, what we can also see from the above is that we have other code
+here using sg_page() - which is a necessity to be able to perform the
+required DMA cache maintanence to ensure that the data is visible to the
+DMA device.  We need to kmap_atomic() these in order to flush them, and
+there's no other way other than struct page to represent a highmem page.
+
+So, I think your intent to want to remove struct page from the I/O
+subsystem is a false hope, unless you want to end up rewriting lots of
+architecture code, and you can come up with an alternative method to
+represent highmem pages.
+
+-- 
+FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
+according to speedtest.net.
