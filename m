@@ -1,90 +1,32 @@
-From: tomeu.vizoso@collabora.com (Tomeu Vizoso)
-Date: Wed, 10 Jun 2015 12:19:49 +0200
-Subject: [PATCH 00/21] On-demand device registration
-In-Reply-To: <CACRpkdZuSj+S2x1yz6n5PgcRK=3ZCcq_To124b2Y+Oj54aydpg@mail.gmail.com>
-References: <1432565608-26036-1-git-send-email-tomeu.vizoso@collabora.com>
- <CACRpkdasLwMfEHGMRd1X3K_DU7NMPreE8TMwqqDTg8k9wj=wJQ@mail.gmail.com>
- <CAAObsKCP-C+TY8Wkk6bQzxZeGYL9X01trtjxfaYp--ZnH07C+w@mail.gmail.com>
- <CACRpkdZuSj+S2x1yz6n5PgcRK=3ZCcq_To124b2Y+Oj54aydpg@mail.gmail.com>
-Message-ID: <CAAObsKD97nEARO5eZYA2g8+z_MrazBy-m8PV_kSyj19ya72mAw@mail.gmail.com>
+From: swexru@gmail.com (Alexey Mednyy)
+Date: Wed, 10 Jun 2015 13:26:36 +0300
+Subject: i.mx53 suspend/resume mainline kernel
+Message-ID: <CAC3zGv_nAOSN6pOJb+4tmObtjoWmMpbo2s1a1cddEXiTkjprsQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10 June 2015 at 09:30, Linus Walleij <linus.walleij@linaro.org> wrote:
-> On Tue, Jun 2, 2015 at 12:14 PM, Tomeu Vizoso
-> <tomeu.vizoso@collabora.com> wrote:
->> On 2 June 2015 at 10:48, Linus Walleij <linus.walleij@linaro.org> wrote:
->
->>> This is what systemd is doing in userspace for starting services:
->>> ask for your dependencies and wait for them if they are not
->>> there. So drivers ask for resources and wait for them. It also
->>> needs to be abstract, so for example we need to be able to
->>> hang on regulator_get() until the driver is up and providing that
->>> regulator, and as long as everything is in slowpath it should
->>> be OK. (And vice versa mutatis mutandis for clk, gpio, pin
->>> control, interrupts (!) and DMA channels for example.)
->>
->> I understood above that you propose probing devices in order, but now
->> you mention that resource getters would block until the dependency is
->> fulfilled which confuses me because if we are probing in order then
->> all dependencies would be fulfilled before the device in question gets
->> probed.
->
-> Sorry, the problem space is a bit convoluted so the answers
-> get a bit convoluted. Maybe I'm thinking aloud and altering the course
-> of my thoughts as I type...
->
-> I guess there can be explicit dependencies for resources like this
-> patch does, but another way would be for all resource fetch functions
-> to be instrumented, so that you do not block until you try to take
-> a resource that is not yet there, e.g.:
->
-> regulator_get(...) -> not available, so:
-> - identify target regulator provider - this will need instrumentation
-> - probe it
->
-> It then turns out the regulator driver is on the i2c bus, so we
-> need to probe the i2c driver:
-> - identify target i2c host for the regulator driver - this will need
->   instrumentation
-> - probe the i2c host driver
->
-> i2c host comes out, probes the regulator driver, regulator driver
-> probes and then the regulator_get() call returns.
+Hello all!
 
-Hmm, if I understand correctly what you say, this is exactly what this
-particular series does:
+Looks like suspend/resume not working right on i.mx53 soc in mainline kernel.
+For some reason SOC is not suspending and hangs somewhere before
+actual low power mode.
 
-regulator_get -> of_platform_device_ensure -> probe() on the platform
-device that encloses the requested device node (i2c host) -> i2c slave
-gets probed and the regulator registered -> regulator_get returns the
-requested resource
+I've put printk's all over imx5 suspend code:
 
-The downside I'm currently looking at is that an explicit dependency
-graph would be useful to have for other purposes. For example to print
-a neat warning when a dependency cannot be fulfilled. Or to refuse to
-unbind a device which other devices depend on, or to automatically
-unbind the devices that depend on it, or to print a warning if a
-device is hotplugged off and other devices depend on it.
+static int mx5_suspend_enter(suspend_state_t state) from pm-imx5.c
+and I see printk message right before
+cpu_do_idle() function which is macro really calls cpu_v7_do_idle from proc-v7.S
 
-> This requires instrumentation on anything providing a resource
-> to another driver like those I mentioned and a lot of overhead
-> infrastructure, but I think it's the right approach. However I don't
-> know if I would ever be able to pull that off myself, I know talk
-> is cheap and I should show the code instead.
+And I don't see that CPU pulls STANDBY pad in any way, pmic don't know
+anything about cpu low power mode.
+Also clocks remain on.
+So, is problem somewhere in those 3 ARM instructions?
 
-Yeah, if you can give it a second look and say if it matches what you
-wrote above, it would be very much appreciated.
+dsb @ WFI may enter a low-power mode
+wfi
+ret lr
 
-> Deepest respect for your efforts!
+Have no idea where to move next...
 
-Thanks!
-
-Tomeu
-
-> Yours,
-> Linus Walleij
-> _______________________________________________
-> dri-devel mailing list
-> dri-devel at lists.freedesktop.org
-> http://lists.freedesktop.org/mailman/listinfo/dri-devel
+_________________________________
+Best regards, Mednyy Alexey.
