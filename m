@@ -1,40 +1,38 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Wed, 10 Jun 2015 16:11:35 -0700
-Subject: [PATCH v5] ARM: smp: Only expose /sys/.../cpuX/online if
- hotpluggable
-In-Reply-To: <20150610225744.GT7557@n2100.arm.linux.org.uk>
-References: <1428705191-15670-1-git-send-email-sboyd@codeaurora.org>
- <20150413134246.GS12732@n2100.arm.linux.org.uk>
- <557739AC.8000903@codeaurora.org>
- <20150610225744.GT7557@n2100.arm.linux.org.uk>
-Message-ID: <5578C427.1070100@codeaurora.org>
+From: khilman@kernel.org (Kevin Hilman)
+Date: Wed, 10 Jun 2015 16:12:55 -0700
+Subject: [GIT PULL v2] Keystone DTS update for v4.2
+In-Reply-To: <1433976681-4179-1-git-send-email-ssantosh@kernel.org> (Santosh
+ Shilimkar's message of "Wed, 10 Jun 2015 15:51:21 -0700")
+References: <1433976681-4179-1-git-send-email-ssantosh@kernel.org>
+Message-ID: <7h1thjjgy0.fsf@deeprootsystems.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/10/2015 03:57 PM, Russell King - ARM Linux wrote:
-> diff --git a/arch/arm/mach-shmobile/common.h b/arch/arm/mach-shmobile/common.h
-> index 476092b86c6e..f2c4bf437ea7 100644
-> --- a/arch/arm/mach-shmobile/common.h
-> +++ b/arch/arm/mach-shmobile/common.h
-> @@ -13,7 +13,8 @@ extern void shmobile_smp_boot(void);
->  extern void shmobile_smp_sleep(void);
->  extern void shmobile_smp_hook(unsigned int cpu, unsigned long fn,
->  			      unsigned long arg);
-> -extern int shmobile_smp_cpu_disable(unsigned int cpu);
-> +extern bool shmobile_smp_cpu_can_disable(unsigned int cpu);
-> +extern void shmobile_invalidate_start(void);
->
-> which your original patch did not include.  The tree I'm applying to
-> (-rc1) contains:
->
-> extern int shmobile_smp_cpu_disable(unsigned int cpu);
-> extern void shmobile_invalidate_start(void);
->
-> there.  Hence git quite rightfully declines to apply the patch.
->
+Santosh Shilimkar <ssantosh@kernel.org> writes:
 
-Thanks. Fixed.
+> Hi Kevin,
+>
+> As you suggested, please find updated pull request without the config patch.
+>
+>
+> The following changes since commit b787f68c36d49bb1d9236f403813641efa74a031:
+>
+>   Linux 4.1-rc1 (2015-04-26 17:59:10 -0700)
+>
+> are available in the git repository at:
+>
+>   git://git.kernel.org/pub/scm/linux/kernel/git/ssantosh/linux-keystone.git tags/keystone-dts-for-4.2
+>
+> for you to fetch changes up to 0b239342305069a09afda35e52e1f49d171a87b2:
+>
+>   ARM: dts: k2l: fix the netcp range size (2015-06-10 15:43:00 -0700)
+>
+> ----------------------------------------------------------------
+> Keystone DTS update for 4.2
+> 	- Includes NETCP related EVM updates
+>
+> ----------------------------------------------------------------
 
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+Thanks for the quick respin.  Pulled into next/dt.
+
+Kevin
