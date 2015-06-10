@@ -1,26 +1,30 @@
-From: khilman@kernel.org (Kevin Hilman)
-Date: Wed, 10 Jun 2015 15:52:09 -0700
-Subject: [PATCH RESEND] ARM: Kconfig: Select clocksource in STM32 entry
-In-Reply-To: <1433668113-10389-1-git-send-email-mcoquelin.stm32@gmail.com>
- (Maxime Coquelin's message of "Sun, 7 Jun 2015 11:08:33 +0200")
-References: <1433668113-10389-1-git-send-email-mcoquelin.stm32@gmail.com>
-Message-ID: <7hpp53jhwm.fsf@deeprootsystems.com>
+From: dinguyen@opensource.altera.com (Dinh Nguyen)
+Date: Wed, 10 Jun 2015 17:46:36 -0500
+Subject: [PATCH v2] ARM: socfpga: add smp_ops.cpu_kill to make kexec/kdump
+ available
+In-Reply-To: <20150610074719.22583.63623.stgit@arietta>
+References: <20150610074719.22583.63623.stgit@arietta>
+Message-ID: <5578BE4C.3050805@opensource.altera.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Maxime Coquelin <mcoquelin.stm32@gmail.com> writes:
-
-> STM32 clocksource driver needs to be selected if ARCH_STM32.
->
-> Signed-off-by: Maxime Coquelin <mcoquelin.stm32@gmail.com>
+On 06/10/2015 02:47 AM, Hiraku Toyooka wrote:
+> Kexec_load syscall in ARM requires that machine-specific code
+> has the smp_ops.cpu_kill() before loading kernel image.
+> This patch adds the cpu_kill(), as a result, kexec reboot and
+> kernel crash dump become available in mach-socfpga.
+> 
+> Signed-off-by: Hiraku Toyooka <hiraku.toyooka.gu@hitachi.com>
+> Cc: Dinh Nguyen <dinguyen@opensource.altera.com>
+> Cc: Russell King <linux@arm.linux.org.uk>
+> Cc: linux-arm-kernel at lists.infradead.org
+> Cc: linux-kernel at vger.kernel.org
 > ---
-> Hi Arnd,
->
->   This patch applies on top of arm-soc's next/soc branch, so that you don't 
-> get conflicts with Stefan's ARM_SINGLE_ARMV7M patch.
+>  arch/arm/mach-socfpga/platsmp.c |   12 ++++++++++++
+>  1 file changed, 12 insertions(+)
+> 
 
-Applied to next/soc,
+Applied!
 
 Thanks,
-
-Kevin
+Dinh
