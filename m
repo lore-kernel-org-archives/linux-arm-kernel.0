@@ -1,119 +1,66 @@
-From: lokeshvutla@ti.com (Lokesh Vutla)
-Date: Wed, 10 Jun 2015 14:56:25 +0530
-Subject: [PATCH 2/3] ARM: DRA: hwmod: RTC: Add lock and unlock functions
-In-Reply-To: <1433928386-24891-1-git-send-email-lokeshvutla@ti.com>
-References: <1433928386-24891-1-git-send-email-lokeshvutla@ti.com>
-Message-ID: <1433928386-24891-3-git-send-email-lokeshvutla@ti.com>
+From: joro@8bytes.org (Joerg Roedel)
+Date: Wed, 10 Jun 2015 11:32:52 +0200
+Subject: [PATCH 1/2] scatterlist: use sg_phys()
+In-Reply-To: <20150609162710.21910.57295.stgit@dwillia2-desk3.amr.corp.intel.com>
+References: <20150609162659.21910.41681.stgit@dwillia2-desk3.amr.corp.intel.com>
+ <20150609162710.21910.57295.stgit@dwillia2-desk3.amr.corp.intel.com>
+Message-ID: <20150610093252.GA20384@8bytes.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-RTC IP have kicker feature which prevents spurious writes to its registers.
-In order to write into any of the RTC registers, KICK values has to be
-written to KICK registers.
+On Tue, Jun 09, 2015 at 12:27:10PM -0400, Dan Williams wrote:
+> diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
+> index 7e7583ddd607..9f6ff6671f01 100644
+> --- a/arch/arm/mm/dma-mapping.c
+> +++ b/arch/arm/mm/dma-mapping.c
+> @@ -1502,7 +1502,7 @@ static int __map_sg_chunk(struct device *dev, struct scatterlist *sg,
+>  		return -ENOMEM;
+>  
+>  	for (count = 0, s = sg; count < (size >> PAGE_SHIFT); s = sg_next(s)) {
+> -		phys_addr_t phys = page_to_phys(sg_page(s));
+> +		phys_addr_t phys = sg_phys(s) - s->offset;
 
-Introduce omap_hwmod_rtc_unlock/lock functions, which  writes into these
-KICK registers inorder to lock and unlock RTC registers.
-Also hook these functions to RTC hwmod.
+So sg_phys() turns out to be 'page_to_phys(sg_page(s)) + s->offset',
+which makes the above statement to:
 
-Signed-off-by: Lokesh Vutla <lokeshvutla@ti.com>
----
- arch/arm/mach-omap2/omap_hwmod.h          |  2 ++
- arch/arm/mach-omap2/omap_hwmod_7xx_data.c |  2 ++
- arch/arm/mach-omap2/omap_hwmod_reset.c    | 47 +++++++++++++++++++++++++++++++
- 3 files changed, 51 insertions(+)
+	page_to_phys(sg_page(s)) + s->offset - s->offset;
 
-diff --git a/arch/arm/mach-omap2/omap_hwmod.h b/arch/arm/mach-omap2/omap_hwmod.h
-index 44c7db9..04855ab 100644
---- a/arch/arm/mach-omap2/omap_hwmod.h
-+++ b/arch/arm/mach-omap2/omap_hwmod.h
-@@ -742,6 +742,8 @@ const char *omap_hwmod_get_main_clk(struct omap_hwmod *oh);
-  */
- 
- extern int omap_hwmod_aess_preprogram(struct omap_hwmod *oh);
-+void omap_hwmod_rtc_unlock(struct omap_hwmod *oh);
-+void omap_hwmod_rtc_lock(struct omap_hwmod *oh);
- 
- /*
-  * Chip variant-specific hwmod init routines - XXX should be converted
-diff --git a/arch/arm/mach-omap2/omap_hwmod_7xx_data.c b/arch/arm/mach-omap2/omap_hwmod_7xx_data.c
-index 0e64c2f..983042f 100644
---- a/arch/arm/mach-omap2/omap_hwmod_7xx_data.c
-+++ b/arch/arm/mach-omap2/omap_hwmod_7xx_data.c
-@@ -1548,6 +1548,8 @@ static struct omap_hwmod_class_sysconfig dra7xx_rtcss_sysc = {
- static struct omap_hwmod_class dra7xx_rtcss_hwmod_class = {
- 	.name	= "rtcss",
- 	.sysc	= &dra7xx_rtcss_sysc,
-+	.unlock	= &omap_hwmod_rtc_unlock,
-+	.lock	= &omap_hwmod_rtc_lock,
- };
- 
- /* rtcss */
-diff --git a/arch/arm/mach-omap2/omap_hwmod_reset.c b/arch/arm/mach-omap2/omap_hwmod_reset.c
-index 65e186c..1fb106d 100644
---- a/arch/arm/mach-omap2/omap_hwmod_reset.c
-+++ b/arch/arm/mach-omap2/omap_hwmod_reset.c
-@@ -25,11 +25,20 @@
-  */
- #include <linux/kernel.h>
- #include <linux/errno.h>
-+#include <linux/delay.h>
- 
- #include <sound/aess.h>
- 
- #include "omap_hwmod.h"
- 
-+#define OMAP_RTC_STATUS_REG	0x44
-+#define OMAP_RTC_KICK0_REG	0x6c
-+#define OMAP_RTC_KICK1_REG	0x70
-+
-+#define OMAP_RTC_KICK0_VALUE	0x83E70B13
-+#define OMAP_RTC_KICK1_VALUE	0x95A4F1E0
-+#define OMAP_RTC_STATUS_BUSY	BIT(0)
-+
- /**
-  * omap_hwmod_aess_preprogram - enable AESS internal autogating
-  * @oh: struct omap_hwmod *
-@@ -51,3 +60,41 @@ int omap_hwmod_aess_preprogram(struct omap_hwmod *oh)
- 
- 	return 0;
- }
-+
-+static void omap_rtc_wait_not_busy(struct omap_hwmod *oh)
-+{
-+	int count;
-+	u8 status;
-+
-+	/* BUSY may stay active for 1/32768 second (~30 usec) */
-+	for (count = 0; count < 50; count++) {
-+		status = omap_hwmod_read(oh, OMAP_RTC_STATUS_REG);
-+		if (!(status & OMAP_RTC_STATUS_BUSY))
-+			break;
-+		udelay(1);
-+	}
-+	/* now we have ~15 usec to read/write various registers */
-+}
-+
-+/**
-+ * omap_hwmod_rtc_unlock - Reset and unlock the Kicker mechanism.
-+ * @oh: struct omap_hwmod *
-+ *
-+ * RTC IP have kicker feature.  This prevents spurious writes to its registers.
-+ * In order to write into any of the RTC registers, KICK values has te be
-+ * written in respective KICK registers. This is needed for hwmod to write into
-+ * sysconfig register.
-+ */
-+void omap_hwmod_rtc_unlock(struct omap_hwmod *oh)
-+{
-+	omap_rtc_wait_not_busy(oh);
-+	omap_hwmod_write(OMAP_RTC_KICK0_VALUE, oh, OMAP_RTC_KICK0_REG);
-+	omap_hwmod_write(OMAP_RTC_KICK1_VALUE, oh, OMAP_RTC_KICK1_REG);
-+}
-+
-+void omap_hwmod_rtc_lock(struct omap_hwmod *oh)
-+{
-+	omap_rtc_wait_not_busy(oh);
-+	omap_hwmod_write(0x0, oh, OMAP_RTC_KICK0_REG);
-+	omap_hwmod_write(0x0, oh, OMAP_RTC_KICK1_REG);
-+}
--- 
-1.9.1
+The compiler will probably optimize that away, but it still doesn't look
+like an improvement.
+
+>  		unsigned int len = PAGE_ALIGN(s->offset + s->length);
+>  
+>  		if (!is_coherent &&
+> diff --git a/arch/microblaze/kernel/dma.c b/arch/microblaze/kernel/dma.c
+> index ed7ba8a11822..dcb3c594d626 100644
+> --- a/arch/microblaze/kernel/dma.c
+> +++ b/arch/microblaze/kernel/dma.c
+> @@ -61,7 +61,7 @@ static int dma_direct_map_sg(struct device *dev, struct scatterlist *sgl,
+>  	/* FIXME this part of code is untested */
+>  	for_each_sg(sgl, sg, nents, i) {
+>  		sg->dma_address = sg_phys(sg);
+> -		__dma_sync(page_to_phys(sg_page(sg)) + sg->offset,
+> +		__dma_sync(sg_phys(sg),
+>  							sg->length, direction);
+
+Here the replacement makes sense, but weird indendation. Could all be
+moved to one line, I guess.
+
+>  	}
+>  
+> diff --git a/drivers/iommu/intel-iommu.c b/drivers/iommu/intel-iommu.c
+> index 68d43beccb7e..9b9ada71e0d3 100644
+> --- a/drivers/iommu/intel-iommu.c
+> +++ b/drivers/iommu/intel-iommu.c
+> @@ -1998,7 +1998,7 @@ static int __domain_mapping(struct dmar_domain *domain, unsigned long iov_pfn,
+>  			sg_res = aligned_nrpages(sg->offset, sg->length);
+>  			sg->dma_address = ((dma_addr_t)iov_pfn << VTD_PAGE_SHIFT) + sg->offset;
+>  			sg->dma_length = sg->length;
+> -			pteval = page_to_phys(sg_page(sg)) | prot;
+> +			pteval = (sg_phys(sg) - sg->offset) | prot;
+
+Here it doesn't make sense too. In general, please remove the cases
+where you have to subtract sg->offset after the conversion.
+
+
+	Joerg
