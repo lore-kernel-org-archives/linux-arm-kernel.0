@@ -1,58 +1,24 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 11 Jun 2015 01:08:09 +0200
-Subject: [PATCH v0] gpio_keys: fix gpio key driver to proper support GIC
- interrupt
-In-Reply-To: <CAL4ahLeMm_Qvk0BWxOYTc973_4=TPjZStgTNe5uJL53FBhMRvg@mail.gmail.com>
-References: <1433402712-21399-1-git-send-email-yvo@apm.com>
- <2953428.ar7Re29b0L@wuerfel>
- <CAL4ahLeMm_Qvk0BWxOYTc973_4=TPjZStgTNe5uJL53FBhMRvg@mail.gmail.com>
-Message-ID: <1529330.QWrJO7eUSt@wuerfel>
+From: khilman@kernel.org (Kevin Hilman)
+Date: Wed, 10 Jun 2015 16:10:52 -0700
+Subject: [PATCH] ARM: keystone: defconfig: enable netcp driver by default
+In-Reply-To: <1433976153-3522-1-git-send-email-ssantosh@kernel.org> (Santosh
+ Shilimkar's message of "Wed, 10 Jun 2015 15:42:33 -0700")
+References: <1433976153-3522-1-git-send-email-ssantosh@kernel.org>
+Message-ID: <7h8ubrjh1f.fsf@deeprootsystems.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 08 June 2015 09:48:29 Y Vo wrote:
-> On Fri, Jun 5, 2015 at 7:50 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> > On Thursday 04 June 2015 14:25:12 Y Vo wrote:
-> >> GIC is designed to support two of trigger mechanisms - active level
-> >> high or edge rising. But in the gpio_keys driver, it tries to use both
-> >> edge rising and edge falling trigger. This patch fixes the gpio_keys
-> >> driver to request only the edge rising event when failed to configure the
-> >> interrupt.
-> >>
-> >> Signed-off-by: Y Vo <yvo@apm.com>
-> >
-> > I think you want to use an 'interrupts' property instead of a 'gpios'
-> > property (or possibly both), so you can pass the right polarity.
-> 
->         gpio-keys {
->                 compatible = "gpio-keys";
->                 apm_ctrl_name = "Power Button";
->                 btn2 {
->                         label = "EXT_INT2";
->                         gpios = <&sbgpio 13 0x0>;
->                         linux,code = <116>;
->                         linux,input-type = <0x1>;     /* EV_KEY */
->                 };
->         };
-> 
->          sbgpio: sbgpio at 17001000{
->                         compatible = "apm,xgene-gpio-sb";
->                         reg = <0x0 0x17001000 0x0 0x400>;
->                         #gpio-cells = <2>;
->                         gpio-controller;
->                         interrupts =    <0x0 0x28 0x1>,
->                                         <0x0 0x29 0x1>,
->                                         <0x0 0x2a 0x1>,
->                                         <0x0 0x2b 0x1>,
->                                         <0x0 0x2c 0x1>,
->                                         <0x0 0x2d 0x1>;
->                 };
-> I can change the polarity of interrupt in the sbgpio node, but the
-> issue here is the gpio_key driver always set interrupt type to
-> (irqflags = IRQF_TRIGGER_RISING | IRQF_TRIGGER_FALLING). And the GIC
-> driver only support edge rising or level high. So that's our issue.
+Santosh Shilimkar <ssantosh@kernel.org> writes:
 
-No, please do as I wrote, and use an interrupts property in the gpio-keys
-node.
+> From: Murali Karicheri <m-karicheri2@ti.com>
+>
+> Enable netcp driver in defconfig for keystone SoCs.
+>
+> Signed-off-by: Murali Karicheri <m-karicheri2@ti.com>
+> Signed-off-by: Santosh Shilimkar <ssantosh@kernel.org>
 
-	Arnd
+Appled to next/defconfig,
+
+Thanks,
+
+Kevin
