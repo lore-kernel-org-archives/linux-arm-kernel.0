@@ -1,62 +1,65 @@
-From: hofrat@osadl.org (Nicholas Mc Guire)
-Date: Wed, 10 Jun 2015 11:02:03 +0200
-Subject: [PATCH] [media] s5p-tv: fix wait_event_timeout return handling
-Message-ID: <1433926923-13092-1-git-send-email-hofrat@osadl.org>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Wed, 10 Jun 2015 10:10:27 +0100
+Subject: [REBASED 2/5] regulator: pwm-regulator: Separate voltage-table
+ initialisation
+In-Reply-To: <20150610110206.6194cc0f@ipc1.ka-ro>
+References: <1433923073-907-1-git-send-email-lee.jones@linaro.org>
+ <1433923073-907-3-git-send-email-lee.jones@linaro.org>
+ <20150610110206.6194cc0f@ipc1.ka-ro>
+Message-ID: <20150610091027.GB2982@x1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-event API conformance testing with coccinelle spatches are being
-used to locate API usage inconsistencies this triggert with:
-./drivers/media/platform/s5p-tv/mixer_reg.c:364
-        incorrect check for negative return
+Oh my ...
 
-Return type of wait_event_timeout is signed long not int and the
-return type is >=0 always thus the negative check is unnecessary.
-An appropriately named variable of type long is inserted and the
-call fixed up aswell as the negative return check dropped.
+On Wed, 10 Jun 2015, Lothar Wa?mann wrote:
+> > Take this out of the main .probe() routine in order to facilitate the
+> > introduction of different ways to obtain 'duty cycle' information.
+> > 
+> > Signed-off-by: Lee Jones <lee.jones@linaro.org>
+> > ---
+> >  drivers/mfd/mfd-child.c           | 47 ++++++++++++++++++++++++
+> >  drivers/regulator/pwm-regulator.c | 77 +++++++++++++++++++++++----------------
+> >  2 files changed, 92 insertions(+), 32 deletions(-)
+> >  create mode 100644 drivers/mfd/mfd-child.c
+> > 
+> > diff --git a/drivers/mfd/mfd-child.c b/drivers/mfd/mfd-child.c
+> > new file mode 100644
+> > index 0000000..f233add
+> > --- /dev/null
+> > +++ b/drivers/mfd/mfd-child.c
+> > @@ -0,0 +1,47 @@
+> > +#include <linux/interrupt.h>
+> > +#include <linux/module.h>
+> > +#include <linux/of_device.h>
+> > +#include <linux/of_irq.h>
+> > +
+> > +static int simple_mfd_child_probe(struct platform_device *pdev)
+> > +{
+> > +	struct resource *res;
+> > +	void __iomem *base;
+> > +	int irq;
+> > +
+> > +	printk("LEE: %s %s()[%d]: Enter\n", __FILE__, __func__, __LINE__);
+> > +
+> Debugging remnant?
+> 
+> > +	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+> > +	dev_err(&pdev->dev, "Phys: %x: %x\n", res->start, resource_size(res));
+> > +
+> That's not an error message and thus shouldn't be printed with
+> dev_err(). dev_dbg() would be more appropriate here.
 
-Signed-off-by: Nicholas Mc Guire <hofrat@osadl.org>
----
+This entire file is cruft and has nothing to do with this set.
 
-Minor change of indentation to make checkpatch happy - not sure if 
-this is much more readable though.
+It was knocked it up quickly to test something unrelated.
 
-Patch was compile tested with exynos_defconfig + CONFIG_MEDIA_SUPPORT=m,
-CONFIG_MEDIA_CAMERA_SUPPORT=y, CONFIG_MEDIA_ANALOG_TV_SUPPORT=y,
-CONFIG_V4L_PLATFORM_DRIVERS=y, CONFIG_VIDEO_SAMSUNG_S5P_TV=y,
-CONFIG_VIDEO_SAMSUNG_S5P_MIXER=m
+I will resubmit this patch with it removed.
 
-Patch is against 4.1-rc7 (localversion-next is -next-20150609)
+Sorry for the noise.
 
- drivers/media/platform/s5p-tv/mixer_reg.c |   12 +++++-------
- 1 file changed, 5 insertions(+), 7 deletions(-)
-
-diff --git a/drivers/media/platform/s5p-tv/mixer_reg.c b/drivers/media/platform/s5p-tv/mixer_reg.c
-index b713403..5127acb 100644
---- a/drivers/media/platform/s5p-tv/mixer_reg.c
-+++ b/drivers/media/platform/s5p-tv/mixer_reg.c
-@@ -357,17 +357,15 @@ void mxr_reg_streamoff(struct mxr_device *mdev)
- 
- int mxr_reg_wait4vsync(struct mxr_device *mdev)
- {
--	int ret;
-+	long time_left;
- 
- 	clear_bit(MXR_EVENT_VSYNC, &mdev->event_flags);
- 	/* TODO: consider adding interruptible */
--	ret = wait_event_timeout(mdev->event_queue,
--		test_bit(MXR_EVENT_VSYNC, &mdev->event_flags),
--		msecs_to_jiffies(1000));
--	if (ret > 0)
-+	time_left = wait_event_timeout(mdev->event_queue,
-+			test_bit(MXR_EVENT_VSYNC, &mdev->event_flags),
-+				 msecs_to_jiffies(1000));
-+	if (time_left > 0)
- 		return 0;
--	if (ret < 0)
--		return ret;
- 	mxr_warn(mdev, "no vsync detected - timeout\n");
- 	return -ETIME;
- }
 -- 
-1.7.10.4
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
