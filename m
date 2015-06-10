@@ -1,22 +1,68 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 10 Jun 2015 14:02:21 +0200
-Subject: [PATCH 23/34] pinctrl: mvebu: armada-xp: rename spi to spi0
-In-Reply-To: <20150609165300.GA16778@lunn.ch>
-References: <1433868446-11028-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1433868446-11028-24-git-send-email-thomas.petazzoni@free-electrons.com>
- <20150609165300.GA16778@lunn.ch>
-Message-ID: <CACRpkdbXTi01MjGni_sD-_weqXepN6-eRho_VdBtzoc0Ctrnng@mail.gmail.com>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Wed, 10 Jun 2015 14:02:29 +0200
+Subject: [PATCH v5 1/7] mmc: dt-bindings: add Mediatek MMC bindings
+In-Reply-To: <1433903088-14407-2-git-send-email-chaotian.jing@mediatek.com>
+References: <1433903088-14407-1-git-send-email-chaotian.jing@mediatek.com>
+ <1433903088-14407-2-git-send-email-chaotian.jing@mediatek.com>
+Message-ID: <CAPDyKFojmJYcQOdk3CkgsJ0xOzgjH86VVwvYCy2whjtiPxAFKg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 9, 2015 at 6:53 PM, Andrew Lunn <andrew@lunn.ch> wrote:
+On 10 June 2015 at 04:24, Chaotian Jing <chaotian.jing@mediatek.com> wrote:
+> Document the device-tree binding of Mediatek MMC host
+>
+> Signed-off-by: Chaotian Jing <chaotian.jing@mediatek.com>
+> ---
+>  Documentation/devicetree/bindings/mmc/mtk-sd.txt | 32 ++++++++++++++++++++++++
+>  1 file changed, 32 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/mmc/mtk-sd.txt
+>
+> diff --git a/Documentation/devicetree/bindings/mmc/mtk-sd.txt b/Documentation/devicetree/bindings/mmc/mtk-sd.txt
+> new file mode 100644
+> index 0000000..a1adfa4
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/mmc/mtk-sd.txt
+> @@ -0,0 +1,32 @@
+> +* MTK MMC controller
+> +
+> +The MTK  MSDC can act as a MMC controller
+> +to support MMC, SD, and SDIO types of memory cards.
+> +
+> +This file documents differences between the core properties in mmc.txt
+> +and the properties used by the msdc driver.
+> +
+> +Required properties:
+> +- compatible: Should be "mediatek,mt8173-mmc","mediatek,mt8135-mmc"
+> +- interrupts: Should contain MSDC interrupt number
+> +- clocks: MSDC source clock, HCLK
+> +- clock-names: "source", "hclk"
 
-> Should this patch also contain a change to armada-xp.dtsi:
+According to the mmc driver, hclk is treated as an optional clock.
+Therefore I think you should list it under an "Optional properties"
+section instead.
 
-I prefer to not carry dt patches in the pinctrl tree.
+> +- pinctrl-names: should be "default", "state_uhs"
+> +- pinctrl-0: should contain default/high speed pin ctrl
+> +- pinctrl-1: should contain uhs mode pin ctrl
+> +- vmmc-supply: power to the Core
+> +- vqmmc-supply: power to the IO
+> +
+> +Examples:
+> +mmc0: mmc at 11230000 {
+> +       compatible = "mediatek,mt8173-mmc", "mediatek,mt8135-mmc";
+> +       reg = <0 0x11230000 0 0x108>;
+> +       interrupts = <GIC_SPI 39 IRQ_TYPE_LEVEL_LOW>;
+> +       vmmc-supply = <&mt6397_vemc_3v3_reg>;
+> +       vqmmc-supply = <&mt6397_vio18_reg>;
+> +       clocks = <&pericfg CLK_PERI_MSDC30_0>, <&topckgen CLK_TOP_MSDC50_0_H_SEL>;
+> +       clock-names = "source", "hclk";
+> +       pinctrl-names = "default", "state_uhs";
+> +       pinctrl-0 = <&mmc0_pins_default>;
+> +       pinctrl-1 = <&mmc0_pins_uhs>;
+> +};
+> --
+> 1.8.1.1.dirty
+>
 
-That part of the kernel should one day go into a separate
-git so it is OK to patch it separately through ARM SoC.
-
-Yours,
-Linus Walleij
+Kind regards
+Uffe
