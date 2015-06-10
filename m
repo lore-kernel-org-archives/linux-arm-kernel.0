@@ -1,133 +1,173 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Wed, 10 Jun 2015 08:57:50 +0100
-Subject: [REBASED 2/5] regulator: pwm-regulator: Separate voltage-table
- initialisation
+Date: Wed, 10 Jun 2015 08:57:51 +0100
+Subject: [REBASED 3/5] regulator: pwm-regulator: Add support for
+ continuous-voltage
 In-Reply-To: <1433923073-907-1-git-send-email-lee.jones@linaro.org>
 References: <1433923073-907-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1433923073-907-3-git-send-email-lee.jones@linaro.org>
+Message-ID: <1433923073-907-4-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Take this out of the main .probe() routine in order to facilitate the
-introduction of different ways to obtain 'duty cycle' information.
+The current version of PWM regulator only supports a static table
+approach, where pre-calculated values are supplied by the vendor and
+obtained via DT.  The continuous-voltage method takes min_uV and
+max_uV, and divides the difference between them up into a number of
+slices.  The number of slices depend on how large the duty cycle
+register is.  This information is provided by a DT property.
+
+As the name alludes, this provides values for a continuous voltage
+range between min_uV and max_uV, which has obvious benefits over
+either limited voltage possibilities, or the requirement to provide
+a large voltage-table.
 
 Signed-off-by: Lee Jones <lee.jones@linaro.org>
 ---
- drivers/mfd/mfd-child.c           | 47 ++++++++++++++++++++++++
- drivers/regulator/pwm-regulator.c | 77 +++++++++++++++++++++++----------------
- 2 files changed, 92 insertions(+), 32 deletions(-)
- create mode 100644 drivers/mfd/mfd-child.c
+ drivers/regulator/pwm-regulator.c | 114 +++++++++++++++++++++++++++++++++++---
+ 1 file changed, 106 insertions(+), 8 deletions(-)
 
-diff --git a/drivers/mfd/mfd-child.c b/drivers/mfd/mfd-child.c
-new file mode 100644
-index 0000000..f233add
---- /dev/null
-+++ b/drivers/mfd/mfd-child.c
-@@ -0,0 +1,47 @@
-+#include <linux/interrupt.h>
-+#include <linux/module.h>
-+#include <linux/of_device.h>
-+#include <linux/of_irq.h>
+diff --git a/drivers/regulator/pwm-regulator.c b/drivers/regulator/pwm-regulator.c
+index 25560fc..b37b616 100644
+--- a/drivers/regulator/pwm-regulator.c
++++ b/drivers/regulator/pwm-regulator.c
+@@ -10,6 +10,7 @@
+  * published by the Free Software Foundation.
+  */
+ 
++#include <linux/delay.h>
+ #include <linux/module.h>
+ #include <linux/init.h>
+ #include <linux/err.h>
+@@ -21,9 +22,16 @@
+ #include <linux/pwm.h>
+ 
+ struct pwm_regulator_data {
+-	struct pwm_voltages *duty_cycle_table;
++	/*  Shared */
+ 	struct pwm_device *pwm;
 +
-+static int simple_mfd_child_probe(struct platform_device *pdev)
++	/* Voltage table */
++	struct pwm_voltages *duty_cycle_table;
+ 	int state;
++
++	/* Continuous voltage */
++	u32 max_duty_cycle;
++	int volt_uV;
+ };
+ 
+ struct pwm_voltages {
+@@ -31,6 +39,9 @@ struct pwm_voltages {
+ 	unsigned int dutycycle;
+ };
+ 
++/**
++ * Voltage table call-backs
++ */
+ static int pwm_regulator_get_voltage_sel(struct regulator_dev *rdev)
+ {
+ 	struct pwm_regulator_data *drvdata = rdev_get_drvdata(rdev);
+@@ -78,6 +89,71 @@ static int pwm_regulator_list_voltage(struct regulator_dev *rdev,
+ 
+ 	return drvdata->duty_cycle_table[selector].uV;
+ }
++
++/**
++ * Continuous voltage call-backs
++ */
++static int pwm_voltage_to_duty_cycle(struct regulator_dev *rdev,
++					int volt_mV)
 +{
-+	struct resource *res;
-+	void __iomem *base;
-+	int irq;
++	struct pwm_regulator_data *drvdata = rdev_get_drvdata(rdev);
++	int min_mV = rdev->constraints->min_uV / 1000;
++	int max_mV = rdev->constraints->max_uV / 1000;
++	int max_duty_cycle = drvdata->max_duty_cycle;
++	int vdiff = min_mV - max_mV;
++	int pwm_code;
++	int tmp;
 +
-+	printk("LEE: %s %s()[%d]: Enter\n", __FILE__, __func__, __LINE__);
++	tmp = max_duty_cycle - min_mV * max_duty_cycle / vdiff;
++	pwm_code = tmp + max_duty_cycle * volt_mV / vdiff;
 +
-+	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-+	dev_err(&pdev->dev, "Phys: %x: %x\n", res->start, resource_size(res));
++	if (pwm_code < 0)
++		pwm_code = 0;
++	if (pwm_code > max_duty_cycle)
++		pwm_code = max_duty_cycle;
 +
-+	base = devm_ioremap_resource(&pdev->dev, res);
-+	if (IS_ERR(base))
-+		return PTR_ERR(base);
++	return pwm_code * 100 / max_duty_cycle;
++}
 +
-+	dev_err(&pdev->dev, "Virt: %p\n", base);
++static int pwm_regulator_get_voltage(struct regulator_dev *rdev)
++{
++	struct pwm_regulator_data *drvdata = rdev_get_drvdata(rdev);
 +
-+	irq = platform_get_irq(pdev, 0);
-+	if (irq < 0) {
-+		dev_err(&pdev->dev, "failed to get IRQ: %d\n", irq);
-+		return irq;
++	return drvdata->volt_uV;
++}
++
++static int pwm_regulator_set_voltage(struct regulator_dev *rdev,
++					int min_uV, int max_uV,
++					unsigned *selector)
++{
++	struct pwm_regulator_data *drvdata = rdev_get_drvdata(rdev);
++	unsigned int ramp_delay = rdev->constraints->ramp_delay;
++	int duty_cycle;
++	int ret;
++
++	duty_cycle = pwm_voltage_to_duty_cycle(rdev, min_uV / 1000);
++
++	ret = pwm_config(drvdata->pwm,
++			 (drvdata->pwm->period / 100) * duty_cycle,
++			 drvdata->pwm->period);
++	if (ret) {
++		dev_err(&rdev->dev, "Failed to configure PWM\n");
++		return ret;
 +	}
 +
-+	dev_err(&pdev->dev, "IRQ: %d\n", irq);
++	ret = pwm_enable(drvdata->pwm);
++	if (ret) {
++		dev_err(&rdev->dev, "Failed to enable PWM\n");
++		return ret;
++	}
++	drvdata->volt_uV = min_uV;
++
++	/* Delay required by PWM regulator to settle to the new voltage */
++	usleep_range(ramp_delay, ramp_delay + 1000);
 +
 +	return 0;
 +}
 +
-+static const struct of_device_id simple_mfd_child_of_match[] = {
-+	{ .compatible = "simple-mfd-child" },
-+	{ }
-+};
-+MODULE_DEVICE_TABLE(of, simple_mfd_child_of_match);
-+
-+static struct platform_driver simple_mfd_child_driver = {
-+	.probe = simple_mfd_child_probe,
-+	.driver = {
-+		.name = "simple-mfd-child",
-+		.of_match_table = of_match_ptr(simple_mfd_child_of_match),
-+	},
-+};
-+module_platform_driver(simple_mfd_child_driver);
-diff --git a/drivers/regulator/pwm-regulator.c b/drivers/regulator/pwm-regulator.c
-index ffa9612..25560fc 100644
---- a/drivers/regulator/pwm-regulator.c
-+++ b/drivers/regulator/pwm-regulator.c
-@@ -78,8 +78,7 @@ static int pwm_regulator_list_voltage(struct regulator_dev *rdev,
- 
- 	return drvdata->duty_cycle_table[selector].uV;
- }
--
--static struct regulator_ops pwm_regulator_voltage_ops = {
-+static struct regulator_ops pwm_regulator_voltage_table_ops = {
+ static struct regulator_ops pwm_regulator_voltage_table_ops = {
  	.set_voltage_sel = pwm_regulator_set_voltage_sel,
  	.get_voltage_sel = pwm_regulator_get_voltage_sel,
- 	.list_voltage    = pwm_regulator_list_voltage,
-@@ -88,20 +87,55 @@ static struct regulator_ops pwm_regulator_voltage_ops = {
- 
- static struct regulator_desc pwm_regulator_desc = {
- 	.name		= "pwm-regulator",
--	.ops		= &pwm_regulator_voltage_ops,
- 	.type		= REGULATOR_VOLTAGE,
- 	.owner		= THIS_MODULE,
- 	.supply_name    = "pwm",
+@@ -85,6 +161,11 @@ static struct regulator_ops pwm_regulator_voltage_table_ops = {
+ 	.map_voltage     = regulator_map_voltage_iterate,
  };
  
-+static int pwm_regulator_init_table(struct platform_device *pdev,
-+				    struct pwm_regulator_data *drvdata)
++static struct regulator_ops pwm_regulator_voltage_continuous_ops = {
++	.get_voltage = pwm_regulator_get_voltage,
++	.set_voltage = pwm_regulator_set_voltage,
++};
++
+ static struct regulator_desc pwm_regulator_desc = {
+ 	.name		= "pwm-regulator",
+ 	.type		= REGULATOR_VOLTAGE,
+@@ -129,6 +210,25 @@ static int pwm_regulator_init_table(struct platform_device *pdev,
+ 	return 0;
+ }
+ 
++static int pwm_regulator_init_continuous(struct platform_device *pdev,
++					 struct pwm_regulator_data *drvdata)
 +{
 +	struct device_node *np = pdev->dev.of_node;
-+	struct pwm_voltages *duty_cycle_table;
-+	int length;
 +	int ret;
 +
-+	of_find_property(np, "voltage-table", &length);
-+
-+	if ((length < sizeof(*duty_cycle_table)) ||
-+	    (length % sizeof(*duty_cycle_table))) {
-+		dev_err(&pdev->dev,
-+			"voltage-table length(%d) is invalid\n",
-+			length);
-+		return -EINVAL;
-+	}
-+
-+	duty_cycle_table = devm_kzalloc(&pdev->dev, length, GFP_KERNEL);
-+	if (!duty_cycle_table)
-+		return -ENOMEM;
-+
-+	ret = of_property_read_u32_array(np, "voltage-table",
-+					 (u32 *)duty_cycle_table,
-+					 length / sizeof(u32));
++	ret = of_property_read_u32(np, "max-duty-cycle",
++				   &drvdata->max_duty_cycle);
 +	if (ret) {
-+		dev_err(&pdev->dev, "Failed to read voltage-table\n");
++		dev_err(&pdev->dev, "Failed to read \"pwm-max-value\"\n");
 +		return ret;
 +	}
 +
-+	drvdata->duty_cycle_table	= duty_cycle_table;
-+	pwm_regulator_desc.ops		= &pwm_regulator_voltage_table_ops;
-+	pwm_regulator_desc.n_voltages	= length / sizeof(*duty_cycle_table);
++	pwm_regulator_desc.ops = &pwm_regulator_voltage_continuous_ops;
++	pwm_regulator_desc.continuous_voltage_range = true;
 +
 +	return 0;
 +}
@@ -135,57 +175,25 @@ index ffa9612..25560fc 100644
  static int pwm_regulator_probe(struct platform_device *pdev)
  {
  	struct pwm_regulator_data *drvdata;
--	struct property *prop;
- 	struct regulator_dev *regulator;
- 	struct regulator_config config = { };
- 	struct device_node *np = pdev->dev.of_node;
--	int length, ret;
-+	int ret;
- 
- 	if (!np) {
- 		dev_err(&pdev->dev, "Device Tree node missing\n");
-@@ -112,36 +146,15 @@ static int pwm_regulator_probe(struct platform_device *pdev)
+@@ -146,14 +246,12 @@ static int pwm_regulator_probe(struct platform_device *pdev)
  	if (!drvdata)
  		return -ENOMEM;
  
--	/* determine the number of voltage-table */
--	prop = of_find_property(np, "voltage-table", &length);
--	if (!prop) {
--		dev_err(&pdev->dev, "No voltage-table\n");
+-	if (of_find_property(np, "voltage-table", NULL)) {
++	if (of_find_property(np, "voltage-table", NULL))
+ 		ret = pwm_regulator_init_table(pdev, drvdata);
+-		if (ret)
+-			return ret;
+-	} else {
+-		dev_err(&pdev->dev, "No \"voltage-table\" supplied\n");
 -		return -EINVAL;
 -	}
--
--	if ((length < sizeof(*drvdata->duty_cycle_table)) ||
--	    (length % sizeof(*drvdata->duty_cycle_table))) {
--		dev_err(&pdev->dev, "voltage-table length(%d) is invalid\n",
--			length);
-+	if (of_find_property(np, "voltage-table", NULL)) {
-+		ret = pwm_regulator_init_table(pdev, drvdata);
-+		if (ret)
-+			return ret;
-+	} else {
-+		dev_err(&pdev->dev, "No \"voltage-table\" supplied\n");
- 		return -EINVAL;
- 	}
++	else
++		ret = pwm_regulator_init_continuous(pdev, drvdata);
++	if (ret)
++		return ret;
  
--	pwm_regulator_desc.n_voltages = length / sizeof(*drvdata->duty_cycle_table);
--
--	drvdata->duty_cycle_table = devm_kzalloc(&pdev->dev,
--						 length, GFP_KERNEL);
--	if (!drvdata->duty_cycle_table)
--		return -ENOMEM;
--
--	/* read voltage table from DT property */
--	ret = of_property_read_u32_array(np, "voltage-table",
--					 (u32 *)drvdata->duty_cycle_table,
--					 length / sizeof(u32));
--	if (ret < 0) {
--		dev_err(&pdev->dev, "read voltage-table failed\n");
--		return ret;
--	}
--
  	config.init_data = of_get_regulator_init_data(&pdev->dev, np,
  						      &pwm_regulator_desc);
- 	if (!config.init_data)
 -- 
 1.9.1
