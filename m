@@ -1,104 +1,43 @@
-From: lina.iyer@linaro.org (Lina Iyer)
-Date: Wed, 10 Jun 2015 14:35:19 -0600
-Subject: [PATCH RFC 2/3] PM / Domains: Support atomic PM domains
-In-Reply-To: <7hy4jrmoch.fsf@deeprootsystems.com>
-References: <1433456946-53296-1-git-send-email-lina.iyer@linaro.org>
- <1433456946-53296-3-git-send-email-lina.iyer@linaro.org>
- <7hy4jrmoch.fsf@deeprootsystems.com>
-Message-ID: <20150610203519.GB7715@linaro.org>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Wed, 10 Jun 2015 14:33:45 -0700
+Subject: [PATCH 1/2 V3] clk: sirf: add CSR atlas7 clk and reset support
+In-Reply-To: <CAGsJ_4xUk1kDnLDrRnipN+Kpm6oOe8C-4DfhdshVUmv+PKjgig@mail.gmail.com>
+References: <1431675587-8637-1-git-send-email-21cnbao@gmail.com>
+ <20150515183029.GL31753@codeaurora.org>
+ <CAGsJ_4zwNQvvSwb49nwKzfke1V1nUCW-tDqbP4FxEr0SfmX9zA@mail.gmail.com>
+ <20150521213324.GA1885@codeaurora.org>
+ <CAGsJ_4xUk1kDnLDrRnipN+Kpm6oOe8C-4DfhdshVUmv+PKjgig@mail.gmail.com>
+Message-ID: <20150610213345.GF29640@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 10 2015 at 12:04 -0600, Kevin Hilman wrote:
->Lina Iyer <lina.iyer@linaro.org> writes:
->
->> Power Domains currently support turning on/off only in process context.
->
->Generic Power Domains...
->
->Also Re: $SUBJECT.  s/atomic/IRQ safe/
->
-Okay. 
+On 06/11, Barry Song wrote:
+> 2015-05-22 5:33 GMT+08:00 Stephen Boyd <sboyd@codeaurora.org>:
+> > On 05/16, Barry Song wrote:
+> >> 2015-05-16 2:30 GMT+08:00 Stephen Boyd <sboyd@codeaurora.org>:
+> >> > On 05/15, Barry Song wrote:
+> >
+> > It isn't really about making boot time faster, it's about using
+> > the proper linux device model for clock providers. That way when
+> > we want to support things like suspend/resume, deferred probe,
+> > devm_*(), sysfs, etc. we can use the device model instead of
+> > resorting to things like syscore_ops for suspend/resume or
+> > forgoing features entirely.
+> >
+> 
+> my feeling is if the clock controller is an internal controller which
+> serve all controllers in the SoC, "deferred probe" might be yes for
+> almost all HW since all HW need clock. so it seems it makes "deferred
+> probe" has no meaning. clock controller seems to be 1st HW which needs
+> to be ready.
 
->> This restricts the usage of PM domains to devices and domains that
->> could be powered on/off in irq disabled contexts as the mutexes used in
->> GenPD allows for cpu sleep while waiting for locks.
->
->That sentence reads the opposite of what you mean.  Rather than "This
->restricts X to Y", I think you menant "This prevents X for Y".
->
-Will reword.
+That sounds like a probe ordering problem, and I agree most
+likely the clock driver will need to probe first in this case. It
+doesn't do anything about other problems like suspend/resume or
+other features that the device model provides solutions for
+though. Maybe we don't use these features, but it doesn't mean we
+should forgo the device model just because we don't need it.
 
->> Genpd inherently provides support for devices, domain hierarchy and can
->
->s/domain heirarchy/nesting/
->
-Ok
-
->> be used to represent cpu clusters like in ARM's big.Little, where, each
->> cpu cluster is in its domain, with supporting caches and other
->> peripheral hardware.
->
->s/domain/power domain/
->
-OK
-
->> Multiple such domains could be part of another domain.
->
->OK, but not important to this change IMO.
->
->> Because mutexes are used to protect and synchronize domain
->
->s/domain/genpd/
->
-Ya, genpd is better word.
-
->> operations and cpu idle operations are inherently atomic,
->
->Be more specific about "CPU idle operations are inherently atomic", as
->it's not obvious that it's true.  I think what you mean is that
->the CPUidle paths for entering of low-power idle states is inherently
->atomic because interrupts are disabled.
->
-Will explain
-
->> the use of
->> genpd is not possible for runtime suspend and resume of the pm domain.
->
->... so, the use of genpd during the idle path of CPUs is not currently
->possible because interrups are disabled in the idle path.
->
->> Replacing the locks to spinlocks would allow cpu domain to be be powered
->                     ^^^^
->s/to/with/
->
-Ok
-
->> off to save power, when all the cpus are powered off.
->
->More accuratly, replacing the locks doesn't allow the domain to be
->powered off, rather it allows genpd to be used in the idle path, which
->would allow genpd to be used
->
->> However, not all domains can operate in irq-safe contexts and usually
->> would need to sleep during domain operations. So genpd has to support
->> both the cases, where the domain is or is not irq-safe. The irq-safe
->> attribute is therefore domain specific.
->>
->> To achieve domain specific locking, set the GENPD_FLAG_IRQ_SAFE flag
->> while defining the domain. This determines if the domain should use a
->> spinlock instead of a mutex. Locking is abstracted through
->> genpd_lock_domain() and genpd_unlock_domain() functions that use the
->> flag to determine the locking to be used for this domain.
->>
->> The restriction this imposes on the domain hierarchy is that subdomains
->> and all devices in the hierarchy also be irq-safe. Non irq-safe domains
->> may continue to have irq-safe devices, but not the other way around.
->
->This might need some corresponding updates to Documentation/ as well.
->
-Agreed. Will add documentation in the next spin.
-
-Thanks for the review Kevin.
-
--- Lina
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
