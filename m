@@ -1,100 +1,362 @@
-From: dan.j.williams@intel.com (Dan Williams)
-Date: Wed, 10 Jun 2015 09:57:06 -0700
-Subject: [PATCH 1/2] scatterlist: use sg_phys()
-In-Reply-To: <20150610163121.GP7557@n2100.arm.linux.org.uk>
-References: <20150609162659.21910.41681.stgit@dwillia2-desk3.amr.corp.intel.com>
- <20150609162710.21910.57295.stgit@dwillia2-desk3.amr.corp.intel.com>
- <20150610093252.GA20384@8bytes.org>
- <CAPcyv4gat8TG9YnHmvD_7A7RD00Urn=febCj2Uc_cVcPi+fnCg@mail.gmail.com>
- <20150610163121.GP7557@n2100.arm.linux.org.uk>
-Message-ID: <CAPcyv4i0MB9GTL4ujtybwBLB9sV+n0PX686Oi-Rt5CGEeey_hQ@mail.gmail.com>
+From: lina.iyer@linaro.org (Lina Iyer)
+Date: Wed, 10 Jun 2015 10:57:42 -0600
+Subject: [PATCH RFC 3/3] PM / Domains: Introduce generic PM domain for
+ cpu domain
+In-Reply-To: <5574121F.2000806@samsung.com>
+References: <1433456946-53296-1-git-send-email-lina.iyer@linaro.org>
+ <1433456946-53296-4-git-send-email-lina.iyer@linaro.org>
+ <5574121F.2000806@samsung.com>
+Message-ID: <20150610165742.GB4497@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 10, 2015 at 9:31 AM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> On Wed, Jun 10, 2015 at 09:00:31AM -0700, Dan Williams wrote:
->> On Wed, Jun 10, 2015 at 2:32 AM, Joerg Roedel <joro@8bytes.org> wrote:
->> > On Tue, Jun 09, 2015 at 12:27:10PM -0400, Dan Williams wrote:
->> >> diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
->> >> index 7e7583ddd607..9f6ff6671f01 100644
->> >> --- a/arch/arm/mm/dma-mapping.c
->> >> +++ b/arch/arm/mm/dma-mapping.c
->> >> @@ -1502,7 +1502,7 @@ static int __map_sg_chunk(struct device *dev, struct scatterlist *sg,
->> >>               return -ENOMEM;
->> >>
->> >>       for (count = 0, s = sg; count < (size >> PAGE_SHIFT); s = sg_next(s)) {
->> >> -             phys_addr_t phys = page_to_phys(sg_page(s));
->> >> +             phys_addr_t phys = sg_phys(s) - s->offset;
->> >
->> > So sg_phys() turns out to be 'page_to_phys(sg_page(s)) + s->offset',
->> > which makes the above statement to:
->> >
->> >         page_to_phys(sg_page(s)) + s->offset - s->offset;
->> >
->> > The compiler will probably optimize that away, but it still doesn't look
->> > like an improvement.
->>
->> The goal is to eventually stop leaking struct page deep into the i/o
->> stack.  Anything that relies on being able to retrieve a struct page
->> out of an sg entry needs to be converted.  I think we need a new
->> helper for this case "sg_phys_aligned()?".
+On Sun, Jun 07 2015 at 03:43 -0600, Krzysztof Kozlowski wrote:
+>W dniu 05.06.2015 o 07:29, Lina Iyer pisze:
+>> Generally cpus are grouped under a power domain in a SoC. When all cpus
+>> in the domain are in their power off state,
 >
-> Why?  The aim of the code is not to detect whether the address is aligned
-> to a page (if it were, it'd be testing for a zero s->offset, or it would
-> be testing for an s->offset being a multiple of the page size.
+>What do you exactly mean here by "CPU in power off state"? How does it
+>map to kernel understanding of CPU device (hotplug? cpuidle?)?
 >
-> Let's first understand the code that's being modified (which seems to be
-> something which isn't done very much today - people seem to just like
-> changing code for the hell of it.)
->
->         for (count = 0, s = sg; count < (size >> PAGE_SHIFT); s = sg_next(s)) {
->                 phys_addr_t phys = page_to_phys(sg_page(s));
->                 unsigned int len = PAGE_ALIGN(s->offset + s->length);
->
->                 if (!is_coherent &&
->                         !dma_get_attr(DMA_ATTR_SKIP_CPU_SYNC, attrs))
->                         __dma_page_cpu_to_dev(sg_page(s), s->offset, s->length,
-> dir);
->
->                 prot = __dma_direction_to_prot(dir);
->
->                 ret = iommu_map(mapping->domain, iova, phys, len, prot);
->                 if (ret < 0)
->                         goto fail;
->                 count += len >> PAGE_SHIFT;
->                 iova += len;
->         }
->
-> What it's doing is trying to map each scatterlist entry via an IOMMU.
-> Unsurprisingly, IOMMUs are page based - you can't map a partial IOMMU
-> page.
->
-> However, what says that the IOMMU page size is the same as the host CPU
-> page size - it may not be... so the above code is wrong for a completely
-> different reason.
->
-> What we _should_ be doing is finding out what the IOMMU minimum page
-> size is, and using that in conjunction with the sg_phys() of the
-> scatterlist entry to determine the start and length of the mapping
-> such that the IOMMU mapping covers the range described by the scatterlist
-> entry.  (iommu_map() takes arguments which must be aligned to the IOMMU
-> minimum page size.)
->
-> However, what we can also see from the above is that we have other code
-> here using sg_page() - which is a necessity to be able to perform the
-> required DMA cache maintanence to ensure that the data is visible to the
-> DMA device.  We need to kmap_atomic() these in order to flush them, and
-> there's no other way other than struct page to represent a highmem page.
->
-> So, I think your intent to want to remove struct page from the I/O
-> subsystem is a false hope, unless you want to end up rewriting lots of
-> architecture code, and you can come up with an alternative method to
-> represent highmem pages.
+Both cpuidle and hotplug could end with with core being powered down at
+the platform driver or at PSCI (on V8). It does not matter which of
+these two frameworks resulted in the cpu being powered off. But, if all
+cpus in the domain are powered off, then the domain could be powered off
+as well. This is the premise of this change. It is probably easier to
+power off the domain when the cores in that domain/cluster have been
+hotplugged off. It saves power to turn off the domain at that time, but
+more power savings can be achieved if the domain could also be powered
+off during cpuidle. Hotplug is not a common occurance, while cpuidle is.
 
-I think there will always be cases that need to do pfn_to_page() for
-buffer management.  Those configurations will be blocked from seeing
-cases where a pfn is not struct page backed.  So, you can have highmem
-or dma to pmem, but not both.  Christoph, this is why I have Kconfig
-symbols (DEV_PFN etc) to gate whether an arch/config supports pfn-only
-i/o.
+>> the cpu domain can also be
+>> powered off. Genpd provides the framework for defining cpus as devices
+>> that are part of a cpu domain.
+>
+>The problem which is solved looks to me like the same problem which
+>coupled cpuidle tried to solve: a certain deep sleep mode (e.g. power
+>off) can be entered when whole cluster is idle or other CPUs in cluster
+>are powered off completely.
+>
+>It seems a little like duplicating the effort around coupled cpuidle.
+>
+I see where are you are going with this, but genpd solution is not
+exactly a duplicate of the solution.
+
+Couple state is used to put the cpus in a deeper sleep state, which
+could also result in powering off the domain. Coupled cpuidle is a
+cpuidle mechanism for choosing a deeper sleep mode on certain hardware
+that can only enter such a mode when all cpus cooperate.
+
+This patch attempts to describe the backend of a cpu domain. CPUs are
+responsible for individual cpuidle states, cpus do enter their
+recommended deepest idle state at the time of no activity. A cpu-domain
+could be comprised of cpus, and other devices like GIC, busses etc, that
+all need to idle before the domain can be powered off. This patch does
+not dictate which idle state any those devices should enter, or
+coordinate the idle states between devices. But, if cpus, choose to
+power down, then this patch recognizes that and reduces the reference
+usage count on the domain. Only when all devices in the domain remove
+their usage count, will the domain be powered off. 
+
+There are two things this patch provides -
+
+i. A generic way to initialize a genpd specifically for cpus. (The
+platform specifies the relation between a cpu and its domain in the DT
+and provides the memory for the genpd structure)
+
+ii. On behalf of a platform, we track when the cpus power up and down
+and use runtime_get and runtime_put on the genpd.
+
+Unlike coupled cpuidle, individual cpu idle state is not manipulated.
+Coupled cpuidle does not care if the domain is powered off, it is used
+to allow a certain C-state for the cpu, based on the idleness of other
+cpus in that cluster. The focus of the series is powering down the
+domain when the devices (cpus included) are powered off. You could see
+this patch as a cpu-pm and runtime-pm interface layer.
+
+Hope that helps.
+
+Thanks,
+Lina
+
+>
+>>
+>> Introduce support for defining and adding a generic power domain for the
+>> cpus based on the DT specification of power domain providers and
+>> consumers.  SoC's that have the cpu domain defined in their DT, can
+>> setup a genpd with a name and the power_on/power_off callbacks. Calling
+>> pm_cpu_domain_init() will register the genpd and attach the cpus for
+>> this domain with the genpd.
+>>
+>> CPU_PM notifications for are used to pm_runtime_get_sync() and
+>> pm_runtime_put_sync() for each cpu.  When all cpus are powered off, the
+>> last cpu going down would call the genpd->power_off(). Correspondingly,
+>> the first cpu up would call the genpd->power_on() callback before
+>> resuming from idle.
+>>
+>> Cc: Ulf Hansson <ulf.hansson@linaro.org>
+>> Cc: Rafael J. Wysocki <rjw@rjwysocki.net>
+>> Cc: Kevin Hilman <khilman@linaro.org>
+>> Signed-off-by: Lina Iyer <lina.iyer@linaro.org>
+>> ---
+>>  drivers/base/power/Makefile     |   1 +
+>>  drivers/base/power/cpu_domain.c | 187 ++++++++++++++++++++++++++++++++++++++++
+>>  include/linux/pm_domain.h       |  12 +++
+>>  kernel/power/Kconfig            |  12 +++
+>>  4 files changed, 212 insertions(+)
+>>  create mode 100644 drivers/base/power/cpu_domain.c
+>>
+>> diff --git a/drivers/base/power/Makefile b/drivers/base/power/Makefile
+>> index 1cb8544..debfc74 100644
+>> --- a/drivers/base/power/Makefile
+>> +++ b/drivers/base/power/Makefile
+>> @@ -4,5 +4,6 @@ obj-$(CONFIG_PM_TRACE_RTC)	+= trace.o
+>>  obj-$(CONFIG_PM_OPP)	+= opp.o
+>>  obj-$(CONFIG_PM_GENERIC_DOMAINS)	+=  domain.o domain_governor.o
+>>  obj-$(CONFIG_HAVE_CLK)	+= clock_ops.o
+>> +obj-$(CONFIG_PM_CPU_DOMAIN)	+= cpu_domain.o
+>>
+>>  ccflags-$(CONFIG_DEBUG_DRIVER) := -DDEBUG
+>> diff --git a/drivers/base/power/cpu_domain.c b/drivers/base/power/cpu_domain.c
+>> new file mode 100644
+>> index 0000000..ee90094
+>> --- /dev/null
+>> +++ b/drivers/base/power/cpu_domain.c
+>> @@ -0,0 +1,187 @@
+>> +/*
+>> + * Generic CPU domain runtime power on/off support
+>> + *
+>> + * Copyright (C) 2015 Linaro Ltd.
+>> + *
+>> + * This program is free software; you can redistribute it and/or modify
+>> + * it under the terms of the GNU General Public License version 2 as
+>> + * published by the Free Software Foundation.
+>> + */
+>> +
+>> +#include <linux/cpu.h>
+>> +#include <linux/cpu_pm.h>
+>> +#include <linux/device.h>
+>> +#include <linux/kernel.h>
+>> +#include <linux/module.h>
+>> +#include <linux/of.h>
+>> +#include <linux/pm_domain.h>
+>> +#include <linux/pm_runtime.h>
+>> +
+>> +static struct cpumask cpus_handled;
+>> +
+>> +static void do_cpu(void *unused)
+>> +{
+>> +	int cpu = smp_processor_id();
+>> +	struct device *dev = get_cpu_device(cpu);
+>> +
+>> +	pm_runtime_get_sync(dev);
+>> +}
+>> +
+>> +static int cpuidle_genpd_device_init(int cpu)
+>> +{
+>> +	struct device *dev = get_cpu_device(cpu);
+>> +
+>> +	/*
+>> +	 * CPU device have to be irq safe for use with cpuidle, which runs
+>> +	 * with irqs disabled.
+>> +	 */
+>> +	pm_runtime_irq_safe(dev);
+>> +	pm_runtime_enable(dev);
+>> +
+>> +	genpd_dev_pm_attach(dev);
+>> +
+>> +	/*
+>> +	 * Execute the below on 'that' cpu to ensure that the reference
+>> +	 * counting is correct. Its possible that while this code is
+>> +	 * executed, the cpu may be in idle but we may incorrectly
+>> +	 * increment the usage. By executing the do_cpu on 'that' cpu,
+>> +	 * we can ensure that the cpu and the usage count are matched.
+>> +	 */
+>> +	return smp_call_function_single(cpu, do_cpu, NULL, true);
+>> +}
+>> +
+>> +static int cpu_state_notifier(struct notifier_block *n,
+>> +			unsigned long action, void *hcpu)
+>> +{
+>> +	int cpu = smp_processor_id();
+>> +	struct device *dev = get_cpu_device(cpu);
+>> +
+>> +	if (!cpumask_test_cpu(cpu, &cpus_handled))
+>> +		return NOTIFY_DONE;
+>> +
+>> +	switch (action) {
+>> +	case CPU_PM_ENTER:
+>> +		pm_runtime_put_sync(dev);
+>> +		break;
+>> +
+>> +	case CPU_PM_ENTER_FAILED:
+>> +	case CPU_PM_EXIT:
+>> +		pm_runtime_get_sync(dev);
+>> +		break;
+>> +
+>> +	default:
+>> +		return NOTIFY_DONE;
+>> +	}
+>> +
+>> +	return NOTIFY_OK;
+>> +}
+>> +
+>> +static int cpu_online_notifier(struct notifier_block *n,
+>> +			unsigned long action, void *hcpu)
+>> +{
+>> +	int cpu = (unsigned long)hcpu;
+>> +	struct device *dev = get_cpu_device(cpu);
+>> +
+>> +	if (!cpumask_test_cpu(cpu, &cpus_handled))
+>> +		return NOTIFY_DONE;
+>> +
+>> +	switch (action) {
+>> +	case CPU_STARTING:
+>> +	case CPU_STARTING_FROZEN:
+>> +		/*
+>> +		 * Attach the cpu to its domain if the cpu is coming up
+>> +		 * for the first time.
+>> +		 * Called from the cpu that is coming up.
+>> +		 */
+>> +		if (!genpd_dev_pm_attach(dev))
+>> +			do_cpu(NULL);
+>> +		break;
+>> +
+>> +	default:
+>> +		return NOTIFY_DONE;
+>> +	}
+>> +
+>> +	return NOTIFY_OK;
+>> +}
+>> +
+>> +static struct notifier_block hotplug_notifier = {
+>> +	.notifier_call = cpu_online_notifier,
+>> +};
+>> +
+>> +static struct notifier_block cpu_pm_notifier = {
+>> +	.notifier_call = cpu_state_notifier,
+>> +};
+>> +
+>> +static struct generic_pm_domain *get_cpu_domain(int cpu)
+>> +{
+>> +	struct device *dev = get_cpu_device(cpu);
+>> +	struct of_phandle_args pd_args;
+>> +	int ret;
+>> +
+>> +	/* Make sure we are a domain consumer */
+>> +	ret = of_parse_phandle_with_args(dev->of_node, "power-domains",
+>> +				"#power-domain-cells", 0, &pd_args);
+>> +	if (ret)
+>> +		return ERR_PTR(ret);
+>> +
+>> +	/* Attach cpus only for this domain */
+>> +	return of_genpd_get_from_provider(&pd_args);
+>> +}
+>> +
+>> +int pm_cpu_domain_init(struct generic_pm_domain *genpd, struct device_node *dn)
+>> +{
+>> +	int cpu;
+>> +	int ret;
+>> +	cpumask_var_t tmpmask;
+>> +	struct generic_pm_domain *cpupd;
+>> +
+>> +	if (!genpd || !dn)
+>> +		return -EINVAL;
+>> +
+>> +	if (!zalloc_cpumask_var(&tmpmask, GFP_KERNEL))
+>> +		return -ENOMEM;
+>> +
+>> +	/* CPU genpds have to operate in IRQ safe mode */
+>> +	genpd->flags |= GENPD_FLAG_IRQ_SAFE;
+>> +
+>> +	pm_genpd_init(genpd, NULL, false);
+>> +	ret = of_genpd_add_provider_simple(dn, genpd);
+>> +	if (ret)
+>> +		return ret;
+>> +
+>> +	/* Only add those cpus to whom we are the domain provider */
+>> +	for_each_online_cpu(cpu) {
+>> +		cpupd = get_cpu_domain(cpu);
+>> +
+>> +		if (IS_ERR(cpupd))
+>> +			continue;
+>> +
+>> +		if (genpd == cpupd) {
+>> +			cpuidle_genpd_device_init(cpu);
+>> +			cpumask_set_cpu(cpu, tmpmask);
+>> +		}
+>> +	}
+>> +
+>> +	if (cpumask_empty(tmpmask))
+>> +		goto done;
+>> +
+>> +	/*
+>> +	 * Not all cpus may be online at this point. Use the hotplug
+>> +	 * notifier to be notified of when the cpu comes online, then
+>> +	 * attach it to the domain.
+>> +	 *
+>> +	 * Register hotplug and cpu_pm notification once for all
+>> +	 * domains.
+>> +	 */
+>> +	if (cpumask_empty(&cpus_handled)) {
+>> +		cpu_pm_register_notifier(&cpu_pm_notifier);
+>> +		register_cpu_notifier(&hotplug_notifier);
+>> +	}
+>> +
+>> +	cpumask_copy(&cpus_handled, tmpmask);
+>> +
+>> +done:
+>> +	free_cpumask_var(tmpmask);
+>> +	return 0;
+>> +}
+>> +EXPORT_SYMBOL(pm_cpu_domain_init);
+>> diff --git a/include/linux/pm_domain.h b/include/linux/pm_domain.h
+>> index dc7cb53..fc97ad8 100644
+>> --- a/include/linux/pm_domain.h
+>> +++ b/include/linux/pm_domain.h
+>> @@ -280,6 +280,7 @@ struct generic_pm_domain *__of_genpd_xlate_onecell(
+>>  					void *data);
+>>
+>>  int genpd_dev_pm_attach(struct device *dev);
+>> +
+>>  #else /* !CONFIG_PM_GENERIC_DOMAINS_OF */
+>>  static inline int __of_genpd_add_provider(struct device_node *np,
+>>  					genpd_xlate_t xlate, void *data)
+>> @@ -325,4 +326,15 @@ static inline int dev_pm_domain_attach(struct device *dev, bool power_on)
+>>  static inline void dev_pm_domain_detach(struct device *dev, bool power_off) {}
+>>  #endif
+>>
+>> +#ifdef CONFIG_PM_CPU_DOMAIN
+>> +extern int pm_cpu_domain_init(struct generic_pm_domain *genpd,
+>> +			struct device_node *dn);
+>> +#else
+>> +static inline int pm_cpu_domain_init(struct generic_pm_domain *genpd,
+>> +			struct device_node *dn)
+>> +{
+>> +	return -ENODEV;
+>> +}
+>> +#endif
+>> +
+>>  #endif /* _LINUX_PM_DOMAIN_H */
+>> diff --git a/kernel/power/Kconfig b/kernel/power/Kconfig
+>> index 7e01f78..55d49f6 100644
+>> --- a/kernel/power/Kconfig
+>> +++ b/kernel/power/Kconfig
+>> @@ -301,3 +301,15 @@ config PM_GENERIC_DOMAINS_OF
+>>
+>>  config CPU_PM
+>>  	bool
+>> +
+>> +config PM_CPU_DOMAIN
+>> +	def_bool y
+>> +	depends on PM_GENERIC_DOMAINS_OF && CPU_PM
+>> +	help
+>> +	  When cpuidle powers of the cpus in a domain, the domain can also be
+>> +	  powered off.
+>> +	  This config option allow for cpus to be registered with the domain
+>> +	  provider specified in the DT and when the cpu is powered off, calls
+>> +	  the runtime PM methods to do the reference counting. The last cpu
+>> +	  going down powers the domain off as well.
+>> +
+>>
+>
