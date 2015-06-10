@@ -1,85 +1,100 @@
-From: alex.bennee@linaro.org (Alex =?utf-8?Q?Benn=C3=A9e?=)
-Date: Wed, 10 Jun 2015 14:52:50 +0100
-Subject: [PATCH v2 05/11] KVM: arm: check ordering of all system register
- tables
-In-Reply-To: <1433046432-1824-6-git-send-email-zhichao.huang@linaro.org>
-References: <1433046432-1824-1-git-send-email-zhichao.huang@linaro.org>
- <1433046432-1824-6-git-send-email-zhichao.huang@linaro.org>
-Message-ID: <87fv5z7jrh.fsf@linaro.org>
+From: boris.brezillon@free-electrons.com (Boris Brezillon)
+Date: Wed, 10 Jun 2015 15:55:45 +0200
+Subject: [PATCH] clk: at91: modify PMC peripheral clock to deal with
+ newer register layout
+In-Reply-To: <1433943764-18506-1-git-send-email-nicolas.ferre@atmel.com>
+References: <1433943764-18506-1-git-send-email-nicolas.ferre@atmel.com>
+Message-ID: <20150610155545.171fd92d@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Nicolas,
 
-Zhichao Huang <zhichao.huang@linaro.org> writes:
+On Wed, 10 Jun 2015 15:42:44 +0200
+Nicolas Ferre <nicolas.ferre@atmel.com> wrote:
 
-> We now have multiple tables for the various system registers
-> we trap. Make sure we check the order of all of them, as it is
-> critical that we get the order right (been there, done that...).
->
-> Signed-off-by: Zhichao Huang <zhichao.huang@linaro.org>
+> As some more information is added to the PCR register, we'd better use
+> a copy of its content and modify just the peripheral-related bits.
+> Implement a read-modify-write for the enable() and disable() callbacks.
+> 
+> Header file is also modified to have the PCR_DIV mask.
+> 
+> Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+
+Apart from the below comment you can add my:
+
+Acked-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+
 > ---
->  arch/arm/kvm/coproc.c | 26 +++++++++++++++++++++-----
->  1 file changed, 21 insertions(+), 5 deletions(-)
->
-> diff --git a/arch/arm/kvm/coproc.c b/arch/arm/kvm/coproc.c
-> index d23395b..16d5f69 100644
-> --- a/arch/arm/kvm/coproc.c
-> +++ b/arch/arm/kvm/coproc.c
-> @@ -737,6 +737,9 @@ static struct coproc_reg invariant_cp15[] = {
->  	{ CRn( 0), CRm( 0), Op1( 0), Op2( 3), is32, NULL, get_TLBTR },
->  	{ CRn( 0), CRm( 0), Op1( 0), Op2( 6), is32, NULL, get_REVIDR },
+>  drivers/clk/at91/clk-peripheral.c | 19 +++++++++++++------
+>  include/linux/clk/at91_pmc.h      |  3 ++-
+>  2 files changed, 15 insertions(+), 7 deletions(-)
+> 
+> diff --git a/drivers/clk/at91/clk-peripheral.c b/drivers/clk/at91/clk-peripheral.c
+> index 597fed423d7d..37e2fea14890 100644
+> --- a/drivers/clk/at91/clk-peripheral.c
+> +++ b/drivers/clk/at91/clk-peripheral.c
+> @@ -161,14 +161,17 @@ static int clk_sam9x5_peripheral_enable(struct clk_hw *hw)
+>  {
+>  	struct clk_sam9x5_peripheral *periph = to_clk_sam9x5_peripheral(hw);
+>  	struct at91_pmc *pmc = periph->pmc;
+> +	u32 tmp;
 >  
-> +	{ CRn( 0), CRm( 0), Op1( 1), Op2( 1), is32, NULL, get_CLIDR },
-> +	{ CRn( 0), CRm( 0), Op1( 1), Op2( 7), is32, NULL, get_AIDR },
-> +
->  	{ CRn( 0), CRm( 1), Op1( 0), Op2( 0), is32, NULL, get_ID_PFR0 },
->  	{ CRn( 0), CRm( 1), Op1( 0), Op2( 1), is32, NULL, get_ID_PFR1 },
->  	{ CRn( 0), CRm( 1), Op1( 0), Op2( 2), is32, NULL, get_ID_DFR0 },
-> @@ -752,9 +755,6 @@ static struct coproc_reg invariant_cp15[] = {
->  	{ CRn( 0), CRm( 2), Op1( 0), Op2( 3), is32, NULL, get_ID_ISAR3 },
->  	{ CRn( 0), CRm( 2), Op1( 0), Op2( 4), is32, NULL, get_ID_ISAR4 },
->  	{ CRn( 0), CRm( 2), Op1( 0), Op2( 5), is32, NULL, get_ID_ISAR5 },
-> -
-> -	{ CRn( 0), CRm( 0), Op1( 1), Op2( 1), is32, NULL, get_CLIDR },
-> -	{ CRn( 0), CRm( 0), Op1( 1), Op2( 7), is32, NULL, get_AIDR },
->  };
+>  	if (periph->id < PERIPHERAL_ID_MIN)
+>  		return 0;
 >  
->  /*
-> @@ -1297,13 +1297,29 @@ int kvm_arm_copy_coproc_indices(struct kvm_vcpu *vcpu, u64 __user *uindices)
->  	return write_demux_regids(uindices);
+> -	pmc_write(pmc, AT91_PMC_PCR, (periph->id & AT91_PMC_PCR_PID) |
+> -				     AT91_PMC_PCR_CMD |
+> -				     AT91_PMC_PCR_DIV(periph->div) |
+> -				     AT91_PMC_PCR_EN);
+> +	pmc_lock(pmc);
+> +	pmc_write(pmc, AT91_PMC_PCR, (periph->id & AT91_PMC_PCR_PID));
+> +	tmp = pmc_read(pmc, AT91_PMC_PCR) & ~AT91_PMC_PCR_P_DIV;
+> +	pmc_write(pmc, AT91_PMC_PCR, tmp | AT91_PMC_PCR_PDIV(periph->div)
+> +					 | AT91_PMC_PCR_EN);
+> +	pmc_unlock(pmc);
+>  	return 0;
 >  }
 >  
-> +static int check_sysreg_table(const struct coproc_reg *table, unsigned int n)
-> +{
-> +	unsigned int i;
-> +
-> +	for (i = 1; i < n; i++) {
-> +		if (cmp_reg(&table[i-1], &table[i]) >= 0) {
-> +			kvm_err("sys_reg table %p out of order (%d)\n",
-> +					table, i - 1);
-
-Isn't a BUG_ON *and* a kvm_err() overkill?
-
-> +			return 1;
-> +		}
-> +	}
-> +
-> +	return 0;
-> +}
-> +
->  void kvm_coproc_table_init(void)
+> @@ -176,12 +179,16 @@ static void clk_sam9x5_peripheral_disable(struct clk_hw *hw)
 >  {
->  	unsigned int i;
+>  	struct clk_sam9x5_peripheral *periph = to_clk_sam9x5_peripheral(hw);
+>  	struct at91_pmc *pmc = periph->pmc;
+> +	u32 tmp;
 >  
->  	/* Make sure tables are unique and in order. */
-> -	for (i = 1; i < ARRAY_SIZE(cp15_regs); i++)
-> -		BUG_ON(cmp_reg(&cp15_regs[i-1], &cp15_regs[i]) >= 0);
-> +	BUG_ON(check_sysreg_table(cp14_regs, ARRAY_SIZE(cp14_regs)));
-> +	BUG_ON(check_sysreg_table(cp15_regs, ARRAY_SIZE(cp15_regs)));
-> +	BUG_ON(check_sysreg_table(invariant_cp15, ARRAY_SIZE(invariant_cp15)));
+>  	if (periph->id < PERIPHERAL_ID_MIN)
+>  		return;
 >  
->  	/* We abuse the reset function to overwrite the table itself. */
->  	for (i = 0; i < ARRAY_SIZE(invariant_cp15); i++)
+> -	pmc_write(pmc, AT91_PMC_PCR, (periph->id & AT91_PMC_PCR_PID) |
+> -				     AT91_PMC_PCR_CMD);
+> +	pmc_lock(pmc);
+> +	pmc_write(pmc, AT91_PMC_PCR, (periph->id & AT91_PMC_PCR_PID));
+> +	tmp = pmc_read(pmc, AT91_PMC_PCR) & ~AT91_PMC_PCR_EN;
+> +	pmc_write(pmc, AT91_PMC_PCR, tmp);
+> +	pmc_unlock(pmc);
+>  }
+>  
+>  static int clk_sam9x5_peripheral_is_enabled(struct clk_hw *hw)
+> diff --git a/include/linux/clk/at91_pmc.h b/include/linux/clk/at91_pmc.h
+> index 7669f7618f39..4685c3d62f94 100644
+> --- a/include/linux/clk/at91_pmc.h
+> +++ b/include/linux/clk/at91_pmc.h
+> @@ -184,7 +184,8 @@ extern void __iomem *at91_pmc_base;
+>  #define AT91_PMC_PCR		0x10c			/* Peripheral Control Register [some SAM9 and SAMA5] */
+>  #define		AT91_PMC_PCR_PID	(0x3f  <<  0)		/* Peripheral ID */
+>  #define		AT91_PMC_PCR_CMD	(0x1  <<  12)		/* Command (read=0, write=1) */
+> -#define		AT91_PMC_PCR_DIV(n)	((n)  <<  16)		/* Divisor Value */
+> +#define		AT91_PMC_PCR_P_DIV	(0x3  <<  16)		/* Divisor mask */
+
+How about renaming this macro into AT91_PMC_PCR_PDIV_MSK ?
+I know the macro names in this file are not consistent, but maybe it's
+time to choose appropriate names for new AT91_PMC macros.
+
+Best Regards,
+
+Boris
 
 -- 
-Alex Benn?e
+Boris Brezillon, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
