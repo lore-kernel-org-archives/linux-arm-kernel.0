@@ -1,181 +1,125 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 10 Jun 2015 17:27:02 +0100
-Subject: [PATCH 05/11] irqchip / gic: Add stacked irqdomain support for
- ACPI based GICv2 init
-In-Reply-To: <1431953961-22706-6-git-send-email-hanjun.guo@linaro.org>
-References: <1431953961-22706-1-git-send-email-hanjun.guo@linaro.org>
- <1431953961-22706-6-git-send-email-hanjun.guo@linaro.org>
-Message-ID: <55786556.1020404@arm.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Wed, 10 Jun 2015 17:28:19 +0100
+Subject: [RFC PATCH v2] arm DMA: Fix allocation from CMA for coherent DMA
+In-Reply-To: <1433351745-3646-1-git-send-email-lorenx4@gmail.com>
+References: <1433351745-3646-1-git-send-email-lorenx4@gmail.com>
+Message-ID: <20150610162819.GD22844@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 18/05/15 13:59, Hanjun Guo wrote:
-> Introduce acpi_irq_domain for GICv2 core domain instead of referring
-> to the irq_default_domain, based on that, pass gsi as the argument and
-> get the gsi in gic_irq_domain_alloc() to add stacked irqdomain support
-> for ACPI based GICv2 init.
+On Wed, Jun 03, 2015 at 07:15:45PM +0200, Lorenzo Nava wrote:
+> This patch allows the use of CMA for DMA coherent memory allocation.
+> At the moment if the input parameter "is_coherent" is set to true 
+> the allocation is not made using the CMA, which I think is not the 
+> desired behaviour.
 > 
-> Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
+> Signed-off-by: Lorenzo Nava <lorenx4@xxxxxxxx>
 > ---
->  drivers/acpi/gsi.c                   | 28 +++++++++++++---------------
->  drivers/irqchip/irq-gic.c            | 32 +++++++++++++++++---------------
->  include/linux/irqchip/arm-gic-acpi.h |  2 ++
->  3 files changed, 32 insertions(+), 30 deletions(-)
+> Changes in v2:
+>  correct __arm_dma_free() according to __dma_alloc() allocation
+> ---
+>  arch/arm/mm/dma-mapping.c |    6 +++---
+>  1 file changed, 3 insertions(+), 3 deletions(-)
 > 
-> diff --git a/drivers/acpi/gsi.c b/drivers/acpi/gsi.c
-> index 38208f2..55b5f31 100644
-> --- a/drivers/acpi/gsi.c
-> +++ b/drivers/acpi/gsi.c
-> @@ -3,6 +3,7 @@
->   *
->   * Copyright (C) 2015 ARM Ltd.
->   * Author: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-> + *         Hanjun Guo <hanjun.guo@linaro.org> for stacked irqdomains support
->   *
->   * This program is free software; you can redistribute it and/or modify
->   * it under the terms of the GNU General Public License version 2 as
-> @@ -13,6 +14,8 @@
->  #include <linux/irqdomain.h>
+> diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
+> index 7e7583d..15643b9 100644
+> --- a/arch/arm/mm/dma-mapping.c
+> +++ b/arch/arm/mm/dma-mapping.c
+> @@ -645,9 +645,9 @@ static void *__dma_alloc(struct device *dev, size_t size, dma_addr_t *handle,
+>  	size = PAGE_ALIGN(size);
+>  	want_vaddr = !dma_get_attr(DMA_ATTR_NO_KERNEL_MAPPING, attrs);
 >  
->  enum acpi_irq_model_id acpi_irq_model;
-> +/* ACPI core domian pointing to GICv2/3 core domain */
-> +struct irq_domain *acpi_irq_domain __read_mostly;
+> -	if (is_coherent || nommu())
+> +	if (nommu())
+>  		addr = __alloc_simple_buffer(dev, size, gfp, &page);
+> -	else if (!(gfp & __GFP_WAIT))
+> +	else if (!is_coherent && !(gfp & __GFP_WAIT))
+>  		addr = __alloc_from_pool(size, &page);
+>  	else if (!dev_get_cma_area(dev))
+>  		addr = __alloc_remap_buffer(dev, size, gfp, prot, &page, caller, want_vaddr);
 
-How is a single domain pointer going to work when you will have several
-domains (GICv2m, ITS)? Crucially, how are you going to perform the
-matching of a device with its irq domain?
+So while you allow __alloc_from_contiguous() to be called when
+is_coherent, the memory returned is still non-cacheable. The reason is
+that the "prot" argument passed to __dma_alloc() in
+arm_coherent_dma_alloc() is pgprot_dmacoherent(PAGE_KERNEL) which means
+Normal NonCacheable memory. The mmap seems to create a cacheable mapping
+as vma->vm_page_prot is not passed through __get_dma_pgprot().
 
-	M.
+I think you need something like below, completely untested:
 
->  
->  static unsigned int acpi_gsi_get_irq_type(int trigger, int polarity)
->  {
-> @@ -45,12 +48,7 @@ static unsigned int acpi_gsi_get_irq_type(int trigger, int polarity)
->   */
->  int acpi_gsi_to_irq(u32 gsi, unsigned int *irq)
->  {
-> -	/*
-> -	 * Only default domain is supported at present, always find
-> -	 * the mapping corresponding to default domain by passing NULL
-> -	 * as irq_domain parameter
-> -	 */
-> -	*irq = irq_find_mapping(NULL, gsi);
-> +	*irq = irq_find_mapping(acpi_irq_domain, gsi);
->  	/*
->  	 * *irq == 0 means no mapping, that should
->  	 * be reported as a failure
-> @@ -72,16 +70,16 @@ EXPORT_SYMBOL_GPL(acpi_gsi_to_irq);
->  int acpi_register_gsi(struct device *dev, u32 gsi, int trigger,
->  		      int polarity)
->  {
-> -	unsigned int irq;
-> +	int irq;
->  	unsigned int irq_type = acpi_gsi_get_irq_type(trigger, polarity);
->  
-> -	/*
-> -	 * There is no way at present to look-up the IRQ domain on ACPI,
-> -	 * hence always create mapping referring to the default domain
-> -	 * by passing NULL as irq_domain parameter
-> -	 */
-> -	irq = irq_create_mapping(NULL, gsi);
-> -	if (!irq)
-> +	irq = irq_find_mapping(acpi_irq_domain, gsi);
-> +	if (irq > 0)
-> +		return irq;
-> +
-> +	irq = irq_domain_alloc_irqs(acpi_irq_domain, 1, dev_to_node(dev),
-> +				    &gsi);
-> +	if (irq <= 0)
->  		return -EINVAL;
->  
->  	/* Set irq type if specified and different than the current one */
-> @@ -98,7 +96,7 @@ EXPORT_SYMBOL_GPL(acpi_register_gsi);
->   */
->  void acpi_unregister_gsi(u32 gsi)
->  {
-> -	int irq = irq_find_mapping(NULL, gsi);
-> +	int irq = irq_find_mapping(acpi_irq_domain, gsi);
->  
->  	irq_dispose_mapping(irq);
->  }
-> diff --git a/drivers/irqchip/irq-gic.c b/drivers/irqchip/irq-gic.c
-> index fefbcb5..869a69f 100644
-> --- a/drivers/irqchip/irq-gic.c
-> +++ b/drivers/irqchip/irq-gic.c
-> @@ -851,15 +851,22 @@ static struct notifier_block gic_cpu_notifier = {
->  static int gic_irq_domain_alloc(struct irq_domain *domain, unsigned int virq,
->  				unsigned int nr_irqs, void *arg)
->  {
-> -	int i, ret;
-> +	int i;
->  	irq_hw_number_t hwirq;
-> -	unsigned int type = IRQ_TYPE_NONE;
-> -	struct of_phandle_args *irq_data = arg;
->  
-> -	ret = gic_irq_domain_xlate(domain, irq_data->np, irq_data->args,
-> -				   irq_data->args_count, &hwirq, &type);
-> -	if (ret)
-> -		return ret;
-> +	if (domain->of_node) {	/* DT case */
-> +		int ret;
-> +		unsigned int type = IRQ_TYPE_NONE;
-> +		struct of_phandle_args *irq_data = arg;
-> +
-> +		ret = gic_irq_domain_xlate(domain, irq_data->np,
-> +					irq_data->args,
-> +					irq_data->args_count, &hwirq, &type);
-> +		if (ret)
-> +			return ret;
-> +	} else {	/* ACPI case */
-> +		hwirq = (irq_hw_number_t)*(u32 *)arg;
-> +	}
->  
->  	for (i = 0; i < nr_irqs; i++)
->  		gic_irq_domain_map(domain, virq + i, hwirq + i);
-> @@ -945,11 +952,11 @@ void __init gic_init_bases(unsigned int gic_nr, int irq_start,
->  		gic_irqs = 1020;
->  	gic->gic_irqs = gic_irqs;
->  
-> -	if (node) {		/* DT case */
-> +	if (node || !acpi_disabled) {		/* DT or ACPI case */
->  		gic->domain = irq_domain_add_linear(node, gic_irqs,
->  						    &gic_irq_domain_hierarchy_ops,
->  						    gic);
-> -	} else {		/* Non-DT case */
-> +	} else {		/* Non-DT and ACPI case */
->  		/*
->  		 * For primary GICs, skip over SGIs.
->  		 * For secondary GICs, skip over PPIs, too.
-> @@ -1133,13 +1140,8 @@ gic_v2_acpi_init(struct acpi_table_header *table)
->  		return -ENOMEM;
->  	}
->  
-> -	/*
-> -	 * Initialize zero GIC instance (no multi-GIC support). Also, set GIC
-> -	 * as default IRQ domain to allow for GSI registration and GSI to IRQ
-> -	 * number translation (see acpi_register_gsi() and acpi_gsi_to_irq()).
-> -	 */
->  	gic_init_bases(0, -1, dist_base, cpu_base, 0, NULL);
-> -	irq_set_default_host(gic_data[0].domain);
-> +	acpi_irq_domain = gic_data[0].domain;
->  
->  	acpi_irq_model = ACPI_IRQ_MODEL_GIC;
->  	return 0;
-> diff --git a/include/linux/irqchip/arm-gic-acpi.h b/include/linux/irqchip/arm-gic-acpi.h
-> index 021e8e8..245386d 100644
-> --- a/include/linux/irqchip/arm-gic-acpi.h
-> +++ b/include/linux/irqchip/arm-gic-acpi.h
-> @@ -21,6 +21,8 @@
->  #define ACPI_GIC_CPU_IF_MEM_SIZE	(SZ_8K)
->  #define ACPI_GICV3_DIST_MEM_SIZE	(SZ_64K)
->  
-> +extern struct irq_domain *acpi_irq_domain;
-> +
->  int acpi_gic_version_init(void);
->  u8 acpi_gic_version(void);
->  #endif /* CONFIG_ACPI */
-> 
-
-
--- 
-Jazz is not dead. It just smells funny...
+diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
+index 1ced8a0f7a52..1ee3d8e8c313 100644
+--- a/arch/arm/mm/dma-mapping.c
++++ b/arch/arm/mm/dma-mapping.c
+@@ -573,11 +573,13 @@ static void __free_from_contiguous(struct device *dev, struct page *page,
+ 	dma_release_from_contiguous(dev, page, size >> PAGE_SHIFT);
+ }
+ 
+-static inline pgprot_t __get_dma_pgprot(struct dma_attrs *attrs, pgprot_t prot)
++static inline pgprot_t __get_dma_pgprot(struct dma_attrs *attrs, pgprot_t prot,
++					bool coherent)
+ {
+-	prot = dma_get_attr(DMA_ATTR_WRITE_COMBINE, attrs) ?
+-			    pgprot_writecombine(prot) :
+-			    pgprot_dmacoherent(prot);
++	if (dma_get_attr(DMA_ATTR_WRITE_COMBINE))
++		prot = pgprot_writecombine(prot);
++	else if (!coherent)
++		prot = pgprot_dmacoherent(prot);
+ 	return prot;
+ }
+ 
+@@ -587,7 +589,7 @@ static inline pgprot_t __get_dma_pgprot(struct dma_attrs *attrs, pgprot_t prot)
+ 
+ #define nommu() 1
+ 
+-#define __get_dma_pgprot(attrs, prot)				__pgprot(0)
++#define __get_dma_pgprot(attrs, prot, coherent)			__pgprot(0)
+ #define __alloc_remap_buffer(dev, size, gfp, prot, ret, c, wv)	NULL
+ #define __alloc_from_pool(size, ret_page)			NULL
+ #define __alloc_from_contiguous(dev, size, prot, ret, c, wv)	NULL
+@@ -670,7 +672,7 @@ static void *__dma_alloc(struct device *dev, size_t size, dma_addr_t *handle,
+ void *arm_dma_alloc(struct device *dev, size_t size, dma_addr_t *handle,
+ 		    gfp_t gfp, struct dma_attrs *attrs)
+ {
+-	pgprot_t prot = __get_dma_pgprot(attrs, PAGE_KERNEL);
++	pgprot_t prot = __get_dma_pgprot(attrs, PAGE_KERNEL, false);
+ 	void *memory;
+ 
+ 	if (dma_alloc_from_coherent(dev, size, handle, &memory))
+@@ -683,7 +685,7 @@ void *arm_dma_alloc(struct device *dev, size_t size, dma_addr_t *handle,
+ static void *arm_coherent_dma_alloc(struct device *dev, size_t size,
+ 	dma_addr_t *handle, gfp_t gfp, struct dma_attrs *attrs)
+ {
+-	pgprot_t prot = __get_dma_pgprot(attrs, PAGE_KERNEL);
++	pgprot_t prot = __get_dma_pgprot(attrs, PAGE_KERNEL, true);
+ 	void *memory;
+ 
+ 	if (dma_alloc_from_coherent(dev, size, handle, &memory))
+@@ -733,7 +735,7 @@ int arm_dma_mmap(struct device *dev, struct vm_area_struct *vma,
+ 		 struct dma_attrs *attrs)
+ {
+ #ifdef CONFIG_MMU
+-	vma->vm_page_prot = __get_dma_pgprot(attrs, vma->vm_page_prot);
++	vma->vm_page_prot = __get_dma_pgprot(attrs, vma->vm_page_prot, false);
+ #endif	/* CONFIG_MMU */
+ 	return __arm_dma_mmap(dev, vma, cpu_addr, dma_addr, size, attrs);
+ }
+@@ -1362,7 +1364,7 @@ static void __iommu_free_atomic(struct device *dev, void *cpu_addr,
+ static void *arm_iommu_alloc_attrs(struct device *dev, size_t size,
+ 	    dma_addr_t *handle, gfp_t gfp, struct dma_attrs *attrs)
+ {
+-	pgprot_t prot = __get_dma_pgprot(attrs, PAGE_KERNEL);
++	pgprot_t prot = __get_dma_pgprot(attrs, PAGE_KERNEL, is_device_dma_coherent(dev));
+ 	struct page **pages;
+ 	void *addr = NULL;
+ 
+@@ -1414,7 +1416,7 @@ static int arm_iommu_mmap_attrs(struct device *dev, struct vm_area_struct *vma,
+ 	unsigned long usize = vma->vm_end - vma->vm_start;
+ 	struct page **pages = __iommu_get_pages(cpu_addr, attrs);
+ 
+-	vma->vm_page_prot = __get_dma_pgprot(attrs, vma->vm_page_prot);
++	vma->vm_page_prot = __get_dma_pgprot(attrs, vma->vm_page_prot, is_device_dma_coherent(dev));
+ 
+ 	if (!pages)
+ 		return -ENXIO;
