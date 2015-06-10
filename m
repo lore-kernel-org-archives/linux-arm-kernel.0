@@ -1,106 +1,30 @@
-From: eric.auger@linaro.org (Eric Auger)
-Date: Wed, 10 Jun 2015 13:45:27 +0200
-Subject: [PATCH v2 1/4] VFIO: platform: add reset struct and lookup table
-In-Reply-To: <1433874374.4927.114.camel@redhat.com>
-References: <1433516792-16397-1-git-send-email-eric.auger@linaro.org>
- <1433516792-16397-2-git-send-email-eric.auger@linaro.org>
- <1433874374.4927.114.camel@redhat.com>
-Message-ID: <55782357.9070601@linaro.org>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Wed, 10 Jun 2015 13:50:42 +0200
+Subject: [PATCH 19/34] pinctrl: mvebu: armada-{370, xp}: normalize ethernet
+ txclkout pins
+In-Reply-To: <1433868446-11028-20-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1433868446-11028-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1433868446-11028-20-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <CACRpkdaZnc8qULmRwC05oKgZxQPVvM2mJRVee3c+Ya1BvoYbcw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Alex,
-On 06/09/2015 08:26 PM, Alex Williamson wrote:
-> On Fri, 2015-06-05 at 17:06 +0200, Eric Auger wrote:
->> This patch introduces the vfio_platform_reset_combo struct that
->> stores all the information useful to handle the reset modality:
->> compat string, name of the reset function, name of the module that
->> implements the reset function. A lookup table of such structures
->> is added, currently containing a single sentinel element. A new
->> type field is added in vfio_platform_device to store what kind of
->> reset is associated to the device, if any.
->>
->> Signed-off-by: Eric Auger <eric.auger@linaro.org>
->> ---
->>  drivers/vfio/platform/vfio_platform_common.c  |  6 ++++++
->>  drivers/vfio/platform/vfio_platform_private.h | 12 ++++++++++++
->>  2 files changed, 18 insertions(+)
->>
->> diff --git a/drivers/vfio/platform/vfio_platform_common.c b/drivers/vfio/platform/vfio_platform_common.c
->> index abcff7a..d970776 100644
->> --- a/drivers/vfio/platform/vfio_platform_common.c
->> +++ b/drivers/vfio/platform/vfio_platform_common.c
->> @@ -25,6 +25,12 @@
->>  
->>  static DEFINE_MUTEX(driver_lock);
->>  
->> +static const struct vfio_platform_reset_combo reset_lookup_table[] = {
->> +	{
->> +		.type = VFIO_PLATFORM_RESET_TYPE_MAX
->> +	},
->> +};
->> +
->>  static int vfio_platform_regions_init(struct vfio_platform_device *vdev)
->>  {
->>  	int cnt = 0, i;
->> diff --git a/drivers/vfio/platform/vfio_platform_private.h b/drivers/vfio/platform/vfio_platform_private.h
->> index 5d31e04..d864124 100644
->> --- a/drivers/vfio/platform/vfio_platform_private.h
->> +++ b/drivers/vfio/platform/vfio_platform_private.h
->> @@ -49,6 +49,10 @@ struct vfio_platform_region {
->>  	void __iomem		*ioaddr;
->>  };
->>  
->> +enum vfio_platform_reset_type {
->> +	VFIO_PLATFORM_RESET_TYPE_MAX /* last element */,
->> +};
->> +
->>  struct vfio_platform_device {
->>  	struct vfio_platform_region	*regions;
->>  	u32				num_regions;
->> @@ -56,6 +60,7 @@ struct vfio_platform_device {
->>  	u32				num_irqs;
->>  	int				refcnt;
->>  	struct mutex			igate;
->> +	enum vfio_platform_reset_type	type;
->>  
->>  	/*
->>  	 * These fields should be filled by the bus specific binder
->> @@ -69,6 +74,13 @@ struct vfio_platform_device {
->>  	int	(*get_irq)(struct vfio_platform_device *vdev, int i);
->>  };
->>  
->> +struct vfio_platform_reset_combo {
->> +	enum vfio_platform_reset_type type;
->> +	char *compat;
->> +	char *reset_function_name;
->> +	char *module_name;
->> +};
->> +
-> 
-> I don't really understand the benefit of vfio_platform_reset_type, what
-> does it add?  If we want an array end marker, we could just use NULL,
-> but if we're dealing with a static table, we could always use ARRAY_SIZE
-> and avoid an end marker altogether.  If the concern is matching the
-> symbol to put when the device is released, we could just use
-> symbol_put_addr() and avoid any sort of lookup.  Seems like there could
-> also be a smattering of "const" in this struct definition too.
+On Tue, Jun 9, 2015 at 6:47 PM, Thomas Petazzoni
+<thomas.petazzoni@free-electrons.com> wrote:
 
-Agreed. I will respin accordingly.
+> This commit normalizes the naming of the Ethernet txclkout pin to be
+> the same accross Marvell SoCs. It is worth mentioning that the DT
+> binding documentation of the Armada XP was wrong for MPP12: it said
+> the function was ge1(txd0), while it is in fact ge1(txclkout). It is
+> however not really a fix worth sending to stable since it does not
+> change the behavior, and the driver itself was correct.
+>
+> Since only the subnames are changed, DT backward compatibility is not
+> affected.
+>
+> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 
-Best Regards
+Patch applied.
 
-Eric
-> 
->>  extern int vfio_platform_probe_common(struct vfio_platform_device *vdev,
->>  				      struct device *dev);
->>  extern struct vfio_platform_device *vfio_platform_remove_common
-> 
-> 
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> 
+Yours,
+Linus Walleij
