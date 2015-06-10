@@ -1,97 +1,68 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Wed, 10 Jun 2015 08:36:23 +0100
-Subject: [PATCH 2/8] mfd: axp20x: Add a cell for the usb power_supply
- part of the axp20x PMICs
-In-Reply-To: <1433885881-19809-3-git-send-email-hdegoede@redhat.com>
+Date: Wed, 10 Jun 2015 08:36:52 +0100
+Subject: [PATCH 1/8] mfd: axp20x: Add missing registers, and mark more
+ registers volatile
+In-Reply-To: <1433885881-19809-2-git-send-email-hdegoede@redhat.com>
 References: <1433885881-19809-1-git-send-email-hdegoede@redhat.com>
- <1433885881-19809-3-git-send-email-hdegoede@redhat.com>
-Message-ID: <20150610073623.GX2982@x1>
+ <1433885881-19809-2-git-send-email-hdegoede@redhat.com>
+Message-ID: <20150610073652.GY2982@x1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Tue, 09 Jun 2015, Hans de Goede wrote:
 
-> Add a cell for the usb power_supply part of the axp20x PMICs.
+> From: Bruno Pr?mont <bonbons@linux-vserver.org>
 > 
-> Note that this cell is only for the usb power_supply part and not the
-> ac-power / battery-charger / rtc-backup-bat-charger bits.
-> 
-> Depending on the board each of those must be enabled / disabled separately
-> in devicetree as most boards do not use all 4. So in dt each one needs its
-> own child-node of the axp20x node. Another reason for using separate child
-> nodes for each is so that other devicetree nodes can have a power-supply
-> property with a phandle referencing a node representing a single
-> power-supply.
-> 
-> The decision to use a separate devicetree node for each is reflected on
-> the kernel side by each getting its own mfd-cell / platform_device and
-> platform-driver.
+> Add an extra set of registers which is necessary tu support the PMICs
+> battery charger function, and mark registers which contain status bits,
+> gpio status, and adc readings as volatile.
 > 
 > Cc: Bruno Pr?mont <bonbons@linux-vserver.org>
 > Signed-off-by: Hans de Goede <hdegoede@redhat.com>
 > ---
->  drivers/mfd/axp20x.c | 32 +++++++++++++++++++++++++++++++-
->  1 file changed, 31 insertions(+), 1 deletion(-)
+>  drivers/mfd/axp20x.c       | 6 ++++++
+>  include/linux/mfd/axp20x.h | 5 +++++
+>  2 files changed, 11 insertions(+)
 > 
 > diff --git a/drivers/mfd/axp20x.c b/drivers/mfd/axp20x.c
-> index 6ffbc11..47ce233 100644
+> index 6df9155..6ffbc11 100644
 > --- a/drivers/mfd/axp20x.c
 > +++ b/drivers/mfd/axp20x.c
-> @@ -113,6 +113,30 @@ static struct resource axp20x_pek_resources[] = {
->  	},
+> @@ -39,10 +39,16 @@ static const char * const axp20x_model_names[] = {
+>  static const struct regmap_range axp20x_writeable_ranges[] = {
+>  	regmap_reg_range(AXP20X_DATACACHE(0), AXP20X_IRQ5_STATE),
+>  	regmap_reg_range(AXP20X_DCDC_MODE, AXP20X_FG_RES),
+> +	regmap_reg_range(AXP20X_RDC_H, AXP20X_OCV(15)),
+
+Define 15 please.
+
 >  };
 >  
-> +static struct resource axp20x_usb_power_supply_resources[] = {
-> +	{
-> +		.name	= "VBUS_PLUGIN",
-> +		.start	= AXP20X_IRQ_VBUS_PLUGIN,
-> +		.end	= AXP20X_IRQ_VBUS_PLUGIN,
-> +		.flags	= IORESOURCE_IRQ,
-> +	}, {
-> +		.name	= "VBUS_REMOVAL",
-> +		.start	= AXP20X_IRQ_VBUS_REMOVAL,
-> +		.end	= AXP20X_IRQ_VBUS_REMOVAL,
-> +		.flags	= IORESOURCE_IRQ,
-> +	}, {
-> +		.name	= "VBUS_VALID",
-> +		.start	= AXP20X_IRQ_VBUS_VALID,
-> +		.end	= AXP20X_IRQ_VBUS_VALID,
-> +		.flags	= IORESOURCE_IRQ,
-> +	}, {
-> +		.name	= "VBUS_NOT_VALID",
-> +		.start	= AXP20X_IRQ_VBUS_NOT_VALID,
-> +		.end	= AXP20X_IRQ_VBUS_NOT_VALID,
-> +		.flags	= IORESOURCE_IRQ,
-> +	},
-> +};
+>  static const struct regmap_range axp20x_volatile_ranges[] = {
+> +	regmap_reg_range(AXP20X_PWR_INPUT_STATUS, AXP20X_USB_OTG_STATUS),
+> +	regmap_reg_range(AXP20X_CHRG_CTRL1, AXP20X_CHRG_CTRL2),
+>  	regmap_reg_range(AXP20X_IRQ1_EN, AXP20X_IRQ5_STATE),
+> +	regmap_reg_range(AXP20X_ACIN_V_ADC_H, AXP20X_IPSOUT_V_HIGH_L),
+> +	regmap_reg_range(AXP20X_GPIO20_SS, AXP20X_GPIO3_CTRL),
+> +	regmap_reg_range(AXP20X_FG_RES, AXP20X_RDC_L),
+>  };
+>  
+>  static const struct regmap_access_table axp20x_writeable_table = {
+> diff --git a/include/linux/mfd/axp20x.h b/include/linux/mfd/axp20x.h
+> index 95568eb..f4290ae 100644
+> --- a/include/linux/mfd/axp20x.h
+> +++ b/include/linux/mfd/axp20x.h
+> @@ -151,6 +151,11 @@ enum {
+>  #define AXP20X_CC_CTRL			0xb8
+>  #define AXP20X_FG_RES			0xb9
+>  
+> +/* OCV */
+> +#define AXP20X_RDC_H			0xba
+> +#define AXP20X_RDC_L			0xbb
+> +#define AXP20X_OCV(m)			(0xc0 + (m))
 > +
->  static struct resource axp22x_pek_resources[] = {
->  	{
->  		.name   = "PEK_DBR",
-> @@ -165,7 +189,7 @@ static const struct regmap_config axp20x_regmap_config = {
->  	.val_bits	= 8,
->  	.wr_table	= &axp20x_writeable_table,
->  	.volatile_table	= &axp20x_volatile_table,
-> -	.max_register	= AXP20X_FG_RES,
-> +	.max_register	= AXP20X_OCV(15),
-
-Please define 15, as MAX_WHATEVER_REG or something.
-
->  	.cache_type	= REGCACHE_RBTREE,
->  };
->  
-> @@ -368,6 +392,12 @@ static struct mfd_cell axp20x_cells[] = {
->  		.resources		= axp20x_pek_resources,
->  	}, {
->  		.name			= "axp20x-regulator",
-> +	}, {
-> +		.name			= "axp20x-usb-power-supply",
-> +		.of_compatible		= "x-powers,axp202-usb-power-supply",
-> +		.num_resources		=
-> +				ARRAY_SIZE(axp20x_usb_power_supply_resources),
-> +		.resources		= axp20x_usb_power_supply_resources,
->  	},
->  };
+>  /* AXP22X specific registers */
+>  #define AXP22X_BATLOW_THRES1		0xe6
 >  
 
 -- 
