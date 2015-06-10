@@ -1,57 +1,76 @@
-From: m-karicheri2@ti.com (Murali Karicheri)
-Date: Wed, 10 Jun 2015 06:59:12 -0400
-Subject: Moan: usage of __iormb() and __iowmb() outside of asm/io.h
-In-Reply-To: <20150608184701.GA7557@n2100.arm.linux.org.uk>
-References: <20150608184701.GA7557@n2100.arm.linux.org.uk>
-Message-ID: <55781880.7040700@ti.com>
+From: eric.auger@linaro.org (Eric Auger)
+Date: Wed, 10 Jun 2015 13:13:37 +0200
+Subject: [PATCH 00/10] arm/arm64: KVM: Active interrupt state switching
+ for shared devices
+In-Reply-To: <5577FD76.7080100@arm.com>
+References: <1433783045-8002-1-git-send-email-marc.zyngier@arm.com>
+ <5577F63C.5040806@linaro.org> <5577FD76.7080100@arm.com>
+Message-ID: <55781BE1.9010006@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/08/2015 02:47 PM, Russell King - ARM Linux wrote:
-> Guys,
->
-> I notice that we have users of __iormb() and __iowmb() outside of asm/io.h:
->
-> drivers/clocksource/timer-keystone.c:   __iowmb();
-> drivers/dma/cppi41.c:                   __iormb();
-> drivers/dma/cppi41.c:   __iowmb();
-> drivers/dma/cppi41.c:           __iowmb();
-> drivers/dma/cppi41.c:                   __iormb();
-> drivers/soc/ti/knav_qmss_queue.c:       __iowmb();
->
-> These are not official kernel barriers - the only reason they exist in
-> asm/io.h is purely to provide a barrier implementation _for_ creating
-> the accessors _in_ asm/io.h, which are macros, and therefore these
-> macros need to stay around for the same scope as those accessors.
->
-> As with all details which are an architecture matter, they are subject
-> to the whims of the architecture maintainer to provide whatever semantics
-> for them that the architecture maintainer deems fit: there is no official
-> requirement for anything of that nature to do anything, and no guarantee
-> that anything such a detail does today it will do so tomorrow.
->
-> This is why only official interfaces should be used, and if they do not
-> satisfy the requirements, then new official interfaces need to be
-> proposed.  Don't ever poke about with stuff that's an architecture
-> implementation detail.
->
-> We've been here before with some of the cache flushing code - and people
-> have been burnt by it.
->
-> I do wish that people would see the difference between stuff which is
-> implemented to facilitate the implementation of an architecture detail
-> vs something which is provided for everyone's use.
->
-> I'm working on a patch which will completely remove these from view.
-> I would strongly suggest that these uses are removed from the above
-> code as a matter of urgency.
->
-> (Thankfully, it looks like it's only TI OMAP related code which has the
-> issue right now.)
->
+Hi Marc,
+On 06/10/2015 11:03 AM, Marc Zyngier wrote:
+> Hi Eric,
+> 
+> On 10/06/15 09:33, Eric Auger wrote:
+>> Hi Marc,
+>> On 06/08/2015 07:03 PM, Marc Zyngier wrote:
+>>> From day 1, our timer code has been using a terrible hack: whenever
+>>> the guest is scheduled with a timer interrupt pending (i.e. the HW
+>>> timer has expired), we restore the timer state with the MASK bit set,
+>>> in order to avoid the physical interrupt to fire again. And again. And
+>>> again...
+>>>
+>>> This is absolutely silly, for at least two reasons:
+>>>
+>>> - This relies on the device (the timer) having a mask bit that we can
+>>>   play with. Not all devices are built like this.
+>>>
+>>> - This expects some behaviour of the guest that only works because the
+>>>   both the kernel timer code and the KVM counterpart have been written
+>>>   by the same idiot (the idiot being me).
+>>>
+>>> The One True Way is to set the GIC active bit when injecting the
+>>> interrupt, and to context-switch across the world switch. This is what
+>>> this series implements.
+>>>
+>>> We introduce a relatively simple infrastructure enabling the mapping
+>>> of a virtual interrupt with its physical counterpart:
+>>>
+>>> - Whenever an virtual interrupt is injected, we look it up in an
+>>>   rbtree. If we have a match, the interrupt is injected with the HW
+>>>   bit set in the LR, together with the physical interrupt.
+>>>
+>>> - Across the world switch, we save/restore the active state for these
+>>>   interrupts using the irqchip_state API.
+>>>
+>>> - On guest EOI, the HW interrupt is automagically deactivated by the
+>>>   GIC, allowing the interrupt to be resampled.
+>>
+>> I am lost about the status of the irqchip part, allowing EOImode=1 and
+>> only dropping the prio for physical forwarded IRQs:
+>> http://lkml.iu.edu/hypermail/linux/kernel/1410.3/00913.html
+>> Doesn't this series also depend on those patches or did I miss something
+>> on the ML?
+> 
+> No, these patches are self-contained. As long as we only deal with
+> shared devices, we don't need EOImode=1, as as we save/restore the
+> active state, and the only irqchip change required (the state accessors)
+> went in with the 4.1 merge window.
+> 
+> The EOImode=1 stuff is still on the cards, and this series contains the
+> basic infrastructure for that (the last patch in the series is there
+> only for that purpose).
+> 
+> Hope this helps,
 
-Adding Santosh as well.
+OK thanks. I am currently rebasing my kvm-vfio series on yours. I will
+let you know the outcome.
 
--- 
-Murali Karicheri
-Linux Kernel, Keystone
+Best Regards
+
+Eric
+> 
+> 	M.
+> 
