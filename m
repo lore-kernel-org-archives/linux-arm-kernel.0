@@ -1,24 +1,40 @@
-From: khilman@kernel.org (Kevin Hilman)
-Date: Wed, 10 Jun 2015 16:10:52 -0700
-Subject: [PATCH] ARM: keystone: defconfig: enable netcp driver by default
-In-Reply-To: <1433976153-3522-1-git-send-email-ssantosh@kernel.org> (Santosh
- Shilimkar's message of "Wed, 10 Jun 2015 15:42:33 -0700")
-References: <1433976153-3522-1-git-send-email-ssantosh@kernel.org>
-Message-ID: <7h8ubrjh1f.fsf@deeprootsystems.com>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Wed, 10 Jun 2015 16:11:35 -0700
+Subject: [PATCH v5] ARM: smp: Only expose /sys/.../cpuX/online if
+ hotpluggable
+In-Reply-To: <20150610225744.GT7557@n2100.arm.linux.org.uk>
+References: <1428705191-15670-1-git-send-email-sboyd@codeaurora.org>
+ <20150413134246.GS12732@n2100.arm.linux.org.uk>
+ <557739AC.8000903@codeaurora.org>
+ <20150610225744.GT7557@n2100.arm.linux.org.uk>
+Message-ID: <5578C427.1070100@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Santosh Shilimkar <ssantosh@kernel.org> writes:
-
-> From: Murali Karicheri <m-karicheri2@ti.com>
+On 06/10/2015 03:57 PM, Russell King - ARM Linux wrote:
+> diff --git a/arch/arm/mach-shmobile/common.h b/arch/arm/mach-shmobile/common.h
+> index 476092b86c6e..f2c4bf437ea7 100644
+> --- a/arch/arm/mach-shmobile/common.h
+> +++ b/arch/arm/mach-shmobile/common.h
+> @@ -13,7 +13,8 @@ extern void shmobile_smp_boot(void);
+>  extern void shmobile_smp_sleep(void);
+>  extern void shmobile_smp_hook(unsigned int cpu, unsigned long fn,
+>  			      unsigned long arg);
+> -extern int shmobile_smp_cpu_disable(unsigned int cpu);
+> +extern bool shmobile_smp_cpu_can_disable(unsigned int cpu);
+> +extern void shmobile_invalidate_start(void);
 >
-> Enable netcp driver in defconfig for keystone SoCs.
+> which your original patch did not include.  The tree I'm applying to
+> (-rc1) contains:
 >
-> Signed-off-by: Murali Karicheri <m-karicheri2@ti.com>
-> Signed-off-by: Santosh Shilimkar <ssantosh@kernel.org>
+> extern int shmobile_smp_cpu_disable(unsigned int cpu);
+> extern void shmobile_invalidate_start(void);
+>
+> there.  Hence git quite rightfully declines to apply the patch.
+>
 
-Appled to next/defconfig,
+Thanks. Fixed.
 
-Thanks,
-
-Kevin
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
