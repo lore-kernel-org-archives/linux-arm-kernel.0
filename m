@@ -1,37 +1,29 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 9 Jun 2015 22:10:38 -0700
-Subject: EDMA oftree entry for AM335x
-In-Reply-To: <20150608105957.GT26523@pengutronix.de>
-References: <20150504064323.GU15254@pengutronix.de>
- <20150504141103.GD24469@atomide.com> <5548CB54.1040302@ti.com>
- <20150505145828.GB21061@atomide.com> <5549F95B.8090905@ti.com>
- <20150506143951.GG21061@atomide.com>
- <20150608105957.GT26523@pengutronix.de>
-Message-ID: <20150610051037.GA2740@atomide.com>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Wed, 10 Jun 2015 14:27:24 +0900
+Subject: [PATCHv2] ARM: exynos_defconfig: Enable CONFIG_SND_SOC_ODROIDX2
+ for Odroid-XU3
+In-Reply-To: <1433822879-3908-1-git-send-email-linux.amoon@gmail.com>
+References: <1433822879-3908-1-git-send-email-linux.amoon@gmail.com>
+Message-ID: <5577CABC.9000609@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Robert Schwebel <r.schwebel@pengutronix.de> [150608 04:01]:
-> On Wed, May 06, 2015 at 07:39:52AM -0700, Tony Lindgren wrote:
-> > 
-> > That may never happen considering that davinci is using it too.. It's
-> > best to not count on that happening anytime soon at least.
+On 09.06.2015 13:07, Anand Moon wrote:
+> Enable CONFIG_SND_SOC_ODROIDX2 and CONFIG_SND_SIMPLE_CARD to enable
+> sound on Odroid-XU3 board using the max98090 audio codec.
 > 
-> So my current understanding is that we have the situation that the
-> kernel warns about the oftree being wrong, but isn't able to handle an
-> oftree that would be right.
->
-> Shouldn't the warning being added when the kernel driver supports that
-> new mechanism?
+> Signed-off-by: Anand Moon <linux.amoon@gmail.com>
+> Reviewed-by: Lukasz Majewski <l.majewski@samsung.com>
+> ---
+> Changes v2: Fixed the commit log.
+> 
+> Signed-off-by: Anand Moon <linux.amoon@gmail.com>
 
-This particular driver is broken and it needs to be fixed properly.
- 
-> I had a warning free mainline kernel without patches on my customer
-> hardware before, so this smells a bit like a regression ... :-/
+Thanks, applied.
 
-Yes sorry I'm not patching away the warning as it does not fix the
-driver. Peter, I assume you are busy fixing it?
+I'll send later to Kukjin for 4.3.
+Unless he picks it also, in that case:
+Acked-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
 
-Regards,
-
-Tony
+Best regards,
+Krzysztof
