@@ -1,50 +1,29 @@
-From: hiraku.toyooka.gu@hitachi.com (Hiraku Toyooka)
-Date: Wed, 10 Jun 2015 16:47:19 +0900
-Subject: [PATCH v2] ARM: socfpga: add smp_ops.cpu_kill to make kexec/kdump
- available
-Message-ID: <20150610074719.22583.63623.stgit@arietta>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Wed, 10 Jun 2015 09:48:21 +0200
+Subject: [RFC] pinctrl: pinctrl-imx: implement suspend/resume
+In-Reply-To: <9333041871b27a3099b185e26b564e2a@agner.ch>
+References: <1433171567-24571-1-git-send-email-stefan@agner.ch>
+ <CAHrpEqS8qYUrcSoNSDMB9tA+D_KcfoSWz75VDSk-S=ZNpwU7mg@mail.gmail.com>
+ <9333041871b27a3099b185e26b564e2a@agner.ch>
+Message-ID: <CACRpkdYoAZyP5AHeOjksdSVN9H+crOse2syDTSOb_Mh7NyMbhQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Kexec_load syscall in ARM requires that machine-specific code
-has the smp_ops.cpu_kill() before loading kernel image.
-This patch adds the cpu_kill(), as a result, kexec reboot and
-kernel crash dump become available in mach-socfpga.
+On Thu, Jun 4, 2015 at 10:24 PM, Stefan Agner <stefan@agner.ch> wrote:
 
-Signed-off-by: Hiraku Toyooka <hiraku.toyooka.gu@hitachi.com>
-Cc: Dinh Nguyen <dinguyen@opensource.altera.com>
-Cc: Russell King <linux@arm.linux.org.uk>
-Cc: linux-arm-kernel at lists.infradead.org
-Cc: linux-kernel at vger.kernel.org
----
- arch/arm/mach-socfpga/platsmp.c |   12 ++++++++++++
- 1 file changed, 12 insertions(+)
+> I actually tried to experiment with pinctrl_pm_select_default_state and
+> pinctrl_pm_select_sleep_state. I think, one solution would be to create
+> sleep states for all drivers. However, it's not necessary to change to a
+> sleep state, since the controller looses the state anyway. What would be
+> required is having a function which allows to force the default state
+> for all pinctrl settings... As far as I can tell, there is no such
+> functionality currently...? Linus?
 
-diff --git a/arch/arm/mach-socfpga/platsmp.c b/arch/arm/mach-socfpga/platsmp.c
-index c64d89b..3caf7c3 100644
---- a/arch/arm/mach-socfpga/platsmp.c
-+++ b/arch/arm/mach-socfpga/platsmp.c
-@@ -95,11 +95,23 @@ static void socfpga_cpu_die(unsigned int cpu)
- 		cpu_do_idle();
- }
- 
-+/*
-+ * We need a dummy function so that platform_can_cpu_hotplug() knows
-+ * we support CPU hotplug. However, the function does not need to do
-+ * anything, because CPUs going offline just do WFI. We could reset
-+ * the CPUs but it would increase power consumption.
-+ */
-+static int socfpga_cpu_kill(unsigned int cpu)
-+{
-+	return 1;
-+}
-+
- struct smp_operations socfpga_smp_ops __initdata = {
- 	.smp_init_cpus		= socfpga_smp_init_cpus,
- 	.smp_prepare_cpus	= socfpga_smp_prepare_cpus,
- 	.smp_boot_secondary	= socfpga_boot_secondary,
- #ifdef CONFIG_HOTPLUG_CPU
- 	.cpu_die		= socfpga_cpu_die,
-+	.cpu_kill		= socfpga_cpu_kill,
- #endif
- };
+You could do it that way, but it requires that the driver depends
+on CONFIG_PM as the states are not cached in the driver
+core otherwise (drivers/base/pinctrl.c).
+
+I have no strong opinion on the subject really... either way works.
+
+Yours,
+Linus Walleij
