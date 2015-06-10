@@ -1,705 +1,1477 @@
 From: ludovic.desroches@atmel.com (Ludovic Desroches)
-Date: Wed, 10 Jun 2015 17:04:58 +0200
-Subject: [RESEND PROTO] pinctrl: rough draft for a future controller
+Date: Wed, 10 Jun 2015 17:04:59 +0200
+Subject: [RESEND PROTO] ARM: at91/dt: proto dt
 In-Reply-To: <1433948699-19800-1-git-send-email-ludovic.desroches@atmel.com>
 References: <1433948699-19800-1-git-send-email-ludovic.desroches@atmel.com>
-Message-ID: <1433948699-19800-4-git-send-email-ludovic.desroches@atmel.com>
+Message-ID: <1433948699-19800-5-git-send-email-ludovic.desroches@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
-
-Draft for a future controller which can mux each pin to any functions.
-
-There are up to 6 functions plus a gpio mode (gpio controller driver
-won't be included in the pincontroller driver).
-
-There is a concept of ioset. An ioset is a set of pins for a device.
-A device can have several iosets.
-There is no obligation to use the whole ioset, for example if you have a
-mmc 4-bits data bus, you can use data4,5,6,7 for another devices.
-The pincontroller has no knowledge about the iosets. So potentially you
-don't have to take care about it BUT validation is done by ioset. It
-means that if you mix device signals from several iosets, you may have
-some bugs. That's why we need to warn the user if he mixes pins from
-several iosets.
-
-There is no chip dependant table, that's why groups (mainly used for
-ioset and debug sysfs readability) are defined in the device tree.
 
 Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com>
 
 Conflicts:
-	drivers/pinctrl/Kconfig
-	drivers/pinctrl/Makefile
+	arch/arm/boot/dts/Makefile
 ---
- drivers/pinctrl/Kconfig             |  10 +
- drivers/pinctrl/Makefile            |   1 +
- drivers/pinctrl/pinctrl-at91-pio4.c | 625 ++++++++++++++++++++++++++++++++++++
- 3 files changed, 636 insertions(+)
- create mode 100644 drivers/pinctrl/pinctrl-at91-pio4.c
+ arch/arm/boot/dts/Makefile                 |   1 +
+ arch/arm/boot/dts/at91-sama5d4ek_proto.dts | 243 ++++++++++
+ arch/arm/boot/dts/sama5d4_proto-pinfunc.h  | 463 +++++++++++++++++++
+ arch/arm/boot/dts/sama5d4_proto.dtsi       | 716 +++++++++++++++++++++++++++++
+ 4 files changed, 1423 insertions(+)
+ create mode 100644 arch/arm/boot/dts/at91-sama5d4ek_proto.dts
+ create mode 100644 arch/arm/boot/dts/sama5d4_proto-pinfunc.h
+ create mode 100644 arch/arm/boot/dts/sama5d4_proto.dtsi
 
-diff --git a/drivers/pinctrl/Kconfig b/drivers/pinctrl/Kconfig
-index aeb5729..dcde103 100644
---- a/drivers/pinctrl/Kconfig
-+++ b/drivers/pinctrl/Kconfig
-@@ -67,6 +67,16 @@ config PINCTRL_AT91
- 	help
- 	  Say Y here to enable the at91 pinctrl driver
- 
-+config PINCTRL_AT91PIO4
-+	bool "AT91 PIO4 pinctrl driver"
-+	depends on OF
-+	depends on ARCH_AT91
-+	select PINMUX
-+	select PINCONF
-+	select GENERIC_PINCONF
-+	help
-+	  Say Y here to enable the at91-pio4 pinctrl driver
-+
- config PINCTRL_AMD
- 	bool "AMD GPIO pin control"
- 	depends on GPIOLIB
-diff --git a/drivers/pinctrl/Makefile b/drivers/pinctrl/Makefile
-index 6eadf04..a685d86 100644
---- a/drivers/pinctrl/Makefile
-+++ b/drivers/pinctrl/Makefile
-@@ -14,6 +14,7 @@ obj-$(CONFIG_PINCTRL_AS3722)	+= pinctrl-as3722.o
- obj-$(CONFIG_PINCTRL_BF54x)	+= pinctrl-adi2-bf54x.o
- obj-$(CONFIG_PINCTRL_BF60x)	+= pinctrl-adi2-bf60x.o
- obj-$(CONFIG_PINCTRL_AT91)	+= pinctrl-at91.o
-+obj-$(CONFIG_PINCTRL_AT91PIO4)	+= pinctrl-at91-pio4.o
- obj-$(CONFIG_PINCTRL_AMD)	+= pinctrl-amd.o
- obj-$(CONFIG_PINCTRL_FALCON)	+= pinctrl-falcon.o
- obj-$(CONFIG_PINCTRL_MESON)	+= meson/
-diff --git a/drivers/pinctrl/pinctrl-at91-pio4.c b/drivers/pinctrl/pinctrl-at91-pio4.c
+diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+index 83a4e68..cc63345 100644
+--- a/arch/arm/boot/dts/Makefile
++++ b/arch/arm/boot/dts/Makefile
+@@ -45,6 +45,7 @@ dtb-$(CONFIG_SOC_SAM_V7) += \
+ 	sama5d35ek.dtb \
+ 	sama5d36ek.dtb \
+ 	at91-sama5d4_xplained.dtb \
++	at91-sama5d4ek_proto.dtb \
+ 	at91-sama5d4ek.dtb
+ dtb-$(CONFIG_ARCH_ATLAS6) += \
+ 	atlas6-evb.dtb
+diff --git a/arch/arm/boot/dts/at91-sama5d4ek_proto.dts b/arch/arm/boot/dts/at91-sama5d4ek_proto.dts
 new file mode 100644
-index 0000000..4df2dd5
+index 0000000..24d92d3
 --- /dev/null
-+++ b/drivers/pinctrl/pinctrl-at91-pio4.c
-@@ -0,0 +1,625 @@
-+#include <linux/mfd/syscon.h>
-+#include <linux/module.h>
-+#include <linux/of.h>
-+#include <linux/platform_device.h>
-+#include <linux/pinctrl/pinconf.h>
-+#include <linux/pinctrl/pinconf-generic.h>
-+#include <linux/pinctrl/pinctrl.h>
-+#include <linux/pinctrl/pinmux.h>
-+#include <linux/regmap.h>
-+#include <linux/slab.h>
-+#include "core.h"
-+#include "pinctrl-utils.h"
-+
-+#define ATMEL_PIO3_BANK_OFFSET	0x1000
-+#define ATMEL_PIO3_PER		0x0000
-+#define ATMEL_PIO3_PDR		0x0004
-+#define ATMEL_PIO3_PSR		0x0008
-+#define ATMEL_PIO3_OER		0x0010
-+#define ATMEL_PIO3_ODR		0x0014
-+#define ATMEL_PIO3_OSR		0x0018
-+#define ATMEL_PIO3_IFER		0x0020
-+#define ATMEL_PIO3_IFDR		0x0024
-+#define ATMEL_PIO3_IFSR		0x0028
-+#define ATMEL_PIO3_SODR		0x0030
-+#define ATMEL_PIO3_CODR		0x0034
-+#define ATMEL_PIO3_ODSR		0x0038
-+#define ATMEL_PIO3_PDSR		0x003C
-+#define ATMEL_PIO3_IER		0x0040
-+#define ATMEL_PIO3_IDR		0x0044
-+#define ATMEL_PIO3_IMR		0x0048
-+#define ATMEL_PIO3_ISR		0x004C
-+#define ATMEL_PIO3_MDER		0x0050
-+#define ATMEL_PIO3_MDDR		0x0054
-+#define ATMEL_PIO3_MDSR		0x0058
-+#define ATMEL_PIO3_PUDR		0x0060
-+#define ATMEL_PIO3_PUER		0x0064
-+#define ATMEL_PIO3_PUSR		0x0068
-+#define ATMEL_PIO3_ABCDSR1	0x0070
-+#define ATMEL_PIO3_ABCDSR2	0x0074
-+#define ATMEL_PIO3_IFSCDR	0x0080
-+#define ATMEL_PIO3_IFSCER	0x0084
-+#define ATMEL_PIO3_IFSCSR	0x0088
-+#define ATMEL_PIO3_SCDR		0x008C
-+#define ATMEL_PIO3_PPDDR	0x0090
-+#define ATMEL_PIO3_PPDER	0x0094
-+#define ATMEL_PIO3_PPDSR	0x0098
-+#define ATMEL_PIO3_OWER		0x00A0
-+#define ATMEL_PIO3_OWDR		0x00A4
-+#define ATMEL_PIO3_OWSR		0x00A8
-+
-+struct atmel_group {
-+	const char *name;
-+	u32 *pins;
-+	unsigned npins;
-+};
-+
-+static const char * const atmel_functions[] = {
-+	"A", "B", "C", "D", "E", "F",
-+};
-+
-+const struct pinctrl_pin_desc atmel_pins[] = {
-+	PINCTRL_PIN(0,   "PA0"),
-+	PINCTRL_PIN(1,   "PA1"),
-+	PINCTRL_PIN(2,   "PA2"),
-+	PINCTRL_PIN(3,   "PA3"),
-+	PINCTRL_PIN(4,   "PA4"),
-+	PINCTRL_PIN(5,   "PA5"),
-+	PINCTRL_PIN(6,   "PA6"),
-+	PINCTRL_PIN(7,   "PA7"),
-+	PINCTRL_PIN(8,   "PA8"),
-+	PINCTRL_PIN(9,   "PA9"),
-+	PINCTRL_PIN(10,  "PA10"),
-+	PINCTRL_PIN(11,  "PA11"),
-+	PINCTRL_PIN(12,  "PA12"),
-+	PINCTRL_PIN(13,  "PA13"),
-+	PINCTRL_PIN(14,  "PA14"),
-+	PINCTRL_PIN(15,  "PA15"),
-+	PINCTRL_PIN(16,  "PA16"),
-+	PINCTRL_PIN(17,  "PA17"),
-+	PINCTRL_PIN(18,  "PA18"),
-+	PINCTRL_PIN(19,  "PA19"),
-+	PINCTRL_PIN(20,  "PA20"),
-+	PINCTRL_PIN(21,  "PA21"),
-+	PINCTRL_PIN(22,  "PA22"),
-+	PINCTRL_PIN(23,  "PA23"),
-+	PINCTRL_PIN(24,  "PA24"),
-+	PINCTRL_PIN(25,  "PA25"),
-+	PINCTRL_PIN(26,  "PA26"),
-+	PINCTRL_PIN(27,  "PA27"),
-+	PINCTRL_PIN(28,  "PA28"),
-+	PINCTRL_PIN(29,  "PA29"),
-+	PINCTRL_PIN(30,  "PA30"),
-+	PINCTRL_PIN(31,  "PA31"),
-+	PINCTRL_PIN(32,  "PB0"),
-+	PINCTRL_PIN(33,  "PB1"),
-+	PINCTRL_PIN(34,  "PB2"),
-+	PINCTRL_PIN(35,  "PB3"),
-+	PINCTRL_PIN(36,  "PB4"),
-+	PINCTRL_PIN(37,  "PB5"),
-+	PINCTRL_PIN(38,  "PB6"),
-+	PINCTRL_PIN(39,  "PB7"),
-+	PINCTRL_PIN(40,  "PB8"),
-+	PINCTRL_PIN(41,  "PB9"),
-+	PINCTRL_PIN(42,  "PB10"),
-+	PINCTRL_PIN(43,  "PB11"),
-+	PINCTRL_PIN(44,  "PB12"),
-+	PINCTRL_PIN(45,  "PB13"),
-+	PINCTRL_PIN(46,  "PB14"),
-+	PINCTRL_PIN(47,  "PB15"),
-+	PINCTRL_PIN(48,  "PB16"),
-+	PINCTRL_PIN(49,  "PB17"),
-+	PINCTRL_PIN(50,  "PB18"),
-+	PINCTRL_PIN(51,  "PB19"),
-+	PINCTRL_PIN(52,  "PB20"),
-+	PINCTRL_PIN(53,  "PB21"),
-+	PINCTRL_PIN(54,  "PB22"),
-+	PINCTRL_PIN(55,  "PB23"),
-+	PINCTRL_PIN(56,  "PB24"),
-+	PINCTRL_PIN(57,  "PB25"),
-+	PINCTRL_PIN(58,  "PB26"),
-+	PINCTRL_PIN(59,  "PB27"),
-+	PINCTRL_PIN(60,  "PB28"),
-+	PINCTRL_PIN(61,  "PB29"),
-+	PINCTRL_PIN(62,  "PB30"),
-+	PINCTRL_PIN(63,  "PB31"),
-+	PINCTRL_PIN(64,  "PC0"),
-+	PINCTRL_PIN(65,  "PC1"),
-+	PINCTRL_PIN(66,  "PC2"),
-+	PINCTRL_PIN(67,  "PC3"),
-+	PINCTRL_PIN(68,  "PC4"),
-+	PINCTRL_PIN(69,  "PC5"),
-+	PINCTRL_PIN(70,  "PC6"),
-+	PINCTRL_PIN(71,  "PC7"),
-+	PINCTRL_PIN(72,  "PC8"),
-+	PINCTRL_PIN(73,  "PC9"),
-+	PINCTRL_PIN(74,  "PC10"),
-+	PINCTRL_PIN(75,  "PC11"),
-+	PINCTRL_PIN(76,  "PC12"),
-+	PINCTRL_PIN(77,  "PC13"),
-+	PINCTRL_PIN(78,  "PC14"),
-+	PINCTRL_PIN(79,  "PC15"),
-+	PINCTRL_PIN(80,  "PC16"),
-+	PINCTRL_PIN(81,  "PC17"),
-+	PINCTRL_PIN(82,  "PC18"),
-+	PINCTRL_PIN(83,  "PC19"),
-+	PINCTRL_PIN(84,  "PC20"),
-+	PINCTRL_PIN(85,  "PC21"),
-+	PINCTRL_PIN(86,  "PC22"),
-+	PINCTRL_PIN(87,  "PC23"),
-+	PINCTRL_PIN(88,  "PC24"),
-+	PINCTRL_PIN(89,  "PC25"),
-+	PINCTRL_PIN(90,  "PC26"),
-+	PINCTRL_PIN(91,  "PC27"),
-+	PINCTRL_PIN(92,  "PC28"),
-+	PINCTRL_PIN(93,  "PC29"),
-+	PINCTRL_PIN(94,  "PC30"),
-+	PINCTRL_PIN(95,  "PC31"),
-+	PINCTRL_PIN(96,  "PD0"),
-+	PINCTRL_PIN(97,  "PD1"),
-+	PINCTRL_PIN(98,  "PD2"),
-+	PINCTRL_PIN(99,  "PD3"),
-+	PINCTRL_PIN(100, "PD4"),
-+	PINCTRL_PIN(101, "PD5"),
-+	PINCTRL_PIN(102, "PD6"),
-+	PINCTRL_PIN(103, "PD7"),
-+	PINCTRL_PIN(104, "PD8"),
-+	PINCTRL_PIN(105, "PD9"),
-+	PINCTRL_PIN(106, "PD10"),
-+	PINCTRL_PIN(107, "PD11"),
-+	PINCTRL_PIN(108, "PD12"),
-+	PINCTRL_PIN(109, "PD13"),
-+	PINCTRL_PIN(110, "PD14"),
-+	PINCTRL_PIN(111, "PD15"),
-+	PINCTRL_PIN(112, "PD16"),
-+	PINCTRL_PIN(113, "PD17"),
-+	PINCTRL_PIN(114, "PD18"),
-+	PINCTRL_PIN(115, "PD19"),
-+	PINCTRL_PIN(116, "PD20"),
-+	PINCTRL_PIN(117, "PD21"),
-+	PINCTRL_PIN(118, "PD22"),
-+	PINCTRL_PIN(119, "PD23"),
-+	PINCTRL_PIN(120, "PD24"),
-+	PINCTRL_PIN(121, "PD25"),
-+	PINCTRL_PIN(122, "PD26"),
-+	PINCTRL_PIN(123, "PD27"),
-+	PINCTRL_PIN(124, "PD28"),
-+	PINCTRL_PIN(125, "PD29"),
-+	PINCTRL_PIN(126, "PD30"),
-+	PINCTRL_PIN(127, "PD31"),
-+	PINCTRL_PIN(128, "PE0"),
-+	PINCTRL_PIN(129, "PE1"),
-+	PINCTRL_PIN(130, "PE2"),
-+	PINCTRL_PIN(131, "PE3"),
-+	PINCTRL_PIN(132, "PE4"),
-+	PINCTRL_PIN(133, "PE5"),
-+	PINCTRL_PIN(134, "PE6"),
-+	PINCTRL_PIN(135, "PE7"),
-+	PINCTRL_PIN(136, "PE8"),
-+	PINCTRL_PIN(137, "PE9"),
-+	PINCTRL_PIN(138, "PE10"),
-+	PINCTRL_PIN(139, "PE11"),
-+	PINCTRL_PIN(140, "PE12"),
-+	PINCTRL_PIN(141, "PE13"),
-+	PINCTRL_PIN(142, "PE14"),
-+	PINCTRL_PIN(143, "PE15"),
-+	PINCTRL_PIN(144, "PE16"),
-+	PINCTRL_PIN(145, "PE17"),
-+	PINCTRL_PIN(146, "PE18"),
-+	PINCTRL_PIN(147, "PE19"),
-+	PINCTRL_PIN(148, "PE20"),
-+	PINCTRL_PIN(149, "PE21"),
-+	PINCTRL_PIN(150, "PE22"),
-+	PINCTRL_PIN(151, "PE23"),
-+	PINCTRL_PIN(152, "PE24"),
-+	PINCTRL_PIN(153, "PE25"),
-+	PINCTRL_PIN(154, "PE26"),
-+	PINCTRL_PIN(155, "PE27"),
-+	PINCTRL_PIN(156, "PE28"),
-+	PINCTRL_PIN(157, "PE29"),
-+	PINCTRL_PIN(158, "PE30"),
-+	PINCTRL_PIN(159, "PE31"),
-+};
-+
-+/**
-+ * struct atmel_pinctrl - driver data
-+ * @pctrl:		pinctrl device
++++ b/arch/arm/boot/dts/at91-sama5d4ek_proto.dts
+@@ -0,0 +1,243 @@
++/*
++ * at91-sama5d4ek.dts - Device Tree file for SAMA5D4 Evaluation Kit
++ *
++ *  Copyright (C) 2014 Atmel,
++ *                2014 Nicolas Ferre <nicolas.ferre@atmel.com>
++ *
++ * This file is dual-licensed: you can use it either under the terms
++ * of the GPL or the X11 license, at your option. Note that this dual
++ * licensing only applies to this file, and not this project as a
++ * whole.
++ *
++ *  a) This file is free software; you can redistribute it and/or
++ *     modify it under the terms of the GNU General Public License as
++ *     published by the Free Software Foundation; either version 2 of the
++ *     License, or (at your option) any later version.
++ *
++ *     This file is distributed in the hope that it will be useful,
++ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
++ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ *     GNU General Public License for more details.
++ *
++ * Or, alternatively,
++ *
++ *  b) Permission is hereby granted, free of charge, to any person
++ *     obtaining a copy of this software and associated documentation
++ *     files (the "Software"), to deal in the Software without
++ *     restriction, including without limitation the rights to use,
++ *     copy, modify, merge, publish, distribute, sublicense, and/or
++ *     sell copies of the Software, and to permit persons to whom the
++ *     Software is furnished to do so, subject to the following
++ *     conditions:
++ *
++ *     The above copyright notice and this permission notice shall be
++ *     included in all copies or substantial portions of the Software.
++ *
++ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
++ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
++ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
++ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
++ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
++ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
++ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
++ *     OTHER DEALINGS IN THE SOFTWARE.
 + */
-+struct atmel_pinctrl {
-+	struct pinctrl_dev 	*pctrl;
-+	struct regmap		*regmap_base;
-+	unsigned int 		nbanks;
-+	unsigned int		npins_per_bank;
-+	struct atmel_group	*groups;
-+	unsigned int		ngroups;
-+	//struct atmel_function	*funcs;
-+	unsigned int nfuncs;
++/dts-v1/;
++#include "sama5d4_proto.dtsi"
++
++/ {
++	model = "Atmel SAMA5D4-EK";
++	compatible = "atmel,sama5d4ek", "atmel,sama5d4", "atmel,sama5";
++
++	chosen {
++		bootargs = "console=ttyS0,115200 ignore_loglevel earlyprintk";
++	};
++
++	memory {
++		reg = <0x20000000 0x20000000>;
++	};
++
++	clocks {
++		#address-cells = <1>;
++		#size-cells = <1>;
++		ranges;
++
++		main_clock: clock at 0 {
++			compatible = "atmel,osc", "fixed-clock";
++			clock-frequency = <12000000>;
++		};
++
++		slow_xtal {
++			clock-frequency = <32768>;
++		};
++
++		main_xtal {
++			clock-frequency = <12000000>;
++		};
++	};
++
++	ahb {
++		apb {
++			pinctrl at fc06a000 {
++				group_defs {
++					mac0_0_rmii {
++						pins = <PIN_PB0__G0_TXCK>,
++						       <PIN_PB2__G0_TXEN>,
++						       <PIN_PB6__G0_RXDV>,
++						       <PIN_PB7__G0_RXER>,
++						       <PIN_PB8__G0_RX0>,
++						       <PIN_PB9__G0_RX1>,
++						       <PIN_PB12__G0_TX0>,
++						       <PIN_PB13__G0_TX1>,
++						       <PIN_PB16__G0_MDC>,
++						       <PIN_PB17__G0_MDIO>;
++					};
++
++					mci0_0_4bit {
++						pins = <PIN_PC4__MCI0_CK>,
++						       <PIN_PC5__MCI0_CDA>,
++						       <PIN_PC6__MCI0_DA0>,
++						       <PIN_PC7__MCI0_DA1>,
++						       <PIN_PC8__MCI0_DA2>,
++						       <PIN_PC9__MCI0_DA3>;
++					};
++
++					mci1_0_4bit {
++						pins = <PIN_PE18__MCI1_CK>,
++						       <PIN_PE19__MCI1_CDA>,
++						       <PIN_PE20__MCI1_DA0>,
++						       <PIN_PE21__MCI1_DA1>,
++						       <PIN_PE22__MCI1_DA2>,
++						       <PIN_PE23__MCI1_DA3>;
++					};
++
++					i2c2_0 {
++						pins = <PIN_PB29__TWD2>,
++						       <PIN_PB30__TWCK2>;
++					};
++				};
++
++				pinctrl_mac0_default: mac0_default {
++					mux {
++						function = "A";
++						groups = "mac0_0_rmii";
++					};
++				};
++
++				pinctrl_i2c2_default: i2c2_default {
++					mux {
++						function = "A";
++						groups = "i2c2_0";
++					};
++				};
++
++				pinctrl_mci0_default: mci0_default {
++					mux {
++						function = "B";
++						groups = "mci0_0_4bit";
++					};
++
++					conf-cmd_data {
++						pins = <PIN_PC5__MCI0_CDA>,
++						       <PIN_PC6__MCI0_DA0>,
++						       <PIN_PC7__MCI0_DA1>,
++						       <PIN_PC8__MCI0_DA2>,
++						       <PIN_PC9__MCI0_DA3>;
++						bias-pull-up;
++					};
++				};
++
++				pinctrl_mci1_default: mci1_default {
++					mux {
++						function = "C";
++						groups = "mci1_0_4bit";
++					};
++
++					conf-cmd_data {
++						pins = <PIN_PE19__MCI1_CDA>,
++						       <PIN_PE20__MCI1_DA0>,
++						       <PIN_PE21__MCI1_DA1>,
++						       <PIN_PE22__MCI1_DA2>,
++						       <PIN_PE23__MCI1_DA3>;
++						bias-pull-up;
++					};
++				};
++
++			};
++
++			mmc0: mmc at f8000000 {
++				pinctrl-names = "default";
++				pinctrl-0 = <&pinctrl_mci0_default>;
++				status = "okay";
++				slot at 1 {
++					reg = <1>;
++					bus-width = <4>;
++					cd-gpios = <&pioE 5 0>;
++				};
++			};
++
++			macb0: ethernet at f8020000 {
++				phy-mode = "rmii";
++				pinctrl-names = "default";
++				pinctrl-0 = <&pinctrl_mac0_default>;
++				status = "okay";
++			};
++
++			i2c2: i2c at f8024000 {
++				status = "okay";
++				pinctrl-names = "default";
++				pinctrl-0 = <&pinctrl_i2c2_default>;
++			};
++
++			mmc1: mmc at fc000000 {
++				pinctrl-names = "default";
++				pinctrl-0 = <&pinctrl_mci1_default>;
++				status = "okay";
++				slot at 0 {
++					reg = <0>;
++					bus-width = <4>;
++					cd-gpios = <&pioE 6 0>;
++				};
++			};
++
++			watchdog at fc068640 {
++				status = "okay";
++			};
++		};
++	};
++
++	gpio_keys {
++		compatible = "gpio-keys";
++		#address-cells = <1>;
++		#size-cells = <0>;
++
++		pb_user1 {
++			label = "pb_user1";
++			gpios = <&pioE 13 GPIO_ACTIVE_HIGH>;
++			linux,code = <0x100>;
++			gpio-key,wakeup;
++		};
++	};
++
++	leds {
++		compatible = "gpio-leds";
++		status = "okay";
++
++		d8 {
++			label = "d8";
++			/* PE28, conflicts with usart4 rts pin */
++			gpios = <&pioE 28 GPIO_ACTIVE_LOW>;
++		};
++
++		d9 {
++			label = "d9";
++			gpios = <&pioE 9 GPIO_ACTIVE_HIGH>;
++		};
++
++		d10 {
++			label = "d10";
++			gpios = <&pioE 8 GPIO_ACTIVE_LOW>;
++			linux,default-trigger = "heartbeat";
++		};
++	};
 +};
+diff --git a/arch/arm/boot/dts/sama5d4_proto-pinfunc.h b/arch/arm/boot/dts/sama5d4_proto-pinfunc.h
+new file mode 100644
+index 0000000..a960da3
+--- /dev/null
++++ b/arch/arm/boot/dts/sama5d4_proto-pinfunc.h
+@@ -0,0 +1,463 @@
++#define PINMUX_PIN(no, ioset) \
++( ((no) & 0xffff) | (((ioset) & 0xff) << 16) )
 +
-+/* ----- pinctrl part ----- */
++#define PIN_PA0			0
++#define PIN_PA0__LCDDAT0	PINMUX_PIN(PIN_PA0, 0)
++#define PIN_PA0__TMS		PINMUX_PIN(PIN_PA0, 0)
++#define PIN_PA1			1
++#define PIN_PA1__LCDDAT1	PINMUX_PIN(PIN_PA1, 0)
++#define PIN_PA2			2
++#define PIN_PA2__LCDDAT2	PINMUX_PIN(PIN_PA2, 0)
++#define PIN_PA2__G1_TXCK	PINMUX_PIN(PIN_PA2, 0)
++#define PIN_PA3			3
++#define PIN_PA3__LCDDAT3	PINMUX_PIN(PIN_PA3, 0)
++#define PIN_PA3__G1_RXCK	PINMUX_PIN(PIN_PA3, 0)
++#define PIN_PA4			4
++#define PIN_PA4__LCDDAT4	PINMUX_PIN(PIN_PA4, 0)
++#define PIN_PA4__G1_TXEN	PINMUX_PIN(PIN_PA4, 0)
++#define PIN_PA5			5
++#define PIN_PA5__LCDDAT5	PINMUX_PIN(PIN_PA5, 0)
++#define PIN_PA5__G1_TXER	PINMUX_PIN(PIN_PA5, 0)
++#define PIN_PA6			6
++#define PIN_PA6__LCDDAT6	PINMUX_PIN(PIN_PA6, 0)
++#define PIN_PA6__G1_CRS		PINMUX_PIN(PIN_PA6, 0)
++#define PIN_PA7			7
++#define PIN_PA7__LCDDAT7	PINMUX_PIN(PIN_PA7, 0)
++#define PIN_PA8			8
++#define PIN_PA8__LCDDAT8	PINMUX_PIN(PIN_PA8, 0)
++#define PIN_PA8__TCK		PINMUX_PIN(PIN_PA8, 0)
++#define PIN_PA9			9
++#define PIN_PA9__LCDDAT9	PINMUX_PIN(PIN_PA9, 0)
++#define PIN_PA9__G1_COL		PINMUX_PIN(PIN_PA9, 0)
++#define PIN_PA10		10
++#define PIN_PA10__LCDDAT10	PINMUX_PIN(PIN_PA10, 0)
++#define PIN_PA10__G1_RXDV	PINMUX_PIN(PIN_PA10, 0)
++#define PIN_PA11		11
++#define PIN_PA11__LCDDAT11	PINMUX_PIN(PIN_PA11, 0)
++#define PIN_PA11__G1_RXER	PINMUX_PIN(PIN_PA11, 0)
++#define PIN_PA12		12
++#define PIN_PA12__LCDDAT12	PINMUX_PIN(PIN_PA12, 0)
++#define PIN_PA12__G1_RX0	PINMUX_PIN(PIN_PA12, 0)
++#define PIN_PA13		13
++#define PIN_PA13__LCDDAT13	PINMUX_PIN(PIN_PA13, 0)
++#define PIN_PA13__G1_RX1	PINMUX_PIN(PIN_PA13, 0)
++#define PIN_PA14		14
++#define PIN_PA14__LCDDAT14	PINMUX_PIN(PIN_PA14, 0)
++#define PIN_PA14__G1_TX0	PINMUX_PIN(PIN_PA14, 0)
++#define PIN_PA15		15
++#define PIN_PA15__LCDDAT15	PINMUX_PIN(PIN_PA15, 0)
++#define PIN_PA15__G1_TX1	PINMUX_PIN(PIN_PA15, 0)
++#define PIN_PA16		16
++#define PIN_PA16__LCDDAT16	PINMUX_PIN(PIN_PA16, 0)
++#define PIN_PA16__NTRST		PINMUX_PIN(PIN_PA16, 0)
++#define PIN_PA17		17
++#define PIN_PA17__LCDDAT17	PINMUX_PIN(PIN_PA17, 0)
++#define PIN_PA18		18
++#define PIN_PA18__LCDDAT18	PINMUX_PIN(PIN_PA18, 0)
++#define PIN_PA18__G1_RX2	PINMUX_PIN(PIN_PA18, 0)
++#define PIN_PA19		19
++#define PIN_PA19__LCDDAT19	PINMUX_PIN(PIN_PA19, 0)
++#define PIN_PA19__G1_RX3	PINMUX_PIN(PIN_PA19, 0)
++#define PIN_PA20		20
++#define PIN_PA20__LCDDAT20	PINMUX_PIN(PIN_PA20, 0)
++#define PIN_PA20__G1_TX2	PINMUX_PIN(PIN_PA20, 0)
++#define PIN_PA21		21
++#define PIN_PA21__LCDDAT21	PINMUX_PIN(PIN_PA21, 0)
++#define PIN_PA21__G1_TX3	PINMUX_PIN(PIN_PA21, 0)
++#define PIN_PA22		22
++#define PIN_PA22__LCDDAT22	PINMUX_PIN(PIN_PA22, 0)
++#define PIN_PA22__G1_MDC	PINMUX_PIN(PIN_PA22, 0)
++#define PIN_PA23		23
++#define PIN_PA23__LCDDAT23	PINMUX_PIN(PIN_PA23, 0)
++#define PIN_PA23__G1_MDIO	PINMUX_PIN(PIN_PA23, 0)
++#define PIN_PA24		24
++#define PIN_PA24__LCDPWM	PINMUX_PIN(PIN_PA24, 0)
++#define PIN_PA24__PCK0		PINMUX_PIN(PIN_PA24, 0)
++#define PIN_PA25		25
++#define PIN_PA25__LCDDISP	PINMUX_PIN(PIN_PA25, 0)
++#define PIN_PA25__TD0		PINMUX_PIN(PIN_PA25, 0)
++#define PIN_PA26		26
++#define PIN_PA26__LCDVSYNC	PINMUX_PIN(PIN_PA26, 0)
++#define PIN_PA26__PWMH0		PINMUX_PIN(PIN_PA26, 0)
++#define PIN_PA26__SPI1_NPCS1	PINMUX_PIN(PIN_PA26, 0)
++#define PIN_PA27		27
++#define PIN_PA27__LCDHSYNC	PINMUX_PIN(PIN_PA27, 0)
++#define PIN_PA27__PWML0		PINMUX_PIN(PIN_PA27, 0)
++#define PIN_PA27__SPI1_NPCS2	PINMUX_PIN(PIN_PA27, 0)
++#define PIN_PA28		28
++#define PIN_PA28__LCDPCK	PINMUX_PIN(PIN_PA28, 0)
++#define PIN_PA28__PWMH1		PINMUX_PIN(PIN_PA28, 0)
++#define PIN_PA28__SPI1_NPCS3	PINMUX_PIN(PIN_PA28, 0)
++#define PIN_PA29		29
++#define PIN_PA29__LCDDEN	PINMUX_PIN(PIN_PA29, 0)
++#define PIN_PA29__PWML1		PINMUX_PIN(PIN_PA29, 0)
++#define PIN_PA30		30
++#define PIN_PA30__TWD0		PINMUX_PIN(PIN_PA30, 0)
++#define PIN_PA31		31
++#define PIN_PA31__TWCK0		PINMUX_PIN(PIN_PA31, 0)
++#define PIN_PB0			32
++#define PIN_PB0__G0_TXCK	PINMUX_PIN(PIN_PB0, 0)
++#define PIN_PB1			33
++#define PIN_PB1__G0_RXCK	PINMUX_PIN(PIN_PB1, 0)
++#define PIN_PB1__SCK2		PINMUX_PIN(PIN_PB1, 0)
++#define PIN_PB1__ISI_PCK	PINMUX_PIN(PIN_PB1, 0)
++#define PIN_PB2			34
++#define PIN_PB2__G0_TXEN	PINMUX_PIN(PIN_PB2, 0)
++#define PIN_PB3			35
++#define PIN_PB3__G0_TXER	PINMUX_PIN(PIN_PB3, 0)
++#define PIN_PB3__CTS2		PINMUX_PIN(PIN_PB3, 0)
++#define PIN_PB3__ISI_VSYNC	PINMUX_PIN(PIN_PB3, 0)
++#define PIN_PB4			36
++#define PIN_PB4__G0_CRS		PINMUX_PIN(PIN_PB4, 1)
++#define PIN_PB4__RXD2		PINMUX_PIN(PIN_PB4, 1)
++#define PIN_PB4__ISI_HSYNC	PINMUX_PIN(PIN_PB4, 1)
++#define PIN_PB5			37
++#define PIN_PB5__G0_COL		PINMUX_PIN(PIN_PB5, 0)
++#define PIN_PB5__TXD2		PINMUX_PIN(PIN_PB5, 0)
++#define PIN_PB5__PCK2		PINMUX_PIN(PIN_PB5, 0)
++#define PIN_PB6			38
++#define PIN_PB6__G0_RXDV	PINMUX_PIN(PIN_PB6, 0)
++#define PIN_PB7			39
++#define PIN_PB7__G0_RXER	PINMUX_PIN(PIN_PB7, 0)
++#define PIN_PB8			40
++#define PIN_PB8__G0_RX0		PINMUX_PIN(PIN_PB8, 0)
++#define PIN_PB9			41
++#define PIN_PB9__G0_RX1		PINMUX_PIN(PIN_PB9, 0)
++#define PIN_PB10		42
++#define PIN_PB10__G0_RX2	PINMUX_PIN(PIN_PB10, 0)
++#define PIN_PB10__PCK2		PINMUX_PIN(PIN_PB10, 0)
++#define PIN_PB10__PWML1		PINMUX_PIN(PIN_PB10, 0)
++#define PIN_PB11		43
++#define PIN_PB11__G0_RX3	PINMUX_PIN(PIN_PB11, 0)
++#define PIN_PB11__RTS2		PINMUX_PIN(PIN_PB11, 0)
++#define PIN_PB11__PWMH1		PINMUX_PIN(PIN_PB11, 0)
++#define PIN_PB12		44
++#define PIN_PB12__G0_TX0	PINMUX_PIN(PIN_PB12, 0)
++#define PIN_PB13		45
++#define PIN_PB13__G0_TX1	PINMUX_PIN(PIN_PB13, 0)
++#define PIN_PB14		46
++#define PIN_PB14__G0_TX2	PINMUX_PIN(PIN_PB14, 0)
++#define PIN_PB14__SPI2_NPCS1	PINMUX_PIN(PIN_PB14, 0)
++#define PIN_PB14__PWMH0		PINMUX_PIN(PIN_PB14, 0)
++#define PIN_PB15		47
++#define PIN_PB15__G0_TX3	PINMUX_PIN(PIN_PB15, 0)
++#define PIN_PB15__SPI2_NPCS2	PINMUX_PIN(PIN_PB15, 0)
++#define PIN_PB15__PWML0		PINMUX_PIN(PIN_PB15, 0)
++#define PIN_PB16		48
++#define PIN_PB16__G0_MDC	PINMUX_PIN(PIN_PB16, 0)
++#define PIN_PB17		49
++#define PIN_PB17__G0_MDIO	PINMUX_PIN(PIN_PB17, 0)
++#define PIN_PB18		50
++#define PIN_PB18__SPI1_MISO	PINMUX_PIN(PIN_PB18, 0)
++#define PIN_PB18__D8		PINMUX_PIN(PIN_PB18, 0)
++#define PIN_PB19		51
++#define PIN_PB19__SPI1_MISO	PINMUX_PIN(PIN_PB19, 0)
++#define PIN_PB19__D9		PINMUX_PIN(PIN_PB19, 0)
++#define PIN_PB20		52
++#define PIN_PB20__SPI1_SPCK	PINMUX_PIN(PIN_PB20, 0)
++#define PIN_PB20__D10		PINMUX_PIN(PIN_PB20, 0)
++#define PIN_PB21		53
++#define PIN_PB21__SPI1_NPCS0	PINMUX_PIN(PIN_PB21, 0)
++#define PIN_PB21__D11		PINMUX_PIN(PIN_PB21, 0)
++#define PIN_PB22		54
++#define PIN_PB22__SPI1_NPCS1	PINMUX_PIN(PIN_PB22, 0)
++#define PIN_PB22__D12		PINMUX_PIN(PIN_PB22, 0)
++#define PIN_PB23		55
++#define PIN_PB23__SPI1_NPCS2	PINMUX_PIN(PIN_PB23, 0)
++#define PIN_PB23__D13		PINMUX_PIN(PIN_PB23, 0)
++#define PIN_PB24		56
++#define PIN_PB24__DRXD		PINMUX_PIN(PIN_PB24, 0)
++#define PIN_PB24__D14		PINMUX_PIN(PIN_PB24, 0)
++#define PIN_PB24__TDI		PINMUX_PIN(PIN_PB24, 0)
++#define PIN_PB25		57
++#define PIN_PB25__DTXD		PINMUX_PIN(PIN_PB25, 0)
++#define PIN_PB25__D15		PINMUX_PIN(PIN_PB25, 0)
++#define PIN_PB25__TD0		PINMUX_PIN(PIN_PB25, 0)
++#define PIN_PB26		58
++#define PIN_PB26__PCK0		PINMUX_PIN(PIN_PB26, 0)
++#define PIN_PB26__RK0		PINMUX_PIN(PIN_PB26, 0)
++#define PIN_PB26__PWMH0		PINMUX_PIN(PIN_PB26, 0)
++#define PIN_PB27		59
++#define PIN_PB27__SPI1_NPCS3	PINMUX_PIN(PIN_PB27, 0)
++#define PIN_PB27__TK0		PINMUX_PIN(PIN_PB27, 0)
++#define PIN_PB27__PWML0		PINMUX_PIN(PIN_PB27, 0)
++#define PIN_PB28		60
++#define PIN_PB28__SPI2_NPCS3	PINMUX_PIN(PIN_PB28, 0)
++#define PIN_PB28__TD0		PINMUX_PIN(PIN_PB28, 0)
++#define PIN_PB28__PWMH1		PINMUX_PIN(PIN_PB28, 0)
++#define PIN_PB29		61
++#define PIN_PB29__TWD2		PINMUX_PIN(PIN_PB29, 0)
++#define PIN_PB29__RD0		PINMUX_PIN(PIN_PB29, 0)
++#define PIN_PB29__PWML1		PINMUX_PIN(PIN_PB29, 0)
++#define PIN_PB30		62
++#define PIN_PB30__TWCK2		PINMUX_PIN(PIN_PB30, 0)
++#define PIN_PB30__RF0		PINMUX_PIN(PIN_PB30, 0)
++#define PIN_PB31		63
++#define PIN_PB31__TF0		PINMUX_PIN(PIN_PB31, 0)
++#define PIN_PC0			64
++#define PIN_PC0__SPI0_MISO	PINMUX_PIN(PIN_PC0, 0)
++#define PIN_PC0__PWMH2		PINMUX_PIN(PIN_PC0, 0)
++#define PIN_PC0__ISI_D8		PINMUX_PIN(PIN_PC0, 0)
++#define PIN_PC1			65
++#define PIN_PC1__SPI0_MOSI	PINMUX_PIN(PIN_PC1, 0)
++#define PIN_PC1__PWML2		PINMUX_PIN(PIN_PC1, 0)
++#define PIN_PC1__ISI_D9		PINMUX_PIN(PIN_PC1, 0)
++#define PIN_PC2			66
++#define PIN_PC2__SPI0_SPCK	PINMUX_PIN(PIN_PC2, 0)
++#define PIN_PC2__PWMH3		PINMUX_PIN(PIN_PC2, 0)
++#define PIN_PC2__ISI_D10	PINMUX_PIN(PIN_PC2, 0)
++#define PIN_PC3			67
++#define PIN_PC3__SPI0_NPCS0	PINMUX_PIN(PIN_PC3, 0)
++#define PIN_PC3__PWML3		PINMUX_PIN(PIN_PC3, 0)
++#define PIN_PC3__ISI_D11	PINMUX_PIN(PIN_PC3, 0)
++#define PIN_PC4			68
++#define PIN_PC4__SPI0_NPCS1	PINMUX_PIN(PIN_PC4, 0)
++#define PIN_PC4__MCI0_CK	PINMUX_PIN(PIN_PC4, 0)
++#define PIN_PC4__PCK1		PINMUX_PIN(PIN_PC4, 0)
++#define PIN_PC5			69
++#define PIN_PC5__D0		PINMUX_PIN(PIN_PC5, 0)
++#define PIN_PC5__MCI0_CDA	PINMUX_PIN(PIN_PC5, 0)
++#define PIN_PC6			70
++#define PIN_PC6__D1		PINMUX_PIN(PIN_PC6, 0)
++#define PIN_PC6__MCI0_DA0	PINMUX_PIN(PIN_PC6, 0)
++#define PIN_PC7			71
++#define PIN_PC7__D2		PINMUX_PIN(PIN_PC7, 0)
++#define PIN_PC7__MCI0_DA1	PINMUX_PIN(PIN_PC7, 0)
++#define PIN_PC8			72
++#define PIN_PC8__D3		PINMUX_PIN(PIN_PC8, 0)
++#define PIN_PC8__MCI0_DA2	PINMUX_PIN(PIN_PC8, 0)
++#define PIN_PC9			73
++#define PIN_PC9__D4		PINMUX_PIN(PIN_PC9, 0)
++#define PIN_PC9__MCI0_DA3	PINMUX_PIN(PIN_PC9, 0)
++#define PIN_PC10		74
++#define PIN_PC10__D5		PINMUX_PIN(PIN_PC10, 0)
++#define PIN_PC10__MCI0_DA4	PINMUX_PIN(PIN_PC10, 0)
++#define PIN_PC11		75
++#define PIN_PC11__D6		PINMUX_PIN(PIN_PC11, 0)
++#define PIN_PC11__MCI0_DA5	PINMUX_PIN(PIN_PC11, 0)
++#define PIN_PC12		76
++#define PIN_PC12__D7		PINMUX_PIN(PIN_PC12, 0)
++#define PIN_PC12__MCI0_DA6	PINMUX_PIN(PIN_PC12, 0)
++#define PIN_PC13		77
++#define PIN_PC13__NRD_NANDOE	PINMUX_PIN(PIN_PC13, 0)
++#define PIN_PC13__MCI0_DA7	PINMUX_PIN(PIN_PC13, 0)
++#define PIN_PC14		78
++#define PIN_PC14__NWE_NANDWE	PINMUX_PIN(PIN_PC14, 0)
++#define PIN_PC15		79
++#define PIN_PC15__NCS3		PINMUX_PIN(PIN_PC15, 0)
++#define PIN_PC16		80
++#define PIN_PC16__NANDRDY	PINMUX_PIN(PIN_PC16, 0)
++#define PIN_PC17		81
++#define PIN_PC17__A21_NANDALE	PINMUX_PIN(PIN_PC17, 0)
++#define PIN_PC18		82
++#define PIN_PC18__A22_NANDCLE	PINMUX_PIN(PIN_PC18, 0)
++#define PIN_PC19		83
++#define PIN_PC19__ISI_D0	PINMUX_PIN(PIN_PC19, 0)
++#define PIN_PC19__TK1		PINMUX_PIN(PIN_PC19, 0)
++#define PIN_PC20		84
++#define PIN_PC20__ISI_D1	PINMUX_PIN(PIN_PC20, 0)
++#define PIN_PC20__TF1		PINMUX_PIN(PIN_PC20, 0)
++#define PIN_PC21		85
++#define PIN_PC21__ISI_D2	PINMUX_PIN(PIN_PC21, 0)
++#define PIN_PC21__TD1		PINMUX_PIN(PIN_PC21, 0)
++#define PIN_PC22		86
++#define PIN_PC22__ISI_D3	PINMUX_PIN(PIN_PC22, 0)
++#define PIN_PC22__RF1		PINMUX_PIN(PIN_PC22, 0)
++#define PIN_PC23		87
++#define PIN_PC23__ISI_D4	PINMUX_PIN(PIN_PC23, 0)
++#define PIN_PC23__RD1		PINMUX_PIN(PIN_PC23, 0)
++#define PIN_PC24		88
++#define PIN_PC24__ISI_D5	PINMUX_PIN(PIN_PC24, 0)
++#define PIN_PC24__RK1		PINMUX_PIN(PIN_PC24, 0)
++#define PIN_PC24__PCK1		PINMUX_PIN(PIN_PC24, 0)
++#define PIN_PC25		89
++#define PIN_PC25__ISI_D6	PINMUX_PIN(PIN_PC25, 0)
++#define PIN_PC25__TWD3		PINMUX_PIN(PIN_PC25, 0)
++#define PIN_PC25__URXD1		PINMUX_PIN(PIN_PC25, 0)
++#define PIN_PC26		90
++#define PIN_PC26__ISI_D7	PINMUX_PIN(PIN_PC26, 0)
++#define PIN_PC26__TWCK3		PINMUX_PIN(PIN_PC26, 0)
++#define PIN_PC26__UTXD1		PINMUX_PIN(PIN_PC26, 0)
++#define PIN_PC27		91
++#define PIN_PC27__AD0		PINMUX_PIN(PIN_PC27, 0)
++#define PIN_PC27__SPI0_NPCS1	PINMUX_PIN(PIN_PC27, 0)
++#define PIN_PC27__PWML0		PINMUX_PIN(PIN_PC27, 0)
++#define PIN_PC28		92
++#define PIN_PC28__AD1		PINMUX_PIN(PIN_PC28, 0)
++#define PIN_PC28__SPI0_NPCS2	PINMUX_PIN(PIN_PC28, 0)
++#define PIN_PC28__PWML1		PINMUX_PIN(PIN_PC28, 0)
++#define PIN_PC29		93
++#define PIN_PC29__AD2		PINMUX_PIN(PIN_PC29, 0)
++#define PIN_PC29__SPI0_NPCS3	PINMUX_PIN(PIN_PC29, 0)
++#define PIN_PC29__PWMFI0	PINMUX_PIN(PIN_PC29, 0)
++#define PIN_PC30		94
++#define PIN_PC30__AD3		PINMUX_PIN(PIN_PC30, 0)
++#define PIN_PC30__PWMH0		PINMUX_PIN(PIN_PC30, 0)
++#define PIN_PC31		95
++#define PIN_PC31__AD4		PINMUX_PIN(PIN_PC31, 0)
++#define PIN_PC31__PWMH1		PINMUX_PIN(PIN_PC31, 0)
++#define PIN_PD0			96
++#define PIN_PD1			97
++#define PIN_PD2			98
++#define PIN_PD3			99
++#define PIN_PD4			100
++#define PIN_PD5			101
++#define PIN_PD6			102
++#define PIN_PD7			103
++#define PIN_PD8			104
++#define PIN_PD8__PCK0		PINMUX_PIN(PIN_PD8, 0)
++#define PIN_PD9			105
++#define PIN_PD9__FIQ		PINMUX_PIN(PIN_PD9, 0)
++#define PIN_PD10		106
++#define PIN_PD10__CTS0		PINMUX_PIN(PIN_PD10, 0)
++#define PIN_PD11		107
++#define PIN_PD11__RTS0		PINMUX_PIN(PIN_PD11, 0)
++#define PIN_PD11__SPI2_MISO	PINMUX_PIN(PIN_PD11, 0)
++#define PIN_PD12		108
++#define PIN_PD12__RXD0		PINMUX_PIN(PIN_PD12, 0)
++#define PIN_PD13		109
++#define PIN_PD13__TXD0		PINMUX_PIN(PIN_PD13, 0)
++#define PIN_PD13__SPI2_MOSI	PINMUX_PIN(PIN_PD13, 0)
++#define PIN_PD14		110
++#define PIN_PD14__CTS1		PINMUX_PIN(PIN_PD14, 0)
++#define PIN_PD15		111
++#define PIN_PD15__RTS1		PINMUX_PIN(PIN_PD15, 0)
++#define PIN_PD15__SPI2_SPCK	PINMUX_PIN(PIN_PD15, 0)
++#define PIN_PD16		112
++#define PIN_PD16__RXD1		PINMUX_PIN(PIN_PD16, 0)
++#define PIN_PD17		113
++#define PIN_PD17__TXD1		PINMUX_PIN(PIN_PD17, 0)
++#define PIN_PD17__SPI2_NPCS0	PINMUX_PIN(PIN_PD17, 0)
++#define PIN_PD18		114
++#define PIN_PD19		115
++#define PIN_PD20		116
++#define PIN_PD21		117
++#define PIN_PD22		118
++#define PIN_PD23		119
++#define PIN_PD24		120
++#define PIN_PD25		121
++#define PIN_PD26		122
++#define PIN_PD27		123
++#define PIN_PD28		124
++#define PIN_PD28__SCK0		PINMUX_PIN(PIN_PD28, 0)
++#define PIN_PD29		125
++#define PIN_PD29__SCK1		PINMUX_PIN(PIN_PD29, 0)
++#define PIN_PD30		126
++#define PIN_PD31		127
++#define PIN_PD31__SPI0_NPCS2	PINMUX_PIN(PIN_PD31, 0)
++#define PIN_PD31__PCK1		PINMUX_PIN(PIN_PD31, 0)
++#define PIN_PE0			128
++#define PIN_PE0__A0_NBS0	PINMUX_PIN(PIN_PE0, 0)
++#define PIN_PE0__MCI0_CDB	PINMUX_PIN(PIN_PE0, 0)
++#define PIN_PE0__CTS4		PINMUX_PIN(PIN_PE0, 0)
++#define PIN_PE1			129
++#define PIN_PE1__A1		PINMUX_PIN(PIN_PE1, 0)
++#define PIN_PE1__MCI0_DB0	PINMUX_PIN(PIN_PE1, 0)
++#define PIN_PE2			130
++#define PIN_PE2__A2		PINMUX_PIN(PIN_PE2, 0)
++#define PIN_PE2__MCI0_DB1	PINMUX_PIN(PIN_PE2, 0)
++#define PIN_PE3			131
++#define PIN_PE3__A3		PINMUX_PIN(PIN_PE3, 0)
++#define PIN_PE3__MCI0_DB2	PINMUX_PIN(PIN_PE3, 0)
++#define PIN_PE4			132
++#define PIN_PE4__A4		PINMUX_PIN(PIN_PE4, 0)
++#define PIN_PE4__MCI0_DB3	PINMUX_PIN(PIN_PE4, 0)
++#define PIN_PE5			133
++#define PIN_PE5__A5		PINMUX_PIN(PIN_PE5, 0)
++#define PIN_PE5__CTS3		PINMUX_PIN(PIN_PE5, 0)
++#define PIN_PE6			134
++#define PIN_PE6__A6		PINMUX_PIN(PIN_PE6, 0)
++#define PIN_PE6__TIOA3		PINMUX_PIN(PIN_PE6, 0)
++#define PIN_PE7			135
++#define PIN_PE7__A7		PINMUX_PIN(PIN_PE7, 0)
++#define PIN_PE7__TIOB3		PINMUX_PIN(PIN_PE7, 0)
++#define PIN_PE7__PWMFI1		PINMUX_PIN(PIN_PE7, 0)
++#define PIN_PE8			136
++#define PIN_PE8__A8		PINMUX_PIN(PIN_PE8, 0)
++#define PIN_PE8__TCLK3		PINMUX_PIN(PIN_PE8, 0)
++#define PIN_PE8__PWML3		PINMUX_PIN(PIN_PE8, 0)
++#define PIN_PE9			137
++#define PIN_PE9__A9		PINMUX_PIN(PIN_PE9, 0)
++#define PIN_PE9__TIOA2		PINMUX_PIN(PIN_PE9, 0)
++#define PIN_PE10		138
++#define PIN_PE10__A10		PINMUX_PIN(PIN_PE10, 0)
++#define PIN_PE10__TIOB2		PINMUX_PIN(PIN_PE10, 0)
++#define PIN_PE11		139
++#define PIN_PE11__A11		PINMUX_PIN(PIN_PE11, 0)
++#define PIN_PE11__TCLK2		PINMUX_PIN(PIN_PE11, 0)
++#define PIN_PE12		140
++#define PIN_PE12__A12		PINMUX_PIN(PIN_PE12, 0)
++#define PIN_PE12__TIOA1		PINMUX_PIN(PIN_PE12, 0)
++#define PIN_PE12__PWMH2		PINMUX_PIN(PIN_PE12, 0)
++#define PIN_PE13		141
++#define PIN_PE13__A13		PINMUX_PIN(PIN_PE13, 0)
++#define PIN_PE13__TIOB1		PINMUX_PIN(PIN_PE13, 0)
++#define PIN_PE13__PWML2		PINMUX_PIN(PIN_PE13, 0)
++#define PIN_PE14		142
++#define PIN_PE14__A14		PINMUX_PIN(PIN_PE14, 0)
++#define PIN_PE14__TCLK1		PINMUX_PIN(PIN_PE14, 0)
++#define PIN_PE14__PWMH3		PINMUX_PIN(PIN_PE14, 0)
++#define PIN_PE15		143
++#define PIN_PE15__A15		PINMUX_PIN(PIN_PE15, 0)
++#define PIN_PE15__SCK3		PINMUX_PIN(PIN_PE15, 0)
++#define PIN_PE15__TIOA0		PINMUX_PIN(PIN_PE15, 0)
++#define PIN_PE16		144
++#define PIN_PE16__A16		PINMUX_PIN(PIN_PE16, 0)
++#define PIN_PE16__RXD3		PINMUX_PIN(PIN_PE16, 0)
++#define PIN_PE16__TIOB0		PINMUX_PIN(PIN_PE16, 0)
++#define PIN_PE17		145
++#define PIN_PE17__A17		PINMUX_PIN(PIN_PE17, 0)
++#define PIN_PE17__TXD3		PINMUX_PIN(PIN_PE17, 0)
++#define PIN_PE17__TCLK0		PINMUX_PIN(PIN_PE17, 0)
++#define PIN_PE18		146
++#define PIN_PE18__A18		PINMUX_PIN(PIN_PE18, 0)
++#define PIN_PE18__TIOA5		PINMUX_PIN(PIN_PE18, 0)
++#define PIN_PE18__MCI1_CK	PINMUX_PIN(PIN_PE18, 0)
++#define PIN_PE19		147
++#define PIN_PE19__A19		PINMUX_PIN(PIN_PE19, 0)
++#define PIN_PE19__TIOB5		PINMUX_PIN(PIN_PE19, 0)
++#define PIN_PE19__MCI1_CDA	PINMUX_PIN(PIN_PE19, 0)
++#define PIN_PE20		148
++#define PIN_PE20__A20		PINMUX_PIN(PIN_PE20, 0)
++#define PIN_PE20__TCLK5		PINMUX_PIN(PIN_PE20, 0)
++#define PIN_PE20__MCI1_DA0	PINMUX_PIN(PIN_PE20, 0)
++#define PIN_PE21		149
++#define PIN_PE21__A23		PINMUX_PIN(PIN_PE21, 0)
++#define PIN_PE21__TIOA4		PINMUX_PIN(PIN_PE21, 0)
++#define PIN_PE21__MCI1_DA1	PINMUX_PIN(PIN_PE21, 0)
++#define PIN_PE22		150
++#define PIN_PE22__A24		PINMUX_PIN(PIN_PE22, 0)
++#define PIN_PE22__TIOB4		PINMUX_PIN(PIN_PE22, 0)
++#define PIN_PE22__MCI1_DA2	PINMUX_PIN(PIN_PE22, 0)
++#define PIN_PE23		151
++#define PIN_PE23__A25		PINMUX_PIN(PIN_PE23, 0)
++#define PIN_PE23__TCLK4		PINMUX_PIN(PIN_PE23, 0)
++#define PIN_PE23__MCI1_DA3	PINMUX_PIN(PIN_PE23, 0)
++#define PIN_PE24		152
++#define PIN_PE24__NCS0		PINMUX_PIN(PIN_PE24, 0)
++#define PIN_PE24__RTS3		PINMUX_PIN(PIN_PE24, 0)
++#define PIN_PE25		153
++#define PIN_PE25__NCS1		PINMUX_PIN(PIN_PE25, 0)
++#define PIN_PE25__SCK4		PINMUX_PIN(PIN_PE25, 0)
++#define PIN_PE25__IRQ		PINMUX_PIN(PIN_PE25, 0)
++#define PIN_PE26		154
++#define PIN_PE26__NCS2		PINMUX_PIN(PIN_PE26, 0)
++#define PIN_PE26__RXD4		PINMUX_PIN(PIN_PE26, 0)
++#define PIN_PE26__A18		PINMUX_PIN(PIN_PE26, 0)
++#define PIN_PE27		155
++#define PIN_PE27__NWR1_NBS1	PINMUX_PIN(PIN_PE27, 0)
++#define PIN_PE27__TXD4		PINMUX_PIN(PIN_PE27, 0)
++#define PIN_PE28		156
++#define PIN_PE28__NWAIT		PINMUX_PIN(PIN_PE28, 0)
++#define PIN_PE28__RTS4		PINMUX_PIN(PIN_PE28, 0)
++#define PIN_PE28__A19		PINMUX_PIN(PIN_PE28, 0)
++#define PIN_PE29		157
++#define PIN_PE29__DIBP		PINMUX_PIN(PIN_PE29, 0)
++#define PIN_PE29__URXD0		PINMUX_PIN(PIN_PE29, 0)
++#define PIN_PE29__TWD1		PINMUX_PIN(PIN_PE29, 0)
++#define PIN_PE30		158
++#define PIN_PE30__DIBN		PINMUX_PIN(PIN_PE30, 0)
++#define PIN_PE30__UTXD0		PINMUX_PIN(PIN_PE30, 0)
++#define PIN_PE30__TWCK1		PINMUX_PIN(PIN_PE30, 0)
++#define PIN_PE31		159
++#define PIN_PE31__ADTRG		PINMUX_PIN(PIN_PE31, 0)
+diff --git a/arch/arm/boot/dts/sama5d4_proto.dtsi b/arch/arm/boot/dts/sama5d4_proto.dtsi
+new file mode 100644
+index 0000000..dd66bf6
+--- /dev/null
++++ b/arch/arm/boot/dts/sama5d4_proto.dtsi
+@@ -0,0 +1,716 @@
++/*
++ * sama5d4.dtsi - Device Tree Include file for SAMA5D4 family SoC
++ *
++ *  Copyright (C) 2014 Atmel,
++ *                2014 Nicolas Ferre <nicolas.ferre@atmel.com>
++ *
++ * This file is dual-licensed: you can use it either under the terms
++ * of the GPL or the X11 license, at your option. Note that this dual
++ * licensing only applies to this file, and not this project as a
++ * whole.
++ *
++ *  a) This file is free software; you can redistribute it and/or
++ *     modify it under the terms of the GNU General Public License as
++ *     published by the Free Software Foundation; either version 2 of the
++ *     License, or (at your option) any later version.
++ *
++ *     This file is distributed in the hope that it will be useful,
++ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
++ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ *     GNU General Public License for more details.
++ *
++ * Or, alternatively,
++ *
++ *  b) Permission is hereby granted, free of charge, to any person
++ *     obtaining a copy of this software and associated documentation
++ *     files (the "Software"), to deal in the Software without
++ *     restriction, including without limitation the rights to use,
++ *     copy, modify, merge, publish, distribute, sublicense, and/or
++ *     sell copies of the Software, and to permit persons to whom the
++ *     Software is furnished to do so, subject to the following
++ *     conditions:
++ *
++ *     The above copyright notice and this permission notice shall be
++ *     included in all copies or substantial portions of the Software.
++ *
++ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
++ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
++ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
++ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
++ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
++ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
++ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
++ *     OTHER DEALINGS IN THE SOFTWARE.
++ */
 +
-+static int atmel_pctrl_get_groups_count(struct pinctrl_dev *pctldev)
-+{
-+	struct atmel_pinctrl *pctrl = pinctrl_dev_get_drvdata(pctldev);
++#include "skeleton.dtsi"
++#include <dt-bindings/clock/at91.h>
++#include <dt-bindings/dma/at91.h>
++#include <dt-bindings/interrupt-controller/irq.h>
++#include <dt-bindings/gpio/gpio.h>
++#include "sama5d4_proto-pinfunc.h"
 +
-+	return pctrl->ngroups;
-+}
++/ {
++	model = "Atmel SAMA5D4 family SoC";
++	compatible = "atmel,sama5d4";
++	interrupt-parent = <&aic>;
 +
-+static const char *atmel_pctrl_get_group_name(struct pinctrl_dev *pctldev,
-+						  unsigned selector)
-+{
-+	struct atmel_pinctrl *pctrl = pinctrl_dev_get_drvdata(pctldev);
++	aliases {
++		serial0 = &usart3;
++		gpio0 = &pioA;
++		gpio1 = &pioB;
++		gpio2 = &pioC;
++		gpio3 = &pioD;
++		gpio4 = &pioE;
++		tcb0 = &tcb0;
++		tcb1 = &tcb1;
++		i2c2 = &i2c2;
++	};
++	cpus {
++		#address-cells = <1>;
++		#size-cells = <0>;
 +
-+	return pctrl->groups[selector].name;
-+}
++		cpu at 0 {
++			device_type = "cpu";
++			compatible = "arm,cortex-a5";
++			reg = <0>;
++			next-level-cache = <&L2>;
++		};
++	};
 +
-+static int atmel_get_group_pins(struct pinctrl_dev *pctldev,
-+				    unsigned selector,
-+				    const unsigned **pins,
-+				    unsigned *num_pins)
-+{
-+	struct atmel_pinctrl *pctrl = pinctrl_dev_get_drvdata(pctldev);
++	memory {
++		reg = <0x20000000 0x20000000>;
++	};
 +
-+	*pins = pctrl->groups[selector].pins;
-+	*num_pins = pctrl->groups[selector].npins;
++	clocks {
++		slow_xtal: slow_xtal {
++			compatible = "fixed-clock";
++			#clock-cells = <0>;
++			clock-frequency = <0>;
++		};
 +
-+	return 0;
-+}
++		main_xtal: main_xtal {
++			compatible = "fixed-clock";
++			#clock-cells = <0>;
++			clock-frequency = <0>;
++		};
 +
-+static const struct pinctrl_ops atmel_pctlops = {
-+	.get_groups_count = atmel_pctrl_get_groups_count,
-+	.get_group_name = atmel_pctrl_get_group_name,
-+	.get_group_pins = atmel_get_group_pins,
-+	.dt_node_to_map = pinconf_generic_dt_node_to_map_all,
-+	.dt_free_map = pinctrl_utils_dt_free_map,
++		adc_op_clk: adc_op_clk{
++			compatible = "fixed-clock";
++			#clock-cells = <0>;
++			clock-frequency = <1000000>;
++		};
++	};
++
++	ahb {
++		compatible = "simple-bus";
++		#address-cells = <1>;
++		#size-cells = <1>;
++		ranges;
++
++		L2: cache-controller at 00a00000 {
++			compatible = "arm,pl310-cache";
++			reg = <0x00a00000 0x1000>;
++			interrupts = <67 IRQ_TYPE_LEVEL_HIGH 4>;
++			cache-unified;
++			cache-level = <2>;
++		};
++
++		apb {
++			compatible = "simple-bus";
++			#address-cells = <1>;
++			#size-cells = <1>;
++			ranges;
++
++			dma1: dma-controller at f0004000 {
++				compatible = "atmel,sama5d4-dma";
++				reg = <0xf0004000 0x200>;
++				interrupts = <50 IRQ_TYPE_LEVEL_HIGH 0>;
++				#dma-cells = <1>;
++				clocks = <&dma1_clk>;
++				clock-names = "dma_clk";
++			};
++
++			ramc0: ramc at f0010000 {
++				compatible = "atmel,sama5d3-ddramc";
++				reg = <0xf0010000 0x200>;
++				clocks = <&ddrck>, <&mpddr_clk>;
++				clock-names = "ddrck", "mpddr";
++			};
++
++			dma0: dma-controller at f0014000 {
++				compatible = "atmel,sama5d4-dma";
++				reg = <0xf0014000 0x200>;
++				interrupts = <8 IRQ_TYPE_LEVEL_HIGH 0>;
++				#dma-cells = <1>;
++				clocks = <&dma0_clk>;
++				clock-names = "dma_clk";
++			};
++
++			pmc: pmc at f0018000 {
++				compatible = "atmel,sama5d3-pmc";
++				reg = <0xf0018000 0x120>;
++				interrupts = <1 IRQ_TYPE_LEVEL_HIGH 7>;
++				interrupt-controller;
++				#address-cells = <1>;
++				#size-cells = <0>;
++				#interrupt-cells = <1>;
++
++				main_rc_osc: main_rc_osc {
++					compatible = "atmel,at91sam9x5-clk-main-rc-osc";
++					#clock-cells = <0>;
++					interrupt-parent = <&pmc>;
++					interrupts = <AT91_PMC_MOSCRCS>;
++					clock-frequency = <12000000>;
++					clock-accuracy = <100000000>;
++				};
++
++				main_osc: main_osc {
++					compatible = "atmel,at91rm9200-clk-main-osc";
++					#clock-cells = <0>;
++					interrupt-parent = <&pmc>;
++					interrupts = <AT91_PMC_MOSCS>;
++					clocks = <&main_xtal>;
++				};
++
++				main: mainck {
++					compatible = "atmel,at91sam9x5-clk-main";
++					#clock-cells = <0>;
++					interrupt-parent = <&pmc>;
++					interrupts = <AT91_PMC_MOSCSELS>;
++					clocks = <&main_rc_osc &main_osc>;
++				};
++
++				plla: pllack {
++					compatible = "atmel,sama5d3-clk-pll";
++					#clock-cells = <0>;
++					interrupt-parent = <&pmc>;
++					interrupts = <AT91_PMC_LOCKA>;
++					clocks = <&main>;
++					reg = <0>;
++					atmel,clk-input-range = <12000000 12000000>;
++					#atmel,pll-clk-output-range-cells = <4>;
++					atmel,pll-clk-output-ranges = <600000000 1200000000 0 0>;
++				};
++
++				plladiv: plladivck {
++					compatible = "atmel,at91sam9x5-clk-plldiv";
++					#clock-cells = <0>;
++					clocks = <&plla>;
++				};
++
++				utmi: utmick {
++					compatible = "atmel,at91sam9x5-clk-utmi";
++					#clock-cells = <0>;
++					interrupt-parent = <&pmc>;
++					interrupts = <AT91_PMC_LOCKU>;
++					clocks = <&main>;
++				};
++
++				mck: masterck {
++					compatible = "atmel,at91sam9x5-clk-master";
++					#clock-cells = <0>;
++					interrupt-parent = <&pmc>;
++					interrupts = <AT91_PMC_MCKRDY>;
++					clocks = <&clk32k>, <&main>, <&plladiv>, <&utmi>;
++					atmel,clk-output-range = <125000000 177000000>;
++					atmel,clk-divisors = <1 2 4 3>;
++				};
++
++				h32ck: h32mxck {
++					#clock-cells = <0>;
++					compatible = "atmel,sama5d4-clk-h32mx";
++					clocks = <&mck>;
++				};
++
++				prog: progck {
++					compatible = "atmel,at91sam9x5-clk-programmable";
++					#address-cells = <1>;
++					#size-cells = <0>;
++					interrupt-parent = <&pmc>;
++					clocks = <&clk32k>, <&main>, <&plladiv>, <&utmi>, <&mck>;
++
++					prog0: prog0 {
++						#clock-cells = <0>;
++						reg = <0>;
++						interrupts = <AT91_PMC_PCKRDY(0)>;
++					};
++
++					prog1: prog1 {
++						#clock-cells = <0>;
++						reg = <1>;
++						interrupts = <AT91_PMC_PCKRDY(1)>;
++					};
++
++					prog2: prog2 {
++						#clock-cells = <0>;
++						reg = <2>;
++						interrupts = <AT91_PMC_PCKRDY(2)>;
++					};
++				};
++
++				smd: smdclk {
++					compatible = "atmel,at91sam9x5-clk-smd";
++					#clock-cells = <0>;
++					clocks = <&plladiv>, <&utmi>;
++				};
++
++				systemck {
++					compatible = "atmel,at91rm9200-clk-system";
++					#address-cells = <1>;
++					#size-cells = <0>;
++
++					ddrck: ddrck {
++						#clock-cells = <0>;
++						reg = <2>;
++						clocks = <&mck>;
++					};
++
++					lcdck: lcdck {
++						#clock-cells = <0>;
++						reg = <4>;
++						clocks = <&smd>;
++					};
++
++					smdck: smdck {
++						#clock-cells = <0>;
++						reg = <4>;
++						clocks = <&smd>;
++					};
++
++					pck0: pck0 {
++						#clock-cells = <0>;
++						reg = <8>;
++						clocks = <&prog0>;
++					};
++
++					pck1: pck1 {
++						#clock-cells = <0>;
++						reg = <9>;
++						clocks = <&prog1>;
++					};
++
++					pck2: pck2 {
++						#clock-cells = <0>;
++						reg = <10>;
++						clocks = <&prog2>;
++					};
++				};
++
++				periph32ck {
++					compatible = "atmel,at91sam9x5-clk-peripheral";
++					#address-cells = <1>;
++					#size-cells = <0>;
++					clocks = <&h32ck>;
++
++					pioD_clk: pioD_clk {
++						#clock-cells = <0>;
++						reg = <5>;
++					};
++
++					usart0_clk: usart0_clk {
++						#clock-cells = <0>;
++						reg = <6>;
++					};
++
++					usart1_clk: usart1_clk {
++						#clock-cells = <0>;
++						reg = <7>;
++					};
++
++					icm_clk: icm_clk {
++						#clock-cells = <0>;
++						reg = <9>;
++					};
++
++					aes_clk: aes_clk {
++						#clock-cells = <0>;
++						reg = <12>;
++					};
++
++					tdes_clk: tdes_clk {
++						#clock-cells = <0>;
++						reg = <14>;
++					};
++
++					sha_clk: sha_clk {
++						#clock-cells = <0>;
++						reg = <15>;
++					};
++
++					matrix1_clk: matrix1_clk {
++						#clock-cells = <0>;
++						reg = <17>;
++					};
++
++					hsmc_clk: hsmc_clk {
++						#clock-cells = <0>;
++						reg = <22>;
++					};
++
++					pioA_clk: pioA_clk {
++						#clock-cells = <0>;
++						reg = <23>;
++					};
++
++					pioB_clk: pioB_clk {
++						#clock-cells = <0>;
++						reg = <24>;
++					};
++
++					pioC_clk: pioC_clk {
++						#clock-cells = <0>;
++						reg = <25>;
++					};
++
++					pioE_clk: pioE_clk {
++						#clock-cells = <0>;
++						reg = <26>;
++					};
++
++					usart3_clk: usart3_clk {
++						#clock-cells = <0>;
++						reg = <30>;
++					};
++
++					twi2_clk: twi2_clk {
++						#clock-cells = <0>;
++						reg = <34>;
++					};
++
++					mci0_clk: mci0_clk {
++						#clock-cells = <0>;
++						reg = <35>;
++					};
++
++					mci1_clk: mci1_clk {
++						#clock-cells = <0>;
++						reg = <36>;
++					};
++
++					tcb0_clk: tcb0_clk {
++						#clock-cells = <0>;
++						reg = <40>;
++					};
++
++					tcb1_clk: tcb1_clk {
++						#clock-cells = <0>;
++						reg = <41>;
++					};
++
++					tcb2_clk: tcb2_clk {
++						#clock-cells = <0>;
++						reg = <42>;
++					};
++
++					dbgu_clk: dbgu_clk {
++						#clock-cells = <0>;
++						reg = <45>;
++					};
++
++					uhphs_clk: uhphs_clk {
++						#clock-cells = <0>;
++						reg = <46>;
++					};
++
++					udphs_clk: udphs_clk {
++						#clock-cells = <0>;
++						reg = <47>;
++					};
++
++					trng_clk: trng_clk {
++						#clock-cells = <0>;
++						reg = <53>;
++					};
++
++					macb0_clk: macb0_clk {
++						#clock-cells = <0>;
++						reg = <54>;
++					};
++
++					fuse_clk: fuse_clk {
++						#clock-cells = <0>;
++						reg = <57>;
++					};
++
++					securam_clk: securam_clk {
++						#clock-cells = <0>;
++						reg = <59>;
++					};
++
++					smd_clk: smd_clk {
++						#clock-cells = <0>;
++						reg = <61>;
++					};
++
++					catb_clk: catb_clk {
++						#clock-cells = <0>;
++						reg = <63>;
++					};
++				};
++
++				periph64ck {
++					compatible = "atmel,at91sam9x5-clk-peripheral";
++					#address-cells = <1>;
++					#size-cells = <0>;
++					clocks = <&mck>;
++
++					dma0_clk: dma0_clk {
++						#clock-cells = <0>;
++						reg = <8>;
++					};
++
++					cpkcc_clk: cpkcc_clk {
++						#clock-cells = <0>;
++						reg = <10>;
++					};
++
++					mpddr_clk: mpddr_clk {
++						#clock-cells = <0>;
++						reg = <16>;
++					};
++
++					matrix0_clk: matrix0_clk {
++						#clock-cells = <0>;
++						reg = <18>;
++					};
++
++					vdec_clk: vdec_clk {
++						#clock-cells = <0>;
++						reg = <19>;
++					};
++
++					dma1_clk: dma1_clk {
++						#clock-cells = <0>;
++						reg = <50>;
++					};
++				};
++			};
++
++			mmc0: mmc at f8000000 {
++				compatible = "atmel,hsmci";
++				reg = <0xf8000000 0x600>;
++				interrupts = <35 IRQ_TYPE_LEVEL_HIGH 0>;
++				dmas = <&dma1
++					(AT91_XDMAC_DT_MEM_IF(0) | AT91_XDMAC_DT_PER_IF(1)
++					| AT91_XDMAC_DT_PERID(0))>;
++				dma-names = "rxtx";
++				status = "disabled";
++				#address-cells = <1>;
++				#size-cells = <0>;
++				clocks = <&mci0_clk>;
++				clock-names = "mci_clk";
++			};
++
++			tcb0: timer at f801c000 {
++				compatible = "atmel,at91sam9x5-tcb";
++				reg = <0xf801c000 0x100>;
++				interrupts = <40 IRQ_TYPE_LEVEL_HIGH 0>;
++				clocks = <&tcb0_clk>;
++				clock-names = "t0_clk";
++			};
++
++			macb0: ethernet at f8020000 {
++				compatible = "atmel,sama5d4-gem";
++				reg = <0xf8020000 0x100>;
++				interrupts = <54 IRQ_TYPE_LEVEL_HIGH 3>;
++				pinctrl-names = "default";
++				pinctrl-0 = <&pinctrl_macb0_rmii>;
++				#address-cells = <1>;
++				#size-cells = <0>;
++				clocks = <&macb0_clk>, <&macb0_clk>;
++				clock-names = "hclk", "pclk";
++				status = "disabled";
++			};
++
++			i2c2: i2c at f8024000 {
++				compatible = "atmel,at91sam9x5-i2c";
++				reg = <0xf8024000 0x4000>;
++				interrupts = <34 IRQ_TYPE_LEVEL_HIGH 6>;
++				dmas = <&dma1
++					(AT91_XDMAC_DT_MEM_IF(0) | AT91_XDMAC_DT_PER_IF(1)
++					| AT91_XDMAC_DT_PERID(6))>,
++				       <&dma1
++					(AT91_XDMAC_DT_MEM_IF(0) | AT91_XDMAC_DT_PER_IF(1)
++					| AT91_XDMAC_DT_PERID(7))>;
++				dma-names = "tx", "rx";
++				#address-cells = <1>;
++				#size-cells = <0>;
++				clocks = <&twi2_clk>;
++				status = "disabled";
++			};
++
++			mmc1: mmc at fc000000 {
++				compatible = "atmel,hsmci";
++				reg = <0xfc000000 0x600>;
++				interrupts = <36 IRQ_TYPE_LEVEL_HIGH 0>;
++				dmas = <&dma1
++					(AT91_XDMAC_DT_MEM_IF(0) | AT91_XDMAC_DT_PER_IF(1)
++					| AT91_XDMAC_DT_PERID(1))>;
++				dma-names = "rxtx";
++				status = "disabled";
++				#address-cells = <1>;
++				#size-cells = <0>;
++				clocks = <&mci1_clk>;
++				clock-names = "mci_clk";
++			};
++
++			usart3: serial at fc00c000 {
++				compatible = "atmel,at91sam9260-usart";
++				reg = <0xfc00c000 0x100>;
++				interrupts = <30 IRQ_TYPE_LEVEL_HIGH 5>;
++				dmas = <&dma1
++					(AT91_XDMAC_DT_MEM_IF(0) | AT91_XDMAC_DT_PER_IF(1)
++					| AT91_XDMAC_DT_PERID(18))>,
++				       <&dma1
++					(AT91_XDMAC_DT_MEM_IF(0) | AT91_XDMAC_DT_PER_IF(1)
++					| AT91_XDMAC_DT_PERID(19))>;
++				dma-names = "tx", "rx";
++				clocks = <&usart3_clk>;
++				clock-names = "usart";
++			};
++
++			tcb1: timer at fc020000 {
++				compatible = "atmel,at91sam9x5-tcb";
++				reg = <0xfc020000 0x100>;
++				interrupts = <41 IRQ_TYPE_LEVEL_HIGH 0>;
++				clocks = <&tcb1_clk>;
++				clock-names = "t0_clk";
++			};
++
++			rstc at fc068600 {
++				compatible = "atmel,at91sam9g45-rstc";
++				reg = <0xfc068600 0x10>;
++			};
++
++			shdwc at fc068610 {
++				compatible = "atmel,at91sam9x5-shdwc";
++				reg = <0xfc068610 0x10>;
++			};
++
++			pit: timer at fc068630 {
++				compatible = "atmel,at91sam9260-pit";
++				reg = <0xfc068630 0x10>;
++				interrupts = <3 IRQ_TYPE_LEVEL_HIGH 5>;
++				clocks = <&h32ck>;
++			};
++
++			watchdog at fc068640 {
++				compatible = "atmel,at91sam9260-wdt";
++				reg = <0xfc068640 0x10>;
++				status = "disabled";
++			};
++
++			sckc at fc068650 {
++				compatible = "atmel,at91sam9x5-sckc";
++				reg = <0xfc068650 0x4>;
++
++				slow_rc_osc: slow_rc_osc {
++					compatible = "atmel,at91sam9x5-clk-slow-rc-osc";
++					#clock-cells = <0>;
++					clock-frequency = <32768>;
++					clock-accuracy = <250000000>;
++					atmel,startup-time-usec = <75>;
++				};
++
++				slow_osc: slow_osc {
++					compatible = "atmel,at91sam9x5-clk-slow-osc";
++					#clock-cells = <0>;
++					clocks = <&slow_xtal>;
++					atmel,startup-time-usec = <1200000>;
++				};
++
++				clk32k: slowck {
++					compatible = "atmel,at91sam9x5-clk-slow";
++					#clock-cells = <0>;
++					clocks = <&slow_rc_osc &slow_osc>;
++				};
++			};
++
++			rtc at fc0686b0 {
++				compatible = "atmel,at91rm9200-rtc";
++				reg = <0xfc0686b0 0x30>;
++				interrupts = <1 IRQ_TYPE_LEVEL_HIGH 7>;
++			};
++
++			dbgu: serial at fc069000 {
++				compatible = "atmel,at91sam9260-usart";
++				reg = <0xfc069000 0x200>;
++				interrupts = <2 IRQ_TYPE_LEVEL_HIGH 7>;
++				clocks = <&dbgu_clk>;
++				clock-names = "usart";
++				status = "disabled";
++			};
++
++			pio_reg: syscon at fc06a000 {
++				compatible = "atmel,sama5d4-pio_reg", "syscon";
++				reg = <0xfc06a000 0x5000>;
++			};
++
++			pinctrl at fc06a000 {
++				#address-cells = <1>;
++				#size-cells = <1>;
++				compatible = "atmel,sama5d4-pinctrl", "simple-bus";
++				atmel,pio_reg = <&pio_reg 0x0>;
++			};
++
++			pioA: gpio at fc06a000 {
++				compatible = "atmel,at91sam9x5-gpio", "atmel,at91rm9200-gpio";
++				interrupts = <23 IRQ_TYPE_LEVEL_HIGH 1>;
++				#gpio-cells = <2>;
++				gpio-controller;
++				interrupt-controller;
++				#interrupt-cells = <2>;
++				clocks = <&pioA_clk>;
++			};
++			
++			pioB: gpio at fc06b000 {
++				compatible = "atmel,at91sam9x5-gpio", "atmel,at91rm9200-gpio";
++				interrupts = <24 IRQ_TYPE_LEVEL_HIGH 1>;
++				#gpio-cells = <2>;
++				gpio-controller;
++				interrupt-controller;
++				#interrupt-cells = <2>;
++				clocks = <&pioB_clk>;
++			};
++			
++			pioC: gpio at fc06c000 {
++				compatible = "atmel,at91sam9x5-gpio", "atmel,at91rm9200-gpio";
++				interrupts = <25 IRQ_TYPE_LEVEL_HIGH 1>;
++				#gpio-cells = <2>;
++				gpio-controller;
++				interrupt-controller;
++				#interrupt-cells = <2>;
++				clocks = <&pioC_clk>;
++			};
++			
++			pioD: gpio at fc06d000 {
++				compatible = "atmel,at91sam9x5-gpio", "atmel,at91rm9200-gpio";
++				interrupts = <5 IRQ_TYPE_LEVEL_HIGH 1>;
++				#gpio-cells = <2>;
++				gpio-controller;
++				interrupt-controller;
++				#interrupt-cells = <2>;
++				clocks = <&pioD_clk>;
++			};
++			
++			pioE: gpio at fc06e000 {
++				compatible = "atmel,at91sam9x5-gpio", "atmel,at91rm9200-gpio";
++				interrupts = <26 IRQ_TYPE_LEVEL_HIGH 1>;
++				#gpio-cells = <2>;
++				gpio-controller;
++				interrupt-controller;
++				#interrupt-cells = <2>;
++				clocks = <&pioE_clk>;
++			};
++			
++			aic: interrupt-controller at fc06e000 {
++				#interrupt-cells = <3>;
++				compatible = "atmel,sama5d4-aic";
++				interrupt-controller;
++				reg = <0xfc06e000 0x200>;
++				atmel,external-irqs = <56>;
++			};
++		};
++	};
 +};
-+
-+/* ----- pinmux part ----- */
-+
-+static int atmel_pmux_get_functions_count(struct pinctrl_dev *pctldev)
-+{
-+	return ARRAY_SIZE(atmel_functions);
-+}
-+
-+static const char *atmel_pmux_get_function_name(struct pinctrl_dev *pctldev,
-+						    unsigned selector)
-+{
-+	return atmel_functions[selector];
-+}
-+
-+static int atmel_pio3_set_mux(struct pinctrl_dev *pctldev,
-+			     unsigned function,
-+			     unsigned group)
-+{
-+	struct atmel_pinctrl *pctrl = pinctrl_dev_get_drvdata(pctldev);
-+
-+	dev_dbg(pctldev->dev, "enable function %s group %s\n",
-+		atmel_functions[function], pctrl->groups[group].name);
-+
-+	return 0;
-+}
-+
-+static const struct pinmux_ops atmel_pio3_pmxops = {
-+	.mux_per_pin = true,
-+	.request = NULL,
-+	.free = NULL,
-+	.get_functions_count = atmel_pmux_get_functions_count,
-+	.get_function_name = atmel_pmux_get_function_name,
-+	.set_mux = atmel_pio3_set_mux,
-+	.gpio_request_enable = NULL,
-+	.gpio_disable_free = NULL,
-+	.gpio_set_direction = NULL,
-+};
-+
-+/* ----- pinconf part ----- */
-+
-+int atmel_pio3_pin_config_read(struct atmel_pinctrl *pctrl, unsigned reg, unsigned pin_id, u32 *res)
-+{
-+	unsigned bank, pin;
-+
-+	bank = pin_id / pctrl->npins_per_bank;
-+	pin = pin_id % pctrl->npins_per_bank;
-+	printk("bank %u, pin %u\n", bank, pin);
-+
-+	return regmap_read(pctrl->regmap_base, bank * ATMEL_PIO3_BANK_OFFSET + reg, res);
-+}
-+
-+void atmel_pio3_pin_config_write(struct atmel_pinctrl *pctrl, unsigned reg, unsigned pin_id)
-+{
-+	unsigned bank, mask, pin;
-+
-+	bank = pin_id / pctrl->npins_per_bank;
-+	pin = pin_id % pctrl->npins_per_bank;
-+	mask = 1 << pin;
-+
-+	regmap_write(pctrl->regmap_base,
-+		     bank * ATMEL_PIO3_BANK_OFFSET +reg,
-+		     mask);
-+}
-+
-+static int atmel_pio3_pin_config_get(struct pinctrl_dev *pctldev,
-+				     unsigned pin,
-+				     unsigned long *config)
-+{
-+	struct atmel_pinctrl *pctrl = pinctrl_dev_get_drvdata(pctldev);
-+	unsigned int arg = 0;
-+	unsigned int param = pinconf_to_config_param(*config);
-+	unsigned mask;
-+	u32 res;
-+	int ret;
-+
-+	mask = 1 << pin;
-+
-+	switch (param) {
-+	case PIN_CONFIG_BIAS_PULL_UP:
-+		ret = atmel_pio3_pin_config_read(pctrl, ATMEL_PIO3_PUSR, pin, &res);
-+		if (ret)
-+			return -EIO;
-+		if (!(res & mask))
-+			return -EINVAL;
-+		arg = 1;
-+		break;
-+	case PIN_CONFIG_BIAS_PULL_DOWN:
-+		ret = atmel_pio3_pin_config_read(pctrl, ATMEL_PIO3_PPDSR, pin, &res);
-+		if (ret)
-+			return -EIO;
-+		if (!(res & mask))
-+			return -EINVAL;
-+		arg = 1;
-+		break;
-+	case PIN_CONFIG_BIAS_DISABLE:
-+		ret = atmel_pio3_pin_config_read(pctrl, ATMEL_PIO3_PUSR, pin, &res);
-+		if (ret)
-+			return -EIO;
-+		if (!(res & mask))
-+			return -EINVAL;
-+		arg = 1;
-+		break;
-+	case PIN_CONFIG_DRIVE_OPEN_DRAIN:
-+		ret = atmel_pio3_pin_config_read(pctrl, ATMEL_PIO3_MDSR, pin, &res);
-+		if (ret)
-+			return -EIO;
-+		if (!(res & mask))
-+			return -EINVAL;
-+		arg = 1;
-+		break;
-+	default:
-+		return -ENOTSUPP;
-+	}
-+
-+	*config = pinconf_to_config_packed(param, arg);
-+	return 0;
-+}
-+
-+static int atmel_pio3_pin_config_set(struct pinctrl_dev *pctldev,
-+				     unsigned pin,
-+				     unsigned long *configs,
-+				     unsigned num_configs)
-+{
-+	struct atmel_pinctrl *pctrl = pinctrl_dev_get_drvdata(pctldev);
-+	int i;
-+
-+	for (i = 0; i < num_configs; i++) {
-+		unsigned int param = pinconf_to_config_param(configs[i]);
-+		//unsigned int arg = pinconf_to_config_argument(configs[i]);
-+
-+		dev_dbg(pctldev->dev, "%s: pin=%u, config=0x%lx\n",
-+			__func__, pin, configs[i]);
-+
-+		switch(param) {
-+		case PIN_CONFIG_BIAS_DISABLE:
-+			atmel_pio3_pin_config_write(pctrl, ATMEL_PIO3_PUDR, pin);
-+			atmel_pio3_pin_config_write(pctrl, ATMEL_PIO3_PPDDR, pin);
-+			break;
-+		case PIN_CONFIG_BIAS_PULL_UP:
-+			atmel_pio3_pin_config_write(pctrl, ATMEL_PIO3_PUER, pin);
-+			break;
-+		case PIN_CONFIG_BIAS_PULL_DOWN:
-+			atmel_pio3_pin_config_write(pctrl, ATMEL_PIO3_PPDER, pin);
-+			break;
-+		case PIN_CONFIG_DRIVE_OPEN_DRAIN:
-+			atmel_pio3_pin_config_write(pctrl, ATMEL_PIO3_MDER, pin);
-+			break;
-+		case PIN_CONFIG_BIAS_HIGH_IMPEDANCE:
-+		case PIN_CONFIG_BIAS_BUS_HOLD:
-+		case PIN_CONFIG_BIAS_PULL_PIN_DEFAULT:
-+		case PIN_CONFIG_DRIVE_PUSH_PULL:
-+		case PIN_CONFIG_DRIVE_OPEN_SOURCE:
-+		case PIN_CONFIG_DRIVE_STRENGTH:
-+		case PIN_CONFIG_INPUT_ENABLE:
-+		case PIN_CONFIG_INPUT_SCHMITT_ENABLE:
-+		case PIN_CONFIG_INPUT_SCHMITT:
-+		case PIN_CONFIG_INPUT_DEBOUNCE:
-+		case PIN_CONFIG_POWER_SOURCE:
-+		case PIN_CONFIG_SLEW_RATE:
-+		case PIN_CONFIG_LOW_POWER_MODE:
-+		case PIN_CONFIG_OUTPUT:
-+		default:
-+			dev_warn(pctldev->dev,
-+				 "unsupported configuration parameter: %u\n",
-+				 param);
-+			continue;
-+		}
-+	}
-+
-+	return 0;
-+}
-+
-+static const struct pinconf_ops atmel_pio3_confops = {
-+	.is_generic = true,
-+	.pin_config_get = atmel_pio3_pin_config_get,
-+	.pin_config_set = atmel_pio3_pin_config_set,
-+	.pin_config_group_get = NULL,
-+	.pin_config_group_set = NULL,
-+	.pin_config_dbg_parse_modify = NULL,
-+	.pin_config_dbg_show = NULL,
-+	.pin_config_group_dbg_show = NULL,
-+	.pin_config_config_dbg_show = NULL,
-+};
-+
-+static struct pinctrl_desc atmel_sama5d4_pctrl_desc = {
-+	.name = "atmel_sama5d4_pinctrl",
-+	.pins = atmel_pins,
-+	.npins = 160,
-+	.complex_pin_desc = true,
-+	.pctlops = &atmel_pctlops,
-+	.pmxops = &atmel_pio3_pmxops,
-+	.confops = &atmel_pio3_confops,
-+	.owner = THIS_MODULE,
-+};
-+
-+static const struct of_device_id atmel_pinctrl_of_match[] = {
-+	{
-+		.compatible = "atmel,sama5d4-pinctrl",
-+		.data = &atmel_sama5d4_pctrl_desc,
-+	}, {
-+		/* sentinel */
-+	}
-+};
-+MODULE_DEVICE_TABLE(of, atmel_pinctrl_of_match);
-+
-+static struct pinctrl_desc *atmel_get_pctrl_desc(struct platform_device *pdev)
-+{
-+	const struct of_device_id *match;
-+
-+	match = of_match_node(atmel_pinctrl_of_match, pdev->dev.of_node);
-+	if (!match)
-+		return NULL;
-+	return (struct pinctrl_desc *) match->data;
-+}
-+
-+static int atmel_pinctrl_probe(struct platform_device *pdev)
-+{
-+	int ret;
-+	struct atmel_pinctrl *pctrl;
-+	struct pinctrl_desc *pctrl_desc;
-+	struct device_node *np = pdev->dev.of_node, *regmap_np;
-+
-+	struct device_node *defs_np, *group_np;
-+	int i, j;
-+	struct atmel_group *group;
-+	unsigned pin_number;
-+	const struct pinctrl_pin_desc *pin_desc;
-+	u32	pingrp_pin;
-+	int ioset;
-+
-+	if (!np) {
-+		dev_err(&pdev->dev, "device tree node not found\n");
-+		return -ENODEV;
-+	}
-+
-+	pctrl = devm_kzalloc(&pdev->dev, sizeof(*pctrl), GFP_KERNEL);
-+	if (!pctrl)
-+		return -ENOMEM;
-+
-+	/* Get pinctrl descriptor according to the device used. */
-+	pctrl_desc = atmel_get_pctrl_desc(pdev);
-+	if (!pctrl_desc)
-+		return -EINVAL;
-+
-+	/* Some registers are shared with the gpio controller. */
-+	regmap_np = of_parse_phandle(np, "atmel,pio_reg", 0);
-+	if (regmap_np) {
-+		pctrl->regmap_base = syscon_node_to_regmap(regmap_np);
-+		if (IS_ERR(pctrl->regmap_base)) {
-+			dev_err(&pdev->dev, "can't get regmap\n");
-+			return PTR_ERR(pctrl->regmap_base);
-+		}
-+	} else {
-+		dev_err(&pdev->dev, "atmel,pio_reg property is missing\n");
-+		return -EINVAL;
-+	}
-+
-+	pctrl->npins_per_bank = 32;
-+
-+	/*  */
-+	defs_np = of_find_node_by_name(np, "group_defs");
-+	if (!defs_np) {
-+		dev_err(&pdev->dev, "pinctrl_defs not found\n");
-+		//TODO
-+	}
-+	/* Count funcs and groups. */
-+	pctrl->ngroups = of_get_child_count(defs_np);
-+
-+	dev_dbg(&pdev->dev, "%u groups\n", pctrl->ngroups);
-+
-+	pctrl->groups = devm_kzalloc(&pdev->dev, sizeof(*pctrl->groups) * pctrl->ngroups, GFP_KERNEL);
-+	//if (!groups) TODO
-+	group = pctrl->groups;
-+
-+	dev_dbg(&pdev->dev, "parsing groups...\n");
-+	i = 0;
-+	ioset = -1;
-+	for_each_child_of_node(defs_np, group_np) {
-+		group->name = group_np->name;
-+		group->npins = of_property_count_u32_elems(group_np, "pins");
-+		dev_dbg(&pdev->dev, "%s with %u pin(s)\n",
-+			group->name, group->npins);
-+		group->pins = devm_kzalloc(&pdev->dev, sizeof(*group->pins) * group->npins, GFP_KERNEL);
-+		//if (!group->pins) TODO
-+		for (i = 0; i < group->npins; i++) {
-+			ret = of_property_read_u32_index(group_np, "pins", i, &pingrp_pin);
-+			//if (ret) TODO
-+			group->pins[i] = pingrp_pin & PINCTRL_PIN_MASK;
-+			if (ioset < 0)
-+				ioset = pingrp_pin >> 16;
-+			if ((pingrp_pin >> 16) != ioset)
-+				dev_warn(&pdev->dev,
-+				         "/!\\ pins from group %s are not using the same ioset /!\\\n",
-+					 group->name);
-+		}
-+
-+		group++;
-+	}
-+
-+	/* debug */
-+	for (i = 0; i < pctrl->ngroups; i++) {
-+		group = &pctrl->groups[i];
-+		dev_dbg(&pdev->dev, "registring %s, %u pin(s):\n",
-+			group->name, group->npins);
-+		for (j = 0; j < group->npins; j++) {
-+			pin_number = group->pins[j];
-+			pin_desc =  &pctrl_desc->pins[pin_number];
-+			dev_dbg(&pdev->dev, "%s (%u)",
-+				pin_desc->name,
-+				pin_desc->number);
-+		}
-+	}
-+	/* end of debug */
-+
-+	pctrl->pctrl = pinctrl_register(pctrl_desc, &pdev->dev, pctrl);
-+	if (!pctrl->pctrl) {
-+		dev_err(&pdev->dev, "pinctrl registration failed\n");
-+		return -ENOMEM;
-+	}
-+
-+	platform_set_drvdata(pdev, pctrl);
-+
-+	dev_info(&pdev->dev, "atmel pinctrl initialized\n");
-+
-+	return 0;
-+}
-+
-+int atmel_pinctrl_remove(struct platform_device *pdev)
-+{
-+	struct atmel_pinctrl *pctrl = platform_get_drvdata(pdev);
-+
-+	pinctrl_unregister(pctrl->pctrl);
-+
-+	return 0;
-+}
-+
-+static struct platform_driver atmel_pinctrl_driver = {
-+	.driver = {
-+		.name = "atmel-pinctrl",
-+		.of_match_table = atmel_pinctrl_of_match,
-+	},
-+	.probe = atmel_pinctrl_probe,
-+	.remove = atmel_pinctrl_remove,
-+};
-+
-+module_platform_driver(atmel_pinctrl_driver);
-+
-+MODULE_AUTHOR(Ludovic Desroches <ludovic.desroches@atmel.com>);
-+MODULE_DESCRIPTION("Atmel new pinctrl driver");
-+MODULE_LICENSE("GPL");
 -- 
 2.2.0
