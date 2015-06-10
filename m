@@ -1,66 +1,132 @@
-From: joro@8bytes.org (Joerg Roedel)
-Date: Wed, 10 Jun 2015 11:32:52 +0200
-Subject: [PATCH 1/2] scatterlist: use sg_phys()
-In-Reply-To: <20150609162710.21910.57295.stgit@dwillia2-desk3.amr.corp.intel.com>
-References: <20150609162659.21910.41681.stgit@dwillia2-desk3.amr.corp.intel.com>
- <20150609162710.21910.57295.stgit@dwillia2-desk3.amr.corp.intel.com>
-Message-ID: <20150610093252.GA20384@8bytes.org>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Wed, 10 Jun 2015 10:34:26 +0100
+Subject: [PATCH 4/8] power: Add an axp20x-usb-power driver
+In-Reply-To: <557801B8.5040804@redhat.com>
+References: <1433885881-19809-1-git-send-email-hdegoede@redhat.com>
+ <1433885881-19809-5-git-send-email-hdegoede@redhat.com>
+ <20150610072957.GV2982@x1> <557801B8.5040804@redhat.com>
+Message-ID: <20150610093426.GD2982@x1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 09, 2015 at 12:27:10PM -0400, Dan Williams wrote:
-> diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
-> index 7e7583ddd607..9f6ff6671f01 100644
-> --- a/arch/arm/mm/dma-mapping.c
-> +++ b/arch/arm/mm/dma-mapping.c
-> @@ -1502,7 +1502,7 @@ static int __map_sg_chunk(struct device *dev, struct scatterlist *sg,
->  		return -ENOMEM;
->  
->  	for (count = 0, s = sg; count < (size >> PAGE_SHIFT); s = sg_next(s)) {
-> -		phys_addr_t phys = page_to_phys(sg_page(s));
-> +		phys_addr_t phys = sg_phys(s) - s->offset;
+On Wed, 10 Jun 2015, Hans de Goede wrote:
 
-So sg_phys() turns out to be 'page_to_phys(sg_page(s)) + s->offset',
-which makes the above statement to:
+> Hi,
+> 
+> Thanks for the quick review I'll do a v2 addressing your concerns soonish.
+> 
+> On 10-06-15 09:29, Lee Jones wrote:
+> >On Tue, 09 Jun 2015, Hans de Goede wrote:
+> >
+> >>This adds a driver for the usb power_supply bits of the axp20x PMICs.
+> >>
+> >>I initially started writing my own driver, before coming aware of
+> >>Bruno Pr?mont's excellent earlier RFC with a driver for this.
+> >>
+> >>My driver was lacking CURRENT_MAX and VOLTAGE_MIN support Bruno's
+> >>drvier has, so I've copied the code for those from his driver.
+> >>
+> >>Note that the AC-power-supply and battery charger bits will need separate
+> >>drivers. Each one needs its own devictree child-node so that other
+> >>devicetree nodes can reference the right power-supply, and thus each one
+> >>will get its own mfd-cell / platform_device and platform-driver.
+> >>
+> >>Cc: Bruno Pr?mont <bonbons@linux-vserver.org>
+> >>Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+> >>---
+> >>  .../bindings/power_supply/axp20x_usb_power.txt     |  34 +++
+> >
+> >This needs to be submitted in a seperate patch.
+> 
+> Ok.
+> 
+> >
+> >>  drivers/power/Kconfig                              |   7 +
+> >>  drivers/power/Makefile                             |   1 +
+> >>  drivers/power/axp20x_usb_power.c                   | 241 +++++++++++++++++++++
+> >>  include/linux/mfd/axp20x.h                         |  24 ++
+> >>  5 files changed, 307 insertions(+)
+> >>  create mode 100644 Documentation/devicetree/bindings/power_supply/axp20x_usb_power.txt
+> >>  create mode 100644 drivers/power/axp20x_usb_power.c
+> >
+> >[...]
+> >
+> >>diff --git a/include/linux/mfd/axp20x.h b/include/linux/mfd/axp20x.h
+> >>index f4290ae..d7adb2e 100644
+> >>--- a/include/linux/mfd/axp20x.h
+> >>+++ b/include/linux/mfd/axp20x.h
+> >>@@ -11,6 +11,8 @@
+> >>  #ifndef __LINUX_MFD_AXP20X_H
+> >>  #define __LINUX_MFD_AXP20X_H
+> >>
+> >>+#include <linux/regmap.h>
+> >>+
+> >>  enum {
+> >>  	AXP202_ID = 0,
+> >>  	AXP209_ID,
+> >>@@ -366,4 +368,26 @@ struct axp20x_fg_pdata {
+> >>  	int thermistor_curve[MAX_THERM_CURVE_SIZE][2];
+> >>  };
+> >>
+> >>+/* generic helper function for reading 9-16 bit wide regs */
+> >>+static inline int axp20x_read_16bit(struct regmap *regmap,
+> >
+> >This is only used twice and only in one file.
+> >
+> >Do you know of any other uses of this call that will be upstreamed
+> >shortly?
+> 
+> Yes I plan to write drivers for the other 3 power_supply class
+> cells (ac-power, battery-charger, rtc-bat-charger) in the axp209,
+> and most of those need the same helper which I why I put it here.
 
-	page_to_phys(sg_page(s)) + s->offset - s->offset;
+Okay.
 
-The compiler will probably optimize that away, but it still doesn't look
-like an improvement.
+> >>+				    unsigned int reg, unsigned int width)
+> >
+> >The function name is a bit misleading.
+> 
+> How about: axp20x_read_multibyte_reg ?
 
->  		unsigned int len = PAGE_ALIGN(s->offset + s->length);
->  
->  		if (!is_coherent &&
-> diff --git a/arch/microblaze/kernel/dma.c b/arch/microblaze/kernel/dma.c
-> index ed7ba8a11822..dcb3c594d626 100644
-> --- a/arch/microblaze/kernel/dma.c
-> +++ b/arch/microblaze/kernel/dma.c
-> @@ -61,7 +61,7 @@ static int dma_direct_map_sg(struct device *dev, struct scatterlist *sgl,
->  	/* FIXME this part of code is untested */
->  	for_each_sg(sgl, sg, nents, i) {
->  		sg->dma_address = sg_phys(sg);
-> -		__dma_sync(page_to_phys(sg_page(sg)) + sg->offset,
-> +		__dma_sync(sg_phys(sg),
->  							sg->length, direction);
+axp20x_read_variable_width() ?
 
-Here the replacement makes sense, but weird indendation. Could all be
-moved to one line, I guess.
+> >>+{
+> >>+	unsigned int v, raw;
+> >>+	int r;
+> >
+> >'v' and 'r' are not good variable names.
+> >
+> >>+	r = regmap_read(regmap, reg, &v);
+> >>+	if (r)
+> >>+		return r;
+> >>+
+> >>+	raw = v << (width - 8);
+> >
+> >So 'reg' is expected to be top end loaded?
+> >
+> >E.g A value of say 0x0101 (257) in 9 bits will look like this:
+> >
+> >reg          reg + 1
+> >1000 0000b   0000 0001b
+> 
+> Yes, I guess this was done so that you can get all the 8 msb-s
+> in a single read if you do not care about the lsb-s.
 
->  	}
->  
-> diff --git a/drivers/iommu/intel-iommu.c b/drivers/iommu/intel-iommu.c
-> index 68d43beccb7e..9b9ada71e0d3 100644
-> --- a/drivers/iommu/intel-iommu.c
-> +++ b/drivers/iommu/intel-iommu.c
-> @@ -1998,7 +1998,7 @@ static int __domain_mapping(struct dmar_domain *domain, unsigned long iov_pfn,
->  			sg_res = aligned_nrpages(sg->offset, sg->length);
->  			sg->dma_address = ((dma_addr_t)iov_pfn << VTD_PAGE_SHIFT) + sg->offset;
->  			sg->dma_length = sg->length;
-> -			pteval = page_to_phys(sg_page(sg)) | prot;
-> +			pteval = (sg_phys(sg) - sg->offset) | prot;
+Odd, but okay.
 
-Here it doesn't make sense too. In general, please remove the cases
-where you have to subtract sg->offset after the conversion.
+> >>+	r = regmap_read(regmap, reg + 1, &v);
+> >>+	if (r)
+> >>+		return r;
+> >>+
+> >>+	raw |= v;
+> >>+
+> >>+	return raw;
+> >>+}
+> >>+
+> >>  #endif /* __LINUX_MFD_AXP20X_H */
 
-
-	Joerg
+-- 
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
