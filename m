@@ -1,88 +1,170 @@
 From: r.spliet@ultimaker.com (Roy Spliet)
-Date: Wed, 10 Jun 2015 10:29:08 +0200
-Subject: [PATCH v3 2/2] mtd: nand: sunxi: Set serial access mode correctly
-In-Reply-To: <1433924948-19288-1-git-send-email-r.spliet@ultimaker.com>
-References: <1433924948-19288-1-git-send-email-r.spliet@ultimaker.com>
-Message-ID: <1433924948-19288-2-git-send-email-r.spliet@ultimaker.com>
+Date: Wed, 10 Jun 2015 10:29:07 +0200
+Subject: [PATCH v3 1/2] mtd: nand: sunxi: Replace failsafe timing cfg with
+ calculated value
+Message-ID: <1433924948-19288-1-git-send-email-r.spliet@ultimaker.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Replaces the hard coded "always use EDO" policy with that prescribed
-by the ONFI 3.1 specification that EDO mode should always be used if tRC
-is below 30ns.
+Calculates the timing cfg value once when initialising a chip, then sets
+it on chip select. Register definition documented the A83 user manual.
 
 Signed-off-by: Roy Spliet <r.spliet@ultimaker.com>
+
+V2:
+- Fix crippled comments
+
+V3:
+- Warn for invalid timings
+- Style
 ---
- drivers/mtd/nand/sunxi_nand.c | 21 +++++++++++++++------
- 1 file changed, 15 insertions(+), 6 deletions(-)
+ drivers/mtd/nand/sunxi_nand.c | 71 ++++++++++++++++++++++++++++++++++++++++---
+ 1 file changed, 66 insertions(+), 5 deletions(-)
 
 diff --git a/drivers/mtd/nand/sunxi_nand.c b/drivers/mtd/nand/sunxi_nand.c
-index 68090b7..d98e98c 100644
+index 6f93b29..68090b7 100644
 --- a/drivers/mtd/nand/sunxi_nand.c
 +++ b/drivers/mtd/nand/sunxi_nand.c
-@@ -99,6 +99,9 @@
+@@ -99,6 +99,13 @@
  				 NFC_CMD_INT_ENABLE | \
  				 NFC_DMA_INT_ENABLE)
  
-+/* define bit use in NFC_TIMING_CTL */
-+#define NFC_TIMING_CTL_EDO	BIT(8)
++/* define bit use in NFC_TIMING_CFG */
++#define NFC_TIMING_CFG(tWB, tADL, tWHR, tRHW, tCAD)		\
++	((tWB) & 0x3) | (((tADL) & 0x3) << 2) |			\
++	(((tWHR) & 0x3) << 4) | (((tRHW) & 0x3) << 6) |		\
++	(((tCAD) & 0x7) << 8);
 +
- /* define bit use in NFC_TIMING_CFG */
- #define NFC_TIMING_CFG(tWB, tADL, tWHR, tRHW, tCAD)		\
- 	((tWB) & 0x3) | (((tADL) & 0x3) << 2) |			\
-@@ -226,6 +229,7 @@ struct sunxi_nand_chip {
++
+ /* define bit use in NFC_CMD */
+ #define NFC_CMD_LOW_BYTE	GENMASK(7, 0)
+ #define NFC_CMD_HIGH_BYTE	GENMASK(15, 8)
+@@ -208,6 +215,7 @@ struct sunxi_nand_hw_ecc {
+  * @nand:		base NAND chip structure
+  * @mtd:		base MTD structure
+  * @clk_rate:		clk_rate required for this NAND chip
++ * @timing_cfg		TIMING_CFG register value for this NAND chip
+  * @selected:		current active CS
+  * @nsels:		number of CS lines required by the NAND chip
+  * @sels:		array of CS lines descriptions
+@@ -217,6 +225,7 @@ struct sunxi_nand_chip {
+ 	struct nand_chip nand;
  	struct mtd_info mtd;
  	unsigned long clk_rate;
- 	u32 timing_cfg;
-+	int serial_mode_edo;
++	u32 timing_cfg;
  	int selected;
  	int nsels;
  	struct sunxi_nand_chip_sel sels[0];
-@@ -380,7 +384,7 @@ static void sunxi_nfc_select_chip(struct mtd_info *mtd, int chip)
- 	struct sunxi_nand_chip *sunxi_nand = to_sunxi_nand(nand);
- 	struct sunxi_nfc *nfc = to_sunxi_nfc(sunxi_nand->nand.controller);
- 	struct sunxi_nand_chip_sel *sel;
--	u32 ctl;
-+	u32 ctl, timing_ctl;
- 
- 	if (chip > 0 && chip >= sunxi_nand->nsels)
- 		return;
-@@ -412,6 +416,9 @@ static void sunxi_nfc_select_chip(struct mtd_info *mtd, int chip)
+@@ -403,6 +412,7 @@ static void sunxi_nfc_select_chip(struct mtd_info *mtd, int chip)
  		}
  	}
  
-+	timing_ctl = sunxi_nand->serial_mode_edo ? NFC_TIMING_CTL_EDO : 0;
-+
-+	writel(timing_ctl, nfc->regs + NFC_REG_TIMING_CTL);
- 	writel(sunxi_nand->timing_cfg, nfc->regs + NFC_REG_TIMING_CFG);
++	writel(sunxi_nand->timing_cfg, nfc->regs + NFC_REG_TIMING_CFG);
  	writel(ctl, nfc->regs + NFC_REG_CTL);
  
-@@ -937,6 +944,13 @@ static int sunxi_nand_chip_set_timings(struct sunxi_nand_chip *chip,
- 	/* TODO: A83 has some more bits for CDQSS, CS, CLHZ, CCS, WC */
- 	chip->timing_cfg = NFC_TIMING_CFG(tWB, tADL, tWHR, tRHW, tCAD);
+ 	sunxi_nand->selected = chip;
+@@ -807,10 +817,33 @@ static int sunxi_nfc_hw_syndrome_ecc_write_page(struct mtd_info *mtd,
+ 	return 0;
+ }
  
-+	/*
-+	 * ONFI specification 3.1, paragraph 4.15.2 dictates that EDO data
-+	 * output cycle timings shall be used if the host drives tRC less than
-+	 * 30 ns.
-+	 */
-+	chip->serial_mode_edo = (timings->tRC_min < 30000);
++static const s32 tWB_lut[] = {6, 12, 16, 20};
++static const s32 tRHW_lut[] = {4, 8, 12, 20};
 +
++static s32 _sunxi_nand_lookup_timing(const s32 *lut, int lut_size, u32 duration,
++		u32 clk_period)
++{
++	u32 clk_cycles = (duration + clk_period - 1) / clk_period;
++	int i;
++
++	for (i = 0; i < lut_size; i++) {
++		if (clk_cycles <= lut[i])
++			return i;
++	}
++
++	/* Doesn't fit */
++	return -1;
++}
++
++#define sunxi_nand_lookup_timing(l,p,c) \
++			_sunxi_nand_lookup_timing(l, ARRAY_SIZE(l), p, c)
++
+ static int sunxi_nand_chip_set_timings(struct sunxi_nand_chip *chip,
+ 				       const struct nand_sdr_timings *timings)
+ {
++	struct sunxi_nfc *nfc = to_sunxi_nfc(chip->nand.controller);
+ 	u32 min_clk_period = 0;
++	u32 tWB, tADL, tWHR, tRHW, tCAD;
+ 
+ 	/* T1 <=> tCLS */
+ 	if (timings->tCLS_min > min_clk_period)
+@@ -872,6 +905,37 @@ static int sunxi_nand_chip_set_timings(struct sunxi_nand_chip *chip,
+ 	if (timings->tWC_min > (min_clk_period * 2))
+ 		min_clk_period = DIV_ROUND_UP(timings->tWC_min, 2);
+ 
++	/* T16 - T19 + tCAD */
++	tWB  = sunxi_nand_lookup_timing(tWB_lut, timings->tWB_max,
++					min_clk_period);
++	if (tWB == -1) {
++		dev_err(nfc->dev, "unsupported tWB\n");
++		return -EINVAL;
++	}
++
++	tADL = DIV_ROUND_UP(timings->tADL_min, min_clk_period) >> 3;
++	if (tADL > 3) {
++		dev_err(nfc->dev, "unsupported tADL\n");
++		return -EINVAL;
++	}
++
++	tWHR = DIV_ROUND_UP(timings->tWHR_min, min_clk_period) >> 3;
++	if (tWHR > 3) {
++		dev_err(nfc->dev, "unsupported tWHR\n");
++		return -EINVAL;
++	}
++
++	tRHW = sunxi_nand_lookup_timing(tRHW_lut, timings->tRHW_min,
++					min_clk_period);
++	if (tRHW == -1) {
++		dev_err(nfc->dev, "unsupported tRHW\n");
++		return -EINVAL;
++	}
++
++	tCAD = 0x7;
++
++	/* TODO: A83 has some more bits for CDQSS, CS, CLHZ, CCS, WC */
++	chip->timing_cfg = NFC_TIMING_CFG(tWB, tADL, tWHR, tRHW, tCAD);
+ 
  	/* Convert min_clk_period from picoseconds to nanoseconds */
  	min_clk_period = DIV_ROUND_UP(min_clk_period, 1000);
+@@ -884,8 +948,6 @@ static int sunxi_nand_chip_set_timings(struct sunxi_nand_chip *chip,
+ 	 */
+ 	chip->clk_rate = (2 * NSEC_PER_SEC) / min_clk_period;
  
-@@ -1439,11 +1453,6 @@ static int sunxi_nfc_probe(struct platform_device *pdev)
+-	/* TODO: configure T16-T19 */
+-
+ 	return 0;
+ }
  
+@@ -1168,6 +1230,7 @@ static int sunxi_nand_chip_init(struct device *dev, struct sunxi_nfc *nfc,
+ 
+ 	chip->nsels = nsels;
+ 	chip->selected = -1;
++	chip->timing_cfg = 0x7ff;
+ 
+ 	for (i = 0; i < nsels; i++) {
+ 		ret = of_property_read_u32_index(np, "reg", i, &tmp);
+@@ -1377,11 +1440,9 @@ static int sunxi_nfc_probe(struct platform_device *pdev)
  	platform_set_drvdata(pdev, nfc);
  
--	/*
--	 * TODO: replace this magic value with EDO flag
--	 */
--	writel(0x100, nfc->regs + NFC_REG_TIMING_CTL);
--
+ 	/*
+-	 * TODO: replace these magic values with proper flags as soon as we
+-	 * know what they are encoding.
++	 * TODO: replace this magic value with EDO flag
+ 	 */
+ 	writel(0x100, nfc->regs + NFC_REG_TIMING_CTL);
+-	writel(0x7ff, nfc->regs + NFC_REG_TIMING_CFG);
+ 
  	ret = sunxi_nand_chips_init(dev, nfc);
  	if (ret) {
- 		dev_err(dev, "failed to init nand chips\n");
 -- 
 2.4.2
 
