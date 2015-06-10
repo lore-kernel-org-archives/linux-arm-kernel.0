@@ -1,36 +1,51 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Wed, 10 Jun 2015 17:21:00 +0200
-Subject: [PATCH v4] ARM: l2c: add options to overwrite prefetching behavior
-In-Reply-To: <1432941541-18588-1-git-send-email-hauke@hauke-m.de>
-References: <1432941541-18588-1-git-send-email-hauke@hauke-m.de>
-Message-ID: <20150610172100.230c0e71@free-electrons.com>
+From: p.fedin@samsung.com (Pavel Fedin)
+Date: Wed, 10 Jun 2015 18:30:13 +0300
+Subject: IRQFD support with GICv3 ITS (WAS: RE: [PATCH 00/13] arm64: KVM:
+ GICv3 ITS emulation)
+In-Reply-To: <557842A0.9070503@linaro.org>
+References: <042601d0a357$d3cec4d0$7b6c4e70$@samsung.com>
+ <557842A0.9070503@linaro.org>
+Message-ID: <05da01d0a392$58bf5030$0a3df090$@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Hauke Mehrtens,
+ Hi!
 
-On Sat, 30 May 2015 01:19:01 +0200, Hauke Mehrtens wrote:
-> These options make it possible to overwrites the data and instruction
-> prefetching behavior of the arm pl310 cache controller.
-> 
-> Signed-off-by: Hauke Mehrtens <hauke@hauke-m.de>
+> indeed in newly added qemu kvm-all.c kvm_arch_msi_data_to_gsi we could
+> call a new ioctl that translates the data + deviceid? into an LPI and
+> program irqfd with that LPI. This is done once when setting irqfd up.
+> This also means extending irqfd support to lpi injection, gsi being the
+> LPI index if gsi >= 8192. in that case we continue using
+> kvm_gsi_direct_mapping and gsi still is an IRQ index.
 
-This patch would be useful to me. I'll test it tomorrow. Did you submit
-it into the Russell patch tracking system, as Russell suggested to do
-in his reply on your v3 ?
+ This is exactly what i have done in my kernel + qemu. I have added a new KVM capability
+and then in qemu i do this:
+--- cut ---
+    if (kvm_gsi_kernel_mapping()) {
+        struct kvm_msi msi;
 
-Russell said:
+        msi.address_lo = (uint32_t)msg.address;
+        msi.address_hi = msg.address >> 32;
+        msi.data = le32_to_cpu(msg.data);
+        memset(msi.pad, 0, sizeof(msi.pad));
 
-"""
-I don't see anything wrong with it, but as ever, it needs to end up in
-the patch system if it's not going to get buried beneath a huge pile of
-email.
-"""
+        if (dev) {
+            msi.devid = (pci_bus_num(dev->bus) << 8) | dev->devfn;
+            msi.flags = KVM_MSI_VALID_DEVID;
+        } else {
+            msi.devid = 0;
+            msi.flags = 0;
+        }
 
-Thanks,
+        return kvm_vm_ioctl(s, KVM_TRANSLATE_MSI, &msi);
+    }
+--- cut ---
+ KVM_TRANSLATE_MSI returns an LPI number. This seemed to be the simplest and fastest thing
+to do.
+ If someone is interested, i could prepare an RFC patch series for this, which would apply
+on top of Andre's ITS implementation.
 
-Thomas
--- 
-Thomas Petazzoni, CTO, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+Kind regards,
+Pavel Fedin
+Expert Engineer
+Samsung Electronics Research center Russia
