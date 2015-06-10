@@ -1,41 +1,46 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 10 Jun 2015 17:59:04 +0100
-Subject: Moan: usage of __iormb() and __iowmb() outside of asm/io.h
-In-Reply-To: <20150610165323.GE22844@e104818-lin.cambridge.arm.com>
-References: <20150608184701.GA7557@n2100.arm.linux.org.uk>
- <20150610111819.GC22973@arm.com>
- <20150610112433.GM7557@n2100.arm.linux.org.uk>
- <20150610123040.GN7557@n2100.arm.linux.org.uk>
- <20150610165323.GE22844@e104818-lin.cambridge.arm.com>
-Message-ID: <20150610165904.GB6612@arm.com>
+From: khilman@kernel.org (Kevin Hilman)
+Date: Wed, 10 Jun 2015 10:01:10 -0700
+Subject: [PATCH RFC 3/3] PM / Domains: Introduce generic PM domain for cpu
+ domain
+In-Reply-To: <5574121F.2000806@samsung.com> (Krzysztof Kozlowski's message of
+ "Sun, 07 Jun 2015 18:42:55 +0900")
+References: <1433456946-53296-1-git-send-email-lina.iyer@linaro.org>
+ <1433456946-53296-4-git-send-email-lina.iyer@linaro.org>
+ <5574121F.2000806@samsung.com>
+Message-ID: <7hbngnpkfd.fsf@deeprootsystems.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 10, 2015 at 05:53:24PM +0100, Catalin Marinas wrote:
-> On Wed, Jun 10, 2015 at 01:30:40PM +0100, Russell King - ARM Linux wrote:
-> > On Wed, Jun 10, 2015 at 12:24:34PM +0100, Russell King - ARM Linux wrote:
-> > > On Wed, Jun 10, 2015 at 12:18:20PM +0100, Will Deacon wrote:
-> > > > I agree to removing these from view; we already have plenty of barrier
-> > > > macros and we don't want these to proliferate outside of the arch code.
-> > > > 
-> > > > Any chance you could do a similar change for arm64, please (we have the
-> > > > same macros there)?
-> > > 
-> > > Yes - as you're aware, removing them from sight does cause us to decend
-> > > into macro-hell in asm/io.h, but I think that's better than having people
-> > > get their grubby fingers on arch internal stuff they shouldn't be touching.
-> > 
-> > Here's what I'm proposing for ARM.  As I say, it's macro-hell...  It's
-> > also not perfect yet (since the __LINUX_ARM_ARCH__ < 6 case isn't
-> > properly handled yet.)
-> 
-> IMO, it makes the code pretty unreadable, it breaks searching/ctags. It
-> may be easier to just randomly change the number of underscores in front
-> of "io*mb" every few kernel releases (e.g. twice a year), so we identify
-> the users outside asm/io.h.
+Krzysztof Kozlowski <k.kozlowski@samsung.com> writes:
 
-Or generate static line functions from the macros, as Russell suggested
-previously. Then we can #undef the macros at the end of the file (I have
-patches doing this for our cmpxchg implementation).
+> W dniu 05.06.2015 o 07:29, Lina Iyer pisze:
+>> Generally cpus are grouped under a power domain in a SoC. When all cpus
+>> in the domain are in their power off state,
+>
+> What do you exactly mean here by "CPU in power off state"? How does it
+> map to kernel understanding of CPU device (hotplug? cpuidle?)?
+>
+>> the cpu domain can also be
+>> powered off. Genpd provides the framework for defining cpus as devices
+>> that are part of a cpu domain.
+>
+> The problem which is solved looks to me like the same problem which
+> coupled cpuidle tried to solve: a certain deep sleep mode (e.g. power
+> off) can be entered when whole cluster is idle or other CPUs in cluster
+> are powered off completely.
+>
+> It seems a little like duplicating the effort around coupled cpuidle.
 
-Will
+Yes, it duplicates some aspects of coupled idle states, but coupled
+states have their own limitations:
+
+- only handles CPUs, not other devices sharing a power rail (e.g. L2$,
+  GIC, floating point unit, CoreSight, etc. etc.)
+
+- not scaling well past 2 CPUs
+
+- doesn't handle clusters: While this series only addresses CPUs
+  currently, the approach can be extended.  Because genpd handles nested
+  domains, the could be used to model clusters as well.
+
+Kevin
