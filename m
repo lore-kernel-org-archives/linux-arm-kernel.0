@@ -1,53 +1,114 @@
-From: eddie.huang@mediatek.com (Eddie Huang)
-Date: Wed, 10 Jun 2015 16:06:09 +0800
-Subject: [PATCH 2/3] spi: mediatek: Add spi bus for Mediatek MT8173
-In-Reply-To: <20150609103951.GA14071@sirena.org.uk>
-References: <1431075343-7887-1-git-send-email-leilk.liu@mediatek.com>
- <1431075343-7887-3-git-send-email-leilk.liu@mediatek.com>
- <20150508175306.GG2761@sirena.org.uk> <1431434356.2128.9.camel@mhfsdcap03>
- <20150512160540.GB3066@sirena.org.uk> <1431675522.2128.13.camel@mhfsdcap03>
- <20150515092543.GY2761@sirena.org.uk>
- <1433758546.19786.16.camel@mtksdaap41>
- <20150608175927.GO14071@sirena.org.uk>
- <1433844321.16178.6.camel@mtksdaap41>
- <20150609103951.GA14071@sirena.org.uk>
-Message-ID: <1433923569.22080.1.camel@mtksdaap41>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Wed, 10 Jun 2015 10:08:43 +0200
+Subject: [PATCH 00/34] pinctrl: mvebu: numerous fixes, cleanups and
+ improvements
+In-Reply-To: <20150609213615.GA32336@lunn.ch>
+References: <1433868446-11028-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <20150609170153.GC16778@lunn.ch>
+ <20150609212211.625964e2@free-electrons.com>
+ <20150609194705.GE16778@lunn.ch>
+ <20150609223456.0f569869@free-electrons.com>
+ <20150609213615.GA32336@lunn.ch>
+Message-ID: <20150610100843.1153368d@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mark,
+Dear Andrew Lunn,
 
-On Tue, 2015-06-09 at 11:39 +0100, Mark Brown wrote:
-> On Tue, Jun 09, 2015 at 06:05:21PM +0800, Eddie Huang wrote:
-> 
-> > --- a/drivers/spi/spi.c
-> > +++ b/drivers/spi/spi.c
-> > @@ -539,8 +539,8 @@ static int __spi_map_msg(struct spi_master *master,
-> > struct spi_message *msg)
-> >         if (!master->can_dma)
-> >                 return 0;
-> 
-> > -       tx_dev = master->dma_tx->device->dev;
-> > -       rx_dev = master->dma_rx->device->dev;
-> > +       tx_dev = master->dma_tx ? master->dma_tx->device->dev :
-> > master->dev;
-> > +       rx_dev = master->dma_rx ? master->dma_rx->device->dev : master-
-> 
-> > Is this what you want ? Actually, I don't like first one at all.
-> 
-> Not quite what I'd been thinking of - we can't just pick the device in
-> the core safely, the device might be a MFD or have some other
-> restriction that needs us to use a separate struct device.  However most
-> of those cases are likely to point towards implementing a dmaengine
-> device so probably the above will work for most cases and is fine.  Can
-> you send a proper patch please?
+On Tue, 9 Jun 2015 23:36:15 +0200, Andrew Lunn wrote:
 
-Sure, we will send this with new MTK SPI driver, such that can verify
-it.
-
+> > This can only work if the function number is not actually used. For
+> > example, in the very first patch "pinctrl: mvebu: armada-38x: fix PCIe
+> > functions" :
+> > 
+> > -		 MPP_VAR_FUNCTION(4, "pcie1", "rstout",     V_88F6820_PLUS),
+> > +		 MPP_VAR_FUNCTION(4, "ge0",   "txerr",      V_88F6810_PLUS),
+> >
+> > So the function 4 used to be pcie1, which you would like to still be
+> > supported, but it's now actually used for ge0.
 > 
-> Please don't use the ternery operator, though.
-OK, will fix it
+> Isn't 4 a function of the hardware?
 
-Eddie
-Thanks
+I don't understand your question here. Of course '4' is
+hardware-related.
+
+> So this never worked. It is a
+> bug. So the DT file must also have a bug if this actually affects
+> anybody. So i would say, no backwards compatibility is required here.
+
+How is this different from the NAND case you highlighted for patch
+03/34 ? If you have a .dts or .dtsi that does:
+
+	marvell,pins = "mpp12";
+	marvell,function = "pcie1";
+
+then this will now generate an error, because there is no longer a
+"pcie1" function on mpp12. Just like with PATCH 03/34 there is no
+longer a "nf" function on pins mpp9 and mpp10.
+
+> > To be honest, I actually prefer that people updating their kernel and
+> > using an old DT get an error about pin muxing, rather than having the
+> > driver silently ignore and have people never update their Device Tree.
+> 
+> I also think many people will be keeping there DT file in step with
+> the kernel. Both get read from /boot by u-boot, or are appended to the
+> kernel, etc. I doubt there are many Marvell systems which a chunk of
+> FLASH dedicated to holding the DT blob.
+
+Agreed.
+
+> > It's also about long term maintainability. Do we want to keep old crap
+> > around forever in all device drivers?
+> > 
+> > > For spi -> spi0 it seems messier. So i would leave it as spi with a
+> > > comment, and add spi1.
+> > 
+> > I'm fine with that.
+> > 
+> > What about tdm2c -> tdm renaming on Armada 38x, and tdm-1 -> tdm for one
+> > single TDM pin on Armada XP ?
+> 
+> Is there an in-kernel use of TDM? I don't think so. So i would just
+> change them.
+
+No, there is no in-kernel use of TDM in the mainline kernel.
+
+> For true bugs, i say no, we fix it. Renames for which there is no
+> in-kernel user, just do it. But where there are in-kernel users, which
+> are not Marvell development boards, we should at least see if there is
+> a simple and not too ugly way to keep backwards compatibility, and
+> issue a strong warning it is time to upgrade.
+
+So, what do you propose to do precisely? Here are the patches that are
+removing/changing the main name of certain MPP functions:
+
+ * [PATCH 01/34] pinctrl: mvebu: armada-38x: fix PCIe functions
+ * [PATCH 02/34] pinctrl: mvebu: armada-370: fix spi0 pin description
+ * [PATCH 03/34] pinctrl: mvebu: armada-375: remove non-existing NAND
+   re/we pins
+ * [PATCH 04/34] pinctrl: mvebu: armada-xp: remove non-existing NAND
+   pins
+ * [PATCH 05/34] pinctrl: mvebu: armada-xp: remove non-existing VDD
+   cpu_pd functions
+ * [PATCH 06/34] pinctrl: mvebu: armada-xp: fix functions of MPP48
+ * [PATCH 07/34] pinctrl: mvebu: armada-375: remove incorrect space in
+   pin description
+ * [PATCH 11/34] pinctrl: mvebu: armada-{38x,39x,xp}: normalize naming
+   of DRAM functions
+ * [PATCH 13/34] pinctrl: mvebu: armada-39x: normalize SDIO pin naming
+ * [PATCH 15/34] pinctrl: mvebu: armada-39x: align NAND pin naming
+ * [PATCH 16/34] pinctrl: mvebu: armada-{370,375,38x,39x,xp}: normalize
+   TDM pins
+ * [PATCH 21/34] pinctrl: mvebu: armada-370: align VDD cpu-pd pin
+   naming with datasheet
+ * [PATCH 23/34] pinctrl: mvebu: armada-xp: rename spi to spi0
+
+What do we do for each of them?
+
+Thanks,
+
+Thomas
+-- 
+Thomas Petazzoni, CTO, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
