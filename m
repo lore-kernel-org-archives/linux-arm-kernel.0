@@ -1,106 +1,97 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Wed, 10 Jun 2015 09:19:34 +0800
-Subject: [linux-sunxi] [PATCH 2/8] mfd: axp20x: Add a cell for the usb
- power_supply part of the axp20x PMICs
-In-Reply-To: <1433885881-19809-3-git-send-email-hdegoede@redhat.com>
-References: <1433885881-19809-1-git-send-email-hdegoede@redhat.com>
- <1433885881-19809-3-git-send-email-hdegoede@redhat.com>
-Message-ID: <CAGb2v652W+i6L1k5-CnHtXZXdJjFswkcyFGromhWSYaXtitW_w@mail.gmail.com>
+From: mturquette@linaro.org (Michael Turquette)
+Date: Tue, 09 Jun 2015 19:13:15 -0700
+Subject: [PATCH v4 3/5] clk: add lpc18xx ccu clk driver
+In-Reply-To: <1432845107-12458-4-git-send-email-manabian@gmail.com>
+References: <1432845107-12458-1-git-send-email-manabian@gmail.com>
+ <1432845107-12458-4-git-send-email-manabian@gmail.com>
+Message-ID: <20150610021315.6017.58085@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 10, 2015 at 5:37 AM, Hans de Goede <hdegoede@redhat.com> wrote:
-> Add a cell for the usb power_supply part of the axp20x PMICs.
->
-> Note that this cell is only for the usb power_supply part and not the
-> ac-power / battery-charger / rtc-backup-bat-charger bits.
->
-> Depending on the board each of those must be enabled / disabled separately
-> in devicetree as most boards do not use all 4. So in dt each one needs its
-> own child-node of the axp20x node. Another reason for using separate child
-> nodes for each is so that other devicetree nodes can have a power-supply
-> property with a phandle referencing a node representing a single
-> power-supply.
->
-> The decision to use a separate devicetree node for each is reflected on
-> the kernel side by each getting its own mfd-cell / platform_device and
-> platform-driver.
->
-> Cc: Bruno Pr?mont <bonbons@linux-vserver.org>
-> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
-> ---
->  drivers/mfd/axp20x.c | 32 +++++++++++++++++++++++++++++++-
->  1 file changed, 31 insertions(+), 1 deletion(-)
->
-> diff --git a/drivers/mfd/axp20x.c b/drivers/mfd/axp20x.c
-> index 6ffbc11..47ce233 100644
-> --- a/drivers/mfd/axp20x.c
-> +++ b/drivers/mfd/axp20x.c
-> @@ -113,6 +113,30 @@ static struct resource axp20x_pek_resources[] = {
->         },
->  };
->
-> +static struct resource axp20x_usb_power_supply_resources[] = {
-> +       {
-> +               .name   = "VBUS_PLUGIN",
-> +               .start  = AXP20X_IRQ_VBUS_PLUGIN,
-> +               .end    = AXP20X_IRQ_VBUS_PLUGIN,
-> +               .flags  = IORESOURCE_IRQ,
-> +       }, {
-> +               .name   = "VBUS_REMOVAL",
-> +               .start  = AXP20X_IRQ_VBUS_REMOVAL,
-> +               .end    = AXP20X_IRQ_VBUS_REMOVAL,
-> +               .flags  = IORESOURCE_IRQ,
-> +       }, {
-> +               .name   = "VBUS_VALID",
-> +               .start  = AXP20X_IRQ_VBUS_VALID,
-> +               .end    = AXP20X_IRQ_VBUS_VALID,
-> +               .flags  = IORESOURCE_IRQ,
-> +       }, {
-> +               .name   = "VBUS_NOT_VALID",
-> +               .start  = AXP20X_IRQ_VBUS_NOT_VALID,
-> +               .end    = AXP20X_IRQ_VBUS_NOT_VALID,
-> +               .flags  = IORESOURCE_IRQ,
-> +       },
-> +};
+Quoting Joachim Eastwood (2015-05-28 13:31:45)
+> +static struct lpc18xx_clk_branch clk_branches[] = {
+> +       {"base_apb3_clk", "apb3_bus",           CLK_APB3_BUS,           CCU_BRANCH_IS_BUS},
+> +       {"base_apb3_clk", "apb3_i2c1",          CLK_APB3_I2C1,          0},
+> +       {"base_apb3_clk", "apb3_dac",           CLK_APB3_DAC,           0},
+> +       {"base_apb3_clk", "apb3_adc0",          CLK_APB3_ADC0,          0},
+> +       {"base_apb3_clk", "apb3_adc1",          CLK_APB3_ADC1,          0},
+> +       {"base_apb3_clk", "apb3_can0",          CLK_APB3_CAN0,          0},
 > +
->  static struct resource axp22x_pek_resources[] = {
->         {
->                 .name   = "PEK_DBR",
-> @@ -165,7 +189,7 @@ static const struct regmap_config axp20x_regmap_config = {
->         .val_bits       = 8,
->         .wr_table       = &axp20x_writeable_table,
->         .volatile_table = &axp20x_volatile_table,
-> -       .max_register   = AXP20X_FG_RES,
-> +       .max_register   = AXP20X_OCV(15),
->         .cache_type     = REGCACHE_RBTREE,
->  };
->
-> @@ -368,6 +392,12 @@ static struct mfd_cell axp20x_cells[] = {
->                 .resources              = axp20x_pek_resources,
->         }, {
->                 .name                   = "axp20x-regulator",
-> +       }, {
-> +               .name                   = "axp20x-usb-power-supply",
+> +       {"base_apb1_clk", "apb1_bus",           CLK_APB1_BUS,           CCU_BRANCH_IS_BUS},
+> +       {"base_apb1_clk", "apb1_mc_pwm",        CLK_APB1_MOTOCON_PWM,   0},
+> +       {"base_apb1_clk", "apb1_i2c0",          CLK_APB1_I2C0,          0},
+> +       {"base_apb1_clk", "apb1_i2s",           CLK_APB1_I2S,           0},
+> +       {"base_apb1_clk", "apb1_can1",          CLK_APB1_CAN1,          0},
+> +
+> +       {"base_spifi_clk", "spifi",             CLK_SPIFI,              0},
+> +
+> +       {"base_cpu_clk", "cpu_bus",             CLK_CPU_BUS,            CCU_BRANCH_IS_BUS},
+> +       {"base_cpu_clk", "cpu_spifi",           CLK_CPU_SPIFI,          0},
+> +       {"base_cpu_clk", "cpu_gpio",            CLK_CPU_GPIO,           0},
+> +       {"base_cpu_clk", "cpu_lcd",             CLK_CPU_LCD,            0},
+> +       {"base_cpu_clk", "cpu_ethernet",        CLK_CPU_ETHERNET,       0},
+> +       {"base_cpu_clk", "cpu_usb0",            CLK_CPU_USB0,           0},
+> +       {"base_cpu_clk", "cpu_emc",             CLK_CPU_EMC,            0},
+> +       {"base_cpu_clk", "cpu_sdio",            CLK_CPU_SDIO,           0},
+> +       {"base_cpu_clk", "cpu_dma",             CLK_CPU_DMA,            0},
+> +       {"base_cpu_clk", "cpu_core",            CLK_CPU_CORE,           0},
+> +       {"base_cpu_clk", "cpu_sct",             CLK_CPU_SCT,            0},
+> +       {"base_cpu_clk", "cpu_usb1",            CLK_CPU_USB1,           0},
+> +       {"base_cpu_clk", "cpu_emcdiv",          CLK_CPU_EMCDIV,         CCU_BRANCH_HAVE_DIV2},
+> +       {"base_cpu_clk", "cpu_flasha",          CLK_CPU_FLASHA,         CCU_BRANCH_HAVE_DIV2},
+> +       {"base_cpu_clk", "cpu_flashb",          CLK_CPU_FLASHB,         CCU_BRANCH_HAVE_DIV2},
+> +       {"base_cpu_clk", "cpu_m0app",           CLK_CPU_M0APP,          CCU_BRANCH_HAVE_DIV2},
+> +       {"base_cpu_clk", "cpu_adchs",           CLK_CPU_ADCHS,          CCU_BRANCH_HAVE_DIV2},
+> +       {"base_cpu_clk", "cpu_eeprom",          CLK_CPU_EEPROM,         CCU_BRANCH_HAVE_DIV2},
+> +       {"base_cpu_clk", "cpu_wwdt",            CLK_CPU_WWDT,           0},
+> +       {"base_cpu_clk", "cpu_uart0",           CLK_CPU_UART0,          0},
+> +       {"base_cpu_clk", "cpu_uart1",           CLK_CPU_UART1,          0},
+> +       {"base_cpu_clk", "cpu_ssp0",            CLK_CPU_SSP0,           0},
+> +       {"base_cpu_clk", "cpu_timer0",          CLK_CPU_TIMER0,         0},
+> +       {"base_cpu_clk", "cpu_timer1",          CLK_CPU_TIMER1,         0},
+> +       {"base_cpu_clk", "cpu_scu",             CLK_CPU_SCU,            0},
+> +       {"base_cpu_clk", "cpu_creg",            CLK_CPU_CREG,           0},
+> +       {"base_cpu_clk", "cpu_ritimer",         CLK_CPU_RITIMER,        0},
+> +       {"base_cpu_clk", "cpu_uart2",           CLK_CPU_UART2,          0},
+> +       {"base_cpu_clk", "cpu_uart3",           CLK_CPU_UART3,          0},
+> +       {"base_cpu_clk", "cpu_timer2",          CLK_CPU_TIMER2,         0},
+> +       {"base_cpu_clk", "cpu_timer3",          CLK_CPU_TIMER3,         0},
+> +       {"base_cpu_clk", "cpu_ssp1",            CLK_CPU_SSP1,           0},
+> +       {"base_cpu_clk", "cpu_qei",             CLK_CPU_QEI,            0},
+> +
+> +       {"base_periph_clk", "periph_bus",       CLK_PERIPH_BUS,         CCU_BRANCH_IS_BUS},
+> +       {"base_periph_clk", "periph_core",      CLK_PERIPH_CORE,        0},
+> +       {"base_periph_clk", "periph_sgpio",     CLK_PERIPH_SGPIO,       0},
+> +
+> +       {"base_usb0_clk",  "usb0",              CLK_USB0,               0},
+> +       {"base_usb1_clk",  "usb1",              CLK_USB1,               0},
+> +       {"base_spi_clk",   "spi",               CLK_SPI,                0},
+> +       {"base_adchs_clk", "adchs",             CLK_ADCHS,              0},
+> +
+> +       {"base_audio_clk", "audio",             CLK_AUDIO,              0},
+> +       {"base_uart3_clk", "apb2_uart3",        CLK_APB2_UART3,         0},
+> +       {"base_uart2_clk", "apb2_uart2",        CLK_APB2_UART2,         0},
+> +       {"base_uart1_clk", "apb0_uart1",        CLK_APB0_UART1,         0},
+> +       {"base_uart0_clk", "apb0_uart0",        CLK_APB0_UART0,         0},
+> +       {"base_ssp1_clk",  "apb2_ssp1",         CLK_APB2_SSP1,          0},
+> +       {"base_ssp0_clk",  "apb0_ssp0",         CLK_APB0_SSP0,          0},
+> +       {"base_sdio_clk",  "sdio",              CLK_SDIO,               0},
+> +};
 
-Could we use either "vbus-power-supply" to match the AXP datasheets,
-or "otg-power-supply" which is slightly more obvious to board owners?
+Hi Joachim,
 
-Thanks
+If it were me, I would have broken this up into two tables, one for each
+CCU. In general I would structure the code to reflect the fact that two
+different IP blocks are being accessed. This isn't a deal breaker but I
+thought I would mention it in case you want to make the change.
 
-ChenYu
+Otherwise this series looks good to me. Let me know if you plan a V5
+submission.
 
-> +               .of_compatible          = "x-powers,axp202-usb-power-supply",
-> +               .num_resources          =
-> +                               ARRAY_SIZE(axp20x_usb_power_supply_resources),
-> +               .resources              = axp20x_usb_power_supply_resources,
->         },
->  };
->
-> --
-> 2.3.6
->
-> --
-> You received this message because you are subscribed to the Google Groups "linux-sunxi" group.
-> To unsubscribe from this group and stop receiving emails from it, send an email to linux-sunxi+unsubscribe at googlegroups.com.
-> For more options, visit https://groups.google.com/d/optout.
+I can take patches #1-4 into the clk tree. Please add my Acked-by to
+patch #5. I will create an immutable branch to share with the arm-soc
+tree so that they can take #5 and have access to the dt-bindings
+headers.
+
+Regards,
+Mike
