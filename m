@@ -1,49 +1,66 @@
-From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
-Date: Wed, 10 Jun 2015 10:49:55 -0700
-Subject: [PATCH v9 4/5] serial: stm32-usart: Add STM32 USART Driver
-In-Reply-To: <CALszF6AaS-i2MBF64mJKtY2h5Sb710Z50Mf8wHotUBysukfZbw@mail.gmail.com>
-References: <1432328616-16964-1-git-send-email-mcoquelin.stm32@gmail.com>
- <1432328616-16964-5-git-send-email-mcoquelin.stm32@gmail.com>
- <20150531215246.GA24174@kroah.com>
- <CALszF6B7_xOMvO9pRJJPNeR4JnOgAQAohSARDivzt2d1DQWP_Q@mail.gmail.com>
- <20150610154240.GC22214@kroah.com>
- <CALszF6AaS-i2MBF64mJKtY2h5Sb710Z50Mf8wHotUBysukfZbw@mail.gmail.com>
-Message-ID: <20150610174955.GA6527@kroah.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Wed, 10 Jun 2015 19:04:16 +0100
+Subject: [PATCH 03/10] KVM: arm/arm64: vgic: Convert struct vgic_lr to
+ use bitfields
+In-Reply-To: <557872A3.8070302@arm.com>
+References: <1433783045-8002-1-git-send-email-marc.zyngier@arm.com>
+ <1433783045-8002-4-git-send-email-marc.zyngier@arm.com>
+ <557872A3.8070302@arm.com>
+Message-ID: <55787C20.9070404@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 10, 2015 at 06:18:37PM +0200, Maxime Coquelin wrote:
-> 2015-06-10 17:42 GMT+02:00 Greg Kroah-Hartman <gregkh@linuxfoundation.org>:
-> > On Wed, Jun 10, 2015 at 01:33:22PM +0200, Maxime Coquelin wrote:
-> >> 2015-05-31 23:52 GMT+02:00 Greg Kroah-Hartman <gregkh@linuxfoundation.org>:
-> >> > On Fri, May 22, 2015 at 11:03:35PM +0200, Maxime Coquelin wrote:
-> >> >> This drivers adds support to the STM32 USART controller, which is a
-> >> >> standard serial driver.
-> >> >>
-> >> >> Tested-by: Chanwoo Choi <cw00.choi@samsung.com>
-> >> >> Reviewed-by: Peter Hurley <peter@hurleysoftware.com>
-> >> >> Reviewed-by: Vladimir Zapolskiy <vladimir_zapolskiy@mentor.com>
-> >> >> Reviewed-by: Andy Shevchenko <andy.shevchenko@gmail.com>
-> >> >> Signed-off-by: Maxime Coquelin <mcoquelin.stm32@gmail.com>
-> >> >
-> >> > Acked-by: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-> >>
-> >> Thanks Greg.
-> >>
-> >> Will you apply it to your tty tree for v4.2? Or it should go in
-> >> someone else tree?
-> >
-> > It's not in my queue, I'm guessing it goes in through some other tree as
-> > there are build dependancies here preventing me from taking it.
+On 10/06/15 18:23, Andre Przywara wrote:
+> Hi Marc,
 > 
-> There should not be any build dependencies.
-> I just tested it on my x86 machine with COMPILE_TEST on both v4.1-rc1
-> and tty-next branch.
-> In both case it compiles without warnings.
+> On 06/08/2015 06:03 PM, Marc Zyngier wrote:
+>> As we're about to cram more information in the vgic_lr structure
+>> (HW interrupt number and additional state information), we switch
+>> to a layout similar to the HW's:
+>>
+>> - use bitfields to save space (we don't need more than 10 bits
+>>   to represent the irq numbers)
+> 
+> But that will not be true for LPIs later, right? Before that I was lucky
+> with the irq field being 16 bits wide ;-)
+> So can we increase that to be at least 14 bits (8192 LPI offset + 8192
+> LPIs) here? The structure would still fit in 32 bits, then.
 
-Ok, then feel free to resend it as a stand-alone patch please and I will
-queue it up.
+Yes, that's true. An oversight on my part.
 
-thanks,
+> I guess guests should get away with only supporting 8K of LPIs, but if
+> we map hardware LPIs to guest IRQs I guess we may exceed 14 bits here.
+> Not sure if we could extend this further for ARM64 only, as we have more
+> room there and also need it only here.
 
-greg k-h
+Mapping LPIs to IRQs is not a problem, as LPIs don't have an active
+state, so you never have to deactivate it, and you never put them in an
+LR. Problem solved! ;-)
+
+Alternative layout proposal for the ITS emulation case:
+
+#define LR_IS_LPI	(1 << 4)
+
+struct vgic_lr {
+	union {
+		unsigned lpi:24;
+		unsigned spi:10;
+		union {
+			unsigned hwirq:10;
+			unsigned source:8;
+		};
+	};
+	unsigned state:5;
+};
+
+That gives you even more space than you had before.
+
+Now, this is absolutely disgusting, of course. This whole intermediate
+structure crap is completely getting out of control, and we should get
+rid of it before we merge the ITS.
+
+/me goes looking for a chainsaw...
+
+	M.
+-- 
+Jazz is not dead. It just smells funny...
