@@ -1,29 +1,26 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Wed, 10 Jun 2015 14:27:24 +0900
-Subject: [PATCHv2] ARM: exynos_defconfig: Enable CONFIG_SND_SOC_ODROIDX2
- for Odroid-XU3
-In-Reply-To: <1433822879-3908-1-git-send-email-linux.amoon@gmail.com>
-References: <1433822879-3908-1-git-send-email-linux.amoon@gmail.com>
-Message-ID: <5577CABC.9000609@samsung.com>
+From: herbert@gondor.apana.org.au (Herbert Xu)
+Date: Wed, 10 Jun 2015 13:38:04 +0800
+Subject: [PATCH 2/2] scatterlist: cleanup sg_chain() and sg_unmark_end()
+In-Reply-To: <20150609162715.21910.77696.stgit@dwillia2-desk3.amr.corp.intel.com>
+References: <20150609162659.21910.41681.stgit@dwillia2-desk3.amr.corp.intel.com>
+ <20150609162715.21910.77696.stgit@dwillia2-desk3.amr.corp.intel.com>
+Message-ID: <20150610053803.GA1693@gondor.apana.org.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09.06.2015 13:07, Anand Moon wrote:
-> Enable CONFIG_SND_SOC_ODROIDX2 and CONFIG_SND_SIMPLE_CARD to enable
-> sound on Odroid-XU3 board using the max98090 audio codec.
-> 
-> Signed-off-by: Anand Moon <linux.amoon@gmail.com>
-> Reviewed-by: Lukasz Majewski <l.majewski@samsung.com>
-> ---
-> Changes v2: Fixed the commit log.
-> 
-> Signed-off-by: Anand Moon <linux.amoon@gmail.com>
+On Tue, Jun 09, 2015 at 12:27:15PM -0400, Dan Williams wrote:
+>
+> +#define scatterwalk_sg_chain(prv, num, sgl)	sg_chain(prv, num, sgl)
+> +#define scatterwalk_sg_next(sgl)		sg_next(sgl)
 
-Thanks, applied.
+Why are you reintroducing the scatterwalk_sg_next macro that we
+just removed?
 
-I'll send later to Kukjin for 4.3.
-Unless he picks it also, in that case:
-Acked-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+I also don't understand why this is so urgent that it has to go
+into mainline at this late date.
 
-Best regards,
-Krzysztof
+Cheers,
+-- 
+Email: Herbert Xu <herbert@gondor.apana.org.au>
+Home Page: http://gondor.apana.org.au/~herbert/
+PGP Key: http://gondor.apana.org.au/~herbert/pubkey.txt
