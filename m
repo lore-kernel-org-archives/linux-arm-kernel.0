@@ -1,380 +1,169 @@
-From: koro.chen@mediatek.com (Koro Chen)
-Date: Wed, 10 Jun 2015 22:24:36 +0800
-Subject: [PATCH 3/3] ASoC: mediatek: Add machine driver for rt5650 rt5676 codec
-In-Reply-To: <1433946276-25969-1-git-send-email-koro.chen@mediatek.com>
-References: <1433946276-25969-1-git-send-email-koro.chen@mediatek.com>
-Message-ID: <1433946276-25969-4-git-send-email-koro.chen@mediatek.com>
+From: javier.martinez@collabora.co.uk (Javier Martinez Canillas)
+Date: Wed, 10 Jun 2015 16:28:18 +0200
+Subject: [PATCH 1/1] irqchip: exynos-combiner: Save IRQ enable set on
+ suspend
+In-Reply-To: <CAKocOONxcWMoqtLKpLpDxf=kv8esdPBOdkJqT-sT=bsSQCNBjg@mail.gmail.com>
+References: <1433941831-16637-1-git-send-email-javier.martinez@collabora.co.uk>
+ <CAKocOONxcWMoqtLKpLpDxf=kv8esdPBOdkJqT-sT=bsSQCNBjg@mail.gmail.com>
+Message-ID: <55784982.80303@collabora.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This is the DPCM based machine driver with rt5650 and rt5676
+Hello Shuah,
 
-Signed-off-by: Koro Chen <koro.chen@mediatek.com>
-Signed-off-by: Nicolas Boichat <drinkcat@chromium.org>
----
- .../bindings/sound/mt8173-rt5650-rt5676.txt        |  15 ++
- sound/soc/mediatek/Kconfig                         |  12 +
- sound/soc/mediatek/Makefile                        |   1 +
- sound/soc/mediatek/mt8173-rt5650-rt5676.c          | 300 +++++++++++++++++++++
- 4 files changed, 328 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/sound/mt8173-rt5650-rt5676.txt
- create mode 100644 sound/soc/mediatek/mt8173-rt5650-rt5676.c
+Thanks a lot for your feedback.
 
-diff --git a/Documentation/devicetree/bindings/sound/mt8173-rt5650-rt5676.txt b/Documentation/devicetree/bindings/sound/mt8173-rt5650-rt5676.txt
-new file mode 100644
-index 0000000..5fbdf39
---- /dev/null
-+++ b/Documentation/devicetree/bindings/sound/mt8173-rt5650-rt5676.txt
-@@ -0,0 +1,15 @@
-+MT8173 with RT5650 RT5676 CODECS
-+
-+Required properties:
-+- compatible : "mediatek,mt8173-rt5650-rt5676"
-+- mediatek,audio-codec: the phandles of rt5650 and rt5676 codecs
-+- avdd-supply : the phandle of regulator to supply 1.8V
-+
-+Example:
-+
-+	sound {
-+		compatible = "mediatek,mt8173-rt5650-rt5676";
-+		mediatek,audio-codec = <&rt5650 &rt5676>;
-+		avdd-supply = <&mt6397_vgp1_reg>;
-+	};
-+
-diff --git a/sound/soc/mediatek/Kconfig b/sound/soc/mediatek/Kconfig
-index 6fb337e..6f03e26 100644
---- a/sound/soc/mediatek/Kconfig
-+++ b/sound/soc/mediatek/Kconfig
-@@ -18,3 +18,15 @@ config SND_SOC_MT8173_MAX98090
- 	  Select Y if you have such device.
- 	  If unsure select "N".
+On 06/10/2015 03:30 PM, Shuah Khan wrote:
+> On Wed, Jun 10, 2015 at 7:10 AM, Javier Martinez Canillas
+> <javier.martinez@collabora.co.uk> wrote:
+>> The Exynos interrupt combiner IP looses its state when the SoC enters
+>> into a low power state during a Suspend-to-RAM. This means that if a
+>> IRQ is used as a source, the interrupts for the devices are disabled
+>> when the system is resumed from a sleep state so are not triggered.
+>>
+>> Save the interrupt enable set register for each combiner group and
+>> restore it after resume to make sure that the interrupts are enabled.
+>>
+>> Signed-off-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
+>> ---
+>>
+>> Hello,
+>>
+>> I noticed this issue because after a S2R, IRQs for some devices didn't
+>> trigger anymore but others continued working and all of them had lines
+>> from a GPIO chip as their interrupt source.
+>>
+>> The only difference was that the GPIO pins that were not working after
+>> a resume, were the ones that had the interrupt combiner as interrupt
+>> parent.
+>>
+>> With this patch now all perhiperals are working correctly after a resume.
+>> Tested on an Exynos5250 Snow, Exynos5420 Peach Pit and Exynos5800 Peach Pi
+>> Chromebooks.
+>>
+>> Best regards,
+>> Javier
+>>
+>>  drivers/irqchip/exynos-combiner.c | 61 +++++++++++++++++++++++++++++++++++----
+>>  1 file changed, 56 insertions(+), 5 deletions(-)
+>>
+>> diff --git a/drivers/irqchip/exynos-combiner.c b/drivers/irqchip/exynos-combiner.c
+>> index 5945223b73fa..69c710641bfa 100644
+>> --- a/drivers/irqchip/exynos-combiner.c
+>> +++ b/drivers/irqchip/exynos-combiner.c
+>> @@ -13,6 +13,7 @@
+>>  #include <linux/init.h>
+>>  #include <linux/io.h>
+>>  #include <linux/slab.h>
+>> +#include <linux/syscore_ops.h>
+>>  #include <linux/irqdomain.h>
+>>  #include <linux/irqchip/chained_irq.h>
+>>  #include <linux/interrupt.h>
+>> @@ -34,9 +35,14 @@ struct combiner_chip_data {
+>>         unsigned int irq_mask;
+>>         void __iomem *base;
+>>         unsigned int parent_irq;
+>> +#ifdef CONFIG_PM
+>> +       u32 pm_save;
+>> +#endif
+>>  };
+>>
+>> +static struct combiner_chip_data *combiner_data;
+>>  static struct irq_domain *combiner_irq_domain;
+>> +static unsigned int max_nr = 20;
+>>
+>>  static inline void __iomem *combiner_base(struct irq_data *data)
+>>  {
+>> @@ -170,12 +176,10 @@ static struct irq_domain_ops combiner_irq_domain_ops = {
+>>  };
+>>
+>>  static void __init combiner_init(void __iomem *combiner_base,
+>> -                                struct device_node *np,
+>> -                                unsigned int max_nr)
+>> +                                struct device_node *np)
+>>  {
+>>         int i, irq;
+>>         unsigned int nr_irq;
+>> -       struct combiner_chip_data *combiner_data;
+>>
+>>         nr_irq = max_nr * IRQ_IN_COMBINER;
+>>
+>> @@ -201,11 +205,56 @@ static void __init combiner_init(void __iomem *combiner_base,
+>>         }
+>>  }
+>>
+>> +#ifdef CONFIG_PM
+>> +
+>> +/**
+>> + * combiner_suspend - save interrupt combiner state before suspend
+>> + *
+>> + * Save the interrupt enable set register for all combiner groups since
+>> + * the state is lost when the system enters into a sleep state.
+>> + *
+>> + */
+>> +static int combiner_suspend(void)
+>> +{
+>> +       int i;
+>> +
+>> +       for (i = 0; i < max_nr; i++)
+>> +               combiner_data[i].pm_save =
+>> +                       __raw_readl(combiner_data[i].base + COMBINER_ENABLE_SET);
+>> +
+>> +       return 0;
+>> +}
+>> +
+>> +/**
+>> + * combiner_resume - restore interrupt combiner state after resume
+>> + *
+>> + * Restore the interrupt enable set register for all combiner groups since
+>> + * the state is lost when the system enters into a sleep state on suspend.
+>> + *
+>> + */
+>> +static void combiner_resume(void)
+>> +{
+>> +       int i;
+>> +
+>> +       for (i = 0; i < max_nr; i++)
+>> +               __raw_writel(combiner_data[i].pm_save,
+>> +                            combiner_data[i].base + COMBINER_ENABLE_SET);
+>> +}
+>> +
+>> +#else
+>> +#define combiner_suspend       NULL
+>> +#define combiner_resume                NULL
+>> +#endif
+>> +
+>> +static struct syscore_ops combiner_syscore_ops = {
+>> +       .suspend        = combiner_suspend,
+>> +       .resume         = combiner_resume,
+>> +};
+>> +
+> 
+> Should this be static const  struct syscore_ops?
+>
+
+That would cause a compile warning since register_syscore_ops() expects a
+struct syscore_ops * as its argument and not a const struct syscore_ops *
  
-+config SND_SOC_MT8173_RT5650_RT5676
-+	bool "ASoC Audio driver for MT8173 with RT5650 RT5676 codecs"
-+	depends on ARCH_MEDIATEK
-+	select SND_SOC_MEDIATEK
-+	select SND_SOC_RT5645
-+	select SND_SOC_RT5677
-+	help
-+	  This adds ASoC driver for Mediatek MT8173 boards
-+	  with the RT5650 and RT5676 codecs.
-+	  Select Y if you have such device.
-+	  If unsure select "N".
-+
-diff --git a/sound/soc/mediatek/Makefile b/sound/soc/mediatek/Makefile
-index 08fa765..75effbe 100644
---- a/sound/soc/mediatek/Makefile
-+++ b/sound/soc/mediatek/Makefile
-@@ -2,3 +2,4 @@
- obj-$(CONFIG_SND_SOC_MEDIATEK) += mtk-afe-pcm.o
- # Machine support
- obj-$(CONFIG_SND_SOC_MT8173_MAX98090) += mt8173-max98090.o
-+obj-$(CONFIG_SND_SOC_MT8173_RT5650_RT5676) += mt8173-rt5650-rt5676.o
-diff --git a/sound/soc/mediatek/mt8173-rt5650-rt5676.c b/sound/soc/mediatek/mt8173-rt5650-rt5676.c
-new file mode 100644
-index 0000000..ceff158
---- /dev/null
-+++ b/sound/soc/mediatek/mt8173-rt5650-rt5676.c
-@@ -0,0 +1,300 @@
-+/*
-+ * mt8173-rt5650-rt5676.c  --  MT8173 machine driver with RT5650/5676 codecs
-+ *
-+ * Copyright (c) 2015 MediaTek Inc.
-+ * Author: Koro Chen <koro.chen@mediatek.com>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 and
-+ * only version 2 as published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ */
-+
-+#include <linux/module.h>
-+#include <linux/gpio.h>
-+#include <linux/of_gpio.h>
-+#include <linux/regulator/consumer.h>
-+#include <sound/soc.h>
-+#include <sound/jack.h>
-+#include "../codecs/rt5645.h"
-+#include "../codecs/rt5677.h"
-+
-+#define MCLK_FOR_CODECS		12288000
-+
-+static const struct snd_soc_dapm_widget mt8173_rt5650_rt5676_widgets[] = {
-+	SND_SOC_DAPM_SPK("Speaker", NULL),
-+	SND_SOC_DAPM_MIC("Int Mic", NULL),
-+	SND_SOC_DAPM_HP("Headphone", NULL),
-+	SND_SOC_DAPM_MIC("Headset Mic", NULL),
-+};
-+
-+static const struct snd_soc_dapm_route mt8173_rt5650_rt5676_routes[] = {
-+	{"Speaker", NULL, "SPOL"},
-+	{"Speaker", NULL, "SPOR"},
-+	{"Speaker", NULL, "Sub AIF2TX"}, /* IF2 ADC to 5650  */
-+	{"Sub DMIC L1", NULL, "Int Mic"}, /* DMIC from 5676 */
-+	{"Sub DMIC R1", NULL, "Int Mic"},
-+	{"Headphone", NULL, "HPOL"},
-+	{"Headphone", NULL, "HPOR"},
-+	{"Headphone", NULL, "Sub AIF2TX"}, /* IF2 ADC to 5650  */
-+	{"Headset Mic", NULL, "micbias1"},
-+	{"Headset Mic", NULL, "micbias2"},
-+	{"IN1P", NULL, "Headset Mic"},
-+	{"IN1N", NULL, "Headset Mic"},
-+	{"Sub AIF2RX", NULL, "Headset Mic"}, /* IF2 DAC from 5650  */
-+};
-+
-+static const struct snd_kcontrol_new mt8173_rt5650_rt5676_controls[] = {
-+	SOC_DAPM_PIN_SWITCH("Speaker"),
-+	SOC_DAPM_PIN_SWITCH("Int Mic"),
-+	SOC_DAPM_PIN_SWITCH("Headphone"),
-+	SOC_DAPM_PIN_SWITCH("Headset Mic"),
-+};
-+
-+static int mt8173_rt5650_rt5676_hw_params(struct snd_pcm_substream *substream,
-+					  struct snd_pcm_hw_params *params)
-+{
-+	struct snd_soc_pcm_runtime *rtd = substream->private_data;
-+	int i, ret;
-+
-+	for (i = 0; i < rtd->num_codecs; i++) {
-+		struct snd_soc_dai *codec_dai = rtd->codec_dais[i];
-+
-+		/* pll from mclk 12.288M */
-+		ret = snd_soc_dai_set_pll(codec_dai, 0, 0, MCLK_FOR_CODECS,
-+					  params_rate(params) * 512);
-+		if (ret)
-+			return ret;
-+
-+		/* sysclk from pll */
-+		ret = snd_soc_dai_set_sysclk(codec_dai, 1,
-+					     params_rate(params) * 512,
-+					     SND_SOC_CLOCK_IN);
-+		if (ret)
-+			return ret;
-+	}
-+	return 0;
-+}
-+
-+static struct snd_soc_ops mt8173_rt5650_rt5676_ops = {
-+	.hw_params = mt8173_rt5650_rt5676_hw_params,
-+};
-+
-+static struct snd_soc_jack mt8173_rt5650_rt5676_jack;
-+
-+static int mt8173_rt5650_rt5676_init(struct snd_soc_pcm_runtime *runtime)
-+{
-+	struct snd_soc_card *card = runtime->card;
-+	struct snd_soc_codec *codec = runtime->codec_dais[0]->codec;
-+	struct snd_soc_codec *codec_sub = runtime->codec_dais[1]->codec;
-+	int ret;
-+
-+	rt5645_sel_asrc_clk_src(codec,
-+				RT5645_DA_STEREO_FILTER |
-+				RT5645_AD_STEREO_FILTER,
-+				RT5645_CLK_SEL_I2S1_ASRC);
-+	rt5677_sel_asrc_clk_src(codec_sub,
-+				RT5677_DA_STEREO_FILTER |
-+				RT5677_AD_STEREO1_FILTER,
-+				RT5677_CLK_SEL_I2S1_ASRC);
-+	rt5677_sel_asrc_clk_src(codec_sub,
-+				RT5677_AD_STEREO2_FILTER |
-+				RT5677_I2S2_SOURCE,
-+				RT5677_CLK_SEL_I2S2_ASRC);
-+
-+	/* enable jack detection */
-+	ret = snd_soc_card_jack_new(card, "Headset Jack",
-+				    SND_JACK_HEADPHONE | SND_JACK_MICROPHONE |
-+				    SND_JACK_BTN_0 | SND_JACK_BTN_1 |
-+				    SND_JACK_BTN_2 | SND_JACK_BTN_3,
-+				    &mt8173_rt5650_rt5676_jack, NULL, 0);
-+	if (ret) {
-+		dev_err(card->dev, "Can't new Headset Jack %d\n", ret);
-+		return ret;
-+	}
-+
-+	return rt5645_set_jack_detect(codec,
-+				      &mt8173_rt5650_rt5676_jack,
-+				      &mt8173_rt5650_rt5676_jack,
-+				      &mt8173_rt5650_rt5676_jack);
-+}
-+
-+static struct snd_soc_dai_link_component mt8173_rt5650_rt5676_codecs[] = {
-+	{
-+		.dai_name = "rt5645-aif1",
-+	},
-+	{
-+		.dai_name = "rt5677-aif1",
-+	},
-+};
-+
-+/* Digital audio interface glue - connects codec <---> CPU */
-+static struct snd_soc_dai_link mt8173_rt5650_rt5676_dais[] = {
-+	/* Front End DAI links */
-+	{
-+		.name = "rt5650_rt5676 Playback",
-+		.stream_name = "rt5650_rt5676 Playback",
-+		.cpu_dai_name = "DL1",
-+		.platform_name = "11220000.mt8173-afe-pcm",
-+		.codec_name = "snd-soc-dummy",
-+		.codec_dai_name = "snd-soc-dummy-dai",
-+		.trigger = {SND_SOC_DPCM_TRIGGER_POST, SND_SOC_DPCM_TRIGGER_POST},
-+		.dynamic = 1,
-+		.dpcm_playback = 1,
-+	},
-+	{
-+		.name = "rt5650_rt5676 Capture",
-+		.stream_name = "rt5650_rt5676 Capture",
-+		.cpu_dai_name = "VUL",
-+		.platform_name = "11220000.mt8173-afe-pcm",
-+		.codec_name = "snd-soc-dummy",
-+		.codec_dai_name = "snd-soc-dummy-dai",
-+		.trigger = {SND_SOC_DPCM_TRIGGER_POST, SND_SOC_DPCM_TRIGGER_POST},
-+		.dynamic = 1,
-+		.dpcm_capture = 1,
-+	},
-+
-+	/* Back End DAI links */
-+	{
-+		.name = "Codec",
-+		.cpu_dai_name = "I2S",
-+		.platform_name = "11220000.mt8173-afe-pcm",
-+		.no_pcm = 1,
-+		.codecs = mt8173_rt5650_rt5676_codecs,
-+		.num_codecs = 2,
-+		.init = mt8173_rt5650_rt5676_init,
-+		.dai_fmt = SND_SOC_DAIFMT_I2S | SND_SOC_DAIFMT_NB_NF |
-+			   SND_SOC_DAIFMT_CBS_CFS,
-+		.ops = &mt8173_rt5650_rt5676_ops,
-+		.ignore_pmdown_time = 1,
-+		.dpcm_playback = 1,
-+		.dpcm_capture = 1,
-+	},
-+	{ /* rt5676 <-> rt5650 intercodec link: Sets rt5676 I2S2 as master */
-+		.name = "rt5650_rt5676 intercodec",
-+		.stream_name = "rt5650_rt5676 intercodec",
-+		.cpu_dai_name = "snd-soc-dummy-dai",
-+		.platform_name = "snd-soc-dummy",
-+		.no_pcm = 1,
-+		.codec_dai_name = "rt5677-aif2",
-+		.dai_fmt = SND_SOC_DAIFMT_I2S | SND_SOC_DAIFMT_NB_NF |
-+			   SND_SOC_DAIFMT_CBM_CFM,
-+	},
-+
-+};
-+
-+static struct snd_soc_codec_conf mt8173_rt5650_rt5676_codec_conf[] = {
-+	{
-+		.name_prefix = "Sub",
-+	},
-+};
-+
-+static struct snd_soc_card mt8173_rt5650_rt5676_card = {
-+	.name = "mtk-rt5650-rt5676",
-+	.dai_link = mt8173_rt5650_rt5676_dais,
-+	.num_links = ARRAY_SIZE(mt8173_rt5650_rt5676_dais),
-+	.codec_conf = mt8173_rt5650_rt5676_codec_conf,
-+	.num_configs = ARRAY_SIZE(mt8173_rt5650_rt5676_codec_conf),
-+	.controls = mt8173_rt5650_rt5676_controls,
-+	.num_controls = ARRAY_SIZE(mt8173_rt5650_rt5676_controls),
-+	.dapm_widgets = mt8173_rt5650_rt5676_widgets,
-+	.num_dapm_widgets = ARRAY_SIZE(mt8173_rt5650_rt5676_widgets),
-+	.dapm_routes = mt8173_rt5650_rt5676_routes,
-+	.num_dapm_routes = ARRAY_SIZE(mt8173_rt5650_rt5676_routes),
-+};
-+
-+static int mt8173_rt5650_rt5676_dev_probe(struct platform_device *pdev)
-+{
-+	struct snd_soc_card *card = &mt8173_rt5650_rt5676_card;
-+	struct regulator *reg_avdd;
-+	int ret;
-+
-+	mt8173_rt5650_rt5676_codecs[0].of_node =
-+		of_parse_phandle(pdev->dev.of_node, "mediatek,audio-codec", 0);
-+	if (!mt8173_rt5650_rt5676_codecs[0].of_node) {
-+		dev_err(&pdev->dev,
-+			"Property 'audio-codec' missing or invalid\n");
-+		return -EINVAL;
-+	}
-+	mt8173_rt5650_rt5676_codecs[1].of_node =
-+		of_parse_phandle(pdev->dev.of_node, "mediatek,audio-codec", 1);
-+	if (!mt8173_rt5650_rt5676_codecs[1].of_node) {
-+		dev_err(&pdev->dev,
-+			"Property 'audio-codec' missing or invalid\n");
-+		return -EINVAL;
-+	}
-+	mt8173_rt5650_rt5676_codec_conf[0].of_node =
-+		mt8173_rt5650_rt5676_codecs[1].of_node;
-+
-+	mt8173_rt5650_rt5676_dais[3].codec_of_node =
-+		mt8173_rt5650_rt5676_codecs[1].of_node;
-+
-+	/* set 5650 codec AVDD/DACREF/CPVDD/DBVDD voltage */
-+	reg_avdd = devm_regulator_get(&pdev->dev, "avdd");
-+	if (IS_ERR(reg_avdd)) {
-+		dev_err(&pdev->dev, "failed to get avdd\n");
-+		return PTR_ERR(reg_avdd);
-+	}
-+	ret = regulator_set_voltage(reg_avdd, 1800000, 1800000);
-+	if (ret != 0) {
-+		dev_err(&pdev->dev, "Failed to set avdd: %d\n", ret);
-+		return ret;
-+	}
-+	dev_info(&pdev->dev, "avdd = %d uv\n",
-+		 regulator_get_voltage(reg_avdd));
-+
-+	ret = regulator_enable(reg_avdd);
-+	if (ret != 0) {
-+		dev_err(&pdev->dev, "Failed to enable avdd: %d\n", ret);
-+		return ret;
-+	}
-+
-+	card->dev = &pdev->dev;
-+	platform_set_drvdata(pdev, card);
-+
-+	ret = snd_soc_register_card(card);
-+	if (ret)
-+		dev_err(&pdev->dev, "%s snd_soc_register_card fail %d\n",
-+			__func__, ret);
-+	return ret;
-+}
-+
-+static int mt8173_rt5650_rt5676_dev_remove(struct platform_device *pdev)
-+{
-+	struct snd_soc_card *card = platform_get_drvdata(pdev);
-+
-+	snd_soc_unregister_card(card);
-+	return 0;
-+}
-+
-+static const struct of_device_id mt8173_rt5650_rt5676_dt_match[] = {
-+	{ .compatible = "mediatek,mt8173-rt5650-rt5676", },
-+	{ }
-+};
-+
-+static struct platform_driver mt8173_rt5650_rt5676_driver = {
-+	.driver = {
-+		   .name = "mtk-rt5650-rt5676",
-+		   .owner = THIS_MODULE,
-+		   .of_match_table = mt8173_rt5650_rt5676_dt_match,
-+#ifdef CONFIG_PM
-+		   .pm = &snd_soc_pm_ops,
-+#endif
-+	},
-+	.probe = mt8173_rt5650_rt5676_dev_probe,
-+	.remove = mt8173_rt5650_rt5676_dev_remove,
-+};
-+
-+module_platform_driver(mt8173_rt5650_rt5676_driver);
-+
-+/* Module information */
-+MODULE_DESCRIPTION("MT8173 RT5650 and RT5676 SoC machine driver");
-+MODULE_AUTHOR("Koro Chen <koro.chen@mediatek.com>");
-+MODULE_LICENSE("GPL v2");
-+MODULE_ALIAS("platform:mtk-rt5650-rt5676");
-+MODULE_DEVICE_TABLE(of, mt8173_rt5650_rt5676_dt_match);
-+
--- 
-1.8.1.1.dirty
+>>  static int __init combiner_of_init(struct device_node *np,
+>>                                    struct device_node *parent)
+>>  {
+>>         void __iomem *combiner_base;
+>> -       unsigned int max_nr = 20;
+>>
+>>         combiner_base = of_iomap(np, 0);
+>>         if (!combiner_base) {
+>> @@ -219,7 +268,9 @@ static int __init combiner_of_init(struct device_node *np,
+>>                         __func__, max_nr);
+>>         }
+>>
+>> -       combiner_init(combiner_base, np, max_nr);
+>> +       combiner_init(combiner_base, np);
+>> +
+>> +       register_syscore_ops(&combiner_syscore_ops);
+>>
+>>         return 0;
+>>  }
+
+Best regards,
+Javier
