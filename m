@@ -1,83 +1,83 @@
 From: koro.chen@mediatek.com (Koro Chen)
-Date: Wed, 10 Jun 2015 22:24:35 +0800
-Subject: [PATCH 2/3] ASoC: mediatek: Add machine driver for MAX98090 codec
+Date: Wed, 10 Jun 2015 22:24:36 +0800
+Subject: [PATCH 3/3] ASoC: mediatek: Add machine driver for rt5650 rt5676 codec
 In-Reply-To: <1433946276-25969-1-git-send-email-koro.chen@mediatek.com>
 References: <1433946276-25969-1-git-send-email-koro.chen@mediatek.com>
-Message-ID: <1433946276-25969-3-git-send-email-koro.chen@mediatek.com>
+Message-ID: <1433946276-25969-4-git-send-email-koro.chen@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This is the DPCM based machine driver with MAX98090
+This is the DPCM based machine driver with rt5650 and rt5676
 
 Signed-off-by: Koro Chen <koro.chen@mediatek.com>
+Signed-off-by: Nicolas Boichat <drinkcat@chromium.org>
 ---
- .../devicetree/bindings/sound/mt8173-max98090.txt  |  17 ++
- sound/soc/mediatek/Kconfig                         |  11 +
- sound/soc/mediatek/Makefile                        |   2 +
- sound/soc/mediatek/mt8173-max98090.c               | 260 +++++++++++++++++++++
- 4 files changed, 290 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/sound/mt8173-max98090.txt
- create mode 100644 sound/soc/mediatek/mt8173-max98090.c
+ .../bindings/sound/mt8173-rt5650-rt5676.txt        |  15 ++
+ sound/soc/mediatek/Kconfig                         |  12 +
+ sound/soc/mediatek/Makefile                        |   1 +
+ sound/soc/mediatek/mt8173-rt5650-rt5676.c          | 300 +++++++++++++++++++++
+ 4 files changed, 328 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/sound/mt8173-rt5650-rt5676.txt
+ create mode 100644 sound/soc/mediatek/mt8173-rt5650-rt5676.c
 
-diff --git a/Documentation/devicetree/bindings/sound/mt8173-max98090.txt b/Documentation/devicetree/bindings/sound/mt8173-max98090.txt
+diff --git a/Documentation/devicetree/bindings/sound/mt8173-rt5650-rt5676.txt b/Documentation/devicetree/bindings/sound/mt8173-rt5650-rt5676.txt
 new file mode 100644
-index 0000000..8d6b84c
+index 0000000..5fbdf39
 --- /dev/null
-+++ b/Documentation/devicetree/bindings/sound/mt8173-max98090.txt
-@@ -0,0 +1,17 @@
-+MT8173 with MAX98090 CODEC
++++ b/Documentation/devicetree/bindings/sound/mt8173-rt5650-rt5676.txt
+@@ -0,0 +1,15 @@
++MT8173 with RT5650 RT5676 CODECS
 +
 +Required properties:
-+- compatible : "mediatek,mt8173-max98090"
-+- mediatek,audio-codec: the phandle of the MAX98090 audio codec
-+- dvdd-supply : the phandle of regulator to supply 1.2V
++- compatible : "mediatek,mt8173-rt5650-rt5676"
++- mediatek,audio-codec: the phandles of rt5650 and rt5676 codecs
 +- avdd-supply : the phandle of regulator to supply 1.8V
 +
 +Example:
 +
 +	sound {
-+		compatible = "mediatek,mt8173-max98090";
-+		mediatek,audio-codec = <&max98090>;
-+		dvdd-supply = <&mt6397_vgp1_reg>;
-+		avdd-supply = <&mt6397_vgp4_reg>;
++		compatible = "mediatek,mt8173-rt5650-rt5676";
++		mediatek,audio-codec = <&rt5650 &rt5676>;
++		avdd-supply = <&mt6397_vgp1_reg>;
 +	};
 +
 diff --git a/sound/soc/mediatek/Kconfig b/sound/soc/mediatek/Kconfig
-index 38630d4..6fb337e 100644
+index 6fb337e..6f03e26 100644
 --- a/sound/soc/mediatek/Kconfig
 +++ b/sound/soc/mediatek/Kconfig
-@@ -7,3 +7,14 @@ config SND_SOC_MEDIATEK
+@@ -18,3 +18,15 @@ config SND_SOC_MT8173_MAX98090
  	  Select Y if you have such device.
- 	  Ex: MT8173
+ 	  If unsure select "N".
  
-+config SND_SOC_MT8173_MAX98090
-+	bool "ASoC Audio driver for MT8173 with MAX98090 codec"
++config SND_SOC_MT8173_RT5650_RT5676
++	bool "ASoC Audio driver for MT8173 with RT5650 RT5676 codecs"
 +	depends on ARCH_MEDIATEK
 +	select SND_SOC_MEDIATEK
-+	select SND_SOC_MAX98090
++	select SND_SOC_RT5645
++	select SND_SOC_RT5677
 +	help
 +	  This adds ASoC driver for Mediatek MT8173 boards
-+	  with the MAX98090 audio codec.
++	  with the RT5650 and RT5676 codecs.
 +	  Select Y if you have such device.
 +	  If unsure select "N".
 +
 diff --git a/sound/soc/mediatek/Makefile b/sound/soc/mediatek/Makefile
-index 5f27cc7..08fa765 100644
+index 08fa765..75effbe 100644
 --- a/sound/soc/mediatek/Makefile
 +++ b/sound/soc/mediatek/Makefile
-@@ -1,2 +1,4 @@
- # MTK Platform Support
+@@ -2,3 +2,4 @@
  obj-$(CONFIG_SND_SOC_MEDIATEK) += mtk-afe-pcm.o
-+# Machine support
-+obj-$(CONFIG_SND_SOC_MT8173_MAX98090) += mt8173-max98090.o
-diff --git a/sound/soc/mediatek/mt8173-max98090.c b/sound/soc/mediatek/mt8173-max98090.c
+ # Machine support
+ obj-$(CONFIG_SND_SOC_MT8173_MAX98090) += mt8173-max98090.o
++obj-$(CONFIG_SND_SOC_MT8173_RT5650_RT5676) += mt8173-rt5650-rt5676.o
+diff --git a/sound/soc/mediatek/mt8173-rt5650-rt5676.c b/sound/soc/mediatek/mt8173-rt5650-rt5676.c
 new file mode 100644
-index 0000000..5cb782a
+index 0000000..ceff158
 --- /dev/null
-+++ b/sound/soc/mediatek/mt8173-max98090.c
-@@ -0,0 +1,260 @@
++++ b/sound/soc/mediatek/mt8173-rt5650-rt5676.c
+@@ -0,0 +1,300 @@
 +/*
-+ * mt8173-max98090.c  --  MT8173 MAX98090 ALSA SoC machine driver
++ * mt8173-rt5650-rt5676.c  --  MT8173 machine driver with RT5650/5676 codecs
 + *
 + * Copyright (c) 2015 MediaTek Inc.
 + * Author: Koro Chen <koro.chen@mediatek.com>
@@ -93,94 +93,129 @@ index 0000000..5cb782a
 + */
 +
 +#include <linux/module.h>
++#include <linux/gpio.h>
++#include <linux/of_gpio.h>
++#include <linux/regulator/consumer.h>
 +#include <sound/soc.h>
 +#include <sound/jack.h>
-+#include <linux/gpio.h>
-+#include <linux/regulator/consumer.h>
-+#include "../codecs/max98090.h"
++#include "../codecs/rt5645.h"
++#include "../codecs/rt5677.h"
 +
-+static struct snd_soc_jack mt8173_max98090_jack;
++#define MCLK_FOR_CODECS		12288000
 +
-+static struct snd_soc_jack_pin mt8173_max98090_jack_pins[] = {
-+	{
-+		.pin	= "Headphone",
-+		.mask	= SND_JACK_HEADPHONE,
-+	},
-+	{
-+		.pin	= "Headset Mic",
-+		.mask	= SND_JACK_MICROPHONE,
-+	},
-+};
-+
-+static const struct snd_soc_dapm_widget mt8173_max98090_widgets[] = {
++static const struct snd_soc_dapm_widget mt8173_rt5650_rt5676_widgets[] = {
 +	SND_SOC_DAPM_SPK("Speaker", NULL),
 +	SND_SOC_DAPM_MIC("Int Mic", NULL),
 +	SND_SOC_DAPM_HP("Headphone", NULL),
 +	SND_SOC_DAPM_MIC("Headset Mic", NULL),
 +};
 +
-+static const struct snd_soc_dapm_route mt8173_max98090_routes[] = {
-+	{"Speaker", NULL, "SPKL"},
-+	{"Speaker", NULL, "SPKR"},
-+	{"DMICL", NULL, "Int Mic"},
-+	{"Headphone", NULL, "HPL"},
-+	{"Headphone", NULL, "HPR"},
-+	{"Headset Mic", NULL, "MICBIAS"},
-+	{"IN34", NULL, "Headset Mic"},
++static const struct snd_soc_dapm_route mt8173_rt5650_rt5676_routes[] = {
++	{"Speaker", NULL, "SPOL"},
++	{"Speaker", NULL, "SPOR"},
++	{"Speaker", NULL, "Sub AIF2TX"}, /* IF2 ADC to 5650  */
++	{"Sub DMIC L1", NULL, "Int Mic"}, /* DMIC from 5676 */
++	{"Sub DMIC R1", NULL, "Int Mic"},
++	{"Headphone", NULL, "HPOL"},
++	{"Headphone", NULL, "HPOR"},
++	{"Headphone", NULL, "Sub AIF2TX"}, /* IF2 ADC to 5650  */
++	{"Headset Mic", NULL, "micbias1"},
++	{"Headset Mic", NULL, "micbias2"},
++	{"IN1P", NULL, "Headset Mic"},
++	{"IN1N", NULL, "Headset Mic"},
++	{"Sub AIF2RX", NULL, "Headset Mic"}, /* IF2 DAC from 5650  */
 +};
 +
-+static const struct snd_kcontrol_new mt8173_max98090_controls[] = {
++static const struct snd_kcontrol_new mt8173_rt5650_rt5676_controls[] = {
 +	SOC_DAPM_PIN_SWITCH("Speaker"),
 +	SOC_DAPM_PIN_SWITCH("Int Mic"),
 +	SOC_DAPM_PIN_SWITCH("Headphone"),
 +	SOC_DAPM_PIN_SWITCH("Headset Mic"),
 +};
 +
-+static int mt8173_max98090_hw_params(struct snd_pcm_substream *substream,
-+				     struct snd_pcm_hw_params *params)
++static int mt8173_rt5650_rt5676_hw_params(struct snd_pcm_substream *substream,
++					  struct snd_pcm_hw_params *params)
 +{
 +	struct snd_soc_pcm_runtime *rtd = substream->private_data;
-+	struct snd_soc_dai *codec_dai = rtd->codec_dai;
++	int i, ret;
 +
-+	return snd_soc_dai_set_sysclk(codec_dai, 0, params_rate(params) * 256,
-+				      SND_SOC_CLOCK_IN);
++	for (i = 0; i < rtd->num_codecs; i++) {
++		struct snd_soc_dai *codec_dai = rtd->codec_dais[i];
++
++		/* pll from mclk 12.288M */
++		ret = snd_soc_dai_set_pll(codec_dai, 0, 0, MCLK_FOR_CODECS,
++					  params_rate(params) * 512);
++		if (ret)
++			return ret;
++
++		/* sysclk from pll */
++		ret = snd_soc_dai_set_sysclk(codec_dai, 1,
++					     params_rate(params) * 512,
++					     SND_SOC_CLOCK_IN);
++		if (ret)
++			return ret;
++	}
++	return 0;
 +}
 +
-+static struct snd_soc_ops mt8173_max98090_ops = {
-+	.hw_params = mt8173_max98090_hw_params,
++static struct snd_soc_ops mt8173_rt5650_rt5676_ops = {
++	.hw_params = mt8173_rt5650_rt5676_hw_params,
 +};
 +
-+static int mt8173_max98090_init(struct snd_soc_pcm_runtime *runtime)
++static struct snd_soc_jack mt8173_rt5650_rt5676_jack;
++
++static int mt8173_rt5650_rt5676_init(struct snd_soc_pcm_runtime *runtime)
 +{
-+	int ret;
 +	struct snd_soc_card *card = runtime->card;
-+	struct snd_soc_codec *codec = runtime->codec;
++	struct snd_soc_codec *codec = runtime->codec_dais[0]->codec;
++	struct snd_soc_codec *codec_sub = runtime->codec_dais[1]->codec;
++	int ret;
++
++	rt5645_sel_asrc_clk_src(codec,
++				RT5645_DA_STEREO_FILTER |
++				RT5645_AD_STEREO_FILTER,
++				RT5645_CLK_SEL_I2S1_ASRC);
++	rt5677_sel_asrc_clk_src(codec_sub,
++				RT5677_DA_STEREO_FILTER |
++				RT5677_AD_STEREO1_FILTER,
++				RT5677_CLK_SEL_I2S1_ASRC);
++	rt5677_sel_asrc_clk_src(codec_sub,
++				RT5677_AD_STEREO2_FILTER |
++				RT5677_I2S2_SOURCE,
++				RT5677_CLK_SEL_I2S2_ASRC);
 +
 +	/* enable jack detection */
-+	ret = snd_soc_card_jack_new(card, "Headphone", SND_JACK_HEADPHONE,
-+				    &mt8173_max98090_jack, NULL, 0);
++	ret = snd_soc_card_jack_new(card, "Headset Jack",
++				    SND_JACK_HEADPHONE | SND_JACK_MICROPHONE |
++				    SND_JACK_BTN_0 | SND_JACK_BTN_1 |
++				    SND_JACK_BTN_2 | SND_JACK_BTN_3,
++				    &mt8173_rt5650_rt5676_jack, NULL, 0);
 +	if (ret) {
-+		dev_err(card->dev, "Can't snd_soc_jack_new %d\n", ret);
++		dev_err(card->dev, "Can't new Headset Jack %d\n", ret);
 +		return ret;
 +	}
 +
-+	ret = snd_soc_jack_add_pins(&mt8173_max98090_jack,
-+				    ARRAY_SIZE(mt8173_max98090_jack_pins),
-+				    mt8173_max98090_jack_pins);
-+	if (ret) {
-+		dev_err(card->dev, "Can't snd_soc_jack_add_pins %d\n", ret);
-+		return ret;
-+	}
-+
-+	return max98090_mic_detect(codec, &mt8173_max98090_jack);
++	return rt5645_set_jack_detect(codec,
++				      &mt8173_rt5650_rt5676_jack,
++				      &mt8173_rt5650_rt5676_jack,
++				      &mt8173_rt5650_rt5676_jack);
 +}
 +
++static struct snd_soc_dai_link_component mt8173_rt5650_rt5676_codecs[] = {
++	{
++		.dai_name = "rt5645-aif1",
++	},
++	{
++		.dai_name = "rt5677-aif1",
++	},
++};
++
 +/* Digital audio interface glue - connects codec <---> CPU */
-+static struct snd_soc_dai_link mt8173_max98090_dais[] = {
++static struct snd_soc_dai_link mt8173_rt5650_rt5676_dais[] = {
 +	/* Front End DAI links */
 +	{
-+		.name = "MAX98090 Playback",
-+		.stream_name = "MAX98090 Playback",
++		.name = "rt5650_rt5676 Playback",
++		.stream_name = "rt5650_rt5676 Playback",
 +		.cpu_dai_name = "DL1",
 +		.platform_name = "11220000.mt8173-afe-pcm",
 +		.codec_name = "snd-soc-dummy",
@@ -190,8 +225,8 @@ index 0000000..5cb782a
 +		.dpcm_playback = 1,
 +	},
 +	{
-+		.name = "MAX98090 Capture",
-+		.stream_name = "MAX98090 Capture",
++		.name = "rt5650_rt5676 Capture",
++		.stream_name = "rt5650_rt5676 Capture",
 +		.cpu_dai_name = "VUL",
 +		.platform_name = "11220000.mt8173-afe-pcm",
 +		.codec_name = "snd-soc-dummy",
@@ -200,79 +235,83 @@ index 0000000..5cb782a
 +		.dynamic = 1,
 +		.dpcm_capture = 1,
 +	},
++
 +	/* Back End DAI links */
 +	{
 +		.name = "Codec",
 +		.cpu_dai_name = "I2S",
 +		.platform_name = "11220000.mt8173-afe-pcm",
 +		.no_pcm = 1,
-+		.codec_dai_name = "HiFi",
-+		.codec_name = "max98090.1-0010",
-+		.init = mt8173_max98090_init,
-+		.ops = &mt8173_max98090_ops,
++		.codecs = mt8173_rt5650_rt5676_codecs,
++		.num_codecs = 2,
++		.init = mt8173_rt5650_rt5676_init,
 +		.dai_fmt = SND_SOC_DAIFMT_I2S | SND_SOC_DAIFMT_NB_NF |
 +			   SND_SOC_DAIFMT_CBS_CFS,
++		.ops = &mt8173_rt5650_rt5676_ops,
++		.ignore_pmdown_time = 1,
 +		.dpcm_playback = 1,
 +		.dpcm_capture = 1,
 +	},
++	{ /* rt5676 <-> rt5650 intercodec link: Sets rt5676 I2S2 as master */
++		.name = "rt5650_rt5676 intercodec",
++		.stream_name = "rt5650_rt5676 intercodec",
++		.cpu_dai_name = "snd-soc-dummy-dai",
++		.platform_name = "snd-soc-dummy",
++		.no_pcm = 1,
++		.codec_dai_name = "rt5677-aif2",
++		.dai_fmt = SND_SOC_DAIFMT_I2S | SND_SOC_DAIFMT_NB_NF |
++			   SND_SOC_DAIFMT_CBM_CFM,
++	},
++
 +};
 +
-+static struct snd_soc_card mt8173_max98090_card = {
-+	.name = "mt8173-max98090",
-+	.dai_link = mt8173_max98090_dais,
-+	.num_links = ARRAY_SIZE(mt8173_max98090_dais),
-+	.controls = mt8173_max98090_controls,
-+	.num_controls = ARRAY_SIZE(mt8173_max98090_controls),
-+	.dapm_widgets = mt8173_max98090_widgets,
-+	.num_dapm_widgets = ARRAY_SIZE(mt8173_max98090_widgets),
-+	.dapm_routes = mt8173_max98090_routes,
-+	.num_dapm_routes = ARRAY_SIZE(mt8173_max98090_routes),
++static struct snd_soc_codec_conf mt8173_rt5650_rt5676_codec_conf[] = {
++	{
++		.name_prefix = "Sub",
++	},
 +};
 +
-+static int mt8173_max98090_dev_probe(struct platform_device *pdev)
++static struct snd_soc_card mt8173_rt5650_rt5676_card = {
++	.name = "mtk-rt5650-rt5676",
++	.dai_link = mt8173_rt5650_rt5676_dais,
++	.num_links = ARRAY_SIZE(mt8173_rt5650_rt5676_dais),
++	.codec_conf = mt8173_rt5650_rt5676_codec_conf,
++	.num_configs = ARRAY_SIZE(mt8173_rt5650_rt5676_codec_conf),
++	.controls = mt8173_rt5650_rt5676_controls,
++	.num_controls = ARRAY_SIZE(mt8173_rt5650_rt5676_controls),
++	.dapm_widgets = mt8173_rt5650_rt5676_widgets,
++	.num_dapm_widgets = ARRAY_SIZE(mt8173_rt5650_rt5676_widgets),
++	.dapm_routes = mt8173_rt5650_rt5676_routes,
++	.num_dapm_routes = ARRAY_SIZE(mt8173_rt5650_rt5676_routes),
++};
++
++static int mt8173_rt5650_rt5676_dev_probe(struct platform_device *pdev)
 +{
-+	struct snd_soc_card *card = &mt8173_max98090_card;
-+	struct device_node *codec_node;
-+	struct regulator *reg_dvdd, *reg_avdd;
-+	int ret, i;
++	struct snd_soc_card *card = &mt8173_rt5650_rt5676_card;
++	struct regulator *reg_avdd;
++	int ret;
 +
-+	codec_node = of_parse_phandle(pdev->dev.of_node,
-+				      "mediatek,audio-codec", 0);
-+	if (!codec_node) {
++	mt8173_rt5650_rt5676_codecs[0].of_node =
++		of_parse_phandle(pdev->dev.of_node, "mediatek,audio-codec", 0);
++	if (!mt8173_rt5650_rt5676_codecs[0].of_node) {
 +		dev_err(&pdev->dev,
 +			"Property 'audio-codec' missing or invalid\n");
-+	} else {
-+		for (i = 0; i < card->num_links; i++) {
-+			if (mt8173_max98090_dais[i].codec_name &&
-+			    !strcmp(mt8173_max98090_dais[i].codec_name,
-+				    "snd-soc-dummy"))
-+				continue;
-+			mt8173_max98090_dais[i].codec_name = NULL;
-+			mt8173_max98090_dais[i].codec_of_node = codec_node;
-+		}
++		return -EINVAL;
 +	}
++	mt8173_rt5650_rt5676_codecs[1].of_node =
++		of_parse_phandle(pdev->dev.of_node, "mediatek,audio-codec", 1);
++	if (!mt8173_rt5650_rt5676_codecs[1].of_node) {
++		dev_err(&pdev->dev,
++			"Property 'audio-codec' missing or invalid\n");
++		return -EINVAL;
++	}
++	mt8173_rt5650_rt5676_codec_conf[0].of_node =
++		mt8173_rt5650_rt5676_codecs[1].of_node;
 +
-+	/* set codec DVDD voltage */
-+	reg_dvdd = devm_regulator_get(&pdev->dev, "dvdd");
-+	if (IS_ERR(reg_dvdd)) {
-+		dev_err(&pdev->dev, "failed to get dvdd\n");
-+		return PTR_ERR(reg_dvdd);
-+	}
-+	ret = regulator_set_voltage(reg_dvdd, 1220000, 1220000);
-+	if (ret != 0) {
-+		dev_err(&pdev->dev, "Failed to set dvdd: %d\n", ret);
-+		return ret;
-+	}
-+	dev_info(&pdev->dev, "dvdd = %d uv\n",
-+		 regulator_get_voltage(reg_dvdd));
++	mt8173_rt5650_rt5676_dais[3].codec_of_node =
++		mt8173_rt5650_rt5676_codecs[1].of_node;
 +
-+	ret = regulator_enable(reg_dvdd);
-+	if (ret != 0) {
-+		dev_err(&pdev->dev, "Failed to enable dvdd: %d\n", ret);
-+		return ret;
-+	}
-+
-+	/* set codec AVDD/HPVDD/DVDDIO voltage */
++	/* set 5650 codec AVDD/DACREF/CPVDD/DBVDD voltage */
 +	reg_avdd = devm_regulator_get(&pdev->dev, "avdd");
 +	if (IS_ERR(reg_avdd)) {
 +		dev_err(&pdev->dev, "failed to get avdd\n");
@@ -283,7 +322,7 @@ index 0000000..5cb782a
 +		dev_err(&pdev->dev, "Failed to set avdd: %d\n", ret);
 +		return ret;
 +	}
-+	dev_info(&pdev->dev, "avdd voltage = %d uv\n",
++	dev_info(&pdev->dev, "avdd = %d uv\n",
 +		 regulator_get_voltage(reg_avdd));
 +
 +	ret = regulator_enable(reg_avdd);
@@ -293,6 +332,7 @@ index 0000000..5cb782a
 +	}
 +
 +	card->dev = &pdev->dev;
++	platform_set_drvdata(pdev, card);
 +
 +	ret = snd_soc_register_card(card);
 +	if (ret)
@@ -301,7 +341,7 @@ index 0000000..5cb782a
 +	return ret;
 +}
 +
-+static int mt8173_max98090_dev_remove(struct platform_device *pdev)
++static int mt8173_rt5650_rt5676_dev_remove(struct platform_device *pdev)
 +{
 +	struct snd_soc_card *card = platform_get_drvdata(pdev);
 +
@@ -309,32 +349,32 @@ index 0000000..5cb782a
 +	return 0;
 +}
 +
-+static const struct of_device_id mt8173_max98090_dt_match[] = {
-+	{ .compatible = "mediatek,mt8173-max98090", },
++static const struct of_device_id mt8173_rt5650_rt5676_dt_match[] = {
++	{ .compatible = "mediatek,mt8173-rt5650-rt5676", },
 +	{ }
 +};
 +
-+static struct platform_driver mt8173_max98090_driver = {
++static struct platform_driver mt8173_rt5650_rt5676_driver = {
 +	.driver = {
-+		   .name = "mt8173-max98090",
++		   .name = "mtk-rt5650-rt5676",
 +		   .owner = THIS_MODULE,
-+		   .of_match_table = mt8173_max98090_dt_match,
++		   .of_match_table = mt8173_rt5650_rt5676_dt_match,
 +#ifdef CONFIG_PM
 +		   .pm = &snd_soc_pm_ops,
 +#endif
 +	},
-+	.probe = mt8173_max98090_dev_probe,
-+	.remove = mt8173_max98090_dev_remove,
++	.probe = mt8173_rt5650_rt5676_dev_probe,
++	.remove = mt8173_rt5650_rt5676_dev_remove,
 +};
 +
-+module_platform_driver(mt8173_max98090_driver);
++module_platform_driver(mt8173_rt5650_rt5676_driver);
 +
 +/* Module information */
-+MODULE_DESCRIPTION("MT8173 MAX98090 ALSA SoC machine driver");
++MODULE_DESCRIPTION("MT8173 RT5650 and RT5676 SoC machine driver");
 +MODULE_AUTHOR("Koro Chen <koro.chen@mediatek.com>");
 +MODULE_LICENSE("GPL v2");
-+MODULE_ALIAS("platform:mt8173-max98090");
-+MODULE_DEVICE_TABLE(of, mt8173_max98090_dt_match);
++MODULE_ALIAS("platform:mtk-rt5650-rt5676");
++MODULE_DEVICE_TABLE(of, mt8173_rt5650_rt5676_dt_match);
 +
 -- 
 1.8.1.1.dirty
