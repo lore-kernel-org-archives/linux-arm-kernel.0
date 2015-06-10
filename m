@@ -1,51 +1,222 @@
-From: p.fedin@samsung.com (Pavel Fedin)
-Date: Wed, 10 Jun 2015 18:30:13 +0300
-Subject: IRQFD support with GICv3 ITS (WAS: RE: [PATCH 00/13] arm64: KVM:
- GICv3 ITS emulation)
-In-Reply-To: <557842A0.9070503@linaro.org>
-References: <042601d0a357$d3cec4d0$7b6c4e70$@samsung.com>
- <557842A0.9070503@linaro.org>
-Message-ID: <05da01d0a392$58bf5030$0a3df090$@samsung.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Wed, 10 Jun 2015 16:33:00 +0100
+Subject: [PATCH 02/11] ACPI / irqchip: Add self-probe infrastructure to
+ initialize IRQ controller
+In-Reply-To: <1431953961-22706-3-git-send-email-hanjun.guo@linaro.org>
+References: <1431953961-22706-1-git-send-email-hanjun.guo@linaro.org>
+ <1431953961-22706-3-git-send-email-hanjun.guo@linaro.org>
+Message-ID: <557858AC.6010701@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
- Hi!
+Hi Hanjun,
 
-> indeed in newly added qemu kvm-all.c kvm_arch_msi_data_to_gsi we could
-> call a new ioctl that translates the data + deviceid? into an LPI and
-> program irqfd with that LPI. This is done once when setting irqfd up.
-> This also means extending irqfd support to lpi injection, gsi being the
-> LPI index if gsi >= 8192. in that case we continue using
-> kvm_gsi_direct_mapping and gsi still is an IRQ index.
+On 18/05/15 13:59, Hanjun Guo wrote:
+> From: Tomasz Nowicki <tomasz.nowicki@linaro.org>
+> 
+> This self-probe infrastructure works in the similar way as OF,
+> but there is some different in the mechanism:
+> 
+> For OF, the init fn will be called once it finds comptiable strings
+> in DT,  but for ACPI, we init irqchips by static tables, and in
+> static ACPI tables, there are no comptiable strings to indicate
+> irqchips, so every init function with IRQCHIP_ACPI_DECLARE in the
+> same table will be called, but thanks to the GIC version presented
+> in ACPI table, we can init different GIC irqchips with this framework.
 
- This is exactly what i have done in my kernel + qemu. I have added a new KVM capability
-and then in qemu i do this:
---- cut ---
-    if (kvm_gsi_kernel_mapping()) {
-        struct kvm_msi msi;
+This triggers an immediate question: If we can find out the GIC version
+in the ACPI tables, which can't we just call the irqchips that implement
+the support for this version?
 
-        msi.address_lo = (uint32_t)msg.address;
-        msi.address_hi = msg.address >> 32;
-        msi.data = le32_to_cpu(msg.data);
-        memset(msi.pad, 0, sizeof(msi.pad));
+i.e: the GICv2 irqchip code would have a line like:
 
-        if (dev) {
-            msi.devid = (pci_bus_num(dev->bus) << 8) | dev->devfn;
-            msi.flags = KVM_MSI_VALID_DEVID;
-        } else {
-            msi.devid = 0;
-            msi.flags = 0;
-        }
+IRQCHIP_ACPI_DECLARE(gic_v2, ACPI_MADT_GIC_VER_V2, gic_v2_acpi_init);
 
-        return kvm_vm_ioctl(s, KVM_TRANSLATE_MSI, &msi);
-    }
---- cut ---
- KVM_TRANSLATE_MSI returns an LPI number. This seemed to be the simplest and fastest thing
-to do.
- If someone is interested, i could prepare an RFC patch series for this, which would apply
-on top of Andre's ITS implementation.
+and the probing code would simply call the drivers that have declared
+their interest for this version code.
 
-Kind regards,
-Pavel Fedin
-Expert Engineer
-Samsung Electronics Research center Russia
+Having code that tests for the version in each driver is not an option
+(this is exactly what we're trying to avoid).
+
+Thanks,
+
+	M.
+
+> 
+> This mechanism can also be used for clock declare and may also works
+> on x86 for some table parsing too.
+> 
+> Signed-off-by: Tomasz Nowicki <tomasz.nowicki@linaro.org>
+> [hj: introduce struct acpi_table_id instead of acpi_device_id]
+> [hj: rework it more generic to all ACPI tables and fix some issues]
+> Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
+> ---
+>  drivers/acpi/Makefile             |  1 +
+>  drivers/acpi/irq.c                | 37 +++++++++++++++++++++++++++++++++++++
+>  drivers/irqchip/irqchip.h         | 12 ++++++++++++
+>  include/asm-generic/vmlinux.lds.h | 13 +++++++++++++
+>  include/linux/acpi.h              | 14 ++++++++++++++
+>  include/linux/mod_devicetable.h   |  7 +++++++
+>  6 files changed, 84 insertions(+)
+>  create mode 100644 drivers/acpi/irq.c
+> 
+> diff --git a/drivers/acpi/Makefile b/drivers/acpi/Makefile
+> index 8a063e2..3e4aec3 100644
+> --- a/drivers/acpi/Makefile
+> +++ b/drivers/acpi/Makefile
+> @@ -80,6 +80,7 @@ obj-$(CONFIG_ACPI_HED)		+= hed.o
+>  obj-$(CONFIG_ACPI_EC_DEBUGFS)	+= ec_sys.o
+>  obj-$(CONFIG_ACPI_CUSTOM_METHOD)+= custom_method.o
+>  obj-$(CONFIG_ACPI_BGRT)		+= bgrt.o
+> +obj-$(CONFIG_IRQCHIP)		+= irq.o
+>  
+>  # processor has its own "processor." module_param namespace
+>  processor-y			:= processor_driver.o processor_throttling.o
+> diff --git a/drivers/acpi/irq.c b/drivers/acpi/irq.c
+> new file mode 100644
+> index 0000000..65d6b93
+> --- /dev/null
+> +++ b/drivers/acpi/irq.c
+> @@ -0,0 +1,37 @@
+> +/*
+> + * Copyright (c) 2015, Linaro Ltd.
+> + * Author: Tomasz Nowicki <tomasz.nowicki@linaro.org>
+> + *         Hanjun Guo <hanjun.guo@linaro.org>
+> + *
+> + * Inspired by drivers/irqchip/irqchip.c
+> + *
+> + * This program is free software; you can redistribute it and/or modify it
+> + * under the terms and conditions of the GNU General Public License,
+> + * version 2, as published by the Free Software Foundation.
+> + *
+> + */
+> +
+> +#include <linux/init.h>
+> +#include <linux/acpi.h>
+> +
+> +/*
+> + * This special acpi_table_id is the sentinel at the end of the
+> + * acpi_table_id[] array of all irqchips. It is automatically placed at
+> + * the end of the array by the linker, thanks to being part of a
+> + * special section.
+> + */
+> +static const struct acpi_table_id
+> +irqchip_acpi_match_end __used __section(__irqchip_acpi_table_end);
+> +
+> +extern struct acpi_table_id __irqchip_acpi_table[];
+> +
+> +void __init acpi_irqchip_init(void)
+> +{
+> +	struct acpi_table_id *id;
+> +
+> +	if (acpi_disabled)
+> +		return;
+> +
+> +	for (id = __irqchip_acpi_table; id->id[0]; id++)
+> +		acpi_table_parse(id->id, (acpi_tbl_table_handler)id->data);
+> +}
+> diff --git a/drivers/irqchip/irqchip.h b/drivers/irqchip/irqchip.h
+> index 0f6486d..1949546 100644
+> --- a/drivers/irqchip/irqchip.h
+> +++ b/drivers/irqchip/irqchip.h
+> @@ -11,6 +11,7 @@
+>  #ifndef _IRQCHIP_H
+>  #define _IRQCHIP_H
+>  
+> +#include <linux/acpi.h>
+>  #include <linux/of.h>
+>  
+>  /*
+> @@ -25,4 +26,15 @@
+>   */
+>  #define IRQCHIP_DECLARE(name, compat, fn) OF_DECLARE_2(irqchip, name, compat, fn)
+>  
+> +/*
+> + * This macro must be used by the different irqchip drivers to declare
+> + * the association between their ACPI table and their initialization function.
+> + *
+> + * @name: name that must be unique accross all IRQCHIP_ACPI_DECLARE of the
+> + * same file.
+> + * @table_id: name of the ACPI table signature
+> + * @fn: initialization function
+> + */
+> +#define IRQCHIP_ACPI_DECLARE(name, table_id, fn)	\
+> +	ACPI_DECLARE(irqchip, name, table_id, fn)
+>  #endif
+> diff --git a/include/asm-generic/vmlinux.lds.h b/include/asm-generic/vmlinux.lds.h
+> index 8bd374d..625776c 100644
+> --- a/include/asm-generic/vmlinux.lds.h
+> +++ b/include/asm-generic/vmlinux.lds.h
+> @@ -181,6 +181,18 @@
+>  #define CPUIDLE_METHOD_OF_TABLES() OF_TABLE(CONFIG_CPU_IDLE, cpuidle_method)
+>  #define EARLYCON_OF_TABLES()	OF_TABLE(CONFIG_SERIAL_EARLYCON, earlycon)
+>  
+> +#ifdef CONFIG_ACPI
+> +#define ACPI_TABLE(name)						\
+> +	. = ALIGN(8);							\
+> +	VMLINUX_SYMBOL(__##name##_acpi_table) = .;			\
+> +	*(__##name##_acpi_table)					\
+> +	*(__##name##_acpi_table_end)
+> +
+> +#define IRQCHIP_ACPI_MATCH_TABLE()	ACPI_TABLE(irqchip)
+> +#else
+> +#define IRQCHIP_ACPI_MATCH_TABLE()
+> +#endif
+> +
+>  #define KERNEL_DTB()							\
+>  	STRUCT_ALIGN();							\
+>  	VMLINUX_SYMBOL(__dtb_start) = .;				\
+> @@ -516,6 +528,7 @@
+>  	CPUIDLE_METHOD_OF_TABLES()					\
+>  	KERNEL_DTB()							\
+>  	IRQCHIP_OF_MATCH_TABLE()					\
+> +	IRQCHIP_ACPI_MATCH_TABLE()					\
+>  	EARLYCON_TABLE()						\
+>  	EARLYCON_OF_TABLES()
+>  
+> diff --git a/include/linux/acpi.h b/include/linux/acpi.h
+> index 90e4ed1e..b904af3 100644
+> --- a/include/linux/acpi.h
+> +++ b/include/linux/acpi.h
+> @@ -820,4 +820,18 @@ static inline struct acpi_device *acpi_get_next_child(struct device *dev,
+>  
+>  #endif
+>  
+> +#ifdef CONFIG_ACPI
+> +#define ACPI_DECLARE(table, name, table_id, fn)				\
+> +	static const struct acpi_table_id __acpi_table_##name		\
+> +		__used __section(__##table##_acpi_table)		\
+> +		 = { .id = table_id,					\
+> +		     .data = (void *)fn }
+> +#else
+> +#define ACPI_DECLARE(table, name, table_id, fn)				\
+> +	static const struct acpi_table_id __acpi_table_##name		\
+> +		__attribute__((unused))					\
+> +		 = { .id = table_id,					\
+> +		     .data = (void*)fn }
+> +#endif
+> +
+>  #endif	/*_LINUX_ACPI_H*/
+> diff --git a/include/linux/mod_devicetable.h b/include/linux/mod_devicetable.h
+> index 3bfd567..47c1ea1 100644
+> --- a/include/linux/mod_devicetable.h
+> +++ b/include/linux/mod_devicetable.h
+> @@ -199,6 +199,13 @@ struct pnp_device_id {
+>  	kernel_ulong_t driver_data;
+>  };
+>  
+> +#define ACPI_TABLE_ID_LEN	5
+> +
+> +struct acpi_table_id {
+> +	__u8 id[ACPI_TABLE_ID_LEN];
+> +	const void *data;
+> +};
+> +
+>  struct pnp_card_device_id {
+>  	__u8 id[PNP_ID_LEN];
+>  	kernel_ulong_t driver_data;
+> 
+
+
+-- 
+Jazz is not dead. It just smells funny...
