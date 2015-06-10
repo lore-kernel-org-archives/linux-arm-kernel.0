@@ -1,64 +1,27 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Wed, 10 Jun 2015 08:57:53 +0100
-Subject: [REBASED 5/5] regulator: pwm-regulator: Don't assign structure
- attributes right away
-In-Reply-To: <1433923073-907-1-git-send-email-lee.jones@linaro.org>
-References: <1433923073-907-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1433923073-907-6-git-send-email-lee.jones@linaro.org>
+Date: Wed, 10 Jun 2015 08:58:13 +0100
+Subject: [PATCH 6/8] regulator: pwm-regulator: Separate voltage-table
+ initialisation
+In-Reply-To: <20150609171442.GL14071@sirena.org.uk>
+References: <1433529771-24496-1-git-send-email-lee.jones@linaro.org>
+ <1433529771-24496-7-git-send-email-lee.jones@linaro.org>
+ <20150609171442.GL14071@sirena.org.uk>
+Message-ID: <20150610075813.GA2982@x1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Perhaps this is just personal preference, but ...
+On Tue, 09 Jun 2015, Mark Brown wrote:
+> On Fri, Jun 05, 2015 at 07:42:49PM +0100, Lee Jones wrote:
+> > Take this out of the main .probe() routine in order to facilitate the
+> > introduction of different ways to obtain 'duty cycle' information.
+> 
+> This and the rest of the patches are fine but seem to depend on patch 4
+> - can you please rebase and resend?
 
-This patch introduces a new local variable to receive and test regulator
-initialisation data.  It simplifies and cleans up the code making it
-that little bit easier to read and maintain.  The local value is assigned
-to the structure attribute when all the others are.  This is the way we
-usually do things.
+Done.
 
-Prevents this kind of nonsense:
-
-	this->is->just.silly = fetch_silly_value(&pointer);
-	if (!this->is->just.silly) {
-		printk("Silly value failed: %d\n", this->is->just.silly);
-		return this->is->just.silly;
-	}
-
-Signed-off-by: Lee Jones <lee.jones@linaro.org>
----
- drivers/regulator/pwm-regulator.c | 8 +++++---
- 1 file changed, 5 insertions(+), 3 deletions(-)
-
-diff --git a/drivers/regulator/pwm-regulator.c b/drivers/regulator/pwm-regulator.c
-index b37b616..2bfcb52 100644
---- a/drivers/regulator/pwm-regulator.c
-+++ b/drivers/regulator/pwm-regulator.c
-@@ -231,6 +231,7 @@ static int pwm_regulator_init_continuous(struct platform_device *pdev,
- 
- static int pwm_regulator_probe(struct platform_device *pdev)
- {
-+	const struct regulator_init_data *init_data;
- 	struct pwm_regulator_data *drvdata;
- 	struct regulator_dev *regulator;
- 	struct regulator_config config = { };
-@@ -253,14 +254,15 @@ static int pwm_regulator_probe(struct platform_device *pdev)
- 	if (ret)
- 		return ret;
- 
--	config.init_data = of_get_regulator_init_data(&pdev->dev, np,
--						      &pwm_regulator_desc);
--	if (!config.init_data)
-+	init_data = of_get_regulator_init_data(&pdev->dev, np,
-+					       &pwm_regulator_desc);
-+	if (!init_data)
- 		return -ENOMEM;
- 
- 	config.of_node = np;
- 	config.dev = &pdev->dev;
- 	config.driver_data = drvdata;
-+	config.init_data = init_data;
- 
- 	drvdata->pwm = devm_pwm_get(&pdev->dev, NULL);
- 	if (IS_ERR(drvdata->pwm)) {
 -- 
-1.9.1
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
