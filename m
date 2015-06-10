@@ -1,19 +1,26 @@
-From: peter.chubb@nicta.com.au (Peter Chubb)
-Date: Thu, 11 Jun 2015 08:51:22 +1000
-Subject: [PATCH 1/1] irqchip: exynos-combiner: Save IRQ enable set on
- suspend
-In-Reply-To: <1433941831-16637-1-git-send-email-javier.martinez@collabora.co.uk>
-References: <1433941831-16637-1-git-send-email-javier.martinez@collabora.co.uk>
-Message-ID: <84ioavb2j9.wl-peter.chubb@nicta.com.au>
+From: khilman@kernel.org (Kevin Hilman)
+Date: Wed, 10 Jun 2015 15:52:09 -0700
+Subject: [PATCH RESEND] ARM: Kconfig: Select clocksource in STM32 entry
+In-Reply-To: <1433668113-10389-1-git-send-email-mcoquelin.stm32@gmail.com>
+ (Maxime Coquelin's message of "Sun, 7 Jun 2015 11:08:33 +0200")
+References: <1433668113-10389-1-git-send-email-mcoquelin.stm32@gmail.com>
+Message-ID: <7hpp53jhwm.fsf@deeprootsystems.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
->>>>> "Javier" == Javier Martinez Canillas <javier.martinez@collabora.co.uk> writes:
+Maxime Coquelin <mcoquelin.stm32@gmail.com> writes:
 
-Javier> The Exynos interrupt combiner IP looses its state when the SoC
-	    	   	     	         s/looses/loses/
+> STM32 clocksource driver needs to be selected if ARCH_STM32.
+>
+> Signed-off-by: Maxime Coquelin <mcoquelin.stm32@gmail.com>
+> ---
+> Hi Arnd,
+>
+>   This patch applies on top of arm-soc's next/soc branch, so that you don't 
+> get conflicts with Stefan's ARM_SINGLE_ARMV7M patch.
 
-Peter C
--- 
-Dr Peter Chubb				        peter.chubb AT nicta.com.au
-http://www.ssrg.nicta.com.au          Software Systems Research Group/NICTA
+Applied to next/soc,
+
+Thanks,
+
+Kevin
