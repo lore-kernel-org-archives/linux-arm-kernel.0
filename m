@@ -1,229 +1,221 @@
-From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Wed, 10 Jun 2015 10:59:13 +0200
-Subject: [PATCH v3 1/2] mtd: nand: sunxi: Replace failsafe timing cfg
- with calculated value
-In-Reply-To: <1433924948-19288-1-git-send-email-r.spliet@ultimaker.com>
-References: <1433924948-19288-1-git-send-email-r.spliet@ultimaker.com>
-Message-ID: <20150610105913.1851241d@bbrezillon>
+From: LW@KARO-electronics.de (Lothar =?UTF-8?B?V2HDn21hbm4=?=)
+Date: Wed, 10 Jun 2015 11:02:06 +0200
+Subject: [REBASED 2/5] regulator: pwm-regulator: Separate voltage-table
+ initialisation
+In-Reply-To: <1433923073-907-3-git-send-email-lee.jones@linaro.org>
+References: <1433923073-907-1-git-send-email-lee.jones@linaro.org>
+ <1433923073-907-3-git-send-email-lee.jones@linaro.org>
+Message-ID: <20150610110206.6194cc0f@ipc1.ka-ro>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Roy,
+Hi,
 
-On Wed, 10 Jun 2015 10:29:07 +0200
-Roy Spliet <r.spliet@ultimaker.com> wrote:
-
-> Calculates the timing cfg value once when initialising a chip, then sets
-> it on chip select. Register definition documented the A83 user manual.
-
-How about rewording the sentence this way:
-
-"
-The TIMING_CFG register was previously statically set to a magic value
-(extracted from Allwinner's BSP) when initializing the NAND controller.
-Now that we have more details about the TIMING_CFG register layout
-(extracted from the A83 user manual) we can dynamically calculate the
-appropriate value for each NAND chip and set it when selecting the
-chip.
-"
-
+> Take this out of the main .probe() routine in order to facilitate the
+> introduction of different ways to obtain 'duty cycle' information.
 > 
-> Signed-off-by: Roy Spliet <r.spliet@ultimaker.com>
-> 
-> V2:
-> - Fix crippled comments
-> 
-> V3:
-> - Warn for invalid timings
-> - Style
-
-Almost right: the changelog should be placed after the '---' line ;-).
-
+> Signed-off-by: Lee Jones <lee.jones@linaro.org>
 > ---
->  drivers/mtd/nand/sunxi_nand.c | 71 ++++++++++++++++++++++++++++++++++++++++---
->  1 file changed, 66 insertions(+), 5 deletions(-)
+>  drivers/mfd/mfd-child.c           | 47 ++++++++++++++++++++++++
+>  drivers/regulator/pwm-regulator.c | 77 +++++++++++++++++++++++----------------
+>  2 files changed, 92 insertions(+), 32 deletions(-)
+>  create mode 100644 drivers/mfd/mfd-child.c
 > 
-> diff --git a/drivers/mtd/nand/sunxi_nand.c b/drivers/mtd/nand/sunxi_nand.c
-> index 6f93b29..68090b7 100644
-> --- a/drivers/mtd/nand/sunxi_nand.c
-> +++ b/drivers/mtd/nand/sunxi_nand.c
-> @@ -99,6 +99,13 @@
->  				 NFC_CMD_INT_ENABLE | \
->  				 NFC_DMA_INT_ENABLE)
->  
-> +/* define bit use in NFC_TIMING_CFG */
-
-  /* define NFC_TIMING_CFG register layout */
-
-> +#define NFC_TIMING_CFG(tWB, tADL, tWHR, tRHW, tCAD)		\
-> +	((tWB) & 0x3) | (((tADL) & 0x3) << 2) |			\
-> +	(((tWHR) & 0x3) << 4) | (((tRHW) & 0x3) << 6) |		\
-> +	(((tCAD) & 0x7) << 8);
+> diff --git a/drivers/mfd/mfd-child.c b/drivers/mfd/mfd-child.c
+> new file mode 100644
+> index 0000000..f233add
+> --- /dev/null
+> +++ b/drivers/mfd/mfd-child.c
+> @@ -0,0 +1,47 @@
+> +#include <linux/interrupt.h>
+> +#include <linux/module.h>
+> +#include <linux/of_device.h>
+> +#include <linux/of_irq.h>
 > +
-> +
->  /* define bit use in NFC_CMD */
->  #define NFC_CMD_LOW_BYTE	GENMASK(7, 0)
->  #define NFC_CMD_HIGH_BYTE	GENMASK(15, 8)
-> @@ -208,6 +215,7 @@ struct sunxi_nand_hw_ecc {
->   * @nand:		base NAND chip structure
->   * @mtd:		base MTD structure
->   * @clk_rate:		clk_rate required for this NAND chip
-> + * @timing_cfg		TIMING_CFG register value for this NAND chip
->   * @selected:		current active CS
->   * @nsels:		number of CS lines required by the NAND chip
->   * @sels:		array of CS lines descriptions
-> @@ -217,6 +225,7 @@ struct sunxi_nand_chip {
->  	struct nand_chip nand;
->  	struct mtd_info mtd;
->  	unsigned long clk_rate;
-> +	u32 timing_cfg;
->  	int selected;
->  	int nsels;
->  	struct sunxi_nand_chip_sel sels[0];
-> @@ -403,6 +412,7 @@ static void sunxi_nfc_select_chip(struct mtd_info *mtd, int chip)
->  		}
->  	}
->  
-> +	writel(sunxi_nand->timing_cfg, nfc->regs + NFC_REG_TIMING_CFG);
->  	writel(ctl, nfc->regs + NFC_REG_CTL);
->  
->  	sunxi_nand->selected = chip;
-> @@ -807,10 +817,33 @@ static int sunxi_nfc_hw_syndrome_ecc_write_page(struct mtd_info *mtd,
->  	return 0;
->  }
->  
-> +static const s32 tWB_lut[] = {6, 12, 16, 20};
-> +static const s32 tRHW_lut[] = {4, 8, 12, 20};
-> +
-> +static s32 _sunxi_nand_lookup_timing(const s32 *lut, int lut_size, u32 duration,
-> +		u32 clk_period)
-
-You can return an int here.
-
+> +static int simple_mfd_child_probe(struct platform_device *pdev)
 > +{
-> +	u32 clk_cycles = (duration + clk_period - 1) / clk_period;
-
-DIV_ROUND_UP(duration, clk_period) ??
-
-> +	int i;
+> +	struct resource *res;
+> +	void __iomem *base;
+> +	int irq;
 > +
-> +	for (i = 0; i < lut_size; i++) {
-> +		if (clk_cycles <= lut[i])
-> +			return i;
+> +	printk("LEE: %s %s()[%d]: Enter\n", __FILE__, __func__, __LINE__);
+> +
+Debugging remnant?
+
+> +	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+> +	dev_err(&pdev->dev, "Phys: %x: %x\n", res->start, resource_size(res));
+> +
+That's not an error message and thus shouldn't be printed with
+dev_err(). dev_dbg() would be more appropriate here.
+
+> +	base = devm_ioremap_resource(&pdev->dev, res);
+> +	if (IS_ERR(base))
+> +		return PTR_ERR(base);
+> +
+> +	dev_err(&pdev->dev, "Virt: %p\n", base);
+dto.
+
+> +
+> +	irq = platform_get_irq(pdev, 0);
+> +	if (irq < 0) {
+> +		dev_err(&pdev->dev, "failed to get IRQ: %d\n", irq);
+> +		return irq;
 > +	}
 > +
-> +	/* Doesn't fit */
-> +	return -1;
-
-How about returning -EINVAL (or -ENOTSUP) directly ?
-
+> +	dev_err(&pdev->dev, "IRQ: %d\n", irq);
+> +
+dto.
+> +	return 0;
 > +}
 > +
-> +#define sunxi_nand_lookup_timing(l,p,c) \
-> +			_sunxi_nand_lookup_timing(l, ARRAY_SIZE(l), p, c)
+> +static const struct of_device_id simple_mfd_child_of_match[] = {
+> +	{ .compatible = "simple-mfd-child" },
+> +	{ }
+> +};
+> +MODULE_DEVICE_TABLE(of, simple_mfd_child_of_match);
 > +
->  static int sunxi_nand_chip_set_timings(struct sunxi_nand_chip *chip,
->  				       const struct nand_sdr_timings *timings)
->  {
-> +	struct sunxi_nfc *nfc = to_sunxi_nfc(chip->nand.controller);
->  	u32 min_clk_period = 0;
-> +	u32 tWB, tADL, tWHR, tRHW, tCAD;
+> +static struct platform_driver simple_mfd_child_driver = {
+> +	.probe = simple_mfd_child_probe,
+> +	.driver = {
+> +		.name = "simple-mfd-child",
+> +		.of_match_table = of_match_ptr(simple_mfd_child_of_match),
+> +	},
+> +};
+> +module_platform_driver(simple_mfd_child_driver);
+> diff --git a/drivers/regulator/pwm-regulator.c b/drivers/regulator/pwm-regulator.c
+> index ffa9612..25560fc 100644
+> --- a/drivers/regulator/pwm-regulator.c
+> +++ b/drivers/regulator/pwm-regulator.c
+> @@ -78,8 +78,7 @@ static int pwm_regulator_list_voltage(struct regulator_dev *rdev,
 >  
->  	/* T1 <=> tCLS */
->  	if (timings->tCLS_min > min_clk_period)
-> @@ -872,6 +905,37 @@ static int sunxi_nand_chip_set_timings(struct sunxi_nand_chip *chip,
->  	if (timings->tWC_min > (min_clk_period * 2))
->  		min_clk_period = DIV_ROUND_UP(timings->tWC_min, 2);
->  
-> +	/* T16 - T19 + tCAD */
-> +	tWB  = sunxi_nand_lookup_timing(tWB_lut, timings->tWB_max,
-> +					min_clk_period);
-> +	if (tWB == -1) {
-> +		dev_err(nfc->dev, "unsupported tWB\n");
-> +		return -EINVAL;
-
-If you return -EINVAL in case of failure, you can just replace that
-test by 
-
-	if (tWB < 0) {
-		dev_err(nfc->dev, "unsupported tWB\n");
-		return tWB;
-	}
-
-> +	}
-> +
-> +	tADL = DIV_ROUND_UP(timings->tADL_min, min_clk_period) >> 3;
-> +	if (tADL > 3) {
-> +		dev_err(nfc->dev, "unsupported tADL\n");
-> +		return -EINVAL;
-> +	}
-> +
-> +	tWHR = DIV_ROUND_UP(timings->tWHR_min, min_clk_period) >> 3;
-> +	if (tWHR > 3) {
-> +		dev_err(nfc->dev, "unsupported tWHR\n");
-> +		return -EINVAL;
-> +	}
-> +
-> +	tRHW = sunxi_nand_lookup_timing(tRHW_lut, timings->tRHW_min,
-> +					min_clk_period);
-> +	if (tRHW == -1) {
-> +		dev_err(nfc->dev, "unsupported tRHW\n");
-> +		return -EINVAL;
-> +	}
-
-Ditto
-
-> +
-> +	tCAD = 0x7;
-
-Can you add a comment explaining why you're hardcoding the tCAD value
-(AFAIR, tCAD is specific to DDR NANDs, and the NAND layer does not
-support DDR NAND timings yet, maybe we should also add a FIXME or TODO
-tag).
-
-> +
-> +	/* TODO: A83 has some more bits for CDQSS, CS, CLHZ, CCS, WC */
-> +	chip->timing_cfg = NFC_TIMING_CFG(tWB, tADL, tWHR, tRHW, tCAD);
->  
->  	/* Convert min_clk_period from picoseconds to nanoseconds */
->  	min_clk_period = DIV_ROUND_UP(min_clk_period, 1000);
-> @@ -884,8 +948,6 @@ static int sunxi_nand_chip_set_timings(struct sunxi_nand_chip *chip,
->  	 */
->  	chip->clk_rate = (2 * NSEC_PER_SEC) / min_clk_period;
->  
-> -	/* TODO: configure T16-T19 */
-> -
->  	return 0;
+>  	return drvdata->duty_cycle_table[selector].uV;
 >  }
+> -
+> -static struct regulator_ops pwm_regulator_voltage_ops = {
+> +static struct regulator_ops pwm_regulator_voltage_table_ops = {
+>  	.set_voltage_sel = pwm_regulator_set_voltage_sel,
+>  	.get_voltage_sel = pwm_regulator_get_voltage_sel,
+>  	.list_voltage    = pwm_regulator_list_voltage,
+> @@ -88,20 +87,55 @@ static struct regulator_ops pwm_regulator_voltage_ops = {
 >  
-> @@ -1168,6 +1230,7 @@ static int sunxi_nand_chip_init(struct device *dev, struct sunxi_nfc *nfc,
+>  static struct regulator_desc pwm_regulator_desc = {
+>  	.name		= "pwm-regulator",
+> -	.ops		= &pwm_regulator_voltage_ops,
+>  	.type		= REGULATOR_VOLTAGE,
+>  	.owner		= THIS_MODULE,
+>  	.supply_name    = "pwm",
+>  };
 >  
->  	chip->nsels = nsels;
->  	chip->selected = -1;
-> +	chip->timing_cfg = 0x7ff;
-
-Why do you need to initialize this field ?
-
+> +static int pwm_regulator_init_table(struct platform_device *pdev,
+> +				    struct pwm_regulator_data *drvdata)
+> +{
+> +	struct device_node *np = pdev->dev.of_node;
+> +	struct pwm_voltages *duty_cycle_table;
+> +	int length;
+> +	int ret;
+> +
+> +	of_find_property(np, "voltage-table", &length);
+> +
+> +	if ((length < sizeof(*duty_cycle_table)) ||
+> +	    (length % sizeof(*duty_cycle_table))) {
+> +		dev_err(&pdev->dev,
+> +			"voltage-table length(%d) is invalid\n",
+> +			length);
+> +		return -EINVAL;
+> +	}
+> +
+> +	duty_cycle_table = devm_kzalloc(&pdev->dev, length, GFP_KERNEL);
+> +	if (!duty_cycle_table)
+> +		return -ENOMEM;
+> +
+> +	ret = of_property_read_u32_array(np, "voltage-table",
+> +					 (u32 *)duty_cycle_table,
+> +					 length / sizeof(u32));
+> +	if (ret) {
+> +		dev_err(&pdev->dev, "Failed to read voltage-table\n");
+> +		return ret;
+> +	}
+> +
+> +	drvdata->duty_cycle_table	= duty_cycle_table;
+> +	pwm_regulator_desc.ops		= &pwm_regulator_voltage_table_ops;
+> +	pwm_regulator_desc.n_voltages	= length / sizeof(*duty_cycle_table);
+> +
+> +	return 0;
+> +}
+> +
+>  static int pwm_regulator_probe(struct platform_device *pdev)
+>  {
+>  	struct pwm_regulator_data *drvdata;
+> -	struct property *prop;
+>  	struct regulator_dev *regulator;
+>  	struct regulator_config config = { };
+>  	struct device_node *np = pdev->dev.of_node;
+> -	int length, ret;
+> +	int ret;
 >  
->  	for (i = 0; i < nsels; i++) {
->  		ret = of_property_read_u32_index(np, "reg", i, &tmp);
-> @@ -1377,11 +1440,9 @@ static int sunxi_nfc_probe(struct platform_device *pdev)
->  	platform_set_drvdata(pdev, nfc);
+>  	if (!np) {
+>  		dev_err(&pdev->dev, "Device Tree node missing\n");
+> @@ -112,36 +146,15 @@ static int pwm_regulator_probe(struct platform_device *pdev)
+>  	if (!drvdata)
+>  		return -ENOMEM;
 >  
->  	/*
-> -	 * TODO: replace these magic values with proper flags as soon as we
-> -	 * know what they are encoding.
-> +	 * TODO: replace this magic value with EDO flag
->  	 */
->  	writel(0x100, nfc->regs + NFC_REG_TIMING_CTL);
-> -	writel(0x7ff, nfc->regs + NFC_REG_TIMING_CFG);
+> -	/* determine the number of voltage-table */
+> -	prop = of_find_property(np, "voltage-table", &length);
+> -	if (!prop) {
+> -		dev_err(&pdev->dev, "No voltage-table\n");
+> -		return -EINVAL;
+> -	}
+> -
+> -	if ((length < sizeof(*drvdata->duty_cycle_table)) ||
+> -	    (length % sizeof(*drvdata->duty_cycle_table))) {
+> -		dev_err(&pdev->dev, "voltage-table length(%d) is invalid\n",
+> -			length);
+> +	if (of_find_property(np, "voltage-table", NULL)) {
+> +		ret = pwm_regulator_init_table(pdev, drvdata);
+> +		if (ret)
+> +			return ret;
+> +	} else {
+> +		dev_err(&pdev->dev, "No \"voltage-table\" supplied\n");
+>  		return -EINVAL;
+>  	}
 >  
->  	ret = sunxi_nand_chips_init(dev, nfc);
->  	if (ret) {
+> -	pwm_regulator_desc.n_voltages = length / sizeof(*drvdata->duty_cycle_table);
+> -
+> -	drvdata->duty_cycle_table = devm_kzalloc(&pdev->dev,
+> -						 length, GFP_KERNEL);
+> -	if (!drvdata->duty_cycle_table)
+> -		return -ENOMEM;
+> -
+> -	/* read voltage table from DT property */
+> -	ret = of_property_read_u32_array(np, "voltage-table",
+> -					 (u32 *)drvdata->duty_cycle_table,
+> -					 length / sizeof(u32));
+> -	if (ret < 0) {
+> -		dev_err(&pdev->dev, "read voltage-table failed\n");
+> -		return ret;
+> -	}
+> -
+>  	config.init_data = of_get_regulator_init_data(&pdev->dev, np,
+>  						      &pwm_regulator_desc);
+>  	if (!config.init_data)
+> -- 
+> 1.9.1
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
 
 
 
 -- 
-Boris Brezillon, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+___________________________________________________________
+
+Ka-Ro electronics GmbH | Pascalstra?e 22 | D - 52076 Aachen
+Phone: +49 2408 1402-0 | Fax: +49 2408 1402-10
+Gesch?ftsf?hrer: Matthias Kaussen
+Handelsregistereintrag: Amtsgericht Aachen, HRB 4996
+
+www.karo-electronics.de | info at karo-electronics.de
+___________________________________________________________
