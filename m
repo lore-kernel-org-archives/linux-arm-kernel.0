@@ -1,53 +1,33 @@
-From: haibo.chen@freescale.com (Haibo Chen)
-Date: Wed, 10 Jun 2015 16:50:43 +0800
-Subject: [PATCH 5/6] mmc: sdhci-esdhc-imx: set back the burst_length_enable
- bit to 1
-In-Reply-To: <1433926244-29244-1-git-send-email-haibo.chen@freescale.com>
-References: <1433926244-29244-1-git-send-email-haibo.chen@freescale.com>
-Message-ID: <1433926244-29244-6-git-send-email-haibo.chen@freescale.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Wed, 10 Jun 2015 10:51:17 +0200
+Subject: [PATCH 01/34] pinctrl: mvebu: armada-38x: fix PCIe functions
+In-Reply-To: <1433868446-11028-2-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1433868446-11028-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1433868446-11028-2-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <CACRpkdbsp=L23SwypwAU=pu1eeVjeS7kVUqQn-zWnKdHOq7buQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently we find that if a usdhc is choosed to boot system, then ROM
-code will set the burst length enable bit of this usdhc as 0.
+On Tue, Jun 9, 2015 at 6:46 PM, Thomas Petazzoni
+<thomas.petazzoni@free-electrons.com> wrote:
 
-This will make performance drop a lot if this usdhc's burst length is
-16. So this patch set back the burst_length_enable bit as 1, which is
-the default value, and means burst length is enabled for INCR.
+> A new revision of the Marvell Armada 38x hardware datasheet unveiled
+> that the definition of some of the PCIe functions were not
+> correct. This commit fixes the pinctrl driver accordingly.
+>
+> Some PCIe functions simply do not exist, some of the PCIe functions in
+> fact were corresponding to other functions, and some PCIe functions
+> have been added.
+>
+> Note: the seemingly unrelated removal of spi(cs2) on MPP47 is related:
+> this function is in fact implemented on MPP43, instead of a PCIe
+> function.
+>
+> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+> Cc: <stable@vger.kernel.org> # v3.15+
+> Fixes: ca6d9a084b56f ("pinctrl: mvebu: add pin-muxing driver for the Marvell Armada 380/385")
 
-Signed-off-by: Haibo Chen <haibo.chen@freescale.com>
----
- drivers/mmc/host/sdhci-esdhc-imx.c | 11 +++++++++++
- 1 file changed, 11 insertions(+)
+Patch applied.
 
-diff --git a/drivers/mmc/host/sdhci-esdhc-imx.c b/drivers/mmc/host/sdhci-esdhc-imx.c
-index 1f0e0d9..e6a1995 100644
---- a/drivers/mmc/host/sdhci-esdhc-imx.c
-+++ b/drivers/mmc/host/sdhci-esdhc-imx.c
-@@ -32,6 +32,7 @@
- #include "sdhci-esdhc.h"
- 
- #define	ESDHC_CTRL_D3CD			0x08
-+#define ESDHC_BURST_LEN_EN_INCR		(1 << 27)
- /* VENDOR SPEC register */
- #define ESDHC_VENDOR_SPEC		0xc0
- #define  ESDHC_VENDOR_SPEC_SDIO_QUIRK	(1 << 1)
-@@ -1088,6 +1089,16 @@ static int sdhci_esdhc_imx_probe(struct platform_device *pdev)
- 		host->quirks2 |= SDHCI_QUIRK2_PRESET_VALUE_BROKEN;
- 		host->mmc->caps |= MMC_CAP_1_8V_DDR;
- 
-+		/*
-+		 * ROM code will change the burst_length_enable setting to
-+		 * zero if this usdhc is choosed to boot system. Change it
-+		 * back here, otherwise it will impact the performance a
-+		 * lot if the burst length is 16.
-+		 */
-+		writel(readl(host->ioaddr + SDHCI_HOST_CONTROL)
-+			| ESDHC_BURST_LEN_EN_INCR,
-+			host->ioaddr + SDHCI_HOST_CONTROL);
-+
- 		if (!(imx_data->socdata->flags & ESDHC_FLAG_HS200))
- 			host->quirks2 |= SDHCI_QUIRK2_BROKEN_HS200;
- 
--- 
-1.9.1
+Yours,
+Linus Walleij
