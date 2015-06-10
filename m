@@ -1,42 +1,85 @@
-From: drake@endlessm.com (Daniel Drake)
-Date: Wed, 10 Jun 2015 07:44:27 -0600
-Subject: [PATCH v2] mmc: meson: Add driver for the SD/MMC host found on
- Amlogic MesonX SoCs
-In-Reply-To: <1433926397-31376-1-git-send-email-carlo@caione.org>
-References: <1433926397-31376-1-git-send-email-carlo@caione.org>
-Message-ID: <CAD8Lp45_Bj3L3+AUgs+WYmS1jkoHhnjR+0wVpMQ1r5oToEPBrg@mail.gmail.com>
+From: alex.bennee@linaro.org (Alex =?utf-8?Q?Benn=C3=A9e?=)
+Date: Wed, 10 Jun 2015 14:52:50 +0100
+Subject: [PATCH v2 05/11] KVM: arm: check ordering of all system register
+ tables
+In-Reply-To: <1433046432-1824-6-git-send-email-zhichao.huang@linaro.org>
+References: <1433046432-1824-1-git-send-email-zhichao.huang@linaro.org>
+ <1433046432-1824-6-git-send-email-zhichao.huang@linaro.org>
+Message-ID: <87fv5z7jrh.fsf@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 10, 2015 at 2:53 AM, Carlo Caione <carlo@caione.org> wrote:
-> +static int meson_mmc_map_dma(struct meson_mmc_host *host,
-> +                            struct mmc_data *data,
-> +                            unsigned int flags)
-> +{      u32 i, dma_len;
-> +       struct scatterlist *sg;
+
+Zhichao Huang <zhichao.huang@linaro.org> writes:
+
+> We now have multiple tables for the various system registers
+> we trap. Make sure we check the order of all of them, as it is
+> critical that we get the order right (been there, done that...).
+>
+> Signed-off-by: Zhichao Huang <zhichao.huang@linaro.org>
+> ---
+>  arch/arm/kvm/coproc.c | 26 +++++++++++++++++++++-----
+>  1 file changed, 21 insertions(+), 5 deletions(-)
+>
+> diff --git a/arch/arm/kvm/coproc.c b/arch/arm/kvm/coproc.c
+> index d23395b..16d5f69 100644
+> --- a/arch/arm/kvm/coproc.c
+> +++ b/arch/arm/kvm/coproc.c
+> @@ -737,6 +737,9 @@ static struct coproc_reg invariant_cp15[] = {
+>  	{ CRn( 0), CRm( 0), Op1( 0), Op2( 3), is32, NULL, get_TLBTR },
+>  	{ CRn( 0), CRm( 0), Op1( 0), Op2( 6), is32, NULL, get_REVIDR },
+>  
+> +	{ CRn( 0), CRm( 0), Op1( 1), Op2( 1), is32, NULL, get_CLIDR },
+> +	{ CRn( 0), CRm( 0), Op1( 1), Op2( 7), is32, NULL, get_AIDR },
 > +
-> +       dma_len = dma_map_sg(mmc_dev(host->mmc), data->sg, data->sg_len,
-> +                            ((data->flags & MMC_DATA_READ) ?
-> +                            DMA_FROM_DEVICE : DMA_TO_DEVICE));
-> +       if (dma_len == 0) {
-> +               dev_err(mmc_dev(host->mmc), "dma_map_sg failed\n");
-> +               return -ENOMEM;
-> +       }
+>  	{ CRn( 0), CRm( 1), Op1( 0), Op2( 0), is32, NULL, get_ID_PFR0 },
+>  	{ CRn( 0), CRm( 1), Op1( 0), Op2( 1), is32, NULL, get_ID_PFR1 },
+>  	{ CRn( 0), CRm( 1), Op1( 0), Op2( 2), is32, NULL, get_ID_DFR0 },
+> @@ -752,9 +755,6 @@ static struct coproc_reg invariant_cp15[] = {
+>  	{ CRn( 0), CRm( 2), Op1( 0), Op2( 3), is32, NULL, get_ID_ISAR3 },
+>  	{ CRn( 0), CRm( 2), Op1( 0), Op2( 4), is32, NULL, get_ID_ISAR4 },
+>  	{ CRn( 0), CRm( 2), Op1( 0), Op2( 5), is32, NULL, get_ID_ISAR5 },
+> -
+> -	{ CRn( 0), CRm( 0), Op1( 1), Op2( 1), is32, NULL, get_CLIDR },
+> -	{ CRn( 0), CRm( 0), Op1( 1), Op2( 7), is32, NULL, get_AIDR },
+>  };
+>  
+>  /*
+> @@ -1297,13 +1297,29 @@ int kvm_arm_copy_coproc_indices(struct kvm_vcpu *vcpu, u64 __user *uindices)
+>  	return write_demux_regids(uindices);
+>  }
+>  
+> +static int check_sysreg_table(const struct coproc_reg *table, unsigned int n)
+> +{
+> +	unsigned int i;
 > +
-> +       for_each_sg(data->sg, sg, data->sg_len, i) {
-> +               if (sg->offset & 3 || sg->length & 3) {
-> +                       dev_err(mmc_dev(host->mmc),
-> +                               "unaligned scatterlist: os %x length %d\n",
-> +                               sg->offset, sg->length);
-> +                       return -EINVAL;
-> +               }
-> +       }
+> +	for (i = 1; i < n; i++) {
+> +		if (cmp_reg(&table[i-1], &table[i]) >= 0) {
+> +			kvm_err("sys_reg table %p out of order (%d)\n",
+> +					table, i - 1);
 
-If the offset/length check fails here, do you leak the DMA mapping?
-If so, can you do the offset/length check first to avoid that?
+Isn't a BUG_ON *and* a kvm_err() overkill?
 
-There should only ever be 1 entry in the scatterlist, right? In that
-case you can do a simple check there, and then instead of looping,
-just check the first entry in the scatterlist.
+> +			return 1;
+> +		}
+> +	}
+> +
+> +	return 0;
+> +}
+> +
+>  void kvm_coproc_table_init(void)
+>  {
+>  	unsigned int i;
+>  
+>  	/* Make sure tables are unique and in order. */
+> -	for (i = 1; i < ARRAY_SIZE(cp15_regs); i++)
+> -		BUG_ON(cmp_reg(&cp15_regs[i-1], &cp15_regs[i]) >= 0);
+> +	BUG_ON(check_sysreg_table(cp14_regs, ARRAY_SIZE(cp14_regs)));
+> +	BUG_ON(check_sysreg_table(cp15_regs, ARRAY_SIZE(cp15_regs)));
+> +	BUG_ON(check_sysreg_table(invariant_cp15, ARRAY_SIZE(invariant_cp15)));
+>  
+>  	/* We abuse the reset function to overwrite the table itself. */
+>  	for (i = 0; i < ARRAY_SIZE(invariant_cp15); i++)
 
-Daniel
+-- 
+Alex Benn?e
