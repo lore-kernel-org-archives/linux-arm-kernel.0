@@ -1,36 +1,36 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 10 Jun 2015 16:58:55 +0100
-Subject: [PATCH] iommu/arm-smmu: Fix broken ATOS check
-Message-ID: <1433951935-6774-1-git-send-email-will.deacon@arm.com>
+From: dan.j.williams@intel.com (Dan Williams)
+Date: Wed, 10 Jun 2015 09:00:31 -0700
+Subject: [PATCH 1/2] scatterlist: use sg_phys()
+In-Reply-To: <20150610093252.GA20384@8bytes.org>
+References: <20150609162659.21910.41681.stgit@dwillia2-desk3.amr.corp.intel.com>
+ <20150609162710.21910.57295.stgit@dwillia2-desk3.amr.corp.intel.com>
+ <20150610093252.GA20384@8bytes.org>
+Message-ID: <CAPcyv4gat8TG9YnHmvD_7A7RD00Urn=febCj2Uc_cVcPi+fnCg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit 83a60ed8f0b5 ("iommu/arm-smmu: fix ARM_SMMU_FEAT_TRANS_OPS
-condition") accidentally negated the ID0_ATOSNS predicate in the ATOS
-feature check, causing the driver to attempt ATOS requests on SMMUv2
-hardware without the ATOS feature implemented.
+On Wed, Jun 10, 2015 at 2:32 AM, Joerg Roedel <joro@8bytes.org> wrote:
+> On Tue, Jun 09, 2015 at 12:27:10PM -0400, Dan Williams wrote:
+>> diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
+>> index 7e7583ddd607..9f6ff6671f01 100644
+>> --- a/arch/arm/mm/dma-mapping.c
+>> +++ b/arch/arm/mm/dma-mapping.c
+>> @@ -1502,7 +1502,7 @@ static int __map_sg_chunk(struct device *dev, struct scatterlist *sg,
+>>               return -ENOMEM;
+>>
+>>       for (count = 0, s = sg; count < (size >> PAGE_SHIFT); s = sg_next(s)) {
+>> -             phys_addr_t phys = page_to_phys(sg_page(s));
+>> +             phys_addr_t phys = sg_phys(s) - s->offset;
+>
+> So sg_phys() turns out to be 'page_to_phys(sg_page(s)) + s->offset',
+> which makes the above statement to:
+>
+>         page_to_phys(sg_page(s)) + s->offset - s->offset;
+>
+> The compiler will probably optimize that away, but it still doesn't look
+> like an improvement.
 
-This patch restores the predicate to the correct value.
-
-Cc: <stable@vger.kernel.org> # 4.0+
-Reported-by: Varun Sethi <varun.sethi@freescale.com>
-Signed-off-by: Will Deacon <will.deacon@arm.com>
----
- drivers/iommu/arm-smmu.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
-index dce041b1c139..9f1af00d0f68 100644
---- a/drivers/iommu/arm-smmu.c
-+++ b/drivers/iommu/arm-smmu.c
-@@ -1566,7 +1566,7 @@ static int arm_smmu_device_cfg_probe(struct arm_smmu_device *smmu)
- 		return -ENODEV;
- 	}
- 
--	if ((id & ID0_S1TS) && ((smmu->version == 1) || (id & ID0_ATOSNS))) {
-+	if ((id & ID0_S1TS) && ((smmu->version == 1) || (!(id & ID0_ATOSNS)))) {
- 		smmu->features |= ARM_SMMU_FEAT_TRANS_OPS;
- 		dev_notice(smmu->dev, "\taddress translation ops\n");
- 	}
--- 
-2.1.4
+The goal is to eventually stop leaking struct page deep into the i/o
+stack.  Anything that relies on being able to retrieve a struct page
+out of an sg entry needs to be converted.  I think we need a new
+helper for this case "sg_phys_aligned()?".
