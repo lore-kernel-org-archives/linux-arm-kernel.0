@@ -1,10 +1,10 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 10 Jun 2015 14:42:01 +0200
-Subject: [PATCH 11/15] pinctrl: kill off set_irq_flags usage
-In-Reply-To: <1433874401-27161-12-git-send-email-robh@kernel.org>
+Date: Wed, 10 Jun 2015 14:43:00 +0200
+Subject: [PATCH 05/15] gpio: kill off set_irq_flags usage
+In-Reply-To: <1433874401-27161-6-git-send-email-robh@kernel.org>
 References: <1433874401-27161-1-git-send-email-robh@kernel.org>
- <1433874401-27161-12-git-send-email-robh@kernel.org>
-Message-ID: <CACRpkdZ4sZHJRGsk3F1J12j5XFnLJ6EvMtzgHsoX_Gjx-NWjPA@mail.gmail.com>
+ <1433874401-27161-6-git-send-email-robh@kernel.org>
+Message-ID: <CACRpkdZW9YvHGoypLRjwQ_gLtnQso3+XN193ZPy17T+31zm+Ag@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -26,19 +26,15 @@ On Tue, Jun 9, 2015 at 8:26 PM, Rob Herring <robh@kernel.org> wrote:
 > copy and paste of this code.
 >
 > Signed-off-by: Rob Herring <robh@kernel.org>
+> Cc: Michael Hennerich <michael.hennerich@analog.com>
 > Cc: Linus Walleij <linus.walleij@linaro.org>
+> Cc: Alexandre Courbot <gnurou@gmail.com>
+> Cc: Ray Jui <rjui@broadcom.com>
 > Cc: Stephen Warren <swarren@wwwdotorg.org>
-> Cc: Lee Jones <lee@kernel.org>
-> Cc: Matthias Brugger <matthias.bgg@gmail.com>
-> Cc: Tomasz Figa <tomasz.figa@gmail.com>
-> Cc: Thomas Abraham <thomas.abraham@linaro.org>
-> Cc: Kukjin Kim <kgene@kernel.org>
-> Cc: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+> Cc: Thierry Reding <thierry.reding@gmail.com>
 > Cc: linux-gpio at vger.kernel.org
-> Cc: linux-rpi-kernel at lists.infradead.org
-> Cc: linux-arm-kernel at lists.infradead.org
-> Cc: linux-mediatek at lists.infradead.org
-> Cc: linux-samsung-soc at vger.kernel.org
+> Cc: bcm-kernel-feedback-list at broadcom.com
+> Cc: linux-tegra at vger.kernel.org
 
 Acked-by: Linus Walleij <linus.walleij@linaro.org>
 
