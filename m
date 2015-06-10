@@ -1,74 +1,81 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 10 Jun 2015 17:29:47 +0100
-Subject: [PATCH 10/11] irqchip / GICv2 / ACPI: Consolidate GICv2 ACPI
- related init code
-In-Reply-To: <555DEB6A.8090404@linaro.org>
-References: <1431953961-22706-1-git-send-email-hanjun.guo@linaro.org>
- <1431953961-22706-11-git-send-email-hanjun.guo@linaro.org>
- <555CF23B.1000002@linaro.org> <555DEB6A.8090404@linaro.org>
-Message-ID: <557865FB.1010502@arm.com>
+From: 21cnbao@gmail.com (Barry Song)
+Date: Thu, 11 Jun 2015 00:30:41 +0800
+Subject: [PATCH 1/2 V3] clk: sirf: add CSR atlas7 clk and reset support
+In-Reply-To: <20150521213324.GA1885@codeaurora.org>
+References: <1431675587-8637-1-git-send-email-21cnbao@gmail.com>
+ <20150515183029.GL31753@codeaurora.org>
+ <CAGsJ_4zwNQvvSwb49nwKzfke1V1nUCW-tDqbP4FxEr0SfmX9zA@mail.gmail.com>
+ <20150521213324.GA1885@codeaurora.org>
+Message-ID: <CAGsJ_4xUk1kDnLDrRnipN+Kpm6oOe8C-4DfhdshVUmv+PKjgig@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 21/05/15 15:27, Hanjun Guo wrote:
-> On 2015?05?21? 04:44, Tomasz Nowicki wrote:
->> Hi Hanjun,
+2015-05-22 5:33 GMT+08:00 Stephen Boyd <sboyd@codeaurora.org>:
+> On 05/16, Barry Song wrote:
+>> 2015-05-16 2:30 GMT+08:00 Stephen Boyd <sboyd@codeaurora.org>:
+>> > On 05/15, Barry Song wrote:
+>> >> From: Zhiwu Song <Zhiwu.Song@csr.com>
+>> >>
+>> >> the hardware node includes both clock and reset support, so it
+>> >> is named as "car".
+>> >> this patch implements Flexible clocks(mux, divider, gate), Selectable
+>> >> clock(mux, divider, gate), root clock(gate),leaf clock(gate), others.
+>> >> it also implements the reset controller functionality.
+>> >>
+>> >> Signed-off-by: Zhiwu Song <Zhiwu.Song@csr.com>
+>> >> Signed-off-by: Guo Zeng <Guo.Zeng@csr.com>
+>> >> Signed-off-by: Barry Song <Baohua.Song@csr.com>
+>> >> ---
+>> >
+>
+> Yes this has already been applied, but replying to the last
+> comment.
+>
+>> >> +
+>> >> +
+>> >> +CLK_OF_DECLARE(atlas7_clk, "sirf,atlas7-car", atlas7_clk_init);
+>> >>
+>> >
+>> > I'm also curious if we actually need to use CLK_OF_DECLARE here
+>> > or if could we use a platform device.
+>> >
+>> > Even if we need to use CLK_OF_DECLARE because some timer or other
+>> > early device needs a clock, I wonder if we shouldn't also make
+>> > these things into real platform drivers that register the other
+>> > clocks that aren't necessary for the early boot process.
+>> >
+>> it seems it is a general question not only for this driver?
+>
+> Yes it is.
+>
 >>
->> On 05/18/2015 02:59 PM, Hanjun Guo wrote:
->>> Move GICv2 ACPI related init code in irq-gic.c to irq-gic-acpi.c,
->>> this can make the ACPI related GIC init code slef-contained.
->>>
->>> Introduce set_acpi_core_irqdomain() to set acpi_irqdomain then
->>> it will be no need to make gic_data[] as a global value, and
->>> it will save the confilcts with GICv3's gic_data in the later
->>> patch.
->>>
->>> acpi_gic_parse_distributor() have the same function as
->>> gic_acpi_parse_madt_distributor() to get the GIC distributor
->>> physical base address, so just remove the duplicate one, and
->>> only get the GIC version when it is unknown.
->>>
->>> Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
->>> ---
->>>   drivers/irqchip/irq-gic-acpi.c       |  95
->>> +++++++++++++++++++++++++++++++-
->>>   drivers/irqchip/irq-gic.c            | 103
->>> +----------------------------------
->>>   include/linux/irqchip/arm-gic-acpi.h |   5 ++
->>>   3 files changed, 101 insertions(+), 102 deletions(-)
->>>
->>> diff --git a/drivers/irqchip/irq-gic-acpi.c
->>> b/drivers/irqchip/irq-gic-acpi.c
->>> index 1388d9e..8463e48 100644
->>> --- a/drivers/irqchip/irq-gic-acpi.c
->>> +++ b/drivers/irqchip/irq-gic-acpi.c
->>> @@ -13,12 +13,16 @@
->>>
->>>   #include <linux/acpi.h>
->>>   #include <linux/init.h>
->>> +#include <linux/irqchip/arm-gic.h>
->>>   #include <linux/irqchip/arm-gic-acpi.h>
->>>   #include <linux/irqchip/arm-gic-v3.h>
->>
->> arm-gic.h and arm-gic-v3.h describe register map for respective drivers
->> and should be used separately within parent driver only.
-> 
-> Seems that there is no duplicate macros in that two head
-> file, but yes, it will confuse people.
-> 
-> Consolidating all ACPI GIC code is an improvement to make
-> ACPI related code self-contained, but also have some drawbacks,
-> 
-> Marc, what do you think?
+>> the main difficulty is maintaining the boot sequence of the platform
+>> devices and other machine codes which require clocks. it seems it is
+>> the easiest way to make clk ready earlier than other drivers.
+>> and i don't think registering these clocks takes much boot time and
+>> make boot slower at least for atlas7 platform since there is no sleep
+>> and long delay in the procedure.
+>
+> It isn't really about making boot time faster, it's about using
+> the proper linux device model for clock providers. That way when
+> we want to support things like suspend/resume, deferred probe,
+> devm_*(), sysfs, etc. we can use the device model instead of
+> resorting to things like syscore_ops for suspend/resume or
+> forgoing features entirely.
+>
 
-What I think is "Over my dead body".
+my feeling is if the clock controller is an internal controller which
+serve all controllers in the SoC, "deferred probe" might be yes for
+almost all HW since all HW need clock. so it seems it makes "deferred
+probe" has no meaning. clock controller seems to be 1st HW which needs
+to be ready.
 
-These include files are private to the respective interrupt controller
-code, and the only reason they are in linux/irqchip is because the
-corresponding KVM support code uses them too.
+but if the clock controller is an external controller, it might be
+exactly a platform driver, or other bus-based drivers.
 
-Thanks,
 
-	M.
--- 
-Jazz is not dead. It just smells funny...
+> --
+> Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+> a Linux Foundation Collaborative Project
+
+-barry
