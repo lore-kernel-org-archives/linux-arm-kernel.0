@@ -1,39 +1,36 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Wed, 10 Jun 2015 17:48:22 +0100
-Subject: [Patch v5 4/6] PCI/ACPI: Consolidate common PCI host bridge code
- into ACPI core
-In-Reply-To: <55771B27.1060509@linux.intel.com>
-References: <1433780448-18636-1-git-send-email-jiang.liu@linux.intel.com>
- <1433780448-18636-5-git-send-email-jiang.liu@linux.intel.com>
- <20150609161230.GC8591@red-moon> <55771B27.1060509@linux.intel.com>
-Message-ID: <20150610164821.GA18832@red-moon>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Wed, 10 Jun 2015 17:53:24 +0100
+Subject: Moan: usage of __iormb() and __iowmb() outside of asm/io.h
+In-Reply-To: <20150610123040.GN7557@n2100.arm.linux.org.uk>
+References: <20150608184701.GA7557@n2100.arm.linux.org.uk>
+ <20150610111819.GC22973@arm.com>
+ <20150610112433.GM7557@n2100.arm.linux.org.uk>
+ <20150610123040.GN7557@n2100.arm.linux.org.uk>
+Message-ID: <20150610165323.GE22844@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 09, 2015 at 05:58:15PM +0100, Jiang Liu wrote:
-> On 2015/6/10 0:12, Lorenzo Pieralisi wrote:
-
-[...]
-
-> >> +struct pci_bus *acpi_pci_root_create(struct acpi_pci_root *root,
-> >> +				     struct acpi_pci_root_ops *ops,
-> >> +				     struct acpi_pci_root_info *info,
-> >> +				     void *sysdata, int segment, int node)
+On Wed, Jun 10, 2015 at 01:30:40PM +0100, Russell King - ARM Linux wrote:
+> On Wed, Jun 10, 2015 at 12:24:34PM +0100, Russell King - ARM Linux wrote:
+> > On Wed, Jun 10, 2015 at 12:18:20PM +0100, Will Deacon wrote:
+> > > I agree to removing these from view; we already have plenty of barrier
+> > > macros and we don't want these to proliferate outside of the arch code.
+> > > 
+> > > Any chance you could do a similar change for arm64, please (we have the
+> > > same macros there)?
 > > 
-> > I do not think you need to pass segment and node, they clutter the
-> > function signature when you can retrieve them from root, I would
-> > make them local variables and use root->segment and acpi_get_node
-> > in the function body to retrieve them.
-> On x86, node and segment may be overridden under certain conditions.
-> For example, segment will always be 0 if 'pci_ignore_seg' is set.
+> > Yes - as you're aware, removing them from sight does cause us to decend
+> > into macro-hell in asm/io.h, but I think that's better than having people
+> > get their grubby fingers on arch internal stuff they shouldn't be touching.
+> 
+> Here's what I'm proposing for ARM.  As I say, it's macro-hell...  It's
+> also not perfect yet (since the __LINUX_ARM_ARCH__ < 6 case isn't
+> properly handled yet.)
 
-Ok, so the question would be then why do you not override the value
-in root->segment then (actually, is it *correct* to leave the segment
-value in root-> unchanged even if it is overriden) ?
+IMO, it makes the code pretty unreadable, it breaks searching/ctags. It
+may be easier to just randomly change the number of underscores in front
+of "io*mb" every few kernel releases (e.g. twice a year), so we identify
+the users outside asm/io.h.
 
-Anyway, node is just used for a printk, why do not you add segment and
-node to acpi_pci_root_info ? Just cosmetic stuff, trying to help you
-simplify the code, it is not easy to parse.
-
-Thanks,
-Lorenzo
+-- 
+Catalin
