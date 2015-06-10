@@ -1,85 +1,80 @@
-From: khilman@kernel.org (Kevin Hilman)
-Date: Wed, 10 Jun 2015 11:04:46 -0700
-Subject: [PATCH RFC 2/3] PM / Domains: Support atomic PM domains
-In-Reply-To: <1433456946-53296-3-git-send-email-lina.iyer@linaro.org> (Lina
- Iyer's message of "Thu, 4 Jun 2015 16:29:05 -0600")
-References: <1433456946-53296-1-git-send-email-lina.iyer@linaro.org>
- <1433456946-53296-3-git-send-email-lina.iyer@linaro.org>
-Message-ID: <7hy4jrmoch.fsf@deeprootsystems.com>
+From: stripathi@apm.com (Suman Tripathi)
+Date: Wed, 10 Jun 2015 23:54:38 +0530
+Subject: [PATCH RESEND v7 2/2] mmc: host: sdhci: Add support to disable
+ SDR104/SDR50/DDR50 based on capability register 0.
+In-Reply-To: <CAPDyKFqA5BGXUV+_r63Xwtpm6Bzi2HB=UN0pDcu6FkjtHOaqew@mail.gmail.com>
+References: <1432197817-22110-1-git-send-email-stripathi@apm.com>
+ <1432197817-22110-3-git-send-email-stripathi@apm.com>
+ <CAPDyKFpxkNF9C8AOJ6+18CEcpZTKycPR0i5OuwPRr1Zc+VPJ5Q@mail.gmail.com>
+ <CAOHikRASDmy7PwFjqmX7JAjW52DYR+d3RkE3yd_45NN5sHK7Pg@mail.gmail.com>
+ <CAOHikRBB9Uyh4Z34_pFTdmA0A-vnV09zTi8iYEU+01XvmzSr_A@mail.gmail.com>
+ <20150605145323.GA15110@shlinux1.ap.freescale.net>
+ <CAOHikRCXuJryKgo7pjehi-SyosE1Rr2zFjc+9yWJwke_ib=Azw@mail.gmail.com>
+ <CAPDyKFqk1_B-wH0Z2QwfxftJy8LLH6Ey9cg56eFxAj7zmeFmOg@mail.gmail.com>
+ <CAPDyKFqA5BGXUV+_r63Xwtpm6Bzi2HB=UN0pDcu6FkjtHOaqew@mail.gmail.com>
+Message-ID: <CAOHikRBGAF4LP8ZnkztUdKgRub8dt+x6xd6dhdJS-ZP9XJqTmg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Lina Iyer <lina.iyer@linaro.org> writes:
+Hi Ulf, Dong
 
-> Power Domains currently support turning on/off only in process context.
-
-Generic Power Domains...
-
-Also Re: $SUBJECT.  s/atomic/IRQ safe/
-
-> This restricts the usage of PM domains to devices and domains that
-> could be powered on/off in irq disabled contexts as the mutexes used in
-> GenPD allows for cpu sleep while waiting for locks.
-
-That sentence reads the opposite of what you mean.  Rather than "This
-restricts X to Y", I think you menant "This prevents X for Y".
-
-> Genpd inherently provides support for devices, domain hierarchy and can
-
-s/domain heirarchy/nesting/
-
-> be used to represent cpu clusters like in ARM's big.Little, where, each
-> cpu cluster is in its domain, with supporting caches and other
-> peripheral hardware. 
-
-s/domain/power domain/
-
-> Multiple such domains could be part of another domain. 
-
-OK, but not important to this change IMO.
-
-> Because mutexes are used to protect and synchronize domain
-
-s/domain/genpd/
-
-> operations and cpu idle operations are inherently atomic, 
-
-Be more specific about "CPU idle operations are inherently atomic", as
-it's not obvious that it's true.  I think what you mean is that
-the CPUidle paths for entering of low-power idle states is inherently
-atomic because interrupts are disabled.
-
-> the use of
-> genpd is not possible for runtime suspend and resume of the pm domain.
-
-... so, the use of genpd during the idle path of CPUs is not currently
-possible because interrups are disabled in the idle path.
-
-> Replacing the locks to spinlocks would allow cpu domain to be be powered
-                     ^^^^
-s/to/with/
-
-> off to save power, when all the cpus are powered off.
-
-More accuratly, replacing the locks doesn't allow the domain to be
-powered off, rather it allows genpd to be used in the idle path, which 
-would allow genpd to be used
-
-> However, not all domains can operate in irq-safe contexts and usually
-> would need to sleep during domain operations. So genpd has to support
-> both the cases, where the domain is or is not irq-safe. The irq-safe
-> attribute is therefore domain specific.
+On Mon, Jun 8, 2015 at 2:08 PM, Ulf Hansson <ulf.hansson@linaro.org> wrote:
+> On 8 June 2015 at 10:37, Ulf Hansson <ulf.hansson@linaro.org> wrote:
+>> [...]
+>>
+>>>> >
+>>>> >    Can you test this patch  on imx SoC ?
+>>>> >
+>>>>
+>>>> (Your email have some format issue.)
+>>>
+>>> Yeah missed to sent in plain text mode.
+>>>
+>>>>
+>>>> I have tested this patch and it does not break imx SoC.
+>>>> You can add my tag.
+>>>> Tested-by: Dong Aisheng <aisheng.dong@freescale.com>
+>>>
+>>> Thanks Dong !!
+>>>
+>>>>
+>>>> However, it looks to me SDHCI_CAN_VDD_180 is only indicating the host VDD
+>>>> capabiliies, not IO voltage capability.
+>>
+>> I think Dong is correct. I don't think SDHCI_CAN_VDD_180 is not
 >
-> To achieve domain specific locking, set the GENPD_FLAG_IRQ_SAFE flag
-> while defining the domain. This determines if the domain should use a
-> spinlock instead of a mutex. Locking is abstracted through
-> genpd_lock_domain() and genpd_unlock_domain() functions that use the
-> flag to determine the locking to be used for this domain.
+> /s /is not /is
 >
-> The restriction this imposes on the domain hierarchy is that subdomains
-> and all devices in the hierarchy also be irq-safe. Non irq-safe domains
-> may continue to have irq-safe devices, but not the other way around.
+>> related to UHS modes at all.
+>>
+>> At least the name of the field (SDHCI_CAN_VDD_180) indicates it's
+>> about VDD/VCC, the core power and not the IO voltage.
+>>
+>>> Are you sure on this ?? If SDHCI host VDD is  1.8V then the cards are
+>>> also capable to operate at 1.8V ? Didn't understand what you mean by
+>>> IO voltage capability
+>>>
+>>>
+>>>> SD3.0 cards require 1.8v IO voltage support.
+>>>> So should this bit affect SD3.0 support?
+>>>
+>>> The preset value resgister says that  SDR modes requires 1.8V and we
+>>> disable the modes based on capability or quirk.
+>>
+>> It requires 1.8V *IO voltage*, not VDD/VCC.
 
-This might need some corresponding updates to Documentation/ as well.
+I agree on this now  . I will post a version where this quirk will be
+added for arasan 4.9a that doesn't support 1.8v voltage signalling.
 
-Kevin
+>>
+>> [...]
+>>
+>> Kind regards
+>> Uffe
+
+
+
+-- 
+Thanks,
+with regards,
+Suman Tripathi
