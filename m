@@ -1,76 +1,118 @@
 From: stripathi@apm.com (Suman Tripathi)
-Date: Wed, 10 Jun 2015 23:54:38 +0530
-Subject: [PATCH RESEND v7 2/2] mmc: host: sdhci: Add support to disable
- SDR104/SDR50/DDR50 based on capability register 0.
-In-Reply-To: <CAPDyKFqA5BGXUV+_r63Xwtpm6Bzi2HB=UN0pDcu6FkjtHOaqew@mail.gmail.com>
-References: <1432197817-22110-1-git-send-email-stripathi@apm.com>
- <1432197817-22110-3-git-send-email-stripathi@apm.com>
- <CAPDyKFpxkNF9C8AOJ6+18CEcpZTKycPR0i5OuwPRr1Zc+VPJ5Q@mail.gmail.com>
- <CAOHikRASDmy7PwFjqmX7JAjW52DYR+d3RkE3yd_45NN5sHK7Pg@mail.gmail.com>
- <CAOHikRBB9Uyh4Z34_pFTdmA0A-vnV09zTi8iYEU+01XvmzSr_A@mail.gmail.com>
- <20150605145323.GA15110@shlinux1.ap.freescale.net>
- <CAOHikRCXuJryKgo7pjehi-SyosE1Rr2zFjc+9yWJwke_ib=Azw@mail.gmail.com>
- <CAPDyKFqk1_B-wH0Z2QwfxftJy8LLH6Ey9cg56eFxAj7zmeFmOg@mail.gmail.com>
- <CAPDyKFqA5BGXUV+_r63Xwtpm6Bzi2HB=UN0pDcu6FkjtHOaqew@mail.gmail.com>
-Message-ID: <CAOHikRBGAF4LP8ZnkztUdKgRub8dt+x6xd6dhdJS-ZP9XJqTmg@mail.gmail.com>
+Date: Wed, 10 Jun 2015 23:56:20 +0530
+Subject: [PATCH v7 1/2] arm64: dts: Add the arasan mmc nodes in
+ apm-storm.dtsi
+In-Reply-To: <CAOHikRAV4i_R8LhmJgRRePSbJ+YG_eb6c94idQZWHS+fh6SAVQ@mail.gmail.com>
+References: <1431517912-10322-1-git-send-email-stripathi@apm.com>
+ <1431517912-10322-2-git-send-email-stripathi@apm.com>
+ <CAOHikRAV4i_R8LhmJgRRePSbJ+YG_eb6c94idQZWHS+fh6SAVQ@mail.gmail.com>
+Message-ID: <CAOHikRBAU=P56A2JhRJiB5gWANMfrZPp+fXR-BGUGyDGYAusKA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ulf, Dong
+Hi Arnd and all
 
-On Mon, Jun 8, 2015 at 2:08 PM, Ulf Hansson <ulf.hansson@linaro.org> wrote:
-> On 8 June 2015 at 10:37, Ulf Hansson <ulf.hansson@linaro.org> wrote:
->> [...]
->>
->>>> >
->>>> >    Can you test this patch  on imx SoC ?
->>>> >
->>>>
->>>> (Your email have some format issue.)
->>>
->>> Yeah missed to sent in plain text mode.
->>>
->>>>
->>>> I have tested this patch and it does not break imx SoC.
->>>> You can add my tag.
->>>> Tested-by: Dong Aisheng <aisheng.dong@freescale.com>
->>>
->>> Thanks Dong !!
->>>
->>>>
->>>> However, it looks to me SDHCI_CAN_VDD_180 is only indicating the host VDD
->>>> capabiliies, not IO voltage capability.
->>
->> I think Dong is correct. I don't think SDHCI_CAN_VDD_180 is not
+On Mon, May 18, 2015 at 12:34 PM, Suman Tripathi <stripathi@apm.com> wrote:
+> Hi Arnd,
 >
-> /s /is not /is
+> On Wed, May 13, 2015 at 5:21 PM, Suman Tripathi <stripathi@apm.com> wrote:
+>> This patch adds the arasan mmc nodes to reuse the of-arasan
+>> driver for APM X-Gene SoC.
+>>
+>> Signed-off-by: Suman Tripathi <stripathi@apm.com>
+>> ---
+>> ---
+>>  arch/arm64/boot/dts/apm/apm-mustang.dts |  4 +++
+>>  arch/arm64/boot/dts/apm/apm-storm.dtsi  | 43 +++++++++++++++++++++++++++++++++
+>>  2 files changed, 47 insertions(+)
+>>
+>> diff --git a/arch/arm64/boot/dts/apm/apm-mustang.dts b/arch/arm64/boot/dts/apm/apm-mustang.dts
+>> index 83578e7..7a3ea72 100644
+>> --- a/arch/arm64/boot/dts/apm/apm-mustang.dts
+>> +++ b/arch/arm64/boot/dts/apm/apm-mustang.dts
+>> @@ -52,3 +52,7 @@
+>>  &xgenet {
+>>         status = "ok";
+>>  };
+>> +
+>> +&mmc0 {
+>> +       status = "ok";
+>> +};
+>> diff --git a/arch/arm64/boot/dts/apm/apm-storm.dtsi b/arch/arm64/boot/dts/apm/apm-storm.dtsi
+>> index c8d3e0e..8e03ecd 100644
+>> --- a/arch/arm64/boot/dts/apm/apm-storm.dtsi
+>> +++ b/arch/arm64/boot/dts/apm/apm-storm.dtsi
+>> @@ -145,6 +145,40 @@
+>>                                 clock-output-names = "socplldiv2";
+>>                         };
+>>
+>> +                       ahbclk: ahbclk at 1f2ac000 {
+>> +                               compatible = "apm,xgene-device-clock";
+>> +                               #clock-cells = <1>;
+>> +                               clocks = <&socplldiv2 0>;
+>> +                               reg = <0x0 0x1f2ac000 0x0 0x1000
+>> +                                       0x0 0x17000000 0x0 0x2000>;
+>> +                               reg-names = "csr-reg", "div-reg";
+>> +                               csr-offset = <0x0>;
+>> +                               csr-mask = <0x1>;
+>> +                               enable-offset = <0x8>;
+>> +                               enable-mask = <0x1>;
+>> +                               divider-offset = <0x164>;
+>> +                               divider-width = <0x5>;
+>> +                               divider-shift = <0x0>;
+>> +                               clock-output-names = "ahbclk";
+>> +                       };
+>> +
+>> +                       sdioclk: sdioclk at 1f2ac000 {
+>> +                               compatible = "apm,xgene-device-clock";
+>> +                               #clock-cells = <1>;
+>> +                               clocks = <&socplldiv2 0>;
+>> +                               reg = <0x0 0x1f2ac000 0x0 0x1000
+>> +                                       0x0 0x17000000 0x0 0x2000>;
+>> +                               reg-names = "csr-reg", "div-reg";
+>> +                               csr-offset = <0x0>;
+>> +                               csr-mask = <0x2>;
+>> +                               enable-offset = <0x8>;
+>> +                               enable-mask = <0x2>;
+>> +                               divider-offset = <0x178>;
+>> +                               divider-width = <0x8>;
+>> +                               divider-shift = <0x0>;
+>> +                               clock-output-names = "sdioclk";
+>> +                       };
+>> +
+>>                         qmlclk: qmlclk {
+>>                                 compatible = "apm,xgene-device-clock";
+>>                                 #clock-cells = <1>;
+>> @@ -533,6 +567,15 @@
+>>                         interrupts = <0x0 0x4f 0x4>;
+>>                 };
+>>
+>> +               mmc0: mmc at 1c000000 {
+>> +                       compatible = "arasan,sdhci-4.9a";
+>> +                       reg = <0x0 0x1c000000 0x0 0x100>;
+>> +                       interrupts = <0x0 0x49 0x4>;
+>> +                       dma-coherent;
+>> +                       clock-names = "clk_xin", "clk_ahb";
+>> +                       clocks = <&sdioclk 0>, <&ahbclk 0>;
+>> +               };
+>> +
+>>                 phy1: phy at 1f21a000 {
+>>                         compatible = "apm,xgene-phy";
+>>                         reg = <0x0 0x1f21a000 0x0 0x100>;
+>> --
+>> 1.8.2.1
+>>
 >
->> related to UHS modes at all.
->>
->> At least the name of the field (SDHCI_CAN_VDD_180) indicates it's
->> about VDD/VCC, the core power and not the IO voltage.
->>
->>> Are you sure on this ?? If SDHCI host VDD is  1.8V then the cards are
->>> also capable to operate at 1.8V ? Didn't understand what you mean by
->>> IO voltage capability
->>>
->>>
->>>> SD3.0 cards require 1.8v IO voltage support.
->>>> So should this bit affect SD3.0 support?
->>>
->>> The preset value resgister says that  SDR modes requires 1.8V and we
->>> disable the modes based on capability or quirk.
->>
->> It requires 1.8V *IO voltage*, not VDD/VCC.
+> Can you review this ?
 
-I agree on this now  . I will post a version where this quirk will be
-added for arasan 4.9a that doesn't support 1.8v voltage signalling.
+Sorry to bother on this again . Can you review it ?
 
->>
->> [...]
->>
->> Kind regards
->> Uffe
+>
+>
+> --
+> Thanks,
+> with regards,
+> Suman Tripathi
 
 
 
