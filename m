@@ -1,30 +1,32 @@
-From: dinguyen@opensource.altera.com (Dinh Nguyen)
-Date: Wed, 10 Jun 2015 17:46:36 -0500
-Subject: [PATCH v2] ARM: socfpga: add smp_ops.cpu_kill to make kexec/kdump
- available
-In-Reply-To: <20150610074719.22583.63623.stgit@arietta>
-References: <20150610074719.22583.63623.stgit@arietta>
-Message-ID: <5578BE4C.3050805@opensource.altera.com>
+From: khilman@kernel.org (Kevin Hilman)
+Date: Wed, 10 Jun 2015 15:52:37 -0700
+Subject: [PATCH RESEND v9] ARM: dts: Introduce STM32F429 MCU
+In-Reply-To: <1433343242-1425-1-git-send-email-mcoquelin.stm32@gmail.com>
+ (Maxime Coquelin's message of "Wed, 3 Jun 2015 16:54:02 +0200")
+References: <1433343242-1425-1-git-send-email-mcoquelin.stm32@gmail.com>
+Message-ID: <7hlhfrjhvu.fsf@deeprootsystems.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/10/2015 02:47 AM, Hiraku Toyooka wrote:
-> Kexec_load syscall in ARM requires that machine-specific code
-> has the smp_ops.cpu_kill() before loading kernel image.
-> This patch adds the cpu_kill(), as a result, kexec reboot and
-> kernel crash dump become available in mach-socfpga.
-> 
-> Signed-off-by: Hiraku Toyooka <hiraku.toyooka.gu@hitachi.com>
-> Cc: Dinh Nguyen <dinguyen@opensource.altera.com>
-> Cc: Russell King <linux@arm.linux.org.uk>
-> Cc: linux-arm-kernel at lists.infradead.org
-> Cc: linux-kernel at vger.kernel.org
-> ---
->  arch/arm/mach-socfpga/platsmp.c |   12 ++++++++++++
->  1 file changed, 12 insertions(+)
-> 
+Maxime Coquelin <mcoquelin.stm32@gmail.com> writes:
 
-Applied!
+> The STMicrolectornics's STM32F429 MCU has the following main features:
+>  - Cortex-M4 core running up to @180MHz
+>  - 2MB internal flash, 256KBytes internal RAM
+>  - FMC controller to connect SDRAM, NOR and NAND memories
+>  - SD/MMC/SDIO support
+>  - Ethernet controller
+>  - USB OTFG FS & HS controllers
+>  - I2C, SPI, CAN busses support
+>  - Several 16 & 32 bits general purpose timers
+>  - Serial Audio interface
+>  - LCD controller
+>
+> Tested-by: Chanwoo Choi <cw00.choi@samsung.com>
+> Signed-off-by: Maxime Coquelin <mcoquelin.stm32@gmail.com>
+
+Applied to next/dt,
 
 Thanks,
-Dinh
+
+Kevin
