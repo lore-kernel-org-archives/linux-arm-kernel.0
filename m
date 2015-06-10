@@ -1,32 +1,27 @@
-From: khilman@kernel.org (Kevin Hilman)
-Date: Wed, 10 Jun 2015 15:52:37 -0700
-Subject: [PATCH RESEND v9] ARM: dts: Introduce STM32F429 MCU
-In-Reply-To: <1433343242-1425-1-git-send-email-mcoquelin.stm32@gmail.com>
- (Maxime Coquelin's message of "Wed, 3 Jun 2015 16:54:02 +0200")
-References: <1433343242-1425-1-git-send-email-mcoquelin.stm32@gmail.com>
-Message-ID: <7hlhfrjhvu.fsf@deeprootsystems.com>
+From: santosh.shilimkar@oracle.com (santosh shilimkar)
+Date: Wed, 10 Jun 2015 15:52:51 -0700
+Subject: [GIT PULL] ARM: Keystone updates for v4.2
+In-Reply-To: <7hmw07kxdw.fsf@deeprootsystems.com>
+References: <1432310314-5090-1-git-send-email-ssantosh@kernel.org>
+ <7hmw07kxdw.fsf@deeprootsystems.com>
+Message-ID: <5578BFC3.2070509@oracle.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Maxime Coquelin <mcoquelin.stm32@gmail.com> writes:
-
-> The STMicrolectornics's STM32F429 MCU has the following main features:
->  - Cortex-M4 core running up to @180MHz
->  - 2MB internal flash, 256KBytes internal RAM
->  - FMC controller to connect SDRAM, NOR and NAND memories
->  - SD/MMC/SDIO support
->  - Ethernet controller
->  - USB OTFG FS & HS controllers
->  - I2C, SPI, CAN busses support
->  - Several 16 & 32 bits general purpose timers
->  - Serial Audio interface
->  - LCD controller
+On 6/10/2015 3:32 PM, Kevin Hilman wrote:
+> Hi Santosh,
 >
-> Tested-by: Chanwoo Choi <cw00.choi@samsung.com>
-> Signed-off-by: Maxime Coquelin <mcoquelin.stm32@gmail.com>
+> Santosh Shilimkar <ssantosh@kernel.org> writes:
+>
+>> Please pull keystone update for 4.2. Since there was just one
+>> config update, sending it along with dts changes.
+>
+> Can you drop the defconfig change and send as a standalone patch (which
+> I'll apply to next/defconfig).  Then resend this as just a DT pull req
+> please which I'll apply to next/dt
+>
+done.
+config patch and dts pull request sent to your kernel.org id.
 
-Applied to next/dt,
-
-Thanks,
-
-Kevin
+Regards,
+Santosh
