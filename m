@@ -1,43 +1,45 @@
-From: ssantosh@kernel.org (Santosh Shilimkar)
-Date: Wed, 10 Jun 2015 15:42:33 -0700
-Subject: [PATCH] ARM: keystone: defconfig: enable netcp driver by default
-Message-ID: <1433976153-3522-1-git-send-email-ssantosh@kernel.org>
+From: khilman@kernel.org (Kevin Hilman)
+Date: Wed, 10 Jun 2015 15:44:05 -0700
+Subject: [GIT PULL] SoCFPGA DTS updates for v4.2, part 3
+In-Reply-To: <1433298638-4159-1-git-send-email-dinh.linux@gmail.com> (dinh
+ linux's message of "Tue, 2 Jun 2015 21:30:38 -0500")
+References: <1433298638-4159-1-git-send-email-dinh.linux@gmail.com>
+Message-ID: <7h4mmfkwui.fsf@deeprootsystems.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Murali Karicheri <m-karicheri2@ti.com>
+dinh.linux at gmail.com writes:
 
-Enable netcp driver in defconfig for keystone SoCs.
+> Hi Arnd, Kevin, Olof:
+>
+> Please pull these patches for v4.2.
+>
+> Thanks,
+> Dinh
+>
+> The following changes since commit 030bbdbf4c833bc69f502eae58498bc5572db736:
+>
+>   Linux 4.1-rc3 (2015-05-10 15:12:29 -0700)
+>
+> are available in the git repository at:
+>
+>   git://git.kernel.org/pub/scm/linux/kernel/git/dinguyen/linux.git socfpga_dts_for_v4.2_part_3
+>
+> for you to fetch changes up to e0e6f74801e1d027fa172d47b3e2515027f4728e:
+>
+>   ARM: socfpga: socrates: add gpio-leds (2015-06-02 14:27:11 -0500)
+>
+> ----------------------------------------------------------------
+> SoCFPGA updates for v4.2 part 3
+> - Add SCU node for Arria 10
+> - Add enable-method for cpu nodes
+> - Add SDRAM controller binding doc
+> - Enable gpio-leds on SoCFPGA Socrates board
+>
+> ----------------------------------------------------------------
 
-Signed-off-by: Murali Karicheri <m-karicheri2@ti.com>
-Signed-off-by: Santosh Shilimkar <ssantosh@kernel.org>
----
- arch/arm/configs/keystone_defconfig | 6 ++++++
- 1 file changed, 6 insertions(+)
+Pulled into next/dt,
 
-diff --git a/arch/arm/configs/keystone_defconfig b/arch/arm/configs/keystone_defconfig
-index f8a1c8f..95ce128 100644
---- a/arch/arm/configs/keystone_defconfig
-+++ b/arch/arm/configs/keystone_defconfig
-@@ -123,6 +123,9 @@ CONFIG_EEPROM_AT24=y
- CONFIG_SCSI=y
- CONFIG_BLK_DEV_SD=y
- CONFIG_NETDEVICES=y
-+CONFIG_TI_KEYSTONE_NETCP=y
-+CONFIG_TI_KEYSTONE_NETCP_ETHSS=y
-+CONFIG_PHYLIB=y
- CONFIG_SERIAL_8250=y
- CONFIG_SERIAL_8250_CONSOLE=y
- CONFIG_SERIAL_OF_PLATFORM=y
-@@ -152,6 +155,9 @@ CONFIG_USB_DWC3_VERBOSE=y
- CONFIG_KEYSTONE_USB_PHY=y
- CONFIG_DMADEVICES=y
- CONFIG_TI_EDMA=y
-+CONFIG_SOC_TI=y
-+CONFIG_KEYSTONE_NAVIGATOR_QMSS=y
-+CONFIG_KEYSTONE_NAVIGATOR_DMA=y
- CONFIG_MEMORY=y
- CONFIG_TI_AEMIF=y
- CONFIG_EXT4_FS=y
--- 
-1.9.1
+Thanks,
+
+Kevin
