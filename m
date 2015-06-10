@@ -1,92 +1,54 @@
 From: kever.yang@rock-chips.com (Kever Yang)
-Date: Wed, 10 Jun 2015 13:59:51 +0800
-Subject: [PATCH v6 3/3] ARM: rockchip: fix the SMP code style
-In-Reply-To: <1433843400-24831-4-git-send-email-wxt@rock-chips.com>
+Date: Wed, 10 Jun 2015 13:59:16 +0800
+Subject: [PATCH v6 2/3] ARM: rockchip: ensure CPU to enter WFI/WFE state
+In-Reply-To: <1433843400-24831-3-git-send-email-wxt@rock-chips.com>
 References: <1433843400-24831-1-git-send-email-wxt@rock-chips.com>
- <1433843400-24831-4-git-send-email-wxt@rock-chips.com>
-Message-ID: <5577D257.4090409@rock-chips.com>
+ <1433843400-24831-3-git-send-email-wxt@rock-chips.com>
+Message-ID: <5577D234.5000502@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi Caesar,
 
 On 06/09/2015 05:49 PM, Caesar Wang wrote:
-> Use the below scripts to check:
-> scripts/checkpatch.pl -f --subject arch/arm/mach-rockchip/platsmp.c
+> The patch can ensure that v7_exit_coherency_flush() in rockchip_cpu_die()
+> executed in time.
+> The mdelay(1) has enough time to fix the problem of CPU offlining.
+> That's a workaround way in rockchip hotplug code,
+> At least, we haven't a better way to solve it. Who know,
+> that maybe fixed by chip (hardware) in the future.
 >
 > Signed-off-by: Caesar Wang <wxt@rock-chips.com>
 >
 > ---
 >
 > Changes in v6:
-> - fix the commnet Unified format.
+> - Fix the delay 1ms describing.
 > Series-changes: 5
+> - Fix the patch decription.
 > - Add the changelog.
 > Series-changes: 2
-> - Use the checkpatch.pl -f --subjective to check.
+> - As Kever points out, Fix the subject typo WFI/WFE.
 >
->   arch/arm/mach-rockchip/platsmp.c | 14 ++++++++------
->   1 file changed, 8 insertions(+), 6 deletions(-)
+>   arch/arm/mach-rockchip/platsmp.c | 7 +++++++
+>   1 file changed, 7 insertions(+)
 >
 > diff --git a/arch/arm/mach-rockchip/platsmp.c b/arch/arm/mach-rockchip/platsmp.c
-> index d629206..30ccb82 100644
+> index b379cc8..d629206 100644
 > --- a/arch/arm/mach-rockchip/platsmp.c
 > +++ b/arch/arm/mach-rockchip/platsmp.c
-> @@ -100,7 +100,7 @@ static int pmu_set_power_domain(int pd, bool on)
->   		ret = pmu_power_domain_is_on(pd);
->   		if (ret < 0) {
->   			pr_err("%s: could not read power domain state\n",
-> -				 __func__);
-> +			       __func__);
->   			return ret;
->   		}
->   	}
-> @@ -130,7 +130,7 @@ static int __cpuinit rockchip_boot_secondary(unsigned int cpu,
->   
->   	if (cpu >= ncores) {
->   		pr_err("%s: cpu %d outside maximum number of cpus %d\n",
-> -							__func__, cpu, ncores);
-> +		       __func__, cpu, ncores);
->   		return -ENXIO;
->   	}
->   
-> @@ -140,7 +140,8 @@ static int __cpuinit rockchip_boot_secondary(unsigned int cpu,
->   		return ret;
->   
->   	if (read_cpuid_part() != ARM_CPU_PART_CORTEX_A9) {
-> -		/* We communicate with the bootrom to active the cpus other
-> +		/*
-> +		 * We communicate with the bootrom to active the cpus other
->   		 * than cpu0, after a blob of initialize code, they will
->   		 * stay at wfe state, once they are actived, they will check
->   		 * the mailbox:
-> @@ -149,11 +150,11 @@ static int __cpuinit rockchip_boot_secondary(unsigned int cpu,
->   		 * The cpu0 need to wait the other cpus other than cpu0 entering
->   		 * the wfe state.The wait time is affected by many aspects.
->   		 * (e.g: cpu frequency, bootrom frequency, sram frequency, ...)
-> -		 * */
-> +		 */
->   		mdelay(1); /* ensure the cpus other than cpu0 to startup */
->   
->   		writel(virt_to_phys(rockchip_secondary_startup),
-> -			sram_base_addr + 8);
-> +		       sram_base_addr + 8);
->   		writel(0xDEADBEAF, sram_base_addr + 4);
->   		dsb_sev();
->   	}
-> @@ -336,7 +337,7 @@ static int rockchip_cpu_kill(unsigned int cpu)
->   static void rockchip_cpu_die(unsigned int cpu)
+> @@ -322,6 +322,13 @@ static void __init rockchip_smp_prepare_cpus(unsigned int max_cpus)
+>   #ifdef CONFIG_HOTPLUG_CPU
+>   static int rockchip_cpu_kill(unsigned int cpu)
 >   {
->   	v7_exit_coherency_flush(louis);
-> -	while(1)
-> +	while (1)
->   		cpu_do_idle();
->   }
->   #endif
-> @@ -349,4 +350,5 @@ static struct smp_operations rockchip_smp_ops __initdata = {
->   	.cpu_die		= rockchip_cpu_die,
->   #endif
->   };
+> +	/*
+> +	 * We need a delay here to ensure that the dying CPU can finish
+> +	 * executing v7_coherency_exit() and reach the WFI/WFE state
+> +	 * prior to having the power domain disabled.
+> +	 */
+> +	mdelay(1);
 > +
->   CPU_METHOD_OF_DECLARE(rk3066_smp, "rockchip,rk3066-smp", &rockchip_smp_ops);
+>   	pmu_set_power_domain(0 + cpu, false);
+>   	return 1;
+>   }
 Reviewed-by: Kever Yang <kever.yang@rock-chips.com>
