@@ -1,49 +1,46 @@
-From: peter.griffin@linaro.org (Peter Griffin)
-Date: Wed, 10 Jun 2015 15:04:06 +0100
-Subject: [PATCH 9/9] ARM: STi: DT: Add STiH407 family mtsin0 pinctrl
- configuration
-In-Reply-To: <1433945046-19855-1-git-send-email-peter.griffin@linaro.org>
-References: <1433945046-19855-1-git-send-email-peter.griffin@linaro.org>
-Message-ID: <1433945046-19855-10-git-send-email-peter.griffin@linaro.org>
+From: manabian@gmail.com (Joachim Eastwood)
+Date: Wed, 10 Jun 2015 16:07:28 +0200
+Subject: [PATCH] ARM: Re-enable TRACE_IRQFLAGS_SUPPORT on ARMv7-M
+In-Reply-To: <5577246B.3080602@linaro.org>
+References: <1433802288-25508-1-git-send-email-mcoquelin.stm32@gmail.com>
+ <20150608224749.GB7557@n2100.arm.linux.org.uk>
+ <CALszF6DPzhAufUyWW-a3X7Cp4=tjSyCBM=Y4LcnWnUH=41qeoQ@mail.gmail.com>
+ <5576D0FE.10900@linaro.org>
+ <20150609150127.GF7557@n2100.arm.linux.org.uk>
+ <5577246B.3080602@linaro.org>
+Message-ID: <CAGhQ9VzdZRVJsfaod6s7_U7Bgw7kKbXhjVG=BR8tARigKha0Kg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-mtsin0 channel can only be configured for parallel data transfer.
+Hi Daniel,
 
-Signed-off-by: Peter Griffin <peter.griffin@linaro.org>
----
- arch/arm/boot/dts/stih407-pinctrl.dtsi | 19 +++++++++++++++++++
- 1 file changed, 19 insertions(+)
+On 9 June 2015 at 19:37, Daniel Thompson <daniel.thompson@linaro.org> wrote:
+> On 09/06/15 16:01, Russell King - ARM Linux wrote:
+>>
+>> On Tue, Jun 09, 2015 at 12:41:50PM +0100, Daniel Thompson wrote:
+>>>
+>>> Does the following patch, which makes the arch_irqs_disabled()
+>>> implementation from asm-generic available on arm, fix the build for you?
+>>
+>>
+>> Yes, this is exactly the kind of fix for this I'm looking for.  Once
+>> everyone's happy with it, it can find it's way to the patch system.
+>
+>
+> From my side, using v4.1-rc6 plus the patch, I can build all defconfigs and
+> both versatile_defconfig and multi_v7_defconfig remain bootable (so both
+> ways through the arch #ifdef in irqflag.h).
+>
+> Similarly working on linux-next-20150608 plus the patch I am able to build
+> and boot Maxime's stm32 code (and show that without the patch it doesn't
+> build).
+>
+> From my side I think that makes it good to go.
 
-diff --git a/arch/arm/boot/dts/stih407-pinctrl.dtsi b/arch/arm/boot/dts/stih407-pinctrl.dtsi
-index af7f5f7..9494b35 100644
---- a/arch/arm/boot/dts/stih407-pinctrl.dtsi
-+++ b/arch/arm/boot/dts/stih407-pinctrl.dtsi
-@@ -607,6 +607,25 @@
- 					};
- 				};
- 			};
-+
-+			mtsin0 {
-+				pinctrl_mtsin0_parallel: mtsin0_parallel {
-+					st,pins {
-+						DATA7 = <&pio10 4 ALT3 IN SE_NICLK_IO 0 CLK_A>;
-+						DATA6 = <&pio10 5 ALT3 IN SE_NICLK_IO 0 CLK_A>;
-+						DATA5 = <&pio10 6 ALT3 IN SE_NICLK_IO 0 CLK_A>;
-+						DATA4 = <&pio10 7 ALT3 IN SE_NICLK_IO 0 CLK_A>;
-+						DATA3 = <&pio11 0 ALT3 IN SE_NICLK_IO 0 CLK_A>;
-+						DATA2 = <&pio11 1 ALT3 IN SE_NICLK_IO 0 CLK_A>;
-+						DATA1 = <&pio11 2 ALT3 IN SE_NICLK_IO 0 CLK_A>;
-+						DATA0 = <&pio11 3 ALT3 IN SE_NICLK_IO 0 CLK_A>;
-+						CLKIN = <&pio10 3 ALT3 IN CLKNOTDATA 0 CLK_A>;
-+						VALID = <&pio10 1 ALT3 IN SE_NICLK_IO 0 CLK_A>;
-+						ERROR = <&pio10 0 ALT3 IN SE_NICLK_IO 0 CLK_A>;
-+						PKCLK = <&pio10 2 ALT3 IN SE_NICLK_IO 0 CLK_A>;
-+					};
-+				};
-+			};
- 		};
- 
- 		pin-controller-front1 {
--- 
-1.9.1
+Since next didn't build for me either I applied this and it works for
+the LPC18xx (Cortex-M4) platform.
+
+Tested-by: Joachim Eastwood <manabian@gmail.com>
+
+regards,
+Joachim Eastwood
