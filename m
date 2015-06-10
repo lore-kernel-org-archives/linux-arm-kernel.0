@@ -1,79 +1,102 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Wed, 10 Jun 2015 09:24:05 +0100
-Subject: [PATCH 1/6] ARM: kvm: psci: fix handling of unimplemented
- functions
-In-Reply-To: <55771FDC.3090800@arm.com>
-References: <1432901799-18359-1-git-send-email-lorenzo.pieralisi@arm.com>
- <1432901799-18359-2-git-send-email-lorenzo.pieralisi@arm.com>
- <55771FDC.3090800@arm.com>
-Message-ID: <20150610082405.GD8591@red-moon>
+From: carlo@endlessm.com (Carlo Caione)
+Date: Wed, 10 Jun 2015 10:30:24 +0200
+Subject: [PATCH] mmc: meson: Add driver for the SD/MMC host found on
+ Amlogic MesonX SoCs
+In-Reply-To: <CAD8Lp45c1GS=xYU3=6g1sdrP_afy7r=TgqL--FKjWbbwL=cReA@mail.gmail.com>
+References: <1433783342-31243-1-git-send-email-carlo@caione.org>
+ <CAD8Lp45c1GS=xYU3=6g1sdrP_afy7r=TgqL--FKjWbbwL=cReA@mail.gmail.com>
+Message-ID: <CAL9uMOESJjJwZq2S2vd7h8Acg+VHQ2CJKow0_bma2HPCdc4-oQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Marc,
+On Tue, Jun 9, 2015 at 1:15 AM, Daniel Drake <drake@endlessm.com> wrote:
+> Hi Carlo,
 
-On Tue, Jun 09, 2015 at 06:18:20PM +0100, Marc Zyngier wrote:
-> Hi Lorenzo,
-> 
-> On 29/05/15 13:16, Lorenzo Pieralisi wrote:
-> > According to the PSCI specification and the SMC/HVC calling
-> > convention, PSCI function_ids that are not implemented must
-> > return NOT_SUPPORTED as return value.
-> > 
-> > Current KVM implementation takes an unhandled PSCI function_id
-> > as an error and injects an undefined instruction into the guest
-> > if PSCI implementation is called with a function_id that is not
-> > handled by the resident PSCI version (ie it is not implemented),
-> > which is not the behaviour expected by a guest when calling a
-> > PSCI function_id that is not implemented.
-> > 
-> > This patch fixes this issue by returning NOT_SUPPORTED whenever
-> > the kvm PSCI call is executed for a function_id that is not
-> > implemented by the PSCI kvm layer.
-> > 
-> > Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-> > Reported-by: Sudeep Holla <sudeep.holla@arm.com>
-> > Cc: Christoffer Dall <christoffer.dall@linaro.org>
-> > Cc: Anup Patel <anup.patel@linaro.org>
-> > Cc: Marc Zyngier <marc.zyngier@arm.com>
-> > ---
-> >  arch/arm/kvm/psci.c | 6 +++---
-> >  1 file changed, 3 insertions(+), 3 deletions(-)
-> > 
-> > diff --git a/arch/arm/kvm/psci.c b/arch/arm/kvm/psci.c
-> > index 7e9398c..ec5943b 100644
-> > --- a/arch/arm/kvm/psci.c
-> > +++ b/arch/arm/kvm/psci.c
-> > @@ -273,7 +273,8 @@ static int kvm_psci_0_2_call(struct kvm_vcpu *vcpu)
-> >  		ret = 0;
-> >  		break;
-> >  	default:
-> > -		return -EINVAL;
-> > +		val = PSCI_RET_NOT_SUPPORTED;
-> > +		break;
-> >  	}
-> >  
-> >  	*vcpu_reg(vcpu, 0) = val;
-> > @@ -295,10 +296,9 @@ static int kvm_psci_0_1_call(struct kvm_vcpu *vcpu)
-> >  		break;
-> >  	case KVM_PSCI_FN_CPU_SUSPEND:
-> >  	case KVM_PSCI_FN_MIGRATE:
-> > +	default:
-> >  		val = PSCI_RET_NOT_SUPPORTED;
-> >  		break;
-> > -	default:
-> > -		return -EINVAL;
-> >  	}
-> >  
-> >  	*vcpu_reg(vcpu, 0) = val;
-> > 
-> 
-> Looks good to me. How do you want to proceed with this one? can I take
-> it independently from the rest of the series? Or would you prefer it
-> being kept as a whole?
+Hey Daniel,
 
-I will prepare a v2 to take into account a comment from Sudeep and I
-will add a stable tag too, yes it should be merged independently.
+> On Mon, Jun 8, 2015 at 11:09 AM, Carlo Caione <carlo@caione.org> wrote:
+>> From: Carlo Caione <carlo@endlessm.com>
+>>
+>> Add a driver for the SD/MMC host found on the Amlogic MesonX SoCs. It
+>> is an MMC controller which provides an interface between the
+>> application processor and various memory cards. It supports the SD
+>> specification v2.0 and the eMMC specification v4.41. It also supports
+>> SDSC, SDHC and SDXC memory card default speed.
+>
+> Nice work, thanks for this!
+>
+>> This patch adds also the bindinding documentation.
+>
+> "binding" typo
+
+ops
+
+>> +static void meson_mmc_request(struct mmc_host *mmc, struct mmc_request *mrq)
+>> +{
+>> +       struct meson_mmc_host *host = mmc_priv(mmc);
+>> +       struct mmc_command *cmd = mrq->cmd;
+>> +       struct mmc_data *data = mrq->data;
+>> +       unsigned long flags;
+>> +
+>> +       spin_lock_irqsave(&host->lock, flags);
+>> +
+>> +       if (host->state != STATE_IDLE) {
+>> +               dev_dbg(mmc_dev(mmc), "%s() rejected, state %u\n",
+>> +                       __func__, host->state);
+>> +               mrq->cmd->error = -EAGAIN;
+>> +               spin_unlock_irqrestore(&host->lock, flags);
+>> +               mmc_request_done(mmc, mrq);
+>> +               return;
+>> +       }
+>> +
+>> +       if (host->ferror) {
+>> +               cmd->error = host->ferror;
+>> +               spin_unlock_irqrestore(&host->lock, flags);
+>> +               mmc_request_done(mmc, mrq);
+>> +               return;
+>> +       }
+>> +
+>> +       dev_dbg(mmc_dev(mmc), "CMD%d(%08x) arg %x len %d flags %08x\n",
+>> +               cmd->opcode & 0x3f, cmd->opcode, cmd->arg,
+>> +               mrq->data ? mrq->data->blksz * mrq->data->blocks : 0,
+>> +               mrq->cmd->flags);
+>> +
+>> +       /* Filter out CMD 5/52/53 */
+>> +       if (cmd->opcode == SD_IO_SEND_OP_COND ||
+>> +           cmd->opcode == SD_IO_RW_DIRECT ||
+>> +           cmd->opcode == SD_IO_RW_EXTENDED) {
+>> +               dev_dbg(mmc_dev(host->mmc), "CMD%d not supported\n", cmd->opcode);
+>> +               cmd->error = -EINVAL;
+>> +               spin_unlock_irqrestore(&host->lock, flags);
+>> +               mmc_request_done(mmc, mrq);
+>> +               return;
+>> +       }
+>> +
+>> +       host->state = STATE_REQUEST;
+>> +
+>> +       if (data) {
+>> +               meson_mmc_map_dma(host, data, data->flags);
+>> +               writel(host->sg_dma, host->base + SDIO_ADDR);
+>
+> As the sg_dma buffer is constant, can you do this register write just
+> once at probe time? I wonder if we really need to do it on each
+> request.
+
+Unfortunately it doesn't work. It is not documented but I guess that
+writing to that register triggers the DMA transfer and the register is
+zeroed afterwards.
+
+> Or, going deeper, I wonder if we can avoid this bounce buffer
+> entirely. Can you try setting mmc->max_segs to 1 then passing the
+> single data segment directly to the hardware with
+>    writel(sg_dma_address(data->sg), host->base + SDIO_ADDR)
+>
+> If that turns out to be more complicated then it sounds, then feel
+> free to push it off to a later driver revision.
+
+Yup. I'll fix it in v2 putting in CC linux-mmc.
 
 Thanks,
-Lorenzo
+
+-- 
+Carlo Caione  |  +39.340.80.30.096  |  Endless
