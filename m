@@ -1,155 +1,49 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 10 Jun 2015 18:48:48 +0100
-Subject: [PATCH v2 8/8] arm: use new irqchip parameter to create different
- vGIC types
-In-Reply-To: <1433493473-4002-9-git-send-email-andre.przywara@arm.com>
-References: <1433493473-4002-1-git-send-email-andre.przywara@arm.com>
- <1433493473-4002-9-git-send-email-andre.przywara@arm.com>
-Message-ID: <55787880.3030504@arm.com>
+From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
+Date: Wed, 10 Jun 2015 10:49:55 -0700
+Subject: [PATCH v9 4/5] serial: stm32-usart: Add STM32 USART Driver
+In-Reply-To: <CALszF6AaS-i2MBF64mJKtY2h5Sb710Z50Mf8wHotUBysukfZbw@mail.gmail.com>
+References: <1432328616-16964-1-git-send-email-mcoquelin.stm32@gmail.com>
+ <1432328616-16964-5-git-send-email-mcoquelin.stm32@gmail.com>
+ <20150531215246.GA24174@kroah.com>
+ <CALszF6B7_xOMvO9pRJJPNeR4JnOgAQAohSARDivzt2d1DQWP_Q@mail.gmail.com>
+ <20150610154240.GC22214@kroah.com>
+ <CALszF6AaS-i2MBF64mJKtY2h5Sb710Z50Mf8wHotUBysukfZbw@mail.gmail.com>
+Message-ID: <20150610174955.GA6527@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/06/15 09:37, Andre Przywara wrote:
-> Currently we unconditionally create a virtual GICv2 in the guest.
-> Add a --irqchip= parameter to let the user specify a different GIC
-> type for the guest.
-> For now we the only other supported type is GICv3.
+On Wed, Jun 10, 2015 at 06:18:37PM +0200, Maxime Coquelin wrote:
+> 2015-06-10 17:42 GMT+02:00 Greg Kroah-Hartman <gregkh@linuxfoundation.org>:
+> > On Wed, Jun 10, 2015 at 01:33:22PM +0200, Maxime Coquelin wrote:
+> >> 2015-05-31 23:52 GMT+02:00 Greg Kroah-Hartman <gregkh@linuxfoundation.org>:
+> >> > On Fri, May 22, 2015 at 11:03:35PM +0200, Maxime Coquelin wrote:
+> >> >> This drivers adds support to the STM32 USART controller, which is a
+> >> >> standard serial driver.
+> >> >>
+> >> >> Tested-by: Chanwoo Choi <cw00.choi@samsung.com>
+> >> >> Reviewed-by: Peter Hurley <peter@hurleysoftware.com>
+> >> >> Reviewed-by: Vladimir Zapolskiy <vladimir_zapolskiy@mentor.com>
+> >> >> Reviewed-by: Andy Shevchenko <andy.shevchenko@gmail.com>
+> >> >> Signed-off-by: Maxime Coquelin <mcoquelin.stm32@gmail.com>
+> >> >
+> >> > Acked-by: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+> >>
+> >> Thanks Greg.
+> >>
+> >> Will you apply it to your tty tree for v4.2? Or it should go in
+> >> someone else tree?
+> >
+> > It's not in my queue, I'm guessing it goes in through some other tree as
+> > there are build dependancies here preventing me from taking it.
 > 
-> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
-> ---
->  arm/aarch64/arm-cpu.c                    |  2 +-
->  arm/gic.c                                | 21 +++++++++++++++++++++
->  arm/include/arm-common/kvm-config-arch.h |  9 ++++++++-
->  arm/kvm-cpu.c                            |  6 ++++++
->  arm/kvm.c                                |  4 +++-
->  5 files changed, 39 insertions(+), 3 deletions(-)
-> 
-> diff --git a/arm/aarch64/arm-cpu.c b/arm/aarch64/arm-cpu.c
-> index f702b9e..3dc8ea3 100644
-> --- a/arm/aarch64/arm-cpu.c
-> +++ b/arm/aarch64/arm-cpu.c
-> @@ -12,7 +12,7 @@
->  static void generate_fdt_nodes(void *fdt, struct kvm *kvm, u32 gic_phandle)
->  {
->  	int timer_interrupts[4] = {13, 14, 11, 10};
-> -	gic__generate_fdt_nodes(fdt, gic_phandle, IRQCHIP_GICV2);
-> +	gic__generate_fdt_nodes(fdt, gic_phandle, kvm->cfg.arch.irqchip);
->  	timer__generate_fdt_nodes(fdt, kvm, timer_interrupts);
->  }
->  
-> diff --git a/arm/gic.c b/arm/gic.c
-> index c50d662..ab0f594 100644
-> --- a/arm/gic.c
-> +++ b/arm/gic.c
-> @@ -21,6 +21,23 @@
->  static int gic_fd = -1;
->  static int nr_redists;
->  
-> +int irqchip_parser(const struct option *opt, const char *arg, int unset)
-> +{
-> +	enum irqchip_type *type = opt->value;
-> +
-> +	*type = IRQCHIP_DEFAULT;
-> +	if (!strcmp(arg, "gicv2")) {
-> +		*type = IRQCHIP_GICV2;
-> +	} else if (!strcmp(arg, "gicv3")) {
-> +		*type = IRQCHIP_GICV3;
-> +	} else if (strcmp(arg, "default")) {
-> +		fprintf(stderr, "irqchip: unknown type \"%s\"\n", arg);
-> +		return -1;
-> +	}
-> +
-> +	return 0;
-> +}
-> +
->  static int gic__create_device(struct kvm *kvm, enum irqchip_type type)
->  {
->  	int err;
-> @@ -121,6 +138,10 @@ int gic__create(struct kvm *kvm, enum irqchip_type type)
->  	case IRQCHIP_GICV2:
->  		max_cpus = GIC_MAX_CPUS;
->  		break;
-> +	case IRQCHIP_GICV3:
-> +		nr_redists = kvm->cfg.nrcpus;
-> +		max_cpus = 255;
+> There should not be any build dependencies.
+> I just tested it on my x86 machine with COMPILE_TEST on both v4.1-rc1
+> and tty-next branch.
+> In both case it compiles without warnings.
 
-Having a #define for this would be nice. But more importantly, the
-actual limit is the one KVM imposes, and the code should probably
-reflect this.
+Ok, then feel free to resend it as a stand-alone patch please and I will
+queue it up.
 
-> +		break;
->  	default:
->  		return -ENODEV;
->  	}
-> diff --git a/arm/include/arm-common/kvm-config-arch.h b/arm/include/arm-common/kvm-config-arch.h
-> index a8ebd94..ae4e89b 100644
-> --- a/arm/include/arm-common/kvm-config-arch.h
-> +++ b/arm/include/arm-common/kvm-config-arch.h
-> @@ -8,8 +8,11 @@ struct kvm_config_arch {
->  	unsigned int	force_cntfrq;
->  	bool		virtio_trans_pci;
->  	bool		aarch32_guest;
-> +	int		irqchip;
->  };
->  
-> +int irqchip_parser(const struct option *opt, const char *arg, int unset);
-> +
->  #define OPT_ARCH_RUN(pfx, cfg)							\
->  	pfx,									\
->  	ARM_OPT_ARCH_RUN(cfg)							\
-> @@ -21,6 +24,10 @@ struct kvm_config_arch {
->  		     "updated to program CNTFRQ correctly*"),			\
->  	OPT_BOOLEAN('\0', "force-pci", &(cfg)->virtio_trans_pci,		\
->  		    "Force virtio devices to use PCI as their default "		\
-> -		    "transport"),
-> +		    "transport"),						\
-> +        OPT_CALLBACK('\0', "irqchip", &(cfg)->irqchip,				\
-> +		     "[gicv2|gicv3]",					\
-> +		     "type of interrupt controller to emulate in the guest",	\
-> +		     irqchip_parser, NULL),
->  
->  #endif /* ARM_COMMON__KVM_CONFIG_ARCH_H */
-> diff --git a/arm/kvm-cpu.c b/arm/kvm-cpu.c
-> index a3344fa..aacc172 100644
-> --- a/arm/kvm-cpu.c
-> +++ b/arm/kvm-cpu.c
-> @@ -144,6 +144,12 @@ bool kvm_cpu__emulate_mmio(struct kvm_cpu *vcpu, u64 phys_addr, u8 *data,
->  {
->  	int nr_redists = 0;
->  
-> +	switch (vcpu->kvm->cfg.arch.irqchip) {
-> +	case IRQCHIP_GICV3:
-> +		nr_redists = vcpu->kvm->nrcpus;
-> +		break;
-> +	}
-> +
->  	if (arm_addr_in_virtio_mmio_region(nr_redists, phys_addr)) {
->  		return kvm__emulate_mmio(vcpu, phys_addr, data, len, is_write);
->  	} else if (arm_addr_in_ioport_region(phys_addr)) {
-> diff --git a/arm/kvm.c b/arm/kvm.c
-> index f9685c2..2628d31 100644
-> --- a/arm/kvm.c
-> +++ b/arm/kvm.c
-> @@ -82,6 +82,8 @@ void kvm__arch_init(struct kvm *kvm, const char *hugetlbfs_path, u64 ram_size)
->  		MADV_MERGEABLE | MADV_HUGEPAGE);
->  
->  	/* Create the virtual GIC. */
-> -	if (gic__create(kvm, IRQCHIP_GICV2))
-> +	if (kvm->cfg.arch.irqchip == IRQCHIP_DEFAULT)
-> +		kvm->cfg.arch.irqchip = IRQCHIP_GICV2;
-> +	if (gic__create(kvm, kvm->cfg.arch.irqchip))
->  		die("Failed to create virtual GIC");
->  }
-> 
+thanks,
 
-I think you really need to revisit this the way you propagate the GIC
-stuff outside of the GIC code. IRQCHIP_DEFAULT should be IRQCHIP_GICV2,
-there is no reason for it to be otherwise. Same goes for the nr_redists
-thing. Keep it localized as much as possible, and only export synthetic
-information to the rest of kvmtool.
-
-Thanks,
-
-	M.
--- 
-Jazz is not dead. It just smells funny...
+greg k-h
