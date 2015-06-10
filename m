@@ -1,36 +1,50 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Wed, 10 Jun 2015 17:53:24 +0100
-Subject: Moan: usage of __iormb() and __iowmb() outside of asm/io.h
-In-Reply-To: <20150610123040.GN7557@n2100.arm.linux.org.uk>
-References: <20150608184701.GA7557@n2100.arm.linux.org.uk>
- <20150610111819.GC22973@arm.com>
- <20150610112433.GM7557@n2100.arm.linux.org.uk>
- <20150610123040.GN7557@n2100.arm.linux.org.uk>
-Message-ID: <20150610165323.GE22844@e104818-lin.cambridge.arm.com>
+From: vinod.koul@intel.com (Vinod Koul)
+Date: Wed, 10 Jun 2015 22:24:55 +0530
+Subject: [PATCH v2 0/5] dmaengine: mv_xor: Fixes and enhancements
+In-Reply-To: <1432645656-20504-1-git-send-email-maxime.ripard@free-electrons.com>
+References: <1432645656-20504-1-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <20150610165455.GW28601@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 10, 2015 at 01:30:40PM +0100, Russell King - ARM Linux wrote:
-> On Wed, Jun 10, 2015 at 12:24:34PM +0100, Russell King - ARM Linux wrote:
-> > On Wed, Jun 10, 2015 at 12:18:20PM +0100, Will Deacon wrote:
-> > > I agree to removing these from view; we already have plenty of barrier
-> > > macros and we don't want these to proliferate outside of the arch code.
-> > > 
-> > > Any chance you could do a similar change for arm64, please (we have the
-> > > same macros there)?
-> > 
-> > Yes - as you're aware, removing them from sight does cause us to decend
-> > into macro-hell in asm/io.h, but I think that's better than having people
-> > get their grubby fingers on arch internal stuff they shouldn't be touching.
+On Tue, May 26, 2015 at 03:07:31PM +0200, Maxime Ripard wrote:
+> Hi,
 > 
-> Here's what I'm proposing for ARM.  As I say, it's macro-hell...  It's
-> also not perfect yet (since the __LINUX_ARM_ARCH__ < 6 case isn't
-> properly handled yet.)
-
-IMO, it makes the code pretty unreadable, it breaks searching/ctags. It
-may be easier to just randomly change the number of underscores in front
-of "io*mb" every few kernel releases (e.g. twice a year), so we identify
-the users outside asm/io.h.
+> This serie is about various fixes and enhancements that were
+> previously submitted as part of the "ARM: mvebu: Add support for RAID6
+> PQ offloading" serie.
+> 
+> Seems the RAID6 PQ stuff seems more controversial than what I
+> expected, we took out the various bugs and enhancements patches, and
+> will submit the other patches as a separate set.
+Applied, thanks
 
 -- 
-Catalin
+~Vinod
+
+> 
+> Changes from v1:
+>   - Moved the bugfix commit as the first commit and cc'd stable
+>   - Changed the Armada 38x compatible to armada-380-xor
+>   - Made some misc cleanups
+> 
+> Lior Amsalem (4):
+>   dmaengine: mv_xor: bug fix for racing condition in descriptors cleanup
+>   dmaengine: mv_xor: add support for a38x command in descriptor mode
+>   dmaengine: mv_xor: Enlarge descriptor pool size
+>   dmaengine: mv_xor: improve descriptors list handling and reduce
+>     locking
+> 
+> Maxime Ripard (1):
+>   dmaengine: mv_xor: Rename function for consistent naming
+> 
+>  Documentation/devicetree/bindings/dma/mv-xor.txt |   2 +-
+>  drivers/dma/mv_xor.c                             | 352 ++++++++++++-----------
+>  drivers/dma/mv_xor.h                             |  27 +-
+>  3 files changed, 206 insertions(+), 175 deletions(-)
+> 
+> -- 
+> 2.4.1
+> 
+
+-- 
