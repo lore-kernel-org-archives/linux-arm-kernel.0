@@ -1,80 +1,41 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Wed, 10 Jun 2015 09:57:18 -0700
-Subject: [PATCH v4] ARM: l2c: add options to overwrite prefetching behavior
-In-Reply-To: <1432941541-18588-1-git-send-email-hauke@hauke-m.de>
-References: <1432941541-18588-1-git-send-email-hauke@hauke-m.de>
-Message-ID: <55786C6E.7070204@gmail.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 10 Jun 2015 17:59:04 +0100
+Subject: Moan: usage of __iormb() and __iowmb() outside of asm/io.h
+In-Reply-To: <20150610165323.GE22844@e104818-lin.cambridge.arm.com>
+References: <20150608184701.GA7557@n2100.arm.linux.org.uk>
+ <20150610111819.GC22973@arm.com>
+ <20150610112433.GM7557@n2100.arm.linux.org.uk>
+ <20150610123040.GN7557@n2100.arm.linux.org.uk>
+ <20150610165323.GE22844@e104818-lin.cambridge.arm.com>
+Message-ID: <20150610165904.GB6612@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 29/05/15 16:19, Hauke Mehrtens wrote:
-> These options make it possible to overwrites the data and instruction
-> prefetching behavior of the arm pl310 cache controller.
+On Wed, Jun 10, 2015 at 05:53:24PM +0100, Catalin Marinas wrote:
+> On Wed, Jun 10, 2015 at 01:30:40PM +0100, Russell King - ARM Linux wrote:
+> > On Wed, Jun 10, 2015 at 12:24:34PM +0100, Russell King - ARM Linux wrote:
+> > > On Wed, Jun 10, 2015 at 12:18:20PM +0100, Will Deacon wrote:
+> > > > I agree to removing these from view; we already have plenty of barrier
+> > > > macros and we don't want these to proliferate outside of the arch code.
+> > > > 
+> > > > Any chance you could do a similar change for arm64, please (we have the
+> > > > same macros there)?
+> > > 
+> > > Yes - as you're aware, removing them from sight does cause us to decend
+> > > into macro-hell in asm/io.h, but I think that's better than having people
+> > > get their grubby fingers on arch internal stuff they shouldn't be touching.
+> > 
+> > Here's what I'm proposing for ARM.  As I say, it's macro-hell...  It's
+> > also not perfect yet (since the __LINUX_ARM_ARCH__ < 6 case isn't
+> > properly handled yet.)
 > 
-> Signed-off-by: Hauke Mehrtens <hauke@hauke-m.de>
+> IMO, it makes the code pretty unreadable, it breaks searching/ctags. It
+> may be easier to just randomly change the number of underscores in front
+> of "io*mb" every few kernel releases (e.g. twice a year), so we identify
+> the users outside asm/io.h.
 
-Acked-by: Florian Fainelli <f.fainelli@gmail.com>
+Or generate static line functions from the macros, as Russell suggested
+previously. Then we can #undef the macros at the end of the file (I have
+patches doing this for our cmpxchg implementation).
 
-> ---
-> changes since
-> v3: 
->   * remove arm prefix
->   * improve documentation
-> v2: only set prefetch
-> v1: set prefetch and aux
->  Documentation/devicetree/bindings/arm/l2cc.txt |  5 +++++
->  arch/arm/mm/cache-l2x0.c                       | 20 ++++++++++++++++++++
->  2 files changed, 25 insertions(+)
-> 
-> diff --git a/Documentation/devicetree/bindings/arm/l2cc.txt b/Documentation/devicetree/bindings/arm/l2cc.txt
-> index 0dbabe9..2251dcc 100644
-> --- a/Documentation/devicetree/bindings/arm/l2cc.txt
-> +++ b/Documentation/devicetree/bindings/arm/l2cc.txt
-> @@ -67,6 +67,11 @@ Optional properties:
->    disable if zero.
->  - arm,prefetch-offset : Override prefetch offset value. Valid values are
->    0-7, 15, 23, and 31.
-> +- prefetch-data : Data prefetch. Value: <0> (forcibly disable), <1>
-> +  (forcibly enable), property absent (retain settings set by firmware)
-> +- prefetch-instr : Instruction prefetch. Value: <0> (forcibly disable),
-> +  <1> (forcibly enable), property absent (retain settings set by
-> +  firmware)
->  
->  Example:
->  
-> diff --git a/arch/arm/mm/cache-l2x0.c b/arch/arm/mm/cache-l2x0.c
-> index e309c8f..2570f83 100644
-> --- a/arch/arm/mm/cache-l2x0.c
-> +++ b/arch/arm/mm/cache-l2x0.c
-> @@ -1199,6 +1199,26 @@ static void __init l2c310_of_parse(const struct device_node *np,
->  		pr_err("L2C-310 OF arm,prefetch-offset property value is missing\n");
->  	}
->  
-> +	ret = of_property_read_u32(np, "prefetch-data", &val);
-> +	if (ret == 0) {
-> +		if (val)
-> +			prefetch |= L310_PREFETCH_CTRL_DATA_PREFETCH;
-> +		else
-> +			prefetch &= ~L310_PREFETCH_CTRL_DATA_PREFETCH;
-> +	} else if (ret != -EINVAL) {
-> +		pr_err("L2C-310 OF prefetch-data property value is missing\n");
-> +	}
-> +
-> +	ret = of_property_read_u32(np, "prefetch-instr", &val);
-> +	if (ret == 0) {
-> +		if (val)
-> +			prefetch |= L310_PREFETCH_CTRL_INSTR_PREFETCH;
-> +		else
-> +			prefetch &= ~L310_PREFETCH_CTRL_INSTR_PREFETCH;
-> +	} else if (ret != -EINVAL) {
-> +		pr_err("L2C-310 OF prefetch-instr property value is missing\n");
-> +	}
-> +
->  	l2x0_saved_regs.prefetch_ctrl = prefetch;
->  }
->  
-> 
-
-
--- 
-Florian
+Will
