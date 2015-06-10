@@ -1,46 +1,91 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Wed, 10 Jun 2015 08:14:50 -0600
-Subject: [PATCH 0/2] get pinctrl more flexible for per pin muxing
- controllers
-In-Reply-To: <CACRpkdawFrfzHf+8vMLz07-r4J48bAVibV++K31dNQ+D-85ZMg@mail.gmail.com>
-References: <1430729776-27797-1-git-send-email-ludovic.desroches@atmel.com>	<556F01CC.8020305@atmel.com>
- <CACRpkdawFrfzHf+8vMLz07-r4J48bAVibV++K31dNQ+D-85ZMg@mail.gmail.com>
-Message-ID: <5578465A.9090503@wwwdotorg.org>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Wed, 10 Jun 2015 15:19:24 +0100
+Subject: [PATCH v2] ARM: kvm: psci: fix handling of unimplemented functions
+Message-ID: <1433945964-18643-1-git-send-email-lorenzo.pieralisi@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/10/2015 01:33 AM, Linus Walleij wrote:
-> On Wed, Jun 3, 2015 at 3:31 PM, Nicolas Ferre <nicolas.ferre@atmel.com> wrote:
->> Le 04/05/2015 10:56, Ludovic Desroches a ?crit :
->>>
->>> The way pins, groups and functions are tied is too constraining for some
->>> controllers. It concerns mainly the ones we don't care about groups and
->>> functions, each pin can be muxed to any functions.
->>> The goal of these two patches is too remove some of the constraints.
->>>
->>> I have added the prototype of a pin controller and device tree to show the
->>> way I want to use these changes. I couldn't test it on boards using generic
->>> pinconf so I am not sure that I don't break something...
->>>
->>>
->>> Ludovic Desroches (4):
->>>    pinctrl: change function behavior for per pin muxing controllers
->>>    pinctrl: introduce complex pin description
->>
->> Linus,
->>
->> Ludovic sent this series nearly one month ago. It was posted after a RFC
->> series on the same topic two months ago. As we don't see any comment on
->> neither of them we assume that it's okay to include them.
->
-> It's a quite big patch and I need help reviewing it and thinking of
-> some possible consequences.
->
-> Stephen, can you give me a hand with this?
+According to the PSCI specification and the SMC/HVC calling
+convention, PSCI function_ids that are not implemented must
+return NOT_SUPPORTED as return value.
 
-I don't have the patch in my list archive, which goes back 60 days.
+Current KVM implementation takes an unhandled PSCI function_id
+as an error and injects an undefined instruction into the guest
+if PSCI implementation is called with a function_id that is not
+handled by the resident PSCI version (ie it is not implemented),
+which is not the behaviour expected by a guest when calling a
+PSCI function_id that is not implemented.
 
-Judging purely by the patch description, the patch sounds incorrect. 
-There's nothing in pinctrl that prevents a particular pin controller 
-from supporting all mux functions on all pins or groups. Simply return 
-the same list of functions for every pin.
+This patch fixes this issue by returning NOT_SUPPORTED whenever
+the kvm PSCI call is executed for a function_id that is not
+implemented by the PSCI kvm layer.
+
+Cc: <stable@vger.kernel.org> # 3.18+
+Cc: Christoffer Dall <christoffer.dall@linaro.org>
+Cc: Marc Zyngier <marc.zyngier@arm.com>
+Acked-by: Sudeep Holla <sudeep.holla@arm.com>
+Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+---
+v1->v2:
+
+- Added stable tag
+- Combined function_id case values returning NOT_SUPPORTED to default
+  case handling
+
+v1: http://lists.infradead.org/pipermail/linux-arm-kernel/2015-May/347353.html
+
+ arch/arm/kvm/psci.c | 16 +++-------------
+ 1 file changed, 3 insertions(+), 13 deletions(-)
+
+diff --git a/arch/arm/kvm/psci.c b/arch/arm/kvm/psci.c
+index 02fa8ef..531e922 100644
+--- a/arch/arm/kvm/psci.c
++++ b/arch/arm/kvm/psci.c
+@@ -230,10 +230,6 @@ static int kvm_psci_0_2_call(struct kvm_vcpu *vcpu)
+ 	case PSCI_0_2_FN64_AFFINITY_INFO:
+ 		val = kvm_psci_vcpu_affinity_info(vcpu);
+ 		break;
+-	case PSCI_0_2_FN_MIGRATE:
+-	case PSCI_0_2_FN64_MIGRATE:
+-		val = PSCI_RET_NOT_SUPPORTED;
+-		break;
+ 	case PSCI_0_2_FN_MIGRATE_INFO_TYPE:
+ 		/*
+ 		 * Trusted OS is MP hence does not require migration
+@@ -242,10 +238,6 @@ static int kvm_psci_0_2_call(struct kvm_vcpu *vcpu)
+ 		 */
+ 		val = PSCI_0_2_TOS_MP;
+ 		break;
+-	case PSCI_0_2_FN_MIGRATE_INFO_UP_CPU:
+-	case PSCI_0_2_FN64_MIGRATE_INFO_UP_CPU:
+-		val = PSCI_RET_NOT_SUPPORTED;
+-		break;
+ 	case PSCI_0_2_FN_SYSTEM_OFF:
+ 		kvm_psci_system_off(vcpu);
+ 		/*
+@@ -271,7 +263,8 @@ static int kvm_psci_0_2_call(struct kvm_vcpu *vcpu)
+ 		ret = 0;
+ 		break;
+ 	default:
+-		return -EINVAL;
++		val = PSCI_RET_NOT_SUPPORTED;
++		break;
+ 	}
+ 
+ 	*vcpu_reg(vcpu, 0) = val;
+@@ -291,12 +284,9 @@ static int kvm_psci_0_1_call(struct kvm_vcpu *vcpu)
+ 	case KVM_PSCI_FN_CPU_ON:
+ 		val = kvm_psci_vcpu_on(vcpu);
+ 		break;
+-	case KVM_PSCI_FN_CPU_SUSPEND:
+-	case KVM_PSCI_FN_MIGRATE:
++	default:
+ 		val = PSCI_RET_NOT_SUPPORTED;
+ 		break;
+-	default:
+-		return -EINVAL;
+ 	}
+ 
+ 	*vcpu_reg(vcpu, 0) = val;
+-- 
+2.2.1
