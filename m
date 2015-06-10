@@ -1,28 +1,37 @@
-From: p.fedin@samsung.com (Pavel Fedin)
-Date: Wed, 10 Jun 2015 18:38:44 +0300
-Subject: IRQFD support with GICv3 ITS (WAS: RE: [PATCH 00/13] arm64: KVM:
- GICv3 ITS emulation)
-In-Reply-To: <557842A0.9070503@linaro.org>
-References: <042601d0a357$d3cec4d0$7b6c4e70$@samsung.com>
- <557842A0.9070503@linaro.org>
-Message-ID: <05db01d0a393$895bf710$9c13e530$@samsung.com>
+From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
+Date: Wed, 10 Jun 2015 08:42:40 -0700
+Subject: [PATCH v9 4/5] serial: stm32-usart: Add STM32 USART Driver
+In-Reply-To: <CALszF6B7_xOMvO9pRJJPNeR4JnOgAQAohSARDivzt2d1DQWP_Q@mail.gmail.com>
+References: <1432328616-16964-1-git-send-email-mcoquelin.stm32@gmail.com>
+ <1432328616-16964-5-git-send-email-mcoquelin.stm32@gmail.com>
+ <20150531215246.GA24174@kroah.com>
+ <CALszF6B7_xOMvO9pRJJPNeR4JnOgAQAohSARDivzt2d1DQWP_Q@mail.gmail.com>
+Message-ID: <20150610154240.GC22214@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
- Hello!
+On Wed, Jun 10, 2015 at 01:33:22PM +0200, Maxime Coquelin wrote:
+> 2015-05-31 23:52 GMT+02:00 Greg Kroah-Hartman <gregkh@linuxfoundation.org>:
+> > On Fri, May 22, 2015 at 11:03:35PM +0200, Maxime Coquelin wrote:
+> >> This drivers adds support to the STM32 USART controller, which is a
+> >> standard serial driver.
+> >>
+> >> Tested-by: Chanwoo Choi <cw00.choi@samsung.com>
+> >> Reviewed-by: Peter Hurley <peter@hurleysoftware.com>
+> >> Reviewed-by: Vladimir Zapolskiy <vladimir_zapolskiy@mentor.com>
+> >> Reviewed-by: Andy Shevchenko <andy.shevchenko@gmail.com>
+> >> Signed-off-by: Maxime Coquelin <mcoquelin.stm32@gmail.com>
+> >
+> > Acked-by: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+> 
+> Thanks Greg.
+> 
+> Will you apply it to your tty tree for v4.2? Or it should go in
+> someone else tree?
 
-> KVM GSI routing, even if only used for MSI routing then mandates to
-> build entries for non MSI IRQs, using irqchip routing entries. Then you
-> draw the irqchip.c kvm_irq_routing_table
-> chip[KVM_NR_IRQCHIPS][KVM_IRQCHIP_NUM_PINS] static allocation issue.
+It's not in my queue, I'm guessing it goes in through some other tree as
+there are build dependancies here preventing me from taking it.
 
- Sorry for this add-on, needed time to look at the code.
- Actually, if we don't use this code at all, and implement our own kvm_set_irq_routing()
-and kvm_free_irq_routing(), we don't have to bother about all these limitations.
- The simplest thing to do there would be to store GSI number in struct its_itte. In this
-case raising an MSI by GSI would not differ from what i currently do.
+thanks,
 
-Kind regards,
-Pavel Fedin
-Expert Engineer
-Samsung Electronics Research center Russia
+greg k-h
