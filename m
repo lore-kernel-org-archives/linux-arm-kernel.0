@@ -1,10 +1,10 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 10 Jun 2015 14:43:00 +0200
-Subject: [PATCH 05/15] gpio: kill off set_irq_flags usage
-In-Reply-To: <1433874401-27161-6-git-send-email-robh@kernel.org>
+Date: Wed, 10 Jun 2015 14:43:54 +0200
+Subject: [PATCH 09/15] mfd: kill off set_irq_flags usage
+In-Reply-To: <1433874401-27161-10-git-send-email-robh@kernel.org>
 References: <1433874401-27161-1-git-send-email-robh@kernel.org>
- <1433874401-27161-6-git-send-email-robh@kernel.org>
-Message-ID: <CACRpkdZW9YvHGoypLRjwQ_gLtnQso3+XN193ZPy17T+31zm+Ag@mail.gmail.com>
+ <1433874401-27161-10-git-send-email-robh@kernel.org>
+Message-ID: <CACRpkdZkDbuAgMmpHaKVSD_cwo1ykV4jFsMUJOb3E=emRrzYXw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -26,15 +26,19 @@ On Tue, Jun 9, 2015 at 8:26 PM, Rob Herring <robh@kernel.org> wrote:
 > copy and paste of this code.
 >
 > Signed-off-by: Rob Herring <robh@kernel.org>
-> Cc: Michael Hennerich <michael.hennerich@analog.com>
+> Cc: Samuel Ortiz <sameo@linux.intel.com>
+> Cc: Lee Jones <lee.jones@linaro.org>
 > Cc: Linus Walleij <linus.walleij@linaro.org>
-> Cc: Alexandre Courbot <gnurou@gmail.com>
-> Cc: Ray Jui <rjui@broadcom.com>
-> Cc: Stephen Warren <swarren@wwwdotorg.org>
-> Cc: Thierry Reding <thierry.reding@gmail.com>
-> Cc: linux-gpio at vger.kernel.org
-> Cc: bcm-kernel-feedback-list at broadcom.com
-> Cc: linux-tegra at vger.kernel.org
+> Cc: Milo Kim <milo.kim@ti.com>
+> Cc: Kumar Gala <galak@codeaurora.org>
+> Cc: Andy Gross <agross@codeaurora.org>
+> Cc: David Brown <davidb@codeaurora.org>
+> Cc: Tony Lindgren <tony@atomide.com>
+> Cc: linux-arm-kernel at lists.infradead.org
+> Cc: patches at opensource.wolfsonmicro.com
+> Cc: linux-arm-msm at vger.kernel.org
+> Cc: linux-soc at vger.kernel.org
+> Cc: linux-omap at vger.kernel.org
 
 Acked-by: Linus Walleij <linus.walleij@linaro.org>
 
