@@ -1,81 +1,98 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 10 Jun 2015 18:07:08 +0100
-Subject: [PATCH v2 5/8] arm: finish VGIC initialisation explicitly
-In-Reply-To: <1433493473-4002-6-git-send-email-andre.przywara@arm.com>
-References: <1433493473-4002-1-git-send-email-andre.przywara@arm.com>
- <1433493473-4002-6-git-send-email-andre.przywara@arm.com>
-Message-ID: <55786EBC.2030904@arm.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 10 Jun 2015 18:13:04 +0100
+Subject: [PATCH 1/2] scatterlist: use sg_phys()
+In-Reply-To: <CAPcyv4i0MB9GTL4ujtybwBLB9sV+n0PX686Oi-Rt5CGEeey_hQ@mail.gmail.com>
+References: <20150609162659.21910.41681.stgit@dwillia2-desk3.amr.corp.intel.com>
+ <20150609162710.21910.57295.stgit@dwillia2-desk3.amr.corp.intel.com>
+ <20150610093252.GA20384@8bytes.org>
+ <CAPcyv4gat8TG9YnHmvD_7A7RD00Urn=febCj2Uc_cVcPi+fnCg@mail.gmail.com>
+ <20150610163121.GP7557@n2100.arm.linux.org.uk>
+ <CAPcyv4i0MB9GTL4ujtybwBLB9sV+n0PX686Oi-Rt5CGEeey_hQ@mail.gmail.com>
+Message-ID: <20150610171304.GQ7557@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/06/15 09:37, Andre Przywara wrote:
-> Since Linux 3.19-rc1 there is a new API to explicitly initialise
-> the in-kernel GIC emulation by a userland KVM device call.
-> Use that to tell the kernel we are finished with the GIC
-> initialisation, since the automatic GIC init will only be provided
-> as a legacy functionality in the future.
+On Wed, Jun 10, 2015 at 09:57:06AM -0700, Dan Williams wrote:
+> On Wed, Jun 10, 2015 at 9:31 AM, Russell King - ARM Linux
+> <linux@arm.linux.org.uk> wrote:
+> > Why?  The aim of the code is not to detect whether the address is aligned
+> > to a page (if it were, it'd be testing for a zero s->offset, or it would
+> > be testing for an s->offset being a multiple of the page size.
+> >
+> > Let's first understand the code that's being modified (which seems to be
+> > something which isn't done very much today - people seem to just like
+> > changing code for the hell of it.)
+> >
+> >         for (count = 0, s = sg; count < (size >> PAGE_SHIFT); s = sg_next(s)) {
+> >                 phys_addr_t phys = page_to_phys(sg_page(s));
+> >                 unsigned int len = PAGE_ALIGN(s->offset + s->length);
+> >
+> >                 if (!is_coherent &&
+> >                         !dma_get_attr(DMA_ATTR_SKIP_CPU_SYNC, attrs))
+> >                         __dma_page_cpu_to_dev(sg_page(s), s->offset, s->length,
+> > dir);
+> >
+> >                 prot = __dma_direction_to_prot(dir);
+> >
+> >                 ret = iommu_map(mapping->domain, iova, phys, len, prot);
+> >                 if (ret < 0)
+> >                         goto fail;
+> >                 count += len >> PAGE_SHIFT;
+> >                 iova += len;
+> >         }
+> >
+> > What it's doing is trying to map each scatterlist entry via an IOMMU.
+> > Unsurprisingly, IOMMUs are page based - you can't map a partial IOMMU
+> > page.
+> >
+> > However, what says that the IOMMU page size is the same as the host CPU
+> > page size - it may not be... so the above code is wrong for a completely
+> > different reason.
+> >
+> > What we _should_ be doing is finding out what the IOMMU minimum page
+> > size is, and using that in conjunction with the sg_phys() of the
+> > scatterlist entry to determine the start and length of the mapping
+> > such that the IOMMU mapping covers the range described by the scatterlist
+> > entry.  (iommu_map() takes arguments which must be aligned to the IOMMU
+> > minimum page size.)
+> >
+> > However, what we can also see from the above is that we have other code
+> > here using sg_page() - which is a necessity to be able to perform the
+> > required DMA cache maintanence to ensure that the data is visible to the
+> > DMA device.  We need to kmap_atomic() these in order to flush them, and
+> > there's no other way other than struct page to represent a highmem page.
+> >
+> > So, I think your intent to want to remove struct page from the I/O
+> > subsystem is a false hope, unless you want to end up rewriting lots of
+> > architecture code, and you can come up with an alternative method to
+> > represent highmem pages.
 > 
-> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
+> I think there will always be cases that need to do pfn_to_page() for
+> buffer management.  Those configurations will be blocked from seeing
+> cases where a pfn is not struct page backed.  So, you can have highmem
+> or dma to pmem, but not both.  Christoph, this is why I have Kconfig
+> symbols (DEV_PFN etc) to gate whether an arch/config supports pfn-only
+> i/o.
 
-Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
+Hmm, pmem... yea, in the SolidRun community, we've basically decided to
+stick with my updated Marvell BMM layer rather than switch to pmem.  I
+forget the reasons why, but the decision was made after looking at what
+pmem was doing...
 
-> ---
->  arm/gic.c | 25 ++++++++++++++++++++++---
->  1 file changed, 22 insertions(+), 3 deletions(-)
-> 
-> diff --git a/arm/gic.c b/arm/gic.c
-> index 6277af8..8d47562 100644
-> --- a/arm/gic.c
-> +++ b/arm/gic.c
-> @@ -89,24 +89,43 @@ int gic__create(struct kvm *kvm)
->  	return err;
->  }
->  
-> +/*
-> + * Sets the number of used interrupts and finalizes the GIC init explicitly.
-> + */
->  static int gic__init_gic(struct kvm *kvm)
->  {
-> +	int ret;
-> +
->  	int lines = irq__get_nr_allocated_lines();
->  	u32 nr_irqs = ALIGN(lines, 32) + GIC_SPI_IRQ_BASE;
->  	struct kvm_device_attr nr_irqs_attr = {
->  		.group	= KVM_DEV_ARM_VGIC_GRP_NR_IRQS,
->  		.addr	= (u64)(unsigned long)&nr_irqs,
->  	};
-> +	struct kvm_device_attr vgic_init_attr = {
-> +		.group	= KVM_DEV_ARM_VGIC_GRP_CTRL,
-> +		.attr	= KVM_DEV_ARM_VGIC_CTRL_INIT,
-> +	};
->  
->  	/*
->  	 * If we didn't use the KVM_CREATE_DEVICE method, KVM will
-> -	 * give us some default number of interrupts.
-> +	 * give us some default number of interrupts. The GIC initialization
-> +	 * will be done automatically in this case.
->  	 */
->  	if (gic_fd < 0)
->  		return 0;
->  
-> -	if (!ioctl(gic_fd, KVM_HAS_DEVICE_ATTR, &nr_irqs_attr))
-> -		return ioctl(gic_fd, KVM_SET_DEVICE_ATTR, &nr_irqs_attr);
-> +	if (!ioctl(gic_fd, KVM_HAS_DEVICE_ATTR, &nr_irqs_attr)) {
-> +		ret = ioctl(gic_fd, KVM_SET_DEVICE_ATTR, &nr_irqs_attr);
-> +		if (ret)
-> +			return ret;
-> +	}
-> +
-> +	if (!ioctl(gic_fd, KVM_HAS_DEVICE_ATTR, &vgic_init_attr)) {
-> +		ret = ioctl(gic_fd, KVM_SET_DEVICE_ATTR, &vgic_init_attr);
-> +		if (ret)
-> +			return ret;
-> +	}
->  
->  	return 0;
->  }
-> 
+In any case, let's not get bogged down in a peripheral issue.
 
+What I'm objecting to is that the patches I've seen seem to be just
+churn without any net benefit.
+
+You can't simply make sg_page() return NULL after this change, because
+you've done nothing with the remaining sg_page() callers to allow them
+to gracefully handle that case.
+
+What I'd like to see is a much fuller series of patches which show the
+whole progression towards your end goal rather than a piecemeal
+approach.  Right now, it's not clear that there is any benefit to
+this round of changes.
 
 -- 
-Jazz is not dead. It just smells funny...
+FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
+according to speedtest.net.
