@@ -1,34 +1,106 @@
-From: Elliott@hp.com (Elliott, Robert (Server Storage))
-Date: Wed, 10 Jun 2015 00:34:57 +0000
-Subject: [PATCH 1/2] scatterlist: use sg_phys()
-In-Reply-To: <20150609162710.21910.57295.stgit@dwillia2-desk3.amr.corp.intel.com>
-References: <20150609162659.21910.41681.stgit@dwillia2-desk3.amr.corp.intel.com>
- <20150609162710.21910.57295.stgit@dwillia2-desk3.amr.corp.intel.com>
-Message-ID: <94D0CD8314A33A4D9D801C0FE68B40295A977F76@G9W0745.americas.hpqcorp.net>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Wed, 10 Jun 2015 09:19:34 +0800
+Subject: [linux-sunxi] [PATCH 2/8] mfd: axp20x: Add a cell for the usb
+ power_supply part of the axp20x PMICs
+In-Reply-To: <1433885881-19809-3-git-send-email-hdegoede@redhat.com>
+References: <1433885881-19809-1-git-send-email-hdegoede@redhat.com>
+ <1433885881-19809-3-git-send-email-hdegoede@redhat.com>
+Message-ID: <CAGb2v652W+i6L1k5-CnHtXZXdJjFswkcyFGromhWSYaXtitW_w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Wed, Jun 10, 2015 at 5:37 AM, Hans de Goede <hdegoede@redhat.com> wrote:
+> Add a cell for the usb power_supply part of the axp20x PMICs.
+>
+> Note that this cell is only for the usb power_supply part and not the
+> ac-power / battery-charger / rtc-backup-bat-charger bits.
+>
+> Depending on the board each of those must be enabled / disabled separately
+> in devicetree as most boards do not use all 4. So in dt each one needs its
+> own child-node of the axp20x node. Another reason for using separate child
+> nodes for each is so that other devicetree nodes can have a power-supply
+> property with a phandle referencing a node representing a single
+> power-supply.
+>
+> The decision to use a separate devicetree node for each is reflected on
+> the kernel side by each getting its own mfd-cell / platform_device and
+> platform-driver.
+>
+> Cc: Bruno Pr?mont <bonbons@linux-vserver.org>
+> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+> ---
+>  drivers/mfd/axp20x.c | 32 +++++++++++++++++++++++++++++++-
+>  1 file changed, 31 insertions(+), 1 deletion(-)
+>
+> diff --git a/drivers/mfd/axp20x.c b/drivers/mfd/axp20x.c
+> index 6ffbc11..47ce233 100644
+> --- a/drivers/mfd/axp20x.c
+> +++ b/drivers/mfd/axp20x.c
+> @@ -113,6 +113,30 @@ static struct resource axp20x_pek_resources[] = {
+>         },
+>  };
+>
+> +static struct resource axp20x_usb_power_supply_resources[] = {
+> +       {
+> +               .name   = "VBUS_PLUGIN",
+> +               .start  = AXP20X_IRQ_VBUS_PLUGIN,
+> +               .end    = AXP20X_IRQ_VBUS_PLUGIN,
+> +               .flags  = IORESOURCE_IRQ,
+> +       }, {
+> +               .name   = "VBUS_REMOVAL",
+> +               .start  = AXP20X_IRQ_VBUS_REMOVAL,
+> +               .end    = AXP20X_IRQ_VBUS_REMOVAL,
+> +               .flags  = IORESOURCE_IRQ,
+> +       }, {
+> +               .name   = "VBUS_VALID",
+> +               .start  = AXP20X_IRQ_VBUS_VALID,
+> +               .end    = AXP20X_IRQ_VBUS_VALID,
+> +               .flags  = IORESOURCE_IRQ,
+> +       }, {
+> +               .name   = "VBUS_NOT_VALID",
+> +               .start  = AXP20X_IRQ_VBUS_NOT_VALID,
+> +               .end    = AXP20X_IRQ_VBUS_NOT_VALID,
+> +               .flags  = IORESOURCE_IRQ,
+> +       },
+> +};
+> +
+>  static struct resource axp22x_pek_resources[] = {
+>         {
+>                 .name   = "PEK_DBR",
+> @@ -165,7 +189,7 @@ static const struct regmap_config axp20x_regmap_config = {
+>         .val_bits       = 8,
+>         .wr_table       = &axp20x_writeable_table,
+>         .volatile_table = &axp20x_volatile_table,
+> -       .max_register   = AXP20X_FG_RES,
+> +       .max_register   = AXP20X_OCV(15),
+>         .cache_type     = REGCACHE_RBTREE,
+>  };
+>
+> @@ -368,6 +392,12 @@ static struct mfd_cell axp20x_cells[] = {
+>                 .resources              = axp20x_pek_resources,
+>         }, {
+>                 .name                   = "axp20x-regulator",
+> +       }, {
+> +               .name                   = "axp20x-usb-power-supply",
 
+Could we use either "vbus-power-supply" to match the AXP datasheets,
+or "otg-power-supply" which is slightly more obvious to board owners?
 
-> -----Original Message-----
-> From: linux-kernel-owner at vger.kernel.org [mailto:linux-kernel-
-> owner at vger.kernel.org] On Behalf Of Dan Williams
-> Sent: Tuesday, June 09, 2015 10:27 AM
-> Subject: [PATCH 1/2] scatterlist: use sg_phys()
-> 
-...
-> diff --git a/arch/microblaze/kernel/dma.c b/arch/microblaze/kernel/dma.c
-> index ed7ba8a11822..dcb3c594d626 100644
-> --- a/arch/microblaze/kernel/dma.c
-> +++ b/arch/microblaze/kernel/dma.c
-> @@ -61,7 +61,7 @@ static int dma_direct_map_sg(struct device *dev, struct
-> scatterlist *sgl,
->  	/* FIXME this part of code is untested */
->  	for_each_sg(sgl, sg, nents, i) {
->  		sg->dma_address = sg_phys(sg);
-> -		__dma_sync(page_to_phys(sg_page(sg)) + sg->offset,
-> +		__dma_sync(sg_phys(sg),
->  							sg->length, direction);
->  	}
+Thanks
 
-That one ends up with weird indentation.
+ChenYu
+
+> +               .of_compatible          = "x-powers,axp202-usb-power-supply",
+> +               .num_resources          =
+> +                               ARRAY_SIZE(axp20x_usb_power_supply_resources),
+> +               .resources              = axp20x_usb_power_supply_resources,
+>         },
+>  };
+>
+> --
+> 2.3.6
+>
+> --
+> You received this message because you are subscribed to the Google Groups "linux-sunxi" group.
+> To unsubscribe from this group and stop receiving emails from it, send an email to linux-sunxi+unsubscribe at googlegroups.com.
+> For more options, visit https://groups.google.com/d/optout.
