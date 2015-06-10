@@ -1,50 +1,23 @@
-From: vinod.koul@intel.com (Vinod Koul)
-Date: Wed, 10 Jun 2015 22:24:55 +0530
-Subject: [PATCH v2 0/5] dmaengine: mv_xor: Fixes and enhancements
-In-Reply-To: <1432645656-20504-1-git-send-email-maxime.ripard@free-electrons.com>
-References: <1432645656-20504-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <20150610165455.GW28601@localhost>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Wed, 10 Jun 2015 17:56:11 +0100
+Subject: [PATCH 15/15] arm64: remove ununsed set_irq_flags
+In-Reply-To: <1433874401-27161-16-git-send-email-robh@kernel.org>
+References: <1433874401-27161-1-git-send-email-robh@kernel.org>
+ <1433874401-27161-16-git-send-email-robh@kernel.org>
+Message-ID: <20150610165610.GF22844@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 26, 2015 at 03:07:31PM +0200, Maxime Ripard wrote:
-> Hi,
+On Tue, Jun 09, 2015 at 01:26:41PM -0500, Rob Herring wrote:
+> Now that all users of set_irq_flags and custom flags are converted to
+> genirq functions, the ARM specific set_irq_flags can be removed.
 > 
-> This serie is about various fixes and enhancements that were
-> previously submitted as part of the "ARM: mvebu: Add support for RAID6
-> PQ offloading" serie.
-> 
-> Seems the RAID6 PQ stuff seems more controversial than what I
-> expected, we took out the various bugs and enhancements patches, and
-> will submit the other patches as a separate set.
-Applied, thanks
+> Signed-off-by: Rob Herring <robh@kernel.org>
+> Cc: Catalin Marinas <catalin.marinas@arm.com>
+> Cc: Will Deacon <will.deacon@arm.com>
+> Cc: linux-arm-kernel at lists.infradead.org
+> ---
+>  arch/arm64/include/asm/hardirq.h | 5 -----
+>  1 file changed, 5 deletions(-)
 
--- 
-~Vinod
-
-> 
-> Changes from v1:
->   - Moved the bugfix commit as the first commit and cc'd stable
->   - Changed the Armada 38x compatible to armada-380-xor
->   - Made some misc cleanups
-> 
-> Lior Amsalem (4):
->   dmaengine: mv_xor: bug fix for racing condition in descriptors cleanup
->   dmaengine: mv_xor: add support for a38x command in descriptor mode
->   dmaengine: mv_xor: Enlarge descriptor pool size
->   dmaengine: mv_xor: improve descriptors list handling and reduce
->     locking
-> 
-> Maxime Ripard (1):
->   dmaengine: mv_xor: Rename function for consistent naming
-> 
->  Documentation/devicetree/bindings/dma/mv-xor.txt |   2 +-
->  drivers/dma/mv_xor.c                             | 352 ++++++++++++-----------
->  drivers/dma/mv_xor.h                             |  27 +-
->  3 files changed, 206 insertions(+), 175 deletions(-)
-> 
-> -- 
-> 2.4.1
-> 
-
--- 
+Acked-by: Catalin Marinas <catalin.marinas@arm.com>
