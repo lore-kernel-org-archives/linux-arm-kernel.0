@@ -1,46 +1,81 @@
-From: khilman@kernel.org (Kevin Hilman)
-Date: Wed, 10 Jun 2015 10:01:10 -0700
-Subject: [PATCH RFC 3/3] PM / Domains: Introduce generic PM domain for cpu
- domain
-In-Reply-To: <5574121F.2000806@samsung.com> (Krzysztof Kozlowski's message of
- "Sun, 07 Jun 2015 18:42:55 +0900")
-References: <1433456946-53296-1-git-send-email-lina.iyer@linaro.org>
- <1433456946-53296-4-git-send-email-lina.iyer@linaro.org>
- <5574121F.2000806@samsung.com>
-Message-ID: <7hbngnpkfd.fsf@deeprootsystems.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Wed, 10 Jun 2015 18:07:08 +0100
+Subject: [PATCH v2 5/8] arm: finish VGIC initialisation explicitly
+In-Reply-To: <1433493473-4002-6-git-send-email-andre.przywara@arm.com>
+References: <1433493473-4002-1-git-send-email-andre.przywara@arm.com>
+ <1433493473-4002-6-git-send-email-andre.przywara@arm.com>
+Message-ID: <55786EBC.2030904@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Krzysztof Kozlowski <k.kozlowski@samsung.com> writes:
+On 05/06/15 09:37, Andre Przywara wrote:
+> Since Linux 3.19-rc1 there is a new API to explicitly initialise
+> the in-kernel GIC emulation by a userland KVM device call.
+> Use that to tell the kernel we are finished with the GIC
+> initialisation, since the automatic GIC init will only be provided
+> as a legacy functionality in the future.
+> 
+> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
 
-> W dniu 05.06.2015 o 07:29, Lina Iyer pisze:
->> Generally cpus are grouped under a power domain in a SoC. When all cpus
->> in the domain are in their power off state,
->
-> What do you exactly mean here by "CPU in power off state"? How does it
-> map to kernel understanding of CPU device (hotplug? cpuidle?)?
->
->> the cpu domain can also be
->> powered off. Genpd provides the framework for defining cpus as devices
->> that are part of a cpu domain.
->
-> The problem which is solved looks to me like the same problem which
-> coupled cpuidle tried to solve: a certain deep sleep mode (e.g. power
-> off) can be entered when whole cluster is idle or other CPUs in cluster
-> are powered off completely.
->
-> It seems a little like duplicating the effort around coupled cpuidle.
+Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
 
-Yes, it duplicates some aspects of coupled idle states, but coupled
-states have their own limitations:
+> ---
+>  arm/gic.c | 25 ++++++++++++++++++++++---
+>  1 file changed, 22 insertions(+), 3 deletions(-)
+> 
+> diff --git a/arm/gic.c b/arm/gic.c
+> index 6277af8..8d47562 100644
+> --- a/arm/gic.c
+> +++ b/arm/gic.c
+> @@ -89,24 +89,43 @@ int gic__create(struct kvm *kvm)
+>  	return err;
+>  }
+>  
+> +/*
+> + * Sets the number of used interrupts and finalizes the GIC init explicitly.
+> + */
+>  static int gic__init_gic(struct kvm *kvm)
+>  {
+> +	int ret;
+> +
+>  	int lines = irq__get_nr_allocated_lines();
+>  	u32 nr_irqs = ALIGN(lines, 32) + GIC_SPI_IRQ_BASE;
+>  	struct kvm_device_attr nr_irqs_attr = {
+>  		.group	= KVM_DEV_ARM_VGIC_GRP_NR_IRQS,
+>  		.addr	= (u64)(unsigned long)&nr_irqs,
+>  	};
+> +	struct kvm_device_attr vgic_init_attr = {
+> +		.group	= KVM_DEV_ARM_VGIC_GRP_CTRL,
+> +		.attr	= KVM_DEV_ARM_VGIC_CTRL_INIT,
+> +	};
+>  
+>  	/*
+>  	 * If we didn't use the KVM_CREATE_DEVICE method, KVM will
+> -	 * give us some default number of interrupts.
+> +	 * give us some default number of interrupts. The GIC initialization
+> +	 * will be done automatically in this case.
+>  	 */
+>  	if (gic_fd < 0)
+>  		return 0;
+>  
+> -	if (!ioctl(gic_fd, KVM_HAS_DEVICE_ATTR, &nr_irqs_attr))
+> -		return ioctl(gic_fd, KVM_SET_DEVICE_ATTR, &nr_irqs_attr);
+> +	if (!ioctl(gic_fd, KVM_HAS_DEVICE_ATTR, &nr_irqs_attr)) {
+> +		ret = ioctl(gic_fd, KVM_SET_DEVICE_ATTR, &nr_irqs_attr);
+> +		if (ret)
+> +			return ret;
+> +	}
+> +
+> +	if (!ioctl(gic_fd, KVM_HAS_DEVICE_ATTR, &vgic_init_attr)) {
+> +		ret = ioctl(gic_fd, KVM_SET_DEVICE_ATTR, &vgic_init_attr);
+> +		if (ret)
+> +			return ret;
+> +	}
+>  
+>  	return 0;
+>  }
+> 
 
-- only handles CPUs, not other devices sharing a power rail (e.g. L2$,
-  GIC, floating point unit, CoreSight, etc. etc.)
 
-- not scaling well past 2 CPUs
-
-- doesn't handle clusters: While this series only addresses CPUs
-  currently, the approach can be extended.  Because genpd handles nested
-  domains, the could be used to model clusters as well.
-
-Kevin
+-- 
+Jazz is not dead. It just smells funny...
