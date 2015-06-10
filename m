@@ -1,35 +1,38 @@
 From: lokeshvutla@ti.com (Lokesh Vutla)
-Date: Wed, 10 Jun 2015 14:56:23 +0530
-Subject: [PATCH 0/3] ARM: OMAP2+: hwmod: RTC: Add lock and unlock hooks
-Message-ID: <1433928386-24891-1-git-send-email-lokeshvutla@ti.com>
+Date: Wed, 10 Jun 2015 14:56:26 +0530
+Subject: [PATCH 3/3] ARM: AMx3xx: hwmod: RTC: Add lock and unlock functions
+In-Reply-To: <1433928386-24891-1-git-send-email-lokeshvutla@ti.com>
+References: <1433928386-24891-1-git-send-email-lokeshvutla@ti.com>
+Message-ID: <1433928386-24891-4-git-send-email-lokeshvutla@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Some IP blocks like RTC, needs an additional unlocking mechanism for
-writing to its registers. This patch adds optional lock and unlock
-function pointers to the IP block's hwmod data which gets executed
-before and after writing into IP sysconfig register.
-And also hook lock and unlock functions to AMx3xx, DRA7 RTC hwmod data,
-so that sysconfig registers are updated properly.
+RTC IP have kicker feature which prevents spurious writes to its registers.
+In order to write into any of the RTC registers, KICK values has to be
+written to KICK registers.
 
-Tested on:
-DRA7-evm: http://pastebin.ubuntu.com/11688889/
-DRA72-evm: http://pastebin.ubuntu.com/11688901/
-BeagleBoard-x15: http://pastebin.ubuntu.com/11688907/
-BeagleBoneBlack: http://pastebin.ubuntu.com/11688923/ 
-AM437x-gp-evm: http://pastebin.ubuntu.com/11689157/ (Used an out of tree patch to enable RTC)
+omap_hwmod_rtc_unlock/lock functions writes into these KICK registers
+inorder to lock and unlock RTC registers.
+This patch hooks omap_hwmod_rtc_unlock/lock functions into RTC hwmod,
+so that SYSCONFIG register is updated properly.
 
-Lokesh Vutla (3):
-  ARM: OMAP2+: hwmod: add support for lock and unlock hooks
-  ARM: DRA: hwmod: RTC: Add lock and unlock functions
-  ARM: AMx3xx: RTC: Add lock and unlock functions
+Signed-off-by: Lokesh Vutla <lokeshvutla@ti.com>
+---
+ arch/arm/mach-omap2/omap_hwmod_33xx_43xx_ipblock_data.c | 2 ++
+ 1 file changed, 2 insertions(+)
 
- arch/arm/mach-omap2/omap_hwmod.c                   | 13 ++++++
- arch/arm/mach-omap2/omap_hwmod.h                   |  6 +++
- .../mach-omap2/omap_hwmod_33xx_43xx_ipblock_data.c |  2 +
- arch/arm/mach-omap2/omap_hwmod_7xx_data.c          |  2 +
- arch/arm/mach-omap2/omap_hwmod_reset.c             | 47 ++++++++++++++++++++++
- 5 files changed, 70 insertions(+)
-
+diff --git a/arch/arm/mach-omap2/omap_hwmod_33xx_43xx_ipblock_data.c b/arch/arm/mach-omap2/omap_hwmod_33xx_43xx_ipblock_data.c
+index cabc569..2d92958 100644
+--- a/arch/arm/mach-omap2/omap_hwmod_33xx_43xx_ipblock_data.c
++++ b/arch/arm/mach-omap2/omap_hwmod_33xx_43xx_ipblock_data.c
+@@ -904,6 +904,8 @@ static struct omap_hwmod_class_sysconfig am33xx_rtc_sysc = {
+ static struct omap_hwmod_class am33xx_rtc_hwmod_class = {
+ 	.name		= "rtc",
+ 	.sysc		= &am33xx_rtc_sysc,
++	.unlock		= &omap_hwmod_rtc_unlock,
++	.lock		= &omap_hwmod_rtc_lock,
+ };
+ 
+ struct omap_hwmod am33xx_rtc_hwmod = {
 -- 
 1.9.1
