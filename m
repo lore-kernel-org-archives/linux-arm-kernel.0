@@ -1,43 +1,47 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Wed, 10 Jun 2015 14:33:45 -0700
-Subject: [PATCH 1/2 V3] clk: sirf: add CSR atlas7 clk and reset support
-In-Reply-To: <CAGsJ_4xUk1kDnLDrRnipN+Kpm6oOe8C-4DfhdshVUmv+PKjgig@mail.gmail.com>
-References: <1431675587-8637-1-git-send-email-21cnbao@gmail.com>
- <20150515183029.GL31753@codeaurora.org>
- <CAGsJ_4zwNQvvSwb49nwKzfke1V1nUCW-tDqbP4FxEr0SfmX9zA@mail.gmail.com>
- <20150521213324.GA1885@codeaurora.org>
- <CAGsJ_4xUk1kDnLDrRnipN+Kpm6oOe8C-4DfhdshVUmv+PKjgig@mail.gmail.com>
-Message-ID: <20150610213345.GF29640@codeaurora.org>
+From: khilman@kernel.org (Kevin Hilman)
+Date: Wed, 10 Jun 2015 14:37:57 -0700
+Subject: [PATCH RFC 3/3] PM / Domains: Introduce generic PM domain for cpu
+ domain
+In-Reply-To: <1433456946-53296-4-git-send-email-lina.iyer@linaro.org> (Lina
+ Iyer's message of "Thu, 4 Jun 2015 16:29:06 -0600")
+References: <1433456946-53296-1-git-send-email-lina.iyer@linaro.org>
+ <1433456946-53296-4-git-send-email-lina.iyer@linaro.org>
+Message-ID: <7hmw07meh6.fsf@deeprootsystems.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/11, Barry Song wrote:
-> 2015-05-22 5:33 GMT+08:00 Stephen Boyd <sboyd@codeaurora.org>:
-> > On 05/16, Barry Song wrote:
-> >> 2015-05-16 2:30 GMT+08:00 Stephen Boyd <sboyd@codeaurora.org>:
-> >> > On 05/15, Barry Song wrote:
-> >
-> > It isn't really about making boot time faster, it's about using
-> > the proper linux device model for clock providers. That way when
-> > we want to support things like suspend/resume, deferred probe,
-> > devm_*(), sysfs, etc. we can use the device model instead of
-> > resorting to things like syscore_ops for suspend/resume or
-> > forgoing features entirely.
-> >
-> 
-> my feeling is if the clock controller is an internal controller which
-> serve all controllers in the SoC, "deferred probe" might be yes for
-> almost all HW since all HW need clock. so it seems it makes "deferred
-> probe" has no meaning. clock controller seems to be 1st HW which needs
-> to be ready.
+Lina Iyer <lina.iyer@linaro.org> writes:
 
-That sounds like a probe ordering problem, and I agree most
-likely the clock driver will need to probe first in this case. It
-doesn't do anything about other problems like suspend/resume or
-other features that the device model provides solutions for
-though. Maybe we don't use these features, but it doesn't mean we
-should forgo the device model just because we don't need it.
+> Generally cpus are grouped under a power domain in a SoC. When all cpus
+> in the domain are in their power off state, the cpu domain can also be
+> powered off. 
 
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+How does this relate to a cluster, and why aren't you using that terminolgy?
+
+> Genpd provides the framework for defining cpus as devices
+> that are part of a cpu domain.
+>
+> Introduce support for defining and adding a generic power domain for the
+> cpus based on the DT specification of power domain providers and
+> consumers.  SoC's that have the cpu domain defined in their DT, can
+> setup a genpd with a name and the power_on/power_off callbacks. Calling
+> pm_cpu_domain_init() will register the genpd and attach the cpus for
+> this domain with the genpd.
+>
+> CPU_PM notifications for are used to pm_runtime_get_sync() and
+> pm_runtime_put_sync() for each cpu.  When all cpus are powered off, the
+> last cpu going down would call the genpd->power_off(). Correspondingly,
+> the first cpu up would call the genpd->power_on() callback before
+> resuming from idle.
+
+Other patches also mention this genpd being useful to gate power to
+non-CPU peripherals on the same power rail.  How are those devices to be
+added?
+
+Without seeing the DTs and the init code that might call
+pm_cpu_domain_init(), it's hard for me to see how this is intended to be
+used.  Could you also include a patch that shows how this is initialized
+and the DT additions?  Ideally, it should also show how a non-CPU device
+would be included.
+
+Kevin
