@@ -1,57 +1,211 @@
 From: chaotian.jing@mediatek.com (Chaotian Jing)
-Date: Wed, 10 Jun 2015 10:24:42 +0800
-Subject: [PATCH v5 1/7] mmc: dt-bindings: add Mediatek MMC bindings
+Date: Wed, 10 Jun 2015 10:24:44 +0800
+Subject: [PATCH v5 3/7] mmc: mediatek: Add PM support for MMC driver
 In-Reply-To: <1433903088-14407-1-git-send-email-chaotian.jing@mediatek.com>
 References: <1433903088-14407-1-git-send-email-chaotian.jing@mediatek.com>
-Message-ID: <1433903088-14407-2-git-send-email-chaotian.jing@mediatek.com>
+Message-ID: <1433903088-14407-4-git-send-email-chaotian.jing@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Document the device-tree binding of Mediatek MMC host
+Add PM support for Mediatek MMC driver
+Save/restore registers when PM
 
 Signed-off-by: Chaotian Jing <chaotian.jing@mediatek.com>
 ---
- Documentation/devicetree/bindings/mmc/mtk-sd.txt | 32 ++++++++++++++++++++++++
- 1 file changed, 32 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/mmc/mtk-sd.txt
+ drivers/mmc/host/mtk-sd.c | 88 +++++++++++++++++++++++++++++++++++++++++++++--
+ 1 file changed, 85 insertions(+), 3 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/mmc/mtk-sd.txt b/Documentation/devicetree/bindings/mmc/mtk-sd.txt
-new file mode 100644
-index 0000000..a1adfa4
---- /dev/null
-+++ b/Documentation/devicetree/bindings/mmc/mtk-sd.txt
-@@ -0,0 +1,32 @@
-+* MTK MMC controller
-+
-+The MTK  MSDC can act as a MMC controller
-+to support MMC, SD, and SDIO types of memory cards.
-+
-+This file documents differences between the core properties in mmc.txt
-+and the properties used by the msdc driver.
-+
-+Required properties:
-+- compatible: Should be "mediatek,mt8173-mmc","mediatek,mt8135-mmc"
-+- interrupts: Should contain MSDC interrupt number
-+- clocks: MSDC source clock, HCLK
-+- clock-names: "source", "hclk"
-+- pinctrl-names: should be "default", "state_uhs"
-+- pinctrl-0: should contain default/high speed pin ctrl
-+- pinctrl-1: should contain uhs mode pin ctrl
-+- vmmc-supply: power to the Core
-+- vqmmc-supply: power to the IO
-+
-+Examples:
-+mmc0: mmc at 11230000 {
-+	compatible = "mediatek,mt8173-mmc", "mediatek,mt8135-mmc";
-+	reg = <0 0x11230000 0 0x108>;
-+	interrupts = <GIC_SPI 39 IRQ_TYPE_LEVEL_LOW>;
-+	vmmc-supply = <&mt6397_vemc_3v3_reg>;
-+	vqmmc-supply = <&mt6397_vio18_reg>;
-+	clocks = <&pericfg CLK_PERI_MSDC30_0>, <&topckgen CLK_TOP_MSDC50_0_H_SEL>;
-+	clock-names = "source", "hclk";
-+	pinctrl-names = "default", "state_uhs";
-+	pinctrl-0 = <&mmc0_pins_default>;
-+	pinctrl-1 = <&mmc0_pins_uhs>;
+diff --git a/drivers/mmc/host/mtk-sd.c b/drivers/mmc/host/mtk-sd.c
+index 8de3299..62e966f 100644
+--- a/drivers/mmc/host/mtk-sd.c
++++ b/drivers/mmc/host/mtk-sd.c
+@@ -22,6 +22,7 @@
+ #include <linux/of_gpio.h>
+ #include <linux/pinctrl/consumer.h>
+ #include <linux/platform_device.h>
++#include <linux/pm_runtime.h>
+ #include <linux/regulator/consumer.h>
+ #include <linux/spinlock.h>
+ 
+@@ -212,6 +213,7 @@
+ #define MSDC_ASYNC_FLAG (0x1 << 1)
+ #define MSDC_MMAP_FLAG (0x1 << 2)
+ 
++#define MTK_MMC_AUTOSUSPEND_DELAY	50
+ #define CMD_TIMEOUT         (HZ/10 * 5)	/* 100ms x5 */
+ #define DAT_TIMEOUT         (HZ    * 5)	/* 1000ms x5 */
+ 
+@@ -254,6 +256,15 @@ struct msdc_dma {
+ 	dma_addr_t bd_addr;	/* the physical address of bd array */
+ };
+ 
++struct msdc_save_para {
++	u32 msdc_cfg;
++	u32 iocon;
++	u32 sdc_cfg;
++	u32 pad_tune;
++	u32 patch_bit0;
++	u32 patch_bit1;
 +};
++
+ struct msdc_host {
+ 	struct device *dev;
+ 	struct mmc_host *mmc;	/* mmc structure */
+@@ -286,6 +297,7 @@ struct msdc_host {
+ 	u32 sclk;		/* SD/MS clock speed */
+ 	bool ddr;
+ 	bool vqmmc_enabled;
++	struct msdc_save_para save_para; /* used when gate HCLK */
+ };
+ 
+ static void sdr_set_bits(void __iomem *reg, u32 bs)
+@@ -680,6 +692,9 @@ static void msdc_request_done(struct msdc_host *host, struct mmc_request *mrq)
+ 	if (mrq->data)
+ 		msdc_unprepare_data(host, mrq);
+ 	mmc_request_done(host->mmc, mrq);
++
++	pm_runtime_mark_last_busy(host->dev);
++	pm_runtime_put_autosuspend(host->dev);
+ }
+ 
+ /* returns true if command is fully handled; returns false otherwise */
+@@ -834,6 +849,8 @@ static void msdc_ops_request(struct mmc_host *mmc, struct mmc_request *mrq)
+ 	WARN_ON(host->mrq);
+ 	host->mrq = mrq;
+ 
++	pm_runtime_get_sync(host->dev);
++
+ 	if (mrq->data)
+ 		msdc_prepare_data(host, mrq);
+ 
+@@ -1148,6 +1165,8 @@ static void msdc_ops_set_ios(struct mmc_host *mmc, struct mmc_ios *ios)
+ 	int ret;
+ 	u32 ddr = 0;
+ 
++	pm_runtime_get_sync(host->dev);
++
+ 	if (ios->timing == MMC_TIMING_UHS_DDR50 ||
+ 	    ios->timing == MMC_TIMING_MMC_DDR52)
+ 		ddr = 1;
+@@ -1162,7 +1181,7 @@ static void msdc_ops_set_ios(struct mmc_host *mmc, struct mmc_ios *ios)
+ 					ios->vdd);
+ 			if (ret) {
+ 				dev_err(host->dev, "Failed to set vmmc power!\n");
+-				return;
++				goto end;
+ 			}
+ 		}
+ 		break;
+@@ -1190,6 +1209,10 @@ static void msdc_ops_set_ios(struct mmc_host *mmc, struct mmc_ios *ios)
+ 
+ 	if (host->mclk != ios->clock || host->ddr != ddr)
+ 		msdc_set_mclk(host, ddr, ios->clock);
++
++end:
++	pm_runtime_mark_last_busy(host->dev);
++	pm_runtime_put_autosuspend(host->dev);
+ }
+ 
+ static struct mmc_host_ops mt_msdc_ops = {
+@@ -1314,12 +1337,18 @@ static int msdc_drv_probe(struct platform_device *pdev)
+ 	if (ret)
+ 		goto release;
+ 
++	pm_runtime_set_active(host->dev);
++	pm_runtime_set_autosuspend_delay(host->dev, MTK_MMC_AUTOSUSPEND_DELAY);
++	pm_runtime_use_autosuspend(host->dev);
++	pm_runtime_enable(host->dev);
+ 	ret = mmc_add_host(mmc);
++
+ 	if (ret)
+-		goto release;
++		goto end;
+ 
+ 	return 0;
+-
++end:
++	pm_runtime_disable(host->dev);
+ release:
+ 	platform_set_drvdata(pdev, NULL);
+ 	msdc_deinit_hw(host);
+@@ -1347,11 +1376,15 @@ static int msdc_drv_remove(struct platform_device *pdev)
+ 	mmc = platform_get_drvdata(pdev);
+ 	host = mmc_priv(mmc);
+ 
++	pm_runtime_get_sync(host->dev);
++
+ 	platform_set_drvdata(pdev, NULL);
+ 	mmc_remove_host(host->mmc);
+ 	msdc_deinit_hw(host);
+ 	msdc_gate_clock(host);
+ 
++	pm_runtime_disable(host->dev);
++	pm_runtime_put_noidle(host->dev);
+ 	dma_free_coherent(&pdev->dev,
+ 			sizeof(struct mt_gpdma_desc),
+ 			host->dma.gpd, host->dma.gpd_addr);
+@@ -1363,6 +1396,54 @@ static int msdc_drv_remove(struct platform_device *pdev)
+ 	return 0;
+ }
+ 
++#ifdef CONFIG_PM
++static void msdc_save_reg(struct msdc_host *host)
++{
++	host->save_para.msdc_cfg = readl(host->base + MSDC_CFG);
++	host->save_para.iocon = readl(host->base + MSDC_IOCON);
++	host->save_para.sdc_cfg = readl(host->base + SDC_CFG);
++	host->save_para.pad_tune = readl(host->base + MSDC_PAD_TUNE);
++	host->save_para.patch_bit0 = readl(host->base + MSDC_PATCH_BIT);
++	host->save_para.patch_bit1 = readl(host->base + MSDC_PATCH_BIT1);
++}
++
++static void msdc_restore_reg(struct msdc_host *host)
++{
++	writel(host->save_para.msdc_cfg, host->base + MSDC_CFG);
++	writel(host->save_para.iocon, host->base + MSDC_IOCON);
++	writel(host->save_para.sdc_cfg, host->base + SDC_CFG);
++	writel(host->save_para.pad_tune, host->base + MSDC_PAD_TUNE);
++	writel(host->save_para.patch_bit0, host->base + MSDC_PATCH_BIT);
++	writel(host->save_para.patch_bit1, host->base + MSDC_PATCH_BIT1);
++}
++
++static int msdc_runtime_suspend(struct device *dev)
++{
++	struct mmc_host *mmc = dev_get_drvdata(dev);
++	struct msdc_host *host = mmc_priv(mmc);
++
++	msdc_save_reg(host);
++	msdc_gate_clock(host);
++	return 0;
++}
++
++static int msdc_runtime_resume(struct device *dev)
++{
++	struct mmc_host *mmc = dev_get_drvdata(dev);
++	struct msdc_host *host = mmc_priv(mmc);
++
++	msdc_ungate_clock(host);
++	msdc_restore_reg(host);
++	return 0;
++}
++#endif
++
++static const struct dev_pm_ops msdc_dev_pm_ops = {
++	SET_SYSTEM_SLEEP_PM_OPS(pm_runtime_force_suspend,
++				pm_runtime_force_resume)
++	SET_RUNTIME_PM_OPS(msdc_runtime_suspend, msdc_runtime_resume, NULL)
++};
++
+ static const struct of_device_id msdc_of_ids[] = {
+ 	{   .compatible = "mediatek,mt8135-mmc", },
+ 	{}
+@@ -1374,6 +1455,7 @@ static struct platform_driver mt_msdc_driver = {
+ 	.driver = {
+ 		.name = "mtk-msdc",
+ 		.of_match_table = msdc_of_ids,
++		.pm = &msdc_dev_pm_ops,
+ 	},
+ };
+ 
 -- 
 1.8.1.1.dirty
