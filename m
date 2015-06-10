@@ -1,132 +1,54 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Wed, 10 Jun 2015 10:34:26 +0100
-Subject: [PATCH 4/8] power: Add an axp20x-usb-power driver
-In-Reply-To: <557801B8.5040804@redhat.com>
-References: <1433885881-19809-1-git-send-email-hdegoede@redhat.com>
- <1433885881-19809-5-git-send-email-hdegoede@redhat.com>
- <20150610072957.GV2982@x1> <557801B8.5040804@redhat.com>
-Message-ID: <20150610093426.GD2982@x1>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Wed, 10 Jun 2015 10:39:30 +0100
+Subject: [PATCH] arm64: dts: add device tree for ARM SMM-A53x2 on
+ LogicTile Express 20MG
+In-Reply-To: <20150610092726.GV12807@e106497-lin.cambridge.arm.com>
+References: <1433864311-2326-1-git-send-email-kristina.martsenko@arm.com>
+ <20150610085825.GS12807@e106497-lin.cambridge.arm.com>
+ <20150610091234.GA1517@leverpostej>
+ <20150610092726.GV12807@e106497-lin.cambridge.arm.com>
+Message-ID: <20150610093930.GC1517@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 10 Jun 2015, Hans de Goede wrote:
-
-> Hi,
+> > > > +/* In use by spinning secondaries */
+> > > > +/memreserve/ 0x80000000 0x00010000;
+> > > 
+> > > Where does the kernel get loaded to? If 0x80000000 is the start of memory and the kernel is
+> > > loaded at 0x80000 offset as usual, then that memory is protected anyway.
+> > 
+> > That's simply not true. The kernel may use _any_ memory which is
+> > described to it and not explicitly reserved.
+> > 
+> > We only reserve the kernel's static image (see arm64_memblock_init),
+> > which does not cover that region. We can easily map that memory and
+> > allocate it to something.
+> > 
+> > While we used to place page tables in the end of that region, we only
+> > reserved the page tables, and it was problematic because you had no idea
+> > how much of that memory the kernel might use.
+> > 
+> > Regardless, DTs should not rely on Linux implementation details like
+> > magic implicit reservations.
 > 
-> Thanks for the quick review I'll do a v2 addressing your concerns soonish.
+> Things might have changed since v3.18 but I remember having a hell of a time trying to
+> access memory that was at the bottom of address space before the kernel start image.
+
+Memory more than 0x80000 bytes below the kernel wouldn't have been
+mapped because of the way the linear map is built, which might have been
+your issue. This is an implementation detail which _will_ change (see
+Ard's patches) and should not be relied upon.
+
+> But I agree that things should be explicitly stated in the DT.
 > 
-> On 10-06-15 09:29, Lee Jones wrote:
-> >On Tue, 09 Jun 2015, Hans de Goede wrote:
-> >
-> >>This adds a driver for the usb power_supply bits of the axp20x PMICs.
-> >>
-> >>I initially started writing my own driver, before coming aware of
-> >>Bruno Pr?mont's excellent earlier RFC with a driver for this.
-> >>
-> >>My driver was lacking CURRENT_MAX and VOLTAGE_MIN support Bruno's
-> >>drvier has, so I've copied the code for those from his driver.
-> >>
-> >>Note that the AC-power-supply and battery charger bits will need separate
-> >>drivers. Each one needs its own devictree child-node so that other
-> >>devicetree nodes can reference the right power-supply, and thus each one
-> >>will get its own mfd-cell / platform_device and platform-driver.
-> >>
-> >>Cc: Bruno Pr?mont <bonbons@linux-vserver.org>
-> >>Signed-off-by: Hans de Goede <hdegoede@redhat.com>
-> >>---
-> >>  .../bindings/power_supply/axp20x_usb_power.txt     |  34 +++
-> >
-> >This needs to be submitted in a seperate patch.
-> 
-> Ok.
-> 
-> >
-> >>  drivers/power/Kconfig                              |   7 +
-> >>  drivers/power/Makefile                             |   1 +
-> >>  drivers/power/axp20x_usb_power.c                   | 241 +++++++++++++++++++++
-> >>  include/linux/mfd/axp20x.h                         |  24 ++
-> >>  5 files changed, 307 insertions(+)
-> >>  create mode 100644 Documentation/devicetree/bindings/power_supply/axp20x_usb_power.txt
-> >>  create mode 100644 drivers/power/axp20x_usb_power.c
-> >
-> >[...]
-> >
-> >>diff --git a/include/linux/mfd/axp20x.h b/include/linux/mfd/axp20x.h
-> >>index f4290ae..d7adb2e 100644
-> >>--- a/include/linux/mfd/axp20x.h
-> >>+++ b/include/linux/mfd/axp20x.h
-> >>@@ -11,6 +11,8 @@
-> >>  #ifndef __LINUX_MFD_AXP20X_H
-> >>  #define __LINUX_MFD_AXP20X_H
-> >>
-> >>+#include <linux/regmap.h>
-> >>+
-> >>  enum {
-> >>  	AXP202_ID = 0,
-> >>  	AXP209_ID,
-> >>@@ -366,4 +368,26 @@ struct axp20x_fg_pdata {
-> >>  	int thermistor_curve[MAX_THERM_CURVE_SIZE][2];
-> >>  };
-> >>
-> >>+/* generic helper function for reading 9-16 bit wide regs */
-> >>+static inline int axp20x_read_16bit(struct regmap *regmap,
-> >
-> >This is only used twice and only in one file.
-> >
-> >Do you know of any other uses of this call that will be upstreamed
-> >shortly?
-> 
-> Yes I plan to write drivers for the other 3 power_supply class
-> cells (ac-power, battery-charger, rtc-bat-charger) in the axp209,
-> and most of those need the same helper which I why I put it here.
+> Question for Kristina now: why spin method and not PSCI for this CoreTile?
 
-Okay.
+Unfortunately the boot monitor only ever implemented spin-table. If
+you're offering to port and maintain ARM Trusted Firmware, we can look
+at having the DT report PSCI. ;)
 
-> >>+				    unsigned int reg, unsigned int width)
-> >
-> >The function name is a bit misleading.
-> 
-> How about: axp20x_read_multibyte_reg ?
+Ideally we'd avoid placing the enable-method in the DTS at all, but I
+believe the boot monitor isn't smart enough to fix that up.
 
-axp20x_read_variable_width() ?
-
-> >>+{
-> >>+	unsigned int v, raw;
-> >>+	int r;
-> >
-> >'v' and 'r' are not good variable names.
-> >
-> >>+	r = regmap_read(regmap, reg, &v);
-> >>+	if (r)
-> >>+		return r;
-> >>+
-> >>+	raw = v << (width - 8);
-> >
-> >So 'reg' is expected to be top end loaded?
-> >
-> >E.g A value of say 0x0101 (257) in 9 bits will look like this:
-> >
-> >reg          reg + 1
-> >1000 0000b   0000 0001b
-> 
-> Yes, I guess this was done so that you can get all the 8 msb-s
-> in a single read if you do not care about the lsb-s.
-
-Odd, but okay.
-
-> >>+	r = regmap_read(regmap, reg + 1, &v);
-> >>+	if (r)
-> >>+		return r;
-> >>+
-> >>+	raw |= v;
-> >>+
-> >>+	return raw;
-> >>+}
-> >>+
-> >>  #endif /* __LINUX_MFD_AXP20X_H */
-
--- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Thanks,
+Mark.
