@@ -1,31 +1,47 @@
-From: pawel.moll@arm.com (Pawel Moll)
-Date: Wed, 10 Jun 2015 10:59:20 +0100
-Subject: [PATCH] arm64: dts: add device tree for ARM SMM-A53x2 on
- LogicTile Express 20MG
-In-Reply-To: <20150610093930.GC1517@leverpostej>
-References: <1433864311-2326-1-git-send-email-kristina.martsenko@arm.com>
- <20150610085825.GS12807@e106497-lin.cambridge.arm.com>
- <20150610091234.GA1517@leverpostej>
- <20150610092726.GV12807@e106497-lin.cambridge.arm.com>
- <20150610093930.GC1517@leverpostej>
-Message-ID: <1433930360.3418.0.camel@arm.com>
+From: mcoquelin.stm32@gmail.com (Maxime Coquelin)
+Date: Wed, 10 Jun 2015 12:03:47 +0200
+Subject: [PATCH] ARM: Re-enable TRACE_IRQFLAGS_SUPPORT on ARMv7-M
+In-Reply-To: <5577246B.3080602@linaro.org>
+References: <1433802288-25508-1-git-send-email-mcoquelin.stm32@gmail.com>
+ <20150608224749.GB7557@n2100.arm.linux.org.uk>
+ <CALszF6DPzhAufUyWW-a3X7Cp4=tjSyCBM=Y4LcnWnUH=41qeoQ@mail.gmail.com>
+ <5576D0FE.10900@linaro.org>
+ <20150609150127.GF7557@n2100.arm.linux.org.uk>
+ <5577246B.3080602@linaro.org>
+Message-ID: <CALszF6DjQ-3gruP4t4cwTBLv=G=2CSqmE8ZJWc8ED1GaNEA7GQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2015-06-10 at 10:39 +0100, Mark Rutland wrote:
-> Ideally we'd avoid placing the enable-method in the DTS at all, but I
-> believe the boot monitor isn't smart enough to fix that up.
+2015-06-09 19:37 GMT+02:00 Daniel Thompson <daniel.thompson@linaro.org>:
+> On 09/06/15 16:01, Russell King - ARM Linux wrote:
+>>
+>> On Tue, Jun 09, 2015 at 12:41:50PM +0100, Daniel Thompson wrote:
+>>>
+>>> Does the following patch, which makes the arch_irqs_disabled()
+>>> implementation from asm-generic available on arm, fix the build for you?
+>>
+>>
+>> Yes, this is exactly the kind of fix for this I'm looking for.  Once
+>> everyone's happy with it, it can find it's way to the patch system.
+>
+>
+> From my side, using v4.1-rc6 plus the patch, I can build all defconfigs and
+> both versatile_defconfig and multi_v7_defconfig remain bootable (so both
+> ways through the arch #ifdef in irqflag.h).
+>
+> Similarly working on linux-next-20150608 plus the patch I am able to build
+> and boot Maxime's stm32 code (and show that without the patch it doesn't
+> build).
+Ok, thanks for having tested on STM32.
 
-You would be surprised how intelligent these animals can be :-P
+>
+> From my side I think that makes it good to go.
+>
+> So... in the absense of objections I will send it to the patch tracker
+> tomorrow.
 
-8<--------------
-    case CPU:
-        err = safdt_insert_prop(safdt, "enable-method",
-                                "spin-table", 11);
-        if (err)
-            break;
-        addr = fdt_uint64(parser->cpu_release_addr);
-        err = safdt_insert_prop(safdt, "cpu-release-addr", &addr, 8);
-8<---------------
+For what it is worth, you can add:
+Acked-by: Maxime Coquelin <maxime.coquelin@st.com>
 
-Pawe?
+Regards,
+Maxime
