@@ -1,98 +1,21 @@
-From: eric.auger@linaro.org (Eric Auger)
-Date: Wed, 10 Jun 2015 10:33:00 +0200
-Subject: [PATCH 00/10] arm/arm64: KVM: Active interrupt state switching
- for shared devices
-In-Reply-To: <1433783045-8002-1-git-send-email-marc.zyngier@arm.com>
-References: <1433783045-8002-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <5577F63C.5040806@linaro.org>
+From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
+Date: Wed, 10 Jun 2015 10:39:22 +0200
+Subject: [RFT v2 34/48] pinctrl: Prepare for killing the first parameter
+ 'irq' of irq_flow_handler_t
+In-Reply-To: <1433391238-19471-35-git-send-email-jiang.liu@linux.intel.com>
+References: <1433391238-19471-1-git-send-email-jiang.liu@linux.intel.com>
+ <1433391238-19471-35-git-send-email-jiang.liu@linux.intel.com>
+Message-ID: <4497677.ZpyibMJVfv@diego>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Marc,
-On 06/08/2015 07:03 PM, Marc Zyngier wrote:
-> From day 1, our timer code has been using a terrible hack: whenever
-> the guest is scheduled with a timer interrupt pending (i.e. the HW
-> timer has expired), we restore the timer state with the MASK bit set,
-> in order to avoid the physical interrupt to fire again. And again. And
-> again...
+Am Donnerstag, 4. Juni 2015, 12:13:44 schrieb Jiang Liu:
+> Change irq flow handler to prepare for killing the first parameter 'irq'
+> of irq_flow_handler_t.
 > 
-> This is absolutely silly, for at least two reasons:
-> 
-> - This relies on the device (the timer) having a mask bit that we can
->   play with. Not all devices are built like this.
-> 
-> - This expects some behaviour of the guest that only works because the
->   both the kernel timer code and the KVM counterpart have been written
->   by the same idiot (the idiot being me).
-> 
-> The One True Way is to set the GIC active bit when injecting the
-> interrupt, and to context-switch across the world switch. This is what
-> this series implements.
-> 
-> We introduce a relatively simple infrastructure enabling the mapping
-> of a virtual interrupt with its physical counterpart:
-> 
-> - Whenever an virtual interrupt is injected, we look it up in an
->   rbtree. If we have a match, the interrupt is injected with the HW
->   bit set in the LR, together with the physical interrupt.
-> 
-> - Across the world switch, we save/restore the active state for these
->   interrupts using the irqchip_state API.
-> 
-> - On guest EOI, the HW interrupt is automagically deactivated by the
->   GIC, allowing the interrupt to be resampled.
+> Signed-off-by: Jiang Liu <jiang.liu@linux.intel.com>
+> ---
+>  drivers/pinctrl/pinctrl-rockchip.c    |    4 ++--
 
-I am lost about the status of the irqchip part, allowing EOImode=1 and
-only dropping the prio for physical forwarded IRQs:
-http://lkml.iu.edu/hypermail/linux/kernel/1410.3/00913.html
-Doesn't this series also depend on those patches or did I miss something
-on the ML?
-
-Best Regards
-
-Eric
-
-> 
-> The timer code is slightly modified to set the active state at the
-> same time as the injection.
-> 
-> The last patch also allows non-shared devices to have their interrupt
-> deactivated the same way (in this case we do not context-switch the
-> active state). This is the first step in the long overdue direction of
-> the mythical IRQ forwarding thing...
-> 
-> This series is based on v4.1-rc7, and has been tested on Juno (GICv2)
-> and the FVP Base model (GICv3 host, both GICv2 and GICv3 guests). I'd
-> appreciate any form of testing, specially in the context of guest
-> migration (there is obviously some interesting stuff there...).
-
-
-
-> 
-> The code is otherwise available at
-> git://git.kernel.org/pub/scm/linux/kernel/git/maz/arm-platforms.git kvm-arm64/active-timer
-> 
-> Marc Zyngier (10):
->   arm/arm64: KVM: Fix ordering of timer/GIC on guest entry
->   arm/arm64: KVM: Move vgic handling to a non-preemptible section
->   KVM: arm/arm64: vgic: Convert struct vgic_lr to use bitfields
->   KVM: arm/arm64: vgic: Allow HW irq to be encoded in LR
->   KVM: arm/arm64: vgic: Relax vgic_can_sample_irq for edge IRQs
->   KVM: arm/arm64: vgic: Allow dynamic mapping of physical/virtual
->     interrupts
->   KVM: arm/arm64: vgic: Allow HW interrupts to be queued to a guest
->   KVM: arm/arm64: vgic: Add vgic_{get,set}_phys_irq_active
->   KVM: arm/arm64: timer: Allow the timer to control the active state
->   KVM: arm/arm64: vgic: Allow non-shared device HW interrupts
-> 
->  arch/arm/kvm/arm.c                 |  21 +++-
->  include/kvm/arm_arch_timer.h       |   3 +
->  include/kvm/arm_vgic.h             |  31 +++++-
->  include/linux/irqchip/arm-gic-v3.h |   3 +
->  include/linux/irqchip/arm-gic.h    |   3 +-
->  virt/kvm/arm/arch_timer.c          |  13 ++-
->  virt/kvm/arm/vgic-v2.c             |  16 ++-
->  virt/kvm/arm/vgic-v3.c             |  21 +++-
->  virt/kvm/arm/vgic.c                | 206 ++++++++++++++++++++++++++++++++++++-
->  9 files changed, 300 insertions(+), 17 deletions(-)
-> 
+For Rockchip
+Acked-by: Heiko Stuebner <heiko@sntech.de>
