@@ -1,34 +1,46 @@
-From: achandran@mvista.com (Arun Chandran)
-Date: Wed, 10 Jun 2015 19:43:04 +0530
-Subject: [PATCH v1] ARM: zynq: Fix earlyprintk in big endian mode
-Message-ID: <1433945584-16379-1-git-send-email-achandran@mvista.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Wed, 10 Jun 2015 08:14:50 -0600
+Subject: [PATCH 0/2] get pinctrl more flexible for per pin muxing
+ controllers
+In-Reply-To: <CACRpkdawFrfzHf+8vMLz07-r4J48bAVibV++K31dNQ+D-85ZMg@mail.gmail.com>
+References: <1430729776-27797-1-git-send-email-ludovic.desroches@atmel.com>	<556F01CC.8020305@atmel.com>
+ <CACRpkdawFrfzHf+8vMLz07-r4J48bAVibV++K31dNQ+D-85ZMg@mail.gmail.com>
+Message-ID: <5578465A.9090503@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-earlyprintk messages are not appearing on the terminal
-emulator during a big endian kernel boot. If we
-byte swap the sending data it comes properly.
+On 06/10/2015 01:33 AM, Linus Walleij wrote:
+> On Wed, Jun 3, 2015 at 3:31 PM, Nicolas Ferre <nicolas.ferre@atmel.com> wrote:
+>> Le 04/05/2015 10:56, Ludovic Desroches a ?crit :
+>>>
+>>> The way pins, groups and functions are tied is too constraining for some
+>>> controllers. It concerns mainly the ones we don't care about groups and
+>>> functions, each pin can be muxed to any functions.
+>>> The goal of these two patches is too remove some of the constraints.
+>>>
+>>> I have added the prototype of a pin controller and device tree to show the
+>>> way I want to use these changes. I couldn't test it on boards using generic
+>>> pinconf so I am not sure that I don't break something...
+>>>
+>>>
+>>> Ludovic Desroches (4):
+>>>    pinctrl: change function behavior for per pin muxing controllers
+>>>    pinctrl: introduce complex pin description
+>>
+>> Linus,
+>>
+>> Ludovic sent this series nearly one month ago. It was posted after a RFC
+>> series on the same topic two months ago. As we don't see any comment on
+>> neither of them we assume that it's okay to include them.
+>
+> It's a quite big patch and I need help reviewing it and thinking of
+> some possible consequences.
+>
+> Stephen, can you give me a hand with this?
 
-Signed-off-by: Arun Chandran <achandran@mvista.com>
----
----
-This can be tested by adding 'early_print("early print test\n");'
-to setup_arch() in arch/arm/kernel/setup.c
----
- arch/arm/include/debug/zynq.S | 1 +
- 1 file changed, 1 insertion(+)
+I don't have the patch in my list archive, which goes back 60 days.
 
-diff --git a/arch/arm/include/debug/zynq.S b/arch/arm/include/debug/zynq.S
-index bd13ded..0d274fe 100644
---- a/arch/arm/include/debug/zynq.S
-+++ b/arch/arm/include/debug/zynq.S
-@@ -38,6 +38,7 @@
- 		.endm
- 
- 		.macro	senduart,rd,rx
-+ARM_BE8(	rev	\rd, \rd )
- 		str	\rd, [\rx, #UART_FIFO_OFFSET]	@ TXDATA
- 		.endm
- 
--- 
-1.9.1
+Judging purely by the patch description, the patch sounds incorrect. 
+There's nothing in pinctrl that prevents a particular pin controller 
+from supporting all mux functions on all pins or groups. Simply return 
+the same list of functions for every pin.
