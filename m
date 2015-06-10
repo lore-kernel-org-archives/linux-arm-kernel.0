@@ -1,27 +1,62 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 10 Jun 2015 11:10:06 +0200
-Subject: [PATCH 13/34] pinctrl: mvebu: armada-39x: normalize SDIO pin
- naming
-In-Reply-To: <1433868446-11028-14-git-send-email-thomas.petazzoni@free-electrons.com>
-References: <1433868446-11028-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1433868446-11028-14-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <CACRpkdb8nonVUJpR7zf3iNapOf1s+HBYAdcWLc4zpt4y1Krv5g@mail.gmail.com>
+From: hofrat@osadl.org (Nicholas Mc Guire)
+Date: Wed, 10 Jun 2015 11:02:03 +0200
+Subject: [PATCH] [media] s5p-tv: fix wait_event_timeout return handling
+Message-ID: <1433926923-13092-1-git-send-email-hofrat@osadl.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 9, 2015 at 6:47 PM, Thomas Petazzoni
-<thomas.petazzoni@free-electrons.com> wrote:
+event API conformance testing with coccinelle spatches are being
+used to locate API usage inconsistencies this triggert with:
+./drivers/media/platform/s5p-tv/mixer_reg.c:364
+        incorrect check for negative return
 
-> In order to be consistent with the datasheet and some other SoCs, this
-> commit renames the SDIO pins of the Armada 39x from "sd" to "sd0".
->
-> While this changes the DT binding, this is not a problem since Armada
-> 39x is a brand new SoC which isn't used in production yet (so now is
-> the right time to fix such things).
->
-> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+Return type of wait_event_timeout is signed long not int and the
+return type is >=0 always thus the negative check is unnecessary.
+An appropriately named variable of type long is inserted and the
+call fixed up aswell as the negative return check dropped.
 
-Patch applied.
+Signed-off-by: Nicholas Mc Guire <hofrat@osadl.org>
+---
 
-Yours,
-Linus Walleij
+Minor change of indentation to make checkpatch happy - not sure if 
+this is much more readable though.
+
+Patch was compile tested with exynos_defconfig + CONFIG_MEDIA_SUPPORT=m,
+CONFIG_MEDIA_CAMERA_SUPPORT=y, CONFIG_MEDIA_ANALOG_TV_SUPPORT=y,
+CONFIG_V4L_PLATFORM_DRIVERS=y, CONFIG_VIDEO_SAMSUNG_S5P_TV=y,
+CONFIG_VIDEO_SAMSUNG_S5P_MIXER=m
+
+Patch is against 4.1-rc7 (localversion-next is -next-20150609)
+
+ drivers/media/platform/s5p-tv/mixer_reg.c |   12 +++++-------
+ 1 file changed, 5 insertions(+), 7 deletions(-)
+
+diff --git a/drivers/media/platform/s5p-tv/mixer_reg.c b/drivers/media/platform/s5p-tv/mixer_reg.c
+index b713403..5127acb 100644
+--- a/drivers/media/platform/s5p-tv/mixer_reg.c
++++ b/drivers/media/platform/s5p-tv/mixer_reg.c
+@@ -357,17 +357,15 @@ void mxr_reg_streamoff(struct mxr_device *mdev)
+ 
+ int mxr_reg_wait4vsync(struct mxr_device *mdev)
+ {
+-	int ret;
++	long time_left;
+ 
+ 	clear_bit(MXR_EVENT_VSYNC, &mdev->event_flags);
+ 	/* TODO: consider adding interruptible */
+-	ret = wait_event_timeout(mdev->event_queue,
+-		test_bit(MXR_EVENT_VSYNC, &mdev->event_flags),
+-		msecs_to_jiffies(1000));
+-	if (ret > 0)
++	time_left = wait_event_timeout(mdev->event_queue,
++			test_bit(MXR_EVENT_VSYNC, &mdev->event_flags),
++				 msecs_to_jiffies(1000));
++	if (time_left > 0)
+ 		return 0;
+-	if (ret < 0)
+-		return ret;
+ 	mxr_warn(mdev, "no vsync detected - timeout\n");
+ 	return -ETIME;
+ }
+-- 
+1.7.10.4
