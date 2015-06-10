@@ -1,75 +1,179 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Wed, 10 Jun 2015 16:29:40 +0200
-Subject: [PATCH] ARM: smp_scu: enable coherent speculative linefills
-In-Reply-To: <1426773255-23349-1-git-send-email-thomas.petazzoni@free-electrons.com>
-References: <1426773255-23349-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <20150610162940.7e1bd275@free-electrons.com>
+From: javier.martinez@collabora.co.uk (Javier Martinez Canillas)
+Date: Wed, 10 Jun 2015 16:32:32 +0200
+Subject: [PATCH 1/1] irqchip: exynos-combiner: Save IRQ enable set on
+ suspend
+In-Reply-To: <CAPTzV16uP9GFeq9hPLvk2kg2F9aaB_936UdR_rpRbqoUh_q9zg@mail.gmail.com>
+References: <1433941831-16637-1-git-send-email-javier.martinez@collabora.co.uk>
+ <CAPTzV16uP9GFeq9hPLvk2kg2F9aaB_936UdR_rpRbqoUh_q9zg@mail.gmail.com>
+Message-ID: <55784A80.7000603@collabora.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Russell,
+Hello Chanho,
 
-Any chance to get this patch reviewed/applied? Should I simply submit
-it to your patch tracking system?
+Thanks a lot for your feedback.
 
-Thanks,
-
-Thomas
-
-On Thu, 19 Mar 2015 14:54:15 +0100, Thomas Petazzoni wrote:
-> According to the ARM TRM, about the SCU Control Register, bit 3
-> (Speculative linefills enable) :
+On 06/10/2015 03:40 PM, Chanho Park wrote:
+> Hi,
 > 
->   When set, coherent linefill requests are sent speculatively to the
->   PL310 in parallel with the tag lookup. If the tag lookup misses, the
->   confirmed linefill is sent to the PL310 and gets Rdata earlier
->   because the data request was already initiated by the speculative
->   request. This feature works only if the PL310 is present in the
->   design.
+> On Wed, Jun 10, 2015 at 10:10 PM, Javier Martinez Canillas
+> <javier.martinez@collabora.co.uk> wrote:
+>> The Exynos interrupt combiner IP looses its state when the SoC enters
+>> into a low power state during a Suspend-to-RAM. This means that if a
+>> IRQ is used as a source, the interrupts for the devices are disabled
+>> when the system is resumed from a sleep state so are not triggered.
+>>
+>> Save the interrupt enable set register for each combiner group and
+>> restore it after resume to make sure that the interrupts are enabled.
+>>
+>> Signed-off-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
+>> ---
+>>
+>> Hello,
+>>
+>> I noticed this issue because after a S2R, IRQs for some devices didn't
+>> trigger anymore but others continued working and all of them had lines
+>> from a GPIO chip as their interrupt source.
+>>
+>> The only difference was that the GPIO pins that were not working after
+>> a resume, were the ones that had the interrupt combiner as interrupt
+>> parent.
+>>
+>> With this patch now all perhiperals are working correctly after a resume.
+>> Tested on an Exynos5250 Snow, Exynos5420 Peach Pit and Exynos5800 Peach Pi
+>> Chromebooks.
+>>
+>> Best regards,
+>> Javier
+>>
+>>  drivers/irqchip/exynos-combiner.c | 61 +++++++++++++++++++++++++++++++++++----
+>>  1 file changed, 56 insertions(+), 5 deletions(-)
+>>
+>> diff --git a/drivers/irqchip/exynos-combiner.c b/drivers/irqchip/exynos-combiner.c
+>> index 5945223b73fa..69c710641bfa 100644
+>> --- a/drivers/irqchip/exynos-combiner.c
+>> +++ b/drivers/irqchip/exynos-combiner.c
+>> @@ -13,6 +13,7 @@
+>>  #include <linux/init.h>
+>>  #include <linux/io.h>
+>>  #include <linux/slab.h>
+>> +#include <linux/syscore_ops.h>
+>>  #include <linux/irqdomain.h>
+>>  #include <linux/irqchip/chained_irq.h>
+>>  #include <linux/interrupt.h>
+>> @@ -34,9 +35,14 @@ struct combiner_chip_data {
+>>         unsigned int irq_mask;
+>>         void __iomem *base;
+>>         unsigned int parent_irq;
+>> +#ifdef CONFIG_PM
+>> +       u32 pm_save;
+>> +#endif
+>>  };
+>>
+>> +static struct combiner_chip_data *combiner_data;
+>>  static struct irq_domain *combiner_irq_domain;
+>> +static unsigned int max_nr = 20;
+>>
+>>  static inline void __iomem *combiner_base(struct irq_data *data)
+>>  {
+>> @@ -170,12 +176,10 @@ static struct irq_domain_ops combiner_irq_domain_ops = {
+>>  };
+>>
+>>  static void __init combiner_init(void __iomem *combiner_base,
+>> -                                struct device_node *np,
+>> -                                unsigned int max_nr)
+>> +                                struct device_node *np)
+>>  {
+>>         int i, irq;
+>>         unsigned int nr_irq;
+>> -       struct combiner_chip_data *combiner_data;
+>>
+>>         nr_irq = max_nr * IRQ_IN_COMBINER;
+>>
+>> @@ -201,11 +205,56 @@ static void __init combiner_init(void __iomem *combiner_base,
+>>         }
+>>  }
+>>
+>> +#ifdef CONFIG_PM
+>> +
+>> +/**
+>> + * combiner_suspend - save interrupt combiner state before suspend
+>> + *
+>> + * Save the interrupt enable set register for all combiner groups since
+>> + * the state is lost when the system enters into a sleep state.
+>> + *
+>> + */
+>> +static int combiner_suspend(void)
+>> +{
+>> +       int i;
+>> +
+>> +       for (i = 0; i < max_nr; i++)
+>> +               combiner_data[i].pm_save =
+>> +                       __raw_readl(combiner_data[i].base + COMBINER_ENABLE_SET);
+>> +
+>> +       return 0;
+>> +}
+>> +
+>> +/**
+>> + * combiner_resume - restore interrupt combiner state after resume
+>> + *
+>> + * Restore the interrupt enable set register for all combiner groups since
+>> + * the state is lost when the system enters into a sleep state on suspend.
+>> + *
+>> + */
+>> +static void combiner_resume(void)
+>> +{
+>> +       int i;
+>> +
+>> +       for (i = 0; i < max_nr; i++)
 > 
-> This feature may improve the overall system performance.
-> 
-> Since the public ARM web site only documents Cortex-A9 revisions r2p0
-> and later, we err on the safe side and only enable this bit on >= r2p0
-> platforms, like the standby bit.
-> 
-> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-> ---
->  arch/arm/kernel/smp_scu.c | 8 ++++++--
->  1 file changed, 6 insertions(+), 2 deletions(-)
-> 
-> diff --git a/arch/arm/kernel/smp_scu.c b/arch/arm/kernel/smp_scu.c
-> index 72f9241..227bb86 100644
-> --- a/arch/arm/kernel/smp_scu.c
-> +++ b/arch/arm/kernel/smp_scu.c
-> @@ -18,6 +18,7 @@
->  
->  #define SCU_CTRL		0x00
->  #define SCU_ENABLE		(1 << 0)
-> +#define SCU_SPEC_LINEFILL	(1 << 3)
->  #define SCU_STANDBY_ENABLE	(1 << 5)
->  #define SCU_CONFIG		0x04
->  #define SCU_CPU_STATUS		0x08
-> @@ -57,10 +58,13 @@ void scu_enable(void __iomem *scu_base)
->  
->  	scu_ctrl |= SCU_ENABLE;
->  
-> -	/* Cortex-A9 earlier than r2p0 has no standby bit in SCU */
-> +	/*
-> +	 * Cortex-A9 earlier than r2p0 has no standby / speculative
-> +	 * line fills bits in SCU
-> +	 */
->  	if ((read_cpuid_id() & 0xff0ffff0) == 0x410fc090 &&
->  	    (read_cpuid_id() & 0x00f0000f) >= 0x00200000)
-> -		scu_ctrl |= SCU_STANDBY_ENABLE;
-> +		scu_ctrl |= SCU_STANDBY_ENABLE | SCU_SPEC_LINEFILL;
->  
->  	writel_relaxed(scu_ctrl, scu_base + SCU_CTRL);
->  
+> Don't you need to clear masking bits of the COMBINER_ENABLE_CLEAR
+> before enabling the bits?
+>
 
+I thought that was not needed since the enable bits are all cleared to 0
+(default reset value) after a suspend.
 
+But I can add the following if you think that it is needed or more safe:
 
--- 
-Thomas Petazzoni, CTO, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+		/* Disable all interrupts */
+		__raw_writel(combiner_data[i].irq_mask,
+			     combiner_data[i].base + COMBINER_ENABLE_CLEAR);
+ 
+>> +               __raw_writel(combiner_data[i].pm_save,
+>> +                            combiner_data[i].base + COMBINER_ENABLE_SET);
+>> +}
+>> +
+>> +#else
+>> +#define combiner_suspend       NULL
+>> +#define combiner_resume                NULL
+>> +#endif
+>> +
+>> +static struct syscore_ops combiner_syscore_ops = {
+>> +       .suspend        = combiner_suspend,
+>> +       .resume         = combiner_resume,
+>> +};
+>> +
+>>  static int __init combiner_of_init(struct device_node *np,
+>>                                    struct device_node *parent)
+>>  {
+>>         void __iomem *combiner_base;
+>> -       unsigned int max_nr = 20;
+>>
+>>         combiner_base = of_iomap(np, 0);
+>>         if (!combiner_base) {
+>> @@ -219,7 +268,9 @@ static int __init combiner_of_init(struct device_node *np,
+>>                         __func__, max_nr);
+>>         }
+>>
+>> -       combiner_init(combiner_base, np, max_nr);
+>> +       combiner_init(combiner_base, np);
+>> +
+>> +       register_syscore_ops(&combiner_syscore_ops);
+>>
+>>         return 0;
+>>  }
+>> --
+
+Best regards,
+Javier
