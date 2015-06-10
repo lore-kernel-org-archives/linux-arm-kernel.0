@@ -1,106 +1,62 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Wed, 10 Jun 2015 08:29:57 +0100
-Subject: [PATCH 4/8] power: Add an axp20x-usb-power driver
-In-Reply-To: <1433885881-19809-5-git-send-email-hdegoede@redhat.com>
-References: <1433885881-19809-1-git-send-email-hdegoede@redhat.com>
- <1433885881-19809-5-git-send-email-hdegoede@redhat.com>
-Message-ID: <20150610072957.GV2982@x1>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Wed, 10 Jun 2015 09:30:32 +0200
+Subject: [PATCH 00/21] On-demand device registration
+In-Reply-To: <CAAObsKCP-C+TY8Wkk6bQzxZeGYL9X01trtjxfaYp--ZnH07C+w@mail.gmail.com>
+References: <1432565608-26036-1-git-send-email-tomeu.vizoso@collabora.com>
+ <CACRpkdasLwMfEHGMRd1X3K_DU7NMPreE8TMwqqDTg8k9wj=wJQ@mail.gmail.com>
+ <CAAObsKCP-C+TY8Wkk6bQzxZeGYL9X01trtjxfaYp--ZnH07C+w@mail.gmail.com>
+Message-ID: <CACRpkdZuSj+S2x1yz6n5PgcRK=3ZCcq_To124b2Y+Oj54aydpg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 09 Jun 2015, Hans de Goede wrote:
+On Tue, Jun 2, 2015 at 12:14 PM, Tomeu Vizoso
+<tomeu.vizoso@collabora.com> wrote:
+> On 2 June 2015 at 10:48, Linus Walleij <linus.walleij@linaro.org> wrote:
 
-> This adds a driver for the usb power_supply bits of the axp20x PMICs.
-> 
-> I initially started writing my own driver, before coming aware of
-> Bruno Pr?mont's excellent earlier RFC with a driver for this.
-> 
-> My driver was lacking CURRENT_MAX and VOLTAGE_MIN support Bruno's
-> drvier has, so I've copied the code for those from his driver.
-> 
-> Note that the AC-power-supply and battery charger bits will need separate
-> drivers. Each one needs its own devictree child-node so that other
-> devicetree nodes can reference the right power-supply, and thus each one
-> will get its own mfd-cell / platform_device and platform-driver.
-> 
-> Cc: Bruno Pr?mont <bonbons@linux-vserver.org>
-> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
-> ---
->  .../bindings/power_supply/axp20x_usb_power.txt     |  34 +++
+>> This is what systemd is doing in userspace for starting services:
+>> ask for your dependencies and wait for them if they are not
+>> there. So drivers ask for resources and wait for them. It also
+>> needs to be abstract, so for example we need to be able to
+>> hang on regulator_get() until the driver is up and providing that
+>> regulator, and as long as everything is in slowpath it should
+>> be OK. (And vice versa mutatis mutandis for clk, gpio, pin
+>> control, interrupts (!) and DMA channels for example.)
+>
+> I understood above that you propose probing devices in order, but now
+> you mention that resource getters would block until the dependency is
+> fulfilled which confuses me because if we are probing in order then
+> all dependencies would be fulfilled before the device in question gets
+> probed.
 
-This needs to be submitted in a seperate patch.
+Sorry, the problem space is a bit convoluted so the answers
+get a bit convoluted. Maybe I'm thinking aloud and altering the course
+of my thoughts as I type...
 
->  drivers/power/Kconfig                              |   7 +
->  drivers/power/Makefile                             |   1 +
->  drivers/power/axp20x_usb_power.c                   | 241 +++++++++++++++++++++
->  include/linux/mfd/axp20x.h                         |  24 ++
->  5 files changed, 307 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/power_supply/axp20x_usb_power.txt
->  create mode 100644 drivers/power/axp20x_usb_power.c
+I guess there can be explicit dependencies for resources like this
+patch does, but another way would be for all resource fetch functions
+to be instrumented, so that you do not block until you try to take
+a resource that is not yet there, e.g.:
 
-[...]
+regulator_get(...) -> not available, so:
+- identify target regulator provider - this will need instrumentation
+- probe it
 
-> diff --git a/include/linux/mfd/axp20x.h b/include/linux/mfd/axp20x.h
-> index f4290ae..d7adb2e 100644
-> --- a/include/linux/mfd/axp20x.h
-> +++ b/include/linux/mfd/axp20x.h
-> @@ -11,6 +11,8 @@
->  #ifndef __LINUX_MFD_AXP20X_H
->  #define __LINUX_MFD_AXP20X_H
->  
-> +#include <linux/regmap.h>
-> +
->  enum {
->  	AXP202_ID = 0,
->  	AXP209_ID,
-> @@ -366,4 +368,26 @@ struct axp20x_fg_pdata {
->  	int thermistor_curve[MAX_THERM_CURVE_SIZE][2];
->  };
->  
-> +/* generic helper function for reading 9-16 bit wide regs */
-> +static inline int axp20x_read_16bit(struct regmap *regmap,
+It then turns out the regulator driver is on the i2c bus, so we
+need to probe the i2c driver:
+- identify target i2c host for the regulator driver - this will need
+  instrumentation
+- probe the i2c host driver
 
-This is only used twice and only in one file.
+i2c host comes out, probes the regulator driver, regulator driver
+probes and then the regulator_get() call returns.
 
-Do you know of any other uses of this call that will be upstreamed
-shortly?
+This requires instrumentation on anything providing a resource
+to another driver like those I mentioned and a lot of overhead
+infrastructure, but I think it's the right approach. However I don't
+know if I would ever be able to pull that off myself, I know talk
+is cheap and I should show the code instead.
 
-> +				    unsigned int reg, unsigned int width)
+Deepest respect for your efforts!
 
-The function name is a bit misleading.
-
-> +{
-> +	unsigned int v, raw;
-> +	int r;
-
-'v' and 'r' are not good variable names.
-
-> +	r = regmap_read(regmap, reg, &v);
-> +	if (r)
-> +		return r;
-> +
-> +	raw = v << (width - 8);
-
-So 'reg' is expected to be top end loaded?
-
-E.g A value of say 0x0101 (257) in 9 bits will look like this:
-
-reg          reg + 1
-1000 0000b   0000 0001b
-
-> +	r = regmap_read(regmap, reg + 1, &v);
-> +	if (r)
-> +		return r;
-> +
-> +	raw |= v;
-> +
-> +	return raw;
-> +}
-> +
->  #endif /* __LINUX_MFD_AXP20X_H */
-
--- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Yours,
+Linus Walleij
