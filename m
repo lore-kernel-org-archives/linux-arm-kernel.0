@@ -1,28 +1,43 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 10 Jun 2015 23:41:34 +0100
-Subject: [PATCHv3 2/2] arm: use max_lowmem_limit in find_limit()
-In-Reply-To: <1433962773-8402-3-git-send-email-orca.chen@gmail.com>
-References: <1433962773-8402-1-git-send-email-orca.chen@gmail.com>
- <1433962773-8402-3-git-send-email-orca.chen@gmail.com>
-Message-ID: <20150610224134.GS7557@n2100.arm.linux.org.uk>
+From: ssantosh@kernel.org (Santosh Shilimkar)
+Date: Wed, 10 Jun 2015 15:42:33 -0700
+Subject: [PATCH] ARM: keystone: defconfig: enable netcp driver by default
+Message-ID: <1433976153-3522-1-git-send-email-ssantosh@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 11, 2015 at 02:59:33AM +0800, Min-Hua Chen wrote:
-> In commit: 1c2f87c22566cd057bc8cde10c37ae9da1a1bb76, the max_low is
-> set by memblock_get_current_limit(). However memblock.current_limit
-> can be changed by memblock_set_current_limit() any point before
-> find_limits().
-> 
-> It's better to use arm_lowmem_limit to be max_lowmem in two ways:
-> First, arm_lowmem_limit cannot be changed by a public API. Second, the
-> high_memory is set by arm_lowmem_limit and is a natural limit of
-> low memory area in bootmem_init().
-> 
-> Signed-off-by: Min-Hua Chen <orca.chen@gmail.com>
+From: Murali Karicheri <m-karicheri2@ti.com>
 
-NAK, this is a known build breaker.
+Enable netcp driver in defconfig for keystone SoCs.
 
+Signed-off-by: Murali Karicheri <m-karicheri2@ti.com>
+Signed-off-by: Santosh Shilimkar <ssantosh@kernel.org>
+---
+ arch/arm/configs/keystone_defconfig | 6 ++++++
+ 1 file changed, 6 insertions(+)
+
+diff --git a/arch/arm/configs/keystone_defconfig b/arch/arm/configs/keystone_defconfig
+index f8a1c8f..95ce128 100644
+--- a/arch/arm/configs/keystone_defconfig
++++ b/arch/arm/configs/keystone_defconfig
+@@ -123,6 +123,9 @@ CONFIG_EEPROM_AT24=y
+ CONFIG_SCSI=y
+ CONFIG_BLK_DEV_SD=y
+ CONFIG_NETDEVICES=y
++CONFIG_TI_KEYSTONE_NETCP=y
++CONFIG_TI_KEYSTONE_NETCP_ETHSS=y
++CONFIG_PHYLIB=y
+ CONFIG_SERIAL_8250=y
+ CONFIG_SERIAL_8250_CONSOLE=y
+ CONFIG_SERIAL_OF_PLATFORM=y
+@@ -152,6 +155,9 @@ CONFIG_USB_DWC3_VERBOSE=y
+ CONFIG_KEYSTONE_USB_PHY=y
+ CONFIG_DMADEVICES=y
+ CONFIG_TI_EDMA=y
++CONFIG_SOC_TI=y
++CONFIG_KEYSTONE_NAVIGATOR_QMSS=y
++CONFIG_KEYSTONE_NAVIGATOR_DMA=y
+ CONFIG_MEMORY=y
+ CONFIG_TI_AEMIF=y
+ CONFIG_EXT4_FS=y
 -- 
-FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
-according to speedtest.net.
+1.9.1
