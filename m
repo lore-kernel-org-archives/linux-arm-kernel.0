@@ -1,36 +1,90 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Wed, 10 Jun 2015 11:11:04 +0100
-Subject: [PATCH] arm64: dts: add device tree for ARM SMM-A53x2 on
- LogicTile Express 20MG
-In-Reply-To: <1433930360.3418.0.camel@arm.com>
-References: <1433864311-2326-1-git-send-email-kristina.martsenko@arm.com>
- <20150610085825.GS12807@e106497-lin.cambridge.arm.com>
- <20150610091234.GA1517@leverpostej>
- <20150610092726.GV12807@e106497-lin.cambridge.arm.com>
- <20150610093930.GC1517@leverpostej>
- <1433930360.3418.0.camel@arm.com>
-Message-ID: <20150610101104.GF1517@leverpostej>
+From: tomeu.vizoso@collabora.com (Tomeu Vizoso)
+Date: Wed, 10 Jun 2015 12:19:49 +0200
+Subject: [PATCH 00/21] On-demand device registration
+In-Reply-To: <CACRpkdZuSj+S2x1yz6n5PgcRK=3ZCcq_To124b2Y+Oj54aydpg@mail.gmail.com>
+References: <1432565608-26036-1-git-send-email-tomeu.vizoso@collabora.com>
+ <CACRpkdasLwMfEHGMRd1X3K_DU7NMPreE8TMwqqDTg8k9wj=wJQ@mail.gmail.com>
+ <CAAObsKCP-C+TY8Wkk6bQzxZeGYL9X01trtjxfaYp--ZnH07C+w@mail.gmail.com>
+ <CACRpkdZuSj+S2x1yz6n5PgcRK=3ZCcq_To124b2Y+Oj54aydpg@mail.gmail.com>
+Message-ID: <CAAObsKD97nEARO5eZYA2g8+z_MrazBy-m8PV_kSyj19ya72mAw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 10, 2015 at 10:59:20AM +0100, Pawel Moll wrote:
-> On Wed, 2015-06-10 at 10:39 +0100, Mark Rutland wrote:
-> > Ideally we'd avoid placing the enable-method in the DTS at all, but I
-> > believe the boot monitor isn't smart enough to fix that up.
-> 
-> You would be surprised how intelligent these animals can be :-P
-> 
-> 8<--------------
->     case CPU:
->         err = safdt_insert_prop(safdt, "enable-method",
->                                 "spin-table", 11);
->         if (err)
->             break;
->         addr = fdt_uint64(parser->cpu_release_addr);
->         err = safdt_insert_prop(safdt, "cpu-release-addr", &addr, 8);
-> 8<---------------
+On 10 June 2015 at 09:30, Linus Walleij <linus.walleij@linaro.org> wrote:
+> On Tue, Jun 2, 2015 at 12:14 PM, Tomeu Vizoso
+> <tomeu.vizoso@collabora.com> wrote:
+>> On 2 June 2015 at 10:48, Linus Walleij <linus.walleij@linaro.org> wrote:
+>
+>>> This is what systemd is doing in userspace for starting services:
+>>> ask for your dependencies and wait for them if they are not
+>>> there. So drivers ask for resources and wait for them. It also
+>>> needs to be abstract, so for example we need to be able to
+>>> hang on regulator_get() until the driver is up and providing that
+>>> regulator, and as long as everything is in slowpath it should
+>>> be OK. (And vice versa mutatis mutandis for clk, gpio, pin
+>>> control, interrupts (!) and DMA channels for example.)
+>>
+>> I understood above that you propose probing devices in order, but now
+>> you mention that resource getters would block until the dependency is
+>> fulfilled which confuses me because if we are probing in order then
+>> all dependencies would be fulfilled before the device in question gets
+>> probed.
+>
+> Sorry, the problem space is a bit convoluted so the answers
+> get a bit convoluted. Maybe I'm thinking aloud and altering the course
+> of my thoughts as I type...
+>
+> I guess there can be explicit dependencies for resources like this
+> patch does, but another way would be for all resource fetch functions
+> to be instrumented, so that you do not block until you try to take
+> a resource that is not yet there, e.g.:
+>
+> regulator_get(...) -> not available, so:
+> - identify target regulator provider - this will need instrumentation
+> - probe it
+>
+> It then turns out the regulator driver is on the i2c bus, so we
+> need to probe the i2c driver:
+> - identify target i2c host for the regulator driver - this will need
+>   instrumentation
+> - probe the i2c host driver
+>
+> i2c host comes out, probes the regulator driver, regulator driver
+> probes and then the regulator_get() call returns.
 
-Sounds like we can get rid of the enable-method and cpu-release-addr
-then.
+Hmm, if I understand correctly what you say, this is exactly what this
+particular series does:
 
-Mark.
+regulator_get -> of_platform_device_ensure -> probe() on the platform
+device that encloses the requested device node (i2c host) -> i2c slave
+gets probed and the regulator registered -> regulator_get returns the
+requested resource
+
+The downside I'm currently looking at is that an explicit dependency
+graph would be useful to have for other purposes. For example to print
+a neat warning when a dependency cannot be fulfilled. Or to refuse to
+unbind a device which other devices depend on, or to automatically
+unbind the devices that depend on it, or to print a warning if a
+device is hotplugged off and other devices depend on it.
+
+> This requires instrumentation on anything providing a resource
+> to another driver like those I mentioned and a lot of overhead
+> infrastructure, but I think it's the right approach. However I don't
+> know if I would ever be able to pull that off myself, I know talk
+> is cheap and I should show the code instead.
+
+Yeah, if you can give it a second look and say if it matches what you
+wrote above, it would be very much appreciated.
+
+> Deepest respect for your efforts!
+
+Thanks!
+
+Tomeu
+
+> Yours,
+> Linus Walleij
+> _______________________________________________
+> dri-devel mailing list
+> dri-devel at lists.freedesktop.org
+> http://lists.freedesktop.org/mailman/listinfo/dri-devel
