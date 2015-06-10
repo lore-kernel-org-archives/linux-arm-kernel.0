@@ -1,23 +1,28 @@
-From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Wed, 10 Jun 2015 10:39:44 +0200
-Subject: [RFT v2 06/48] pinctrl: Use irq_desc_get_xxx() to avoid redundant
- lookup of irq_desc
-In-Reply-To: <1433391238-19471-7-git-send-email-jiang.liu@linux.intel.com>
-References: <1433391238-19471-1-git-send-email-jiang.liu@linux.intel.com>
- <1433391238-19471-7-git-send-email-jiang.liu@linux.intel.com>
-Message-ID: <11293365.dyj0hfgNSb@diego>
+From: haibo.chen@freescale.com (Haibo Chen)
+Date: Wed, 10 Jun 2015 16:50:38 +0800
+Subject: [PATCH 0/6] mmc: imx: a few fixes and new feature add
+Message-ID: <1433926244-29244-1-git-send-email-haibo.chen@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Donnerstag, 4. Juni 2015, 12:13:16 schrieb Jiang Liu:
-> Use irq_desc_get_xxx() to avoid redundant lookup of irq_desc while we
-> already have a pointer to corresponding irq_desc.
-> 
-> Signed-off-by: Jiang Liu <jiang.liu@linux.intel.com>
-> Acked-by: Linus Walleij <linus.walleij@linaro.org>
-> ---
->  drivers/pinctrl/pinctrl-rockchip.c            |    4 ++--
+Patch 1 add imx7d support, and also HS400 mode support.
+Patch 2 add tuning-step, which can be get from dts.
+Patch 3 add eMMC5.0 support for imx7d in dts.
+Patch 4~6 small fixes.
 
+Haibo Chen (6):
+  mmc: sdhci-esdhc-imx: add imx7d support and support HS400
+  mmc: sdhci-esdhc-imx: add tuning-step seting support
+  ARM: dts: imx7d-sdb: add eMMC5.0 support
+  mmc: sdhci-esdhc-imx: config watermater levles and burst lengths
+  mmc: sdhci-esdhc-imx: set back the burst_length_enable bit to 1
+  mmc: sdhci-esdhc-imx: add compatible string in binding doc
 
-For Rockchip
-Acked-by: Heiko Stuebner <heiko@sntech.de>
+ .../devicetree/bindings/mmc/fsl-imx-esdhc.txt      |  1 +
+ arch/arm/boot/dts/imx7d-sdb.dts                    | 13 +++
+ drivers/mmc/host/sdhci-esdhc-imx.c                 | 97 +++++++++++++++++++++-
+ include/linux/platform_data/mmc-esdhc-imx.h        |  1 +
+ 4 files changed, 111 insertions(+), 1 deletion(-)
+
+-- 
+1.9.1
