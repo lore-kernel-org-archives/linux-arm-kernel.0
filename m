@@ -1,54 +1,42 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Wed, 10 Jun 2015 10:39:30 +0100
-Subject: [PATCH] arm64: dts: add device tree for ARM SMM-A53x2 on
- LogicTile Express 20MG
-In-Reply-To: <20150610092726.GV12807@e106497-lin.cambridge.arm.com>
-References: <1433864311-2326-1-git-send-email-kristina.martsenko@arm.com>
- <20150610085825.GS12807@e106497-lin.cambridge.arm.com>
- <20150610091234.GA1517@leverpostej>
- <20150610092726.GV12807@e106497-lin.cambridge.arm.com>
-Message-ID: <20150610093930.GC1517@leverpostej>
+From: gangchen@rdamicro.com (Chen Gang)
+Date: Wed, 10 Jun 2015 17:53:24 +0800
+Subject: [PATCH v2 1/1] ARM : missing corrupted reg in __do_div_asm
+Message-ID: <20150610095324.GA29556@localhost.rdamicro.com.cn>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> > > > +/* In use by spinning secondaries */
-> > > > +/memreserve/ 0x80000000 0x00010000;
-> > > 
-> > > Where does the kernel get loaded to? If 0x80000000 is the start of memory and the kernel is
-> > > loaded at 0x80000 offset as usual, then that memory is protected anyway.
-> > 
-> > That's simply not true. The kernel may use _any_ memory which is
-> > described to it and not explicitly reserved.
-> > 
-> > We only reserve the kernel's static image (see arm64_memblock_init),
-> > which does not cover that region. We can easily map that memory and
-> > allocate it to something.
-> > 
-> > While we used to place page tables in the end of that region, we only
-> > reserved the page tables, and it was problematic because you had no idea
-> > how much of that memory the kernel might use.
-> > 
-> > Regardless, DTs should not rely on Linux implementation details like
-> > magic implicit reservations.
-> 
-> Things might have changed since v3.18 but I remember having a hell of a time trying to
-> access memory that was at the bottom of address space before the kernel start image.
+__xl (R0 in little endian system, or R1 in big endian system) is corrupted
+after calling __do_div64 and compiler is not informed about this in
+macro __do_div_asm. If n is used again afterwards, __xl won't be
+reloaded and n will contain incorrect value.
 
-Memory more than 0x80000 bytes below the kernel wouldn't have been
-mapped because of the way the linear map is built, which might have been
-your issue. This is an implementation detail which _will_ change (see
-Ard's patches) and should not be relied upon.
+Signed-off-by: Chen Gang <gangchen@rdamicro.com>
+---
+ arch/arm/include/asm/div64.h | 10 ++++++----
+ 1 file changed, 6 insertions(+), 4 deletions(-)
 
-> But I agree that things should be explicitly stated in the DT.
-> 
-> Question for Kristina now: why spin method and not PSCI for this CoreTile?
-
-Unfortunately the boot monitor only ever implemented spin-table. If
-you're offering to port and maintain ARM Trusted Firmware, we can look
-at having the DT report PSCI. ;)
-
-Ideally we'd avoid placing the enable-method in the DTS at all, but I
-believe the boot monitor isn't smart enough to fix that up.
-
-Thanks,
-Mark.
+diff --git a/arch/arm/include/asm/div64.h b/arch/arm/include/asm/div64.h
+index 662c7bd..fa9489e 100644
+--- a/arch/arm/include/asm/div64.h
++++ b/arch/arm/include/asm/div64.h
+@@ -34,12 +34,14 @@
+ 	register unsigned long long __n   asm("r0") = n;	\
+ 	register unsigned long long __res asm("r2");		\
+ 	register unsigned int __rem       asm(__xh);		\
++	register unsigned int __clobber   asm(__xl);		\
+ 	asm(	__asmeq("%0", __xh)				\
+-		__asmeq("%1", "r2")				\
+-		__asmeq("%2", "r0")				\
+-		__asmeq("%3", "r4")				\
++		__asmeq("%1", __xl)				\
++		__asmeq("%2", "r2")				\
++		__asmeq("%3", "r0")				\
++		__asmeq("%4", "r4")				\
+ 		"bl	__do_div64"				\
+-		: "=r" (__rem), "=r" (__res)			\
++		: "=r" (__rem), "=r" (__clobber), "=r" (__res)  \
+ 		: "r" (__n), "r" (__base)			\
+ 		: "ip", "lr", "cc");				\
+ 	n = __res;						\
+-- 
+2.4.2
