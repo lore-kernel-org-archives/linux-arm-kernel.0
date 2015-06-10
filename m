@@ -1,44 +1,39 @@
-From: manabian@gmail.com (Joachim Eastwood)
-Date: Wed, 10 Jun 2015 16:02:59 +0200
-Subject: [PATCH v4 3/5] clk: add lpc18xx ccu clk driver
-In-Reply-To: <20150610021315.6017.58085@quantum>
-References: <1432845107-12458-1-git-send-email-manabian@gmail.com>
- <1432845107-12458-4-git-send-email-manabian@gmail.com>
- <20150610021315.6017.58085@quantum>
-Message-ID: <CAGhQ9VwONWTULGUbGuf_2HbLpfU4pp8S49xdtoCcKcm1p=n7hg@mail.gmail.com>
+From: peter.griffin@linaro.org (Peter Griffin)
+Date: Wed, 10 Jun 2015 15:03:57 +0100
+Subject: [PATCH 0/9]  Add STiH407 fanmily pinctrl DT for tsin,
+ tsout and mtsin channels
+Message-ID: <1433945046-19855-1-git-send-email-peter.griffin@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mike,
+Hi folks,
 
+This set adds in the necessary DT pinctrl configuration for the transport stream
+input channels, transport stream output channels and merged transport stream input
+channels for STiH407 family silicon.
 
-> Hi Joachim,
->
-> If it were me, I would have broken this up into two tables, one for each
-> CCU. In general I would structure the code to reflect the fact that two
-> different IP blocks are being accessed. This isn't a deal breaker but I
-> thought I would mention it in case you want to make the change.
->
-> Otherwise this series looks good to me. Let me know if you plan a V5
-> submission.
-
-If there is still time for 4.2 and you don't have any more comments on
-how the driver uses the DT bindings I would rather send a follow up
-patch that splits the ccu table for 4.3.
-
-
-> I can take patches #1-4 into the clk tree. Please add my Acked-by to
-> patch #5. I will create an immutable branch to share with the arm-soc
-> tree so that they can take #5 and have access to the dt-bindings
-> headers.
-
-Sounds good. I'll talk to arm-soc team about it. But it isn't critical
-for me to get the DTS changes in for 4.2, but I would be very grateful
-for getting the drivers and headers in for 4.2 so that 4.3 is ready
-and doesn't have any header dependencies for all the driver DTS stuff.
-
-Thanks, Mike.
-
+Some of these channels have alternate pinctrl configurations depending on the board
+design. These pinctrl groups will be used by the LinuxDVB c8sectpfe driver which
+will be upstreamed in due course, which allows LDVB tuners and demodulators to be
+used with an upstream kernel to get transport stream data into the SoC.
 
 regards,
-Joachim Eastwood
+
+Peter.
+
+Peter Griffin (9):
+  ARM: STi: DT: Add STiH407 family tsin0 pinctrl configuration
+  ARM: STi: DT: Add STiH407 family tsin1 pinctrl configuration
+  ARM: STi: DT: Add STiH407 family tsin2 pinctrl configuration
+  ARM: STi: DT: Add STiH407 family tsin3 pinctrl configuration
+  ARM: STi: DT: Add STiH407 family tsin4 pinctrl configuration
+  ARM: STi: DT: Add STiH407 family tsin5 pinctrl configuration
+  ARM: STi: DT: Add STiH407 family tsout0 pinctrl configuration
+  ARM: STi: DT: Add STiH407 family tsout1 pinctrl configuration
+  ARM: STi: DT: Add STiH407 family mtsin0 pinctrl configuration
+
+ arch/arm/boot/dts/stih407-pinctrl.dtsi | 200 +++++++++++++++++++++++++++++++++
+ 1 file changed, 200 insertions(+)
+
+-- 
+1.9.1
