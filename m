@@ -1,66 +1,85 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 10 Jun 2015 19:04:16 +0100
-Subject: [PATCH 03/10] KVM: arm/arm64: vgic: Convert struct vgic_lr to
- use bitfields
-In-Reply-To: <557872A3.8070302@arm.com>
-References: <1433783045-8002-1-git-send-email-marc.zyngier@arm.com>
- <1433783045-8002-4-git-send-email-marc.zyngier@arm.com>
- <557872A3.8070302@arm.com>
-Message-ID: <55787C20.9070404@arm.com>
+From: khilman@kernel.org (Kevin Hilman)
+Date: Wed, 10 Jun 2015 11:04:46 -0700
+Subject: [PATCH RFC 2/3] PM / Domains: Support atomic PM domains
+In-Reply-To: <1433456946-53296-3-git-send-email-lina.iyer@linaro.org> (Lina
+ Iyer's message of "Thu, 4 Jun 2015 16:29:05 -0600")
+References: <1433456946-53296-1-git-send-email-lina.iyer@linaro.org>
+ <1433456946-53296-3-git-send-email-lina.iyer@linaro.org>
+Message-ID: <7hy4jrmoch.fsf@deeprootsystems.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/06/15 18:23, Andre Przywara wrote:
-> Hi Marc,
-> 
-> On 06/08/2015 06:03 PM, Marc Zyngier wrote:
->> As we're about to cram more information in the vgic_lr structure
->> (HW interrupt number and additional state information), we switch
->> to a layout similar to the HW's:
->>
->> - use bitfields to save space (we don't need more than 10 bits
->>   to represent the irq numbers)
-> 
-> But that will not be true for LPIs later, right? Before that I was lucky
-> with the irq field being 16 bits wide ;-)
-> So can we increase that to be at least 14 bits (8192 LPI offset + 8192
-> LPIs) here? The structure would still fit in 32 bits, then.
+Lina Iyer <lina.iyer@linaro.org> writes:
 
-Yes, that's true. An oversight on my part.
+> Power Domains currently support turning on/off only in process context.
 
-> I guess guests should get away with only supporting 8K of LPIs, but if
-> we map hardware LPIs to guest IRQs I guess we may exceed 14 bits here.
-> Not sure if we could extend this further for ARM64 only, as we have more
-> room there and also need it only here.
+Generic Power Domains...
 
-Mapping LPIs to IRQs is not a problem, as LPIs don't have an active
-state, so you never have to deactivate it, and you never put them in an
-LR. Problem solved! ;-)
+Also Re: $SUBJECT.  s/atomic/IRQ safe/
 
-Alternative layout proposal for the ITS emulation case:
+> This restricts the usage of PM domains to devices and domains that
+> could be powered on/off in irq disabled contexts as the mutexes used in
+> GenPD allows for cpu sleep while waiting for locks.
 
-#define LR_IS_LPI	(1 << 4)
+That sentence reads the opposite of what you mean.  Rather than "This
+restricts X to Y", I think you menant "This prevents X for Y".
 
-struct vgic_lr {
-	union {
-		unsigned lpi:24;
-		unsigned spi:10;
-		union {
-			unsigned hwirq:10;
-			unsigned source:8;
-		};
-	};
-	unsigned state:5;
-};
+> Genpd inherently provides support for devices, domain hierarchy and can
 
-That gives you even more space than you had before.
+s/domain heirarchy/nesting/
 
-Now, this is absolutely disgusting, of course. This whole intermediate
-structure crap is completely getting out of control, and we should get
-rid of it before we merge the ITS.
+> be used to represent cpu clusters like in ARM's big.Little, where, each
+> cpu cluster is in its domain, with supporting caches and other
+> peripheral hardware. 
 
-/me goes looking for a chainsaw...
+s/domain/power domain/
 
-	M.
--- 
-Jazz is not dead. It just smells funny...
+> Multiple such domains could be part of another domain. 
+
+OK, but not important to this change IMO.
+
+> Because mutexes are used to protect and synchronize domain
+
+s/domain/genpd/
+
+> operations and cpu idle operations are inherently atomic, 
+
+Be more specific about "CPU idle operations are inherently atomic", as
+it's not obvious that it's true.  I think what you mean is that
+the CPUidle paths for entering of low-power idle states is inherently
+atomic because interrupts are disabled.
+
+> the use of
+> genpd is not possible for runtime suspend and resume of the pm domain.
+
+... so, the use of genpd during the idle path of CPUs is not currently
+possible because interrups are disabled in the idle path.
+
+> Replacing the locks to spinlocks would allow cpu domain to be be powered
+                     ^^^^
+s/to/with/
+
+> off to save power, when all the cpus are powered off.
+
+More accuratly, replacing the locks doesn't allow the domain to be
+powered off, rather it allows genpd to be used in the idle path, which 
+would allow genpd to be used
+
+> However, not all domains can operate in irq-safe contexts and usually
+> would need to sleep during domain operations. So genpd has to support
+> both the cases, where the domain is or is not irq-safe. The irq-safe
+> attribute is therefore domain specific.
+>
+> To achieve domain specific locking, set the GENPD_FLAG_IRQ_SAFE flag
+> while defining the domain. This determines if the domain should use a
+> spinlock instead of a mutex. Locking is abstracted through
+> genpd_lock_domain() and genpd_unlock_domain() functions that use the
+> flag to determine the locking to be used for this domain.
+>
+> The restriction this imposes on the domain hierarchy is that subdomains
+> and all devices in the hierarchy also be irq-safe. Non irq-safe domains
+> may continue to have irq-safe devices, but not the other way around.
+
+This might need some corresponding updates to Documentation/ as well.
+
+Kevin
