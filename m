@@ -1,58 +1,31 @@
-From: santosh.shilimkar@oracle.com (santosh shilimkar)
-Date: Wed, 10 Jun 2015 10:25:54 -0700
-Subject: Moan: usage of __iormb() and __iowmb() outside of asm/io.h
-In-Reply-To: <55781880.7040700@ti.com>
-References: <20150608184701.GA7557@n2100.arm.linux.org.uk>
- <55781880.7040700@ti.com>
-Message-ID: <55787322.8020501@oracle.com>
+From: khilman@kernel.org (Kevin Hilman)
+Date: Wed, 10 Jun 2015 10:33:37 -0700
+Subject: [PATCH RFC 1/3] PM / Domains: Allocate memory outside domain locks
+In-Reply-To: <1433456946-53296-2-git-send-email-lina.iyer@linaro.org> (Lina
+ Iyer's message of "Thu, 4 Jun 2015 16:29:04 -0600")
+References: <1433456946-53296-1-git-send-email-lina.iyer@linaro.org>
+ <1433456946-53296-2-git-send-email-lina.iyer@linaro.org>
+Message-ID: <7hpp53o4cu.fsf@deeprootsystems.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 6/10/2015 3:59 AM, Murali Karicheri wrote:
-> On 06/08/2015 02:47 PM, Russell King - ARM Linux wrote:
->> Guys,
->>
->> I notice that we have users of __iormb() and __iowmb() outside of
->> asm/io.h:
->>
->> drivers/clocksource/timer-keystone.c:   __iowmb();
->> drivers/dma/cppi41.c:                   __iormb();
->> drivers/dma/cppi41.c:   __iowmb();
->> drivers/dma/cppi41.c:           __iowmb();
->> drivers/dma/cppi41.c:                   __iormb();
->> drivers/soc/ti/knav_qmss_queue.c:       __iowmb();
->>
-Looks like CPPI abuse got carry forwarded. I also missed these because
-of oversight. Should have insisted to use the standard accessors.
+Lina Iyer <lina.iyer@linaro.org> writes:
 
->> These are not official kernel barriers - the only reason they exist in
->> asm/io.h is purely to provide a barrier implementation _for_ creating
->> the accessors _in_ asm/io.h, which are macros, and therefore these
->> macros need to stay around for the same scope as those accessors.
->>
->> As with all details which are an architecture matter, they are subject
->> to the whims of the architecture maintainer to provide whatever semantics
->> for them that the architecture maintainer deems fit: there is no official
->> requirement for anything of that nature to do anything, and no guarantee
->> that anything such a detail does today it will do so tomorrow.
->>
->> This is why only official interfaces should be used, and if they do not
->> satisfy the requirements, then new official interfaces need to be
->> proposed.  Don't ever poke about with stuff that's an architecture
->> implementation detail.
->>
->> We've been here before with some of the cache flushing code - and people
->> have been burnt by it.
->>
->> I do wish that people would see the difference between stuff which is
->> implemented to facilitate the implementation of an architecture detail
->> vs something which is provided for everyone's use.
->>
->> I'm working on a patch which will completely remove these from view.
->> I would strongly suggest that these uses are removed from the above
->> code as a matter of urgency.
->>
-Sorry for that Russell and thanks for addressing it advance.
+> In order for domains to be powered on/off in irq locked context, the
+> domain locks could either be a spinlock or a mutex, depending on the
+> domain. 
 
-Regards,
-Santosh
+I'd drop that sentence.
+
+> In preparation for atomic support, allocate domain data outside
+
+In preparation for supporting IRQ-safe domainss, ...
+
+> the domain locks, so the allocation calls dont have to be context
+> sensitive.
+
+OK, but *why* don't these allocations need to be protected by the
+locks.  Presumably they were put inside the locks for a reason, so you
+should make the case for why the lock protection isn't needed.
+
+Kevin
