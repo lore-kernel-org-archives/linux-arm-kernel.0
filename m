@@ -1,43 +1,37 @@
-From: pi-cheng.chen@linaro.org (Pi-Cheng Chen)
-Date: Wed, 10 Jun 2015 11:37:52 +0800
-Subject: [PATCH 2/2] cpufreq: mediatek: Add MT8173 cpufreq driver
-In-Reply-To: <1433841449.16887.58.camel@x220>
-References: <1433766561-1330-1-git-send-email-pi-cheng.chen@linaro.org>
- <1433766561-1330-3-git-send-email-pi-cheng.chen@linaro.org>
- <1433841449.16887.58.camel@x220>
-Message-ID: <CALx668WP6Z-bU3_ZX1Ujb=MV_QGA6HdTg8ycUYTqWJ1xtp-Hiw@mail.gmail.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Tue, 9 Jun 2015 22:10:38 -0700
+Subject: EDMA oftree entry for AM335x
+In-Reply-To: <20150608105957.GT26523@pengutronix.de>
+References: <20150504064323.GU15254@pengutronix.de>
+ <20150504141103.GD24469@atomide.com> <5548CB54.1040302@ti.com>
+ <20150505145828.GB21061@atomide.com> <5549F95B.8090905@ti.com>
+ <20150506143951.GG21061@atomide.com>
+ <20150608105957.GT26523@pengutronix.de>
+Message-ID: <20150610051037.GA2740@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 9, 2015 at 5:17 PM, Paul Bolle <pebolle@tiscali.nl> wrote:
-> On Mon, 2015-06-08 at 20:29 +0800, Pi-Cheng Chen wrote:
->> --- /dev/null
->> +++ b/drivers/cpufreq/mt8173-cpufreq.c
+* Robert Schwebel <r.schwebel@pengutronix.de> [150608 04:01]:
+> On Wed, May 06, 2015 at 07:39:52AM -0700, Tony Lindgren wrote:
+> > 
+> > That may never happen considering that davinci is using it too.. It's
+> > best to not count on that happening anytime soon at least.
+> 
+> So my current understanding is that we have the situation that the
+> kernel warns about the oftree being wrong, but isn't able to handle an
+> oftree that would be right.
 >
->> +#include <linux/module.h>
->
-> Weren't you going to drop this include?
+> Shouldn't the warning being added when the kernel driver supports that
+> new mechanism?
 
-Sorry I forget to merge that part of fix into this patch.
-Will fix it.
+This particular driver is broken and it needs to be fixed properly.
+ 
+> I had a warning free mainline kernel without patches on my customer
+> hardware before, so this smells a bit like a regression ... :-/
 
->
->> +module_init(mt8173_cpufreq_driver_init);
->
-> For built-in code this is equivalent to, speaking from memory:
->     device_initcall(mt8173_cpufreq_driver_init);
->
-> Why don't you just use that directly?
+Yes sorry I'm not patching away the warning as it does not fix the
+driver. Peter, I assume you are busy fixing it?
 
-Yes. Will do it.
-Thanks for reviewing.
+Regards,
 
-Best Regards,
-Pi-Cheng
-
->
-> Thanks,
->
->
-> Paul Bolle
->
+Tony
