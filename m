@@ -1,23 +1,25 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 10 Jun 2015 14:00:03 +0200
-Subject: [PATCH 22/34] pinctrl: mvebu: armada-370: align spi1 clock pin
- naming
-In-Reply-To: <1433868446-11028-23-git-send-email-thomas.petazzoni@free-electrons.com>
+Date: Wed, 10 Jun 2015 14:01:23 +0200
+Subject: [PATCH 23/34] pinctrl: mvebu: armada-xp: rename spi to spi0
+In-Reply-To: <1433868446-11028-24-git-send-email-thomas.petazzoni@free-electrons.com>
 References: <1433868446-11028-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1433868446-11028-23-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <CACRpkdZGo2MxqicMVWzty92ZQK+1gjBmVXhXQ8n56B=URPK1gg@mail.gmail.com>
+ <1433868446-11028-24-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <CACRpkdbYmsbKJSs9h=Rs2iMrAhYQ+WV5L5xCZYvgmaJar4gEtg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Tue, Jun 9, 2015 at 6:47 PM, Thomas Petazzoni
 <thomas.petazzoni@free-electrons.com> wrote:
 
-> Across all SoCs, even on Armada 370 for SPI0, the clock pin uses the
-> 'sck' subname and not 'clk', so this commit adjusts the code and
-> documentation accordingly.
+> After updating to the latest Armada XP datasheet, we discovered that
+> there is a second SPI bus accessible from the MPP pins, called 'spi1'.
 >
-> Since this commit only changes the subname, DT backward compatibility
-> is not affected.
+> In order to be consistent with other SoCs having two SPI busses, this
+> commit renames the functions of the first SPI bus to 'spi0' instead of
+> just 'spi'.
+>
+> This commit obviously breaks the DT backward compatibility for the
+> people using the "spi" function name in their Device Tree.
 >
 > Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 
