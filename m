@@ -1,114 +1,57 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Wed, 10 Jun 2015 10:08:43 +0200
-Subject: [PATCH 00/34] pinctrl: mvebu: numerous fixes, cleanups and
- improvements
-In-Reply-To: <20150609213615.GA32336@lunn.ch>
-References: <1433868446-11028-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <20150609170153.GC16778@lunn.ch>
- <20150609212211.625964e2@free-electrons.com>
- <20150609194705.GE16778@lunn.ch>
- <20150609223456.0f569869@free-electrons.com>
- <20150609213615.GA32336@lunn.ch>
-Message-ID: <20150610100843.1153368d@free-electrons.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 10 Jun 2015 09:11:21 +0100
+Subject: Master-aware devices and sideband ID data
+In-Reply-To: <20150609101515.GA28474@leverpostej>
+References: <20150324155007.GC23005@leverpostej>
+ <26BE36EF-2C5B-4DA6-8950-8FEBB031ED1B@caviumnetworks.com>
+ <20150527173953.GC23176@leverpostej>
+ <E342D737-5DD5-48C7-BB01-B83C29CB6E31@caviumnetworks.com>
+ <20150601102208.GD22406@leverpostej>
+ <158EFC9F-FCAF-44D3-AD40-804EDFE0CE25@caviumnetworks.com>
+ <20150605090534.GC1198@arm.com>
+ <20150609101515.GA28474@leverpostej>
+Message-ID: <20150610081120.GA22973@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Andrew Lunn,
-
-On Tue, 9 Jun 2015 23:36:15 +0200, Andrew Lunn wrote:
-
-> > This can only work if the function number is not actually used. For
-> > example, in the very first patch "pinctrl: mvebu: armada-38x: fix PCIe
-> > functions" :
+On Tue, Jun 09, 2015 at 11:17:54AM +0100, Mark Rutland wrote:
+> On Fri, Jun 05, 2015 at 10:05:34AM +0100, Will Deacon wrote:
+> > On Thu, Jun 04, 2015 at 11:19:30PM +0100, Chalamarla, Tirumalesh wrote:
+> > > > On Jun 1, 2015, at 3:22 AM, Mark Rutland <mark.rutland@arm.com> wrote:
+> > > > It's possible to specify that the paths exist. I expect that software
+> > > > would select which to use at runtime.
+> > > > 
+> > > My worry is how to define any priorities/preferences between masters. 
+> > > in general the proposal looks reasonable.
 > > 
-> > -		 MPP_VAR_FUNCTION(4, "pcie1", "rstout",     V_88F6820_PLUS),
-> > +		 MPP_VAR_FUNCTION(4, "ge0",   "txerr",      V_88F6810_PLUS),
-> >
-> > So the function 4 used to be pcie1, which you would like to still be
-> > supported, but it's now actually used for ge0.
+> > I agree that the proposal looks reasonable (in terms of the ability to
+> > describe the sort of topologies that we will face) but I still don't
+> > understand what I need to do in e.g. my IOMMU driver to support this
+> > binding whilst continuing to support the existing iommus binding, which
+> > is relied upon to configure dma-mapping.
+> > 
+> > Mark: how do you see this co-existing/merging with the current bindings?
 > 
-> Isn't 4 a function of the hardware?
-
-I don't understand your question here. Of course '4' is
-hardware-related.
-
-> So this never worked. It is a
-> bug. So the DT file must also have a bug if this actually affects
-> anybody. So i would say, no backwards compatibility is required here.
-
-How is this different from the NAND case you highlighted for patch
-03/34 ? If you have a .dts or .dtsi that does:
-
-	marvell,pins = "mpp12";
-	marvell,function = "pcie1";
-
-then this will now generate an error, because there is no longer a
-"pcie1" function on mpp12. Just like with PATCH 03/34 there is no
-longer a "nf" function on pins mpp9 and mpp10.
-
-> > To be honest, I actually prefer that people updating their kernel and
-> > using an old DT get an error about pin muxing, rather than having the
-> > driver silently ignore and have people never update their Device Tree.
+> As I mentioned in my initial mail, it's not clear to me how this can be
+> reconciled with the current bindings. Everything I've been able to come
+> up with so far at best ends up describing the same thing repeatedly.
 > 
-> I also think many people will be keeping there DT file in step with
-> the kernel. Both get read from /boot by u-boot, or are appended to the
-> kernel, etc. I doubt there are many Marvell systems which a chunk of
-> FLASH dedicated to holding the DT blob.
+> I'll see what I can come up with. Any sugestions are welcome!
 
-Agreed.
+Well, I'd start with the current iommu binding and see if you can figure
+out which properties need adding to it in order to describe the sort of
+topologies you can describe with your original proposal.
 
-> > It's also about long term maintainability. Do we want to keep old crap
-> > around forever in all device drivers?
-> > 
-> > > For spi -> spi0 it seems messier. So i would leave it as spi with a
-> > > comment, and add spi1.
-> > 
-> > I'm fine with that.
-> > 
-> > What about tdm2c -> tdm renaming on Armada 38x, and tdm-1 -> tdm for one
-> > single TDM pin on Armada XP ?
+> > I don't think it's practical to throw away what we have and move over to
+> > something totally different all in one go, but there clearly *is* benefit
+> > in your proposal over the existing scheme.
 > 
-> Is there an in-kernel use of TDM? I don't think so. So i would just
-> change them.
+> I can see that's probably not practical. :(
+> 
+> Do we know what we're going to do w.r.t. IORT? That's going to require
+> the kernel to be able to handle a similar description to this proposal.
 
-No, there is no in-kernel use of TDM in the mainline kernel.
+IORT is part of ACPI, so it doesn't care about the existing DT binding
+and doesn't need to co-exist at runtime.
 
-> For true bugs, i say no, we fix it. Renames for which there is no
-> in-kernel user, just do it. But where there are in-kernel users, which
-> are not Marvell development boards, we should at least see if there is
-> a simple and not too ugly way to keep backwards compatibility, and
-> issue a strong warning it is time to upgrade.
-
-So, what do you propose to do precisely? Here are the patches that are
-removing/changing the main name of certain MPP functions:
-
- * [PATCH 01/34] pinctrl: mvebu: armada-38x: fix PCIe functions
- * [PATCH 02/34] pinctrl: mvebu: armada-370: fix spi0 pin description
- * [PATCH 03/34] pinctrl: mvebu: armada-375: remove non-existing NAND
-   re/we pins
- * [PATCH 04/34] pinctrl: mvebu: armada-xp: remove non-existing NAND
-   pins
- * [PATCH 05/34] pinctrl: mvebu: armada-xp: remove non-existing VDD
-   cpu_pd functions
- * [PATCH 06/34] pinctrl: mvebu: armada-xp: fix functions of MPP48
- * [PATCH 07/34] pinctrl: mvebu: armada-375: remove incorrect space in
-   pin description
- * [PATCH 11/34] pinctrl: mvebu: armada-{38x,39x,xp}: normalize naming
-   of DRAM functions
- * [PATCH 13/34] pinctrl: mvebu: armada-39x: normalize SDIO pin naming
- * [PATCH 15/34] pinctrl: mvebu: armada-39x: align NAND pin naming
- * [PATCH 16/34] pinctrl: mvebu: armada-{370,375,38x,39x,xp}: normalize
-   TDM pins
- * [PATCH 21/34] pinctrl: mvebu: armada-370: align VDD cpu-pd pin
-   naming with datasheet
- * [PATCH 23/34] pinctrl: mvebu: armada-xp: rename spi to spi0
-
-What do we do for each of them?
-
-Thanks,
-
-Thomas
--- 
-Thomas Petazzoni, CTO, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+Will
