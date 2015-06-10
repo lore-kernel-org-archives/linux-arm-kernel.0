@@ -1,31 +1,35 @@
-From: mcoquelin.stm32@gmail.com (Maxime Coquelin)
-Date: Wed, 10 Jun 2015 13:33:22 +0200
-Subject: [PATCH v9 4/5] serial: stm32-usart: Add STM32 USART Driver
-In-Reply-To: <20150531215246.GA24174@kroah.com>
-References: <1432328616-16964-1-git-send-email-mcoquelin.stm32@gmail.com>
- <1432328616-16964-5-git-send-email-mcoquelin.stm32@gmail.com>
- <20150531215246.GA24174@kroah.com>
-Message-ID: <CALszF6B7_xOMvO9pRJJPNeR4JnOgAQAohSARDivzt2d1DQWP_Q@mail.gmail.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Wed, 10 Jun 2015 13:36:07 +0200
+Subject: [PATCH 16/34] pinctrl: mvebu: armada-{370,375,38x,39x,xp}:
+ normalize TDM pins
+In-Reply-To: <1433868446-11028-17-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1433868446-11028-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1433868446-11028-17-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <CACRpkdbDYYUQvx+7da-zBNmM1Xjdfu=M2kpscaN4wsw7UAu9mQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2015-05-31 23:52 GMT+02:00 Greg Kroah-Hartman <gregkh@linuxfoundation.org>:
-> On Fri, May 22, 2015 at 11:03:35PM +0200, Maxime Coquelin wrote:
->> This drivers adds support to the STM32 USART controller, which is a
->> standard serial driver.
->>
->> Tested-by: Chanwoo Choi <cw00.choi@samsung.com>
->> Reviewed-by: Peter Hurley <peter@hurleysoftware.com>
->> Reviewed-by: Vladimir Zapolskiy <vladimir_zapolskiy@mentor.com>
->> Reviewed-by: Andy Shevchenko <andy.shevchenko@gmail.com>
->> Signed-off-by: Maxime Coquelin <mcoquelin.stm32@gmail.com>
+On Tue, Jun 9, 2015 at 6:47 PM, Thomas Petazzoni
+<thomas.petazzoni@free-electrons.com> wrote:
+
+> This commit normalizes the naming of the TDM pins accross the
+> different Marvell SoCs. Mainly it consists in:
 >
-> Acked-by: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+>  * Removing the 'n' from signal names: 'intn' becomes 'int' and 'rstn'
+>    becomes 'rst'
+>
+>  * Renaming the main name 'tdm2c' to 'tdm' on Armada 38x.
+>
+>  * Change the main name 'tdm-1' to 'tdm' for one of the pins of the
+>    Armada XP
+>
+> The last two changes affect DT compatibility, but since the TDM
+> interface is nowhere near being supported in mainline, it should not
+> be considered to be a serious problem at this point.
+>
+> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 
-Thanks Greg.
+Patch applied.
 
-Will you apply it to your tty tree for v4.2? Or it should go in
-someone else tree?
-
-Regards,
-Maxime
+Yours,
+Linus Walleij
