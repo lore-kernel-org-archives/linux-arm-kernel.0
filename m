@@ -1,46 +1,75 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 10 Jun 2015 14:43:54 +0200
-Subject: [PATCH 09/15] mfd: kill off set_irq_flags usage
-In-Reply-To: <1433874401-27161-10-git-send-email-robh@kernel.org>
-References: <1433874401-27161-1-git-send-email-robh@kernel.org>
- <1433874401-27161-10-git-send-email-robh@kernel.org>
-Message-ID: <CACRpkdZkDbuAgMmpHaKVSD_cwo1ykV4jFsMUJOb3E=emRrzYXw@mail.gmail.com>
+From: wsa@the-dreams.de (Wolfram Sang)
+Date: Wed, 10 Jun 2015 21:57:09 +0900
+Subject: [PATCH v6 0/6] i2c: at91: add support to FIFOs and alternative
+ command
+In-Reply-To: <cover.1433866582.git.cyrille.pitchen@atmel.com>
+References: <cover.1433866582.git.cyrille.pitchen@atmel.com>
+Message-ID: <20150610125708.GE1592@katana>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 9, 2015 at 8:26 PM, Rob Herring <robh@kernel.org> wrote:
+On Tue, Jun 09, 2015 at 06:22:13PM +0200, Cyrille Pitchen wrote:
+> ChangeLog
+> 
+> v6:
+> - replace "at91sama5d2" by "sama5d2".
+> 
+> v5:
+> - print I2C controller version in an already existing dev_info() instead of
+>   adding a new one.
+> 
+> v4:
+> - replace 0x%x by %#x when printing I2C controller version
+> - change the order of patches: the race condition bug fix becomes the first
+>   patch so it be can more easily applied to older kernels.
+> 
+> v3:
+> - fix braces {} coding style issue
+> - split the alternative command patch into 2 patches: the first one fixes
+>   a race condition whereas the second one is the actual alternative command
+>   patch
+> 
+> v2:
+> - fix typo in comment for AT91_TWI_SVEN.
+> - document new device tree bindings like "atmel,fifo-size".
+> - explicitly set the has_alt_cmd boolean to false to already existing chip
+>   configs.
+> - use the BIT() macro to define the register bits and do a little cleanup in a
+>   dedicated patch.
+> - reword some comments to better explain why the TXCOMP interrupt is no longer
+>   enabled in at91_do_twi_transfer() but later in
+>   at91_twi_write_data_dma_callback() to avoid a race condition when DMA is used.
+> - remove useless TXCOMP interrupt enable line in at91_twi_write_next_byte()
+>   since this interrupt is also enabled by at91_do_twi_transfer() for PIO
+>   transfers.
+> 
+> v1:
+> This series of patches adds support of two new features which will be
+> introduced with Atmel sama5d2x SoC.
+> 
+> First, the alternative command mode eases the sending of STOP conditions.
+> Before starting an I2C transaction, the size data to be transfered is
+> written into the new Alternative Command Register. For each byte transferred,
+> the I2C controller decreases this counter and automatically sends a STOP
+> condition when the counter value reaches 0, that is to say when the last byte
+> of the transaction has been sent/received. So there is no longer need to set
+> the STOP bit into the Control Register.
+> 
+> Then the use of FIFOs allows to reduce number I/O accesses: for instance,
+> the TX FIFO allows to write up to 4 data in a single access to the Transmit
+> Holding Register. Also the RX FIFO allows to read up to 4 data in a single
+> access to the Receive Holding Register. Currently only DMA transfers take
+> advantage of FIFOs.
 
-> set_irq_flags is ARM specific with custom flags which have genirq
-> equivalents. Convert drivers to use the genirq interfaces directly, so we
-> can kill off set_irq_flags. The translation of flags is as follows:
->
-> IRQF_VALID -> !IRQ_NOREQUEST
-> IRQF_PROBE -> !IRQ_NOPROBE
-> IRQF_NOAUTOEN -> IRQ_NOAUTOEN
->
-> For IRQs managed by an irqdomain, the irqdomain core code handles clearing
-> and setting IRQ_NOREQUEST already, so there is no need to do this in
-> .map() functions and we can simply remove the set_irq_flags calls. Some
-> users also set IRQ_NOPROBE and this has been maintained although it is not
-> clear that is really needed. There appears to be a great deal of blind
-> copy and paste of this code.
->
-> Signed-off-by: Rob Herring <robh@kernel.org>
-> Cc: Samuel Ortiz <sameo@linux.intel.com>
-> Cc: Lee Jones <lee.jones@linaro.org>
-> Cc: Linus Walleij <linus.walleij@linaro.org>
-> Cc: Milo Kim <milo.kim@ti.com>
-> Cc: Kumar Gala <galak@codeaurora.org>
-> Cc: Andy Gross <agross@codeaurora.org>
-> Cc: David Brown <davidb@codeaurora.org>
-> Cc: Tony Lindgren <tony@atomide.com>
-> Cc: linux-arm-kernel at lists.infradead.org
-> Cc: patches at opensource.wolfsonmicro.com
-> Cc: linux-arm-msm at vger.kernel.org
-> Cc: linux-soc at vger.kernel.org
-> Cc: linux-omap at vger.kernel.org
+After fixing the version string in patch 5 as mentioned there, and added
+the acks from Ludovic for the previous version.
 
-Acked-by: Linus Walleij <linus.walleij@linaro.org>
+Applied to for-next, thanks!
 
-Yours,
-Linus Walleij
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150610/4cdfebf0/attachment.sig>
