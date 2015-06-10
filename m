@@ -1,102 +1,65 @@
-From: carlo@endlessm.com (Carlo Caione)
-Date: Wed, 10 Jun 2015 10:30:24 +0200
-Subject: [PATCH] mmc: meson: Add driver for the SD/MMC host found on
- Amlogic MesonX SoCs
-In-Reply-To: <CAD8Lp45c1GS=xYU3=6g1sdrP_afy7r=TgqL--FKjWbbwL=cReA@mail.gmail.com>
-References: <1433783342-31243-1-git-send-email-carlo@caione.org>
- <CAD8Lp45c1GS=xYU3=6g1sdrP_afy7r=TgqL--FKjWbbwL=cReA@mail.gmail.com>
-Message-ID: <CAL9uMOESJjJwZq2S2vd7h8Acg+VHQ2CJKow0_bma2HPCdc4-oQ@mail.gmail.com>
+From: p.fedin@samsung.com (Pavel Fedin)
+Date: Wed, 10 Jun 2015 11:31:19 +0300
+Subject: IRQFD support with GICv3 ITS (WAS: RE: [PATCH 00/13] arm64: KVM: GICv3
+ ITS emulation)
+Message-ID: <042601d0a357$d3cec4d0$7b6c4e70$@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 9, 2015 at 1:15 AM, Daniel Drake <drake@endlessm.com> wrote:
-> Hi Carlo,
+ Hello guys!
 
-Hey Daniel,
+> Currently on ARM, irqfd supports routing an host eventfd towards a
+> virtual SPI:
+> eventfd -> vSPI = gsi+32
+> parameters of irqfd are the eventfd and the gsi.
 
-> On Mon, Jun 8, 2015 at 11:09 AM, Carlo Caione <carlo@caione.org> wrote:
->> From: Carlo Caione <carlo@endlessm.com>
->>
->> Add a driver for the SD/MMC host found on the Amlogic MesonX SoCs. It
->> is an MMC controller which provides an interface between the
->> application processor and various memory cards. It supports the SD
->> specification v2.0 and the eMMC specification v4.41. It also supports
->> SDSC, SDHC and SDXC memory card default speed.
->
-> Nice work, thanks for this!
->
->> This patch adds also the bindinding documentation.
->
-> "binding" typo
+ Yes, but this works only with GICv2m, because it actually turns MSI data into SPI number.
+ITS works in a completely different way.
 
-ops
+> 2) now we have virtual msi injection, we could use msi routing to inject
+> virtual LPI's. But is it what you need for your qemu integration?
 
->> +static void meson_mmc_request(struct mmc_host *mmc, struct mmc_request *mrq)
->> +{
->> +       struct meson_mmc_host *host = mmc_priv(mmc);
->> +       struct mmc_command *cmd = mrq->cmd;
->> +       struct mmc_data *data = mrq->data;
->> +       unsigned long flags;
->> +
->> +       spin_lock_irqsave(&host->lock, flags);
->> +
->> +       if (host->state != STATE_IDLE) {
->> +               dev_dbg(mmc_dev(mmc), "%s() rejected, state %u\n",
->> +                       __func__, host->state);
->> +               mrq->cmd->error = -EAGAIN;
->> +               spin_unlock_irqrestore(&host->lock, flags);
->> +               mmc_request_done(mmc, mrq);
->> +               return;
->> +       }
->> +
->> +       if (host->ferror) {
->> +               cmd->error = host->ferror;
->> +               spin_unlock_irqrestore(&host->lock, flags);
->> +               mmc_request_done(mmc, mrq);
->> +               return;
->> +       }
->> +
->> +       dev_dbg(mmc_dev(mmc), "CMD%d(%08x) arg %x len %d flags %08x\n",
->> +               cmd->opcode & 0x3f, cmd->opcode, cmd->arg,
->> +               mrq->data ? mrq->data->blksz * mrq->data->blocks : 0,
->> +               mrq->cmd->flags);
->> +
->> +       /* Filter out CMD 5/52/53 */
->> +       if (cmd->opcode == SD_IO_SEND_OP_COND ||
->> +           cmd->opcode == SD_IO_RW_DIRECT ||
->> +           cmd->opcode == SD_IO_RW_EXTENDED) {
->> +               dev_dbg(mmc_dev(host->mmc), "CMD%d not supported\n", cmd->opcode);
->> +               cmd->error = -EINVAL;
->> +               spin_unlock_irqrestore(&host->lock, flags);
->> +               mmc_request_done(mmc, mrq);
->> +               return;
->> +       }
->> +
->> +       host->state = STATE_REQUEST;
->> +
->> +       if (data) {
->> +               meson_mmc_map_dma(host, data, data->flags);
->> +               writel(host->sg_dma, host->base + SDIO_ADDR);
->
-> As the sg_dma buffer is constant, can you do this register write just
-> once at probe time? I wonder if we really need to do it on each
-> request.
+ Actually this is what i wanted to discuss here...
+ I have studied a little bit IRQ routing mechanism... And it comes to a question what is
+'GSI'. As far as i could understand, on x86 GSI is a completely virtual entity, which can
+be tied either to irqchip's pin (physical IRQ) or MSI event. There is totally no
+correspondence between GSI numbers and guest IRQ numbers. GSIs are just allocated by the
+userspace starting from 0 and on. Is my understanding correct?
+ On ARM, i see, completely different approach is used. For KVM_IRQ_LINE ioctl GSI is
+actually a raw GIC IRQ number plus some extra bits for target and type. For KVM_IRQFD with
+GICv2m GSI is actually SPI number (starting from zero, so that IRQ = GSI + 32).
+ First of all, i would say that we already have an inconsistence in ARM API. The same
+thing called GSI has two different meanings for different functions.
+ I think it would be a bad idea to introduce a third, separate meaning for MSIs. However,
+this is what we could do:
 
-Unfortunately it doesn't work. It is not documented but I guess that
-writing to that register triggers the DMA transfer and the register is
-zeroed afterwards.
+ Approach 1: GICv2m way.
+ We could add one more IOCTL which would decode MSI data into IRQ (in our case it's LPI)
+number. What it would return is LPI - 32, to keep in line with existing convention.
+ Pros: does not bring any more inconsistence into KVM API.
+ Cons: requires adding one more IOCTL and one more MSI handling mechanism. Isn't there too
+many of them already?
 
-> Or, going deeper, I wonder if we can avoid this bounce buffer
-> entirely. Can you try setting mmc->max_segs to 1 then passing the
-> single data segment directly to the hardware with
->    writel(sg_dma_address(data->sg), host->base + SDIO_ADDR)
->
-> If that turns out to be more complicated then it sounds, then feel
-> free to push it off to a later driver revision.
+ Approach 2: IRQ routing.
+ We could implement MSI routing using virtual GSI numbers. In order to stay compatible
+with what we have, we could say that GSI numbers below 8192 are SPI GSIs, and everything
+starting from 8192 is MSI. Then we could use KVM_SET_GSI_ROUTING ioctl to assign these
+GSIs to actual MSIs which then will go full-cycle through ITS.
+ Pros: Does not introduce any new APIs.
+ Cons:
+    - Introduces third meaning for GSI on ARM.
+    - Slower than approach 1 because in that case every interrupt is pre-translated while
+here we engage ITS every time.
 
-Yup. I'll fix it in v2 putting in CC linux-mmc.
+ Personally i have already tried approach 1 and i can say that it works. There is no
+problem with target specification because current ITS code stores everything in a single
+bunch so that i anyway have to locate a particular ITTE corresponding to an LPI and get
+collection ID from there. However, yes, i agree, this approach has the same performance
+drawback as my suggested approach 2.
 
-Thanks,
+ Any thoughts / ideas ?
 
--- 
-Carlo Caione  |  +39.340.80.30.096  |  Endless
+Kind regards,
+Pavel Fedin
+Expert Engineer
+Samsung Electronics Research center Russia
