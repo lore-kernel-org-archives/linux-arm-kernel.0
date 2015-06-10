@@ -1,173 +1,81 @@
-From: parkch98@gmail.com (Chanho Park)
-Date: Wed, 10 Jun 2015 22:40:02 +0900
-Subject: [PATCH 1/1] irqchip: exynos-combiner: Save IRQ enable set on
- suspend
-In-Reply-To: <1433941831-16637-1-git-send-email-javier.martinez@collabora.co.uk>
-References: <1433941831-16637-1-git-send-email-javier.martinez@collabora.co.uk>
-Message-ID: <CAPTzV16uP9GFeq9hPLvk2kg2F9aaB_936UdR_rpRbqoUh_q9zg@mail.gmail.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Wed, 10 Jun 2015 15:42:44 +0200
+Subject: [PATCH] clk: at91: modify PMC peripheral clock to deal with newer
+ register layout
+Message-ID: <1433943764-18506-1-git-send-email-nicolas.ferre@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+As some more information is added to the PCR register, we'd better use
+a copy of its content and modify just the peripheral-related bits.
+Implement a read-modify-write for the enable() and disable() callbacks.
 
-On Wed, Jun 10, 2015 at 10:10 PM, Javier Martinez Canillas
-<javier.martinez@collabora.co.uk> wrote:
-> The Exynos interrupt combiner IP looses its state when the SoC enters
-> into a low power state during a Suspend-to-RAM. This means that if a
-> IRQ is used as a source, the interrupts for the devices are disabled
-> when the system is resumed from a sleep state so are not triggered.
->
-> Save the interrupt enable set register for each combiner group and
-> restore it after resume to make sure that the interrupts are enabled.
->
-> Signed-off-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
-> ---
->
-> Hello,
->
-> I noticed this issue because after a S2R, IRQs for some devices didn't
-> trigger anymore but others continued working and all of them had lines
-> from a GPIO chip as their interrupt source.
->
-> The only difference was that the GPIO pins that were not working after
-> a resume, were the ones that had the interrupt combiner as interrupt
-> parent.
->
-> With this patch now all perhiperals are working correctly after a resume.
-> Tested on an Exynos5250 Snow, Exynos5420 Peach Pit and Exynos5800 Peach Pi
-> Chromebooks.
->
-> Best regards,
-> Javier
->
->  drivers/irqchip/exynos-combiner.c | 61 +++++++++++++++++++++++++++++++++++----
->  1 file changed, 56 insertions(+), 5 deletions(-)
->
-> diff --git a/drivers/irqchip/exynos-combiner.c b/drivers/irqchip/exynos-combiner.c
-> index 5945223b73fa..69c710641bfa 100644
-> --- a/drivers/irqchip/exynos-combiner.c
-> +++ b/drivers/irqchip/exynos-combiner.c
-> @@ -13,6 +13,7 @@
->  #include <linux/init.h>
->  #include <linux/io.h>
->  #include <linux/slab.h>
-> +#include <linux/syscore_ops.h>
->  #include <linux/irqdomain.h>
->  #include <linux/irqchip/chained_irq.h>
->  #include <linux/interrupt.h>
-> @@ -34,9 +35,14 @@ struct combiner_chip_data {
->         unsigned int irq_mask;
->         void __iomem *base;
->         unsigned int parent_irq;
-> +#ifdef CONFIG_PM
-> +       u32 pm_save;
-> +#endif
->  };
->
-> +static struct combiner_chip_data *combiner_data;
->  static struct irq_domain *combiner_irq_domain;
-> +static unsigned int max_nr = 20;
->
->  static inline void __iomem *combiner_base(struct irq_data *data)
->  {
-> @@ -170,12 +176,10 @@ static struct irq_domain_ops combiner_irq_domain_ops = {
->  };
->
->  static void __init combiner_init(void __iomem *combiner_base,
-> -                                struct device_node *np,
-> -                                unsigned int max_nr)
-> +                                struct device_node *np)
->  {
->         int i, irq;
->         unsigned int nr_irq;
-> -       struct combiner_chip_data *combiner_data;
->
->         nr_irq = max_nr * IRQ_IN_COMBINER;
->
-> @@ -201,11 +205,56 @@ static void __init combiner_init(void __iomem *combiner_base,
->         }
->  }
->
-> +#ifdef CONFIG_PM
-> +
-> +/**
-> + * combiner_suspend - save interrupt combiner state before suspend
-> + *
-> + * Save the interrupt enable set register for all combiner groups since
-> + * the state is lost when the system enters into a sleep state.
-> + *
-> + */
-> +static int combiner_suspend(void)
-> +{
-> +       int i;
-> +
-> +       for (i = 0; i < max_nr; i++)
-> +               combiner_data[i].pm_save =
-> +                       __raw_readl(combiner_data[i].base + COMBINER_ENABLE_SET);
-> +
-> +       return 0;
-> +}
-> +
-> +/**
-> + * combiner_resume - restore interrupt combiner state after resume
-> + *
-> + * Restore the interrupt enable set register for all combiner groups since
-> + * the state is lost when the system enters into a sleep state on suspend.
-> + *
-> + */
-> +static void combiner_resume(void)
-> +{
-> +       int i;
-> +
-> +       for (i = 0; i < max_nr; i++)
+Header file is also modified to have the PCR_DIV mask.
 
-Don't you need to clear masking bits of the COMBINER_ENABLE_CLEAR
-before enabling the bits?
+Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+---
+ drivers/clk/at91/clk-peripheral.c | 19 +++++++++++++------
+ include/linux/clk/at91_pmc.h      |  3 ++-
+ 2 files changed, 15 insertions(+), 7 deletions(-)
 
-> +               __raw_writel(combiner_data[i].pm_save,
-> +                            combiner_data[i].base + COMBINER_ENABLE_SET);
-> +}
-> +
-> +#else
-> +#define combiner_suspend       NULL
-> +#define combiner_resume                NULL
-> +#endif
-> +
-> +static struct syscore_ops combiner_syscore_ops = {
-> +       .suspend        = combiner_suspend,
-> +       .resume         = combiner_resume,
-> +};
-> +
->  static int __init combiner_of_init(struct device_node *np,
->                                    struct device_node *parent)
->  {
->         void __iomem *combiner_base;
-> -       unsigned int max_nr = 20;
->
->         combiner_base = of_iomap(np, 0);
->         if (!combiner_base) {
-> @@ -219,7 +268,9 @@ static int __init combiner_of_init(struct device_node *np,
->                         __func__, max_nr);
->         }
->
-> -       combiner_init(combiner_base, np, max_nr);
-> +       combiner_init(combiner_base, np);
-> +
-> +       register_syscore_ops(&combiner_syscore_ops);
->
->         return 0;
->  }
-> --
-> 2.1.4
->
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> Please read the FAQ at  http://www.tux.org/lkml/
-
-
-
+diff --git a/drivers/clk/at91/clk-peripheral.c b/drivers/clk/at91/clk-peripheral.c
+index 597fed423d7d..37e2fea14890 100644
+--- a/drivers/clk/at91/clk-peripheral.c
++++ b/drivers/clk/at91/clk-peripheral.c
+@@ -161,14 +161,17 @@ static int clk_sam9x5_peripheral_enable(struct clk_hw *hw)
+ {
+ 	struct clk_sam9x5_peripheral *periph = to_clk_sam9x5_peripheral(hw);
+ 	struct at91_pmc *pmc = periph->pmc;
++	u32 tmp;
+ 
+ 	if (periph->id < PERIPHERAL_ID_MIN)
+ 		return 0;
+ 
+-	pmc_write(pmc, AT91_PMC_PCR, (periph->id & AT91_PMC_PCR_PID) |
+-				     AT91_PMC_PCR_CMD |
+-				     AT91_PMC_PCR_DIV(periph->div) |
+-				     AT91_PMC_PCR_EN);
++	pmc_lock(pmc);
++	pmc_write(pmc, AT91_PMC_PCR, (periph->id & AT91_PMC_PCR_PID));
++	tmp = pmc_read(pmc, AT91_PMC_PCR) & ~AT91_PMC_PCR_P_DIV;
++	pmc_write(pmc, AT91_PMC_PCR, tmp | AT91_PMC_PCR_PDIV(periph->div)
++					 | AT91_PMC_PCR_EN);
++	pmc_unlock(pmc);
+ 	return 0;
+ }
+ 
+@@ -176,12 +179,16 @@ static void clk_sam9x5_peripheral_disable(struct clk_hw *hw)
+ {
+ 	struct clk_sam9x5_peripheral *periph = to_clk_sam9x5_peripheral(hw);
+ 	struct at91_pmc *pmc = periph->pmc;
++	u32 tmp;
+ 
+ 	if (periph->id < PERIPHERAL_ID_MIN)
+ 		return;
+ 
+-	pmc_write(pmc, AT91_PMC_PCR, (periph->id & AT91_PMC_PCR_PID) |
+-				     AT91_PMC_PCR_CMD);
++	pmc_lock(pmc);
++	pmc_write(pmc, AT91_PMC_PCR, (periph->id & AT91_PMC_PCR_PID));
++	tmp = pmc_read(pmc, AT91_PMC_PCR) & ~AT91_PMC_PCR_EN;
++	pmc_write(pmc, AT91_PMC_PCR, tmp);
++	pmc_unlock(pmc);
+ }
+ 
+ static int clk_sam9x5_peripheral_is_enabled(struct clk_hw *hw)
+diff --git a/include/linux/clk/at91_pmc.h b/include/linux/clk/at91_pmc.h
+index 7669f7618f39..4685c3d62f94 100644
+--- a/include/linux/clk/at91_pmc.h
++++ b/include/linux/clk/at91_pmc.h
+@@ -184,7 +184,8 @@ extern void __iomem *at91_pmc_base;
+ #define AT91_PMC_PCR		0x10c			/* Peripheral Control Register [some SAM9 and SAMA5] */
+ #define		AT91_PMC_PCR_PID	(0x3f  <<  0)		/* Peripheral ID */
+ #define		AT91_PMC_PCR_CMD	(0x1  <<  12)		/* Command (read=0, write=1) */
+-#define		AT91_PMC_PCR_DIV(n)	((n)  <<  16)		/* Divisor Value */
++#define		AT91_PMC_PCR_P_DIV	(0x3  <<  16)		/* Divisor mask */
++#define		AT91_PMC_PCR_PDIV(n)	((n)  <<  16)		/* Divisor Value */
+ #define			AT91_PMC_PCR_DIV0	0x0			/* Peripheral clock is MCK */
+ #define			AT91_PMC_PCR_DIV2	0x1			/* Peripheral clock is MCK/2 */
+ #define			AT91_PMC_PCR_DIV4	0x2			/* Peripheral clock is MCK/4 */
 -- 
-Best Regards,
-Chanho Park
+2.1.3
