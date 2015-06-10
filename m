@@ -1,52 +1,35 @@
-From: mcoquelin.stm32@gmail.com (Maxime Coquelin)
-Date: Wed, 10 Jun 2015 21:22:59 +0200
-Subject: [PATCH v9 4/5] serial: stm32-usart: Add STM32 USART Driver
-In-Reply-To: <20150610174955.GA6527@kroah.com>
-References: <1432328616-16964-1-git-send-email-mcoquelin.stm32@gmail.com>
- <1432328616-16964-5-git-send-email-mcoquelin.stm32@gmail.com>
- <20150531215246.GA24174@kroah.com>
- <CALszF6B7_xOMvO9pRJJPNeR4JnOgAQAohSARDivzt2d1DQWP_Q@mail.gmail.com>
- <20150610154240.GC22214@kroah.com>
- <CALszF6AaS-i2MBF64mJKtY2h5Sb710Z50Mf8wHotUBysukfZbw@mail.gmail.com>
- <20150610174955.GA6527@kroah.com>
-Message-ID: <CALszF6BhyKqKUkWpEr_Fcc_jVrhEy7cZTY3oHKyo3sZK1exUtw@mail.gmail.com>
+From: hauke@hauke-m.de (Hauke Mehrtens)
+Date: Wed, 10 Jun 2015 21:26:35 +0200
+Subject: [PATCH v4] ARM: l2c: add options to overwrite prefetching behavior
+In-Reply-To: <20150610172100.230c0e71@free-electrons.com>
+References: <1432941541-18588-1-git-send-email-hauke@hauke-m.de>
+ <20150610172100.230c0e71@free-electrons.com>
+Message-ID: <55788F6B.7060406@hauke-m.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2015-06-10 19:49 GMT+02:00 Greg Kroah-Hartman <gregkh@linuxfoundation.org>:
-> On Wed, Jun 10, 2015 at 06:18:37PM +0200, Maxime Coquelin wrote:
->> 2015-06-10 17:42 GMT+02:00 Greg Kroah-Hartman <gregkh@linuxfoundation.org>:
->> > On Wed, Jun 10, 2015 at 01:33:22PM +0200, Maxime Coquelin wrote:
->> >> 2015-05-31 23:52 GMT+02:00 Greg Kroah-Hartman <gregkh@linuxfoundation.org>:
->> >> > On Fri, May 22, 2015 at 11:03:35PM +0200, Maxime Coquelin wrote:
->> >> >> This drivers adds support to the STM32 USART controller, which is a
->> >> >> standard serial driver.
->> >> >>
->> >> >> Tested-by: Chanwoo Choi <cw00.choi@samsung.com>
->> >> >> Reviewed-by: Peter Hurley <peter@hurleysoftware.com>
->> >> >> Reviewed-by: Vladimir Zapolskiy <vladimir_zapolskiy@mentor.com>
->> >> >> Reviewed-by: Andy Shevchenko <andy.shevchenko@gmail.com>
->> >> >> Signed-off-by: Maxime Coquelin <mcoquelin.stm32@gmail.com>
->> >> >
->> >> > Acked-by: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
->> >>
->> >> Thanks Greg.
->> >>
->> >> Will you apply it to your tty tree for v4.2? Or it should go in
->> >> someone else tree?
->> >
->> > It's not in my queue, I'm guessing it goes in through some other tree as
->> > there are build dependancies here preventing me from taking it.
+On 06/10/2015 05:21 PM, Thomas Petazzoni wrote:
+> Dear Hauke Mehrtens,
+> 
+> On Sat, 30 May 2015 01:19:01 +0200, Hauke Mehrtens wrote:
+>> These options make it possible to overwrites the data and instruction
+>> prefetching behavior of the arm pl310 cache controller.
 >>
->> There should not be any build dependencies.
->> I just tested it on my x86 machine with COMPILE_TEST on both v4.1-rc1
->> and tty-next branch.
->> In both case it compiles without warnings.
->
-> Ok, then feel free to resend it as a stand-alone patch please and I will
-> queue it up.
+>> Signed-off-by: Hauke Mehrtens <hauke@hauke-m.de>
+> 
+> This patch would be useful to me. I'll test it tomorrow. Did you submit
+> it into the Russell patch tracking system, as Russell suggested to do
+> in his reply on your v3 ?
+> 
+> Russell said:
+> 
+> """
+> I don't see anything wrong with it, but as ever, it needs to end up in
+> the patch system if it's not going to get buried beneath a huge pile of
+> email.
+> """
+Thanks for asking, I did not know Russell's patch process, but Florian
+guided me and now it is submitted, see
+http://www.arm.linux.org.uk/developer/patches/viewpatch.php?id=8391/1
 
-Patch resent as a standalone patch.
-
-Thanks!
-Maxime
+Hauke
