@@ -1,221 +1,68 @@
-From: LW@KARO-electronics.de (Lothar =?UTF-8?B?V2HDn21hbm4=?=)
-Date: Wed, 10 Jun 2015 11:02:06 +0200
-Subject: [REBASED 2/5] regulator: pwm-regulator: Separate voltage-table
- initialisation
-In-Reply-To: <1433923073-907-3-git-send-email-lee.jones@linaro.org>
-References: <1433923073-907-1-git-send-email-lee.jones@linaro.org>
- <1433923073-907-3-git-send-email-lee.jones@linaro.org>
-Message-ID: <20150610110206.6194cc0f@ipc1.ka-ro>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Wed, 10 Jun 2015 10:03:50 +0100
+Subject: [PATCH 00/10] arm/arm64: KVM: Active interrupt state switching
+ for shared devices
+In-Reply-To: <5577F63C.5040806@linaro.org>
+References: <1433783045-8002-1-git-send-email-marc.zyngier@arm.com>
+ <5577F63C.5040806@linaro.org>
+Message-ID: <5577FD76.7080100@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Eric,
 
-> Take this out of the main .probe() routine in order to facilitate the
-> introduction of different ways to obtain 'duty cycle' information.
+On 10/06/15 09:33, Eric Auger wrote:
+> Hi Marc,
+> On 06/08/2015 07:03 PM, Marc Zyngier wrote:
+>> From day 1, our timer code has been using a terrible hack: whenever
+>> the guest is scheduled with a timer interrupt pending (i.e. the HW
+>> timer has expired), we restore the timer state with the MASK bit set,
+>> in order to avoid the physical interrupt to fire again. And again. And
+>> again...
+>>
+>> This is absolutely silly, for at least two reasons:
+>>
+>> - This relies on the device (the timer) having a mask bit that we can
+>>   play with. Not all devices are built like this.
+>>
+>> - This expects some behaviour of the guest that only works because the
+>>   both the kernel timer code and the KVM counterpart have been written
+>>   by the same idiot (the idiot being me).
+>>
+>> The One True Way is to set the GIC active bit when injecting the
+>> interrupt, and to context-switch across the world switch. This is what
+>> this series implements.
+>>
+>> We introduce a relatively simple infrastructure enabling the mapping
+>> of a virtual interrupt with its physical counterpart:
+>>
+>> - Whenever an virtual interrupt is injected, we look it up in an
+>>   rbtree. If we have a match, the interrupt is injected with the HW
+>>   bit set in the LR, together with the physical interrupt.
+>>
+>> - Across the world switch, we save/restore the active state for these
+>>   interrupts using the irqchip_state API.
+>>
+>> - On guest EOI, the HW interrupt is automagically deactivated by the
+>>   GIC, allowing the interrupt to be resampled.
 > 
-> Signed-off-by: Lee Jones <lee.jones@linaro.org>
-> ---
->  drivers/mfd/mfd-child.c           | 47 ++++++++++++++++++++++++
->  drivers/regulator/pwm-regulator.c | 77 +++++++++++++++++++++++----------------
->  2 files changed, 92 insertions(+), 32 deletions(-)
->  create mode 100644 drivers/mfd/mfd-child.c
-> 
-> diff --git a/drivers/mfd/mfd-child.c b/drivers/mfd/mfd-child.c
-> new file mode 100644
-> index 0000000..f233add
-> --- /dev/null
-> +++ b/drivers/mfd/mfd-child.c
-> @@ -0,0 +1,47 @@
-> +#include <linux/interrupt.h>
-> +#include <linux/module.h>
-> +#include <linux/of_device.h>
-> +#include <linux/of_irq.h>
-> +
-> +static int simple_mfd_child_probe(struct platform_device *pdev)
-> +{
-> +	struct resource *res;
-> +	void __iomem *base;
-> +	int irq;
-> +
-> +	printk("LEE: %s %s()[%d]: Enter\n", __FILE__, __func__, __LINE__);
-> +
-Debugging remnant?
+> I am lost about the status of the irqchip part, allowing EOImode=1 and
+> only dropping the prio for physical forwarded IRQs:
+> http://lkml.iu.edu/hypermail/linux/kernel/1410.3/00913.html
+> Doesn't this series also depend on those patches or did I miss something
+> on the ML?
 
-> +	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-> +	dev_err(&pdev->dev, "Phys: %x: %x\n", res->start, resource_size(res));
-> +
-That's not an error message and thus shouldn't be printed with
-dev_err(). dev_dbg() would be more appropriate here.
+No, these patches are self-contained. As long as we only deal with
+shared devices, we don't need EOImode=1, as as we save/restore the
+active state, and the only irqchip change required (the state accessors)
+went in with the 4.1 merge window.
 
-> +	base = devm_ioremap_resource(&pdev->dev, res);
-> +	if (IS_ERR(base))
-> +		return PTR_ERR(base);
-> +
-> +	dev_err(&pdev->dev, "Virt: %p\n", base);
-dto.
+The EOImode=1 stuff is still on the cards, and this series contains the
+basic infrastructure for that (the last patch in the series is there
+only for that purpose).
 
-> +
-> +	irq = platform_get_irq(pdev, 0);
-> +	if (irq < 0) {
-> +		dev_err(&pdev->dev, "failed to get IRQ: %d\n", irq);
-> +		return irq;
-> +	}
-> +
-> +	dev_err(&pdev->dev, "IRQ: %d\n", irq);
-> +
-dto.
-> +	return 0;
-> +}
-> +
-> +static const struct of_device_id simple_mfd_child_of_match[] = {
-> +	{ .compatible = "simple-mfd-child" },
-> +	{ }
-> +};
-> +MODULE_DEVICE_TABLE(of, simple_mfd_child_of_match);
-> +
-> +static struct platform_driver simple_mfd_child_driver = {
-> +	.probe = simple_mfd_child_probe,
-> +	.driver = {
-> +		.name = "simple-mfd-child",
-> +		.of_match_table = of_match_ptr(simple_mfd_child_of_match),
-> +	},
-> +};
-> +module_platform_driver(simple_mfd_child_driver);
-> diff --git a/drivers/regulator/pwm-regulator.c b/drivers/regulator/pwm-regulator.c
-> index ffa9612..25560fc 100644
-> --- a/drivers/regulator/pwm-regulator.c
-> +++ b/drivers/regulator/pwm-regulator.c
-> @@ -78,8 +78,7 @@ static int pwm_regulator_list_voltage(struct regulator_dev *rdev,
->  
->  	return drvdata->duty_cycle_table[selector].uV;
->  }
-> -
-> -static struct regulator_ops pwm_regulator_voltage_ops = {
-> +static struct regulator_ops pwm_regulator_voltage_table_ops = {
->  	.set_voltage_sel = pwm_regulator_set_voltage_sel,
->  	.get_voltage_sel = pwm_regulator_get_voltage_sel,
->  	.list_voltage    = pwm_regulator_list_voltage,
-> @@ -88,20 +87,55 @@ static struct regulator_ops pwm_regulator_voltage_ops = {
->  
->  static struct regulator_desc pwm_regulator_desc = {
->  	.name		= "pwm-regulator",
-> -	.ops		= &pwm_regulator_voltage_ops,
->  	.type		= REGULATOR_VOLTAGE,
->  	.owner		= THIS_MODULE,
->  	.supply_name    = "pwm",
->  };
->  
-> +static int pwm_regulator_init_table(struct platform_device *pdev,
-> +				    struct pwm_regulator_data *drvdata)
-> +{
-> +	struct device_node *np = pdev->dev.of_node;
-> +	struct pwm_voltages *duty_cycle_table;
-> +	int length;
-> +	int ret;
-> +
-> +	of_find_property(np, "voltage-table", &length);
-> +
-> +	if ((length < sizeof(*duty_cycle_table)) ||
-> +	    (length % sizeof(*duty_cycle_table))) {
-> +		dev_err(&pdev->dev,
-> +			"voltage-table length(%d) is invalid\n",
-> +			length);
-> +		return -EINVAL;
-> +	}
-> +
-> +	duty_cycle_table = devm_kzalloc(&pdev->dev, length, GFP_KERNEL);
-> +	if (!duty_cycle_table)
-> +		return -ENOMEM;
-> +
-> +	ret = of_property_read_u32_array(np, "voltage-table",
-> +					 (u32 *)duty_cycle_table,
-> +					 length / sizeof(u32));
-> +	if (ret) {
-> +		dev_err(&pdev->dev, "Failed to read voltage-table\n");
-> +		return ret;
-> +	}
-> +
-> +	drvdata->duty_cycle_table	= duty_cycle_table;
-> +	pwm_regulator_desc.ops		= &pwm_regulator_voltage_table_ops;
-> +	pwm_regulator_desc.n_voltages	= length / sizeof(*duty_cycle_table);
-> +
-> +	return 0;
-> +}
-> +
->  static int pwm_regulator_probe(struct platform_device *pdev)
->  {
->  	struct pwm_regulator_data *drvdata;
-> -	struct property *prop;
->  	struct regulator_dev *regulator;
->  	struct regulator_config config = { };
->  	struct device_node *np = pdev->dev.of_node;
-> -	int length, ret;
-> +	int ret;
->  
->  	if (!np) {
->  		dev_err(&pdev->dev, "Device Tree node missing\n");
-> @@ -112,36 +146,15 @@ static int pwm_regulator_probe(struct platform_device *pdev)
->  	if (!drvdata)
->  		return -ENOMEM;
->  
-> -	/* determine the number of voltage-table */
-> -	prop = of_find_property(np, "voltage-table", &length);
-> -	if (!prop) {
-> -		dev_err(&pdev->dev, "No voltage-table\n");
-> -		return -EINVAL;
-> -	}
-> -
-> -	if ((length < sizeof(*drvdata->duty_cycle_table)) ||
-> -	    (length % sizeof(*drvdata->duty_cycle_table))) {
-> -		dev_err(&pdev->dev, "voltage-table length(%d) is invalid\n",
-> -			length);
-> +	if (of_find_property(np, "voltage-table", NULL)) {
-> +		ret = pwm_regulator_init_table(pdev, drvdata);
-> +		if (ret)
-> +			return ret;
-> +	} else {
-> +		dev_err(&pdev->dev, "No \"voltage-table\" supplied\n");
->  		return -EINVAL;
->  	}
->  
-> -	pwm_regulator_desc.n_voltages = length / sizeof(*drvdata->duty_cycle_table);
-> -
-> -	drvdata->duty_cycle_table = devm_kzalloc(&pdev->dev,
-> -						 length, GFP_KERNEL);
-> -	if (!drvdata->duty_cycle_table)
-> -		return -ENOMEM;
-> -
-> -	/* read voltage table from DT property */
-> -	ret = of_property_read_u32_array(np, "voltage-table",
-> -					 (u32 *)drvdata->duty_cycle_table,
-> -					 length / sizeof(u32));
-> -	if (ret < 0) {
-> -		dev_err(&pdev->dev, "read voltage-table failed\n");
-> -		return ret;
-> -	}
-> -
->  	config.init_data = of_get_regulator_init_data(&pdev->dev, np,
->  						      &pwm_regulator_desc);
->  	if (!config.init_data)
-> -- 
-> 1.9.1
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+Hope this helps,
 
-
-
+	M.
 -- 
-___________________________________________________________
-
-Ka-Ro electronics GmbH | Pascalstra?e 22 | D - 52076 Aachen
-Phone: +49 2408 1402-0 | Fax: +49 2408 1402-10
-Gesch?ftsf?hrer: Matthias Kaussen
-Handelsregistereintrag: Amtsgericht Aachen, HRB 4996
-
-www.karo-electronics.de | info at karo-electronics.de
-___________________________________________________________
+Jazz is not dead. It just smells funny...
