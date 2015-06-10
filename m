@@ -1,54 +1,44 @@
 From: ludovic.desroches@atmel.com (Ludovic Desroches)
-Date: Wed, 10 Jun 2015 17:00:00 +0200
-Subject: [PATCH 0/2] get pinctrl more flexible for per pin muxing
+Date: Wed, 10 Jun 2015 17:04:55 +0200
+Subject: [RESEND PATCH 0/2] get pinctrl more flexible for per pin muxing
  controllers
-In-Reply-To: <5578465A.9090503@wwwdotorg.org>
-References: <1430729776-27797-1-git-send-email-ludovic.desroches@atmel.com>
- <556F01CC.8020305@atmel.com>
- <CACRpkdawFrfzHf+8vMLz07-r4J48bAVibV++K31dNQ+D-85ZMg@mail.gmail.com>
- <5578465A.9090503@wwwdotorg.org>
-Message-ID: <20150610150000.GR25800@odux.rfo.atmel.com>
+Message-ID: <1433948699-19800-1-git-send-email-ludovic.desroches@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 10, 2015 at 08:14:50AM -0600, Stephen Warren wrote:
-> On 06/10/2015 01:33 AM, Linus Walleij wrote:
-> >On Wed, Jun 3, 2015 at 3:31 PM, Nicolas Ferre <nicolas.ferre@atmel.com> wrote:
-> >>Le 04/05/2015 10:56, Ludovic Desroches a ?crit :
-> >>>
-> >>>The way pins, groups and functions are tied is too constraining for some
-> >>>controllers. It concerns mainly the ones we don't care about groups and
-> >>>functions, each pin can be muxed to any functions.
-> >>>The goal of these two patches is too remove some of the constraints.
-> >>>
-> >>>I have added the prototype of a pin controller and device tree to show the
-> >>>way I want to use these changes. I couldn't test it on boards using generic
-> >>>pinconf so I am not sure that I don't break something...
-> >>>
-> >>>
-> >>>Ludovic Desroches (4):
-> >>>   pinctrl: change function behavior for per pin muxing controllers
-> >>>   pinctrl: introduce complex pin description
-> >>
-> >>Linus,
-> >>
-> >>Ludovic sent this series nearly one month ago. It was posted after a RFC
-> >>series on the same topic two months ago. As we don't see any comment on
-> >>neither of them we assume that it's okay to include them.
-> >
-> >It's a quite big patch and I need help reviewing it and thinking of
-> >some possible consequences.
-> >
-> >Stephen, can you give me a hand with this?
-> 
-> I don't have the patch in my list archive, which goes back 60 days.
-> 
-> Judging purely by the patch description, the patch sounds incorrect. There's
-> nothing in pinctrl that prevents a particular pin controller from supporting
-> all mux functions on all pins or groups. Simply return the same list of
-> functions for every pin.
+Hi,
 
-Maybe my description is not accurate. I'll resend it.
+The way pins, groups and functions are tied is too constraining for some
+controllers. It concerns mainly the ones we don't care about groups and
+functions, each pin can be muxed to any functions.
+The goal of these two patches is too remove some of the constraints.
 
+I have added the prototype of a pin controller and device tree to show the
+way I want to use these changes. I couldn't test it on boards using generic
+pinconf so I am not sure that I don't break something...
 
-Ludovic
+Ludovic Desroches (4):
+  pinctrl: change function behavior for per pin muxing controllers
+  pinctrl: introduce complex pin description
+  pinctrl: rough draft for a future controller
+  ARM: at91/dt: proto dt
+
+ arch/arm/boot/dts/Makefile                 |   1 +
+ arch/arm/boot/dts/at91-sama5d4ek_proto.dts | 243 ++++++++++
+ arch/arm/boot/dts/sama5d4_proto-pinfunc.h  | 463 +++++++++++++++++++
+ arch/arm/boot/dts/sama5d4_proto.dtsi       | 716 +++++++++++++++++++++++++++++
+ drivers/pinctrl/Kconfig                    |  10 +
+ drivers/pinctrl/Makefile                   |   1 +
+ drivers/pinctrl/pinconf-generic.c          |  44 +-
+ drivers/pinctrl/pinctrl-at91-pio4.c        | 625 +++++++++++++++++++++++++
+ drivers/pinctrl/pinmux.c                   |  58 +--
+ include/linux/pinctrl/pinctrl.h            |   6 +
+ include/linux/pinctrl/pinmux.h             |   3 +
+ 11 files changed, 2134 insertions(+), 36 deletions(-)
+ create mode 100644 arch/arm/boot/dts/at91-sama5d4ek_proto.dts
+ create mode 100644 arch/arm/boot/dts/sama5d4_proto-pinfunc.h
+ create mode 100644 arch/arm/boot/dts/sama5d4_proto.dtsi
+ create mode 100644 drivers/pinctrl/pinctrl-at91-pio4.c
+
+-- 
+2.2.0
