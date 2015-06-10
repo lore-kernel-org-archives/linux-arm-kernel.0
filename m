@@ -1,180 +1,79 @@
-From: r.spliet@ultimaker.com (Roy Spliet)
-Date: Wed, 10 Jun 2015 10:29:07 +0200
-Subject: [PATCH v3 1/2] mtd: nand: sunxi: Replace failsafe timing cfg with
- calculated value
-Message-ID: <1433924948-19288-1-git-send-email-r.spliet@ultimaker.com>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Wed, 10 Jun 2015 09:24:05 +0100
+Subject: [PATCH 1/6] ARM: kvm: psci: fix handling of unimplemented
+ functions
+In-Reply-To: <55771FDC.3090800@arm.com>
+References: <1432901799-18359-1-git-send-email-lorenzo.pieralisi@arm.com>
+ <1432901799-18359-2-git-send-email-lorenzo.pieralisi@arm.com>
+ <55771FDC.3090800@arm.com>
+Message-ID: <20150610082405.GD8591@red-moon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Calculates the timing cfg value once when initialising a chip, then sets
-it on chip select. Register definition documented the A83 user manual.
+Hi Marc,
 
-Signed-off-by: Roy Spliet <r.spliet@ultimaker.com>
+On Tue, Jun 09, 2015 at 06:18:20PM +0100, Marc Zyngier wrote:
+> Hi Lorenzo,
+> 
+> On 29/05/15 13:16, Lorenzo Pieralisi wrote:
+> > According to the PSCI specification and the SMC/HVC calling
+> > convention, PSCI function_ids that are not implemented must
+> > return NOT_SUPPORTED as return value.
+> > 
+> > Current KVM implementation takes an unhandled PSCI function_id
+> > as an error and injects an undefined instruction into the guest
+> > if PSCI implementation is called with a function_id that is not
+> > handled by the resident PSCI version (ie it is not implemented),
+> > which is not the behaviour expected by a guest when calling a
+> > PSCI function_id that is not implemented.
+> > 
+> > This patch fixes this issue by returning NOT_SUPPORTED whenever
+> > the kvm PSCI call is executed for a function_id that is not
+> > implemented by the PSCI kvm layer.
+> > 
+> > Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+> > Reported-by: Sudeep Holla <sudeep.holla@arm.com>
+> > Cc: Christoffer Dall <christoffer.dall@linaro.org>
+> > Cc: Anup Patel <anup.patel@linaro.org>
+> > Cc: Marc Zyngier <marc.zyngier@arm.com>
+> > ---
+> >  arch/arm/kvm/psci.c | 6 +++---
+> >  1 file changed, 3 insertions(+), 3 deletions(-)
+> > 
+> > diff --git a/arch/arm/kvm/psci.c b/arch/arm/kvm/psci.c
+> > index 7e9398c..ec5943b 100644
+> > --- a/arch/arm/kvm/psci.c
+> > +++ b/arch/arm/kvm/psci.c
+> > @@ -273,7 +273,8 @@ static int kvm_psci_0_2_call(struct kvm_vcpu *vcpu)
+> >  		ret = 0;
+> >  		break;
+> >  	default:
+> > -		return -EINVAL;
+> > +		val = PSCI_RET_NOT_SUPPORTED;
+> > +		break;
+> >  	}
+> >  
+> >  	*vcpu_reg(vcpu, 0) = val;
+> > @@ -295,10 +296,9 @@ static int kvm_psci_0_1_call(struct kvm_vcpu *vcpu)
+> >  		break;
+> >  	case KVM_PSCI_FN_CPU_SUSPEND:
+> >  	case KVM_PSCI_FN_MIGRATE:
+> > +	default:
+> >  		val = PSCI_RET_NOT_SUPPORTED;
+> >  		break;
+> > -	default:
+> > -		return -EINVAL;
+> >  	}
+> >  
+> >  	*vcpu_reg(vcpu, 0) = val;
+> > 
+> 
+> Looks good to me. How do you want to proceed with this one? can I take
+> it independently from the rest of the series? Or would you prefer it
+> being kept as a whole?
 
-V2:
-- Fix crippled comments
+I will prepare a v2 to take into account a comment from Sudeep and I
+will add a stable tag too, yes it should be merged independently.
 
-V3:
-- Warn for invalid timings
-- Style
----
- drivers/mtd/nand/sunxi_nand.c | 71 ++++++++++++++++++++++++++++++++++++++++---
- 1 file changed, 66 insertions(+), 5 deletions(-)
-
-diff --git a/drivers/mtd/nand/sunxi_nand.c b/drivers/mtd/nand/sunxi_nand.c
-index 6f93b29..68090b7 100644
---- a/drivers/mtd/nand/sunxi_nand.c
-+++ b/drivers/mtd/nand/sunxi_nand.c
-@@ -99,6 +99,13 @@
- 				 NFC_CMD_INT_ENABLE | \
- 				 NFC_DMA_INT_ENABLE)
- 
-+/* define bit use in NFC_TIMING_CFG */
-+#define NFC_TIMING_CFG(tWB, tADL, tWHR, tRHW, tCAD)		\
-+	((tWB) & 0x3) | (((tADL) & 0x3) << 2) |			\
-+	(((tWHR) & 0x3) << 4) | (((tRHW) & 0x3) << 6) |		\
-+	(((tCAD) & 0x7) << 8);
-+
-+
- /* define bit use in NFC_CMD */
- #define NFC_CMD_LOW_BYTE	GENMASK(7, 0)
- #define NFC_CMD_HIGH_BYTE	GENMASK(15, 8)
-@@ -208,6 +215,7 @@ struct sunxi_nand_hw_ecc {
-  * @nand:		base NAND chip structure
-  * @mtd:		base MTD structure
-  * @clk_rate:		clk_rate required for this NAND chip
-+ * @timing_cfg		TIMING_CFG register value for this NAND chip
-  * @selected:		current active CS
-  * @nsels:		number of CS lines required by the NAND chip
-  * @sels:		array of CS lines descriptions
-@@ -217,6 +225,7 @@ struct sunxi_nand_chip {
- 	struct nand_chip nand;
- 	struct mtd_info mtd;
- 	unsigned long clk_rate;
-+	u32 timing_cfg;
- 	int selected;
- 	int nsels;
- 	struct sunxi_nand_chip_sel sels[0];
-@@ -403,6 +412,7 @@ static void sunxi_nfc_select_chip(struct mtd_info *mtd, int chip)
- 		}
- 	}
- 
-+	writel(sunxi_nand->timing_cfg, nfc->regs + NFC_REG_TIMING_CFG);
- 	writel(ctl, nfc->regs + NFC_REG_CTL);
- 
- 	sunxi_nand->selected = chip;
-@@ -807,10 +817,33 @@ static int sunxi_nfc_hw_syndrome_ecc_write_page(struct mtd_info *mtd,
- 	return 0;
- }
- 
-+static const s32 tWB_lut[] = {6, 12, 16, 20};
-+static const s32 tRHW_lut[] = {4, 8, 12, 20};
-+
-+static s32 _sunxi_nand_lookup_timing(const s32 *lut, int lut_size, u32 duration,
-+		u32 clk_period)
-+{
-+	u32 clk_cycles = (duration + clk_period - 1) / clk_period;
-+	int i;
-+
-+	for (i = 0; i < lut_size; i++) {
-+		if (clk_cycles <= lut[i])
-+			return i;
-+	}
-+
-+	/* Doesn't fit */
-+	return -1;
-+}
-+
-+#define sunxi_nand_lookup_timing(l,p,c) \
-+			_sunxi_nand_lookup_timing(l, ARRAY_SIZE(l), p, c)
-+
- static int sunxi_nand_chip_set_timings(struct sunxi_nand_chip *chip,
- 				       const struct nand_sdr_timings *timings)
- {
-+	struct sunxi_nfc *nfc = to_sunxi_nfc(chip->nand.controller);
- 	u32 min_clk_period = 0;
-+	u32 tWB, tADL, tWHR, tRHW, tCAD;
- 
- 	/* T1 <=> tCLS */
- 	if (timings->tCLS_min > min_clk_period)
-@@ -872,6 +905,37 @@ static int sunxi_nand_chip_set_timings(struct sunxi_nand_chip *chip,
- 	if (timings->tWC_min > (min_clk_period * 2))
- 		min_clk_period = DIV_ROUND_UP(timings->tWC_min, 2);
- 
-+	/* T16 - T19 + tCAD */
-+	tWB  = sunxi_nand_lookup_timing(tWB_lut, timings->tWB_max,
-+					min_clk_period);
-+	if (tWB == -1) {
-+		dev_err(nfc->dev, "unsupported tWB\n");
-+		return -EINVAL;
-+	}
-+
-+	tADL = DIV_ROUND_UP(timings->tADL_min, min_clk_period) >> 3;
-+	if (tADL > 3) {
-+		dev_err(nfc->dev, "unsupported tADL\n");
-+		return -EINVAL;
-+	}
-+
-+	tWHR = DIV_ROUND_UP(timings->tWHR_min, min_clk_period) >> 3;
-+	if (tWHR > 3) {
-+		dev_err(nfc->dev, "unsupported tWHR\n");
-+		return -EINVAL;
-+	}
-+
-+	tRHW = sunxi_nand_lookup_timing(tRHW_lut, timings->tRHW_min,
-+					min_clk_period);
-+	if (tRHW == -1) {
-+		dev_err(nfc->dev, "unsupported tRHW\n");
-+		return -EINVAL;
-+	}
-+
-+	tCAD = 0x7;
-+
-+	/* TODO: A83 has some more bits for CDQSS, CS, CLHZ, CCS, WC */
-+	chip->timing_cfg = NFC_TIMING_CFG(tWB, tADL, tWHR, tRHW, tCAD);
- 
- 	/* Convert min_clk_period from picoseconds to nanoseconds */
- 	min_clk_period = DIV_ROUND_UP(min_clk_period, 1000);
-@@ -884,8 +948,6 @@ static int sunxi_nand_chip_set_timings(struct sunxi_nand_chip *chip,
- 	 */
- 	chip->clk_rate = (2 * NSEC_PER_SEC) / min_clk_period;
- 
--	/* TODO: configure T16-T19 */
--
- 	return 0;
- }
- 
-@@ -1168,6 +1230,7 @@ static int sunxi_nand_chip_init(struct device *dev, struct sunxi_nfc *nfc,
- 
- 	chip->nsels = nsels;
- 	chip->selected = -1;
-+	chip->timing_cfg = 0x7ff;
- 
- 	for (i = 0; i < nsels; i++) {
- 		ret = of_property_read_u32_index(np, "reg", i, &tmp);
-@@ -1377,11 +1440,9 @@ static int sunxi_nfc_probe(struct platform_device *pdev)
- 	platform_set_drvdata(pdev, nfc);
- 
- 	/*
--	 * TODO: replace these magic values with proper flags as soon as we
--	 * know what they are encoding.
-+	 * TODO: replace this magic value with EDO flag
- 	 */
- 	writel(0x100, nfc->regs + NFC_REG_TIMING_CTL);
--	writel(0x7ff, nfc->regs + NFC_REG_TIMING_CFG);
- 
- 	ret = sunxi_nand_chips_init(dev, nfc);
- 	if (ret) {
--- 
-2.4.2
-
-
--- 
-
-
-IMAGINE IT >> MAKE IT
-
-Meet us online at Twitter <http://twitter.com/ultimaker>, Facebook 
-<http://facebook.com/ultimaker>, Google+ <http://google.com/+Ultimaker>
-
-www.ultimaker.com
+Thanks,
+Lorenzo
