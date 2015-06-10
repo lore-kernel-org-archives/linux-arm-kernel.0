@@ -1,27 +1,39 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 10 Jun 2015 13:57:56 +0200
-Subject: [PATCH 21/34] pinctrl: mvebu: armada-370: align VDD cpu-pd pin
- naming with datasheet
-In-Reply-To: <1433868446-11028-22-git-send-email-thomas.petazzoni@free-electrons.com>
-References: <1433868446-11028-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1433868446-11028-22-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <CACRpkdY8mNLNNUAbG4MqtxikWsLBBgHfqBPk6WksRJ+KEPni2Q@mail.gmail.com>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Wed, 10 Jun 2015 13:59:52 +0200
+Subject: [PATCH v5 3/7] mmc: mediatek: Add PM support for MMC driver
+In-Reply-To: <1433903088-14407-4-git-send-email-chaotian.jing@mediatek.com>
+References: <1433903088-14407-1-git-send-email-chaotian.jing@mediatek.com>
+ <1433903088-14407-4-git-send-email-chaotian.jing@mediatek.com>
+Message-ID: <CAPDyKFrdw6m8C6oXRRC1cxmOPda8WqrFwwuP87rDBqEehdTaTA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 9, 2015 at 6:47 PM, Thomas Petazzoni
-<thomas.petazzoni@free-electrons.com> wrote:
-
-> For consistency with the datasheet, this commit renames the VDD
-> function of the MPP4 pin.
+On 10 June 2015 at 04:24, Chaotian Jing <chaotian.jing@mediatek.com> wrote:
+> Add PM support for Mediatek MMC driver
+> Save/restore registers when PM
 >
-> While this changes the DT compatibility, it is not considered to be a
-> problem since this pin is unlikely to be used for anything but
-> debugging purposes.
+> Signed-off-by: Chaotian Jing <chaotian.jing@mediatek.com>
+> ---
+>  drivers/mmc/host/mtk-sd.c | 88 +++++++++++++++++++++++++++++++++++++++++++++--
+>  1 file changed, 85 insertions(+), 3 deletions(-)
 >
-> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+> diff --git a/drivers/mmc/host/mtk-sd.c b/drivers/mmc/host/mtk-sd.c
+> index 8de3299..62e966f 100644
+> --- a/drivers/mmc/host/mtk-sd.c
+> +++ b/drivers/mmc/host/mtk-sd.c
+> @@ -22,6 +22,7 @@
+>  #include <linux/of_gpio.h>
+>  #include <linux/pinctrl/consumer.h>
+>  #include <linux/platform_device.h>
 
-Patch applied.
+Add pm.h as well.
 
-Yours,
-Linus Walleij
+> +#include <linux/pm_runtime.h>
+>  #include <linux/regulator/consumer.h>
+>  #include <linux/spinlock.h>
+>
+
+[...]
+
+Kind regards
+Uffe
