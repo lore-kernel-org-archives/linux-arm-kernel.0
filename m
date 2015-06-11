@@ -1,58 +1,85 @@
-From: gerg@uclinux.org (Greg Ungerer)
-Date: Thu, 11 Jun 2015 14:04:18 +1000
-Subject: [PATCH] ARM: mvebu: pass the coherency availability information
- at init time
-In-Reply-To: <20150611034521.GA12809@kroah.com>
-References: <1433992764-12753-1-git-send-email-gerg@uclinux.org>
- <20150611034521.GA12809@kroah.com>
-Message-ID: <557908C2.4090302@uclinux.org>
+From: chunyan.zhang@spreadtrum.com (Chunyan Zhang)
+Date: Thu, 11 Jun 2015 12:02:45 +0800
+Subject: [PATCH] arm64: fix bug for reloading FPSIMD state after CPU hotplug.
+Message-ID: <1433995365-6043-1-git-send-email-chunyan.zhang@spreadtrum.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/06/15 13:45, Greg KH wrote:
-> On Thu, Jun 11, 2015 at 01:19:24PM +1000, gerg at uclinux.org wrote:
->> From: Greg Ungerer <gerg@uclinux.org>
->>
->> This patch is specifically meant to be applied to stable tree linux-3.10.y.
-> 
-> Why?  What's wrong with taking the exact specific upstream patches
-> instead?
+From: Janet Liu <janet.liu@spreadtrum.com>
 
-The exact patch mentioned below ("5686a1e5aa4") will not apply.
-Too much of the code around it has changed. This does the same
-thing in the same away taking into account the changes around it.
+Now FPSIMD don't handle HOTPLUG_CPU. This introduces bug after cpu down/up process.
 
+After cpu down/up process, the FPSMID hardware register is default value, not any
+process's fpsimd context. when CPU_DEAD set cpu's fpsimd_state to NULL, it will force
+to load the fpsimd context for the thread, to avoid the chance to skip to load the context.
+If process A is the last user process on CPU N before cpu down, and the first user process
+on the same CPU N after cpu up, A's fpsimd_state.cpu is the current cpu id,
+and per_cpu(fpsimd_last_state) points A's fpsimd_state, so kernel will not reload the
+context during it return to user space.
 
-> Your descriptions here:
-> 
->> IO coherency should not be used on the Armada 370 SoC, due to all
->> the necessary pre-requisites for reliable operation not being met
->> (such as write allocate cache policy, shareable pages, SMP bit set).
->>
->> Commit e55355453600a33bb5ca4f71f2d7214875f3b061 ("ARM: mvebu: disable
->> I/O coherency on non-SMP situations on Armada 370/375/38x/XP") was
->> intended to disable IO coherency for the Armada 370. However it only
->> disables the CPU side IO coherency. The mbus driver (drivers/bus/
->> mvebu-mbus.c) still passes the IO coherency attributes through the
->> dram chip selects and onto driver memory window attributes. It
->> does this based on looking directly into the device tree (looking
->> for "marvell,coherency-fabric").
->>
->> To fix we pass the coherency availability information (whether enabled
->> or not) to the mbus driver at init time. This is done in the same way
->> that it was done for mainline kernels in commit
->> 5686a1e5aa436c49187a60052d5885fb1f541ce6 ("bus: mvebu: pass the
->> coherency availability information at init time").
->>
->> Having the IO coherency enabled on the Armada 370 SoC causes rare
->> unreliable system behavior. It is not easy to consistently reproduce
->> problems caused by this. Best method I have seen is heavy network
->> load resulting in kernel dumps due to corrupted memory.
-> 
-> I don't understand the issue here, I really don't want to not take
-> patches that are not in Linus's tree, sorry.
+Signed-off-by: Janet Liu <janet.liu@spreadtrum.com>
+Signed-off-by: Xiongshan An <xiongshan.an@spreadtrum.com>
+Signed-off-by: Chunyan Zhang <chunyan.zhang@spreadtrum.com>
+---
+ arch/arm64/kernel/fpsimd.c |   32 ++++++++++++++++++++++++++++++++
+ 1 file changed, 32 insertions(+)
 
-Sure.
-
-Regards
-Greg
+diff --git a/arch/arm64/kernel/fpsimd.c b/arch/arm64/kernel/fpsimd.c
+index 3dca156..35ef3a2 100644
+--- a/arch/arm64/kernel/fpsimd.c
++++ b/arch/arm64/kernel/fpsimd.c
+@@ -23,6 +23,7 @@
+ #include <linux/sched.h>
+ #include <linux/signal.h>
+ #include <linux/hardirq.h>
++#include <linux/cpu.h>
+ 
+ #include <asm/fpsimd.h>
+ #include <asm/cputype.h>
+@@ -296,6 +297,36 @@ static void fpsimd_pm_init(void)
+ static inline void fpsimd_pm_init(void) { }
+ #endif /* CONFIG_CPU_PM */
+ 
++#ifdef CONFIG_HOTPLUG_CPU
++static int fpsimd_cpu_hotplug_notifier(struct notifier_block *nfb,
++				       unsigned long action,
++				       void *hcpu)
++{
++	int cpu = (long)hcpu;
++
++	switch (action & ~CPU_TASKS_FROZEN) {
++	case CPU_DEAD:
++		per_cpu(fpsimd_last_state, cpu) = NULL;
++		break;
++	default:
++		break;
++	}
++	return NOTIFY_OK;
++}
++
++static struct notifier_block fpsimd_cpu_hotplug_notifier_block = {
++	.notifier_call = fpsimd_cpu_hotplug_notifier,
++};
++
++static inline void fpsimd_hotplug_init(void)
++{
++	register_cpu_notifier(&fpsimd_cpu_hotplug_notifier_block);
++}
++
++#else
++static inline void fpsimd_hotplug_init(void) { }
++#endif
++
+ /*
+  * FP/SIMD support code initialisation.
+  */
+@@ -315,6 +346,7 @@ static int __init fpsimd_init(void)
+ 		elf_hwcap |= HWCAP_ASIMD;
+ 
+ 	fpsimd_pm_init();
++	fpsimd_hotplug_init();
+ 
+ 	return 0;
+ }
+-- 
+1.7.9.5
