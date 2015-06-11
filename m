@@ -1,95 +1,79 @@
-From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Thu, 11 Jun 2015 17:38:45 +0200
-Subject: [PATCH v4 2/2] mtd: nand: sunxi: Set serial access mode correctly
-In-Reply-To: <1434034637-9804-2-git-send-email-r.spliet@ultimaker.com>
-References: <1434034637-9804-1-git-send-email-r.spliet@ultimaker.com>
- <1434034637-9804-2-git-send-email-r.spliet@ultimaker.com>
-Message-ID: <20150611173845.650083f9@bbrezillon>
+From: andre.przywara@arm.com (Andre Przywara)
+Date: Thu, 11 Jun 2015 16:46:11 +0100
+Subject: [PATCH 09/13] KVM: arm64: handle pending bit for LPIs in ITS
+ emulation
+In-Reply-To: <55770D4A.9090801@linaro.org>
+References: <1432893209-27313-1-git-send-email-andre.przywara@arm.com>
+ <1432893209-27313-10-git-send-email-andre.przywara@arm.com>
+ <55770D4A.9090801@linaro.org>
+Message-ID: <5579AD43.6070407@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 11 Jun 2015 16:57:17 +0200
-Roy Spliet <r.spliet@ultimaker.com> wrote:
+Salut Eric,
 
-> Replaces the hard coded "always use EDO" policy with that prescribed
-> by the ONFI 3.1 specification that EDO mode should always be used if tRC
-> is below 30ns.
-> 
-> Signed-off-by: Roy Spliet <r.spliet@ultimaker.com>
+On 06/09/2015 04:59 PM, Eric Auger wrote:
+> On 05/29/2015 11:53 AM, Andre Przywara wrote:
+>> As the actual LPI number in a guest can be quite high, but is mostly
+>> assigned using a very sparse allocation scheme, bitmaps and arrays
+>> for storing the virtual interrupt status are a waste of memory.
+>> We use our equivalent of the "Interrupt Translation Table Entry"
+>> (ITTE) to hold this extra status information for a virtual LPI.
+>> As the normal VGIC code cannot use it's fancy bitmaps to manage
+>> pending interrupts, we provide a hook in the VGIC code to let the
+>> ITS emulation handle the list register queueing itself.
+>> LPIs are located in a separate number range (>=8192), so
+>> distinguishing them is easy. With LPIs being only edge-triggered, we
+>> get away with a less complex IRQ handling.
+>>
+>> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
+>> ---
+>>  include/kvm/arm_vgic.h      |  2 ++
+>>  virt/kvm/arm/its-emul.c     | 66 +++++++++++++++++++++++++++++++++++++++++++
+>>  virt/kvm/arm/its-emul.h     |  3 ++
+>>  virt/kvm/arm/vgic-v3-emul.c |  2 ++
+>>  virt/kvm/arm/vgic.c         | 68 +++++++++++++++++++++++++++++++++------------
+>>  5 files changed, 124 insertions(+), 17 deletions(-)
+>>
+>> diff --git a/include/kvm/arm_vgic.h b/include/kvm/arm_vgic.h
+>> index fa17df6..de19c34 100644
+>> --- a/include/kvm/arm_vgic.h
+>> +++ b/include/kvm/arm_vgic.h
+>> @@ -147,6 +147,8 @@ struct vgic_vm_ops {
+>>  	int	(*init_model)(struct kvm *);
+>>  	void	(*destroy_model)(struct kvm *);
+>>  	int	(*map_resources)(struct kvm *, const struct vgic_params *);
+>> +	bool	(*queue_lpis)(struct kvm_vcpu *);
+>> +	void	(*unqueue_lpi)(struct kvm_vcpu *, int irq);
+>>  };
+>>  
+>>  struct vgic_io_device {
+>> diff --git a/virt/kvm/arm/its-emul.c b/virt/kvm/arm/its-emul.c
+>> index f0f4a9c..f75fb9e 100644
+>> --- a/virt/kvm/arm/its-emul.c
+>> +++ b/virt/kvm/arm/its-emul.c
+>> @@ -50,8 +50,26 @@ struct its_itte {
+>>  	struct its_collection *collection;
+>>  	u32 lpi;
+>>  	u32 event_id;
+>> +	bool enabled;
+>> +	unsigned long *pending;
+> allocated in later patch. does not ease the review of the life cycle but
+> I guess it is accepted/acceptable.
 
-Acked-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+I tried to move some bits around a bit and ran into several issues, so I
+guess we have to live with that.
 
-Thanks,
+> Isn't it somehow redundant to have a bitmap here where the collection
+> already indicates the target cpu id on which the LPI is pending?
 
-Boris
+Unfortunately only "somewhat", as Marc taught me the other day ;-)
+First, the spec shows that the pending bitmap is allocated _per CPU_, so
+we have to model this here appropriately.
+Second, you could have an LPI pending on one distributor, then change
+the associated collection to another distributor and trigger that
+interrupt again. This would make it pending on two VCPUs.
+Admittedly not the most prominent use case, but possible.
 
-> 
-> V4:
-> - Simplify by pre-calculating the entire timing CTL register value
-> ---
->  drivers/mtd/nand/sunxi_nand.c | 17 ++++++++++++-----
->  1 file changed, 12 insertions(+), 5 deletions(-)
-> 
-> diff --git a/drivers/mtd/nand/sunxi_nand.c b/drivers/mtd/nand/sunxi_nand.c
-> index 79de4ef..26df48f 100644
-> --- a/drivers/mtd/nand/sunxi_nand.c
-> +++ b/drivers/mtd/nand/sunxi_nand.c
-> @@ -99,6 +99,9 @@
->  				 NFC_CMD_INT_ENABLE | \
->  				 NFC_DMA_INT_ENABLE)
->  
-> +/* define bit use in NFC_TIMING_CTL */
-> +#define NFC_TIMING_CTL_EDO	BIT(8)
-> +
->  /* define NFC_TIMING_CFG register layout */
->  #define NFC_TIMING_CFG(tWB, tADL, tWHR, tRHW, tCAD)		\
->  	((tWB) & 0x3) | (((tADL) & 0x3) << 2) |			\
-> @@ -226,6 +229,7 @@ struct sunxi_nand_chip {
->  	struct mtd_info mtd;
->  	unsigned long clk_rate;
->  	u32 timing_cfg;
-> +	u32 timing_ctl;
->  	int selected;
->  	int nsels;
->  	struct sunxi_nand_chip_sel sels[0];
-> @@ -412,6 +416,7 @@ static void sunxi_nfc_select_chip(struct mtd_info *mtd, int chip)
->  		}
->  	}
->  
-> +	writel(sunxi_nand->timing_ctl, nfc->regs + NFC_REG_TIMING_CTL);
->  	writel(sunxi_nand->timing_cfg, nfc->regs + NFC_REG_TIMING_CFG);
->  	writel(ctl, nfc->regs + NFC_REG_CTL);
->  
-> @@ -941,6 +946,13 @@ static int sunxi_nand_chip_set_timings(struct sunxi_nand_chip *chip,
->  	/* TODO: A83 has some more bits for CDQSS, CS, CLHZ, CCS, WC */
->  	chip->timing_cfg = NFC_TIMING_CFG(tWB, tADL, tWHR, tRHW, tCAD);
->  
-> +	/*
-> +	 * ONFI specification 3.1, paragraph 4.15.2 dictates that EDO data
-> +	 * output cycle timings shall be used if the host drives tRC less than
-> +	 * 30 ns.
-> +	 */
-> +	chip->timing_ctl = (timings->tRC_min < 30000) ? NFC_TIMING_CTL_EDO : 0;
-> +
->  	/* Convert min_clk_period from picoseconds to nanoseconds */
->  	min_clk_period = DIV_ROUND_UP(min_clk_period, 1000);
->  
-> @@ -1442,11 +1454,6 @@ static int sunxi_nfc_probe(struct platform_device *pdev)
->  
->  	platform_set_drvdata(pdev, nfc);
->  
-> -	/*
-> -	 * TODO: replace this magic value with EDO flag
-> -	 */
-> -	writel(0x100, nfc->regs + NFC_REG_TIMING_CTL);
-> -
->  	ret = sunxi_nand_chips_init(dev, nfc);
->  	if (ret) {
->  		dev_err(dev, "failed to init nand chips\n");
-
-
-
--- 
-Boris Brezillon, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+Cheers,
+Andre.
