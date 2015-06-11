@@ -1,53 +1,76 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Thu, 11 Jun 2015 09:35:44 +0900
-Subject: [PATCH RFC 3/3] PM / Domains: Introduce generic PM domain for cpu
- domain
-In-Reply-To: <7hbngnpkfd.fsf@deeprootsystems.com>
-References: <1433456946-53296-1-git-send-email-lina.iyer@linaro.org>
- <1433456946-53296-4-git-send-email-lina.iyer@linaro.org>
- <5574121F.2000806@samsung.com> <7hbngnpkfd.fsf@deeprootsystems.com>
-Message-ID: <5578D7E0.8020305@samsung.com>
+From: chaotian.jing@mediatek.com (Chaotian Jing)
+Date: Thu, 11 Jun 2015 09:33:51 +0800
+Subject: [PATCH v5 1/7] mmc: dt-bindings: add Mediatek MMC bindings
+In-Reply-To: <CAPDyKFojmJYcQOdk3CkgsJ0xOzgjH86VVwvYCy2whjtiPxAFKg@mail.gmail.com>
+References: <1433903088-14407-1-git-send-email-chaotian.jing@mediatek.com>
+ <1433903088-14407-2-git-send-email-chaotian.jing@mediatek.com>
+ <CAPDyKFojmJYcQOdk3CkgsJ0xOzgjH86VVwvYCy2whjtiPxAFKg@mail.gmail.com>
+Message-ID: <1433986431.14592.2.camel@mhfsdcap03>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11.06.2015 02:01, Kevin Hilman wrote:
-> Krzysztof Kozlowski <k.kozlowski@samsung.com> writes:
+Dear Ulf,
+Thanks for your review!
+please see my comment:
+On Wed, 2015-06-10 at 14:02 +0200, Ulf Hansson wrote:
+> On 10 June 2015 at 04:24, Chaotian Jing <chaotian.jing@mediatek.com> wrote:
+> > Document the device-tree binding of Mediatek MMC host
+> >
+> > Signed-off-by: Chaotian Jing <chaotian.jing@mediatek.com>
+> > ---
+> >  Documentation/devicetree/bindings/mmc/mtk-sd.txt | 32 ++++++++++++++++++++++++
+> >  1 file changed, 32 insertions(+)
+> >  create mode 100644 Documentation/devicetree/bindings/mmc/mtk-sd.txt
+> >
+> > diff --git a/Documentation/devicetree/bindings/mmc/mtk-sd.txt b/Documentation/devicetree/bindings/mmc/mtk-sd.txt
+> > new file mode 100644
+> > index 0000000..a1adfa4
+> > --- /dev/null
+> > +++ b/Documentation/devicetree/bindings/mmc/mtk-sd.txt
+> > @@ -0,0 +1,32 @@
+> > +* MTK MMC controller
+> > +
+> > +The MTK  MSDC can act as a MMC controller
+> > +to support MMC, SD, and SDIO types of memory cards.
+> > +
+> > +This file documents differences between the core properties in mmc.txt
+> > +and the properties used by the msdc driver.
+> > +
+> > +Required properties:
+> > +- compatible: Should be "mediatek,mt8173-mmc","mediatek,mt8135-mmc"
+> > +- interrupts: Should contain MSDC interrupt number
+> > +- clocks: MSDC source clock, HCLK
+> > +- clock-names: "source", "hclk"
 > 
->> W dniu 05.06.2015 o 07:29, Lina Iyer pisze:
->>> Generally cpus are grouped under a power domain in a SoC. When all cpus
->>> in the domain are in their power off state,
->>
->> What do you exactly mean here by "CPU in power off state"? How does it
->> map to kernel understanding of CPU device (hotplug? cpuidle?)?
->>
->>> the cpu domain can also be
->>> powered off. Genpd provides the framework for defining cpus as devices
->>> that are part of a cpu domain.
->>
->> The problem which is solved looks to me like the same problem which
->> coupled cpuidle tried to solve: a certain deep sleep mode (e.g. power
->> off) can be entered when whole cluster is idle or other CPUs in cluster
->> are powered off completely.
->>
->> It seems a little like duplicating the effort around coupled cpuidle.
+> According to the mmc driver, hclk is treated as an optional clock.
+> Therefore I think you should list it under an "Optional properties"
+> section instead.
 > 
-> Yes, it duplicates some aspects of coupled idle states, but coupled
-> states have their own limitations:
-> 
-> - only handles CPUs, not other devices sharing a power rail (e.g. L2$,
->   GIC, floating point unit, CoreSight, etc. etc.)
-> 
-> - not scaling well past 2 CPUs
-> 
-> - doesn't handle clusters: While this series only addresses CPUs
->   currently, the approach can be extended.  Because genpd handles nested
->   domains, the could be used to model clusters as well.
+I will make the hclk to mandatory at next driver revision.
+if there was no hclk at dtsi, then the host would probe fail.
 
-Right. I agree with your explanation. I am just thinking how to utilize
-this for Exynos deep sleep modes which now we implement using coupled
-cpuidle.
-
-Anyway I like the idea!
-
-Best regards,
-Krzysztof
+> > +- pinctrl-names: should be "default", "state_uhs"
+> > +- pinctrl-0: should contain default/high speed pin ctrl
+> > +- pinctrl-1: should contain uhs mode pin ctrl
+> > +- vmmc-supply: power to the Core
+> > +- vqmmc-supply: power to the IO
+> > +
+> > +Examples:
+> > +mmc0: mmc at 11230000 {
+> > +       compatible = "mediatek,mt8173-mmc", "mediatek,mt8135-mmc";
+> > +       reg = <0 0x11230000 0 0x108>;
+> > +       interrupts = <GIC_SPI 39 IRQ_TYPE_LEVEL_LOW>;
+> > +       vmmc-supply = <&mt6397_vemc_3v3_reg>;
+> > +       vqmmc-supply = <&mt6397_vio18_reg>;
+> > +       clocks = <&pericfg CLK_PERI_MSDC30_0>, <&topckgen CLK_TOP_MSDC50_0_H_SEL>;
+> > +       clock-names = "source", "hclk";
+> > +       pinctrl-names = "default", "state_uhs";
+> > +       pinctrl-0 = <&mmc0_pins_default>;
+> > +       pinctrl-1 = <&mmc0_pins_uhs>;
+> > +};
+> > --
+> > 1.8.1.1.dirty
+> >
+> 
+> Kind regards
+> Uffe
