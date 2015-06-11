@@ -1,7 +1,7 @@
 From: vthakkar1994@gmail.com (Vaishali Thakkar)
-Date: Thu, 11 Jun 2015 10:57:35 +0530
-Subject: [PATCH] ARM: pxa: Use setup_timer
-Message-ID: <20150611052734.GA3943@vaishali-Ideapad-Z570>
+Date: Thu, 11 Jun 2015 11:03:59 +0530
+Subject: [PATCH] ARM: iop32x: Use setup_timer
+Message-ID: <20150611053359.GA4855@vaishali-Ideapad-Z570>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -22,26 +22,22 @@ expression e1, e2, a;
 
 Signed-off-by: Vaishali Thakkar <vthakkar1994@gmail.com>
 ---
- arch/arm/mach-pxa/sharpsl_pm.c | 6 ++----
- 1 file changed, 2 insertions(+), 4 deletions(-)
+ arch/arm/mach-iop32x/n2100.c | 3 +--
+ 1 file changed, 1 insertion(+), 2 deletions(-)
 
-diff --git a/arch/arm/mach-pxa/sharpsl_pm.c b/arch/arm/mach-pxa/sharpsl_pm.c
-index 051a655..bdc0c41 100644
---- a/arch/arm/mach-pxa/sharpsl_pm.c
-+++ b/arch/arm/mach-pxa/sharpsl_pm.c
-@@ -841,11 +841,9 @@ static int sharpsl_pm_probe(struct platform_device *pdev)
- 	sharpsl_pm.charge_mode = CHRG_OFF;
- 	sharpsl_pm.flags = 0;
- 
--	init_timer(&sharpsl_pm.ac_timer);
--	sharpsl_pm.ac_timer.function = sharpsl_ac_timer;
-+	setup_timer(&sharpsl_pm.ac_timer, sharpsl_ac_timer, 0UL);
- 
--	init_timer(&sharpsl_pm.chrg_full_timer);
--	sharpsl_pm.chrg_full_timer.function = sharpsl_chrg_full_timer;
-+	setup_timer(&sharpsl_pm.chrg_full_timer, sharpsl_chrg_full_timer, 0UL);
- 
- 	led_trigger_register_simple("sharpsl-charge", &sharpsl_charge_led_trigger);
- 
+diff --git a/arch/arm/mach-iop32x/n2100.c b/arch/arm/mach-iop32x/n2100.c
+index c1cd80e..4a64a11 100644
+--- a/arch/arm/mach-iop32x/n2100.c
++++ b/arch/arm/mach-iop32x/n2100.c
+@@ -336,8 +336,7 @@ static int __init n2100_request_gpios(void)
+ 			pr_err("could not set power GPIO as input\n");
+ 	}
+ 	/* Set up power button poll timer */
+-	init_timer(&power_button_poll_timer);
+-	power_button_poll_timer.function = power_button_poll;
++	setup_timer(&power_button_poll_timer, power_button_poll, 0UL);
+ 	power_button_poll_timer.expires = jiffies + (HZ / 10);
+ 	add_timer(&power_button_poll_timer);
+ 	return 0;
 -- 
 1.9.1
