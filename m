@@ -1,28 +1,39 @@
 From: khilman@kernel.org (Kevin Hilman)
-Date: Thu, 11 Jun 2015 16:25:52 -0700
-Subject: [PATCH v6 0/4] Add basic ZTE zx296702 SOC support
-In-Reply-To: <20150606013820.GA12021@tiger> (Shawn Guo's message of "Sat, 6
- Jun 2015 09:38:20 +0800")
-References: <1433388063-13682-1-git-send-email-jun.nie@linaro.org>
- <20150604182739.GH490@codeaurora.org> <20150605023703.GD17189@dragon>
- <20150605190744.GB648@codeaurora.org> <20150606013820.GA12021@tiger>
-Message-ID: <7hzj45bzen.fsf@deeprootsystems.com>
+Date: Thu, 11 Jun 2015 16:30:59 -0700
+Subject: [GIT PULL 1/3] omap device tree changes for v4.2, part 2
+In-Reply-To: <556de65c.d032320a.4894.5604SMTPIN_ADDED_BROKEN@mx.google.com>
+ (Tony Lindgren's message of "Tue, 2 Jun 2015 10:22:15 -0700")
+References: <556de65c.d032320a.4894.5604SMTPIN_ADDED_BROKEN@mx.google.com>
+Message-ID: <7hvbetbz64.fsf@deeprootsystems.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Shawn Guo <shawnguo@kernel.org> writes:
+Tony Lindgren <tony@atomide.com> writes:
 
-> On Fri, Jun 05, 2015 at 12:07:44PM -0700, Stephen Boyd wrote:
->> I was saying that if this isn't going to be accepted into arm-soc
->> because it's too close to the next merge window, then we can take
->> it through the clk tree next time. Looks like Arnd is ready to
->> take it though and I've already given Reviewed-by so it should be
->> good to go through arm-soc.
+> The following changes since commit 52dfcbfc94833b0192d439127ee9ff46023cdbb2:
 >
-> Thanks for clarification, Stephen.
+>   ARM: dts: am335x-evm: add mmc3 and wlan definitions to dts (2015-05-21 12:05:59 -0700)
+>
+> are available in the git repository at:
+>
+>   git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v4.2/dt-pt2
+>
+> for you to fetch changes up to 8584d4fcab2222e2501e1c95b4d063cd4a76891d:
+>
+>   ARM: dts: am335x-sl50: Add Toby-Churchill SL50 board support. (2015-05-28 09:49:50 -0700)
+>
+> ----------------------------------------------------------------
+> Few more omap device tree changes for v4.2 merge window:
+>
+> - Add dm9000 Ethernet support to omap3-devkit8000
+>
+> - Add Toby-Churchill SL50 board support
+>
+> - Add vendor prefix for Toby Churchill Ltd
+>
+> ----------------------------------------------------------------
 
-This is now applied to the zte/soc branch of arm-soc tree, with
-Stephen's Reviewed-by, and merged into next/soc for v4.2.
+Pulled into next/dt.
 
 Thanks,
 
