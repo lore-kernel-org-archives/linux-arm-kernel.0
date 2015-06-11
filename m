@@ -1,19 +1,26 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 11 Jun 2015 17:25:49 +0100
-Subject: [RFC/PATCH 0/9] IOMMU probe deferral support
-In-Reply-To: <1431644410-2997-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
-References: <1431644410-2997-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
-Message-ID: <20150611162549.GE29425@arm.com>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Thu, 11 Jun 2015 21:57:27 +0530
+Subject: [PATCH 3/6] clocksource: bcm2835: Migrate to new 'set-state'
+ interface
+In-Reply-To: <5579B3C7.5030305@linaro.org>
+References: <cover.1433768426.git.viresh.kumar@linaro.org>
+ <b0bf70d911dffe170b0d2b2b3e680bb445c15fc4.1433768426.git.viresh.kumar@linaro.org>
+ <5579A864.5010500@linaro.org> <20150611160048.GC4386@linux>
+ <5579B3C7.5030305@linaro.org>
+Message-ID: <20150611162726.GE4386@linux>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Laurent,
+Hi Thomas,
 
-On Fri, May 15, 2015 at 12:00:01AM +0100, Laurent Pinchart wrote:
-> This patch series attempts to implement support for deferring probe of both
-> IOMMU drivers and bus master drivers.
+On 11-06-15, 18:13, Daniel Lezcano wrote:
+> Yes, I think it would make sense to ignore NULL callback in
+> __clockevents_set_state, otherwise we will end up to fill the
+> different drivers with duplicated noop functions.
 
-Have you had a chance to look at any of the feedback you've received on
-this?
+Do you suggest the same ?
 
-Will
+Thanks.
+
+-- 
+viresh
