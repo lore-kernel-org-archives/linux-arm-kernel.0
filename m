@@ -1,64 +1,47 @@
-From: g.liakhovetski@gmx.de (Guennadi Liakhovetski)
-Date: Thu, 11 Jun 2015 21:08:36 +0200 (CEST)
-Subject: [PATCH v5 0/3] media: atmel-isi: rework on the clock part and
- add runtime pm support
-In-Reply-To: <557904CC.2090106@atmel.com>
-References: <1432634087-3356-1-git-send-email-josh.wu@atmel.com>
- <557904CC.2090106@atmel.com>
-Message-ID: <Pine.LNX.4.64.1506112106300.18734@axis700.grange>
+From: al.stone@linaro.org (al.stone at linaro.org)
+Date: Thu, 11 Jun 2015 13:45:08 -0600
+Subject: [PATCH 0/3] Correct for ACPI 5.1->6.0 spec changes in MADT GICC
+ entries
+Message-ID: <1434051911-14665-1-git-send-email-al.stone@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Josh,
+From: Al Stone <al.stone@linaro.org>
 
-On Thu, 11 Jun 2015, Josh Wu wrote:
+In the ACPI 5.1 version of the spec, the struct for the GICC subtable (struct
+acpi_madt_generic_interrupt) of the MADT is 76 bytes long; in ACPI 6.0, the
+struct is 80 bytes long.  But, there is only one definition in ACPICA for
+this struct -- and that is the 6.0 version.  Hence, when BAD_MADT_ENTRY()
+compares the struct size to the length in the GICC subtable, it fails if 5.1
+structs are in use, and there are systems in the wild that have them.
 
-> Hi, Guennadi
-> 
-> Any feedback for this patch series?
+Note that this was found in linux-next and these patches apply against that
+tree and the arm64 kernel tree; 4.1-rc7 does not appear to have this problem
+since it has the 5.1 struct definition.
 
-Sorry, I haven't found the time to look at patches from you and William 
-Towle, they are at the top of my todo list now - after all the compulsory 
-things, of course. I'll handle them as soon as I find time. Sorry for the 
-delay.
+This patch set first adds macros for easily using the ACPI spec version, and
+then adds the BAD_MADT_GICC_ENTRY() macro that uses them to check the GICC
+subtable only, accounting for the difference in specification versions that
+are possible.  The final patch adds in usage of the BAD_MADT_GICC_ENTRY
+macro.  The BAD_MADT_ENTRY() will continue to work as is for all other
+MADT subtables.
 
-Thanks
-Guennadi
+If these patches are acceptable, a cleanup effort will follow to simplify
+the use of ACPI spec version numbers elsewhere.
 
-> Best Regards,
-> Josh Wu
-> 
-> On 5/26/2015 5:54 PM, Josh Wu wrote:
-> > This patch series fix the peripheral clock code and enable runtime support.
-> > Also it clean up the code which is for the compatiblity of mck.
-> > 
-> > Changes in v5:
-> > - add new patch to fix the condition that codec request still in work.
-> > - fix the error path in start_streaming() thanks to Laurent.
-> > 
-> > Changes in v4:
-> > - need to call pm_runtime_disable() in atmel_isi_remove().
-> > - merged the patch which remove isi disable code in atmel_isi_probe() as
-> >    isi peripherial clock is not enabled in this moment.
-> > - refine the commit log
-> > 
-> > Changes in v3:
-> > - remove useless definition: ISI_DEFAULT_MCLK_FREQ
-> > 
-> > Changes in v2:
-> > - merged v1 two patch into one.
-> > - use runtime_pm_put() instead of runtime_pm_put_sync()
-> > - enable peripheral clock before access ISI registers.
-> > - totally remove clock_start()/clock_stop() as they are optional.
-> > 
-> > Josh Wu (3):
-> >    media: atmel-isi: disable ISI even it has codec request in
-> >      stop_streaming()
-> >    media: atmel-isi: add runtime pm support
-> >    media: atmel-isi: remove mck back compatiable code as it's not need
-> > 
-> >   drivers/media/platform/soc_camera/atmel-isi.c | 105
-> > ++++++++++++--------------
-> >   1 file changed, 48 insertions(+), 57 deletions(-)
-> > 
-> 
+These were tested and known to work on an APM Mustang system, where the
+problem was originally uncovered.
+
+
+Al Stone (3):
+  ACPI: introduce macros for using the ACPI specification version
+  ACPI: add BAD_MADT_GICC_ENTRY() macro
+  ACPI / ARM64: use the new BAD_MADT_GICC_ENTRY macro
+
+ arch/arm64/kernel/smp.c   |  2 +-
+ drivers/irqchip/irq-gic.c |  2 +-
+ include/linux/acpi.h      | 12 ++++++++++++
+ 3 files changed, 14 insertions(+), 2 deletions(-)
+
+-- 
+2.1.0
