@@ -1,73 +1,67 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Thu, 11 Jun 2015 21:40:23 +0900
-Subject: [PATCH 1/2] clk: exynos4: Add PCLK_ADC gate clock on Exynos4x12
-In-Reply-To: <CABxcv=kNb2ERqLL2gG73nkU+kpPsYAWKSyu=bkjfxZBMKOwyPQ@mail.gmail.com>
-References: <1434011190-24563-1-git-send-email-k.kozlowski@samsung.com>
- <55796660.1070702@samsung.com>
- <CABxcv=kNb2ERqLL2gG73nkU+kpPsYAWKSyu=bkjfxZBMKOwyPQ@mail.gmail.com>
-Message-ID: <557981B7.3000303@samsung.com>
+From: hanjun.guo@linaro.org (Hanjun Guo)
+Date: Thu, 11 Jun 2015 20:55:09 +0800
+Subject: [PATCH 02/11] ACPI / irqchip: Add self-probe infrastructure to
+ initialize IRQ controller
+In-Reply-To: <557858AC.6010701@arm.com>
+References: <1431953961-22706-1-git-send-email-hanjun.guo@linaro.org>
+ <1431953961-22706-3-git-send-email-hanjun.guo@linaro.org>
+ <557858AC.6010701@arm.com>
+Message-ID: <5579852D.1010509@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-W dniu 11.06.2015 o 21:15, Javier Martinez Canillas pisze:
-> Hello Krzysztof,
-> 
-> On Thu, Jun 11, 2015 at 12:43 PM, Krzysztof Kozlowski
-> <k.kozlowski@samsung.com> wrote:
->> W dniu 11.06.2015 o 17:26, Krzysztof Kozlowski pisze:
->>> Add proper gate clock for the Analog to Digital Converter (ADC) on
->>> Exynos4x12.
->>>
->>> Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
->>> ---
->>>  drivers/clk/samsung/clk-exynos4.c   | 3 +++
->>>  include/dt-bindings/clock/exynos4.h | 5 ++++-
->>>  2 files changed, 7 insertions(+), 1 deletion(-)
->>>
->>> diff --git a/drivers/clk/samsung/clk-exynos4.c b/drivers/clk/samsung/clk-exynos4.c
->>> index 714d6ba782c8..5f32410a01f8 100644
->>> --- a/drivers/clk/samsung/clk-exynos4.c
->>> +++ b/drivers/clk/samsung/clk-exynos4.c
->>> @@ -85,6 +85,7 @@
->>>  #define DIV_PERIL4           0xc560
->>>  #define DIV_PERIL5           0xc564
->>>  #define E4X12_DIV_CAM1               0xc568
->>> +#define E4X12_GATE_BUS_FSYS1 0xc744
->>>  #define GATE_SCLK_CAM                0xc820
->>>  #define GATE_IP_CAM          0xc920
->>>  #define GATE_IP_TV           0xc924
->>> @@ -1095,6 +1096,8 @@ static struct samsung_gate_clock exynos4x12_gate_clks[] __initdata = {
->>>               0),
->>>       GATE(CLK_PPMUIMAGE, "ppmuimage", "aclk200", E4X12_GATE_IP_IMAGE, 9, 0,
->>>               0),
->>> +     GATE(CLK_PCLK_ADC, "pclk_adc", "aclk133", E4X12_GATE_BUS_FSYS1, 16, 0,
->>> +             0),
->>
->> Now I have even simpler idea. Don't add new clock id but just define
->> here the CLK_TSADC as:
->> GATE(CLK_TSADC, "tsadc", "aclk133", E4X12_GATE_BUS_FSYS1, 16, 0, 0);
->>
->> With this change the second patch wouldn't be needed however this does
->> not reflect the Exynos 4x12 datasheet.
->>
->> Any comments?
->>
-> 
-> I think it's better to reflect the datasheet so I prefer your original
-> patch.
+Hi Marc,
 
-Yeah, I also like sticking to datasheet but maybe it is not always worth
-to reproduce the datasheet in 100%. It is just thinking out loud.
+On 06/10/2015 11:33 PM, Marc Zyngier wrote:
+> Hi Hanjun,
+>
+> On 18/05/15 13:59, Hanjun Guo wrote:
+>> From: Tomasz Nowicki <tomasz.nowicki@linaro.org>
+>>
+>> This self-probe infrastructure works in the similar way as OF,
+>> but there is some different in the mechanism:
+>>
+>> For OF, the init fn will be called once it finds comptiable strings
+>> in DT,  but for ACPI, we init irqchips by static tables, and in
+>> static ACPI tables, there are no comptiable strings to indicate
+>> irqchips, so every init function with IRQCHIP_ACPI_DECLARE in the
+>> same table will be called, but thanks to the GIC version presented
+>> in ACPI table, we can init different GIC irqchips with this framework.
+>
+> This triggers an immediate question: If we can find out the GIC version
+> in the ACPI tables, which can't we just call the irqchips that implement
+> the support for this version?
 
-> Also, wouldn't changing the CLK_TSADC gate definition cause a
-> regression on an Exynos4210 board that is using the tsadc clock? or
-> maybe I misunderstood the explanation of your Patch 2/2?
+This is really a good question and triggers me to rethink about
+the implementation.
 
-No, no. The Exynos4210 would be unchanged. It has the CLK_TSADC - both
-in hardware and in kernel driver. The Exynos4x12 SoCs don't have so we can:
-1. Add new CLK_PCLK_ADC (id and clock) reflecting datasheet.
-2. Add only CLK_TSADC clock  on Exynos4x12 which will be using the
-register of PCLK_ADC. The id would stay the same as on Exynos4210.
+>
+> i.e: the GICv2 irqchip code would have a line like:
+>
+> IRQCHIP_ACPI_DECLARE(gic_v2, ACPI_MADT_GIC_VER_V2, gic_v2_acpi_init);
+>
+> and the probing code would simply call the drivers that have declared
+> their interest for this version code.
 
-Best regards,
-Krzysztof
+if we want to achieve this, we can redefine the strut for acpi_table_id:
+
+#define ACPI_TABLE_ID_LEN	5
+
+struct acpi_table_id {
+	__u8 id[ACPI_TABLE_ID_LEN];
+	const void *handler;
+	kernel_ulong_t driver_data;
+};
+
+then pass the ACPI_MADT_GIC_VER_V2 as the driver_data, it will
+work as you suggested.
+
+>
+> Having code that tests for the version in each driver is not an option
+> (this is exactly what we're trying to avoid).
+
+I also think it's awkward to do that in each driver, thanks for the
+suggestion!
+
+Thanks
+Hanjun
