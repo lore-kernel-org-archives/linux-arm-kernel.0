@@ -1,9 +1,9 @@
 From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Thu, 11 Jun 2015 19:36:44 +0200
-Subject: [PATCH v4 13/13] crypto: marvell/CESA: add DT bindings documentation
+Date: Thu, 11 Jun 2015 19:36:46 +0200
+Subject: [PATCH v4 14/14] crypto: marvell/CESA: add DT bindings documentation
 In-Reply-To: <1434044206-10459-1-git-send-email-boris.brezillon@free-electrons.com>
 References: <1434044206-10459-1-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <1434044206-10459-26-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <1434044206-10459-28-git-send-email-boris.brezillon@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
