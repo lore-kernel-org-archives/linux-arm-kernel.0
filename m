@@ -1,31 +1,30 @@
 From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Thu, 11 Jun 2015 17:08:56 +0100
-Subject: [PATCH] arm64: fix bug for reloading FPSIMD state after CPU
- hotplug.
-In-Reply-To: <1433995365-6043-1-git-send-email-chunyan.zhang@spreadtrum.com>
-References: <1433995365-6043-1-git-send-email-chunyan.zhang@spreadtrum.com>
-Message-ID: <20150611160856.GC29305@e104818-lin.cambridge.arm.com>
+Date: Thu, 11 Jun 2015 17:13:06 +0100
+Subject: [PATCH v2] arm:arm64/hw_breakpoint.c: Remove unnecessary header
+In-Reply-To: <20150611152942.GC29425@arm.com>
+References: <"000a01d0a433$033bc340$09b349c0$@s"@samsung.com>
+ <20150611152942.GC29425@arm.com>
+Message-ID: <20150611161306.GD29305@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 11, 2015 at 12:02:45PM +0800, Chunyan Zhang wrote:
-> From: Janet Liu <janet.liu@spreadtrum.com>
+On Thu, Jun 11, 2015 at 04:29:43PM +0100, Will Deacon wrote:
+> On Thu, Jun 11, 2015 at 11:39:58AM +0100, Maninder Singh wrote:
+> > Header <asm/kdebug.h> is not needed in hw_breakpoint.c 
+> > for arm as well as arm64.
+> > Removing the same.
+> > 
+> > Signed-off-by: Maninder Singh <maninder1.s@samsung.com>
+> > Reviewed-by: Vaneet Narang <v.narang@samsung.com>
+> > ---
+> >  arch/arm/kernel/hw_breakpoint.c   |    1 -
+> >  arch/arm64/kernel/hw_breakpoint.c |    1 -
+> >  2 files changed, 0 insertions(+), 2 deletions(-)
 > 
-> Now FPSIMD don't handle HOTPLUG_CPU. This introduces bug after cpu down/up process.
-> 
-> After cpu down/up process, the FPSMID hardware register is default value, not any
-> process's fpsimd context. when CPU_DEAD set cpu's fpsimd_state to NULL, it will force
-> to load the fpsimd context for the thread, to avoid the chance to skip to load the context.
-> If process A is the last user process on CPU N before cpu down, and the first user process
-> on the same CPU N after cpu up, A's fpsimd_state.cpu is the current cpu id,
-> and per_cpu(fpsimd_last_state) points A's fpsimd_state, so kernel will not reload the
-> context during it return to user space.
-> 
-> Signed-off-by: Janet Liu <janet.liu@spreadtrum.com>
-> Signed-off-by: Xiongshan An <xiongshan.an@spreadtrum.com>
-> Signed-off-by: Chunyan Zhang <chunyan.zhang@spreadtrum.com>
+> Sorry for the bother, but can you send this as two separate patches please?
+> They'll need to go via two different trees to get into mainline.
 
-Applied. Thanks.
+Or just send it to kernel-janitors at vger.kernel.org.
 
 -- 
 Catalin
