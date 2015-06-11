@@ -1,22 +1,30 @@
-From: hdegoede@redhat.com (Hans de Goede)
-Date: Thu, 11 Jun 2015 09:56:49 +0200
-Subject: [linux-sunxi] Re: [PATCH v4 1/2] phy-sun4i-usb: Add full support
- for usb0 phy / OTG
+From: cw00.choi@samsung.com (Chanwoo Choi)
+Date: Thu, 11 Jun 2015 17:07:02 +0900
+Subject: [PATCH v4 1/2] phy-sun4i-usb: Add full support for usb0 phy / OTG
 In-Reply-To: <55792122.20607@ti.com>
 References: <1433088626-8858-1-git-send-email-hdegoede@redhat.com>
- <1433088626-8858-2-git-send-email-hdegoede@redhat.com>
- <55792122.20607@ti.com>
-Message-ID: <55793F41.7000304@redhat.com>
+ <1433088626-8858-2-git-send-email-hdegoede@redhat.com> <55792122.20607@ti.com>
+Message-ID: <557941A6.5000306@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Hans,
 
-On 11-06-15 07:48, Kishon Vijay Abraham I wrote:
+I add the comment about extcon-related code.
+
+Firstly,
+I'd like you to implment the extcon driver for phy-sun4i-usb device
+in drivers/extcon/ directoryby using MFD because there are both extcon
+provider driver and extcon client driver. I think that all extcon
+provider driver better to be included in drivers/extcon/ directory.
+extcon_set_cable_state() function should be handled in extcon provider
+driver which is incluced in drivers/extcon/ directory.
+
+On 06/11/2015 02:48 PM, Kishon Vijay Abraham I wrote:
 > +Chanwoo
->
+> 
 > Hi,
->
+> 
 > On Sunday 31 May 2015 09:40 PM, Hans de Goede wrote:
 >> The usb0 phy is connected to an OTG controller, and as such needs some special
 >> handling:
@@ -95,40 +103,11 @@ On 11-06-15 07:48, Kishon Vijay Abraham I wrote:
 >>       depends on ARCH_SUNXI && HAS_IOMEM && OF
 >>       depends on RESET_CONTROLLER
 >> +    select EXTCON
->
+> 
 > Avoid using 'select' on visible Kconfig symbols.
-
-Ok, I'll do a v5 changing this to a depends on.
-
+> 
 > Also please split the patch to make the reviewing a bit easier.
-
-There really is not much which can be split out, the iscr register
-updating is only done from the id / vbus det scanning, so the 2 are
-intertwined with each other.
-
-Also I must say I'm unhappy with the fact that you request this now,
-after this patch has been posted in its current form a long time
-ago already. The changes in v3 and v4 were very minimal, the
-patch has existed in this for since v2, so you've had a long long
-time to request changes like this already.
-
-In the mean time I've build a whole set of related changes (enabling
-the use of otg on newer versions of the sunxi soc), so sorry I'm
-not going to split this up now as that is going to be a big pain
-with all the extra patches which are sitting on top, and as said
-there really is not that much to split in the first place.
-
-I'll send out a v5 of this patch together with a resend of all the
-patches adding support for new models which sit on top of this one
-(and which I've already send before).
-
-Regards,
-
-Hans
-
-
-
->
+> 
 > Thanks
 > Kishon
 >>       select GENERIC_PHY
@@ -213,6 +192,24 @@ Hans
 >> +    /* phy0 / otg related variables */
 >> +    struct extcon_dev extcon;
 >> +    const char *extcon_cable_names[3];
+
+The latest extcon use the unique id to indicate the each external connector
+instead of legacy string. The related patch[1] and patch[2] will be merged on v4.2-rc1.
+
+[1] extcon: Use the unique id for external connector instead of string
+- http://git.kernel.org/cgit/linux/kernel/git/gregkh/char-misc.git/commit/?h=char-misc-next&id=2a9de9c0f08d61fbe3764a21d22d0b72df97d6ae
+[2] extcon: Redefine the unique id of supported external connectors without 'enum extcon' type
+- http://git.kernel.org/cgit/linux/kernel/git/chanwoo/extcon.git/commit/?h=extcon-next-v4.3&id=bbd8d8b4244bb2799143c959fde57b1f034ec838
+
+For exmaple in drivers/extcon/extcon-usb-gpio.c:
+Maybe you can add the similiar array which include the supported external connector.
+
+static const unsigned int usb_extcon_cable[] = {
+	EXTCON_USB,
+	EXTCON_USB_HOST,
+	EXTCON_NONE,
+};
+
 >> +    bool phy0_init;
 >> +    bool phy0_poll;
 >> +    struct gpio_desc *id_det_gpio;
@@ -399,6 +396,20 @@ Hans
 >> +        extcon_set_cable_state(&data->extcon,
 >> +                       extcon_cable_name[EXTCON_USB],
 >> +                       vbus_det);
+
+I don't want to use the legacy extcon API with string name.
+Instead, you can use the recommeded extcon_set_cable_state_() API as following:
+
+- Legacy extcon API
+: extern int extcon_set_cable_state(struct extcon_dev *edev,
+				  const char *cable_name, bool cable_state);
+- Recommended extcon API
+: extern int extcon_set_cable_state_(struct extcon_dev *edev, unsigned int id,
+				   bool cable_state);
+
+[1] extcon: Use the unique id for external connector instead of string
+- http://git.kernel.org/cgit/linux/kernel/git/gregkh/char-misc.git/commit/?h=char-misc-next&id=2a9de9c0f08d61fbe3764a21d22d0b72df97d6ae
+
 >> +
 >> +    if (data->phy0_poll)
 >> +        queue_delayed_work(system_wq, &data->detect, POLL_TIME);
@@ -434,8 +445,21 @@ Hans
 >> +    data->extcon_cable_names[1] = extcon_cable_name[EXTCON_USB];
 >> +    data->extcon_cable_names[2] = NULL;
 >> +    data->extcon.name = DRIVER_NAME;
+
+Don't need it because extcon_dev_register() set the device name automatically.
+You can check it on patch[3].
+[3] http://git.kernel.org/cgit/linux/kernel/git/gregkh/char-misc.git/commit/?h=char-misc-next&id=71c3ffa5d23af0554c27010cf12710da9bf85950
+
 >> +    data->extcon.supported_cable = data->extcon_cable_names;
+
+You can use the devm_extcon_dev_allocate() to set the supported external connectors.
+
 >> +    data->extcon.dev.parent = dev;
+
+Don't need it because extcon_dev_register() set the parent device automatically.
+
+The field of 'struct extcon_dev' shold be filled with extcon API without direct allocation.
+
 >>
 >>       if (of_device_is_compatible(np, "allwinner,sun5i-a13-usb-phy"))
 >>           data->num_phys = 2;
@@ -542,4 +566,7 @@ Hans
 >>   };
 >>   module_platform_driver(sun4i_usb_phy_driver);
 >>
->
+> 
+
+Thanks,
+Chanwoo Choi
