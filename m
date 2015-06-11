@@ -1,10 +1,10 @@
 From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Thu, 11 Jun 2015 19:36:21 +0200
-Subject: [PATCH v4 01/13] crypto: mv_cesa: use gen_pool to reserve the SRAM
+Date: Thu, 11 Jun 2015 19:36:23 +0200
+Subject: [PATCH v4 02/14] crypto: mv_cesa: use gen_pool to reserve the SRAM
  memory region
 In-Reply-To: <1434044206-10459-1-git-send-email-boris.brezillon@free-electrons.com>
 References: <1434044206-10459-1-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <1434044206-10459-3-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <1434044206-10459-5-git-send-email-boris.brezillon@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
