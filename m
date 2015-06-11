@@ -1,631 +1,510 @@
-From: wangzhou1@hisilicon.com (Zhou Wang)
-Date: Thu, 11 Jun 2015 13:44:18 +0800
-Subject: [PATCH v2 2/4] PCI: designware: Add ARM64 support
-In-Reply-To: <EE11001F9E5DDD47B7634E2F8A612F2E013A4278@lhreml505-mbx.china.huawei.com>
-References: <1433320542-49576-1-git-send-email-wangzhou1@hisilicon.com>
- <1433320542-49576-3-git-send-email-wangzhou1@hisilicon.com>
- <5570507F.4030704@arm.com> <557159B2.9090103@hisilicon.com>
- <20150609111507.GB20182@red-moon>
- <EE11001F9E5DDD47B7634E2F8A612F2E013A4278@lhreml505-mbx.china.huawei.com>
-Message-ID: <55792032.2080903@hisilicon.com>
+From: kishon@ti.com (Kishon Vijay Abraham I)
+Date: Thu, 11 Jun 2015 11:18:18 +0530
+Subject: [PATCH v4 1/2] phy-sun4i-usb: Add full support for usb0 phy / OTG
+In-Reply-To: <1433088626-8858-2-git-send-email-hdegoede@redhat.com>
+References: <1433088626-8858-1-git-send-email-hdegoede@redhat.com>
+ <1433088626-8858-2-git-send-email-hdegoede@redhat.com>
+Message-ID: <55792122.20607@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2015/6/10 21:35, Gabriele Paoloni wrote:
-> Hi Zhou Wang and all
-> 
-> I have worked on a patch that unify ARM and ARM64. As you can see I have removed the parser and now I use "of_pci_get_host_bridge_resources" in order to retrieve the resources associated to each pci host bridge window.
-> The resources now are not copied to the designware pcie_port pp, instead they are passed by pointer.
-> 
-> This patch is intended to replace entirely "[PATCH v2 2/4]"; so I have also included all the changes about the other drivers 
-> 
-> Please find the patch inline below. 
-> 
-> Let me know if you think it is ok.
-> 
-> Regards
-> 
-> Gab
-> 
-> ------------------------------------
-> ------------------------------------
-> 
-> This patch is a rework of
-> "[PATCH v2 2/4] PCI: designware: Add ARM64 support" from Zhou Wang.
-> 
-> The intention is to complete the unification between ARM and
-> ARM64 now that the dependency on arch/arm/kernel/bios32.c is gone.
-> 
-> I have also included the rework asked by James Morse: 
-> io_base declared as resource_size_t
-> 
-> It compiles fine on ARCH arm and arm64.
++Chanwoo
 
-Hi Gabriele,
+Hi,
 
-I manually apply this patch on my series, as there are some format errors
-about this patch. And I think this patch is a experimental one, it could not
-be compiled successfully.
-
-> 
-> It needs to be tested.
-> 
-> Signed-off-by: Gabriele Paoloni <gabriele.paoloni@huawei.com>
-> 
-> [...]
+On Sunday 31 May 2015 09:40 PM, Hans de Goede wrote:
+> The usb0 phy is connected to an OTG controller, and as such needs some special
+> handling:
 >
-> -int dw_pcie_host_init(struct pcie_port *pp)
-> +int __init dw_pcie_host_init(struct pcie_port *pp)
->  {
->  	struct device_node *np = pp->dev->of_node;
->  	struct platform_device *pdev = to_platform_device(pp->dev);
-> -	struct of_pci_range range;
-> -	struct of_pci_range_parser parser;
-> +	struct pci_bus *bus;
->  	struct resource *cfg_res;
-> +	LIST_HEAD(res);
->  	u32 val, na, ns;
->  	const __be32 *addrp;
->  	int i, index, ret;
-> +	int rlen;
-> +	struct pci_host_bridge_window *win;
-
-This struct is not in latest kernel, I think you should use struct resource_entry.
-
-Thanks,
-Zhou
-
-> +	const __be32 *parser_range_end = of_get_property(np, "ranges", &rlen);
+> 1) It allows explicit control over the pullups, enable these on phy_init and
+> disable them on phy_exit.
+>
+> 2) It has bits to signal id and vbus detect to the musb-core, add support for
+> for monitoring id and vbus detect gpio-s for use in dual role mode, and set
+> these bits to the correct values for operating in host only mode when no
+> gpios are specified in the devicetree.
+>
+> 3) When in dual role mode the musb sunxi glue needs to know if the a host or
+> device cable is plugged in, so when in dual role mode register an extcon.
+>
+> While updating the devicetree binding documentation also add documentation
+> for the sofar undocumented usage of regulators for vbus for all 3 phys.
+>
+> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+> ---
+> Changes in v2:
+> -Removed the sunxi specific phy functions, instead the id / vbus gpio polling
+>   has been moved to the phy-sun4i-usb driver and their status is exported
+>   through extcon for the sunxi-musb glue
+> Changes in v3:
+> -No changes
+> Changes in v4:
+> -Do not call regulator_disable in an unbalanced manner when an external vbus
+>   is present
+> ---
+>   .../devicetree/bindings/phy/sun4i-usb-phy.txt      |  18 +-
+>   drivers/phy/Kconfig                                |   1 +
+>   drivers/phy/phy-sun4i-usb.c                        | 273 ++++++++++++++++++++-
+>   3 files changed, 281 insertions(+), 11 deletions(-)
+>
+> diff --git a/Documentation/devicetree/bindings/phy/sun4i-usb-phy.txt b/Documentation/devicetree/bindings/phy/sun4i-usb-phy.txt
+> index 16528b9..557fa99 100644
+> --- a/Documentation/devicetree/bindings/phy/sun4i-usb-phy.txt
+> +++ b/Documentation/devicetree/bindings/phy/sun4i-usb-phy.txt
+> @@ -23,6 +23,13 @@ Required properties:
+>     * "usb1_reset"
+>     * "usb2_reset" for sun4i, sun6i or sun7i
+>
+> +Optional properties:
+> +- usb0_id_det-gpios : gpio phandle for reading the otg id pin value
+> +- usb0_vbus_det-gpios : gpio phandle for detecting the presence of usb0 vbus
+> +- usb0_vbus-supply : regulator phandle for controller usb0 vbus
+> +- usb1_vbus-supply : regulator phandle for controller usb1 vbus
+> +- usb2_vbus-supply : regulator phandle for controller usb2 vbus
 > +
-> +	if (parser_range_end == NULL)
-> +			return -ENOENT;
-> +	parser_range_end += rlen/sizeof(__be32);
+>   Example:
+>   	usbphy: phy at 0x01c13400 {
+>   		#phy-cells = <1>;
+> @@ -32,6 +39,13 @@ Example:
+>   		reg-names = "phy_ctrl", "pmu1", "pmu2";
+>   		clocks = <&usb_clk 8>;
+>   		clock-names = "usb_phy";
+> -		resets = <&usb_clk 1>, <&usb_clk 2>;
+> -		reset-names = "usb1_reset", "usb2_reset";
+> +		resets = <&usb_clk 0>, <&usb_clk 1>, <&usb_clk 2>;
+> +		reset-names = "usb0_reset", "usb1_reset", "usb2_reset";
+> +		pinctrl-names = "default";
+> +		pinctrl-0 = <&usb0_id_detect_pin>, <&usb0_vbus_detect_pin>;
+> +		usb0_id_det-gpios = <&pio 7 19 GPIO_ACTIVE_HIGH>; /* PH19 */
+> +		usb0_vbus_det-gpios = <&pio 7 22 GPIO_ACTIVE_HIGH>; /* PH22 */
+> +		usb0_vbus-supply = <&reg_usb0_vbus>;
+> +		usb1_vbus-supply = <&reg_usb1_vbus>;
+> +		usb2_vbus-supply = <&reg_usb2_vbus>;
+>   	};
+> diff --git a/drivers/phy/Kconfig b/drivers/phy/Kconfig
+> index a53bd5b..4614fba 100644
+> --- a/drivers/phy/Kconfig
+> +++ b/drivers/phy/Kconfig
+> @@ -173,6 +173,7 @@ config PHY_SUN4I_USB
+>   	tristate "Allwinner sunxi SoC USB PHY driver"
+>   	depends on ARCH_SUNXI && HAS_IOMEM && OF
+>   	depends on RESET_CONTROLLER
+> +	select EXTCON
+
+Avoid using 'select' on visible Kconfig symbols.
+
+Also please split the patch to make the reviewing a bit easier.
+
+Thanks
+Kishon
+>   	select GENERIC_PHY
+>   	help
+>   	  Enable this to support the transceiver that is part of Allwinner
+> diff --git a/drivers/phy/phy-sun4i-usb.c b/drivers/phy/phy-sun4i-usb.c
+> index 91c5be4..b45d707 100644
+> --- a/drivers/phy/phy-sun4i-usb.c
+> +++ b/drivers/phy/phy-sun4i-usb.c
+> @@ -1,7 +1,7 @@
+>   /*
+>    * Allwinner sun4i USB phy driver
+>    *
+> - * Copyright (C) 2014 Hans de Goede <hdegoede@redhat.com>
+> + * Copyright (C) 2014-2015 Hans de Goede <hdegoede@redhat.com>
+>    *
+>    * Based on code from
+>    * Allwinner Technology Co., Ltd. <www.allwinnertech.com>
+> @@ -23,17 +23,23 @@
+>
+>   #include <linux/clk.h>
+>   #include <linux/err.h>
+> +#include <linux/extcon.h>
+>   #include <linux/io.h>
+> +#include <linux/interrupt.h>
+>   #include <linux/kernel.h>
+>   #include <linux/module.h>
+>   #include <linux/mutex.h>
+>   #include <linux/of.h>
+>   #include <linux/of_address.h>
+> +#include <linux/of_gpio.h>
+>   #include <linux/phy/phy.h>
+>   #include <linux/phy/phy-sun4i-usb.h>
+>   #include <linux/platform_device.h>
+>   #include <linux/regulator/consumer.h>
+>   #include <linux/reset.h>
+> +#include <linux/workqueue.h>
 > +
->  
->  	/* Find the address cell size and the number of cells in order to get
->  	 * the untranslated address.
-> @@ -375,78 +375,67 @@ int dw_pcie_host_init(struct pcie_port *pp)
->  		dev_err(pp->dev, "missing *config* reg space\n");
->  	}
->  
-> -	if (of_pci_range_parser_init(&parser, np)) {
-> -		dev_err(pp->dev, "missing ranges property\n");
-> -		return -EINVAL;
-> -	}
-> +	ret = of_pci_get_host_bridge_resources(np, 0, 0xff, &res, &pp->io_base);
+> +#define DRIVER_NAME "sun4i-usb-phy"
+>
+>   #define REG_ISCR			0x00
+>   #define REG_PHYCTL			0x04
+> @@ -47,6 +53,17 @@
+>   #define SUNXI_AHB_INCRX_ALIGN_EN	BIT(8)
+>   #define SUNXI_ULPI_BYPASS_EN		BIT(0)
+>
+> +/* ISCR, Interface Status and Control bits */
+> +#define ISCR_ID_PULLUP_EN		(1 << 17)
+> +#define ISCR_DPDM_PULLUP_EN	(1 << 16)
+> +/* sunxi has the phy id/vbus pins not connected, so we use the force bits */
+> +#define ISCR_FORCE_ID_MASK	(3 << 14)
+> +#define ISCR_FORCE_ID_LOW		(2 << 14)
+> +#define ISCR_FORCE_ID_HIGH	(3 << 14)
+> +#define ISCR_FORCE_VBUS_MASK	(3 << 12)
+> +#define ISCR_FORCE_VBUS_LOW	(2 << 12)
+> +#define ISCR_FORCE_VBUS_HIGH	(3 << 12)
+> +
+>   /* Common Control Bits for Both PHYs */
+>   #define PHY_PLL_BW			0x03
+>   #define PHY_RES45_CAL_EN		0x0c
+> @@ -63,6 +80,13 @@
+>
+>   #define MAX_PHYS			3
+>
+> +/*
+> + * Note do not raise the debounce time, we must report Vusb high within 100ms
+> + * otherwise we get Vbus errors
+> + */
+> +#define DEBOUNCE_TIME			msecs_to_jiffies(50)
+> +#define POLL_TIME			msecs_to_jiffies(250)
+> +
+>   struct sun4i_usb_phy_data {
+>   	void __iomem *base;
+>   	struct mutex mutex;
+> @@ -74,13 +98,58 @@ struct sun4i_usb_phy_data {
+>   		struct regulator *vbus;
+>   		struct reset_control *reset;
+>   		struct clk *clk;
+> +		bool regulator_on;
+>   		int index;
+>   	} phys[MAX_PHYS];
+> +	/* phy0 / otg related variables */
+> +	struct extcon_dev extcon;
+> +	const char *extcon_cable_names[3];
+> +	bool phy0_init;
+> +	bool phy0_poll;
+> +	struct gpio_desc *id_det_gpio;
+> +	struct gpio_desc *vbus_det_gpio;
+> +	int id_det_irq;
+> +	int vbus_det_irq;
+> +	int id_det;
+> +	int vbus_det;
+> +	struct delayed_work detect;
+>   };
+>
+>   #define to_sun4i_usb_phy_data(phy) \
+>   	container_of((phy), struct sun4i_usb_phy_data, phys[(phy)->index])
+>
+> +static void sun4i_usb_phy0_update_iscr(struct phy *_phy, u32 clr, u32 set)
+> +{
+> +	struct sun4i_usb_phy *phy = phy_get_drvdata(_phy);
+> +	struct sun4i_usb_phy_data *data = to_sun4i_usb_phy_data(phy);
+> +	u32 iscr;
+> +
+> +	iscr = readl(data->base + REG_ISCR);
+> +	iscr &= ~clr;
+> +	iscr |= set;
+> +	writel(iscr, data->base + REG_ISCR);
+> +}
+> +
+> +static void sun4i_usb_phy0_set_id_detect(struct phy *phy, u32 val)
+> +{
+> +	if (val)
+> +		val = ISCR_FORCE_ID_HIGH;
+> +	else
+> +		val = ISCR_FORCE_ID_LOW;
+> +
+> +	sun4i_usb_phy0_update_iscr(phy, ISCR_FORCE_ID_MASK, val);
+> +}
+> +
+> +static void sun4i_usb_phy0_set_vbus_detect(struct phy *phy, u32 val)
+> +{
+> +	if (val)
+> +		val = ISCR_FORCE_VBUS_HIGH;
+> +	else
+> +		val = ISCR_FORCE_VBUS_LOW;
+> +
+> +	sun4i_usb_phy0_update_iscr(phy, ISCR_FORCE_VBUS_MASK, val);
+> +}
+> +
+>   static void sun4i_usb_phy_write(struct sun4i_usb_phy *phy, u32 addr, u32 data,
+>   				int len)
+>   {
+> @@ -171,12 +240,39 @@ static int sun4i_usb_phy_init(struct phy *_phy)
+>
+>   	sun4i_usb_phy_passby(phy, 1);
+>
+> +	if (phy->index == 0) {
+> +		data->phy0_init = true;
+> +
+> +		/* Enable pull-ups */
+> +		sun4i_usb_phy0_update_iscr(_phy, 0, ISCR_DPDM_PULLUP_EN);
+> +		sun4i_usb_phy0_update_iscr(_phy, 0, ISCR_ID_PULLUP_EN);
+> +
+> +		if (data->id_det_gpio) {
+> +			/* OTG mode, force ISCR and cable state updates */
+> +			data->id_det = -1;
+> +			data->vbus_det = -1;
+> +			queue_delayed_work(system_wq, &data->detect, 0);
+> +		} else {
+> +			/* Host only mode */
+> +			sun4i_usb_phy0_set_id_detect(_phy, 0);
+> +			sun4i_usb_phy0_set_vbus_detect(_phy, 1);
+> +		}
+> +	}
+> +
+>   	return 0;
+>   }
+>
+>   static int sun4i_usb_phy_exit(struct phy *_phy)
+>   {
+>   	struct sun4i_usb_phy *phy = phy_get_drvdata(_phy);
+> +	struct sun4i_usb_phy_data *data = to_sun4i_usb_phy_data(phy);
+> +
+> +	if (phy->index == 0) {
+> +		/* Disable pull-ups */
+> +		sun4i_usb_phy0_update_iscr(_phy, ISCR_DPDM_PULLUP_EN, 0);
+> +		sun4i_usb_phy0_update_iscr(_phy, ISCR_ID_PULLUP_EN, 0);
+> +		data->phy0_init = false;
+> +	}
+>
+>   	sun4i_usb_phy_passby(phy, 0);
+>   	reset_control_assert(phy->reset);
+> @@ -188,20 +284,46 @@ static int sun4i_usb_phy_exit(struct phy *_phy)
+>   static int sun4i_usb_phy_power_on(struct phy *_phy)
+>   {
+>   	struct sun4i_usb_phy *phy = phy_get_drvdata(_phy);
+> -	int ret = 0;
+> +	struct sun4i_usb_phy_data *data = to_sun4i_usb_phy_data(phy);
+> +	int ret;
+> +
+> +	if (!phy->vbus || phy->regulator_on)
+> +		return 0;
+> +
+> +	/* For phy0 only turn on Vbus if we don't have an ext. Vbus */
+> +	if (phy->index == 0 && data->vbus_det)
+> +		return 0;
+>
+> -	if (phy->vbus)
+> -		ret = regulator_enable(phy->vbus);
+> +	ret = regulator_enable(phy->vbus);
 > +	if (ret)
 > +		return ret;
->  
->  	/* Get the I/O and memory ranges from DT */
-> -	for_each_of_pci_range(&parser, &range) {
-> -		unsigned long restype = range.flags & IORESOURCE_TYPE_BITS;
-> -
-> -		if (restype == IORESOURCE_IO) {
-> -			of_pci_range_to_resource(&range, np, &pp->io);
-> -			pp->io.name = "I/O";
-> -			pp->io.start = max_t(resource_size_t,
-> -					     PCIBIOS_MIN_IO,
-> -					     range.pci_addr + global_io_offset);
-> -			pp->io.end = min_t(resource_size_t,
-> -					   IO_SPACE_LIMIT,
-> -					   range.pci_addr + range.size
-> -					   + global_io_offset - 1);
-> -			pp->io_size = resource_size(&pp->io);
-> -			pp->io_bus_addr = range.pci_addr;
-> -			pp->io_base = range.cpu_addr;
-> -
-> -			/* Find the untranslated IO space address */
-> -			pp->io_mod_base = of_read_number(parser.range -
-> -							 parser.np + na, ns);
-> -		}
-> -		if (restype == IORESOURCE_MEM) {
-> -			of_pci_range_to_resource(&range, np, &pp->mem);
-> -			pp->mem.name = "MEM";
-> -			pp->mem_size = resource_size(&pp->mem);
-> -			pp->mem_bus_addr = range.pci_addr;
-> -
-> -			/* Find the untranslated MEM space address */
-> -			pp->mem_mod_base = of_read_number(parser.range -
-> -							  parser.np + na, ns);
-> -		}
-> -		if (restype == 0) {
-> -			of_pci_range_to_resource(&range, np, &pp->cfg);
-> -			pp->cfg0_size = resource_size(&pp->cfg)/2;
-> -			pp->cfg1_size = resource_size(&pp->cfg)/2;
-> -			pp->cfg0_base = pp->cfg.start;
-> -			pp->cfg1_base = pp->cfg.start + pp->cfg0_size;
-> +	list_for_each_entry(win, &res, list) {
-> +		switch (resource_type(win->res)) {
-> +		case IORESOURCE_IO:
-> +			pp->io = win->res;
-> +			pp->io->name = "I/O";
-> +			pp->io_size = resource_size(pp->io);
-> +			pp->io_bus_addr = pp->io->start - win->offset;
-> +			/* magic 5 below comes from magic na and ns in
-> +			 * of_pci_range_parser_init()                 */
-> +			pp->io_mod_base = of_read_number(parser_range_end -
-> +					of_n_addr_cells(np) - 5 + na, ns);
-> +			ret = pci_remap_iospace(pp->io, pp->io_base);
-> +			if (ret) {
-> +				dev_warn(pp->dev, "error %d: failed to map resource %pR\n",
-> +				ret, pp->io);
-> +			continue;
-> +			}
-> +			break;
-> +		case IORESOURCE_MEM:
-> +			pp->mem = win->res;
-> +			pp->mem->name = "MEM";
-> +			pp->mem_size = resource_size(pp->mem);
-> +			pp->mem_bus_addr = pp->mem->start - win->offset;
-> +			pp->mem_mod_base = of_read_number(parser_range_end -
-> +					of_n_addr_cells(np) - 5 + na, ns);
-> +			break;
-> +		case 0:
-> +			pp->cfg = win->res;
-> +			pp->cfg0_size = resource_size(pp->cfg)/2;
-> +			pp->cfg1_size = resource_size(pp->cfg)/2;
-> +			pp->cfg0_base = pp->cfg->start;
-> +			pp->cfg1_base = pp->cfg->start + pp->cfg0_size;
->  
->  			/* Find the untranslated configuration space address */
-> -			pp->cfg0_mod_base = of_read_number(parser.range -
-> -							   parser.np + na, ns);
-> -			pp->cfg1_mod_base = pp->cfg0_mod_base +
-> -					    pp->cfg0_size;
-> +			pp->cfg0_mod_base = of_read_number(parser_range_end -
-> +					of_n_addr_cells(np) - 5 + na, ns);
-> +			pp->cfg1_mod_base = pp->cfg0_mod_base + pp->cfg0_size;
-> +			break;
-> +		case IORESOURCE_BUS:
-> +			pp->busn = win->res;
-> +			break;
-> +		default:
-> +			continue;
->  		}
->  	}
->  
-> -	ret = of_pci_parse_bus_range(np, &pp->busn);
-> -	if (ret < 0) {
-> -		pp->busn.name = np->name;
-> -		pp->busn.start = 0;
-> -		pp->busn.end = 0xff;
-> -		pp->busn.flags = IORESOURCE_BUS;
-> -		dev_dbg(pp->dev, "failed to parse bus-range property: %d, using default %pR\n",
-> -			ret, &pp->busn);
-> -	}
-> -
->  	if (!pp->dbi_base) {
-> -		pp->dbi_base = devm_ioremap(pp->dev, pp->cfg.start,
-> -					resource_size(&pp->cfg));
-> +		pp->dbi_base = devm_ioremap(pp->dev, pp->cfg->start,
-> +					resource_size(pp->cfg));
->  		if (!pp->dbi_base) {
->  			dev_err(pp->dev, "error with ioremap\n");
->  			return -ENOMEM;
->  		}
->  	}
->  
-> -	pp->mem_base = pp->mem.start;
-> +	pp->mem_base = pp->mem->start;
->  
->  	if (!pp->va_cfg0_base) {
->  		pp->va_cfg0_base = devm_ioremap(pp->dev, pp->cfg0_base, @@ -493,24 +482,47 @@ int dw_pcie_host_init(struct pcie_port *pp)
->  	if (pp->ops->host_init)
->  		pp->ops->host_init(pp);
->  
-> -	dw_pcie_wr_own_conf(pp, PCI_BASE_ADDRESS_0, 4, 0);
-> +	if (dw_pcie_wr_own_conf(pp, PCI_BASE_ADDRESS_0, 4, 0)
-> +			!= PCIBIOS_SUCCESSFUL)
-> +		return -EINVAL;
->  
->  	/* program correct class for RC */
-> -	dw_pcie_wr_own_conf(pp, PCI_CLASS_DEVICE, 2, PCI_CLASS_BRIDGE_PCI);
-> +	if (dw_pcie_wr_own_conf(pp, PCI_CLASS_DEVICE, 2, PCI_CLASS_BRIDGE_PCI)
-> +			!= PCIBIOS_SUCCESSFUL)
-> +		return -EINVAL;
+>
+> -	return ret;
+> +	phy->regulator_on = true;
 > +
-> +	if (dw_pcie_rd_own_conf(pp, PCIE_LINK_WIDTH_SPEED_CONTROL, 4, &val)
-> +			!= PCIBIOS_SUCCESSFUL)
-> +		return -EINVAL;
->  
-> -	dw_pcie_rd_own_conf(pp, PCIE_LINK_WIDTH_SPEED_CONTROL, 4, &val);
->  	val |= PORT_LOGIC_SPEED_CHANGE;
-> -	dw_pcie_wr_own_conf(pp, PCIE_LINK_WIDTH_SPEED_CONTROL, 4, val);
->  
-> -#ifdef CONFIG_PCI_MSI
-> -	dw_pcie_msi_chip.dev = pp->dev;
-> -	dw_pci.msi_ctrl = &dw_pcie_msi_chip;
-> +	if (dw_pcie_wr_own_conf(pp, PCIE_LINK_WIDTH_SPEED_CONTROL, 4, val)
-> +			!= PCIBIOS_SUCCESSFUL)
-> +		return -EINVAL;
+> +	/* We must report Vbus high within OTG_TIME_A_WAIT_VRISE msec. */
+> +	if (phy->index == 0 && data->phy0_poll)
+> +		mod_delayed_work(system_wq, &data->detect, DEBOUNCE_TIME);
 > +
-> +	bus = pci_create_root_bus(pp->dev, pp->root_bus_nr, &dw_pcie_ops,
-> +			      pp, &res);
-> +	if (!bus)
-> +		return -ENOMEM;
+> +	return 0;
+>   }
+>
+>   static int sun4i_usb_phy_power_off(struct phy *_phy)
+>   {
+>   	struct sun4i_usb_phy *phy = phy_get_drvdata(_phy);
+> +	struct sun4i_usb_phy_data *data = to_sun4i_usb_phy_data(phy);
 > +
-> +#ifdef CONFIG_GENERIC_MSI_IRQ_DOMAIN
-> +	bus->msi = container_of(&pp->irq_domain, struct msi_controller, 
-> +domain); #else
-> +	bus->msi = &dw_pcie_msi_chip;
->  #endif
->  
-> -	dw_pci.nr_controllers = 1;
-> -	dw_pci.private_data = (void **)&pp;
-> +	pci_scan_child_bus(bus);
-> +	if (pp->ops->scan_bus)
-> +		pp->ops->scan_bus(pp);
->  
-> -	pci_common_init_dev(pp->dev, &dw_pci);
-> +#ifdef CONFIG_ARM
-> +	/* support old dtbs that incorrectly describe IRQs */
-> +	pci_fixup_irqs(pci_common_swizzle, of_irq_parse_and_map_pci); #endif
+> +	if (!phy->vbus || !phy->regulator_on)
+> +		return 0;
+>
+> -	if (phy->vbus)
+> -		regulator_disable(phy->vbus);
+> +	regulator_disable(phy->vbus);
+> +	phy->regulator_on = false;
 > +
-> +	pci_assign_unassigned_bus_resources(bus);
-> +	pci_bus_add_devices(bus);
->  
->  	return 0;
->  }
-> @@ -653,7 +665,7 @@ static int dw_pcie_valid_config(struct pcie_port *pp,  static int dw_pcie_rd_conf(struct pci_bus *bus, u32 devfn, int where,
->  			int size, u32 *val)
->  {
-> -	struct pcie_port *pp = sys_to_pcie(bus->sysdata);
-> +	struct pcie_port *pp = bus->sysdata;
->  	int ret;
->  
->  	if (dw_pcie_valid_config(pp, bus, PCI_SLOT(devfn)) == 0) { @@ -677,7 +689,7 @@ static int dw_pcie_rd_conf(struct pci_bus *bus, u32 devfn, int where,  static int dw_pcie_wr_conf(struct pci_bus *bus, u32 devfn,
->  			int where, int size, u32 val)
->  {
-> -	struct pcie_port *pp = sys_to_pcie(bus->sysdata);
-> +	struct pcie_port *pp = bus->sysdata;
->  	int ret;
->  
->  	if (dw_pcie_valid_config(pp, bus, PCI_SLOT(devfn)) == 0) @@ -701,64 +713,6 @@ static struct pci_ops dw_pcie_ops = {
->  	.write = dw_pcie_wr_conf,
->  };
->  
-> -static int dw_pcie_setup(int nr, struct pci_sys_data *sys) -{
-> -	struct pcie_port *pp;
-> -
-> -	pp = sys_to_pcie(sys);
-> -
-> -	if (global_io_offset < SZ_1M && pp->io_size > 0) {
-> -		sys->io_offset = global_io_offset - pp->io_bus_addr;
-> -		pci_ioremap_io(global_io_offset, pp->io_base);
-> -		global_io_offset += SZ_64K;
-> -		pci_add_resource_offset(&sys->resources, &pp->io,
-> -					sys->io_offset);
-> -	}
-> -
-> -	sys->mem_offset = pp->mem.start - pp->mem_bus_addr;
-> -	pci_add_resource_offset(&sys->resources, &pp->mem, sys->mem_offset);
-> -	pci_add_resource(&sys->resources, &pp->busn);
-> -
-> -	return 1;
-> -}
-> -
-> -static struct pci_bus *dw_pcie_scan_bus(int nr, struct pci_sys_data *sys) -{
-> -	struct pci_bus *bus;
-> -	struct pcie_port *pp = sys_to_pcie(sys);
-> -
-> -	pp->root_bus_nr = sys->busnr;
-> -	bus = pci_create_root_bus(pp->dev, sys->busnr,
-> -				  &dw_pcie_ops, sys, &sys->resources);
-> -	if (!bus)
-> -		return NULL;
-> -
-> -	pci_scan_child_bus(bus);
-> -
-> -	if (bus && pp->ops->scan_bus)
-> -		pp->ops->scan_bus(pp);
-> -
-> -	return bus;
-> -}
-> -
-> -static int dw_pcie_map_irq(const struct pci_dev *dev, u8 slot, u8 pin) -{
-> -	struct pcie_port *pp = sys_to_pcie(dev->bus->sysdata);
-> -	int irq;
-> -
-> -	irq = of_irq_parse_and_map_pci(dev, slot, pin);
-> -	if (!irq)
-> -		irq = pp->irq;
-> -
-> -	return irq;
-> -}
-> -
-> -static struct hw_pci dw_pci = {
-> -	.setup		= dw_pcie_setup,
-> -	.scan		= dw_pcie_scan_bus,
-> -	.map_irq	= dw_pcie_map_irq,
-> -};
-> -
->  void dw_pcie_setup_rc(struct pcie_port *pp)  {
->  	u32 val;
-> diff --git a/drivers/pci/host/pcie-designware.h b/drivers/pci/host/pcie-designware.h
-> index d0bbd27..ab78710 100644
-> --- a/drivers/pci/host/pcie-designware.h
-> +++ b/drivers/pci/host/pcie-designware.h
-> @@ -34,7 +34,7 @@ struct pcie_port {
->  	u64			cfg1_mod_base;
->  	void __iomem		*va_cfg1_base;
->  	u32			cfg1_size;
-> -	u64			io_base;
-> +	resource_size_t			io_base;
->  	u64			io_mod_base;
->  	phys_addr_t		io_bus_addr;
->  	u32			io_size;
-> @@ -42,10 +42,10 @@ struct pcie_port {
->  	u64			mem_mod_base;
->  	phys_addr_t		mem_bus_addr;
->  	u32			mem_size;
-> -	struct resource		cfg;
-> -	struct resource		io;
-> -	struct resource		mem;
-> -	struct resource		busn;
-> +	struct resource		*cfg;
-> +	struct resource		*io;
-> +	struct resource		*mem;
-> +	struct resource		*busn;
->  	int			irq;
->  	u32			lanes;
->  	struct pcie_host_ops	*ops;
-> diff --git a/drivers/pci/host/pcie-spear13xx.c b/drivers/pci/host/pcie-spear13xx.c
-> index 020d788..e78ddf8 100644
-> --- a/drivers/pci/host/pcie-spear13xx.c
-> +++ b/drivers/pci/host/pcie-spear13xx.c
-> @@ -287,7 +287,7 @@ static int spear13xx_add_pcie_port(struct pcie_port *pp,
->  		return ret;
->  	}
->  
-> -	pp->root_bus_nr = -1;
-> +	pp->root_bus_nr = 0;
->  	pp->ops = &spear13xx_pcie_host_ops;
->  
->  	ret = dw_pcie_host_init(pp);
-> ------------------------------------
-> ------------------------------------
-> 
-> 
-> 
-> 
->> -----Original Message-----
->> From: Lorenzo Pieralisi [mailto:lorenzo.pieralisi at arm.com]
->> Sent: Tuesday, June 09, 2015 12:15 PM
->> To: Wangzhou (B)
->> Cc: James Morse; Bjorn Helgaas; Jingoo Han; Pratyush Anand; Arnd
->> Bergmann; fabrice.gasnier at st.com; Liviu Dudau; linux-
->> pci at vger.kernel.org; linux-arm-kernel at lists.infradead.org;
->> devicetree at vger.kernel.org; Gabriele Paoloni; Yuanzhichang; Zhudacai;
->> zhangjukuo; qiuzhenfa; Liguozhu (Kenneth)
->> Subject: Re: [PATCH v2 2/4] PCI: designware: Add ARM64 support
->>
->> On Fri, Jun 05, 2015 at 09:11:30AM +0100, Zhou Wang wrote:
->>
->> [...]
->>
->>>>> -int dw_pcie_host_init(struct pcie_port *pp)
->>>>> +int __init dw_pcie_host_init(struct pcie_port *pp)
->>>>>  {
->>>>>  	struct device_node *np = pp->dev->of_node;
->>>>>  	struct platform_device *pdev = to_platform_device(pp->dev);
->>>>>  	struct of_pci_range range;
->>>>>  	struct of_pci_range_parser parser;
->>>>> +	struct pci_bus *bus;
->>>>>  	struct resource *cfg_res;
->>>>> +	LIST_HEAD(res);
->>>>>  	u32 val, na, ns;
->>>>>  	const __be32 *addrp;
->>>>>  	int i, index, ret;
->>>>> @@ -502,15 +498,49 @@ int dw_pcie_host_init(struct pcie_port *pp)
->>>>>  	val |= PORT_LOGIC_SPEED_CHANGE;
->>>>>  	dw_pcie_wr_own_conf(pp, PCIE_LINK_WIDTH_SPEED_CONTROL, 4,
->> val);
->>>>>
->>>>> -#ifdef CONFIG_PCI_MSI
->>>>> -	dw_pcie_msi_chip.dev = pp->dev;
->>>>> -	dw_pci.msi_ctrl = &dw_pcie_msi_chip;
->>>>> +#ifdef CONFIG_ARM
->>>>> +	/*
->>>>> +	 * FIXME: we should really be able to use
->>>>> +	 * of_pci_get_host_bridge_resources on arm32 as well,
->>>>> +	 * but the conversion needs some more testing
->>>>> +	 */
->>>>> +	if (global_io_offset < SZ_1M && pp->io_size > 0) {
->>>>> +		pci_ioremap_io(global_io_offset, pp->io_base);
->>>>> +		global_io_offset += SZ_64K;
->>>>> +		pci_add_resource_offset(&res, &pp->io,
->>>>> +					global_io_offset - pp->io_bus_addr);
->>>>> +	}
->>>>> +	pci_add_resource_offset(&res, &pp->mem,
->>>>> +				pp->mem.start - pp->mem_bus_addr);
->>>>> +	pci_add_resource(&res, &pp->busn);
->>>>
->>>> I don't think this #ifdef is necessary. In the spirit of 'the
->>>> conversion needs some more testing', I removed it leaving just the
->> below arm64 code.
->>>>
->>>> This worked on my Freescale i.MX6 Quad SABRE Lite Board, I went as
->>>> far as scanning for wireless access points.
->>>>
->>>
->>> I think it depends on which kind of PCIe device you use, if we use a
->>> PCIe device with a I/O Bar, it may not work well without above code.
->>> But so far, I have not met a PCIe device which must work with a I/O
->> Bar.
->>
->> There are two problems here:
->>
->> 1) the io_base address you get from of_pci_get_host_bridge_resources
->>    must be mapped using pci_remap_iospace. You are not doing this, so
->>    even if you had a PCIe card with I/O bar it would not work on arm64
->>    as the code stands. Remember that I/O space on arm/arm64 works as a
->>    memory access with offset from PCI_IOBASE and that's the value you
->> get
->>    in the I/O resource. See:
->>
->>    drivers/pci/host/pci-host-generic.c
->>    drivers/pci/host/pci-versatile.c
->>    drivers/pci/host/pci-xgene.c
->>
->> 2) (1) above would sort out I/O space access for both arm and arm64 so,
->>    as James said, the #ifdef is useless.
->>
->> I hope this makes things clearer.
->>
->> Thanks,
->> Lorenzo
->>
->>>
->>>>> +#else
->>>>> +	ret = of_pci_get_host_bridge_resources(np, 0, 0xff, &res,
->>>>> +&pp->io_base);
->>>>
->>>> of_pci_get_host_bridge_resources expects &pp->io_base to be a
->>>> resource_size_t*, but &io_base is u64*. This generates a warning on
->>>> arm with the above change. Changing the the type in
->>>> drivers/pci/host/pcie-designware.h fixes this.
->>>>
->>>>
->>>> Thanks,
->>>>
->>>> James
->>>>
->>>
->>> OK, will modify this in next version.
->>>
->>> Best Regards and thanks again for your test, Zhou
->>>
->>>>> +	if (ret)
->>>>> +		return ret;
->>>>> +#endif
->>>>> +
->>>>> +	bus = pci_create_root_bus(pp->dev, pp->root_bus_nr,
->> &dw_pcie_ops,
->>>>> +			      pp, &res);
->>>>> +	if (!bus)
->>>>> +		return -ENOMEM;
->>>>> +
->>>>> +#ifdef CONFIG_GENERIC_MSI_IRQ_DOMAIN
->>>>> +	bus->msi = container_of(&pp->irq_domain, struct
->> msi_controller,
->>>>> +domain); #else
->>>>> +	bus->msi = &dw_pcie_msi_chip;
->>>>>  #endif
->>>>>
->>>>> -	dw_pci.nr_controllers = 1;
->>>>> -	dw_pci.private_data = (void **)&pp;
->>>>> +	pci_scan_child_bus(bus);
->>>>> +	if (pp->ops->scan_bus)
->>>>> +		pp->ops->scan_bus(pp);
->>>>>
->>>>> -	pci_common_init_dev(pp->dev, &dw_pci);
->>>>> +#ifdef CONFIG_ARM
->>>>> +	/* support old dtbs that incorrectly describe IRQs */
->>>>> +	pci_fixup_irqs(pci_common_swizzle,
->> of_irq_parse_and_map_pci);
->>>>> +#endif
->>>>> +
->>>>> +	pci_assign_unassigned_bus_resources(bus);
->>>>> +	pci_bus_add_devices(bus);
->>>>>
->>>>>  	return 0;
->>>>>  }
->>>>> @@ -653,7 +683,7 @@ static int dw_pcie_valid_config(struct
->>>>> pcie_port *pp,  static int dw_pcie_rd_conf(struct pci_bus *bus,
->> u32 devfn, int where,
->>>>>  			int size, u32 *val)
->>>>>  {
->>>>> -	struct pcie_port *pp = sys_to_pcie(bus->sysdata);
->>>>> +	struct pcie_port *pp = bus->sysdata;
->>>>>  	int ret;
->>>>>
->>>>>  	if (dw_pcie_valid_config(pp, bus, PCI_SLOT(devfn)) == 0)
->> { @@
->>>>> -677,7 +707,7 @@ static int dw_pcie_rd_conf(struct pci_bus *bus,
->>>>> u32 devfn, int where,  static int dw_pcie_wr_conf(struct pci_bus
->> *bus, u32 devfn,
->>>>>  			int where, int size, u32 val)
->>>>>  {
->>>>> -	struct pcie_port *pp = sys_to_pcie(bus->sysdata);
->>>>> +	struct pcie_port *pp = bus->sysdata;
->>>>>  	int ret;
->>>>>
->>>>>  	if (dw_pcie_valid_config(pp, bus, PCI_SLOT(devfn)) == 0) @@
->>>>> -701,64 +731,6 @@ static struct pci_ops dw_pcie_ops = {
->>>>>  	.write = dw_pcie_wr_conf,
->>>>>  };
->>>>>
->>>>> -static int dw_pcie_setup(int nr, struct pci_sys_data *sys) -{
->>>>> -	struct pcie_port *pp;
->>>>> -
->>>>> -	pp = sys_to_pcie(sys);
->>>>> -
->>>>> -	if (global_io_offset < SZ_1M && pp->io_size > 0) {
->>>>> -		sys->io_offset = global_io_offset - pp->io_bus_addr;
->>>>> -		pci_ioremap_io(global_io_offset, pp->io_base);
->>>>> -		global_io_offset += SZ_64K;
->>>>> -		pci_add_resource_offset(&sys->resources, &pp->io,
->>>>> -					sys->io_offset);
->>>>> -	}
->>>>> -
->>>>> -	sys->mem_offset = pp->mem.start - pp->mem_bus_addr;
->>>>> -	pci_add_resource_offset(&sys->resources, &pp->mem, sys-
->>> mem_offset);
->>>>> -	pci_add_resource(&sys->resources, &pp->busn);
->>>>> -
->>>>> -	return 1;
->>>>> -}
->>>>> -
->>>>> -static struct pci_bus *dw_pcie_scan_bus(int nr, struct
->>>>> pci_sys_data *sys) -{
->>>>> -	struct pci_bus *bus;
->>>>> -	struct pcie_port *pp = sys_to_pcie(sys);
->>>>> -
->>>>> -	pp->root_bus_nr = sys->busnr;
->>>>> -	bus = pci_create_root_bus(pp->dev, sys->busnr,
->>>>> -				  &dw_pcie_ops, sys, &sys->resources);
->>>>> -	if (!bus)
->>>>> -		return NULL;
->>>>> -
->>>>> -	pci_scan_child_bus(bus);
->>>>> -
->>>>> -	if (bus && pp->ops->scan_bus)
->>>>> -		pp->ops->scan_bus(pp);
->>>>> -
->>>>> -	return bus;
->>>>> -}
->>>>> -
->>>>> -static int dw_pcie_map_irq(const struct pci_dev *dev, u8 slot, u8
->>>>> pin) -{
->>>>> -	struct pcie_port *pp = sys_to_pcie(dev->bus->sysdata);
->>>>> -	int irq;
->>>>> -
->>>>> -	irq = of_irq_parse_and_map_pci(dev, slot, pin);
->>>>> -	if (!irq)
->>>>> -		irq = pp->irq;
->>>>> -
->>>>> -	return irq;
->>>>> -}
->>>>> -
->>>>> -static struct hw_pci dw_pci = {
->>>>> -	.setup		= dw_pcie_setup,
->>>>> -	.scan		= dw_pcie_scan_bus,
->>>>> -	.map_irq	= dw_pcie_map_irq,
->>>>> -};
->>>>> -
->>>>>  void dw_pcie_setup_rc(struct pcie_port *pp)  {
->>>>>  	u32 val;
->>>>
->>>>
->>>> .
->>>>
->>>
->>>
->>> --
->>> To unsubscribe from this list: send the line "unsubscribe linux-pci"
->>> in the body of a message to majordomo at vger.kernel.org More majordomo
->>> info at  http://vger.kernel.org/majordomo-info.html
->>>
-> 
-> .
-> 
+> +	/*
+> +	 * phy0 vbus typically slowly discharges, sometimes this causes the
+> +	 * Vbus gpio to not trigger an edge irq on Vbus off, so force a rescan.
+> +	 */
+> +	if (phy->index == 0 && !data->phy0_poll)
+> +		mod_delayed_work(system_wq, &data->detect, POLL_TIME);
+>
+>   	return 0;
+>   }
+> @@ -221,6 +343,61 @@ static struct phy_ops sun4i_usb_phy_ops = {
+>   	.owner		= THIS_MODULE,
+>   };
+>
+> +static void sun4i_usb_phy0_id_vbus_det_scan(struct work_struct *work)
+> +{
+> +	struct sun4i_usb_phy_data *data =
+> +		container_of(work, struct sun4i_usb_phy_data, detect.work);
+> +	struct phy *phy0 = data->phys[0].phy;
+> +	int id_det, vbus_det, id_notify = 0, vbus_notify = 0;
+> +
+> +	id_det = gpiod_get_value_cansleep(data->id_det_gpio);
+> +	vbus_det = gpiod_get_value_cansleep(data->vbus_det_gpio);
+> +
+> +	mutex_lock(&phy0->mutex);
+> +
+> +	if (!data->phy0_init) {
+> +		mutex_unlock(&phy0->mutex);
+> +		return;
+> +	}
+> +
+> +	if (id_det != data->id_det) {
+> +		sun4i_usb_phy0_set_id_detect(phy0, id_det);
+> +		data->id_det = id_det;
+> +		id_notify = 1;
+> +	}
+> +
+> +	if (vbus_det != data->vbus_det) {
+> +		sun4i_usb_phy0_set_vbus_detect(phy0, vbus_det);
+> +		data->vbus_det = vbus_det;
+> +		vbus_notify = 1;
+> +	}
+> +
+> +	mutex_unlock(&phy0->mutex);
+> +
+> +	if (id_notify)
+> +		extcon_set_cable_state(&data->extcon,
+> +				       extcon_cable_name[EXTCON_USB_HOST],
+> +				       !id_det);
+> +
+> +	if (vbus_notify)
+> +		extcon_set_cable_state(&data->extcon,
+> +				       extcon_cable_name[EXTCON_USB],
+> +				       vbus_det);
+> +
+> +	if (data->phy0_poll)
+> +		queue_delayed_work(system_wq, &data->detect, POLL_TIME);
+> +}
+> +
+> +static irqreturn_t sun4i_usb_phy0_id_vbus_det_irq(int irq, void *dev_id)
+> +{
+> +	struct sun4i_usb_phy_data *data = dev_id;
+> +
+> +	/* vbus or id changed, let the pins settle and then scan them */
+> +	mod_delayed_work(system_wq, &data->detect, DEBOUNCE_TIME);
+> +
+> +	return IRQ_HANDLED;
+> +}
+> +
+>   static struct phy *sun4i_usb_phy_xlate(struct device *dev,
+>   					struct of_phandle_args *args)
+>   {
+> @@ -240,13 +417,20 @@ static int sun4i_usb_phy_probe(struct platform_device *pdev)
+>   	struct phy_provider *phy_provider;
+>   	bool dedicated_clocks;
+>   	struct resource *res;
+> -	int i;
+> +	int i, ret;
+>
+>   	data = devm_kzalloc(dev, sizeof(*data), GFP_KERNEL);
+>   	if (!data)
+>   		return -ENOMEM;
+>
+>   	mutex_init(&data->mutex);
+> +	INIT_DELAYED_WORK(&data->detect, sun4i_usb_phy0_id_vbus_det_scan);
+> +	data->extcon_cable_names[0] = extcon_cable_name[EXTCON_USB_HOST];
+> +	data->extcon_cable_names[1] = extcon_cable_name[EXTCON_USB];
+> +	data->extcon_cable_names[2] = NULL;
+> +	data->extcon.name = DRIVER_NAME;
+> +	data->extcon.supported_cable = data->extcon_cable_names;
+> +	data->extcon.dev.parent = dev;
+>
+>   	if (of_device_is_compatible(np, "allwinner,sun5i-a13-usb-phy"))
+>   		data->num_phys = 2;
+> @@ -269,6 +453,34 @@ static int sun4i_usb_phy_probe(struct platform_device *pdev)
+>   	if (IS_ERR(data->base))
+>   		return PTR_ERR(data->base);
+>
+> +	data->id_det_gpio = devm_gpiod_get(dev, "usb0_id_det", GPIOD_IN);
+> +	if (IS_ERR(data->id_det_gpio)) {
+> +		if (PTR_ERR(data->id_det_gpio) == -EPROBE_DEFER)
+> +			return -EPROBE_DEFER;
+> +		data->id_det_gpio = NULL;
+> +	}
+> +
+> +	data->vbus_det_gpio = devm_gpiod_get(dev, "usb0_vbus_det", GPIOD_IN);
+> +	if (IS_ERR(data->vbus_det_gpio)) {
+> +		if (PTR_ERR(data->vbus_det_gpio) == -EPROBE_DEFER)
+> +			return -EPROBE_DEFER;
+> +		data->vbus_det_gpio = NULL;
+> +	}
+> +
+> +	/* We either want both gpio pins or neither (when in host mode) */
+> +	if (!data->id_det_gpio != !data->vbus_det_gpio) {
+> +		dev_err(dev, "failed to get id or vbus detect pin\n");
+> +		return -ENODEV;
+> +	}
+> +
+> +	if (data->id_det_gpio) {
+> +		ret = devm_extcon_dev_register(dev, &data->extcon);
+> +		if (ret) {
+> +			dev_err(dev, "failed to register extcon: %d\n", ret);
+> +			return ret;
+> +		}
+> +	}
+> +
+>   	for (i = 0; i < data->num_phys; i++) {
+>   		struct sun4i_usb_phy *phy = data->phys + i;
+>   		char name[16];
+> @@ -318,12 +530,54 @@ static int sun4i_usb_phy_probe(struct platform_device *pdev)
+>   		phy_set_drvdata(phy->phy, &data->phys[i]);
+>   	}
+>
+> +	data->id_det_irq = gpiod_to_irq(data->id_det_gpio);
+> +	data->vbus_det_irq = gpiod_to_irq(data->vbus_det_gpio);
+> +	if (data->id_det_irq  < 0 || data->vbus_det_irq < 0)
+> +		data->phy0_poll = true;
+> +
+> +	if (data->id_det_irq >= 0) {
+> +		ret = devm_request_irq(dev, data->id_det_irq,
+> +				sun4i_usb_phy0_id_vbus_det_irq,
+> +				IRQF_TRIGGER_RISING | IRQF_TRIGGER_FALLING,
+> +				"usb0-id-det", data);
+> +		if (ret) {
+> +			dev_err(dev, "Err requesting id-det-irq: %d\n", ret);
+> +			return ret;
+> +		}
+> +	}
+> +
+> +	if (data->vbus_det_irq >= 0) {
+> +		ret = devm_request_irq(dev, data->vbus_det_irq,
+> +				sun4i_usb_phy0_id_vbus_det_irq,
+> +				IRQF_TRIGGER_RISING | IRQF_TRIGGER_FALLING,
+> +				"usb0-vbus-det", data);
+> +		if (ret) {
+> +			dev_err(dev, "Err requesting vbus-det-irq: %d\n", ret);
+> +			return ret;
+> +		}
+> +	}
+> +
+>   	dev_set_drvdata(dev, data);
+>   	phy_provider = devm_of_phy_provider_register(dev, sun4i_usb_phy_xlate);
+>
+>   	return PTR_ERR_OR_ZERO(phy_provider);
+>   }
+>
+> +static int sun4i_usb_phy_remove(struct platform_device *pdev)
+> +{
+> +	struct device *dev = &pdev->dev;
+> +	struct sun4i_usb_phy_data *data = dev_get_drvdata(dev);
+> +
+> +	if (data->id_det_irq >= 0)
+> +		devm_free_irq(dev, data->id_det_irq, data);
+> +	if (data->vbus_det_irq >= 0)
+> +		devm_free_irq(dev, data->vbus_det_irq, data);
+> +
+> +	cancel_delayed_work_sync(&data->detect);
+> +
+> +	return 0;
+> +}
+> +
+>   static const struct of_device_id sun4i_usb_phy_of_match[] = {
+>   	{ .compatible = "allwinner,sun4i-a10-usb-phy" },
+>   	{ .compatible = "allwinner,sun5i-a13-usb-phy" },
+> @@ -335,9 +589,10 @@ MODULE_DEVICE_TABLE(of, sun4i_usb_phy_of_match);
+>
+>   static struct platform_driver sun4i_usb_phy_driver = {
+>   	.probe	= sun4i_usb_phy_probe,
+> +	.remove	= sun4i_usb_phy_remove,
+>   	.driver = {
+>   		.of_match_table	= sun4i_usb_phy_of_match,
+> -		.name  = "sun4i-usb-phy",
+> +		.name  = DRIVER_NAME,
+>   	}
+>   };
+>   module_platform_driver(sun4i_usb_phy_driver);
+>
