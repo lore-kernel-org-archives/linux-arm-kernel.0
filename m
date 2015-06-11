@@ -1,95 +1,115 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu, 11 Jun 2015 11:02:56 +0100
-Subject: [PATCH 07/10] KVM: arm/arm64: vgic: Allow HW interrupts to be
- queued to a guest
-In-Reply-To: <55795862.1050407@arm.com>
-References: <1433783045-8002-1-git-send-email-marc.zyngier@arm.com>
- <1433783045-8002-8-git-send-email-marc.zyngier@arm.com>
- <55794A7A.2080306@arm.com> <557951C6.2090408@arm.com>
- <55795862.1050407@arm.com>
-Message-ID: <55795CD0.9050106@arm.com>
+From: cw00.choi@samsung.com (Chanwoo Choi)
+Date: Thu, 11 Jun 2015 19:30:38 +0900
+Subject: [linux-sunxi] Re: [PATCH v4 1/2] phy-sun4i-usb: Add full support
+ for usb0 phy / OTG
+In-Reply-To: <5579572D.4070006@redhat.com>
+References: <1433088626-8858-1-git-send-email-hdegoede@redhat.com>
+ <1433088626-8858-2-git-send-email-hdegoede@redhat.com> <55792122.20607@ti.com>
+ <557941A6.5000306@samsung.com> <557944EE.1020303@redhat.com>
+ <557946EC.3060607@samsung.com> <55794DEA.1050604@redhat.com>
+ <557955D4.4030908@samsung.com> <5579572D.4070006@redhat.com>
+Message-ID: <5579634E.9080004@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/06/15 10:44, Andre Przywara wrote:
-> On 06/11/2015 10:15 AM, Marc Zyngier wrote:
->> On 11/06/15 09:44, Andre Przywara wrote:
->>> On 06/08/2015 06:04 PM, Marc Zyngier wrote:
-> ...
->>>> @@ -1344,6 +1364,35 @@ static bool vgic_process_maintenance(struct kvm_vcpu *vcpu)
->>>>  	return level_pending;
->>>>  }
->>>>  
->>>> +/* Return 1 if HW interrupt went from active to inactive, and 0 otherwise */
->>>> +static int vgic_sync_hwirq(struct kvm_vcpu *vcpu, struct vgic_lr vlr)
->>>> +{
->>>> +	struct irq_phys_map *map;
->>>> +	int ret;
->>>> +
->>>> +	if (!(vlr.state & LR_HW))
->>>> +		return 0;
->>>> +
->>>> +	map = vgic_irq_map_search(vcpu, vlr.irq);
+Hi,
+
+On 06/11/2015 06:38 PM, Hans de Goede wrote:
+> Hi,
+> 
+> On 11-06-15 11:33, Chanwoo Choi wrote:
+>> Hi,
+>>
+>> On 06/11/2015 05:59 PM, Hans de Goede wrote:
+>>> Hi,
 >>>
->>> I wonder if it's safe to rely on that mapping here. Are we sure that
->>> this hasn't changed while the VCPU was running? If I got this correctly,
->>> currently only vcpu_reset will actually add a map entry, but I guess in
->>> the future there will be more users.
+>>> On 11-06-15 10:29, Chanwoo Choi wrote:
+>>>> Hi Hans,
+>>>>
+>>>> On 06/11/2015 05:21 PM, Hans de Goede wrote:
+>>>>> Hi Chanwoo,
+>>>>>
+>>>>> Thanks for the quick review.
+>>>>>
+>>>>> On 11-06-15 10:07, Chanwoo Choi wrote:
+>>>>>> Hi Hans,
+>>>>>>
+>>>>>> I add the comment about extcon-related code.
+>>>>>>
+>>>>>> Firstly,
+>>>>>> I'd like you to implment the extcon driver for phy-sun4i-usb device
+>>>>>> in drivers/extcon/ directoryby using MFD
+>>>>>
+>>>>> No, just no, this is not what the MFD framework is for, the usb-phy
+>>>>> in question here is not a multifunction device. The MFD framework
+>>>>> is intended for true multi-function devices like i2c attached
+>>>>> PMICs which have regulators, gpios, pwm, input (power button),
+>>>>> chargers, power-supply, etc. That is NOT the case here.
+>>>>>
+>>>>> Also moving this to the MFD framework would very likely requiring
+>>>>> the devicetree binding for the usb-phy to change which we cannot
+>>>>> do as that would break the devicetree ABI.
+>>>>>
+>>>>>> because there are both extcon
+>>>>>> provider driver and extcon client driver. I think that all extcon
+>>>>>> provider driver better to be included in drivers/extcon/ directory.
+>>>>>> extcon_set_cable_state() function should be handled in extcon provider
+>>>>>> driver which is incluced in drivers/extcon/ directory.
+>>>>>
+>>>>> I do not find this a compelling reason, there are plenty of subsystems
+>>>>> where not all implementations of the subsystem class live in the subsystem
+>>>>> directory, e.g. input and hwmon devices are often also found outside of
+>>>>> the input and hwmon driver directories.
+>>>>
+>>>> There are difference on between input/hwmon and extcon.
+>>>>
+>>>> Because input and hwmon driver implement the only one type driver as provider driver.
+>>>> But, extcon implement the two type driver of both extcon provider and extcon client driver.
+>>>> The extcon is similiar with regulator and clock framework as resource.
+>>>>
+>>>> extcon provider driver to provider the event when the state of external connector is changed.
+>>>> - devm_extcon_dev_register()
+>>>> - e.g., almost extcon provider driver are included in 'drivers/extcon/' directory.
+>>>
+>>> I understand, but that does not change my first argument, that the usb-phy is not
+>>> a MFD device. And although it may be desirable to keep extcon provider drivers
+>>> in the drivers/extcon, there are no technical reasons to do so.
+>>>
+>>> The whole reason why Kishon asked me to start using the extcon framework is to avoid
+>>> adding a private API to the phy-sun4i-usb code for notifying the musb-sunxi code
+>>> about otg-id-pin status changes. Adding a separate driver for just the extcon bits
+>>> means re-adding a private api to the phy-sun4i-usb code but this time for the
+>>> extcon code, at which point we might just as well skip extcon and have the
+>>> musb-sunxi glue code call directly into the phy-sun4i-usb code...
+>>>
+>>> Needing a private API for a separate extcn driver actually is a good argument to
+>>> NOT have a separate extcon driver and keep the extcon code in the phy-sun4i-usb code,
+>>> where as I see no technical arguments in favor of a separate extcon driver.
 >>
->> How can the guest interrupt change? This is HW, as far as the guest is
->> concerned. An actual interrupt line. We don't reconfigure the HW live.
-> 
-> I was thinking about the rbtree mapping we introduced. There we map a
-> guest interrupt to a hardware interrupt. Are we sure that no one tears
-> down that mapping while we have an LR populated with this pair?
-> I am not talking about the timer here, but more about future users.
-> 
->>> Also we rely on the irqdomain mapping to be still the same, but that is
->>> probably a safe assumption.
+>> There is one technical issue.
 >>
->> Like I said before, this *cannot* change.
+>> The extcon_set_cable_state() should be handled by extcon provider driver.
 > 
-> OK, got it.
+> That is something which can be done regardless of where the extcon provider
+> driver code is located in the kernel tree...
 > 
+>> because extcon_set_cable_state() inform the extcon client driver of the event
+>> when detecting the change of h/w line (gpio line) or register of peripheral device.
 >>
->>> But I'd still find it more natural to use the hwirq number from the LR
->>> at this point. Can't we use irq_find_mapping() here to learn Linux'
->>> (current) irq number from that?
+>> But, extcon client driver can now get the instance of extcon_dev structure
+>> by extcon_get_edev_by_phandle() and then can change the cable state by using the extcon_set_cable_state().
 >>
->> I think you're confused.
->>
->> - The guest irq (vlr.irq) is entirely made up, and has no connection
->> with reality. it is stable, and cannot change during the lifetime of the
->> guest (think of it as a HW irq line).
->>
->> - The host hwirq (vlr.hwirq) is stable as well, for the same reason.
->>
->> - The Linux IRQ cannot change because we've been given it by the kernel,
->> and that's what we use for *everything* as far as the kernel is
->> concerned. Its mapping to hwirq is stable as well because this is how we
->> talk to the HW.
+>> I think that these issue have to be protected by framework level.
 > 
-> Not disputing any of them, but:
+> Protecting this at the framework level would mean protecting it with code
+> in drivers/extcon/extcon.c, that code will be used (and thus can protect
+> things) regardless of where the extcon provider code lives.
 > 
->> - irq_find_mapping gives you the *reverse* mapping (from hwirq to Linux
->> irq), and for that to work, you need the domain on which you want to
->> apply the translation. This is only useful when actually taking the
->> interrupt (i.e. in an interrupt controller driver). I can't see how that
->> could make sense here.
-> 
-> So if the guest has acked/EOIed it's IRQ, the GIC at the same time
-> acked/EOIed the hardware IRQ it found in the LR. Now we assume that this
-> is the very same as the HW IRQ we found doing our rbtree traversal.
-> I just wanted to be sure that this is always true and that this mapping
-> didn't change while the VCPU was running.
-> If you are sure of this, fine, I was just concerned that someone breaks
-> this assumption in the future by more dynamically mapping/unmapping
-> entries (say some irq forwarding user) and we will not notice.
+> I really still see no technical reasons why all extcon provider code
+> MUST be under drivers/extcon.
 
-How can the mapping change? Are you thinking of an unmap/map operation
-being done while the guest is running, replacing a HW device with
-another? That's not an option, and not only for the interrupts.
+OK. As you said, this issue shold be prevented on framework.
+I'm considering what is appropriate method to resolve this issue.
 
-	M.
--- 
-Jazz is not dead. It just smells funny...
+Thanks,
+Chanwoo Choi
