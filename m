@@ -1,36 +1,102 @@
-From: joro@8bytes.org (Joerg Roedel)
-Date: Thu, 11 Jun 2015 08:50:56 +0200
-Subject: [PATCH 1/2] scatterlist: use sg_phys()
-In-Reply-To: <CAPcyv4gat8TG9YnHmvD_7A7RD00Urn=febCj2Uc_cVcPi+fnCg@mail.gmail.com>
-References: <20150609162659.21910.41681.stgit@dwillia2-desk3.amr.corp.intel.com>
- <20150609162710.21910.57295.stgit@dwillia2-desk3.amr.corp.intel.com>
- <20150610093252.GA20384@8bytes.org>
- <CAPcyv4gat8TG9YnHmvD_7A7RD00Urn=febCj2Uc_cVcPi+fnCg@mail.gmail.com>
-Message-ID: <20150611065056.GG20384@8bytes.org>
+From: pebolle@tiscali.nl (Paul Bolle)
+Date: Thu, 11 Jun 2015 09:03:07 +0200
+Subject: [PATCH 1/3] ASoC: mediatek: Add AFE platform driver
+In-Reply-To: <1433946276-25969-2-git-send-email-koro.chen@mediatek.com>
+References: <1433946276-25969-1-git-send-email-koro.chen@mediatek.com>
+ <1433946276-25969-2-git-send-email-koro.chen@mediatek.com>
+Message-ID: <1434006187.24094.40.camel@x220>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 10, 2015 at 09:00:31AM -0700, Dan Williams wrote:
-> > So sg_phys() turns out to be 'page_to_phys(sg_page(s)) + s->offset',
-> > which makes the above statement to:
-> >
-> >         page_to_phys(sg_page(s)) + s->offset - s->offset;
-> >
-> > The compiler will probably optimize that away, but it still doesn't look
-> > like an improvement.
-> 
-> The goal is to eventually stop leaking struct page deep into the i/o
-> stack.  Anything that relies on being able to retrieve a struct page
-> out of an sg entry needs to be converted.  I think we need a new
-> helper for this case "sg_phys_aligned()?".
+On Wed, 2015-06-10 at 22:24 +0800, Koro Chen wrote:
+> --- /dev/null
+> +++ b/sound/soc/mediatek/Kconfig
 
-You still have a reference to a struct page, because sg_phys() calls
-sg_page() too. If you want to get rid of sg_page() something like
-sg_pfn() migth be a more workable solution than sg_phys_(page_)aligned.
+> +config SND_SOC_MEDIATEK
+> +	bool "ASoC support for Mediatek chip"
+> +	depends on ARCH_MEDIATEK
+> +	help
+> +	  This adds ASoC platform driver support for Mediatek chip
+> +	  that can be used with other codecs.
+> +	  Select Y if you have such device.
+> +	  Ex: MT8173
 
-But maybe I am just missing the bigger scope of this, so I agree with
-Russell that it is better so see a patch series which shows the
-direction you want to go with this.
+> --- /dev/null
+> +++ b/sound/soc/mediatek/Makefile
+
+> +obj-$(CONFIG_SND_SOC_MEDIATEK) += mtk-afe-pcm.o
+
+> --- /dev/null
+> +++ b/sound/soc/mediatek/mtk-afe-pcm.c
+
+> +#include <linux/module.h>
+
+> +static void mtk_afe_set_i2s_enable(struct mtk_afe *afe, bool enable)
+> +{
+> +	unsigned int val;
+> +
+> +	regmap_read(afe->regmap, AFE_I2S_CON2, &val);
+> +	if (!!(val & AFE_I2S_CON2_EN) == !!enable)
+
+(What does negating a bool twice do?)
+
+> +		return; /* must skip soft reset */
+> +
+> +	/* I2S soft reset begin */
+> +	regmap_update_bits(afe->regmap, AUDIO_TOP_CON1, 0x4, 0x4);
+> +
+> +	/* input */
+> +	regmap_update_bits(afe->regmap, AFE_I2S_CON2, 0x1, !!enable);
+
+Ditto.
+
+> +
+> +	/* output */
+> +	regmap_update_bits(afe->regmap, AFE_I2S_CON1, 0x1, !!enable);
+
+Ditto.
+
+> +
+> +	/* I2S soft reset end */
+> +	udelay(1);
+> +	regmap_update_bits(afe->regmap, AUDIO_TOP_CON1, 0x4, 0);
+> +}
+
+> +static const struct of_device_id mtk_afe_pcm_dt_match[] = {
+> +	{ .compatible = "mediatek,mt8173-afe-pcm", },
+> +	{ }
+> +}; 
+
+> +static struct platform_driver mtk_afe_pcm_driver = {
+> +	.driver = {
+> +		   .name = "mtk-afe-pcm",
+> +		   .owner = THIS_MODULE,
+> +		   .of_match_table = mtk_afe_pcm_dt_match,
+> +		   .pm = &mtk_afe_pm_ops,
+> +	},
+> +	.probe = mtk_afe_pcm_dev_probe,
+> +	.remove = mtk_afe_pcm_dev_remove,
+> +};
+
+> +MODULE_DESCRIPTION("Mediatek ALSA SoC AFE platform driver");
+> +MODULE_AUTHOR("Koro Chen <koro.chen@mediatek.com>");
+> +MODULE_LICENSE("GPL v2");
+> +MODULE_DEVICE_TABLE(of, mtk_afe_pcm_dt_match);
+
+(The common pattern is to have MODULE_DEVICE_TABLE() directly follow
+that table.)
+
+SND_SOC_MEDIATEK is a bool symbol and mtk-afe-pcm.o is built-in only.
+But the code uses a few module specific constructs. I spotted
+THIS_MODULE, MODULE_DESCRIPTION, MODULE_AUTHOR, MODULE_LICENSE, and
+MODULE_DEVICE_TABLE.
+
+Is SND_SOC_MEDIATEK perhaps meant to be bool?
+
+Likewise for SND_SOC_MT8173_MAX98090 (in 2/3) and
+SND_SOC_MT8173_RT5650_RT5676 (in 3/3).
+
+Thanks,
 
 
-	Joerg
+Paul Bolle
