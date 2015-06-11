@@ -1,10 +1,10 @@
 From: khilman@kernel.org (Kevin Hilman)
-Date: Wed, 10 Jun 2015 17:06:12 -0700
-Subject: [GIT PULL]Hisilicon 64-bit soc hi6220 DT changes for 4.2
-In-Reply-To: <5571BF2B.5080500@hisilicon.com> (Wei Xu's message of "Fri, 5 Jun
- 2015 16:24:27 +0100")
-References: <5571BF2B.5080500@hisilicon.com>
-Message-ID: <7h381zhzwr.fsf@deeprootsystems.com>
+Date: Wed, 10 Jun 2015 17:08:05 -0700
+Subject: [GIT PULL v2]Hisilicon 64-bit SoC changes for 4.2
+In-Reply-To: <5571C7F7.9090702@hisilicon.com> (Wei Xu's message of "Fri, 5 Jun
+ 2015 17:01:59 +0100")
+References: <5571C7F7.9090702@hisilicon.com>
+Message-ID: <7hwpzbgl96.fsf@deeprootsystems.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -13,6 +13,7 @@ Wei Xu <xuwei5@hisilicon.com> writes:
 > Hi Arnd, Hi Olof, Hi Kevin,
 >
 > Please help to pull the following changes.
+> Sorry for the late pull request.
 > Thanks!
 >
 > Best Regards,
@@ -26,22 +27,20 @@ Wei Xu <xuwei5@hisilicon.com> writes:
 >
 > are available in the git repository at:
 >
->   git://github.com/hisilicon/linux-hisi.git tags/hi6620-dt-for-4.2
+>   git://github.com/hisilicon/linux-hisi.git tags/hi6220-soc-for-4.2
 >
-> for you to fetch changes up to 86e8f528ef325843d9b01ee6d00823e667cab5e2:
+> for you to fetch changes up to 85fe946e8c8485d868edcbdcef78f04e4a259a6a:
 >
->   arm64: dts: Add dts files for Hisilicon Hi6220 SoC (2015-06-05 15:30:06 +0100)
+>   arm64: Enable Hisilicon ARMv8 SoC family in Kconfig and defconfig (2015-06-05 16:01:17 +0100)
 >
 > ----------------------------------------------------------------
-> ARM64: DT: Hisilicon hi6220 soc and hikey board updates for 4.2
+> ARM64: Hisilicon ARM64 SoC Updates for V4.2
 >
-> - Added the devicetree bindings document for hi6220 SoC
-> - Added the devicetree bindings document for hi6220 clock
-> - Added dts files for hi6220 SoC and hikey board
+> - Added Hisilicon ARM64 SoC family support in Kconfig and defconfig
 >
 > ----------------------------------------------------------------
 
-Pulled into next/dt,
+Pulled into next/soc,
 
 Thanks,
 
