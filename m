@@ -1,63 +1,34 @@
 From: khilman@kernel.org (Kevin Hilman)
-Date: Thu, 11 Jun 2015 14:46:07 -0700
-Subject: [GIT PULL 5/5] Samsung mach updates for v4.2
-In-Reply-To: <5571E4F7.40706@kernel.org> (Kukjin Kim's message of "Sat, 06 Jun
- 2015 03:05:43 +0900")
-References: <5571E4F7.40706@kernel.org>
-Message-ID: <7hlhfpdilc.fsf@deeprootsystems.com>
+Date: Thu, 11 Jun 2015 14:48:02 -0700
+Subject: [PATCH v2] MAINTAINERS: ARM64: EXYNOS: Extend entry for ARM64 DTS
+In-Reply-To: <1433584939-3520-1-git-send-email-k.kozlowski@samsung.com>
+References: <1433584939-3520-1-git-send-email-k.kozlowski@samsung.com>
+Message-ID: <CAMAWPa-3RhXgCjXcdQkPn3W1SJ++iAkfaBdp_p4Se9Ykg1A1mw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Kukjin Kim <kgene@kernel.org> writes:
+Hi Krzysztof,
 
-> Hi,
+On Sat, Jun 6, 2015 at 3:02 AM, Krzysztof Kozlowski
+<k.kozlowski@samsung.com> wrote:
+> Extend the Exynos entry to ARM64 device tree sources.
 >
-> Here is Samsung mach updates for v4.2 and this is based on v4.1-rc4
-> because of dependencies with previous Samsung fixes during -rc
->
-> Please pull and if any problems, please let me know.
->
-> Thanks,
-> Kukjin
->
->
-> The following changes since commit e26081808edadfd257c6c9d81014e3b25e9a6118:
->
->   Linux 4.1-rc4 (2015-05-18 10:13:47 -0700)
->
-> are available in the git repository at:
->
->   git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git
-> tags/samsung-mach-1
->
-> for you to fetch changes up to 2be2a3ff42a52e926cbd1cc1d376a161a9a73667:
->
->   ARM: EXYNOS: register power domain driver from core_initcall
-> (2015-06-06 02:18:03 +0900)
->
-> ----------------------------------------------------------------
-> Samsung updates for v4.2
->
-> - add failure(exception) handling
->   : of_iomap(), of_find_device_by_node() and kstrdup()
->
-> - add common poweroff to use PS_HOLD based for all of exynos SoCs
-> - add exnos_get/set_boot_addr() helper
-> - constify platform_device_id and irq_domain_ops
-> - get current parent clock for power domain on/off
-> - use core_initcall to register power domain driver
-> - make exynos_core_restart() less verbose
->
-> - add support coupled CPUidle for exynos3250
->
-> - fix exynos_boot_secondary() return value on timeout
-> - fix clk_enable() in s3c24xx adc
-> - fix missing of_node_put() for power domains
->
-> ----------------------------------------------------------------
+> Cc: Catalin Marinas <catalin.marinas@arm.com>
+> Cc: Will Deacon <will.deacon@arm.com>
+> Cc: Russell King <linux@arm.linux.org.uk>
+> Cc: Kukjin Kim <kgene@kernel.org>
+> Cc: Kevin Hilman <khilman@kernel.org>
+> Cc: Arnd Bergmann <arnd@arndb.de>
+> Cc: Olof Johansson <olof@lixom.net>
+> Cc: linux-samsung-soc at vger.kernel.org
+> Cc: linux-arm-kernel at lists.infradead.org
+> Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+> Reviewed-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
 
-Pulled into next/soc,
+Applied to arm-soc's next/soc branch.
 
-Thanks,
+Note I found this by chance.  It almost fell through the cracks
+because arm at kernel.org (for arm-soc maintainers) wasn't on the to/cc
+list.
 
 Kevin
