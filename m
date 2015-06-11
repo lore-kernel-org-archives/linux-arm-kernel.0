@@ -1,66 +1,174 @@
-From: l.stach@pengutronix.de (Lucas Stach)
-Date: Thu, 11 Jun 2015 17:11:39 +0200
-Subject: [PATCH v3 1/2] mtd: nand: sunxi: Replace failsafe timing cfg
- with calculated value
-In-Reply-To: <20150611165812.5c0e4c7f@bbrezillon>
-References: <1433924948-19288-1-git-send-email-r.spliet@ultimaker.com>
- <20150610105913.1851241d@bbrezillon> <5579A03B.2010406@ultimaker.com>
- <20150611165812.5c0e4c7f@bbrezillon>
-Message-ID: <1434035499.20095.1.camel@pengutronix.de>
+From: andre.przywara@arm.com (Andre Przywara)
+Date: Thu, 11 Jun 2015 16:12:34 +0100
+Subject: [PATCH 04/13] KVM: arm64: Introduce new MMIO region for the ITS
+ base address
+In-Reply-To: <5576A930.6050100@linaro.org>
+References: <1432893209-27313-1-git-send-email-andre.przywara@arm.com>
+ <1432893209-27313-5-git-send-email-andre.przywara@arm.com>
+ <5576A930.6050100@linaro.org>
+Message-ID: <5579A562.3000108@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Donnerstag, den 11.06.2015, 16:58 +0200 schrieb Boris Brezillon:
-> Hi Roy,
-> 
-> On Thu, 11 Jun 2015 16:50:35 +0200
-> Roy Spliet <r.spliet@ultimaker.com> wrote:
-> 
-> > Hello Boris,
-> > 
-> > Op 10-06-15 om 10:59 schreef Boris Brezillon:
-> > > Hi Roy,
-> > >
-> > > On Wed, 10 Jun 2015 10:29:07 +0200
-> > > Roy Spliet <r.spliet@ultimaker.com> wrote:
-> > >
-> > >> Calculates the timing cfg value once when initialising a chip, then sets
-> > >> it on chip select. Register definition documented the A83 user manual.
-> > > How about rewording the sentence this way:
-> > >
-> > > "
-> > > The TIMING_CFG register was previously statically set to a magic value
-> > > (extracted from Allwinner's BSP) when initializing the NAND controller.
-> > > Now that we have more details about the TIMING_CFG register layout
-> > > (extracted from the A83 user manual) we can dynamically calculate the
-> > > appropriate value for each NAND chip and set it when selecting the
-> > > chip.
-> > > "
-> > >
-> > >> Signed-off-by: Roy Spliet <r.spliet@ultimaker.com>
-> > >>
-> > >> V2:
-> > >> - Fix crippled comments
-> > >>
-> > >> V3:
-> > >> - Warn for invalid timings
-> > >> - Style
-> > > Almost right: the changelog should be placed after the '---' line ;-).
-> > Git (format-patch, send-email) doesn't let me do that to the best of my 
-> > knowledge. Other comments I will process, thanks.
-> 
-> Use git format-patch to generate the patches and then add your
-> changelog before sending the mails with git send-email.
-> 
-> Or you could generate a cover-letter (pass --cover-letter to
-> format-patch) and put your change log in there.
-> 
-Just insert the '---' line after your S-o-B when you write the commit
-log. This will do all the right things for you.
+Hi Eric,
 
-Regards,
-Lucas
+thanks for the review!
 
--- 
-Pengutronix e.K.             | Lucas Stach                 |
-Industrial Linux Solutions   | http://www.pengutronix.de/  |
+On 06/09/2015 09:52 AM, Eric Auger wrote:
+> On 05/29/2015 11:53 AM, Andre Przywara wrote:
+>> The ARM GICv3 ITS controller requires a separate register frame to
+>> cover ITS specific registers. Add a new VGIC address type and store
+>> the address in a field in the vgic_dist structure.
+>> Provide a function to check whether userland has provided the address,
+>> so ITS functionality can be guarded by that check.
+>>
+>> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
+>> ---
+>>  Documentation/virtual/kvm/devices/arm-vgic.txt |  7 +++++++
+>>  arch/arm64/include/uapi/asm/kvm.h              |  3 +++
+>>  include/kvm/arm_vgic.h                         |  3 +++
+>>  virt/kvm/arm/vgic-v3-emul.c                    |  1 +
+>>  virt/kvm/arm/vgic.c                            | 17 +++++++++++++++++
+>>  virt/kvm/arm/vgic.h                            |  1 +
+>>  6 files changed, 32 insertions(+)
+>>
+>> diff --git a/Documentation/virtual/kvm/devices/arm-vgic.txt b/Documentation/virtual/kvm/devices/arm-vgic.txt
+>> index 3fb9054..1f89001 100644
+>> --- a/Documentation/virtual/kvm/devices/arm-vgic.txt
+>> +++ b/Documentation/virtual/kvm/devices/arm-vgic.txt
+>> @@ -39,6 +39,13 @@ Groups:
+>>        Only valid for KVM_DEV_TYPE_ARM_VGIC_V3.
+>>        This address needs to be 64K aligned.
+>>  
+>> +    KVM_VGIC_V3_ADDR_TYPE_ITS (rw, 64-bit)
+>> +      Base address in the guest physical address space of the GICv3 ITS
+>> +      register frame. The ITS allows MSI(-X) interrupts to be injected
+>> +      into guests. This extension is optional, if the kernel does not
+>> +      support the ITS, the call returns -ENODEV.
+>> +      Only valid for KVM_DEV_TYPE_ARM_VGIC_V3.
+>> +      This address needs to be 64K aligned and the region covers 64 KByte.
+> I would emphasize this is the control registers (ITS_Base) hence a
+> single page, not comprising the ITS translation register page.
+
+Good point, will do.
+
+>>  
+>>    KVM_DEV_ARM_VGIC_GRP_DIST_REGS
+>>    Attributes:
+>> diff --git a/arch/arm64/include/uapi/asm/kvm.h b/arch/arm64/include/uapi/asm/kvm.h
+>> index d268320..e42435c 100644
+>> --- a/arch/arm64/include/uapi/asm/kvm.h
+>> +++ b/arch/arm64/include/uapi/asm/kvm.h
+>> @@ -82,8 +82,11 @@ struct kvm_regs {
+>>  #define KVM_VGIC_V3_ADDR_TYPE_DIST	2
+>>  #define KVM_VGIC_V3_ADDR_TYPE_REDIST	3
+>>  
+> extra white line?
+>> +#define KVM_VGIC_V3_ADDR_TYPE_ITS	4
+>> +
+>>  #define KVM_VGIC_V3_DIST_SIZE		SZ_64K
+>>  #define KVM_VGIC_V3_REDIST_SIZE		(2 * SZ_64K)
+>> +#define KVM_VGIC_V3_ITS_SIZE		SZ_64K
+>>  
+>>  #define KVM_ARM_VCPU_POWER_OFF		0 /* CPU is started in OFF state */
+>>  #define KVM_ARM_VCPU_EL1_32BIT		1 /* CPU running a 32bit VM */
+>> diff --git a/include/kvm/arm_vgic.h b/include/kvm/arm_vgic.h
+>> index b18e2c5..37725bb 100644
+>> --- a/include/kvm/arm_vgic.h
+>> +++ b/include/kvm/arm_vgic.h
+>> @@ -178,6 +178,9 @@ struct vgic_dist {
+>>  		phys_addr_t		vgic_redist_base;
+>>  	};
+>>  
+>> +	/* The base address for the MSI control block (V2M/ITS) */
+> why V2M here? It's it the GITS_TRANSLATER page that has a fellow page in
+> case of V2M?
+
+Ah yes, this was a leftover from a previous version of the series. I had
+V2M in-kernel emulation implemented at some time, but later dropped that.
+Thanks for spotting.
+
+>> +	phys_addr_t		vgic_its_base;
+>> +
+>>  	/* Distributor enabled */
+>>  	u32			enabled;
+>>  
+>> diff --git a/virt/kvm/arm/vgic-v3-emul.c b/virt/kvm/arm/vgic-v3-emul.c
+>> index fbfdd6f..16c6d8a 100644
+>> --- a/virt/kvm/arm/vgic-v3-emul.c
+>> +++ b/virt/kvm/arm/vgic-v3-emul.c
+>> @@ -1012,6 +1012,7 @@ static int vgic_v3_has_attr(struct kvm_device *dev,
+>>  			return -ENXIO;
+>>  		case KVM_VGIC_V3_ADDR_TYPE_DIST:
+>>  		case KVM_VGIC_V3_ADDR_TYPE_REDIST:
+>> +		case KVM_VGIC_V3_ADDR_TYPE_ITS:
+>>  			return 0;
+>>  		}
+>>  		break;
+>> diff --git a/virt/kvm/arm/vgic.c b/virt/kvm/arm/vgic.c
+>> index 6ea30e0..2e9723aa 100644
+>> --- a/virt/kvm/arm/vgic.c
+>> +++ b/virt/kvm/arm/vgic.c
+>> @@ -932,6 +932,16 @@ int vgic_register_kvm_io_dev(struct kvm *kvm, gpa_t base, int len,
+>>  	return ret;
+>>  }
+>>  
+>> +bool vgic_has_its(struct kvm *kvm)
+>> +{
+>> +	struct vgic_dist *dist = &kvm->arch.vgic;
+>> +
+>> +	if (dist->vgic_model != KVM_DEV_TYPE_ARM_VGIC_V3)
+>> +		return false;
+>> +
+>> +	return !IS_VGIC_ADDR_UNDEF(dist->vgic_its_base);
+>> +}
+>> +
+>>  static int vgic_nr_shared_irqs(struct vgic_dist *dist)
+>>  {
+>>  	return dist->nr_irqs - VGIC_NR_PRIVATE_IRQS;
+>> @@ -1835,6 +1845,7 @@ int kvm_vgic_create(struct kvm *kvm, u32 type)
+>>  	kvm->arch.vgic.vgic_dist_base = VGIC_ADDR_UNDEF;
+>>  	kvm->arch.vgic.vgic_cpu_base = VGIC_ADDR_UNDEF;
+>>  	kvm->arch.vgic.vgic_redist_base = VGIC_ADDR_UNDEF;
+>> +	kvm->arch.vgic.vgic_its_base = VGIC_ADDR_UNDEF;
+> minor: given the fact we have specialized
+> init_vgic_model/vgic_vx_init_emulation wouldn't it make sense to move
+> those VGIC v3 specific assignment there? also CPU base is specific to v2?
+
+Yes, that seems to make some sense. The original idea was to make sure
+that all of those addresses are properly initialized regardless of the
+chosen guest model, but I see that this gets messy and would probably be
+better solved by moving those assignments.
+
+Thanks,
+Andre.
+
+>>  
+>>  out_unlock:
+>>  	for (; vcpu_lock_idx >= 0; vcpu_lock_idx--) {
+>> @@ -1932,6 +1943,12 @@ int kvm_vgic_addr(struct kvm *kvm, unsigned long type, u64 *addr, bool write)
+>>  		block_size = KVM_VGIC_V3_REDIST_SIZE;
+>>  		alignment = SZ_64K;
+>>  		break;
+>> +	case KVM_VGIC_V3_ADDR_TYPE_ITS:
+>> +		type_needed = KVM_DEV_TYPE_ARM_VGIC_V3;
+>> +		addr_ptr = &vgic->vgic_its_base;
+>> +		block_size = KVM_VGIC_V3_ITS_SIZE;
+>> +		alignment = SZ_64K;
+>> +		break;
+>>  #endif
+>>  	default:
+>>  		r = -ENODEV;
+>> diff --git a/virt/kvm/arm/vgic.h b/virt/kvm/arm/vgic.h
+>> index 0df74cb..a093f5c 100644
+>> --- a/virt/kvm/arm/vgic.h
+>> +++ b/virt/kvm/arm/vgic.h
+>> @@ -136,5 +136,6 @@ int vgic_get_common_attr(struct kvm_device *dev, struct kvm_device_attr *attr);
+>>  int vgic_init(struct kvm *kvm);
+>>  void vgic_v2_init_emulation(struct kvm *kvm);
+>>  void vgic_v3_init_emulation(struct kvm *kvm);
+>> +bool vgic_has_its(struct kvm *kvm);
+>>  
+>>  #endif
+>>
+> 
