@@ -1,36 +1,29 @@
 From: khilman@kernel.org (Kevin Hilman)
-Date: Thu, 11 Jun 2015 15:58:15 -0700
-Subject: [PATCH 0/2] ARM: socfpga: Add CPU_METHOD_OF_DECLARE for SoCFPGA
-In-Reply-To: <1433297642-3818-1-git-send-email-dinh.linux@gmail.com>
-References: <1433297642-3818-1-git-send-email-dinh.linux@gmail.com>
-Message-ID: <CAMAWPa-y-7N4GMhigvFMdk3BAU=3Nd2vEYVAQ+mBgd3-xK1aJg@mail.gmail.com>
+Date: Thu, 11 Jun 2015 16:25:52 -0700
+Subject: [PATCH v6 0/4] Add basic ZTE zx296702 SOC support
+In-Reply-To: <20150606013820.GA12021@tiger> (Shawn Guo's message of "Sat, 6
+ Jun 2015 09:38:20 +0800")
+References: <1433388063-13682-1-git-send-email-jun.nie@linaro.org>
+ <20150604182739.GH490@codeaurora.org> <20150605023703.GD17189@dragon>
+ <20150605190744.GB648@codeaurora.org> <20150606013820.GA12021@tiger>
+Message-ID: <7hzj45bzen.fsf@deeprootsystems.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Dinh,
+Shawn Guo <shawnguo@kernel.org> writes:
 
-On Tue, Jun 2, 2015 at 7:14 PM,  <dinh.linux@gmail.com> wrote:
-> From: Dinh Nguyen <dinh.linux@gmail.com>
+> On Fri, Jun 05, 2015 at 12:07:44PM -0700, Stephen Boyd wrote:
+>> I was saying that if this isn't going to be accepted into arm-soc
+>> because it's too close to the next merge window, then we can take
+>> it through the clk tree next time. Looks like Arnd is ready to
+>> take it though and I've already given Reviewed-by so it should be
+>> good to go through arm-soc.
 >
-> Hi Arnd, Kevin, Olof:
->
-> Please apply these 2 patches for v4.2. I could not do a pull request for
-> these as they will cause a merge conflict for arm-soc/next.
->
-> Thanks,
->
-> Dinh Nguyen (2):
->   ARM: socfpga: use CPU_METHOD_OF_DECLARE for socfpga_cyclone5
->   ARM: socfpga: add CPU_METHOD_OF_DECLARE for Arria 10
+> Thanks for clarification, Stephen.
 
-This one caused a build failure after merging the L1 invalidate patch
-from Russell[1] since it removed the SoC specific secondary startup.
-I've fixed this up in our next/soc branch by using the generic
-secondary_startup[2].  Please let me know if you see any issues with
-this.
+This is now applied to the zte/soc branch of arm-soc tree, with
+Stephen's Reviewed-by, and merged into next/soc for v4.2.
+
+Thanks,
 
 Kevin
-
-[1] https://git.kernel.org/cgit/linux/kernel/git/arm/arm-soc.git/commit/?h=next/cleanup&id=02b4e2756e01c623cc4dbceae4b07be75252db5b
-
-[2] https://git.kernel.org/cgit/linux/kernel/git/arm/arm-soc.git/commit/?h=socfpga/soc&id=89b8da06ba302dd130df60df7964ccd3ab151cd6
