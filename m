@@ -1,43 +1,63 @@
-From: swexru@gmail.com (Alexey Mednyy)
-Date: Thu, 11 Jun 2015 17:26:28 +0300
-Subject: i.mx53 suspend/resume mainline kernel
-In-Reply-To: <CAC3zGv_nAOSN6pOJb+4tmObtjoWmMpbo2s1a1cddEXiTkjprsQ@mail.gmail.com>
-References: <CAC3zGv_nAOSN6pOJb+4tmObtjoWmMpbo2s1a1cddEXiTkjprsQ@mail.gmail.com>
-Message-ID: <55799A94.5070709@gmail.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Thu, 11 Jun 2015 15:26:57 +0100
+Subject: [RFC PATCH v2] arm DMA: Fix allocation from CMA for coherent DMA
+In-Reply-To: <CAE=W-e1FJ6j0=Nae0o7jcwFFbtUjogvLOWgL_D6J30Ztsb31-A@mail.gmail.com>
+References: <1433351745-3646-1-git-send-email-lorenx4@gmail.com>
+ <20150610162819.GD22844@e104818-lin.cambridge.arm.com>
+ <CAE=W-e1FJ6j0=Nae0o7jcwFFbtUjogvLOWgL_D6J30Ztsb31-A@mail.gmail.com>
+Message-ID: <20150611142537.GA29305@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Problem solved with this patch. Why it's not merged?
+On Wed, Jun 10, 2015 at 09:34:43PM +0200, Lorenzo Nava wrote:
+> On Wed, Jun 10, 2015 at 6:28 PM, Catalin Marinas
+> <catalin.marinas@arm.com> wrote:
+> > On Wed, Jun 03, 2015 at 07:15:45PM +0200, Lorenzo Nava wrote:
+> > > This patch allows the use of CMA for DMA coherent memory allocation.
+> > > At the moment if the input parameter "is_coherent" is set to true
+> > > the allocation is not made using the CMA, which I think is not the
+> > > desired behaviour.
+> > >
+> > > Signed-off-by: Lorenzo Nava <lorenx4@xxxxxxxx>
+[...]
+> > So while you allow __alloc_from_contiguous() to be called when
+> > is_coherent, the memory returned is still non-cacheable. The reason is
+> > that the "prot" argument passed to __dma_alloc() in
+> > arm_coherent_dma_alloc() is pgprot_dmacoherent(PAGE_KERNEL) which means
+> > Normal NonCacheable memory. The mmap seems to create a cacheable mapping
+> > as vma->vm_page_prot is not passed through __get_dma_pgprot().
+[...]
+> Well the final scope of this patch is just to fix what in my opinion
+> is an incorrect behaviour: the lack of use of CMA when the flag
+> "is_coherent" is set.
 
-http://lists.infradead.org/pipermail/linux-arm-kernel/2014-March/242052.html
+But you still have to fix it properly: "is_coherent" means cacheable
+memory which you don't get with your patch.
 
-On Jun 10, 2015 13:26, "Alexey Mednyy" <swexru at gmail.com
-<mailto:swexru@gmail.com>> wrote:
+> Of course it still exists the problem of modify the attribute to make
+> the memory cacheable, but it is something I would like to do in a
+> second step (the patch you posted is of course a good starting point).
 
-    Hello all!
+So between the first and the second step, you basically break
+dma_alloc_coherent() by moving the allocation from
+__alloc_simple_buffer() (returning cacheable memory) to
+__alloc_from_contiguous() which changes the memory attributes to
+whatever __get_dma_pgprot() returned (currently Normal Non-cacheable).
 
-    Looks like suspend/resume not working right on i.mx53 soc in
-    mainline kernel.
-    For some reason SOC is not suspending and hangs somewhere before
-    actual low power mode.
+> I think that the current implementation maps memory keeping non
+> cacheable attributes enable, because the 'attrs' parameter passed to
+> arm_dma_mmap() has no WRITE_COMBINE attribute set (according to
+> dma_mmap_coherent() in include/asm-generic/dma-mapping-common.h).
 
-    I've put printk's all over imx5 suspend code:
+At least on ARMv7, WRITE_COMBINE and Normal Non-cacheable are the same.
 
-    static int mx5_suspend_enter(suspend_state_t state) from pm-imx5.c
-    and I see printk message right before
-    cpu_do_idle() function which is macro really calls cpu_v7_do_idle
-    from proc-v7.S
+> I also notice this patch that is pending "[PATCH v3]
+> arm/mm/dma-mapping.c: Add arm_coherent_dma_mmap": it modifies the
+> mapping of memory for coherent DMA. I want to understand if the merge
+> of this patch requires any other modification to guarantee that
+> coherent memory is allocated with cacheable attributes.
 
-    And I don't see that CPU pulls STANDBY pad in any way, pmic don't know
-    anything about cpu low power mode.
-    Also clocks remain on.
-    So, is problem somewhere in those 3 ARM instructions?
+I think this patch will go in, it is already in linux-next.
 
-    dsb @ WFI may enter a low-power mode
-    wfi
-    ret lr
-
-    Have no idea where to move next...
-
-    _________________________________
-    Best regards, Mednyy Alexey.
+-- 
+Catalin
