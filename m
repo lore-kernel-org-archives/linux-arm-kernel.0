@@ -1,18 +1,77 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Thu, 11 Jun 2015 18:30:30 +0530
-Subject: [PATCH 0/6] clockevent: Migrate to new 'set-state' interface
-In-Reply-To: <55797A58.9020601@linaro.org>
-References: <cover.1433768426.git.viresh.kumar@linaro.org>
- <55797A58.9020601@linaro.org>
-Message-ID: <20150611130030.GB28891@linux>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Thu, 11 Jun 2015 14:07:00 +0100
+Subject: [PATCH] arm: Update memblock limit after mapping lowmem
+In-Reply-To: <1433445349-12497-1-git-send-email-labbott@fedoraproject.org>
+References: <1433445349-12497-1-git-send-email-labbott@fedoraproject.org>
+Message-ID: <20150611130700.GA8153@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11-06-15, 14:08, Daniel Lezcano wrote:
-> I suggest you use the kernel continuous integration [1] to test the
-> patches, it is probable some of the hardware is there.
+On Thu, Jun 04, 2015 at 08:15:49PM +0100, Laura Abbott wrote:
+> 
+> The memblock limit is currently used in find_limits
+> to find the bounds for ZONE_NORMAL. The memblock
+> limit may need to be rounded down a PMD size to ensure
+> allocations are fully mapped though. This has the side
+> effect of reducing the amount of memory in ZONE_NORMAL.
+> Once all lowmem is mapped, it's safe to change the memblock
+> limit back to include the unaligned section. Adjust the
+> memblock limit after lowmem mapping is complete.
+> 
+> Before:
+>  # cat /proc/zoneinfo | grep managed
+>         managed  62907
+>         managed  424
+> 
+> After:
+>  # cat /proc/zoneinfo | grep managed
+>         managed  63331
+> 
+> Signed-off-by: Laura Abbott <labbott@fedoraproject.org>
+> ---
+> This is a replacement for
+> 'arm: Don't use memblock limit for the lowmem bound' which
+> doesn't actually work on NOMMU systems.
 
-Will do. Thanks.
+Works for me on TC2, atop v4.1-rc7. Before this patch, with a few byes
+carved out of the memory node I would see:
 
--- 
-viresh
+Memory: 1030380K/1046528K available (4832K kernel code, 154K rwdata, 1376K rodata, 260K init, 147K bss, 16148K reserved, 0K cma-reserved)
+
+$ cat /proc/zoneinfo | grep managed
+        managed  257660
+
+With the patch I see:
+
+Memory: 1032424K/1048572K available (4832K kernel code, 154K rwdata, 1376K rodata, 260K init, 147K bss, 16148K reserved, 0K cma-reserved)
+
+$ cat /proc/zoneinfo | grep managed
+        managed  258171
+
+The patch itself looks good to me.
+
+Reviewed-by: Mark Rutland <mark.rutland@arm.com>
+Tested-by: Mark Rutland <mark.rutland@arm.com>
+
+Thanks,
+Mark.
+
+> ---
+>  arch/arm/mm/mmu.c | 1 +
+>  1 file changed, 1 insertion(+)
+> 
+> diff --git a/arch/arm/mm/mmu.c b/arch/arm/mm/mmu.c
+> index 7186382..904d153 100644
+> --- a/arch/arm/mm/mmu.c
+> +++ b/arch/arm/mm/mmu.c
+> @@ -1519,6 +1519,7 @@ void __init paging_init(const struct machine_desc *mdesc)
+>  	build_mem_type_table();
+>  	prepare_page_table();
+>  	map_lowmem();
+> +	memblock_set_current_limit(arm_lowmem_limit);
+>  	dma_contiguous_remap();
+>  	devicemaps_init(mdesc);
+>  	kmap_init();
+> -- 
+> 2.4.1
+> 
