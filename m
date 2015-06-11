@@ -1,76 +1,42 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Thu, 11 Jun 2015 13:51:51 +0200
-Subject: [PATCH] PM / Domains: Try power off masters in error path of
- __pm_genpd_poweron()
-Message-ID: <1434023511-4263-1-git-send-email-ulf.hansson@linaro.org>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Thu, 11 Jun 2015 13:52:11 +0200
+Subject: [PATCH] ARM: mm: show prefetch state when either data or instr
+ prefect is enabled
+Message-ID: <1434023531-20052-1-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-While powering up a genpd, its domain masters are first being powered up.
-In the error path of __pm_genpd_poweron(), we didn't care to try power off
-these domain masters. Let's deal with that to avoid leaving unused PM
-domains powered.
+The l2c310_enable() function shows the state of prefetch configuration
+only when both data *and* instruction prefetching is enabled, but the
+message itself is able to cope with having either data or instruction
+prefetch enabled, showing "ID prefetch enabled" when both are enabled,
+"D prefetch enabled" when only data prefetch is enabled, and "I
+prefetch enabled" when only instruction prefetch is enabled.
 
-Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
+Therefore, this commit adjusts the code to display the prefetch
+configuration when either data *or* instruction prefetching is
+enabled. On my system with data prefetching enabled only, it shows:
+
+  [    0.000000] L2C-310 D prefetch enabled, offset 1 lines
+
+Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 ---
- drivers/base/power/domain.c | 30 +++++++++++++++++-------------
- 1 file changed, 17 insertions(+), 13 deletions(-)
+ arch/arm/mm/cache-l2x0.c | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
 
-diff --git a/drivers/base/power/domain.c b/drivers/base/power/domain.c
-index 2327613..32dcb80 100644
---- a/drivers/base/power/domain.c
-+++ b/drivers/base/power/domain.c
-@@ -235,6 +235,18 @@ static int genpd_power_off(struct generic_pm_domain *genpd)
- }
+diff --git a/arch/arm/mm/cache-l2x0.c b/arch/arm/mm/cache-l2x0.c
+index d6e43d8..6bdf3a5 100644
+--- a/arch/arm/mm/cache-l2x0.c
++++ b/arch/arm/mm/cache-l2x0.c
+@@ -656,7 +656,8 @@ static void __init l2c310_enable(void __iomem *base, u32 aux, unsigned num_lock)
+ 	/* Read back resulting AUX_CTRL value as it could have been altered. */
+ 	aux = readl_relaxed(base + L2X0_AUX_CTRL);
  
- /**
-+ * genpd_queue_power_off_work - Queue up the execution of pm_genpd_poweroff().
-+ * @genpd: PM domait to power off.
-+ *
-+ * Queue up the execution of pm_genpd_poweroff() unless it's already been done
-+ * before.
-+ */
-+static void genpd_queue_power_off_work(struct generic_pm_domain *genpd)
-+{
-+	queue_work(pm_wq, &genpd->power_off_work);
-+}
-+
-+/**
-  * __pm_genpd_poweron - Restore power to a given PM domain and its masters.
-  * @genpd: PM domain to power up.
-  *
-@@ -315,8 +327,12 @@ static int __pm_genpd_poweron(struct generic_pm_domain *genpd)
- 	return 0;
+-	if (aux & (L310_AUX_CTRL_DATA_PREFETCH | L310_AUX_CTRL_INSTR_PREFETCH)) {
++	if ((aux & L310_AUX_CTRL_DATA_PREFETCH) ||
++	    (aux & L310_AUX_CTRL_INSTR_PREFETCH)) {
+ 		u32 prefetch = readl_relaxed(base + L310_PREFETCH_CTRL);
  
-  err:
--	list_for_each_entry_continue_reverse(link, &genpd->slave_links, slave_node)
-+	list_for_each_entry_continue_reverse(link,
-+					&genpd->slave_links,
-+					slave_node) {
- 		genpd_sd_counter_dec(link->master);
-+		genpd_queue_power_off_work(link->master);
-+	}
- 
- 	return ret;
- }
-@@ -490,18 +506,6 @@ static bool genpd_abort_poweroff(struct generic_pm_domain *genpd)
- }
- 
- /**
-- * genpd_queue_power_off_work - Queue up the execution of pm_genpd_poweroff().
-- * @genpd: PM domait to power off.
-- *
-- * Queue up the execution of pm_genpd_poweroff() unless it's already been done
-- * before.
-- */
--static void genpd_queue_power_off_work(struct generic_pm_domain *genpd)
--{
--	queue_work(pm_wq, &genpd->power_off_work);
--}
--
--/**
-  * pm_genpd_poweroff - Remove power from a given PM domain.
-  * @genpd: PM domain to power down.
-  *
+ 		pr_info("L2C-310 %s%s prefetch enabled, offset %u lines\n",
 -- 
-1.9.1
+2.1.0
