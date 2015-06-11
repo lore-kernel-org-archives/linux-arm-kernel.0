@@ -1,67 +1,68 @@
-From: hanjun.guo@linaro.org (Hanjun Guo)
-Date: Thu, 11 Jun 2015 20:55:09 +0800
-Subject: [PATCH 02/11] ACPI / irqchip: Add self-probe infrastructure to
- initialize IRQ controller
-In-Reply-To: <557858AC.6010701@arm.com>
-References: <1431953961-22706-1-git-send-email-hanjun.guo@linaro.org>
- <1431953961-22706-3-git-send-email-hanjun.guo@linaro.org>
- <557858AC.6010701@arm.com>
-Message-ID: <5579852D.1010509@linaro.org>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Thu, 11 Jun 2015 18:27:33 +0530
+Subject: [PATCH 1/6] clocksource: arm_arch_timer: Migrate to new
+ 'set-state' interface
+In-Reply-To: <55797DB6.1040301@linaro.org>
+References: <cover.1433768426.git.viresh.kumar@linaro.org>
+ <80bb7da364daf25660d130513d386353ac78a640.1433768426.git.viresh.kumar@linaro.org>
+ <55797DB6.1040301@linaro.org>
+Message-ID: <20150611125733.GA28891@linux>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Marc,
+On 11-06-15, 14:23, Daniel Lezcano wrote:
+> [ ... ]
+> 
+> Instead of returning zero in the functions
+> 'timer_shutdown_virt|phys|virt_mem|phys_mem', do it here directly.
+> 
 
-On 06/10/2015 11:33 PM, Marc Zyngier wrote:
-> Hi Hanjun,
->
-> On 18/05/15 13:59, Hanjun Guo wrote:
->> From: Tomasz Nowicki <tomasz.nowicki@linaro.org>
->>
->> This self-probe infrastructure works in the similar way as OF,
->> but there is some different in the mechanism:
->>
->> For OF, the init fn will be called once it finds comptiable strings
->> in DT,  but for ACPI, we init irqchips by static tables, and in
->> static ACPI tables, there are no comptiable strings to indicate
->> irqchips, so every init function with IRQCHIP_ACPI_DECLARE in the
->> same table will be called, but thanks to the GIC version presented
->> in ACPI table, we can init different GIC irqchips with this framework.
->
-> This triggers an immediate question: If we can find out the GIC version
-> in the ACPI tables, which can't we just call the irqchips that implement
-> the support for this version?
+> 
+> As suggested above:
+> 
+> 	return timer_shutdown(ARCH_TIMER_VIRT_ACCESS, clk);
+> 
+> >  }
 
-This is really a good question and triggers me to rethink about
-the implementation.
+Sure.
 
->
-> i.e: the GICv2 irqchip code would have a line like:
->
-> IRQCHIP_ACPI_DECLARE(gic_v2, ACPI_MADT_GIC_VER_V2, gic_v2_acpi_init);
->
-> and the probing code would simply call the drivers that have declared
-> their interest for this version code.
+> >@@ -286,17 +286,18 @@ static void __arch_timer_setup(unsigned type,
 
-if we want to achieve this, we can redefine the strut for acpi_table_id:
+> >-	clk->set_mode(CLOCK_EVT_MODE_SHUTDOWN, clk);
+> >+	clk->set_state_oneshot = arch_timer_set_oneshot;
+> >+	clk->set_state_shutdown(clk);
+> 
+> Why don't you call clockevent_shutdown(clk) ?
 
-#define ACPI_TABLE_ID_LEN	5
+I haven't changed the behavior as the current code doesn't do it that
+way. If we want to change it, then it should be a separate patch.
 
-struct acpi_table_id {
-	__u8 id[ACPI_TABLE_ID_LEN];
-	const void *handler;
-	kernel_ulong_t driver_data;
-};
+Having said that, in this particular instance the device is not yet
+registered with the core and we probably didn't wanted 'mode' to be
+set to SHUTDOWN. That would have also hit a WARN/BUG as clockevents
+core expected the device to be in UNUSED mode at registration.
 
-then pass the ACPI_MADT_GIC_VER_V2 as the driver_data, it will
-work as you suggested.
+> There is some initialization there, no ?
 
->
-> Having code that tests for the version in each driver is not an option
-> (this is exactly what we're trying to avoid).
+We don't want it at this point of time.
 
-I also think it's awkward to do that in each driver, thanks for the
-suggestion!
+> >  	clockevents_config_and_register(clk, arch_timer_rate, 0xf, 0x7fffffff);
+> >  }
+> >@@ -506,7 +507,7 @@ static void arch_timer_stop(struct clock_event_device *clk)
+> >  			disable_percpu_irq(arch_timer_ppi[PHYS_NONSECURE_PPI]);
+> >  	}
+> >
+> >-	clk->set_mode(CLOCK_EVT_MODE_UNUSED, clk);
+> >+	clk->set_state_shutdown(clk);
+> >  }
+> 
+> Ditto.
 
-Thanks
-Hanjun
+This is called from the CPU_DYING notifier, not sure what the
+intention was behind not letting the clockevents core about mode
+change.
+
+But if it has to change, then it should happen in a separate patch.
+
+-- 
+viresh
