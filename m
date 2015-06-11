@@ -1,49 +1,73 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Thu, 11 Jun 2015 14:39:35 +0200
-Subject: [PATCH] ARM: mm: show prefetch state when either data or instr
- prefect is enabled
-In-Reply-To: <20150611121052.GX7557@n2100.arm.linux.org.uk>
-References: <1434023531-20052-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <20150611121052.GX7557@n2100.arm.linux.org.uk>
-Message-ID: <20150611143935.1f725466@free-electrons.com>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Thu, 11 Jun 2015 21:40:23 +0900
+Subject: [PATCH 1/2] clk: exynos4: Add PCLK_ADC gate clock on Exynos4x12
+In-Reply-To: <CABxcv=kNb2ERqLL2gG73nkU+kpPsYAWKSyu=bkjfxZBMKOwyPQ@mail.gmail.com>
+References: <1434011190-24563-1-git-send-email-k.kozlowski@samsung.com>
+ <55796660.1070702@samsung.com>
+ <CABxcv=kNb2ERqLL2gG73nkU+kpPsYAWKSyu=bkjfxZBMKOwyPQ@mail.gmail.com>
+Message-ID: <557981B7.3000303@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Russell,
-
-On Thu, 11 Jun 2015 13:10:52 +0100, Russell King - ARM Linux wrote:
-
-> > diff --git a/arch/arm/mm/cache-l2x0.c b/arch/arm/mm/cache-l2x0.c
-> > index d6e43d8..6bdf3a5 100644
-> > --- a/arch/arm/mm/cache-l2x0.c
-> > +++ b/arch/arm/mm/cache-l2x0.c
-> > @@ -656,7 +656,8 @@ static void __init l2c310_enable(void __iomem *base, u32 aux, unsigned num_lock)
-> >  	/* Read back resulting AUX_CTRL value as it could have been altered. */
-> >  	aux = readl_relaxed(base + L2X0_AUX_CTRL);
-> >  
-> > -	if (aux & (L310_AUX_CTRL_DATA_PREFETCH | L310_AUX_CTRL_INSTR_PREFETCH)) {
+W dniu 11.06.2015 o 21:15, Javier Martinez Canillas pisze:
+> Hello Krzysztof,
 > 
-> What this says is...
-> 	first, bitwise _OR_ L310_AUX_CTRL_DATA_PREFETCH with
-> 	L310_AUX_CTRL_INSTR_PREFETCH.  This produces a number which has
-> 	_two_ bits set.
+> On Thu, Jun 11, 2015 at 12:43 PM, Krzysztof Kozlowski
+> <k.kozlowski@samsung.com> wrote:
+>> W dniu 11.06.2015 o 17:26, Krzysztof Kozlowski pisze:
+>>> Add proper gate clock for the Analog to Digital Converter (ADC) on
+>>> Exynos4x12.
+>>>
+>>> Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+>>> ---
+>>>  drivers/clk/samsung/clk-exynos4.c   | 3 +++
+>>>  include/dt-bindings/clock/exynos4.h | 5 ++++-
+>>>  2 files changed, 7 insertions(+), 1 deletion(-)
+>>>
+>>> diff --git a/drivers/clk/samsung/clk-exynos4.c b/drivers/clk/samsung/clk-exynos4.c
+>>> index 714d6ba782c8..5f32410a01f8 100644
+>>> --- a/drivers/clk/samsung/clk-exynos4.c
+>>> +++ b/drivers/clk/samsung/clk-exynos4.c
+>>> @@ -85,6 +85,7 @@
+>>>  #define DIV_PERIL4           0xc560
+>>>  #define DIV_PERIL5           0xc564
+>>>  #define E4X12_DIV_CAM1               0xc568
+>>> +#define E4X12_GATE_BUS_FSYS1 0xc744
+>>>  #define GATE_SCLK_CAM                0xc820
+>>>  #define GATE_IP_CAM          0xc920
+>>>  #define GATE_IP_TV           0xc924
+>>> @@ -1095,6 +1096,8 @@ static struct samsung_gate_clock exynos4x12_gate_clks[] __initdata = {
+>>>               0),
+>>>       GATE(CLK_PPMUIMAGE, "ppmuimage", "aclk200", E4X12_GATE_IP_IMAGE, 9, 0,
+>>>               0),
+>>> +     GATE(CLK_PCLK_ADC, "pclk_adc", "aclk133", E4X12_GATE_BUS_FSYS1, 16, 0,
+>>> +             0),
+>>
+>> Now I have even simpler idea. Don't add new clock id but just define
+>> here the CLK_TSADC as:
+>> GATE(CLK_TSADC, "tsadc", "aclk133", E4X12_GATE_BUS_FSYS1, 16, 0, 0);
+>>
+>> With this change the second patch wouldn't be needed however this does
+>> not reflect the Exynos 4x12 datasheet.
+>>
+>> Any comments?
+>>
 > 
-> 	then, bitwise _AND_ that number with the auxiliary control register.
-> 
-> 	If the result is non-zero, then execute the code within the if() { }
-> 	block.
-> 
-> So, I'm not going to take this patch.  The code is correct as it stands.
+> I think it's better to reflect the datasheet so I prefer your original
+> patch.
 
-You are indeed absolutely correct. I got confused because I wasn't
-seeing the message, but it was caused by the other problem (writing
-AUX_CTRL overwriting the changes made to PREFETCH_CTRL). But that
-obviously had nothing to do with this part of the code.
+Yeah, I also like sticking to datasheet but maybe it is not always worth
+to reproduce the datasheet in 100%. It is just thinking out loud.
 
-Sorry for the noise, and thanks for the quick feedback,
+> Also, wouldn't changing the CLK_TSADC gate definition cause a
+> regression on an Exynos4210 board that is using the tsadc clock? or
+> maybe I misunderstood the explanation of your Patch 2/2?
 
-Thomas
--- 
-Thomas Petazzoni, CTO, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+No, no. The Exynos4210 would be unchanged. It has the CLK_TSADC - both
+in hardware and in kernel driver. The Exynos4x12 SoCs don't have so we can:
+1. Add new CLK_PCLK_ADC (id and clock) reflecting datasheet.
+2. Add only CLK_TSADC clock  on Exynos4x12 which will be using the
+register of PCLK_ADC. The id would stay the same as on Exynos4210.
+
+Best regards,
+Krzysztof
