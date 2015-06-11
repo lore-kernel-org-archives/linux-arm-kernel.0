@@ -1,106 +1,87 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Thu, 11 Jun 2015 14:23:18 +0200
-Subject: [PATCH 1/6] clocksource: arm_arch_timer: Migrate to new
- 'set-state' interface
-In-Reply-To: <80bb7da364daf25660d130513d386353ac78a640.1433768426.git.viresh.kumar@linaro.org>
-References: <cover.1433768426.git.viresh.kumar@linaro.org>
- <80bb7da364daf25660d130513d386353ac78a640.1433768426.git.viresh.kumar@linaro.org>
-Message-ID: <55797DB6.1040301@linaro.org>
+From: k.kozlowski.k@gmail.com (Krzysztof Kozlowski)
+Date: Thu, 11 Jun 2015 21:33:53 +0900
+Subject: [PATCH] PM / Domains: Try power off masters in error path of
+ __pm_genpd_poweron()
+In-Reply-To: <1434023511-4263-1-git-send-email-ulf.hansson@linaro.org>
+References: <1434023511-4263-1-git-send-email-ulf.hansson@linaro.org>
+Message-ID: <55798031.50205@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/08/2015 03:40 PM, Viresh Kumar wrote:
-> Migrate arm_arch_timer driver to the new 'set-state' interface provided
-> by the clockevents core, the earlier 'set-mode' interface is marked
-> obsolete now.
->
-> This also enables us to implement callbacks for new states of clockevent
-> devices, for example: ONESHOT_STOPPED.
->
-> Cc: Marc Zyngier <marc.zyngier@arm.com>
-> Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
+W dniu 11.06.2015 o 20:51, Ulf Hansson pisze:
+> While powering up a genpd, its domain masters are first being powered up.
+> In the error path of __pm_genpd_poweron(), we didn't care to try power off
+> these domain masters. Let's deal with that to avoid leaving unused PM
+> domains powered.
+> 
+> Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
 > ---
->   drivers/clocksource/arm_arch_timer.c | 61 ++++++++++++++++++------------------
->   1 file changed, 31 insertions(+), 30 deletions(-)
->
-> diff --git a/drivers/clocksource/arm_arch_timer.c b/drivers/clocksource/arm_arch_timer.c
-> index 0aa135ddbf80..d0b0cf43b981 100644
-> --- a/drivers/clocksource/arm_arch_timer.c
-> +++ b/drivers/clocksource/arm_arch_timer.c
-> @@ -181,44 +181,44 @@ static irqreturn_t arch_timer_handler_virt_mem(int irq, void *dev_id)
->   	return timer_handler(ARCH_TIMER_MEM_VIRT_ACCESS, evt);
->   }
->
-> -static __always_inline void timer_set_mode(const int access, int mode,
-> -				  struct clock_event_device *clk)
-> +static __always_inline void timer_shutdown(const int access,
-> +					   struct clock_event_device *clk)
->   {
+>  drivers/base/power/domain.c | 30 +++++++++++++++++-------------
+>  1 file changed, 17 insertions(+), 13 deletions(-)
+> 
+> diff --git a/drivers/base/power/domain.c b/drivers/base/power/domain.c
+> index 2327613..32dcb80 100644
+> --- a/drivers/base/power/domain.c
+> +++ b/drivers/base/power/domain.c
+> @@ -235,6 +235,18 @@ static int genpd_power_off(struct generic_pm_domain *genpd)
+>  }
+>  
+>  /**
+> + * genpd_queue_power_off_work - Queue up the execution of pm_genpd_poweroff().
+> + * @genpd: PM domait to power off.
+> + *
+> + * Queue up the execution of pm_genpd_poweroff() unless it's already been done
+> + * before.
+> + */
+> +static void genpd_queue_power_off_work(struct generic_pm_domain *genpd)
+> +{
+> +	queue_work(pm_wq, &genpd->power_off_work);
+> +}
+> +
+> +/**
+>   * __pm_genpd_poweron - Restore power to a given PM domain and its masters.
+>   * @genpd: PM domain to power up.
+>   *
+> @@ -315,8 +327,12 @@ static int __pm_genpd_poweron(struct generic_pm_domain *genpd)
+>  	return 0;
+>  
+>   err:
+> -	list_for_each_entry_continue_reverse(link, &genpd->slave_links, slave_node)
+> +	list_for_each_entry_continue_reverse(link,
+> +					&genpd->slave_links,
+> +					slave_node) {
+>  		genpd_sd_counter_dec(link->master);
+> +		genpd_queue_power_off_work(link->master);
 
-[ ... ]
+It looks sensible to revert work already done however I wonder if this
+is necessary for each slave. The first successful call to
+pm_genpd_poweroff() will also walk through slave_links and queue the work.
 
-Instead of returning zero in the functions 
-'timer_shutdown_virt|phys|virt_mem|phys_mem', do it here directly.
-
->   }
->
-> -static void arch_timer_set_mode_virt(enum clock_event_mode mode,
-> -				     struct clock_event_device *clk)
-> +static int arch_timer_shutdown_virt(struct clock_event_device *clk)
->   {
-> -	timer_set_mode(ARCH_TIMER_VIRT_ACCESS, mode, clk);
-> +	timer_shutdown(ARCH_TIMER_VIRT_ACCESS, clk);
-> +	return 0;
-
-As suggested above:
-
-	return timer_shutdown(ARCH_TIMER_VIRT_ACCESS, clk);
-
->   }
->
-
-[ ... ]
-
-> @@ -286,17 +286,18 @@ static void __arch_timer_setup(unsigned type,
->   		clk->rating = 400;
->   		clk->cpumask = cpu_all_mask;
->   		if (arch_timer_mem_use_virtual) {
-> -			clk->set_mode = arch_timer_set_mode_virt_mem;
-> +			clk->set_state_shutdown = arch_timer_shutdown_virt_mem;
->   			clk->set_next_event =
->   				arch_timer_set_next_event_virt_mem;
->   		} else {
-> -			clk->set_mode = arch_timer_set_mode_phys_mem;
-> +			clk->set_state_shutdown = arch_timer_shutdown_phys_mem;
->   			clk->set_next_event =
->   				arch_timer_set_next_event_phys_mem;
->   		}
->   	}
->
-> -	clk->set_mode(CLOCK_EVT_MODE_SHUTDOWN, clk);
-> +	clk->set_state_oneshot = arch_timer_set_oneshot;
-> +	clk->set_state_shutdown(clk);
-
-Why don't you call clockevent_shutdown(clk) ?
-
-There is some initialization there, no ?
-
->   	clockevents_config_and_register(clk, arch_timer_rate, 0xf, 0x7fffffff);
->   }
-> @@ -506,7 +507,7 @@ static void arch_timer_stop(struct clock_event_device *clk)
->   			disable_percpu_irq(arch_timer_ppi[PHYS_NONSECURE_PPI]);
->   	}
->
-> -	clk->set_mode(CLOCK_EVT_MODE_UNUSED, clk);
-> +	clk->set_state_shutdown(clk);
->   }
-
-Ditto.
+Best regards,
+Krzysztof
 
 
--- 
-  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
-
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+> +	}
+>  
+>  	return ret;
+>  }
+> @@ -490,18 +506,6 @@ static bool genpd_abort_poweroff(struct generic_pm_domain *genpd)
+>  }
+>  
+>  /**
+> - * genpd_queue_power_off_work - Queue up the execution of pm_genpd_poweroff().
+> - * @genpd: PM domait to power off.
+> - *
+> - * Queue up the execution of pm_genpd_poweroff() unless it's already been done
+> - * before.
+> - */
+> -static void genpd_queue_power_off_work(struct generic_pm_domain *genpd)
+> -{
+> -	queue_work(pm_wq, &genpd->power_off_work);
+> -}
+> -
+> -/**
+>   * pm_genpd_poweroff - Remove power from a given PM domain.
+>   * @genpd: PM domain to power down.
+>   *
+> 
