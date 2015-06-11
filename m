@@ -1,80 +1,70 @@
-From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Thu, 11 Jun 2015 22:54:59 +0900
-Subject: [PATCH 1/2] clk: exynos4: Add PCLK_ADC gate clock on Exynos4x12
-In-Reply-To: <557981B7.3000303@samsung.com>
-References: <1434011190-24563-1-git-send-email-k.kozlowski@samsung.com>
- <55796660.1070702@samsung.com>
- <CABxcv=kNb2ERqLL2gG73nkU+kpPsYAWKSyu=bkjfxZBMKOwyPQ@mail.gmail.com>
- <557981B7.3000303@samsung.com>
-Message-ID: <CA+Ln22EqW7_6h_0JoZqzSjV3ToC8gf8joGHiC2uUo6fLJ8aBVQ@mail.gmail.com>
+From: rogerq@ti.com (Roger Quadros)
+Date: Thu, 11 Jun 2015 17:00:38 +0300
+Subject: [PATCH 08/15] memory: kill off set_irq_flags usage
+In-Reply-To: <CAL_JsqL7abq_Vf2+BT2s9W7QDhLx-UbLFOoWf1E=p9WDBhgPdA@mail.gmail.com>
+References: <1433874401-27161-1-git-send-email-robh@kernel.org>
+ <1433874401-27161-9-git-send-email-robh@kernel.org>
+ <20150611151835.6d9b66a1@rockdesk>
+ <CAL_JsqL7abq_Vf2+BT2s9W7QDhLx-UbLFOoWf1E=p9WDBhgPdA@mail.gmail.com>
+Message-ID: <20150611170038.2f278e70@rockdesk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2015-06-11 21:40 GMT+09:00 Krzysztof Kozlowski <k.kozlowski@samsung.com>:
-> W dniu 11.06.2015 o 21:15, Javier Martinez Canillas pisze:
->> Hello Krzysztof,
->>
->> On Thu, Jun 11, 2015 at 12:43 PM, Krzysztof Kozlowski
->> <k.kozlowski@samsung.com> wrote:
->>> W dniu 11.06.2015 o 17:26, Krzysztof Kozlowski pisze:
->>>> Add proper gate clock for the Analog to Digital Converter (ADC) on
->>>> Exynos4x12.
->>>>
->>>> Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
->>>> ---
->>>>  drivers/clk/samsung/clk-exynos4.c   | 3 +++
->>>>  include/dt-bindings/clock/exynos4.h | 5 ++++-
->>>>  2 files changed, 7 insertions(+), 1 deletion(-)
->>>>
->>>> diff --git a/drivers/clk/samsung/clk-exynos4.c b/drivers/clk/samsung/clk-exynos4.c
->>>> index 714d6ba782c8..5f32410a01f8 100644
->>>> --- a/drivers/clk/samsung/clk-exynos4.c
->>>> +++ b/drivers/clk/samsung/clk-exynos4.c
->>>> @@ -85,6 +85,7 @@
->>>>  #define DIV_PERIL4           0xc560
->>>>  #define DIV_PERIL5           0xc564
->>>>  #define E4X12_DIV_CAM1               0xc568
->>>> +#define E4X12_GATE_BUS_FSYS1 0xc744
->>>>  #define GATE_SCLK_CAM                0xc820
->>>>  #define GATE_IP_CAM          0xc920
->>>>  #define GATE_IP_TV           0xc924
->>>> @@ -1095,6 +1096,8 @@ static struct samsung_gate_clock exynos4x12_gate_clks[] __initdata = {
->>>>               0),
->>>>       GATE(CLK_PPMUIMAGE, "ppmuimage", "aclk200", E4X12_GATE_IP_IMAGE, 9, 0,
->>>>               0),
->>>> +     GATE(CLK_PCLK_ADC, "pclk_adc", "aclk133", E4X12_GATE_BUS_FSYS1, 16, 0,
->>>> +             0),
->>>
->>> Now I have even simpler idea. Don't add new clock id but just define
->>> here the CLK_TSADC as:
->>> GATE(CLK_TSADC, "tsadc", "aclk133", E4X12_GATE_BUS_FSYS1, 16, 0, 0);
->>>
->>> With this change the second patch wouldn't be needed however this does
->>> not reflect the Exynos 4x12 datasheet.
->>>
->>> Any comments?
->>>
->>
->> I think it's better to reflect the datasheet so I prefer your original
->> patch.
->
-> Yeah, I also like sticking to datasheet but maybe it is not always worth
-> to reproduce the datasheet in 100%. It is just thinking out loud.
->
->> Also, wouldn't changing the CLK_TSADC gate definition cause a
->> regression on an Exynos4210 board that is using the tsadc clock? or
->> maybe I misunderstood the explanation of your Patch 2/2?
->
-> No, no. The Exynos4210 would be unchanged. It has the CLK_TSADC - both
-> in hardware and in kernel driver. The Exynos4x12 SoCs don't have so we can:
-> 1. Add new CLK_PCLK_ADC (id and clock) reflecting datasheet.
-> 2. Add only CLK_TSADC clock  on Exynos4x12 which will be using the
-> register of PCLK_ADC. The id would stay the same as on Exynos4210.
+On Thu, 11 Jun 2015 08:17:45 -0500
+Rob Herring <robh@kernel.org> wrote:
 
-Or we can:
-3. Add new CLK_PCLK_ADC macro equal to current CLK_TSADC. Then drivers
-and dtsi would be able to use the name matching the datasheet, but the
-ID (and so DT ABI) would be preserved.
+> On Thu, Jun 11, 2015 at 7:18 AM, Roger Quadros <rogerq@ti.com> wrote:
+> > Rob,
+> >
+> > On Tue, 9 Jun 2015 13:26:34 -0500
+> > Rob Herring <robh@kernel.org> wrote:
+> >
+> >> set_irq_flags is ARM specific with custom flags which have genirq
+> >> equivalents. Convert drivers to use the genirq interfaces directly, so we
+> >> can kill off set_irq_flags. The translation of flags is as follows:
+> >>
+> >> IRQF_VALID -> !IRQ_NOREQUEST
+> >> IRQF_PROBE -> !IRQ_NOPROBE
+> >> IRQF_NOAUTOEN -> IRQ_NOAUTOEN
+> >>
+> >> For IRQs managed by an irqdomain, the irqdomain core code handles clearing
+> >> and setting IRQ_NOREQUEST already, so there is no need to do this in
+> >> .map() functions and we can simply remove the set_irq_flags calls. Some
+> >> users also set IRQ_NOPROBE and this has been maintained although it is not
+> >> clear that is really needed. There appears to be a great deal of blind
+> >> copy and paste of this code.
+> >>
+> >> Signed-off-by: Rob Herring <robh@kernel.org>
+> >> Cc: Roger Quadros <rogerq@ti.com>
+> >> Cc: Tony Lindgren <tony@atomide.com>
+> >> Cc: linux-omap at vger.kernel.org
+> >> ---
+> >>  drivers/memory/omap-gpmc.c | 5 ++---
+> >>  1 file changed, 2 insertions(+), 3 deletions(-)
+> >>
+> >> diff --git a/drivers/memory/omap-gpmc.c b/drivers/memory/omap-gpmc.c
+> >> index c94ea0d..0c833e2 100644
+> >> --- a/drivers/memory/omap-gpmc.c
+> >> +++ b/drivers/memory/omap-gpmc.c
+> >> @@ -1176,8 +1176,8 @@ static int gpmc_setup_irq(void)
+> >>               gpmc_client_irq[i].irq = gpmc_irq_start + i;
+> >>               irq_set_chip_and_handler(gpmc_client_irq[i].irq,
+> >>                                       &gpmc_irq_chip, handle_simple_irq);
+> >> -             set_irq_flags(gpmc_client_irq[i].irq,
+> >> -                             IRQF_VALID | IRQF_NOAUTOEN);
+> >> +             irq_modify_status(gpmc_client_irq[i].irq, IRQ_NOREQUEST,
+> >> +                               IRQ_NOAUTOEN);
+> >
+> > Shouldn't this be
+> >                 irq_modify_status(gpmc_client_irq[i].irq, IRQ_NOREQUEST,
+> >                                   IRQ_NOAUTOEN | IRQ_NOPROBE);
+> > ?
+> 
+> Only if this needs to work on !ARM. The default for ARM is IRQ_NOPROBE set.
 
-Best regards,
-Tomasz
+OK. In that case.
+
+Acked-by: Roger Quadros <rogerq@ti.com>
+
+cheers,
+-roger
