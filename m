@@ -1,68 +1,65 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Thu, 11 Jun 2015 17:15:31 +0100
-Subject: [PATCH] arm: dts: vexpress: describe all PMUs in TC2 dts
-Message-ID: <1434039331-14504-1-git-send-email-mark.rutland@arm.com>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Thu, 11 Jun 2015 17:18:08 +0100
+Subject: [Patch v5 4/6] PCI/ACPI: Consolidate common PCI host bridge code
+ into ACPI core
+In-Reply-To: <55787191.6060400@linux.intel.com>
+References: <1433780448-18636-1-git-send-email-jiang.liu@linux.intel.com>
+ <1433780448-18636-5-git-send-email-jiang.liu@linux.intel.com>
+ <20150609161230.GC8591@red-moon> <55771B27.1060509@linux.intel.com>
+ <20150610164821.GA18832@red-moon>
+ <55787191.6060400@linux.intel.com>
+Message-ID: <20150611161808.GE23914@red-moon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The dts for the CoreTile Express A15x2 A7x3 (TC2) only describes the
-PMUs of the Cortex-A15 CPUs, and not the Cortex-A7 CPUs.
+Hi Gerry,
 
-Now that we have a mechanism for describing disparate PMUs and their
-interrupts in device tree, this patch makes use of these to describe the
-PMUs for all CPUs in the system. For consistency, the existing A15 PMU
-interrupt-affinity property is reflowed across two lines.
+On Wed, Jun 10, 2015 at 06:19:13PM +0100, Jiang Liu wrote:
+> On 2015/6/11 0:48, Lorenzo Pieralisi wrote:
+> > On Tue, Jun 09, 2015 at 05:58:15PM +0100, Jiang Liu wrote:
+> >> On 2015/6/10 0:12, Lorenzo Pieralisi wrote:
+> > 
+> > [...]
+> > 
+> >>>> +struct pci_bus *acpi_pci_root_create(struct acpi_pci_root *root,
+> >>>> +				     struct acpi_pci_root_ops *ops,
+> >>>> +				     struct acpi_pci_root_info *info,
+> >>>> +				     void *sysdata, int segment, int node)
+> >>>
+> >>> I do not think you need to pass segment and node, they clutter the
+> >>> function signature when you can retrieve them from root, I would
+> >>> make them local variables and use root->segment and acpi_get_node
+> >>> in the function body to retrieve them.
+> >> On x86, node and segment may be overridden under certain conditions.
+> >> For example, segment will always be 0 if 'pci_ignore_seg' is set.
+> > 
+> > Ok, so the question would be then why do you not override the value
+> > in root->segment then (actually, is it *correct* to leave the segment
+> > value in root-> unchanged even if it is overriden) ?
+> > 
+> > Anyway, node is just used for a printk, why do not you add segment and
+> > node to acpi_pci_root_info ? Just cosmetic stuff, trying to help you
+> > simplify the code, it is not easy to parse.
+> Hi Lorenzo,
+> 	I used the complex prototype to explicitly reminder callers
+> that you need to prepare all these information. If simpler interface
+> is preferred, we could pack all ops, sysdata, segment, node, root
+> into info, that there's will be only one parameter "info" left.
+> The drawback is that it will add several lines of code to each arch
+> using this interface. So prefer simpler interface or less lines of code?:)
 
-Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-Acked-by: Will Deacon <will.deacon@arm.com>
-Cc: Liviu Dudau <liviu.dudau@arm.com>
-Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-Cc: Sudeep Holla <sudeep.holla@arm.com>
----
- arch/arm/boot/dts/vexpress-v2p-ca15_a7.dts | 15 +++++++++++++--
- 1 file changed, 13 insertions(+), 2 deletions(-)
+I was just referring to segment and node parameters, I think that having
+them in the parameters list is overkill and they can be encapsulated.
 
-This was previously posted along with the corresponding support code [1], which
-is now queued in Will's perf/updates branch [2], for v4.2. I've rebased it atop
-of Sudeep's interrupt-affinity addition, but otherwise it's identical.
+With the changes discussed previously feel free to add my:
 
-Liviu, Lorenzo, Sudeep, are you happy to ack this and/or queue it up to follow
-the support code?
+Reviewed-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
 
-Thanks,
-Mark.
-
-[1] http://lists.infradead.org/pipermail/linux-arm-kernel/2015-May/343144.html
-[2] https://git.kernel.org/cgit/linux/kernel/git/will/linux.git/log/?h=perf/updates
-
-diff --git a/arch/arm/boot/dts/vexpress-v2p-ca15_a7.dts b/arch/arm/boot/dts/vexpress-v2p-ca15_a7.dts
-index 107395c..038e30e 100644
---- a/arch/arm/boot/dts/vexpress-v2p-ca15_a7.dts
-+++ b/arch/arm/boot/dts/vexpress-v2p-ca15_a7.dts
-@@ -187,11 +187,22 @@
- 			     <1 10 0xf08>;
- 	};
- 
--	pmu {
-+	pmu_a15 {
- 		compatible = "arm,cortex-a15-pmu";
- 		interrupts = <0 68 4>,
- 			     <0 69 4>;
--		interrupt-affinity = <&cpu0>, <&cpu1>;
-+		interrupt-affinity = <&cpu0>,
-+				     <&cpu1>;
-+	};
-+
-+	pmu_a7 {
-+		compatible = "arm,cortex-a7-pmu";
-+		interrupts = <0 128 4>,
-+			     <0 129 4>,
-+			     <0 130 4>;
-+		interrupt-affinity = <&cpu2>,
-+				     <&cpu3>,
-+				     <&cpu4>;
- 	};
- 
- 	oscclk6a: oscclk6a {
--- 
-1.9.1
+> Thanks!
+> Gerry
+> 
+> > 
+> > Thanks,
+> > Lorenzo
+> > 
+> 
