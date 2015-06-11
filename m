@@ -1,76 +1,76 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Thu, 11 Jun 2015 13:51:12 +0200
-Subject: [PATCH] ARM: mvebu: use DT properties to fine-tune the L2
- configuration
-Message-ID: <1434023472-19851-1-git-send-email-thomas.petazzoni@free-electrons.com>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Thu, 11 Jun 2015 13:51:51 +0200
+Subject: [PATCH] PM / Domains: Try power off masters in error path of
+ __pm_genpd_poweron()
+Message-ID: <1434023511-4263-1-git-send-email-ulf.hansson@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In order to optimize the L2 cache performance, this commit adjusts the
-configuration of the L2 on the Cortex-A9 based Marvell EBU processors
-(Armada 375, 38x and 39x), using the appropriate DT properties.
+While powering up a genpd, its domain masters are first being powered up.
+In the error path of __pm_genpd_poweron(), we didn't care to try power off
+these domain masters. Let's deal with that to avoid leaving unused PM
+domains powered.
 
-We enable double linefill, incr double linefill, data prefetch and
-disable double linefill on wrap. This matches the configuration that
-was fine tuned in the Marvell BSP.
-
-Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
 ---
-Enabling the data prefetching depends on a patch from "Hauke Mehrtens
-<hauke@hauke-m.de>", [PATCH v4] ARM: l2c: add options to overwrite
-prefetching behavior, which has been applied by Russell (see
-http://www.arm.linux.org.uk/developer/patches/viewpatch.php?id=8391/1)
-but does not appear yet in his for-next branch.
----
- arch/arm/boot/dts/armada-375.dtsi | 4 ++++
- arch/arm/boot/dts/armada-38x.dtsi | 4 ++++
- arch/arm/boot/dts/armada-39x.dtsi | 4 ++++
- 3 files changed, 12 insertions(+)
+ drivers/base/power/domain.c | 30 +++++++++++++++++-------------
+ 1 file changed, 17 insertions(+), 13 deletions(-)
 
-diff --git a/arch/arm/boot/dts/armada-375.dtsi b/arch/arm/boot/dts/armada-375.dtsi
-index f076ff8..4d4964b 100644
---- a/arch/arm/boot/dts/armada-375.dtsi
-+++ b/arch/arm/boot/dts/armada-375.dtsi
-@@ -176,6 +176,10 @@
- 				reg = <0x8000 0x1000>;
- 				cache-unified;
- 				cache-level = <2>;
-+				arm,double-linefill-incr = <1>;
-+				arm,double-linefill-wrap = <0>;
-+				arm,double-linefill = <1>;
-+				prefetch-data = <1>;
- 			};
+diff --git a/drivers/base/power/domain.c b/drivers/base/power/domain.c
+index 2327613..32dcb80 100644
+--- a/drivers/base/power/domain.c
++++ b/drivers/base/power/domain.c
+@@ -235,6 +235,18 @@ static int genpd_power_off(struct generic_pm_domain *genpd)
+ }
  
- 			scu at c000 {
-diff --git a/arch/arm/boot/dts/armada-38x.dtsi b/arch/arm/boot/dts/armada-38x.dtsi
-index 218a2ac..a86d1dc 100644
---- a/arch/arm/boot/dts/armada-38x.dtsi
-+++ b/arch/arm/boot/dts/armada-38x.dtsi
-@@ -143,6 +143,10 @@
- 				reg = <0x8000 0x1000>;
- 				cache-unified;
- 				cache-level = <2>;
-+				arm,double-linefill-incr = <1>;
-+				arm,double-linefill-wrap = <0>;
-+				arm,double-linefill = <1>;
-+				prefetch-data = <1>;
- 			};
+ /**
++ * genpd_queue_power_off_work - Queue up the execution of pm_genpd_poweroff().
++ * @genpd: PM domait to power off.
++ *
++ * Queue up the execution of pm_genpd_poweroff() unless it's already been done
++ * before.
++ */
++static void genpd_queue_power_off_work(struct generic_pm_domain *genpd)
++{
++	queue_work(pm_wq, &genpd->power_off_work);
++}
++
++/**
+  * __pm_genpd_poweron - Restore power to a given PM domain and its masters.
+  * @genpd: PM domain to power up.
+  *
+@@ -315,8 +327,12 @@ static int __pm_genpd_poweron(struct generic_pm_domain *genpd)
+ 	return 0;
  
- 			scu at c000 {
-diff --git a/arch/arm/boot/dts/armada-39x.dtsi b/arch/arm/boot/dts/armada-39x.dtsi
-index ecd1318..06d9cc5 100644
---- a/arch/arm/boot/dts/armada-39x.dtsi
-+++ b/arch/arm/boot/dts/armada-39x.dtsi
-@@ -104,6 +104,10 @@
- 				reg = <0x8000 0x1000>;
- 				cache-unified;
- 				cache-level = <2>;
-+				arm,double-linefill-incr = <1>;
-+				arm,double-linefill-wrap = <0>;
-+				arm,double-linefill = <1>;
-+				prefetch-data = <1>;
- 			};
+  err:
+-	list_for_each_entry_continue_reverse(link, &genpd->slave_links, slave_node)
++	list_for_each_entry_continue_reverse(link,
++					&genpd->slave_links,
++					slave_node) {
+ 		genpd_sd_counter_dec(link->master);
++		genpd_queue_power_off_work(link->master);
++	}
  
- 			scu at c000 {
+ 	return ret;
+ }
+@@ -490,18 +506,6 @@ static bool genpd_abort_poweroff(struct generic_pm_domain *genpd)
+ }
+ 
+ /**
+- * genpd_queue_power_off_work - Queue up the execution of pm_genpd_poweroff().
+- * @genpd: PM domait to power off.
+- *
+- * Queue up the execution of pm_genpd_poweroff() unless it's already been done
+- * before.
+- */
+-static void genpd_queue_power_off_work(struct generic_pm_domain *genpd)
+-{
+-	queue_work(pm_wq, &genpd->power_off_work);
+-}
+-
+-/**
+  * pm_genpd_poweroff - Remove power from a given PM domain.
+  * @genpd: PM domain to power down.
+  *
 -- 
-2.1.0
+1.9.1
