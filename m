@@ -1,33 +1,43 @@
-From: kristina.martsenko@arm.com (Kristina Martsenko)
-Date: Thu, 11 Jun 2015 15:12:43 +0100
-Subject: [PATCH] arm64: dts: add device tree for ARM SMM-A53x2 on LogicTile
- Express 20MG
-In-Reply-To: <20150610085825.GS12807@e106497-lin.cambridge.arm.com>
-References: <1433864311-2326-1-git-send-email-kristina.martsenko@arm.com>
- <20150610085825.GS12807@e106497-lin.cambridge.arm.com>
-Message-ID: <5579975B.8080902@arm.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 11 Jun 2015 07:13:31 -0700
+Subject: EDMA oftree entry for AM335x
+In-Reply-To: <55781BDA.9020705@ti.com>
+References: <20150504064323.GU15254@pengutronix.de>
+ <20150504141103.GD24469@atomide.com> <5548CB54.1040302@ti.com>
+ <20150505145828.GB21061@atomide.com> <5549F95B.8090905@ti.com>
+ <20150506143951.GG21061@atomide.com>
+ <20150608105957.GT26523@pengutronix.de>
+ <20150610051037.GA2740@atomide.com> <55781BDA.9020705@ti.com>
+Message-ID: <20150611141330.GC2740@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Liviu,
-
-On 10/06/15 09:58, Liviu Dudau wrote:
-> Hi Kristina,
+* Peter Ujfalusi <peter.ujfalusi@ti.com> [150610 04:18]:
+> On 06/10/2015 08:10 AM, Tony Lindgren wrote:
+> > * Robert Schwebel <r.schwebel@pengutronix.de> [150608 04:01]:
+> >> On Wed, May 06, 2015 at 07:39:52AM -0700, Tony Lindgren wrote:
+> >>>
+> >>> That may never happen considering that davinci is using it too.. It's
+> >>> best to not count on that happening anytime soon at least.
+> >>
+> >> So my current understanding is that we have the situation that the
+> >> kernel warns about the oftree being wrong, but isn't able to handle an
+> >> oftree that would be right.
+> >>
+> >> Shouldn't the warning being added when the kernel driver supports that
+> >> new mechanism?
+> > 
+> > This particular driver is broken and it needs to be fixed properly.
+> >  
+> >> I had a warning free mainline kernel without patches on my customer
+> >> hardware before, so this smells a bit like a regression ... :-/
+> > 
+> > Yes sorry I'm not patching away the warning as it does not fix the
+> > driver. Peter, I assume you are busy fixing it?
 > 
-> On Tue, Jun 09, 2015 at 04:38:31PM +0100, Kristina Martsenko wrote:
->> Add a DTS file for the MP2 Cortex-A53 Soft Macrocell Model implemented
->> on a LogicTile Express 20MG (V2F-1XV7) daughterboard. This is based on
->> the version that's currently available from the ARM DTS repository [1].
->>
->> [1] git://linux-arm.org/arm-dts.git
-> 
-> I thought the plan was to keep new DTs in this repository, not to add
-> them into the kernel. Has this changed?
+> Well, I was not.
+> But I'm now ;)
 
-There doesn't seem to be a plan, and all new DTs are being merged into
-the kernel. So for the time being it's better to have this one in the
-kernel as well.
+OK good to hear!
 
-Thanks for the review, I'll send a v2.
-
-Kristina
+Tony
