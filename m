@@ -1,137 +1,112 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Thu, 11 Jun 2015 21:50:30 +0200
-Subject: [PATCH 1/2] genalloc: rename dev_get_gen_pool() to gen_pool_get()
-In-Reply-To: <1434029302-7239-1-git-send-email-vladimir_zapolskiy@mentor.com>
-References: <1434029192-7082-1-git-send-email-vladimir_zapolskiy@mentor.com>
- <1434029302-7239-1-git-send-email-vladimir_zapolskiy@mentor.com>
-Message-ID: <5579E686.1010205@atmel.com>
+From: dhdang@apm.com (Duc Dang)
+Date: Thu, 11 Jun 2015 13:08:14 -0700
+Subject: [PATCH 1/1] PCI: X-Gene: Disable Configuration Request Retry Status
+ for X-Gene v1 PCIe
+Message-ID: <1434053294-10962-1-git-send-email-dhdang@apm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le 11/06/2015 15:28, Vladimir Zapolskiy a ?crit :
-> To be consistent with other genalloc interface namings, rename
-> dev_get_gen_pool() to gen_pool_get(). The original omitted "dev_"
-> prefix is removed, since it points to argument type of the function,
-> and so it does not bring any useful information.
-> 
-> Signed-off-by: Vladimir Zapolskiy <vladimir_zapolskiy@mentor.com>
-> ---
->  arch/arm/mach-at91/pm.c                   | 2 +-
->  arch/arm/mach-imx/pm-imx5.c               | 2 +-
->  arch/arm/mach-imx/pm-imx6.c               | 2 +-
->  drivers/media/platform/coda/coda-common.c | 2 +-
->  include/linux/genalloc.h                  | 2 +-
->  lib/genalloc.c                            | 8 ++++----
->  6 files changed, 9 insertions(+), 9 deletions(-)
-> 
-> diff --git a/arch/arm/mach-at91/pm.c b/arch/arm/mach-at91/pm.c
-> index 1e18476..e24df77 100644
-> --- a/arch/arm/mach-at91/pm.c
-> +++ b/arch/arm/mach-at91/pm.c
-> @@ -369,7 +369,7 @@ static void __init at91_pm_sram_init(void)
->  		return;
->  	}
->  
-> -	sram_pool = dev_get_gen_pool(&pdev->dev);
-> +	sram_pool = gen_pool_get(&pdev->dev);
->  	if (!sram_pool) {
->  		pr_warn("%s: sram pool unavailable!\n", __func__);
->  		return;
+X-Gene v1 PCIe controller has a bug in Configuration Request Retry
+Status (CRS) logic:
+  When CPU tries to read Vendor ID and Device ID of not-existed
+  remote device, the controller returns 0xFFFF0001 instead of
+  0xFFFFFFFF; this will add significant delay in boot time as
+  pci_bus_read_dev_vendor_id will wait for 60 seconds before
+  giving up.
 
-No blocked on my side. For AT91:
-Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+So for X-Gene v1 PCIe controllers, disable CRS capability
+advertisement by clearing CRS Software Visibility bit before
+returning the Root Capability value to the callers. This is done
+by implementing X-Gene PCIe specific xgene_pcie_config_read32 for
+CFG read accesses to replace the generic default pci_generic_config_read32
+function.
 
-> diff --git a/arch/arm/mach-imx/pm-imx5.c b/arch/arm/mach-imx/pm-imx5.c
-> index 0309ccd..1885676 100644
-> --- a/arch/arm/mach-imx/pm-imx5.c
-> +++ b/arch/arm/mach-imx/pm-imx5.c
-> @@ -297,7 +297,7 @@ static int __init imx_suspend_alloc_ocram(
->  		goto put_node;
->  	}
->  
-> -	ocram_pool = dev_get_gen_pool(&pdev->dev);
-> +	ocram_pool = gen_pool_get(&pdev->dev);
->  	if (!ocram_pool) {
->  		pr_warn("%s: ocram pool unavailable!\n", __func__);
->  		ret = -ENODEV;
-> diff --git a/arch/arm/mach-imx/pm-imx6.c b/arch/arm/mach-imx/pm-imx6.c
-> index b01650d..93ecf55 100644
-> --- a/arch/arm/mach-imx/pm-imx6.c
-> +++ b/arch/arm/mach-imx/pm-imx6.c
-> @@ -451,7 +451,7 @@ static int __init imx6q_suspend_init(const struct imx6_pm_socdata *socdata)
->  		goto put_node;
->  	}
->  
-> -	ocram_pool = dev_get_gen_pool(&pdev->dev);
-> +	ocram_pool = gen_pool_get(&pdev->dev);
->  	if (!ocram_pool) {
->  		pr_warn("%s: ocram pool unavailable!\n", __func__);
->  		ret = -ENODEV;
-> diff --git a/drivers/media/platform/coda/coda-common.c b/drivers/media/platform/coda/coda-common.c
-> index 6d6e0ca..6e640c0 100644
-> --- a/drivers/media/platform/coda/coda-common.c
-> +++ b/drivers/media/platform/coda/coda-common.c
-> @@ -2157,7 +2157,7 @@ static int coda_probe(struct platform_device *pdev)
->  	/* Get IRAM pool from device tree or platform data */
->  	pool = of_get_named_gen_pool(np, "iram", 0);
->  	if (!pool && pdata)
-> -		pool = dev_get_gen_pool(pdata->iram_dev);
-> +		pool = gen_pool_get(pdata->iram_dev);
->  	if (!pool) {
->  		dev_err(&pdev->dev, "iram pool not available\n");
->  		return -ENOMEM;
-> diff --git a/include/linux/genalloc.h b/include/linux/genalloc.h
-> index 1ccaab4..015d170 100644
-> --- a/include/linux/genalloc.h
-> +++ b/include/linux/genalloc.h
-> @@ -119,7 +119,7 @@ extern unsigned long gen_pool_best_fit(unsigned long *map, unsigned long size,
->  
->  extern struct gen_pool *devm_gen_pool_create(struct device *dev,
->  		int min_alloc_order, int nid);
-> -extern struct gen_pool *dev_get_gen_pool(struct device *dev);
-> +extern struct gen_pool *gen_pool_get(struct device *dev);
->  
->  bool addr_in_gen_pool(struct gen_pool *pool, unsigned long start,
->  			size_t size);
-> diff --git a/lib/genalloc.c b/lib/genalloc.c
-> index d214866..948e92c 100644
-> --- a/lib/genalloc.c
-> +++ b/lib/genalloc.c
-> @@ -602,12 +602,12 @@ struct gen_pool *devm_gen_pool_create(struct device *dev, int min_alloc_order,
->  EXPORT_SYMBOL(devm_gen_pool_create);
->  
->  /**
-> - * dev_get_gen_pool - Obtain the gen_pool (if any) for a device
-> + * gen_pool_get - Obtain the gen_pool (if any) for a device
->   * @dev: device to retrieve the gen_pool from
->   *
->   * Returns the gen_pool for the device if one is present, or NULL.
->   */
-> -struct gen_pool *dev_get_gen_pool(struct device *dev)
-> +struct gen_pool *gen_pool_get(struct device *dev)
->  {
->  	struct gen_pool **p = devres_find(dev, devm_gen_pool_release, NULL,
->  					NULL);
-> @@ -616,7 +616,7 @@ struct gen_pool *dev_get_gen_pool(struct device *dev)
->  		return NULL;
->  	return *p;
->  }
-> -EXPORT_SYMBOL_GPL(dev_get_gen_pool);
-> +EXPORT_SYMBOL_GPL(gen_pool_get);
->  
->  #ifdef CONFIG_OF
->  /**
-> @@ -642,7 +642,7 @@ struct gen_pool *of_get_named_gen_pool(struct device_node *np,
->  	of_node_put(np_pool);
->  	if (!pdev)
->  		return NULL;
-> -	return dev_get_gen_pool(&pdev->dev);
-> +	return gen_pool_get(&pdev->dev);
->  }
->  EXPORT_SYMBOL_GPL(of_get_named_gen_pool);
->  #endif /* CONFIG_OF */
-> 
+Signed-off-by: Duc Dang <dhdang@apm.com>
+---
+ drivers/pci/host/pci-xgene.c | 48 +++++++++++++++++++++++++++++++++++++++++++-
+ 1 file changed, 47 insertions(+), 1 deletion(-)
 
-
+diff --git a/drivers/pci/host/pci-xgene.c b/drivers/pci/host/pci-xgene.c
+index ee082c0..741a253 100644
+--- a/drivers/pci/host/pci-xgene.c
++++ b/drivers/pci/host/pci-xgene.c
+@@ -59,6 +59,12 @@
+ #define SZ_1T				(SZ_1G*1024ULL)
+ #define PIPE_PHY_RATE_RD(src)		((0xc000 & (u32)(src)) >> 0xe)
+ 
++#define ROOT_CAP_AND_CTRL		0x5C
++
++/* PCIe IP version */
++#define XGENE_PCIE_IP_VER_UNKN		0
++#define XGENE_PCIE_IP_VER_1		1
++
+ struct xgene_pcie_port {
+ 	struct device_node	*node;
+ 	struct device		*dev;
+@@ -67,6 +73,7 @@ struct xgene_pcie_port {
+ 	void __iomem		*cfg_base;
+ 	unsigned long		cfg_addr;
+ 	bool			link_up;
++	u32			version;
+ };
+ 
+ static inline u32 pcie_bar_low_val(u32 addr, u32 flags)
+@@ -140,9 +147,44 @@ static void __iomem *xgene_pcie_map_bus(struct pci_bus *bus, unsigned int devfn,
+ 	return xgene_pcie_get_cfg_base(bus) + offset;
+ }
+ 
++int xgene_pcie_config_read32(struct pci_bus *bus, unsigned int devfn,
++			      int where, int size, u32 *val)
++{
++	void __iomem *addr;
++	struct xgene_pcie_port *port = bus->sysdata;
++
++	addr = bus->ops->map_bus(bus, devfn, where & ~0x3);
++	if (!addr) {
++		*val = ~0;
++		return PCIBIOS_DEVICE_NOT_FOUND;
++	}
++
++	*val = readl(addr);
++	/*
++	 * X-Gene v1 PCIe controller has a bug in Configuration Request
++	 * Retry Status (CRS) logic:
++	 *  When CPU tries to read Vendor ID and Device ID of not-existed
++	 *  remote device, the controller returns 0xFFFF0001 instead of
++	 *  0xFFFFFFFF; this will add significant delay in boot time as
++	 *  pci_bus_read_dev_vendor_id will wait for 60 seconds before
++	 *  giving up.
++	 * So for X-Gene v1 PCIe controllers, disable CRS capability
++	 * advertisement by clearing CRS Software Visibility bit before
++	 * returning the Root Capability value to the callers.
++	 */
++	if (pci_is_root_bus(bus) && (port->version == XGENE_PCIE_IP_VER_1) &&
++	    ((where & ~0x3) == ROOT_CAP_AND_CTRL))
++		*val &= ~(PCI_EXP_RTCAP_CRSVIS << 16);
++
++	if (size <= 2)
++		*val = (*val >> (8 * (where & 3))) & ((1 << (size * 8)) - 1);
++
++	return PCIBIOS_SUCCESSFUL;
++}
++
+ static struct pci_ops xgene_pcie_ops = {
+ 	.map_bus = xgene_pcie_map_bus,
+-	.read = pci_generic_config_read32,
++	.read = xgene_pcie_config_read32,
+ 	.write = pci_generic_config_write32,
+ };
+ 
+@@ -483,6 +525,10 @@ static int xgene_pcie_probe_bridge(struct platform_device *pdev)
+ 	port->node = of_node_get(pdev->dev.of_node);
+ 	port->dev = &pdev->dev;
+ 
++	port->version = XGENE_PCIE_IP_VER_UNKN;
++	if (of_device_is_compatible(port->node, "apm,xgene-pcie"))
++		port->version = XGENE_PCIE_IP_VER_1;
++
+ 	ret = xgene_pcie_map_reg(port, pdev);
+ 	if (ret)
+ 		return ret;
 -- 
-Nicolas Ferre
+1.9.1
