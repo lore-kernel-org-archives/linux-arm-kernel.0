@@ -1,45 +1,47 @@
 From: khilman@kernel.org (Kevin Hilman)
-Date: Wed, 10 Jun 2015 17:04:20 -0700
-Subject: [GIT PULL] at91: dt for 4.2 #4
-In-Reply-To: <1433509218-21690-1-git-send-email-nicolas.ferre@atmel.com>
- (Nicolas Ferre's message of "Fri, 5 Jun 2015 15:00:18 +0200")
-References: <1433509218-21690-1-git-send-email-nicolas.ferre@atmel.com>
-Message-ID: <7h7frbhzzv.fsf@deeprootsystems.com>
+Date: Wed, 10 Jun 2015 17:06:12 -0700
+Subject: [GIT PULL]Hisilicon 64-bit soc hi6220 DT changes for 4.2
+In-Reply-To: <5571BF2B.5080500@hisilicon.com> (Wei Xu's message of "Fri, 5 Jun
+ 2015 16:24:27 +0100")
+References: <5571BF2B.5080500@hisilicon.com>
+Message-ID: <7h381zhzwr.fsf@deeprootsystems.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Nicolas Ferre <nicolas.ferre@atmel.com> writes:
+Wei Xu <xuwei5@hisilicon.com> writes:
 
-> Arnd, Olof, Kevin,
+> Hi Arnd, Hi Olof, Hi Kevin,
 >
-> Another batch of DT changes for 4.2. The bulk of it is the move to stdout-path
-> for our cosonle.
-> As usual, the material is based on previous at91-dt3 that you already have.
+> Please help to pull the following changes.
+> Thanks!
 >
-> Thanks, best regards,
+> Best Regards,
+> Wei
 >
-> The following changes since commit f80737082c210fae8ce15ad5d615da381889d5e9:
+> ---
 >
->   ARM: at91/dt: remove useless usb clock (2015-05-22 11:11:33 +0200)
+> The following changes since commit b787f68c36d49bb1d9236f403813641efa74a031:
+>
+>   Linux 4.1-rc1 (2015-04-26 17:59:10 -0700)
 >
 > are available in the git repository at:
 >
->   git://git.kernel.org/pub/scm/linux/kernel/git/nferre/linux-at91.git tags/at91-dt4
+>   git://github.com/hisilicon/linux-hisi.git tags/hi6620-dt-for-4.2
 >
-> for you to fetch changes up to ea25525ce0d195724fead07fe6562fe478a3bf6f:
+> for you to fetch changes up to 86e8f528ef325843d9b01ee6d00823e667cab5e2:
 >
->   ARM: at91/dt: sama5d4ek: mci0 uses slot 0 (2015-06-04 11:49:12 +0200)
+>   arm64: dts: Add dts files for Hisilicon Hi6220 SoC (2015-06-05 15:30:06 +0100)
 >
 > ----------------------------------------------------------------
-> Fourth batch of DT changes for 4.2:
-> - rtc node for at91sam9rl/at91sam9rlek
-> - move to stdout-path for console on kizbox and all Atmel's boards
-> - Addition of the Acme Systems' Arietta G25
-> - two little fixes for Kizbox and sama5d4ek
+> ARM64: DT: Hisilicon hi6220 soc and hikey board updates for 4.2
+>
+> - Added the devicetree bindings document for hi6220 SoC
+> - Added the devicetree bindings document for hi6220 clock
+> - Added dts files for hi6220 SoC and hikey board
 >
 > ----------------------------------------------------------------
 
-Applied to next/dt,
+Pulled into next/dt,
 
 Thanks,
 
