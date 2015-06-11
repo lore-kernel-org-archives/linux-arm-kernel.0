@@ -1,36 +1,47 @@
-From: chunyan.zhang@spreadtrum.com (Chunyan Zhang)
-Date: Thu, 11 Jun 2015 12:04:32 +0800
-Subject: [PATCH] arm64: kernel thread don't need to save fpsimd context.
-Message-ID: <1433995472-6170-1-git-send-email-chunyan.zhang@spreadtrum.com>
+From: vthakkar1994@gmail.com (Vaishali Thakkar)
+Date: Thu, 11 Jun 2015 10:57:35 +0530
+Subject: [PATCH] ARM: pxa: Use setup_timer
+Message-ID: <20150611052734.GA3943@vaishali-Ideapad-Z570>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Janet Liu <janet.liu@spreadtrum.com>
+Use the timer API function setup_timer instead of structure field
+assignments to initialize a timer.
 
-kernel thread's default fpsimd state is zero. When fork a thread, if parent is kernel thread,
- and save hardware context to parent's fpsimd state, but this hardware context is user
-process's context, because kernel thread don't use fpsimd, it will not introduce issue,
-it add a little cost.
+A simplified version of the Coccinelle semantic patch that performs
+this transformation is as follows:
 
-Signed-off-by: Janet Liu <janet.liu@spreadtrum.com>
-Signed-off-by: Chunyan Zhang <chunyan.zhang@spreadtrum.com>
+@change@
+expression e1, e2, a;
+@@
+
+-init_timer(&e1);
++setup_timer(&e1, a, 0UL);
+... when != a = e2
+-e1.function = a;
+
+Signed-off-by: Vaishali Thakkar <vthakkar1994@gmail.com>
 ---
- arch/arm64/kernel/process.c |    3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
+ arch/arm/mach-pxa/sharpsl_pm.c | 6 ++----
+ 1 file changed, 2 insertions(+), 4 deletions(-)
 
-diff --git a/arch/arm64/kernel/process.c b/arch/arm64/kernel/process.c
-index c6b1f3b..2a46732 100644
---- a/arch/arm64/kernel/process.c
-+++ b/arch/arm64/kernel/process.c
-@@ -243,7 +243,8 @@ void release_thread(struct task_struct *dead_task)
+diff --git a/arch/arm/mach-pxa/sharpsl_pm.c b/arch/arm/mach-pxa/sharpsl_pm.c
+index 051a655..bdc0c41 100644
+--- a/arch/arm/mach-pxa/sharpsl_pm.c
++++ b/arch/arm/mach-pxa/sharpsl_pm.c
+@@ -841,11 +841,9 @@ static int sharpsl_pm_probe(struct platform_device *pdev)
+ 	sharpsl_pm.charge_mode = CHRG_OFF;
+ 	sharpsl_pm.flags = 0;
  
- int arch_dup_task_struct(struct task_struct *dst, struct task_struct *src)
- {
--	fpsimd_preserve_current_state();
-+	if (current->mm)
-+		fpsimd_preserve_current_state();
- 	*dst = *src;
- 	return 0;
- }
+-	init_timer(&sharpsl_pm.ac_timer);
+-	sharpsl_pm.ac_timer.function = sharpsl_ac_timer;
++	setup_timer(&sharpsl_pm.ac_timer, sharpsl_ac_timer, 0UL);
+ 
+-	init_timer(&sharpsl_pm.chrg_full_timer);
+-	sharpsl_pm.chrg_full_timer.function = sharpsl_chrg_full_timer;
++	setup_timer(&sharpsl_pm.chrg_full_timer, sharpsl_chrg_full_timer, 0UL);
+ 
+ 	led_trigger_register_simple("sharpsl-charge", &sharpsl_charge_led_trigger);
+ 
 -- 
-1.7.9.5
+1.9.1
