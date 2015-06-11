@@ -1,61 +1,24 @@
-From: robh@kernel.org (Rob Herring)
-Date: Thu, 11 Jun 2015 08:17:45 -0500
-Subject: [PATCH 08/15] memory: kill off set_irq_flags usage
-In-Reply-To: <20150611151835.6d9b66a1@rockdesk>
-References: <1433874401-27161-1-git-send-email-robh@kernel.org>
- <1433874401-27161-9-git-send-email-robh@kernel.org>
- <20150611151835.6d9b66a1@rockdesk>
-Message-ID: <CAL_JsqL7abq_Vf2+BT2s9W7QDhLx-UbLFOoWf1E=p9WDBhgPdA@mail.gmail.com>
+From: wsa@the-dreams.de (Wolfram Sang)
+Date: Thu, 11 Jun 2015 22:18:38 +0900
+Subject: [PATCH 1/1] i2c: at91: fix code checker warnings
+In-Reply-To: <7419376c5a4e60f1b23d36e66a102c7c40db1089.1434013494.git.cyrille.pitchen@atmel.com>
+References: <cover.1434013494.git.cyrille.pitchen@atmel.com>
+ <7419376c5a4e60f1b23d36e66a102c7c40db1089.1434013494.git.cyrille.pitchen@atmel.com>
+Message-ID: <20150611131837.GB1510@katana>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 11, 2015 at 7:18 AM, Roger Quadros <rogerq@ti.com> wrote:
-> Rob,
->
-> On Tue, 9 Jun 2015 13:26:34 -0500
-> Rob Herring <robh@kernel.org> wrote:
->
->> set_irq_flags is ARM specific with custom flags which have genirq
->> equivalents. Convert drivers to use the genirq interfaces directly, so we
->> can kill off set_irq_flags. The translation of flags is as follows:
->>
->> IRQF_VALID -> !IRQ_NOREQUEST
->> IRQF_PROBE -> !IRQ_NOPROBE
->> IRQF_NOAUTOEN -> IRQ_NOAUTOEN
->>
->> For IRQs managed by an irqdomain, the irqdomain core code handles clearing
->> and setting IRQ_NOREQUEST already, so there is no need to do this in
->> .map() functions and we can simply remove the set_irq_flags calls. Some
->> users also set IRQ_NOPROBE and this has been maintained although it is not
->> clear that is really needed. There appears to be a great deal of blind
->> copy and paste of this code.
->>
->> Signed-off-by: Rob Herring <robh@kernel.org>
->> Cc: Roger Quadros <rogerq@ti.com>
->> Cc: Tony Lindgren <tony@atomide.com>
->> Cc: linux-omap at vger.kernel.org
->> ---
->>  drivers/memory/omap-gpmc.c | 5 ++---
->>  1 file changed, 2 insertions(+), 3 deletions(-)
->>
->> diff --git a/drivers/memory/omap-gpmc.c b/drivers/memory/omap-gpmc.c
->> index c94ea0d..0c833e2 100644
->> --- a/drivers/memory/omap-gpmc.c
->> +++ b/drivers/memory/omap-gpmc.c
->> @@ -1176,8 +1176,8 @@ static int gpmc_setup_irq(void)
->>               gpmc_client_irq[i].irq = gpmc_irq_start + i;
->>               irq_set_chip_and_handler(gpmc_client_irq[i].irq,
->>                                       &gpmc_irq_chip, handle_simple_irq);
->> -             set_irq_flags(gpmc_client_irq[i].irq,
->> -                             IRQF_VALID | IRQF_NOAUTOEN);
->> +             irq_modify_status(gpmc_client_irq[i].irq, IRQ_NOREQUEST,
->> +                               IRQ_NOAUTOEN);
->
-> Shouldn't this be
->                 irq_modify_status(gpmc_client_irq[i].irq, IRQ_NOREQUEST,
->                                   IRQ_NOAUTOEN | IRQ_NOPROBE);
-> ?
+On Thu, Jun 11, 2015 at 11:16:32AM +0200, Cyrille Pitchen wrote:
+> buf_len is a size_t, so unsigned but was tested with '<= 0'.
+> 
+> Signed-off-by: Cyrille Pitchen <cyrille.pitchen@atmel.com>
 
-Only if this needs to work on !ARM. The default for ARM is IRQ_NOPROBE set.
+Applied to for-next, thanks!
 
-Rob
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150611/88e0d7ec/attachment.sig>
