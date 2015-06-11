@@ -1,68 +1,89 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Thu, 11 Jun 2015 18:27:33 +0530
-Subject: [PATCH 1/6] clocksource: arm_arch_timer: Migrate to new
- 'set-state' interface
-In-Reply-To: <55797DB6.1040301@linaro.org>
-References: <cover.1433768426.git.viresh.kumar@linaro.org>
- <80bb7da364daf25660d130513d386353ac78a640.1433768426.git.viresh.kumar@linaro.org>
- <55797DB6.1040301@linaro.org>
-Message-ID: <20150611125733.GA28891@linux>
+From: javier@dowhile0.org (Javier Martinez Canillas)
+Date: Thu, 11 Jun 2015 14:58:33 +0200
+Subject: [PATCH 1/2] clk: exynos4: Add PCLK_ADC gate clock on Exynos4x12
+In-Reply-To: <557981B7.3000303@samsung.com>
+References: <1434011190-24563-1-git-send-email-k.kozlowski@samsung.com>
+ <55796660.1070702@samsung.com>
+ <CABxcv=kNb2ERqLL2gG73nkU+kpPsYAWKSyu=bkjfxZBMKOwyPQ@mail.gmail.com>
+ <557981B7.3000303@samsung.com>
+Message-ID: <CABxcv=myq4VeMamstjVR2cpWCiD_FM91ncYYVKd4jRF=nB5zZQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11-06-15, 14:23, Daniel Lezcano wrote:
-> [ ... ]
-> 
-> Instead of returning zero in the functions
-> 'timer_shutdown_virt|phys|virt_mem|phys_mem', do it here directly.
-> 
+Hello Krzysztof,
 
-> 
-> As suggested above:
-> 
-> 	return timer_shutdown(ARCH_TIMER_VIRT_ACCESS, clk);
-> 
-> >  }
+On Thu, Jun 11, 2015 at 2:40 PM, Krzysztof Kozlowski
+<k.kozlowski@samsung.com> wrote:
+> W dniu 11.06.2015 o 21:15, Javier Martinez Canillas pisze:
+>> Hello Krzysztof,
+>>
+>> On Thu, Jun 11, 2015 at 12:43 PM, Krzysztof Kozlowski
+>> <k.kozlowski@samsung.com> wrote:
+>>> W dniu 11.06.2015 o 17:26, Krzysztof Kozlowski pisze:
+>>>> Add proper gate clock for the Analog to Digital Converter (ADC) on
+>>>> Exynos4x12.
+>>>>
+>>>> Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+>>>> ---
+>>>>  drivers/clk/samsung/clk-exynos4.c   | 3 +++
+>>>>  include/dt-bindings/clock/exynos4.h | 5 ++++-
+>>>>  2 files changed, 7 insertions(+), 1 deletion(-)
+>>>>
+>>>> diff --git a/drivers/clk/samsung/clk-exynos4.c b/drivers/clk/samsung/clk-exynos4.c
+>>>> index 714d6ba782c8..5f32410a01f8 100644
+>>>> --- a/drivers/clk/samsung/clk-exynos4.c
+>>>> +++ b/drivers/clk/samsung/clk-exynos4.c
+>>>> @@ -85,6 +85,7 @@
+>>>>  #define DIV_PERIL4           0xc560
+>>>>  #define DIV_PERIL5           0xc564
+>>>>  #define E4X12_DIV_CAM1               0xc568
+>>>> +#define E4X12_GATE_BUS_FSYS1 0xc744
+>>>>  #define GATE_SCLK_CAM                0xc820
+>>>>  #define GATE_IP_CAM          0xc920
+>>>>  #define GATE_IP_TV           0xc924
+>>>> @@ -1095,6 +1096,8 @@ static struct samsung_gate_clock exynos4x12_gate_clks[] __initdata = {
+>>>>               0),
+>>>>       GATE(CLK_PPMUIMAGE, "ppmuimage", "aclk200", E4X12_GATE_IP_IMAGE, 9, 0,
+>>>>               0),
+>>>> +     GATE(CLK_PCLK_ADC, "pclk_adc", "aclk133", E4X12_GATE_BUS_FSYS1, 16, 0,
+>>>> +             0),
+>>>
+>>> Now I have even simpler idea. Don't add new clock id but just define
+>>> here the CLK_TSADC as:
+>>> GATE(CLK_TSADC, "tsadc", "aclk133", E4X12_GATE_BUS_FSYS1, 16, 0, 0);
+>>>
+>>> With this change the second patch wouldn't be needed however this does
+>>> not reflect the Exynos 4x12 datasheet.
+>>>
+>>> Any comments?
+>>>
+>>
+>> I think it's better to reflect the datasheet so I prefer your original
+>> patch.
+>
+> Yeah, I also like sticking to datasheet but maybe it is not always worth
+> to reproduce the datasheet in 100%. It is just thinking out loud.
+>
 
-Sure.
+Agreed.
 
-> >@@ -286,17 +286,18 @@ static void __arch_timer_setup(unsigned type,
+>> Also, wouldn't changing the CLK_TSADC gate definition cause a
+>> regression on an Exynos4210 board that is using the tsadc clock? or
+>> maybe I misunderstood the explanation of your Patch 2/2?
+>
+> No, no. The Exynos4210 would be unchanged. It has the CLK_TSADC - both
+> in hardware and in kernel driver. The Exynos4x12 SoCs don't have so we can:
+> 1. Add new CLK_PCLK_ADC (id and clock) reflecting datasheet.
+> 2. Add only CLK_TSADC clock  on Exynos4x12 which will be using the
+> register of PCLK_ADC. The id would stay the same as on Exynos4210.
+>
 
-> >-	clk->set_mode(CLOCK_EVT_MODE_SHUTDOWN, clk);
-> >+	clk->set_state_oneshot = arch_timer_set_oneshot;
-> >+	clk->set_state_shutdown(clk);
-> 
-> Why don't you call clockevent_shutdown(clk) ?
+I see, thanks for the explanation. Both approaches seems sensible for
+me then, I don't have a strong opinion on either though.
 
-I haven't changed the behavior as the current code doesn't do it that
-way. If we want to change it, then it should be a separate patch.
+> Best regards,
+> Krzysztof
+>
 
-Having said that, in this particular instance the device is not yet
-registered with the core and we probably didn't wanted 'mode' to be
-set to SHUTDOWN. That would have also hit a WARN/BUG as clockevents
-core expected the device to be in UNUSED mode at registration.
-
-> There is some initialization there, no ?
-
-We don't want it at this point of time.
-
-> >  	clockevents_config_and_register(clk, arch_timer_rate, 0xf, 0x7fffffff);
-> >  }
-> >@@ -506,7 +507,7 @@ static void arch_timer_stop(struct clock_event_device *clk)
-> >  			disable_percpu_irq(arch_timer_ppi[PHYS_NONSECURE_PPI]);
-> >  	}
-> >
-> >-	clk->set_mode(CLOCK_EVT_MODE_UNUSED, clk);
-> >+	clk->set_state_shutdown(clk);
-> >  }
-> 
-> Ditto.
-
-This is called from the CPU_DYING notifier, not sure what the
-intention was behind not letting the clockevents core about mode
-change.
-
-But if it has to change, then it should happen in a separate patch.
-
--- 
-viresh
+Best regards,
+Javier
