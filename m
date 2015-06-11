@@ -1,97 +1,64 @@
-From: eric.auger@linaro.org (Eric Auger)
-Date: Thu, 11 Jun 2015 20:24:14 +0200
-Subject: [PATCH 09/13] KVM: arm64: handle pending bit for LPIs in ITS
- emulation
-In-Reply-To: <5579B0EA.1090701@arm.com>
-References: <1432893209-27313-1-git-send-email-andre.przywara@arm.com>
- <1432893209-27313-10-git-send-email-andre.przywara@arm.com>
- <55770D4A.9090801@linaro.org> <5579AD43.6070407@arm.com>
- <5579B0EA.1090701@arm.com>
-Message-ID: <5579D24E.50208@linaro.org>
+From: g.liakhovetski@gmx.de (Guennadi Liakhovetski)
+Date: Thu, 11 Jun 2015 21:08:36 +0200 (CEST)
+Subject: [PATCH v5 0/3] media: atmel-isi: rework on the clock part and
+ add runtime pm support
+In-Reply-To: <557904CC.2090106@atmel.com>
+References: <1432634087-3356-1-git-send-email-josh.wu@atmel.com>
+ <557904CC.2090106@atmel.com>
+Message-ID: <Pine.LNX.4.64.1506112106300.18734@axis700.grange>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/11/2015 06:01 PM, Marc Zyngier wrote:
-> On 11/06/15 16:46, Andre Przywara wrote:
->> Salut Eric,
->>
->> On 06/09/2015 04:59 PM, Eric Auger wrote:
->>> On 05/29/2015 11:53 AM, Andre Przywara wrote:
->>>> As the actual LPI number in a guest can be quite high, but is mostly
->>>> assigned using a very sparse allocation scheme, bitmaps and arrays
->>>> for storing the virtual interrupt status are a waste of memory.
->>>> We use our equivalent of the "Interrupt Translation Table Entry"
->>>> (ITTE) to hold this extra status information for a virtual LPI.
->>>> As the normal VGIC code cannot use it's fancy bitmaps to manage
->>>> pending interrupts, we provide a hook in the VGIC code to let the
->>>> ITS emulation handle the list register queueing itself.
->>>> LPIs are located in a separate number range (>=8192), so
->>>> distinguishing them is easy. With LPIs being only edge-triggered, we
->>>> get away with a less complex IRQ handling.
->>>>
->>>> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
->>>> ---
->>>>  include/kvm/arm_vgic.h      |  2 ++
->>>>  virt/kvm/arm/its-emul.c     | 66 +++++++++++++++++++++++++++++++++++++++++++
->>>>  virt/kvm/arm/its-emul.h     |  3 ++
->>>>  virt/kvm/arm/vgic-v3-emul.c |  2 ++
->>>>  virt/kvm/arm/vgic.c         | 68 +++++++++++++++++++++++++++++++++------------
->>>>  5 files changed, 124 insertions(+), 17 deletions(-)
->>>>
->>>> diff --git a/include/kvm/arm_vgic.h b/include/kvm/arm_vgic.h
->>>> index fa17df6..de19c34 100644
->>>> --- a/include/kvm/arm_vgic.h
->>>> +++ b/include/kvm/arm_vgic.h
->>>> @@ -147,6 +147,8 @@ struct vgic_vm_ops {
->>>>  	int	(*init_model)(struct kvm *);
->>>>  	void	(*destroy_model)(struct kvm *);
->>>>  	int	(*map_resources)(struct kvm *, const struct vgic_params *);
->>>> +	bool	(*queue_lpis)(struct kvm_vcpu *);
->>>> +	void	(*unqueue_lpi)(struct kvm_vcpu *, int irq);
->>>>  };
->>>>  
->>>>  struct vgic_io_device {
->>>> diff --git a/virt/kvm/arm/its-emul.c b/virt/kvm/arm/its-emul.c
->>>> index f0f4a9c..f75fb9e 100644
->>>> --- a/virt/kvm/arm/its-emul.c
->>>> +++ b/virt/kvm/arm/its-emul.c
->>>> @@ -50,8 +50,26 @@ struct its_itte {
->>>>  	struct its_collection *collection;
->>>>  	u32 lpi;
->>>>  	u32 event_id;
->>>> +	bool enabled;
->>>> +	unsigned long *pending;
->>> allocated in later patch. does not ease the review of the life cycle but
->>> I guess it is accepted/acceptable.
->>
->> I tried to move some bits around a bit and ran into several issues, so I
->> guess we have to live with that.
->>
->>> Isn't it somehow redundant to have a bitmap here where the collection
->>> already indicates the target cpu id on which the LPI is pending?
->>
->> Unfortunately only "somewhat", as Marc taught me the other day ;-)
->> First, the spec shows that the pending bitmap is allocated _per CPU_, so
->> we have to model this here appropriately.
->> Second, you could have an LPI pending on one distributor, then change
->> the associated collection to another distributor and trigger that
->> interrupt again. This would make it pending on two VCPUs.
->> Admittedly not the most prominent use case, but possible.
+Hi Josh,
+
+On Thu, 11 Jun 2015, Josh Wu wrote:
+
+> Hi, Guennadi
 > 
-> The exact scenario is related to the MOVI command, which changes the
-> affinity of the interrupt and also move any pending state from another
-> CPU. There is no guarantee that these two actions are completed
-> atomically w.r.t the delivery of interrupts to CPUs.
+> Any feedback for this patch series?
+
+Sorry, I haven't found the time to look at patches from you and William 
+Towle, they are at the top of my todo list now - after all the compulsory 
+things, of course. I'll handle them as soon as I find time. Sorry for the 
+delay.
+
+Thanks
+Guennadi
+
+> Best Regards,
+> Josh Wu
 > 
-> We *could* make it atomic, but that would be quite heavy handed.
-
-OK thanks,
-
-The ITS command chapter is my next one ;-)
-
-Best Regards
-
-Eric
-> 
-> 	M.
+> On 5/26/2015 5:54 PM, Josh Wu wrote:
+> > This patch series fix the peripheral clock code and enable runtime support.
+> > Also it clean up the code which is for the compatiblity of mck.
+> > 
+> > Changes in v5:
+> > - add new patch to fix the condition that codec request still in work.
+> > - fix the error path in start_streaming() thanks to Laurent.
+> > 
+> > Changes in v4:
+> > - need to call pm_runtime_disable() in atmel_isi_remove().
+> > - merged the patch which remove isi disable code in atmel_isi_probe() as
+> >    isi peripherial clock is not enabled in this moment.
+> > - refine the commit log
+> > 
+> > Changes in v3:
+> > - remove useless definition: ISI_DEFAULT_MCLK_FREQ
+> > 
+> > Changes in v2:
+> > - merged v1 two patch into one.
+> > - use runtime_pm_put() instead of runtime_pm_put_sync()
+> > - enable peripheral clock before access ISI registers.
+> > - totally remove clock_start()/clock_stop() as they are optional.
+> > 
+> > Josh Wu (3):
+> >    media: atmel-isi: disable ISI even it has codec request in
+> >      stop_streaming()
+> >    media: atmel-isi: add runtime pm support
+> >    media: atmel-isi: remove mck back compatiable code as it's not need
+> > 
+> >   drivers/media/platform/soc_camera/atmel-isi.c | 105
+> > ++++++++++++--------------
+> >   1 file changed, 48 insertions(+), 57 deletions(-)
+> > 
 > 
