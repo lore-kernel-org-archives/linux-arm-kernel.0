@@ -1,76 +1,37 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Thu, 11 Jun 2015 11:24:59 +0200
-Subject: [PATCH v4] ARM: l2c: add options to overwrite prefetching behavior
-In-Reply-To: <55788F6B.7060406@hauke-m.de>
-References: <1432941541-18588-1-git-send-email-hauke@hauke-m.de>
- <20150610172100.230c0e71@free-electrons.com>
- <55788F6B.7060406@hauke-m.de>
-Message-ID: <20150611112459.6590ab05@free-electrons.com>
+From: cyrille.pitchen@atmel.com (Cyrille Pitchen)
+Date: Thu, 11 Jun 2015 11:26:20 +0200
+Subject: [PATCH 0/1] i2c: at91: fix code checker warnings
+In-Reply-To: <cover.1434013494.git.cyrille.pitchen@atmel.com>
+References: <cover.1434013494.git.cyrille.pitchen@atmel.com>
+Message-ID: <5579543C.6040108@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Hauke Mehrtens,
+Hi all,
 
-On Wed, 10 Jun 2015 21:26:35 +0200, Hauke Mehrtens wrote:
+this patch was made after applying the previous series
+"[PATCH v6 0/6] i2c: at91: add support to FIFOs and alternative command",
+which was already accepted.
 
-> Thanks for asking, I did not know Russell's patch process, but Florian
-> guided me and now it is submitted, see
-> http://www.arm.linux.org.uk/developer/patches/viewpatch.php?id=8391/1
+Best Regards,
 
-I tested your patch, and I'm not sure how it can work for you, because
-the changes made to the PREFETCH_CTRL register on the data/instruction
-prefetch bits are later overridden by changes made to the AUX_CTRL
-register.
+Cyrille
 
-Here is what I've found so far:
-
-static void l2c_configure(void __iomem *base)
-{
-	if (outer_cache.configure) {
-		outer_cache.configure(&l2x0_saved_regs);
-		return;
-	}
-
-	if (l2x0_data->configure)
-		l2x0_data->configure(base);
-
-	l2c_write_sec(l2x0_saved_regs.aux_ctrl, base, L2X0_AUX_CTRL);
-}
-
-l2x0_data->configure() is what writes the PREFETCH_CTRL register with
-the value determined in l2c310_of_parse() :
-
-	if (revision >= L310_CACHE_ID_RTL_R2P0) {
-		l2c_write_sec(l2x0_saved_regs.prefetch_ctrl, base,
-			      L310_PREFETCH_CTRL);
-	}
-
-The value written in the L310_PREFETCH_CTRL register is correct: it
-properly has bits 28/29 sets depending on prefetch-data/prefetch-instr.
-
-However, when l2c_configure() does:
-
-	l2c_write_sec(l2x0_saved_regs.aux_ctrl, base, L2X0_AUX_CTRL);
-
-It writes l2x0_saved_regs.aux_ctrl to the AUX_CTRL register, which has
-a "clone" of the prefetch data and prefetch instruction bits. And it
-resets them to zero. I've added debug messages before/after this line,
-and here is what I see:
-
-[    0.000000]  ==> (1) prefetch is now 0x58800000
-[    0.000000]  ==> (2) prefetch is now 0x48800000
-
-I had enabled only the prefetch-data, so in step (1) (before aux_ctrl
-is written to AUX_CTRL), bit 28 is correctly set to 1. However, after
-AUX_CTRL is written, it's restored to 0.
-
-How does your patch handles the fact that the prefetch data and
-prefetch instr are cloned between PREFETCH_CTRL and AUX_CTRL ?
-
-Thanks,
-
-Thomas
--- 
-Thomas Petazzoni, CTO, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+Le 11/06/2015 11:16, Cyrille Pitchen a ?crit :
+> ChangeLog
+> 
+> v1:
+> This patch fixes somes code checker warnings reported by Wolfram Sang:
+> 
+> drivers/i2c/busses/i2c-at91.c:213: style: Checking if unsigned variable 'buf_len' is less than zero.
+> drivers/i2c/busses/i2c-at91.c:254: style: Checking if unsigned variable 'buf_len' is less than zero.
+> drivers/i2c/busses/i2c-at91.c:293: style: Checking if unsigned variable 'buf_len' is less than zero.
+> 
+> Thanks for reporting!
+> 
+> Cyrille Pitchen (1):
+>   i2c: at91: fix code checker warnings
+> 
+>  drivers/i2c/busses/i2c-at91.c | 6 +++---
+>  1 file changed, 3 insertions(+), 3 deletions(-)
+> 
