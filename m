@@ -1,103 +1,40 @@
-From: andre.przywara@arm.com (Andre Przywara)
-Date: Thu, 11 Jun 2015 10:44:02 +0100
-Subject: [PATCH 07/10] KVM: arm/arm64: vgic: Allow HW interrupts to be
- queued to a guest
-In-Reply-To: <557951C6.2090408@arm.com>
-References: <1433783045-8002-1-git-send-email-marc.zyngier@arm.com>
- <1433783045-8002-8-git-send-email-marc.zyngier@arm.com>
- <55794A7A.2080306@arm.com> <557951C6.2090408@arm.com>
-Message-ID: <55795862.1050407@arm.com>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Thu, 11 Jun 2015 11:47:31 +0200
+Subject: [PATCH v4] ARM: l2c: add options to overwrite prefetching behavior
+In-Reply-To: <20150611093907.GW7557@n2100.arm.linux.org.uk>
+References: <1432941541-18588-1-git-send-email-hauke@hauke-m.de>
+ <20150610172100.230c0e71@free-electrons.com>
+ <55788F6B.7060406@hauke-m.de>
+ <20150611112459.6590ab05@free-electrons.com>
+ <20150611093417.GV7557@n2100.arm.linux.org.uk>
+ <20150611093907.GW7557@n2100.arm.linux.org.uk>
+Message-ID: <20150611114731.23147349@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/11/2015 10:15 AM, Marc Zyngier wrote:
-> On 11/06/15 09:44, Andre Przywara wrote:
->> On 06/08/2015 06:04 PM, Marc Zyngier wrote:
-...
->>> @@ -1344,6 +1364,35 @@ static bool vgic_process_maintenance(struct kvm_vcpu *vcpu)
->>>  	return level_pending;
->>>  }
->>>  
->>> +/* Return 1 if HW interrupt went from active to inactive, and 0 otherwise */
->>> +static int vgic_sync_hwirq(struct kvm_vcpu *vcpu, struct vgic_lr vlr)
->>> +{
->>> +	struct irq_phys_map *map;
->>> +	int ret;
->>> +
->>> +	if (!(vlr.state & LR_HW))
->>> +		return 0;
->>> +
->>> +	map = vgic_irq_map_search(vcpu, vlr.irq);
->>
->> I wonder if it's safe to rely on that mapping here. Are we sure that
->> this hasn't changed while the VCPU was running? If I got this correctly,
->> currently only vcpu_reset will actually add a map entry, but I guess in
->> the future there will be more users.
-> 
-> How can the guest interrupt change? This is HW, as far as the guest is
-> concerned. An actual interrupt line. We don't reconfigure the HW live.
+Russell,
 
-I was thinking about the rbtree mapping we introduced. There we map a
-guest interrupt to a hardware interrupt. Are we sure that no one tears
-down that mapping while we have an LR populated with this pair?
-I am not talking about the timer here, but more about future users.
+On Thu, 11 Jun 2015 10:39:07 +0100, Russell King - ARM Linux wrote:
 
->> Also we rely on the irqdomain mapping to be still the same, but that is
->> probably a safe assumption.
+> > > How does your patch handles the fact that the prefetch data and
+> > > prefetch instr are cloned between PREFETCH_CTRL and AUX_CTRL ?
+> > 
+> > It needs my patch.
 > 
-> Like I said before, this *cannot* change.
+> ... in fact, please see all the other L2C patches queued in my tree.
+> Hauke's patch is designed to be applied on top of these patches, not
+> to 4.1-rc directly.
 
-OK, got it.
+Yes, right. In the mean time, I discovered the discussion you had with
+Hauke on the v2 of his patch series, and started looking at your
+for-next branch. I wanted to give a test before reporting back, and
+it's now done: with "ARM: l2c: write auxiliary control register first"
++ Hauke's patch, it works fine for me.
 
-> 
->> But I'd still find it more natural to use the hwirq number from the LR
->> at this point. Can't we use irq_find_mapping() here to learn Linux'
->> (current) irq number from that?
-> 
-> I think you're confused.
-> 
-> - The guest irq (vlr.irq) is entirely made up, and has no connection
-> with reality. it is stable, and cannot change during the lifetime of the
-> guest (think of it as a HW irq line).
-> 
-> - The host hwirq (vlr.hwirq) is stable as well, for the same reason.
-> 
-> - The Linux IRQ cannot change because we've been given it by the kernel,
-> and that's what we use for *everything* as far as the kernel is
-> concerned. Its mapping to hwirq is stable as well because this is how we
-> talk to the HW.
+Thanks!
 
-Not disputing any of them, but:
-
-> - irq_find_mapping gives you the *reverse* mapping (from hwirq to Linux
-> irq), and for that to work, you need the domain on which you want to
-> apply the translation. This is only useful when actually taking the
-> interrupt (i.e. in an interrupt controller driver). I can't see how that
-> could make sense here.
-
-So if the guest has acked/EOIed it's IRQ, the GIC at the same time
-acked/EOIed the hardware IRQ it found in the LR. Now we assume that this
-is the very same as the HW IRQ we found doing our rbtree traversal.
-I just wanted to be sure that this is always true and that this mapping
-didn't change while the VCPU was running.
-If you are sure of this, fine, I was just concerned that someone breaks
-this assumption in the future by more dynamically mapping/unmapping
-entries (say some irq forwarding user) and we will not notice.
-
-Cheers,
-Andre.
-
-> 
-> The purpose of this mapping is to, given the guest irq (because that's
-> what we inject), what the other values are:
-> - hwirq: to provide GICH with the interrupt to deactivate
-> - Linux irq: to control the active state through the irqchip state API.
-> 
->> Or am I too paranoid here?
-> 
-> Hope it makes more sense to you now.
-> 
-> Thanks,
-> 
-> 	M.
-> 
+Thomas
+-- 
+Thomas Petazzoni, CTO, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
