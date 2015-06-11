@@ -1,46 +1,47 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Thu, 11 Jun 2015 13:52:30 +0200
-Subject: [PATCH] ARM: mm: enable L1 prefetch on Cortex-A9
-Message-ID: <1434023550-20147-1-git-send-email-thomas.petazzoni@free-electrons.com>
+From: jaswinder.singh@linaro.org (Jassi Brar)
+Date: Thu, 11 Jun 2015 17:24:19 +0530
+Subject: [PATCH v4 2/8] firmware: add support for ARM System Control and
+ Power Interface(SCPI) protocol
+In-Reply-To: <1433760002-24120-3-git-send-email-sudeep.holla@arm.com>
+References: <1433760002-24120-1-git-send-email-sudeep.holla@arm.com>
+ <1433760002-24120-3-git-send-email-sudeep.holla@arm.com>
+Message-ID: <CAJe_ZheUknLZuMg-02V-AqyjxX8Nx4oK3O2HapqfCLkkXjngAg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Cortex-A9 has a L1 prefetch capability documented at
-http://infocenter.arm.com/help/index.jsp?topic=/com.arm.doc.ddi0388e/Chdejhgd.html:
-
-  The Cortex-A9 data cache implements an automatic prefetcher that
-  monitors cache misses done by the processor. This unit can monitor
-  and prefetch two independent data streams. It can be activated in
-  software using a CP15 Auxiliary Control Register bit. See Auxiliary
-  Control Register.
-
-This commit enables this L1 prefetch feature unconditionally on all
-Cortex-A9 by setting bit 2 in the Auxiliary Control CP15
-register. Note that since this bit only exists on Cortex-A9 but not on
-Cortex-A5 or Cortex-R7, we separate the handling of Cortex-A9 from the
-one of those two other cores.
-
-Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
----
- arch/arm/mm/proc-v7.S | 5 ++++-
- 1 file changed, 4 insertions(+), 1 deletion(-)
-
-diff --git a/arch/arm/mm/proc-v7.S b/arch/arm/mm/proc-v7.S
-index 3d1054f..106ea4d 100644
---- a/arch/arm/mm/proc-v7.S
-+++ b/arch/arm/mm/proc-v7.S
-@@ -257,8 +257,11 @@ ENDPROC(cpu_pj4b_do_resume)
-  *	It is assumed that:
-  *	- cache type register is implemented
-  */
--__v7_ca5mp_setup:
- __v7_ca9mp_setup:
-+	mov	r10, #(1 << 0)			@ Cache/TLB ops broadcasting
-+	orr	r10, r10, #(1 << 2)		@ L1 prefetch
-+	b	1f
-+__v7_ca5mp_setup:
- __v7_cr7mp_setup:
- 	mov	r10, #(1 << 0)			@ Cache/TLB ops broadcasting
- 	b	1f
--- 
-2.1.0
+On 8 June 2015 at 16:09, Sudeep Holla <sudeep.holla@arm.com> wrote:
+...
+> +
+> +static void scpi_process_cmd(struct scpi_chan *ch, u32 cmd)
+> +{
+> +       unsigned long flags;
+> +       struct scpi_xfer *t, *match = NULL;
+> +
+> +       spin_lock_irqsave(&ch->rx_lock, flags);
+> +       if (list_empty(&ch->rx_pending)) {
+> +               spin_unlock_irqrestore(&ch->rx_lock, flags);
+> +               return;
+> +       }
+> +
+> +       list_for_each_entry(t, &ch->rx_pending, node)
+> +               if (CMD_XTRACT_UNIQ(t->cmd) == CMD_XTRACT_UNIQ(cmd)) {
+> +                       list_del(&t->node);
+> +                       match = t;
+> +                       break;
+> +               }
+> +       /* check if wait_for_completion is in progress or timed-out */
+> +       if (match && !completion_done(&match->done)) {
+> +               struct scpi_shared_mem *mem = ch->rx_payload;
+> +               unsigned int len = min(match->rx_len, CMD_SIZE(cmd));
+> +
+> +               match->status = le32_to_cpu(mem->status);
+> +               memcpy_fromio(match->rx_buf, mem->payload, len);
+> +               if (match->rx_len > len)
+> +                       memset(match->rx_buf + len, 0, match->rx_len - len);
+> +               complete(&match->done);
+> +       }
+> +       spin_unlock_irqrestore(&ch->rx_lock, flags);
+> +}
+There doesn't seem to be support for commands sent by remote?
+Something like when remote is the thermal master and it needs to send
+sensor readings crossing thresholds.
