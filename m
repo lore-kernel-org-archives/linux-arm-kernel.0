@@ -1,62 +1,101 @@
-From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Thu, 11 Jun 2015 19:36:45 +0200
-Subject: [PATCH v4 13/14] crypto: marvell/CESA: add support for Kirkwood and
- Dove SoCs
-In-Reply-To: <1434044206-10459-1-git-send-email-boris.brezillon@free-electrons.com>
-References: <1434044206-10459-1-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <1434044206-10459-27-git-send-email-boris.brezillon@free-electrons.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Thu, 11 Jun 2015 18:58:24 +0100
+Subject: [PATCH] arm/arm64: KVM: vgic: Do not save GICH_HCR / ICH_HCR_EL2
+Message-ID: <1434045504-11549-1-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Arnaud Ebalard <arno@natisbad.org>
+The GIC Hypervisor Configuration Register is used to enable
+the delivery of virtual interupts to a guest, as well as to
+define in which conditions maintenance interrupts are delivered
+to the host.
 
-Add the Kirkwood and Dove SoC descriptions, and control the allhwsupport
-module parameter to avoid probing the CESA IP when the old CESA driver is
-enabled (unless it is explicitly requested to do so).
+This register doesn't contain any information that we need to
+read back (the EOIcount is utterly useless for us).
 
-Signed-off-by: Arnaud Ebalard <arno@natisbad.org>
-Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+So let's save ourselves some cycles, and not save it before
+writing zero to it.
+
+Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- drivers/crypto/marvell/cesa.c | 13 ++++++++++++-
- 1 file changed, 12 insertions(+), 1 deletion(-)
+ arch/arm/kvm/interrupts_head.S  | 3 ---
+ arch/arm64/kvm/vgic-v2-switch.S | 3 ---
+ arch/arm64/kvm/vgic-v3-switch.S | 2 --
+ 3 files changed, 8 deletions(-)
 
-diff --git a/drivers/crypto/marvell/cesa.c b/drivers/crypto/marvell/cesa.c
-index bd54973..3546ee7 100644
---- a/drivers/crypto/marvell/cesa.c
-+++ b/drivers/crypto/marvell/cesa.c
-@@ -211,6 +211,15 @@ static const struct mv_cesa_caps orion_caps = {
- 	.has_tdma = false,
- };
+diff --git a/arch/arm/kvm/interrupts_head.S b/arch/arm/kvm/interrupts_head.S
+index 35e4a3a..82a4ac9 100644
+--- a/arch/arm/kvm/interrupts_head.S
++++ b/arch/arm/kvm/interrupts_head.S
+@@ -412,7 +412,6 @@ vcpu	.req	r0		@ vcpu pointer always in r0
+ 	add	r11, vcpu, #VCPU_VGIC_CPU
  
-+static const struct mv_cesa_caps kirkwood_caps = {
-+	.nengines = 1,
-+	.cipher_algs = orion_cipher_algs,
-+	.ncipher_algs = ARRAY_SIZE(orion_cipher_algs),
-+	.ahash_algs = orion_ahash_algs,
-+	.nahash_algs = ARRAY_SIZE(orion_ahash_algs),
-+	.has_tdma = true,
-+};
-+
- static const struct mv_cesa_caps armada_370_caps = {
- 	.nengines = 1,
- 	.cipher_algs = armada_370_cipher_algs,
-@@ -231,6 +240,8 @@ static const struct mv_cesa_caps armada_xp_caps = {
+ 	/* Save all interesting registers */
+-	ldr	r3, [r2, #GICH_HCR]
+ 	ldr	r4, [r2, #GICH_VMCR]
+ 	ldr	r5, [r2, #GICH_MISR]
+ 	ldr	r6, [r2, #GICH_EISR0]
+@@ -420,7 +419,6 @@ vcpu	.req	r0		@ vcpu pointer always in r0
+ 	ldr	r8, [r2, #GICH_ELRSR0]
+ 	ldr	r9, [r2, #GICH_ELRSR1]
+ 	ldr	r10, [r2, #GICH_APR]
+-ARM_BE8(rev	r3, r3	)
+ ARM_BE8(rev	r4, r4	)
+ ARM_BE8(rev	r5, r5	)
+ ARM_BE8(rev	r6, r6	)
+@@ -429,7 +427,6 @@ ARM_BE8(rev	r8, r8	)
+ ARM_BE8(rev	r9, r9	)
+ ARM_BE8(rev	r10, r10	)
  
- static const struct of_device_id mv_cesa_of_match_table[] = {
- 	{ .compatible = "marvell,orion-crypto", .data = &orion_caps },
-+	{ .compatible = "marvell,kirkwood-crypto", .data = &kirkwood_caps },
-+	{ .compatible = "marvell,dove-crypto", .data = &kirkwood_caps },
- 	{ .compatible = "marvell,armada-370-crypto", .data = &armada_370_caps },
- 	{ .compatible = "marvell,armada-xp-crypto", .data = &armada_xp_caps },
- 	{ .compatible = "marvell,armada-375-crypto", .data = &armada_xp_caps },
-@@ -379,7 +390,7 @@ static int mv_cesa_probe(struct platform_device *pdev)
- 		caps = match->data;
- 	}
+-	str	r3, [r11, #VGIC_V2_CPU_HCR]
+ 	str	r4, [r11, #VGIC_V2_CPU_VMCR]
+ 	str	r5, [r11, #VGIC_V2_CPU_MISR]
+ #ifdef CONFIG_CPU_ENDIAN_BE8
+diff --git a/arch/arm64/kvm/vgic-v2-switch.S b/arch/arm64/kvm/vgic-v2-switch.S
+index f002fe1..3f00071 100644
+--- a/arch/arm64/kvm/vgic-v2-switch.S
++++ b/arch/arm64/kvm/vgic-v2-switch.S
+@@ -47,7 +47,6 @@ __save_vgic_v2_state:
+ 	add	x3, x0, #VCPU_VGIC_CPU
  
--	if (caps == &orion_caps && !allhwsupport)
-+	if ((caps == &orion_caps || caps == &kirkwood_caps) && !allhwsupport)
- 		return -ENOTSUPP;
+ 	/* Save all interesting registers */
+-	ldr	w4, [x2, #GICH_HCR]
+ 	ldr	w5, [x2, #GICH_VMCR]
+ 	ldr	w6, [x2, #GICH_MISR]
+ 	ldr	w7, [x2, #GICH_EISR0]
+@@ -55,7 +54,6 @@ __save_vgic_v2_state:
+ 	ldr	w9, [x2, #GICH_ELRSR0]
+ 	ldr	w10, [x2, #GICH_ELRSR1]
+ 	ldr	w11, [x2, #GICH_APR]
+-CPU_BE(	rev	w4,  w4  )
+ CPU_BE(	rev	w5,  w5  )
+ CPU_BE(	rev	w6,  w6  )
+ CPU_BE(	rev	w7,  w7  )
+@@ -64,7 +62,6 @@ CPU_BE(	rev	w9,  w9  )
+ CPU_BE(	rev	w10, w10 )
+ CPU_BE(	rev	w11, w11 )
  
- 	cesa = devm_kzalloc(dev, sizeof(*cesa), GFP_KERNEL);
+-	str	w4, [x3, #VGIC_V2_CPU_HCR]
+ 	str	w5, [x3, #VGIC_V2_CPU_VMCR]
+ 	str	w6, [x3, #VGIC_V2_CPU_MISR]
+ CPU_LE(	str	w7, [x3, #VGIC_V2_CPU_EISR] )
+diff --git a/arch/arm64/kvm/vgic-v3-switch.S b/arch/arm64/kvm/vgic-v3-switch.S
+index 617a012..3c20730 100644
+--- a/arch/arm64/kvm/vgic-v3-switch.S
++++ b/arch/arm64/kvm/vgic-v3-switch.S
+@@ -48,13 +48,11 @@
+ 	dsb	st
+ 
+ 	// Save all interesting registers
+-	mrs_s	x4, ICH_HCR_EL2
+ 	mrs_s	x5, ICH_VMCR_EL2
+ 	mrs_s	x6, ICH_MISR_EL2
+ 	mrs_s	x7, ICH_EISR_EL2
+ 	mrs_s	x8, ICH_ELSR_EL2
+ 
+-	str	w4, [x3, #VGIC_V3_CPU_HCR]
+ 	str	w5, [x3, #VGIC_V3_CPU_VMCR]
+ 	str	w6, [x3, #VGIC_V3_CPU_MISR]
+ 	str	w7, [x3, #VGIC_V3_CPU_EISR]
 -- 
-1.9.1
+2.1.4
