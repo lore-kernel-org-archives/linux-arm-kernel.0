@@ -1,43 +1,43 @@
-From: vthakkar1994@gmail.com (Vaishali Thakkar)
-Date: Thu, 11 Jun 2015 11:03:59 +0530
-Subject: [PATCH] ARM: iop32x: Use setup_timer
-Message-ID: <20150611053359.GA4855@vaishali-Ideapad-Z570>
+From: kishon@ti.com (Kishon Vijay Abraham I)
+Date: Thu, 11 Jun 2015 11:08:43 +0530
+Subject: [PATCH v3 0/2] USB OTG PHY driver for NXP LPC18xx family
+In-Reply-To: <CAGhQ9VzoZN0wow6csD7Mq58CFk31DGup676NoO=hyqnuAwNQwA@mail.gmail.com>
+References: <1432922617-11512-1-git-send-email-manabian@gmail.com>
+ <CAGhQ9VzoZN0wow6csD7Mq58CFk31DGup676NoO=hyqnuAwNQwA@mail.gmail.com>
+Message-ID: <55791EE3.4040001@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use the timer API function setup_timer instead of structure field
-assignments to initialize a timer.
+Hi Joachim,
 
-A simplified version of the Coccinelle semantic patch that performs
-this transformation is as follows:
+On Thursday 11 June 2015 12:39 AM, Joachim Eastwood wrote:
+> Hi Kishon,
+>
+> On 29 May 2015 at 20:03, Joachim Eastwood <manabian@gmail.com> wrote:
+>> This patch set adds support for the internal USB OTG PHY found
+>> on NXP LPC18xx and LPC43xx devices. Driver takes care of
+>> enabling the PHY and setting the clock rate which is need for
+>> USB0 support on this platform.
+>>
+>> This version address the comments from Kishon Vijay Abraham I.
+>>
+>> Changes in v3:
+>>   - depend on MFD_SYSCON
+>>
+>> Changes in v2:
+>>   - use PTR_ERR_OR_ZERO in phy driver
+>>   - rename binding doc
+>>   - update doc commit message
+>>
+>> Base support for this platform can now be found in arm-soc next.
+>>
+>> Joachim Eastwood (2):
+>>    phy: add lpc18xx usb otg phy driver
+>>    phy: dt bindings: add XP LPC18xx/43xx USB OTG PHY bindings
+>
+> Do you have any more comments on the patches or are they okey now?
 
-@change@
-expression e1, e2, a;
-@@
+The patches look fine. But it can go only in 4.3.
 
--init_timer(&e1);
-+setup_timer(&e1, a, 0UL);
-... when != a = e2
--e1.function = a;
-
-Signed-off-by: Vaishali Thakkar <vthakkar1994@gmail.com>
----
- arch/arm/mach-iop32x/n2100.c | 3 +--
- 1 file changed, 1 insertion(+), 2 deletions(-)
-
-diff --git a/arch/arm/mach-iop32x/n2100.c b/arch/arm/mach-iop32x/n2100.c
-index c1cd80e..4a64a11 100644
---- a/arch/arm/mach-iop32x/n2100.c
-+++ b/arch/arm/mach-iop32x/n2100.c
-@@ -336,8 +336,7 @@ static int __init n2100_request_gpios(void)
- 			pr_err("could not set power GPIO as input\n");
- 	}
- 	/* Set up power button poll timer */
--	init_timer(&power_button_poll_timer);
--	power_button_poll_timer.function = power_button_poll;
-+	setup_timer(&power_button_poll_timer, power_button_poll, 0UL);
- 	power_button_poll_timer.expires = jiffies + (HZ / 10);
- 	add_timer(&power_button_poll_timer);
- 	return 0;
--- 
-1.9.1
+Thanks
+Kishon
