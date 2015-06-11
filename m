@@ -1,56 +1,76 @@
-From: 21cnbao@gmail.com (Barry Song)
-Date: Thu, 11 Jun 2015 19:46:27 +0800
-Subject: [PATCH 1/2 V3] clk: sirf: add CSR atlas7 clk and reset support
-In-Reply-To: <20150610213345.GF29640@codeaurora.org>
-References: <1431675587-8637-1-git-send-email-21cnbao@gmail.com>
- <20150515183029.GL31753@codeaurora.org>
- <CAGsJ_4zwNQvvSwb49nwKzfke1V1nUCW-tDqbP4FxEr0SfmX9zA@mail.gmail.com>
- <20150521213324.GA1885@codeaurora.org>
- <CAGsJ_4xUk1kDnLDrRnipN+Kpm6oOe8C-4DfhdshVUmv+PKjgig@mail.gmail.com>
- <20150610213345.GF29640@codeaurora.org>
-Message-ID: <CAGsJ_4x-OK0oNxd6em=sH308Oz8zR1mvMwh2mg=jzK6nhi-0_Q@mail.gmail.com>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Thu, 11 Jun 2015 13:51:12 +0200
+Subject: [PATCH] ARM: mvebu: use DT properties to fine-tune the L2
+ configuration
+Message-ID: <1434023472-19851-1-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2015-06-11 5:33 GMT+08:00 Stephen Boyd <sboyd@codeaurora.org>:
-> On 06/11, Barry Song wrote:
->> 2015-05-22 5:33 GMT+08:00 Stephen Boyd <sboyd@codeaurora.org>:
->> > On 05/16, Barry Song wrote:
->> >> 2015-05-16 2:30 GMT+08:00 Stephen Boyd <sboyd@codeaurora.org>:
->> >> > On 05/15, Barry Song wrote:
->> >
->> > It isn't really about making boot time faster, it's about using
->> > the proper linux device model for clock providers. That way when
->> > we want to support things like suspend/resume, deferred probe,
->> > devm_*(), sysfs, etc. we can use the device model instead of
->> > resorting to things like syscore_ops for suspend/resume or
->> > forgoing features entirely.
->> >
->>
->> my feeling is if the clock controller is an internal controller which
->> serve all controllers in the SoC, "deferred probe" might be yes for
->> almost all HW since all HW need clock. so it seems it makes "deferred
->> probe" has no meaning. clock controller seems to be 1st HW which needs
->> to be ready.
->
-> That sounds like a probe ordering problem, and I agree most
-> likely the clock driver will need to probe first in this case. It
-> doesn't do anything about other problems like suspend/resume or
-> other features that the device model provides solutions for
-> though. Maybe we don't use these features, but it doesn't mean we
-> should forgo the device model just because we don't need it.
+In order to optimize the L2 cache performance, this commit adjusts the
+configuration of the L2 on the Cortex-A9 based Marvell EBU processors
+(Armada 375, 38x and 39x), using the appropriate DT properties.
 
-this is generally done by a earlier init like subsys_init, core_init
-etc. i agree it is always good to use the bus/driver/device model if
-possible.
-actually, moving to platform bus still has some deferred probe issue.
-it is probably everyone before clk driver need deferred probe.
-do you think we are possible to ask for clk even before platform
-devices are extended in machine callbacks?
+We enable double linefill, incr double linefill, data prefetch and
+disable double linefill on wrap. This matches the configuration that
+was fine tuned in the Marvell BSP.
 
+Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+---
+Enabling the data prefetching depends on a patch from "Hauke Mehrtens
+<hauke@hauke-m.de>", [PATCH v4] ARM: l2c: add options to overwrite
+prefetching behavior, which has been applied by Russell (see
+http://www.arm.linux.org.uk/developer/patches/viewpatch.php?id=8391/1)
+but does not appear yet in his for-next branch.
+---
+ arch/arm/boot/dts/armada-375.dtsi | 4 ++++
+ arch/arm/boot/dts/armada-38x.dtsi | 4 ++++
+ arch/arm/boot/dts/armada-39x.dtsi | 4 ++++
+ 3 files changed, 12 insertions(+)
 
->
-> --
-> Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-> a Linux Foundation Collaborative Project
--barry
+diff --git a/arch/arm/boot/dts/armada-375.dtsi b/arch/arm/boot/dts/armada-375.dtsi
+index f076ff8..4d4964b 100644
+--- a/arch/arm/boot/dts/armada-375.dtsi
++++ b/arch/arm/boot/dts/armada-375.dtsi
+@@ -176,6 +176,10 @@
+ 				reg = <0x8000 0x1000>;
+ 				cache-unified;
+ 				cache-level = <2>;
++				arm,double-linefill-incr = <1>;
++				arm,double-linefill-wrap = <0>;
++				arm,double-linefill = <1>;
++				prefetch-data = <1>;
+ 			};
+ 
+ 			scu at c000 {
+diff --git a/arch/arm/boot/dts/armada-38x.dtsi b/arch/arm/boot/dts/armada-38x.dtsi
+index 218a2ac..a86d1dc 100644
+--- a/arch/arm/boot/dts/armada-38x.dtsi
++++ b/arch/arm/boot/dts/armada-38x.dtsi
+@@ -143,6 +143,10 @@
+ 				reg = <0x8000 0x1000>;
+ 				cache-unified;
+ 				cache-level = <2>;
++				arm,double-linefill-incr = <1>;
++				arm,double-linefill-wrap = <0>;
++				arm,double-linefill = <1>;
++				prefetch-data = <1>;
+ 			};
+ 
+ 			scu at c000 {
+diff --git a/arch/arm/boot/dts/armada-39x.dtsi b/arch/arm/boot/dts/armada-39x.dtsi
+index ecd1318..06d9cc5 100644
+--- a/arch/arm/boot/dts/armada-39x.dtsi
++++ b/arch/arm/boot/dts/armada-39x.dtsi
+@@ -104,6 +104,10 @@
+ 				reg = <0x8000 0x1000>;
+ 				cache-unified;
+ 				cache-level = <2>;
++				arm,double-linefill-incr = <1>;
++				arm,double-linefill-wrap = <0>;
++				arm,double-linefill = <1>;
++				prefetch-data = <1>;
+ 			};
+ 
+ 			scu at c000 {
+-- 
+2.1.0
