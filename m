@@ -1,47 +1,32 @@
-From: jaswinder.singh@linaro.org (Jassi Brar)
-Date: Thu, 11 Jun 2015 17:24:19 +0530
-Subject: [PATCH v4 2/8] firmware: add support for ARM System Control and
- Power Interface(SCPI) protocol
-In-Reply-To: <1433760002-24120-3-git-send-email-sudeep.holla@arm.com>
-References: <1433760002-24120-1-git-send-email-sudeep.holla@arm.com>
- <1433760002-24120-3-git-send-email-sudeep.holla@arm.com>
-Message-ID: <CAJe_ZheUknLZuMg-02V-AqyjxX8Nx4oK3O2HapqfCLkkXjngAg@mail.gmail.com>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Thu, 11 Jun 2015 13:56:32 +0200
+Subject: [PATCH] ARM: mvebu: adjust Armada XP DT spi muxing after pinctrl
+ function rename
+Message-ID: <1434023792-20455-1-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 8 June 2015 at 16:09, Sudeep Holla <sudeep.holla@arm.com> wrote:
-...
-> +
-> +static void scpi_process_cmd(struct scpi_chan *ch, u32 cmd)
-> +{
-> +       unsigned long flags;
-> +       struct scpi_xfer *t, *match = NULL;
-> +
-> +       spin_lock_irqsave(&ch->rx_lock, flags);
-> +       if (list_empty(&ch->rx_pending)) {
-> +               spin_unlock_irqrestore(&ch->rx_lock, flags);
-> +               return;
-> +       }
-> +
-> +       list_for_each_entry(t, &ch->rx_pending, node)
-> +               if (CMD_XTRACT_UNIQ(t->cmd) == CMD_XTRACT_UNIQ(cmd)) {
-> +                       list_del(&t->node);
-> +                       match = t;
-> +                       break;
-> +               }
-> +       /* check if wait_for_completion is in progress or timed-out */
-> +       if (match && !completion_done(&match->done)) {
-> +               struct scpi_shared_mem *mem = ch->rx_payload;
-> +               unsigned int len = min(match->rx_len, CMD_SIZE(cmd));
-> +
-> +               match->status = le32_to_cpu(mem->status);
-> +               memcpy_fromio(match->rx_buf, mem->payload, len);
-> +               if (match->rx_len > len)
-> +                       memset(match->rx_buf + len, 0, match->rx_len - len);
-> +               complete(&match->done);
-> +       }
-> +       spin_unlock_irqrestore(&ch->rx_lock, flags);
-> +}
-There doesn't seem to be support for commands sent by remote?
-Something like when remote is the thermal master and it needs to send
-sensor readings crossing thresholds.
+Following the merge of "pinctrl: mvebu: armada-xp: rename spi to spi0"
+by Linus Walleij, we need to adjust the Armada XP Device Tree
+accordingly, by adjusting the pinctrl configuration for SPI pins.
+
+Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+---
+ arch/arm/boot/dts/armada-xp.dtsi | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/arch/arm/boot/dts/armada-xp.dtsi b/arch/arm/boot/dts/armada-xp.dtsi
+index 013d63f..dba8d3f 100644
+--- a/arch/arm/boot/dts/armada-xp.dtsi
++++ b/arch/arm/boot/dts/armada-xp.dtsi
+@@ -289,7 +289,7 @@
+ 	spi0_pins: spi0-pins {
+ 		marvell,pins = "mpp36", "mpp37",
+ 			       "mpp38", "mpp39";
+-		marvell,function = "spi";
++		marvell,function = "spi0";
+ 	};
+ 
+ 	uart2_pins: uart2-pins {
+-- 
+2.1.0
