@@ -1,212 +1,225 @@
-From: eric.auger@linaro.org (Eric Auger)
-Date: Thu, 11 Jun 2015 19:44:39 +0200
-Subject: [PATCH 10/13] KVM: arm64: sync LPI properties and status between
- guest and KVM
-In-Reply-To: <1432893209-27313-11-git-send-email-andre.przywara@arm.com>
-References: <1432893209-27313-1-git-send-email-andre.przywara@arm.com>
- <1432893209-27313-11-git-send-email-andre.przywara@arm.com>
-Message-ID: <5579C907.3020700@linaro.org>
+From: boris.brezillon@free-electrons.com (Boris Brezillon)
+Date: Thu, 11 Jun 2015 19:36:36 +0200
+Subject: [PATCH v4 09/14] crypto: marvell/CESA: add SHA256 support
+In-Reply-To: <1434044206-10459-1-git-send-email-boris.brezillon@free-electrons.com>
+References: <1434044206-10459-1-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <1434044206-10459-18-git-send-email-boris.brezillon@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/29/2015 11:53 AM, Andre Przywara wrote:
-> The properties and status of the GICv3 LPIs are hold in tables in
-> (guest) memory. To achieve reasonable performance, we cache this
-> data in our own data structures, so we need to sync those two views
-> from time to time. This behaviour is well described in the GICv3 spec
-> and is also exercised by hardware, so the sync points are well known.
-> 
-> Provide functions that read the guest memory and store the
-> information from the property and status table in the kernel.
-configuration and pending tables?
-> 
-> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
-> ---
->  virt/kvm/arm/its-emul.c | 140 ++++++++++++++++++++++++++++++++++++++++++++++++
->  1 file changed, 140 insertions(+)
-> 
-> diff --git a/virt/kvm/arm/its-emul.c b/virt/kvm/arm/its-emul.c
-> index f75fb9e..afd440e 100644
-> --- a/virt/kvm/arm/its-emul.c
-> +++ b/virt/kvm/arm/its-emul.c
-> @@ -50,6 +50,7 @@ struct its_itte {
->  	struct its_collection *collection;
->  	u32 lpi;
->  	u32 event_id;
-> +	u8 priority;
->  	bool enabled;
->  	unsigned long *pending;
->  };
-> @@ -70,7 +71,140 @@ static struct its_itte *find_itte_by_lpi(struct kvm *kvm, int lpi)
->  	return NULL;
->  }
->  
-> +#define LPI_PROP_ENABLE_BIT(p)	((p) & LPI_PROP_ENABLED)
-> +#define LPI_PROP_PRIORITY(p)	((p) & 0xfc)
-> +
-> +/* stores the priority and enable bit for a given LPI */
-> +static void update_lpi_property(struct kvm *kvm, struct its_itte *itte, u8 prop)
-inline?
-> +{
-> +	itte->priority = LPI_PROP_PRIORITY(prop);
-> +	itte->enabled  = LPI_PROP_ENABLE_BIT(prop);
-> +}
-> +
-> +#define GIC_LPI_OFFSET 8192
-> +
-> +/* We scan the table in chunks the size of the smallest page size */
-in 4kB chunks? you can merge that comment with the one below I think
-> +#define CHUNK_SIZE 4096U
-> +
->  #define BASER_BASE_ADDRESS(x) ((x) & 0xfffffffff000ULL)
-> +#define PROPBASE_TSIZE(x) (1U << (x & 0x1f))
-> +
-> +/*
-> + * Scan the whole LPI property table and put the LPI configuration
-it is called configuration table in archi spec.
-> + * data in our own data structures. This relies on the LPI being
-> + * mapped before.
-> + * We scan from two sides:
-> + * 1) for each byte in the table we care for the ones being enabled
-> + * 2) for each mapped LPI we look into the table to spot LPIs being disabled
-> + * Must be called with the ITS lock held.
-> + */
-> +static bool its_update_lpi_properties(struct kvm *kvm)
-> +{
-> +	struct vgic_dist *dist = &kvm->arch.vgic;
-> +	u8 *prop;
-> +	u32 tsize;
-> +	gpa_t propbase;
-> +	int lpi = GIC_LPI_OFFSET;
-> +	struct its_itte *itte;
-> +	struct its_device *device;
-> +	int ret;
-> +
-> +	propbase = BASER_BASE_ADDRESS(dist->propbaser);
-> +	tsize = PROPBASE_TSIZE(dist->propbaser);
-according to the spec the IDbits should be compared against
-GICD_TYPER.IDbits and treated accordingly?
-> +
-> +	prop = kmalloc(CHUNK_SIZE, GFP_KERNEL);
-> +	if (!prop)
-> +		return false;
-> +
-> +	while (tsize > 0) {
-> +		int chunksize = min(tsize, CHUNK_SIZE);
-> +
-> +		ret = kvm_read_guest(kvm, propbase, prop, chunksize);
-> +		if (ret) {
-> +			kfree(prop);
-> +			break;
-> +		}
-although benign, double kfree and we return true; is it what we want?
-> +
-> +		/*
-> +		 * Updating the status for all allocated LPIs. We catch
-> +		 * those LPIs that get disabled. We really don't care
-> +		 * about unmapped LPIs, as they need to be updated
-> +		 * later manually anyway once they get mapped.
-> +		 */
-> +		for_each_lpi(device, itte, kvm) {
-> +			/*
-> +			 * Is the LPI covered by that part of the table we
-> +			 * are currently looking at?
-> +			 */
-not sure this comment is needed, although I like comments :-)
-> +			if (itte->lpi < lpi)
-> +				continue;
-> +			if (itte->lpi >= lpi + chunksize)
-> +				continue;
-could be combined
-> +
-> +			update_lpi_property(kvm, itte,
-> +					    prop[itte->lpi - lpi]);
-> +		}
-> +		tsize -= chunksize;
-> +		lpi += chunksize;
-> +		propbase += chunksize;
-> +	}
-> +
-> +	kfree(prop);
-> +	return true;
-> +}
-> +
-> +/*
-> + * Scan the whole LPI pending table and sync the pending bit in there
-> + * with our own data structures. This relies on the LPI being
-> + * mapped before.
-> + * Must be called with the ITS lock held.
-> + */
-> +static bool its_sync_lpi_pending_table(struct kvm_vcpu *vcpu)
-> +{
-> +	struct vgic_dist *dist = &vcpu->kvm->arch.vgic;
-> +	unsigned long *pendmask;
-> +	u32 nr_lpis;
-> +	gpa_t pendbase;
-> +	int lpi = GIC_LPI_OFFSET;
-> +	struct its_itte *itte;
-> +	struct its_device *device;
-> +	int ret;
-> +	int lpi_bit, nr_bits;
-> +
-> +	pendbase = BASER_BASE_ADDRESS(dist->pendbaser[vcpu->vcpu_id]);
-archi spec says the first 1kB of the table corresponds to other classes
-of IRQs. where is this offset applied?
-> +	nr_lpis = GIC_LPI_OFFSET;
-> +
-> +	pendmask = kmalloc(CHUNK_SIZE, GFP_KERNEL);
-> +	if (!pendmask)
-> +		return false;
-> +
-> +	while (nr_lpis > 0) {
-> +		nr_bits = min(nr_lpis, CHUNK_SIZE * 8);
-> +
-> +		ret = kvm_read_guest(vcpu->kvm, pendbase, pendmask,
-> +				     nr_bits / 8);
-> +		if (ret)
-> +			break;
-return false?
+From: Arnaud Ebalard <arno@natisbad.org>
 
+Add support for SHA256 operations.
 
-> +
-> +		for_each_lpi(device, itte, vcpu->kvm) {
-> +			lpi_bit = itte->lpi - lpi;
-> +			if (lpi_bit < 0)
-> +				continue;
-> +			if (lpi_bit >= nr_bits)
-> +				continue;
-> +			if (test_bit(lpi_bit, pendmask))
-> +				set_bit(vcpu->vcpu_id, itte->pending);
-> +			else
-> +				clear_bit(vcpu->vcpu_id, itte->pending);
-> +		}
-> +		nr_lpis -= nr_bits;
-> +		lpi += nr_bits;
-> +		pendbase += nr_bits / 8;
-> +	}
-> +
-> +	kfree(pendmask);
-> +	return true;
-> +}
->  
->  /* distributor lock is hold by the VGIC MMIO handler */
->  static bool handle_mmio_misc_gits(struct kvm_vcpu *vcpu,
-> @@ -350,6 +484,12 @@ static const struct vgic_io_range vgicv3_its_ranges[] = {
->  
->  void vgic_enable_lpis(struct kvm_vcpu *vcpu)
->  {
-> +	struct vgic_its *its = &vcpu->kvm->arch.vgic.its;
-> +
-> +	spin_lock(&its->lock);
-> +	its_update_lpi_properties(vcpu->kvm);
-> +	its_sync_lpi_pending_table(vcpu);
-question of the flush ...
+Signed-off-by: Arnaud Ebalard <arno@natisbad.org>
+Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+---
+ drivers/crypto/marvell/cesa.c |   2 +
+ drivers/crypto/marvell/cesa.h |   2 +
+ drivers/crypto/marvell/hash.c | 157 ++++++++++++++++++++++++++++++++++++++++++
+ 3 files changed, 161 insertions(+)
 
-Cheers
-
-Eric
-> +	spin_unlock(&its->lock);
->  }
->  
->  int vits_init(struct kvm *kvm)
-> 
+diff --git a/drivers/crypto/marvell/cesa.c b/drivers/crypto/marvell/cesa.c
+index b9da0df..e4dfee0 100644
+--- a/drivers/crypto/marvell/cesa.c
++++ b/drivers/crypto/marvell/cesa.c
+@@ -176,8 +176,10 @@ static struct crypto_alg *armada_370_cipher_algs[] = {
+ static struct ahash_alg *armada_370_ahash_algs[] = {
+ 	&mv_md5_alg,
+ 	&mv_sha1_alg,
++	&mv_sha256_alg,
+ 	&mv_ahmac_md5_alg,
+ 	&mv_ahmac_sha1_alg,
++	&mv_ahmac_sha256_alg,
+ };
+ 
+ static const struct mv_cesa_caps armada_370_caps = {
+diff --git a/drivers/crypto/marvell/cesa.h b/drivers/crypto/marvell/cesa.h
+index 23c4603..497746b 100644
+--- a/drivers/crypto/marvell/cesa.h
++++ b/drivers/crypto/marvell/cesa.h
+@@ -789,8 +789,10 @@ int mv_cesa_dma_add_op_transfers(struct mv_cesa_tdma_chain *chain,
+ 
+ extern struct ahash_alg mv_md5_alg;
+ extern struct ahash_alg mv_sha1_alg;
++extern struct ahash_alg mv_sha256_alg;
+ extern struct ahash_alg mv_ahmac_md5_alg;
+ extern struct ahash_alg mv_ahmac_sha1_alg;
++extern struct ahash_alg mv_ahmac_sha256_alg;
+ 
+ extern struct crypto_alg mv_cesa_ecb_des_alg;
+ extern struct crypto_alg mv_cesa_cbc_des_alg;
+diff --git a/drivers/crypto/marvell/hash.c b/drivers/crypto/marvell/hash.c
+index 63fa493..8292bb7 100644
+--- a/drivers/crypto/marvell/hash.c
++++ b/drivers/crypto/marvell/hash.c
+@@ -973,6 +973,95 @@ struct ahash_alg mv_sha1_alg = {
+ 	}
+ };
+ 
++static int mv_cesa_sha256_init(struct ahash_request *req)
++{
++	struct mv_cesa_op_ctx tmpl;
++
++	mv_cesa_set_op_cfg(&tmpl, CESA_SA_DESC_CFG_MACM_SHA256);
++
++	mv_cesa_ahash_init(req, &tmpl);
++
++	return 0;
++}
++
++static int mv_cesa_sha256_digest(struct ahash_request *req)
++{
++	int ret;
++
++	ret = mv_cesa_sha256_init(req);
++	if (ret)
++		return ret;
++
++	return mv_cesa_ahash_finup(req);
++}
++
++static int mv_cesa_sha256_export(struct ahash_request *req, void *out)
++{
++	struct sha256_state *out_state = out;
++	struct crypto_ahash *ahash = crypto_ahash_reqtfm(req);
++	struct mv_cesa_ahash_req *creq = ahash_request_ctx(req);
++	unsigned int ds = crypto_ahash_digestsize(ahash);
++
++	out_state->count = creq->len;
++	memcpy(out_state->state, creq->state, ds);
++	memset(out_state->buf, 0, sizeof(out_state->buf));
++	if (creq->cache)
++		memcpy(out_state->buf, creq->cache, creq->cache_ptr);
++
++	return 0;
++}
++
++static int mv_cesa_sha256_import(struct ahash_request *req, const void *in)
++{
++	const struct sha256_state *in_state = in;
++	struct crypto_ahash *ahash = crypto_ahash_reqtfm(req);
++	struct mv_cesa_ahash_req *creq = ahash_request_ctx(req);
++	unsigned int digsize = crypto_ahash_digestsize(ahash);
++	unsigned int cache_ptr;
++	int ret;
++
++	creq->len = in_state->count;
++	memcpy(creq->state, in_state->state, digsize);
++	creq->cache_ptr = 0;
++
++	cache_ptr = creq->len % SHA256_BLOCK_SIZE;
++	if (!cache_ptr)
++		return 0;
++
++	ret = mv_cesa_ahash_alloc_cache(req);
++	if (ret)
++		return ret;
++
++	memcpy(creq->cache, in_state->buf, cache_ptr);
++	creq->cache_ptr = cache_ptr;
++
++	return 0;
++}
++
++struct ahash_alg mv_sha256_alg = {
++	.init = mv_cesa_sha256_init,
++	.update = mv_cesa_ahash_update,
++	.final = mv_cesa_ahash_final,
++	.finup = mv_cesa_ahash_finup,
++	.digest = mv_cesa_sha256_digest,
++	.export = mv_cesa_sha256_export,
++	.import = mv_cesa_sha256_import,
++	.halg = {
++		.digestsize = SHA256_DIGEST_SIZE,
++		.base = {
++			.cra_name = "sha256",
++			.cra_driver_name = "mv-sha256",
++			.cra_priority = 300,
++			.cra_flags = CRYPTO_ALG_ASYNC |
++				     CRYPTO_ALG_KERN_DRIVER_ONLY,
++			.cra_blocksize = SHA256_BLOCK_SIZE,
++			.cra_ctxsize = sizeof(struct mv_cesa_hash_ctx),
++			.cra_init = mv_cesa_ahash_cra_init,
++			.cra_module = THIS_MODULE,
++		 }
++	}
++};
++
+ struct mv_cesa_ahash_result {
+ 	struct completion completion;
+ 	int error;
+@@ -1274,3 +1363,71 @@ struct ahash_alg mv_ahmac_sha1_alg = {
+ 		 }
+ 	}
+ };
++
++static int mv_cesa_ahmac_sha256_setkey(struct crypto_ahash *tfm, const u8 *key,
++				       unsigned int keylen)
++{
++	struct mv_cesa_hmac_ctx *ctx = crypto_tfm_ctx(crypto_ahash_tfm(tfm));
++	struct sha256_state istate, ostate;
++	int ret, i;
++
++	ret = mv_cesa_ahmac_setkey("mv-sha256", key, keylen, &istate, &ostate);
++	if (ret)
++		return ret;
++
++	for (i = 0; i < ARRAY_SIZE(istate.state); i++)
++		ctx->iv[i] = be32_to_cpu(istate.state[i]);
++
++	for (i = 0; i < ARRAY_SIZE(ostate.state); i++)
++		ctx->iv[i + 8] = be32_to_cpu(ostate.state[i]);
++
++	return 0;
++}
++
++static int mv_cesa_ahmac_sha256_init(struct ahash_request *req)
++{
++	struct mv_cesa_hmac_ctx *ctx = crypto_tfm_ctx(req->base.tfm);
++	struct mv_cesa_op_ctx tmpl;
++
++	mv_cesa_set_op_cfg(&tmpl, CESA_SA_DESC_CFG_MACM_HMAC_SHA256);
++	memcpy(tmpl.ctx.hash.iv, ctx->iv, sizeof(ctx->iv));
++
++	mv_cesa_ahash_init(req, &tmpl);
++
++	return 0;
++}
++
++static int mv_cesa_ahmac_sha256_digest(struct ahash_request *req)
++{
++	int ret;
++
++	ret = mv_cesa_ahmac_sha256_init(req);
++	if (ret)
++		return ret;
++
++	return mv_cesa_ahash_finup(req);
++}
++
++struct ahash_alg mv_ahmac_sha256_alg = {
++	.init = mv_cesa_ahmac_sha256_init,
++	.update = mv_cesa_ahash_update,
++	.final = mv_cesa_ahash_final,
++	.finup = mv_cesa_ahash_finup,
++	.digest = mv_cesa_ahmac_sha256_digest,
++	.setkey = mv_cesa_ahmac_sha256_setkey,
++	.halg = {
++		.digestsize = SHA256_DIGEST_SIZE,
++		.statesize = sizeof(struct sha256_state),
++		.base = {
++			.cra_name = "hmac(sha256)",
++			.cra_driver_name = "mv-hmac-sha256",
++			.cra_priority = 300,
++			.cra_flags = CRYPTO_ALG_ASYNC |
++				     CRYPTO_ALG_KERN_DRIVER_ONLY,
++			.cra_blocksize = SHA256_BLOCK_SIZE,
++			.cra_ctxsize = sizeof(struct mv_cesa_hmac_ctx),
++			.cra_init = mv_cesa_ahmac_cra_init,
++			.cra_module = THIS_MODULE,
++		 }
++	}
++};
+-- 
+1.9.1
