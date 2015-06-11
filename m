@@ -1,46 +1,42 @@
 From: khilman@kernel.org (Kevin Hilman)
-Date: Wed, 10 Jun 2015 17:08:05 -0700
-Subject: [GIT PULL v2]Hisilicon 64-bit SoC changes for 4.2
-In-Reply-To: <5571C7F7.9090702@hisilicon.com> (Wei Xu's message of "Fri, 5 Jun
- 2015 17:01:59 +0100")
-References: <5571C7F7.9090702@hisilicon.com>
-Message-ID: <7hwpzbgl96.fsf@deeprootsystems.com>
+Date: Wed, 10 Jun 2015 17:10:39 -0700
+Subject: [GIT PULL] SoCFPGA updates for v4.2, part 2, version 2
+In-Reply-To: <5578C1AA.3000307@opensource.altera.com> (Dinh Nguyen's message
+ of "Wed, 10 Jun 2015 18:00:58 -0500")
+References: <1433533151-6301-1-git-send-email-dinh.linux@gmail.com>
+ <7hh9qfjhht.fsf@deeprootsystems.com>
+ <5578C1AA.3000307@opensource.altera.com>
+Message-ID: <7hmw07gl4w.fsf@deeprootsystems.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Wei Xu <xuwei5@hisilicon.com> writes:
+Dinh Nguyen <dinguyen@opensource.altera.com> writes:
 
-> Hi Arnd, Hi Olof, Hi Kevin,
+> On 06/10/2015 06:01 PM, Kevin Hilman wrote:
+>> dinh.linux at gmail.com writes:
+>> 
+>>> Hi Arnd, Kevin, Olof,
+>>>
+>>> This is an updated pull request for the supend-to-ram patch that has the
+>>> EDAC code removed in order to avoid a merge conflict.
+>>>
+>>> Thanks,
+>>> Dinh
+>>>
+>>> The following changes since commit c65b99f046843d2455aa231747b5a07a999a9f3d:
+>>>
+>>>   Linux 4.1-rc6 (2015-05-31 19:01:07 -0700)
+>> 
+>> Why v4.1-rc6?  
+>> 
+>> Are there specific dependencies there?  If not, we prefer these pulls to
+>> be on older -rc tags (typically nothing past where arm-soc/master is).
 >
-> Please help to pull the following changes.
-> Sorry for the late pull request.
-> Thanks!
->
-> Best Regards,
-> Wei
->
-> ---
->
-> The following changes since commit b787f68c36d49bb1d9236f403813641efa74a031:
->
->   Linux 4.1-rc1 (2015-04-26 17:59:10 -0700)
->
-> are available in the git repository at:
->
->   git://github.com/hisilicon/linux-hisi.git tags/hi6220-soc-for-4.2
->
-> for you to fetch changes up to 85fe946e8c8485d868edcbdcef78f04e4a259a6a:
->
->   arm64: Enable Hisilicon ARMv8 SoC family in Kconfig and defconfig (2015-06-05 16:01:17 +0100)
->
-> ----------------------------------------------------------------
-> ARM64: Hisilicon ARM64 SoC Updates for V4.2
->
-> - Added Hisilicon ARM64 SoC family support in Kconfig and defconfig
->
-> ----------------------------------------------------------------
+> No dependency, I just saw that arm-soc/for-next was at -rc6. I remember
+> seeing an email that you should based to an early -rc, or the same -rc
+> as the for-next branch?
 
-Pulled into next/soc,
+Same -rc as the master branch preferably.
 
 Thanks,
 
