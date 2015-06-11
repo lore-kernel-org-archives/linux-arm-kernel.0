@@ -1,87 +1,216 @@
-From: k.kozlowski.k@gmail.com (Krzysztof Kozlowski)
-Date: Thu, 11 Jun 2015 21:33:53 +0900
-Subject: [PATCH] PM / Domains: Try power off masters in error path of
- __pm_genpd_poweron()
-In-Reply-To: <1434023511-4263-1-git-send-email-ulf.hansson@linaro.org>
-References: <1434023511-4263-1-git-send-email-ulf.hansson@linaro.org>
-Message-ID: <55798031.50205@gmail.com>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Thu, 11 Jun 2015 14:35:24 +0200
+Subject: [linux-sunxi] Re: [PATCH v4 1/2] phy-sun4i-usb: Add full support
+ for usb0 phy / OTG
+In-Reply-To: <55796E23.90509@ti.com>
+References: <1433088626-8858-1-git-send-email-hdegoede@redhat.com>
+ <1433088626-8858-2-git-send-email-hdegoede@redhat.com>
+ <55795800.4070405@ti.com> <55795A98.8090303@redhat.com>
+ <55796E23.90509@ti.com>
+Message-ID: <5579808C.2080208@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-W dniu 11.06.2015 o 20:51, Ulf Hansson pisze:
-> While powering up a genpd, its domain masters are first being powered up.
-> In the error path of __pm_genpd_poweron(), we didn't care to try power off
-> these domain masters. Let's deal with that to avoid leaving unused PM
-> domains powered.
-> 
-> Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
-> ---
->  drivers/base/power/domain.c | 30 +++++++++++++++++-------------
->  1 file changed, 17 insertions(+), 13 deletions(-)
-> 
-> diff --git a/drivers/base/power/domain.c b/drivers/base/power/domain.c
-> index 2327613..32dcb80 100644
-> --- a/drivers/base/power/domain.c
-> +++ b/drivers/base/power/domain.c
-> @@ -235,6 +235,18 @@ static int genpd_power_off(struct generic_pm_domain *genpd)
->  }
->  
->  /**
-> + * genpd_queue_power_off_work - Queue up the execution of pm_genpd_poweroff().
-> + * @genpd: PM domait to power off.
-> + *
-> + * Queue up the execution of pm_genpd_poweroff() unless it's already been done
-> + * before.
-> + */
-> +static void genpd_queue_power_off_work(struct generic_pm_domain *genpd)
-> +{
-> +	queue_work(pm_wq, &genpd->power_off_work);
-> +}
-> +
-> +/**
->   * __pm_genpd_poweron - Restore power to a given PM domain and its masters.
->   * @genpd: PM domain to power up.
->   *
-> @@ -315,8 +327,12 @@ static int __pm_genpd_poweron(struct generic_pm_domain *genpd)
->  	return 0;
->  
->   err:
-> -	list_for_each_entry_continue_reverse(link, &genpd->slave_links, slave_node)
-> +	list_for_each_entry_continue_reverse(link,
-> +					&genpd->slave_links,
-> +					slave_node) {
->  		genpd_sd_counter_dec(link->master);
-> +		genpd_queue_power_off_work(link->master);
+Hi,
 
-It looks sensible to revert work already done however I wonder if this
-is necessary for each slave. The first successful call to
-pm_genpd_poweroff() will also walk through slave_links and queue the work.
+On 11-06-15 13:16, Kishon Vijay Abraham I wrote:
+> Hi,
+>
+> On Thursday 11 June 2015 03:23 PM, Hans de Goede wrote:
+>> Hi,
+>>
+>> On 11-06-15 11:42, Kishon Vijay Abraham I wrote:
+>>> Hi,
+>>>
+>>> On Sunday 31 May 2015 09:40 PM, Hans de Goede wrote:
+>>>> The usb0 phy is connected to an OTG controller, and as such needs some special
+>>>> handling:
+>>>>
+>>>> 1) It allows explicit control over the pullups, enable these on phy_init and
+>>>> disable them on phy_exit.
+>>>>
+>>>> 2) It has bits to signal id and vbus detect to the musb-core, add support for
+>>>> for monitoring id and vbus detect gpio-s for use in dual role mode, and set
+>>>> these bits to the correct values for operating in host only mode when no
+>>>> gpios are specified in the devicetree.
+>>>>
+>>>> 3) When in dual role mode the musb sunxi glue needs to know if the a host or
+>>>> device cable is plugged in, so when in dual role mode register an extcon.
+>>>>
+>>>> While updating the devicetree binding documentation also add documentation
+>>>> for the sofar undocumented usage of regulators for vbus for all 3 phys.
+>>>>
+>>>> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+>>>> ---
+>>>> Changes in v2:
+>>>> -Removed the sunxi specific phy functions, instead the id / vbus gpio polling
+>>>>    has been moved to the phy-sun4i-usb driver and their status is exported
+>>>>    through extcon for the sunxi-musb glue
+>>>> Changes in v3:
+>>>> -No changes
+>>>> Changes in v4:
+>>>> -Do not call regulator_disable in an unbalanced manner when an external vbus
+>>>>    is present
+>>>> ---
+>>>>    .../devicetree/bindings/phy/sun4i-usb-phy.txt      |  18 +-
+>>>>    drivers/phy/Kconfig                                |   1 +
+>>>>    drivers/phy/phy-sun4i-usb.c                        | 273 ++++++++++++++++++++-
+>>>>    3 files changed, 281 insertions(+), 11 deletions(-)
+>>>>
+>>> .
+>>> .
+>>> <snip>
+>>> .
+>>> .
+>>>> diff --git a/drivers/phy/phy-sun4i-usb.c b/drivers/phy/phy-sun4i-usb.c
+>>>> index 91c5be4..b45d707 100644
+>>>> --- a/drivers/phy/phy-sun4i-usb.c
+>>>> +++ b/drivers/phy/phy-sun4i-usb.c
+>>>> @@ -1,7 +1,7 @@
+>>>
+>>> .
+>>> .
+>>> <snip>
+>>> .
+>>> .
+>>>>    static struct phy *sun4i_usb_phy_xlate(struct device *dev,
+>>>>                        struct of_phandle_args *args)
+>>>>    {
+>>>> @@ -240,13 +417,20 @@ static int sun4i_usb_phy_probe(struct platform_device *pdev)
+>>>>        struct phy_provider *phy_provider;
+>>>>        bool dedicated_clocks;
+>>>>        struct resource *res;
+>>>> -    int i;
+>>>> +    int i, ret;
+>>>>
+>>>>        data = devm_kzalloc(dev, sizeof(*data), GFP_KERNEL);
+>>>>        if (!data)
+>>>>            return -ENOMEM;
+>>>>
+>>>>        mutex_init(&data->mutex);
+>>>> +    INIT_DELAYED_WORK(&data->detect, sun4i_usb_phy0_id_vbus_det_scan);
+>>>> +    data->extcon_cable_names[0] = extcon_cable_name[EXTCON_USB_HOST];
+>>>> +    data->extcon_cable_names[1] = extcon_cable_name[EXTCON_USB];
+>>>> +    data->extcon_cable_names[2] = NULL;
+>>>> +    data->extcon.name = DRIVER_NAME;
+>>>> +    data->extcon.supported_cable = data->extcon_cable_names;
+>>>> +    data->extcon.dev.parent = dev;
+>>>>
+>>>>        if (of_device_is_compatible(np, "allwinner,sun5i-a13-usb-phy"))
+>>>>            data->num_phys = 2;
+>>>> @@ -269,6 +453,34 @@ static int sun4i_usb_phy_probe(struct platform_device *pdev)
+>>>>        if (IS_ERR(data->base))
+>>>>            return PTR_ERR(data->base);
+>>>>
+>>>> +    data->id_det_gpio = devm_gpiod_get(dev, "usb0_id_det", GPIOD_IN);
+>>>> +    if (IS_ERR(data->id_det_gpio)) {
+>>>> +        if (PTR_ERR(data->id_det_gpio) == -EPROBE_DEFER)
+>>>> +            return -EPROBE_DEFER;
+>>>> +        data->id_det_gpio = NULL;
+>>>> +    }
+>>>> +
+>>>> +    data->vbus_det_gpio = devm_gpiod_get(dev, "usb0_vbus_det", GPIOD_IN);
+>>>> +    if (IS_ERR(data->vbus_det_gpio)) {
+>>>> +        if (PTR_ERR(data->vbus_det_gpio) == -EPROBE_DEFER)
+>>>> +            return -EPROBE_DEFER;
+>>>> +        data->vbus_det_gpio = NULL;
+>>>> +    }
+>>>> +
+>>>> +    /* We either want both gpio pins or neither (when in host mode) */
+>>>> +    if (!data->id_det_gpio != !data->vbus_det_gpio) {
+>>>> +        dev_err(dev, "failed to get id or vbus detect pin\n");
+>>>> +        return -ENODEV;
+>>>> +    }
+>>>> +
+>>>> +    if (data->id_det_gpio) {
+>>>> +        ret = devm_extcon_dev_register(dev, &data->extcon);
+>>>> +        if (ret) {
+>>>> +            dev_err(dev, "failed to register extcon: %d\n", ret);
+>>>> +            return ret;
+>>>> +        }
+>>>> +    }
+>>>> +
+>>>>        for (i = 0; i < data->num_phys; i++) {
+>>>>            struct sun4i_usb_phy *phy = data->phys + i;
+>>>>            char name[16];
+>>>> @@ -318,12 +530,54 @@ static int sun4i_usb_phy_probe(struct platform_device *pdev)
+>>>>            phy_set_drvdata(phy->phy, &data->phys[i]);
+>>>>        }
+>>>>
+>>>> +    data->id_det_irq = gpiod_to_irq(data->id_det_gpio);
+>>>> +    data->vbus_det_irq = gpiod_to_irq(data->vbus_det_gpio);
+>>>> +    if (data->id_det_irq  < 0 || data->vbus_det_irq < 0)
+>>>> +        data->phy0_poll = true;
+>>>
+>>> if polling is enabled, we shouldn't enable irq at all?
+>>
+>> Thanks for the review.
+>>
+>> One some boards one of the gpio-s is irq capable and the other
+>> is not, in which case the current code indeed enables both
+>> irq handling for the one gpio which is irq capable and enables
+>> polling. This is done this way deliberately as the irq path
+>> has much better latency then polling and the 2 can co-exist.
+>
+> okay. Would be good to have this as a comment.
+>>
+>>>> +
+>>>> +    if (data->id_det_irq >= 0) {
+>>>> +        ret = devm_request_irq(dev, data->id_det_irq,
+>>>> +                sun4i_usb_phy0_id_vbus_det_irq,
+>>>> +                IRQF_TRIGGER_RISING | IRQF_TRIGGER_FALLING,
+>>>> +                "usb0-id-det", data);
+>>>> +        if (ret) {
+>>>> +            dev_err(dev, "Err requesting id-det-irq: %d\n", ret);
+>>>> +            return ret;
+>>>> +        }
+>>>> +    }
+>>>> +
+>>>> +    if (data->vbus_det_irq >= 0) {
+>>>> +        ret = devm_request_irq(dev, data->vbus_det_irq,
+>>>> +                sun4i_usb_phy0_id_vbus_det_irq,
+>>>> +                IRQF_TRIGGER_RISING | IRQF_TRIGGER_FALLING,
+>>>> +                "usb0-vbus-det", data);
+>>>> +        if (ret) {
+>>>> +            dev_err(dev, "Err requesting vbus-det-irq: %d\n", ret);
+>>>> +            return ret;
+>>>> +        }
+>>>> +    }
+>>>> +
+>>>>        dev_set_drvdata(dev, data);
+>>>>        phy_provider = devm_of_phy_provider_register(dev, sun4i_usb_phy_xlate);
+>>>>
+>>>>        return PTR_ERR_OR_ZERO(phy_provider);
+>>>>    }
+>>>>
+>>>> +static int sun4i_usb_phy_remove(struct platform_device *pdev)
+>>>> +{
+>>>> +    struct device *dev = &pdev->dev;
+>>>> +    struct sun4i_usb_phy_data *data = dev_get_drvdata(dev);
+>>>> +
+>>>> +    if (data->id_det_irq >= 0)
+>>>> +        devm_free_irq(dev, data->id_det_irq, data);
+>>>> +    if (data->vbus_det_irq >= 0)
+>>>> +        devm_free_irq(dev, data->vbus_det_irq, data);
+>>>
+>>> This shouldn't be needed since you already use devm_* in probe.
+>>
+>> The use of devm_* in probe helps to keep the error handling in
+>> probe sane, but we must explicitly free the irqs here, otherwise
+>> they may trigger after this:
+>
+>  From whatever I know free irq will be invoked in remove if devm_request_irq is used in probe. I have to check though.
 
-Best regards,
-Krzysztof
+Yes it will be invoked, but after we've stopped our workqueue function,
+and in the mean time the irq handler can trigger re-scheduling the
+workqueue function.
 
+All drivers using a workqueue explicitly free irqs on remove before
+stopping the workqueue because of this reason. The auto freeing
+of the irq happens after the remove function has been called, and
+thus after the workqueue has been stopped/cancelled which is too
+late.
 
-> +	}
->  
->  	return ret;
->  }
-> @@ -490,18 +506,6 @@ static bool genpd_abort_poweroff(struct generic_pm_domain *genpd)
->  }
->  
->  /**
-> - * genpd_queue_power_off_work - Queue up the execution of pm_genpd_poweroff().
-> - * @genpd: PM domait to power off.
-> - *
-> - * Queue up the execution of pm_genpd_poweroff() unless it's already been done
-> - * before.
-> - */
-> -static void genpd_queue_power_off_work(struct generic_pm_domain *genpd)
-> -{
-> -	queue_work(pm_wq, &genpd->power_off_work);
-> -}
-> -
-> -/**
->   * pm_genpd_poweroff - Remove power from a given PM domain.
->   * @genpd: PM domain to power down.
->   *
-> 
+Regards,
+
+Hans
