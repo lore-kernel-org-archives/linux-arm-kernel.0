@@ -1,225 +1,107 @@
 From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Thu, 11 Jun 2015 19:36:30 +0200
-Subject: [PATCH v4 06/14] crypto: marvell/CESA: add DES support
+Date: Thu, 11 Jun 2015 19:36:43 +0200
+Subject: [PATCH v4 12/14] crypto: marvell/CESA: add support for Orion SoCs
 In-Reply-To: <1434044206-10459-1-git-send-email-boris.brezillon@free-electrons.com>
 References: <1434044206-10459-1-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <1434044206-10459-12-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <1434044206-10459-25-git-send-email-boris.brezillon@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add support for DES operations.
+Add the Orion SoC description, and select this implementation by default
+to support non-DT probing: Orion is the only platform where non-DT boards
+are declaring the CESA block.
+
+Control the allhwsupport module parameter to avoid probing the CESA IP when
+the old CESA driver is enabled (unless it is explicitly requested to do
+so).
 
 Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
-Signed-off-by: Arnaud Ebalard <arno@natisbad.org>
 ---
- drivers/crypto/marvell/cesa.c   |   2 +
- drivers/crypto/marvell/cesa.h   |   2 +
- drivers/crypto/marvell/cipher.c | 150 ++++++++++++++++++++++++++++++++++++++++
- 3 files changed, 154 insertions(+)
+ drivers/crypto/marvell/cesa.c | 42 +++++++++++++++++++++++++++++++++++-------
+ 1 file changed, 35 insertions(+), 7 deletions(-)
 
 diff --git a/drivers/crypto/marvell/cesa.c b/drivers/crypto/marvell/cesa.c
-index 5a226c4..47c9ef8 100644
+index c7e25a0..bd54973 100644
 --- a/drivers/crypto/marvell/cesa.c
 +++ b/drivers/crypto/marvell/cesa.c
-@@ -165,6 +165,8 @@ static void mv_cesa_remove_algs(struct mv_cesa_dev *cesa)
+@@ -168,6 +168,22 @@ static void mv_cesa_remove_algs(struct mv_cesa_dev *cesa)
+ 		crypto_unregister_alg(cesa->caps->cipher_algs[i]);
  }
  
- static struct crypto_alg *armada_370_cipher_algs[] = {
++static struct crypto_alg *orion_cipher_algs[] = {
 +	&mv_cesa_ecb_des_alg,
 +	&mv_cesa_cbc_des_alg,
- 	&mv_cesa_ecb_aes_alg,
- 	&mv_cesa_cbc_aes_alg,
++	&mv_cesa_ecb_des3_ede_alg,
++	&mv_cesa_cbc_des3_ede_alg,
++	&mv_cesa_ecb_aes_alg,
++	&mv_cesa_cbc_aes_alg,
++};
++
++static struct ahash_alg *orion_ahash_algs[] = {
++	&mv_md5_alg,
++	&mv_sha1_alg,
++	&mv_ahmac_md5_alg,
++	&mv_ahmac_sha1_alg,
++};
++
+ static struct crypto_alg *armada_370_cipher_algs[] = {
+ 	&mv_cesa_ecb_des_alg,
+ 	&mv_cesa_cbc_des_alg,
+@@ -186,6 +202,15 @@ static struct ahash_alg *armada_370_ahash_algs[] = {
+ 	&mv_ahmac_sha256_alg,
  };
-diff --git a/drivers/crypto/marvell/cesa.h b/drivers/crypto/marvell/cesa.h
-index fcacc70..5d91da3 100644
---- a/drivers/crypto/marvell/cesa.h
-+++ b/drivers/crypto/marvell/cesa.h
-@@ -790,6 +790,8 @@ int mv_cesa_dma_add_op_transfers(struct mv_cesa_tdma_chain *chain,
- extern struct ahash_alg mv_sha1_alg;
- extern struct ahash_alg mv_ahmac_sha1_alg;
  
-+extern struct crypto_alg mv_cesa_ecb_des_alg;
-+extern struct crypto_alg mv_cesa_cbc_des_alg;
- extern struct crypto_alg mv_cesa_ecb_aes_alg;
- extern struct crypto_alg mv_cesa_cbc_aes_alg;
- 
-diff --git a/drivers/crypto/marvell/cipher.c b/drivers/crypto/marvell/cipher.c
-index 8188fc2..2094a9e 100644
---- a/drivers/crypto/marvell/cipher.c
-+++ b/drivers/crypto/marvell/cipher.c
-@@ -13,9 +13,15 @@
-  */
- 
- #include <crypto/aes.h>
-+#include <crypto/des.h>
- 
- #include "cesa.h"
- 
-+struct mv_cesa_des_ctx {
-+	struct mv_cesa_ctx base;
-+	u8 key[DES_KEY_SIZE];
++static const struct mv_cesa_caps orion_caps = {
++	.nengines = 1,
++	.cipher_algs = orion_cipher_algs,
++	.ncipher_algs = ARRAY_SIZE(orion_cipher_algs),
++	.ahash_algs = orion_ahash_algs,
++	.nahash_algs = ARRAY_SIZE(orion_ahash_algs),
++	.has_tdma = false,
 +};
 +
- struct mv_cesa_aes_ctx {
- 	struct mv_cesa_ctx base;
- 	struct crypto_aes_ctx aes;
-@@ -223,6 +229,30 @@ static int mv_cesa_aes_setkey(struct crypto_ablkcipher *cipher, const u8 *key,
- 	return 0;
- }
+ static const struct mv_cesa_caps armada_370_caps = {
+ 	.nengines = 1,
+ 	.cipher_algs = armada_370_cipher_algs,
+@@ -205,6 +230,7 @@ static const struct mv_cesa_caps armada_xp_caps = {
+ };
  
-+static int mv_cesa_des_setkey(struct crypto_ablkcipher *cipher, const u8 *key,
-+			      unsigned int len)
-+{
-+	struct crypto_tfm *tfm = crypto_ablkcipher_tfm(cipher);
-+	struct mv_cesa_des_ctx *ctx = crypto_tfm_ctx(tfm);
-+	u32 tmp[DES_EXPKEY_WORDS];
-+	int ret;
-+
-+	if (len != DES_KEY_SIZE) {
-+		crypto_ablkcipher_set_flags(cipher, CRYPTO_TFM_RES_BAD_KEY_LEN);
-+		return -EINVAL;
-+	}
-+
-+	ret = des_ekey(tmp, key);
-+	if (!ret && (tfm->crt_flags & CRYPTO_TFM_REQ_WEAK_KEY)) {
-+		tfm->crt_flags |= CRYPTO_TFM_RES_WEAK_KEY;
-+		return -EINVAL;
-+	}
-+
-+	memcpy(ctx->key, key, DES_KEY_SIZE);
-+
-+	return 0;
-+}
-+
- static int mv_cesa_ablkcipher_dma_req_init(struct ablkcipher_request *req,
- 				const struct mv_cesa_op_ctx *op_templ)
+ static const struct of_device_id mv_cesa_of_match_table[] = {
++	{ .compatible = "marvell,orion-crypto", .data = &orion_caps },
+ 	{ .compatible = "marvell,armada-370-crypto", .data = &armada_370_caps },
+ 	{ .compatible = "marvell,armada-xp-crypto", .data = &armada_xp_caps },
+ 	{ .compatible = "marvell,armada-375-crypto", .data = &armada_xp_caps },
+@@ -330,7 +356,7 @@ static void mv_cesa_put_sram(struct platform_device *pdev, int idx)
+ 
+ static int mv_cesa_probe(struct platform_device *pdev)
  {
-@@ -341,6 +371,126 @@ static int mv_cesa_ablkcipher_req_init(struct ablkcipher_request *req,
- 	return ret;
- }
+-	const struct mv_cesa_caps *caps = NULL;
++	const struct mv_cesa_caps *caps = &orion_caps;
+ 	const struct mbus_dram_target_info *dram;
+ 	const struct of_device_id *match;
+ 	struct device *dev = &pdev->dev;
+@@ -345,14 +371,16 @@ static int mv_cesa_probe(struct platform_device *pdev)
+ 		return -EEXIST;
+ 	}
  
-+static int mv_cesa_des_op(struct ablkcipher_request *req,
-+			  struct mv_cesa_op_ctx *tmpl)
-+{
-+	struct mv_cesa_des_ctx *ctx = crypto_tfm_ctx(req->base.tfm);
-+	int ret;
-+
-+	mv_cesa_update_op_cfg(tmpl, CESA_SA_DESC_CFG_CRYPTM_DES,
-+			      CESA_SA_DESC_CFG_CRYPTM_MSK);
-+
-+	memcpy(tmpl->ctx.blkcipher.key, ctx->key, DES_KEY_SIZE);
-+
-+	ret = mv_cesa_ablkcipher_req_init(req, tmpl);
-+	if (ret)
-+		return ret;
-+
-+	ret = mv_cesa_queue_req(&req->base);
-+	if (ret && ret != -EINPROGRESS)
-+		mv_cesa_ablkcipher_cleanup(req);
-+
-+	return ret;
-+}
-+
-+static int mv_cesa_ecb_des_encrypt(struct ablkcipher_request *req)
-+{
-+	struct mv_cesa_op_ctx tmpl;
-+
-+	mv_cesa_set_op_cfg(&tmpl,
-+			   CESA_SA_DESC_CFG_CRYPTCM_ECB |
-+			   CESA_SA_DESC_CFG_DIR_ENC);
-+
-+	return mv_cesa_des_op(req, &tmpl);
-+}
-+
-+static int mv_cesa_ecb_des_decrypt(struct ablkcipher_request *req)
-+{
-+	struct mv_cesa_op_ctx tmpl;
-+
-+	mv_cesa_set_op_cfg(&tmpl,
-+			   CESA_SA_DESC_CFG_CRYPTCM_ECB |
-+			   CESA_SA_DESC_CFG_DIR_DEC);
-+
-+	return mv_cesa_des_op(req, &tmpl);
-+}
-+
-+struct crypto_alg mv_cesa_ecb_des_alg = {
-+	.cra_name = "ecb(des)",
-+	.cra_driver_name = "mv-ecb-des",
-+	.cra_priority = 300,
-+	.cra_flags = CRYPTO_ALG_TYPE_ABLKCIPHER |
-+		     CRYPTO_ALG_KERN_DRIVER_ONLY | CRYPTO_ALG_ASYNC,
-+	.cra_blocksize = DES_BLOCK_SIZE,
-+	.cra_ctxsize = sizeof(struct mv_cesa_des_ctx),
-+	.cra_alignmask = 0,
-+	.cra_type = &crypto_ablkcipher_type,
-+	.cra_module = THIS_MODULE,
-+	.cra_init = mv_cesa_ablkcipher_cra_init,
-+	.cra_u = {
-+		.ablkcipher = {
-+			.min_keysize = DES_KEY_SIZE,
-+			.max_keysize = DES_KEY_SIZE,
-+			.setkey = mv_cesa_des_setkey,
-+			.encrypt = mv_cesa_ecb_des_encrypt,
-+			.decrypt = mv_cesa_ecb_des_decrypt,
-+		},
-+	},
-+};
-+
-+static int mv_cesa_cbc_des_op(struct ablkcipher_request *req,
-+			      struct mv_cesa_op_ctx *tmpl)
-+{
-+	mv_cesa_update_op_cfg(tmpl, CESA_SA_DESC_CFG_CRYPTCM_CBC,
-+			      CESA_SA_DESC_CFG_CRYPTCM_MSK);
-+
-+	memcpy(tmpl->ctx.blkcipher.iv, req->info, 8);
-+
-+	return mv_cesa_des_op(req, tmpl);
-+}
-+
-+static int mv_cesa_cbc_des_encrypt(struct ablkcipher_request *req)
-+{
-+	struct mv_cesa_op_ctx tmpl;
-+
-+	mv_cesa_set_op_cfg(&tmpl, CESA_SA_DESC_CFG_DIR_ENC);
-+
-+	return mv_cesa_cbc_des_op(req, &tmpl);
-+}
-+
-+static int mv_cesa_cbc_des_decrypt(struct ablkcipher_request *req)
-+{
-+	struct mv_cesa_op_ctx tmpl;
-+
-+	mv_cesa_set_op_cfg(&tmpl, CESA_SA_DESC_CFG_DIR_DEC);
-+
-+	return mv_cesa_cbc_des_op(req, &tmpl);
-+}
-+
-+struct crypto_alg mv_cesa_cbc_des_alg = {
-+	.cra_name = "cbc(des)",
-+	.cra_driver_name = "mv-cbc-des",
-+	.cra_priority = 300,
-+	.cra_flags = CRYPTO_ALG_TYPE_ABLKCIPHER |
-+		     CRYPTO_ALG_KERN_DRIVER_ONLY | CRYPTO_ALG_ASYNC,
-+	.cra_blocksize = DES_BLOCK_SIZE,
-+	.cra_ctxsize = sizeof(struct mv_cesa_des_ctx),
-+	.cra_alignmask = 0,
-+	.cra_type = &crypto_ablkcipher_type,
-+	.cra_module = THIS_MODULE,
-+	.cra_init = mv_cesa_ablkcipher_cra_init,
-+	.cra_u = {
-+		.ablkcipher = {
-+			.min_keysize = DES_KEY_SIZE,
-+			.max_keysize = DES_KEY_SIZE,
-+			.ivsize	     = DES_BLOCK_SIZE,
-+			.setkey = mv_cesa_des_setkey,
-+			.encrypt = mv_cesa_cbc_des_encrypt,
-+			.decrypt = mv_cesa_cbc_des_decrypt,
-+		},
-+	},
-+};
-+
- static int mv_cesa_aes_op(struct ablkcipher_request *req,
- 			  struct mv_cesa_op_ctx *tmpl)
- {
+-	if (!dev->of_node)
+-		return -ENOTSUPP;
++	if (dev->of_node) {
++		match = of_match_node(mv_cesa_of_match_table, dev->of_node);
++		if (!match || !match->data)
++			return -ENOTSUPP;
+ 
+-	match = of_match_node(mv_cesa_of_match_table, dev->of_node);
+-	if (!match || !match->data)
+-		return -ENOTSUPP;
++		caps = match->data;
++	}
+ 
+-	caps = match->data;
++	if (caps == &orion_caps && !allhwsupport)
++		return -ENOTSUPP;
+ 
+ 	cesa = devm_kzalloc(dev, sizeof(*cesa), GFP_KERNEL);
+ 	if (!cesa)
 -- 
 1.9.1
