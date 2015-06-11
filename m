@@ -1,92 +1,28 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Thu, 11 Jun 2015 16:54:24 +0100
-Subject: [PATCH v2 4/4] arm64: Hook up IOMMU dma_ops
-In-Reply-To: <cover.1434036796.git.robin.murphy@arm.com>
-References: <cover.1434036796.git.robin.murphy@arm.com>
-Message-ID: <74db00fa23da4de6a45cc28dc434e6691b95b9a4.1434036796.git.robin.murphy@arm.com>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Thu, 11 Jun 2015 21:30:48 +0530
+Subject: [PATCH 3/6] clocksource: bcm2835: Migrate to new 'set-state'
+ interface
+In-Reply-To: <5579A864.5010500@linaro.org>
+References: <cover.1433768426.git.viresh.kumar@linaro.org>
+ <b0bf70d911dffe170b0d2b2b3e680bb445c15fc4.1433768426.git.viresh.kumar@linaro.org>
+ <5579A864.5010500@linaro.org>
+Message-ID: <20150611160048.GC4386@linux>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-With iommu_dma_ops in place, hook them up to the configuration code, so
-IOMMU-fronted devices will get them automatically.
+On 11-06-15, 17:25, Daniel Lezcano wrote:
+> Please mention in the log you removed the RESUME because it does
+> nothing and the core code will just ignore it.
 
-Signed-off-by: Robin Murphy <robin.murphy@arm.com>
----
- arch/arm64/Kconfig                   |  1 +
- arch/arm64/include/asm/dma-mapping.h | 11 ++++++-----
- arch/arm64/mm/dma-mapping.c          | 15 +++++++++++++++
- 3 files changed, 22 insertions(+), 5 deletions(-)
+Okay.
 
-diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-index 7796af4..257cd7e 100644
---- a/arch/arm64/Kconfig
-+++ b/arch/arm64/Kconfig
-@@ -70,6 +70,7 @@ config ARM64
- 	select HAVE_PERF_USER_STACK_DUMP
- 	select HAVE_RCU_TABLE_FREE
- 	select HAVE_SYSCALL_TRACEPOINTS
-+	select IOMMU_DMA if IOMMU_SUPPORT
- 	select IRQ_DOMAIN
- 	select MODULES_USE_ELF_RELA
- 	select NO_BOOTMEM
-diff --git a/arch/arm64/include/asm/dma-mapping.h b/arch/arm64/include/asm/dma-mapping.h
-index 835a8d1..a87b507 100644
---- a/arch/arm64/include/asm/dma-mapping.h
-+++ b/arch/arm64/include/asm/dma-mapping.h
-@@ -45,11 +45,8 @@ static inline struct dma_map_ops *get_dma_ops(struct device *dev)
- 		return __generic_dma_ops(dev);
- }
- 
--static inline void arch_setup_dma_ops(struct device *dev, u64 dma_base, u64 size,
--				      struct iommu_ops *iommu, bool coherent)
--{
--	dev->archdata.dma_coherent = coherent;
--}
-+void arch_setup_dma_ops(struct device *dev, u64 dma_base, u64 size,
-+			struct iommu_ops *iommu, bool coherent);
- #define arch_setup_dma_ops	arch_setup_dma_ops
- 
- /* do not use this function in a driver */
-@@ -64,6 +61,10 @@ static inline bool is_device_dma_coherent(struct device *dev)
- #include <linux/dma-iommu.h>
- 
- #ifdef CONFIG_IOMMU_DMA
-+
-+void arch_teardown_dma_ops(struct device *dev);
-+#define arch_teardown_dma_ops	arch_teardown_dma_ops
-+
- static inline struct iommu_dma_domain *arch_get_dma_domain(struct device *dev)
- {
- 	return dev->archdata.dma_domain;
-diff --git a/arch/arm64/mm/dma-mapping.c b/arch/arm64/mm/dma-mapping.c
-index 51b7ae5..c1e1a07 100644
---- a/arch/arm64/mm/dma-mapping.c
-+++ b/arch/arm64/mm/dma-mapping.c
-@@ -769,6 +769,14 @@ static void __iommu_setup_dma_ops(struct device *dev, u64 dma_base, u64 size,
- 	mutex_unlock(&iommu_dma_notifier_lock);
- }
- 
-+void arch_teardown_dma_ops(struct device *dev)
-+{
-+	if (dev->archdata.dma_domain) {
-+		iommu_dma_detach_device(dev);
-+		dev->archdata.dma_ops = NULL;
-+	}
-+}
-+
- #else
- 
- static void __iommu_setup_dma_ops(struct device *dev, u64 dma_base, u64 size,
-@@ -776,3 +784,10 @@ static void __iommu_setup_dma_ops(struct device *dev, u64 dma_base, u64 size,
- { }
- 
- #endif  /* CONFIG_IOMMU_DMA */
-+
-+void arch_setup_dma_ops(struct device *dev, u64 dma_base, u64 size,
-+			struct iommu_ops *iommu, bool coherent)
-+{
-+	dev->archdata.dma_coherent = coherent;
-+	__iommu_setup_dma_ops(dev, dma_base, size, iommu);
-+}
+> The patch is ok but there is an inconsistency on how are handled the
+> different callbacks. tick_resume can be omitted but not
+> state_shutdown and state_oneshot forcing the drivers to define empty
+> functions.
+
+It was done because they are thought to be compulsory, but even I
+am not sure if we should make all callbacks as optional.
+
 -- 
-1.9.1
+viresh
