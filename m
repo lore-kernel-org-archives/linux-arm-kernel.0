@@ -1,80 +1,128 @@
-From: hanjun.guo@linaro.org (Hanjun Guo)
-Date: Thu, 11 Jun 2015 21:25:34 +0800
-Subject: [PATCH 10/11] irqchip / GICv2 / ACPI: Consolidate GICv2 ACPI
- related init code
-In-Reply-To: <557865FB.1010502@arm.com>
-References: <1431953961-22706-1-git-send-email-hanjun.guo@linaro.org>
- <1431953961-22706-11-git-send-email-hanjun.guo@linaro.org>
- <555CF23B.1000002@linaro.org> <555DEB6A.8090404@linaro.org>
- <557865FB.1010502@arm.com>
-Message-ID: <55798C4E.8070903@linaro.org>
+From: vladimir_zapolskiy@mentor.com (Vladimir Zapolskiy)
+Date: Thu, 11 Jun 2015 16:28:22 +0300
+Subject: [PATCH 1/2] genalloc: rename dev_get_gen_pool() to gen_pool_get()
+In-Reply-To: <1434029192-7082-1-git-send-email-vladimir_zapolskiy@mentor.com>
+References: <1434029192-7082-1-git-send-email-vladimir_zapolskiy@mentor.com>
+Message-ID: <1434029302-7239-1-git-send-email-vladimir_zapolskiy@mentor.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Marc,
+To be consistent with other genalloc interface namings, rename
+dev_get_gen_pool() to gen_pool_get(). The original omitted "dev_"
+prefix is removed, since it points to argument type of the function,
+and so it does not bring any useful information.
 
-On 06/11/2015 12:29 AM, Marc Zyngier wrote:
-> On 21/05/15 15:27, Hanjun Guo wrote:
->> On 2015?05?21? 04:44, Tomasz Nowicki wrote:
->>> Hi Hanjun,
->>>
->>> On 05/18/2015 02:59 PM, Hanjun Guo wrote:
->>>> Move GICv2 ACPI related init code in irq-gic.c to irq-gic-acpi.c,
->>>> this can make the ACPI related GIC init code slef-contained.
->>>>
->>>> Introduce set_acpi_core_irqdomain() to set acpi_irqdomain then
->>>> it will be no need to make gic_data[] as a global value, and
->>>> it will save the confilcts with GICv3's gic_data in the later
->>>> patch.
->>>>
->>>> acpi_gic_parse_distributor() have the same function as
->>>> gic_acpi_parse_madt_distributor() to get the GIC distributor
->>>> physical base address, so just remove the duplicate one, and
->>>> only get the GIC version when it is unknown.
->>>>
->>>> Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
->>>> ---
->>>>    drivers/irqchip/irq-gic-acpi.c       |  95
->>>> +++++++++++++++++++++++++++++++-
->>>>    drivers/irqchip/irq-gic.c            | 103
->>>> +----------------------------------
->>>>    include/linux/irqchip/arm-gic-acpi.h |   5 ++
->>>>    3 files changed, 101 insertions(+), 102 deletions(-)
->>>>
->>>> diff --git a/drivers/irqchip/irq-gic-acpi.c
->>>> b/drivers/irqchip/irq-gic-acpi.c
->>>> index 1388d9e..8463e48 100644
->>>> --- a/drivers/irqchip/irq-gic-acpi.c
->>>> +++ b/drivers/irqchip/irq-gic-acpi.c
->>>> @@ -13,12 +13,16 @@
->>>>
->>>>    #include <linux/acpi.h>
->>>>    #include <linux/init.h>
->>>> +#include <linux/irqchip/arm-gic.h>
->>>>    #include <linux/irqchip/arm-gic-acpi.h>
->>>>    #include <linux/irqchip/arm-gic-v3.h>
->>>
->>> arm-gic.h and arm-gic-v3.h describe register map for respective drivers
->>> and should be used separately within parent driver only.
->>
->> Seems that there is no duplicate macros in that two head
->> file, but yes, it will confuse people.
->>
->> Consolidating all ACPI GIC code is an improvement to make
->> ACPI related code self-contained, but also have some drawbacks,
->>
->> Marc, what do you think?
->
-> What I think is "Over my dead body".
->
-> These include files are private to the respective interrupt controller
-> code, and the only reason they are in linux/irqchip is because the
-> corresponding KVM support code uses them too.
+Signed-off-by: Vladimir Zapolskiy <vladimir_zapolskiy@mentor.com>
+---
+ arch/arm/mach-at91/pm.c                   | 2 +-
+ arch/arm/mach-imx/pm-imx5.c               | 2 +-
+ arch/arm/mach-imx/pm-imx6.c               | 2 +-
+ drivers/media/platform/coda/coda-common.c | 2 +-
+ include/linux/genalloc.h                  | 2 +-
+ lib/genalloc.c                            | 8 ++++----
+ 6 files changed, 9 insertions(+), 9 deletions(-)
 
-So for this patch, we are totally in the wrong direction, I will
-remove the last two patches in next version.
-
-Thanks for your constructive comments, much appreciated :)
-
-Thanks
-Hanjun
+diff --git a/arch/arm/mach-at91/pm.c b/arch/arm/mach-at91/pm.c
+index 1e18476..e24df77 100644
+--- a/arch/arm/mach-at91/pm.c
++++ b/arch/arm/mach-at91/pm.c
+@@ -369,7 +369,7 @@ static void __init at91_pm_sram_init(void)
+ 		return;
+ 	}
+ 
+-	sram_pool = dev_get_gen_pool(&pdev->dev);
++	sram_pool = gen_pool_get(&pdev->dev);
+ 	if (!sram_pool) {
+ 		pr_warn("%s: sram pool unavailable!\n", __func__);
+ 		return;
+diff --git a/arch/arm/mach-imx/pm-imx5.c b/arch/arm/mach-imx/pm-imx5.c
+index 0309ccd..1885676 100644
+--- a/arch/arm/mach-imx/pm-imx5.c
++++ b/arch/arm/mach-imx/pm-imx5.c
+@@ -297,7 +297,7 @@ static int __init imx_suspend_alloc_ocram(
+ 		goto put_node;
+ 	}
+ 
+-	ocram_pool = dev_get_gen_pool(&pdev->dev);
++	ocram_pool = gen_pool_get(&pdev->dev);
+ 	if (!ocram_pool) {
+ 		pr_warn("%s: ocram pool unavailable!\n", __func__);
+ 		ret = -ENODEV;
+diff --git a/arch/arm/mach-imx/pm-imx6.c b/arch/arm/mach-imx/pm-imx6.c
+index b01650d..93ecf55 100644
+--- a/arch/arm/mach-imx/pm-imx6.c
++++ b/arch/arm/mach-imx/pm-imx6.c
+@@ -451,7 +451,7 @@ static int __init imx6q_suspend_init(const struct imx6_pm_socdata *socdata)
+ 		goto put_node;
+ 	}
+ 
+-	ocram_pool = dev_get_gen_pool(&pdev->dev);
++	ocram_pool = gen_pool_get(&pdev->dev);
+ 	if (!ocram_pool) {
+ 		pr_warn("%s: ocram pool unavailable!\n", __func__);
+ 		ret = -ENODEV;
+diff --git a/drivers/media/platform/coda/coda-common.c b/drivers/media/platform/coda/coda-common.c
+index 6d6e0ca..6e640c0 100644
+--- a/drivers/media/platform/coda/coda-common.c
++++ b/drivers/media/platform/coda/coda-common.c
+@@ -2157,7 +2157,7 @@ static int coda_probe(struct platform_device *pdev)
+ 	/* Get IRAM pool from device tree or platform data */
+ 	pool = of_get_named_gen_pool(np, "iram", 0);
+ 	if (!pool && pdata)
+-		pool = dev_get_gen_pool(pdata->iram_dev);
++		pool = gen_pool_get(pdata->iram_dev);
+ 	if (!pool) {
+ 		dev_err(&pdev->dev, "iram pool not available\n");
+ 		return -ENOMEM;
+diff --git a/include/linux/genalloc.h b/include/linux/genalloc.h
+index 1ccaab4..015d170 100644
+--- a/include/linux/genalloc.h
++++ b/include/linux/genalloc.h
+@@ -119,7 +119,7 @@ extern unsigned long gen_pool_best_fit(unsigned long *map, unsigned long size,
+ 
+ extern struct gen_pool *devm_gen_pool_create(struct device *dev,
+ 		int min_alloc_order, int nid);
+-extern struct gen_pool *dev_get_gen_pool(struct device *dev);
++extern struct gen_pool *gen_pool_get(struct device *dev);
+ 
+ bool addr_in_gen_pool(struct gen_pool *pool, unsigned long start,
+ 			size_t size);
+diff --git a/lib/genalloc.c b/lib/genalloc.c
+index d214866..948e92c 100644
+--- a/lib/genalloc.c
++++ b/lib/genalloc.c
+@@ -602,12 +602,12 @@ struct gen_pool *devm_gen_pool_create(struct device *dev, int min_alloc_order,
+ EXPORT_SYMBOL(devm_gen_pool_create);
+ 
+ /**
+- * dev_get_gen_pool - Obtain the gen_pool (if any) for a device
++ * gen_pool_get - Obtain the gen_pool (if any) for a device
+  * @dev: device to retrieve the gen_pool from
+  *
+  * Returns the gen_pool for the device if one is present, or NULL.
+  */
+-struct gen_pool *dev_get_gen_pool(struct device *dev)
++struct gen_pool *gen_pool_get(struct device *dev)
+ {
+ 	struct gen_pool **p = devres_find(dev, devm_gen_pool_release, NULL,
+ 					NULL);
+@@ -616,7 +616,7 @@ struct gen_pool *dev_get_gen_pool(struct device *dev)
+ 		return NULL;
+ 	return *p;
+ }
+-EXPORT_SYMBOL_GPL(dev_get_gen_pool);
++EXPORT_SYMBOL_GPL(gen_pool_get);
+ 
+ #ifdef CONFIG_OF
+ /**
+@@ -642,7 +642,7 @@ struct gen_pool *of_get_named_gen_pool(struct device_node *np,
+ 	of_node_put(np_pool);
+ 	if (!pdev)
+ 		return NULL;
+-	return dev_get_gen_pool(&pdev->dev);
++	return gen_pool_get(&pdev->dev);
+ }
+ EXPORT_SYMBOL_GPL(of_get_named_gen_pool);
+ #endif /* CONFIG_OF */
+-- 
+2.1.4
