@@ -1,63 +1,57 @@
-From: hanjun.guo@linaro.org (Hanjun Guo)
-Date: Thu, 11 Jun 2015 21:22:37 +0800
-Subject: [PATCH 05/11] irqchip / gic: Add stacked irqdomain support for
- ACPI based GICv2 init
-In-Reply-To: <55786556.1020404@arm.com>
-References: <1431953961-22706-1-git-send-email-hanjun.guo@linaro.org>
- <1431953961-22706-6-git-send-email-hanjun.guo@linaro.org>
- <55786556.1020404@arm.com>
-Message-ID: <55798B9D.5050409@linaro.org>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Thu, 11 Jun 2015 14:23:48 +0100
+Subject: [PATCH v4 2/8] firmware: add support for ARM System Control and
+ Power Interface(SCPI) protocol
+In-Reply-To: <CAJe_ZheUknLZuMg-02V-AqyjxX8Nx4oK3O2HapqfCLkkXjngAg@mail.gmail.com>
+References: <1433760002-24120-1-git-send-email-sudeep.holla@arm.com>	<1433760002-24120-3-git-send-email-sudeep.holla@arm.com>
+ <CAJe_ZheUknLZuMg-02V-AqyjxX8Nx4oK3O2HapqfCLkkXjngAg@mail.gmail.com>
+Message-ID: <55798BE4.2000604@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/11/2015 12:27 AM, Marc Zyngier wrote:
-> On 18/05/15 13:59, Hanjun Guo wrote:
->> Introduce acpi_irq_domain for GICv2 core domain instead of referring
->> to the irq_default_domain, based on that, pass gsi as the argument and
->> get the gsi in gic_irq_domain_alloc() to add stacked irqdomain support
->> for ACPI based GICv2 init.
->>
->> Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
->> ---
->>   drivers/acpi/gsi.c                   | 28 +++++++++++++---------------
->>   drivers/irqchip/irq-gic.c            | 32 +++++++++++++++++---------------
->>   include/linux/irqchip/arm-gic-acpi.h |  2 ++
->>   3 files changed, 32 insertions(+), 30 deletions(-)
->>
->> diff --git a/drivers/acpi/gsi.c b/drivers/acpi/gsi.c
->> index 38208f2..55b5f31 100644
->> --- a/drivers/acpi/gsi.c
->> +++ b/drivers/acpi/gsi.c
->> @@ -3,6 +3,7 @@
->>    *
->>    * Copyright (C) 2015 ARM Ltd.
->>    * Author: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
->> + *         Hanjun Guo <hanjun.guo@linaro.org> for stacked irqdomains support
->>    *
->>    * This program is free software; you can redistribute it and/or modify
->>    * it under the terms of the GNU General Public License version 2 as
->> @@ -13,6 +14,8 @@
->>   #include <linux/irqdomain.h>
->>
->>   enum acpi_irq_model_id acpi_irq_model;
->> +/* ACPI core domian pointing to GICv2/3 core domain */
->> +struct irq_domain *acpi_irq_domain __read_mostly;
+
+
+On 11/06/15 12:54, Jassi Brar wrote:
+> On 8 June 2015 at 16:09, Sudeep Holla <sudeep.holla@arm.com> wrote:
+> ...
+>> +
+>> +static void scpi_process_cmd(struct scpi_chan *ch, u32 cmd)
+>> +{
+>> +       unsigned long flags;
+>> +       struct scpi_xfer *t, *match = NULL;
+>> +
+>> +       spin_lock_irqsave(&ch->rx_lock, flags);
+>> +       if (list_empty(&ch->rx_pending)) {
+>> +               spin_unlock_irqrestore(&ch->rx_lock, flags);
+>> +               return;
+>> +       }
+>> +
+>> +       list_for_each_entry(t, &ch->rx_pending, node)
+>> +               if (CMD_XTRACT_UNIQ(t->cmd) == CMD_XTRACT_UNIQ(cmd)) {
+>> +                       list_del(&t->node);
+>> +                       match = t;
+>> +                       break;
+>> +               }
+>> +       /* check if wait_for_completion is in progress or timed-out */
+>> +       if (match && !completion_done(&match->done)) {
+>> +               struct scpi_shared_mem *mem = ch->rx_payload;
+>> +               unsigned int len = min(match->rx_len, CMD_SIZE(cmd));
+>> +
+>> +               match->status = le32_to_cpu(mem->status);
+>> +               memcpy_fromio(match->rx_buf, mem->payload, len);
+>> +               if (match->rx_len > len)
+>> +                       memset(match->rx_buf + len, 0, match->rx_len - len);
+>> +               complete(&match->done);
+>> +       }
+>> +       spin_unlock_irqrestore(&ch->rx_lock, flags);
+>> +}
+> There doesn't seem to be support for commands sent by remote?
+> Something like when remote is the thermal master and it needs to send
+> sensor readings crossing thresholds.
 >
-> How is a single domain pointer going to work when you will have several
-> domains (GICv2m, ITS)?
 
-This acpi_irq_domain is the core domain which is the parent domain
-of GICv2m or ITS.
+SCP firmware claims to support that but never tested on Juno platform.
+So I would like to add it when there's first user for that.
 
-acpi_irq_domain points to GICv2 or GICv3 domain when the GIC
-is initialized.
-
-> Crucially, how are you going to perform the
-> matching of a device with its irq domain?
-
-since every ITS will have a domain, and there is a mapping
-from device id to ITS ID in IORT table, then we can match the
-device with the ITS irq domain, does it make sense?
-
-Thanks
-Hanjun
+Regards,
+Sudeep
