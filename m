@@ -1,82 +1,45 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Thu, 11 Jun 2015 17:25:24 +0200
-Subject: [PATCH 3/6] clocksource: bcm2835: Migrate to new 'set-state'
- interface
-In-Reply-To: <b0bf70d911dffe170b0d2b2b3e680bb445c15fc4.1433768426.git.viresh.kumar@linaro.org>
-References: <cover.1433768426.git.viresh.kumar@linaro.org>
- <b0bf70d911dffe170b0d2b2b3e680bb445c15fc4.1433768426.git.viresh.kumar@linaro.org>
-Message-ID: <5579A864.5010500@linaro.org>
+From: Dave.Martin@arm.com (Dave Martin)
+Date: Thu, 11 Jun 2015 16:29:15 +0100
+Subject: [PATCH 01/10] arm64/debug: Eliminate magic number for size of BRK
+ instruction
+In-Reply-To: <1434036566-9848-1-git-send-email-Dave.Martin@arm.com>
+References: <1434036566-9848-1-git-send-email-Dave.Martin@arm.com>
+Message-ID: <1434036566-9848-2-git-send-email-Dave.Martin@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/08/2015 03:40 PM, Viresh Kumar wrote:
-> Migrate bcm2835 driver to the new 'set-state' interface provided by
-> the clockevents core, the earlier 'set-mode' interface is marked
-> obsolete now.
->
-> This also enables us to implement callbacks for new states of clockevent
-> devices, for example: ONESHOT_STOPPED.
+The size of an A64 BRK instruction is the same as the size of all other
+A64 instructions, because all A64 instructions are the same size.
 
-Please mention in the log you removed the RESUME because it does nothing 
-and the core code will just ignore it.
+BREAK_INSTR_SIZE is retained for readibility, but it should not be
+an independent constant from AARCH64_INSN_SIZE.
 
-> Cc: Stephen Warren <swarren@wwwdotorg.org>
-> Cc: Lee Jones <lee@kernel.org>
-> Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
+Signed-off-by: Dave Martin <Dave.Martin@arm.com>
+---
+ arch/arm64/include/asm/debug-monitors.h |    4 +++-
+ 1 file changed, 3 insertions(+), 1 deletion(-)
 
-Acked-by: Daniel Lezcano <daniel.lezcano@linaro.org>
-
-> ---
->   drivers/clocksource/bcm2835_timer.c | 17 ++++-------------
->   1 file changed, 4 insertions(+), 13 deletions(-)
->
-> diff --git a/drivers/clocksource/bcm2835_timer.c b/drivers/clocksource/bcm2835_timer.c
-> index 26ed331b1aad..b59b8e1ba503 100644
-> --- a/drivers/clocksource/bcm2835_timer.c
-> +++ b/drivers/clocksource/bcm2835_timer.c
-> @@ -54,19 +54,9 @@ static u64 notrace bcm2835_sched_read(void)
->   	return readl_relaxed(system_clock);
->   }
->
-> -static void bcm2835_time_set_mode(enum clock_event_mode mode,
-> -	struct clock_event_device *evt_dev)
-> +static int bcm2835_time_noop(struct clock_event_device *evt)
->   {
-> -	switch (mode) {
-> -	case CLOCK_EVT_MODE_ONESHOT:
-> -	case CLOCK_EVT_MODE_UNUSED:
-> -	case CLOCK_EVT_MODE_SHUTDOWN:
-> -	case CLOCK_EVT_MODE_RESUME:
-> -		break;
-> -	default:
-> -		WARN(1, "%s: unhandled event mode %d\n", __func__, mode);
-> -		break;
-> -	}
-> +	return 0;
->   }
->
->   static int bcm2835_time_set_next_event(unsigned long event,
-> @@ -129,7 +119,8 @@ static void __init bcm2835_timer_init(struct device_node *node)
->   	timer->evt.name = node->name;
->   	timer->evt.rating = 300;
->   	timer->evt.features = CLOCK_EVT_FEAT_ONESHOT;
-> -	timer->evt.set_mode = bcm2835_time_set_mode;
-> +	timer->evt.set_state_shutdown = bcm2835_time_noop;
-> +	timer->evt.set_state_oneshot = bcm2835_time_noop;
-
-The patch is ok but there is an inconsistency on how are handled the 
-different callbacks. tick_resume can be omitted but not state_shutdown 
-and state_oneshot forcing the drivers to define empty functions.
-
->   	timer->evt.set_next_event = bcm2835_time_set_next_event;
->   	timer->evt.cpumask = cpumask_of(0);
->   	timer->act.name = node->name;
-
-
-
+diff --git a/arch/arm64/include/asm/debug-monitors.h b/arch/arm64/include/asm/debug-monitors.h
+index 40ec68a..f3d2dbd 100644
+--- a/arch/arm64/include/asm/debug-monitors.h
++++ b/arch/arm64/include/asm/debug-monitors.h
+@@ -18,6 +18,8 @@
+ 
+ #ifdef __KERNEL__
+ 
++#include <asm/insn.h>
++
+ /* Low-level stepping controls. */
+ #define DBG_MDSCR_SS		(1 << 0)
+ #define DBG_SPSR_SS		(1 << 21)
+@@ -38,7 +40,7 @@
+ /*
+  * Break point instruction encoding
+  */
+-#define BREAK_INSTR_SIZE		4
++#define BREAK_INSTR_SIZE		AARCH64_INSN_SIZE
+ 
+ /*
+  * ESR values expected for dynamic and compile time BRK instruction
 -- 
-  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
-
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+1.7.10.4
