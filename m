@@ -1,37 +1,29 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Thu, 11 Jun 2015 09:26:42 +0200
-Subject: [PATCH v4] ARM: l2c: add options to overwrite prefetching behavior
-In-Reply-To: <55788F6B.7060406@hauke-m.de>
-References: <1432941541-18588-1-git-send-email-hauke@hauke-m.de>
- <20150610172100.230c0e71@free-electrons.com>
- <55788F6B.7060406@hauke-m.de>
-Message-ID: <20150611092642.0d9e112c@free-electrons.com>
+From: hch@lst.de (Christoph Hellwig)
+Date: Thu, 11 Jun 2015 09:31:07 +0200
+Subject: [PATCH 2/2] scatterlist: cleanup sg_chain() and sg_unmark_end()
+In-Reply-To: <20150610053803.GA1693@gondor.apana.org.au>
+References: <20150609162659.21910.41681.stgit@dwillia2-desk3.amr.corp.intel.com>
+ <20150609162715.21910.77696.stgit@dwillia2-desk3.amr.corp.intel.com>
+ <20150610053803.GA1693@gondor.apana.org.au>
+Message-ID: <20150611073107.GD1905@lst.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+On Wed, Jun 10, 2015 at 01:38:04PM +0800, Herbert Xu wrote:
+> On Tue, Jun 09, 2015 at 12:27:15PM -0400, Dan Williams wrote:
+> >
+> > +#define scatterwalk_sg_chain(prv, num, sgl)	sg_chain(prv, num, sgl)
+> > +#define scatterwalk_sg_next(sgl)		sg_next(sgl)
+> 
+> Why are you reintroducing the scatterwalk_sg_next macro that we
+> just removed?
+> 
+> I also don't understand why this is so urgent that it has to go
+> into mainline at this late date.
 
-On Wed, 10 Jun 2015 21:26:35 +0200, Hauke Mehrtens wrote:
+It allows getting a cleaner slate for the next merge window, which seems
+useful on it's own.  The re-addition of scatterwalk_sg_next seems next,
+but getting rid of the open-coded sg_chain is useful.
 
-> > This patch would be useful to me. I'll test it tomorrow. Did you submit
-> > it into the Russell patch tracking system, as Russell suggested to do
-> > in his reply on your v3 ?
-> > 
-> > Russell said:
-> > 
-> > """
-> > I don't see anything wrong with it, but as ever, it needs to end up in
-> > the patch system if it's not going to get buried beneath a huge pile of
-> > email.
-> > """
-> Thanks for asking, I did not know Russell's patch process, but Florian
-> guided me and now it is submitted, see
-> http://www.arm.linux.org.uk/developer/patches/viewpatch.php?id=8391/1
-
-Great, thanks!
-
-Thomas
--- 
-Thomas Petazzoni, CTO, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+Maybe you can take it through the crypto tree and also kill off the
+scatterwalk_sg_chain name as well while we're at it?
