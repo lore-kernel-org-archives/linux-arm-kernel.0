@@ -1,10 +1,10 @@
 From: khilman@kernel.org (Kevin Hilman)
-Date: Thu, 11 Jun 2015 14:45:58 -0700
+Date: Thu, 11 Jun 2015 14:46:07 -0700
 Subject: [GIT PULL 5/5] Samsung mach updates for v4.2
 In-Reply-To: <5571E4F7.40706@kernel.org> (Kukjin Kim's message of "Sat, 06 Jun
  2015 03:05:43 +0900")
 References: <5571E4F7.40706@kernel.org>
-Message-ID: <7hmw05dill.fsf@deeprootsystems.com>
+Message-ID: <7hlhfpdilc.fsf@deeprootsystems.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
