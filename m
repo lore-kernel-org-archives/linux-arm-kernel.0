@@ -1,34 +1,34 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Thu, 11 Jun 2015 09:25:49 +0200
-Subject: [PATCH] ARM: mvebu: pass the coherency availability information
- at init time
-In-Reply-To: <557908C2.4090302@uclinux.org>
-References: <1433992764-12753-1-git-send-email-gerg@uclinux.org>
- <20150611034521.GA12809@kroah.com> <557908C2.4090302@uclinux.org>
-Message-ID: <20150611092549.2276beb8@free-electrons.com>
+Date: Thu, 11 Jun 2015 09:26:42 +0200
+Subject: [PATCH v4] ARM: l2c: add options to overwrite prefetching behavior
+In-Reply-To: <55788F6B.7060406@hauke-m.de>
+References: <1432941541-18588-1-git-send-email-hauke@hauke-m.de>
+ <20150610172100.230c0e71@free-electrons.com>
+ <55788F6B.7060406@hauke-m.de>
+Message-ID: <20150611092642.0d9e112c@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Greg, Greg,
+Hello,
 
-On Thu, 11 Jun 2015 14:04:18 +1000, Greg Ungerer wrote:
+On Wed, 10 Jun 2015 21:26:35 +0200, Hauke Mehrtens wrote:
 
-> > Why?  What's wrong with taking the exact specific upstream patches
-> > instead?
-> 
-> The exact patch mentioned below ("5686a1e5aa4") will not apply.
-> Too much of the code around it has changed. This does the same
-> thing in the same away taking into account the changes around it.
+> > This patch would be useful to me. I'll test it tomorrow. Did you submit
+> > it into the Russell patch tracking system, as Russell suggested to do
+> > in his reply on your v3 ?
+> > 
+> > Russell said:
+> > 
+> > """
+> > I don't see anything wrong with it, but as ever, it needs to end up in
+> > the patch system if it's not going to get buried beneath a huge pile of
+> > email.
+> > """
+> Thanks for asking, I did not know Russell's patch process, but Florian
+> guided me and now it is submitted, see
+> http://www.arm.linux.org.uk/developer/patches/viewpatch.php?id=8391/1
 
-As the original author of 5686a1e5aa4 ("bus: mvebu: pass the coherency
-availability information at init time"), I can confirm that it will
-clearly not apply as is on 3.10. What Greg Ungerer is proposing here is
-a backport of 5686a1e5aa4 to 3.10.
-
-The mistake is that 5686a1e5aa4 should have been marked for stable
-really.
-
-Best regards,
+Great, thanks!
 
 Thomas
 -- 
