@@ -1,42 +1,57 @@
 From: Dave.Martin@arm.com (Dave Martin)
-Date: Thu, 11 Jun 2015 16:29:18 +0100
-Subject: [PATCH 04/10] arm64/debug: Eliminate magic number from ESR template
- definition
+Date: Thu, 11 Jun 2015 16:29:20 +0100
+Subject: [PATCH 06/10] arm64/debug: Move BRK ESR template macro into
+ <asm/esr.h>
 In-Reply-To: <1434036566-9848-1-git-send-email-Dave.Martin@arm.com>
 References: <1434036566-9848-1-git-send-email-Dave.Martin@arm.com>
-Message-ID: <1434036566-9848-5-git-send-email-Dave.Martin@arm.com>
+Message-ID: <1434036566-9848-7-git-send-email-Dave.Martin@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-<asm/esr.h> has perfectly good constants for defining ESR values
-already.  Let's use them.
+It makes sense to keep all the architectural exception syndrome
+definitions in the same place.
 
 Signed-off-by: Dave Martin <Dave.Martin@arm.com>
 ---
- arch/arm64/include/asm/debug-monitors.h |    4 +++-
- 1 file changed, 3 insertions(+), 1 deletion(-)
+ arch/arm64/include/asm/debug-monitors.h |    7 -------
+ arch/arm64/include/asm/esr.h            |    7 +++++++
+ 2 files changed, 7 insertions(+), 7 deletions(-)
 
 diff --git a/arch/arm64/include/asm/debug-monitors.h b/arch/arm64/include/asm/debug-monitors.h
-index ab7d5a8..ff09058 100644
+index bb97e9d..e28b1dd 100644
 --- a/arch/arm64/include/asm/debug-monitors.h
 +++ b/arch/arm64/include/asm/debug-monitors.h
-@@ -18,6 +18,7 @@
- 
- #ifdef __KERNEL__
- 
-+#include <asm/esr.h>
- #include <asm/insn.h>
- 
- /* Low-level stepping controls. */
-@@ -45,7 +46,8 @@
- /*
-  * ESR values expected for dynamic and compile time BRK instruction
-  */
--#define DBG_ESR_VAL_BRK(x)	(0xf2000000 | ((x) & 0xffff))
-+#define DBG_ESR_VAL_BRK(x) \
-+	((ESR_ELx_EC_BRK64 << ESR_ELx_EC_SHIFT) | ESR_ELx_IL | ((x) & 0xffff))
+@@ -44,13 +44,6 @@
+ #define BREAK_INSTR_SIZE		AARCH64_INSN_SIZE
  
  /*
+- * ESR values expected for dynamic and compile time BRK instruction
+- */
+-#define ESR_ELx_VAL_BRK64(imm)					\
+-	((ESR_ELx_EC_BRK64 << ESR_ELx_EC_SHIFT) | ESR_ELx_IL |	\
+-	 ((imm) & 0xffff))
+-
+-/*
   * #imm16 values used for BRK instruction generation
+  * Allowed values for kgbd are 0x400 - 0x7ff
+  * 0x100: for triggering a fault on purpose (reserved)
+diff --git a/arch/arm64/include/asm/esr.h b/arch/arm64/include/asm/esr.h
+index 8dab2a9..7568d14 100644
+--- a/arch/arm64/include/asm/esr.h
++++ b/arch/arm64/include/asm/esr.h
+@@ -101,6 +101,13 @@
+ #define ESR_ELx_WFx_ISS_WFE	(UINT(1) << 0)
+ #define ESR_ELx_xVC_IMM_MASK	((UINT(1) << 16) - 1)
+ 
++/* ESR value templates for specific events */
++
++/* BRK instruction trap from AArch64 state */
++#define ESR_ELx_VAL_BRK64(imm)					\
++	((ESR_ELx_EC_BRK64 << ESR_ELx_EC_SHIFT) | ESR_ELx_IL |	\
++	 ((imm) & 0xffff))
++
+ #ifndef __ASSEMBLY__
+ #include <asm/types.h>
+ 
 -- 
 1.7.10.4
