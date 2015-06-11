@@ -1,170 +1,81 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu, 11 Jun 2015 09:56:39 +0100
-Subject: [PATCH 06/10] KVM: arm/arm64: vgic: Allow dynamic mapping of
- physical/virtual interrupts
-In-Reply-To: <55794A31.5050901@arm.com>
-References: <1433783045-8002-1-git-send-email-marc.zyngier@arm.com>
- <1433783045-8002-7-git-send-email-marc.zyngier@arm.com>
- <55794A31.5050901@arm.com>
-Message-ID: <55794D47.7040702@arm.com>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Thu, 11 Jun 2015 10:59:22 +0200
+Subject: [linux-sunxi] Re: [PATCH v4 1/2] phy-sun4i-usb: Add full support
+ for usb0 phy / OTG
+In-Reply-To: <557946EC.3060607@samsung.com>
+References: <1433088626-8858-1-git-send-email-hdegoede@redhat.com>
+ <1433088626-8858-2-git-send-email-hdegoede@redhat.com>
+ <55792122.20607@ti.com> <557941A6.5000306@samsung.com>
+ <557944EE.1020303@redhat.com> <557946EC.3060607@samsung.com>
+Message-ID: <55794DEA.1050604@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/06/15 09:43, Andre Przywara wrote:
-> Hi,
-> 
-> On 06/08/2015 06:04 PM, Marc Zyngier wrote:
->> In order to be able to feed physical interrupts to a guest, we need
->> to be able to establish the virtual-physical mapping between the two
->> worlds.
+Hi,
+
+On 11-06-15 10:29, Chanwoo Choi wrote:
+> Hi Hans,
+>
+> On 06/11/2015 05:21 PM, Hans de Goede wrote:
+>> Hi Chanwoo,
 >>
->> The mapping is kept in a rbtree, indexed by virtual interrupts.
+>> Thanks for the quick review.
 >>
->> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
->> ---
->>  include/kvm/arm_vgic.h |  18 ++++++++
->>  virt/kvm/arm/vgic.c    | 110 +++++++++++++++++++++++++++++++++++++++++++++++++
->>  2 files changed, 128 insertions(+)
+>> On 11-06-15 10:07, Chanwoo Choi wrote:
+>>> Hi Hans,
+>>>
+>>> I add the comment about extcon-related code.
+>>>
+>>> Firstly,
+>>> I'd like you to implment the extcon driver for phy-sun4i-usb device
+>>> in drivers/extcon/ directoryby using MFD
 >>
->> diff --git a/include/kvm/arm_vgic.h b/include/kvm/arm_vgic.h
->> index 4f9fa1d..33d121a 100644
->> --- a/include/kvm/arm_vgic.h
->> +++ b/include/kvm/arm_vgic.h
->> @@ -159,6 +159,14 @@ struct vgic_io_device {
->>  	struct kvm_io_device dev;
->>  };
->>  
->> +struct irq_phys_map {
->> +	struct rb_node		node;
->> +	u32			virt_irq;
->> +	u32			phys_irq;
->> +	u32			irq;
-> 
-> Can you add comments explaining the different IRQ types here?
-> So I take it that phys_irq is the actual SPI number (hwirq in irqchip
-> lingo), virt_irq is the guest's virtual IRQ number and irq is Linux'
-> notion of the IRQ number (the first column in /proc/interrupts)?
-> Would renaming help? (phys_irq to hwirq? virt_irq to guest_irq?)
+>> No, just no, this is not what the MFD framework is for, the usb-phy
+>> in question here is not a multifunction device. The MFD framework
+>> is intended for true multi-function devices like i2c attached
+>> PMICs which have regulators, gpios, pwm, input (power button),
+>> chargers, power-supply, etc. That is NOT the case here.
+>>
+>> Also moving this to the MFD framework would very likely requiring
+>> the devicetree binding for the usb-phy to change which we cannot
+>> do as that would break the devicetree ABI.
+>>
+>>> because there are both extcon
+>>> provider driver and extcon client driver. I think that all extcon
+>>> provider driver better to be included in drivers/extcon/ directory.
+>>> extcon_set_cable_state() function should be handled in extcon provider
+>>> driver which is incluced in drivers/extcon/ directory.
+>>
+>> I do not find this a compelling reason, there are plenty of subsystems
+>> where not all implementations of the subsystem class live in the subsystem
+>> directory, e.g. input and hwmon devices are often also found outside of
+>> the input and hwmon driver directories.
+>
+> There are difference on between input/hwmon and extcon.
+>
+> Because input and hwmon driver implement the only one type driver as provider driver.
+> But, extcon implement the two type driver of both extcon provider and extcon client driver.
+> The extcon is similiar with regulator and clock framework as resource.
+>
+> extcon provider driver to provider the event when the state of external connector is changed.
+> - devm_extcon_dev_register()
+> - e.g., almost extcon provider driver are included in 'drivers/extcon/' directory.
 
-Adding comments would probably help. Renaming, I'm not sure. The virt vs
-phys was clear enough for me. The ambiguous one would be "irq"... I'll
-try to work something out anyway.
+I understand, but that does not change my first argument, that the usb-phy is not
+a MFD device. And although it may be desirable to keep extcon provider drivers
+in the drivers/extcon, there are no technical reasons to do so.
 
-> 
->> +	bool			active;
->> +};
->> +
->>  struct vgic_dist {
->>  	spinlock_t		lock;
->>  	bool			in_kernel;
->> @@ -256,6 +264,10 @@ struct vgic_dist {
->>  	struct vgic_vm_ops	vm_ops;
->>  	struct vgic_io_device	dist_iodev;
->>  	struct vgic_io_device	*redist_iodevs;
->> +
->> +	/* Virtual irq to hwirq mapping */
->> +	spinlock_t		irq_phys_map_lock;
->> +	struct rb_root		irq_phys_map;
->>  };
->>  
->>  struct vgic_v2_cpu_if {
->> @@ -307,6 +319,9 @@ struct vgic_cpu {
->>  		struct vgic_v2_cpu_if	vgic_v2;
->>  		struct vgic_v3_cpu_if	vgic_v3;
->>  	};
->> +
->> +	/* Protected by the distributor's irq_phys_map_lock */
->> +	struct rb_root	irq_phys_map;
->>  };
->>  
->>  #define LR_EMPTY	0xff
->> @@ -331,6 +346,9 @@ int kvm_vgic_inject_irq(struct kvm *kvm, int cpuid, unsigned int irq_num,
->>  void vgic_v3_dispatch_sgi(struct kvm_vcpu *vcpu, u64 reg);
->>  int kvm_vgic_vcpu_pending_irq(struct kvm_vcpu *vcpu);
->>  int kvm_vgic_vcpu_active_irq(struct kvm_vcpu *vcpu);
->> +struct irq_phys_map *vgic_map_phys_irq(struct kvm_vcpu *vcpu,
->> +				       int virt_irq, int irq);
->> +int vgic_unmap_phys_irq(struct kvm_vcpu *vcpu, struct irq_phys_map *map);
->>  
->>  #define irqchip_in_kernel(k)	(!!((k)->arch.vgic.in_kernel))
->>  #define vgic_initialized(k)	(!!((k)->arch.vgic.nr_cpus))
->> diff --git a/virt/kvm/arm/vgic.c b/virt/kvm/arm/vgic.c
->> index 59ed7a3..c6604f2 100644
->> --- a/virt/kvm/arm/vgic.c
->> +++ b/virt/kvm/arm/vgic.c
->> @@ -24,6 +24,7 @@
->>  #include <linux/of.h>
->>  #include <linux/of_address.h>
->>  #include <linux/of_irq.h>
->> +#include <linux/rbtree.h>
->>  #include <linux/uaccess.h>
->>  
->>  #include <linux/irqchip/arm-gic.h>
->> @@ -84,6 +85,8 @@ static void vgic_retire_disabled_irqs(struct kvm_vcpu *vcpu);
->>  static void vgic_retire_lr(int lr_nr, int irq, struct kvm_vcpu *vcpu);
->>  static struct vgic_lr vgic_get_lr(const struct kvm_vcpu *vcpu, int lr);
->>  static void vgic_set_lr(struct kvm_vcpu *vcpu, int lr, struct vgic_lr lr_desc);
->> +static struct irq_phys_map *vgic_irq_map_search(struct kvm_vcpu *vcpu,
->> +						int virt_irq);
->>  
->>  static const struct vgic_ops *vgic_ops;
->>  static const struct vgic_params *vgic;
->> @@ -1585,6 +1588,112 @@ static irqreturn_t vgic_maintenance_handler(int irq, void *data)
->>  	return IRQ_HANDLED;
->>  }
->>  
->> +static struct rb_root *vgic_get_irq_phys_map(struct kvm_vcpu *vcpu,
->> +					     int virt_irq)
->> +{
->> +	if (virt_irq < VGIC_NR_PRIVATE_IRQS)
->> +		return &vcpu->arch.vgic_cpu.irq_phys_map;
->> +	else
->> +		return &vcpu->kvm->arch.vgic.irq_phys_map;
->> +}
->> +
->> +struct irq_phys_map *vgic_map_phys_irq(struct kvm_vcpu *vcpu,
->> +				       int virt_irq, int irq)
->> +{
->> +	struct vgic_dist *dist = &vcpu->kvm->arch.vgic;
->> +	struct rb_root *root = vgic_get_irq_phys_map(vcpu, virt_irq);
->> +	struct rb_node **new = &root->rb_node, *parent = NULL;
->> +	struct irq_phys_map *new_map;
->> +	struct irq_desc *desc;
->> +	struct irq_data *data;
->> +	int phys_irq;
->> +
->> +	desc = irq_to_desc(irq);
->> +	if (!desc) {
->> +		kvm_err("kvm_arch_timer: can't obtain interrupt descriptor\n");
-> 
-> I guess kvm_arch_timer: is a left-over of the original user?
-> 
->> +		return NULL;
->> +	}
->> +
->> +	data = irq_desc_get_irq_data(desc);
->> +	while (data->parent_data)
->> +		data = data->parent_data;
->> +
->> +	phys_irq = data->hwirq;
-> 
-> So if I get this correctly we "cache" hwirq/phys_irq in this map to get
-> a cheaper access to it, but actually it is redundant since we have
-> Linux' irq number, isn't it?
+The whole reason why Kishon asked me to start using the extcon framework is to avoid
+adding a private API to the phy-sun4i-usb code for notifying the musb-sunxi code
+about otg-id-pin status changes. Adding a separate driver for just the extcon bits
+means re-adding a private api to the phy-sun4i-usb code but this time for the
+extcon code, at which point we might just as well skip extcon and have the
+musb-sunxi glue code call directly into the phy-sun4i-usb code...
 
-Define what you call by redundant. Parsing the irq_data hierarchy can be
-arbitrarily long, and what we're after is the irq vs GIC view of the HW irq.
+Needing a private API for a separate extcn driver actually is a good argument to
+NOT have a separate extcon driver and keep the extcon code in the phy-sun4i-usb code,
+where as I see no technical arguments in favor of a separate extcon driver.
 
-> Are we sure that the irqdomain mapping of irq and phys_irq never will
-> change while this map entry is valid? This is probably true for the
-> timer, but does that still hold in the future with other devices?
-> (see also the next email for more rationale)
+Regards,
 
-How could such a mapping change? We have done a request_irq on this IRQ
-line. If it was to change, we'd get notifier when *another device* is
-interrupting us. That would simply defeat the whole purpose of having
-separate interrupts.
-
-	M.
--- 
-Jazz is not dead. It just smells funny...
+Hans
