@@ -1,86 +1,100 @@
 From: eric.auger@linaro.org (Eric Auger)
-Date: Thu, 11 Jun 2015 14:08:45 +0200
-Subject: [PATCH v3 2/4] VFIO: platform: add reset callback
+Date: Thu, 11 Jun 2015 14:08:46 +0200
+Subject: [PATCH v3 3/4] VFIO: platform: populate the reset function on probe
 In-Reply-To: <1434024527-13869-1-git-send-email-eric.auger@linaro.org>
 References: <1434024527-13869-1-git-send-email-eric.auger@linaro.org>
-Message-ID: <1434024527-13869-3-git-send-email-eric.auger@linaro.org>
+Message-ID: <1434024527-13869-4-git-send-email-eric.auger@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-A new reset callback is introduced. If this callback is populated,
-the reset is invoked on device first open/last close or upon userspace
-ioctl.  The modality is exposed on VFIO_DEVICE_GET_INFO.
+The reset function lookup happens on vfio-platform probe. The reset
+module load is requested  and a reference to the function symbol is
+hold. The reference is released on vfio-platform remove.
 
 Signed-off-by: Eric Auger <eric.auger@linaro.org>
 
 ---
 
+v2 -> v3:
+- vfio_platform_get_reset becomes void
+- use ARRAY_SIZE
+- use symbol_put_addr
+
 v1 -> v2:
-- reset now is also called on first open on top of last close
-- remove IS_ERR_OR_NULL
+- [get,put]_reset now is called once on probe/remove
+- use request_module to automatically load the reset module that
+  matches the compatibility string
+- lookup table is used instead of list
+- remove registration mechanism: reset function name is stored in the
+  lookup table.
+- use device_property_read_string instead of
+  device_property_read_string_array
 ---
- drivers/vfio/platform/vfio_platform_common.c  | 15 +++++++++++++--
- drivers/vfio/platform/vfio_platform_private.h |  1 +
- 2 files changed, 14 insertions(+), 2 deletions(-)
+ drivers/vfio/platform/vfio_platform_common.c | 37 +++++++++++++++++++++++++++-
+ 1 file changed, 36 insertions(+), 1 deletion(-)
 
 diff --git a/drivers/vfio/platform/vfio_platform_common.c b/drivers/vfio/platform/vfio_platform_common.c
-index 611597e..6393581 100644
+index 6393581..f3391a9 100644
 --- a/drivers/vfio/platform/vfio_platform_common.c
 +++ b/drivers/vfio/platform/vfio_platform_common.c
-@@ -103,6 +103,8 @@ static void vfio_platform_release(void *device_data)
- 	mutex_lock(&driver_lock);
- 
- 	if (!(--vdev->refcnt)) {
-+		if (vdev->reset)
-+			vdev->reset(vdev);
- 		vfio_platform_regions_cleanup(vdev);
- 		vfio_platform_irq_cleanup(vdev);
- 	}
-@@ -130,6 +132,9 @@ static int vfio_platform_open(void *device_data)
- 		ret = vfio_platform_irq_init(vdev);
- 		if (ret)
- 			goto err_irq;
-+
-+		if (vdev->reset)
-+			vdev->reset(vdev);
- 	}
- 
- 	vdev->refcnt++;
-@@ -162,6 +167,8 @@ static long vfio_platform_ioctl(void *device_data,
- 		if (info.argsz < minsz)
- 			return -EINVAL;
- 
-+		if (vdev->reset)
-+			vdev->flags |= VFIO_DEVICE_FLAGS_RESET;
- 		info.flags = vdev->flags;
- 		info.num_regions = vdev->num_regions;
- 		info.num_irqs = vdev->num_irqs;
-@@ -255,8 +262,12 @@ static long vfio_platform_ioctl(void *device_data,
- 
- 		return ret;
- 
--	} else if (cmd == VFIO_DEVICE_RESET)
--		return -EINVAL;
-+	} else if (cmd == VFIO_DEVICE_RESET) {
-+		if (vdev->reset)
-+			return vdev->reset(vdev);
-+		else
-+			return -EINVAL;
-+	}
- 
- 	return -ENOTTY;
- }
-diff --git a/drivers/vfio/platform/vfio_platform_private.h b/drivers/vfio/platform/vfio_platform_private.h
-index 9e37b9f..1c9b3d5 100644
---- a/drivers/vfio/platform/vfio_platform_private.h
-+++ b/drivers/vfio/platform/vfio_platform_private.h
-@@ -67,6 +67,7 @@ struct vfio_platform_device {
- 	struct resource*
- 		(*get_resource)(struct vfio_platform_device *vdev, int i);
- 	int	(*get_irq)(struct vfio_platform_device *vdev, int i);
-+	int	(*reset)(struct vfio_platform_device *vdev);
+@@ -28,6 +28,36 @@ static DEFINE_MUTEX(driver_lock);
+ static const struct vfio_platform_reset_combo reset_lookup_table[] = {
  };
  
- struct vfio_platform_reset_combo {
++static void vfio_platform_get_reset(struct vfio_platform_device *vdev,
++				    struct device *dev)
++{
++	const char *compat;
++	int (*reset)(struct vfio_platform_device *);
++	int ret, i;
++
++	ret = device_property_read_string(dev, "compatible", &compat);
++	if (ret)
++		return;
++
++	for (i = 0 ; i < ARRAY_SIZE(reset_lookup_table); i++) {
++		if (!strcmp(reset_lookup_table[i].compat, compat)) {
++			request_module(reset_lookup_table[i].module_name);
++			reset = __symbol_get(
++				reset_lookup_table[i].reset_function_name);
++			if (reset) {
++				vdev->reset = reset;
++				return;
++			}
++		}
++	}
++}
++
++static void vfio_platform_put_reset(struct vfio_platform_device *vdev)
++{
++	if (vdev->reset)
++		symbol_put_addr(vdev->reset);
++}
++
+ static int vfio_platform_regions_init(struct vfio_platform_device *vdev)
+ {
+ 	int cnt = 0, i;
+@@ -516,6 +546,8 @@ int vfio_platform_probe_common(struct vfio_platform_device *vdev,
+ 		return ret;
+ 	}
+ 
++	vfio_platform_get_reset(vdev, dev);
++
+ 	mutex_init(&vdev->igate);
+ 
+ 	return 0;
+@@ -527,8 +559,11 @@ struct vfio_platform_device *vfio_platform_remove_common(struct device *dev)
+ 	struct vfio_platform_device *vdev;
+ 
+ 	vdev = vfio_del_group_dev(dev);
+-	if (vdev)
++
++	if (vdev) {
++		vfio_platform_put_reset(vdev);
+ 		iommu_group_put(dev->iommu_group);
++	}
+ 
+ 	return vdev;
+ }
 -- 
 1.9.1
