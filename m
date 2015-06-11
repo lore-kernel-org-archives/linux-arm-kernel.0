@@ -1,89 +1,220 @@
-From: javier@dowhile0.org (Javier Martinez Canillas)
-Date: Thu, 11 Jun 2015 14:58:33 +0200
-Subject: [PATCH 1/2] clk: exynos4: Add PCLK_ADC gate clock on Exynos4x12
-In-Reply-To: <557981B7.3000303@samsung.com>
-References: <1434011190-24563-1-git-send-email-k.kozlowski@samsung.com>
- <55796660.1070702@samsung.com>
- <CABxcv=kNb2ERqLL2gG73nkU+kpPsYAWKSyu=bkjfxZBMKOwyPQ@mail.gmail.com>
- <557981B7.3000303@samsung.com>
-Message-ID: <CABxcv=myq4VeMamstjVR2cpWCiD_FM91ncYYVKd4jRF=nB5zZQ@mail.gmail.com>
+From: kishon@ti.com (Kishon Vijay Abraham I)
+Date: Thu, 11 Jun 2015 18:29:38 +0530
+Subject: [linux-sunxi] Re: [PATCH v4 1/2] phy-sun4i-usb: Add full support
+ for usb0 phy / OTG
+In-Reply-To: <5579808C.2080208@redhat.com>
+References: <1433088626-8858-1-git-send-email-hdegoede@redhat.com>
+ <1433088626-8858-2-git-send-email-hdegoede@redhat.com>
+ <55795800.4070405@ti.com> <55795A98.8090303@redhat.com>
+ <55796E23.90509@ti.com> <5579808C.2080208@redhat.com>
+Message-ID: <5579863A.6000402@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Krzysztof,
 
-On Thu, Jun 11, 2015 at 2:40 PM, Krzysztof Kozlowski
-<k.kozlowski@samsung.com> wrote:
-> W dniu 11.06.2015 o 21:15, Javier Martinez Canillas pisze:
->> Hello Krzysztof,
+
+On Thursday 11 June 2015 06:05 PM, Hans de Goede wrote:
+> Hi,
+>
+> On 11-06-15 13:16, Kishon Vijay Abraham I wrote:
+>> Hi,
 >>
->> On Thu, Jun 11, 2015 at 12:43 PM, Krzysztof Kozlowski
->> <k.kozlowski@samsung.com> wrote:
->>> W dniu 11.06.2015 o 17:26, Krzysztof Kozlowski pisze:
->>>> Add proper gate clock for the Analog to Digital Converter (ADC) on
->>>> Exynos4x12.
+>> On Thursday 11 June 2015 03:23 PM, Hans de Goede wrote:
+>>> Hi,
+>>>
+>>> On 11-06-15 11:42, Kishon Vijay Abraham I wrote:
+>>>> Hi,
 >>>>
->>>> Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
->>>> ---
->>>>  drivers/clk/samsung/clk-exynos4.c   | 3 +++
->>>>  include/dt-bindings/clock/exynos4.h | 5 ++++-
->>>>  2 files changed, 7 insertions(+), 1 deletion(-)
+>>>> On Sunday 31 May 2015 09:40 PM, Hans de Goede wrote:
+>>>>> The usb0 phy is connected to an OTG controller, and as such needs some special
+>>>>> handling:
+>>>>>
+>>>>> 1) It allows explicit control over the pullups, enable these on phy_init and
+>>>>> disable them on phy_exit.
+>>>>>
+>>>>> 2) It has bits to signal id and vbus detect to the musb-core, add support for
+>>>>> for monitoring id and vbus detect gpio-s for use in dual role mode, and set
+>>>>> these bits to the correct values for operating in host only mode when no
+>>>>> gpios are specified in the devicetree.
+>>>>>
+>>>>> 3) When in dual role mode the musb sunxi glue needs to know if the a host or
+>>>>> device cable is plugged in, so when in dual role mode register an extcon.
+>>>>>
+>>>>> While updating the devicetree binding documentation also add documentation
+>>>>> for the sofar undocumented usage of regulators for vbus for all 3 phys.
+>>>>>
+>>>>> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+>>>>> ---
+>>>>> Changes in v2:
+>>>>> -Removed the sunxi specific phy functions, instead the id / vbus gpio polling
+>>>>>     has been moved to the phy-sun4i-usb driver and their status is exported
+>>>>>     through extcon for the sunxi-musb glue
+>>>>> Changes in v3:
+>>>>> -No changes
+>>>>> Changes in v4:
+>>>>> -Do not call regulator_disable in an unbalanced manner when an external vbus
+>>>>>     is present
+>>>>> ---
+>>>>>     .../devicetree/bindings/phy/sun4i-usb-phy.txt      |  18 +-
+>>>>>     drivers/phy/Kconfig                                |   1 +
+>>>>>     drivers/phy/phy-sun4i-usb.c                        | 273 ++++++++++++++++++++-
+>>>>>     3 files changed, 281 insertions(+), 11 deletions(-)
+>>>>>
+>>>> .
+>>>> .
+>>>> <snip>
+>>>> .
+>>>> .
+>>>>> diff --git a/drivers/phy/phy-sun4i-usb.c b/drivers/phy/phy-sun4i-usb.c
+>>>>> index 91c5be4..b45d707 100644
+>>>>> --- a/drivers/phy/phy-sun4i-usb.c
+>>>>> +++ b/drivers/phy/phy-sun4i-usb.c
+>>>>> @@ -1,7 +1,7 @@
 >>>>
->>>> diff --git a/drivers/clk/samsung/clk-exynos4.c b/drivers/clk/samsung/clk-exynos4.c
->>>> index 714d6ba782c8..5f32410a01f8 100644
->>>> --- a/drivers/clk/samsung/clk-exynos4.c
->>>> +++ b/drivers/clk/samsung/clk-exynos4.c
->>>> @@ -85,6 +85,7 @@
->>>>  #define DIV_PERIL4           0xc560
->>>>  #define DIV_PERIL5           0xc564
->>>>  #define E4X12_DIV_CAM1               0xc568
->>>> +#define E4X12_GATE_BUS_FSYS1 0xc744
->>>>  #define GATE_SCLK_CAM                0xc820
->>>>  #define GATE_IP_CAM          0xc920
->>>>  #define GATE_IP_TV           0xc924
->>>> @@ -1095,6 +1096,8 @@ static struct samsung_gate_clock exynos4x12_gate_clks[] __initdata = {
->>>>               0),
->>>>       GATE(CLK_PPMUIMAGE, "ppmuimage", "aclk200", E4X12_GATE_IP_IMAGE, 9, 0,
->>>>               0),
->>>> +     GATE(CLK_PCLK_ADC, "pclk_adc", "aclk133", E4X12_GATE_BUS_FSYS1, 16, 0,
->>>> +             0),
+>>>> .
+>>>> .
+>>>> <snip>
+>>>> .
+>>>> .
+>>>>>     static struct phy *sun4i_usb_phy_xlate(struct device *dev,
+>>>>>                         struct of_phandle_args *args)
+>>>>>     {
+>>>>> @@ -240,13 +417,20 @@ static int sun4i_usb_phy_probe(struct platform_device *pdev)
+>>>>>         struct phy_provider *phy_provider;
+>>>>>         bool dedicated_clocks;
+>>>>>         struct resource *res;
+>>>>> -    int i;
+>>>>> +    int i, ret;
+>>>>>
+>>>>>         data = devm_kzalloc(dev, sizeof(*data), GFP_KERNEL);
+>>>>>         if (!data)
+>>>>>             return -ENOMEM;
+>>>>>
+>>>>>         mutex_init(&data->mutex);
+>>>>> +    INIT_DELAYED_WORK(&data->detect, sun4i_usb_phy0_id_vbus_det_scan);
+>>>>> +    data->extcon_cable_names[0] = extcon_cable_name[EXTCON_USB_HOST];
+>>>>> +    data->extcon_cable_names[1] = extcon_cable_name[EXTCON_USB];
+>>>>> +    data->extcon_cable_names[2] = NULL;
+>>>>> +    data->extcon.name = DRIVER_NAME;
+>>>>> +    data->extcon.supported_cable = data->extcon_cable_names;
+>>>>> +    data->extcon.dev.parent = dev;
+>>>>>
+>>>>>         if (of_device_is_compatible(np, "allwinner,sun5i-a13-usb-phy"))
+>>>>>             data->num_phys = 2;
+>>>>> @@ -269,6 +453,34 @@ static int sun4i_usb_phy_probe(struct platform_device *pdev)
+>>>>>         if (IS_ERR(data->base))
+>>>>>             return PTR_ERR(data->base);
+>>>>>
+>>>>> +    data->id_det_gpio = devm_gpiod_get(dev, "usb0_id_det", GPIOD_IN);
+>>>>> +    if (IS_ERR(data->id_det_gpio)) {
+>>>>> +        if (PTR_ERR(data->id_det_gpio) == -EPROBE_DEFER)
+>>>>> +            return -EPROBE_DEFER;
+>>>>> +        data->id_det_gpio = NULL;
+>>>>> +    }
+>>>>> +
+>>>>> +    data->vbus_det_gpio = devm_gpiod_get(dev, "usb0_vbus_det", GPIOD_IN);
+>>>>> +    if (IS_ERR(data->vbus_det_gpio)) {
+>>>>> +        if (PTR_ERR(data->vbus_det_gpio) == -EPROBE_DEFER)
+>>>>> +            return -EPROBE_DEFER;
+>>>>> +        data->vbus_det_gpio = NULL;
+>>>>> +    }
+>>>>> +
+>>>>> +    /* We either want both gpio pins or neither (when in host mode) */
+>>>>> +    if (!data->id_det_gpio != !data->vbus_det_gpio) {
+>>>>> +        dev_err(dev, "failed to get id or vbus detect pin\n");
+>>>>> +        return -ENODEV;
+>>>>> +    }
+>>>>> +
+>>>>> +    if (data->id_det_gpio) {
+>>>>> +        ret = devm_extcon_dev_register(dev, &data->extcon);
+>>>>> +        if (ret) {
+>>>>> +            dev_err(dev, "failed to register extcon: %d\n", ret);
+>>>>> +            return ret;
+>>>>> +        }
+>>>>> +    }
+>>>>> +
+>>>>>         for (i = 0; i < data->num_phys; i++) {
+>>>>>             struct sun4i_usb_phy *phy = data->phys + i;
+>>>>>             char name[16];
+>>>>> @@ -318,12 +530,54 @@ static int sun4i_usb_phy_probe(struct platform_device *pdev)
+>>>>>             phy_set_drvdata(phy->phy, &data->phys[i]);
+>>>>>         }
+>>>>>
+>>>>> +    data->id_det_irq = gpiod_to_irq(data->id_det_gpio);
+>>>>> +    data->vbus_det_irq = gpiod_to_irq(data->vbus_det_gpio);
+>>>>> +    if (data->id_det_irq  < 0 || data->vbus_det_irq < 0)
+>>>>> +        data->phy0_poll = true;
+>>>>
+>>>> if polling is enabled, we shouldn't enable irq at all?
 >>>
->>> Now I have even simpler idea. Don't add new clock id but just define
->>> here the CLK_TSADC as:
->>> GATE(CLK_TSADC, "tsadc", "aclk133", E4X12_GATE_BUS_FSYS1, 16, 0, 0);
+>>> Thanks for the review.
 >>>
->>> With this change the second patch wouldn't be needed however this does
->>> not reflect the Exynos 4x12 datasheet.
->>>
->>> Any comments?
->>>
+>>> One some boards one of the gpio-s is irq capable and the other
+>>> is not, in which case the current code indeed enables both
+>>> irq handling for the one gpio which is irq capable and enables
+>>> polling. This is done this way deliberately as the irq path
+>>> has much better latency then polling and the 2 can co-exist.
 >>
->> I think it's better to reflect the datasheet so I prefer your original
->> patch.
+>> okay. Would be good to have this as a comment.
+>>>
+>>>>> +
+>>>>> +    if (data->id_det_irq >= 0) {
+>>>>> +        ret = devm_request_irq(dev, data->id_det_irq,
+>>>>> +                sun4i_usb_phy0_id_vbus_det_irq,
+>>>>> +                IRQF_TRIGGER_RISING | IRQF_TRIGGER_FALLING,
+>>>>> +                "usb0-id-det", data);
+>>>>> +        if (ret) {
+>>>>> +            dev_err(dev, "Err requesting id-det-irq: %d\n", ret);
+>>>>> +            return ret;
+>>>>> +        }
+>>>>> +    }
+>>>>> +
+>>>>> +    if (data->vbus_det_irq >= 0) {
+>>>>> +        ret = devm_request_irq(dev, data->vbus_det_irq,
+>>>>> +                sun4i_usb_phy0_id_vbus_det_irq,
+>>>>> +                IRQF_TRIGGER_RISING | IRQF_TRIGGER_FALLING,
+>>>>> +                "usb0-vbus-det", data);
+>>>>> +        if (ret) {
+>>>>> +            dev_err(dev, "Err requesting vbus-det-irq: %d\n", ret);
+>>>>> +            return ret;
+>>>>> +        }
+>>>>> +    }
+>>>>> +
+>>>>>         dev_set_drvdata(dev, data);
+>>>>>         phy_provider = devm_of_phy_provider_register(dev, sun4i_usb_phy_xlate);
+>>>>>
+>>>>>         return PTR_ERR_OR_ZERO(phy_provider);
+>>>>>     }
+>>>>>
+>>>>> +static int sun4i_usb_phy_remove(struct platform_device *pdev)
+>>>>> +{
+>>>>> +    struct device *dev = &pdev->dev;
+>>>>> +    struct sun4i_usb_phy_data *data = dev_get_drvdata(dev);
+>>>>> +
+>>>>> +    if (data->id_det_irq >= 0)
+>>>>> +        devm_free_irq(dev, data->id_det_irq, data);
+>>>>> +    if (data->vbus_det_irq >= 0)
+>>>>> +        devm_free_irq(dev, data->vbus_det_irq, data);
+>>>>
+>>>> This shouldn't be needed since you already use devm_* in probe.
+>>>
+>>> The use of devm_* in probe helps to keep the error handling in
+>>> probe sane, but we must explicitly free the irqs here, otherwise
+>>> they may trigger after this:
+>>
+>>   From whatever I know free irq will be invoked in remove if devm_request_irq is used in probe. I have to check though.
 >
-> Yeah, I also like sticking to datasheet but maybe it is not always worth
-> to reproduce the datasheet in 100%. It is just thinking out loud.
+> Yes it will be invoked, but after we've stopped our workqueue function,
+> and in the mean time the irq handler can trigger re-scheduling the
+> workqueue function.
 >
+> All drivers using a workqueue explicitly free irqs on remove before
+> stopping the workqueue because of this reason. The auto freeing
+> of the irq happens after the remove function has been called, and
+> thus after the workqueue has been stopped/cancelled which is too
+> late.
 
-Agreed.
+Fine then. Thanks for that detail.
 
->> Also, wouldn't changing the CLK_TSADC gate definition cause a
->> regression on an Exynos4210 board that is using the tsadc clock? or
->> maybe I misunderstood the explanation of your Patch 2/2?
->
-> No, no. The Exynos4210 would be unchanged. It has the CLK_TSADC - both
-> in hardware and in kernel driver. The Exynos4x12 SoCs don't have so we can:
-> 1. Add new CLK_PCLK_ADC (id and clock) reflecting datasheet.
-> 2. Add only CLK_TSADC clock  on Exynos4x12 which will be using the
-> register of PCLK_ADC. The id would stay the same as on Exynos4210.
->
-
-I see, thanks for the explanation. Both approaches seems sensible for
-me then, I don't have a strong opinion on either though.
-
-> Best regards,
-> Krzysztof
->
-
-Best regards,
-Javier
+Thanks
+Kishon
