@@ -1,42 +1,40 @@
 From: khilman@kernel.org (Kevin Hilman)
-Date: Wed, 10 Jun 2015 17:10:39 -0700
-Subject: [GIT PULL] SoCFPGA updates for v4.2, part 2, version 2
-In-Reply-To: <5578C1AA.3000307@opensource.altera.com> (Dinh Nguyen's message
- of "Wed, 10 Jun 2015 18:00:58 -0500")
-References: <1433533151-6301-1-git-send-email-dinh.linux@gmail.com>
- <7hh9qfjhht.fsf@deeprootsystems.com>
- <5578C1AA.3000307@opensource.altera.com>
-Message-ID: <7hmw07gl4w.fsf@deeprootsystems.com>
+Date: Wed, 10 Jun 2015 17:11:36 -0700
+Subject: [GIT PULL] Broadcom Device Tree changes for 4.2 (part 3)
+In-Reply-To: <1433640869-12746-1-git-send-email-f.fainelli@gmail.com> (Florian
+ Fainelli's message of "Sat, 6 Jun 2015 18:34:28 -0700")
+References: <1433640869-12746-1-git-send-email-f.fainelli@gmail.com>
+Message-ID: <7hioavgl3b.fsf@deeprootsystems.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dinh Nguyen <dinguyen@opensource.altera.com> writes:
+Florian Fainelli <f.fainelli@gmail.com> writes:
 
-> On 06/10/2015 06:01 PM, Kevin Hilman wrote:
->> dinh.linux at gmail.com writes:
->> 
->>> Hi Arnd, Kevin, Olof,
->>>
->>> This is an updated pull request for the supend-to-ram patch that has the
->>> EDAC code removed in order to avoid a merge conflict.
->>>
->>> Thanks,
->>> Dinh
->>>
->>> The following changes since commit c65b99f046843d2455aa231747b5a07a999a9f3d:
->>>
->>>   Linux 4.1-rc6 (2015-05-31 19:01:07 -0700)
->> 
->> Why v4.1-rc6?  
->> 
->> Are there specific dependencies there?  If not, we prefer these pulls to
->> be on older -rc tags (typically nothing past where arm-soc/master is).
+> The following changes since commit 9d7ef1b76c131f9b5e0a31fd1444d4fa6b8a841c:
 >
-> No dependency, I just saw that arm-soc/for-next was at -rc6. I remember
-> seeing an email that you should based to an early -rc, or the same -rc
-> as the for-next branch?
+>   ARM: dts: BCM63xx: re-parent NAND controller node (2015-05-27 09:57:34 -0700)
+>
+> are available in the git repository at:
+>
+>   https://github.com/Broadcom/stblinux tags/arm-soc/for-4.2/dts-part3
+>
+> for you to fetch changes up to 26343bdacfcdbf6ee3303d6078a015b908f90193:
+>
+>   ARM: BCM5301X: Add DT for Asus RT-AC87U (2015-06-06 16:13:16 -0700)
+>
+> ----------------------------------------------------------------
+> This pull request contains Broadcom BCM5301x related changes:
+>
+> - Hauke adds the interrupt mapping for the BCM5301x PCIe controller
+>
+> - Haule adds support for NAND flash using the standard Broadcom NAND controller
+>   iProc specific binding on BCM4708/5301x
+>
+> - Rafal adds support for the Asus RT-AC87U router
+>
+> ----------------------------------------------------------------
 
-Same -rc as the master branch preferably.
+Pulled into next/dt,
 
 Thanks,
 
