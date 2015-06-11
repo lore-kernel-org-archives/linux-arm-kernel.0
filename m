@@ -1,45 +1,37 @@
 From: Dave.Martin@arm.com (Dave Martin)
-Date: Thu, 11 Jun 2015 16:29:15 +0100
-Subject: [PATCH 01/10] arm64/debug: Eliminate magic number for size of BRK
- instruction
+Date: Thu, 11 Jun 2015 16:29:16 +0100
+Subject: [PATCH 02/10] arm64/debug: Mask off all reserved bits from generated
+ ESR values
 In-Reply-To: <1434036566-9848-1-git-send-email-Dave.Martin@arm.com>
 References: <1434036566-9848-1-git-send-email-Dave.Martin@arm.com>
-Message-ID: <1434036566-9848-2-git-send-email-Dave.Martin@arm.com>
+Message-ID: <1434036566-9848-3-git-send-email-Dave.Martin@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The size of an A64 BRK instruction is the same as the size of all other
-A64 instructions, because all A64 instructions are the same size.
+There are only 16 comment bits in a BRK instruction, which
+correspond to ESR bits 15:0.  Bits 24:16 of the ESR are RES0,
+and might have weird meanings in the future.
 
-BREAK_INSTR_SIZE is retained for readibility, but it should not be
-an independent constant from AARCH64_INSN_SIZE.
+This code inserts 16 bits of comment in the ESR value instead of
+20 (almost certainly a typo in the original code).
 
 Signed-off-by: Dave Martin <Dave.Martin@arm.com>
 ---
- arch/arm64/include/asm/debug-monitors.h |    4 +++-
- 1 file changed, 3 insertions(+), 1 deletion(-)
+ arch/arm64/include/asm/debug-monitors.h |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
 diff --git a/arch/arm64/include/asm/debug-monitors.h b/arch/arm64/include/asm/debug-monitors.h
-index 40ec68a..f3d2dbd 100644
+index f3d2dbd..ab7d5a8 100644
 --- a/arch/arm64/include/asm/debug-monitors.h
 +++ b/arch/arm64/include/asm/debug-monitors.h
-@@ -18,6 +18,8 @@
- 
- #ifdef __KERNEL__
- 
-+#include <asm/insn.h>
-+
- /* Low-level stepping controls. */
- #define DBG_MDSCR_SS		(1 << 0)
- #define DBG_SPSR_SS		(1 << 21)
-@@ -38,7 +40,7 @@
- /*
-  * Break point instruction encoding
-  */
--#define BREAK_INSTR_SIZE		4
-+#define BREAK_INSTR_SIZE		AARCH64_INSN_SIZE
- 
+@@ -45,7 +45,7 @@
  /*
   * ESR values expected for dynamic and compile time BRK instruction
+  */
+-#define DBG_ESR_VAL_BRK(x)	(0xf2000000 | ((x) & 0xfffff))
++#define DBG_ESR_VAL_BRK(x)	(0xf2000000 | ((x) & 0xffff))
+ 
+ /*
+  * #imm16 values used for BRK instruction generation
 -- 
 1.7.10.4
