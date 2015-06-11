@@ -1,65 +1,58 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Thu, 11 Jun 2015 17:18:08 +0100
-Subject: [Patch v5 4/6] PCI/ACPI: Consolidate common PCI host bridge code
- into ACPI core
-In-Reply-To: <55787191.6060400@linux.intel.com>
-References: <1433780448-18636-1-git-send-email-jiang.liu@linux.intel.com>
- <1433780448-18636-5-git-send-email-jiang.liu@linux.intel.com>
- <20150609161230.GC8591@red-moon> <55771B27.1060509@linux.intel.com>
- <20150610164821.GA18832@red-moon>
- <55787191.6060400@linux.intel.com>
-Message-ID: <20150611161808.GE23914@red-moon>
+From: cyrille.pitchen@atmel.com (Cyrille Pitchen)
+Date: Thu, 11 Jun 2015 18:20:13 +0200
+Subject: [PATCH linux-next v2 0/4] tty/serial: at91: add support to FIFOs
+Message-ID: <cover.1434038494.git.cyrille.pitchen@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Gerry,
+ChangeLog
 
-On Wed, Jun 10, 2015 at 06:19:13PM +0100, Jiang Liu wrote:
-> On 2015/6/11 0:48, Lorenzo Pieralisi wrote:
-> > On Tue, Jun 09, 2015 at 05:58:15PM +0100, Jiang Liu wrote:
-> >> On 2015/6/10 0:12, Lorenzo Pieralisi wrote:
-> > 
-> > [...]
-> > 
-> >>>> +struct pci_bus *acpi_pci_root_create(struct acpi_pci_root *root,
-> >>>> +				     struct acpi_pci_root_ops *ops,
-> >>>> +				     struct acpi_pci_root_info *info,
-> >>>> +				     void *sysdata, int segment, int node)
-> >>>
-> >>> I do not think you need to pass segment and node, they clutter the
-> >>> function signature when you can retrieve them from root, I would
-> >>> make them local variables and use root->segment and acpi_get_node
-> >>> in the function body to retrieve them.
-> >> On x86, node and segment may be overridden under certain conditions.
-> >> For example, segment will always be 0 if 'pci_ignore_seg' is set.
-> > 
-> > Ok, so the question would be then why do you not override the value
-> > in root->segment then (actually, is it *correct* to leave the segment
-> > value in root-> unchanged even if it is overriden) ?
-> > 
-> > Anyway, node is just used for a printk, why do not you add segment and
-> > node to acpi_pci_root_info ? Just cosmetic stuff, trying to help you
-> > simplify the code, it is not easy to parse.
-> Hi Lorenzo,
-> 	I used the complex prototype to explicitly reminder callers
-> that you need to prepare all these information. If simpler interface
-> is preferred, we could pack all ops, sysdata, segment, node, root
-> into info, that there's will be only one parameter "info" left.
-> The drawback is that it will add several lines of code to each arch
-> using this interface. So prefer simpler interface or less lines of code?:)
+v2:
+- remove "atmel,rts-high-threshold" and "atmel,rts-low-threshold" from new
+  DT properties. For now these two thresholds are set once for all during the
+  probe but a later patch might allow to configure them at run time.
+- reword the commit message of the DT property patch to better explain why we
+  have chosen to introduce the new property "atmel,fifo-size".
+- add a missing chunk in the FIFO patch: as the commit message explains, we
+  need to use 8bit accesses when dealing with the Transmit/Receive Holding
+  Registers.
 
-I was just referring to segment and node parameters, I think that having
-them in the parameters list is overkill and they can be encapsulated.
+v1:
+This series of patches add support to FIFOs which will be introduced with Atmel
+sama5d2x SoC.
 
-With the changes discussed previously feel free to add my:
+FIFOs allow to reduce the number of I/O access. Indeed depending on the data
+size and the USART mode, FIFOs work in either single or multiple data. For
+multiple data, up to 4 data can be written into the Transmit Holding Register
+or read from the Receive Holding Register in a single word access.
 
-Reviewed-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+Also the RX FIFO allows to reduce the risk of receive overrun and data loss,
+especially when the DMA controller is not used.
 
-> Thanks!
-> Gerry
-> 
-> > 
-> > Thanks,
-> > Lorenzo
-> > 
-> 
+Finally, when the hardware handshake mode is selected, the RTS line can now be
+controlled by two thresholds on the RX FIFO. When FIFO level (the number of
+data available to be read) crosses the high threshold, the RTS line is set to
+high level telling the peer that it should stop sending new data. Data are read
+from the RX FIFO and when the FIFO level crosses the low threshold, the RTS
+is set back to low level telling the remote peer that it can send data again.
+
+This new feature resolves a long time hardware limitation where the RTS line
+was directly controlled by a PDC signal. There is no equivalent of that signal
+for the DMA controller so for all SoCs without PDC for USART there was no mean
+to control the RTS line properly: once the hardware handshake mode selected,
+the RTS line remains high level. Next SoCs with FIFOs will be able to use the
+hardware handshake mode thanks to the RX FIFO.
+
+Cyrille Pitchen (4):
+  ARM: at91/dt: add a new DT property to support FIFOs on Atmel USARTs
+  tty/serial: at91: fix some macro definitions to fit coding style
+  tty/serial: at91: add support to FIFOs
+  tty/serial: at91: use 32bit writes into TX FIFO when DMA is enabled
+
+ .../devicetree/bindings/serial/atmel-usart.txt     |   3 +
+ drivers/tty/serial/atmel_serial.c                  | 193 +++++++++++++----
+ include/linux/atmel_serial.h                       | 240 ++++++++++++---------
+ 3 files changed, 293 insertions(+), 143 deletions(-)
+
+-- 
+1.8.2.2
