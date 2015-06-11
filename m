@@ -1,26 +1,27 @@
 From: al.stone@linaro.org (al.stone at linaro.org)
-Date: Thu, 11 Jun 2015 13:45:09 -0600
-Subject: [PATCH 1/3] ACPI: introduce macros for using the ACPI specification
- version
+Date: Thu, 11 Jun 2015 13:45:10 -0600
+Subject: [PATCH 2/3] ACPI: add BAD_MADT_GICC_ENTRY() macro
 In-Reply-To: <1434051911-14665-1-git-send-email-al.stone@linaro.org>
 References: <1434051911-14665-1-git-send-email-al.stone@linaro.org>
-Message-ID: <1434051911-14665-2-git-send-email-al.stone@linaro.org>
+Message-ID: <1434051911-14665-3-git-send-email-al.stone@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Al Stone <al.stone@linaro.org>
 
-Add the ACPI_SPEC_VERSION() macro to build a proper version number from
-a major and minor revision number.  Add also the ACPI_FADT_SPEC_VERSION
-that constructs a proper version number from the entries in the current
-FADT.
+The BAD_MADT_ENTRY() macro is designed to work for all of the subtables
+of the MADT.  In the ACPI 5.1 version of the spec, the struct for the
+GICC subtable (struct acpi_madt_generic_interrupt) is 76 bytes long; in
+ACPI 6.0, the struct is 80 bytes long.  But, there is only one definition
+in ACPICA for this struct -- and that is the 6.0 version.  Hence, when
+BAD_MADT_ENTRY() compares the struct size to the length in the GICC
+subtable, it fails if 5.1 structs are in use, and there are systems in
+the wild that have them.
 
-These macros are added in order to simplify retrieving and comparing ACPI
-specification version numbers, since this is becoming a more frequent need.
-In particular, there are some architectures that require at least a certain
-version of the spec, and there are differences in some structure sizes that
-have changed with recent versions but can only be tracked by spec version
-number.
+This patch adds the BAD_MADT_GICC_ENTRY() that checks the GICC subtable
+only, accounting for the difference in specification versions that are
+possible.  The BAD_MADT_ENTRY() will continue to work as is for all other
+MADT subtables.
 
 Signed-off-by: Al Stone <al.stone@linaro.org>
 Reviewed-by: Hanjun Guo <hanjun.guo@linaro.org>
@@ -30,24 +31,26 @@ CC: Rafael J. Wysocki <rjw@rjwysocki.net>
 CC: Len Brown <lenb@kernel.org>
 
 ---
- include/linux/acpi.h | 5 +++++
- 1 file changed, 5 insertions(+)
+ include/linux/acpi.h | 7 +++++++
+ 1 file changed, 7 insertions(+)
 
 diff --git a/include/linux/acpi.h b/include/linux/acpi.h
-index a4acb55..33ed313 100644
+index 33ed313..8a83f91 100644
 --- a/include/linux/acpi.h
 +++ b/include/linux/acpi.h
-@@ -48,6 +48,11 @@
- #include <acpi/acpi_io.h>
- #include <asm/acpi.h>
+@@ -127,6 +127,13 @@ static inline void acpi_initrd_override(void *data, size_t size)
+ 		(!entry) || (unsigned long)entry + sizeof(*entry) > end ||  \
+ 		((struct acpi_subtable_header *)entry)->length < sizeof(*entry))
  
-+#define ACPI_SPEC_VERSION(major, minor)	((major<<8)|minor)
-+#define ACPI_FADT_SPEC_VERSION	\
-+	ACPI_SPEC_VERSION(acpi_gbl_FADT.header.revision, \
-+			  acpi_gbl_FADT.minor_revision)
++#define BAD_MADT_GICC_ENTRY(entry, end) (				    \
++		(!entry) || (unsigned long)entry + sizeof(*entry) > end ||  \
++		((ACPI_FADT_SPEC_VERSION == ACPI_SPEC_VERSION(5,1)) &&	    \
++		 (entry->header.length != 76))				||  \
++		((ACPI_FADT_SPEC_VERSION == ACPI_SPEC_VERSION(6,0)) &&	    \
++		 (entry->header.length != 80)))
 +
- static inline acpi_handle acpi_device_handle(struct acpi_device *adev)
- {
- 	return adev ? adev->handle : NULL;
+ char * __acpi_map_table (unsigned long phys_addr, unsigned long size);
+ void __acpi_unmap_table(char *map, unsigned long size);
+ int early_acpi_boot_init(void);
 -- 
 2.1.0
