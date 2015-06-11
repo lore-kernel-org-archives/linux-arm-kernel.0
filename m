@@ -1,89 +1,126 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Thu, 11 Jun 2015 11:06:09 +0200
-Subject: [PATCH 2/2] ASoC: atmel: properly select dma driver state
-In-Reply-To: <1434013569-24745-1-git-send-email-alexandre.belloni@free-electrons.com>
-References: <1434013569-24745-1-git-send-email-alexandre.belloni@free-electrons.com>
-Message-ID: <1434013569-24745-2-git-send-email-alexandre.belloni@free-electrons.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Thu, 11 Jun 2015 10:15:50 +0100
+Subject: [PATCH 07/10] KVM: arm/arm64: vgic: Allow HW interrupts to be
+ queued to a guest
+In-Reply-To: <55794A7A.2080306@arm.com>
+References: <1433783045-8002-1-git-send-email-marc.zyngier@arm.com>
+ <1433783045-8002-8-git-send-email-marc.zyngier@arm.com>
+ <55794A7A.2080306@arm.com>
+Message-ID: <557951C6.2090408@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-It is currently possible to have CONFIG_SND_ATMEL_SOC_SSC=y with either
-CONFIG_SND_ATMEL_SOC_PDC=m or CONFIG_SND_ATMEL_SOC_DMA=m. This results in a
-driver that compiles but does not link with this kind of error:
+On 11/06/15 09:44, Andre Przywara wrote:
+> Hi Marc,
+> 
+> On 06/08/2015 06:04 PM, Marc Zyngier wrote:
+>> To allow a HW interrupt to be injected into a guest, we lookup the
+>> guest virtual interrupt in the irq_phys_map rbtree, and if we have
+>> a match, encode both interrupts in the LR.
+>>
+>> We also mark the interrupt as "active" at the host distributor level.
+>>
+>> On guest EOI on the virtual interrupt, the host interrupt will be
+>> deactivated.
+>>
+>> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+>> ---
+>>  virt/kvm/arm/vgic.c | 71 ++++++++++++++++++++++++++++++++++++++++++++++++++---
+>>  1 file changed, 68 insertions(+), 3 deletions(-)
+>>
+>> diff --git a/virt/kvm/arm/vgic.c b/virt/kvm/arm/vgic.c
+>> index c6604f2..495ac7d 100644
+>> --- a/virt/kvm/arm/vgic.c
+>> +++ b/virt/kvm/arm/vgic.c
+>> @@ -1120,6 +1120,26 @@ static void vgic_queue_irq_to_lr(struct kvm_vcpu *vcpu, int irq,
+>>  	if (!vgic_irq_is_edge(vcpu, irq))
+>>  		vlr.state |= LR_EOI_INT;
+>>  
+>> +	if (vlr.irq >= VGIC_NR_SGIS) {
+>> +		struct irq_phys_map *map;
+>> +		map = vgic_irq_map_search(vcpu, irq);
+>> +
+>> +		if (map) {
+>> +			int ret;
+>> +
+>> +			BUG_ON(!map->active);
+>> +			vlr.hwirq = map->phys_irq;
+>> +			vlr.state |= LR_HW;
+>> +			vlr.state &= ~LR_EOI_INT;
+>> +
+>> +			ret = irq_set_irqchip_state(map->irq,
+>> +						    IRQCHIP_STATE_ACTIVE,
+>> +						    true);
+>> +			vgic_irq_set_queued(vcpu, irq);
+>> +			WARN_ON(ret);
+>> +		}
+>> +	}
+>> +
+>>  	vgic_set_lr(vcpu, lr_nr, vlr);
+>>  	vgic_sync_lr_elrsr(vcpu, lr_nr, vlr);
+>>  }
+>> @@ -1344,6 +1364,35 @@ static bool vgic_process_maintenance(struct kvm_vcpu *vcpu)
+>>  	return level_pending;
+>>  }
+>>  
+>> +/* Return 1 if HW interrupt went from active to inactive, and 0 otherwise */
+>> +static int vgic_sync_hwirq(struct kvm_vcpu *vcpu, struct vgic_lr vlr)
+>> +{
+>> +	struct irq_phys_map *map;
+>> +	int ret;
+>> +
+>> +	if (!(vlr.state & LR_HW))
+>> +		return 0;
+>> +
+>> +	map = vgic_irq_map_search(vcpu, vlr.irq);
+> 
+> I wonder if it's safe to rely on that mapping here. Are we sure that
+> this hasn't changed while the VCPU was running? If I got this correctly,
+> currently only vcpu_reset will actually add a map entry, but I guess in
+> the future there will be more users.
 
-sound/built-in.o: In function `atmel_ssc_set_audio':
-(.text+0x87d90): undefined reference to `atmel_pcm_pdc_platform_register'
-sound/built-in.o: In function `atmel_ssc_put_audio':
-(.text+0x8879a): undefined reference to `atmel_pcm_pdc_platform_unregister'
+How can the guest interrupt change? This is HW, as far as the guest is
+concerned. An actual interrupt line. We don't reconfigure the HW live.
 
-Introduce new config options SND_ATMEL_SOC_SSC_PDC and
-SND_ATMEL_SOC_SSC_DMA which should be used by the board drivers and the
-correct logic to properly select the SND_ATMEL_SOC_PDC and
-SND_ATMEL_SOC_DMA states.
+> Also we rely on the irqdomain mapping to be still the same, but that is
+> probably a safe assumption.
 
-Reported-by: Randy Dunlap <rdunlap@infradead.org>
-Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
----
- sound/soc/atmel/Kconfig | 21 +++++++++++++++------
- 1 file changed, 15 insertions(+), 6 deletions(-)
+Like I said before, this *cannot* change.
 
-diff --git a/sound/soc/atmel/Kconfig b/sound/soc/atmel/Kconfig
-index 93abe4e6d596..1489cd461aec 100644
---- a/sound/soc/atmel/Kconfig
-+++ b/sound/soc/atmel/Kconfig
-@@ -10,20 +10,31 @@ if SND_ATMEL_SOC
- 
- config SND_ATMEL_SOC_PDC
- 	tristate
-+	default m if SND_ATMEL_SOC_SSC_PDC=m && SND_ATMEL_SOC_SSC=m
-+	default y if SND_ATMEL_SOC_SSC_PDC=y || (SND_ATMEL_SOC_SSC_PDC=m && SND_ATMEL_SOC_SSC=y)
-+
-+config SND_ATMEL_SOC_SSC_PDC
-+	tristate
- 
- config SND_ATMEL_SOC_DMA
- 	tristate
- 	select SND_SOC_GENERIC_DMAENGINE_PCM
-+	default m if SND_ATMEL_SOC_SSC_DMA=m && SND_ATMEL_SOC_SSC=m
-+	default y if SND_ATMEL_SOC_SSC_DMA=y || (SND_ATMEL_SOC_SSC_DMA=m && SND_ATMEL_SOC_SSC=y)
-+
-+config SND_ATMEL_SOC_SSC_DMA
-+	tristate
- 
- config SND_ATMEL_SOC_SSC
- 	tristate
-+	default y if SND_ATMEL_SOC_SSC_DMA=y || SND_ATMEL_SOC_SSC_PDC=y
-+	default m if SND_ATMEL_SOC_SSC_DMA=m || SND_ATMEL_SOC_SSC_PDC=m
- 
- config SND_AT91_SOC_SAM9G20_WM8731
- 	tristate "SoC Audio support for WM8731-based At91sam9g20 evaluation board"
- 	depends on ARCH_AT91 || COMPILE_TEST
- 	depends on ATMEL_SSC && SND_SOC_I2C_AND_SPI
--	select SND_ATMEL_SOC_PDC
--	select SND_ATMEL_SOC_SSC
-+	select SND_ATMEL_SOC_SSC_PDC
- 	select SND_SOC_WM8731
- 	help
- 	  Say Y if you want to add support for SoC audio on WM8731-based
-@@ -33,8 +44,7 @@ config SND_ATMEL_SOC_WM8904
- 	tristate "Atmel ASoC driver for boards using WM8904 codec"
- 	depends on ARCH_AT91 || COMPILE_TEST
- 	depends on ATMEL_SSC && I2C
--	select SND_ATMEL_SOC_SSC
--	select SND_ATMEL_SOC_DMA
-+	select SND_ATMEL_SOC_SSC_DMA
- 	select SND_SOC_WM8904
- 	help
- 	  Say Y if you want to add support for Atmel ASoC driver for boards using
-@@ -44,8 +54,7 @@ config SND_AT91_SOC_SAM9X5_WM8731
- 	tristate "SoC Audio support for WM8731-based at91sam9x5 board"
- 	depends on ARCH_AT91 || COMPILE_TEST
- 	depends on ATMEL_SSC && SND_SOC_I2C_AND_SPI
--	select SND_ATMEL_SOC_SSC
--	select SND_ATMEL_SOC_DMA
-+	select SND_ATMEL_SOC_SSC_DMA
- 	select SND_SOC_WM8731
- 	help
- 	  Say Y if you want to add support for audio SoC on an
+> But I'd still find it more natural to use the hwirq number from the LR
+> at this point. Can't we use irq_find_mapping() here to learn Linux'
+> (current) irq number from that?
+
+I think you're confused.
+
+- The guest irq (vlr.irq) is entirely made up, and has no connection
+with reality. it is stable, and cannot change during the lifetime of the
+guest (think of it as a HW irq line).
+
+- The host hwirq (vlr.hwirq) is stable as well, for the same reason.
+
+- The Linux IRQ cannot change because we've been given it by the kernel,
+and that's what we use for *everything* as far as the kernel is
+concerned. Its mapping to hwirq is stable as well because this is how we
+talk to the HW.
+
+- irq_find_mapping gives you the *reverse* mapping (from hwirq to Linux
+irq), and for that to work, you need the domain on which you want to
+apply the translation. This is only useful when actually taking the
+interrupt (i.e. in an interrupt controller driver). I can't see how that
+could make sense here.
+
+The purpose of this mapping is to, given the guest irq (because that's
+what we inject), what the other values are:
+- hwirq: to provide GICH with the interrupt to deactivate
+- Linux irq: to control the active state through the irqchip state API.
+
+> Or am I too paranoid here?
+
+Hope it makes more sense to you now.
+
+Thanks,
+
+	M.
 -- 
-2.1.4
+Jazz is not dead. It just smells funny...
