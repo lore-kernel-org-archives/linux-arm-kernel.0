@@ -1,64 +1,70 @@
-From: javier@dowhile0.org (Javier Martinez Canillas)
-Date: Thu, 11 Jun 2015 14:15:38 +0200
-Subject: [PATCH 1/2] clk: exynos4: Add PCLK_ADC gate clock on Exynos4x12
-In-Reply-To: <55796660.1070702@samsung.com>
-References: <1434011190-24563-1-git-send-email-k.kozlowski@samsung.com>
- <55796660.1070702@samsung.com>
-Message-ID: <CABxcv=kNb2ERqLL2gG73nkU+kpPsYAWKSyu=bkjfxZBMKOwyPQ@mail.gmail.com>
+From: rogerq@ti.com (Roger Quadros)
+Date: Thu, 11 Jun 2015 15:18:35 +0300
+Subject: [PATCH 08/15] memory: kill off set_irq_flags usage
+In-Reply-To: <1433874401-27161-9-git-send-email-robh@kernel.org>
+References: <1433874401-27161-1-git-send-email-robh@kernel.org>
+ <1433874401-27161-9-git-send-email-robh@kernel.org>
+Message-ID: <20150611151835.6d9b66a1@rockdesk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Krzysztof,
+Rob,
 
-On Thu, Jun 11, 2015 at 12:43 PM, Krzysztof Kozlowski
-<k.kozlowski@samsung.com> wrote:
-> W dniu 11.06.2015 o 17:26, Krzysztof Kozlowski pisze:
->> Add proper gate clock for the Analog to Digital Converter (ADC) on
->> Exynos4x12.
->>
->> Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
->> ---
->>  drivers/clk/samsung/clk-exynos4.c   | 3 +++
->>  include/dt-bindings/clock/exynos4.h | 5 ++++-
->>  2 files changed, 7 insertions(+), 1 deletion(-)
->>
->> diff --git a/drivers/clk/samsung/clk-exynos4.c b/drivers/clk/samsung/clk-exynos4.c
->> index 714d6ba782c8..5f32410a01f8 100644
->> --- a/drivers/clk/samsung/clk-exynos4.c
->> +++ b/drivers/clk/samsung/clk-exynos4.c
->> @@ -85,6 +85,7 @@
->>  #define DIV_PERIL4           0xc560
->>  #define DIV_PERIL5           0xc564
->>  #define E4X12_DIV_CAM1               0xc568
->> +#define E4X12_GATE_BUS_FSYS1 0xc744
->>  #define GATE_SCLK_CAM                0xc820
->>  #define GATE_IP_CAM          0xc920
->>  #define GATE_IP_TV           0xc924
->> @@ -1095,6 +1096,8 @@ static struct samsung_gate_clock exynos4x12_gate_clks[] __initdata = {
->>               0),
->>       GATE(CLK_PPMUIMAGE, "ppmuimage", "aclk200", E4X12_GATE_IP_IMAGE, 9, 0,
->>               0),
->> +     GATE(CLK_PCLK_ADC, "pclk_adc", "aclk133", E4X12_GATE_BUS_FSYS1, 16, 0,
->> +             0),
->
-> Now I have even simpler idea. Don't add new clock id but just define
-> here the CLK_TSADC as:
-> GATE(CLK_TSADC, "tsadc", "aclk133", E4X12_GATE_BUS_FSYS1, 16, 0, 0);
->
-> With this change the second patch wouldn't be needed however this does
-> not reflect the Exynos 4x12 datasheet.
->
-> Any comments?
->
+On Tue, 9 Jun 2015 13:26:34 -0500
+Rob Herring <robh@kernel.org> wrote:
 
-I think it's better to reflect the datasheet so I prefer your original
-patch. Also, wouldn't changing the CLK_TSADC gate definition cause a
-regression on an Exynos4210 board that is using the tsadc clock? or
-maybe I misunderstood the explanation of your Patch 2/2?
+> set_irq_flags is ARM specific with custom flags which have genirq
+> equivalents. Convert drivers to use the genirq interfaces directly, so we
+> can kill off set_irq_flags. The translation of flags is as follows:
+> 
+> IRQF_VALID -> !IRQ_NOREQUEST
+> IRQF_PROBE -> !IRQ_NOPROBE
+> IRQF_NOAUTOEN -> IRQ_NOAUTOEN
+> 
+> For IRQs managed by an irqdomain, the irqdomain core code handles clearing
+> and setting IRQ_NOREQUEST already, so there is no need to do this in
+> .map() functions and we can simply remove the set_irq_flags calls. Some
+> users also set IRQ_NOPROBE and this has been maintained although it is not
+> clear that is really needed. There appears to be a great deal of blind
+> copy and paste of this code.
+> 
+> Signed-off-by: Rob Herring <robh@kernel.org>
+> Cc: Roger Quadros <rogerq@ti.com>
+> Cc: Tony Lindgren <tony@atomide.com>
+> Cc: linux-omap at vger.kernel.org
+> ---
+>  drivers/memory/omap-gpmc.c | 5 ++---
+>  1 file changed, 2 insertions(+), 3 deletions(-)
+> 
+> diff --git a/drivers/memory/omap-gpmc.c b/drivers/memory/omap-gpmc.c
+> index c94ea0d..0c833e2 100644
+> --- a/drivers/memory/omap-gpmc.c
+> +++ b/drivers/memory/omap-gpmc.c
+> @@ -1176,8 +1176,8 @@ static int gpmc_setup_irq(void)
+>  		gpmc_client_irq[i].irq = gpmc_irq_start + i;
+>  		irq_set_chip_and_handler(gpmc_client_irq[i].irq,
+>  					&gpmc_irq_chip, handle_simple_irq);
+> -		set_irq_flags(gpmc_client_irq[i].irq,
+> -				IRQF_VALID | IRQF_NOAUTOEN);
+> +		irq_modify_status(gpmc_client_irq[i].irq, IRQ_NOREQUEST,
+> +				  IRQ_NOAUTOEN);
 
-> Best regards,
-> Krzysztof
->
+Shouldn't this be
+		irq_modify_status(gpmc_client_irq[i].irq, IRQ_NOREQUEST,
+				  IRQ_NOAUTOEN | IRQ_NOPROBE);
+?
 
-Best regards,
-Javier
+>  	}
+>  
+>  	/* Disable interrupts */
+> @@ -1200,7 +1200,6 @@ static int gpmc_free_irq(void)
+>  	for (i = 0; i < GPMC_NR_IRQ; i++) {
+>  		irq_set_handler(gpmc_client_irq[i].irq, NULL);
+>  		irq_set_chip(gpmc_client_irq[i].irq, &no_irq_chip);
+> -		irq_modify_status(gpmc_client_irq[i].irq, 0, 0);
+>  	}
+>  
+>  	irq_free_descs(gpmc_irq_start, GPMC_NR_IRQ);
+
+cheers,
+-roger
