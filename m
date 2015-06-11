@@ -1,57 +1,80 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Thu, 11 Jun 2015 14:23:48 +0100
-Subject: [PATCH v4 2/8] firmware: add support for ARM System Control and
- Power Interface(SCPI) protocol
-In-Reply-To: <CAJe_ZheUknLZuMg-02V-AqyjxX8Nx4oK3O2HapqfCLkkXjngAg@mail.gmail.com>
-References: <1433760002-24120-1-git-send-email-sudeep.holla@arm.com>	<1433760002-24120-3-git-send-email-sudeep.holla@arm.com>
- <CAJe_ZheUknLZuMg-02V-AqyjxX8Nx4oK3O2HapqfCLkkXjngAg@mail.gmail.com>
-Message-ID: <55798BE4.2000604@arm.com>
+From: hanjun.guo@linaro.org (Hanjun Guo)
+Date: Thu, 11 Jun 2015 21:25:34 +0800
+Subject: [PATCH 10/11] irqchip / GICv2 / ACPI: Consolidate GICv2 ACPI
+ related init code
+In-Reply-To: <557865FB.1010502@arm.com>
+References: <1431953961-22706-1-git-send-email-hanjun.guo@linaro.org>
+ <1431953961-22706-11-git-send-email-hanjun.guo@linaro.org>
+ <555CF23B.1000002@linaro.org> <555DEB6A.8090404@linaro.org>
+ <557865FB.1010502@arm.com>
+Message-ID: <55798C4E.8070903@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Marc,
 
-
-On 11/06/15 12:54, Jassi Brar wrote:
-> On 8 June 2015 at 16:09, Sudeep Holla <sudeep.holla@arm.com> wrote:
-> ...
->> +
->> +static void scpi_process_cmd(struct scpi_chan *ch, u32 cmd)
->> +{
->> +       unsigned long flags;
->> +       struct scpi_xfer *t, *match = NULL;
->> +
->> +       spin_lock_irqsave(&ch->rx_lock, flags);
->> +       if (list_empty(&ch->rx_pending)) {
->> +               spin_unlock_irqrestore(&ch->rx_lock, flags);
->> +               return;
->> +       }
->> +
->> +       list_for_each_entry(t, &ch->rx_pending, node)
->> +               if (CMD_XTRACT_UNIQ(t->cmd) == CMD_XTRACT_UNIQ(cmd)) {
->> +                       list_del(&t->node);
->> +                       match = t;
->> +                       break;
->> +               }
->> +       /* check if wait_for_completion is in progress or timed-out */
->> +       if (match && !completion_done(&match->done)) {
->> +               struct scpi_shared_mem *mem = ch->rx_payload;
->> +               unsigned int len = min(match->rx_len, CMD_SIZE(cmd));
->> +
->> +               match->status = le32_to_cpu(mem->status);
->> +               memcpy_fromio(match->rx_buf, mem->payload, len);
->> +               if (match->rx_len > len)
->> +                       memset(match->rx_buf + len, 0, match->rx_len - len);
->> +               complete(&match->done);
->> +       }
->> +       spin_unlock_irqrestore(&ch->rx_lock, flags);
->> +}
-> There doesn't seem to be support for commands sent by remote?
-> Something like when remote is the thermal master and it needs to send
-> sensor readings crossing thresholds.
+On 06/11/2015 12:29 AM, Marc Zyngier wrote:
+> On 21/05/15 15:27, Hanjun Guo wrote:
+>> On 2015?05?21? 04:44, Tomasz Nowicki wrote:
+>>> Hi Hanjun,
+>>>
+>>> On 05/18/2015 02:59 PM, Hanjun Guo wrote:
+>>>> Move GICv2 ACPI related init code in irq-gic.c to irq-gic-acpi.c,
+>>>> this can make the ACPI related GIC init code slef-contained.
+>>>>
+>>>> Introduce set_acpi_core_irqdomain() to set acpi_irqdomain then
+>>>> it will be no need to make gic_data[] as a global value, and
+>>>> it will save the confilcts with GICv3's gic_data in the later
+>>>> patch.
+>>>>
+>>>> acpi_gic_parse_distributor() have the same function as
+>>>> gic_acpi_parse_madt_distributor() to get the GIC distributor
+>>>> physical base address, so just remove the duplicate one, and
+>>>> only get the GIC version when it is unknown.
+>>>>
+>>>> Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
+>>>> ---
+>>>>    drivers/irqchip/irq-gic-acpi.c       |  95
+>>>> +++++++++++++++++++++++++++++++-
+>>>>    drivers/irqchip/irq-gic.c            | 103
+>>>> +----------------------------------
+>>>>    include/linux/irqchip/arm-gic-acpi.h |   5 ++
+>>>>    3 files changed, 101 insertions(+), 102 deletions(-)
+>>>>
+>>>> diff --git a/drivers/irqchip/irq-gic-acpi.c
+>>>> b/drivers/irqchip/irq-gic-acpi.c
+>>>> index 1388d9e..8463e48 100644
+>>>> --- a/drivers/irqchip/irq-gic-acpi.c
+>>>> +++ b/drivers/irqchip/irq-gic-acpi.c
+>>>> @@ -13,12 +13,16 @@
+>>>>
+>>>>    #include <linux/acpi.h>
+>>>>    #include <linux/init.h>
+>>>> +#include <linux/irqchip/arm-gic.h>
+>>>>    #include <linux/irqchip/arm-gic-acpi.h>
+>>>>    #include <linux/irqchip/arm-gic-v3.h>
+>>>
+>>> arm-gic.h and arm-gic-v3.h describe register map for respective drivers
+>>> and should be used separately within parent driver only.
+>>
+>> Seems that there is no duplicate macros in that two head
+>> file, but yes, it will confuse people.
+>>
+>> Consolidating all ACPI GIC code is an improvement to make
+>> ACPI related code self-contained, but also have some drawbacks,
+>>
+>> Marc, what do you think?
 >
+> What I think is "Over my dead body".
+>
+> These include files are private to the respective interrupt controller
+> code, and the only reason they are in linux/irqchip is because the
+> corresponding KVM support code uses them too.
 
-SCP firmware claims to support that but never tested on Juno platform.
-So I would like to add it when there's first user for that.
+So for this patch, we are totally in the wrong direction, I will
+remove the last two patches in next version.
 
-Regards,
-Sudeep
+Thanks for your constructive comments, much appreciated :)
+
+Thanks
+Hanjun
