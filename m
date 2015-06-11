@@ -1,126 +1,40 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Thu, 11 Jun 2015 23:13:09 +0200
-Subject: [PATCH RFC 2/3] PM / Domains: Support atomic PM domains
-In-Reply-To: <20150611194709.GD1103@linaro.org>
-References: <1433456946-53296-1-git-send-email-lina.iyer@linaro.org>
- <1433456946-53296-3-git-send-email-lina.iyer@linaro.org>
- <CAPDyKFqqQS+-0guT4+vZ9Y38ztxPeEgENLy_yqFts09z0ZwgJA@mail.gmail.com>
- <20150611194709.GD1103@linaro.org>
-Message-ID: <CAPDyKFp=cEXnroiMPbXs9YVtiuZKBP38Qow3fcVU8LTcZCoEFg@mail.gmail.com>
+From: khilman@kernel.org (Kevin Hilman)
+Date: Thu, 11 Jun 2015 14:15:33 -0700
+Subject: [PATCH] ARM64: juno: add GPIO keys
+In-Reply-To: <1433418072-10319-1-git-send-email-linus.walleij@linaro.org>
+ (Linus Walleij's message of "Thu, 4 Jun 2015 13:41:12 +0200")
+References: <1433418072-10319-1-git-send-email-linus.walleij@linaro.org>
+Message-ID: <7hioaudk0a.fsf@deeprootsystems.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[...]
+Linus Walleij <linus.walleij@linaro.org> writes:
 
->>> @@ -387,7 +452,7 @@ static int pm_genpd_poweroff(struct generic_pm_domain
->>> *genpd)
->>>                         return -EBUSY;
->>>
->>>                 if (pdd->dev->driver && (!pm_runtime_suspended(pdd->dev)
->>> -                   || pdd->dev->power.irq_safe))
->>> +                       || (pdd->dev->power.irq_safe &&
->>> !genpd->irq_safe)))
->>
->>
->> This deserves a comment in the code.
->>
-> This check should simplify to
->                 if (!pm_runtime_suspended(pdd->dev))
+> The Juno board has two keys connected to a PL061 GPIO block,
+> in accordance to DDI0524B "ARM Versatile Express Juno Development
+> Platform" revision 1.0, table 2-4 "GPIO (0) and GPIO (1) used
+> for additional user key entry". By trial-and-error I found that
+> these are connected to the two keys named "power" and "home"
+> on the motherboard.
 >
-> The other connditions seem unnecessary just to determine if the devices are
-> suspended.
+> Register the GPIO block and these two keys in the device tree
+> using the PL061 GPIO driver and the generic gpio keys.
 >
-> Do you see any problem with that?
-
-I am not sure, need to think a bit more about it. Anyway, I wouldn't
-do the "simplification" in $subject patch, since it's a related to
-different topic.
-
-[...]
-
->>> @@ -478,12 +543,8 @@ static int pm_genpd_runtime_suspend(struct device
->>> *dev)
->>>         if (IS_ERR(genpd))
->>>                 return -EINVAL;
->>>
->>> -       /*
->>> -        * We can't allow to power off the PM domain if it holds an
->>> irq_safe
->>> -        * device. That's beacuse we use mutexes to protect data while
->>> power
->>> -        * off and on the PM domain, thus we can't execute in atomic
->>> context.
->>> -        */
->>> -       if (dev->power.irq_safe)
->>> +       /* We can't allow to power off a domain that is also not irq
->>> safe. */
->>
->>
->> I wouldn't mind to keep some more pieces of the earlier comment, since
->> it explains a bit more of the *why*. Could you try to rephrase this
->> comment in that regard?
->>
->>> +       if (dev->power.irq_safe && !genpd->irq_safe)
->>
->>
->> This looks correct...
->>
-> Apparently not the best place to check this. We should still allow
-> runtime suspend of the device, irrespective of whether the domain is IRQ
-> safe or not and this check here is incorrect.
-
-You are absolutely correct!
-
-That change is actually done as a part of the patch I posted [1],
-which $subject patch is based upon.
-
-Earlier we could only invoke the ->stop|start() callbacks for an IRQ
-safe device. According to the changes made in [1], we are now able to
-also invoke the ->runtime_suspend|resume() callbacks. Yet another
-positive "side effect". I will cook a v4 and post a new version to fix
-this.
-
+> - Map POWER, HOME, VOL+ and VOL- to the obvious input events.
+> - Map RLOCK to KEY_SCREENLOCK/KEY_COFFEE unless someone can
+>   explain better what this is for.
+> - Map the NMI button to KEY_SYSREQ as this is used like so
+>   in the SYSREQ debugging hack.
 >
->>>                 return -EBUSY;
->>>
->>>         stop_ok = genpd->gov ? genpd->gov->stop_ok : NULL;
->>> @@ -500,11 +561,19 @@ static int pm_genpd_runtime_suspend(struct device
->>> *dev)
->>>                 return ret;
->>>         }
->>>
->>> -       mutex_lock(&genpd->lock);
->>> +       /*
->>> +        * If power.irq_safe is set, this routine will be run with
->>> interrupts
->>> +        * off, so suspend only if the power domain is irq_safe.
->>> +        */
->>> +       if (dev->power.irq_safe && !genpd->irq_safe)
->>> +               return 0;
->>
->>
->> ... but this doesn't. You have already returned -EBUSY above for this
->> case.
->>
-> This is probably more appropriate, as we want to skip locking the
-> domain, because it may be in atomic context and the domain may use
-> mutexes to lock.
+> Acked-by: Liviu Dudau <Liviu.Dudau@arm.com>
+> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+> ---
+> Hi ARM SoC folks, please apply this patch directly to
+> the DT branch for ARM64. This is a resend of the v2 version
+> with Liviu's ACK.
 
-Yep.
+Applied to next/dt.
 
->
-> I feel like, we miss out an opportunity here to power off the domain, if
-> device is IRQ safe while the domain is not, but the function is called
-> from a process context. I am not sure how to check that correctly, yet.
+Thanks,
 
-You may be able to power off the PM domain for some cases, yes. But...
-if you do that, how would you then be able to power on the PM domain
-from atomic context via pm_genpd_runtime_resume()?
-
-[...]
-
-[1]
-http://www.spinics.net/lists/arm-kernel/msg424994.html
-
-Kind regards
-Uffe
+Kevin
