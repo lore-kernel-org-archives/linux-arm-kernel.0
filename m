@@ -1,68 +1,88 @@
-From: valentin.longchamp@keymile.com (Valentin Longchamp)
-Date: Fri, 12 Jun 2015 13:37:52 +0200
-Subject: [ehci-orion] ETIMEOUT with ehci_setup()'s ehci_halt()
-In-Reply-To: <55758095.2030609@keymile.com>
-References: <5571B38E.7080505@keymile.com> <20150605151930.GA16909@lunn.ch>
- <5572E4E8.2060405@gmail.com> <55758095.2030609@keymile.com>
-Message-ID: <557AC490.5040405@keymile.com>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Fri, 12 Jun 2015 12:54:06 +0100
+Subject: [PATCH v2 1/1] irqchip: exynos-combiner: Save IRQ enable set
+ on suspend
+In-Reply-To: <557AC23D.8040602@collabora.co.uk>
+References: <1434087795-13990-1-git-send-email-javier.martinez@collabora.co.uk>
+ <557AB00C.5040606@arm.com> <557AC23D.8040602@collabora.co.uk>
+Message-ID: <557AC85E.5070705@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/08/2015 01:46 PM, Valentin Longchamp wrote:
-> On 06/06/2015 02:17 PM, Sebastian Hesselbarth wrote:
->> On 05.06.2015 17:19, Andrew Lunn wrote:
->>> On Fri, Jun 05, 2015 at 04:34:54PM +0200, Valentin Longchamp wrote:
->>>> I am currently bringing up the USB 2.0 Host controller of the Bobcat's (98DX4122
->>>> Marvell switch) internal kirkwood CPU on a variation of Keymile's km_kirwood
->>>> hardware (kirkwood-km_kirkwood.dts).
->>>>
->>>> When the driver registers its hcd, it fails with a timemout as it can be seen in
->>>> the below log:
->>>>
->>>>> root at kmcoge5un:~# dmesg -n 8
->>>>> root at kmcoge5un:~# insmod ehci-orion.ko
->>>>> ehci-orion: EHCI orion driver
->>>>> Initializing Orion-SoC USB Host Controller
->>>>> orion-ehci f1050000.ehci: EHCI Host Controller
->>>>> orion-ehci f1050000.ehci: new USB bus registered, assigned bus number 1
->>>>> orion-ehci f1050000.ehci: reset hcs_params 0x10011 dbg=0 ind cc=0 pcc=0 ordered ports=1
->>>>> orion-ehci f1050000.ehci: reset hcc_params 0006 thresh 0 uframes 256/512/1024 park
->>>>> orion-ehci f1050000.ehci: park 0
->>>>> orion-ehci f1050000.ehci: reset command 0080002 (park)=0 ithresh=8 period=1024 Reset HALT
->>>>> orion-ehci f1050000.ehci: can't setup
->>>>> orion-ehci f1050000.ehci: USB bus 1 deregistered
->>>>> orion-ehci f1050000.ehci: init f1050000.ehci fail, -110
->>>>> orion-ehci: probe of f1050000.ehci failed with error -110
->>>>
->>>> This is very similar to this problem, except that it always happens:
->>>> https://lkml.org/lkml/2012/6/4/381
->>>>
->>>> I have cornered it out to the last handshake() call of the ehci_halt() call,
->>>> that should set the controller in the HALT state. If I comment this handshake()
->>>> call out, the registration is fine and the controller then looks OK (I don't
->>>> have a hardware with a real USB bus to further test it yet).
+
+
+On 12/06/15 12:27, Javier Martinez Canillas wrote:
+> Hello Sudeep,
+>
+> Thanks a lot for the feedback.
+>
+> On 06/12/2015 12:10 PM, Sudeep Holla wrote:
 >>
->> Valentin,
 >>
->> can you specify what "real USB bus" means? Does your current hardware
->> support USB host or device with anything connected to it?
-> 
-> No. The current hardware I am testing on does not support USB since the USB bus
-> is not "wired" at all, there is no phy present (this maybe causes a problem ?).
-> What I test is if the ehci-orion USB host driver is able to register with and
-> configure the USB host controller present in the SoC, in order to prepare things
-> for when the hardware is available.
-> 
-> Hopefully I get some new hardware prototypes where the USB bus is complete this
-> week so that I can test on the real setup.
-> 
+>> On 12/06/15 06:43, Javier Martinez Canillas wrote:
+>>> The Exynos interrupt combiner IP loses its state when the SoC enters
+>>> into a low power state during a Suspend-to-RAM. This means that if a
+>>> IRQ is used as a source, the interrupts for the devices are disabled
+>>> when the system is resumed from a sleep state so are not triggered.
+>>>
+>>> Save the interrupt enable set register for each combiner group and
+>>> restore it after resume to make sure that the interrupts are enabled.
+>>>
+>>
+>> Not sure if you need this. IMO it's not clean and redundant though I
+>> admit many drivers do exactly same thing. I am trying to remove or point
+>> out those redundant code as irqchip core has options/flags to do what
+>> you need. I assume there are no wakeup sources connected to this
+>
+> Yes, there are wakeup sources connected to this combiner. As Krzysztof
+> said some wakeup sources use a GPIO line as IRQ whose interrupt parent
+> is the combiner. As an example the Power gpio-key and cros_ec keyboard
+> for both Exynos5250 Snow and Exynos5420 Peach Pit/Pi.
+>
+> Both drivers/input/keyboard/gpio_keysc and drivers/mfd/cros_ec.c do the
+> right thing though and call {enable,disable}_irq_wake() on the S2R path.
+>
+> And in fact, the peripherals resume the system after a suspend but after
+> resume, interrupts are not triggered anymore.
+>
 
-We have now received the hardware prototype and the behavior is exactly the
-same: ETIMEOUT in ehci_halt(). If the last handshake() call is removed, the EHCI
-host controller is correctly initialized and the device on the bus is detected
-and works correctly.
+I agree for the wakeup source, but I need to go through the irqchip core
+again to understand this better.
 
-I thus tend to think that this is an IP (or Bobcat) internal problem and is not
-really related with the hardware nor a PHY.
+>> combiner. Setting irqchip flags should solve this problem. A
+>> simple patch below should do the job ?
+>>
+>
+> I don't see how the below patch is going to work for the case I'm
+> trying to solve. If I understand correctly, the
+> IRQCHIP_MASK_ON_SUSPEND flag is used to force masking non wakeup
+> interrupt in the suspend path (instead of just disabling the
+> interrupts on suspend and not masking at the hardware level)
+>
 
-Valentin
+It also takes re-enables all the IRQs in the resume path that were
+disabled on the suspend path.
+
+> But my problem is not about interrupts needed to be masked on suspend
+> but the opposite, that interrupts have to be unmasked on resume since
+> the IP loses its state so after a resume, interrupts are not
+> triggered anymore.
+>
+
+As I mentioned above this happens for all non-wake up interrupts.
+However this needs to done for wake up interrupts IIUC. BTW if these
+registers are lost assuming the combiner was powered down, even the
+status register will be lost and you will not know exactly the wakeup
+reason right ?
+
+> So I also don't see how implementing irq_set_wake() as you suggested
+> is going to work. Maybe we need a IRQCHIP_UNMASK_ON_RESUME flag for
+> this case?
+>
+
+IIRC these combiner feeds to main interrupt controller and you need to
+make sure that interrupt is set as wakeup if required. Right ? so you
+may still need irq_set_wake IMO.
+
+Regards,
+Sudeep
