@@ -1,43 +1,73 @@
 From: timur@codeaurora.org (Timur Tabi)
-Date: Fri, 12 Jun 2015 16:57:42 -0500
-Subject: [PATCH 1/2] arm64: qcom: Add define for ARMv8 implementer (MIDR)
-Message-ID: <1434146263-30972-1-git-send-email-timur@codeaurora.org>
+Date: Fri, 12 Jun 2015 16:57:43 -0500
+Subject: [PATCH 2/2] arm64: KVM: Add VCPU support for Qualcomm Technologies
+ Kryo ARMv8 CPU
+In-Reply-To: <1434146263-30972-1-git-send-email-timur@codeaurora.org>
+References: <1434146263-30972-1-git-send-email-timur@codeaurora.org>
+Message-ID: <1434146263-30972-2-git-send-email-timur@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Shanker Donthineni <shankerd@codeaurora.org>
 
-This patch adds define for Qualcomm Technologies ARMv8 CPU
-implementer ID 0x51 and part number for Kryo in asm/cputype.h.
+This patch enables assignment of 32/64bit guest VCPU to
+Qualcomm Technologies ARMv8 CPU. Added KVM_ARM_TARGET_QCOM_KRYO
+to the KVM target list and modified vm_target_cpu() to return
+KVM_ARM_TARGET_QCOM_KRYO when CPU running in AArch64 mode.
 
 Signed-off-by: Shanker Donthineni <shankerd@codeaurora.org>
 Signed-off-by: Timur Tabi <timur@codeaurora.org>
 ---
- arch/arm64/include/asm/cputype.h | 4 ++++
- 1 file changed, 4 insertions(+)
+ arch/arm64/include/uapi/asm/kvm.h    | 3 ++-
+ arch/arm64/kvm/guest.c               | 6 ++++++
+ arch/arm64/kvm/sys_regs_generic_v8.c | 2 ++
+ 3 files changed, 10 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm64/include/asm/cputype.h b/arch/arm64/include/asm/cputype.h
-index a84ec60..6978764 100644
---- a/arch/arm64/include/asm/cputype.h
-+++ b/arch/arm64/include/asm/cputype.h
-@@ -64,6 +64,7 @@
+diff --git a/arch/arm64/include/uapi/asm/kvm.h b/arch/arm64/include/uapi/asm/kvm.h
+index d268320..426933e 100644
+--- a/arch/arm64/include/uapi/asm/kvm.h
++++ b/arch/arm64/include/uapi/asm/kvm.h
+@@ -59,8 +59,9 @@ struct kvm_regs {
+ #define KVM_ARM_TARGET_CORTEX_A57	2
+ #define KVM_ARM_TARGET_XGENE_POTENZA	3
+ #define KVM_ARM_TARGET_CORTEX_A53	4
++#define KVM_ARM_TARGET_QCOM_KRYO	5
  
- #define ARM_CPU_IMP_ARM		0x41
- #define ARM_CPU_IMP_APM		0x50
-+#define ARM_CPU_IMP_QCOM	0x51
+-#define KVM_ARM_NUM_TARGETS		5
++#define KVM_ARM_NUM_TARGETS		6
  
- #define ARM_CPU_PART_AEM_V8	0xD0F
- #define ARM_CPU_PART_FOUNDATION	0xD00
-@@ -84,6 +85,9 @@
- #define SCTLR_EL1_CP15BEN	(0x1 << 5)
- #define SCTLR_EL1_SED		(0x1 << 8)
+ /* KVM_ARM_SET_DEVICE_ADDR ioctl id encoding */
+ #define KVM_ARM_DEVICE_TYPE_SHIFT	0
+diff --git a/arch/arm64/kvm/guest.c b/arch/arm64/kvm/guest.c
+index 9535bd5..836cf16 100644
+--- a/arch/arm64/kvm/guest.c
++++ b/arch/arm64/kvm/guest.c
+@@ -291,6 +291,12 @@ int __attribute_const__ kvm_target_cpu(void)
+ 			return KVM_ARM_TARGET_XGENE_POTENZA;
+ 		};
+ 		break;
++	case ARM_CPU_IMP_QCOM:
++		switch (part_number & QCOM_CPU_PART_MASK) {
++		case QCOM_CPU_PART_KRYO:
++			return KVM_ARM_TARGET_QCOM_KRYO;
++		}
++		break;
+ 	};
  
-+#define QCOM_CPU_PART_MASK	0xF00
-+#define QCOM_CPU_PART_KRYO	0x200
-+
- #ifndef __ASSEMBLY__
+ 	return -EINVAL;
+diff --git a/arch/arm64/kvm/sys_regs_generic_v8.c b/arch/arm64/kvm/sys_regs_generic_v8.c
+index 475fd29..3712ea8 100644
+--- a/arch/arm64/kvm/sys_regs_generic_v8.c
++++ b/arch/arm64/kvm/sys_regs_generic_v8.c
+@@ -94,6 +94,8 @@ static int __init sys_reg_genericv8_init(void)
+ 					  &genericv8_target_table);
+ 	kvm_register_target_sys_reg_table(KVM_ARM_TARGET_XGENE_POTENZA,
+ 					  &genericv8_target_table);
++	kvm_register_target_sys_reg_table(KVM_ARM_TARGET_QCOM_KRYO,
++					  &genericv8_target_table);
  
- /*
+ 	return 0;
+ }
 -- 
 Qualcomm Innovation Center, Inc.
 The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
