@@ -1,133 +1,143 @@
-From: noralf@tronnes.org (=?UTF-8?q?Noralf=20Tr=C3=B8nnes?=)
-Date: Fri, 12 Jun 2015 19:26:56 +0200
-Subject: [PATCH] irqchip: bcm2835: Add FIQ support
-Message-ID: <1434130016-26574-1-git-send-email-noralf@tronnes.org>
+From: eric.auger@linaro.org (Eric Auger)
+Date: Fri, 12 Jun 2015 19:30:15 +0200
+Subject: [PATCH v3 1/4] VFIO: platform: add reset struct and lookup table
+In-Reply-To: <1434118785.4927.274.camel@redhat.com>
+References: <1434024527-13869-1-git-send-email-eric.auger@linaro.org>		
+ <1434024527-13869-2-git-send-email-eric.auger@linaro.org>	
+ <1434057115.4927.211.camel@redhat.com> <557AE172.5010302@linaro.org>
+ <1434118785.4927.274.camel@redhat.com>
+Message-ID: <557B1727.8080208@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add a duplicate irq range with an offset on the hwirq's so the
-driver can detect that enable_fiq() is used.
-Tested with downstream dwc_otg USB controller driver.
+Hi Alex,
+On 06/12/2015 04:19 PM, Alex Williamson wrote:
+> On Fri, 2015-06-12 at 15:41 +0200, Eric Auger wrote:
+>> Hi Alex,
+>> On 06/11/2015 11:11 PM, Alex Williamson wrote:
+>>> On Thu, 2015-06-11 at 14:08 +0200, Eric Auger wrote:
+>>>> This patch introduces the vfio_platform_reset_combo struct that
+>>>> stores all the information useful to handle the reset modality:
+>>>> compat string, name of the reset function, name of the module that
+>>>> implements the reset function. A lookup table of such structures
+>>>> is added, currently containing a single sentinel element. A new
+>>>> type field is added in vfio_platform_device to store what kind of
+>>>> reset is associated to the device, if any.
+>>>
+>>> The commit log no longer matches the code.
+>> yes indeed missed that.
+>>>
+>>> The only other thing I'm struggling with in this series is that in 0/4
+>>> you suggest that the reset modules can be in-kernel or external, but
+>>> we're making a static list here, so there's really no support for
+>>> random, user-provided reset modules.  So are we missing the mark on the
+>>> requirements?
+>>
+>> Well personally I do not have a MUST HAVE requirement for that feature.
+>> My main requirement was to find a way to stop DMA/IRQ transfers
+>> programmed by a previous VM potentially jeopardizing the integrity of a
+>> second VM.
+>>>
+>>> One way I thought you could achieve your requirement would be if we did
+>>> away with the lookup table and looked for the module and function using
+>>> a pre-defined transform on the compat ID.  For instance, a compat ID of
+>>> "calxeda,hb-xgmac" would automatically request a module named
+>>> "vfio-platform-reset-calxedahb-xgmac" and look for a symbol of the same
+>>> name for the reset function (I wonder if we can actually have a module
+>>> and symbol of the same name).
+>> I just tried and it works
+>>   It seems fairly safe since an external
+>>> module would need to be explicitly placed in the search path for the
+>>> userspace module loader.
+>> we talked together with Christoffer about such a technique at the very
+>> beginning and he was not very fond of it, advising an approach using a
+>> defined API.
+>>>
+>>> Otherwise the table would need to become a list, the external module
+>>> would need to be manually loaded, and the module_init() would need to
+>>> register an entry on that list.
+>> Isn't it what I attempted to do in v2 or do you mean something else?
+> 
+> IIRC, v2 required all modules to be manually loaded, which I think was
+> bound to be a support issue.
+  In-kernel modules should definitely have
+> the benefit of auto-loading,
+yes you're right! thanks for your clarification.
 
-Signed-off-by: Noralf Tr?nnes <noralf@tronnes.org>
----
- arch/arm/mach-bcm/Kconfig     |  1 +
- drivers/irqchip/irq-bcm2835.c | 53 ++++++++++++++++++++++++++++++++++++++-----
- 2 files changed, 48 insertions(+), 6 deletions(-)
+ but if we want to support external modules,
+> I'm just hypothesizing that we either need to standardize naming so that
+> we can ask for them or require registration.  In-kernel modules could
+> still effectively be pre-registered and requested on-demand.
+>> Having a whitelist brings the benefit to know which devices really are
+>> used with vfio-platform (besides some devices may not need any reset
+>> module). I don't know yet whether this is something that may slow down
+>> the adoption.
+>>
+>> Personally I would keep it as is for now and see how it gets used and
+>> whether users complain, ...
+>>
+>> If you agree I will respin just reworking the commit message.
+> 
+> If there's really no external module requirement, then your current
+> approach is fine.  We're not creating anything here that can't later be
+> modified.  Thanks,
+OK. I will send v4 with updated commit messages early next week.
 
-diff --git a/arch/arm/mach-bcm/Kconfig b/arch/arm/mach-bcm/Kconfig
-index 8b11f44..7cfef7b 100644
---- a/arch/arm/mach-bcm/Kconfig
-+++ b/arch/arm/mach-bcm/Kconfig
-@@ -114,6 +114,7 @@ config ARCH_BCM2835
- 	select ARM_ERRATA_411920
- 	select ARM_TIMER_SP804
- 	select CLKSRC_OF
-+	select FIQ
- 	select PINCTRL
- 	select PINCTRL_BCM2835
- 	help
-diff --git a/drivers/irqchip/irq-bcm2835.c b/drivers/irqchip/irq-bcm2835.c
-index 5916d6c..db66246 100644
---- a/drivers/irqchip/irq-bcm2835.c
-+++ b/drivers/irqchip/irq-bcm2835.c
-@@ -56,7 +56,7 @@
- #include "irqchip.h"
- 
- /* Put the bank and irq (32 bits) into the hwirq */
--#define MAKE_HWIRQ(b, n)	((b << 5) | (n))
-+#define MAKE_HWIRQ(b, n)	(((b) << 5) | (n))
- #define HWIRQ_BANK(i)		(i >> 5)
- #define HWIRQ_BIT(i)		BIT(i & 0x1f)
- 
-@@ -72,9 +72,13 @@
- 					| SHORTCUT1_MASK | SHORTCUT2_MASK)
- 
- #define REG_FIQ_CONTROL		0x0c
-+#define REG_FIQ_ENABLE		0x80
-+#define REG_FIQ_DISABLE		0
- 
- #define NR_BANKS		3
- #define IRQS_PER_BANK		32
-+#define NUMBER_IRQS		MAKE_HWIRQ(NR_BANKS, 0)
-+#define FIQ_START		(NR_IRQS_BANK0 + MAKE_HWIRQ(NR_BANKS - 1, 0))
- 
- static int reg_pending[] __initconst = { 0x00, 0x04, 0x08 };
- static int reg_enable[] __initconst = { 0x18, 0x10, 0x14 };
-@@ -98,14 +102,38 @@ static struct armctrl_ic intc __read_mostly;
- static void __exception_irq_entry bcm2835_handle_irq(
- 	struct pt_regs *regs);
- 
-+static inline unsigned int hwirq_to_fiq(unsigned long hwirq)
-+{
-+	hwirq -= NUMBER_IRQS;
-+	/*
-+	 * The hwirq numbering used in this driver is:
-+	 *   BASE (0-7) GPU1 (32-63) GPU2 (64-95).
-+	 * This differ from the one used in the FIQ register:
-+	 *   GPU1 (0-31) GPU2 (32-63) BASE (64-71)
-+	 */
-+	if (hwirq >= 32)
-+		return hwirq - 32;
-+
-+	return hwirq + 64;
-+}
-+
- static void armctrl_mask_irq(struct irq_data *d)
- {
--	writel_relaxed(HWIRQ_BIT(d->hwirq), intc.disable[HWIRQ_BANK(d->hwirq)]);
-+	if (d->hwirq >= NUMBER_IRQS)
-+		writel_relaxed(REG_FIQ_DISABLE, intc.base + REG_FIQ_CONTROL);
-+	else
-+		writel_relaxed(HWIRQ_BIT(d->hwirq),
-+			       intc.disable[HWIRQ_BANK(d->hwirq)]);
- }
- 
- static void armctrl_unmask_irq(struct irq_data *d)
- {
--	writel_relaxed(HWIRQ_BIT(d->hwirq), intc.enable[HWIRQ_BANK(d->hwirq)]);
-+	if (d->hwirq >= NUMBER_IRQS)
-+		writel_relaxed(REG_FIQ_ENABLE | hwirq_to_fiq(d->hwirq),
-+			       intc.base + REG_FIQ_CONTROL);
-+	else
-+		writel_relaxed(HWIRQ_BIT(d->hwirq),
-+			       intc.enable[HWIRQ_BANK(d->hwirq)]);
- }
- 
- static struct irq_chip armctrl_chip = {
-@@ -150,8 +178,9 @@ static int __init armctrl_of_init(struct device_node *node,
- 		panic("%s: unable to map IC registers\n",
- 			node->full_name);
- 
--	intc.domain = irq_domain_add_linear(node, MAKE_HWIRQ(NR_BANKS, 0),
--			&armctrl_ops, NULL);
-+	intc.base = base;
-+	intc.domain = irq_domain_add_linear(node, NUMBER_IRQS * 2,
-+					    &armctrl_ops, NULL);
- 	if (!intc.domain)
- 		panic("%s: unable to create IRQ domain\n", node->full_name);
- 
-@@ -168,8 +197,20 @@ static int __init armctrl_of_init(struct device_node *node,
- 			set_irq_flags(irq, IRQF_VALID | IRQF_PROBE);
- 		}
- 	}
--
- 	set_handle_irq(bcm2835_handle_irq);
-+
-+	/* Make a duplicate irq range which is used to enable FIQ */
-+	for (b = 0; b < NR_BANKS; b++) {
-+		for (i = 0; i < bank_irqs[b]; i++) {
-+			irq = irq_create_mapping(intc.domain,
-+					MAKE_HWIRQ(b, i) + NUMBER_IRQS);
-+			BUG_ON(irq <= 0);
-+			irq_set_chip(irq, &armctrl_chip);
-+			set_irq_flags(irq, IRQF_VALID | IRQF_PROBE);
-+		}
-+	}
-+	init_FIQ(FIQ_START);
-+
- 	return 0;
- }
- 
--- 
-2.2.2
+Have a nice week end.
+
+Eric
+
+> 
+> Alex
+> 
+> 
+>>>> ---
+>>>>
+>>>> v2 -> v3:
+>>>> - add const in struct vfio_platform_reset_combo
+>>>> - remove enum vfio_platform_reset_type
+>>>>
+>>>> v2: creation
+>>>> ---
+>>>>  drivers/vfio/platform/vfio_platform_common.c  | 3 +++
+>>>>  drivers/vfio/platform/vfio_platform_private.h | 6 ++++++
+>>>>  2 files changed, 9 insertions(+)
+>>>>
+>>>> diff --git a/drivers/vfio/platform/vfio_platform_common.c b/drivers/vfio/platform/vfio_platform_common.c
+>>>> index abcff7a..611597e 100644
+>>>> --- a/drivers/vfio/platform/vfio_platform_common.c
+>>>> +++ b/drivers/vfio/platform/vfio_platform_common.c
+>>>> @@ -25,6 +25,9 @@
+>>>>  
+>>>>  static DEFINE_MUTEX(driver_lock);
+>>>>  
+>>>> +static const struct vfio_platform_reset_combo reset_lookup_table[] = {
+>>>> +};
+>>>> +
+>>>>  static int vfio_platform_regions_init(struct vfio_platform_device *vdev)
+>>>>  {
+>>>>  	int cnt = 0, i;
+>>>> diff --git a/drivers/vfio/platform/vfio_platform_private.h b/drivers/vfio/platform/vfio_platform_private.h
+>>>> index 5d31e04..9e37b9f 100644
+>>>> --- a/drivers/vfio/platform/vfio_platform_private.h
+>>>> +++ b/drivers/vfio/platform/vfio_platform_private.h
+>>>> @@ -69,6 +69,12 @@ struct vfio_platform_device {
+>>>>  	int	(*get_irq)(struct vfio_platform_device *vdev, int i);
+>>>>  };
+>>>>  
+>>>> +struct vfio_platform_reset_combo {
+>>>> +	const char *compat;
+>>>> +	const char *reset_function_name;
+>>>> +	const char *module_name;
+>>>> +};
+>>>> +
+>>>>  extern int vfio_platform_probe_common(struct vfio_platform_device *vdev,
+>>>>  				      struct device *dev);
+>>>>  extern struct vfio_platform_device *vfio_platform_remove_common
+>>>
+>>>
+>>>
+>>
+> 
+> 
+> 
