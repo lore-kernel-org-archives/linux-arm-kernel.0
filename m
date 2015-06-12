@@ -1,47 +1,31 @@
-From: michal.simek@xilinx.com (Michal Simek)
-Date: Fri, 12 Jun 2015 11:25:17 +0200
-Subject: [PATCH v2] ARM: zynq: Fix earlyprintk in big endian mode
-In-Reply-To: <1434092004-21385-1-git-send-email-achandran@mvista.com>
-References: <1433945584-16379-1-git-send-email-achandran@mvista.com>
- <1434092004-21385-1-git-send-email-achandran@mvista.com>
-Message-ID: <557AA57D.1010104@xilinx.com>
+From: eddie.huang@mediatek.com (Eddie Huang)
+Date: Fri, 12 Jun 2015 17:27:07 +0800
+Subject: [PATCH v3 0/2] arm64: dts: Mediatek: MT8173 updtes 
+Message-ID: <1434101229-32695-1-git-send-email-eddie.huang@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/12/2015 08:53 AM, Arun Chandran wrote:
-> earlyprintk messages are not appearing on the terminal
-> emulator during a big endian kernel boot. In BE mode
-> sending full words to UART will result in unprintable
-> characters as they are byte swapped versions of printable
-> ones. So send only bytes.
-> 
-> Signed-off-by: Arun Chandran <achandran@mvista.com>
-> ---
-> ---
-> Changes since v1:
-> 	removed the byte swapping logic. Just send characters instead.
-> ---
->  arch/arm/include/debug/zynq.S | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm/include/debug/zynq.S b/arch/arm/include/debug/zynq.S
-> index bd13ded..de86b92 100644
-> --- a/arch/arm/include/debug/zynq.S
-> +++ b/arch/arm/include/debug/zynq.S
-> @@ -38,7 +38,7 @@
->  		.endm
->  
->  		.macro	senduart,rd,rx
-> -		str	\rd, [\rx, #UART_FIFO_OFFSET]	@ TXDATA
-> +		strb	\rd, [\rx, #UART_FIFO_OFFSET]	@ TXDATA
->  		.endm
->  
->  		.macro	waituart,rd,rx
-> 
+This series add MT8173 watchdog and I2C device nodes. Both device nodes 
+are based on 4.1-rc1, but I2C need two extra CCF patches from Sascha [1][2].
 
-ok - this works too.
+[1] clk: Add common clock support for Mediatek MT8135 and MT8173
+    http://lists.infradead.org/pipermail/linux-arm-kernel/2015-April/338763.html
+[2] ARM64: dts: mt8173: Add clock controller device nodes
+    http://lists.infradead.org/pipermail/linux-arm-kernel/2015-May/344753.html
 
-Tested-by: Michal Simek <michal.simek@xilinx.com>
+Change in v3:
+Move I2C pin from SoC dtsi to board dts file.
 
-Thanks,
-Michal
+Change in v2:
+Modify I2C device node accroding register address order.
+
+Eddie Huang (2):
+  arm64: dts: mt8173: Add watchdog device node
+  arm64: dts: mt8173: Add I2C device node
+
+ arch/arm64/boot/dts/mediatek/mt8173-evb.dts | 50 ++++++++++++++++++
+ arch/arm64/boot/dts/mediatek/mt8173.dtsi    | 78 +++++++++++++++++++++++++++++
+ 2 files changed, 128 insertions(+)
+
+-- 
+1.8.1.1.dirty
