@@ -1,23 +1,39 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Fri, 12 Jun 2015 13:16:55 +0100
-Subject: [PATCH v2 4/6] regulator: Add soft start support
-In-Reply-To: <1434069427-3642-5-git-send-email-sboyd@codeaurora.org>
-References: <1434069427-3642-1-git-send-email-sboyd@codeaurora.org>
- <1434069427-3642-5-git-send-email-sboyd@codeaurora.org>
-Message-ID: <20150612121655.GV1921@sirena.org.uk>
+From: linux@roeck-us.net (Guenter Roeck)
+Date: Fri, 12 Jun 2015 05:18:15 -0700
+Subject: [PATCH 2/3] watchdog: bcm2835: Add poweroff code for the Raspberry
+ Pi
+In-Reply-To: <557AC203.6060600@lategoodbye.de>
+References: <1433845305-17329-1-git-send-email-noralf@tronnes.org>
+ <1433845305-17329-2-git-send-email-noralf@tronnes.org>
+ <557AC203.6060600@lategoodbye.de>
+Message-ID: <557ACE07.3040104@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 11, 2015 at 05:37:05PM -0700, Stephen Boyd wrote:
-> Some regulators support a "soft start" feature where the voltage
-> ramps up slowly when the regulator is enabled. Add an op
-> (set_soft_start) and a DT property + constraint to support this.
+On 06/12/2015 04:26 AM, Stefan Wahren wrote:
+> Hi Noralf,
+>
+> Am 09.06.2015 um 12:21 schrieb Noralf Tr?nnes:
+>> This adds a new poweroff function to the watchdog driver for the
+>> Raspberry Pi. Currently poweroff/halt results in a reboot.
+>>
+>> [...]
+>>
+>> +static void rpi_power_off(void)
+>> +{
+>> +    struct device_node *np =
+>> +        of_find_compatible_node(NULL, NULL, "brcm,raspberrypi-pm-wdt");
+>> +    struct platform_device *pdev = of_find_device_by_node(np);
+>> +    struct bcm2835_wdt *wdt = platform_get_drvdata(pdev);
+>> +    u32 val;
+>> +
+>> +    val = readl_relaxed(wdt->base + PM_RSTS);
+>
+> do you think it's safe here to assume wdt could never be NULL?
+>
 
-Applied, thanks.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150612/10f4d15d/attachment.sig>
+If the call is made, the driver must be instantiated. We can therefore assume
+that neither np, pdev, nor wdt is NULL. If one of those is NULL, it would be
+a bug, which should not be ignored.
+
+Guenter
