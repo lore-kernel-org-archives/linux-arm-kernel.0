@@ -1,34 +1,54 @@
-From: antoine.tenart@free-electrons.com (Antoine Tenart)
-Date: Fri, 12 Jun 2015 11:05:37 +0200
-Subject: [PATCH v2 06/10] pinctrl: berlin: use proper compatibles
-In-Reply-To: <CACRpkda-4SahLjwe09D-Hb8p0nQFdG1Zc_xvLPwLGYQMkJQaXA@mail.gmail.com>
-References: <1425654328-26298-1-git-send-email-antoine.tenart@free-electrons.com>
- <1425654328-26298-7-git-send-email-antoine.tenart@free-electrons.com>
- <CACRpkda-4SahLjwe09D-Hb8p0nQFdG1Zc_xvLPwLGYQMkJQaXA@mail.gmail.com>
-Message-ID: <20150612090537.GB29596@kwain>
+From: yamada.masahiro@socionext.com (Masahiro Yamada)
+Date: Fri, 12 Jun 2015 18:04:17 +0900
+Subject: [PATCH] serial: 8250_uniphier: add bindings document for UniPhier UART
+Message-ID: <1434099857-13594-1-git-send-email-yamada.masahiro@socionext.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 10, 2015 at 09:13:55AM +0200, Linus Walleij wrote:
-> On Fri, Mar 6, 2015 at 4:05 PM, Antoine Tenart
-> <antoine.tenart@free-electrons.com> wrote:
-> 
-> > The Berlin pin-controller driver was sharing the chip and system
-> > controller nodes with the clock and the reset drivers. They all shared
-> > the same compatible. With the introduction of the Marvell Berlin MFD
-> > controller, the Berlin pin-controller driver has now its own node.
-> > Update its compatibles to not share anymore the ones of the chip and
-> > system controllers.
-> >
-> > Signed-off-by: Antoine Tenart <antoine.tenart@free-electrons.com>
-> 
-> Antoine, how is this series going?
+This is binding information for the UniPhier on-chip UART driver
+(drivers/tty/serial/8250/8250_uniphier.c).
 
-The series should be in the berlin tree at the moment.
+Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
+---
 
-Antoine
+Greg,
 
+If not too late, can you merge this patch into your tty repository
+for the upcoming merge window, please?
+
+
+ .../devicetree/bindings/serial/uniphier-uart.txt   | 23 ++++++++++++++++++++++
+ 1 file changed, 23 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/serial/uniphier-uart.txt
+
+diff --git a/Documentation/devicetree/bindings/serial/uniphier-uart.txt b/Documentation/devicetree/bindings/serial/uniphier-uart.txt
+new file mode 100644
+index 0000000..0b3892a
+--- /dev/null
++++ b/Documentation/devicetree/bindings/serial/uniphier-uart.txt
+@@ -0,0 +1,23 @@
++UniPhier UART controller
++
++Required properties:
++- compatible: should be "socionext,uniphier-uart".
++- reg: offset and length of the register set for the device.
++- interrupts: a single interrupt specifier.
++- clocks: phandle to the input clock.
++
++Optional properties:
++- fifo-size: the RX/TX FIFO size.  Defaults to 64 if not specified.
++
++Example:
++	aliases {
++		serial0 = &serial0;
++	};
++
++	serial0: serial at 54006800 {
++		compatible = "socionext,uniphier-uart";
++		reg = <0x54006800 0x40>;
++		interrupts = <0 33 4>;
++		clocks = <&uart_clk>;
++		fifo-size = <64>;
++	};
 -- 
-Antoine T?nart, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+1.9.1
