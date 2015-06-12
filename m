@@ -1,36 +1,61 @@
-From: khilman@kernel.org (Kevin Hilman)
-Date: Fri, 12 Jun 2015 11:19:59 -0700
-Subject: linux-next: build failure after merge of the arm-soc tree
-In-Reply-To: <1434069014.28544.1.camel@ellerman.id.au> (Michael Ellerman's
- message of "Fri, 12 Jun 2015 10:30:14 +1000")
-References: <1434069014.28544.1.camel@ellerman.id.au>
-Message-ID: <7hlhfobxgw.fsf@deeprootsystems.com>
+From: javier.martinez@collabora.co.uk (Javier Martinez Canillas)
+Date: Fri, 12 Jun 2015 21:36:07 +0200
+Subject: [PATCH v2 1/1] irqchip: exynos-combiner: Save IRQ enable set
+ on suspend
+In-Reply-To: <557AD728.7090908@collabora.co.uk>
+References: <1434087795-13990-1-git-send-email-javier.martinez@collabora.co.uk>
+ <557AB00C.5040606@arm.com> <557AC23D.8040602@collabora.co.uk>
+ <557AC85E.5070705@arm.com> <557AD728.7090908@collabora.co.uk>
+Message-ID: <557B34A7.4090507@collabora.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Michael Ellerman <mpe@ellerman.id.au> writes:
+Hello Sudeep,
 
-> Hi all,
+On 06/12/2015 02:57 PM, Javier Martinez Canillas wrote:
+> On 06/12/2015 01:54 PM, Sudeep Holla wrote:
+
+[snip]
+
+> 
+>> registers are lost assuming the combiner was powered down, even the
+>> status register will be lost and you will not know exactly the wakeup
+>> reason right ?
+>>
+> 
+> Good question, I didn't find in the documentation I've access to that
+> this happen but just found through experimentation that the IRQ enable
+> set register values are lost after a resume and that saving/restoring
+> the values makes the interrupts to be triggered again.
 >
-> After merging the arm-soc tree, today's linux-next build (arm_multi_v7_defconfig)
-> failed like this:
->
->   scripts/Makefile.build:258: recipe for target 'arch/arm/mach-socfpga/platsmp.o' failed
->   arch/arm/mach-socfpga/platsmp.c:66:23: error: 'socfpga_secondary_startup' undeclared (first use in this function)
->      writel(virt_to_phys(socfpga_secondary_startup),
->                        ^
->
-> Caused by the interaction of commits 45be0cdb5323 "ARM: socfpga: add
-> CPU_METHOD_OF_DECLARE for Arria 10" and 02b4e2756e01 "ARM: v7 setup function
-> should invalidate L1 cache".
 
-I found this as well, unfortunately after it was already pulled for -next.
+I'll share here too the findings I mentioned over IRC. As you suggested I
+add some printouts and noticed that the ISTRn (Interrupt Status) registers
+values are indeed preserved on resume so I can know for example if the
+wakeup source was the power gpio-key or cros_ec keyboard. I've checked the
+values of the registers against the Exynos manual and they corresponds to
+the interrupt sources in each case so the values are correct.
 
-> I applied the following fix for today.
+So as you said, it seems that is not that the IP block loses its state on
+S2R but that something is blindly writing the IESRn (Interrupt Enable Set)
+registers.
 
-Yes, that's the right fix, and arm-soc now has the equivalent fix as
-well.
+To reduce the possible s/w components that could be doing this, I booted a
+signed FIT image directly using the RO U-Boot instead of chain loading a
+mainline nv-uboot. In this configuration I've the same issue so it seems
+that if something is zeroing those registers on S2R, this can't be changed
+without void the warranty of these machines.
 
-Thanks,
+I also looked at the downstream ChromiumOS v3.8 tree [0] and I see that
+they have a very similar solution than my patch, the IESRn are also saved
+but using a notifier for the CPU_PM_ENTER and CPU_PM_EXIT events instead
+or registering a syscore ops but the idea is basically the same.
 
-Kevin
+I have to take a look to the U-boot that is shipped on the device, I think
+the correct branch is [1] but I'm not sure if that is the correct one.
+
+Best regards,
+Javier
+
+[0]: https://chromium.googlesource.com/chromiumos/third_party/kernel/+/chromeos-3.8/arch/arm/mach-exynos/common.c#657
+[1]: https://chromium.googlesource.com/chromiumos/third_party/u-boot firmware-pit-4482.B
