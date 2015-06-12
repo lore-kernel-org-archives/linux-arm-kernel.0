@@ -1,48 +1,96 @@
 From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Thu, 11 Jun 2015 17:37:01 -0700
-Subject: [PATCH v2 0/6] SPMI regulator driver
-Message-ID: <1434069427-3642-1-git-send-email-sboyd@codeaurora.org>
+Date: Thu, 11 Jun 2015 17:37:05 -0700
+Subject: [PATCH v2 4/6] regulator: Add soft start support
+In-Reply-To: <1434069427-3642-1-git-send-email-sboyd@codeaurora.org>
+References: <1434069427-3642-1-git-send-email-sboyd@codeaurora.org>
+Message-ID: <1434069427-3642-5-git-send-email-sboyd@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patchset adds support for the regulators found on Qualcomm's
-SPMI PMICs. The first patch is the "basic" driver that doesn't have
-any non-standard features. The next 4 patches add ways to configure some
-of the non-standard features that are generic but aren't supported
-in the regulator framework. And the final patch adds support
-for the non-standard features and some vendor specific features to
-the SPMI regulator driver.
+Some regulators support a "soft start" feature where the voltage
+ramps up slowly when the regulator is enabled. Add an op
+(set_soft_start) and a DT property + constraint to support this.
 
-Changes since v1:
- * Split driver into standard and non-standard patches to ease review
- * New patches to regulator framework for non-standard features
- * Added bypass support
- * Namespaced macros
- * Switch to set_load() ops instead of get_optimum_mode()
- * Consolidated range finding code
- * Used delay op to calculate how long to delay after setting voltage on FTSMPS
+Cc: <devicetree@vger.kernel.org>
+Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+---
+ Documentation/devicetree/bindings/regulator/regulator.txt | 1 +
+ drivers/regulator/core.c                                  | 8 ++++++++
+ drivers/regulator/of_regulator.c                          | 3 +++
+ include/linux/regulator/driver.h                          | 2 ++
+ include/linux/regulator/machine.h                         | 1 +
+ 5 files changed, 15 insertions(+)
 
-Stephen Boyd (6):
-  regulator: Add QCOM SPMI regulator driver
-  regulator: Add system_load constraint
-  regulator: Add pull down support
-  regulator: Add soft start support
-  regulator: Add input current limit support
-  regulator: qcom-spmi: Add vendor specific configuration
-
- .../bindings/regulator/qcom,spmi-regulator.txt     |  183 +++
- .../devicetree/bindings/regulator/regulator.txt    |    5 +
- drivers/regulator/Kconfig                          |   11 +
- drivers/regulator/Makefile                         |    1 +
- drivers/regulator/core.c                           |   27 +
- drivers/regulator/of_regulator.c                   |   12 +
- drivers/regulator/qcom_spmi-regulator.c            | 1678 ++++++++++++++++++++
- include/linux/regulator/driver.h                   |   10 +
- include/linux/regulator/machine.h                  |    8 +
- 9 files changed, 1935 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/regulator/qcom,spmi-regulator.txt
- create mode 100644 drivers/regulator/qcom_spmi-regulator.c
-
+diff --git a/Documentation/devicetree/bindings/regulator/regulator.txt b/Documentation/devicetree/bindings/regulator/regulator.txt
+index 6c79fd70ab5a..4b1df61ccbd7 100644
+--- a/Documentation/devicetree/bindings/regulator/regulator.txt
++++ b/Documentation/devicetree/bindings/regulator/regulator.txt
+@@ -19,6 +19,7 @@ Optional properties:
+   design requires. This property describes the total system ramp time
+   required due to the combination of internal ramping of the regulator itself,
+   and board design issues such as trace capacitance and load on the supply.
++- regulator-soft-start: Enable soft start so that voltage ramps slowly
+ - regulator-state-mem sub-root node for Suspend-to-RAM mode
+   : suspend to memory, the device goes to sleep, but all data stored in memory,
+   only some external interrupt can wake the device.
+diff --git a/drivers/regulator/core.c b/drivers/regulator/core.c
+index 1d6172a9f65c..88622fc76b81 100644
+--- a/drivers/regulator/core.c
++++ b/drivers/regulator/core.c
+@@ -1059,6 +1059,14 @@ static int set_machine_constraints(struct regulator_dev *rdev,
+ 		}
+ 	}
+ 
++	if (rdev->constraints->soft_start && ops->set_soft_start) {
++		ret = ops->set_soft_start(rdev);
++		if (ret < 0) {
++			rdev_err(rdev, "failed to set soft start\n");
++			goto out;
++		}
++	}
++
+ 	print_constraints(rdev);
+ 	return 0;
+ out:
+diff --git a/drivers/regulator/of_regulator.c b/drivers/regulator/of_regulator.c
+index 237b014666fa..72576dd9bf7b 100644
+--- a/drivers/regulator/of_regulator.c
++++ b/drivers/regulator/of_regulator.c
+@@ -84,6 +84,9 @@ static void of_get_regulation_constraints(struct device_node *np,
+ 	if (!ret)
+ 		constraints->enable_time = pval;
+ 
++	constraints->soft_start = of_property_read_bool(np,
++					"regulator-soft-start");
++
+ 	if (!of_property_read_u32(np, "regulator-initial-mode", &pval)) {
+ 		if (desc && desc->of_map_mode) {
+ 			ret = desc->of_map_mode(pval);
+diff --git a/include/linux/regulator/driver.h b/include/linux/regulator/driver.h
+index 5eb85e152eb7..02e1e8d4b1bb 100644
+--- a/include/linux/regulator/driver.h
++++ b/include/linux/regulator/driver.h
+@@ -161,6 +161,8 @@ struct regulator_ops {
+ 				     unsigned int old_selector,
+ 				     unsigned int new_selector);
+ 
++	int (*set_soft_start) (struct regulator_dev *);
++
+ 	/* report regulator status ... most other accessors report
+ 	 * control inputs, this reports results of combining inputs
+ 	 * from Linux (and other sources) with the actual load.
+diff --git a/include/linux/regulator/machine.h b/include/linux/regulator/machine.h
+index 8ffb0619a03c..7f7d0a3fe1e1 100644
+--- a/include/linux/regulator/machine.h
++++ b/include/linux/regulator/machine.h
+@@ -142,6 +142,7 @@ struct regulation_constraints {
+ 	unsigned boot_on:1;	/* bootloader/firmware enabled regulator */
+ 	unsigned apply_uV:1;	/* apply uV constraint if min == max */
+ 	unsigned ramp_disable:1; /* disable ramp delay */
++	unsigned soft_start:1;	/* ramp voltage slowly */
+ 	unsigned pull_down:1;	/* pull down resistor when regulator off */
+ };
+ 
 -- 
 The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
 a Linux Foundation Collaborative Project
