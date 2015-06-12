@@ -1,38 +1,40 @@
-From: koro.chen@mediatek.com (Koro Chen)
-Date: Fri, 12 Jun 2015 16:24:48 +0800
-Subject: [alsa-devel] [PATCH 1/3] ASoC: mediatek: Add AFE platform driver
-In-Reply-To: <1434094677.2271.125.camel@x220>
-References: <1433946276-25969-1-git-send-email-koro.chen@mediatek.com>
- <1433946276-25969-2-git-send-email-koro.chen@mediatek.com>
- <1434006187.24094.40.camel@x220> <1434074158.10969.5.camel@mtksdaap41>
- <1434094677.2271.125.camel@x220>
-Message-ID: <1434097488.29733.0.camel@mtksdaap41>
+From: srinivas.kandagatla@linaro.org (Srinivas Kandagatla)
+Date: Fri, 12 Jun 2015 09:39:20 +0100
+Subject: [PATCH 2/6] clocksource: arm_global_timer: Migrate to new
+ 'set-state' interface
+In-Reply-To: <54f346e663f605e2f078a3114de85ba281d1e6d0.1433768426.git.viresh.kumar@linaro.org>
+References: <cover.1433768426.git.viresh.kumar@linaro.org>
+ <54f346e663f605e2f078a3114de85ba281d1e6d0.1433768426.git.viresh.kumar@linaro.org>
+Message-ID: <557A9AB8.9060200@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2015-06-12 at 09:37 +0200, Paul Bolle wrote:
-> On Fri, 2015-06-12 at 09:55 +0800, Koro Chen wrote:
-> > On Thu, 2015-06-11 at 09:03 +0200, Paul Bolle wrote:
-> > > (What does negating a bool twice do?)
-> > > 
-> > Because bool actually can be unsigned char, although actually in this
-> > driver, the caller always passes "true" or "false" to this function.
-> 
-> bool is _Bool in the kernel (see include/linux/types.h). So whenever you
-> see a bool in the kernel you can assume it's either 0 or 1. Are there
-> any cases where this conveniently simple rule doesn't hold?
-> 
-> But here the discussion is moot, because as you say, the function will
-> only be passed false or true so we know "enable" is either 0 or 1 and
-> double negating will do nothing.
-> 
-> > Do you think if this is the case, should I still need to do !!?
-> 
-> So you should not, as it's confusing at best.
-> 
-OK, thank you. I will drop it in the next version of patch.
-> Thanks,
-> 
-> 
-> Paul Bolle
-> 
+
+
+On 08/06/15 14:40, Viresh Kumar wrote:
+> Migrate arm_global_timer driver to the new 'set-state' interface
+> provided by the clockevents core, the earlier 'set-mode' interface is
+> marked obsolete now.
+>
+> This also enables us to implement callbacks for new states of clockevent
+> devices, for example: ONESHOT_STOPPED.
+>
+> Cc: Srinivas Kandagatla <srinivas.kandagatla@gmail.com>
+> Cc: Maxime Coquelin <maxime.coquelin@st.com>
+> Cc: Patrice Chotard <patrice.chotard@st.com>
+> Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
+> ---
+>   drivers/clocksource/arm_global_timer.c | 37 ++++++++++++++++------------------
+>   1 file changed, 17 insertions(+), 20 deletions(-)
+>
+> diff --git a/drivers/clocksource/arm_global_timer.c b/drivers/clocksource/arm_global_timer.c
+> index e6833771a716..29ea50ac366a 100644
+> --- a/drivers/clocksource/arm_global_timer.c
+> +++ b/drivers/clocksource/arm_global_timer.c
+>
+Hi Viresh,
+Thanks for the patch,
+
+Acked-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
+
+--srini
