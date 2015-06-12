@@ -1,50 +1,65 @@
-From: gerg@uclinux.org (Greg Ungerer)
-Date: Fri, 12 Jun 2015 11:19:43 +1000
-Subject: [PATCH] ARM: mvebu: pass the coherency availability information
- at init time
-In-Reply-To: <20150611145129.GA3777@kroah.com>
-References: <1433992764-12753-1-git-send-email-gerg@uclinux.org>
- <20150611034521.GA12809@kroah.com> <557908C2.4090302@uclinux.org>
- <20150611092549.2276beb8@free-electrons.com>
- <20150611145129.GA3777@kroah.com>
-Message-ID: <557A33AF.9030101@uclinux.org>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Fri, 12 Jun 2015 10:53:25 +0900
+Subject: [PATCH v2] clk: exynos4: Fix wrong clock for Exynos4x12 ADC
+Message-ID: <1434074005-18846-1-git-send-email-k.kozlowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/06/15 00:51, Greg KH wrote:
-> On Thu, Jun 11, 2015 at 09:25:49AM +0200, Thomas Petazzoni wrote:
->> Greg, Greg,
->>
->> On Thu, 11 Jun 2015 14:04:18 +1000, Greg Ungerer wrote:
->>
->>>> Why?  What's wrong with taking the exact specific upstream patches
->>>> instead?
->>>
->>> The exact patch mentioned below ("5686a1e5aa4") will not apply.
->>> Too much of the code around it has changed. This does the same
->>> thing in the same away taking into account the changes around it.
->>
->> As the original author of 5686a1e5aa4 ("bus: mvebu: pass the coherency
->> availability information at init time"), I can confirm that it will
->> clearly not apply as is on 3.10. What Greg Ungerer is proposing here is
->> a backport of 5686a1e5aa4 to 3.10.
-> 
-> What about 3.14-stable?
+The TSADC gate clock was used in Exynos4x12 DTSI for exynos-adc driver.
+However TSADC is present only on Exynos4210 so on Trats2 board (with
+Exynos4412 SoC) the exynos-adc driver could not be probed:
+   ERROR: could not get clock /adc at 126C0000:adc(0)
+   exynos-adc 126c0000.adc: failed getting clock, err = -2
+   exynos-adc: probe of 126c0000.adc failed with error -2
 
-As Thomas pointed out, yes. Due to file movements and other changes
-neither this patch (for 3.10.y) or the original commit 5686a1e5aa4
-apply cleanly to 3.14.y.
+Instead on Exynos4x12 SoCs the main clock used by Analog to Digital
+Converter is located in different register and it is named in datasheet
+as PCLK_ADC. Regardless of the name the purpose of this PCLK_ADC clock
+is the same as purpose of TSADC from Exynos4210.
 
-How do you want to handle that for 3.14.y?
+The patch adds gate clock for Exynos4x12 using the proper register so
+backward compatibility is preserved. This fixes the probe of exynos-adc
+driver on Exynos4x12 boards and allows accessing sensors connected to it
+on Trats2 board (ntc,ncp15wb473 AP and battery thermistors).
 
+Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+Cc: <stable@vger.kernel.org>
+Fixes: c63c57433003 ("ARM: dts: Add ADC's dt data to read raw data for exynos4x12")
+Link: https://lkml.org/lkml/2015/6/11/85
 
-> And if this is just a simple backport, that should have been stated
-> here.
+---
 
-The part that said "This is done in the same way that it was done
-for mainline kernels in commit" was meant to convey that meaning.
-Do you want an updated patch with those exact words, "simple
-backport", in the commit message?
+Changes since v1:
+1. After discussion on LKML this solution was chosen because it smaller,
+   simpler, self-contained (one patch to fix issue) and maintains backward
+   compatibility. Thanks to Javier Martinez Canillas and Tomasz Figa for
+   valuable comments.
+2. Dropped patch 2/2 because now it is not needed. The clock id "TSADC"
+   will be used on all Exynos4 boards.
+3. Added CC-stable.
+---
+ drivers/clk/samsung/clk-exynos4.c | 2 ++
+ 1 file changed, 2 insertions(+)
 
-Regards
-Greg
+diff --git a/drivers/clk/samsung/clk-exynos4.c b/drivers/clk/samsung/clk-exynos4.c
+index 714d6ba782c8..f7890bf652e6 100644
+--- a/drivers/clk/samsung/clk-exynos4.c
++++ b/drivers/clk/samsung/clk-exynos4.c
+@@ -85,6 +85,7 @@
+ #define DIV_PERIL4		0xc560
+ #define DIV_PERIL5		0xc564
+ #define E4X12_DIV_CAM1		0xc568
++#define E4X12_GATE_BUS_FSYS1	0xc744
+ #define GATE_SCLK_CAM		0xc820
+ #define GATE_IP_CAM		0xc920
+ #define GATE_IP_TV		0xc924
+@@ -1095,6 +1096,7 @@ static struct samsung_gate_clock exynos4x12_gate_clks[] __initdata = {
+ 		0),
+ 	GATE(CLK_PPMUIMAGE, "ppmuimage", "aclk200", E4X12_GATE_IP_IMAGE, 9, 0,
+ 		0),
++	GATE(CLK_TSADC, "tsadc", "aclk133", E4X12_GATE_BUS_FSYS1, 16, 0, 0),
+ 	GATE(CLK_MIPI_HSI, "mipi_hsi", "aclk133", GATE_IP_FSYS, 10, 0, 0),
+ 	GATE(CLK_CHIPID, "chipid", "aclk100", E4X12_GATE_IP_PERIR, 0, 0, 0),
+ 	GATE(CLK_SYSREG, "sysreg", "aclk100", E4X12_GATE_IP_PERIR, 1,
+-- 
+1.9.1
