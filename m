@@ -1,56 +1,49 @@
-From: javier@dowhile0.org (Javier Martinez Canillas)
-Date: Fri, 12 Jun 2015 07:46:23 +0200
-Subject: [PATCH v2] clk: exynos4: Fix wrong clock for Exynos4x12 ADC
-In-Reply-To: <1434074005-18846-1-git-send-email-k.kozlowski@samsung.com>
-References: <1434074005-18846-1-git-send-email-k.kozlowski@samsung.com>
-Message-ID: <CABxcv=mQfcb3jsRzOcWXAbNRf-dumoHS8X-2TEeOdB2E_T5BMQ@mail.gmail.com>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Fri, 12 Jun 2015 14:57:01 +0900
+Subject: [PATCH v2 1/1] irqchip: exynos-combiner: Save IRQ enable set on
+ suspend
+In-Reply-To: <1434087795-13990-1-git-send-email-javier.martinez@collabora.co.uk>
+References: <1434087795-13990-1-git-send-email-javier.martinez@collabora.co.uk>
+Message-ID: <557A74AD.6040305@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Krzysztof,
-
-On Fri, Jun 12, 2015 at 3:53 AM, Krzysztof Kozlowski
-<k.kozlowski@samsung.com> wrote:
-> The TSADC gate clock was used in Exynos4x12 DTSI for exynos-adc driver.
-> However TSADC is present only on Exynos4210 so on Trats2 board (with
-> Exynos4412 SoC) the exynos-adc driver could not be probed:
->    ERROR: could not get clock /adc at 126C0000:adc(0)
->    exynos-adc 126c0000.adc: failed getting clock, err = -2
->    exynos-adc: probe of 126c0000.adc failed with error -2
->
-> Instead on Exynos4x12 SoCs the main clock used by Analog to Digital
-> Converter is located in different register and it is named in datasheet
-> as PCLK_ADC. Regardless of the name the purpose of this PCLK_ADC clock
-> is the same as purpose of TSADC from Exynos4210.
->
-> The patch adds gate clock for Exynos4x12 using the proper register so
-> backward compatibility is preserved. This fixes the probe of exynos-adc
-> driver on Exynos4x12 boards and allows accessing sensors connected to it
-> on Trats2 board (ntc,ncp15wb473 AP and battery thermistors).
->
-> Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
-> Cc: <stable@vger.kernel.org>
-> Fixes: c63c57433003 ("ARM: dts: Add ADC's dt data to read raw data for exynos4x12")
-> Link: https://lkml.org/lkml/2015/6/11/85
->
+On 12.06.2015 14:43, Javier Martinez Canillas wrote:
+> The Exynos interrupt combiner IP loses its state when the SoC enters
+> into a low power state during a Suspend-to-RAM. This means that if a
+> IRQ is used as a source, the interrupts for the devices are disabled
+> when the system is resumed from a sleep state so are not triggered.
+> 
+> Save the interrupt enable set register for each combiner group and
+> restore it after resume to make sure that the interrupts are enabled.
+> 
+> Signed-off-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
 > ---
->
+> 
+> Hello,
+> 
+> I noticed this issue because after a S2R, IRQs for some devices didn't
+> trigger anymore but others continued working and all of them had lines
+> from a GPIO chip as their interrupt source.
+> 
+> The only difference was that the GPIO pins that were not working after
+> a resume, were the ones that had the interrupt combiner as interrupt
+> parent.
+> 
+> With this patch now all perhiperals are working correctly after a resume.
+> Tested on an Exynos5250 Snow, Exynos5420 Peach Pit and Exynos5800 Peach Pi
+> Chromebooks.
+> 
+> Best regards,
+> Javier
+> 
 > Changes since v1:
-> 1. After discussion on LKML this solution was chosen because it smaller,
->    simpler, self-contained (one patch to fix issue) and maintains backward
->    compatibility. Thanks to Javier Martinez Canillas and Tomasz Figa for
->    valuable comments.
-> 2. Dropped patch 2/2 because now it is not needed. The clock id "TSADC"
->    will be used on all Exynos4 boards.
-> 3. Added CC-stable.
-> ---
->  drivers/clk/samsung/clk-exynos4.c | 2 ++
->  1 file changed, 2 insertions(+)
->
+>  - Clear masking bits before of the COMBINER_ENABLE_CLEAR register before
+>    restore IRQ enable set the Suggested by Chanho Park.
+>  - Fixes a typo in the commit message. Suggested by Peter Chubb.
 
-Patch looks good to me.
-
-Reviewed-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
+Looks okay,
+Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
 
 Best regards,
-Javier
+Krzysztof
