@@ -1,34 +1,36 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Fri, 12 Jun 2015 11:17:48 +0200
-Subject: [PATCHv2 2/2] PWM: atmel: fix incorrect CDTY value after disabling
-In-Reply-To: <1432570309-17819-1-git-send-email-alexandre.belloni@free-electrons.com>
-References: <1432559996-4415-2-git-send-email-alexandre.belloni@free-electrons.com>
- <1432570309-17819-1-git-send-email-alexandre.belloni@free-electrons.com>
-Message-ID: <20150612091747.GB19400@ulmo.nvidia.com>
+From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
+Date: Fri, 12 Jun 2015 11:24:22 +0200
+Subject: [PATCH v2 06/10] pinctrl: berlin: use proper compatibles
+In-Reply-To: <20150612090537.GB29596@kwain>
+References: <1425654328-26298-1-git-send-email-antoine.tenart@free-electrons.com>
+ <1425654328-26298-7-git-send-email-antoine.tenart@free-electrons.com>
+ <CACRpkda-4SahLjwe09D-Hb8p0nQFdG1Zc_xvLPwLGYQMkJQaXA@mail.gmail.com>
+ <20150612090537.GB29596@kwain>
+Message-ID: <557AA546.8030505@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 25, 2015 at 06:11:49PM +0200, Alexandre Belloni wrote:
-> pwm-leds calls .config() and .disable() in a row. This exhibits that it may
-> happen that the channel gets disabled before CDTY has been updated with CUPD.
-> The issue gets quite worse with long periods.
-> So, ensure that at least one period has past before disabling the channel by
-> polling ISR.
-> 
-> Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
-> ---
-> I had the previous patch tested on a multicolor LED and unfortunately, the delay
-> is not nice in that case. I wanted to avoid a mutex.
-> This version uses a variable to store the state of the update of the pwm. This
-> is reset everytime is gets a new configuration and updated when it is disabled
-> or another pwm is configured.
-> When disabling a multicolor LED, we only wait for the first pwm to update then
-> we remember that we already seen the other one having their period expire and it
-> looks much better.
-> 
->  drivers/pwm/pwm-atmel.c | 28 ++++++++++++++++++++++++++++
->  1 file changed, 28 insertions(+)
+On 06/12/2015 11:05 AM, Antoine Tenart wrote:
+> On Wed, Jun 10, 2015 at 09:13:55AM +0200, Linus Walleij wrote:
+>> On Fri, Mar 6, 2015 at 4:05 PM, Antoine Tenart
+>> <antoine.tenart@free-electrons.com> wrote:
+>>
+>>> The Berlin pin-controller driver was sharing the chip and system
+>>> controller nodes with the clock and the reset drivers. They all shared
+>>> the same compatible. With the introduction of the Marvell Berlin MFD
+>>> controller, the Berlin pin-controller driver has now its own node.
+>>> Update its compatibles to not share anymore the ones of the chip and
+>>> system controllers.
+>>>
+>>> Signed-off-by: Antoine Tenart <antoine.tenart@free-electrons.com>
+>>
+>> Antoine, how is this series going?
+>
+> The series should be in the berlin tree at the moment.
 
-Applied, thanks.
+Not only berlin, but also arm-soc:
 
-Thierry
+[1] https://lkml.org/r/5498391.Fl346EDjWm at wuerfel
+[2] https://lkml.org/r/2918562.6HiyIinobj at wuerfel
+
+Sebastian
