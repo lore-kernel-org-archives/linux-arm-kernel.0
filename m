@@ -1,171 +1,200 @@
-From: cyrille.pitchen@atmel.com (Cyrille Pitchen)
-Date: Fri, 12 Jun 2015 19:01:32 +0200
-Subject: [BUG] at91: serial: something wrong with using DMA
-In-Reply-To: <5570376F.7050406@aksignal.cz>
-References: <555C8B79.4030900@aksignal.cz> <556563CE.3090506@aksignal.cz>
- <556D611A.5090004@aksignal.cz> <5570376F.7050406@aksignal.cz>
-Message-ID: <557B106C.4020207@atmel.com>
+From: andre.przywara@arm.com (Andre Przywara)
+Date: Fri, 12 Jun 2015 18:03:32 +0100
+Subject: [PATCH 05/13] KVM: arm64: handle ITS related GICv3 redistributor
+ registers
+In-Reply-To: <5576A943.80803@linaro.org>
+References: <1432893209-27313-1-git-send-email-andre.przywara@arm.com>
+ <1432893209-27313-6-git-send-email-andre.przywara@arm.com>
+ <5576A943.80803@linaro.org>
+Message-ID: <557B10E4.1060305@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi jiri,
+Hi Eric,
 
-the bug is reproduced on sama5d3x with the 3.18 at91 kernel. So with a DMA
-controller driven by drivers/dma/at_hdmac.c. This driver is also used for
-at91sam9g25.
+On 06/09/2015 09:52 AM, Eric Auger wrote:
+> On 05/29/2015 11:53 AM, Andre Przywara wrote:
+>> In the GICv3 redistributor there are the PENDBASER and PROPBASER
+>> registers which we did not emulate so far, as they only make sense
+>> when having an ITS. In preparation for that emulate those MMIO
+>> accesses by storing the 64-bit data written into it into a variable
+>> which we later read in the ITS emulation.
+>>
+>> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
+>> ---
+>>  include/kvm/arm_vgic.h      |  4 ++++
+>>  virt/kvm/arm/vgic-v3-emul.c | 43 +++++++++++++++++++++++++++++++++++++++++++
+>>  virt/kvm/arm/vgic.c         | 35 +++++++++++++++++++++++++++++++++++
+>>  virt/kvm/arm/vgic.h         |  4 ++++
+>>  4 files changed, 86 insertions(+)
+>>
+>> diff --git a/include/kvm/arm_vgic.h b/include/kvm/arm_vgic.h
+>> index 37725bb..9ea0b3b 100644
+>> --- a/include/kvm/arm_vgic.h
+>> +++ b/include/kvm/arm_vgic.h
+>> @@ -256,6 +256,10 @@ struct vgic_dist {
+>>  	struct vgic_vm_ops	vm_ops;
+>>  	struct vgic_io_device	dist_iodev;
+>>  	struct vgic_io_device	*redist_iodevs;
+>> +
+> add some comments?
+> /* LPI config table shared by all distributors */
+>> +	u64			propbaser;
+> /* LPI pending table per distributors */
+>> +	u64			*pendbaser;
+>> +	bool			lpis_enabled;
+>>  };
+>>  
+>>  struct vgic_v2_cpu_if {
+>> diff --git a/virt/kvm/arm/vgic-v3-emul.c b/virt/kvm/arm/vgic-v3-emul.c
+>> index 16c6d8a..04f3aed 100644
+>> --- a/virt/kvm/arm/vgic-v3-emul.c
+>> +++ b/virt/kvm/arm/vgic-v3-emul.c
+>> @@ -607,6 +607,37 @@ static bool handle_mmio_cfg_reg_redist(struct kvm_vcpu *vcpu,
+>>  	return vgic_handle_cfg_reg(reg, mmio, offset);
+>>  }
+>>  
+>> +/* We don't trigger any actions here, just store the register value */
+>> +static bool handle_mmio_propbaser_redist(struct kvm_vcpu *vcpu,
+>> +					 struct kvm_exit_mmio *mmio,
+>> +					 phys_addr_t offset)
+>> +{
+>> +	struct vgic_dist *dist = &vcpu->kvm->arch.vgic;
+>> +	int mode = ACCESS_READ_VALUE;
+>> +
+> you may add the same comment as below?
+>> +	mode |= dist->lpis_enabled ? ACCESS_WRITE_IGNORED : ACCESS_WRITE_VALUE;
+>> +	vgic_handle_base_register(vcpu, mmio, offset, &dist->propbaser, mode);
+> having the PROPBASER programmed to different values on different redist
+> with EnableLPIs==1 also is unpredictable. Do we plan to check that
+> somewhere? Allow a single write?
 
-3.18 at91, 3.19 vanilla and later kernels contain a patch
-"tty/serial: at91: fix rx ring buffer management".
-This patch was not applied to 3.18 vanilla yet.
+Well, we are safe if the spec says it's unpredictable, aren't we?
+I refrained from checking too many corner cases (same for the ITS
+commands, btw), since we lack a good way of communicating errors.
+SErrors into a guest do not work AFAIK, and spamming dmesg with
+guest-triggerable messages is also bad.
+After all this is an emulator, not a validator. So as long as this
+doesn't affect the host and violates the spec, I think we get away with
+ignoring stupid requests from the guest.
+I am happy to revisit this shall the need arise.
 
-This patch didn't introduce the bug you reported but I refer to it because my
-debug traces were produced by applying another "debug" patch after the
-"fix rx ring buffer management" patch.
+>> +
+>> +	return false;
+>> +}
+>> +
+>> +/* We don't trigger any actions here, just store the register value */
+>> +static bool handle_mmio_pendbaser_redist(struct kvm_vcpu *vcpu,
+>> +					 struct kvm_exit_mmio *mmio,
+>> +					 phys_addr_t offset)
+>> +{
+>> +	struct kvm_vcpu *rdvcpu = mmio->private;
+>> +	struct vgic_dist *dist = &vcpu->kvm->arch.vgic;
+>> +	int mode = ACCESS_READ_VALUE;
+>> +
+>> +	/* Storing a value with LPIs already enabled is undefined */
+>> +	mode |= dist->lpis_enabled ? ACCESS_WRITE_IGNORED : ACCESS_WRITE_VALUE;
+>> +	vgic_handle_base_register(vcpu, mmio, offset,
+>> +				  &dist->pendbaser[rdvcpu->vcpu_id], mode);
+> pendbaser is not yet allocated. Wouldn't it make sense to introduce that
+> patch later on?
 
-The "debug" patch is:
+I am quite glad having found a patch order which compiles ;-)
+But well, I guess we have to address this as this strictly isn't safe if
+pendbaser is NULL (though it works with how GCC compiles this).
 
-@@ -1014,6 +1016,9 @@ static void atmel_rx_from_dma(struct uart_port *port)
-         */
-        ring->head = sg_dma_len(&atmel_port->sg_rx) - state.residue;
-        BUG_ON(ring->head > sg_dma_len(&atmel_port->sg_rx));
-+       dev_vdbg(port->dev, "%s: tail=%d, head=%d, residue=%u, dma_len=%u\n",
-+                __FUNCTION__, ring->tail, ring->head, state.residue,
-+                sg_dma_len(&atmel_port->sg_rx));
-        /*
-         * At this point ring->head may point to the first byte right after the
-         * last byte of the dma buffer:
+Thanks for looking!
 
->From my PC, I used picocom to send one character at a time to the sama5d3x USART.
-Then the resulting traces are:
+Cheers,
+Andre.
 
-...
-Jan  1 00:44:06 buildroot kern.debug kernel: atmel_usart f0020000.serial: atmel_rx_from_dma: tail=2030, head=2031, residue=2065, dma_len=4096
-Jan  1 00:44:06 buildroot kern.debug kernel: atmel_usart f0020000.serial: atmel_rx_from_dma: tail=2031, head=2032, residue=2064, dma_len=4096
-Jan  1 00:44:06 buildroot kern.debug kernel: atmel_usart f0020000.serial: atmel_rx_from_dma: tail=2032, head=2033, residue=2063, dma_len=4096
-Jan  1 00:44:09 buildroot kern.debug kernel: atmel_usart f0020000.serial: atmel_rx_from_dma: tail=2033, head=2034, residue=2062, dma_len=4096
-Jan  1 00:44:10 buildroot kern.debug kernel: atmel_usart f0020000.serial: atmel_rx_from_dma: tail=2034, head=2035, residue=2061, dma_len=4096
-Jan  1 00:44:11 buildroot kern.debug kernel: atmel_usart f0020000.serial: atmel_rx_from_dma: tail=2035, head=2036, residue=2060, dma_len=4096
-Jan  1 00:44:12 buildroot kern.debug kernel: atmel_usart f0020000.serial: atmel_rx_from_dma: tail=2036, head=2037, residue=2059, dma_len=4096
-Jan  1 00:44:13 buildroot kern.debug kernel: atmel_usart f0020000.serial: atmel_rx_from_dma: tail=2037, head=2038, residue=2058, dma_len=4096
-Jan  1 00:44:15 buildroot kern.debug kernel: atmel_usart f0020000.serial: atmel_rx_from_dma: tail=2038, head=2039, residue=2057, dma_len=4096
-Jan  1 00:44:17 buildroot kern.debug kernel: atmel_usart f0020000.serial: atmel_rx_from_dma: tail=2039, head=2040, residue=2056, dma_len=4096
-Jan  1 00:44:18 buildroot kern.debug kernel: atmel_usart f0020000.serial: atmel_rx_from_dma: tail=2040, head=2041, residue=2055, dma_len=4096
-Jan  1 00:44:20 buildroot kern.debug kernel: atmel_usart f0020000.serial: atmel_rx_from_dma: tail=2041, head=2042, residue=2054, dma_len=4096
-Jan  1 00:44:21 buildroot kern.debug kernel: atmel_usart f0020000.serial: atmel_rx_from_dma: tail=2042, head=2043, residue=2053, dma_len=4096
-Jan  1 00:44:22 buildroot kern.debug kernel: atmel_usart f0020000.serial: atmel_rx_from_dma: tail=2043, head=2044, residue=2052, dma_len=4096
-Jan  1 00:44:23 buildroot kern.debug kernel: atmel_usart f0020000.serial: atmel_rx_from_dma: tail=2044, head=2045, residue=2051, dma_len=4096
-Jan  1 00:44:25 buildroot kern.debug kernel: atmel_usart f0020000.serial: atmel_rx_from_dma: tail=2045, head=2046, residue=2050, dma_len=4096
-Jan  1 00:44:26 buildroot kern.debug kernel: atmel_usart f0020000.serial: atmel_rx_from_dma: tail=2046, head=2047, residue=2049, dma_len=4096
-Jan  1 00:44:28 buildroot kern.debug kernel: atmel_usart f0020000.serial: atmel_rx_from_dma: tail=2047, head=2048, residue=2048, dma_len=4096
-Jan  1 00:44:32 buildroot kern.debug kernel: atmel_usart f0020000.serial: atmel_rx_from_dma: tail=2048, head=2048, residue=2048, dma_len=4096
-Jan  1 00:44:37 buildroot kern.debug kernel: atmel_usart f0020000.serial: atmel_rx_from_dma: tail=2048, head=2048, residue=2048, dma_len=4096
-Jan  1 00:44:39 buildroot kern.debug kernel: atmel_usart f0020000.serial: atmel_rx_from_dma: tail=2048, head=2048, residue=2048, dma_len=4096
-Jan  1 00:44:40 buildroot kern.debug kernel: atmel_usart f0020000.serial: atmel_rx_from_dma: tail=2048, head=2048, residue=2048, dma_len=4096
-Jan  1 00:44:42 buildroot kern.debug kernel: atmel_usart f0020000.serial: atmel_rx_from_dma: tail=2048, head=2048, residue=2048, dma_len=4096
-Jan  1 00:44:43 buildroot kern.debug kernel: atmel_usart f0020000.serial: atmel_rx_from_dma: tail=2048, head=2048, residue=2048, dma_len=4096
-Jan  1 00:44:45 buildroot kern.debug kernel: atmel_usart f0020000.serial: atmel_rx_from_dma: tail=2048, head=2048, residue=2048, dma_len=4096
-Jan  1 00:44:46 buildroot kern.debug kernel: atmel_usart f0020000.serial: atmel_rx_from_dma: tail=2048, head=2048, residue=2048, dma_len=4096
-Jan  1 00:44:48 buildroot kern.debug kernel: atmel_usart f0020000.serial: atmel_rx_from_dma: tail=2048, head=2048, residue=2048, dma_len=4096
-Jan  1 00:44:49 buildroot kern.debug kernel: atmel_usart f0020000.serial: atmel_rx_from_dma: tail=2048, head=2048, residue=2048, dma_len=4096
-Jan  1 00:44:52 buildroot kern.debug kernel: atmel_usart f0020000.serial: atmel_rx_from_dma: tail=2048, head=2048, residue=2048, dma_len=4096
-Jan  1 00:44:53 buildroot kern.debug kernel: atmel_usart f0020000.serial: atmel_rx_from_dma: tail=2048, head=2048, residue=2048, dma_len=4096
-Jan  1 00:44:53 buildroot kern.debug kernel: atmel_usart f0020000.serial: atmel_rx_from_dma: tail=2048, head=2048, residue=2048, dma_len=4096
-Jan  1 00:44:54 buildroot kern.debug kernel: atmel_usart f0020000.serial: atmel_rx_from_dma: tail=2048, head=2048, residue=2048, dma_len=4096
-Jan  1 00:44:55 buildroot kern.debug kernel: atmel_usart f0020000.serial: atmel_rx_from_dma: tail=2048, head=2048, residue=2048, dma_len=4096
-...
-Jan  1 00:55:04 buildroot kern.debug kernel: atmel_usart f0020000.serial: atmel_rx_from_dma: tail=2048, head=2048, residue=2048, dma_len=4096
-Jan  1 00:55:04 buildroot kern.debug kernel: atmel_usart f0020000.serial: atmel_rx_from_dma: tail=2048, head=2048, residue=2048, dma_len=4096
-Jan  1 00:55:04 buildroot kern.debug kernel: atmel_usart f0020000.serial: atmel_rx_from_dma: tail=2048, head=2048, residue=2048, dma_len=4096
-Jan  1 00:55:04 buildroot kern.debug kernel: atmel_usart f0020000.serial: atmel_rx_from_dma: tail=2048, head=0, residue=4096, dma_len=4096
-Jan  1 00:55:04 buildroot kern.debug kernel: atmel_usart f0020000.serial: atmel_rx_from_dma: tail=0, head=1, residue=4095, dma_len=4096
-Jan  1 00:55:04 buildroot kern.debug kernel: atmel_usart f0020000.serial: atmel_rx_from_dma: tail=1, head=2, residue=4094, dma_len=4096
-Jan  1 00:55:04 buildroot kern.debug kernel: atmel_usart f0020000.serial: atmel_rx_from_dma: tail=2, head=3, residue=4093, dma_len=4096
-Jan  1 00:55:04 buildroot kern.debug kernel: atmel_usart f0020000.serial: atmel_rx_from_dma: tail=3, head=4, residue=4092, dma_len=4096
-Jan  1 00:55:04 buildroot kern.debug kernel: atmel_usart f0020000.serial: atmel_rx_from_dma: tail=4, head=5, residue=4091, dma_len=4096
-Jan  1 00:55:04 buildroot kern.debug kernel: atmel_usart f0020000.serial: atmel_rx_from_dma: tail=5, head=6, residue=4090, dma_len=4096
-Jan  1 00:55:04 buildroot kern.debug kernel: atmel_usart f0020000.serial: atmel_rx_from_dma: tail=6, head=7, residue=4089, dma_len=4096
-Jan  1 00:55:04 buildroot kern.debug kernel: atmel_usart f0020000.serial: atmel_rx_from_dma: tail=7, head=8, residue=4088, dma_len=4096
-Jan  1 00:55:04 buildroot kern.debug kernel: atmel_usart f0020000.serial: atmel_rx_from_dma: tail=8, head=9, residue=4087, dma_len=4096
-Jan  1 00:55:04 buildroot kern.debug kernel: atmel_usart f0020000.serial: atmel_rx_from_dma: tail=9, head=10, residue=4086, dma_len=4096
-Jan  1 00:55:04 buildroot kern.debug kernel: atmel_usart f0020000.serial: atmel_rx_from_dma: tail=10, head=11, residue=4085, dma_len=4096
-Jan  1 00:55:04 buildroot kern.debug kernel: atmel_usart f0020000.serial: atmel_rx_from_dma: tail=11, head=12, residue=4084, dma_len=4096
-Jan  1 00:55:04 buildroot kern.debug kernel: atmel_usart f0020000.serial: atmel_rx_from_dma: tail=12, head=13, residue=4083, dma_len=4096
-Jan  1 00:55:04 buildroot kern.debug kernel: atmel_usart f0020000.serial: atmel_rx_from_dma: tail=13, head=14, residue=4082, dma_len=4096
-Jan  1 00:55:04 buildroot kern.debug kernel: atmel_usart f0020000.serial: atmel_rx_from_dma: tail=14, head=15, residue=4081, dma_len=4096
-...
-
-Please note that for the 2048 first received bytes, the DMA residue is
-decreased normally down to 2048. Then for the next 2048 received bytes, the DMA
-residue remains at the wrong 2048 value whereas it should decrease.
-At this point 4096 bytes were received, this is the size of the DMA ring
-buffer: the DMA driver reschedules a new transfer so the new residue is 4096.
-Following the received bytes, the residue is decreased down to 2048 then
-blocked again for the next 2048 bytes and so on...
-
-The DMA residue is used to update the head pointer of the USART RX ring buffer.
-Since the computation of the DMA residue is wrong the USART can't work
-properly.
-
-We have to look at the residue computation in the at_hdmac.c driver.
-Anyway, thanks for reporting and for your investigation: it helped a lot!
-
-Best Regards,
-
-Cyrille
-
-Le 04/06/2015 13:33, Ji?? Prchal a ?crit :
-> Hi,
-> writing again, I made small tester to see what is happening. There is loop ttyS3 to ttyS2.
-> 
-> / # uname -a
-> Linux prchal 3.18.0-linux4sam_4.7_cpm9g25+ #2 PREEMPT Thu May 21 14:29:51 CEST 2015 armv5tejl GNU/Linux
-> / #  testtty -i /dev/ttyS2 -o /dev/ttyS3 -b 512
-> [ 9657.789789] atmel_usart f801c000.serial: using dma0chan4 for rx DMA transfers
-> [ 9657.798798] atmel_usart f801c000.serial: using dma0chan5 for tx DMA transfers
-> [ 9657.807807] atmel_usart f8020000.serial: using dma0chan6 for rx DMA transfers
-> [ 9657.816816] atmel_usart f8020000.serial: using dma0chan7 for tx DMA transfers
-> Write to /dev/ttyS3 = 512 B.
-> Read from /dev/ttyS2 = 512 B. Total = 512 B.
-> Write to /dev/ttyS3 = 512 B.
-> Read from /dev/ttyS2 = 512 B. Total = 1024 B.
-> Write to /dev/ttyS3 = 512 B.
-> Read from /dev/ttyS2 = 512 B. Total = 1536 B.
-> Write to /dev/ttyS3 = 512 B.
-> Read from /dev/ttyS2 = 512 B. Total = 2048 B.
-> Write to /dev/ttyS3 = 512 B.
-> Read from /dev/ttyS2 = 0 B, error! Total = 2048 B.
-> Write to /dev/ttyS3 = 512 B.
-> Read from /dev/ttyS2 = 0 B, error! Total = 2048 B.
-> Write to /dev/ttyS3 = 512 B.
-> Read from /dev/ttyS2 = 0 B, error! Total = 2048 B.
-> Write to /dev/ttyS3 = 512 B.
-> Read from /dev/ttyS2 = 2048 B, error! Total = 4096 B.
-> Write to /dev/ttyS3 = 512 B.
-> Read from /dev/ttyS2 = 512 B. Total = 4608 B.
-> Write to /dev/ttyS3 = 512 B.
-> Read from /dev/ttyS2 = 512 B. Total = 5120 B.
-> Write to /dev/ttyS3 = 512 B.
-> Read from /dev/ttyS2 = 512 B. Total = 5632 B.
-> Write to /dev/ttyS3 = 512 B.
-> Read from /dev/ttyS2 = 512 B. Total = 6144 B.
-> 
-> and repeated...
-> 
-> I can send testtty source code if you like.
-> 
-> 
-> On 2.6.2015 09:54, Ji?? Prchal wrote:
->> Hi,
->> we made some research how it "doesn't" work.
->> Just after the ttyS is opened it gives data in each read as it received them (44 B). No select, just read, VMIN = 0
->> VTIME = 1. But after 2048 B in total received since open it stopped giving data (read returns 0) until next 2048 B
->> received and then read gives all of the next 2048 B and so on.
->> In kernel 3.18.13 it works fine, in 4.x or 3.18.0-linux4sam no.
->> What we do wrong?
->> Jiri
+> Eric
+>> +
+>> +	return false;
+>> +}
+>> +
+>>  #define SGI_base(x) ((x) + SZ_64K)
+>>  
+>>  static const struct vgic_io_range vgic_redist_ranges[] = {
+>> @@ -635,6 +666,18 @@ static const struct vgic_io_range vgic_redist_ranges[] = {
+>>  		.handle_mmio    = handle_mmio_raz_wi,
+>>  	},
+>>  	{
+>> +		.base		= GICR_PENDBASER,
+>> +		.len		= 0x08,
+>> +		.bits_per_irq	= 0,
+>> +		.handle_mmio	= handle_mmio_pendbaser_redist,
+>> +	},
+>> +	{
+>> +		.base		= GICR_PROPBASER,
+>> +		.len		= 0x08,
+>> +		.bits_per_irq	= 0,
+>> +		.handle_mmio	= handle_mmio_propbaser_redist,
+>> +	},
+>> +	{
+>>  		.base           = GICR_IDREGS,
+>>  		.len            = 0x30,
+>>  		.bits_per_irq   = 0,
+>> diff --git a/virt/kvm/arm/vgic.c b/virt/kvm/arm/vgic.c
+>> index 2e9723aa..0a9236d 100644
+>> --- a/virt/kvm/arm/vgic.c
+>> +++ b/virt/kvm/arm/vgic.c
+>> @@ -448,6 +448,41 @@ void vgic_reg_access(struct kvm_exit_mmio *mmio, u32 *reg,
+>>  	}
+>>  }
+>>  
+>> +/* handle a 64-bit register access */
+>> +void vgic_handle_base_register(struct kvm_vcpu *vcpu,
+>> +			       struct kvm_exit_mmio *mmio,
+>> +			       phys_addr_t offset, u64 *basereg,
+>> +			       int mode)
+>> +{
+>> +	u32 reg;
+>> +	u64 breg;
+>> +
+>> +	switch (offset & ~3) {
+>> +	case 0x00:
+>> +		breg = *basereg;
+>> +		reg = lower_32_bits(breg);
+>> +		vgic_reg_access(mmio, &reg, offset & 3, mode);
+>> +		if (mmio->is_write && (mode & ACCESS_WRITE_VALUE)) {
+>> +			breg &= GENMASK_ULL(63, 32);
+>> +			breg |= reg;
+>> +			*basereg = breg;
+>> +		}
+>> +		break;
+>> +	case 0x04:
+>> +		breg = *basereg;
+>> +		reg = upper_32_bits(breg);
+>> +		vgic_reg_access(mmio, &reg, offset & 3, mode);
+>> +		if (mmio->is_write && (mode & ACCESS_WRITE_VALUE)) {
+>> +			breg  = lower_32_bits(breg);
+>> +			breg |= (u64)reg << 32;
+>> +			*basereg = breg;
+>> +		}
+>> +		break;
+>> +	}
+>> +}
+>> +
+>> +
+>> +
+>>  bool handle_mmio_raz_wi(struct kvm_vcpu *vcpu, struct kvm_exit_mmio *mmio,
+>>  			phys_addr_t offset)
+>>  {
+>> diff --git a/virt/kvm/arm/vgic.h b/virt/kvm/arm/vgic.h
+>> index a093f5c..b2d791c 100644
+>> --- a/virt/kvm/arm/vgic.h
+>> +++ b/virt/kvm/arm/vgic.h
+>> @@ -71,6 +71,10 @@ void vgic_reg_access(struct kvm_exit_mmio *mmio, u32 *reg,
+>>  		     phys_addr_t offset, int mode);
+>>  bool handle_mmio_raz_wi(struct kvm_vcpu *vcpu, struct kvm_exit_mmio *mmio,
+>>  			phys_addr_t offset);
+>> +void vgic_handle_base_register(struct kvm_vcpu *vcpu,
+>> +			       struct kvm_exit_mmio *mmio,
+>> +			       phys_addr_t offset, u64 *basereg,
+>> +			       int mode);
+>>  
+>>  static inline
+>>  u32 mmio_data_read(struct kvm_exit_mmio *mmio, u32 mask)
 >>
 > 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
