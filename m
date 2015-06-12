@@ -1,74 +1,93 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Fri, 12 Jun 2015 14:13:25 +0100
-Subject: [PATCH 2/3] ASoC: mediatek: Add machine driver for MAX98090 codec
-In-Reply-To: <1433946276-25969-3-git-send-email-koro.chen@mediatek.com>
-References: <1433946276-25969-1-git-send-email-koro.chen@mediatek.com>
- <1433946276-25969-3-git-send-email-koro.chen@mediatek.com>
-Message-ID: <20150612131325.GA1921@sirena.org.uk>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Fri, 12 Jun 2015 15:27:28 +0200
+Subject: [PATCH 00/20] ARM: dts: Add USB and OTG related nodes and enable
+ on various boards
+In-Reply-To: <55783B2C.3080207@redhat.com>
+References: <1433530943-12599-1-git-send-email-hdegoede@redhat.com>
+ <20150608100358.GW23777@lukather> <55783B2C.3080207@redhat.com>
+Message-ID: <557ADE40.70200@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 10, 2015 at 10:24:35PM +0800, Koro Chen wrote:
+Hi,
 
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/sound/mt8173-max98090.txt
-> @@ -0,0 +1,17 @@
-> +MT8173 with MAX98090 CODEC
-> +
-> +Required properties:
-> +- compatible : "mediatek,mt8173-max98090"
-> +- mediatek,audio-codec: the phandle of the MAX98090 audio codec
-> +- dvdd-supply : the phandle of regulator to supply 1.2V
-> +- avdd-supply : the phandle of regulator to supply 1.8V
+On 10-06-15 15:27, Hans de Goede wrote:
+> Hi,
+>
+> On 08-06-15 12:03, Maxime Ripard wrote:
+>> Hi Hans,
+>>
+>> On Fri, Jun 05, 2015 at 09:02:03PM +0200, Hans de Goede wrote:
+>>> Hi Maxime,
+>>>
+>>> Here is a patch-set with all the otg / sun8i-usb-host related dts patches
+>>> I've accumulated.
+>>>
+>>> These are intended for 4.3, and go hand in hand with the outstanding
+>>> musb-sunxi / phy-sun4i-usb patches, which I expect to be merged as is
+>>> for 4.3 .
+>>
+>> I'm fine with these patches. Do you have a branch somewhere that I can
+>> pull (without the one that you wanted me to drop, obviously)?
+>
+> I've just created a branch with just these patches directly on top
+> of sunxi/for-next for you:
+>
+> https://github.com/jwrdegoede/linux-sunxi/commits/otg-dts-for-maxime
 
-Why are these supplies part of the machine driver?
+Please ignore this for now. There have been some changes to the extcon
+framework, making it more integrated with devicetree, this means I need
+to add an extcon property to the musb nodes in devicetree:
 
-> +config SND_SOC_MT8173_MAX98090
-> +	bool "ASoC Audio driver for MT8173 with MAX98090 codec"
+--- a/Documentation/devicetree/bindings/usb/allwinner,sun4i-a10-musb.txt
++++ b/Documentation/devicetree/bindings/usb/allwinner,sun4i-a10-musb.txt
+@@ -12,6 +12,7 @@ Required properties:
+   - phys            : phy specifier for the otg phy
+   - phy-names       : must be "usb"
+   - dr_mode         : Dual-Role mode must be "host" or "otg"
++ - extcon          : extcon specifier for the otg phy
 
-Why bool?
+  Example:
 
-> +	codec_node = of_parse_phandle(pdev->dev.of_node,
-> +				      "mediatek,audio-codec", 0);
-> +	if (!codec_node) {
-> +		dev_err(&pdev->dev,
-> +			"Property 'audio-codec' missing or invalid\n");
-> +	} else {
+@@ -23,5 +24,6 @@ Example:
+                 interrupt-names = "mc";
+                 phys = <&usbphy 0>;
+                 phy-names = "usb";
++         extcon = <&usbphy 0>;
+                 status = "disabled";
+         };
 
-Isn't this a fatal error?
+--- a/arch/arm/boot/dts/sun7i-a20.dtsi
++++ b/arch/arm/boot/dts/sun7i-a20.dtsi
+@@ -773,6 +773,7 @@
+                         interrupt-names = "mc";
+                         phys = <&usbphy 0>;
+                         phy-names = "usb";
++                 extcon = <&usbphy 0>;
+                         allwinner,sram = <&otg_sram 1>;
+                         status = "disabled";
+                 };
 
-> +	/* set codec DVDD voltage */
-> +	reg_dvdd = devm_regulator_get(&pdev->dev, "dvdd");
-> +	if (IS_ERR(reg_dvdd)) {
-> +		dev_err(&pdev->dev, "failed to get dvdd\n");
-> +		return PTR_ERR(reg_dvdd);
-> +	}
-> +	ret = regulator_set_voltage(reg_dvdd, 1220000, 1220000);
-> +	if (ret != 0) {
-> +		dev_err(&pdev->dev, "Failed to set dvdd: %d\n", ret);
-> +		return ret;
-> +	}
+I'll push a new version of the patches to otg-dts-for-maxime
+with the extcon property added for you and ping you when it is
+ready.
 
-No, this is not appropriate for a machine driver - this is something the
-regulator constraints set for the board should do.
+> While preparing this branch I noticed that the dts for
+> the ippo q8h a33 tablets is not yet merged:
+>
+> http://www.spinics.net/lists/devicetree/msg82149.html
+>
+> You suggested to use the DT quirks interface instead of creating
+> a separate dts for each board variant, and in the end I agreed,
+> and asked you to merge it renamed to a more generic name
+> without the lcd1024x600 bit in there.
+>
+> I can make it more generic and resend it myself. Do you want me
+> to squash in the otg changes when I resend it, or shall I keep
+> those separate ?
 
-> +	dev_info(&pdev->dev, "dvdd = %d uv\n",
-> +		 regulator_get_voltage(reg_dvdd));
+And about this one: ping ?
 
-Don't include debugging stuff like this please.
+Thanks & Regards,
 
-> +	ret = regulator_enable(reg_dvdd);
-> +	if (ret != 0) {
-> +		dev_err(&pdev->dev, "Failed to enable dvdd: %d\n", ret);
-> +		return ret;
-> +	}
-
-IF this is for the CODEC then you should add regulator support to the
-CODEC driver.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150612/38267582/attachment.sig>
+Hans
