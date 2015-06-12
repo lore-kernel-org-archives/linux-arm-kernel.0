@@ -1,39 +1,45 @@
-From: robh@kernel.org (Rob Herring)
-Date: Fri, 12 Jun 2015 09:35:33 -0500
-Subject: [PATCH 01/15] ARM: kill off set_irq_flags usage
-In-Reply-To: <alpine.LNX.2.00.1506121604200.30841@localhost>
-References: <1433874401-27161-1-git-send-email-robh@kernel.org>
- <1433874401-27161-2-git-send-email-robh@kernel.org>
- <alpine.LNX.2.00.1506121604200.30841@localhost>
-Message-ID: <CAL_JsqKvLW-0p=A3BHoAYH_+ODCTt4C07OAHc__rUzC0jZ5p5g@mail.gmail.com>
+From: dinguyen@opensource.altera.com (Dinh Nguyen)
+Date: Fri, 12 Jun 2015 09:45:19 -0500
+Subject: [PATCH 0/2] ARM: socfpga: Add CPU_METHOD_OF_DECLARE for SoCFPGA
+In-Reply-To: <CAMAWPa-y-7N4GMhigvFMdk3BAU=3Nd2vEYVAQ+mBgd3-xK1aJg@mail.gmail.com>
+References: <1433297642-3818-1-git-send-email-dinh.linux@gmail.com>
+ <CAMAWPa-y-7N4GMhigvFMdk3BAU=3Nd2vEYVAQ+mBgd3-xK1aJg@mail.gmail.com>
+Message-ID: <557AF07F.2010906@opensource.altera.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 12, 2015 at 9:05 AM, Hans Ulli Kroll
-<ulli.kroll@googlemail.com> wrote:
->
->
-> On Tue, 9 Jun 2015, Rob Herring wrote:
->
->> set_irq_flags is ARM specific with custom flags which have genirq
->> equivalents. Convert drivers to use the genirq interfaces directly, so we
->> can kill off set_irq_flags. The translation of flags is as follows:
->>
->> IRQF_VALID -> !IRQ_NOREQUEST
->> IRQF_PROBE -> !IRQ_NOPROBE
->> IRQF_NOAUTOEN -> IRQ_NOAUTOEN
->>
->> For IRQs managed by an irqdomain, the irqdomain core code handles clearing
->> and setting IRQ_NOREQUEST already, so there is no need to do this in
->> .map() functions and we can simply remove the set_irq_flags calls. Some
->> users also set IRQ_NOPROBE and this has been maintained although it is not
->> clear that is really needed. There appears to be a great deal of blind
->> copy and paste of this code.
->>
->
-> for mach-gemini
-> Signed-off-by: Hans Ulli Kroll <ulli.kroll@googlemail.com>
+Hi Kevin,
 
-You mean acked-by, right?
+On 06/11/2015 05:58 PM, Kevin Hilman wrote:
+> Hi Dinh,
+> 
+> On Tue, Jun 2, 2015 at 7:14 PM,  <dinh.linux@gmail.com> wrote:
+>> From: Dinh Nguyen <dinh.linux@gmail.com>
+>>
+>> Hi Arnd, Kevin, Olof:
+>>
+>> Please apply these 2 patches for v4.2. I could not do a pull request for
+>> these as they will cause a merge conflict for arm-soc/next.
+>>
+>> Thanks,
+>>
+>> Dinh Nguyen (2):
+>>   ARM: socfpga: use CPU_METHOD_OF_DECLARE for socfpga_cyclone5
+>>   ARM: socfpga: add CPU_METHOD_OF_DECLARE for Arria 10
+> 
+> This one caused a build failure after merging the L1 invalidate patch
+> from Russell[1] since it removed the SoC specific secondary startup.
+> I've fixed this up in our next/soc branch by using the generic
+> secondary_startup[2].  Please let me know if you see any issues with
+> this.
+> 
+> Kevin
+> 
+> [1] https://git.kernel.org/cgit/linux/kernel/git/arm/arm-soc.git/commit/?h=next/cleanup&id=02b4e2756e01c623cc4dbceae4b07be75252db5b
+> 
+> [2] https://git.kernel.org/cgit/linux/kernel/git/arm/arm-soc.git/commit/?h=socfpga/soc&id=89b8da06ba302dd130df60df7964ccd3ab151cd6
+> 
 
-Rob
+Tested and not seeing any issues with your patch. Thanks for fixing it.
+
+Dinh
