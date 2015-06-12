@@ -1,200 +1,39 @@
-From: andre.przywara@arm.com (Andre Przywara)
-Date: Fri, 12 Jun 2015 18:03:32 +0100
-Subject: [PATCH 05/13] KVM: arm64: handle ITS related GICv3 redistributor
- registers
-In-Reply-To: <5576A943.80803@linaro.org>
-References: <1432893209-27313-1-git-send-email-andre.przywara@arm.com>
- <1432893209-27313-6-git-send-email-andre.przywara@arm.com>
- <5576A943.80803@linaro.org>
-Message-ID: <557B10E4.1060305@arm.com>
+From: matthias.bgg@gmail.com (Matthias Brugger)
+Date: Fri, 12 Jun 2015 19:05:34 +0200
+Subject: [PATCH 0/5] Add Mediatek MT8173 subsystem clocks support
+In-Reply-To: <20150611235212.GI29640@codeaurora.org>
+References: <1432192376-6712-1-git-send-email-jamesjj.liao@mediatek.com>
+ <20150608074858.GK6325@pengutronix.de>
+ <20150611235212.GI29640@codeaurora.org>
+Message-ID: <31179881.mpd5ayrmF7@ubix>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Eric,
-
-On 06/09/2015 09:52 AM, Eric Auger wrote:
-> On 05/29/2015 11:53 AM, Andre Przywara wrote:
->> In the GICv3 redistributor there are the PENDBASER and PROPBASER
->> registers which we did not emulate so far, as they only make sense
->> when having an ITS. In preparation for that emulate those MMIO
->> accesses by storing the 64-bit data written into it into a variable
->> which we later read in the ITS emulation.
->>
->> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
->> ---
->>  include/kvm/arm_vgic.h      |  4 ++++
->>  virt/kvm/arm/vgic-v3-emul.c | 43 +++++++++++++++++++++++++++++++++++++++++++
->>  virt/kvm/arm/vgic.c         | 35 +++++++++++++++++++++++++++++++++++
->>  virt/kvm/arm/vgic.h         |  4 ++++
->>  4 files changed, 86 insertions(+)
->>
->> diff --git a/include/kvm/arm_vgic.h b/include/kvm/arm_vgic.h
->> index 37725bb..9ea0b3b 100644
->> --- a/include/kvm/arm_vgic.h
->> +++ b/include/kvm/arm_vgic.h
->> @@ -256,6 +256,10 @@ struct vgic_dist {
->>  	struct vgic_vm_ops	vm_ops;
->>  	struct vgic_io_device	dist_iodev;
->>  	struct vgic_io_device	*redist_iodevs;
->> +
-> add some comments?
-> /* LPI config table shared by all distributors */
->> +	u64			propbaser;
-> /* LPI pending table per distributors */
->> +	u64			*pendbaser;
->> +	bool			lpis_enabled;
->>  };
->>  
->>  struct vgic_v2_cpu_if {
->> diff --git a/virt/kvm/arm/vgic-v3-emul.c b/virt/kvm/arm/vgic-v3-emul.c
->> index 16c6d8a..04f3aed 100644
->> --- a/virt/kvm/arm/vgic-v3-emul.c
->> +++ b/virt/kvm/arm/vgic-v3-emul.c
->> @@ -607,6 +607,37 @@ static bool handle_mmio_cfg_reg_redist(struct kvm_vcpu *vcpu,
->>  	return vgic_handle_cfg_reg(reg, mmio, offset);
->>  }
->>  
->> +/* We don't trigger any actions here, just store the register value */
->> +static bool handle_mmio_propbaser_redist(struct kvm_vcpu *vcpu,
->> +					 struct kvm_exit_mmio *mmio,
->> +					 phys_addr_t offset)
->> +{
->> +	struct vgic_dist *dist = &vcpu->kvm->arch.vgic;
->> +	int mode = ACCESS_READ_VALUE;
->> +
-> you may add the same comment as below?
->> +	mode |= dist->lpis_enabled ? ACCESS_WRITE_IGNORED : ACCESS_WRITE_VALUE;
->> +	vgic_handle_base_register(vcpu, mmio, offset, &dist->propbaser, mode);
-> having the PROPBASER programmed to different values on different redist
-> with EnableLPIs==1 also is unpredictable. Do we plan to check that
-> somewhere? Allow a single write?
-
-Well, we are safe if the spec says it's unpredictable, aren't we?
-I refrained from checking too many corner cases (same for the ITS
-commands, btw), since we lack a good way of communicating errors.
-SErrors into a guest do not work AFAIK, and spamming dmesg with
-guest-triggerable messages is also bad.
-After all this is an emulator, not a validator. So as long as this
-doesn't affect the host and violates the spec, I think we get away with
-ignoring stupid requests from the guest.
-I am happy to revisit this shall the need arise.
-
->> +
->> +	return false;
->> +}
->> +
->> +/* We don't trigger any actions here, just store the register value */
->> +static bool handle_mmio_pendbaser_redist(struct kvm_vcpu *vcpu,
->> +					 struct kvm_exit_mmio *mmio,
->> +					 phys_addr_t offset)
->> +{
->> +	struct kvm_vcpu *rdvcpu = mmio->private;
->> +	struct vgic_dist *dist = &vcpu->kvm->arch.vgic;
->> +	int mode = ACCESS_READ_VALUE;
->> +
->> +	/* Storing a value with LPIs already enabled is undefined */
->> +	mode |= dist->lpis_enabled ? ACCESS_WRITE_IGNORED : ACCESS_WRITE_VALUE;
->> +	vgic_handle_base_register(vcpu, mmio, offset,
->> +				  &dist->pendbaser[rdvcpu->vcpu_id], mode);
-> pendbaser is not yet allocated. Wouldn't it make sense to introduce that
-> patch later on?
-
-I am quite glad having found a patch order which compiles ;-)
-But well, I guess we have to address this as this strictly isn't safe if
-pendbaser is NULL (though it works with how GCC compiles this).
-
-Thanks for looking!
-
-Cheers,
-Andre.
-
-> Eric
->> +
->> +	return false;
->> +}
->> +
->>  #define SGI_base(x) ((x) + SZ_64K)
->>  
->>  static const struct vgic_io_range vgic_redist_ranges[] = {
->> @@ -635,6 +666,18 @@ static const struct vgic_io_range vgic_redist_ranges[] = {
->>  		.handle_mmio    = handle_mmio_raz_wi,
->>  	},
->>  	{
->> +		.base		= GICR_PENDBASER,
->> +		.len		= 0x08,
->> +		.bits_per_irq	= 0,
->> +		.handle_mmio	= handle_mmio_pendbaser_redist,
->> +	},
->> +	{
->> +		.base		= GICR_PROPBASER,
->> +		.len		= 0x08,
->> +		.bits_per_irq	= 0,
->> +		.handle_mmio	= handle_mmio_propbaser_redist,
->> +	},
->> +	{
->>  		.base           = GICR_IDREGS,
->>  		.len            = 0x30,
->>  		.bits_per_irq   = 0,
->> diff --git a/virt/kvm/arm/vgic.c b/virt/kvm/arm/vgic.c
->> index 2e9723aa..0a9236d 100644
->> --- a/virt/kvm/arm/vgic.c
->> +++ b/virt/kvm/arm/vgic.c
->> @@ -448,6 +448,41 @@ void vgic_reg_access(struct kvm_exit_mmio *mmio, u32 *reg,
->>  	}
->>  }
->>  
->> +/* handle a 64-bit register access */
->> +void vgic_handle_base_register(struct kvm_vcpu *vcpu,
->> +			       struct kvm_exit_mmio *mmio,
->> +			       phys_addr_t offset, u64 *basereg,
->> +			       int mode)
->> +{
->> +	u32 reg;
->> +	u64 breg;
->> +
->> +	switch (offset & ~3) {
->> +	case 0x00:
->> +		breg = *basereg;
->> +		reg = lower_32_bits(breg);
->> +		vgic_reg_access(mmio, &reg, offset & 3, mode);
->> +		if (mmio->is_write && (mode & ACCESS_WRITE_VALUE)) {
->> +			breg &= GENMASK_ULL(63, 32);
->> +			breg |= reg;
->> +			*basereg = breg;
->> +		}
->> +		break;
->> +	case 0x04:
->> +		breg = *basereg;
->> +		reg = upper_32_bits(breg);
->> +		vgic_reg_access(mmio, &reg, offset & 3, mode);
->> +		if (mmio->is_write && (mode & ACCESS_WRITE_VALUE)) {
->> +			breg  = lower_32_bits(breg);
->> +			breg |= (u64)reg << 32;
->> +			*basereg = breg;
->> +		}
->> +		break;
->> +	}
->> +}
->> +
->> +
->> +
->>  bool handle_mmio_raz_wi(struct kvm_vcpu *vcpu, struct kvm_exit_mmio *mmio,
->>  			phys_addr_t offset)
->>  {
->> diff --git a/virt/kvm/arm/vgic.h b/virt/kvm/arm/vgic.h
->> index a093f5c..b2d791c 100644
->> --- a/virt/kvm/arm/vgic.h
->> +++ b/virt/kvm/arm/vgic.h
->> @@ -71,6 +71,10 @@ void vgic_reg_access(struct kvm_exit_mmio *mmio, u32 *reg,
->>  		     phys_addr_t offset, int mode);
->>  bool handle_mmio_raz_wi(struct kvm_vcpu *vcpu, struct kvm_exit_mmio *mmio,
->>  			phys_addr_t offset);
->> +void vgic_handle_base_register(struct kvm_vcpu *vcpu,
->> +			       struct kvm_exit_mmio *mmio,
->> +			       phys_addr_t offset, u64 *basereg,
->> +			       int mode);
->>  
->>  static inline
->>  u32 mmio_data_read(struct kvm_exit_mmio *mmio, u32 mask)
->>
+On Thursday, June 11, 2015 04:52:12 PM Stephen Boyd wrote:
+> On 06/08, Sascha Hauer wrote:
+> > On Fri, Jun 05, 2015 at 05:59:12PM -0700, Stephen Boyd wrote:
+> > > And similar things could be done for the reset driver.
+> > 
+> > The problem I see with this approach is that we scatter the code for a
+> > otherwise simple driver over a bunch of directories. We would have
+> > 
+> > drivers/clk/mediatek/vencsys.c
+> > drivers/reset/mediatek/vencsys.c
+> > drivers/soc/mediatek/vencsys.c
+> > 
+> > The same must be added for vdecsys, imgsys and vencltsys. That will make
+> > 12 drivers and three maintainers for 12 registers.  I think this will be
+> > a pain to maintain, hence my suggestion to put the vencsys code into a
+> > single file and not split this up into more subsystem specific files.
 > 
+> I probably don't have enough information here, but why is it a
+> pain to maintain? It seems more like a pain to setup the first
+> time and then little to no pain to maintain because we clearly
+> split functionality based on subsystem. No merge conflicts, clear
+> division of functionality, etc. But again, I don't think it
+> matters much either way given that reset and clk drivers are
+> combined sometimes and don't always reside in drivers/clk or
+> drivers/reset either.
+
+Actually I would prefer to have the clock and resets in drivers/clk, just as 
+we already did for Mediatek up to now.
