@@ -1,84 +1,53 @@
 From: majun258@huawei.com (Ma Jun)
-Date: Fri, 12 Jun 2015 10:49:59 +0800
-Subject: [PATCH v2 3/3] dt-binding:Documents the mbigen bindings
-In-Reply-To: <1434077399-32200-1-git-send-email-majun258@huawei.com>
-References: <1434077399-32200-1-git-send-email-majun258@huawei.com>
-Message-ID: <1434077399-32200-4-git-send-email-majun258@huawei.com>
+Date: Fri, 12 Jun 2015 10:49:56 +0800
+Subject: [PATCH v2 0/3] IRQ/Gic-V3:Support Mbigen interrupt controller
+Message-ID: <1434077399-32200-1-git-send-email-majun258@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the mbigen msi interrupt controller bindings document
+This patch set is applied to supprot the mbigen device.
 
-Signed-off-by: Ma Jun <majun258@huawei.com>
----
- Documentation/devicetree/bindings/arm/mbigen.txt |   59 ++++++++++++++++++++++
- 1 files changed, 59 insertions(+), 0 deletions(-)
+Mbigen means message based interrupt generator.
+It locate in ITS or out side of ITS.
+
+In fact, mbigen is a kind of interrupt controller collects
+the irq form non-PCI devices and generate msi interrupt.
+
+Hisilicon designed mbigen to reduce the wired interrupt 
+number connected to GIC.
+
+In these patches, the interrupts from non-PCI devices are
+named as MBI to distiguish between legacy MSI interrupt from
+PCI devices.
+
+As a kind of MSI interrupt controller, the mbigen is used as a child 
+domain of ITS domain just like PCI devices.
+
+So,in order to support the mbigen interrupt controller, the 
+its-gic-v3-its.c and other related files are changed.
+
+Change in v2
+---Compared to v1, mbigen domain is used as a child domain of ITS accroding
+   to Marc's advice.So, all changed files related with MSI in v1 are removed.
+   Now, only its domain related files are changed to support this new interrupt
+   controller.
+
+
+
+Ma Jun (3):
+  Add mbigen driver to support mbigen interrupt controller
+  Change arm-gic-its to support the Mbigen interrupt
+  dt-binding:Documents the mbigen bindings
+
+ Documentation/devicetree/bindings/arm/mbigen.txt |   59 +++
+ drivers/irqchip/Kconfig                          |    7 +
+ drivers/irqchip/Makefile                         |    1 +
+ drivers/irqchip/irq-gic-v3-its.c                 |   66 +++-
+ drivers/irqchip/irq-mbigen.c                     |  579 ++++++++++++++++++++++
+ include/linux/irq.h                              |    5 +
+ include/linux/mbi.h                              |  114 +++++
+ kernel/irq/chip.c                                |   40 ++-
+ 8 files changed, 866 insertions(+), 5 deletions(-)
  create mode 100644 Documentation/devicetree/bindings/arm/mbigen.txt
-
-diff --git a/Documentation/devicetree/bindings/arm/mbigen.txt b/Documentation/devicetree/bindings/arm/mbigen.txt
-new file mode 100644
-index 0000000..c7c261b
---- /dev/null
-+++ b/Documentation/devicetree/bindings/arm/mbigen.txt
-@@ -0,0 +1,59 @@
-+Hisilicon mbigen device tree bindings.
-+=======================================
-+
-+Mbigen means: message based interrupt generator.
-+
-+MBI is kind of msi interrupt only used on Non-PCI devices.
-+
-+To reduce the wired interrupt number connected to GIC,
-+Hisilicon designed mbigen to collect and generate interrupt.
-+
-+
-+Non-pci devices can connect to mbigen and gnerate the inteerrupt
-+by wirtting ITS register.
-+
-+The mbigen and devices connect to mbigen have the following properties:
-+
-+
-+Mbigen required properties:
-+-------------------------------------------
-+-compatible: Should be "hisilicon,mbi-gen"
-+-msi-parent: should specified the ITS mbigen connected
-+-interrupt controller: Identifies the node as an interrupt controller
-+- #interrupt-cells : Specifies the number of cells needed to encode an
-+  interrupt source. The value is 2 for now.
-+
-+  The 1st cell is the interrupt number(Hwirq).This value depends on
-+  the Soc design.
-+
-+  The 2nd cell is the interrupt trigger type, encoded as follows:
-+		1 = edge triggered
-+		4 = level triggered
-+
-+- reg: Specifies the base physical address and size of the ITS
-+  registers.
-+
-+Examples:
-+
-+	mbigen_pa: interrupt-controller at 4c030000 {
-+			compatible = "hisilicon,mbi-gen";
-+			msi-parent = <&its_pa>;
-+			interrupt-controller;
-+			#interrupt-cells = <2>;
-+			reg = <0x4c030000 0x10000>;
-+		};
-+
-+Device connect to mbigen required properties:
-+----------------------------------------------------
-+-interrupt-parent: Specifies the mbigen node which device connected.
-+-interrupts:specifies the interrupt source.The first cell is hwirq num, the
-+  second number is trigger type.
-+
-+Examples:
-+	usb0: ehci at a1000000 {
-+		compatible = "generic-ehci";
-+		interrupt-parent = <&mbigen_pa>;
-+		reg = <0xa1000000 0x10000>;
-+		interrupts = <20 4>;
-+	};
-+
--- 
-1.7.1
+ create mode 100644 drivers/irqchip/irq-mbigen.c
+ create mode 100644 include/linux/mbi.h
