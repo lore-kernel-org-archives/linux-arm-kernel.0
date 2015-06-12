@@ -1,253 +1,68 @@
-From: kristina.martsenko@arm.com (Kristina Martsenko)
-Date: Fri, 12 Jun 2015 12:32:42 +0100
-Subject: [PATCH v3] arm64: dts: add device tree for ARM SMM-A53x2 on LogicTile
- Express 20MG
-Message-ID: <1434108762-5637-1-git-send-email-kristina.martsenko@arm.com>
+From: valentin.longchamp@keymile.com (Valentin Longchamp)
+Date: Fri, 12 Jun 2015 13:37:52 +0200
+Subject: [ehci-orion] ETIMEOUT with ehci_setup()'s ehci_halt()
+In-Reply-To: <55758095.2030609@keymile.com>
+References: <5571B38E.7080505@keymile.com> <20150605151930.GA16909@lunn.ch>
+ <5572E4E8.2060405@gmail.com> <55758095.2030609@keymile.com>
+Message-ID: <557AC490.5040405@keymile.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add a DTS file for the MP2 Cortex-A53 Soft Macrocell Model implemented
-on a LogicTile Express 20MG (V2F-1XV7) daughterboard. This is based on
-the version that's currently available from the ARM DTS repository [1].
+On 06/08/2015 01:46 PM, Valentin Longchamp wrote:
+> On 06/06/2015 02:17 PM, Sebastian Hesselbarth wrote:
+>> On 05.06.2015 17:19, Andrew Lunn wrote:
+>>> On Fri, Jun 05, 2015 at 04:34:54PM +0200, Valentin Longchamp wrote:
+>>>> I am currently bringing up the USB 2.0 Host controller of the Bobcat's (98DX4122
+>>>> Marvell switch) internal kirkwood CPU on a variation of Keymile's km_kirwood
+>>>> hardware (kirkwood-km_kirkwood.dts).
+>>>>
+>>>> When the driver registers its hcd, it fails with a timemout as it can be seen in
+>>>> the below log:
+>>>>
+>>>>> root at kmcoge5un:~# dmesg -n 8
+>>>>> root at kmcoge5un:~# insmod ehci-orion.ko
+>>>>> ehci-orion: EHCI orion driver
+>>>>> Initializing Orion-SoC USB Host Controller
+>>>>> orion-ehci f1050000.ehci: EHCI Host Controller
+>>>>> orion-ehci f1050000.ehci: new USB bus registered, assigned bus number 1
+>>>>> orion-ehci f1050000.ehci: reset hcs_params 0x10011 dbg=0 ind cc=0 pcc=0 ordered ports=1
+>>>>> orion-ehci f1050000.ehci: reset hcc_params 0006 thresh 0 uframes 256/512/1024 park
+>>>>> orion-ehci f1050000.ehci: park 0
+>>>>> orion-ehci f1050000.ehci: reset command 0080002 (park)=0 ithresh=8 period=1024 Reset HALT
+>>>>> orion-ehci f1050000.ehci: can't setup
+>>>>> orion-ehci f1050000.ehci: USB bus 1 deregistered
+>>>>> orion-ehci f1050000.ehci: init f1050000.ehci fail, -110
+>>>>> orion-ehci: probe of f1050000.ehci failed with error -110
+>>>>
+>>>> This is very similar to this problem, except that it always happens:
+>>>> https://lkml.org/lkml/2012/6/4/381
+>>>>
+>>>> I have cornered it out to the last handshake() call of the ehci_halt() call,
+>>>> that should set the controller in the HALT state. If I comment this handshake()
+>>>> call out, the registration is fine and the controller then looks OK (I don't
+>>>> have a hardware with a real USB bus to further test it yet).
+>>
+>> Valentin,
+>>
+>> can you specify what "real USB bus" means? Does your current hardware
+>> support USB host or device with anything connected to it?
+> 
+> No. The current hardware I am testing on does not support USB since the USB bus
+> is not "wired" at all, there is no phy present (this maybe causes a problem ?).
+> What I test is if the ehci-orion USB host driver is able to register with and
+> configure the USB host controller present in the SoC, in order to prepare things
+> for when the hardware is available.
+> 
+> Hopefully I get some new hardware prototypes where the USB bus is complete this
+> week so that I can test on the real setup.
+> 
 
-[1] git://linux-arm.org/arm-dts.git
+We have now received the hardware prototype and the behavior is exactly the
+same: ETIMEOUT in ehci_halt(). If the last handshake() call is removed, the EHCI
+host controller is correctly initialized and the device on the bus is detected
+and works correctly.
 
-Signed-off-by: Kristina Martsenko <kristina.martsenko@arm.com>
----
+I thus tend to think that this is an IP (or Bobcat) internal problem and is not
+really related with the hardware nor a PHY.
 
-Changes in v3:
- - Also removed the /memreserve/, the Boot Monitor adds that too.
-
-Changes in v2:
- - Removed enable-method and cpu-release-addr from the second CPU (since
-   the Boot Monitor can add those itself).
-
- MAINTAINERS                                        |   1 +
- arch/arm64/boot/dts/arm/Makefile                   |   1 +
- .../boot/dts/arm/vexpress-v2f-1xv7-ca53x2.dts      | 191 +++++++++++++++++++++
- 3 files changed, 193 insertions(+)
- create mode 100644 arch/arm64/boot/dts/arm/vexpress-v2f-1xv7-ca53x2.dts
-
-diff --git a/MAINTAINERS b/MAINTAINERS
-index f6b9f82..02ef46d 100644
---- a/MAINTAINERS
-+++ b/MAINTAINERS
-@@ -1613,6 +1613,7 @@ M:	Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
- L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
- S:	Maintained
- F:	arch/arm/boot/dts/vexpress*
-+F:	arch/arm64/boot/dts/arm/vexpress*
- F:	arch/arm/mach-vexpress/
- F:	*/*/vexpress*
- F:	*/*/*/vexpress*
-diff --git a/arch/arm64/boot/dts/arm/Makefile b/arch/arm64/boot/dts/arm/Makefile
-index c5c98b9..bb3c072 100644
---- a/arch/arm64/boot/dts/arm/Makefile
-+++ b/arch/arm64/boot/dts/arm/Makefile
-@@ -1,6 +1,7 @@
- dtb-$(CONFIG_ARCH_VEXPRESS) += foundation-v8.dtb
- dtb-$(CONFIG_ARCH_VEXPRESS) += juno.dtb juno-r1.dtb
- dtb-$(CONFIG_ARCH_VEXPRESS) += rtsm_ve-aemv8a.dtb
-+dtb-$(CONFIG_ARCH_VEXPRESS) += vexpress-v2f-1xv7-ca53x2.dtb
- 
- always		:= $(dtb-y)
- subdir-y	:= $(dts-dirs)
-diff --git a/arch/arm64/boot/dts/arm/vexpress-v2f-1xv7-ca53x2.dts b/arch/arm64/boot/dts/arm/vexpress-v2f-1xv7-ca53x2.dts
-new file mode 100644
-index 0000000..5b1d018
---- /dev/null
-+++ b/arch/arm64/boot/dts/arm/vexpress-v2f-1xv7-ca53x2.dts
-@@ -0,0 +1,191 @@
-+/*
-+ * ARM Ltd. Versatile Express
-+ *
-+ * LogicTile Express 20MG
-+ * V2F-1XV7
-+ *
-+ * Cortex-A53 (2 cores) Soft Macrocell Model
-+ *
-+ * HBI-0247C
-+ */
-+
-+/dts-v1/;
-+
-+#include <dt-bindings/interrupt-controller/arm-gic.h>
-+
-+/ {
-+	model = "V2F-1XV7 Cortex-A53x2 SMM";
-+	arm,hbi = <0x247>;
-+	arm,vexpress,site = <0xf>;
-+	compatible = "arm,vexpress,v2f-1xv7,ca53x2", "arm,vexpress,v2f-1xv7", "arm,vexpress";
-+	interrupt-parent = <&gic>;
-+	#address-cells = <2>;
-+	#size-cells = <2>;
-+
-+	chosen {
-+		stdout-path = "serial0:38400n8";
-+	};
-+
-+	aliases {
-+		serial0 = &v2m_serial0;
-+		serial1 = &v2m_serial1;
-+		serial2 = &v2m_serial2;
-+		serial3 = &v2m_serial3;
-+		i2c0 = &v2m_i2c_dvi;
-+		i2c1 = &v2m_i2c_pcie;
-+	};
-+
-+	cpus {
-+		#address-cells = <2>;
-+		#size-cells = <0>;
-+
-+		cpu at 0 {
-+			device_type = "cpu";
-+			compatible = "arm,cortex-a53", "arm,armv8";
-+			reg = <0 0>;
-+			next-level-cache = <&L2_0>;
-+		};
-+
-+		cpu at 1 {
-+			device_type = "cpu";
-+			compatible = "arm,cortex-a53", "arm,armv8";
-+			reg = <0 1>;
-+			next-level-cache = <&L2_0>;
-+		};
-+
-+		L2_0: l2-cache0 {
-+			compatible = "cache";
-+		};
-+	};
-+
-+	memory at 80000000 {
-+		device_type = "memory";
-+		reg = <0 0x80000000 0 0x80000000>; /* 2GB @ 2GB */
-+	};
-+
-+	gic: interrupt-controller at 2c001000 {
-+		compatible = "arm,gic-400";
-+		#interrupt-cells = <3>;
-+		#address-cells = <0>;
-+		interrupt-controller;
-+		reg = <0 0x2c001000 0 0x1000>,
-+		      <0 0x2c002000 0 0x2000>,
-+		      <0 0x2c004000 0 0x2000>,
-+		      <0 0x2c006000 0 0x2000>;
-+		interrupts = <GIC_PPI 9 (GIC_CPU_MASK_SIMPLE(2) | IRQ_TYPE_LEVEL_HIGH)>;
-+	};
-+
-+	timer {
-+		compatible = "arm,armv8-timer";
-+		interrupts = <GIC_PPI 13 (GIC_CPU_MASK_SIMPLE(2) | IRQ_TYPE_LEVEL_LOW)>,
-+			     <GIC_PPI 14 (GIC_CPU_MASK_SIMPLE(2) | IRQ_TYPE_LEVEL_LOW)>,
-+			     <GIC_PPI 11 (GIC_CPU_MASK_SIMPLE(2) | IRQ_TYPE_LEVEL_LOW)>,
-+			     <GIC_PPI 10 (GIC_CPU_MASK_SIMPLE(2) | IRQ_TYPE_LEVEL_LOW)>;
-+	};
-+
-+	pmu {
-+		compatible = "arm,armv8-pmuv3";
-+		interrupts = <GIC_SPI 68 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 69 IRQ_TYPE_LEVEL_HIGH>;
-+	};
-+
-+	dcc {
-+		compatible = "arm,vexpress,config-bus";
-+		arm,vexpress,config-bridge = <&v2m_sysreg>;
-+
-+		smbclk: osc at 4 {
-+			/* SMC clock */
-+			compatible = "arm,vexpress-osc";
-+			arm,vexpress-sysreg,func = <1 4>;
-+			freq-range = <40000000 40000000>;
-+			#clock-cells = <0>;
-+			clock-output-names = "smclk";
-+		};
-+
-+		volt at 0 {
-+			/* VIO to expansion board above */
-+			compatible = "arm,vexpress-volt";
-+			arm,vexpress-sysreg,func = <2 0>;
-+			regulator-name = "VIO_UP";
-+			regulator-min-microvolt = <800000>;
-+			regulator-max-microvolt = <1800000>;
-+			regulator-always-on;
-+		};
-+
-+		volt at 1 {
-+			/* 12V from power connector J6 */
-+			compatible = "arm,vexpress-volt";
-+			arm,vexpress-sysreg,func = <2 1>;
-+			regulator-name = "12";
-+			regulator-always-on;
-+		};
-+
-+		temp at 0 {
-+			/* FPGA temperature */
-+			compatible = "arm,vexpress-temp";
-+			arm,vexpress-sysreg,func = <4 0>;
-+			label = "FPGA";
-+		};
-+	};
-+
-+	smb {
-+		compatible = "simple-bus";
-+
-+		#address-cells = <2>;
-+		#size-cells = <1>;
-+		ranges = <0 0 0 0x08000000 0x04000000>,
-+			 <1 0 0 0x14000000 0x04000000>,
-+			 <2 0 0 0x18000000 0x04000000>,
-+			 <3 0 0 0x1c000000 0x04000000>,
-+			 <4 0 0 0x0c000000 0x04000000>,
-+			 <5 0 0 0x10000000 0x04000000>;
-+
-+		#interrupt-cells = <1>;
-+		interrupt-map-mask = <0 0 63>;
-+		interrupt-map = <0 0  0 &gic GIC_SPI  0 IRQ_TYPE_LEVEL_HIGH>,
-+				<0 0  1 &gic GIC_SPI  1 IRQ_TYPE_LEVEL_HIGH>,
-+				<0 0  2 &gic GIC_SPI  2 IRQ_TYPE_LEVEL_HIGH>,
-+				<0 0  3 &gic GIC_SPI  3 IRQ_TYPE_LEVEL_HIGH>,
-+				<0 0  4 &gic GIC_SPI  4 IRQ_TYPE_LEVEL_HIGH>,
-+				<0 0  5 &gic GIC_SPI  5 IRQ_TYPE_LEVEL_HIGH>,
-+				<0 0  6 &gic GIC_SPI  6 IRQ_TYPE_LEVEL_HIGH>,
-+				<0 0  7 &gic GIC_SPI  7 IRQ_TYPE_LEVEL_HIGH>,
-+				<0 0  8 &gic GIC_SPI  8 IRQ_TYPE_LEVEL_HIGH>,
-+				<0 0  9 &gic GIC_SPI  9 IRQ_TYPE_LEVEL_HIGH>,
-+				<0 0 10 &gic GIC_SPI 10 IRQ_TYPE_LEVEL_HIGH>,
-+				<0 0 11 &gic GIC_SPI 11 IRQ_TYPE_LEVEL_HIGH>,
-+				<0 0 12 &gic GIC_SPI 12 IRQ_TYPE_LEVEL_HIGH>,
-+				<0 0 13 &gic GIC_SPI 13 IRQ_TYPE_LEVEL_HIGH>,
-+				<0 0 14 &gic GIC_SPI 14 IRQ_TYPE_LEVEL_HIGH>,
-+				<0 0 15 &gic GIC_SPI 15 IRQ_TYPE_LEVEL_HIGH>,
-+				<0 0 16 &gic GIC_SPI 16 IRQ_TYPE_LEVEL_HIGH>,
-+				<0 0 17 &gic GIC_SPI 17 IRQ_TYPE_LEVEL_HIGH>,
-+				<0 0 18 &gic GIC_SPI 18 IRQ_TYPE_LEVEL_HIGH>,
-+				<0 0 19 &gic GIC_SPI 19 IRQ_TYPE_LEVEL_HIGH>,
-+				<0 0 20 &gic GIC_SPI 20 IRQ_TYPE_LEVEL_HIGH>,
-+				<0 0 21 &gic GIC_SPI 21 IRQ_TYPE_LEVEL_HIGH>,
-+				<0 0 22 &gic GIC_SPI 22 IRQ_TYPE_LEVEL_HIGH>,
-+				<0 0 23 &gic GIC_SPI 23 IRQ_TYPE_LEVEL_HIGH>,
-+				<0 0 24 &gic GIC_SPI 24 IRQ_TYPE_LEVEL_HIGH>,
-+				<0 0 25 &gic GIC_SPI 25 IRQ_TYPE_LEVEL_HIGH>,
-+				<0 0 26 &gic GIC_SPI 26 IRQ_TYPE_LEVEL_HIGH>,
-+				<0 0 27 &gic GIC_SPI 27 IRQ_TYPE_LEVEL_HIGH>,
-+				<0 0 28 &gic GIC_SPI 28 IRQ_TYPE_LEVEL_HIGH>,
-+				<0 0 29 &gic GIC_SPI 29 IRQ_TYPE_LEVEL_HIGH>,
-+				<0 0 30 &gic GIC_SPI 30 IRQ_TYPE_LEVEL_HIGH>,
-+				<0 0 31 &gic GIC_SPI 31 IRQ_TYPE_LEVEL_HIGH>,
-+				<0 0 32 &gic GIC_SPI 32 IRQ_TYPE_LEVEL_HIGH>,
-+				<0 0 33 &gic GIC_SPI 33 IRQ_TYPE_LEVEL_HIGH>,
-+				<0 0 34 &gic GIC_SPI 34 IRQ_TYPE_LEVEL_HIGH>,
-+				<0 0 35 &gic GIC_SPI 35 IRQ_TYPE_LEVEL_HIGH>,
-+				<0 0 36 &gic GIC_SPI 36 IRQ_TYPE_LEVEL_HIGH>,
-+				<0 0 37 &gic GIC_SPI 37 IRQ_TYPE_LEVEL_HIGH>,
-+				<0 0 38 &gic GIC_SPI 38 IRQ_TYPE_LEVEL_HIGH>,
-+				<0 0 39 &gic GIC_SPI 39 IRQ_TYPE_LEVEL_HIGH>,
-+				<0 0 40 &gic GIC_SPI 40 IRQ_TYPE_LEVEL_HIGH>,
-+				<0 0 41 &gic GIC_SPI 41 IRQ_TYPE_LEVEL_HIGH>,
-+				<0 0 42 &gic GIC_SPI 42 IRQ_TYPE_LEVEL_HIGH>;
-+
-+		/include/ "../../../../arm/boot/dts/vexpress-v2m-rs1.dtsi"
-+	};
-+};
--- 
-2.1.4
+Valentin
