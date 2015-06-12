@@ -1,62 +1,60 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Fri, 12 Jun 2015 10:53:13 -0300
-Subject: Running kexec on mx6
-In-Reply-To: <CAOMZO5A_=okeGhRjRb-7xkO7RJKTECdgBxinrTLtVR+6TMpnVw@mail.gmail.com>
-References: <CAOMZO5A_=okeGhRjRb-7xkO7RJKTECdgBxinrTLtVR+6TMpnVw@mail.gmail.com>
-Message-ID: <CAOMZO5A0+SSdT5mfy7fmO4DUQKimQpFCSu16EVLkxR+qh6137A@mail.gmail.com>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Fri, 12 Jun 2015 15:55:37 +0200
+Subject: [PATCH] ARM: mvebu: add missing newline at end of messages
+In-Reply-To: <1434116314-10533-1-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1434116314-10533-1-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <20150612135537.GH21991@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 11, 2015 at 9:08 PM, Fabio Estevam <festevam@gmail.com> wrote:
-> Hi,
->
-> I am trying to load a kernel and dtb via kexec on a mx6solo wandboard
-> board running 4.1-rc7:
->
-> root at wandboard-solo:~# kexec -d -l /mnt/zImage --dtb /mnt/imx6dl-wandboard.dtb -
-> -command-line="console=ttymxc0,115200 root=/dev/mmcblk2p2 rootwait rw"
-> my_load:667: do
-> kernel: 0x75da4008 kernel_size: 0x5be000
-> kexec_load: entry = 0x10008000 flags = 0x280000
-> nr_segments = 2
-> segment[0].buf   = 0x75da4008
-> segment[0].bufsz = 0x5be000
-> segment[0].mem   = 0x10008000
-> segment[0].memsz = 0x5be000
-> segment[1].buf   = 0x1ce9008
-> segment[1].bufsz = 0x6c87
-> segment[1].mem   = 0x116f9000
-> segment[1].memsz = 0x7000
-> root at wandboard-solo:~# kexec -e
-> [   62.581795] kexec: Starting new kernel
-> [   62.585570] Disabling non-boot CPUs ...
-> [   62.589485] Bye!
->
-> And then nothing comes out.
+On Fri, Jun 12, 2015 at 03:38:34PM +0200, Thomas Petazzoni wrote:
+> Commit 548ae94c1cc7f ("ARM: mvebu: Disable CPU Idle on Armada 38x")
+> added two new pr_warn() messages in mach-mvebu/pmsu.c. However, these
+> messages lack the final new line, causing the next message to be
+> displayed on the same line.
+> 
+> This commit adds the missing ending newlines.
+> 
+> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 
-If I use a 4.1-rc7 to be loaded via kexec then I get the
-"Uncompressing Linux... done, booting the kernel" message.
+Hardly needs it, but
 
-Initially I was loading a 3.10 kernel from a running 4.1-rc7.
+Acked-by: Andrew Lunn <andrew@lunn.ch>?
 
-Now I see:
+	  Andrew
 
-root at wandboard-solo:~# kexec -d -l /tmp/zImage --dtb /tmp/imx6dl-wandboard.dtb -
--command-line="console=ttymxc0,115200 root=/dev/mmcblk0p2 rootwait rw"
-my_load:667: do
-kernel: 0x75d95008 kernel_size: 0x5c99d8
-kexec_load: entry = 0x10008000 flags = 0x280000
-nr_segments = 2
-segment[0].buf   = 0x75d95008
-segment[0].bufsz = 0x5c99d8
-segment[0].mem   = 0x10008000
-segment[0].memsz = 0x5ca000
-segment[1].buf   = 0x1f4008
-segment[1].bufsz = 0x6d63
-segment[1].mem   = 0x11728000
-segment[1].memsz = 0x7000
-root at wandboard-solo:~# kexec -e
-[   27.591555] kexec: Starting new kernel
-[   27.595331] Disabling non-boot CPUs ...
-[   27.599250] Bye!
-Uncompressing Linux... done, booting the kernel.
+
+> ---
+>  arch/arm/mach-mvebu/pmsu.c | 4 ++--
+>  1 file changed, 2 insertions(+), 2 deletions(-)
+> 
+> diff --git a/arch/arm/mach-mvebu/pmsu.c b/arch/arm/mach-mvebu/pmsu.c
+> index 4f4e222..e8fdb9c 100644
+> --- a/arch/arm/mach-mvebu/pmsu.c
+> +++ b/arch/arm/mach-mvebu/pmsu.c
+> @@ -415,7 +415,7 @@ static __init int armada_38x_cpuidle_init(void)
+>  	void __iomem *mpsoc_base;
+>  	u32 reg;
+>  
+> -	pr_warn("CPU idle is currently broken on Armada 38x: disabling");
+> +	pr_warn("CPU idle is currently broken on Armada 38x: disabling\n");
+>  	return 0;
+>  
+>  	np = of_find_compatible_node(NULL, NULL,
+> @@ -486,7 +486,7 @@ static int __init mvebu_v7_cpu_pm_init(void)
+>  	 */
+>  	if (of_machine_is_compatible("marvell,armada380")) {
+>  		cpu_hotplug_disable();
+> -		pr_warn("CPU hotplug support is currently broken on Armada 38x: disabling");
+> +		pr_warn("CPU hotplug support is currently broken on Armada 38x: disabling\n");
+>  	}
+>  
+>  	if (of_machine_is_compatible("marvell,armadaxp"))
+> -- 
+> 2.1.0
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
