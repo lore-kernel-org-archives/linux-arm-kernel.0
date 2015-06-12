@@ -1,36 +1,47 @@
-From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Fri, 12 Jun 2015 11:24:22 +0200
-Subject: [PATCH v2 06/10] pinctrl: berlin: use proper compatibles
-In-Reply-To: <20150612090537.GB29596@kwain>
-References: <1425654328-26298-1-git-send-email-antoine.tenart@free-electrons.com>
- <1425654328-26298-7-git-send-email-antoine.tenart@free-electrons.com>
- <CACRpkda-4SahLjwe09D-Hb8p0nQFdG1Zc_xvLPwLGYQMkJQaXA@mail.gmail.com>
- <20150612090537.GB29596@kwain>
-Message-ID: <557AA546.8030505@gmail.com>
+From: michal.simek@xilinx.com (Michal Simek)
+Date: Fri, 12 Jun 2015 11:25:17 +0200
+Subject: [PATCH v2] ARM: zynq: Fix earlyprintk in big endian mode
+In-Reply-To: <1434092004-21385-1-git-send-email-achandran@mvista.com>
+References: <1433945584-16379-1-git-send-email-achandran@mvista.com>
+ <1434092004-21385-1-git-send-email-achandran@mvista.com>
+Message-ID: <557AA57D.1010104@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/12/2015 11:05 AM, Antoine Tenart wrote:
-> On Wed, Jun 10, 2015 at 09:13:55AM +0200, Linus Walleij wrote:
->> On Fri, Mar 6, 2015 at 4:05 PM, Antoine Tenart
->> <antoine.tenart@free-electrons.com> wrote:
->>
->>> The Berlin pin-controller driver was sharing the chip and system
->>> controller nodes with the clock and the reset drivers. They all shared
->>> the same compatible. With the introduction of the Marvell Berlin MFD
->>> controller, the Berlin pin-controller driver has now its own node.
->>> Update its compatibles to not share anymore the ones of the chip and
->>> system controllers.
->>>
->>> Signed-off-by: Antoine Tenart <antoine.tenart@free-electrons.com>
->>
->> Antoine, how is this series going?
->
-> The series should be in the berlin tree at the moment.
+On 06/12/2015 08:53 AM, Arun Chandran wrote:
+> earlyprintk messages are not appearing on the terminal
+> emulator during a big endian kernel boot. In BE mode
+> sending full words to UART will result in unprintable
+> characters as they are byte swapped versions of printable
+> ones. So send only bytes.
+> 
+> Signed-off-by: Arun Chandran <achandran@mvista.com>
+> ---
+> ---
+> Changes since v1:
+> 	removed the byte swapping logic. Just send characters instead.
+> ---
+>  arch/arm/include/debug/zynq.S | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm/include/debug/zynq.S b/arch/arm/include/debug/zynq.S
+> index bd13ded..de86b92 100644
+> --- a/arch/arm/include/debug/zynq.S
+> +++ b/arch/arm/include/debug/zynq.S
+> @@ -38,7 +38,7 @@
+>  		.endm
+>  
+>  		.macro	senduart,rd,rx
+> -		str	\rd, [\rx, #UART_FIFO_OFFSET]	@ TXDATA
+> +		strb	\rd, [\rx, #UART_FIFO_OFFSET]	@ TXDATA
+>  		.endm
+>  
+>  		.macro	waituart,rd,rx
+> 
 
-Not only berlin, but also arm-soc:
+ok - this works too.
 
-[1] https://lkml.org/r/5498391.Fl346EDjWm at wuerfel
-[2] https://lkml.org/r/2918562.6HiyIinobj at wuerfel
+Tested-by: Michal Simek <michal.simek@xilinx.com>
 
-Sebastian
+Thanks,
+Michal
