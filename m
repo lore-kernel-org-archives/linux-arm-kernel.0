@@ -1,82 +1,191 @@
 From: matthias.bgg@gmail.com (Matthias Brugger)
-Date: Fri, 12 Jun 2015 19:09:02 +0200
-Subject: [PATCH 4/5] clk: mediatek: Add subsystem clocks of MT8173
-In-Reply-To: <1432192376-6712-5-git-send-email-jamesjj.liao@mediatek.com>
-References: <1432192376-6712-1-git-send-email-jamesjj.liao@mediatek.com>
- <1432192376-6712-5-git-send-email-jamesjj.liao@mediatek.com>
-Message-ID: <5809360.66NP4oPW1R@ubix>
+Date: Fri, 12 Jun 2015 19:13:53 +0200
+Subject: [PATCH v3 2/2] arm64: dts: mt8173: Add I2C device node
+In-Reply-To: <CAGS+omB1UadXeKZLmMdhSamsPpipQLmoH_PhbUPvszrYTq68fA@mail.gmail.com>
+References: <1434101229-32695-1-git-send-email-eddie.huang@mediatek.com>
+ <1434101229-32695-3-git-send-email-eddie.huang@mediatek.com>
+ <CAGS+omB1UadXeKZLmMdhSamsPpipQLmoH_PhbUPvszrYTq68fA@mail.gmail.com>
+Message-ID: <1863259.t4daGE7nbQ@ubix>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday, May 21, 2015 03:12:55 PM James Liao wrote:
-> Most multimedia subsystem clocks will be accessed by multiple
-> drivers, so it's a better way to manage these clocks in CCF.
-> This patch adds clock support for MM, IMG, VDEC, VENC and VENC_LT
-> subsystems.
+On Friday, June 12, 2015 08:28:51 PM Daniel Kurtz wrote:
+> Hi Eddie,
 > 
-> Signed-off-by: James Liao <jamesjj.liao@mediatek.com>
-> ---
->  drivers/clk/mediatek/clk-mt8173.c      | 310
-> +++++++++++++++++++++++++++++++++ include/dt-bindings/clock/mt8173-clk.h | 
-> 87 +++++++++
->  2 files changed, 397 insertions(+)
+> On Fri, Jun 12, 2015 at 5:27 PM, Eddie Huang <eddie.huang@mediatek.com> 
+wrote:
+> > Add MT8173 I2C device nodes, include I2C controllers and pins.
+> > MT8173 has six I2C controllers, from i2c0 to i2c6, exclude i2c5.
+> > The 6th I2C controller register base doesn't next to 5th I2C,
+> > and there is a hardware between 5th and 6th I2C controller. So
+> > SoC designer name 6th controller as "i2c6", not "i2c5".
 > 
-> diff --git a/drivers/clk/mediatek/clk-mt8173.c
-> b/drivers/clk/mediatek/clk-mt8173.c index eb175ac..e2f40ba 100644
-> --- a/drivers/clk/mediatek/clk-mt8173.c
-> +++ b/drivers/clk/mediatek/clk-mt8173.c
-> @@ -700,6 +700,195 @@ static const struct mtk_composite peri_clks[]
-> __initconst = { MUX(CLK_PERI_UART3_SEL, "uart3_ck_sel",
-> uart_ck_sel_parents, 0x40c, 3, 1), };
+> This is slightly misleading.  There are in fact 7 I2C controllers, but
+> "i2c5" is dedicated for use by HDMI for ddc & hdcp.
+> Is there a reason why the HDMI I2C port cannot be controlled by the
+> generic i2c driver?
 > 
-> +static struct mtk_gate_regs img_cg_regs = {
-> +	.set_ofs = 0x0004,
-> +	.clr_ofs = 0x0008,
-> +	.sta_ofs = 0x0000,
-> +};
-> +
-> +#define GATE_IMG(_id, _name, _parent, _shift) {	\
-> +		.id = _id,					\
-> +		.name = _name,					\
-> +		.parent_name = _parent,				\
-> +		.regs = &img_cg_regs,				\
-> +		.shift = _shift,				\
-> +		.ops = &mtk_clk_gate_ops_setclr,			\
-> +	}
-> +
-[...]
-> +
-> +static struct mtk_gate_regs venc_cg_regs = {
-> +	.set_ofs = 0x0004,
-> +	.clr_ofs = 0x0008,
-> +	.sta_ofs = 0x0000,
-> +};
-> +
-> +#define GATE_VENC(_id, _name, _parent, _shift) {	\
-> +		.id = _id,					\
-> +		.name = _name,					\
-> +		.parent_name = _parent,				\
-> +		.regs = &venc_cg_regs,				\
-> +		.shift = _shift,				\
-> +		.ops = &mtk_clk_gate_ops_setclr_inv,		\
-> +	}
-> +
-> +static struct mtk_gate venc_clks[] __initdata = {
-> +	GATE_VENC(CLK_VENC_CKE0, "venc_cke0", "mm_sel", 0),
-> +	GATE_VENC(CLK_VENC_CKE1, "venc_cke1", "venc_sel", 4),
-> +	GATE_VENC(CLK_VENC_CKE2, "venc_cke2", "venc_sel", 8),
-> +	GATE_VENC(CLK_VENC_CKE3, "venc_cke3", "venc_sel", 12),
-> +};
-> +
-> +static struct mtk_gate_regs venclt_cg_regs = {
-> +	.set_ofs = 0x0004,
-> +	.clr_ofs = 0x0008,
-> +	.sta_ofs = 0x0000,
-> +};
+> Of course the hdmiddc / i2c5 node can always be added in a later
+> patch, so this is no reason to hold up this patch.
+> 
+> > Signed-off-by: Eddie Huang <eddie.huang@mediatek.com>
+> > ---
+> > 
+> >  arch/arm64/boot/dts/mediatek/mt8173-evb.dts | 50 ++++++++++++++++++++
+> >  arch/arm64/boot/dts/mediatek/mt8173.dtsi    | 72
+> >  +++++++++++++++++++++++++++++ 2 files changed, 122 insertions(+)
+> > 
+> > diff --git a/arch/arm64/boot/dts/mediatek/mt8173-evb.dts
+> > b/arch/arm64/boot/dts/mediatek/mt8173-evb.dts index 43d5401..2e01988
+> > 100644
+> > --- a/arch/arm64/boot/dts/mediatek/mt8173-evb.dts
+> > +++ b/arch/arm64/boot/dts/mediatek/mt8173-evb.dts
+> > @@ -33,6 +33,56 @@
+> > 
+> >         chosen { };
+> >  
+> >  };
+> > 
+> > +&pio {
+> 
+> I don't think we needed to move these i2c pinmux descriptions from
+> mt8173.dtsi to the board .dts file.
+> 
+> AFAICT, the "i2cN_pins_a" nodes defined here are the pinctl
+> configuration that the corresponding enabled i2c nodes would choose.
+> Thus, they are generic to the MT8173 SoC, not specific to any board.
+> By themselves, these nodes do not actually select a pin configuration.
+> 
+> It is the nodes that *enable* the individual i2c nodes, and hence
+> activate those pin settings, which is board specific.
+> 
+> Hence, if your intent is to have the evb enable all i2c nodes, it
+> would have a set of nodes like this:
+> 
+> 
+> &i2c0 {
+>   pinctrl-names = "default";
+>   pinctrl-0 = <&i2c0_pins_a>;
+>   status = "okay";
+> };
+> 
+> &i2c1 {
+>  pinctrl-names = "default";
+>  pinctrl-0 = <&i2c1_pins_a>;
+>  status = "okay";
+> };
+> 
+> ...
+> 
+> > +       i2c0_pins_a: i2c0 at 0 {
+> 
+> Do these nodes need the "@0"?
+> 
+> > +               pins1 {
+> > +                       pinmux = <MT8173_PIN_45_SDA0__FUNC_SDA0>,
+> > +                                <MT8173_PIN_46_SCL0__FUNC_SCL0>;
+> > +                       bias-disable;
+> > +               };
+> > +       };
+> > +
+> > +       i2c1_pins_a: i2c1 at 0 {
+> > +               pins1 {
+> > +                       pinmux = <MT8173_PIN_125_SDA1__FUNC_SDA1>,
+> > +                                <MT8173_PIN_126_SCL1__FUNC_SCL1>;
+> > +                       bias-disable;
+> > +               };
+> > +       };
+> > +
+> > +       i2c2_pins_a: i2c2 at 0 {
+> > +               pins1 {
+> > +                       pinmux = <MT8173_PIN_43_SDA2__FUNC_SDA2>,
+> > +                                <MT8173_PIN_44_SCL2__FUNC_SCL2>;
+> > +                       bias-disable;
+> > +               };
+> > +       };
+> > +
+> > +       i2c3_pins_a: i2c3 at 0 {
+> > +               pins1 {
+> > +                       pinmux = <MT8173_PIN_106_SDA3__FUNC_SDA3>,
+> > +                                <MT8173_PIN_107_SCL3__FUNC_SCL3>;
+> > +                       bias-disable;
+> > +               };
+> > +       };
+> > +
+> > +       i2c4_pins_a: i2c4 at 0 {
+> > +               pins1 {
+> > +                       pinmux = <MT8173_PIN_133_SDA4__FUNC_SDA4>,
+> > +                                <MT8173_PIN_134_SCL4__FUNC_SCL4>;
+> > +                       bias-disable;
+> > +               };
+> > +       };
+> > +
+> > +       i2c6_pins_a: i2c6 at 0 {
+> > +               pins1 {
+> > +                       pinmux = <MT8173_PIN_100_MSDC2_DAT0__FUNC_SDA5>,
+> > +                                <MT8173_PIN_101_MSDC2_DAT1__FUNC_SCL5>;
+> 
+> These are the SDA/SCL pins for i2c port 6, so they should really be
+> _SDA6 / _SCL6.
+> However... I checked, and these settings are labeled "SDA5 & SCL5" in
+> the datasheet.
+> I recommend marking them correctly as 6 here and fixing the datasheet :-).
+> 
+> > +                       bias-disable;
+> > +               };
+> > +       };
+> > +};
+> > +
+> > 
+> >  &uart0 {
+> >  
+> >         status = "okay";
+> >  
+> >  };
+> > 
+> > diff --git a/arch/arm64/boot/dts/mediatek/mt8173.dtsi
+> > b/arch/arm64/boot/dts/mediatek/mt8173.dtsi index b52ec43..6d3dbbdd 100644
+> > --- a/arch/arm64/boot/dts/mediatek/mt8173.dtsi
+> > +++ b/arch/arm64/boot/dts/mediatek/mt8173.dtsi
+> > @@ -229,6 +229,78 @@
+> > 
+> >                         clocks = <&uart_clk>;
+> >                         status = "disabled";
+> >                 
+> >                 };
+> > 
+> > +
+> > +               i2c0: i2c at 11007000 {
+> > +                       compatible = "mediatek,mt8173-i2c";
+> > +                       reg = <0 0x11007000 0 0x70>,
+> > +                             <0 0x11000100 0 0x80>;
+> > +                       interrupts = <GIC_SPI 76 IRQ_TYPE_LEVEL_LOW>;
+> > +                       clock-div = <16>;
+> > +                       clocks = <&pericfg CLK_PERI_I2C0>,
+> > +                                <&pericfg CLK_PERI_AP_DMA>;
+> > +                       clock-names = "main", "dma";
+> 
+> The following fields must also be selected by the i2c nodes when they
+> are enabled:
+> 
+> clock-frequency = <100000>;
+> pinctrl-names = "default";
+> pinctrl-0 = <&i2c0_pins_a>;
+> #address-cells = <1>;
+> #size-cells = <0>;
+> 
+> So, is there any reason not to also include them here in mt8173.dtsi
+> so we can use them as defaults?
+> This would simplify the i2c nodes in the board specific .dts files.
+> The only field that might be board specific would be clock-frequency,
+> but that is trivial to override on a port-by-port basis in board files
+> as necessary.
 
+The problem is, that most of the pins have several modes (up to eight).
+In the future when all the device drivers are implemented, this gets you a 
+really huge dtsi. AFAIK this can cause a somewhat long parsing time of the dtb 
+when booting the system.
+Sascha, please correct me, if I'm wrong.
 
-The register for imagesys, vencsys and vencltsys have all the same offset.
-We could use just one struct for all of them. 
-
-Cheers,
+Thanks,
 Matthias
