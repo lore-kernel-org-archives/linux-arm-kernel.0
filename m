@@ -1,38 +1,48 @@
-From: mpe@ellerman.id.au (Michael Ellerman)
-Date: Fri, 12 Jun 2015 10:30:14 +1000
-Subject: linux-next: build failure after merge of the arm-soc tree
-Message-ID: <1434069014.28544.1.camel@ellerman.id.au>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Thu, 11 Jun 2015 17:31:01 -0700
+Subject: [PATCH v2 0/6] SPMI regulator driver
+Message-ID: <1434069067-1371-1-git-send-email-sboyd@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi all,
+This patchset adds support for the regulators found on Qualcomm's
+SPMI PMICs. The first patch is the "basic" driver that doesn't have
+any non-standard features. The next 4 patches add ways to configure some
+of the non-standard features that are generic but aren't supported
+in the regulator framework. And the final patch adds support
+for the non-standard features and some vendor specific features to
+the SPMI regulator driver.
 
-After merging the arm-soc tree, today's linux-next build (arm_multi_v7_defconfig)
-failed like this:
+Changes since v1:
+ * Split driver into standard and non-standard patches to ease review
+ * New patches to regulator framework for non-standard features
+ * Added bypass support
+ * Namespaced macros
+ * Switch to set_load() ops instead of get_optimum_mode()
+ * Consolidated range finding code
+ * Used delay op to calculate how long to delay after setting voltage on FTSMPS
 
-  scripts/Makefile.build:258: recipe for target 'arch/arm/mach-socfpga/platsmp.o' failed
-  arch/arm/mach-socfpga/platsmp.c:66:23: error: 'socfpga_secondary_startup' undeclared (first use in this function)
-     writel(virt_to_phys(socfpga_secondary_startup),
-                       ^
+Stephen Boyd (6):
+  regulator: Add QCOM SPMI regulator driver
+  regulator: Add system_load constraint
+  regulator: Add pull down support
+  regulator: Add soft start support
+  regulator: Add input current limit support
+  regulator: qcom-spmi: Add vendor specific configuration
 
-Caused by the interaction of commits 45be0cdb5323 "ARM: socfpga: add
-CPU_METHOD_OF_DECLARE for Arria 10" and 02b4e2756e01 "ARM: v7 setup function
-should invalidate L1 cache".
+ .../bindings/regulator/qcom,spmi-regulator.txt     |  183 +++
+ .../devicetree/bindings/regulator/regulator.txt    |    5 +
+ drivers/regulator/Kconfig                          |   11 +
+ drivers/regulator/Makefile                         |    1 +
+ drivers/regulator/core.c                           |   27 +
+ drivers/regulator/of_regulator.c                   |   12 +
+ drivers/regulator/qcom_spmi-regulator.c            | 1678 ++++++++++++++++++++
+ include/linux/regulator/driver.h                   |   10 +
+ include/linux/regulator/machine.h                  |    8 +
+ 9 files changed, 1935 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/regulator/qcom,spmi-regulator.txt
+ create mode 100644 drivers/regulator/qcom_spmi-regulator.c
 
-I applied the following fix for today.
-
-diff --git a/arch/arm/mach-socfpga/platsmp.c b/arch/arm/mach-socfpga/platsmp.c
-index 4d2ad3d31f7b..c6f1df89f9af 100644
---- a/arch/arm/mach-socfpga/platsmp.c
-+++ b/arch/arm/mach-socfpga/platsmp.c
-@@ -63,7 +63,7 @@ static int socfpga_a10_boot_secondary(unsigned int cpu, struct task_struct *idle
- 		       SOCFPGA_A10_RSTMGR_MODMPURST);
- 		memcpy(phys_to_virt(0), &secondary_trampoline, trampoline_size);
- 
--		writel(virt_to_phys(socfpga_secondary_startup),
-+		writel(virt_to_phys(secondary_startup),
- 		       sys_manager_base_addr + (socfpga_cpu1start_addr & 0x00000fff));
- 
- 		flush_cache_all();
-
-cheers
+-- 
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+a Linux Foundation Collaborative Project
