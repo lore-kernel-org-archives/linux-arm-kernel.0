@@ -1,47 +1,42 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Fri, 12 Jun 2015 11:56:46 +0100
-Subject: [PATCH v2 1/1] irqchip: exynos-combiner: Save IRQ enable set
- on suspend
-In-Reply-To: <557AB793.1060809@samsung.com>
-References: <1434087795-13990-1-git-send-email-javier.martinez@collabora.co.uk>
- <557AB00C.5040606@arm.com> <557AB793.1060809@samsung.com>
-Message-ID: <557ABAEE.9010703@arm.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Fri, 12 Jun 2015 12:06:35 +0100
+Subject: [PATCH 0/2] arm64: KVM: Use instruction patching for GIC world switch
+Message-ID: <1434107197-4919-1-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+The current way we deal with the GIC world switch on arm64 is a bit
+convoluted. As we have two possible backends, we rely on a couple of
+indirections set at boot time. These indirection never change, so it
+would make more sense to directly patch in a branch to the right
+function.
 
+To do this, we introduce a new CPU feature that detect the presence of
+a GICv3 CPU interface. When detected, we patch branches to the GICv3
+save/restore functions that otherwise point to the GICv2 backend.
 
-On 12/06/15 11:42, Krzysztof Kozlowski wrote:
-> On 12.06.2015 19:10, Sudeep Holla wrote:
->>
->>
->> On 12/06/15 06:43, Javier Martinez Canillas wrote:
->>> The Exynos interrupt combiner IP loses its state when the SoC enters
->>> into a low power state during a Suspend-to-RAM. This means that if a
->>> IRQ is used as a source, the interrupts for the devices are disabled
->>> when the system is resumed from a sleep state so are not triggered.
->>>
->>> Save the interrupt enable set register for each combiner group and
->>> restore it after resume to make sure that the interrupts are enabled.
->>>
->>
->> Not sure if you need this. IMO it's not clean and redundant though I
->> admit many drivers do exactly same thing. I am trying to remove or point
->> out those redundant code as irqchip core has options/flags to do what
->> you need. I assume there are no wakeup sources connected to this
->> combiner.
->
-> It may have wake up sources connected. Correct me if I am wrong but (at
-> least) on Exynos5250 combiner takes care of gpx1 GPIO pins which may be
-> external interrupts (e.g. power key on Exynos5250 Snow). I didn't check
-> other boards.
->
+Tested on both GICv2 (Juno, Seattle) and GICv3 (FVP Base model).
 
-In that case, this irqchip should implement irq_set_wake and the driver
-implementing power key should use enable_irq_wake in the suspend path.
-Just saving all the mask/enable registers is not scalable solution and
-also useless if it's just one or to interrupts that are very few IRQs
-registered/actively being used.
+These patches have been on the various lists for quite a while as part
+of a series dealing with instruction patching. Now that the
+prerequisite are queued for 4.2, it would make sense for these to be
+merged alongside.
 
-Regards,
-Sudeep
+Catalin, would you mind taking them through the arm64 tree?
+
+Marc Zyngier (2):
+  arm64: alternative: Introduce feature for GICv3 CPU interface
+  arm64: KVM: Switch vgic save/restore to alternative_insn
+
+ arch/arm/include/asm/kvm_host.h     |  5 -----
+ arch/arm64/include/asm/cpufeature.h |  8 +++++++-
+ arch/arm64/include/asm/kvm_asm.h    |  5 -----
+ arch/arm64/include/asm/kvm_host.h   | 23 -----------------------
+ arch/arm64/kernel/asm-offsets.c     |  1 -
+ arch/arm64/kernel/cpufeature.c      | 16 ++++++++++++++++
+ arch/arm64/kvm/hyp.S                | 18 ++++--------------
+ virt/kvm/arm/vgic.c                 |  3 ---
+ 8 files changed, 27 insertions(+), 52 deletions(-)
+
+-- 
+2.1.4
