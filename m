@@ -1,70 +1,33 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 12 Jun 2015 15:01:23 +0100
-Subject: Running kexec on mx6
-In-Reply-To: <CAOMZO5A0+SSdT5mfy7fmO4DUQKimQpFCSu16EVLkxR+qh6137A@mail.gmail.com>
-References: <CAOMZO5A_=okeGhRjRb-7xkO7RJKTECdgBxinrTLtVR+6TMpnVw@mail.gmail.com>
- <CAOMZO5A0+SSdT5mfy7fmO4DUQKimQpFCSu16EVLkxR+qh6137A@mail.gmail.com>
-Message-ID: <20150612140123.GA7557@n2100.arm.linux.org.uk>
+From: ulli.kroll@googlemail.com (Hans Ulli Kroll)
+Date: Fri, 12 Jun 2015 16:05:48 +0200 (CEST)
+Subject: [PATCH 01/15] ARM: kill off set_irq_flags usage
+In-Reply-To: <1433874401-27161-2-git-send-email-robh@kernel.org>
+References: <1433874401-27161-1-git-send-email-robh@kernel.org>
+ <1433874401-27161-2-git-send-email-robh@kernel.org>
+Message-ID: <alpine.LNX.2.00.1506121604200.30841@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 12, 2015 at 10:53:13AM -0300, Fabio Estevam wrote:
-> On Thu, Jun 11, 2015 at 9:08 PM, Fabio Estevam <festevam@gmail.com> wrote:
-> > Hi,
-> >
-> > I am trying to load a kernel and dtb via kexec on a mx6solo wandboard
-> > board running 4.1-rc7:
-> >
-> > root at wandboard-solo:~# kexec -d -l /mnt/zImage --dtb /mnt/imx6dl-wandboard.dtb -
-> > -command-line="console=ttymxc0,115200 root=/dev/mmcblk2p2 rootwait rw"
-> > my_load:667: do
-> > kernel: 0x75da4008 kernel_size: 0x5be000
-> > kexec_load: entry = 0x10008000 flags = 0x280000
-> > nr_segments = 2
-> > segment[0].buf   = 0x75da4008
-> > segment[0].bufsz = 0x5be000
-> > segment[0].mem   = 0x10008000
-> > segment[0].memsz = 0x5be000
-> > segment[1].buf   = 0x1ce9008
-> > segment[1].bufsz = 0x6c87
-> > segment[1].mem   = 0x116f9000
-> > segment[1].memsz = 0x7000
-> > root at wandboard-solo:~# kexec -e
-> > [   62.581795] kexec: Starting new kernel
-> > [   62.585570] Disabling non-boot CPUs ...
-> > [   62.589485] Bye!
-> >
-> > And then nothing comes out.
-> 
-> If I use a 4.1-rc7 to be loaded via kexec then I get the
-> "Uncompressing Linux... done, booting the kernel" message.
-> 
-> Initially I was loading a 3.10 kernel from a running 4.1-rc7.
-> 
-> Now I see:
-> 
-> root at wandboard-solo:~# kexec -d -l /tmp/zImage --dtb /tmp/imx6dl-wandboard.dtb -
-> -command-line="console=ttymxc0,115200 root=/dev/mmcblk0p2 rootwait rw"
-> my_load:667: do
-> kernel: 0x75d95008 kernel_size: 0x5c99d8
-> kexec_load: entry = 0x10008000 flags = 0x280000
-> nr_segments = 2
-> segment[0].buf   = 0x75d95008
-> segment[0].bufsz = 0x5c99d8
-> segment[0].mem   = 0x10008000
-> segment[0].memsz = 0x5ca000
-> segment[1].buf   = 0x1f4008
-> segment[1].bufsz = 0x6d63
-> segment[1].mem   = 0x11728000
-> segment[1].memsz = 0x7000
-> root at wandboard-solo:~# kexec -e
-> [   27.591555] kexec: Starting new kernel
-> [   27.595331] Disabling non-boot CPUs ...
-> [   27.599250] Bye!
-> Uncompressing Linux... done, booting the kernel.
 
-Has it ever worked, or is this a regression?
 
--- 
-FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
-according to speedtest.net.
+On Tue, 9 Jun 2015, Rob Herring wrote:
+
+> set_irq_flags is ARM specific with custom flags which have genirq
+> equivalents. Convert drivers to use the genirq interfaces directly, so we
+> can kill off set_irq_flags. The translation of flags is as follows:
+> 
+> IRQF_VALID -> !IRQ_NOREQUEST
+> IRQF_PROBE -> !IRQ_NOPROBE
+> IRQF_NOAUTOEN -> IRQ_NOAUTOEN
+> 
+> For IRQs managed by an irqdomain, the irqdomain core code handles clearing
+> and setting IRQ_NOREQUEST already, so there is no need to do this in
+> .map() functions and we can simply remove the set_irq_flags calls. Some
+> users also set IRQ_NOPROBE and this has been maintained although it is not
+> clear that is really needed. There appears to be a great deal of blind
+> copy and paste of this code.
+> 
+
+for mach-gemini
+Signed-off-by: Hans Ulli Kroll <ulli.kroll@googlemail.com>
+y
