@@ -1,141 +1,36 @@
-From: ryabinin.a.a@gmail.com (Andrey Ryabinin)
-Date: Fri, 12 Jun 2015 21:14:17 +0300
-Subject: [PATCH v2 5/5] arm64: add KASan support
-In-Reply-To: <CACRpkdaRJJjCXR=vK1M2YhR26JZfGoBB+jcqz8r2MhERfxRzqA@mail.gmail.com>
-References: <1431698344-28054-1-git-send-email-a.ryabinin@samsung.com>
- <1431698344-28054-6-git-send-email-a.ryabinin@samsung.com>
- <CACRpkdaRJJjCXR=vK1M2YhR26JZfGoBB+jcqz8r2MhERfxRzqA@mail.gmail.com>
-Message-ID: <CAPAsAGy-r8Z2N09wKV+e0kLfbwxd-eWK6N5Xajsnqq9jfyWqcQ@mail.gmail.com>
+From: khilman@kernel.org (Kevin Hilman)
+Date: Fri, 12 Jun 2015 11:19:59 -0700
+Subject: linux-next: build failure after merge of the arm-soc tree
+In-Reply-To: <1434069014.28544.1.camel@ellerman.id.au> (Michael Ellerman's
+ message of "Fri, 12 Jun 2015 10:30:14 +1000")
+References: <1434069014.28544.1.camel@ellerman.id.au>
+Message-ID: <7hlhfobxgw.fsf@deeprootsystems.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2015-06-11 16:39 GMT+03:00 Linus Walleij <linus.walleij@linaro.org>:
-> On Fri, May 15, 2015 at 3:59 PM, Andrey Ryabinin <a.ryabinin@samsung.com> wrote:
+Michael Ellerman <mpe@ellerman.id.au> writes:
+
+> Hi all,
 >
->> This patch adds arch specific code for kernel address sanitizer
->> (see Documentation/kasan.txt).
+> After merging the arm-soc tree, today's linux-next build (arm_multi_v7_defconfig)
+> failed like this:
 >
-> I looked closer at this again ... I am trying to get KASan up for
-> ARM(32) with some tricks and hacks.
+>   scripts/Makefile.build:258: recipe for target 'arch/arm/mach-socfpga/platsmp.o' failed
+>   arch/arm/mach-socfpga/platsmp.c:66:23: error: 'socfpga_secondary_startup' undeclared (first use in this function)
+>      writel(virt_to_phys(socfpga_secondary_startup),
+>                        ^
 >
+> Caused by the interaction of commits 45be0cdb5323 "ARM: socfpga: add
+> CPU_METHOD_OF_DECLARE for Arria 10" and 02b4e2756e01 "ARM: v7 setup function
+> should invalidate L1 cache".
 
-I have some patches for that. They still need some polishing, but works for me.
-I could share after I get back to office on Tuesday.
+I found this as well, unfortunately after it was already pulled for -next.
 
+> I applied the following fix for today.
 
->> +config KASAN_SHADOW_OFFSET
->> +       hex
->> +       default 0xdfff200000000000 if ARM64_VA_BITS_48
->> +       default 0xdffffc8000000000 if ARM64_VA_BITS_42
->> +       default 0xdfffff9000000000 if ARM64_VA_BITS_39
->
-> So IIUC these offsets are simply chosen to satisfy the equation
->
->         SHADOW = (void *)((unsigned long)addr >> KASAN_SHADOW_SCALE_SHIFT)
->                 + KASAN_SHADOW_OFFSET;
->
-> For all memory that needs to be covered, i.e. kernel text+data,
-> modules text+data, any other kernel-mode running code+data.
->
-> And it needs to be statically assigned like this because the offset
-> is used at compile time.
->
-> Atleast that is how I understood it... correct me if wrong.
-> (Dunno if all is completely obvious to everyone else in the world...)
->
+Yes, that's the right fix, and arm-soc now has the equivalent fix as
+well.
 
-I think you understood this right.
+Thanks,
 
->> +/*
->> + * KASAN_SHADOW_START: beginning of the kernel virtual addresses.
->> + * KASAN_SHADOW_END: KASAN_SHADOW_START + 1/8 of kernel virtual addresses.
->> + */
->> +#define KASAN_SHADOW_START      (UL(0xffffffffffffffff) << (VA_BITS))
->> +#define KASAN_SHADOW_END        (KASAN_SHADOW_START + (1UL << (VA_BITS - 3)))
->
-> Will this not mean that shadow start to end actually covers *all*
-> virtual addresses including userspace and what not? However a
-> large portion of this shadow memory will be unused because the
-> SHADOW_OFFSET only works for code compiled for the kernel
-> anyway.
->
-
-SHADOW_OFFSET:SHADOW_END - covers *all* 64bits of virtual addresses.
-SHADOW_OFFSET:SHADOW_START - unused shadow.
-SHADOW_START:SHADOW_END - covers only kernel virtual addresses (used shadow).
-
-
-> When working on ARM32 I certainly could not map
-> (1UL << (VA_BITS -3)) i.e. for 32 bit (1UL << 29) bytes (512 MB) of
-
-Why not? We can just take it from TASK_SIZE.
-
-> virtual memory for shadow, instead I had to restrict it to the size that
-> actually maps the memory used by the kernel.
->
-
-That should work too.
-
-> I tried shrinking it down but it crashed on me so tell me how
-> wrong I am ... :)
->
-> But here comes the real tricks, where I need some help to
-> understand the patch set, maybe some comments should be
-> inserted here and there to ease understanding:
->
-
-...
-
->> +
->> +void __init kasan_early_init(void)
->> +{
->> +       kasan_map_early_shadow(swapper_pg_dir);
->> +       start_kernel();
->> +}
->
-> So as far as I can see, kasan_early_init() needs to be called before
-> we even run start_kernel() because every memory access would
-> crash unless the MMU is set up for the shadow memory.
->
-
- kasan_early_init() should be called before *any* instrumented function.
-
-> Is it correct that when the pte's, pgd's and pud's are populated
-> KASan really doesn't kick in, it's just done to have some scratch
-> memory with whatever contents so as to do dummy updates
-> for the __asan_loadN() and __asan_storeN() calls, and no checks
-> start until the shadow memory is populated in kasan_init()
-> i.e. there are no KASan checks for any code executing up
-> to that point, just random writes and reads?
->
-
-Yes, kasan_early_init() setups scratch memory with whatever contents.
-But  KASan checks shadow before kasan_init(), that's the reason why we
-need scratch shadow.
-So checks are performed, but KASan don't print any reports, because
-init_task has non-zero kasan_depth flag (see include/linux/init_task.h)
-We check that flag in kasan_report() and print report iff it have zero value.
-
-In kasan_init() after shadow populated, we enable reports by setting
-kasan_depth to zero.
-
-
-> Also, this code under kasan_early_init(), must that not be
-> written extremely carefully to avoid any loads and stores?
-> I.e. even if this file is obviously compiled with
-> KASAN_SANITIZE_kasan_init.o := n so that it is not
-> instrumented, I'm thinking about the functions it is calling,
-> like set_pte(), pgd_populate(), pmd_offset() etc etc.
->
-
-These functions are not instrumented as well, because they are static
-and located in headers.
-So these functions will be in kasan_init.o translation unit and will
-be compiled without -fsanitize=kernel-address.
-
-> Are we just lucky that these functions never do any loads
-> and stores?
->
-
-We relay on fact that these functions are static inline and do not call other
-functions from other (instrumented) files.
+Kevin
