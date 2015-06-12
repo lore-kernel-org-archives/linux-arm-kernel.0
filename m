@@ -1,433 +1,191 @@
-From: lina.iyer@linaro.org (Lina Iyer)
-Date: Fri, 12 Jun 2015 10:03:20 -0600
-Subject: [RFC 1/7] thermal: qcom: tsens: Add a skeletal tsens drivers
-In-Reply-To: <1429796773-7151-2-git-send-email-rnayak@codeaurora.org>
-References: <1429796773-7151-1-git-send-email-rnayak@codeaurora.org>
- <1429796773-7151-2-git-send-email-rnayak@codeaurora.org>
-Message-ID: <20150612160320.GE1103@linaro.org>
+From: eric.auger@linaro.org (Eric Auger)
+Date: Fri, 12 Jun 2015 18:05:44 +0200
+Subject: [PATCH 13/13] KVM: arm64: enable ITS emulation as a virtual MSI
+ controller
+In-Reply-To: <1432893209-27313-14-git-send-email-andre.przywara@arm.com>
+References: <1432893209-27313-1-git-send-email-andre.przywara@arm.com>
+ <1432893209-27313-14-git-send-email-andre.przywara@arm.com>
+Message-ID: <557B0358.8030307@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 23 2015 at 07:51 -0600, Rajendra Nayak wrote:
->tsens is qualcomms' thermal temperature sensor device. It
-/s/tsens/TSENS /s/qualcomm/Qualcomm
+On 05/29/2015 11:53 AM, Andre Przywara wrote:
+> If userspace has provided a base address for the ITS register frame,
+> we enable the bits that advertise LPIs in the GICv3.
+> When the guest has enabled LPIs and the ITS, we enable the emulation
+> part by initializing the ITS data structures and trapping on ITS
+> register frame accesses by the guest.
+> Also we enable the KVM_SIGNAL_MSI feature to allow userland to inject
+> MSIs into the guest. Not having enabled the ITS emulation will lead
+> to a -ENODEV when trying to inject a MSI.
 
->supports reading temperatures from multiple thermal sensors
->present on various QCOM SoCs.
->Calibration data is generally read from a eeprom device.
->
->Add a skeleton driver with all the necessary abstractions so
->a variety of qcom device families which support tsens can
->add driver extensions.
->
->Also add the required device tree bindings which can be used
->to descibe the tsens device in DT.
->
->Signed-off-by: Rajendra Nayak <rnayak@codeaurora.org>
+in vgic-v3-emul.c you can now remove the old comments saying LPIs are
+not supported, at the beginning of the file.
+> 
+> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
+> ---
+>  Documentation/virtual/kvm/api.txt |  2 +-
+>  arch/arm64/kvm/Kconfig            |  1 +
+>  include/kvm/arm_vgic.h            | 10 ++++++++++
+>  virt/kvm/arm/its-emul.c           |  9 ++++++++-
+>  virt/kvm/arm/vgic-v3-emul.c       | 20 +++++++++++++++-----
+>  virt/kvm/arm/vgic.c               | 10 ++++++++++
+>  6 files changed, 45 insertions(+), 7 deletions(-)
+> 
+> diff --git a/Documentation/virtual/kvm/api.txt b/Documentation/virtual/kvm/api.txt
+> index 891d64a..d20fd94 100644
+> --- a/Documentation/virtual/kvm/api.txt
+> +++ b/Documentation/virtual/kvm/api.txt
+> @@ -2108,7 +2108,7 @@ after pausing the vcpu, but before it is resumed.
+>  4.71 KVM_SIGNAL_MSI
+>  
+>  Capability: KVM_CAP_SIGNAL_MSI
+> -Architectures: x86
+> +Architectures: x86 arm64
+>  Type: vm ioctl
+>  Parameters: struct kvm_msi (in)
+>  Returns: >0 on delivery, 0 if guest blocked the MSI, and -1 on error
+> diff --git a/arch/arm64/kvm/Kconfig b/arch/arm64/kvm/Kconfig
+> index 5105e29..6c432c0 100644
+> --- a/arch/arm64/kvm/Kconfig
+> +++ b/arch/arm64/kvm/Kconfig
+> @@ -30,6 +30,7 @@ config KVM
+>  	select SRCU
+>  	select HAVE_KVM_EVENTFD
+>  	select HAVE_KVM_IRQFD
+> +	select HAVE_KVM_MSI
+>  	---help---
+>  	  Support hosting virtualized guest machines.
+>  
+> diff --git a/include/kvm/arm_vgic.h b/include/kvm/arm_vgic.h
+> index 6bb138d..8f1be6a 100644
+> --- a/include/kvm/arm_vgic.h
+> +++ b/include/kvm/arm_vgic.h
+> @@ -162,6 +162,7 @@ struct vgic_io_device {
+>  
+>  struct vgic_its {
+>  	bool			enabled;
+> +	struct vgic_io_device	iodev;
+>  	spinlock_t		lock;
+>  	u64			cbaser;
+>  	int			creadr;
+> @@ -365,4 +366,13 @@ static inline int vgic_v3_probe(struct device_node *vgic_node,
+>  }
+>  #endif
+>  
+> +#ifdef CONFIG_HAVE_KVM_MSI
+> +int kvm_send_userspace_msi(struct kvm *kvm, struct kvm_msi *msi);
+> +#else
+> +static inline int kvm_send_userspace_msi(struct kvm *kvm, struct kvm_msi *msi)
+> +{
+> +	return -ENODEV;
+> +}
+> +#endif
+> +
+>  #endif
+> diff --git a/virt/kvm/arm/its-emul.c b/virt/kvm/arm/its-emul.c
+> index 35e886c..864de19 100644
+> --- a/virt/kvm/arm/its-emul.c
+> +++ b/virt/kvm/arm/its-emul.c
+> @@ -964,6 +964,7 @@ int vits_init(struct kvm *kvm)
+>  {
+>  	struct vgic_dist *dist = &kvm->arch.vgic;
+>  	struct vgic_its *its = &dist->its;
+> +	int ret;
+>  
+>  	if (IS_VGIC_ADDR_UNDEF(dist->vgic_its_base))
+>  		return -ENXIO;
+> @@ -977,9 +978,15 @@ int vits_init(struct kvm *kvm)
+>  	INIT_LIST_HEAD(&its->device_list);
+>  	INIT_LIST_HEAD(&its->collection_list);
+>  
+> +	ret = vgic_register_kvm_io_dev(kvm, dist->vgic_its_base,
+> +				       KVM_VGIC_V3_ITS_SIZE, vgicv3_its_ranges,
+> +				       -1, &its->iodev);
+> +	if (ret)
+> +		return ret;
+> +
+>  	its->enabled = false;
+>  
+> -	return -ENXIO;
+> +	return 0;
+>  }
+>  
+>  void vits_destroy(struct kvm *kvm)
+> diff --git a/virt/kvm/arm/vgic-v3-emul.c b/virt/kvm/arm/vgic-v3-emul.c
+> index 4513551..71d0bcf 100644
+> --- a/virt/kvm/arm/vgic-v3-emul.c
+> +++ b/virt/kvm/arm/vgic-v3-emul.c
+> @@ -89,10 +89,11 @@ static bool handle_mmio_ctlr(struct kvm_vcpu *vcpu,
+>  /*
+>   * As this implementation does not provide compatibility
+>   * with GICv2 (ARE==1), we report zero CPUs in bits [5..7].
+> - * Also LPIs and MBIs are not supported, so we set the respective bits to 0.
+> - * Also we report at most 2**10=1024 interrupt IDs (to match 1024 SPIs).
+> + * Also we report at most 2**10=1024 interrupt IDs (to match 1024 SPIs)
+> + * and provide 16 bits worth of LPI number space (to give 8192 LPIs).
+65536 LPIS
+>   */
+> -#define INTERRUPT_ID_BITS 10
+> +#define INTERRUPT_ID_BITS_SPIS 10
+> +#define INTERRUPT_ID_BITS_ITS 16
+>  static bool handle_mmio_typer(struct kvm_vcpu *vcpu,
+>  			      struct kvm_exit_mmio *mmio, phys_addr_t offset)
+>  {
+> @@ -100,7 +101,12 @@ static bool handle_mmio_typer(struct kvm_vcpu *vcpu,
+>  
+>  	reg = (min(vcpu->kvm->arch.vgic.nr_irqs, 1024) >> 5) - 1;
+>  
+> -	reg |= (INTERRUPT_ID_BITS - 1) << 19;
+> +	if (vgic_has_its(vcpu->kvm)) {
+> +		reg |= GICD_TYPER_LPIS;
+> +		reg |= (INTERRUPT_ID_BITS_ITS - 1) << 19;
+> +	} else {
+> +		reg |= (INTERRUPT_ID_BITS_SPIS - 1) << 19;
+> +	}
+>  
+>  	vgic_reg_access(mmio, &reg, offset,
+>  			ACCESS_READ_VALUE | ACCESS_WRITE_IGNORED);
+> @@ -519,7 +525,9 @@ static bool handle_mmio_ctlr_redist(struct kvm_vcpu *vcpu,
+>  	vgic_reg_access(mmio, &reg, offset,
+>  			ACCESS_READ_VALUE | ACCESS_WRITE_VALUE);
+>  	if (!dist->lpis_enabled && (reg & GICR_CTLR_ENABLE_LPIS)) {
+> -		/* Eventually do something */
+> +		dist->lpis_enabled = true;
+> +		vgic_enable_lpis(vcpu);
+> +		return true;
+>  	}
+>  	return false;
+>  }
+> @@ -546,6 +554,8 @@ static bool handle_mmio_typer_redist(struct kvm_vcpu *vcpu,
+>  	reg = redist_vcpu->vcpu_id << 8;
+>  	if (target_vcpu_id == atomic_read(&vcpu->kvm->online_vcpus) - 1)
+>  		reg |= GICR_TYPER_LAST;
+> +	if (vgic_has_its(vcpu->kvm))
+> +		reg |= GICR_TYPER_PLPIS;
+>  	vgic_reg_access(mmio, &reg, offset,
+>  			ACCESS_READ_VALUE | ACCESS_WRITE_IGNORED);
+>  	return false;
+> diff --git a/virt/kvm/arm/vgic.c b/virt/kvm/arm/vgic.c
+> index 9f7b05f..09b1f46 100644
+> --- a/virt/kvm/arm/vgic.c
+> +++ b/virt/kvm/arm/vgic.c
+> @@ -2254,3 +2254,13 @@ int kvm_set_msi(struct kvm_kernel_irq_routing_entry *e,
+>  {
+>  	return 0;
+>  }
+> +
+> +#ifdef CONFIG_HAVE_KVM_MSI
+> +int kvm_send_userspace_msi(struct kvm *kvm, struct kvm_msi *msi)
+> +{
+> +	if (kvm->arch.vgic.vm_ops.inject_msi)
+> +		return kvm->arch.vgic.vm_ops.inject_msi(kvm, msi);
+vits_inject_msi returns 0 on success while KVM API says KVM_SIGNAL_MSI
+should return > 0 on delivery and 0 is guest blocked the MSI and -1 on error
 
-Minor nits. Otherwise,
-
-Reviewed-by: Lina Iyer <lina.iyer@linaro.org>
-
->---
-> .../devicetree/bindings/thermal/qcom-tsens.txt     |  36 ++++
-> drivers/thermal/Kconfig                            |   5 +
-> drivers/thermal/Makefile                           |   1 +
-> drivers/thermal/qcom/Kconfig                       |  10 +
-> drivers/thermal/qcom/Makefile                      |   2 +
-> drivers/thermal/qcom/tsens.c                       | 206 +++++++++++++++++++++
-> drivers/thermal/qcom/tsens.h                       |  58 ++++++
-> 7 files changed, 318 insertions(+)
-> create mode 100644 Documentation/devicetree/bindings/thermal/qcom-tsens.txt
-> create mode 100644 drivers/thermal/qcom/Kconfig
-> create mode 100644 drivers/thermal/qcom/Makefile
-> create mode 100644 drivers/thermal/qcom/tsens.c
-> create mode 100644 drivers/thermal/qcom/tsens.h
->
->diff --git a/Documentation/devicetree/bindings/thermal/qcom-tsens.txt b/Documentation/devicetree/bindings/thermal/qcom-tsens.txt
->new file mode 100644
->index 0000000..90ec469
->--- /dev/null
->+++ b/Documentation/devicetree/bindings/thermal/qcom-tsens.txt
->@@ -0,0 +1,36 @@
->+* QCOM SoC Temperature Sensor (TSENS)
->+
->+Required properties:
->+- compatible :
->+ - "qcom,msm8916-tsens" : For 8916 Family of SoCs
->+ - "qcom,msm8974-tsens" : For 8974 Family of SoCs
->+ - "qcom,msm8960-tsens" : For 8960 Family of SoCs
->+
->+- reg: Address range of the thermal registers
->+- qcom,tsens-slopes : Must contain slope value for each of the sensors controlled
->+			by this device
->+- #thermal-sensor-cells : Should be 1. See ./thermal.txt for a description.
->+- Refer to Documentation/devicetree/bindings/eeprom/eeprom.txt to know how to specify
->+an eeprom cell
->+
->+Optional properties:
->+- qcom,sensor-id: List of sensor instances used in a given SoC. A TSENS IP can
->+		  have a fixed number of sensors (like 11) but a given SoC can
->+		  use only 5 of these and they might not always the first 5. They
->+		  could be sensors 0, 1, 4, 8 and 9. This property is used to
->+		  describe the subset of the sensors used. If this property is
->+		  missing they are assumed to be the first 'n'
->+		  sensors numbered sequentially.
-
-May want to explicitly call out that the numsensor defaults to number of
-slope values.
-
->+
->+Example:
->+tsens: thermal-sesnor at 900000 {
-/s/sesnor/sensor
-
->+		compatible = "qcom,msm8916-tsens";
->+		qcom,tsens-slopes = <1176 1176 1154 1176 1111
->+				1132 1132 1199 1132 1199
->+				1132>;
->+		calib_data = <&tsens_caldata>;
->+		calib_sel = <&tsens_calsel>;
->+		qcom,tsens-slopes = <3200 3200 3200 3200 3200>;
->+		qcom,sensor-id = <0 1 2 4 5>;
->+		#thermal-sensor-cells = <1>;
->+	};
->diff --git a/drivers/thermal/Kconfig b/drivers/thermal/Kconfig
->index af40db0..46b63ff 100644
->--- a/drivers/thermal/Kconfig
->+++ b/drivers/thermal/Kconfig
->@@ -299,4 +299,9 @@ depends on ARCH_STI && OF
-> source "drivers/thermal/st/Kconfig"
-> endmenu
->
->+menu "Qualcomm thermal drivers"
->+depends on ARCH_QCOM && OF
->+source "drivers/thermal/qcom/Kconfig"
->+endmenu
->+
-> endif
->diff --git a/drivers/thermal/Makefile b/drivers/thermal/Makefile
->index fa0dc48..df83890 100644
->--- a/drivers/thermal/Makefile
->+++ b/drivers/thermal/Makefile
->@@ -38,4 +38,5 @@ obj-$(CONFIG_INTEL_SOC_DTS_THERMAL)	+= intel_soc_dts_thermal.o
-> obj-$(CONFIG_TI_SOC_THERMAL)	+= ti-soc-thermal/
-> obj-$(CONFIG_INT340X_THERMAL)  += int340x_thermal/
-> obj-$(CONFIG_ST_THERMAL)	+= st/
->+obj-$(CONFIG_QCOM_TSENS)	+= qcom/
-> obj-$(CONFIG_TEGRA_SOCTHERM)	+= tegra_soctherm.o
->diff --git a/drivers/thermal/qcom/Kconfig b/drivers/thermal/qcom/Kconfig
->new file mode 100644
->index 0000000..ade0a03
->--- /dev/null
->+++ b/drivers/thermal/qcom/Kconfig
->@@ -0,0 +1,10 @@
->+config QCOM_TSENS
->+	tristate "Qualcomm Tsens Temperature Alarm"
-TSENS is the correct usage.
-
->+	depends on THERMAL
->+	depends on QCOM_QFPROM
->+	help
->+	  This enables the thermal sysfs driver for the Tsens device. It shows
->+	  up in Sysfs as a thermal zone with multiple trip points. Disabling the
->+	  thermal zone device via the mode file results in disabling the sensor.
->+	  Also able to set threshold temperature for both hot and cold and update
->+	  when a threshold is reached.
->diff --git a/drivers/thermal/qcom/Makefile b/drivers/thermal/qcom/Makefile
->new file mode 100644
->index 0000000..401069b
->--- /dev/null
->+++ b/drivers/thermal/qcom/Makefile
->@@ -0,0 +1,2 @@
->+obj-$(CONFIG_QCOM_TSENS)	+= qcom_tsens.o
->+qcom_tsens-y			+= tsens.o
->diff --git a/drivers/thermal/qcom/tsens.c b/drivers/thermal/qcom/tsens.c
->new file mode 100644
->index 0000000..fa4a73a
->--- /dev/null
->+++ b/drivers/thermal/qcom/tsens.c
->@@ -0,0 +1,206 @@
->+/*
->+ * Copyright (c) 2015, The Linux Foundation. All rights reserved.
->+ *
->+ * This program is free software; you can redistribute it and/or modify
->+ * it under the terms of the GNU General Public License version 2 and
->+ * only version 2 as published by the Free Software Foundation.
->+ *
->+ * This program is distributed in the hope that it will be useful,
->+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
->+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
->+ * GNU General Public License for more details.
->+ *
->+ */
->+
->+#include <linux/err.h>
->+#include <linux/module.h>
->+#include <linux/of.h>
->+#include <linux/platform_device.h>
->+#include <linux/pm.h>
->+#include <linux/slab.h>
->+#include <linux/thermal.h>
->+#include "tsens.h"
->+
->+static int tsens_get_temp(void *data, long *temp)
->+{
->+	const struct tsens_sensor *s = data;
->+	struct tsens_device *tmdev = s->tmdev;
->+
->+	return tmdev->ops->get_temp(tmdev, s->id, temp);
->+}
->+
->+static int tsens_get_trend(void *data, long *temp)
->+{
->+	const struct tsens_sensor *s = data;
->+	struct tsens_device *tmdev = s->tmdev;
->+
->+	if (tmdev->ops->get_trend)
->+		return tmdev->ops->get_trend(tmdev, s->id, temp);
->+
->+	return -ENOSYS;
->+}
->+
->+#ifdef CONFIG_PM
->+static int tsens_suspend(struct device *dev)
->+{
->+	struct tsens_device *tmdev = dev_get_drvdata(dev);
->+
->+	if (tmdev->ops->suspend)
-You seem to have checked for tmdev->ops in resume, why not here?
-
->+		return tmdev->ops->suspend(tmdev);
->+
->+	return 0;
->+}
->+
->+static int tsens_resume(struct device *dev)
->+{
->+	struct tsens_device *tmdev = dev_get_drvdata(dev);
->+
->+	if (tmdev->ops && tmdev->ops->resume)
->+		return tmdev->ops->resume(tmdev);
->+
->+	return 0;
->+}
->+
->+static SIMPLE_DEV_PM_OPS(tsens_pm_ops, tsens_suspend, tsens_resume);
->+#define TSENS_PM_OPS   (&tsens_pm_ops)
->+
->+#else /* CONFIG_PM_SLEEP */
->+#define TSENS_PM_OPS NULL
->+#endif /* CONFIG_PM_SLEEP */
->+
->+static const struct of_device_id tsens_table[] = {
->+	{
->+		.compatible = "qcom,msm8960-tsens",
->+	}, {
->+		.compatible = "qcom,msm8916-tsens",
->+	}, {
->+		.compatible = "qcom,msm8974-tsens",
->+	},
-
-{ .compatible = "..." },
-
-Makes for an easier read, unless, you have ops that have long names.
-
->+	{}
->+};
->+MODULE_DEVICE_TABLE(of, tsens_table);
->+
->+static const struct thermal_zone_of_device_ops tsens_of_ops = {
->+	.get_temp = tsens_get_temp,
->+	.get_trend = tsens_get_trend,
->+};
->+
->+static int tsens_register(struct tsens_device *tmdev)
->+{
->+	int i, ret;
->+	struct thermal_zone_device *tzd;
->+	u32 *hw_id, n = tmdev->num_sensors;
->+	struct device_node *np = tmdev->dev->of_node;
->+
->+	hw_id = devm_kcalloc(tmdev->dev, n, sizeof(u32), GFP_KERNEL);
->+	if (!hw_id)
->+		return -ENOMEM;
->+
->+	ret = of_property_read_u32_array(np, "qcom,sensor-id", hw_id, n);
->+	if (ret)
->+		for (i = 0;  i < tmdev->num_sensors; i++)
->+			tmdev->sensor[i].hw_id = i;
->+	else
->+		for (i = 0;  i < tmdev->num_sensors; i++)
->+			tmdev->sensor[i].hw_id = hw_id[i];
->+
->+	for (i = 0;  i < tmdev->num_sensors; i++) {
->+		tmdev->sensor[i].tmdev = tmdev;
->+		tmdev->sensor[i].id = i;
->+		tzd = thermal_zone_of_sensor_register(tmdev->dev, i,
->+						      &tmdev->sensor[i],
->+						      &tsens_of_ops);
->+		if (IS_ERR(tzd))
->+			continue;
->+		tmdev->sensor[i].tzd = tzd;
->+		if (tmdev->ops->enable)
->+			tmdev->ops->enable(tmdev, i);
->+	}
->+	return 0;
->+}
->+
->+static int tsens_probe(struct platform_device *pdev)
->+{
->+	int ret, i, num;
->+	struct device_node *np = pdev->dev.of_node;
->+	struct tsens_sensor *s;
->+	struct tsens_device *tmdev;
->+	const struct of_device_id *id;
->+
->+	num = of_property_count_u32_elems(np, "qcom,tsens-slopes");
->+	if (num <= 0) {
->+		dev_err(&pdev->dev, "invalid tsens slopes\n");
->+		return -EINVAL;
->+	}
->+
->+	tmdev = devm_kzalloc(&pdev->dev, sizeof(*tmdev) +
->+			     num * sizeof(*s), GFP_KERNEL);
->+	if (!tmdev)
->+		return -ENOMEM;
->+
->+	tmdev->dev = &pdev->dev;
->+	tmdev->num_sensors = num;
->+
->+	for (i = 0, s = tmdev->sensor; i < tmdev->num_sensors; i++, s++)
->+		of_property_read_u32_index(np, "qcom,tsens-slopes", i,
->+					   &s->slope);
->+
->+	id = of_match_node(tsens_table, np);
->+	if (!id)
->+		return -ENODEV;
->+
->+	tmdev->ops = id->data;
->+	if (!tmdev->ops || !tmdev->ops->init || !tmdev->ops->calibrate ||
->+	    !tmdev->ops->get_temp)
->+		return -EINVAL;
->+
->+	ret = tmdev->ops->init(tmdev);
->+	if (ret < 0) {
->+		dev_err(&pdev->dev, "tsens init failed\n");
->+		return ret;
->+	}
->+
->+	ret = tmdev->ops->calibrate(tmdev);
->+	if (ret < 0) {
->+		dev_err(&pdev->dev, "tsens calibration failed\n");
->+		return ret;
->+	}
->+
->+	ret = tsens_register(tmdev);
->+
->+	platform_set_drvdata(pdev, tmdev);
->+
->+	return ret;
->+}
->+
->+static int tsens_remove(struct platform_device *pdev)
->+{
->+	int i;
->+	struct tsens_device *tmdev = platform_get_drvdata(pdev);
->+	struct thermal_zone_device *tzd;
->+
->+	if (tmdev->ops->disable)
->+		tmdev->ops->disable(tmdev);
->+
->+	for (i = 0; i < tmdev->num_sensors; i++) {
->+		tzd = tmdev->sensor[i].tzd;
->+		thermal_zone_of_sensor_unregister(&pdev->dev, tzd);
->+	}
->+
->+	return 0;
->+}
->+
->+static struct platform_driver tsens_driver = {
->+	.probe = tsens_probe,
->+	.remove = tsens_remove,
->+	.driver = {
->+		.name = "qcom-tsens",
->+		.pm	= TSENS_PM_OPS,
->+		.of_match_table = tsens_table,
->+	},
->+};
->+module_platform_driver(tsens_driver);
->+
->+MODULE_LICENSE("GPL v2");
->+MODULE_DESCRIPTION("QCOM Temperature Sensor driver");
->+MODULE_ALIAS("platform:qcom-tsens");
->diff --git a/drivers/thermal/qcom/tsens.h b/drivers/thermal/qcom/tsens.h
->new file mode 100644
->index 0000000..6e3c365
->--- /dev/null
->+++ b/drivers/thermal/qcom/tsens.h
->@@ -0,0 +1,58 @@
->+/*
->+ * Copyright (c) 2015, The Linux Foundation. All rights reserved.
->+ *
->+ * This software is licensed under the terms of the GNU General Public
->+ * License version 2, as published by the Free Software Foundation, and
->+ * may be copied, distributed, and modified under those terms.
->+ *
->+ * This program is distributed in the hope that it will be useful,
->+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
->+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
->+ * GNU General Public License for more details.
->+ */
->+#ifndef __QCOM_TSENS_H__
->+#define __QCOM_TSENS_H__
->+
->+struct tsens_device;
->+
->+struct tsens_sensor {
->+	struct tsens_device		*tmdev;
->+	struct thermal_zone_device	*tzd;
->+	int				offset;
->+	int				id;
->+	int				hw_id;
->+	u32				slope;
->+	u32				status;
->+};
->+
->+struct tsens_ops {
->+	/* mandatory callbacks */
->+	int (*init)(struct tsens_device *);
->+	int (*calibrate)(struct tsens_device *);
->+	int (*get_temp)(struct tsens_device *, int, long *);
->+	/* optional callbacks */
->+	int (*enable)(struct tsens_device *, int);
->+	void (*disable)(struct tsens_device *);
->+	int (*suspend)(struct tsens_device *);
->+	int (*resume)(struct tsens_device *);
->+	int (*get_trend)(struct tsens_device *, int, long *);
->+};
->+
->+/* Registers to be saved/restored across a context loss */
->+struct tsens_context {
->+	int	threshold;
->+	int	control;
->+};
->+
->+struct tsens_device {
->+	struct device			*dev;
->+	u32				num_sensors;
->+	struct regmap			*map;
->+	struct regmap_field		*status_field;
->+	struct tsens_context		c;
-Could have had a better variable name - ctx, perhaps?
-
->+	bool				trdy;
->+	const struct tsens_ops		*ops;
->+	struct tsens_sensor		sensor[0];
->+};
->+
->+#endif /* __QCOM_TSENS_H__ */
->-- 
->QUALCOMM INDIA, on behalf of Qualcomm Innovation Center, Inc. is a member
->of Code Aurora Forum, hosted by The Linux Foundation
->
+Eric
+> +	else
+> +		return -ENODEV;
+> +}
+> +#endif
+> 
