@@ -1,54 +1,38 @@
-From: khilman@kernel.org (Kevin Hilman)
-Date: Thu, 11 Jun 2015 17:09:05 -0700
-Subject: [PATCH v2] MAINTAINERS: ARM64: EXYNOS: Extend entry for ARM64 DTS
-In-Reply-To: <557A1B31.1090201@samsung.com>
-References: <1433584939-3520-1-git-send-email-k.kozlowski@samsung.com>
- <CAMAWPa-3RhXgCjXcdQkPn3W1SJ++iAkfaBdp_p4Se9Ykg1A1mw@mail.gmail.com>
- <557A1B31.1090201@samsung.com>
-Message-ID: <CAMAWPa_R6pKHBz8fZ+FhEXcvDxwGFC9oS=N8tNnJdJkKFFePSw@mail.gmail.com>
+From: mpe@ellerman.id.au (Michael Ellerman)
+Date: Fri, 12 Jun 2015 10:30:14 +1000
+Subject: linux-next: build failure after merge of the arm-soc tree
+Message-ID: <1434069014.28544.1.camel@ellerman.id.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 11, 2015 at 4:35 PM, Krzysztof Kozlowski
-<k.kozlowski@samsung.com> wrote:
-> W dniu 12.06.2015 o 06:48, Kevin Hilman pisze:
->> Hi Krzysztof,
->>
->> On Sat, Jun 6, 2015 at 3:02 AM, Krzysztof Kozlowski
->> <k.kozlowski@samsung.com> wrote:
->>> Extend the Exynos entry to ARM64 device tree sources.
->>>
->>> Cc: Catalin Marinas <catalin.marinas@arm.com>
->>> Cc: Will Deacon <will.deacon@arm.com>
->>> Cc: Russell King <linux@arm.linux.org.uk>
->>> Cc: Kukjin Kim <kgene@kernel.org>
->>> Cc: Kevin Hilman <khilman@kernel.org>
->>> Cc: Arnd Bergmann <arnd@arndb.de>
->>> Cc: Olof Johansson <olof@lixom.net>
->>> Cc: linux-samsung-soc at vger.kernel.org
->>> Cc: linux-arm-kernel at lists.infradead.org
->>> Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
->>> Reviewed-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
->>
->> Applied to arm-soc's next/soc branch.
->>
->> Note I found this by chance.  It almost fell through the cracks
->> because arm at kernel.org (for arm-soc maintainers) wasn't on the to/cc
->> list.
->
-> Thanks. I was not aware of this email/list address. It isn't mentioned
-> in MAINTAINERS.
+Hi all,
 
-Yes, that's kind of by design as it's not meant for general patch
-review/discussion.
+After merging the arm-soc tree, today's linux-next build (arm_multi_v7_defconfig)
+failed like this:
 
-> So I suspect that any stuff intended to go directly to
-> arm-soc maintainers (not through vendor SoC tree) should be sent there?
+  scripts/Makefile.build:258: recipe for target 'arch/arm/mach-socfpga/platsmp.o' failed
+  arch/arm/mach-socfpga/platsmp.c:66:23: error: 'socfpga_secondary_startup' undeclared (first use in this function)
+     writel(virt_to_phys(socfpga_secondary_startup),
+                       ^
 
-Yes, this list is specifically for subarch/platform maintainers (which
-now includes you :) to send stuff that would like to be applied to the
-arm-soc tree.
+Caused by the interaction of commits 45be0cdb5323 "ARM: socfpga: add
+CPU_METHOD_OF_DECLARE for Arria 10" and 02b4e2756e01 "ARM: v7 setup function
+should invalidate L1 cache".
 
-Thanks,
+I applied the following fix for today.
 
-Kevin
+diff --git a/arch/arm/mach-socfpga/platsmp.c b/arch/arm/mach-socfpga/platsmp.c
+index 4d2ad3d31f7b..c6f1df89f9af 100644
+--- a/arch/arm/mach-socfpga/platsmp.c
++++ b/arch/arm/mach-socfpga/platsmp.c
+@@ -63,7 +63,7 @@ static int socfpga_a10_boot_secondary(unsigned int cpu, struct task_struct *idle
+ 		       SOCFPGA_A10_RSTMGR_MODMPURST);
+ 		memcpy(phys_to_virt(0), &secondary_trampoline, trampoline_size);
+ 
+-		writel(virt_to_phys(socfpga_secondary_startup),
++		writel(virt_to_phys(secondary_startup),
+ 		       sys_manager_base_addr + (socfpga_cpu1start_addr & 0x00000fff));
+ 
+ 		flush_cache_all();
+
+cheers
