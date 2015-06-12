@@ -1,33 +1,22 @@
-From: ulli.kroll@googlemail.com (Hans Ulli Kroll)
-Date: Fri, 12 Jun 2015 16:05:48 +0200 (CEST)
-Subject: [PATCH 01/15] ARM: kill off set_irq_flags usage
-In-Reply-To: <1433874401-27161-2-git-send-email-robh@kernel.org>
-References: <1433874401-27161-1-git-send-email-robh@kernel.org>
- <1433874401-27161-2-git-send-email-robh@kernel.org>
-Message-ID: <alpine.LNX.2.00.1506121604200.30841@localhost>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Fri, 12 Jun 2015 11:06:39 -0300
+Subject: Running kexec on mx6
+In-Reply-To: <20150612140123.GA7557@n2100.arm.linux.org.uk>
+References: <CAOMZO5A_=okeGhRjRb-7xkO7RJKTECdgBxinrTLtVR+6TMpnVw@mail.gmail.com>
+ <CAOMZO5A0+SSdT5mfy7fmO4DUQKimQpFCSu16EVLkxR+qh6137A@mail.gmail.com>
+ <20150612140123.GA7557@n2100.arm.linux.org.uk>
+Message-ID: <CAOMZO5BsH=7yOa0fs5mtSdD2GF3hTa=+Kmtp0LqiOdFCCwNQhQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Russell,
 
+On Fri, Jun 12, 2015 at 11:01 AM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
 
-On Tue, 9 Jun 2015, Rob Herring wrote:
+> Has it ever worked, or is this a regression?
 
-> set_irq_flags is ARM specific with custom flags which have genirq
-> equivalents. Convert drivers to use the genirq interfaces directly, so we
-> can kill off set_irq_flags. The translation of flags is as follows:
-> 
-> IRQF_VALID -> !IRQ_NOREQUEST
-> IRQF_PROBE -> !IRQ_NOPROBE
-> IRQF_NOAUTOEN -> IRQ_NOAUTOEN
-> 
-> For IRQs managed by an irqdomain, the irqdomain core code handles clearing
-> and setting IRQ_NOREQUEST already, so there is no need to do this in
-> .map() functions and we can simply remove the set_irq_flags calls. Some
-> users also set IRQ_NOPROBE and this has been maintained although it is not
-> clear that is really needed. There appears to be a great deal of blind
-> copy and paste of this code.
-> 
+It is my first time using kexec. Also tested running a 3.10 kernel and
+it also failed, so I think kexec has never worked on mx6.
 
-for mach-gemini
-Signed-off-by: Hans Ulli Kroll <ulli.kroll@googlemail.com>
-y
+Thanks
