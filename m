@@ -1,20 +1,26 @@
-From: vinod.koul@intel.com (Vinod Koul)
-Date: Fri, 12 Jun 2015 18:31:34 +0530
-Subject: [PATCH] dmaengine: fsl-edma: clear pending interrupts on
- initialization
-In-Reply-To: <1433706370-3867-1-git-send-email-stefan@agner.ch>
-References: <1433706370-3867-1-git-send-email-stefan@agner.ch>
-Message-ID: <20150612130134.GK28601@localhost>
+From: broonie@kernel.org (Mark Brown)
+Date: Fri, 12 Jun 2015 14:06:38 +0100
+Subject: [PATCH 1/3] ASoC: mediatek: Add AFE platform driver
+In-Reply-To: <1433946276-25969-2-git-send-email-koro.chen@mediatek.com>
+References: <1433946276-25969-1-git-send-email-koro.chen@mediatek.com>
+ <1433946276-25969-2-git-send-email-koro.chen@mediatek.com>
+Message-ID: <20150612130638.GZ1921@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jun 07, 2015 at 09:46:10PM +0200, Stefan Agner wrote:
-> Clear pending interrupts before requesting interrupts and move
-> interrupt initialization after channels have been initialized.
-> This avoids a NULL pointer dereference panic when using kexec
-> while DMA requests were running.
+On Wed, Jun 10, 2015 at 10:24:34PM +0800, Koro Chen wrote:
+> This is the DPCM based platform driver of AFE (Audio Front End) unit.
+> 
+> Signed-off-by: Koro Chen <koro.chen@mediatek.com>
+> Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
 
-Applied, thanks
-
--- 
-~Vinod
+Your signoff should be last if you're the one sending the patch.
+Otherwise this seems basically fine, but you said you were going to send
+a new version so not applying.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150612/9a88f75a/attachment.sig>
