@@ -1,78 +1,253 @@
-From: javier.martinez@collabora.co.uk (Javier Martinez Canillas)
-Date: Fri, 12 Jun 2015 13:27:57 +0200
-Subject: [PATCH v2 1/1] irqchip: exynos-combiner: Save IRQ enable set
- on suspend
-In-Reply-To: <557AB00C.5040606@arm.com>
-References: <1434087795-13990-1-git-send-email-javier.martinez@collabora.co.uk>
- <557AB00C.5040606@arm.com>
-Message-ID: <557AC23D.8040602@collabora.co.uk>
+From: kristina.martsenko@arm.com (Kristina Martsenko)
+Date: Fri, 12 Jun 2015 12:32:42 +0100
+Subject: [PATCH v3] arm64: dts: add device tree for ARM SMM-A53x2 on LogicTile
+ Express 20MG
+Message-ID: <1434108762-5637-1-git-send-email-kristina.martsenko@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Sudeep,
+Add a DTS file for the MP2 Cortex-A53 Soft Macrocell Model implemented
+on a LogicTile Express 20MG (V2F-1XV7) daughterboard. This is based on
+the version that's currently available from the ARM DTS repository [1].
 
-Thanks a lot for the feedback.
+[1] git://linux-arm.org/arm-dts.git
 
-On 06/12/2015 12:10 PM, Sudeep Holla wrote:
-> 
-> 
-> On 12/06/15 06:43, Javier Martinez Canillas wrote:
->> The Exynos interrupt combiner IP loses its state when the SoC enters
->> into a low power state during a Suspend-to-RAM. This means that if a
->> IRQ is used as a source, the interrupts for the devices are disabled
->> when the system is resumed from a sleep state so are not triggered.
->>
->> Save the interrupt enable set register for each combiner group and
->> restore it after resume to make sure that the interrupts are enabled.
->>
-> 
-> Not sure if you need this. IMO it's not clean and redundant though I
-> admit many drivers do exactly same thing. I am trying to remove or point
-> out those redundant code as irqchip core has options/flags to do what
-> you need. I assume there are no wakeup sources connected to this
+Signed-off-by: Kristina Martsenko <kristina.martsenko@arm.com>
+---
 
-Yes, there are wakeup sources connected to this combiner. As Krzysztof
-said some wakeup sources use a GPIO line as IRQ whose interrupt parent
-is the combiner. As an example the Power gpio-key and cros_ec keyboard
-for both Exynos5250 Snow and Exynos5420 Peach Pit/Pi.
+Changes in v3:
+ - Also removed the /memreserve/, the Boot Monitor adds that too.
 
-Both drivers/input/keyboard/gpio_keysc and drivers/mfd/cros_ec.c do the
-right thing though and call {enable,disable}_irq_wake() on the S2R path.
+Changes in v2:
+ - Removed enable-method and cpu-release-addr from the second CPU (since
+   the Boot Monitor can add those itself).
 
-And in fact, the peripherals resume the system after a suspend but after
-resume, interrupts are not triggered anymore.
+ MAINTAINERS                                        |   1 +
+ arch/arm64/boot/dts/arm/Makefile                   |   1 +
+ .../boot/dts/arm/vexpress-v2f-1xv7-ca53x2.dts      | 191 +++++++++++++++++++++
+ 3 files changed, 193 insertions(+)
+ create mode 100644 arch/arm64/boot/dts/arm/vexpress-v2f-1xv7-ca53x2.dts
 
-> combiner. Setting irqchip flags should solve this problem. A simple
-> patch below should do the job ?
->
-
-I don't see how the below patch is going to work for the case I'm trying to
-solve. If I understand correctly, the IRQCHIP_MASK_ON_SUSPEND flag is used
-to force masking non wakeup interrupt in the suspend path (instead of just
-disabling the interrupts on suspend and not masking at the hardware level)
-
-But my problem is not about interrupts needed to be masked on suspend but
-the opposite, that interrupts have to be unmasked on resume since the IP
-loses its state so after a resume, interrupts are not triggered anymore.
-
-So I also don't see how implementing irq_set_wake() as you suggested is
-going to work. Maybe we need a IRQCHIP_UNMASK_ON_RESUME flag for this case?
-
-> -->8
-> 
-> diff --git a/drivers/irqchip/exynos-combiner.c 
-> b/drivers/irqchip/exynos-combiner.c
-> index 5945223b73fa..c0bcec59f829 100644
-> --- a/drivers/irqchip/exynos-combiner.c
-> +++ b/drivers/irqchip/exynos-combiner.c
-> @@ -111,6 +111,7 @@ static struct irq_chip combiner_chip = {
->   #ifdef CONFIG_SMP
->          .irq_set_affinity       = combiner_set_affinity,
->   #endif
-> +       .flags                  = IRQCHIP_MASK_ON_SUSPEND,
->   };
-> 
-> 
-
-Best regards,
-Javier
+diff --git a/MAINTAINERS b/MAINTAINERS
+index f6b9f82..02ef46d 100644
+--- a/MAINTAINERS
++++ b/MAINTAINERS
+@@ -1613,6 +1613,7 @@ M:	Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+ L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
+ S:	Maintained
+ F:	arch/arm/boot/dts/vexpress*
++F:	arch/arm64/boot/dts/arm/vexpress*
+ F:	arch/arm/mach-vexpress/
+ F:	*/*/vexpress*
+ F:	*/*/*/vexpress*
+diff --git a/arch/arm64/boot/dts/arm/Makefile b/arch/arm64/boot/dts/arm/Makefile
+index c5c98b9..bb3c072 100644
+--- a/arch/arm64/boot/dts/arm/Makefile
++++ b/arch/arm64/boot/dts/arm/Makefile
+@@ -1,6 +1,7 @@
+ dtb-$(CONFIG_ARCH_VEXPRESS) += foundation-v8.dtb
+ dtb-$(CONFIG_ARCH_VEXPRESS) += juno.dtb juno-r1.dtb
+ dtb-$(CONFIG_ARCH_VEXPRESS) += rtsm_ve-aemv8a.dtb
++dtb-$(CONFIG_ARCH_VEXPRESS) += vexpress-v2f-1xv7-ca53x2.dtb
+ 
+ always		:= $(dtb-y)
+ subdir-y	:= $(dts-dirs)
+diff --git a/arch/arm64/boot/dts/arm/vexpress-v2f-1xv7-ca53x2.dts b/arch/arm64/boot/dts/arm/vexpress-v2f-1xv7-ca53x2.dts
+new file mode 100644
+index 0000000..5b1d018
+--- /dev/null
++++ b/arch/arm64/boot/dts/arm/vexpress-v2f-1xv7-ca53x2.dts
+@@ -0,0 +1,191 @@
++/*
++ * ARM Ltd. Versatile Express
++ *
++ * LogicTile Express 20MG
++ * V2F-1XV7
++ *
++ * Cortex-A53 (2 cores) Soft Macrocell Model
++ *
++ * HBI-0247C
++ */
++
++/dts-v1/;
++
++#include <dt-bindings/interrupt-controller/arm-gic.h>
++
++/ {
++	model = "V2F-1XV7 Cortex-A53x2 SMM";
++	arm,hbi = <0x247>;
++	arm,vexpress,site = <0xf>;
++	compatible = "arm,vexpress,v2f-1xv7,ca53x2", "arm,vexpress,v2f-1xv7", "arm,vexpress";
++	interrupt-parent = <&gic>;
++	#address-cells = <2>;
++	#size-cells = <2>;
++
++	chosen {
++		stdout-path = "serial0:38400n8";
++	};
++
++	aliases {
++		serial0 = &v2m_serial0;
++		serial1 = &v2m_serial1;
++		serial2 = &v2m_serial2;
++		serial3 = &v2m_serial3;
++		i2c0 = &v2m_i2c_dvi;
++		i2c1 = &v2m_i2c_pcie;
++	};
++
++	cpus {
++		#address-cells = <2>;
++		#size-cells = <0>;
++
++		cpu at 0 {
++			device_type = "cpu";
++			compatible = "arm,cortex-a53", "arm,armv8";
++			reg = <0 0>;
++			next-level-cache = <&L2_0>;
++		};
++
++		cpu at 1 {
++			device_type = "cpu";
++			compatible = "arm,cortex-a53", "arm,armv8";
++			reg = <0 1>;
++			next-level-cache = <&L2_0>;
++		};
++
++		L2_0: l2-cache0 {
++			compatible = "cache";
++		};
++	};
++
++	memory at 80000000 {
++		device_type = "memory";
++		reg = <0 0x80000000 0 0x80000000>; /* 2GB @ 2GB */
++	};
++
++	gic: interrupt-controller at 2c001000 {
++		compatible = "arm,gic-400";
++		#interrupt-cells = <3>;
++		#address-cells = <0>;
++		interrupt-controller;
++		reg = <0 0x2c001000 0 0x1000>,
++		      <0 0x2c002000 0 0x2000>,
++		      <0 0x2c004000 0 0x2000>,
++		      <0 0x2c006000 0 0x2000>;
++		interrupts = <GIC_PPI 9 (GIC_CPU_MASK_SIMPLE(2) | IRQ_TYPE_LEVEL_HIGH)>;
++	};
++
++	timer {
++		compatible = "arm,armv8-timer";
++		interrupts = <GIC_PPI 13 (GIC_CPU_MASK_SIMPLE(2) | IRQ_TYPE_LEVEL_LOW)>,
++			     <GIC_PPI 14 (GIC_CPU_MASK_SIMPLE(2) | IRQ_TYPE_LEVEL_LOW)>,
++			     <GIC_PPI 11 (GIC_CPU_MASK_SIMPLE(2) | IRQ_TYPE_LEVEL_LOW)>,
++			     <GIC_PPI 10 (GIC_CPU_MASK_SIMPLE(2) | IRQ_TYPE_LEVEL_LOW)>;
++	};
++
++	pmu {
++		compatible = "arm,armv8-pmuv3";
++		interrupts = <GIC_SPI 68 IRQ_TYPE_LEVEL_HIGH>,
++			     <GIC_SPI 69 IRQ_TYPE_LEVEL_HIGH>;
++	};
++
++	dcc {
++		compatible = "arm,vexpress,config-bus";
++		arm,vexpress,config-bridge = <&v2m_sysreg>;
++
++		smbclk: osc at 4 {
++			/* SMC clock */
++			compatible = "arm,vexpress-osc";
++			arm,vexpress-sysreg,func = <1 4>;
++			freq-range = <40000000 40000000>;
++			#clock-cells = <0>;
++			clock-output-names = "smclk";
++		};
++
++		volt at 0 {
++			/* VIO to expansion board above */
++			compatible = "arm,vexpress-volt";
++			arm,vexpress-sysreg,func = <2 0>;
++			regulator-name = "VIO_UP";
++			regulator-min-microvolt = <800000>;
++			regulator-max-microvolt = <1800000>;
++			regulator-always-on;
++		};
++
++		volt at 1 {
++			/* 12V from power connector J6 */
++			compatible = "arm,vexpress-volt";
++			arm,vexpress-sysreg,func = <2 1>;
++			regulator-name = "12";
++			regulator-always-on;
++		};
++
++		temp at 0 {
++			/* FPGA temperature */
++			compatible = "arm,vexpress-temp";
++			arm,vexpress-sysreg,func = <4 0>;
++			label = "FPGA";
++		};
++	};
++
++	smb {
++		compatible = "simple-bus";
++
++		#address-cells = <2>;
++		#size-cells = <1>;
++		ranges = <0 0 0 0x08000000 0x04000000>,
++			 <1 0 0 0x14000000 0x04000000>,
++			 <2 0 0 0x18000000 0x04000000>,
++			 <3 0 0 0x1c000000 0x04000000>,
++			 <4 0 0 0x0c000000 0x04000000>,
++			 <5 0 0 0x10000000 0x04000000>;
++
++		#interrupt-cells = <1>;
++		interrupt-map-mask = <0 0 63>;
++		interrupt-map = <0 0  0 &gic GIC_SPI  0 IRQ_TYPE_LEVEL_HIGH>,
++				<0 0  1 &gic GIC_SPI  1 IRQ_TYPE_LEVEL_HIGH>,
++				<0 0  2 &gic GIC_SPI  2 IRQ_TYPE_LEVEL_HIGH>,
++				<0 0  3 &gic GIC_SPI  3 IRQ_TYPE_LEVEL_HIGH>,
++				<0 0  4 &gic GIC_SPI  4 IRQ_TYPE_LEVEL_HIGH>,
++				<0 0  5 &gic GIC_SPI  5 IRQ_TYPE_LEVEL_HIGH>,
++				<0 0  6 &gic GIC_SPI  6 IRQ_TYPE_LEVEL_HIGH>,
++				<0 0  7 &gic GIC_SPI  7 IRQ_TYPE_LEVEL_HIGH>,
++				<0 0  8 &gic GIC_SPI  8 IRQ_TYPE_LEVEL_HIGH>,
++				<0 0  9 &gic GIC_SPI  9 IRQ_TYPE_LEVEL_HIGH>,
++				<0 0 10 &gic GIC_SPI 10 IRQ_TYPE_LEVEL_HIGH>,
++				<0 0 11 &gic GIC_SPI 11 IRQ_TYPE_LEVEL_HIGH>,
++				<0 0 12 &gic GIC_SPI 12 IRQ_TYPE_LEVEL_HIGH>,
++				<0 0 13 &gic GIC_SPI 13 IRQ_TYPE_LEVEL_HIGH>,
++				<0 0 14 &gic GIC_SPI 14 IRQ_TYPE_LEVEL_HIGH>,
++				<0 0 15 &gic GIC_SPI 15 IRQ_TYPE_LEVEL_HIGH>,
++				<0 0 16 &gic GIC_SPI 16 IRQ_TYPE_LEVEL_HIGH>,
++				<0 0 17 &gic GIC_SPI 17 IRQ_TYPE_LEVEL_HIGH>,
++				<0 0 18 &gic GIC_SPI 18 IRQ_TYPE_LEVEL_HIGH>,
++				<0 0 19 &gic GIC_SPI 19 IRQ_TYPE_LEVEL_HIGH>,
++				<0 0 20 &gic GIC_SPI 20 IRQ_TYPE_LEVEL_HIGH>,
++				<0 0 21 &gic GIC_SPI 21 IRQ_TYPE_LEVEL_HIGH>,
++				<0 0 22 &gic GIC_SPI 22 IRQ_TYPE_LEVEL_HIGH>,
++				<0 0 23 &gic GIC_SPI 23 IRQ_TYPE_LEVEL_HIGH>,
++				<0 0 24 &gic GIC_SPI 24 IRQ_TYPE_LEVEL_HIGH>,
++				<0 0 25 &gic GIC_SPI 25 IRQ_TYPE_LEVEL_HIGH>,
++				<0 0 26 &gic GIC_SPI 26 IRQ_TYPE_LEVEL_HIGH>,
++				<0 0 27 &gic GIC_SPI 27 IRQ_TYPE_LEVEL_HIGH>,
++				<0 0 28 &gic GIC_SPI 28 IRQ_TYPE_LEVEL_HIGH>,
++				<0 0 29 &gic GIC_SPI 29 IRQ_TYPE_LEVEL_HIGH>,
++				<0 0 30 &gic GIC_SPI 30 IRQ_TYPE_LEVEL_HIGH>,
++				<0 0 31 &gic GIC_SPI 31 IRQ_TYPE_LEVEL_HIGH>,
++				<0 0 32 &gic GIC_SPI 32 IRQ_TYPE_LEVEL_HIGH>,
++				<0 0 33 &gic GIC_SPI 33 IRQ_TYPE_LEVEL_HIGH>,
++				<0 0 34 &gic GIC_SPI 34 IRQ_TYPE_LEVEL_HIGH>,
++				<0 0 35 &gic GIC_SPI 35 IRQ_TYPE_LEVEL_HIGH>,
++				<0 0 36 &gic GIC_SPI 36 IRQ_TYPE_LEVEL_HIGH>,
++				<0 0 37 &gic GIC_SPI 37 IRQ_TYPE_LEVEL_HIGH>,
++				<0 0 38 &gic GIC_SPI 38 IRQ_TYPE_LEVEL_HIGH>,
++				<0 0 39 &gic GIC_SPI 39 IRQ_TYPE_LEVEL_HIGH>,
++				<0 0 40 &gic GIC_SPI 40 IRQ_TYPE_LEVEL_HIGH>,
++				<0 0 41 &gic GIC_SPI 41 IRQ_TYPE_LEVEL_HIGH>,
++				<0 0 42 &gic GIC_SPI 42 IRQ_TYPE_LEVEL_HIGH>;
++
++		/include/ "../../../../arm/boot/dts/vexpress-v2m-rs1.dtsi"
++	};
++};
+-- 
+2.1.4
