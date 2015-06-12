@@ -1,93 +1,43 @@
-From: hdegoede@redhat.com (Hans de Goede)
-Date: Fri, 12 Jun 2015 15:27:28 +0200
-Subject: [PATCH 00/20] ARM: dts: Add USB and OTG related nodes and enable
- on various boards
-In-Reply-To: <55783B2C.3080207@redhat.com>
-References: <1433530943-12599-1-git-send-email-hdegoede@redhat.com>
- <20150608100358.GW23777@lukather> <55783B2C.3080207@redhat.com>
-Message-ID: <557ADE40.70200@redhat.com>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Fri, 12 Jun 2015 15:38:34 +0200
+Subject: [PATCH] ARM: mvebu: add missing newline at end of messages
+Message-ID: <1434116314-10533-1-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Commit 548ae94c1cc7f ("ARM: mvebu: Disable CPU Idle on Armada 38x")
+added two new pr_warn() messages in mach-mvebu/pmsu.c. However, these
+messages lack the final new line, causing the next message to be
+displayed on the same line.
 
-On 10-06-15 15:27, Hans de Goede wrote:
-> Hi,
->
-> On 08-06-15 12:03, Maxime Ripard wrote:
->> Hi Hans,
->>
->> On Fri, Jun 05, 2015 at 09:02:03PM +0200, Hans de Goede wrote:
->>> Hi Maxime,
->>>
->>> Here is a patch-set with all the otg / sun8i-usb-host related dts patches
->>> I've accumulated.
->>>
->>> These are intended for 4.3, and go hand in hand with the outstanding
->>> musb-sunxi / phy-sun4i-usb patches, which I expect to be merged as is
->>> for 4.3 .
->>
->> I'm fine with these patches. Do you have a branch somewhere that I can
->> pull (without the one that you wanted me to drop, obviously)?
->
-> I've just created a branch with just these patches directly on top
-> of sunxi/for-next for you:
->
-> https://github.com/jwrdegoede/linux-sunxi/commits/otg-dts-for-maxime
+This commit adds the missing ending newlines.
 
-Please ignore this for now. There have been some changes to the extcon
-framework, making it more integrated with devicetree, this means I need
-to add an extcon property to the musb nodes in devicetree:
+Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+---
+ arch/arm/mach-mvebu/pmsu.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
---- a/Documentation/devicetree/bindings/usb/allwinner,sun4i-a10-musb.txt
-+++ b/Documentation/devicetree/bindings/usb/allwinner,sun4i-a10-musb.txt
-@@ -12,6 +12,7 @@ Required properties:
-   - phys            : phy specifier for the otg phy
-   - phy-names       : must be "usb"
-   - dr_mode         : Dual-Role mode must be "host" or "otg"
-+ - extcon          : extcon specifier for the otg phy
-
-  Example:
-
-@@ -23,5 +24,6 @@ Example:
-                 interrupt-names = "mc";
-                 phys = <&usbphy 0>;
-                 phy-names = "usb";
-+         extcon = <&usbphy 0>;
-                 status = "disabled";
-         };
-
---- a/arch/arm/boot/dts/sun7i-a20.dtsi
-+++ b/arch/arm/boot/dts/sun7i-a20.dtsi
-@@ -773,6 +773,7 @@
-                         interrupt-names = "mc";
-                         phys = <&usbphy 0>;
-                         phy-names = "usb";
-+                 extcon = <&usbphy 0>;
-                         allwinner,sram = <&otg_sram 1>;
-                         status = "disabled";
-                 };
-
-I'll push a new version of the patches to otg-dts-for-maxime
-with the extcon property added for you and ping you when it is
-ready.
-
-> While preparing this branch I noticed that the dts for
-> the ippo q8h a33 tablets is not yet merged:
->
-> http://www.spinics.net/lists/devicetree/msg82149.html
->
-> You suggested to use the DT quirks interface instead of creating
-> a separate dts for each board variant, and in the end I agreed,
-> and asked you to merge it renamed to a more generic name
-> without the lcd1024x600 bit in there.
->
-> I can make it more generic and resend it myself. Do you want me
-> to squash in the otg changes when I resend it, or shall I keep
-> those separate ?
-
-And about this one: ping ?
-
-Thanks & Regards,
-
-Hans
+diff --git a/arch/arm/mach-mvebu/pmsu.c b/arch/arm/mach-mvebu/pmsu.c
+index 4f4e222..e8fdb9c 100644
+--- a/arch/arm/mach-mvebu/pmsu.c
++++ b/arch/arm/mach-mvebu/pmsu.c
+@@ -415,7 +415,7 @@ static __init int armada_38x_cpuidle_init(void)
+ 	void __iomem *mpsoc_base;
+ 	u32 reg;
+ 
+-	pr_warn("CPU idle is currently broken on Armada 38x: disabling");
++	pr_warn("CPU idle is currently broken on Armada 38x: disabling\n");
+ 	return 0;
+ 
+ 	np = of_find_compatible_node(NULL, NULL,
+@@ -486,7 +486,7 @@ static int __init mvebu_v7_cpu_pm_init(void)
+ 	 */
+ 	if (of_machine_is_compatible("marvell,armada380")) {
+ 		cpu_hotplug_disable();
+-		pr_warn("CPU hotplug support is currently broken on Armada 38x: disabling");
++		pr_warn("CPU hotplug support is currently broken on Armada 38x: disabling\n");
+ 	}
+ 
+ 	if (of_machine_is_compatible("marvell,armadaxp"))
+-- 
+2.1.0
