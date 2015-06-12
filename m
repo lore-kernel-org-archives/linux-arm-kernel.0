@@ -1,86 +1,113 @@
 From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Thu, 11 Jun 2015 17:31:03 -0700
-Subject: [PATCH v2 2/6] regulator: Add system_load constraint
+Date: Thu, 11 Jun 2015 17:31:04 -0700
+Subject: [PATCH v2 3/6] regulator: Add pull down support
 In-Reply-To: <1434069067-1371-1-git-send-email-sboyd@codeaurora.org>
 References: <1434069067-1371-1-git-send-email-sboyd@codeaurora.org>
-Message-ID: <1434069067-1371-3-git-send-email-sboyd@codeaurora.org>
+Message-ID: <1434069067-1371-4-git-send-email-sboyd@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Some regulators have a fixed load that isn't captured by
-consumers that the kernel knows about. Add a constraint to
-support this.
+Some regulators need to be configured to pull down a resistor
+when the regulator is disabled. Add an op (set_pull_down) and a
+DT property + constraint to support this.
 
 Cc: <devicetree@vger.kernel.org>
 Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
 ---
- Documentation/devicetree/bindings/regulator/regulator.txt | 2 ++
- drivers/regulator/core.c                                  | 2 ++
- drivers/regulator/of_regulator.c                          | 3 +++
- include/linux/regulator/machine.h                         | 3 +++
- 4 files changed, 10 insertions(+)
+ Documentation/devicetree/bindings/regulator/regulator.txt | 1 +
+ drivers/regulator/core.c                                  | 8 ++++++++
+ drivers/regulator/of_regulator.c                          | 2 ++
+ include/linux/regulator/driver.h                          | 5 +++++
+ include/linux/regulator/machine.h                         | 2 ++
+ 5 files changed, 18 insertions(+)
 
 diff --git a/Documentation/devicetree/bindings/regulator/regulator.txt b/Documentation/devicetree/bindings/regulator/regulator.txt
-index abb26b58c83e..553d2d0fe6d9 100644
+index 553d2d0fe6d9..6c79fd70ab5a 100644
 --- a/Documentation/devicetree/bindings/regulator/regulator.txt
 +++ b/Documentation/devicetree/bindings/regulator/regulator.txt
-@@ -37,6 +37,8 @@ Optional properties:
- - regulator-initial-mode: initial operating mode. The set of possible operating
-   modes depends on the capabilities of every hardware so each device binding
+@@ -39,6 +39,7 @@ Optional properties:
    documentation explains which values the regulator supports.
-+- regulator-system-load: Load in uA present on regulator that is not captured by
-+  any consumer request.
+ - regulator-system-load: Load in uA present on regulator that is not captured by
+   any consumer request.
++- regulator-pull-down: Enable pull down resistor when the regulator is disabled.
  
  Deprecated properties:
  - regulator-compatible: If a regulator chip contains multiple
 diff --git a/drivers/regulator/core.c b/drivers/regulator/core.c
-index 9dba0a3d4526..ab383dfe5386 100644
+index ab383dfe5386..1d6172a9f65c 100644
 --- a/drivers/regulator/core.c
 +++ b/drivers/regulator/core.c
-@@ -678,6 +678,8 @@ static int drms_uA_update(struct regulator_dev *rdev)
- 	list_for_each_entry(sibling, &rdev->consumer_list, list)
- 		current_uA += sibling->uA_load;
- 
-+	current_uA += rdev->constraints->system_load;
-+
- 	if (rdev->desc->ops->set_load) {
- 		/* set the optimum mode for our new total regulator load */
- 		err = rdev->desc->ops->set_load(rdev, current_uA);
-diff --git a/drivers/regulator/of_regulator.c b/drivers/regulator/of_regulator.c
-index 856c17d69b7e..b44da860ac22 100644
---- a/drivers/regulator/of_regulator.c
-+++ b/drivers/regulator/of_regulator.c
-@@ -95,6 +95,9 @@ static void of_get_regulation_constraints(struct device_node *np,
+@@ -1051,6 +1051,14 @@ static int set_machine_constraints(struct regulator_dev *rdev,
  		}
  	}
  
-+	if (!of_property_read_u32(np, "regulator-system-load", &pval))
-+		constraints->system_load = pval;
++	if (rdev->constraints->pull_down && ops->set_pull_down) {
++		ret = ops->set_pull_down(rdev);
++		if (ret < 0) {
++			rdev_err(rdev, "failed to set pull down\n");
++			goto out;
++		}
++	}
 +
- 	for (i = 0; i < ARRAY_SIZE(regulator_states); i++) {
- 		switch (i) {
- 		case PM_SUSPEND_MEM:
+ 	print_constraints(rdev);
+ 	return 0;
+ out:
+diff --git a/drivers/regulator/of_regulator.c b/drivers/regulator/of_regulator.c
+index b44da860ac22..237b014666fa 100644
+--- a/drivers/regulator/of_regulator.c
++++ b/drivers/regulator/of_regulator.c
+@@ -67,6 +67,8 @@ static void of_get_regulation_constraints(struct device_node *np,
+ 	if (!constraints->always_on) /* status change should be possible. */
+ 		constraints->valid_ops_mask |= REGULATOR_CHANGE_STATUS;
+ 
++	constraints->pull_down = of_property_read_bool(np, "regulator-pull-down");
++
+ 	if (of_property_read_bool(np, "regulator-allow-bypass"))
+ 		constraints->valid_ops_mask |= REGULATOR_CHANGE_BYPASS;
+ 
+diff --git a/include/linux/regulator/driver.h b/include/linux/regulator/driver.h
+index fffa688ac3a7..5eb85e152eb7 100644
+--- a/include/linux/regulator/driver.h
++++ b/include/linux/regulator/driver.h
+@@ -121,6 +121,9 @@ struct regulator_linear_range {
+  * @set_suspend_mode: Set the operating mode for the regulator when the
+  *                    system is suspended.
+  *
++ * @set_pull_down: Configure the regulator to pull down when the regulator
++ *		   is disabled.
++ *
+  * This struct describes regulator operations which can be implemented by
+  * regulator chip drivers.
+  */
+@@ -187,6 +190,8 @@ struct regulator_ops {
+ 
+ 	/* set regulator suspend operating mode (defined in consumer.h) */
+ 	int (*set_suspend_mode) (struct regulator_dev *, unsigned int mode);
++
++	int (*set_pull_down) (struct regulator_dev *);
+ };
+ 
+ /*
 diff --git a/include/linux/regulator/machine.h b/include/linux/regulator/machine.h
-index b07562e082c4..01526559c8c3 100644
+index 01526559c8c3..8ffb0619a03c 100644
 --- a/include/linux/regulator/machine.h
 +++ b/include/linux/regulator/machine.h
-@@ -75,6 +75,7 @@ struct regulator_state {
+@@ -87,6 +87,7 @@ struct regulator_state {
+  *           applied.
+  * @apply_uV: Apply the voltage constraint when initialising.
+  * @ramp_disable: Disable ramp delay when initialising or when setting voltage.
++ * @pull_down: Enable pull down when regulator is disabled.
   *
-  * @min_uA: Smallest current consumers may set.
-  * @max_uA: Largest current consumers may set.
-+ * @system_load: Load that isn't captured by any consumer requests.
+  * @input_uV: Input voltage for regulator when supplied by another regulator.
   *
-  * @valid_modes_mask: Mask of modes which may be configured by consumers.
-  * @valid_ops_mask: Operations which may be performed by consumers.
-@@ -112,6 +113,8 @@ struct regulation_constraints {
- 	int min_uA;
- 	int max_uA;
+@@ -141,6 +142,7 @@ struct regulation_constraints {
+ 	unsigned boot_on:1;	/* bootloader/firmware enabled regulator */
+ 	unsigned apply_uV:1;	/* apply uV constraint if min == max */
+ 	unsigned ramp_disable:1; /* disable ramp delay */
++	unsigned pull_down:1;	/* pull down resistor when regulator off */
+ };
  
-+	int system_load;
-+
- 	/* valid regulator operating modes for this machine */
- 	unsigned int valid_modes_mask;
- 
+ /**
 -- 
 The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
 a Linux Foundation Collaborative Project
