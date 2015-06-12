@@ -1,34 +1,76 @@
 From: robherring2@gmail.com (Rob Herring)
-Date: Thu, 11 Jun 2015 21:55:17 -0500
-Subject: [PATCH 1/2] dt-bindings: add vendor prefix for Netxeon Technology
-In-Reply-To: <19362183.0Io0nOHtsp@phil>
-References: <19362183.0Io0nOHtsp@phil>
-Message-ID: <CAL_Jsq+ewJt0Qkqosioqp-KgPwku_h-9poOVjF8N6d7YJscpjA@mail.gmail.com>
+Date: Thu, 11 Jun 2015 22:13:21 -0500
+Subject: [PATCH v2 6/6] regulator: qcom-spmi: Add vendor specific
+ configuration
+In-Reply-To: <1434069427-3642-7-git-send-email-sboyd@codeaurora.org>
+References: <1434069427-3642-1-git-send-email-sboyd@codeaurora.org>
+ <1434069427-3642-7-git-send-email-sboyd@codeaurora.org>
+Message-ID: <CAL_JsqL6R5jz1Xhgav0a0SeWqcRT200sofP-G_zQLfDVeqwarA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 26, 2015 at 2:49 PM, Heiko Stuebner <heiko@sntech.de> wrote:
-> Signed-off-by: Heiko Stuebner <heiko@sntech.de>
+On Thu, Jun 11, 2015 at 7:37 PM, Stephen Boyd <sboyd@codeaurora.org> wrote:
+> Add support for over current protection (OCP), pin control
+> selection, soft start and soft start strength, auto-mode, input
+> current limiting, and pull down.
+>
+> Cc: <devicetree@vger.kernel.org>
+> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
 > ---
->  Documentation/devicetree/bindings/vendor-prefixes.txt | 1 +
+>
+> Changes from v1:
+> * New patch split from original SPMI regulator driver
+>
+>  .../bindings/regulator/qcom,spmi-regulator.txt     |  62 +++++
+>  drivers/regulator/qcom_spmi-regulator.c            | 298 ++++++++++++++++++++-
+>  2 files changed, 358 insertions(+), 2 deletions(-)
+>
+> diff --git a/Documentation/devicetree/bindings/regulator/qcom,spmi-regulator.txt b/Documentation/devicetree/bindings/regulator/qcom,spmi-regulator.txt
+> index 75b4604bad07..ab01a152e930 100644
+> --- a/Documentation/devicetree/bindings/regulator/qcom,spmi-regulator.txt
+> +++ b/Documentation/devicetree/bindings/regulator/qcom,spmi-regulator.txt
+> @@ -99,6 +99,68 @@ see regulator.txt - with additional custom properties described below:
+>                     soft start are active all the time. 0 = Set initial mode to
+>                     low power mode (LPM).
+>
+> +- qcom,auto-mode-enable:
 
-Acked-by: Rob Herring <robh@kernel.org>
+Auto regulator modes are fairly common. Can't we have a common property here?
 
->  1 file changed, 1 insertion(+)
->
-> diff --git a/Documentation/devicetree/bindings/vendor-prefixes.txt b/Documentation/devicetree/bindings/vendor-prefixes.txt
-> index 8033919..1de2dfd 100644
-> --- a/Documentation/devicetree/bindings/vendor-prefixes.txt
-> +++ b/Documentation/devicetree/bindings/vendor-prefixes.txt
-> @@ -134,6 +134,7 @@ national    National Semiconductor
->  neonode                Neonode Inc.
->  netgear        NETGEAR
->  netlogic       Broadcom Corporation (formerly NetLogic Microsystems)
-> +netxeon                Shenzhen Netxeon Technology CO., LTD
->  newhaven       Newhaven Display International
->  nintendo       Nintendo
->  nokia  Nokia
-> --
-> 2.1.4
->
->
+> +       Usage: optional
+> +       Value type: <u32>
+
+This can be bool. Unless we want to have a mode property with "auto"
+being one possible value.
+
+> +       Description: 1 = Enable automatic hardware selection of regulator
+> +                        mode (HPM vs LPM); not available on boost type
+> +                        regulators. 0 = Disable auto mode selection.
+> +
+> +- qcom,ocp-enable:
+> +       Usage: optional
+> +       Value type: <u32>
+> +       Description: 1 = Allow over current protection (OCP) to be enabled for
+> +                    voltage switch type regulators so that they latch off
+> +                    automatically when over current is detected. OCP is
+> +                    enabled when in HPM or auto mode.  0 = Disable OCP.
+
+This seems common too.
+
+> +
+> +- qcom,ocp-max-retries:
+> +       Usage: optional
+> +       Value type: <u32>
+> +       Description: Maximum number of times to try toggling a voltage switch
+> +                    off and back on as a result of consecutive over current
+> +                    events.
+> +
+> +- qcom,ocp-retry-delay:
+> +       Usage: optional
+> +       Value type: <u32>
+> +       Description: Time to delay in milliseconds between each voltage switch
+> +                    toggle after an over current event takes place.
+
+These 2 are perhaps less common. I hope I don't have a device that does this. :)
+
+Rob
