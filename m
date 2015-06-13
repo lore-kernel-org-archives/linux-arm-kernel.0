@@ -1,61 +1,48 @@
-From: carlo@caione.org (Carlo Caione)
-Date: Sat, 13 Jun 2015 17:35:58 +0200
-Subject: [PATCH 1/2] pinctrl: meson: Enable GPIO IRQs
-In-Reply-To: <CACRpkdYCxnf3nUz+jTSu4qw1_nXKkc+_TioZTxW7LpP_dX-MRg@mail.gmail.com>
-References: <1432551641-3256-1-git-send-email-carlo@caione.org>
- <1432551641-3256-2-git-send-email-carlo@caione.org>
- <CACRpkdYCxnf3nUz+jTSu4qw1_nXKkc+_TioZTxW7LpP_dX-MRg@mail.gmail.com>
-Message-ID: <CAOQ7t2Z6svU4fi2N46ugDcVxtLwmfuOXJPLPhFom8LLqAenusw@mail.gmail.com>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Sat, 13 Jun 2015 17:53:23 +0200
+Subject: [PATCH 00/34] pinctrl: mvebu: numerous fixes,
+ cleanups and improvements
+In-Reply-To: <CACRpkda7mOYoh0QpxYR-EppshnZPOU2BUSs6t_Hv86aZoQY-MQ@mail.gmail.com>
+References: <1433868446-11028-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <CACRpkda7mOYoh0QpxYR-EppshnZPOU2BUSs6t_Hv86aZoQY-MQ@mail.gmail.com>
+Message-ID: <557C51F3.7060707@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 1, 2015 at 4:30 PM, Linus Walleij <linus.walleij@linaro.org> wrote:
-> On Mon, May 25, 2015 at 1:00 PM, Carlo Caione <carlo@caione.org> wrote:
+Hi Linus,
 
-Hey Linus,
-I was starting to write the v2, but I still have a couple of (probably
-silly) questions.
+On 10/06/2015 14:39, Linus Walleij wrote:
+> On Tue, Jun 9, 2015 at 6:46 PM, Thomas Petazzoni
+> <thomas.petazzoni@free-electrons.com> wrote:
+> 
+>> This fairly long series of patches implement numerous fixes, cleanups
+>> and improvements to the description of the MPP pins on Armada 370,
+>> 375, 38x, 39x and XP.
+> 
+> I have simply applied all of them, I trust you.
 
->> +       int ret;
->> +
->> +       pin = domain->data->pin_base + offset;
->
-> This is not looking good. Nominally you should use the irqdomain to
-> translate hwirq to Linux IRQ.
->
-> Normally this is just
->
-> line = irq_find_mapping(domain, hwirq);
+Does it means that it will be part of 4.2 ?
 
-Ok, it sounds reasonable but this implies that the mapping between the
-virq and the hwirq in the outermost domain already exists when the
-.to_irq hook is called, right? Also IIUC for hierarchical domains the
-mapping should also exist on all the irq_domains in the hierarchy.
 
->> +       ret = meson_get_bank(domain, pin, &bank);
->> +       if (ret)
->> +               return -ENXIO;
->> +
->> +       irq_data.args_count = 2;
->> +       irq_data.args[0] = pin;
->> +       virq = irq_domain_alloc_irqs(pc->irq_domain, 1, NUMA_NO_NODE, &irq_data);
->
-> This is wrong. You have to alloc the irqs either
->
-> (A) when the driver is probed, looping over all IRQs.
->   Then pair with free():in the IRQs in the remove()
->   call.
+Thanks,
 
-This is not really clear to me. Are you suggesting that the mapping
-between the hwirq and virq should be done at probe time so that we can
-use irq_find_mapping later?
-IIUC for the hierarchical domains the mapping creation should be
-propagated to all the domains in cascade and this is usually done
-using the .alloc hook of the irq_domain_ops and at probe time we do
-not still have the hwirq to pass to the parent GIC. Any idea on how to
-approach this problem?
+Gregory
 
-Cheers,
+
+> 
+> If updates to existing device trees in the kernel are needed please funnel
+> these through ARM SoC.
+> 
+> I do not subscribe to the "device tree bindings etched in stone" philosophy
+> for devices not yet widely deployed so I would recommend to disregard it.
+> 
+> Yours,
+> Linus Walleij
+> 
+
 
 -- 
-Carlo Caione
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
