@@ -1,179 +1,182 @@
-From: m.smarduch@samsung.com (Mario Smarduch)
-Date: Sat, 13 Jun 2015 15:20:52 -0700
-Subject: [PATCH] arm64: KVM: Optimize arm64 guest exit VFP/SIMD register
- save/restore
-Message-ID: <557CACC4.8040405@samsung.com>
+From: knaack.h@gmx.de (Hartmut Knaack)
+Date: Sun, 14 Jun 2015 01:46:49 +0200
+Subject: [PATCH v7 4/8] mfd: fsl imx25 Touchscreen ADC driver
+In-Reply-To: <1425369498-25541-5-git-send-email-mpa@pengutronix.de>
+References: <1425369498-25541-1-git-send-email-mpa@pengutronix.de>
+ <1425369498-25541-5-git-send-email-mpa@pengutronix.de>
+Message-ID: <557CC0E9.107@gmx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently VFP/SIMD registers are always saved and restored
-on Guest entry and exit.
+Markus Pargmann schrieb am 03.03.2015 um 08:58:
+> This is the core driver for imx25 touchscreen/adc driver. The module
+> has one shared ADC and two different conversion queues which use the
+> ADC. The two queues are identical. Both can be used for general purpose
+> ADC but one is meant to be used for touchscreens.
+> 
+> This driver is the core which manages the central components and
+> registers of the TSC/ADC unit. It manages the IRQs and forwards them to
+> the correct components.
+> 
+> Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
+> Signed-off-by: Denis Carikli <denis@eukrea.com>
+> Acked-by: Jonathan Cameron <jic23@kernel.org>
+> ---
+> 
 
-This patch only saves and restores VFP/SIMD registers on
-Guest access. To do this cptr_el2 VFP/SIMD trap is set
-on Guest entry and later checked on exit. This follows
-the ARMv7 VFPv3 implementation. Running an informal test
-there are high number of exits that don't access VFP/SIMD
-registers.
+Hi Markus,
+I would recommend to make use of GENMASK for many of the masks you define below.
+That makes it better readable from which to which bitnumber that mask applies.
+Thanks,
 
-Tested on FVP Model, executed threads on host and
-Guest accessing VFP/SIMD registers resulting in consistent
-results.
+Hartmut
 
-
-Signed-off-by: Mario Smarduch <m.smarduch@samsung.com>
----
- arch/arm64/include/asm/kvm_arm.h |  5 +++-
- arch/arm64/kvm/hyp.S             | 57
-+++++++++++++++++++++++++++++++++++++---
- 2 files changed, 57 insertions(+), 5 deletions(-)
-
-diff --git a/arch/arm64/include/asm/kvm_arm.h
-b/arch/arm64/include/asm/kvm_arm.h
-index ac6fafb..7605e09 100644
---- a/arch/arm64/include/asm/kvm_arm.h
-+++ b/arch/arm64/include/asm/kvm_arm.h
-@@ -171,10 +171,13 @@
- #define HSTR_EL2_TTEE	(1 << 16)
- #define HSTR_EL2_T(x)	(1 << x)
-
-+/* Hyp Coproccessor Trap Register Shifts */
-+#define CPTR_EL2_TFP_SHIFT 10
-+
- /* Hyp Coprocessor Trap Register */
- #define CPTR_EL2_TCPAC	(1 << 31)
- #define CPTR_EL2_TTA	(1 << 20)
--#define CPTR_EL2_TFP	(1 << 10)
-+#define CPTR_EL2_TFP	(1 << CPTR_EL2_TFP_SHIFT)
-
- /* Hyp Debug Configuration Register bits */
- #define MDCR_EL2_TDRA		(1 << 11)
-diff --git a/arch/arm64/kvm/hyp.S b/arch/arm64/kvm/hyp.S
-index 5befd01..b3044b4 100644
---- a/arch/arm64/kvm/hyp.S
-+++ b/arch/arm64/kvm/hyp.S
-@@ -673,6 +673,24 @@
- 	tbz	\tmp, #KVM_ARM64_DEBUG_DIRTY_SHIFT, \target
- .endm
-
-+/*
-+ * Check cptr VFP/SIMD accessed bit, if set VFP/SIMD not accessed by guest.
-+ */
-+.macro skip_fpsimd_state tmp, target
-+	mrs	\tmp, cptr_el2
-+	tbnz	\tmp, #CPTR_EL2_TFP_SHIFT, \target
-+.endm
-+
-+/*
-+ * Check cptr VFP/SIMD accessed bit if set, VFP/SIMD not accessed by guest.
-+ * Also disable all cptr traps on return to host.
-+ */
-+.macro skip_fpsimd_state_reset tmp, target
-+	mrs	\tmp, cptr_el2
-+	msr	cptr_el2, xzr
-+	tbnz	\tmp, #CPTR_EL2_TFP_SHIFT, \target
-+.endm
-+
- .macro compute_debug_state target
- 	// Compute debug state: If any of KDE, MDE or KVM_ARM64_DEBUG_DIRTY
- 	// is set, we do a full save/restore cycle and disable trapping.
-@@ -763,6 +781,7 @@
- 	ldr     x2, [x0, #VCPU_HCR_EL2]
- 	msr     hcr_el2, x2
- 	mov	x2, #CPTR_EL2_TTA
-+	orr	x2, x2, #CPTR_EL2_TFP
- 	msr	cptr_el2, x2
-
- 	mov	x2, #(1 << 15)	// Trap CP15 Cr=15
-@@ -785,7 +804,6 @@
- .macro deactivate_traps
- 	mov	x2, #HCR_RW
- 	msr	hcr_el2, x2
--	msr	cptr_el2, xzr
- 	msr	hstr_el2, xzr
-
- 	mrs	x2, mdcr_el2
-@@ -911,6 +929,30 @@ __save_fpsimd:
- __restore_fpsimd:
- 	restore_fpsimd
- 	ret
-+/*
-+ * On Guest VFP/SIMD access, switch Guest/Host registers and reset cptr
-access
-+ * bit to disable trapping.
-+ */
-+switch_to_guest_vfp:
-+	ldr	x2, =(CPTR_EL2_TTA)
-+	msr	cptr_el2, x2
-+
-+	mrs	x0, tpidr_el2
-+
-+	ldr	x2, [x0, #VCPU_HOST_CONTEXT]
-+	kern_hyp_va x2
-+
-+	add	x3, x2, #CPU_GP_REG_OFFSET(CPU_FP_REGS)
-+	fpsimd_save x3, 1
-+
-+	add	x2, x0, #VCPU_CONTEXT
-+	add	x3, x2, #CPU_GP_REG_OFFSET(CPU_FP_REGS)
-+	fpsimd_restore x3, 1
-+
-+	pop	x2, x3
-+	pop	x0, x1
-+
-+	eret
-
- /*
-  * u64 __kvm_vcpu_run(struct kvm_vcpu *vcpu);
-@@ -932,7 +974,6 @@ ENTRY(__kvm_vcpu_run)
- 	kern_hyp_va x2
-
- 	save_host_regs
--	bl __save_fpsimd
- 	bl __save_sysregs
-
- 	compute_debug_state 1f
-@@ -948,7 +989,6 @@ ENTRY(__kvm_vcpu_run)
- 	add	x2, x0, #VCPU_CONTEXT
-
- 	bl __restore_sysregs
--	bl __restore_fpsimd
-
- 	skip_debug_state x3, 1f
- 	bl	__restore_debug
-@@ -967,7 +1007,9 @@ __kvm_vcpu_return:
- 	add	x2, x0, #VCPU_CONTEXT
-
- 	save_guest_regs
-+	skip_fpsimd_state x3, 1f
- 	bl __save_fpsimd
-+1:
- 	bl __save_sysregs
-
- 	skip_debug_state x3, 1f
-@@ -986,8 +1028,11 @@ __kvm_vcpu_return:
- 	kern_hyp_va x2
-
- 	bl __restore_sysregs
--	bl __restore_fpsimd
-
-+	/* Disable cptr VFP/SIMD access bit, skip restore if VFP not accessed */
-+	skip_fpsimd_state_reset x3, 1f
-+	bl __restore_fpsimd
-+1:
- 	skip_debug_state x3, 1f
- 	// Clear the dirty flag for the next run, as all the state has
- 	// already been saved. Note that we nuke the whole 64bit word.
-@@ -1166,6 +1211,10 @@ el1_sync:					// Guest trapped into EL2
- 	mrs	x1, esr_el2
- 	lsr	x2, x1, #ESR_ELx_EC_SHIFT
-
-+	/* Guest accessed VFP/SIMD registers, save host, restore Guest */
-+	cmp	x2, #ESR_ELx_EC_FP_ASIMD
-+	b.eq	switch_to_guest_vfp
-+
- 	cmp	x2, #ESR_ELx_EC_HVC64
- 	b.ne	el1_trap
-
--- 
-1.9.1
+<...>
+> diff --git a/include/linux/mfd/imx25-tsadc.h b/include/linux/mfd/imx25-tsadc.h
+> new file mode 100644
+> index 000000000000..da348ac34a41
+> --- /dev/null
+> +++ b/include/linux/mfd/imx25-tsadc.h
+> @@ -0,0 +1,141 @@
+> +#ifndef _LINUX_INCLUDE_INPUT_IMX25_TSADC_H_
+> +#define _LINUX_INCLUDE_INPUT_IMX25_TSADC_H_
+> +
+> +struct regmap;
+> +struct device;
+> +struct clk;
+> +
+> +struct mx25_tsadc {
+> +	struct regmap *regs;
+> +	struct irq_domain *domain;
+> +	struct clk *clk;
+> +};
+> +
+> +#define MX25_TSC_TGCR			0x00
+> +#define MX25_TSC_TGSR			0x04
+> +#define MX25_TSC_TICR			0x08
+> +
+> +/* The same register layout for TC and GC queue */
+> +#define MX25_ADCQ_FIFO			0x00
+> +#define MX25_ADCQ_CR			0x04
+> +#define MX25_ADCQ_SR			0x08
+> +#define MX25_ADCQ_MR			0x0c
+> +#define MX25_ADCQ_ITEM_7_0		0x20
+> +#define MX25_ADCQ_ITEM_15_8		0x24
+> +#define MX25_ADCQ_CFG(n)		(0x40 + ((n) * 0x4))
+> +
+> +#define MX25_ADCQ_MR_MASK		0xffffffff
+> +
+> +/* TGCR */
+> +#define MX25_TGCR_PDBTIME(x)		((x) << 25)
+> +#define MX25_TGCR_PDBTIME_MASK		MX25_TGCR_PDBTIME(0x7f)
+> +#define MX25_TGCR_PDBEN			BIT(24)
+> +#define MX25_TGCR_PDEN			BIT(23)
+> +#define MX25_TGCR_ADCCLKCFG(x)		((x) << 16)
+> +#define MX25_TGCR_GET_ADCCLK(x)		(((x) >> 16) & 0x1f)
+> +#define MX25_TGCR_INTREFEN		BIT(10)
+> +#define MX25_TGCR_POWERMODE_MASK	(3 << 8)
+> +#define MX25_TGCR_POWERMODE_SAVE	(1 << 8)
+> +#define MX25_TGCR_POWERMODE_ON		(2 << 8)
+> +#define MX25_TGCR_STLC			BIT(5)
+> +#define MX25_TGCR_SLPC			BIT(4)
+> +#define MX25_TGCR_FUNC_RST		BIT(2)
+> +#define MX25_TGCR_TSC_RST		BIT(1)
+> +#define MX25_TGCR_CLK_EN		BIT(0)
+> +
+> +/* TGSR */
+> +#define MX25_TGSR_SLP_INT		BIT(2)
+> +#define MX25_TGSR_GCQ_INT		BIT(1)
+> +#define MX25_TGSR_TCQ_INT		BIT(0)
+> +
+> +/* ADCQ_ITEM_* */
+> +#define _MX25_ADCQ_ITEM(item, x)	((x) << ((item) * 4))
+> +#define MX25_ADCQ_ITEM(item, x)		((item) >= 8 ? \
+> +		_MX25_ADCQ_ITEM((item) - 8, (x)) : _MX25_ADCQ_ITEM((item), (x)))
+> +
+> +/* ADCQ_FIFO (TCQFIFO and GCQFIFO) */
+> +#define MX25_ADCQ_FIFO_DATA(x)		(((x) >> 4) & 0xfff)
+> +#define MX25_ADCQ_FIFO_ID(x)		((x) & 0xf)
+> +
+> +/* ADCQ_CR (TCQR and GCQR) */
+> +#define MX25_ADCQ_CR_PDCFG_LEVEL	BIT(19)
+> +#define MX25_ADCQ_CR_PDMSK		BIT(18)
+> +#define MX25_ADCQ_CR_FRST		BIT(17)
+> +#define MX25_ADCQ_CR_QRST		BIT(16)
+> +#define MX25_ADCQ_CR_RWAIT_MASK		(0xf << 12)
+> +#define MX25_ADCQ_CR_RWAIT(x)		((x) << 12)
+> +#define MX25_ADCQ_CR_WMRK_MASK		(0xf << 8)
+> +#define MX25_ADCQ_CR_WMRK(x)		((x) << 8)
+> +#define MX25_ADCQ_CR_LITEMID_MASK	(0xf << 4)
+> +#define MX25_ADCQ_CR_LITEMID(x)		((x) << 4)
+> +#define MX25_ADCQ_CR_RPT		BIT(3)
+> +#define MX25_ADCQ_CR_FQS		BIT(2)
+> +#define MX25_ADCQ_CR_QSM_MASK		0x3
+> +#define MX25_ADCQ_CR_QSM_PD		0x1
+> +#define MX25_ADCQ_CR_QSM_FQS		0x2
+> +#define MX25_ADCQ_CR_QSM_FQS_PD		0x3
+> +
+> +/* ADCQ_SR (TCQSR and GCQSR) */
+> +#define MX25_ADCQ_SR_FDRY		BIT(15)
+> +#define MX25_ADCQ_SR_FULL		BIT(14)
+> +#define MX25_ADCQ_SR_EMPT		BIT(13)
+> +#define MX25_ADCQ_SR_FDN(x)		(((x) >> 8) & 0x1f)
+> +#define MX25_ADCQ_SR_FRR		BIT(6)
+> +#define MX25_ADCQ_SR_FUR		BIT(5)
+> +#define MX25_ADCQ_SR_FOR		BIT(4)
+> +#define MX25_ADCQ_SR_EOQ		BIT(1)
+> +#define MX25_ADCQ_SR_PD			BIT(0)
+> +
+> +/* ADCQ_MR (TCQMR and GCQMR) */
+> +#define MX25_ADCQ_MR_FDRY_DMA		BIT(31)
+> +#define MX25_ADCQ_MR_FER_DMA		BIT(22)
+> +#define MX25_ADCQ_MR_FUR_DMA		BIT(21)
+> +#define MX25_ADCQ_MR_FOR_DMA		BIT(20)
+> +#define MX25_ADCQ_MR_EOQ_DMA		BIT(17)
+> +#define MX25_ADCQ_MR_PD_DMA		BIT(16)
+> +#define MX25_ADCQ_MR_FDRY_IRQ		BIT(15)
+> +#define MX25_ADCQ_MR_FER_IRQ		BIT(6)
+> +#define MX25_ADCQ_MR_FUR_IRQ		BIT(5)
+> +#define MX25_ADCQ_MR_FOR_IRQ		BIT(4)
+> +#define MX25_ADCQ_MR_EOQ_IRQ		BIT(1)
+> +#define MX25_ADCQ_MR_PD_IRQ		BIT(0)
+> +
+> +/* ADCQ_CFG (TICR, TCC0-7,GCC0-7) */
+> +#define MX25_ADCQ_CFG_SETTLING_TIME(x)	((x) << 24)
+> +#define MX25_ADCQ_CFG_IGS		(1 << 20)
+> +#define MX25_ADCQ_CFG_NOS_MASK		(0xf << 16)
+> +#define MX25_ADCQ_CFG_NOS(x)		(((x) - 1) << 16)
+> +#define MX25_ADCQ_CFG_WIPER		(1 << 15)
+> +#define MX25_ADCQ_CFG_YNLR		(1 << 14)
+> +#define MX25_ADCQ_CFG_YPLL_HIGH		(0 << 12)
+> +#define MX25_ADCQ_CFG_YPLL_OFF		(1 << 12)
+> +#define MX25_ADCQ_CFG_YPLL_LOW		(3 << 12)
+> +#define MX25_ADCQ_CFG_XNUR_HIGH		(0 << 10)
+> +#define MX25_ADCQ_CFG_XNUR_OFF		(1 << 10)
+> +#define MX25_ADCQ_CFG_XNUR_LOW		(3 << 10)
+> +#define MX25_ADCQ_CFG_XPUL_HIGH		(0 << 9)
+> +#define MX25_ADCQ_CFG_XPUL_OFF		(1 << 9)
+> +#define MX25_ADCQ_CFG_REFP(sel)		((sel) << 7)
+> +#define MX25_ADCQ_CFG_REFP_YP		(0 << 7)
+> +#define MX25_ADCQ_CFG_REFP_XP		(1 << 7)
+> +#define MX25_ADCQ_CFG_REFP_EXT		(2 << 7)
+> +#define MX25_ADCQ_CFG_REFP_INT		(3 << 7)
+> +#define MX25_ADCQ_CFG_REFP_MASK		(3 << 7)
+> +#define MX25_ADCQ_CFG_IN(sel)		((sel) << 4)
+> +#define MX25_ADCQ_CFG_IN_XP		(0 << 4)
+> +#define MX25_ADCQ_CFG_IN_YP		(1 << 4)
+> +#define MX25_ADCQ_CFG_IN_XN		(2 << 4)
+> +#define MX25_ADCQ_CFG_IN_YN		(3 << 4)
+> +#define MX25_ADCQ_CFG_IN_WIPER		(4 << 4)
+> +#define MX25_ADCQ_CFG_IN_AUX0		(5 << 4)
+> +#define MX25_ADCQ_CFG_IN_AUX1		(6 << 4)
+> +#define MX25_ADCQ_CFG_IN_AUX2		(7 << 4)
+> +#define MX25_ADCQ_CFG_REFN(sel)		((sel) << 2)
+> +#define MX25_ADCQ_CFG_REFN_XN		(0 << 2)
+> +#define MX25_ADCQ_CFG_REFN_YN		(1 << 2)
+> +#define MX25_ADCQ_CFG_REFN_NGND		(2 << 2)
+> +#define MX25_ADCQ_CFG_REFN_NGND2	(3 << 2)
+> +#define MX25_ADCQ_CFG_REFN_MASK		(3 << 2)
+> +#define MX25_ADCQ_CFG_PENIACK		(1 << 1)
+> +
+> +#endif  /* _LINUX_INCLUDE_INPUT_IMX25_TSADC_H_ */
+> 
