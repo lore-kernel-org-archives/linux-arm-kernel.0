@@ -1,200 +1,840 @@
 From: hdegoede@redhat.com (Hans de Goede)
-Date: Sat, 13 Jun 2015 14:37:51 +0200
-Subject: [PATCH v5 7/7] phy-sun4i-usb: Add support for monitoring vbus via a
- power-supply
-In-Reply-To: <1434199071-22127-1-git-send-email-hdegoede@redhat.com>
-References: <1434199071-22127-1-git-send-email-hdegoede@redhat.com>
-Message-ID: <1434199071-22127-8-git-send-email-hdegoede@redhat.com>
+Date: Sat, 13 Jun 2015 14:42:08 +0200
+Subject: [PATCH v5 1/3] musb: sunxi: Add support for the Allwinner sunxi musb
+ controller
+In-Reply-To: <1434199330-22263-1-git-send-email-hdegoede@redhat.com>
+References: <1434199330-22263-1-git-send-email-hdegoede@redhat.com>
+Message-ID: <1434199330-22263-2-git-send-email-hdegoede@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On some boards there is no vbus_det gpio pin, instead vbus-detection for
-otg can be done via the pmic.
+This is based on initial code to get the Allwinner sunxi musb controller
+supported by Chen-Yu Tsai and Roman Byshko.
 
-This commit adds support for monitoring vbus_det via the power_supply
-exported by the pmic, enabling support for otg on these boards.
+This adds support for the Allwinner sunxi musb controller in both host only
+and otg mode. Peripheral only mode is not supported, as no boards use that.
+
+This has been tested on a cubietruck (A20 SoC) and an UTOO P66 tablet
+(A13 SoC) with a variety of devices in host mode and with the g_serial gadget
+driver in peripheral mode, plugging otg / host cables in/out a lot of times
+in all possible imaginable plug orders.
 
 Signed-off-by: Hans de Goede <hdegoede@redhat.com>
 ---
- .../devicetree/bindings/phy/sun4i-usb-phy.txt      |  1 +
- drivers/phy/Kconfig                                |  1 +
- drivers/phy/phy-sun4i-usb.c                        | 76 ++++++++++++++++++++--
- 3 files changed, 71 insertions(+), 7 deletions(-)
+Changes in v2:
+-Move polling of id and vbus-det gpio-s to the phy driver
+-Use extcon to get id (USB_HOST mode) status changes from the phy driver
+-Stop using syscon, instead use Maxime Ripard's sunxi SRAM controller driver
+Changes in v3:
+-Check that USB_MUSB_FOO config is compatible with the dr_mode setting from dt
+Changes in v4:
+-Squash in "musb: sunxi: Add pre/post root reset end platform functions" patch
+-Adjust for sunxi_sram controller driver changes
+-Stop musb work from turning vbus off again when in host mode
+Changes in v5:
+-Squash in "musb: sunxi: Remove special MUSB_SUN4I flag" patch, as it was
+ mostly revering changes done by this patch
+-Adjust for extcon api changes landing in 4.2
+---
+ .../bindings/usb/allwinner,sun4i-a10-musb.txt      |  27 +
+ drivers/usb/musb/Kconfig                           |  13 +-
+ drivers/usb/musb/Makefile                          |   1 +
+ drivers/usb/musb/sunxi.c                           | 703 +++++++++++++++++++++
+ 4 files changed, 743 insertions(+), 1 deletion(-)
+ create mode 100644 Documentation/devicetree/bindings/usb/allwinner,sun4i-a10-musb.txt
+ create mode 100644 drivers/usb/musb/sunxi.c
 
-diff --git a/Documentation/devicetree/bindings/phy/sun4i-usb-phy.txt b/Documentation/devicetree/bindings/phy/sun4i-usb-phy.txt
-index 5f48979..0cebf74 100644
---- a/Documentation/devicetree/bindings/phy/sun4i-usb-phy.txt
-+++ b/Documentation/devicetree/bindings/phy/sun4i-usb-phy.txt
-@@ -29,6 +29,7 @@ Required properties:
- Optional properties:
- - usb0_id_det-gpios : gpio phandle for reading the otg id pin value
- - usb0_vbus_det-gpios : gpio phandle for detecting the presence of usb0 vbus
-+- usb0_vbus_power-supply: power-supply phandle for usb0 vbus presence detect
- - usb0_vbus-supply : regulator phandle for controller usb0 vbus
- - usb1_vbus-supply : regulator phandle for controller usb1 vbus
- - usb2_vbus-supply : regulator phandle for controller usb2 vbus
-diff --git a/drivers/phy/Kconfig b/drivers/phy/Kconfig
-index 9841780..4e71765 100644
---- a/drivers/phy/Kconfig
-+++ b/drivers/phy/Kconfig
-@@ -174,6 +174,7 @@ config PHY_SUN4I_USB
- 	depends on ARCH_SUNXI && HAS_IOMEM && OF
- 	depends on RESET_CONTROLLER
- 	depends on EXTCON
-+	depends on POWER_SUPPLY
- 	select GENERIC_PHY
+diff --git a/Documentation/devicetree/bindings/usb/allwinner,sun4i-a10-musb.txt b/Documentation/devicetree/bindings/usb/allwinner,sun4i-a10-musb.txt
+new file mode 100644
+index 0000000..9254a6c
+--- /dev/null
++++ b/Documentation/devicetree/bindings/usb/allwinner,sun4i-a10-musb.txt
+@@ -0,0 +1,27 @@
++Allwinner sun4i A10 musb DRC/OTG controller
++-------------------------------------------
++
++Required properties:
++ - compatible      : "allwinner,sun4i-a10-musb"
++ - reg             : mmio address range of the musb controller
++ - clocks          : clock specifier for the musb controller ahb gate clock
++ - interrupts      : interrupt to which the musb controller is connected
++ - interrupt-names : must be "mc"
++ - phys            : phy specifier for the otg phy
++ - phy-names       : must be "usb"
++ - dr_mode         : Dual-Role mode must be "host" or "otg"
++ - extcon          : extcon specifier for the otg phy
++
++Example:
++
++	usb_otg: usb at 01c13000 {
++		compatible = "allwinner,sun4i-a10-musb";
++		reg = <0x01c13000 0x0400>;
++		clocks = <&ahb_gates 0>;
++		interrupts = <38>;
++		interrupt-names = "mc";
++		phys = <&usbphy 0>;
++		phy-names = "usb";
++		extcon = <&usbphy 0>;
++		status = "disabled";
++	};
+diff --git a/drivers/usb/musb/Kconfig b/drivers/usb/musb/Kconfig
+index 39db8b6..37081ed 100644
+--- a/drivers/usb/musb/Kconfig
++++ b/drivers/usb/musb/Kconfig
+@@ -5,7 +5,7 @@
+ 
+ # (M)HDRC = (Multipoint) Highspeed Dual-Role Controller
+ config USB_MUSB_HDRC
+-	tristate 'Inventra Highspeed Dual Role Controller (TI, ADI, ...)'
++	tristate 'Inventra Highspeed Dual Role Controller (TI, ADI, AW, ...)'
+ 	depends on (USB || USB_GADGET)
  	help
- 	  Enable this to support the transceiver that is part of Allwinner
-diff --git a/drivers/phy/phy-sun4i-usb.c b/drivers/phy/phy-sun4i-usb.c
-index 0681641..1010519 100644
---- a/drivers/phy/phy-sun4i-usb.c
-+++ b/drivers/phy/phy-sun4i-usb.c
-@@ -36,6 +36,7 @@
- #include <linux/phy/phy.h>
- #include <linux/phy/phy-sun4i-usb.h>
- #include <linux/platform_device.h>
-+#include <linux/power_supply.h>
- #include <linux/regulator/consumer.h>
- #include <linux/reset.h>
- #include <linux/workqueue.h>
-@@ -108,6 +109,9 @@ struct sun4i_usb_phy_data {
- 	bool phy0_poll;
- 	struct gpio_desc *id_det_gpio;
- 	struct gpio_desc *vbus_det_gpio;
-+	struct power_supply *vbus_power_supply;
-+	struct notifier_block vbus_power_nb;
-+	bool vbus_power_nb_registered;
- 	int id_det_irq;
- 	int vbus_det_irq;
- 	int id_det;
-@@ -352,6 +356,30 @@ static struct phy_ops sun4i_usb_phy_ops = {
- 	.owner		= THIS_MODULE,
- };
+ 	  Say Y here if your system has a dual role high speed USB
+@@ -20,6 +20,8 @@ config USB_MUSB_HDRC
+ 	  Analog Devices parts using this IP include Blackfin BF54x,
+ 	  BF525 and BF527.
  
-+static int sun4i_usb_phy0_get_vbus_det(struct sun4i_usb_phy_data *data)
++	  Allwinner SoCs using this IP include A10, A13, A20, ...
++
+ 	  If you do not know what this is, please say N.
+ 
+ 	  To compile this driver as a module, choose M here; the
+@@ -60,6 +62,15 @@ endchoice
+ 
+ comment "Platform Glue Layer"
+ 
++config USB_MUSB_SUNXI
++	tristate "Allwinner (sunxi)"
++	depends on ARCH_SUNXI
++	depends on NOP_USB_XCEIV
++	depends on PHY_SUN4I_USB
++	depends on EXTCON
++	depends on GENERIC_PHY
++	select SUNXI_SRAM
++
+ config USB_MUSB_DAVINCI
+ 	tristate "DaVinci"
+ 	depends on ARCH_DAVINCI_DMx
+diff --git a/drivers/usb/musb/Makefile b/drivers/usb/musb/Makefile
+index ba49501..f95befe 100644
+--- a/drivers/usb/musb/Makefile
++++ b/drivers/usb/musb/Makefile
+@@ -20,6 +20,7 @@ obj-$(CONFIG_USB_MUSB_DA8XX)			+= da8xx.o
+ obj-$(CONFIG_USB_MUSB_BLACKFIN)			+= blackfin.o
+ obj-$(CONFIG_USB_MUSB_UX500)			+= ux500.o
+ obj-$(CONFIG_USB_MUSB_JZ4740)			+= jz4740.o
++obj-$(CONFIG_USB_MUSB_SUNXI)			+= sunxi.o
+ 
+ 
+ obj-$(CONFIG_USB_MUSB_AM335X_CHILD)		+= musb_am335x.o
+diff --git a/drivers/usb/musb/sunxi.c b/drivers/usb/musb/sunxi.c
+new file mode 100644
+index 0000000..71c1cea
+--- /dev/null
++++ b/drivers/usb/musb/sunxi.c
+@@ -0,0 +1,703 @@
++/*
++ * Allwinner sun4i MUSB Glue Layer
++ *
++ * Copyright (C) 2015 Hans de Goede <hdegoede@redhat.com>
++ *
++ * Based on code from
++ * Allwinner Technology Co., Ltd. <www.allwinnertech.com>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation; either version 2 of the License, or
++ * (at your option) any later version.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ */
++
++#include <linux/clk.h>
++#include <linux/err.h>
++#include <linux/extcon.h>
++#include <linux/io.h>
++#include <linux/kernel.h>
++#include <linux/module.h>
++#include <linux/of.h>
++#include <linux/phy/phy-sun4i-usb.h>
++#include <linux/platform_device.h>
++#include <linux/soc/sunxi/sunxi_sram.h>
++#include <linux/usb/musb.h>
++#include <linux/usb/of.h>
++#include <linux/usb/usb_phy_generic.h>
++#include <linux/workqueue.h>
++#include "musb_core.h"
++
++/*
++ * Register offsets, note sunxi musb has a different layout then most
++ * musb implementations, we translate the layout in musb_readb & friends.
++ */
++#define SUNXI_MUSB_POWER			0x0040
++#define SUNXI_MUSB_DEVCTL			0x0041
++#define SUNXI_MUSB_INDEX			0x0042
++#define SUNXI_MUSB_VEND0			0x0043
++#define SUNXI_MUSB_INTRTX			0x0044
++#define SUNXI_MUSB_INTRRX			0x0046
++#define SUNXI_MUSB_INTRTXE			0x0048
++#define SUNXI_MUSB_INTRRXE			0x004a
++#define SUNXI_MUSB_INTRUSB			0x004c
++#define SUNXI_MUSB_INTRUSBE			0x0050
++#define SUNXI_MUSB_FRAME			0x0054
++#define SUNXI_MUSB_TXFIFOSZ			0x0090
++#define SUNXI_MUSB_TXFIFOADD			0x0092
++#define SUNXI_MUSB_RXFIFOSZ			0x0094
++#define SUNXI_MUSB_RXFIFOADD			0x0096
++#define SUNXI_MUSB_FADDR			0x0098
++#define SUNXI_MUSB_TXFUNCADDR			0x0098
++#define SUNXI_MUSB_TXHUBADDR			0x009a
++#define SUNXI_MUSB_TXHUBPORT			0x009b
++#define SUNXI_MUSB_RXFUNCADDR			0x009c
++#define SUNXI_MUSB_RXHUBADDR			0x009e
++#define SUNXI_MUSB_RXHUBPORT			0x009f
++#define SUNXI_MUSB_CONFIGDATA			0x00c0
++
++/* VEND0 bits */
++#define SUNXI_MUSB_VEND0_PIO_MODE		0
++
++/* flags */
++#define SUNXI_MUSB_FL_ENABLED			0
++#define SUNXI_MUSB_FL_HOSTMODE			1
++#define SUNXI_MUSB_FL_HOSTMODE_PEND		2
++#define SUNXI_MUSB_FL_VBUS_ON			3
++#define SUNXI_MUSB_FL_PHY_ON			4
++
++/* Our read/write methods need access and do not get passed in a musb ref :| */
++struct musb *sunxi_musb;
++
++struct sunxi_glue {
++	struct device		*dev;
++	struct platform_device	*musb;
++	struct clk		*clk;
++	struct phy		*phy;
++	struct platform_device	*usb_phy;
++	struct usb_phy		*xceiv;
++	unsigned long		flags;
++	struct work_struct	work;
++	struct extcon_dev	*extcon;
++	struct notifier_block	host_nb;
++};
++
++/* phy_power_on / off may sleep, so we use a workqueue  */
++static void sunxi_musb_work(struct work_struct *work)
 +{
-+	if (data->vbus_det_gpio)
-+		return gpiod_get_value_cansleep(data->vbus_det_gpio);
++	struct sunxi_glue *glue = container_of(work, struct sunxi_glue, work);
++	bool vbus_on, phy_on;
 +
-+	if (data->vbus_power_supply) {
-+		union power_supply_propval val;
-+		int r;
++	if (!test_bit(SUNXI_MUSB_FL_ENABLED, &glue->flags))
++		return;
 +
-+		r = power_supply_get_property(data->vbus_power_supply,
-+					      POWER_SUPPLY_PROP_PRESENT, &val);
-+		if (r == 0)
-+			return val.intval;
-+	}
++	if (test_and_clear_bit(SUNXI_MUSB_FL_HOSTMODE_PEND, &glue->flags)) {
++		struct musb *musb = platform_get_drvdata(glue->musb);
++		unsigned long flags;
++		u8 devctl;
 +
-+	/* Fallback: report vbus as high */
-+	return 1;
-+}
++		spin_lock_irqsave(&musb->lock, flags);
 +
-+static bool sun4i_usb_phy0_have_vbus_det(struct sun4i_usb_phy_data *data)
-+{
-+	return data->vbus_det_gpio || data->vbus_power_supply;
-+}
-+
- static void sun4i_usb_phy0_id_vbus_det_scan(struct work_struct *work)
- {
- 	struct sun4i_usb_phy_data *data =
-@@ -360,10 +388,7 @@ static void sun4i_usb_phy0_id_vbus_det_scan(struct work_struct *work)
- 	int id_det, vbus_det, id_notify = 0, vbus_notify = 0;
- 
- 	id_det = gpiod_get_value_cansleep(data->id_det_gpio);
--	if (data->vbus_det_gpio)
--		vbus_det = gpiod_get_value_cansleep(data->vbus_det_gpio);
--	else
--		vbus_det = 1; /* Report vbus as high */
-+	vbus_det = sun4i_usb_phy0_get_vbus_det(data);
- 
- 	mutex_lock(&phy0->mutex);
- 
-@@ -378,7 +403,7 @@ static void sun4i_usb_phy0_id_vbus_det_scan(struct work_struct *work)
- 		 * without vbus detection report vbus low for long enough for
- 		 * the musb-ip to end the current device session.
- 		 */
--		if (!data->vbus_det_gpio && id_det == 0) {
-+		if (!sun4i_usb_phy0_have_vbus_det(data) && id_det == 0) {
- 			sun4i_usb_phy0_set_vbus_detect(phy0, 0);
- 			msleep(200);
- 			sun4i_usb_phy0_set_vbus_detect(phy0, 1);
-@@ -404,7 +429,7 @@ static void sun4i_usb_phy0_id_vbus_det_scan(struct work_struct *work)
- 		 * without vbus detection report vbus low for long enough to
- 		 * the musb-ip to end the current host session.
- 		 */
--		if (!data->vbus_det_gpio && id_det == 1) {
-+		if (!sun4i_usb_phy0_have_vbus_det(data) && id_det == 1) {
- 			mutex_lock(&phy0->mutex);
- 			sun4i_usb_phy0_set_vbus_detect(phy0, 0);
- 			msleep(1000);
-@@ -430,6 +455,20 @@ static irqreturn_t sun4i_usb_phy0_id_vbus_det_irq(int irq, void *dev_id)
- 	return IRQ_HANDLED;
- }
- 
-+static int sun4i_usb_phy0_vbus_notify(struct notifier_block *nb,
-+				      unsigned long val, void *v)
-+{
-+	struct sun4i_usb_phy_data *data = 
-+		container_of(nb, struct sun4i_usb_phy_data, vbus_power_nb);
-+	struct power_supply *psy = v;
-+
-+	/* Properties on the vbus_power_supply changed, scan vbus_det */
-+	if (val == PSY_EVENT_PROP_CHANGED && psy == data->vbus_power_supply)
-+		mod_delayed_work(system_wq, &data->detect, DEBOUNCE_TIME);
-+
-+	return NOTIFY_OK;
-+}
-+
- static struct phy *sun4i_usb_phy_xlate(struct device *dev,
- 					struct of_phandle_args *args)
- {
-@@ -446,6 +485,8 @@ static int sun4i_usb_phy_remove(struct platform_device *pdev)
- 	struct device *dev = &pdev->dev;
- 	struct sun4i_usb_phy_data *data = dev_get_drvdata(dev);
- 
-+	if (data->vbus_power_nb_registered)
-+		power_supply_unreg_notifier(&data->vbus_power_nb);
- 	if (data->id_det_irq >= 0)
- 		devm_free_irq(dev, data->id_det_irq, data);
- 	if (data->vbus_det_irq >= 0)
-@@ -522,8 +563,18 @@ static int sun4i_usb_phy_probe(struct platform_device *pdev)
- 		data->vbus_det_gpio = NULL;
- 	}
- 
-+	if (of_find_property(np, "usb0_vbus_power-supply", NULL)) {
-+		data->vbus_power_supply = devm_power_supply_get_by_phandle(dev,
-+						     "usb0_vbus_power-supply");
-+		if (IS_ERR(data->vbus_power_supply))
-+			return PTR_ERR(data->vbus_power_supply);
-+
-+		if (!data->vbus_power_supply)
-+			return -EPROBE_DEFER;
-+	}
-+
- 	/* vbus_det without id_det makes no sense, and is not supported */
--	if (data->vbus_det_gpio && !data->id_det_gpio) {
-+	if (sun4i_usb_phy0_have_vbus_det(data) && !data->id_det_gpio) {
- 		dev_err(dev, "usb0_id_det missing or invalid\n");
- 		return -ENODEV;
- 	}
-@@ -620,6 +671,17 @@ static int sun4i_usb_phy_probe(struct platform_device *pdev)
- 		}
- 	}
- 
-+	if (data->vbus_power_supply) {
-+		data->vbus_power_nb.notifier_call = sun4i_usb_phy0_vbus_notify;
-+		data->vbus_power_nb.priority = 0;
-+		ret = power_supply_reg_notifier(&data->vbus_power_nb);
-+		if (ret) {
-+			sun4i_usb_phy_remove(pdev); /* Stop detect work */
-+			return ret;
++		devctl = readb(musb->mregs + SUNXI_MUSB_DEVCTL);
++		if (test_bit(SUNXI_MUSB_FL_HOSTMODE, &glue->flags)) {
++			set_bit(SUNXI_MUSB_FL_VBUS_ON, &glue->flags);
++			musb->xceiv->otg->default_a = 1;
++			musb->xceiv->otg->state = OTG_STATE_A_IDLE;
++			MUSB_HST_MODE(musb);
++			devctl |= MUSB_DEVCTL_SESSION;
++		} else {
++			clear_bit(SUNXI_MUSB_FL_VBUS_ON, &glue->flags);
++			musb->xceiv->otg->default_a = 0;
++			musb->xceiv->otg->state = OTG_STATE_B_IDLE;
++			MUSB_DEV_MODE(musb);
++			devctl &= ~MUSB_DEVCTL_SESSION;
 +		}
-+		data->vbus_power_nb_registered = true;
++		writeb(devctl, musb->mregs + SUNXI_MUSB_DEVCTL);
++
++		spin_unlock_irqrestore(&musb->lock, flags);
 +	}
 +
- 	phy_provider = devm_of_phy_provider_register(dev, sun4i_usb_phy_xlate);
- 	if (IS_ERR(phy_provider)) {
- 		sun4i_usb_phy_remove(pdev); /* Stop detect work */
++	vbus_on = test_bit(SUNXI_MUSB_FL_VBUS_ON, &glue->flags);
++	phy_on = test_bit(SUNXI_MUSB_FL_PHY_ON, &glue->flags);
++
++	if (phy_on != vbus_on) {
++		if (vbus_on) {
++			phy_power_on(glue->phy);
++			set_bit(SUNXI_MUSB_FL_PHY_ON, &glue->flags);
++		} else {
++			phy_power_off(glue->phy);
++			clear_bit(SUNXI_MUSB_FL_PHY_ON, &glue->flags);
++		}
++	}
++}
++
++static void sunxi_musb_set_vbus(struct musb *musb, int is_on)
++{
++	struct sunxi_glue *glue = dev_get_drvdata(musb->controller->parent);
++
++	if (is_on)
++		set_bit(SUNXI_MUSB_FL_VBUS_ON, &glue->flags);
++	else
++		clear_bit(SUNXI_MUSB_FL_VBUS_ON, &glue->flags);
++
++	schedule_work(&glue->work);
++}
++
++void sunxi_musb_pre_root_reset_end(struct musb *musb)
++{
++	struct sunxi_glue *glue = dev_get_drvdata(musb->controller->parent);
++
++	sun4i_usb_phy_set_squelch_detect(glue->phy, false);
++}
++
++void sunxi_musb_post_root_reset_end(struct musb *musb)
++{
++	struct sunxi_glue *glue = dev_get_drvdata(musb->controller->parent);
++
++	sun4i_usb_phy_set_squelch_detect(glue->phy, true);
++}
++
++static irqreturn_t sunxi_musb_interrupt(int irq, void *__hci)
++{
++	struct musb *musb = __hci;
++	unsigned long flags;
++
++	spin_lock_irqsave(&musb->lock, flags);
++
++	musb->int_usb = readb(musb->mregs + SUNXI_MUSB_INTRUSB);
++	if (musb->int_usb)
++		writeb(musb->int_usb, musb->mregs + SUNXI_MUSB_INTRUSB);
++
++	/*
++	 * sunxi musb often signals babble on low / full speed device
++	 * disconnect, without ever raising MUSB_INTR_DISCONNECT, since
++	 * normally babble never happens treat it as disconnect.
++	 */
++	if ((musb->int_usb & MUSB_INTR_BABBLE) && is_host_active(musb)) {
++		musb->int_usb &= ~MUSB_INTR_BABBLE;
++		musb->int_usb |= MUSB_INTR_DISCONNECT;
++	}
++
++	if ((musb->int_usb & MUSB_INTR_RESET) && !is_host_active(musb)) {
++		/* ep0 FADDR must be 0 when (re)entering peripheral mode */
++		musb_ep_select(musb->mregs, 0);
++		musb_writeb(musb->mregs, MUSB_FADDR, 0);
++	}
++
++	musb->int_tx = readw(musb->mregs + SUNXI_MUSB_INTRTX);
++	if (musb->int_tx)
++		writew(musb->int_tx, musb->mregs + SUNXI_MUSB_INTRTX);
++
++	musb->int_rx = readw(musb->mregs + SUNXI_MUSB_INTRRX);
++	if (musb->int_rx)
++		writew(musb->int_rx, musb->mregs + SUNXI_MUSB_INTRRX);
++
++	musb_interrupt(musb);
++
++	spin_unlock_irqrestore(&musb->lock, flags);
++
++	return IRQ_HANDLED;
++}
++
++static int sunxi_musb_host_notifier(struct notifier_block *nb,
++				    unsigned long event, void *ptr)
++{
++	struct sunxi_glue *glue = container_of(nb, struct sunxi_glue, host_nb);
++
++	if (event)
++		set_bit(SUNXI_MUSB_FL_HOSTMODE, &glue->flags);
++	else
++		clear_bit(SUNXI_MUSB_FL_HOSTMODE, &glue->flags);
++
++	set_bit(SUNXI_MUSB_FL_HOSTMODE_PEND, &glue->flags);
++	schedule_work(&glue->work);
++
++	return NOTIFY_DONE;
++}
++
++static int sunxi_musb_init(struct musb *musb)
++{
++	struct sunxi_glue *glue = dev_get_drvdata(musb->controller->parent);
++	int ret;
++
++	sunxi_musb = musb;
++	musb->phy = glue->phy;
++	musb->xceiv = glue->xceiv;
++
++	ret = sunxi_sram_claim(musb->controller->parent);
++	if (ret)
++		return ret;
++
++	ret = clk_prepare_enable(glue->clk);
++	if (ret)
++		goto error_sram_release;
++
++	writeb(SUNXI_MUSB_VEND0_PIO_MODE, musb->mregs + SUNXI_MUSB_VEND0);
++
++	/* Register notifier before calling phy_init() */
++	if (musb->port_mode == MUSB_PORT_MODE_DUAL_ROLE) {
++		ret = extcon_register_notifier(glue->extcon, EXTCON_USB_HOST,
++					       &glue->host_nb);
++		if (ret)
++			goto error_clk_disable;
++	}
++
++	ret = phy_init(glue->phy);
++	if (ret)
++		goto error_unregister_notifier;
++
++	if (musb->port_mode == MUSB_PORT_MODE_HOST) {
++		ret = phy_power_on(glue->phy);
++		if (ret)
++			goto error_phy_exit;
++		set_bit(SUNXI_MUSB_FL_PHY_ON, &glue->flags);
++		/* Stop musb work from turning vbus off again */
++		set_bit(SUNXI_MUSB_FL_VBUS_ON, &glue->flags);
++	}
++
++	musb->isr = sunxi_musb_interrupt;
++
++	/* Stop the musb-core from doing runtime pm (not supported on sunxi) */
++	pm_runtime_get(musb->controller);
++
++	return 0;
++
++error_phy_exit:
++	phy_exit(glue->phy);
++error_unregister_notifier:
++	if (musb->port_mode == MUSB_PORT_MODE_DUAL_ROLE)
++		extcon_unregister_notifier(glue->extcon, EXTCON_USB_HOST,
++					   &glue->host_nb);
++error_clk_disable:
++	clk_disable_unprepare(glue->clk);
++error_sram_release:
++	sunxi_sram_release(musb->controller->parent);
++	return ret;
++}
++
++static int sunxi_musb_exit(struct musb *musb)
++{
++	struct sunxi_glue *glue = dev_get_drvdata(musb->controller->parent);
++
++	pm_runtime_put(musb->controller);
++
++	cancel_work_sync(&glue->work);
++	if (test_bit(SUNXI_MUSB_FL_PHY_ON, &glue->flags))
++		phy_power_off(glue->phy);
++
++	phy_exit(glue->phy);
++
++	if (musb->port_mode == MUSB_PORT_MODE_DUAL_ROLE)
++		extcon_unregister_notifier(glue->extcon, EXTCON_USB_HOST,
++					   &glue->host_nb);
++
++	clk_disable_unprepare(glue->clk);
++	sunxi_sram_release(musb->controller->parent);
++
++	return 0;
++}
++
++static void sunxi_musb_enable(struct musb *musb)
++{
++	struct sunxi_glue *glue = dev_get_drvdata(musb->controller->parent);
++
++	/* musb_core does not call us in a balanced manner */
++	if (test_and_set_bit(SUNXI_MUSB_FL_ENABLED, &glue->flags))
++		return;
++
++	schedule_work(&glue->work);
++}
++
++static void sunxi_musb_disable(struct musb *musb)
++{
++	struct sunxi_glue *glue = dev_get_drvdata(musb->controller->parent);
++
++	clear_bit(SUNXI_MUSB_FL_ENABLED, &glue->flags);
++}
++
++/*
++ * sunxi musb register layout
++ * 0x00 - 0x17	fifo regs, 1 long per fifo
++ * 0x40 - 0x57	generic control regs (power - frame)
++ * 0x80 - 0x8f	ep control regs (addressed through hw_ep->regs, indexed)
++ * 0x90 - 0x97	fifo control regs (indexed)
++ * 0x98 - 0x9f	multipoint / busctl regs (indexed)
++ * 0xc0		configdata reg
++ */
++
++static u32 sunxi_musb_fifo_offset(u8 epnum)
++{
++	return (epnum * 4);
++}
++
++static u32 sunxi_musb_ep_offset(u8 epnum, u16 offset)
++{
++	WARN_ONCE(offset != 0,
++		  "sunxi_musb_ep_offset called with non 0 offset\n");
++
++	return 0x80; /* indexed, so ignore epnum */
++}
++
++static u32 sunxi_musb_busctl_offset(u8 epnum, u16 offset)
++{
++	return SUNXI_MUSB_TXFUNCADDR + offset;
++}
++
++static u8 sunxi_musb_readb(const void __iomem *addr, unsigned offset)
++{
++	if (addr == sunxi_musb->mregs) {
++		/* generic control or fifo control reg access */
++		switch (offset) {
++		case MUSB_FADDR:
++			return readb(addr + SUNXI_MUSB_FADDR);
++		case MUSB_POWER:
++			return readb(addr + SUNXI_MUSB_POWER);
++		case MUSB_INTRUSB:
++			return readb(addr + SUNXI_MUSB_INTRUSB);
++		case MUSB_INTRUSBE:
++			return readb(addr + SUNXI_MUSB_INTRUSBE);
++		case MUSB_INDEX:
++			return readb(addr + SUNXI_MUSB_INDEX);
++		case MUSB_TESTMODE:
++			return 0; /* No testmode on sunxi */
++		case MUSB_DEVCTL:
++			return readb(addr + SUNXI_MUSB_DEVCTL);
++		case MUSB_TXFIFOSZ:
++			return readb(addr + SUNXI_MUSB_TXFIFOSZ);
++		case MUSB_RXFIFOSZ:
++			return readb(addr + SUNXI_MUSB_RXFIFOSZ);
++		case MUSB_CONFIGDATA + 0x10: /* See musb_read_configdata() */
++			return readb(addr + SUNXI_MUSB_CONFIGDATA);
++		/* Offset for these is fixed by sunxi_musb_busctl_offset() */
++		case SUNXI_MUSB_TXFUNCADDR:
++		case SUNXI_MUSB_TXHUBADDR:
++		case SUNXI_MUSB_TXHUBPORT:
++		case SUNXI_MUSB_RXFUNCADDR:
++		case SUNXI_MUSB_RXHUBADDR:
++		case SUNXI_MUSB_RXHUBPORT:
++			/* multipoint / busctl reg access */
++			return readb(addr + offset);
++		default:
++			dev_err(sunxi_musb->controller->parent,
++				"Error unknown readb offset %u\n", offset);
++			return 0;
++		}
++	} else if (addr == (sunxi_musb->mregs + 0x80)) {
++		/* ep control reg access */
++		/* sunxi has a 2 byte hole before the txtype register */
++		if (offset >= MUSB_TXTYPE)
++			offset += 2;
++		return readb(addr + offset);
++	}
++
++	dev_err(sunxi_musb->controller->parent,
++		"Error unknown readb at 0x%x bytes offset\n",
++		(int)(addr - sunxi_musb->mregs));
++	return 0;
++}
++
++static void sunxi_musb_writeb(void __iomem *addr, unsigned offset, u8 data)
++{
++	if (addr == sunxi_musb->mregs) {
++		/* generic control or fifo control reg access */
++		switch (offset) {
++		case MUSB_FADDR:
++			return writeb(data, addr + SUNXI_MUSB_FADDR);
++		case MUSB_POWER:
++			return writeb(data, addr + SUNXI_MUSB_POWER);
++		case MUSB_INTRUSB:
++			return writeb(data, addr + SUNXI_MUSB_INTRUSB);
++		case MUSB_INTRUSBE:
++			return writeb(data, addr + SUNXI_MUSB_INTRUSBE);
++		case MUSB_INDEX:
++			return writeb(data, addr + SUNXI_MUSB_INDEX);
++		case MUSB_TESTMODE:
++			if (data)
++				dev_warn(sunxi_musb->controller->parent,
++					"sunxi-musb does not have testmode\n");
++			return;
++		case MUSB_DEVCTL:
++			return writeb(data, addr + SUNXI_MUSB_DEVCTL);
++		case MUSB_TXFIFOSZ:
++			return writeb(data, addr + SUNXI_MUSB_TXFIFOSZ);
++		case MUSB_RXFIFOSZ:
++			return writeb(data, addr + SUNXI_MUSB_RXFIFOSZ);
++		/* Offset for these is fixed by sunxi_musb_busctl_offset() */
++		case SUNXI_MUSB_TXFUNCADDR:
++		case SUNXI_MUSB_TXHUBADDR:
++		case SUNXI_MUSB_TXHUBPORT:
++		case SUNXI_MUSB_RXFUNCADDR:
++		case SUNXI_MUSB_RXHUBADDR:
++		case SUNXI_MUSB_RXHUBPORT:
++			/* multipoint / busctl reg access */
++			return writeb(data, addr + offset);
++		default:
++			dev_err(sunxi_musb->controller->parent,
++				"Error unknown writeb offset %u\n", offset);
++			return;
++		}
++	} else if (addr == (sunxi_musb->mregs + 0x80)) {
++		/* ep control reg access */
++		if (offset >= MUSB_TXTYPE)
++			offset += 2;
++		return writeb(data, addr + offset);
++	}
++
++	dev_err(sunxi_musb->controller->parent,
++		"Error unknown writeb at 0x%x bytes offset\n",
++		(int)(addr - sunxi_musb->mregs));
++}
++
++static u16 sunxi_musb_readw(const void __iomem *addr, unsigned offset)
++{
++	if (addr == sunxi_musb->mregs) {
++		/* generic control or fifo control reg access */
++		switch (offset) {
++		case MUSB_INTRTX:
++			return readw(addr + SUNXI_MUSB_INTRTX);
++		case MUSB_INTRRX:
++			return readw(addr + SUNXI_MUSB_INTRRX);
++		case MUSB_INTRTXE:
++			return readw(addr + SUNXI_MUSB_INTRTXE);
++		case MUSB_INTRRXE:
++			return readw(addr + SUNXI_MUSB_INTRRXE);
++		case MUSB_FRAME:
++			return readw(addr + SUNXI_MUSB_FRAME);
++		case MUSB_TXFIFOADD:
++			return readw(addr + SUNXI_MUSB_TXFIFOADD);
++		case MUSB_RXFIFOADD:
++			return readw(addr + SUNXI_MUSB_RXFIFOADD);
++		case MUSB_HWVERS:
++			return 0; /* sunxi musb version is not known */
++		default:
++			dev_err(sunxi_musb->controller->parent,
++				"Error unknown readw offset %u\n", offset);
++			return 0;
++		}
++	} else if (addr == (sunxi_musb->mregs + 0x80)) {
++		/* ep control reg access */
++		return readw(addr + offset);
++	}
++
++	dev_err(sunxi_musb->controller->parent,
++		"Error unknown readw at 0x%x bytes offset\n",
++		(int)(addr - sunxi_musb->mregs));
++	return 0;
++}
++
++static void sunxi_musb_writew(void __iomem *addr, unsigned offset, u16 data)
++{
++	if (addr == sunxi_musb->mregs) {
++		/* generic control or fifo control reg access */
++		switch (offset) {
++		case MUSB_INTRTX:
++			return writew(data, addr + SUNXI_MUSB_INTRTX);
++		case MUSB_INTRRX:
++			return writew(data, addr + SUNXI_MUSB_INTRRX);
++		case MUSB_INTRTXE:
++			return writew(data, addr + SUNXI_MUSB_INTRTXE);
++		case MUSB_INTRRXE:
++			return writew(data, addr + SUNXI_MUSB_INTRRXE);
++		case MUSB_FRAME:
++			return writew(data, addr + SUNXI_MUSB_FRAME);
++		case MUSB_TXFIFOADD:
++			return writew(data, addr + SUNXI_MUSB_TXFIFOADD);
++		case MUSB_RXFIFOADD:
++			return writew(data, addr + SUNXI_MUSB_RXFIFOADD);
++		default:
++			dev_err(sunxi_musb->controller->parent,
++				"Error unknown writew offset %u\n", offset);
++			return;
++		}
++	} else if (addr == (sunxi_musb->mregs + 0x80)) {
++		/* ep control reg access */
++		return writew(data, addr + offset);
++	}
++
++	dev_err(sunxi_musb->controller->parent,
++		"Error unknown writew at 0x%x bytes offset\n",
++		(int)(addr - sunxi_musb->mregs));
++}
++
++static const struct musb_platform_ops sunxi_musb_ops = {
++	.quirks		= MUSB_INDEXED_EP,
++	.init		= sunxi_musb_init,
++	.exit		= sunxi_musb_exit,
++	.enable		= sunxi_musb_enable,
++	.disable	= sunxi_musb_disable,
++	.fifo_offset	= sunxi_musb_fifo_offset,
++	.ep_offset	= sunxi_musb_ep_offset,
++	.busctl_offset	= sunxi_musb_busctl_offset,
++	.readb		= sunxi_musb_readb,
++	.writeb		= sunxi_musb_writeb,
++	.readw		= sunxi_musb_readw,
++	.writew		= sunxi_musb_writew,
++	.set_vbus	= sunxi_musb_set_vbus,
++	.pre_root_reset_end = sunxi_musb_pre_root_reset_end,
++	.post_root_reset_end = sunxi_musb_post_root_reset_end,
++};
++
++/* Allwinner OTG supports up to 5 endpoints */
++#define SUNXI_MUSB_MAX_EP_NUM	6
++#define SUNXI_MUSB_RAM_BITS	11
++
++static struct musb_fifo_cfg sunxi_musb_mode_cfg[] = {
++	MUSB_EP_FIFO_SINGLE(1, FIFO_TX, 512),
++	MUSB_EP_FIFO_SINGLE(1, FIFO_RX, 512),
++	MUSB_EP_FIFO_SINGLE(2, FIFO_TX, 512),
++	MUSB_EP_FIFO_SINGLE(2, FIFO_RX, 512),
++	MUSB_EP_FIFO_SINGLE(3, FIFO_TX, 512),
++	MUSB_EP_FIFO_SINGLE(3, FIFO_RX, 512),
++	MUSB_EP_FIFO_SINGLE(4, FIFO_TX, 512),
++	MUSB_EP_FIFO_SINGLE(4, FIFO_RX, 512),
++	MUSB_EP_FIFO_SINGLE(5, FIFO_TX, 512),
++	MUSB_EP_FIFO_SINGLE(5, FIFO_RX, 512),
++};
++
++static struct musb_hdrc_config sunxi_musb_hdrc_config = {
++	.fifo_cfg       = sunxi_musb_mode_cfg,
++	.fifo_cfg_size  = ARRAY_SIZE(sunxi_musb_mode_cfg),
++	.multipoint	= true,
++	.dyn_fifo	= true,
++	.soft_con       = true,
++	.num_eps	= SUNXI_MUSB_MAX_EP_NUM,
++	.ram_bits	= SUNXI_MUSB_RAM_BITS,
++	.dma		= 0,
++};
++
++static int sunxi_musb_probe(struct platform_device *pdev)
++{
++	struct musb_hdrc_platform_data	pdata;
++	struct platform_device_info	pinfo;
++	struct sunxi_glue		*glue;
++	struct device_node		*np = pdev->dev.of_node;
++	int ret;
++
++	if (!np) {
++		dev_err(&pdev->dev, "Error no device tree node found\n");
++		return -EINVAL;
++	}
++
++	glue = devm_kzalloc(&pdev->dev, sizeof(*glue), GFP_KERNEL);
++	if (!glue)
++		return -ENOMEM;
++
++	memset(&pdata, 0, sizeof(pdata));
++	switch (of_usb_get_dr_mode(np)) {
++#if defined CONFIG_USB_MUSB_DUAL_ROLE || defined CONFIG_USB_MUSB_HOST
++	case USB_DR_MODE_HOST:
++		pdata.mode = MUSB_PORT_MODE_HOST;
++		break;
++#endif
++#ifdef CONFIG_USB_MUSB_DUAL_ROLE
++	case USB_DR_MODE_OTG:
++		glue->extcon = extcon_get_edev_by_phandle(&pdev->dev, 0);
++		if (IS_ERR(glue->extcon)) {
++			if (PTR_ERR(glue->extcon) == -EPROBE_DEFER)
++				return -EPROBE_DEFER;
++			dev_err(&pdev->dev, "Invalid or missing extcon\n");
++			return PTR_ERR(glue->extcon);
++		}
++		pdata.mode = MUSB_PORT_MODE_DUAL_ROLE;
++		break;
++#endif
++	default:
++		dev_err(&pdev->dev, "Invalid or missing 'dr_mode' property\n");
++		return -EINVAL;
++	}
++	pdata.platform_ops	= &sunxi_musb_ops;
++	pdata.config		= &sunxi_musb_hdrc_config;
++
++	glue->dev = &pdev->dev;
++	INIT_WORK(&glue->work, sunxi_musb_work);
++	glue->host_nb.notifier_call = sunxi_musb_host_notifier;
++
++	glue->clk = devm_clk_get(&pdev->dev, NULL);
++	if (IS_ERR(glue->clk)) {
++		dev_err(&pdev->dev, "Error getting clock: %ld\n",
++			PTR_ERR(glue->clk));
++		return PTR_ERR(glue->clk);
++	}
++
++	glue->phy = devm_phy_get(&pdev->dev, "usb");
++	if (IS_ERR(glue->phy)) {
++		if (PTR_ERR(glue->phy) == -EPROBE_DEFER)
++			return -EPROBE_DEFER;
++		dev_err(&pdev->dev, "Error getting phy %ld\n",
++			PTR_ERR(glue->phy));
++		return PTR_ERR(glue->phy);
++	}
++
++	glue->usb_phy = usb_phy_generic_register();
++	if (IS_ERR(glue->usb_phy)) {
++		dev_err(&pdev->dev, "Error registering usb-phy %ld\n",
++			PTR_ERR(glue->usb_phy));
++		return PTR_ERR(glue->usb_phy);
++	}
++
++	glue->xceiv = devm_usb_get_phy(&pdev->dev, USB_PHY_TYPE_USB2);
++	if (IS_ERR(glue->xceiv)) {
++		ret = PTR_ERR(glue->xceiv);
++		dev_err(&pdev->dev, "Error getting usb-phy %d\n", ret);
++		goto err_unregister_usb_phy;
++	}
++
++	platform_set_drvdata(pdev, glue);
++
++	memset(&pinfo, 0, sizeof(pinfo));
++	pinfo.name	 = "musb-hdrc";
++	pinfo.id	= PLATFORM_DEVID_AUTO;
++	pinfo.parent	= &pdev->dev;
++	pinfo.res	= pdev->resource;
++	pinfo.num_res	= pdev->num_resources;
++	pinfo.data	= &pdata;
++	pinfo.size_data = sizeof(pdata);
++
++	glue->musb = platform_device_register_full(&pinfo);
++	if (IS_ERR(glue->musb)) {
++		ret = PTR_ERR(glue->musb);
++		dev_err(&pdev->dev, "Error registering musb dev: %d\n", ret);
++		goto err_unregister_usb_phy;
++	}
++
++	return 0;
++
++err_unregister_usb_phy:
++	usb_phy_generic_unregister(glue->usb_phy);
++	return ret;
++}
++
++static int sunxi_musb_remove(struct platform_device *pdev)
++{
++	struct sunxi_glue *glue = platform_get_drvdata(pdev);
++	struct platform_device *usb_phy = glue->usb_phy;
++
++	platform_device_unregister(glue->musb); /* Frees glue ! */
++	usb_phy_generic_unregister(usb_phy);
++
++	return 0;
++}
++
++static const struct of_device_id sunxi_musb_match[] = {
++	{ .compatible = "allwinner,sun4i-a10-musb", },
++	{}
++};
++
++static struct platform_driver sunxi_musb_driver = {
++	.probe = sunxi_musb_probe,
++	.remove = sunxi_musb_remove,
++	.driver = {
++		.name = "musb-sunxi",
++		.of_match_table = sunxi_musb_match,
++	},
++};
++module_platform_driver(sunxi_musb_driver);
++
++MODULE_DESCRIPTION("Allwinner sunxi MUSB Glue Layer");
++MODULE_AUTHOR("Hans de Goede <hdegoede@redhat.com>");
++MODULE_LICENSE("GPL v2");
 -- 
 2.4.3
