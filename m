@@ -1,109 +1,61 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Sat, 13 Jun 2015 17:25:22 +0200
-Subject: [PATCH v2 5/5] arm64: add KASan support
-In-Reply-To: <CAPAsAGy-r8Z2N09wKV+e0kLfbwxd-eWK6N5Xajsnqq9jfyWqcQ@mail.gmail.com>
-References: <1431698344-28054-1-git-send-email-a.ryabinin@samsung.com>
- <1431698344-28054-6-git-send-email-a.ryabinin@samsung.com>
- <CACRpkdaRJJjCXR=vK1M2YhR26JZfGoBB+jcqz8r2MhERfxRzqA@mail.gmail.com>
- <CAPAsAGy-r8Z2N09wKV+e0kLfbwxd-eWK6N5Xajsnqq9jfyWqcQ@mail.gmail.com>
-Message-ID: <CACRpkdZmHLMxosLXjyOPdkavo=UNzmTcHOLF5vV4cS1ULfbq6A@mail.gmail.com>
+From: carlo@caione.org (Carlo Caione)
+Date: Sat, 13 Jun 2015 17:35:58 +0200
+Subject: [PATCH 1/2] pinctrl: meson: Enable GPIO IRQs
+In-Reply-To: <CACRpkdYCxnf3nUz+jTSu4qw1_nXKkc+_TioZTxW7LpP_dX-MRg@mail.gmail.com>
+References: <1432551641-3256-1-git-send-email-carlo@caione.org>
+ <1432551641-3256-2-git-send-email-carlo@caione.org>
+ <CACRpkdYCxnf3nUz+jTSu4qw1_nXKkc+_TioZTxW7LpP_dX-MRg@mail.gmail.com>
+Message-ID: <CAOQ7t2Z6svU4fi2N46ugDcVxtLwmfuOXJPLPhFom8LLqAenusw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 12, 2015 at 8:14 PM, Andrey Ryabinin <ryabinin.a.a@gmail.com> wrote:
-> 2015-06-11 16:39 GMT+03:00 Linus Walleij <linus.walleij@linaro.org>:
->> On Fri, May 15, 2015 at 3:59 PM, Andrey Ryabinin <a.ryabinin@samsung.com> wrote:
->>
->>> This patch adds arch specific code for kernel address sanitizer
->>> (see Documentation/kasan.txt).
->>
->> I looked closer at this again ... I am trying to get KASan up for
->> ARM(32) with some tricks and hacks.
->>
+On Mon, Jun 1, 2015 at 4:30 PM, Linus Walleij <linus.walleij@linaro.org> wrote:
+> On Mon, May 25, 2015 at 1:00 PM, Carlo Caione <carlo@caione.org> wrote:
+
+Hey Linus,
+I was starting to write the v2, but I still have a couple of (probably
+silly) questions.
+
+>> +       int ret;
+>> +
+>> +       pin = domain->data->pin_base + offset;
 >
-> I have some patches for that. They still need some polishing, but works for me.
-> I could share after I get back to office on Tuesday.
-
-OK! I'd be happy to test!
-
-I have a WIP patch too, but it was trying to do a physical carveout
-at early boot because of misunderstandings as to how KASan works...
-Yeah I'm a slow learner.
-
->>> +/*
->>> + * KASAN_SHADOW_START: beginning of the kernel virtual addresses.
->>> + * KASAN_SHADOW_END: KASAN_SHADOW_START + 1/8 of kernel virtual addresses.
->>> + */
->>> +#define KASAN_SHADOW_START      (UL(0xffffffffffffffff) << (VA_BITS))
->>> +#define KASAN_SHADOW_END        (KASAN_SHADOW_START + (1UL << (VA_BITS - 3)))
->>
->> Will this not mean that shadow start to end actually covers *all*
->> virtual addresses including userspace and what not? However a
->> large portion of this shadow memory will be unused because the
->> SHADOW_OFFSET only works for code compiled for the kernel
->> anyway.
->>
+> This is not looking good. Nominally you should use the irqdomain to
+> translate hwirq to Linux IRQ.
 >
-> SHADOW_OFFSET:SHADOW_END - covers *all* 64bits of virtual addresses.
-> SHADOW_OFFSET:SHADOW_START - unused shadow.
-> SHADOW_START:SHADOW_END - covers only kernel virtual addresses (used shadow).
-
-Aha. I see now...
-
->> When working on ARM32 I certainly could not map
->> (1UL << (VA_BITS -3)) i.e. for 32 bit (1UL << 29) bytes (512 MB) of
+> Normally this is just
 >
-> Why not? We can just take it from TASK_SIZE.
+> line = irq_find_mapping(domain, hwirq);
 
-Yeah the idea to steal it from userspace occured to me too...
-with ARM32 having a highmem split in the middle of vmalloc I was
-quite stressed when trying to chisel it out from the vmalloc area.
+Ok, it sounds reasonable but this implies that the mapping between the
+virq and the hwirq in the outermost domain already exists when the
+.to_irq hook is called, right? Also IIUC for hierarchical domains the
+mapping should also exist on all the irq_domains in the hierarchy.
 
-I actually managed to remove all static iomaps from my platform
-so I could allocate the KASan memory from high to log addresses
-at 0xf7000000-0xff000000 but it puts requirements on all
-the ARM32 platforms to rid their static maps :P
-
->> Is it correct that when the pte's, pgd's and pud's are populated
->> KASan really doesn't kick in, it's just done to have some scratch
->> memory with whatever contents so as to do dummy updates
->> for the __asan_loadN() and __asan_storeN() calls, and no checks
->> start until the shadow memory is populated in kasan_init()
->> i.e. there are no KASan checks for any code executing up
->> to that point, just random writes and reads?
+>> +       ret = meson_get_bank(domain, pin, &bank);
+>> +       if (ret)
+>> +               return -ENXIO;
+>> +
+>> +       irq_data.args_count = 2;
+>> +       irq_data.args[0] = pin;
+>> +       virq = irq_domain_alloc_irqs(pc->irq_domain, 1, NUMA_NO_NODE, &irq_data);
 >
-> Yes, kasan_early_init() setups scratch memory with whatever contents.
-> But  KASan checks shadow before kasan_init(), that's the reason why we
-> need scratch shadow.
+> This is wrong. You have to alloc the irqs either
 >
-> So checks are performed, but KASan don't print any reports, because
-> init_task has non-zero kasan_depth flag (see include/linux/init_task.h)
-> We check that flag in kasan_report() and print report iff it have zero value.
->
-> In kasan_init() after shadow populated, we enable reports by setting
-> kasan_depth to zero.
+> (A) when the driver is probed, looping over all IRQs.
+>   Then pair with free():in the IRQs in the remove()
+>   call.
 
-Aha now I understand how this works! Now I understand
-this init_task.kasan_depth = 0 too.
+This is not really clear to me. Are you suggesting that the mapping
+between the hwirq and virq should be done at probe time so that we can
+use irq_find_mapping later?
+IIUC for the hierarchical domains the mapping creation should be
+propagated to all the domains in cascade and this is usually done
+using the .alloc hook of the irq_domain_ops and at probe time we do
+not still have the hwirq to pass to the parent GIC. Any idea on how to
+approach this problem?
 
->> Are we just lucky that these functions never do any loads
->> and stores?
->>
->
-> We relay on fact that these functions are static inline and do not call other
-> functions from other (instrumented) files.
+Cheers,
 
-Aha, makes perfect sense.
-
-I think I understand the code a bit now ... it maps all the KASan
-shadow memory to the physical memory of the zero page and let all
-updates hit that memory until the memory manager is up and running,
-then you allocate physical memory backing the shadow in
-kasan_populate_zero_shadow().
-
-I misunderstood it such that the backing physical shadow memory
-had to be available when we do the early call... no wonder I
-got lost.
-
-Yours,
-Linus Walleij
+-- 
+Carlo Caione
