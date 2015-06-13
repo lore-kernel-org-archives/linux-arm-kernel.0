@@ -1,55 +1,130 @@
 From: hdegoede@redhat.com (Hans de Goede)
-Date: Sat, 13 Jun 2015 14:37:47 +0200
-Subject: [PATCH v5 3/7] phy-sun4i-usb: Swap check for disconnect threshold
+Date: Sat, 13 Jun 2015 14:37:50 +0200
+Subject: [PATCH v5 6/7] phy-sun4i-usb: Add support for boards with broken
+ Vusb-detection
 In-Reply-To: <1434199071-22127-1-git-send-email-hdegoede@redhat.com>
 References: <1434199071-22127-1-git-send-email-hdegoede@redhat.com>
-Message-ID: <1434199071-22127-4-git-send-email-hdegoede@redhat.com>
+Message-ID: <1434199071-22127-7-git-send-email-hdegoede@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Before this commit the code for determining the disconnect threshold was
-checking for "allwinner,sun4i-a10-usb-phy" or "allwinner,sun6i-a31-usb-phy"
-assuming that those where the exception and then newer SoCs would use a
-disconnect threshold of 2 like sun7i does. But it turns out that newer
-SoCs use a disconnect threshold of 3 and sun5i and sun7i are the
-exceptions, so check for those instead.
+On some boards we cannot detect the presence of an external Vusb, because
+e.g. the 5V of the otg connector is directly connected to the 5V of the board,
+and thus is always high.
 
-Here are the settings from the various Allwinner SDK sources:
- sun4i-a10: USBC_Phy_Write(usbc_no, 0x2a, 3, 2);
- sun5i-a13: USBC_Phy_Write(usbc_no, 0x2a, 2, 2);
- sun6i-a31: USBC_Phy_Write(usbc_no, 0x2a, 3, 2);
- sun7i-a20: USBC_Phy_Write(usbc_no, 0x2a, 2, 2);
- sun8i-a23: USBC_Phy_Write(usbc_no, 0x2a, 3, 2);
- sun8i-h3:  USBC_Phy_Write(usbc_no, 0x2a, 3, 2);
- sun9i-a80: USBC_Phy_Write(usbc_no, 0x2a, 3, 2);
-
-Note this commit makes no functional changes as currently we only support
-sun4i - sun7i.
+This commit adds support for using such boards by only looking at the
+id-detection pin.
 
 Signed-off-by: Hans de Goede <hdegoede@redhat.com>
 ---
- drivers/phy/phy-sun4i-usb.c | 8 ++++----
- 1 file changed, 4 insertions(+), 4 deletions(-)
+ drivers/phy/phy-sun4i-usb.c | 44 ++++++++++++++++++++++++++++++++++++--------
+ 1 file changed, 36 insertions(+), 8 deletions(-)
 
 diff --git a/drivers/phy/phy-sun4i-usb.c b/drivers/phy/phy-sun4i-usb.c
-index 86d9ce1..d78a071 100644
+index 5060257..0681641 100644
 --- a/drivers/phy/phy-sun4i-usb.c
 +++ b/drivers/phy/phy-sun4i-usb.c
-@@ -447,11 +447,11 @@ static int sun4i_usb_phy_probe(struct platform_device *pdev)
- 	else
- 		data->num_phys = 3;
+@@ -22,6 +22,7 @@
+  */
  
--	if (of_device_is_compatible(np, "allwinner,sun4i-a10-usb-phy") ||
--	    of_device_is_compatible(np, "allwinner,sun6i-a31-usb-phy"))
--		data->disc_thresh = 3;
--	else
-+	if (of_device_is_compatible(np, "allwinner,sun5i-a13-usb-phy") ||
-+	    of_device_is_compatible(np, "allwinner,sun7i-a20-usb-phy"))
- 		data->disc_thresh = 2;
+ #include <linux/clk.h>
++#include <linux/delay.h>
+ #include <linux/err.h>
+ #include <linux/extcon.h>
+ #include <linux/io.h>
+@@ -309,7 +310,7 @@ static int sun4i_usb_phy_power_on(struct phy *_phy)
+ 	phy->regulator_on = true;
+ 
+ 	/* We must report Vbus high within OTG_TIME_A_WAIT_VRISE msec. */
+-	if (phy->index == 0 && data->phy0_poll)
++	if (phy->index == 0 && data->vbus_det_gpio && data->phy0_poll)
+ 		mod_delayed_work(system_wq, &data->detect, DEBOUNCE_TIME);
+ 
+ 	return 0;
+@@ -330,7 +331,7 @@ static int sun4i_usb_phy_power_off(struct phy *_phy)
+ 	 * phy0 vbus typically slowly discharges, sometimes this causes the
+ 	 * Vbus gpio to not trigger an edge irq on Vbus off, so force a rescan.
+ 	 */
+-	if (phy->index == 0 && !data->phy0_poll)
++	if (phy->index == 0 && data->vbus_det_gpio && !data->phy0_poll)
+ 		mod_delayed_work(system_wq, &data->detect, POLL_TIME);
+ 
+ 	return 0;
+@@ -359,7 +360,10 @@ static void sun4i_usb_phy0_id_vbus_det_scan(struct work_struct *work)
+ 	int id_det, vbus_det, id_notify = 0, vbus_notify = 0;
+ 
+ 	id_det = gpiod_get_value_cansleep(data->id_det_gpio);
+-	vbus_det = gpiod_get_value_cansleep(data->vbus_det_gpio);
++	if (data->vbus_det_gpio)
++		vbus_det = gpiod_get_value_cansleep(data->vbus_det_gpio);
 +	else
-+		data->disc_thresh = 3;
++		vbus_det = 1; /* Report vbus as high */
  
- 	if (of_device_is_compatible(np, "allwinner,sun6i-a31-usb-phy"))
- 		dedicated_clocks = true;
+ 	mutex_lock(&phy0->mutex);
+ 
+@@ -369,6 +373,16 @@ static void sun4i_usb_phy0_id_vbus_det_scan(struct work_struct *work)
+ 	}
+ 
+ 	if (id_det != data->id_det) {
++		/*
++		 * When a host cable (id == 0) gets plugged in on systems
++		 * without vbus detection report vbus low for long enough for
++		 * the musb-ip to end the current device session.
++		 */
++		if (!data->vbus_det_gpio && id_det == 0) {
++			sun4i_usb_phy0_set_vbus_detect(phy0, 0);
++			msleep(200);
++			sun4i_usb_phy0_set_vbus_detect(phy0, 1);
++		}
+ 		sun4i_usb_phy0_set_id_detect(phy0, id_det);
+ 		data->id_det = id_det;
+ 		id_notify = 1;
+@@ -382,9 +396,22 @@ static void sun4i_usb_phy0_id_vbus_det_scan(struct work_struct *work)
+ 
+ 	mutex_unlock(&phy0->mutex);
+ 
+-	if (id_notify)
++	if (id_notify) {
+ 		extcon_set_cable_state_(data->extcon, EXTCON_USB_HOST,
+ 					!id_det);
++		/*
++		 * When a host cable gets unplugged (id == 1) on systems
++		 * without vbus detection report vbus low for long enough to
++		 * the musb-ip to end the current host session.
++		 */
++		if (!data->vbus_det_gpio && id_det == 1) {
++			mutex_lock(&phy0->mutex);
++			sun4i_usb_phy0_set_vbus_detect(phy0, 0);
++			msleep(1000);
++			sun4i_usb_phy0_set_vbus_detect(phy0, 1);
++			mutex_unlock(&phy0->mutex);
++		}
++	}
+ 
+ 	if (vbus_notify)
+ 		extcon_set_cable_state_(data->extcon, EXTCON_USB, vbus_det);
+@@ -495,9 +522,9 @@ static int sun4i_usb_phy_probe(struct platform_device *pdev)
+ 		data->vbus_det_gpio = NULL;
+ 	}
+ 
+-	/* We either want both gpio pins or neither (when in host mode) */
+-	if (!data->id_det_gpio != !data->vbus_det_gpio) {
+-		dev_err(dev, "failed to get id or vbus detect pin\n");
++	/* vbus_det without id_det makes no sense, and is not supported */
++	if (data->vbus_det_gpio && !data->id_det_gpio) {
++		dev_err(dev, "usb0_id_det missing or invalid\n");
+ 		return -ENODEV;
+ 	}
+ 
+@@ -565,7 +592,8 @@ static int sun4i_usb_phy_probe(struct platform_device *pdev)
+ 
+ 	data->id_det_irq = gpiod_to_irq(data->id_det_gpio);
+ 	data->vbus_det_irq = gpiod_to_irq(data->vbus_det_gpio);
+-	if (data->id_det_irq  < 0 || data->vbus_det_irq < 0)
++	if ((data->id_det_gpio && data->id_det_irq < 0) ||
++	    (data->vbus_det_gpio && data->vbus_det_irq < 0))
+ 		data->phy0_poll = true;
+ 
+ 	if (data->id_det_irq >= 0) {
 -- 
 2.4.3
