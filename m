@@ -1,89 +1,84 @@
 From: hdegoede@redhat.com (Hans de Goede)
-Date: Sat, 13 Jun 2015 14:42:10 +0200
-Subject: [PATCH v5 3/3] musb: sunxi: Add support for musb controller in A33 SoC
-In-Reply-To: <1434199330-22263-1-git-send-email-hdegoede@redhat.com>
-References: <1434199330-22263-1-git-send-email-hdegoede@redhat.com>
-Message-ID: <1434199330-22263-4-git-send-email-hdegoede@redhat.com>
+Date: Sat, 13 Jun 2015 15:30:50 +0200
+Subject: [PATCH 00/20] ARM: dts: Add USB and OTG related nodes and enable
+ on various boards
+In-Reply-To: <557ADE40.70200@redhat.com>
+References: <1433530943-12599-1-git-send-email-hdegoede@redhat.com>
+ <20150608100358.GW23777@lukather> <55783B2C.3080207@redhat.com>
+ <557ADE40.70200@redhat.com>
+Message-ID: <557C308A.4010104@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The A33 SoC uses the same musb controller as found on the A31 and later,
-but allwinner has removed the configdata register, this commit adds special
-handling for this.
+Hi,
 
-Signed-off-by: Hans de Goede <hdegoede@redhat.com>
----
- .../devicetree/bindings/usb/allwinner,sun4i-a10-musb.txt  |  3 ++-
- drivers/usb/musb/sunxi.c                                  | 15 +++++++++++++++
- 2 files changed, 17 insertions(+), 1 deletion(-)
+On 12-06-15 15:27, Hans de Goede wrote:
+> Hi,
+>
+> On 10-06-15 15:27, Hans de Goede wrote:
+>> Hi,
+>>
+>> On 08-06-15 12:03, Maxime Ripard wrote:
+>>> Hi Hans,
+>>>
+>>> On Fri, Jun 05, 2015 at 09:02:03PM +0200, Hans de Goede wrote:
+>>>> Hi Maxime,
+>>>>
+>>>> Here is a patch-set with all the otg / sun8i-usb-host related dts patches
+>>>> I've accumulated.
+>>>>
+>>>> These are intended for 4.3, and go hand in hand with the outstanding
+>>>> musb-sunxi / phy-sun4i-usb patches, which I expect to be merged as is
+>>>> for 4.3 .
+>>>
+>>> I'm fine with these patches. Do you have a branch somewhere that I can
+>>> pull (without the one that you wanted me to drop, obviously)?
+>>
+>> I've just created a branch with just these patches directly on top
+>> of sunxi/for-next for you:
+>>
+>> https://github.com/jwrdegoede/linux-sunxi/commits/otg-dts-for-maxime
+>
+> Please ignore this for now. There have been some changes to the extcon
+> framework, making it more integrated with devicetree, this means I need
+> to add an extcon property to the musb nodes in devicetree:
+>
+> --- a/Documentation/devicetree/bindings/usb/allwinner,sun4i-a10-musb.txt
+> +++ b/Documentation/devicetree/bindings/usb/allwinner,sun4i-a10-musb.txt
+> @@ -12,6 +12,7 @@ Required properties:
+>    - phys            : phy specifier for the otg phy
+>    - phy-names       : must be "usb"
+>    - dr_mode         : Dual-Role mode must be "host" or "otg"
+> + - extcon          : extcon specifier for the otg phy
+>
+>   Example:
+>
+> @@ -23,5 +24,6 @@ Example:
+>                  interrupt-names = "mc";
+>                  phys = <&usbphy 0>;
+>                  phy-names = "usb";
+> +         extcon = <&usbphy 0>;
+>                  status = "disabled";
+>          };
+>
+> --- a/arch/arm/boot/dts/sun7i-a20.dtsi
+> +++ b/arch/arm/boot/dts/sun7i-a20.dtsi
+> @@ -773,6 +773,7 @@
+>                          interrupt-names = "mc";
+>                          phys = <&usbphy 0>;
+>                          phy-names = "usb";
+> +                 extcon = <&usbphy 0>;
+>                          allwinner,sram = <&otg_sram 1>;
+>                          status = "disabled";
+>                  };
+>
+> I'll push a new version of the patches to otg-dts-for-maxime
+> with the extcon property added for you and ping you when it is
+> ready.
 
-diff --git a/Documentation/devicetree/bindings/usb/allwinner,sun4i-a10-musb.txt b/Documentation/devicetree/bindings/usb/allwinner,sun4i-a10-musb.txt
-index fde180b..862cd7c 100644
---- a/Documentation/devicetree/bindings/usb/allwinner,sun4i-a10-musb.txt
-+++ b/Documentation/devicetree/bindings/usb/allwinner,sun4i-a10-musb.txt
-@@ -2,7 +2,8 @@ Allwinner sun4i A10 musb DRC/OTG controller
- -------------------------------------------
- 
- Required properties:
-- - compatible      : "allwinner,sun4i-a10-musb" or "allwinner,sun6i-a31-musb"
-+ - compatible      : "allwinner,sun4i-a10-musb", "allwinner,sun6i-a31-musb"
-+                     or "allwinner,sun8i-a33-musb"
-  - reg             : mmio address range of the musb controller
-  - clocks          : clock specifier for the musb controller ahb gate clock
-  - reset           : reset specifier for the ahb reset (A31 and newer only)
-diff --git a/drivers/usb/musb/sunxi.c b/drivers/usb/musb/sunxi.c
-index 825bc41..0e24292 100644
---- a/drivers/usb/musb/sunxi.c
-+++ b/drivers/usb/musb/sunxi.c
-@@ -73,6 +73,7 @@
- #define SUNXI_MUSB_FL_PHY_ON			4
- #define SUNXI_MUSB_FL_HAS_SRAM			5
- #define SUNXI_MUSB_FL_HAS_RESET			6
-+#define SUNXI_MUSB_FL_NO_CONFIGDATA		7
- 
- /* Our read/write methods need access and do not get passed in a musb ref :| */
- struct musb *sunxi_musb;
-@@ -370,6 +371,8 @@ static u32 sunxi_musb_busctl_offset(u8 epnum, u16 offset)
- 
- static u8 sunxi_musb_readb(const void __iomem *addr, unsigned offset)
- {
-+	struct sunxi_glue *glue;
-+
- 	if (addr == sunxi_musb->mregs) {
- 		/* generic control or fifo control reg access */
- 		switch (offset) {
-@@ -392,6 +395,12 @@ static u8 sunxi_musb_readb(const void __iomem *addr, unsigned offset)
- 		case MUSB_RXFIFOSZ:
- 			return readb(addr + SUNXI_MUSB_RXFIFOSZ);
- 		case MUSB_CONFIGDATA + 0x10: /* See musb_read_configdata() */
-+			glue = dev_get_drvdata(sunxi_musb->controller->parent);
-+			/* A33 saves a reg, and we get to hardcode this */
-+			if (test_bit(SUNXI_MUSB_FL_NO_CONFIGDATA,
-+				     &glue->flags))
-+				return 0xde;
-+
- 			return readb(addr + SUNXI_MUSB_CONFIGDATA);
- 		/* Offset for these is fixed by sunxi_musb_busctl_offset() */
- 		case SUNXI_MUSB_TXFUNCADDR:
-@@ -643,6 +652,11 @@ static int sunxi_musb_probe(struct platform_device *pdev)
- 	if (of_device_is_compatible(np, "allwinner,sun6i-a31-musb"))
- 		set_bit(SUNXI_MUSB_FL_HAS_RESET, &glue->flags);
- 
-+	if (of_device_is_compatible(np, "allwinner,sun8i-a33-musb")) {
-+		set_bit(SUNXI_MUSB_FL_HAS_RESET, &glue->flags);
-+		set_bit(SUNXI_MUSB_FL_NO_CONFIGDATA, &glue->flags);
-+	}
-+
- 	glue->clk = devm_clk_get(&pdev->dev, NULL);
- 	if (IS_ERR(glue->clk)) {
- 		dev_err(&pdev->dev, "Error getting clock: %ld\n",
-@@ -723,6 +737,7 @@ static int sunxi_musb_remove(struct platform_device *pdev)
- static const struct of_device_id sunxi_musb_match[] = {
- 	{ .compatible = "allwinner,sun4i-a10-musb", },
- 	{ .compatible = "allwinner,sun6i-a31-musb", },
-+	{ .compatible = "allwinner,sun8i-a33-musb", },
- 	{}
- };
- 
--- 
-2.4.3
+Done, https://github.com/jwrdegoede/linux-sunxi/commits/otg-dts-for-maxime
+now contains the necessary changes and is ready for merging for 4.3.
+
+Regards,
+
+Hans
