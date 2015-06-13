@@ -1,35 +1,171 @@
 From: hdegoede@redhat.com (Hans de Goede)
-Date: Sat, 13 Jun 2015 14:42:07 +0200
-Subject: [PATCH v5 0/3] musb: sunxi: Add support for the Allwinner sunxi musb
-Message-ID: <1434199330-22263-1-git-send-email-hdegoede@redhat.com>
+Date: Sat, 13 Jun 2015 14:42:09 +0200
+Subject: [PATCH v5 2/3] musb: sunxi: Add support for musb controller in A31 SoC
+In-Reply-To: <1434199330-22263-1-git-send-email-hdegoede@redhat.com>
+References: <1434199330-22263-1-git-send-email-hdegoede@redhat.com>
+Message-ID: <1434199330-22263-3-git-send-email-hdegoede@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Felipe,
+The A31 SoC uses the same musb controller as found in earlier SoCs, but it
+is hooked up slightly different. Its SRAM is private and no longer controlled
+through the SRAM controller, and its reset is controlled via a separate
+reset controller. This commit adds support for this setup.
 
-Here is a patch series with all my oustanding musb-sunxi changes pending
-for merging into 4.3.
+Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+---
+ .../bindings/usb/allwinner,sun4i-a10-musb.txt      |  3 +-
+ drivers/usb/musb/sunxi.c                           | 50 +++++++++++++++++++---
+ 2 files changed, 46 insertions(+), 7 deletions(-)
 
-This includes the 5th iteration of the patch for adding the basic sunxi-glue,
-the major change in v5 is that it has been ported to the extcon API changes
-which are queued up for 4.2 from :
-
-http://git.kernel.org/cgit/linux/kernel/git/chanwoo/extcon.git/log/?h=extcon-ne
-
-which already merged in GKH's char-misc branch for 4.2, this means that
-this series now depends on those changes.
-
-Besides that I've also squashed in a fix I send out recently which removes
-the need for the special MUSB_SUN4I flag + core changes checking for that
-flag which my original version has. Meaning that the changes are nowly
-soley confined to the addition of drivers/usb/musb/sunxi.c + matching
-Kconfig / Makefile changes.
-
-Other than that this is a resend of some of the other feature addition
-patches I recently send rebased on top of v5 of the musb sunxi glue.
-
-Please merge this series for 4.3.
-
-Regards,
-
-Hans
+diff --git a/Documentation/devicetree/bindings/usb/allwinner,sun4i-a10-musb.txt b/Documentation/devicetree/bindings/usb/allwinner,sun4i-a10-musb.txt
+index 9254a6c..fde180b 100644
+--- a/Documentation/devicetree/bindings/usb/allwinner,sun4i-a10-musb.txt
++++ b/Documentation/devicetree/bindings/usb/allwinner,sun4i-a10-musb.txt
+@@ -2,9 +2,10 @@ Allwinner sun4i A10 musb DRC/OTG controller
+ -------------------------------------------
+ 
+ Required properties:
+- - compatible      : "allwinner,sun4i-a10-musb"
++ - compatible      : "allwinner,sun4i-a10-musb" or "allwinner,sun6i-a31-musb"
+  - reg             : mmio address range of the musb controller
+  - clocks          : clock specifier for the musb controller ahb gate clock
++ - reset           : reset specifier for the ahb reset (A31 and newer only)
+  - interrupts      : interrupt to which the musb controller is connected
+  - interrupt-names : must be "mc"
+  - phys            : phy specifier for the otg phy
+diff --git a/drivers/usb/musb/sunxi.c b/drivers/usb/musb/sunxi.c
+index 71c1cea..825bc41 100644
+--- a/drivers/usb/musb/sunxi.c
++++ b/drivers/usb/musb/sunxi.c
+@@ -26,6 +26,7 @@
+ #include <linux/of.h>
+ #include <linux/phy/phy-sun4i-usb.h>
+ #include <linux/platform_device.h>
++#include <linux/reset.h>
+ #include <linux/soc/sunxi/sunxi_sram.h>
+ #include <linux/usb/musb.h>
+ #include <linux/usb/of.h>
+@@ -70,6 +71,8 @@
+ #define SUNXI_MUSB_FL_HOSTMODE_PEND		2
+ #define SUNXI_MUSB_FL_VBUS_ON			3
+ #define SUNXI_MUSB_FL_PHY_ON			4
++#define SUNXI_MUSB_FL_HAS_SRAM			5
++#define SUNXI_MUSB_FL_HAS_RESET			6
+ 
+ /* Our read/write methods need access and do not get passed in a musb ref :| */
+ struct musb *sunxi_musb;
+@@ -78,6 +81,7 @@ struct sunxi_glue {
+ 	struct device		*dev;
+ 	struct platform_device	*musb;
+ 	struct clk		*clk;
++	struct reset_control	*rst;
+ 	struct phy		*phy;
+ 	struct platform_device	*usb_phy;
+ 	struct usb_phy		*xceiv;
+@@ -229,14 +233,22 @@ static int sunxi_musb_init(struct musb *musb)
+ 	musb->phy = glue->phy;
+ 	musb->xceiv = glue->xceiv;
+ 
+-	ret = sunxi_sram_claim(musb->controller->parent);
+-	if (ret)
+-		return ret;
++	if (test_bit(SUNXI_MUSB_FL_HAS_SRAM, &glue->flags)) {
++		ret = sunxi_sram_claim(musb->controller->parent);
++		if (ret)
++			return ret;
++	}
+ 
+ 	ret = clk_prepare_enable(glue->clk);
+ 	if (ret)
+ 		goto error_sram_release;
+ 
++	if (test_bit(SUNXI_MUSB_FL_HAS_RESET, &glue->flags)) {
++		ret = reset_control_deassert(glue->rst);
++		if (ret)
++			goto error_clk_disable;
++	}
++
+ 	writeb(SUNXI_MUSB_VEND0_PIO_MODE, musb->mregs + SUNXI_MUSB_VEND0);
+ 
+ 	/* Register notifier before calling phy_init() */
+@@ -244,7 +256,7 @@ static int sunxi_musb_init(struct musb *musb)
+ 		ret = extcon_register_notifier(glue->extcon, EXTCON_USB_HOST,
+ 					       &glue->host_nb);
+ 		if (ret)
+-			goto error_clk_disable;
++			goto error_reset_assert;
+ 	}
+ 
+ 	ret = phy_init(glue->phy);
+@@ -273,10 +285,14 @@ error_unregister_notifier:
+ 	if (musb->port_mode == MUSB_PORT_MODE_DUAL_ROLE)
+ 		extcon_unregister_notifier(glue->extcon, EXTCON_USB_HOST,
+ 					   &glue->host_nb);
++error_reset_assert:
++	if (test_bit(SUNXI_MUSB_FL_HAS_RESET, &glue->flags))
++		reset_control_assert(glue->rst);
+ error_clk_disable:
+ 	clk_disable_unprepare(glue->clk);
+ error_sram_release:
+-	sunxi_sram_release(musb->controller->parent);
++	if (test_bit(SUNXI_MUSB_FL_HAS_SRAM, &glue->flags))
++		sunxi_sram_release(musb->controller->parent);
+ 	return ret;
+ }
+ 
+@@ -296,8 +312,12 @@ static int sunxi_musb_exit(struct musb *musb)
+ 		extcon_unregister_notifier(glue->extcon, EXTCON_USB_HOST,
+ 					   &glue->host_nb);
+ 
++	if (test_bit(SUNXI_MUSB_FL_HAS_RESET, &glue->flags))
++		reset_control_assert(glue->rst);
++
+ 	clk_disable_unprepare(glue->clk);
+-	sunxi_sram_release(musb->controller->parent);
++	if (test_bit(SUNXI_MUSB_FL_HAS_SRAM, &glue->flags))
++		sunxi_sram_release(musb->controller->parent);
+ 
+ 	return 0;
+ }
+@@ -617,6 +637,12 @@ static int sunxi_musb_probe(struct platform_device *pdev)
+ 	INIT_WORK(&glue->work, sunxi_musb_work);
+ 	glue->host_nb.notifier_call = sunxi_musb_host_notifier;
+ 
++	if (of_device_is_compatible(np, "allwinner,sun4i-a10-musb"))
++		set_bit(SUNXI_MUSB_FL_HAS_SRAM, &glue->flags);
++
++	if (of_device_is_compatible(np, "allwinner,sun6i-a31-musb"))
++		set_bit(SUNXI_MUSB_FL_HAS_RESET, &glue->flags);
++
+ 	glue->clk = devm_clk_get(&pdev->dev, NULL);
+ 	if (IS_ERR(glue->clk)) {
+ 		dev_err(&pdev->dev, "Error getting clock: %ld\n",
+@@ -624,6 +650,17 @@ static int sunxi_musb_probe(struct platform_device *pdev)
+ 		return PTR_ERR(glue->clk);
+ 	}
+ 
++	if (test_bit(SUNXI_MUSB_FL_HAS_RESET, &glue->flags)) {
++		glue->rst = devm_reset_control_get(&pdev->dev, NULL);
++		if (IS_ERR(glue->rst)) {
++			if (PTR_ERR(glue->rst) == -EPROBE_DEFER)
++				return -EPROBE_DEFER;
++			dev_err(&pdev->dev, "Error getting reset %ld\n",
++				PTR_ERR(glue->rst));
++			return PTR_ERR(glue->rst);
++		}
++	}
++
+ 	glue->phy = devm_phy_get(&pdev->dev, "usb");
+ 	if (IS_ERR(glue->phy)) {
+ 		if (PTR_ERR(glue->phy) == -EPROBE_DEFER)
+@@ -685,6 +722,7 @@ static int sunxi_musb_remove(struct platform_device *pdev)
+ 
+ static const struct of_device_id sunxi_musb_match[] = {
+ 	{ .compatible = "allwinner,sun4i-a10-musb", },
++	{ .compatible = "allwinner,sun6i-a31-musb", },
+ 	{}
+ };
+ 
+-- 
+2.4.3
