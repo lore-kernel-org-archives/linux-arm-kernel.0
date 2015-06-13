@@ -1,97 +1,93 @@
 From: heiko@sntech.de (Heiko Stuebner)
-Date: Sat, 13 Jun 2015 18:22:19 +0200
-Subject: [PATCH 5/8] clk: rockchip: define the inverters of rk3066/rk3188 and
- rk3288
+Date: Sat, 13 Jun 2015 18:22:20 +0200
+Subject: [PATCH 6/8] dt-bindings: add documentation of rk3668 clock controller
 In-Reply-To: <1434212542-17145-1-git-send-email-heiko@sntech.de>
 References: <1434212542-17145-1-git-send-email-heiko@sntech.de>
-Message-ID: <1434212542-17145-6-git-send-email-heiko@sntech.de>
+Message-ID: <1434212542-17145-7-git-send-email-heiko@sntech.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Both soc series' have inverters on the hsadc and camera interface clock
-paths. So define them using the newly added inverter type.
+Add the devicetree binding for the cru on the rk3368 which quite similar
+structured as previous clock controllers.
 
 Signed-off-by: Heiko Stuebner <heiko@sntech.de>
+Cc: Rob Herring <robh+dt@kernel.org>
+Cc: Pawel Moll <pawel.moll@arm.com>
+Cc: Mark Rutland <mark.rutland@arm.com>
+Cc: Ian Campbell <ijc+devicetree@hellion.org.uk>
+Cc: Kumar Gala <galak@codeaurora.org>
+Cc: devicetree at vger.kernel.org
 ---
- drivers/clk/rockchip/clk-rk3188.c | 9 ++++++++-
- drivers/clk/rockchip/clk-rk3288.c | 7 ++++++-
- 2 files changed, 14 insertions(+), 2 deletions(-)
+ .../bindings/clock/rockchip,rk3368-cru.txt         | 61 ++++++++++++++++++++++
+ 1 file changed, 61 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/clock/rockchip,rk3368-cru.txt
 
-diff --git a/drivers/clk/rockchip/clk-rk3188.c b/drivers/clk/rockchip/clk-rk3188.c
-index e4f9d47..a9ab4f9 100644
---- a/drivers/clk/rockchip/clk-rk3188.c
-+++ b/drivers/clk/rockchip/clk-rk3188.c
-@@ -235,6 +235,7 @@ static struct rockchip_pll_clock rk3188_pll_clks[] __initdata = {
- #define MFLAGS CLK_MUX_HIWORD_MASK
- #define DFLAGS CLK_DIVIDER_HIWORD_MASK
- #define GFLAGS (CLK_GATE_HIWORD_MASK | CLK_GATE_SET_TO_DISABLE)
-+#define IFLAGS ROCKCHIP_INVERTER_HIWORD_MASK
- 
- /* 2 ^ (val + 1) */
- static struct clk_div_table div_core_peri_t[] = {
-@@ -310,6 +311,8 @@ static struct rockchip_clk_branch common_clk_branches[] __initdata = {
- 
- 	GATE(0, "pclkin_cif0", "ext_cif0", 0,
- 			RK2928_CLKGATE_CON(3), 3, GFLAGS),
-+	INVERTER(0, "pclk_cif0", "pclkin_cif0",
-+			RK2928_CLKSEL_CON(30), 8, IFLAGS),
- 
- 	/*
- 	 * the 480m are generated inside the usb block from these clocks,
-@@ -334,8 +337,10 @@ static struct rockchip_clk_branch common_clk_branches[] __initdata = {
- 	COMPOSITE_FRAC(0, "hsadc_frac", "hsadc_src", 0,
- 			RK2928_CLKSEL_CON(23), 0,
- 			RK2928_CLKGATE_CON(2), 7, GFLAGS),
--	MUX(SCLK_HSADC, "sclk_hsadc", mux_sclk_hsadc_p, 0,
-+	MUX(0, "sclk_hsadc_out", mux_sclk_hsadc_p, 0,
- 			RK2928_CLKSEL_CON(22), 4, 2, MFLAGS),
-+	INVERTER(SCLK_HSADC, "sclk_hsadc", "sclk_hsadc_out",
-+			RK2928_CLKSEL_CON(22), 7, IFLAGS),
- 
- 	COMPOSITE_NOMUX(SCLK_SARADC, "sclk_saradc", "xin24m", 0,
- 			RK2928_CLKSEL_CON(24), 8, 8, DFLAGS,
-@@ -557,6 +562,8 @@ static struct rockchip_clk_branch rk3066a_clk_branches[] __initdata = {
- 
- 	GATE(0, "pclkin_cif1", "ext_cif1", 0,
- 			RK2928_CLKGATE_CON(3), 4, GFLAGS),
-+	INVERTER(0, "pclk_cif1", "pclkin_cif1",
-+			RK2928_CLKSEL_CON(30), 12, IFLAGS),
- 
- 	COMPOSITE(0, "aclk_gpu_src", mux_pll_src_cpll_gpll_p, 0,
- 			RK2928_CLKSEL_CON(33), 8, 1, MFLAGS, 0, 5, DFLAGS,
-diff --git a/drivers/clk/rockchip/clk-rk3288.c b/drivers/clk/rockchip/clk-rk3288.c
-index 6f0259f..a0c639f 100644
---- a/drivers/clk/rockchip/clk-rk3288.c
-+++ b/drivers/clk/rockchip/clk-rk3288.c
-@@ -223,6 +223,7 @@ static struct clk_div_table div_hclk_cpu_t[] = {
- #define MFLAGS CLK_MUX_HIWORD_MASK
- #define DFLAGS CLK_DIVIDER_HIWORD_MASK
- #define GFLAGS (CLK_GATE_HIWORD_MASK | CLK_GATE_SET_TO_DISABLE)
-+#define IFLAGS ROCKCHIP_INVERTER_HIWORD_MASK
- 
- static struct rockchip_clk_branch rk3288_clk_branches[] __initdata = {
- 	/*
-@@ -592,8 +593,10 @@ static struct rockchip_clk_branch rk3288_clk_branches[] __initdata = {
- 	COMPOSITE(0, "hsadc_src", mux_pll_src_cpll_gpll_p, 0,
- 			RK3288_CLKSEL_CON(22), 0, 1, MFLAGS, 8, 8, DFLAGS,
- 			RK3288_CLKGATE_CON(2), 6, GFLAGS),
--	MUX(SCLK_HSADC, "sclk_hsadc_out", mux_hsadcout_p, 0,
-+	MUX(0, "sclk_hsadc_out", mux_hsadcout_p, 0,
- 			RK3288_CLKSEL_CON(22), 4, 1, MFLAGS),
-+	INVERTER(SCLK_HSADC, "sclk_hsadc", "sclk_hsadc_out",
-+			RK3288_CLKSEL_CON(22), 7, IFLAGS),
- 
- 	GATE(0, "jtag", "ext_jtag", 0,
- 			RK3288_CLKGATE_CON(4), 14, GFLAGS),
-@@ -768,7 +771,9 @@ static struct rockchip_clk_branch rk3288_clk_branches[] __initdata = {
- 	 */
- 
- 	GATE(0, "pclk_vip_in", "ext_vip", 0, RK3288_CLKGATE_CON(16), 0, GFLAGS),
-+	INVERTER(0, "pclk_vip", "pclk_vip_in", RK3288_CLKSEL_CON(29), 4, IFLAGS),
- 	GATE(0, "pclk_isp_in", "ext_isp", 0, RK3288_CLKGATE_CON(16), 3, GFLAGS),
-+	INVERTER(0, "pclk_isp", "pclk_isp_in", RK3288_CLKSEL_CON(29), 3, IFLAGS),
- };
- 
- static const char *const rk3288_critical_clocks[] __initconst = {
+diff --git a/Documentation/devicetree/bindings/clock/rockchip,rk3368-cru.txt b/Documentation/devicetree/bindings/clock/rockchip,rk3368-cru.txt
+new file mode 100644
+index 0000000..0815df5
+--- /dev/null
++++ b/Documentation/devicetree/bindings/clock/rockchip,rk3368-cru.txt
+@@ -0,0 +1,61 @@
++* Rockchip RK3368 Clock and Reset Unit
++
++The RK3368 clock controller generates and supplies clock to various
++controllers within the SoC and also implements a reset controller for SoC
++peripherals.
++
++Required Properties:
++
++- compatible: should be "rockchip,rk3368-cru"
++- reg: physical base address of the controller and length of memory mapped
++  region.
++- #clock-cells: should be 1.
++- #reset-cells: should be 1.
++
++Optional Properties:
++
++- rockchip,grf: phandle to the syscon managing the "general register files"
++  If missing, pll rates are not changeable, due to the missing pll lock status.
++
++Each clock is assigned an identifier and client nodes can use this identifier
++to specify the clock which they consume. All available clocks are defined as
++preprocessor macros in the dt-bindings/clock/rk3368-cru.h headers and can be
++used in device tree sources. Similar macros exist for the reset sources in
++these files.
++
++External clocks:
++
++There are several clocks that are generated outside the SoC. It is expected
++that they are defined using standard clock bindings with following
++clock-output-names:
++ - "xin24m" - crystal input - required,
++ - "xin32k" - rtc clock - optional,
++ - "ext_i2s" - external I2S clock - optional,
++ - "ext_gmac" - external GMAC clock - optional
++ - "ext_hsadc" - external HSADC clock - optional,
++ - "ext_isp" - external ISP clock - optional,
++ - "ext_jtag" - external JTAG clock - optional
++ - "ext_vip" - external VIP clock - optional,
++ - "usbotg_out" - output clock of the pll in the otg phy
++
++Example: Clock controller node:
++
++	cru: clock-controller at ff760000 {
++		compatible = "rockchip,rk3368-cru";
++		reg = <0x0 0xff760000 0x0 0x1000>;
++		rockchip,grf = <&grf>;
++		#clock-cells = <1>;
++		#reset-cells = <1>;
++	};
++
++Example: UART controller node that consumes the clock generated by the clock
++  controller:
++
++	uart0: serial at 10124000 {
++		compatible = "snps,dw-apb-uart";
++		reg = <0x10124000 0x400>;
++		interrupts = <GIC_SPI 34 IRQ_TYPE_LEVEL_HIGH>;
++		reg-shift = <2>;
++		reg-io-width = <1>;
++		clocks = <&cru SCLK_UART0>;
++	};
 -- 
 2.1.4
