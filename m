@@ -1,84 +1,244 @@
-From: jic23@kernel.org (Jonathan Cameron)
-Date: Sun, 14 Jun 2015 12:20:31 +0100
-Subject: [PATCH v2 2/2] iio: adc: xilinx-xadc: Add label as an optional
- argument for aux channels
-In-Reply-To: <20150608134914.GF633@jcartwri.amer.corp.natinst.com>
-References: <555B78A3.2030202@metafoo.de>
- <1432135352-29848-1-git-send-email-xander.huff@ni.com>
- <1432135352-29848-2-git-send-email-xander.huff@ni.com>
- <55747616.1010901@kernel.org>
- <20150608134914.GF633@jcartwri.amer.corp.natinst.com>
-Message-ID: <557D637F.8090206@kernel.org>
+From: manabian@gmail.com (Joachim Eastwood)
+Date: Sun, 14 Jun 2015 13:22:14 +0200
+Subject: [PATCH RFC 1/4] dmaengine: pl08x: support dt channel assignment
+In-Reply-To: <1434280937-8369-1-git-send-email-manabian@gmail.com>
+References: <1434280937-8369-1-git-send-email-manabian@gmail.com>
+Message-ID: <1434280937-8369-2-git-send-email-manabian@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/06/15 14:49, Josh Cartwright wrote:
-> On Sun, Jun 07, 2015 at 05:49:26PM +0100, Jonathan Cameron wrote:
->> On 20/05/15 16:22, Xander Huff wrote:
->>> To better facilitate user-mode access to optional aux channels, allow
->>> device trees to specify a custom label for defined channels.
->>>
->>> Signed-off-by: Xander Huff <xander.huff@ni.com>
->>> Reviewed-by: Joe Hershberger <joe.hershberger@ni.com>
->>> Reviewed-by: Josh Cartwright <joshc@ni.com>
->>> ---
->>>  drivers/iio/adc/xilinx-xadc-core.c | 3 +++
->>>  1 file changed, 3 insertions(+)
->>>
->>> diff --git a/drivers/iio/adc/xilinx-xadc-core.c b/drivers/iio/adc/xilinx-xadc-core.c
->>> index ce93bd8..bda4241 100644
->>> --- a/drivers/iio/adc/xilinx-xadc-core.c
->>> +++ b/drivers/iio/adc/xilinx-xadc-core.c
->>> @@ -1119,6 +1119,9 @@ static int xadc_parse_dt(struct iio_dev *indio_dev, struct device_node *np,
->>>  			if (ret || reg > 16)
->>>  				continue;
->>>  
->>> +			of_property_read_string(child, "label",
->>> +						&chan->extend_name);
->>> +
->>>  			if (of_property_read_bool(child, "xlnx,bipolar"))
->>>  				chan->scan_type.sign = 's';
->>>  
->>>
->> I think what Lars was suggesting was a change to the IIO side of this rather than
->> just changing the device tree binding.
-> 
-> I'm not so sure.  His observation was just that the typical name of
-> these properties is 'label', which I think makes sense and is commonly
-> used.
-> 
-> Naming things is hard.
-> 
-> Perhaps, though, an improvement may be made if we lifted this out of the
-> xadc driver and moved it into the IIO core (I can't imagine that this
-> driver is the only one representing each channel with a separate node in
-> DT).
-> 
->> Perhaps an additional per channel attribute called _label which would
->> allow for board specific labelling?
-> 
-> This would seem a bit odd in DT-land; if a user wanted a different label
-> name for their board, they would just rename it in their device tree for
-> that board.  Fortunately, with the structured dtsi include files, this
-> is pretty painless to do.
-I don't really mind how it is done.  From a userspace point of view in IIO
-though I think these belong in their own attribute rather than in the naming
-of the attributes. The extended name stuff just makes for really hideous
-userspace code!
+From: Linus Walleij <linus.walleij@linaro.org>
 
-Hence you could use the device tree node naming to provide it, or some other
-means, but I'd like to have it provided to userspace as say
+Add support for assigning DMA channels from a device tree.
 
-in_voltage0_label which when read provides the name as a straightforward string.
+[je: remove channel sub-node parsing, dynamic channel creation on xlate]
 
-This would obviously want to be provided by the IIO core.
+Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+Signed-off-by: Joachim Eastwood <manabian@gmail.com>
+---
+ drivers/dma/amba-pl08x.c | 192 ++++++++++++++++++++++++++++++++++++++++++++++-
+ 1 file changed, 189 insertions(+), 3 deletions(-)
 
-As for moving the per channel DT node stuff into the IIO core, at this point
-there are a few drivers doing it, but far from all, so the best bet would be
-a utility function to help the drivers handle the manipulation rather than
-direct support in the core.
-
-Jonathan
-> 
->   Josh
-> 
+diff --git a/drivers/dma/amba-pl08x.c b/drivers/dma/amba-pl08x.c
+index 83aa55d6fa5d..4ec975e8d437 100644
+--- a/drivers/dma/amba-pl08x.c
++++ b/drivers/dma/amba-pl08x.c
+@@ -87,6 +87,8 @@
+ #include <linux/init.h>
+ #include <linux/interrupt.h>
+ #include <linux/module.h>
++#include <linux/of.h>
++#include <linux/of_dma.h>
+ #include <linux/pm_runtime.h>
+ #include <linux/seq_file.h>
+ #include <linux/slab.h>
+@@ -2039,10 +2041,188 @@ static inline void init_pl08x_debugfs(struct pl08x_driver_data *pl08x)
+ }
+ #endif
+ 
++#ifdef CONFIG_OF
++static struct dma_chan *pl08x_find_chan_id(struct pl08x_driver_data *pl08x,
++					 u32 id)
++{
++	struct pl08x_dma_chan *chan;
++
++	list_for_each_entry(chan, &pl08x->slave.channels, vc.chan.device_node) {
++		if (chan->signal == id)
++			return &chan->vc.chan;
++	}
++
++	return NULL;
++}
++
++static struct dma_chan *pl08x_of_xlate(struct of_phandle_args *dma_spec,
++				       struct of_dma *ofdma)
++{
++	struct pl08x_driver_data *pl08x = ofdma->of_dma_data;
++	struct pl08x_channel_data *data;
++	struct pl08x_dma_chan *chan;
++	struct dma_chan *dma_chan;
++
++	if (!pl08x)
++		return NULL;
++
++	if (dma_spec->args_count != 2)
++		return NULL;
++
++	dma_chan = pl08x_find_chan_id(pl08x, dma_spec->args[0]);
++	if (dma_chan)
++		return dma_get_slave_channel(dma_chan);
++
++	chan = devm_kzalloc(pl08x->slave.dev, sizeof(*chan) + sizeof(*data),
++			    GFP_KERNEL);
++	if (!chan)
++		return NULL;
++
++	data = (void *)&chan[1];
++	data->bus_id = "(none)";
++	data->periph_buses = dma_spec->args[1];
++
++	chan->cd = data;
++	chan->host = pl08x;
++	chan->slave = true;
++	chan->name = data->bus_id;
++	chan->state = PL08X_CHAN_IDLE;
++	chan->signal = dma_spec->args[0];
++	chan->vc.desc_free = pl08x_desc_free;
++
++	vchan_init(&chan->vc, &pl08x->slave);
++
++	return dma_get_slave_channel(&chan->vc.chan);
++}
++
++static int pl08x_of_probe(struct amba_device *adev,
++			  struct pl08x_driver_data *pl08x,
++			  struct device_node *np)
++{
++	struct pl08x_platform_data *pd;
++	u32 cctl_memcpy = 0;
++	u32 val;
++	int ret;
++
++	pd = devm_kzalloc(&adev->dev, sizeof(*pd), GFP_KERNEL);
++	if (!pd)
++		return -ENOMEM;
++
++	/* Eligible bus masters for fetching LLIs */
++	if (of_property_read_bool(np, "lli-bus-interface-ahb1"))
++		pd->lli_buses |= PL08X_AHB1;
++	if (of_property_read_bool(np, "lli-bus-interface-ahb2"))
++		pd->lli_buses |= PL08X_AHB2;
++	if (!pd->lli_buses) {
++		dev_info(&adev->dev, "no bus masters for LLIs stated, assume all\n");
++		pd->lli_buses |= PL08X_AHB1 | PL08X_AHB2;
++	}
++
++	/* Eligible bus masters for memory access */
++	if (of_property_read_bool(np, "mem-bus-interface-ahb1"))
++		pd->mem_buses |= PL08X_AHB1;
++	if (of_property_read_bool(np, "mem-bus-interface-ahb2"))
++		pd->mem_buses |= PL08X_AHB2;
++	if (!pd->mem_buses) {
++		dev_info(&adev->dev, "no bus masters for memory stated, assume all\n");
++		pd->mem_buses |= PL08X_AHB1 | PL08X_AHB2;
++	}
++
++	/* Parse the memcpy channel properties */
++	ret = of_property_read_u32(np, "memcpy-burst-size", &val);
++	if (ret) {
++		dev_info(&adev->dev, "no memcpy burst size specified, using 1 byte\n");
++		val = 1;
++	}
++	switch (val) {
++	default:
++		dev_err(&adev->dev, "illegal burst size for memcpy, set to 1\n");
++		/* Fall through */
++	case 1:
++		cctl_memcpy |= PL080_BSIZE_1 << PL080_CONTROL_SB_SIZE_SHIFT |
++			       PL080_BSIZE_1 << PL080_CONTROL_DB_SIZE_SHIFT;
++		break;
++	case 4:
++		cctl_memcpy |= PL080_BSIZE_4 << PL080_CONTROL_SB_SIZE_SHIFT |
++			       PL080_BSIZE_4 << PL080_CONTROL_DB_SIZE_SHIFT;
++		break;
++	case 8:
++		cctl_memcpy |= PL080_BSIZE_8 << PL080_CONTROL_SB_SIZE_SHIFT |
++			       PL080_BSIZE_8 << PL080_CONTROL_DB_SIZE_SHIFT;
++		break;
++	case 16:
++		cctl_memcpy |= PL080_BSIZE_16 << PL080_CONTROL_SB_SIZE_SHIFT |
++			       PL080_BSIZE_16 << PL080_CONTROL_DB_SIZE_SHIFT;
++		break;
++	case 32:
++		cctl_memcpy |= PL080_BSIZE_32 << PL080_CONTROL_SB_SIZE_SHIFT |
++			       PL080_BSIZE_32 << PL080_CONTROL_DB_SIZE_SHIFT;
++		break;
++	case 64:
++		cctl_memcpy |= PL080_BSIZE_64 << PL080_CONTROL_SB_SIZE_SHIFT |
++			       PL080_BSIZE_64 << PL080_CONTROL_DB_SIZE_SHIFT;
++		break;
++	case 128:
++		cctl_memcpy |= PL080_BSIZE_128 << PL080_CONTROL_SB_SIZE_SHIFT |
++			       PL080_BSIZE_128 << PL080_CONTROL_DB_SIZE_SHIFT;
++		break;
++	case 256:
++		cctl_memcpy |= PL080_BSIZE_256 << PL080_CONTROL_SB_SIZE_SHIFT |
++			       PL080_BSIZE_256 << PL080_CONTROL_DB_SIZE_SHIFT;
++		break;
++	}
++
++	ret = of_property_read_u32(np, "memcpy-bus-width", &val);
++	if (ret) {
++		dev_info(&adev->dev, "no memcpy bus width specified, using 8 bits\n");
++		val = 8;
++	}
++	switch (val) {
++	default:
++		dev_err(&adev->dev, "illegal bus width for memcpy, set to 8 bits\n");
++		/* Fall through */
++	case 8:
++		cctl_memcpy |= PL080_WIDTH_8BIT << PL080_CONTROL_SWIDTH_SHIFT |
++			       PL080_WIDTH_8BIT << PL080_CONTROL_DWIDTH_SHIFT;
++		break;
++	case 16:
++		cctl_memcpy |= PL080_WIDTH_16BIT << PL080_CONTROL_SWIDTH_SHIFT |
++			       PL080_WIDTH_16BIT << PL080_CONTROL_DWIDTH_SHIFT;
++		break;
++	case 32:
++		cctl_memcpy |= PL080_WIDTH_32BIT << PL080_CONTROL_SWIDTH_SHIFT |
++			       PL080_WIDTH_32BIT << PL080_CONTROL_DWIDTH_SHIFT;
++		break;
++	}
++
++	/* This is currently the only thing making sense */
++	cctl_memcpy |= PL080_CONTROL_PROT_SYS;
++
++	/* Set up memcpy channel */
++	pd->memcpy_channel.bus_id = "memcpy";
++	pd->memcpy_channel.cctl_memcpy = cctl_memcpy;
++	/* Use the buses that can access memory, obviously */
++	pd->memcpy_channel.periph_buses = pd->mem_buses;
++
++	pl08x->pd = pd;
++
++	return of_dma_controller_register(adev->dev.of_node, pl08x_of_xlate,
++					  pl08x);
++}
++#else
++static inline int pl08x_of_probe(struct amba_device *adev,
++				 struct pl08x_driver_data *pl08x,
++				 struct device_node *np)
++{
++	return -EINVAL;
++}
++#endif
++
+ static int pl08x_probe(struct amba_device *adev, const struct amba_id *id)
+ {
+ 	struct pl08x_driver_data *pl08x;
+ 	const struct vendor_data *vd = id->data;
++	struct device_node *np = adev->dev.of_node;
+ 	u32 tsfr_size;
+ 	int ret = 0;
+ 	int i;
+@@ -2104,9 +2284,15 @@ static int pl08x_probe(struct amba_device *adev, const struct amba_id *id)
+ 	/* Get the platform data */
+ 	pl08x->pd = dev_get_platdata(&adev->dev);
+ 	if (!pl08x->pd) {
+-		dev_err(&adev->dev, "no platform data supplied\n");
+-		ret = -EINVAL;
+-		goto out_no_platdata;
++		if (np) {
++			ret = pl08x_of_probe(adev, pl08x, np);
++			if (ret)
++				goto out_no_platdata;
++		} else {
++			dev_err(&adev->dev, "no platform data supplied\n");
++			ret = -EINVAL;
++			goto out_no_platdata;
++		}
+ 	}
+ 
+ 	/* Assign useful pointers to the driver state */
+-- 
+1.8.0
