@@ -1,32 +1,77 @@
-From: dbaryshkov@gmail.com (Dmitry Eremin-Solenikov)
-Date: Sun, 14 Jun 2015 19:17:00 +0300
-Subject: [PATCH v5 06/17] video: backlight: add new locomo backlight driver
-In-Reply-To: <20150614151331.GE7557@n2100.arm.linux.org.uk>
-References: <1433797008-6246-1-git-send-email-dbaryshkov@gmail.com>
- <1433797008-6246-7-git-send-email-dbaryshkov@gmail.com>
- <20150614151331.GE7557@n2100.arm.linux.org.uk>
-Message-ID: <CALT56yOC7ec_QCk7kQHwJN=7Z1fF3XAP=RR4ZahO6Qg3L8PjJA@mail.gmail.com>
+From: zhichao.huang@linaro.org (zichao)
+Date: Mon, 15 Jun 2015 00:17:23 +0800
+Subject: [PATCH v2 04/11] KVM: arm: common infrastructure for handling
+ AArch32 CP14/CP15
+In-Reply-To: <87y4jt6tyw.fsf@linaro.org>
+References: <1433046432-1824-1-git-send-email-zhichao.huang@linaro.org>
+ <1433046432-1824-5-git-send-email-zhichao.huang@linaro.org>
+ <87y4jt6tyw.fsf@linaro.org>
+Message-ID: <557DA913.5030205@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
 
-2015-06-14 18:13 GMT+03:00 Russell King - ARM Linux <linux@arm.linux.org.uk>:
-> On Mon, Jun 08, 2015 at 11:56:37PM +0300, Dmitry Eremin-Solenikov wrote:
->> Add new simple backlight driver - it cares only about PWM/frontlight
->> part of LoCoMo, it does not touch TFT settings and does not export TFT
->> power control.
->
-> Is there a reason not to model the PWM as a PWM device, and use pwm_bl.c ?
-> pwm_bl.c can be used in non-DT setups too.
 
-I thought about it too. The problem is the FLVR pin, which adds another
-(extra) brighness level after the PWM is configured to 100% duty cycle.
+On 2015/6/9 18:45, Alex Benn?e wrote:
+> 
+> Zhichao Huang <zhichao.huang@linaro.org> writes:
+> 
+>> As we're about to trap a bunch of CP14 registers, let's rework
+>> the CP15 handling so it can be generalized and work with multiple
+>> tables.
+>>
+>> Signed-off-by: Zhichao Huang <zhichao.huang@linaro.org>
+>> ---
+>>  arch/arm/kvm/coproc.c          | 176 ++++++++++++++++++++++++++---------------
+>>  arch/arm/kvm/interrupts_head.S |   2 +-
+>>  2 files changed, 112 insertions(+), 66 deletions(-)
+>>
+>> diff --git a/arch/arm/kvm/coproc.c b/arch/arm/kvm/coproc.c
+>> index 9d283d9..d23395b 100644
+>> --- a/arch/arm/kvm/coproc.c
+>> +++ b/arch/arm/kvm/coproc.c
+>> @@ -375,6 +375,9 @@ static const struct coproc_reg cp15_regs[] = {
+>>  	{ CRn(15), CRm( 0), Op1( 4), Op2( 0), is32, access_cbar},
+>>  };
+>>  
+>> +static const struct coproc_reg cp14_regs[] = {
+>> +};
+>> +
+>>  /* Target specific emulation tables */
+>>  static struct kvm_coproc_target_table *target_tables[KVM_ARM_NUM_TARGETS];
+>>  
+>> @@ -424,47 +427,75 @@ static const struct coproc_reg *find_reg(const struct coproc_params *params,
+>>  	return NULL;
+>>  }
+>>  
+>> -static int emulate_cp15(struct kvm_vcpu *vcpu,
+>> -			const struct coproc_params *params)
+>> +/*
+>> + * emulate_cp --  tries to match a cp14/cp15 access in a handling table,
+>> + *                and call the corresponding trap handler.
+>> + *
+>> + * @params: pointer to the descriptor of the access
+>> + * @table: array of trap descriptors
+>> + * @num: size of the trap descriptor array
+>> + *
+>> + * Return 0 if the access has been handled, and -1 if not.
+>> + */
+>> +static int emulate_cp(struct kvm_vcpu *vcpu,
+>> +			const struct coproc_params *params,
+>> +			const struct coproc_reg *table,
+>> +			size_t num)
+>>  {
+>> -	size_t num;
+>> -	const struct coproc_reg *table, *r;
+>> -
+>> -	trace_kvm_emulate_cp15_imp(params->Op1, params->Rt1, params->CRn,
+>> -				   params->CRm, params->Op2,
+>> params->is_write);
+> 
+> Where has this trace gone? We still want to be able to view register
+> traps when debugging.
+> 
 
-Whether to use PWM subsystem or not for handling this PWM is an open question.
-I decided not to use it (at least for now), because that would bring complexity
-with no directly added value.
+OK, I will add it in v3 patches.
 
--- 
-With best wishes
-Dmitry
+> 
