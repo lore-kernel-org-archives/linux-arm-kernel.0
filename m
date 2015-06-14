@@ -1,94 +1,44 @@
-From: zhichao.huang@linaro.org (zichao)
-Date: Mon, 15 Jun 2015 00:18:55 +0800
-Subject: [PATCH v2 05/11] KVM: arm: check ordering of all system register
- tables
-In-Reply-To: <87fv5z7jrh.fsf@linaro.org>
-References: <1433046432-1824-1-git-send-email-zhichao.huang@linaro.org>
- <1433046432-1824-6-git-send-email-zhichao.huang@linaro.org>
- <87fv5z7jrh.fsf@linaro.org>
-Message-ID: <557DA96F.3000705@linaro.org>
+From: dbaryshkov@gmail.com (Dmitry Eremin-Solenikov)
+Date: Sun, 14 Jun 2015 19:26:01 +0300
+Subject: [PATCH v5 05/17] input: make LoCoMo keyboard driver support both
+ poodle and collie
+In-Reply-To: <20150614151106.GD7557@n2100.arm.linux.org.uk>
+References: <1433797008-6246-1-git-send-email-dbaryshkov@gmail.com>
+ <1433797008-6246-6-git-send-email-dbaryshkov@gmail.com>
+ <20150614151106.GD7557@n2100.arm.linux.org.uk>
+Message-ID: <CALT56yOOT+Y_60c4HNHKvkBG1twrnV9aEnKKTm4GyusnEoivww@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hello,
 
-
-On 2015/6/10 21:52, Alex Benn?e wrote:
-> 
-> Zhichao Huang <zhichao.huang@linaro.org> writes:
-> 
->> We now have multiple tables for the various system registers
->> we trap. Make sure we check the order of all of them, as it is
->> critical that we get the order right (been there, done that...).
+2015-06-14 18:11 GMT+03:00 Russell King - ARM Linux <linux@arm.linux.org.uk>:
+> On Mon, Jun 08, 2015 at 11:56:36PM +0300, Dmitry Eremin-Solenikov wrote:
+>> @@ -278,6 +281,11 @@ static int locomokbd_probe(struct platform_device *dev)
+>>                       locomokbd_keycode,
+>>                       sizeof(locomokbd->keycode));
 >>
->> Signed-off-by: Zhichao Huang <zhichao.huang@linaro.org>
->> ---
->>  arch/arm/kvm/coproc.c | 26 +++++++++++++++++++++-----
->>  1 file changed, 21 insertions(+), 5 deletions(-)
->>
->> diff --git a/arch/arm/kvm/coproc.c b/arch/arm/kvm/coproc.c
->> index d23395b..16d5f69 100644
->> --- a/arch/arm/kvm/coproc.c
->> +++ b/arch/arm/kvm/coproc.c
->> @@ -737,6 +737,9 @@ static struct coproc_reg invariant_cp15[] = {
->>  	{ CRn( 0), CRm( 0), Op1( 0), Op2( 3), is32, NULL, get_TLBTR },
->>  	{ CRn( 0), CRm( 0), Op1( 0), Op2( 6), is32, NULL, get_REVIDR },
->>  
->> +	{ CRn( 0), CRm( 0), Op1( 1), Op2( 1), is32, NULL, get_CLIDR },
->> +	{ CRn( 0), CRm( 0), Op1( 1), Op2( 7), is32, NULL, get_AIDR },
->> +
->>  	{ CRn( 0), CRm( 1), Op1( 0), Op2( 0), is32, NULL, get_ID_PFR0 },
->>  	{ CRn( 0), CRm( 1), Op1( 0), Op2( 1), is32, NULL, get_ID_PFR1 },
->>  	{ CRn( 0), CRm( 1), Op1( 0), Op2( 2), is32, NULL, get_ID_DFR0 },
->> @@ -752,9 +755,6 @@ static struct coproc_reg invariant_cp15[] = {
->>  	{ CRn( 0), CRm( 2), Op1( 0), Op2( 3), is32, NULL, get_ID_ISAR3 },
->>  	{ CRn( 0), CRm( 2), Op1( 0), Op2( 4), is32, NULL, get_ID_ISAR4 },
->>  	{ CRn( 0), CRm( 2), Op1( 0), Op2( 5), is32, NULL, get_ID_ISAR5 },
->> -
->> -	{ CRn( 0), CRm( 0), Op1( 1), Op2( 1), is32, NULL, get_CLIDR },
->> -	{ CRn( 0), CRm( 0), Op1( 1), Op2( 7), is32, NULL, get_AIDR },
->>  };
->>  
->>  /*
->> @@ -1297,13 +1297,29 @@ int kvm_arm_copy_coproc_indices(struct kvm_vcpu *vcpu, u64 __user *uindices)
->>  	return write_demux_regids(uindices);
->>  }
->>  
->> +static int check_sysreg_table(const struct coproc_reg *table, unsigned int n)
->> +{
->> +	unsigned int i;
->> +
->> +	for (i = 1; i < n; i++) {
->> +		if (cmp_reg(&table[i-1], &table[i]) >= 0) {
->> +			kvm_err("sys_reg table %p out of order (%d)\n",
->> +					table, i - 1);
-> 
-> Isn't a BUG_ON *and* a kvm_err() overkill?
-> 
+>> +     if (machine_is_collie())
+>> +             locomokbd->keycode[18] = KEY_HOME;
+>> +     else
+>> +             locomokbd->keycode[3] = KEY_HOME;
+>
+> We had decided that we weren't allowing any new machine_is_xxx() in drivers.
+> Why can't this difference be encoded via platform data, so it can be later
+> encoded in DT if sa11x0 moves in that direction?
 
-In deed, it would not be able to happened, because all the cp14_regs/cp15_regs are static codes.
+I'd agree with you. However this looks rather long path:
+* Introduce platform data with just one preference (for home key).
+* Switch poodle(pxa) to dts
+* Switch collie(sa1100) to dts
+* Introduce special property (or use compatibility string)
+* Kill platform data.
 
-I think the BUG_ON will make the developers to notice whether they get the order right.
+By allowing machine_is_xx() here we can forget about this temporary platform
+data. The change is quite isolated. If you completely disagree with this patch,
+I'd prefer to just drop it for now (as it is an added feature rather
+than just refactoring).
 
-And another reason may be to keep the same way with the ARM64.
-
->> +			return 1;
->> +		}
->> +	}
->> +
->> +	return 0;
->> +}
->> +
->>  void kvm_coproc_table_init(void)
->>  {
->>  	unsigned int i;
->>  
->>  	/* Make sure tables are unique and in order. */
->> -	for (i = 1; i < ARRAY_SIZE(cp15_regs); i++)
->> -		BUG_ON(cmp_reg(&cp15_regs[i-1], &cp15_regs[i]) >= 0);
->> +	BUG_ON(check_sysreg_table(cp14_regs, ARRAY_SIZE(cp14_regs)));
->> +	BUG_ON(check_sysreg_table(cp15_regs, ARRAY_SIZE(cp15_regs)));
->> +	BUG_ON(check_sysreg_table(invariant_cp15, ARRAY_SIZE(invariant_cp15)));
->>  
->>  	/* We abuse the reset function to overwrite the table itself. */
->>  	for (i = 0; i < ARRAY_SIZE(invariant_cp15); i++)
-> 
+-- 
+With best wishes
+Dmitry
