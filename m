@@ -1,77 +1,94 @@
 From: zhichao.huang@linaro.org (zichao)
-Date: Mon, 15 Jun 2015 00:17:23 +0800
-Subject: [PATCH v2 04/11] KVM: arm: common infrastructure for handling
- AArch32 CP14/CP15
-In-Reply-To: <87y4jt6tyw.fsf@linaro.org>
+Date: Mon, 15 Jun 2015 00:18:55 +0800
+Subject: [PATCH v2 05/11] KVM: arm: check ordering of all system register
+ tables
+In-Reply-To: <87fv5z7jrh.fsf@linaro.org>
 References: <1433046432-1824-1-git-send-email-zhichao.huang@linaro.org>
- <1433046432-1824-5-git-send-email-zhichao.huang@linaro.org>
- <87y4jt6tyw.fsf@linaro.org>
-Message-ID: <557DA913.5030205@linaro.org>
+ <1433046432-1824-6-git-send-email-zhichao.huang@linaro.org>
+ <87fv5z7jrh.fsf@linaro.org>
+Message-ID: <557DA96F.3000705@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
 
-On 2015/6/9 18:45, Alex Benn?e wrote:
+On 2015/6/10 21:52, Alex Benn?e wrote:
 > 
 > Zhichao Huang <zhichao.huang@linaro.org> writes:
 > 
->> As we're about to trap a bunch of CP14 registers, let's rework
->> the CP15 handling so it can be generalized and work with multiple
->> tables.
+>> We now have multiple tables for the various system registers
+>> we trap. Make sure we check the order of all of them, as it is
+>> critical that we get the order right (been there, done that...).
 >>
 >> Signed-off-by: Zhichao Huang <zhichao.huang@linaro.org>
 >> ---
->>  arch/arm/kvm/coproc.c          | 176 ++++++++++++++++++++++++++---------------
->>  arch/arm/kvm/interrupts_head.S |   2 +-
->>  2 files changed, 112 insertions(+), 66 deletions(-)
+>>  arch/arm/kvm/coproc.c | 26 +++++++++++++++++++++-----
+>>  1 file changed, 21 insertions(+), 5 deletions(-)
 >>
 >> diff --git a/arch/arm/kvm/coproc.c b/arch/arm/kvm/coproc.c
->> index 9d283d9..d23395b 100644
+>> index d23395b..16d5f69 100644
 >> --- a/arch/arm/kvm/coproc.c
 >> +++ b/arch/arm/kvm/coproc.c
->> @@ -375,6 +375,9 @@ static const struct coproc_reg cp15_regs[] = {
->>  	{ CRn(15), CRm( 0), Op1( 4), Op2( 0), is32, access_cbar},
+>> @@ -737,6 +737,9 @@ static struct coproc_reg invariant_cp15[] = {
+>>  	{ CRn( 0), CRm( 0), Op1( 0), Op2( 3), is32, NULL, get_TLBTR },
+>>  	{ CRn( 0), CRm( 0), Op1( 0), Op2( 6), is32, NULL, get_REVIDR },
+>>  
+>> +	{ CRn( 0), CRm( 0), Op1( 1), Op2( 1), is32, NULL, get_CLIDR },
+>> +	{ CRn( 0), CRm( 0), Op1( 1), Op2( 7), is32, NULL, get_AIDR },
+>> +
+>>  	{ CRn( 0), CRm( 1), Op1( 0), Op2( 0), is32, NULL, get_ID_PFR0 },
+>>  	{ CRn( 0), CRm( 1), Op1( 0), Op2( 1), is32, NULL, get_ID_PFR1 },
+>>  	{ CRn( 0), CRm( 1), Op1( 0), Op2( 2), is32, NULL, get_ID_DFR0 },
+>> @@ -752,9 +755,6 @@ static struct coproc_reg invariant_cp15[] = {
+>>  	{ CRn( 0), CRm( 2), Op1( 0), Op2( 3), is32, NULL, get_ID_ISAR3 },
+>>  	{ CRn( 0), CRm( 2), Op1( 0), Op2( 4), is32, NULL, get_ID_ISAR4 },
+>>  	{ CRn( 0), CRm( 2), Op1( 0), Op2( 5), is32, NULL, get_ID_ISAR5 },
+>> -
+>> -	{ CRn( 0), CRm( 0), Op1( 1), Op2( 1), is32, NULL, get_CLIDR },
+>> -	{ CRn( 0), CRm( 0), Op1( 1), Op2( 7), is32, NULL, get_AIDR },
 >>  };
 >>  
->> +static const struct coproc_reg cp14_regs[] = {
->> +};
->> +
->>  /* Target specific emulation tables */
->>  static struct kvm_coproc_target_table *target_tables[KVM_ARM_NUM_TARGETS];
->>  
->> @@ -424,47 +427,75 @@ static const struct coproc_reg *find_reg(const struct coproc_params *params,
->>  	return NULL;
+>>  /*
+>> @@ -1297,13 +1297,29 @@ int kvm_arm_copy_coproc_indices(struct kvm_vcpu *vcpu, u64 __user *uindices)
+>>  	return write_demux_regids(uindices);
 >>  }
 >>  
->> -static int emulate_cp15(struct kvm_vcpu *vcpu,
->> -			const struct coproc_params *params)
->> +/*
->> + * emulate_cp --  tries to match a cp14/cp15 access in a handling table,
->> + *                and call the corresponding trap handler.
->> + *
->> + * @params: pointer to the descriptor of the access
->> + * @table: array of trap descriptors
->> + * @num: size of the trap descriptor array
->> + *
->> + * Return 0 if the access has been handled, and -1 if not.
->> + */
->> +static int emulate_cp(struct kvm_vcpu *vcpu,
->> +			const struct coproc_params *params,
->> +			const struct coproc_reg *table,
->> +			size_t num)
+>> +static int check_sysreg_table(const struct coproc_reg *table, unsigned int n)
+>> +{
+>> +	unsigned int i;
+>> +
+>> +	for (i = 1; i < n; i++) {
+>> +		if (cmp_reg(&table[i-1], &table[i]) >= 0) {
+>> +			kvm_err("sys_reg table %p out of order (%d)\n",
+>> +					table, i - 1);
+> 
+> Isn't a BUG_ON *and* a kvm_err() overkill?
+> 
+
+In deed, it would not be able to happened, because all the cp14_regs/cp15_regs are static codes.
+
+I think the BUG_ON will make the developers to notice whether they get the order right.
+
+And another reason may be to keep the same way with the ARM64.
+
+>> +			return 1;
+>> +		}
+>> +	}
+>> +
+>> +	return 0;
+>> +}
+>> +
+>>  void kvm_coproc_table_init(void)
 >>  {
->> -	size_t num;
->> -	const struct coproc_reg *table, *r;
->> -
->> -	trace_kvm_emulate_cp15_imp(params->Op1, params->Rt1, params->CRn,
->> -				   params->CRm, params->Op2,
->> params->is_write);
-> 
-> Where has this trace gone? We still want to be able to view register
-> traps when debugging.
-> 
-
-OK, I will add it in v3 patches.
-
+>>  	unsigned int i;
+>>  
+>>  	/* Make sure tables are unique and in order. */
+>> -	for (i = 1; i < ARRAY_SIZE(cp15_regs); i++)
+>> -		BUG_ON(cmp_reg(&cp15_regs[i-1], &cp15_regs[i]) >= 0);
+>> +	BUG_ON(check_sysreg_table(cp14_regs, ARRAY_SIZE(cp14_regs)));
+>> +	BUG_ON(check_sysreg_table(cp15_regs, ARRAY_SIZE(cp15_regs)));
+>> +	BUG_ON(check_sysreg_table(invariant_cp15, ARRAY_SIZE(invariant_cp15)));
+>>  
+>>  	/* We abuse the reset function to overwrite the table itself. */
+>>  	for (i = 0; i < ARRAY_SIZE(invariant_cp15); i++)
 > 
