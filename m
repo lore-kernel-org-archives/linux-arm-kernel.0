@@ -1,87 +1,56 @@
 From: manabian@gmail.com (Joachim Eastwood)
-Date: Sun, 14 Jun 2015 13:22:15 +0200
-Subject: [PATCH RFC 2/4] doc: dt: dma: add binding doc for pl08x
-In-Reply-To: <1434280937-8369-1-git-send-email-manabian@gmail.com>
-References: <1434280937-8369-1-git-send-email-manabian@gmail.com>
-Message-ID: <1434280937-8369-3-git-send-email-manabian@gmail.com>
+Date: Sun, 14 Jun 2015 13:22:13 +0200
+Subject: [PATCH RFC 0/4] PL08x DT bindings and LPC18xx DMA support
+Message-ID: <1434280937-8369-1-git-send-email-manabian@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Linus Walleij <linus.walleij@linaro.org>
+This patch set aims to add support for DMA on the NXP LPC18xx/43xx
+(Cortex-M3/M4) platform. The platform has a PL080 controller with a
+mux in front of the DMA request lines. This setup is quite common
+and can be found on most other, if not all, NXP LPC devices.
 
-This introduces device tree bindings for the PL08x DMA controllers
-when used with fixed signal assignment per channel, i.e. if each
-channel on the PL08x is assigned precisely one burst/single signal
-set.
+Patch set adds DT support for the PL08x dmaengine driver and a DMA
+router driver for the LPC18xx/43xx DMA multiplexer.
 
-[je: remove channel sub-node parsing, use cell value to assign AHB]
+DT support for the PL08x was originally written by Linus Walleij and
+can be found on the link below.
+http://lists.infradead.org/pipermail/linux-arm-kernel/2014-September/286866.html
 
-Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
-Signed-off-by: Joachim Eastwood <manabian@gmail.com>
----
- .../devicetree/bindings/dma/arm-pl08x.txt          | 54 ++++++++++++++++++++++
- 1 file changed, 54 insertions(+)
+The following changes has since been made to the pl08x dt patch by
+Linus:
+ - move AHB master setting into dma specifier as
+   suggested by Arnd [1].
+ - remove channel sub-nodes from driver and dt doc.
+ - dynamically allocate dma channels in xlate
+   function as outlined by Arnd [2].
+ - address some minor comments from Arnd in [1].
+ - minor misc clean ups (white space + include order).
+
+Patch set successfully tested on 8250 UART (TX) with DMA support on
+Embedded Artists' LPC4357 Developer's Kit.
+
+[1] http://lists.infradead.org/pipermail/linux-arm-kernel/2014-September/287834.html
+[2] http://lists.infradead.org/pipermail/linux-arm-kernel/2014-September/286150.html
+
+Joachim Eastwood (2):
+  dmaengine: add driver for lpc18xx dmamux
+  doc: dt: dma: add bindings for lpc1850-dmamux
+
+Linus Walleij (2):
+  dmaengine: pl08x: support dt channel assignment
+  doc: dt: dma: add binding doc for pl08x
+
+ .../devicetree/bindings/dma/arm-pl08x.txt          |  54 ++++++
+ .../devicetree/bindings/dma/lpc1850-dmamux.txt     |  54 ++++++
+ drivers/dma/Kconfig                                |   9 +
+ drivers/dma/Makefile                               |   1 +
+ drivers/dma/amba-pl08x.c                           | 192 ++++++++++++++++++++-
+ drivers/dma/lpc18xx-dmamux.c                       | 184 ++++++++++++++++++++
+ 6 files changed, 491 insertions(+), 3 deletions(-)
  create mode 100644 Documentation/devicetree/bindings/dma/arm-pl08x.txt
+ create mode 100644 Documentation/devicetree/bindings/dma/lpc1850-dmamux.txt
+ create mode 100644 drivers/dma/lpc18xx-dmamux.c
 
-diff --git a/Documentation/devicetree/bindings/dma/arm-pl08x.txt b/Documentation/devicetree/bindings/dma/arm-pl08x.txt
-new file mode 100644
-index 000000000000..8a0097a029d3
---- /dev/null
-+++ b/Documentation/devicetree/bindings/dma/arm-pl08x.txt
-@@ -0,0 +1,54 @@
-+* ARM PrimeCells PL080 and PL081 and derivatives DMA controller
-+
-+Required properties:
-+- compatible: "arm,pl080", "arm,primecell";
-+	      "arm,pl081", "arm,primecell";
-+- reg: Address range of the PL08x registers
-+- interrupt: The PL08x interrupt number
-+- clocks: The clock running the IP core clock
-+- clock-names: Must contain "apb_pclk"
-+- lli-bus-interface-ahb1: if AHB master 1 is eligible for fetching LLIs
-+- lli-bus-interface-ahb2: if AHB master 2 is eligible for fetching LLIs
-+- mem-bus-interface-ahb1: if AHB master 1 is eligible for fetching memory contents
-+- mem-bus-interface-ahb2: if AHB master 2 is eligible for fetching memory contents
-+- #dma-cells: must be <2>. First cell should contain the DMA request,
-+              second cell should contain either 1 or 2 depending on
-+              which AHB master that is used.
-+
-+Optional properties:
-+- dma-channels: contains the total number of DMA channels supported by the DMAC
-+- dma-requests: contains the total number of DMA requests supported by the DMAC
-+- memcpy-burst-size: the size of the bursts for memcpy: 1, 4, 8, 16, 32
-+  64, 128 or 256 bytes are legal values
-+- memcpy-bus-width: the bus width used for memcpy: 8, 16 or 32 are legal
-+  values
-+
-+Clients
-+Required properties:
-+- dmas: List of DMA controller phandle, request channel and AHB master id
-+- dma-names: Names of the aforementioned requested channels
-+
-+Example:
-+
-+dmac0: dma-controller at 10130000 {
-+	compatible = "arm,pl080", "arm,primecell";
-+	reg = <0x10130000 0x1000>;
-+	interrupt-parent = <&vica>;
-+	interrupts = <15>;
-+	clocks = <&hclkdma0>;
-+	clock-names = "apb_pclk";
-+	lli-bus-interface-ahb1;
-+	lli-bus-interface-ahb2;
-+	mem-bus-interface-ahb2;
-+	memcpy-burst-size = <256>;
-+	memcpy-bus-width = <32>;
-+	#dma-cells = <2>;
-+};
-+
-+device at 40008000 {
-+	...
-+	dmas = <&dmac0 0 2
-+		&dmac0 1 2>;
-+	dma-names = "tx", "rx";
-+	...
-+};
 -- 
 1.8.0
