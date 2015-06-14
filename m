@@ -1,77 +1,93 @@
 From: linux.amoon@gmail.com (Anand Moon)
-Date: Sun, 14 Jun 2015 19:54:03 +0930
-Subject: [PATCHv6 2/4] ARM: dts: exynos5422-odroidxu3: Enable TMU at
- Exynos5422 base
+Date: Sun, 14 Jun 2015 19:54:04 +0930
+Subject: [PATCHv6 3/4] ARM: dts: exynos5422-odroidxu3: Define default
+ thermal-zones
 In-Reply-To: <1434277445-5243-1-git-send-email-linux.amoon@gmail.com>
 References: <1434277445-5243-1-git-send-email-linux.amoon@gmail.com>
-Message-ID: <1434277445-5243-2-git-send-email-linux.amoon@gmail.com>
+Message-ID: <1434277445-5243-3-git-send-email-linux.amoon@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This changes enables TMU IP block on the Exynos5422 Odroid-XU3
-device.
+Trip points corresponding to the one defined in the exynos_tmu_data.c
+for Exynos5422 have been included so define thermal-zones attribute.
 
 Signed-off-by: Anand Moon <linux.amoon@gmail.com>
 Tested-by: Markus Reichl <m.reichl@fivetechno.de>
 Acked-by: Lukasz Majewski <l.majewski@samsung.com>
+Acked-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
 ---
 Changes rebase on git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung branch for-next
-Changes from v5: Use LDO7 regulator instead of LD010.
-
-The output of LDO18 goes to VDD_EMMC_1V8. This is not regulator for TMU.
-
-I think the schematics are missing some of details but it can be deducted that:
-1. TEMP SE is supplied by VDD18_TS power domain. It consists of 5
-pairs of pins (XTSTEST_OUT[0-4], XTSEXT_RES[0-4]).
-2. The VDD18_TS01, VDD18_TS23 and VDD18_TS4 are wired to the LDO7 of
-S2MPS11 PMIC.
-3. I confirmed with the Exynos5422 datasheet that these
-VDD18_TS{01,23,4} supply the XTSTEST pins (OUT and RES).
-
-So the LDO7 it is... but before using it there is a caveat. The LDO7
-is also connected to VDD of MIPI, HDMI and few more. So when you use
-this regulator in TMU it may be turned off by TMU driver (e.g. during
-unbind). In such case these other blocks also should be tested and
-checked whether they take this regulator and enable it.
+Changes from v5 : Rename exynos5-cpu-thermal.dtsi to exynos5422-cpu-thermal.dtsi
+			as this file belongs to exynos5422 boards
 ---
- arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi | 25 ++++++++++++++++++++++
- 1 file changed, 25 insertions(+)
+ arch/arm/boot/dts/exynos5422-cpu-thermal.dtsi | 59 +++++++++++++++++++++++++++
+ 1 file changed, 59 insertions(+)
+ create mode 100644 arch/arm/boot/dts/exynos5422-cpu-thermal.dtsi
 
-diff --git a/arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi b/arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi
-index a2f9941..b6570fc 100644
---- a/arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi
-+++ b/arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi
-@@ -474,6 +474,31 @@
- 	status = "okay";
- };
- 
-+&tmu_cpu0 {
-+	vtmu-supply = <&ldo7_reg>;
-+	status = "okay";
-+};
+diff --git a/arch/arm/boot/dts/exynos5422-cpu-thermal.dtsi b/arch/arm/boot/dts/exynos5422-cpu-thermal.dtsi
+new file mode 100644
+index 0000000..c73393a
+--- /dev/null
++++ b/arch/arm/boot/dts/exynos5422-cpu-thermal.dtsi
+@@ -0,0 +1,59 @@
++/*
++ * Device tree sources for Exynos5422 thermal zone
++ *
++ * Copyright (c) 2015 Lukasz Majewski <l.majewski@samsung.com>
++ *			Anand Moon <linux.amoon@gmail.com>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ *
++ */
 +
-+&tmu_cpu1 {
-+	vtmu-supply = <&ldo7_reg>;
-+	status = "okay";
-+};
++#include <dt-bindings/thermal/thermal.h>
 +
-+&tmu_cpu2 {
-+	vtmu-supply = <&ldo7_reg>;
-+	status = "okay";
++/ {
++	thermal-zones {
++		cpu0_thermal: cpu0-thermal {
++			thermal-sensors = <&tmu_cpu0 0>;
++			polling-delay-passive = <0>;
++			polling-delay = <0>;
++			trips {
++				cpu_alert0: cpu-alert-0 {
++					temperature = <50000>; /* millicelsius */
++					hysteresis = <5000>; /* millicelsius */
++					type = "active";
++				};
++				cpu_alert1: cpu-alert-1 {
++					temperature = <60000>; /* millicelsius */
++					hysteresis = <5000>; /* millicelsius */
++					type = "active";
++				};
++				cpu_alert2: cpu-alert-2 {
++					temperature = <70000>; /* millicelsius */
++					hysteresis = <5000>; /* millicelsius */
++					type = "active";
++				};
++				cpu_crit0: cpu-crit-0 {
++					temperature = <120000>; /* millicelsius */
++					hysteresis = <0>; /* millicelsius */
++					type = "critical";
++				};
++			};
++			cooling-maps {
++				map0 {
++				     trip = <&cpu_alert0>;
++				     cooling-device = <&fan0 0 1>;
++				};
++				map1 {
++				     trip = <&cpu_alert1>;
++				     cooling-device = <&fan0 1 2>;
++				};
++				map2 {
++				     trip = <&cpu_alert2>;
++				     cooling-device = <&fan0 2 3>;
++				};
++			};
++		};
++	};
 +};
-+
-+&tmu_cpu3 {
-+	vtmu-supply = <&ldo7_reg>;
-+	status = "okay";
-+};
-+
-+&tmu_gpu {
-+	vtmu-supply = <&ldo7_reg>;
-+	status = "okay";
-+};
-+
- &rtc {
- 	status = "okay";
- 	clocks = <&clock CLK_RTC>, <&s2mps11_osc S2MPS11_CLK_AP>;
 -- 
 2.4.3
