@@ -1,56 +1,80 @@
 From: manabian@gmail.com (Joachim Eastwood)
-Date: Sun, 14 Jun 2015 13:22:13 +0200
-Subject: [PATCH RFC 0/4] PL08x DT bindings and LPC18xx DMA support
-Message-ID: <1434280937-8369-1-git-send-email-manabian@gmail.com>
+Date: Sun, 14 Jun 2015 13:22:17 +0200
+Subject: [PATCH RFC 4/4] doc: dt: dma: add bindings for lpc1850-dmamux
+In-Reply-To: <1434280937-8369-1-git-send-email-manabian@gmail.com>
+References: <1434280937-8369-1-git-send-email-manabian@gmail.com>
+Message-ID: <1434280937-8369-5-git-send-email-manabian@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch set aims to add support for DMA on the NXP LPC18xx/43xx
-(Cortex-M3/M4) platform. The platform has a PL080 controller with a
-mux in front of the DMA request lines. This setup is quite common
-and can be found on most other, if not all, NXP LPC devices.
+Add device tree bindings documentation for the
+lpc1850-dmamux DMA router.
 
-Patch set adds DT support for the PL08x dmaengine driver and a DMA
-router driver for the LPC18xx/43xx DMA multiplexer.
-
-DT support for the PL08x was originally written by Linus Walleij and
-can be found on the link below.
-http://lists.infradead.org/pipermail/linux-arm-kernel/2014-September/286866.html
-
-The following changes has since been made to the pl08x dt patch by
-Linus:
- - move AHB master setting into dma specifier as
-   suggested by Arnd [1].
- - remove channel sub-nodes from driver and dt doc.
- - dynamically allocate dma channels in xlate
-   function as outlined by Arnd [2].
- - address some minor comments from Arnd in [1].
- - minor misc clean ups (white space + include order).
-
-Patch set successfully tested on 8250 UART (TX) with DMA support on
-Embedded Artists' LPC4357 Developer's Kit.
-
-[1] http://lists.infradead.org/pipermail/linux-arm-kernel/2014-September/287834.html
-[2] http://lists.infradead.org/pipermail/linux-arm-kernel/2014-September/286150.html
-
-Joachim Eastwood (2):
-  dmaengine: add driver for lpc18xx dmamux
-  doc: dt: dma: add bindings for lpc1850-dmamux
-
-Linus Walleij (2):
-  dmaengine: pl08x: support dt channel assignment
-  doc: dt: dma: add binding doc for pl08x
-
- .../devicetree/bindings/dma/arm-pl08x.txt          |  54 ++++++
- .../devicetree/bindings/dma/lpc1850-dmamux.txt     |  54 ++++++
- drivers/dma/Kconfig                                |   9 +
- drivers/dma/Makefile                               |   1 +
- drivers/dma/amba-pl08x.c                           | 192 ++++++++++++++++++++-
- drivers/dma/lpc18xx-dmamux.c                       | 184 ++++++++++++++++++++
- 6 files changed, 491 insertions(+), 3 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/dma/arm-pl08x.txt
+Signed-off-by: Joachim Eastwood <manabian@gmail.com>
+---
+ .../devicetree/bindings/dma/lpc1850-dmamux.txt     | 54 ++++++++++++++++++++++
+ 1 file changed, 54 insertions(+)
  create mode 100644 Documentation/devicetree/bindings/dma/lpc1850-dmamux.txt
- create mode 100644 drivers/dma/lpc18xx-dmamux.c
 
+diff --git a/Documentation/devicetree/bindings/dma/lpc1850-dmamux.txt b/Documentation/devicetree/bindings/dma/lpc1850-dmamux.txt
+new file mode 100644
+index 000000000000..87740adb2995
+--- /dev/null
++++ b/Documentation/devicetree/bindings/dma/lpc1850-dmamux.txt
+@@ -0,0 +1,54 @@
++NXP LPC18xx/43xx DMA MUX (DMA request router)
++
++Required properties:
++- compatible:	"nxp,lpc1850-dmamux"
++- reg:		Memory map for accessing module
++- #dma-cells:	Should be set to <3>.
++		* 1st cell contain the master dma request signal
++		* 2nd cell contain the mux value (0-3) for the peripheral
++		* 3rd cell contain either 1 or 2 depending on the AHB
++		  master used.
++- dma-requests:	Number of DMA requests for the mux
++- dma-masters:	phandle pointing to the DMA controller
++
++The DMA controller node need to have the following poroperties:
++- dma-requests:	Number of DMA requests the controller can handle
++
++Example:
++
++dmac: dma at 40002000 {
++	compatible = "nxp,lpc1850-gpdma", "arm,pl080", "arm,primecell";
++	arm,primecell-periphid = <0x00041080>;
++	reg = <0x40002000 0x1000>;
++	interrupts = <2>;
++	clocks = <&ccu1 CLK_CPU_DMA>;
++	clock-names = "apb_pclk";
++	#dma-cells = <2>;
++	dma-channels = <8>;
++	dma-requests = <16>;
++	lli-bus-interface-ahb1;
++	lli-bus-interface-ahb2;
++	mem-bus-interface-ahb1;
++	mem-bus-interface-ahb2;
++	memcpy-burst-size = <256>;
++	memcpy-bus-width = <32>;
++};
++
++dmamux: dma-mux {
++	compatible = "nxp,lpc1850-dmamux";
++	#dma-cells = <3>;
++	dma-requests = <64>;
++	dma-masters = <&dmac>;
++};
++
++uart0: serial at 40081000 {
++	compatible = "nxp,lpc1850-uart", "ns16550a";
++	reg = <0x40081000 0x1000>;
++	reg-shift = <2>;
++	interrupts = <24>;
++	clocks = <&ccu2 CLK_APB0_UART0>, <&ccu1 CLK_CPU_UART0>;
++	clock-names = "uartclk", "reg";
++	dmas = <&dmamux 1 1 2
++		&dmamux 2 1 2>;
++	dma-names = "tx", "rx";
++};
 -- 
 1.8.0
