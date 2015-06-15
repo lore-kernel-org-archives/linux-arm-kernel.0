@@ -1,40 +1,43 @@
-From: omaplinuxkernel@gmail.com (Shubhrajyoti Datta)
-Date: Mon, 15 Jun 2015 20:35:17 +0530
-Subject: [PATCH v2 2/2] dma: Add Xilinx zynqmp dma engine driver support
-In-Reply-To: <1434378982-30184-2-git-send-email-punnaia@xilinx.com>
-References: <1434378982-30184-1-git-send-email-punnaia@xilinx.com>
- <1434378982-30184-2-git-send-email-punnaia@xilinx.com>
-Message-ID: <CAM=Q2ctpOhxryYqgiHDQry7Q_1noYGEX4pYg+tp+wLgV9=X1hw@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 15 Jun 2015 16:05:22 +0100
+Subject: [PATCH] ARM: mm: enable L1 prefetch on Cortex-A9
+In-Reply-To: <20150615165753.61d8c75a@free-electrons.com>
+References: <1434023550-20147-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <20150615111103.GL7557@n2100.arm.linux.org.uk>
+ <20150615165753.61d8c75a@free-electrons.com>
+Message-ID: <20150615150522.GN7557@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 15, 2015 at 8:06 PM, Punnaiah Choudary Kalluri
-<punnaiah.choudary.kalluri@xilinx.com> wrote:
-> Added the basic driver for zynqmp dma engine used in Zynq
-> UltraScale+ MPSoC. The initial release of this driver supports
-> only memory to memory transfers.
->
-> Signed-off-by: Punnaiah Choudary Kalluri <punnaia@xilinx.com>
-> ---
-<snip>
+On Mon, Jun 15, 2015 at 04:57:53PM +0200, Thomas Petazzoni wrote:
+> Russell,
+> 
+> On Mon, 15 Jun 2015 12:11:03 +0100, Russell King - ARM Linux wrote:
+> 
+> > I'd prefer not to take this until after the next merge window, because I
+> > don't want to deal with conflicts that this may cause with other branches
+> > in my tree.
+> > 
+> > We're at -rc8 now, only a week away from -final, now is not really the
+> > time to be taking new code into git trees anyway.
+> 
+> I should have mentioned that explicitly, but I clearly didn't expect
+> this patch to be taken for the upcoming 4.2 merge window as it's way
+> too late. Targeting 4.3 is perfectly fine.
+> 
+> However, can you consider my "ARM: smp_scu: enable coherent speculative
+> linefills", which has been sent almost three months ago:
+> 
+>   http://lists.infradead.org/pipermail/linux-arm-kernel/2015-March/332106.html
 
-> +/**
-> + * zynqmp_dma_chan_is_idle - Provides the channel idle status
-> + * @chan: ZynqMP DMA DMA channel pointer
-> + *
-> + * Return: '1' if the channel is idle otherwise '0'
-> + */
-> +static int zynqmp_dma_chan_is_idle(struct zynqmp_dma_chan *chan)
+I looked at that, and decided I didn't have enough information to know
+whether that's a good idea to apply or not for all the different variants
+we have out there.  It's something that needs to be merged early in the
+cycle to give it enough time to be (hopefully) tested by people.
 
-maybe this could return bool.
+A lot of these "enable optimisation X" patches need to go through that
+treatment.
 
-> +{
-> +       u32 regval;
-> +
-> +       regval = readl(chan->regs + STATUS);
-> +       if (regval & STATUS_BUSY)
-> +               return 0;
-> +
-> +       return 1;
-> +}
-> +
+-- 
+FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
+according to speedtest.net.
