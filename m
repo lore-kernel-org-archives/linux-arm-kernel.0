@@ -1,55 +1,33 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Mon, 15 Jun 2015 21:44:47 +0200
-Subject: [PATCH v2 12/14] drivers: sh: Stop using pm_runtime.c for
- multi-platform shmobile with genpd
-In-Reply-To: <1432839219-475-13-git-send-email-geert+renesas@glider.be>
-References: <1432839219-475-1-git-send-email-geert+renesas@glider.be>
- <1432839219-475-13-git-send-email-geert+renesas@glider.be>
-Message-ID: <CAMuHMdWfqXZKUShiSqi0RmGpfkqgsL-5We__Vnou1aj5OHYPmA@mail.gmail.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Mon, 15 Jun 2015 22:43:21 +0200
+Subject: [PATCH] ARM: nomadik: set proper compatible for accelerometer
+In-Reply-To: <7hbngg4wss.fsf@deeprootsystems.com>
+References: <1433490145-2936-1-git-send-email-linus.walleij@linaro.org>
+ <CACRpkdZ+r3Gd6Drx+PMw280hYO6Nszh4V16E+O-ehawX80DjQg@mail.gmail.com>
+ <7hbngg4wss.fsf@deeprootsystems.com>
+Message-ID: <CACRpkdYWTYFbz9LEjhKRLjeqoOuYJcrM-rtsMwab6R2rZ-u0+g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 28, 2015 at 8:53 PM, Geert Uytterhoeven
-<geert+renesas@glider.be> wrote:
-> Now most multi-platform ARM shmobile platforms (SH-Mobile, R-Mobile,
-> R-Car, RZ) use the CPG Clock Domain to take care of PM runtime
-> management of the module clocks, we no longer need the legacy default PM
-> domain hack, which also prevented registering the real PM domain.
+On Mon, Jun 15, 2015 at 9:05 PM, Kevin Hilman <khilman@kernel.org> wrote:
+> Linus Walleij <linus.walleij@linaro.org> writes:
+>> On Fri, Jun 5, 2015 at 9:42 AM, Linus Walleij <linus.walleij@linaro.org> wrote:
+>>
+>>> Adjust device tree entry to the proper registered compatible
+>>> string for LIS3LV02DL.
+>>>
+>>> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+>>> ---
+>>> Hi ARM SoC people, please apply this directly for -next on the
+>>> DT branch. It makes the accelerometer work on the Nomadik.
+>>
+>> Ping on this.
 >
-> EMMA Mobile EV2 doesn't have MSTP clocks and doesn't use the CPG Clock
-> Domain. But all its device drivers manage clocks explicitly, without
-> relying on Runtime PM, so it doesn't need the legacy default PM hack
-> neither.
->
-> Hence do not compile it when running an ARM multi-platform kernel with
-> genpd support.
->
-> The default PM domain is still needed:
->   - for legacy SuperH,
->   - for legacy (non-DT) ARM/shmobile platforms
->       - without genpd support (r8a7778, r8a7779),
->       - with genpd support, for devices in the "C5" always-on power
->         area (r8a7740, sh73a0),
->   - for the CONFIG_PM=n case.
->
-> Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
-> Reviewed-by: Ulf Hansson <ulf.hansson@linaro.org>
-> ---
-> v2:
->   - Add Reviewed-by,
->   - Just stop compiling pm_runtime.c instead of using a runtime check,
->     as no multi-platform ARM platforms need this anymore.
+> Sorry, forgot to reply here, but this was applied to next/dt at the same
+> time as your other one (ARM64: juno: add GPIO keys).  It's in arm-soc as
+> 386f56bb7330 ARM: nomadik: set proper compatible for accelerometer
 
-The runtime check must stay for the ARM multiplatform CONFIG_PM=n case,
-to prevent the code from running on non-shmobile machines. Will fix.
+Ah, I should've checked. Sorry, and thanks!
 
-Gr{oetje,eeting}s,
-
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+Yours,
+Linus Walleij
