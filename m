@@ -1,122 +1,100 @@
-From: m-karicheri2@ti.com (Murali Karicheri)
-Date: Mon, 15 Jun 2015 12:26:53 -0400
-Subject: [PATCH 1/2] clk: keystone: add support for post divider register
- for main pll
-In-Reply-To: <1432915453-409-1-git-send-email-m-karicheri2@ti.com>
-References: <1432915453-409-1-git-send-email-m-karicheri2@ti.com>
-Message-ID: <557EFCCD.5000501@ti.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 15 Jun 2015 17:28:16 +0100
+Subject: [BUG?] crypto: caam: little/big endianness on ARM vs PPC
+In-Reply-To: <20150615155907.GC7947@pengutronix.de>
+References: <20150615155907.GC7947@pengutronix.de>
+Message-ID: <20150615162816.GO7557@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/29/2015 12:04 PM, Murali Karicheri wrote:
-> Main PLL controller has post divider bits in a separate register in
-> pll controller. Use the value from this register instead of fixed
-> divider when available.
->
-> Signed-off-by: Murali Karicheri <m-karicheri2@ti.com>
-> ---
->   .../devicetree/bindings/clock/keystone-pll.txt       |  8 ++++----
->   drivers/clk/keystone/pll.c                           | 20 ++++++++++++++++++--
->   2 files changed, 22 insertions(+), 6 deletions(-)
->
-> diff --git a/Documentation/devicetree/bindings/clock/keystone-pll.txt b/Documentation/devicetree/bindings/clock/keystone-pll.txt
-> index 225990f..47570d2 100644
-> --- a/Documentation/devicetree/bindings/clock/keystone-pll.txt
-> +++ b/Documentation/devicetree/bindings/clock/keystone-pll.txt
-> @@ -15,8 +15,8 @@ Required properties:
->   - compatible : shall be "ti,keystone,main-pll-clock" or "ti,keystone,pll-clock"
->   - clocks : parent clock phandle
->   - reg - pll control0 and pll multipler registers
-> -- reg-names : control and multiplier. The multiplier is applicable only for
-> -		main pll clock
-> +- reg-names : control, multiplier and post-divider. The multiplier and
-> +		post-divider registers are applicable only for main pll clock
->   - fixed-postdiv : fixed post divider value. If absent, use clkod register bits
->   		for postdiv
->
-> @@ -25,8 +25,8 @@ Example:
->   		#clock-cells = <0>;
->   		compatible = "ti,keystone,main-pll-clock";
->   		clocks = <&refclksys>;
-> -		reg = <0x02620350 4>, <0x02310110 4>;
-> -		reg-names = "control", "multiplier";
-> +		reg = <0x02620350 4>, <0x02310110 4>, <0x02310108 4>;
-> +		reg-names = "control", "multiplier", "post-divider";
->   		fixed-postdiv = <2>;
->   	};
->
-> diff --git a/drivers/clk/keystone/pll.c b/drivers/clk/keystone/pll.c
-> index 0dd8a4b..4a375ea 100644
-> --- a/drivers/clk/keystone/pll.c
-> +++ b/drivers/clk/keystone/pll.c
-> @@ -37,7 +37,8 @@
->    *	Main PLL or any other PLLs in the device such as ARM PLL, DDR PLL
->    *	or PA PLL available on keystone2. These PLLs are controlled by
->    *	this register. Main PLL is controlled by a PLL controller.
-> - * @pllm: PLL register map address
-> + * @pllm: PLL register map address for multiplier bits
-> + * @pllod: PLL register map address for post divider bits
->    * @pll_ctl0: PLL controller map address
->    * @pllm_lower_mask: multiplier lower mask
->    * @pllm_upper_mask: multiplier upper mask
-> @@ -53,6 +54,7 @@ struct clk_pll_data {
->   	u32 phy_pllm;
->   	u32 phy_pll_ctl0;
->   	void __iomem *pllm;
-> +	void __iomem *pllod;
->   	void __iomem *pll_ctl0;
->   	u32 pllm_lower_mask;
->   	u32 pllm_upper_mask;
-> @@ -102,7 +104,11 @@ static unsigned long clk_pllclk_recalc(struct clk_hw *hw,
->   		/* read post divider from od bits*/
->   		postdiv = ((val & pll_data->clkod_mask) >>
->   				 pll_data->clkod_shift) + 1;
-> -	else
-> +	else if (pll_data->pllod) {
-> +		postdiv = readl(pll_data->pllod);
-> +		postdiv = ((postdiv & pll_data->clkod_mask) >>
-> +				pll_data->clkod_shift) + 1;
-> +	} else
->   		postdiv = pll_data->postdiv;
->
->   	rate /= (prediv + 1);
-> @@ -172,12 +178,21 @@ static void __init _of_pll_clk_init(struct device_node *node, bool pllctrl)
->   		/* assume the PLL has output divider register bits */
->   		pll_data->clkod_mask = CLKOD_MASK;
->   		pll_data->clkod_shift = CLKOD_SHIFT;
-> +
-> +		/*
-> +		 * Check if there is an post-divider register. If not
-> +		 * assume od bits are part of control register.
-> +		 */
-> +		i = of_property_match_string(node, "reg-names",
-> +					     "post-divider");
-> +		pll_data->pllod = of_iomap(node, i);
->   	}
->
->   	i = of_property_match_string(node, "reg-names", "control");
->   	pll_data->pll_ctl0 = of_iomap(node, i);
->   	if (!pll_data->pll_ctl0) {
->   		pr_err("%s: ioremap failed\n", __func__);
-> +		iounmap(pll_data->pllod);
->   		goto out;
->   	}
->
-> @@ -193,6 +208,7 @@ static void __init _of_pll_clk_init(struct device_node *node, bool pllctrl)
->   		pll_data->pllm = of_iomap(node, i);
->   		if (!pll_data->pllm) {
->   			iounmap(pll_data->pll_ctl0);
-> +			iounmap(pll_data->pllod);
->   			goto out;
->   		}
->   	}
->
-DT and CLK maintainers,
+On Mon, Jun 15, 2015 at 05:59:07PM +0200, Steffen Trumtrar wrote:
+> I'm working on CAAM support for the ARM-based i.MX6 SoCs. The current
+> drivers/crypto/caam driver only works for PowerPC AFAIK.
+> Actually, there isn't that much to do, to get support for the i.MX6 but
+> one patch breaks the driver severely:
+> 
+> 	commit ef94b1d834aace7101de77c3a7c2631b9ae9c5f6
+> 	crypto: caam - Add definition of rd/wr_reg64 for little endian platform
 
-A gentle reminder to review and provide your comments or acks.
+You're not the only one who's hitting problems with this - Jon Nettleton
+has been working on it recently.
 
-Thanks and regards,
+The way this has been done is fairly yucky to start with: several things
+about it are particularly horrid.  The first is the repetitive code
+for the BE and LE cases, when all that's actually different is the
+register order between the two code cases.
+
+The second thing is the excessive use of masking - I'm pretty sure the
+compiler won't complain with the below.
+
+diff --git a/drivers/crypto/caam/regs.h b/drivers/crypto/caam/regs.h
+index 378ddc17f60e..ba0fa630a25d 100644
+--- a/drivers/crypto/caam/regs.h
++++ b/drivers/crypto/caam/regs.h
+@@ -84,34 +84,28 @@
+ #endif
+ 
+ #ifndef CONFIG_64BIT
+-#ifdef __BIG_ENDIAN
+-static inline void wr_reg64(u64 __iomem *reg, u64 data)
+-{
+-	wr_reg32((u32 __iomem *)reg, (data & 0xffffffff00000000ull) >> 32);
+-	wr_reg32((u32 __iomem *)reg + 1, data & 0x00000000ffffffffull);
+-}
+-
+-static inline u64 rd_reg64(u64 __iomem *reg)
+-{
+-	return (((u64)rd_reg32((u32 __iomem *)reg)) << 32) |
+-		((u64)rd_reg32((u32 __iomem *)reg + 1));
+-}
++#if defined(__BIG_ENDIAN)
++#define REG64_HI32(reg) ((u32 __iomem *)(reg))
++#define REG64_LO32(reg) ((u32 __iomem *)(reg) + 1)
++#elif defined(__LITTLE_ENDIAN)
++#define REG64_HI32(reg) ((u32 __iomem *)(reg) + 1)
++#define REG64_LO32(reg) ((u32 __iomem *)(reg))
+ #else
+-#ifdef __LITTLE_ENDIAN
++#error Broken endian?
++#endif
++
+ static inline void wr_reg64(u64 __iomem *reg, u64 data)
+ {
+-	wr_reg32((u32 __iomem *)reg + 1, (data & 0xffffffff00000000ull) >> 32);
+-	wr_reg32((u32 __iomem *)reg, data & 0x00000000ffffffffull);
++	wr_reg32(REG64_HI32(reg), data >> 32);
++	wr_reg32(REG64_LO32(reg), data);
+ }
+ 
+ static inline u64 rd_reg64(u64 __iomem *reg)
+ {
+-	return (((u64)rd_reg32((u32 __iomem *)reg + 1)) << 32) |
+-		((u64)rd_reg32((u32 __iomem *)reg));
++	return ((u64)rd_reg32(REG64_HI32(reg))) << 32 |
++		rd_reg32(REG64_LO32(reg));
+ }
+ #endif
+-#endif
+-#endif
+ 
+ /*
+  * jr_outentry
+
+The second issue is that apparently, the register order doesn't actually
+change for LE devices - in other words, the byte order within each register
+does change, but they aren't a 64-bit register, they're two separate 32-bit
+registers.  So, they should always be written as such.
+
+So, I'd get rid of the #if defined(__BIG_ENDIAN) stuff and instead have:
+
++/*
++ * The DMA address register is a pair of 32-bit registers, and should
++ * always be accessed as such.
++ */
++#define REG64_HI32(reg) ((u32 __iomem *)(reg))
++#define REG64_LO32(reg) ((u32 __iomem *)(reg) + 1)
+
 
 -- 
-Murali Karicheri
-Linux Kernel, Keystone
+FTTC broadband for 0.8mile line: currently@10.5Mbps down 400kbps up
+according to speedtest.net.
