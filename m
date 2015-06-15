@@ -1,60 +1,33 @@
-From: p.marczak@samsung.com (Przemyslaw Marczak)
-Date: Mon, 15 Jun 2015 14:57:18 +0200
-Subject: [RFC] ARM: exynos: MCPM: [is this a] fix for secondary boot on
- 5422?
-In-Reply-To: <CAP245DVU4RmkSuOR2dNV+GMwkKxAXFs_p3zo90DP2Zo4-hbhcg@mail.gmail.com>
-References: <1416896510-24612-1-git-send-email-khilman@kernel.org>
- <CAJKOXPfLEV1sQsz87ULDKX4vijqRpbGj7AcOEDiy83kukvVKVg@mail.gmail.com>
- <557EA6AE.304@samsung.com>
- <CAP245DVU4RmkSuOR2dNV+GMwkKxAXFs_p3zo90DP2Zo4-hbhcg@mail.gmail.com>
-Message-ID: <557ECBAE.20302@samsung.com>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Mon, 15 Jun 2015 10:12:27 -0300
+Subject: Running kexec on mx6
+In-Reply-To: <20150612175402.GO17968@pengutronix.de>
+References: <CAOMZO5A_=okeGhRjRb-7xkO7RJKTECdgBxinrTLtVR+6TMpnVw@mail.gmail.com>
+ <CAOMZO5A0+SSdT5mfy7fmO4DUQKimQpFCSu16EVLkxR+qh6137A@mail.gmail.com>
+ <20150612140123.GA7557@n2100.arm.linux.org.uk>
+ <CAOMZO5BsH=7yOa0fs5mtSdD2GF3hTa=+Kmtp0LqiOdFCCwNQhQ@mail.gmail.com>
+ <20150612175402.GO17968@pengutronix.de>
+Message-ID: <CAOMZO5BvHLrfXO7vs9_Fwv4gPtNHW_LVEd_gTAi3cNM5g2Ecdg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Philipp,
 
-On 06/15/2015 01:19 PM, Amit Kucheria wrote:
-> On Mon, Jun 15, 2015 at 3:49 PM, Przemyslaw Marczak
-> <p.marczak@samsung.com> wrote:
->> Hello Krzysztof,
+On Fri, Jun 12, 2015 at 2:54 PM, Robert Schwebel
+<r.schwebel@pengutronix.de> wrote:
+> On Fri, Jun 12, 2015 at 11:06:39AM -0300, Fabio Estevam wrote:
+>> On Fri, Jun 12, 2015 at 11:01 AM, Russell King - ARM Linux
+>> <linux@arm.linux.org.uk> wrote:
 >>
+>> > Has it ever worked, or is this a regression?
 >>
->> On 06/14/2015 10:56 AM, Krzysztof Koz?owski wrote:
+>> It is my first time using kexec. Also tested running a 3.10 kernel and
+>> it also failed, so I think kexec has never worked on mx6.
 >
-> <snip>
->
->> I'm trying port the hardkernel's SPL to the mainline U-Boot at present. The
->> mainline SPL is implemented for E5420 and E5800. But there are few
->> differences:
->> - different DRAM
->> - different clocks
->> - different boot core (peach-pi boots from A15)
->> - bl2 signature
->> - hdk's SPL uses smc calls
->> ... and some more.
->
-> This is really good news! Would this work leave CCI control to Linux
-> so that we may use MCPM to manage cpu and cluster OFF?
->
+> We have used kexec on MX6 before. Adding Philipp to Cc:.
 
-Yes, I would like to get this stuff working.
+Do you recall which kernel version you used to get kexec working on mx6?
 
->> The BL1 keeps signature key and some part of code, but it's code is
->> proprietary - but we should be able to setup the secondary cores in BL2.
->>
->> When, I get the basic setup working, then I'm going to focus on the
->> secondary CPU's init. I don't have the documentation for iROM code, so
->> everything takes a while.
->>
->>   If you looking for the lowlevel code, which is executed after wakeup,
->> please check this :
->> https://github.com/hardkernel/u-boot/blob/odroidxu3-v2012.07/board/samsung/smdk5422/lowlevel_init.S
->>
->> The 'lowlevel_init' label is always executed on boot.
->
+Any extra patches needed?
 
-Best regards,
--- 
-Przemyslaw Marczak
-Samsung R&D Institute Poland
-Samsung Electronics
-p.marczak at samsung.com
+Thanks
