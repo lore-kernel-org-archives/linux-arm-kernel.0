@@ -1,58 +1,99 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Mon, 15 Jun 2015 14:14:57 +0200
-Subject: Build regressions/improvements in v4.1-rc8
-In-Reply-To: <1434365804-11523-1-git-send-email-geert@linux-m68k.org>
-References: <1434365804-11523-1-git-send-email-geert@linux-m68k.org>
-Message-ID: <CAMuHMdUmPhz+vBg2Hw8YnEmPEeJwQB1g1=Mxsdvp2fUOoz7=BQ@mail.gmail.com>
+From: k.kozlowski.k@gmail.com (=?UTF-8?Q?Krzysztof_Koz=C5=82owski?=)
+Date: Mon, 15 Jun 2015 21:17:07 +0900
+Subject: [RFC] ARM: exynos: MCPM: [is this a] fix for secondary boot on
+ 5422?
+In-Reply-To: <557EA6AE.304@samsung.com>
+References: <1416896510-24612-1-git-send-email-khilman@kernel.org>
+ <CAJKOXPfLEV1sQsz87ULDKX4vijqRpbGj7AcOEDiy83kukvVKVg@mail.gmail.com>
+ <557EA6AE.304@samsung.com>
+Message-ID: <CAJKOXPfRgTf=6Z=pbz3zQj__Nt_uLtqhD65pYc3NMrF_NJ62=g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 15, 2015 at 12:56 PM, Geert Uytterhoeven
-<geert@linux-m68k.org> wrote:
-> JFYI, when comparing v4.1-rc8[1] to v4.1-rc7[3], the summaries are:
->   - build errors: +10/-7
+2015-06-15 19:19 GMT+09:00 Przemyslaw Marczak <p.marczak@samsung.com>:
+> Hello Krzysztof,
+>
+>
+> On 06/14/2015 10:56 AM, Krzysztof Koz?owski wrote:
+>>
+>>
+>> Hi,
+>>
+>> +Cc Marek, Bartlomiej, Kukjin Kim,
+>>
+>>
+>> I would like to bring back this topic. Unfortunately I don't have
+>> access to source code of BL1 (or any other firmware blob) so my
+>> knowledge here comes mostly from experimenting and from looking at
+>> sources of vendor kernel for Gear 2 (Exynos3250) and SM-G900H (Galaxy
+>> S5, Exynos5422).
+>>
+>> It seems that some booting firmware (I would suspect BL1 because this
+>> ships Samsung to Hardkernel) uses SPARE2 as synchronization mechanism.
+>> For example vendor kernel, when booting little core, it waits till
+>> SPARE2==1 and then executes software reset for this core.
+>>
+>> Observations shown that BL1 for Odroid, when booting secondary little
+>> core:
+>> 1. Expects that SPARE2 register will be initialized to 1.
+>> 2. If it is, then it sets it to 0, proceeds further and little core boots.
+>> 3. If it is not, then it sets it to 1 and waits. Maybe this is a
+>> notification to userspace - reset me please!
+>>
+>> Unfortunately executing software reset in that time (at point 3)
+>> stopped kernel from booting. No logs/dmesg and I was unable to turn on
+>> early printk.
+>>
+>> The answer why two of little cores boot is quite simple now. At
+>> beginning the SPARE2==0 so first little core will set it to 1 and wait
+>> till software reset. Kernel timeouts on this CPU bring up so it starts
+>> the sequence for next little core. Now the SPARE2==1 so the core boots
+>> fine and SPARE2 is set to 0. The last little core starts from
+>> SPARE2==0, sets it to 1 and waits for software reset.
+>>
+>> Since no one knows how this exactly works and we are stuck with BL1
+>> provided as is, then IMHO the patch makes sense.
+>>
+>> Kevin, can you refresh the patch?
+>> It would be nice to:
+>> 1. set SPARE2 only for Odroid (of_machine_is_compatible()),
+>> 2. extend the explanation.
+>>
+>>
+>> Best regards,
+>> Krzysztof
+>>
+>
+> I'm trying port the hardkernel's SPL to the mainline U-Boot at present. The
+> mainline SPL is implemented for E5420 and E5800. But there are few
+> differences:
+> - different DRAM
+> - different clocks
+> - different boot core (peach-pi boots from A15)
+> - bl2 signature
+> - hdk's SPL uses smc calls
+> ... and some more.
+>
+> The BL1 keeps signature key and some part of code, but it's code is
+> proprietary - but we should be able to setup the secondary cores in BL2.
+>
+> When, I get the basic setup working, then I'm going to focus on the
+> secondary CPU's init. I don't have the documentation for iROM code, so
+> everything takes a while.
 
-  + /home/kisskb/slave/src/Documentation/prctl/disable-tsc-ctxt-sw-stress-test.c:
-error: impossible register constraint in 'asm':  => 34:1
-  + /home/kisskb/slave/src/Documentation/prctl/disable-tsc-on-off-stress-test.c:
-error: impossible register constraint in 'asm':  => 36:1
-  + /home/kisskb/slave/src/Documentation/prctl/disable-tsc-test.c:
-error: impossible register constraint in 'asm':  => 36:1
-  + /home/kisskb/slave/src/Documentation/vDSO/vdso_standalone_test_x86.c:
-error: impossible register constraint in 'asm':  => 49:2
+Great, good luck!
 
-i386-randconfig
+>
+>  If you looking for the lowlevel code, which is executed after wakeup,
+> please check this :
+> https://github.com/hardkernel/u-boot/blob/odroidxu3-v2012.07/board/samsung/smdk5422/lowlevel_init.S
+>
+> The 'lowlevel_init' label is always executed on boot.
 
-  + /home/kisskb/slave/src/arch/sh/mm/cache-sh4.c: error:
-'cached_to_uncached' undeclared (first use in this function):  =>
-99:17
-  + /home/kisskb/slave/src/arch/sh/mm/cache-sh4.c: error: implicit
-declaration of function 'cpu_context'
-[-Werror=implicit-function-declaration]:  => 192:2
+I already looked at it without any success. I couldn't find the reason
+of this SPARE2 behaviour in that code. However I found there one small
+funny fact about magic values for low power modes - kernel and u-boot
+expect some of the values in different places.
 
-sh-randconfig
-
-  + error: No rule to make target include/config/auto.conf:  => N/A
-
-arm-randconfig
-
-  + error: aes.c: undefined reference to `.enable_kernel_altivec':  =>
-.text+0xc921e0), .text+0xc92394), .text+0xc92460)
-  + error: aes_cbc.c: undefined reference to `.enable_kernel_altivec':
- => .text+0xc92598), .text+0xc926f4)
-
-powerpc-randconfig
-
-> [1] http://kisskb.ellerman.id.au/kisskb/head/9008/ (254 out of 257 configs)
-> [3] http://kisskb.ellerman.id.au/kisskb/head/8978/ (254 out of 257 configs)
-
-Gr{oetje,eeting}s,
-
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+Best regards,
+Krzysztof
