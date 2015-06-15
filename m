@@ -1,202 +1,91 @@
-From: cyrille.pitchen@atmel.com (Cyrille Pitchen)
-Date: Mon, 15 Jun 2015 17:17:51 +0200
-Subject: [PATCH linux-next 1/1] dmaengine: at_hdmac: fix residue computation
-In-Reply-To: <cover.1434380729.git.cyrille.pitchen@atmel.com>
-References: <cover.1434380729.git.cyrille.pitchen@atmel.com>
-Message-ID: <381ecf2427a6aae4b7109d930121df9f36aef81e.1434380729.git.cyrille.pitchen@atmel.com>
+From: javier.martinez@collabora.co.uk (Javier Martinez Canillas)
+Date: Mon, 15 Jun 2015 17:23:39 +0200
+Subject: [PATCH v2 1/1] irqchip: exynos-combiner: Save IRQ enable set
+ on suspend
+In-Reply-To: <557EEA6C.6020002@arm.com>
+References: <1434087795-13990-1-git-send-email-javier.martinez@collabora.co.uk>	<557AB00C.5040606@arm.com>	<557AC23D.8040602@collabora.co.uk>	<557AC85E.5070705@arm.com>	<557AD728.7090908@collabora.co.uk>	<557B34A7.4090507@collabora.co.uk>
+ <CAD=FV=UQF+n8AjSXYajqUb0qswcoUrSgnsasV82JaS3dBtNO8Q@mail.gmail.com>
+ <557E82BC.7080203@collabora.co.uk> <557E947B.3030804@arm.com>
+ <557EE890.2050001@collabora.co.uk> <557EEA6C.6020002@arm.com>
+Message-ID: <557EEDFB.7080502@collabora.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As claimed by the programmer datasheet and confirmed by the IP designer,
-the Block Transfer Size (BTSIZE) bitfield of the Channel x Control A
-Register (CTRLAx) always refers to a number of Source Width (SRC_WIDTH)
-transfers.
+Hello Sudeep,
 
-Both the SRC_WIDTH and BTSIZE bitfields can be extacted from the CTRLAx
-register to compute the DMA residue. So the 'tx_width' field is useless
-and can be removed from the struct at_desc.
+On 06/15/2015 05:08 PM, Sudeep Holla wrote:
+> On 15/06/15 16:00, Javier Martinez Canillas wrote:
+>> On 06/15/2015 11:01 AM, Sudeep Holla wrote:
+>>> On 15/06/15 08:46, Javier Martinez Canillas wrote:
 
-Before this patch, atc_prep_slave_sg() was not consistent: BTSIZE was
-correctly initialized according to the SRC_WIDTH but 'tx_width' was always
-set to reg_width, which was incorrect for MEM_TO_DEV transfers. It led to
-bad DMA residue when 'tx_width' != SRC_WIDTH.
+[...]
 
-Also the 'tx_width' field was mostly set only in the first and last
-descriptors. Depending on the kind of DMA transfer, this field remained
-uninitialized for intermediate descriptors. The accurate DMA residue was
-computed only when the currently processed descriptor was the first or the
-last of the chain. This algorithm was a little bit odd. An accurate DMA
-residue can always be computed using the SRC_WIDTH and BTSIZE bitfields
-in the CTRLAx register.
+>>>
+>>> Agreed. But I would suggest also to add MASK_ON_SUSPEND and set_irq_wake
+>>> also and then you can restore iff it's non-zero as irq core will take
+>>> care of most of the non-wakeup sources. Because I am planning to push
+>>
+>> I've looking at this and a problem I found is that IIUC the set_irq_wake
+>> is not propagated from the the Exynos pinctrl / GPIO driver which is the
+>> combiner's external interrupt source so the callback is never called.
+>> Which means that right now only the state of the wakeup source IRQs can't
+>> be saved since that information is not present.
+>>
+>> The drivers/pinctrl/samsung/pinctrl-exynos.c driver enables and disables
+>> the combiner interrupts but its .irq_set_wake handler only updates the
+>> wakeup source mask for the external interrupts but does not call the
+>> combiner .set_irq_wake so that should be changed as well.
+>>
+> 
+> Thanks for the looking at this.
+>
 
-Finally, the test to check whether the currently processed descriptor is
-the last of the chain was wrong: for cyclic transfer, last_desc->lli.dscr
-is NOT equal to zero, since set_desc_eol() is never called, but logically
-equal to first_desc->txd.phys. This bug has a side effect on the
-drivers/tty/serial/atmel_serial.c driver, which uses cyclic DMA transfer
-to receive data. Since the DMA residue was wrong each time the DMA
-transfer reaches the second (and last) period of the transfer, no more
-data were received by the USART driver till the cyclic DMA transfer loops
-back to the first period.
+You are welcome and thanks to you for pointing this out.
+ 
+>> But even for non-wakeup interrupts, I found that they are not enabled when
+>> adding the MASK_ON_SUSPEND on my tests. I don't know if that is related
+>> to the pinctrl driver missing something else though.
+>>
+> 
+> Even GIC is not masking any interrupt on suspend and if other irqchip or
+> drivers are assuming that, it will work fine for now. But once I
+> introduce that change in GIC it will break.
+> 
+>>> MASK_ON_SUSPEND to GIC and it will break this combiner if it assumes the
+>>> combiner interrupts are always on in GIC. Implement set_irq_wake as
+>>> enable_irq_wake (comb_irq_to_GIC).
+>>>
+>>
+>> Right, but can we do this as a follow-up? S2R is currently broken on these
+>> machines and $subject is I think a reasonable small fix that won't introduce
+>> any regressions.
+>>
+> 
+> No issues, I just wanted to understand the issue better and also make
+> sure we understand that things might break in future once that GIC
+> change is introduced. So we already know the reason or atleast have some
+> basic understanding as why would it break if it breaks :)
+>
 
-Signed-off-by: Cyrille Pitchen <cyrille.pitchen@atmel.com>
----
- drivers/dma/at_hdmac.c      | 47 ++++++++++++++++-----------------------------
- drivers/dma/at_hdmac_regs.h |  3 +--
- 2 files changed, 18 insertions(+), 32 deletions(-)
+Indeed, in the meantime I will continue looking at this to better understand
+all the interactions so if something breaks with your changes I may be able
+to test / debug and hopefully fix it :)
+ 
+>> To do a more intrusive change, I should better understand the interactions
+>> between the Exynos pinctrl / GPIO, interrupt combiner and the GIC and in the
+>> meantime S2R will continue to be broken on these platforms unless someone
+>> more familiar with all this could point me in the right direction.
+>>
+> 
+> As I said I am fine with this patch for now and I don't want to block it.
+>
 
-diff --git a/drivers/dma/at_hdmac.c b/drivers/dma/at_hdmac.c
-index 59892126..51e870a 100644
---- a/drivers/dma/at_hdmac.c
-+++ b/drivers/dma/at_hdmac.c
-@@ -285,12 +285,19 @@ static struct at_desc *atc_get_desc_by_cookie(struct at_dma_chan *atchan,
-  *
-  * @current_len: the number of bytes left before reading CTRLA
-  * @ctrla: the value of CTRLA
-- * @desc: the descriptor containing the transfer width
-  */
--static inline int atc_calc_bytes_left(int current_len, u32 ctrla,
--					struct at_desc *desc)
-+static inline int atc_calc_bytes_left(int current_len, u32 ctrla)
- {
--	return current_len - ((ctrla & ATC_BTSIZE_MAX) << desc->tx_width);
-+	u32 btsize = (ctrla & ATC_BTSIZE_MAX);
-+	u32 src_width = ATC_REG_TO_SRC_WIDTH(ctrla);
-+
-+	/*
-+	 * According to the datasheet, when reading the Control A Register
-+	 * (ctrla), the Buffer Transfer Size (btsize) bitfield refers to the
-+	 * number of transfers completed on the Source Interface.
-+	 * So btsize is always a number of source width transfers.
-+	 */
-+	return current_len - (btsize << src_width);
- }
- 
- /**
-@@ -299,14 +306,13 @@ static inline int atc_calc_bytes_left(int current_len, u32 ctrla,
-  *
-  * @current_len: the number of bytes left before reading CTRLA
-  * @atchan: the channel to read CTRLA for
-- * @desc: the descriptor containing the transfer width
-  */
- static inline int atc_calc_bytes_left_from_reg(int current_len,
--			struct at_dma_chan *atchan, struct at_desc *desc)
-+					       struct at_dma_chan *atchan)
- {
- 	u32 ctrla = channel_readl(atchan, CTRLA);
- 
--	return atc_calc_bytes_left(current_len, ctrla, desc);
-+	return atc_calc_bytes_left(current_len, ctrla);
- }
- 
- /**
-@@ -354,7 +360,7 @@ static int atc_get_bytes_left(struct dma_chan *chan, dma_cookie_t cookie)
- 
- 		/* for the first descriptor we can be more accurate */
- 		if (desc_first->lli.dscr == dscr)
--			return atc_calc_bytes_left(ret, ctrla, desc_first);
-+			return atc_calc_bytes_left(ret, ctrla);
- 
- 		ret -= desc_first->len;
- 		list_for_each_entry(desc, &desc_first->tx_list, desc_node) {
-@@ -365,16 +371,13 @@ static int atc_get_bytes_left(struct dma_chan *chan, dma_cookie_t cookie)
- 		}
- 
- 		/*
--		 * For the last descriptor in the chain we can calculate
-+		 * For the current descriptor in the chain we can calculate
- 		 * the remaining bytes using the channel's register.
--		 * Note that the transfer width of the first and last
--		 * descriptor may differ.
- 		 */
--		if (!desc->lli.dscr)
--			ret = atc_calc_bytes_left_from_reg(ret, atchan, desc);
-+		ret = atc_calc_bytes_left_from_reg(ret, atchan);
- 	} else {
- 		/* single transfer */
--		ret = atc_calc_bytes_left_from_reg(ret, atchan, desc_first);
-+		ret = atc_calc_bytes_left_from_reg(ret, atchan);
- 	}
- 
- 	return ret;
-@@ -726,7 +729,6 @@ atc_prep_dma_interleaved(struct dma_chan *chan,
- 
- 	desc->txd.cookie = -EBUSY;
- 	desc->total_len = desc->len = len;
--	desc->tx_width = dwidth;
- 
- 	/* set end-of-link to the last link descriptor of list*/
- 	set_desc_eol(desc);
-@@ -804,10 +806,6 @@ atc_prep_dma_memcpy(struct dma_chan *chan, dma_addr_t dest, dma_addr_t src,
- 	first->txd.cookie = -EBUSY;
- 	first->total_len = len;
- 
--	/* set transfer width for the calculation of the residue */
--	first->tx_width = src_width;
--	prev->tx_width = src_width;
--
- 	/* set end-of-link to the last link descriptor of list*/
- 	set_desc_eol(desc);
- 
-@@ -956,10 +954,6 @@ atc_prep_slave_sg(struct dma_chan *chan, struct scatterlist *sgl,
- 	first->txd.cookie = -EBUSY;
- 	first->total_len = total_len;
- 
--	/* set transfer width for the calculation of the residue */
--	first->tx_width = reg_width;
--	prev->tx_width = reg_width;
--
- 	/* first link descriptor of list is responsible of flags */
- 	first->txd.flags = flags; /* client is in control of this ack */
- 
-@@ -1077,12 +1071,6 @@ atc_prep_dma_sg(struct dma_chan *chan,
- 		desc->txd.cookie = 0;
- 		desc->len = len;
- 
--		/*
--		 * Although we only need the transfer width for the first and
--		 * the last descriptor, its easier to set it to all descriptors.
--		 */
--		desc->tx_width = src_width;
--
- 		atc_desc_chain(&first, &prev, desc);
- 
- 		/* update the lengths and addresses for the next loop cycle */
-@@ -1256,7 +1244,6 @@ atc_prep_dma_cyclic(struct dma_chan *chan, dma_addr_t buf_addr, size_t buf_len,
- 	/* First descriptor of the chain embedds additional information */
- 	first->txd.cookie = -EBUSY;
- 	first->total_len = buf_len;
--	first->tx_width = reg_width;
- 
- 	return &first->txd;
- 
-diff --git a/drivers/dma/at_hdmac_regs.h b/drivers/dma/at_hdmac_regs.h
-index bc8d5eb..7f5a082 100644
---- a/drivers/dma/at_hdmac_regs.h
-+++ b/drivers/dma/at_hdmac_regs.h
-@@ -112,6 +112,7 @@
- #define		ATC_SRC_WIDTH_BYTE	(0x0 << 24)
- #define		ATC_SRC_WIDTH_HALFWORD	(0x1 << 24)
- #define		ATC_SRC_WIDTH_WORD	(0x2 << 24)
-+#define		ATC_REG_TO_SRC_WIDTH(r)	(((r) >> 24) & 0x3)
- #define	ATC_DST_WIDTH_MASK	(0x3 << 28)	/* Destination Single Transfer Size */
- #define		ATC_DST_WIDTH(x)	((x) << 28)
- #define		ATC_DST_WIDTH_BYTE	(0x0 << 28)
-@@ -182,7 +183,6 @@ struct at_lli {
-  * @txd: support for the async_tx api
-  * @desc_node: node on the channed descriptors list
-  * @len: descriptor byte count
-- * @tx_width: transfer width
-  * @total_len: total transaction byte count
-  */
- struct at_desc {
-@@ -194,7 +194,6 @@ struct at_desc {
- 	struct dma_async_tx_descriptor	txd;
- 	struct list_head		desc_node;
- 	size_t				len;
--	u32				tx_width;
- 	size_t				total_len;
- 
- 	/* Interleaved data */
--- 
-1.8.2.2
+Thanks a lot, Krzysztof who is one of the Exynos maintainers has also agreed
+with the patch so hopefully this can land sooner rather than later.
+
+> Regards,
+> Sudeep
+> 
+
+Best regards,
+Javier
