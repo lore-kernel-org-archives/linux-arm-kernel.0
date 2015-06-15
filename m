@@ -1,115 +1,65 @@
-From: rjw@rjwysocki.net (Rafael J. Wysocki)
-Date: Tue, 16 Jun 2015 00:30:17 +0200
-Subject: [PATCH V7 3/3] OPP: Add binding for 'opp-suspend'
-In-Reply-To: <20150613084023.GA4203@linux>
-References: <cover.1433434659.git.viresh.kumar@linaro.org>
- <dedf8c02fdd9dbf169f43de74ead4c1434d89b45.1433434659.git.viresh.kumar@linaro.org>
- <20150613084023.GA4203@linux>
-Message-ID: <2801919.LhyMzJckqR@vostro.rjw.lan>
+From: herbert@gondor.apana.org.au (Herbert Xu)
+Date: Tue, 16 Jun 2015 06:05:06 +0800
+Subject: [BUG?] crypto: caam: little/big endianness on ARM vs PPC
+In-Reply-To: <20150615155907.GC7947@pengutronix.de>
+References: <20150615155907.GC7947@pengutronix.de>
+Message-ID: <20150615220506.GA15134@gondor.apana.org.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Saturday, June 13, 2015 02:10:23 PM Viresh Kumar wrote:
-> On 04-06-15, 21:50, Viresh Kumar wrote:
-> > +		opp-suspend = <&suspend_opp>;
+On Mon, Jun 15, 2015 at 05:59:07PM +0200, Steffen Trumtrar wrote:
+> Hi!
 > 
-> > -		opp00 {
-> > +		suspend-opp: opp00 {
+> I'm working on CAAM support for the ARM-based i.MX6 SoCs. The current
+> drivers/crypto/caam driver only works for PowerPC AFAIK.
+> Actually, there isn't that much to do, to get support for the i.MX6 but
+> one patch breaks the driver severely:
 > 
-> Minor nit, s/suspend-opp/suspend_opp
+> 	commit ef94b1d834aace7101de77c3a7c2631b9ae9c5f6
+> 	crypto: caam - Add definition of rd/wr_reg64 for little endian platform
 > 
-> and here is updated patch
+> This patch adds
 > 
-> From: Viresh Kumar <viresh.kumar@linaro.org>
-> Date: Wed, 20 May 2015 08:27:49 +0530
-> Subject: [PATCH V8] OPP: Add binding for 'opp-suspend'
+> +#ifdef __LITTLE_ENDIAN
+> +static inline void wr_reg64(u64 __iomem *reg, u64 data)
+> +{
+> +	wr_reg32((u32 __iomem *)reg + 1, (data & 0xffffffff00000000ull) >> 32);
+> +	wr_reg32((u32 __iomem *)reg, data & 0x00000000ffffffffull);
+> +}
 > 
-> On few platforms, for power efficiency, we want the device to be
-> configured for a specific OPP while we put the device in suspend state.
+> The wr_reg64 function is only used in one place in the drivers/crypto/caam/jr.c
+> driver: to write the dma_addr_t to the register. Without that patch everything
+> works fine on ARM (little endian, 32bit), with that patch the driver will write
+> 0's into the register that holds the DMA address (the numerically-higher) -> kernel hangs.
+> Also, from my understanding, the comment above the defines, stating that you
+> have to first write the numerically-lower and then the numerically-higher address
+> on 32bit systems doesn't match with the implementation.
 > 
-> Add an optional property in operating-points-v2 bindings for that.
+> What I don't know/understand is if this makes any sense for any PowerPC implementation.
 > 
-> Acked-by: Nishanth Menon <nm@ti.com>
-> Suggested-by: Nishanth Menon <nm@ti.com>
-> Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
+> So, the question is, how to fix this? I'd prefer to do it directly in the jr driver
+> instead of the ifdef-ery.
+> 
+> Something like
+> 	if (sizeof(dma_addr_t) == sizeof(u32))
+> 		wr_reg32(&jrp->rregs->inpring_base + 1, inpbusaddr);
+> 	else if (sizeof(dma_addr_t) == sizeof(u64))
+> 		wr_reg64(...)
+> 
+> or just go by DT compatible and then remove the inline function definitions.
+> 
+> As far as I can tell, the compatible wouldn't be needed for anything else in the
+> jr driver, so maybe that is not optimal. On the other hand the sizeof(..)
+> solution would only catch little endian on 32bit and not big endian (?!)
+> I however don't know what combinations actually *have* to be caught, as I don't
+> know, which exist.
+> 
+> So, what do you think people?
 
-Well, I'm kind of wondering what else has been overlooked here.
+I'm adding a couple of CCs.
 
-Anyway, if I'm supposed to apply this series, I need an ACK from at least
-one person listed as an "OPEN FIRMWARE AND FLATTENED DEVICE TREE BINDINGS"
-maintainer.  Preferably from Rob.
-
-
-> ---
->  Documentation/devicetree/bindings/power/opp.txt | 14 ++++++++++----
->  1 file changed, 10 insertions(+), 4 deletions(-)
-> 
-> diff --git a/Documentation/devicetree/bindings/power/opp.txt b/Documentation/devicetree/bindings/power/opp.txt
-> index 2938c52dbf84..29f115d26f7d 100644
-> --- a/Documentation/devicetree/bindings/power/opp.txt
-> +++ b/Documentation/devicetree/bindings/power/opp.txt
-> @@ -74,6 +74,8 @@ This describes the OPPs belonging to a device. This node can have following
->    Missing property means devices have independent clock/voltage/current lines,
->    but they share OPP tables.
->  
-> +- opp-suspend: Phandle of the OPP to set while device is suspended.
-> +
->  
->  * OPP Node
->  
-> @@ -145,9 +147,10 @@ Example 1: Single cluster Dual-core ARM cortex A9, switch DVFS states together.
->  
->  	cpu0_opp_table: opp_table0 {
->  		compatible = "operating-points-v2";
-> +		opp-suspend = <&suspend_opp>;
->  		opp-shared;
->  
-> -		opp00 {
-> +		suspend_opp: opp00 {
->  			opp-hz = <1000000000>;
->  			opp-microvolt = <970000 975000 985000>;
->  			opp-microamp = <70000>;
-> @@ -219,13 +222,14 @@ independently.
->  
->  	cpu_opp_table: opp_table {
->  		compatible = "operating-points-v2";
-> +		opp-suspend = <&suspend_opp>;
->  
->  		/*
->  		 * Missing opp-shared property means CPUs switch DVFS states
->  		 * independently.
->  		 */
->  
-> -		opp00 {
-> +		suspend_opp: opp00 {
->  			opp-hz = <1000000000>;
->  			opp-microvolt = <970000 975000 985000>;
->  			opp-microamp = <70000>;
-> @@ -298,9 +302,10 @@ DVFS state together.
->  
->  	cluster0_opp: opp_table0 {
->  		compatible = "operating-points-v2";
-> +		opp-suspend = <&suspend_opp0>;
->  		opp-shared;
->  
-> -		opp00 {
-> +		suspend_opp: opp00 {
->  			opp-hz = <1000000000>;
->  			opp-microvolt = <970000 975000 985000>;
->  			opp-microamp = <70000>;
-> @@ -323,9 +328,10 @@ DVFS state together.
->  
->  	cluster1_opp: opp_table1 {
->  		compatible = "operating-points-v2";
-> +		opp-suspend = <&suspend_opp1>;
->  		opp-shared;
->  
-> -		opp10 {
-> +		suspend_opp: opp10 {
->  			opp-hz = <1300000000>;
->  			opp-microvolt = <1045000 1050000 1055000>;
->  			opp-microamp = <95000>;
-
+Thanks,
 -- 
-I speak only for myself.
-Rafael J. Wysocki, Intel Open Source Technology Center.
+Email: Herbert Xu <herbert@gondor.apana.org.au>
+Home Page: http://gondor.apana.org.au/~herbert/
+PGP Key: http://gondor.apana.org.au/~herbert/pubkey.txt
