@@ -1,75 +1,48 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 15 Jun 2015 18:18:48 +0100
-Subject: [BUG?] crypto: caam: little/big endianness on ARM vs PPC
-In-Reply-To: <CALHpu34FHKTHr-2TZ-6Tmctev3WjBVTKfDbr6TYOJiOt+yDvfQ@mail.gmail.com>
-References: <20150615155907.GC7947@pengutronix.de>
- <CALHpu34FHKTHr-2TZ-6Tmctev3WjBVTKfDbr6TYOJiOt+yDvfQ@mail.gmail.com>
-Message-ID: <20150615171848.GP7557@n2100.arm.linux.org.uk>
+From: HartleyS@visionengravers.com (Hartley Sweeten)
+Date: Mon, 15 Jun 2015 17:25:26 +0000
+Subject: [PATCH 0/5] EP93xx GENERIC_CLOCKEVENTS
+In-Reply-To: <1434376222-4587-1-git-send-email-linus.walleij@linaro.org>
+References: <1434376222-4587-1-git-send-email-linus.walleij@linaro.org>
+Message-ID: <DC148C5AA1CEBA4E87973D432B1C2D883D49CA16@P3PWEX4MB008.ex4.secureserver.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 15, 2015 at 06:33:17PM +0200, Jon Nettleton wrote:
-> Funny enough I tackled this problem over the weekend as well.  My
-> approach was to switch the driver over to use the *_relaxed() io
-> functions and then special case the bits missing from the various
-> ARCHs.  Basically adding setbits32 and clrbits32 for !PPC
-> architectures and letting PPC and ARM share a writeq/readq set of
-> functions.  I left the existing LITTLE_ENDIAN special case until I
-> could verify if it was needed, or had been tested.
+On Monday, June 15, 2015 6:50 AM, Linus Walleij wrote:
+> This converts the EP93xx to GENERIC_CLOCKEVENTS.
+>
+> After this only the RISC PC and EBSA110 uses GETTIMEOFFSET.
+>
+> Linus Walleij (5):
+>   ARM: ep93xx: move timer to its own file
+>   ARM: ep93xx: switch to GENERIC_CLOCKEVENTS
+>   ARM: ep93xx: use non-raw accessors for timer
+>   ARM: ep93xx: switch clockevent to timer 3
+>   ARM: ep93xx: activate NO_HZ and high-res timers
+>
+>  arch/arm/Kconfig                    |   3 +-
+>  arch/arm/configs/ep93xx_defconfig   |   2 +
+>  arch/arm/mach-ep93xx/Makefile       |   2 +-
+>  arch/arm/mach-ep93xx/core.c         | 109 ----------------------------
+>  arch/arm/mach-ep93xx/timer-ep93xx.c | 141 ++++++++++++++++++++++++++++++++++++
+>  5 files changed, 146 insertions(+), 111 deletions(-)
+>  create mode 100644 arch/arm/mach-ep93xx/timer-ep93xx.c
 
-I'll follow up here with what I've mentioned elsewhere, and some further
-thoughts.
+Hi Linus,
 
-I think this shows the dangers of using struct { } to define register
-offsets.  Let's start here:
+Tested on Vision Engraving Systems EP9307 (vision_ep9307.c).
 
-/*
- * caam_job_ring - direct job ring setup
- * 1-4 possible per instantiation, base + 1000/2000/3000/4000
- * Padded out to 0x1000
- */
-struct caam_job_ring {
-        /* Input ring */
-        u64 inpring_base;       /* IRBAx -  Input desc ring baseaddr */
-        u32 rsvd1;
+You can use whatever tag is appropriate:
 
-Apparently, this is a CPU-endian 64-bit value (it's not defined using
-le64 or be64 which would "fix" it's endian.)
+Tested-by: H Hartley Sweeten <hsweeten@visionengravers.com>
+Reviewed-by: H Hartley Sweeten <hsweeten@visionengravers.com>
 
-The second question, which comes up in light of the breakage that's
-being reported is: is this really a 64-bit register, or is it a pair
-of 32-bit registers side-by-side?
 
-The documentation I'm looking at doesn't document the register at
-base + 0x1000, but documents the one at base + 0x1004, and the one
-at 0x1004 is given the name "IRBAR0_LS", which presumably stands
-for "input ring base address register 0, least significant".
+One nit...
 
-As the code originally stood for PPC, IRBAR0_LS is also at 0x1004,
-but appears to be big endian.
+Is the "Timer handling for EP93xx" comment still correct?
 
-On ARM, IRBAR0_LS appears at the same address, but is little endian.
+It still mentions a 16-bit timer (timer 1) used for the timer interrupt and gettimeoffset()
+being used with timer 4.
 
-This is *not* a 64-bit register at all, but is a pair of 32-bit
-registers side by side.  Moreover, readq() should not be used - no
-amount of arch mangling could ever produce a sane readq() which
-coped with this.
-
-So, the CAAM code is buggy in this regard: using readq() here when
-endian-portability is required is wrong.  It's got to be two 32-bit
-reads or two 32-bit writes in the appropriate endian.
-
-Also, note that there's a big difference between __raw_readl() and
-readl_relaxed().  readl_relaxed() is always little-endian.  __raw_readl()
-is god-knows-what-the-archtecture-decides endian.  Switching PPC
-drivers from __raw_readl() to readl_relaxed() is really not a good
-idea unless someone from the PPC camp reviews and tests the code.
-
-So, what I'd suggest is just fixing rd_reg64() and wr_reg64() to do
-the right thing: keeping the two 32-bit words in the same order
-irrespective of the endian-ness, and staying with the __raw_*
-accessors until PPC people can look at this.
-
--- 
-FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
-according to speedtest.net.
+Regards,
+Hartley
