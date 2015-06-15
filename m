@@ -1,40 +1,28 @@
-From: bpringle@sympatico.ca (Bill Pringlemeir)
-Date: Mon, 15 Jun 2015 10:29:17 -0400
-Subject: [PATCH v5 1/6] mtd: nand: vf610_nfc: Freescale NFC for VF610,
- MPC5125 and others
-In-Reply-To: <20150609213338.GD5720@breakpoint.cc> (Sebastian Andrzej
- Siewior's message of "Tue, 9 Jun 2015 23:33:38 +0200")
-References: <1433584416-29607-1-git-send-email-stefan@agner.ch>
- <1433584416-29607-2-git-send-email-stefan@agner.ch>
- <20150609213338.GD5720@breakpoint.cc>
-Message-ID: <BLU436-SMTP1380BAD5F776944D62A9148B8B80@phx.gbl>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 15 Jun 2015 15:36:01 +0100
+Subject: [PATCH 1/2] net: mvneta: introduce tx_csum_limit property
+In-Reply-To: <1434378443-23029-2-git-send-email-simon.guinot@sequanux.org>
+References: <1434378443-23029-1-git-send-email-simon.guinot@sequanux.org>
+ <1434378443-23029-2-git-send-email-simon.guinot@sequanux.org>
+Message-ID: <20150615143601.GM7557@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On  9 Jun 2015, sebastian at breakpoint.cc wrote:
+On Mon, Jun 15, 2015 at 04:27:22PM +0200, Simon Guinot wrote:
+> This patch introduces the tx_csum_limit DT property. This allows to
+> configure the maximum frame size for which the Ethernet controller is
+> able to perform TCP/IP checksumming. If MTU is set to a value greater
+> than tx_csum_limit, then the features NETIF_F_IP_CSUM and NETIF_F_TSO
+> are disabled.
+> 
+> Signed-off-by: Simon Guinot <simon.guinot@sequanux.org>
+> Cc: <stable@vger.kernel.org> # v3.8+
 
-> On 2015-06-06 11:53:31 [+0200], Stefan Agner wrote:
+Sorry, I just tripped over this.  This looks like a patch adding a new
+_feature_ to this ethernet driver.  It isn't a regression fix, and it
+isn't a bug fix.  Why are you wanting to get it into stable kernels,
+which are supposed to only have bug and regression fixes applied?
 
->> +static const struct of_device_id vf610_nfc_dt_ids[] = {
->> +	{ .compatible = "fsl,vf610-nfc" },
->> +	{ .compatible = "fsl,mpc5125-nfc" },
-
-> I advise against a "fsl,mpc5125-nfc" binding. First of all it is the
-> same as the previous one. Second of all it was not tested at all on
-> the SoC it suggests to work. Plus the chip select function has a
-> comment hat it won't work on MPC5125. So it really makes no sense to
-> add it here.
-
-Someone has used a version of the driver on the PowerPC.  I don't have
-access to his email address now.  Anyways, the chipselect code is
-different on the PowerPC versions of the controller afair.  So if some
-external code sets up the chipselect for a single chip, then things are
-fine.
-
-Both the PowerPC and ARM support DT/OF, but you can never actually run
-either version as the code must be compiled for either assembler.  So I
-am not quite sure that this was the correct way to go anyways...  So I
-agree with your conclusion we can remove that binding.
-
-Regards,
-Bill.
+-- 
+FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
+according to speedtest.net.
