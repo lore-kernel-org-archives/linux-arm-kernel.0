@@ -1,138 +1,57 @@
 From: khilman@kernel.org (Kevin Hilman)
-Date: Mon, 15 Jun 2015 11:53:54 -0700
+Date: Mon, 15 Jun 2015 11:58:26 -0700
 Subject: [RFC] ARM: exynos: MCPM: [is this a] fix for secondary boot on
  5422?
-In-Reply-To: <CAJKOXPfLEV1sQsz87ULDKX4vijqRpbGj7AcOEDiy83kukvVKVg@mail.gmail.com>
- ("Krzysztof =?utf-8?Q?Koz=C5=82owski=22's?= message of "Sun, 14 Jun 2015
- 17:56:20 +0900")
+In-Reply-To: <557ECBAE.20302@samsung.com> (Przemyslaw Marczak's message of
+ "Mon, 15 Jun 2015 14:57:18 +0200")
 References: <1416896510-24612-1-git-send-email-khilman@kernel.org>
  <CAJKOXPfLEV1sQsz87ULDKX4vijqRpbGj7AcOEDiy83kukvVKVg@mail.gmail.com>
-Message-ID: <7h1thc6bwd.fsf@deeprootsystems.com>
+ <557EA6AE.304@samsung.com>
+ <CAP245DVU4RmkSuOR2dNV+GMwkKxAXFs_p3zo90DP2Zo4-hbhcg@mail.gmail.com>
+ <557ECBAE.20302@samsung.com>
+Message-ID: <7hoakg4x4d.fsf@deeprootsystems.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Krzysztof Koz?owski <k.kozlowski.k@gmail.com> writes:
+Przemyslaw Marczak <p.marczak@samsung.com> writes:
 
-> 2014-11-25 15:21 GMT+09:00 Kevin Hilman <khilman@kernel.org>:
->> From: Kevin Hilman <khilman@linaro.org>
+> On 06/15/2015 01:19 PM, Amit Kucheria wrote:
+>> On Mon, Jun 15, 2015 at 3:49 PM, Przemyslaw Marczak
+>> <p.marczak@samsung.com> wrote:
+>>> Hello Krzysztof,
+>>>
+>>>
+>>> On 06/14/2015 10:56 AM, Krzysztof Koz?owski wrote:
 >>
->> Using the current exynos_defconfig on the exynos5422-odroid-xu3, only
->> 6 of 8 CPUs come online with MCPM boot.  CPU0 is an A7, CPUs 1-4 are
->> A15s and CPU5-7 are the other A7s, but with the current code, CPUs 5
->> and 7 do not boot:
+>> <snip>
 >>
->>    [...]
->>    Exynos MCPM support installed
->>    CPU1: update cpu_capacity 1535
->>    CPU1: thread -1, cpu 0, socket 0, mpidr 80000000
->>    CPU2: update cpu_capacity 1535
->>    CPU2: thread -1, cpu 1, socket 0, mpidr 80000001
->>    CPU3: update cpu_capacity 1535
->>    CPU3: thread -1, cpu 2, socket 0, mpidr 80000002
->>    CPU4: update cpu_capacity 1535
->>    CPU4: thread -1, cpu 3, socket 0, mpidr 80000003
->>    CPU5: failed to come online
->>    CPU6: update cpu_capacity 448
->>    CPU6: thread -1, cpu 2, socket 1, mpidr 80000102
->>    CPU7: failed to come online
->>    Brought up 6 CPUs
->>    CPU: WARNING: CPU(s) started in wrong/inconsistent modes
->>    (primary CPU mode 0x13)
->>    CPU: This may indicate a broken bootloader or firmware.
+>>> I'm trying port the hardkernel's SPL to the mainline U-Boot at present. The
+>>> mainline SPL is implemented for E5420 and E5800. But there are few
+>>> differences:
+>>> - different DRAM
+>>> - different clocks
+>>> - different boot core (peach-pi boots from A15)
+>>> - bl2 signature
+>>> - hdk's SPL uses smc calls
+>>> ... and some more.
 >>
->> Thanks to a tip from Abhilash, this patch gets all 8 CPUs booting
->> again, but the warning about CPUs started in inconsistent modes
->> remains.  Also, not being terribly familiar with Exynos internals,
->> it's not at all obvious to me why this register write (done for *all*
->> secondaries) makes things work works for the 2 secondary CPUs that
->> didn't come online.  It's also not obvious whether this is the right
->> general fix, since it doesn't seem to be needed on other 542x or 5800
->> platforms.
+>> This is really good news! Would this work leave CCI control to Linux
+>> so that we may use MCPM to manage cpu and cluster OFF?
 >>
->> I suspect the "right" fix is in the bootloader someplace, but not
->> knowing this hardware well, I'm not sure if the fix is in u-boot
->> proper, or somewhere in the binary blobs (bl1/bl2/tz) that start
->> before u-boot.  The u-boot I'm using is from the hardkernel u-boot
->> repo[1], and I'd welcome any suggestions to try.  I'm able to rebuild
->> my own u-boot from there, but only have binaries for bl1/bl2/tz.
->>
->> [1] branch "odroidxu3-v2012.07" of: https://github.com/hardkernel/u-boot.git
->>
->>
->> Cc: Mauro Ribeiro <mauro.ribeiro@hardkernel.com>
->> Cc: Abhilash Kesavan <a.kesavan@samsung.com>,
->> Cc: Andrew Bresticker <abrestic@chromium.org>
->> Cc: Doug Anderson <dianders@chromium.org>
->> Cc: Nicolas Pitre <nicolas.pitre@linaro.org>
->> Signed-off-by: Kevin Hilman <khilman@linaro.org>
->> ---
->>  arch/arm/mach-exynos/mcpm-exynos.c | 2 ++
->>  arch/arm/mach-exynos/regs-pmu.h    | 1 +
->>  2 files changed, 3 insertions(+)
 >
-> Hi,
+> Yes, I would like to get this stuff working.
 >
-> +Cc Marek, Bartlomiej, Kukjin Kim,
->
->
-> I would like to bring back this topic. Unfortunately I don't have
-> access to source code of BL1 (or any other firmware blob) so my
-> knowledge here comes mostly from experimenting and from looking at
-> sources of vendor kernel for Gear 2 (Exynos3250) and SM-G900H (Galaxy
-> S5, Exynos5422).
->
-> It seems that some booting firmware (I would suspect BL1 because this
-> ships Samsung to Hardkernel) uses SPARE2 as synchronization mechanism.
-> For example vendor kernel, when booting little core, it waits till
-> SPARE2==1 and then executes software reset for this core.
->
-> Observations shown that BL1 for Odroid, when booting secondary little core:
-> 1. Expects that SPARE2 register will be initialized to 1.
-> 2. If it is, then it sets it to 0, proceeds further and little core boots.
-> 3. If it is not, then it sets it to 1 and waits. Maybe this is a
-> notification to userspace - reset me please!
->
-> Unfortunately executing software reset in that time (at point 3)
-> stopped kernel from booting. No logs/dmesg and I was unable to turn on
-> early printk.
->
-> The answer why two of little cores boot is quite simple now. At
-> beginning the SPARE2==0 so first little core will set it to 1 and wait
-> till software reset. Kernel timeouts on this CPU bring up so it starts
-> the sequence for next little core. Now the SPARE2==1 so the core boots
-> fine and SPARE2 is set to 0. The last little core starts from
-> SPARE2==0, sets it to 1 and waits for software reset.
->
-> Since no one knows how this exactly works and we are stuck with BL1
-> provided as is, then IMHO the patch makes sense.
->
-> Kevin, can you refresh the patch?
-> It would be nice to:
-> 1. set SPARE2 only for Odroid (of_machine_is_compatible()),
-> 2. extend the explanation.
 
-I'd rather someone else refresh this patch who actually understands
-what's going on here and could write a descriptive changelog.  I have no
-claims to the authorship as Abhilash is the one who suggested this fix
-in the first place.
+Do you have access to BL1 sources to change this?
 
-Also, please note that 8 cores booting doesn't mean all 8 cores fully
-working.  This firmware is still horribly broken for low-power modes.
+IIUC, what is happening is BL1 is leaving CCI in secure mode, which
+means the kernel MCPM cannot manage it.  That means the kernel cannot
+manage any low-power CPU or cluster states.
 
-Even with all 8 cores enabled, the firmware also as CCI left in secure
-mode which means the kernel MCPM cannot manage CCI, and thus cannot hit
-any low-power states.  If CPUidle is enabled, the kernel will hang as
-soon as any MCPM state is attempted.  In order to get WFI-only CPUidle
-working, I've also had to disable CCI in the DTS by appending something
-like this to the board DTS file:
+Does anyone know at which stage of the boot secure world is left for
+normal world?  in BL1?  in BL2?
 
-&cci {
-     status = "disabled";
-};
-
-All of this though makes me wonder how the hardkernel kernel actually
-does any low-power idle.  Is it relying on firmware for this?  I have a
-hard time believe that the firmware would be able to handle this in a
-race-free way.
+If it's in BL2, maybe the CCI issue can also be fixed by ensuring that
+CCI is not left in secure mode so the kernel can properly manage CCI.
 
 Kevin
