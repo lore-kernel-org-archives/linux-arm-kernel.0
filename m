@@ -1,100 +1,77 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 15 Jun 2015 17:28:16 +0100
+From: jon.nettleton@gmail.com (Jon Nettleton)
+Date: Mon, 15 Jun 2015 18:33:17 +0200
 Subject: [BUG?] crypto: caam: little/big endianness on ARM vs PPC
 In-Reply-To: <20150615155907.GC7947@pengutronix.de>
 References: <20150615155907.GC7947@pengutronix.de>
-Message-ID: <20150615162816.GO7557@n2100.arm.linux.org.uk>
+Message-ID: <CALHpu34FHKTHr-2TZ-6Tmctev3WjBVTKfDbr6TYOJiOt+yDvfQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 15, 2015 at 05:59:07PM +0200, Steffen Trumtrar wrote:
+On Mon, Jun 15, 2015 at 5:59 PM, Steffen Trumtrar
+<s.trumtrar@pengutronix.de> wrote:
+> Hi!
+>
 > I'm working on CAAM support for the ARM-based i.MX6 SoCs. The current
 > drivers/crypto/caam driver only works for PowerPC AFAIK.
 > Actually, there isn't that much to do, to get support for the i.MX6 but
 > one patch breaks the driver severely:
-> 
-> 	commit ef94b1d834aace7101de77c3a7c2631b9ae9c5f6
-> 	crypto: caam - Add definition of rd/wr_reg64 for little endian platform
+>
+>         commit ef94b1d834aace7101de77c3a7c2631b9ae9c5f6
+>         crypto: caam - Add definition of rd/wr_reg64 for little endian platform
+>
+> This patch adds
+>
+> +#ifdef __LITTLE_ENDIAN
+> +static inline void wr_reg64(u64 __iomem *reg, u64 data)
+> +{
+> +       wr_reg32((u32 __iomem *)reg + 1, (data & 0xffffffff00000000ull) >> 32);
+> +       wr_reg32((u32 __iomem *)reg, data & 0x00000000ffffffffull);
+> +}
+>
+> The wr_reg64 function is only used in one place in the drivers/crypto/caam/jr.c
+> driver: to write the dma_addr_t to the register. Without that patch everything
+> works fine on ARM (little endian, 32bit), with that patch the driver will write
+> 0's into the register that holds the DMA address (the numerically-higher) -> kernel hangs.
+> Also, from my understanding, the comment above the defines, stating that you
+> have to first write the numerically-lower and then the numerically-higher address
+> on 32bit systems doesn't match with the implementation.
+>
+> What I don't know/understand is if this makes any sense for any PowerPC implementation.
+>
+> So, the question is, how to fix this? I'd prefer to do it directly in the jr driver
+> instead of the ifdef-ery.
+>
+> Something like
+>         if (sizeof(dma_addr_t) == sizeof(u32))
+>                 wr_reg32(&jrp->rregs->inpring_base + 1, inpbusaddr);
+>         else if (sizeof(dma_addr_t) == sizeof(u64))
+>                 wr_reg64(...)
+>
+> or just go by DT compatible and then remove the inline function definitions.
+>
+> As far as I can tell, the compatible wouldn't be needed for anything else in the
+> jr driver, so maybe that is not optimal. On the other hand the sizeof(..)
+> solution would only catch little endian on 32bit and not big endian (?!)
+> I however don't know what combinations actually *have* to be caught, as I don't
+> know, which exist.
+>
+> So, what do you think people?
 
-You're not the only one who's hitting problems with this - Jon Nettleton
-has been working on it recently.
+Funny enough I tackled this problem over the weekend as well.  My
+approach was to switch the driver over to use the *_relaxed() io
+functions and then special case the bits missing from the various
+ARCHs.  Basically adding setbits32 and clrbits32 for !PPC
+architectures and letting PPC and ARM share a writeq/readq set of
+functions.  I left the existing LITTLE_ENDIAN special case until I
+could verify if it was needed, or had been tested.
 
-The way this has been done is fairly yucky to start with: several things
-about it are particularly horrid.  The first is the repetitive code
-for the BE and LE cases, when all that's actually different is the
-register order between the two code cases.
+For reference, the patch against 4.1-rc5/6 is attached.
 
-The second thing is the excessive use of masking - I'm pretty sure the
-compiler won't complain with the below.
-
-diff --git a/drivers/crypto/caam/regs.h b/drivers/crypto/caam/regs.h
-index 378ddc17f60e..ba0fa630a25d 100644
---- a/drivers/crypto/caam/regs.h
-+++ b/drivers/crypto/caam/regs.h
-@@ -84,34 +84,28 @@
- #endif
- 
- #ifndef CONFIG_64BIT
--#ifdef __BIG_ENDIAN
--static inline void wr_reg64(u64 __iomem *reg, u64 data)
--{
--	wr_reg32((u32 __iomem *)reg, (data & 0xffffffff00000000ull) >> 32);
--	wr_reg32((u32 __iomem *)reg + 1, data & 0x00000000ffffffffull);
--}
--
--static inline u64 rd_reg64(u64 __iomem *reg)
--{
--	return (((u64)rd_reg32((u32 __iomem *)reg)) << 32) |
--		((u64)rd_reg32((u32 __iomem *)reg + 1));
--}
-+#if defined(__BIG_ENDIAN)
-+#define REG64_HI32(reg) ((u32 __iomem *)(reg))
-+#define REG64_LO32(reg) ((u32 __iomem *)(reg) + 1)
-+#elif defined(__LITTLE_ENDIAN)
-+#define REG64_HI32(reg) ((u32 __iomem *)(reg) + 1)
-+#define REG64_LO32(reg) ((u32 __iomem *)(reg))
- #else
--#ifdef __LITTLE_ENDIAN
-+#error Broken endian?
-+#endif
-+
- static inline void wr_reg64(u64 __iomem *reg, u64 data)
- {
--	wr_reg32((u32 __iomem *)reg + 1, (data & 0xffffffff00000000ull) >> 32);
--	wr_reg32((u32 __iomem *)reg, data & 0x00000000ffffffffull);
-+	wr_reg32(REG64_HI32(reg), data >> 32);
-+	wr_reg32(REG64_LO32(reg), data);
- }
- 
- static inline u64 rd_reg64(u64 __iomem *reg)
- {
--	return (((u64)rd_reg32((u32 __iomem *)reg + 1)) << 32) |
--		((u64)rd_reg32((u32 __iomem *)reg));
-+	return ((u64)rd_reg32(REG64_HI32(reg))) << 32 |
-+		rd_reg32(REG64_LO32(reg));
- }
- #endif
--#endif
--#endif
- 
- /*
-  * jr_outentry
-
-The second issue is that apparently, the register order doesn't actually
-change for LE devices - in other words, the byte order within each register
-does change, but they aren't a 64-bit register, they're two separate 32-bit
-registers.  So, they should always be written as such.
-
-So, I'd get rid of the #if defined(__BIG_ENDIAN) stuff and instead have:
-
-+/*
-+ * The DMA address register is a pair of 32-bit registers, and should
-+ * always be accessed as such.
-+ */
-+#define REG64_HI32(reg) ((u32 __iomem *)(reg))
-+#define REG64_LO32(reg) ((u32 __iomem *)(reg) + 1)
-
-
--- 
-FTTC broadband for 0.8mile line: currently@10.5Mbps down 400kbps up
-according to speedtest.net.
+-Jon
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: 0001-crypto-caam-use-generic-_relaxed-io-functions.patch
+Type: application/octet-stream
+Size: 14156 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150615/de0b9a37/attachment-0001.obj>
