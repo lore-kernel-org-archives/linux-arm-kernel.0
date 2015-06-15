@@ -1,42 +1,86 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Mon, 15 Jun 2015 10:01:47 +0100
-Subject: [PATCH v2 1/1] irqchip: exynos-combiner: Save IRQ enable set
- on suspend
-In-Reply-To: <557E82BC.7080203@collabora.co.uk>
-References: <1434087795-13990-1-git-send-email-javier.martinez@collabora.co.uk>	<557AB00C.5040606@arm.com>	<557AC23D.8040602@collabora.co.uk>	<557AC85E.5070705@arm.com>	<557AD728.7090908@collabora.co.uk>	<557B34A7.4090507@collabora.co.uk>
- <CAD=FV=UQF+n8AjSXYajqUb0qswcoUrSgnsasV82JaS3dBtNO8Q@mail.gmail.com>
- <557E82BC.7080203@collabora.co.uk>
-Message-ID: <557E947B.3030804@arm.com>
+From: eric.auger@linaro.org (Eric Auger)
+Date: Mon, 15 Jun 2015 11:09:41 +0200
+Subject: [PATCH v4 0/4] VFIO platform reset
+Message-ID: <1434359385-19916-1-git-send-email-eric.auger@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+In situations where the userspace driver is stopped abnormally and the
+VFIO platform device is released, the assigned HW device currently is
+left running. As a consequence the HW device might continue issuing IRQs
+and performing DMA accesses.
+
+On release, no physical IRQ handler is setup anymore. Also the DMA buffers
+are unmapped leading to IOMMU aborts. So there is no serious consequence.
+
+However when assigning that HW device again to another userspace driver,
+this latter might face some unexpected IRQs and DMA accesses, which are
+the result of the previous assignment.
+
+In virtualization use-case, a VM newly granted with that HW device may be
+impacted by the assignment of that device to a previous VM:
+- IRQs may be injected very early when booting the new guest, even before
+  the guest driver has initialized leading to possible driver state
+  inconsistency.
+- DMA accesses may hit the newly mapped VM address space at addresses that
+  may jeopardize the integrity of the newly installed VM.
+
+Obviously the criticity depends on the assigned HW device.
+
+As opposed to PCI, there is no standard mechanism to reset the platform
+device.
+
+This series proposes to implement device specific reset functions in
+separate in-kernel vfio reset modules. The vfio-platform driver holds
+a whitelist of implemented triplets (compat string, module name,
+reset function name). When the vfio-platform driver is probed it identifies
+the fellow reset module/function matching the compat string of the
+device, if any, and forces the load of this reset module.
+
+A first reset module is provided: the vfio-platform-calxedaxgmac
+module which implements a basic reset for the Calxeda xgmac.
+
+The series can be found at
+https://git.linaro.org/people/eric.auger/linux.git/shortlog/refs/heads/v4.1-rc8-reset-v4
+
+History:
+v3 -> v4:
+- fix the commit message of "VFIO: platform: add reset struct and lookup table"
+
+v2 -> v3:
+- remove void module_init/exit functions in calxeda reset module
+- remove enum vfio_platform_reset_type
+- for reset lookup, use ARRAY_SIZE
+- in reset put use symbol_put_addr
+
+v1 -> v2:
+- much simplified compared to v1 although principle of external modules is
+  kept: removed mechanism of dynamic registration of reset functions
+- list is replaced by whitelist lookup table
+- name of the reset function also stored in the lookup table
+- autoload of reset modules
+
+RFC -> PATCH v1:
+- solution now based on a lookup list instead of specialized driver
 
 
-On 15/06/15 08:46, Javier Martinez Canillas wrote:
-[...]
+Eric Auger (4):
+  VFIO: platform: add reset struct and lookup table
+  VFIO: platform: add reset callback
+  VFIO: platform: populate the reset function on probe
+  VFIO: platform: Calxeda xgmac reset module
 
->
-> Sudeep, so we may need something like $subject after all from Doug's
-> explanations since the combiner chip state is lost during a S2R. I know
-> that it adds more duplicated code (others irqchip drivers do the same)
-> and it may not scale well if a chip has many registers but is the best
-> solution I could came with.
->
+ drivers/vfio/platform/Kconfig                      |  2 +
+ drivers/vfio/platform/Makefile                     |  2 +
+ drivers/vfio/platform/reset/Kconfig                |  7 ++
+ drivers/vfio/platform/reset/Makefile               |  5 ++
+ .../platform/reset/vfio_platform_calxedaxgmac.c    | 86 ++++++++++++++++++++++
+ drivers/vfio/platform/vfio_platform_common.c       | 60 ++++++++++++++-
+ drivers/vfio/platform/vfio_platform_private.h      |  7 ++
+ 7 files changed, 166 insertions(+), 3 deletions(-)
+ create mode 100644 drivers/vfio/platform/reset/Kconfig
+ create mode 100644 drivers/vfio/platform/reset/Makefile
+ create mode 100644 drivers/vfio/platform/reset/vfio_platform_calxedaxgmac.c
 
-OK
-
-> If you have a suggestion for a better alternative, I can give a try and
-> write the patch. But I think $subject could also land to fix this issue
-> since is a very non intrusive change and later can be changed once the
-> irqchip core supports this use case.
->
-
-Agreed. But I would suggest also to add MASK_ON_SUSPEND and set_irq_wake
-also and then you can restore iff it's non-zero as irq core will take
-care of most of the non-wakeup sources. Because I am planning to push
-MASK_ON_SUSPEND to GIC and it will break this combiner if it assumes the
-combiner interrupts are always on in GIC. Implement set_irq_wake as
-enable_irq_wake (comb_irq_to_GIC).
-
-Regards,
-Sudeep
+-- 
+1.9.1
