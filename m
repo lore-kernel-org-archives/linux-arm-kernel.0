@@ -1,69 +1,98 @@
-From: khilman@kernel.org (Kevin Hilman)
-Date: Mon, 15 Jun 2015 11:43:53 -0700
-Subject: [PATCH RFC 3/3] PM / Domains: Introduce generic PM domain for cpu
- domain
-In-Reply-To: <20150611145649.GC1103@linaro.org> (Lina Iyer's message of "Thu,
- 11 Jun 2015 08:56:49 -0600")
-References: <1433456946-53296-1-git-send-email-lina.iyer@linaro.org>
- <1433456946-53296-4-git-send-email-lina.iyer@linaro.org>
- <7hmw07meh6.fsf@deeprootsystems.com>
- <20150611145649.GC1103@linaro.org>
-Message-ID: <7hioao6cd2.fsf@deeprootsystems.com>
+From: m.smarduch@samsung.com (Mario Smarduch)
+Date: Mon, 15 Jun 2015 11:44:11 -0700
+Subject: [PATCH] arm64: KVM: Optimize arm64 guest exit VFP/SIMD register
+ save/restore
+In-Reply-To: <557F1765.8040405@arm.com>
+References: <557CACC4.8040405@samsung.com> <557EA23D.4090200@arm.com>
+ <557F13A5.9030603@samsung.com> <557F1765.8040405@arm.com>
+Message-ID: <557F1CFB.8040106@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Lina Iyer <lina.iyer@linaro.org> writes:
-
-> On Wed, Jun 10 2015 at 15:38 -0600, Kevin Hilman wrote:
->>Lina Iyer <lina.iyer@linaro.org> writes:
->>
->>> Generally cpus are grouped under a power domain in a SoC. When all cpus
->>> in the domain are in their power off state, the cpu domain can also be
->>> powered off.
->>
->>How does this relate to a cluster, and why aren't you using that terminolgy?
->>
->>> Genpd provides the framework for defining cpus as devices
->>> that are part of a cpu domain.
+On 06/15/2015 11:20 AM, Marc Zyngier wrote:
+> On 15/06/15 19:04, Mario Smarduch wrote:
+>> On 06/15/2015 03:00 AM, Marc Zyngier wrote:
+>>> Hi Mario,
 >>>
->>> Introduce support for defining and adding a generic power domain for the
->>> cpus based on the DT specification of power domain providers and
->>> consumers.  SoC's that have the cpu domain defined in their DT, can
->>> setup a genpd with a name and the power_on/power_off callbacks. Calling
->>> pm_cpu_domain_init() will register the genpd and attach the cpus for
->>> this domain with the genpd.
+>>> I was working on a more ambitious patch series, 
+>>> but we probably ought to
+>>> start small, and this looks fairly sensible to me.
+>>
+>> Hi Marc,
+>>    thanks for reviewing, I was thinking to post this
+>> first and next iteration on guest access switch
+>> back to host registers only upon  return to user space or
+>> vCPU context switch. This should save more cycles for
+>> various exits.
+>>
+>> Were you thinking along the same lines or something
+>> altogether different?
+> 
+> That's mostly what I had in mind. Basically staying away from touching
+> the FP registers until vcpu_put(). I had it mostly working, but
+> experienced some interesting corruption cases, specially when using
+> 32bit guests.
+> 
+>>
 >>>
->>> CPU_PM notifications for are used to pm_runtime_get_sync() and
->>> pm_runtime_put_sync() for each cpu.  When all cpus are powered off, the
->>> last cpu going down would call the genpd->power_off(). Correspondingly,
->>> the first cpu up would call the genpd->power_on() callback before
->>> resuming from idle.
+>>> A few minor comments below.
+>>>
+>>> On 13/06/15 23:20, Mario Smarduch wrote:
+>>>> Currently VFP/SIMD registers are always saved and restored
+>>>> on Guest entry and exit.
+>>>>
+>>>> This patch only saves and restores VFP/SIMD registers on
+>>>> Guest access. To do this cptr_el2 VFP/SIMD trap is set
+>>>> on Guest entry and later checked on exit. This follows
+>>>> the ARMv7 VFPv3 implementation. Running an informal test
+>>>> there are high number of exits that don't access VFP/SIMD
+>>>> registers.
+>>>
+>>> It would be good to add some numbers here. How often do we exit without
+>>> having touched the FPSIMD regs? For which workload?
 >>
->>Other patches also mention this genpd being useful to gate power to
->>non-CPU peripherals on the same power rail.  How are those devices to be
->>added?
+>> Lmbench is what I typically use, with ssh server, i.e., cause page
+>> faults and interrupts - usually registers are not touched.
+>> I'll run the tests again and define usually.
 >>
-> I am not investigating DT nodes to figure out which node is a consumer
-> for this domain provider. That could be a good way to do it, but
-> practically speaking, there may be platform dependencies and specifics
-> that may need to be met, before the device can be added to the CPU
-> genpd.
->
-> So that is not generalized here. I didn't see a better way to do that,
-> generically. Do you have ideas on that?
->
-> The platform is the owner of the genpd and therefore can add those
-> non-cpu devices to the genpd as and when appropritate.
+>> Any other loads you had in mind?
+> 
+> Not really (apart from running hackbench, of course...;-). I'd just like
+> to see the numbers in the commit message, so that we can document the
+> improvement (and maybe track regressions).
 
-I'm pretty sure the generic code will already add devices to genpds if
-the genpd is using the of_genpd_* stuff.  That is why I'm wondering why
-the extra stuff for CPUs is needed.
+Ok I understand.
 
-> In this regard, I also have a question, who initializes the genpd. My
-> assumption is that CPUs will get probed before most other devices and
-> therefore the domain provider could be initialized by this file. But, I
-> could be wrong here.
+> 
+> [...]
+> 
+>>>
+>>>>  	skip_debug_state x3, 1f
+>>>>  	// Clear the dirty flag for the next run, as all the state has
+>>>>  	// already been saved. Note that we nuke the whole 64bit word.
+>>>> @@ -1166,6 +1211,10 @@ el1_sync:					// Guest trapped into EL2
+>>>>  	mrs	x1, esr_el2
+>>>>  	lsr	x2, x1, #ESR_ELx_EC_SHIFT
+>>>>
+>>>> +	/* Guest accessed VFP/SIMD registers, save host, restore Guest */
+>>>> +	cmp	x2, #ESR_ELx_EC_FP_ASIMD
+>>>> +	b.eq	switch_to_guest_vfp
+>>>> +
+>>>
+>>> I'd prefer you moved that hunk to el1_trap, where we handle all the
+>>> traps coming from the guest.
+>>
+>> I'm thinking would it make sense to update the armv7 side as
+>> well. When reading both exit handlers the flow mirrors
+>> each other.
+> 
+> The 32bit code is starting to show its age, and could probably do with a
+> refactor. If you have some cycles to spare, that'd be quite interesting.
 
-Initializing it in this driver seems OK to me.
+Yep, will do, ARMv7 is still very relevant.
 
-Kevin
+> 
+> Thanks,
+> 
+> 	M.
+> 
