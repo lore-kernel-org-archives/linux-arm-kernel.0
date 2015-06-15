@@ -1,63 +1,25 @@
-From: s.trumtrar@pengutronix.de (Steffen Trumtrar)
-Date: Mon, 15 Jun 2015 17:59:07 +0200
-Subject: [BUG?] crypto: caam: little/big endianness on ARM vs PPC
-Message-ID: <20150615155907.GC7947@pengutronix.de>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Mon, 15 Jun 2015 10:01:29 -0600
+Subject: [RESEND PATCH 2/2] pinctrl: introduce complex pin description
+In-Reply-To: <1433948699-19800-3-git-send-email-ludovic.desroches@atmel.com>
+References: <1433948699-19800-1-git-send-email-ludovic.desroches@atmel.com>
+ <1433948699-19800-3-git-send-email-ludovic.desroches@atmel.com>
+Message-ID: <557EF6D9.6050503@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi!
+On 06/10/2015 09:04 AM, Ludovic Desroches wrote:
+> Using a string to describe a pin in the device tree can be not enough.
+> Some controllers may need extra information to fully describe a pin. It
+> concerns mainly controllers which have a per pin muxing approach which
+> don't fit well the notions of groups and functions.
+> Instead of using a pin name, a 32 bit value is used. The 16 least
+> significant bits are used for the pin number. Other 16 bits can be used to
+> store extra parameters.
 
-I'm working on CAAM support for the ARM-based i.MX6 SoCs. The current
-drivers/crypto/caam driver only works for PowerPC AFAIK.
-Actually, there isn't that much to do, to get support for the i.MX6 but
-one patch breaks the driver severely:
-
-	commit ef94b1d834aace7101de77c3a7c2631b9ae9c5f6
-	crypto: caam - Add definition of rd/wr_reg64 for little endian platform
-
-This patch adds
-
-+#ifdef __LITTLE_ENDIAN
-+static inline void wr_reg64(u64 __iomem *reg, u64 data)
-+{
-+	wr_reg32((u32 __iomem *)reg + 1, (data & 0xffffffff00000000ull) >> 32);
-+	wr_reg32((u32 __iomem *)reg, data & 0x00000000ffffffffull);
-+}
-
-The wr_reg64 function is only used in one place in the drivers/crypto/caam/jr.c
-driver: to write the dma_addr_t to the register. Without that patch everything
-works fine on ARM (little endian, 32bit), with that patch the driver will write
-0's into the register that holds the DMA address (the numerically-higher) -> kernel hangs.
-Also, from my understanding, the comment above the defines, stating that you
-have to first write the numerically-lower and then the numerically-higher address
-on 32bit systems doesn't match with the implementation.
-
-What I don't know/understand is if this makes any sense for any PowerPC implementation.
-
-So, the question is, how to fix this? I'd prefer to do it directly in the jr driver
-instead of the ifdef-ery.
-
-Something like
-	if (sizeof(dma_addr_t) == sizeof(u32))
-		wr_reg32(&jrp->rregs->inpring_base + 1, inpbusaddr);
-	else if (sizeof(dma_addr_t) == sizeof(u64))
-		wr_reg64(...)
-
-or just go by DT compatible and then remove the inline function definitions.
-
-As far as I can tell, the compatible wouldn't be needed for anything else in the
-jr driver, so maybe that is not optimal. On the other hand the sizeof(..)
-solution would only catch little endian on 32bit and not big endian (?!)
-I however don't know what combinations actually *have* to be caught, as I don't
-know, which exist.
-
-So, what do you think people?
-
-Thanks,
-Steffen Trumtrar
-
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+The driver for the pin controller is supposed to provide this 
+information in a table. The whole point of having a driver, rather than 
+a table/list of raw register values in the DT, is so the driver can 
+provide this information at a semantic level. This information is fixed 
+per SoC and so make sense to put into a driver, while the board-specific 
+configuration varies wildly, and hence makes sense to put into DT.
