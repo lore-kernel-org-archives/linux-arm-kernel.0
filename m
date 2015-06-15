@@ -1,106 +1,40 @@
-From: simon.guinot@sequanux.org (Simon Guinot)
-Date: Mon, 15 Jun 2015 16:27:22 +0200
-Subject: [PATCH 1/2] net: mvneta: introduce tx_csum_limit property
-In-Reply-To: <1434378443-23029-1-git-send-email-simon.guinot@sequanux.org>
-References: <1434378443-23029-1-git-send-email-simon.guinot@sequanux.org>
-Message-ID: <1434378443-23029-2-git-send-email-simon.guinot@sequanux.org>
+From: bpringle@sympatico.ca (Bill Pringlemeir)
+Date: Mon, 15 Jun 2015 10:29:17 -0400
+Subject: [PATCH v5 1/6] mtd: nand: vf610_nfc: Freescale NFC for VF610,
+ MPC5125 and others
+In-Reply-To: <20150609213338.GD5720@breakpoint.cc> (Sebastian Andrzej
+ Siewior's message of "Tue, 9 Jun 2015 23:33:38 +0200")
+References: <1433584416-29607-1-git-send-email-stefan@agner.ch>
+ <1433584416-29607-2-git-send-email-stefan@agner.ch>
+ <20150609213338.GD5720@breakpoint.cc>
+Message-ID: <BLU436-SMTP1380BAD5F776944D62A9148B8B80@phx.gbl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch introduces the tx_csum_limit DT property. This allows to
-configure the maximum frame size for which the Ethernet controller is
-able to perform TCP/IP checksumming. If MTU is set to a value greater
-than tx_csum_limit, then the features NETIF_F_IP_CSUM and NETIF_F_TSO
-are disabled.
+On  9 Jun 2015, sebastian at breakpoint.cc wrote:
 
-Signed-off-by: Simon Guinot <simon.guinot@sequanux.org>
-Cc: <stable@vger.kernel.org> # v3.8+
----
- .../bindings/net/marvell-armada-370-neta.txt       |  3 +++
- drivers/net/ethernet/marvell/mvneta.c              | 25 +++++++++++++++++++++-
- 2 files changed, 27 insertions(+), 1 deletion(-)
+> On 2015-06-06 11:53:31 [+0200], Stefan Agner wrote:
 
-diff --git a/Documentation/devicetree/bindings/net/marvell-armada-370-neta.txt b/Documentation/devicetree/bindings/net/marvell-armada-370-neta.txt
-index 750d577e8083..db48c83ff0f5 100644
---- a/Documentation/devicetree/bindings/net/marvell-armada-370-neta.txt
-+++ b/Documentation/devicetree/bindings/net/marvell-armada-370-neta.txt
-@@ -8,6 +8,9 @@ Required properties:
- - phy-mode: See ethernet.txt file in the same directory
- - clocks: a pointer to the reference clock for this device.
- 
-+Optional properties:
-+- tx_csum_limit: max tx packet size for hardware checksum.
-+
- Example:
- 
- ethernet at d0070000 {
-diff --git a/drivers/net/ethernet/marvell/mvneta.c b/drivers/net/ethernet/marvell/mvneta.c
-index ce5f7f9cff06..1a724e0a2a26 100644
---- a/drivers/net/ethernet/marvell/mvneta.c
-+++ b/drivers/net/ethernet/marvell/mvneta.c
-@@ -310,6 +310,7 @@ struct mvneta_port {
- 	unsigned int link;
- 	unsigned int duplex;
- 	unsigned int speed;
-+	unsigned int tx_csum_limit;
- 	int use_inband_status:1;
- };
- 
-@@ -2502,8 +2503,10 @@ static int mvneta_change_mtu(struct net_device *dev, int mtu)
- 
- 	dev->mtu = mtu;
- 
--	if (!netif_running(dev))
-+	if (!netif_running(dev)) {
-+		netdev_update_features(dev);
- 		return 0;
-+	}
- 
- 	/* The interface is running, so we have to force a
- 	 * reallocation of the queues
-@@ -2532,9 +2535,26 @@ static int mvneta_change_mtu(struct net_device *dev, int mtu)
- 	mvneta_start_dev(pp);
- 	mvneta_port_up(pp);
- 
-+	netdev_update_features(dev);
-+
- 	return 0;
- }
- 
-+static netdev_features_t mvneta_fix_features(struct net_device *dev,
-+					     netdev_features_t features)
-+{
-+	struct mvneta_port *pp = netdev_priv(dev);
-+
-+	if (pp->tx_csum_limit && dev->mtu > pp->tx_csum_limit) {
-+		features &= ~(NETIF_F_IP_CSUM | NETIF_F_TSO);
-+		netdev_info(dev,
-+			    "Disable IP checksum for MTU greater than %dB\n",
-+			    pp->tx_csum_limit);
-+	}
-+
-+	return features;
-+}
-+
- /* Get mac address */
- static void mvneta_get_mac_addr(struct mvneta_port *pp, unsigned char *addr)
- {
-@@ -2856,6 +2876,7 @@ static const struct net_device_ops mvneta_netdev_ops = {
- 	.ndo_set_rx_mode     = mvneta_set_rx_mode,
- 	.ndo_set_mac_address = mvneta_set_mac_addr,
- 	.ndo_change_mtu      = mvneta_change_mtu,
-+	.ndo_fix_features    = mvneta_fix_features,
- 	.ndo_get_stats64     = mvneta_get_stats64,
- 	.ndo_do_ioctl        = mvneta_ioctl,
- };
-@@ -3101,6 +3122,8 @@ static int mvneta_probe(struct platform_device *pdev)
- 		}
- 	}
- 
-+	of_property_read_u32(dn, "tx_csum_limit", &pp->tx_csum_limit);
-+
- 	pp->tx_ring_size = MVNETA_MAX_TXD;
- 	pp->rx_ring_size = MVNETA_MAX_RXD;
- 
--- 
-2.1.4
+>> +static const struct of_device_id vf610_nfc_dt_ids[] = {
+>> +	{ .compatible = "fsl,vf610-nfc" },
+>> +	{ .compatible = "fsl,mpc5125-nfc" },
+
+> I advise against a "fsl,mpc5125-nfc" binding. First of all it is the
+> same as the previous one. Second of all it was not tested at all on
+> the SoC it suggests to work. Plus the chip select function has a
+> comment hat it won't work on MPC5125. So it really makes no sense to
+> add it here.
+
+Someone has used a version of the driver on the PowerPC.  I don't have
+access to his email address now.  Anyways, the chipselect code is
+different on the PowerPC versions of the controller afair.  So if some
+external code sets up the chipselect for a single chip, then things are
+fine.
+
+Both the PowerPC and ARM support DT/OF, but you can never actually run
+either version as the code must be compiled for either assembler.  So I
+am not quite sure that this was the correct way to go anyways...  So I
+agree with your conclusion we can remove that binding.
+
+Regards,
+Bill.
