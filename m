@@ -1,227 +1,124 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 15 Jun 2015 11:00:29 +0100
-Subject: [PATCH] arm64: KVM: Optimize arm64 guest exit VFP/SIMD register
- save/restore
-In-Reply-To: <557CACC4.8040405@samsung.com>
-References: <557CACC4.8040405@samsung.com>
-Message-ID: <557EA23D.4090200@arm.com>
+From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
+Date: Mon, 15 Jun 2015 12:07:23 +0200
+Subject: [RFC] ARM: exynos: MCPM: [is this a] fix for secondary boot on
+ 5422?
+In-Reply-To: <CAJKOXPfLEV1sQsz87ULDKX4vijqRpbGj7AcOEDiy83kukvVKVg@mail.gmail.com>
+References: <1416896510-24612-1-git-send-email-khilman@kernel.org>
+ <CAJKOXPfLEV1sQsz87ULDKX4vijqRpbGj7AcOEDiy83kukvVKVg@mail.gmail.com>
+Message-ID: <2692641.0572IpMyUN@amdc1976>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mario,
 
-I was working on a more ambitious patch series, but we probably ought to
-start small, and this looks fairly sensible to me.
+Hi,
 
-A few minor comments below.
++ Cc Przemyslaw Marczak (he is working on fixing u-boot fox XU3)
 
-On 13/06/15 23:20, Mario Smarduch wrote:
-> Currently VFP/SIMD registers are always saved and restored
-> on Guest entry and exit.
-> 
-> This patch only saves and restores VFP/SIMD registers on
-> Guest access. To do this cptr_el2 VFP/SIMD trap is set
-> on Guest entry and later checked on exit. This follows
-> the ARMv7 VFPv3 implementation. Running an informal test
-> there are high number of exits that don't access VFP/SIMD
-> registers.
+Best regards,
+--
+Bartlomiej Zolnierkiewicz
+Samsung R&D Institute Poland
+Samsung Electronics
 
-It would be good to add some numbers here. How often do we exit without
-having touched the FPSIMD regs? For which workload?
-
-> Tested on FVP Model, executed threads on host and
-> Guest accessing VFP/SIMD registers resulting in consistent
-> results.
+On Sunday, June 14, 2015 05:56:20 PM Krzysztof Koz?owski wrote:
+> 2014-11-25 15:21 GMT+09:00 Kevin Hilman <khilman@kernel.org>:
+> > From: Kevin Hilman <khilman@linaro.org>
+> >
+> > Using the current exynos_defconfig on the exynos5422-odroid-xu3, only
+> > 6 of 8 CPUs come online with MCPM boot.  CPU0 is an A7, CPUs 1-4 are
+> > A15s and CPU5-7 are the other A7s, but with the current code, CPUs 5
+> > and 7 do not boot:
+> >
+> >    [...]
+> >    Exynos MCPM support installed
+> >    CPU1: update cpu_capacity 1535
+> >    CPU1: thread -1, cpu 0, socket 0, mpidr 80000000
+> >    CPU2: update cpu_capacity 1535
+> >    CPU2: thread -1, cpu 1, socket 0, mpidr 80000001
+> >    CPU3: update cpu_capacity 1535
+> >    CPU3: thread -1, cpu 2, socket 0, mpidr 80000002
+> >    CPU4: update cpu_capacity 1535
+> >    CPU4: thread -1, cpu 3, socket 0, mpidr 80000003
+> >    CPU5: failed to come online
+> >    CPU6: update cpu_capacity 448
+> >    CPU6: thread -1, cpu 2, socket 1, mpidr 80000102
+> >    CPU7: failed to come online
+> >    Brought up 6 CPUs
+> >    CPU: WARNING: CPU(s) started in wrong/inconsistent modes
+> >    (primary CPU mode 0x13)
+> >    CPU: This may indicate a broken bootloader or firmware.
+> >
+> > Thanks to a tip from Abhilash, this patch gets all 8 CPUs booting
+> > again, but the warning about CPUs started in inconsistent modes
+> > remains.  Also, not being terribly familiar with Exynos internals,
+> > it's not at all obvious to me why this register write (done for *all*
+> > secondaries) makes things work works for the 2 secondary CPUs that
+> > didn't come online.  It's also not obvious whether this is the right
+> > general fix, since it doesn't seem to be needed on other 542x or 5800
+> > platforms.
+> >
+> > I suspect the "right" fix is in the bootloader someplace, but not
+> > knowing this hardware well, I'm not sure if the fix is in u-boot
+> > proper, or somewhere in the binary blobs (bl1/bl2/tz) that start
+> > before u-boot.  The u-boot I'm using is from the hardkernel u-boot
+> > repo[1], and I'd welcome any suggestions to try.  I'm able to rebuild
+> > my own u-boot from there, but only have binaries for bl1/bl2/tz.
+> >
+> > [1] branch "odroidxu3-v2012.07" of: https://github.com/hardkernel/u-boot.git
+> >
+> >
+> > Cc: Mauro Ribeiro <mauro.ribeiro@hardkernel.com>
+> > Cc: Abhilash Kesavan <a.kesavan@samsung.com>,
+> > Cc: Andrew Bresticker <abrestic@chromium.org>
+> > Cc: Doug Anderson <dianders@chromium.org>
+> > Cc: Nicolas Pitre <nicolas.pitre@linaro.org>
+> > Signed-off-by: Kevin Hilman <khilman@linaro.org>
+> > ---
+> >  arch/arm/mach-exynos/mcpm-exynos.c | 2 ++
+> >  arch/arm/mach-exynos/regs-pmu.h    | 1 +
+> >  2 files changed, 3 insertions(+)
+> 
+> Hi,
+> 
+> +Cc Marek, Bartlomiej, Kukjin Kim,
 > 
 > 
-> Signed-off-by: Mario Smarduch <m.smarduch@samsung.com>
-> ---
->  arch/arm64/include/asm/kvm_arm.h |  5 +++-
->  arch/arm64/kvm/hyp.S             | 57
-> +++++++++++++++++++++++++++++++++++++---
->  2 files changed, 57 insertions(+), 5 deletions(-)
+> I would like to bring back this topic. Unfortunately I don't have
+> access to source code of BL1 (or any other firmware blob) so my
+> knowledge here comes mostly from experimenting and from looking at
+> sources of vendor kernel for Gear 2 (Exynos3250) and SM-G900H (Galaxy
+> S5, Exynos5422).
 > 
-> diff --git a/arch/arm64/include/asm/kvm_arm.h
-> b/arch/arm64/include/asm/kvm_arm.h
-> index ac6fafb..7605e09 100644
-> --- a/arch/arm64/include/asm/kvm_arm.h
-> +++ b/arch/arm64/include/asm/kvm_arm.h
-> @@ -171,10 +171,13 @@
->  #define HSTR_EL2_TTEE	(1 << 16)
->  #define HSTR_EL2_T(x)	(1 << x)
+> It seems that some booting firmware (I would suspect BL1 because this
+> ships Samsung to Hardkernel) uses SPARE2 as synchronization mechanism.
+> For example vendor kernel, when booting little core, it waits till
+> SPARE2==1 and then executes software reset for this core.
 > 
-> +/* Hyp Coproccessor Trap Register Shifts */
-> +#define CPTR_EL2_TFP_SHIFT 10
-> +
->  /* Hyp Coprocessor Trap Register */
->  #define CPTR_EL2_TCPAC	(1 << 31)
->  #define CPTR_EL2_TTA	(1 << 20)
-> -#define CPTR_EL2_TFP	(1 << 10)
-> +#define CPTR_EL2_TFP	(1 << CPTR_EL2_TFP_SHIFT)
+> Observations shown that BL1 for Odroid, when booting secondary little core:
+> 1. Expects that SPARE2 register will be initialized to 1.
+> 2. If it is, then it sets it to 0, proceeds further and little core boots.
+> 3. If it is not, then it sets it to 1 and waits. Maybe this is a
+> notification to userspace - reset me please!
 > 
->  /* Hyp Debug Configuration Register bits */
->  #define MDCR_EL2_TDRA		(1 << 11)
-> diff --git a/arch/arm64/kvm/hyp.S b/arch/arm64/kvm/hyp.S
-> index 5befd01..b3044b4 100644
-> --- a/arch/arm64/kvm/hyp.S
-> +++ b/arch/arm64/kvm/hyp.S
-> @@ -673,6 +673,24 @@
->  	tbz	\tmp, #KVM_ARM64_DEBUG_DIRTY_SHIFT, \target
->  .endm
+> Unfortunately executing software reset in that time (at point 3)
+> stopped kernel from booting. No logs/dmesg and I was unable to turn on
+> early printk.
 > 
-> +/*
-> + * Check cptr VFP/SIMD accessed bit, if set VFP/SIMD not accessed by guest.
-> + */
-> +.macro skip_fpsimd_state tmp, target
-> +	mrs	\tmp, cptr_el2
-> +	tbnz	\tmp, #CPTR_EL2_TFP_SHIFT, \target
-> +.endm
-> +
-> +/*
-> + * Check cptr VFP/SIMD accessed bit if set, VFP/SIMD not accessed by guest.
-> + * Also disable all cptr traps on return to host.
-> + */
-> +.macro skip_fpsimd_state_reset tmp, target
-> +	mrs	\tmp, cptr_el2
-> +	msr	cptr_el2, xzr
-> +	tbnz	\tmp, #CPTR_EL2_TFP_SHIFT, \target
-> +.endm
-> +
->  .macro compute_debug_state target
->  	// Compute debug state: If any of KDE, MDE or KVM_ARM64_DEBUG_DIRTY
->  	// is set, we do a full save/restore cycle and disable trapping.
-> @@ -763,6 +781,7 @@
->  	ldr     x2, [x0, #VCPU_HCR_EL2]
->  	msr     hcr_el2, x2
->  	mov	x2, #CPTR_EL2_TTA
-> +	orr	x2, x2, #CPTR_EL2_TFP
->  	msr	cptr_el2, x2
+> The answer why two of little cores boot is quite simple now. At
+> beginning the SPARE2==0 so first little core will set it to 1 and wait
+> till software reset. Kernel timeouts on this CPU bring up so it starts
+> the sequence for next little core. Now the SPARE2==1 so the core boots
+> fine and SPARE2 is set to 0. The last little core starts from
+> SPARE2==0, sets it to 1 and waits for software reset.
 > 
->  	mov	x2, #(1 << 15)	// Trap CP15 Cr=15
-> @@ -785,7 +804,6 @@
->  .macro deactivate_traps
->  	mov	x2, #HCR_RW
->  	msr	hcr_el2, x2
-> -	msr	cptr_el2, xzr
->  	msr	hstr_el2, xzr
+> Since no one knows how this exactly works and we are stuck with BL1
+> provided as is, then IMHO the patch makes sense.
 > 
->  	mrs	x2, mdcr_el2
-> @@ -911,6 +929,30 @@ __save_fpsimd:
->  __restore_fpsimd:
->  	restore_fpsimd
->  	ret
-> +/*
-> + * On Guest VFP/SIMD access, switch Guest/Host registers and reset cptr
-> access
-> + * bit to disable trapping.
-> + */
-> +switch_to_guest_vfp:
-
-Consider renaming this to "switch_to_guest_fpsimd" for consistency.
-
-> +	ldr	x2, =(CPTR_EL2_TTA)
-> +	msr	cptr_el2, x2
-
-I'd feel more comfortable if you read cptr_el2, cleared the TFP bit, and
-wrote the result back. Loading an arbitrary value is likely to cause
-bugs in the long run.
-
-> +
-> +	mrs	x0, tpidr_el2
-> +
-> +	ldr	x2, [x0, #VCPU_HOST_CONTEXT]
-> +	kern_hyp_va x2
-> +
-> +	add	x3, x2, #CPU_GP_REG_OFFSET(CPU_FP_REGS)
-> +	fpsimd_save x3, 1
-> +
-> +	add	x2, x0, #VCPU_CONTEXT
-> +	add	x3, x2, #CPU_GP_REG_OFFSET(CPU_FP_REGS)
-> +	fpsimd_restore x3, 1
-
-That's quite a lot of code expansion (fpsimd_{save,restore} are macros).
-
-How about saving x4 and lr on the stack, and doing a a bl in each case?
-That would be consistent with the rest of the code (well, what's left of
-it).
-
-> +
-> +	pop	x2, x3
-> +	pop	x0, x1
-> +
-> +	eret
+> Kevin, can you refresh the patch?
+> It would be nice to:
+> 1. set SPARE2 only for Odroid (of_machine_is_compatible()),
+> 2. extend the explanation.
 > 
->  /*
->   * u64 __kvm_vcpu_run(struct kvm_vcpu *vcpu);
-> @@ -932,7 +974,6 @@ ENTRY(__kvm_vcpu_run)
->  	kern_hyp_va x2
 > 
->  	save_host_regs
-> -	bl __save_fpsimd
->  	bl __save_sysregs
-> 
->  	compute_debug_state 1f
-> @@ -948,7 +989,6 @@ ENTRY(__kvm_vcpu_run)
->  	add	x2, x0, #VCPU_CONTEXT
-> 
->  	bl __restore_sysregs
-> -	bl __restore_fpsimd
-> 
->  	skip_debug_state x3, 1f
->  	bl	__restore_debug
-> @@ -967,7 +1007,9 @@ __kvm_vcpu_return:
->  	add	x2, x0, #VCPU_CONTEXT
-> 
->  	save_guest_regs
-> +	skip_fpsimd_state x3, 1f
->  	bl __save_fpsimd
-> +1:
->  	bl __save_sysregs
-> 
->  	skip_debug_state x3, 1f
-> @@ -986,8 +1028,11 @@ __kvm_vcpu_return:
->  	kern_hyp_va x2
-> 
->  	bl __restore_sysregs
-> -	bl __restore_fpsimd
-> 
-> +	/* Disable cptr VFP/SIMD access bit, skip restore if VFP not accessed */
-> +	skip_fpsimd_state_reset x3, 1f
-> +	bl __restore_fpsimd
-> +1:
-
-Neither the macro name (skip_fpsimd_state_reset) nor the comment make it
-clear that it is also re-enabling access to the trace registers.
-
-I'd rather see:
-
-	skip_fpsimd_state x3, 1f
-	bl __restore_fpsimd
-1:
-	/* Clear FPSIMD and Trace trapping */
-	msr	cptr_el2, xzr
-
->  	skip_debug_state x3, 1f
->  	// Clear the dirty flag for the next run, as all the state has
->  	// already been saved. Note that we nuke the whole 64bit word.
-> @@ -1166,6 +1211,10 @@ el1_sync:					// Guest trapped into EL2
->  	mrs	x1, esr_el2
->  	lsr	x2, x1, #ESR_ELx_EC_SHIFT
-> 
-> +	/* Guest accessed VFP/SIMD registers, save host, restore Guest */
-> +	cmp	x2, #ESR_ELx_EC_FP_ASIMD
-> +	b.eq	switch_to_guest_vfp
-> +
-
-I'd prefer you moved that hunk to el1_trap, where we handle all the
-traps coming from the guest.
-
->  	cmp	x2, #ESR_ELx_EC_HVC64
->  	b.ne	el1_trap
-> 
-
-Thanks,
-
-	M.
--- 
-Jazz is not dead. It just smells funny...
+> Best regards,
+> Krzysztof
