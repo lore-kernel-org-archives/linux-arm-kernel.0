@@ -1,13 +1,13 @@
 From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Tue, 16 Jun 2015 02:42:42 +0300
-Subject: [PATCH v2 1/2] ARM: shmobile: r8a7790: add EtherAVB clocks
+Date: Tue, 16 Jun 2015 02:43:51 +0300
+Subject: [PATCH v2 2/2] ARM: shmobile: r8a7790: add EtherAVB DT support
 In-Reply-To: <2857896.YA1bBSQVkA@wasted.cogentembedded.com>
 References: <2857896.YA1bBSQVkA@wasted.cogentembedded.com>
-Message-ID: <3547940.lZD6YNB6hA@wasted.cogentembedded.com>
+Message-ID: <5039206.91vH9hDYGY@wasted.cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the EtherAVB clock to the R8A7790 device tree.
+Define the generic R8A7790 part of the EtherAVB device node. 
 
 Based on original patch by Mitsuhiro Kimura <mitsuhiro.kimura.kc@renesas.com>.
 
@@ -15,49 +15,30 @@ Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
 
 ---
 Changes in version 2:
-- fixed the order of the clock property values;
+- changed the "compatible" property to match the driver;
 - refreshed the patch.
 
- arch/arm/boot/dts/r8a7790.dtsi            |   10 ++++++----
- include/dt-bindings/clock/r8a7790-clock.h |    1 +
- 2 files changed, 7 insertions(+), 4 deletions(-)
+ arch/arm/boot/dts/r8a7790.dtsi |   10 ++++++++++
+ 1 file changed, 10 insertions(+)
 
 Index: renesas/arch/arm/boot/dts/r8a7790.dtsi
 ===================================================================
 --- renesas.orig/arch/arm/boot/dts/r8a7790.dtsi
 +++ renesas/arch/arm/boot/dts/r8a7790.dtsi
-@@ -1249,16 +1249,18 @@
- 			compatible = "renesas,r8a7790-mstp-clocks", "renesas,cpg-mstp-clocks";
- 			reg = <0 0xe6150990 0 4>, <0 0xe61509a0 0 4>;
- 			clocks = <&hp_clk>, <&zg_clk>, <&zg_clk>, <&zg_clk>,
--			         <&zg_clk>, <&p_clk>, <&zs_clk>, <&zs_clk>;
-+			         <&zg_clk>, <&hp_clk>, <&p_clk>, <&zs_clk>,
-+				 <&zs_clk>;
- 			#clock-cells = <1>;
- 			clock-indices = <
- 				R8A7790_CLK_MLB R8A7790_CLK_VIN3 R8A7790_CLK_VIN2
--				R8A7790_CLK_VIN1 R8A7790_CLK_VIN0 R8A7790_CLK_ETHER
-+				R8A7790_CLK_VIN1 R8A7790_CLK_VIN0
-+				R8A7790_CLK_ETHERAVB R8A7790_CLK_ETHER
- 				R8A7790_CLK_SATA1 R8A7790_CLK_SATA0
- 			>;
- 			clock-output-names =
--				"mlb", "vin3", "vin2", "vin1", "vin0", "ether",
--				"sata1", "sata0";
-+				"mlb", "vin3", "vin2", "vin1", "vin0",
-+				"etheravb", "ether", "sata1", "sata0";
- 		};
- 		mstp9_clks: mstp9_clks at e6150994 {
- 			compatible = "renesas,r8a7790-mstp-clocks", "renesas,cpg-mstp-clocks";
-Index: renesas/include/dt-bindings/clock/r8a7790-clock.h
-===================================================================
---- renesas.orig/include/dt-bindings/clock/r8a7790-clock.h
-+++ renesas/include/dt-bindings/clock/r8a7790-clock.h
-@@ -108,6 +108,7 @@
- #define R8A7790_CLK_VIN2		9
- #define R8A7790_CLK_VIN1		10
- #define R8A7790_CLK_VIN0		11
-+#define R8A7790_CLK_ETHERAVB		12
- #define R8A7790_CLK_ETHER		13
- #define R8A7790_CLK_SATA1		14
- #define R8A7790_CLK_SATA0		15
+@@ -671,6 +671,16 @@
+ 		status = "disabled";
+ 	};
+ 
++	avb: ethernet at e6800000 {
++		compatible = "renesas,etheravb-r8a7790";
++		reg = <0 0xe6800000 0 0x800>, <0 0xee0e8000 0 0x4000>;
++		interrupts = <0 163 IRQ_TYPE_LEVEL_HIGH>;
++		clocks = <&mstp8_clks R8A7790_CLK_ETHERAVB>;
++		#address-cells = <1>;
++		#size-cells = <0>;
++		status = "disabled";
++	};
++
+ 	sata0: sata at ee300000 {
+ 		compatible = "renesas,sata-r8a7790";
+ 		reg = <0 0xee300000 0 0x2000>;
