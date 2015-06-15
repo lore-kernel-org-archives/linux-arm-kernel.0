@@ -1,57 +1,83 @@
-From: vaibhav.hiremath@linaro.org (Vaibhav Hiremath)
-Date: Mon, 15 Jun 2015 21:19:59 +0530
-Subject: [PATCH-V2 12/12] Documentation: binding: add sclk adjustment
- properties to i2c-pxa
-In-Reply-To: <1434383399-2370-1-git-send-email-vaibhav.hiremath@linaro.org>
-References: <vaibhav.hiremath@linaro.org>
- <1434383399-2370-1-git-send-email-vaibhav.hiremath@linaro.org>
-Message-ID: <1434383399-2370-13-git-send-email-vaibhav.hiremath@linaro.org>
+From: simon.guinot@sequanux.org (Simon Guinot)
+Date: Mon, 15 Jun 2015 17:54:41 +0200
+Subject: [PATCH 1/2] net: mvneta: introduce tx_csum_limit property
+In-Reply-To: <20150615164952.4f2f4dab@free-electrons.com>
+References: <1434378443-23029-1-git-send-email-simon.guinot@sequanux.org>
+ <1434378443-23029-2-git-send-email-simon.guinot@sequanux.org>
+ <20150615164952.4f2f4dab@free-electrons.com>
+Message-ID: <20150615155440.GS4853@kw.sim.vm.gnt>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-With addition of PXA910 family of devices, the TWSI module supports
-new feature which allows us to adjust SCLK.
-With DT properties i2c-pxa driver takes input configuration
-in nsec and converts it to respective bit-fields,
+On Mon, Jun 15, 2015 at 04:49:52PM +0200, Thomas Petazzoni wrote:
+> Dear Simon Guinot,
+> 
+> On Mon, 15 Jun 2015 16:27:22 +0200, Simon Guinot wrote:
+> > This patch introduces the tx_csum_limit DT property. This allows to
+> > configure the maximum frame size for which the Ethernet controller is
+> > able to perform TCP/IP checksumming. If MTU is set to a value greater
+> > than tx_csum_limit, then the features NETIF_F_IP_CSUM and NETIF_F_TSO
+> > are disabled.
+> > 
+> > Signed-off-by: Simon Guinot <simon.guinot@sequanux.org>
+> > Cc: <stable@vger.kernel.org> # v3.8+
+> > ---
+> >  .../bindings/net/marvell-armada-370-neta.txt       |  3 +++
+> >  drivers/net/ethernet/marvell/mvneta.c              | 25 +++++++++++++++++++++-
+> >  2 files changed, 27 insertions(+), 1 deletion(-)
+> > 
+> > diff --git a/Documentation/devicetree/bindings/net/marvell-armada-370-neta.txt b/Documentation/devicetree/bindings/net/marvell-armada-370-neta.txt
+> > index 750d577e8083..db48c83ff0f5 100644
+> > --- a/Documentation/devicetree/bindings/net/marvell-armada-370-neta.txt
+> > +++ b/Documentation/devicetree/bindings/net/marvell-armada-370-neta.txt
+> > @@ -8,6 +8,9 @@ Required properties:
+> >  - phy-mode: See ethernet.txt file in the same directory
+> >  - clocks: a pointer to the reference clock for this device.
+> >  
+> > +Optional properties:
+> > +- tx_csum_limit: max tx packet size for hardware checksum.
+> 
+> To be honest, I'd prefer to have a different compatible string to
+> identify the two different versions of the hardware block.
+> 
+> The current armada-370-neta would limit the HW checksumming features to
+> packets smaller than 1600 bytes, while a new armada-xp-neta would not
+> have this limit.
 
- - i2c-sclk-low-time-ns : SCLK low time (tlow)
-   This property is used along with mode selection.
- - i2c-sclk-high-time-ns : SCLK high time (thigh)
+This was also my first idea. But by doing this, we take the risk of
+losing the HW checksumming feature with jumbo frames on some currently
+working Armada XP setups. This may happen for example if a user is able
+to update the kernel but not the on-board DTB. In order to fix a feature
+on a SoC, we are breaking the DTB-kernel compatibility for the very same
+feature on an another SoC. I am not sure it is OK.
 
-Signed-off-by: Vaibhav Hiremath <vaibhav.hiremath@linaro.org>
----
- Documentation/devicetree/bindings/i2c/i2c-pxa.txt | 13 +++++++++++++
- 1 file changed, 13 insertions(+)
+Are you comfortable with that ?
 
-diff --git a/Documentation/devicetree/bindings/i2c/i2c-pxa.txt b/Documentation/devicetree/bindings/i2c/i2c-pxa.txt
-index 9657db5..0fafd91 100644
---- a/Documentation/devicetree/bindings/i2c/i2c-pxa.txt
-+++ b/Documentation/devicetree/bindings/i2c/i2c-pxa.txt
-@@ -23,12 +23,25 @@ Optional properties :
-  - i2c-disable-after-xfer : If set, driver will disable I2C module
-    after msg xfer and enable it again before xfer.
- 
-+   (Applicable to PXA910 family):
-+
-+ - i2c-sclk-low-time-ns : SCLK low time (tlow), for standard/fast/high
-+   speed mode.
-+   This property is used along with mode selection. Driver uses this property
-+   to set low/high time for standard and fast speed mode, as counter bit-field
-+   is same for both.
-+ - i2c-sclk-high-time-ns : SCLK high time (thigh), Used in case of high speed
-+   mode.
-+
- Examples:
- 	twsi1: i2c at d4011000 {
- 		compatible = "mrvl,mmp-twsi";
- 		reg = <0xd4011000 0x1000>;
- 		interrupts = <7>;
- 		mrvl,i2c-fast-mode;
-+
-+		i2c-sclk-low-time-ns = <988>;
-+		i2c-sclk-high-time-ns = <988>;
- 	};
- 	
- 	twsi2: i2c at d4025000 {
--- 
-1.9.1
+By adding a new optional property, at least we ensure that the things
+will still work the same way with Armada-XP SoCs (for every DTB-Linux
+combination).
+
+Please, let me know if you still want to introduce a compatible string
+for Armada-XP.
+
+Simon
+
+> 
+> Yet another case where we should have used "armada-<soc>-neta",
+> "armada-370-neta" in the .dtsi files for each SoC so that such
+> modification do not require changing the Device Trees.
+> 
+> Best regards,
+> 
+> Thomas
+> -- 
+> Thomas Petazzoni, CTO, Free Electrons
+> Embedded Linux, Kernel and Android engineering
+> http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 181 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150615/9b2f02fe/attachment.sig>
