@@ -1,36 +1,35 @@
-From: stefan.wahren@i2se.com (Stefan Wahren)
-Date: Mon, 15 Jun 2015 04:37:00 +0000
-Subject: [PATCH] phy: phy-mxs-usb: suspend to RAM causes NULL pointer
- dereference
-Message-ID: <1434343020-29604-1-git-send-email-stefan.wahren@i2se.com>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Mon, 15 Jun 2015 13:54:29 +0900
+Subject: [PATCH] pinctrl: samsung: Remove old unused defines
+Message-ID: <1434344069-19133-1-git-send-email-k.kozlowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Triggering suspend to RAM via sysfs on a i.MX28 causes a NULL pointer
-dereference. This patch avoids the oops in mxs_phy_get_vbus_status()
-by aborting since there is no syscon available.
+Since 9a2c1c3b91aa ("pinctrl: samsung: Allow grouping multiple
+pinmux/pinconf nodes") the defines for GPIO group and function names are
+not used anywhere in the driver.
 
-Signed-off-by: Stefan Wahren <stefan.wahren@i2se.com>
-Fixes: efdbd3a5d6e ("usb: phy: mxs: do not set PWD.RXPWD1PT1 for low speed connection")
-CC: <stable@vger.kernel.org> # 4.0
-Acked-by: Peter Chen <peter.chen@freescale.com>
+Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+Inspired-by: Dan Carpenter <dan.carpenter@oracle.com>
 ---
- drivers/usb/phy/phy-mxs-usb.c |    3 +++
- 1 file changed, 3 insertions(+)
+ drivers/pinctrl/samsung/pinctrl-samsung.c | 5 -----
+ 1 file changed, 5 deletions(-)
 
-diff --git a/drivers/usb/phy/phy-mxs-usb.c b/drivers/usb/phy/phy-mxs-usb.c
-index 8f7cb06..3fcc048 100644
---- a/drivers/usb/phy/phy-mxs-usb.c
-+++ b/drivers/usb/phy/phy-mxs-usb.c
-@@ -217,6 +217,9 @@ static bool mxs_phy_get_vbus_status(struct mxs_phy *mxs_phy)
- {
- 	unsigned int vbus_value;
+diff --git a/drivers/pinctrl/samsung/pinctrl-samsung.c b/drivers/pinctrl/samsung/pinctrl-samsung.c
+index 3dd5a3b2ac62..c760bf43d116 100644
+--- a/drivers/pinctrl/samsung/pinctrl-samsung.c
++++ b/drivers/pinctrl/samsung/pinctrl-samsung.c
+@@ -33,11 +33,6 @@
+ #include "../core.h"
+ #include "pinctrl-samsung.h"
  
-+	if (!mxs_phy->regmap_anatop)
-+		return false;
-+
- 	if (mxs_phy->port_id == 0)
- 		regmap_read(mxs_phy->regmap_anatop,
- 			ANADIG_USB1_VBUS_DET_STAT,
+-#define GROUP_SUFFIX		"-grp"
+-#define GSUFFIX_LEN		sizeof(GROUP_SUFFIX)
+-#define FUNCTION_SUFFIX		"-mux"
+-#define FSUFFIX_LEN		sizeof(FUNCTION_SUFFIX)
+-
+ /* list of all possible config options supported */
+ static struct pin_config {
+ 	const char *property;
 -- 
-1.7.9.5
+1.9.1
