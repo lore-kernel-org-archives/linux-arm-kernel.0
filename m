@@ -1,46 +1,35 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Mon, 15 Jun 2015 14:03:35 +0900
-Subject: MAINTAINERS: pinctrl: Outdated email of Thomas Abraham
-Message-ID: <557E5CA7.7080202@samsung.com>
+From: kishon@ti.com (Kishon Vijay Abraham I)
+Date: Mon, 15 Jun 2015 10:57:07 +0530
+Subject: [PATCH v5 0/7] phy-sun4i-usb: Add OTG and newer SoC support
+In-Reply-To: <1434199071-22127-1-git-send-email-hdegoede@redhat.com>
+References: <1434199071-22127-1-git-send-email-hdegoede@redhat.com>
+Message-ID: <557E622B.50401@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Thomas,
+Hi,
 
+On Saturday 13 June 2015 06:07 PM, Hans de Goede wrote:
+> Hi Kishon,
+>
+> Here is a patch series with all my oustanding phy-sun4i-usb changes pending
+> for merging into 4.3.
+>
+> This includes the 5th iteration of the OTG support addition, now with the
+> extcon provider support addition split-out into a new patch and ported to
+> the extcon API changes which are queued up for 4.2 from :
+>
+> http://git.kernel.org/cgit/linux/kernel/git/chanwoo/extcon.git/log/?h=extcon-next-v4.2
+>
+> which already merged in GKH's char-misc branch for 4.2, this means that
+> this series now depends on those changes.
+>
+> Other than that this is a resend of some of the other feature addition
+> patches I recently send rebased on top of v5 of the OTG support.
+>
+> Please merge this series for 4.3.
 
-The email mentioned in maintainers:
-=============
-	PIN CONTROLLER - SAMSUNG
-	M:      Tomasz Figa <tomasz.figa@gmail.com>
-	M:      Thomas Abraham <thomas.abraham@linaro.org>
-=============
+sure, will queue once -rc1 is tagged.
 
-
-bounces with not existing recipient for very long time:
-=============
-Delivery to the following recipient failed permanently:
-
-     thomas.abraham at linaro.org
-
-Technical details of permanent failure:
-Google tried to deliver your message, but it was rejected by the server
-for the recipient domain linaro.org by aspmx.l.google.com.
-[2607:f8b0:4002:c03::1a].
-
-The error that the other server returned was:
-550-5.1.1 The email account that you tried to reach does not exist.
-Please try
-550-5.1.1 double-checking the recipient's email address for typos or
-550-5.1.1 unnecessary spaces. Learn more at
-550 5.1.1 https://support.google.com/mail/answer/6596 p64si4527340ywb.22
-- gsmtp
-=============
-
-Could you provide a patch changing the email address for maintaining the
-pinctrl to a new, valid one?
-If not then perhaps this entry should be moved to CREDITS leaving only
-Tomasz Figa as maintainer?
-
-
-Best regards,
-Krzysztof
+Thanks
+Kishon
