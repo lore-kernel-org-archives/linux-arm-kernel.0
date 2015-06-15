@@ -1,91 +1,159 @@
 From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Mon, 15 Jun 2015 19:27:15 +0200
-Subject: [PATCH linux-next 1/2] mfd: devicetree: add bindings for Atmel
- Flexcom
-In-Reply-To: <9cb26f42aaba9629e48d3def610ce90aa8574e06.1434386119.git.cyrille.pitchen@atmel.com>
+Date: Mon, 15 Jun 2015 19:32:57 +0200
+Subject: [PATCH linux-next 2/2] mfd: flexcom: add a driver for Atmel
+ Flexible Serial Communication Unit
+In-Reply-To: <e85ceae28a0b382b12b809ac7cca891fcb7ac846.1434386119.git.cyrille.pitchen@atmel.com>
 References: <cover.1434386119.git.cyrille.pitchen@atmel.com>
- <9cb26f42aaba9629e48d3def610ce90aa8574e06.1434386119.git.cyrille.pitchen@atmel.com>
-Message-ID: <20150615192715.31a387c8@bbrezillon>
+ <e85ceae28a0b382b12b809ac7cca891fcb7ac846.1434386119.git.cyrille.pitchen@atmel.com>
+Message-ID: <20150615193257.42c9df3d@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Cyrille,
-
-On Mon, 15 Jun 2015 18:38:04 +0200
+On Mon, 15 Jun 2015 18:38:05 +0200
 Cyrille Pitchen <cyrille.pitchen@atmel.com> wrote:
 
+> This driver supports the new Atmel Flexcom. The Flexcom is a wrapper which
+> integrates one SPI controller, one I2C controller and one USART. Only one
+> function can be enabled at a time. This driver selects the function once
+> for all, when the Flexcom is probed, according to the value of the new
+> "atmel,flexcom-mode" device tree property.
+> 
+> This driver has chosen to present the Flexcom to the system as a MFD so
+> the implementation is seamless for the existing Atmel SPI, I2C and USART
+> drivers.
+> 
+> Also the Flexcom embeds FIFOs: the latest patches of the SPI, I2C and
+> USART drivers take advantage of this new feature.
+> 
 > Signed-off-by: Cyrille Pitchen <cyrille.pitchen@atmel.com>
 > ---
->  .../devicetree/bindings/mfd/atmel-flexcom.txt      | 28 ++++++++++++++++++++++
->  1 file changed, 28 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/mfd/atmel-flexcom.txt
+>  drivers/mfd/Kconfig         | 11 +++++
+>  drivers/mfd/Makefile        |  1 +
+>  drivers/mfd/atmel-flexcom.c | 97 +++++++++++++++++++++++++++++++++++++++++++++
+>  3 files changed, 109 insertions(+)
+>  create mode 100644 drivers/mfd/atmel-flexcom.c
 > 
-> diff --git a/Documentation/devicetree/bindings/mfd/atmel-flexcom.txt b/Documentation/devicetree/bindings/mfd/atmel-flexcom.txt
+> diff --git a/drivers/mfd/Kconfig b/drivers/mfd/Kconfig
+> index aefbbbf..4aebf08 100644
+> --- a/drivers/mfd/Kconfig
+> +++ b/drivers/mfd/Kconfig
+> @@ -60,6 +60,17 @@ config MFD_AAT2870_CORE
+>  	  additional drivers must be enabled in order to use the
+>  	  functionality of the device.
+>  
+> +config MFD_ATMEL_FLEXCOM
+> +	tristate "Atmel Flexcom (Flexible Serial Communication Unit)"
+> +	select MFD_CORE
+> +	depends on OF
+> +	help
+> +	  Select this to get support for Atmel Flexcom. This is a wrapper
+> +	  which embeds a SPI controller, a I2C controller and a USART. Only
+> +	  one function can be used at a time. The choice is done at boot time
+> +	  by the probe function of this MFD driver according to a device tree
+> +	  property.
+> +
+>  config MFD_ATMEL_HLCDC
+>  	tristate "Atmel HLCDC (High-end LCD Controller)"
+>  	select MFD_CORE
+> diff --git a/drivers/mfd/Makefile b/drivers/mfd/Makefile
+> index ea40e07..0705eb2 100644
+> --- a/drivers/mfd/Makefile
+> +++ b/drivers/mfd/Makefile
+> @@ -160,6 +160,7 @@ obj-$(CONFIG_MFD_SPMI_PMIC)	+= qcom-spmi-pmic.o
+>  obj-$(CONFIG_TPS65911_COMPARATOR)	+= tps65911-comparator.o
+>  obj-$(CONFIG_MFD_TPS65090)	+= tps65090.o
+>  obj-$(CONFIG_MFD_AAT2870_CORE)	+= aat2870-core.o
+> +obj-$(CONFIG_MFD_ATMEL_FLEXCOM)	+= atmel-flexcom.o
+>  obj-$(CONFIG_MFD_ATMEL_HLCDC)	+= atmel-hlcdc.o
+>  obj-$(CONFIG_MFD_INTEL_MSIC)	+= intel_msic.o
+>  obj-$(CONFIG_MFD_PALMAS)	+= palmas.o
+> diff --git a/drivers/mfd/atmel-flexcom.c b/drivers/mfd/atmel-flexcom.c
 > new file mode 100644
-> index 0000000..6b1a32e
+> index 0000000..14c35e6
 > --- /dev/null
-> +++ b/Documentation/devicetree/bindings/mfd/atmel-flexcom.txt
-> @@ -0,0 +1,28 @@
-> +* Device tree bindings for Atmel Flexcom (Flexible Serial Communication Unit)
+> +++ b/drivers/mfd/atmel-flexcom.c
+> @@ -0,0 +1,97 @@
+> +/*
+> + * Driver for Atmel Flexcom
+> + *
+> + * Copyright (C) 2015 Atmel Corporation
+> + *
+> + * Author: Cyrille Pitchen <cyrille.pitchen@atmel.com>
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License as published by
+> + * the Free Software Foundation; either version 2 of the License, or
+> + * (at your option) any later version.
+> + *
+> + */
 > +
-> +The Atmel Flexcom is just a wrapper which embeds a SPI controller, an I2C
-> +controller and an USART. Only one function can be used at a time and is chosen
-> +at boot time according to the device tree.
+> +#include <linux/module.h>
+> +#include <linux/types.h>
+> +#include <linux/kernel.h>
+> +#include <linux/platform_device.h>
+> +#include <linux/of.h>
+> +#include <linux/of_platform.h>
+> +#include <linux/err.h>
+> +#include <linux/io.h>
+> +#include <linux/clk.h>
 > +
-> +Required properties:
-> +- compatible: "atmel,sama5d2-flexcom"
-> +- reg: shall be the offset/length value for Flexcom dedicated I/O registers
-> +  (without USART, TWI or SPI registers).
-> +- clocks: shall be the Flexcom peripheral clock from PMC.
-> +- #address-cells: should be <1>
-> +- #size-cells: should be <1>
-> +- ranges: must be present
-> +- atmel,flexcom-mode: shall be a string among { "spi", "usart", "i2c", "twi" }.
-> +  "i2c" and "twi" are synonymous.
+> +#define FX_MR		0x0
+> +#define FX_RHR		0x10
+> +#define FX_THR		0x20
+> +#define FX_VERSION	0xfc
 > +
-> +Example:
+> +#define FX_MR_NO_COM	0
+> +#define FX_MR_USART	1
+> +#define FX_MR_SPI	2
+> +#define FX_MR_TWI	3
 > +
-> +flx0: flexcom at f8034000 {
-> +	compatible = "atmel,sama5d2-flexcom";
-> +	reg = <0xf8034000 0x200>;
-> +	clocks = <&flx0_clk>;
-> +	#address-cells = <1>;
-> +	#size-cells = <1>;
-> +	ranges;
-> +	atmel,flexcom-mode = "spi";
-> +};
+> +
+> +static int atmel_flexcom_probe(struct platform_device *pdev)
+> +{
+> +	struct clk *clk;
+> +	struct resource *res;
+> +	unsigned char __iomem *map;
+> +	unsigned int version, mr;
+> +	const char *mode;
+> +	int err;
+> +
+> +	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+> +	map = devm_ioremap_resource(&pdev->dev, res);
 
-Since the subdevices are using a set of registers contained by the
-flexcom device I would define it like this:
+If you take the approach I suggested in the DT binding review,
+you shouldn't reserve the whole memory region, just the flexcom
+part(0x0 to 0x200). 
 
-flx0: flexcom at f8034000 {
-	compatible = "atmel,sama5d2-flexcom";
-	reg = <0xf8034000 0x800>;
-	clocks = <&flx0_clk>;
-	#address-cells = <1>;
-	#size-cells = <1>;
-	ranges = <0x0 0xf8034000 0x800>;
-	atmel,flexcom-mode = "spi";
+> +	if (IS_ERR(map))
+> +		return PTR_ERR(map);
+> +
+> +	clk = devm_clk_get(&pdev->dev, NULL);
+> +	if (IS_ERR(clk))
+> +		return PTR_ERR(clk);
+> +
+> +	err = of_property_read_string(pdev->dev.of_node,
+> +				      "atmel,flexcom-mode", &mode);
+> +	if (err)
+> +		return err;
+> +
+> +	if (!strcmp(mode, "usart"))
+> +		mr = FX_MR_USART;
+> +	else if (!strcmp(mode, "spi"))
+> +		mr = FX_MR_SPI;
+> +	else if (!strcmp(mode, "twi") || !strcmp(mode, "i2c"))
+> +		mr = FX_MR_TWI;
+> +	else
+> +		return -EINVAL;
+> +
+> +	clk_prepare_enable(clk);
+> +	version = __raw_readl(map + FX_VERSION);
+> +	__raw_writel(mr, map + FX_MR);
+> +	clk_disable_unprepare(clk);
 
-	usart at 200 {
-		reg = <0x200 0x100>;
-		/* ... */
-	};
+Is there a good reason to use the __raw versions of the writel/readl
+functions ?
 
-	spi at 400 {
-		reg = <0x400 0x100>;
-		/* ... */
-	};
 
-	i2c at 600 {
-		reg = <0x600 0x100>;
-		/* ... */
-	};
-};
-
-Best Regards,
-
-Boris
 
 -- 
 Boris Brezillon, Free Electrons
