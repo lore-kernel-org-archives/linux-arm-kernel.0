@@ -1,60 +1,47 @@
-From: linux.amoon@gmail.com (Anand Moon)
-Date: Mon, 15 Jun 2015 07:53:26 +0530
-Subject: [PATCHv6 2/4] ARM: dts: exynos5422-odroidxu3: Enable TMU at
- Exynos5422 base
-In-Reply-To: <557E181C.7070209@samsung.com>
-References: <1434277445-5243-1-git-send-email-linux.amoon@gmail.com>
- <1434277445-5243-2-git-send-email-linux.amoon@gmail.com>
- <557E181C.7070209@samsung.com>
-Message-ID: <CANAwSgTOY3MECYLTjgmfSo5WrRuNycSSet2ZDhNTb-=gy8DGYQ@mail.gmail.com>
+From: koro.chen@mediatek.com (Koro Chen)
+Date: Mon, 15 Jun 2015 10:31:45 +0800
+Subject: [PATCH 2/3] ASoC: mediatek: Add machine driver for MAX98090 codec
+In-Reply-To: <20150612131325.GA1921@sirena.org.uk>
+References: <1433946276-25969-1-git-send-email-koro.chen@mediatek.com>
+ <1433946276-25969-3-git-send-email-koro.chen@mediatek.com>
+ <20150612131325.GA1921@sirena.org.uk>
+Message-ID: <1434335505.14980.13.camel@mtksdaap41>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-hi Krzysztof
+On Fri, 2015-06-12 at 14:13 +0100, Mark Brown wrote:
+> On Wed, Jun 10, 2015 at 10:24:35PM +0800, Koro Chen wrote:
+> 
+> > --- /dev/null
+> > +++ b/Documentation/devicetree/bindings/sound/mt8173-max98090.txt
+> > @@ -0,0 +1,17 @@
+> > +MT8173 with MAX98090 CODEC
+> > +
+> > +Required properties:
+> > +- compatible : "mediatek,mt8173-max98090"
+> > +- mediatek,audio-codec: the phandle of the MAX98090 audio codec
+> > +- dvdd-supply : the phandle of regulator to supply 1.2V
+> > +- avdd-supply : the phandle of regulator to supply 1.8V
+> 
+> Why are these supplies part of the machine driver?
+> 
+These are for the codec as you said. I think I should remove all these
+supplies as well as codes in machine drivers, since now the regulators
+are configured during the board's bootloader stage.
 
-On 15 June 2015 at 05:41, Krzysztof Kozlowski <k.kozlowski@samsung.com> wrote:
-> On 14.06.2015 19:24, Anand Moon wrote:
->> This changes enables TMU IP block on the Exynos5422 Odroid-XU3
->> device.
->>
->> Signed-off-by: Anand Moon <linux.amoon@gmail.com>
->> Tested-by: Markus Reichl <m.reichl@fivetechno.de>
->
-> This does not look right.
-> You put this "Tested-by" since beginning of this patchset (v1) but first
-> it was LDO10. Then you proposed LDO18 and now you use LDO7 from my
-> suggestion. Which of this was tested by Markus because I cannot find his
-> emails with it on LKML?
-
-Markus Reichl tested the earlier version with LDO10.
-Commit logs got carry forward by mistake.
-
--Anand Moon
-
->
-> Krzysztof
->
->> Acked-by: Lukasz Majewski <l.majewski@samsung.com>
->> ---
->> Changes rebase on git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung branch for-next
->> Changes from v5: Use LDO7 regulator instead of LD010.
->>
->> The output of LDO18 goes to VDD_EMMC_1V8. This is not regulator for TMU.
->>
->> I think the schematics are missing some of details but it can be deducted that:
->> 1. TEMP SE is supplied by VDD18_TS power domain. It consists of 5
->> pairs of pins (XTSTEST_OUT[0-4], XTSEXT_RES[0-4]).
->> 2. The VDD18_TS01, VDD18_TS23 and VDD18_TS4 are wired to the LDO7 of
->> S2MPS11 PMIC.
->> 3. I confirmed with the Exynos5422 datasheet that these
->> VDD18_TS{01,23,4} supply the XTSTEST pins (OUT and RES).
->>
->> So the LDO7 it is... but before using it there is a caveat. The LDO7
->> is also connected to VDD of MIPI, HDMI and few more. So when you use
->> this regulator in TMU it may be turned off by TMU driver (e.g. during
->> unbind). In such case these other blocks also should be tested and
->> checked whether they take this regulator and enable it.
->> ---
->>  arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi | 25 ++++++++++++++++++++++
->>  1 file changed, 25 insertions(+)
->
+> > +config SND_SOC_MT8173_MAX98090
+> > +	bool "ASoC Audio driver for MT8173 with MAX98090 codec"
+> 
+> Why bool?
+> 
+This should be tristate as Paul mentioned before. I will fix it.
+> > +	codec_node = of_parse_phandle(pdev->dev.of_node,
+> > +				      "mediatek,audio-codec", 0);
+> > +	if (!codec_node) {
+> > +		dev_err(&pdev->dev,
+> > +			"Property 'audio-codec' missing or invalid\n");
+> > +	} else {
+> 
+> Isn't this a fatal error?
+> 
+Thank you and yes it should be fatal, I will fix it.
