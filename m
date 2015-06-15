@@ -1,63 +1,54 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 15 Jun 2015 12:01:36 +0100
-Subject: [PATCH v2 1/2] ARM: Add cpu_resume_arm() for firmwares that
- resume in ARM state
-In-Reply-To: <20150615063324.GY18985@pengutronix.de>
-References: <1433272378-8470-1-git-send-email-sboyd@codeaurora.org>
- <1433272378-8470-2-git-send-email-sboyd@codeaurora.org>
- <20150615063324.GY18985@pengutronix.de>
-Message-ID: <20150615110136.GJ7557@n2100.arm.linux.org.uk>
+From: andre.przywara@arm.com (Andre Przywara)
+Date: Mon, 15 Jun 2015 12:09:59 +0100
+Subject: [PATCH] serial/amba-pl011: Disable interrupts around TX softirq
+In-Reply-To: <20150613003945.GA10941@kroah.com>
+References: <1433513267-24163-1-git-send-email-Dave.Martin@arm.com>
+ <20150613003945.GA10941@kroah.com>
+Message-ID: <557EB287.300@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 15, 2015 at 08:33:25AM +0200, Uwe Kleine-K?nig wrote:
-> Hello,
-> > +	.arm
-> > +ENTRY(cpu_resume_arm)
-> > + THUMB(	badr	r9, 1f		)	@ Kernel is entered in ARM.
-> > + THUMB(	bx	r9		)	@ If this is a Thumb-2 kernel,
-> > + THUMB(	.thumb			)	@ switch to Thumb now.
-> > + THUMB(1:			)
-> >  ENTRY(cpu_resume)
-> >  ARM_BE8(setend be)			@ ensure we are in BE mode
-> >  #ifdef CONFIG_ARM_VIRT_EXT
-> this patch is in next as 51ac91b7f6b11b0da55ac93885ee7b864865bcb1 and
-> breaks efm32_defconfig. The exact error message is:
+Hi Greg,
+
+On 06/13/2015 01:39 AM, Greg Kroah-Hartman wrote:
+> On Fri, Jun 05, 2015 at 03:07:47PM +0100, Dave Martin wrote:
+>> pl011_tx_softirq() currently uses spin_{,un}lock(), which are not
+>> sufficient to inhibit pl011_int() from being triggered by a local
+>> IRQ and trying to re-take the same lock.  This can lead to
+>> deadlocks.
+>>
+>> This patch uses the _irq() locking variants instead to ensure that
+>> pl011_int() handling for a given port is deferred until any
+>> pl011_tx_softirq() work for that port is complete.
+>>
+>> Signed-off-by: Dave Martin <Dave.Martin@arm.com>
+>> Tested-by: Robin Murphy <robin.murphy@arm.com>
+>> Cc: stable <stable@vger.kernel.org> # 4.1
+>> ---
+>>
+>> Another candidate for v4.1 if possible (sorry!) -- I thought this change
+>> was already in, but it went astray when I was refactoring.
 > 
->   AS      arch/arm/kernel/sleep.o
-> arch/arm/kernel/sleep.S: Assembler messages:
-> arch/arm/kernel/sleep.S:121: Error: selected processor does not support ARM opcodes
-> arch/arm/kernel/sleep.S:123: Error: bad instruction `badr r9,1f'
-> arch/arm/kernel/sleep.S:124: Error: attempt to use an ARM instruction on a Thumb-only processor -- `bx r9'
-> scripts/Makefile.build:294: recipe for target 'arch/arm/kernel/sleep.o' failed
-> make[3]: *** [arch/arm/kernel/sleep.o] Error 1
+> Too late for 4.1, sorry.
 
-Don't get me wrong, the build testing which goes on is really great, but
-there's now a problem with all this.
+So if I get this correctly, we go from "some characters lost from
+systemd messages" behaviour in 4.0 to "may deadlock" in 4.1 now?
+Is that right?
 
-There needs to be coordination between the people doing the build tests
-to ensure that we don't "tire out" those who read the emails with different
-groups of people reporting the same problem days after it was first
-discovered, and even worse, days after it's been fixed.
+I understand that you are reluctant to take this patch this late in the
+game, but wouldn't it actually be better now to revert PL011 to the
+state of 4.0 to avoid ending up with worse-than-4.0 behaviour in the 4.1
+release?
+We could still backport the solution ending up in 4.2-rc to 4.1.x.
 
-The worst thing to do is to report build regressions on Monday for a tree
-which was created on Thursday - by the time Monday comes around, projects
-such as the 0-day builder have had plenty of time to find them.
+Cheers,
+Andre.
 
-Remember, the linux-next tree which is published on Friday (Austrailian
-time) is a result of git trees snapshotted around midnight on Thursday.
-
-So, if you're going to build an old linux-next tree, before you report any
-problems, please check whether other build systems have already reported
-them.  If you've gone to the trouble of tracking down the commit which
-caused it, and therefore the likely git tree, check whether a fix has
-already been merged.  Or maybe wait until the post-weekend linux-next is
-published...
-
-(The problem you're referring to was fixed and pushed out on Friday -
-which seems to be a regular thing that happens with problems you've
-reported on Mondays...)
-
--- 
-FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
-according to speedtest.net.
+> This doesn't apply to my tty-next branch,
+> otherwise I would have queued it up there.  Care to redo it and mark it
+> for -stable, like I did above, and resend it?
+> 
+> thanks,
+> 
+> greg k-h
+> 
