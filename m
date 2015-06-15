@@ -1,109 +1,142 @@
 From: stillcompiling@gmail.com (Joshua Clayton)
-Date: Mon, 15 Jun 2015 09:18:59 -0700
-Subject: [PATCH 04/10] dma: sdma-imx set dma script address directly
+Date: Mon, 15 Jun 2015 09:18:58 -0700
+Subject: [PATCH 03/10] dma: imx-sdma: use a container_of function
 In-Reply-To: <1434385144-4432-1-git-send-email-stillcompiling@gmail.com>
 References: <1434385144-4432-1-git-send-email-stillcompiling@gmail.com>
-Message-ID: <1434385144-4432-5-git-send-email-stillcompiling@gmail.com>
+Message-ID: <1434385144-4432-4-git-send-email-stillcompiling@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-SDMA uses different firmware scripts per device type and per
-direction, but only one script per channel may be used at a time.
-By moving the call to sdma_get_pc() into get_context, it will
-be called any time the dma direction may change.
-
-Then there is no need to store multiple script addresses, so those
-may be removed from struct sdma_channel.
-
-We also add an error message should setting the script fail to
-find a valid script address.
+Rather than including a struct sdma_engine pointer in
+each sdma_channel, introduce to_sdma_engine() to get
+the parent struct.
 
 Signed-off-by: Joshua Clayton <stillcompiling@gmail.com>
 ---
- drivers/dma/imx-sdma.c | 34 ++++++++++++++++------------------
- 1 file changed, 16 insertions(+), 18 deletions(-)
+ drivers/dma/imx-sdma.c | 27 +++++++++++++++------------
+ 1 file changed, 15 insertions(+), 12 deletions(-)
 
 diff --git a/drivers/dma/imx-sdma.c b/drivers/dma/imx-sdma.c
-index 7c8703f..fdf88c4 100644
+index c255664..7c8703f 100644
 --- a/drivers/dma/imx-sdma.c
 +++ b/drivers/dma/imx-sdma.c
-@@ -257,7 +257,6 @@ struct sdma_channel {
- 	unsigned int			period_len;
- 	struct sdma_buffer_descriptor	*bd;
- 	dma_addr_t			bd_phys;
--	unsigned int			pc_from_device, pc_to_device;
- 	unsigned long			flags;
- 	dma_addr_t			per_address;
- 	unsigned long			event_mask[2];
-@@ -688,8 +687,8 @@ static irqreturn_t sdma_int_handler(int irq, void *dev_id)
- /*
-  * sets the pc of SDMA script according to the peripheral type
+@@ -246,7 +246,6 @@ struct sdma_engine;
+  * @num_bd		max NUM_BD. number of descriptors currently handling
   */
--static void sdma_get_pc(struct sdma_channel *sdmac,
--		enum sdma_peripheral_type peripheral_type)
-+static s32 sdma_get_pc(struct sdma_channel *sdmac,
-+		enum dma_transfer_direction direction)
- {
- 	struct sdma_engine *sdma = to_sdma_engine(sdmac);
- 	int per_2_emi = 0, emi_2_per = 0;
-@@ -699,10 +698,7 @@ static void sdma_get_pc(struct sdma_channel *sdmac,
- 	 */
- 	int per_2_per = 0, emi_2_emi = 0;
- 
--	sdmac->pc_from_device = 0;
--	sdmac->pc_to_device = 0;
--
--	switch (peripheral_type) {
-+	switch (sdmac->peripheral_type) {
- 	case IMX_DMATYPE_MEMORY:
- 		emi_2_emi = sdma->script_addrs->ap_2_ap_addr;
- 		break;
-@@ -774,8 +770,14 @@ static void sdma_get_pc(struct sdma_channel *sdmac,
- 		break;
- 	}
- 
--	sdmac->pc_from_device = per_2_emi;
--	sdmac->pc_to_device = emi_2_per;
-+	switch (direction) {
-+	case DMA_MEM_TO_DEV:
-+		return emi_2_per;
-+	case DMA_DEV_TO_MEM:
-+		return per_2_emi;
-+	default:
-+		return 0;
-+	}
+ struct sdma_channel {
+-	struct sdma_engine		*sdma;
+ 	unsigned int			channel;
+ 	enum dma_transfer_direction		direction;
+ 	enum sdma_peripheral_type	peripheral_type;
+@@ -467,6 +466,11 @@ static inline u32 chnenbl_ofs(struct sdma_engine *sdma, unsigned int event)
+ 	return chnenbl0 + event * 4;
  }
  
++static struct sdma_engine *to_sdma_engine(struct sdma_channel *sdmac)
++{
++	return container_of(sdmac, struct sdma_engine, channel[sdmac->channel]);
++}
++
+ static int sdma_config_ownership(struct sdma_engine *sdma, int channel,
+ 		bool event_override, bool mcu_override, bool dsp_override)
+ {
+@@ -687,7 +691,7 @@ static irqreturn_t sdma_int_handler(int irq, void *dev_id)
+ static void sdma_get_pc(struct sdma_channel *sdmac,
+ 		enum sdma_peripheral_type peripheral_type)
+ {
+-	struct sdma_engine *sdma = sdmac->sdma;
++	struct sdma_engine *sdma = to_sdma_engine(sdmac);
+ 	int per_2_emi = 0, emi_2_per = 0;
+ 	/*
+ 	 * These are needed once we start to support transfers between
+@@ -776,7 +780,7 @@ static void sdma_get_pc(struct sdma_channel *sdmac,
+ 
  static int sdma_load_context(struct sdma_channel *sdmac)
-@@ -788,15 +790,13 @@ static int sdma_load_context(struct sdma_channel *sdmac)
+ {
+-	struct sdma_engine *sdma = sdmac->sdma;
++	struct sdma_engine *sdma = to_sdma_engine(sdmac);
+ 	int channel = sdmac->channel;
+ 	int load_address;
+ 	struct sdma_context_data *context = sdma->context;
+@@ -836,7 +840,7 @@ static int sdma_config_channel(struct sdma_channel *sdmac)
+ {
  	int ret;
- 	unsigned long flags;
+ 	int channel = sdmac->channel;
+-	struct sdma_engine *sdma = sdmac->sdma;
++	struct sdma_engine *sdma = to_sdma_engine(sdmac);
  
--	if (sdmac->direction == DMA_DEV_TO_MEM) {
--		load_address = sdmac->pc_from_device;
--	} else {
--		load_address = sdmac->pc_to_device;
-+	load_address = sdma_get_pc(sdmac, sdmac->direction);
-+	if (!load_address) {
-+		dev_err(sdma->dev, "SDMA channel %d: No dma script found\n",
-+			channel);
-+		return -EFAULT;
- 	}
+ 	sdma_disable_channel(sdma, channel);
  
--	if (load_address < 0)
--		return load_address;
--
- 	dev_dbg(sdma->dev, "load_address = %d\n", load_address);
- 	dev_dbg(sdma->dev, "wml = 0x%08x\n", (u32)sdmac->watermark_level);
- 	dev_dbg(sdma->dev, "shp_addr = 0x%08x\n", sdmac->shp_addr);
-@@ -867,8 +867,6 @@ static int sdma_config_channel(struct sdma_channel *sdmac)
- 		break;
- 	}
+@@ -906,7 +910,7 @@ static int sdma_set_channel_priority(struct sdma_engine *sdma, int channel,
  
--	sdma_get_pc(sdmac, sdmac->peripheral_type);
--
- 	if ((sdmac->peripheral_type != IMX_DMATYPE_MEMORY) &&
- 			(sdmac->peripheral_type != IMX_DMATYPE_DSP)) {
- 		/* Handle multiple event channels differently */
+ static int sdma_request_channel(struct sdma_channel *sdmac)
+ {
+-	struct sdma_engine *sdma = sdmac->sdma;
++	struct sdma_engine *sdma = to_sdma_engine(sdmac);
+ 	int channel = sdmac->channel;
+ 	int ret = -EBUSY;
+ 
+@@ -950,7 +954,7 @@ static dma_cookie_t sdma_tx_submit(struct dma_async_tx_descriptor *tx)
+ static int sdma_alloc_chan_resources(struct dma_chan *chan)
+ {
+ 	struct sdma_channel *sdmac = to_sdma_chan(chan);
+-	struct sdma_engine *sdma = sdmac->sdma;
++	struct sdma_engine *sdma = to_sdma_engine(sdmac);
+ 	struct imx_dma_data *data = chan->private;
+ 	int prio, ret;
+ 
+@@ -995,7 +999,7 @@ static int sdma_alloc_chan_resources(struct dma_chan *chan)
+ static void sdma_free_chan_resources(struct dma_chan *chan)
+ {
+ 	struct sdma_channel *sdmac = to_sdma_chan(chan);
+-	struct sdma_engine *sdma = sdmac->sdma;
++	struct sdma_engine *sdma = to_sdma_engine(sdmac);
+ 	int channel = sdmac->channel;
+ 
+ 	sdma_disable_channel(sdma, channel);
+@@ -1022,7 +1026,7 @@ static struct dma_async_tx_descriptor *sdma_prep_slave_sg(
+ 		unsigned long flags, void *context)
+ {
+ 	struct sdma_channel *sdmac = to_sdma_chan(chan);
+-	struct sdma_engine *sdma = sdmac->sdma;
++	struct sdma_engine *sdma = to_sdma_engine(sdmac);
+ 	int ret, i, count;
+ 	int channel = sdmac->channel;
+ 	struct scatterlist *sg;
+@@ -1123,7 +1127,7 @@ static struct dma_async_tx_descriptor *sdma_prep_dma_cyclic(
+ 		unsigned long flags)
+ {
+ 	struct sdma_channel *sdmac = to_sdma_chan(chan);
+-	struct sdma_engine *sdma = sdmac->sdma;
++	struct sdma_engine *sdma = to_sdma_engine(sdmac);
+ 	int num_periods = buf_len / period_len;
+ 	int channel = sdmac->channel;
+ 	int ret, i = 0, buf = 0;
+@@ -1201,7 +1205,7 @@ static int sdma_control(struct dma_chan *chan, enum dma_ctrl_cmd cmd,
+ 		unsigned long arg)
+ {
+ 	struct sdma_channel *sdmac = to_sdma_chan(chan);
+-	struct sdma_engine *sdma = sdmac->sdma;
++	struct sdma_engine *sdma = to_sdma_engine(sdmac);
+ 	struct dma_slave_config *dmaengine_cfg = (void *)arg;
+ 
+ 	switch (cmd) {
+@@ -1250,7 +1254,7 @@ static enum dma_status sdma_tx_status(struct dma_chan *chan,
+ static void sdma_issue_pending(struct dma_chan *chan)
+ {
+ 	struct sdma_channel *sdmac = to_sdma_chan(chan);
+-	struct sdma_engine *sdma = sdmac->sdma;
++	struct sdma_engine *sdma = to_sdma_engine(sdmac);
+ 
+ 	if (sdmac->status == DMA_IN_PROGRESS)
+ 		sdma_enable_channel(sdma, sdmac->channel);
+@@ -1539,7 +1543,6 @@ static int sdma_probe(struct platform_device *pdev)
+ 	for (i = 0; i < MAX_DMA_CHANNELS; i++) {
+ 		struct sdma_channel *sdmac = &sdma->channel[i];
+ 
+-		sdmac->sdma = sdma;
+ 		spin_lock_init(&sdmac->lock);
+ 
+ 		sdmac->chan.device = &sdma->dma_device;
 -- 
 2.1.4
