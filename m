@@ -1,47 +1,61 @@
 From: linux.amoon@gmail.com (Anand Moon)
-Date: Mon, 15 Jun 2015 12:23:20 +0930
-Subject: [PATCHv7 1/4] ARM: dts: exynos5422-odroidxu3: Add pwm-fan node
-Message-ID: <1434336803-4132-1-git-send-email-linux.amoon@gmail.com>
+Date: Mon, 15 Jun 2015 12:23:21 +0930
+Subject: [PATCHv7 2/4] ARM: dts: exynos5422-odroidxu3: Enable TMU at
+ Exynos5422 base
+In-Reply-To: <1434336803-4132-1-git-send-email-linux.amoon@gmail.com>
+References: <1434336803-4132-1-git-send-email-linux.amoon@gmail.com>
+Message-ID: <1434336803-4132-2-git-send-email-linux.amoon@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add pwm-fan node to the Odroid-XU3 board.
+This changes enables TMU IP block on the Exynos5422 Odroid-XU3
+device.
 
 Signed-off-by: Anand Moon <linux.amoon@gmail.com>
-Tested-by: Markus Reichl <m.reichl@fivetechno.de>
 Acked-by: Lukasz Majewski <l.majewski@samsung.com>
-Acked-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
 ---
- arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi | 10 ++++++++++
- 1 file changed, 10 insertions(+)
+Changes rebase on git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung branch for-next
+Changes from v5 and v6: Use LDO7 regulator instead of LDO10 regulator to control TMU.
+	Fixed the commit log.
+---
+ arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi | 25 ++++++++++++++++++++++
+ 1 file changed, 25 insertions(+)
 
 diff --git a/arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi b/arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi
-index 8adf455..17e6a9a 100644
+index 17e6a9a..96d894e 100644
 --- a/arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi
 +++ b/arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi
-@@ -107,6 +107,15 @@
- 			clocks = <&i2s0 CLK_I2S_CDCLK>;
- 		};
- 	};
-+
-+	fan0: pwm-fan {
-+		compatible = "pwm-fan";
-+		pwms = <&pwm 0 20972 0>;
-+		cooling-min-state = <0>;
-+		cooling-max-state = <3>;
-+		#cooling-cells = <2>;
-+		cooling-levels = <0 130 170 230>;
-+	};
- };
- 
- &clock_audss {
-@@ -461,6 +470,7 @@
- 	 */
- 	pinctrl-0 = <&pwm0_out &pwm1_out &pwm2_out &pwm3_out>;
- 	pinctrl-names = "default";
-+	samsung,pwm-outputs = <0>;
+@@ -474,6 +474,31 @@
  	status = "okay";
  };
  
++&tmu_cpu0 {
++	vtmu-supply = <&ldo7_reg>;
++	status = "okay";
++};
++
++&tmu_cpu1 {
++	vtmu-supply = <&ldo7_reg>;
++	status = "okay";
++};
++
++&tmu_cpu2 {
++	vtmu-supply = <&ldo7_reg>;
++	status = "okay";
++};
++
++&tmu_cpu3 {
++	vtmu-supply = <&ldo7_reg>;
++	status = "okay";
++};
++
++&tmu_gpu {
++	vtmu-supply = <&ldo7_reg>;
++	status = "okay";
++};
++
+ &rtc {
+ 	status = "okay";
+ 	clocks = <&clock CLK_RTC>, <&s2mps11_osc S2MPS11_CLK_AP>;
 -- 
 2.4.3
