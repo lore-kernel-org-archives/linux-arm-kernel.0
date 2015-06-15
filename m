@@ -1,35 +1,31 @@
-From: mars.cheng@mediatek.com (Mars Cheng)
-Date: Mon, 15 Jun 2015 11:08:45 +0800
-Subject: [Patch 0/2] Add mt6580 basic chip support
-In-Reply-To: <1433319533-24803-1-git-send-email-mars.cheng@mediatek.com>
-References: <1433319533-24803-1-git-send-email-mars.cheng@mediatek.com>
-Message-ID: <1434337725.21703.2.camel@mtkswgap22>
+From: maninder1.s@samsung.com (Maninder Singh)
+Date: Mon, 15 Jun 2015 08:45:44 +0530
+Subject: [PATCH 1/1] arm/hw_breakpoint.c: remove unnecessary header
+Message-ID: <"000001d0a719$92ad5b40$b80811c0$@s"@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi all
+Header <asm/kdebug.h> is not needed for arm,
+removing the same.
 
-May I know if I miss anything to let this patch be reviewed?
-I will do my best to fix the problems.
+Signed-off-by: Maninder Singh <maninder1.s@samsung.com>
+Reviewed-by: Vaneet Narang <v.narang@samsung.com>
+---
+ arch/arm/kernel/hw_breakpoint.c |    1 -
+ 1 files changed, 0 insertions(+), 1 deletions(-)
 
-Thanks a lot.
-
-On Wed, 2015-06-03 at 16:18 +0800, Mars Cheng wrote:
-> This series add support to mediatek's new SoC, mt6580, a 4-core CA7.
-> Only basic I/O, including interrupt, timer & uart.
-> 
-> Mars Cheng (2):
->   Document: DT: Add bindings for mediatek MT6580 SoC Platform
->   ARM: dts: mediatek: add mt6580 basic support
-> 
->  Documentation/devicetree/bindings/arm/mediatek.txt |   4 +
->  arch/arm/boot/dts/Makefile                         |   1 +
->  arch/arm/boot/dts/mt6580-evbp1.dts                 |  34 ++++++
->  arch/arm/boot/dts/mt6580.dtsi                      | 130 +++++++++++++++++++++
->  4 files changed, 169 insertions(+)
->  create mode 100644 arch/arm/boot/dts/mt6580-evbp1.dts
->  create mode 100644 arch/arm/boot/dts/mt6580.dtsi
-> 
-> --
-> 1.8.1.1.dirty
-> 
+diff --git a/arch/arm/kernel/hw_breakpoint.c
+b/arch/arm/kernel/hw_breakpoint.c
+index dc7d0a9..6284779 100644
+--- a/arch/arm/kernel/hw_breakpoint.c
++++ b/arch/arm/kernel/hw_breakpoint.c
+@@ -35,7 +35,6 @@
+ #include <asm/cputype.h>
+ #include <asm/current.h>
+ #include <asm/hw_breakpoint.h>
+-#include <asm/kdebug.h>
+ #include <asm/traps.h>
+ 
+ /* Breakpoint currently in use for each BRP. */
+-- 
+1.7.1
