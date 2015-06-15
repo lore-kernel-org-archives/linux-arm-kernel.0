@@ -1,54 +1,37 @@
-From: andre.przywara@arm.com (Andre Przywara)
-Date: Mon, 15 Jun 2015 12:09:59 +0100
-Subject: [PATCH] serial/amba-pl011: Disable interrupts around TX softirq
-In-Reply-To: <20150613003945.GA10941@kroah.com>
-References: <1433513267-24163-1-git-send-email-Dave.Martin@arm.com>
- <20150613003945.GA10941@kroah.com>
-Message-ID: <557EB287.300@arm.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 15 Jun 2015 12:11:03 +0100
+Subject: [PATCH] ARM: mm: enable L1 prefetch on Cortex-A9
+In-Reply-To: <1434023550-20147-1-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1434023550-20147-1-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <20150615111103.GL7557@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Greg,
-
-On 06/13/2015 01:39 AM, Greg Kroah-Hartman wrote:
-> On Fri, Jun 05, 2015 at 03:07:47PM +0100, Dave Martin wrote:
->> pl011_tx_softirq() currently uses spin_{,un}lock(), which are not
->> sufficient to inhibit pl011_int() from being triggered by a local
->> IRQ and trying to re-take the same lock.  This can lead to
->> deadlocks.
->>
->> This patch uses the _irq() locking variants instead to ensure that
->> pl011_int() handling for a given port is deferred until any
->> pl011_tx_softirq() work for that port is complete.
->>
->> Signed-off-by: Dave Martin <Dave.Martin@arm.com>
->> Tested-by: Robin Murphy <robin.murphy@arm.com>
->> Cc: stable <stable@vger.kernel.org> # 4.1
->> ---
->>
->> Another candidate for v4.1 if possible (sorry!) -- I thought this change
->> was already in, but it went astray when I was refactoring.
+On Thu, Jun 11, 2015 at 01:52:30PM +0200, Thomas Petazzoni wrote:
+> The Cortex-A9 has a L1 prefetch capability documented at
+> http://infocenter.arm.com/help/index.jsp?topic=/com.arm.doc.ddi0388e/Chdejhgd.html:
 > 
-> Too late for 4.1, sorry.
-
-So if I get this correctly, we go from "some characters lost from
-systemd messages" behaviour in 4.0 to "may deadlock" in 4.1 now?
-Is that right?
-
-I understand that you are reluctant to take this patch this late in the
-game, but wouldn't it actually be better now to revert PL011 to the
-state of 4.0 to avoid ending up with worse-than-4.0 behaviour in the 4.1
-release?
-We could still backport the solution ending up in 4.2-rc to 4.1.x.
-
-Cheers,
-Andre.
-
-> This doesn't apply to my tty-next branch,
-> otherwise I would have queued it up there.  Care to redo it and mark it
-> for -stable, like I did above, and resend it?
+>   The Cortex-A9 data cache implements an automatic prefetcher that
+>   monitors cache misses done by the processor. This unit can monitor
+>   and prefetch two independent data streams. It can be activated in
+>   software using a CP15 Auxiliary Control Register bit. See Auxiliary
+>   Control Register.
 > 
-> thanks,
+> This commit enables this L1 prefetch feature unconditionally on all
+> Cortex-A9 by setting bit 2 in the Auxiliary Control CP15
+> register. Note that since this bit only exists on Cortex-A9 but not on
+> Cortex-A5 or Cortex-R7, we separate the handling of Cortex-A9 from the
+> one of those two other cores.
 > 
-> greg k-h
-> 
+> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+
+I'd prefer not to take this until after the next merge window, because I
+don't want to deal with conflicts that this may cause with other branches
+in my tree.
+
+We're at -rc8 now, only a week away from -final, now is not really the
+time to be taking new code into git trees anyway.
+
+-- 
+FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
+according to speedtest.net.
