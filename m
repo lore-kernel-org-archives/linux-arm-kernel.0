@@ -1,44 +1,72 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Mon, 15 Jun 2015 16:49:35 +0100
-Subject: [PATCH v3 2/3] spi: atmel: update DT bindings documentation
-In-Reply-To: <5579B95F.9060307@atmel.com>
-References: <cover.1433850255.git.cyrille.pitchen@atmel.com>
- <ce7c16faafaa24f5bb711115c0eea1f8992d08c3.1433850255.git.cyrille.pitchen@atmel.com>
- <20150609172531.GM14071@sirena.org.uk> <5579B95F.9060307@atmel.com>
-Message-ID: <20150615154935.GT18309@sirena.org.uk>
+From: vaibhav.hiremath@linaro.org (Vaibhav Hiremath)
+Date: Mon, 15 Jun 2015 21:19:47 +0530
+Subject: [PATCH-V2 00/12] i2c: pxa: Fixes,
+ cleanup and support for pxa910 family
+In-Reply-To: <vaibhav.hiremath@linaro.org>
+References: <vaibhav.hiremath@linaro.org>
+Message-ID: <1434383399-2370-1-git-send-email-vaibhav.hiremath@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 11, 2015 at 06:37:51PM +0200, Cyrille Pitchen wrote:
-> Le 09/06/2015 19:25, Mark Brown a ?crit :
-> > On Tue, Jun 09, 2015 at 01:53:53PM +0200, Cyrille Pitchen wrote:
-> >> - add new property "atmel,fifo-size"
+This patch series fixes bugs/warnings, cleans up the code and adds
+support for PXA910 family of devices to PXA I2C bus driver.
 
-> > Why is this a property and not something we know from the IP version?
+There has been one attempt made sometime back in 2012 to upstream
+some of the patches from below list, but did not get follow up later.
+I have consolidated all the patches, cleaned them up, splited into
+logical changes, added new patches and submitting it now.
 
-> Please be aware that the VERSION register can not be used to guess the
-> size of FIFOs. Indeed, for a given hardware version, the SPI controller
-> can be integrated on Atmel SoCs with different FIFO sizes. Also the
-> "atmel,fifo-size" property is optional as older SPI controllers don't
-> embed FIFO at all.
+I tried to maintain authorship & Signoff except where I did some
+significant changes to the code/logic.
 
-...
+Link to previous post:
+http://permalink.gmane.org/gmane.linux.drivers.i2c/13557
 
-> Finally, on a given SoC, there can be several instances of the SPI
-> controller with different FIFO sizes. This explain why we'd rather use a
-> dedicated DT property than use the "compatible" property.
+Testing:
+  - Basic testing on PMIC device on I2C-0 interface
+  - Boot tested on platform based on PXA1928
+  - Probe is successfully passing
+  - Read few registers of PMIC (RTC, ID, etc...) during boot
 
-> I hope these pieces of information will help to clarify this point.
-> Of course, we are open to other suggestions.
 
-Ugh, what a wonderfully consistent hardware design :(  Please make it
-clear in the documentation what is going on here, this looks like an
-obvious bug in the DT binding - a very common pattern for bugs is to do
-version quirks like this as properties.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150615/9adc5a69/attachment.sig>
+V1 => V2:
+========
+Link to V1 - http://lists.infradead.org/pipermail/linux-arm-kernel/2015-May/347012.html
+
+  - Fixed all comments from "Robert Jarzmik" and "Wolfram Sang"
+  - Dropped Patch
+	05/12: using core bus reset implementation - under work.
+               Will submit shortly.
+	08/12: NAKed and dropped
+  - Seperated DT binding patch from driver changes, for easy merge
+
+
+Leilei Shang (1):
+  i2c: pxa: keep i2c irq ON in suspend
+
+Shouming Wang (1):
+  i2c: pxa: Return I2C_RETRY when timeout in pio mode
+
+Vaibhav Hiremath (8):
+  i2c: pxa: No need to set slave addr for i2c master mode reset
+  i2c: pxa: Reset i2c controller on timeout in interrupt and pio mode
+  i2c: pxa: Update debug function to dump more info on error
+  i2c:pxa: Use devm_ variants in probe function
+  Documentation: binding: add new property 'disable_after_xfer' to
+    i2c-pxa
+  i2c: pxa: Add support for pxa910/988 & new configuration features
+  i2c: pxa: Add ILCR (tLow & tHigh) configuration support
+  Documentation: binding: add sclk adjustment properties to i2c-pxa
+
+Yi Zhang (1):
+  i2c: pxa: enable/disable i2c module across msg xfer
+
+Yipeng Yao (1):
+  i2c: pxa: Remove compile warnning in 64bit mode
+
+ Documentation/devicetree/bindings/i2c/i2c-pxa.txt |  18 ++
+ drivers/i2c/busses/i2c-pxa.c                      | 267 ++++++++++++++++------
+ 2 files changed, 220 insertions(+), 65 deletions(-)
+
+-- 
+1.9.1
