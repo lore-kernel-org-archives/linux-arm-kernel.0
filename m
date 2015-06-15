@@ -1,45 +1,57 @@
 From: chaotian.jing@mediatek.com (Chaotian Jing)
-Date: Mon, 15 Jun 2015 19:20:46 +0800
-Subject: [PATCH v6 0/7] Add Mediatek MMC driver 
-Message-ID: <1434367253-26577-1-git-send-email-chaotian.jing@mediatek.com>
+Date: Mon, 15 Jun 2015 19:20:47 +0800
+Subject: [PATCH v6 1/7] mmc: dt-bindings: add Mediatek MMC bindings
+In-Reply-To: <1434367253-26577-1-git-send-email-chaotian.jing@mediatek.com>
+References: <1434367253-26577-1-git-send-email-chaotian.jing@mediatek.com>
+Message-ID: <1434367253-26577-2-git-send-email-chaotian.jing@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This series enables MMC support on the MT8135/MT8173 platform.
-MT8135 has 5 MMC controllers and MT8173 has 4 MMC controllers.
+Document the device-tree binding of Mediatek MMC host
 
-Changes base on Ulf's comments
-Make hclk mandatory in the driver code
-Change host->hclk to host->src_clk_freq
-Add linux/pm.h
-
-Chaotian Jing (3):
-  mmc: dt-bindings: add Mediatek MMC bindings
-  mmc: mediatek: Add Mediatek MMC driver
-  mmc: mediatek: Add PM support for MMC driver
-
-Eddie Huang (2):
-  arm64: dts: mediatek: Add MT8173 MMC dts
-  arm64: mediatek: Add Mediatek MMC support in defconfig
-
-Yingjoe Chen (2):
-  ARM: mediatek: dts: Add emmc support to mt8135
-  ARM: multi_v7_defconfig: Enable Mediatek MMC support multi-v7
-
- Documentation/devicetree/bindings/mmc/mtk-sd.txt |   32 +
- arch/arm/boot/dts/mt8135-evbp1.dts               |  158 +++
- arch/arm/boot/dts/mt8135.dtsi                    |   55 +
- arch/arm/configs/multi_v7_defconfig              |    1 +
- arch/arm64/boot/dts/mediatek/mt8173-evb.dts      |  126 ++
- arch/arm64/boot/dts/mediatek/mt8173.dtsi         |   45 +-
- arch/arm64/configs/defconfig                     |    1 +
- drivers/mmc/host/Kconfig                         |    8 +
- drivers/mmc/host/Makefile                        |    1 +
- drivers/mmc/host/mtk-sd.c                        | 1461 ++++++++++++++++++++++
- include/linux/mmc/core.h                         |    1 +
- 11 files changed, 1888 insertions(+), 1 deletion(-)
+Signed-off-by: Chaotian Jing <chaotian.jing@mediatek.com>
+---
+ Documentation/devicetree/bindings/mmc/mtk-sd.txt | 32 ++++++++++++++++++++++++
+ 1 file changed, 32 insertions(+)
  create mode 100644 Documentation/devicetree/bindings/mmc/mtk-sd.txt
- create mode 100644 drivers/mmc/host/mtk-sd.c
 
+diff --git a/Documentation/devicetree/bindings/mmc/mtk-sd.txt b/Documentation/devicetree/bindings/mmc/mtk-sd.txt
+new file mode 100644
+index 0000000..a1adfa4
+--- /dev/null
++++ b/Documentation/devicetree/bindings/mmc/mtk-sd.txt
+@@ -0,0 +1,32 @@
++* MTK MMC controller
++
++The MTK  MSDC can act as a MMC controller
++to support MMC, SD, and SDIO types of memory cards.
++
++This file documents differences between the core properties in mmc.txt
++and the properties used by the msdc driver.
++
++Required properties:
++- compatible: Should be "mediatek,mt8173-mmc","mediatek,mt8135-mmc"
++- interrupts: Should contain MSDC interrupt number
++- clocks: MSDC source clock, HCLK
++- clock-names: "source", "hclk"
++- pinctrl-names: should be "default", "state_uhs"
++- pinctrl-0: should contain default/high speed pin ctrl
++- pinctrl-1: should contain uhs mode pin ctrl
++- vmmc-supply: power to the Core
++- vqmmc-supply: power to the IO
++
++Examples:
++mmc0: mmc at 11230000 {
++	compatible = "mediatek,mt8173-mmc", "mediatek,mt8135-mmc";
++	reg = <0 0x11230000 0 0x108>;
++	interrupts = <GIC_SPI 39 IRQ_TYPE_LEVEL_LOW>;
++	vmmc-supply = <&mt6397_vemc_3v3_reg>;
++	vqmmc-supply = <&mt6397_vio18_reg>;
++	clocks = <&pericfg CLK_PERI_MSDC30_0>, <&topckgen CLK_TOP_MSDC50_0_H_SEL>;
++	clock-names = "source", "hclk";
++	pinctrl-names = "default", "state_uhs";
++	pinctrl-0 = <&mmc0_pins_default>;
++	pinctrl-1 = <&mmc0_pins_uhs>;
++};
 -- 
 1.8.1.1.dirty
