@@ -1,62 +1,167 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Mon, 15 Jun 2015 08:33:25 +0200
-Subject: [PATCH v2 1/2] ARM: Add cpu_resume_arm() for firmwares that
- resume in ARM state
-In-Reply-To: <1433272378-8470-2-git-send-email-sboyd@codeaurora.org>
-References: <1433272378-8470-1-git-send-email-sboyd@codeaurora.org>
- <1433272378-8470-2-git-send-email-sboyd@codeaurora.org>
-Message-ID: <20150615063324.GY18985@pengutronix.de>
+From: majun258@huawei.com (majun (F))
+Date: Mon, 15 Jun 2015 15:05:49 +0800
+Subject: [PATCH v2 2/3] IRQ/Gic-V3: Change arm-gic-its to support the
+ Mbigen interrupt
+In-Reply-To: <alpine.DEB.2.11.1506121230320.3786@nanos>
+References: <1434077399-32200-1-git-send-email-majun258@huawei.com>
+ <1434077399-32200-3-git-send-email-majun258@huawei.com>
+ <alpine.DEB.2.11.1506121230320.3786@nanos>
+Message-ID: <557E794D.2080705@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
 
-On Tue, Jun 02, 2015 at 12:12:57PM -0700, Stephen Boyd wrote:
-> Some platforms always enter the kernel in the ARM state even if
-> the kernel is compiled for THUMB2. Add a small wrapper on top of
-> cpu_resume() that switches into THUMB2 state.
+
+? 2015/6/12 18:48, Thomas Gleixner ??:
+> On Fri, 12 Jun 2015, Ma Jun wrote:
 > 
-> This fixes a problem reported by Kevin Hilman on next-20150601
-> where the ifc6410 fails to boot a THUMB2 kernel because the
-> platform's firmware always enters the kernel in ARM mode from
-> deep idle states.
+>> This patch is applied to support the mbigen interrupt.
+>>
+>> As a kind of MSI interrupt controller, the mbigen is used as a child 
+>> domain of ITS domain just like PCI devices.
+>> So the arm-gic-v3-its and related files are changed.
+>>
+>> The chip.c is also changed to check irq_ach before it called.
 > 
-> Reported-by: Kevin Hilman <khilman@linaro.org>
-> Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-> Cc: Lina Iyer <lina.iyer@linaro.org>
-> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+> This patch wants to be split into several:
+> 
+> 1) Changes to the core code
+> 
+> 2) New functionality in the core code
+> 
+> 2) Changes to gic-v3-its
+> 
+> And all patches require proper changelogs which explain WHY these
+> changes are necessary.
+> 
+> We can see which files are changed from the diffstat and the patch
+> ourself. So no point to mention this in the changelog.
+> 
+> But we cannot figure out from looking at the code WHY you think that
+> your approach to solve the problem is the right one.
+> 
+>>  void irq_chip_ack_parent(struct irq_data *data)
+>>  {
+>>  	data = data->parent_data;
+>> -	data->chip->irq_ack(data);
+>> +	if (data->chip->irq_ack)
+>> +		data->chip->irq_ack(data);
+> 
+> Why is this required? Just because? Again, you fail to provide a
+> rationale for the changes to the irq_chip*parent() functions.
+> 
+> Why would you call irq_chip_ack_parent() if that parent does not
+> provide the required functionality in the first place?
+> 
 
-> diff --git a/arch/arm/kernel/sleep.S b/arch/arm/kernel/sleep.S
-> index 76bb3128e135..f37593567ef5 100644
-> --- a/arch/arm/kernel/sleep.S
-> +++ b/arch/arm/kernel/sleep.S
-> @@ -118,6 +118,12 @@ ENDPROC(cpu_resume_after_mmu)
->  
->  	.text
->  	.align
-> +	.arm
-> +ENTRY(cpu_resume_arm)
-> + THUMB(	badr	r9, 1f		)	@ Kernel is entered in ARM.
-> + THUMB(	bx	r9		)	@ If this is a Thumb-2 kernel,
-> + THUMB(	.thumb			)	@ switch to Thumb now.
-> + THUMB(1:			)
->  ENTRY(cpu_resume)
->  ARM_BE8(setend be)			@ ensure we are in BE mode
->  #ifdef CONFIG_ARM_VIRT_EXT
-this patch is in next as 51ac91b7f6b11b0da55ac93885ee7b864865bcb1 and
-breaks efm32_defconfig. The exact error message is:
+Yes, this is not a necessary callback. I will remove this callback
+from mbigen driver.
 
-  AS      arch/arm/kernel/sleep.o
-arch/arm/kernel/sleep.S: Assembler messages:
-arch/arm/kernel/sleep.S:121: Error: selected processor does not support ARM opcodes
-arch/arm/kernel/sleep.S:123: Error: bad instruction `badr r9,1f'
-arch/arm/kernel/sleep.S:124: Error: attempt to use an ARM instruction on a Thumb-only processor -- `bx r9'
-scripts/Makefile.build:294: recipe for target 'arch/arm/kernel/sleep.o' failed
-make[3]: *** [arch/arm/kernel/sleep.o] Error 1
+>>  /*
+>> @@ -363,6 +364,9 @@ struct irq_chip {
+>>  	int		(*irq_request_resources)(struct irq_data *data);
+>>  	void		(*irq_release_resources)(struct irq_data *data);
+>>  
+>> +	void		(*irq_compose_mbigen_msg)(struct irq_data *data, struct mbigen_msg *msg);
+>> +	void		(*irq_write_mbigen_msg)(struct irq_data *data, struct mbigen_msg *msg);
+>> +
+> 
+> What's so special about mbigen to justify extra callbacks which just
+> bloat the data structure for everyone. Why are the msi callbacks not
+> sufficient?
+> 
+> MBI is just another variant of MSI, right?
+> 
+yes,MBI is a kind of MSI which used for non-pci devices.
 
-Best regards
-Uwe
+According to Marc's advice, the irq hierachy structure
+in my patch likes below:
+non-pci devices-->mbigen-->its-->gic
+pci devices     -->msi __/
 
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Eventhough the function *irq_compose_mbigen_msg does
+the same thing as *irq_chip_compose_msi_msg, I still
+added this function. Because I don't want mix the code
+used by msi(pci devices) with the code used by mbigen.
+
+> struct mbigen_msg {
+>        u32     address_lo;
+>        u32     address_hi;
+>        u32     data;
+> };
+> 
+> struct mbigen_msg is just a mindless copy of struct msi_msg:
+> 
+> struct msi_msg {
+>         u32     address_lo;     /* low 32 bits of msi message address */
+>         u32     address_hi;     /* high 32 bits of msi message address */
+>         u32     data;           /* 16 bits of msi message data */
+> };
+> 
+> So what's the point of this?
+>
+
+Based on the same reason, I also added  structure mbigen_msg for
+mbigen using.
+
+>>  	void		(*irq_compose_msi_msg)(struct irq_data *data, struct msi_msg *msg);
+>>  	void		(*irq_write_msi_msg)(struct irq_data *data, struct msi_msg *msg);
+>>  
+> 
+>> +
+>> +/**
+>> + * irq_chip_compose_mbigen_msg - Componse mbigen message for a mbigen irq chip
+>> + * @data:	Pointer to interrupt specific data
+>> + * @msg:	Pointer to the mbigen message
+>> + *
+>> + * For hierarchical domains we find the first chip in the hierarchy
+>> + * which implements the irq_compose_mbigen_msg callback. For non
+>> + * hierarchical we use the top level chip.
+>> + */
+>> +
+>> +int irq_chip_compose_mbigen_msg(struct irq_data *data, struct mbigen_msg *msg)
+>> +{
+>> +	struct irq_data *pos = NULL;
+>> +
+>> +#ifdef	CONFIG_IRQ_DOMAIN_HIERARCHY
+>> +	for (; data; data = data->parent_data)
+>> +#endif
+>> +		if (data->chip && data->chip->irq_compose_mbigen_msg)
+>> +			pos = data;
+>> +	if (!pos)
+>> +		return -ENOSYS;
+>> +
+>> +	pos->chip->irq_compose_mbigen_msg(pos, msg);
+>> +
+>> +	return 0;
+>> +}
+> 
+> Again, this is a completely useless copy of irq_chip_compose_msi_msg().
+> Why can't you just use the existing callbacks and use struct msi_msg
+> for your special chip?
+> 
+As mentioned before, to avoid using the code of msi, i added this
+function.Because they are different domain.
+
+If you don't mind, I can use the irq_chip_compose_msi_msg function in
+mbigen driver instead of irq_chip_compose_mbigen_msg.
+
+> And w/o looking at the mbigen code in detail, I bet it's nothing else
+> than MSI for non PCI devices and contains tons of redundant and copied
+> code, right?
+>
+> Can you please provide a proper description of this mbigen chip and
+> explain WHY you think that it needs all this special hackery?
+> 
+> Thanks,
+> 
+> 	tglx
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> Please read the FAQ at  http://www.tux.org/lkml/
+> 
+> .
+> 
