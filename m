@@ -1,47 +1,47 @@
-From: koro.chen@mediatek.com (Koro Chen)
-Date: Mon, 15 Jun 2015 10:31:45 +0800
-Subject: [PATCH 2/3] ASoC: mediatek: Add machine driver for MAX98090 codec
-In-Reply-To: <20150612131325.GA1921@sirena.org.uk>
-References: <1433946276-25969-1-git-send-email-koro.chen@mediatek.com>
- <1433946276-25969-3-git-send-email-koro.chen@mediatek.com>
- <20150612131325.GA1921@sirena.org.uk>
-Message-ID: <1434335505.14980.13.camel@mtksdaap41>
+From: linux.amoon@gmail.com (Anand Moon)
+Date: Mon, 15 Jun 2015 12:23:20 +0930
+Subject: [PATCHv7 1/4] ARM: dts: exynos5422-odroidxu3: Add pwm-fan node
+Message-ID: <1434336803-4132-1-git-send-email-linux.amoon@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2015-06-12 at 14:13 +0100, Mark Brown wrote:
-> On Wed, Jun 10, 2015 at 10:24:35PM +0800, Koro Chen wrote:
-> 
-> > --- /dev/null
-> > +++ b/Documentation/devicetree/bindings/sound/mt8173-max98090.txt
-> > @@ -0,0 +1,17 @@
-> > +MT8173 with MAX98090 CODEC
-> > +
-> > +Required properties:
-> > +- compatible : "mediatek,mt8173-max98090"
-> > +- mediatek,audio-codec: the phandle of the MAX98090 audio codec
-> > +- dvdd-supply : the phandle of regulator to supply 1.2V
-> > +- avdd-supply : the phandle of regulator to supply 1.8V
-> 
-> Why are these supplies part of the machine driver?
-> 
-These are for the codec as you said. I think I should remove all these
-supplies as well as codes in machine drivers, since now the regulators
-are configured during the board's bootloader stage.
+Add pwm-fan node to the Odroid-XU3 board.
 
-> > +config SND_SOC_MT8173_MAX98090
-> > +	bool "ASoC Audio driver for MT8173 with MAX98090 codec"
-> 
-> Why bool?
-> 
-This should be tristate as Paul mentioned before. I will fix it.
-> > +	codec_node = of_parse_phandle(pdev->dev.of_node,
-> > +				      "mediatek,audio-codec", 0);
-> > +	if (!codec_node) {
-> > +		dev_err(&pdev->dev,
-> > +			"Property 'audio-codec' missing or invalid\n");
-> > +	} else {
-> 
-> Isn't this a fatal error?
-> 
-Thank you and yes it should be fatal, I will fix it.
+Signed-off-by: Anand Moon <linux.amoon@gmail.com>
+Tested-by: Markus Reichl <m.reichl@fivetechno.de>
+Acked-by: Lukasz Majewski <l.majewski@samsung.com>
+Acked-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+---
+ arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi | 10 ++++++++++
+ 1 file changed, 10 insertions(+)
+
+diff --git a/arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi b/arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi
+index 8adf455..17e6a9a 100644
+--- a/arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi
++++ b/arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi
+@@ -107,6 +107,15 @@
+ 			clocks = <&i2s0 CLK_I2S_CDCLK>;
+ 		};
+ 	};
++
++	fan0: pwm-fan {
++		compatible = "pwm-fan";
++		pwms = <&pwm 0 20972 0>;
++		cooling-min-state = <0>;
++		cooling-max-state = <3>;
++		#cooling-cells = <2>;
++		cooling-levels = <0 130 170 230>;
++	};
+ };
+ 
+ &clock_audss {
+@@ -461,6 +470,7 @@
+ 	 */
+ 	pinctrl-0 = <&pwm0_out &pwm1_out &pwm2_out &pwm3_out>;
+ 	pinctrl-names = "default";
++	samsung,pwm-outputs = <0>;
+ 	status = "okay";
+ };
+ 
+-- 
+2.4.3
