@@ -1,256 +1,142 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Mon, 15 Jun 2015 09:45:29 +0200
-Subject: [PATCH 3/5] soc: Mediatek: Add SCPSYS power domain driver
-In-Reply-To: <CAPDyKFpY+agi_JyuP2iGB+7HPoTuwHi2iC1D2YCsGnNfZhevNw@mail.gmail.com>
-References: <1433839623-10804-1-git-send-email-s.hauer@pengutronix.de>
- <1433839623-10804-4-git-send-email-s.hauer@pengutronix.de>
- <CAPDyKFpY+agi_JyuP2iGB+7HPoTuwHi2iC1D2YCsGnNfZhevNw@mail.gmail.com>
-Message-ID: <20150615074529.GQ6325@pengutronix.de>
+From: javier.martinez@collabora.co.uk (Javier Martinez Canillas)
+Date: Mon, 15 Jun 2015 09:46:04 +0200
+Subject: [PATCH v2 1/1] irqchip: exynos-combiner: Save IRQ enable set
+ on suspend
+In-Reply-To: <CAD=FV=UQF+n8AjSXYajqUb0qswcoUrSgnsasV82JaS3dBtNO8Q@mail.gmail.com>
+References: <1434087795-13990-1-git-send-email-javier.martinez@collabora.co.uk>	<557AB00C.5040606@arm.com>	<557AC23D.8040602@collabora.co.uk>	<557AC85E.5070705@arm.com>	<557AD728.7090908@collabora.co.uk>	<557B34A7.4090507@collabora.co.uk>
+ <CAD=FV=UQF+n8AjSXYajqUb0qswcoUrSgnsasV82JaS3dBtNO8Q@mail.gmail.com>
+Message-ID: <557E82BC.7080203@collabora.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ulf,
+Hello Doug,
 
-On Wed, Jun 10, 2015 at 04:47:01PM +0200, Ulf Hansson wrote:
-> On 9 June 2015 at 10:47, Sascha Hauer <s.hauer@pengutronix.de> wrote:
-> > This adds a power domain driver for the Mediatek SCPSYS unit.
-> >
-> > The System Control Processor System (SCPSYS) has several power
-> > management related tasks in the system. The tasks include thermal
-> > measurement, dynamic voltage frequency scaling (DVFS), interrupt
-> > filter and lowlevel sleep control. The System Power Manager (SPM)
-> > inside the SCPSYS is for the MTCMOS power domain control.
-> >
-> > For now this driver only adds power domain support, the more
-> > advanced features are not yet supported. The driver implements
-> > the generic PM domain device tree bindings, the first user will
-> > most likely be the Mediatek AFE audio driver.
-> >
-> > Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
-> > ---
-> >  drivers/soc/mediatek/Kconfig             |   9 +
-> >  drivers/soc/mediatek/Makefile            |   1 +
-> >  drivers/soc/mediatek/mtk-scpsys.c        | 490 +++++++++++++++++++++++++++++++
-> >  include/dt-bindings/power/mt8173-power.h |  15 +
-> >  4 files changed, 515 insertions(+)
-> >  create mode 100644 drivers/soc/mediatek/mtk-scpsys.c
-> >  create mode 100644 include/dt-bindings/power/mt8173-power.h
-> >
-> > diff --git a/drivers/soc/mediatek/Kconfig b/drivers/soc/mediatek/Kconfig
-> > index e4f37a3..9a61b54 100644
-> > --- a/drivers/soc/mediatek/Kconfig
-> > +++ b/drivers/soc/mediatek/Kconfig
-> > @@ -18,3 +18,12 @@ config MTK_PMIC_WRAP
-> >           Say yes here to add support for MediaTek PMIC Wrapper found
-> >           on different MediaTek SoCs. The PMIC wrapper is a proprietary
-> >           hardware to connect the PMIC.
-> > +
-> > +config MTK_SCPSYS
-> > +       bool "MediaTek SCPSYS Support"
-> > +       depends on ARCH_MEDIATEK || COMPILE_TEST
+Thanks a lot for your comments.
+
+On 06/12/2015 10:17 PM, Doug Anderson wrote:
+> Hi,
 > 
-> How about also depending on "PM" and selecting PM_GENERIC_DOMAINS,
-> would that work?
-
-That's what patch 4/5 does. So far all drivers have this in
-arch/arm/mach-*/Kconfig and so did I. However, they probably have it
-under arch/ to have it next to the driver. I'll move it here and drop
-4/5.
-
-> > +static int scpsys_power_on(struct generic_pm_domain *genpd)
-> > +{
-> > +       struct scp_domain *scpd = container_of(genpd, struct scp_domain, genpd);
-> > +       struct scp *scp = scpd->scp;
-> > +       unsigned long timeout;
-> > +       bool expired;
-> > +       void __iomem *ctl_addr = scpd->ctl_addr;
-> > +       u32 sram_pdn_ack = scpd->sram_pdn_ack_bits;
-> > +       u32 val;
-> > +       int ret;
-> > +
-> > +       if (scpd->clk) {
+> On Fri, Jun 12, 2015 at 12:36 PM, Javier Martinez Canillas
+> <javier.martinez@collabora.co.uk> wrote:
+>>>> registers are lost assuming the combiner was powered down, even the
+>>>> status register will be lost and you will not know exactly the wakeup
+>>>> reason right ?
+>>>>
+>>>
+>>> Good question, I didn't find in the documentation I've access to that
+>>> this happen but just found through experimentation that the IRQ enable
+>>> set register values are lost after a resume and that saving/restoring
+>>> the values makes the interrupts to be triggered again.
+>>>
+>>
+>> I'll share here too the findings I mentioned over IRC. As you suggested I
+>> add some printouts and noticed that the ISTRn (Interrupt Status) registers
+>> values are indeed preserved on resume so I can know for example if the
+>> wakeup source was the power gpio-key or cros_ec keyboard. I've checked the
+>> values of the registers against the Exynos manual and they corresponds to
+>> the interrupt sources in each case so the values are correct.
+>>
+>> So as you said, it seems that is not that the IP block loses its state on
+>> S2R but that something is blindly writing the IESRn (Interrupt Enable Set)
+>> registers.
 > 
-> Shouldn't you check for !IS_ERR(scpd->clk) instead?
+> I'll postulate an alternate theory here.  You can tell me if you buy
+> it or if you think I've been out in the sun too long.
+> 
+> Let's say that the interrupt combiner's status registers show the raw
+> status as asserted by whatever is hooked up to the combiner.  This
+> means that even if the combiner got reset we could still read the
+> status register and get the status of the source.  Imagine that the
+> combiner is like a GPIO bank.  If you reset the GPIO bank, you'll lose
+> all kinds of config (input vs. output, edge interrupt status, maybe
+> pulls, etc).  ...but you can still read the state asserted by an
+> external source, right?
+> 
 
-No. scpd->clk is initialized like this:
+That definitely makes a lot of sense to me.
 
-		if (data->clk_id != MT8173_CLK_NONE)
-			scpd->clk = scp->clk[data->clk_id];
+> In this case the combiner's interrupt source is 'EINT 11'.  ...and I'm
+> pretty sure that the controller managine 'EINT 11' _doesn't_ lose
+> power across suspend/resume...
+>
 
-So scpd->clk will never be an ERR_PTR but always NULL if unset.
+Yes, the External Interrupt sources come from the GPIO controller and the
+driver has a similar logic than $subject to save the registers state.
+ 
+> 
+> I'll further bolster my theory by saying that _almost nothing_ in the
+> exynos keeps power across suspend/resume.  The UART?  Nope.  The GPIO
+> controllers?  Nuh-uh.  The GIC?  Sorry, but no.  The clock tree?  It
+> might be nice, but you're out of luck.  ...so it would make me
+> terribly surprised to see the combiner keep power.
+>
+
+It surprised me as well but I didn't think about what you said that the
+combiner interrupt source was restored so the status register could just
+be showing the combiner's input raw status even after the chip was reset.
 
 > 
-> > +               ret = clk_prepare_enable(scpd->clk);
-> > +               if (ret)
-> > +                       return ret;
-> > +       }
-> > +
-> > +       val = readl(ctl_addr);
-> > +       val |= PWR_ON_BIT;
-> > +       writel(val, ctl_addr);
-> > +       val |= PWR_ON_2ND_BIT;
-> > +       writel(val, ctl_addr);
-> > +
-> > +       /* wait until PWR_ACK = 1 */
-> > +       timeout = jiffies + HZ;
-> > +       expired = false;
-> > +       while (1) {
-> > +               ret = scpsys_domain_is_on(scpd);
-> > +               if (ret > 0)
-> > +                       break;
-> > +
-> > +               if (expired) {
-> > +                       ret = -ETIMEDOUT;
-> > +                       goto out;
-> > +               }
-> > +
-> > +               cpu_relax();
-> > +
-> > +               if (time_after(jiffies, timeout))
-> > +                       expired = true;
-> > +       }
-> > +
-> > +       val &= ~PWR_CLK_DIS_BIT;
-> > +       writel(val, ctl_addr);
-> > +
-> > +       val &= ~PWR_ISO_BIT;
-> > +       writel(val, ctl_addr);
-> > +
-> > +       val |= PWR_RST_B_BIT;
-> > +       writel(val, ctl_addr);
-> > +
-> > +       val &= ~scpd->sram_pdn_bits;
-> > +       writel(val, ctl_addr);
-> > +
-> > +       /* wait until SRAM_PDN_ACK all 0 */
-> > +       timeout = jiffies + HZ;
-> > +       expired = false;
-> > +       while (sram_pdn_ack && (readl(ctl_addr) & sram_pdn_ack)) {
-> > +
-> > +               if (expired) {
-> > +                       ret = -ETIMEDOUT;
-> > +                       goto out;
-> > +               }
-> > +
-> > +               cpu_relax();
-> > +
-> > +               if (time_after(jiffies, timeout))
-> > +                       expired = true;
-> > +       }
-> > +
-> > +       if (scpd->bus_prot_mask) {
-> > +               ret = mtk_infracfg_clear_bus_protection(scp->infracfg,
-> > +                               scpd->bus_prot_mask);
-> > +               if (ret)
-> > +                       return ret;
-> > +       }
-> > +
-> > +       return 0;
-> > +out:
+>> To reduce the possible s/w components that could be doing this, I booted a
+>> signed FIT image directly using the RO U-Boot instead of chain loading a
+>> mainline nv-uboot. In this configuration I've the same issue so it seems
+>> that if something is zeroing those registers on S2R, this can't be changed
+>> without void the warranty of these machines.
+>>
+>> I also looked at the downstream ChromiumOS v3.8 tree [0] and I see that
+>> they have a very similar solution than my patch, the IESRn are also saved
+>> but using a notifier for the CPU_PM_ENTER and CPU_PM_EXIT events instead
+>> or registering a syscore ops but the idea is basically the same.
 > 
-> There are no error handling. Especially the clock should be gated.
-
-I'll disable the clock in the error path for the next round. Apart from
-that I think I cannot implement a proper error handling without knowing
-what actually went wrong. I mean I ask the hardware to do something
-and then poll for a bit to get the ack from the hardware. If that ack
-doesn't come I don't know what to do to recover from this state. A I2C
-controller or such could probably be resetted in this situation, but a
-power domain controller?
-
-> > +       writel(val, ctl_addr);
-> > +
-> > +       /* wait until PWR_ACK = 0 */
-> > +       timeout = jiffies + HZ;
-> > +       expired = false;
-> > +       while (1) {
-> > +               ret = scpsys_domain_is_on(scpd);
-> > +               if (ret == 0)
-> > +                       break;
-> > +
-> > +               if (expired) {
-> > +                       ret = -ETIMEDOUT;
-> > +                       goto out;
-> > +               }
-> > +
-> > +               cpu_relax();
-> > +
-> > +               if (time_after(jiffies, timeout))
-> > +                       expired = true;
-> > +       }
-> > +
-> > +       if (scpd->clk)
+> Yup, you can see where kliegs added it in
+> <https://chromium-review.googlesource.com/#/c/27964/>.  As per the
+> comments in that CL, this was probably broken in:
 > 
-> Shouldn't you check for !IS_ERR(scpd->clk) instead?
-
-No, as above.
-
-> > +               return -ENOMEM;
-> > +
-> > +       scp->clk[MT8173_CLK_MM] = devm_clk_get(&pdev->dev, "mm");
-> > +       if (IS_ERR(scp->clk[MT8173_CLK_MM])) {
-> > +               dev_err(&pdev->dev, "Failed to get mm clk: %ld\n",
-> > +                               PTR_ERR(scp->clk[MT8173_CLK_MM]));
+> 063bd6f ARM: EXYNOS: Remove GIC save & restore function
 > 
-> I think a similar error message is already printed by the common clk framework!?
-> 
-> > +               return PTR_ERR(scp->clk[MT8173_CLK_MM]);
-> > +       }
-> > +
-> > +       scp->clk[MT8173_CLK_MFG] = devm_clk_get(&pdev->dev, "mfg");
-> > +       if (IS_ERR(scp->clk[MT8173_CLK_MFG])) {
-> > +               dev_err(&pdev->dev, "Failed to get mfg clk: %ld\n",
-> > +                               PTR_ERR(scp->clk[MT8173_CLK_MFG]));
-> 
-> I think a similar error message is already printed by the common clk framework!?
+>
 
-Yes, will drop these messages.
+Nod, thanks for the pointer.
+
+>> I have to take a look to the U-boot that is shipped on the device, I think
+>> the correct branch is [1] but I'm not sure if that is the correct one.
+> 
+> It is the right one.  If U-Boot were touching this (which would
+> greatly surprise me) it should be here:
+> 
+> arch/arm/include/asm/arch-exynos/cpu.h
+> 
+> ...and it's not.  Doing a grep for '10440000' (the combiner base
+> address) doesn't find anything in U-Boot either, which makes it less
+> likely.  ...and it's even less likely since the amount of code that is
+> in U-Boot that runs at resume time is a very small subset and I'm
+> fairly familiar with it and I would have remembered it touching the
+> combiner.
+>
+
+That explains why I was also not able to find were U-Boot was overwriting
+those registers.
+
+> It's POSSIBLE that the internal ROM in exynos is clobbering this, but
+> as per above it seems crazy unlikely and I think it's just losing
+> power.
+>
+
+Agreed.
 
 > 
-> > +               return PTR_ERR(scp->clk[MT8173_CLK_MFG]);
-> > +       }
-> > +
-> > +       scp->infracfg = syscon_regmap_lookup_by_phandle(pdev->dev.of_node,
-> > +                       "infracfg");
-> > +       if (IS_ERR(scp->infracfg)) {
-> > +               dev_err(&pdev->dev, "Cannot find infracfg controller: %ld\n",
-> > +                               PTR_ERR(scp->infracfg));
-> > +               return PTR_ERR(scp->infracfg);
-> > +       }
-> > +
-> > +       pd_data->num_domains = NUM_DOMAINS;
-> > +
-> > +       for (i = 0; i < NUM_DOMAINS; i++) {
-> > +               struct scp_domain *scpd = &scp->domains[i];
-> > +               struct generic_pm_domain *genpd = &scpd->genpd;
-> > +               const struct scp_domain_data *data = &scp_domain_data[i];
-> > +
-> > +               pd_data->domains[i] = genpd;
-> > +               scpd->scp = scp;
-> > +
-> > +               scpd->sta_mask = data->sta_mask;
-> > +               scpd->ctl_addr = scp->base + data->ctl_offs;
-> > +               scpd->sram_pdn_bits = data->sram_pdn_bits;
-> > +               scpd->sram_pdn_ack_bits = data->sram_pdn_ack_bits;
-> > +               scpd->bus_prot_mask = data->bus_prot_mask;
-> > +               if (data->clk_id != MT8173_CLK_NONE)
-> > +                       scpd->clk = scp->clk[data->clk_id];
-> 
-> This seems odd. Why do you need to have an array of clocks to deal
-> with this assignment?
-> 
-> I don't find that the struct scp->clk pointer is used but from this
-> place. Couldn't you just fetch a reference to the clock to a local
-> struct *clk, without caching it in the struct scp->clk?
+> -Doug
+>
 
-Yes, will change.
+Sudeep, so we may need something like $subject after all from Doug's
+explanations since the combiner chip state is lost during a S2R. I know
+that it adds more duplicated code (others irqchip drivers do the same)
+and it may not scale well if a chip has many registers but is the best
+solution I could came with.
 
-Thanks for reviewing.
+If you have a suggestion for a better alternative, I can give a try and
+write the patch. But I think $subject could also land to fix this issue
+since is a very non intrusive change and later can be changed once the
+irqchip core supports this use case.
 
-Sascha
-
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Best regards,
+Javier
