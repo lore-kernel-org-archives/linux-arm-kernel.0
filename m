@@ -1,33 +1,37 @@
-From: chaotian.jing@mediatek.com (Chaotian Jing)
-Date: Mon, 15 Jun 2015 19:20:52 +0800
-Subject: [PATCH v6 6/7] arm64: mediatek: Add Mediatek MMC support in defconfig
-In-Reply-To: <1434367253-26577-1-git-send-email-chaotian.jing@mediatek.com>
-References: <1434367253-26577-1-git-send-email-chaotian.jing@mediatek.com>
-Message-ID: <1434367253-26577-7-git-send-email-chaotian.jing@mediatek.com>
+From: boris.brezillon@free-electrons.com (Boris Brezillon)
+Date: Mon, 15 Jun 2015 13:25:03 +0200
+Subject: [RESEND PATCH v4 05/14] crypto: marvell/CESA: add TDMA support
+In-Reply-To: <20150615100920.GB32199@gondor.apana.org.au>
+References: <1434093366-14681-1-git-send-email-boris.brezillon@free-electrons.com>
+ <1434093366-14681-6-git-send-email-boris.brezillon@free-electrons.com>
+ <20150615100920.GB32199@gondor.apana.org.au>
+Message-ID: <20150615132503.69ec2cbb@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Eddie Huang <eddie.huang@mediatek.com>
+Hi Herbert,
 
-Add CONFIG_MMC_MTK=y in defconfig
+On Mon, 15 Jun 2015 18:09:20 +0800
+Herbert Xu <herbert@gondor.apana.org.au> wrote:
 
-Signed-off-by: Chaotian Jing <chaotian.jing@mediatek.com>
-Signed-off-by: Eddie Huang <eddie.huang@mediatek.com>
----
- arch/arm64/configs/defconfig | 1 +
- 1 file changed, 1 insertion(+)
+> On Fri, Jun 12, 2015 at 09:15:57AM +0200, Boris Brezillon wrote:
+> >
+> > +	ret = dma_map_sg(cesa_dev->dev, req->src, creq->src_nents,
+> > +			 DMA_TO_DEVICE);
+> > +	if (ret < 0)
+> 
+> This function returns zero on error, not negative.  See
+> Documentation/DMA-API-HOWTO.txt for details.
 
-diff --git a/arch/arm64/configs/defconfig b/arch/arm64/configs/defconfig
-index d3cedb5..78e3234 100644
---- a/arch/arm64/configs/defconfig
-+++ b/arch/arm64/configs/defconfig
-@@ -140,6 +140,7 @@ CONFIG_MMC_ARMMMCI=y
- CONFIG_MMC_SDHCI=y
- CONFIG_MMC_SDHCI_PLTFM=y
- CONFIG_MMC_SPI=y
-+CONFIG_MMC_MTK=y
- CONFIG_RTC_CLASS=y
- CONFIG_RTC_DRV_EFI=y
- CONFIG_RTC_DRV_XGENE=y
+Yep, I'll fix that.
+
+Thanks for pointing this out.
+
+Best Regards,
+
+Boris
+
 -- 
-1.8.1.1.dirty
+Boris Brezillon, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
