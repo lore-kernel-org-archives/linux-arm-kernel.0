@@ -1,161 +1,258 @@
-From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Mon, 15 Jun 2015 19:32:57 +0200
-Subject: [PATCH linux-next 2/2] mfd: flexcom: add a driver for Atmel
- Flexible Serial Communication Unit
-In-Reply-To: <e85ceae28a0b382b12b809ac7cca891fcb7ac846.1434386119.git.cyrille.pitchen@atmel.com>
-References: <cover.1434386119.git.cyrille.pitchen@atmel.com>
- <e85ceae28a0b382b12b809ac7cca891fcb7ac846.1434386119.git.cyrille.pitchen@atmel.com>
-Message-ID: <20150615193257.42c9df3d@bbrezillon>
+From: hsweeten@visionengravers.com (H Hartley Sweeten)
+Date: Mon, 15 Jun 2015 10:35:06 -0700
+Subject: [PATCH] ARM: ep93xx: remove memory configuration options
+Message-ID: <1434389706-58739-1-git-send-email-hsweeten@visionengravers.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 15 Jun 2015 18:38:05 +0200
-Cyrille Pitchen <cyrille.pitchen@atmel.com> wrote:
+The ARM_PATCH_PHYS_VIRT option makes the ep93xx memory configuration
+options obsolete.
 
-> This driver supports the new Atmel Flexcom. The Flexcom is a wrapper which
-> integrates one SPI controller, one I2C controller and one USART. Only one
-> function can be enabled at a time. This driver selects the function once
-> for all, when the Flexcom is probed, according to the value of the new
-> "atmel,flexcom-mode" device tree property.
-> 
-> This driver has chosen to present the Flexcom to the system as a MFD so
-> the implementation is seamless for the existing Atmel SPI, I2C and USART
-> drivers.
-> 
-> Also the Flexcom embeds FIFOs: the latest patches of the SPI, I2C and
-> USART drivers take advantage of this new feature.
-> 
-> Signed-off-by: Cyrille Pitchen <cyrille.pitchen@atmel.com>
-> ---
->  drivers/mfd/Kconfig         | 11 +++++
->  drivers/mfd/Makefile        |  1 +
->  drivers/mfd/atmel-flexcom.c | 97 +++++++++++++++++++++++++++++++++++++++++++++
->  3 files changed, 109 insertions(+)
->  create mode 100644 drivers/mfd/atmel-flexcom.c
-> 
-> diff --git a/drivers/mfd/Kconfig b/drivers/mfd/Kconfig
-> index aefbbbf..4aebf08 100644
-> --- a/drivers/mfd/Kconfig
-> +++ b/drivers/mfd/Kconfig
-> @@ -60,6 +60,17 @@ config MFD_AAT2870_CORE
->  	  additional drivers must be enabled in order to use the
->  	  functionality of the device.
->  
-> +config MFD_ATMEL_FLEXCOM
-> +	tristate "Atmel Flexcom (Flexible Serial Communication Unit)"
-> +	select MFD_CORE
-> +	depends on OF
-> +	help
-> +	  Select this to get support for Atmel Flexcom. This is a wrapper
-> +	  which embeds a SPI controller, a I2C controller and a USART. Only
-> +	  one function can be used at a time. The choice is done at boot time
-> +	  by the probe function of this MFD driver according to a device tree
-> +	  property.
-> +
->  config MFD_ATMEL_HLCDC
->  	tristate "Atmel HLCDC (High-end LCD Controller)"
->  	select MFD_CORE
-> diff --git a/drivers/mfd/Makefile b/drivers/mfd/Makefile
-> index ea40e07..0705eb2 100644
-> --- a/drivers/mfd/Makefile
-> +++ b/drivers/mfd/Makefile
-> @@ -160,6 +160,7 @@ obj-$(CONFIG_MFD_SPMI_PMIC)	+= qcom-spmi-pmic.o
->  obj-$(CONFIG_TPS65911_COMPARATOR)	+= tps65911-comparator.o
->  obj-$(CONFIG_MFD_TPS65090)	+= tps65090.o
->  obj-$(CONFIG_MFD_AAT2870_CORE)	+= aat2870-core.o
-> +obj-$(CONFIG_MFD_ATMEL_FLEXCOM)	+= atmel-flexcom.o
->  obj-$(CONFIG_MFD_ATMEL_HLCDC)	+= atmel-hlcdc.o
->  obj-$(CONFIG_MFD_INTEL_MSIC)	+= intel_msic.o
->  obj-$(CONFIG_MFD_PALMAS)	+= palmas.o
-> diff --git a/drivers/mfd/atmel-flexcom.c b/drivers/mfd/atmel-flexcom.c
-> new file mode 100644
-> index 0000000..14c35e6
-> --- /dev/null
-> +++ b/drivers/mfd/atmel-flexcom.c
-> @@ -0,0 +1,97 @@
-> +/*
-> + * Driver for Atmel Flexcom
-> + *
-> + * Copyright (C) 2015 Atmel Corporation
-> + *
-> + * Author: Cyrille Pitchen <cyrille.pitchen@atmel.com>
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License as published by
-> + * the Free Software Foundation; either version 2 of the License, or
-> + * (at your option) any later version.
-> + *
-> + */
-> +
-> +#include <linux/module.h>
-> +#include <linux/types.h>
-> +#include <linux/kernel.h>
-> +#include <linux/platform_device.h>
-> +#include <linux/of.h>
-> +#include <linux/of_platform.h>
-> +#include <linux/err.h>
-> +#include <linux/io.h>
-> +#include <linux/clk.h>
-> +
-> +#define FX_MR		0x0
-> +#define FX_RHR		0x10
-> +#define FX_THR		0x20
-> +#define FX_VERSION	0xfc
-> +
-> +#define FX_MR_NO_COM	0
-> +#define FX_MR_USART	1
-> +#define FX_MR_SPI	2
-> +#define FX_MR_TWI	3
-> +
-> +
-> +static int atmel_flexcom_probe(struct platform_device *pdev)
-> +{
-> +	struct clk *clk;
-> +	struct resource *res;
-> +	unsigned char __iomem *map;
-> +	unsigned int version, mr;
-> +	const char *mode;
-> +	int err;
-> +
-> +	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-> +	map = devm_ioremap_resource(&pdev->dev, res);
+This allows support for all the ep93xx variations to be built into a
+single kernel.
 
-If you take the approach I suggested in the DT binding review,
-you shouldn't reserve the whole memory region, just the flexcom
-part(0x0 to 0x200). 
+Signed-off-by: H Hartley Sweeten <hsweeten@visionengravers.com>
+---
+ arch/arm/Kconfig                   |  8 +++---
+ arch/arm/mach-ep93xx/Kconfig       | 54 --------------------------------------
+ arch/arm/mach-ep93xx/Makefile.boot | 15 +----------
+ 3 files changed, 4 insertions(+), 73 deletions(-)
 
-> +	if (IS_ERR(map))
-> +		return PTR_ERR(map);
-> +
-> +	clk = devm_clk_get(&pdev->dev, NULL);
-> +	if (IS_ERR(clk))
-> +		return PTR_ERR(clk);
-> +
-> +	err = of_property_read_string(pdev->dev.of_node,
-> +				      "atmel,flexcom-mode", &mode);
-> +	if (err)
-> +		return err;
-> +
-> +	if (!strcmp(mode, "usart"))
-> +		mr = FX_MR_USART;
-> +	else if (!strcmp(mode, "spi"))
-> +		mr = FX_MR_SPI;
-> +	else if (!strcmp(mode, "twi") || !strcmp(mode, "i2c"))
-> +		mr = FX_MR_TWI;
-> +	else
-> +		return -EINVAL;
-> +
-> +	clk_prepare_enable(clk);
-> +	version = __raw_readl(map + FX_VERSION);
-> +	__raw_writel(mr, map + FX_MR);
-> +	clk_disable_unprepare(clk);
-
-Is there a good reason to use the __raw versions of the writel/readl
-functions ?
-
-
-
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index 00623a2..d504acc 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -268,7 +268,6 @@ config PHYS_OFFSET
+ 	depends on !ARM_PATCH_PHYS_VIRT
+ 	default DRAM_BASE if !MMU
+ 	default 0x00000000 if ARCH_EBSA110 || \
+-			EP93XX_SDCE3_SYNC_PHYS_OFFSET || \
+ 			ARCH_FOOTBRIDGE || \
+ 			ARCH_INTEGRATOR || \
+ 			ARCH_IOP13XX || \
+@@ -277,10 +276,7 @@ config PHYS_OFFSET
+ 	default 0x10000000 if ARCH_OMAP1 || ARCH_RPC
+ 	default 0x20000000 if ARCH_S5PV210
+ 	default 0x70000000 if REALVIEW_HIGH_PHYS_OFFSET
+-	default 0xc0000000 if EP93XX_SDCE0_PHYS_OFFSET || ARCH_SA1100
+-	default 0xd0000000 if EP93XX_SDCE1_PHYS_OFFSET
+-	default 0xe0000000 if EP93XX_SDCE2_PHYS_OFFSET
+-	default 0xf0000000 if EP93XX_SDCE3_ASYNC_PHYS_OFFSET
++	default 0xc0000000 if ARCH_SA1100
+ 	help
+ 	  Please provide the physical address corresponding to the
+ 	  location of main memory in your system.
+@@ -419,7 +415,9 @@ config ARCH_EP93XX
+ 	select ARCH_HAS_HOLES_MEMORYMODEL
+ 	select ARCH_REQUIRE_GPIOLIB
+ 	select ARM_AMBA
++	select ARM_PATCH_PHYS_VIRT
+ 	select ARM_VIC
++	select AUTO_ZRELADDR
+ 	select CLKDEV_LOOKUP
+ 	select CLKSRC_MMIO
+ 	select CPU_ARM920T
+diff --git a/arch/arm/mach-ep93xx/Kconfig b/arch/arm/mach-ep93xx/Kconfig
+index bec570a..61a75ca 100644
+--- a/arch/arm/mach-ep93xx/Kconfig
++++ b/arch/arm/mach-ep93xx/Kconfig
+@@ -15,45 +15,8 @@ config CRUNCH
+ 
+ comment "EP93xx Platforms"
+ 
+-choice
+-	prompt "EP93xx first SDRAM bank selection"
+-	default EP93XX_SDCE3_SYNC_PHYS_OFFSET
+-
+-config EP93XX_SDCE3_SYNC_PHYS_OFFSET
+-	bool "0x00000000 - SDCE3/SyncBoot"
+-	help
+-	  Select this option if you want support for EP93xx boards with the
+-	  first SDRAM bank at 0x00000000.
+-
+-config EP93XX_SDCE0_PHYS_OFFSET
+-	bool "0xc0000000 - SDCEO"
+-	help
+-	  Select this option if you want support for EP93xx boards with the
+-	  first SDRAM bank at 0xc0000000.
+-
+-config EP93XX_SDCE1_PHYS_OFFSET
+-	bool "0xd0000000 - SDCE1"
+-	help
+-	  Select this option if you want support for EP93xx boards with the
+-	  first SDRAM bank at 0xd0000000.
+-
+-config EP93XX_SDCE2_PHYS_OFFSET
+-	bool "0xe0000000 - SDCE2"
+-	help
+-	  Select this option if you want support for EP93xx boards with the
+-	  first SDRAM bank at 0xe0000000.
+-
+-config EP93XX_SDCE3_ASYNC_PHYS_OFFSET
+-	bool "0xf0000000 - SDCE3/AsyncBoot"
+-	help
+-	  Select this option if you want support for EP93xx boards with the
+-	  first SDRAM bank at 0xf0000000.
+-
+-endchoice
+-
+ config MACH_ADSSPHERE
+ 	bool "Support ADS Sphere"
+-	depends on EP93XX_SDCE3_SYNC_PHYS_OFFSET
+ 	help
+ 	  Say 'Y' here if you want your kernel to support the ADS
+ 	  Sphere board.
+@@ -63,7 +26,6 @@ config MACH_EDB93XX
+ 
+ config MACH_EDB9301
+ 	bool "Support Cirrus Logic EDB9301"
+-	depends on EP93XX_SDCE3_SYNC_PHYS_OFFSET
+ 	select MACH_EDB93XX
+ 	help
+ 	  Say 'Y' here if you want your kernel to support the Cirrus
+@@ -71,7 +33,6 @@ config MACH_EDB9301
+ 
+ config MACH_EDB9302
+ 	bool "Support Cirrus Logic EDB9302"
+-	depends on EP93XX_SDCE3_SYNC_PHYS_OFFSET
+ 	select MACH_EDB93XX
+ 	help
+ 	  Say 'Y' here if you want your kernel to support the Cirrus
+@@ -79,7 +40,6 @@ config MACH_EDB9302
+ 
+ config MACH_EDB9302A
+ 	bool "Support Cirrus Logic EDB9302A"
+-	depends on EP93XX_SDCE0_PHYS_OFFSET
+ 	select MACH_EDB93XX
+ 	help
+ 	  Say 'Y' here if you want your kernel to support the Cirrus
+@@ -87,7 +47,6 @@ config MACH_EDB9302A
+ 
+ config MACH_EDB9307
+ 	bool "Support Cirrus Logic EDB9307"
+-	depends on EP93XX_SDCE3_SYNC_PHYS_OFFSET
+ 	select MACH_EDB93XX
+ 	help
+ 	  Say 'Y' here if you want your kernel to support the Cirrus
+@@ -95,7 +54,6 @@ config MACH_EDB9307
+ 
+ config MACH_EDB9307A
+ 	bool "Support Cirrus Logic EDB9307A"
+-	depends on EP93XX_SDCE0_PHYS_OFFSET
+ 	select MACH_EDB93XX
+ 	help
+ 	  Say 'Y' here if you want your kernel to support the Cirrus
+@@ -103,7 +61,6 @@ config MACH_EDB9307A
+ 
+ config MACH_EDB9312
+ 	bool "Support Cirrus Logic EDB9312"
+-	depends on EP93XX_SDCE3_SYNC_PHYS_OFFSET
+ 	select MACH_EDB93XX
+ 	help
+ 	  Say 'Y' here if you want your kernel to support the Cirrus
+@@ -111,7 +68,6 @@ config MACH_EDB9312
+ 
+ config MACH_EDB9315
+ 	bool "Support Cirrus Logic EDB9315"
+-	depends on EP93XX_SDCE3_SYNC_PHYS_OFFSET
+ 	select MACH_EDB93XX
+ 	help
+ 	  Say 'Y' here if you want your kernel to support the Cirrus
+@@ -119,14 +75,12 @@ config MACH_EDB9315
+ 
+ config MACH_EDB9315A
+ 	bool "Support Cirrus Logic EDB9315A"
+-	depends on EP93XX_SDCE0_PHYS_OFFSET
+ 	select MACH_EDB93XX
+ 	help
+ 	  Say 'Y' here if you want your kernel to support the Cirrus
+ 	  Logic EDB9315A Evaluation Board.
+ 
+ config MACH_GESBC9312
+-	depends on EP93XX_SDCE3_SYNC_PHYS_OFFSET
+ 	bool "Support Glomation GESBC-9312-sx"
+ 	help
+ 	  Say 'Y' here if you want your kernel to support the Glomation
+@@ -137,7 +91,6 @@ config MACH_MICRO9
+ 
+ config MACH_MICRO9H
+ 	bool "Support Contec Micro9-High"
+-	depends on EP93XX_SDCE3_SYNC_PHYS_OFFSET
+ 	select MACH_MICRO9
+ 	help
+ 	  Say 'Y' here if you want your kernel to support the
+@@ -145,7 +98,6 @@ config MACH_MICRO9H
+ 
+ config MACH_MICRO9M
+ 	bool "Support Contec Micro9-Mid"
+-	depends on EP93XX_SDCE3_ASYNC_PHYS_OFFSET
+ 	select MACH_MICRO9
+ 	help
+ 	  Say 'Y' here if you want your kernel to support the
+@@ -153,7 +105,6 @@ config MACH_MICRO9M
+ 
+ config MACH_MICRO9L
+ 	bool "Support Contec Micro9-Lite"
+-	depends on EP93XX_SDCE3_SYNC_PHYS_OFFSET
+ 	select MACH_MICRO9
+ 	help
+ 	  Say 'Y' here if you want your kernel to support the
+@@ -161,7 +112,6 @@ config MACH_MICRO9L
+ 
+ config MACH_MICRO9S
+ 	bool "Support Contec Micro9-Slim"
+-	depends on EP93XX_SDCE3_ASYNC_PHYS_OFFSET
+ 	select MACH_MICRO9
+ 	help
+ 	  Say 'Y' here if you want your kernel to support the
+@@ -169,28 +119,24 @@ config MACH_MICRO9S
+ 
+ config MACH_SIM_ONE
+         bool "Support Simplemachines Sim.One board"
+-        depends on EP93XX_SDCE0_PHYS_OFFSET
+         help
+           Say 'Y' here if you want your kernel to support the
+           Simplemachines Sim.One board.
+ 
+ config MACH_SNAPPER_CL15
+ 	bool "Support Bluewater Systems Snapper CL15 Module"
+-	depends on EP93XX_SDCE0_PHYS_OFFSET
+ 	help
+ 	  Say 'Y' here if you want your kernel to support the Bluewater
+ 	  Systems Snapper CL15 Module.
+ 
+ config MACH_TS72XX
+ 	bool "Support Technologic Systems TS-72xx SBC"
+-	depends on EP93XX_SDCE3_SYNC_PHYS_OFFSET
+ 	help
+ 	  Say 'Y' here if you want your kernel to support the
+ 	  Technologic Systems TS-72xx board.
+ 
+ config MACH_VISION_EP9307
+ 	bool "Support Vision Engraving Systems EP9307 SoM"
+-	depends on EP93XX_SDCE0_PHYS_OFFSET
+ 	help
+ 	  Say 'Y' here if you want your kernel to support the
+ 	  Vision Engraving Systems EP9307 SoM.
+diff --git a/arch/arm/mach-ep93xx/Makefile.boot b/arch/arm/mach-ep93xx/Makefile.boot
+index d3113a7..ed82ed7 100644
+--- a/arch/arm/mach-ep93xx/Makefile.boot
++++ b/arch/arm/mach-ep93xx/Makefile.boot
+@@ -1,14 +1 @@
+-   zreladdr-$(CONFIG_EP93XX_SDCE3_SYNC_PHYS_OFFSET)	+= 0x00008000
+-params_phys-$(CONFIG_EP93XX_SDCE3_SYNC_PHYS_OFFSET)	:= 0x00000100
+-
+-   zreladdr-$(CONFIG_EP93XX_SDCE0_PHYS_OFFSET)		+= 0xc0008000
+-params_phys-$(CONFIG_EP93XX_SDCE0_PHYS_OFFSET)		:= 0xc0000100
+-
+-   zreladdr-$(CONFIG_EP93XX_SDCE1_PHYS_OFFSET)		+= 0xd0008000
+-params_phys-$(CONFIG_EP93XX_SDCE1_PHYS_OFFSET)		:= 0xd0000100
+-
+-   zreladdr-$(CONFIG_EP93XX_SDCE2_PHYS_OFFSET)		+= 0xe0008000
+-params_phys-$(CONFIG_EP93XX_SDCE2_PHYS_OFFSET)		:= 0xe0000100
+-
+-   zreladdr-$(CONFIG_EP93XX_SDCE3_ASYNC_PHYS_OFFSET)	+= 0xf0008000
+-params_phys-$(CONFIG_EP93XX_SDCE3_ASYNC_PHYS_OFFSET)	:= 0xf0000100
++# Empty file waiting for deletion once Makefile.boot isn't needed any more.
 -- 
-Boris Brezillon, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+2.3.0
