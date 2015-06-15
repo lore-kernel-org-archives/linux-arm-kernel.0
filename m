@@ -1,29 +1,44 @@
-From: romain.perier@gmail.com (Romain Perier)
-Date: Mon, 15 Jun 2015 17:47:48 +0000
-Subject: [PATCH] ARM: dts: rockchip: Add dmac_bus rx and tx for uart2
-Message-ID: <1434390468-27296-1-git-send-email-romain.perier@gmail.com>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Mon, 15 Jun 2015 19:50:59 +0200
+Subject: [PATCH linux-next 2/2] mfd: flexcom: add a driver for Atmel
+ Flexible Serial Communication Unit
+In-Reply-To: <e85ceae28a0b382b12b809ac7cca891fcb7ac846.1434386119.git.cyrille.pitchen@atmel.com>
+References: <cover.1434386119.git.cyrille.pitchen@atmel.com>
+ <e85ceae28a0b382b12b809ac7cca891fcb7ac846.1434386119.git.cyrille.pitchen@atmel.com>
+Message-ID: <20150615175059.GE17679@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This removes warning "ttyS2 - Failed to request dma" from kernel logs
+Hi,
 
-Signed-off-by: Romain Perier <romain.perier@gmail.com>
----
- arch/arm/boot/dts/rk3288.dtsi | 2 ++
- 1 file changed, 2 insertions(+)
+On 15/06/2015 at 18:38:05 +0200, Cyrille Pitchen wrote :
+> +	err = of_property_read_string(pdev->dev.of_node,
+> +				      "atmel,flexcom-mode", &mode);
+> +	if (err)
+> +		return err;
+> +
+> +	if (!strcmp(mode, "usart"))
+> +		mr = FX_MR_USART;
+> +	else if (!strcmp(mode, "spi"))
+> +		mr = FX_MR_SPI;
+> +	else if (!strcmp(mode, "twi") || !strcmp(mode, "i2c"))
+> +		mr = FX_MR_TWI;
+> +	else
+> +		return -EINVAL;
+> +
+> +	clk_prepare_enable(clk);
+> +	version = __raw_readl(map + FX_VERSION);
+> +	__raw_writel(mr, map + FX_MR);
+> +	clk_disable_unprepare(clk);
+> +
+> +	dev_info(&pdev->dev, "version: %#x\n", version);
+> +
 
-diff --git a/arch/arm/boot/dts/rk3288.dtsi b/arch/arm/boot/dts/rk3288.dtsi
-index 22316d0..816f40a 100644
---- a/arch/arm/boot/dts/rk3288.dtsi
-+++ b/arch/arm/boot/dts/rk3288.dtsi
-@@ -385,6 +385,8 @@
- 		clock-names = "baudclk", "apb_pclk";
- 		pinctrl-names = "default";
- 		pinctrl-0 = <&uart2_xfer>;
-+		dmas = <&dmac_bus_s 4>, <&dmac_bus_s 5>;
-+		dma-names = "tx", "rx";
- 		status = "disabled";
- 	};
- 
+I would also print the selected mode for debugging convenience,
+especially if this is used with device tree overlays.
+
+
 -- 
-1.9.1
+Alexandre Belloni, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
