@@ -1,167 +1,196 @@
-From: majun258@huawei.com (majun (F))
-Date: Mon, 15 Jun 2015 15:05:49 +0800
-Subject: [PATCH v2 2/3] IRQ/Gic-V3: Change arm-gic-its to support the
- Mbigen interrupt
-In-Reply-To: <alpine.DEB.2.11.1506121230320.3786@nanos>
-References: <1434077399-32200-1-git-send-email-majun258@huawei.com>
- <1434077399-32200-3-git-send-email-majun258@huawei.com>
- <alpine.DEB.2.11.1506121230320.3786@nanos>
-Message-ID: <557E794D.2080705@huawei.com>
+From: eddie.huang@mediatek.com (Eddie Huang)
+Date: Mon, 15 Jun 2015 15:35:25 +0800
+Subject: [PATCH v3 2/2] arm64: dts: mt8173: Add I2C device node
+In-Reply-To: <CAGS+omB1UadXeKZLmMdhSamsPpipQLmoH_PhbUPvszrYTq68fA@mail.gmail.com>
+References: <1434101229-32695-1-git-send-email-eddie.huang@mediatek.com>
+ <1434101229-32695-3-git-send-email-eddie.huang@mediatek.com>
+ <CAGS+omB1UadXeKZLmMdhSamsPpipQLmoH_PhbUPvszrYTq68fA@mail.gmail.com>
+Message-ID: <1434353725.15875.26.camel@mtksdaap41>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Dan,
 
+On Fri, 2015-06-12 at 20:28 +0800, Daniel Kurtz wrote:
+> On Fri, Jun 12, 2015 at 5:27 PM, Eddie Huang <eddie.huang@mediatek.com> wrote:
+> >
+> > Add MT8173 I2C device nodes, include I2C controllers and pins.
+> > MT8173 has six I2C controllers, from i2c0 to i2c6, exclude i2c5.
+> > The 6th I2C controller register base doesn't next to 5th I2C,
+> > and there is a hardware between 5th and 6th I2C controller. So
+> > SoC designer name 6th controller as "i2c6", not "i2c5".
+> 
+> 
+> This is slightly misleading.  There are in fact 7 I2C controllers, but
+> "i2c5" is dedicated for use by HDMI for ddc & hdcp.
+> Is there a reason why the HDMI I2C port cannot be controlled by the
+> generic i2c driver?
+> 
+We add some extra HW function to HDMI I2C port, we have special driver
+to control this HW, not generic I2C driver. This is why I don't count
+this hardware to generic I2C controllers. 
 
-? 2015/6/12 18:48, Thomas Gleixner ??:
-> On Fri, 12 Jun 2015, Ma Jun wrote:
+> Of course the hdmiddc / i2c5 node can always be added in a later
+> patch, so this is no reason to hold up this patch.
 > 
->> This patch is applied to support the mbigen interrupt.
->>
->> As a kind of MSI interrupt controller, the mbigen is used as a child 
->> domain of ITS domain just like PCI devices.
->> So the arm-gic-v3-its and related files are changed.
->>
->> The chip.c is also changed to check irq_ach before it called.
+> > Signed-off-by: Eddie Huang <eddie.huang@mediatek.com>
+> > ---
+> >  arch/arm64/boot/dts/mediatek/mt8173-evb.dts | 50 ++++++++++++++++++++
+> >  arch/arm64/boot/dts/mediatek/mt8173.dtsi    | 72 +++++++++++++++++++++++++++++
+> >  2 files changed, 122 insertions(+)
+> >
+> > diff --git a/arch/arm64/boot/dts/mediatek/mt8173-evb.dts b/arch/arm64/boot/dts/mediatek/mt8173-evb.dts
+> > index 43d5401..2e01988 100644
+> > --- a/arch/arm64/boot/dts/mediatek/mt8173-evb.dts
+> > +++ b/arch/arm64/boot/dts/mediatek/mt8173-evb.dts
+> > @@ -33,6 +33,56 @@
+> >         chosen { };
+> >  };
+> >
+> > +&pio {
 > 
-> This patch wants to be split into several:
+> I don't think we needed to move these i2c pinmux descriptions from
+> mt8173.dtsi to the board .dts file.
 > 
-> 1) Changes to the core code
+> AFAICT, the "i2cN_pins_a" nodes defined here are the pinctl
+> configuration that the corresponding enabled i2c nodes would choose.
+> Thus, they are generic to the MT8173 SoC, not specific to any board.
+> By themselves, these nodes do not actually select a pin configuration.
 > 
-> 2) New functionality in the core code
+> It is the nodes that *enable* the individual i2c nodes, and hence
+> activate those pin settings, which is board specific.
 > 
-> 2) Changes to gic-v3-its
+> Hence, if your intent is to have the evb enable all i2c nodes, it
+> would have a set of nodes like this:
 > 
-> And all patches require proper changelogs which explain WHY these
-> changes are necessary.
 > 
-> We can see which files are changed from the diffstat and the patch
-> ourself. So no point to mention this in the changelog.
-> 
-> But we cannot figure out from looking at the code WHY you think that
-> your approach to solve the problem is the right one.
-> 
->>  void irq_chip_ack_parent(struct irq_data *data)
->>  {
->>  	data = data->parent_data;
->> -	data->chip->irq_ack(data);
->> +	if (data->chip->irq_ack)
->> +		data->chip->irq_ack(data);
-> 
-> Why is this required? Just because? Again, you fail to provide a
-> rationale for the changes to the irq_chip*parent() functions.
-> 
-> Why would you call irq_chip_ack_parent() if that parent does not
-> provide the required functionality in the first place?
-> 
-
-Yes, this is not a necessary callback. I will remove this callback
-from mbigen driver.
-
->>  /*
->> @@ -363,6 +364,9 @@ struct irq_chip {
->>  	int		(*irq_request_resources)(struct irq_data *data);
->>  	void		(*irq_release_resources)(struct irq_data *data);
->>  
->> +	void		(*irq_compose_mbigen_msg)(struct irq_data *data, struct mbigen_msg *msg);
->> +	void		(*irq_write_mbigen_msg)(struct irq_data *data, struct mbigen_msg *msg);
->> +
-> 
-> What's so special about mbigen to justify extra callbacks which just
-> bloat the data structure for everyone. Why are the msi callbacks not
-> sufficient?
-> 
-> MBI is just another variant of MSI, right?
-> 
-yes,MBI is a kind of MSI which used for non-pci devices.
-
-According to Marc's advice, the irq hierachy structure
-in my patch likes below:
-non-pci devices-->mbigen-->its-->gic
-pci devices     -->msi __/
-
-Eventhough the function *irq_compose_mbigen_msg does
-the same thing as *irq_chip_compose_msi_msg, I still
-added this function. Because I don't want mix the code
-used by msi(pci devices) with the code used by mbigen.
-
-> struct mbigen_msg {
->        u32     address_lo;
->        u32     address_hi;
->        u32     data;
+> &i2c0 {
+>   pinctrl-names = "default";
+>   pinctrl-0 = <&i2c0_pins_a>;
+>   status = "okay";
 > };
 > 
-> struct mbigen_msg is just a mindless copy of struct msi_msg:
-> 
-> struct msi_msg {
->         u32     address_lo;     /* low 32 bits of msi message address */
->         u32     address_hi;     /* high 32 bits of msi message address */
->         u32     data;           /* 16 bits of msi message data */
+> &i2c1 {
+>  pinctrl-names = "default";
+>  pinctrl-0 = <&i2c1_pins_a>;
+>  status = "okay";
 > };
 > 
-> So what's the point of this?
->
+> ...
+> 
+I personally think put I2C pins in SoC dtsi is ok because it is basic
+and fixed. Almost every platform need these pins, so not necessary to
+care about dtb size. And these pins are fixed. We put pins that may
+change by platforms to board dts, like mmc.
 
-Based on the same reason, I also added  structure mbigen_msg for
-mbigen using.
+> 
+> > +       i2c0_pins_a: i2c0 at 0 {
+> 
+> Do these nodes need the "@0"?
+> 
+Will remove.
 
->>  	void		(*irq_compose_msi_msg)(struct irq_data *data, struct msi_msg *msg);
->>  	void		(*irq_write_msi_msg)(struct irq_data *data, struct msi_msg *msg);
->>  
+> >
+> > +               pins1 {
+> > +                       pinmux = <MT8173_PIN_45_SDA0__FUNC_SDA0>,
+> > +                                <MT8173_PIN_46_SCL0__FUNC_SCL0>;
+> > +                       bias-disable;
+> > +               };
+> > +       };
+> > +
+> > +       i2c1_pins_a: i2c1 at 0 {
+> > +               pins1 {
+> > +                       pinmux = <MT8173_PIN_125_SDA1__FUNC_SDA1>,
+> > +                                <MT8173_PIN_126_SCL1__FUNC_SCL1>;
+> > +                       bias-disable;
+> > +               };
+> > +       };
+> > +
+> > +       i2c2_pins_a: i2c2 at 0 {
+> > +               pins1 {
+> > +                       pinmux = <MT8173_PIN_43_SDA2__FUNC_SDA2>,
+> > +                                <MT8173_PIN_44_SCL2__FUNC_SCL2>;
+> > +                       bias-disable;
+> > +               };
+> > +       };
+> > +
+> > +       i2c3_pins_a: i2c3 at 0 {
+> > +               pins1 {
+> > +                       pinmux = <MT8173_PIN_106_SDA3__FUNC_SDA3>,
+> > +                                <MT8173_PIN_107_SCL3__FUNC_SCL3>;
+> > +                       bias-disable;
+> > +               };
+> > +       };
+> > +
+> > +       i2c4_pins_a: i2c4 at 0 {
+> > +               pins1 {
+> > +                       pinmux = <MT8173_PIN_133_SDA4__FUNC_SDA4>,
+> > +                                <MT8173_PIN_134_SCL4__FUNC_SCL4>;
+> > +                       bias-disable;
+> > +               };
+> > +       };
+> > +
+> > +       i2c6_pins_a: i2c6 at 0 {
+> > +               pins1 {
+> > +                       pinmux = <MT8173_PIN_100_MSDC2_DAT0__FUNC_SDA5>,
+> > +                                <MT8173_PIN_101_MSDC2_DAT1__FUNC_SCL5>;
 > 
->> +
->> +/**
->> + * irq_chip_compose_mbigen_msg - Componse mbigen message for a mbigen irq chip
->> + * @data:	Pointer to interrupt specific data
->> + * @msg:	Pointer to the mbigen message
->> + *
->> + * For hierarchical domains we find the first chip in the hierarchy
->> + * which implements the irq_compose_mbigen_msg callback. For non
->> + * hierarchical we use the top level chip.
->> + */
->> +
->> +int irq_chip_compose_mbigen_msg(struct irq_data *data, struct mbigen_msg *msg)
->> +{
->> +	struct irq_data *pos = NULL;
->> +
->> +#ifdef	CONFIG_IRQ_DOMAIN_HIERARCHY
->> +	for (; data; data = data->parent_data)
->> +#endif
->> +		if (data->chip && data->chip->irq_compose_mbigen_msg)
->> +			pos = data;
->> +	if (!pos)
->> +		return -ENOSYS;
->> +
->> +	pos->chip->irq_compose_mbigen_msg(pos, msg);
->> +
->> +	return 0;
->> +}
+> These are the SDA/SCL pins for i2c port 6, so they should really be
+> _SDA6 / _SCL6.
+> However... I checked, and these settings are labeled "SDA5 & SCL5" in
+> the datasheet.
+> I recommend marking them correctly as 6 here and fixing the datasheet :-).
 > 
-> Again, this is a completely useless copy of irq_chip_compose_msi_msg().
-> Why can't you just use the existing callbacks and use struct msi_msg
-> for your special chip?
-> 
-As mentioned before, to avoid using the code of msi, i added this
-function.Because they are different domain.
+We make mistake at the beginning not give these pins suitable name, if
+we change now, it may affect already shipped products. So I tend to keep
+it.
 
-If you don't mind, I can use the irq_chip_compose_msi_msg function in
-mbigen driver instead of irq_chip_compose_mbigen_msg.
+> >
+> > +                       bias-disable;
+> > +               };
+> > +       };
+> > +};
+> > +
+> >  &uart0 {
+> >         status = "okay";
+> >  };
+> > diff --git a/arch/arm64/boot/dts/mediatek/mt8173.dtsi b/arch/arm64/boot/dts/mediatek/mt8173.dtsi
+> > index b52ec43..6d3dbbdd 100644
+> > --- a/arch/arm64/boot/dts/mediatek/mt8173.dtsi
+> > +++ b/arch/arm64/boot/dts/mediatek/mt8173.dtsi
+> > @@ -229,6 +229,78 @@
+> >                         clocks = <&uart_clk>;
+> >                         status = "disabled";
+> >                 };
+> > +
+> > +               i2c0: i2c at 11007000 {
+> > +                       compatible = "mediatek,mt8173-i2c";
+> > +                       reg = <0 0x11007000 0 0x70>,
+> > +                             <0 0x11000100 0 0x80>;
+> > +                       interrupts = <GIC_SPI 76 IRQ_TYPE_LEVEL_LOW>;
+> > +                       clock-div = <16>;
+> > +                       clocks = <&pericfg CLK_PERI_I2C0>,
+> > +                                <&pericfg CLK_PERI_AP_DMA>;
+> > +                       clock-names = "main", "dma";
+> 
+> The following fields must also be selected by the i2c nodes when they
+> are enabled:
+> 
+> clock-frequency = <100000>;
+> pinctrl-names = "default";
+> pinctrl-0 = <&i2c0_pins_a>;
+> #address-cells = <1>;
+> #size-cells = <0>;
+> 
+> So, is there any reason not to also include them here in mt8173.dtsi
+> so we can use them as defaults?
+> This would simplify the i2c nodes in the board specific .dts files.
+> The only field that might be board specific would be clock-frequency,
+> but that is trivial to override on a port-by-port basis in board files
+> as necessary.
+> 
+Since I tend to put I2C pins in SoC dtsi, I think I will put all you
+mention above in SoC dtsi.
 
-> And w/o looking at the mbigen code in detail, I bet it's nothing else
-> than MSI for non PCI devices and contains tons of redundant and copied
-> code, right?
->
-> Can you please provide a proper description of this mbigen chip and
-> explain WHY you think that it needs all this special hackery?
-> 
-> Thanks,
-> 
-> 	tglx
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> Please read the FAQ at  http://www.tux.org/lkml/
-> 
-> .
-> 
+Eddie
+Thanks
