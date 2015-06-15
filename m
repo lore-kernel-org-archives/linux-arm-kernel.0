@@ -1,122 +1,127 @@
 From: dave.long@linaro.org (David Long)
-Date: Mon, 15 Jun 2015 15:07:04 -0400
-Subject: [PATCH v7 2/7] arm64: Add more test functions to insn.c
+Date: Mon, 15 Jun 2015 15:07:07 -0400
+Subject: [PATCH v7 5/7] arm64: Add trampoline code for kretprobes
 In-Reply-To: <1434395229-6654-1-git-send-email-dave.long@linaro.org>
 References: <1434395229-6654-1-git-send-email-dave.long@linaro.org>
-Message-ID: <1434395229-6654-3-git-send-email-dave.long@linaro.org>
+Message-ID: <1434395229-6654-6-git-send-email-dave.long@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: "David A. Long" <dave.long@linaro.org>
+From: William Cohen <wcohen@redhat.com>
 
-Certain instructions are hard to execute correctly out-of-line (as in
-kprobes).  Test functions are added to insn.[hc] to identify these.  The
-instructions include any that use PC-relative addressing, change the PC,
-or change interrupt masking. For efficiency and simplicity test
-functions are also added for small collections of related instructions.
+The trampoline code is used by kretprobes to capture a return from a probed
+function.  This is done by saving the registers, calling the handler, and
+restoring the registers.  The code then returns to the roginal saved caller
+return address.  It is necessary to do this directly instead of using a
+software breakpoint because the code used in processing that breakpoint
+could itself be kprobe'd and cause a problematic reentry into the debug
+exception handler.
 
+Signed-off-by: William Cohen <wcohen@redhat.com>
 Signed-off-by: David A. Long <dave.long@linaro.org>
 ---
- arch/arm64/include/asm/insn.h | 18 ++++++++++++++++++
- arch/arm64/kernel/insn.c      | 28 ++++++++++++++++++++++++++++
- 2 files changed, 46 insertions(+)
+ arch/arm64/include/asm/kprobes.h  |  1 +
+ arch/arm64/kernel/kprobes-arm64.h | 41 +++++++++++++++++++++++++++++++++++++++
+ arch/arm64/kernel/kprobes.c       | 26 +++++++++++++++++++++++++
+ 3 files changed, 68 insertions(+)
 
-diff --git a/arch/arm64/include/asm/insn.h b/arch/arm64/include/asm/insn.h
-index f81b328..1fdd237 100644
---- a/arch/arm64/include/asm/insn.h
-+++ b/arch/arm64/include/asm/insn.h
-@@ -223,8 +223,13 @@ static __always_inline bool aarch64_insn_is_##abbr(u32 code) \
- static __always_inline u32 aarch64_insn_get_##abbr##_value(void) \
- { return (val); }
+diff --git a/arch/arm64/include/asm/kprobes.h b/arch/arm64/include/asm/kprobes.h
+index af31c4d..d081f49 100644
+--- a/arch/arm64/include/asm/kprobes.h
++++ b/arch/arm64/include/asm/kprobes.h
+@@ -58,5 +58,6 @@ int kprobe_exceptions_notify(struct notifier_block *self,
+ 			     unsigned long val, void *data);
+ int kprobe_breakpoint_handler(struct pt_regs *regs, unsigned int esr);
+ int kprobe_single_step_handler(struct pt_regs *regs, unsigned int esr);
++void kretprobe_trampoline(void);
  
-+__AARCH64_INSN_FUNCS(adr_adrp,	0x1F000000, 0x10000000)
-+__AARCH64_INSN_FUNCS(prfm_lit,	0xFF000000, 0xD8000000)
- __AARCH64_INSN_FUNCS(str_reg,	0x3FE0EC00, 0x38206800)
- __AARCH64_INSN_FUNCS(ldr_reg,	0x3FE0EC00, 0x38606800)
-+__AARCH64_INSN_FUNCS(ldr_lit,	0xBF000000, 0x18000000)
-+__AARCH64_INSN_FUNCS(ldrsw_lit,	0xFF000000, 0x98000000)
-+__AARCH64_INSN_FUNCS(exclusive,	0x3F000000, 0x08000000)
- __AARCH64_INSN_FUNCS(stp_post,	0x7FC00000, 0x28800000)
- __AARCH64_INSN_FUNCS(ldp_post,	0x7FC00000, 0x28C00000)
- __AARCH64_INSN_FUNCS(stp_pre,	0x7FC00000, 0x29800000)
-@@ -264,19 +269,29 @@ __AARCH64_INSN_FUNCS(ands,	0x7F200000, 0x6A000000)
- __AARCH64_INSN_FUNCS(bics,	0x7F200000, 0x6A200000)
- __AARCH64_INSN_FUNCS(b,		0xFC000000, 0x14000000)
- __AARCH64_INSN_FUNCS(bl,	0xFC000000, 0x94000000)
-+__AARCH64_INSN_FUNCS(b_bl,	0x7C000000, 0x14000000)
-+__AARCH64_INSN_FUNCS(cb,	0x7E000000, 0x34000000)
- __AARCH64_INSN_FUNCS(cbz,	0x7F000000, 0x34000000)
- __AARCH64_INSN_FUNCS(cbnz,	0x7F000000, 0x35000000)
-+__AARCH64_INSN_FUNCS(tb,	0x7E000000, 0x36000000)
- __AARCH64_INSN_FUNCS(tbz,	0x7F000000, 0x36000000)
- __AARCH64_INSN_FUNCS(tbnz,	0x7F000000, 0x37000000)
-+__AARCH64_INSN_FUNCS(b_bl_cb_tb, 0x5C000000, 0x14000000)
- __AARCH64_INSN_FUNCS(bcond,	0xFF000010, 0x54000000)
- __AARCH64_INSN_FUNCS(svc,	0xFFE0001F, 0xD4000001)
- __AARCH64_INSN_FUNCS(hvc,	0xFFE0001F, 0xD4000002)
- __AARCH64_INSN_FUNCS(smc,	0xFFE0001F, 0xD4000003)
- __AARCH64_INSN_FUNCS(brk,	0xFFE0001F, 0xD4200000)
-+__AARCH64_INSN_FUNCS(exception,	0xFF000000, 0xD4000000)
- __AARCH64_INSN_FUNCS(hint,	0xFFFFF01F, 0xD503201F)
- __AARCH64_INSN_FUNCS(br,	0xFFFFFC1F, 0xD61F0000)
- __AARCH64_INSN_FUNCS(blr,	0xFFFFFC1F, 0xD63F0000)
-+__AARCH64_INSN_FUNCS(br_blr,	0xFFDFFC1F, 0xD61F0000)
- __AARCH64_INSN_FUNCS(ret,	0xFFFFFC1F, 0xD65F0000)
-+__AARCH64_INSN_FUNCS(msr_imm,	0xFFF8F000, 0xD5004000)
-+__AARCH64_INSN_FUNCS(msr_reg,	0xFFF00000, 0xD5100000)
-+__AARCH64_INSN_FUNCS(set_clr_daif, 0xFFFFF0DF, 0xD50340DF)
-+__AARCH64_INSN_FUNCS(rd_wr_daif, 0xFFDFFFE0, 0xD51B4220)
+ #endif /* _ARM_KPROBES_H */
+diff --git a/arch/arm64/kernel/kprobes-arm64.h b/arch/arm64/kernel/kprobes-arm64.h
+index ff8a55f..bdcfa62 100644
+--- a/arch/arm64/kernel/kprobes-arm64.h
++++ b/arch/arm64/kernel/kprobes-arm64.h
+@@ -27,4 +27,45 @@ extern kprobes_pstate_check_t * const kprobe_condition_checks[16];
+ enum kprobe_insn __kprobes
+ arm_kprobe_decode_insn(kprobe_opcode_t insn, struct arch_specific_insn *asi);
  
- #undef	__AARCH64_INSN_FUNCS
- 
-@@ -285,6 +300,9 @@ bool aarch64_insn_is_nop(u32 insn);
- int aarch64_insn_read(void *addr, u32 *insnp);
- int aarch64_insn_write(void *addr, u32 insn);
- enum aarch64_insn_encoding_class aarch64_get_insn_class(u32 insn);
-+bool aarch64_insn_uses_literal(u32 insn);
-+bool aarch64_insn_is_branch(u32 insn);
-+bool aarch64_insn_is_daif_access(u32 insn);
- u64 aarch64_insn_decode_immediate(enum aarch64_insn_imm_type type, u32 insn);
- u32 aarch64_insn_encode_immediate(enum aarch64_insn_imm_type type,
- 				  u32 insn, u64 imm);
-diff --git a/arch/arm64/kernel/insn.c b/arch/arm64/kernel/insn.c
-index 9249020..ecd8882 100644
---- a/arch/arm64/kernel/insn.c
-+++ b/arch/arm64/kernel/insn.c
-@@ -155,6 +155,34 @@ static bool __kprobes __aarch64_insn_hotpatch_safe(u32 insn)
- 		aarch64_insn_is_nop(insn);
++#define SAVE_REGS_STRING\
++	"	stp x0, x1, [sp, #16 * 0]\n"	\
++	"	stp x2, x3, [sp, #16 * 1]\n"	\
++	"	stp x4, x5, [sp, #16 * 2]\n"	\
++	"	stp x6, x7, [sp, #16 * 3]\n"	\
++	"	stp x8, x9, [sp, #16 * 4]\n"	\
++	"	stp x10, x11, [sp, #16 * 5]\n"	\
++	"	stp x12, x13, [sp, #16 * 6]\n"	\
++	"	stp x14, x15, [sp, #16 * 7]\n"	\
++	"	stp x16, x17, [sp, #16 * 8]\n"	\
++	"	stp x18, x19, [sp, #16 * 9]\n"	\
++	"	stp x20, x21, [sp, #16 * 10]\n"	\
++	"	stp x22, x23, [sp, #16 * 11]\n"	\
++	"	stp x24, x25, [sp, #16 * 12]\n"	\
++	"	stp x26, x27, [sp, #16 * 13]\n"	\
++	"	stp x28, x29, [sp, #16 * 14]\n"	\
++	"	str x30,   [sp, #16 * 15]\n"    \
++	"	mrs x0, nzcv\n"			\
++	"	str x0, [sp, #8 * 33]\n"
++
++
++#define RESTORE_REGS_STRING\
++	"	ldr x0, [sp, #8 * 33]\n"	\
++	"	msr nzcv, x0\n"			\
++	"	ldp x0, x1, [sp, #16 * 0]\n"	\
++	"	ldp x2, x3, [sp, #16 * 1]\n"	\
++	"	ldp x4, x5, [sp, #16 * 2]\n"	\
++	"	ldp x6, x7, [sp, #16 * 3]\n"	\
++	"	ldp x8, x9, [sp, #16 * 4]\n"	\
++	"	ldp x10, x11, [sp, #16 * 5]\n"	\
++	"	ldp x12, x13, [sp, #16 * 6]\n"	\
++	"	ldp x14, x15, [sp, #16 * 7]\n"	\
++	"	ldp x16, x17, [sp, #16 * 8]\n"	\
++	"	ldp x18, x19, [sp, #16 * 9]\n"	\
++	"	ldp x20, x21, [sp, #16 * 10]\n"	\
++	"	ldp x22, x23, [sp, #16 * 11]\n"	\
++	"	ldp x24, x25, [sp, #16 * 12]\n"	\
++	"	ldp x26, x27, [sp, #16 * 13]\n"	\
++	"	ldp x28, x29, [sp, #16 * 14]\n"	\
++	"	ldr x30,   [sp, #16 * 15]\n"
++
+ #endif /* _ARM_KERNEL_KPROBES_ARM64_H */
+diff --git a/arch/arm64/kernel/kprobes.c b/arch/arm64/kernel/kprobes.c
+index 6255814..570218c 100644
+--- a/arch/arm64/kernel/kprobes.c
++++ b/arch/arm64/kernel/kprobes.c
+@@ -560,6 +560,32 @@ int __kprobes longjmp_break_handler(struct kprobe *p, struct pt_regs *regs)
+ 	return 0;
  }
  
-+bool __kprobes aarch64_insn_uses_literal(u32 insn)
++/*
++ * When a retprobed function returns, this code saves registers and
++ * calls trampoline_handler() runs, which calls the kretprobe's handler.
++ */
++static void __used __kprobes kretprobe_trampoline_holder(void)
 +{
-+	/* ldr/ldrsw (literal), prfm */
-+
-+	return aarch64_insn_is_ldr_lit(insn) ||
-+		aarch64_insn_is_ldrsw_lit(insn) ||
-+		aarch64_insn_is_adr_adrp(insn) ||
-+		aarch64_insn_is_prfm_lit(insn);
++	asm volatile (".global kretprobe_trampoline\n"
++			"kretprobe_trampoline:\n"
++			"sub sp, sp, %0\n"
++			SAVE_REGS_STRING
++			"mov x0, sp\n"
++			"bl trampoline_probe_handler\n"
++			/* Replace trampoline address in lr with actual
++			   orig_ret_addr return address. */
++			"str x0, [sp, #16 * 15]\n"
++			RESTORE_REGS_STRING
++			"add sp, sp, %0\n"
++			"ret\n"
++		      : : "I"(sizeof(struct pt_regs)) : "memory");
 +}
 +
-+bool __kprobes aarch64_insn_is_branch(u32 insn)
++static void __kprobes __used *trampoline_probe_handler(struct pt_regs *regs)
 +{
-+	/* b, bl, cb*, tb*, b.cond, br, blr */
-+
-+	return aarch64_insn_is_b_bl_cb_tb(insn) ||
-+		aarch64_insn_is_br_blr(insn) ||
-+		aarch64_insn_is_ret(insn) ||
-+		aarch64_insn_is_bcond(insn);
++	return (void *) 0;
 +}
 +
-+bool __kprobes aarch64_insn_is_daif_access(u32 insn)
-+{
-+	/* msr daif, mrs daif, msr daifset, msr daifclr */
-+
-+	return aarch64_insn_is_rd_wr_daif(insn) ||
-+		aarch64_insn_is_set_clr_daif(insn);
-+}
-+
- /*
-  * ARM Architecture Reference Manual for ARMv8 Profile-A, Issue A.a
-  * Section B2.6.5 "Concurrent modification and execution of instructions":
+ int __init arch_init_kprobes(void)
+ {
+ 	return 0;
 -- 
 1.8.1.2
