@@ -1,42 +1,44 @@
-From: dave.long@linaro.org (David Long)
-Date: Mon, 15 Jun 2015 12:42:57 -0400
-Subject: [PATCH 0/2] Consolidate redundant register/stack access code
-Message-ID: <1434386579-6045-1-git-send-email-dave.long@linaro.org>
+From: jonathanh@nvidia.com (Jon Hunter)
+Date: Mon, 15 Jun 2015 17:45:33 +0100
+Subject: [PATCH] ARM: tegra124: pmu support
+In-Reply-To: <1434169283-19512-1-git-send-email-khuey@kylehuey.com>
+References: <1434169283-19512-1-git-send-email-khuey@kylehuey.com>
+Message-ID: <557F012D.5040509@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: "David A. Long" <dave.long@linaro.org>
+Adding linux-tegra ML ...
 
-Move duplicate and functionally equivalent code for accessing registers
-and stack (CONFIG_HAVE_REGS_AND_STACK_ACCESS_API) from arch subdirs into
-common kernel files.
+On 13/06/15 05:21, Kyle Huey wrote:
+> This patch modifies the device tree for tegra124 based devices to enable the Cortex A15 PMU.  The interrupt numbers are taken from NVIDIA TRM DP-06905-001_v03p.  This patch was tested on a Jetson TK1.
+> 
+> Signed-off-by: Kyle Huey <khuey@kylehuey.com>
+> ---
+>  arch/arm/boot/dts/tegra124.dtsi | 8 ++++++++
+>  1 file changed, 8 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/tegra124.dtsi b/arch/arm/boot/dts/tegra124.dtsi
+> index 4be06c6..9032ccb 100644
+> --- a/arch/arm/boot/dts/tegra124.dtsi
+> +++ b/arch/arm/boot/dts/tegra124.dtsi
+> @@ -190,6 +190,14 @@
+>  		status = "disabled";
+>  	};
+>  
+> +	pmu {
+> +		compatible = "arm,cortex-a15-pmu";
+> +		interrupts = <GIC_SPI 144 IRQ_TYPE_LEVEL_HIGH>,
+> +			     <GIC_SPI 145 IRQ_TYPE_LEVEL_HIGH>,
+> +			     <GIC_SPI 146 IRQ_TYPE_LEVEL_HIGH>,
+> +			     <GIC_SPI 147 IRQ_TYPE_LEVEL_HIGH>;
+> +	};
+> +
+>  	timer at 0,60005000 {
+>  		compatible = "nvidia,tegra124-timer", "nvidia,tegra20-timer";
+>  		reg = <0x0 0x60005000 0x0 0x400>;
+> 
 
-Note: Help regression testing s390, hexagon, and sh would be appreciated.
-      Powerpc builds but I have not verified the functionality.
+Acked-by: Jon Hunter <jonathanh@nvidia.com>
 
-David A. Long (2):
-  Move the pt_regs_offset struct definition from arch to common include
-    file
-  Consolidate redundant register/stack access code
-
- arch/arm/include/asm/ptrace.h          |  6 ---
- arch/arm/kernel/ptrace.c               | 72 +---------------------------------
- arch/hexagon/include/uapi/asm/ptrace.h |  3 --
- arch/powerpc/include/asm/ptrace.h      | 38 ------------------
- arch/powerpc/kernel/ptrace.c           | 39 +-----------------
- arch/s390/include/asm/ptrace.h         |  3 --
- arch/s390/kernel/ptrace.c              | 70 ++++++++++-----------------------
- arch/sh/include/asm/ptrace.h           | 44 ---------------------
- arch/sh/kernel/Makefile                |  2 +-
- arch/sh/kernel/ptrace.c                | 33 ----------------
- arch/sh/kernel/ptrace_32.c             |  2 +-
- arch/sh/kernel/ptrace_64.c             |  2 +-
- arch/x86/include/asm/ptrace.h          | 37 -----------------
- arch/x86/kernel/ptrace.c               | 39 +-----------------
- include/linux/ptrace.h                 | 51 ++++++++++++++++++++++++
- kernel/ptrace.c                        | 38 ++++++++++++++++++
- 16 files changed, 116 insertions(+), 363 deletions(-)
- delete mode 100644 arch/sh/kernel/ptrace.c
-
--- 
-1.8.1.2
+Cheers
+Jon
