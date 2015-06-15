@@ -1,31 +1,60 @@
-From: herbert@gondor.apana.org.au (Herbert Xu)
-Date: Mon, 15 Jun 2015 20:40:00 +0800
-Subject: [RESEND PATCH v4 04/14] crypto: add a new driver for Marvell's
- CESA
-In-Reply-To: <20150615133853.57687ecf@bbrezillon>
-References: <1434093366-14681-1-git-send-email-boris.brezillon@free-electrons.com>
- <1434093366-14681-5-git-send-email-boris.brezillon@free-electrons.com>
- <20150615094827.GA32073@gondor.apana.org.au>
- <20150615133853.57687ecf@bbrezillon>
-Message-ID: <20150615124000.GB1646@gondor.apana.org.au>
+From: p.marczak@samsung.com (Przemyslaw Marczak)
+Date: Mon, 15 Jun 2015 14:57:18 +0200
+Subject: [RFC] ARM: exynos: MCPM: [is this a] fix for secondary boot on
+ 5422?
+In-Reply-To: <CAP245DVU4RmkSuOR2dNV+GMwkKxAXFs_p3zo90DP2Zo4-hbhcg@mail.gmail.com>
+References: <1416896510-24612-1-git-send-email-khilman@kernel.org>
+ <CAJKOXPfLEV1sQsz87ULDKX4vijqRpbGj7AcOEDiy83kukvVKVg@mail.gmail.com>
+ <557EA6AE.304@samsung.com>
+ <CAP245DVU4RmkSuOR2dNV+GMwkKxAXFs_p3zo90DP2Zo4-hbhcg@mail.gmail.com>
+Message-ID: <557ECBAE.20302@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 15, 2015 at 01:38:53PM +0200, Boris Brezillon wrote:
-> Oh right.
-> I still have trouble understanding the need for the backlog concept
-> (maybe you can give some insight): the backlog is just another list
-> where we put all the requests when the queue has exceeded the limit
-> fixed in crypto_queue_init, but the result is pretty much the same, the
-> request stored in the backlog will be handled at some point, so what's
-> the real point of this backlog.
 
-The point is to tell the user to stop sending requests by returning
-EBUSY.  When the queue clears up again we then invoke the callback
-and tell the user that they can send requests again.
+On 06/15/2015 01:19 PM, Amit Kucheria wrote:
+> On Mon, Jun 15, 2015 at 3:49 PM, Przemyslaw Marczak
+> <p.marczak@samsung.com> wrote:
+>> Hello Krzysztof,
+>>
+>>
+>> On 06/14/2015 10:56 AM, Krzysztof Koz?owski wrote:
+>
+> <snip>
+>
+>> I'm trying port the hardkernel's SPL to the mainline U-Boot at present. The
+>> mainline SPL is implemented for E5420 and E5800. But there are few
+>> differences:
+>> - different DRAM
+>> - different clocks
+>> - different boot core (peach-pi boots from A15)
+>> - bl2 signature
+>> - hdk's SPL uses smc calls
+>> ... and some more.
+>
+> This is really good news! Would this work leave CCI control to Linux
+> so that we may use MCPM to manage cpu and cluster OFF?
+>
 
-Cheers,
+Yes, I would like to get this stuff working.
+
+>> The BL1 keeps signature key and some part of code, but it's code is
+>> proprietary - but we should be able to setup the secondary cores in BL2.
+>>
+>> When, I get the basic setup working, then I'm going to focus on the
+>> secondary CPU's init. I don't have the documentation for iROM code, so
+>> everything takes a while.
+>>
+>>   If you looking for the lowlevel code, which is executed after wakeup,
+>> please check this :
+>> https://github.com/hardkernel/u-boot/blob/odroidxu3-v2012.07/board/samsung/smdk5422/lowlevel_init.S
+>>
+>> The 'lowlevel_init' label is always executed on boot.
+>
+
+Best regards,
 -- 
-Email: Herbert Xu <herbert@gondor.apana.org.au>
-Home Page: http://gondor.apana.org.au/~herbert/
-PGP Key: http://gondor.apana.org.au/~herbert/pubkey.txt
+Przemyslaw Marczak
+Samsung R&D Institute Poland
+Samsung Electronics
+p.marczak at samsung.com
