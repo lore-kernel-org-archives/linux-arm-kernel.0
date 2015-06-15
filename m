@@ -1,41 +1,32 @@
-From: xerofoify@gmail.com (Nicholas Krause)
-Date: Mon, 15 Jun 2015 13:38:05 -0400
-Subject: [PATCH] seeq:Make functions have a return type of bool in the file
- ether3.c
-Message-ID: <1434389885-12691-1-git-send-email-xerofoify@gmail.com>
+From: romain.perier@gmail.com (Romain Perier)
+Date: Mon, 15 Jun 2015 17:41:41 +0000
+Subject: [PATCH] ARM: dts: rockchip: Add ramp delay for vdd_cpu in firefly
+ board dts
+Message-ID: <1434390101-27000-1-git-send-email-romain.perier@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This makes the functions ether3_probe_bus_8 and ether3_probe_bus_16
-have a return type of bool now due to their return statement being
-only able to evaluate  as either one or zero.
+Adds ramp delay for the vdd_cpu output. It removes warning "ramp_delay not set"
+emitted by the function regulator_set_voltage_time_sel() by the same time,
+which floods kernel logs.
 
-Signed-off-by: Nicholas Krause <xerofoify@gmail.com>
+Signed-off-by: Romain Perier <romain.perier@gmail.com>
 ---
- drivers/net/ethernet/seeq/ether3.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+ arch/arm/boot/dts/rk3288-firefly.dtsi | 2 ++
+ 1 file changed, 2 insertions(+)
 
-diff --git a/drivers/net/ethernet/seeq/ether3.c b/drivers/net/ethernet/seeq/ether3.c
-index bdac936..412c28e 100644
---- a/drivers/net/ethernet/seeq/ether3.c
-+++ b/drivers/net/ethernet/seeq/ether3.c
-@@ -354,7 +354,7 @@ ether3_init_for_open(struct net_device *dev)
- 	ether3_outw(priv(dev)->regs.command | CMD_RXON, REG_COMMAND);
- }
+diff --git a/arch/arm/boot/dts/rk3288-firefly.dtsi b/arch/arm/boot/dts/rk3288-firefly.dtsi
+index 0b42372..0c66e92 100644
+--- a/arch/arm/boot/dts/rk3288-firefly.dtsi
++++ b/arch/arm/boot/dts/rk3288-firefly.dtsi
+@@ -213,6 +213,8 @@
+ 		regulator-max-microvolt = <1350000>;
+ 		regulator-always-on;
+ 		regulator-boot-on;
++		regulator-enable-ramp-delay = <300>;
++		regulator-ramp-delay = <8000>;
+ 		vin-supply = <&vcc_sys>;
+ 	};
  
--static inline int
-+static inline bool
- ether3_probe_bus_8(struct net_device *dev, int val)
- {
- 	int write_low, write_high, read_low, read_high;
-@@ -375,7 +375,7 @@ ether3_probe_bus_8(struct net_device *dev, int val)
- 	return read_low == write_low && read_high == write_high;
- }
- 
--static inline int
-+static inline bool
- ether3_probe_bus_16(struct net_device *dev, int val)
- {
- 	int read_val;
 -- 
-2.1.4
+1.9.1
