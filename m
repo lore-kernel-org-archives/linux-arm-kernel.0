@@ -1,146 +1,104 @@
-From: p.marczak@samsung.com (Przemyslaw Marczak)
-Date: Mon, 15 Jun 2015 12:19:26 +0200
-Subject: [RFC] ARM: exynos: MCPM: [is this a] fix for secondary boot on
- 5422?
-In-Reply-To: <CAJKOXPfLEV1sQsz87ULDKX4vijqRpbGj7AcOEDiy83kukvVKVg@mail.gmail.com>
-References: <1416896510-24612-1-git-send-email-khilman@kernel.org>
- <CAJKOXPfLEV1sQsz87ULDKX4vijqRpbGj7AcOEDiy83kukvVKVg@mail.gmail.com>
-Message-ID: <557EA6AE.304@samsung.com>
+From: josh.wu@atmel.com (Josh Wu)
+Date: Mon, 15 Jun 2015 18:27:17 +0800
+Subject: [PATCH 1/2] ARM: at91: dts: add isi & ov2640 dt nodes for
+ at91sam9m10g45ek board
+Message-ID: <1434364038-8117-1-git-send-email-josh.wu@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Krzysztof,
+Add the link for atmel-isi and ov2640 sensor node.
 
-On 06/14/2015 10:56 AM, Krzysztof Koz?owski wrote:
-> 2014-11-25 15:21 GMT+09:00 Kevin Hilman <khilman@kernel.org>:
->> From: Kevin Hilman <khilman@linaro.org>
->>
->> Using the current exynos_defconfig on the exynos5422-odroid-xu3, only
->> 6 of 8 CPUs come online with MCPM boot.  CPU0 is an A7, CPUs 1-4 are
->> A15s and CPU5-7 are the other A7s, but with the current code, CPUs 5
->> and 7 do not boot:
->>
->>     [...]
->>     Exynos MCPM support installed
->>     CPU1: update cpu_capacity 1535
->>     CPU1: thread -1, cpu 0, socket 0, mpidr 80000000
->>     CPU2: update cpu_capacity 1535
->>     CPU2: thread -1, cpu 1, socket 0, mpidr 80000001
->>     CPU3: update cpu_capacity 1535
->>     CPU3: thread -1, cpu 2, socket 0, mpidr 80000002
->>     CPU4: update cpu_capacity 1535
->>     CPU4: thread -1, cpu 3, socket 0, mpidr 80000003
->>     CPU5: failed to come online
->>     CPU6: update cpu_capacity 448
->>     CPU6: thread -1, cpu 2, socket 1, mpidr 80000102
->>     CPU7: failed to come online
->>     Brought up 6 CPUs
->>     CPU: WARNING: CPU(s) started in wrong/inconsistent modes
->>     (primary CPU mode 0x13)
->>     CPU: This may indicate a broken bootloader or firmware.
->>
->> Thanks to a tip from Abhilash, this patch gets all 8 CPUs booting
->> again, but the warning about CPUs started in inconsistent modes
->> remains.  Also, not being terribly familiar with Exynos internals,
->> it's not at all obvious to me why this register write (done for *all*
->> secondaries) makes things work works for the 2 secondary CPUs that
->> didn't come online.  It's also not obvious whether this is the right
->> general fix, since it doesn't seem to be needed on other 542x or 5800
->> platforms.
->>
->> I suspect the "right" fix is in the bootloader someplace, but not
->> knowing this hardware well, I'm not sure if the fix is in u-boot
->> proper, or somewhere in the binary blobs (bl1/bl2/tz) that start
->> before u-boot.  The u-boot I'm using is from the hardkernel u-boot
->> repo[1], and I'd welcome any suggestions to try.  I'm able to rebuild
->> my own u-boot from there, but only have binaries for bl1/bl2/tz.
->>
->> [1] branch "odroidxu3-v2012.07" of: https://github.com/hardkernel/u-boot.git
->>
->>
->> Cc: Mauro Ribeiro <mauro.ribeiro@hardkernel.com>
->> Cc: Abhilash Kesavan <a.kesavan@samsung.com>,
->> Cc: Andrew Bresticker <abrestic@chromium.org>
->> Cc: Doug Anderson <dianders@chromium.org>
->> Cc: Nicolas Pitre <nicolas.pitre@linaro.org>
->> Signed-off-by: Kevin Hilman <khilman@linaro.org>
->> ---
->>   arch/arm/mach-exynos/mcpm-exynos.c | 2 ++
->>   arch/arm/mach-exynos/regs-pmu.h    | 1 +
->>   2 files changed, 3 insertions(+)
->
-> Hi,
->
-> +Cc Marek, Bartlomiej, Kukjin Kim,
->
->
-> I would like to bring back this topic. Unfortunately I don't have
-> access to source code of BL1 (or any other firmware blob) so my
-> knowledge here comes mostly from experimenting and from looking at
-> sources of vendor kernel for Gear 2 (Exynos3250) and SM-G900H (Galaxy
-> S5, Exynos5422).
->
-> It seems that some booting firmware (I would suspect BL1 because this
-> ships Samsung to Hardkernel) uses SPARE2 as synchronization mechanism.
-> For example vendor kernel, when booting little core, it waits till
-> SPARE2==1 and then executes software reset for this core.
->
-> Observations shown that BL1 for Odroid, when booting secondary little core:
-> 1. Expects that SPARE2 register will be initialized to 1.
-> 2. If it is, then it sets it to 0, proceeds further and little core boots.
-> 3. If it is not, then it sets it to 1 and waits. Maybe this is a
-> notification to userspace - reset me please!
->
-> Unfortunately executing software reset in that time (at point 3)
-> stopped kernel from booting. No logs/dmesg and I was unable to turn on
-> early printk.
->
-> The answer why two of little cores boot is quite simple now. At
-> beginning the SPARE2==0 so first little core will set it to 1 and wait
-> till software reset. Kernel timeouts on this CPU bring up so it starts
-> the sequence for next little core. Now the SPARE2==1 so the core boots
-> fine and SPARE2 is set to 0. The last little core starts from
-> SPARE2==0, sets it to 1 and waits for software reset.
->
-> Since no one knows how this exactly works and we are stuck with BL1
-> provided as is, then IMHO the patch makes sense.
->
-> Kevin, can you refresh the patch?
-> It would be nice to:
-> 1. set SPARE2 only for Odroid (of_machine_is_compatible()),
-> 2. extend the explanation.
->
->
-> Best regards,
-> Krzysztof
->
+Signed-off-by: Josh Wu <josh.wu@atmel.com>
+---
 
-I'm trying port the hardkernel's SPL to the mainline U-Boot at present. 
-The mainline SPL is implemented for E5420 and E5800. But there are few 
-differences:
-- different DRAM
-- different clocks
-- different boot core (peach-pi boots from A15)
-- bl2 signature
-- hdk's SPL uses smc calls
-... and some more.
+ arch/arm/boot/dts/at91sam9g45.dtsi     |  4 +++
+ arch/arm/boot/dts/at91sam9m10g45ek.dts | 45 ++++++++++++++++++++++++++++++++++
+ 2 files changed, 49 insertions(+)
 
-The BL1 keeps signature key and some part of code, but it's code is 
-proprietary - but we should be able to setup the secondary cores in BL2.
-
-When, I get the basic setup working, then I'm going to focus on the 
-secondary CPU's init. I don't have the documentation for iROM code, so 
-everything takes a while.
-
-  If you looking for the lowlevel code, which is executed after wakeup, 
-please check this :
-https://github.com/hardkernel/u-boot/blob/odroidxu3-v2012.07/board/samsung/smdk5422/lowlevel_init.S
-
-The 'lowlevel_init' label is always executed on boot.
-
-Best regards,
+diff --git a/arch/arm/boot/dts/at91sam9g45.dtsi b/arch/arm/boot/dts/at91sam9g45.dtsi
+index d260ba7..e707613 100644
+--- a/arch/arm/boot/dts/at91sam9g45.dtsi
++++ b/arch/arm/boot/dts/at91sam9g45.dtsi
+@@ -1070,6 +1070,10 @@
+ 				pinctrl-names = "default";
+ 				pinctrl-0 = <&pinctrl_isi>;
+ 				status = "disabled";
++				port {
++					#address-cells = <1>;
++					#size-cells = <0>;
++				};
+ 			};
+ 
+ 			pwm0: pwm at fffb8000 {
+diff --git a/arch/arm/boot/dts/at91sam9m10g45ek.dts b/arch/arm/boot/dts/at91sam9m10g45ek.dts
+index 1375d33..5062e18 100644
+--- a/arch/arm/boot/dts/at91sam9m10g45ek.dts
++++ b/arch/arm/boot/dts/at91sam9m10g45ek.dts
+@@ -63,6 +63,25 @@
+ 
+ 			i2c0: i2c at fff84000 {
+ 				status = "okay";
++				ov2640: camera at 30 {
++					compatible = "ovti,ov2640";
++					reg = <0x30>;
++					pinctrl-names = "default";
++					pinctrl-0 = <&pinctrl_pck1_as_isi_mck &pinctrl_sensor_power &pinctrl_sensor_reset>;
++					resetb-gpios = <&pioD 12 GPIO_ACTIVE_LOW>;
++					pwdn-gpios = <&pioD 13 GPIO_ACTIVE_HIGH>;
++					clocks = <&pck1>;
++					clock-names = "xvclk";
++					assigned-clocks = <&pck1>;
++					assigned-clock-rates = <25000000>;
++
++					port {
++						ov2640_0: endpoint {
++							remote-endpoint = <&isi_0>;
++							bus-width = <8>;
++						};
++					};
++				};
+ 			};
+ 
+ 			i2c1: i2c at fff88000 {
+@@ -101,6 +120,22 @@
+ 			};
+ 
+ 			pinctrl at fffff200 {
++				camera_sensor {
++					pinctrl_pck1_as_isi_mck: pck1_as_isi_mck-0 {
++						atmel,pins =
++							<AT91_PIOB 31 AT91_PERIPH_B AT91_PINCTRL_NONE>;
++					};
++
++					pinctrl_sensor_reset: sensor_reset-0 {
++						atmel,pins =
++							<AT91_PIOD 12 AT91_PERIPH_GPIO AT91_PINCTRL_NONE>;
++					};
++
++					pinctrl_sensor_power: sensor_power-0 {
++						atmel,pins =
++							<AT91_PIOD 13 AT91_PERIPH_GPIO AT91_PINCTRL_NONE>;
++					};
++				};
+ 				mmc0 {
+ 					pinctrl_board_mmc0: mmc0-board {
+ 						atmel,pins =
+@@ -155,6 +190,16 @@
+ 				status = "okay";
+ 			};
+ 
++			isi at fffb4000 {
++				status = "okay";
++				port {
++					isi_0: endpoint {
++						remote-endpoint = <&ov2640_0>;
++						bus-width = <8>;
++					};
++				};
++			};
++
+ 			pwm0: pwm at fffb8000 {
+ 				status = "okay";
+ 
 -- 
-Przemyslaw Marczak
-Samsung R&D Institute Poland
-Samsung Electronics
-p.marczak at samsung.com
+1.9.1
