@@ -1,40 +1,121 @@
-From: benoar@dolka.fr (Benjamin Cama)
-Date: Mon, 15 Jun 2015 15:51:24 +0200
-Subject: Linkstation Mini and =?UTF-8?Q?=5F=5Fmachine=5Farch=5Ftype=20prob?=
- =?UTF-8?Q?lem=2C=20not=20booting=20since=20=33=2E=38?=
-Message-ID: <97db3502cd014faf1c710b1cc0fe8848@dolka.fr>
+From: p.marczak@samsung.com (Przemyslaw Marczak)
+Date: Mon, 15 Jun 2015 16:00:21 +0200
+Subject: [RFC] ARM: exynos: MCPM: [is this a] fix for secondary boot on
+ 5422?
+In-Reply-To: <CAJKOXPfRgTf=6Z=pbz3zQj__Nt_uLtqhD65pYc3NMrF_NJ62=g@mail.gmail.com>
+References: <1416896510-24612-1-git-send-email-khilman@kernel.org>
+ <CAJKOXPfLEV1sQsz87ULDKX4vijqRpbGj7AcOEDiy83kukvVKVg@mail.gmail.com>
+ <557EA6AE.304@samsung.com>
+ <CAJKOXPfRgTf=6Z=pbz3zQj__Nt_uLtqhD65pYc3NMrF_NJ62=g@mail.gmail.com>
+Message-ID: <557EDA75.8060807@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi everyone,
 
-First, I am new here (and not subscribed, so Cc me please). I hope I am
-on the right list [edit: resent to the correct one, again].
+On 06/15/2015 02:17 PM, Krzysztof Koz?owski wrote:
+> 2015-06-15 19:19 GMT+09:00 Przemyslaw Marczak <p.marczak@samsung.com>:
+>> Hello Krzysztof,
+>>
+>>
+>> On 06/14/2015 10:56 AM, Krzysztof Koz?owski wrote:
+>>>
+>>>
+>>> Hi,
+>>>
+>>> +Cc Marek, Bartlomiej, Kukjin Kim,
+>>>
+>>>
+>>> I would like to bring back this topic. Unfortunately I don't have
+>>> access to source code of BL1 (or any other firmware blob) so my
+>>> knowledge here comes mostly from experimenting and from looking at
+>>> sources of vendor kernel for Gear 2 (Exynos3250) and SM-G900H (Galaxy
+>>> S5, Exynos5422).
+>>>
+>>> It seems that some booting firmware (I would suspect BL1 because this
+>>> ships Samsung to Hardkernel) uses SPARE2 as synchronization mechanism.
+>>> For example vendor kernel, when booting little core, it waits till
+>>> SPARE2==1 and then executes software reset for this core.
+>>>
+>>> Observations shown that BL1 for Odroid, when booting secondary little
+>>> core:
+>>> 1. Expects that SPARE2 register will be initialized to 1.
+>>> 2. If it is, then it sets it to 0, proceeds further and little core boots.
+>>> 3. If it is not, then it sets it to 1 and waits. Maybe this is a
+>>> notification to userspace - reset me please!
+>>>
+>>> Unfortunately executing software reset in that time (at point 3)
+>>> stopped kernel from booting. No logs/dmesg and I was unable to turn on
+>>> early printk.
+>>>
+>>> The answer why two of little cores boot is quite simple now. At
+>>> beginning the SPARE2==0 so first little core will set it to 1 and wait
+>>> till software reset. Kernel timeouts on this CPU bring up so it starts
+>>> the sequence for next little core. Now the SPARE2==1 so the core boots
+>>> fine and SPARE2 is set to 0. The last little core starts from
+>>> SPARE2==0, sets it to 1 and waits for software reset.
+>>>
+>>> Since no one knows how this exactly works and we are stuck with BL1
+>>> provided as is, then IMHO the patch makes sense.
+>>>
+>>> Kevin, can you refresh the patch?
+>>> It would be nice to:
+>>> 1. set SPARE2 only for Odroid (of_machine_is_compatible()),
+>>> 2. extend the explanation.
+>>>
+>>>
+>>> Best regards,
+>>> Krzysztof
+>>>
+>>
+>> I'm trying port the hardkernel's SPL to the mainline U-Boot at present. The
+>> mainline SPL is implemented for E5420 and E5800. But there are few
+>> differences:
+>> - different DRAM
+>> - different clocks
+>> - different boot core (peach-pi boots from A15)
+>> - bl2 signature
+>> - hdk's SPL uses smc calls
+>> ... and some more.
+>>
+>> The BL1 keeps signature key and some part of code, but it's code is
+>> proprietary - but we should be able to setup the secondary cores in BL2.
+>>
+>> When, I get the basic setup working, then I'm going to focus on the
+>> secondary CPU's init. I don't have the documentation for iROM code, so
+>> everything takes a while.
+>
+> Great, good luck!
+>
 
-I usually run old kernels (3.2) on my Linkstation Mini
-(CONFIG_MACH_LINKSTATION_MINI, Marvell Orion based, non-DT) but I 
-wanted
-to try a newer one and found that after 3.7, it didn't boot anymore at
-all: no message at all displayed, not even with earlyprintk. I bisected
-the faulty commit down to b8b499c86be58cb309964fcab5b62ac4a240a878 
-?ARM:
-7602/1: Pass real "__machine_arch_type" variable to 
-setup_machine_tags()
-procedure? which looks like a quite broad change, and makes me 1) not
-really understand what it does 2) astonished not to see someone else
-affected (judging by the time since it doesn't work). Using the version
-prior to this commit works, but trying to revert it on some newer
-version (4.1-rc7) also fails, so the change must be something deeper
-that I can handle. Note that when I disable CONFIG_CPU_FEROCEON_OLD_ID
-(it is such an old Feroceon), it still correctly displays at boot
-?Error: unrecognized/unsupported processor variant (0x41069260).?, so
-the machine ID is somewhat read correctly.
+Thanks!
 
-Also, my intent at first was to try converting this machine to DT, so 
-maybe
-the solution to my problem would simply be to try converting it and see
-if it fixes the problem?
+>>
+>>   If you looking for the lowlevel code, which is executed after wakeup,
+>> please check this :
+>> https://github.com/hardkernel/u-boot/blob/odroidxu3-v2012.07/board/samsung/smdk5422/lowlevel_init.S
+>>
+>> The 'lowlevel_init' label is always executed on boot.
+>
+> I already looked at it without any success. I couldn't find the reason
+> of this SPARE2 behaviour in that code. However I found there one small
+> funny fact about magic values for low power modes - kernel and u-boot
+> expect some of the values in different places.
+>
+> Best regards,
+> Krzysztof
+>
 
-Thanks for any thought on this problem,
---
-benjamin
+I checked the SPARE registers, and only SPARE0 is set by iROM code to 
+0xFCBA0D10, it is defined in the kernel as: S5P_CHECK_AFTR. I didn't 
+analyzed the kernel code yet, however it looks, that it doesn't use 
+SPARE0 register.
+
+I need finish the basic SPL support, and then will start synchronize 
+with the kernel.
+
+Best regards,
+-- 
+Przemyslaw Marczak
+Samsung R&D Institute Poland
+Samsung Electronics
+p.marczak at samsung.com
