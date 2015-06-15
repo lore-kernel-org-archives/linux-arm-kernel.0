@@ -1,23 +1,63 @@
-From: koro.chen@mediatek.com (Koro Chen)
-Date: Mon, 15 Jun 2015 10:06:41 +0800
-Subject: [PATCH 1/3] ASoC: mediatek: Add AFE platform driver
-In-Reply-To: <20150612130638.GZ1921@sirena.org.uk>
-References: <1433946276-25969-1-git-send-email-koro.chen@mediatek.com>
- <1433946276-25969-2-git-send-email-koro.chen@mediatek.com>
- <20150612130638.GZ1921@sirena.org.uk>
-Message-ID: <1434334001.14980.3.camel@mtksdaap41>
+From: imrehg@gmail.com (Gergely Imreh)
+Date: Mon, 15 Jun 2015 10:07:23 +0800
+Subject: [PATCH 1/1] iio:adc: XADC: Set offset explicitly to zero on
+ voltage channels
+In-Reply-To: <557DA3FA.4050300@kernel.org>
+References: <1434010946-8118-1-git-send-email-imrehg@gmail.com>
+ <557C76D2.7030306@kernel.org>
+ <CAJ3iQcoKPi7vCO5c==DcwwNY6LEKJ+xPueELDC85XPVus0qf0A@mail.gmail.com>
+ <557DA18F.5090805@metafoo.de> <557DA3FA.4050300@kernel.org>
+Message-ID: <CAJ3iQcp0pOd6wMfkjWsBuj+EhCO0ig5xsyb8O3+qtKdUbnvOzQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2015-06-12 at 14:06 +0100, Mark Brown wrote:
-> On Wed, Jun 10, 2015 at 10:24:34PM +0800, Koro Chen wrote:
-> > This is the DPCM based platform driver of AFE (Audio Front End) unit.
-> > 
-> > Signed-off-by: Koro Chen <koro.chen@mediatek.com>
-> > Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
-> 
-> Your signoff should be last if you're the one sending the patch.
-> Otherwise this seems basically fine, but you said you were going to send
-> a new version so not applying.
-Thank you, I will fix this in the next version of patch along with
-fixups of Paul's comments.
+On 14 June 2015 at 23:55, Jonathan Cameron <jic23@kernel.org> wrote:
+> On 14/06/15 16:45, Lars-Peter Clausen wrote:
+>> On 06/14/2015 05:15 AM, Gergely Imreh wrote:
+>>> On 14 June 2015 at 02:30, Jonathan Cameron <jic23@kernel.org> wrote:
+>>>> On 11/06/15 09:22, Gergely Imreh wrote:
+>>>>> The Xilinx XADC driver has both a temperature channel and 8 voltage
+>>>>> channels. The voltage channels have no offset, but actually were still
+>>>>> set the same offset as the temperature channel. This did not cause
+>>>>> problems in /sys/bus/iio/ but can cause problems with other drivers
+>>>>> using iio data. For example iio-hwmon did return wrong voltage values
+>>>>> because of the offset.
+>>>>>
+>>>>> Change tested with the Parallella board.
+>>>>>
+>>>>> Signed-off-by: Gergely Imreh <imrehg@gmail.com>
+>>>> Well spotted on the bug, but I think we are better off fixing this at the
+>>>> true source of the problem which is in drivers/iio/inkern.c
+>>>> iio_convert_raw_to_processed_unlocked which does a call to
+>>>> iio_channel_read(chan, &offset, NULL, IIO_CHAN_INFO_OFFSET) then uses
+>>>> the error return to check if the offset parameter is available. It should
+>>>> be checking that before making this call with a call to iio_channel_has_info.
+>>>>
+>>>> I don't suppose you could prepare a patch fixing that as you found the problem?
+>>>
+>>> I'll check it out, and send an updated patch! Thanks for the pointers
+>>> to the core of the issue.
+>>
+>> The issue was already fixed a while ago, see this patch:
+>> http://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=65de7654d39c70c2b942f801cea01590cf7e3458
+>>
+>>  Starting with that commit iio_channel_read() returns an error when
+>> the attribute is not available, which causes
+>> iio_convert_raw_to_processed_unlocked() to skip the offset if it is
+>> not available.
+>>
+> oops.  Good spot. I'd completely forgotten about that and failed to spot
+> the check when looking at the code yesterday.
+>
+> Glad you were keeping an eagle eye on things ;)
+
+Okay, thanks, then it's all good, scrub this patch!
+That linked change was not backported to the Parallella yet, and
+missed it. Looks like it's going to be included now.
+
+Thanks for the feedback!
+   Greg
+
+>
+> J
+>> - Lars
