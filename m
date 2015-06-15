@@ -1,43 +1,38 @@
 From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Mon, 15 Jun 2015 13:38:53 +0200
+Date: Mon, 15 Jun 2015 13:39:31 +0200
 Subject: [RESEND PATCH v4 04/14] crypto: add a new driver for Marvell's
  CESA
-In-Reply-To: <20150615094827.GA32073@gondor.apana.org.au>
+In-Reply-To: <20150615093754.GA31948@gondor.apana.org.au>
 References: <1434093366-14681-1-git-send-email-boris.brezillon@free-electrons.com>
  <1434093366-14681-5-git-send-email-boris.brezillon@free-electrons.com>
- <20150615094827.GA32073@gondor.apana.org.au>
-Message-ID: <20150615133853.57687ecf@bbrezillon>
+ <20150615093754.GA31948@gondor.apana.org.au>
+Message-ID: <20150615133931.73f6f105@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 15 Jun 2015 17:48:27 +0800
+On Mon, 15 Jun 2015 17:37:54 +0800
 Herbert Xu <herbert@gondor.apana.org.au> wrote:
 
 > On Fri, Jun 12, 2015 at 09:15:56AM +0200, Boris Brezillon wrote:
 > >
-> > +static void mv_cesa_dequeue_req_unlocked(struct mv_cesa_engine *engine)
+> > +static inline int mv_cesa_sg_count(struct scatterlist *sg, int nbytes)
 > > +{
-> > +	struct crypto_async_request *req;
-> > +	struct mv_cesa_ctx *ctx;
+> > +	int nents = 0;
 > > +
-> > +	spin_lock_bh(&cesa_dev->lock);
-> > +	req = crypto_dequeue_request(&cesa_dev->queue);
+> > +	while (nbytes > 0) {
+> > +		nents++;
+> > +		nbytes -= sg->length;
+> > +		sg = sg_next(sg);
+> > +	}
+> > +
+> > +	return nents;
+> > +}
 > 
-> Need to call crypto_get_backlog before this so you can do the
-> backlog notification afterwards.
+> Please replace this with the newly added sg_nents_for_len.
 
-Oh right.
-I still have trouble understanding the need for the backlog concept
-(maybe you can give some insight): the backlog is just another list
-where we put all the requests when the queue has exceeded the limit
-fixed in crypto_queue_init, but the result is pretty much the same, the
-request stored in the backlog will be handled at some point, so what's
-the real point of this backlog.
+Sure, I'll use the sg_nents_for_len function.
 
-Anyway, this question was just for my own understanding of this thing:
-I'll fix the code to notify users that their request is in progress.
-
-Best Regards,
+Thanks,
 
 Boris
 
