@@ -1,111 +1,162 @@
-From: eric.auger@linaro.org (Eric Auger)
-Date: Mon, 15 Jun 2015 18:11:06 +0200
-Subject: [PATCH 07/10] KVM: arm/arm64: vgic: Allow HW interrupts to be
- queued to a guest
-In-Reply-To: <55795CD0.9050106@arm.com>
-References: <1433783045-8002-1-git-send-email-marc.zyngier@arm.com>
- <1433783045-8002-8-git-send-email-marc.zyngier@arm.com>
- <55794A7A.2080306@arm.com> <557951C6.2090408@arm.com>
- <55795862.1050407@arm.com> <55795CD0.9050106@arm.com>
-Message-ID: <557EF91A.7020002@linaro.org>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Mon, 15 Jun 2015 18:15:04 +0200
+Subject: [PATCH v2 00/14] ARM: shmobile: Add CPG Clock Domains
+In-Reply-To: <1432839219-475-1-git-send-email-geert+renesas@glider.be>
+References: <1432839219-475-1-git-send-email-geert+renesas@glider.be>
+Message-ID: <CAMuHMdXntR6c4-uUNGVGx7D7941e8hvnmtVBvDu2+iUsNHQ=Qw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/11/2015 12:02 PM, Marc Zyngier wrote:
-> On 11/06/15 10:44, Andre Przywara wrote:
->> On 06/11/2015 10:15 AM, Marc Zyngier wrote:
->>> On 11/06/15 09:44, Andre Przywara wrote:
->>>> On 06/08/2015 06:04 PM, Marc Zyngier wrote:
->> ...
->>>>> @@ -1344,6 +1364,35 @@ static bool vgic_process_maintenance(struct kvm_vcpu *vcpu)
->>>>>  	return level_pending;
->>>>>  }
->>>>>  
->>>>> +/* Return 1 if HW interrupt went from active to inactive, and 0 otherwise */
->>>>> +static int vgic_sync_hwirq(struct kvm_vcpu *vcpu, struct vgic_lr vlr)
->>>>> +{
->>>>> +	struct irq_phys_map *map;
->>>>> +	int ret;
->>>>> +
->>>>> +	if (!(vlr.state & LR_HW))
->>>>> +		return 0;
->>>>> +
->>>>> +	map = vgic_irq_map_search(vcpu, vlr.irq);
->>>>
->>>> I wonder if it's safe to rely on that mapping here. Are we sure that
->>>> this hasn't changed while the VCPU was running? If I got this correctly,
->>>> currently only vcpu_reset will actually add a map entry, but I guess in
->>>> the future there will be more users.
->>>
->>> How can the guest interrupt change? This is HW, as far as the guest is
->>> concerned. An actual interrupt line. We don't reconfigure the HW live.
->>
->> I was thinking about the rbtree mapping we introduced. There we map a
->> guest interrupt to a hardware interrupt. Are we sure that no one tears
->> down that mapping while we have an LR populated with this pair?
->> I am not talking about the timer here, but more about future users.
->>
->>>> Also we rely on the irqdomain mapping to be still the same, but that is
->>>> probably a safe assumption.
->>>
->>> Like I said before, this *cannot* change.
->>
->> OK, got it.
->>
->>>
->>>> But I'd still find it more natural to use the hwirq number from the LR
->>>> at this point. Can't we use irq_find_mapping() here to learn Linux'
->>>> (current) irq number from that?
->>>
->>> I think you're confused.
->>>
->>> - The guest irq (vlr.irq) is entirely made up, and has no connection
->>> with reality. it is stable, and cannot change during the lifetime of the
->>> guest (think of it as a HW irq line).
->>>
->>> - The host hwirq (vlr.hwirq) is stable as well, for the same reason.
->>>
->>> - The Linux IRQ cannot change because we've been given it by the kernel,
->>> and that's what we use for *everything* as far as the kernel is
->>> concerned. Its mapping to hwirq is stable as well because this is how we
->>> talk to the HW.
->>
->> Not disputing any of them, but:
->>
->>> - irq_find_mapping gives you the *reverse* mapping (from hwirq to Linux
->>> irq), and for that to work, you need the domain on which you want to
->>> apply the translation. This is only useful when actually taking the
->>> interrupt (i.e. in an interrupt controller driver). I can't see how that
->>> could make sense here.
->>
->> So if the guest has acked/EOIed it's IRQ, the GIC at the same time
->> acked/EOIed the hardware IRQ it found in the LR. Now we assume that this
->> is the very same as the HW IRQ we found doing our rbtree traversal.
->> I just wanted to be sure that this is always true and that this mapping
->> didn't change while the VCPU was running.
->> If you are sure of this, fine, I was just concerned that someone breaks
->> this assumption in the future by more dynamically mapping/unmapping
->> entries (say some irq forwarding user) and we will not notice.
-> 
-> How can the mapping change? Are you thinking of an unmap/map operation
-> being done while the guest is running, replacing a HW device with
-> another? That's not an option, and not only for the interrupts.
+On Thu, May 28, 2015 at 8:53 PM, Geert Uytterhoeven
+<geert+renesas@glider.be> wrote:
+>         Hi all,
+>
+> This patch series adds Clock Domain support to the Clock Pulse Generator
+> (CPG) Module Stop (MSTP) Clocks driver using the generic PM Domain, to
+> be used on shmobile SoCs without device power domains (R-Car Gen1 and
+> Gen2, RZ).  This allows to power-manage the module clocks of SoC devices
+> that are part of the CPG Clock Domain using Runtime PM, or for system
+> suspend/resume, similar to SoCs with device power domains (SH-Mobile and
+> R-Mobile).
+>
+> SoC devices that are part of the CPG Clock Domain and can be
+> power-managed through an MSTP clock are tagged in DT with a proper
+> "power-domains" property. This applies to most on-SoC devices, which
+> have a one-to-one mapping from SoC device to DT device node.
+> Notable exceptions are "display" and "sound" device nodes, which
+> represent multiple SoC devices, each having their own MSTP clocks. Hence
+> drivers for such devices still have to manage their (multiple module)
+> clocks themselves.
+>
+> The (MSTP) clock to use for power-management is found by scanning for
+> clocks that are compatible with "renesas,cpg-mstp-clocks".
+> Before, the "first" clock tied to each device (con_id NULL) was used,
+> being a bit ad-hoc. It was suggested to use the "fck" clock instead,
+> but this may conflict with DT bindings for devices we don't control
+> (e.g. GIC-400 plans to mandate "clk" for the clk-name of its single
+> clock). Looking for real MSTP clocks avoids this problem.
+>
+> Logically, the CPG Clock Domain operates on the SoC CPG/MSTP block.
+> As there's no single device node in DT representing this block (there
+> are separate device nodes for the CPG and for the individual MSTP
+> clocks), I bound the logic to the CPG device node.
+> Perhaps this is something we should change for future SoCs?
 
-Well that's what we achieved I think with the kvm-vfio integration. The
-requirement was: since we allow the user-space to turn forwarding on,
-through the kvm-vfio device, we should offer the inverse operation and
-this was should never fail. This was achieved by forcing the guest exit,
-check the HW state of the IRQ, and quite a lot of pain ...
+Inside Renesas, we've been discussing this face-to-face, but haven't
+reached a conclusion yet.
 
-At that time the kvm-vfio integration seemed to be the most appropriate
-approach. Now it seems this is put into question again with Intel posted
-IRQ API series review (https://lkml.org/lkml/2015/6/12/595). I think you
-will happy. not sure I can say the same ;-)
+In Linux terminology, "PM domain" is a higher-level abstraction than
+just (hardware) "power domain" (sometimes called "power area").
+A "PM domain" is any collection of devices that are power-managed
+similarly. As such it covers not only hardware power domains, but also
+clock domains, and even firmware controlled devices (e.g. as used by the
+Linux ACPI subsystem).
 
-Best Regards
+I find it a bit unfortunate this was not reflected in the DT bindings
+for Generic PM domains, which use "power-domains" properties, making
+believe people this is about hardware power domains only.
 
-Eric
+One other point of confusion is that there are multiple kernel
+subsystems that can (or seem to be able to) be used for the same
+purpose. Both regulators and power domains are used to "control power".
+The same is true for clocks vs. clock domains.
+My point of view is that the regulator and clock subsystems are more
+about the properties of regulators (voltage, current) resp. clocks
+(frequencies), while power/clock domains are about being active or
+inactive.
 
-> 
-> 	M.
-> 
+On Renesas SoCs (SH/R-Mobile, R-Car, RZ), the MSTP (Module Standby and
+Software Reset) block is very intimately tied to the CPG (Clock Pulse
+Generator) block.
+
+The MSTP block provides two functions:
+  1. Module Standby: "Clock supply to specified modules is stopped by
+     setting the module stop control register bits."
+     However, the clock supply to a module is not stopped until all CPUs
+     in the SoC agree.  Indeed, there are separate MSTP registers for
+     application (Cortex-A) and real-time (SH and/or Cortex-R) cores.
+  2. Reset control. to perform a software reset of a specific module.
+
+Given the second function, perhaps the MSTP bits shouldn't have been
+moduled as clocks, but it made sense at the time of introduction, and
+IMHO it still does.
+
+However, due to the module standby function, all connected devices are
+grouped into a collection of devices that are power-managed similarly,
+by controlling the clock supply to the individual modules. So this
+warrants the use of a PM domain.
+
+Alternative solutions that have been proposed are:
+
+  1. | Explicit opt-in in drivers (from Laurent)
+     | As the driver knows best which clock it wants to manage, the
+     | driver could tell runtime PM if/when which clock to use.
+
+     My rebuttal here is twofold:
+       - Does the driver know best? It may know it may need to enable a
+         clock. But the clock may be optional: on some SoCs, the same IP
+         core may be present without the Module Standby feature (e.g.
+         the GPIO blocks on R-Car Gen1 are not documented to have MSTP
+         bits, while they do on R-Car Gen2). Why would the driver have
+         to care?
+
+         The hardware documentation clearly states the purpose of the
+         MSTP clocks: when a module is not in use, its module clock can
+         be stopped to reduce power consumption.  All of this should be
+         described in DT. We already have the clocks in DT. If a module
+         has an MSTP clock, it means the module can be put in standby
+         mode. This is the same for all modules, hence for all drivers.
+
+       - The idea is to reduce the amount of boilerplate code, not to
+         increase it. The more code we can move into platform code, the
+         less drivers have to care.
+
+         This is the real power behind the abstraction of runtime PM.
+         The driver only has to tell runtime PM when it wants to "use"
+         the hardware module, using pm_runtime_{get_sync,put}().
+         It doesn't have to know this involves enabling clocks and/or
+         power domains, or parent devices. All of this is taken care of
+         by a small piece of platform code, and the generic code.
+         As not all drivers are runtime PM-aware yet, calls to
+         pm_runtime_*() functions may have to be added, though. But
+         that's it.
+
+     Side note: Laurent has been mostly involved with multimedia devices.
+     And let display and sound be the two exceptions where there's no
+     one-to-one mapping from SoC devices to DT device nodes...
+     Hence the multimedia drivers would have to manage the (multiple)
+     module clocks anyway.
+
+     Perhaps the display and sound bindings can be reworked, to better
+     describe the hardware structure, and expose a one-to-one mapping
+     between MSTP clocks and hardware modules, too?
+
+  2. | Handling MSTP clocks automatically in a similar way that the current
+     | code handles the first clock, without requiring usage of a
+     | power-domain property in DT (from Magnus)
+     | As there are already "clocks = <...>" links from device nodes to MSTP
+     | clocks in DT, we can just scan for those, without requiring
+     | (superfluous) "power-domains = <...>" properties in DT.
+
+     Indeed, given the presence of a link to an MSTP clock in a device
+     node, we know the module can be put in standby mode.
+     But without the standard "power-domains" property, we would need
+     our own specialized code to scan all nodes for MSTP clocks (through
+     a platform_bus notifier again?), and add the corresponding devices
+     to the clock domain.  Hence the "power-domains" properties allow to
+     use the generic code, and thus share more code with other SoCs.
+     In addition, a "power-domains" property gives a strong clue to
+     people not familiar with Renesas SoCs and their MSTP clocks.
+
+Thanks for your comments/suggestions/supports/flames/...!
+
+Gr{oetje,eeting}s,
+
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
