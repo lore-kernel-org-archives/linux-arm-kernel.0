@@ -1,33 +1,46 @@
-From: lina.iyer@linaro.org (Lina Iyer)
-Date: Mon, 15 Jun 2015 13:14:34 -0600
-Subject: [PATCH RFC 3/3] PM / Domains: Introduce generic PM domain for
- cpu domain
-In-Reply-To: <7hioao6cd2.fsf@deeprootsystems.com>
-References: <1433456946-53296-1-git-send-email-lina.iyer@linaro.org>
- <1433456946-53296-4-git-send-email-lina.iyer@linaro.org>
- <7hmw07meh6.fsf@deeprootsystems.com>
- <20150611145649.GC1103@linaro.org>
- <7hioao6cd2.fsf@deeprootsystems.com>
-Message-ID: <20150615191434.GA14311@linaro.org>
+From: dave.long@linaro.org (David Long)
+Date: Mon, 15 Jun 2015 15:07:09 -0400
+Subject: [PATCH v7 7/7] kprobes: Add arm64 case in kprobe example module
+In-Reply-To: <1434395229-6654-1-git-send-email-dave.long@linaro.org>
+References: <1434395229-6654-1-git-send-email-dave.long@linaro.org>
+Message-ID: <1434395229-6654-8-git-send-email-dave.long@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 15 2015 at 12:43 -0600, Kevin Hilman wrote:
->Lina Iyer <lina.iyer@linaro.org> writes:
->
->> On Wed, Jun 10 2015 at 15:38 -0600, Kevin Hilman wrote:
->>>Lina Iyer <lina.iyer@linaro.org> writes:
+From: Sandeepa Prabhu <sandeepa.prabhu@linaro.org>
 
+Add info prints in sample kprobe handlers for ARM64
 
->I'm pretty sure the generic code will already add devices to genpds if
->the genpd is using the of_genpd_* stuff.  That is why I'm wondering why
->the extra stuff for CPUs is needed.
->
-I dont see that automatically happening. When I attach a device, it
-finds the corresponding genpd provider and attaches the device.  But I
-dont see in any code that creates genpd and find the related device
-nodes and adds them to the genpd.
+Signed-off-by: Sandeepa Prabhu <sandeepa.prabhu@linaro.org>
+---
+ samples/kprobes/kprobe_example.c | 8 ++++++++
+ 1 file changed, 8 insertions(+)
 
-May be I am missing something.
-
--- Lina
+diff --git a/samples/kprobes/kprobe_example.c b/samples/kprobes/kprobe_example.c
+index 366db1a..51d459c 100644
+--- a/samples/kprobes/kprobe_example.c
++++ b/samples/kprobes/kprobe_example.c
+@@ -42,6 +42,10 @@ static int handler_pre(struct kprobe *p, struct pt_regs *regs)
+ 			" ex1 = 0x%lx\n",
+ 		p->addr, regs->pc, regs->ex1);
+ #endif
++#ifdef CONFIG_ARM64
++	pr_info("pre_handler: p->addr = 0x%p, pc = 0x%lx\n",
++		p->addr, (long)regs->pc);
++#endif
+ 
+ 	/* A dump_stack() here will give a stack backtrace */
+ 	return 0;
+@@ -67,6 +71,10 @@ static void handler_post(struct kprobe *p, struct pt_regs *regs,
+ 	printk(KERN_INFO "post_handler: p->addr = 0x%p, ex1 = 0x%lx\n",
+ 		p->addr, regs->ex1);
+ #endif
++#ifdef CONFIG_ARM64
++	pr_info("post_handler: p->addr = 0x%p, pc = 0x%lx\n",
++		p->addr, (long)regs->pc);
++#endif
+ }
+ 
+ /*
+-- 
+1.8.1.2
