@@ -1,33 +1,63 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Mon, 15 Jun 2015 09:58:05 -0600
-Subject: [RESEND PATCH 1/2] pinctrl: change function behavior for per
- pin muxing controllers
-In-Reply-To: <1433948699-19800-2-git-send-email-ludovic.desroches@atmel.com>
-References: <1433948699-19800-1-git-send-email-ludovic.desroches@atmel.com>
- <1433948699-19800-2-git-send-email-ludovic.desroches@atmel.com>
-Message-ID: <557EF60D.8020007@wwwdotorg.org>
+From: s.trumtrar@pengutronix.de (Steffen Trumtrar)
+Date: Mon, 15 Jun 2015 17:59:07 +0200
+Subject: [BUG?] crypto: caam: little/big endianness on ARM vs PPC
+Message-ID: <20150615155907.GC7947@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/10/2015 09:04 AM, Ludovic Desroches wrote:
-> When having a controller which allows per pin muxing, declaring with
-> which groups a function can be used is a useless constraint since groups
-> are something virtual.
+Hi!
 
-This isn't true.
+I'm working on CAAM support for the ARM-based i.MX6 SoCs. The current
+drivers/crypto/caam driver only works for PowerPC AFAIK.
+Actually, there isn't that much to do, to get support for the i.MX6 but
+one patch breaks the driver severely:
 
-Irrespective of whether a particular piece of pinmux HW can control the 
-mux function for each pin individually, or only in groups, it's quite 
-likely that each function can only be selected onto a subset of those 
-pins or groups. Requiring the pinctrl driver to inform the core which 
-set of pins/groups particular functions can be selected onto seems quite 
-reasonable.
+	commit ef94b1d834aace7101de77c3a7c2631b9ae9c5f6
+	crypto: caam - Add definition of rd/wr_reg64 for little endian platform
 
-In my opinion at least, for HW that can select the mux function at the 
-per-pin level, the only sensible set of groups is one group per pin with 
-each group containing a single pin. Any other use of groups is a 
-SW/user-level construct, and is something unrelated to why the pinctrl 
-subsystem supports groups. If we want to represent those groups in 
-pinctrl, there should be two separate sets of groups; one to represent 
-the actual HW capabilities, and one to represent the SW/user-level 
-convenience abstractions.
+This patch adds
+
++#ifdef __LITTLE_ENDIAN
++static inline void wr_reg64(u64 __iomem *reg, u64 data)
++{
++	wr_reg32((u32 __iomem *)reg + 1, (data & 0xffffffff00000000ull) >> 32);
++	wr_reg32((u32 __iomem *)reg, data & 0x00000000ffffffffull);
++}
+
+The wr_reg64 function is only used in one place in the drivers/crypto/caam/jr.c
+driver: to write the dma_addr_t to the register. Without that patch everything
+works fine on ARM (little endian, 32bit), with that patch the driver will write
+0's into the register that holds the DMA address (the numerically-higher) -> kernel hangs.
+Also, from my understanding, the comment above the defines, stating that you
+have to first write the numerically-lower and then the numerically-higher address
+on 32bit systems doesn't match with the implementation.
+
+What I don't know/understand is if this makes any sense for any PowerPC implementation.
+
+So, the question is, how to fix this? I'd prefer to do it directly in the jr driver
+instead of the ifdef-ery.
+
+Something like
+	if (sizeof(dma_addr_t) == sizeof(u32))
+		wr_reg32(&jrp->rregs->inpring_base + 1, inpbusaddr);
+	else if (sizeof(dma_addr_t) == sizeof(u64))
+		wr_reg64(...)
+
+or just go by DT compatible and then remove the inline function definitions.
+
+As far as I can tell, the compatible wouldn't be needed for anything else in the
+jr driver, so maybe that is not optimal. On the other hand the sizeof(..)
+solution would only catch little endian on 32bit and not big endian (?!)
+I however don't know what combinations actually *have* to be caught, as I don't
+know, which exist.
+
+So, what do you think people?
+
+Thanks,
+Steffen Trumtrar
+
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
