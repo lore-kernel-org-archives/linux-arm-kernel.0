@@ -1,41 +1,40 @@
-From: pebolle@tiscali.nl (Paul Bolle)
-Date: Mon, 15 Jun 2015 17:00:19 +0200
-Subject: [PATCH v15 3/4] soc: rockchip: power-domain: add power domain
- driver
-In-Reply-To: <1434258820-26779-4-git-send-email-wxt@rock-chips.com>
-References: <1434258820-26779-1-git-send-email-wxt@rock-chips.com>
- <1434258820-26779-4-git-send-email-wxt@rock-chips.com>
-Message-ID: <1434380419.2069.38.camel@x220>
+From: omaplinuxkernel@gmail.com (Shubhrajyoti Datta)
+Date: Mon, 15 Jun 2015 20:35:17 +0530
+Subject: [PATCH v2 2/2] dma: Add Xilinx zynqmp dma engine driver support
+In-Reply-To: <1434378982-30184-2-git-send-email-punnaia@xilinx.com>
+References: <1434378982-30184-1-git-send-email-punnaia@xilinx.com>
+ <1434378982-30184-2-git-send-email-punnaia@xilinx.com>
+Message-ID: <CAM=Q2ctpOhxryYqgiHDQry7Q_1noYGEX4pYg+tp+wLgV9=X1hw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, 2015-06-14 at 13:13 +0800, Caesar Wang wrote:
+On Mon, Jun 15, 2015 at 8:06 PM, Punnaiah Choudary Kalluri
+<punnaiah.choudary.kalluri@xilinx.com> wrote:
+> Added the basic driver for zynqmp dma engine used in Zynq
+> UltraScale+ MPSoC. The initial release of this driver supports
+> only memory to memory transfers.
+>
+> Signed-off-by: Punnaiah Choudary Kalluri <punnaia@xilinx.com>
+> ---
+<snip>
 
-> --- /dev/null
-> +++ b/drivers/soc/rockchip/Kconfig
+> +/**
+> + * zynqmp_dma_chan_is_idle - Provides the channel idle status
+> + * @chan: ZynqMP DMA DMA channel pointer
+> + *
+> + * Return: '1' if the channel is idle otherwise '0'
+> + */
+> +static int zynqmp_dma_chan_is_idle(struct zynqmp_dma_chan *chan)
 
-> +config PM_GENERIC_DOMAINS
-> +        tristate "Rockchip generic power domain"
+maybe this could return bool.
 
-Since my remarks on v13 you removed the module specific code from 
-pm_domains.c. But now this became a tristate symbol. That makes little
-sense. Why didn't you keep bool?
-
-> +        depends on PM
-> +        help
-> +          Say y here to enable power doamin support.
-
-s/doamin/domain/.
-
-> +          In order to meet high performance and low power requirements, a power
-> +          management unit is designed or saving power when RK3288 in low power
-> +          mode. The RK3288 PMU is dedicated for managing the power ot the whole chip.
-
-s/ot/of/
-
-> +          If unsure, say N.
-
-Thanks,
-
-
-Paul Bolle
+> +{
+> +       u32 regval;
+> +
+> +       regval = readl(chan->regs + STATUS);
+> +       if (regval & STATUS_BUSY)
+> +               return 0;
+> +
+> +       return 1;
+> +}
+> +
