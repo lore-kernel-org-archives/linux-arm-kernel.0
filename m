@@ -1,100 +1,138 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 15 Jun 2015 19:51:44 +0100
-Subject: [PATCH] arm64: KVM: Optimize arm64 guest exit VFP/SIMD register
- save/restore
-In-Reply-To: <557F1CFB.8040106@samsung.com>
-References: <557CACC4.8040405@samsung.com> <557EA23D.4090200@arm.com>
- <557F13A5.9030603@samsung.com> <557F1765.8040405@arm.com>
- <557F1CFB.8040106@samsung.com>
-Message-ID: <557F1EC0.6060004@arm.com>
+From: khilman@kernel.org (Kevin Hilman)
+Date: Mon, 15 Jun 2015 11:53:54 -0700
+Subject: [RFC] ARM: exynos: MCPM: [is this a] fix for secondary boot on
+ 5422?
+In-Reply-To: <CAJKOXPfLEV1sQsz87ULDKX4vijqRpbGj7AcOEDiy83kukvVKVg@mail.gmail.com>
+ ("Krzysztof =?utf-8?Q?Koz=C5=82owski=22's?= message of "Sun, 14 Jun 2015
+ 17:56:20 +0900")
+References: <1416896510-24612-1-git-send-email-khilman@kernel.org>
+ <CAJKOXPfLEV1sQsz87ULDKX4vijqRpbGj7AcOEDiy83kukvVKVg@mail.gmail.com>
+Message-ID: <7h1thc6bwd.fsf@deeprootsystems.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 15/06/15 19:44, Mario Smarduch wrote:
-> On 06/15/2015 11:20 AM, Marc Zyngier wrote:
->> On 15/06/15 19:04, Mario Smarduch wrote:
->>> On 06/15/2015 03:00 AM, Marc Zyngier wrote:
->>>> Hi Mario,
->>>>
->>>> I was working on a more ambitious patch series, 
->>>> but we probably ought to
->>>> start small, and this looks fairly sensible to me.
->>>
->>> Hi Marc,
->>>    thanks for reviewing, I was thinking to post this
->>> first and next iteration on guest access switch
->>> back to host registers only upon  return to user space or
->>> vCPU context switch. This should save more cycles for
->>> various exits.
->>>
->>> Were you thinking along the same lines or something
->>> altogether different?
->>
->> That's mostly what I had in mind. Basically staying away from touching
->> the FP registers until vcpu_put(). I had it mostly working, but
->> experienced some interesting corruption cases, specially when using
->> 32bit guests.
->>
->>>
->>>>
->>>> A few minor comments below.
->>>>
->>>> On 13/06/15 23:20, Mario Smarduch wrote:
->>>>> Currently VFP/SIMD registers are always saved and restored
->>>>> on Guest entry and exit.
->>>>>
->>>>> This patch only saves and restores VFP/SIMD registers on
->>>>> Guest access. To do this cptr_el2 VFP/SIMD trap is set
->>>>> on Guest entry and later checked on exit. This follows
->>>>> the ARMv7 VFPv3 implementation. Running an informal test
->>>>> there are high number of exits that don't access VFP/SIMD
->>>>> registers.
->>>>
->>>> It would be good to add some numbers here. How often do we exit without
->>>> having touched the FPSIMD regs? For which workload?
->>>
->>> Lmbench is what I typically use, with ssh server, i.e., cause page
->>> faults and interrupts - usually registers are not touched.
->>> I'll run the tests again and define usually.
->>>
->>> Any other loads you had in mind?
->>
->> Not really (apart from running hackbench, of course...;-). I'd just like
->> to see the numbers in the commit message, so that we can document the
->> improvement (and maybe track regressions).
-> 
-> Ok I understand.
-> 
->>
->> [...]
->>
->>>>
->>>>>  	skip_debug_state x3, 1f
->>>>>  	// Clear the dirty flag for the next run, as all the state has
->>>>>  	// already been saved. Note that we nuke the whole 64bit word.
->>>>> @@ -1166,6 +1211,10 @@ el1_sync:					// Guest trapped into EL2
->>>>>  	mrs	x1, esr_el2
->>>>>  	lsr	x2, x1, #ESR_ELx_EC_SHIFT
->>>>>
->>>>> +	/* Guest accessed VFP/SIMD registers, save host, restore Guest */
->>>>> +	cmp	x2, #ESR_ELx_EC_FP_ASIMD
->>>>> +	b.eq	switch_to_guest_vfp
->>>>> +
->>>>
->>>> I'd prefer you moved that hunk to el1_trap, where we handle all the
->>>> traps coming from the guest.
->>>
->>> I'm thinking would it make sense to update the armv7 side as
->>> well. When reading both exit handlers the flow mirrors
->>> each other.
->>
->> The 32bit code is starting to show its age, and could probably do with a
->> refactor. If you have some cycles to spare, that'd be quite interesting.
-> 
-> Yep, will do, ARMv7 is still very relevant.
+Krzysztof Koz?owski <k.kozlowski.k@gmail.com> writes:
 
-You bet it is. My home router is a v7 VM...
+> 2014-11-25 15:21 GMT+09:00 Kevin Hilman <khilman@kernel.org>:
+>> From: Kevin Hilman <khilman@linaro.org>
+>>
+>> Using the current exynos_defconfig on the exynos5422-odroid-xu3, only
+>> 6 of 8 CPUs come online with MCPM boot.  CPU0 is an A7, CPUs 1-4 are
+>> A15s and CPU5-7 are the other A7s, but with the current code, CPUs 5
+>> and 7 do not boot:
+>>
+>>    [...]
+>>    Exynos MCPM support installed
+>>    CPU1: update cpu_capacity 1535
+>>    CPU1: thread -1, cpu 0, socket 0, mpidr 80000000
+>>    CPU2: update cpu_capacity 1535
+>>    CPU2: thread -1, cpu 1, socket 0, mpidr 80000001
+>>    CPU3: update cpu_capacity 1535
+>>    CPU3: thread -1, cpu 2, socket 0, mpidr 80000002
+>>    CPU4: update cpu_capacity 1535
+>>    CPU4: thread -1, cpu 3, socket 0, mpidr 80000003
+>>    CPU5: failed to come online
+>>    CPU6: update cpu_capacity 448
+>>    CPU6: thread -1, cpu 2, socket 1, mpidr 80000102
+>>    CPU7: failed to come online
+>>    Brought up 6 CPUs
+>>    CPU: WARNING: CPU(s) started in wrong/inconsistent modes
+>>    (primary CPU mode 0x13)
+>>    CPU: This may indicate a broken bootloader or firmware.
+>>
+>> Thanks to a tip from Abhilash, this patch gets all 8 CPUs booting
+>> again, but the warning about CPUs started in inconsistent modes
+>> remains.  Also, not being terribly familiar with Exynos internals,
+>> it's not at all obvious to me why this register write (done for *all*
+>> secondaries) makes things work works for the 2 secondary CPUs that
+>> didn't come online.  It's also not obvious whether this is the right
+>> general fix, since it doesn't seem to be needed on other 542x or 5800
+>> platforms.
+>>
+>> I suspect the "right" fix is in the bootloader someplace, but not
+>> knowing this hardware well, I'm not sure if the fix is in u-boot
+>> proper, or somewhere in the binary blobs (bl1/bl2/tz) that start
+>> before u-boot.  The u-boot I'm using is from the hardkernel u-boot
+>> repo[1], and I'd welcome any suggestions to try.  I'm able to rebuild
+>> my own u-boot from there, but only have binaries for bl1/bl2/tz.
+>>
+>> [1] branch "odroidxu3-v2012.07" of: https://github.com/hardkernel/u-boot.git
+>>
+>>
+>> Cc: Mauro Ribeiro <mauro.ribeiro@hardkernel.com>
+>> Cc: Abhilash Kesavan <a.kesavan@samsung.com>,
+>> Cc: Andrew Bresticker <abrestic@chromium.org>
+>> Cc: Doug Anderson <dianders@chromium.org>
+>> Cc: Nicolas Pitre <nicolas.pitre@linaro.org>
+>> Signed-off-by: Kevin Hilman <khilman@linaro.org>
+>> ---
+>>  arch/arm/mach-exynos/mcpm-exynos.c | 2 ++
+>>  arch/arm/mach-exynos/regs-pmu.h    | 1 +
+>>  2 files changed, 3 insertions(+)
+>
+> Hi,
+>
+> +Cc Marek, Bartlomiej, Kukjin Kim,
+>
+>
+> I would like to bring back this topic. Unfortunately I don't have
+> access to source code of BL1 (or any other firmware blob) so my
+> knowledge here comes mostly from experimenting and from looking at
+> sources of vendor kernel for Gear 2 (Exynos3250) and SM-G900H (Galaxy
+> S5, Exynos5422).
+>
+> It seems that some booting firmware (I would suspect BL1 because this
+> ships Samsung to Hardkernel) uses SPARE2 as synchronization mechanism.
+> For example vendor kernel, when booting little core, it waits till
+> SPARE2==1 and then executes software reset for this core.
+>
+> Observations shown that BL1 for Odroid, when booting secondary little core:
+> 1. Expects that SPARE2 register will be initialized to 1.
+> 2. If it is, then it sets it to 0, proceeds further and little core boots.
+> 3. If it is not, then it sets it to 1 and waits. Maybe this is a
+> notification to userspace - reset me please!
+>
+> Unfortunately executing software reset in that time (at point 3)
+> stopped kernel from booting. No logs/dmesg and I was unable to turn on
+> early printk.
+>
+> The answer why two of little cores boot is quite simple now. At
+> beginning the SPARE2==0 so first little core will set it to 1 and wait
+> till software reset. Kernel timeouts on this CPU bring up so it starts
+> the sequence for next little core. Now the SPARE2==1 so the core boots
+> fine and SPARE2 is set to 0. The last little core starts from
+> SPARE2==0, sets it to 1 and waits for software reset.
+>
+> Since no one knows how this exactly works and we are stuck with BL1
+> provided as is, then IMHO the patch makes sense.
+>
+> Kevin, can you refresh the patch?
+> It would be nice to:
+> 1. set SPARE2 only for Odroid (of_machine_is_compatible()),
+> 2. extend the explanation.
 
-	M.
--- 
-Jazz is not dead. It just smells funny...
+I'd rather someone else refresh this patch who actually understands
+what's going on here and could write a descriptive changelog.  I have no
+claims to the authorship as Abhilash is the one who suggested this fix
+in the first place.
+
+Also, please note that 8 cores booting doesn't mean all 8 cores fully
+working.  This firmware is still horribly broken for low-power modes.
+
+Even with all 8 cores enabled, the firmware also as CCI left in secure
+mode which means the kernel MCPM cannot manage CCI, and thus cannot hit
+any low-power states.  If CPUidle is enabled, the kernel will hang as
+soon as any MCPM state is attempted.  In order to get WFI-only CPUidle
+working, I've also had to disable CCI in the DTS by appending something
+like this to the board DTS file:
+
+&cci {
+     status = "disabled";
+};
+
+All of this though makes me wonder how the hardkernel kernel actually
+does any low-power idle.  Is it relying on firmware for this?  I have a
+hard time believe that the firmware would be able to handle this in a
+race-free way.
+
+Kevin
