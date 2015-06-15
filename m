@@ -1,45 +1,100 @@
-From: me@kylehuey.com (Kyle Huey)
-Date: Mon, 15 Jun 2015 11:46:08 -0700
-Subject: [PATCH v2] ARM: tegra124: pmu support
-Message-ID: <1434393968-1105-1-git-send-email-khuey@kylehuey.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Mon, 15 Jun 2015 19:51:44 +0100
+Subject: [PATCH] arm64: KVM: Optimize arm64 guest exit VFP/SIMD register
+ save/restore
+In-Reply-To: <557F1CFB.8040106@samsung.com>
+References: <557CACC4.8040405@samsung.com> <557EA23D.4090200@arm.com>
+ <557F13A5.9030603@samsung.com> <557F1765.8040405@arm.com>
+ <557F1CFB.8040106@samsung.com>
+Message-ID: <557F1EC0.6060004@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch modifies the device tree for tegra124 based devices to enable the Cortex A15 PMU.  The interrupt numbers are taken from NVIDIA TRM DP-06905-001_v03p.  This patch was tested on a Jetson TK1.
+On 15/06/15 19:44, Mario Smarduch wrote:
+> On 06/15/2015 11:20 AM, Marc Zyngier wrote:
+>> On 15/06/15 19:04, Mario Smarduch wrote:
+>>> On 06/15/2015 03:00 AM, Marc Zyngier wrote:
+>>>> Hi Mario,
+>>>>
+>>>> I was working on a more ambitious patch series, 
+>>>> but we probably ought to
+>>>> start small, and this looks fairly sensible to me.
+>>>
+>>> Hi Marc,
+>>>    thanks for reviewing, I was thinking to post this
+>>> first and next iteration on guest access switch
+>>> back to host registers only upon  return to user space or
+>>> vCPU context switch. This should save more cycles for
+>>> various exits.
+>>>
+>>> Were you thinking along the same lines or something
+>>> altogether different?
+>>
+>> That's mostly what I had in mind. Basically staying away from touching
+>> the FP registers until vcpu_put(). I had it mostly working, but
+>> experienced some interesting corruption cases, specially when using
+>> 32bit guests.
+>>
+>>>
+>>>>
+>>>> A few minor comments below.
+>>>>
+>>>> On 13/06/15 23:20, Mario Smarduch wrote:
+>>>>> Currently VFP/SIMD registers are always saved and restored
+>>>>> on Guest entry and exit.
+>>>>>
+>>>>> This patch only saves and restores VFP/SIMD registers on
+>>>>> Guest access. To do this cptr_el2 VFP/SIMD trap is set
+>>>>> on Guest entry and later checked on exit. This follows
+>>>>> the ARMv7 VFPv3 implementation. Running an informal test
+>>>>> there are high number of exits that don't access VFP/SIMD
+>>>>> registers.
+>>>>
+>>>> It would be good to add some numbers here. How often do we exit without
+>>>> having touched the FPSIMD regs? For which workload?
+>>>
+>>> Lmbench is what I typically use, with ssh server, i.e., cause page
+>>> faults and interrupts - usually registers are not touched.
+>>> I'll run the tests again and define usually.
+>>>
+>>> Any other loads you had in mind?
+>>
+>> Not really (apart from running hackbench, of course...;-). I'd just like
+>> to see the numbers in the commit message, so that we can document the
+>> improvement (and maybe track regressions).
+> 
+> Ok I understand.
+> 
+>>
+>> [...]
+>>
+>>>>
+>>>>>  	skip_debug_state x3, 1f
+>>>>>  	// Clear the dirty flag for the next run, as all the state has
+>>>>>  	// already been saved. Note that we nuke the whole 64bit word.
+>>>>> @@ -1166,6 +1211,10 @@ el1_sync:					// Guest trapped into EL2
+>>>>>  	mrs	x1, esr_el2
+>>>>>  	lsr	x2, x1, #ESR_ELx_EC_SHIFT
+>>>>>
+>>>>> +	/* Guest accessed VFP/SIMD registers, save host, restore Guest */
+>>>>> +	cmp	x2, #ESR_ELx_EC_FP_ASIMD
+>>>>> +	b.eq	switch_to_guest_vfp
+>>>>> +
+>>>>
+>>>> I'd prefer you moved that hunk to el1_trap, where we handle all the
+>>>> traps coming from the guest.
+>>>
+>>> I'm thinking would it make sense to update the armv7 side as
+>>> well. When reading both exit handlers the flow mirrors
+>>> each other.
+>>
+>> The 32bit code is starting to show its age, and could probably do with a
+>> refactor. If you have some cycles to spare, that'd be quite interesting.
+> 
+> Yep, will do, ARMv7 is still very relevant.
 
-Signed-off-by: Kyle Huey <khuey@kylehuey.com>
----
- arch/arm/boot/dts/tegra124.dtsi | 8 ++++++++
- 1 file changed, 8 insertions(+)
+You bet it is. My home router is a v7 VM...
 
-diff --git a/arch/arm/boot/dts/tegra124.dtsi b/arch/arm/boot/dts/tegra124.dtsi
-index 4be06c6..d966d4e 100644
---- a/arch/arm/boot/dts/tegra124.dtsi
-+++ b/arch/arm/boot/dts/tegra124.dtsi
-@@ -906,16 +906,24 @@
- 
- 		cpu at 3 {
- 			device_type = "cpu";
- 			compatible = "arm,cortex-a15";
- 			reg = <3>;
- 		};
- 	};
- 
-+	pmu {
-+		compatible = "arm,cortex-a15-pmu";
-+		interrupts = <GIC_SPI 144 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 145 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 146 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 147 IRQ_TYPE_LEVEL_HIGH>;
-+	};
-+
- 	thermal-zones {
- 		cpu {
- 			polling-delay-passive = <1000>;
- 			polling-delay = <1000>;
- 
- 			thermal-sensors =
- 				<&soctherm TEGRA124_SOCTHERM_SENSOR_CPU>;
- 		};
+	M.
 -- 
-1.9.1
+Jazz is not dead. It just smells funny...
