@@ -1,196 +1,256 @@
-From: eddie.huang@mediatek.com (Eddie Huang)
-Date: Mon, 15 Jun 2015 15:35:25 +0800
-Subject: [PATCH v3 2/2] arm64: dts: mt8173: Add I2C device node
-In-Reply-To: <CAGS+omB1UadXeKZLmMdhSamsPpipQLmoH_PhbUPvszrYTq68fA@mail.gmail.com>
-References: <1434101229-32695-1-git-send-email-eddie.huang@mediatek.com>
- <1434101229-32695-3-git-send-email-eddie.huang@mediatek.com>
- <CAGS+omB1UadXeKZLmMdhSamsPpipQLmoH_PhbUPvszrYTq68fA@mail.gmail.com>
-Message-ID: <1434353725.15875.26.camel@mtksdaap41>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Mon, 15 Jun 2015 09:45:29 +0200
+Subject: [PATCH 3/5] soc: Mediatek: Add SCPSYS power domain driver
+In-Reply-To: <CAPDyKFpY+agi_JyuP2iGB+7HPoTuwHi2iC1D2YCsGnNfZhevNw@mail.gmail.com>
+References: <1433839623-10804-1-git-send-email-s.hauer@pengutronix.de>
+ <1433839623-10804-4-git-send-email-s.hauer@pengutronix.de>
+ <CAPDyKFpY+agi_JyuP2iGB+7HPoTuwHi2iC1D2YCsGnNfZhevNw@mail.gmail.com>
+Message-ID: <20150615074529.GQ6325@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Dan,
+Hi Ulf,
 
-On Fri, 2015-06-12 at 20:28 +0800, Daniel Kurtz wrote:
-> On Fri, Jun 12, 2015 at 5:27 PM, Eddie Huang <eddie.huang@mediatek.com> wrote:
+On Wed, Jun 10, 2015 at 04:47:01PM +0200, Ulf Hansson wrote:
+> On 9 June 2015 at 10:47, Sascha Hauer <s.hauer@pengutronix.de> wrote:
+> > This adds a power domain driver for the Mediatek SCPSYS unit.
 > >
-> > Add MT8173 I2C device nodes, include I2C controllers and pins.
-> > MT8173 has six I2C controllers, from i2c0 to i2c6, exclude i2c5.
-> > The 6th I2C controller register base doesn't next to 5th I2C,
-> > and there is a hardware between 5th and 6th I2C controller. So
-> > SoC designer name 6th controller as "i2c6", not "i2c5".
-> 
-> 
-> This is slightly misleading.  There are in fact 7 I2C controllers, but
-> "i2c5" is dedicated for use by HDMI for ddc & hdcp.
-> Is there a reason why the HDMI I2C port cannot be controlled by the
-> generic i2c driver?
-> 
-We add some extra HW function to HDMI I2C port, we have special driver
-to control this HW, not generic I2C driver. This is why I don't count
-this hardware to generic I2C controllers. 
-
-> Of course the hdmiddc / i2c5 node can always be added in a later
-> patch, so this is no reason to hold up this patch.
-> 
-> > Signed-off-by: Eddie Huang <eddie.huang@mediatek.com>
+> > The System Control Processor System (SCPSYS) has several power
+> > management related tasks in the system. The tasks include thermal
+> > measurement, dynamic voltage frequency scaling (DVFS), interrupt
+> > filter and lowlevel sleep control. The System Power Manager (SPM)
+> > inside the SCPSYS is for the MTCMOS power domain control.
+> >
+> > For now this driver only adds power domain support, the more
+> > advanced features are not yet supported. The driver implements
+> > the generic PM domain device tree bindings, the first user will
+> > most likely be the Mediatek AFE audio driver.
+> >
+> > Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
 > > ---
-> >  arch/arm64/boot/dts/mediatek/mt8173-evb.dts | 50 ++++++++++++++++++++
-> >  arch/arm64/boot/dts/mediatek/mt8173.dtsi    | 72 +++++++++++++++++++++++++++++
-> >  2 files changed, 122 insertions(+)
+> >  drivers/soc/mediatek/Kconfig             |   9 +
+> >  drivers/soc/mediatek/Makefile            |   1 +
+> >  drivers/soc/mediatek/mtk-scpsys.c        | 490 +++++++++++++++++++++++++++++++
+> >  include/dt-bindings/power/mt8173-power.h |  15 +
+> >  4 files changed, 515 insertions(+)
+> >  create mode 100644 drivers/soc/mediatek/mtk-scpsys.c
+> >  create mode 100644 include/dt-bindings/power/mt8173-power.h
 > >
-> > diff --git a/arch/arm64/boot/dts/mediatek/mt8173-evb.dts b/arch/arm64/boot/dts/mediatek/mt8173-evb.dts
-> > index 43d5401..2e01988 100644
-> > --- a/arch/arm64/boot/dts/mediatek/mt8173-evb.dts
-> > +++ b/arch/arm64/boot/dts/mediatek/mt8173-evb.dts
-> > @@ -33,6 +33,56 @@
-> >         chosen { };
-> >  };
-> >
-> > +&pio {
+> > diff --git a/drivers/soc/mediatek/Kconfig b/drivers/soc/mediatek/Kconfig
+> > index e4f37a3..9a61b54 100644
+> > --- a/drivers/soc/mediatek/Kconfig
+> > +++ b/drivers/soc/mediatek/Kconfig
+> > @@ -18,3 +18,12 @@ config MTK_PMIC_WRAP
+> >           Say yes here to add support for MediaTek PMIC Wrapper found
+> >           on different MediaTek SoCs. The PMIC wrapper is a proprietary
+> >           hardware to connect the PMIC.
+> > +
+> > +config MTK_SCPSYS
+> > +       bool "MediaTek SCPSYS Support"
+> > +       depends on ARCH_MEDIATEK || COMPILE_TEST
 > 
-> I don't think we needed to move these i2c pinmux descriptions from
-> mt8173.dtsi to the board .dts file.
+> How about also depending on "PM" and selecting PM_GENERIC_DOMAINS,
+> would that work?
+
+That's what patch 4/5 does. So far all drivers have this in
+arch/arm/mach-*/Kconfig and so did I. However, they probably have it
+under arch/ to have it next to the driver. I'll move it here and drop
+4/5.
+
+> > +static int scpsys_power_on(struct generic_pm_domain *genpd)
+> > +{
+> > +       struct scp_domain *scpd = container_of(genpd, struct scp_domain, genpd);
+> > +       struct scp *scp = scpd->scp;
+> > +       unsigned long timeout;
+> > +       bool expired;
+> > +       void __iomem *ctl_addr = scpd->ctl_addr;
+> > +       u32 sram_pdn_ack = scpd->sram_pdn_ack_bits;
+> > +       u32 val;
+> > +       int ret;
+> > +
+> > +       if (scpd->clk) {
 > 
-> AFAICT, the "i2cN_pins_a" nodes defined here are the pinctl
-> configuration that the corresponding enabled i2c nodes would choose.
-> Thus, they are generic to the MT8173 SoC, not specific to any board.
-> By themselves, these nodes do not actually select a pin configuration.
-> 
-> It is the nodes that *enable* the individual i2c nodes, and hence
-> activate those pin settings, which is board specific.
-> 
-> Hence, if your intent is to have the evb enable all i2c nodes, it
-> would have a set of nodes like this:
-> 
-> 
-> &i2c0 {
->   pinctrl-names = "default";
->   pinctrl-0 = <&i2c0_pins_a>;
->   status = "okay";
-> };
-> 
-> &i2c1 {
->  pinctrl-names = "default";
->  pinctrl-0 = <&i2c1_pins_a>;
->  status = "okay";
-> };
-> 
-> ...
-> 
-I personally think put I2C pins in SoC dtsi is ok because it is basic
-and fixed. Almost every platform need these pins, so not necessary to
-care about dtb size. And these pins are fixed. We put pins that may
-change by platforms to board dts, like mmc.
+> Shouldn't you check for !IS_ERR(scpd->clk) instead?
+
+No. scpd->clk is initialized like this:
+
+		if (data->clk_id != MT8173_CLK_NONE)
+			scpd->clk = scp->clk[data->clk_id];
+
+So scpd->clk will never be an ERR_PTR but always NULL if unset.
 
 > 
-> > +       i2c0_pins_a: i2c0 at 0 {
+> > +               ret = clk_prepare_enable(scpd->clk);
+> > +               if (ret)
+> > +                       return ret;
+> > +       }
+> > +
+> > +       val = readl(ctl_addr);
+> > +       val |= PWR_ON_BIT;
+> > +       writel(val, ctl_addr);
+> > +       val |= PWR_ON_2ND_BIT;
+> > +       writel(val, ctl_addr);
+> > +
+> > +       /* wait until PWR_ACK = 1 */
+> > +       timeout = jiffies + HZ;
+> > +       expired = false;
+> > +       while (1) {
+> > +               ret = scpsys_domain_is_on(scpd);
+> > +               if (ret > 0)
+> > +                       break;
+> > +
+> > +               if (expired) {
+> > +                       ret = -ETIMEDOUT;
+> > +                       goto out;
+> > +               }
+> > +
+> > +               cpu_relax();
+> > +
+> > +               if (time_after(jiffies, timeout))
+> > +                       expired = true;
+> > +       }
+> > +
+> > +       val &= ~PWR_CLK_DIS_BIT;
+> > +       writel(val, ctl_addr);
+> > +
+> > +       val &= ~PWR_ISO_BIT;
+> > +       writel(val, ctl_addr);
+> > +
+> > +       val |= PWR_RST_B_BIT;
+> > +       writel(val, ctl_addr);
+> > +
+> > +       val &= ~scpd->sram_pdn_bits;
+> > +       writel(val, ctl_addr);
+> > +
+> > +       /* wait until SRAM_PDN_ACK all 0 */
+> > +       timeout = jiffies + HZ;
+> > +       expired = false;
+> > +       while (sram_pdn_ack && (readl(ctl_addr) & sram_pdn_ack)) {
+> > +
+> > +               if (expired) {
+> > +                       ret = -ETIMEDOUT;
+> > +                       goto out;
+> > +               }
+> > +
+> > +               cpu_relax();
+> > +
+> > +               if (time_after(jiffies, timeout))
+> > +                       expired = true;
+> > +       }
+> > +
+> > +       if (scpd->bus_prot_mask) {
+> > +               ret = mtk_infracfg_clear_bus_protection(scp->infracfg,
+> > +                               scpd->bus_prot_mask);
+> > +               if (ret)
+> > +                       return ret;
+> > +       }
+> > +
+> > +       return 0;
+> > +out:
 > 
-> Do these nodes need the "@0"?
-> 
-Will remove.
+> There are no error handling. Especially the clock should be gated.
 
-> >
-> > +               pins1 {
-> > +                       pinmux = <MT8173_PIN_45_SDA0__FUNC_SDA0>,
-> > +                                <MT8173_PIN_46_SCL0__FUNC_SCL0>;
-> > +                       bias-disable;
-> > +               };
-> > +       };
-> > +
-> > +       i2c1_pins_a: i2c1 at 0 {
-> > +               pins1 {
-> > +                       pinmux = <MT8173_PIN_125_SDA1__FUNC_SDA1>,
-> > +                                <MT8173_PIN_126_SCL1__FUNC_SCL1>;
-> > +                       bias-disable;
-> > +               };
-> > +       };
-> > +
-> > +       i2c2_pins_a: i2c2 at 0 {
-> > +               pins1 {
-> > +                       pinmux = <MT8173_PIN_43_SDA2__FUNC_SDA2>,
-> > +                                <MT8173_PIN_44_SCL2__FUNC_SCL2>;
-> > +                       bias-disable;
-> > +               };
-> > +       };
-> > +
-> > +       i2c3_pins_a: i2c3 at 0 {
-> > +               pins1 {
-> > +                       pinmux = <MT8173_PIN_106_SDA3__FUNC_SDA3>,
-> > +                                <MT8173_PIN_107_SCL3__FUNC_SCL3>;
-> > +                       bias-disable;
-> > +               };
-> > +       };
-> > +
-> > +       i2c4_pins_a: i2c4 at 0 {
-> > +               pins1 {
-> > +                       pinmux = <MT8173_PIN_133_SDA4__FUNC_SDA4>,
-> > +                                <MT8173_PIN_134_SCL4__FUNC_SCL4>;
-> > +                       bias-disable;
-> > +               };
-> > +       };
-> > +
-> > +       i2c6_pins_a: i2c6 at 0 {
-> > +               pins1 {
-> > +                       pinmux = <MT8173_PIN_100_MSDC2_DAT0__FUNC_SDA5>,
-> > +                                <MT8173_PIN_101_MSDC2_DAT1__FUNC_SCL5>;
-> 
-> These are the SDA/SCL pins for i2c port 6, so they should really be
-> _SDA6 / _SCL6.
-> However... I checked, and these settings are labeled "SDA5 & SCL5" in
-> the datasheet.
-> I recommend marking them correctly as 6 here and fixing the datasheet :-).
-> 
-We make mistake at the beginning not give these pins suitable name, if
-we change now, it may affect already shipped products. So I tend to keep
-it.
+I'll disable the clock in the error path for the next round. Apart from
+that I think I cannot implement a proper error handling without knowing
+what actually went wrong. I mean I ask the hardware to do something
+and then poll for a bit to get the ack from the hardware. If that ack
+doesn't come I don't know what to do to recover from this state. A I2C
+controller or such could probably be resetted in this situation, but a
+power domain controller?
 
-> >
-> > +                       bias-disable;
-> > +               };
-> > +       };
-> > +};
+> > +       writel(val, ctl_addr);
 > > +
-> >  &uart0 {
-> >         status = "okay";
-> >  };
-> > diff --git a/arch/arm64/boot/dts/mediatek/mt8173.dtsi b/arch/arm64/boot/dts/mediatek/mt8173.dtsi
-> > index b52ec43..6d3dbbdd 100644
-> > --- a/arch/arm64/boot/dts/mediatek/mt8173.dtsi
-> > +++ b/arch/arm64/boot/dts/mediatek/mt8173.dtsi
-> > @@ -229,6 +229,78 @@
-> >                         clocks = <&uart_clk>;
-> >                         status = "disabled";
-> >                 };
+> > +       /* wait until PWR_ACK = 0 */
+> > +       timeout = jiffies + HZ;
+> > +       expired = false;
+> > +       while (1) {
+> > +               ret = scpsys_domain_is_on(scpd);
+> > +               if (ret == 0)
+> > +                       break;
 > > +
-> > +               i2c0: i2c at 11007000 {
-> > +                       compatible = "mediatek,mt8173-i2c";
-> > +                       reg = <0 0x11007000 0 0x70>,
-> > +                             <0 0x11000100 0 0x80>;
-> > +                       interrupts = <GIC_SPI 76 IRQ_TYPE_LEVEL_LOW>;
-> > +                       clock-div = <16>;
-> > +                       clocks = <&pericfg CLK_PERI_I2C0>,
-> > +                                <&pericfg CLK_PERI_AP_DMA>;
-> > +                       clock-names = "main", "dma";
+> > +               if (expired) {
+> > +                       ret = -ETIMEDOUT;
+> > +                       goto out;
+> > +               }
+> > +
+> > +               cpu_relax();
+> > +
+> > +               if (time_after(jiffies, timeout))
+> > +                       expired = true;
+> > +       }
+> > +
+> > +       if (scpd->clk)
 > 
-> The following fields must also be selected by the i2c nodes when they
-> are enabled:
-> 
-> clock-frequency = <100000>;
-> pinctrl-names = "default";
-> pinctrl-0 = <&i2c0_pins_a>;
-> #address-cells = <1>;
-> #size-cells = <0>;
-> 
-> So, is there any reason not to also include them here in mt8173.dtsi
-> so we can use them as defaults?
-> This would simplify the i2c nodes in the board specific .dts files.
-> The only field that might be board specific would be clock-frequency,
-> but that is trivial to override on a port-by-port basis in board files
-> as necessary.
-> 
-Since I tend to put I2C pins in SoC dtsi, I think I will put all you
-mention above in SoC dtsi.
+> Shouldn't you check for !IS_ERR(scpd->clk) instead?
 
-Eddie
-Thanks
+No, as above.
+
+> > +               return -ENOMEM;
+> > +
+> > +       scp->clk[MT8173_CLK_MM] = devm_clk_get(&pdev->dev, "mm");
+> > +       if (IS_ERR(scp->clk[MT8173_CLK_MM])) {
+> > +               dev_err(&pdev->dev, "Failed to get mm clk: %ld\n",
+> > +                               PTR_ERR(scp->clk[MT8173_CLK_MM]));
+> 
+> I think a similar error message is already printed by the common clk framework!?
+> 
+> > +               return PTR_ERR(scp->clk[MT8173_CLK_MM]);
+> > +       }
+> > +
+> > +       scp->clk[MT8173_CLK_MFG] = devm_clk_get(&pdev->dev, "mfg");
+> > +       if (IS_ERR(scp->clk[MT8173_CLK_MFG])) {
+> > +               dev_err(&pdev->dev, "Failed to get mfg clk: %ld\n",
+> > +                               PTR_ERR(scp->clk[MT8173_CLK_MFG]));
+> 
+> I think a similar error message is already printed by the common clk framework!?
+
+Yes, will drop these messages.
+
+> 
+> > +               return PTR_ERR(scp->clk[MT8173_CLK_MFG]);
+> > +       }
+> > +
+> > +       scp->infracfg = syscon_regmap_lookup_by_phandle(pdev->dev.of_node,
+> > +                       "infracfg");
+> > +       if (IS_ERR(scp->infracfg)) {
+> > +               dev_err(&pdev->dev, "Cannot find infracfg controller: %ld\n",
+> > +                               PTR_ERR(scp->infracfg));
+> > +               return PTR_ERR(scp->infracfg);
+> > +       }
+> > +
+> > +       pd_data->num_domains = NUM_DOMAINS;
+> > +
+> > +       for (i = 0; i < NUM_DOMAINS; i++) {
+> > +               struct scp_domain *scpd = &scp->domains[i];
+> > +               struct generic_pm_domain *genpd = &scpd->genpd;
+> > +               const struct scp_domain_data *data = &scp_domain_data[i];
+> > +
+> > +               pd_data->domains[i] = genpd;
+> > +               scpd->scp = scp;
+> > +
+> > +               scpd->sta_mask = data->sta_mask;
+> > +               scpd->ctl_addr = scp->base + data->ctl_offs;
+> > +               scpd->sram_pdn_bits = data->sram_pdn_bits;
+> > +               scpd->sram_pdn_ack_bits = data->sram_pdn_ack_bits;
+> > +               scpd->bus_prot_mask = data->bus_prot_mask;
+> > +               if (data->clk_id != MT8173_CLK_NONE)
+> > +                       scpd->clk = scp->clk[data->clk_id];
+> 
+> This seems odd. Why do you need to have an array of clocks to deal
+> with this assignment?
+> 
+> I don't find that the struct scp->clk pointer is used but from this
+> place. Couldn't you just fetch a reference to the clock to a local
+> struct *clk, without caching it in the struct scp->clk?
+
+Yes, will change.
+
+Thanks for reviewing.
+
+Sascha
+
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
