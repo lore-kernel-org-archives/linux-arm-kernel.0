@@ -1,65 +1,48 @@
-From: herbert@gondor.apana.org.au (Herbert Xu)
-Date: Tue, 16 Jun 2015 06:05:06 +0800
-Subject: [BUG?] crypto: caam: little/big endianness on ARM vs PPC
-In-Reply-To: <20150615155907.GC7947@pengutronix.de>
-References: <20150615155907.GC7947@pengutronix.de>
-Message-ID: <20150615220506.GA15134@gondor.apana.org.au>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Mon, 15 Jun 2015 19:43:53 -0300
+Subject: Running kexec on mx6
+In-Reply-To: <CAOMZO5Br0BBSeSxtCG3aeew7ToVuBH00xEJhAsjHWRCav8+ufA@mail.gmail.com>
+References: <CAOMZO5A_=okeGhRjRb-7xkO7RJKTECdgBxinrTLtVR+6TMpnVw@mail.gmail.com>
+ <CAOMZO5A0+SSdT5mfy7fmO4DUQKimQpFCSu16EVLkxR+qh6137A@mail.gmail.com>
+ <CAOMZO5CvjfADx_0AhxVNwadPTb-i5LCdPTOq2ZQaYpzo-m+4Jg@mail.gmail.com>
+ <CAOMZO5Br0BBSeSxtCG3aeew7ToVuBH00xEJhAsjHWRCav8+ufA@mail.gmail.com>
+Message-ID: <CAOMZO5DBoKXE9URxWvk+WkJEZ1RkC4S3hAyugTbd7b5Qu91QKA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 15, 2015 at 05:59:07PM +0200, Steffen Trumtrar wrote:
-> Hi!
-> 
-> I'm working on CAAM support for the ARM-based i.MX6 SoCs. The current
-> drivers/crypto/caam driver only works for PowerPC AFAIK.
-> Actually, there isn't that much to do, to get support for the i.MX6 but
-> one patch breaks the driver severely:
-> 
-> 	commit ef94b1d834aace7101de77c3a7c2631b9ae9c5f6
-> 	crypto: caam - Add definition of rd/wr_reg64 for little endian platform
-> 
-> This patch adds
-> 
-> +#ifdef __LITTLE_ENDIAN
-> +static inline void wr_reg64(u64 __iomem *reg, u64 data)
-> +{
-> +	wr_reg32((u32 __iomem *)reg + 1, (data & 0xffffffff00000000ull) >> 32);
-> +	wr_reg32((u32 __iomem *)reg, data & 0x00000000ffffffffull);
-> +}
-> 
-> The wr_reg64 function is only used in one place in the drivers/crypto/caam/jr.c
-> driver: to write the dma_addr_t to the register. Without that patch everything
-> works fine on ARM (little endian, 32bit), with that patch the driver will write
-> 0's into the register that holds the DMA address (the numerically-higher) -> kernel hangs.
-> Also, from my understanding, the comment above the defines, stating that you
-> have to first write the numerically-lower and then the numerically-higher address
-> on 32bit systems doesn't match with the implementation.
-> 
-> What I don't know/understand is if this makes any sense for any PowerPC implementation.
-> 
-> So, the question is, how to fix this? I'd prefer to do it directly in the jr driver
-> instead of the ifdef-ery.
-> 
-> Something like
-> 	if (sizeof(dma_addr_t) == sizeof(u32))
-> 		wr_reg32(&jrp->rregs->inpring_base + 1, inpbusaddr);
-> 	else if (sizeof(dma_addr_t) == sizeof(u64))
-> 		wr_reg64(...)
-> 
-> or just go by DT compatible and then remove the inline function definitions.
-> 
-> As far as I can tell, the compatible wouldn't be needed for anything else in the
-> jr driver, so maybe that is not optimal. On the other hand the sizeof(..)
-> solution would only catch little endian on 32bit and not big endian (?!)
-> I however don't know what combinations actually *have* to be caught, as I don't
-> know, which exist.
-> 
-> So, what do you think people?
+On Mon, Jun 15, 2015 at 6:40 PM, Fabio Estevam <festevam@gmail.com> wrote:
 
-I'm adding a couple of CCs.
+> [    0.925893] imx-sdma 20ec000.sdma: Direct firmware load for
+> imx/sdma/sdma-imx6q.bin failed with error -2
+> [    0.935510] imx-sdma 20ec000.sdma: external firmware not found,
+> using ROM firmware
+> [    0.941269] imx-sdma 20ec000.sdma: initialized
+> [    0.943507] pfuze100-regulator 1-0008: Full layer: 1, Metal layer: 1
+> [    0.944228] pfuze100-regulator 1-0008: FAB: 0, FIN: 0
+> [    0.944236] pfuze100-regulator 1-0008: pfuze100 found.
+>
+> [Hangs here]
 
-Thanks,
--- 
-Email: Herbert Xu <herbert@gondor.apana.org.au>
-Home Page: http://gondor.apana.org.au/~herbert/
-PGP Key: http://gondor.apana.org.au/~herbert/pubkey.txt
+Restarted from a clean build of imx_v6_v7_defconfig and now it can
+kexec a linux-next kernel just fine on a mx6qsabresd:
+http://pastebin.com/458TY8Z3
+
+However, kexec still hangs the same way on mx6solo:
+[  216.673307] kexec: Starting new kernel
+[  216.677079] Disabling non-boot CPUs ...
+[  216.681002] Bye!
+[  216.682852] ********** flushing and disabling L2 cache
+Uncompressing Linux... done, booting the kernel.
+[    0.000000] Booting Linux on physical CPU 0x0
+[    0.000000] Linux version 4.1.0-rc7-next-20150615-dirty
+(fabio at fabio-Latitude-E6410) (gcc version 4.7.3 (Ubuntu/Linaro
+4.7.3-12ubu5
+[    0.000000] CPU: ARMv7 Processor [412fc09a] revision 10 (ARMv7), cr=10c5387d
+[    0.000000] CPU: PIPT / VIPT nonaliasing data cache, VIPT aliasing
+instruction cache
+[    0.000000] Machine model: Wandboard i.MX6 Dual Lite Board
+[    0.000000] bootconsole [earlycon0] enabled
+[    0.000000] cma: Reserved 16 MiB at 0x4f000000
+[    0.000000] Memory policy: Data cache writeback
+
+So kexec is working fine on mx6quad, but not on mx6solo.
