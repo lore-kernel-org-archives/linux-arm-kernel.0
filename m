@@ -1,175 +1,140 @@
 From: vaibhav.hiremath@linaro.org (Vaibhav Hiremath)
-Date: Mon, 15 Jun 2015 21:19:54 +0530
-Subject: [PATCH-V2 07/12] i2c:pxa: Use devm_ variants in probe function
+Date: Mon, 15 Jun 2015 21:19:55 +0530
+Subject: [PATCH-V2 08/12] i2c: pxa: enable/disable i2c module across msg xfer
 In-Reply-To: <1434383399-2370-1-git-send-email-vaibhav.hiremath@linaro.org>
 References: <vaibhav.hiremath@linaro.org>
  <1434383399-2370-1-git-send-email-vaibhav.hiremath@linaro.org>
-Message-ID: <1434383399-2370-8-git-send-email-vaibhav.hiremath@linaro.org>
+Message-ID: <1434383399-2370-9-git-send-email-vaibhav.hiremath@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch cleans up i2c_pxa_probe() function,
+From: Yi Zhang <yizhang@marvell.com>
 
- - Use devm_ variants wherever
-   This will clean both probe exit and i2c_pxa_remove() functions
+Enable i2c module/unit before transmission and disable when it finishes.
 
- - Check platform resource before parsing any other data from DT/platform
+why?
+It's because the i2c bus may be distrubed if the slave device,
+typically a touch, powers on.
 
- - Use dev_err on failure from i2c_add_numbered_adapter()
+As we do not want to break slave mode support, this patch introduces
+DT property to control disable of the I2C module after xfer in master mode
+of operation.
 
- - Use pr_info instead of printk for KERN_INFO
+i2c-disable-after-xfer : If set, driver will disable I2C module after msg xfer
 
+Signed-off-by: Yi Zhang <yizhang@marvell.com>
 Signed-off-by: Vaibhav Hiremath <vaibhav.hiremath@linaro.org>
 ---
- drivers/i2c/busses/i2c-pxa.c | 81 ++++++++++++++++++--------------------------
- 1 file changed, 33 insertions(+), 48 deletions(-)
+ drivers/i2c/busses/i2c-pxa.c | 41 +++++++++++++++++++++++++++++++++++++++--
+ 1 file changed, 39 insertions(+), 2 deletions(-)
 
 diff --git a/drivers/i2c/busses/i2c-pxa.c b/drivers/i2c/busses/i2c-pxa.c
-index b8b3856..0a8b3bb 100644
+index 0a8b3bb..c753411 100644
 --- a/drivers/i2c/busses/i2c-pxa.c
 +++ b/drivers/i2c/busses/i2c-pxa.c
-@@ -1166,10 +1166,22 @@ static int i2c_pxa_probe(struct platform_device *dev)
- 	struct resource *res = NULL;
- 	int ret, irq;
+@@ -161,6 +161,7 @@ struct pxa_i2c {
+ 	unsigned char		master_code;
+ 	unsigned long		rate;
+ 	bool			highmode_enter;
++	bool			disable_after_xfer;
+ };
  
--	i2c = kzalloc(sizeof(struct pxa_i2c), GFP_KERNEL);
-+	i2c = devm_kzalloc(&dev->dev, sizeof(struct pxa_i2c), GFP_KERNEL);
- 	if (!i2c) {
--		ret = -ENOMEM;
--		goto emalloc;
-+		dev_err(&dev->dev, "memory allocation failed\n");
-+		return -ENOMEM;
-+	}
+ #define _IBMR(i2c)	((i2c)->reg_ibmr)
+@@ -286,6 +287,22 @@ static void i2c_pxa_scream_blue_murder(struct pxa_i2c *i2c, const char *why)
+ static void i2c_pxa_master_complete(struct pxa_i2c *i2c, int ret);
+ static irqreturn_t i2c_pxa_handler(int this_irq, void *dev_id);
+ 
++/* enable/disable i2c unit */
++static inline int i2c_pxa_is_enabled(struct pxa_i2c *i2c)
++{
++	return (readl(_ICR(i2c)) & ICR_IUE);
++}
 +
-+	res = platform_get_resource(dev, IORESOURCE_MEM, 0);
-+	if (!res) {
-+		dev_err(&dev->dev, "no mem resource\n");
-+		return -ENODEV;
++static inline void i2c_pxa_enable(struct pxa_i2c *i2c, bool enable)
++{
++	if (enable && !i2c_pxa_is_enabled(i2c)) {
++		writel(readl(_ICR(i2c)) | ICR_IUE, _ICR(i2c));
++		udelay(100);
++	} else {
++		writel(readl(_ICR(i2c)) & ~ICR_IUE, _ICR(i2c));
 +	}
++}
 +
-+	irq = platform_get_irq(dev, 0);
-+	if (irq < 0) {
-+		dev_err(&dev->dev, "no irq resource: %d\n", irq);
-+		return irq;
- 	}
+ static inline int i2c_pxa_is_slavemode(struct pxa_i2c *i2c)
+ {
+ 	return !(readl(_ICR(i2c)) & ICR_SCLE);
+@@ -482,8 +499,7 @@ static void i2c_pxa_reset(struct pxa_i2c *i2c)
+ 	i2c_pxa_set_slave(i2c, 0);
  
- 	/* Default adapter num to device id; i2c_pxa_probe_dt can override. */
-@@ -1179,19 +1191,7 @@ static int i2c_pxa_probe(struct platform_device *dev)
- 	if (ret > 0)
- 		ret = i2c_pxa_probe_pdata(dev, i2c, &i2c_type);
- 	if (ret < 0)
--		goto eclk;
--
--	res = platform_get_resource(dev, IORESOURCE_MEM, 0);
--	irq = platform_get_irq(dev, 0);
--	if (res == NULL || irq < 0) {
--		ret = -ENODEV;
--		goto eclk;
--	}
--
--	if (!request_mem_region(res->start, resource_size(res), res->name)) {
--		ret = -ENOMEM;
--		goto eclk;
--	}
-+		return ret;
+ 	/* enable unit */
+-	writel(readl(_ICR(i2c)) | ICR_IUE, _ICR(i2c));
+-	udelay(100);
++	i2c_pxa_enable(i2c, true);
+ }
  
- 	i2c->adap.owner   = THIS_MODULE;
- 	i2c->adap.retries = 5;
-@@ -1201,16 +1201,17 @@ static int i2c_pxa_probe(struct platform_device *dev)
  
- 	strlcpy(i2c->adap.name, "pxa_i2c-i2c", sizeof(i2c->adap.name));
+@@ -840,6 +856,9 @@ static int i2c_pxa_pio_xfer(struct i2c_adapter *adap,
+ 	struct pxa_i2c *i2c = adap->algo_data;
+ 	int ret, i;
  
--	i2c->clk = clk_get(&dev->dev, NULL);
-+	i2c->clk = devm_clk_get(&dev->dev, NULL);
- 	if (IS_ERR(i2c->clk)) {
--		ret = PTR_ERR(i2c->clk);
--		goto eclk;
-+		dev_err(&dev->dev, "failed to get the clk\n");
-+		return PTR_ERR(i2c->clk);
- 	}
- 
--	i2c->reg_base = ioremap(res->start, resource_size(res));
--	if (!i2c->reg_base) {
--		ret = -EIO;
--		goto eremap;
-+	i2c->reg_base = devm_ioremap_resource(&dev->dev, res);
-+	if (IS_ERR(i2c->reg_base)) {
-+		dev_err(&dev->dev, "failed to map resource: %ld\n",
-+			PTR_ERR(i2c->reg_base));
-+		return PTR_ERR(i2c->reg_base);
- 	}
- 
- 	i2c->reg_ibmr = i2c->reg_base + pxa_reg_layout[i2c_type].ibmr;
-@@ -1252,11 +1253,13 @@ static int i2c_pxa_probe(struct platform_device *dev)
- 		i2c->adap.algo = &i2c_pxa_pio_algorithm;
- 	} else {
- 		i2c->adap.algo = &i2c_pxa_algorithm;
--		ret = request_irq(irq, i2c_pxa_handler,
-+		ret = devm_request_irq(&dev->dev, irq, i2c_pxa_handler,
- 				IRQF_SHARED | IRQF_NO_SUSPEND,
- 				dev_name(&dev->dev), i2c);
--		if (ret)
-+		if (ret) {
-+			dev_err(&dev->dev, "failed to request irq: %d\n", ret);
- 			goto ereqirq;
-+		}
- 	}
- 
- 	i2c_pxa_reset(i2c);
-@@ -1269,33 +1272,22 @@ static int i2c_pxa_probe(struct platform_device *dev)
- 
- 	ret = i2c_add_numbered_adapter(&i2c->adap);
- 	if (ret < 0) {
--		printk(KERN_INFO "I2C: Failed to add bus\n");
--		goto eadapt;
-+		dev_err(&dev->dev, "failed to add bus: %d\n", ret);
-+		goto ereqirq;
- 	}
- 
- 	platform_set_drvdata(dev, i2c);
- 
- #ifdef CONFIG_I2C_PXA_SLAVE
--	printk(KERN_INFO "I2C: %s: PXA I2C adapter, slave address %d\n",
--	       dev_name(&i2c->adap.dev), i2c->slave_addr);
-+	dev_info(&i2c->adap.dev, " PXA I2C adapter, slave address %d\n",
-+		i2c->slave_addr);
- #else
--	printk(KERN_INFO "I2C: %s: PXA I2C adapter\n",
--	       dev_name(&i2c->adap.dev));
-+	dev_info(&i2c->adap.dev, " PXA I2C adapter\n");
- #endif
- 	return 0;
- 
--eadapt:
--	if (!i2c->use_pio)
--		free_irq(irq, i2c);
- ereqirq:
- 	clk_disable_unprepare(i2c->clk);
--	iounmap(i2c->reg_base);
--eremap:
--	clk_put(i2c->clk);
--eclk:
--	kfree(i2c);
--emalloc:
--	release_mem_region(res->start, resource_size(res));
++	/* Enable i2c unit */
++	i2c_pxa_enable(i2c, true);
++
+ 	/* If the I2C controller is disabled we need to reset it
+ 	  (probably due to a suspend/resume destroying state). We do
+ 	  this here as we can then avoid worrying about resuming the
+@@ -860,6 +879,11 @@ static int i2c_pxa_pio_xfer(struct i2c_adapter *adap,
+ 	ret = -EREMOTEIO;
+  out:
+ 	i2c_pxa_set_slave(i2c, ret);
++
++	/* disable i2c unit */
++	if (i2c->disable_after_xfer)
++		i2c_pxa_enable(i2c, false);
++
  	return ret;
  }
  
-@@ -1304,15 +1296,8 @@ static int i2c_pxa_remove(struct platform_device *dev)
- 	struct pxa_i2c *i2c = platform_get_drvdata(dev);
+@@ -1075,6 +1099,9 @@ static int i2c_pxa_xfer(struct i2c_adapter *adap, struct i2c_msg msgs[], int num
+ 	struct pxa_i2c *i2c = adap->algo_data;
+ 	int ret, i;
  
- 	i2c_del_adapter(&i2c->adap);
--	if (!i2c->use_pio)
--		free_irq(i2c->irq, i2c);
- 
- 	clk_disable_unprepare(i2c->clk);
--	clk_put(i2c->clk);
--
--	iounmap(i2c->reg_base);
--	release_mem_region(i2c->iobase, i2c->iosize);
--	kfree(i2c);
- 
- 	return 0;
++	/* Enable i2c unit */
++	i2c_pxa_enable(i2c, true);
++
+ 	for (i = adap->retries; i >= 0; i--) {
+ 		ret = i2c_pxa_do_xfer(i2c, msgs, num);
+ 		if (ret != I2C_RETRY)
+@@ -1088,6 +1115,10 @@ static int i2c_pxa_xfer(struct i2c_adapter *adap, struct i2c_msg msgs[], int num
+ 	ret = -EREMOTEIO;
+  out:
+ 	i2c_pxa_set_slave(i2c, ret);
++	/* disable i2c unit */
++	if (i2c->disable_after_xfer)
++		i2c_pxa_enable(i2c, false);
++
+ 	return ret;
  }
+ 
+@@ -1128,6 +1159,9 @@ static int i2c_pxa_probe_dt(struct platform_device *pdev, struct pxa_i2c *i2c,
+ 	/* For device tree we always use the dynamic or alias-assigned ID */
+ 	i2c->adap.nr = -1;
+ 
++	i2c->disable_after_xfer = of_property_read_bool(np,
++				"i2c-disable-after-xfer");
++
+ 	if (of_get_property(np, "mrvl,i2c-polling", NULL))
+ 		i2c->use_pio = 1;
+ 	if (of_get_property(np, "mrvl,i2c-fast-mode", NULL))
+@@ -1278,6 +1312,9 @@ static int i2c_pxa_probe(struct platform_device *dev)
+ 
+ 	platform_set_drvdata(dev, i2c);
+ 
++	if (i2c->disable_after_xfer)
++		i2c_pxa_enable(i2c, false);
++
+ #ifdef CONFIG_I2C_PXA_SLAVE
+ 	dev_info(&i2c->adap.dev, " PXA I2C adapter, slave address %d\n",
+ 		i2c->slave_addr);
 -- 
 1.9.1
