@@ -1,65 +1,86 @@
 From: eric.auger@linaro.org (Eric Auger)
-Date: Mon, 15 Jun 2015 11:09:42 +0200
-Subject: [PATCH v4 1/4] VFIO: platform: add reset struct and lookup table
+Date: Mon, 15 Jun 2015 11:09:43 +0200
+Subject: [PATCH v4 2/4] VFIO: platform: add reset callback
 In-Reply-To: <1434359385-19916-1-git-send-email-eric.auger@linaro.org>
 References: <1434359385-19916-1-git-send-email-eric.auger@linaro.org>
-Message-ID: <1434359385-19916-2-git-send-email-eric.auger@linaro.org>
+Message-ID: <1434359385-19916-3-git-send-email-eric.auger@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch introduces the vfio_platform_reset_combo struct that
-stores all the information useful to handle the reset modality:
-compat string, name of the reset function, name of the module that
-implements the reset function. A lookup table of such structures
-is added, currently void.
+A new reset callback is introduced. If this callback is populated,
+the reset is invoked on device first open/last close or upon userspace
+ioctl.  The modality is exposed on VFIO_DEVICE_GET_INFO.
 
 Signed-off-by: Eric Auger <eric.auger@linaro.org>
 
 ---
 
-v3 -> v4:
-- update the commit message
-
-v2 -> v3:
-- add const in struct vfio_platform_reset_combo
-- remove enum vfio_platform_reset_type
-
-v2: creation
+v1 -> v2:
+- reset now is also called on first open on top of last close
+- remove IS_ERR_OR_NULL
 ---
- drivers/vfio/platform/vfio_platform_common.c  | 3 +++
- drivers/vfio/platform/vfio_platform_private.h | 6 ++++++
- 2 files changed, 9 insertions(+)
+ drivers/vfio/platform/vfio_platform_common.c  | 15 +++++++++++++--
+ drivers/vfio/platform/vfio_platform_private.h |  1 +
+ 2 files changed, 14 insertions(+), 2 deletions(-)
 
 diff --git a/drivers/vfio/platform/vfio_platform_common.c b/drivers/vfio/platform/vfio_platform_common.c
-index abcff7a..611597e 100644
+index 611597e..6393581 100644
 --- a/drivers/vfio/platform/vfio_platform_common.c
 +++ b/drivers/vfio/platform/vfio_platform_common.c
-@@ -25,6 +25,9 @@
+@@ -103,6 +103,8 @@ static void vfio_platform_release(void *device_data)
+ 	mutex_lock(&driver_lock);
  
- static DEFINE_MUTEX(driver_lock);
- 
-+static const struct vfio_platform_reset_combo reset_lookup_table[] = {
-+};
+ 	if (!(--vdev->refcnt)) {
++		if (vdev->reset)
++			vdev->reset(vdev);
+ 		vfio_platform_regions_cleanup(vdev);
+ 		vfio_platform_irq_cleanup(vdev);
+ 	}
+@@ -130,6 +132,9 @@ static int vfio_platform_open(void *device_data)
+ 		ret = vfio_platform_irq_init(vdev);
+ 		if (ret)
+ 			goto err_irq;
 +
- static int vfio_platform_regions_init(struct vfio_platform_device *vdev)
- {
- 	int cnt = 0, i;
++		if (vdev->reset)
++			vdev->reset(vdev);
+ 	}
+ 
+ 	vdev->refcnt++;
+@@ -162,6 +167,8 @@ static long vfio_platform_ioctl(void *device_data,
+ 		if (info.argsz < minsz)
+ 			return -EINVAL;
+ 
++		if (vdev->reset)
++			vdev->flags |= VFIO_DEVICE_FLAGS_RESET;
+ 		info.flags = vdev->flags;
+ 		info.num_regions = vdev->num_regions;
+ 		info.num_irqs = vdev->num_irqs;
+@@ -255,8 +262,12 @@ static long vfio_platform_ioctl(void *device_data,
+ 
+ 		return ret;
+ 
+-	} else if (cmd == VFIO_DEVICE_RESET)
+-		return -EINVAL;
++	} else if (cmd == VFIO_DEVICE_RESET) {
++		if (vdev->reset)
++			return vdev->reset(vdev);
++		else
++			return -EINVAL;
++	}
+ 
+ 	return -ENOTTY;
+ }
 diff --git a/drivers/vfio/platform/vfio_platform_private.h b/drivers/vfio/platform/vfio_platform_private.h
-index 5d31e04..9e37b9f 100644
+index 9e37b9f..1c9b3d5 100644
 --- a/drivers/vfio/platform/vfio_platform_private.h
 +++ b/drivers/vfio/platform/vfio_platform_private.h
-@@ -69,6 +69,12 @@ struct vfio_platform_device {
+@@ -67,6 +67,7 @@ struct vfio_platform_device {
+ 	struct resource*
+ 		(*get_resource)(struct vfio_platform_device *vdev, int i);
  	int	(*get_irq)(struct vfio_platform_device *vdev, int i);
++	int	(*reset)(struct vfio_platform_device *vdev);
  };
  
-+struct vfio_platform_reset_combo {
-+	const char *compat;
-+	const char *reset_function_name;
-+	const char *module_name;
-+};
-+
- extern int vfio_platform_probe_common(struct vfio_platform_device *vdev,
- 				      struct device *dev);
- extern struct vfio_platform_device *vfio_platform_remove_common
+ struct vfio_platform_reset_combo {
 -- 
 1.9.1
