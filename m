@@ -1,46 +1,55 @@
-From: dave.long@linaro.org (David Long)
-Date: Mon, 15 Jun 2015 15:07:09 -0400
-Subject: [PATCH v7 7/7] kprobes: Add arm64 case in kprobe example module
-In-Reply-To: <1434395229-6654-1-git-send-email-dave.long@linaro.org>
-References: <1434395229-6654-1-git-send-email-dave.long@linaro.org>
-Message-ID: <1434395229-6654-8-git-send-email-dave.long@linaro.org>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Mon, 15 Jun 2015 21:44:47 +0200
+Subject: [PATCH v2 12/14] drivers: sh: Stop using pm_runtime.c for
+ multi-platform shmobile with genpd
+In-Reply-To: <1432839219-475-13-git-send-email-geert+renesas@glider.be>
+References: <1432839219-475-1-git-send-email-geert+renesas@glider.be>
+ <1432839219-475-13-git-send-email-geert+renesas@glider.be>
+Message-ID: <CAMuHMdWfqXZKUShiSqi0RmGpfkqgsL-5We__Vnou1aj5OHYPmA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Sandeepa Prabhu <sandeepa.prabhu@linaro.org>
+On Thu, May 28, 2015 at 8:53 PM, Geert Uytterhoeven
+<geert+renesas@glider.be> wrote:
+> Now most multi-platform ARM shmobile platforms (SH-Mobile, R-Mobile,
+> R-Car, RZ) use the CPG Clock Domain to take care of PM runtime
+> management of the module clocks, we no longer need the legacy default PM
+> domain hack, which also prevented registering the real PM domain.
+>
+> EMMA Mobile EV2 doesn't have MSTP clocks and doesn't use the CPG Clock
+> Domain. But all its device drivers manage clocks explicitly, without
+> relying on Runtime PM, so it doesn't need the legacy default PM hack
+> neither.
+>
+> Hence do not compile it when running an ARM multi-platform kernel with
+> genpd support.
+>
+> The default PM domain is still needed:
+>   - for legacy SuperH,
+>   - for legacy (non-DT) ARM/shmobile platforms
+>       - without genpd support (r8a7778, r8a7779),
+>       - with genpd support, for devices in the "C5" always-on power
+>         area (r8a7740, sh73a0),
+>   - for the CONFIG_PM=n case.
+>
+> Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+> Reviewed-by: Ulf Hansson <ulf.hansson@linaro.org>
+> ---
+> v2:
+>   - Add Reviewed-by,
+>   - Just stop compiling pm_runtime.c instead of using a runtime check,
+>     as no multi-platform ARM platforms need this anymore.
 
-Add info prints in sample kprobe handlers for ARM64
+The runtime check must stay for the ARM multiplatform CONFIG_PM=n case,
+to prevent the code from running on non-shmobile machines. Will fix.
 
-Signed-off-by: Sandeepa Prabhu <sandeepa.prabhu@linaro.org>
----
- samples/kprobes/kprobe_example.c | 8 ++++++++
- 1 file changed, 8 insertions(+)
+Gr{oetje,eeting}s,
 
-diff --git a/samples/kprobes/kprobe_example.c b/samples/kprobes/kprobe_example.c
-index 366db1a..51d459c 100644
---- a/samples/kprobes/kprobe_example.c
-+++ b/samples/kprobes/kprobe_example.c
-@@ -42,6 +42,10 @@ static int handler_pre(struct kprobe *p, struct pt_regs *regs)
- 			" ex1 = 0x%lx\n",
- 		p->addr, regs->pc, regs->ex1);
- #endif
-+#ifdef CONFIG_ARM64
-+	pr_info("pre_handler: p->addr = 0x%p, pc = 0x%lx\n",
-+		p->addr, (long)regs->pc);
-+#endif
- 
- 	/* A dump_stack() here will give a stack backtrace */
- 	return 0;
-@@ -67,6 +71,10 @@ static void handler_post(struct kprobe *p, struct pt_regs *regs,
- 	printk(KERN_INFO "post_handler: p->addr = 0x%p, ex1 = 0x%lx\n",
- 		p->addr, regs->ex1);
- #endif
-+#ifdef CONFIG_ARM64
-+	pr_info("post_handler: p->addr = 0x%p, pc = 0x%lx\n",
-+		p->addr, (long)regs->pc);
-+#endif
- }
- 
- /*
--- 
-1.8.1.2
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
