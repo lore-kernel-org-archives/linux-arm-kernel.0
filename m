@@ -1,32 +1,34 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Mon, 15 Jun 2015 16:56:14 +0200
+Date: Mon, 15 Jun 2015 16:57:53 +0200
 Subject: [PATCH] ARM: mm: enable L1 prefetch on Cortex-A9
-In-Reply-To: <557EAC15.1070807@de.bosch.com>
+In-Reply-To: <20150615111103.GL7557@n2100.arm.linux.org.uk>
 References: <1434023550-20147-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <557EAC15.1070807@de.bosch.com>
-Message-ID: <20150615165614.26b713b6@free-electrons.com>
+ <20150615111103.GL7557@n2100.arm.linux.org.uk>
+Message-ID: <20150615165753.61d8c75a@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Dirk Behme,
+Russell,
 
-On Mon, 15 Jun 2015 12:42:29 +0200, Dirk Behme wrote:
+On Mon, 15 Jun 2015 12:11:03 +0100, Russell King - ARM Linux wrote:
 
-> > This commit enables this L1 prefetch feature unconditionally on all
-> > Cortex-A9 by setting bit 2 in the Auxiliary Control CP15
-> > register. Note that since this bit only exists on Cortex-A9 but not on
-> > Cortex-A5 or Cortex-R7, we separate the handling of Cortex-A9 from the
-> > one of those two other cores.
+> I'd prefer not to take this until after the next merge window, because I
+> don't want to deal with conflicts that this may cause with other branches
+> in my tree.
 > 
-> Have you observed or measured any performance improvements or changes 
-> using this change?
+> We're at -rc8 now, only a week away from -final, now is not really the
+> time to be taking new code into git trees anyway.
 
-No, I haven't done any measurement myself, I merely wanted to propagate
-some of the optimizations that were implemented in the Marvell BSP and
-open the discussion around enabling the L1 prefetching feature of the
-A9.
+I should have mentioned that explicitly, but I clearly didn't expect
+this patch to be taken for the upcoming 4.2 merge window as it's way
+too late. Targeting 4.3 is perfectly fine.
 
-Best regards,
+However, can you consider my "ARM: smp_scu: enable coherent speculative
+linefills", which has been sent almost three months ago:
+
+  http://lists.infradead.org/pipermail/linux-arm-kernel/2015-March/332106.html
+
+Thanks,
 
 Thomas
 -- 
