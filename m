@@ -1,32 +1,33 @@
-From: m.smarduch@samsung.com (Mario Smarduch)
-Date: Mon, 15 Jun 2015 12:08:41 -0700
-Subject: [PATCH] arm64: KVM: Optimize arm64 guest exit VFP/SIMD register
- save/restore
-In-Reply-To: <557F1EC0.6060004@arm.com>
-References: <557CACC4.8040405@samsung.com> <557EA23D.4090200@arm.com>
- <557F13A5.9030603@samsung.com> <557F1765.8040405@arm.com>
- <557F1CFB.8040106@samsung.com> <557F1EC0.6060004@arm.com>
-Message-ID: <557F22B9.9020902@samsung.com>
+From: lina.iyer@linaro.org (Lina Iyer)
+Date: Mon, 15 Jun 2015 13:14:34 -0600
+Subject: [PATCH RFC 3/3] PM / Domains: Introduce generic PM domain for
+ cpu domain
+In-Reply-To: <7hioao6cd2.fsf@deeprootsystems.com>
+References: <1433456946-53296-1-git-send-email-lina.iyer@linaro.org>
+ <1433456946-53296-4-git-send-email-lina.iyer@linaro.org>
+ <7hmw07meh6.fsf@deeprootsystems.com>
+ <20150611145649.GC1103@linaro.org>
+ <7hioao6cd2.fsf@deeprootsystems.com>
+Message-ID: <20150615191434.GA14311@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/15/2015 11:51 AM, Marc Zyngier wrote:
-> On 15/06/15 19:44, Mario Smarduch wrote:
->> On 06/15/2015 11:20 AM, Marc Zyngier wrote:
->>> On 15/06/15 19:04, Mario Smarduch wrote:
->>>> On 06/15/2015 03:00 AM, Marc Zyngier wrote:
->>>>> Hi Mario,
->>>>>
-[...]
->>>
->>> The 32bit code is starting to show its age, and could probably do with a
->>> refactor. If you have some cycles to spare, that'd be quite interesting.
->>
->> Yep, will do, ARMv7 is still very relevant.
-> 
-> You bet it is. My home router is a v7 VM...
-> 
-> 	M.
-> 
-Definitely nice use case, another one RPi2 appears like
-everyone is hacking on it :)
+On Mon, Jun 15 2015 at 12:43 -0600, Kevin Hilman wrote:
+>Lina Iyer <lina.iyer@linaro.org> writes:
+>
+>> On Wed, Jun 10 2015 at 15:38 -0600, Kevin Hilman wrote:
+>>>Lina Iyer <lina.iyer@linaro.org> writes:
+
+
+>I'm pretty sure the generic code will already add devices to genpds if
+>the genpd is using the of_genpd_* stuff.  That is why I'm wondering why
+>the extra stuff for CPUs is needed.
+>
+I dont see that automatically happening. When I attach a device, it
+finds the corresponding genpd provider and attaches the device.  But I
+dont see in any code that creates genpd and find the related device
+nodes and adds them to the genpd.
+
+May be I am missing something.
+
+-- Lina
