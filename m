@@ -1,75 +1,58 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Tue, 16 Jun 2015 14:13:00 +0200
-Subject: [PATCH 4/9] ARM: mvebu: prepare mvebu_pm_store_bootinfo() to support
- multiple SoCs
+Date: Tue, 16 Jun 2015 14:13:04 +0200
+Subject: [PATCH 8/9] ARM: mvebu: add suspend/resume DT information for Armada
+ 388 GP
 In-Reply-To: <1434456785-23696-1-git-send-email-thomas.petazzoni@free-electrons.com>
 References: <1434456785-23696-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1434456785-23696-5-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1434456785-23696-9-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As we are going to introduce support for Armada 38x in pm.c, split out
-the Armada XP part of mvebu_pm_store_bootinfo() into
-mvebu_pm_store_armadaxp_bootinfo(), and make the former retunr an
-error when an unsupported SoC is used.
+This commit improves the Armada 388 GP Device Tree description to
+describe the 3 GPIOs that are used to connect the SoC to the PIC
+micro-controller that we talk to shutdown the SoC when entering
+suspend to RAM.
 
 Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 ---
- arch/arm/mach-mvebu/pm.c | 25 +++++++++++++++++++++----
- 1 file changed, 21 insertions(+), 4 deletions(-)
+ arch/arm/boot/dts/armada-388-gp.dts | 16 ++++++++++++++++
+ 1 file changed, 16 insertions(+)
 
-diff --git a/arch/arm/mach-mvebu/pm.c b/arch/arm/mach-mvebu/pm.c
-index eca650b..02fdf67 100644
---- a/arch/arm/mach-mvebu/pm.c
-+++ b/arch/arm/mach-mvebu/pm.c
-@@ -105,12 +105,10 @@ static phys_addr_t mvebu_internal_reg_base(void)
- 	return of_translate_address(np, in_addr);
- }
+diff --git a/arch/arm/boot/dts/armada-388-gp.dts b/arch/arm/boot/dts/armada-388-gp.dts
+index 78514ab..5f53a96 100644
+--- a/arch/arm/boot/dts/armada-388-gp.dts
++++ b/arch/arm/boot/dts/armada-388-gp.dts
+@@ -56,6 +56,14 @@
+ 		reg = <0x00000000 0x80000000>; /* 2 GB */
+ 	};
  
--static void mvebu_pm_store_bootinfo(void)
-+static void mvebu_pm_store_armadaxp_bootinfo(u32 *store_addr)
- {
--	u32 *store_addr;
- 	phys_addr_t resume_pc;
- 
--	store_addr = phys_to_virt(BOOT_INFO_ADDR);
- 	resume_pc = virt_to_phys(armada_370_xp_cpu_resume);
- 
- 	/*
-@@ -151,14 +149,33 @@ static void mvebu_pm_store_bootinfo(void)
- 	writel(BOOT_MAGIC_LIST_END, store_addr);
- }
- 
-+static int mvebu_pm_store_bootinfo(void)
-+{
-+	u32 *store_addr;
++	cpus {
++		pm_pic {
++			ctrl-gpios = <&gpio1 1 GPIO_ACTIVE_LOW>,
++				     <&gpio1 2 GPIO_ACTIVE_LOW>,
++				     <&gpio1 3 GPIO_ACTIVE_LOW>;
++		};
++	};
 +
-+	store_addr = phys_to_virt(BOOT_INFO_ADDR);
-+
-+	if (of_machine_is_compatible("marvell,armadaxp"))
-+		mvebu_pm_store_armadaxp_bootinfo(store_addr);
-+	else
-+		return -ENODEV;
-+
-+	return 0;
-+}
-+
- static int mvebu_pm_enter(suspend_state_t state)
- {
-+	int ret;
-+
- 	if (state != PM_SUSPEND_MEM)
- 		return -EINVAL;
+ 	soc {
+ 		ranges = <MBUS_ID(0xf0, 0x01) 0 0xf1000000 0x100000
+ 			  MBUS_ID(0x01, 0x1d) 0 0xfff00000 0x100000>;
+@@ -406,8 +414,16 @@
+ };
  
-+	ret = mvebu_pm_store_bootinfo();
-+	if (ret)
-+		return ret;
+ &pinctrl {
++	pinctrl-0 = <&pic_pins>;
++	pinctrl-names = "default";
 +
- 	cpu_pm_enter();
- 
--	mvebu_pm_store_bootinfo();
- 	cpu_suspend(0, mvebu_pm_powerdown);
- 
- 	outer_resume();
+ 	pca0_pins: pca0_pins {
+ 		marvell,pins = "mpp18";
+ 		marvell,function = "gpio";
+ 	};
++
++	pic_pins: pic-pins-0 {
++		marvell,pins = "mpp33", "mpp34", "mpp35";
++		marvell,function = "gpio";
++	};
+ };
 -- 
 2.1.0
