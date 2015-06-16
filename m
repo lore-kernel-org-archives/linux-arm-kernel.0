@@ -1,9 +1,9 @@
 From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Tue, 16 Jun 2015 14:31:49 -0700
-Subject: [PATCH 06/10] ARM: dts: qcom: apq8084-mtp: Use stdout-path
+Date: Tue, 16 Jun 2015 14:31:46 -0700
+Subject: [PATCH 03/10] ARM: dts: qcom: apq8064-ifc6410: Use stdout-path
 In-Reply-To: <1434490313-13905-1-git-send-email-sboyd@codeaurora.org>
 References: <1434490313-13905-1-git-send-email-sboyd@codeaurora.org>
-Message-ID: <1434490313-13905-7-git-send-email-sboyd@codeaurora.org>
+Message-ID: <1434490313-13905-4-git-send-email-sboyd@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -12,28 +12,24 @@ kernel command line.
 
 Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
 ---
- arch/arm/boot/dts/qcom-apq8084-mtp.dts | 8 ++++++++
- 1 file changed, 8 insertions(+)
+ arch/arm/boot/dts/qcom-apq8064-ifc6410.dts | 4 ++++
+ 1 file changed, 4 insertions(+)
 
-diff --git a/arch/arm/boot/dts/qcom-apq8084-mtp.dts b/arch/arm/boot/dts/qcom-apq8084-mtp.dts
-index cb43acfc5d1d..3016c7048d44 100644
---- a/arch/arm/boot/dts/qcom-apq8084-mtp.dts
-+++ b/arch/arm/boot/dts/qcom-apq8084-mtp.dts
-@@ -5,6 +5,14 @@
- 	model = "Qualcomm APQ 8084-MTP";
- 	compatible = "qcom,apq8084-mtp", "qcom,apq8084";
+diff --git a/arch/arm/boot/dts/qcom-apq8064-ifc6410.dts b/arch/arm/boot/dts/qcom-apq8064-ifc6410.dts
+index a7c939ba8873..c843274a34ef 100644
+--- a/arch/arm/boot/dts/qcom-apq8064-ifc6410.dts
++++ b/arch/arm/boot/dts/qcom-apq8064-ifc6410.dts
+@@ -9,6 +9,10 @@
+ 		serial0 = &gsbi7_serial;
+ 	};
  
-+	aliases {
-+		serial0 = &blsp2_uart2;
-+	};
-+
 +	chosen {
 +		stdout-path = "serial0:115200n8";
 +	};
 +
  	soc {
- 		serial at f995e000 {
- 			status = "okay";
+ 		pinctrl at 800000 {
+ 			card_detect: card_detect {
 -- 
 The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
 a Linux Foundation Collaborative Project
