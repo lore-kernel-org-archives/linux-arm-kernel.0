@@ -1,248 +1,68 @@
-From: djkurtz@chromium.org (Daniel Kurtz)
-Date: Tue, 16 Jun 2015 20:20:14 +0800
-Subject: [PATCH v6 4/7] arm64: dts: mediatek: Add MT8173 MMC dts
-In-Reply-To: <CAGS+omCwxH5vTTKNOEcN9C9s=1yBpYEqbMz1NygYoLY9OFKchg@mail.gmail.com>
-References: <1434367253-26577-1-git-send-email-chaotian.jing@mediatek.com>
- <1434367253-26577-5-git-send-email-chaotian.jing@mediatek.com>
- <CAGS+omCwxH5vTTKNOEcN9C9s=1yBpYEqbMz1NygYoLY9OFKchg@mail.gmail.com>
-Message-ID: <CAGS+omDMprTvjwpXfdh7mg9i=WXdzO_Fv-oEop3z6AEVCG=DFQ@mail.gmail.com>
+From: tomasz.figa@gmail.com (Tomasz Figa)
+Date: Tue, 16 Jun 2015 21:32:08 +0900
+Subject: [PATCH v2 1/1] irqchip: exynos-combiner: Save IRQ enable set on
+ suspend
+In-Reply-To: <557EE890.2050001@collabora.co.uk>
+References: <1434087795-13990-1-git-send-email-javier.martinez@collabora.co.uk>
+ <557AB00C.5040606@arm.com> <557AC23D.8040602@collabora.co.uk>
+ <557AC85E.5070705@arm.com> <557AD728.7090908@collabora.co.uk>
+ <557B34A7.4090507@collabora.co.uk>
+ <CAD=FV=UQF+n8AjSXYajqUb0qswcoUrSgnsasV82JaS3dBtNO8Q@mail.gmail.com>
+ <557E82BC.7080203@collabora.co.uk> <557E947B.3030804@arm.com>
+ <557EE890.2050001@collabora.co.uk>
+Message-ID: <CA+Ln22H8A5xY4S=yEnftTKUdsAM3Oib2gZV_GG=m6nENn2fw0g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 16, 2015 at 7:39 PM, Daniel Kurtz <djkurtz@chromium.org> wrote:
-> Hi Chaotian,
+2015-06-16 0:00 GMT+09:00 Javier Martinez Canillas
+<javier.martinez@collabora.co.uk>:
+> Hello Sudeep,
 >
-> On Mon, Jun 15, 2015 at 7:20 PM, Chaotian Jing
-> <chaotian.jing@mediatek.com> wrote:
->> From: Eddie Huang <eddie.huang@mediatek.com>
+> On 06/15/2015 11:01 AM, Sudeep Holla wrote:
 >>
->> Add node mmc0 ~ mmc3 for mt8173.dtsi
->> Add node mmc0, mmc1 for mt8173-evb.dts
 >>
->> Signed-off-by: Chaotian Jing <chaotian.jing@mediatek.com>
->> Signed-off-by: Eddie Huang <eddie.huang@mediatek.com>
->> ---
->>  arch/arm64/boot/dts/mediatek/mt8173-evb.dts | 126 ++++++++++++++++++++++++++++
->>  arch/arm64/boot/dts/mediatek/mt8173.dtsi    |  45 +++++++++-
->>  2 files changed, 170 insertions(+), 1 deletion(-)
+>> On 15/06/15 08:46, Javier Martinez Canillas wrote:
+>> [...]
 >>
->> diff --git a/arch/arm64/boot/dts/mediatek/mt8173-evb.dts b/arch/arm64/boot/dts/mediatek/mt8173-evb.dts
->> index b1560c9..762ec61 100644
->> --- a/arch/arm64/boot/dts/mediatek/mt8173-evb.dts
->> +++ b/arch/arm64/boot/dts/mediatek/mt8173-evb.dts
->> @@ -33,6 +33,132 @@
->>         chosen { };
->>  };
+>>>
+>>> Sudeep, so we may need something like $subject after all from Doug's
+>>> explanations since the combiner chip state is lost during a S2R. I know
+>>> that it adds more duplicated code (others irqchip drivers do the same)
+>>> and it may not scale well if a chip has many registers but is the best
+>>> solution I could came with.
+>>>
 >>
->> +&mmc0 {
->> +       pinctrl-names = "default", "state_uhs";
->> +       pinctrl-0 = <&mmc0_pins_default>;
->> +       pinctrl-1 = <&mmc0_pins_uhs>;
->> +       status = "okay";
->> +       bus-width = <8>;
->> +       max-frequency = <50000000>;
->> +       cap-mmc-highspeed;
->> +       vmmc-supply = <&mt6397_vemc_3v3_reg>;
->> +       vqmmc-supply = <&mt6397_vio18_reg>;
-
-I also can't find phandles for these regulators.
-
->> +       non-removable;
->> +};
->> +
->> +&mmc1 {
->> +       pinctrl-names = "default", "state_uhs";
->> +       pinctrl-0 = <&mmc1_pins_default>;
->> +       pinctrl-1 = <&mmc1_pins_uhs>;
->> +       status = "okay";
->> +       bus-width = <4>;
->> +       max-frequency = <50000000>;
->> +       cap-sd-highspeed;
->> +       sd-uhs-sdr25;
->> +       cd-gpios = <&pio 132 0>;
->> +       vmmc-supply = <&mt6397_vmch_reg>;
->> +       vqmmc-supply = <&mt6397_vmc_reg>;
-
-nor these regulators.
-
-Which kernel branch are you basing your patch set on?
-
-Thanks,
--Dan
-
-
->> +};
->> +
->> +&pio {
->> +       mmc0_pins_default: mmc0default {
->> +               pins_cmd_dat {
->> +                       pinmux = <MT8173_PIN_57_MSDC0_DAT0__FUNC_MSDC0_DAT0>,
->> +                               <MT8173_PIN_58_MSDC0_DAT1__FUNC_MSDC0_DAT1>,
->> +                               <MT8173_PIN_59_MSDC0_DAT2__FUNC_MSDC0_DAT2>,
->> +                               <MT8173_PIN_60_MSDC0_DAT3__FUNC_MSDC0_DAT3>,
->> +                               <MT8173_PIN_61_MSDC0_DAT4__FUNC_MSDC0_DAT4>,
->> +                               <MT8173_PIN_62_MSDC0_DAT5__FUNC_MSDC0_DAT5>,
->> +                               <MT8173_PIN_63_MSDC0_DAT6__FUNC_MSDC0_DAT6>,
->> +                               <MT8173_PIN_64_MSDC0_DAT7__FUNC_MSDC0_DAT7>,
->> +                               <MT8173_PIN_66_MSDC0_CMD__FUNC_MSDC0_CMD>;
->> +                       input-enable;
->> +                       bias-pull-up;
->> +               };
->> +
->> +               pins_clk {
->> +                       pinmux = <MT8173_PIN_65_MSDC0_CLK__FUNC_MSDC0_CLK>;
->> +                       bias-pull-down;
->> +               };
->> +
->> +               pins_rst {
->> +                       pinmux = <MT8173_PIN_68_MSDC0_RST___FUNC_MSDC0_RSTB>;
->> +                       bias-pull-up;
->> +               };
->> +       };
->> +
->> +       mmc1_pins_default: mmc1default {
->> +               pins_cmd_dat {
->> +                       pinmux = <MT8173_PIN_73_MSDC1_DAT0__FUNC_MSDC1_DAT0>,
->> +                            <MT8173_PIN_74_MSDC1_DAT1__FUNC_MSDC1_DAT1>,
->> +                            <MT8173_PIN_75_MSDC1_DAT2__FUNC_MSDC1_DAT2>,
->> +                            <MT8173_PIN_76_MSDC1_DAT3__FUNC_MSDC1_DAT3>,
->> +                            <MT8173_PIN_78_MSDC1_CMD__FUNC_MSDC1_CMD>;
->> +                       input-enable;
->> +                       drive-strength = <MTK_DRIVE_4mA>;
->> +                       bias-pull-up = <MTK_PUPD_SET_R1R0_10>;
->> +               };
->> +
->> +               pins_clk {
->> +                       pinmux = <MT8173_PIN_77_MSDC1_CLK__FUNC_MSDC1_CLK>;
->> +                       bias-pull-down;
->> +                       drive-strength = <MTK_DRIVE_4mA>;
->> +               };
->> +
->> +               pins_insert {
->> +                       pinmux = <MT8173_PIN_132_I2S0_DATA1__FUNC_GPIO132>;
->> +                       bias-pull-up;
->> +               };
->> +       };
->> +
->> +       mmc0_pins_uhs: mmc0 at 0{
->> +               pins_cmd_dat {
->> +                       pinmux = <MT8173_PIN_57_MSDC0_DAT0__FUNC_MSDC0_DAT0>,
->> +                               <MT8173_PIN_58_MSDC0_DAT1__FUNC_MSDC0_DAT1>,
->> +                               <MT8173_PIN_59_MSDC0_DAT2__FUNC_MSDC0_DAT2>,
->> +                               <MT8173_PIN_60_MSDC0_DAT3__FUNC_MSDC0_DAT3>,
->> +                               <MT8173_PIN_61_MSDC0_DAT4__FUNC_MSDC0_DAT4>,
->> +                               <MT8173_PIN_62_MSDC0_DAT5__FUNC_MSDC0_DAT5>,
->> +                               <MT8173_PIN_63_MSDC0_DAT6__FUNC_MSDC0_DAT6>,
->> +                               <MT8173_PIN_64_MSDC0_DAT7__FUNC_MSDC0_DAT7>,
->> +                               <MT8173_PIN_66_MSDC0_CMD__FUNC_MSDC0_CMD>;
->> +                       input-enable;
->> +                       drive-strength = <MTK_DRIVE_2mA>;
->> +                       bias-pull-up = <MTK_PUPD_SET_R1R0_01>;
->> +               };
->> +
->> +               pins_clk {
->> +                       pinmux = <MT8173_PIN_65_MSDC0_CLK__FUNC_MSDC0_CLK>;
->> +                       drive-strength = <MTK_DRIVE_2mA>;
->> +                       bias-pull-down = <MTK_PUPD_SET_R1R0_01>;
->> +               };
->> +
->> +               pins_rst {
->> +                       pinmux = <MT8173_PIN_68_MSDC0_RST___FUNC_MSDC0_RSTB>;
->> +                       bias-pull-up;
->> +               };
->> +       };
->> +
->> +       mmc1_pins_uhs: mmc1 at 0 {
->> +               pins_cmd_dat {
->> +                       pinmux = <MT8173_PIN_73_MSDC1_DAT0__FUNC_MSDC1_DAT0>,
->> +                            <MT8173_PIN_74_MSDC1_DAT1__FUNC_MSDC1_DAT1>,
->> +                            <MT8173_PIN_75_MSDC1_DAT2__FUNC_MSDC1_DAT2>,
->> +                            <MT8173_PIN_76_MSDC1_DAT3__FUNC_MSDC1_DAT3>,
->> +                            <MT8173_PIN_78_MSDC1_CMD__FUNC_MSDC1_CMD>;
->> +                       input-enable;
->> +                       drive-strength = <MTK_DRIVE_4mA>;
->> +                       bias-pull-up = <MTK_PUPD_SET_R1R0_10>;
->> +               };
->> +
->> +               pins_clk {
->> +                       pinmux = <MT8173_PIN_77_MSDC1_CLK__FUNC_MSDC1_CLK>;
->> +                       drive-strength = <MTK_DRIVE_4mA>;
->> +                       bias-pull-down = <MTK_PUPD_SET_R1R0_10>;
->> +               };
->> +       };
->> +};
->> +
->>  &pwrap {
->>         pmic: mt6397 {
->>                 compatible = "mediatek,mt6397";
->> diff --git a/arch/arm64/boot/dts/mediatek/mt8173.dtsi b/arch/arm64/boot/dts/mediatek/mt8173.dtsi
->> index 512e4eb..56ea429 100644
->> --- a/arch/arm64/boot/dts/mediatek/mt8173.dtsi
->> +++ b/arch/arm64/boot/dts/mediatek/mt8173.dtsi
->> @@ -288,7 +288,50 @@
->>                         reg = <0 0x19000000 0 0x1000>;
->>                         #clock-cells = <1>;
->>                 };
->> -       };
+>> OK
 >>
->> +               mmc0: mmc at 11230000 {
->> +                       compatible = "mediatek,mt8173-mmc",
->> +                                    "mediatek,mt8135-mmc";
->> +                       reg = <0 0x11230000 0 0x1000>;
->> +                       interrupts = <GIC_SPI 71 IRQ_TYPE_LEVEL_LOW>;
->> +                       clocks = <&pericfg CLK_PERI_MSDC30_0>,
->> +                                <&topckgen CLK_TOP_MSDC50_0_H_SEL>;
->> +                       clock-names = "source", "hclk";
->> +                       status = "disabled";
->> +               };
->> +
->> +               mmc1: mmc at 11240000 {
->> +                       compatible = "mediatek,mt8173-mmc",
->> +                                    "mediatek,mt8135-mmc";
->> +                       reg = <0 0x11240000 0 0x1000>;
->> +                       interrupts = <GIC_SPI 72 IRQ_TYPE_LEVEL_LOW>;
->> +                       clocks = <&pericfg CLK_PERI_MSDC30_1>,
->> +                                <&clk_null>;
+>>> If you have a suggestion for a better alternative, I can give a try and
+>>> write the patch. But I think $subject could also land to fix this issue
+>>> since is a very non intrusive change and later can be changed once the
+>>> irqchip core supports this use case.
+>>>
+>>
+>> Agreed. But I would suggest also to add MASK_ON_SUSPEND and set_irq_wake
+>> also and then you can restore iff it's non-zero as irq core will take
+>> care of most of the non-wakeup sources. Because I am planning to push
 >
-> This requires a "clk_null" phandle, but I have not seen a patch adding
-> that on the public list.
-> Did I miss a patch?
+> I've looking at this and a problem I found is that IIUC the set_irq_wake
+> is not propagated from the the Exynos pinctrl / GPIO driver which is the
+> combiner's external interrupt source so the callback is never called.
+> Which means that right now only the state of the wakeup source IRQs can't
+> be saved since that information is not present.
 >
-> -Dan
+> The drivers/pinctrl/samsung/pinctrl-exynos.c driver enables and disables
+> the combiner interrupts but its .irq_set_wake handler only updates the
+> wakeup source mask for the external interrupts but does not call the
+> combiner .set_irq_wake so that should be changed as well.
 >
->> +                       clock-names = "source", "hclk";
->> +                       status = "disabled";
->> +               };
->> +
->> +               mmc2: mmc at 11250000 {
->> +                       compatible = "mediatek,mt8173-mmc",
->> +                                    "mediatek,mt8135-mmc";
->> +                       reg = <0 0x11250000 0 0x1000>;
->> +                       interrupts = <GIC_SPI 73 IRQ_TYPE_LEVEL_LOW>;
->> +                       clocks = <&pericfg CLK_PERI_MSDC30_2>,
->> +                                <&clk_null>;
->> +                       clock-names = "source", "hclk";
->> +                       status = "disabled";
->> +               };
->> +
->> +               mmc3: mmc at 11260000 {
->> +                       compatible = "mediatek,mt8173-mmc",
->> +                                    "mediatek,mt8135-mmc";
->> +                       reg = <0 0x11260000 0 0x1000>;
->> +                       interrupts = <GIC_SPI 74 IRQ_TYPE_LEVEL_LOW>;
->> +                       clocks = <&pericfg CLK_PERI_MSDC30_3>,
->> +                                <&topckgen CLK_TOP_MSDC50_2_H_SEL>;
->> +                       clock-names = "source", "hclk";
->> +                       status = "disabled";
->> +               };
->> +       };
->>  };
->>
->> --
->> 1.8.1.1.dirty
->>
->>
->> _______________________________________________
->> Linux-mediatek mailing list
->> Linux-mediatek at lists.infradead.org
->> http://lists.infradead.org/mailman/listinfo/linux-mediatek
+
+As far as I'm aware of, wake-up events from pin controllers don't go
+through GIC, but rather directly to PMU, which is a dedicated unit
+responsible for power management and not a standalone interrupt
+controller (well actually I saw a series making it a cascaded
+controller some time ago, but I'm not sure if that went in). Based on
+this, I don't think we have to call set_irq_wake on GIC. Correct me if
+I'm wrong, though.
+
+Best regards,
+Tomasz
