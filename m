@@ -1,127 +1,72 @@
-From: hsweeten@visionengravers.com (H Hartley Sweeten)
-Date: Tue, 16 Jun 2015 09:52:47 -0700
-Subject: [PATCH 2/2] ARM: ep93xx: vision_ep9307: add audio support
-In-Reply-To: <1434473567-5258-1-git-send-email-hsweeten@visionengravers.com>
-References: <1434473567-5258-1-git-send-email-hsweeten@visionengravers.com>
-Message-ID: <1434473567-5258-3-git-send-email-hsweeten@visionengravers.com>
+From: romain.perier@gmail.com (Romain Perier)
+Date: Tue, 16 Jun 2015 17:19:26 +0000
+Subject: [PATCH] ARM: dts: rockchip: Add DMA tx and rx channels in UART
+ interfaces for RK3288 SoCs
+Message-ID: <1434475166-30338-1-git-send-email-romain.perier@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add I2S audio support to the vision_ep9307 system.
+This enable DMA capability for the corresponding UART interfaces, also it removes
+warning "ttyS%d - Failed to request dma" from kernel logs.
 
-Signed-off-by: H Hartley Sweeten <hsweeten@visionengravers.com>
+Signed-off-by: Romain Perier <romain.perier@gmail.com>
 ---
- arch/arm/mach-ep93xx/vision_ep9307.c | 58 ++++++++++++++++++++++++++++++++++--
- 1 file changed, 56 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/mach-ep93xx/vision_ep9307.c b/arch/arm/mach-ep93xx/vision_ep9307.c
-index aa87dfa..ff22a6a 100644
---- a/arch/arm/mach-ep93xx/vision_ep9307.c
-+++ b/arch/arm/mach-ep93xx/vision_ep9307.c
-@@ -29,6 +29,8 @@
- #include <linux/spi/mmc_spi.h>
- #include <linux/mmc/host.h>
+Changes since v1 ("[PATCH] ARM: dts: rockchip: Add dmac_bus rx and tx for uart2"):
+	- Add DMA tx and rx channels for all UART interfaces
+	- Rename commit summary
+
+ arch/arm/boot/dts/rk3288.dtsi | 10 ++++++++++
+ 1 file changed, 10 insertions(+)
+
+diff --git a/arch/arm/boot/dts/rk3288.dtsi b/arch/arm/boot/dts/rk3288.dtsi
+index 22316d0..1996452 100644
+--- a/arch/arm/boot/dts/rk3288.dtsi
++++ b/arch/arm/boot/dts/rk3288.dtsi
+@@ -359,6 +359,8 @@
+ 		clock-names = "baudclk", "apb_pclk";
+ 		pinctrl-names = "default";
+ 		pinctrl-0 = <&uart0_xfer>;
++		dmas = <&dmac_peri 1>, <&dmac_peri 2>;
++		dma-names = "tx", "rx";
+ 		status = "disabled";
+ 	};
  
-+#include <sound/cs4271.h>
-+
- #include <mach/hardware.h>
- #include <linux/platform_data/video-ep93xx.h>
- #include <linux/platform_data/spi-ep93xx.h>
-@@ -169,6 +171,35 @@ static struct i2c_board_info vision_i2c_info[] __initdata = {
- };
+@@ -372,6 +374,8 @@
+ 		clock-names = "baudclk", "apb_pclk";
+ 		pinctrl-names = "default";
+ 		pinctrl-0 = <&uart1_xfer>;
++		dmas = <&dmac_peri 3>, <&dmac_peri 4>;
++		dma-names = "tx", "rx";
+ 		status = "disabled";
+ 	};
  
- /*************************************************************************
-+ * SPI CS4271 Audio Codec
-+ *************************************************************************/
-+static struct cs4271_platform_data vision_cs4271_data = {
-+	.gpio_nreset	= EP93XX_GPIO_LINE_H(2),
-+};
-+
-+static int vision_cs4271_hw_setup(struct spi_device *spi)
-+{
-+	return gpio_request_one(EP93XX_GPIO_LINE_EGPIO6,
-+				GPIOF_OUT_INIT_HIGH, spi->modalias);
-+}
-+
-+static void vision_cs4271_hw_cleanup(struct spi_device *spi)
-+{
-+	gpio_free(EP93XX_GPIO_LINE_EGPIO6);
-+}
-+
-+static void vision_cs4271_hw_cs_control(struct spi_device *spi, int value)
-+{
-+	gpio_set_value(EP93XX_GPIO_LINE_EGPIO6, value);
-+}
-+
-+static struct ep93xx_spi_chip_ops vision_cs4271_hw = {
-+	.setup		= vision_cs4271_hw_setup,
-+	.cleanup	= vision_cs4271_hw_cleanup,
-+	.cs_control	= vision_cs4271_hw_cs_control,
-+};
-+
-+/*************************************************************************
-  * SPI Flash
-  *************************************************************************/
- #define VISION_SPI_FLASH_CS	EP93XX_GPIO_LINE_EGPIO7
-@@ -262,12 +293,20 @@ static struct ep93xx_spi_chip_ops vision_spi_mmc_hw = {
-  *************************************************************************/
- static struct spi_board_info vision_spi_board_info[] __initdata = {
- 	{
-+		.modalias		= "cs4271",
-+		.platform_data		= &vision_cs4271_data,
-+		.controller_data	= &vision_cs4271_hw,
-+		.max_speed_hz		= 6000000,
-+		.bus_num		= 0,
-+		.chip_select		= 0,
-+		.mode			= SPI_MODE_3,
-+	}, {
- 		.modalias		= "sst25l",
- 		.platform_data		= &vision_spi_flash_data,
- 		.controller_data	= &vision_spi_flash_hw,
- 		.max_speed_hz		= 20000000,
- 		.bus_num		= 0,
--		.chip_select		= 0,
-+		.chip_select		= 1,
- 		.mode			= SPI_MODE_3,
- 	}, {
- 		.modalias		= "mmc_spi",
-@@ -275,7 +314,7 @@ static struct spi_board_info vision_spi_board_info[] __initdata = {
- 		.controller_data	= &vision_spi_mmc_hw,
- 		.max_speed_hz		= 20000000,
- 		.bus_num		= 0,
--		.chip_select		= 1,
-+		.chip_select		= 2,
- 		.mode			= SPI_MODE_3,
- 	},
- };
-@@ -286,6 +325,20 @@ static struct ep93xx_spi_info vision_spi_master __initdata = {
- };
+@@ -385,6 +389,8 @@
+ 		clock-names = "baudclk", "apb_pclk";
+ 		pinctrl-names = "default";
+ 		pinctrl-0 = <&uart2_xfer>;
++		dmas = <&dmac_bus_s 4>, <&dmac_bus_s 5>;
++		dma-names = "tx", "rx";
+ 		status = "disabled";
+ 	};
  
- /*************************************************************************
-+ * I2S Audio
-+ *************************************************************************/
-+static struct platform_device vision_audio_device = {
-+	.name		= "edb93xx-audio",
-+	.id		= -1,
-+};
-+
-+static void __init vision_register_i2s(void)
-+{
-+	ep93xx_register_i2s();
-+	platform_device_register(&vision_audio_device);
-+}
-+
-+/*************************************************************************
-  * Machine Initialization
-  *************************************************************************/
- static void __init vision_init_machine(void)
-@@ -310,6 +363,7 @@ static void __init vision_init_machine(void)
- 				ARRAY_SIZE(vision_i2c_info));
- 	ep93xx_register_spi(&vision_spi_master, vision_spi_board_info,
- 				ARRAY_SIZE(vision_spi_board_info));
-+	vision_register_i2s();
- }
+@@ -398,6 +404,8 @@
+ 		clock-names = "baudclk", "apb_pclk";
+ 		pinctrl-names = "default";
+ 		pinctrl-0 = <&uart3_xfer>;
++		dmas = <&dmac_peri 7>, <&dmac_peri 8>;
++		dma-names = "tx", "rx";
+ 		status = "disabled";
+ 	};
  
- MACHINE_START(VISION_EP9307, "Vision Engraving Systems EP9307")
+@@ -411,6 +419,8 @@
+ 		clock-names = "baudclk", "apb_pclk";
+ 		pinctrl-names = "default";
+ 		pinctrl-0 = <&uart4_xfer>;
++		dmas = <&dmac_peri 9>, <&dmac_peri 10>;
++		dma-names = "tx", "rx";
+ 		status = "disabled";
+ 	};
+ 
 -- 
-2.3.0
+1.9.1
