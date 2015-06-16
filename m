@@ -1,254 +1,141 @@
-From: vaibhav.hiremath@linaro.org (Vaibhav Hiremath)
-Date: Tue, 16 Jun 2015 13:22:13 +0530
-Subject: [PATCH 1/4] mfd: 88pm800: add device tree support
-In-Reply-To: <20150601083835.GE3329@x1>
-References: <1432937962-4537-1-git-send-email-vaibhav.hiremath@linaro.org>
- <1432937962-4537-2-git-send-email-vaibhav.hiremath@linaro.org>
- <20150601083835.GE3329@x1>
-Message-ID: <557FD5AD.5020405@linaro.org>
+From: tomeu.vizoso@collabora.com (Tomeu Vizoso)
+Date: Tue, 16 Jun 2015 09:53:08 +0200
+Subject: [PATCH 02/21] ARM: tegra: Add gpio-ranges property
+In-Reply-To: <5567393A.6000901@wwwdotorg.org>
+References: <1432565608-26036-1-git-send-email-tomeu.vizoso@collabora.com>
+ <1432565608-26036-3-git-send-email-tomeu.vizoso@collabora.com>
+ <5564CC84.1030700@wwwdotorg.org>
+ <CAAObsKD7YbZX01A=SS7z_PxAMPweHy6sw5ut=50h50C=j9y0zA@mail.gmail.com>
+ <5565D96F.3000600@wwwdotorg.org>
+ <CAAObsKB-ayRd7OB1W9nYBJzvBDK0RZk1U56Gqxn08sHPT5FvzA@mail.gmail.com>
+ <5567393A.6000901@wwwdotorg.org>
+Message-ID: <CAAObsKDzAuFbU1+TKm3TwSL_i3D9PqL2kPUE8GoP+Vck_9Gqxw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On Monday 01 June 2015 02:08 PM, Lee Jones wrote:
-> On Sat, 30 May 2015, Vaibhav Hiremath wrote:
->
-
-Thanks for your review. and sorry for delayed response.
-
->> Add DT support to the 88pm800 driver along with below properties
->> 	- marvell,88pm800-irq-write-clear :
->> 	  Idicates whether interrupt status is cleared by write
+On 28 May 2015 at 17:50, Stephen Warren <swarren@wwwdotorg.org> wrote:
+> On 05/28/2015 02:26 AM, Tomeu Vizoso wrote:
 >>
->> Also, creates the DT binding text file,
->> Documentation/devicetree/bindings/mfd/88pm800.txt
+>> On 27 May 2015 at 16:49, Stephen Warren <swarren@wwwdotorg.org> wrote:
+>>>
+>>> On 05/27/2015 08:18 AM, Tomeu Vizoso wrote:
+>>>>
+>>>>
+>>>> On 26 May 2015 at 21:41, Stephen Warren <swarren@wwwdotorg.org> wrote:
+>>>>>
+>>>>>
+>>>>> On 05/25/2015 08:53 AM, Tomeu Vizoso wrote:
+>>>>>>
+>>>>>>
+>>>>>>
+>>>>>> Specify how the GPIOs map to the pins in T124, so the dependency is
+>>>>>> explicit.
+>>>>>>
+>>>>>> Signed-off-by: Tomeu Vizoso <tomeu.vizoso@collabora.com>
+>>>>>> ---
+>>>>>>     arch/arm/boot/dts/tegra124.dtsi | 1 +
+>>>>>>     1 file changed, 1 insertion(+)
+>>>>>>
+>>>>>> diff --git a/arch/arm/boot/dts/tegra124.dtsi
+>>>>>> b/arch/arm/boot/dts/tegra124.dtsi
+>>>>>> index 13cc7ca..5d1d35f 100644
+>>>>>> --- a/arch/arm/boot/dts/tegra124.dtsi
+>>>>>> +++ b/arch/arm/boot/dts/tegra124.dtsi
+>>>>>> @@ -254,6 +254,7 @@
+>>>>>>                   gpio-controller;
+>>>>>>                   #interrupt-cells = <2>;
+>>>>>>                   interrupt-controller;
+>>>>>> +               gpio-ranges = <&pinmux 0 0 250>;
+>>>>>
+>>>>>
+>>>>>
+>>>>>
+>>>>> We should be consistent between SoCs. Why not make the same change for
+>>>>> all
+>>>>> Tegra SoCs?
+>>>>>
+>>>>> I think this change will cause the GPIO subsystem to call into the
+>>>>> pinctrl
+>>>>> subsystem and create/add/register a new GPIO<->pinctrl range structure.
+>>>>> The
+>>>>> pinctrl driver already does this, so I think we'll end up with two
+>>>>> duplicate
+>>>>> entries in the pinctrl device's gpio_ranges list. This probably won't
+>>>>> cause
+>>>>> a problem, but I wanted to make sure you'd thought about it to make
+>>>>> sure.
+>>>>
+>>>>
+>>>>
+>>>> Actually, I have checked and see that gpio-tegra.c registers 256
+>>>> gpios, but pinctrl-tegra124.c adds a range of only 251. I don't really
+>>>> remember where I got the 250 value from, sorry :(
+>>>>
+>>>> I don't see how that would cause any concrete problems, but maybe we
+>>>> should have a single authoritative source (not sure we can do so
+>>>> without breaking DT ABI though).
+>>>>
+>>>>> Right now, I think we get lucky and pinctrl ends up probing first (or
+>>>>> at
+>>>>> least very early) anyway. Somewhat related to this series, I wonder if
+>>>>> we
+>>>>> shouldn't add pinctrl client properties to every node in the Tegra DT
+>>>>> that
+>>>>> describes a controller that makes use of external pins that are
+>>>>> affected
+>>>>> by
+>>>>> the pinmux. Such a change would guarantee this desired probing order.
+>>>>> In
+>>>>> order to preserve the "program the entire pinmux at once" semantics,
+>>>>> these
+>>>>> new pinctrl client properties would all need to reference empty states,
+>>>>> yet
+>>>>> would still need to exist to represent the dependency.
+>>>>
+>>>>
+>>>>
+>>>> I think so, but aren't almost all those pins used as gpios? If so,
+>>>> then such a controller's driver will request the gpio it wants which
+>>>> will cause the gpio driver to be registered (and hopefully probed) if
+>>>> needed, which in turn will check that the corresponding pinctrl device
+>>>> has been registered. Or am I missing something?
+>>>
+>>>
+>>>
+>>> As you say this probably works out fine for pins that are used as GPIOs.
+>>> I
+>>> was thinking more about SFIOs. Take an I2C controller, which doesn't use
+>>> any
+>>> GPIOs itself. The pinctrl device should be probed before the I2C device,
+>>> so
+>>> that the I2C driver can initiate transactions on the I2C bus during its
+>>> probe if it wanted to (or at least, clients could initiate transactions
+>>> at
+>>> any completely arbitrary time as soon as probe was complete).
 >>
->> Signed-off-by: Chao Xie <chao.xie@marvell.com>
->> Signed-off-by: Vaibhav Hiremath <vaibhav.hiremath@linaro.org>
->> ---
->>   Documentation/devicetree/bindings/mfd/88pm800.txt | 57 +++++++++++++++++++++++
->>   drivers/mfd/88pm800.c                             | 39 ++++++++++++++++
->
-> These should be submitted separately.
->
-
-
-Ok, will separate it in next version.
-
-
->>   2 files changed, 96 insertions(+)
->>   create mode 100644 Documentation/devicetree/bindings/mfd/88pm800.txt
 >>
->> diff --git a/Documentation/devicetree/bindings/mfd/88pm800.txt b/Documentation/devicetree/bindings/mfd/88pm800.txt
->> new file mode 100644
->> index 0000000..094951b
->> --- /dev/null
->> +++ b/Documentation/devicetree/bindings/mfd/88pm800.txt
->> @@ -0,0 +1,57 @@
->> +* Marvell 88PM800 Power Management IC
->> +
->> +Required parent device properties:
->> +- compatible : "marvell,88pm800"
->> +- reg : the I2C slave address for the 88pm800 chip
->> +- interrupts : IRQ line for the 88pm800 chip
->> +- interrupt-controller: describes the 88pm800 as an interrupt controller
->> +- #interrupt-cells : should be 1.
->> +		- The cell is the 88pm800 local IRQ number
->> +
->> +Optional parent device properties:
->> +- marvell,88pm800-irq-write-clr: indicates whether interrupt status is cleared by write
+>> What is using the SFIO in this case, the I2C master or the I2C client?
 >
-> Drop the device name.  These bindings should be as generic as possible.
 >
+> The I2C controller a/k/a the I2C master.
+>
+>> In any case, is the problem you are referring to that ICs may rely on
+>
+>
+> s/ICs/drivers/ I think.
+>
+>> a specific pinmux configuration but that's not currently reflected on
+>> the DT because pinmux configuration happened so early that things just
+>> worked?
+>
+>
+> Yes; the dependency of some nodes on pinctrl isn't explicitly called out in
+> the DT. It's probably not a good idea to have such implicit dependencies,
+> although I suppose for something so central as pinmux, maybe it's not
+> terrible, since almost everything depends on it and it's pretty obvious.
 
-OK, how about simply
-
-"mfd-irq_clr_on_write"
-
-> Also describe what the absence of the property means.
->
-
-Ok.
-
->> +88pm800 consists of a large and varied group of sub-devices:
->
-> 3?
->
-
-I have explicitly mentioned in note that more device list will follow.
-I just wanted to add entries as and when we add/enable driver support.
-
->> +Device			 Supply Names	 Description
->> +------			 ------------	 -----------
->> +88pm80x-onkey		:		: On key
->> +88pm80x-rtc		:		: RTC
->> +88pm80x			:		: Regulators
->
-> Surely regulators is 88pm80x-regulator, no?
->
-
-did not understand what change is expected here.
-
->> +Note: More device list will follow
->> +
->> +Example:
->> +
->> +	pmic: 88pm800 at 30 {
->> +		compatible = "marvell,88pm800";
->> +		reg = <0x30>;
->> +		interrupts = <0 77 0x4>;
->
-> Please use the #defines in include/dt-bindings/
->
-
-Ok.
-
->> +		interrupt-parent = <&gic>;
->> +		interrupt-controller;
->> +		#interrupt-cells = <1>;
->> +
->> +		marvell,88pm800-irq-write-clr;
->> +
->> +		regulators {
->> +			compatible = "marvell,88pm80x-regulator";
->> +
->> +			buck1a: BUCK1A {
->> +				regulator-compatible = "88PM800-BUCK1A";
->> +				regulator-min-microvolt = <600000>;
->> +				regulator-max-microvolt = <1800000>;
->> +				regulator-boot-on;
->> +				regulator-always-on;
->> +			};
->> +			ldo1: LDO1 {
->> +				regulator-compatible = "88PM800-LDO1";
->> +				regulator-min-microvolt = <1700000>;
->> +				regulator-max-microvolt = <3300000>;
->> +				regulator-boot-on;
->> +				regulator-always-on;
->> +			};
->> +		};
->
-> '\n' here.
->
->> +		rtc {
->> +			compatible = "marvell,88pm80x-rtc";
->> +		};
->> +	};
->> diff --git a/drivers/mfd/88pm800.c b/drivers/mfd/88pm800.c
->> index 841717a..06ee058 100644
->> --- a/drivers/mfd/88pm800.c
->> +++ b/drivers/mfd/88pm800.c
->> @@ -27,6 +27,7 @@
->>   #include <linux/mfd/core.h>
->>   #include <linux/mfd/88pm80x.h>
->>   #include <linux/slab.h>
->> +#include <linux/of_device.h>
->>
->>   /* Interrupt Registers */
->>   #define PM800_INT_STATUS1		(0x05)
->> @@ -121,6 +122,11 @@ static const struct i2c_device_id pm80x_id_table[] = {
->>   };
->>   MODULE_DEVICE_TABLE(i2c, pm80x_id_table);
->>
->> +static const struct of_device_id pm80x_of_match_table[] = {
->> +	{ .compatible = "marvell,88pm800", },
->> +	{},
->> +};
->> +
->>   static struct resource rtc_resources[] = {
->>   	{
->>   	 .name = "88pm80x-rtc",
->> @@ -133,6 +139,7 @@ static struct resource rtc_resources[] = {
->>   static struct mfd_cell rtc_devs[] = {
->>   	{
->>   	 .name = "88pm80x-rtc",
->> +	 .of_compatible = "marvell,88pm80x-rtc",
->>   	 .num_resources = ARRAY_SIZE(rtc_resources),
->>   	 .resources = &rtc_resources[0],
->>   	 .id = -1,
->> @@ -151,6 +158,7 @@ static struct resource onkey_resources[] = {
->>   static const struct mfd_cell onkey_devs[] = {
->>   	{
->>   	 .name = "88pm80x-onkey",
->> +	 .of_compatible = "marvell,88pm80x-onkey",
->>   	 .num_resources = 1,
->>   	 .resources = &onkey_resources[0],
->>   	 .id = -1,
->> @@ -160,6 +168,7 @@ static const struct mfd_cell onkey_devs[] = {
->>   static const struct mfd_cell regulator_devs[] = {
->>   	{
->>   	 .name = "88pm80x-regulator",
->> +	 .of_compatible = "marvell,88pm80x-regulator",
->>   	 .id = -1,
->>   	},
->>   };
->> @@ -538,14 +547,43 @@ out:
->>   	return ret;
->>   }
->>
->> +static int pm800_probe_dt(struct device_node *np,
->> +			 struct device *dev,
->
-> Do you even use dev?
->
-
-Yeah, not used. Will remove it.
-
->> +			 struct pm80x_platform_data *pdata)
->> +{
->> +	pdata->irq_mode =
->> +		of_property_read_bool(np, "marvell,88pm800-irq-write-clear");
->
-> You write a new function for this?
->
-
-Just felt clean this way.
-I am ok to merge it in parent function.
-
->> +	return 0;
->> +}
->> +
->> +
->
-> Superfluous '\n'.
->
->>   static int pm800_probe(struct i2c_client *client,
->>   				 const struct i2c_device_id *id)
->>   {
->>   	int ret = 0;
->>   	struct pm80x_chip *chip;
->>   	struct pm80x_platform_data *pdata = dev_get_platdata(&client->dev);
->> +	struct device_node *node = client->dev.of_node;
->
-> It's more common to use 'np'.
->
-
-ok.
-
->>   	struct pm80x_subchip *subchip;
->>
->> +	if (!pdata && !node) {
->> +		dev_err(&client->dev,
->> +			"pm80x requires platform data or of_node\n");
->> +		return -EINVAL;
->> +	}
->> +
->> +	if (!pdata) {
->> +		pdata = devm_kzalloc(&client->dev, sizeof(*pdata), GFP_KERNEL);
->> +		if (!pdata) {
->> +			dev_err(&client->dev, "failed to allocaate memory\n");
->> +			return -ENOMEM;
->> +		}
->> +		ret = pm800_probe_dt(node, &client->dev, pdata);
->> +		if (ret)
->> +			return ret;
->> +	}
->
-> All this for a single attribute?  Please simplify.
->
-
-Ok, let me kill probe_dt function here.
+Yup, agreed.
 
 Thanks,
-Vaibhav
+
+Tomeu
