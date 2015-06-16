@@ -1,189 +1,118 @@
 From: tomi.valkeinen@ti.com (Tomi Valkeinen)
-Date: Tue, 16 Jun 2015 13:16:24 +0300
-Subject: [PATCH 2/7] OMAPDSS: refactor dss probe function
+Date: Tue, 16 Jun 2015 13:16:29 +0300
+Subject: [PATCH 7/7] OMAPDSS: simplify submodule reg/unreg code
 In-Reply-To: <1434449789-13812-1-git-send-email-tomi.valkeinen@ti.com>
 References: <1434449789-13812-1-git-send-email-tomi.valkeinen@ti.com>
-Message-ID: <1434449789-13812-3-git-send-email-tomi.valkeinen@ti.com>
+Message-ID: <1434449789-13812-8-git-send-email-tomi.valkeinen@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Refactor dss probe function by extracting the setup for video plls into
-a separate function. The call to this function is also moved to a
-slightly earlier phase, so that in error case we can bail out more
-easily.
+Now that we are using components in omapdss, there's no need for
+separate handling of dss and dispc driver init. Thus we can move the dss
+and dispc init and unit func pointers to the lists we use for the other
+dss submodules.
+
+We can now also handle errors returned by the registration functions
+properly: if registering a driver fails, we can stop processing and
+return the error.
 
 Signed-off-by: Tomi Valkeinen <tomi.valkeinen@ti.com>
 ---
- drivers/video/fbdev/omap2/dss/dss.c | 125 ++++++++++++++++++++----------------
- 1 file changed, 69 insertions(+), 56 deletions(-)
+ drivers/video/fbdev/omap2/dss/core.c | 46 ++++++++++++------------------------
+ 1 file changed, 15 insertions(+), 31 deletions(-)
 
-diff --git a/drivers/video/fbdev/omap2/dss/dss.c b/drivers/video/fbdev/omap2/dss/dss.c
-index 35601ab232e3..1ce47441efe3 100644
---- a/drivers/video/fbdev/omap2/dss/dss.c
-+++ b/drivers/video/fbdev/omap2/dss/dss.c
-@@ -1026,14 +1026,73 @@ static void __exit dss_uninit_ports(struct platform_device *pdev)
- 	} while ((port = omapdss_of_get_next_port(parent, port)) != NULL);
- }
+diff --git a/drivers/video/fbdev/omap2/dss/core.c b/drivers/video/fbdev/omap2/dss/core.c
+index 5c64515de818..54eeb507f9b3 100644
+--- a/drivers/video/fbdev/omap2/dss/core.c
++++ b/drivers/video/fbdev/omap2/dss/core.c
+@@ -245,6 +245,8 @@ static struct platform_driver omap_dss_driver = {
  
-+static int dss_video_pll_probe(struct platform_device *pdev)
-+{
-+	struct device_node *np = pdev->dev.of_node;
-+	struct regulator *pll_regulator;
-+	int r;
-+
-+	if (!np)
-+		return 0;
-+
-+	if (of_property_read_bool(np, "syscon-pll-ctrl")) {
-+		dss.syscon_pll_ctrl = syscon_regmap_lookup_by_phandle(np,
-+			"syscon-pll-ctrl");
-+		if (IS_ERR(dss.syscon_pll_ctrl)) {
-+			dev_err(&pdev->dev,
-+				"failed to get syscon-pll-ctrl regmap\n");
-+			return PTR_ERR(dss.syscon_pll_ctrl);
-+		}
-+
-+		if (of_property_read_u32_index(np, "syscon-pll-ctrl", 1,
-+				&dss.syscon_pll_ctrl_offset)) {
-+			dev_err(&pdev->dev,
-+				"failed to get syscon-pll-ctrl offset\n");
-+			return -EINVAL;
-+		}
-+	}
-+
-+	pll_regulator = devm_regulator_get(&pdev->dev, "vdda_video");
-+	if (IS_ERR(pll_regulator)) {
-+		r = PTR_ERR(pll_regulator);
-+
-+		switch (r) {
-+		case -ENOENT:
-+			pll_regulator = NULL;
-+			break;
-+
-+		case -EPROBE_DEFER:
-+			return -EPROBE_DEFER;
-+
-+		default:
-+			DSSERR("can't get DPLL VDDA regulator\n");
-+			return r;
-+		}
-+	}
-+
-+	if (of_property_match_string(np, "reg-names", "pll1") >= 0) {
-+		dss.video1_pll = dss_video_pll_init(pdev, 0, pll_regulator);
-+		if (IS_ERR(dss.video1_pll))
-+			return PTR_ERR(dss.video1_pll);
-+	}
-+
-+	if (of_property_match_string(np, "reg-names", "pll2") >= 0) {
-+		dss.video2_pll = dss_video_pll_init(pdev, 1, pll_regulator);
-+		if (IS_ERR(dss.video2_pll)) {
-+			dss_video_pll_uninit(dss.video1_pll);
-+			return PTR_ERR(dss.video2_pll);
-+		}
-+	}
-+
-+	return 0;
-+}
-+
- /* DSS HW IP initialisation */
- static int __init omap_dsshw_probe(struct platform_device *pdev)
+ /* INIT */
+ static int (*dss_output_drv_reg_funcs[])(void) __initdata = {
++	dss_init_platform_driver,
++	dispc_init_platform_driver,
+ #ifdef CONFIG_OMAP2_DSS_DSI
+ 	dsi_init_platform_driver,
+ #endif
+@@ -268,7 +270,7 @@ static int (*dss_output_drv_reg_funcs[])(void) __initdata = {
+ #endif
+ };
+ 
+-static void (*dss_output_drv_unreg_funcs[])(void) __exitdata = {
++static void (*dss_output_drv_unreg_funcs[])(void) = {
+ #ifdef CONFIG_OMAP5_DSS_HDMI
+ 	hdmi5_uninit_platform_driver,
+ #endif
+@@ -290,10 +292,10 @@ static void (*dss_output_drv_unreg_funcs[])(void) __exitdata = {
+ #ifdef CONFIG_OMAP2_DSS_DSI
+ 	dsi_uninit_platform_driver,
+ #endif
++	dispc_uninit_platform_driver,
++	dss_uninit_platform_driver,
+ };
+ 
+-static bool dss_output_drv_loaded[ARRAY_SIZE(dss_output_drv_reg_funcs)];
+-
+ static int __init omap_dss_init(void)
  {
- 	struct resource *dss_mem;
--	struct device_node *np = pdev->dev.of_node;
- 	u32 rev;
  	int r;
--	struct regulator *pll_regulator;
- 
- 	dss.pdev = pdev;
- 
-@@ -1062,6 +1121,10 @@ static int __init omap_dsshw_probe(struct platform_device *pdev)
+@@ -303,33 +305,20 @@ static int __init omap_dss_init(void)
  	if (r)
- 		goto err_setup_clocks;
+ 		return r;
  
-+	r = dss_video_pll_probe(pdev);
-+	if (r)
-+		goto err_pll_init;
-+
- 	pm_runtime_enable(&pdev->dev);
- 
- 	r = dss_runtime_get();
-@@ -1088,57 +1151,6 @@ static int __init omap_dsshw_probe(struct platform_device *pdev)
- 
- 	dss_init_ports(pdev);
- 
--	if (np && of_property_read_bool(np, "syscon-pll-ctrl")) {
--		dss.syscon_pll_ctrl = syscon_regmap_lookup_by_phandle(np,
--			"syscon-pll-ctrl");
--		if (IS_ERR(dss.syscon_pll_ctrl)) {
--			dev_err(&pdev->dev,
--				"failed to get syscon-pll-ctrl regmap\n");
--			return PTR_ERR(dss.syscon_pll_ctrl);
--		}
--
--		if (of_property_read_u32_index(np, "syscon-pll-ctrl", 1,
--				&dss.syscon_pll_ctrl_offset)) {
--			dev_err(&pdev->dev,
--				"failed to get syscon-pll-ctrl offset\n");
--			return -EINVAL;
--		}
+-	r = dss_init_platform_driver();
+-	if (r) {
+-		DSSERR("Failed to initialize DSS platform driver\n");
+-		goto err_dss;
 -	}
 -
--	pll_regulator = devm_regulator_get(&pdev->dev, "vdda_video");
--	if (IS_ERR(pll_regulator)) {
--		r = PTR_ERR(pll_regulator);
--
--		switch (r) {
--		case -ENOENT:
--			pll_regulator = NULL;
--			break;
--
--		case -EPROBE_DEFER:
--			return -EPROBE_DEFER;
--
--		default:
--			DSSERR("can't get DPLL VDDA regulator\n");
--			return r;
--		}
+-	r = dispc_init_platform_driver();
+-	if (r) {
+-		DSSERR("Failed to initialize dispc platform driver\n");
+-		goto err_dispc;
 -	}
 -
--	if (of_property_match_string(np, "reg-names", "pll1") >= 0) {
--		dss.video1_pll = dss_video_pll_init(pdev, 0, pll_regulator);
--		if (IS_ERR(dss.video1_pll)) {
--			r = PTR_ERR(dss.video1_pll);
--			goto err_pll_init;
--		}
--	}
--
--	if (of_property_match_string(np, "reg-names", "pll2") >= 0) {
--		dss.video2_pll = dss_video_pll_init(pdev, 1, pll_regulator);
--		if (IS_ERR(dss.video2_pll)) {
--			r = PTR_ERR(dss.video2_pll);
--			goto err_pll_init;
--		}
--	}
--
- 	rev = dss_read_reg(DSS_REVISION);
- 	printk(KERN_INFO "OMAP DSS rev %d.%d\n",
- 			FLD_GET(rev, 7, 4), FLD_GET(rev, 3, 0));
-@@ -1153,14 +1165,15 @@ static int __init omap_dsshw_probe(struct platform_device *pdev)
+-	/*
+-	 * It's ok if the output-driver register fails. It happens, for example,
+-	 * when there is no output-device (e.g. SDI for OMAP4).
+-	 */
+ 	for (i = 0; i < ARRAY_SIZE(dss_output_drv_reg_funcs); ++i) {
+ 		r = dss_output_drv_reg_funcs[i]();
+-		if (r == 0)
+-			dss_output_drv_loaded[i] = true;
++		if (r)
++			goto err_reg;
+ 	}
  
  	return 0;
  
--err_pll_init:
-+err_runtime_get:
-+	pm_runtime_disable(&pdev->dev);
+-err_dispc:
+-	dss_uninit_platform_driver();
+-err_dss:
++err_reg:
++	for (i = ARRAY_SIZE(dss_output_drv_reg_funcs) - i;
++			i < ARRAY_SIZE(dss_output_drv_reg_funcs);
++			++i)
++		dss_output_drv_unreg_funcs[i]();
 +
- 	if (dss.video1_pll)
- 		dss_video_pll_uninit(dss.video1_pll);
+ 	platform_driver_unregister(&omap_dss_driver);
  
- 	if (dss.video2_pll)
- 		dss_video_pll_uninit(dss.video2_pll);
--err_runtime_get:
--	pm_runtime_disable(&pdev->dev);
-+err_pll_init:
- err_setup_clocks:
- 	dss_put_clocks();
  	return r;
+@@ -339,13 +328,8 @@ static void __exit omap_dss_exit(void)
+ {
+ 	int i;
+ 
+-	for (i = 0; i < ARRAY_SIZE(dss_output_drv_unreg_funcs); ++i) {
+-		if (dss_output_drv_loaded[i])
+-			dss_output_drv_unreg_funcs[i]();
+-	}
+-
+-	dispc_uninit_platform_driver();
+-	dss_uninit_platform_driver();
++	for (i = 0; i < ARRAY_SIZE(dss_output_drv_unreg_funcs); ++i)
++		dss_output_drv_unreg_funcs[i]();
+ 
+ 	platform_driver_unregister(&omap_dss_driver);
+ }
 -- 
 2.1.4
