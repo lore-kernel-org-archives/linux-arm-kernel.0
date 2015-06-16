@@ -1,186 +1,113 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Tue, 16 Jun 2015 14:26:37 -0500
-Subject: [PATCH RESEND] i2c: omap: improve duty cycle on SCL
-In-Reply-To: <1434482445-1818-1-git-send-email-balbi@ti.com>
-References: <1434482445-1818-1-git-send-email-balbi@ti.com>
-Message-ID: <20150616192637.GE30496@saruman.tx.rr.com>
+From: pantelis.antoniou@konsulko.com (Pantelis Antoniou)
+Date: Tue, 16 Jun 2015 22:33:38 +0300
+Subject: [PATCH v2 6/6] ARM: sun8i: dts: Add Ippo-q8h v1.2 with A33 and
+ 1024x600 lcd support
+In-Reply-To: <20150616175512.GJ11732@lukather>
+References: <1432997706-20172-1-git-send-email-hdegoede@redhat.com>
+ <1432997706-20172-7-git-send-email-hdegoede@redhat.com>
+ <20150602081459.GO23777@lukather> <556D6955.8030708@redhat.com>
+ <20150603094535.GI23777@lukather> <556EE104.3090803@redhat.com>
+ <20150613135002.GP19653@lukather>
+ <85E62D2D-5387-433B-A944-7F2145459F08@konsulko.com>
+ <20150616175512.GJ11732@lukather>
+Message-ID: <D4216F2D-0556-4849-B1DF-8E4D250006B4@konsulko.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 16, 2015 at 02:20:45PM -0500, Felipe Balbi wrote:
-> With this patch we try to be as close to 50%
-> duty cycle as possible. The reason for this
-> is that some devices present an erratic behavior
-> with certain duty cycles.
-> 
-> One such example is TPS65218 PMIC which fails
-> to change voltages when running @ 400kHz and
-> duty cycle is lower than 34%.
-> 
-> The idea of the patch is simple:
-> 
-> calculate desired scl_period from requested scl
-> and use 50% for tLow and 50% for tHigh.
-> 
-> tLow is calculated with a DIV_ROUND_UP() to make
-> sure it's slightly higher than tHigh and to make
-> sure that we end up within I2C specifications.
-> 
-> Kudos to Nishanth Menon and Dave Gerlach for helping
-> debugging the TPS65218 problem found on AM437x SK.
-> 
-> Signed-off-by: Felipe Balbi <balbi@ti.com>
+Hi Maxime,
 
-Aaro, can you test this on N900 ?
-
-> ---
->  drivers/i2c/busses/i2c-omap.c | 86 ++++++++++++++++++++++++++++---------------
->  1 file changed, 56 insertions(+), 30 deletions(-)
+> On Jun 16, 2015, at 20:55 , Maxime Ripard <maxime.ripard@free-electrons.com> wrote:
 > 
-> diff --git a/drivers/i2c/busses/i2c-omap.c b/drivers/i2c/busses/i2c-omap.c
-> index 0e894193accf..034d2d1ff289 100644
-> --- a/drivers/i2c/busses/i2c-omap.c
-> +++ b/drivers/i2c/busses/i2c-omap.c
-> @@ -25,6 +25,7 @@
->   */
->  
->  #include <linux/module.h>
-> +#include <linux/kernel.h>
->  #include <linux/delay.h>
->  #include <linux/i2c.h>
->  #include <linux/err.h>
-> @@ -39,6 +40,8 @@
->  #include <linux/i2c-omap.h>
->  #include <linux/pm_runtime.h>
->  
-> +#define NSECS_PER_SEC			1000000000
-> +
->  /* I2C controller revisions */
->  #define OMAP_I2C_OMAP1_REV_2		0x20
->  
-> @@ -359,6 +362,8 @@ static int omap_i2c_init(struct omap_i2c_dev *dev)
->  	u16 fsscll = 0, fssclh = 0, hsscll = 0, hssclh = 0;
->  	unsigned long fclk_rate = 12000000;
->  	unsigned long internal_clk = 0;
-> +	unsigned long internal_clk_period = 0;
-> +	unsigned long scl_period = 0;
->  	struct clk *fclk;
->  
->  	if (dev->rev >= OMAP_I2C_REV_ON_3430_3530) {
-> @@ -395,52 +400,73 @@ static int omap_i2c_init(struct omap_i2c_dev *dev)
->  	}
->  
->  	if (!(dev->flags & OMAP_I2C_FLAG_SIMPLE_CLOCK)) {
-> -
->  		/*
->  		 * HSI2C controller internal clk rate should be 19.2 Mhz for
-> -		 * HS and for all modes on 2430. On 34xx we can use lower rate
-> -		 * to get longer filter period for better noise suppression.
-> -		 * The filter is iclk (fclk for HS) period.
-> +		 * HS and for all modes on 2430. For all other devices and
-> +		 * speeds we will use a 12MHz internal clock.
->  		 */
-> -		if (dev->speed > 400 ||
-> -			       dev->flags & OMAP_I2C_FLAG_FORCE_19200_INT_CLK)
-> -			internal_clk = 19200;
-> -		else if (dev->speed > 100)
-> -			internal_clk = 9600;
-> -		else
-> -			internal_clk = 4000;
-> +		if (dev->flags & OMAP_I2C_FLAG_FORCE_19200_INT_CLK ||
-> +				dev->speed > 400) {
-> +			internal_clk = 1920000;
-> +			internal_clk_period = NSECS_PER_SEC /
-> +				internal_clk; /* ns */
-> +		} else {
-> +			internal_clk = 12000000;
-> +			internal_clk_period = NSECS_PER_SEC /
-> +				internal_clk; /* ns */
-> +		}
-> +
->  		fclk = clk_get(dev->dev, "fck");
-> -		fclk_rate = clk_get_rate(fclk) / 1000;
-> +		fclk_rate = clk_get_rate(fclk);
->  		clk_put(fclk);
->  
->  		/* Compute prescaler divisor */
->  		psc = fclk_rate / internal_clk;
->  		psc = psc - 1;
->  
-> +		/*
-> +		 * Here's the tricky part, we want to make sure our duty cycle
-> +		 * is as close to 50% as possible. In order to achieve that, we
-> +		 * will first figure out what's the period on chosen scl is,
-> +		 * then divide that by two and calculate SCLL and SCLH based on
-> +		 * that.
-> +		 *
-> +		 * SCLL and SCLH equations are as folows:
-> +		 *
-> +		 * SCLL = (tLow / iclk_period) - 7;
-> +		 * SCLH = (tHigh / iclk_period) - 5;
-> +		 *
-> +		 * Where iclk_period is period of Internal Clock.
-> +		 *
-> +		 * tLow and tHigh will be basically half of scl_period where
-> +		 * possible as long as we can match I2C spec's minimum limits
-> +		 * for them.
-> +		 */
-> +		scl_period = NSECS_PER_SEC / dev->speed;
-> +
->  		/* If configured for High Speed */
->  		if (dev->speed > 400) {
-> -			unsigned long scl;
-> +			unsigned long fs_period;
-> +
-> +			/*
-> +			 * first phase of HS mode is up to
-> +			 * 400kHz so we will use that.
-> +			 */
-> +			fs_period = NSECS_PER_SEC / 400;
->  
->  			/* For first phase of HS mode */
-> -			scl = internal_clk / 400;
-> -			fsscll = scl - (scl / 3) - 7;
-> -			fssclh = (scl / 3) - 5;
-> +			fsscll = DIV_ROUND_UP(fs_period >> 1,
-> +					internal_clk_period) - 7;
-> +			fssclh = (fs_period >> 1) / internal_clk_period - 5;
->  
->  			/* For second phase of HS mode */
-> -			scl = fclk_rate / dev->speed;
-> -			hsscll = scl - (scl / 3) - 7;
-> -			hssclh = (scl / 3) - 5;
-> -		} else if (dev->speed > 100) {
-> -			unsigned long scl;
-> -
-> -			/* Fast mode */
-> -			scl = internal_clk / dev->speed;
-> -			fsscll = scl - (scl / 3) - 7;
-> -			fssclh = (scl / 3) - 5;
-> -		} else {
-> -			/* Standard mode */
-> -			fsscll = internal_clk / (dev->speed * 2) - 7;
-> -			fssclh = internal_clk / (dev->speed * 2) - 5;
-> +			hsscll = DIV_ROUND_UP(scl_period >> 1,
-> +					internal_clk_period) - 7;
-> +			hssclh = (scl_period >> 1) / internal_clk_period - 5;
-> +		} else  {
-> +			fsscll = DIV_ROUND_UP(scl_period >> 1,
-> +					internal_clk_period) - 7;
-> +			fssclh = (scl_period >> 1) / internal_clk_period - 5;
->  		}
->  		scll = (hsscll << OMAP_I2C_SCLL_HSSCLL) | fsscll;
->  		sclh = (hssclh << OMAP_I2C_SCLH_HSSCLH) | fssclh;
+> Hi Pantelis,
+> 
+> On Sun, Jun 14, 2015 at 09:16:21PM +0300, Pantelis Antoniou wrote:
+>>> I think we need to discuss this with Pantelis and what is his feeling
+>>> about this.
+>>> 
+>>> Pantelis, to sum things up, we have a case of a tablet that comes with
+>>> the exact same board, but coming in two flavours with two differents
+>>> screen resolutions. It looks like a great case for your DT quirks
+>>> work, but we have no way of runtime detecting the difference between
+>>> the two variants. What do you think about this? Should we go with
+>>> using the DT quirks or is this simply out of scope?
+>>> 
+>>> There's not so much example of similar cases in the kernel, and none
+>>> of them use quirks so far (obviously) but they all boil down to either
+>>> the solution you were suggesting in that patch or adding the alternate
+>>> configuration as a comment.
+>>> 
+>>> I don't think the latter would work for you, and I agree with that, so
+>>> I guess that depending on what Pantelis says, either we go with a
+>>> better solution using the quirks, or we end up using what you
+>>> suggested (with a nitpick though, I'd prefer if you used the display
+>>> standard instead of the resolution, which would make it xga I guess?)
+>>> 
+>> 
+>> First of all, the quirks interface is at an RFC stage (new name
+>> suggested is ?variants?); getting that out of the way this seems
+>> like what it is designed to do.
+>> 
+>> The idea of the DT quirks is to drastically cut down on the number
+>> of different DTs required, each different for each board with minute
+>> differences from one another.
+> 
+> We're on the same page then :)
+> 
+
+Heh :)
+
+>> In your case you have boards that have no way to be probed about
+>> what they ?are?, but that?s no big problem. You can easily pass the
+>> board variant in the kernel command line and use that to select the
+>> quirk to apply.
+> 
+> Hans actually pointed out that this would just move the logic
+> somewhere else, but not remove it. In our case, that would mean U-Boot
+> (Hans being the U-Boot maintainer for the SoCs that are used in this
+> particular board).
+> 
+> That would still require us to have a different configuration and to
+> add some logic to pass that extra parameter to the kernel. I'd be glad
+> to have less stuff in the kernel, but I can understand that he doesn't
+> want more stuff either.
+> 
+
+Well, I don?t know the specifics of your board, but if you have a configuration
+subset that works for all the boards and makes it at least possible to load
+a kernel (i.e. ram, serial, storage) you can keep a single bootloader that?s not
+full featured, but at least can boot any kind of variant.
+
+Afterwards you can just update the bootargs variable to the correct one for
+a given board.  
+ 
+>> In fact the original patchset does contain a command line quirk for
+>> enabling and disabling the onboard emmc & hdmi of the beaglebone
+>> black for capes that need to use those signals.
+> 
+> Ah. I somehow overlooked that when reading it.
+> 
+>> Saying that, if you?re in a hurry I?d say go with a different DTSs
+>> for now, since that?s going to go in a near kernel cycle; DT quirks
+>> will be discussed at plumber?s in a couple of months, and then we?ll
+>> if it will go in and in what form.
+> 
+> Ok. I won't be here this year, but if you could raise the topic of how
+> to handle "non-discoverable boards" then, it would be great.
+> 
+> Hans, I guess we can go for your suggestion then: apply a "generic" DT
+> for the board right now, we're going to need it anyway. Then, when
+> will have real display support, depending on the current state of the
+> discussion for the quirks, we will either merge a different DT
+> including the generic one, or if the quirks have something that work
+> for both of us then, use the quirks. Sounds good?
+> 
+> Maxime
+> 
 > -- 
-> 2.4.3
-> 
+> Maxime Ripard, Free Electrons
+> Embedded Linux, Kernel and Android engineering
+> http://free-electrons.com
 
--- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150616/298d1327/attachment-0001.sig>
+Regards
+
+? Pantelis
