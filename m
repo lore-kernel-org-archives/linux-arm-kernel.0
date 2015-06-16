@@ -1,117 +1,44 @@
 From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Tue, 16 Jun 2015 14:50:40 +0100
-Subject: [PATCH 2/2] drivers: firmware: psci: add system suspend support
-In-Reply-To: <1434462640-19613-1-git-send-email-sudeep.holla@arm.com>
-References: <1434462640-19613-1-git-send-email-sudeep.holla@arm.com>
-Message-ID: <1434462640-19613-3-git-send-email-sudeep.holla@arm.com>
+Date: Tue, 16 Jun 2015 14:50:38 +0100
+Subject: [PATCH 0/2] PSCI: system suspend support
+Message-ID: <1434462640-19613-1-git-send-email-sudeep.holla@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-PSCI v1.0 introduces a new API called PSCI_SYSTEM_SUSPEND. This API
-provides the mechanism by which the calling OS can request entry into
-the deepest possible system sleep state.
+Hi,
 
-It meets all the necessary preconditions for entrying suspend to RAM
-state in Linux. This patch adds support for PSCI_SYSTEM_SUSPEND in psci
-firmware and registers a psci system suspend operation to implement the
-suspend-to-RAM(s2r) in a generic way on all the platforms implementing
-PSCI.
+These couple of patches add generic support for PSCI system suspend.
 
-Cc: Mark Rutland <mark.rutland@arm.com>
-Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
----
- drivers/firmware/psci.c   | 39 +++++++++++++++++++++++++++++++++++++++
- include/uapi/linux/psci.h |  2 ++
- 2 files changed, 41 insertions(+)
+The first patch aligns the cpu_{suspend,resume} functions so that they
+have identical prototype both on ARM32 and ARM64. The second patch adds
+the system suspend support on top of PSCIv1.0 implementation.
 
-diff --git a/drivers/firmware/psci.c b/drivers/firmware/psci.c
-index 68d0c2f6d004..4f0359516119 100644
---- a/drivers/firmware/psci.c
-+++ b/drivers/firmware/psci.c
-@@ -20,11 +20,13 @@
- #include <linux/printk.h>
- #include <linux/psci.h>
- #include <linux/reboot.h>
-+#include <linux/suspend.h>
- 
- #include <uapi/linux/psci.h>
- 
- #include <asm/system_misc.h>
- #include <asm/smp_plat.h>
-+#include <asm/suspend.h>
- 
- /*
-  * While a 64-bit OS can make calls with SMC32 calling conventions, for some
-@@ -222,6 +224,41 @@ static int __init psci_features(u32 psci_func_id)
- 			      psci_func_id, 0, 0);
- }
- 
-+static int psci_system_suspend(unsigned long entry_point)
-+{
-+	return invoke_psci_fn(PSCI_0_2_FN_NATIVE(SYSTEM_SUSPEND),
-+			      entry_point, 0, 0);
-+}
-+
-+static int psci_system_suspend_finisher(unsigned long unused)
-+{
-+	return psci_system_suspend(virt_to_phys(cpu_resume));
-+}
-+
-+static int psci_system_suspend_enter(suspend_state_t state)
-+{
-+	if (state != PM_SUSPEND_MEM)
-+		return 0;
-+
-+	return cpu_suspend(0, psci_system_suspend_finisher);
-+}
-+
-+static const struct platform_suspend_ops psci_suspend_ops = {
-+	.valid          = suspend_valid_only_mem,
-+	.enter          = psci_system_suspend_enter,
-+};
-+
-+static void __init psci_init_system_suspend(void)
-+{
-+	if (!IS_ENABLED(CONFIG_SUSPEND))
-+		return;
-+
-+	if (psci_features(PSCI_0_2_FN_NATIVE(SYSTEM_SUSPEND)))
-+		return;
-+
-+	suspend_set_ops(&psci_suspend_ops);
-+}
-+
- static void __init psci_init_cpu_suspend(void)
- {
- 	int feature = psci_features(psci_function_id[PSCI_FN_CPU_SUSPEND]);
-@@ -310,6 +347,8 @@ static int __init psci_probe(void)
- 
- 	psci_init_cpu_suspend();
- 
-+	psci_init_system_suspend();
-+
- 	return 0;
- }
- 
-diff --git a/include/uapi/linux/psci.h b/include/uapi/linux/psci.h
-index 2598d7c9bf20..62b054524819 100644
---- a/include/uapi/linux/psci.h
-+++ b/include/uapi/linux/psci.h
-@@ -39,12 +39,14 @@
- #define PSCI_0_2_FN_MIGRATE_INFO_UP_CPU		PSCI_0_2_FN(7)
- #define PSCI_0_2_FN_SYSTEM_OFF			PSCI_0_2_FN(8)
- #define PSCI_0_2_FN_SYSTEM_RESET		PSCI_0_2_FN(9)
-+#define PSCI_0_2_FN_SYSTEM_SUSPEND		PSCI_0_2_FN(14)
- 
- #define PSCI_0_2_FN64_CPU_SUSPEND		PSCI_0_2_FN64(1)
- #define PSCI_0_2_FN64_CPU_ON			PSCI_0_2_FN64(3)
- #define PSCI_0_2_FN64_AFFINITY_INFO		PSCI_0_2_FN64(4)
- #define PSCI_0_2_FN64_MIGRATE			PSCI_0_2_FN64(5)
- #define PSCI_0_2_FN64_MIGRATE_INFO_UP_CPU	PSCI_0_2_FN64(7)
-+#define PSCI_0_2_FN64_SYSTEM_SUSPEND		PSCI_0_2_FN64(14)
- 
- #define PSCI_1_0_FN_PSCI_FEATURES		PSCI_0_2_FN(10)
- 
+The series is built on top of M.Rutland's branch[1] + Lorenzo's PSCI
+v1.0 support[2]. The wakeup source is not scope of these patches. It
+needs to addressed separately.
+
+Platforms with PSCI v1.0 supported in the firmware and SYSTEM_SUSPEND
+feature advertised as available is required for testing this. This was
+tested in ARM on Juno platform.
+
+Regards,
+Sudeep
+
+[1] git://git.kernel.org/pub/scm/linux/kernel/git/mark/linux.git psci/unification
+[2] http://www.spinics.net/lists/devicetree/msg82017.html
+
+Sudeep Holla (2):
+  arm64: kernel: rename __cpu_suspend to keep it aligned with arm
+  drivers: firmware: psci: add system suspend support
+
+ arch/arm64/include/asm/cpuidle.h |  8 ++------
+ arch/arm64/include/asm/suspend.h |  2 +-
+ arch/arm64/kernel/cpuidle.c      |  4 ++--
+ arch/arm64/kernel/psci.c         |  2 +-
+ arch/arm64/kernel/suspend.c      |  6 +++---
+ drivers/firmware/psci.c          | 39 +++++++++++++++++++++++++++++++++++++++
+ include/uapi/linux/psci.h        |  2 ++
+ 7 files changed, 50 insertions(+), 13 deletions(-)
+
 -- 
 1.9.1
