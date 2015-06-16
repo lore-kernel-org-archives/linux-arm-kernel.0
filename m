@@ -1,49 +1,58 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 16 Jun 2015 09:58:51 +0200
-Subject: [PATCH 2/2] ARM: ep93xx: enable SIM.ONE MMC/SD hardware
-Message-ID: <1434441531-18647-1-git-send-email-linus.walleij@linaro.org>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Tue, 16 Jun 2015 10:03:06 +0200
+Subject: [PATCH v6 0/7] Add Mediatek MMC driver
+In-Reply-To: <1434367253-26577-1-git-send-email-chaotian.jing@mediatek.com>
+References: <1434367253-26577-1-git-send-email-chaotian.jing@mediatek.com>
+Message-ID: <CAPDyKFrAbAFR7_p5O4bPh6FZEBVhGZ2rq3htCKcF2QgQuCEf2g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The SIM.ONE has a MMC card connected to the SPI host. This card
-usually hosts an EXT4 root file system. Enable these options in
-the defconfig so the default ompiled kernel will work
-out-of-the-box.
+On 15 June 2015 at 13:20, Chaotian Jing <chaotian.jing@mediatek.com> wrote:
+> This series enables MMC support on the MT8135/MT8173 platform.
+> MT8135 has 5 MMC controllers and MT8173 has 4 MMC controllers.
+>
+> Changes base on Ulf's comments
+> Make hclk mandatory in the driver code
+> Change host->hclk to host->src_clk_freq
+> Add linux/pm.h
+>
+> Chaotian Jing (3):
+>   mmc: dt-bindings: add Mediatek MMC bindings
+>   mmc: mediatek: Add Mediatek MMC driver
+>   mmc: mediatek: Add PM support for MMC driver
+>
+> Eddie Huang (2):
+>   arm64: dts: mediatek: Add MT8173 MMC dts
+>   arm64: mediatek: Add Mediatek MMC support in defconfig
+>
+> Yingjoe Chen (2):
+>   ARM: mediatek: dts: Add emmc support to mt8135
+>   ARM: multi_v7_defconfig: Enable Mediatek MMC support multi-v7
+>
+>  Documentation/devicetree/bindings/mmc/mtk-sd.txt |   32 +
+>  arch/arm/boot/dts/mt8135-evbp1.dts               |  158 +++
+>  arch/arm/boot/dts/mt8135.dtsi                    |   55 +
+>  arch/arm/configs/multi_v7_defconfig              |    1 +
+>  arch/arm64/boot/dts/mediatek/mt8173-evb.dts      |  126 ++
+>  arch/arm64/boot/dts/mediatek/mt8173.dtsi         |   45 +-
+>  arch/arm64/configs/defconfig                     |    1 +
+>  drivers/mmc/host/Kconfig                         |    8 +
+>  drivers/mmc/host/Makefile                        |    1 +
+>  drivers/mmc/host/mtk-sd.c                        | 1461 ++++++++++++++++++++++
+>  include/linux/mmc/core.h                         |    1 +
+>  11 files changed, 1888 insertions(+), 1 deletion(-)
+>  create mode 100644 Documentation/devicetree/bindings/mmc/mtk-sd.txt
+>  create mode 100644 drivers/mmc/host/mtk-sd.c
+>
+> --
+> 1.8.1.1.dirty
+>
 
-Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
----
- arch/arm/configs/ep93xx_defconfig | 5 +++++
- 1 file changed, 5 insertions(+)
+Hi Chaotian,
 
-diff --git a/arch/arm/configs/ep93xx_defconfig b/arch/arm/configs/ep93xx_defconfig
-index 7838cb8919e6..b3c32d0d4573 100644
---- a/arch/arm/configs/ep93xx_defconfig
-+++ b/arch/arm/configs/ep93xx_defconfig
-@@ -85,6 +85,8 @@ CONFIG_I2C_CHARDEV=y
- CONFIG_I2C_DEBUG_CORE=y
- CONFIG_I2C_DEBUG_ALGO=y
- CONFIG_I2C_DEBUG_BUS=y
-+CONFIG_SPI=y
-+CONFIG_SPI_EP93XX=y
- CONFIG_WATCHDOG=y
- CONFIG_EP93XX_WATCHDOG=y
- CONFIG_USB=y
-@@ -95,6 +97,8 @@ CONFIG_USB_STORAGE=y
- CONFIG_USB_SERIAL=y
- CONFIG_USB_SERIAL_CONSOLE=y
- CONFIG_USB_SERIAL_PL2303=y
-+CONFIG_MMC=y
-+CONFIG_MMC_SPI=y
- CONFIG_RTC_CLASS=y
- CONFIG_RTC_DRV_DS1307=y
- CONFIG_RTC_DRV_M48T86=y
-@@ -102,6 +106,7 @@ CONFIG_RTC_DRV_EP93XX=y
- CONFIG_EXT2_FS=y
- CONFIG_EXT3_FS=y
- # CONFIG_EXT3_FS_XATTR is not set
-+CONFIG_EXT4_FS=y
- CONFIG_VFAT_FS=y
- CONFIG_TMPFS=y
- CONFIG_JFFS2_FS=y
--- 
-1.9.3
+I have applied patch 1->3 for my next branch, which thus includes the
+mmc driver parts. I could potentially also pick the ARM patches, but
+then those needs to be acked from the ARM SoC folks.
+
+Kind regards
+Uffe
