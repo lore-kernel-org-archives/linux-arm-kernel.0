@@ -1,35 +1,40 @@
-From: schwidefsky@de.ibm.com (Martin Schwidefsky)
-Date: Tue, 16 Jun 2015 10:12:16 +0200
-Subject: [PATCH 0/2] Consolidate redundant register/stack access code
-In-Reply-To: <1434386579-6045-1-git-send-email-dave.long@linaro.org>
-References: <1434386579-6045-1-git-send-email-dave.long@linaro.org>
-Message-ID: <20150616101216.08a56f1a@mschwide>
+From: tglx@linutronix.de (Thomas Gleixner)
+Date: Tue, 16 Jun 2015 10:21:29 +0200 (CEST)
+Subject: [PATCH v2 1/1] irqchip: exynos-combiner: Save IRQ enable set on
+ suspend
+In-Reply-To: <557F6677.8080507@samsung.com>
+References: <1434087795-13990-1-git-send-email-javier.martinez@collabora.co.uk>
+ <557AB00C.5040606@arm.com> <557AC23D.8040602@collabora.co.uk>
+ <557AC85E.5070705@arm.com> <557AD728.7090908@collabora.co.uk>
+ <557B34A7.4090507@collabora.co.uk>
+ <CAD=FV=UQF+n8AjSXYajqUb0qswcoUrSgnsasV82JaS3dBtNO8Q@mail.gmail.com>
+ <557E82BC.7080203@collabora.co.uk> <557E947B.3030804@arm.com>
+ <557EE890.2050001@collabora.co.uk> <557EEA6C.6020002@arm.com>
+ <557EEDFB.7080502@collabora.co.uk> <557F6677.8080507@samsung.com>
+Message-ID: <alpine.DEB.2.11.1506161020510.4120@nanos>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 15 Jun 2015 12:42:57 -0400
-David Long <dave.long@linaro.org> wrote:
+On Tue, 16 Jun 2015, Krzysztof Kozlowski wrote:
 
-> From: "David A. Long" <dave.long@linaro.org>
+> On 16.06.2015 00:23, Javier Martinez Canillas wrote:
+> (...)
+> >>> To do a more intrusive change, I should better understand the interactions
+> >>> between the Exynos pinctrl / GPIO, interrupt combiner and the GIC and in the
+> >>> meantime S2R will continue to be broken on these platforms unless someone
+> >>> more familiar with all this could point me in the right direction.
+> >>>
+> >>
+> >> As I said I am fine with this patch for now and I don't want to block it.
+> >>
+> > 
+> > Thanks a lot, Krzysztof who is one of the Exynos maintainers has also agreed
+> > with the patch so hopefully this can land sooner rather than later.
 > 
-> Move duplicate and functionally equivalent code for accessing registers
-> and stack (CONFIG_HAVE_REGS_AND_STACK_ACCESS_API) from arch subdirs into
-> common kernel files.
-> 
-> Note: Help regression testing s390, hexagon, and sh would be appreciated.
->       Powerpc builds but I have not verified the functionality.
-> 
-> David A. Long (2):
->   Move the pt_regs_offset struct definition from arch to common include
->     file
->   Consolidate redundant register/stack access code
+> I assume this will go through irqchip tree, right?
 
-Compiles & boots on a s390 box. The code for regs_query_register_offset
-and regs_query_register_name is a bit more complex for s390 compared
-to the current state of things. Should be equivalent though.
+yes, picking it up now
 
--- 
-blue skies,
-   Martin.
+Thanks,
 
-"Reality continues to ruin my life." - Calvin.
+	tglx
