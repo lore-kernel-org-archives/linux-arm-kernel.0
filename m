@@ -1,57 +1,117 @@
-From: nm@ti.com (Nishanth Menon)
-Date: Tue, 16 Jun 2015 08:34:02 -0500
-Subject: [PATCH V7 1/3] OPP: Add new bindings to address shortcomings
- of existing bindings
-In-Reply-To: <d83c0b6b1768c7229384216329b607d13886aa02.1433434659.git.viresh.kumar@linaro.org>
-References: <cover.1433434659.git.viresh.kumar@linaro.org>
- <d83c0b6b1768c7229384216329b607d13886aa02.1433434659.git.viresh.kumar@linaro.org>
-Message-ID: <558025CA.8050008@ti.com>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Tue, 16 Jun 2015 14:50:40 +0100
+Subject: [PATCH 2/2] drivers: firmware: psci: add system suspend support
+In-Reply-To: <1434462640-19613-1-git-send-email-sudeep.holla@arm.com>
+References: <1434462640-19613-1-git-send-email-sudeep.holla@arm.com>
+Message-ID: <1434462640-19613-3-git-send-email-sudeep.holla@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/04/2015 11:20 AM, Viresh Kumar wrote:
-> Current OPP (Operating performance point) device tree bindings have been
-> insufficient due to the inflexible nature of the original bindings. Over
-> time, we have realized that Operating Performance Point definitions and
-> usage is varied depending on the SoC and a "single size (just frequency,
-> voltage) fits all" model which the original bindings attempted and
-> failed.
-> 
-> The proposed next generation of the bindings addresses by providing a
-> expandable binding for OPPs and introduces the following common
-> shortcomings seen with the original bindings:
-> 
-> - Getting clock/voltage/current rails sharing information between CPUs.
->   Shared by all cores vs independent clock per core vs shared clock per
->   cluster.
-> 
-> - Support for specifying current levels along with voltages.
-> 
-> - Support for multiple regulators.
-> 
-> - Support for turbo modes.
-> 
-> - Other per OPP settings: transition latencies, disabled status, etc.?
-> 
-> - Expandability of OPPs in future.
-> 
-> This patch introduces new bindings "operating-points-v2" to get these problems
-> solved. Refer to the bindings for more details.
-> 
-> We now have multiple versions of OPP binding and only one of them should
-> be used per device.
-> 
-> Reviewed-by: Rob Herring <robh@kernel.org>
-> Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
+PSCI v1.0 introduces a new API called PSCI_SYSTEM_SUSPEND. This API
+provides the mechanism by which the calling OS can request entry into
+the deepest possible system sleep state.
 
-I thought I had acked the patch 1 of the series as well in the list,
-but looks like I have'nt.. So, for the record..
+It meets all the necessary preconditions for entrying suspend to RAM
+state in Linux. This patch adds support for PSCI_SYSTEM_SUSPEND in psci
+firmware and registers a psci system suspend operation to implement the
+suspend-to-RAM(s2r) in a generic way on all the platforms implementing
+PSCI.
 
-Acked-by: Nishanth Menon <nm@ti.com>
+Cc: Mark Rutland <mark.rutland@arm.com>
+Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
+---
+ drivers/firmware/psci.c   | 39 +++++++++++++++++++++++++++++++++++++++
+ include/uapi/linux/psci.h |  2 ++
+ 2 files changed, 41 insertions(+)
 
-
-Thanks for doing this.
-
+diff --git a/drivers/firmware/psci.c b/drivers/firmware/psci.c
+index 68d0c2f6d004..4f0359516119 100644
+--- a/drivers/firmware/psci.c
++++ b/drivers/firmware/psci.c
+@@ -20,11 +20,13 @@
+ #include <linux/printk.h>
+ #include <linux/psci.h>
+ #include <linux/reboot.h>
++#include <linux/suspend.h>
+ 
+ #include <uapi/linux/psci.h>
+ 
+ #include <asm/system_misc.h>
+ #include <asm/smp_plat.h>
++#include <asm/suspend.h>
+ 
+ /*
+  * While a 64-bit OS can make calls with SMC32 calling conventions, for some
+@@ -222,6 +224,41 @@ static int __init psci_features(u32 psci_func_id)
+ 			      psci_func_id, 0, 0);
+ }
+ 
++static int psci_system_suspend(unsigned long entry_point)
++{
++	return invoke_psci_fn(PSCI_0_2_FN_NATIVE(SYSTEM_SUSPEND),
++			      entry_point, 0, 0);
++}
++
++static int psci_system_suspend_finisher(unsigned long unused)
++{
++	return psci_system_suspend(virt_to_phys(cpu_resume));
++}
++
++static int psci_system_suspend_enter(suspend_state_t state)
++{
++	if (state != PM_SUSPEND_MEM)
++		return 0;
++
++	return cpu_suspend(0, psci_system_suspend_finisher);
++}
++
++static const struct platform_suspend_ops psci_suspend_ops = {
++	.valid          = suspend_valid_only_mem,
++	.enter          = psci_system_suspend_enter,
++};
++
++static void __init psci_init_system_suspend(void)
++{
++	if (!IS_ENABLED(CONFIG_SUSPEND))
++		return;
++
++	if (psci_features(PSCI_0_2_FN_NATIVE(SYSTEM_SUSPEND)))
++		return;
++
++	suspend_set_ops(&psci_suspend_ops);
++}
++
+ static void __init psci_init_cpu_suspend(void)
+ {
+ 	int feature = psci_features(psci_function_id[PSCI_FN_CPU_SUSPEND]);
+@@ -310,6 +347,8 @@ static int __init psci_probe(void)
+ 
+ 	psci_init_cpu_suspend();
+ 
++	psci_init_system_suspend();
++
+ 	return 0;
+ }
+ 
+diff --git a/include/uapi/linux/psci.h b/include/uapi/linux/psci.h
+index 2598d7c9bf20..62b054524819 100644
+--- a/include/uapi/linux/psci.h
++++ b/include/uapi/linux/psci.h
+@@ -39,12 +39,14 @@
+ #define PSCI_0_2_FN_MIGRATE_INFO_UP_CPU		PSCI_0_2_FN(7)
+ #define PSCI_0_2_FN_SYSTEM_OFF			PSCI_0_2_FN(8)
+ #define PSCI_0_2_FN_SYSTEM_RESET		PSCI_0_2_FN(9)
++#define PSCI_0_2_FN_SYSTEM_SUSPEND		PSCI_0_2_FN(14)
+ 
+ #define PSCI_0_2_FN64_CPU_SUSPEND		PSCI_0_2_FN64(1)
+ #define PSCI_0_2_FN64_CPU_ON			PSCI_0_2_FN64(3)
+ #define PSCI_0_2_FN64_AFFINITY_INFO		PSCI_0_2_FN64(4)
+ #define PSCI_0_2_FN64_MIGRATE			PSCI_0_2_FN64(5)
+ #define PSCI_0_2_FN64_MIGRATE_INFO_UP_CPU	PSCI_0_2_FN64(7)
++#define PSCI_0_2_FN64_SYSTEM_SUSPEND		PSCI_0_2_FN64(14)
+ 
+ #define PSCI_1_0_FN_PSCI_FEATURES		PSCI_0_2_FN(10)
+ 
 -- 
-Regards,
-Nishanth Menon
+1.9.1
