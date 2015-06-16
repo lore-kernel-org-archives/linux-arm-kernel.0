@@ -1,37 +1,51 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Tue, 16 Jun 2015 15:01:49 -0300
-Subject: Running kexec on mx6
-In-Reply-To: <20150616161317.GS7557@n2100.arm.linux.org.uk>
-References: <CAOMZO5A_=okeGhRjRb-7xkO7RJKTECdgBxinrTLtVR+6TMpnVw@mail.gmail.com>
- <CAOMZO5A0+SSdT5mfy7fmO4DUQKimQpFCSu16EVLkxR+qh6137A@mail.gmail.com>
- <CAOMZO5CvjfADx_0AhxVNwadPTb-i5LCdPTOq2ZQaYpzo-m+4Jg@mail.gmail.com>
- <CAOMZO5Br0BBSeSxtCG3aeew7ToVuBH00xEJhAsjHWRCav8+ufA@mail.gmail.com>
- <CAOMZO5DBoKXE9URxWvk+WkJEZ1RkC4S3hAyugTbd7b5Qu91QKA@mail.gmail.com>
- <CAOMZO5DOdrJdkvmtBV3Kegdxg=LVZB60qB_TvMJ-D45+1vDAHw@mail.gmail.com>
- <20150616094242.GR7557@n2100.arm.linux.org.uk>
- <CAOMZO5B9ysnLKpCrpyN3JBUrxVT7MOh7crY3nS8MDW2Hv4Xs+A@mail.gmail.com>
- <CAOMZO5BYCNuQ=5zHurf6Zqmpwcj1tiCZj7Nj4j6ygijbePNBFw@mail.gmail.com>
- <20150616161317.GS7557@n2100.arm.linux.org.uk>
-Message-ID: <CAOMZO5A43JV9piTpkoQQdkYr2P-ysEZVaXLQWd4mNW7OTe_ANw@mail.gmail.com>
+From: HartleyS@visionengravers.com (Hartley Sweeten)
+Date: Tue, 16 Jun 2015 18:04:17 +0000
+Subject: [PATCH] ARM: ep93xx: add LEDs and triggers to defconfig
+In-Reply-To: <1434443764-25973-1-git-send-email-linus.walleij@linaro.org>
+References: <1434443764-25973-1-git-send-email-linus.walleij@linaro.org>
+Message-ID: <DC148C5AA1CEBA4E87973D432B1C2D883D4A378D@P3PWEX4MB008.ex4.secureserver.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 16, 2015 at 1:13 PM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
+On Tuesday, June 16, 2015 1:36 AM, Linus Walleij wrote:
+> The EP93xx has two designated LEDs (not always connected): a
+> green and a red one. These are registered in the core, so let's
+> enable the driver and some triggers.
+>
+> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+> ---
+>  arch/arm/configs/ep93xx_defconfig | 5 +++++
+>  1 file changed, 5 insertions(+)
+>
+> diff --git a/arch/arm/configs/ep93xx_defconfig b/arch/arm/configs/ep93xx_defconfig
+> index b3c32d0d4573..9a5205abc7c3 100644
+> --- a/arch/arm/configs/ep93xx_defconfig
+> +++ b/arch/arm/configs/ep93xx_defconfig
+> @@ -99,6 +99,11 @@ CONFIG_USB_SERIAL_CONSOLE=y
+>  CONFIG_USB_SERIAL_PL2303=y
+>  CONFIG_MMC=y
+>  CONFIG_MMC_SPI=y
+> +CONFIG_NEW_LEDS=y
+> +CONFIG_LEDS_CLASS=y
+> +CONFIG_LEDS_GPIO=y
+> +CONFIG_LEDS_TRIGGERS=y
+> +CONFIG_LEDS_TRIGGER_HEARTBEAT=y
+>  CONFIG_RTC_CLASS=y
+>  CONFIG_RTC_DRV_DS1307=y
+>  CONFIG_RTC_DRV_M48T86=y
 
-> Well, the good news is I can reproduce it here... the bad news is that
-> my attempt to debug it so far is causing extra problems - because the
-> imx6 uart is having its clocks disabled, which kind'a makes it hard to
-> get debug out... that's wasted half an hour working that out, and
-> further debug is now going to have to wait until later this evening
-> or tomorrow.
+Makes sense to me.
+Reviewed-by: H Hartley Sweeten <hsweeten@visionengravers.com>
 
-Thanks, Russell.
+Linus,
 
-I am having different results from the initial post now.
+Since you are updating the ep93xx_defconfig...
 
-I noticed that 4.1-rc works fine, but 4.0 does not.
+To use the I2C on ep93xx we need CONFIG_I2C_GPIO. Also,
+do we really need the CONFIG_I2C_DEBUG_* options enabled?
 
-If I apply commit fee3fd4fd2ad136b ("ARM: 8338/1: kexec: Relax SMP
-validation to improve DT compatibility") against 4.0 then kexec works
-fine here.
+In order for DMA to work with the SPI driver we also need:
+CONFIG_DMADEVICES and CONFIG_EP93XX_DMA enabled.
+
+Regards,
+Hartley
