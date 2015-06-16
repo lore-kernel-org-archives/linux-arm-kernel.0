@@ -1,53 +1,43 @@
-From: omaplinuxkernel@gmail.com (Shubhrajyoti Datta)
-Date: Tue, 16 Jun 2015 11:01:44 +0530
-Subject: [PATCH-V2 03/12] i2c: pxa: Return I2C_RETRY when timeout in pio
- mode
-In-Reply-To: <1434383399-2370-4-git-send-email-vaibhav.hiremath@linaro.org>
-References: <vaibhav.hiremath@linaro.org>
- <1434383399-2370-1-git-send-email-vaibhav.hiremath@linaro.org>
- <1434383399-2370-4-git-send-email-vaibhav.hiremath@linaro.org>
-Message-ID: <CAM=Q2ct_PPkWkP4x3-YG4akYDw9Wi+HMK=5dJWEL4R8WO28JZQ@mail.gmail.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Tue, 16 Jun 2015 09:01:31 +0200
+Subject: [PATCH] ARM: ep93xx: update comment on timer usage
+Message-ID: <1434438091-9475-1-git-send-email-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 15, 2015 at 9:19 PM, Vaibhav Hiremath
-<vaibhav.hiremath@linaro.org> wrote:
-> From: Shouming Wang <wangshm@marvell.com>
->
-> In case of timeout in pio mode of operation return I2C_RETRY.
-> This behavior will be same as interrupt mode of operation.
->
-> Signed-off-by: Shouming Wang <wangshm@marvell.com>
-> [vaibhav.hiremath at linaro.org: Updated changelog]
-> Signed-off-by: Vaibhav Hiremath <vaibhav.hiremath@linaro.org>
-> ---
->  drivers/i2c/busses/i2c-pxa.c | 4 +++-
->  1 file changed, 3 insertions(+), 1 deletion(-)
->
-> diff --git a/drivers/i2c/busses/i2c-pxa.c b/drivers/i2c/busses/i2c-pxa.c
-> index 023e59f..632008f 100644
-> --- a/drivers/i2c/busses/i2c-pxa.c
-> +++ b/drivers/i2c/busses/i2c-pxa.c
-> @@ -745,8 +745,10 @@ static int i2c_pxa_do_pio_xfer(struct pxa_i2c *i2c,
->         ret = i2c->msg_idx;
->
->  out:
-> -       if (timeout == 0)
-> +       if (timeout == 0) {
->                 i2c_pxa_scream_blue_murder(i2c, "timeout");
-> +               ret = I2C_RETRY;
+When refactoring the EP93xx timer some of the documentation
+git out of date. Update it.
 
-Can we use standard  return types.
+Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+---
+ arch/arm/mach-ep93xx/timer-ep93xx.c | 13 ++++++-------
+ 1 file changed, 6 insertions(+), 7 deletions(-)
 
-> +       }
->
->         return ret;
->  }
-> --
-> 1.9.1
->
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+diff --git a/arch/arm/mach-ep93xx/timer-ep93xx.c b/arch/arm/mach-ep93xx/timer-ep93xx.c
+index 9edaa754b689..ac48ac1fd16d 100644
+--- a/arch/arm/mach-ep93xx/timer-ep93xx.c
++++ b/arch/arm/mach-ep93xx/timer-ep93xx.c
+@@ -18,15 +18,14 @@
+  * is free-running, and can't generate interrupts.
+  *
+  * The 508 kHz timers are ideal for use for the timer interrupt, as the
+- * most common values of HZ divide 508 kHz nicely.  We pick one of the 16
+- * bit timers (timer 1) since we don't need more than 16 bits of reload
+- * value as long as HZ >= 8.
++ * most common values of HZ divide 508 kHz nicely.  We pick the 32 bit
++ * timer (timer 3) to get as long sleep intervals as possible when using
++ * CONFIG_NO_HZ.
+  *
+  * The higher clock rate of timer 4 makes it a better choice than the
+- * other timers for use in gettimeoffset(), while the fact that it can't
+- * generate interrupts means we don't have to worry about not being able
+- * to use this timer for something else.  We also use timer 4 for keeping
+- * track of lost jiffies.
++ * other timers for use as clock source and for sched_clock(), providing
++ * a stable 40 bit time base.
++ *************************************************************************
+  */
+ #define EP93XX_TIMER_REG(x)		(EP93XX_TIMER_BASE + (x))
+ #define EP93XX_TIMER1_LOAD		EP93XX_TIMER_REG(0x00)
+-- 
+1.9.3
