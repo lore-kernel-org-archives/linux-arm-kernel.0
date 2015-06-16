@@ -1,31 +1,46 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 16 Jun 2015 17:49:15 +0100
-Subject: [PATCH v2 01/11] KVM: arm: plug guest debug exploit
-In-Reply-To: <557DA811.8090705@linaro.org>
-References: <1433046432-1824-1-git-send-email-zhichao.huang@linaro.org>
- <1433046432-1824-2-git-send-email-zhichao.huang@linaro.org>
- <556C3A68.8050903@arm.com> <557449EA.7040003@linaro.org>
- <5576BFF7.3070706@arm.com> <557DA6E4.7090609@linaro.org>
- <557DA811.8090705@linaro.org>
-Message-ID: <20150616164914.GM30522@arm.com>
+From: Dave.Martin@arm.com (Dave Martin)
+Date: Tue, 16 Jun 2015 17:51:29 +0100
+Subject: [PATCH 00/10] arm64: Use BRK instruction for generic BUG traps
+In-Reply-To: <20150616145105.GG30522@arm.com>
+References: <1434036566-9848-1-git-send-email-Dave.Martin@arm.com>
+ <20150616145105.GG30522@arm.com>
+Message-ID: <20150616165129.GC3651@e103592.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jun 14, 2015 at 05:13:05PM +0100, zichao wrote:
-> I and marc are talking about how to plug the guest debug exploit in an
-> easier way.
+On Tue, Jun 16, 2015 at 03:51:05PM +0100, Will Deacon wrote:
+> Hi Dave,
 > 
-> I remembered that you mentioned disabling monitor mode had proven to be
-> extremely fragile in practice on 32-bit ARM SoCs, what if I save/restore
-> the debug monitor mode on each switch between the guest and the host,
-> would it be acceptable?
+> On Thu, Jun 11, 2015 at 04:29:14PM +0100, Dave P Martin wrote:
+> > Currently, the minimal default BUG() implementation from asm-generic is
+> > used for arm64.
+> > 
+> > This series uses the BRK software breakpoint instruction to generate a
+> > trap instead, similarly to most other arches, with the generic BUG code
+> > generating the dmesg boilerplate.  This eliminates a fair amount of
+> > inlined code at BUG() and WARN() sites.
+> 
+> I think patches 3 and 8 are a bit OTT and don't really bring us much.
+> 
+> However, for the rest of the series (modulo my minor comments):
+> 
+>   Reviewed-by: Will Deacon <will.deacon@arm.com>
 
-If you're just referring to DBGDSCRext, then you could give it a go, but
-you'll certainly want to predicate any writes to that register on whether
-or not hw_breakpoint managed to reset the debug regs on the host.
+Patch 3 is needed to silence compiler warnings that happen as a side-
+effect of the redefinition of DBG_ESR_VAL_BRK in patch 4.
 
-Like I said, accessing these registers always worries me, so I'd really
-avoid it in KVM if you can. If not, you'll need to do extensive testing
-on a bunch of platforms with and without the presence of external debug.
+A point hack in DBG_ESR_VAL_BRK could have fixed this, but the existing
+ESR definitions are the real cause -- simply stripping all the type
+information didn't appear safe due to the use of shifts and masking.
+Unfortunately, attempting to fix this properly touched more code than I
+would have liked...
 
-Will
+
+Patch 8 was requested by Mark Rutland, who preferred a separate header
+for those definitions rather than allowing them to sprawl in place.
+It seemed a fair point, but I'm happy either way.
+
+I can still drop the affected patches if you want -- let me know.
+
+Cheers
+---Dave
