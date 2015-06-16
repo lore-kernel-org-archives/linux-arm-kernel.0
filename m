@@ -1,58 +1,36 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Tue, 16 Jun 2015 14:13:04 +0200
-Subject: [PATCH 8/9] ARM: mvebu: add suspend/resume DT information for Armada
+Date: Tue, 16 Jun 2015 14:13:05 +0200
+Subject: [PATCH 9/9] ARM: mvebu: adjust board name and compatible for Armada
  388 GP
 In-Reply-To: <1434456785-23696-1-git-send-email-thomas.petazzoni@free-electrons.com>
 References: <1434456785-23696-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1434456785-23696-9-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1434456785-23696-10-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This commit improves the Armada 388 GP Device Tree description to
-describe the 3 GPIOs that are used to connect the SoC to the PIC
-micro-controller that we talk to shutdown the SoC when entering
-suspend to RAM.
+As the name of the Device Tree file name suggests, the Armada 388 GP
+really contains an Armada 388 SoC, so this commit updates the board
+name and compatible string in the Device Tree file.
 
 Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 ---
- arch/arm/boot/dts/armada-388-gp.dts | 16 ++++++++++++++++
- 1 file changed, 16 insertions(+)
+ arch/arm/boot/dts/armada-388-gp.dts | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
 diff --git a/arch/arm/boot/dts/armada-388-gp.dts b/arch/arm/boot/dts/armada-388-gp.dts
-index 78514ab..5f53a96 100644
+index 5f53a96..605f924 100644
 --- a/arch/arm/boot/dts/armada-388-gp.dts
 +++ b/arch/arm/boot/dts/armada-388-gp.dts
-@@ -56,6 +56,14 @@
- 		reg = <0x00000000 0x80000000>; /* 2 GB */
- 	};
+@@ -44,8 +44,8 @@
+ #include <dt-bindings/gpio/gpio.h>
  
-+	cpus {
-+		pm_pic {
-+			ctrl-gpios = <&gpio1 1 GPIO_ACTIVE_LOW>,
-+				     <&gpio1 2 GPIO_ACTIVE_LOW>,
-+				     <&gpio1 3 GPIO_ACTIVE_LOW>;
-+		};
-+	};
-+
- 	soc {
- 		ranges = <MBUS_ID(0xf0, 0x01) 0 0xf1000000 0x100000
- 			  MBUS_ID(0x01, 0x1d) 0 0xfff00000 0x100000>;
-@@ -406,8 +414,16 @@
- };
+ / {
+-	model = "Marvell Armada 385 GP";
+-	compatible = "marvell,a385-gp", "marvell,armada388", "marvell,armada380";
++	model = "Marvell Armada 388 GP";
++	compatible = "marvell,a388-gp", "marvell,armada388", "marvell,armada380";
  
- &pinctrl {
-+	pinctrl-0 = <&pic_pins>;
-+	pinctrl-names = "default";
-+
- 	pca0_pins: pca0_pins {
- 		marvell,pins = "mpp18";
- 		marvell,function = "gpio";
- 	};
-+
-+	pic_pins: pic-pins-0 {
-+		marvell,pins = "mpp33", "mpp34", "mpp35";
-+		marvell,function = "gpio";
-+	};
- };
+ 	chosen {
+ 		stdout-path = "serial0:115200n8";
 -- 
 2.1.0
