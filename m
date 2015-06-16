@@ -1,35 +1,34 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Tue, 16 Jun 2015 08:57:43 +0900
-Subject: [PATCH v2 1/1] irqchip: exynos-combiner: Save IRQ enable set on
- suspend
-In-Reply-To: <557EEDFB.7080502@collabora.co.uk>
-References: <1434087795-13990-1-git-send-email-javier.martinez@collabora.co.uk>
- <557AB00C.5040606@arm.com> <557AC23D.8040602@collabora.co.uk>
- <557AC85E.5070705@arm.com> <557AD728.7090908@collabora.co.uk>
- <557B34A7.4090507@collabora.co.uk>
- <CAD=FV=UQF+n8AjSXYajqUb0qswcoUrSgnsasV82JaS3dBtNO8Q@mail.gmail.com>
- <557E82BC.7080203@collabora.co.uk> <557E947B.3030804@arm.com>
- <557EE890.2050001@collabora.co.uk> <557EEA6C.6020002@arm.com>
- <557EEDFB.7080502@collabora.co.uk>
-Message-ID: <557F6677.8080507@samsung.com>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Tue, 16 Jun 2015 06:01:58 +0530
+Subject: [PATCH V7 3/3] OPP: Add binding for 'opp-suspend'
+In-Reply-To: <CAL_JsqJb4P2Z2esgm5ffjWV37MU2KUF4gBdUpwSV8+21iTD1Bg@mail.gmail.com>
+References: <cover.1433434659.git.viresh.kumar@linaro.org>
+ <dedf8c02fdd9dbf169f43de74ead4c1434d89b45.1433434659.git.viresh.kumar@linaro.org>
+ <CAL_JsqJb4P2Z2esgm5ffjWV37MU2KUF4gBdUpwSV8+21iTD1Bg@mail.gmail.com>
+Message-ID: <CAKohpomTT6i0dbboK901eguCbQiBdCT6gvLvTY24ajDdY__2fg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 16.06.2015 00:23, Javier Martinez Canillas wrote:
-(...)
->>> To do a more intrusive change, I should better understand the interactions
->>> between the Exynos pinctrl / GPIO, interrupt combiner and the GIC and in the
->>> meantime S2R will continue to be broken on these platforms unless someone
->>> more familiar with all this could point me in the right direction.
->>>
->>
->> As I said I am fine with this patch for now and I don't want to block it.
->>
-> 
-> Thanks a lot, Krzysztof who is one of the Exynos maintainers has also agreed
-> with the patch so hopefully this can land sooner rather than later.
+On 16 June 2015 at 05:05, Rob Herring <robherring2@gmail.com> wrote:
+>> +- opp-suspend: Phandle of the OPP to set while device is suspended.
+>> +
+>
+> I would just do a bool property in the OPP you want.
 
-I assume this will go through irqchip tree, right?
+I will do that if you want, no big deal.
 
-Best regards,
-Krzysztof
+But I would like to explain why I did it this way. Nishanth asked the same
+thing earlier and now he looks convinced :)
+
+There can only be one OPP that can be selected during suspend. Allowing
+more than one OPP to select this property doesn't look like the right thing
+to me. In that case we have to make a rule that the first OPP in the table
+will be selected or error out in that case.
+
+And I thought that this is property of the table, instead of each OPP. For
+example, in code this will waste lots of space if we choose such a field
+in individual OPPs, and we will always keep it in the OPP-table thing..
+
+But then this is DT :)
+
+I will wait for your reply Rob on this, and then will send an update. Thanks.
