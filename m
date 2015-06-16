@@ -1,51 +1,57 @@
-From: gradator@gradator.net (Sylvain Rochet)
-Date: Tue, 16 Jun 2015 15:32:55 +0200
-Subject: [BUG] at91: macb: does not work
-In-Reply-To: <20150616152454.348ae4ea@bbrezillon>
-References: <5580205B.1030804@aksignal.cz> <20150616152454.348ae4ea@bbrezillon>
-Message-ID: <20150616133255.GA28340@gradator.net>
+From: nm@ti.com (Nishanth Menon)
+Date: Tue, 16 Jun 2015 08:34:02 -0500
+Subject: [PATCH V7 1/3] OPP: Add new bindings to address shortcomings
+ of existing bindings
+In-Reply-To: <d83c0b6b1768c7229384216329b607d13886aa02.1433434659.git.viresh.kumar@linaro.org>
+References: <cover.1433434659.git.viresh.kumar@linaro.org>
+ <d83c0b6b1768c7229384216329b607d13886aa02.1433434659.git.viresh.kumar@linaro.org>
+Message-ID: <558025CA.8050008@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Ji??,
-
-On Tue, Jun 16, 2015 at 03:24:54PM +0200, Boris Brezillon wrote:
-> Hi Jiri,
+On 06/04/2015 11:20 AM, Viresh Kumar wrote:
+> Current OPP (Operating performance point) device tree bindings have been
+> insufficient due to the inflexible nature of the original bindings. Over
+> time, we have realized that Operating Performance Point definitions and
+> usage is varied depending on the SoC and a "single size (just frequency,
+> voltage) fits all" model which the original bindings attempted and
+> failed.
 > 
-> On Tue, 16 Jun 2015 15:10:51 +0200
-> Ji?? Prchal <jiri.prchal@aksignal.cz> wrote:
+> The proposed next generation of the bindings addresses by providing a
+> expandable binding for OPPs and introduces the following common
+> shortcomings seen with the original bindings:
 > 
-> > Hi,
-> > in v4.1-rc8 does not work ethernet. It normally gets up, but no data are going through.
-> > 
-> > [    4.400000] macb f802c000.ethernet (unnamed net_device) (uninitialized): invalid hw address, using random
-> > [    4.510000] macb f802c000.ethernet eth0: Cadence MACB rev 0x0001010c at 0xf802c000 irq 37 (52:30:8f:6b:9c:b7)
-> > [    4.520000] macb f802c000.ethernet eth0: attached PHY driver [Generic PHY] (mii_bus:phy_addr=f802c000.etherne:03, irq=-1)
-> > [   15.510000] macb f802c000.ethernet eth0: link up (100/Full)
-> > 
-> > / # ip -s link ls eth0
-> > 2: eth0: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 qdisc pfifo_fast state UP mode DEFAULT group default qlen 1000
-> >      link/ether a2:61:fe:17:65:b1 brd ff:ff:ff:ff:ff:ff
-> >      RX: bytes  packets  errors  dropped overrun mcast
-> >      0          0        0       0       0       0
-> >      TX: bytes  packets  errors  dropped carrier collsns
-> >      0          0        0       0       0       0
-> > 
-> > In v4.0.5 it's working.
+> - Getting clock/voltage/current rails sharing information between CPUs.
+>   Shared by all cores vs independent clock per core vs shared clock per
+>   cluster.
 > 
-> On which platform are you testing (SoC and board) ?
+> - Support for specifying current levels along with voltages.
+> 
+> - Support for multiple regulators.
+> 
+> - Support for turbo modes.
+> 
+> - Other per OPP settings: transition latencies, disabled status, etc.?
+> 
+> - Expandability of OPPs in future.
+> 
+> This patch introduces new bindings "operating-points-v2" to get these problems
+> solved. Refer to the bindings for more details.
+> 
+> We now have multiple versions of OPP binding and only one of them should
+> be used per device.
+> 
+> Reviewed-by: Rob Herring <robh@kernel.org>
+> Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
 
-I guess I'm also affected by this issue, but contrary to Ji?? my eth0 
-interface passes traffic a minute or so after booting up.
+I thought I had acked the patch 1 of the series as well in the list,
+but looks like I have'nt.. So, for the record..
 
-This doesn't seem to be related with TM9000 screen and the ETH0/QT1070 
-hardware IRQ sharing.
+Acked-by: Nishanth Menon <nm@ti.com>
 
-Sylvain
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150616/ade22d02/attachment.sig>
+
+Thanks for doing this.
+
+-- 
+Regards,
+Nishanth Menon
