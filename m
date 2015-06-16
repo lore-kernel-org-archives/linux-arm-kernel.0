@@ -1,156 +1,296 @@
-From: m.smarduch@samsung.com (Mario Smarduch)
-Date: Tue, 16 Jun 2015 14:50:51 -0700
-Subject: [PATCH v2 1/2] arm64: KVM: Optimize arm64 fp/simd save/restore
-In-Reply-To: <1434491452-19177-1-git-send-email-m.smarduch@samsung.com>
-References: <1434491452-19177-1-git-send-email-m.smarduch@samsung.com>
-Message-ID: <1434491452-19177-2-git-send-email-m.smarduch@samsung.com>
+From: stefan@agner.ch (Stefan Agner)
+Date: Tue, 16 Jun 2015 23:51:47 +0200
+Subject: [PATCH v4] ARM: early fixmap support for earlycon
+Message-ID: <1434491507-6208-1-git-send-email-stefan@agner.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch only saves and restores FP/SIMD registers on Guest access. To do
-this cptr_el2 FP/SIMD trap is set on Guest entry and later checked on exit.
-lmbench, hackbench show significant improvements, for 30-50% exits FP/SIMD
-context is not saved/restored
+Add early fixmap support, initially to support permanent, fixed
+mapping support for early console. A temporary, early pte is
+created which is migrated to a permanent mapping in paging_init.
+This is also needed since the attributes may change as the memory
+types are initialized. The 3MiB range of fixmap spans two pte
+tables, but currently only one pte is created for early fixmap
+support.
 
-Signed-off-by: Mario Smarduch <m.smarduch@samsung.com>
+Re-add FIX_KMAP_BEGIN to the index calculation in highmem.c since
+the index for kmap does not start at zero anymore. This reverts
+4221e2e6b316 ("ARM: 8031/1: fixmap: remove FIX_KMAP_BEGIN and
+FIX_KMAP_END") to some extent.
+
+Cc: Mark Salter <msalter@redhat.com>
+Cc: Russell King <linux@arm.linux.org.uk>
+Cc: Kees Cook <keescook@chromium.org>
+Cc: Laura Abbott <lauraa@codeaurora.org>
+Cc: Arnd Bergmann <arnd@arndb.de>
+Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+Signed-off-by: Rob Herring <robh@kernel.org>
+Signed-off-by: Stefan Agner <stefan@agner.ch>
 ---
- arch/arm64/include/asm/kvm_arm.h |    5 ++++-
- arch/arm64/kvm/hyp.S             |   46 +++++++++++++++++++++++++++++++++++---
- 2 files changed, 47 insertions(+), 4 deletions(-)
+Changes since v3:
+- Remove address of on functions
+- Clear all pmd's except early fixmap pmd in devicemaps_init
+- Update comment in devicemaps_init since earlycon works now as debug method
+- Add comment regarding FIXMAP_PAGE_IO/FIXMAP_PAGE_NOCACHE use
 
-diff --git a/arch/arm64/include/asm/kvm_arm.h b/arch/arm64/include/asm/kvm_arm.h
-index ac6fafb..7605e09 100644
---- a/arch/arm64/include/asm/kvm_arm.h
-+++ b/arch/arm64/include/asm/kvm_arm.h
-@@ -171,10 +171,13 @@
- #define HSTR_EL2_TTEE	(1 << 16)
- #define HSTR_EL2_T(x)	(1 << x)
+Changes since v2:
+- Rebased and tested on rmk/for-next
+- Flush TLB's when clearing the temporary PMD in early_fixmap_shutdown
+
+Changes since v1 (RFC):
+- Rebased and tested on v3.19-rc5
+- Spelling errors in comments and commit message
+- Added Rob's SOB
+
+ arch/arm/Kconfig              |  3 ++
+ arch/arm/include/asm/fixmap.h | 15 +++++++-
+ arch/arm/kernel/setup.c       |  3 ++
+ arch/arm/mm/highmem.c         |  6 +--
+ arch/arm/mm/mmu.c             | 88 +++++++++++++++++++++++++++++++++++++++----
+ 5 files changed, 104 insertions(+), 11 deletions(-)
+
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index d0950ce..ef164a7 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -186,6 +186,9 @@ config ARCH_HAS_ILOG2_U64
+ config ARCH_HAS_BANDGAP
+ 	bool
  
-+/* Hyp Coproccessor Trap Register Shifts */
-+#define CPTR_EL2_TFP_SHIFT 10
++config FIX_EARLYCON_MEM
++	def_bool y
 +
- /* Hyp Coprocessor Trap Register */
- #define CPTR_EL2_TCPAC	(1 << 31)
- #define CPTR_EL2_TTA	(1 << 20)
--#define CPTR_EL2_TFP	(1 << 10)
-+#define CPTR_EL2_TFP	(1 << CPTR_EL2_TFP_SHIFT)
+ config GENERIC_HWEIGHT
+ 	bool
+ 	default y
+diff --git a/arch/arm/include/asm/fixmap.h b/arch/arm/include/asm/fixmap.h
+index 0415eae..58cfe9f 100644
+--- a/arch/arm/include/asm/fixmap.h
++++ b/arch/arm/include/asm/fixmap.h
+@@ -6,9 +6,13 @@
+ #define FIXADDR_TOP		(FIXADDR_END - PAGE_SIZE)
  
- /* Hyp Debug Configuration Register bits */
- #define MDCR_EL2_TDRA		(1 << 11)
-diff --git a/arch/arm64/kvm/hyp.S b/arch/arm64/kvm/hyp.S
-index 5befd01..de0788f 100644
---- a/arch/arm64/kvm/hyp.S
-+++ b/arch/arm64/kvm/hyp.S
-@@ -673,6 +673,15 @@
- 	tbz	\tmp, #KVM_ARM64_DEBUG_DIRTY_SHIFT, \target
- .endm
+ #include <asm/kmap_types.h>
++#include <asm/pgtable.h>
  
-+/*
-+ * Check cptr VFP/SIMD accessed bit, if set VFP/SIMD not accessed by guest.
-+ */
-+.macro skip_fpsimd_state tmp, target
-+	mrs	\tmp, cptr_el2
-+	tbnz	\tmp, #CPTR_EL2_TFP_SHIFT, \target
-+.endm
+ enum fixed_addresses {
+-	FIX_KMAP_BEGIN,
++	FIX_EARLYCON_MEM_BASE,
++	__end_of_permanent_fixed_addresses,
 +
-+
- .macro compute_debug_state target
- 	// Compute debug state: If any of KDE, MDE or KVM_ARM64_DEBUG_DIRTY
- 	// is set, we do a full save/restore cycle and disable trapping.
-@@ -763,6 +772,7 @@
- 	ldr     x2, [x0, #VCPU_HCR_EL2]
- 	msr     hcr_el2, x2
- 	mov	x2, #CPTR_EL2_TTA
-+	orr     x2, x2, #CPTR_EL2_TFP
- 	msr	cptr_el2, x2
++	FIX_KMAP_BEGIN = __end_of_permanent_fixed_addresses,
+ 	FIX_KMAP_END = FIX_KMAP_BEGIN + (KM_TYPE_NR * NR_CPUS) - 1,
  
- 	mov	x2, #(1 << 15)	// Trap CP15 Cr=15
-@@ -785,7 +795,6 @@
- .macro deactivate_traps
- 	mov	x2, #HCR_RW
- 	msr	hcr_el2, x2
--	msr	cptr_el2, xzr
- 	msr	hstr_el2, xzr
+ 	/* Support writing RO kernel text via kprobes, jump labels, etc. */
+@@ -18,7 +22,16 @@ enum fixed_addresses {
+ 	__end_of_fixed_addresses
+ };
  
- 	mrs	x2, mdcr_el2
-@@ -912,6 +921,28 @@ __restore_fpsimd:
- 	restore_fpsimd
- 	ret
++#define FIXMAP_PAGE_COMMON	(L_PTE_YOUNG | L_PTE_PRESENT | L_PTE_XN | L_PTE_DIRTY)
++
++#define FIXMAP_PAGE_NORMAL	(FIXMAP_PAGE_COMMON | L_PTE_MT_WRITEBACK)
++
++/* Used by set_fixmap_(io|nocache), both meant for mapping a device */
++#define FIXMAP_PAGE_IO		(FIXMAP_PAGE_COMMON | L_PTE_MT_DEV_SHARED | L_PTE_SHARED)
++#define FIXMAP_PAGE_NOCACHE	FIXMAP_PAGE_IO
++
+ void __set_fixmap(enum fixed_addresses idx, phys_addr_t phys, pgprot_t prot);
++void __init early_fixmap_init(void);
  
-+switch_to_guest_fpsimd:
-+	push	x4, lr
+ #include <asm-generic/fixmap.h>
+ 
+diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
+index e6d8c76..6f03beb 100644
+--- a/arch/arm/kernel/setup.c
++++ b/arch/arm/kernel/setup.c
+@@ -37,6 +37,7 @@
+ #include <asm/cpu.h>
+ #include <asm/cputype.h>
+ #include <asm/elf.h>
++#include <asm/fixmap.h>
+ #include <asm/procinfo.h>
+ #include <asm/psci.h>
+ #include <asm/sections.h>
+@@ -953,6 +954,8 @@ void __init setup_arch(char **cmdline_p)
+ 	strlcpy(cmd_line, boot_command_line, COMMAND_LINE_SIZE);
+ 	*cmdline_p = cmd_line;
+ 
++	early_fixmap_init();
 +
-+	mrs	x2, cptr_el2
-+	bic	x2, x2, #CPTR_EL2_TFP
-+	msr	cptr_el2, x2
+ 	parse_early_param();
+ 
+ #ifdef CONFIG_MMU
+diff --git a/arch/arm/mm/highmem.c b/arch/arm/mm/highmem.c
+index b98895d..c7097f9 100644
+--- a/arch/arm/mm/highmem.c
++++ b/arch/arm/mm/highmem.c
+@@ -78,7 +78,7 @@ void *kmap_atomic(struct page *page)
+ 
+ 	type = kmap_atomic_idx_push();
+ 
+-	idx = type + KM_TYPE_NR * smp_processor_id();
++	idx = FIX_KMAP_BEGIN + type + KM_TYPE_NR * smp_processor_id();
+ 	vaddr = __fix_to_virt(idx);
+ #ifdef CONFIG_DEBUG_HIGHMEM
+ 	/*
+@@ -105,7 +105,7 @@ void __kunmap_atomic(void *kvaddr)
+ 
+ 	if (kvaddr >= (void *)FIXADDR_START) {
+ 		type = kmap_atomic_idx();
+-		idx = type + KM_TYPE_NR * smp_processor_id();
++		idx = FIX_KMAP_BEGIN + type + KM_TYPE_NR * smp_processor_id();
+ 
+ 		if (cache_is_vivt())
+ 			__cpuc_flush_dcache_area((void *)vaddr, PAGE_SIZE);
+@@ -135,7 +135,7 @@ void *kmap_atomic_pfn(unsigned long pfn)
+ 		return page_address(page);
+ 
+ 	type = kmap_atomic_idx_push();
+-	idx = type + KM_TYPE_NR * smp_processor_id();
++	idx = FIX_KMAP_BEGIN + type + KM_TYPE_NR * smp_processor_id();
+ 	vaddr = __fix_to_virt(idx);
+ #ifdef CONFIG_DEBUG_HIGHMEM
+ 	BUG_ON(!pte_none(get_fixmap_pte(vaddr)));
+diff --git a/arch/arm/mm/mmu.c b/arch/arm/mm/mmu.c
+index 6ca7d9a..fb9e817 100644
+--- a/arch/arm/mm/mmu.c
++++ b/arch/arm/mm/mmu.c
+@@ -357,6 +357,47 @@ const struct mem_type *get_mem_type(unsigned int type)
+ }
+ EXPORT_SYMBOL(get_mem_type);
+ 
++static pte_t *(*pte_offset_fixmap)(pmd_t *dir, unsigned long addr);
 +
-+	mrs	x0, tpidr_el2
++static pte_t bm_pte[PTRS_PER_PTE + PTE_HWTABLE_PTRS]
++	__aligned(PTE_HWTABLE_OFF + PTE_HWTABLE_SIZE) __initdata;
 +
-+	ldr	x2, [x0, #VCPU_HOST_CONTEXT]
-+	kern_hyp_va x2
-+	bl __save_fpsimd
++static pte_t * __init pte_offset_early_fixmap(pmd_t *dir, unsigned long addr)
++{
++	return &bm_pte[pte_index(addr)];
++}
 +
-+	add	x2, x0, #VCPU_CONTEXT
-+	bl __restore_fpsimd
++static pte_t *pte_offset_late_fixmap(pmd_t *dir, unsigned long addr)
++{
++	return pte_offset_kernel(dir, addr);
++}
 +
-+	pop	x4, lr
-+	pop	x2, x3
-+	pop	x0, x1
++static inline pmd_t * __init fixmap_pmd(unsigned long addr)
++{
++	pgd_t *pgd = pgd_offset_k(addr);
++	pud_t *pud = pud_offset(pgd, addr);
++	pmd_t *pmd = pmd_offset(pud, addr);
 +
-+	eret
++	return pmd;
++}
++
++void __init early_fixmap_init(void)
++{
++	pmd_t *pmd;
++
++	/*
++	 * The early fixmap range spans multiple pmds, for which
++	 * we are not prepared:
++	 */
++	BUILD_BUG_ON((__fix_to_virt(__end_of_permanent_fixed_addresses) >> PMD_SHIFT)
++		     != FIXADDR_TOP >> PMD_SHIFT);
++
++	pmd = fixmap_pmd(FIXADDR_TOP);
++	pmd_populate_kernel(&init_mm, pmd, bm_pte);
++
++	pte_offset_fixmap = pte_offset_early_fixmap;
++}
 +
  /*
-  * u64 __kvm_vcpu_run(struct kvm_vcpu *vcpu);
-  *
-@@ -932,7 +963,6 @@ ENTRY(__kvm_vcpu_run)
- 	kern_hyp_va x2
+  * To avoid TLB flush broadcasts, this uses local_flush_tlb_kernel_range().
+  * As a result, this can only be called with preemption disabled, as under
+@@ -365,7 +406,7 @@ EXPORT_SYMBOL(get_mem_type);
+ void __set_fixmap(enum fixed_addresses idx, phys_addr_t phys, pgprot_t prot)
+ {
+ 	unsigned long vaddr = __fix_to_virt(idx);
+-	pte_t *pte = pte_offset_kernel(pmd_off_k(vaddr), vaddr);
++	pte_t *pte = pte_offset_fixmap(pmd_off_k(vaddr), vaddr);
  
- 	save_host_regs
--	bl __save_fpsimd
- 	bl __save_sysregs
+ 	/* Make sure fixmap region does not exceed available allocation. */
+ 	BUILD_BUG_ON(FIXADDR_START + (__end_of_fixed_addresses * PAGE_SIZE) >
+@@ -855,7 +896,7 @@ static void __init create_mapping(struct map_desc *md)
+ 	}
  
- 	compute_debug_state 1f
-@@ -948,7 +978,6 @@ ENTRY(__kvm_vcpu_run)
- 	add	x2, x0, #VCPU_CONTEXT
+ 	if ((md->type == MT_DEVICE || md->type == MT_ROM) &&
+-	    md->virtual >= PAGE_OFFSET &&
++	    md->virtual >= PAGE_OFFSET && md->virtual < FIXADDR_START &&
+ 	    (md->virtual < VMALLOC_START || md->virtual >= VMALLOC_END)) {
+ 		pr_warn("BUG: mapping for 0x%08llx at 0x%08lx out of vmalloc space\n",
+ 			(long long)__pfn_to_phys((u64)md->pfn), md->virtual);
+@@ -1213,10 +1254,10 @@ void __init arm_mm_memblock_reserve(void)
  
- 	bl __restore_sysregs
--	bl __restore_fpsimd
+ /*
+  * Set up the device mappings.  Since we clear out the page tables for all
+- * mappings above VMALLOC_START, we will remove any debug device mappings.
+- * This means you have to be careful how you debug this function, or any
+- * called function.  This means you can't use any function or debugging
+- * method which may touch any device, otherwise the kernel _will_ crash.
++ * mappings above VMALLOC_START, except early fixmap, we might remove debug
++ * device mappings.  This means earlycon can be used to debug this function
++ * Any other function or debugging method which may touch any device _will_
++ * crash the kernel.
+  */
+ static void __init devicemaps_init(const struct machine_desc *mdesc)
+ {
+@@ -1231,7 +1272,10 @@ static void __init devicemaps_init(const struct machine_desc *mdesc)
  
- 	skip_debug_state x3, 1f
- 	bl	__restore_debug
-@@ -967,7 +996,9 @@ __kvm_vcpu_return:
- 	add	x2, x0, #VCPU_CONTEXT
+ 	early_trap_init(vectors);
  
- 	save_guest_regs
-+	skip_fpsimd_state x3, 1f
- 	bl __save_fpsimd
-+1:
- 	bl __save_sysregs
+-	for (addr = VMALLOC_START; addr; addr += PMD_SIZE)
++	/*
++	 * Clear page table except top pmd used by early fixmaps
++	 */
++	for (addr = VMALLOC_START; addr < (FIXADDR_TOP & PMD_MASK); addr += PMD_SIZE)
+ 		pmd_clear(pmd_off_k(addr));
  
- 	skip_debug_state x3, 1f
-@@ -986,7 +1017,11 @@ __kvm_vcpu_return:
- 	kern_hyp_va x2
+ 	/*
+@@ -1483,6 +1527,35 @@ void __init early_paging_init(const struct machine_desc *mdesc)
  
- 	bl __restore_sysregs
-+	skip_fpsimd_state x3, 1f
- 	bl __restore_fpsimd
-+1:
-+	/* Clear FPSIMD and Trace trapping */
-+	msr     cptr_el2, xzr
+ #endif
  
- 	skip_debug_state x3, 1f
- 	// Clear the dirty flag for the next run, as all the state has
-@@ -1201,6 +1236,11 @@ el1_trap:
- 	 * x1: ESR
- 	 * x2: ESR_EC
- 	 */
++static void __init early_fixmap_shutdown(void)
++{
++	int i;
++	unsigned long va = fix_to_virt(__end_of_permanent_fixed_addresses - 1);
 +
-+	/* Guest accessed VFP/SIMD registers, save host, restore Guest */
-+	cmp	x2, #ESR_ELx_EC_FP_ASIMD
-+	b.eq	switch_to_guest_fpsimd
++	pte_offset_fixmap = pte_offset_late_fixmap;
++	pmd_clear(fixmap_pmd(va));
++	local_flush_tlb_kernel_page(va);
 +
- 	cmp	x2, #ESR_ELx_EC_DABT_LOW
- 	mov	x0, #ESR_ELx_EC_IABT_LOW
- 	ccmp	x2, x0, #4, ne
++	for (i = 0; i < __end_of_permanent_fixed_addresses; i++) {
++		pte_t *pte;
++		struct map_desc map;
++
++		map.virtual = fix_to_virt(i);
++		pte = pte_offset_early_fixmap(pmd_off_k(map.virtual), map.virtual);
++
++		/* Only i/o device mappings are supported ATM */
++		if (pte_none(*pte) ||
++		    (pte_val(*pte) & L_PTE_MT_MASK) != L_PTE_MT_DEV_SHARED)
++			continue;
++
++		map.pfn = pte_pfn(*pte);
++		map.type = MT_DEVICE;
++		map.length = PAGE_SIZE;
++
++		create_mapping(&map);
++	}
++}
++
+ /*
+  * paging_init() sets up the page tables, initialises the zone memory
+  * maps, and sets up the zero page, bad page and bad page tables.
+@@ -1495,6 +1568,7 @@ void __init paging_init(const struct machine_desc *mdesc)
+ 	prepare_page_table();
+ 	map_lowmem();
+ 	dma_contiguous_remap();
++	early_fixmap_shutdown();
+ 	devicemaps_init(mdesc);
+ 	kmap_init();
+ 	tcm_init();
 -- 
-1.7.9.5
+2.4.2
