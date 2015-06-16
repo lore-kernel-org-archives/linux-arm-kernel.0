@@ -1,33 +1,16 @@
-From: hsweeten@visionengravers.com (H Hartley Sweeten)
-Date: Tue, 16 Jun 2015 09:52:46 -0700
-Subject: [PATCH 1/2] ARM: ep93xx: vision_ep9307: enable DMA for SPI
-In-Reply-To: <1434473567-5258-1-git-send-email-hsweeten@visionengravers.com>
-References: <1434473567-5258-1-git-send-email-hsweeten@visionengravers.com>
-Message-ID: <1434473567-5258-2-git-send-email-hsweeten@visionengravers.com>
+From: HartleyS@visionengravers.com (Hartley Sweeten)
+Date: Tue, 16 Jun 2015 16:58:20 +0000
+Subject: [PATCH] ARM: ep93xx: update comment on timer usage
+In-Reply-To: <1434438091-9475-1-git-send-email-linus.walleij@linaro.org>
+References: <1434438091-9475-1-git-send-email-linus.walleij@linaro.org>
+Message-ID: <DC148C5AA1CEBA4E87973D432B1C2D883D4A366C@P3PWEX4MB008.ex4.secureserver.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enable the 'use_dma' flag in the SPI platform data to improve the speed
-of the mmc_spi driver.
+On Tuesday, June 16, 2015 12:02 AM, Linus Walleij wrote:
+> When refactoring the EP93xx timer some of the documentation
+> git out of date. Update it.
+>
+> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 
-Signed-off-by: H Hartley Sweeten <hsweeten@visionengravers.com>
----
- arch/arm/mach-ep93xx/vision_ep9307.c | 3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
-
-diff --git a/arch/arm/mach-ep93xx/vision_ep9307.c b/arch/arm/mach-ep93xx/vision_ep9307.c
-index 6bc1c18..aa87dfa 100644
---- a/arch/arm/mach-ep93xx/vision_ep9307.c
-+++ b/arch/arm/mach-ep93xx/vision_ep9307.c
-@@ -281,7 +281,8 @@ static struct spi_board_info vision_spi_board_info[] __initdata = {
- };
- 
- static struct ep93xx_spi_info vision_spi_master __initdata = {
--	.num_chipselect		= ARRAY_SIZE(vision_spi_board_info),
-+	.num_chipselect	= ARRAY_SIZE(vision_spi_board_info),
-+	.use_dma	= 1,
- };
- 
- /*************************************************************************
--- 
-2.3.0
+Reviewed-by: H Hartley Sweeten <hsweeten@visionengravers.com>
