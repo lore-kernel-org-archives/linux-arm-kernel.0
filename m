@@ -1,49 +1,64 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 16 Jun 2015 18:39:07 +0100
-Subject: [PATCH 0/2] Consolidate redundant register/stack access code
-In-Reply-To: <1434386579-6045-1-git-send-email-dave.long@linaro.org>
-References: <1434386579-6045-1-git-send-email-dave.long@linaro.org>
-Message-ID: <20150616173907.GV30522@arm.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Tue, 16 Jun 2015 19:41:14 +0200
+Subject: [PATCH v2 6/6] ARM: sun8i: dts: Add Ippo-q8h v1.2 with A33 and
+ 1024x600 lcd support
+In-Reply-To: <557C3BD3.6030105@redhat.com>
+References: <1432997706-20172-1-git-send-email-hdegoede@redhat.com>
+ <1432997706-20172-7-git-send-email-hdegoede@redhat.com>
+ <20150602081459.GO23777@lukather> <556D6955.8030708@redhat.com>
+ <20150603094535.GI23777@lukather> <556EE104.3090803@redhat.com>
+ <20150613135002.GP19653@lukather> <557C3BD3.6030105@redhat.com>
+Message-ID: <20150616174114.GI11732@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi David,
+Hi,
 
-On Mon, Jun 15, 2015 at 05:42:57PM +0100, David Long wrote:
-> From: "David A. Long" <dave.long@linaro.org>
+On Sat, Jun 13, 2015 at 04:18:59PM +0200, Hans de Goede wrote:
+> >Pantelis, to sum things up, we have a case of a tablet that comes with
+> >the exact same board, but coming in two flavours with two differents
+> >screen resolutions. It looks like a great case for your DT quirks
+> >work, but we have no way of runtime detecting the difference between
+> >the two variants. What do you think about this? Should we go with
+> >using the DT quirks or is this simply out of scope?
+> >
+> >There's not so much example of similar cases in the kernel, and none
+> >of them use quirks so far (obviously) but they all boil down to either
+> >the solution you were suggesting in that patch or adding the alternate
+> >configuration as a comment.
+> >
+> >I don't think the latter would work for you, and I agree with that, so
+> >I guess that depending on what Pantelis says, either we go with a
+> >better solution using the quirks, or we end up using what you
+> >suggested (with a nitpick though, I'd prefer if you used the display
+> >standard instead of the resolution, which would make it xga I guess?)
 > 
-> Move duplicate and functionally equivalent code for accessing registers
-> and stack (CONFIG_HAVE_REGS_AND_STACK_ACCESS_API) from arch subdirs into
-> common kernel files.
+> If we go with a separate dts file for each of the 800x480 and 1024x600
+> screens, I would greatly prefer to stick with the lcd1024x600 in the dts
+> filename instead of using something like xga, the fact that you say:
+> "I guess" that my answer to that is: I dunno I would need to look this
+> up in wikipedia or some such makes me think that using a qualifier like
+> xga is not going the help end users decide which dts file to pick, it
+> will just lead to them needing to go to wikipedia too. Also note that
+> the advertising of these tablets on ebay / aliexpress almost always
+> uses the resolution and not something like "xga".
 > 
-> Note: Help regression testing s390, hexagon, and sh would be appreciated.
->       Powerpc builds but I have not verified the functionality.
-> 
-> David A. Long (2):
->   Move the pt_regs_offset struct definition from arch to common include
->     file
->   Consolidate redundant register/stack access code
-> 
->  arch/arm/include/asm/ptrace.h          |  6 ---
->  arch/arm/kernel/ptrace.c               | 72 +---------------------------------
->  arch/hexagon/include/uapi/asm/ptrace.h |  3 --
->  arch/powerpc/include/asm/ptrace.h      | 38 ------------------
->  arch/powerpc/kernel/ptrace.c           | 39 +-----------------
->  arch/s390/include/asm/ptrace.h         |  3 --
->  arch/s390/kernel/ptrace.c              | 70 ++++++++++-----------------------
->  arch/sh/include/asm/ptrace.h           | 44 ---------------------
->  arch/sh/kernel/Makefile                |  2 +-
->  arch/sh/kernel/ptrace.c                | 33 ----------------
->  arch/sh/kernel/ptrace_32.c             |  2 +-
->  arch/sh/kernel/ptrace_64.c             |  2 +-
->  arch/x86/include/asm/ptrace.h          | 37 -----------------
->  arch/x86/kernel/ptrace.c               | 39 +-----------------
->  include/linux/ptrace.h                 | 51 ++++++++++++++++++++++++
->  kernel/ptrace.c                        | 38 ++++++++++++++++++
->  16 files changed, 116 insertions(+), 363 deletions(-)
+> So all in all if we do not decide to use quirks for this I would like
+> to keep the filename as is.
 
-Nice cleanup! The ARMy bits all look fine to me.
+Yeah, except that the display standard is also encoding the refresh
+rate and color depth, that might change from one board to another.
 
-  Acked-by: Will Deacon <will.deacon@arm.com>
+Maxime
 
-Will
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150616/0174be5b/attachment.sig>
