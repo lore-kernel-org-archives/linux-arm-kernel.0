@@ -1,131 +1,62 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Tue, 16 Jun 2015 14:50:39 +0100
-Subject: [PATCH 1/2] arm64: kernel: rename __cpu_suspend to keep it aligned
- with arm
-In-Reply-To: <1434462640-19613-1-git-send-email-sudeep.holla@arm.com>
-References: <1434462640-19613-1-git-send-email-sudeep.holla@arm.com>
-Message-ID: <1434462640-19613-2-git-send-email-sudeep.holla@arm.com>
+From: robherring2@gmail.com (Rob Herring)
+Date: Tue, 16 Jun 2015 08:47:33 -0500
+Subject: [PATCH] ARM: mm: enable L1 prefetch on Cortex-A9
+In-Reply-To: <1434023550-20147-1-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1434023550-20147-1-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <CAL_JsqKTC+BO6bin3Qekjn37Np6F86Uvv1-194VGTyYxcNfjHw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch renames __cpu_suspend to cpu_suspend so that it's aligned
-with ARM32. It also removes the redundant wrapper created.
+On Thu, Jun 11, 2015 at 6:52 AM, Thomas Petazzoni
+<thomas.petazzoni@free-electrons.com> wrote:
+> The Cortex-A9 has a L1 prefetch capability documented at
+> http://infocenter.arm.com/help/index.jsp?topic=/com.arm.doc.ddi0388e/Chdejhgd.html:
+>
+>   The Cortex-A9 data cache implements an automatic prefetcher that
+>   monitors cache misses done by the processor. This unit can monitor
+>   and prefetch two independent data streams. It can be activated in
+>   software using a CP15 Auxiliary Control Register bit. See Auxiliary
+>   Control Register.
+>
+> This commit enables this L1 prefetch feature unconditionally on all
+> Cortex-A9 by setting bit 2 in the Auxiliary Control CP15
+> register. Note that since this bit only exists on Cortex-A9 but not on
+> Cortex-A5 or Cortex-R7, we separate the handling of Cortex-A9 from the
+> one of those two other cores.
 
-This is preparation to implement generic PSCI system suspend using the
-cpu_{suspend,resume} which now has the same interface on both ARM and
-ARM64.
+Does this work in non-secure mode? Perhaps it is just ignored. If so,
+it deserves a comment along the lines of "This bit should be set by
+the bootloader and setting it has no effect in non-secure mode."
 
-Cc: Mark Rutland <mark.rutland@arm.com>
-Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
----
- arch/arm64/include/asm/cpuidle.h | 8 ++------
- arch/arm64/include/asm/suspend.h | 2 +-
- arch/arm64/kernel/cpuidle.c      | 4 ++--
- arch/arm64/kernel/psci.c         | 2 +-
- arch/arm64/kernel/suspend.c      | 6 +++---
- 5 files changed, 9 insertions(+), 13 deletions(-)
+Rob
 
-diff --git a/arch/arm64/include/asm/cpuidle.h b/arch/arm64/include/asm/cpuidle.h
-index 141b2fcabaa6..0f74f05d662a 100644
---- a/arch/arm64/include/asm/cpuidle.h
-+++ b/arch/arm64/include/asm/cpuidle.h
-@@ -5,20 +5,16 @@
- 
- #ifdef CONFIG_CPU_IDLE
- extern int arm_cpuidle_init(unsigned int cpu);
--extern int cpu_suspend(unsigned long arg);
-+extern int arm_cpuidle_suspend(int index);
- #else
- static inline int arm_cpuidle_init(unsigned int cpu)
- {
- 	return -EOPNOTSUPP;
- }
- 
--static inline int cpu_suspend(unsigned long arg)
-+static inline int arm_cpuidle_suspend(int index)
- {
- 	return -EOPNOTSUPP;
- }
- #endif
--static inline int arm_cpuidle_suspend(int index)
--{
--	return cpu_suspend(index);
--}
- #endif
-diff --git a/arch/arm64/include/asm/suspend.h b/arch/arm64/include/asm/suspend.h
-index 003802f58963..59a5b0f1e81c 100644
---- a/arch/arm64/include/asm/suspend.h
-+++ b/arch/arm64/include/asm/suspend.h
-@@ -21,6 +21,6 @@ struct sleep_save_sp {
- 	phys_addr_t save_ptr_stash_phys;
- };
- 
--extern int __cpu_suspend(unsigned long arg, int (*fn)(unsigned long));
-+extern int cpu_suspend(unsigned long arg, int (*fn)(unsigned long));
- extern void cpu_resume(void);
- #endif
-diff --git a/arch/arm64/kernel/cpuidle.c b/arch/arm64/kernel/cpuidle.c
-index f8aa16973318..7ce589ca54a4 100644
---- a/arch/arm64/kernel/cpuidle.c
-+++ b/arch/arm64/kernel/cpuidle.c
-@@ -32,7 +32,7 @@ int arm_cpuidle_init(unsigned int cpu)
-  * Return: 0 on success, -EOPNOTSUPP if CPU suspend hook not initialized, CPU
-  * operations back-end error code otherwise.
-  */
--int cpu_suspend(unsigned long arg)
-+int arm_cpuidle_suspend(int index)
- {
- 	int cpu = smp_processor_id();
- 
-@@ -42,5 +42,5 @@ int cpu_suspend(unsigned long arg)
- 	 */
- 	if (!cpu_ops[cpu] || !cpu_ops[cpu]->cpu_suspend)
- 		return -EOPNOTSUPP;
--	return cpu_ops[cpu]->cpu_suspend(arg);
-+	return cpu_ops[cpu]->cpu_suspend(index);
- }
-diff --git a/arch/arm64/kernel/psci.c b/arch/arm64/kernel/psci.c
-index a0fc99a518b8..4be597228b14 100644
---- a/arch/arm64/kernel/psci.c
-+++ b/arch/arm64/kernel/psci.c
-@@ -203,7 +203,7 @@ static int __maybe_unused cpu_psci_cpu_suspend(unsigned long index)
- 	if (!psci_power_state_loses_context(state[index - 1]))
- 		ret = psci_ops.cpu_suspend(state[index - 1], 0);
- 	else
--		ret = __cpu_suspend(index, psci_suspend_finisher);
-+		ret = cpu_suspend(index, psci_suspend_finisher);
- 
- 	return ret;
- }
-diff --git a/arch/arm64/kernel/suspend.c b/arch/arm64/kernel/suspend.c
-index d7daf45ae7a2..400e1265e205 100644
---- a/arch/arm64/kernel/suspend.c
-+++ b/arch/arm64/kernel/suspend.c
-@@ -51,13 +51,13 @@ void __init cpu_suspend_set_dbg_restorer(void (*hw_bp_restore)(void *))
- }
- 
- /*
-- * __cpu_suspend
-+ * cpu_suspend
-  *
-  * arg: argument to pass to the finisher function
-  * fn: finisher function pointer
-  *
-  */
--int __cpu_suspend(unsigned long arg, int (*fn)(unsigned long))
-+int cpu_suspend(unsigned long arg, int (*fn)(unsigned long))
- {
- 	struct mm_struct *mm = current->active_mm;
- 	int ret;
-@@ -82,7 +82,7 @@ int __cpu_suspend(unsigned long arg, int (*fn)(unsigned long))
- 		 * We are resuming from reset with TTBR0_EL1 set to the
- 		 * idmap to enable the MMU; restore the active_mm mappings in
- 		 * TTBR0_EL1 unless the active_mm == &init_mm, in which case
--		 * the thread entered __cpu_suspend with TTBR0_EL1 set to
-+		 * the thread entered cpu_suspend with TTBR0_EL1 set to
- 		 * reserved TTBR0 page tables and should be restored as such.
- 		 */
- 		if (mm == &init_mm)
--- 
-1.9.1
+> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+> ---
+>  arch/arm/mm/proc-v7.S | 5 ++++-
+>  1 file changed, 4 insertions(+), 1 deletion(-)
+>
+> diff --git a/arch/arm/mm/proc-v7.S b/arch/arm/mm/proc-v7.S
+> index 3d1054f..106ea4d 100644
+> --- a/arch/arm/mm/proc-v7.S
+> +++ b/arch/arm/mm/proc-v7.S
+> @@ -257,8 +257,11 @@ ENDPROC(cpu_pj4b_do_resume)
+>   *     It is assumed that:
+>   *     - cache type register is implemented
+>   */
+> -__v7_ca5mp_setup:
+>  __v7_ca9mp_setup:
+> +       mov     r10, #(1 << 0)                  @ Cache/TLB ops broadcasting
+> +       orr     r10, r10, #(1 << 2)             @ L1 prefetch
+> +       b       1f
+> +__v7_ca5mp_setup:
+>  __v7_cr7mp_setup:
+>         mov     r10, #(1 << 0)                  @ Cache/TLB ops broadcasting
+>         b       1f
+> --
+> 2.1.0
+>
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
