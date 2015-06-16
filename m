@@ -1,54 +1,40 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Tue, 16 Jun 2015 14:12:56 +0200
-Subject: [PATCH 0/9] ARM: mvebu: add suspend to RAM support for Armada 38x
-Message-ID: <1434456785-23696-1-git-send-email-thomas.petazzoni@free-electrons.com>
+Date: Tue, 16 Jun 2015 14:12:59 +0200
+Subject: [PATCH 3/9] ARM: mvebu: do not check machine in mvebu_pm_init()
+In-Reply-To: <1434456785-23696-1-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1434456785-23696-1-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1434456785-23696-4-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+The mvebu_pm_init() initializes the support for suspend/resume, and
+before doing that, it checks if we are on a board on which
+suspend/resume is actually supported. However, this check is already
+done by mvebu_armada_xp_gp_pm_init(), and there is no need to
+duplicate the check: callers of mvebu_pm_init() should now what they
+are doing.
 
-This patch series adds suspend to RAM support for the Armada 38x SoC,
-and especially the Armada 388 GP board. It has been tested on Armada
-XP GP little and big endian, and on Armada 388 GP little and big
-endian.
+This commit is done in preparation to the addition of suspend/resume
+support on Armada 38x.
 
-The first patch is really a fix, that makes Armada XP GP suspend to
-RAM work in big endian configurations.
+Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+---
+ arch/arm/mach-mvebu/pm.c | 3 ---
+ 1 file changed, 3 deletions(-)
 
-Then patches 2 to 5 are preparation patches, and patches 6 to 9
-implement the suspend/resume support for Armada 38x itself, with first
-the code changes, and then the Device Tree changes.
-
-This is obviously not intended for 4.2, but for 4.3.
-
-Best regards,
-
-Thomas
-
-Nadav Haklai (1):
-  ARM: mvebu: prepare set_cpu_coherent() for future extension
-
-Thomas Petazzoni (8):
-  ARM: mvebu: fix suspend to RAM on big-endian configurations
-  ARM: mvebu: do not check machine in mvebu_pm_init()
-  ARM: mvebu: prepare mvebu_pm_store_bootinfo() to support multiple SoCs
-  ARM: mvebu: prepare pm-board.c for the introduction of Armada 38x
-    support
-  ARM: mvebu: add suspend/resume support for Armada 38x
-  ARM: mvebu: add suspend/resume related definitions in Armada 38x
-    Device Tree
-  ARM: mvebu: add suspend/resume DT information for Armada 388 GP
-  ARM: mvebu: adjust board name and compatible for Armada 388 GP
-
- arch/arm/boot/dts/armada-388-gp.dts | 20 +++++++++--
- arch/arm/boot/dts/armada-38x.dtsi   |  7 +++-
- arch/arm/mach-mvebu/board-v7.c      |  1 +
- arch/arm/mach-mvebu/coherency.c     | 33 +++++++++++-------
- arch/arm/mach-mvebu/pm-board.c      | 28 ++++++++-------
- arch/arm/mach-mvebu/pm.c            | 69 +++++++++++++++++++++++++++++++++----
- arch/arm/mach-mvebu/pmsu.h          |  1 +
- arch/arm/mach-mvebu/pmsu_ll.S       | 43 +++++++++++++++++++++++
- 8 files changed, 168 insertions(+), 34 deletions(-)
-
+diff --git a/arch/arm/mach-mvebu/pm.c b/arch/arm/mach-mvebu/pm.c
+index 6573a8f..eca650b 100644
+--- a/arch/arm/mach-mvebu/pm.c
++++ b/arch/arm/mach-mvebu/pm.c
+@@ -182,9 +182,6 @@ int mvebu_pm_init(void (*board_pm_enter)(void __iomem *sdram_reg, u32 srcmd))
+ 	struct device_node *np;
+ 	struct resource res;
+ 
+-	if (!of_machine_is_compatible("marvell,armadaxp"))
+-		return -ENODEV;
+-
+ 	np = of_find_compatible_node(NULL, NULL,
+ 				     "marvell,armada-xp-sdram-controller");
+ 	if (!np)
 -- 
 2.1.0
