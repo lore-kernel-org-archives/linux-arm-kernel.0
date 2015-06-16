@@ -1,54 +1,67 @@
-From: vaibhav.hiremath@linaro.org (Vaibhav Hiremath)
-Date: Tue, 16 Jun 2015 13:58:59 +0530
-Subject: [PATCH-RESEND 0/3] i2c: core/pxa: Add support for hardware lock
-In-Reply-To: <1433270731-23790-1-git-send-email-vaibhav.hiremath@linaro.org>
-References: <vaibhav.hiremath@linaro.org>
- <1433270731-23790-1-git-send-email-vaibhav.hiremath@linaro.org>
-Message-ID: <557FDE4B.3060304@linaro.org>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Tue, 16 Jun 2015 09:30:59 +0100
+Subject: [PATCH] arm64: KVM: Optimize arm64 guest exit VFP/SIMD register
+ save/restore
+In-Reply-To: <557F922A.6070306@samsung.com>
+References: <557CACC4.8040405@samsung.com> <557EA23D.4090200@arm.com>
+ <557F13A5.9030603@samsung.com> <557F1765.8040405@arm.com>
+ <557F922A.6070306@samsung.com>
+Message-ID: <557FDEC3.3090308@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On 16/06/15 04:04, Mario Smarduch wrote:
+> On 06/15/2015 11:20 AM, Marc Zyngier wrote:
+>> On 15/06/15 19:04, Mario Smarduch wrote:
+>>> On 06/15/2015 03:00 AM, Marc Zyngier wrote:
+>>>> Hi Mario,
+>>>>
+> [ ... ]
+>>>>
+>>>> On 13/06/15 23:20, Mario Smarduch wrote:
+>>>>> Currently VFP/SIMD registers are always saved and restored
+>>>>> on Guest entry and exit.
+>>>>>
+>>>>> This patch only saves and restores VFP/SIMD registers on
+>>>>> Guest access. To do this cptr_el2 VFP/SIMD trap is set
+>>>>> on Guest entry and later checked on exit. This follows
+>>>>> the ARMv7 VFPv3 implementation. Running an informal test
+>>>>> there are high number of exits that don't access VFP/SIMD
+>>>>> registers.
+>>>>
+>>>> It would be good to add some numbers here. How often do we exit without
+>>>> having touched the FPSIMD regs? For which workload?
+>>>
+>>> Lmbench is what I typically use, with ssh server, i.e., cause page
+>>> faults and interrupts - usually registers are not touched.
+>>> I'll run the tests again and define usually.
+>>>
+>>> Any other loads you had in mind?
+>>
+>> Not really (apart from running hackbench, of course...;-). I'd just like
+>> to see the numbers in the commit message, so that we can document the
+>> improvement (and maybe track regressions).
+> 
+> Hi Marc,
+>    some ballpark numbers.
+> 
+>    hackbench about 30% of the time optimized path is taken
+> (for 10*40 test).
+> 
+> Lmbench3 upwards of 50% for context switching, memory bw,
+> pipe, proc creation, sys call. There are lot more tests
+> but I limited to these tests. In addition other processes
+> are running in background NTP, SSH, ... doing their own
+> thing.
+> 
+> I added a tmp counter to kvm_vcpu_arch to count vfpsimd
+> events.
 
-
-On Wednesday 03 June 2015 12:15 AM, Vaibhav Hiremath wrote:
-> To justify the need for hardware lock, lets take a real usecase scenario -
->
-> In case of Marvell SoC, PXA910 silicon, both AP and CP are present and
-> these two ARM cores are sharing one pair of I2C pins.
->
-> In order to keep I2C transaction operated with atomic, hardware lock
-> (RIPC) is required.
->
-> This patch extends support for atomic operation by adding hardware lock support
-> to the i2c-core.
->
-> PATCH[1/3] : Core changes for hardware lock
-> PATCH[2/3 & 3/3] : hardware lock support to i2c-pxa bus driver.
->
-> Link to previous post:
-> http://lkml.iu.edu/hypermail/linux/kernel/1104.3/02352.html
-> http://lkml.iu.edu/hypermail/linux/kernel/1104.3/02353.html
-> http://lkml.iu.edu/hypermail/linux/kernel/1104.3/02354.html
->
-> TODO:
->    - DT node addition
->      I am using PXA1928 based platform which is still not available
->      in Mainline, so it is based on, below patch-series
->      Link to Rob's patches:
->       https://lkml.org/lkml/2015/5/1/14
->       https://lkml.org/lkml/2015/5/19/1206
->      PMIC 88pm860 support
->       http://www.spinics.net/lists/arm-kernel/msg422554.html
->
-> Vaibhav Hiremath (3):
->    i2c: core: append hardware lock with bus lock
->    i2c: pxa: Add support for hardware lock
->    i2c: pxa: Add pin ctrl support for CP core access
->
-
-Wolfram,
-
-Any update on this patch-series?
+That looks good. Please include these numbers in the commit message for
+v2 of that patch.
 
 Thanks,
-Vaibhav
+
+	M.
+-- 
+Jazz is not dead. It just smells funny...
