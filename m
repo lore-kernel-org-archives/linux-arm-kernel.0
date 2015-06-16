@@ -1,51 +1,125 @@
 From: robherring2@gmail.com (Rob Herring)
-Date: Tue, 16 Jun 2015 08:22:07 -0500
-Subject: [PATCH-V2 12/12] Documentation: binding: add sclk adjustment
- properties to i2c-pxa
-In-Reply-To: <1434383399-2370-13-git-send-email-vaibhav.hiremath@linaro.org>
-References: <vaibhav.hiremath@linaro.org>
- <1434383399-2370-1-git-send-email-vaibhav.hiremath@linaro.org>
- <1434383399-2370-13-git-send-email-vaibhav.hiremath@linaro.org>
-Message-ID: <CAL_JsqKu0BFLU8JdxDwrkn2SZTQPX6GYu2AFOYP49zknfu28Tw@mail.gmail.com>
+Date: Tue, 16 Jun 2015 08:02:33 -0500
+Subject: [PATCH 1/4] mfd: 88pm800: add device tree support
+In-Reply-To: <557FD5AD.5020405@linaro.org>
+References: <1432937962-4537-1-git-send-email-vaibhav.hiremath@linaro.org>
+ <1432937962-4537-2-git-send-email-vaibhav.hiremath@linaro.org>
+ <20150601083835.GE3329@x1> <557FD5AD.5020405@linaro.org>
+Message-ID: <CAL_Jsq+6yk59Z4swi2xq4=_=m89pBUt-fNXJF8smjw7qS8xazA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 15, 2015 at 10:49 AM, Vaibhav Hiremath
+On Tue, Jun 16, 2015 at 2:52 AM, Vaibhav Hiremath
 <vaibhav.hiremath@linaro.org> wrote:
-> With addition of PXA910 family of devices, the TWSI module supports
-> new feature which allows us to adjust SCLK.
-> With DT properties i2c-pxa driver takes input configuration
-> in nsec and converts it to respective bit-fields,
 >
->  - i2c-sclk-low-time-ns : SCLK low time (tlow)
->    This property is used along with mode selection.
->  - i2c-sclk-high-time-ns : SCLK high time (thigh)
 >
-> Signed-off-by: Vaibhav Hiremath <vaibhav.hiremath@linaro.org>
-> ---
->  Documentation/devicetree/bindings/i2c/i2c-pxa.txt | 13 +++++++++++++
->  1 file changed, 13 insertions(+)
+> On Monday 01 June 2015 02:08 PM, Lee Jones wrote:
+>>
+>> On Sat, 30 May 2015, Vaibhav Hiremath wrote:
+>>
 >
-> diff --git a/Documentation/devicetree/bindings/i2c/i2c-pxa.txt b/Documentation/devicetree/bindings/i2c/i2c-pxa.txt
-> index 9657db5..0fafd91 100644
-> --- a/Documentation/devicetree/bindings/i2c/i2c-pxa.txt
-> +++ b/Documentation/devicetree/bindings/i2c/i2c-pxa.txt
-> @@ -23,12 +23,25 @@ Optional properties :
->   - i2c-disable-after-xfer : If set, driver will disable I2C module
->     after msg xfer and enable it again before xfer.
+> Thanks for your review. and sorry for delayed response.
 >
-> +   (Applicable to PXA910 family):
-> +
-> + - i2c-sclk-low-time-ns : SCLK low time (tlow), for standard/fast/high
-> +   speed mode.
-> +   This property is used along with mode selection. Driver uses this property
-> +   to set low/high time for standard and fast speed mode, as counter bit-field
-> +   is same for both.
+>>> Add DT support to the 88pm800 driver along with below properties
+>>>         - marvell,88pm800-irq-write-clear :
+>>>           Idicates whether interrupt status is cleared by write
+>>>
+>>> Also, creates the DT binding text file,
+>>> Documentation/devicetree/bindings/mfd/88pm800.txt
+>>>
+>>> Signed-off-by: Chao Xie <chao.xie@marvell.com>
+>>> Signed-off-by: Vaibhav Hiremath <vaibhav.hiremath@linaro.org>
+>>> ---
+>>>   Documentation/devicetree/bindings/mfd/88pm800.txt | 57
+>>> +++++++++++++++++++++++
+>>>   drivers/mfd/88pm800.c                             | 39 ++++++++++++++++
+>>
+>>
+>> These should be submitted separately.
+>>
+>
+>
+> Ok, will separate it in next version.
+>
+>
+>>>   2 files changed, 96 insertions(+)
+>>>   create mode 100644 Documentation/devicetree/bindings/mfd/88pm800.txt
+>>>
+>>> diff --git a/Documentation/devicetree/bindings/mfd/88pm800.txt
+>>> b/Documentation/devicetree/bindings/mfd/88pm800.txt
+>>> new file mode 100644
+>>> index 0000000..094951b
+>>> --- /dev/null
+>>> +++ b/Documentation/devicetree/bindings/mfd/88pm800.txt
+>>> @@ -0,0 +1,57 @@
+>>> +* Marvell 88PM800 Power Management IC
 
-This belongs below both properties, and it should be clear that both
-properties are required if present.
+Might as well name this 88PM8xx from the start.
 
-> + - i2c-sclk-high-time-ns : SCLK high time (thigh), Used in case of high speed
-> +   mode.
+>>> +
+>>> +Required parent device properties:
+>>> +- compatible : "marvell,88pm800"
+
+You might as well include 88pm805 and 88pm860 here since 805 support
+is in the kernel and you will be submitting 860 support. They don't
+have to be added with driver support.
+
+>>> +- reg : the I2C slave address for the 88pm800 chip
+>>> +- interrupts : IRQ line for the 88pm800 chip
+>>> +- interrupt-controller: describes the 88pm800 as an interrupt controller
+>>> +- #interrupt-cells : should be 1.
+>>> +               - The cell is the 88pm800 local IRQ number
+>>> +
+>>> +Optional parent device properties:
+>>> +- marvell,88pm800-irq-write-clr: indicates whether interrupt status is
+>>> cleared by write
+>>
+>>
+>> Drop the device name.  These bindings should be as generic as possible.
+>>
+>
+> OK, how about simply
+>
+> "mfd-irq_clr_on_write"
+
+No, mfd is a Linux name which doesn't belong in bindings, and
+underscores are generally not used.
+
+I think Lee meant marvell,irq-write-clr or irq-write-clr.
+
+This could also just be dropped altogether and set based on the
+compatible strings with match data.
+
+>> Also describe what the absence of the property means.
+>>
+>
+> Ok.
+>
+>>> +88pm800 consists of a large and varied group of sub-devices:
+>>
+>>
+>> 3?
+>>
+>
+> I have explicitly mentioned in note that more device list will follow.
+> I just wanted to add entries as and when we add/enable driver support.
+>
+>>> +Device                  Supply Names    Description
+>>> +------                  ------------    -----------
+>>> +88pm80x-onkey          :               : On key
+>>> +88pm80x-rtc            :               : RTC
+>>> +88pm80x                        :               : Regulators
+>>
+>>
+>> Surely regulators is 88pm80x-regulator, no?
+>>
+>
+> did not understand what change is expected here.
+
+The node name for regulators node should be 88pm80x-regulator? But
+these don't correspond to node names based on the example and the
+example is correct IMO. So these are Linux driver names? If so, they
+don't belong in the binding doc. What you need is to document the
+sub-node compatible strings
 
 Rob
