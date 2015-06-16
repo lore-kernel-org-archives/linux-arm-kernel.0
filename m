@@ -1,66 +1,58 @@
-From: matthias.bgg@gmail.com (Matthias Brugger)
-Date: Tue, 16 Jun 2015 16:23:35 +0200
-Subject: [PATCH v4 3/3] clk: mediatek: Use regmap clk-mux for mt8135
-In-Reply-To: <1434464615-9080-1-git-send-email-matthias.bgg@gmail.com>
-References: <1434464615-9080-1-git-send-email-matthias.bgg@gmail.com>
-Message-ID: <1434464615-9080-4-git-send-email-matthias.bgg@gmail.com>
+From: vaibhav.hiremath@linaro.org (Vaibhav Hiremath)
+Date: Tue, 16 Jun 2015 19:55:58 +0530
+Subject: [PATCH-V2 12/12] Documentation: binding: add sclk adjustment
+ properties to i2c-pxa
+In-Reply-To: <CAL_JsqKu0BFLU8JdxDwrkn2SZTQPX6GYu2AFOYP49zknfu28Tw@mail.gmail.com>
+References: <vaibhav.hiremath@linaro.org>
+ <1434383399-2370-1-git-send-email-vaibhav.hiremath@linaro.org>
+ <1434383399-2370-13-git-send-email-vaibhav.hiremath@linaro.org>
+ <CAL_JsqKu0BFLU8JdxDwrkn2SZTQPX6GYu2AFOYP49zknfu28Tw@mail.gmail.com>
+Message-ID: <558031F6.5050107@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The pericfg controller is used by various device drivers, so that it
-is implemented via a regmap. In the actual clk implementation for
-mt8135, some clk-mux use the traditional register approach which
-acceses the register via iomem.
-This patch changes the use from iomem to the needed regmap.
 
-Signed-off-by: Matthias Brugger <matthias.bgg@gmail.com>
----
- drivers/clk/mediatek/clk-mt8135.c | 21 +++++++--------------
- 1 file changed, 7 insertions(+), 14 deletions(-)
 
-diff --git a/drivers/clk/mediatek/clk-mt8135.c b/drivers/clk/mediatek/clk-mt8135.c
-index 08b4b84..c28a9d4 100644
---- a/drivers/clk/mediatek/clk-mt8135.c
-+++ b/drivers/clk/mediatek/clk-mt8135.c
-@@ -513,11 +513,11 @@ static const char * const uart_ck_sel_parents[] __initconst = {
- 	"uart_sel",
- };
- 
--static const struct mtk_composite peri_clks[] __initconst = {
--	MUX(CLK_PERI_UART0_SEL, "uart0_ck_sel", uart_ck_sel_parents, 0x40c, 0, 1),
--	MUX(CLK_PERI_UART1_SEL, "uart1_ck_sel", uart_ck_sel_parents, 0x40c, 1, 1),
--	MUX(CLK_PERI_UART2_SEL, "uart2_ck_sel", uart_ck_sel_parents, 0x40c, 2, 1),
--	MUX(CLK_PERI_UART3_SEL, "uart3_ck_sel", uart_ck_sel_parents, 0x40c, 3, 1),
-+static const struct mtk_regm_mux peri_clks[] __initconst = {
-+	MUX_REGMAP(CLK_PERI_UART0_SEL, "uart0_ck_sel", uart_ck_sel_parents, 0x40c, 0, 1),
-+	MUX_REGMAP(CLK_PERI_UART1_SEL, "uart1_ck_sel", uart_ck_sel_parents, 0x40c, 1, 1),
-+	MUX_REGMAP(CLK_PERI_UART2_SEL, "uart2_ck_sel", uart_ck_sel_parents, 0x40c, 2, 1),
-+	MUX_REGMAP(CLK_PERI_UART3_SEL, "uart3_ck_sel", uart_ck_sel_parents, 0x40c, 3, 1),
- };
- 
- static void __init mtk_topckgen_init(struct device_node *node)
-@@ -573,20 +573,13 @@ static void __init mtk_pericfg_init(struct device_node *node)
- {
- 	struct clk_onecell_data *clk_data;
- 	int r;
--	void __iomem *base;
--
--	base = of_iomap(node, 0);
--	if (!base) {
--		pr_err("%s(): ioremap failed\n", __func__);
--		return;
--	}
- 
- 	clk_data = mtk_alloc_clk_data(CLK_PERI_NR_CLK);
- 
- 	mtk_clk_register_gates(node, peri_gates, ARRAY_SIZE(peri_gates),
- 						clk_data);
--	mtk_clk_register_composites(peri_clks, ARRAY_SIZE(peri_clks), base,
--			&mt8135_clk_lock, clk_data);
-+	mtk_clk_regm_register_mux(node, peri_clks, ARRAY_SIZE(peri_clks),
-+			clk_data);
- 
- 	r = of_clk_add_provider(node, of_clk_src_onecell_get, clk_data);
- 	if (r)
--- 
-1.9.1
+On Tuesday 16 June 2015 06:52 PM, Rob Herring wrote:
+> On Mon, Jun 15, 2015 at 10:49 AM, Vaibhav Hiremath
+> <vaibhav.hiremath@linaro.org> wrote:
+>> With addition of PXA910 family of devices, the TWSI module supports
+>> new feature which allows us to adjust SCLK.
+>> With DT properties i2c-pxa driver takes input configuration
+>> in nsec and converts it to respective bit-fields,
+>>
+>>   - i2c-sclk-low-time-ns : SCLK low time (tlow)
+>>     This property is used along with mode selection.
+>>   - i2c-sclk-high-time-ns : SCLK high time (thigh)
+>>
+>> Signed-off-by: Vaibhav Hiremath <vaibhav.hiremath@linaro.org>
+>> ---
+>>   Documentation/devicetree/bindings/i2c/i2c-pxa.txt | 13 +++++++++++++
+>>   1 file changed, 13 insertions(+)
+>>
+>> diff --git a/Documentation/devicetree/bindings/i2c/i2c-pxa.txt b/Documentation/devicetree/bindings/i2c/i2c-pxa.txt
+>> index 9657db5..0fafd91 100644
+>> --- a/Documentation/devicetree/bindings/i2c/i2c-pxa.txt
+>> +++ b/Documentation/devicetree/bindings/i2c/i2c-pxa.txt
+>> @@ -23,12 +23,25 @@ Optional properties :
+>>    - i2c-disable-after-xfer : If set, driver will disable I2C module
+>>      after msg xfer and enable it again before xfer.
+>>
+>> +   (Applicable to PXA910 family):
+>> +
+>> + - i2c-sclk-low-time-ns : SCLK low time (tlow), for standard/fast/high
+>> +   speed mode.
+>> +   This property is used along with mode selection. Driver uses this property
+>> +   to set low/high time for standard and fast speed mode, as counter bit-field
+>> +   is same for both.
+>
+> This belongs below both properties, and it should be clear that both
+> properties are required if present.
+>
+
+Technically, both properties are required only in case of high_mode.
+
+As mentioned above, in case of standard and fast mode we use tLow value.
+
+Thanks,
+Vaibhav
