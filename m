@@ -1,47 +1,27 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Tue, 16 Jun 2015 10:16:19 +0100
-Subject: [PATCH v2] ARM: tegra124: pmu support
-In-Reply-To: <1434393968-1105-1-git-send-email-khuey@kylehuey.com>
-References: <1434393968-1105-1-git-send-email-khuey@kylehuey.com>
-Message-ID: <20150616091619.GA17817@leverpostej>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Tue, 16 Jun 2015 11:19:14 +0200
+Subject: RCU stall in af_unix.c, should use spin_lock_irqsave?
+In-Reply-To: <6E9AD71A-9E19-437F-A94B-D8B267F533EA@opengear.com>
+References: <6E9AD71A-9E19-437F-A94B-D8B267F533EA@opengear.com>
+Message-ID: <20150616111914.1c00e197@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 15, 2015 at 07:46:08PM +0100, Kyle Huey wrote:
-> This patch modifies the device tree for tegra124 based devices to enable the Cortex A15 PMU.  The interrupt numbers are taken from NVIDIA TRM DP-06905-001_v03p.  This patch was tested on a Jetson TK1.
-> 
-> Signed-off-by: Kyle Huey <khuey@kylehuey.com>
-> ---
->  arch/arm/boot/dts/tegra124.dtsi | 8 ++++++++
->  1 file changed, 8 insertions(+)
-> 
-> diff --git a/arch/arm/boot/dts/tegra124.dtsi b/arch/arm/boot/dts/tegra124.dtsi
-> index 4be06c6..d966d4e 100644
-> --- a/arch/arm/boot/dts/tegra124.dtsi
-> +++ b/arch/arm/boot/dts/tegra124.dtsi
-> @@ -906,16 +906,24 @@
->  
->  		cpu at 3 {
->  			device_type = "cpu";
->  			compatible = "arm,cortex-a15";
->  			reg = <3>;
->  		};
->  	};
->  
-> +	pmu {
-> +		compatible = "arm,cortex-a15-pmu";
-> +		interrupts = <GIC_SPI 144 IRQ_TYPE_LEVEL_HIGH>,
-> +			     <GIC_SPI 145 IRQ_TYPE_LEVEL_HIGH>,
-> +			     <GIC_SPI 146 IRQ_TYPE_LEVEL_HIGH>,
-> +			     <GIC_SPI 147 IRQ_TYPE_LEVEL_HIGH>;
-> +	};
+Hello,
 
-As these are SPIs, you should fill in the interrupt-affinity property
-(see Documentation/devicetree/bindings/arm/pmu.txt). That'll avoid
-potential problems with CPU renumbering, and prevent the kernel from
-complaining at boot time.
+On Tue, 16 Jun 2015 19:17:50 +1000, Ken Wilson wrote:
 
-Otherwise, this looks fine.
+> We?re running into this issue (stall on the on_each_cpu call in mvpp2) on our customer?s Armada 375 platform
+> Did you make any progress with fixes to the mvpp2 driver?
 
-Thanks,
-Mark.
+We do have some patches, but there are still not fixing the problem
+entirely, unfortunately. This is a topic to which we need to put some
+effort. I'll have a look at what we can do.
+
+Best regards,
+
+Thomas
+-- 
+Thomas Petazzoni, CTO, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
