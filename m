@@ -1,47 +1,39 @@
-From: fabien.dessenne@st.com (Fabien Dessenne)
-Date: Tue, 16 Jun 2015 15:30:40 +0200
-Subject: [PATCH] ARM: DT: STiH410: Add bdisp dt nodes
-Message-ID: <1434461440-3965-1-git-send-email-fabien.dessenne@st.com>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Tue, 16 Jun 2015 15:31:24 +0200
+Subject: [BUG] at91: macb: does not work
+In-Reply-To: <5580205B.1030804@aksignal.cz>
+References: <5580205B.1030804@aksignal.cz>
+Message-ID: <20150616133124.GB6549@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the bdisp (2D blitter for STMicroelectronics SoC) dt nodes for the
-first of the two bdisp devices, defining register address, interrupt and
-clock.
+Hi,
 
-Signed-off-by: Fabien Dessenne <fabien.dessenne@st.com>
----
- arch/arm/boot/dts/stih410.dtsi | 12 ++++++++++++
- 1 file changed, 12 insertions(+)
+On 16/06/2015 at 15:10:51 +0200, Ji?? Prchal wrote :
+> Hi,
+> in v4.1-rc8 does not work ethernet. It normally gets up, but no data are going through.
+> 
+> [    4.400000] macb f802c000.ethernet (unnamed net_device) (uninitialized): invalid hw address, using random
+> [    4.510000] macb f802c000.ethernet eth0: Cadence MACB rev 0x0001010c at 0xf802c000 irq 37 (52:30:8f:6b:9c:b7)
+> [    4.520000] macb f802c000.ethernet eth0: attached PHY driver [Generic PHY] (mii_bus:phy_addr=f802c000.etherne:03, irq=-1)
+> [   15.510000] macb f802c000.ethernet eth0: link up (100/Full)
+> 
+> / # ip -s link ls eth0
+> 2: eth0: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 qdisc pfifo_fast state UP mode DEFAULT group default qlen 1000
+>     link/ether a2:61:fe:17:65:b1 brd ff:ff:ff:ff:ff:ff
+>     RX: bytes  packets  errors  dropped overrun mcast
+>     0          0        0       0       0       0
+>     TX: bytes  packets  errors  dropped carrier collsns
+>     0          0        0       0       0       0
+> 
+> In v4.0.5 it's working.
+> 
 
-diff --git a/arch/arm/boot/dts/stih410.dtsi b/arch/arm/boot/dts/stih410.dtsi
-index 208b5e8..6f40bc9 100644
---- a/arch/arm/boot/dts/stih410.dtsi
-+++ b/arch/arm/boot/dts/stih410.dtsi
-@@ -10,6 +10,10 @@
- #include "stih407-family.dtsi"
- #include "stih410-pinctrl.dtsi"
- / {
-+	aliases {
-+		bdisp0 = &bdisp0;
-+	};
-+
- 	soc {
- 		usb2_picophy1: phy2 {
- 			compatible = "st,stih407-usb2-phy";
-@@ -218,5 +222,13 @@
- 				};
- 			};
- 		};
-+
-+		bdisp0:bdisp at 9f10000 {
-+			compatible = "st,stih407-bdisp";
-+			reg = <0x9f10000 0x1000>;
-+			interrupts = <GIC_SPI 38 IRQ_TYPE_NONE>;
-+			clock-names = "bdisp";
-+			clocks = <&clk_s_c0_flexgen CLK_IC_BDISP_0>;
-+		};
- 	};
- };
+You probably have an issue in your device tree. I've just tested both
+interfaces of my sama5d3 xplained and they are working fine.
+
+
 -- 
-1.9.1
+Alexandre Belloni, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
