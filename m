@@ -1,8 +1,8 @@
 From: rmk+kernel@arm.linux.org.uk (Russell King)
-Date: Tue, 16 Jun 2015 23:06:50 +0100
-Subject: [PATCH 7/9] gpio: gpio-tegra: fix race in installing chained IRQ
+Date: Tue, 16 Jun 2015 23:07:01 +0100
+Subject: [PATCH 9/9] irq: spear-shirq: fix race in installing chained IRQ
  handler
-Message-ID: <E1Z4z0M-0002Sl-Ti@rmk-PC.arm.linux.org.uk>
+Message-ID: <E1Z4z0X-0002T1-6U@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -14,23 +14,22 @@ Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 ---
 Depends on patch 1.
 
- drivers/gpio/gpio-tegra.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+ drivers/irqchip/spear-shirq.c | 3 +--
+ 1 file changed, 1 insertion(+), 2 deletions(-)
 
-diff --git a/drivers/gpio/gpio-tegra.c b/drivers/gpio/gpio-tegra.c
-index 1741981d53c8..56dcc8ed98de 100644
---- a/drivers/gpio/gpio-tegra.c
-+++ b/drivers/gpio/gpio-tegra.c
-@@ -515,8 +515,8 @@ static int tegra_gpio_probe(struct platform_device *pdev)
- 	for (i = 0; i < tegra_gpio_bank_count; i++) {
- 		bank = &tegra_gpio_banks[i];
+diff --git a/drivers/irqchip/spear-shirq.c b/drivers/irqchip/spear-shirq.c
+index 9c145a7cb056..a45121546caf 100644
+--- a/drivers/irqchip/spear-shirq.c
++++ b/drivers/irqchip/spear-shirq.c
+@@ -207,8 +207,7 @@ static void __init spear_shirq_register(struct spear_shirq *shirq,
+ 	if (!shirq->irq_chip)
+ 		return;
  
--		irq_set_chained_handler(bank->irq, tegra_gpio_irq_handler);
--		irq_set_handler_data(bank->irq, bank);
-+		irq_set_chained_handler_and_data(bank->irq,
-+						 tegra_gpio_irq_handler, bank);
+-	irq_set_chained_handler(parent_irq, shirq_handler);
+-	irq_set_handler_data(parent_irq, shirq);
++	irq_set_chained_handler_and_data(parent_irq, shirq_handler, shirq);
  
- 		for (j = 0; j < 4; j++)
- 			spin_lock_init(&bank->lvl_lock[j]);
+ 	for (i = 0; i < shirq->nr_irqs; i++) {
+ 		irq_set_chip_and_handler(shirq->virq_base + i,
 -- 
 2.1.0
