@@ -1,36 +1,146 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Tue, 16 Jun 2015 17:08:29 -0500
-Subject: [PATCH 2/2] cpufreq: dt: allow driver to boot automatically
-In-Reply-To: <CAJZ5v0hO+Rbcyq8Gcpecdw9rGW1Qdhrmj6X6TVtRpLOxQKW+=g@mail.gmail.com>
-References: <1431115050-23693-1-git-send-email-balbi@ti.com>
- <1431115050-23693-2-git-send-email-balbi@ti.com>
- <20150616214032.GA4313@saruman.tx.rr.com>
- <CAJZ5v0hO+Rbcyq8Gcpecdw9rGW1Qdhrmj6X6TVtRpLOxQKW+=g@mail.gmail.com>
-Message-ID: <20150616220829.GB4313@saruman.tx.rr.com>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Tue, 16 Jun 2015 15:29:25 -0700
+Subject: [PATCH v5 04/11] nvmem: Add a simple NVMEM framework for consumers
+In-Reply-To: <1432226593-8817-1-git-send-email-srinivas.kandagatla@linaro.org>
+References: <1432226535-8640-1-git-send-email-srinivas.kandagatla@linaro.org>
+ <1432226593-8817-1-git-send-email-srinivas.kandagatla@linaro.org>
+Message-ID: <5580A345.30204@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 17, 2015 at 12:04:07AM +0200, Rafael J. Wysocki wrote:
-> On Tue, Jun 16, 2015 at 11:40 PM, Felipe Balbi <balbi@ti.com> wrote:
-> > On Fri, May 08, 2015 at 02:57:30PM -0500, Felipe Balbi wrote:
-> >> by adding the missing MODULE_ALIAS(), cpufreq-dt
-> >> can be autoloaded by udev/systemd.
-> >>
-> >> Signed-off-by: Felipe Balbi <balbi@ti.com>
-> >
-> > looks like this wasn't applied anywhere. Viresh, can you apply this
-> > patch please ?
-> 
-> I've overlooked it, sorry about that.  Applied now, thanks!
+On 05/21/2015 09:43 AM, Srinivas Kandagatla wrote:
+> @@ -379,6 +380,351 @@ int nvmem_unregister(struct nvmem_device *nvmem)
+[...]
+> +
+> +	return nvmem;
+> +}
+> +
+> +static int __nvmem_device_put(struct nvmem_device *nvmem)
 
-Thanks Rafael.
+Why does this return int? It's not used anywhere.
+
+> +{
+> +	module_put(nvmem->owner);
+> +	mutex_lock(&nvmem_mutex);
+> +	nvmem->users--;
+> +	mutex_unlock(&nvmem_mutex);
+> +
+> +	return 0;
+> +}
+> +
+> +static struct nvmem_cell *nvmem_cell_get_from_list(const char *cell_id)
+> +{
+> +	struct nvmem_cell *cell = NULL;
+> +	struct nvmem_device *nvmem;
+> +
+> +	nvmem = __nvmem_device_get(NULL, &cell, cell_id);
+> +	if (IS_ERR(nvmem))
+> +		return (struct nvmem_cell *)nvmem;
+
+ERR_CAST?
+
+> +
+> +
+> +	return cell;
+> +
+> +}
+> +
+> +static struct nvmem_cell *of_nvmem_cell_get(struct device_node *np,
+> +					    const char *name)
+> +{
+> +	struct device_node *cell_np, *nvmem_np;
+> +	struct nvmem_cell *cell;
+> +	struct nvmem_device *nvmem;
+> +	const __be32 *addr;
+> +	int rval, len, index;
+> +
+> +	index = of_property_match_string(np, "nvmem-cell-names", name);
+> +
+> +	cell_np = of_parse_phandle(np, "nvmem-cell", index);
+> +	if (!cell_np)
+> +		return ERR_PTR(-EINVAL);
+> +
+> +	nvmem_np = of_get_next_parent(cell_np);
+> +	if (!nvmem_np)
+> +		return ERR_PTR(-EINVAL);
+> +
+> +	nvmem = __nvmem_device_get(nvmem_np, NULL, NULL);
+> +	if (IS_ERR(nvmem))
+> +		return (struct nvmem_cell *)nvmem;
+
+ERR_CAST?
+
+> +
+> +	addr = of_get_property(cell_np, "reg", &len);
+> +	if (!addr || (len < 2 * sizeof(int))) {
+> +		dev_err(&nvmem->dev, "of_i2c: invalid reg on %s\n",
+
+huh? of_i2c?
+
+
+> +
+> +	/* if it's not end on byte boundary */
+> +	if ((nbits + bit_offset) % BITS_PER_BYTE) {
+> +		/* setup the last byte with msb bits from nvmem */
+> +		rc = regmap_raw_read(nvmem->regmap,
+> +				    cell->offset + cell->bytes - 1, &v, 1);
+> +		*p |= GENMASK(7, (nbits + bit_offset) % BITS_PER_BYTE) & v;
+> +
+> +	}
+> +
+> +	return buf;
+> +}
+> +
+> +/**
+> + * nvmem_cell_write(): Write to a given nvmem cell
+
+This isn't kernel doc notation. It should be like
+
+    nvmem_cell_write - Write to a given nvmem cell
+
+> + *
+> + * @cell: nvmem cell to be written.
+> + * @buf: Buffer to be written.
+> + * @len: length of buffer to be written to nvmem cell.
+> + *
+> + * The return value will be an length of bytes written or non zero on failure.
+> + */
+> +int nvmem_cell_write(struct nvmem_cell *cell, void *buf, ssize_t len)
+[..]
+> +
+>  static int nvmem_init(void)
+>  {
+>  	return class_register(&nvmem_class);
+> diff --git a/include/linux/nvmem-consumer.h b/include/linux/nvmem-consumer.h
+> new file mode 100644
+> index 0000000..c3fa8c7
+> --- /dev/null
+> +++ b/include/linux/nvmem-consumer.h
+> @@ -0,0 +1,49 @@
+> +/*
+> + * nvmem framework consumer.
+> + *
+> + * Copyright (C) 2015 Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
+> + * Copyright (C) 2013 Maxime Ripard <maxime.ripard@free-electrons.com>
+> + *
+> + * This file is licensed under the terms of the GNU General Public
+> + * License version 2.  This program is licensed "as is" without any
+> + * warranty of any kind, whether express or implied.
+> + */
+> +
+> +#ifndef _LINUX_NVMEM_CONSUMER_H
+> +#define _LINUX_NVMEM_CONSUMER_H
+> +
+> +/* consumer cookie */
+> +struct nvmem_cell;
+> +
+> +#if IS_ENABLED(CONFIG_NVMEM)
+> +
+> +/* Cell based interface */
+> +struct nvmem_cell *nvmem_cell_get(struct device *dev, const char *name);
+
+We should probably forward declare struct device in this file too.
 
 -- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150616/de9514a8/attachment-0001.sig>
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
