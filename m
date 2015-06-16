@@ -1,56 +1,160 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Tue, 16 Jun 2015 17:36:41 +0300
-Subject: [PATCH 0/7] OMAPDSS: use components (fix probing problems)
-In-Reply-To: <1434449789-13812-1-git-send-email-tomi.valkeinen@ti.com>
-References: <1434449789-13812-1-git-send-email-tomi.valkeinen@ti.com>
-Message-ID: <358618591.Y41I6t5qpX@avalon>
+From: vaibhav.hiremath@linaro.org (Vaibhav Hiremath)
+Date: Tue, 16 Jun 2015 20:06:10 +0530
+Subject: [PATCH 1/4] mfd: 88pm800: add device tree support
+In-Reply-To: <CAL_Jsq+6yk59Z4swi2xq4=_=m89pBUt-fNXJF8smjw7qS8xazA@mail.gmail.com>
+References: <1432937962-4537-1-git-send-email-vaibhav.hiremath@linaro.org>
+ <1432937962-4537-2-git-send-email-vaibhav.hiremath@linaro.org>
+ <20150601083835.GE3329@x1> <557FD5AD.5020405@linaro.org>
+ <CAL_Jsq+6yk59Z4swi2xq4=_=m89pBUt-fNXJF8smjw7qS8xazA@mail.gmail.com>
+Message-ID: <5580345A.8080202@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tomi,
 
-Thank for the patches.
 
-On Tuesday 16 June 2015 13:16:22 Tomi Valkeinen wrote:
-> Hi,
-> 
-> I noticed that on some platforms omapdss did not probe successfully. Some
-> resource was not available yet, but omapdss did not manage to handle
-> deferred probing. The reason was the use of platform_driver_probe() in
-> combination with how the omapdss module handles the drivers.
-> 
-> To fix this properly, the component system felt fine for the job, and it
-> seems to work nicely.
-> 
->  Tomi
-> 
-> Tomi Valkeinen (7):
->   OMAPDSS: move 'dss_initialized' to dss driver
->   OMAPDSS: refactor dss probe function
->   OMAPDSS: fix dss_init_ports error handling
->   OMAPDSS: remove uses of __init/__exit
->   OMAPDSS: reorder uninit calls
->   OMAPDSS: componentize omapdss
->   OMAPDSS: simplify submodule reg/unreg code
+On Tuesday 16 June 2015 06:32 PM, Rob Herring wrote:
+> On Tue, Jun 16, 2015 at 2:52 AM, Vaibhav Hiremath
+> <vaibhav.hiremath@linaro.org> wrote:
+>>
+>>
+>> On Monday 01 June 2015 02:08 PM, Lee Jones wrote:
+>>>
+>>> On Sat, 30 May 2015, Vaibhav Hiremath wrote:
+>>>
+>>
+>> Thanks for your review. and sorry for delayed response.
+>>
+>>>> Add DT support to the 88pm800 driver along with below properties
+>>>>          - marvell,88pm800-irq-write-clear :
+>>>>            Idicates whether interrupt status is cleared by write
+>>>>
+>>>> Also, creates the DT binding text file,
+>>>> Documentation/devicetree/bindings/mfd/88pm800.txt
+>>>>
+>>>> Signed-off-by: Chao Xie <chao.xie@marvell.com>
+>>>> Signed-off-by: Vaibhav Hiremath <vaibhav.hiremath@linaro.org>
+>>>> ---
+>>>>    Documentation/devicetree/bindings/mfd/88pm800.txt | 57
+>>>> +++++++++++++++++++++++
+>>>>    drivers/mfd/88pm800.c                             | 39 ++++++++++++++++
+>>>
+>>>
+>>> These should be submitted separately.
+>>>
+>>
+>>
+>> Ok, will separate it in next version.
+>>
+>>
+>>>>    2 files changed, 96 insertions(+)
+>>>>    create mode 100644 Documentation/devicetree/bindings/mfd/88pm800.txt
+>>>>
+>>>> diff --git a/Documentation/devicetree/bindings/mfd/88pm800.txt
+>>>> b/Documentation/devicetree/bindings/mfd/88pm800.txt
+>>>> new file mode 100644
+>>>> index 0000000..094951b
+>>>> --- /dev/null
+>>>> +++ b/Documentation/devicetree/bindings/mfd/88pm800.txt
+>>>> @@ -0,0 +1,57 @@
+>>>> +* Marvell 88PM800 Power Management IC
+>
+> Might as well name this 88PM8xx from the start.
+>
 
-I've quickly reviewed the whole series and it looks good to me.
+Good point.
+Will include it in next version.
 
-Acked-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+I am ready with V2, but luckily I did not sent next version, as I
+wanted to wait for Lee's response. :)
 
->  drivers/video/fbdev/omap2/dss/core.c  |  80 ++++--------
->  drivers/video/fbdev/omap2/dss/dispc.c |  42 +++++--
->  drivers/video/fbdev/omap2/dss/dpi.c   |  36 ++++--
->  drivers/video/fbdev/omap2/dss/dsi.c   |  27 +++-
->  drivers/video/fbdev/omap2/dss/dss.c   | 223 ++++++++++++++++++++-----------
->  drivers/video/fbdev/omap2/dss/dss.h   |  32 ++---
->  drivers/video/fbdev/omap2/dss/hdmi4.c |  28 ++++-
->  drivers/video/fbdev/omap2/dss/hdmi5.c |  28 ++++-
->  drivers/video/fbdev/omap2/dss/rfbi.c  |  32 ++++-
->  drivers/video/fbdev/omap2/dss/sdi.c   |  35 ++++--
->  drivers/video/fbdev/omap2/dss/venc.c  |  31 +++--
->  11 files changed, 396 insertions(+), 198 deletions(-)
+>>>> +
+>>>> +Required parent device properties:
+>>>> +- compatible : "marvell,88pm800"
+>
+> You might as well include 88pm805 and 88pm860 here since 805 support
+> is in the kernel and you will be submitting 860 support. They don't
+> have to be added with driver support.
+>
 
--- 
-Regards,
+Ok.
 
-Laurent Pinchart
+>>>> +- reg : the I2C slave address for the 88pm800 chip
+>>>> +- interrupts : IRQ line for the 88pm800 chip
+>>>> +- interrupt-controller: describes the 88pm800 as an interrupt controller
+>>>> +- #interrupt-cells : should be 1.
+>>>> +               - The cell is the 88pm800 local IRQ number
+>>>> +
+>>>> +Optional parent device properties:
+>>>> +- marvell,88pm800-irq-write-clr: indicates whether interrupt status is
+>>>> cleared by write
+>>>
+>>>
+>>> Drop the device name.  These bindings should be as generic as possible.
+>>>
+>>
+>> OK, how about simply
+>>
+>> "mfd-irq_clr_on_write"
+>
+> No, mfd is a Linux name which doesn't belong in bindings, and
+> underscores are generally not used.
+>
+
+Oops.
+
+underscore is just typo. did not meant it.
+
+> I think Lee meant marvell,irq-write-clr or irq-write-clr.
+>
+
+will pick "marvell,irq-write-clr"
+
+
+> This could also just be dropped altogether and set based on the
+> compatible strings with match data.
+>
+
+It is configurable option, can be changed. so we still need get an
+input.
+
+>>> Also describe what the absence of the property means.
+>>>
+>>
+>> Ok.
+>>
+>>>> +88pm800 consists of a large and varied group of sub-devices:
+>>>
+>>>
+>>> 3?
+>>>
+>>
+>> I have explicitly mentioned in note that more device list will follow.
+>> I just wanted to add entries as and when we add/enable driver support.
+>>
+>>>> +Device                  Supply Names    Description
+>>>> +------                  ------------    -----------
+>>>> +88pm80x-onkey          :               : On key
+>>>> +88pm80x-rtc            :               : RTC
+>>>> +88pm80x                        :               : Regulators
+>>>
+>>>
+>>> Surely regulators is 88pm80x-regulator, no?
+>>>
+>>
+>> did not understand what change is expected here.
+>
+> The node name for regulators node should be 88pm80x-regulator? But
+> these don't correspond to node names based on the example and the
+> example is correct IMO. So these are Linux driver names? If so, they
+> don't belong in the binding doc. What you need is to document the
+> sub-node compatible strings
+
+Hmmm,
+Got it.
+
+rtc and onkey are compatible strings only, I made mistake on regulator.
+I will change to "88pm80x-regulator".
+
+
+Thanks,
+Vaibhav
