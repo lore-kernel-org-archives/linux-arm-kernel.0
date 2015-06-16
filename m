@@ -1,99 +1,186 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Tue, 16 Jun 2015 14:23:23 -0500
-Subject: [PATCH V7 3/3] OPP: Add binding for 'opp-suspend'
-In-Reply-To: <20150616025425.GB26592@linux>
-References: <cover.1433434659.git.viresh.kumar@linaro.org>
- <dedf8c02fdd9dbf169f43de74ead4c1434d89b45.1433434659.git.viresh.kumar@linaro.org>
- <CAL_JsqJb4P2Z2esgm5ffjWV37MU2KUF4gBdUpwSV8+21iTD1Bg@mail.gmail.com>
- <CAKohpomTT6i0dbboK901eguCbQiBdCT6gvLvTY24ajDdY__2fg@mail.gmail.com>
- <20150616025425.GB26592@linux>
-Message-ID: <CAL_JsqJ2gCJvtrZqDWWoY6Gv4Ag7xLV93wLbT5b37jO=oWo+MQ@mail.gmail.com>
+From: balbi@ti.com (Felipe Balbi)
+Date: Tue, 16 Jun 2015 14:26:37 -0500
+Subject: [PATCH RESEND] i2c: omap: improve duty cycle on SCL
+In-Reply-To: <1434482445-1818-1-git-send-email-balbi@ti.com>
+References: <1434482445-1818-1-git-send-email-balbi@ti.com>
+Message-ID: <20150616192637.GE30496@saruman.tx.rr.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 15, 2015 at 9:54 PM, Viresh Kumar <viresh.kumar@linaro.org> wrote:
-> On 16-06-15, 06:01, Viresh Kumar wrote:
->> On 16 June 2015 at 05:05, Rob Herring <robherring2@gmail.com> wrote:
->> >> +- opp-suspend: Phandle of the OPP to set while device is suspended.
->> >> +
->> >
->> > I would just do a bool property in the OPP you want.
->>
->> I will do that if you want, no big deal.
->
-> In order to not waste any time, here is the change you suggested. Ack
-> the one (original change or this one) you like :)
->
-> ------------------8<----------------------
->
-> From: Viresh Kumar <viresh.kumar@linaro.org>
-> Date: Wed, 20 May 2015 08:27:49 +0530
-> Subject: [PATCH V8] OPP: Add binding for 'opp-suspend'
->
-> On few platforms, for power efficiency, we want the device to be
-> configured for a specific OPP while we put the device in suspend state.
->
-> Add an optional property in operating-points-v2 bindings for that.
->
-> Acked-by: Nishanth Menon <nm@ti.com>
-> Suggested-by: Nishanth Menon <nm@ti.com>
-> Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
+On Tue, Jun 16, 2015 at 02:20:45PM -0500, Felipe Balbi wrote:
+> With this patch we try to be as close to 50%
+> duty cycle as possible. The reason for this
+> is that some devices present an erratic behavior
+> with certain duty cycles.
+> 
+> One such example is TPS65218 PMIC which fails
+> to change voltages when running @ 400kHz and
+> duty cycle is lower than 34%.
+> 
+> The idea of the patch is simple:
+> 
+> calculate desired scl_period from requested scl
+> and use 50% for tLow and 50% for tHigh.
+> 
+> tLow is calculated with a DIV_ROUND_UP() to make
+> sure it's slightly higher than tHigh and to make
+> sure that we end up within I2C specifications.
+> 
+> Kudos to Nishanth Menon and Dave Gerlach for helping
+> debugging the TPS65218 problem found on AM437x SK.
+> 
+> Signed-off-by: Felipe Balbi <balbi@ti.com>
+
+Aaro, can you test this on N900 ?
+
 > ---
-> V7->V8:
-> - opp-suspend is moved to OPPs instead of the table, and is bool now.
-
-Acked-by: Rob Herring <robh@kernel.org>
-
-
->  Documentation/devicetree/bindings/power/opp.txt | 7 +++++++
->  1 file changed, 7 insertions(+)
->
-> diff --git a/Documentation/devicetree/bindings/power/opp.txt b/Documentation/devicetree/bindings/power/opp.txt
-> index 2938c52dbf84..2d4291127003 100644
-> --- a/Documentation/devicetree/bindings/power/opp.txt
-> +++ b/Documentation/devicetree/bindings/power/opp.txt
-> @@ -113,6 +113,9 @@ properties.
->    frequency for a short duration of time limited by the device's power, current
->    and thermal limits.
->
-> +- opp-suspend: Marks the OPP to be used during device suspend. Only one OPP in
-> +  the table should have this.
+>  drivers/i2c/busses/i2c-omap.c | 86 ++++++++++++++++++++++++++++---------------
+>  1 file changed, 56 insertions(+), 30 deletions(-)
+> 
+> diff --git a/drivers/i2c/busses/i2c-omap.c b/drivers/i2c/busses/i2c-omap.c
+> index 0e894193accf..034d2d1ff289 100644
+> --- a/drivers/i2c/busses/i2c-omap.c
+> +++ b/drivers/i2c/busses/i2c-omap.c
+> @@ -25,6 +25,7 @@
+>   */
+>  
+>  #include <linux/module.h>
+> +#include <linux/kernel.h>
+>  #include <linux/delay.h>
+>  #include <linux/i2c.h>
+>  #include <linux/err.h>
+> @@ -39,6 +40,8 @@
+>  #include <linux/i2c-omap.h>
+>  #include <linux/pm_runtime.h>
+>  
+> +#define NSECS_PER_SEC			1000000000
 > +
->  - status: Marks the node enabled/disabled.
->
->  Example 1: Single cluster Dual-core ARM cortex A9, switch DVFS states together.
-> @@ -152,6 +155,7 @@ Example 1: Single cluster Dual-core ARM cortex A9, switch DVFS states together.
->                         opp-microvolt = <970000 975000 985000>;
->                         opp-microamp = <70000>;
->                         clock-latency-ns = <300000>;
-> +                       opp-suspend;
->                 };
->                 opp01 {
->                         opp-hz = <1100000000>;
-> @@ -230,6 +234,7 @@ independently.
->                         opp-microvolt = <970000 975000 985000>;
->                         opp-microamp = <70000>;
->                         clock-latency-ns = <300000>;
-> +                       opp-suspend;
->                 };
->                 opp01 {
->                         opp-hz = <1100000000>;
-> @@ -305,6 +310,7 @@ DVFS state together.
->                         opp-microvolt = <970000 975000 985000>;
->                         opp-microamp = <70000>;
->                         clock-latency-ns = <300000>;
-> +                       opp-suspend;
->                 };
->                 opp01 {
->                         opp-hz = <1100000000>;
-> @@ -330,6 +336,7 @@ DVFS state together.
->                         opp-microvolt = <1045000 1050000 1055000>;
->                         opp-microamp = <95000>;
->                         clock-latency-ns = <400000>;
-> +                       opp-suspend;
->                 };
->                 opp11 {
->                         opp-hz = <1400000000>;
-> --
-> 2.4.0
->
+>  /* I2C controller revisions */
+>  #define OMAP_I2C_OMAP1_REV_2		0x20
+>  
+> @@ -359,6 +362,8 @@ static int omap_i2c_init(struct omap_i2c_dev *dev)
+>  	u16 fsscll = 0, fssclh = 0, hsscll = 0, hssclh = 0;
+>  	unsigned long fclk_rate = 12000000;
+>  	unsigned long internal_clk = 0;
+> +	unsigned long internal_clk_period = 0;
+> +	unsigned long scl_period = 0;
+>  	struct clk *fclk;
+>  
+>  	if (dev->rev >= OMAP_I2C_REV_ON_3430_3530) {
+> @@ -395,52 +400,73 @@ static int omap_i2c_init(struct omap_i2c_dev *dev)
+>  	}
+>  
+>  	if (!(dev->flags & OMAP_I2C_FLAG_SIMPLE_CLOCK)) {
+> -
+>  		/*
+>  		 * HSI2C controller internal clk rate should be 19.2 Mhz for
+> -		 * HS and for all modes on 2430. On 34xx we can use lower rate
+> -		 * to get longer filter period for better noise suppression.
+> -		 * The filter is iclk (fclk for HS) period.
+> +		 * HS and for all modes on 2430. For all other devices and
+> +		 * speeds we will use a 12MHz internal clock.
+>  		 */
+> -		if (dev->speed > 400 ||
+> -			       dev->flags & OMAP_I2C_FLAG_FORCE_19200_INT_CLK)
+> -			internal_clk = 19200;
+> -		else if (dev->speed > 100)
+> -			internal_clk = 9600;
+> -		else
+> -			internal_clk = 4000;
+> +		if (dev->flags & OMAP_I2C_FLAG_FORCE_19200_INT_CLK ||
+> +				dev->speed > 400) {
+> +			internal_clk = 1920000;
+> +			internal_clk_period = NSECS_PER_SEC /
+> +				internal_clk; /* ns */
+> +		} else {
+> +			internal_clk = 12000000;
+> +			internal_clk_period = NSECS_PER_SEC /
+> +				internal_clk; /* ns */
+> +		}
+> +
+>  		fclk = clk_get(dev->dev, "fck");
+> -		fclk_rate = clk_get_rate(fclk) / 1000;
+> +		fclk_rate = clk_get_rate(fclk);
+>  		clk_put(fclk);
+>  
+>  		/* Compute prescaler divisor */
+>  		psc = fclk_rate / internal_clk;
+>  		psc = psc - 1;
+>  
+> +		/*
+> +		 * Here's the tricky part, we want to make sure our duty cycle
+> +		 * is as close to 50% as possible. In order to achieve that, we
+> +		 * will first figure out what's the period on chosen scl is,
+> +		 * then divide that by two and calculate SCLL and SCLH based on
+> +		 * that.
+> +		 *
+> +		 * SCLL and SCLH equations are as folows:
+> +		 *
+> +		 * SCLL = (tLow / iclk_period) - 7;
+> +		 * SCLH = (tHigh / iclk_period) - 5;
+> +		 *
+> +		 * Where iclk_period is period of Internal Clock.
+> +		 *
+> +		 * tLow and tHigh will be basically half of scl_period where
+> +		 * possible as long as we can match I2C spec's minimum limits
+> +		 * for them.
+> +		 */
+> +		scl_period = NSECS_PER_SEC / dev->speed;
+> +
+>  		/* If configured for High Speed */
+>  		if (dev->speed > 400) {
+> -			unsigned long scl;
+> +			unsigned long fs_period;
+> +
+> +			/*
+> +			 * first phase of HS mode is up to
+> +			 * 400kHz so we will use that.
+> +			 */
+> +			fs_period = NSECS_PER_SEC / 400;
+>  
+>  			/* For first phase of HS mode */
+> -			scl = internal_clk / 400;
+> -			fsscll = scl - (scl / 3) - 7;
+> -			fssclh = (scl / 3) - 5;
+> +			fsscll = DIV_ROUND_UP(fs_period >> 1,
+> +					internal_clk_period) - 7;
+> +			fssclh = (fs_period >> 1) / internal_clk_period - 5;
+>  
+>  			/* For second phase of HS mode */
+> -			scl = fclk_rate / dev->speed;
+> -			hsscll = scl - (scl / 3) - 7;
+> -			hssclh = (scl / 3) - 5;
+> -		} else if (dev->speed > 100) {
+> -			unsigned long scl;
+> -
+> -			/* Fast mode */
+> -			scl = internal_clk / dev->speed;
+> -			fsscll = scl - (scl / 3) - 7;
+> -			fssclh = (scl / 3) - 5;
+> -		} else {
+> -			/* Standard mode */
+> -			fsscll = internal_clk / (dev->speed * 2) - 7;
+> -			fssclh = internal_clk / (dev->speed * 2) - 5;
+> +			hsscll = DIV_ROUND_UP(scl_period >> 1,
+> +					internal_clk_period) - 7;
+> +			hssclh = (scl_period >> 1) / internal_clk_period - 5;
+> +		} else  {
+> +			fsscll = DIV_ROUND_UP(scl_period >> 1,
+> +					internal_clk_period) - 7;
+> +			fssclh = (scl_period >> 1) / internal_clk_period - 5;
+>  		}
+>  		scll = (hsscll << OMAP_I2C_SCLL_HSSCLL) | fsscll;
+>  		sclh = (hssclh << OMAP_I2C_SCLH_HSSCLH) | fssclh;
+> -- 
+> 2.4.3
+> 
+
+-- 
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150616/298d1327/attachment-0001.sig>
