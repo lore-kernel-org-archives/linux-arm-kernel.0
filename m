@@ -1,43 +1,99 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Tue, 16 Jun 2015 13:31:16 -0700
-Subject: [PATCH 5/5] ARM: qcom_defconfig: Enable options for KS8851 ethernet
-In-Reply-To: <1434486676-21812-1-git-send-email-sboyd@codeaurora.org>
-References: <1434486676-21812-1-git-send-email-sboyd@codeaurora.org>
-Message-ID: <1434486676-21812-6-git-send-email-sboyd@codeaurora.org>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Tue, 16 Jun 2015 14:32:14 -0600
+Subject: [PATCH 02/21] ARM: tegra: Add gpio-ranges property
+In-Reply-To: <CAAObsKBtmJnBZXcv0UE6xGvphSCShFNWehOG8a-PJg-VqPznRw@mail.gmail.com>
+References: <1432565608-26036-1-git-send-email-tomeu.vizoso@collabora.com>
+ <1432565608-26036-3-git-send-email-tomeu.vizoso@collabora.com>
+ <5564CC84.1030700@wwwdotorg.org>
+ <CACRpkdbtCDQLaPhWFT0a7NdJmxYzRvhU_efgUh2ZXhbc+FHg3g@mail.gmail.com>
+ <556DCE71.7050108@wwwdotorg.org>
+ <CAAObsKBtmJnBZXcv0UE6xGvphSCShFNWehOG8a-PJg-VqPznRw@mail.gmail.com>
+Message-ID: <558087CE.5070903@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enable the RPM and RPM regulator drivers as well as the KS8851
-ethernet driver so that ethernet works on MSM8960 CDP.
+On 06/16/2015 02:42 AM, Tomeu Vizoso wrote:
+> On 2 June 2015 at 17:40, Stephen Warren <swarren@wwwdotorg.org> wrote:
+>> On 06/02/2015 05:28 AM, Linus Walleij wrote:
+>>>
+>>> On Tue, May 26, 2015 at 9:41 PM, Stephen Warren <swarren@wwwdotorg.org>
+>>> wrote:
+>>>>
+>>>> On 05/25/2015 08:53 AM, Tomeu Vizoso wrote:
+>>>>>
+>>>>>
+>>>>> Specify how the GPIOs map to the pins in T124, so the dependency is
+>>>>> explicit.
+>>>>>
+>>>>> Signed-off-by: Tomeu Vizoso <tomeu.vizoso@collabora.com>
+>>>>> ---
+>>>>>     arch/arm/boot/dts/tegra124.dtsi | 1 +
+>>>>>     1 file changed, 1 insertion(+)
+>>>>>
+>>>>> diff --git a/arch/arm/boot/dts/tegra124.dtsi
+>>>>> b/arch/arm/boot/dts/tegra124.dtsi
+>>>>> index 13cc7ca..5d1d35f 100644
+>>>>> --- a/arch/arm/boot/dts/tegra124.dtsi
+>>>>> +++ b/arch/arm/boot/dts/tegra124.dtsi
+>>>>> @@ -254,6 +254,7 @@
+>>>>>                   gpio-controller;
+>>>>>                   #interrupt-cells = <2>;
+>>>>>                   interrupt-controller;
+>>>>> +               gpio-ranges = <&pinmux 0 0 250>;
+>>>>
+>>>>
+>>>>
+>>>> We should be consistent between SoCs. Why not make the same change for
+>>>> all
+>>>> Tegra SoCs?
+>>>
+>>>
+>>> Agreed.
+>>>
+>>>> I think this change will cause the GPIO subsystem to call into the
+>>>> pinctrl
+>>>> subsystem and create/add/register a new GPIO<->pinctrl range structure.
+>>>> The
+>>>> pinctrl driver already does this, so I think we'll end up with two
+>>>> duplicate
+>>>> entries in the pinctrl device's gpio_ranges list. This probably won't
+>>>> cause
+>>>> a problem, but I wanted to make sure you'd thought about it to make sure.
+>>>
+>>>
+>>> That sounds like duplication indeed, I would expect that first a patch
+>>> adds the ranges to the dts[i] files and then a second patch delete the
+>>> same ranges from the pinctrl driver then, if these shall come in from
+>>> the device tree.
+>>
+>>
+>> We can't delete the gpio-range-registration code from the Tegra pinmux
+>> driver, or old DTs won't work correctly. We could make it conditional based
+>> upon whether the DT contains the property or not.
+>
+> I've been looking at this and haven't found a good solution. From what
+> I see, the pinctrl driver doesn't have a reference to the gpio device
+> node so cannot tell if it needs to add the range or not.
 
-Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
----
- arch/arm/configs/qcom_defconfig | 3 +++
- 1 file changed, 3 insertions(+)
+Well, we know what the node must be called, so the pinctrl driver could 
+search for it by name.
 
-diff --git a/arch/arm/configs/qcom_defconfig b/arch/arm/configs/qcom_defconfig
-index e6a6f282e3de..ff7985ba226e 100644
---- a/arch/arm/configs/qcom_defconfig
-+++ b/arch/arm/configs/qcom_defconfig
-@@ -67,6 +67,7 @@ CONFIG_SCSI_LOGGING=y
- CONFIG_SCSI_SCAN_ASYNC=y
- CONFIG_NETDEVICES=y
- CONFIG_DUMMY=y
-+CONFIG_KS8851=y
- CONFIG_MDIO_BITBANG=y
- CONFIG_MDIO_GPIO=y
- CONFIG_SLIP=y
-@@ -104,8 +105,10 @@ CONFIG_GPIO_SYSFS=y
- CONFIG_POWER_RESET=y
- CONFIG_POWER_RESET_MSM=y
- CONFIG_THERMAL=y
-+CONFIG_MFD_QCOM_RPM=y
- CONFIG_REGULATOR=y
- CONFIG_REGULATOR_FIXED_VOLTAGE=y
-+CONFIG_REGULATOR_QCOM_RPM=y
- CONFIG_MEDIA_SUPPORT=y
- CONFIG_FB=y
- CONFIG_SOUND=y
--- 
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-a Linux Foundation Collaborative Project
+> The gpio driver can tell whether it should add the range or not, but
+> if it has to because the gpio-ranges property isn't there, then it
+> doesn't have the reference to the pinctrl device to set the range to.
+>
+> So, given that pinctrl_add_gpio_range is deprecated already, wonder if
+> the lesser evil isn't leaving the duplicated entries for now. On newer
+> SoC revisions such as T210 we can stop calling pinctrl_add_gpio_range
+> at all.
+>
+> Or, we can accept that nobody is going to boot a newer kernel with an
+> older DT on the affected boards and just rely on the presence of the
+> gpio-ranges property :)
+
+Isn't the simplest solution to just leave it as it is? Nothing's broken 
+is it?
+
+For any new SoCs we add, we can certainly switch to a new scheme if we 
+want, but we need to catch/implement that early before the base .dtsi 
+file is included in its first kernel release.
