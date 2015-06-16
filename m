@@ -1,84 +1,54 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 16 Jun 2015 04:46:45 -0700
-Subject: [GIT PULL] omap generic wakeirq for v4.2 merge window
-Message-ID: <20150616114645.GA4156@atomide.com>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Tue, 16 Jun 2015 14:12:56 +0200
+Subject: [PATCH 0/9] ARM: mvebu: add suspend to RAM support for Armada 38x
+Message-ID: <1434456785-23696-1-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hello,
 
-Here's a late pull request that would be good to get into v4.2.
-This series mostly just drops code that's now unnecessary, and
-also fixes potential interrupt re-entrancy issues that the old
-handling has.
+This patch series adds suspend to RAM support for the Armada 38x SoC,
+and especially the Armada 388 GP board. It has been tested on Armada
+XP GP little and big endian, and on Armada 388 GP little and big
+endian.
 
-The series changes omap hsmmc, 8250_omap and omap-serial to use
-the Linux generic wakeirq. I had to redo the branch last week on
-recent tty-next branch because of a merge conflict. Other than
-that, these patches were already in Linux next earlier.
+The first patch is really a fix, that makes Armada XP GP suspend to
+RAM work in big endian configurations.
 
-The pull request below also shows the related patches in Rafael's
-pm-wakeirq branch as I did not create a separate merge commit to
-base patches on.
+Then patches 2 to 5 are preparation patches, and patches 6 to 9
+implement the suspend/resume support for Armada 38x itself, with first
+the code changes, and then the Device Tree changes.
 
-This branch depends on both Rafael's pm-wakeirq and Greg's
-tty-next, so it should be sent separately towards the end of the
-merge window.
+This is obviously not intended for 4.2, but for 4.3.
 
-Regards,
+Best regards,
 
-Tony
+Thomas
 
-8< ------------------
+Nadav Haklai (1):
+  ARM: mvebu: prepare set_cpu_coherent() for future extension
 
-The following changes since commit 00fda1682efdbd62a20a8a21aee52d994c323c7f:
+Thomas Petazzoni (8):
+  ARM: mvebu: fix suspend to RAM on big-endian configurations
+  ARM: mvebu: do not check machine in mvebu_pm_init()
+  ARM: mvebu: prepare mvebu_pm_store_bootinfo() to support multiple SoCs
+  ARM: mvebu: prepare pm-board.c for the introduction of Armada 38x
+    support
+  ARM: mvebu: add suspend/resume support for Armada 38x
+  ARM: mvebu: add suspend/resume related definitions in Armada 38x
+    Device Tree
+  ARM: mvebu: add suspend/resume DT information for Armada 388 GP
+  ARM: mvebu: adjust board name and compatible for Armada 388 GP
 
-  Merge 4.1-rc7 into tty-next (2015-06-08 10:49:28 -0700)
+ arch/arm/boot/dts/armada-388-gp.dts | 20 +++++++++--
+ arch/arm/boot/dts/armada-38x.dtsi   |  7 +++-
+ arch/arm/mach-mvebu/board-v7.c      |  1 +
+ arch/arm/mach-mvebu/coherency.c     | 33 +++++++++++-------
+ arch/arm/mach-mvebu/pm-board.c      | 28 ++++++++-------
+ arch/arm/mach-mvebu/pm.c            | 69 +++++++++++++++++++++++++++++++++----
+ arch/arm/mach-mvebu/pmsu.h          |  1 +
+ arch/arm/mach-mvebu/pmsu_ll.S       | 43 +++++++++++++++++++++++
+ 8 files changed, 168 insertions(+), 34 deletions(-)
 
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v4.2/wakeirq-drivers-v2
-
-for you to fetch changes up to 63e63a1981c7247fea41ce97b3144befc8f2fb7b:
-
-  Merge branch 'wakeirq-8250' into omap-for-v4.2/wakeirq-v2 (2015-06-09 23:37:31 -0700)
-
-----------------------------------------------------------------
-Omap driver changes for v4.2 to switch drivers over to Linux generic
-wake IRQ events for omap_hsmmc, 8250_omap and omap-serial
-drivers.
-
-The generic wake IRQs also fix issues that these drivers potentially
-have with IRQ re-entrancy@least for serial-omap.
-
-Note that because of dependencies and merge conflicts these are
-based on Rafael's pm-wakeirq and Greg's tty-next branches.
-
-----------------------------------------------------------------
-Ben Dooks (1):
-      PM / runtime: add note about re-calling in during device probe()
-
-Tony Lindgren (6):
-      PM / Runtime: Update last_busy in rpm_resume
-      PM / Wakeirq: Add automated device wake IRQ handling
-      mmc: omap_hsmmc: Change wake-up interrupt to use generic wakeirq
-      serial: omap: Switch wake-up interrupt to generic wakeirq
-      serial: 8250_omap: Move wake-up interrupt to generic wakeirq
-      Merge branch 'wakeirq-8250' into omap-for-v4.2/wakeirq-v2
-
- Documentation/power/runtime_pm.txt  |   6 +
- drivers/base/power/Makefile         |   2 +-
- drivers/base/power/main.c           |   3 +
- drivers/base/power/power.h          |  48 +++++++
- drivers/base/power/runtime.c        |   6 +
- drivers/base/power/wakeirq.c        | 273 ++++++++++++++++++++++++++++++++++++
- drivers/base/power/wakeup.c         |  92 ++++++++++++
- drivers/mmc/host/omap_hsmmc.c       |  49 +------
- drivers/tty/serial/8250/8250_omap.c |  58 +-------
- drivers/tty/serial/omap-serial.c    |  35 +----
- include/linux/pm.h                  |   2 +
- include/linux/pm_wakeirq.h          |  52 +++++++
- include/linux/pm_wakeup.h           |   9 ++
- 13 files changed, 506 insertions(+), 129 deletions(-)
- create mode 100644 drivers/base/power/wakeirq.c
- create mode 100644 include/linux/pm_wakeirq.h
+-- 
+2.1.0
