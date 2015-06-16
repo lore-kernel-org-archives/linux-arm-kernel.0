@@ -1,57 +1,108 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Tue, 16 Jun 2015 14:13:03 +0200
-Subject: [PATCH 7/9] ARM: mvebu: add suspend/resume related definitions in
- Armada 38x Device Tree
+Date: Tue, 16 Jun 2015 14:13:01 +0200
+Subject: [PATCH 5/9] ARM: mvebu: prepare pm-board.c for the introduction of
+ Armada 38x support
 In-Reply-To: <1434456785-23696-1-git-send-email-thomas.petazzoni@free-electrons.com>
 References: <1434456785-23696-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1434456785-23696-8-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1434456785-23696-6-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In order to support suspend/resume, the SoC-level Armada 38x Device
-Tree file must be improved with the following additions:
+The pm-board.c code contains the board-specific logic to enter suspend
+to RAM. Until now, the code supported only the Armada XP GP board, so
+all functions and symbols were named with armada_xp_gp. However, it
+turns out that the Armada 388 GP also uses the same 3 GPIOs protocol
+to talk to the PIC microcontroller that controls the power supply.
 
- - Description of the SDRAM controller registers, which are needed in
-   order to allow the suspend/resume code to put the RAM in
-   self-refresh. This is similar to what was done in commit
-   6e6db2bea3ea ("ARM: mvebu: add SDRAM controller description for
-   Armada XP") for Armada XP.
-
- - Description of additional registers for the MBus controller, which
-   need to be saved/restored accross a suspend/resume cycle. This is
-   similar to what was done in commit 8b7dc9d37a44e ("ARM: mvebu:
-   adjust mbus controller description on Armada 370/XP") for Armada
-   XP.
+Since we are going to re-use the same code with no change for Armada
+38x, this commit renames the functions and symbols to use just
+"armada" instead of "armada_xp_gp". Better names can be found if one
+day other boards having a different protocol/mechanism are supported
+in the kernel.
 
 Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 ---
- arch/arm/boot/dts/armada-38x.dtsi | 7 ++++++-
- 1 file changed, 6 insertions(+), 1 deletion(-)
+ arch/arm/mach-mvebu/pm-board.c | 22 +++++++++++-----------
+ 1 file changed, 11 insertions(+), 11 deletions(-)
 
-diff --git a/arch/arm/boot/dts/armada-38x.dtsi b/arch/arm/boot/dts/armada-38x.dtsi
-index 218a2ac..ffaf351 100644
---- a/arch/arm/boot/dts/armada-38x.dtsi
-+++ b/arch/arm/boot/dts/armada-38x.dtsi
-@@ -138,6 +138,11 @@
- 			#size-cells = <1>;
- 			ranges = <0 MBUS_ID(0xf0, 0x01) 0 0x100000>;
+diff --git a/arch/arm/mach-mvebu/pm-board.c b/arch/arm/mach-mvebu/pm-board.c
+index 301ab38..b8c26cb 100644
+--- a/arch/arm/mach-mvebu/pm-board.c
++++ b/arch/arm/mach-mvebu/pm-board.c
+@@ -1,7 +1,7 @@
+ /*
+  * Board-level suspend/resume support.
+  *
+- * Copyright (C) 2014 Marvell
++ * Copyright (C) 2014-2015 Marvell
+  *
+  * Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+  *
+@@ -20,27 +20,27 @@
+ #include <linux/slab.h>
+ #include "common.h"
  
-+			sdramc at 1400 {
-+				compatible = "marvell,armada-xp-sdram-controller";
-+				reg = <0x1400 0x500>;
-+			};
-+
- 			L2: cache-controller at 8000 {
- 				compatible = "arm,pl310-cache";
- 				reg = <0x8000 0x1000>;
-@@ -369,7 +374,7 @@
+-#define ARMADA_XP_GP_PIC_NR_GPIOS 3
++#define ARMADA_PIC_NR_GPIOS 3
  
- 			mbusc: mbus-controller at 20000 {
- 				compatible = "marvell,mbus-controller";
--				reg = <0x20000 0x100>, <0x20180 0x20>;
-+				reg = <0x20000 0x100>, <0x20180 0x20>, <0x20250 0x8>;
- 			};
+ static void __iomem *gpio_ctrl;
+-static int pic_gpios[ARMADA_XP_GP_PIC_NR_GPIOS];
+-static int pic_raw_gpios[ARMADA_XP_GP_PIC_NR_GPIOS];
++static int pic_gpios[ARMADA_PIC_NR_GPIOS];
++static int pic_raw_gpios[ARMADA_PIC_NR_GPIOS];
  
- 			mpic: interrupt-controller at 20a00 {
+-static void mvebu_armada_xp_gp_pm_enter(void __iomem *sdram_reg, u32 srcmd)
++static void mvebu_armada_pm_enter(void __iomem *sdram_reg, u32 srcmd)
+ {
+ 	u32 reg, ackcmd;
+ 	int i;
+ 
+ 	/* Put 001 as value on the GPIOs */
+ 	reg = readl(gpio_ctrl);
+-	for (i = 0; i < ARMADA_XP_GP_PIC_NR_GPIOS; i++)
++	for (i = 0; i < ARMADA_PIC_NR_GPIOS; i++)
+ 		reg &= ~BIT(pic_raw_gpios[i]);
+ 	reg |= BIT(pic_raw_gpios[0]);
+ 	writel(reg, gpio_ctrl);
+ 
+ 	/* Prepare writing 111 to the GPIOs */
+ 	ackcmd = readl(gpio_ctrl);
+-	for (i = 0; i < ARMADA_XP_GP_PIC_NR_GPIOS; i++)
++	for (i = 0; i < ARMADA_PIC_NR_GPIOS; i++)
+ 		ackcmd |= BIT(pic_raw_gpios[i]);
+ 
+ 	srcmd = cpu_to_le32(srcmd);
+@@ -76,7 +76,7 @@ static void mvebu_armada_xp_gp_pm_enter(void __iomem *sdram_reg, u32 srcmd)
+ 		  [ackcmd] "r" (ackcmd), [gpio_ctrl] "r" (gpio_ctrl) : "r1");
+ }
+ 
+-static int mvebu_armada_xp_gp_pm_init(void)
++static int mvebu_armada_pm_init(void)
+ {
+ 	struct device_node *np;
+ 	struct device_node *gpio_ctrl_np;
+@@ -89,7 +89,7 @@ static int mvebu_armada_xp_gp_pm_init(void)
+ 	if (!np)
+ 		return -ENODEV;
+ 
+-	for (i = 0; i < ARMADA_XP_GP_PIC_NR_GPIOS; i++) {
++	for (i = 0; i < ARMADA_PIC_NR_GPIOS; i++) {
+ 		char *name;
+ 		struct of_phandle_args args;
+ 
+@@ -134,11 +134,11 @@ static int mvebu_armada_xp_gp_pm_init(void)
+ 	if (!gpio_ctrl)
+ 		return -ENOMEM;
+ 
+-	mvebu_pm_init(mvebu_armada_xp_gp_pm_enter);
++	mvebu_pm_init(mvebu_armada_pm_enter);
+ 
+ out:
+ 	of_node_put(np);
+ 	return ret;
+ }
+ 
+-late_initcall(mvebu_armada_xp_gp_pm_init);
++late_initcall(mvebu_armada_pm_init);
 -- 
 2.1.0
