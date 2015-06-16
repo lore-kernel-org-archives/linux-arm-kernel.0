@@ -1,62 +1,44 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Tue, 16 Jun 2015 08:47:33 -0500
-Subject: [PATCH] ARM: mm: enable L1 prefetch on Cortex-A9
-In-Reply-To: <1434023550-20147-1-git-send-email-thomas.petazzoni@free-electrons.com>
-References: <1434023550-20147-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <CAL_JsqKTC+BO6bin3Qekjn37Np6F86Uvv1-194VGTyYxcNfjHw@mail.gmail.com>
+From: jiri.prchal@aksignal.cz (=?UTF-8?B?SmnFmcOtIFByY2hhbA==?=)
+Date: Tue, 16 Jun 2015 16:05:46 +0200
+Subject: [BUG] at91: macb: does not work
+In-Reply-To: <20150616133124.GB6549@piout.net>
+References: <5580205B.1030804@aksignal.cz> <20150616133124.GB6549@piout.net>
+Message-ID: <55802D3A.1000107@aksignal.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 11, 2015 at 6:52 AM, Thomas Petazzoni
-<thomas.petazzoni@free-electrons.com> wrote:
-> The Cortex-A9 has a L1 prefetch capability documented at
-> http://infocenter.arm.com/help/index.jsp?topic=/com.arm.doc.ddi0388e/Chdejhgd.html:
->
->   The Cortex-A9 data cache implements an automatic prefetcher that
->   monitors cache misses done by the processor. This unit can monitor
->   and prefetch two independent data streams. It can be activated in
->   software using a CP15 Auxiliary Control Register bit. See Auxiliary
->   Control Register.
->
-> This commit enables this L1 prefetch feature unconditionally on all
-> Cortex-A9 by setting bit 2 in the Auxiliary Control CP15
-> register. Note that since this bit only exists on Cortex-A9 but not on
-> Cortex-A5 or Cortex-R7, we separate the handling of Cortex-A9 from the
-> one of those two other cores.
 
-Does this work in non-secure mode? Perhaps it is just ignored. If so,
-it deserves a comment along the lines of "This bit should be set by
-the bootloader and setting it has no effect in non-secure mode."
 
-Rob
+On 16.6.2015 15:31, Alexandre Belloni wrote:
+> Hi,
+>
+> On 16/06/2015 at 15:10:51 +0200, Ji?? Prchal wrote :
+>> Hi,
+>> in v4.1-rc8 does not work ethernet. It normally gets up, but no data are going through.
+>>
+>> [    4.400000] macb f802c000.ethernet (unnamed net_device) (uninitialized): invalid hw address, using random
+>> [    4.510000] macb f802c000.ethernet eth0: Cadence MACB rev 0x0001010c at 0xf802c000 irq 37 (52:30:8f:6b:9c:b7)
+>> [    4.520000] macb f802c000.ethernet eth0: attached PHY driver [Generic PHY] (mii_bus:phy_addr=f802c000.etherne:03, irq=-1)
+>> [   15.510000] macb f802c000.ethernet eth0: link up (100/Full)
+>>
+>> / # ip -s link ls eth0
+>> 2: eth0: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 qdisc pfifo_fast state UP mode DEFAULT group default qlen 1000
+>>      link/ether a2:61:fe:17:65:b1 brd ff:ff:ff:ff:ff:ff
+>>      RX: bytes  packets  errors  dropped overrun mcast
+>>      0          0        0       0       0       0
+>>      TX: bytes  packets  errors  dropped carrier collsns
+>>      0          0        0       0       0       0
+>>
+>> In v4.0.5 it's working.
+>>
+>
+> You probably have an issue in your device tree. I've just tested both
+> interfaces of my sama5d3 xplained and they are working fine.
 
-> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-> ---
->  arch/arm/mm/proc-v7.S | 5 ++++-
->  1 file changed, 4 insertions(+), 1 deletion(-)
->
-> diff --git a/arch/arm/mm/proc-v7.S b/arch/arm/mm/proc-v7.S
-> index 3d1054f..106ea4d 100644
-> --- a/arch/arm/mm/proc-v7.S
-> +++ b/arch/arm/mm/proc-v7.S
-> @@ -257,8 +257,11 @@ ENDPROC(cpu_pj4b_do_resume)
->   *     It is assumed that:
->   *     - cache type register is implemented
->   */
-> -__v7_ca5mp_setup:
->  __v7_ca9mp_setup:
-> +       mov     r10, #(1 << 0)                  @ Cache/TLB ops broadcasting
-> +       orr     r10, r10, #(1 << 2)             @ L1 prefetch
-> +       b       1f
-> +__v7_ca5mp_setup:
->  __v7_cr7mp_setup:
->         mov     r10, #(1 << 0)                  @ Cache/TLB ops broadcasting
->         b       1f
-> --
-> 2.1.0
+Sorry for that, I compiled and loaded dtb and it works now.
+(Just forget that "make" doesn't compile dtb.)
+Thanks
+Jiri
+
 >
 >
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
