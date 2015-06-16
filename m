@@ -1,46 +1,46 @@
 From: wxt@rock-chips.com (Caesar Wang)
-Date: Tue, 16 Jun 2015 15:27:42 +0800
-Subject: [PATCH v2 0/3] Add the efuse driver on rockchip platform
-Message-ID: <1434439665-27781-1-git-send-email-wxt@rock-chips.com>
+Date: Tue, 16 Jun 2015 15:27:43 +0800
+Subject: [PATCH v2 1/3] soc/rockchip: Add efuse bindings for Rockchip SoC
+ efuse driver
+In-Reply-To: <1434439665-27781-1-git-send-email-wxt@rock-chips.com>
+References: <1434439665-27781-1-git-send-email-wxt@rock-chips.com>
+Message-ID: <1434439665-27781-2-git-send-email-wxt@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The original driver is uploaded by Jianqun.
-Here is his patchs:
-    https://patchwork.kernel.org/patch/5410341/
-    https://patchwork.kernel.org/patch/5410351/
+Add efuse bindings for RK3066, RK3188, RK3288 and RK3368.
 
-Jianqun, nevermind!
-I check-pick it and re-upload the driver for the upstream.
-e.g.:
-    Tested by on minnie board.(kernel-4.1-rc8)
-    cd /sys/devices/platform/ffb40000.efuse
-    localhost ffb40000.efuse # cat cpu_leakage_show
-    cpu_version_show
-    The results:
-            19
-            2
+Signed-off-by: Jianqun Xu <jay.xu@rock-chips.com>
+Signed-off-by: Caesar Wang <wxt@rock-chips.com>
+
+---
 
 Changes in v2:
 - Change the document decription.
-- Move the efuse driver into driver/soc/vendor.
-- update the efuse driver.
-- Add the dts node on RK3288.
 
-Caesar Wang (3):
-  soc/rockchip: Add efuse bindings for Rockchip SoC efuse driver
-  soc/rockchip: efuse: Add Rockchip SoC efuse support
-  ARM: dts: Add RK3288 efuse node
-
- .../bindings/fuse/rockchip,rockchip-efuse.txt      |  14 ++
- arch/arm/boot/dts/rk3288.dtsi                      |   5 +
- drivers/soc/Makefile                               |   1 +
- drivers/soc/rockchip/Makefile                      |   4 +
- drivers/soc/rockchip/efuse.c                       | 212 +++++++++++++++++++++
- 5 files changed, 236 insertions(+)
+ .../devicetree/bindings/fuse/rockchip,rockchip-efuse.txt   | 14 ++++++++++++++
+ 1 file changed, 14 insertions(+)
  create mode 100644 Documentation/devicetree/bindings/fuse/rockchip,rockchip-efuse.txt
- create mode 100644 drivers/soc/rockchip/Makefile
- create mode 100644 drivers/soc/rockchip/efuse.c
 
+diff --git a/Documentation/devicetree/bindings/fuse/rockchip,rockchip-efuse.txt b/Documentation/devicetree/bindings/fuse/rockchip,rockchip-efuse.txt
+new file mode 100644
+index 0000000..f1f338e
+--- /dev/null
++++ b/Documentation/devicetree/bindings/fuse/rockchip,rockchip-efuse.txt
+@@ -0,0 +1,14 @@
++ROCKCHIP RK3066/RK3188/RK3288/RK3368 efuse block.
++
++Required properties:
++- compatible : should be: "rockchip,<name>-efuse"
++  "rockchip,rk3066-efuse": found on RK3066,RK3188,RK3288 and RK3368.
++- reg: Should contain 1 entry: the entry gives the physical address and length
++       of the fuse registers.
++
++Example:
++
++	efuse: efuse at ffb40000 {
++		compatible = "rockchip,rk3066-efuse";
++		reg = <0xffb40000 0x10000>;
++	};
 -- 
 1.9.1
