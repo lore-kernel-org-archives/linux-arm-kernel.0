@@ -1,125 +1,69 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Tue, 16 Jun 2015 08:02:33 -0500
-Subject: [PATCH 1/4] mfd: 88pm800: add device tree support
-In-Reply-To: <557FD5AD.5020405@linaro.org>
-References: <1432937962-4537-1-git-send-email-vaibhav.hiremath@linaro.org>
- <1432937962-4537-2-git-send-email-vaibhav.hiremath@linaro.org>
- <20150601083835.GE3329@x1> <557FD5AD.5020405@linaro.org>
-Message-ID: <CAL_Jsq+6yk59Z4swi2xq4=_=m89pBUt-fNXJF8smjw7qS8xazA@mail.gmail.com>
+From: boris.brezillon@free-electrons.com (Boris Brezillon)
+Date: Tue, 16 Jun 2015 15:24:54 +0200
+Subject: [BUG] at91: macb: does not work
+In-Reply-To: <5580205B.1030804@aksignal.cz>
+References: <5580205B.1030804@aksignal.cz>
+Message-ID: <20150616152454.348ae4ea@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 16, 2015 at 2:52 AM, Vaibhav Hiremath
-<vaibhav.hiremath@linaro.org> wrote:
->
->
-> On Monday 01 June 2015 02:08 PM, Lee Jones wrote:
->>
->> On Sat, 30 May 2015, Vaibhav Hiremath wrote:
->>
->
-> Thanks for your review. and sorry for delayed response.
->
->>> Add DT support to the 88pm800 driver along with below properties
->>>         - marvell,88pm800-irq-write-clear :
->>>           Idicates whether interrupt status is cleared by write
->>>
->>> Also, creates the DT binding text file,
->>> Documentation/devicetree/bindings/mfd/88pm800.txt
->>>
->>> Signed-off-by: Chao Xie <chao.xie@marvell.com>
->>> Signed-off-by: Vaibhav Hiremath <vaibhav.hiremath@linaro.org>
->>> ---
->>>   Documentation/devicetree/bindings/mfd/88pm800.txt | 57
->>> +++++++++++++++++++++++
->>>   drivers/mfd/88pm800.c                             | 39 ++++++++++++++++
->>
->>
->> These should be submitted separately.
->>
->
->
-> Ok, will separate it in next version.
->
->
->>>   2 files changed, 96 insertions(+)
->>>   create mode 100644 Documentation/devicetree/bindings/mfd/88pm800.txt
->>>
->>> diff --git a/Documentation/devicetree/bindings/mfd/88pm800.txt
->>> b/Documentation/devicetree/bindings/mfd/88pm800.txt
->>> new file mode 100644
->>> index 0000000..094951b
->>> --- /dev/null
->>> +++ b/Documentation/devicetree/bindings/mfd/88pm800.txt
->>> @@ -0,0 +1,57 @@
->>> +* Marvell 88PM800 Power Management IC
+Hi Jiri,
 
-Might as well name this 88PM8xx from the start.
+On Tue, 16 Jun 2015 15:10:51 +0200
+Ji?? Prchal <jiri.prchal@aksignal.cz> wrote:
 
->>> +
->>> +Required parent device properties:
->>> +- compatible : "marvell,88pm800"
+> Hi,
+> in v4.1-rc8 does not work ethernet. It normally gets up, but no data are going through.
+> 
+> [    4.400000] macb f802c000.ethernet (unnamed net_device) (uninitialized): invalid hw address, using random
+> [    4.510000] macb f802c000.ethernet eth0: Cadence MACB rev 0x0001010c at 0xf802c000 irq 37 (52:30:8f:6b:9c:b7)
+> [    4.520000] macb f802c000.ethernet eth0: attached PHY driver [Generic PHY] (mii_bus:phy_addr=f802c000.etherne:03, irq=-1)
+> [   15.510000] macb f802c000.ethernet eth0: link up (100/Full)
+> 
+> / # ip -s link ls eth0
+> 2: eth0: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 qdisc pfifo_fast state UP mode DEFAULT group default qlen 1000
+>      link/ether a2:61:fe:17:65:b1 brd ff:ff:ff:ff:ff:ff
+>      RX: bytes  packets  errors  dropped overrun mcast
+>      0          0        0       0       0       0
+>      TX: bytes  packets  errors  dropped carrier collsns
+>      0          0        0       0       0       0
+> 
+> In v4.0.5 it's working.
 
-You might as well include 88pm805 and 88pm860 here since 805 support
-is in the kernel and you will be submitting 860 support. They don't
-have to be added with driver support.
+On which platform are you testing (SoC and board) ?
 
->>> +- reg : the I2C slave address for the 88pm800 chip
->>> +- interrupts : IRQ line for the 88pm800 chip
->>> +- interrupt-controller: describes the 88pm800 as an interrupt controller
->>> +- #interrupt-cells : should be 1.
->>> +               - The cell is the 88pm800 local IRQ number
->>> +
->>> +Optional parent device properties:
->>> +- marvell,88pm800-irq-write-clr: indicates whether interrupt status is
->>> cleared by write
->>
->>
->> Drop the device name.  These bindings should be as generic as possible.
->>
->
-> OK, how about simply
->
-> "mfd-irq_clr_on_write"
+Best Regards,
 
-No, mfd is a Linux name which doesn't belong in bindings, and
-underscores are generally not used.
+Boris
 
-I think Lee meant marvell,irq-write-clr or irq-write-clr.
+> 
+> I bisected it and found:
+> a848748959d554666b34cffc08ef2d23f4bb2990 is the first bad commit
+> commit a848748959d554666b34cffc08ef2d23f4bb2990
+> Author: Boris BREZILLON <boris.brezillon@free-electrons.com>
+> Date:   Sat Mar 7 07:23:30 2015 +0100
+> 
+>      net: macb: remove #if defined(CONFIG_ARCH_AT91) sections
+> 
+>      With multi platform support those sections could lead to unexpected
+>      behavior if both ARCH_AT91 and another ARM SoC using the MACB IP are
+>      selected.
+>      Add two new capabilities to encode the default MII mode and the presence
+>      of a CLKEN bit in USRIO register.
+>      Then define the appropriate config for IPs embedded in at91 SoCs.
+> 
+>      Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+>      Reviewed-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+>      Signed-off-by: David S. Miller <davem@davemloft.net>
+> 
+> :040000 040000 1c87dbb47362b56e88a0e7256c991c64cf60e0bf af0bcc11f81aebf2c64afa5cd53766d494ea3fdb M	drivers
+> 
+> 
+> Jiri
 
-This could also just be dropped altogether and set based on the
-compatible strings with match data.
 
->> Also describe what the absence of the property means.
->>
->
-> Ok.
->
->>> +88pm800 consists of a large and varied group of sub-devices:
->>
->>
->> 3?
->>
->
-> I have explicitly mentioned in note that more device list will follow.
-> I just wanted to add entries as and when we add/enable driver support.
->
->>> +Device                  Supply Names    Description
->>> +------                  ------------    -----------
->>> +88pm80x-onkey          :               : On key
->>> +88pm80x-rtc            :               : RTC
->>> +88pm80x                        :               : Regulators
->>
->>
->> Surely regulators is 88pm80x-regulator, no?
->>
->
-> did not understand what change is expected here.
 
-The node name for regulators node should be 88pm80x-regulator? But
-these don't correspond to node names based on the example and the
-example is correct IMO. So these are Linux driver names? If so, they
-don't belong in the binding doc. What you need is to document the
-sub-node compatible strings
-
-Rob
+-- 
+Boris Brezillon, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
