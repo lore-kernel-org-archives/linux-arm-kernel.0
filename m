@@ -1,37 +1,46 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 16 Jun 2015 09:03:36 +0200
-Subject: [PATCH 0/5] EP93xx GENERIC_CLOCKEVENTS
-In-Reply-To: <DC148C5AA1CEBA4E87973D432B1C2D883D49CA16@P3PWEX4MB008.ex4.secureserver.net>
-References: <1434376222-4587-1-git-send-email-linus.walleij@linaro.org>
- <DC148C5AA1CEBA4E87973D432B1C2D883D49CA16@P3PWEX4MB008.ex4.secureserver.net>
-Message-ID: <CACRpkdbwpfHeiESZ9c71m5GV7VMGO3e0ky13mdEZMQ=8vpM0BQ@mail.gmail.com>
+From: wxt@rock-chips.com (Caesar Wang)
+Date: Tue, 16 Jun 2015 15:27:42 +0800
+Subject: [PATCH v2 0/3] Add the efuse driver on rockchip platform
+Message-ID: <1434439665-27781-1-git-send-email-wxt@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 15, 2015 at 7:25 PM, Hartley Sweeten
-<HartleyS@visionengravers.com> wrote:
+The original driver is uploaded by Jianqun.
+Here is his patchs:
+    https://patchwork.kernel.org/patch/5410341/
+    https://patchwork.kernel.org/patch/5410351/
 
-> Tested on Vision Engraving Systems EP9307 (vision_ep9307.c).
->
-> You can use whatever tag is appropriate:
->
-> Tested-by: H Hartley Sweeten <hsweeten@visionengravers.com>
-> Reviewed-by: H Hartley Sweeten <hsweeten@visionengravers.com>
+Jianqun, nevermind!
+I check-pick it and re-upload the driver for the upstream.
+e.g.:
+    Tested by on minnie board.(kernel-4.1-rc8)
+    cd /sys/devices/platform/ffb40000.efuse
+    localhost ffb40000.efuse # cat cpu_leakage_show
+    cpu_version_show
+    The results:
+            19
+            2
 
-Awesome.
+Changes in v2:
+- Change the document decription.
+- Move the efuse driver into driver/soc/vendor.
+- update the efuse driver.
+- Add the dts node on RK3288.
 
-Do you want to queue this material for v4.3, or shall I create a branch
-to funnel this to ARM SoC? I will put your PATCH_PHYS_TO_VIRT
-patch on top of that pile of course.
+Caesar Wang (3):
+  soc/rockchip: Add efuse bindings for Rockchip SoC efuse driver
+  soc/rockchip: efuse: Add Rockchip SoC efuse support
+  ARM: dts: Add RK3288 efuse node
 
-> One nit...
->
-> Is the "Timer handling for EP93xx" comment still correct?
->
-> It still mentions a 16-bit timer (timer 1) used for the timer interrupt and gettimeoffset()
-> being used with timer 4.
+ .../bindings/fuse/rockchip,rockchip-efuse.txt      |  14 ++
+ arch/arm/boot/dts/rk3288.dtsi                      |   5 +
+ drivers/soc/Makefile                               |   1 +
+ drivers/soc/rockchip/Makefile                      |   4 +
+ drivers/soc/rockchip/efuse.c                       | 212 +++++++++++++++++++++
+ 5 files changed, 236 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/fuse/rockchip,rockchip-efuse.txt
+ create mode 100644 drivers/soc/rockchip/Makefile
+ create mode 100644 drivers/soc/rockchip/efuse.c
 
-Darn, sent a separate patch to address this.
-
-Yours,
-Linus Walleij
+-- 
+1.9.1
