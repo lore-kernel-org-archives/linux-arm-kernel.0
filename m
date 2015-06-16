@@ -1,47 +1,84 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Tue, 16 Jun 2015 11:59:05 +0000
-Subject: [PATCH 1/2] net: mvneta: introduce tx_csum_limit property
-In-Reply-To: <20150616120034.510b0030@free-electrons.com>
-References: <1434378443-23029-1-git-send-email-simon.guinot@sequanux.org>
- <1434378443-23029-2-git-send-email-simon.guinot@sequanux.org>
- <20150615164952.4f2f4dab@free-electrons.com>
- <20150615155440.GS4853@kw.sim.vm.gnt>
- <20150616120034.510b0030@free-electrons.com>
-Message-ID: <20150616115905.GB2917@io.lakedaemon.net>
+From: tony@atomide.com (Tony Lindgren)
+Date: Tue, 16 Jun 2015 04:46:45 -0700
+Subject: [GIT PULL] omap generic wakeirq for v4.2 merge window
+Message-ID: <20150616114645.GA4156@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Thomas, Simon,
+Hi,
 
-On Tue, Jun 16, 2015 at 12:00:34PM +0200, Thomas Petazzoni wrote:
-> On Mon, 15 Jun 2015 17:54:41 +0200, Simon Guinot wrote:
-> > > The current armada-370-neta would limit the HW checksumming features to
-> > > packets smaller than 1600 bytes, while a new armada-xp-neta would not
-> > > have this limit.
-> > 
-> > This was also my first idea. But by doing this, we take the risk of
-> > losing the HW checksumming feature with jumbo frames on some currently
-> > working Armada XP setups. This may happen for example if a user is able
-> > to update the kernel but not the on-board DTB. In order to fix a feature
-> > on a SoC, we are breaking the DTB-kernel compatibility for the very same
-> > feature on an another SoC. I am not sure it is OK.
+Here's a late pull request that would be good to get into v4.2.
+This series mostly just drops code that's now unnecessary, and
+also fixes potential interrupt re-entrancy issues that the old
+handling has.
 
-Frankly, this isn't a realistic scenario.  We've said from day one that
-if the dtb is provided with the board that it needs to be updateable.
-For exactly these kinds of situations.  Also, Thomas' assessment is
-correct, everyone we've ever spoken to is keeping the dtb in sync with
-the kernel.
+The series changes omap hsmmc, 8250_omap and omap-serial to use
+the Linux generic wakeirq. I had to redo the branch last week on
+recent tty-next branch because of a merge conflict. Other than
+that, these patches were already in Linux next earlier.
 
-As long as a board with the old dtb boots a newer kernel without
-crashing, then it's fine.  afaict in this situation, the updated driver
-should limit HW checksumming for packets >1600 bytes if the compatible
-string is 'armada-370-neta'.  Regardless of actual SoC underneath.
-If the driver gets 'armada-xp-neta' then there is no checksum limit.
+The pull request below also shows the related patches in Rafael's
+pm-wakeirq branch as I did not create a separate merge commit to
+base patches on.
 
-Users with an Armada XP SoC and an old dtb will need to upgrade the dtb
-in order to make use of HW checksumming on jumbo packets with newer
-kernels.  Seems sane to me.
+This branch depends on both Rafael's pm-wakeirq and Greg's
+tty-next, so it should be sent separately towards the end of the
+merge window.
 
-thx,
+Regards,
 
-Jason.
+Tony
+
+8< ------------------
+
+The following changes since commit 00fda1682efdbd62a20a8a21aee52d994c323c7f:
+
+  Merge 4.1-rc7 into tty-next (2015-06-08 10:49:28 -0700)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v4.2/wakeirq-drivers-v2
+
+for you to fetch changes up to 63e63a1981c7247fea41ce97b3144befc8f2fb7b:
+
+  Merge branch 'wakeirq-8250' into omap-for-v4.2/wakeirq-v2 (2015-06-09 23:37:31 -0700)
+
+----------------------------------------------------------------
+Omap driver changes for v4.2 to switch drivers over to Linux generic
+wake IRQ events for omap_hsmmc, 8250_omap and omap-serial
+drivers.
+
+The generic wake IRQs also fix issues that these drivers potentially
+have with IRQ re-entrancy@least for serial-omap.
+
+Note that because of dependencies and merge conflicts these are
+based on Rafael's pm-wakeirq and Greg's tty-next branches.
+
+----------------------------------------------------------------
+Ben Dooks (1):
+      PM / runtime: add note about re-calling in during device probe()
+
+Tony Lindgren (6):
+      PM / Runtime: Update last_busy in rpm_resume
+      PM / Wakeirq: Add automated device wake IRQ handling
+      mmc: omap_hsmmc: Change wake-up interrupt to use generic wakeirq
+      serial: omap: Switch wake-up interrupt to generic wakeirq
+      serial: 8250_omap: Move wake-up interrupt to generic wakeirq
+      Merge branch 'wakeirq-8250' into omap-for-v4.2/wakeirq-v2
+
+ Documentation/power/runtime_pm.txt  |   6 +
+ drivers/base/power/Makefile         |   2 +-
+ drivers/base/power/main.c           |   3 +
+ drivers/base/power/power.h          |  48 +++++++
+ drivers/base/power/runtime.c        |   6 +
+ drivers/base/power/wakeirq.c        | 273 ++++++++++++++++++++++++++++++++++++
+ drivers/base/power/wakeup.c         |  92 ++++++++++++
+ drivers/mmc/host/omap_hsmmc.c       |  49 +------
+ drivers/tty/serial/8250/8250_omap.c |  58 +-------
+ drivers/tty/serial/omap-serial.c    |  35 +----
+ include/linux/pm.h                  |   2 +
+ include/linux/pm_wakeirq.h          |  52 +++++++
+ include/linux/pm_wakeup.h           |   9 ++
+ 13 files changed, 506 insertions(+), 129 deletions(-)
+ create mode 100644 drivers/base/power/wakeirq.c
+ create mode 100644 include/linux/pm_wakeirq.h
