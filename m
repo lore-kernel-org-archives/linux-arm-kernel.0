@@ -1,76 +1,44 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Tue, 16 Jun 2015 14:12:58 +0200
-Subject: [PATCH 2/9] ARM: mvebu: prepare set_cpu_coherent() for future
- extension
+Date: Tue, 16 Jun 2015 14:12:57 +0200
+Subject: [PATCH 1/9] ARM: mvebu: fix suspend to RAM on big-endian
+ configurations
 In-Reply-To: <1434456785-23696-1-git-send-email-thomas.petazzoni@free-electrons.com>
 References: <1434456785-23696-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1434456785-23696-3-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1434456785-23696-2-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Nadav Haklai <nadavh@marvell.com>
+The current Armada XP suspend to RAM implementation, as added in
+commit 27432825ae19f ("ARM: mvebu: Armada XP GP specific
+suspend/resume code") does not handle big-endian configurations
+properly: the small bit of assembly code putting the DRAM in
+self-refresh and toggling the GPIOs to turn off power forgets to
+convert the values to little-endian.
 
-This patch prepares the set_cpu_coherent() function in coherency.c to
-be extended to support other SoCs than Armada XP. It will be needed on
-Armada 38x to re-enable the coherency after exiting from suspend to
-RAM.
+This commit fixes that by making sure the two values we will write to
+the DRAM controller register and GPIO register are already in
+little-endian before entering the critical assembly code.
 
-This preparation simply moves the function further down in coherency.c
-so that it can use coherency_type(), and uses that function to only do
-the Armada XP specific work if we are on Armada XP.
-
-Signed-off-by: Nadav Haklai <nadavh@marvell.com>
 Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+Cc: <stable@vger.kernel.org> # v3.19+
+Fixes: 27432825ae19f ("ARM: mvebu: Armada XP GP specific suspend/resume code")
 ---
- arch/arm/mach-mvebu/coherency.c | 29 +++++++++++++++++------------
- 1 file changed, 17 insertions(+), 12 deletions(-)
+ arch/arm/mach-mvebu/pm-board.c | 3 +++
+ 1 file changed, 3 insertions(+)
 
-diff --git a/arch/arm/mach-mvebu/coherency.c b/arch/arm/mach-mvebu/coherency.c
-index e46e9ea..44eedf3 100644
---- a/arch/arm/mach-mvebu/coherency.c
-+++ b/arch/arm/mach-mvebu/coherency.c
-@@ -65,18 +65,6 @@ static const struct of_device_id of_coherency_table[] = {
- int ll_enable_coherency(void);
- void ll_add_cpu_to_smp_group(void);
+diff --git a/arch/arm/mach-mvebu/pm-board.c b/arch/arm/mach-mvebu/pm-board.c
+index 6dfd4ab..301ab38 100644
+--- a/arch/arm/mach-mvebu/pm-board.c
++++ b/arch/arm/mach-mvebu/pm-board.c
+@@ -43,6 +43,9 @@ static void mvebu_armada_xp_gp_pm_enter(void __iomem *sdram_reg, u32 srcmd)
+ 	for (i = 0; i < ARMADA_XP_GP_PIC_NR_GPIOS; i++)
+ 		ackcmd |= BIT(pic_raw_gpios[i]);
  
--int set_cpu_coherent(void)
--{
--	if (!coherency_base) {
--		pr_warn("Can't make current CPU cache coherent.\n");
--		pr_warn("Coherency fabric is not initialized\n");
--		return 1;
--	}
--
--	ll_add_cpu_to_smp_group();
--	return ll_enable_coherency();
--}
--
- static int mvebu_hwcc_notifier(struct notifier_block *nb,
- 			       unsigned long event, void *__dev)
- {
-@@ -206,6 +194,23 @@ static int coherency_type(void)
- 	return type;
- }
- 
-+int set_cpu_coherent(void)
-+{
-+	int type = coherency_type();
++	srcmd = cpu_to_le32(srcmd);
++	ackcmd = cpu_to_le32(ackcmd);
 +
-+	if (type == COHERENCY_FABRIC_TYPE_ARMADA_370_XP) {
-+		if (!coherency_base) {
-+			pr_warn("Can't make current CPU cache coherent.\n");
-+			pr_warn("Coherency fabric is not initialized\n");
-+			return 1;
-+		}
-+		ll_add_cpu_to_smp_group();
-+		return ll_enable_coherency();
-+	}
-+
-+	return 0;
-+}
-+
- int coherency_available(void)
- {
- 	return coherency_type() != COHERENCY_FABRIC_TYPE_NONE;
+ 	/*
+ 	 * Wait a while, the PIC needs quite a bit of time between the
+ 	 * two GPIO commands.
 -- 
 2.1.0
