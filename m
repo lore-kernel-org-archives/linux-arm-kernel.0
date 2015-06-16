@@ -1,70 +1,39 @@
 From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Tue, 16 Jun 2015 11:59:08 +0200
-Subject: [PATCH v5 14/14] crypto: marvell/CESA: add DT bindings documentation
+Date: Tue, 16 Jun 2015 11:59:05 +0200
+Subject: [PATCH v5 11/14] crypto: marvell/CESA: add allhwsupport module
+ parameter
 In-Reply-To: <1434448748-10828-1-git-send-email-boris.brezillon@free-electrons.com>
 References: <1434448748-10828-1-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <1434448748-10828-15-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <1434448748-10828-12-git-send-email-boris.brezillon@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add DT bindings documentation for the new marvell-cesa driver.
+The old and new marvell CESA drivers both support Orion and Kirkwood SoCs.
+Add a module parameter to choose whether these SoCs should be attached to
+the new or the old driver.
+
+The default policy is to keep attaching those IPs to the old driver if it
+is enabled, until we decide the new CESA driver is stable/secure enough.
 
 Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
 ---
- .../devicetree/bindings/crypto/marvell-cesa.txt    | 45 ++++++++++++++++++++++
- 1 file changed, 45 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/crypto/marvell-cesa.txt
+ drivers/crypto/marvell/cesa.c | 4 ++++
+ 1 file changed, 4 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/crypto/marvell-cesa.txt b/Documentation/devicetree/bindings/crypto/marvell-cesa.txt
-new file mode 100644
-index 0000000..c6c6a4a0
---- /dev/null
-+++ b/Documentation/devicetree/bindings/crypto/marvell-cesa.txt
-@@ -0,0 +1,45 @@
-+Marvell Cryptographic Engines And Security Accelerator
+diff --git a/drivers/crypto/marvell/cesa.c b/drivers/crypto/marvell/cesa.c
+index af590bf..a05b5cb 100644
+--- a/drivers/crypto/marvell/cesa.c
++++ b/drivers/crypto/marvell/cesa.c
+@@ -31,6 +31,10 @@
+ 
+ #include "cesa.h"
+ 
++static int allhwsupport = !IS_ENABLED(CONFIG_CRYPTO_DEV_MV_CESA);
++module_param_named(allhwsupport, allhwsupport, int, 0444);
++MODULE_PARM_DESC(allhwsupport, "Enable support for all hardware (even it if overlaps with the mv_cesa driver)");
 +
-+Required properties:
-+- compatible: should be one of the following string
-+	      "marvell,orion-crypto"
-+	      "marvell,kirkwood-crypto"
-+	      "marvell,dove-crypto"
-+	      "marvell,armada-370-crypto"
-+	      "marvell,armada-xp-crypto"
-+	      "marvell,armada-375-crypto"
-+	      "marvell,armada-38x-crypto"
-+- reg: base physical address of the engine and length of memory mapped
-+       region. Can also contain an entry for the SRAM attached to the CESA,
-+       but this representation is deprecated and marvell,crypto-srams should
-+       be used instead
-+- reg-names: "regs". Can contain an "sram" entry, but this representation
-+	     is deprecated and marvell,crypto-srams should be used instead
-+- interrupts: interrupt number
-+- clocks: reference to the crypto engines clocks. This property is not
-+	  required for orion and kirkwood platforms
-+- clock-names: "cesaX" and "cesazX", X should be replaced by the crypto engine
-+	       id.
-+	       This property is not required for the orion and kirkwoord
-+	       platforms.
-+	       "cesazX" clocks are not required on armada-370 platforms
-+- marvell,crypto-srams: phandle to crypto SRAM definitions
-+
-+Optional properties:
-+- marvell,crypto-sram-size: SRAM size reserved for crypto operations, if not
-+			    specified the whole SRAM is used (2KB)
-+
-+
-+Examples:
-+
-+	crypto at 90000 {
-+		compatible = "marvell,armada-xp-crypto";
-+		reg = <0x90000 0x10000>;
-+		reg-names = "regs";
-+		interrupts = <48>, <49>;
-+		clocks = <&gateclk 23>, <&gateclk 23>;
-+		clock-names = "cesa0", "cesa1";
-+		marvell,crypto-srams = <&crypto_sram0>, <&crypto_sram1>;
-+		marvell,crypto-sram-size = <0x600>;
-+		status = "okay";
-+	};
+ struct mv_cesa_dev *cesa_dev;
+ 
+ static void mv_cesa_dequeue_req_unlocked(struct mv_cesa_engine *engine)
 -- 
 1.9.1
