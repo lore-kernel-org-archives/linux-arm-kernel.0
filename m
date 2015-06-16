@@ -1,27 +1,40 @@
-From: khilman@kernel.org (Kevin Hilman)
-Date: Tue, 16 Jun 2015 16:21:51 -0700
-Subject: [GIT PULL] SoCFPGA updates for v4.2, part 3
-In-Reply-To: <1434424895-4047-1-git-send-email-dinh.linux@gmail.com> (dinh
- linux's message of "Mon, 15 Jun 2015 22:21:35 -0500")
-References: <1434424895-4047-1-git-send-email-dinh.linux@gmail.com>
-Message-ID: <7hfv5rw86o.fsf@deeprootsystems.com>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Tue, 16 Jun 2015 16:22:56 -0700
+Subject: [PATCH v4] ARM: early fixmap support for earlycon
+In-Reply-To: <1434491507-6208-1-git-send-email-stefan@agner.ch>
+References: <1434491507-6208-1-git-send-email-stefan@agner.ch>
+Message-ID: <5580AFD0.1030606@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-dinh.linux at gmail.com writes:
-
-> Hi Arnd, Kevin, Olof:
+On 06/16/2015 02:51 PM, Stefan Agner wrote:
+> Add early fixmap support, initially to support permanent, fixed
+> mapping support for early console. A temporary, early pte is
+> created which is migrated to a permanent mapping in paging_init.
+> This is also needed since the attributes may change as the memory
+> types are initialized. The 3MiB range of fixmap spans two pte
+> tables, but currently only one pte is created for early fixmap
+> support.
 >
-> If it's not too late for v4.2, can you please pull in this patch.
+> Re-add FIX_KMAP_BEGIN to the index calculation in highmem.c since
+> the index for kmap does not start at zero anymore. This reverts
+> 4221e2e6b316 ("ARM: 8031/1: fixmap: remove FIX_KMAP_BEGIN and
+> FIX_KMAP_END") to some extent.
+>
+> Cc: Mark Salter <msalter@redhat.com>
+> Cc: Russell King <linux@arm.linux.org.uk>
+> Cc: Kees Cook <keescook@chromium.org>
+> Cc: Laura Abbott <lauraa@codeaurora.org>
+> Cc: Arnd Bergmann <arnd@arndb.de>
+> Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> Signed-off-by: Rob Herring <robh@kernel.org>
+> Signed-off-by: Stefan Agner <stefan@agner.ch>
 >
 
-Sorry, too late for v4.2.   
+Works on msm_serial.
 
-If this is actually fixing a regression (it doesn't look like it to me
-at first glance), please resend as a fix for v4.2-rc explaining the
-regression that is being fixed.  Otherwise, please add it to your queue
-for v4.3.
+Tested-by: Stephen Boyd <sboyd@codeaurora.org>
 
-Thanks,
-
-Kevin
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
