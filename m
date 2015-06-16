@@ -1,45 +1,31 @@
-From: HartleyS@visionengravers.com (Hartley Sweeten)
-Date: Tue, 16 Jun 2015 16:37:39 +0000
-Subject: [PATCH 0/5] EP93xx GENERIC_CLOCKEVENTS
-In-Reply-To: <CACRpkdbwpfHeiESZ9c71m5GV7VMGO3e0ky13mdEZMQ=8vpM0BQ@mail.gmail.com>
-References: <1434376222-4587-1-git-send-email-linus.walleij@linaro.org>
- <DC148C5AA1CEBA4E87973D432B1C2D883D49CA16@P3PWEX4MB008.ex4.secureserver.net>
- <CACRpkdbwpfHeiESZ9c71m5GV7VMGO3e0ky13mdEZMQ=8vpM0BQ@mail.gmail.com>
-Message-ID: <DC148C5AA1CEBA4E87973D432B1C2D883D4A35CE@P3PWEX4MB008.ex4.secureserver.net>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 16 Jun 2015 17:49:15 +0100
+Subject: [PATCH v2 01/11] KVM: arm: plug guest debug exploit
+In-Reply-To: <557DA811.8090705@linaro.org>
+References: <1433046432-1824-1-git-send-email-zhichao.huang@linaro.org>
+ <1433046432-1824-2-git-send-email-zhichao.huang@linaro.org>
+ <556C3A68.8050903@arm.com> <557449EA.7040003@linaro.org>
+ <5576BFF7.3070706@arm.com> <557DA6E4.7090609@linaro.org>
+ <557DA811.8090705@linaro.org>
+Message-ID: <20150616164914.GM30522@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday, June 16, 2015 12:04 AM, Linus Walleij wrote:
-> On Mon, Jun 15, 2015 at 7:25 PM, Hartley Sweeten <HartleyS@visionengravers.com> wrote:
->> Tested on Vision Engraving Systems EP9307 (vision_ep9307.c).
->>
->> You can use whatever tag is appropriate:
->>
->> Tested-by: H Hartley Sweeten <hsweeten@visionengravers.com>
->> Reviewed-by: H Hartley Sweeten <hsweeten@visionengravers.com>
->
-> Awesome.
->
-> Do you want to queue this material for v4.3, or shall I create a branch
-> to funnel this to ARM SoC? I will put your PATCH_PHYS_TO_VIRT
-> patch on top of that pile of course.
+On Sun, Jun 14, 2015 at 05:13:05PM +0100, zichao wrote:
+> I and marc are talking about how to plug the guest debug exploit in an
+> easier way.
+> 
+> I remembered that you mentioned disabling monitor mode had proven to be
+> extremely fragile in practice on 32-bit ARM SoCs, what if I save/restore
+> the debug monitor mode on each switch between the guest and the host,
+> would it be acceptable?
 
-If you can queue up any ep93xx patches that would be great.
+If you're just referring to DBGDSCRext, then you could give it a go, but
+you'll certainly want to predicate any writes to that register on whether
+or not hw_breakpoint managed to reset the debug regs on the host.
 
-Ryan used to queue them on his github branch but it has not been updated
-for quite a while. I have not seen any responses from him lately so I'm not
-sure if he is even active.
+Like I said, accessing these registers always worries me, so I'd really
+avoid it in KVM if you can. If not, you'll need to do extensive testing
+on a bunch of platforms with and without the presence of external debug.
 
->> One nit...
->>
->> Is the "Timer handling for EP93xx" comment still correct?
->>
->> It still mentions a 16-bit timer (timer 1) used for the timer interrupt and gettimeoffset()
->> being used with timer 4.
->
-> Darn, sent a separate patch to address this.
-
-Great.
-
-Thanks,
-Hartley
+Will
