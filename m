@@ -1,21 +1,65 @@
 From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Tue, 16 Jun 2015 15:58:13 -0700
-Subject: [PATCH v5 07/11] nvmem: Add simple nvmem-mmio consumer helper
- functions.
-In-Reply-To: <1432226665-8994-1-git-send-email-srinivas.kandagatla@linaro.org>
+Date: Tue, 16 Jun 2015 16:00:43 -0700
+Subject: [PATCH v5 08/11] nvmem: qfprom: Add Qualcomm QFPROM support.
+In-Reply-To: <1432226675-9039-1-git-send-email-srinivas.kandagatla@linaro.org>
 References: <1432226535-8640-1-git-send-email-srinivas.kandagatla@linaro.org>
- <1432226665-8994-1-git-send-email-srinivas.kandagatla@linaro.org>
-Message-ID: <5580AA05.90709@codeaurora.org>
+ <1432226675-9039-1-git-send-email-srinivas.kandagatla@linaro.org>
+Message-ID: <5580AA9B.7040001@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On 05/21/2015 09:44 AM, Srinivas Kandagatla wrote:
-> diff --git a/drivers/nvmem/nvmem-mmio.c b/drivers/nvmem/nvmem-mmio.c
+> diff --git a/drivers/nvmem/Kconfig b/drivers/nvmem/Kconfig
+> index f157b6d..e665e23 100644
+> --- a/drivers/nvmem/Kconfig
+> +++ b/drivers/nvmem/Kconfig
+> @@ -8,3 +8,18 @@ menuconfig NVMEM
+>  	  from both the Linux Kernel and the userspace.
+>  
+>  	  If unsure, say no.
+> +
+> +if NVMEM
+> +
+> +config QCOM_QFPROM
+> +	tristate "QCOM QFPROM Support"
+> +	depends on ARCH_QCOM
+
+ || COMPILE_TEST?
+
+> +	select REGMAP_MMIO
+> +	help
+> +	  Say y here to enable QFPROM support. The QFPROM provides access
+> +	  functions for QFPROM data to rest of the drivers via nvmem interface.
+> +
+> +	  This driver can also be built as a module. If so, the module
+> +	  will be called nvmem-qfprom.
+> +
+> +endif
+> diff --git a/drivers/nvmem/Makefile b/drivers/nvmem/Makefile
+> index f694cfc..caea611 100644
+> --- a/drivers/nvmem/Makefile
+> +++ b/drivers/nvmem/Makefile
+> @@ -5,3 +5,7 @@
+>  obj-$(CONFIG_NVMEM)		+= nvmem_core.o
+>  nvmem_core-y			:= core.o
+>  nvmem_core-y			+= nvmem-mmio.o
+> +
+> +# Devices
+> +obj-$(CONFIG_QCOM_QFPROM)	+= nvmem_qfprom.o
+> +nvmem_qfprom-y			:= qfprom.o
+
+Why not just
+
+obj-$(CONFIG_QCOM_QFPROM) += nvmem_qfprom.o
+
+?
+
+> diff --git a/drivers/nvmem/qfprom.c b/drivers/nvmem/qfprom.c
 > new file mode 100644
-> index 0000000..0d8131f
+> index 0000000..5ea84bb
 > --- /dev/null
-> +++ b/drivers/nvmem/nvmem-mmio.c
-> @@ -0,0 +1,69 @@
+> +++ b/drivers/nvmem/qfprom.c
+> @@ -0,0 +1,51 @@
 > +/*
 > + * Copyright (C) 2015 Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
 > + *
@@ -29,84 +73,35 @@ On 05/21/2015 09:44 AM, Srinivas Kandagatla wrote:
 > + * GNU General Public License for more details.
 > + */
 > +
-> +#include <linux/device.h>
 > +#include <linux/module.h>
-> +#include <linux/err.h>
 > +#include <linux/of.h>
-> +#include <linux/of_device.h>
-
-#include <linux/platform_device.h>
-#include <linux/nvmem_provider.h>
-#include <linux/regmap.h>
-
 > +#include "nvmem-mmio.h"
 > +
-> +int nvmem_mmio_remove(struct platform_device *pdev)
-> +{
-> +	struct nvmem_device *nvmem = platform_get_drvdata(pdev);
-> +
-> +	return nvmem_unregister(nvmem);
-> +}
-> +EXPORT_SYMBOL_GPL(nvmem_mmio_remove);
-> +
-> +int nvmem_mmio_probe(struct platform_device *pdev)
-> +{
-> +
-[...]
-> +
-> +	platform_set_drvdata(pdev, nvmem);
+> +static struct regmap_config qfprom_regmap_config = {
 
-It may be better to return the nvmem device instead so that the one
-drvdata member is usable by the calling driver.
+const?
 
-> +
-> +	return 0;
-> +}
-> +EXPORT_SYMBOL_GPL(nvmem_mmio_probe);
-
-Kernel-doc on these exported functions?
-
-> diff --git a/drivers/nvmem/nvmem-mmio.h b/drivers/nvmem/nvmem-mmio.h
-> new file mode 100644
-> index 0000000..a2ad4e5
-> --- /dev/null
-> +++ b/drivers/nvmem/nvmem-mmio.h
-> @@ -0,0 +1,41 @@
-> +/*
-> + * MMIO based nvmem providers.
-> + *
-> + * Copyright (C) 2015 Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
-> + *
-> + * This file is licensed under the terms of the GNU General Public
-> + * License version 2.  This program is licensed "as is" without any
-> + * warranty of any kind, whether express or implied.
-> + */
-> +
-> +#ifndef _LINUX_NVMEM_MMIO_H
-> +#define _LINUX_NVMEM_MMIO_H
-> +
-> +#include <linux/platform_device.h>
-
-Forward declare struct platform_device instead.
-
-> +#include <linux/nvmem-provider.h>
-
-Forward declare nvmem_config instead.
-
-> +#include <linux/regmap.h>
-
-Forward declare regmap_config instead.
-
-> +
-> +struct nvmem_mmio_data {
-> +	struct regmap_config *regmap_config;
-> +	struct nvmem_config *nvmem_config;
+> +	.reg_bits = 32,
+> +	.val_bits = 8,
+> +	.reg_stride = 1,
 > +};
 > +
-> +#if IS_ENABLED(CONFIG_NVMEM)
+> +static struct nvmem_config econfig = {
+
+const?
+
+> +	.name = "qfprom",
+> +	.owner = THIS_MODULE,
+> +};
 > +
-> +int nvmem_mmio_probe(struct platform_device *pdev);
-> +int nvmem_mmio_remove(struct platform_device *pdev);
+> +static struct nvmem_mmio_data qfprom_data = {
+
+const?
+
+> +	.nvmem_config = &econfig,
+> +	.regmap_config = &qfprom_regmap_config,
+> +};
+>
 
 -- 
 Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
