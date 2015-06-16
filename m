@@ -1,40 +1,76 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Tue, 16 Jun 2015 14:12:59 +0200
-Subject: [PATCH 3/9] ARM: mvebu: do not check machine in mvebu_pm_init()
+Date: Tue, 16 Jun 2015 14:12:58 +0200
+Subject: [PATCH 2/9] ARM: mvebu: prepare set_cpu_coherent() for future
+ extension
 In-Reply-To: <1434456785-23696-1-git-send-email-thomas.petazzoni@free-electrons.com>
 References: <1434456785-23696-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1434456785-23696-4-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1434456785-23696-3-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The mvebu_pm_init() initializes the support for suspend/resume, and
-before doing that, it checks if we are on a board on which
-suspend/resume is actually supported. However, this check is already
-done by mvebu_armada_xp_gp_pm_init(), and there is no need to
-duplicate the check: callers of mvebu_pm_init() should now what they
-are doing.
+From: Nadav Haklai <nadavh@marvell.com>
 
-This commit is done in preparation to the addition of suspend/resume
-support on Armada 38x.
+This patch prepares the set_cpu_coherent() function in coherency.c to
+be extended to support other SoCs than Armada XP. It will be needed on
+Armada 38x to re-enable the coherency after exiting from suspend to
+RAM.
 
+This preparation simply moves the function further down in coherency.c
+so that it can use coherency_type(), and uses that function to only do
+the Armada XP specific work if we are on Armada XP.
+
+Signed-off-by: Nadav Haklai <nadavh@marvell.com>
 Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 ---
- arch/arm/mach-mvebu/pm.c | 3 ---
- 1 file changed, 3 deletions(-)
+ arch/arm/mach-mvebu/coherency.c | 29 +++++++++++++++++------------
+ 1 file changed, 17 insertions(+), 12 deletions(-)
 
-diff --git a/arch/arm/mach-mvebu/pm.c b/arch/arm/mach-mvebu/pm.c
-index 6573a8f..eca650b 100644
---- a/arch/arm/mach-mvebu/pm.c
-+++ b/arch/arm/mach-mvebu/pm.c
-@@ -182,9 +182,6 @@ int mvebu_pm_init(void (*board_pm_enter)(void __iomem *sdram_reg, u32 srcmd))
- 	struct device_node *np;
- 	struct resource res;
+diff --git a/arch/arm/mach-mvebu/coherency.c b/arch/arm/mach-mvebu/coherency.c
+index e46e9ea..44eedf3 100644
+--- a/arch/arm/mach-mvebu/coherency.c
++++ b/arch/arm/mach-mvebu/coherency.c
+@@ -65,18 +65,6 @@ static const struct of_device_id of_coherency_table[] = {
+ int ll_enable_coherency(void);
+ void ll_add_cpu_to_smp_group(void);
  
--	if (!of_machine_is_compatible("marvell,armadaxp"))
--		return -ENODEV;
+-int set_cpu_coherent(void)
+-{
+-	if (!coherency_base) {
+-		pr_warn("Can't make current CPU cache coherent.\n");
+-		pr_warn("Coherency fabric is not initialized\n");
+-		return 1;
+-	}
 -
- 	np = of_find_compatible_node(NULL, NULL,
- 				     "marvell,armada-xp-sdram-controller");
- 	if (!np)
+-	ll_add_cpu_to_smp_group();
+-	return ll_enable_coherency();
+-}
+-
+ static int mvebu_hwcc_notifier(struct notifier_block *nb,
+ 			       unsigned long event, void *__dev)
+ {
+@@ -206,6 +194,23 @@ static int coherency_type(void)
+ 	return type;
+ }
+ 
++int set_cpu_coherent(void)
++{
++	int type = coherency_type();
++
++	if (type == COHERENCY_FABRIC_TYPE_ARMADA_370_XP) {
++		if (!coherency_base) {
++			pr_warn("Can't make current CPU cache coherent.\n");
++			pr_warn("Coherency fabric is not initialized\n");
++			return 1;
++		}
++		ll_add_cpu_to_smp_group();
++		return ll_enable_coherency();
++	}
++
++	return 0;
++}
++
+ int coherency_available(void)
+ {
+ 	return coherency_type() != COHERENCY_FABRIC_TYPE_NONE;
 -- 
 2.1.0
