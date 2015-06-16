@@ -1,40 +1,47 @@
-From: robert.richter@caviumnetworks.com (Robert Richter)
-Date: Tue, 16 Jun 2015 15:24:34 +0200
-Subject: [PATCH v5 0/2] ahci: Add generic MSI-X support for single
- interrupts to SATA PCI
-In-Reply-To: <1433526566-21136-1-git-send-email-rric@kernel.org>
-References: <1433526566-21136-1-git-send-email-rric@kernel.org>
-Message-ID: <20150616132434.GO10428@rric.localhost>
+From: fabien.dessenne@st.com (Fabien Dessenne)
+Date: Tue, 16 Jun 2015 15:30:40 +0200
+Subject: [PATCH] ARM: DT: STiH410: Add bdisp dt nodes
+Message-ID: <1434461440-3965-1-git-send-email-fabien.dessenne@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05.06.15 19:49:24, Robert Richter wrote:
-> From: Robert Richter <rrichter@cavium.com>
-> 
-> This patch set adds generic support for MSI-X interrupts to the SATA
-> PCI driver.
-> 
-> One patch does the generic change, the other add support for Cavium's
-> ThunderX host controller.
+Add the bdisp (2D blitter for STMicroelectronics SoC) dt nodes for the
+first of the two bdisp devices, defining register address, interrupt and
+clock.
 
-Tejun,
+Signed-off-by: Fabien Dessenne <fabien.dessenne@st.com>
+---
+ arch/arm/boot/dts/stih410.dtsi | 12 ++++++++++++
+ 1 file changed, 12 insertions(+)
 
-any comment on this?
-
-Thanks,
-
--Robert
-
-> 
-> 
-> Robert Richter (2):
->   ahci: Add generic MSI-X support for single interrupts to SATA PCI
->     driver
->   ahci: Add support for Cavium's ThunderX host controller
-> 
->  drivers/ata/ahci.c | 82 +++++++++++++++++++++++++++++++++++++++++++++++++++++-
->  1 file changed, 81 insertions(+), 1 deletion(-)
-> 
-> -- 
-> 2.1.1
-> 
+diff --git a/arch/arm/boot/dts/stih410.dtsi b/arch/arm/boot/dts/stih410.dtsi
+index 208b5e8..6f40bc9 100644
+--- a/arch/arm/boot/dts/stih410.dtsi
++++ b/arch/arm/boot/dts/stih410.dtsi
+@@ -10,6 +10,10 @@
+ #include "stih407-family.dtsi"
+ #include "stih410-pinctrl.dtsi"
+ / {
++	aliases {
++		bdisp0 = &bdisp0;
++	};
++
+ 	soc {
+ 		usb2_picophy1: phy2 {
+ 			compatible = "st,stih407-usb2-phy";
+@@ -218,5 +222,13 @@
+ 				};
+ 			};
+ 		};
++
++		bdisp0:bdisp at 9f10000 {
++			compatible = "st,stih407-bdisp";
++			reg = <0x9f10000 0x1000>;
++			interrupts = <GIC_SPI 38 IRQ_TYPE_NONE>;
++			clock-names = "bdisp";
++			clocks = <&clk_s_c0_flexgen CLK_IC_BDISP_0>;
++		};
+ 	};
+ };
+-- 
+1.9.1
