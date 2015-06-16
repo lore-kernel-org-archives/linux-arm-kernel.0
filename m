@@ -1,72 +1,49 @@
-From: romain.perier@gmail.com (Romain Perier)
-Date: Tue, 16 Jun 2015 17:19:26 +0000
-Subject: [PATCH] ARM: dts: rockchip: Add DMA tx and rx channels in UART
- interfaces for RK3288 SoCs
-Message-ID: <1434475166-30338-1-git-send-email-romain.perier@gmail.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 16 Jun 2015 18:39:07 +0100
+Subject: [PATCH 0/2] Consolidate redundant register/stack access code
+In-Reply-To: <1434386579-6045-1-git-send-email-dave.long@linaro.org>
+References: <1434386579-6045-1-git-send-email-dave.long@linaro.org>
+Message-ID: <20150616173907.GV30522@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This enable DMA capability for the corresponding UART interfaces, also it removes
-warning "ttyS%d - Failed to request dma" from kernel logs.
+Hi David,
 
-Signed-off-by: Romain Perier <romain.perier@gmail.com>
----
+On Mon, Jun 15, 2015 at 05:42:57PM +0100, David Long wrote:
+> From: "David A. Long" <dave.long@linaro.org>
+> 
+> Move duplicate and functionally equivalent code for accessing registers
+> and stack (CONFIG_HAVE_REGS_AND_STACK_ACCESS_API) from arch subdirs into
+> common kernel files.
+> 
+> Note: Help regression testing s390, hexagon, and sh would be appreciated.
+>       Powerpc builds but I have not verified the functionality.
+> 
+> David A. Long (2):
+>   Move the pt_regs_offset struct definition from arch to common include
+>     file
+>   Consolidate redundant register/stack access code
+> 
+>  arch/arm/include/asm/ptrace.h          |  6 ---
+>  arch/arm/kernel/ptrace.c               | 72 +---------------------------------
+>  arch/hexagon/include/uapi/asm/ptrace.h |  3 --
+>  arch/powerpc/include/asm/ptrace.h      | 38 ------------------
+>  arch/powerpc/kernel/ptrace.c           | 39 +-----------------
+>  arch/s390/include/asm/ptrace.h         |  3 --
+>  arch/s390/kernel/ptrace.c              | 70 ++++++++++-----------------------
+>  arch/sh/include/asm/ptrace.h           | 44 ---------------------
+>  arch/sh/kernel/Makefile                |  2 +-
+>  arch/sh/kernel/ptrace.c                | 33 ----------------
+>  arch/sh/kernel/ptrace_32.c             |  2 +-
+>  arch/sh/kernel/ptrace_64.c             |  2 +-
+>  arch/x86/include/asm/ptrace.h          | 37 -----------------
+>  arch/x86/kernel/ptrace.c               | 39 +-----------------
+>  include/linux/ptrace.h                 | 51 ++++++++++++++++++++++++
+>  kernel/ptrace.c                        | 38 ++++++++++++++++++
+>  16 files changed, 116 insertions(+), 363 deletions(-)
 
-Changes since v1 ("[PATCH] ARM: dts: rockchip: Add dmac_bus rx and tx for uart2"):
-	- Add DMA tx and rx channels for all UART interfaces
-	- Rename commit summary
+Nice cleanup! The ARMy bits all look fine to me.
 
- arch/arm/boot/dts/rk3288.dtsi | 10 ++++++++++
- 1 file changed, 10 insertions(+)
+  Acked-by: Will Deacon <will.deacon@arm.com>
 
-diff --git a/arch/arm/boot/dts/rk3288.dtsi b/arch/arm/boot/dts/rk3288.dtsi
-index 22316d0..1996452 100644
---- a/arch/arm/boot/dts/rk3288.dtsi
-+++ b/arch/arm/boot/dts/rk3288.dtsi
-@@ -359,6 +359,8 @@
- 		clock-names = "baudclk", "apb_pclk";
- 		pinctrl-names = "default";
- 		pinctrl-0 = <&uart0_xfer>;
-+		dmas = <&dmac_peri 1>, <&dmac_peri 2>;
-+		dma-names = "tx", "rx";
- 		status = "disabled";
- 	};
- 
-@@ -372,6 +374,8 @@
- 		clock-names = "baudclk", "apb_pclk";
- 		pinctrl-names = "default";
- 		pinctrl-0 = <&uart1_xfer>;
-+		dmas = <&dmac_peri 3>, <&dmac_peri 4>;
-+		dma-names = "tx", "rx";
- 		status = "disabled";
- 	};
- 
-@@ -385,6 +389,8 @@
- 		clock-names = "baudclk", "apb_pclk";
- 		pinctrl-names = "default";
- 		pinctrl-0 = <&uart2_xfer>;
-+		dmas = <&dmac_bus_s 4>, <&dmac_bus_s 5>;
-+		dma-names = "tx", "rx";
- 		status = "disabled";
- 	};
- 
-@@ -398,6 +404,8 @@
- 		clock-names = "baudclk", "apb_pclk";
- 		pinctrl-names = "default";
- 		pinctrl-0 = <&uart3_xfer>;
-+		dmas = <&dmac_peri 7>, <&dmac_peri 8>;
-+		dma-names = "tx", "rx";
- 		status = "disabled";
- 	};
- 
-@@ -411,6 +419,8 @@
- 		clock-names = "baudclk", "apb_pclk";
- 		pinctrl-names = "default";
- 		pinctrl-0 = <&uart4_xfer>;
-+		dmas = <&dmac_peri 9>, <&dmac_peri 10>;
-+		dma-names = "tx", "rx";
- 		status = "disabled";
- 	};
- 
--- 
-1.9.1
+Will
