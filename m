@@ -1,54 +1,62 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Tue, 16 Jun 2015 14:11:29 +0100
-Subject: [PATCH v2 1/1] irqchip: exynos-combiner: Save IRQ enable set
- on suspend
-In-Reply-To: <CA+Ln22H8A5xY4S=yEnftTKUdsAM3Oib2gZV_GG=m6nENn2fw0g@mail.gmail.com>
-References: <1434087795-13990-1-git-send-email-javier.martinez@collabora.co.uk>	<557AB00C.5040606@arm.com>	<557AC23D.8040602@collabora.co.uk>	<557AC85E.5070705@arm.com>	<557AD728.7090908@collabora.co.uk>	<557B34A7.4090507@collabora.co.uk>	<CAD=FV=UQF+n8AjSXYajqUb0qswcoUrSgnsasV82JaS3dBtNO8Q@mail.gmail.com>	<557E82BC.7080203@collabora.co.uk>	<557E947B.3030804@arm.com>	<557EE890.2050001@collabora.co.uk>
- <CA+Ln22H8A5xY4S=yEnftTKUdsAM3Oib2gZV_GG=m6nENn2fw0g@mail.gmail.com>
-Message-ID: <55802081.8050200@arm.com>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Tue, 16 Jun 2015 15:17:08 +0200
+Subject: [PATCH 03/34] pinctrl: mvebu: armada-375: remove non-existing
+ NAND re/we pins
+In-Reply-To: <20150609165843.GB16778@lunn.ch>
+References: <1433868446-11028-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1433868446-11028-4-git-send-email-thomas.petazzoni@free-electrons.com>
+ <20150609165843.GB16778@lunn.ch>
+Message-ID: <20150616151708.7f07228d@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Dear Andrew Lunn,
 
+On Tue, 9 Jun 2015 18:58:43 +0200, Andrew Lunn wrote:
 
-On 16/06/15 13:32, Tomasz Figa wrote:
-> 2015-06-16 0:00 GMT+09:00 Javier Martinez Canillas <javier.martinez@collabora.co.uk>:
->> On 06/15/2015 11:01 AM, Sudeep Holla wrote:
+> From armada-375.dtsi:
+> 
+>                                 nand_pins: nand-pins {
+>                                         marvell,pins = "mpp0", "mpp1", "mpp2",
+>                                                 "mpp3", "mpp4", "mpp5",
+>                                                 "mpp6", "mpp7", "mpp8",
+>                                                 "mpp9", "mpp10", "mpp11",
+>                                                 "mpp12", "mpp13";
+>                                         marvell,function = "nand";
+>                                 };
+> 
+> Don't you also need to remove mpp9 and mpp10 from here? What does
+> pinctrl do when you ask for pins which are not a member of the
+> function?
 
-[...]
+In fact, no. Look at the patch:
 
->>>
->>> Agreed. But I would suggest also to add MASK_ON_SUSPEND and
->>> set_irq_wake also and then you can restore iff it's non-zero as
->>> irq core will take care of most of the non-wakeup sources.
->>> Because I am planning to push
->>
->> I've looking at this and a problem I found is that IIUC the
->> set_irq_wake is not propagated from the the Exynos pinctrl / GPIO
->> driver which is the combiner's external interrupt source so the
->> callback is never called. Which means that right now only the
->> state of the wakeup source IRQs can't be saved since that
->> information is not present.
->>
->> The drivers/pinctrl/samsung/pinctrl-exynos.c driver enables and
->> disables the combiner interrupts but its .irq_set_wake handler
->> only updates the wakeup source mask for the external interrupts but
->> does not call the combiner .set_irq_wake so that should be changed
->> as well.
->>
->
-> As far as I'm aware of, wake-up events from pin controllers don't go
->  through GIC, but rather directly to PMU, which is a dedicated unit
-> responsible for power management and not a standalone interrupt
-> controller (well actually I saw a series making it a cascaded
-> controller some time ago, but I'm not sure if that went in). Based on
-> this, I don't think we have to call set_irq_wake on GIC. Correct me
-> if I'm wrong, though.
+ 	MPP_MODE(9,
+ 		 MPP_FUNCTION(0x0, "gpio", NULL),
+-		 MPP_FUNCTION(0x1, "nf", "wen"),
+ 		 MPP_FUNCTION(0x2, "spi0", "sck"),
+ 		 MPP_FUNCTION(0x3, "spi1", "sck"),
+ 		 MPP_FUNCTION(0x5, "nand", "we")),
+ 	MPP_MODE(10,
+ 		 MPP_FUNCTION(0x0, "gpio", NULL),
+-		 MPP_FUNCTION(0x1, "nf", "ren"),
+ 		 MPP_FUNCTION(0x2, "dram", "vttctrl"),
+ 		 MPP_FUNCTION(0x3, "led", "c1"),
+ 		 MPP_FUNCTION(0x5, "nand", "re"),
 
-Thanks for the details, this was my assumption when Doug confirmed that
-the combiner is also powered down, either there must be some bypass or a
-dedicated logic to wakeup. But I was not sure though so insisted
-set_irq_wake but based on what you say it's not required.
+See how both pins had a "nf" function (0x1) and a "nand" function
+(0x5). I didn't even notice that when doing the patch, so my commit log
+was slightly confusing.
 
-Regards,
-Sudeep
+The "nf" functions were incorrect. The "nand" functions were correct,
+and already used by armada-375.dtsi. I have just tested NAND on Armada
+375 DB with all the pinctrl patches applied, and it works fine (created
+a UBI device, with a volume, etc.).
+
+Best regards,
+
+Thomas
+-- 
+Thomas Petazzoni, CTO, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
