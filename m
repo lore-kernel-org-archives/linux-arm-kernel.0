@@ -1,131 +1,52 @@
-From: wcohen@redhat.com (William Cohen)
-Date: Tue, 16 Jun 2015 11:09:59 -0400
-Subject: [PATCH v7 5/7] arm64: Add trampoline code for kretprobes
-In-Reply-To: <1434395229-6654-6-git-send-email-dave.long@linaro.org>
-References: <1434395229-6654-1-git-send-email-dave.long@linaro.org>
- <1434395229-6654-6-git-send-email-dave.long@linaro.org>
-Message-ID: <55803C47.6030000@redhat.com>
+From: paul.gortmaker@windriver.com (Paul Gortmaker)
+Date: Tue, 16 Jun 2015 11:29:45 -0400
+Subject: [PATCH] drivers/cpufreq: include <module.h> for modular
+ exynos-cpufreq.c code
+In-Reply-To: <557F6567.1070901@samsung.com>
+References: <1430444867-22342-1-git-send-email-paul.gortmaker@windriver.com>
+ <1433366298-30016-1-git-send-email-paul.gortmaker@windriver.com>
+ <5110473.q5rJrrjs9a@vostro.rjw.lan> <557F6567.1070901@samsung.com>
+Message-ID: <558040E9.2060008@windriver.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/15/2015 03:07 PM, David Long wrote:
-> From: William Cohen <wcohen@redhat.com>
+On 15-06-15 07:53 PM, Krzysztof Kozlowski wrote:
+> On 16.06.2015 08:47, Rafael J. Wysocki wrote:
+>> On Wednesday, June 03, 2015 05:18:18 PM Paul Gortmaker wrote:
+>>> This file is built off of a tristate Kconfig option ("ARM_EXYNOS_CPUFREQ")
+>>> and also contains modular function calls so it should explicitly include
+>>> module.h to avoid compile breakage during pending header shuffles.
+>>>
+>>> Cc: "Rafael J. Wysocki" <rjw@rjwysocki.net>
+>>> Cc: Viresh Kumar <viresh.kumar@linaro.org>
+>>> Cc: Kukjin Kim <kgene@kernel.org>
+>>> Cc: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+>>> Cc: linux-pm at vger.kernel.org
+>>> Cc: linux-arm-kernel at lists.infradead.org
+>>> Cc: linux-samsung-soc at vger.kernel.org
+>>> Signed-off-by: Paul Gortmaker <paul.gortmaker@windriver.com>
+>>
+>> I'm assuming that this will go in via the Samsung tree.
+>>
+>>
+>>> ---
+>>>
+>>> [ patch will be appended to the implicit include fixup series, see:
+>>>   https://lkml.kernel.org/r/1430444867-22342-1-git-send-email-paul.gortmaker at windriver.com
+>>>   for the original series posting.]
 > 
-> The trampoline code is used by kretprobes to capture a return from a probed
-> function.  This is done by saving the registers, calling the handler, and
-> restoring the registers.  The code then returns to the roginal saved caller
+> Paul, will you handle the patch or should it go through Samsung tree?
 
-s/roginal/original
 
-> return address.  It is necessary to do this directly instead of using a
-> software breakpoint because the code used in processing that breakpoint
-> could itself be kprobe'd and cause a problematic reentry into the debug
-> exception handler.
+I have to keep a copy of the patch in the above series, since if
+I don't then we'll introduce build failures into the bisection
+history, so yes I'll handle it.
+
+Thanks,
+Paul.
+--
+
 > 
-> Signed-off-by: William Cohen <wcohen@redhat.com>
-> Signed-off-by: David A. Long <dave.long@linaro.org>
-> ---
->  arch/arm64/include/asm/kprobes.h  |  1 +
->  arch/arm64/kernel/kprobes-arm64.h | 41 +++++++++++++++++++++++++++++++++++++++
->  arch/arm64/kernel/kprobes.c       | 26 +++++++++++++++++++++++++
->  3 files changed, 68 insertions(+)
-> 
-> diff --git a/arch/arm64/include/asm/kprobes.h b/arch/arm64/include/asm/kprobes.h
-> index af31c4d..d081f49 100644
-> --- a/arch/arm64/include/asm/kprobes.h
-> +++ b/arch/arm64/include/asm/kprobes.h
-> @@ -58,5 +58,6 @@ int kprobe_exceptions_notify(struct notifier_block *self,
->  			     unsigned long val, void *data);
->  int kprobe_breakpoint_handler(struct pt_regs *regs, unsigned int esr);
->  int kprobe_single_step_handler(struct pt_regs *regs, unsigned int esr);
-> +void kretprobe_trampoline(void);
->  
->  #endif /* _ARM_KPROBES_H */
-> diff --git a/arch/arm64/kernel/kprobes-arm64.h b/arch/arm64/kernel/kprobes-arm64.h
-> index ff8a55f..bdcfa62 100644
-> --- a/arch/arm64/kernel/kprobes-arm64.h
-> +++ b/arch/arm64/kernel/kprobes-arm64.h
-> @@ -27,4 +27,45 @@ extern kprobes_pstate_check_t * const kprobe_condition_checks[16];
->  enum kprobe_insn __kprobes
->  arm_kprobe_decode_insn(kprobe_opcode_t insn, struct arch_specific_insn *asi);
->  
-> +#define SAVE_REGS_STRING\
-> +	"	stp x0, x1, [sp, #16 * 0]\n"	\
-> +	"	stp x2, x3, [sp, #16 * 1]\n"	\
-> +	"	stp x4, x5, [sp, #16 * 2]\n"	\
-> +	"	stp x6, x7, [sp, #16 * 3]\n"	\
-> +	"	stp x8, x9, [sp, #16 * 4]\n"	\
-> +	"	stp x10, x11, [sp, #16 * 5]\n"	\
-> +	"	stp x12, x13, [sp, #16 * 6]\n"	\
-> +	"	stp x14, x15, [sp, #16 * 7]\n"	\
-> +	"	stp x16, x17, [sp, #16 * 8]\n"	\
-> +	"	stp x18, x19, [sp, #16 * 9]\n"	\
-> +	"	stp x20, x21, [sp, #16 * 10]\n"	\
-> +	"	stp x22, x23, [sp, #16 * 11]\n"	\
-> +	"	stp x24, x25, [sp, #16 * 12]\n"	\
-> +	"	stp x26, x27, [sp, #16 * 13]\n"	\
-> +	"	stp x28, x29, [sp, #16 * 14]\n"	\
-> +	"	str x30,   [sp, #16 * 15]\n"    \
-> +	"	mrs x0, nzcv\n"			\
-> +	"	str x0, [sp, #8 * 33]\n"
-> +
-> +
-> +#define RESTORE_REGS_STRING\
-> +	"	ldr x0, [sp, #8 * 33]\n"	\
-> +	"	msr nzcv, x0\n"			\
-> +	"	ldp x0, x1, [sp, #16 * 0]\n"	\
-> +	"	ldp x2, x3, [sp, #16 * 1]\n"	\
-> +	"	ldp x4, x5, [sp, #16 * 2]\n"	\
-> +	"	ldp x6, x7, [sp, #16 * 3]\n"	\
-> +	"	ldp x8, x9, [sp, #16 * 4]\n"	\
-> +	"	ldp x10, x11, [sp, #16 * 5]\n"	\
-> +	"	ldp x12, x13, [sp, #16 * 6]\n"	\
-> +	"	ldp x14, x15, [sp, #16 * 7]\n"	\
-> +	"	ldp x16, x17, [sp, #16 * 8]\n"	\
-> +	"	ldp x18, x19, [sp, #16 * 9]\n"	\
-> +	"	ldp x20, x21, [sp, #16 * 10]\n"	\
-> +	"	ldp x22, x23, [sp, #16 * 11]\n"	\
-> +	"	ldp x24, x25, [sp, #16 * 12]\n"	\
-> +	"	ldp x26, x27, [sp, #16 * 13]\n"	\
-> +	"	ldp x28, x29, [sp, #16 * 14]\n"	\
-> +	"	ldr x30,   [sp, #16 * 15]\n"
-> +
->  #endif /* _ARM_KERNEL_KPROBES_ARM64_H */
-> diff --git a/arch/arm64/kernel/kprobes.c b/arch/arm64/kernel/kprobes.c
-> index 6255814..570218c 100644
-> --- a/arch/arm64/kernel/kprobes.c
-> +++ b/arch/arm64/kernel/kprobes.c
-> @@ -560,6 +560,32 @@ int __kprobes longjmp_break_handler(struct kprobe *p, struct pt_regs *regs)
->  	return 0;
->  }
->  
-> +/*
-> + * When a retprobed function returns, this code saves registers and
-> + * calls trampoline_handler() runs, which calls the kretprobe's handler.
-> + */
-> +static void __used __kprobes kretprobe_trampoline_holder(void)
-> +{
-> +	asm volatile (".global kretprobe_trampoline\n"
-> +			"kretprobe_trampoline:\n"
-> +			"sub sp, sp, %0\n"
-> +			SAVE_REGS_STRING
-> +			"mov x0, sp\n"
-> +			"bl trampoline_probe_handler\n"
-> +			/* Replace trampoline address in lr with actual
-> +			   orig_ret_addr return address. */
-> +			"str x0, [sp, #16 * 15]\n"
-> +			RESTORE_REGS_STRING
-> +			"add sp, sp, %0\n"
-> +			"ret\n"
-> +		      : : "I"(sizeof(struct pt_regs)) : "memory");
-> +}
-> +
-> +static void __kprobes __used *trampoline_probe_handler(struct pt_regs *regs)
-> +{
-> +	return (void *) 0;
-> +}
-> +
->  int __init arch_init_kprobes(void)
->  {
->  	return 0;
+> Best regards,
+> Krzysztof
 > 
