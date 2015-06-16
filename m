@@ -1,44 +1,75 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Tue, 16 Jun 2015 14:12:57 +0200
-Subject: [PATCH 1/9] ARM: mvebu: fix suspend to RAM on big-endian
- configurations
+Date: Tue, 16 Jun 2015 14:13:00 +0200
+Subject: [PATCH 4/9] ARM: mvebu: prepare mvebu_pm_store_bootinfo() to support
+ multiple SoCs
 In-Reply-To: <1434456785-23696-1-git-send-email-thomas.petazzoni@free-electrons.com>
 References: <1434456785-23696-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1434456785-23696-2-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1434456785-23696-5-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The current Armada XP suspend to RAM implementation, as added in
-commit 27432825ae19f ("ARM: mvebu: Armada XP GP specific
-suspend/resume code") does not handle big-endian configurations
-properly: the small bit of assembly code putting the DRAM in
-self-refresh and toggling the GPIOs to turn off power forgets to
-convert the values to little-endian.
-
-This commit fixes that by making sure the two values we will write to
-the DRAM controller register and GPIO register are already in
-little-endian before entering the critical assembly code.
+As we are going to introduce support for Armada 38x in pm.c, split out
+the Armada XP part of mvebu_pm_store_bootinfo() into
+mvebu_pm_store_armadaxp_bootinfo(), and make the former retunr an
+error when an unsupported SoC is used.
 
 Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-Cc: <stable@vger.kernel.org> # v3.19+
-Fixes: 27432825ae19f ("ARM: mvebu: Armada XP GP specific suspend/resume code")
 ---
- arch/arm/mach-mvebu/pm-board.c | 3 +++
- 1 file changed, 3 insertions(+)
+ arch/arm/mach-mvebu/pm.c | 25 +++++++++++++++++++++----
+ 1 file changed, 21 insertions(+), 4 deletions(-)
 
-diff --git a/arch/arm/mach-mvebu/pm-board.c b/arch/arm/mach-mvebu/pm-board.c
-index 6dfd4ab..301ab38 100644
---- a/arch/arm/mach-mvebu/pm-board.c
-+++ b/arch/arm/mach-mvebu/pm-board.c
-@@ -43,6 +43,9 @@ static void mvebu_armada_xp_gp_pm_enter(void __iomem *sdram_reg, u32 srcmd)
- 	for (i = 0; i < ARMADA_XP_GP_PIC_NR_GPIOS; i++)
- 		ackcmd |= BIT(pic_raw_gpios[i]);
+diff --git a/arch/arm/mach-mvebu/pm.c b/arch/arm/mach-mvebu/pm.c
+index eca650b..02fdf67 100644
+--- a/arch/arm/mach-mvebu/pm.c
++++ b/arch/arm/mach-mvebu/pm.c
+@@ -105,12 +105,10 @@ static phys_addr_t mvebu_internal_reg_base(void)
+ 	return of_translate_address(np, in_addr);
+ }
  
-+	srcmd = cpu_to_le32(srcmd);
-+	ackcmd = cpu_to_le32(ackcmd);
-+
+-static void mvebu_pm_store_bootinfo(void)
++static void mvebu_pm_store_armadaxp_bootinfo(u32 *store_addr)
+ {
+-	u32 *store_addr;
+ 	phys_addr_t resume_pc;
+ 
+-	store_addr = phys_to_virt(BOOT_INFO_ADDR);
+ 	resume_pc = virt_to_phys(armada_370_xp_cpu_resume);
+ 
  	/*
- 	 * Wait a while, the PIC needs quite a bit of time between the
- 	 * two GPIO commands.
+@@ -151,14 +149,33 @@ static void mvebu_pm_store_bootinfo(void)
+ 	writel(BOOT_MAGIC_LIST_END, store_addr);
+ }
+ 
++static int mvebu_pm_store_bootinfo(void)
++{
++	u32 *store_addr;
++
++	store_addr = phys_to_virt(BOOT_INFO_ADDR);
++
++	if (of_machine_is_compatible("marvell,armadaxp"))
++		mvebu_pm_store_armadaxp_bootinfo(store_addr);
++	else
++		return -ENODEV;
++
++	return 0;
++}
++
+ static int mvebu_pm_enter(suspend_state_t state)
+ {
++	int ret;
++
+ 	if (state != PM_SUSPEND_MEM)
+ 		return -EINVAL;
+ 
++	ret = mvebu_pm_store_bootinfo();
++	if (ret)
++		return ret;
++
+ 	cpu_pm_enter();
+ 
+-	mvebu_pm_store_bootinfo();
+ 	cpu_suspend(0, mvebu_pm_powerdown);
+ 
+ 	outer_resume();
 -- 
 2.1.0
