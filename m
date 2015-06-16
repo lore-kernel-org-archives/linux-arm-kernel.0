@@ -1,631 +1,708 @@
 From: tomi.valkeinen@ti.com (Tomi Valkeinen)
-Date: Tue, 16 Jun 2015 13:16:26 +0300
-Subject: [PATCH 4/7] OMAPDSS: remove uses of __init/__exit
+Date: Tue, 16 Jun 2015 13:16:28 +0300
+Subject: [PATCH 6/7] OMAPDSS: componentize omapdss
 In-Reply-To: <1434449789-13812-1-git-send-email-tomi.valkeinen@ti.com>
 References: <1434449789-13812-1-git-send-email-tomi.valkeinen@ti.com>
-Message-ID: <1434449789-13812-5-git-send-email-tomi.valkeinen@ti.com>
+Message-ID: <1434449789-13812-7-git-send-email-tomi.valkeinen@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following patches will add component handling to omapdss, improving
-the handling of deferred probing. However, at the moment we're using
-quite a lot of __inits and __exits in the driver, which prevent normal
-dynamic probing and removal.
+omapdss kernel module contains drivers for multiple devices, one for
+each DSS submodule. The probing we have at the moment is a mess, and
+doesn't give us proper deferred probing nor ensure that all the devices
+are probed before omapfb/omapdrm start using omapdss.
 
-This patch removes most of the uses of __init and __exit.
+This patch solves the mess by using the component system for DSS
+submodules.
+
+The changes to all DSS submodules (dispc, dpi, dsi, hdmi4/5, rfbi, sdi,
+venc) are the same: probe & remove functions are changed to bind &
+unbind, and new probe & remove functions are added which call
+component_add/del.
+
+The dss_core driver (dss.c) acts as a component master. Adding and
+matching the components is simple: all dss device's child devices are
+added as components.
+
+However, we do have some dependencies between the drivers. The order in
+which they should be probed is reflected by the list in core.c
+(dss_output_drv_reg_funcs). The drivers are registered in that order,
+which causes the components to be added in that order, which makes the
+components to be bound in that order. This feels a bit fragile, and we
+probably should improve the code to manage binds in random order.
+However, for now, this works fine.
 
 Signed-off-by: Tomi Valkeinen <tomi.valkeinen@ti.com>
 ---
- drivers/video/fbdev/omap2/dss/dispc.c | 20 ++++++++++----------
- drivers/video/fbdev/omap2/dss/dpi.c   | 14 +++++++-------
- drivers/video/fbdev/omap2/dss/dsi.c   |  6 +++---
- drivers/video/fbdev/omap2/dss/dss.c   | 26 +++++++++++++-------------
- drivers/video/fbdev/omap2/dss/dss.h   | 32 ++++++++++++++++----------------
- drivers/video/fbdev/omap2/dss/hdmi4.c |  6 +++---
- drivers/video/fbdev/omap2/dss/hdmi5.c |  6 +++---
- drivers/video/fbdev/omap2/dss/rfbi.c  |  8 ++++----
- drivers/video/fbdev/omap2/dss/sdi.c   | 12 ++++++------
- drivers/video/fbdev/omap2/dss/venc.c  |  8 ++++----
- 10 files changed, 69 insertions(+), 69 deletions(-)
+ drivers/video/fbdev/omap2/dss/dispc.c | 28 ++++++++++++++---
+ drivers/video/fbdev/omap2/dss/dpi.c   | 26 ++++++++++++---
+ drivers/video/fbdev/omap2/dss/dsi.c   | 25 ++++++++++++---
+ drivers/video/fbdev/omap2/dss/dss.c   | 59 ++++++++++++++++++++++++++++++++---
+ drivers/video/fbdev/omap2/dss/hdmi4.c | 26 ++++++++++++---
+ drivers/video/fbdev/omap2/dss/hdmi5.c | 26 ++++++++++++---
+ drivers/video/fbdev/omap2/dss/rfbi.c  | 28 ++++++++++++++---
+ drivers/video/fbdev/omap2/dss/sdi.c   | 27 +++++++++++++---
+ drivers/video/fbdev/omap2/dss/venc.c  | 27 +++++++++++++---
+ 9 files changed, 234 insertions(+), 38 deletions(-)
 
 diff --git a/drivers/video/fbdev/omap2/dss/dispc.c b/drivers/video/fbdev/omap2/dss/dispc.c
-index f4fc77d9d3bf..e3417af63451 100644
+index e3417af63451..c8e34163211a 100644
 --- a/drivers/video/fbdev/omap2/dss/dispc.c
 +++ b/drivers/video/fbdev/omap2/dss/dispc.c
-@@ -3692,7 +3692,7 @@ static void _omap_dispc_initial_config(void)
- 		dispc_init_mflag();
- }
+@@ -39,6 +39,7 @@
+ #include <linux/mfd/syscon.h>
+ #include <linux/regmap.h>
+ #include <linux/of.h>
++#include <linux/component.h>
  
--static const struct dispc_features omap24xx_dispc_feats __initconst = {
-+static const struct dispc_features omap24xx_dispc_feats = {
- 	.sw_start		=	5,
- 	.fp_start		=	15,
- 	.bp_start		=	27,
-@@ -3711,7 +3711,7 @@ static const struct dispc_features omap24xx_dispc_feats __initconst = {
- 	.set_max_preload	=	false,
- };
+ #include <video/omapdss.h>
  
--static const struct dispc_features omap34xx_rev1_0_dispc_feats __initconst = {
-+static const struct dispc_features omap34xx_rev1_0_dispc_feats = {
- 	.sw_start		=	5,
- 	.fp_start		=	15,
- 	.bp_start		=	27,
-@@ -3731,7 +3731,7 @@ static const struct dispc_features omap34xx_rev1_0_dispc_feats __initconst = {
- 	.set_max_preload	=	false,
- };
- 
--static const struct dispc_features omap34xx_rev3_0_dispc_feats __initconst = {
-+static const struct dispc_features omap34xx_rev3_0_dispc_feats = {
- 	.sw_start		=	7,
- 	.fp_start		=	19,
- 	.bp_start		=	31,
-@@ -3751,7 +3751,7 @@ static const struct dispc_features omap34xx_rev3_0_dispc_feats __initconst = {
- 	.set_max_preload	=	false,
- };
- 
--static const struct dispc_features omap44xx_dispc_feats __initconst = {
-+static const struct dispc_features omap44xx_dispc_feats = {
- 	.sw_start		=	7,
- 	.fp_start		=	19,
- 	.bp_start		=	31,
-@@ -3771,7 +3771,7 @@ static const struct dispc_features omap44xx_dispc_feats __initconst = {
- 	.set_max_preload	=	true,
- };
- 
--static const struct dispc_features omap54xx_dispc_feats __initconst = {
-+static const struct dispc_features omap54xx_dispc_feats = {
- 	.sw_start		=	7,
- 	.fp_start		=	19,
- 	.bp_start		=	31,
-@@ -3792,7 +3792,7 @@ static const struct dispc_features omap54xx_dispc_feats __initconst = {
- 	.set_max_preload	=	true,
- };
- 
--static int __init dispc_init_features(struct platform_device *pdev)
-+static int dispc_init_features(struct platform_device *pdev)
- {
- 	const struct dispc_features *src;
- 	struct dispc_features *dst;
-@@ -3882,7 +3882,7 @@ void dispc_free_irq(void *dev_id)
+@@ -3882,8 +3883,9 @@ void dispc_free_irq(void *dev_id)
  EXPORT_SYMBOL(dispc_free_irq);
  
  /* DISPC HW IP initialisation */
--static int __init omap_dispchw_probe(struct platform_device *pdev)
-+static int omap_dispchw_probe(struct platform_device *pdev)
+-static int omap_dispchw_probe(struct platform_device *pdev)
++static int dispc_bind(struct device *dev, struct device *master, void *data)
  {
++	struct platform_device *pdev = to_platform_device(dev);
  	u32 rev;
  	int r = 0;
-@@ -3955,7 +3955,7 @@ err_runtime_get:
+ 	struct resource *dispc_mem;
+@@ -3955,12 +3957,27 @@ err_runtime_get:
  	return r;
  }
  
--static int __exit omap_dispchw_remove(struct platform_device *pdev)
-+static int omap_dispchw_remove(struct platform_device *pdev)
+-static int omap_dispchw_remove(struct platform_device *pdev)
++static void dispc_unbind(struct device *dev, struct device *master,
++			       void *data)
  {
- 	pm_runtime_disable(&pdev->dev);
+-	pm_runtime_disable(&pdev->dev);
++	pm_runtime_disable(dev);
  
-@@ -4013,7 +4013,7 @@ static const struct of_device_id dispc_of_match[] = {
+ 	dss_uninit_overlay_managers();
++}
++
++static const struct component_ops dispc_component_ops = {
++	.bind	= dispc_bind,
++	.unbind	= dispc_unbind,
++};
+ 
++static int dispc_probe(struct platform_device *pdev)
++{
++	return component_add(&pdev->dev, &dispc_component_ops);
++}
++
++static int dispc_remove(struct platform_device *pdev)
++{
++	component_del(&pdev->dev, &dispc_component_ops);
+ 	return 0;
+ }
+ 
+@@ -4013,7 +4030,8 @@ static const struct of_device_id dispc_of_match[] = {
  };
  
  static struct platform_driver omap_dispchw_driver = {
--	.remove         = __exit_p(omap_dispchw_remove),
-+	.remove         = omap_dispchw_remove,
+-	.remove         = omap_dispchw_remove,
++	.probe		= dispc_probe,
++	.remove         = dispc_remove,
  	.driver         = {
  		.name   = "omapdss_dispc",
  		.pm	= &dispc_pm_ops,
-@@ -4027,7 +4027,7 @@ int __init dispc_init_platform_driver(void)
- 	return platform_driver_probe(&omap_dispchw_driver, omap_dispchw_probe);
+@@ -4024,7 +4042,7 @@ static struct platform_driver omap_dispchw_driver = {
+ 
+ int __init dispc_init_platform_driver(void)
+ {
+-	return platform_driver_probe(&omap_dispchw_driver, omap_dispchw_probe);
++	return platform_driver_register(&omap_dispchw_driver);
  }
  
--void __exit dispc_uninit_platform_driver(void)
-+void dispc_uninit_platform_driver(void)
- {
- 	platform_driver_unregister(&omap_dispchw_driver);
- }
+ void dispc_uninit_platform_driver(void)
 diff --git a/drivers/video/fbdev/omap2/dss/dpi.c b/drivers/video/fbdev/omap2/dss/dpi.c
-index f83e7b030249..a06e7558280f 100644
+index a06e7558280f..fb45b6432968 100644
 --- a/drivers/video/fbdev/omap2/dss/dpi.c
 +++ b/drivers/video/fbdev/omap2/dss/dpi.c
-@@ -731,7 +731,7 @@ static void dpi_init_output(struct platform_device *pdev)
- 	omapdss_register_output(out);
+@@ -32,6 +32,7 @@
+ #include <linux/string.h>
+ #include <linux/of.h>
+ #include <linux/clk.h>
++#include <linux/component.h>
+ 
+ #include <video/omapdss.h>
+ 
+@@ -783,8 +784,9 @@ static void dpi_uninit_output_port(struct device_node *port)
+ 	omapdss_unregister_output(out);
  }
  
--static void __exit dpi_uninit_output(struct platform_device *pdev)
-+static void dpi_uninit_output(struct platform_device *pdev)
+-static int omap_dpi_probe(struct platform_device *pdev)
++static int dpi_bind(struct device *dev, struct device *master, void *data)
  {
- 	struct dpi_data *dpi = dpi_get_data_from_pdev(pdev);
- 	struct omap_dss_device *out = &dpi->output;
-@@ -775,7 +775,7 @@ static void dpi_init_output_port(struct platform_device *pdev,
- 	omapdss_register_output(out);
- }
++	struct platform_device *pdev = to_platform_device(dev);
+ 	struct dpi_data *dpi;
  
--static void __exit dpi_uninit_output_port(struct device_node *port)
-+static void dpi_uninit_output_port(struct device_node *port)
- {
- 	struct dpi_data *dpi = port->data;
- 	struct omap_dss_device *out = &dpi->output;
-@@ -802,7 +802,7 @@ static int omap_dpi_probe(struct platform_device *pdev)
+ 	dpi = devm_kzalloc(&pdev->dev, sizeof(*dpi), GFP_KERNEL);
+@@ -802,16 +804,32 @@ static int omap_dpi_probe(struct platform_device *pdev)
  	return 0;
  }
  
--static int __exit omap_dpi_remove(struct platform_device *pdev)
-+static int omap_dpi_remove(struct platform_device *pdev)
+-static int omap_dpi_remove(struct platform_device *pdev)
++static void dpi_unbind(struct device *dev, struct device *master, void *data)
  {
++	struct platform_device *pdev = to_platform_device(dev);
++
  	dpi_uninit_output(pdev);
++}
++
++static const struct component_ops dpi_component_ops = {
++	.bind	= dpi_bind,
++	.unbind	= dpi_unbind,
++};
  
-@@ -811,7 +811,7 @@ static int __exit omap_dpi_remove(struct platform_device *pdev)
++static int dpi_probe(struct platform_device *pdev)
++{
++	return component_add(&pdev->dev, &dpi_component_ops);
++}
++
++static int dpi_remove(struct platform_device *pdev)
++{
++	component_del(&pdev->dev, &dpi_component_ops);
+ 	return 0;
+ }
  
  static struct platform_driver omap_dpi_driver = {
- 	.probe		= omap_dpi_probe,
--	.remove         = __exit_p(omap_dpi_remove),
-+	.remove         = omap_dpi_remove,
+-	.probe		= omap_dpi_probe,
+-	.remove         = omap_dpi_remove,
++	.probe		= dpi_probe,
++	.remove		= dpi_remove,
  	.driver         = {
  		.name   = "omapdss_dpi",
  		.suppress_bind_attrs = true,
-@@ -823,12 +823,12 @@ int __init dpi_init_platform_driver(void)
- 	return platform_driver_register(&omap_dpi_driver);
- }
- 
--void __exit dpi_uninit_platform_driver(void)
-+void dpi_uninit_platform_driver(void)
- {
- 	platform_driver_unregister(&omap_dpi_driver);
- }
- 
--int __init dpi_init_port(struct platform_device *pdev, struct device_node *port)
-+int dpi_init_port(struct platform_device *pdev, struct device_node *port)
- {
- 	struct dpi_data *dpi;
- 	struct device_node *ep;
-@@ -870,7 +870,7 @@ err_datalines:
- 	return r;
- }
- 
--void __exit dpi_uninit_port(struct device_node *port)
-+void dpi_uninit_port(struct device_node *port)
- {
- 	struct dpi_data *dpi = port->data;
- 
 diff --git a/drivers/video/fbdev/omap2/dss/dsi.c b/drivers/video/fbdev/omap2/dss/dsi.c
-index 28b0bc11669d..c4c27c09c62f 100644
+index c4c27c09c62f..b3606def5b7b 100644
 --- a/drivers/video/fbdev/omap2/dss/dsi.c
 +++ b/drivers/video/fbdev/omap2/dss/dsi.c
-@@ -5484,7 +5484,7 @@ err_runtime_get:
+@@ -40,6 +40,7 @@
+ #include <linux/pm_runtime.h>
+ #include <linux/of.h>
+ #include <linux/of_platform.h>
++#include <linux/component.h>
+ 
+ #include <video/omapdss.h>
+ #include <video/mipi_display.h>
+@@ -5274,8 +5275,9 @@ static int dsi_init_pll_data(struct platform_device *dsidev)
+ }
+ 
+ /* DSI1 HW IP initialisation */
+-static int omap_dsihw_probe(struct platform_device *dsidev)
++static int dsi_bind(struct device *dev, struct device *master, void *data)
+ {
++	struct platform_device *dsidev = to_platform_device(dev);
+ 	u32 rev;
+ 	int r, i;
+ 	struct dsi_data *dsi;
+@@ -5484,8 +5486,9 @@ err_runtime_get:
  	return r;
  }
  
--static int __exit omap_dsihw_remove(struct platform_device *dsidev)
-+static int omap_dsihw_remove(struct platform_device *dsidev)
+-static int omap_dsihw_remove(struct platform_device *dsidev)
++static void dsi_unbind(struct device *dev, struct device *master, void *data)
  {
++	struct platform_device *dsidev = to_platform_device(dev);
  	struct dsi_data *dsi = dsi_get_dsidrv_data(dsidev);
  
-@@ -5570,7 +5570,7 @@ static const struct of_device_id dsi_of_match[] = {
+ 	of_platform_depopulate(&dsidev->dev);
+@@ -5502,7 +5505,21 @@ static int omap_dsihw_remove(struct platform_device *dsidev)
+ 		regulator_disable(dsi->vdds_dsi_reg);
+ 		dsi->vdds_dsi_enabled = false;
+ 	}
++}
++
++static const struct component_ops dsi_component_ops = {
++	.bind	= dsi_bind,
++	.unbind	= dsi_unbind,
++};
+ 
++static int dsi_probe(struct platform_device *pdev)
++{
++	return component_add(&pdev->dev, &dsi_component_ops);
++}
++
++static int dsi_remove(struct platform_device *pdev)
++{
++	component_del(&pdev->dev, &dsi_component_ops);
+ 	return 0;
+ }
+ 
+@@ -5569,8 +5586,8 @@ static const struct of_device_id dsi_of_match[] = {
+ };
  
  static struct platform_driver omap_dsihw_driver = {
- 	.probe		= omap_dsihw_probe,
--	.remove         = __exit_p(omap_dsihw_remove),
-+	.remove         = omap_dsihw_remove,
+-	.probe		= omap_dsihw_probe,
+-	.remove         = omap_dsihw_remove,
++	.probe		= dsi_probe,
++	.remove		= dsi_remove,
  	.driver         = {
  		.name   = "omapdss_dsi",
  		.pm	= &dsi_pm_ops,
-@@ -5584,7 +5584,7 @@ int __init dsi_init_platform_driver(void)
- 	return platform_driver_register(&omap_dsihw_driver);
- }
- 
--void __exit dsi_uninit_platform_driver(void)
-+void dsi_uninit_platform_driver(void)
- {
- 	platform_driver_unregister(&omap_dsihw_driver);
- }
 diff --git a/drivers/video/fbdev/omap2/dss/dss.c b/drivers/video/fbdev/omap2/dss/dss.c
-index 28e6ff053b47..3397cbf484b0 100644
+index 3397cbf484b0..612b093831d5 100644
 --- a/drivers/video/fbdev/omap2/dss/dss.c
 +++ b/drivers/video/fbdev/omap2/dss/dss.c
-@@ -819,7 +819,7 @@ static const enum omap_display_type dra7xx_ports[] = {
- 	OMAP_DISPLAY_TYPE_DPI,
- };
+@@ -39,6 +39,7 @@
+ #include <linux/of.h>
+ #include <linux/regulator/consumer.h>
+ #include <linux/suspend.h>
++#include <linux/component.h>
  
--static const struct dss_features omap24xx_dss_feats __initconst = {
-+static const struct dss_features omap24xx_dss_feats = {
- 	/*
- 	 * fck div max is really 16, but the divider range has gaps. The range
- 	 * from 1 to 6 has no gaps, so let's use that as a max.
-@@ -832,7 +832,7 @@ static const struct dss_features omap24xx_dss_feats __initconst = {
- 	.num_ports		=	ARRAY_SIZE(omap2plus_ports),
- };
+ #include <video/omapdss.h>
  
--static const struct dss_features omap34xx_dss_feats __initconst = {
-+static const struct dss_features omap34xx_dss_feats = {
- 	.fck_div_max		=	16,
- 	.dss_fck_multiplier	=	2,
- 	.parent_clk_name	=	"dpll4_ck",
-@@ -841,7 +841,7 @@ static const struct dss_features omap34xx_dss_feats __initconst = {
- 	.num_ports		=	ARRAY_SIZE(omap34xx_ports),
- };
- 
--static const struct dss_features omap3630_dss_feats __initconst = {
-+static const struct dss_features omap3630_dss_feats = {
- 	.fck_div_max		=	32,
- 	.dss_fck_multiplier	=	1,
- 	.parent_clk_name	=	"dpll4_ck",
-@@ -850,7 +850,7 @@ static const struct dss_features omap3630_dss_feats __initconst = {
- 	.num_ports		=	ARRAY_SIZE(omap2plus_ports),
- };
- 
--static const struct dss_features omap44xx_dss_feats __initconst = {
-+static const struct dss_features omap44xx_dss_feats = {
- 	.fck_div_max		=	32,
- 	.dss_fck_multiplier	=	1,
- 	.parent_clk_name	=	"dpll_per_x2_ck",
-@@ -859,7 +859,7 @@ static const struct dss_features omap44xx_dss_feats __initconst = {
- 	.num_ports		=	ARRAY_SIZE(omap2plus_ports),
- };
- 
--static const struct dss_features omap54xx_dss_feats __initconst = {
-+static const struct dss_features omap54xx_dss_feats = {
- 	.fck_div_max		=	64,
- 	.dss_fck_multiplier	=	1,
- 	.parent_clk_name	=	"dpll_per_x2_ck",
-@@ -868,7 +868,7 @@ static const struct dss_features omap54xx_dss_feats __initconst = {
- 	.num_ports		=	ARRAY_SIZE(omap2plus_ports),
- };
- 
--static const struct dss_features am43xx_dss_feats __initconst = {
-+static const struct dss_features am43xx_dss_feats = {
- 	.fck_div_max		=	0,
- 	.dss_fck_multiplier	=	0,
- 	.parent_clk_name	=	NULL,
-@@ -877,7 +877,7 @@ static const struct dss_features am43xx_dss_feats __initconst = {
- 	.num_ports		=	ARRAY_SIZE(omap2plus_ports),
- };
- 
--static const struct dss_features dra7xx_dss_feats __initconst = {
-+static const struct dss_features dra7xx_dss_feats = {
- 	.fck_div_max		=	64,
- 	.dss_fck_multiplier	=	1,
- 	.parent_clk_name	=	"dpll_per_x2_ck",
-@@ -886,7 +886,7 @@ static const struct dss_features dra7xx_dss_feats __initconst = {
- 	.num_ports		=	ARRAY_SIZE(dra7xx_ports),
- };
- 
--static int __init dss_init_features(struct platform_device *pdev)
-+static int dss_init_features(struct platform_device *pdev)
- {
- 	const struct dss_features *src;
- 	struct dss_features *dst;
-@@ -940,7 +940,7 @@ static int __init dss_init_features(struct platform_device *pdev)
- 	return 0;
- }
- 
--static int __init dss_init_ports(struct platform_device *pdev)
-+static int dss_init_ports(struct platform_device *pdev)
- {
- 	struct device_node *parent = pdev->dev.of_node;
- 	struct device_node *port;
-@@ -984,7 +984,7 @@ static int __init dss_init_ports(struct platform_device *pdev)
- 	return 0;
- }
- 
--static void __exit dss_uninit_ports(struct platform_device *pdev)
-+static void dss_uninit_ports(struct platform_device *pdev)
- {
- 	struct device_node *parent = pdev->dev.of_node;
- 	struct device_node *port;
-@@ -1088,7 +1088,7 @@ static int dss_video_pll_probe(struct platform_device *pdev)
+@@ -1088,8 +1089,9 @@ static int dss_video_pll_probe(struct platform_device *pdev)
  }
  
  /* DSS HW IP initialisation */
--static int __init omap_dsshw_probe(struct platform_device *pdev)
-+static int omap_dsshw_probe(struct platform_device *pdev)
+-static int omap_dsshw_probe(struct platform_device *pdev)
++static int dss_bind(struct device *dev)
  {
++	struct platform_device *pdev = to_platform_device(dev);
  	struct resource *dss_mem;
  	u32 rev;
-@@ -1182,7 +1182,7 @@ err_setup_clocks:
+ 	int r;
+@@ -1159,6 +1161,10 @@ static int omap_dsshw_probe(struct platform_device *pdev)
+ 
+ 	dss_runtime_put();
+ 
++	r = component_bind_all(&pdev->dev, NULL);
++	if (r)
++		goto err_component;
++
+ 	dss_debugfs_create_file("dss", dss_dump_regs);
+ 
+ 	pm_set_vt_switch(0);
+@@ -1167,6 +1173,7 @@ static int omap_dsshw_probe(struct platform_device *pdev)
+ 
+ 	return 0;
+ 
++err_component:
+ err_runtime_get:
+ 	pm_runtime_disable(&pdev->dev);
+ 	dss_uninit_ports(pdev);
+@@ -1182,10 +1189,14 @@ err_setup_clocks:
  	return r;
  }
  
--static int __exit omap_dsshw_remove(struct platform_device *pdev)
-+static int omap_dsshw_remove(struct platform_device *pdev)
+-static int omap_dsshw_remove(struct platform_device *pdev)
++static void dss_unbind(struct device *dev)
  {
++	struct platform_device *pdev = to_platform_device(dev);
++
  	dss_initialized = false;
  
-@@ -1243,7 +1243,7 @@ static const struct of_device_id dss_of_match[] = {
++	component_unbind_all(&pdev->dev, NULL);
++
+ 	if (dss.video1_pll)
+ 		dss_video_pll_uninit(dss.video1_pll);
+ 
+@@ -1197,7 +1208,46 @@ static int omap_dsshw_remove(struct platform_device *pdev)
+ 	pm_runtime_disable(&pdev->dev);
+ 
+ 	dss_put_clocks();
++}
++
++static const struct component_master_ops dss_component_ops = {
++	.bind = dss_bind,
++	.unbind = dss_unbind,
++};
+ 
++static int dss_component_compare(struct device *dev, void *data)
++{
++	struct device *child = data;
++	return dev == child;
++}
++
++static int dss_add_child_component(struct device *dev, void *data)
++{
++	struct component_match **match = data;
++
++	component_match_add(dev->parent, match, dss_component_compare, dev);
++
++	return 0;
++}
++
++static int dss_probe(struct platform_device *pdev)
++{
++	struct component_match *match = NULL;
++	int r;
++
++	/* add all the child devices as components */
++	device_for_each_child(&pdev->dev, &match, dss_add_child_component);
++
++	r = component_master_add_with_match(&pdev->dev, &dss_component_ops, match);
++	if (r)
++		return r;
++
++	return 0;
++}
++
++static int dss_remove(struct platform_device *pdev)
++{
++	component_master_del(&pdev->dev, &dss_component_ops);
+ 	return 0;
+ }
+ 
+@@ -1243,7 +1293,8 @@ static const struct of_device_id dss_of_match[] = {
  MODULE_DEVICE_TABLE(of, dss_of_match);
  
  static struct platform_driver omap_dsshw_driver = {
--	.remove         = __exit_p(omap_dsshw_remove),
-+	.remove         = omap_dsshw_remove,
+-	.remove         = omap_dsshw_remove,
++	.probe		= dss_probe,
++	.remove		= dss_remove,
  	.driver         = {
  		.name   = "omapdss_dss",
  		.pm	= &dss_pm_ops,
-diff --git a/drivers/video/fbdev/omap2/dss/dss.h b/drivers/video/fbdev/omap2/dss/dss.h
-index 4812eee2622a..2406bcdb831a 100644
---- a/drivers/video/fbdev/omap2/dss/dss.h
-+++ b/drivers/video/fbdev/omap2/dss/dss.h
-@@ -309,18 +309,18 @@ bool dss_div_calc(unsigned long pck, unsigned long fck_min,
+@@ -1254,7 +1305,7 @@ static struct platform_driver omap_dsshw_driver = {
  
- /* SDI */
- int sdi_init_platform_driver(void) __init;
--void sdi_uninit_platform_driver(void) __exit;
-+void sdi_uninit_platform_driver(void);
- 
- #ifdef CONFIG_OMAP2_DSS_SDI
--int sdi_init_port(struct platform_device *pdev, struct device_node *port) __init;
--void sdi_uninit_port(struct device_node *port) __exit;
-+int sdi_init_port(struct platform_device *pdev, struct device_node *port);
-+void sdi_uninit_port(struct device_node *port);
- #else
--static inline int __init sdi_init_port(struct platform_device *pdev,
-+static inline int sdi_init_port(struct platform_device *pdev,
- 		struct device_node *port)
+ int __init dss_init_platform_driver(void)
  {
- 	return 0;
+-	return platform_driver_probe(&omap_dsshw_driver, omap_dsshw_probe);
++	return platform_driver_register(&omap_dsshw_driver);
  }
--static inline void __exit sdi_uninit_port(struct device_node *port)
-+static inline void sdi_uninit_port(struct device_node *port)
- {
- }
- #endif
-@@ -333,7 +333,7 @@ struct dentry;
- struct file_operations;
  
- int dsi_init_platform_driver(void) __init;
--void dsi_uninit_platform_driver(void) __exit;
-+void dsi_uninit_platform_driver(void);
- 
- void dsi_dump_clocks(struct seq_file *s);
- 
-@@ -350,25 +350,25 @@ static inline u8 dsi_get_pixel_size(enum omap_dss_dsi_pixel_format fmt)
- 
- /* DPI */
- int dpi_init_platform_driver(void) __init;
--void dpi_uninit_platform_driver(void) __exit;
-+void dpi_uninit_platform_driver(void);
- 
- #ifdef CONFIG_OMAP2_DSS_DPI
--int dpi_init_port(struct platform_device *pdev, struct device_node *port) __init;
--void dpi_uninit_port(struct device_node *port) __exit;
-+int dpi_init_port(struct platform_device *pdev, struct device_node *port);
-+void dpi_uninit_port(struct device_node *port);
- #else
--static inline int __init dpi_init_port(struct platform_device *pdev,
-+static inline int dpi_init_port(struct platform_device *pdev,
- 		struct device_node *port)
- {
- 	return 0;
- }
--static inline void __exit dpi_uninit_port(struct device_node *port)
-+static inline void dpi_uninit_port(struct device_node *port)
- {
- }
- #endif
- 
- /* DISPC */
- int dispc_init_platform_driver(void) __init;
--void dispc_uninit_platform_driver(void) __exit;
-+void dispc_uninit_platform_driver(void);
- void dispc_dump_clocks(struct seq_file *s);
- 
- void dispc_enable_sidle(void);
-@@ -418,18 +418,18 @@ int dispc_wb_setup(const struct omap_dss_writeback_info *wi,
- 
- /* VENC */
- int venc_init_platform_driver(void) __init;
--void venc_uninit_platform_driver(void) __exit;
-+void venc_uninit_platform_driver(void);
- 
- /* HDMI */
- int hdmi4_init_platform_driver(void) __init;
--void hdmi4_uninit_platform_driver(void) __exit;
-+void hdmi4_uninit_platform_driver(void);
- 
- int hdmi5_init_platform_driver(void) __init;
--void hdmi5_uninit_platform_driver(void) __exit;
-+void hdmi5_uninit_platform_driver(void);
- 
- /* RFBI */
- int rfbi_init_platform_driver(void) __init;
--void rfbi_uninit_platform_driver(void) __exit;
-+void rfbi_uninit_platform_driver(void);
- 
- 
- #ifdef CONFIG_OMAP2_DSS_COLLECT_IRQ_STATS
+ void dss_uninit_platform_driver(void)
 diff --git a/drivers/video/fbdev/omap2/dss/hdmi4.c b/drivers/video/fbdev/omap2/dss/hdmi4.c
-index 916d47978f41..31deebbc32dc 100644
+index 31deebbc32dc..d35312d69025 100644
 --- a/drivers/video/fbdev/omap2/dss/hdmi4.c
 +++ b/drivers/video/fbdev/omap2/dss/hdmi4.c
-@@ -713,7 +713,7 @@ err:
+@@ -32,6 +32,7 @@
+ #include <linux/clk.h>
+ #include <linux/gpio.h>
+ #include <linux/regulator/consumer.h>
++#include <linux/component.h>
+ #include <video/omapdss.h>
+ #include <sound/omap-hdmi-audio.h>
+ 
+@@ -646,8 +647,9 @@ static int hdmi_audio_register(struct device *dev)
+ }
+ 
+ /* HDMI HW IP initialisation */
+-static int omapdss_hdmihw_probe(struct platform_device *pdev)
++static int hdmi4_bind(struct device *dev, struct device *master, void *data)
+ {
++	struct platform_device *pdev = to_platform_device(dev);
+ 	int r;
+ 	int irq;
+ 
+@@ -713,8 +715,10 @@ err:
  	return r;
  }
  
--static int __exit omapdss_hdmihw_remove(struct platform_device *pdev)
-+static int omapdss_hdmihw_remove(struct platform_device *pdev)
+-static int omapdss_hdmihw_remove(struct platform_device *pdev)
++static void hdmi4_unbind(struct device *dev, struct device *master, void *data)
  {
++	struct platform_device *pdev = to_platform_device(dev);
++
  	if (hdmi.audio_pdev)
  		platform_device_unregister(hdmi.audio_pdev);
-@@ -757,7 +757,7 @@ static const struct of_device_id hdmi_of_match[] = {
+ 
+@@ -723,7 +727,21 @@ static int omapdss_hdmihw_remove(struct platform_device *pdev)
+ 	hdmi_pll_uninit(&hdmi.pll);
+ 
+ 	pm_runtime_disable(&pdev->dev);
++}
++
++static const struct component_ops hdmi4_component_ops = {
++	.bind	= hdmi4_bind,
++	.unbind	= hdmi4_unbind,
++};
+ 
++static int hdmi4_probe(struct platform_device *pdev)
++{
++	return component_add(&pdev->dev, &hdmi4_component_ops);
++}
++
++static int hdmi4_remove(struct platform_device *pdev)
++{
++	component_del(&pdev->dev, &hdmi4_component_ops);
+ 	return 0;
+ }
+ 
+@@ -756,8 +774,8 @@ static const struct of_device_id hdmi_of_match[] = {
+ };
  
  static struct platform_driver omapdss_hdmihw_driver = {
- 	.probe		= omapdss_hdmihw_probe,
--	.remove         = __exit_p(omapdss_hdmihw_remove),
-+	.remove         = omapdss_hdmihw_remove,
+-	.probe		= omapdss_hdmihw_probe,
+-	.remove         = omapdss_hdmihw_remove,
++	.probe		= hdmi4_probe,
++	.remove		= hdmi4_remove,
  	.driver         = {
  		.name   = "omapdss_hdmi",
  		.pm	= &hdmi_pm_ops,
-@@ -771,7 +771,7 @@ int __init hdmi4_init_platform_driver(void)
- 	return platform_driver_register(&omapdss_hdmihw_driver);
- }
- 
--void __exit hdmi4_uninit_platform_driver(void)
-+void hdmi4_uninit_platform_driver(void)
- {
- 	platform_driver_unregister(&omapdss_hdmihw_driver);
- }
 diff --git a/drivers/video/fbdev/omap2/dss/hdmi5.c b/drivers/video/fbdev/omap2/dss/hdmi5.c
-index 3f0b34a7031a..a57f5e8f9aea 100644
+index a57f5e8f9aea..7f875788edbc 100644
 --- a/drivers/video/fbdev/omap2/dss/hdmi5.c
 +++ b/drivers/video/fbdev/omap2/dss/hdmi5.c
-@@ -748,7 +748,7 @@ err:
+@@ -37,6 +37,7 @@
+ #include <linux/clk.h>
+ #include <linux/gpio.h>
+ #include <linux/regulator/consumer.h>
++#include <linux/component.h>
+ #include <video/omapdss.h>
+ #include <sound/omap-hdmi-audio.h>
+ 
+@@ -681,8 +682,9 @@ static int hdmi_audio_register(struct device *dev)
+ }
+ 
+ /* HDMI HW IP initialisation */
+-static int omapdss_hdmihw_probe(struct platform_device *pdev)
++static int hdmi5_bind(struct device *dev, struct device *master, void *data)
+ {
++	struct platform_device *pdev = to_platform_device(dev);
+ 	int r;
+ 	int irq;
+ 
+@@ -748,8 +750,10 @@ err:
  	return r;
  }
  
--static int __exit omapdss_hdmihw_remove(struct platform_device *pdev)
-+static int omapdss_hdmihw_remove(struct platform_device *pdev)
+-static int omapdss_hdmihw_remove(struct platform_device *pdev)
++static void hdmi5_unbind(struct device *dev, struct device *master, void *data)
  {
++	struct platform_device *pdev = to_platform_device(dev);
++
  	if (hdmi.audio_pdev)
  		platform_device_unregister(hdmi.audio_pdev);
-@@ -793,7 +793,7 @@ static const struct of_device_id hdmi_of_match[] = {
  
- static struct platform_driver omapdss_hdmihw_driver = {
- 	.probe		= omapdss_hdmihw_probe,
--	.remove         = __exit_p(omapdss_hdmihw_remove),
-+	.remove         = omapdss_hdmihw_remove,
- 	.driver         = {
- 		.name   = "omapdss_hdmi5",
- 		.pm	= &hdmi_pm_ops,
-@@ -807,7 +807,7 @@ int __init hdmi5_init_platform_driver(void)
- 	return platform_driver_register(&omapdss_hdmihw_driver);
- }
+@@ -758,7 +762,21 @@ static int omapdss_hdmihw_remove(struct platform_device *pdev)
+ 	hdmi_pll_uninit(&hdmi.pll);
  
--void __exit hdmi5_uninit_platform_driver(void)
-+void hdmi5_uninit_platform_driver(void)
- {
- 	platform_driver_unregister(&omapdss_hdmihw_driver);
- }
-diff --git a/drivers/video/fbdev/omap2/dss/rfbi.c b/drivers/video/fbdev/omap2/dss/rfbi.c
-index 065effca9236..8ec810bce0b6 100644
---- a/drivers/video/fbdev/omap2/dss/rfbi.c
-+++ b/drivers/video/fbdev/omap2/dss/rfbi.c
-@@ -938,7 +938,7 @@ static void rfbi_init_output(struct platform_device *pdev)
- 	omapdss_register_output(out);
- }
+ 	pm_runtime_disable(&pdev->dev);
++}
++
++static const struct component_ops hdmi5_component_ops = {
++	.bind	= hdmi5_bind,
++	.unbind	= hdmi5_unbind,
++};
  
--static void __exit rfbi_uninit_output(struct platform_device *pdev)
-+static void rfbi_uninit_output(struct platform_device *pdev)
- {
- 	struct omap_dss_device *out = &rfbi.output;
- 
-@@ -1005,7 +1005,7 @@ err_runtime_get:
- 	return r;
- }
- 
--static int __exit omap_rfbihw_remove(struct platform_device *pdev)
-+static int omap_rfbihw_remove(struct platform_device *pdev)
- {
- 	rfbi_uninit_output(pdev);
- 
-@@ -1039,7 +1039,7 @@ static const struct dev_pm_ops rfbi_pm_ops = {
- 
- static struct platform_driver omap_rfbihw_driver = {
- 	.probe		= omap_rfbihw_probe,
--	.remove         = __exit_p(omap_rfbihw_remove),
-+	.remove         = omap_rfbihw_remove,
- 	.driver         = {
- 		.name   = "omapdss_rfbi",
- 		.pm	= &rfbi_pm_ops,
-@@ -1052,7 +1052,7 @@ int __init rfbi_init_platform_driver(void)
- 	return platform_driver_register(&omap_rfbihw_driver);
- }
- 
--void __exit rfbi_uninit_platform_driver(void)
-+void rfbi_uninit_platform_driver(void)
- {
- 	platform_driver_unregister(&omap_rfbihw_driver);
- }
-diff --git a/drivers/video/fbdev/omap2/dss/sdi.c b/drivers/video/fbdev/omap2/dss/sdi.c
-index 5c2ccab5a958..a873118f1e0e 100644
---- a/drivers/video/fbdev/omap2/dss/sdi.c
-+++ b/drivers/video/fbdev/omap2/dss/sdi.c
-@@ -350,7 +350,7 @@ static void sdi_init_output(struct platform_device *pdev)
- 	omapdss_register_output(out);
- }
- 
--static void __exit sdi_uninit_output(struct platform_device *pdev)
-+static void sdi_uninit_output(struct platform_device *pdev)
- {
- 	struct omap_dss_device *out = &sdi.output;
- 
-@@ -366,7 +366,7 @@ static int omap_sdi_probe(struct platform_device *pdev)
++static int hdmi5_probe(struct platform_device *pdev)
++{
++	return component_add(&pdev->dev, &hdmi5_component_ops);
++}
++
++static int hdmi5_remove(struct platform_device *pdev)
++{
++	component_del(&pdev->dev, &hdmi5_component_ops);
  	return 0;
  }
  
--static int __exit omap_sdi_remove(struct platform_device *pdev)
-+static int omap_sdi_remove(struct platform_device *pdev)
- {
- 	sdi_uninit_output(pdev);
+@@ -792,8 +810,8 @@ static const struct of_device_id hdmi_of_match[] = {
+ };
  
-@@ -375,7 +375,7 @@ static int __exit omap_sdi_remove(struct platform_device *pdev)
+ static struct platform_driver omapdss_hdmihw_driver = {
+-	.probe		= omapdss_hdmihw_probe,
+-	.remove         = omapdss_hdmihw_remove,
++	.probe		= hdmi5_probe,
++	.remove		= hdmi5_remove,
+ 	.driver         = {
+ 		.name   = "omapdss_hdmi5",
+ 		.pm	= &hdmi_pm_ops,
+diff --git a/drivers/video/fbdev/omap2/dss/rfbi.c b/drivers/video/fbdev/omap2/dss/rfbi.c
+index 8ec810bce0b6..1525a494d057 100644
+--- a/drivers/video/fbdev/omap2/dss/rfbi.c
++++ b/drivers/video/fbdev/omap2/dss/rfbi.c
+@@ -36,6 +36,7 @@
+ #include <linux/semaphore.h>
+ #include <linux/platform_device.h>
+ #include <linux/pm_runtime.h>
++#include <linux/component.h>
+ 
+ #include <video/omapdss.h>
+ #include "dss.h"
+@@ -946,8 +947,9 @@ static void rfbi_uninit_output(struct platform_device *pdev)
+ }
+ 
+ /* RFBI HW IP initialisation */
+-static int omap_rfbihw_probe(struct platform_device *pdev)
++static int rfbi_bind(struct device *dev, struct device *master, void *data)
+ {
++	struct platform_device *pdev = to_platform_device(dev);
+ 	u32 rev;
+ 	struct resource *rfbi_mem;
+ 	struct clk *clk;
+@@ -1005,8 +1007,10 @@ err_runtime_get:
+ 	return r;
+ }
+ 
+-static int omap_rfbihw_remove(struct platform_device *pdev)
++static void rfbi_unbind(struct device *dev, struct device *master, void *data)
+ {
++	struct platform_device *pdev = to_platform_device(dev);
++
+ 	rfbi_uninit_output(pdev);
+ 
+ 	pm_runtime_disable(&pdev->dev);
+@@ -1014,6 +1018,22 @@ static int omap_rfbihw_remove(struct platform_device *pdev)
+ 	return 0;
+ }
+ 
++static const struct component_ops rfbi_component_ops = {
++	.bind	= rfbi_bind,
++	.unbind	= rfbi_unbind,
++};
++
++static int rfbi_probe(struct platform_device *pdev)
++{
++	return component_add(&pdev->dev, &rfbi_component_ops);
++}
++
++static int rfbi_remove(struct platform_device *pdev)
++{
++	component_del(&pdev->dev, &rfbi_component_ops);
++	return 0;
++}
++
+ static int rfbi_runtime_suspend(struct device *dev)
+ {
+ 	dispc_runtime_put();
+@@ -1038,8 +1058,8 @@ static const struct dev_pm_ops rfbi_pm_ops = {
+ };
+ 
+ static struct platform_driver omap_rfbihw_driver = {
+-	.probe		= omap_rfbihw_probe,
+-	.remove         = omap_rfbihw_remove,
++	.probe		= rfbi_probe,
++	.remove         = rfbi_remove,
+ 	.driver         = {
+ 		.name   = "omapdss_rfbi",
+ 		.pm	= &rfbi_pm_ops,
+diff --git a/drivers/video/fbdev/omap2/dss/sdi.c b/drivers/video/fbdev/omap2/dss/sdi.c
+index a873118f1e0e..5843580a1deb 100644
+--- a/drivers/video/fbdev/omap2/dss/sdi.c
++++ b/drivers/video/fbdev/omap2/dss/sdi.c
+@@ -27,6 +27,7 @@
+ #include <linux/platform_device.h>
+ #include <linux/string.h>
+ #include <linux/of.h>
++#include <linux/component.h>
+ 
+ #include <video/omapdss.h>
+ #include "dss.h"
+@@ -357,8 +358,10 @@ static void sdi_uninit_output(struct platform_device *pdev)
+ 	omapdss_unregister_output(out);
+ }
+ 
+-static int omap_sdi_probe(struct platform_device *pdev)
++static int sdi_bind(struct device *dev, struct device *master, void *data)
+ {
++	struct platform_device *pdev = to_platform_device(dev);
++
+ 	sdi.pdev = pdev;
+ 
+ 	sdi_init_output(pdev);
+@@ -366,16 +369,32 @@ static int omap_sdi_probe(struct platform_device *pdev)
+ 	return 0;
+ }
+ 
+-static int omap_sdi_remove(struct platform_device *pdev)
++static void sdi_unbind(struct device *dev, struct device *master, void *data)
+ {
++	struct platform_device *pdev = to_platform_device(dev);
++
+ 	sdi_uninit_output(pdev);
++}
++
++static const struct component_ops sdi_component_ops = {
++	.bind	= sdi_bind,
++	.unbind	= sdi_unbind,
++};
+ 
++static int sdi_probe(struct platform_device *pdev)
++{
++	return component_add(&pdev->dev, &sdi_component_ops);
++}
++
++static int sdi_remove(struct platform_device *pdev)
++{
++	component_del(&pdev->dev, &sdi_component_ops);
+ 	return 0;
+ }
  
  static struct platform_driver omap_sdi_driver = {
- 	.probe		= omap_sdi_probe,
--	.remove         = __exit_p(omap_sdi_remove),
-+	.remove         = omap_sdi_remove,
+-	.probe		= omap_sdi_probe,
+-	.remove         = omap_sdi_remove,
++	.probe		= sdi_probe,
++	.remove         = sdi_remove,
  	.driver         = {
  		.name   = "omapdss_sdi",
  		.suppress_bind_attrs = true,
-@@ -387,12 +387,12 @@ int __init sdi_init_platform_driver(void)
- 	return platform_driver_register(&omap_sdi_driver);
- }
- 
--void __exit sdi_uninit_platform_driver(void)
-+void sdi_uninit_platform_driver(void)
- {
- 	platform_driver_unregister(&omap_sdi_driver);
- }
- 
--int __init sdi_init_port(struct platform_device *pdev, struct device_node *port)
-+int sdi_init_port(struct platform_device *pdev, struct device_node *port)
- {
- 	struct device_node *ep;
- 	u32 datapairs;
-@@ -426,7 +426,7 @@ err_datapairs:
- 	return r;
- }
- 
--void __exit sdi_uninit_port(struct device_node *port)
-+void sdi_uninit_port(struct device_node *port)
- {
- 	if (!sdi.port_initialized)
- 		return;
 diff --git a/drivers/video/fbdev/omap2/dss/venc.c b/drivers/video/fbdev/omap2/dss/venc.c
-index ef7fd925e7f2..e7fad0e19d43 100644
+index e7fad0e19d43..99ca268c1cdd 100644
 --- a/drivers/video/fbdev/omap2/dss/venc.c
 +++ b/drivers/video/fbdev/omap2/dss/venc.c
-@@ -802,7 +802,7 @@ static void venc_init_output(struct platform_device *pdev)
- 	omapdss_register_output(out);
+@@ -35,6 +35,7 @@
+ #include <linux/regulator/consumer.h>
+ #include <linux/pm_runtime.h>
+ #include <linux/of.h>
++#include <linux/component.h>
+ 
+ #include <video/omapdss.h>
+ 
+@@ -852,8 +853,9 @@ err:
  }
  
--static void __exit venc_uninit_output(struct platform_device *pdev)
-+static void venc_uninit_output(struct platform_device *pdev)
+ /* VENC HW IP initialisation */
+-static int omap_venchw_probe(struct platform_device *pdev)
++static int venc_bind(struct device *dev, struct device *master, void *data)
  {
- 	struct omap_dss_device *out = &venc.output;
- 
-@@ -912,7 +912,7 @@ err_runtime_get:
++	struct platform_device *pdev = to_platform_device(dev);
+ 	u8 rev_id;
+ 	struct resource *venc_mem;
+ 	int r;
+@@ -912,12 +914,28 @@ err_runtime_get:
  	return r;
  }
  
--static int __exit omap_venchw_remove(struct platform_device *pdev)
-+static int omap_venchw_remove(struct platform_device *pdev)
+-static int omap_venchw_remove(struct platform_device *pdev)
++static void venc_unbind(struct device *dev, struct device *master, void *data)
  {
++	struct platform_device *pdev = to_platform_device(dev);
++
  	venc_uninit_output(pdev);
  
-@@ -960,7 +960,7 @@ static const struct of_device_id venc_of_match[] = {
+ 	pm_runtime_disable(&pdev->dev);
++}
+ 
++static const struct component_ops venc_component_ops = {
++	.bind	= venc_bind,
++	.unbind	= venc_unbind,
++};
++
++static int venc_probe(struct platform_device *pdev)
++{
++	return component_add(&pdev->dev, &venc_component_ops);
++}
++
++static int venc_remove(struct platform_device *pdev)
++{
++	component_del(&pdev->dev, &venc_component_ops);
+ 	return 0;
+ }
+ 
+@@ -950,7 +968,6 @@ static const struct dev_pm_ops venc_pm_ops = {
+ 	.runtime_resume = venc_runtime_resume,
+ };
+ 
+-
+ static const struct of_device_id venc_of_match[] = {
+ 	{ .compatible = "ti,omap2-venc", },
+ 	{ .compatible = "ti,omap3-venc", },
+@@ -959,8 +976,8 @@ static const struct of_device_id venc_of_match[] = {
+ };
  
  static struct platform_driver omap_venchw_driver = {
- 	.probe		= omap_venchw_probe,
--	.remove         = __exit_p(omap_venchw_remove),
-+	.remove         = omap_venchw_remove,
+-	.probe		= omap_venchw_probe,
+-	.remove         = omap_venchw_remove,
++	.probe		= venc_probe,
++	.remove		= venc_remove,
  	.driver         = {
  		.name   = "omapdss_venc",
  		.pm	= &venc_pm_ops,
-@@ -974,7 +974,7 @@ int __init venc_init_platform_driver(void)
- 	return platform_driver_register(&omap_venchw_driver);
- }
- 
--void __exit venc_uninit_platform_driver(void)
-+void venc_uninit_platform_driver(void)
- {
- 	platform_driver_unregister(&omap_venchw_driver);
- }
 -- 
 2.1.4
