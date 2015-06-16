@@ -1,51 +1,56 @@
-From: HartleyS@visionengravers.com (Hartley Sweeten)
-Date: Tue, 16 Jun 2015 18:04:17 +0000
-Subject: [PATCH] ARM: ep93xx: add LEDs and triggers to defconfig
-In-Reply-To: <1434443764-25973-1-git-send-email-linus.walleij@linaro.org>
-References: <1434443764-25973-1-git-send-email-linus.walleij@linaro.org>
-Message-ID: <DC148C5AA1CEBA4E87973D432B1C2D883D4A378D@P3PWEX4MB008.ex4.secureserver.net>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Tue, 16 Jun 2015 11:11:22 -0700
+Subject: [PATCH] regulator: qcom_spmi: Add missing braces for aligned code
+Message-ID: <1434478282-13552-1-git-send-email-sboyd@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday, June 16, 2015 1:36 AM, Linus Walleij wrote:
-> The EP93xx has two designated LEDs (not always connected): a
-> green and a red one. These are registered in the core, so let's
-> enable the driver and some triggers.
->
-> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
-> ---
->  arch/arm/configs/ep93xx_defconfig | 5 +++++
->  1 file changed, 5 insertions(+)
->
-> diff --git a/arch/arm/configs/ep93xx_defconfig b/arch/arm/configs/ep93xx_defconfig
-> index b3c32d0d4573..9a5205abc7c3 100644
-> --- a/arch/arm/configs/ep93xx_defconfig
-> +++ b/arch/arm/configs/ep93xx_defconfig
-> @@ -99,6 +99,11 @@ CONFIG_USB_SERIAL_CONSOLE=y
->  CONFIG_USB_SERIAL_PL2303=y
->  CONFIG_MMC=y
->  CONFIG_MMC_SPI=y
-> +CONFIG_NEW_LEDS=y
-> +CONFIG_LEDS_CLASS=y
-> +CONFIG_LEDS_GPIO=y
-> +CONFIG_LEDS_TRIGGERS=y
-> +CONFIG_LEDS_TRIGGER_HEARTBEAT=y
->  CONFIG_RTC_CLASS=y
->  CONFIG_RTC_DRV_DS1307=y
->  CONFIG_RTC_DRV_M48T86=y
+drivers/regulator/qcom_spmi-regulator.c:751:3-50: code aligned
+with following code on line 753
+drivers/regulator/qcom_spmi-regulator.c:584:3-41: code aligned
+with following code on line 587
 
-Makes sense to me.
-Reviewed-by: H Hartley Sweeten <hsweeten@visionengravers.com>
+These lines where missing braces causing the break to always
+be executed even when it shouldn't be. Fix it.
 
-Linus,
+Reported-by: kbuild test robot <fengguang.wu@intel.com>
+Cc: Julia Lawall <julia.lawall@lip6.fr>
+Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+---
+ drivers/regulator/qcom_spmi-regulator.c | 6 ++++--
+ 1 file changed, 4 insertions(+), 2 deletions(-)
 
-Since you are updating the ep93xx_defconfig...
-
-To use the I2C on ep93xx we need CONFIG_I2C_GPIO. Also,
-do we really need the CONFIG_I2C_DEBUG_* options enabled?
-
-In order for DMA to work with the SPI driver we also need:
-CONFIG_DMADEVICES and CONFIG_EP93XX_DMA enabled.
-
-Regards,
-Hartley
+diff --git a/drivers/regulator/qcom_spmi-regulator.c b/drivers/regulator/qcom_spmi-regulator.c
+index 162b86501a91..ff6ccc734565 100644
+--- a/drivers/regulator/qcom_spmi-regulator.c
++++ b/drivers/regulator/qcom_spmi-regulator.c
+@@ -580,11 +580,12 @@ static int spmi_regulator_select_voltage_same_range(struct spmi_regulator *vreg,
+ 	*selector = 0;
+ 	for (i = 0; i < vreg->set_points->count; i++) {
+ 		if (uV >= vreg->set_points->range[i].set_point_min_uV
+-		    && uV <= vreg->set_points->range[i].set_point_max_uV)
++		    && uV <= vreg->set_points->range[i].set_point_max_uV) {
+ 			*selector +=
+ 			    (uV - vreg->set_points->range[i].set_point_min_uV)
+ 				/ vreg->set_points->range[i].step_uV;
+ 			break;
++		}
+ 
+ 		*selector += vreg->set_points->range[i].n_voltages;
+ 	}
+@@ -747,10 +748,11 @@ static int spmi_regulator_common_list_voltage(struct regulator_dev *rdev,
+ 		return 0;
+ 
+ 	for (i = 0; i < vreg->set_points->count; i++) {
+-		if (selector < vreg->set_points->range[i].n_voltages)
++		if (selector < vreg->set_points->range[i].n_voltages) {
+ 			uV = selector * vreg->set_points->range[i].step_uV
+ 				+ vreg->set_points->range[i].set_point_min_uV;
+ 			break;
++		}
+ 
+ 		selector -= vreg->set_points->range[i].n_voltages;
+ 	}
+-- 
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+a Linux Foundation Collaborative Project
