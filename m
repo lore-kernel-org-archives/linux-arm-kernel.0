@@ -1,46 +1,31 @@
-From: Dave.Martin@arm.com (Dave Martin)
-Date: Tue, 16 Jun 2015 17:51:29 +0100
-Subject: [PATCH 00/10] arm64: Use BRK instruction for generic BUG traps
-In-Reply-To: <20150616145105.GG30522@arm.com>
-References: <1434036566-9848-1-git-send-email-Dave.Martin@arm.com>
- <20150616145105.GG30522@arm.com>
-Message-ID: <20150616165129.GC3651@e103592.cambridge.arm.com>
+From: hsweeten@visionengravers.com (H Hartley Sweeten)
+Date: Tue, 16 Jun 2015 09:50:29 -0700
+Subject: [PATCH 1/2] ARM: ep93xx: vision_ep9307: enable DMA for SPI
+Message-ID: <1434473429-5208-1-git-send-email-hsweeten@visionengravers.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 16, 2015 at 03:51:05PM +0100, Will Deacon wrote:
-> Hi Dave,
-> 
-> On Thu, Jun 11, 2015 at 04:29:14PM +0100, Dave P Martin wrote:
-> > Currently, the minimal default BUG() implementation from asm-generic is
-> > used for arm64.
-> > 
-> > This series uses the BRK software breakpoint instruction to generate a
-> > trap instead, similarly to most other arches, with the generic BUG code
-> > generating the dmesg boilerplate.  This eliminates a fair amount of
-> > inlined code at BUG() and WARN() sites.
-> 
-> I think patches 3 and 8 are a bit OTT and don't really bring us much.
-> 
-> However, for the rest of the series (modulo my minor comments):
-> 
->   Reviewed-by: Will Deacon <will.deacon@arm.com>
+Enable the 'use_dma' flag in the SPI platform data to improve the speed
+of the mmc_spi driver.
 
-Patch 3 is needed to silence compiler warnings that happen as a side-
-effect of the redefinition of DBG_ESR_VAL_BRK in patch 4.
+Signed-off-by: H Hartley Sweeten <hsweeten@visionengravers.com>
+---
+ arch/arm/mach-ep93xx/vision_ep9307.c | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
 
-A point hack in DBG_ESR_VAL_BRK could have fixed this, but the existing
-ESR definitions are the real cause -- simply stripping all the type
-information didn't appear safe due to the use of shifts and masking.
-Unfortunately, attempting to fix this properly touched more code than I
-would have liked...
-
-
-Patch 8 was requested by Mark Rutland, who preferred a separate header
-for those definitions rather than allowing them to sprawl in place.
-It seemed a fair point, but I'm happy either way.
-
-I can still drop the affected patches if you want -- let me know.
-
-Cheers
----Dave
+diff --git a/arch/arm/mach-ep93xx/vision_ep9307.c b/arch/arm/mach-ep93xx/vision_ep9307.c
+index 6bc1c18..aa87dfa 100644
+--- a/arch/arm/mach-ep93xx/vision_ep9307.c
++++ b/arch/arm/mach-ep93xx/vision_ep9307.c
+@@ -281,7 +281,8 @@ static struct spi_board_info vision_spi_board_info[] __initdata = {
+ };
+ 
+ static struct ep93xx_spi_info vision_spi_master __initdata = {
+-	.num_chipselect		= ARRAY_SIZE(vision_spi_board_info),
++	.num_chipselect	= ARRAY_SIZE(vision_spi_board_info),
++	.use_dma	= 1,
+ };
+ 
+ /*************************************************************************
+-- 
+2.3.0
