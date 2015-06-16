@@ -1,62 +1,51 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Tue, 16 Jun 2015 15:17:08 +0200
-Subject: [PATCH 03/34] pinctrl: mvebu: armada-375: remove non-existing
- NAND re/we pins
-In-Reply-To: <20150609165843.GB16778@lunn.ch>
-References: <1433868446-11028-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1433868446-11028-4-git-send-email-thomas.petazzoni@free-electrons.com>
- <20150609165843.GB16778@lunn.ch>
-Message-ID: <20150616151708.7f07228d@free-electrons.com>
+From: robherring2@gmail.com (Rob Herring)
+Date: Tue, 16 Jun 2015 08:17:47 -0500
+Subject: [PATCH 1/2] Move the pt_regs_offset struct definition from arch
+ to common include file
+In-Reply-To: <1434386579-6045-2-git-send-email-dave.long@linaro.org>
+References: <1434386579-6045-1-git-send-email-dave.long@linaro.org>
+ <1434386579-6045-2-git-send-email-dave.long@linaro.org>
+Message-ID: <CAL_JsqK3L9Hv9bhAtwAAXVYjLJBTOG9=4ddOo-SFqnD-_KieCQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Andrew Lunn,
+On Mon, Jun 15, 2015 at 11:42 AM, David Long <dave.long@linaro.org> wrote:
+> From: "David A. Long" <dave.long@linaro.org>
+>
+> The pt_regs_offset structure is used for HAVE_REGS_AND_STACK_ACCESS_API
+>  feature and has identical definitions in four different arch ptrace.h
+> include files. It seems unlikely that definition would ever need to be
+> changed regardless of architecture so lets move it into
+> include/linux/ptrace.h.
+>
+> Signed-off-by: David A. Long <dave.long@linaro.org>
+> ---
+>  arch/arm/kernel/ptrace.c     | 5 -----
+>  arch/powerpc/kernel/ptrace.c | 5 -----
+>  arch/sh/include/asm/ptrace.h | 5 -----
+>  arch/x86/kernel/ptrace.c     | 5 -----
+>  include/linux/ptrace.h       | 9 +++++++++
+>  5 files changed, 9 insertions(+), 20 deletions(-)
+>
+> diff --git a/arch/arm/kernel/ptrace.c b/arch/arm/kernel/ptrace.c
+> index ef9119f..fb45cf1 100644
+> --- a/arch/arm/kernel/ptrace.c
+> +++ b/arch/arm/kernel/ptrace.c
+> @@ -59,11 +59,6 @@
+>  #define BREAKINST_THUMB        0xde01
+>  #endif
+>
+> -struct pt_regs_offset {
+> -       const char *name;
+> -       int offset;
+> -};
+> -
+>  #define REG_OFFSET_NAME(r) \
+>         {.name = #r, .offset = offsetof(struct pt_regs, ARM_##r)}
+>  #define REG_OFFSET_END {.name = NULL, .offset = 0}
 
-On Tue, 9 Jun 2015 18:58:43 +0200, Andrew Lunn wrote:
+Can't you also move these? ARM is complicated with the "ARM_"
+prefixing, but the others appear to be the same. Maybe you can remove
+the prefix or redefine the macro for ARM.
 
-> From armada-375.dtsi:
-> 
->                                 nand_pins: nand-pins {
->                                         marvell,pins = "mpp0", "mpp1", "mpp2",
->                                                 "mpp3", "mpp4", "mpp5",
->                                                 "mpp6", "mpp7", "mpp8",
->                                                 "mpp9", "mpp10", "mpp11",
->                                                 "mpp12", "mpp13";
->                                         marvell,function = "nand";
->                                 };
-> 
-> Don't you also need to remove mpp9 and mpp10 from here? What does
-> pinctrl do when you ask for pins which are not a member of the
-> function?
-
-In fact, no. Look at the patch:
-
- 	MPP_MODE(9,
- 		 MPP_FUNCTION(0x0, "gpio", NULL),
--		 MPP_FUNCTION(0x1, "nf", "wen"),
- 		 MPP_FUNCTION(0x2, "spi0", "sck"),
- 		 MPP_FUNCTION(0x3, "spi1", "sck"),
- 		 MPP_FUNCTION(0x5, "nand", "we")),
- 	MPP_MODE(10,
- 		 MPP_FUNCTION(0x0, "gpio", NULL),
--		 MPP_FUNCTION(0x1, "nf", "ren"),
- 		 MPP_FUNCTION(0x2, "dram", "vttctrl"),
- 		 MPP_FUNCTION(0x3, "led", "c1"),
- 		 MPP_FUNCTION(0x5, "nand", "re"),
-
-See how both pins had a "nf" function (0x1) and a "nand" function
-(0x5). I didn't even notice that when doing the patch, so my commit log
-was slightly confusing.
-
-The "nf" functions were incorrect. The "nand" functions were correct,
-and already used by armada-375.dtsi. I have just tested NAND on Armada
-375 DB with all the pinctrl patches applied, and it works fine (created
-a UBI device, with a volume, etc.).
-
-Best regards,
-
-Thomas
--- 
-Thomas Petazzoni, CTO, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+Rob
