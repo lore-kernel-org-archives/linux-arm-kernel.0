@@ -1,27 +1,30 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Tue, 16 Jun 2015 09:46:46 -0300
-Subject: Running kexec on mx6
-In-Reply-To: <CAOMZO5B9ysnLKpCrpyN3JBUrxVT7MOh7crY3nS8MDW2Hv4Xs+A@mail.gmail.com>
-References: <CAOMZO5A_=okeGhRjRb-7xkO7RJKTECdgBxinrTLtVR+6TMpnVw@mail.gmail.com>
- <CAOMZO5A0+SSdT5mfy7fmO4DUQKimQpFCSu16EVLkxR+qh6137A@mail.gmail.com>
- <CAOMZO5CvjfADx_0AhxVNwadPTb-i5LCdPTOq2ZQaYpzo-m+4Jg@mail.gmail.com>
- <CAOMZO5Br0BBSeSxtCG3aeew7ToVuBH00xEJhAsjHWRCav8+ufA@mail.gmail.com>
- <CAOMZO5DBoKXE9URxWvk+WkJEZ1RkC4S3hAyugTbd7b5Qu91QKA@mail.gmail.com>
- <CAOMZO5DOdrJdkvmtBV3Kegdxg=LVZB60qB_TvMJ-D45+1vDAHw@mail.gmail.com>
- <20150616094242.GR7557@n2100.arm.linux.org.uk>
- <CAOMZO5B9ysnLKpCrpyN3JBUrxVT7MOh7crY3nS8MDW2Hv4Xs+A@mail.gmail.com>
-Message-ID: <CAOMZO5BYCNuQ=5zHurf6Zqmpwcj1tiCZj7Nj4j6ygijbePNBFw@mail.gmail.com>
+From: s.trumtrar@pengutronix.de (Steffen Trumtrar)
+Date: Tue, 16 Jun 2015 14:53:50 +0200
+Subject: [BUG?] crypto: caam: little/big endianness on ARM vs PPC
+In-Reply-To: <BLUPR03MB391FCCC8B9AC019A0C8DA04E9A70@BLUPR03MB391.namprd03.prod.outlook.com>
+References: <20150615155907.GC7947@pengutronix.de>
+ <20150615220506.GA15134@gondor.apana.org.au>
+ <BLUPR03MB391FCCC8B9AC019A0C8DA04E9A70@BLUPR03MB391.namprd03.prod.outlook.com>
+Message-ID: <20150616125350.GE7947@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 16, 2015 at 8:15 AM, Fabio Estevam <festevam@gmail.com> wrote:
+Hi!
 
->> Which kernel - the one which is doing the kexec, or the one being kexec'd
->> into?
->
-> In my tests the kernel which is doing the kexec needs to have
-> CONFIG_SMP=n, so that kexec works on mx6solo.
+On Tue, Jun 16, 2015 at 03:27:54AM +0000, Victoria Milhoan wrote:
+> All,
+> 
+> Freescale has been adding i.MX6 support to the CAAM driver and testing on both i.MX6 and QorIQ platforms. The patch series is now available for review. Your feedback for the provided patches is appreciated.
+> 
 
-Other combination that works is to have CONFIG_SMP=y and then pass
-'nosmp' in the kernel command line, or also by removing cpu1 from the
-imx6dl.dtsi.
+Could you maybe bounce me that thread?
+I can't find it in a format that allows me to reply to the patches.
+
+Thanks,
+Steffen
+
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
