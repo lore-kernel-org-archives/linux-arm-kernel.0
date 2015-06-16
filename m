@@ -1,58 +1,56 @@
-From: vaibhav.hiremath@linaro.org (Vaibhav Hiremath)
-Date: Tue, 16 Jun 2015 19:55:58 +0530
-Subject: [PATCH-V2 12/12] Documentation: binding: add sclk adjustment
- properties to i2c-pxa
-In-Reply-To: <CAL_JsqKu0BFLU8JdxDwrkn2SZTQPX6GYu2AFOYP49zknfu28Tw@mail.gmail.com>
-References: <vaibhav.hiremath@linaro.org>
- <1434383399-2370-1-git-send-email-vaibhav.hiremath@linaro.org>
- <1434383399-2370-13-git-send-email-vaibhav.hiremath@linaro.org>
- <CAL_JsqKu0BFLU8JdxDwrkn2SZTQPX6GYu2AFOYP49zknfu28Tw@mail.gmail.com>
-Message-ID: <558031F6.5050107@linaro.org>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Tue, 16 Jun 2015 17:36:41 +0300
+Subject: [PATCH 0/7] OMAPDSS: use components (fix probing problems)
+In-Reply-To: <1434449789-13812-1-git-send-email-tomi.valkeinen@ti.com>
+References: <1434449789-13812-1-git-send-email-tomi.valkeinen@ti.com>
+Message-ID: <358618591.Y41I6t5qpX@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Tomi,
 
+Thank for the patches.
 
-On Tuesday 16 June 2015 06:52 PM, Rob Herring wrote:
-> On Mon, Jun 15, 2015 at 10:49 AM, Vaibhav Hiremath
-> <vaibhav.hiremath@linaro.org> wrote:
->> With addition of PXA910 family of devices, the TWSI module supports
->> new feature which allows us to adjust SCLK.
->> With DT properties i2c-pxa driver takes input configuration
->> in nsec and converts it to respective bit-fields,
->>
->>   - i2c-sclk-low-time-ns : SCLK low time (tlow)
->>     This property is used along with mode selection.
->>   - i2c-sclk-high-time-ns : SCLK high time (thigh)
->>
->> Signed-off-by: Vaibhav Hiremath <vaibhav.hiremath@linaro.org>
->> ---
->>   Documentation/devicetree/bindings/i2c/i2c-pxa.txt | 13 +++++++++++++
->>   1 file changed, 13 insertions(+)
->>
->> diff --git a/Documentation/devicetree/bindings/i2c/i2c-pxa.txt b/Documentation/devicetree/bindings/i2c/i2c-pxa.txt
->> index 9657db5..0fafd91 100644
->> --- a/Documentation/devicetree/bindings/i2c/i2c-pxa.txt
->> +++ b/Documentation/devicetree/bindings/i2c/i2c-pxa.txt
->> @@ -23,12 +23,25 @@ Optional properties :
->>    - i2c-disable-after-xfer : If set, driver will disable I2C module
->>      after msg xfer and enable it again before xfer.
->>
->> +   (Applicable to PXA910 family):
->> +
->> + - i2c-sclk-low-time-ns : SCLK low time (tlow), for standard/fast/high
->> +   speed mode.
->> +   This property is used along with mode selection. Driver uses this property
->> +   to set low/high time for standard and fast speed mode, as counter bit-field
->> +   is same for both.
->
-> This belongs below both properties, and it should be clear that both
-> properties are required if present.
->
+On Tuesday 16 June 2015 13:16:22 Tomi Valkeinen wrote:
+> Hi,
+> 
+> I noticed that on some platforms omapdss did not probe successfully. Some
+> resource was not available yet, but omapdss did not manage to handle
+> deferred probing. The reason was the use of platform_driver_probe() in
+> combination with how the omapdss module handles the drivers.
+> 
+> To fix this properly, the component system felt fine for the job, and it
+> seems to work nicely.
+> 
+>  Tomi
+> 
+> Tomi Valkeinen (7):
+>   OMAPDSS: move 'dss_initialized' to dss driver
+>   OMAPDSS: refactor dss probe function
+>   OMAPDSS: fix dss_init_ports error handling
+>   OMAPDSS: remove uses of __init/__exit
+>   OMAPDSS: reorder uninit calls
+>   OMAPDSS: componentize omapdss
+>   OMAPDSS: simplify submodule reg/unreg code
 
-Technically, both properties are required only in case of high_mode.
+I've quickly reviewed the whole series and it looks good to me.
 
-As mentioned above, in case of standard and fast mode we use tLow value.
+Acked-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
 
-Thanks,
-Vaibhav
+>  drivers/video/fbdev/omap2/dss/core.c  |  80 ++++--------
+>  drivers/video/fbdev/omap2/dss/dispc.c |  42 +++++--
+>  drivers/video/fbdev/omap2/dss/dpi.c   |  36 ++++--
+>  drivers/video/fbdev/omap2/dss/dsi.c   |  27 +++-
+>  drivers/video/fbdev/omap2/dss/dss.c   | 223 ++++++++++++++++++++-----------
+>  drivers/video/fbdev/omap2/dss/dss.h   |  32 ++---
+>  drivers/video/fbdev/omap2/dss/hdmi4.c |  28 ++++-
+>  drivers/video/fbdev/omap2/dss/hdmi5.c |  28 ++++-
+>  drivers/video/fbdev/omap2/dss/rfbi.c  |  32 ++++-
+>  drivers/video/fbdev/omap2/dss/sdi.c   |  35 ++++--
+>  drivers/video/fbdev/omap2/dss/venc.c  |  31 +++--
+>  11 files changed, 396 insertions(+), 198 deletions(-)
+
+-- 
+Regards,
+
+Laurent Pinchart
