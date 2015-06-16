@@ -1,8 +1,8 @@
 From: rmk+kernel@arm.linux.org.uk (Russell King)
-Date: Tue, 16 Jun 2015 23:07:01 +0100
-Subject: [PATCH 9/9] irq: spear-shirq: fix race in installing chained IRQ
+Date: Tue, 16 Jun 2015 23:06:56 +0100
+Subject: [PATCH 8/9] irq: irq-keystonr: fix race in installing chained IRQ
  handler
-Message-ID: <E1Z4z0X-0002T1-6U@rmk-PC.arm.linux.org.uk>
+Message-ID: <E1Z4z0S-0002Ss-1V@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -14,22 +14,22 @@ Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 ---
 Depends on patch 1.
 
- drivers/irqchip/spear-shirq.c | 3 +--
+ drivers/irqchip/irq-keystone.c | 3 +--
  1 file changed, 1 insertion(+), 2 deletions(-)
 
-diff --git a/drivers/irqchip/spear-shirq.c b/drivers/irqchip/spear-shirq.c
-index 9c145a7cb056..a45121546caf 100644
---- a/drivers/irqchip/spear-shirq.c
-+++ b/drivers/irqchip/spear-shirq.c
-@@ -207,8 +207,7 @@ static void __init spear_shirq_register(struct spear_shirq *shirq,
- 	if (!shirq->irq_chip)
- 		return;
+diff --git a/drivers/irqchip/irq-keystone.c b/drivers/irqchip/irq-keystone.c
+index 78e8b3ce5252..00b0193687ef 100644
+--- a/drivers/irqchip/irq-keystone.c
++++ b/drivers/irqchip/irq-keystone.c
+@@ -184,8 +184,7 @@ static int keystone_irq_probe(struct platform_device *pdev)
  
--	irq_set_chained_handler(parent_irq, shirq_handler);
--	irq_set_handler_data(parent_irq, shirq);
-+	irq_set_chained_handler_and_data(parent_irq, shirq_handler, shirq);
+ 	platform_set_drvdata(pdev, kirq);
  
- 	for (i = 0; i < shirq->nr_irqs; i++) {
- 		irq_set_chip_and_handler(shirq->virq_base + i,
+-	irq_set_chained_handler(kirq->irq, keystone_irq_handler);
+-	irq_set_handler_data(kirq->irq, kirq);
++	irq_set_chained_handler_and_data(kirq->irq, keystone_irq_handler, kirq);
+ 
+ 	/* clear all source bits */
+ 	keystone_irq_writel(kirq, ~0x0);
 -- 
 2.1.0
