@@ -1,73 +1,41 @@
-From: srinivas.kandagatla@linaro.org (Srinivas Kandagatla)
-Date: Tue, 16 Jun 2015 10:21:54 +0100
-Subject: [PATCH v2 0/3] Add the efuse driver on rockchip platform
-In-Reply-To: <557FE3EA.4000306@i2se.com>
-References: <1434439665-27781-1-git-send-email-wxt@rock-chips.com>
- <557FE3EA.4000306@i2se.com>
-Message-ID: <557FEAB2.1040101@linaro.org>
+From: noralf@tronnes.org (=?UTF-8?B?Tm9yYWxmIFRyw7hubmVz?=)
+Date: Tue, 16 Jun 2015 11:39:26 +0200
+Subject: [PATCH v2 2/3] watchdog: bcm2835: Add poweroff code for the
+ Raspberry Pi
+In-Reply-To: <557F930E.8010002@wwwdotorg.org>
+References: <1434195541-28368-1-git-send-email-noralf@tronnes.org>
+ <1434195541-28368-2-git-send-email-noralf@tronnes.org>
+ <557F930E.8010002@wwwdotorg.org>
+Message-ID: <557FEECE.9060909@tronnes.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Stefan,
 
-
-On 16/06/15 09:52, Stefan Wahren wrote:
-> Hi Caesar,
->
-> [add Maxime and Srinivas]
->
-> Am 16.06.2015 um 09:27 schrieb Caesar Wang:
->> The original driver is uploaded by Jianqun.
->> Here is his patchs:
->>      https://patchwork.kernel.org/patch/5410341/
->>      https://patchwork.kernel.org/patch/5410351/
+Den 16.06.2015 05:07, skrev Stephen Warren:
+> On 06/13/2015 05:39 AM, Noralf Tr?nnes wrote:
+>> This adds a new poweroff function to the watchdog driver for the
+>> Raspberry Pi. Currently poweroff/halt results in a reboot.
 >>
->> Jianqun, nevermind!
->> I check-pick it and re-upload the driver for the upstream.
->> e.g.:
->>      Tested by on minnie board.(kernel-4.1-rc8)
->>      cd /sys/devices/platform/ffb40000.efuse
->>      localhost ffb40000.efuse # cat cpu_leakage_show
->>      cpu_version_show
->>      The results:
->>              19
->>              2
+>> The Raspberry Pi firmware uses the RSTS register to know which
+>> partiton to boot from. The partiton value is spread into bits
+>> 0, 2, 4, 6, 8, 10. Partiton 63 is a special partition used by
+>> the firmware to indicate halt.
 >>
->> Changes in v2:
->> - Change the document decription.
->> - Move the efuse driver into driver/soc/vendor.
->> - update the efuse driver.
->> - Add the dts node on RK3288.
->>
->>
+>> The firmware made this change in 19 Aug 2013 and was matched
+>> by the downstream commit:
+>> Changes for new NOOBS multi partition booting from gsh
+> I don't understand why we need a new compatible value here; why not
+> simply modify the existing bcm2835_power_off() function. That is written
+> to do something that's interpreted by the RPi firmware, not something
+> that the bcm2835 HW does.
 >
-> i want to mention that there is a upcoming new framework suitable for
-> efuse drivers:
->
-> https://lkml.org/lkml/2015/5/21/643
->
-> Unfortunately i don't know the current development state.
->
+> Admittedly the current name is a bit misleading, but fixing that should
+> be a separate change to fixing the implementation to do what the current
+> firmware expects.
 
-Currently this framework is used by atleast 3 drivers(qcom-tsens, 
-qcom-cpr, begel-bone-cape manager) which are still floating in the 
-mailing list.
-
-I was hoping that these 3 users would getback with tested-by.. which did 
-not happen for last 3-4 weeks.
-
-I would appreciate, If you could try framework too, and let me know.
-
-I added two of wrappers on top of v5 at: 
-https://git.linaro.org/people/srinivas.kandagatla/linux.git/shortlog/refs/heads/nvmem-dev-v5
-
-
-I think I should request Mark to take the framework.
-
-
-
---srini
-> Regards
-> Stefan
->
->
+There are other boards that use the BCM2835 and I didn't want to break the
+behaviour for those that use the reference firmware. Roku 2 device uses
+this soc, and changing bcm2835_power_off() would break support for it.
+ODROID-W also use BCM2835, but this is a Pi clone so I don't know if they
+have matched their firmware behaviour to that of the Pi (admittedly not
+many boards were made, their source of chips went dry).
