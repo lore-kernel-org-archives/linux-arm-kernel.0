@@ -1,58 +1,72 @@
-From: joshc@ni.com (Josh Cartwright)
-Date: Tue, 16 Jun 2015 13:45:22 -0500
-Subject: [PATCHv4 1/2] dts: Adding docs for Xilinx LogiCORE IP mailbox
- driver.
-In-Reply-To: <1433175507-3833-2-git-send-email-moritz.fischer@ettus.com>
-References: <1433175507-3833-1-git-send-email-moritz.fischer@ettus.com>
- <1433175507-3833-2-git-send-email-moritz.fischer@ettus.com>
-Message-ID: <20150616184522.GU633@jcartwri.amer.corp.natinst.com>
+From: bhelgaas@google.com (Bjorn Helgaas)
+Date: Tue, 16 Jun 2015 13:49:50 -0500
+Subject: [PATCH Part1 v11 4/5] PCI: xgene: Use pci_scan_root_bus()
+ instead of pci_create_root_bus()
+In-Reply-To: <CACoXjcnZG9+oyc43G2NM1tvrZycMGiQFHm2E27+1Q_8_Vu9aEQ@mail.gmail.com>
+References: <1430204499-19571-1-git-send-email-wangyijing@huawei.com>
+ <1430204499-19571-5-git-send-email-wangyijing@huawei.com>
+ <20150527154758.GU32152@google.com>
+ <CACoXjcnZG9+oyc43G2NM1tvrZycMGiQFHm2E27+1Q_8_Vu9aEQ@mail.gmail.com>
+Message-ID: <20150616184950.GA7710@google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 01, 2015 at 09:18:26AM -0700, Moritz Fischer wrote:
-> Changes from v3:
-> - Changed reg size to 0x100
-> 
-> Changes from v2:
-> - Addressed Michal's stylistic comments
-> - Fixed typo in compatible string
-> 
-> Changes from v1:
-> - Added common clock framework support
-> 
-> Changes from v0:
-> - Fixed example bindings
-> 
-> Signed-off-by: Moritz Fischer <moritz.fischer@ettus.com>
-> Acked-by: Michal Simek <michal.simek@xilinx.com>
-> ---
->  .../bindings/mailbox/xilinx-mailbox.txt         | 44 ++++++++++++++++++++
->  1 file changed, 44 insertions(+)
-> 
-> diff --git a/Documentation/devicetree/bindings/mailbox/xilinx-mailbox.txt b/Documentation/devicetree/bindings/mailbox/xilinx-mailbox.txt
-> new file mode 100644
-> index 0000000..f9ec46d
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/mailbox/xilinx-mailbox.txt
-> @@ -0,0 +1,44 @@
-> +Xilinx Mailbox Driver
-> +=====================
-> +
-> +Required properties:
-> +- compatible       : "xlnx,mailbox-2.1".
-> +- reg              :  physical base address of the mailbox and length of
-> +                      memory mapped region.
-> +- #mbox-cells      :  common mailbox binding property to identify the number
-> +                      of cells required for the mailbox specifier, should be 1
+[+cc Duc, Loc]
 
-It seems strange to me to require #mbox-cells = <1>, when this hardware
-only supports a single channel.  Why not #mbox-cells = <0>; ?
+On Wed, May 27, 2015 at 10:21:40AM -0700, Tanmay Inamdar wrote:
+> On Wed, May 27, 2015 at 8:47 AM, Bjorn Helgaas <bhelgaas@google.com> wrote:
+> > On Tue, Apr 28, 2015 at 03:01:38PM +0800, Yijing Wang wrote:
+> >> Pci_bus_add_devices() was ripped out of pci_scan_root_bus().
+> >> Now pci_scan_root_bus() == pci_create_root_bus() +
+> >> pci_scan_child_bus() if busn resource is supplied.
+> >> Xgene added the busn resource to resources list
+> >> in of_pci_get_host_bridge_resources(). So it should be safe
+> >> to use pci_scan_root_bus() instead.
+> >>
+> >> Signed-off-by: Yijing Wang <wangyijing@huawei.com>
+> >> CC: Tanmay Inamdar <tinamdar@apm.com>
+> >
+> > Tanmay, any comments on this?
+> >
+> 
+> Looks good to me.
+> 
+> Acked-by: Tanmay Inamdar <tinamdar@apm.com>
 
-  Josh
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150616/c4ba30ba/attachment.sig>
+I had applied this, but dropped it because it conflicted with Duc's
+MSI patch, which adds a call to xgene_pcie_msi_enable() between
+pci_create_root_bus() and pci_scan_child_bus().
+
+We should figure out a better way to do this, e.g., with
+pci_host_bridge_ops, so we can use pci_scan_root_bus() on X-Gene.  But we
+don't have that yet.
+
+> >> ---
+> >>  drivers/pci/host/pci-xgene.c |    3 +--
+> >>  1 files changed, 1 insertions(+), 2 deletions(-)
+> >>
+> >> diff --git a/drivers/pci/host/pci-xgene.c b/drivers/pci/host/pci-xgene.c
+> >> index ee082c0..87e3962 100644
+> >> --- a/drivers/pci/host/pci-xgene.c
+> >> +++ b/drivers/pci/host/pci-xgene.c
+> >> @@ -499,12 +499,11 @@ static int xgene_pcie_probe_bridge(struct platform_device *pdev)
+> >>       if (ret)
+> >>               return ret;
+> >>
+> >> -     bus = pci_create_root_bus(&pdev->dev, 0,
+> >> +     bus = pci_scan_root_bus(&pdev->dev, 0,
+> >>                                       &xgene_pcie_ops, port, &res);
+> >>       if (!bus)
+> >>               return -ENOMEM;
+> >>
+> >> -     pci_scan_child_bus(bus);
+> >>       pci_assign_unassigned_bus_resources(bus);
+> >>       pci_bus_add_devices(bus);
+> >>
+> >> --
+> >> 1.7.1
+> >>
+> >> --
+> >> To unsubscribe from this list: send the line "unsubscribe linux-pci" in
+> >> the body of a message to majordomo at vger.kernel.org
+> >> More majordomo info at  http://vger.kernel.org/majordomo-info.html
