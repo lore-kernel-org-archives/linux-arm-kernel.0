@@ -1,129 +1,75 @@
 From: rmk+kernel@arm.linux.org.uk (Russell King)
-Date: Tue, 16 Jun 2015 23:06:20 +0100
-Subject: [PATCH 1/9] irq: add irq_set_chained_handler_and_data()
-Message-ID: <E1Z4yzs-0002Rw-4B@rmk-PC.arm.linux.org.uk>
+Date: Tue, 16 Jun 2015 23:06:25 +0100
+Subject: [PATCH 2/9] ARM: sa1100: convert SA11x0 related code to use new
+ chained handler helper
+Message-ID: <E1Z4yzx-0002S6-7p@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Driver authors seem to get the ordering of irq_set_chained_handler()
-and irq_set_handler_data() wrong - ordering the former before the
-latter.  This opens a race window where, if there is an interrupt
-pending, the handler will be called between these two calls,
-potentially resulting in an oops.
-
-Provide a single interface to set both of these together, especially
-as that's commonly what is required.
+Convert SA11x0 (Neponset, SA1111, and UCB1x00 code) to use the new
+irq_set_chained_handler_and_data() helper.
 
 Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 ---
-It probably makes sense to convert everything over to this new
-registration function, and kill all users of irq_set_chained_handler()
-to prevent this problem recurring.  Thoughts?
+Depends on patch 1.
 
- include/linux/irq.h |  9 +++++++++
- kernel/irq/chip.c   | 45 ++++++++++++++++++++++++++++++++++-----------
- 2 files changed, 43 insertions(+), 11 deletions(-)
+ arch/arm/common/sa1111.c        | 7 +++----
+ arch/arm/mach-sa1100/neponset.c | 3 +--
+ drivers/mfd/ucb1x00-core.c      | 3 +--
+ 3 files changed, 5 insertions(+), 8 deletions(-)
 
-diff --git a/include/linux/irq.h b/include/linux/irq.h
-index 62c6901cab55..4942cbc379bb 100644
---- a/include/linux/irq.h
-+++ b/include/linux/irq.h
-@@ -517,6 +517,15 @@ irq_set_chained_handler(unsigned int irq, irq_flow_handler_t handle)
- 	__irq_set_handler(irq, handle, 1, NULL);
- }
+diff --git a/arch/arm/common/sa1111.c b/arch/arm/common/sa1111.c
+index 5cc779c8e9c6..93ee70dbbdd3 100644
+--- a/arch/arm/common/sa1111.c
++++ b/arch/arm/common/sa1111.c
+@@ -501,8 +501,8 @@ static int sa1111_setup_irq(struct sa1111 *sachip, unsigned irq_base)
+ 	 * Register SA1111 interrupt
+ 	 */
+ 	irq_set_irq_type(sachip->irq, IRQ_TYPE_EDGE_RISING);
+-	irq_set_handler_data(sachip->irq, sachip);
+-	irq_set_chained_handler(sachip->irq, sa1111_irq_handler);
++	irq_set_chained_handler_and_data(sachip->irq, sa1111_irq_handler,
++					 sachip);
  
-+/*
-+ * Set a highlevel chained flow handler and its data for a given IRQ.
-+ * (a chained handler is automatically enabled and set to
-+ *  IRQ_NOREQUEST, IRQ_NOPROBE, and IRQ_NOTHREAD)
-+ */
-+void
-+irq_set_chained_handler_and_data(unsigned int irq, irq_flow_handler_t handle,
-+				 void *data);
-+
- void irq_modify_status(unsigned int irq, unsigned long clr, unsigned long set);
+ 	dev_info(sachip->dev, "Providing IRQ%u-%u\n",
+ 		sachip->irq_base, sachip->irq_base + SA1111_IRQ_NR - 1);
+@@ -836,8 +836,7 @@ static void __sa1111_remove(struct sa1111 *sachip)
+ 	clk_unprepare(sachip->clk);
  
- static inline void irq_set_status_flags(unsigned int irq, unsigned long set)
-diff --git a/kernel/irq/chip.c b/kernel/irq/chip.c
-index eb9a4ea394ab..92bed9010bc6 100644
---- a/kernel/irq/chip.c
-+++ b/kernel/irq/chip.c
-@@ -719,15 +719,9 @@ void handle_percpu_devid_irq(unsigned int irq, struct irq_desc *desc)
- }
+ 	if (sachip->irq != NO_IRQ) {
+-		irq_set_chained_handler(sachip->irq, NULL);
+-		irq_set_handler_data(sachip->irq, NULL);
++		irq_set_chained_handler_and_data(sachip->irq, NULL, NULL);
+ 		irq_free_descs(sachip->irq_base, SA1111_IRQ_NR);
  
- void
--__irq_set_handler(unsigned int irq, irq_flow_handler_t handle, int is_chained,
--		  const char *name)
-+__irq_do_set_handler(struct irq_desc *desc, irq_flow_handler_t handle,
-+		     int is_chained, const char *name)
- {
--	unsigned long flags;
--	struct irq_desc *desc = irq_get_desc_buslock(irq, &flags, 0);
--
--	if (!desc)
--		return;
--
- 	if (!handle) {
- 		handle = handle_bad_irq;
- 	} else {
-@@ -749,13 +743,13 @@ __irq_set_handler(unsigned int irq, irq_flow_handler_t handle, int is_chained,
- 			 * right away.
- 			 */
- 			if (WARN_ON(is_chained))
--				goto out;
-+				return;
- 			/* Try the parent */
- 			irq_data = irq_data->parent_data;
- 		}
- #endif
- 		if (WARN_ON(!irq_data || irq_data->chip == &no_irq_chip))
--			goto out;
-+			return;
+ 		release_mem_region(sachip->phys + SA1111_INTC, 512);
+diff --git a/arch/arm/mach-sa1100/neponset.c b/arch/arm/mach-sa1100/neponset.c
+index af868d258e66..99d9a3b1bf34 100644
+--- a/arch/arm/mach-sa1100/neponset.c
++++ b/arch/arm/mach-sa1100/neponset.c
+@@ -327,8 +327,7 @@ static int neponset_probe(struct platform_device *dev)
+ 	irq_set_chip(d->irq_base + NEP_IRQ_SA1111, &nochip);
+ 
+ 	irq_set_irq_type(irq, IRQ_TYPE_EDGE_RISING);
+-	irq_set_handler_data(irq, d);
+-	irq_set_chained_handler(irq, neponset_irq_handler);
++	irq_set_chained_handler_and_data(irq, neponset_irq_handler, d);
+ 
+ 	/*
+ 	 * We would set IRQ_GPIO25 to be a wake-up IRQ, but unfortunately
+diff --git a/drivers/mfd/ucb1x00-core.c b/drivers/mfd/ucb1x00-core.c
+index 58ea9fdd3a15..3591550598ad 100644
+--- a/drivers/mfd/ucb1x00-core.c
++++ b/drivers/mfd/ucb1x00-core.c
+@@ -566,8 +566,7 @@ static int ucb1x00_probe(struct mcp *mcp)
  	}
  
- 	/* Uninstall? */
-@@ -774,12 +768,41 @@ __irq_set_handler(unsigned int irq, irq_flow_handler_t handle, int is_chained,
- 		irq_settings_set_nothread(desc);
- 		irq_startup(desc, true);
- 	}
--out:
-+}
-+
-+void
-+__irq_set_handler(unsigned int irq, irq_flow_handler_t handle, int is_chained,
-+		  const char *name)
-+{
-+	unsigned long flags;
-+	struct irq_desc *desc = irq_get_desc_buslock(irq, &flags, 0);
-+
-+	if (!desc)
-+		return;
-+
-+	__irq_do_set_handler(desc, handle, is_chained, name);
- 	irq_put_desc_busunlock(desc, flags);
- }
- EXPORT_SYMBOL_GPL(__irq_set_handler);
+ 	irq_set_irq_type(ucb->irq, IRQ_TYPE_EDGE_RISING);
+-	irq_set_handler_data(ucb->irq, ucb);
+-	irq_set_chained_handler(ucb->irq, ucb1x00_irq);
++	irq_set_chained_handler_and_data(ucb->irq, ucb1x00_irq, ucb);
  
- void
-+irq_set_chained_handler_and_data(unsigned int irq, irq_flow_handler_t handle,
-+				 void *data)
-+{
-+	unsigned long flags;
-+	struct irq_desc *desc = irq_get_desc_buslock(irq, &flags, 0);
-+
-+	if (!desc)
-+		return;
-+
-+	__irq_do_set_handler(desc, handle, 1, NULL);
-+	desc->irq_data.handler_data = data;
-+	
-+	irq_put_desc_busunlock(desc, flags);
-+}
-+EXPORT_SYMBOL_GPL(irq_set_chained_handler_and_data);
-+
-+void
- irq_set_chip_and_handler_name(unsigned int irq, struct irq_chip *chip,
- 			      irq_flow_handler_t handle, const char *name)
- {
+ 	if (pdata && pdata->gpio_base) {
+ 		ucb->gpio.label = dev_name(&ucb->dev);
 -- 
 2.1.0
