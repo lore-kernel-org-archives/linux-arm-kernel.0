@@ -1,37 +1,22 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Tue, 16 Jun 2015 08:15:10 -0300
-Subject: Running kexec on mx6
-In-Reply-To: <20150616094242.GR7557@n2100.arm.linux.org.uk>
-References: <CAOMZO5A_=okeGhRjRb-7xkO7RJKTECdgBxinrTLtVR+6TMpnVw@mail.gmail.com>
- <CAOMZO5A0+SSdT5mfy7fmO4DUQKimQpFCSu16EVLkxR+qh6137A@mail.gmail.com>
- <CAOMZO5CvjfADx_0AhxVNwadPTb-i5LCdPTOq2ZQaYpzo-m+4Jg@mail.gmail.com>
- <CAOMZO5Br0BBSeSxtCG3aeew7ToVuBH00xEJhAsjHWRCav8+ufA@mail.gmail.com>
- <CAOMZO5DBoKXE9URxWvk+WkJEZ1RkC4S3hAyugTbd7b5Qu91QKA@mail.gmail.com>
- <CAOMZO5DOdrJdkvmtBV3Kegdxg=LVZB60qB_TvMJ-D45+1vDAHw@mail.gmail.com>
- <20150616094242.GR7557@n2100.arm.linux.org.uk>
-Message-ID: <CAOMZO5B9ysnLKpCrpyN3JBUrxVT7MOh7crY3nS8MDW2Hv4Xs+A@mail.gmail.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Tue, 16 Jun 2015 12:15:37 +0100
+Subject: [PATCH v3] regulator: Add QCOM SPMI regulator driver
+In-Reply-To: <1434149230-11785-1-git-send-email-sboyd@codeaurora.org>
+References: <1434149230-11785-1-git-send-email-sboyd@codeaurora.org>
+Message-ID: <20150616111537.GJ18309@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Russell,
+On Fri, Jun 12, 2015 at 03:47:10PM -0700, Stephen Boyd wrote:
+> Add an SPMI regulator driver for Qualcomm's PM8841, PM8941, and
+> PM8916 PMICs. This driver is based largely on code from
+> codeaurora.org[1].
 
-On Tue, Jun 16, 2015 at 6:42 AM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> On Tue, Jun 16, 2015 at 01:18:34AM -0300, Fabio Estevam wrote:
->> On Mon, Jun 15, 2015 at 7:43 PM, Fabio Estevam <festevam@gmail.com> wrote:
->>
->> > So kexec is working fine on mx6quad, but not on mx6solo.
->>
->> Also tried on mx6dl and kexec works well.
->>
->> On mx6solo I can only get kexec to work if I rebuild the kernel
->> without SMP support (CONFIG_SMP=n):
->> http://pastebin.com/nRVe3NZM
->
-> Which kernel - the one which is doing the kexec, or the one being kexec'd
-> into?
-
-In my tests the kernel which is doing the kexec needs to have
-CONFIG_SMP=n, so that kexec works on mx6solo.
-
-Thanks
+Applied, thanks.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150616/d293a3be/attachment.sig>
