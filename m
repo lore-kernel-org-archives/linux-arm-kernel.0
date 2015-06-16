@@ -1,58 +1,46 @@
-From: m.smarduch@samsung.com (Mario Smarduch)
-Date: Tue, 16 Jun 2015 14:50:52 -0700
-Subject: [PATCH v2 2/2] arm: KVM: keep arm vfp/simd exit handling consistent
- with arm64
-In-Reply-To: <1434491452-19177-1-git-send-email-m.smarduch@samsung.com>
-References: <1434491452-19177-1-git-send-email-m.smarduch@samsung.com>
-Message-ID: <1434491452-19177-3-git-send-email-m.smarduch@samsung.com>
+From: rafael@kernel.org (Rafael J. Wysocki)
+Date: Wed, 17 Jun 2015 00:04:07 +0200
+Subject: [PATCH 2/2] cpufreq: dt: allow driver to boot automatically
+In-Reply-To: <20150616214032.GA4313@saruman.tx.rr.com>
+References: <1431115050-23693-1-git-send-email-balbi@ti.com>
+ <1431115050-23693-2-git-send-email-balbi@ti.com>
+ <20150616214032.GA4313@saruman.tx.rr.com>
+Message-ID: <CAJZ5v0hO+Rbcyq8Gcpecdw9rGW1Qdhrmj6X6TVtRpLOxQKW+=g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-After enhancing arm64 FP/SIMD exit handling, FP/SIMD exit branch is moved
-to guest trap handling. This keeps exiting handling flow between both
-architectures consistent.
+On Tue, Jun 16, 2015 at 11:40 PM, Felipe Balbi <balbi@ti.com> wrote:
+> On Fri, May 08, 2015 at 02:57:30PM -0500, Felipe Balbi wrote:
+>> by adding the missing MODULE_ALIAS(), cpufreq-dt
+>> can be autoloaded by udev/systemd.
+>>
+>> Signed-off-by: Felipe Balbi <balbi@ti.com>
+>
+> looks like this wasn't applied anywhere. Viresh, can you apply this
+> patch please ?
 
-Signed-off-by: Mario Smarduch <m.smarduch@samsung.com>
----
- arch/arm/kvm/interrupts.S |   12 +++++++-----
- 1 file changed, 7 insertions(+), 5 deletions(-)
+I've overlooked it, sorry about that.  Applied now, thanks!
 
-diff --git a/arch/arm/kvm/interrupts.S b/arch/arm/kvm/interrupts.S
-index 79caf79..fca2c56 100644
---- a/arch/arm/kvm/interrupts.S
-+++ b/arch/arm/kvm/interrupts.S
-@@ -363,10 +363,6 @@ hyp_hvc:
- 	@ Check syndrome register
- 	mrc	p15, 4, r1, c5, c2, 0	@ HSR
- 	lsr	r0, r1, #HSR_EC_SHIFT
--#ifdef CONFIG_VFPv3
--	cmp	r0, #HSR_EC_CP_0_13
--	beq	switch_to_guest_vfp
--#endif
- 	cmp	r0, #HSR_EC_HVC
- 	bne	guest_trap		@ Not HVC instr.
- 
-@@ -406,6 +402,12 @@ THUMB(	orr	lr, #1)
- 1:	eret
- 
- guest_trap:
-+#ifdef CONFIG_VFPv3
-+	/* Guest accessed VFP/SIMD registers, save host, restore Guest */
-+	cmp	r0, #HSR_EC_CP_0_13
-+	beq	switch_to_guest_fpsimd
-+#endif
-+
- 	load_vcpu			@ Load VCPU pointer to r0
- 	str	r1, [vcpu, #VCPU_HSR]
- 
-@@ -478,7 +480,7 @@ guest_trap:
-  * inject an undefined exception to the guest.
-  */
- #ifdef CONFIG_VFPv3
--switch_to_guest_vfp:
-+switch_to_guest_fpsimd:
- 	load_vcpu			@ Load VCPU pointer to r0
- 	push	{r3-r7}
- 
--- 
-1.7.9.5
+
+>> ---
+>>  drivers/cpufreq/cpufreq-dt.c | 1 +
+>>  1 file changed, 1 insertion(+)
+>>
+>> diff --git a/drivers/cpufreq/cpufreq-dt.c b/drivers/cpufreq/cpufreq-dt.c
+>> index bab67db54b7e..528a82bf5038 100644
+>> --- a/drivers/cpufreq/cpufreq-dt.c
+>> +++ b/drivers/cpufreq/cpufreq-dt.c
+>> @@ -416,6 +416,7 @@ static struct platform_driver dt_cpufreq_platdrv = {
+>>  };
+>>  module_platform_driver(dt_cpufreq_platdrv);
+>>
+>> +MODULE_ALIAS("platform:cpufreq-dt");
+>>  MODULE_AUTHOR("Viresh Kumar <viresh.kumar@linaro.org>");
+>>  MODULE_AUTHOR("Shawn Guo <shawn.guo@linaro.org>");
+>>  MODULE_DESCRIPTION("Generic cpufreq driver");
+>> --
+>> 2.4.0.rc3
+>>
+>
+> --
+> balbi
