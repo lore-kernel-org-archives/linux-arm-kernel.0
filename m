@@ -1,38 +1,32 @@
-From: rmk+kernel@arm.linux.org.uk (Russell King)
-Date: Tue, 16 Jun 2015 23:29:41 +0100
-Subject: [PATCH] GPU: ipu: fix lockup caused by pending chained interrupts
-In-Reply-To: <E1Z4yzs-0002Rw-4B@rmk-PC.arm.linux.org.uk>
-References: <E1Z4yzs-0002Rw-4B@rmk-PC.arm.linux.org.uk>
-Message-ID: <E1Z4zMT-0004Y7-KJ@rmk-PC.arm.linux.org.uk>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 16 Jun 2015 23:32:58 +0100
+Subject: [PATCH v4] ARM: early fixmap support for earlycon
+In-Reply-To: <1434491507-6208-1-git-send-email-stefan@agner.ch>
+References: <1434491507-6208-1-git-send-email-stefan@agner.ch>
+Message-ID: <20150616223258.GW7557@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Even with the oops fixed by a previous patch, the system still fails to
-kexec, due to a stuck chained interrupt locking the system.  We must
-disable the child interrupts prior to setting up the irq chip to ensure
-we don't get stuck here.
+On Tue, Jun 16, 2015 at 11:51:47PM +0200, Stefan Agner wrote:
+> Add early fixmap support, initially to support permanent, fixed
+> mapping support for early console. A temporary, early pte is
+> created which is migrated to a permanent mapping in paging_init.
+> This is also needed since the attributes may change as the memory
+> types are initialized. The 3MiB range of fixmap spans two pte
+> tables, but currently only one pte is created for early fixmap
+> support.
+> 
+> Re-add FIX_KMAP_BEGIN to the index calculation in highmem.c since
+> the index for kmap does not start at zero anymore. This reverts
+> 4221e2e6b316 ("ARM: 8031/1: fixmap: remove FIX_KMAP_BEGIN and
+> FIX_KMAP_END") to some extent.
 
-Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
----
-Maybe this is all that's really needed... would also be nice if this
-path had an etry in MAINTAINERS...
+Sorry, this isn't going to make the next merge window, I've closed my
+tree at the end of last week to new submissions (because it got too
+painful to maintain the for-next branch due to the number of cross-
+dependencies between branches.)  The only patches I'll entertain this
+week and throughout the merge window are bug fixes.
 
- drivers/gpu/ipu-v3/ipu-common.c | 3 +++
- 1 file changed, 3 insertions(+)
-
-diff --git a/drivers/gpu/ipu-v3/ipu-common.c b/drivers/gpu/ipu-v3/ipu-common.c
-index 6d2f39d36e44..00f2058944e5 100644
---- a/drivers/gpu/ipu-v3/ipu-common.c
-+++ b/drivers/gpu/ipu-v3/ipu-common.c
-@@ -1107,6 +1107,9 @@ static int ipu_irq_init(struct ipu_soc *ipu)
- 		return ret;
- 	}
- 
-+	for (i = 0; i < IPU_NUM_IRQS; i += 32)
-+		ipu_cm_write(ipu, 0, IPU_INT_CTRL(i / 32));
-+
- 	for (i = 0; i < IPU_NUM_IRQS; i += 32) {
- 		gc = irq_get_domain_generic_chip(ipu->domain, i);
- 		gc->reg_base = ipu->cm_reg;
 -- 
-2.1.0
+FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
+according to speedtest.net.
