@@ -1,40 +1,48 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Tue, 16 Jun 2015 14:31:50 -0700
-Subject: [PATCH 07/10] ARM: dts: qcom: ipq8064-ap148: Use stdout-path
-In-Reply-To: <1434490313-13905-1-git-send-email-sboyd@codeaurora.org>
-References: <1434490313-13905-1-git-send-email-sboyd@codeaurora.org>
-Message-ID: <1434490313-13905-8-git-send-email-sboyd@codeaurora.org>
+From: balbi@ti.com (Felipe Balbi)
+Date: Tue, 16 Jun 2015 16:40:32 -0500
+Subject: [PATCH 2/2] cpufreq: dt: allow driver to boot automatically
+In-Reply-To: <1431115050-23693-2-git-send-email-balbi@ti.com>
+References: <1431115050-23693-1-git-send-email-balbi@ti.com>
+ <1431115050-23693-2-git-send-email-balbi@ti.com>
+Message-ID: <20150616214032.GA4313@saruman.tx.rr.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use stdout-path so that we don't have to put the console on the
-kernel command line.
+On Fri, May 08, 2015 at 02:57:30PM -0500, Felipe Balbi wrote:
+> by adding the missing MODULE_ALIAS(), cpufreq-dt
+> can be autoloaded by udev/systemd.
+> 
+> Signed-off-by: Felipe Balbi <balbi@ti.com>
 
-Cc: Mathieu Olivari <mathieu@codeaurora.org>
-Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
----
- arch/arm/boot/dts/qcom-ipq8064-ap148.dts | 8 ++++++++
- 1 file changed, 8 insertions(+)
+looks like this wasn't applied anywhere. Viresh, can you apply this
+patch please ?
 
-diff --git a/arch/arm/boot/dts/qcom-ipq8064-ap148.dts b/arch/arm/boot/dts/qcom-ipq8064-ap148.dts
-index 55b2910efd87..d501382493e3 100644
---- a/arch/arm/boot/dts/qcom-ipq8064-ap148.dts
-+++ b/arch/arm/boot/dts/qcom-ipq8064-ap148.dts
-@@ -4,6 +4,14 @@
- 	model = "Qualcomm IPQ8064/AP148";
- 	compatible = "qcom,ipq8064-ap148", "qcom,ipq8064";
- 
-+	aliases {
-+		serial0 = &gsbi4_serial;
-+	};
-+
-+	chosen {
-+		stdout-path = "serial0:115200n8";
-+	};
-+
- 	reserved-memory {
- 		#address-cells = <1>;
- 		#size-cells = <1>;
+> ---
+>  drivers/cpufreq/cpufreq-dt.c | 1 +
+>  1 file changed, 1 insertion(+)
+> 
+> diff --git a/drivers/cpufreq/cpufreq-dt.c b/drivers/cpufreq/cpufreq-dt.c
+> index bab67db54b7e..528a82bf5038 100644
+> --- a/drivers/cpufreq/cpufreq-dt.c
+> +++ b/drivers/cpufreq/cpufreq-dt.c
+> @@ -416,6 +416,7 @@ static struct platform_driver dt_cpufreq_platdrv = {
+>  };
+>  module_platform_driver(dt_cpufreq_platdrv);
+>  
+> +MODULE_ALIAS("platform:cpufreq-dt");
+>  MODULE_AUTHOR("Viresh Kumar <viresh.kumar@linaro.org>");
+>  MODULE_AUTHOR("Shawn Guo <shawn.guo@linaro.org>");
+>  MODULE_DESCRIPTION("Generic cpufreq driver");
+> -- 
+> 2.4.0.rc3
+> 
+
 -- 
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-a Linux Foundation Collaborative Project
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150616/83a6496d/attachment.sig>
