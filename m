@@ -1,136 +1,267 @@
 From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Tue, 16 Jun 2015 13:31:15 -0700
-Subject: [PATCH 4/5] ARM: dts: qcom: Add ks8851 node for wired ethernet
+Date: Tue, 16 Jun 2015 13:31:14 -0700
+Subject: [PATCH 3/5] ARM: dts: qcom: Add MSM8960 CDP RPM regulators
 In-Reply-To: <1434486676-21812-1-git-send-email-sboyd@codeaurora.org>
 References: <1434486676-21812-1-git-send-email-sboyd@codeaurora.org>
-Message-ID: <1434486676-21812-5-git-send-email-sboyd@codeaurora.org>
+Message-ID: <1434486676-21812-4-git-send-email-sboyd@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The micrel ks8851 device is present on MSM8960 CDP boards. It is
-connected to two regulators, one controlled via a gpio and
-another controlled via the RPM. Add the gsbi, spi, gpio
-regulator, and micrel ks8851 nodes so that ethernet works
-properly.
+Add RPM regulators and configure their constraints on the MSM8960
+CDP so that we can control these supplies.
 
 Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
 ---
- arch/arm/boot/dts/qcom-msm8960-cdp.dts | 66 ++++++++++++++++++++++++++++++++++
- arch/arm/boot/dts/qcom-msm8960.dtsi    | 25 +++++++++++++
- 2 files changed, 91 insertions(+)
+ arch/arm/boot/dts/qcom-msm8960-cdp.dts | 236 +++++++++++++++++++++++++++++++++
+ 1 file changed, 236 insertions(+)
 
 diff --git a/arch/arm/boot/dts/qcom-msm8960-cdp.dts b/arch/arm/boot/dts/qcom-msm8960-cdp.dts
-index be241f14246d..fad71d5527b0 100644
+index 7f70fae90959..be241f14246d 100644
 --- a/arch/arm/boot/dts/qcom-msm8960-cdp.dts
 +++ b/arch/arm/boot/dts/qcom-msm8960-cdp.dts
-@@ -262,6 +262,72 @@
- 				};
+@@ -26,6 +26,242 @@
+ 				status = "okay";
  			};
  		};
 +
-+		gsbi at 16000000 {
-+			status = "ok";
-+			qcom,mode = <GSBI_PROT_SPI>;
-+			pinctrl-names = "default";
-+			pinctrl-0 = <&spi1_default>;
-+			spi at 16080000 {
-+				status = "ok";
-+				eth at 0 {
-+					compatible = "micrel,ks8851";
-+					reg = <0>;
-+					interrupt-parent = <&msmgpio>;
-+					interrupts = <90 8>;
-+					spi-max-frequency = <5400000>;
-+					vdd-supply = <&ext_l2>;
-+					vdd-io-supply = <&pm8921_lvs6>;
-+					reset-gpios = <&msmgpio 89 0>;
++		rpm at 108000 {
++			regulators {
++				compatible = "qcom,rpm-pm8921-regulators";
++				vin_lvs1_3_6-supply = <&pm8921_s4>;
++				vin_lvs2-supply = <&pm8921_s4>;
++				vin_lvs4_5_7-supply = <&pm8921_s4>;
++				vdd_ncp-supply = <&pm8921_l6>;
++				vdd_l1_l2_l12_l18-supply = <&pm8921_s4>;
++				vdd_l21_l23_l29-supply = <&pm8921_s8>;
++				vdd_l24-supply = <&pm8921_s1>;
++				vdd_l25-supply = <&pm8921_s1>;
++				vdd_l27-supply = <&pm8921_s7>;
++				vdd_l28-supply = <&pm8921_s7>;
++
++				/* Buck SMPS */
++				pm8921_s1: s1 {
++					regulator-always-on;
++					regulator-min-microvolt = <1225000>;
++					regulator-max-microvolt = <1225000>;
++					qcom,switch-mode-frequency = <3200000>;
++					bias-pull-down;
++				};
++
++				pm8921_s2: s2 {
++					regulator-min-microvolt = <1300000>;
++					regulator-max-microvolt = <1300000>;
++					qcom,switch-mode-frequency = <1600000>;
++					bias-pull-down;
++				};
++
++				pm8921_s3: s3 {
++					regulator-min-microvolt = <500000>;
++					regulator-max-microvolt = <1150000>;
++					qcom,switch-mode-frequency = <4800000>;
++					bias-pull-down;
++				};
++
++				pm8921_s4: s4 {
++					regulator-always-on;
++					regulator-min-microvolt = <1800000>;
++					regulator-max-microvolt = <1800000>;
++					qcom,switch-mode-frequency = <1600000>;
++					bias-pull-down;
++					qcom,force-mode = <QCOM_RPM_FORCE_MODE_AUTO>;
++				};
++
++				pm8921_s7: s7 {
++					regulator-min-microvolt = <1150000>;
++					regulator-max-microvolt = <1150000>;
++					qcom,switch-mode-frequency = <3200000>;
++					bias-pull-down;
++				};
++
++				pm8921_s8: s8 {
++					regulator-always-on;
++					regulator-min-microvolt = <2050000>;
++					regulator-max-microvolt = <2050000>;
++					qcom,switch-mode-frequency = <1600000>;
++					bias-pull-down;
++				};
++
++				/* PMOS LDO */
++				pm8921_l1: l1 {
++					regulator-always-on;
++					regulator-min-microvolt = <1050000>;
++					regulator-max-microvolt = <1050000>;
++					bias-pull-down;
++				};
++
++				pm8921_l2: l2 {
++					regulator-min-microvolt = <1200000>;
++					regulator-max-microvolt = <1200000>;
++					bias-pull-down;
++				};
++
++				pm8921_l3: l3 {
++					regulator-min-microvolt = <3075000>;
++					regulator-max-microvolt = <3075000>;
++					bias-pull-down;
++				};
++
++				pm8921_l4: l4 {
++					regulator-always-on;
++					regulator-min-microvolt = <1800000>;
++					regulator-max-microvolt = <1800000>;
++					bias-pull-down;
++				};
++
++				pm8921_l5: l5 {
++					regulator-min-microvolt = <2950000>;
++					regulator-max-microvolt = <2950000>;
++					bias-pull-down;
++				};
++
++				pm8921_l6: l6 {
++					regulator-min-microvolt = <2950000>;
++					regulator-max-microvolt = <2950000>;
++					bias-pull-down;
++				};
++
++				pm8921_l7: l7 {
++					regulator-always-on;
++					regulator-min-microvolt = <1850000>;
++					regulator-max-microvolt = <2950000>;
++					bias-pull-down;
++				};
++
++				pm8921_l8: l8 {
++					regulator-min-microvolt = <2800000>;
++					regulator-max-microvolt = <3000000>;
++					bias-pull-down;
++				};
++
++				pm8921_l9: l9 {
++					regulator-min-microvolt = <3000000>;
++					regulator-max-microvolt = <3000000>;
++					bias-pull-down;
++				};
++
++				pm8921_l10: l10 {
++					regulator-min-microvolt = <3000000>;
++					regulator-max-microvolt = <3000000>;
++					bias-pull-down;
++				};
++
++				pm8921_l11: l11 {
++					regulator-min-microvolt = <2850000>;
++					regulator-max-microvolt = <2850000>;
++					bias-pull-down;
++				};
++
++				pm8921_l12: l12 {
++					regulator-min-microvolt = <1200000>;
++					regulator-max-microvolt = <1200000>;
++					bias-pull-down;
++				};
++
++				pm8921_l14: l14 {
++					regulator-min-microvolt = <1800000>;
++					regulator-max-microvolt = <1800000>;
++					bias-pull-down;
++				};
++
++				pm8921_l15: l15 {
++					regulator-min-microvolt = <1800000>;
++					regulator-max-microvolt = <2950000>;
++					bias-pull-down;
++				};
++
++				pm8921_l16: l16 {
++					regulator-min-microvolt = <2800000>;
++					regulator-max-microvolt = <2800000>;
++					bias-pull-down;
++				};
++
++				pm8921_l17: l17 {
++					regulator-min-microvolt = <1800000>;
++					regulator-max-microvolt = <2950000>;
++					bias-pull-down;
++				};
++
++				pm8921_l18: l18 {
++					regulator-min-microvolt = <1300000>;
++					regulator-max-microvolt = <1300000>;
++					bias-pull-down;
++				};
++
++				pm8921_l21: l21 {
++					regulator-min-microvolt = <1900000>;
++					regulator-max-microvolt = <1900000>;
++					bias-pull-down;
++				};
++
++				pm8921_l22: l22 {
++					regulator-min-microvolt = <2750000>;
++					regulator-max-microvolt = <2750000>;
++					bias-pull-down;
++				};
++
++				pm8921_l23: l23 {
++					regulator-always-on;
++					regulator-min-microvolt = <1800000>;
++					regulator-max-microvolt = <1800000>;
++					bias-pull-down;
++				};
++
++				pm8921_l24: l24 {
++					regulator-min-microvolt = <750000>;
++					regulator-max-microvolt = <1150000>;
++					bias-pull-down;
++				};
++
++				pm8921_l25: l25 {
++					regulator-always-on;
++					regulator-min-microvolt = <1250000>;
++					regulator-max-microvolt = <1250000>;
++					bias-pull-down;
++				};
++
++				/* Low Voltage Switch */
++				pm8921_lvs1: lvs1 {
++					bias-pull-down;
++				};
++
++				pm8921_lvs2: lvs2 {
++					bias-pull-down;
++				};
++
++				pm8921_lvs3: lvs3 {
++					bias-pull-down;
++				};
++
++				pm8921_lvs4: lvs4 {
++					bias-pull-down;
++				};
++
++				pm8921_lvs5: lvs5 {
++					bias-pull-down;
++				};
++
++				pm8921_lvs6: lvs6 {
++					bias-pull-down;
++				};
++
++				pm8921_lvs7: lvs7 {
++					bias-pull-down;
++				};
++
++				pm8921_ncp: ncp {
++					regulator-min-microvolt = <1800000>;
++					regulator-max-microvolt = <1800000>;
++					qcom,switch-mode-frequency = <1600000>;
 +				};
 +			};
-+		};
-+
-+		pinctrl at 800000 {
-+			spi1_default: spi1_default {
-+				mux {
-+					pins = "gpio6", "gpio7", "gpio9";
-+					function = "gsbi1";
-+				};
-+
-+				mosi {
-+					pins = "gpio6";
-+					drive-strength = <12>;
-+					bias-disable;
-+				};
-+
-+				miso {
-+					pins = "gpio7";
-+					drive-strength = <12>;
-+					bias-disable;
-+				};
-+
-+				cs {
-+					pins = "gpio8";
-+					drive-strength = <12>;
-+					bias-disable;
-+					output-low;
-+				};
-+
-+				clk {
-+					pins = "gpio9";
-+					drive-strength = <12>;
-+					bias-disable;
-+				};
-+			};
-+		};
-+	};
-+
-+	regulators {
-+		compatible = "simple-bus";
-+
-+		ext_l2: gpio-regulator at 91 {
-+			compatible = "regulator-fixed";
-+			regulator-name = "ext_l2";
-+			gpio = <&msmgpio 91 0>;
-+			startup-delay-us = <10000>;
-+			enable-active-high;
 +		};
  	};
  };
  
-diff --git a/arch/arm/boot/dts/qcom-msm8960.dtsi b/arch/arm/boot/dts/qcom-msm8960.dtsi
-index fcf4bb5f9c3f..2096a94c9b52 100644
---- a/arch/arm/boot/dts/qcom-msm8960.dtsi
-+++ b/arch/arm/boot/dts/qcom-msm8960.dtsi
-@@ -271,5 +271,30 @@
- 			compatible = "qcom,tcsr-msm8960", "syscon";
- 			reg = <0x1a400000 0x100>;
- 		};
-+
-+		gsbi at 16000000 {
-+			compatible = "qcom,gsbi-v1.0.0";
-+			cell-index = <1>;
-+			reg = <0x16000000 0x100>;
-+			clocks = <&gcc GSBI1_H_CLK>;
-+			clock-names = "iface";
-+			#address-cells = <1>;
-+			#size-cells = <1>;
-+			ranges;
-+
-+			spi at 16080000 {
-+				compatible = "qcom,spi-qup-v1.1.1";
-+				#address-cells = <1>;
-+				#size-cells = <0>;
-+				reg = <0x16080000 0x1000>;
-+				interrupts = <0 147 0>;
-+				spi-max-frequency = <24000000>;
-+				cs-gpios = <&msmgpio 8 0>;
-+
-+				clocks = <&gcc GSBI1_QUP_CLK>, <&gcc GSBI1_H_CLK>;
-+				clock-names = "core", "iface";
-+				status = "disabled";
-+			};
-+		};
- 	};
- };
 -- 
 The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
 a Linux Foundation Collaborative Project
