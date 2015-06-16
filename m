@@ -1,75 +1,85 @@
 From: rmk+kernel@arm.linux.org.uk (Russell King)
-Date: Tue, 16 Jun 2015 23:06:25 +0100
-Subject: [PATCH 2/9] ARM: sa1100: convert SA11x0 related code to use new
- chained handler helper
-Message-ID: <E1Z4yzx-0002S6-7p@rmk-PC.arm.linux.org.uk>
+Date: Tue, 16 Jun 2015 23:06:30 +0100
+Subject: [PATCH 3/9] GPU: ipu: fix race in installing IPU chained IRQ handler
+Message-ID: <E1Z4z02-0002SI-Br@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Convert SA11x0 (Neponset, SA1111, and UCB1x00 code) to use the new
-irq_set_chained_handler_and_data() helper.
+The IPU code was installing its chained interrupt handler (which enables
+the interrupt) before it was setting its data, which provokes an oops on
+kexec.  Fix this by converting to irq_set_chained_handler_and_data().
+
+[drm] Initialized drm 1.1.0 20060810
+imx-drm display-subsystem: parent device of /soc/aips-bus at 02000000/ldb at 020e0008/lvds-channel at 1 is not available
+imx-drm display-subsystem: parent device of /soc/aips-bus at 02000000/ldb at 020e0008/lvds-channel at 1 is not available
+Unable to handle kernel NULL pointer dereference at virtual address 00000070
+pgd = c0004000
+[00000070] *pgd=00000000
+Internal error: Oops: 5 [#1] SMP ARM
+Modules linked in:
+CPU: 0 PID: 1 Comm: swapper/0 Not tainted 4.1.0-rc6+ #1693
+Hardware name: Freescale i.MX6 Quad/DualLite (Device Tree)
+task: d74c0000 ti: d74aa000 task.ti: d74aa000
+PC is at ipu_irq_handle+0x28/0xd8
+LR is at ipu_irq_handler+0x6c/0xc0
+pc : [<c03c56d8>]    lr : [<c03c58a4>]    psr: 200001d3
+sp : d74abbd0  ip : d74abc00  fp : d74abbfc
+r10: 000001e0  r9 : c0085154  r8 : 00000009
+r7 : 00000000  r6 : 00000000  r5 : d74abc04  r4 : c0a6b6a8
+r3 : 00000000  r2 : 00000009  r1 : d74abc04  r0 : 00000000
+Flags: nzCv  IRQs off  FIQs off  Mode SVC_32  ISA ARM  Segment kernel
+Control: 10c5387d  Table: 10004059  DAC: 00000015
+Process swapper/0 (pid: 1, stack limit = 0xd74aa210)
+Stack: (0xd74abbd0 to 0xd74ac000)
+Backtrace:
+[<c03c56b0>] (ipu_irq_handle) from [<c03c58a4>] (ipu_irq_handler+0x6c/0xc0)
+[<c03c5838>] (ipu_irq_handler) from [<c0080154>] (generic_handle_irq+0x28/0x38)
+[<c008012c>] (generic_handle_irq) from [<c0080288>] (__handle_domain_irq+0x5c/0xb8)
+[<c008022c>] (__handle_domain_irq) from [<c0009428>] (gic_handle_irq+0x28/0x68)
+[<c0009400>] (gic_handle_irq) from [<c0013dc4>] (__irq_svc+0x44/0x5c)
+[<c07638fc>] (_raw_spin_unlock_irqrestore) from [<c00803bc>] (__irq_put_desc_unlock+0x1c/0x40)
+[<c00803a0>] (__irq_put_desc_unlock) from [<c00841f4>] (__irq_set_handler+0x54/0x5c)
+[<c00841a0>] (__irq_set_handler) from [<c03c5f48>] (ipu_probe+0x29c/0x708)
+[<c03c5cac>] (ipu_probe) from [<c03d3848>] (platform_drv_probe+0x50/0xac)
+[<c03d37f8>] (platform_drv_probe) from [<c03d1f3c>] (driver_probe_device+0x1d4/0x278)
 
 Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 ---
 Depends on patch 1.
 
- arch/arm/common/sa1111.c        | 7 +++----
- arch/arm/mach-sa1100/neponset.c | 3 +--
- drivers/mfd/ucb1x00-core.c      | 3 +--
- 3 files changed, 5 insertions(+), 8 deletions(-)
+ drivers/gpu/ipu-v3/ipu-common.c | 13 +++++--------
+ 1 file changed, 5 insertions(+), 8 deletions(-)
 
-diff --git a/arch/arm/common/sa1111.c b/arch/arm/common/sa1111.c
-index 5cc779c8e9c6..93ee70dbbdd3 100644
---- a/arch/arm/common/sa1111.c
-+++ b/arch/arm/common/sa1111.c
-@@ -501,8 +501,8 @@ static int sa1111_setup_irq(struct sa1111 *sachip, unsigned irq_base)
- 	 * Register SA1111 interrupt
- 	 */
- 	irq_set_irq_type(sachip->irq, IRQ_TYPE_EDGE_RISING);
--	irq_set_handler_data(sachip->irq, sachip);
--	irq_set_chained_handler(sachip->irq, sa1111_irq_handler);
-+	irq_set_chained_handler_and_data(sachip->irq, sa1111_irq_handler,
-+					 sachip);
- 
- 	dev_info(sachip->dev, "Providing IRQ%u-%u\n",
- 		sachip->irq_base, sachip->irq_base + SA1111_IRQ_NR - 1);
-@@ -836,8 +836,7 @@ static void __sa1111_remove(struct sa1111 *sachip)
- 	clk_unprepare(sachip->clk);
- 
- 	if (sachip->irq != NO_IRQ) {
--		irq_set_chained_handler(sachip->irq, NULL);
--		irq_set_handler_data(sachip->irq, NULL);
-+		irq_set_chained_handler_and_data(sachip->irq, NULL, NULL);
- 		irq_free_descs(sachip->irq_base, SA1111_IRQ_NR);
- 
- 		release_mem_region(sachip->phys + SA1111_INTC, 512);
-diff --git a/arch/arm/mach-sa1100/neponset.c b/arch/arm/mach-sa1100/neponset.c
-index af868d258e66..99d9a3b1bf34 100644
---- a/arch/arm/mach-sa1100/neponset.c
-+++ b/arch/arm/mach-sa1100/neponset.c
-@@ -327,8 +327,7 @@ static int neponset_probe(struct platform_device *dev)
- 	irq_set_chip(d->irq_base + NEP_IRQ_SA1111, &nochip);
- 
- 	irq_set_irq_type(irq, IRQ_TYPE_EDGE_RISING);
--	irq_set_handler_data(irq, d);
--	irq_set_chained_handler(irq, neponset_irq_handler);
-+	irq_set_chained_handler_and_data(irq, neponset_irq_handler, d);
- 
- 	/*
- 	 * We would set IRQ_GPIO25 to be a wake-up IRQ, but unfortunately
-diff --git a/drivers/mfd/ucb1x00-core.c b/drivers/mfd/ucb1x00-core.c
-index 58ea9fdd3a15..3591550598ad 100644
---- a/drivers/mfd/ucb1x00-core.c
-+++ b/drivers/mfd/ucb1x00-core.c
-@@ -566,8 +566,7 @@ static int ucb1x00_probe(struct mcp *mcp)
+diff --git a/drivers/gpu/ipu-v3/ipu-common.c b/drivers/gpu/ipu-v3/ipu-common.c
+index 67bab5c36056..6d2f39d36e44 100644
+--- a/drivers/gpu/ipu-v3/ipu-common.c
++++ b/drivers/gpu/ipu-v3/ipu-common.c
+@@ -1119,10 +1119,9 @@ static int ipu_irq_init(struct ipu_soc *ipu)
+ 		ct->regs.mask = IPU_INT_CTRL(i / 32);
  	}
  
- 	irq_set_irq_type(ucb->irq, IRQ_TYPE_EDGE_RISING);
--	irq_set_handler_data(ucb->irq, ucb);
--	irq_set_chained_handler(ucb->irq, ucb1x00_irq);
-+	irq_set_chained_handler_and_data(ucb->irq, ucb1x00_irq, ucb);
+-	irq_set_chained_handler(ipu->irq_sync, ipu_irq_handler);
+-	irq_set_handler_data(ipu->irq_sync, ipu);
+-	irq_set_chained_handler(ipu->irq_err, ipu_err_irq_handler);
+-	irq_set_handler_data(ipu->irq_err, ipu);
++	irq_set_chained_handler_and_data(ipu->irq_sync, ipu_irq_handler, ipu);
++	irq_set_chained_handler_and_data(ipu->irq_err, ipu_err_irq_handler,
++					 ipu);
  
- 	if (pdata && pdata->gpio_base) {
- 		ucb->gpio.label = dev_name(&ucb->dev);
+ 	return 0;
+ }
+@@ -1131,10 +1130,8 @@ static void ipu_irq_exit(struct ipu_soc *ipu)
+ {
+ 	int i, irq;
+ 
+-	irq_set_chained_handler(ipu->irq_err, NULL);
+-	irq_set_handler_data(ipu->irq_err, NULL);
+-	irq_set_chained_handler(ipu->irq_sync, NULL);
+-	irq_set_handler_data(ipu->irq_sync, NULL);
++	irq_set_chained_handler_and_data(ipu->irq_err, NULL, NULL);
++	irq_set_chained_handler_and_data(ipu->irq_sync, NULL, NULL);
+ 
+ 	/* TODO: remove irq_domain_generic_chips */
+ 
 -- 
 2.1.0
