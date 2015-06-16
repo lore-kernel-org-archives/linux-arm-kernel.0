@@ -1,34 +1,59 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Tue, 16 Jun 2015 06:01:58 +0530
-Subject: [PATCH V7 3/3] OPP: Add binding for 'opp-suspend'
-In-Reply-To: <CAL_JsqJb4P2Z2esgm5ffjWV37MU2KUF4gBdUpwSV8+21iTD1Bg@mail.gmail.com>
-References: <cover.1433434659.git.viresh.kumar@linaro.org>
- <dedf8c02fdd9dbf169f43de74ead4c1434d89b45.1433434659.git.viresh.kumar@linaro.org>
- <CAL_JsqJb4P2Z2esgm5ffjWV37MU2KUF4gBdUpwSV8+21iTD1Bg@mail.gmail.com>
-Message-ID: <CAKohpomTT6i0dbboK901eguCbQiBdCT6gvLvTY24ajDdY__2fg@mail.gmail.com>
+From: wxt@rock-chips.com (Caesar Wang)
+Date: Tue, 16 Jun 2015 10:00:30 +0800
+Subject: [PATCH v15 3/4] soc: rockchip: power-domain: add power domain
+ driver
+In-Reply-To: <1434380419.2069.38.camel@x220>
+References: <1434258820-26779-1-git-send-email-wxt@rock-chips.com>	
+ <1434258820-26779-4-git-send-email-wxt@rock-chips.com>
+ <1434380419.2069.38.camel@x220>
+Message-ID: <557F833E.9000905@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 16 June 2015 at 05:05, Rob Herring <robherring2@gmail.com> wrote:
->> +- opp-suspend: Phandle of the OPP to set while device is suspended.
->> +
+
+
+? 2015?06?15? 23:00, Paul Bolle ??:
+> On Sun, 2015-06-14 at 13:13 +0800, Caesar Wang wrote:
 >
-> I would just do a bool property in the OPP you want.
+>> --- /dev/null
+>> +++ b/drivers/soc/rockchip/Kconfig
+>> +config PM_GENERIC_DOMAINS
+>> +        tristate "Rockchip generic power domain"
+> Since my remarks on v13 you removed the module specific code from
+> pm_domains.c. But now this became a tristate symbol. That makes little
+> sense. Why didn't you keep bool?
 
-I will do that if you want, no big deal.
+Yeah, you are right. :s/tristate/bool
 
-But I would like to explain why I did it this way. Nishanth asked the same
-thing earlier and now he looks convinced :)
+I forget it when the driver is moving from 'arch/arm/mach-rockchip/' to 
+'/driver/soc/rockchip/'.
+>
+>> +        depends on PM
+>> +        help
+>> +          Say y here to enable power doamin support.
+> s/doamin/domain/.
 
-There can only be one OPP that can be selected during suspend. Allowing
-more than one OPP to select this property doesn't look like the right thing
-to me. In that case we have to make a rule that the first OPP in the table
-will be selected or error out in that case.
+Done.
+>> +          In order to meet high performance and low power requirements, a power
+>> +          management unit is designed or saving power when RK3288 in low power
+>> +          mode. The RK3288 PMU is dedicated for managing the power ot the whole chip.
+> s/ot/of/
 
-And I thought that this is property of the table, instead of each OPP. For
-example, in code this will waste lots of space if we choose such a field
-in individual OPPs, and we will always keep it in the OPP-table thing..
+Done.
+>> +          If unsure, say N.
+> Thanks,
+>
+>
+> Paul Bolle
 
-But then this is DT :)
+Thanks,
 
-I will wait for your reply Rob on this, and then will send an update. Thanks.
+Caesar
+
+>
+>
+>
+
+-- 
+Thanks,
+- Caesar
