@@ -1,56 +1,44 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Tue, 16 Jun 2015 11:11:22 -0700
-Subject: [PATCH] regulator: qcom_spmi: Add missing braces for aligned code
-Message-ID: <1434478282-13552-1-git-send-email-sboyd@codeaurora.org>
+From: khilman@kernel.org (Kevin Hilman)
+Date: Tue, 16 Jun 2015 11:17:53 -0700
+Subject: [PATCH 5/5] ARM64: MediaTek MT8173: Add SCPSYS device node
+In-Reply-To: <1433839623-10804-6-git-send-email-s.hauer@pengutronix.de>
+ (Sascha Hauer's message of "Tue, 9 Jun 2015 10:47:03 +0200")
+References: <1433839623-10804-1-git-send-email-s.hauer@pengutronix.de>
+ <1433839623-10804-6-git-send-email-s.hauer@pengutronix.de>
+Message-ID: <7hlhfjy0tq.fsf@deeprootsystems.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-drivers/regulator/qcom_spmi-regulator.c:751:3-50: code aligned
-with following code on line 753
-drivers/regulator/qcom_spmi-regulator.c:584:3-41: code aligned
-with following code on line 587
+Sascha Hauer <s.hauer@pengutronix.de> writes:
 
-These lines where missing braces causing the break to always
-be executed even when it shouldn't be. Fix it.
+> This adds the SCPSYS device node to the MT8173 dtsi file.
+>
+> Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
+> ---
+>  arch/arm64/boot/dts/mediatek/mt8173.dtsi | 10 ++++++++++
+>  1 file changed, 10 insertions(+)
+>
+> diff --git a/arch/arm64/boot/dts/mediatek/mt8173.dtsi b/arch/arm64/boot/dts/mediatek/mt8173.dtsi
+> index 924fdb6..12430f0 100644
+> --- a/arch/arm64/boot/dts/mediatek/mt8173.dtsi
+> +++ b/arch/arm64/boot/dts/mediatek/mt8173.dtsi
+> @@ -125,6 +125,16 @@
+>  						<GIC_SPI 147 IRQ_TYPE_LEVEL_HIGH>;
+>  		};
+>  
+> +		scpsys: scpsys at 10006000 {
+> +			compatible = "mediatek,mt8173-scpsys";
+> +			#power-domain-cells = <1>;
+> +			reg = <0 0x10006000 0 0x1000>;
+> +			clocks = <&clk26m>,
+> +				 <&topckgen CLK_TOP_MM_SEL>;
 
-Reported-by: kbuild test robot <fengguang.wu@intel.com>
-Cc: Julia Lawall <julia.lawall@lip6.fr>
-Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
----
- drivers/regulator/qcom_spmi-regulator.c | 6 ++++--
- 1 file changed, 4 insertions(+), 2 deletions(-)
+Neither your binding doc (nor the generic one) mentions these clock
+properties or what they are used for.  They appear to define a clock
+that must be enabled in order to for the power domain to be on.
 
-diff --git a/drivers/regulator/qcom_spmi-regulator.c b/drivers/regulator/qcom_spmi-regulator.c
-index 162b86501a91..ff6ccc734565 100644
---- a/drivers/regulator/qcom_spmi-regulator.c
-+++ b/drivers/regulator/qcom_spmi-regulator.c
-@@ -580,11 +580,12 @@ static int spmi_regulator_select_voltage_same_range(struct spmi_regulator *vreg,
- 	*selector = 0;
- 	for (i = 0; i < vreg->set_points->count; i++) {
- 		if (uV >= vreg->set_points->range[i].set_point_min_uV
--		    && uV <= vreg->set_points->range[i].set_point_max_uV)
-+		    && uV <= vreg->set_points->range[i].set_point_max_uV) {
- 			*selector +=
- 			    (uV - vreg->set_points->range[i].set_point_min_uV)
- 				/ vreg->set_points->range[i].step_uV;
- 			break;
-+		}
- 
- 		*selector += vreg->set_points->range[i].n_voltages;
- 	}
-@@ -747,10 +748,11 @@ static int spmi_regulator_common_list_voltage(struct regulator_dev *rdev,
- 		return 0;
- 
- 	for (i = 0; i < vreg->set_points->count; i++) {
--		if (selector < vreg->set_points->range[i].n_voltages)
-+		if (selector < vreg->set_points->range[i].n_voltages) {
- 			uV = selector * vreg->set_points->range[i].step_uV
- 				+ vreg->set_points->range[i].set_point_min_uV;
- 			break;
-+		}
- 
- 		selector -= vreg->set_points->range[i].n_voltages;
- 	}
--- 
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-a Linux Foundation Collaborative Project
+Also the order here seems rather important and probably needs
+documenting in the binding (e.g. the clk_id order is hard-coded in the
+driver.)
+
+Kevin
