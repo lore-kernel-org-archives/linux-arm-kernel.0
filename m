@@ -1,93 +1,77 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 16 Jun 2015 14:32:03 +0100
-Subject: [PATCH 2/2] arm64: KVM: Add VCPU support for Qualcomm Technologies
- Kryo ARMv8 CPU
-In-Reply-To: <1434146263-30972-2-git-send-email-timur@codeaurora.org>
-References: <1434146263-30972-1-git-send-email-timur@codeaurora.org>
- <1434146263-30972-2-git-send-email-timur@codeaurora.org>
-Message-ID: <55802553.4020600@arm.com>
+From: jiri.prchal@aksignal.cz (=?UTF-8?B?SmnFmcOtIFByY2hhbA==?=)
+Date: Tue, 16 Jun 2015 15:32:55 +0200
+Subject: [BUG] at91: macb: does not work
+In-Reply-To: <20150616152454.348ae4ea@bbrezillon>
+References: <5580205B.1030804@aksignal.cz> <20150616152454.348ae4ea@bbrezillon>
+Message-ID: <55802587.8010508@aksignal.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In the future, please add the KVM/ARM maintainers on Cc.
 
-On 12/06/15 22:57, Timur Tabi wrote:
-> From: Shanker Donthineni <shankerd@codeaurora.org>
-> 
-> This patch enables assignment of 32/64bit guest VCPU to
-> Qualcomm Technologies ARMv8 CPU. Added KVM_ARM_TARGET_QCOM_KRYO
-> to the KVM target list and modified vm_target_cpu() to return
-> KVM_ARM_TARGET_QCOM_KRYO when CPU running in AArch64 mode.
-> 
-> Signed-off-by: Shanker Donthineni <shankerd@codeaurora.org>
-> Signed-off-by: Timur Tabi <timur@codeaurora.org>
-> ---
->  arch/arm64/include/uapi/asm/kvm.h    | 3 ++-
->  arch/arm64/kvm/guest.c               | 6 ++++++
->  arch/arm64/kvm/sys_regs_generic_v8.c | 2 ++
->  3 files changed, 10 insertions(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm64/include/uapi/asm/kvm.h b/arch/arm64/include/uapi/asm/kvm.h
-> index d268320..426933e 100644
-> --- a/arch/arm64/include/uapi/asm/kvm.h
-> +++ b/arch/arm64/include/uapi/asm/kvm.h
-> @@ -59,8 +59,9 @@ struct kvm_regs {
->  #define KVM_ARM_TARGET_CORTEX_A57	2
->  #define KVM_ARM_TARGET_XGENE_POTENZA	3
->  #define KVM_ARM_TARGET_CORTEX_A53	4
-> +#define KVM_ARM_TARGET_QCOM_KRYO	5
->  
-> -#define KVM_ARM_NUM_TARGETS		5
-> +#define KVM_ARM_NUM_TARGETS		6
->  
->  /* KVM_ARM_SET_DEVICE_ADDR ioctl id encoding */
->  #define KVM_ARM_DEVICE_TYPE_SHIFT	0
-> diff --git a/arch/arm64/kvm/guest.c b/arch/arm64/kvm/guest.c
-> index 9535bd5..836cf16 100644
-> --- a/arch/arm64/kvm/guest.c
-> +++ b/arch/arm64/kvm/guest.c
-> @@ -291,6 +291,12 @@ int __attribute_const__ kvm_target_cpu(void)
->  			return KVM_ARM_TARGET_XGENE_POTENZA;
->  		};
->  		break;
-> +	case ARM_CPU_IMP_QCOM:
-> +		switch (part_number & QCOM_CPU_PART_MASK) {
-> +		case QCOM_CPU_PART_KRYO:
-> +			return KVM_ARM_TARGET_QCOM_KRYO;
-> +		}
-> +		break;
->  	};
->  
->  	return -EINVAL;
-> diff --git a/arch/arm64/kvm/sys_regs_generic_v8.c b/arch/arm64/kvm/sys_regs_generic_v8.c
-> index 475fd29..3712ea8 100644
-> --- a/arch/arm64/kvm/sys_regs_generic_v8.c
-> +++ b/arch/arm64/kvm/sys_regs_generic_v8.c
-> @@ -94,6 +94,8 @@ static int __init sys_reg_genericv8_init(void)
->  					  &genericv8_target_table);
->  	kvm_register_target_sys_reg_table(KVM_ARM_TARGET_XGENE_POTENZA,
->  					  &genericv8_target_table);
-> +	kvm_register_target_sys_reg_table(KVM_ARM_TARGET_QCOM_KRYO,
-> +					  &genericv8_target_table);
->  
->  	return 0;
->  }
-> 
 
-That's getting slightly out of hand and I think we need to stop being
-paranoid.
+On 16.6.2015 15:24, Boris Brezillon wrote:
+> Hi Jiri,
+>
+> On Tue, 16 Jun 2015 15:10:51 +0200
+> Ji?? Prchal <jiri.prchal@aksignal.cz> wrote:
+>
+>> Hi,
+>> in v4.1-rc8 does not work ethernet. It normally gets up, but no data are going through.
+>>
+>> [    4.400000] macb f802c000.ethernet (unnamed net_device) (uninitialized): invalid hw address, using random
+>> [    4.510000] macb f802c000.ethernet eth0: Cadence MACB rev 0x0001010c at 0xf802c000 irq 37 (52:30:8f:6b:9c:b7)
+>> [    4.520000] macb f802c000.ethernet eth0: attached PHY driver [Generic PHY] (mii_bus:phy_addr=f802c000.etherne:03, irq=-1)
+>> [   15.510000] macb f802c000.ethernet eth0: link up (100/Full)
+>>
+>> / # ip -s link ls eth0
+>> 2: eth0: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 qdisc pfifo_fast state UP mode DEFAULT group default qlen 1000
+>>       link/ether a2:61:fe:17:65:b1 brd ff:ff:ff:ff:ff:ff
+>>       RX: bytes  packets  errors  dropped overrun mcast
+>>       0          0        0       0       0       0
+>>       TX: bytes  packets  errors  dropped carrier collsns
+>>       0          0        0       0       0       0
+>>
+>> In v4.0.5 it's working.
+>
+> On which platform are you testing (SoC and board) ?
 
-All our target CPUs are using the generic tables, and this looks like an
-unnecessary complexity as long as we choose to ignore
-cross-microarchitecture migration (things like big-little or live
-migration from one CPU type to another).
+Oh, sorry.
+[    0.000000] AT91: Detected soc subtype: at91sam9g25
+Board design like at91sam9x5ek.
+Phy: DM9161BEP
+Used RMII.
 
-Let's just implement a default target that works for everything. Should
-we support some CPUs in a more specific manner, it will then be worth
-adding to that list. I believe Suzuki (cc-ed) has something brewing.
+Jiri
 
-Thanks,
-
-	M.
--- 
-Jazz is not dead. It just smells funny...
+>
+> Best Regards,
+>
+> Boris
+>
+>>
+>> I bisected it and found:
+>> a848748959d554666b34cffc08ef2d23f4bb2990 is the first bad commit
+>> commit a848748959d554666b34cffc08ef2d23f4bb2990
+>> Author: Boris BREZILLON <boris.brezillon@free-electrons.com>
+>> Date:   Sat Mar 7 07:23:30 2015 +0100
+>>
+>>       net: macb: remove #if defined(CONFIG_ARCH_AT91) sections
+>>
+>>       With multi platform support those sections could lead to unexpected
+>>       behavior if both ARCH_AT91 and another ARM SoC using the MACB IP are
+>>       selected.
+>>       Add two new capabilities to encode the default MII mode and the presence
+>>       of a CLKEN bit in USRIO register.
+>>       Then define the appropriate config for IPs embedded in at91 SoCs.
+>>
+>>       Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+>>       Reviewed-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+>>       Signed-off-by: David S. Miller <davem@davemloft.net>
+>>
+>> :040000 040000 1c87dbb47362b56e88a0e7256c991c64cf60e0bf af0bcc11f81aebf2c64afa5cd53766d494ea3fdb M	drivers
+>>
+>>
+>> Jiri
+>
+>
+>
