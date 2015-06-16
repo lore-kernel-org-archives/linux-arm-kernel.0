@@ -1,146 +1,38 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Tue, 16 Jun 2015 15:29:25 -0700
-Subject: [PATCH v5 04/11] nvmem: Add a simple NVMEM framework for consumers
-In-Reply-To: <1432226593-8817-1-git-send-email-srinivas.kandagatla@linaro.org>
-References: <1432226535-8640-1-git-send-email-srinivas.kandagatla@linaro.org>
- <1432226593-8817-1-git-send-email-srinivas.kandagatla@linaro.org>
-Message-ID: <5580A345.30204@codeaurora.org>
+From: rmk+kernel@arm.linux.org.uk (Russell King)
+Date: Tue, 16 Jun 2015 23:29:41 +0100
+Subject: [PATCH] GPU: ipu: fix lockup caused by pending chained interrupts
+In-Reply-To: <E1Z4yzs-0002Rw-4B@rmk-PC.arm.linux.org.uk>
+References: <E1Z4yzs-0002Rw-4B@rmk-PC.arm.linux.org.uk>
+Message-ID: <E1Z4zMT-0004Y7-KJ@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/21/2015 09:43 AM, Srinivas Kandagatla wrote:
-> @@ -379,6 +380,351 @@ int nvmem_unregister(struct nvmem_device *nvmem)
-[...]
-> +
-> +	return nvmem;
-> +}
-> +
-> +static int __nvmem_device_put(struct nvmem_device *nvmem)
+Even with the oops fixed by a previous patch, the system still fails to
+kexec, due to a stuck chained interrupt locking the system.  We must
+disable the child interrupts prior to setting up the irq chip to ensure
+we don't get stuck here.
 
-Why does this return int? It's not used anywhere.
+Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+---
+Maybe this is all that's really needed... would also be nice if this
+path had an etry in MAINTAINERS...
 
-> +{
-> +	module_put(nvmem->owner);
-> +	mutex_lock(&nvmem_mutex);
-> +	nvmem->users--;
-> +	mutex_unlock(&nvmem_mutex);
-> +
-> +	return 0;
-> +}
-> +
-> +static struct nvmem_cell *nvmem_cell_get_from_list(const char *cell_id)
-> +{
-> +	struct nvmem_cell *cell = NULL;
-> +	struct nvmem_device *nvmem;
-> +
-> +	nvmem = __nvmem_device_get(NULL, &cell, cell_id);
-> +	if (IS_ERR(nvmem))
-> +		return (struct nvmem_cell *)nvmem;
+ drivers/gpu/ipu-v3/ipu-common.c | 3 +++
+ 1 file changed, 3 insertions(+)
 
-ERR_CAST?
-
-> +
-> +
-> +	return cell;
-> +
-> +}
-> +
-> +static struct nvmem_cell *of_nvmem_cell_get(struct device_node *np,
-> +					    const char *name)
-> +{
-> +	struct device_node *cell_np, *nvmem_np;
-> +	struct nvmem_cell *cell;
-> +	struct nvmem_device *nvmem;
-> +	const __be32 *addr;
-> +	int rval, len, index;
-> +
-> +	index = of_property_match_string(np, "nvmem-cell-names", name);
-> +
-> +	cell_np = of_parse_phandle(np, "nvmem-cell", index);
-> +	if (!cell_np)
-> +		return ERR_PTR(-EINVAL);
-> +
-> +	nvmem_np = of_get_next_parent(cell_np);
-> +	if (!nvmem_np)
-> +		return ERR_PTR(-EINVAL);
-> +
-> +	nvmem = __nvmem_device_get(nvmem_np, NULL, NULL);
-> +	if (IS_ERR(nvmem))
-> +		return (struct nvmem_cell *)nvmem;
-
-ERR_CAST?
-
-> +
-> +	addr = of_get_property(cell_np, "reg", &len);
-> +	if (!addr || (len < 2 * sizeof(int))) {
-> +		dev_err(&nvmem->dev, "of_i2c: invalid reg on %s\n",
-
-huh? of_i2c?
-
-
-> +
-> +	/* if it's not end on byte boundary */
-> +	if ((nbits + bit_offset) % BITS_PER_BYTE) {
-> +		/* setup the last byte with msb bits from nvmem */
-> +		rc = regmap_raw_read(nvmem->regmap,
-> +				    cell->offset + cell->bytes - 1, &v, 1);
-> +		*p |= GENMASK(7, (nbits + bit_offset) % BITS_PER_BYTE) & v;
-> +
-> +	}
-> +
-> +	return buf;
-> +}
-> +
-> +/**
-> + * nvmem_cell_write(): Write to a given nvmem cell
-
-This isn't kernel doc notation. It should be like
-
-    nvmem_cell_write - Write to a given nvmem cell
-
-> + *
-> + * @cell: nvmem cell to be written.
-> + * @buf: Buffer to be written.
-> + * @len: length of buffer to be written to nvmem cell.
-> + *
-> + * The return value will be an length of bytes written or non zero on failure.
-> + */
-> +int nvmem_cell_write(struct nvmem_cell *cell, void *buf, ssize_t len)
-[..]
-> +
->  static int nvmem_init(void)
->  {
->  	return class_register(&nvmem_class);
-> diff --git a/include/linux/nvmem-consumer.h b/include/linux/nvmem-consumer.h
-> new file mode 100644
-> index 0000000..c3fa8c7
-> --- /dev/null
-> +++ b/include/linux/nvmem-consumer.h
-> @@ -0,0 +1,49 @@
-> +/*
-> + * nvmem framework consumer.
-> + *
-> + * Copyright (C) 2015 Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
-> + * Copyright (C) 2013 Maxime Ripard <maxime.ripard@free-electrons.com>
-> + *
-> + * This file is licensed under the terms of the GNU General Public
-> + * License version 2.  This program is licensed "as is" without any
-> + * warranty of any kind, whether express or implied.
-> + */
-> +
-> +#ifndef _LINUX_NVMEM_CONSUMER_H
-> +#define _LINUX_NVMEM_CONSUMER_H
-> +
-> +/* consumer cookie */
-> +struct nvmem_cell;
-> +
-> +#if IS_ENABLED(CONFIG_NVMEM)
-> +
-> +/* Cell based interface */
-> +struct nvmem_cell *nvmem_cell_get(struct device *dev, const char *name);
-
-We should probably forward declare struct device in this file too.
-
+diff --git a/drivers/gpu/ipu-v3/ipu-common.c b/drivers/gpu/ipu-v3/ipu-common.c
+index 6d2f39d36e44..00f2058944e5 100644
+--- a/drivers/gpu/ipu-v3/ipu-common.c
++++ b/drivers/gpu/ipu-v3/ipu-common.c
+@@ -1107,6 +1107,9 @@ static int ipu_irq_init(struct ipu_soc *ipu)
+ 		return ret;
+ 	}
+ 
++	for (i = 0; i < IPU_NUM_IRQS; i += 32)
++		ipu_cm_write(ipu, 0, IPU_INT_CTRL(i / 32));
++
+ 	for (i = 0; i < IPU_NUM_IRQS; i += 32) {
+ 		gc = irq_get_domain_generic_chip(ipu->domain, i);
+ 		gc->reg_base = ipu->cm_reg;
 -- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+2.1.0
