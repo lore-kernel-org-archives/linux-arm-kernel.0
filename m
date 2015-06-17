@@ -1,43 +1,22 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Wed, 17 Jun 2015 10:00:06 +0200
-Subject: [PATCH v5 04/11] nvmem: Add a simple NVMEM framework for consumers
-In-Reply-To: <5580A345.30204@codeaurora.org>
-References: <1432226535-8640-1-git-send-email-srinivas.kandagatla@linaro.org>
- <1432226593-8817-1-git-send-email-srinivas.kandagatla@linaro.org>
- <5580A345.30204@codeaurora.org>
-Message-ID: <20150617080006.GH6325@pengutronix.de>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Wed, 17 Jun 2015 10:20:32 +0200
+Subject: [PATCH 1/2] pinctrl: rockchip: generalize perpin driver-strength
+ setting
+In-Reply-To: <2322857.kblfsanYOB@diego>
+References: <2322857.kblfsanYOB@diego>
+Message-ID: <CACRpkda7U++34xSi-ePb4g7tZLde80YSaooY6WHcM=n097ZiGg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 16, 2015 at 03:29:25PM -0700, Stephen Boyd wrote:
-> On 05/21/2015 09:43 AM, Srinivas Kandagatla wrote:
-> > +	/* if it's not end on byte boundary */
-> > +	if ((nbits + bit_offset) % BITS_PER_BYTE) {
-> > +		/* setup the last byte with msb bits from nvmem */
-> > +		rc = regmap_raw_read(nvmem->regmap,
-> > +				    cell->offset + cell->bytes - 1, &v, 1);
-> > +		*p |= GENMASK(7, (nbits + bit_offset) % BITS_PER_BYTE) & v;
-> > +
-> > +	}
-> > +
-> > +	return buf;
-> > +}
-> > +
-> > +/**
-> > + * nvmem_cell_write(): Write to a given nvmem cell
-> 
-> This isn't kernel doc notation. It should be like
-> 
->     nvmem_cell_write - Write to a given nvmem cell
+On Fri, Jun 12, 2015 at 11:50 PM, Heiko St?bner <heiko@sntech.de> wrote:
 
-Almost. Should be:
+> The upcoming support for the RK3368 ARM64 SoC also supports perpin
+> drive strength settings (at different register positions), so generalize
+> the register and offset calculation to easily support this one too.
+>
+> Signed-off-by: Heiko Stuebner <heiko@sntech.de>
 
-      nvmem_cell_write() - Write to a given nvmem cell
+Patch applied.
 
-Sascha
-
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Yours,
+Linus Walleij
