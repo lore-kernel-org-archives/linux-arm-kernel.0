@@ -1,21 +1,26 @@
 From: horms@verge.net.au (Simon Horman)
-Date: Wed, 17 Jun 2015 09:37:57 +0900
+Date: Wed, 17 Jun 2015 09:39:58 +0900
 Subject: [PATCH v2 0/2] Add R8A7790 EtherAVB DT support
-In-Reply-To: <2857896.YA1bBSQVkA@wasted.cogentembedded.com>
+In-Reply-To: <20150617003757.GC2433@verge.net.au>
 References: <2857896.YA1bBSQVkA@wasted.cogentembedded.com>
-Message-ID: <20150617003757.GC2433@verge.net.au>
+ <20150617003757.GC2433@verge.net.au>
+Message-ID: <20150617003958.GA24889@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 16, 2015 at 02:41:07AM +0300, Sergei Shtylyov wrote:
-> Hello.
+On Wed, Jun 17, 2015 at 09:37:57AM +0900, Simon Horman wrote:
+> On Tue, Jun 16, 2015 at 02:41:07AM +0300, Sergei Shtylyov wrote:
+> > Hello.
+> > 
+> >    Here's the set of 2 patches against Simon Horman's 'renesas.git' repo,
+> > 'renesas-devel-20150610-v4.1-rc7' tag. Here we add the EtherAVB device tree
+> > support for the R8A7790 SoC. The 2nd patch depends on the EtherAVB driver
+> > merged into the 'net-next.git' repo recently for the bindings...
+> > 
+> > [1/2] ARM: shmobile: r8a7790: add EtherAVB clocks
+> > [2/2] ARM: shmobile: r8a7790: add EtherAVB DT support
 > 
->    Here's the set of 2 patches against Simon Horman's 'renesas.git' repo,
-> 'renesas-devel-20150610-v4.1-rc7' tag. Here we add the EtherAVB device tree
-> support for the R8A7790 SoC. The 2nd patch depends on the EtherAVB driver
-> merged into the 'net-next.git' repo recently for the bindings...
-> 
-> [1/2] ARM: shmobile: r8a7790: add EtherAVB clocks
-> [2/2] ARM: shmobile: r8a7790: add EtherAVB DT support
+> Thanks Sergei, I have queued these up.
 
-Thanks Sergei, I have queued these up.
+Please consider submitting patches to enable the new driver
+in shmobile_defconfig and multi_v7_defconfig.
