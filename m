@@ -1,21 +1,28 @@
 From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Wed, 17 Jun 2015 18:12:40 +0200
-Subject: [PATCH 4/9] ARM: mvebu: prepare mvebu_pm_store_bootinfo() to
- support multiple SoCs
-In-Reply-To: <1434456785-23696-5-git-send-email-thomas.petazzoni@free-electrons.com>
+Date: Wed, 17 Jun 2015 18:13:15 +0200
+Subject: [PATCH 5/9] ARM: mvebu: prepare pm-board.c for the introduction
+ of Armada 38x support
+In-Reply-To: <1434456785-23696-6-git-send-email-thomas.petazzoni@free-electrons.com>
 References: <1434456785-23696-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1434456785-23696-5-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <55819C78.8080804@free-electrons.com>
+ <1434456785-23696-6-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <55819C9B.2080000@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi Thomas,
 
 On 16/06/2015 14:13, Thomas Petazzoni wrote:
-> As we are going to introduce support for Armada 38x in pm.c, split out
-> the Armada XP part of mvebu_pm_store_bootinfo() into
-> mvebu_pm_store_armadaxp_bootinfo(), and make the former retunr an
-> error when an unsupported SoC is used.
+> The pm-board.c code contains the board-specific logic to enter suspend
+> to RAM. Until now, the code supported only the Armada XP GP board, so
+> all functions and symbols were named with armada_xp_gp. However, it
+> turns out that the Armada 388 GP also uses the same 3 GPIOs protocol
+> to talk to the PIC microcontroller that controls the power supply.
+> 
+> Since we are going to re-use the same code with no change for Armada
+> 38x, this commit renames the functions and symbols to use just
+> "armada" instead of "armada_xp_gp". Better names can be found if one
+> day other boards having a different protocol/mechanism are supported
+> in the kernel.
 > 
 > Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 
@@ -27,62 +34,88 @@ Thanks,
 Gregory
 
 > ---
->  arch/arm/mach-mvebu/pm.c | 25 +++++++++++++++++++++----
->  1 file changed, 21 insertions(+), 4 deletions(-)
+>  arch/arm/mach-mvebu/pm-board.c | 22 +++++++++++-----------
+>  1 file changed, 11 insertions(+), 11 deletions(-)
 > 
-> diff --git a/arch/arm/mach-mvebu/pm.c b/arch/arm/mach-mvebu/pm.c
-> index eca650b..02fdf67 100644
-> --- a/arch/arm/mach-mvebu/pm.c
-> +++ b/arch/arm/mach-mvebu/pm.c
-> @@ -105,12 +105,10 @@ static phys_addr_t mvebu_internal_reg_base(void)
->  	return of_translate_address(np, in_addr);
+> diff --git a/arch/arm/mach-mvebu/pm-board.c b/arch/arm/mach-mvebu/pm-board.c
+> index 301ab38..b8c26cb 100644
+> --- a/arch/arm/mach-mvebu/pm-board.c
+> +++ b/arch/arm/mach-mvebu/pm-board.c
+> @@ -1,7 +1,7 @@
+>  /*
+>   * Board-level suspend/resume support.
+>   *
+> - * Copyright (C) 2014 Marvell
+> + * Copyright (C) 2014-2015 Marvell
+>   *
+>   * Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+>   *
+> @@ -20,27 +20,27 @@
+>  #include <linux/slab.h>
+>  #include "common.h"
+>  
+> -#define ARMADA_XP_GP_PIC_NR_GPIOS 3
+> +#define ARMADA_PIC_NR_GPIOS 3
+>  
+>  static void __iomem *gpio_ctrl;
+> -static int pic_gpios[ARMADA_XP_GP_PIC_NR_GPIOS];
+> -static int pic_raw_gpios[ARMADA_XP_GP_PIC_NR_GPIOS];
+> +static int pic_gpios[ARMADA_PIC_NR_GPIOS];
+> +static int pic_raw_gpios[ARMADA_PIC_NR_GPIOS];
+>  
+> -static void mvebu_armada_xp_gp_pm_enter(void __iomem *sdram_reg, u32 srcmd)
+> +static void mvebu_armada_pm_enter(void __iomem *sdram_reg, u32 srcmd)
+>  {
+>  	u32 reg, ackcmd;
+>  	int i;
+>  
+>  	/* Put 001 as value on the GPIOs */
+>  	reg = readl(gpio_ctrl);
+> -	for (i = 0; i < ARMADA_XP_GP_PIC_NR_GPIOS; i++)
+> +	for (i = 0; i < ARMADA_PIC_NR_GPIOS; i++)
+>  		reg &= ~BIT(pic_raw_gpios[i]);
+>  	reg |= BIT(pic_raw_gpios[0]);
+>  	writel(reg, gpio_ctrl);
+>  
+>  	/* Prepare writing 111 to the GPIOs */
+>  	ackcmd = readl(gpio_ctrl);
+> -	for (i = 0; i < ARMADA_XP_GP_PIC_NR_GPIOS; i++)
+> +	for (i = 0; i < ARMADA_PIC_NR_GPIOS; i++)
+>  		ackcmd |= BIT(pic_raw_gpios[i]);
+>  
+>  	srcmd = cpu_to_le32(srcmd);
+> @@ -76,7 +76,7 @@ static void mvebu_armada_xp_gp_pm_enter(void __iomem *sdram_reg, u32 srcmd)
+>  		  [ackcmd] "r" (ackcmd), [gpio_ctrl] "r" (gpio_ctrl) : "r1");
 >  }
 >  
-> -static void mvebu_pm_store_bootinfo(void)
-> +static void mvebu_pm_store_armadaxp_bootinfo(u32 *store_addr)
+> -static int mvebu_armada_xp_gp_pm_init(void)
+> +static int mvebu_armada_pm_init(void)
 >  {
-> -	u32 *store_addr;
->  	phys_addr_t resume_pc;
+>  	struct device_node *np;
+>  	struct device_node *gpio_ctrl_np;
+> @@ -89,7 +89,7 @@ static int mvebu_armada_xp_gp_pm_init(void)
+>  	if (!np)
+>  		return -ENODEV;
 >  
-> -	store_addr = phys_to_virt(BOOT_INFO_ADDR);
->  	resume_pc = virt_to_phys(armada_370_xp_cpu_resume);
+> -	for (i = 0; i < ARMADA_XP_GP_PIC_NR_GPIOS; i++) {
+> +	for (i = 0; i < ARMADA_PIC_NR_GPIOS; i++) {
+>  		char *name;
+>  		struct of_phandle_args args;
 >  
->  	/*
-> @@ -151,14 +149,33 @@ static void mvebu_pm_store_bootinfo(void)
->  	writel(BOOT_MAGIC_LIST_END, store_addr);
+> @@ -134,11 +134,11 @@ static int mvebu_armada_xp_gp_pm_init(void)
+>  	if (!gpio_ctrl)
+>  		return -ENOMEM;
+>  
+> -	mvebu_pm_init(mvebu_armada_xp_gp_pm_enter);
+> +	mvebu_pm_init(mvebu_armada_pm_enter);
+>  
+>  out:
+>  	of_node_put(np);
+>  	return ret;
 >  }
 >  
-> +static int mvebu_pm_store_bootinfo(void)
-> +{
-> +	u32 *store_addr;
-> +
-> +	store_addr = phys_to_virt(BOOT_INFO_ADDR);
-> +
-> +	if (of_machine_is_compatible("marvell,armadaxp"))
-> +		mvebu_pm_store_armadaxp_bootinfo(store_addr);
-> +	else
-> +		return -ENODEV;
-> +
-> +	return 0;
-> +}
-> +
->  static int mvebu_pm_enter(suspend_state_t state)
->  {
-> +	int ret;
-> +
->  	if (state != PM_SUSPEND_MEM)
->  		return -EINVAL;
->  
-> +	ret = mvebu_pm_store_bootinfo();
-> +	if (ret)
-> +		return ret;
-> +
->  	cpu_pm_enter();
->  
-> -	mvebu_pm_store_bootinfo();
->  	cpu_suspend(0, mvebu_pm_powerdown);
->  
->  	outer_resume();
+> -late_initcall(mvebu_armada_xp_gp_pm_init);
+> +late_initcall(mvebu_armada_pm_init);
 > 
 
 
