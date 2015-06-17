@@ -1,189 +1,117 @@
-From: ludovic.desroches@atmel.com (Ludovic Desroches)
-Date: Wed, 17 Jun 2015 14:38:16 +0200
-Subject: [RESEND PATCH 1/2] pinctrl: change function behavior for per pin
- muxing controllers
-In-Reply-To: <557EF60D.8020007@wwwdotorg.org>
-References: <1433948699-19800-1-git-send-email-ludovic.desroches@atmel.com>
- <1433948699-19800-2-git-send-email-ludovic.desroches@atmel.com>
- <557EF60D.8020007@wwwdotorg.org>
-Message-ID: <20150617123816.GB12295@odux.rfo.atmel.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Wed, 17 Jun 2015 13:39:39 +0100
+Subject: [PATCH 04/10] KVM: arm/arm64: vgic: Allow HW irq to be encoded
+ in LR
+In-Reply-To: <55815FA5.4010203@linaro.org>
+References: <1433783045-8002-1-git-send-email-marc.zyngier@arm.com>
+ <1433783045-8002-5-git-send-email-marc.zyngier@arm.com>
+ <55815FA5.4010203@linaro.org>
+Message-ID: <55816A8B.3070803@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Stephen,
+On 17/06/15 12:53, Eric Auger wrote:
+> On 06/08/2015 07:03 PM, Marc Zyngier wrote:
+>> Now that struct vgic_lr supports the LR_HW bit and carries a hwirq
+>> field, we can encode that information into the list registers.
+>>
+>> This patch provides implementations for both GICv2 and GICv3.
+>>
+>> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+>> ---
+>>  include/linux/irqchip/arm-gic-v3.h |  3 +++
+>>  include/linux/irqchip/arm-gic.h    |  3 ++-
+>>  virt/kvm/arm/vgic-v2.c             | 16 +++++++++++++++-
+>>  virt/kvm/arm/vgic-v3.c             | 21 ++++++++++++++++++---
+>>  4 files changed, 38 insertions(+), 5 deletions(-)
+>>
+>> diff --git a/include/linux/irqchip/arm-gic-v3.h b/include/linux/irqchip/arm-gic-v3.h
+>> index ffbc034..cf637d6 100644
+>> --- a/include/linux/irqchip/arm-gic-v3.h
+>> +++ b/include/linux/irqchip/arm-gic-v3.h
+>> @@ -268,9 +268,12 @@
+>>  
+>>  #define ICH_LR_EOI			(1UL << 41)
+>>  #define ICH_LR_GROUP			(1UL << 60)
+>> +#define ICH_LR_HW			(1UL << 61)
+>>  #define ICH_LR_STATE			(3UL << 62)
+>>  #define ICH_LR_PENDING_BIT		(1UL << 62)
+>>  #define ICH_LR_ACTIVE_BIT		(1UL << 63)
+>> +#define ICH_LR_PHYS_ID_SHIFT		32
+>> +#define ICH_LR_PHYS_ID_MASK		(0x3ffUL << ICH_LR_PHYS_ID_SHIFT)
+>>  
+>>  #define ICH_MISR_EOI			(1 << 0)
+>>  #define ICH_MISR_U			(1 << 1)
+>> diff --git a/include/linux/irqchip/arm-gic.h b/include/linux/irqchip/arm-gic.h
+>> index 9de976b..ca88dad 100644
+>> --- a/include/linux/irqchip/arm-gic.h
+>> +++ b/include/linux/irqchip/arm-gic.h
+>> @@ -71,11 +71,12 @@
+>>  
+>>  #define GICH_LR_VIRTUALID		(0x3ff << 0)
+>>  #define GICH_LR_PHYSID_CPUID_SHIFT	(10)
+>> -#define GICH_LR_PHYSID_CPUID		(7 << GICH_LR_PHYSID_CPUID_SHIFT)
+>> +#define GICH_LR_PHYSID_CPUID		(0x3ff << GICH_LR_PHYSID_CPUID_SHIFT)
+>>  #define GICH_LR_STATE			(3 << 28)
+>>  #define GICH_LR_PENDING_BIT		(1 << 28)
+>>  #define GICH_LR_ACTIVE_BIT		(1 << 29)
+>>  #define GICH_LR_EOI			(1 << 19)
+>> +#define GICH_LR_HW			(1 << 31)
+>>  
+>>  #define GICH_VMCR_CTRL_SHIFT		0
+>>  #define GICH_VMCR_CTRL_MASK		(0x21f << GICH_VMCR_CTRL_SHIFT)
+>> diff --git a/virt/kvm/arm/vgic-v2.c b/virt/kvm/arm/vgic-v2.c
+>> index f9b9c7c..8d7b04d 100644
+>> --- a/virt/kvm/arm/vgic-v2.c
+>> +++ b/virt/kvm/arm/vgic-v2.c
+>> @@ -48,6 +48,10 @@ static struct vgic_lr vgic_v2_get_lr(const struct kvm_vcpu *vcpu, int lr)
+>>  		lr_desc.state |= LR_STATE_ACTIVE;
+>>  	if (val & GICH_LR_EOI)
+>>  		lr_desc.state |= LR_EOI_INT;
+>> +	if (val & GICH_LR_HW) {
+>> +		lr_desc.state |= LR_HW;
+>> +		lr_desc.hwirq = (val & GICH_LR_PHYSID_CPUID) >> GICH_LR_PHYSID_CPUID_SHIFT;
+>> +	}
+>>  
+>>  	return lr_desc;
+>>  }
+>> @@ -55,7 +59,9 @@ static struct vgic_lr vgic_v2_get_lr(const struct kvm_vcpu *vcpu, int lr)
+>>  static void vgic_v2_set_lr(struct kvm_vcpu *vcpu, int lr,
+>>  			   struct vgic_lr lr_desc)
+>>  {
+>> -	u32 lr_val = (lr_desc.source << GICH_LR_PHYSID_CPUID_SHIFT) | lr_desc.irq;
+>> +	u32 lr_val;
+>> +
+>> +	lr_val = lr_desc.irq;
+>>  
+>>  	if (lr_desc.state & LR_STATE_PENDING)
+>>  		lr_val |= GICH_LR_PENDING_BIT;
+>> @@ -64,6 +70,14 @@ static void vgic_v2_set_lr(struct kvm_vcpu *vcpu, int lr,
+>>  	if (lr_desc.state & LR_EOI_INT)
+>>  		lr_val |= GICH_LR_EOI;
+>>  
+>> +	if (lr_desc.state & LR_HW) {
+>> +		lr_val |= GICH_LR_HW;
+>> +		lr_val |= (u32)lr_desc.hwirq << GICH_LR_PHYSID_CPUID_SHIFT;
+>
+> shouldn't we test somewhere that the hwirq is between 16 and 1019. Else
+> behavior is unpredictable according to v2 spec. when queuing into the LR
+> we currently check the linux irq vlr.irq >= VGIC_NR_SGIS if I am not wrong.
 
-On Mon, Jun 15, 2015 at 09:58:05AM -0600, Stephen Warren wrote:
-> On 06/10/2015 09:04 AM, Ludovic Desroches wrote:
-> >When having a controller which allows per pin muxing, declaring with
-> >which groups a function can be used is a useless constraint since groups
-> >are something virtual.
-> 
-> This isn't true.
-> 
-> Irrespective of whether a particular piece of pinmux HW can control the mux
-> function for each pin individually, or only in groups, it's quite likely
-> that each function can only be selected onto a subset of those pins or
-> groups. Requiring the pinctrl driver to inform the core which set of
-> pins/groups particular functions can be selected onto seems quite
-> reasonable.
-> 
-> In my opinion at least, for HW that can select the mux function at the
-> per-pin level, the only sensible set of groups is one group per pin with
-> each group containing a single pin. Any other use of groups is a
-> SW/user-level construct, and is something unrelated to why the pinctrl
-> subsystem supports groups. If we want to represent those groups in pinctrl,
-> there should be two separate sets of groups; one to represent the actual HW
-> capabilities, and one to represent the SW/user-level convenience
-> abstractions.
+This is actually implicit. vgic_map_phys_irq() takes a parameter (irq)
+that is the Linux view of the hwirq we're dealing with (we fetch this
+hwirq by traversing the irq_data list associated with irq).
 
-Groups that I would like to use are not something related to the user or
-software. It's an hardware reality but they would be more flexibles.
+SGIs are not part of the set of interrupts that can be mapped to a Linux
+irq (their usage is completely private to the two GIC drivers).
 
-Usually the muxing is done by selecting a function (which seems to be
-device related: usart, spi, etc.), then you select on which pins you
-want this function.
+Note that GICv3 allows SGIs to be set as a physical interrupt in an LR
+though, but this is not a feature we use so far.
 
-In my case, I can't select a function only by choosing a mux. It is a
-combination of the mux and the pin on which it is applied. So my
-functions will be GPIO, A, B, C, etc. If I use function A on pin 12, I
-will have my i2c clock signal but I can have this signal on pin 58 if I
-use function C. Do you understand what I mean? It's not very easy to
-explain... So here is a real example:
+> besides Reviewed-by: Eric Auger <eric.auger@linaro.org>
 
- -------------------------------------------------- 
-|              | pio peripheral                    |
- -------------------------------------------------- 
-| signal | dir | func | signal       | dir | ioset |
- -------------------------------------------------- 
-| PA8    | I/O | A    | SDMMC0_DAT6  | I/O | 1     |
-|        |     | B    | QSPI1_IO1    | I/O | 1     |
-|        |     | D    | TCLK5        | I   | 1     |
-|        |     | E    | FLEXCOM2_IO2 | I/O | 1     |
-|        |     | F    | NWE/NANDWE   | O   | 2     |
- -------------------------------------------------- 
-| PD28   | I/O | A    | SPI1_NPCS0   | I/O | 3     |
-|        |     | B    | TDI          | I/O | 3     |
-|        |     | C    | FLEXCOM2_IO2 | I   | 2     |
- -------------------------------------------------- 
+Thanks!
 
-
-You are right that having a group per pin is a solution.
-
-If I follow your proposal (tell me if I'm wrong):
-- I will have 128 groups since I have 128 pins.
-- I will have functions GPIO, A, B, C, D, E, F.
-- I have to give the groups which can achieve a function so I will have
-128 groups for each function. It means 128 x 7 = 896 groups.
-
-Does it seems to be something reasonable and intelligible? From my point
-of view no. And what about the sysfs readability?
-
-With my current implementation, I have something quite understandable
-for the user if he needs to check the pinmuxing:
-
-  # cat /sys/kernel/debug/pinctrl/ahb\:apb\:pinctrl at fc038000/pinmux-pins
-  pin 17 (PA17): (MUX UNCLAIMED) (GPIO UNCLAIMED)
-  pin 18 (PA18): b0000000.sdio-host (GPIO UNCLAIMED) function E group sdmmc1_0
-  pin 19 (PA19): b0000000.sdio-host (GPIO UNCLAIMED) function E group sdmmc1_0  
-                                                                                
-  # cat /sys/kernel/debug/pinctrl/pinctrl-maps                                  
-  Pinctrl maps:                                                                 
-                                                                                
-  device b0000000.sdio-host                                                     
-  state default                                                                 
-  type MUX_GROUP (2)                                                            
-  controlling device ahb:apb:pinctrl at fc038000                                   
-  group sdmmc1_0                                                                
-  function E                                                                    
-                                                                                
-  device b0000000.sdio-host                                                     
-  state default                                                                 
-  type CONFIGS_PIN (3)                                                          
-  controlling device ahb:apb:pinctrl at fc038000                                   
-  pin PA28                                                                      
-  config 00010003                                                               
-                                                                                
-  device b0000000.sdio-host                                                     
-  state default                                                                 
-  type CONFIGS_PIN (3)                                                          
-  controlling device ahb:apb:pinctrl at fc038000                                   
-  pin PA18                                                                      
-  config 00010003                                                               
-                                                                                
-                                                  
-Doing as you propose, I assume the result should be:                            
-                                                                                
-  # cat /sys/kernel/debug/pinctrl/ahb\:apb\:pinctrl at fc038000/pinmux-pins        
-  pin 17 (PA17): (MUX UNCLAIMED) (GPIO UNCLAIMED)                               
-  pin 18 (PA18): b0000000.sdio-host (GPIO UNCLAIMED) function E group PA18
-  pin 19 (PA19): b0000000.sdio-host (GPIO UNCLAIMED) function E group PA19
-
-  # cat /sys/kernel/debug/pinctrl/pinctrl-maps
-  Pinctrl maps:
-
-  device b0000000.sdio-host
-  state default
-  type MUX_GROUP (2)
-  controlling device ahb:apb:pinctrl at fc038000
-  group PA28
-  function E
-
-  device b0000000.sdio-host
-  state default
-  type CONFIGS_PIN (3)
-  controlling device ahb:apb:pinctrl at fc038000
-  pin PA28
-  config 00010003
-                                                                                
-  device b0000000.sdio-host
-  state default
-  type MUX_GROUP (2)
-  controlling device ahb:apb:pinctrl at fc038000
-  group PA18
-  function E
-
-  device b0000000.sdio-host
-  state default
-  type CONFIGS_PIN (3)
-  controlling device ahb:apb:pinctrl at fc038000
-  pin PA18
-  config 00010003
-
-I think it is more difficult to understand what is done here.
-
-
-I have sent patches months ago trying to improve things by having
-something more flexible. I don't think I introduce too big changes.
-The only answers I got were from people thinking that pinctrl framework
-conception is not good to fit all kind of controllers. I re-sent the
-patch series to gain more expose and have no  answer...
-
-I wanted to use as much as possible the generic stuff we have in order
-to not add a new "custom" implementation. If it is such a big deal to
-do these changes because you (or other people) think that we can use
-it as is to describe our pinmux/pinconf configuration then I can
-switch to a custom implementation too and not use the pinconf generic
-dt_node_to_map. I think this solution is not encouraged by Linus who
-prefers to cling the generic infrastructure, isn'it? This is exactly
-why I took this approach.
-
-
-FYI: some context about these patches:
-
-The RFC I send long time ago:
-http://www.spinics.net/lists/linux-gpio/msg05198.html
-
-My second attempt:
-http://comments.gmane.org/gmane.linux.kernel.gpio/7767
-
-It is not the first time, there are discussions about it. Sascha sent a
-patch which fits part of my needs:
-http://lists.infradead.org/pipermail/linux-arm-kernel/2015-January/318452.html
-
-And it seems some controllers use this approach:
-http://lists.infradead.org/pipermail/linux-arm-kernel/2015-January/318452.html
-
-
-Regards
-
-Ludovic
+	M.
+-- 
+Jazz is not dead. It just smells funny...
