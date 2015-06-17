@@ -1,26 +1,51 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Wed, 17 Jun 2015 09:39:58 +0900
-Subject: [PATCH v2 0/2] Add R8A7790 EtherAVB DT support
-In-Reply-To: <20150617003757.GC2433@verge.net.au>
-References: <2857896.YA1bBSQVkA@wasted.cogentembedded.com>
- <20150617003757.GC2433@verge.net.au>
-Message-ID: <20150617003958.GA24889@verge.net.au>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Tue, 16 Jun 2015 19:28:43 -0600
+Subject: [PATCH v2 2/3] watchdog: bcm2835: Add poweroff code for the
+ Raspberry Pi
+In-Reply-To: <557FEECE.9060909@tronnes.org>
+References: <1434195541-28368-1-git-send-email-noralf@tronnes.org>
+ <1434195541-28368-2-git-send-email-noralf@tronnes.org>
+ <557F930E.8010002@wwwdotorg.org> <557FEECE.9060909@tronnes.org>
+Message-ID: <5580CD4B.70003@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 17, 2015 at 09:37:57AM +0900, Simon Horman wrote:
-> On Tue, Jun 16, 2015 at 02:41:07AM +0300, Sergei Shtylyov wrote:
-> > Hello.
-> > 
-> >    Here's the set of 2 patches against Simon Horman's 'renesas.git' repo,
-> > 'renesas-devel-20150610-v4.1-rc7' tag. Here we add the EtherAVB device tree
-> > support for the R8A7790 SoC. The 2nd patch depends on the EtherAVB driver
-> > merged into the 'net-next.git' repo recently for the bindings...
-> > 
-> > [1/2] ARM: shmobile: r8a7790: add EtherAVB clocks
-> > [2/2] ARM: shmobile: r8a7790: add EtherAVB DT support
+On 06/16/2015 03:39 AM, Noralf Tr?nnes wrote:
 > 
-> Thanks Sergei, I have queued these up.
+> Den 16.06.2015 05:07, skrev Stephen Warren:
+>> On 06/13/2015 05:39 AM, Noralf Tr?nnes wrote:
+>>> This adds a new poweroff function to the watchdog driver for the
+>>> Raspberry Pi. Currently poweroff/halt results in a reboot.
+>>>
+>>> The Raspberry Pi firmware uses the RSTS register to know which
+>>> partiton to boot from. The partiton value is spread into bits
+>>> 0, 2, 4, 6, 8, 10. Partiton 63 is a special partition used by
+>>> the firmware to indicate halt.
+>>>
+>>> The firmware made this change in 19 Aug 2013 and was matched
+>>> by the downstream commit:
+>>> Changes for new NOOBS multi partition booting from gsh
+>> I don't understand why we need a new compatible value here; why not
+>> simply modify the existing bcm2835_power_off() function. That is written
+>> to do something that's interpreted by the RPi firmware, not something
+>> that the bcm2835 HW does.
+>>
+>> Admittedly the current name is a bit misleading, but fixing that should
+>> be a separate change to fixing the implementation to do what the current
+>> firmware expects.
+> 
+> There are other boards that use the BCM2835 and I didn't want to break the
+> behaviour for those that use the reference firmware.
 
-Please consider submitting patches to enable the new driver
-in shmobile_defconfig and multi_v7_defconfig.
+We don't support those other board in mainline Linux AFAIK. In other
+discussions, Eric Anholt stated that the Roku 2 for example doesn't use
+the same firmware (albeit they were derived from the same base a long
+way back apparently) so I have no good reason to believe this logic is a
+standard across difference bcm2835 devices. Do you know more specific
+details?
+
+> Roku 2 device uses
+> this soc, and changing bcm2835_power_off() would break support for it.
+> ODROID-W also use BCM2835, but this is a Pi clone so I don't know if they
+> have matched their firmware behaviour to that of the Pi (admittedly not
+> many boards were made, their source of chips went dry).
