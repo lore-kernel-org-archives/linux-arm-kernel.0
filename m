@@ -1,58 +1,57 @@
 From: julien.grall@citrix.com (Julien Grall)
-Date: Wed, 17 Jun 2015 15:28:01 +0100
-Subject: [PATCH v2 0/7] xen: Clean up
-Message-ID: <1434551288-14113-1-git-send-email-julien.grall@citrix.com>
+Date: Wed, 17 Jun 2015 15:28:03 +0100
+Subject: [PATCH v2 2/7] xen/xenbus: client: Fix call of virt_to_mfn in
+ xenbus_grant_ring
+In-Reply-To: <1434551288-14113-1-git-send-email-julien.grall@citrix.com>
+References: <1434551288-14113-1-git-send-email-julien.grall@citrix.com>
+Message-ID: <1434551288-14113-3-git-send-email-julien.grall@citrix.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+virt_to_mfn should take a void* rather an unsigned long. While it
+doesn't really matter now, it would throw a compiler warning later when
+virt_to_mfn will enforce the type.
 
-Thoses patches was originally part of the Xen 64KB series [1]. Although,
-I think they can go without waiting the rest of the 64KB series.
+At the same time, avoid to compute new virtual address every time in the
+loop and directly increment the parameter as we don't use it later.
 
-Patch #1-#4 should go through the Xen tree, even though patch #1 touches
-multiple part.
-
-Patch #5-#7 should go through the Block tree.
-
-Regards,
-
-[1] http://lkml.org/lkml/2015/5/14/533
-
-Cc: Boris Ostrovsky <boris.ostrovsky@oracle.com>
-Cc: David Vrabel <david.vrabel@citrix.com>
-Cc: Ian Campbell <ian.campbell@citrix.com>
-Cc: Konrad Rzeszutek Wilk <konrad.wilk@oracle.com>
-Cc: netdev at vger.kernel.org
-Cc: Roger Pau Monn? <roger.pau@citrix.com>
-Cc: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
+Signed-off-by: Julien Grall <julien.grall@citrix.com>
+Reviewed-by: David Vrabel <david.vrabel@citrix.com>
 Cc: Wei Liu <wei.liu2@citrix.com>
+Cc: Konrad Rzeszutek Wilk <konrad.wilk@oracle.com>
+Cc: Boris Ostrovsky <boris.ostrovsky@oracle.com>
 
-Julien Grall (7):
-  xen: Include xen/page.h rather than asm/xen/page.h
-  xen/xenbus: client: Fix call of virt_to_mfn in xenbus_grant_ring
-  xen/grant-table: Remove unused macro SPP
-  arm/xen: Drop duplicate define mfn_to_virt
-  block/xen-blkfront: Remove unused macro MAXIMUM_OUTSTANDING_BLOCK_REQS
-  block/xen-blkfront: Remove invalid comment
-  block/xen-blkback: s/nr_pages/nr_segs/
+---
+    Changes in v2:
+        - Remove the cast to (char *)
+        - Add David's Reviewed-by
+---
+ drivers/xen/xenbus/xenbus_client.c | 6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
 
- arch/arm/include/asm/xen/page.h     |  1 -
- arch/arm/xen/mm.c                   |  2 +-
- arch/arm/xen/p2m.c                  |  2 +-
- drivers/block/xen-blkback/blkback.c | 10 +++++-----
- drivers/block/xen-blkback/common.h  |  2 +-
- drivers/block/xen-blkfront.c        |  8 --------
- drivers/net/xen-netback/netback.c   |  2 +-
- drivers/net/xen-netfront.c          |  1 -
- drivers/xen/events/events_base.c    |  2 +-
- drivers/xen/events/events_fifo.c    |  2 +-
- drivers/xen/gntdev.c                |  2 +-
- drivers/xen/grant-table.c           |  1 -
- drivers/xen/manage.c                |  2 +-
- drivers/xen/tmem.c                  |  2 +-
- drivers/xen/xenbus/xenbus_client.c  |  8 ++++----
- 15 files changed, 18 insertions(+), 29 deletions(-)
-
+diff --git a/drivers/xen/xenbus/xenbus_client.c b/drivers/xen/xenbus/xenbus_client.c
+index a014016..9ad3272 100644
+--- a/drivers/xen/xenbus/xenbus_client.c
++++ b/drivers/xen/xenbus/xenbus_client.c
+@@ -379,16 +379,16 @@ int xenbus_grant_ring(struct xenbus_device *dev, void *vaddr,
+ 	int i, j;
+ 
+ 	for (i = 0; i < nr_pages; i++) {
+-		unsigned long addr = (unsigned long)vaddr +
+-			(PAGE_SIZE * i);
+ 		err = gnttab_grant_foreign_access(dev->otherend_id,
+-						  virt_to_mfn(addr), 0);
++						  virt_to_mfn(vaddr), 0);
+ 		if (err < 0) {
+ 			xenbus_dev_fatal(dev, err,
+ 					 "granting access to ring page");
+ 			goto fail;
+ 		}
+ 		grefs[i] = err;
++
++		vaddr = vaddr + PAGE_SIZE;
+ 	}
+ 
+ 	return 0;
 -- 
 2.1.4
