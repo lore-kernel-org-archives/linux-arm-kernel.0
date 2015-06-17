@@ -1,94 +1,47 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Wed, 17 Jun 2015 18:04:46 +0200
-Subject: [PATCHv2 5/5] dmaengine: mv_xor: de-duplicate mv_chan_set_mode*()
-In-Reply-To: <1434557086-9520-1-git-send-email-thomas.petazzoni@free-electrons.com>
-References: <1434557086-9520-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1434557086-9520-6-git-send-email-thomas.petazzoni@free-electrons.com>
+From: soren.brinkmann@xilinx.com (=?utf-8?B?U8O2cmVu?= Brinkmann)
+Date: Wed, 17 Jun 2015 09:07:30 -0700
+Subject: [PATCH] xilinx:Remove unused variable num_frag in the function
+ axienet_start_xmit
+In-Reply-To: <1434556362-3748-1-git-send-email-xerofoify@gmail.com>
+References: <1434556362-3748-1-git-send-email-xerofoify@gmail.com>
+Message-ID: <20150617160730.GE2906@xsjsorenbubuntu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When commit 6f166312c6ea2 ("dmaengine: mv_xor: add support for a38x
-command in descriptor mode") added support for the descriptor mode
-available in Marvell Armada 38x and later SoCs, it added a new
-function mv_chan_set_mode_to_desc() which allows to configure a XOR
-channel to get the specific operation to be done from each individual
-DMA descriptor.
+On Wed, 2015-06-17 at 11:52AM -0400, Nicholas Krause wrote:
+> This removes the unused variable num_frag and the setting of it
+> to the number of fragments from the passed sk_buff pointer by
+> this function's caller due to this variable never being used
+> in this particular function and is not declared as  global so
+> setting it for global use in this file is pointless.
+> 
+> Signed-off-by: Nicholas Krause <xerofoify@gmail.com>
+> ---
+>  drivers/net/ethernet/xilinx/xilinx_axienet_main.c | 2 --
+>  1 file changed, 2 deletions(-)
+> 
+> diff --git a/drivers/net/ethernet/xilinx/xilinx_axienet_main.c b/drivers/net/ethernet/xilinx/xilinx_axienet_main.c
+> index 28b7e7d..624dce4 100644
+> --- a/drivers/net/ethernet/xilinx/xilinx_axienet_main.c
+> +++ b/drivers/net/ethernet/xilinx/xilinx_axienet_main.c
+> @@ -651,7 +651,6 @@ static inline int axienet_check_tx_bd_space(struct axienet_local *lp,
+>  static int axienet_start_xmit(struct sk_buff *skb, struct net_device *ndev)
+>  {
+>  	u32 ii;
+> -	u32 num_frag;
+>  	u32 csum_start_off;
+>  	u32 csum_index_off;
+>  	skb_frag_t *frag;
+> @@ -659,7 +658,6 @@ static int axienet_start_xmit(struct sk_buff *skb, struct net_device *ndev)
+>  	struct axienet_local *lp = netdev_priv(ndev);
+>  	struct axidma_bd *cur_p;
+>  
+> -	num_frag = skb_shinfo(skb)->nr_frags;
+>  	cur_p = &lp->tx_bd_v[lp->tx_bd_tail];
+>  
+>  	if (axienet_check_tx_bd_space(lp, num_frag)) {
 
-However, this function was mainly a duplicate of the existing
-mv_chan_set_mode(), with just the operation being different.
+It's used right here, isn't it (and further down in this function too)?
+Does your tree compile with this change?
 
-This commit re-organizes the code into a single mv_chan_set_mode()
-function, which takes the operation mode as argument, and the
-mv_xor_channel_add() function decides whether to use
-XOR_OPERATION_MODE_IN_DESC or XOR_OPERATION_MODE_XOR.
-
-Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
----
- drivers/dma/mv_xor.c | 41 +++--------------------------------------
- 1 file changed, 3 insertions(+), 38 deletions(-)
-
-diff --git a/drivers/dma/mv_xor.c b/drivers/dma/mv_xor.c
-index 1fe3e33..6e09d59 100644
---- a/drivers/dma/mv_xor.c
-+++ b/drivers/dma/mv_xor.c
-@@ -139,45 +139,10 @@ static void mv_chan_clear_err_status(struct mv_xor_chan *chan)
- }
- 
- static void mv_chan_set_mode(struct mv_xor_chan *chan,
--			     enum dma_transaction_type type)
-+			     u32 op_mode)
- {
--	u32 op_mode;
- 	u32 config = readl_relaxed(XOR_CONFIG(chan));
- 
--	switch (type) {
--	case DMA_XOR:
--		op_mode = XOR_OPERATION_MODE_XOR;
--		break;
--	case DMA_MEMCPY:
--		op_mode = XOR_OPERATION_MODE_MEMCPY;
--		break;
--	default:
--		dev_err(mv_chan_to_devp(chan),
--			"error: unsupported operation %d\n",
--			type);
--		BUG();
--		return;
--	}
--
--	config &= ~0x7;
--	config |= op_mode;
--
--#if defined(__BIG_ENDIAN)
--	config |= XOR_DESCRIPTOR_SWAP;
--#else
--	config &= ~XOR_DESCRIPTOR_SWAP;
--#endif
--
--	writel_relaxed(config, XOR_CONFIG(chan));
--}
--
--static void mv_chan_set_mode_to_desc(struct mv_xor_chan *chan)
--{
--	u32 op_mode;
--	u32 config = readl_relaxed(XOR_CONFIG(chan));
--
--	op_mode = XOR_OPERATION_MODE_IN_DESC;
--
- 	config &= ~0x7;
- 	config |= op_mode;
- 
-@@ -1042,9 +1007,9 @@ mv_xor_channel_add(struct mv_xor_device *xordev,
- 	mv_chan_unmask_interrupts(mv_chan);
- 
- 	if (mv_chan->op_in_desc == XOR_MODE_IN_DESC)
--		mv_chan_set_mode_to_desc(mv_chan);
-+		mv_chan_set_mode(mv_chan, XOR_OPERATION_MODE_IN_DESC);
- 	else
--		mv_chan_set_mode(mv_chan, DMA_XOR);
-+		mv_chan_set_mode(mv_chan, XOR_OPERATION_MODE_XOR);
- 
- 	spin_lock_init(&mv_chan->lock);
- 	INIT_LIST_HEAD(&mv_chan->chain);
--- 
-2.1.0
+	S?ren
