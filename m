@@ -1,37 +1,54 @@
 From: geert+renesas@glider.be (Geert Uytterhoeven)
-Date: Wed, 17 Jun 2015 10:38:50 +0200
-Subject: [PATCH v2 1/7] Revert "staging: board: disable as it breaks the build"
+Date: Wed, 17 Jun 2015 10:38:56 +0200
+Subject: [PATCH v2 7/7] ARM: shmobile: armadillo800eva dts: Add pinctrl and
+ gpio-hog for lcdc0
 In-Reply-To: <1434530336-15073-1-git-send-email-geert+renesas@glider.be>
 References: <1434530336-15073-1-git-send-email-geert+renesas@glider.be>
-Message-ID: <1434530336-15073-2-git-send-email-geert+renesas@glider.be>
+Message-ID: <1434530336-15073-8-git-send-email-geert+renesas@glider.be>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This reverts commit d13778d537a0ed6115d2a79a942af999cfb8eec6.
-
-Commit 13c11072536f2613 ("staging:board: remove unnecessary function")
-fixed the build of drivers/staging/board/board.c.
+Configure pinctrl and a GPIO-controller board mux for LCD use.
+This allows the armadillo800eva board staging code to enable lcdc0.
 
 Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
-Reviewed-by: Simon Horman <horms+renesas@verge.net.au>
 ---
 v2:
-  - Add Reviewed-by.
+  - New.
 ---
- drivers/staging/board/Kconfig | 1 -
- 1 file changed, 1 deletion(-)
+ arch/arm/boot/dts/r8a7740-armadillo800eva.dts | 13 +++++++++++++
+ 1 file changed, 13 insertions(+)
 
-diff --git a/drivers/staging/board/Kconfig b/drivers/staging/board/Kconfig
-index 0a89ad16371f7ded..b8ee81840666ad35 100644
---- a/drivers/staging/board/Kconfig
-+++ b/drivers/staging/board/Kconfig
-@@ -1,7 +1,6 @@
- config STAGING_BOARD
- 	bool "Staging Board Support"
- 	depends on OF_ADDRESS
--	depends on BROKEN
- 	help
- 	  Select to enable per-board staging support code.
+diff --git a/arch/arm/boot/dts/r8a7740-armadillo800eva.dts b/arch/arm/boot/dts/r8a7740-armadillo800eva.dts
+index 2e31d8c01cbf6a74..105d9c95de4af611 100644
+--- a/arch/arm/boot/dts/r8a7740-armadillo800eva.dts
++++ b/arch/arm/boot/dts/r8a7740-armadillo800eva.dts
+@@ -224,6 +224,9 @@
+ };
  
+ &pfc {
++	pinctrl-0 = <&lcd0_pins>;
++	pinctrl-names = "default";
++
+ 	ether_pins: ether {
+ 		renesas,groups = "gether_mii", "gether_int";
+ 		renesas,function = "gether";
+@@ -259,6 +262,16 @@
+ 				 "fsia_data_in_1", "fsia_data_out_0";
+ 		renesas,function = "fsia";
+ 	};
++
++	lcd0_pins: lcd0 {
++		renesas,groups = "lcd0_data24_0", "lcd0_lclk_1", "lcd0_sync";
++		renesas,function = "lcd0";
++
++		/* DBGMD/LCDC0/FSIA MUX */
++		gpio-hog;
++		gpios = <176 0>;
++		output-high;
++	};
+ };
+ 
+ &tpu {
 -- 
 1.9.1
