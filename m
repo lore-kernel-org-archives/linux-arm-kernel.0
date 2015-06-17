@@ -1,52 +1,97 @@
-From: ludovic.desroches@atmel.com (Ludovic Desroches)
-Date: Wed, 17 Jun 2015 16:22:26 +0200
-Subject: [PATCH] dmaengine: at_xdmac: fix bug about channel configuration
-Message-ID: <1434550946-27750-1-git-send-email-ludovic.desroches@atmel.com>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Wed, 17 Jun 2015 16:28:22 +0200
+Subject: [PATCH] ARM: mvebu: use DT properties to fine-tune the L2
+ configuration
+In-Reply-To: <1434023472-19851-1-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1434023472-19851-1-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <55818406.3070703@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When using descriptor view 2 or higher, we don't write the configuration
-into AT_XDMAC_CC register because this configuration will be fetch from
-the descriptor. Unfortunately, the PROT bit is not updated with this
-method, we have to do it manually before enabling the channel.
+Hi Thomas,
 
-Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com>
----
- drivers/dma/at_xdmac.c | 19 ++++++++++---------
- 1 file changed, 10 insertions(+), 9 deletions(-)
+On 11/06/2015 13:51, Thomas Petazzoni wrote:
+> In order to optimize the L2 cache performance, this commit adjusts the
+> configuration of the L2 on the Cortex-A9 based Marvell EBU processors
+> (Armada 375, 38x and 39x), using the appropriate DT properties.
+> 
+> We enable double linefill, incr double linefill, data prefetch and
+> disable double linefill on wrap. This matches the configuration that
+> was fine tuned in the Marvell BSP.
+> 
+> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 
-diff --git a/drivers/dma/at_xdmac.c b/drivers/dma/at_xdmac.c
-index cf1213d..52ca1cc 100644
---- a/drivers/dma/at_xdmac.c
-+++ b/drivers/dma/at_xdmac.c
-@@ -359,18 +359,19 @@ static void at_xdmac_start_xfer(struct at_xdmac_chan *atchan,
- 	 * descriptor view 2 since some fields of the configuration register
- 	 * depend on transfer size and src/dest addresses.
- 	 */
--	if (at_xdmac_chan_is_cyclic(atchan)) {
-+	if (at_xdmac_chan_is_cyclic(atchan))
- 		reg = AT_XDMAC_CNDC_NDVIEW_NDV1;
--		at_xdmac_chan_write(atchan, AT_XDMAC_CC, first->lld.mbr_cfg);
--	} else if (first->lld.mbr_ubc & AT_XDMAC_MBR_UBC_NDV3) {
-+	else if (first->lld.mbr_ubc & AT_XDMAC_MBR_UBC_NDV3)
- 		reg = AT_XDMAC_CNDC_NDVIEW_NDV3;
--	} else {
--		/*
--		 * No need to write AT_XDMAC_CC reg, it will be done when the
--		 * descriptor is fecthed.
--		 */
-+	else
- 		reg = AT_XDMAC_CNDC_NDVIEW_NDV2;
--	}
-+	/*
-+	 * Even if the register will be updated from the configuration in the
-+	 * descriptor when using view 2 or higher, the PROT bit won't be set
-+	 * properly. This bit can be modified only by using the channel
-+	 * configuration register.
-+	 */
-+	at_xdmac_chan_write(atchan, AT_XDMAC_CC, first->lld.mbr_cfg);
- 
- 	reg |= AT_XDMAC_CNDC_NDDUP
- 	       | AT_XDMAC_CNDC_NDSUP
+Acked-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+
+
+applied on mvebu/dt-4.3
+
+Thanks,
+
+Gregory
+
+> ---
+> Enabling the data prefetching depends on a patch from "Hauke Mehrtens
+> <hauke@hauke-m.de>", [PATCH v4] ARM: l2c: add options to overwrite
+> prefetching behavior, which has been applied by Russell (see
+> http://www.arm.linux.org.uk/developer/patches/viewpatch.php?id=8391/1)
+> but does not appear yet in his for-next branch.
+> ---
+>  arch/arm/boot/dts/armada-375.dtsi | 4 ++++
+>  arch/arm/boot/dts/armada-38x.dtsi | 4 ++++
+>  arch/arm/boot/dts/armada-39x.dtsi | 4 ++++
+>  3 files changed, 12 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/armada-375.dtsi b/arch/arm/boot/dts/armada-375.dtsi
+> index f076ff8..4d4964b 100644
+> --- a/arch/arm/boot/dts/armada-375.dtsi
+> +++ b/arch/arm/boot/dts/armada-375.dtsi
+> @@ -176,6 +176,10 @@
+>  				reg = <0x8000 0x1000>;
+>  				cache-unified;
+>  				cache-level = <2>;
+> +				arm,double-linefill-incr = <1>;
+> +				arm,double-linefill-wrap = <0>;
+> +				arm,double-linefill = <1>;
+> +				prefetch-data = <1>;
+>  			};
+>  
+>  			scu at c000 {
+> diff --git a/arch/arm/boot/dts/armada-38x.dtsi b/arch/arm/boot/dts/armada-38x.dtsi
+> index 218a2ac..a86d1dc 100644
+> --- a/arch/arm/boot/dts/armada-38x.dtsi
+> +++ b/arch/arm/boot/dts/armada-38x.dtsi
+> @@ -143,6 +143,10 @@
+>  				reg = <0x8000 0x1000>;
+>  				cache-unified;
+>  				cache-level = <2>;
+> +				arm,double-linefill-incr = <1>;
+> +				arm,double-linefill-wrap = <0>;
+> +				arm,double-linefill = <1>;
+> +				prefetch-data = <1>;
+>  			};
+>  
+>  			scu at c000 {
+> diff --git a/arch/arm/boot/dts/armada-39x.dtsi b/arch/arm/boot/dts/armada-39x.dtsi
+> index ecd1318..06d9cc5 100644
+> --- a/arch/arm/boot/dts/armada-39x.dtsi
+> +++ b/arch/arm/boot/dts/armada-39x.dtsi
+> @@ -104,6 +104,10 @@
+>  				reg = <0x8000 0x1000>;
+>  				cache-unified;
+>  				cache-level = <2>;
+> +				arm,double-linefill-incr = <1>;
+> +				arm,double-linefill-wrap = <0>;
+> +				arm,double-linefill = <1>;
+> +				prefetch-data = <1>;
+>  			};
+>  
+>  			scu at c000 {
+> 
+
+
 -- 
-2.2.0
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
