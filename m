@@ -1,147 +1,156 @@
 From: geert+renesas@glider.be (Geert Uytterhoeven)
-Date: Wed, 17 Jun 2015 10:38:54 +0200
-Subject: [PATCH v2 5/7] staging: board: Add support for devices with complex
- dependencies
+Date: Wed, 17 Jun 2015 10:38:55 +0200
+Subject: [PATCH v2 6/7] staging: board: armadillo800eva: Board staging for
+ sh_mobile_lcdc_fb
 In-Reply-To: <1434530336-15073-1-git-send-email-geert+renesas@glider.be>
 References: <1434530336-15073-1-git-send-email-geert+renesas@glider.be>
-Message-ID: <1434530336-15073-6-git-send-email-geert+renesas@glider.be>
+Message-ID: <1434530336-15073-7-git-send-email-geert+renesas@glider.be>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add support for easy registering of one ore more platform devices that
-may:
-  - need clocks that are described in DT,
-  - be part of a PM Domain.
+Add staging board support for the r8a7740-based armadillo800eva board
+and add platform devices to allow in-tree continuous development of the
+drivers on the armadillo800eva board.
 
-All these dependencies are optional.
+When DT bindings are ready for theses drivers then the platform devices
+in the armadillo800eva staging board code can easily be removed. Until
+then we use platform devices to continuously improve the driver and
+integrate code.
+
+Added platform devices:
+  - sh_mobile_lcdc_fb for the on-board LCD.
 
 Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
 ---
 v2:
-  - Drop support for pinctrl, use standard pinctrl in DT instead,
-  - Drop support for configured GPIOs, use "gpio-hog" in DT instead,
-  - Use clk_add_alias() instead of open coding,
+  - Drop pinctrl and configured GPIOs, these are now configured from DT,
   - Update for changed function names,
   - Drop RFC status.
 ---
- drivers/staging/board/board.c | 56 +++++++++++++++++++++++++++++++++++++++++++
- drivers/staging/board/board.h | 20 ++++++++++++++++
- 2 files changed, 76 insertions(+)
+ drivers/staging/board/Makefile          |   3 +-
+ drivers/staging/board/armadillo800eva.c | 105 ++++++++++++++++++++++++++++++++
+ 2 files changed, 107 insertions(+), 1 deletion(-)
+ create mode 100644 drivers/staging/board/armadillo800eva.c
 
-diff --git a/drivers/staging/board/board.c b/drivers/staging/board/board.c
-index 8712f566b31196e0..29d456e29f38feac 100644
---- a/drivers/staging/board/board.c
-+++ b/drivers/staging/board/board.c
-@@ -9,6 +9,7 @@
- 
- #define pr_fmt(fmt)	"board_staging: "  fmt
- 
-+#include <linux/clkdev.h>
- #include <linux/init.h>
- #include <linux/irq.h>
- #include <linux/device.h>
-@@ -16,6 +17,8 @@
- #include <linux/of.h>
- #include <linux/of_address.h>
- #include <linux/of_irq.h>
+diff --git a/drivers/staging/board/Makefile b/drivers/staging/board/Makefile
+index 65d39ecfad63bbf4..6842745feb9404f8 100644
+--- a/drivers/staging/board/Makefile
++++ b/drivers/staging/board/Makefile
+@@ -1,2 +1,3 @@
+ obj-y	:= board.o
+-obj-$(CONFIG_ARCH_EMEV2)      += kzm9d.o
++obj-$(CONFIG_ARCH_EMEV2)	+= kzm9d.o
++obj-$(CONFIG_ARCH_R8A7740)	+= armadillo800eva.o
+diff --git a/drivers/staging/board/armadillo800eva.c b/drivers/staging/board/armadillo800eva.c
+new file mode 100644
+index 0000000000000000..81df77bd55cc9868
+--- /dev/null
++++ b/drivers/staging/board/armadillo800eva.c
+@@ -0,0 +1,105 @@
++/*
++ * Staging board support for Armadillo 800 eva.
++ * Enable not-yet-DT-capable devices here.
++ *
++ * Based on board-armadillo800eva.c
++ *
++ * Copyright (C) 2012 Renesas Solutions Corp.
++ * Copyright (C) 2012 Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation; version 2 of the License.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ */
++
++#include <linux/dma-mapping.h>
++#include <linux/fb.h>
++#include <linux/kernel.h>
 +#include <linux/platform_device.h>
-+#include <linux/pm_domain.h>
- 
- #include "board.h"
- 
-@@ -118,3 +121,56 @@ void __init board_staging_gic_fixup_resources(struct resource *res,
- 	for (i = 0; i < nres; i++)
- 		gic_fixup_resource(&res[i]);
- }
++#include <linux/videodev2.h>
 +
-+int __init board_staging_register_clock(const struct board_staging_clk *bsc)
-+{
-+	int error;
++#include <video/sh_mobile_lcdc.h>
 +
-+	pr_debug("Aliasing clock %s for con_id %s dev_id %s\n", bsc->clk,
-+		 bsc->con_id, bsc->dev_id);
-+	error = clk_add_alias(bsc->con_id, bsc->dev_id, bsc->clk, NULL);
-+	if (error)
-+		pr_err("Failed to alias clock %s (%d)\n", bsc->clk, error);
++#include "board.h"
 +
-+	return error;
-+}
 +
-+int __init board_staging_register_device(const struct board_staging_dev *dev)
-+{
-+	struct platform_device *pdev = dev->pdev;
-+	unsigned int i;
-+	int error;
-+
-+	pr_debug("Trying to register device %s\n", pdev->name);
-+	if (board_staging_dt_node_available(pdev->resource,
-+					    pdev->num_resources)) {
-+		pr_warn("Skipping %s, already in DT\n", pdev->name);
-+		return -EEXIST;
-+	}
-+
-+	board_staging_gic_fixup_resources(pdev->resource, pdev->num_resources);
-+
-+	for (i = 0; i < dev->nclocks; i++)
-+		board_staging_register_clock(&dev->clocks[i]);
-+
-+	error = platform_device_register(pdev);
-+	if (error) {
-+		pr_err("Failed to register device %s (%d)\n", pdev->name,
-+		       error);
-+		return error;
-+	}
-+
-+	if (dev->domain)
-+		__pm_genpd_name_add_device(dev->domain, &pdev->dev, NULL);
-+
-+	return error;
-+}
-+
-+void __init board_staging_register_devices(const struct board_staging_dev *devs,
-+					   unsigned int ndevs)
-+{
-+	unsigned int i;
-+
-+	for (i = 0; i < ndevs; i++)
-+		board_staging_register_device(&devs[i]);
-+}
-diff --git a/drivers/staging/board/board.h b/drivers/staging/board/board.h
-index 3af6dbe22f91ebdc..42ed125132201327 100644
---- a/drivers/staging/board/board.h
-+++ b/drivers/staging/board/board.h
-@@ -4,12 +4,32 @@
- #include <linux/init.h>
- #include <linux/of.h>
- 
-+struct board_staging_clk {
-+	const char *clk;
-+	const char *con_id;
-+	const char *dev_id;
++static struct fb_videomode lcdc0_mode = {
++	.name		= "AMPIER/AM-800480",
++	.xres		= 800,
++	.yres		= 480,
++	.left_margin	= 88,
++	.right_margin	= 40,
++	.hsync_len	= 128,
++	.upper_margin	= 20,
++	.lower_margin	= 5,
++	.vsync_len	= 5,
++	.sync		= 0,
 +};
 +
-+struct board_staging_dev {
-+	/* Platform Device */
-+	struct platform_device *pdev;
-+	/* Clocks (optional) */
-+	const struct board_staging_clk *clocks;
-+	unsigned int nclocks;
-+	/* Generic PM Domain (optional) */
-+	const char *domain;
++static struct sh_mobile_lcdc_info lcdc0_info = {
++	.clock_source	= LCDC_CLK_BUS,
++	.ch[0] = {
++		.chan		= LCDC_CHAN_MAINLCD,
++		.fourcc		= V4L2_PIX_FMT_RGB565,
++		.interface_type	= RGB24,
++		.clock_divider	= 5,
++		.flags		= 0,
++		.lcd_modes	= &lcdc0_mode,
++		.num_modes	= 1,
++		.panel_cfg = {
++			.width	= 111,
++			.height = 68,
++		},
++	},
 +};
 +
- struct resource;
- 
- bool board_staging_dt_node_available(const struct resource *resource,
- 				     unsigned int num_resources);
- int board_staging_gic_setup_xlate(const char *gic_match, unsigned int base);
- void board_staging_gic_fixup_resources(struct resource *res, unsigned int nres);
-+int board_staging_register_clock(const struct board_staging_clk *bsc);
-+int board_staging_register_device(const struct board_staging_dev *dev);
-+void board_staging_register_devices(const struct board_staging_dev *devs,
-+				    unsigned int ndevs);
- 
- #define board_staging(str, fn)			\
- static int __init runtime_board_check(void)	\
++static struct resource lcdc0_resources[] = {
++	[0] = {
++		.name	= "LCD0",
++		.start	= 0xfe940000,
++		.end	= 0xfe943fff,
++		.flags	= IORESOURCE_MEM,
++	},
++	[1] = {
++		.start	= 177 + 32,
++		.flags	= IORESOURCE_IRQ,
++	},
++};
++
++static struct platform_device lcdc0_device = {
++	.name		= "sh_mobile_lcdc_fb",
++	.num_resources	= ARRAY_SIZE(lcdc0_resources),
++	.resource	= lcdc0_resources,
++	.id		= 0,
++	.dev	= {
++		.platform_data	= &lcdc0_info,
++		.coherent_dma_mask = DMA_BIT_MASK(32),
++	},
++};
++
++static const struct board_staging_clk lcdc0_clocks[] __initconst = {
++	{ "lcdc0", NULL, "sh_mobile_lcdc_fb.0" },
++};
++
++static const struct board_staging_dev armadillo800eva_devices[] __initconst = {
++	{
++		.pdev		= &lcdc0_device,
++		.clocks		= lcdc0_clocks,
++		.nclocks	= ARRAY_SIZE(lcdc0_clocks),
++		.domain		= "a4lc",
++	},
++};
++
++static void __init armadillo800eva_init(void)
++{
++	board_staging_gic_setup_xlate("arm,cortex-a9-gic", 32);
++	board_staging_register_devices(armadillo800eva_devices,
++				       ARRAY_SIZE(armadillo800eva_devices));
++}
++
++board_staging("renesas,armadillo800eva", armadillo800eva_init);
 -- 
 1.9.1
