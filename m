@@ -1,48 +1,45 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Wed, 17 Jun 2015 18:04:41 +0200
-Subject: [PATCHv2 0/5] dmaengine: mv_xor fixes and improvements
-Message-ID: <1434557086-9520-1-git-send-email-thomas.petazzoni@free-electrons.com>
+Date: Wed, 17 Jun 2015 18:04:45 +0200
+Subject: [PATCHv2 4/5] dmaengine: mv_xor: remove mv_xor_chan->current_type
+ field
+In-Reply-To: <1434557086-9520-1-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1434557086-9520-1-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1434557086-9520-5-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+Since commit 3e4f52e2da9f6 ("dma: mv_xor: Simplify the DMA_MEMCPY
+operation"), this field is no longer used, so get rid of it.
 
-Here is a v2 of the series making some fixes and improvements to the
-mv_xor driver.
+Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+---
+ drivers/dma/mv_xor.c | 1 -
+ drivers/dma/mv_xor.h | 1 -
+ 2 files changed, 2 deletions(-)
 
-Here are the changes compared to v1:
-
- * Device Tree related changes omitted, since they have been applied
-   by one of the ARM mach-mvebu maintainer.
-
- * Addition of one commit, "dmaengine: mv_xor: fix big endian
-   operation in register mode", fixing a regression introduced by one
-   the patches currently in the 'next' branch of Vinod's
-   repository. It should be merged as part of 4.2.
-
- * Addition of two cleanup patches:
-
-    dmaengine: mv_xor: remove mv_xor_chan->current_type field
-    dmaengine: mv_xor: de-duplicate mv_chan_set_mode*()
-
-   These patches, like the two other non-fixes, can either go in 4.2
-   if it's not too late, or in 4.3.
-
-Thanks,
-
-Thomas
-
-Thomas Petazzoni (5):
-  dmaengine: mv_xor: fix big endian operation in register mode
-  dmaengine: mv_xor: add suspend/resume support
-  dmaengine: mv_xor: remove support for dmacap,* DT properties
-  dmaengine: mv_xor: remove mv_xor_chan->current_type field
-  dmaengine: mv_xor: de-duplicate mv_chan_set_mode*()
-
- Documentation/devicetree/bindings/dma/mv-xor.txt | 10 +--
- drivers/dma/mv_xor.c                             | 97 +++++++++++++-----------
- drivers/dma/mv_xor.h                             |  2 +-
- 3 files changed, 58 insertions(+), 51 deletions(-)
-
+diff --git a/drivers/dma/mv_xor.c b/drivers/dma/mv_xor.c
+index 6aedc36..1fe3e33 100644
+--- a/drivers/dma/mv_xor.c
++++ b/drivers/dma/mv_xor.c
+@@ -169,7 +169,6 @@ static void mv_chan_set_mode(struct mv_xor_chan *chan,
+ #endif
+ 
+ 	writel_relaxed(config, XOR_CONFIG(chan));
+-	chan->current_type = type;
+ }
+ 
+ static void mv_chan_set_mode_to_desc(struct mv_xor_chan *chan)
+diff --git a/drivers/dma/mv_xor.h b/drivers/dma/mv_xor.h
+index 41a2e8d..c19fe30 100644
+--- a/drivers/dma/mv_xor.h
++++ b/drivers/dma/mv_xor.h
+@@ -110,7 +110,6 @@ struct mv_xor_chan {
+ 	void __iomem		*mmr_high_base;
+ 	unsigned int		idx;
+ 	int                     irq;
+-	enum dma_transaction_type	current_type;
+ 	struct list_head	chain;
+ 	struct list_head	free_slots;
+ 	struct list_head	allocated_slots;
 -- 
 2.1.0
