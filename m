@@ -1,62 +1,56 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Wed, 17 Jun 2015 17:35:31 +0100
-Subject: [PATCH 2/3] spi: mediatek: Add spi bus for Mediatek MT8173
-In-Reply-To: <1434550251.23617.38.camel@mtksdaap41>
-References: <1431675522.2128.13.camel@mhfsdcap03>
- <20150515092543.GY2761@sirena.org.uk>
- <1433758546.19786.16.camel@mtksdaap41>
- <20150608175927.GO14071@sirena.org.uk>
- <1433844321.16178.6.camel@mtksdaap41>
- <20150609103951.GA14071@sirena.org.uk>
- <1433923569.22080.1.camel@mtksdaap41>
- <1434532083.19346.27.camel@mtksdaap41>
- <20150617124758.GE3214@sirena.org.uk>
- <1434550251.23617.38.camel@mtksdaap41>
-Message-ID: <20150617163531.GU14071@sirena.org.uk>
+From: andre.przywara@arm.com (Andre Przywara)
+Date: Wed, 17 Jun 2015 17:37:36 +0100
+Subject: [PATCH] arm: cmpxchg: update macro to prevent compiler warning
+Message-ID: <1434559056-20558-1-git-send-email-andre.przywara@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 17, 2015 at 10:10:51PM +0800, Eddie Huang wrote:
+In kernel/acct.c we call the cmpxchg() macro without using it's
+return value, so the compiler complains when compiling for ARM:
 
-> Our hardware limitation is: we don't have separate dma tx, rx channel
-> with transfer finish interrupt, only have spi trigger operation.So the
-> mediatek SPI dma full duplex operation steps are:
-> 1. Set TX DMA address.
-> 2. Set RX DMA address.
-> 3. Set length (this step assume TX, RX are the same size).
-> 4. Set TX DMA enable, RX DMA enable bit in spi config register. (not
-> trigger DMA, just told spi use dma)
-> 5. Trigger spi operations.
-> 6. Wait spi operations finish interrupt.
+kernel/acct.c: In function 'acct_pin_kill':
+arch/arm/include/asm/cmpxchg.h:205:3: warning: value computed is not used [-Wunused-value]
+  ((__typeof__(*(ptr)))__cmpxchg_mb((ptr),   \
+   ^
+kernel/acct.c:174:2: note: in expansion of macro 'cmpxchg'
+  cmpxchg(&acct->ns->bacct, pin, NULL);
+  ^
 
-Sure, that's what I understood.
+Rearrange the macro along the lines of a similar patch for arm64
+60010e508111 ("arm64: cmpxchg: update macros to prevent warnings")
+to fix the warning.
 
-> If tx scatterlist per list data size are 128, 4096, 256. rx scatterlist
-> per list data size are 128, 4096, 256. So we need to go through above
-> steps three times. If tx scatterlists per list data size are 128, 4096,
-> 256. rx scatterlists per list data size are 256, 4096, 128. If we start
-> sending first entry, tx size is 128, rx size is 256, this will cause
-> hardware malfunction because tx, rx data length are not the same.
+Signed-off-by: Andre Przywara <andre.przywara@arm.com>
+Cc: Mark Hambleton <Mark.Hambleton@arm.com>
+---
+ arch/arm/include/asm/cmpxchg.h | 15 ++++++++++-----
+ 1 file changed, 10 insertions(+), 5 deletions(-)
 
-> The solution I think is copy scatterlist data into one single buffer in
-> mediatek spi transfer function, but I think this is odd because
-> __spi_map_msg() map single buffer into scatterlist, then our driver map
-> scatterlist into single buffer again. I hope this explaination is more
-> clear than before.
-
-To repeat what I said in my last mail: there's no need to use the
-scatterlists as-is, your driver can do whatever set of DMA transfers it
-likes to keep the lengths of each transfer the same.  Attempting to
-linearise the transfers in memory isn't going to work unless you
-allocate physically contiguous memory (which could get painful) and will
-add substantial overhead.
-
-For example with your above example you could split the transfers up to
-be 128, 128, 3968, 128, 128.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150617/e9e81fa4/attachment.sig>
+diff --git a/arch/arm/include/asm/cmpxchg.h b/arch/arm/include/asm/cmpxchg.h
+index abb2c37..dc27aaf 100644
+--- a/arch/arm/include/asm/cmpxchg.h
++++ b/arch/arm/include/asm/cmpxchg.h
+@@ -201,11 +201,16 @@ static inline unsigned long __cmpxchg_mb(volatile void *ptr, unsigned long old,
+ 	return ret;
+ }
+ 
+-#define cmpxchg(ptr,o,n)						\
+-	((__typeof__(*(ptr)))__cmpxchg_mb((ptr),			\
+-					  (unsigned long)(o),		\
+-					  (unsigned long)(n),		\
+-					  sizeof(*(ptr))))
++#define cmpxchg(ptr, o, n)						\
++({									\
++	__typeof__(*(ptr)) __ret;					\
++	__ret = (__typeof__(*(ptr)))					\
++		__cmpxchg_mb((ptr),					\
++			     (unsigned long)(o),			\
++			     (unsigned long)(n),			\
++			     sizeof(*(ptr)));				\
++	__ret;								\
++})
+ 
+ static inline unsigned long __cmpxchg_local(volatile void *ptr,
+ 					    unsigned long old,
+-- 
+2.3.5
