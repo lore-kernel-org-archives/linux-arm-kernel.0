@@ -1,117 +1,82 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 17 Jun 2015 13:39:39 +0100
-Subject: [PATCH 04/10] KVM: arm/arm64: vgic: Allow HW irq to be encoded
- in LR
-In-Reply-To: <55815FA5.4010203@linaro.org>
-References: <1433783045-8002-1-git-send-email-marc.zyngier@arm.com>
- <1433783045-8002-5-git-send-email-marc.zyngier@arm.com>
- <55815FA5.4010203@linaro.org>
-Message-ID: <55816A8B.3070803@arm.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Wed, 17 Jun 2015 14:40:38 +0200
+Subject: [PATCH v2 1/2] clk: at91: cleanup PMC header file for PCR register
+ fields
+Message-ID: <62604b586c61f119ffb5942b77eb9b759c17a790.1434544584.git.nicolas.ferre@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 17/06/15 12:53, Eric Auger wrote:
-> On 06/08/2015 07:03 PM, Marc Zyngier wrote:
->> Now that struct vgic_lr supports the LR_HW bit and carries a hwirq
->> field, we can encode that information into the list registers.
->>
->> This patch provides implementations for both GICv2 and GICv3.
->>
->> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
->> ---
->>  include/linux/irqchip/arm-gic-v3.h |  3 +++
->>  include/linux/irqchip/arm-gic.h    |  3 ++-
->>  virt/kvm/arm/vgic-v2.c             | 16 +++++++++++++++-
->>  virt/kvm/arm/vgic-v3.c             | 21 ++++++++++++++++++---
->>  4 files changed, 38 insertions(+), 5 deletions(-)
->>
->> diff --git a/include/linux/irqchip/arm-gic-v3.h b/include/linux/irqchip/arm-gic-v3.h
->> index ffbc034..cf637d6 100644
->> --- a/include/linux/irqchip/arm-gic-v3.h
->> +++ b/include/linux/irqchip/arm-gic-v3.h
->> @@ -268,9 +268,12 @@
->>  
->>  #define ICH_LR_EOI			(1UL << 41)
->>  #define ICH_LR_GROUP			(1UL << 60)
->> +#define ICH_LR_HW			(1UL << 61)
->>  #define ICH_LR_STATE			(3UL << 62)
->>  #define ICH_LR_PENDING_BIT		(1UL << 62)
->>  #define ICH_LR_ACTIVE_BIT		(1UL << 63)
->> +#define ICH_LR_PHYS_ID_SHIFT		32
->> +#define ICH_LR_PHYS_ID_MASK		(0x3ffUL << ICH_LR_PHYS_ID_SHIFT)
->>  
->>  #define ICH_MISR_EOI			(1 << 0)
->>  #define ICH_MISR_U			(1 << 1)
->> diff --git a/include/linux/irqchip/arm-gic.h b/include/linux/irqchip/arm-gic.h
->> index 9de976b..ca88dad 100644
->> --- a/include/linux/irqchip/arm-gic.h
->> +++ b/include/linux/irqchip/arm-gic.h
->> @@ -71,11 +71,12 @@
->>  
->>  #define GICH_LR_VIRTUALID		(0x3ff << 0)
->>  #define GICH_LR_PHYSID_CPUID_SHIFT	(10)
->> -#define GICH_LR_PHYSID_CPUID		(7 << GICH_LR_PHYSID_CPUID_SHIFT)
->> +#define GICH_LR_PHYSID_CPUID		(0x3ff << GICH_LR_PHYSID_CPUID_SHIFT)
->>  #define GICH_LR_STATE			(3 << 28)
->>  #define GICH_LR_PENDING_BIT		(1 << 28)
->>  #define GICH_LR_ACTIVE_BIT		(1 << 29)
->>  #define GICH_LR_EOI			(1 << 19)
->> +#define GICH_LR_HW			(1 << 31)
->>  
->>  #define GICH_VMCR_CTRL_SHIFT		0
->>  #define GICH_VMCR_CTRL_MASK		(0x21f << GICH_VMCR_CTRL_SHIFT)
->> diff --git a/virt/kvm/arm/vgic-v2.c b/virt/kvm/arm/vgic-v2.c
->> index f9b9c7c..8d7b04d 100644
->> --- a/virt/kvm/arm/vgic-v2.c
->> +++ b/virt/kvm/arm/vgic-v2.c
->> @@ -48,6 +48,10 @@ static struct vgic_lr vgic_v2_get_lr(const struct kvm_vcpu *vcpu, int lr)
->>  		lr_desc.state |= LR_STATE_ACTIVE;
->>  	if (val & GICH_LR_EOI)
->>  		lr_desc.state |= LR_EOI_INT;
->> +	if (val & GICH_LR_HW) {
->> +		lr_desc.state |= LR_HW;
->> +		lr_desc.hwirq = (val & GICH_LR_PHYSID_CPUID) >> GICH_LR_PHYSID_CPUID_SHIFT;
->> +	}
->>  
->>  	return lr_desc;
->>  }
->> @@ -55,7 +59,9 @@ static struct vgic_lr vgic_v2_get_lr(const struct kvm_vcpu *vcpu, int lr)
->>  static void vgic_v2_set_lr(struct kvm_vcpu *vcpu, int lr,
->>  			   struct vgic_lr lr_desc)
->>  {
->> -	u32 lr_val = (lr_desc.source << GICH_LR_PHYSID_CPUID_SHIFT) | lr_desc.irq;
->> +	u32 lr_val;
->> +
->> +	lr_val = lr_desc.irq;
->>  
->>  	if (lr_desc.state & LR_STATE_PENDING)
->>  		lr_val |= GICH_LR_PENDING_BIT;
->> @@ -64,6 +70,14 @@ static void vgic_v2_set_lr(struct kvm_vcpu *vcpu, int lr,
->>  	if (lr_desc.state & LR_EOI_INT)
->>  		lr_val |= GICH_LR_EOI;
->>  
->> +	if (lr_desc.state & LR_HW) {
->> +		lr_val |= GICH_LR_HW;
->> +		lr_val |= (u32)lr_desc.hwirq << GICH_LR_PHYSID_CPUID_SHIFT;
->
-> shouldn't we test somewhere that the hwirq is between 16 and 1019. Else
-> behavior is unpredictable according to v2 spec. when queuing into the LR
-> we currently check the linux irq vlr.irq >= VGIC_NR_SGIS if I am not wrong.
+Add _MASK and _OFFSET values and cleanup register fields layout.
 
-This is actually implicit. vgic_map_phys_irq() takes a parameter (irq)
-that is the Linux view of the hwirq we're dealing with (we fetch this
-hwirq by traversing the irq_data list associated with irq).
+Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+---
+ drivers/clk/at91/clk-peripheral.c |  8 ++++----
+ include/linux/clk/at91_pmc.h      | 14 ++++++--------
+ 2 files changed, 10 insertions(+), 12 deletions(-)
 
-SGIs are not part of the set of interrupts that can be mapped to a Linux
-irq (their usage is completely private to the two GIC drivers).
-
-Note that GICv3 allows SGIs to be set as a physical interrupt in an LR
-though, but this is not a feature we use so far.
-
-> besides Reviewed-by: Eric Auger <eric.auger@linaro.org>
-
-Thanks!
-
-	M.
+diff --git a/drivers/clk/at91/clk-peripheral.c b/drivers/clk/at91/clk-peripheral.c
+index 597fed423d7d..61d0adda7088 100644
+--- a/drivers/clk/at91/clk-peripheral.c
++++ b/drivers/clk/at91/clk-peripheral.c
+@@ -165,7 +165,7 @@ static int clk_sam9x5_peripheral_enable(struct clk_hw *hw)
+ 	if (periph->id < PERIPHERAL_ID_MIN)
+ 		return 0;
+ 
+-	pmc_write(pmc, AT91_PMC_PCR, (periph->id & AT91_PMC_PCR_PID) |
++	pmc_write(pmc, AT91_PMC_PCR, (periph->id & AT91_PMC_PCR_PID_MASK) |
+ 				     AT91_PMC_PCR_CMD |
+ 				     AT91_PMC_PCR_DIV(periph->div) |
+ 				     AT91_PMC_PCR_EN);
+@@ -180,7 +180,7 @@ static void clk_sam9x5_peripheral_disable(struct clk_hw *hw)
+ 	if (periph->id < PERIPHERAL_ID_MIN)
+ 		return;
+ 
+-	pmc_write(pmc, AT91_PMC_PCR, (periph->id & AT91_PMC_PCR_PID) |
++	pmc_write(pmc, AT91_PMC_PCR, (periph->id & AT91_PMC_PCR_PID_MASK) |
+ 				     AT91_PMC_PCR_CMD);
+ }
+ 
+@@ -194,7 +194,7 @@ static int clk_sam9x5_peripheral_is_enabled(struct clk_hw *hw)
+ 		return 1;
+ 
+ 	pmc_lock(pmc);
+-	pmc_write(pmc, AT91_PMC_PCR, (periph->id & AT91_PMC_PCR_PID));
++	pmc_write(pmc, AT91_PMC_PCR, (periph->id & AT91_PMC_PCR_PID_MASK));
+ 	ret = !!(pmc_read(pmc, AT91_PMC_PCR) & AT91_PMC_PCR_EN);
+ 	pmc_unlock(pmc);
+ 
+@@ -213,7 +213,7 @@ clk_sam9x5_peripheral_recalc_rate(struct clk_hw *hw,
+ 		return parent_rate;
+ 
+ 	pmc_lock(pmc);
+-	pmc_write(pmc, AT91_PMC_PCR, (periph->id & AT91_PMC_PCR_PID));
++	pmc_write(pmc, AT91_PMC_PCR, (periph->id & AT91_PMC_PCR_PID_MASK));
+ 	tmp = pmc_read(pmc, AT91_PMC_PCR);
+ 	pmc_unlock(pmc);
+ 
+diff --git a/include/linux/clk/at91_pmc.h b/include/linux/clk/at91_pmc.h
+index 7669f7618f39..dfc59e2b64fb 100644
+--- a/include/linux/clk/at91_pmc.h
++++ b/include/linux/clk/at91_pmc.h
+@@ -182,13 +182,11 @@ extern void __iomem *at91_pmc_base;
+ #define AT91_PMC_PCSR1		0x108			/* Peripheral Clock Enable Register 1 */
+ 
+ #define AT91_PMC_PCR		0x10c			/* Peripheral Control Register [some SAM9 and SAMA5] */
+-#define		AT91_PMC_PCR_PID	(0x3f  <<  0)		/* Peripheral ID */
+-#define		AT91_PMC_PCR_CMD	(0x1  <<  12)		/* Command (read=0, write=1) */
+-#define		AT91_PMC_PCR_DIV(n)	((n)  <<  16)		/* Divisor Value */
+-#define			AT91_PMC_PCR_DIV0	0x0			/* Peripheral clock is MCK */
+-#define			AT91_PMC_PCR_DIV2	0x1			/* Peripheral clock is MCK/2 */
+-#define			AT91_PMC_PCR_DIV4	0x2			/* Peripheral clock is MCK/4 */
+-#define			AT91_PMC_PCR_DIV8	0x3			/* Peripheral clock is MCK/8 */
+-#define		AT91_PMC_PCR_EN		(0x1  <<  28)		/* Enable */
++#define		AT91_PMC_PCR_PID_MASK		0x3f
++#define		AT91_PMC_PCR_CMD		(0x1  <<  12)				/* Command (read=0, write=1) */
++#define		AT91_PMC_PCR_DIV_OFFSET		16
++#define		AT91_PMC_PCR_DIV_MASK		(0x3  << AT91_PMC_PCR_DIV_OFFSET)
++#define		AT91_PMC_PCR_DIV(n)		((n)  << AT91_PMC_PCR_DIV_OFFSET)	/* Divisor Value */
++#define		AT91_PMC_PCR_EN			(0x1  <<  28)				/* Enable */
+ 
+ #endif
 -- 
-Jazz is not dead. It just smells funny...
+2.1.3
