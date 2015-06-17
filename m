@@ -1,63 +1,43 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 17 Jun 2015 10:26:36 +0200
-Subject: [PATCH 1/2] pinctrl: meson: Enable GPIO IRQs
-In-Reply-To: <CAOQ7t2Z6svU4fi2N46ugDcVxtLwmfuOXJPLPhFom8LLqAenusw@mail.gmail.com>
-References: <1432551641-3256-1-git-send-email-carlo@caione.org>
- <1432551641-3256-2-git-send-email-carlo@caione.org>
- <CACRpkdYCxnf3nUz+jTSu4qw1_nXKkc+_TioZTxW7LpP_dX-MRg@mail.gmail.com>
- <CAOQ7t2Z6svU4fi2N46ugDcVxtLwmfuOXJPLPhFom8LLqAenusw@mail.gmail.com>
-Message-ID: <CACRpkdZ4kB=LQac4vY1tWZo0ESBmWY0Ba0yUei3cV8XnpVZ03A@mail.gmail.com>
+From: boris.brezillon@free-electrons.com (Boris Brezillon)
+Date: Wed, 17 Jun 2015 09:45:38 +0200
+Subject: [PATCH v6 10/14] crypto: marvell/CESA: add support for all armada SoCs
+In-Reply-To: <1434527142-3609-1-git-send-email-boris.brezillon@free-electrons.com>
+References: <1434527142-3609-1-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <1434527142-3609-11-git-send-email-boris.brezillon@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Jun 13, 2015 at 5:35 PM, Carlo Caione <carlo@caione.org> wrote:
-> On Mon, Jun 1, 2015 at 4:30 PM, Linus Walleij <linus.walleij@linaro.org> wrote:
->> On Mon, May 25, 2015 at 1:00 PM, Carlo Caione <carlo@caione.org> wrote:
->
-> Hey Linus,
-> I was starting to write the v2, but I still have a couple of (probably
-> silly) questions.
->
->>> +       int ret;
->>> +
->>> +       pin = domain->data->pin_base + offset;
->>
->> This is not looking good. Nominally you should use the irqdomain to
->> translate hwirq to Linux IRQ.
->>
->> Normally this is just
->>
->> line = irq_find_mapping(domain, hwirq);
->
-> Ok, it sounds reasonable but this implies that the mapping between the
-> virq and the hwirq in the outermost domain already exists when the
-> .to_irq hook is called, right? Also IIUC for hierarchical domains the
-> mapping should also exist on all the irq_domains in the hierarchy.
+Add CESA IP description for all the missing armada SoCs (XP, 375 and 38x).
 
-I guess, I am no expert in the hierarchical domains, sadly.
+Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+---
+ drivers/crypto/marvell/cesa.c | 12 ++++++++++++
+ 1 file changed, 12 insertions(+)
 
-The point is that it should be possible to request an IRQ
-from the irqchip side without having to have called .to_irq()
-on the GPIO first.
-
->> (A) when the driver is probed, looping over all IRQs.
->>   Then pair with free():in the IRQs in the remove()
->>   call.
->
-> This is not really clear to me. Are you suggesting that the mapping
-> between the hwirq and virq should be done at probe time so that we can
-> use irq_find_mapping later?
-
-Yes.
-
-> IIUC for the hierarchical domains the mapping creation should be
-> propagated to all the domains in cascade and this is usually done
-> using the .alloc hook of the irq_domain_ops and at probe time we do
-> not still have the hwirq to pass to the parent GIC. Any idea on how to
-> approach this problem?
-
-I guess it needs to be done in some other hook on the
-irqchip in that case. Just not in .to_irq() on the gpiochip.
-
-Yours,
-Linus Walleij
+diff --git a/drivers/crypto/marvell/cesa.c b/drivers/crypto/marvell/cesa.c
+index 9c43cd7e..af590bf 100644
+--- a/drivers/crypto/marvell/cesa.c
++++ b/drivers/crypto/marvell/cesa.c
+@@ -195,8 +195,20 @@ static const struct mv_cesa_caps armada_370_caps = {
+ 	.has_tdma = true,
+ };
+ 
++static const struct mv_cesa_caps armada_xp_caps = {
++	.nengines = 2,
++	.cipher_algs = armada_370_cipher_algs,
++	.ncipher_algs = ARRAY_SIZE(armada_370_cipher_algs),
++	.ahash_algs = armada_370_ahash_algs,
++	.nahash_algs = ARRAY_SIZE(armada_370_ahash_algs),
++	.has_tdma = true,
++};
++
+ static const struct of_device_id mv_cesa_of_match_table[] = {
+ 	{ .compatible = "marvell,armada-370-crypto", .data = &armada_370_caps },
++	{ .compatible = "marvell,armada-xp-crypto", .data = &armada_xp_caps },
++	{ .compatible = "marvell,armada-375-crypto", .data = &armada_xp_caps },
++	{ .compatible = "marvell,armada-38x-crypto", .data = &armada_xp_caps },
+ 	{}
+ };
+ MODULE_DEVICE_TABLE(of, mv_cesa_of_match_table);
+-- 
+1.9.1
