@@ -1,184 +1,179 @@
-From: eddie.huang@mediatek.com (Eddie Huang)
-Date: Wed, 17 Jun 2015 23:08:03 +0800
-Subject: [PATCH v4 2/2] arm64: dts: mt8173: Add I2C device node
-In-Reply-To: <1434553683-11651-1-git-send-email-eddie.huang@mediatek.com>
-References: <1434553683-11651-1-git-send-email-eddie.huang@mediatek.com>
-Message-ID: <1434553683-11651-3-git-send-email-eddie.huang@mediatek.com>
+From: eric.auger@linaro.org (Eric Auger)
+Date: Wed, 17 Jun 2015 17:11:02 +0200
+Subject: [PATCH 10/10] KVM: arm/arm64: vgic: Allow non-shared device HW
+ interrupts
+In-Reply-To: <1433783045-8002-11-git-send-email-marc.zyngier@arm.com>
+References: <1433783045-8002-1-git-send-email-marc.zyngier@arm.com>
+ <1433783045-8002-11-git-send-email-marc.zyngier@arm.com>
+Message-ID: <55818E06.8010400@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add MT8173 I2C device nodes, include I2C controllers and pins.
-MT8173 has six I2C controllers, from i2c0 to i2c6, exclude i2c5.
-The 6th I2C controller register base doesn't next to 5th I2C,
-and there is a hardware between 5th and 6th I2C controller. So
-SoC designer name 6th controller as "i2c6", not "i2c5".
+Hi Marc,
+On 06/08/2015 07:04 PM, Marc Zyngier wrote:
+> So far, the only use of the HW interrupt facility is the timer,
+> implying that the active state is context-switched for each vcpu,
+> as the device is is shared across all vcpus.
+s/is//
+> 
+> This does not work for a device that has been assigned to a VM,
+> as the guest is entierely in control of that device (the HW is
+entirely?
+> not shared). In that case, it makes sense to bypass the whole
+> active state srtwitchint, and only track the deactivation of the
+switching
+> interrupt.
+> 
+> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+> ---
+>  include/kvm/arm_vgic.h    |  5 +++--
+>  virt/kvm/arm/arch_timer.c |  2 +-
+>  virt/kvm/arm/vgic.c       | 37 ++++++++++++++++++++++++-------------
+>  3 files changed, 28 insertions(+), 16 deletions(-)
+> 
+> diff --git a/include/kvm/arm_vgic.h b/include/kvm/arm_vgic.h
+> index 1c653c1..5d47d60 100644
+> --- a/include/kvm/arm_vgic.h
+> +++ b/include/kvm/arm_vgic.h
+> @@ -164,7 +164,8 @@ struct irq_phys_map {
+>  	u32			virt_irq;
+>  	u32			phys_irq;
+>  	u32			irq;
+> -	bool			active;
+> +	bool			shared;
+> +	bool			active; /* Only valid if shared */
+>  };
+>  
+>  struct vgic_dist {
+> @@ -347,7 +348,7 @@ void vgic_v3_dispatch_sgi(struct kvm_vcpu *vcpu, u64 reg);
+>  int kvm_vgic_vcpu_pending_irq(struct kvm_vcpu *vcpu);
+>  int kvm_vgic_vcpu_active_irq(struct kvm_vcpu *vcpu);
+>  struct irq_phys_map *vgic_map_phys_irq(struct kvm_vcpu *vcpu,
+> -				       int virt_irq, int irq);
+> +				       int virt_irq, int irq, bool shared);
+>  int vgic_unmap_phys_irq(struct kvm_vcpu *vcpu, struct irq_phys_map *map);
+>  bool vgic_get_phys_irq_active(struct irq_phys_map *map);
+>  void vgic_set_phys_irq_active(struct irq_phys_map *map, bool active);
+> diff --git a/virt/kvm/arm/arch_timer.c b/virt/kvm/arm/arch_timer.c
+> index b9fff78..9544d79 100644
+> --- a/virt/kvm/arm/arch_timer.c
+> +++ b/virt/kvm/arm/arch_timer.c
+> @@ -202,7 +202,7 @@ void kvm_timer_vcpu_reset(struct kvm_vcpu *vcpu,
+>  	 * Tell the VGIC that the virtual interrupt is tied to a
+>  	 * physical interrupt. We do that once per VCPU.
+>  	 */
+> -	timer->map = vgic_map_phys_irq(vcpu, irq->irq, host_vtimer_irq);
+> +	timer->map = vgic_map_phys_irq(vcpu, irq->irq, host_vtimer_irq, true);
+>  	WARN_ON(!timer->map);
+>  }
+>  
+> diff --git a/virt/kvm/arm/vgic.c b/virt/kvm/arm/vgic.c
+> index f376b56..4223166 100644
+> --- a/virt/kvm/arm/vgic.c
+> +++ b/virt/kvm/arm/vgic.c
+> @@ -1125,18 +1125,21 @@ static void vgic_queue_irq_to_lr(struct kvm_vcpu *vcpu, int irq,
+>  		map = vgic_irq_map_search(vcpu, irq);
+>  
+>  		if (map) {
+> -			int ret;
+> -
+> -			BUG_ON(!map->active);
+>  			vlr.hwirq = map->phys_irq;
+>  			vlr.state |= LR_HW;
+>  			vlr.state &= ~LR_EOI_INT;
+>  
+> -			ret = irq_set_irqchip_state(map->irq,
+> -						    IRQCHIP_STATE_ACTIVE,
+> -						    true);
+>  			vgic_irq_set_queued(vcpu, irq);
+the queued state is set again in vgic_queue_hwirq for level_sensitive
+IRQs although not harmful.
+> -			WARN_ON(ret);
+> +
+> +			if (map->shared) {
+> +				int ret;
+> +
+> +				BUG_ON(!map->active);
+> +				ret = irq_set_irqchip_state(map->irq,
+> +							    IRQCHIP_STATE_ACTIVE,
+> +							    true);
+> +				WARN_ON(ret);
+> +			}
+>  		}
+>  	}
+>  
+> @@ -1368,21 +1371,28 @@ static bool vgic_process_maintenance(struct kvm_vcpu *vcpu)
+>  static int vgic_sync_hwirq(struct kvm_vcpu *vcpu, struct vgic_lr vlr)
+>  {
+>  	struct irq_phys_map *map;
+> +	bool active;
+>  	int ret;
+>  
+>  	if (!(vlr.state & LR_HW))
+>  		return 0;
+>  
+>  	map = vgic_irq_map_search(vcpu, vlr.irq);
+> -	BUG_ON(!map || !map->active);
+> +	BUG_ON(!map);
+> +	BUG_ON(map->shared && !map->active);
+>  
+>  	ret = irq_get_irqchip_state(map->irq,
+>  				    IRQCHIP_STATE_ACTIVE,
+> -				    &map->active);
+> +				    &active);
+>  
+In case of non shared and EOIMode = 1 - I know this is not your current
+interest here though ;-) - , once the guest EOIs its virtual IRQ and GIC
+deactivates the physical one, a new phys IRQ can hit immediatly, the
+physical handler can be entered and the state is seen as active here.
+The queued state is never reset in such a case and the system gets stuck
+since the can_sample fails I think. What I mean here is sounds the state
+machine as is does not work for my VFIO case. So some adaptations still
+are needed I think. Do you share my diagnosis?
 
-Signed-off-by: Eddie Huang <eddie.huang@mediatek.com>
----
- arch/arm64/boot/dts/mediatek/mt8173.dtsi | 144 +++++++++++++++++++++++++++++++
- 1 file changed, 144 insertions(+)
-
-diff --git a/arch/arm64/boot/dts/mediatek/mt8173.dtsi b/arch/arm64/boot/dts/mediatek/mt8173.dtsi
-index b52ec43..1816c8f 100644
---- a/arch/arm64/boot/dts/mediatek/mt8173.dtsi
-+++ b/arch/arm64/boot/dts/mediatek/mt8173.dtsi
-@@ -158,6 +158,54 @@
- 			interrupts = <GIC_SPI 145 IRQ_TYPE_LEVEL_HIGH>,
- 						<GIC_SPI 146 IRQ_TYPE_LEVEL_HIGH>,
- 						<GIC_SPI 147 IRQ_TYPE_LEVEL_HIGH>;
-+
-+			i2c0_pins_a: i2c0 {
-+				pins1 {
-+					pinmux = <MT8173_PIN_45_SDA0__FUNC_SDA0>,
-+						 <MT8173_PIN_46_SCL0__FUNC_SCL0>;
-+					bias-disable;
-+				};
-+			};
-+
-+			i2c1_pins_a: i2c1 {
-+				pins1 {
-+					pinmux = <MT8173_PIN_125_SDA1__FUNC_SDA1>,
-+						 <MT8173_PIN_126_SCL1__FUNC_SCL1>;
-+					bias-disable;
-+				};
-+			};
-+
-+			i2c2_pins_a: i2c2 {
-+				pins1 {
-+					pinmux = <MT8173_PIN_43_SDA2__FUNC_SDA2>,
-+						 <MT8173_PIN_44_SCL2__FUNC_SCL2>;
-+					bias-disable;
-+				};
-+			};
-+
-+			i2c3_pins_a: i2c3 {
-+				pins1 {
-+					pinmux = <MT8173_PIN_106_SDA3__FUNC_SDA3>,
-+						 <MT8173_PIN_107_SCL3__FUNC_SCL3>;
-+					bias-disable;
-+				};
-+			};
-+
-+			i2c4_pins_a: i2c4 {
-+				pins1 {
-+					pinmux = <MT8173_PIN_133_SDA4__FUNC_SDA4>,
-+						 <MT8173_PIN_134_SCL4__FUNC_SCL4>;
-+					bias-disable;
-+				};
-+			};
-+
-+			i2c6_pins_a: i2c6 {
-+				pins1 {
-+					pinmux = <MT8173_PIN_100_MSDC2_DAT0__FUNC_SDA5>,
-+						 <MT8173_PIN_101_MSDC2_DAT1__FUNC_SCL5>;
-+					bias-disable;
-+				};
-+			};
- 		};
- 
- 		watchdog: watchdog at 10007000 {
-@@ -229,6 +277,102 @@
- 			clocks = <&uart_clk>;
- 			status = "disabled";
- 		};
-+
-+		i2c0: i2c at 11007000 {
-+			compatible = "mediatek,mt8173-i2c";
-+			reg = <0 0x11007000 0 0x70>,
-+			      <0 0x11000100 0 0x80>;
-+			interrupts = <GIC_SPI 76 IRQ_TYPE_LEVEL_LOW>;
-+			clock-div = <16>;
-+			clocks = <&pericfg CLK_PERI_I2C0>,
-+				 <&pericfg CLK_PERI_AP_DMA>;
-+			clock-names = "main", "dma";
-+			pinctrl-names = "default";
-+			pinctrl-0 = <&i2c0_pins_a>;
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			status = "disabled";
-+		};
-+
-+		i2c1: i2c at 11008000 {
-+			compatible = "mediatek,mt8173-i2c";
-+			reg = <0 0x11008000 0 0x70>,
-+			      <0 0x11000180 0 0x80>;
-+			interrupts = <GIC_SPI 77 IRQ_TYPE_LEVEL_LOW>;
-+			clock-div = <16>;
-+			clocks = <&pericfg CLK_PERI_I2C1>,
-+				 <&pericfg CLK_PERI_AP_DMA>;
-+			clock-names = "main", "dma";
-+			pinctrl-names = "default";
-+			pinctrl-0 = <&i2c1_pins_a>;
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			status = "disabled";
-+		};
-+
-+		i2c2: i2c at 11009000 {
-+			compatible = "mediatek,mt8173-i2c";
-+			reg = <0 0x11009000 0 0x70>,
-+			      <0 0x11000200 0 0x80>;
-+			interrupts = <GIC_SPI 78 IRQ_TYPE_LEVEL_LOW>;
-+			clock-div = <16>;
-+			clocks = <&pericfg CLK_PERI_I2C2>,
-+				 <&pericfg CLK_PERI_AP_DMA>;
-+			clock-names = "main", "dma";
-+			pinctrl-names = "default";
-+			pinctrl-0 = <&i2c2_pins_a>;
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			status = "disabled";
-+		};
-+
-+		i2c3: i2c3 at 11010000 {
-+			compatible = "mediatek,mt8173-i2c";
-+			reg = <0 0x11010000 0 0x70>,
-+			      <0 0x11000280 0 0x80>;
-+			interrupts = <GIC_SPI 79 IRQ_TYPE_LEVEL_LOW>;
-+			clock-div = <16>;
-+			clocks = <&pericfg CLK_PERI_I2C3>,
-+				 <&pericfg CLK_PERI_AP_DMA>;
-+			clock-names = "main", "dma";
-+			pinctrl-names = "default";
-+			pinctrl-0 = <&i2c3_pins_a>;
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			status = "disabled";
-+		};
-+
-+		i2c4: i2c4 at 11011000 {
-+			compatible = "mediatek,mt8173-i2c";
-+			reg = <0 0x11011000 0 0x70>,
-+			      <0 0x11000300 0 0x80>;
-+			interrupts = <GIC_SPI 80 IRQ_TYPE_LEVEL_LOW>;
-+			clock-div = <16>;
-+			clocks = <&pericfg CLK_PERI_I2C4>,
-+				 <&pericfg CLK_PERI_AP_DMA>;
-+			clock-names = "main", "dma";
-+			pinctrl-names = "default";
-+			pinctrl-0 = <&i2c4_pins_a>;
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			status = "disabled";
-+		};
-+
-+		i2c6: i2c6 at 11013000 {
-+			compatible = "mediatek,mt8173-i2c";
-+			reg = <0 0x11013000 0 0x70>,
-+			      <0 0x11000080 0 0x80>;
-+			interrupts = <GIC_SPI 82 IRQ_TYPE_LEVEL_LOW>;
-+			clock-div = <16>;
-+			clocks = <&pericfg CLK_PERI_I2C6>,
-+				 <&pericfg CLK_PERI_AP_DMA>;
-+			clock-names = "main", "dma";
-+			pinctrl-names = "default";
-+			pinctrl-0 = <&i2c6_pins_a>;
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			status = "disabled";
-+		};
- 	};
- 
- };
--- 
-1.8.1.1.dirty
+Eric
+>  
+> -	if (map->active) {
+> +	if (!map->shared)
+> +		return !active;
+> +
+> +	map->active = active;
+> +
+> +	if (active) {
+>  		ret = irq_set_irqchip_state(map->irq,
+>  					    IRQCHIP_STATE_ACTIVE,
+>  					    false);
+> @@ -1663,7 +1673,7 @@ static struct rb_root *vgic_get_irq_phys_map(struct kvm_vcpu *vcpu,
+>  }
+>  
+>  struct irq_phys_map *vgic_map_phys_irq(struct kvm_vcpu *vcpu,
+> -				       int virt_irq, int irq)
+> +				       int virt_irq, int irq, bool shared)
+>  {
+>  	struct vgic_dist *dist = &vcpu->kvm->arch.vgic;
+>  	struct rb_root *root = vgic_get_irq_phys_map(vcpu, virt_irq);
+> @@ -1710,6 +1720,7 @@ struct irq_phys_map *vgic_map_phys_irq(struct kvm_vcpu *vcpu,
+>  	new_map->virt_irq = virt_irq;
+>  	new_map->phys_irq = phys_irq;
+>  	new_map->irq = irq;
+> +	new_map->shared = shared;
+>  
+>  	rb_link_node(&new_map->node, parent, new);
+>  	rb_insert_color(&new_map->node, root);
+> @@ -1746,13 +1757,13 @@ static struct irq_phys_map *vgic_irq_map_search(struct kvm_vcpu *vcpu,
+>  
+>  bool vgic_get_phys_irq_active(struct irq_phys_map *map)
+>  {
+> -	BUG_ON(!map);
+> +	BUG_ON(!map || !map->shared);
+>  	return map->active;
+>  }
+>  
+>  void vgic_set_phys_irq_active(struct irq_phys_map *map, bool active)
+>  {
+> -	BUG_ON(!map);
+> +	BUG_ON(!map || !map->shared);
+>  	map->active = active;
+>  }
+>  
+> 
