@@ -1,36 +1,27 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Wed, 17 Jun 2015 08:10:55 +0530
-Subject: [PATCH 9/9] irq: spear-shirq: fix race in installing chained IRQ
- handler
-In-Reply-To: <E1Z4z0X-0002T1-6U@rmk-PC.arm.linux.org.uk>
-References: <E1Z4z0X-0002T1-6U@rmk-PC.arm.linux.org.uk>
-Message-ID: <CAOh2x=m2y+T0Z78nV5zDmSa6_7NH972EXcEEUKZMZ1dSxE6YKw@mail.gmail.com>
+From: herbert@gondor.apana.org.au (Herbert Xu)
+Date: Wed, 17 Jun 2015 13:05:27 +0800
+Subject: [PATCH v5 05/14] crypto: marvell/CESA: add TDMA support
+In-Reply-To: <1434448748-10828-6-git-send-email-boris.brezillon@free-electrons.com>
+References: <1434448748-10828-1-git-send-email-boris.brezillon@free-electrons.com>
+ <1434448748-10828-6-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <20150617050527.GA8807@gondor.apana.org.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 17, 2015 at 3:37 AM, Russell King
-<rmk+kernel@arm.linux.org.uk> wrote:
-> Fix a race where a pending interrupt could be received and the handler
-> called before the handler's data has been setup, by converting to
-> irq_set_chained_handler_and_data().
+On Tue, Jun 16, 2015 at 11:58:59AM +0200, Boris Brezillon wrote:
 >
-> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
-> ---
-> Depends on patch 1.
->
->  drivers/irqchip/spear-shirq.c | 3 +--
->  1 file changed, 1 insertion(+), 2 deletions(-)
->
-> diff --git a/drivers/irqchip/spear-shirq.c b/drivers/irqchip/spear-shirq.c
-> index 9c145a7cb056..a45121546caf 100644
-> --- a/drivers/irqchip/spear-shirq.c
-> +++ b/drivers/irqchip/spear-shirq.c
-> @@ -207,8 +207,7 @@ static void __init spear_shirq_register(struct spear_shirq *shirq,
->         if (!shirq->irq_chip)
->                 return;
->
-> -       irq_set_chained_handler(parent_irq, shirq_handler);
-> -       irq_set_handler_data(parent_irq, shirq);
-> +       irq_set_chained_handler_and_data(parent_irq, shirq_handler, shirq);
+> +	ret = dma_map_sg(cesa_dev->dev, req->src, creq->src_nents,
+> +			 DMA_TO_DEVICE);
+> +	if (ret != creq->src_nents)
+> +		return -ENOMEM;
 
-Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
+Hmm it doesn't quite work like that.  It returns zero on error,
+otherwise it returns the number (n) of mapped entries which may be
+less than what you gave it due to merging.  You're then supposed
+to use only the first n entries which should contain everything.
+
+Cheers,
+-- 
+Email: Herbert Xu <herbert@gondor.apana.org.au>
+Home Page: http://gondor.apana.org.au/~herbert/
+PGP Key: http://gondor.apana.org.au/~herbert/pubkey.txt
