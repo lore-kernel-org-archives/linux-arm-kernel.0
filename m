@@ -1,32 +1,116 @@
 From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Wed, 17 Jun 2015 09:45:29 +0200
-Subject: [PATCH v6 01/14] crypto: mv_cesa: document the clocks property
-In-Reply-To: <1434527142-3609-1-git-send-email-boris.brezillon@free-electrons.com>
-References: <1434527142-3609-1-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <1434527142-3609-2-git-send-email-boris.brezillon@free-electrons.com>
+Date: Wed, 17 Jun 2015 09:45:28 +0200
+Subject: [PATCH v6 00/14] crypto: add a new driver for Marvell's CESA
+Message-ID: <1434527142-3609-1-git-send-email-boris.brezillon@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Dove platforms, the crypto engine requires a clock. Document this
-clocks property in the mv_cesa bindings doc.
+Hello,
 
-Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
----
- Documentation/devicetree/bindings/crypto/mv_cesa.txt | 2 ++
- 1 file changed, 2 insertions(+)
+This patch series adds a new driver supporting Marvell's CESA IP.
+This driver addresses some limitations of the existing one.
+>From a performance and CPU load point of view the most important
+limitation in the existing driver is the lack of DMA support, thus
+preventing us from chaining crypto operations.
 
-diff --git a/Documentation/devicetree/bindings/crypto/mv_cesa.txt b/Documentation/devicetree/bindings/crypto/mv_cesa.txt
-index 47229b1..eaa2873 100644
---- a/Documentation/devicetree/bindings/crypto/mv_cesa.txt
-+++ b/Documentation/devicetree/bindings/crypto/mv_cesa.txt
-@@ -7,6 +7,8 @@ Required properties:
-         length
- - reg-names : "regs" , "sram";
- - interrupts : interrupt number
-+- clocks: reference to the crypto engines clocks. This property is only
-+	  required for Dove platforms
- 
- Examples:
- 
+I know we usually try to adapt existing drivers instead of replacing them
+by new ones, but after trying to refactor the mv_cesa driver I realized it
+would take longer than writing an new one from scratch.
+
+Here are the main features brought by this new driver:
+- support for armada SoCs (up to 38x) while keeping support for older ones
+  (Orion and Kirkwood). Note that old DT bindings (those used on Orion and
+  Kirkwood platforms) are supported, or IOTW, old DTs are compatible with
+  this new driver.
+- DMA mode to offload the CPU in case of intensive crypto usage
+- new algorithms: SHA256, DES and 3DES
+
+I'd like to thank Arnaud, who has carefully reviewed several iterations of
+this driver, helped me improved my implementation, provided support for
+several crypto algorithms, provided support for armada-370 and tested
+the driver on different platforms, hence the SoB and dual MODULE_AUTHOR
+in the driver code.
+
+In this version I dropped the DT changes, but you'll find them in my
+cesa-v6 branch [1]. In this branch you'll find everything you need to
+test on all Marvell platforms (including the old ones).
+I'll post a series updating all the DTs once this driver has been merged.
+
+Best Regards,
+
+Boris
+
+[1]https://github.com/bbrezillon/linux-marvell/tree/cesa-v6
+
+Changes since v5:
+- fix the dma_map_sg return code check (again)
+- fix select entries in the Kconfig option
+
+Changes since v4:
+- fix the dma_map_sg return code check
+- add import/export functions to all HMAC algos
+- update the passed IV when handling cipher requests
+- properly handle requests in the crypto queue backlog
+- use sg_nents_for_len
+
+Changes since v3:
+- add import functions for hash algorithms
+- patch mv_cesa driver to support the new DT bindings
+- few fixes in the documentation
+- replace mv_mbus_dram_info() call by mv_mbus_dram_info_nooverlap()
+- remove DT updates from the series
+
+Changes since v2:
+- fixes in the cipher code (->dst_nents was assigned the ->src_nents
+  value and CBC state was overwritten by the IV after each chunk
+  operation)
+- spit the code as suggested by Sebastian
+
+Changes since v1:
+- (suggested by Jason) kept the existing CESA driver and added a mechanism
+  to prevent the new driver from probing devices handled my the existing
+  one (Orion and Kirkwood platforms)
+- (reported by Paul) addressed a few Kconfig and module definition issues
+- (suggested by Andrew) added DT changes to the series
+
+Arnaud Ebalard (4):
+  crypto: marvell/CESA: add Triple-DES support
+  crypto: marvell/CESA: add MD5 support
+  crypto: marvell/CESA: add SHA256 support
+  crypto: marvell/CESA: add support for Kirkwood and Dove SoCs
+
+Boris Brezillon (10):
+  crypto: mv_cesa: document the clocks property
+  crypto: mv_cesa: use gen_pool to reserve the SRAM memory region
+  crypto: mv_cesa: explicitly define kirkwood and dove compatible
+    strings
+  crypto: add a new driver for Marvell's CESA
+  crypto: marvell/CESA: add TDMA support
+  crypto: marvell/CESA: add DES support
+  crypto: marvell/CESA: add support for all armada SoCs
+  crypto: marvell/CESA: add allhwsupport module parameter
+  crypto: marvell/CESA: add support for Orion SoCs
+  crypto: marvell/CESA: add DT bindings documentation
+
+ .../devicetree/bindings/crypto/marvell-cesa.txt    |   45 +
+ .../devicetree/bindings/crypto/mv_cesa.txt         |   31 +-
+ drivers/crypto/Kconfig                             |   17 +
+ drivers/crypto/Makefile                            |    1 +
+ drivers/crypto/marvell/Makefile                    |    2 +
+ drivers/crypto/marvell/cesa.c                      |  548 ++++++++
+ drivers/crypto/marvell/cesa.h                      |  791 +++++++++++
+ drivers/crypto/marvell/cipher.c                    |  784 +++++++++++
+ drivers/crypto/marvell/hash.c                      | 1443 ++++++++++++++++++++
+ drivers/crypto/marvell/tdma.c                      |  224 +++
+ drivers/crypto/mv_cesa.c                           |   60 +-
+ 11 files changed, 3922 insertions(+), 24 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/crypto/marvell-cesa.txt
+ create mode 100644 drivers/crypto/marvell/Makefile
+ create mode 100644 drivers/crypto/marvell/cesa.c
+ create mode 100644 drivers/crypto/marvell/cesa.h
+ create mode 100644 drivers/crypto/marvell/cipher.c
+ create mode 100644 drivers/crypto/marvell/hash.c
+ create mode 100644 drivers/crypto/marvell/tdma.c
+
 -- 
 1.9.1
