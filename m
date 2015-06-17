@@ -1,109 +1,28 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Wed, 17 Jun 2015 13:57:14 -0500
-Subject: [PATCH RESEND] i2c: omap: improve duty cycle on SCL
-In-Reply-To: <5581BEB2.6070007@gmail.com>
-References: <1434482445-1818-1-git-send-email-balbi@ti.com>
- <55813BA0.3010001@nokia.com>
- <20150617180052.GF18421@saruman.tx.rr.com>
- <5581BEB2.6070007@gmail.com>
-Message-ID: <20150617185714.GH18421@saruman.tx.rr.com>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Wed, 17 Jun 2015 12:00:06 -0700
+Subject: [PATCH 0/3] ARM: Allow SPARSEMEM on multiplatform build
+In-Reply-To: <1433469518-8472-1-git-send-email-gregory.0xf0@gmail.com>
+References: <1433469518-8472-1-git-send-email-gregory.0xf0@gmail.com>
+Message-ID: <5581C3B6.9090900@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On 06/04/2015 06:58 PM, Gregory Fong wrote:
+> This is based on the changeset submitted by Kevin Cernekee last September:
+> http://lists.infradead.org/pipermail/linux-arm-kernel/2014-September/286835.html
+>
+> The changes I have made are:
+> - update commit messages per review comments from Arnd and Russell
+> - change to allow FLATMEM or SPARSEMEM on all multiplatform builds, not just
+>   multi-v7
+>
+>
 
-On Wed, Jun 17, 2015 at 08:38:42PM +0200, Alexander Sverdlin wrote:
-> Hello Felipe,
-> 
-> On 17/06/15 20:00, Felipe Balbi wrote:
-> >>> With this patch we try to be as close to 50%
-> >>> > > duty cycle as possible. The reason for this
-> >>> > > is that some devices present an erratic behavior
-> >>> > > with certain duty cycles.
-> >>> > > 
-> >>> > > One such example is TPS65218 PMIC which fails
-> >>> > > to change voltages when running @ 400kHz and
-> >>> > > duty cycle is lower than 34%.
-> >>> > > 
-> >>> > > The idea of the patch is simple:
-> >>> > > 
-> >>> > > calculate desired scl_period from requested scl
-> >>> > > and use 50% for tLow and 50% for tHigh.
-> >>> > > 
-> >>> > > tLow is calculated with a DIV_ROUND_UP() to make
-> >>> > > sure it's slightly higher than tHigh and to make
-> >>> > > sure that we end up within I2C specifications.
-> >>> > > 
-> >>> > > Kudos to Nishanth Menon and Dave Gerlach for helping
-> >>> > > debugging the TPS65218 problem found on AM437x SK.
-> >>> > > 
-> >>> > > Signed-off-by: Felipe Balbi <balbi@ti.com>
-> >> > 
-> >> > NAK.
-> >> > This is a direct violation of PHILIPS I2C-bus Specification v.2.1,
-> >> > section 15.
-> >> > Namely, you will have LOW period of SCL clock shorter than required
-> >> > 1.3uS.
-> > how is this out of spec ?
-> > 
-> > http://i.imgur.com/jEDlZT7.png
-> > 
-> > -Width = 1.4us, frequency 373.1kHz, duty cycle of 47.76%
-> > 
-> > In any case, I have to send v2 anyway (found a bug which would show up
-> > on frequencies above 400kHz), so I'll resend this patch.
-> 
-> If you really target 50% duty cycle and there will be no
-> rounding/truncation error, you will end up with 1.25uS at 400kHz. I
-> understand why you want to make HIGH phase longer, but 50% is a bad
-> target at 400hHz. Probably more safe value?
+Things don't blow up on MSM8960 when switching between flatmem and
+sparsemem so feel free to add:
 
-We can't generate exactly 400kHz anyway, and we're not getting exactly
-50% duty cycle, it just brings it *closer* to that. I even mention the
-reason for the DIV_ROUND_UP() there. Let's just go through the math
-using TRM equation:
-
-@400kHz with 12MHz internal clock:
-
-tLow = (SCLL + 7) * iclk_period
-
-1250 = (SCLL + 7) * 1/12MHz
-
-SCLL = DIV_ROUND_UP(1250, 83) - 7
-SCLL = (1250 + 82)/83 - 7
-SCLL = 9
-
-Now if we do the reverse to find actual tLow:
-
-tLow = (9 + 7) * 83
-tLow = 1328ns
-
-Likewise if we do it for tHigh:
-
-tHigh = (SCLH + 5) iclk_period
-
-SCLH = 1250 / 83 - 5
-SCLH = 10
-
-tHigh = 15 * 83
-tHigh = 1245
-
-tHigh + tLow (SCL period) = 2573ns. That gives us SCL of 388.65kHz. An
-error of mere 3% of what we really wanted to achieve. I'd say this is
-pretty darn good.
-
-Now you tell me, how is this *ever* going to be out of spec ?
-
-DIV_ROUND_UP() and the truncation at internal clock period calculation
-makes sure that tLow will be within spec. Instead of blindly NAKing the
-patch, you could've gone through this exercise yourself.
+Tested-by: Stephen Boyd <sboyd@codeaurora.org>
 
 -- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150617/087ae310/attachment.sig>
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
