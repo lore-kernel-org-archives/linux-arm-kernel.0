@@ -1,19 +1,28 @@
-From: rafael@kernel.org (Rafael J. Wysocki)
-Date: Wed, 17 Jun 2015 11:38:22 +0200
-Subject: [PATCH V7 3/3] OPP: Add binding for 'opp-suspend'
-In-Reply-To: <20150617023828.GB13553@linux>
-References: <cover.1433434659.git.viresh.kumar@linaro.org>
- <20150616025425.GB26592@linux>
- <CAL_JsqJ2gCJvtrZqDWWoY6Gv4Ag7xLV93wLbT5b37jO=oWo+MQ@mail.gmail.com>
- <4228747.vs1U0RqIQB@vostro.rjw.lan> <20150617023828.GB13553@linux>
-Message-ID: <CAJZ5v0jDnss6eOF-2h_DgV5Afh5fyiTOE0h6KkuW31wtTgbO-A@mail.gmail.com>
+From: herbert@gondor.apana.org.au (Herbert Xu)
+Date: Wed, 17 Jun 2015 17:50:01 +0800
+Subject: [PATCH v6 05/14] crypto: marvell/CESA: add TDMA support
+In-Reply-To: <1434527142-3609-6-git-send-email-boris.brezillon@free-electrons.com>
+References: <1434527142-3609-1-git-send-email-boris.brezillon@free-electrons.com>
+ <1434527142-3609-6-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <20150617095001.GA11538@gondor.apana.org.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 17, 2015 at 4:38 AM, Viresh Kumar <viresh.kumar@linaro.org> wrote:
-> On 16-06-15, 23:21, Rafael J. Wysocki wrote:
->> Does your ACK also apply to patches [1-2/3] in this series?
+On Wed, Jun 17, 2015 at 09:45:33AM +0200, Boris Brezillon wrote:
 >
-> His RBY tag is already present for 1/3 :)
+> +	ret = dma_map_sg(cesa_dev->dev, req->src, creq->src_nents,
+> +			 DMA_TO_DEVICE);
+> +	if (!ret)
+> +		return -ENOMEM;
+> +
+> +	creq->src_nents = ret;
 
-Yes, it is, sorry for overlooking that.
+DMA-API-HOWTO says that you must retain the original nents and
+use it when you call dma_unmap_sg.  So I'm afraid one more repost
+is needed :)
+
+Thanks,
+-- 
+Email: Herbert Xu <herbert@gondor.apana.org.au>
+Home Page: http://gondor.apana.org.au/~herbert/
+PGP Key: http://gondor.apana.org.au/~herbert/pubkey.txt
