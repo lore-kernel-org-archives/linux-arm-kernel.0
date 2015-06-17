@@ -1,62 +1,72 @@
-From: eric.auger@linaro.org (Eric Auger)
-Date: Wed, 17 Jun 2015 17:11:29 +0200
-Subject: [PATCH 08/10] KVM: arm/arm64: vgic: Add vgic_{get,
- set}_phys_irq_active
-In-Reply-To: <1433783045-8002-9-git-send-email-marc.zyngier@arm.com>
-References: <1433783045-8002-1-git-send-email-marc.zyngier@arm.com>
- <1433783045-8002-9-git-send-email-marc.zyngier@arm.com>
-Message-ID: <55818E21.4030707@linaro.org>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Wed, 17 Jun 2015 17:12:36 +0200
+Subject: [PATCH v2 1/3] net: mvneta: introduce compatible string "marvell,
+ armada-xp-neta"
+In-Reply-To: <1434547162-6275-2-git-send-email-simon.guinot@sequanux.org>
+References: <1434547162-6275-1-git-send-email-simon.guinot@sequanux.org>
+ <1434547162-6275-2-git-send-email-simon.guinot@sequanux.org>
+Message-ID: <55818E64.20007@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Reviewed-by: Eric Auger <eric.auger@linaro.org>
-On 06/08/2015 07:04 PM, Marc Zyngier wrote:
-> In order to control the active state of an interrupt, introduce
-> a pair of accessors allowing the state to be set/queried.
+Hi Simon,
+
+On 17/06/2015 15:19, Simon Guinot wrote:
+> The mvneta driver supports the Ethernet IP found in the Armada 370, XP,
+> 380 and 385 SoCs. Since at least one more hardware feature is available
+> for the Armada XP SoCs then a way to identify them is needed.
 > 
-> This only affects the logical state, and the HW state will only be
-> applied at world-switch time.
-> 
-> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+> This patch introduces a new compatible string "marvell,armada-xp-neta".
+
+Let's be future proof by going further. I would like to have an compatible string
+for each SoC even if we currently we don't use them.
+
+You even don't have to use add it in the mvneta.c file if you use:
+"marvell,armada-380-neta", "marvell,armada-xp-neta"
+
+
+Thanks,
+
+Gregory
+
+
+> Signed-off-by: Simon Guinot <simon.guinot@sequanux.org>
+> Cc: <stable@vger.kernel.org> # v3.8+
 > ---
->  include/kvm/arm_vgic.h |  2 ++
->  virt/kvm/arm/vgic.c    | 12 ++++++++++++
->  2 files changed, 14 insertions(+)
+>  Documentation/devicetree/bindings/net/marvell-armada-370-neta.txt | 2 +-
+>  drivers/net/ethernet/marvell/mvneta.c                             | 1 +
+>  2 files changed, 2 insertions(+), 1 deletion(-)
 > 
-> diff --git a/include/kvm/arm_vgic.h b/include/kvm/arm_vgic.h
-> index 33d121a..1c653c1 100644
-> --- a/include/kvm/arm_vgic.h
-> +++ b/include/kvm/arm_vgic.h
-> @@ -349,6 +349,8 @@ int kvm_vgic_vcpu_active_irq(struct kvm_vcpu *vcpu);
->  struct irq_phys_map *vgic_map_phys_irq(struct kvm_vcpu *vcpu,
->  				       int virt_irq, int irq);
->  int vgic_unmap_phys_irq(struct kvm_vcpu *vcpu, struct irq_phys_map *map);
-> +bool vgic_get_phys_irq_active(struct irq_phys_map *map);
-> +void vgic_set_phys_irq_active(struct irq_phys_map *map, bool active);
+> diff --git a/Documentation/devicetree/bindings/net/marvell-armada-370-neta.txt b/Documentation/devicetree/bindings/net/marvell-armada-370-neta.txt
+> index 750d577e8083..f5a8ca29aff0 100644
+> --- a/Documentation/devicetree/bindings/net/marvell-armada-370-neta.txt
+> +++ b/Documentation/devicetree/bindings/net/marvell-armada-370-neta.txt
+> @@ -1,7 +1,7 @@
+>  * Marvell Armada 370 / Armada XP Ethernet Controller (NETA)
 >  
->  #define irqchip_in_kernel(k)	(!!((k)->arch.vgic.in_kernel))
->  #define vgic_initialized(k)	(!!((k)->arch.vgic.nr_cpus))
-> diff --git a/virt/kvm/arm/vgic.c b/virt/kvm/arm/vgic.c
-> index 495ac7d..f376b56 100644
-> --- a/virt/kvm/arm/vgic.c
-> +++ b/virt/kvm/arm/vgic.c
-> @@ -1744,6 +1744,18 @@ static struct irq_phys_map *vgic_irq_map_search(struct kvm_vcpu *vcpu,
->  	return this;
->  }
+>  Required properties:
+> -- compatible: should be "marvell,armada-370-neta".
+> +- compatible: "marvell,armada-370-neta" or "marvell,armada-xp-neta".
+>  - reg: address and length of the register set for the device.
+>  - interrupts: interrupt for the device
+>  - phy: See ethernet.txt file in the same directory.
+> diff --git a/drivers/net/ethernet/marvell/mvneta.c b/drivers/net/ethernet/marvell/mvneta.c
+> index ce5f7f9cff06..aceb977b104d 100644
+> --- a/drivers/net/ethernet/marvell/mvneta.c
+> +++ b/drivers/net/ethernet/marvell/mvneta.c
+> @@ -3179,6 +3179,7 @@ static int mvneta_remove(struct platform_device *pdev)
 >  
-> +bool vgic_get_phys_irq_active(struct irq_phys_map *map)
-> +{
-> +	BUG_ON(!map);
-> +	return map->active;
-> +}
-> +
-> +void vgic_set_phys_irq_active(struct irq_phys_map *map, bool active)
-> +{
-> +	BUG_ON(!map);
-> +	map->active = active;
-> +}
-> +
->  int vgic_unmap_phys_irq(struct kvm_vcpu *vcpu, struct irq_phys_map *map)
->  {
->  	struct vgic_dist *dist = &vcpu->kvm->arch.vgic;
+>  static const struct of_device_id mvneta_match[] = {
+>  	{ .compatible = "marvell,armada-370-neta" },
+> +	{ .compatible = "marvell,armada-xp-neta" },
+>  	{ }
+>  };
+>  MODULE_DEVICE_TABLE(of, mvneta_match);
 > 
+
+
+-- 
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
