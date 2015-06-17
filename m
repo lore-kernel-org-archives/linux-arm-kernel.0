@@ -1,57 +1,191 @@
 From: julien.grall@citrix.com (Julien Grall)
-Date: Wed, 17 Jun 2015 15:28:03 +0100
-Subject: [PATCH v2 2/7] xen/xenbus: client: Fix call of virt_to_mfn in
- xenbus_grant_ring
+Date: Wed, 17 Jun 2015 15:28:02 +0100
+Subject: [PATCH v2 1/7] xen: Include xen/page.h rather than asm/xen/page.h
 In-Reply-To: <1434551288-14113-1-git-send-email-julien.grall@citrix.com>
 References: <1434551288-14113-1-git-send-email-julien.grall@citrix.com>
-Message-ID: <1434551288-14113-3-git-send-email-julien.grall@citrix.com>
+Message-ID: <1434551288-14113-2-git-send-email-julien.grall@citrix.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-virt_to_mfn should take a void* rather an unsigned long. While it
-doesn't really matter now, it would throw a compiler warning later when
-virt_to_mfn will enforce the type.
+Using xen/page.h will be necessary later for using common xen page
+helpers.
 
-At the same time, avoid to compute new virtual address every time in the
-loop and directly increment the parameter as we don't use it later.
+As xen/page.h already include asm/xen/page.h, always use the later.
 
 Signed-off-by: Julien Grall <julien.grall@citrix.com>
 Reviewed-by: David Vrabel <david.vrabel@citrix.com>
+Cc: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
+Cc: Ian Campbell <ian.campbell@citrix.com>
 Cc: Wei Liu <wei.liu2@citrix.com>
 Cc: Konrad Rzeszutek Wilk <konrad.wilk@oracle.com>
 Cc: Boris Ostrovsky <boris.ostrovsky@oracle.com>
+Cc: netdev at vger.kernel.org
 
 ---
     Changes in v2:
-        - Remove the cast to (char *)
         - Add David's Reviewed-by
 ---
- drivers/xen/xenbus/xenbus_client.c | 6 +++---
- 1 file changed, 3 insertions(+), 3 deletions(-)
+ arch/arm/xen/mm.c                  | 2 +-
+ arch/arm/xen/p2m.c                 | 2 +-
+ drivers/net/xen-netback/netback.c  | 2 +-
+ drivers/net/xen-netfront.c         | 1 -
+ drivers/xen/events/events_base.c   | 2 +-
+ drivers/xen/events/events_fifo.c   | 2 +-
+ drivers/xen/gntdev.c               | 2 +-
+ drivers/xen/manage.c               | 2 +-
+ drivers/xen/tmem.c                 | 2 +-
+ drivers/xen/xenbus/xenbus_client.c | 2 +-
+ 10 files changed, 9 insertions(+), 10 deletions(-)
 
+diff --git a/arch/arm/xen/mm.c b/arch/arm/xen/mm.c
+index 4983250..03e75fe 100644
+--- a/arch/arm/xen/mm.c
++++ b/arch/arm/xen/mm.c
+@@ -15,10 +15,10 @@
+ #include <xen/xen.h>
+ #include <xen/interface/grant_table.h>
+ #include <xen/interface/memory.h>
++#include <xen/page.h>
+ #include <xen/swiotlb-xen.h>
+ 
+ #include <asm/cacheflush.h>
+-#include <asm/xen/page.h>
+ #include <asm/xen/hypercall.h>
+ #include <asm/xen/interface.h>
+ 
+diff --git a/arch/arm/xen/p2m.c b/arch/arm/xen/p2m.c
+index cb7a14c..887596c 100644
+--- a/arch/arm/xen/p2m.c
++++ b/arch/arm/xen/p2m.c
+@@ -10,10 +10,10 @@
+ 
+ #include <xen/xen.h>
+ #include <xen/interface/memory.h>
++#include <xen/page.h>
+ #include <xen/swiotlb-xen.h>
+ 
+ #include <asm/cacheflush.h>
+-#include <asm/xen/page.h>
+ #include <asm/xen/hypercall.h>
+ #include <asm/xen/interface.h>
+ 
+diff --git a/drivers/net/xen-netback/netback.c b/drivers/net/xen-netback/netback.c
+index 0d25943..c04d797 100644
+--- a/drivers/net/xen-netback/netback.c
++++ b/drivers/net/xen-netback/netback.c
+@@ -44,9 +44,9 @@
+ #include <xen/xen.h>
+ #include <xen/events.h>
+ #include <xen/interface/memory.h>
++#include <xen/page.h>
+ 
+ #include <asm/xen/hypercall.h>
+-#include <asm/xen/page.h>
+ 
+ /* Provide an option to disable split event channels at load time as
+  * event channels are limited resource. Split event channels are
+diff --git a/drivers/net/xen-netfront.c b/drivers/net/xen-netfront.c
+index e031c94..e9800ea 100644
+--- a/drivers/net/xen-netfront.c
++++ b/drivers/net/xen-netfront.c
+@@ -45,7 +45,6 @@
+ #include <linux/slab.h>
+ #include <net/ip.h>
+ 
+-#include <asm/xen/page.h>
+ #include <xen/xen.h>
+ #include <xen/xenbus.h>
+ #include <xen/events.h>
+diff --git a/drivers/xen/events/events_base.c b/drivers/xen/events/events_base.c
+index 3838795..96093ae 100644
+--- a/drivers/xen/events/events_base.c
++++ b/drivers/xen/events/events_base.c
+@@ -39,8 +39,8 @@
+ #include <asm/irq.h>
+ #include <asm/idle.h>
+ #include <asm/io_apic.h>
+-#include <asm/xen/page.h>
+ #include <asm/xen/pci.h>
++#include <xen/page.h>
+ #endif
+ #include <asm/sync_bitops.h>
+ #include <asm/xen/hypercall.h>
+diff --git a/drivers/xen/events/events_fifo.c b/drivers/xen/events/events_fifo.c
+index 417415d..ed673e1 100644
+--- a/drivers/xen/events/events_fifo.c
++++ b/drivers/xen/events/events_fifo.c
+@@ -44,13 +44,13 @@
+ #include <asm/sync_bitops.h>
+ #include <asm/xen/hypercall.h>
+ #include <asm/xen/hypervisor.h>
+-#include <asm/xen/page.h>
+ 
+ #include <xen/xen.h>
+ #include <xen/xen-ops.h>
+ #include <xen/events.h>
+ #include <xen/interface/xen.h>
+ #include <xen/interface/event_channel.h>
++#include <xen/page.h>
+ 
+ #include "events_internal.h"
+ 
+diff --git a/drivers/xen/gntdev.c b/drivers/xen/gntdev.c
+index 8927485..67b9163 100644
+--- a/drivers/xen/gntdev.c
++++ b/drivers/xen/gntdev.c
+@@ -41,9 +41,9 @@
+ #include <xen/balloon.h>
+ #include <xen/gntdev.h>
+ #include <xen/events.h>
++#include <xen/page.h>
+ #include <asm/xen/hypervisor.h>
+ #include <asm/xen/hypercall.h>
+-#include <asm/xen/page.h>
+ 
+ MODULE_LICENSE("GPL");
+ MODULE_AUTHOR("Derek G. Murray <Derek.Murray@cl.cam.ac.uk>, "
+diff --git a/drivers/xen/manage.c b/drivers/xen/manage.c
+index 9e6a851..d10effe 100644
+--- a/drivers/xen/manage.c
++++ b/drivers/xen/manage.c
+@@ -19,10 +19,10 @@
+ #include <xen/grant_table.h>
+ #include <xen/events.h>
+ #include <xen/hvc-console.h>
++#include <xen/page.h>
+ #include <xen/xen-ops.h>
+ 
+ #include <asm/xen/hypercall.h>
+-#include <asm/xen/page.h>
+ #include <asm/xen/hypervisor.h>
+ 
+ enum shutdown_state {
+diff --git a/drivers/xen/tmem.c b/drivers/xen/tmem.c
+index c4211a3..3718b4a 100644
+--- a/drivers/xen/tmem.c
++++ b/drivers/xen/tmem.c
+@@ -17,8 +17,8 @@
+ 
+ #include <xen/xen.h>
+ #include <xen/interface/xen.h>
++#include <xen/page.h>
+ #include <asm/xen/hypercall.h>
+-#include <asm/xen/page.h>
+ #include <asm/xen/hypervisor.h>
+ #include <xen/tmem.h>
+ 
 diff --git a/drivers/xen/xenbus/xenbus_client.c b/drivers/xen/xenbus/xenbus_client.c
-index a014016..9ad3272 100644
+index 96b2011..a014016 100644
 --- a/drivers/xen/xenbus/xenbus_client.c
 +++ b/drivers/xen/xenbus/xenbus_client.c
-@@ -379,16 +379,16 @@ int xenbus_grant_ring(struct xenbus_device *dev, void *vaddr,
- 	int i, j;
- 
- 	for (i = 0; i < nr_pages; i++) {
--		unsigned long addr = (unsigned long)vaddr +
--			(PAGE_SIZE * i);
- 		err = gnttab_grant_foreign_access(dev->otherend_id,
--						  virt_to_mfn(addr), 0);
-+						  virt_to_mfn(vaddr), 0);
- 		if (err < 0) {
- 			xenbus_dev_fatal(dev, err,
- 					 "granting access to ring page");
- 			goto fail;
- 		}
- 		grefs[i] = err;
-+
-+		vaddr = vaddr + PAGE_SIZE;
- 	}
- 
- 	return 0;
+@@ -37,7 +37,7 @@
+ #include <linux/vmalloc.h>
+ #include <linux/export.h>
+ #include <asm/xen/hypervisor.h>
+-#include <asm/xen/page.h>
++#include <xen/page.h>
+ #include <xen/interface/xen.h>
+ #include <xen/interface/event_channel.h>
+ #include <xen/balloon.h>
 -- 
 2.1.4
