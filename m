@@ -1,9 +1,9 @@
 From: geert+renesas@glider.be (Geert Uytterhoeven)
-Date: Wed, 17 Jun 2015 15:03:33 +0200
-Subject: [PATCH 2/5] ARM: shmobile: r8a7790 dtsi: Use "arm,gic-400" for GIC
+Date: Wed, 17 Jun 2015 15:03:35 +0200
+Subject: [PATCH 4/5] ARM: shmobile: r8a7793 dtsi: Use "arm,gic-400" for GIC
 In-Reply-To: <1434546216-10773-1-git-send-email-geert+renesas@glider.be>
 References: <1434546216-10773-1-git-send-email-geert+renesas@glider.be>
-Message-ID: <1434546216-10773-3-git-send-email-geert+renesas@glider.be>
+Message-ID: <1434546216-10773-5-git-send-email-geert+renesas@glider.be>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -21,14 +21,14 @@ You can read the GICD_IIDR register from U-Boot using
 
     md 0xf1001008 1
 ---
- arch/arm/boot/dts/r8a7790.dtsi | 2 +-
+ arch/arm/boot/dts/r8a7793.dtsi | 2 +-
  1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm/boot/dts/r8a7790.dtsi b/arch/arm/boot/dts/r8a7790.dtsi
-index 51ab8865ea37dc89..d24dcf231fff65ed 100644
---- a/arch/arm/boot/dts/r8a7790.dtsi
-+++ b/arch/arm/boot/dts/r8a7790.dtsi
-@@ -113,7 +113,7 @@
+diff --git a/arch/arm/boot/dts/r8a7793.dtsi b/arch/arm/boot/dts/r8a7793.dtsi
+index c50c5f65388af2d0..3355c487d108360f 100644
+--- a/arch/arm/boot/dts/r8a7793.dtsi
++++ b/arch/arm/boot/dts/r8a7793.dtsi
+@@ -42,7 +42,7 @@
  	};
  
  	gic: interrupt-controller at f1001000 {
