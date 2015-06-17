@@ -1,43 +1,42 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Wed, 17 Jun 2015 22:43:12 +0200
-Subject: [PATCH v2 1/3] net: mvneta: introduce compatible string
- "marvell, armada-xp-neta"
-In-Reply-To: <20150617170112.GD2917@io.lakedaemon.net>
+Date: Wed, 17 Jun 2015 22:43:53 +0200
+Subject: [PATCH v2 0/3] Fix Ethernet jumbo frames support for Armada 370
+ and 38x
+In-Reply-To: <20150617172217.GY4853@kw.sim.vm.gnt>
 References: <1434547162-6275-1-git-send-email-simon.guinot@sequanux.org>
- <1434547162-6275-2-git-send-email-simon.guinot@sequanux.org>
- <55818E64.20007@free-electrons.com>
- <55818F10.8030304@free-electrons.com>
- <20150617170112.GD2917@io.lakedaemon.net>
-Message-ID: <20150617224312.3bfc80d9@free-electrons.com>
+ <20150617172458.3e373b8a@free-electrons.com>
+ <20150617172217.GY4853@kw.sim.vm.gnt>
+Message-ID: <20150617224353.5ec9ec9d@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Jason,
+Simon,
 
-On Wed, 17 Jun 2015 17:01:12 +0000, Jason Cooper wrote:
+On Wed, 17 Jun 2015 19:22:17 +0200, Simon Guinot wrote:
 
-> I disagree with this.  We can't predict what incosistencies we'll discover in
-> the future.  We should only assign new compatible strings based on known IP
-> variations when we discover them.  This seems fraught with demons since we
-> can't predict the scope of affected IP blocks (some steppings of one SoC, three
-> SoCs plus two steppings of a fourth, etc)
+> > You should add a Fixes: tag to each commit to indicate which commit is
+> > being fixed by your patches.
+> > 
+> > Also, I was a bit surprised by your statement that Armada 38x is also
+> > affected by the problem, since Armada 38x is more recent than Armada
+> > XP. but indeed, according to the Armada 38x datasheet:
+> > 
+> >   IPv4 and TCP/UDP over IPv4/IPv6 checksum generation on transmit
+> >   frames for standard Ethernet packet size
+> > 
+> > While the Armada XP datasheet says:
+> > 
+> >   Long frames transmission (including jumbo frames), with
+> >   IPv4/v6/TCP/UDP checksum generation
+> > 
+> > So it seems like you're right about this!
 > 
-> imho, the 'future-proofing' lies in being specific as to the naming of the
-> compatible strings against known hardware variations at the time.
+> At first, I though this was an error in the Armada 38x datasheet (maybe
+> a sloppy copy/paster). Therefore I have checked on an DB-88F6820-GP
+> board and then I can confirm that the Armada 38x is also affected.
 
-Except that this clearly doesn't work, and the case raised by Simon is
-a perfect illustration of why planning ahead is beneficial. We already
-had the issue several times on mvebu platforms, so it should really
-become the rule to have one compatible string specific to the actual
-SoC in the list of compatible strings.
-
-Not doing so requires breaking DT backward compatibility more often, so
-wanting DT backward compatibility and not wanting to plan ahead is a
-bit antagonist. But I personally don't care much about DT backward
-compatibility, and I've explained numerous times why, so in the end I
-don't really care much.
-
-Best regards,
+Ok, so the datasheet was correct (houra!). Thanks a lot for having done
+the additional testing.
 
 Thomas
 -- 
