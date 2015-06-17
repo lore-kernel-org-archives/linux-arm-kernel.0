@@ -1,200 +1,251 @@
 From: geert+renesas@glider.be (Geert Uytterhoeven)
-Date: Wed, 17 Jun 2015 11:31:22 +0200
-Subject: [PATCH 06/15] ARM: shmobile: Remove legacy armadillo800eva_defconfig
+Date: Wed, 17 Jun 2015 11:31:27 +0200
+Subject: [PATCH 11/15] ARM: shmobile: Remove obsolete zboot support
 In-Reply-To: <1434533491-21979-1-git-send-email-geert+renesas@glider.be>
 References: <1434533491-21979-1-git-send-email-geert+renesas@glider.be>
-Message-ID: <1434533491-21979-7-git-send-email-geert+renesas@glider.be>
+Message-ID: <1434533491-21979-12-git-send-email-geert+renesas@glider.be>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The legacy board code for Armadillo-800 EVA has been removed.
+The last user of the zboot code was the KZM-A9-GT legacy board code,
+which has been removed.
 
 Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
 ---
- MAINTAINERS                                |   1 -
- arch/arm/configs/armadillo800eva_defconfig | 162 -----------------------------
- 2 files changed, 163 deletions(-)
- delete mode 100644 arch/arm/configs/armadillo800eva_defconfig
+ arch/arm/boot/compressed/Makefile                  |   4 -
+ arch/arm/boot/compressed/head-shmobile.S           |  71 --------------
+ arch/arm/mach-shmobile/include/mach/zboot.h        |  14 ---
+ arch/arm/mach-shmobile/include/mach/zboot_macros.h | 108 ---------------------
+ 4 files changed, 197 deletions(-)
+ delete mode 100644 arch/arm/boot/compressed/head-shmobile.S
+ delete mode 100644 arch/arm/mach-shmobile/include/mach/zboot.h
+ delete mode 100644 arch/arm/mach-shmobile/include/mach/zboot_macros.h
 
-diff --git a/MAINTAINERS b/MAINTAINERS
-index f1fe0cc0dadee9df..32ee18a233b6db80 100644
---- a/MAINTAINERS
-+++ b/MAINTAINERS
-@@ -1455,7 +1455,6 @@ F:	arch/arm/boot/dts/emev2*
- F:	arch/arm/boot/dts/r7s*
- F:	arch/arm/boot/dts/r8a*
- F:	arch/arm/boot/dts/sh*
--F:	arch/arm/configs/armadillo800eva_defconfig
- F:	arch/arm/configs/bockw_defconfig
- F:	arch/arm/configs/marzen_defconfig
- F:	arch/arm/configs/shmobile_defconfig
-diff --git a/arch/arm/configs/armadillo800eva_defconfig b/arch/arm/configs/armadillo800eva_defconfig
+diff --git a/arch/arm/boot/compressed/Makefile b/arch/arm/boot/compressed/Makefile
+index 7a13aebacf81d47c..3f9a9ebc77c389bb 100644
+--- a/arch/arm/boot/compressed/Makefile
++++ b/arch/arm/boot/compressed/Makefile
+@@ -51,10 +51,6 @@ else
+ endif
+ endif
+ 
+-ifeq ($(CONFIG_ARCH_SHMOBILE_LEGACY),y)
+-OBJS		+= head-shmobile.o
+-endif
+-
+ #
+ # We now have a PIC decompressor implementation.  Decompressors running
+ # from RAM should not define ZTEXTADDR.  Decompressors running directly
+diff --git a/arch/arm/boot/compressed/head-shmobile.S b/arch/arm/boot/compressed/head-shmobile.S
 deleted file mode 100644
-index 5666e3700a821814..0000000000000000
---- a/arch/arm/configs/armadillo800eva_defconfig
+index 22a75259faa32996..0000000000000000
+--- a/arch/arm/boot/compressed/head-shmobile.S
 +++ /dev/null
-@@ -1,162 +0,0 @@
--CONFIG_EXPERIMENTAL=y
--CONFIG_SYSVIPC=y
--CONFIG_IKCONFIG=y
--CONFIG_IKCONFIG_PROC=y
--CONFIG_LOG_BUF_SHIFT=16
--# CONFIG_UTS_NS is not set
--# CONFIG_IPC_NS is not set
--# CONFIG_PID_NS is not set
--CONFIG_CC_OPTIMIZE_FOR_SIZE=y
--CONFIG_PERF_EVENTS=y
--CONFIG_SLAB=y
--CONFIG_MODULES=y
--CONFIG_MODULE_UNLOAD=y
--CONFIG_MODULE_FORCE_UNLOAD=y
--# CONFIG_BLK_DEV_BSG is not set
--# CONFIG_IOSCHED_DEADLINE is not set
--# CONFIG_IOSCHED_CFQ is not set
--CONFIG_ARCH_SHMOBILE_LEGACY=y
--CONFIG_ARCH_R8A7740=y
--CONFIG_MACH_ARMADILLO800EVA=y
--# CONFIG_SH_TIMER_TMU is not set
--CONFIG_ARM_THUMB=y
--CONFIG_CACHE_L2X0=y
--CONFIG_ARM_ERRATA_430973=y
--CONFIG_ARM_ERRATA_458693=y
--CONFIG_ARM_ERRATA_460075=y
--CONFIG_PL310_ERRATA_588369=y
--CONFIG_ARM_ERRATA_720789=y
--CONFIG_PL310_ERRATA_727915=y
--CONFIG_ARM_ERRATA_743622=y
--CONFIG_ARM_ERRATA_751472=y
--CONFIG_PL310_ERRATA_753970=y
--CONFIG_ARM_ERRATA_754322=y
--CONFIG_PL310_ERRATA_769419=y
--CONFIG_ARM_ERRATA_775420=y
--CONFIG_AEABI=y
--# CONFIG_OABI_COMPAT is not set
--CONFIG_FORCE_MAX_ZONEORDER=13
--CONFIG_ZBOOT_ROM_TEXT=0x0
--CONFIG_ZBOOT_ROM_BSS=0x0
--CONFIG_ARM_APPENDED_DTB=y
--CONFIG_KEXEC=y
--CONFIG_VFP=y
--CONFIG_NEON=y
--# CONFIG_CORE_DUMP_DEFAULT_ELF_HEADERS is not set
--CONFIG_PM=y
--CONFIG_NET=y
--CONFIG_PACKET=y
--CONFIG_UNIX=y
--CONFIG_INET=y
--CONFIG_IP_PNP=y
--CONFIG_IP_PNP_DHCP=y
--# CONFIG_INET_XFRM_MODE_TRANSPORT is not set
--# CONFIG_INET_XFRM_MODE_TUNNEL is not set
--# CONFIG_INET_XFRM_MODE_BEET is not set
--# CONFIG_INET_LRO is not set
--# CONFIG_INET_DIAG is not set
--# CONFIG_IPV6 is not set
--# CONFIG_WIRELESS is not set
--CONFIG_UEVENT_HELPER_PATH="/sbin/hotplug"
--CONFIG_DEVTMPFS=y
--CONFIG_DEVTMPFS_MOUNT=y
--CONFIG_SCSI=y
--CONFIG_BLK_DEV_SD=y
--CONFIG_MD=y
--CONFIG_BLK_DEV_DM=y
--CONFIG_NETDEVICES=y
--# CONFIG_NET_VENDOR_BROADCOM is not set
--# CONFIG_NET_VENDOR_CHELSIO is not set
--# CONFIG_NET_VENDOR_CIRRUS is not set
--# CONFIG_NET_VENDOR_FARADAY is not set
--# CONFIG_NET_VENDOR_INTEL is not set
--# CONFIG_NET_VENDOR_MARVELL is not set
--# CONFIG_NET_VENDOR_MICREL is not set
--# CONFIG_NET_VENDOR_NATSEMI is not set
--CONFIG_SH_ETH=y
--# CONFIG_NET_VENDOR_SEEQ is not set
--# CONFIG_NET_VENDOR_SMSC is not set
--# CONFIG_NET_VENDOR_STMICRO is not set
--# CONFIG_WLAN is not set
--# CONFIG_INPUT_MOUSEDEV_PSAUX is not set
--CONFIG_INPUT_EVDEV=y
--# CONFIG_KEYBOARD_ATKBD is not set
--CONFIG_KEYBOARD_GPIO=y
--# CONFIG_INPUT_MOUSE is not set
--CONFIG_INPUT_TOUCHSCREEN=y
--CONFIG_TOUCHSCREEN_ST1232=y
--# CONFIG_SERIO is not set
--# CONFIG_LEGACY_PTYS is not set
--CONFIG_SERIAL_SH_SCI=y
--CONFIG_SERIAL_SH_SCI_NR_UARTS=9
--CONFIG_SERIAL_SH_SCI_CONSOLE=y
--# CONFIG_HW_RANDOM is not set
--CONFIG_I2C=y
--CONFIG_I2C_GPIO=y
--CONFIG_I2C_SH_MOBILE=y
--# CONFIG_HWMON is not set
--CONFIG_REGULATOR=y
--CONFIG_REGULATOR_GPIO=y
--CONFIG_MEDIA_SUPPORT=y
--CONFIG_VIDEO_DEV=y
--CONFIG_MEDIA_CAMERA_SUPPORT=y
--CONFIG_V4L_PLATFORM_DRIVERS=y
--CONFIG_SOC_CAMERA=y
--CONFIG_SOC_CAMERA_MT9T112=y
--CONFIG_VIDEO_SH_MOBILE_CEU=y
--CONFIG_FB=y
--CONFIG_FB_SH_MOBILE_LCDC=y
--CONFIG_FB_SH_MOBILE_HDMI=y
--CONFIG_LCD_CLASS_DEVICE=y
--CONFIG_BACKLIGHT_PWM=y
--CONFIG_FRAMEBUFFER_CONSOLE=y
--CONFIG_FRAMEBUFFER_CONSOLE_DETECT_PRIMARY=y
--CONFIG_LOGO=y
--# CONFIG_LOGO_LINUX_MONO is not set
--# CONFIG_LOGO_LINUX_VGA16 is not set
--# CONFIG_SND_SUPPORT_OLD_API is not set
--# CONFIG_SND_VERBOSE_PROCFS is not set
--# CONFIG_SND_DRIVERS is not set
--# CONFIG_SND_ARM is not set
--CONFIG_SND_SOC_SH4_FSI=y
--# CONFIG_HID_SUPPORT is not set
--CONFIG_USB=y
--CONFIG_USB_RENESAS_USBHS=y
--CONFIG_USB_GADGET=y
--CONFIG_USB_RENESAS_USBHS_UDC=y
--CONFIG_USB_ETH=m
--CONFIG_MMC=y
--CONFIG_MMC_SDHI=y
--CONFIG_MMC_SH_MMCIF=y
--CONFIG_NEW_LEDS=y
--CONFIG_LEDS_CLASS=y
--CONFIG_LEDS_GPIO=y
--CONFIG_RTC_CLASS=y
--CONFIG_RTC_DRV_S35390A=y
--CONFIG_DMADEVICES=y
--CONFIG_SH_DMAE=y
--CONFIG_UIO=y
--CONFIG_UIO_PDRV_GENIRQ=y
--CONFIG_PWM=y
--CONFIG_PWM_RENESAS_TPU=y
--# CONFIG_DNOTIFY is not set
--CONFIG_MSDOS_FS=y
--CONFIG_VFAT_FS=y
--CONFIG_TMPFS=y
--# CONFIG_MISC_FILESYSTEMS is not set
--CONFIG_NFS_FS=y
--CONFIG_NFS_V3_ACL=y
--CONFIG_NFS_V4=y
--CONFIG_NFS_V4_1=y
--CONFIG_ROOT_NFS=y
--CONFIG_NLS_CODEPAGE_437=y
--CONFIG_NLS_ISO8859_1=y
--# CONFIG_ENABLE_WARN_DEPRECATED is not set
--# CONFIG_ENABLE_MUST_CHECK is not set
--# CONFIG_ARM_UNWIND is not set
--CONFIG_CRYPTO=y
--CONFIG_CRYPTO_CBC=y
--CONFIG_CRYPTO_MD5=y
--CONFIG_CRYPTO_DES=y
--CONFIG_CRYPTO_ANSI_CPRNG=y
--CONFIG_XZ_DEC=y
+@@ -1,71 +0,0 @@
+-/*
+- * The head-file for SH-Mobile ARM platforms
+- *
+- * Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+- * Simon Horman <horms@verge.net.au>
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License as published by
+- * the Free Software Foundation; version 2 of the License.
+- *
+- * This program is distributed in the hope that it will be useful,
+- * but WITHOUT ANY WARRANTY; without even the implied warranty of
+- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+- * GNU General Public License for more details.
+- *
+- * You should have received a copy of the GNU General Public License
+- * along with this program; if not, write to the Free Software
+- * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
+- */
+-
+-#ifdef CONFIG_ZBOOT_ROM
+-
+-	.section	".start", "ax"
+-
+-	/* load board-specific initialization code */
+-#include <mach/zboot.h>
+-
+-	adr	r0, dtb_info
+-	ldmia	r0, {r1, r3, r4, r5, r7}
+-
+-	sub	r0, r0, r1		@ calculate the delta offset
+-	add	r5, r5, r0		@ _edata
+-
+-	ldr	lr, [r5, #0]		@ check if valid DTB is present
+-	cmp	lr, r3
+-	bne	0f
+-
+-	add	r9, r7, #31		@ rounded up to a multiple
+-	bic	r9, r9, #31		@ ... of 32 bytes
+-
+-	add	r6, r9, r5		@ copy from _edata
+-	add	r9, r9, r4		@ to MEMORY_START
+-
+-1:	ldmdb	r6!, {r0 - r3, r10 - r12, lr}
+-	cmp	r6, r5
+-	stmdb	r9!, {r0 - r3, r10 - r12, lr}
+-	bhi	1b
+-
+-	/* Success: Zero board ID, pointer to start of memory for atag/dtb */
+-	mov	r7, #0
+-	mov	r8, r4
+-	b	2f
+-
+-	.align	2
+-dtb_info:
+-	.word	dtb_info
+-#ifndef __ARMEB__
+-	.word	0xedfe0dd0		@ sig is 0xd00dfeed big endian
+-#else
+-	.word	0xd00dfeed
+-#endif
+-	.word	MEMORY_START
+-	.word	_edata
+-	.word	0x4000			@ maximum DTB size
+-0:
+-	/* Failure: Zero board ID, NULL atag/dtb */
+-	mov 	r7, #0
+-	mov	r8, #0			@ pass null pointer as atag
+-2 :
+-
+-#endif /* CONFIG_ZBOOT_ROM */
+diff --git a/arch/arm/mach-shmobile/include/mach/zboot.h b/arch/arm/mach-shmobile/include/mach/zboot.h
+deleted file mode 100644
+index 80f599f4b5ab5733..0000000000000000
+--- a/arch/arm/mach-shmobile/include/mach/zboot.h
++++ /dev/null
+@@ -1,14 +0,0 @@
+-#ifndef ZBOOT_H
+-#define ZBOOT_H
+-
+-#include <mach/zboot_macros.h>
+-
+-/**************************************************
+- *
+- *		board specific settings
+- *
+- **************************************************/
+-
+-#error "unsupported board."
+-
+-#endif /* ZBOOT_H */
+diff --git a/arch/arm/mach-shmobile/include/mach/zboot_macros.h b/arch/arm/mach-shmobile/include/mach/zboot_macros.h
+deleted file mode 100644
+index 14fd3d538e9aa11a..0000000000000000
+--- a/arch/arm/mach-shmobile/include/mach/zboot_macros.h
++++ /dev/null
+@@ -1,108 +0,0 @@
+-#ifndef __ZBOOT_MACRO_H
+-#define __ZBOOT_MACRO_H
+-
+-/* The LIST command is used to include comments in the script */
+-.macro	LIST comment
+-.endm
+-
+-/* The ED command is used to write a 32-bit word */
+-.macro ED, addr, data
+-	LDR	r0, 1f
+-	LDR	r1, 2f
+-	STR	r1, [r0]
+-	B	3f
+-1 :	.long	\addr
+-2 :	.long	\data
+-3 :
+-.endm
+-
+-/* The EW command is used to write a 16-bit word */
+-.macro EW, addr, data
+-	LDR	r0, 1f
+-	LDR	r1, 2f
+-	STRH	r1, [r0]
+-	B	3f
+-1 :	.long	\addr
+-2 :	.long	\data
+-3 :
+-.endm
+-
+-/* The EB command is used to write an 8-bit word */
+-.macro EB, addr, data
+-	LDR	r0, 1f
+-	LDR	r1, 2f
+-	STRB	r1, [r0]
+-	B	3f
+-1 :	.long	\addr
+-2 :	.long	\data
+-3 :
+-.endm
+-
+-/* The WAIT command is used to delay the execution */
+-.macro  WAIT, time, reg
+-	LDR	r1, 1f
+-	LDR	r0, 2f
+-	STR	r0, [r1]
+-10 :
+-	LDR	r0, [r1]
+-	CMP	r0, #0x00000000
+-	BNE	10b
+-	NOP
+-	B	3f
+-1 :	.long	\reg
+-2 :	.long	\time * 100
+-3 :
+-.endm
+-
+-/* The DD command is used to read a 32-bit word */
+-.macro  DD, start, end
+-	LDR	r1, 1f
+-	B	2f
+-1 :	.long	\start
+-2 :
+-.endm
+-
+-/* loop until a given value has been read (with mask) */
+-.macro WAIT_MASK, addr, data, cmp
+-	LDR	r0, 2f
+-	LDR	r1, 3f
+-	LDR	r2, 4f
+-1:
+-	LDR	r3, [r0, #0]
+-	AND	r3, r1, r3
+-	CMP	r2, r3
+-	BNE	1b
+-	B	5f
+-2:	.long	\addr
+-3:	.long	\data
+-4:	.long	\cmp
+-5:
+-.endm
+-
+-/* read 32-bit value from addr, "or" an immediate and write back */
+-.macro ED_OR, addr, data
+-	LDR r4, 1f
+-	LDR r5, 2f
+-	LDR r6, [r4]
+-	ORR r5, r6, r5
+-	STR r5, [r4]
+-	B	3f
+-1:	.long	\addr
+-2:	.long	\data
+-3:
+-.endm
+-
+-/* read 32-bit value from addr, "and" an immediate and write back */
+-.macro ED_AND, addr, data
+-	LDR r4, 1f
+-	LDR r5, 2f
+-	LDR r6, [r4]
+-	AND r5, r6, r5
+-	STR r5, [r4]
+-	B	3f
+-1:	.long \addr
+-2:	.long \data
+-3:
+-.endm
+-
+-#endif /* __ZBOOT_MACRO_H */
 -- 
 1.9.1
