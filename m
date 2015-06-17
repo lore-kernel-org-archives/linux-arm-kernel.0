@@ -1,79 +1,94 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Wed, 17 Jun 2015 08:23:52 -0500
-Subject: [PATCH V7 2/3] OPP: Allow multiple OPP tables to be passed via DT
-In-Reply-To: <263c128844f5a3c9280c8be71f6c9eb1869a5188.1433434659.git.viresh.kumar@linaro.org>
-References: <cover.1433434659.git.viresh.kumar@linaro.org>
- <263c128844f5a3c9280c8be71f6c9eb1869a5188.1433434659.git.viresh.kumar@linaro.org>
-Message-ID: <CAL_Jsq+EOOeQw42wZi+H82ovLn8LcQUuK9HGT+FvewdhTf7Q1w@mail.gmail.com>
+From: simon.guinot@sequanux.org (Simon Guinot)
+Date: Wed, 17 Jun 2015 15:19:22 +0200
+Subject: [PATCH v2 3/3] ARM: mvebu: disable IP checksum with jumbo frames for
+ Armada 370
+In-Reply-To: <1434547162-6275-1-git-send-email-simon.guinot@sequanux.org>
+References: <1434547162-6275-1-git-send-email-simon.guinot@sequanux.org>
+Message-ID: <1434547162-6275-4-git-send-email-simon.guinot@sequanux.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 4, 2015 at 11:20 AM, Viresh Kumar <viresh.kumar@linaro.org> wrote:
-> On some platforms (Like Qualcomm's SoCs), it is not decided until
-> runtime on what OPPs to use. The OPP tables can be fixed at compile
-> time, but which table to use is found out only after reading some efuses
-> (sort of an prom) and knowing characteristics of the SoC.
->
-> To support such platform we need to pass multiple OPP tables per device
-> and hardware should be able to choose one and only one table out of
-> those.
->
-> Update OPP-v2 bindings to support that.
->
-> Acked-by: Nishanth Menon <nm@ti.com>
-> Reviewed-by: Stephen Boyd <sboyd@codeaurora.org>
-> Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
-> ---
->  Documentation/devicetree/bindings/power/opp.txt | 52 +++++++++++++++++++++++++
->  1 file changed, 52 insertions(+)
->
-> diff --git a/Documentation/devicetree/bindings/power/opp.txt b/Documentation/devicetree/bindings/power/opp.txt
-> index 259bf00edf7d..2938c52dbf84 100644
-> --- a/Documentation/devicetree/bindings/power/opp.txt
-> +++ b/Documentation/devicetree/bindings/power/opp.txt
-> @@ -45,6 +45,9 @@ Devices supporting OPPs must set their "operating-points-v2" property with
->  phandle to a OPP table in their DT node. The OPP core will use this phandle to
->  find the operating points for the device.
->
-> +Devices may want to choose OPP tables at runtime and so can provide a list of
-> +phandles here. But only *one* of them should be chosen at runtime.
-> +
->  If required, this can be extended for SoC vendor specfic bindings. Such bindings
->  should be documented as Documentation/devicetree/bindings/power/<vendor>-opp.txt
->  and should have a compatible description like: "operating-points-v2-<vendor>".
-> @@ -63,6 +66,9 @@ This describes the OPPs belonging to a device. This node can have following
->    reference an OPP.
->
->  Optional properties:
-> +- opp-name: Name of the OPP table, to uniquely identify it if more than one OPP
-> +  table is supplied in "operating-points-v2" property of device.
-> +
->  - opp-shared: Indicates that device nodes using this OPP Table Node's phandle
->    switch their DVFS state together, i.e. they share clock/voltage/current lines.
->    Missing property means devices have independent clock/voltage/current lines,
-> @@ -396,3 +402,49 @@ Example 4: Handling multiple regulators
->                 };
->         };
->  };
-> +
-> +Example 5: Multiple OPP tables
-> +
-> +/ {
-> +       cpus {
-> +               cpu at 0 {
-> +                       compatible = "arm,cortex-a7";
-> +                       ...
-> +
-> +                       cpu-supply = <&cpu_supply>
-> +                       operating-points-v2 = <&cpu0_opp_table_slow>, <&cpu0_opp_table_fast>;
+The Ethernet controller found in the Armada 370, 380 and 385 SoCs don't
+support TCP/IP checksumming with frame sizes larger than 1600 bytes.
 
-You've made a fundamental change here in that this can now be a list
-of phandles. There should be some description on what a list means
-(merge the tables?, select one?).
+This patch fixes the issue by disabling the features NETIF_F_IP_CSUM and
+NETIF_F_TSO for the Armada 370 and compatibles SoCs when the MTU is set
+to a value greater than 1600 bytes.
 
-I think this needs to have a defined order and the platform should
-know what that is. For example, if you read the efuses and decide you
-need the "slow" table, you know to pick the first entry. Then you
-don't need opp-name. Does that work for QCom?
+Signed-off-by: Simon Guinot <simon.guinot@sequanux.org>
+Cc: <stable@vger.kernel.org> # v3.8+
+---
+ drivers/net/ethernet/marvell/mvneta.c | 26 +++++++++++++++++++++++++-
+ 1 file changed, 25 insertions(+), 1 deletion(-)
 
-Rob
+diff --git a/drivers/net/ethernet/marvell/mvneta.c b/drivers/net/ethernet/marvell/mvneta.c
+index aceb977b104d..9b2b7478fe47 100644
+--- a/drivers/net/ethernet/marvell/mvneta.c
++++ b/drivers/net/ethernet/marvell/mvneta.c
+@@ -310,6 +310,7 @@ struct mvneta_port {
+ 	unsigned int link;
+ 	unsigned int duplex;
+ 	unsigned int speed;
++	unsigned int tx_csum_limit;
+ 	int use_inband_status:1;
+ };
+ 
+@@ -2502,8 +2503,10 @@ static int mvneta_change_mtu(struct net_device *dev, int mtu)
+ 
+ 	dev->mtu = mtu;
+ 
+-	if (!netif_running(dev))
++	if (!netif_running(dev)) {
++		netdev_update_features(dev);
+ 		return 0;
++	}
+ 
+ 	/* The interface is running, so we have to force a
+ 	 * reallocation of the queues
+@@ -2532,9 +2535,26 @@ static int mvneta_change_mtu(struct net_device *dev, int mtu)
+ 	mvneta_start_dev(pp);
+ 	mvneta_port_up(pp);
+ 
++	netdev_update_features(dev);
++
+ 	return 0;
+ }
+ 
++static netdev_features_t mvneta_fix_features(struct net_device *dev,
++					     netdev_features_t features)
++{
++	struct mvneta_port *pp = netdev_priv(dev);
++
++	if (pp->tx_csum_limit && dev->mtu > pp->tx_csum_limit) {
++		features &= ~(NETIF_F_IP_CSUM | NETIF_F_TSO);
++		netdev_info(dev,
++			    "Disable IP checksum for MTU greater than %dB\n",
++			    pp->tx_csum_limit);
++	}
++
++	return features;
++}
++
+ /* Get mac address */
+ static void mvneta_get_mac_addr(struct mvneta_port *pp, unsigned char *addr)
+ {
+@@ -2856,6 +2876,7 @@ static const struct net_device_ops mvneta_netdev_ops = {
+ 	.ndo_set_rx_mode     = mvneta_set_rx_mode,
+ 	.ndo_set_mac_address = mvneta_set_mac_addr,
+ 	.ndo_change_mtu      = mvneta_change_mtu,
++	.ndo_fix_features    = mvneta_fix_features,
+ 	.ndo_get_stats64     = mvneta_get_stats64,
+ 	.ndo_do_ioctl        = mvneta_ioctl,
+ };
+@@ -3101,6 +3122,9 @@ static int mvneta_probe(struct platform_device *pdev)
+ 		}
+ 	}
+ 
++	if (of_device_is_compatible(dn, "marvell,armada-370-neta"))
++		pp->tx_csum_limit = 1600;
++
+ 	pp->tx_ring_size = MVNETA_MAX_TXD;
+ 	pp->rx_ring_size = MVNETA_MAX_RXD;
+ 
+-- 
+2.1.4
