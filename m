@@ -1,217 +1,41 @@
-From: eric.auger@linaro.org (Eric Auger)
-Date: Wed, 17 Jun 2015 17:50:50 +0200
-Subject: [PATCH 10/10] KVM: arm/arm64: vgic: Allow non-shared device HW
- interrupts
-In-Reply-To: <55819445.4090309@arm.com>
-References: <1433783045-8002-1-git-send-email-marc.zyngier@arm.com>
- <1433783045-8002-11-git-send-email-marc.zyngier@arm.com>
- <55818E06.8010400@linaro.org> <55819445.4090309@arm.com>
-Message-ID: <5581975A.8070509@linaro.org>
+From: xerofoify@gmail.com (Nicholas Krause)
+Date: Wed, 17 Jun 2015 11:52:42 -0400
+Subject: [PATCH] xilinx:Remove unused variable num_frag in the function
+ axienet_start_xmit
+Message-ID: <1434556362-3748-1-git-send-email-xerofoify@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/17/2015 05:37 PM, Marc Zyngier wrote:
-> On 17/06/15 16:11, Eric Auger wrote:
->> Hi Marc,
->> On 06/08/2015 07:04 PM, Marc Zyngier wrote:
->>> So far, the only use of the HW interrupt facility is the timer,
->>> implying that the active state is context-switched for each vcpu,
->>> as the device is is shared across all vcpus.
->> s/is//
->>>
->>> This does not work for a device that has been assigned to a VM,
->>> as the guest is entierely in control of that device (the HW is
->> entirely?
->>> not shared). In that case, it makes sense to bypass the whole
->>> active state srtwitchint, and only track the deactivation of the
->> switching
-> 
-> Congratulations, I think you're now ready to try deciphering my
-> handwriting... ;-)
-good to see you're not a machine or maybe you do it on purpose some
-times ;-)
-> 
->>> interrupt.
->>>
->>> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
->>> ---
->>>  include/kvm/arm_vgic.h    |  5 +++--
->>>  virt/kvm/arm/arch_timer.c |  2 +-
->>>  virt/kvm/arm/vgic.c       | 37 ++++++++++++++++++++++++-------------
->>>  3 files changed, 28 insertions(+), 16 deletions(-)
->>>
->>> diff --git a/include/kvm/arm_vgic.h b/include/kvm/arm_vgic.h
->>> index 1c653c1..5d47d60 100644
->>> --- a/include/kvm/arm_vgic.h
->>> +++ b/include/kvm/arm_vgic.h
->>> @@ -164,7 +164,8 @@ struct irq_phys_map {
->>>  	u32			virt_irq;
->>>  	u32			phys_irq;
->>>  	u32			irq;
->>> -	bool			active;
->>> +	bool			shared;
->>> +	bool			active; /* Only valid if shared */
->>>  };
->>>  
->>>  struct vgic_dist {
->>> @@ -347,7 +348,7 @@ void vgic_v3_dispatch_sgi(struct kvm_vcpu *vcpu, u64 reg);
->>>  int kvm_vgic_vcpu_pending_irq(struct kvm_vcpu *vcpu);
->>>  int kvm_vgic_vcpu_active_irq(struct kvm_vcpu *vcpu);
->>>  struct irq_phys_map *vgic_map_phys_irq(struct kvm_vcpu *vcpu,
->>> -				       int virt_irq, int irq);
->>> +				       int virt_irq, int irq, bool shared);
->>>  int vgic_unmap_phys_irq(struct kvm_vcpu *vcpu, struct irq_phys_map *map);
->>>  bool vgic_get_phys_irq_active(struct irq_phys_map *map);
->>>  void vgic_set_phys_irq_active(struct irq_phys_map *map, bool active);
->>> diff --git a/virt/kvm/arm/arch_timer.c b/virt/kvm/arm/arch_timer.c
->>> index b9fff78..9544d79 100644
->>> --- a/virt/kvm/arm/arch_timer.c
->>> +++ b/virt/kvm/arm/arch_timer.c
->>> @@ -202,7 +202,7 @@ void kvm_timer_vcpu_reset(struct kvm_vcpu *vcpu,
->>>  	 * Tell the VGIC that the virtual interrupt is tied to a
->>>  	 * physical interrupt. We do that once per VCPU.
->>>  	 */
->>> -	timer->map = vgic_map_phys_irq(vcpu, irq->irq, host_vtimer_irq);
->>> +	timer->map = vgic_map_phys_irq(vcpu, irq->irq, host_vtimer_irq, true);
->>>  	WARN_ON(!timer->map);
->>>  }
->>>  
->>> diff --git a/virt/kvm/arm/vgic.c b/virt/kvm/arm/vgic.c
->>> index f376b56..4223166 100644
->>> --- a/virt/kvm/arm/vgic.c
->>> +++ b/virt/kvm/arm/vgic.c
->>> @@ -1125,18 +1125,21 @@ static void vgic_queue_irq_to_lr(struct kvm_vcpu *vcpu, int irq,
->>>  		map = vgic_irq_map_search(vcpu, irq);
->>>  
->>>  		if (map) {
->>> -			int ret;
->>> -
->>> -			BUG_ON(!map->active);
->>>  			vlr.hwirq = map->phys_irq;
->>>  			vlr.state |= LR_HW;
->>>  			vlr.state &= ~LR_EOI_INT;
->>>  
->>> -			ret = irq_set_irqchip_state(map->irq,
->>> -						    IRQCHIP_STATE_ACTIVE,
->>> -						    true);
->>>  			vgic_irq_set_queued(vcpu, irq);
->>
->> the queued state is set again in vgic_queue_hwirq for level_sensitive
->> IRQs although not harmful.
-> 
-> Indeed. We still need it for edge interrupts though. I'll try to find a
-> nicer way...
-> 
->>> -			WARN_ON(ret);
->>> +
->>> +			if (map->shared) {
->>> +				int ret;
->>> +
->>> +				BUG_ON(!map->active);
->>> +				ret = irq_set_irqchip_state(map->irq,
->>> +							    IRQCHIP_STATE_ACTIVE,
->>> +							    true);
->>> +				WARN_ON(ret);
->>> +			}
->>>  		}
->>>  	}
->>>  
->>> @@ -1368,21 +1371,28 @@ static bool vgic_process_maintenance(struct kvm_vcpu *vcpu)
->>>  static int vgic_sync_hwirq(struct kvm_vcpu *vcpu, struct vgic_lr vlr)
->>>  {
->>>  	struct irq_phys_map *map;
->>> +	bool active;
->>>  	int ret;
->>>  
->>>  	if (!(vlr.state & LR_HW))
->>>  		return 0;
->>>  
->>>  	map = vgic_irq_map_search(vcpu, vlr.irq);
->>> -	BUG_ON(!map || !map->active);
->>> +	BUG_ON(!map);
->>> +	BUG_ON(map->shared && !map->active);
->>>  
->>>  	ret = irq_get_irqchip_state(map->irq,
->>>  				    IRQCHIP_STATE_ACTIVE,
->>> -				    &map->active);
->>> +				    &active);
->>>  
->> In case of non shared and EOIMode = 1 - I know this is not your current
->> interest here though ;-) - , once the guest EOIs its virtual IRQ and GIC
->> deactivates the physical one, a new phys IRQ can hit immediatly, the
->> physical handler can be entered and the state is seen as active here.
->> The queued state is never reset in such a case and the system gets stuck
->> since the can_sample fails I think. What I mean here is sounds the state
->> machine as is does not work for my VFIO case. So some adaptations still
->> are needed I think. Do you share my diagnosis?
-> 
-> Yup, there is something that doesn't quite work here.
-> 
-> I think the mistake is to sample the distributor active state. I wonder
-> if I can simply rely on the LR state. If it is neither pending nor
-> active, it means that we have done the deactivation, and we can then
-> reset the queued state.
+This removes the unused variable num_frag and the setting of it
+to the number of fragments from the passed sk_buff pointer by
+this function's caller due to this variable never being used
+in this particular function and is not declared as  global so
+setting it for global use in this file is pointless.
 
-I tried to use the LR in the past - it was also Christoffer's will - but
-it was not working. I observed injection before seeing the LR voided.
-This is why I resorted to using the pending state instead and treated
-forwarded IRQ as edge in vgic_queue_hwirq.  sampling could be done only
-if the IRQ was pending.
+Signed-off-by: Nicholas Krause <xerofoify@gmail.com>
+---
+ drivers/net/ethernet/xilinx/xilinx_axienet_main.c | 2 --
+ 1 file changed, 2 deletions(-)
 
-Eric
-> 
-> As a bonus, it would save a read from MMIO, which is often dog slow.
-> 
-> Thoughts?
-> 
-> 	M.
->>
->> Eric
->>>  
->>> -	if (map->active) {
->>> +	if (!map->shared)
->>> +		return !active;
->>> +
->>> +	map->active = active;
->>> +
->>> +	if (active) {
->>>  		ret = irq_set_irqchip_state(map->irq,
->>>  					    IRQCHIP_STATE_ACTIVE,
->>>  					    false);
->>> @@ -1663,7 +1673,7 @@ static struct rb_root *vgic_get_irq_phys_map(struct kvm_vcpu *vcpu,
->>>  }
->>>  
->>>  struct irq_phys_map *vgic_map_phys_irq(struct kvm_vcpu *vcpu,
->>> -				       int virt_irq, int irq)
->>> +				       int virt_irq, int irq, bool shared)
->>>  {
->>>  	struct vgic_dist *dist = &vcpu->kvm->arch.vgic;
->>>  	struct rb_root *root = vgic_get_irq_phys_map(vcpu, virt_irq);
->>> @@ -1710,6 +1720,7 @@ struct irq_phys_map *vgic_map_phys_irq(struct kvm_vcpu *vcpu,
->>>  	new_map->virt_irq = virt_irq;
->>>  	new_map->phys_irq = phys_irq;
->>>  	new_map->irq = irq;
->>> +	new_map->shared = shared;
->>>  
->>>  	rb_link_node(&new_map->node, parent, new);
->>>  	rb_insert_color(&new_map->node, root);
->>> @@ -1746,13 +1757,13 @@ static struct irq_phys_map *vgic_irq_map_search(struct kvm_vcpu *vcpu,
->>>  
->>>  bool vgic_get_phys_irq_active(struct irq_phys_map *map)
->>>  {
->>> -	BUG_ON(!map);
->>> +	BUG_ON(!map || !map->shared);
->>>  	return map->active;
->>>  }
->>>  
->>>  void vgic_set_phys_irq_active(struct irq_phys_map *map, bool active)
->>>  {
->>> -	BUG_ON(!map);
->>> +	BUG_ON(!map || !map->shared);
->>>  	map->active = active;
->>>  }
->>>  
->>>
->>
-> 
-> 
+diff --git a/drivers/net/ethernet/xilinx/xilinx_axienet_main.c b/drivers/net/ethernet/xilinx/xilinx_axienet_main.c
+index 28b7e7d..624dce4 100644
+--- a/drivers/net/ethernet/xilinx/xilinx_axienet_main.c
++++ b/drivers/net/ethernet/xilinx/xilinx_axienet_main.c
+@@ -651,7 +651,6 @@ static inline int axienet_check_tx_bd_space(struct axienet_local *lp,
+ static int axienet_start_xmit(struct sk_buff *skb, struct net_device *ndev)
+ {
+ 	u32 ii;
+-	u32 num_frag;
+ 	u32 csum_start_off;
+ 	u32 csum_index_off;
+ 	skb_frag_t *frag;
+@@ -659,7 +658,6 @@ static int axienet_start_xmit(struct sk_buff *skb, struct net_device *ndev)
+ 	struct axienet_local *lp = netdev_priv(ndev);
+ 	struct axidma_bd *cur_p;
+ 
+-	num_frag = skb_shinfo(skb)->nr_frags;
+ 	cur_p = &lp->tx_bd_v[lp->tx_bd_tail];
+ 
+ 	if (axienet_check_tx_bd_space(lp, num_frag)) {
+-- 
+2.1.4
