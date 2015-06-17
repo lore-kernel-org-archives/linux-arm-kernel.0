@@ -1,47 +1,39 @@
 From: julien.grall@citrix.com (Julien Grall)
-Date: Wed, 17 Jun 2015 15:28:07 +0100
-Subject: [PATCH v2 6/7] block/xen-blkfront: Remove invalid comment
+Date: Wed, 17 Jun 2015 15:28:04 +0100
+Subject: [PATCH v2 3/7] xen/grant-table: Remove unused macro SPP
 In-Reply-To: <1434551288-14113-1-git-send-email-julien.grall@citrix.com>
 References: <1434551288-14113-1-git-send-email-julien.grall@citrix.com>
-Message-ID: <1434551288-14113-7-git-send-email-julien.grall@citrix.com>
+Message-ID: <1434551288-14113-4-git-send-email-julien.grall@citrix.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Julien Grall <julien.grall@linaro.org>
-
-Since commit b764915 "xen-blkfront: use a different scatterlist for each
-request", biovec has been replaced by scatterlist when copying back the
-data during a completion request.
+SPP was used by the grant table v2 code which has been removed in
+commit 438b33c7145ca8a5131a30c36d8f59bce119a19a "xen/grant-table:
+remove support for V2 tables".
 
 Signed-off-by: Julien Grall <julien.grall@citrix.com>
-Acked-by: Roger Pau Monn? <roger.pau@citrix.com>
+Reviewed-by: David Vrabel <david.vrabel@citrix.com>
 Cc: Konrad Rzeszutek Wilk <konrad.wilk@oracle.com>
 Cc: Boris Ostrovsky <boris.ostrovsky@oracle.com>
-Cc: David Vrabel <david.vrabel@citrix.com>
 
 ---
     Changes in v2:
-        - Add Roger's Acked-by
+        - Add David's Reviewed-by
 ---
- drivers/block/xen-blkfront.c | 6 ------
- 1 file changed, 6 deletions(-)
+ drivers/xen/grant-table.c | 1 -
+ 1 file changed, 1 deletion(-)
 
-diff --git a/drivers/block/xen-blkfront.c b/drivers/block/xen-blkfront.c
-index 5c72c25..60cf1d6 100644
---- a/drivers/block/xen-blkfront.c
-+++ b/drivers/block/xen-blkfront.c
-@@ -1056,12 +1056,6 @@ static void blkif_completion(struct blk_shadow *s, struct blkfront_info *info,
- 		s->req.u.indirect.nr_segments : s->req.u.rw.nr_segments;
+diff --git a/drivers/xen/grant-table.c b/drivers/xen/grant-table.c
+index b1c7170..62f591f 100644
+--- a/drivers/xen/grant-table.c
++++ b/drivers/xen/grant-table.c
+@@ -138,7 +138,6 @@ static struct gnttab_free_callback *gnttab_free_callback_list;
+ static int gnttab_expand(unsigned int req_entries);
  
- 	if (bret->operation == BLKIF_OP_READ && info->feature_persistent) {
--		/*
--		 * Copy the data received from the backend into the bvec.
--		 * Since bv_offset can be different than 0, and bv_len different
--		 * than PAGE_SIZE, we have to keep track of the current offset,
--		 * to be sure we are copying the data from the right shared page.
--		 */
- 		for_each_sg(s->sg, sg, nseg, i) {
- 			BUG_ON(sg->offset + sg->length > PAGE_SIZE);
- 			shared_data = kmap_atomic(
+ #define RPP (PAGE_SIZE / sizeof(grant_ref_t))
+-#define SPP (PAGE_SIZE / sizeof(grant_status_t))
+ 
+ static inline grant_ref_t *__gnttab_entry(grant_ref_t entry)
+ {
 -- 
 2.1.4
