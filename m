@@ -1,120 +1,84 @@
-From: dave.long@linaro.org (David Long)
-Date: Wed, 17 Jun 2015 14:51:04 -0400
-Subject: [PATCH v7 0/7] arm64: Add kernel probes (kprobes) support
-In-Reply-To: <558181C2.6020500@hitachi.com>
-References: <1434395229-6654-1-git-send-email-dave.long@linaro.org>
- <558181C2.6020500@hitachi.com>
-Message-ID: <5581C198.1040802@linaro.org>
+From: soren.brinkmann@xilinx.com (=?utf-8?B?U8O2cmVu?= Brinkmann)
+Date: Wed, 17 Jun 2015 11:58:48 -0700
+Subject: [PATCH] xilinx:Remove unused variable num_frag in the function
+ axienet_start_xmit
+In-Reply-To: <DD47523D-0DF9-46B5-9382-3C30BBD9E815@gmail.com>
+References: <1434556362-3748-1-git-send-email-xerofoify@gmail.com>
+ <20150617160730.GE2906@xsjsorenbubuntu>
+ <DD47523D-0DF9-46B5-9382-3C30BBD9E815@gmail.com>
+Message-ID: <20150617185848.GI2906@xsjsorenbubuntu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/17/15 10:18, Masami Hiramatsu wrote:
-> Hi David,
->
-> At first, thank you for updating this series! :)
->
-> On 2015/06/16 4:07, David Long wrote:
->> From: "David A. Long" <dave.long@linaro.org>
->>
->> This patchset is heavily based on Sandeepa Prabhu's ARM v8 kprobes patches,
->> first seen in October 2013. This version attempts to address concerns raised by
->> reviewers and also fixes problems discovered during testing.
->>
->> This patchset adds support for kernel probes(kprobes), jump probes(jprobes)
->> and return probes(kretprobes) support for ARM64.
->>
->> The kprobes mechanism makes use of software breakpoint and single stepping
->> support available in the ARM v8 kernel.
->>
->> The is patch depends on:
->> 	[PATCH 1/2] Move the pt_regs_offset struct definition from arch to common include file
->> 	[PATCH 2/2] Consolidate redundant register/stack access code
->>
->
-> Hmm, what are those patches ? Would they be not merged to upstream yet?
-> If so, where I can get them from? I'd like to know the actual url for them.
->
+On Wed, 2015-06-17 at 12:21PM -0400, Nicholas Krause wrote:
+> 
+> 
+> On June 17, 2015 12:07:30 PM EDT, "S?ren Brinkmann" <soren.brinkmann@xilinx.com> wrote:
+> >On Wed, 2015-06-17 at 11:52AM -0400, Nicholas Krause wrote:
+> >> This removes the unused variable num_frag and the setting of it
+> >> to the number of fragments from the passed sk_buff pointer by
+> >> this function's caller due to this variable never being used
+> >> in this particular function and is not declared as  global so
+> >> setting it for global use in this file is pointless.
+> >> 
+> >> Signed-off-by: Nicholas Krause <xerofoify@gmail.com>
+> >> ---
+> >>  drivers/net/ethernet/xilinx/xilinx_axienet_main.c | 2 --
+> >>  1 file changed, 2 deletions(-)
+> >> 
+> >> diff --git a/drivers/net/ethernet/xilinx/xilinx_axienet_main.c
+> >b/drivers/net/ethernet/xilinx/xilinx_axienet_main.c
+> >> index 28b7e7d..624dce4 100644
+> >> --- a/drivers/net/ethernet/xilinx/xilinx_axienet_main.c
+> >> +++ b/drivers/net/ethernet/xilinx/xilinx_axienet_main.c
+> >> @@ -651,7 +651,6 @@ static inline int
+> >axienet_check_tx_bd_space(struct axienet_local *lp,
+> >>  static int axienet_start_xmit(struct sk_buff *skb, struct net_device
+> >*ndev)
+> >>  {
+> >>  	u32 ii;
+> >> -	u32 num_frag;
+> >>  	u32 csum_start_off;
+> >>  	u32 csum_index_off;
+> >>  	skb_frag_t *frag;
+> >> @@ -659,7 +658,6 @@ static int axienet_start_xmit(struct sk_buff
+> >*skb, struct net_device *ndev)
+> >>  	struct axienet_local *lp = netdev_priv(ndev);
+> >>  	struct axidma_bd *cur_p;
+> >>  
+> >> -	num_frag = skb_shinfo(skb)->nr_frags;
+> >>  	cur_p = &lp->tx_bd_v[lp->tx_bd_tail];
+> >>  
+> >>  	if (axienet_check_tx_bd_space(lp, num_frag)) {
+> >
+> >It's used right here, isn't it (and further down in this function too)?
+> >Does your tree compile with this change?
+> >
+> >	S?ren
+> My tree does compile with this change. 
 
-These patches were sent out to the kernel mailing lists shortly before 
-the kprobes64 patch.  Until such time as they are accepted upstream they 
-can also be found on the "kprobes64-v7" branch of my personal git repo at:
+You have to fix your testing process:
+    CHK     include/config/kernel.release
+    UPD     include/config/kernel.release
+    CHK     include/generated/uapi/linux/version.h
+    CHK     include/generated/utsrelease.h
+    UPD     include/generated/utsrelease.h
+    CHK     include/generated/bounds.h
+    CHK     include/generated/timeconst.h
+    CHK     include/generated/asm-offsets.h
+    CALL    scripts/checksyscalls.sh
+  <stdin>:1253:2: warning: #warning syscall userfaultfd not implemented [-Wcpp]
+    CC      drivers/net/ethernet/xilinx/xilinx_axienet_main.o
+  drivers/net/ethernet/xilinx/xilinx_axienet_main.c: In function 'axienet_start_xmit':
+  drivers/net/ethernet/xilinx/xilinx_axienet_main.c:667:36: error: 'num_frag' undeclared (first use in this function)
+    if (axienet_check_tx_bd_space(lp, num_frag)) {
+                                      ^
+  drivers/net/ethernet/xilinx/xilinx_axienet_main.c:667:36: note: each undeclared identifier is reported only once for each function it appears in
+  scripts/Makefile.build:258: recipe for target 'drivers/net/ethernet/xilinx/xilinx_axienet_main.o' failed
+  make[1]: *** [drivers/net/ethernet/xilinx/xilinx_axienet_main.o] Error 1
+  Makefile:1545: recipe for target 'drivers/net/ethernet/xilinx/xilinx_axienet_main.o' failed
+  make: *** [drivers/net/ethernet/xilinx/xilinx_axienet_main.o] Error 2
 
-https://git.linaro.org/people/dave.long/linux.git
+NACK for the patch.
 
-as commits:
-
-3ce7d917bef3aee9fff70252d83e65f1cc7f909b
-03f4bece51a068f4e1dac8813a57feeccfa24c26
-
-
-Since I'm not planning on keeping that branch around forever I did not 
-include that info in the cover-letter email.  Please advise if there is 
-a better way to record dependencies like this.
-
->
-> [...]
->> Changes since v6 include:
->>
->> 1) New trampoline code from Will Cohen fixes the occasional failure seen
->> when processing kretprobes by replacing the software breakpoint with
->> assembly code to implement the return to the original execution stream.
->
-> Yeah, that's what we need :)
->
-> Thank you,
->
-
-You're welcome :-)
-
->> 2) Changed ip0, ip1, fp, and lr to plain numbered registers for purposes
->> of recognizing them as an ascii string in the stack/reg access code.
->> 3) Removed orig_x0.
->> 4) Moved ARM_x* defines from arch/arm64/include/uapi/asm/ptrace.h to
->> arch/arm64/kernel/ptrace.c.
->>
->> David A. Long (2):
->>    arm64: Add HAVE_REGS_AND_STACK_ACCESS_API feature
->>    arm64: Add more test functions to insn.c
->>
->> Sandeepa Prabhu (4):
->>    arm64: Kprobes with single stepping support
->>    arm64: kprobes instruction simulation support
->>    arm64: Add kernel return probes support (kretprobes)
->>    kprobes: Add arm64 case in kprobe example module
->>
->> William Cohen (1):
->>    arm64: Add trampoline code for kretprobes
->>
->>   arch/arm64/Kconfig                       |   3 +
->>   arch/arm64/include/asm/debug-monitors.h  |   5 +
->>   arch/arm64/include/asm/insn.h            |  18 +
->>   arch/arm64/include/asm/kprobes.h         |  63 +++
->>   arch/arm64/include/asm/probes.h          |  50 +++
->>   arch/arm64/include/asm/ptrace.h          |  28 +-
->>   arch/arm64/kernel/Makefile               |   3 +
->>   arch/arm64/kernel/debug-monitors.c       |  35 +-
->>   arch/arm64/kernel/insn.c                 |  28 ++
->>   arch/arm64/kernel/kprobes-arm64.c        | 166 ++++++++
->>   arch/arm64/kernel/kprobes-arm64.h        |  71 ++++
->>   arch/arm64/kernel/kprobes.c              | 665 +++++++++++++++++++++++++++++++
->>   arch/arm64/kernel/kprobes.h              |  24 ++
->>   arch/arm64/kernel/probes-condn-check.c   | 122 ++++++
->>   arch/arm64/kernel/probes-simulate-insn.c | 174 ++++++++
->>   arch/arm64/kernel/probes-simulate-insn.h |  33 ++
->>   arch/arm64/kernel/ptrace.c               |  77 ++++
->>   arch/arm64/kernel/vmlinux.lds.S          |   1 +
->>   arch/arm64/mm/fault.c                    |  25 ++
->>   samples/kprobes/kprobe_example.c         |   8 +
->>   20 files changed, 1588 insertions(+), 11 deletions(-)
->>   create mode 100644 arch/arm64/include/asm/kprobes.h
->>   create mode 100644 arch/arm64/include/asm/probes.h
->>   create mode 100644 arch/arm64/kernel/kprobes-arm64.c
->>   create mode 100644 arch/arm64/kernel/kprobes-arm64.h
->>   create mode 100644 arch/arm64/kernel/kprobes.c
->>   create mode 100644 arch/arm64/kernel/kprobes.h
->>   create mode 100644 arch/arm64/kernel/probes-condn-check.c
->>   create mode 100644 arch/arm64/kernel/probes-simulate-insn.c
->>   create mode 100644 arch/arm64/kernel/probes-simulate-insn.h
->>
->
->
+	S?ren
