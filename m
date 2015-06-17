@@ -1,70 +1,221 @@
 From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Wed, 17 Jun 2015 09:45:42 +0200
-Subject: [PATCH v6 14/14] crypto: marvell/CESA: add DT bindings documentation
+Date: Wed, 17 Jun 2015 09:45:35 +0200
+Subject: [PATCH v6 07/14] crypto: marvell/CESA: add Triple-DES support
 In-Reply-To: <1434527142-3609-1-git-send-email-boris.brezillon@free-electrons.com>
 References: <1434527142-3609-1-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <1434527142-3609-15-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <1434527142-3609-8-git-send-email-boris.brezillon@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add DT bindings documentation for the new marvell-cesa driver.
+From: Arnaud Ebalard <arno@natisbad.org>
 
+Add support for Triple-DES operations.
+
+Signed-off-by: Arnaud Ebalard <arno@natisbad.org>
 Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
 ---
- .../devicetree/bindings/crypto/marvell-cesa.txt    | 45 ++++++++++++++++++++++
- 1 file changed, 45 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/crypto/marvell-cesa.txt
+ drivers/crypto/marvell/cesa.c   |   2 +
+ drivers/crypto/marvell/cesa.h   |   2 +
+ drivers/crypto/marvell/cipher.c | 147 ++++++++++++++++++++++++++++++++++++++++
+ 3 files changed, 151 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/crypto/marvell-cesa.txt b/Documentation/devicetree/bindings/crypto/marvell-cesa.txt
-new file mode 100644
-index 0000000..c6c6a4a0
---- /dev/null
-+++ b/Documentation/devicetree/bindings/crypto/marvell-cesa.txt
-@@ -0,0 +1,45 @@
-+Marvell Cryptographic Engines And Security Accelerator
+diff --git a/drivers/crypto/marvell/cesa.c b/drivers/crypto/marvell/cesa.c
+index 212840e..c0b1b49 100644
+--- a/drivers/crypto/marvell/cesa.c
++++ b/drivers/crypto/marvell/cesa.c
+@@ -171,6 +171,8 @@ static void mv_cesa_remove_algs(struct mv_cesa_dev *cesa)
+ static struct crypto_alg *armada_370_cipher_algs[] = {
+ 	&mv_cesa_ecb_des_alg,
+ 	&mv_cesa_cbc_des_alg,
++	&mv_cesa_ecb_des3_ede_alg,
++	&mv_cesa_cbc_des3_ede_alg,
+ 	&mv_cesa_ecb_aes_alg,
+ 	&mv_cesa_cbc_aes_alg,
+ };
+diff --git a/drivers/crypto/marvell/cesa.h b/drivers/crypto/marvell/cesa.h
+index 2ee48fe..2e8b7fc 100644
+--- a/drivers/crypto/marvell/cesa.h
++++ b/drivers/crypto/marvell/cesa.h
+@@ -779,6 +779,8 @@ extern struct ahash_alg mv_ahmac_sha1_alg;
+ 
+ extern struct crypto_alg mv_cesa_ecb_des_alg;
+ extern struct crypto_alg mv_cesa_cbc_des_alg;
++extern struct crypto_alg mv_cesa_ecb_des3_ede_alg;
++extern struct crypto_alg mv_cesa_cbc_des3_ede_alg;
+ extern struct crypto_alg mv_cesa_ecb_aes_alg;
+ extern struct crypto_alg mv_cesa_cbc_aes_alg;
+ 
+diff --git a/drivers/crypto/marvell/cipher.c b/drivers/crypto/marvell/cipher.c
+index ee49f5f..806c43a 100644
+--- a/drivers/crypto/marvell/cipher.c
++++ b/drivers/crypto/marvell/cipher.c
+@@ -22,6 +22,11 @@ struct mv_cesa_des_ctx {
+ 	u8 key[DES_KEY_SIZE];
+ };
+ 
++struct mv_cesa_des3_ctx {
++	struct mv_cesa_ctx base;
++	u8 key[DES3_EDE_KEY_SIZE];
++};
 +
-+Required properties:
-+- compatible: should be one of the following string
-+	      "marvell,orion-crypto"
-+	      "marvell,kirkwood-crypto"
-+	      "marvell,dove-crypto"
-+	      "marvell,armada-370-crypto"
-+	      "marvell,armada-xp-crypto"
-+	      "marvell,armada-375-crypto"
-+	      "marvell,armada-38x-crypto"
-+- reg: base physical address of the engine and length of memory mapped
-+       region. Can also contain an entry for the SRAM attached to the CESA,
-+       but this representation is deprecated and marvell,crypto-srams should
-+       be used instead
-+- reg-names: "regs". Can contain an "sram" entry, but this representation
-+	     is deprecated and marvell,crypto-srams should be used instead
-+- interrupts: interrupt number
-+- clocks: reference to the crypto engines clocks. This property is not
-+	  required for orion and kirkwood platforms
-+- clock-names: "cesaX" and "cesazX", X should be replaced by the crypto engine
-+	       id.
-+	       This property is not required for the orion and kirkwoord
-+	       platforms.
-+	       "cesazX" clocks are not required on armada-370 platforms
-+- marvell,crypto-srams: phandle to crypto SRAM definitions
+ struct mv_cesa_aes_ctx {
+ 	struct mv_cesa_ctx base;
+ 	struct crypto_aes_ctx aes;
+@@ -261,6 +266,22 @@ static int mv_cesa_des_setkey(struct crypto_ablkcipher *cipher, const u8 *key,
+ 	return 0;
+ }
+ 
++static int mv_cesa_des3_ede_setkey(struct crypto_ablkcipher *cipher,
++				   const u8 *key, unsigned int len)
++{
++	struct crypto_tfm *tfm = crypto_ablkcipher_tfm(cipher);
++	struct mv_cesa_des_ctx *ctx = crypto_tfm_ctx(tfm);
 +
-+Optional properties:
-+- marvell,crypto-sram-size: SRAM size reserved for crypto operations, if not
-+			    specified the whole SRAM is used (2KB)
++	if (len != DES3_EDE_KEY_SIZE) {
++		crypto_ablkcipher_set_flags(cipher, CRYPTO_TFM_RES_BAD_KEY_LEN);
++		return -EINVAL;
++	}
 +
++	memcpy(ctx->key, key, DES3_EDE_KEY_SIZE);
 +
-+Examples:
++	return 0;
++}
 +
-+	crypto at 90000 {
-+		compatible = "marvell,armada-xp-crypto";
-+		reg = <0x90000 0x10000>;
-+		reg-names = "regs";
-+		interrupts = <48>, <49>;
-+		clocks = <&gateclk 23>, <&gateclk 23>;
-+		clock-names = "cesa0", "cesa1";
-+		marvell,crypto-srams = <&crypto_sram0>, <&crypto_sram1>;
-+		marvell,crypto-sram-size = <0x600>;
-+		status = "okay";
-+	};
+ static int mv_cesa_ablkcipher_dma_req_init(struct ablkcipher_request *req,
+ 				const struct mv_cesa_op_ctx *op_templ)
+ {
+@@ -501,6 +522,132 @@ struct crypto_alg mv_cesa_cbc_des_alg = {
+ 	},
+ };
+ 
++static int mv_cesa_des3_op(struct ablkcipher_request *req,
++			   struct mv_cesa_op_ctx *tmpl)
++{
++	struct mv_cesa_des3_ctx *ctx = crypto_tfm_ctx(req->base.tfm);
++	int ret;
++
++	mv_cesa_update_op_cfg(tmpl, CESA_SA_DESC_CFG_CRYPTM_3DES,
++			      CESA_SA_DESC_CFG_CRYPTM_MSK);
++
++	memcpy(tmpl->ctx.blkcipher.key, ctx->key, DES3_EDE_KEY_SIZE);
++
++	ret = mv_cesa_ablkcipher_req_init(req, tmpl);
++	if (ret)
++		return ret;
++
++	ret = mv_cesa_queue_req(&req->base);
++	if (ret && ret != -EINPROGRESS)
++		mv_cesa_ablkcipher_cleanup(req);
++
++	return ret;
++}
++
++static int mv_cesa_ecb_des3_ede_encrypt(struct ablkcipher_request *req)
++{
++	struct mv_cesa_op_ctx tmpl;
++
++	mv_cesa_set_op_cfg(&tmpl,
++			   CESA_SA_DESC_CFG_CRYPTCM_ECB |
++			   CESA_SA_DESC_CFG_3DES_EDE |
++			   CESA_SA_DESC_CFG_DIR_ENC);
++
++	return mv_cesa_des3_op(req, &tmpl);
++}
++
++static int mv_cesa_ecb_des3_ede_decrypt(struct ablkcipher_request *req)
++{
++	struct mv_cesa_op_ctx tmpl;
++
++	mv_cesa_set_op_cfg(&tmpl,
++			   CESA_SA_DESC_CFG_CRYPTCM_ECB |
++			   CESA_SA_DESC_CFG_3DES_EDE |
++			   CESA_SA_DESC_CFG_DIR_DEC);
++
++	return mv_cesa_des3_op(req, &tmpl);
++}
++
++struct crypto_alg mv_cesa_ecb_des3_ede_alg = {
++	.cra_name = "ecb(des3_ede)",
++	.cra_driver_name = "mv-ecb-des3-ede",
++	.cra_priority = 300,
++	.cra_flags = CRYPTO_ALG_TYPE_ABLKCIPHER |
++		     CRYPTO_ALG_KERN_DRIVER_ONLY | CRYPTO_ALG_ASYNC,
++	.cra_blocksize = DES3_EDE_BLOCK_SIZE,
++	.cra_ctxsize = sizeof(struct mv_cesa_des3_ctx),
++	.cra_alignmask = 0,
++	.cra_type = &crypto_ablkcipher_type,
++	.cra_module = THIS_MODULE,
++	.cra_init = mv_cesa_ablkcipher_cra_init,
++	.cra_u = {
++		.ablkcipher = {
++			.min_keysize = DES3_EDE_KEY_SIZE,
++			.max_keysize = DES3_EDE_KEY_SIZE,
++			.ivsize	     = DES3_EDE_BLOCK_SIZE,
++			.setkey = mv_cesa_des3_ede_setkey,
++			.encrypt = mv_cesa_ecb_des3_ede_encrypt,
++			.decrypt = mv_cesa_ecb_des3_ede_decrypt,
++		},
++	},
++};
++
++static int mv_cesa_cbc_des3_op(struct ablkcipher_request *req,
++			       struct mv_cesa_op_ctx *tmpl)
++{
++	memcpy(tmpl->ctx.blkcipher.iv, req->info, DES3_EDE_BLOCK_SIZE);
++
++	return mv_cesa_des3_op(req, tmpl);
++}
++
++static int mv_cesa_cbc_des3_ede_encrypt(struct ablkcipher_request *req)
++{
++	struct mv_cesa_op_ctx tmpl;
++
++	mv_cesa_set_op_cfg(&tmpl,
++			   CESA_SA_DESC_CFG_CRYPTCM_CBC |
++			   CESA_SA_DESC_CFG_3DES_EDE |
++			   CESA_SA_DESC_CFG_DIR_ENC);
++
++	return mv_cesa_cbc_des3_op(req, &tmpl);
++}
++
++static int mv_cesa_cbc_des3_ede_decrypt(struct ablkcipher_request *req)
++{
++	struct mv_cesa_op_ctx tmpl;
++
++	mv_cesa_set_op_cfg(&tmpl,
++			   CESA_SA_DESC_CFG_CRYPTCM_CBC |
++			   CESA_SA_DESC_CFG_3DES_EDE |
++			   CESA_SA_DESC_CFG_DIR_DEC);
++
++	return mv_cesa_cbc_des3_op(req, &tmpl);
++}
++
++struct crypto_alg mv_cesa_cbc_des3_ede_alg = {
++	.cra_name = "cbc(des3_ede)",
++	.cra_driver_name = "mv-cbc-des3-ede",
++	.cra_priority = 300,
++	.cra_flags = CRYPTO_ALG_TYPE_ABLKCIPHER |
++		     CRYPTO_ALG_KERN_DRIVER_ONLY | CRYPTO_ALG_ASYNC,
++	.cra_blocksize = DES3_EDE_BLOCK_SIZE,
++	.cra_ctxsize = sizeof(struct mv_cesa_des3_ctx),
++	.cra_alignmask = 0,
++	.cra_type = &crypto_ablkcipher_type,
++	.cra_module = THIS_MODULE,
++	.cra_init = mv_cesa_ablkcipher_cra_init,
++	.cra_u = {
++		.ablkcipher = {
++			.min_keysize = DES3_EDE_KEY_SIZE,
++			.max_keysize = DES3_EDE_KEY_SIZE,
++			.ivsize	     = DES3_EDE_BLOCK_SIZE,
++			.setkey = mv_cesa_des3_ede_setkey,
++			.encrypt = mv_cesa_cbc_des3_ede_encrypt,
++			.decrypt = mv_cesa_cbc_des3_ede_decrypt,
++		},
++	},
++};
++
+ static int mv_cesa_aes_op(struct ablkcipher_request *req,
+ 			  struct mv_cesa_op_ctx *tmpl)
+ {
 -- 
 1.9.1
