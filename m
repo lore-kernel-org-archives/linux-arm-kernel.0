@@ -1,258 +1,189 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Wed, 17 Jun 2015 14:37:06 +0200
-Subject: [PATCH RESEND 3/4] ARM: mvebu: remove unneeded dmacap,
- * properties in Device Trees
-In-Reply-To: <1434543141-3242-4-git-send-email-thomas.petazzoni@free-electrons.com>
-References: <1434543141-3242-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1434543141-3242-4-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <558169F2.2070608@free-electrons.com>
+From: ludovic.desroches@atmel.com (Ludovic Desroches)
+Date: Wed, 17 Jun 2015 14:38:16 +0200
+Subject: [RESEND PATCH 1/2] pinctrl: change function behavior for per pin
+ muxing controllers
+In-Reply-To: <557EF60D.8020007@wwwdotorg.org>
+References: <1433948699-19800-1-git-send-email-ludovic.desroches@atmel.com>
+ <1433948699-19800-2-git-send-email-ludovic.desroches@atmel.com>
+ <557EF60D.8020007@wwwdotorg.org>
+Message-ID: <20150617123816.GB12295@odux.rfo.atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Thomas,
+Hi Stephen,
 
-On 17/06/2015 14:12, Thomas Petazzoni wrote:
-> The dmacap,* properties are now ignored by the mv_xor driver, who
-> knows what are the capabilities of the hardware. For the DMA_XOR and
-> DMA_MEMCPY capabilities, there are no changes: they were anyway
-> mentionned in all DTs. The DMA_MEMSET operation (enabled by
-> dmacap,memset) was ignored since the removal of DMA_MEMSET support
-> from mv_xor. Also, now the DMA_INTERRUPT capability is enabled for all
-> SoCs.
+On Mon, Jun 15, 2015 at 09:58:05AM -0600, Stephen Warren wrote:
+> On 06/10/2015 09:04 AM, Ludovic Desroches wrote:
+> >When having a controller which allows per pin muxing, declaring with
+> >which groups a function can be used is a useless constraint since groups
+> >are something virtual.
 > 
-> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-
-Acked-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
-
-I will wait for that 'dmaengine: mv_xor: remove support for dmacap,* DT
-properties' was applied before applying it.
-
-
-Thanks,
-
-Gregory
-
-> ---
-> Note: this patch should only be applied once 'dmaengine: mv_xor:
-> remove support for dmacap,* DT properties' is applied.
-> ---
->  arch/arm/boot/dts/armada-370.dtsi | 10 ----------
->  arch/arm/boot/dts/armada-375.dtsi | 10 ----------
->  arch/arm/boot/dts/armada-38x.dtsi | 10 ----------
->  arch/arm/boot/dts/armada-39x.dtsi | 10 ----------
->  arch/arm/boot/dts/armada-xp.dtsi  | 10 ----------
->  arch/arm/boot/dts/dove.dtsi       |  8 --------
->  6 files changed, 58 deletions(-)
+> This isn't true.
 > 
-> diff --git a/arch/arm/boot/dts/armada-370.dtsi b/arch/arm/boot/dts/armada-370.dtsi
-> index 00b50db5..cb68579 100644
-> --- a/arch/arm/boot/dts/armada-370.dtsi
-> +++ b/arch/arm/boot/dts/armada-370.dtsi
-> @@ -278,14 +278,9 @@
->  
->  				xor00 {
->  					interrupts = <51>;
-> -					dmacap,memcpy;
-> -					dmacap,xor;
->  				};
->  				xor01 {
->  					interrupts = <52>;
-> -					dmacap,memcpy;
-> -					dmacap,xor;
-> -					dmacap,memset;
->  				};
->  			};
->  
-> @@ -297,14 +292,9 @@
->  
->  				xor10 {
->  					interrupts = <94>;
-> -					dmacap,memcpy;
-> -					dmacap,xor;
->  				};
->  				xor11 {
->  					interrupts = <95>;
-> -					dmacap,memcpy;
-> -					dmacap,xor;
-> -					dmacap,memset;
->  				};
->  			};
->  		};
-> diff --git a/arch/arm/boot/dts/armada-375.dtsi b/arch/arm/boot/dts/armada-375.dtsi
-> index f076ff8..ebee84a 100644
-> --- a/arch/arm/boot/dts/armada-375.dtsi
-> +++ b/arch/arm/boot/dts/armada-375.dtsi
-> @@ -476,14 +476,9 @@
->  
->  				xor00 {
->  					interrupts = <GIC_SPI 22 IRQ_TYPE_LEVEL_HIGH>;
-> -					dmacap,memcpy;
-> -					dmacap,xor;
->  				};
->  				xor01 {
->  					interrupts = <GIC_SPI 23 IRQ_TYPE_LEVEL_HIGH>;
-> -					dmacap,memcpy;
-> -					dmacap,xor;
-> -					dmacap,memset;
->  				};
->  			};
->  
-> @@ -496,14 +491,9 @@
->  
->  				xor10 {
->  					interrupts = <GIC_SPI 65 IRQ_TYPE_LEVEL_HIGH>;
-> -					dmacap,memcpy;
-> -					dmacap,xor;
->  				};
->  				xor11 {
->  					interrupts = <GIC_SPI 66 IRQ_TYPE_LEVEL_HIGH>;
-> -					dmacap,memcpy;
-> -					dmacap,xor;
-> -					dmacap,memset;
->  				};
->  			};
->  
-> diff --git a/arch/arm/boot/dts/armada-38x.dtsi b/arch/arm/boot/dts/armada-38x.dtsi
-> index 218a2ac..1710523 100644
-> --- a/arch/arm/boot/dts/armada-38x.dtsi
-> +++ b/arch/arm/boot/dts/armada-38x.dtsi
-> @@ -456,14 +456,9 @@
->  
->  				xor00 {
->  					interrupts = <GIC_SPI 22 IRQ_TYPE_LEVEL_HIGH>;
-> -					dmacap,memcpy;
-> -					dmacap,xor;
->  				};
->  				xor01 {
->  					interrupts = <GIC_SPI 23 IRQ_TYPE_LEVEL_HIGH>;
-> -					dmacap,memcpy;
-> -					dmacap,xor;
-> -					dmacap,memset;
->  				};
->  			};
->  
-> @@ -476,14 +471,9 @@
->  
->  				xor10 {
->  					interrupts = <GIC_SPI 65 IRQ_TYPE_LEVEL_HIGH>;
-> -					dmacap,memcpy;
-> -					dmacap,xor;
->  				};
->  				xor11 {
->  					interrupts = <GIC_SPI 66 IRQ_TYPE_LEVEL_HIGH>;
-> -					dmacap,memcpy;
-> -					dmacap,xor;
-> -					dmacap,memset;
->  				};
->  			};
->  
-> diff --git a/arch/arm/boot/dts/armada-39x.dtsi b/arch/arm/boot/dts/armada-39x.dtsi
-> index ecd1318..9c510d8 100644
-> --- a/arch/arm/boot/dts/armada-39x.dtsi
-> +++ b/arch/arm/boot/dts/armada-39x.dtsi
-> @@ -331,14 +331,9 @@
->  
->  				xor00 {
->  					interrupts = <GIC_SPI 22 IRQ_TYPE_LEVEL_HIGH>;
-> -					dmacap,memcpy;
-> -					dmacap,xor;
->  				};
->  				xor01 {
->  					interrupts = <GIC_SPI 23 IRQ_TYPE_LEVEL_HIGH>;
-> -					dmacap,memcpy;
-> -					dmacap,xor;
-> -					dmacap,memset;
->  				};
->  			};
->  
-> @@ -351,14 +346,9 @@
->  
->  				xor10 {
->  					interrupts = <GIC_SPI 65 IRQ_TYPE_LEVEL_HIGH>;
-> -					dmacap,memcpy;
-> -					dmacap,xor;
->  				};
->  				xor11 {
->  					interrupts = <GIC_SPI 66 IRQ_TYPE_LEVEL_HIGH>;
-> -					dmacap,memcpy;
-> -					dmacap,xor;
-> -					dmacap,memset;
->  				};
->  			};
->  
-> diff --git a/arch/arm/boot/dts/armada-xp.dtsi b/arch/arm/boot/dts/armada-xp.dtsi
-> index 013d63f..9c46054 100644
-> --- a/arch/arm/boot/dts/armada-xp.dtsi
-> +++ b/arch/arm/boot/dts/armada-xp.dtsi
-> @@ -209,14 +209,9 @@
->  
->  				xor10 {
->  					interrupts = <51>;
-> -					dmacap,memcpy;
-> -					dmacap,xor;
->  				};
->  				xor11 {
->  					interrupts = <52>;
-> -					dmacap,memcpy;
-> -					dmacap,xor;
-> -					dmacap,memset;
->  				};
->  			};
->  
-> @@ -229,14 +224,9 @@
->  
->  				xor00 {
->  					interrupts = <94>;
-> -					dmacap,memcpy;
-> -					dmacap,xor;
->  				};
->  				xor01 {
->  					interrupts = <95>;
-> -					dmacap,memcpy;
-> -					dmacap,xor;
-> -					dmacap,memset;
->  				};
->  			};
->  		};
-> diff --git a/arch/arm/boot/dts/dove.dtsi b/arch/arm/boot/dts/dove.dtsi
-> index 9ad8295..e71c552 100644
-> --- a/arch/arm/boot/dts/dove.dtsi
-> +++ b/arch/arm/boot/dts/dove.dtsi
-> @@ -261,14 +261,10 @@
->  
->  				channel0 {
->  					interrupts = <39>;
-> -					dmacap,memcpy;
-> -					dmacap,xor;
->  				};
->  
->  				channel1 {
->  					interrupts = <40>;
-> -					dmacap,memcpy;
-> -					dmacap,xor;
->  				};
->  			};
->  
-> @@ -281,14 +277,10 @@
->  
->  				channel0 {
->  					interrupts = <42>;
-> -					dmacap,memcpy;
-> -					dmacap,xor;
->  				};
->  
->  				channel1 {
->  					interrupts = <43>;
-> -					dmacap,memcpy;
-> -					dmacap,xor;
->  				};
->  			};
->  
+> Irrespective of whether a particular piece of pinmux HW can control the mux
+> function for each pin individually, or only in groups, it's quite likely
+> that each function can only be selected onto a subset of those pins or
+> groups. Requiring the pinctrl driver to inform the core which set of
+> pins/groups particular functions can be selected onto seems quite
+> reasonable.
 > 
+> In my opinion at least, for HW that can select the mux function at the
+> per-pin level, the only sensible set of groups is one group per pin with
+> each group containing a single pin. Any other use of groups is a
+> SW/user-level construct, and is something unrelated to why the pinctrl
+> subsystem supports groups. If we want to represent those groups in pinctrl,
+> there should be two separate sets of groups; one to represent the actual HW
+> capabilities, and one to represent the SW/user-level convenience
+> abstractions.
+
+Groups that I would like to use are not something related to the user or
+software. It's an hardware reality but they would be more flexibles.
+
+Usually the muxing is done by selecting a function (which seems to be
+device related: usart, spi, etc.), then you select on which pins you
+want this function.
+
+In my case, I can't select a function only by choosing a mux. It is a
+combination of the mux and the pin on which it is applied. So my
+functions will be GPIO, A, B, C, etc. If I use function A on pin 12, I
+will have my i2c clock signal but I can have this signal on pin 58 if I
+use function C. Do you understand what I mean? It's not very easy to
+explain... So here is a real example:
+
+ -------------------------------------------------- 
+|              | pio peripheral                    |
+ -------------------------------------------------- 
+| signal | dir | func | signal       | dir | ioset |
+ -------------------------------------------------- 
+| PA8    | I/O | A    | SDMMC0_DAT6  | I/O | 1     |
+|        |     | B    | QSPI1_IO1    | I/O | 1     |
+|        |     | D    | TCLK5        | I   | 1     |
+|        |     | E    | FLEXCOM2_IO2 | I/O | 1     |
+|        |     | F    | NWE/NANDWE   | O   | 2     |
+ -------------------------------------------------- 
+| PD28   | I/O | A    | SPI1_NPCS0   | I/O | 3     |
+|        |     | B    | TDI          | I/O | 3     |
+|        |     | C    | FLEXCOM2_IO2 | I   | 2     |
+ -------------------------------------------------- 
 
 
--- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+You are right that having a group per pin is a solution.
+
+If I follow your proposal (tell me if I'm wrong):
+- I will have 128 groups since I have 128 pins.
+- I will have functions GPIO, A, B, C, D, E, F.
+- I have to give the groups which can achieve a function so I will have
+128 groups for each function. It means 128 x 7 = 896 groups.
+
+Does it seems to be something reasonable and intelligible? From my point
+of view no. And what about the sysfs readability?
+
+With my current implementation, I have something quite understandable
+for the user if he needs to check the pinmuxing:
+
+  # cat /sys/kernel/debug/pinctrl/ahb\:apb\:pinctrl at fc038000/pinmux-pins
+  pin 17 (PA17): (MUX UNCLAIMED) (GPIO UNCLAIMED)
+  pin 18 (PA18): b0000000.sdio-host (GPIO UNCLAIMED) function E group sdmmc1_0
+  pin 19 (PA19): b0000000.sdio-host (GPIO UNCLAIMED) function E group sdmmc1_0  
+                                                                                
+  # cat /sys/kernel/debug/pinctrl/pinctrl-maps                                  
+  Pinctrl maps:                                                                 
+                                                                                
+  device b0000000.sdio-host                                                     
+  state default                                                                 
+  type MUX_GROUP (2)                                                            
+  controlling device ahb:apb:pinctrl at fc038000                                   
+  group sdmmc1_0                                                                
+  function E                                                                    
+                                                                                
+  device b0000000.sdio-host                                                     
+  state default                                                                 
+  type CONFIGS_PIN (3)                                                          
+  controlling device ahb:apb:pinctrl at fc038000                                   
+  pin PA28                                                                      
+  config 00010003                                                               
+                                                                                
+  device b0000000.sdio-host                                                     
+  state default                                                                 
+  type CONFIGS_PIN (3)                                                          
+  controlling device ahb:apb:pinctrl at fc038000                                   
+  pin PA18                                                                      
+  config 00010003                                                               
+                                                                                
+                                                  
+Doing as you propose, I assume the result should be:                            
+                                                                                
+  # cat /sys/kernel/debug/pinctrl/ahb\:apb\:pinctrl at fc038000/pinmux-pins        
+  pin 17 (PA17): (MUX UNCLAIMED) (GPIO UNCLAIMED)                               
+  pin 18 (PA18): b0000000.sdio-host (GPIO UNCLAIMED) function E group PA18
+  pin 19 (PA19): b0000000.sdio-host (GPIO UNCLAIMED) function E group PA19
+
+  # cat /sys/kernel/debug/pinctrl/pinctrl-maps
+  Pinctrl maps:
+
+  device b0000000.sdio-host
+  state default
+  type MUX_GROUP (2)
+  controlling device ahb:apb:pinctrl at fc038000
+  group PA28
+  function E
+
+  device b0000000.sdio-host
+  state default
+  type CONFIGS_PIN (3)
+  controlling device ahb:apb:pinctrl at fc038000
+  pin PA28
+  config 00010003
+                                                                                
+  device b0000000.sdio-host
+  state default
+  type MUX_GROUP (2)
+  controlling device ahb:apb:pinctrl at fc038000
+  group PA18
+  function E
+
+  device b0000000.sdio-host
+  state default
+  type CONFIGS_PIN (3)
+  controlling device ahb:apb:pinctrl at fc038000
+  pin PA18
+  config 00010003
+
+I think it is more difficult to understand what is done here.
+
+
+I have sent patches months ago trying to improve things by having
+something more flexible. I don't think I introduce too big changes.
+The only answers I got were from people thinking that pinctrl framework
+conception is not good to fit all kind of controllers. I re-sent the
+patch series to gain more expose and have no  answer...
+
+I wanted to use as much as possible the generic stuff we have in order
+to not add a new "custom" implementation. If it is such a big deal to
+do these changes because you (or other people) think that we can use
+it as is to describe our pinmux/pinconf configuration then I can
+switch to a custom implementation too and not use the pinconf generic
+dt_node_to_map. I think this solution is not encouraged by Linus who
+prefers to cling the generic infrastructure, isn'it? This is exactly
+why I took this approach.
+
+
+FYI: some context about these patches:
+
+The RFC I send long time ago:
+http://www.spinics.net/lists/linux-gpio/msg05198.html
+
+My second attempt:
+http://comments.gmane.org/gmane.linux.kernel.gpio/7767
+
+It is not the first time, there are discussions about it. Sascha sent a
+patch which fits part of my needs:
+http://lists.infradead.org/pipermail/linux-arm-kernel/2015-January/318452.html
+
+And it seems some controllers use this approach:
+http://lists.infradead.org/pipermail/linux-arm-kernel/2015-January/318452.html
+
+
+Regards
+
+Ludovic
