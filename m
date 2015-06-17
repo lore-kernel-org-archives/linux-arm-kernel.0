@@ -1,64 +1,45 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Wed, 17 Jun 2015 17:24:23 +0200
-Subject: [PATCH 1/9] ARM: mvebu: fix suspend to RAM on big-endian
- configurations
-In-Reply-To: <1434456785-23696-2-git-send-email-thomas.petazzoni@free-electrons.com>
-References: <1434456785-23696-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1434456785-23696-2-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <55819127.1040306@free-electrons.com>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Wed, 17 Jun 2015 17:24:58 +0200
+Subject: [PATCH v2 0/3] Fix Ethernet jumbo frames support for Armada 370
+ and 38x
+In-Reply-To: <1434547162-6275-1-git-send-email-simon.guinot@sequanux.org>
+References: <1434547162-6275-1-git-send-email-simon.guinot@sequanux.org>
+Message-ID: <20150617172458.3e373b8a@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Thomas,
+Dear Simon Guinot,
 
-On 16/06/2015 14:12, Thomas Petazzoni wrote:
-> The current Armada XP suspend to RAM implementation, as added in
-> commit 27432825ae19f ("ARM: mvebu: Armada XP GP specific
-> suspend/resume code") does not handle big-endian configurations
-> properly: the small bit of assembly code putting the DRAM in
-> self-refresh and toggling the GPIOs to turn off power forgets to
-> convert the values to little-endian.
+On Wed, 17 Jun 2015 15:19:19 +0200, Simon Guinot wrote:
+
+> This patch series fixes the Ethernet jumbo frames support for the SoCs
+> Armada 370, 380 and 385. Unlike Armada XP, the Ethernet controller for
+> this SoCs don't support TCP/IP checksumming with a frame size larger
+> than 1600 bytes.
 > 
-> This commit fixes that by making sure the two values we will write to
-> the DRAM controller register and GPIO register are already in
-> little-endian before entering the critical assembly code.
-> 
-> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-> Cc: <stable@vger.kernel.org> # v3.19+
-> Fixes: 27432825ae19f ("ARM: mvebu: Armada XP GP specific suspend/resume code")
+> This patches should be applied to the -stable kernels 3.8 and onwards.
 
+You should add a Fixes: tag to each commit to indicate which commit is
+being fixed by your patches.
 
-Acked-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+Also, I was a bit surprised by your statement that Armada 38x is also
+affected by the problem, since Armada 38x is more recent than Armada
+XP. but indeed, according to the Armada 38x datasheet:
 
-applied on mvebu/fixes
+  IPv4 and TCP/UDP over IPv4/IPv6 checksum generation on transmit
+  frames for standard Ethernet packet size
 
-Thanks,
+While the Armada XP datasheet says:
 
-Gregory
+  Long frames transmission (including jumbo frames), with
+  IPv4/v6/TCP/UDP checksum generation
 
-> ---
->  arch/arm/mach-mvebu/pm-board.c | 3 +++
->  1 file changed, 3 insertions(+)
-> 
-> diff --git a/arch/arm/mach-mvebu/pm-board.c b/arch/arm/mach-mvebu/pm-board.c
-> index 6dfd4ab..301ab38 100644
-> --- a/arch/arm/mach-mvebu/pm-board.c
-> +++ b/arch/arm/mach-mvebu/pm-board.c
-> @@ -43,6 +43,9 @@ static void mvebu_armada_xp_gp_pm_enter(void __iomem *sdram_reg, u32 srcmd)
->  	for (i = 0; i < ARMADA_XP_GP_PIC_NR_GPIOS; i++)
->  		ackcmd |= BIT(pic_raw_gpios[i]);
->  
-> +	srcmd = cpu_to_le32(srcmd);
-> +	ackcmd = cpu_to_le32(ackcmd);
-> +
->  	/*
->  	 * Wait a while, the PIC needs quite a bit of time between the
->  	 * two GPIO commands.
-> 
+So it seems like you're right about this!
 
+Best regards,
 
+Thomas
 -- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
+Thomas Petazzoni, CTO, Free Electrons
+Embedded Linux, Kernel and Android engineering
 http://free-electrons.com
