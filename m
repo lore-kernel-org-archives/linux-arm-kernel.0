@@ -1,40 +1,56 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Wed, 17 Jun 2015 19:03:14 +0530
-Subject: [PATCH V7 2/3] OPP: Allow multiple OPP tables to be passed via DT
-In-Reply-To: <CAL_Jsq+EOOeQw42wZi+H82ovLn8LcQUuK9HGT+FvewdhTf7Q1w@mail.gmail.com>
-References: <cover.1433434659.git.viresh.kumar@linaro.org>
- <263c128844f5a3c9280c8be71f6c9eb1869a5188.1433434659.git.viresh.kumar@linaro.org>
- <CAL_Jsq+EOOeQw42wZi+H82ovLn8LcQUuK9HGT+FvewdhTf7Q1w@mail.gmail.com>
-Message-ID: <20150617133314.GB15153@linux>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Wed, 17 Jun 2015 14:34:33 +0100
+Subject: [PATCH 04/10] KVM: arm/arm64: vgic: Allow HW irq to be encoded
+ in LR
+In-Reply-To: <CAFEAcA8idJehTx75G1OzcPpg5ewx_6X15srx7iV6sszmiqHNFw@mail.gmail.com>
+References: <1433783045-8002-1-git-send-email-marc.zyngier@arm.com>
+ <1433783045-8002-5-git-send-email-marc.zyngier@arm.com>
+ <55815FA5.4010203@linaro.org>
+ <CAFEAcA8idJehTx75G1OzcPpg5ewx_6X15srx7iV6sszmiqHNFw@mail.gmail.com>
+Message-ID: <55817769.60909@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 17-06-15, 08:23, Rob Herring wrote:
-> > +                       operating-points-v2 = <&cpu0_opp_table_slow>, <&cpu0_opp_table_fast>;
+On 17/06/15 14:21, Peter Maydell wrote:
+> On 17 June 2015 at 12:53, Eric Auger <eric.auger@linaro.org> wrote:
+>> shouldn't we test somewhere that the hwirq is between 16 and 1019.
 > 
-> You've made a fundamental change here in that this can now be a list
-> of phandles. There should be some description on what a list means
-> (merge the tables?, select one?).
+> Not directly related, but that reminds me that I noticed the
+> other day that we have VGIC_MAX_IRQS = 1024 (and use that as a
+> guard on how many irqs we let userspace configure and ask us
+> to deliver), but that doesn't account for the couple of magic
+> numbers at the top of the range. I think that lets userspace
+> cause us to do UNPREDICTABLE things to the GIC...
 
-Did you miss the description I wrote few lines earlier or are you
-asking for something else? This is what I wrote earlier:
+Good point. How about the following:
 
-> > +Devices may want to choose OPP tables at runtime and so can provide a list of
-> > +phandles here. But only *one* of them should be chosen at runtime.
+diff --git a/virt/kvm/arm/vgic.c b/virt/kvm/arm/vgic.c
+index 78fb820..950064a 100644
+--- a/virt/kvm/arm/vgic.c
++++ b/virt/kvm/arm/vgic.c
+@@ -1561,7 +1561,7 @@ int kvm_vgic_inject_irq(struct kvm *kvm, int cpuid, unsigned int irq_num,
+ 			goto out;
+ 	}
+ 
+-	if (irq_num >= kvm->arch.vgic.nr_irqs)
++	if (irq_num >= min(kvm->arch.vgic.nr_irqs, 1020))
+ 		return -EINVAL;
+ 
+ 	vcpu_id = vgic_update_irq_pending(kvm, cpuid, irq_num, level);
+@@ -2161,10 +2161,7 @@ int kvm_set_irq(struct kvm *kvm, int irq_source_id,
+ 
+ 	BUG_ON(!vgic_initialized(kvm));
+ 
+-	if (spi > kvm->arch.vgic.nr_irqs)
+-		return -EINVAL;
+ 	return kvm_vgic_inject_irq(kvm, 0, spi, level);
+-
+ }
+ 
+ /* MSI not implemented yet */
 
-So, clearly only ONE of the tables should be used.
+Thanks,
 
-> I think this needs to have a defined order and the platform should
-> know what that is. For example, if you read the efuses and decide you
-> need the "slow" table, you know to pick the first entry. Then you
-> don't need opp-name. Does that work for QCom?
-
-Why forcing on the order here? For example, consider a case where the
-platform can have four tables, A B C D. Now DT is free to pass all
-four or just a subset of those. Like, for some boards table B doesn't
-stand valid. And so it may wanna pass just A C D. And so keeping these
-tables in order is going to break for sure. Flexibility is probably
-better in this case.
-
+	M.
 -- 
-viresh
+Jazz is not dead. It just smells funny...
