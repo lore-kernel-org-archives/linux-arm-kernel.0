@@ -1,76 +1,35 @@
 From: aisheng.dong@freescale.com (Dong Aisheng)
-Date: Thu, 18 Jun 2015 01:33:33 +0800
-Subject: [PATCH 0/5] dts: imx: fix sd card gpio polarity specified in device
+Date: Thu, 18 Jun 2015 01:33:34 +0800
+Subject: [PATCH 1/5] dts: imx51: fix sd card gpio polarity specified in device
  tree
-Message-ID: <1434562418-24090-1-git-send-email-aisheng.dong@freescale.com>
+In-Reply-To: <1434562418-24090-1-git-send-email-aisheng.dong@freescale.com>
+References: <1434562418-24090-1-git-send-email-aisheng.dong@freescale.com>
+Message-ID: <1434562418-24090-2-git-send-email-aisheng.dong@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit 8d86e4f mmc: sdhci-esdhc-imx: Call mmc_of_parse()
-serious break the sd card detect/write protect function
-since a lot of GPIO flags of cd-gpios/wp-gpios are wrongly set
-in devicetree.
-Before commit 8d86e4f, we do not use GPIO flags passed from
-devicetree. But after it, GPIO flags specfied in dt becomes valid
-and will affect the normal cd/wp function.
+cd-gpios polarity should be changed to GPIO_ACTIVE_LOW and wp-gpios
+should be changed to GPIO_ACTIVE_HIGH.
+Otherwise, the SD may not work properly due to wrong polarity inversion
+specified in DT after switch to common parsing function mmc_of_parse().
 
-This patch series fixes all wrongly set GPIO flags in devicetree.
+Signed-off-by: Dong Aisheng <aisheng.dong@freescale.com>
+---
+ arch/arm/boot/dts/imx51-apf51dev.dts | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-Because the eSDHC/uSDHC host driver only supports
-MMC_CAP2_RO_ACTIVE_HIGH and no MMC_CAP2_CD_ACTIVE_HIGH,
-so i changed the dts accordingly.
-
-It is supposed to not cause any function break since all boards
-affected work well before commit 8d86e4f with this type of CAPs.
-
-However, i still CCed each board maintainer affected by this change,
-Please help review and let me know if any wrong change.
-
-The series is based on shawn/for-next tree.
-
-Fixes: 8d86e4fcccf6 ("mmc: sdhci-esdhc-imx: Call mmc_of_parse()")
-
-Dong Aisheng (5):
-  dts: imx51: fix sd card gpio polarity specified in device tree
-  dts: imx53: fix sd card gpio polarity specified in device tree
-  dts: imx6: fix sd card gpio polarity specified in device tree
-  dts: imx25: fix sd card gpio polarity specified in device tree
-  dts: imx7: fix sd card gpio polarity specified in device tree
-
- arch/arm/boot/dts/imx25-pdk.dts              |  4 ++--
- arch/arm/boot/dts/imx51-apf51dev.dts         |  2 +-
- arch/arm/boot/dts/imx53-ard.dts              |  4 ++--
- arch/arm/boot/dts/imx53-m53evk.dts           |  4 ++--
- arch/arm/boot/dts/imx53-qsb-common.dtsi      |  4 ++--
- arch/arm/boot/dts/imx53-smd.dts              |  4 ++--
- arch/arm/boot/dts/imx53-tqma53.dtsi          |  4 ++--
- arch/arm/boot/dts/imx53-tx53.dtsi            |  4 ++--
- arch/arm/boot/dts/imx53-voipac-bsb.dts       |  4 ++--
- arch/arm/boot/dts/imx6dl-riotboard.dts       |  8 ++++----
- arch/arm/boot/dts/imx6q-arm2.dts             |  5 +++--
- arch/arm/boot/dts/imx6q-gk802.dts            |  3 ++-
- arch/arm/boot/dts/imx6q-tbs2910.dts          |  4 ++--
- arch/arm/boot/dts/imx6qdl-aristainetos.dtsi  |  4 ++--
- arch/arm/boot/dts/imx6qdl-aristainetos2.dtsi |  4 ++--
- arch/arm/boot/dts/imx6qdl-cubox-i.dtsi       |  2 +-
- arch/arm/boot/dts/imx6qdl-dfi-fs700-m60.dtsi |  4 +++-
- arch/arm/boot/dts/imx6qdl-gw52xx.dtsi        |  2 +-
- arch/arm/boot/dts/imx6qdl-gw53xx.dtsi        |  2 +-
- arch/arm/boot/dts/imx6qdl-gw54xx.dtsi        |  2 +-
- arch/arm/boot/dts/imx6qdl-hummingboard.dtsi  |  2 +-
- arch/arm/boot/dts/imx6qdl-nitrogen6x.dtsi    |  4 ++--
- arch/arm/boot/dts/imx6qdl-phytec-pfla02.dtsi |  8 ++++----
- arch/arm/boot/dts/imx6qdl-rex.dtsi           |  4 ++--
- arch/arm/boot/dts/imx6qdl-sabreauto.dtsi     |  4 ++--
- arch/arm/boot/dts/imx6qdl-sabrelite.dtsi     |  6 +++---
- arch/arm/boot/dts/imx6qdl-sabresd.dtsi       |  8 ++++----
- arch/arm/boot/dts/imx6qdl-tx6.dtsi           |  4 ++--
- arch/arm/boot/dts/imx6qdl-wandboard.dtsi     |  6 ++++--
- arch/arm/boot/dts/imx6sl-evk.dts             | 10 +++++-----
- arch/arm/boot/dts/imx6sx-sabreauto.dts       |  4 ++--
- arch/arm/boot/dts/imx6sx-sdb.dtsi            |  4 ++--
- arch/arm/boot/dts/imx7d-sdb.dts              |  4 ++--
- 33 files changed, 74 insertions(+), 68 deletions(-)
-
+diff --git a/arch/arm/boot/dts/imx51-apf51dev.dts b/arch/arm/boot/dts/imx51-apf51dev.dts
+index 93d3ea1..0f3fe29 100644
+--- a/arch/arm/boot/dts/imx51-apf51dev.dts
++++ b/arch/arm/boot/dts/imx51-apf51dev.dts
+@@ -98,7 +98,7 @@
+ &esdhc1 {
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&pinctrl_esdhc1>;
+-	cd-gpios = <&gpio2 29 GPIO_ACTIVE_HIGH>;
++	cd-gpios = <&gpio2 29 GPIO_ACTIVE_LOW>;
+ 	bus-width = <4>;
+ 	status = "okay";
+ };
 -- 
 1.9.1
