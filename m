@@ -1,57 +1,39 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 17 Jun 2015 17:42:28 +0100
-Subject: [PATCH 09/10] arm64/BUG: Use BRK instruction for generic BUG traps
-In-Reply-To: <20150617113518.GE3651@e103592.cambridge.arm.com>
-References: <1434036566-9848-1-git-send-email-Dave.Martin@arm.com>
- <1434036566-9848-10-git-send-email-Dave.Martin@arm.com>
- <20150616144810.GE30522@arm.com>
- <20150617113518.GE3651@e103592.cambridge.arm.com>
-Message-ID: <20150617164228.GA31594@arm.com>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Wed, 17 Jun 2015 17:01:12 +0000
+Subject: [PATCH v2 1/3] net: mvneta: introduce compatible string
+ "marvell, armada-xp-neta"
+In-Reply-To: <55818F10.8030304@free-electrons.com>
+References: <1434547162-6275-1-git-send-email-simon.guinot@sequanux.org>
+ <1434547162-6275-2-git-send-email-simon.guinot@sequanux.org>
+ <55818E64.20007@free-electrons.com>
+ <55818F10.8030304@free-electrons.com>
+Message-ID: <20150617170112.GD2917@io.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Dave,
+Hi Gregory,
 
-On Wed, Jun 17, 2015 at 12:35:18PM +0100, Dave P Martin wrote:
-> On Tue, Jun 16, 2015 at 03:48:10PM +0100, Will Deacon wrote:
-> > On Thu, Jun 11, 2015 at 04:29:23PM +0100, Dave P Martin wrote:
-> > > diff --git a/arch/arm64/include/asm/brk.h b/arch/arm64/include/asm/brk.h
-> > > index 99b8dfb..f4d5894 100644
-> > > --- a/arch/arm64/include/asm/brk.h
-> > > +++ b/arch/arm64/include/asm/brk.h
-> > > @@ -27,5 +27,6 @@
-> > >  #define FAULT_BRK_IMM			0x100
-> > >  #define KGDB_DYN_DBG_BRK_IMM		0x400
-> > >  #define KGDB_COMPILED_DBG_BRK_IMM	0x401
-> > > +#define BUG_BRK_IMM			0x7ff
+On Wed, Jun 17, 2015 at 05:15:28PM +0200, Gregory CLEMENT wrote:
+> On 17/06/2015 17:12, Gregory CLEMENT wrote:
+> > On 17/06/2015 15:19, Simon Guinot wrote:
+> >> The mvneta driver supports the Ethernet IP found in the Armada 370, XP,
+> >> 380 and 385 SoCs. Since at least one more hardware feature is available
+> >> for the Armada XP SoCs then a way to identify them is needed.
+> >>
+> >> This patch introduces a new compatible string "marvell,armada-xp-neta".
 > > 
-> > Just curious, but how did you come up with this number?
-> 
-> There's a comment in debug-monitors.h that the "allowed values for
-> kgbd" (sic) are 0x400..0x7ff.
-> 
-> So 0x7ff seemed unlikely to clash with any other use, and well
-> out of the way of the values that kgbd currently uses.
-> 
-> It's debatable that the BUG value shouldn't be in the range at all.
-> However, BUG_BRK_IMM is a contract between the kernel and itself for
-> EL1 only, so it can be changed at any time in the future with minimal
-> impact.
-> 
-> What's your view?
+> > Let's be future proof by going further. I would like to have an compatible string
+> > for each SoC even if we currently we don't use them.
 
-I wonder if that kgdb range is inclusive? Maybe best to use 0x800 to be
-sure.
+I disagree with this.  We can't predict what incosistencies we'll discover in
+the future.  We should only assign new compatible strings based on known IP
+variations when we discover them.  This seems fraught with demons since we
+can't predict the scope of affected IP blocks (some steppings of one SoC, three
+SoCs plus two steppings of a fourth, etc)
 
-> > Could we define is_valid_bugaddr as a macro in the header file and avoid
-> > the potential out-of-line call?
-> 
-> We could, but it would require a change to <linux/bug.h>.  Since
-> this is slowpath anyway, I wasn't sure it was worth it.
-> 
-> Happy to add that and try to push it as part of this series if
-> you like -- let me know.
+imho, the 'future-proofing' lies in being specific as to the naming of the
+compatible strings against known hardware variations at the time.
 
-Nah, it's fine. I hadn't spotted the declaration.
+thx,
 
-Will
+Jason.
