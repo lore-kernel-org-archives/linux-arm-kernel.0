@@ -1,90 +1,40 @@
 From: julien.grall@citrix.com (Julien Grall)
-Date: Wed, 17 Jun 2015 15:28:08 +0100
-Subject: [PATCH v2 7/7] block/xen-blkback: s/nr_pages/nr_segs/
+Date: Wed, 17 Jun 2015 15:28:06 +0100
+Subject: [PATCH v2 5/7] block/xen-blkfront: Remove unused macro
+ MAXIMUM_OUTSTANDING_BLOCK_REQS
 In-Reply-To: <1434551288-14113-1-git-send-email-julien.grall@citrix.com>
 References: <1434551288-14113-1-git-send-email-julien.grall@citrix.com>
-Message-ID: <1434551288-14113-8-git-send-email-julien.grall@citrix.com>
+Message-ID: <1434551288-14113-6-git-send-email-julien.grall@citrix.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Julien Grall <julien.grall@linaro.org>
 
-Make the code less confusing to read now that Linux may not have the
-same page size as Xen.
-
 Signed-off-by: Julien Grall <julien.grall@citrix.com>
 Acked-by: Roger Pau Monn? <roger.pau@citrix.com>
 Cc: Konrad Rzeszutek Wilk <konrad.wilk@oracle.com>
+Cc: Boris Ostrovsky <boris.ostrovsky@oracle.com>
+Cc: David Vrabel <david.vrabel@citrix.com>
 
 ---
     Changes in v2:
         - Add Roger's Acked-by
 ---
- drivers/block/xen-blkback/blkback.c | 10 +++++-----
- drivers/block/xen-blkback/common.h  |  2 +-
- 2 files changed, 6 insertions(+), 6 deletions(-)
+ drivers/block/xen-blkfront.c | 2 --
+ 1 file changed, 2 deletions(-)
 
-diff --git a/drivers/block/xen-blkback/blkback.c b/drivers/block/xen-blkback/blkback.c
-index 713fc9f..7049528 100644
---- a/drivers/block/xen-blkback/blkback.c
-+++ b/drivers/block/xen-blkback/blkback.c
-@@ -729,7 +729,7 @@ static void xen_blkbk_unmap_and_respond(struct pending_req *req)
- 	struct grant_page **pages = req->segments;
- 	unsigned int invcount;
+diff --git a/drivers/block/xen-blkfront.c b/drivers/block/xen-blkfront.c
+index 2c61cf8..5c72c25 100644
+--- a/drivers/block/xen-blkfront.c
++++ b/drivers/block/xen-blkfront.c
+@@ -139,8 +139,6 @@ static unsigned int nr_minors;
+ static unsigned long *minors;
+ static DEFINE_SPINLOCK(minor_lock);
  
--	invcount = xen_blkbk_unmap_prepare(blkif, pages, req->nr_pages,
-+	invcount = xen_blkbk_unmap_prepare(blkif, pages, req->nr_segs,
- 					   req->unmap, req->unmap_pages);
+-#define MAXIMUM_OUTSTANDING_BLOCK_REQS \
+-	(BLKIF_MAX_SEGMENTS_PER_REQUEST * BLK_RING_SIZE)
+ #define GRANT_INVALID_REF	0
  
- 	work->data = req;
-@@ -915,7 +915,7 @@ static int xen_blkbk_map_seg(struct pending_req *pending_req)
- 	int rc;
- 
- 	rc = xen_blkbk_map(pending_req->blkif, pending_req->segments,
--			   pending_req->nr_pages,
-+			   pending_req->nr_segs,
- 	                   (pending_req->operation != BLKIF_OP_READ));
- 
- 	return rc;
-@@ -931,7 +931,7 @@ static int xen_blkbk_parse_indirect(struct blkif_request *req,
- 	int indirect_grefs, rc, n, nseg, i;
- 	struct blkif_request_segment *segments = NULL;
- 
--	nseg = pending_req->nr_pages;
-+	nseg = pending_req->nr_segs;
- 	indirect_grefs = INDIRECT_PAGES(nseg);
- 	BUG_ON(indirect_grefs > BLKIF_MAX_INDIRECT_PAGES_PER_REQUEST);
- 
-@@ -1251,7 +1251,7 @@ static int dispatch_rw_block_io(struct xen_blkif *blkif,
- 	pending_req->id        = req->u.rw.id;
- 	pending_req->operation = req_operation;
- 	pending_req->status    = BLKIF_RSP_OKAY;
--	pending_req->nr_pages  = nseg;
-+	pending_req->nr_segs   = nseg;
- 
- 	if (req->operation != BLKIF_OP_INDIRECT) {
- 		preq.dev               = req->u.rw.handle;
-@@ -1372,7 +1372,7 @@ static int dispatch_rw_block_io(struct xen_blkif *blkif,
- 
-  fail_flush:
- 	xen_blkbk_unmap(blkif, pending_req->segments,
--	                pending_req->nr_pages);
-+	                pending_req->nr_segs);
-  fail_response:
- 	/* Haven't submitted any bio's yet. */
- 	make_response(blkif, req->u.rw.id, req_operation, BLKIF_RSP_ERROR);
-diff --git a/drivers/block/xen-blkback/common.h b/drivers/block/xen-blkback/common.h
-index f620b5d..7a03e07 100644
---- a/drivers/block/xen-blkback/common.h
-+++ b/drivers/block/xen-blkback/common.h
-@@ -343,7 +343,7 @@ struct grant_page {
- struct pending_req {
- 	struct xen_blkif	*blkif;
- 	u64			id;
--	int			nr_pages;
-+	int			nr_segs;
- 	atomic_t		pendcnt;
- 	unsigned short		operation;
- 	int			status;
+ #define PARTS_PER_DISK		16
 -- 
 2.1.4
