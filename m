@@ -1,28 +1,97 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Wed, 17 Jun 2015 12:00:06 -0700
-Subject: [PATCH 0/3] ARM: Allow SPARSEMEM on multiplatform build
-In-Reply-To: <1433469518-8472-1-git-send-email-gregory.0xf0@gmail.com>
-References: <1433469518-8472-1-git-send-email-gregory.0xf0@gmail.com>
-Message-ID: <5581C3B6.9090900@codeaurora.org>
+From: alexander.sverdlin@gmail.com (Alexander Sverdlin)
+Date: Wed, 17 Jun 2015 21:00:53 +0200
+Subject: [PATCH v2] i2c: omap: improve duty cycle on SCL
+In-Reply-To: <1434565751-14944-1-git-send-email-balbi@ti.com>
+References: <1434565751-14944-1-git-send-email-balbi@ti.com>
+Message-ID: <5581C3E5.6020109@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/04/2015 06:58 PM, Gregory Fong wrote:
-> This is based on the changeset submitted by Kevin Cernekee last September:
-> http://lists.infradead.org/pipermail/linux-arm-kernel/2014-September/286835.html
->
-> The changes I have made are:
-> - update commit messages per review comments from Arnd and Russell
-> - change to allow FLATMEM or SPARSEMEM on all multiplatform builds, not just
->   multi-v7
->
->
+Hi!
 
-Things don't blow up on MSM8960 when switching between flatmem and
-sparsemem so feel free to add:
+On 17/06/15 20:29, Felipe Balbi wrote:
+> -		if (dev->speed > 400 ||
+> -			       dev->flags & OMAP_I2C_FLAG_FORCE_19200_INT_CLK)
+> -			internal_clk = 19200;
 
-Tested-by: Stephen Boyd <sboyd@codeaurora.org>
+Let's compare, what it waas before in this case...
 
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+> -		else if (dev->speed > 100)
+> -			internal_clk = 9600;
+> -		else
+> -			internal_clk = 4000;
+> +		if (dev->flags & OMAP_I2C_FLAG_FORCE_19200_INT_CLK ||
+> +				dev->speed > 400) {
+> +			internal_clk = 1920000;
+
+Seems that it should be 19200000? Because...
+
+> +			internal_clk_period = NSECS_PER_SEC /
+> +				internal_clk; /* ns */
+
+520
+
+> +		} else {
+> +			internal_clk = 12000000;
+> +			internal_clk_period = NSECS_PER_SEC /
+> +				internal_clk; /* ns */
+> +		}
+> +
+>  		fclk = clk_get(dev->dev, "fck");
+> -		fclk_rate = clk_get_rate(fclk) / 1000;
+> +		fclk_rate = clk_get_rate(fclk);
+>  		clk_put(fclk);
+>  
+>  		/* Compute prescaler divisor */
+>  		psc = fclk_rate / internal_clk;
+>  		psc = psc - 1;
+>  
+> +		/*
+> +		 * Here's the tricky part, we want to make sure our duty cycle
+> +		 * is as close to 50% as possible. In order to achieve that, we
+> +		 * will first figure out what's the period on chosen scl is,
+> +		 * then divide that by two and calculate SCLL and SCLH based on
+> +		 * that.
+> +		 *
+> +		 * SCLL and SCLH equations are as folows:
+> +		 *
+> +		 * SCLL = (tLow / iclk_period) - 7;
+> +		 * SCLH = (tHigh / iclk_period) - 5;
+> +		 *
+> +		 * Where iclk_period is period of Internal Clock.
+> +		 *
+> +		 * tLow and tHigh will be basically half of scl_period where
+> +		 * possible as long as we can match I2C spec's minimum limits
+> +		 * for them.
+> +		 */
+> +		scl_period = NSECS_PER_SEC / (dev->speed * 1000);
+> +
+>  		/* If configured for High Speed */
+>  		if (dev->speed > 400) {
+> -			unsigned long scl;
+> +			unsigned long fs_period;
+> +
+> +			/*
+> +			 * first phase of HS mode is up to
+> +			 * 400kHz so we will use that.
+> +			 */
+> +			fs_period = NSECS_PER_SEC / 400000;
+>  
+>  			/* For first phase of HS mode */
+> -			scl = internal_clk / 400;
+
+scl=19200/400=48
+
+> -			fsscll = scl - (scl / 3) - 7;
+fsscll=48-16-7=25
+> -			fssclh = (scl / 3) - 5;
+fssclh=16-5=11
+> +			fsscll = DIV_ROUND_UP(fs_period >> 1,
+> +					internal_clk_period) - 7;
+> +			fssclh = (fs_period >> 1) / internal_clk_period - 5;
+
+And with your patch:
+fsscll=ROUND_UP(1250/520)-7=-4
+fssclh=1250/520-5=-3
+
+Alex.
