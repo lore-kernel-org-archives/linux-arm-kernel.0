@@ -1,39 +1,31 @@
 From: julien.grall@citrix.com (Julien Grall)
-Date: Wed, 17 Jun 2015 15:28:04 +0100
-Subject: [PATCH v2 3/7] xen/grant-table: Remove unused macro SPP
+Date: Wed, 17 Jun 2015 15:28:05 +0100
+Subject: [PATCH v2 4/7] arm/xen: Drop duplicate define mfn_to_virt
 In-Reply-To: <1434551288-14113-1-git-send-email-julien.grall@citrix.com>
 References: <1434551288-14113-1-git-send-email-julien.grall@citrix.com>
-Message-ID: <1434551288-14113-4-git-send-email-julien.grall@citrix.com>
+Message-ID: <1434551288-14113-5-git-send-email-julien.grall@citrix.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-SPP was used by the grant table v2 code which has been removed in
-commit 438b33c7145ca8a5131a30c36d8f59bce119a19a "xen/grant-table:
-remove support for V2 tables".
+From: Julien Grall <julien.grall@linaro.org>
 
 Signed-off-by: Julien Grall <julien.grall@citrix.com>
-Reviewed-by: David Vrabel <david.vrabel@citrix.com>
-Cc: Konrad Rzeszutek Wilk <konrad.wilk@oracle.com>
-Cc: Boris Ostrovsky <boris.ostrovsky@oracle.com>
-
+Cc: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
 ---
-    Changes in v2:
-        - Add David's Reviewed-by
----
- drivers/xen/grant-table.c | 1 -
+ arch/arm/include/asm/xen/page.h | 1 -
  1 file changed, 1 deletion(-)
 
-diff --git a/drivers/xen/grant-table.c b/drivers/xen/grant-table.c
-index b1c7170..62f591f 100644
---- a/drivers/xen/grant-table.c
-+++ b/drivers/xen/grant-table.c
-@@ -138,7 +138,6 @@ static struct gnttab_free_callback *gnttab_free_callback_list;
- static int gnttab_expand(unsigned int req_entries);
+diff --git a/arch/arm/include/asm/xen/page.h b/arch/arm/include/asm/xen/page.h
+index 0b579b2..1bee8ca 100644
+--- a/arch/arm/include/asm/xen/page.h
++++ b/arch/arm/include/asm/xen/page.h
+@@ -12,7 +12,6 @@
+ #include <xen/interface/grant_table.h>
  
- #define RPP (PAGE_SIZE / sizeof(grant_ref_t))
--#define SPP (PAGE_SIZE / sizeof(grant_status_t))
+ #define phys_to_machine_mapping_valid(pfn) (1)
+-#define mfn_to_virt(m)			(__va(mfn_to_pfn(m) << PAGE_SHIFT))
  
- static inline grant_ref_t *__gnttab_entry(grant_ref_t entry)
- {
+ #define pte_mfn	    pte_pfn
+ #define mfn_pte	    pfn_pte
 -- 
 2.1.4
