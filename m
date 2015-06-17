@@ -1,208 +1,49 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 17 Jun 2015 16:37:41 +0100
-Subject: [PATCH 10/10] KVM: arm/arm64: vgic: Allow non-shared device HW
- interrupts
-In-Reply-To: <55818E06.8010400@linaro.org>
-References: <1433783045-8002-1-git-send-email-marc.zyngier@arm.com>
- <1433783045-8002-11-git-send-email-marc.zyngier@arm.com>
- <55818E06.8010400@linaro.org>
-Message-ID: <55819445.4090309@arm.com>
+From: balbi@ti.com (Felipe Balbi)
+Date: Wed, 17 Jun 2015 10:38:12 -0500
+Subject: [PATCH] i2c: omap: improve duty cycle on SCL
+In-Reply-To: <55815581.80807@gmx.de>
+References: <1434482276-1210-1-git-send-email-balbi@ti.com>
+ <55815581.80807@gmx.de>
+Message-ID: <20150617153812.GB18421@saruman.tx.rr.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 17/06/15 16:11, Eric Auger wrote:
-> Hi Marc,
-> On 06/08/2015 07:04 PM, Marc Zyngier wrote:
->> So far, the only use of the HW interrupt facility is the timer,
->> implying that the active state is context-switched for each vcpu,
->> as the device is is shared across all vcpus.
-> s/is//
->>
->> This does not work for a device that has been assigned to a VM,
->> as the guest is entierely in control of that device (the HW is
-> entirely?
->> not shared). In that case, it makes sense to bypass the whole
->> active state srtwitchint, and only track the deactivation of the
-> switching
+Hi,
 
-Congratulations, I think you're now ready to try deciphering my
-handwriting... ;-)
-
->> interrupt.
->>
->> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
->> ---
->>  include/kvm/arm_vgic.h    |  5 +++--
->>  virt/kvm/arm/arch_timer.c |  2 +-
->>  virt/kvm/arm/vgic.c       | 37 ++++++++++++++++++++++++-------------
->>  3 files changed, 28 insertions(+), 16 deletions(-)
->>
->> diff --git a/include/kvm/arm_vgic.h b/include/kvm/arm_vgic.h
->> index 1c653c1..5d47d60 100644
->> --- a/include/kvm/arm_vgic.h
->> +++ b/include/kvm/arm_vgic.h
->> @@ -164,7 +164,8 @@ struct irq_phys_map {
->>  	u32			virt_irq;
->>  	u32			phys_irq;
->>  	u32			irq;
->> -	bool			active;
->> +	bool			shared;
->> +	bool			active; /* Only valid if shared */
->>  };
->>  
->>  struct vgic_dist {
->> @@ -347,7 +348,7 @@ void vgic_v3_dispatch_sgi(struct kvm_vcpu *vcpu, u64 reg);
->>  int kvm_vgic_vcpu_pending_irq(struct kvm_vcpu *vcpu);
->>  int kvm_vgic_vcpu_active_irq(struct kvm_vcpu *vcpu);
->>  struct irq_phys_map *vgic_map_phys_irq(struct kvm_vcpu *vcpu,
->> -				       int virt_irq, int irq);
->> +				       int virt_irq, int irq, bool shared);
->>  int vgic_unmap_phys_irq(struct kvm_vcpu *vcpu, struct irq_phys_map *map);
->>  bool vgic_get_phys_irq_active(struct irq_phys_map *map);
->>  void vgic_set_phys_irq_active(struct irq_phys_map *map, bool active);
->> diff --git a/virt/kvm/arm/arch_timer.c b/virt/kvm/arm/arch_timer.c
->> index b9fff78..9544d79 100644
->> --- a/virt/kvm/arm/arch_timer.c
->> +++ b/virt/kvm/arm/arch_timer.c
->> @@ -202,7 +202,7 @@ void kvm_timer_vcpu_reset(struct kvm_vcpu *vcpu,
->>  	 * Tell the VGIC that the virtual interrupt is tied to a
->>  	 * physical interrupt. We do that once per VCPU.
->>  	 */
->> -	timer->map = vgic_map_phys_irq(vcpu, irq->irq, host_vtimer_irq);
->> +	timer->map = vgic_map_phys_irq(vcpu, irq->irq, host_vtimer_irq, true);
->>  	WARN_ON(!timer->map);
->>  }
->>  
->> diff --git a/virt/kvm/arm/vgic.c b/virt/kvm/arm/vgic.c
->> index f376b56..4223166 100644
->> --- a/virt/kvm/arm/vgic.c
->> +++ b/virt/kvm/arm/vgic.c
->> @@ -1125,18 +1125,21 @@ static void vgic_queue_irq_to_lr(struct kvm_vcpu *vcpu, int irq,
->>  		map = vgic_irq_map_search(vcpu, irq);
->>  
->>  		if (map) {
->> -			int ret;
->> -
->> -			BUG_ON(!map->active);
->>  			vlr.hwirq = map->phys_irq;
->>  			vlr.state |= LR_HW;
->>  			vlr.state &= ~LR_EOI_INT;
->>  
->> -			ret = irq_set_irqchip_state(map->irq,
->> -						    IRQCHIP_STATE_ACTIVE,
->> -						    true);
->>  			vgic_irq_set_queued(vcpu, irq);
->
-> the queued state is set again in vgic_queue_hwirq for level_sensitive
-> IRQs although not harmful.
-
-Indeed. We still need it for edge interrupts though. I'll try to find a
-nicer way...
-
->> -			WARN_ON(ret);
->> +
->> +			if (map->shared) {
->> +				int ret;
->> +
->> +				BUG_ON(!map->active);
->> +				ret = irq_set_irqchip_state(map->irq,
->> +							    IRQCHIP_STATE_ACTIVE,
->> +							    true);
->> +				WARN_ON(ret);
->> +			}
->>  		}
->>  	}
->>  
->> @@ -1368,21 +1371,28 @@ static bool vgic_process_maintenance(struct kvm_vcpu *vcpu)
->>  static int vgic_sync_hwirq(struct kvm_vcpu *vcpu, struct vgic_lr vlr)
->>  {
->>  	struct irq_phys_map *map;
->> +	bool active;
->>  	int ret;
->>  
->>  	if (!(vlr.state & LR_HW))
->>  		return 0;
->>  
->>  	map = vgic_irq_map_search(vcpu, vlr.irq);
->> -	BUG_ON(!map || !map->active);
->> +	BUG_ON(!map);
->> +	BUG_ON(map->shared && !map->active);
->>  
->>  	ret = irq_get_irqchip_state(map->irq,
->>  				    IRQCHIP_STATE_ACTIVE,
->> -				    &map->active);
->> +				    &active);
->>  
-> In case of non shared and EOIMode = 1 - I know this is not your current
-> interest here though ;-) - , once the guest EOIs its virtual IRQ and GIC
-> deactivates the physical one, a new phys IRQ can hit immediatly, the
-> physical handler can be entered and the state is seen as active here.
-> The queued state is never reset in such a case and the system gets stuck
-> since the can_sample fails I think. What I mean here is sounds the state
-> machine as is does not work for my VFIO case. So some adaptations still
-> are needed I think. Do you share my diagnosis?
-
-Yup, there is something that doesn't quite work here.
-
-I think the mistake is to sample the distributor active state. I wonder
-if I can simply rely on the LR state. If it is neither pending nor
-active, it means that we have done the deactivation, and we can then
-reset the queued state.
-
-As a bonus, it would save a read from MMIO, which is often dog slow.
-
-Thoughts?
-
-	M.
+On Wed, Jun 17, 2015 at 01:09:53PM +0200, Michael Lawnick wrote:
+> Am 16.06.2015 um 21:17 schrieb Felipe Balbi:
+> >With this patch we try to be as close to 50%
+> >duty cycle as possible. The reason for this
+> >is that some devices present an erratic behavior
+> >with certain duty cycles.
+> >
+> >One such example is TPS65218 PMIC which fails
+> >to change voltages when running @ 400kHz and
+> >duty cycle is lower than 34%.
+> >
+> >The idea of the patch is simple:
+> >
+> >calculate desired scl_period from requested scl
+> >and use 50% for tLow and 50% for tHigh.
+> ...
+> Hmm, and what's about  Philips I2C specification 2.1, Jan 2000, Table 5?
 > 
-> Eric
->>  
->> -	if (map->active) {
->> +	if (!map->shared)
->> +		return !active;
->> +
->> +	map->active = active;
->> +
->> +	if (active) {
->>  		ret = irq_set_irqchip_state(map->irq,
->>  					    IRQCHIP_STATE_ACTIVE,
->>  					    false);
->> @@ -1663,7 +1673,7 @@ static struct rb_root *vgic_get_irq_phys_map(struct kvm_vcpu *vcpu,
->>  }
->>  
->>  struct irq_phys_map *vgic_map_phys_irq(struct kvm_vcpu *vcpu,
->> -				       int virt_irq, int irq)
->> +				       int virt_irq, int irq, bool shared)
->>  {
->>  	struct vgic_dist *dist = &vcpu->kvm->arch.vgic;
->>  	struct rb_root *root = vgic_get_irq_phys_map(vcpu, virt_irq);
->> @@ -1710,6 +1720,7 @@ struct irq_phys_map *vgic_map_phys_irq(struct kvm_vcpu *vcpu,
->>  	new_map->virt_irq = virt_irq;
->>  	new_map->phys_irq = phys_irq;
->>  	new_map->irq = irq;
->> +	new_map->shared = shared;
->>  
->>  	rb_link_node(&new_map->node, parent, new);
->>  	rb_insert_color(&new_map->node, root);
->> @@ -1746,13 +1757,13 @@ static struct irq_phys_map *vgic_irq_map_search(struct kvm_vcpu *vcpu,
->>  
->>  bool vgic_get_phys_irq_active(struct irq_phys_map *map)
->>  {
->> -	BUG_ON(!map);
->> +	BUG_ON(!map || !map->shared);
->>  	return map->active;
->>  }
->>  
->>  void vgic_set_phys_irq_active(struct irq_phys_map *map, bool active)
->>  {
->> -	BUG_ON(!map);
->> +	BUG_ON(!map || !map->shared);
->>  	map->active = active;
->>  }
->>  
->>
+> >PARAMETER                       SYMBOL  STANDARD-MODE   FAST-MODE     UNIT
+> >                                          MIN. MAX.     MIN. MAX.
+> >LOW period of the SCL clock     tLOW      4.7   ?       1.3   ?       ?s
+> >HIGH period of the SCL clock    tHIGH     4.0   ?       0.6   ?       ?s
 > 
+> Your signal is in spec (0.85 ?s high, 1,65 low).
+> Maybe your TPS65218 is just buggy or signals are bad?
 
+yes, tps is buggy, it's written in the commit log itself.
 
 -- 
-Jazz is not dead. It just smells funny...
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150617/0f2305fc/attachment.sig>
