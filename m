@@ -1,55 +1,31 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Wed, 17 Jun 2015 15:43:03 +0200
-Subject: [PATCH] ARM: mvebu: adjust Armada XP DT spi muxing after pinctrl
- function rename
-In-Reply-To: <1434023792-20455-1-git-send-email-thomas.petazzoni@free-electrons.com>
-References: <1434023792-20455-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <55817967.8010909@free-electrons.com>
+From: tomeu.vizoso@collabora.com (Tomeu Vizoso)
+Date: Wed, 17 Jun 2015 15:42:16 +0200
+Subject: [PATCH 06/13] of/platform: Set fwnode field for new devices
+In-Reply-To: <1434548543-22949-1-git-send-email-tomeu.vizoso@collabora.com>
+References: <1434548543-22949-1-git-send-email-tomeu.vizoso@collabora.com>
+Message-ID: <1434548543-22949-7-git-send-email-tomeu.vizoso@collabora.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Thomas, Arnd, Olof,
+When allocating a new platform device, set the fwnode field in the
+struct device to point to the device_node.
 
-On 11/06/2015 13:56, Thomas Petazzoni wrote:
-> Following the merge of "pinctrl: mvebu: armada-xp: rename spi to spi0"
-> by Linus Walleij, we need to adjust the Armada XP Device Tree
-> accordingly, by adjusting the pinctrl configuration for SPI pins.
-> 
-> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+Signed-off-by: Tomeu Vizoso <tomeu.vizoso@collabora.com>
+---
+ drivers/of/platform.c | 1 +
+ 1 file changed, 1 insertion(+)
 
-Acked-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
-
-
-applied on mvebu/dt with the hope that it could be merged for 4.2
-in order to avoid breakage.
-
-
-Thanks,
-
-Gregory
-
-> ---
->  arch/arm/boot/dts/armada-xp.dtsi | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm/boot/dts/armada-xp.dtsi b/arch/arm/boot/dts/armada-xp.dtsi
-> index 013d63f..dba8d3f 100644
-> --- a/arch/arm/boot/dts/armada-xp.dtsi
-> +++ b/arch/arm/boot/dts/armada-xp.dtsi
-> @@ -289,7 +289,7 @@
->  	spi0_pins: spi0-pins {
->  		marvell,pins = "mpp36", "mpp37",
->  			       "mpp38", "mpp39";
-> -		marvell,function = "spi";
-> +		marvell,function = "spi0";
->  	};
->  
->  	uart2_pins: uart2-pins {
-> 
-
-
+diff --git a/drivers/of/platform.c b/drivers/of/platform.c
+index ddf8e42..e880f55 100644
+--- a/drivers/of/platform.c
++++ b/drivers/of/platform.c
+@@ -139,6 +139,7 @@ struct platform_device *of_device_alloc(struct device_node *np,
+ 	}
+ 
+ 	dev->dev.of_node = of_node_get(np);
++	dev->dev.fwnode = &dev->dev.of_node->fwnode;
+ 	dev->dev.parent = parent ? : &platform_bus;
+ 
+ 	if (bus_id)
 -- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+2.4.1
