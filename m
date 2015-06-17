@@ -1,53 +1,62 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Wed, 17 Jun 2015 18:31:09 +0200
-Subject: [PATCH 9/9] ARM: mvebu: adjust board name and compatible for
- Armada 388 GP
-In-Reply-To: <1434456785-23696-10-git-send-email-thomas.petazzoni@free-electrons.com>
-References: <1434456785-23696-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1434456785-23696-10-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <5581A0CD.30109@free-electrons.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Wed, 17 Jun 2015 17:35:31 +0100
+Subject: [PATCH 2/3] spi: mediatek: Add spi bus for Mediatek MT8173
+In-Reply-To: <1434550251.23617.38.camel@mtksdaap41>
+References: <1431675522.2128.13.camel@mhfsdcap03>
+ <20150515092543.GY2761@sirena.org.uk>
+ <1433758546.19786.16.camel@mtksdaap41>
+ <20150608175927.GO14071@sirena.org.uk>
+ <1433844321.16178.6.camel@mtksdaap41>
+ <20150609103951.GA14071@sirena.org.uk>
+ <1433923569.22080.1.camel@mtksdaap41>
+ <1434532083.19346.27.camel@mtksdaap41>
+ <20150617124758.GE3214@sirena.org.uk>
+ <1434550251.23617.38.camel@mtksdaap41>
+Message-ID: <20150617163531.GU14071@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Thomas,
+On Wed, Jun 17, 2015 at 10:10:51PM +0800, Eddie Huang wrote:
 
-On 16/06/2015 14:13, Thomas Petazzoni wrote:
-> As the name of the Device Tree file name suggests, the Armada 388 GP
-> really contains an Armada 388 SoC, so this commit updates the board
-> name and compatible string in the Device Tree file.
+> Our hardware limitation is: we don't have separate dma tx, rx channel
+> with transfer finish interrupt, only have spi trigger operation.So the
+> mediatek SPI dma full duplex operation steps are:
+> 1. Set TX DMA address.
+> 2. Set RX DMA address.
+> 3. Set length (this step assume TX, RX are the same size).
+> 4. Set TX DMA enable, RX DMA enable bit in spi config register. (not
+> trigger DMA, just told spi use dma)
+> 5. Trigger spi operations.
+> 6. Wait spi operations finish interrupt.
 
-Actually the name of the board (the one written on the box) is DB-88F6820-GP.
-And 88F6820 is the code name of Armada 385. But indeed the SoC is an Armada 388
-on our boards.
+Sure, that's what I understood.
 
-Gregory
+> If tx scatterlist per list data size are 128, 4096, 256. rx scatterlist
+> per list data size are 128, 4096, 256. So we need to go through above
+> steps three times. If tx scatterlists per list data size are 128, 4096,
+> 256. rx scatterlists per list data size are 256, 4096, 128. If we start
+> sending first entry, tx size is 128, rx size is 256, this will cause
+> hardware malfunction because tx, rx data length are not the same.
 
-> 
-> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-> ---
->  arch/arm/boot/dts/armada-388-gp.dts | 4 ++--
->  1 file changed, 2 insertions(+), 2 deletions(-)
-> 
-> diff --git a/arch/arm/boot/dts/armada-388-gp.dts b/arch/arm/boot/dts/armada-388-gp.dts
-> index 5f53a96..605f924 100644
-> --- a/arch/arm/boot/dts/armada-388-gp.dts
-> +++ b/arch/arm/boot/dts/armada-388-gp.dts
-> @@ -44,8 +44,8 @@
->  #include <dt-bindings/gpio/gpio.h>
->  
->  / {
-> -	model = "Marvell Armada 385 GP";
-> -	compatible = "marvell,a385-gp", "marvell,armada388", "marvell,armada380";
-> +	model = "Marvell Armada 388 GP";
-> +	compatible = "marvell,a388-gp", "marvell,armada388", "marvell,armada380";
->  
->  	chosen {
->  		stdout-path = "serial0:115200n8";
-> 
+> The solution I think is copy scatterlist data into one single buffer in
+> mediatek spi transfer function, but I think this is odd because
+> __spi_map_msg() map single buffer into scatterlist, then our driver map
+> scatterlist into single buffer again. I hope this explaination is more
+> clear than before.
 
+To repeat what I said in my last mail: there's no need to use the
+scatterlists as-is, your driver can do whatever set of DMA transfers it
+likes to keep the lengths of each transfer the same.  Attempting to
+linearise the transfers in memory isn't going to work unless you
+allocate physically contiguous memory (which could get painful) and will
+add substantial overhead.
 
--- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+For example with your above example you could split the transfers up to
+be 128, 128, 3968, 128, 128.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150617/e9e81fa4/attachment.sig>
