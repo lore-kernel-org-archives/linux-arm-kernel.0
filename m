@@ -1,21 +1,36 @@
 From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Wed, 17 Jun 2015 08:08:28 +0530
-Subject: [PATCH V7 3/3] OPP: Add binding for 'opp-suspend'
-In-Reply-To: <4228747.vs1U0RqIQB@vostro.rjw.lan>
-References: <cover.1433434659.git.viresh.kumar@linaro.org>
- <20150616025425.GB26592@linux>
- <CAL_JsqJ2gCJvtrZqDWWoY6Gv4Ag7xLV93wLbT5b37jO=oWo+MQ@mail.gmail.com>
- <4228747.vs1U0RqIQB@vostro.rjw.lan>
-Message-ID: <20150617023828.GB13553@linux>
+Date: Wed, 17 Jun 2015 08:10:55 +0530
+Subject: [PATCH 9/9] irq: spear-shirq: fix race in installing chained IRQ
+ handler
+In-Reply-To: <E1Z4z0X-0002T1-6U@rmk-PC.arm.linux.org.uk>
+References: <E1Z4z0X-0002T1-6U@rmk-PC.arm.linux.org.uk>
+Message-ID: <CAOh2x=m2y+T0Z78nV5zDmSa6_7NH972EXcEEUKZMZ1dSxE6YKw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 16-06-15, 23:21, Rafael J. Wysocki wrote:
-> Does your ACK also apply to patches [1-2/3] in this series?
+On Wed, Jun 17, 2015 at 3:37 AM, Russell King
+<rmk+kernel@arm.linux.org.uk> wrote:
+> Fix a race where a pending interrupt could be received and the handler
+> called before the handler's data has been setup, by converting to
+> irq_set_chained_handler_and_data().
+>
+> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+> ---
+> Depends on patch 1.
+>
+>  drivers/irqchip/spear-shirq.c | 3 +--
+>  1 file changed, 1 insertion(+), 2 deletions(-)
+>
+> diff --git a/drivers/irqchip/spear-shirq.c b/drivers/irqchip/spear-shirq.c
+> index 9c145a7cb056..a45121546caf 100644
+> --- a/drivers/irqchip/spear-shirq.c
+> +++ b/drivers/irqchip/spear-shirq.c
+> @@ -207,8 +207,7 @@ static void __init spear_shirq_register(struct spear_shirq *shirq,
+>         if (!shirq->irq_chip)
+>                 return;
+>
+> -       irq_set_chained_handler(parent_irq, shirq_handler);
+> -       irq_set_handler_data(parent_irq, shirq);
+> +       irq_set_chained_handler_and_data(parent_irq, shirq_handler, shirq);
 
-His RBY tag is already present for 1/3 :)
-
-@Rob: Please Ack 2/3 as well :)
-
--- 
-viresh
+Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
