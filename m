@@ -1,180 +1,120 @@
-From: d-gerlach@ti.com (Dave Gerlach)
-Date: Wed, 17 Jun 2015 13:46:02 -0500
-Subject: [PATCH v5 1/4] remoteproc: introduce rproc_get_by_phandle API
-In-Reply-To: <1432327530-48032-2-git-send-email-d-gerlach@ti.com>
-References: <1432327530-48032-2-git-send-email-d-gerlach@ti.com>
-Message-ID: <1434566762-40702-1-git-send-email-d-gerlach@ti.com>
+From: dave.long@linaro.org (David Long)
+Date: Wed, 17 Jun 2015 14:51:04 -0400
+Subject: [PATCH v7 0/7] arm64: Add kernel probes (kprobes) support
+In-Reply-To: <558181C2.6020500@hitachi.com>
+References: <1434395229-6654-1-git-send-email-dave.long@linaro.org>
+ <558181C2.6020500@hitachi.com>
+Message-ID: <5581C198.1040802@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Allow users of remoteproc the ability to get a handle to an rproc by
-passing a phandle supplied in the user's device tree node. This is
-useful in situations that require manual booting of the rproc.
+On 06/17/15 10:18, Masami Hiramatsu wrote:
+> Hi David,
+>
+> At first, thank you for updating this series! :)
+>
+> On 2015/06/16 4:07, David Long wrote:
+>> From: "David A. Long" <dave.long@linaro.org>
+>>
+>> This patchset is heavily based on Sandeepa Prabhu's ARM v8 kprobes patches,
+>> first seen in October 2013. This version attempts to address concerns raised by
+>> reviewers and also fixes problems discovered during testing.
+>>
+>> This patchset adds support for kernel probes(kprobes), jump probes(jprobes)
+>> and return probes(kretprobes) support for ARM64.
+>>
+>> The kprobes mechanism makes use of software breakpoint and single stepping
+>> support available in the ARM v8 kernel.
+>>
+>> The is patch depends on:
+>> 	[PATCH 1/2] Move the pt_regs_offset struct definition from arch to common include file
+>> 	[PATCH 2/2] Consolidate redundant register/stack access code
+>>
+>
+> Hmm, what are those patches ? Would they be not merged to upstream yet?
+> If so, where I can get them from? I'd like to know the actual url for them.
+>
 
-This patch uses the code removed by commit 40e575b1d0b3 ("remoteproc:
-remove the get_by_name/put API") for the ref counting but is modified
-to use a simple list and locking mechanism and has rproc_get_by_name
-replaced with an rproc_get_by_phandle API.
+These patches were sent out to the kernel mailing lists shortly before 
+the kprobes64 patch.  Until such time as they are accepted upstream they 
+can also be found on the "kprobes64-v7" branch of my personal git repo at:
 
-Signed-off-by: Dave Gerlach <d-gerlach@ti.com>
-Signed-off-by: Suman Anna <s-anna@ti.com>
----
-v4->v5: Fixed build error from of_find_node_by_phandle when !CONFIG_OF
-	based on offline discussion.
+https://git.linaro.org/people/dave.long/linux.git
 
- Documentation/remoteproc.txt         |  6 +++++
- drivers/remoteproc/remoteproc_core.c | 52 ++++++++++++++++++++++++++++++++++++
- include/linux/remoteproc.h           | 14 +++++++---
- 3 files changed, 69 insertions(+), 3 deletions(-)
+as commits:
 
-diff --git a/Documentation/remoteproc.txt b/Documentation/remoteproc.txt
-index e6469fd..ef0219f 100644
---- a/Documentation/remoteproc.txt
-+++ b/Documentation/remoteproc.txt
-@@ -51,6 +51,12 @@ cost.
-         rproc_shutdown() returns, and users can still use it with a subsequent
-         rproc_boot(), if needed.
- 
-+  struct rproc *rproc_get_by_phandle(phandle phandle)
-+    - Find an rproc handle using a device tree phandle. Returns the rproc
-+      handle on success, and NULL on failure. This function increments
-+      the remote processor's refcount, so always use rproc_put() to
-+      decrement it back once rproc isn't needed anymore.
-+
- 3. Typical usage
- 
- #include <linux/remoteproc.h>
-diff --git a/drivers/remoteproc/remoteproc_core.c b/drivers/remoteproc/remoteproc_core.c
-index e991512..a898c48 100644
---- a/drivers/remoteproc/remoteproc_core.c
-+++ b/drivers/remoteproc/remoteproc_core.c
-@@ -44,6 +44,9 @@
- 
- #include "remoteproc_internal.h"
- 
-+static DEFINE_MUTEX(rproc_list_mutex);
-+static LIST_HEAD(rproc_list);
-+
- typedef int (*rproc_handle_resources_t)(struct rproc *rproc,
- 				struct resource_table *table, int len);
- typedef int (*rproc_handle_resource_t)(struct rproc *rproc,
-@@ -1144,6 +1147,45 @@ out:
- }
- EXPORT_SYMBOL(rproc_shutdown);
- 
-+#ifdef CONFIG_OF
-+/**
-+ * rproc_get_by_phandle() - find a remote processor by phandle
-+ * @phandle: phandle to the rproc
-+ *
-+ * Finds an rproc handle using the remote processor's phandle, and then
-+ * return a handle to the rproc.
-+ *
-+ * This function increments the remote processor's refcount, so always
-+ * use rproc_put() to decrement it back once rproc isn't needed anymore.
-+ *
-+ * Returns the rproc handle on success, and NULL on failure.
-+ */
-+struct rproc *rproc_get_by_phandle(phandle phandle)
-+{
-+	struct rproc *rproc = NULL, *r;
-+	struct device_node *np;
-+
-+	np = of_find_node_by_phandle(phandle);
-+	if (!np)
-+		return NULL;
-+
-+	mutex_lock(&rproc_list_mutex);
-+	list_for_each_entry(r, &rproc_list, node) {
-+		if (r->dev.parent && r->dev.parent->of_node == np) {
-+			rproc = r;
-+			get_device(&rproc->dev);
-+			break;
-+		}
-+	}
-+	mutex_unlock(&rproc_list_mutex);
-+
-+	of_node_put(np);
-+
-+	return rproc;
-+}
-+EXPORT_SYMBOL(rproc_get_by_phandle);
-+#endif /* CONFIG_OF */
-+
- /**
-  * rproc_add() - register a remote processor
-  * @rproc: the remote processor handle to register
-@@ -1173,6 +1215,11 @@ int rproc_add(struct rproc *rproc)
- 	if (ret < 0)
- 		return ret;
- 
-+	/* expose to rproc_get_by_phandle users */
-+	mutex_lock(&rproc_list_mutex);
-+	list_add(&rproc->node, &rproc_list);
-+	mutex_unlock(&rproc_list_mutex);
-+
- 	dev_info(dev, "%s is available\n", rproc->name);
- 
- 	dev_info(dev, "Note: remoteproc is still under development and considered experimental.\n");
-@@ -1360,6 +1407,11 @@ int rproc_del(struct rproc *rproc)
- 	/* Free the copy of the resource table */
- 	kfree(rproc->cached_table);
- 
-+	/* the rproc is downref'ed as soon as it's removed from the klist */
-+	mutex_lock(&rproc_list_mutex);
-+	list_del(&rproc->node);
-+	mutex_unlock(&rproc_list_mutex);
-+
- 	device_del(&rproc->dev);
- 
- 	return 0;
-diff --git a/include/linux/remoteproc.h b/include/linux/remoteproc.h
-index 78b8a9b..cccfe0b 100644
---- a/include/linux/remoteproc.h
-+++ b/include/linux/remoteproc.h
-@@ -36,11 +36,11 @@
- #define REMOTEPROC_H
- 
- #include <linux/types.h>
--#include <linux/klist.h>
- #include <linux/mutex.h>
- #include <linux/virtio.h>
- #include <linux/completion.h>
- #include <linux/idr.h>
-+#include <linux/of.h>
- 
- /**
-  * struct resource_table - firmware resource table header
-@@ -375,7 +375,7 @@ enum rproc_crash_type {
- 
- /**
-  * struct rproc - represents a physical remote processor device
-- * @node: klist node of this rproc object
-+ * @node: list node of this rproc object
-  * @domain: iommu domain
-  * @name: human readable name of the rproc
-  * @firmware: name of firmware file to be loaded
-@@ -407,7 +407,7 @@ enum rproc_crash_type {
-  * @has_iommu: flag to indicate if remote processor is behind an MMU
-  */
- struct rproc {
--	struct klist_node node;
-+	struct list_head node;
- 	struct iommu_domain *domain;
- 	const char *name;
- 	const char *firmware;
-@@ -504,4 +504,12 @@ static inline struct rproc *vdev_to_rproc(struct virtio_device *vdev)
- 	return rvdev->rproc;
- }
- 
-+#ifdef CONFIG_OF
-+struct rproc *rproc_get_by_phandle(phandle phandle);
-+#else
-+static inline struct rproc *rproc_get_by_phandle(phandle phandle)
-+{
-+	return NULL;
-+}
-+#endif /* CONFIG_OF */
- #endif /* REMOTEPROC_H */
--- 
-2.4.1
+3ce7d917bef3aee9fff70252d83e65f1cc7f909b
+03f4bece51a068f4e1dac8813a57feeccfa24c26
+
+
+Since I'm not planning on keeping that branch around forever I did not 
+include that info in the cover-letter email.  Please advise if there is 
+a better way to record dependencies like this.
+
+>
+> [...]
+>> Changes since v6 include:
+>>
+>> 1) New trampoline code from Will Cohen fixes the occasional failure seen
+>> when processing kretprobes by replacing the software breakpoint with
+>> assembly code to implement the return to the original execution stream.
+>
+> Yeah, that's what we need :)
+>
+> Thank you,
+>
+
+You're welcome :-)
+
+>> 2) Changed ip0, ip1, fp, and lr to plain numbered registers for purposes
+>> of recognizing them as an ascii string in the stack/reg access code.
+>> 3) Removed orig_x0.
+>> 4) Moved ARM_x* defines from arch/arm64/include/uapi/asm/ptrace.h to
+>> arch/arm64/kernel/ptrace.c.
+>>
+>> David A. Long (2):
+>>    arm64: Add HAVE_REGS_AND_STACK_ACCESS_API feature
+>>    arm64: Add more test functions to insn.c
+>>
+>> Sandeepa Prabhu (4):
+>>    arm64: Kprobes with single stepping support
+>>    arm64: kprobes instruction simulation support
+>>    arm64: Add kernel return probes support (kretprobes)
+>>    kprobes: Add arm64 case in kprobe example module
+>>
+>> William Cohen (1):
+>>    arm64: Add trampoline code for kretprobes
+>>
+>>   arch/arm64/Kconfig                       |   3 +
+>>   arch/arm64/include/asm/debug-monitors.h  |   5 +
+>>   arch/arm64/include/asm/insn.h            |  18 +
+>>   arch/arm64/include/asm/kprobes.h         |  63 +++
+>>   arch/arm64/include/asm/probes.h          |  50 +++
+>>   arch/arm64/include/asm/ptrace.h          |  28 +-
+>>   arch/arm64/kernel/Makefile               |   3 +
+>>   arch/arm64/kernel/debug-monitors.c       |  35 +-
+>>   arch/arm64/kernel/insn.c                 |  28 ++
+>>   arch/arm64/kernel/kprobes-arm64.c        | 166 ++++++++
+>>   arch/arm64/kernel/kprobes-arm64.h        |  71 ++++
+>>   arch/arm64/kernel/kprobes.c              | 665 +++++++++++++++++++++++++++++++
+>>   arch/arm64/kernel/kprobes.h              |  24 ++
+>>   arch/arm64/kernel/probes-condn-check.c   | 122 ++++++
+>>   arch/arm64/kernel/probes-simulate-insn.c | 174 ++++++++
+>>   arch/arm64/kernel/probes-simulate-insn.h |  33 ++
+>>   arch/arm64/kernel/ptrace.c               |  77 ++++
+>>   arch/arm64/kernel/vmlinux.lds.S          |   1 +
+>>   arch/arm64/mm/fault.c                    |  25 ++
+>>   samples/kprobes/kprobe_example.c         |   8 +
+>>   20 files changed, 1588 insertions(+), 11 deletions(-)
+>>   create mode 100644 arch/arm64/include/asm/kprobes.h
+>>   create mode 100644 arch/arm64/include/asm/probes.h
+>>   create mode 100644 arch/arm64/kernel/kprobes-arm64.c
+>>   create mode 100644 arch/arm64/kernel/kprobes-arm64.h
+>>   create mode 100644 arch/arm64/kernel/kprobes.c
+>>   create mode 100644 arch/arm64/kernel/kprobes.h
+>>   create mode 100644 arch/arm64/kernel/probes-condn-check.c
+>>   create mode 100644 arch/arm64/kernel/probes-simulate-insn.c
+>>   create mode 100644 arch/arm64/kernel/probes-simulate-insn.h
+>>
+>
+>
