@@ -1,87 +1,108 @@
-From: Frank.Li@freescale.com (Frank.Li at freescale.com)
-Date: Wed, 17 Jun 2015 23:39:24 +0800
-Subject: [PATCH 3/8] Document: dt: binding: imx: update document for imx6ul
- support
-In-Reply-To: <1434555569-8237-1-git-send-email-Frank.Li@freescale.com>
-References: <1434555569-8237-1-git-send-email-Frank.Li@freescale.com>
-Message-ID: <1434555569-8237-4-git-send-email-Frank.Li@freescale.com>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Wed, 17 Jun 2015 16:41:50 +0100
+Subject: [PATCH 2/2] drivers: firmware: psci: add system suspend support
+In-Reply-To: <20150617150804.GE27017@red-moon>
+References: <1434462640-19613-1-git-send-email-sudeep.holla@arm.com>
+ <1434462640-19613-3-git-send-email-sudeep.holla@arm.com>
+ <20150617150804.GE27017@red-moon>
+Message-ID: <5581953E.2090109@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Frank Li <Frank.Li@freescale.com>
 
-This part just add necessary change to boot imx6ul.
-Update clock and pinctrl for imx6ul
 
-Signed-off-by: Frank Li <Frank.Li@freescale.com>
-Signed-off-by: Frank Li <Frank.Li@freescale.com>
----
- .../devicetree/bindings/clock/imx6ul-clock.txt     | 13 ++++++++
- .../bindings/pinctrl/fsl,imx6ul-pinctrl.txt        | 36 ++++++++++++++++++++++
- 2 files changed, 49 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/clock/imx6ul-clock.txt
- create mode 100644 Documentation/devicetree/bindings/pinctrl/fsl,imx6ul-pinctrl.txt
+On 17/06/15 16:08, Lorenzo Pieralisi wrote:
+> On Tue, Jun 16, 2015 at 02:50:40PM +0100, Sudeep Holla wrote:
+>> PSCI v1.0 introduces a new API called PSCI_SYSTEM_SUSPEND. This API
+>> provides the mechanism by which the calling OS can request entry into
+>> the deepest possible system sleep state.
+>>
+>> It meets all the necessary preconditions for entrying suspend to RAM
+>
+> s/entrying/entering/
+>
+>> state in Linux. This patch adds support for PSCI_SYSTEM_SUSPEND in psci
+>> firmware and registers a psci system suspend operation to implement the
+>> suspend-to-RAM(s2r) in a generic way on all the platforms implementing
+>> PSCI.
+>>
+>> Cc: Mark Rutland <mark.rutland@arm.com>
+>> Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+>> Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
+>> ---
+>>   drivers/firmware/psci.c   | 39 +++++++++++++++++++++++++++++++++++++++
+>>   include/uapi/linux/psci.h |  2 ++
+>>   2 files changed, 41 insertions(+)
+>>
+>> diff --git a/drivers/firmware/psci.c b/drivers/firmware/psci.c
+>> index 68d0c2f6d004..4f0359516119 100644
+>> --- a/drivers/firmware/psci.c
+>> +++ b/drivers/firmware/psci.c
+>> @@ -20,11 +20,13 @@
+>>   #include <linux/printk.h>
+>>   #include <linux/psci.h>
+>>   #include <linux/reboot.h>
+>> +#include <linux/suspend.h>
+>>
+>>   #include <uapi/linux/psci.h>
+>>
+>>   #include <asm/system_misc.h>
+>>   #include <asm/smp_plat.h>
+>> +#include <asm/suspend.h>
+>>
+>>   /*
+>>    * While a 64-bit OS can make calls with SMC32 calling conventions, for some
+>> @@ -222,6 +224,41 @@ static int __init psci_features(u32 psci_func_id)
+>>   			      psci_func_id, 0, 0);
+>>   }
+>>
+>> +static int psci_system_suspend(unsigned long entry_point)
+>> +{
+>> +	return invoke_psci_fn(PSCI_0_2_FN_NATIVE(SYSTEM_SUSPEND),
+>> +			      entry_point, 0, 0);
+>> +}
+>> +
+>> +static int psci_system_suspend_finisher(unsigned long unused)
+>> +{
+>> +	return psci_system_suspend(virt_to_phys(cpu_resume));
+>
+> Do we really need another level of indirection ? I would invoke
+> the PSCI function from here.
+>
 
-diff --git a/Documentation/devicetree/bindings/clock/imx6ul-clock.txt b/Documentation/devicetree/bindings/clock/imx6ul-clock.txt
-new file mode 100644
-index 0000000..3ff362e
---- /dev/null
-+++ b/Documentation/devicetree/bindings/clock/imx6ul-clock.txt
-@@ -0,0 +1,13 @@
-+* Clock bindings for Freescale i.MX6 UltraLite
-+
-+Required properties:
-+- compatible: Should be "fsl,imx6ul-ccm"
-+- reg: Address and length of the register set
-+- #clock-cells: Should be <1>
-+- clocks: list of clock specifiers, must contain an entry for each required
-+  entry in clock-names
-+- clock-names: should include entries "ckil", "osc", "ipp_di0" and "ipp_di1"
-+
-+The clock consumer should specify the desired clock by having the clock
-+ID in its "clocks" phandle cell.  See include/dt-bindings/clock/imx6ul-clock.h
-+for the full list of i.MX6 UltraLite  clock IDs.
-diff --git a/Documentation/devicetree/bindings/pinctrl/fsl,imx6ul-pinctrl.txt b/Documentation/devicetree/bindings/pinctrl/fsl,imx6ul-pinctrl.txt
-new file mode 100644
-index 0000000..a81bbf3
---- /dev/null
-+++ b/Documentation/devicetree/bindings/pinctrl/fsl,imx6ul-pinctrl.txt
-@@ -0,0 +1,36 @@
-+* Freescale i.MX6 UltraLite IOMUX Controller
-+
-+Please refer to fsl,imx-pinctrl.txt in this directory for common binding part
-+and usage.
-+
-+Required properties:
-+- compatible: "fsl,imx6ul-iomuxc"
-+- fsl,pins: each entry consists of 6 integers and represents the mux and config
-+  setting for one pin.  The first 5 integers <mux_reg conf_reg input_reg mux_val
-+  input_val> are specified using a PIN_FUNC_ID macro, which can be found in
-+  imx6ul-pinfunc.h under device tree source folder.  The last integer CONFIG is
-+  the pad setting value like pull-up on this pin.  Please refer to i.MX6 UltraLite
-+  Reference Manual for detailed CONFIG settings.
-+
-+CONFIG bits definition:
-+PAD_CTL_HYS                     (1 << 16)
-+PAD_CTL_PUS_100K_DOWN           (0 << 14)
-+PAD_CTL_PUS_47K_UP              (1 << 14)
-+PAD_CTL_PUS_100K_UP             (2 << 14)
-+PAD_CTL_PUS_22K_UP              (3 << 14)
-+PAD_CTL_PUE                     (1 << 13)
-+PAD_CTL_PKE                     (1 << 12)
-+PAD_CTL_ODE                     (1 << 11)
-+PAD_CTL_SPEED_LOW               (0 << 6)
-+PAD_CTL_SPEED_MED               (1 << 6)
-+PAD_CTL_SPEED_HIGH              (3 << 6)
-+PAD_CTL_DSE_DISABLE             (0 << 3)
-+PAD_CTL_DSE_260ohm              (1 << 3)
-+PAD_CTL_DSE_130ohm              (2 << 3)
-+PAD_CTL_DSE_87ohm               (3 << 3)
-+PAD_CTL_DSE_65ohm               (4 << 3)
-+PAD_CTL_DSE_52ohm               (5 << 3)
-+PAD_CTL_DSE_43ohm               (6 << 3)
-+PAD_CTL_DSE_37ohm               (7 << 3)
-+PAD_CTL_SRE_FAST                (1 << 0)
-+PAD_CTL_SRE_SLOW                (0 << 0)
--- 
-1.9.1
+True not really required, copied from other functions just for
+consistency. I will merge them into one.
+
+>> +}
+>> +
+>> +static int psci_system_suspend_enter(suspend_state_t state)
+>> +{
+>> +	if (state != PM_SUSPEND_MEM)
+>> +		return 0;
+>
+> suspend_valid_only_mem should check this, am I missing something ?
+>
+
+Yes it's taken care, I can remove that.
+
+[...]
+
+>> diff --git a/include/uapi/linux/psci.h b/include/uapi/linux/psci.h
+>> index 2598d7c9bf20..62b054524819 100644
+>> --- a/include/uapi/linux/psci.h
+>> +++ b/include/uapi/linux/psci.h
+>> @@ -39,12 +39,14 @@
+>>   #define PSCI_0_2_FN_MIGRATE_INFO_UP_CPU		PSCI_0_2_FN(7)
+>>   #define PSCI_0_2_FN_SYSTEM_OFF			PSCI_0_2_FN(8)
+>>   #define PSCI_0_2_FN_SYSTEM_RESET		PSCI_0_2_FN(9)
+>> +#define PSCI_0_2_FN_SYSTEM_SUSPEND		PSCI_0_2_FN(14)
+>
+> I think you should keep versioning consistent, namely SYSTEM_SUSPEND
+> is a 1.0 only feature and the tag should reflect that.
+>
+
+Correct, IIRC I kept it to make you use of PSCI_0_2_FN_NATIVE initially
+and forgot to change. I will update them all to use _1_0 tag.
+
+Regards,
+Sudeep
