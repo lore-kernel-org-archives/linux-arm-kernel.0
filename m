@@ -1,101 +1,78 @@
-From: tglx@linutronix.de (Thomas Gleixner)
-Date: Wed, 17 Jun 2015 16:10:02 +0200 (CEST)
-Subject: [PATCH 1/9] irq: add irq_set_chained_handler_and_data()
-In-Reply-To: <E1Z4yzs-0002Rw-4B@rmk-PC.arm.linux.org.uk>
-References: <E1Z4yzs-0002Rw-4B@rmk-PC.arm.linux.org.uk>
-Message-ID: <alpine.DEB.2.11.1506171609390.4107@nanos>
+From: eddie.huang@mediatek.com (Eddie Huang)
+Date: Wed, 17 Jun 2015 22:10:51 +0800
+Subject: [PATCH 2/3] spi: mediatek: Add spi bus for Mediatek MT8173
+In-Reply-To: <20150617124758.GE3214@sirena.org.uk>
+References: <1431434356.2128.9.camel@mhfsdcap03>
+ <20150512160540.GB3066@sirena.org.uk> <1431675522.2128.13.camel@mhfsdcap03>
+ <20150515092543.GY2761@sirena.org.uk>
+ <1433758546.19786.16.camel@mtksdaap41>
+ <20150608175927.GO14071@sirena.org.uk>
+ <1433844321.16178.6.camel@mtksdaap41>
+ <20150609103951.GA14071@sirena.org.uk>
+ <1433923569.22080.1.camel@mtksdaap41>
+ <1434532083.19346.27.camel@mtksdaap41>
+ <20150617124758.GE3214@sirena.org.uk>
+Message-ID: <1434550251.23617.38.camel@mtksdaap41>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 16 Jun 2015, Russell King wrote:
-
-> Driver authors seem to get the ordering of irq_set_chained_handler()
-> and irq_set_handler_data() wrong - ordering the former before the
-> latter.  This opens a race window where, if there is an interrupt
-> pending, the handler will be called between these two calls,
-> potentially resulting in an oops.
+On Wed, 2015-06-17 at 13:47 +0100, Mark Brown wrote:
+> On Wed, Jun 17, 2015 at 05:08:03PM +0800, Eddie Huang wrote:
 > 
-> Provide a single interface to set both of these together, especially
-> as that's commonly what is required.
+> > Here comes the problem, although total length of tx, rx is the same,
+> > each entry in rx and tx scatterlist may not be the same (in the case
+> > data buffer allocate from vmalloc). Other vendor have dmaengine driver
+> > to send entry-by-entry automatically, so it is ok due to total length is
+> > the same.But mediatek hw can only send tx and rx scatterlist entry one
+> > by on, which means in full duplex, mediatek SPI hardware need send each
+> > entry separately, will cause full duplex fail because tx/rx entry size
+> > or entry number may not be the same.
 > 
-> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
-> ---
-> It probably makes sense to convert everything over to this new
-> registration function, and kill all users of irq_set_chained_handler()
-> to prevent this problem recurring.  Thoughts?
+> I don't see why this is a problem - your driver is going to have to do
+> more work to overcome the limitations of the hardware but surely it's
+> just a question of how you parse the scatterlists (or rewriting them if
+> that's appropriate)?
+> 
+> > The problem is not dma map discuss earlier, it is mediatek spi hardware
+> > limitation that can't support scatterlist dma transfer in full-duplex
+> > mode. We can only support both tx and rx has the same size continuous
+> > memory data in full-duplex mode. I don't know whether should modify
+> > spi.c to support mediatek spi, or we just return can_dma() false and do
+> > transfer one continuous data in transfer function.
+> 
+> > By the way, I think maybe it is better to change can_dma() to So 
+> > can_dma_sg().
+> 
+> Don't you just need to handle the scatterlists in page sized chunks
+> here?  There's nothing about passing information about the memory that
+> was mapped around in a scatterlist that means you have to pass the whole
+> list to the hardware at once - at heart the scatterlist is just a
+> convenient structure for passing around where the data to be transferred
+> is.
 
-Yes. Classic coccinelle problem. Here is the semantic patch:
+Our hardware limitation is: we don't have separate dma tx, rx channel
+with transfer finish interrupt, only have spi trigger operation.So the
+mediatek SPI dma full duplex operation steps are:
+1. Set TX DMA address.
+2. Set RX DMA address.
+3. Set length (this step assume TX, RX are the same size).
+4. Set TX DMA enable, RX DMA enable bit in spi config register. (not
+trigger DMA, just told spi use dma)
+5. Trigger spi operations.
+6. Wait spi operations finish interrupt.
 
-@@
-expression E1, E2, E3;
-@@
--irq_set_chained_handler(E1, E3);
-...
--irq_set_handler_data(E1, E2);
-+irq_set_chained_handler_and_data(E1, E3, E2);
+If tx scatterlist per list data size are 128, 4096, 256. rx scatterlist
+per list data size are 128, 4096, 256. So we need to go through above
+steps three times. If tx scatterlists per list data size are 128, 4096,
+256. rx scatterlists per list data size are 256, 4096, 128. If we start
+sending first entry, tx size is 128, rx size is 256, this will cause
+hardware malfunction because tx, rx data length are not the same.
 
-This finds and corrects all instances which get it wrong:
+The solution I think is copy scatterlist data into one single buffer in
+mediatek spi transfer function, but I think this is odd because
+__spi_map_msg() map single buffer into scatterlist, then our driver map
+scatterlist into single buffer again. I hope this explaination is more
+clear than before.
 
-arch:
- arm/common/locomo.c                   |    3 +--
- arm/common/sa1111.c                   |    3 +--
- arm/mach-gemini/gpio.c                |    4 ++--
- avr32/mach-at32ap/extint.c            |    3 +--
- m68k/mac/psc.c                        |   12 ++++--------
- mips/ath25/ar2315.c                   |    4 ++--
- mips/ath25/ar5312.c                   |    4 ++--
- mips/pci/pci-ar2315.c                 |    4 ++--
- mips/ralink/irq.c                     |    3 +--
- sh/intc/core.c                        |    5 +++--
-
-drivers:
- dma/ipu/ipu_irq.c                     |    6 ++----
- gpio/gpio-bcm-kona.c                  |    5 +++--
- gpio/gpio-davinci.c                   |   10 ++--------
- gpio/gpio-dwapb.c                     |    4 ++--
- gpio/gpio-msic.c                      |    3 +--
- gpio/gpio-mxc.c                       |   10 +++++-----
- gpio/gpio-mxs.c                       |    4 ++--
- gpio/gpio-tegra.c                     |    4 ++--
- gpu/ipu-v3/ipu-common.c               |   13 +++++--------
- irqchip/irq-keystone.c                |    4 ++--
- irqchip/spear-shirq.c                 |    3 +--
- mfd/pm8921-core.c                     |    6 ++----
- mfd/t7l66xb.c                         |    3 +--
- mfd/tc6393xb.c                        |    3 +--
- pci/host/pci-keystone.c               |    7 +++----
- pinctrl/mediatek/pinctrl-mtk-common.c |    3 +--
- pinctrl/pinctrl-adi2.c                |    4 ++--
- pinctrl/pinctrl-st.c                  |    4 ++--
- pinctrl/samsung/pinctrl-exynos.c      |    4 ++--
- pinctrl/samsung/pinctrl-s3c24xx.c     |    3 +--
- pinctrl/samsung/pinctrl-s3c64xx.c     |    8 ++++----
- pinctrl/sunxi/pinctrl-sunxi.c         |    6 +++---
- spmi/spmi-pmic-arb.c                  |    6 ++----
- 33 files changed, 70 insertions(+), 98 deletions(-)
-
-If we revert the search pattern we get the ones which got it right:
-
-@@
-expression E1, E2, E3;
-@@
--irq_set_handler_data(E1, E2);
-...
--irq_set_chained_handler(E1, E3);
-+irq_set_chained_handler_and_data(E1, E3, E2);
-
-That handles another bunch and leaves us with 135 instances of
-irq_set_chained_handler() which do not set handler data. So its
-trivial to change them to
-
- irq_set_chained_handler_and_data(irq, handler, NULL);
-
-and then remove irq_set_chained_handler()
-
-If thats ok for you, then i apply the lot you sent and run the cocci
-scripts right at rc1. I have another set of transformations in that
-area pending.
-
-Thanks,
-
-	tglx
+Eddie
+Thanks
