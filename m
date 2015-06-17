@@ -1,118 +1,23 @@
-From: simon.guinot@sequanux.org (Simon Guinot)
-Date: Wed, 17 Jun 2015 15:19:21 +0200
-Subject: [PATCH v2 2/3] ARM: mvebu: update Ethernet compatible string for
- Armada XP
-In-Reply-To: <1434547162-6275-1-git-send-email-simon.guinot@sequanux.org>
-References: <1434547162-6275-1-git-send-email-simon.guinot@sequanux.org>
-Message-ID: <1434547162-6275-3-git-send-email-simon.guinot@sequanux.org>
+From: peter.maydell@linaro.org (Peter Maydell)
+Date: Wed, 17 Jun 2015 14:21:59 +0100
+Subject: [PATCH 04/10] KVM: arm/arm64: vgic: Allow HW irq to be encoded in
+ LR
+In-Reply-To: <55815FA5.4010203@linaro.org>
+References: <1433783045-8002-1-git-send-email-marc.zyngier@arm.com>
+ <1433783045-8002-5-git-send-email-marc.zyngier@arm.com>
+ <55815FA5.4010203@linaro.org>
+Message-ID: <CAFEAcA8idJehTx75G1OzcPpg5ewx_6X15srx7iV6sszmiqHNFw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch updates the Ethernet DT nodes for Armada XP SoCs with the
-compatible string "marvell,armada-xp-neta".
+On 17 June 2015 at 12:53, Eric Auger <eric.auger@linaro.org> wrote:
+> shouldn't we test somewhere that the hwirq is between 16 and 1019.
 
-Signed-off-by: Simon Guinot <simon.guinot@sequanux.org>
-Cc: <stable@vger.kernel.org> # v3.8+
----
- arch/arm/boot/dts/armada-370-xp.dtsi     |  2 --
- arch/arm/boot/dts/armada-370.dtsi        |  8 ++++++++
- arch/arm/boot/dts/armada-xp-mv78260.dtsi |  2 +-
- arch/arm/boot/dts/armada-xp-mv78460.dtsi |  2 +-
- arch/arm/boot/dts/armada-xp.dtsi         | 10 +++++++++-
- 5 files changed, 19 insertions(+), 5 deletions(-)
+Not directly related, but that reminds me that I noticed the
+other day that we have VGIC_MAX_IRQS = 1024 (and use that as a
+guard on how many irqs we let userspace configure and ask us
+to deliver), but that doesn't account for the couple of magic
+numbers at the top of the range. I think that lets userspace
+cause us to do UNPREDICTABLE things to the GIC...
 
-diff --git a/arch/arm/boot/dts/armada-370-xp.dtsi b/arch/arm/boot/dts/armada-370-xp.dtsi
-index ec96f0b36346..06a2f2ae9d1e 100644
---- a/arch/arm/boot/dts/armada-370-xp.dtsi
-+++ b/arch/arm/boot/dts/armada-370-xp.dtsi
-@@ -270,7 +270,6 @@
- 			};
- 
- 			eth0: ethernet at 70000 {
--				compatible = "marvell,armada-370-neta";
- 				reg = <0x70000 0x4000>;
- 				interrupts = <8>;
- 				clocks = <&gateclk 4>;
-@@ -286,7 +285,6 @@
- 			};
- 
- 			eth1: ethernet at 74000 {
--				compatible = "marvell,armada-370-neta";
- 				reg = <0x74000 0x4000>;
- 				interrupts = <10>;
- 				clocks = <&gateclk 3>;
-diff --git a/arch/arm/boot/dts/armada-370.dtsi b/arch/arm/boot/dts/armada-370.dtsi
-index 00b50db57c9c..ca4257b2f77d 100644
---- a/arch/arm/boot/dts/armada-370.dtsi
-+++ b/arch/arm/boot/dts/armada-370.dtsi
-@@ -307,6 +307,14 @@
- 					dmacap,memset;
- 				};
- 			};
-+
-+			ethernet at 70000 {
-+				compatible = "marvell,armada-370-neta";
-+			};
-+
-+			ethernet at 74000 {
-+				compatible = "marvell,armada-370-neta";
-+			};
- 		};
- 	};
- };
-diff --git a/arch/arm/boot/dts/armada-xp-mv78260.dtsi b/arch/arm/boot/dts/armada-xp-mv78260.dtsi
-index 8479fdc9e9c2..c5fdc99f0dbe 100644
---- a/arch/arm/boot/dts/armada-xp-mv78260.dtsi
-+++ b/arch/arm/boot/dts/armada-xp-mv78260.dtsi
-@@ -318,7 +318,7 @@
- 			};
- 
- 			eth3: ethernet at 34000 {
--				compatible = "marvell,armada-370-neta";
-+				compatible = "marvell,armada-xp-neta";
- 				reg = <0x34000 0x4000>;
- 				interrupts = <14>;
- 				clocks = <&gateclk 1>;
-diff --git a/arch/arm/boot/dts/armada-xp-mv78460.dtsi b/arch/arm/boot/dts/armada-xp-mv78460.dtsi
-index 661d54c81580..0e24f1a38540 100644
---- a/arch/arm/boot/dts/armada-xp-mv78460.dtsi
-+++ b/arch/arm/boot/dts/armada-xp-mv78460.dtsi
-@@ -356,7 +356,7 @@
- 			};
- 
- 			eth3: ethernet at 34000 {
--				compatible = "marvell,armada-370-neta";
-+				compatible = "marvell,armada-xp-neta";
- 				reg = <0x34000 0x4000>;
- 				interrupts = <14>;
- 				clocks = <&gateclk 1>;
-diff --git a/arch/arm/boot/dts/armada-xp.dtsi b/arch/arm/boot/dts/armada-xp.dtsi
-index 013d63f69e36..8fdd6d7c0ab1 100644
---- a/arch/arm/boot/dts/armada-xp.dtsi
-+++ b/arch/arm/boot/dts/armada-xp.dtsi
-@@ -177,7 +177,7 @@
- 			};
- 
- 			eth2: ethernet at 30000 {
--				compatible = "marvell,armada-370-neta";
-+				compatible = "marvell,armada-xp-neta";
- 				reg = <0x30000 0x4000>;
- 				interrupts = <12>;
- 				clocks = <&gateclk 2>;
-@@ -220,6 +220,14 @@
- 				};
- 			};
- 
-+			ethernet at 70000 {
-+				compatible = "marvell,armada-xp-neta";
-+			};
-+
-+			ethernet at 74000 {
-+				compatible = "marvell,armada-xp-neta";
-+			};
-+
- 			xor at f0900 {
- 				compatible = "marvell,orion-xor";
- 				reg = <0xF0900 0x100
--- 
-2.1.4
+-- PMM
