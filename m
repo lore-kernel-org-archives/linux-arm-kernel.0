@@ -1,133 +1,200 @@
-From: tomeu.vizoso@collabora.com (Tomeu Vizoso)
-Date: Wed, 17 Jun 2015 12:04:53 +0200
-Subject: [PATCH 02/21] ARM: tegra: Add gpio-ranges property
-In-Reply-To: <558087CE.5070903@wwwdotorg.org>
-References: <1432565608-26036-1-git-send-email-tomeu.vizoso@collabora.com>
- <1432565608-26036-3-git-send-email-tomeu.vizoso@collabora.com>
- <5564CC84.1030700@wwwdotorg.org>
- <CACRpkdbtCDQLaPhWFT0a7NdJmxYzRvhU_efgUh2ZXhbc+FHg3g@mail.gmail.com>
- <556DCE71.7050108@wwwdotorg.org>
- <CAAObsKBtmJnBZXcv0UE6xGvphSCShFNWehOG8a-PJg-VqPznRw@mail.gmail.com>
- <558087CE.5070903@wwwdotorg.org>
-Message-ID: <CAAObsKAkVKNOQpw9hbY-EVKjh7fRTfP5GbzcVVGxQMTFAztc7Q@mail.gmail.com>
+From: geert+renesas@glider.be (Geert Uytterhoeven)
+Date: Wed, 17 Jun 2015 11:31:22 +0200
+Subject: [PATCH 06/15] ARM: shmobile: Remove legacy armadillo800eva_defconfig
+In-Reply-To: <1434533491-21979-1-git-send-email-geert+renesas@glider.be>
+References: <1434533491-21979-1-git-send-email-geert+renesas@glider.be>
+Message-ID: <1434533491-21979-7-git-send-email-geert+renesas@glider.be>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 16 June 2015 at 22:32, Stephen Warren <swarren@wwwdotorg.org> wrote:
-> On 06/16/2015 02:42 AM, Tomeu Vizoso wrote:
->>
->> On 2 June 2015 at 17:40, Stephen Warren <swarren@wwwdotorg.org> wrote:
->>>
->>> On 06/02/2015 05:28 AM, Linus Walleij wrote:
->>>>
->>>>
->>>> On Tue, May 26, 2015 at 9:41 PM, Stephen Warren <swarren@wwwdotorg.org>
->>>> wrote:
->>>>>
->>>>>
->>>>> On 05/25/2015 08:53 AM, Tomeu Vizoso wrote:
->>>>>>
->>>>>>
->>>>>>
->>>>>> Specify how the GPIOs map to the pins in T124, so the dependency is
->>>>>> explicit.
->>>>>>
->>>>>> Signed-off-by: Tomeu Vizoso <tomeu.vizoso@collabora.com>
->>>>>> ---
->>>>>>     arch/arm/boot/dts/tegra124.dtsi | 1 +
->>>>>>     1 file changed, 1 insertion(+)
->>>>>>
->>>>>> diff --git a/arch/arm/boot/dts/tegra124.dtsi
->>>>>> b/arch/arm/boot/dts/tegra124.dtsi
->>>>>> index 13cc7ca..5d1d35f 100644
->>>>>> --- a/arch/arm/boot/dts/tegra124.dtsi
->>>>>> +++ b/arch/arm/boot/dts/tegra124.dtsi
->>>>>> @@ -254,6 +254,7 @@
->>>>>>                   gpio-controller;
->>>>>>                   #interrupt-cells = <2>;
->>>>>>                   interrupt-controller;
->>>>>> +               gpio-ranges = <&pinmux 0 0 250>;
->>>>>
->>>>>
->>>>>
->>>>>
->>>>> We should be consistent between SoCs. Why not make the same change for
->>>>> all
->>>>> Tegra SoCs?
->>>>
->>>>
->>>>
->>>> Agreed.
->>>>
->>>>> I think this change will cause the GPIO subsystem to call into the
->>>>> pinctrl
->>>>> subsystem and create/add/register a new GPIO<->pinctrl range structure.
->>>>> The
->>>>> pinctrl driver already does this, so I think we'll end up with two
->>>>> duplicate
->>>>> entries in the pinctrl device's gpio_ranges list. This probably won't
->>>>> cause
->>>>> a problem, but I wanted to make sure you'd thought about it to make
->>>>> sure.
->>>>
->>>>
->>>>
->>>> That sounds like duplication indeed, I would expect that first a patch
->>>> adds the ranges to the dts[i] files and then a second patch delete the
->>>> same ranges from the pinctrl driver then, if these shall come in from
->>>> the device tree.
->>>
->>>
->>>
->>> We can't delete the gpio-range-registration code from the Tegra pinmux
->>> driver, or old DTs won't work correctly. We could make it conditional
->>> based
->>> upon whether the DT contains the property or not.
->>
->>
->> I've been looking at this and haven't found a good solution. From what
->> I see, the pinctrl driver doesn't have a reference to the gpio device
->> node so cannot tell if it needs to add the range or not.
->
->
-> Well, we know what the node must be called, so the pinctrl driver could
-> search for it by name.
+The legacy board code for Armadillo-800 EVA has been removed.
 
-Ok, will write something in this direction.
+Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+---
+ MAINTAINERS                                |   1 -
+ arch/arm/configs/armadillo800eva_defconfig | 162 -----------------------------
+ 2 files changed, 163 deletions(-)
+ delete mode 100644 arch/arm/configs/armadillo800eva_defconfig
 
->> The gpio driver can tell whether it should add the range or not, but
->> if it has to because the gpio-ranges property isn't there, then it
->> doesn't have the reference to the pinctrl device to set the range to.
->>
->> So, given that pinctrl_add_gpio_range is deprecated already, wonder if
->> the lesser evil isn't leaving the duplicated entries for now. On newer
->> SoC revisions such as T210 we can stop calling pinctrl_add_gpio_range
->> at all.
->>
->> Or, we can accept that nobody is going to boot a newer kernel with an
->> older DT on the affected boards and just rely on the presence of the
->> gpio-ranges property :)
->
->
-> Isn't the simplest solution to just leave it as it is? Nothing's broken is
-> it?
-
-Well, without an explicit dependency from the gpio node to the pinctrl
-node I cannot avoid a deferred probe (which will cause other deferred
-probes in turn).
-
-> For any new SoCs we add, we can certainly switch to a new scheme if we want,
-> but we need to catch/implement that early before the base .dtsi file is
-> included in its first kernel release.
-
-Definitely.
-
-Regards,
-
-Tomeu
-
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> Please read the FAQ at  http://www.tux.org/lkml/
+diff --git a/MAINTAINERS b/MAINTAINERS
+index f1fe0cc0dadee9df..32ee18a233b6db80 100644
+--- a/MAINTAINERS
++++ b/MAINTAINERS
+@@ -1455,7 +1455,6 @@ F:	arch/arm/boot/dts/emev2*
+ F:	arch/arm/boot/dts/r7s*
+ F:	arch/arm/boot/dts/r8a*
+ F:	arch/arm/boot/dts/sh*
+-F:	arch/arm/configs/armadillo800eva_defconfig
+ F:	arch/arm/configs/bockw_defconfig
+ F:	arch/arm/configs/marzen_defconfig
+ F:	arch/arm/configs/shmobile_defconfig
+diff --git a/arch/arm/configs/armadillo800eva_defconfig b/arch/arm/configs/armadillo800eva_defconfig
+deleted file mode 100644
+index 5666e3700a821814..0000000000000000
+--- a/arch/arm/configs/armadillo800eva_defconfig
++++ /dev/null
+@@ -1,162 +0,0 @@
+-CONFIG_EXPERIMENTAL=y
+-CONFIG_SYSVIPC=y
+-CONFIG_IKCONFIG=y
+-CONFIG_IKCONFIG_PROC=y
+-CONFIG_LOG_BUF_SHIFT=16
+-# CONFIG_UTS_NS is not set
+-# CONFIG_IPC_NS is not set
+-# CONFIG_PID_NS is not set
+-CONFIG_CC_OPTIMIZE_FOR_SIZE=y
+-CONFIG_PERF_EVENTS=y
+-CONFIG_SLAB=y
+-CONFIG_MODULES=y
+-CONFIG_MODULE_UNLOAD=y
+-CONFIG_MODULE_FORCE_UNLOAD=y
+-# CONFIG_BLK_DEV_BSG is not set
+-# CONFIG_IOSCHED_DEADLINE is not set
+-# CONFIG_IOSCHED_CFQ is not set
+-CONFIG_ARCH_SHMOBILE_LEGACY=y
+-CONFIG_ARCH_R8A7740=y
+-CONFIG_MACH_ARMADILLO800EVA=y
+-# CONFIG_SH_TIMER_TMU is not set
+-CONFIG_ARM_THUMB=y
+-CONFIG_CACHE_L2X0=y
+-CONFIG_ARM_ERRATA_430973=y
+-CONFIG_ARM_ERRATA_458693=y
+-CONFIG_ARM_ERRATA_460075=y
+-CONFIG_PL310_ERRATA_588369=y
+-CONFIG_ARM_ERRATA_720789=y
+-CONFIG_PL310_ERRATA_727915=y
+-CONFIG_ARM_ERRATA_743622=y
+-CONFIG_ARM_ERRATA_751472=y
+-CONFIG_PL310_ERRATA_753970=y
+-CONFIG_ARM_ERRATA_754322=y
+-CONFIG_PL310_ERRATA_769419=y
+-CONFIG_ARM_ERRATA_775420=y
+-CONFIG_AEABI=y
+-# CONFIG_OABI_COMPAT is not set
+-CONFIG_FORCE_MAX_ZONEORDER=13
+-CONFIG_ZBOOT_ROM_TEXT=0x0
+-CONFIG_ZBOOT_ROM_BSS=0x0
+-CONFIG_ARM_APPENDED_DTB=y
+-CONFIG_KEXEC=y
+-CONFIG_VFP=y
+-CONFIG_NEON=y
+-# CONFIG_CORE_DUMP_DEFAULT_ELF_HEADERS is not set
+-CONFIG_PM=y
+-CONFIG_NET=y
+-CONFIG_PACKET=y
+-CONFIG_UNIX=y
+-CONFIG_INET=y
+-CONFIG_IP_PNP=y
+-CONFIG_IP_PNP_DHCP=y
+-# CONFIG_INET_XFRM_MODE_TRANSPORT is not set
+-# CONFIG_INET_XFRM_MODE_TUNNEL is not set
+-# CONFIG_INET_XFRM_MODE_BEET is not set
+-# CONFIG_INET_LRO is not set
+-# CONFIG_INET_DIAG is not set
+-# CONFIG_IPV6 is not set
+-# CONFIG_WIRELESS is not set
+-CONFIG_UEVENT_HELPER_PATH="/sbin/hotplug"
+-CONFIG_DEVTMPFS=y
+-CONFIG_DEVTMPFS_MOUNT=y
+-CONFIG_SCSI=y
+-CONFIG_BLK_DEV_SD=y
+-CONFIG_MD=y
+-CONFIG_BLK_DEV_DM=y
+-CONFIG_NETDEVICES=y
+-# CONFIG_NET_VENDOR_BROADCOM is not set
+-# CONFIG_NET_VENDOR_CHELSIO is not set
+-# CONFIG_NET_VENDOR_CIRRUS is not set
+-# CONFIG_NET_VENDOR_FARADAY is not set
+-# CONFIG_NET_VENDOR_INTEL is not set
+-# CONFIG_NET_VENDOR_MARVELL is not set
+-# CONFIG_NET_VENDOR_MICREL is not set
+-# CONFIG_NET_VENDOR_NATSEMI is not set
+-CONFIG_SH_ETH=y
+-# CONFIG_NET_VENDOR_SEEQ is not set
+-# CONFIG_NET_VENDOR_SMSC is not set
+-# CONFIG_NET_VENDOR_STMICRO is not set
+-# CONFIG_WLAN is not set
+-# CONFIG_INPUT_MOUSEDEV_PSAUX is not set
+-CONFIG_INPUT_EVDEV=y
+-# CONFIG_KEYBOARD_ATKBD is not set
+-CONFIG_KEYBOARD_GPIO=y
+-# CONFIG_INPUT_MOUSE is not set
+-CONFIG_INPUT_TOUCHSCREEN=y
+-CONFIG_TOUCHSCREEN_ST1232=y
+-# CONFIG_SERIO is not set
+-# CONFIG_LEGACY_PTYS is not set
+-CONFIG_SERIAL_SH_SCI=y
+-CONFIG_SERIAL_SH_SCI_NR_UARTS=9
+-CONFIG_SERIAL_SH_SCI_CONSOLE=y
+-# CONFIG_HW_RANDOM is not set
+-CONFIG_I2C=y
+-CONFIG_I2C_GPIO=y
+-CONFIG_I2C_SH_MOBILE=y
+-# CONFIG_HWMON is not set
+-CONFIG_REGULATOR=y
+-CONFIG_REGULATOR_GPIO=y
+-CONFIG_MEDIA_SUPPORT=y
+-CONFIG_VIDEO_DEV=y
+-CONFIG_MEDIA_CAMERA_SUPPORT=y
+-CONFIG_V4L_PLATFORM_DRIVERS=y
+-CONFIG_SOC_CAMERA=y
+-CONFIG_SOC_CAMERA_MT9T112=y
+-CONFIG_VIDEO_SH_MOBILE_CEU=y
+-CONFIG_FB=y
+-CONFIG_FB_SH_MOBILE_LCDC=y
+-CONFIG_FB_SH_MOBILE_HDMI=y
+-CONFIG_LCD_CLASS_DEVICE=y
+-CONFIG_BACKLIGHT_PWM=y
+-CONFIG_FRAMEBUFFER_CONSOLE=y
+-CONFIG_FRAMEBUFFER_CONSOLE_DETECT_PRIMARY=y
+-CONFIG_LOGO=y
+-# CONFIG_LOGO_LINUX_MONO is not set
+-# CONFIG_LOGO_LINUX_VGA16 is not set
+-# CONFIG_SND_SUPPORT_OLD_API is not set
+-# CONFIG_SND_VERBOSE_PROCFS is not set
+-# CONFIG_SND_DRIVERS is not set
+-# CONFIG_SND_ARM is not set
+-CONFIG_SND_SOC_SH4_FSI=y
+-# CONFIG_HID_SUPPORT is not set
+-CONFIG_USB=y
+-CONFIG_USB_RENESAS_USBHS=y
+-CONFIG_USB_GADGET=y
+-CONFIG_USB_RENESAS_USBHS_UDC=y
+-CONFIG_USB_ETH=m
+-CONFIG_MMC=y
+-CONFIG_MMC_SDHI=y
+-CONFIG_MMC_SH_MMCIF=y
+-CONFIG_NEW_LEDS=y
+-CONFIG_LEDS_CLASS=y
+-CONFIG_LEDS_GPIO=y
+-CONFIG_RTC_CLASS=y
+-CONFIG_RTC_DRV_S35390A=y
+-CONFIG_DMADEVICES=y
+-CONFIG_SH_DMAE=y
+-CONFIG_UIO=y
+-CONFIG_UIO_PDRV_GENIRQ=y
+-CONFIG_PWM=y
+-CONFIG_PWM_RENESAS_TPU=y
+-# CONFIG_DNOTIFY is not set
+-CONFIG_MSDOS_FS=y
+-CONFIG_VFAT_FS=y
+-CONFIG_TMPFS=y
+-# CONFIG_MISC_FILESYSTEMS is not set
+-CONFIG_NFS_FS=y
+-CONFIG_NFS_V3_ACL=y
+-CONFIG_NFS_V4=y
+-CONFIG_NFS_V4_1=y
+-CONFIG_ROOT_NFS=y
+-CONFIG_NLS_CODEPAGE_437=y
+-CONFIG_NLS_ISO8859_1=y
+-# CONFIG_ENABLE_WARN_DEPRECATED is not set
+-# CONFIG_ENABLE_MUST_CHECK is not set
+-# CONFIG_ARM_UNWIND is not set
+-CONFIG_CRYPTO=y
+-CONFIG_CRYPTO_CBC=y
+-CONFIG_CRYPTO_MD5=y
+-CONFIG_CRYPTO_DES=y
+-CONFIG_CRYPTO_ANSI_CPRNG=y
+-CONFIG_XZ_DEC=y
+-- 
+1.9.1
