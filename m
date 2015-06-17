@@ -1,33 +1,23 @@
-From: herbert@gondor.apana.org.au (Herbert Xu)
-Date: Wed, 17 Jun 2015 13:58:24 +0800
-Subject: [PATCH v5 04/14] crypto: add a new driver for Marvell's CESA
-In-Reply-To: <1434448748-10828-5-git-send-email-boris.brezillon@free-electrons.com>
-References: <1434448748-10828-1-git-send-email-boris.brezillon@free-electrons.com>
- <1434448748-10828-5-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <20150617055824.GA9155@gondor.apana.org.au>
+From: ohad@wizery.com (Ohad Ben-Cohen)
+Date: Wed, 17 Jun 2015 10:12:45 +0300
+Subject: [PATCH v4 0/4] remoteproc: Introduce wkup_m3_rproc driver
+In-Reply-To: <1432327530-48032-1-git-send-email-d-gerlach@ti.com>
+References: <1432327530-48032-1-git-send-email-d-gerlach@ti.com>
+Message-ID: <CAK=WgbbQKaAuyfUJGWpzEmdSZFyReOsf+uPSQq9BMSaSh_xzaA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 16, 2015 at 11:58:58AM +0200, Boris Brezillon wrote:
->
-> +config CRYPTO_DEV_MARVELL_CESA
-> +	tristate "New Marvell's Cryptographic Engine driver"
-> +	depends on (PLAT_ORION || ARCH_MVEBU || COMPILE_TEST) && HAS_DMA && HAS_IOMEM
-> +	select CRYPTO_ALGAPI
-> +	select CRYPTO_AES
-> +	select CRYPTO_DES
-> +	select CRYPTO_BLKCIPHER2
-> +	select CRYPTO_HASH
+On Fri, May 22, 2015 at 11:45 PM, Dave Gerlach <d-gerlach@ti.com> wrote:
+> Hi,
+> This patch series is v4 of the series to add a wkup_m3_rproc driver
+> for TI AM335xi and AM437x SoCs. This family of SoCs contains an ARM
+> Cortex M3 coprocessor that is responsible for low-level power tasks
+> that cannot be handled by the main ARM Cortex A8 so firmware running
+> from the CM3 can be used instead. This driver handles loading
+> of the firmware and reset of the CM3. Change info can be found
+> with each patch.
 
-While you're fixing the DMA issue, could you also replace BLKCIPHER2
-with BLKCIPHER and kill the select on ALGAPI? BLKCIPHER2 is internal
-to the crypto API and should not be used elsewhere while ALGAPI is
-only meant to be selected by crypto types such as BLKCIPHER.
-
-I know the existing driver does this too and I will fix that now.
+Applied all 4 patches to remoteproc's for-next branch.
 
 Thanks,
--- 
-Email: Herbert Xu <herbert@gondor.apana.org.au>
-Home Page: http://gondor.apana.org.au/~herbert/
-PGP Key: http://gondor.apana.org.au/~herbert/pubkey.txt
+Ohad.
