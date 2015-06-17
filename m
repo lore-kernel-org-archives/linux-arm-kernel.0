@@ -1,30 +1,22 @@
 From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Wed, 17 Jun 2015 16:51:26 +0200
-Subject: [PATCH] ARM: mvebu: add missing newline at end of messages
-In-Reply-To: <20150612135537.GH21991@lunn.ch>
-References: <1434116314-10533-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <20150612135537.GH21991@lunn.ch>
-Message-ID: <5581896E.8050009@free-electrons.com>
+Date: Wed, 17 Jun 2015 16:53:40 +0200
+Subject: [PATCH] ARM: orion5x: Use vsprintf %pM extension
+In-Reply-To: <20150615032842.GD10886@lunn.ch>
+References: <1434333690.2507.30.camel@perches.com>
+ <20150615032842.GD10886@lunn.ch>
+Message-ID: <558189F4.2010509@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Andrew, Thomas,
+Hi Andrew, Joe,
 
-On 12/06/2015 15:55, Andrew Lunn wrote:
-> On Fri, Jun 12, 2015 at 03:38:34PM +0200, Thomas Petazzoni wrote:
->> Commit 548ae94c1cc7f ("ARM: mvebu: Disable CPU Idle on Armada 38x")
->> added two new pr_warn() messages in mach-mvebu/pmsu.c. However, these
->> messages lack the final new line, causing the next message to be
->> displayed on the same line.
+On 15/06/2015 05:28, Andrew Lunn wrote:
+> On Sun, Jun 14, 2015 at 07:01:30PM -0700, Joe Perches wrote:
+>> Format mac addresses with the normal kernel extension.
 >>
->> This commit adds the missing ending newlines.
->>
->> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+>> Signed-off-by: Joe Perches <joe@perches.com>
 > 
-> Hardly needs it, but
-> 
-> Acked-by: Andrew Lunn <andrew@lunn.ch>?
-
+> Acked-by: Andrew Lunn <andrew@lunn.ch>
 
 applied on mvebu/cleanup-4.3
 
@@ -34,41 +26,43 @@ Gregory
 > 
 > 	  Andrew
 > 
-> 
 >> ---
->>  arch/arm/mach-mvebu/pmsu.c | 4 ++--
->>  1 file changed, 2 insertions(+), 2 deletions(-)
+>>  arch/arm/mach-orion5x/dns323-setup.c | 4 +---
+>>  arch/arm/mach-orion5x/tsx09-common.c | 4 +---
+>>  2 files changed, 2 insertions(+), 6 deletions(-)
 >>
->> diff --git a/arch/arm/mach-mvebu/pmsu.c b/arch/arm/mach-mvebu/pmsu.c
->> index 4f4e222..e8fdb9c 100644
->> --- a/arch/arm/mach-mvebu/pmsu.c
->> +++ b/arch/arm/mach-mvebu/pmsu.c
->> @@ -415,7 +415,7 @@ static __init int armada_38x_cpuidle_init(void)
->>  	void __iomem *mpsoc_base;
->>  	u32 reg;
->>  
->> -	pr_warn("CPU idle is currently broken on Armada 38x: disabling");
->> +	pr_warn("CPU idle is currently broken on Armada 38x: disabling\n");
->>  	return 0;
->>  
->>  	np = of_find_compatible_node(NULL, NULL,
->> @@ -486,7 +486,7 @@ static int __init mvebu_v7_cpu_pm_init(void)
->>  	 */
->>  	if (of_machine_is_compatible("marvell,armada380")) {
->>  		cpu_hotplug_disable();
->> -		pr_warn("CPU hotplug support is currently broken on Armada 38x: disabling");
->> +		pr_warn("CPU hotplug support is currently broken on Armada 38x: disabling\n");
+>> diff --git a/arch/arm/mach-orion5x/dns323-setup.c b/arch/arm/mach-orion5x/dns323-setup.c
+>> index 09d2a26..f267e58 100644
+>> --- a/arch/arm/mach-orion5x/dns323-setup.c
+>> +++ b/arch/arm/mach-orion5x/dns323-setup.c
+>> @@ -236,9 +236,7 @@ static int __init dns323_read_mac_addr(void)
 >>  	}
 >>  
->>  	if (of_machine_is_compatible("marvell,armadaxp"))
->> -- 
->> 2.1.0
+>>  	iounmap(mac_page);
+>> -	printk("DNS-323: Found ethernet MAC address: ");
+>> -	for (i = 0; i < 6; i++)
+>> -		printk("%.2x%s", addr[i], (i < 5) ? ":" : ".\n");
+>> +	printk("DNS-323: Found ethernet MAC address: %pM\n", addr);
+>>  
+>>  	memcpy(dns323_eth_data.mac_addr, addr, 6);
+>>  
+>> diff --git a/arch/arm/mach-orion5x/tsx09-common.c b/arch/arm/mach-orion5x/tsx09-common.c
+>> index 7189827..24b2959 100644
+>> --- a/arch/arm/mach-orion5x/tsx09-common.c
+>> +++ b/arch/arm/mach-orion5x/tsx09-common.c
+>> @@ -101,9 +101,7 @@ static int __init qnap_tsx09_check_mac_addr(const char *addr_str)
+>>  		addr[i] = byte;
+>>  	}
+>>  
+>> -	printk(KERN_INFO "tsx09: found ethernet mac address ");
+>> -	for (i = 0; i < 6; i++)
+>> -		printk("%.2x%s", addr[i], (i < 5) ? ":" : ".\n");
+>> +	printk(KERN_INFO "tsx09: found ethernet mac address %pM\n", addr);
+>>  
+>>  	memcpy(qnap_tsx09_eth_data.mac_addr, addr, 6);
+>>  
 >>
 >>
->> _______________________________________________
->> linux-arm-kernel mailing list
->> linux-arm-kernel at lists.infradead.org
->> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
 
 
 -- 
