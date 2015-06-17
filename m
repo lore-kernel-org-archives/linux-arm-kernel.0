@@ -1,34 +1,36 @@
-From: yamada.masahiro@socionext.com (Masahiro Yamada)
-Date: Wed, 17 Jun 2015 17:51:41 +0900
-Subject: [PATCH] gpio: zynq: add missing module_exit function
-Message-ID: <1434531101-2585-1-git-send-email-yamada.masahiro@socionext.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Wed, 17 Jun 2015 10:59:04 +0200
+Subject: [RESEND PATCH 1/2] ARM: at91/dt: trivial: fix USB udc compatible
+ string
+Message-ID: <99dc2e0ec98342632b6e3adad3861f4dd0fcde41.1434530650.git.nicolas.ferre@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This driver is tristate, so it should be cleanable.
+To please checkpatch and the tiresome reader, add the "atmel," prefix to the
+USB udc compatible string.
 
-Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
+Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+Cc: <stable@vger.kernel.org>  #4.0+
 ---
+ Documentation/devicetree/bindings/usb/atmel-usb.txt | 6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
 
- drivers/gpio/gpio-zynq.c | 6 ++++++
- 1 file changed, 6 insertions(+)
-
-diff --git a/drivers/gpio/gpio-zynq.c b/drivers/gpio/gpio-zynq.c
-index 184c4b1..1d38da7 100644
---- a/drivers/gpio/gpio-zynq.c
-+++ b/drivers/gpio/gpio-zynq.c
-@@ -722,6 +722,12 @@ static int __init zynq_gpio_init(void)
- }
- postcore_initcall(zynq_gpio_init);
+diff --git a/Documentation/devicetree/bindings/usb/atmel-usb.txt b/Documentation/devicetree/bindings/usb/atmel-usb.txt
+index 1be8d7a26c15..5883b73ea1b5 100644
+--- a/Documentation/devicetree/bindings/usb/atmel-usb.txt
++++ b/Documentation/devicetree/bindings/usb/atmel-usb.txt
+@@ -79,9 +79,9 @@ Atmel High-Speed USB device controller
  
-+static void __exit zynq_gpio_exit(void)
-+{
-+	platform_driver_unregister(&zynq_gpio_driver);
-+}
-+module_exit(zynq_gpio_exit);
-+
- MODULE_AUTHOR("Xilinx Inc.");
- MODULE_DESCRIPTION("Zynq GPIO driver");
- MODULE_LICENSE("GPL");
+ Required properties:
+  - compatible: Should be one of the following
+-	       "at91sam9rl-udc"
+-	       "at91sam9g45-udc"
+-	       "sama5d3-udc"
++	       "atmel,at91sam9rl-udc"
++	       "atmel,at91sam9g45-udc"
++	       "atmel,sama5d3-udc"
+  - reg: Address and length of the register set for the device
+  - interrupts: Should contain usba interrupt
+  - clocks: Should reference the peripheral and host clocks
 -- 
-1.9.1
+2.1.3
