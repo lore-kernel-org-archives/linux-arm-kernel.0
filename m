@@ -1,54 +1,34 @@
-From: robert.richter@caviumnetworks.com (Robert Richter)
-Date: Wed, 17 Jun 2015 10:48:52 +0200
-Subject: [PATCH] ahci, msix: Fix build error for !PCI_MSI
-In-Reply-To: <20150616201341.GD22637@mtj.duckdns.org>
-References: <1433526566-21136-1-git-send-email-rric@kernel.org>
- <20150616132434.GO10428@rric.localhost>
- <20150616201341.GD22637@mtj.duckdns.org>
-Message-ID: <20150617084852.GL4914@rric.localhost>
+From: yamada.masahiro@socionext.com (Masahiro Yamada)
+Date: Wed, 17 Jun 2015 17:51:41 +0900
+Subject: [PATCH] gpio: zynq: add missing module_exit function
+Message-ID: <1434531101-2585-1-git-send-email-yamada.masahiro@socionext.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
->From fd984f3be22f27b8d3c4cf577dbbf0a39792ea89 Mon Sep 17 00:00:00 2001
-From: Robert Richter <rrichter@cavium.com>
-Date: Wed, 17 Jun 2015 10:33:22 +0200
-Subject: [PATCH] ahci, msix: Fix build error for !PCI_MSI
-MIME-Version: 1.0
-Content-Type: text/plain; charset=UTF-8
-Content-Transfer-Encoding: 8bit
+This driver is tristate, so it should be cleanable.
 
-Fixing a build error if PCI_MSI is unset:
-
- drivers/ata/ahci.c: In function ?msix_get_desc?:
- drivers/ata/ahci.c:1210:2: error: ?struct pci_dev? has no member named ?msi_list?
-
-Catched by Fengguang's build bot.
-
-Reported-by: kbuild test robot <fengguang.wu@intel.com>
-Signed-off-by: Robert Richter <rrichter@cavium.com>
+Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
 ---
- drivers/ata/ahci.c | 3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
 
-diff --git a/drivers/ata/ahci.c b/drivers/ata/ahci.c
-index bdedaa4f9d7b..99cc9526ae95 100644
---- a/drivers/ata/ahci.c
-+++ b/drivers/ata/ahci.c
-@@ -1205,13 +1205,14 @@ static inline void ahci_gtf_filter_workaround(struct ata_host *host)
- 
- static struct msi_desc *msix_get_desc(struct pci_dev *dev, u16 entry)
- {
-+#ifdef CONFIG_PCI_MSI
- 	struct msi_desc *desc;
- 
- 	list_for_each_entry(desc, &dev->msi_list, list) {
- 		if (desc->msi_attrib.entry_nr == entry)
- 			return desc;
- 	}
--
-+#endif
- 	return NULL;
+ drivers/gpio/gpio-zynq.c | 6 ++++++
+ 1 file changed, 6 insertions(+)
+
+diff --git a/drivers/gpio/gpio-zynq.c b/drivers/gpio/gpio-zynq.c
+index 184c4b1..1d38da7 100644
+--- a/drivers/gpio/gpio-zynq.c
++++ b/drivers/gpio/gpio-zynq.c
+@@ -722,6 +722,12 @@ static int __init zynq_gpio_init(void)
  }
+ postcore_initcall(zynq_gpio_init);
  
++static void __exit zynq_gpio_exit(void)
++{
++	platform_driver_unregister(&zynq_gpio_driver);
++}
++module_exit(zynq_gpio_exit);
++
+ MODULE_AUTHOR("Xilinx Inc.");
+ MODULE_DESCRIPTION("Zynq GPIO driver");
+ MODULE_LICENSE("GPL");
 -- 
-2.1.1
+1.9.1
