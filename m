@@ -1,66 +1,125 @@
 From: tomeu.vizoso@collabora.com (Tomeu Vizoso)
-Date: Wed, 17 Jun 2015 15:42:17 +0200
-Subject: [PATCH 07/13] driver-core: Add class.get_dependencies() callback
+Date: Wed, 17 Jun 2015 15:42:18 +0200
+Subject: [PATCH 08/13] gpio: sysfs: implement class.get_dependencies()
 In-Reply-To: <1434548543-22949-1-git-send-email-tomeu.vizoso@collabora.com>
 References: <1434548543-22949-1-git-send-email-tomeu.vizoso@collabora.com>
-Message-ID: <1434548543-22949-8-git-send-email-tomeu.vizoso@collabora.com>
+Message-ID: <1434548543-22949-9-git-send-email-tomeu.vizoso@collabora.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Classes can implement this callback to provide a list of dependencies
-for a firmware node. These dependencies can be used to probe devices in
-order and to give proper warnings when dependencies cannot be fulfilled.
-
-This functionality is implemented in a class callback because subsystems
-implement the bindings that define how dependencies are expressed in the
-firmware.
-
-Adds struct fwnode_dependency, to be used to represent lists of
-dependencies of fwnodes.
+So the GPIO subsystem can be queried about the dependencies of nodes
+that consume GPIOs, as specified in bindings/gpio/gpio.txt.
 
 Signed-off-by: Tomeu Vizoso <tomeu.vizoso@collabora.com>
 ---
- include/linux/device.h | 6 ++++++
- include/linux/fwnode.h | 5 +++++
- 2 files changed, 11 insertions(+)
+ drivers/gpio/gpiolib-sysfs.c | 81 ++++++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 81 insertions(+)
 
-diff --git a/include/linux/device.h b/include/linux/device.h
-index 5a31bf3..c52f290 100644
---- a/include/linux/device.h
-+++ b/include/linux/device.h
-@@ -367,6 +367,10 @@ int subsys_virtual_register(struct bus_type *subsys,
-  * @dev_release: Called to release the device.
-  * @suspend:	Used to put the device to sleep mode, usually to a low power
-  *		state.
-+ * @get_dependencies: Returns a list of struct fwnode_dependency containing
-+ *		the dependencies of the passed firmware node. The class is
-+ *		expected to inspect the firmware node and extract dependencies
-+ *		from its properties, based on bindings documentation.
-  * @resume:	Used to bring the device from the sleep mode.
-  * @ns_type:	Callbacks so sysfs can detemine namespaces.
-  * @namespace:	Namespace of the device belongs to this class.
-@@ -397,6 +401,8 @@ struct class {
- 	int (*suspend)(struct device *dev, pm_message_t state);
- 	int (*resume)(struct device *dev);
+diff --git a/drivers/gpio/gpiolib-sysfs.c b/drivers/gpio/gpiolib-sysfs.c
+index b57ed8e..d0a7fb1 100644
+--- a/drivers/gpio/gpiolib-sysfs.c
++++ b/drivers/gpio/gpiolib-sysfs.c
+@@ -7,6 +7,7 @@
+ #include <linux/interrupt.h>
+ #include <linux/kdev_t.h>
+ #include <linux/slab.h>
++#include <linux/of.h>
  
-+	struct list_head *(*get_dependencies)(struct fwnode_handle *fwnode);
+ #include "gpiolib.h"
+ 
+@@ -515,6 +516,85 @@ done:
+ 	return status ? : len;
+ }
+ 
++static bool strends(const char *str, const char *postfix)
++{
++	if (strlen(str) < strlen(postfix))
++		return false;
 +
- 	const struct kobj_ns_type_operations *ns_type;
- 	const void *(*namespace)(struct device *dev);
++	return strcmp(str + strlen(str) - strlen(postfix), postfix) == 0;
++}
++
++static void add_dependency(struct fwnode_handle *fwnode,
++			   struct list_head *list)
++{
++	struct fwnode_dependency *dep;
++
++	dep = kzalloc(sizeof(*dep), GFP_KERNEL);
++	if (!dep)
++		return;
++
++	INIT_LIST_HEAD(&dep->dependency);
++	dep->fwnode = fwnode;
++
++	list_add_tail(&dep->dependency, list);
++}
++
++struct list_head *gpio_get_dependencies(struct fwnode_handle *fwnode)
++{
++	struct device_node *np = of_node(fwnode);
++	struct list_head *list = NULL;
++	struct property *pp;
++	struct of_phandle_args pspec;
++	int count, i, ret;
++
++	if (!is_of_node(fwnode))
++		return NULL;
++
++	np = of_node(fwnode);
++	if (!np)
++		return NULL;
++
++	list = kzalloc(sizeof(*list), GFP_KERNEL);
++	if (!list)
++		return NULL;
++
++	INIT_LIST_HEAD(list);
++
++	for_each_property_of_node(np, pp) {
++		if (strcmp(pp->name, "gpio") &&
++		    !strends(pp->name, "-gpios") &&
++		    !strends(pp->name, "-gpio"))
++			continue;
++
++		count = of_count_phandle_with_args(np, pp->name,
++						   "#gpio-cells");
++		for (i = 0; i < count; i++) {
++			ret = of_parse_phandle_with_args(np, pp->name,
++							 "#gpio-cells", i,
++							 &pspec);
++			if (ret || !pspec.np)
++				continue;
++
++			add_dependency(&pspec.np->fwnode, list);
++
++			of_node_put(pspec.np);
++		}
++	}
++
++	for (i = 0;; i++) {
++		ret = of_parse_phandle_with_fixed_args(np, "gpio-ranges", 3,
++						       i, &pspec);
++		if (ret)
++			break;
++
++		add_dependency(&pspec.np->fwnode, list);
++
++		of_node_put(pspec.np);
++	}
++
++	return list;
++}
++
+ static struct class_attribute gpio_class_attrs[] = {
+ 	__ATTR(export, 0200, NULL, export_store),
+ 	__ATTR(unexport, 0200, NULL, unexport_store),
+@@ -526,6 +606,7 @@ static struct class gpio_class = {
+ 	.owner =	THIS_MODULE,
  
-diff --git a/include/linux/fwnode.h b/include/linux/fwnode.h
-index 0408545..68ab558 100644
---- a/include/linux/fwnode.h
-+++ b/include/linux/fwnode.h
-@@ -24,4 +24,9 @@ struct fwnode_handle {
- 	struct fwnode_handle *secondary;
+ 	.class_attrs =	gpio_class_attrs,
++	.get_dependencies = gpio_get_dependencies,
  };
  
-+struct fwnode_dependency {
-+	struct fwnode_handle *fwnode;
-+	struct list_head dependency;
-+};
-+
- #endif
+ 
 -- 
 2.4.1
