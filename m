@@ -1,56 +1,77 @@
-From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Wed, 17 Jun 2015 17:58:28 +0200
-Subject: [PATCH v7 05/14] crypto: marvell/CESA: add TDMA support
-In-Reply-To: <20150617173402.7946bbb0@bbrezillon>
-References: <20150617122533.GA13185@gondor.apana.org.au>
- <1434547922-10363-1-git-send-email-boris.brezillon@free-electrons.com>
- <20150617150808.GA14915@gondor.apana.org.au>
- <20150617173402.7946bbb0@bbrezillon>
-Message-ID: <20150617175828.2a83cda6@bbrezillon>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Wed, 17 Jun 2015 18:04:42 +0200
+Subject: [PATCHv2 1/5] dmaengine: mv_xor: fix big endian operation in register
+ mode
+In-Reply-To: <1434557086-9520-1-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1434557086-9520-1-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1434557086-9520-2-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 17 Jun 2015 17:34:02 +0200
-Boris Brezillon <boris.brezillon@free-electrons.com> wrote:
+Commit 6f166312c6ea2 ("dmaengine: mv_xor: add support for a38x command
+in descriptor mode") introduced the support for a feature that
+appeared in Armada 38x: specifying the operation to be performed in a
+per-descriptor basis rather than globally per channel.
 
-> On Wed, 17 Jun 2015 23:08:08 +0800
-> Herbert Xu <herbert@gondor.apana.org.au> wrote:
-> 
-> > On Wed, Jun 17, 2015 at 03:32:02PM +0200, Boris Brezillon wrote:
-> > >
-> > > Hi Herbert,
-> > > 
-> > > I send you this patch alone so that you can verify I'm now properly
-> > > manipulating the SG list. Once I have your confirmation I'll send
-> > > the whole series again and annoy all the people in Cc one more time
-> > > ;-).
-> > 
-> > Thanks.  The only problem that I can see is the fact you're not
-> > checking for req->src == req->dst.  If they're equal then you must
-> > not map it twice.  Instead it should be mapped as DMA_BIDIRECTIONAL.
-> 
-> I can check for that too, but note that it doesn't prevent one from
-> providing different scatterlist structures pointing to the same memory
-> region.
+However, when doing so, it changed the function mv_chan_set_mode() to
+use:
 
-Actually, I don't know if it's a problem or not, so if it's not, please
-ignore my comment.
+  if (IS_ENABLED(__BIG_ENDIAN))
 
-> This being said, checking for req->src == req->dst should fix the case
-> where dst and src are pointing to the same scatterlist, which is a good
-> start.
+instead of:
 
-Here is an incremental patch [1], please let me know if something else
-is missing.
+  #if defined(__BIG_ENDIAN)
 
-Thanks,
+While IS_ENABLED() is perfectly fine for CONFIG_* symbols, it is not
+for other symbols such as __BIG_ENDIAN that is provided directly by
+the compiler. Consequently, the commit broke support for big-endian,
+as the XOR_DESCRIPTOR_SWAP flag was not set in the XOR channel
+configuration register.
 
-Boris
+The primarily visible effect was some nasty warnings and failures
+appearing during the self-test of the XOR unit:
 
-[1]http://code.bulix.org/x8mz8x-88568
+[    1.197368] mv_xor d0060900.xor: error on chan 0. intr cause 0x00000082
+[    1.197393] mv_xor d0060900.xor: config       0x00008440
+[    1.197410] mv_xor d0060900.xor: activation   0x00000000
+[    1.197427] mv_xor d0060900.xor: intr cause   0x00000082
+[    1.197443] mv_xor d0060900.xor: intr mask    0x000003f7
+[    1.197460] mv_xor d0060900.xor: error cause  0x00000000
+[    1.197477] mv_xor d0060900.xor: error addr   0x00000000
+[    1.197491] ------------[ cut here ]------------
+[    1.197513] WARNING: CPU: 0 PID: 1 at ../drivers/dma/mv_xor.c:664 mv_xor_interrupt_handler+0x14c/0x170()
 
+See also:
 
+  http://storage.kernelci.org/next/next-20150617/arm-mvebu_v7_defconfig+CONFIG_CPU_BIG_ENDIAN=y/lab-khilman/boot-armada-xp-openblocks-ax3-4.txt
+
+Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+Fixes: 6f166312c6ea2 ("dmaengine: mv_xor: add support for a38x command in descriptor mode")
+---
+This fix should go in for 4.2.
+---
+ drivers/dma/mv_xor.c | 9 +++++----
+ 1 file changed, 5 insertions(+), 4 deletions(-)
+
+diff --git a/drivers/dma/mv_xor.c b/drivers/dma/mv_xor.c
+index fbaf1ea..f1325f6 100644
+--- a/drivers/dma/mv_xor.c
++++ b/drivers/dma/mv_xor.c
+@@ -162,10 +162,11 @@ static void mv_chan_set_mode(struct mv_xor_chan *chan,
+ 	config &= ~0x7;
+ 	config |= op_mode;
+ 
+-	if (IS_ENABLED(__BIG_ENDIAN))
+-		config |= XOR_DESCRIPTOR_SWAP;
+-	else
+-		config &= ~XOR_DESCRIPTOR_SWAP;
++#if defined(__BIG_ENDIAN)
++	config |= XOR_DESCRIPTOR_SWAP;
++#else
++	config &= ~XOR_DESCRIPTOR_SWAP;
++#endif
+ 
+ 	writel_relaxed(config, XOR_CONFIG(chan));
+ 	chan->current_type = type;
 -- 
-Boris Brezillon, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+2.1.0
