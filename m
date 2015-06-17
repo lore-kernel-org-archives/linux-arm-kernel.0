@@ -1,42 +1,74 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Wed, 17 Jun 2015 14:00:49 -0500
-Subject: [PATCH v2] i2c: omap: improve duty cycle on SCL
-In-Reply-To: <5581C3E5.6020109@gmail.com>
-References: <1434565751-14944-1-git-send-email-balbi@ti.com>
- <5581C3E5.6020109@gmail.com>
-Message-ID: <20150617190049.GI18421@saruman.tx.rr.com>
+From: vaibhav.hiremath@linaro.org (Vaibhav Hiremath)
+Date: Thu, 18 Jun 2015 00:28:06 +0530
+Subject: [PATCH-v2] rtc: 88pm80x: add device tree support
+In-Reply-To: <1434567488-6477-1-git-send-email-vaibhav.hiremath@linaro.org>
+References: <vaibhav.hiremath@linaro.org>
+ <1434567488-6477-1-git-send-email-vaibhav.hiremath@linaro.org>
+Message-ID: <1434567488-6477-3-git-send-email-vaibhav.hiremath@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 17, 2015 at 09:00:53PM +0200, Alexander Sverdlin wrote:
-> Hi!
-> 
-> On 17/06/15 20:29, Felipe Balbi wrote:
-> > -		if (dev->speed > 400 ||
-> > -			       dev->flags & OMAP_I2C_FLAG_FORCE_19200_INT_CLK)
-> > -			internal_clk = 19200;
-> 
-> Let's compare, what it waas before in this case...
-> 
-> > -		else if (dev->speed > 100)
-> > -			internal_clk = 9600;
-> > -		else
-> > -			internal_clk = 4000;
-> > +		if (dev->flags & OMAP_I2C_FLAG_FORCE_19200_INT_CLK ||
-> > +				dev->speed > 400) {
-> > +			internal_clk = 1920000;
-> 
-> Seems that it should be 19200000? Because...
+Along with DT support, this patch also cleans up the unnecessary
+code around 'rtc_wakeup' initialization.
 
-indeed, it's missing one 0. I don't have OMAP3 board to test that out,
-that's why I asked Aaro to run the test. v3 coming.
+Signed-off-by: Chao Xie <chao.xie@marvell.com>
+Signed-off-by: Vaibhav Hiremath <vaibhav.hiremath@linaro.org>
+---
+Link to V1: https://lkml.org/lkml/2015/5/29/757
 
+ drivers/rtc/rtc-88pm80x.c | 28 +++++++++++++++++-----------
+ 1 file changed, 17 insertions(+), 11 deletions(-)
+
+diff --git a/drivers/rtc/rtc-88pm80x.c b/drivers/rtc/rtc-88pm80x.c
+index 7df0579..8f66519 100644
+--- a/drivers/rtc/rtc-88pm80x.c
++++ b/drivers/rtc/rtc-88pm80x.c
+@@ -251,17 +251,26 @@ static SIMPLE_DEV_PM_OPS(pm80x_rtc_pm_ops, pm80x_rtc_suspend, pm80x_rtc_resume);
+ static int pm80x_rtc_probe(struct platform_device *pdev)
+ {
+ 	struct pm80x_chip *chip = dev_get_drvdata(pdev->dev.parent);
+-	struct pm80x_platform_data *pm80x_pdata =
+-				dev_get_platdata(pdev->dev.parent);
+-	struct pm80x_rtc_pdata *pdata = NULL;
++	struct pm80x_rtc_pdata *pdata = dev_get_platdata(&pdev->dev);
+ 	struct pm80x_rtc_info *info;
++	struct device_node *node = pdev->dev.of_node;
+ 	struct rtc_time tm;
+ 	unsigned long ticks = 0;
+ 	int ret;
+ 
+-	pdata = dev_get_platdata(&pdev->dev);
+-	if (pdata == NULL)
+-		dev_warn(&pdev->dev, "No platform data!\n");
++	if (!pdata && !node) {
++		dev_err(&pdev->dev,
++			"pm80x-rtc requires platform data or of_node\n");
++		return -EINVAL;
++	}
++
++	if (!pdata) {
++		pdata = devm_kzalloc(&pdev->dev, sizeof(*pdata), GFP_KERNEL);
++		if (!pdata) {
++			dev_err(&pdev->dev, "failed to allocate memory\n");
++			return -ENOMEM;
++		}
++	}
+ 
+ 	info =
+ 	    devm_kzalloc(&pdev->dev, sizeof(struct pm80x_rtc_info), GFP_KERNEL);
+@@ -327,11 +336,8 @@ static int pm80x_rtc_probe(struct platform_device *pdev)
+ 	regmap_update_bits(info->map, PM800_RTC_CONTROL, PM800_RTC1_USE_XO,
+ 			   PM800_RTC1_USE_XO);
+ 
+-	if (pm80x_pdata) {
+-		pdata = pm80x_pdata->rtc;
+-		if (pdata)
+-			info->rtc_dev->dev.platform_data = &pdata->rtc_wakeup;
+-	}
++	/* remeber whether this power up is caused by PMIC RTC or not */
++	info->rtc_dev->dev.platform_data = &pdata->rtc_wakeup;
+ 
+ 	device_init_wakeup(&pdev->dev, 1);
+ 
 -- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150617/cd157eaa/attachment.sig>
+1.9.1
