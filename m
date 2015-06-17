@@ -1,29 +1,87 @@
-From: herbert@gondor.apana.org.au (Herbert Xu)
-Date: Wed, 17 Jun 2015 20:25:33 +0800
-Subject: [PATCH v6 05/14] crypto: marvell/CESA: add TDMA support
-In-Reply-To: <20150617133324.1ee6ad55@bbrezillon>
-References: <1434527142-3609-1-git-send-email-boris.brezillon@free-electrons.com>
- <1434527142-3609-6-git-send-email-boris.brezillon@free-electrons.com>
- <20150617095001.GA11538@gondor.apana.org.au>
- <20150617133324.1ee6ad55@bbrezillon>
-Message-ID: <20150617122533.GA13185@gondor.apana.org.au>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Wed, 17 Jun 2015 14:35:28 +0200
+Subject: [PATCH RESEND 4/4] ARM: mvebu: use armada-380-xor on Armada 38x
+ and 39x
+In-Reply-To: <1434543141-3242-5-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1434543141-3242-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1434543141-3242-5-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <55816990.1010700@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 17, 2015 at 01:33:24PM +0200, Boris Brezillon wrote:
->
-> Actually, I think I don't need to save the dma_map_sg return val, since
-> I'm using the sg_next function to iterate over the scatterlist. Am I
-> right ?
-> IOW, is the ->map_sg() function (in dma_map_ops) supposed to merge the
-> contiguous entries and then flag the unused entries with the is_chain
-> flag ?
+Hi Thomas,
 
-Right.  If you're simply using sg_dma_length in conjunction with
-sg_next then you don't need the new length.
+On 17/06/2015 14:12, Thomas Petazzoni wrote:
+> The Armada 38x and 39x SoC support have an updated XOR hardware block
+> compared to previous SoCs. These features can be enabled by using the
+> 'armada-380-xor' compatible string, available since commit
+> 6f166312c6ea ("dmaengine: mv_xor: add support for a38x command in
+> descriptor mode").
+> 
+> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 
-Cheers,
+Acked-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+
+applied on mvebu/dt-4.3
+
+Thanks,
+
+Gregory
+
+> ---
+>  arch/arm/boot/dts/armada-38x.dtsi | 4 ++--
+>  arch/arm/boot/dts/armada-39x.dtsi | 4 ++--
+>  2 files changed, 4 insertions(+), 4 deletions(-)
+> 
+> diff --git a/arch/arm/boot/dts/armada-38x.dtsi b/arch/arm/boot/dts/armada-38x.dtsi
+> index 1710523..4851d32 100644
+> --- a/arch/arm/boot/dts/armada-38x.dtsi
+> +++ b/arch/arm/boot/dts/armada-38x.dtsi
+> @@ -448,7 +448,7 @@
+>  			};
+>  
+>  			xor at 60800 {
+> -				compatible = "marvell,orion-xor";
+> +				compatible = "marvell,armada-380-xor", "marvell,orion-xor";
+>  				reg = <0x60800 0x100
+>  				       0x60a00 0x100>;
+>  				clocks = <&gateclk 22>;
+> @@ -463,7 +463,7 @@
+>  			};
+>  
+>  			xor at 60900 {
+> -				compatible = "marvell,orion-xor";
+> +				compatible = "marvell,armada-380-xor", "marvell,orion-xor";
+>  				reg = <0x60900 0x100
+>  				       0x60b00 0x100>;
+>  				clocks = <&gateclk 28>;
+> diff --git a/arch/arm/boot/dts/armada-39x.dtsi b/arch/arm/boot/dts/armada-39x.dtsi
+> index 9c510d8..b77c8dc 100644
+> --- a/arch/arm/boot/dts/armada-39x.dtsi
+> +++ b/arch/arm/boot/dts/armada-39x.dtsi
+> @@ -323,7 +323,7 @@
+>  			};
+>  
+>  			xor at 60800 {
+> -				compatible = "marvell,orion-xor";
+> +				compatible = "marvell,armada-380-xor", "marvell,orion-xor";
+>  				reg = <0x60800 0x100
+>  				       0x60a00 0x100>;
+>  				clocks = <&gateclk 22>;
+> @@ -338,7 +338,7 @@
+>  			};
+>  
+>  			xor at 60900 {
+> -				compatible = "marvell,orion-xor";
+> +				compatible = "marvell,armada-380-xor", "marvell,orion-xor";
+>  				reg = <0x60900 0x100
+>  				       0x60b00 0x100>;
+>  				clocks = <&gateclk 28>;
+> 
+
+
 -- 
-Email: Herbert Xu <herbert@gondor.apana.org.au>
-Home Page: http://gondor.apana.org.au/~herbert/
-PGP Key: http://gondor.apana.org.au/~herbert/pubkey.txt
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
