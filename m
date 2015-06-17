@@ -1,251 +1,97 @@
 From: geert+renesas@glider.be (Geert Uytterhoeven)
-Date: Wed, 17 Jun 2015 11:31:27 +0200
-Subject: [PATCH 11/15] ARM: shmobile: Remove obsolete zboot support
-In-Reply-To: <1434533491-21979-1-git-send-email-geert+renesas@glider.be>
-References: <1434533491-21979-1-git-send-email-geert+renesas@glider.be>
-Message-ID: <1434533491-21979-12-git-send-email-geert+renesas@glider.be>
+Date: Wed, 17 Jun 2015 10:38:49 +0200
+Subject: [PATCH v2 0/7] staging: board: armadillo800eva: Board staging for
+ sh_mobile_lcdc_fb
+Message-ID: <1434530336-15073-1-git-send-email-geert+renesas@glider.be>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The last user of the zboot code was the KZM-A9-GT legacy board code,
-which has been removed.
+	Hi Greg, Simon, Magnus,
 
-Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
----
- arch/arm/boot/compressed/Makefile                  |   4 -
- arch/arm/boot/compressed/head-shmobile.S           |  71 --------------
- arch/arm/mach-shmobile/include/mach/zboot.h        |  14 ---
- arch/arm/mach-shmobile/include/mach/zboot_macros.h | 108 ---------------------
- 4 files changed, 197 deletions(-)
- delete mode 100644 arch/arm/boot/compressed/head-shmobile.S
- delete mode 100644 arch/arm/mach-shmobile/include/mach/zboot.h
- delete mode 100644 arch/arm/mach-shmobile/include/mach/zboot_macros.h
+This patch series adds board staging support for the Renesas R-Mobile A1
+(r8a7740) based Armadillo-800 EVA board. It allows to support the frame
+buffer device for the on-board LCD (which isn't supported by a DT-aware
+driver yet) in modern DT-based multi-platform kernels.
 
-diff --git a/arch/arm/boot/compressed/Makefile b/arch/arm/boot/compressed/Makefile
-index 7a13aebacf81d47c..3f9a9ebc77c389bb 100644
---- a/arch/arm/boot/compressed/Makefile
-+++ b/arch/arm/boot/compressed/Makefile
-@@ -51,10 +51,6 @@ else
- endif
- endif
- 
--ifeq ($(CONFIG_ARCH_SHMOBILE_LEGACY),y)
--OBJS		+= head-shmobile.o
--endif
--
- #
- # We now have a PIC decompressor implementation.  Decompressors running
- # from RAM should not define ZTEXTADDR.  Decompressors running directly
-diff --git a/arch/arm/boot/compressed/head-shmobile.S b/arch/arm/boot/compressed/head-shmobile.S
-deleted file mode 100644
-index 22a75259faa32996..0000000000000000
---- a/arch/arm/boot/compressed/head-shmobile.S
-+++ /dev/null
-@@ -1,71 +0,0 @@
--/*
-- * The head-file for SH-Mobile ARM platforms
-- *
-- * Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
-- * Simon Horman <horms@verge.net.au>
-- *
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License as published by
-- * the Free Software Foundation; version 2 of the License.
-- *
-- * This program is distributed in the hope that it will be useful,
-- * but WITHOUT ANY WARRANTY; without even the implied warranty of
-- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-- * GNU General Public License for more details.
-- *
-- * You should have received a copy of the GNU General Public License
-- * along with this program; if not, write to the Free Software
-- * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
-- */
--
--#ifdef CONFIG_ZBOOT_ROM
--
--	.section	".start", "ax"
--
--	/* load board-specific initialization code */
--#include <mach/zboot.h>
--
--	adr	r0, dtb_info
--	ldmia	r0, {r1, r3, r4, r5, r7}
--
--	sub	r0, r0, r1		@ calculate the delta offset
--	add	r5, r5, r0		@ _edata
--
--	ldr	lr, [r5, #0]		@ check if valid DTB is present
--	cmp	lr, r3
--	bne	0f
--
--	add	r9, r7, #31		@ rounded up to a multiple
--	bic	r9, r9, #31		@ ... of 32 bytes
--
--	add	r6, r9, r5		@ copy from _edata
--	add	r9, r9, r4		@ to MEMORY_START
--
--1:	ldmdb	r6!, {r0 - r3, r10 - r12, lr}
--	cmp	r6, r5
--	stmdb	r9!, {r0 - r3, r10 - r12, lr}
--	bhi	1b
--
--	/* Success: Zero board ID, pointer to start of memory for atag/dtb */
--	mov	r7, #0
--	mov	r8, r4
--	b	2f
--
--	.align	2
--dtb_info:
--	.word	dtb_info
--#ifndef __ARMEB__
--	.word	0xedfe0dd0		@ sig is 0xd00dfeed big endian
--#else
--	.word	0xd00dfeed
--#endif
--	.word	MEMORY_START
--	.word	_edata
--	.word	0x4000			@ maximum DTB size
--0:
--	/* Failure: Zero board ID, NULL atag/dtb */
--	mov 	r7, #0
--	mov	r8, #0			@ pass null pointer as atag
--2 :
--
--#endif /* CONFIG_ZBOOT_ROM */
-diff --git a/arch/arm/mach-shmobile/include/mach/zboot.h b/arch/arm/mach-shmobile/include/mach/zboot.h
-deleted file mode 100644
-index 80f599f4b5ab5733..0000000000000000
---- a/arch/arm/mach-shmobile/include/mach/zboot.h
-+++ /dev/null
-@@ -1,14 +0,0 @@
--#ifndef ZBOOT_H
--#define ZBOOT_H
--
--#include <mach/zboot_macros.h>
--
--/**************************************************
-- *
-- *		board specific settings
-- *
-- **************************************************/
--
--#error "unsupported board."
--
--#endif /* ZBOOT_H */
-diff --git a/arch/arm/mach-shmobile/include/mach/zboot_macros.h b/arch/arm/mach-shmobile/include/mach/zboot_macros.h
-deleted file mode 100644
-index 14fd3d538e9aa11a..0000000000000000
---- a/arch/arm/mach-shmobile/include/mach/zboot_macros.h
-+++ /dev/null
-@@ -1,108 +0,0 @@
--#ifndef __ZBOOT_MACRO_H
--#define __ZBOOT_MACRO_H
--
--/* The LIST command is used to include comments in the script */
--.macro	LIST comment
--.endm
--
--/* The ED command is used to write a 32-bit word */
--.macro ED, addr, data
--	LDR	r0, 1f
--	LDR	r1, 2f
--	STR	r1, [r0]
--	B	3f
--1 :	.long	\addr
--2 :	.long	\data
--3 :
--.endm
--
--/* The EW command is used to write a 16-bit word */
--.macro EW, addr, data
--	LDR	r0, 1f
--	LDR	r1, 2f
--	STRH	r1, [r0]
--	B	3f
--1 :	.long	\addr
--2 :	.long	\data
--3 :
--.endm
--
--/* The EB command is used to write an 8-bit word */
--.macro EB, addr, data
--	LDR	r0, 1f
--	LDR	r1, 2f
--	STRB	r1, [r0]
--	B	3f
--1 :	.long	\addr
--2 :	.long	\data
--3 :
--.endm
--
--/* The WAIT command is used to delay the execution */
--.macro  WAIT, time, reg
--	LDR	r1, 1f
--	LDR	r0, 2f
--	STR	r0, [r1]
--10 :
--	LDR	r0, [r1]
--	CMP	r0, #0x00000000
--	BNE	10b
--	NOP
--	B	3f
--1 :	.long	\reg
--2 :	.long	\time * 100
--3 :
--.endm
--
--/* The DD command is used to read a 32-bit word */
--.macro  DD, start, end
--	LDR	r1, 1f
--	B	2f
--1 :	.long	\start
--2 :
--.endm
--
--/* loop until a given value has been read (with mask) */
--.macro WAIT_MASK, addr, data, cmp
--	LDR	r0, 2f
--	LDR	r1, 3f
--	LDR	r2, 4f
--1:
--	LDR	r3, [r0, #0]
--	AND	r3, r1, r3
--	CMP	r2, r3
--	BNE	1b
--	B	5f
--2:	.long	\addr
--3:	.long	\data
--4:	.long	\cmp
--5:
--.endm
--
--/* read 32-bit value from addr, "or" an immediate and write back */
--.macro ED_OR, addr, data
--	LDR r4, 1f
--	LDR r5, 2f
--	LDR r6, [r4]
--	ORR r5, r6, r5
--	STR r5, [r4]
--	B	3f
--1:	.long	\addr
--2:	.long	\data
--3:
--.endm
--
--/* read 32-bit value from addr, "and" an immediate and write back */
--.macro ED_AND, addr, data
--	LDR r4, 1f
--	LDR r5, 2f
--	LDR r6, [r4]
--	AND r5, r6, r5
--	STR r5, [r4]
--	B	3f
--1:	.long \addr
--2:	.long \data
--3:
--.endm
--
--#endif /* __ZBOOT_MACRO_H */
+The board staging area was introduced last year to allow continuous
+upstream in-tree development and integration of platform devices. It
+helps developers integrate devices as platform devices for device
+drivers that only provide platform device bindings.  This in turn allows
+for incremental development of both hardware feature support and DT
+binding work in parallel.
+
+The goal is to complete the move to ARM multi-platform kernels for all
+shmobile platforms, and drop the existing board files
+(arch/arm/mach-shmobile/board-*). Once this series is accepted, more
+than 3000 lines of legacy armadillo board code and r8a7740 SoC code can
+be removed.
+
+This series consists of 5 parts:
+  - Patch 1 re-enables compilation of the board staging area, which was
+    disabled after a compile breakage, but has been fixed in the mean
+    time,
+  - Path 2 moves initialization of staging board code to an earlier
+    moment, as currently it happens after unused PM domains are powered
+    down,
+  - Patches 3 and 4 (hopefully) fix the existing kzm9d board staging
+    code, which was presumably "broken" by commit 9a1091ef0017c40a
+    ("irqchip: gic: Support hierarchy irq domain."),
+  - Patches 5 and 6 add support for registering platform devices with
+    complex dependencies (clocks and PM domains), and add armadillo
+    board staging code for enabling a frame buffer on the on-board LCD,
+  - Patch 7 (new) adds pinctrl and gpio-hog configuration to enable the
+    LCD.
+
+The first 6 patches should go in through the staging tree, the last one
+through the shmobile tree.
+
+Major changes since v1 (more detailed changelogs in the individual
+patches):
+  - Add support for low/high edge/level interrupts in hwirq translation,
+  - Move pinctrl and GPIO configuration from board staging code to DT,
+  - Use clk_add_alias() instead of open coding.
+
+Dependencies:
+  - This is against next-20150617,
+  - The gpio-hog in patch 7 depends on a bug fix like "[PATCH] [RFC]
+    gpio: Retry deferred GPIO hogging on pin range change"
+    (https://lkml.org/lkml/2015/6/16/455). It can be applied as-is
+    though.
+
+This was tested on r8a7740/armadillo.
+This was not tested on emev2/kzm9d, due to lack of hardware.
+
+Thanks for applying!
+
+Geert Uytterhoeven (7):
+  Revert "staging: board: disable as it breaks the build"
+  staging: board: Initialize staging board code earlier
+  staging: board: Add support for translating hwirq to virq numbers
+  staging: board: kzm9d: Translate hwirq numbers to virq numbers
+  staging: board: Add support for devices with complex dependencies
+  staging: board: armadillo800eva: Board staging for sh_mobile_lcdc_fb
+  ARM: shmobile: armadillo800eva dts: Add pinctrl and gpio-hog for lcdc0
+
+ arch/arm/boot/dts/r8a7740-armadillo800eva.dts |  13 +++
+ drivers/staging/board/Kconfig                 |   1 -
+ drivers/staging/board/Makefile                |   3 +-
+ drivers/staging/board/armadillo800eva.c       | 105 ++++++++++++++++++++
+ drivers/staging/board/board.c                 | 136 ++++++++++++++++++++++++++
+ drivers/staging/board/board.h                 |  27 ++++-
+ drivers/staging/board/kzm9d.c                 |  10 +-
+ 7 files changed, 290 insertions(+), 5 deletions(-)
+ create mode 100644 drivers/staging/board/armadillo800eva.c
+
 -- 
 1.9.1
+
+Gr{oetje,eeting}s,
+
+						Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+							    -- Linus Torvalds
