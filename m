@@ -1,74 +1,101 @@
 From: vaibhav.hiremath@linaro.org (Vaibhav Hiremath)
-Date: Thu, 18 Jun 2015 00:28:06 +0530
-Subject: [PATCH-v2] rtc: 88pm80x: add device tree support
+Date: Thu, 18 Jun 2015 00:28:05 +0530
+Subject: [PATCH-v2 1/3] mfd: 88pm800: Add device tree support
 In-Reply-To: <1434567488-6477-1-git-send-email-vaibhav.hiremath@linaro.org>
 References: <vaibhav.hiremath@linaro.org>
  <1434567488-6477-1-git-send-email-vaibhav.hiremath@linaro.org>
-Message-ID: <1434567488-6477-3-git-send-email-vaibhav.hiremath@linaro.org>
+Message-ID: <1434567488-6477-2-git-send-email-vaibhav.hiremath@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Along with DT support, this patch also cleans up the unnecessary
-code around 'rtc_wakeup' initialization.
+Add DT support to the 88pm800 driver, along with compatible
+field for it's sub-devices (rtc, onkey and regulator)
 
 Signed-off-by: Chao Xie <chao.xie@marvell.com>
 Signed-off-by: Vaibhav Hiremath <vaibhav.hiremath@linaro.org>
 ---
-Link to V1: https://lkml.org/lkml/2015/5/29/757
+ drivers/mfd/88pm800.c | 25 +++++++++++++++++++++++++
+ 1 file changed, 25 insertions(+)
 
- drivers/rtc/rtc-88pm80x.c | 28 +++++++++++++++++-----------
- 1 file changed, 17 insertions(+), 11 deletions(-)
-
-diff --git a/drivers/rtc/rtc-88pm80x.c b/drivers/rtc/rtc-88pm80x.c
-index 7df0579..8f66519 100644
---- a/drivers/rtc/rtc-88pm80x.c
-+++ b/drivers/rtc/rtc-88pm80x.c
-@@ -251,17 +251,26 @@ static SIMPLE_DEV_PM_OPS(pm80x_rtc_pm_ops, pm80x_rtc_suspend, pm80x_rtc_resume);
- static int pm80x_rtc_probe(struct platform_device *pdev)
- {
- 	struct pm80x_chip *chip = dev_get_drvdata(pdev->dev.parent);
--	struct pm80x_platform_data *pm80x_pdata =
--				dev_get_platdata(pdev->dev.parent);
--	struct pm80x_rtc_pdata *pdata = NULL;
-+	struct pm80x_rtc_pdata *pdata = dev_get_platdata(&pdev->dev);
- 	struct pm80x_rtc_info *info;
-+	struct device_node *node = pdev->dev.of_node;
- 	struct rtc_time tm;
- 	unsigned long ticks = 0;
- 	int ret;
+diff --git a/drivers/mfd/88pm800.c b/drivers/mfd/88pm800.c
+index 841717a..059f01a 100644
+--- a/drivers/mfd/88pm800.c
++++ b/drivers/mfd/88pm800.c
+@@ -27,6 +27,7 @@
+ #include <linux/mfd/core.h>
+ #include <linux/mfd/88pm80x.h>
+ #include <linux/slab.h>
++#include <linux/of_device.h>
  
--	pdata = dev_get_platdata(&pdev->dev);
--	if (pdata == NULL)
--		dev_warn(&pdev->dev, "No platform data!\n");
-+	if (!pdata && !node) {
-+		dev_err(&pdev->dev,
-+			"pm80x-rtc requires platform data or of_node\n");
+ /* Interrupt Registers */
+ #define PM800_INT_STATUS1		(0x05)
+@@ -121,6 +122,11 @@ static const struct i2c_device_id pm80x_id_table[] = {
+ };
+ MODULE_DEVICE_TABLE(i2c, pm80x_id_table);
+ 
++static const struct of_device_id pm80x_of_match_table[] = {
++	{ .compatible = "marvell,88pm800", },
++	{},
++};
++
+ static struct resource rtc_resources[] = {
+ 	{
+ 	 .name = "88pm80x-rtc",
+@@ -133,6 +139,7 @@ static struct resource rtc_resources[] = {
+ static struct mfd_cell rtc_devs[] = {
+ 	{
+ 	 .name = "88pm80x-rtc",
++	 .of_compatible = "marvell,88pm80x-rtc",
+ 	 .num_resources = ARRAY_SIZE(rtc_resources),
+ 	 .resources = &rtc_resources[0],
+ 	 .id = -1,
+@@ -151,6 +158,7 @@ static struct resource onkey_resources[] = {
+ static const struct mfd_cell onkey_devs[] = {
+ 	{
+ 	 .name = "88pm80x-onkey",
++	 .of_compatible = "marvell,88pm80x-onkey",
+ 	 .num_resources = 1,
+ 	 .resources = &onkey_resources[0],
+ 	 .id = -1,
+@@ -160,6 +168,7 @@ static const struct mfd_cell onkey_devs[] = {
+ static const struct mfd_cell regulator_devs[] = {
+ 	{
+ 	 .name = "88pm80x-regulator",
++	 .of_compatible = "marvell,88pm80x-regulator",
+ 	 .id = -1,
+ 	},
+ };
+@@ -544,8 +553,23 @@ static int pm800_probe(struct i2c_client *client,
+ 	int ret = 0;
+ 	struct pm80x_chip *chip;
+ 	struct pm80x_platform_data *pdata = dev_get_platdata(&client->dev);
++	struct device_node *np = client->dev.of_node;
+ 	struct pm80x_subchip *subchip;
+ 
++	if (!pdata && !np) {
++		dev_err(&client->dev,
++			"pm80x requires platform data or of_node\n");
 +		return -EINVAL;
 +	}
 +
 +	if (!pdata) {
-+		pdata = devm_kzalloc(&pdev->dev, sizeof(*pdata), GFP_KERNEL);
++		pdata = devm_kzalloc(&client->dev, sizeof(*pdata), GFP_KERNEL);
 +		if (!pdata) {
-+			dev_err(&pdev->dev, "failed to allocate memory\n");
++			dev_err(&client->dev, "failed to allocaate memory\n");
 +			return -ENOMEM;
 +		}
 +	}
- 
- 	info =
- 	    devm_kzalloc(&pdev->dev, sizeof(struct pm80x_rtc_info), GFP_KERNEL);
-@@ -327,11 +336,8 @@ static int pm80x_rtc_probe(struct platform_device *pdev)
- 	regmap_update_bits(info->map, PM800_RTC_CONTROL, PM800_RTC1_USE_XO,
- 			   PM800_RTC1_USE_XO);
- 
--	if (pm80x_pdata) {
--		pdata = pm80x_pdata->rtc;
--		if (pdata)
--			info->rtc_dev->dev.platform_data = &pdata->rtc_wakeup;
--	}
-+	/* remeber whether this power up is caused by PMIC RTC or not */
-+	info->rtc_dev->dev.platform_data = &pdata->rtc_wakeup;
- 
- 	device_init_wakeup(&pdev->dev, 1);
- 
++
+ 	ret = pm80x_init(client);
+ 	if (ret) {
+ 		dev_err(&client->dev, "pm800_init fail\n");
+@@ -611,6 +635,7 @@ static struct i2c_driver pm800_driver = {
+ 		.name = "88PM800",
+ 		.owner = THIS_MODULE,
+ 		.pm = &pm80x_pm_ops,
++		.of_match_table	= pm80x_of_match_table,
+ 		},
+ 	.probe = pm800_probe,
+ 	.remove = pm800_remove,
 -- 
 1.9.1
