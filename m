@@ -1,37 +1,50 @@
-From: khilman@kernel.org (Kevin Hilman)
-Date: Tue, 16 Jun 2015 16:27:28 -0700
-Subject: [PATCH 12/12] msm: msm_fb: Remove dead code
-In-Reply-To: <55806E63.8020509@codeaurora.org> (Stephen Boyd's message of
- "Tue, 16 Jun 2015 11:43:47 -0700")
-References: <1426270185-19510-1-git-send-email-sboyd@codeaurora.org>
- <1426270185-19510-13-git-send-email-sboyd@codeaurora.org>
- <20150313185109.GE14457@ns203013.ovh.net>
- <55806E63.8020509@codeaurora.org>
-Message-ID: <7h7fr3w7xb.fsf@deeprootsystems.com>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Wed, 17 Jun 2015 09:36:14 +0900
+Subject: [PATCH] drivers/cpufreq: include <module.h> for modular
+ exynos-cpufreq.c code
+In-Reply-To: <558040E9.2060008@windriver.com>
+References: <1430444867-22342-1-git-send-email-paul.gortmaker@windriver.com>
+ <1433366298-30016-1-git-send-email-paul.gortmaker@windriver.com>
+ <5110473.q5rJrrjs9a@vostro.rjw.lan> <557F6567.1070901@samsung.com>
+ <558040E9.2060008@windriver.com>
+Message-ID: <5580C0FE.5010502@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Stephen Boyd <sboyd@codeaurora.org> writes:
-
-> On 03/13/2015 11:51 AM, Jean-Christophe PLAGNIOL-VILLARD wrote:
->> On 11:09 Fri 13 Mar     , Stephen Boyd wrote:
->>> This code is no longer used now that mach-msm has been removed.
->>> Delete it.
+On 17.06.2015 00:29, Paul Gortmaker wrote:
+> On 15-06-15 07:53 PM, Krzysztof Kozlowski wrote:
+>> On 16.06.2015 08:47, Rafael J. Wysocki wrote:
+>>> On Wednesday, June 03, 2015 05:18:18 PM Paul Gortmaker wrote:
+>>>> This file is built off of a tristate Kconfig option ("ARM_EXYNOS_CPUFREQ")
+>>>> and also contains modular function calls so it should explicitly include
+>>>> module.h to avoid compile breakage during pending header shuffles.
+>>>>
+>>>> Cc: "Rafael J. Wysocki" <rjw@rjwysocki.net>
+>>>> Cc: Viresh Kumar <viresh.kumar@linaro.org>
+>>>> Cc: Kukjin Kim <kgene@kernel.org>
+>>>> Cc: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+>>>> Cc: linux-pm at vger.kernel.org
+>>>> Cc: linux-arm-kernel at lists.infradead.org
+>>>> Cc: linux-samsung-soc at vger.kernel.org
+>>>> Signed-off-by: Paul Gortmaker <paul.gortmaker@windriver.com>
 >>>
->>> Cc: Jean-Christophe Plagniol-Villard <plagnioj@jcrosoft.com>
->>> Cc: Tomi Valkeinen <tomi.valkeinen@ti.com>
->>> Cc: David Brown <davidb@codeaurora.org>
->>> Cc: Bryan Huntsman <bryanh@codeaurora.org>
->>> Cc: Daniel Walker <dwalker@fifo99.com>
->>> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
->> Acked-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+>>> I'm assuming that this will go in via the Samsung tree.
+>>>
+>>>
+>>>> ---
+>>>>
+>>>> [ patch will be appended to the implicit include fixup series, see:
+>>>>   https://lkml.kernel.org/r/1430444867-22342-1-git-send-email-paul.gortmaker at windriver.com
+>>>>   for the original series posting.]
 >>
->
-> Thanks again. Should this go through arm-soc (Cced)? Or some other tree
-> besides the fb tree? This is the last patch that hasn't been applied in
-> this set of 12 patches.
+>> Paul, will you handle the patch or should it go through Samsung tree?
+> 
+> 
+> I have to keep a copy of the patch in the above series, since if
+> I don't then we'll introduce build failures into the bisection
+> history, so yes I'll handle it.
 
-It's all drivers/video/fbdev/*, so it's not arm-soc material. Looks to
-me like it should go through the fbdev tree.
+Thank you, I'll leave the patch for you to handle.
 
-Kevin
+Best regards,
+Krzysztof
