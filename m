@@ -1,50 +1,27 @@
-From: simon.guinot@sequanux.org (Simon Guinot)
-Date: Wed, 17 Jun 2015 15:19:20 +0200
-Subject: [PATCH v2 1/3] net: mvneta: introduce compatible string "marvell,
- armada-xp-neta"
-In-Reply-To: <1434547162-6275-1-git-send-email-simon.guinot@sequanux.org>
-References: <1434547162-6275-1-git-send-email-simon.guinot@sequanux.org>
-Message-ID: <1434547162-6275-2-git-send-email-simon.guinot@sequanux.org>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Wed, 17 Jun 2015 15:22:51 +0200
+Subject: [PATCH] clk: at91: trivial: typo in peripheral clock description
+Message-ID: <1434547371-12123-1-git-send-email-nicolas.ferre@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The mvneta driver supports the Ethernet IP found in the Armada 370, XP,
-380 and 385 SoCs. Since at least one more hardware feature is available
-for the Armada XP SoCs then a way to identify them is needed.
-
-This patch introduces a new compatible string "marvell,armada-xp-neta".
-
-Signed-off-by: Simon Guinot <simon.guinot@sequanux.org>
-Cc: <stable@vger.kernel.org> # v3.8+
+Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
 ---
- Documentation/devicetree/bindings/net/marvell-armada-370-neta.txt | 2 +-
- drivers/net/ethernet/marvell/mvneta.c                             | 1 +
- 2 files changed, 2 insertions(+), 1 deletion(-)
+ Documentation/devicetree/bindings/clock/at91-clock.txt | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/Documentation/devicetree/bindings/net/marvell-armada-370-neta.txt b/Documentation/devicetree/bindings/net/marvell-armada-370-neta.txt
-index 750d577e8083..f5a8ca29aff0 100644
---- a/Documentation/devicetree/bindings/net/marvell-armada-370-neta.txt
-+++ b/Documentation/devicetree/bindings/net/marvell-armada-370-neta.txt
-@@ -1,7 +1,7 @@
- * Marvell Armada 370 / Armada XP Ethernet Controller (NETA)
- 
- Required properties:
--- compatible: should be "marvell,armada-370-neta".
-+- compatible: "marvell,armada-370-neta" or "marvell,armada-xp-neta".
- - reg: address and length of the register set for the device.
- - interrupts: interrupt for the device
- - phy: See ethernet.txt file in the same directory.
-diff --git a/drivers/net/ethernet/marvell/mvneta.c b/drivers/net/ethernet/marvell/mvneta.c
-index ce5f7f9cff06..aceb977b104d 100644
---- a/drivers/net/ethernet/marvell/mvneta.c
-+++ b/drivers/net/ethernet/marvell/mvneta.c
-@@ -3179,6 +3179,7 @@ static int mvneta_remove(struct platform_device *pdev)
- 
- static const struct of_device_id mvneta_match[] = {
- 	{ .compatible = "marvell,armada-370-neta" },
-+	{ .compatible = "marvell,armada-xp-neta" },
- 	{ }
- };
- MODULE_DEVICE_TABLE(of, mvneta_match);
+diff --git a/Documentation/devicetree/bindings/clock/at91-clock.txt b/Documentation/devicetree/bindings/clock/at91-clock.txt
+index 7a4d4926f44e..5ba6450693b9 100644
+--- a/Documentation/devicetree/bindings/clock/at91-clock.txt
++++ b/Documentation/devicetree/bindings/clock/at91-clock.txt
+@@ -248,7 +248,7 @@ Required properties for peripheral clocks:
+ - #address-cells : shall be 1 (reg is used to encode clk id).
+ - clocks : shall be the master clock phandle.
+ 	e.g. clocks = <&mck>;
+-- name: device tree node describing a specific system clock.
++- name: device tree node describing a specific peripheral clock.
+ 	* #clock-cells : from common clock binding; shall be set to 0.
+ 	* reg: peripheral id. See Atmel's datasheets to get a full
+ 	  list of peripheral ids.
 -- 
-2.1.4
+2.1.3
