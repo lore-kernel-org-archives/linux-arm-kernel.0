@@ -1,47 +1,93 @@
-From: soren.brinkmann@xilinx.com (=?utf-8?B?U8O2cmVu?= Brinkmann)
-Date: Wed, 17 Jun 2015 09:07:30 -0700
-Subject: [PATCH] xilinx:Remove unused variable num_frag in the function
- axienet_start_xmit
-In-Reply-To: <1434556362-3748-1-git-send-email-xerofoify@gmail.com>
-References: <1434556362-3748-1-git-send-email-xerofoify@gmail.com>
-Message-ID: <20150617160730.GE2906@xsjsorenbubuntu>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Wed, 17 Jun 2015 18:12:40 +0200
+Subject: [PATCH 4/9] ARM: mvebu: prepare mvebu_pm_store_bootinfo() to
+ support multiple SoCs
+In-Reply-To: <1434456785-23696-5-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1434456785-23696-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1434456785-23696-5-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <55819C78.8080804@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2015-06-17 at 11:52AM -0400, Nicholas Krause wrote:
-> This removes the unused variable num_frag and the setting of it
-> to the number of fragments from the passed sk_buff pointer by
-> this function's caller due to this variable never being used
-> in this particular function and is not declared as  global so
-> setting it for global use in this file is pointless.
+Hi Thomas,
+
+On 16/06/2015 14:13, Thomas Petazzoni wrote:
+> As we are going to introduce support for Armada 38x in pm.c, split out
+> the Armada XP part of mvebu_pm_store_bootinfo() into
+> mvebu_pm_store_armadaxp_bootinfo(), and make the former retunr an
+> error when an unsupported SoC is used.
 > 
-> Signed-off-by: Nicholas Krause <xerofoify@gmail.com>
+> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+
+Acked-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+
+
+Thanks,
+
+Gregory
+
 > ---
->  drivers/net/ethernet/xilinx/xilinx_axienet_main.c | 2 --
->  1 file changed, 2 deletions(-)
+>  arch/arm/mach-mvebu/pm.c | 25 +++++++++++++++++++++----
+>  1 file changed, 21 insertions(+), 4 deletions(-)
 > 
-> diff --git a/drivers/net/ethernet/xilinx/xilinx_axienet_main.c b/drivers/net/ethernet/xilinx/xilinx_axienet_main.c
-> index 28b7e7d..624dce4 100644
-> --- a/drivers/net/ethernet/xilinx/xilinx_axienet_main.c
-> +++ b/drivers/net/ethernet/xilinx/xilinx_axienet_main.c
-> @@ -651,7 +651,6 @@ static inline int axienet_check_tx_bd_space(struct axienet_local *lp,
->  static int axienet_start_xmit(struct sk_buff *skb, struct net_device *ndev)
+> diff --git a/arch/arm/mach-mvebu/pm.c b/arch/arm/mach-mvebu/pm.c
+> index eca650b..02fdf67 100644
+> --- a/arch/arm/mach-mvebu/pm.c
+> +++ b/arch/arm/mach-mvebu/pm.c
+> @@ -105,12 +105,10 @@ static phys_addr_t mvebu_internal_reg_base(void)
+>  	return of_translate_address(np, in_addr);
+>  }
+>  
+> -static void mvebu_pm_store_bootinfo(void)
+> +static void mvebu_pm_store_armadaxp_bootinfo(u32 *store_addr)
 >  {
->  	u32 ii;
-> -	u32 num_frag;
->  	u32 csum_start_off;
->  	u32 csum_index_off;
->  	skb_frag_t *frag;
-> @@ -659,7 +658,6 @@ static int axienet_start_xmit(struct sk_buff *skb, struct net_device *ndev)
->  	struct axienet_local *lp = netdev_priv(ndev);
->  	struct axidma_bd *cur_p;
+> -	u32 *store_addr;
+>  	phys_addr_t resume_pc;
 >  
-> -	num_frag = skb_shinfo(skb)->nr_frags;
->  	cur_p = &lp->tx_bd_v[lp->tx_bd_tail];
+> -	store_addr = phys_to_virt(BOOT_INFO_ADDR);
+>  	resume_pc = virt_to_phys(armada_370_xp_cpu_resume);
 >  
->  	if (axienet_check_tx_bd_space(lp, num_frag)) {
+>  	/*
+> @@ -151,14 +149,33 @@ static void mvebu_pm_store_bootinfo(void)
+>  	writel(BOOT_MAGIC_LIST_END, store_addr);
+>  }
+>  
+> +static int mvebu_pm_store_bootinfo(void)
+> +{
+> +	u32 *store_addr;
+> +
+> +	store_addr = phys_to_virt(BOOT_INFO_ADDR);
+> +
+> +	if (of_machine_is_compatible("marvell,armadaxp"))
+> +		mvebu_pm_store_armadaxp_bootinfo(store_addr);
+> +	else
+> +		return -ENODEV;
+> +
+> +	return 0;
+> +}
+> +
+>  static int mvebu_pm_enter(suspend_state_t state)
+>  {
+> +	int ret;
+> +
+>  	if (state != PM_SUSPEND_MEM)
+>  		return -EINVAL;
+>  
+> +	ret = mvebu_pm_store_bootinfo();
+> +	if (ret)
+> +		return ret;
+> +
+>  	cpu_pm_enter();
+>  
+> -	mvebu_pm_store_bootinfo();
+>  	cpu_suspend(0, mvebu_pm_powerdown);
+>  
+>  	outer_resume();
+> 
 
-It's used right here, isn't it (and further down in this function too)?
-Does your tree compile with this change?
 
-	S?ren
+-- 
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
