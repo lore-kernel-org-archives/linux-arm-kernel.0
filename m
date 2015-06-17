@@ -1,40 +1,21 @@
-From: yvo@apm.com (Y Vo)
-Date: Wed, 17 Jun 2015 08:41:52 +0700
-Subject: [PATCH v0] arm64: dts: Add poweroff button device node for APM X-Gene
- platform
-Message-ID: <1434505312-27977-1-git-send-email-yvo@apm.com>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Wed, 17 Jun 2015 08:08:28 +0530
+Subject: [PATCH V7 3/3] OPP: Add binding for 'opp-suspend'
+In-Reply-To: <4228747.vs1U0RqIQB@vostro.rjw.lan>
+References: <cover.1433434659.git.viresh.kumar@linaro.org>
+ <20150616025425.GB26592@linux>
+ <CAL_JsqJ2gCJvtrZqDWWoY6Gv4Ag7xLV93wLbT5b37jO=oWo+MQ@mail.gmail.com>
+ <4228747.vs1U0RqIQB@vostro.rjw.lan>
+Message-ID: <20150617023828.GB13553@linux>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds poweroff button device node to support poweroff feature
-on APM X-Gene Mustang platform.
+On 16-06-15, 23:21, Rafael J. Wysocki wrote:
+> Does your ACK also apply to patches [1-2/3] in this series?
 
-Signed-off-by: Y Vo <yvo@apm.com>
----
- arch/arm64/boot/dts/apm/apm-mustang.dts |   11 +++++++++++
- 1 files changed, 11 insertions(+), 0 deletions(-)
+His RBY tag is already present for 1/3 :)
 
-diff --git a/arch/arm64/boot/dts/apm/apm-mustang.dts b/arch/arm64/boot/dts/apm/apm-mustang.dts
-index 83578e7..67979c8 100644
---- a/arch/arm64/boot/dts/apm/apm-mustang.dts
-+++ b/arch/arm64/boot/dts/apm/apm-mustang.dts
-@@ -23,6 +23,17 @@
- 		device_type = "memory";
- 		reg = < 0x1 0x00000000 0x0 0x80000000 >; /* Updated by bootloader */
- 	};
-+
-+	gpio-keys {
-+		compatible = "gpio-keys";
-+		apm_ctrl_name = "Power Button";
-+		btn3 {
-+			label = "EXT_PWR";
-+			linux,code = <116>;
-+			linux,input-type = <0x1>;     /* EV_KEY */
-+			interrupts = <0x0 0x2d 0x1>;
-+		};
-+	};
- };
- 
- &pcie0clk {
+@Rob: Please Ack 2/3 as well :)
+
 -- 
-1.7.1
+viresh
