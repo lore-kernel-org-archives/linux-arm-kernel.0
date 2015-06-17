@@ -1,84 +1,109 @@
-From: soren.brinkmann@xilinx.com (=?utf-8?B?U8O2cmVu?= Brinkmann)
-Date: Wed, 17 Jun 2015 11:58:48 -0700
-Subject: [PATCH] xilinx:Remove unused variable num_frag in the function
- axienet_start_xmit
-In-Reply-To: <DD47523D-0DF9-46B5-9382-3C30BBD9E815@gmail.com>
-References: <1434556362-3748-1-git-send-email-xerofoify@gmail.com>
- <20150617160730.GE2906@xsjsorenbubuntu>
- <DD47523D-0DF9-46B5-9382-3C30BBD9E815@gmail.com>
-Message-ID: <20150617185848.GI2906@xsjsorenbubuntu>
+From: balbi@ti.com (Felipe Balbi)
+Date: Wed, 17 Jun 2015 13:57:14 -0500
+Subject: [PATCH RESEND] i2c: omap: improve duty cycle on SCL
+In-Reply-To: <5581BEB2.6070007@gmail.com>
+References: <1434482445-1818-1-git-send-email-balbi@ti.com>
+ <55813BA0.3010001@nokia.com>
+ <20150617180052.GF18421@saruman.tx.rr.com>
+ <5581BEB2.6070007@gmail.com>
+Message-ID: <20150617185714.GH18421@saruman.tx.rr.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2015-06-17 at 12:21PM -0400, Nicholas Krause wrote:
+Hi,
+
+On Wed, Jun 17, 2015 at 08:38:42PM +0200, Alexander Sverdlin wrote:
+> Hello Felipe,
 > 
+> On 17/06/15 20:00, Felipe Balbi wrote:
+> >>> With this patch we try to be as close to 50%
+> >>> > > duty cycle as possible. The reason for this
+> >>> > > is that some devices present an erratic behavior
+> >>> > > with certain duty cycles.
+> >>> > > 
+> >>> > > One such example is TPS65218 PMIC which fails
+> >>> > > to change voltages when running @ 400kHz and
+> >>> > > duty cycle is lower than 34%.
+> >>> > > 
+> >>> > > The idea of the patch is simple:
+> >>> > > 
+> >>> > > calculate desired scl_period from requested scl
+> >>> > > and use 50% for tLow and 50% for tHigh.
+> >>> > > 
+> >>> > > tLow is calculated with a DIV_ROUND_UP() to make
+> >>> > > sure it's slightly higher than tHigh and to make
+> >>> > > sure that we end up within I2C specifications.
+> >>> > > 
+> >>> > > Kudos to Nishanth Menon and Dave Gerlach for helping
+> >>> > > debugging the TPS65218 problem found on AM437x SK.
+> >>> > > 
+> >>> > > Signed-off-by: Felipe Balbi <balbi@ti.com>
+> >> > 
+> >> > NAK.
+> >> > This is a direct violation of PHILIPS I2C-bus Specification v.2.1,
+> >> > section 15.
+> >> > Namely, you will have LOW period of SCL clock shorter than required
+> >> > 1.3uS.
+> > how is this out of spec ?
+> > 
+> > http://i.imgur.com/jEDlZT7.png
+> > 
+> > -Width = 1.4us, frequency 373.1kHz, duty cycle of 47.76%
+> > 
+> > In any case, I have to send v2 anyway (found a bug which would show up
+> > on frequencies above 400kHz), so I'll resend this patch.
 > 
-> On June 17, 2015 12:07:30 PM EDT, "S?ren Brinkmann" <soren.brinkmann@xilinx.com> wrote:
-> >On Wed, 2015-06-17 at 11:52AM -0400, Nicholas Krause wrote:
-> >> This removes the unused variable num_frag and the setting of it
-> >> to the number of fragments from the passed sk_buff pointer by
-> >> this function's caller due to this variable never being used
-> >> in this particular function and is not declared as  global so
-> >> setting it for global use in this file is pointless.
-> >> 
-> >> Signed-off-by: Nicholas Krause <xerofoify@gmail.com>
-> >> ---
-> >>  drivers/net/ethernet/xilinx/xilinx_axienet_main.c | 2 --
-> >>  1 file changed, 2 deletions(-)
-> >> 
-> >> diff --git a/drivers/net/ethernet/xilinx/xilinx_axienet_main.c
-> >b/drivers/net/ethernet/xilinx/xilinx_axienet_main.c
-> >> index 28b7e7d..624dce4 100644
-> >> --- a/drivers/net/ethernet/xilinx/xilinx_axienet_main.c
-> >> +++ b/drivers/net/ethernet/xilinx/xilinx_axienet_main.c
-> >> @@ -651,7 +651,6 @@ static inline int
-> >axienet_check_tx_bd_space(struct axienet_local *lp,
-> >>  static int axienet_start_xmit(struct sk_buff *skb, struct net_device
-> >*ndev)
-> >>  {
-> >>  	u32 ii;
-> >> -	u32 num_frag;
-> >>  	u32 csum_start_off;
-> >>  	u32 csum_index_off;
-> >>  	skb_frag_t *frag;
-> >> @@ -659,7 +658,6 @@ static int axienet_start_xmit(struct sk_buff
-> >*skb, struct net_device *ndev)
-> >>  	struct axienet_local *lp = netdev_priv(ndev);
-> >>  	struct axidma_bd *cur_p;
-> >>  
-> >> -	num_frag = skb_shinfo(skb)->nr_frags;
-> >>  	cur_p = &lp->tx_bd_v[lp->tx_bd_tail];
-> >>  
-> >>  	if (axienet_check_tx_bd_space(lp, num_frag)) {
-> >
-> >It's used right here, isn't it (and further down in this function too)?
-> >Does your tree compile with this change?
-> >
-> >	S?ren
-> My tree does compile with this change. 
+> If you really target 50% duty cycle and there will be no
+> rounding/truncation error, you will end up with 1.25uS at 400kHz. I
+> understand why you want to make HIGH phase longer, but 50% is a bad
+> target at 400hHz. Probably more safe value?
 
-You have to fix your testing process:
-    CHK     include/config/kernel.release
-    UPD     include/config/kernel.release
-    CHK     include/generated/uapi/linux/version.h
-    CHK     include/generated/utsrelease.h
-    UPD     include/generated/utsrelease.h
-    CHK     include/generated/bounds.h
-    CHK     include/generated/timeconst.h
-    CHK     include/generated/asm-offsets.h
-    CALL    scripts/checksyscalls.sh
-  <stdin>:1253:2: warning: #warning syscall userfaultfd not implemented [-Wcpp]
-    CC      drivers/net/ethernet/xilinx/xilinx_axienet_main.o
-  drivers/net/ethernet/xilinx/xilinx_axienet_main.c: In function 'axienet_start_xmit':
-  drivers/net/ethernet/xilinx/xilinx_axienet_main.c:667:36: error: 'num_frag' undeclared (first use in this function)
-    if (axienet_check_tx_bd_space(lp, num_frag)) {
-                                      ^
-  drivers/net/ethernet/xilinx/xilinx_axienet_main.c:667:36: note: each undeclared identifier is reported only once for each function it appears in
-  scripts/Makefile.build:258: recipe for target 'drivers/net/ethernet/xilinx/xilinx_axienet_main.o' failed
-  make[1]: *** [drivers/net/ethernet/xilinx/xilinx_axienet_main.o] Error 1
-  Makefile:1545: recipe for target 'drivers/net/ethernet/xilinx/xilinx_axienet_main.o' failed
-  make: *** [drivers/net/ethernet/xilinx/xilinx_axienet_main.o] Error 2
+We can't generate exactly 400kHz anyway, and we're not getting exactly
+50% duty cycle, it just brings it *closer* to that. I even mention the
+reason for the DIV_ROUND_UP() there. Let's just go through the math
+using TRM equation:
 
-NACK for the patch.
+@400kHz with 12MHz internal clock:
 
-	S?ren
+tLow = (SCLL + 7) * iclk_period
+
+1250 = (SCLL + 7) * 1/12MHz
+
+SCLL = DIV_ROUND_UP(1250, 83) - 7
+SCLL = (1250 + 82)/83 - 7
+SCLL = 9
+
+Now if we do the reverse to find actual tLow:
+
+tLow = (9 + 7) * 83
+tLow = 1328ns
+
+Likewise if we do it for tHigh:
+
+tHigh = (SCLH + 5) iclk_period
+
+SCLH = 1250 / 83 - 5
+SCLH = 10
+
+tHigh = 15 * 83
+tHigh = 1245
+
+tHigh + tLow (SCL period) = 2573ns. That gives us SCL of 388.65kHz. An
+error of mere 3% of what we really wanted to achieve. I'd say this is
+pretty darn good.
+
+Now you tell me, how is this *ever* going to be out of spec ?
+
+DIV_ROUND_UP() and the truncation at internal clock period calculation
+makes sure that tLow will be within spec. Instead of blindly NAKing the
+patch, you could've gone through this exercise yourself.
+
+-- 
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150617/087ae310/attachment.sig>
