@@ -1,107 +1,40 @@
 From: geert+renesas@glider.be (Geert Uytterhoeven)
-Date: Wed, 17 Jun 2015 11:31:26 +0200
-Subject: [PATCH 10/15] ARM: shmobile: R-Mobile: Remove legacy PM Domain code
+Date: Wed, 17 Jun 2015 11:31:31 +0200
+Subject: [PATCH 15/15] pinctrl: sh-pfc: Remove obsolete r8a7740
+ platform_device_id entry
 In-Reply-To: <1434533491-21979-1-git-send-email-geert+renesas@glider.be>
 References: <1434533491-21979-1-git-send-email-geert+renesas@glider.be>
-Message-ID: <1434533491-21979-11-git-send-email-geert+renesas@glider.be>
+Message-ID: <1434533491-21979-16-git-send-email-geert+renesas@glider.be>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The last user of the legacy R-Mobile PM Domain code was the r8a7740
-legacy SoC code, which has been removed.
+Since the removal of the r8a7740 legacy board code, r8a7740 is only
+supported in generic DT-only ARM multi-platform builds.  The driver
+doesn't need to match platform devices by name anymore, hence remove the
+corresponding platform_device_id entry.
 
 Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+Cc: Linus Walleij <linus.walleij@linaro.org>
 ---
- arch/arm/mach-shmobile/pm-rmobile.c | 39 -------------------------------------
- arch/arm/mach-shmobile/pm-rmobile.h | 24 -----------------------
- 2 files changed, 63 deletions(-)
+Please do not apply until the legacy r8a7740 SoC code has been removed.
+Or just provide an ack, so Simon can apply it when appropriate.
+---
+ drivers/pinctrl/sh-pfc/core.c | 3 ---
+ 1 file changed, 3 deletions(-)
 
-diff --git a/arch/arm/mach-shmobile/pm-rmobile.c b/arch/arm/mach-shmobile/pm-rmobile.c
-index b9b494f5ca99fc7c..a5b96b990aea8dfc 100644
---- a/arch/arm/mach-shmobile/pm-rmobile.c
-+++ b/arch/arm/mach-shmobile/pm-rmobile.c
-@@ -169,43 +169,6 @@ static void rmobile_init_pm_domain(struct rmobile_pm_domain *rmobile_pd)
- 	__rmobile_pd_power_up(rmobile_pd, false);
+diff --git a/drivers/pinctrl/sh-pfc/core.c b/drivers/pinctrl/sh-pfc/core.c
+index 3ff523e58c38d123..aeeeb76327c0684e 100644
+--- a/drivers/pinctrl/sh-pfc/core.c
++++ b/drivers/pinctrl/sh-pfc/core.c
+@@ -585,9 +585,6 @@ static int sh_pfc_remove(struct platform_device *pdev)
  }
  
--#ifdef CONFIG_ARCH_SHMOBILE_LEGACY
--
--void rmobile_init_domains(struct rmobile_pm_domain domains[], int num)
--{
--	int j;
--
--	for (j = 0; j < num; j++)
--		rmobile_init_pm_domain(&domains[j]);
--}
--
--void rmobile_add_device_to_domain_td(const char *domain_name,
--				     struct platform_device *pdev,
--				     struct gpd_timing_data *td)
--{
--	struct device *dev = &pdev->dev;
--
--	__pm_genpd_name_add_device(domain_name, dev, td);
--}
--
--void rmobile_add_devices_to_domains(struct pm_domain_device data[],
--				    int size)
--{
--	struct gpd_timing_data latencies = {
--		.stop_latency_ns = DEFAULT_DEV_LATENCY_NS,
--		.start_latency_ns = DEFAULT_DEV_LATENCY_NS,
--		.save_state_latency_ns = DEFAULT_DEV_LATENCY_NS,
--		.restore_state_latency_ns = DEFAULT_DEV_LATENCY_NS,
--	};
--	int j;
--
--	for (j = 0; j < size; j++)
--		rmobile_add_device_to_domain_td(data[j].domain_name,
--						data[j].pdev, &latencies);
--}
--
--#else /* !CONFIG_ARCH_SHMOBILE_LEGACY */
--
- static int rmobile_pd_suspend_busy(void)
- {
- 	/*
-@@ -436,5 +399,3 @@ static int __init rmobile_init_pm_domains(void)
- }
- 
- core_initcall(rmobile_init_pm_domains);
--
--#endif /* !CONFIG_ARCH_SHMOBILE_LEGACY */
-diff --git a/arch/arm/mach-shmobile/pm-rmobile.h b/arch/arm/mach-shmobile/pm-rmobile.h
-index 3992b619c1278dcc..30a4a421ee315b98 100644
---- a/arch/arm/mach-shmobile/pm-rmobile.h
-+++ b/arch/arm/mach-shmobile/pm-rmobile.h
-@@ -31,28 +31,4 @@ struct pm_domain_device {
- 	struct platform_device *pdev;
- };
- 
--#if defined(CONFIG_PM_RMOBILE) && defined(CONFIG_ARCH_SHMOBILE_LEGACY)
--extern void rmobile_init_domains(struct rmobile_pm_domain domains[], int num);
--extern void rmobile_add_device_to_domain_td(const char *domain_name,
--					    struct platform_device *pdev,
--					    struct gpd_timing_data *td);
--
--static inline void rmobile_add_device_to_domain(const char *domain_name,
--						struct platform_device *pdev)
--{
--	rmobile_add_device_to_domain_td(domain_name, pdev, NULL);
--}
--
--extern void rmobile_add_devices_to_domains(struct pm_domain_device data[],
--					   int size);
--#else
--
--#define rmobile_init_domains(domains, num) do { } while (0)
--#define rmobile_add_device_to_domain_td(name, pdev, td) do { } while (0)
--#define rmobile_add_device_to_domain(name, pdev) do { } while (0)
--
--static inline void rmobile_add_devices_to_domains(struct pm_domain_device d[],
--						  int size) {}
--#endif /* CONFIG_PM_RMOBILE */
--
- #endif /* PM_RMOBILE_H */
+ static const struct platform_device_id sh_pfc_id_table[] = {
+-#ifdef CONFIG_PINCTRL_PFC_R8A7740
+-	{ "pfc-r8a7740", (kernel_ulong_t)&r8a7740_pinmux_info },
+-#endif
+ #ifdef CONFIG_PINCTRL_PFC_R8A7778
+ 	{ "pfc-r8a7778", (kernel_ulong_t)&r8a7778_pinmux_info },
+ #endif
 -- 
 1.9.1
