@@ -1,58 +1,141 @@
-From: noralf@tronnes.org (=?UTF-8?q?Noralf=20Tr=C3=B8nnes?=)
-Date: Wed, 17 Jun 2015 16:04:04 +0200
-Subject: [PATCH v3] watchdog: bcm2835: Fix poweroff behaviour
-Message-ID: <1434549844-11704-1-git-send-email-noralf@tronnes.org>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Wed, 17 Jun 2015 15:06:34 +0100
+Subject: [PATCH v3 06/10] arm: simplify MMIO dispatching
+In-Reply-To: <55817B07.8010502@arm.com>
+References: <1434540121-21283-1-git-send-email-andre.przywara@arm.com>
+ <1434540121-21283-7-git-send-email-andre.przywara@arm.com>
+ <55816C9F.1090500@arm.com> <55817B07.8010502@arm.com>
+Message-ID: <55817EEA.9060402@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently poweroff/halt results in a reboot on the Raspberry Pi.
-The firmware uses the RSTS register to know which partiton to
-boot from. The partiton value is spread into bits
-0, 2, 4, 6, 8, 10. Partiton 63 is a special partition used by
-the firmware to indicate halt.
+On 17/06/15 14:49, Andre Przywara wrote:
+> Hi Marc,
+> 
+> On 06/17/2015 01:48 PM, Marc Zyngier wrote:
+>> On 17/06/15 12:21, Andre Przywara wrote:
+>>> Currently we separate any incoming MMIO request into one of the ARM
+>>> memory map regions and take care to spare the GIC.
+>>> It turns out that this is unnecessary, as we only have one special
+>>> region (the IO port area in the first 64 KByte). The MMIO rbtree
+>>> takes care about unhandled MMIO ranges, so we can simply drop all the
+>>> special range checking (except that for the IO range) in
+>>> kvm_cpu__emulate_mmio().
+>>> As the GIC is handled in the kernel, a GIC MMIO access should never
+>>> reach userland (and we don't know what to do with it anyway).
+>>> This lets us delete some more code and simplifies future extensions
+>>> (like expanding the GIC regions).
+>>> To be in line with the other architectures, move the now simpler
+>>> code into a header file.
+>>>
+>>> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
+>>> ---
+>>>  arm/include/arm-common/kvm-arch.h     | 12 ------------
+>>>  arm/include/arm-common/kvm-cpu-arch.h | 14 ++++++++++++--
+>>>  arm/kvm-cpu.c                         | 16 ----------------
+>>>  3 files changed, 12 insertions(+), 30 deletions(-)
+>>>
+>>> diff --git a/arm/include/arm-common/kvm-arch.h b/arm/include/arm-common/kvm-arch.h
+>>> index 082131d..90d6733 100644
+>>> --- a/arm/include/arm-common/kvm-arch.h
+>>> +++ b/arm/include/arm-common/kvm-arch.h
+>>> @@ -45,18 +45,6 @@ static inline bool arm_addr_in_ioport_region(u64 phys_addr)
+>>>  	return phys_addr >= KVM_IOPORT_AREA && phys_addr < limit;
+>>>  }
+>>>  
+>>> -static inline bool arm_addr_in_virtio_mmio_region(u64 phys_addr)
+>>> -{
+>>> -	u64 limit = KVM_VIRTIO_MMIO_AREA + ARM_VIRTIO_MMIO_SIZE;
+>>> -	return phys_addr >= KVM_VIRTIO_MMIO_AREA && phys_addr < limit;
+>>> -}
+>>> -
+>>> -static inline bool arm_addr_in_pci_region(u64 phys_addr)
+>>> -{
+>>> -	u64 limit = KVM_PCI_CFG_AREA + ARM_PCI_CFG_SIZE + ARM_PCI_MMIO_SIZE;
+>>> -	return phys_addr >= KVM_PCI_CFG_AREA && phys_addr < limit;
+>>> -}
+>>> -
+>>>  struct kvm_arch {
+>>>  	/*
+>>>  	 * We may have to align the guest memory for virtio, so keep the
+>>> diff --git a/arm/include/arm-common/kvm-cpu-arch.h b/arm/include/arm-common/kvm-cpu-arch.h
+>>> index 36c7872..329979a 100644
+>>> --- a/arm/include/arm-common/kvm-cpu-arch.h
+>>> +++ b/arm/include/arm-common/kvm-cpu-arch.h
+>>> @@ -44,8 +44,18 @@ static inline bool kvm_cpu__emulate_io(struct kvm_cpu *vcpu, u16 port, void *dat
+>>>  	return false;
+>>>  }
+>>>  
+>>> -bool kvm_cpu__emulate_mmio(struct kvm_cpu *vcpu, u64 phys_addr, u8 *data,
+>>> -			   u32 len, u8 is_write);
+>>> +static inline bool kvm_cpu__emulate_mmio(struct kvm_cpu *vcpu, u64 phys_addr,
+>>> +					 u8 *data, u32 len, u8 is_write)
+>>> +{
+>>> +	if (arm_addr_in_ioport_region(phys_addr)) {
+>>> +		int direction = is_write ? KVM_EXIT_IO_OUT : KVM_EXIT_IO_IN;
+>>> +		u16 port = (phys_addr - KVM_IOPORT_AREA) & USHRT_MAX;
+>>> +
+>>> +		return kvm__emulate_io(vcpu, port, data, direction, len, 1);
+>>> +	}
+>>> +
+>>> +	return kvm__emulate_mmio(vcpu, phys_addr, data, len, is_write);
+>>> +}
+>>>  
+>>>  unsigned long kvm_cpu__get_vcpu_mpidr(struct kvm_cpu *vcpu);
+>>>  
+>>> diff --git a/arm/kvm-cpu.c b/arm/kvm-cpu.c
+>>> index ab08815..7780251 100644
+>>> --- a/arm/kvm-cpu.c
+>>> +++ b/arm/kvm-cpu.c
+>>> @@ -139,22 +139,6 @@ bool kvm_cpu__handle_exit(struct kvm_cpu *vcpu)
+>>>  	return false;
+>>>  }
+>>>  
+>>> -bool kvm_cpu__emulate_mmio(struct kvm_cpu *vcpu, u64 phys_addr, u8 *data,
+>>> -			   u32 len, u8 is_write)
+>>> -{
+>>> -	if (arm_addr_in_virtio_mmio_region(phys_addr)) {
+>>> -		return kvm__emulate_mmio(vcpu, phys_addr, data, len, is_write);
+>>> -	} else if (arm_addr_in_ioport_region(phys_addr)) {
+>>> -		int direction = is_write ? KVM_EXIT_IO_OUT : KVM_EXIT_IO_IN;
+>>> -		u16 port = (phys_addr - KVM_IOPORT_AREA) & USHRT_MAX;
+>>> -		return kvm__emulate_io(vcpu, port, data, direction, len, 1);
+>>> -	} else if (arm_addr_in_pci_region(phys_addr)) {
+>>> -		return kvm__emulate_mmio(vcpu, phys_addr, data, len, is_write);
+>>> -	}
+>>
+>> Can you explain why this arm_addr_in_pci_region(phys_addr) check has
+>> disappeared in your updated version on this function? It may be a non
+>> issue, but I'd very much like to understand.
+> 
+> If you look above the calls to kvm__emulate_mmio() are exactly the same
+> for the PCI and the virtio_mmio region, also as the areas are
+> non-overlapping the if branches can be reordered.
+> arm_addr_in_virtio_mmio_region() is true between 64k and (1GB - GIC),
+> while arm_addr_in_pci_region() gives true between 1GB and 2GB.
+> 
+> So this translates into: do kvm__emulate_io() for anything below 64K and
+> kvm__emulate_mmio() for everything else except for the GIC area,
+> admittedly in a quite convoluted way.
+> 
+> So my patch just removes the check for the GIC region and rewrites it to
+> match that description in the last sentence, with the rationale given in
+> the commit message.
+> Does that make sense?
+> If you desperately want some extra barfing for misguided GIC requests,
+> I'd rather introduce that to the "no match" code path in
+> kvm__emulate_mmio or register some dummy MMIO regions for the GIC with
+> panic() handlers.
 
-The firmware made this change in 19 Aug 2013 and was matched
-by the downstream commit:
-Changes for new NOOBS multi partition booting from gsh
+No, that's fine.
 
-Signed-off-by: Noralf Tr?nnes <noralf@tronnes.org>
----
+I just wondered what was the rational behind having the
+arm_addr_in_pci_region() call there. It might have guarded something,
+but if you're absolutely positive that this doesn't cause a regression,
+that's OK with me.
 
-v2: Fix typo in commit message
+Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
 
-v3: Only Raspberry Pi is supported so it's ok to just modify
-    the poweroff function (Stephen Warrren)
-
- drivers/watchdog/bcm2835_wdt.c | 10 ++++++++--
- 1 file changed, 8 insertions(+), 2 deletions(-)
-
-diff --git a/drivers/watchdog/bcm2835_wdt.c b/drivers/watchdog/bcm2835_wdt.c
-index 7116968..43dbf5b 100644
---- a/drivers/watchdog/bcm2835_wdt.c
-+++ b/drivers/watchdog/bcm2835_wdt.c
-@@ -36,6 +36,13 @@
- #define PM_RSTC_WRCFG_FULL_RESET	0x00000020
- #define PM_RSTC_RESET			0x00000102
-
-+/*
-+ * The Raspberry Pi firmware uses the RSTS register to know which partiton
-+ * to boot from. The partiton value is spread into bits 0, 2, 4, 6, 8, 10.
-+ * Partiton 63 is a special partition used by the firmware to indicate halt.
-+ */
-+#define PM_RSTS_RASPBERRYPI_HALT	0x555
-+
- #define SECS_TO_WDOG_TICKS(x) ((x) << 16)
- #define WDOG_TICKS_TO_SECS(x) ((x) >> 16)
-
-@@ -151,8 +158,7 @@ static void bcm2835_power_off(void)
- 	 * hard reset.
- 	 */
- 	val = readl_relaxed(wdt->base + PM_RSTS);
--	val &= PM_RSTC_WRCFG_CLR;
--	val |= PM_PASSWORD | PM_RSTS_HADWRH_SET;
-+	val |= PM_PASSWORD | PM_RSTS_RASPBERRYPI_HALT;
- 	writel_relaxed(val, wdt->base + PM_RSTS);
-
- 	/* Continue with normal reset mechanism */
---
-2.2.2
+	M.
+-- 
+Jazz is not dead. It just smells funny...
