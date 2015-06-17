@@ -1,126 +1,60 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Wed, 17 Jun 2015 18:13:15 +0200
-Subject: [PATCH 5/9] ARM: mvebu: prepare pm-board.c for the introduction
- of Armada 38x support
-In-Reply-To: <1434456785-23696-6-git-send-email-thomas.petazzoni@free-electrons.com>
-References: <1434456785-23696-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1434456785-23696-6-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <55819C9B.2080000@free-electrons.com>
+From: xerofoify@gmail.com (Nicholas Krause)
+Date: Wed, 17 Jun 2015 12:21:04 -0400
+Subject: [PATCH] xilinx:Remove unused variable num_frag in the function
+ axienet_start_xmit
+In-Reply-To: <20150617160730.GE2906@xsjsorenbubuntu>
+References: <1434556362-3748-1-git-send-email-xerofoify@gmail.com>
+ <20150617160730.GE2906@xsjsorenbubuntu>
+Message-ID: <DD47523D-0DF9-46B5-9382-3C30BBD9E815@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Thomas,
-
-On 16/06/2015 14:13, Thomas Petazzoni wrote:
-> The pm-board.c code contains the board-specific logic to enter suspend
-> to RAM. Until now, the code supported only the Armada XP GP board, so
-> all functions and symbols were named with armada_xp_gp. However, it
-> turns out that the Armada 388 GP also uses the same 3 GPIOs protocol
-> to talk to the PIC microcontroller that controls the power supply.
-> 
-> Since we are going to re-use the same code with no change for Armada
-> 38x, this commit renames the functions and symbols to use just
-> "armada" instead of "armada_xp_gp". Better names can be found if one
-> day other boards having a different protocol/mechanism are supported
-> in the kernel.
-> 
-> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-
-Acked-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
 
 
-Thanks,
-
-Gregory
-
-> ---
->  arch/arm/mach-mvebu/pm-board.c | 22 +++++++++++-----------
->  1 file changed, 11 insertions(+), 11 deletions(-)
-> 
-> diff --git a/arch/arm/mach-mvebu/pm-board.c b/arch/arm/mach-mvebu/pm-board.c
-> index 301ab38..b8c26cb 100644
-> --- a/arch/arm/mach-mvebu/pm-board.c
-> +++ b/arch/arm/mach-mvebu/pm-board.c
-> @@ -1,7 +1,7 @@
->  /*
->   * Board-level suspend/resume support.
->   *
-> - * Copyright (C) 2014 Marvell
-> + * Copyright (C) 2014-2015 Marvell
->   *
->   * Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
->   *
-> @@ -20,27 +20,27 @@
->  #include <linux/slab.h>
->  #include "common.h"
->  
-> -#define ARMADA_XP_GP_PIC_NR_GPIOS 3
-> +#define ARMADA_PIC_NR_GPIOS 3
->  
->  static void __iomem *gpio_ctrl;
-> -static int pic_gpios[ARMADA_XP_GP_PIC_NR_GPIOS];
-> -static int pic_raw_gpios[ARMADA_XP_GP_PIC_NR_GPIOS];
-> +static int pic_gpios[ARMADA_PIC_NR_GPIOS];
-> +static int pic_raw_gpios[ARMADA_PIC_NR_GPIOS];
->  
-> -static void mvebu_armada_xp_gp_pm_enter(void __iomem *sdram_reg, u32 srcmd)
-> +static void mvebu_armada_pm_enter(void __iomem *sdram_reg, u32 srcmd)
->  {
->  	u32 reg, ackcmd;
->  	int i;
->  
->  	/* Put 001 as value on the GPIOs */
->  	reg = readl(gpio_ctrl);
-> -	for (i = 0; i < ARMADA_XP_GP_PIC_NR_GPIOS; i++)
-> +	for (i = 0; i < ARMADA_PIC_NR_GPIOS; i++)
->  		reg &= ~BIT(pic_raw_gpios[i]);
->  	reg |= BIT(pic_raw_gpios[0]);
->  	writel(reg, gpio_ctrl);
->  
->  	/* Prepare writing 111 to the GPIOs */
->  	ackcmd = readl(gpio_ctrl);
-> -	for (i = 0; i < ARMADA_XP_GP_PIC_NR_GPIOS; i++)
-> +	for (i = 0; i < ARMADA_PIC_NR_GPIOS; i++)
->  		ackcmd |= BIT(pic_raw_gpios[i]);
->  
->  	srcmd = cpu_to_le32(srcmd);
-> @@ -76,7 +76,7 @@ static void mvebu_armada_xp_gp_pm_enter(void __iomem *sdram_reg, u32 srcmd)
->  		  [ackcmd] "r" (ackcmd), [gpio_ctrl] "r" (gpio_ctrl) : "r1");
->  }
->  
-> -static int mvebu_armada_xp_gp_pm_init(void)
-> +static int mvebu_armada_pm_init(void)
->  {
->  	struct device_node *np;
->  	struct device_node *gpio_ctrl_np;
-> @@ -89,7 +89,7 @@ static int mvebu_armada_xp_gp_pm_init(void)
->  	if (!np)
->  		return -ENODEV;
->  
-> -	for (i = 0; i < ARMADA_XP_GP_PIC_NR_GPIOS; i++) {
-> +	for (i = 0; i < ARMADA_PIC_NR_GPIOS; i++) {
->  		char *name;
->  		struct of_phandle_args args;
->  
-> @@ -134,11 +134,11 @@ static int mvebu_armada_xp_gp_pm_init(void)
->  	if (!gpio_ctrl)
->  		return -ENOMEM;
->  
-> -	mvebu_pm_init(mvebu_armada_xp_gp_pm_enter);
-> +	mvebu_pm_init(mvebu_armada_pm_enter);
->  
->  out:
->  	of_node_put(np);
->  	return ret;
->  }
->  
-> -late_initcall(mvebu_armada_xp_gp_pm_init);
-> +late_initcall(mvebu_armada_pm_init);
-> 
-
+On June 17, 2015 12:07:30 PM EDT, "S?ren Brinkmann" <soren.brinkmann@xilinx.com> wrote:
+>On Wed, 2015-06-17 at 11:52AM -0400, Nicholas Krause wrote:
+>> This removes the unused variable num_frag and the setting of it
+>> to the number of fragments from the passed sk_buff pointer by
+>> this function's caller due to this variable never being used
+>> in this particular function and is not declared as  global so
+>> setting it for global use in this file is pointless.
+>> 
+>> Signed-off-by: Nicholas Krause <xerofoify@gmail.com>
+>> ---
+>>  drivers/net/ethernet/xilinx/xilinx_axienet_main.c | 2 --
+>>  1 file changed, 2 deletions(-)
+>> 
+>> diff --git a/drivers/net/ethernet/xilinx/xilinx_axienet_main.c
+>b/drivers/net/ethernet/xilinx/xilinx_axienet_main.c
+>> index 28b7e7d..624dce4 100644
+>> --- a/drivers/net/ethernet/xilinx/xilinx_axienet_main.c
+>> +++ b/drivers/net/ethernet/xilinx/xilinx_axienet_main.c
+>> @@ -651,7 +651,6 @@ static inline int
+>axienet_check_tx_bd_space(struct axienet_local *lp,
+>>  static int axienet_start_xmit(struct sk_buff *skb, struct net_device
+>*ndev)
+>>  {
+>>  	u32 ii;
+>> -	u32 num_frag;
+>>  	u32 csum_start_off;
+>>  	u32 csum_index_off;
+>>  	skb_frag_t *frag;
+>> @@ -659,7 +658,6 @@ static int axienet_start_xmit(struct sk_buff
+>*skb, struct net_device *ndev)
+>>  	struct axienet_local *lp = netdev_priv(ndev);
+>>  	struct axidma_bd *cur_p;
+>>  
+>> -	num_frag = skb_shinfo(skb)->nr_frags;
+>>  	cur_p = &lp->tx_bd_v[lp->tx_bd_tail];
+>>  
+>>  	if (axienet_check_tx_bd_space(lp, num_frag)) {
+>
+>It's used right here, isn't it (and further down in this function too)?
+>Does your tree compile with this change?
+>
+>	S?ren
+My tree does compile with this change. 
+Nick 
 
 -- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+Sent from my Android device with K-9 Mail. Please excuse my brevity.
