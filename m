@@ -1,76 +1,187 @@
-From: eddie.huang@mediatek.com (Eddie Huang)
-Date: Wed, 17 Jun 2015 17:08:03 +0800
-Subject: [PATCH 2/3] spi: mediatek: Add spi bus for Mediatek MT8173
-In-Reply-To: <1433923569.22080.1.camel@mtksdaap41>
-References: <1431075343-7887-1-git-send-email-leilk.liu@mediatek.com>
- <1431075343-7887-3-git-send-email-leilk.liu@mediatek.com>
- <20150508175306.GG2761@sirena.org.uk> <1431434356.2128.9.camel@mhfsdcap03>
- <20150512160540.GB3066@sirena.org.uk> <1431675522.2128.13.camel@mhfsdcap03>
- <20150515092543.GY2761@sirena.org.uk>
- <1433758546.19786.16.camel@mtksdaap41>
- <20150608175927.GO14071@sirena.org.uk>
- <1433844321.16178.6.camel@mtksdaap41>
- <20150609103951.GA14071@sirena.org.uk>
- <1433923569.22080.1.camel@mtksdaap41>
-Message-ID: <1434532083.19346.27.camel@mtksdaap41>
+From: alexander.sverdlin@nokia.com (Alexander Sverdlin)
+Date: Wed, 17 Jun 2015 11:19:28 +0200
+Subject: [PATCH RESEND] i2c: omap: improve duty cycle on SCL
+In-Reply-To: <1434482445-1818-1-git-send-email-balbi@ti.com>
+References: <1434482445-1818-1-git-send-email-balbi@ti.com>
+Message-ID: <55813BA0.3010001@nokia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mark,
+Hello!
 
-On Wed, 2015-06-10 at 16:06 +0800, Eddie Huang wrote:
-> On Tue, 2015-06-09 at 11:39 +0100, Mark Brown wrote:
-> > On Tue, Jun 09, 2015 at 06:05:21PM +0800, Eddie Huang wrote:
-> > 
-> > > --- a/drivers/spi/spi.c
-> > > +++ b/drivers/spi/spi.c
-> > > @@ -539,8 +539,8 @@ static int __spi_map_msg(struct spi_master *master,
-> > > struct spi_message *msg)
-> > >         if (!master->can_dma)
-> > >                 return 0;
-> > 
-> > > -       tx_dev = master->dma_tx->device->dev;
-> > > -       rx_dev = master->dma_rx->device->dev;
-> > > +       tx_dev = master->dma_tx ? master->dma_tx->device->dev :
-> > > master->dev;
-> > > +       rx_dev = master->dma_rx ? master->dma_rx->device->dev : master-
-> > 
-> > > Is this what you want ? Actually, I don't like first one at all.
-> > 
-> > Not quite what I'd been thinking of - we can't just pick the device in
-> > the core safely, the device might be a MFD or have some other
-> > restriction that needs us to use a separate struct device.  However most
-> > of those cases are likely to point towards implementing a dmaengine
-> > device so probably the above will work for most cases and is fine.  Can
-> > you send a proper patch please?
+On 16/06/15 21:20, ext Felipe Balbi wrote:
+> With this patch we try to be as close to 50%
+> duty cycle as possible. The reason for this
+> is that some devices present an erratic behavior
+> with certain duty cycles.
+> 
+> One such example is TPS65218 PMIC which fails
+> to change voltages when running @ 400kHz and
+> duty cycle is lower than 34%.
+> 
+> The idea of the patch is simple:
+> 
+> calculate desired scl_period from requested scl
+> and use 50% for tLow and 50% for tHigh.
+> 
+> tLow is calculated with a DIV_ROUND_UP() to make
+> sure it's slightly higher than tHigh and to make
+> sure that we end up within I2C specifications.
+> 
+> Kudos to Nishanth Menon and Dave Gerlach for helping
+> debugging the TPS65218 problem found on AM437x SK.
+> 
+> Signed-off-by: Felipe Balbi <balbi@ti.com>
+
+NAK.
+This is a direct violation of PHILIPS I2C-bus Specification v.2.1, section 15.
+Namely, you will have LOW period of SCL clock shorter than required 1.3uS.
+Therefore, I'm trying to fix the same currently in davinci:
+https://patchwork.ozlabs.org/patch/483024/
+
+Probably your problem is in board design. I don't think this should be the reason
+for the spec-violating code in the upstream Kernel. You have your TI SDK for this.
+
+> ---
+>  drivers/i2c/busses/i2c-omap.c | 86 ++++++++++++++++++++++++++++---------------
+>  1 file changed, 56 insertions(+), 30 deletions(-)
+> 
+> diff --git a/drivers/i2c/busses/i2c-omap.c b/drivers/i2c/busses/i2c-omap.c
+> index 0e894193accf..034d2d1ff289 100644
+> --- a/drivers/i2c/busses/i2c-omap.c
+> +++ b/drivers/i2c/busses/i2c-omap.c
+> @@ -25,6 +25,7 @@
+>   */
+>  
+>  #include <linux/module.h>
+> +#include <linux/kernel.h>
+>  #include <linux/delay.h>
+>  #include <linux/i2c.h>
+>  #include <linux/err.h>
+> @@ -39,6 +40,8 @@
+>  #include <linux/i2c-omap.h>
+>  #include <linux/pm_runtime.h>
+>  
+> +#define NSECS_PER_SEC			1000000000
+> +
+>  /* I2C controller revisions */
+>  #define OMAP_I2C_OMAP1_REV_2		0x20
+>  
+> @@ -359,6 +362,8 @@ static int omap_i2c_init(struct omap_i2c_dev *dev)
+>  	u16 fsscll = 0, fssclh = 0, hsscll = 0, hssclh = 0;
+>  	unsigned long fclk_rate = 12000000;
+>  	unsigned long internal_clk = 0;
+> +	unsigned long internal_clk_period = 0;
+> +	unsigned long scl_period = 0;
+>  	struct clk *fclk;
+>  
+>  	if (dev->rev >= OMAP_I2C_REV_ON_3430_3530) {
+> @@ -395,52 +400,73 @@ static int omap_i2c_init(struct omap_i2c_dev *dev)
+>  	}
+>  
+>  	if (!(dev->flags & OMAP_I2C_FLAG_SIMPLE_CLOCK)) {
+> -
+>  		/*
+>  		 * HSI2C controller internal clk rate should be 19.2 Mhz for
+> -		 * HS and for all modes on 2430. On 34xx we can use lower rate
+> -		 * to get longer filter period for better noise suppression.
+> -		 * The filter is iclk (fclk for HS) period.
+> +		 * HS and for all modes on 2430. For all other devices and
+> +		 * speeds we will use a 12MHz internal clock.
+>  		 */
+> -		if (dev->speed > 400 ||
+> -			       dev->flags & OMAP_I2C_FLAG_FORCE_19200_INT_CLK)
+> -			internal_clk = 19200;
+> -		else if (dev->speed > 100)
+> -			internal_clk = 9600;
+> -		else
+> -			internal_clk = 4000;
+> +		if (dev->flags & OMAP_I2C_FLAG_FORCE_19200_INT_CLK ||
+> +				dev->speed > 400) {
+> +			internal_clk = 1920000;
+> +			internal_clk_period = NSECS_PER_SEC /
+> +				internal_clk; /* ns */
+> +		} else {
+> +			internal_clk = 12000000;
+> +			internal_clk_period = NSECS_PER_SEC /
+> +				internal_clk; /* ns */
+> +		}
+> +
+>  		fclk = clk_get(dev->dev, "fck");
+> -		fclk_rate = clk_get_rate(fclk) / 1000;
+> +		fclk_rate = clk_get_rate(fclk);
+>  		clk_put(fclk);
+>  
+>  		/* Compute prescaler divisor */
+>  		psc = fclk_rate / internal_clk;
+>  		psc = psc - 1;
+>  
+> +		/*
+> +		 * Here's the tricky part, we want to make sure our duty cycle
+> +		 * is as close to 50% as possible. In order to achieve that, we
+> +		 * will first figure out what's the period on chosen scl is,
+> +		 * then divide that by two and calculate SCLL and SCLH based on
+> +		 * that.
+> +		 *
+> +		 * SCLL and SCLH equations are as folows:
+> +		 *
+> +		 * SCLL = (tLow / iclk_period) - 7;
+> +		 * SCLH = (tHigh / iclk_period) - 5;
+> +		 *
+> +		 * Where iclk_period is period of Internal Clock.
+> +		 *
+> +		 * tLow and tHigh will be basically half of scl_period where
+> +		 * possible as long as we can match I2C spec's minimum limits
+> +		 * for them.
+> +		 */
+> +		scl_period = NSECS_PER_SEC / dev->speed;
+> +
+>  		/* If configured for High Speed */
+>  		if (dev->speed > 400) {
+> -			unsigned long scl;
+> +			unsigned long fs_period;
+> +
+> +			/*
+> +			 * first phase of HS mode is up to
+> +			 * 400kHz so we will use that.
+> +			 */
+> +			fs_period = NSECS_PER_SEC / 400;
+>  
+>  			/* For first phase of HS mode */
+> -			scl = internal_clk / 400;
+> -			fsscll = scl - (scl / 3) - 7;
+> -			fssclh = (scl / 3) - 5;
+> +			fsscll = DIV_ROUND_UP(fs_period >> 1,
+> +					internal_clk_period) - 7;
+> +			fssclh = (fs_period >> 1) / internal_clk_period - 5;
+>  
+>  			/* For second phase of HS mode */
+> -			scl = fclk_rate / dev->speed;
+> -			hsscll = scl - (scl / 3) - 7;
+> -			hssclh = (scl / 3) - 5;
+> -		} else if (dev->speed > 100) {
+> -			unsigned long scl;
+> -
+> -			/* Fast mode */
+> -			scl = internal_clk / dev->speed;
+> -			fsscll = scl - (scl / 3) - 7;
+> -			fssclh = (scl / 3) - 5;
+> -		} else {
+> -			/* Standard mode */
+> -			fsscll = internal_clk / (dev->speed * 2) - 7;
+> -			fssclh = internal_clk / (dev->speed * 2) - 5;
+> +			hsscll = DIV_ROUND_UP(scl_period >> 1,
+> +					internal_clk_period) - 7;
+> +			hssclh = (scl_period >> 1) / internal_clk_period - 5;
+> +		} else  {
+> +			fsscll = DIV_ROUND_UP(scl_period >> 1,
+> +					internal_clk_period) - 7;
+> +			fssclh = (scl_period >> 1) / internal_clk_period - 5;
+>  		}
+>  		scll = (hsscll << OMAP_I2C_SCLL_HSSCLL) | fsscll;
+>  		sclh = (hssclh << OMAP_I2C_SCLH_HSSCLH) | fssclh;
 > 
 
-After further investigate, we found problem when use can_dma() to
-implement spi driver.
-
-If can_dma() return true in __spi_map_msg() function, it will map data
-buffer to sg_table, then pass this sg_table to transfer function. In
-transfer function, spi hardware can do tx and rx at the same time (full
-duplex), and the data size must be the same.
-
-Here comes the problem, although total length of tx, rx is the same,
-each entry in rx and tx scatterlist may not be the same (in the case
-data buffer allocate from vmalloc). Other vendor have dmaengine driver
-to send entry-by-entry automatically, so it is ok due to total length is
-the same.But mediatek hw can only send tx and rx scatterlist entry one
-by on, which means in full duplex, mediatek SPI hardware need send each
-entry separately, will cause full duplex fail because tx/rx entry size
-or entry number may not be the same.
-
-The problem is not dma map discuss earlier, it is mediatek spi hardware
-limitation that can't support scatterlist dma transfer in full-duplex
-mode. We can only support both tx and rx has the same size continuous
-memory data in full-duplex mode. I don't know whether should modify
-spi.c to support mediatek spi, or we just return can_dma() false and do
-transfer one continuous data in transfer function.
-
-By the way, I think maybe it is better to change can_dma() to
-can_dma_sg().
-
-Eddie
-Thanks
+-- 
+Best regards,
+Alexander Sverdlin.
