@@ -1,40 +1,110 @@
 From: geert+renesas@glider.be (Geert Uytterhoeven)
-Date: Wed, 17 Jun 2015 11:31:30 +0200
-Subject: [PATCH 14/15] pinctrl: sh-pfc: r8a7740: Remove obsolete
- multi-platform check
+Date: Wed, 17 Jun 2015 11:31:25 +0200
+Subject: [PATCH 09/15] ARM: shmobile: Remove unused dma-register.h
 In-Reply-To: <1434533491-21979-1-git-send-email-geert+renesas@glider.be>
 References: <1434533491-21979-1-git-send-email-geert+renesas@glider.be>
-Message-ID: <1434533491-21979-15-git-send-email-geert+renesas@glider.be>
+Message-ID: <1434533491-21979-10-git-send-email-geert+renesas@glider.be>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since the removal of the r8a7740 legacy board code, r8a7740 is only
-supported in generic ARM multi-platform builds.  Hence
-CONFIG_ARCH_MULTIPLATFORM is always set, and the check can be removed.
+The last users of "dma-register.h" were the sh73a0 and r8a7740 legacy
+SoC code, which have been removed.
 
 Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
-Cc: Linus Walleij <linus.walleij@linaro.org>
 ---
-Please do not apply until the legacy r8a7740 SoC code has been removed.
-Or just provide an ack, so Simon can apply it when appropriate.
----
- drivers/pinctrl/sh-pfc/pfc-r8a7740.c | 4 ----
- 1 file changed, 4 deletions(-)
+ arch/arm/mach-shmobile/dma-register.h | 84 -----------------------------------
+ 1 file changed, 84 deletions(-)
+ delete mode 100644 arch/arm/mach-shmobile/dma-register.h
 
-diff --git a/drivers/pinctrl/sh-pfc/pfc-r8a7740.c b/drivers/pinctrl/sh-pfc/pfc-r8a7740.c
-index d0bb1459783a16d2..82ef1862dd1ba808 100644
---- a/drivers/pinctrl/sh-pfc/pfc-r8a7740.c
-+++ b/drivers/pinctrl/sh-pfc/pfc-r8a7740.c
-@@ -22,10 +22,6 @@
- #include <linux/kernel.h>
- #include <linux/pinctrl/pinconf-generic.h>
- 
--#ifndef CONFIG_ARCH_MULTIPLATFORM
--#include <mach/irqs.h>
--#endif
+diff --git a/arch/arm/mach-shmobile/dma-register.h b/arch/arm/mach-shmobile/dma-register.h
+deleted file mode 100644
+index 52a2f66e600f2995..0000000000000000
+--- a/arch/arm/mach-shmobile/dma-register.h
++++ /dev/null
+@@ -1,84 +0,0 @@
+-/*
+- * SH-ARM CPU-specific DMA definitions, used by both DMA drivers
+- *
+- * Copyright (C) 2012 Renesas Solutions Corp
+- *
+- * Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+- *
+- * Based on arch/sh/include/cpu-sh4/cpu/dma-register.h
+- * Copyright (C) 2010 Guennadi Liakhovetski <g.liakhovetski@gmx.de>
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License version 2 as
+- * published by the Free Software Foundation.
+- */
 -
- #include "core.h"
- #include "sh_pfc.h"
- 
+-#ifndef DMA_REGISTER_H
+-#define DMA_REGISTER_H
+-
+-/*
+- *		Direct Memory Access Controller
+- */
+-
+-/* Transmit sizes and respective CHCR register values */
+-enum {
+-	XMIT_SZ_8BIT		= 0,
+-	XMIT_SZ_16BIT		= 1,
+-	XMIT_SZ_32BIT		= 2,
+-	XMIT_SZ_64BIT		= 7,
+-	XMIT_SZ_128BIT		= 3,
+-	XMIT_SZ_256BIT		= 4,
+-	XMIT_SZ_512BIT		= 5,
+-};
+-
+-/* log2(size / 8) - used to calculate number of transfers */
+-static const unsigned int dma_ts_shift[] = {
+-	[XMIT_SZ_8BIT]		= 0,
+-	[XMIT_SZ_16BIT]		= 1,
+-	[XMIT_SZ_32BIT]		= 2,
+-	[XMIT_SZ_64BIT]		= 3,
+-	[XMIT_SZ_128BIT]	= 4,
+-	[XMIT_SZ_256BIT]	= 5,
+-	[XMIT_SZ_512BIT]	= 6,
+-};
+-
+-#define TS_LOW_BIT	0x3 /* --xx */
+-#define TS_HI_BIT	0xc /* xx-- */
+-
+-#define TS_LOW_SHIFT	(3)
+-#define TS_HI_SHIFT	(20 - 2)	/* 2 bits for shifted low TS */
+-
+-#define TS_INDEX2VAL(i) \
+-	((((i) & TS_LOW_BIT) << TS_LOW_SHIFT) |\
+-	 (((i) & TS_HI_BIT)  << TS_HI_SHIFT))
+-
+-#define CHCR_TX(xmit_sz) (DM_FIX | SM_INC | RS_ERS | TS_INDEX2VAL((xmit_sz)))
+-#define CHCR_RX(xmit_sz) (DM_INC | SM_FIX | RS_ERS | TS_INDEX2VAL((xmit_sz)))
+-
+-
+-/*
+- *		USB High-Speed DMAC
+- */
+-/* Transmit sizes and respective CHCR register values */
+-enum {
+-	USBTS_XMIT_SZ_8BYTE		= 0,
+-	USBTS_XMIT_SZ_16BYTE		= 1,
+-	USBTS_XMIT_SZ_32BYTE		= 2,
+-};
+-
+-/* log2(size / 8) - used to calculate number of transfers */
+-static const unsigned int dma_usbts_shift[] = {
+-	[USBTS_XMIT_SZ_8BYTE]	= 3,
+-	[USBTS_XMIT_SZ_16BYTE]	= 4,
+-	[USBTS_XMIT_SZ_32BYTE]	= 5,
+-};
+-
+-#define USBTS_LOW_BIT	0x3 /* --xx */
+-#define USBTS_HI_BIT	0x0 /* ---- */
+-
+-#define USBTS_LOW_SHIFT	6
+-#define USBTS_HI_SHIFT	0
+-
+-#define USBTS_INDEX2VAL(i) (((i) & 3) << 6)
+-
+-#endif /* DMA_REGISTER_H */
 -- 
 1.9.1
