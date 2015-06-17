@@ -1,51 +1,40 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Tue, 16 Jun 2015 19:28:43 -0600
-Subject: [PATCH v2 2/3] watchdog: bcm2835: Add poweroff code for the
- Raspberry Pi
-In-Reply-To: <557FEECE.9060909@tronnes.org>
-References: <1434195541-28368-1-git-send-email-noralf@tronnes.org>
- <1434195541-28368-2-git-send-email-noralf@tronnes.org>
- <557F930E.8010002@wwwdotorg.org> <557FEECE.9060909@tronnes.org>
-Message-ID: <5580CD4B.70003@wwwdotorg.org>
+From: yvo@apm.com (Y Vo)
+Date: Wed, 17 Jun 2015 08:41:52 +0700
+Subject: [PATCH v0] arm64: dts: Add poweroff button device node for APM X-Gene
+ platform
+Message-ID: <1434505312-27977-1-git-send-email-yvo@apm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/16/2015 03:39 AM, Noralf Tr?nnes wrote:
-> 
-> Den 16.06.2015 05:07, skrev Stephen Warren:
->> On 06/13/2015 05:39 AM, Noralf Tr?nnes wrote:
->>> This adds a new poweroff function to the watchdog driver for the
->>> Raspberry Pi. Currently poweroff/halt results in a reboot.
->>>
->>> The Raspberry Pi firmware uses the RSTS register to know which
->>> partiton to boot from. The partiton value is spread into bits
->>> 0, 2, 4, 6, 8, 10. Partiton 63 is a special partition used by
->>> the firmware to indicate halt.
->>>
->>> The firmware made this change in 19 Aug 2013 and was matched
->>> by the downstream commit:
->>> Changes for new NOOBS multi partition booting from gsh
->> I don't understand why we need a new compatible value here; why not
->> simply modify the existing bcm2835_power_off() function. That is written
->> to do something that's interpreted by the RPi firmware, not something
->> that the bcm2835 HW does.
->>
->> Admittedly the current name is a bit misleading, but fixing that should
->> be a separate change to fixing the implementation to do what the current
->> firmware expects.
-> 
-> There are other boards that use the BCM2835 and I didn't want to break the
-> behaviour for those that use the reference firmware.
+This patch adds poweroff button device node to support poweroff feature
+on APM X-Gene Mustang platform.
 
-We don't support those other board in mainline Linux AFAIK. In other
-discussions, Eric Anholt stated that the Roku 2 for example doesn't use
-the same firmware (albeit they were derived from the same base a long
-way back apparently) so I have no good reason to believe this logic is a
-standard across difference bcm2835 devices. Do you know more specific
-details?
+Signed-off-by: Y Vo <yvo@apm.com>
+---
+ arch/arm64/boot/dts/apm/apm-mustang.dts |   11 +++++++++++
+ 1 files changed, 11 insertions(+), 0 deletions(-)
 
-> Roku 2 device uses
-> this soc, and changing bcm2835_power_off() would break support for it.
-> ODROID-W also use BCM2835, but this is a Pi clone so I don't know if they
-> have matched their firmware behaviour to that of the Pi (admittedly not
-> many boards were made, their source of chips went dry).
+diff --git a/arch/arm64/boot/dts/apm/apm-mustang.dts b/arch/arm64/boot/dts/apm/apm-mustang.dts
+index 83578e7..67979c8 100644
+--- a/arch/arm64/boot/dts/apm/apm-mustang.dts
++++ b/arch/arm64/boot/dts/apm/apm-mustang.dts
+@@ -23,6 +23,17 @@
+ 		device_type = "memory";
+ 		reg = < 0x1 0x00000000 0x0 0x80000000 >; /* Updated by bootloader */
+ 	};
++
++	gpio-keys {
++		compatible = "gpio-keys";
++		apm_ctrl_name = "Power Button";
++		btn3 {
++			label = "EXT_PWR";
++			linux,code = <116>;
++			linux,input-type = <0x1>;     /* EV_KEY */
++			interrupts = <0x0 0x2d 0x1>;
++		};
++	};
+ };
+ 
+ &pcie0clk {
+-- 
+1.7.1
