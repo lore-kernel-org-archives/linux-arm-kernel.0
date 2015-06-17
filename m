@@ -1,104 +1,52 @@
-From: masami.hiramatsu.pt@hitachi.com (Masami Hiramatsu)
-Date: Wed, 17 Jun 2015 23:18:42 +0900
-Subject: [PATCH v7 0/7] arm64: Add kernel probes (kprobes) support
-In-Reply-To: <1434395229-6654-1-git-send-email-dave.long@linaro.org>
-References: <1434395229-6654-1-git-send-email-dave.long@linaro.org>
-Message-ID: <558181C2.6020500@hitachi.com>
+From: ludovic.desroches@atmel.com (Ludovic Desroches)
+Date: Wed, 17 Jun 2015 16:22:26 +0200
+Subject: [PATCH] dmaengine: at_xdmac: fix bug about channel configuration
+Message-ID: <1434550946-27750-1-git-send-email-ludovic.desroches@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi David,
+When using descriptor view 2 or higher, we don't write the configuration
+into AT_XDMAC_CC register because this configuration will be fetch from
+the descriptor. Unfortunately, the PROT bit is not updated with this
+method, we have to do it manually before enabling the channel.
 
-At first, thank you for updating this series! :)
+Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com>
+---
+ drivers/dma/at_xdmac.c | 19 ++++++++++---------
+ 1 file changed, 10 insertions(+), 9 deletions(-)
 
-On 2015/06/16 4:07, David Long wrote:
-> From: "David A. Long" <dave.long@linaro.org>
-> 
-> This patchset is heavily based on Sandeepa Prabhu's ARM v8 kprobes patches,
-> first seen in October 2013. This version attempts to address concerns raised by
-> reviewers and also fixes problems discovered during testing.
-> 
-> This patchset adds support for kernel probes(kprobes), jump probes(jprobes)
-> and return probes(kretprobes) support for ARM64.
-> 
-> The kprobes mechanism makes use of software breakpoint and single stepping
-> support available in the ARM v8 kernel.
-> 
-> The is patch depends on:
-> 	[PATCH 1/2] Move the pt_regs_offset struct definition from arch to common include file
-> 	[PATCH 2/2] Consolidate redundant register/stack access code
-> 
-
-Hmm, what are those patches ? Would they be not merged to upstream yet?
-If so, where I can get them from? I'd like to know the actual url for them.
-
-
-[...]
-> Changes since v6 include:
-> 
-> 1) New trampoline code from Will Cohen fixes the occasional failure seen
-> when processing kretprobes by replacing the software breakpoint with
-> assembly code to implement the return to the original execution stream.
-
-Yeah, that's what we need :)
-
-Thank you,
-
-> 2) Changed ip0, ip1, fp, and lr to plain numbered registers for purposes
-> of recognizing them as an ascii string in the stack/reg access code.
-> 3) Removed orig_x0.
-> 4) Moved ARM_x* defines from arch/arm64/include/uapi/asm/ptrace.h to
-> arch/arm64/kernel/ptrace.c.
-> 
-> David A. Long (2):
->   arm64: Add HAVE_REGS_AND_STACK_ACCESS_API feature
->   arm64: Add more test functions to insn.c
-> 
-> Sandeepa Prabhu (4):
->   arm64: Kprobes with single stepping support
->   arm64: kprobes instruction simulation support
->   arm64: Add kernel return probes support (kretprobes)
->   kprobes: Add arm64 case in kprobe example module
-> 
-> William Cohen (1):
->   arm64: Add trampoline code for kretprobes
-> 
->  arch/arm64/Kconfig                       |   3 +
->  arch/arm64/include/asm/debug-monitors.h  |   5 +
->  arch/arm64/include/asm/insn.h            |  18 +
->  arch/arm64/include/asm/kprobes.h         |  63 +++
->  arch/arm64/include/asm/probes.h          |  50 +++
->  arch/arm64/include/asm/ptrace.h          |  28 +-
->  arch/arm64/kernel/Makefile               |   3 +
->  arch/arm64/kernel/debug-monitors.c       |  35 +-
->  arch/arm64/kernel/insn.c                 |  28 ++
->  arch/arm64/kernel/kprobes-arm64.c        | 166 ++++++++
->  arch/arm64/kernel/kprobes-arm64.h        |  71 ++++
->  arch/arm64/kernel/kprobes.c              | 665 +++++++++++++++++++++++++++++++
->  arch/arm64/kernel/kprobes.h              |  24 ++
->  arch/arm64/kernel/probes-condn-check.c   | 122 ++++++
->  arch/arm64/kernel/probes-simulate-insn.c | 174 ++++++++
->  arch/arm64/kernel/probes-simulate-insn.h |  33 ++
->  arch/arm64/kernel/ptrace.c               |  77 ++++
->  arch/arm64/kernel/vmlinux.lds.S          |   1 +
->  arch/arm64/mm/fault.c                    |  25 ++
->  samples/kprobes/kprobe_example.c         |   8 +
->  20 files changed, 1588 insertions(+), 11 deletions(-)
->  create mode 100644 arch/arm64/include/asm/kprobes.h
->  create mode 100644 arch/arm64/include/asm/probes.h
->  create mode 100644 arch/arm64/kernel/kprobes-arm64.c
->  create mode 100644 arch/arm64/kernel/kprobes-arm64.h
->  create mode 100644 arch/arm64/kernel/kprobes.c
->  create mode 100644 arch/arm64/kernel/kprobes.h
->  create mode 100644 arch/arm64/kernel/probes-condn-check.c
->  create mode 100644 arch/arm64/kernel/probes-simulate-insn.c
->  create mode 100644 arch/arm64/kernel/probes-simulate-insn.h
-> 
-
-
+diff --git a/drivers/dma/at_xdmac.c b/drivers/dma/at_xdmac.c
+index cf1213d..52ca1cc 100644
+--- a/drivers/dma/at_xdmac.c
++++ b/drivers/dma/at_xdmac.c
+@@ -359,18 +359,19 @@ static void at_xdmac_start_xfer(struct at_xdmac_chan *atchan,
+ 	 * descriptor view 2 since some fields of the configuration register
+ 	 * depend on transfer size and src/dest addresses.
+ 	 */
+-	if (at_xdmac_chan_is_cyclic(atchan)) {
++	if (at_xdmac_chan_is_cyclic(atchan))
+ 		reg = AT_XDMAC_CNDC_NDVIEW_NDV1;
+-		at_xdmac_chan_write(atchan, AT_XDMAC_CC, first->lld.mbr_cfg);
+-	} else if (first->lld.mbr_ubc & AT_XDMAC_MBR_UBC_NDV3) {
++	else if (first->lld.mbr_ubc & AT_XDMAC_MBR_UBC_NDV3)
+ 		reg = AT_XDMAC_CNDC_NDVIEW_NDV3;
+-	} else {
+-		/*
+-		 * No need to write AT_XDMAC_CC reg, it will be done when the
+-		 * descriptor is fecthed.
+-		 */
++	else
+ 		reg = AT_XDMAC_CNDC_NDVIEW_NDV2;
+-	}
++	/*
++	 * Even if the register will be updated from the configuration in the
++	 * descriptor when using view 2 or higher, the PROT bit won't be set
++	 * properly. This bit can be modified only by using the channel
++	 * configuration register.
++	 */
++	at_xdmac_chan_write(atchan, AT_XDMAC_CC, first->lld.mbr_cfg);
+ 
+ 	reg |= AT_XDMAC_CNDC_NDDUP
+ 	       | AT_XDMAC_CNDC_NDSUP
 -- 
-Masami HIRAMATSU
-Linux Technology Research Center, System Productivity Research Dept.
-Center for Technology Innovation - Systems Engineering
-Hitachi, Ltd., Research & Development Group
-E-mail: masami.hiramatsu.pt at hitachi.com
+2.2.0
