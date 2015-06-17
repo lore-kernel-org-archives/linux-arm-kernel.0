@@ -1,87 +1,89 @@
 From: geert+renesas@glider.be (Geert Uytterhoeven)
-Date: Wed, 17 Jun 2015 11:31:21 +0200
-Subject: [PATCH 05/15] ARM: shmobile: Remove legacy board code for
- Armadillo-800 EVA
+Date: Wed, 17 Jun 2015 11:31:17 +0200
+Subject: [PATCH 01/15] ARM: shmobile: Remove legacy board code for KZM-A9-GT
 In-Reply-To: <1434533491-21979-1-git-send-email-geert+renesas@glider.be>
 References: <1434533491-21979-1-git-send-email-geert+renesas@glider.be>
-Message-ID: <1434533491-21979-6-git-send-email-geert+renesas@glider.be>
+Message-ID: <1434533491-21979-2-git-send-email-geert+renesas@glider.be>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Armadillo-800 EVA board is sufficiently supported by DT-based and
-board-less R-Mobile A1 (r8a7740) multiplatform kernels, and board
-staging code. Hence remove the legacy board code to reduce maintenance
-effort.
+The KZM-A9-GT board is sufficiently supported by DT-based and board-less
+SH-Mobile AG5 (sh73a0) multiplatform kernels. Hence remove the legacy
+board code to reduce maintenance effort.
 
 Lacking areas are:
-  - USB (it doesn't work in legacy, neither),
-  - HDMI (it doesn't work in legacy, neither),
-  - Camera (we don't care),
+  - USB (it does't work in legacy, neither),
+  - LCDC (the LCDC is wired to the legacy INTC, which is not planned to
+    be supported with DT).
   - DMAC/IPMMU (no DT bindings are planned).
 
 Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
 ---
- arch/arm/mach-shmobile/Kconfig                 |    9 -
- arch/arm/mach-shmobile/Makefile                |    1 -
- arch/arm/mach-shmobile/Makefile.boot           |    1 -
- arch/arm/mach-shmobile/board-armadillo800eva.c | 1365 ------------------------
- 4 files changed, 1376 deletions(-)
- delete mode 100644 arch/arm/mach-shmobile/board-armadillo800eva.c
+ arch/arm/mach-shmobile/Kconfig                     |   8 -
+ arch/arm/mach-shmobile/Makefile                    |   1 -
+ arch/arm/mach-shmobile/Makefile.boot               |   1 -
+ arch/arm/mach-shmobile/board-kzm9g.c               | 916 ---------------------
+ arch/arm/mach-shmobile/include/mach/head-kzm9g.txt | 410 ---------
+ arch/arm/mach-shmobile/include/mach/zboot.h        |   5 -
+ arch/arm/mach-shmobile/intc-sh73a0.c               | 337 --------
+ 7 files changed, 1678 deletions(-)
+ delete mode 100644 arch/arm/mach-shmobile/board-kzm9g.c
+ delete mode 100644 arch/arm/mach-shmobile/include/mach/head-kzm9g.txt
+ delete mode 100644 arch/arm/mach-shmobile/intc-sh73a0.c
 
 diff --git a/arch/arm/mach-shmobile/Kconfig b/arch/arm/mach-shmobile/Kconfig
-index bc8e2f60fe505ee2..e256c6b664710099 100644
+index 429157d437f518c4..2a4d8348b6299dff 100644
 --- a/arch/arm/mach-shmobile/Kconfig
 +++ b/arch/arm/mach-shmobile/Kconfig
-@@ -129,15 +129,6 @@ config ARCH_R8A7779
+@@ -176,14 +176,6 @@ config MACH_MARZEN
+ 	select REGULATOR_FIXED_VOLTAGE if REGULATOR
+ 	select USE_OF
  
- comment "Renesas ARM SoCs Board Type"
- 
--config MACH_ARMADILLO800EVA
--	bool "Armadillo-800 EVA board"
--	depends on ARCH_R8A7740
+-config MACH_KZM9G
+-	bool "KZM-A9-GT board"
+-	depends on ARCH_SH73A0
 -	select ARCH_REQUIRE_GPIOLIB
 -	select REGULATOR_FIXED_VOLTAGE if REGULATOR
--	select SMSC_PHY if SH_ETH
--	select SND_SOC_WM8978 if SND_SIMPLE_CARD && I2C
+-	select SND_SOC_AK4642 if SND_SIMPLE_CARD
 -	select USE_OF
 -
- config MACH_BOCKW
- 	bool "BOCK-W platform"
- 	depends on ARCH_R8A7778
+ comment "Renesas ARM SoCs System Configuration"
+ 
+ config CPU_HAS_INTEVT
 diff --git a/arch/arm/mach-shmobile/Makefile b/arch/arm/mach-shmobile/Makefile
-index 7e20ab3021be0ff2..4ffd7428353b53f9 100644
+index def7a093d99cfaf9..9bdb8a11acb10c4e 100644
 --- a/arch/arm/mach-shmobile/Makefile
 +++ b/arch/arm/mach-shmobile/Makefile
-@@ -58,7 +58,6 @@ else
- obj-$(CONFIG_MACH_BOCKW)	+= board-bockw.o
+@@ -60,7 +60,6 @@ obj-$(CONFIG_MACH_BOCKW)	+= board-bockw.o
  obj-$(CONFIG_MACH_BOCKW_REFERENCE)	+= board-bockw-reference.o
  obj-$(CONFIG_MACH_MARZEN)	+= board-marzen.o
--obj-$(CONFIG_MACH_ARMADILLO800EVA)	+= board-armadillo800eva.o
+ obj-$(CONFIG_MACH_ARMADILLO800EVA)	+= board-armadillo800eva.o
+-obj-$(CONFIG_MACH_KZM9G)	+= board-kzm9g.o intc-sh73a0.o
  endif
  
  # Framework support
 diff --git a/arch/arm/mach-shmobile/Makefile.boot b/arch/arm/mach-shmobile/Makefile.boot
-index 2269b1c3c30b108a..14cdfc0ed0755a59 100644
+index e1ef19cef89c7f34..2269b1c3c30b108a 100644
 --- a/arch/arm/mach-shmobile/Makefile.boot
 +++ b/arch/arm/mach-shmobile/Makefile.boot
-@@ -1,6 +1,5 @@
- # per-board load address for uImage
- loadaddr-y	:=
--loadaddr-$(CONFIG_MACH_ARMADILLO800EVA) += 0x40008000
+@@ -3,7 +3,6 @@ loadaddr-y	:=
+ loadaddr-$(CONFIG_MACH_ARMADILLO800EVA) += 0x40008000
  loadaddr-$(CONFIG_MACH_BOCKW) += 0x60008000
  loadaddr-$(CONFIG_MACH_BOCKW_REFERENCE) += 0x60008000
+-loadaddr-$(CONFIG_MACH_KZM9G) += 0x41008000
  loadaddr-$(CONFIG_MACH_MARZEN) += 0x60008000
-diff --git a/arch/arm/mach-shmobile/board-armadillo800eva.c b/arch/arm/mach-shmobile/board-armadillo800eva.c
+ 
+ __ZRELADDR	:= $(sort $(loadaddr-y))
+diff --git a/arch/arm/mach-shmobile/board-kzm9g.c b/arch/arm/mach-shmobile/board-kzm9g.c
 deleted file mode 100644
-index bf37e3c532f661a6..0000000000000000
---- a/arch/arm/mach-shmobile/board-armadillo800eva.c
+index 260d8319fd82f927..0000000000000000
+--- a/arch/arm/mach-shmobile/board-kzm9g.c
 +++ /dev/null
-@@ -1,1365 +0,0 @@
+@@ -1,916 +0,0 @@
 -/*
-- * armadillo 800 eva board support
+- * KZM-A9-GT board support
 - *
-- * Copyright (C) 2012 Renesas Solutions Corp.
-- * Copyright (C) 2012 Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+- * Copyright (C) 2012	Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
 - *
 - * This program is free software; you can redistribute it and/or modify
 - * it under the terms of the GNU General Public License as published by
@@ -93,638 +95,377 @@ index bf37e3c532f661a6..0000000000000000
 - * GNU General Public License for more details.
 - */
 -
--#include <linux/clk.h>
 -#include <linux/delay.h>
--#include <linux/err.h>
 -#include <linux/gpio.h>
 -#include <linux/gpio_keys.h>
--#include <linux/i2c-gpio.h>
--#include <linux/input.h>
+-#include <linux/io.h>
 -#include <linux/irq.h>
--#include <linux/kernel.h>
--#include <linux/mfd/tmio.h>
+-#include <linux/i2c.h>
+-#include <linux/i2c/pcf857x.h>
+-#include <linux/input.h>
+-#include <linux/irqchip/arm-gic.h>
 -#include <linux/mmc/host.h>
 -#include <linux/mmc/sh_mmcif.h>
 -#include <linux/mmc/sh_mobile_sdhi.h>
+-#include <linux/mfd/as3711.h>
+-#include <linux/mfd/tmio.h>
 -#include <linux/pinctrl/machine.h>
--#include <linux/platform_data/st1232_pdata.h>
+-#include <linux/pinctrl/pinconf-generic.h>
 -#include <linux/platform_device.h>
--#include <linux/pwm.h>
--#include <linux/pwm_backlight.h>
 -#include <linux/reboot.h>
--#include <linux/regulator/driver.h>
 -#include <linux/regulator/fixed.h>
--#include <linux/regulator/gpio-regulator.h>
 -#include <linux/regulator/machine.h>
--#include <linux/sh_eth.h>
+-#include <linux/smsc911x.h>
+-#include <linux/usb/r8a66597.h>
 -#include <linux/usb/renesas_usbhs.h>
 -#include <linux/videodev2.h>
 -
+-#include <sound/sh_fsi.h>
+-#include <sound/simple_card.h>
 -#include <asm/hardware/cache-l2x0.h>
 -#include <asm/mach-types.h>
 -#include <asm/mach/arch.h>
--#include <asm/mach/map.h>
--#include <asm/mach/time.h>
--#include <asm/page.h>
--#include <media/mt9t112.h>
--#include <media/sh_mobile_ceu.h>
--#include <media/soc_camera.h>
--#include <sound/sh_fsi.h>
--#include <sound/simple_card.h>
--#include <video/sh_mobile_hdmi.h>
 -#include <video/sh_mobile_lcdc.h>
 -
 -#include "common.h"
+-#include "intc.h"
 -#include "irqs.h"
--#include "pm-rmobile.h"
--#include "r8a7740.h"
--#include "sh-gpio.h"
+-#include "sh73a0.h"
 -
 -/*
-- * CON1		Camera Module
-- * CON2		Extension Bus
-- * CON3		HDMI Output
-- * CON4		Composite Video Output
-- * CON5		H-UDI JTAG
-- * CON6		ARM JTAG
-- * CON7		SD1
-- * CON8		SD2
-- * CON9		RTC BackUp
-- * CON10	Monaural Mic Input
-- * CON11	Stereo Headphone Output
-- * CON12	Audio Line Output(L)
-- * CON13	Audio Line Output(R)
-- * CON14	AWL13 Module
-- * CON15	Extension
-- * CON16	LCD1
-- * CON17	LCD2
-- * CON19	Power Input
-- * CON20	USB1
-- * CON21	USB2
-- * CON22	Serial
-- * CON23	LAN
-- * CON24	USB3
-- * LED1		Camera LED(Yellow)
-- * LED2		Power LED (Green)
-- * ED3-LED6	User LED(Yellow)
-- * LED7		LAN link LED(Green)
-- * LED8		LAN activity LED(Yellow)
+- * external GPIO
 - */
+-#define GPIO_PCF8575_BASE	(310)
+-#define GPIO_PCF8575_PORT10	(GPIO_PCF8575_BASE + 8)
+-#define GPIO_PCF8575_PORT11	(GPIO_PCF8575_BASE + 9)
+-#define GPIO_PCF8575_PORT12	(GPIO_PCF8575_BASE + 10)
+-#define GPIO_PCF8575_PORT13	(GPIO_PCF8575_BASE + 11)
+-#define GPIO_PCF8575_PORT14	(GPIO_PCF8575_BASE + 12)
+-#define GPIO_PCF8575_PORT15	(GPIO_PCF8575_BASE + 13)
+-#define GPIO_PCF8575_PORT16	(GPIO_PCF8575_BASE + 14)
+-
+-/* Dummy supplies, where voltage doesn't matter */
+-static struct regulator_consumer_supply dummy_supplies[] = {
+-	REGULATOR_SUPPLY("vddvario", "smsc911x.0"),
+-	REGULATOR_SUPPLY("vdd33a", "smsc911x.0"),
+-};
 -
 -/*
-- * DipSwitch
-- *
-- *                    SW1
-- *
-- * -12345678-+---------------+----------------------------
-- *  1        | boot          | hermit
-- *  0        | boot          | OS auto boot
-- * -12345678-+---------------+----------------------------
-- *   00      | boot device   | eMMC
-- *   10      | boot device   | SDHI0 (CON7)
-- *   01      | boot device   | -
-- *   11      | boot device   | Extension Buss (CS0)
-- * -12345678-+---------------+----------------------------
-- *     0     | Extension Bus | D8-D15 disable, eMMC enable
-- *     1     | Extension Bus | D8-D15 enable,  eMMC disable
-- * -12345678-+---------------+----------------------------
-- *      0    | SDHI1         | COM8 disable, COM14 enable
-- *      1    | SDHI1         | COM8 enable,  COM14 disable
-- * -12345678-+---------------+----------------------------
-- *       0   | USB0          | COM20 enable,  COM24 disable
-- *       1   | USB0          | COM20 disable, COM24 enable
-- * -12345678-+---------------+----------------------------
-- *        00 | JTAG          | SH-X2
-- *        10 | JTAG          | ARM
-- *        01 | JTAG          | -
-- *        11 | JTAG          | Boundary Scan
-- *-----------+---------------+----------------------------
-- */
--
--/*
-- * FSI-WM8978
+- * FSI-AK4648
 - *
 - * this command is required when playback.
 - *
-- * # amixer set "Headphone" 50
-- *
-- * this command is required when capture.
-- *
-- * # amixer set "Input PGA" 15
-- * # amixer set "Left Input Mixer MicP" on
-- * # amixer set "Left Input Mixer MicN" on
-- * # amixer set "Right Input Mixer MicN" on
-- * # amixer set "Right Input Mixer MicP" on
+- * # amixer set "LINEOUT Mixer DACL" on
 - */
 -
--/*
-- * USB function
-- *
-- * When you use USB Function,
-- * set SW1.6 ON, and connect cable to CN24.
-- *
-- * USBF needs workaround on R8A7740 chip.
-- * These are a little bit complex.
-- * see
-- *	usbhsf_power_ctrl()
-- */
--#define IRQ7		irq_pin(7)
--#define USBCR1		IOMEM(0xe605810a)
--#define USBH		0xC6700000
--#define USBH_USBCTR	0x10834
+-/* SMSC 9221 */
+-static struct resource smsc9221_resources[] = {
+-	[0] = {
+-		.start	= 0x10000000, /* CS4 */
+-		.end	= 0x100000ff,
+-		.flags	= IORESOURCE_MEM,
+-	},
+-	[1] = {
+-		.start	= irq_pin(3), /* IRQ3 */
+-		.flags	= IORESOURCE_IRQ,
+-	},
+-};
 -
--struct usbhsf_private {
--	struct clk *phy;
--	struct clk *usb24;
--	struct clk *pci;
--	struct clk *func;
--	struct clk *host;
--	void __iomem *usbh_base;
+-static struct smsc911x_platform_config smsc9221_platdata = {
+-	.flags		= SMSC911X_USE_32BIT | SMSC911X_SAVE_MAC_ADDRESS,
+-	.phy_interface	= PHY_INTERFACE_MODE_MII,
+-	.irq_polarity	= SMSC911X_IRQ_POLARITY_ACTIVE_LOW,
+-	.irq_type	= SMSC911X_IRQ_TYPE_PUSH_PULL,
+-};
+-
+-static struct platform_device smsc_device = {
+-	.name		= "smsc911x",
+-	.dev  = {
+-		.platform_data = &smsc9221_platdata,
+-	},
+-	.resource	= smsc9221_resources,
+-	.num_resources	= ARRAY_SIZE(smsc9221_resources),
+-};
+-
+-/* USB external chip */
+-static struct r8a66597_platdata usb_host_data = {
+-	.on_chip	= 0,
+-	.xtal		= R8A66597_PLATDATA_XTAL_48MHZ,
+-};
+-
+-static struct resource usb_resources[] = {
+-	[0] = {
+-		.start	= 0x10010000,
+-		.end	= 0x1001ffff - 1,
+-		.flags	= IORESOURCE_MEM,
+-	},
+-	[1] = {
+-		.start	= irq_pin(1), /* IRQ1 */
+-		.flags	= IORESOURCE_IRQ,
+-	},
+-};
+-
+-static struct platform_device usb_host_device = {
+-	.name	= "r8a66597_hcd",
+-	.dev = {
+-		.platform_data		= &usb_host_data,
+-		.dma_mask		= NULL,
+-		.coherent_dma_mask	= 0xffffffff,
+-	},
+-	.num_resources	= ARRAY_SIZE(usb_resources),
+-	.resource	= usb_resources,
+-};
+-
+-/* USB Func CN17 */
+-struct usbhs_private {
+-	void __iomem *phy;
+-	void __iomem *cr2;
 -	struct renesas_usbhs_platform_info info;
 -};
 -
--#define usbhsf_get_priv(pdev)				\
--	container_of(renesas_usbhs_get_info(pdev),	\
--		     struct usbhsf_private, info)
+-#define IRQ15			irq_pin(15)
+-#define USB_PHY_MODE		(1 << 4)
+-#define USB_PHY_INT_EN		((1 << 3) | (1 << 2))
+-#define USB_PHY_ON		(1 << 1)
+-#define USB_PHY_OFF		(1 << 0)
+-#define USB_PHY_INT_CLR		(USB_PHY_ON | USB_PHY_OFF)
 -
--static int usbhsf_get_id(struct platform_device *pdev)
+-#define usbhs_get_priv(pdev) \
+-	container_of(renesas_usbhs_get_info(pdev), struct usbhs_private, info)
+-
+-static int usbhs_get_vbus(struct platform_device *pdev)
+-{
+-	struct usbhs_private *priv = usbhs_get_priv(pdev);
+-
+-	return !((1 << 7) & __raw_readw(priv->cr2));
+-}
+-
+-static int usbhs_phy_reset(struct platform_device *pdev)
+-{
+-	struct usbhs_private *priv = usbhs_get_priv(pdev);
+-
+-	/* init phy */
+-	__raw_writew(0x8a0a, priv->cr2);
+-
+-	return 0;
+-}
+-
+-static int usbhs_get_id(struct platform_device *pdev)
 -{
 -	return USBHS_GADGET;
 -}
 -
--static int usbhsf_power_ctrl(struct platform_device *pdev,
--			      void __iomem *base, int enable)
--{
--	struct usbhsf_private *priv = usbhsf_get_priv(pdev);
--
--	/*
--	 * Work around for USB Function.
--	 * It needs USB host clock, and settings
--	 */
--	if (enable) {
--		/*
--		 * enable all the related usb clocks
--		 * for usb workaround
--		 */
--		clk_enable(priv->usb24);
--		clk_enable(priv->pci);
--		clk_enable(priv->host);
--		clk_enable(priv->func);
--		clk_enable(priv->phy);
--
--		/*
--		 * set USBCR1
--		 *
--		 * Port1 is driven by USB function,
--		 * Port2 is driven by USB HOST
--		 * One HOST (Port1 or Port2 is HOST)
--		 * USB PLL input clock = 24MHz
--		 */
--		__raw_writew(0xd750, USBCR1);
--		mdelay(1);
--
--		/*
--		 * start USB Host
--		 */
--		__raw_writel(0x0000000c, priv->usbh_base + USBH_USBCTR);
--		__raw_writel(0x00000008, priv->usbh_base + USBH_USBCTR);
--		mdelay(10);
--
--		/*
--		 * USB PHY Power ON
--		 */
--		__raw_writew(0xd770, USBCR1);
--		__raw_writew(0x4000, base + 0x102); /* USBF :: SUSPMODE */
--
--	} else {
--		__raw_writel(0x0000010f, priv->usbh_base + USBH_USBCTR);
--		__raw_writew(0xd7c0, USBCR1); /* GPIO */
--
--		clk_disable(priv->phy);
--		clk_disable(priv->func);	/* usb work around */
--		clk_disable(priv->host);	/* usb work around */
--		clk_disable(priv->pci);		/* usb work around */
--		clk_disable(priv->usb24);	/* usb work around */
--	}
--
--	return 0;
--}
--
--static int usbhsf_get_vbus(struct platform_device *pdev)
--{
--	return gpio_get_value(209);
--}
--
--static irqreturn_t usbhsf_interrupt(int irq, void *data)
+-static irqreturn_t usbhs_interrupt(int irq, void *data)
 -{
 -	struct platform_device *pdev = data;
+-	struct usbhs_private *priv = usbhs_get_priv(pdev);
 -
 -	renesas_usbhs_call_notify_hotplug(pdev);
+-
+-	/* clear status */
+-	__raw_writew(__raw_readw(priv->phy) | USB_PHY_INT_CLR, priv->phy);
 -
 -	return IRQ_HANDLED;
 -}
 -
--static int usbhsf_hardware_exit(struct platform_device *pdev)
+-static int usbhs_hardware_init(struct platform_device *pdev)
 -{
--	struct usbhsf_private *priv = usbhsf_get_priv(pdev);
--
--	if (!IS_ERR(priv->phy))
--		clk_put(priv->phy);
--	if (!IS_ERR(priv->usb24))
--		clk_put(priv->usb24);
--	if (!IS_ERR(priv->pci))
--		clk_put(priv->pci);
--	if (!IS_ERR(priv->host))
--		clk_put(priv->host);
--	if (!IS_ERR(priv->func))
--		clk_put(priv->func);
--	if (priv->usbh_base)
--		iounmap(priv->usbh_base);
--
--	priv->phy	= NULL;
--	priv->usb24	= NULL;
--	priv->pci	= NULL;
--	priv->host	= NULL;
--	priv->func	= NULL;
--	priv->usbh_base	= NULL;
--
--	free_irq(IRQ7, pdev);
--
--	return 0;
--}
--
--static int usbhsf_hardware_init(struct platform_device *pdev)
--{
--	struct usbhsf_private *priv = usbhsf_get_priv(pdev);
+-	struct usbhs_private *priv = usbhs_get_priv(pdev);
 -	int ret;
 -
--	priv->phy	= clk_get(&pdev->dev, "phy");
--	priv->usb24	= clk_get(&pdev->dev, "usb24");
--	priv->pci	= clk_get(&pdev->dev, "pci");
--	priv->func	= clk_get(&pdev->dev, "func");
--	priv->host	= clk_get(&pdev->dev, "host");
--	priv->usbh_base	= ioremap_nocache(USBH, 0x20000);
+-	/* clear interrupt status */
+-	__raw_writew(USB_PHY_MODE | USB_PHY_INT_CLR, priv->phy);
 -
--	if (IS_ERR(priv->phy)		||
--	    IS_ERR(priv->usb24)		||
--	    IS_ERR(priv->pci)		||
--	    IS_ERR(priv->host)		||
--	    IS_ERR(priv->func)		||
--	    !priv->usbh_base) {
--		dev_err(&pdev->dev, "USB clock setting failed\n");
--		usbhsf_hardware_exit(pdev);
--		return -EIO;
--	}
--
--	ret = request_irq(IRQ7, usbhsf_interrupt, IRQF_TRIGGER_NONE,
+-	ret = request_irq(IRQ15, usbhs_interrupt, IRQF_TRIGGER_HIGH,
 -			  dev_name(&pdev->dev), pdev);
 -	if (ret) {
 -		dev_err(&pdev->dev, "request_irq err\n");
 -		return ret;
 -	}
--	irq_set_irq_type(IRQ7, IRQ_TYPE_EDGE_BOTH);
 -
--	/* usb24 use 1/1 of parent clock (= usb24s = 24MHz) */
--	clk_set_rate(priv->usb24,
--		     clk_get_rate(clk_get_parent(priv->usb24)));
+-	/* enable USB phy interrupt */
+-	__raw_writew(USB_PHY_MODE | USB_PHY_INT_EN, priv->phy);
 -
 -	return 0;
 -}
 -
--static struct usbhsf_private usbhsf_private = {
+-static int usbhs_hardware_exit(struct platform_device *pdev)
+-{
+-	struct usbhs_private *priv = usbhs_get_priv(pdev);
+-
+-	/* clear interrupt status */
+-	__raw_writew(USB_PHY_MODE | USB_PHY_INT_CLR, priv->phy);
+-
+-	free_irq(IRQ15, pdev);
+-
+-	return 0;
+-}
+-
+-static u32 usbhs_pipe_cfg[] = {
+-	USB_ENDPOINT_XFER_CONTROL,
+-	USB_ENDPOINT_XFER_ISOC,
+-	USB_ENDPOINT_XFER_ISOC,
+-	USB_ENDPOINT_XFER_BULK,
+-	USB_ENDPOINT_XFER_BULK,
+-	USB_ENDPOINT_XFER_BULK,
+-	USB_ENDPOINT_XFER_INT,
+-	USB_ENDPOINT_XFER_INT,
+-	USB_ENDPOINT_XFER_INT,
+-	USB_ENDPOINT_XFER_BULK,
+-	USB_ENDPOINT_XFER_BULK,
+-	USB_ENDPOINT_XFER_BULK,
+-	USB_ENDPOINT_XFER_BULK,
+-	USB_ENDPOINT_XFER_BULK,
+-	USB_ENDPOINT_XFER_BULK,
+-	USB_ENDPOINT_XFER_BULK,
+-};
+-
+-static struct usbhs_private usbhs_private = {
+-	.phy	= IOMEM(0xe60781e0),		/* USBPHYINT */
+-	.cr2	= IOMEM(0xe605810c),		/* USBCR2 */
 -	.info = {
 -		.platform_callback = {
--			.get_id		= usbhsf_get_id,
--			.get_vbus	= usbhsf_get_vbus,
--			.hardware_init	= usbhsf_hardware_init,
--			.hardware_exit	= usbhsf_hardware_exit,
--			.power_ctrl	= usbhsf_power_ctrl,
+-			.hardware_init	= usbhs_hardware_init,
+-			.hardware_exit	= usbhs_hardware_exit,
+-			.get_id		= usbhs_get_id,
+-			.phy_reset	= usbhs_phy_reset,
+-			.get_vbus	= usbhs_get_vbus,
 -		},
 -		.driver_param = {
--			.buswait_bwait		= 5,
--			.detection_delay	= 5,
--			.d0_rx_id	= SHDMA_SLAVE_USBHS_RX,
--			.d1_tx_id	= SHDMA_SLAVE_USBHS_TX,
+-			.buswait_bwait	= 4,
+-			.has_otg	= 1,
+-			.pipe_type	= usbhs_pipe_cfg,
+-			.pipe_size	= ARRAY_SIZE(usbhs_pipe_cfg),
 -		},
--	}
--};
--
--static struct resource usbhsf_resources[] = {
--	{
--		.name	= "USBHS",
--		.start	= 0xe6890000,
--		.end	= 0xe6890104 - 1,
--		.flags	= IORESOURCE_MEM,
--	},
--	{
--		.start	= gic_spi(51),
--		.flags	= IORESOURCE_IRQ,
 -	},
 -};
 -
--static struct platform_device usbhsf_device = {
--	.name	= "renesas_usbhs",
--	.dev = {
--		.platform_data = &usbhsf_private.info,
--	},
--	.id = -1,
--	.num_resources	= ARRAY_SIZE(usbhsf_resources),
--	.resource	= usbhsf_resources,
--};
--
--/* Ether */
--static struct sh_eth_plat_data sh_eth_platdata = {
--	.phy			= 0x00, /* LAN8710A */
--	.edmac_endian		= EDMAC_LITTLE_ENDIAN,
--	.phy_interface		= PHY_INTERFACE_MODE_MII,
--};
--
--static struct resource sh_eth_resources[] = {
--	{
--		.start	= 0xe9a00000,
--		.end	= 0xe9a00800 - 1,
--		.flags	= IORESOURCE_MEM,
--	}, {
--		.start	= 0xe9a01800,
--		.end	= 0xe9a02000 - 1,
--		.flags	= IORESOURCE_MEM,
--	}, {
--		.start	= gic_spi(110),
--		.flags	= IORESOURCE_IRQ,
--	},
--};
--
--static struct platform_device sh_eth_device = {
--	.name = "r8a7740-gether",
--	.id = -1,
--	.dev = {
--		.platform_data = &sh_eth_platdata,
--		.dma_mask = &sh_eth_device.dev.coherent_dma_mask,
--		.coherent_dma_mask = DMA_BIT_MASK(32),
--	},
--	.resource = sh_eth_resources,
--	.num_resources = ARRAY_SIZE(sh_eth_resources),
--};
--
--/* PWM */
--static struct resource pwm_resources[] = {
+-static struct resource usbhs_resources[] = {
 -	[0] = {
--		.start = 0xe6600000,
--		.end = 0xe66000ff,
--		.flags = IORESOURCE_MEM,
+-		.start	= 0xE6890000,
+-		.end	= 0xE68900e6 - 1,
+-		.flags	= IORESOURCE_MEM,
+-	},
+-	[1] = {
+-		.start	= gic_spi(62),
+-		.end	= gic_spi(62),
+-		.flags	= IORESOURCE_IRQ,
 -	},
 -};
 -
--static struct platform_device pwm_device = {
--	.name = "renesas-tpu-pwm",
--	.id = -1,
--	.num_resources = ARRAY_SIZE(pwm_resources),
--	.resource = pwm_resources,
--};
--
--static struct pwm_lookup pwm_lookup[] = {
--	PWM_LOOKUP("renesas-tpu-pwm", 2, "pwm-backlight.0", NULL,
--		   33333, PWM_POLARITY_INVERSED),
--};
--
--/* LCDC and backlight */
--static struct platform_pwm_backlight_data pwm_backlight_data = {
--	.lth_brightness = 50,
--	.max_brightness = 255,
--	.dft_brightness = 255,
--	.pwm_period_ns = 33333, /* 30kHz */
--	.enable_gpio = 61,
--};
--
--static struct platform_device pwm_backlight_device = {
--	.name = "pwm-backlight",
+-static struct platform_device usbhs_device = {
+-	.name	= "renesas_usbhs",
+-	.id	= -1,
 -	.dev = {
--		.platform_data = &pwm_backlight_data,
+-		.dma_mask		= NULL,
+-		.coherent_dma_mask	= 0xffffffff,
+-		.platform_data		= &usbhs_private.info,
 -	},
+-	.num_resources	= ARRAY_SIZE(usbhs_resources),
+-	.resource	= usbhs_resources,
 -};
 -
--static struct fb_videomode lcdc0_mode = {
--	.name		= "AMPIER/AM-800480",
+-/* LCDC */
+-static struct fb_videomode kzm_lcdc_mode = {
+-	.name		= "WVGA Panel",
 -	.xres		= 800,
 -	.yres		= 480,
--	.left_margin	= 88,
--	.right_margin	= 40,
--	.hsync_len	= 128,
+-	.left_margin	= 220,
+-	.right_margin	= 110,
+-	.hsync_len	= 70,
 -	.upper_margin	= 20,
 -	.lower_margin	= 5,
 -	.vsync_len	= 5,
 -	.sync		= 0,
 -};
 -
--static struct sh_mobile_lcdc_info lcdc0_info = {
--	.clock_source	= LCDC_CLK_BUS,
+-static struct sh_mobile_lcdc_info lcdc_info = {
+-	.clock_source = LCDC_CLK_BUS,
 -	.ch[0] = {
 -		.chan		= LCDC_CHAN_MAINLCD,
 -		.fourcc		= V4L2_PIX_FMT_RGB565,
 -		.interface_type	= RGB24,
+-		.lcd_modes	= &kzm_lcdc_mode,
+-		.num_modes	= 1,
 -		.clock_divider	= 5,
 -		.flags		= 0,
--		.lcd_modes	= &lcdc0_mode,
--		.num_modes	= 1,
 -		.panel_cfg = {
--			.width	= 111,
--			.height = 68,
+-			.width	= 152,
+-			.height	= 91,
 -		},
--	},
+-	}
 -};
 -
--static struct resource lcdc0_resources[] = {
+-static struct resource lcdc_resources[] = {
 -	[0] = {
--		.name	= "LCD0",
+-		.name	= "LCDC",
 -		.start	= 0xfe940000,
 -		.end	= 0xfe943fff,
 -		.flags	= IORESOURCE_MEM,
 -	},
 -	[1] = {
--		.start	= gic_spi(177),
+-		.start	= intcs_evt2irq(0x580),
 -		.flags	= IORESOURCE_IRQ,
 -	},
 -};
 -
--static struct platform_device lcdc0_device = {
+-static struct platform_device lcdc_device = {
 -	.name		= "sh_mobile_lcdc_fb",
--	.num_resources	= ARRAY_SIZE(lcdc0_resources),
--	.resource	= lcdc0_resources,
--	.id		= 0,
+-	.num_resources	= ARRAY_SIZE(lcdc_resources),
+-	.resource	= lcdc_resources,
 -	.dev	= {
--		.platform_data	= &lcdc0_info,
+-		.platform_data	= &lcdc_info,
 -		.coherent_dma_mask = DMA_BIT_MASK(32),
 -	},
 -};
 -
--/*
-- * LCDC1/HDMI
-- */
--static struct sh_mobile_hdmi_info hdmi_info = {
--	.flags		= HDMI_OUTPUT_PUSH_PULL |
--			  HDMI_OUTPUT_POLARITY_HI |
--			  HDMI_32BIT_REG |
--			  HDMI_HAS_HTOP1 |
--			  HDMI_SND_SRC_SPDIF,
+-/* Fixed 1.8V regulator to be used by MMCIF */
+-static struct regulator_consumer_supply fixed1v8_power_consumers[] =
+-{
+-	REGULATOR_SUPPLY("vmmc", "sh_mmcif.0"),
+-	REGULATOR_SUPPLY("vqmmc", "sh_mmcif.0"),
 -};
 -
--static struct resource hdmi_resources[] = {
+-/* MMCIF */
+-static struct resource sh_mmcif_resources[] = {
 -	[0] = {
--		.name	= "HDMI",
--		.start	= 0xe6be0000,
--		.end	= 0xe6be03ff,
+-		.name	= "MMCIF",
+-		.start	= 0xe6bd0000,
+-		.end	= 0xe6bd00ff,
 -		.flags	= IORESOURCE_MEM,
 -	},
 -	[1] = {
--		.start	= gic_spi(131),
+-		.start	= gic_spi(140),
 -		.flags	= IORESOURCE_IRQ,
 -	},
 -	[2] = {
--		.name	= "HDMI emma3pf",
--		.start	= 0xe6be4000,
--		.end	= 0xe6be43ff,
--		.flags	= IORESOURCE_MEM,
--	},
--};
--
--static struct platform_device hdmi_device = {
--	.name		= "sh-mobile-hdmi",
--	.num_resources	= ARRAY_SIZE(hdmi_resources),
--	.resource	= hdmi_resources,
--	.id             = -1,
--	.dev	= {
--		.platform_data	= &hdmi_info,
--	},
--};
--
--static const struct fb_videomode lcdc1_mode = {
--	.name		= "HDMI 720p",
--	.xres		= 1280,
--	.yres		= 720,
--	.pixclock	= 13468,
--	.left_margin	= 220,
--	.right_margin	= 110,
--	.hsync_len	= 40,
--	.upper_margin	= 20,
--	.lower_margin	= 5,
--	.vsync_len	= 5,
--	.refresh	= 60,
--	.sync		= FB_SYNC_VERT_HIGH_ACT | FB_SYNC_HOR_HIGH_ACT,
--};
--
--static struct sh_mobile_lcdc_info hdmi_lcdc_info = {
--	.clock_source	= LCDC_CLK_PERIPHERAL, /* HDMI clock */
--	.ch[0] = {
--		.chan			= LCDC_CHAN_MAINLCD,
--		.fourcc			= V4L2_PIX_FMT_RGB565,
--		.interface_type		= RGB24,
--		.clock_divider		= 1,
--		.flags			= LCDC_FLAGS_DWPOL,
--		.lcd_modes		= &lcdc1_mode,
--		.num_modes		= 1,
--		.tx_dev			= &hdmi_device,
--		.panel_cfg = {
--			.width	= 1280,
--			.height = 720,
--		},
--	},
--};
--
--static struct resource hdmi_lcdc_resources[] = {
--	[0] = {
--		.name	= "LCDC1",
--		.start	= 0xfe944000,
--		.end	= 0xfe948000 - 1,
--		.flags	= IORESOURCE_MEM,
--	},
--	[1] = {
--		.start	= gic_spi(178),
+-		.start	= gic_spi(141),
 -		.flags	= IORESOURCE_IRQ,
 -	},
 -};
 -
--static struct platform_device hdmi_lcdc_device = {
--	.name		= "sh_mobile_lcdc_fb",
--	.num_resources	= ARRAY_SIZE(hdmi_lcdc_resources),
--	.resource	= hdmi_lcdc_resources,
--	.id		= 1,
--	.dev	= {
--		.platform_data	= &hdmi_lcdc_info,
--		.coherent_dma_mask = DMA_BIT_MASK(32),
+-static struct sh_mmcif_plat_data sh_mmcif_platdata = {
+-	.ocr		= MMC_VDD_165_195,
+-	.caps		= MMC_CAP_8_BIT_DATA | MMC_CAP_NONREMOVABLE,
+-	.ccs_unsupported = true,
+-	.slave_id_tx	= SHDMA_SLAVE_MMCIF_TX,
+-	.slave_id_rx	= SHDMA_SLAVE_MMCIF_RX,
+-};
+-
+-static struct platform_device mmc_device = {
+-	.name		= "sh_mmcif",
+-	.dev		= {
+-		.dma_mask		= NULL,
+-		.coherent_dma_mask	= 0xffffffff,
+-		.platform_data		= &sh_mmcif_platdata,
 -	},
+-	.num_resources	= ARRAY_SIZE(sh_mmcif_resources),
+-	.resource	= sh_mmcif_resources,
 -};
 -
--/* LEDS */
--static struct gpio_led gpio_leds[] = {
--	{
--		.name		= "LED3",
--		.gpio		= 102,
--		.default_state	= LEDS_GPIO_DEFSTATE_ON,
--	}, {
--		.name		= "LED4",
--		.gpio		= 111,
--		.default_state	= LEDS_GPIO_DEFSTATE_ON,
--	}, {
--		.name		= "LED5",
--		.gpio		= 110,
--		.default_state	= LEDS_GPIO_DEFSTATE_ON,
--	}, {
--		.name		= "LED6",
--		.gpio		= 177,
--		.default_state	= LEDS_GPIO_DEFSTATE_ON,
--	},
--};
--
--static struct gpio_led_platform_data leds_gpio_info = {
--	.leds		= gpio_leds,
--	.num_leds	= ARRAY_SIZE(gpio_leds),
--};
--
--static struct platform_device leds_gpio_device = {
--	.name   = "leds-gpio",
--	.id     = -1,
--	.dev    = {
--		.platform_data  = &leds_gpio_info,
--	},
--};
--
--/* GPIO KEY */
--#define GPIO_KEY(c, g, d, ...) \
--	{ .code = c, .gpio = g, .desc = d, .active_low = 1, __VA_ARGS__ }
--
--static struct gpio_keys_button gpio_buttons[] = {
--	GPIO_KEY(KEY_POWER,	99,	"SW3", .wakeup = 1),
--	GPIO_KEY(KEY_BACK,	100,	"SW4"),
--	GPIO_KEY(KEY_MENU,	97,	"SW5"),
--	GPIO_KEY(KEY_HOME,	98,	"SW6"),
--};
--
--static struct gpio_keys_platform_data gpio_key_info = {
--	.buttons	= gpio_buttons,
--	.nbuttons	= ARRAY_SIZE(gpio_buttons),
--};
--
--static struct platform_device gpio_keys_device = {
--	.name   = "gpio-keys",
--	.id     = -1,
--	.dev    = {
--		.platform_data  = &gpio_key_info,
--	},
--};
--
--/* Fixed 3.3V regulator to be used by SDHI1, MMCIF */
--static struct regulator_consumer_supply fixed3v3_power_consumers[] = {
--	REGULATOR_SUPPLY("vmmc", "sh_mmcif"),
--	REGULATOR_SUPPLY("vqmmc", "sh_mmcif"),
--};
--
--/* Fixed 3.3V regulator used by LCD backlight */
--static struct regulator_consumer_supply fixed5v0_power_consumers[] = {
--	REGULATOR_SUPPLY("power", "pwm-backlight.0"),
--};
--
--/* Fixed 3.3V regulator to be used by SDHI0 */
--static struct regulator_consumer_supply vcc_sdhi0_consumers[] = {
+-/* Fixed 3.3V regulators to be used by SDHI0 */
+-static struct regulator_consumer_supply vcc_sdhi0_consumers[] =
+-{
 -	REGULATOR_SUPPLY("vmmc", "sh_mobile_sdhi.0"),
 -};
 -
@@ -739,339 +480,177 @@ index bf37e3c532f661a6..0000000000000000
 -static struct fixed_voltage_config vcc_sdhi0_info = {
 -	.supply_name = "SDHI0 Vcc",
 -	.microvolts = 3300000,
--	.gpio = 75,
+-	.gpio = 15,
 -	.enable_high = 1,
 -	.init_data = &vcc_sdhi0_init_data,
 -};
 -
 -static struct platform_device vcc_sdhi0 = {
 -	.name = "reg-fixed-voltage",
--	.id   = 1,
+-	.id   = 0,
 -	.dev  = {
 -		.platform_data = &vcc_sdhi0_info,
 -	},
 -};
 -
--/* 1.8 / 3.3V SDHI0 VccQ regulator */
--static struct regulator_consumer_supply vccq_sdhi0_consumers[] = {
--	REGULATOR_SUPPLY("vqmmc", "sh_mobile_sdhi.0"),
+-/* Fixed 3.3V regulators to be used by SDHI2 */
+-static struct regulator_consumer_supply vcc_sdhi2_consumers[] =
+-{
+-	REGULATOR_SUPPLY("vmmc", "sh_mobile_sdhi.2"),
 -};
 -
--static struct regulator_init_data vccq_sdhi0_init_data = {
--	.constraints = {
--		.input_uV	= 3300000,
--		.min_uV		= 1800000,
--		.max_uV         = 3300000,
--		.valid_ops_mask = REGULATOR_CHANGE_VOLTAGE |
--				  REGULATOR_CHANGE_STATUS,
--	},
--	.num_consumer_supplies  = ARRAY_SIZE(vccq_sdhi0_consumers),
--	.consumer_supplies      = vccq_sdhi0_consumers,
--};
--
--static struct gpio vccq_sdhi0_gpios[] = {
--	{17, GPIOF_OUT_INIT_LOW, "vccq-sdhi0" },
--};
--
--static struct gpio_regulator_state vccq_sdhi0_states[] = {
--	{ .value = 3300000, .gpios = (0 << 0) },
--	{ .value = 1800000, .gpios = (1 << 0) },
--};
--
--static struct gpio_regulator_config vccq_sdhi0_info = {
--	.supply_name = "vqmmc",
--
--	.enable_gpio = 74,
--	.enable_high = 1,
--	.enabled_at_boot = 0,
--
--	.gpios = vccq_sdhi0_gpios,
--	.nr_gpios = ARRAY_SIZE(vccq_sdhi0_gpios),
--
--	.states = vccq_sdhi0_states,
--	.nr_states = ARRAY_SIZE(vccq_sdhi0_states),
--
--	.type = REGULATOR_VOLTAGE,
--	.init_data = &vccq_sdhi0_init_data,
--};
--
--static struct platform_device vccq_sdhi0 = {
--	.name = "gpio-regulator",
--	.id   = -1,
--	.dev  = {
--		.platform_data = &vccq_sdhi0_info,
--	},
--};
--
--/* Fixed 3.3V regulator to be used by SDHI1 */
--static struct regulator_consumer_supply vcc_sdhi1_consumers[] = {
--	REGULATOR_SUPPLY("vmmc", "sh_mobile_sdhi.1"),
--};
--
--static struct regulator_init_data vcc_sdhi1_init_data = {
+-static struct regulator_init_data vcc_sdhi2_init_data = {
 -	.constraints = {
 -		.valid_ops_mask = REGULATOR_CHANGE_STATUS,
 -	},
--	.num_consumer_supplies  = ARRAY_SIZE(vcc_sdhi1_consumers),
--	.consumer_supplies      = vcc_sdhi1_consumers,
+-	.num_consumer_supplies  = ARRAY_SIZE(vcc_sdhi2_consumers),
+-	.consumer_supplies      = vcc_sdhi2_consumers,
 -};
 -
--static struct fixed_voltage_config vcc_sdhi1_info = {
--	.supply_name = "SDHI1 Vcc",
+-static struct fixed_voltage_config vcc_sdhi2_info = {
+-	.supply_name = "SDHI2 Vcc",
 -	.microvolts = 3300000,
--	.gpio = 16,
+-	.gpio = 14,
 -	.enable_high = 1,
--	.init_data = &vcc_sdhi1_init_data,
+-	.init_data = &vcc_sdhi2_init_data,
 -};
 -
--static struct platform_device vcc_sdhi1 = {
+-static struct platform_device vcc_sdhi2 = {
 -	.name = "reg-fixed-voltage",
--	.id   = 2,
+-	.id   = 1,
 -	.dev  = {
--		.platform_data = &vcc_sdhi1_info,
+-		.platform_data = &vcc_sdhi2_info,
 -	},
 -};
 -
--/* SDHI0 */
+-/* SDHI */
 -static struct tmio_mmc_data sdhi0_info = {
 -	.chan_priv_tx	= (void *)SHDMA_SLAVE_SDHI0_TX,
 -	.chan_priv_rx	= (void *)SHDMA_SLAVE_SDHI0_RX,
+-	.flags		= TMIO_MMC_HAS_IDLE_WAIT,
 -	.capabilities	= MMC_CAP_SD_HIGHSPEED | MMC_CAP_SDIO_IRQ |
 -			  MMC_CAP_POWER_OFF_CARD,
--	.flags		= TMIO_MMC_HAS_IDLE_WAIT | TMIO_MMC_USE_GPIO_CD,
--	.cd_gpio	= 167,
 -};
 -
 -static struct resource sdhi0_resources[] = {
--	{
+-	[0] = {
 -		.name	= "SDHI0",
--		.start	= 0xe6850000,
--		.end	= 0xe6850100 - 1,
+-		.start	= 0xee100000,
+-		.end	= 0xee1000ff,
 -		.flags	= IORESOURCE_MEM,
 -	},
--	/*
--	 * no SH_MOBILE_SDHI_IRQ_CARD_DETECT here
--	 */
--	{
--		.name	= SH_MOBILE_SDHI_IRQ_SDCARD,
--		.start	= gic_spi(118),
+-	[1] = {
+-		.name	= SH_MOBILE_SDHI_IRQ_CARD_DETECT,
+-		.start	= gic_spi(83),
 -		.flags	= IORESOURCE_IRQ,
 -	},
--	{
+-	[2] = {
+-		.name	= SH_MOBILE_SDHI_IRQ_SDCARD,
+-		.start	= gic_spi(84),
+-		.flags	= IORESOURCE_IRQ,
+-	},
+-	[3] = {
 -		.name	= SH_MOBILE_SDHI_IRQ_SDIO,
--		.start	= gic_spi(119),
+-		.start	= gic_spi(85),
 -		.flags	= IORESOURCE_IRQ,
 -	},
 -};
 -
 -static struct platform_device sdhi0_device = {
 -	.name		= "sh_mobile_sdhi",
--	.id		= 0,
--	.dev		= {
--		.platform_data	= &sdhi0_info,
--	},
 -	.num_resources	= ARRAY_SIZE(sdhi0_resources),
 -	.resource	= sdhi0_resources,
+-	.dev	= {
+-		.platform_data	= &sdhi0_info,
+-	},
 -};
 -
--/* SDHI1 */
--static struct tmio_mmc_data sdhi1_info = {
--	.chan_priv_tx	= (void *)SHDMA_SLAVE_SDHI1_TX,
--	.chan_priv_rx	= (void *)SHDMA_SLAVE_SDHI1_RX,
--	.capabilities	= MMC_CAP_SD_HIGHSPEED | MMC_CAP_SDIO_IRQ |
--			  MMC_CAP_POWER_OFF_CARD,
--	.flags		= TMIO_MMC_HAS_IDLE_WAIT | TMIO_MMC_USE_GPIO_CD,
--	/* Port72 cannot generate IRQs, will be used in polling mode. */
--	.cd_gpio	= 72,
+-/* Micro SD */
+-static struct tmio_mmc_data sdhi2_info = {
+-	.chan_priv_tx	= (void *)SHDMA_SLAVE_SDHI2_TX,
+-	.chan_priv_rx	= (void *)SHDMA_SLAVE_SDHI2_RX,
+-	.flags		= TMIO_MMC_HAS_IDLE_WAIT |
+-			  TMIO_MMC_USE_GPIO_CD |
+-			  TMIO_MMC_WRPROTECT_DISABLE,
+-	.capabilities	= MMC_CAP_SD_HIGHSPEED | MMC_CAP_POWER_OFF_CARD,
+-	.cd_gpio	= 13,
 -};
 -
--static struct resource sdhi1_resources[] = {
+-static struct resource sdhi2_resources[] = {
 -	[0] = {
--		.name	= "SDHI1",
--		.start	= 0xe6860000,
--		.end	= 0xe6860100 - 1,
+-		.name	= "SDHI2",
+-		.start	= 0xee140000,
+-		.end	= 0xee1400ff,
 -		.flags	= IORESOURCE_MEM,
 -	},
 -	[1] = {
--		.start	= gic_spi(121),
+-		.name	= SH_MOBILE_SDHI_IRQ_CARD_DETECT,
+-		.start	= gic_spi(103),
 -		.flags	= IORESOURCE_IRQ,
 -	},
 -	[2] = {
--		.start	= gic_spi(122),
+-		.name	= SH_MOBILE_SDHI_IRQ_SDCARD,
+-		.start	= gic_spi(104),
 -		.flags	= IORESOURCE_IRQ,
 -	},
 -	[3] = {
--		.start	= gic_spi(123),
+-		.name	= SH_MOBILE_SDHI_IRQ_SDIO,
+-		.start	= gic_spi(105),
 -		.flags	= IORESOURCE_IRQ,
 -	},
 -};
 -
--static struct platform_device sdhi1_device = {
+-static struct platform_device sdhi2_device = {
 -	.name		= "sh_mobile_sdhi",
--	.id		= 1,
--	.dev		= {
--		.platform_data	= &sdhi1_info,
--	},
--	.num_resources	= ARRAY_SIZE(sdhi1_resources),
--	.resource	= sdhi1_resources,
--};
--
--static const struct pinctrl_map eva_sdhi1_pinctrl_map[] = {
--	PIN_MAP_MUX_GROUP_DEFAULT("sh_mobile_sdhi.1", "pfc-r8a7740",
--				  "sdhi1_data4", "sdhi1"),
--	PIN_MAP_MUX_GROUP_DEFAULT("sh_mobile_sdhi.1", "pfc-r8a7740",
--				  "sdhi1_ctrl", "sdhi1"),
--	PIN_MAP_MUX_GROUP_DEFAULT("sh_mobile_sdhi.1", "pfc-r8a7740",
--				  "sdhi1_cd", "sdhi1"),
--	PIN_MAP_MUX_GROUP_DEFAULT("sh_mobile_sdhi.1", "pfc-r8a7740",
--				  "sdhi1_wp", "sdhi1"),
--};
--
--/* MMCIF */
--static struct sh_mmcif_plat_data sh_mmcif_plat = {
--	.sup_pclk	= 0,
--	.caps		= MMC_CAP_4_BIT_DATA |
--			  MMC_CAP_8_BIT_DATA |
--			  MMC_CAP_NONREMOVABLE,
--	.ccs_unsupported = true,
--	.slave_id_tx	= SHDMA_SLAVE_MMCIF_TX,
--	.slave_id_rx	= SHDMA_SLAVE_MMCIF_RX,
--};
--
--static struct resource sh_mmcif_resources[] = {
--	[0] = {
--		.name	= "MMCIF",
--		.start	= 0xe6bd0000,
--		.end	= 0xe6bd0100 - 1,
--		.flags	= IORESOURCE_MEM,
--	},
--	[1] = {
--		/* MMC ERR */
--		.start	= gic_spi(56),
--		.flags	= IORESOURCE_IRQ,
--	},
--	[2] = {
--		/* MMC NOR */
--		.start	= gic_spi(57),
--		.flags	= IORESOURCE_IRQ,
--	},
--};
--
--static struct platform_device sh_mmcif_device = {
--	.name		= "sh_mmcif",
--	.id		= -1,
--	.dev		= {
--		.platform_data	= &sh_mmcif_plat,
--	},
--	.num_resources	= ARRAY_SIZE(sh_mmcif_resources),
--	.resource	= sh_mmcif_resources,
--};
--
--/* Camera */
--static int mt9t111_power(struct device *dev, int mode)
--{
--	struct clk *mclk = clk_get(NULL, "video1");
--
--	if (IS_ERR(mclk)) {
--		dev_err(dev, "can't get video1 clock\n");
--		return -EINVAL;
--	}
--
--	if (mode) {
--		/* video1 (= CON1 camera) expect 24MHz */
--		clk_set_rate(mclk, clk_round_rate(mclk, 24000000));
--		clk_enable(mclk);
--		gpio_set_value(158, 1);
--	} else {
--		gpio_set_value(158, 0);
--		clk_disable(mclk);
--	}
--
--	clk_put(mclk);
--
--	return 0;
--}
--
--static struct i2c_board_info i2c_camera_mt9t111 = {
--	I2C_BOARD_INFO("mt9t112", 0x3d),
--};
--
--static struct mt9t112_camera_info mt9t111_info = {
--	.divider = { 16, 0, 0, 7, 0, 10, 14, 7, 7 },
--};
--
--static struct soc_camera_link mt9t111_link = {
--	.i2c_adapter_id	= 0,
--	.bus_id		= 0,
--	.board_info	= &i2c_camera_mt9t111,
--	.power		= mt9t111_power,
--	.priv		= &mt9t111_info,
--};
--
--static struct platform_device camera_device = {
--	.name	= "soc-camera-pdrv",
--	.id	= 0,
+-	.id		= 2,
+-	.num_resources	= ARRAY_SIZE(sdhi2_resources),
+-	.resource	= sdhi2_resources,
 -	.dev	= {
--		.platform_data = &mt9t111_link,
+-		.platform_data	= &sdhi2_info,
 -	},
 -};
 -
--/* CEU0 */
--static struct sh_mobile_ceu_info sh_mobile_ceu0_info = {
--	.flags = SH_CEU_FLAG_LOWER_8BIT,
+-/* KEY */
+-#define GPIO_KEY(c, g, d) { .code = c, .gpio = g, .desc = d, .active_low = 1 }
+-
+-static struct gpio_keys_button gpio_buttons[] = {
+-	GPIO_KEY(KEY_BACK,	GPIO_PCF8575_PORT10,	"SW3"),
+-	GPIO_KEY(KEY_RIGHT,	GPIO_PCF8575_PORT11,	"SW2-R"),
+-	GPIO_KEY(KEY_LEFT,	GPIO_PCF8575_PORT12,	"SW2-L"),
+-	GPIO_KEY(KEY_ENTER,	GPIO_PCF8575_PORT13,	"SW2-P"),
+-	GPIO_KEY(KEY_UP,	GPIO_PCF8575_PORT14,	"SW2-U"),
+-	GPIO_KEY(KEY_DOWN,	GPIO_PCF8575_PORT15,	"SW2-D"),
+-	GPIO_KEY(KEY_HOME,	GPIO_PCF8575_PORT16,	"SW1"),
 -};
 -
--static struct resource ceu0_resources[] = {
--	[0] = {
--		.name	= "CEU",
--		.start	= 0xfe910000,
--		.end	= 0xfe91009f,
--		.flags	= IORESOURCE_MEM,
--	},
--	[1] = {
--		.start  = gic_spi(160),
--		.flags  = IORESOURCE_IRQ,
--	},
--	[2] = {
--		/* place holder for contiguous memory */
--	},
+-static struct gpio_keys_platform_data gpio_key_info = {
+-	.buttons	= gpio_buttons,
+-	.nbuttons	= ARRAY_SIZE(gpio_buttons),
 -};
 -
--static struct platform_device ceu0_device = {
--	.name		= "sh_mobile_ceu",
--	.id		= 0,
--	.num_resources	= ARRAY_SIZE(ceu0_resources),
--	.resource	= ceu0_resources,
+-static struct platform_device gpio_keys_device = {
+-	.name	= "gpio-keys",
 -	.dev	= {
--		.platform_data		= &sh_mobile_ceu0_info,
--		.coherent_dma_mask	= 0xffffffff,
+-		.platform_data  = &gpio_key_info,
 -	},
 -};
 -
--/* FSI */
+-/* FSI-AK4648 */
 -static struct sh_fsi_platform_info fsi_info = {
--	/* FSI-WM8978 */
 -	.port_a = {
--		.tx_id = SHDMA_SLAVE_FSIA_TX,
+-		.tx_id = SHDMA_SLAVE_FSI2A_TX,
 -	},
--	/* FSI-HDMI */
--	.port_b = {
--		.flags		= SH_FSI_FMT_SPDIF |
--				  SH_FSI_ENABLE_STREAM_MODE |
--				  SH_FSI_CLK_CPG,
--		.tx_id		= SHDMA_SLAVE_FSIB_TX,
--	}
 -};
 -
 -static struct resource fsi_resources[] = {
 -	[0] = {
 -		.name	= "FSI",
--		.start	= 0xfe1f0000,
--		.end	= 0xfe1f0400 - 1,
+-		.start	= 0xEC230000,
+-		.end	= 0xEC230400 - 1,
 -		.flags	= IORESOURCE_MEM,
 -	},
 -	[1] = {
--		.start  = gic_spi(9),
+-		.start  = gic_spi(146),
 -		.flags  = IORESOURCE_IRQ,
 -	},
 -};
@@ -1086,361 +665,1111 @@ index bf37e3c532f661a6..0000000000000000
 -	},
 -};
 -
--/* FSI-WM8978 */
--static struct asoc_simple_card_info fsi_wm8978_info = {
--	.name		= "wm8978",
--	.card		= "FSI2A-WM8978",
--	.codec		= "wm8978.0-001a",
+-static struct asoc_simple_card_info fsi2_ak4648_info = {
+-	.name		= "AK4648",
+-	.card		= "FSI2A-AK4648",
+-	.codec		= "ak4642-codec.0-0012",
 -	.platform	= "sh_fsi2",
--	.daifmt		= SND_SOC_DAIFMT_I2S | SND_SOC_DAIFMT_CBM_CFM,
+-	.daifmt		= SND_SOC_DAIFMT_LEFT_J | SND_SOC_DAIFMT_CBM_CFM,
 -	.cpu_dai = {
 -		.name	= "fsia-dai",
 -	},
 -	.codec_dai = {
--		.name	= "wm8978-hifi",
--		.sysclk	= 12288000,
+-		.name	= "ak4642-hifi",
+-		.sysclk	= 11289600,
 -	},
 -};
 -
--static struct platform_device fsi_wm8978_device = {
+-static struct platform_device fsi_ak4648_device = {
 -	.name	= "asoc-simple-card",
--	.id	= 0,
 -	.dev	= {
--		.platform_data	= &fsi_wm8978_info,
+-		.platform_data	= &fsi2_ak4648_info,
 -		.coherent_dma_mask = DMA_BIT_MASK(32),
--		.dma_mask = &fsi_wm8978_device.dev.coherent_dma_mask,
--	},
--};
--
--/* FSI-HDMI */
--static struct asoc_simple_card_info fsi2_hdmi_info = {
--	.name		= "HDMI",
--	.card		= "FSI2B-HDMI",
--	.codec		= "sh-mobile-hdmi",
--	.platform	= "sh_fsi2",
--	.daifmt		= SND_SOC_DAIFMT_CBS_CFS,
--	.cpu_dai = {
--		.name	= "fsib-dai",
--	},
--	.codec_dai = {
--		.name = "sh_mobile_hdmi-hifi",
--	},
--};
--
--static struct platform_device fsi_hdmi_device = {
--	.name	= "asoc-simple-card",
--	.id	= 1,
--	.dev	= {
--		.platform_data	= &fsi2_hdmi_info,
--		.coherent_dma_mask = DMA_BIT_MASK(32),
--		.dma_mask = &fsi_hdmi_device.dev.coherent_dma_mask,
--	},
--};
--
--/* RTC: RTC connects i2c-gpio. */
--static struct i2c_gpio_platform_data i2c_gpio_data = {
--	.sda_pin	= 208,
--	.scl_pin	= 91,
--	.udelay		= 5, /* 100 kHz */
--};
--
--static struct platform_device i2c_gpio_device = {
--	.name = "i2c-gpio",
--	.id = 2,
--	.dev = {
--		.platform_data = &i2c_gpio_data,
+-		.dma_mask = &fsi_ak4648_device.dev.coherent_dma_mask,
 -	},
 -};
 -
 -/* I2C */
--static struct st1232_pdata st1232_i2c0_pdata = {
--	.reset_gpio = 166,
+-
+-/* StepDown1 is used to supply 1.315V to the CPU */
+-static struct regulator_init_data as3711_sd1 = {
+-	.constraints = {
+-		.name = "1.315V CPU",
+-		.boot_on = 1,
+-		.always_on = 1,
+-		.min_uV = 1315000,
+-		.max_uV = 1335000,
+-	},
+-};
+-
+-/* StepDown2 is used to supply 1.8V to the CPU and to the board */
+-static struct regulator_init_data as3711_sd2 = {
+-	.constraints = {
+-		.name = "1.8V",
+-		.boot_on = 1,
+-		.always_on = 1,
+-		.min_uV = 1800000,
+-		.max_uV = 1800000,
+-	},
+-};
+-
+-/*
+- * StepDown3 is switched in parallel with StepDown2, seems to be off,
+- * according to read-back pre-set register values
+- */
+-
+-/* StepDown4 is used to supply 1.215V to the CPU and to the board */
+-static struct regulator_init_data as3711_sd4 = {
+-	.constraints = {
+-		.name = "1.215V",
+-		.boot_on = 1,
+-		.always_on = 1,
+-		.min_uV = 1215000,
+-		.max_uV = 1235000,
+-	},
+-};
+-
+-/* LDO1 is unused and unconnected */
+-
+-/* LDO2 is used to supply 2.8V to the CPU */
+-static struct regulator_init_data as3711_ldo2 = {
+-	.constraints = {
+-		.name = "2.8V CPU",
+-		.boot_on = 1,
+-		.always_on = 1,
+-		.min_uV = 2800000,
+-		.max_uV = 2800000,
+-	},
+-};
+-
+-/* LDO3 is used to supply 3.0V to the CPU */
+-static struct regulator_init_data as3711_ldo3 = {
+-	.constraints = {
+-		.name = "3.0V CPU",
+-		.boot_on = 1,
+-		.always_on = 1,
+-		.min_uV = 3000000,
+-		.max_uV = 3000000,
+-	},
+-};
+-
+-/* LDO4 is used to supply 2.8V to the board */
+-static struct regulator_init_data as3711_ldo4 = {
+-	.constraints = {
+-		.name = "2.8V",
+-		.boot_on = 1,
+-		.always_on = 1,
+-		.min_uV = 2800000,
+-		.max_uV = 2800000,
+-	},
+-};
+-
+-/* LDO5 is switched parallel to LDO4, also set to 2.8V */
+-static struct regulator_init_data as3711_ldo5 = {
+-	.constraints = {
+-		.name = "2.8V #2",
+-		.boot_on = 1,
+-		.always_on = 1,
+-		.min_uV = 2800000,
+-		.max_uV = 2800000,
+-	},
+-};
+-
+-/* LDO6 is unused and unconnected */
+-
+-/* LDO7 is used to supply 1.15V to the CPU */
+-static struct regulator_init_data as3711_ldo7 = {
+-	.constraints = {
+-		.name = "1.15V CPU",
+-		.boot_on = 1,
+-		.always_on = 1,
+-		.min_uV = 1150000,
+-		.max_uV = 1150000,
+-	},
+-};
+-
+-/* LDO8 is switched parallel to LDO7, also set to 1.15V */
+-static struct regulator_init_data as3711_ldo8 = {
+-	.constraints = {
+-		.name = "1.15V CPU #2",
+-		.boot_on = 1,
+-		.always_on = 1,
+-		.min_uV = 1150000,
+-		.max_uV = 1150000,
+-	},
+-};
+-
+-static struct as3711_platform_data as3711_pdata = {
+-	.regulator	= {
+-		.init_data	= {
+-			[AS3711_REGULATOR_SD_1] = &as3711_sd1,
+-			[AS3711_REGULATOR_SD_2] = &as3711_sd2,
+-			[AS3711_REGULATOR_SD_4] = &as3711_sd4,
+-			[AS3711_REGULATOR_LDO_2] = &as3711_ldo2,
+-			[AS3711_REGULATOR_LDO_3] = &as3711_ldo3,
+-			[AS3711_REGULATOR_LDO_4] = &as3711_ldo4,
+-			[AS3711_REGULATOR_LDO_5] = &as3711_ldo5,
+-			[AS3711_REGULATOR_LDO_7] = &as3711_ldo7,
+-			[AS3711_REGULATOR_LDO_8] = &as3711_ldo8,
+-		},
+-	},
+-	.backlight	= {
+-		.su2_fb = "sh_mobile_lcdc_fb.0",
+-		.su2_max_uA = 36000,
+-		.su2_feedback = AS3711_SU2_CURR_AUTO,
+-		.su2_fbprot = AS3711_SU2_GPIO4,
+-		.su2_auto_curr1 = true,
+-		.su2_auto_curr2 = true,
+-		.su2_auto_curr3 = true,
+-	},
+-};
+-
+-static struct pcf857x_platform_data pcf8575_pdata = {
+-	.gpio_base	= GPIO_PCF8575_BASE,
 -};
 -
 -static struct i2c_board_info i2c0_devices[] = {
 -	{
+-		I2C_BOARD_INFO("ak4648", 0x12),
+-	},
+-	{
+-		I2C_BOARD_INFO("r2025sd", 0x32),
+-	},
+-	{
+-		I2C_BOARD_INFO("ak8975", 0x0c),
+-		.irq = irq_pin(28), /* IRQ28 */
+-	},
+-	{
+-		I2C_BOARD_INFO("adxl34x", 0x1d),
+-		.irq = irq_pin(26), /* IRQ26 */
+-	},
+-	{
+-		I2C_BOARD_INFO("as3711", 0x40),
+-		.irq = intcs_evt2irq(0x3300), /* IRQ24 */
+-		.platform_data = &as3711_pdata,
+-	},
+-};
+-
+-static struct i2c_board_info i2c1_devices[] = {
+-	{
 -		I2C_BOARD_INFO("st1232-ts", 0x55),
--		.irq = irq_pin(10),
--		.platform_data = &st1232_i2c0_pdata,
--	},
--	{
--		I2C_BOARD_INFO("wm8978", 0x1a),
+-		.irq = irq_pin(8), /* IRQ8 */
 -	},
 -};
 -
--static struct i2c_board_info i2c2_devices[] = {
+-static struct i2c_board_info i2c3_devices[] = {
 -	{
--		I2C_BOARD_INFO("s35390a", 0x30),
--		.type = "s35390a",
+-		I2C_BOARD_INFO("pcf8575", 0x20),
+-		.irq = irq_pin(19), /* IRQ19 */
+-		.platform_data = &pcf8575_pdata,
 -	},
 -};
 -
--/*
-- * board devices
-- */
--static struct platform_device *eva_devices[] __initdata = {
--	&lcdc0_device,
--	&pwm_device,
--	&pwm_backlight_device,
--	&leds_gpio_device,
--	&gpio_keys_device,
--	&sh_eth_device,
+-static struct platform_device *kzm_devices[] __initdata = {
+-	&smsc_device,
+-	&usb_host_device,
+-	&usbhs_device,
+-	&lcdc_device,
+-	&mmc_device,
 -	&vcc_sdhi0,
--	&vccq_sdhi0,
+-	&vcc_sdhi2,
 -	&sdhi0_device,
--	&sh_mmcif_device,
--	&hdmi_device,
--	&hdmi_lcdc_device,
--	&camera_device,
--	&ceu0_device,
+-	&sdhi2_device,
+-	&gpio_keys_device,
 -	&fsi_device,
--	&fsi_wm8978_device,
--	&fsi_hdmi_device,
--	&i2c_gpio_device,
+-	&fsi_ak4648_device,
 -};
 -
--static const struct pinctrl_map eva_pinctrl_map[] = {
--	/* CEU0 */
--	PIN_MAP_MUX_GROUP_DEFAULT("sh_mobile_ceu.0", "pfc-r8a7740",
--				  "ceu0_data_0_7", "ceu0"),
--	PIN_MAP_MUX_GROUP_DEFAULT("sh_mobile_ceu.0", "pfc-r8a7740",
--				  "ceu0_clk_0", "ceu0"),
--	PIN_MAP_MUX_GROUP_DEFAULT("sh_mobile_ceu.0", "pfc-r8a7740",
--				  "ceu0_sync", "ceu0"),
--	PIN_MAP_MUX_GROUP_DEFAULT("sh_mobile_ceu.0", "pfc-r8a7740",
--				  "ceu0_field", "ceu0"),
--	/* FSIA */
--	PIN_MAP_MUX_GROUP_DEFAULT("asoc-simple-card.0", "pfc-r8a7740",
+-static unsigned long pin_pullup_conf[] = {
+-	PIN_CONF_PACKED(PIN_CONFIG_BIAS_PULL_UP, 0),
+-};
+-
+-static const struct pinctrl_map kzm_pinctrl_map[] = {
+-	/* FSIA (AK4648) */
+-	PIN_MAP_MUX_GROUP_DEFAULT("sh_fsi2", "pfc-sh73a0",
+-				  "fsia_mclk_in", "fsia"),
+-	PIN_MAP_MUX_GROUP_DEFAULT("sh_fsi2", "pfc-sh73a0",
 -				  "fsia_sclk_in", "fsia"),
--	PIN_MAP_MUX_GROUP_DEFAULT("asoc-simple-card.0", "pfc-r8a7740",
--				  "fsia_mclk_out", "fsia"),
--	PIN_MAP_MUX_GROUP_DEFAULT("asoc-simple-card.0", "pfc-r8a7740",
--				  "fsia_data_in_1", "fsia"),
--	PIN_MAP_MUX_GROUP_DEFAULT("asoc-simple-card.0", "pfc-r8a7740",
--				  "fsia_data_out_0", "fsia"),
--	/* FSIB */
--	PIN_MAP_MUX_GROUP_DEFAULT("asoc-simple-card.1", "pfc-r8a7740",
--				  "fsib_mclk_in", "fsib"),
--	/* GETHER */
--	PIN_MAP_MUX_GROUP_DEFAULT("r8a7740-gether", "pfc-r8a7740",
--				  "gether_mii", "gether"),
--	PIN_MAP_MUX_GROUP_DEFAULT("r8a7740-gether", "pfc-r8a7740",
--				  "gether_int", "gether"),
--	/* HDMI */
--	PIN_MAP_MUX_GROUP_DEFAULT("sh-mobile-hdmi", "pfc-r8a7740",
--				  "hdmi", "hdmi"),
--	/* LCD0 */
--	PIN_MAP_MUX_GROUP_DEFAULT("sh_mobile_lcdc_fb.0", "pfc-r8a7740",
--				  "lcd0_data24_0", "lcd0"),
--	PIN_MAP_MUX_GROUP_DEFAULT("sh_mobile_lcdc_fb.0", "pfc-r8a7740",
--				  "lcd0_lclk_1", "lcd0"),
--	PIN_MAP_MUX_GROUP_DEFAULT("sh_mobile_lcdc_fb.0", "pfc-r8a7740",
--				  "lcd0_sync", "lcd0"),
+-	PIN_MAP_MUX_GROUP_DEFAULT("sh_fsi2", "pfc-sh73a0",
+-				  "fsia_data_in", "fsia"),
+-	PIN_MAP_MUX_GROUP_DEFAULT("sh_fsi2", "pfc-sh73a0",
+-				  "fsia_data_out", "fsia"),
+-	/* I2C3 */
+-	PIN_MAP_MUX_GROUP_DEFAULT("i2c-sh_mobile.3", "pfc-sh73a0",
+-				  "i2c3_1", "i2c3"),
+-	/* LCD */
+-	PIN_MAP_MUX_GROUP_DEFAULT("sh_mobile_lcdc_fb.0", "pfc-sh73a0",
+-				  "lcd_data24", "lcd"),
+-	PIN_MAP_MUX_GROUP_DEFAULT("sh_mobile_lcdc_fb.0", "pfc-sh73a0",
+-				  "lcd_sync", "lcd"),
 -	/* MMCIF */
--	PIN_MAP_MUX_GROUP_DEFAULT("sh_mmcif.0", "pfc-r8a7740",
--				  "mmc0_data8_1", "mmc0"),
--	PIN_MAP_MUX_GROUP_DEFAULT("sh_mmcif.0", "pfc-r8a7740",
--				  "mmc0_ctrl_1", "mmc0"),
--	/* SCIFA1 */
--	PIN_MAP_MUX_GROUP_DEFAULT("sh-sci.1", "pfc-r8a7740",
--				  "scifa1_data", "scifa1"),
+-	PIN_MAP_MUX_GROUP_DEFAULT("sh_mmcif.0", "pfc-sh73a0",
+-				  "mmc0_data8_0", "mmc0"),
+-	PIN_MAP_MUX_GROUP_DEFAULT("sh_mmcif.0", "pfc-sh73a0",
+-				  "mmc0_ctrl_0", "mmc0"),
+-	PIN_MAP_CONFIGS_PIN_DEFAULT("sh_mmcif.0", "pfc-sh73a0",
+-				    "PORT279", pin_pullup_conf),
+-	PIN_MAP_CONFIGS_GROUP_DEFAULT("sh_mmcif.0", "pfc-sh73a0",
+-				      "mmc0_data8_0", pin_pullup_conf),
+-	/* SCIFA4 */
+-	PIN_MAP_MUX_GROUP_DEFAULT("sh-sci.4", "pfc-sh73a0",
+-				  "scifa4_data", "scifa4"),
+-	PIN_MAP_MUX_GROUP_DEFAULT("sh-sci.4", "pfc-sh73a0",
+-				  "scifa4_ctrl", "scifa4"),
 -	/* SDHI0 */
--	PIN_MAP_MUX_GROUP_DEFAULT("sh_mobile_sdhi.0", "pfc-r8a7740",
+-	PIN_MAP_MUX_GROUP_DEFAULT("sh_mobile_sdhi.0", "pfc-sh73a0",
 -				  "sdhi0_data4", "sdhi0"),
--	PIN_MAP_MUX_GROUP_DEFAULT("sh_mobile_sdhi.0", "pfc-r8a7740",
+-	PIN_MAP_MUX_GROUP_DEFAULT("sh_mobile_sdhi.0", "pfc-sh73a0",
 -				  "sdhi0_ctrl", "sdhi0"),
--	PIN_MAP_MUX_GROUP_DEFAULT("sh_mobile_sdhi.0", "pfc-r8a7740",
+-	PIN_MAP_MUX_GROUP_DEFAULT("sh_mobile_sdhi.0", "pfc-sh73a0",
+-				  "sdhi0_cd", "sdhi0"),
+-	PIN_MAP_MUX_GROUP_DEFAULT("sh_mobile_sdhi.0", "pfc-sh73a0",
 -				  "sdhi0_wp", "sdhi0"),
--	/* ST1232 */
--	PIN_MAP_MUX_GROUP_DEFAULT("0-0055", "pfc-r8a7740",
--				  "intc_irq10", "intc"),
--	/* TPU0 */
--	PIN_MAP_MUX_GROUP_DEFAULT("renesas-tpu-pwm", "pfc-r8a7740",
--				  "tpu0_to2_1", "tpu0"),
--	/* USBHS */
--	PIN_MAP_MUX_GROUP_DEFAULT("renesas_usbhs", "pfc-r8a7740",
--				  "intc_irq7_1", "intc"),
+-	/* SDHI2 */
+-	PIN_MAP_MUX_GROUP_DEFAULT("sh_mobile_sdhi.2", "pfc-sh73a0",
+-				  "sdhi2_data4", "sdhi2"),
+-	PIN_MAP_MUX_GROUP_DEFAULT("sh_mobile_sdhi.2", "pfc-sh73a0",
+-				  "sdhi2_ctrl", "sdhi2"),
+-	/* SMSC */
+-	PIN_MAP_MUX_GROUP_DEFAULT("smsc911x.0", "pfc-sh73a0",
+-				  "bsc_cs4", "bsc"),
+-	/* USB */
+-	PIN_MAP_MUX_GROUP_DEFAULT("renesas_usbhs", "pfc-sh73a0",
+-				  "usb_vbus", "usb"),
 -};
 -
--static void __init eva_clock_init(void)
+-static void __init kzm_init(void)
 -{
--	struct clk *system	= clk_get(NULL, "system_clk");
--	struct clk *xtal1	= clk_get(NULL, "extal1");
--	struct clk *usb24s	= clk_get(NULL, "usb24s");
--	struct clk *fsibck	= clk_get(NULL, "fsibck");
+-	regulator_register_always_on(2, "fixed-1.8V", fixed1v8_power_consumers,
+-				     ARRAY_SIZE(fixed1v8_power_consumers), 1800000);
+-	regulator_register_fixed(3, dummy_supplies, ARRAY_SIZE(dummy_supplies));
 -
--	if (IS_ERR(system)	||
--	    IS_ERR(xtal1)	||
--	    IS_ERR(usb24s)	||
--	    IS_ERR(fsibck)) {
--		pr_err("armadillo800eva board clock init failed\n");
--		goto clock_error;
--	}
+-	pinctrl_register_mappings(kzm_pinctrl_map, ARRAY_SIZE(kzm_pinctrl_map));
 -
--	/* armadillo 800 eva extal1 is 24MHz */
--	clk_set_rate(xtal1, 24000000);
+-	sh73a0_pinmux_init();
 -
--	/* usb24s use extal1 (= system) clock (= 24MHz) */
--	clk_set_parent(usb24s, system);
+-	/* SMSC */
+-	gpio_request_one(224, GPIOF_IN, NULL); /* IRQ3 */
 -
--	/* FSIBCK is 12.288MHz, and it is parent of FSI-B */
--	clk_set_rate(fsibck, 12288000);
+-	/* LCDC */
+-	gpio_request_one(222, GPIOF_OUT_INIT_HIGH, NULL); /* LCDCDON */
+-	gpio_request_one(226, GPIOF_OUT_INIT_HIGH, NULL); /* SC */
 -
--clock_error:
--	if (!IS_ERR(system))
--		clk_put(system);
--	if (!IS_ERR(xtal1))
--		clk_put(xtal1);
--	if (!IS_ERR(usb24s))
--		clk_put(usb24s);
--	if (!IS_ERR(fsibck))
--		clk_put(fsibck);
--}
--
--/*
-- * board init
-- */
--#define GPIO_PORT7CR	IOMEM(0xe6050007)
--#define GPIO_PORT8CR	IOMEM(0xe6050008)
--static void __init eva_init(void)
--{
--	static struct pm_domain_device domain_devices[] __initdata = {
--		{ "A4LC", &lcdc0_device },
--		{ "A4LC", &hdmi_lcdc_device },
--		{ "A4MP", &hdmi_device },
--		{ "A4MP", &fsi_device },
--		{ "A4R",  &ceu0_device },
--		{ "A4S",  &sh_eth_device },
--		{ "A3SP", &pwm_device },
--		{ "A3SP", &sdhi0_device },
--		{ "A3SP", &sh_mmcif_device },
--	};
--	struct platform_device *usb = NULL, *sdhi1 = NULL;
--
--	regulator_register_always_on(0, "fixed-3.3V", fixed3v3_power_consumers,
--				     ARRAY_SIZE(fixed3v3_power_consumers), 3300000);
--	regulator_register_always_on(3, "fixed-5.0V", fixed5v0_power_consumers,
--				     ARRAY_SIZE(fixed5v0_power_consumers), 5000000);
--
--	pinctrl_register_mappings(eva_pinctrl_map, ARRAY_SIZE(eva_pinctrl_map));
--	pwm_add_table(pwm_lookup, ARRAY_SIZE(pwm_lookup));
--
--	r8a7740_pinmux_init();
--	r8a7740_meram_workaround();
--
--	/* GETHER */
--	gpio_request_one(18, GPIOF_OUT_INIT_HIGH, NULL); /* PHY_RST */
--
--	/* USB */
--	gpio_request_one(159, GPIOF_IN, NULL); /* USB_DEVICE_MODE */
--
--	if (gpio_get_value(159)) {
--		/* USB Host */
--	} else {
--		/* USB Func */
--		/*
--		 * The USBHS interrupt handlers needs to read the IRQ pin value
--		 * (HI/LOW) to diffentiate USB connection and disconnection
--		 * events (usbhsf_get_vbus()). We thus need to select both the
--		 * intc_irq7_1 pin group and GPIO 209 here.
--		 */
--		gpio_request_one(209, GPIOF_IN, NULL);
--
--		platform_device_register(&usbhsf_device);
--		usb = &usbhsf_device;
--	}
--
--	/* CON1/CON15 Camera */
--	gpio_request_one(173, GPIOF_OUT_INIT_LOW, NULL);  /* STANDBY */
--	gpio_request_one(172, GPIOF_OUT_INIT_HIGH, NULL); /* RST */
--	/* see mt9t111_power() */
--	gpio_request_one(158, GPIOF_OUT_INIT_LOW, NULL);  /* CAM_PON */
--
--	/* FSI-WM8978 */
--	gpio_request(7, NULL);
--	gpio_request(8, NULL);
--	gpio_direction_none(GPIO_PORT7CR); /* FSIAOBT needs no direction */
--	gpio_direction_none(GPIO_PORT8CR); /* FSIAOLR needs no direction */
--
--	/*
--	 * CAUTION
--	 *
--	 * DBGMD/LCDC0/FSIA MUX
--	 * DBGMD_SELECT_B should be set after setting PFC Function.
--	 */
--	gpio_request_one(176, GPIOF_OUT_INIT_HIGH, NULL);
--
--	/*
--	 * We can switch CON8/CON14 by SW1.5,
--	 * but it needs after DBGMD_SELECT_B
--	 */
--	gpio_request_one(6, GPIOF_IN, NULL);
--	if (gpio_get_value(6)) {
--		/* CON14 enable */
--	} else {
--		/* CON8 (SDHI1) enable */
--		pinctrl_register_mappings(eva_sdhi1_pinctrl_map,
--					  ARRAY_SIZE(eva_sdhi1_pinctrl_map));
--
--		platform_device_register(&vcc_sdhi1);
--		platform_device_register(&sdhi1_device);
--		sdhi1 = &sdhi1_device;
--	}
--
+-	/* Touchscreen */
+-	gpio_request_one(223, GPIOF_IN, NULL); /* IRQ8 */
 -
 -#ifdef CONFIG_CACHE_L2X0
--	/* Shared attribute override enable, 32K*8way */
--	l2x0_init(IOMEM(0xf0002000), 0x00400000, 0xc20f0fff);
+-	/* Shared attribute override enable, 64K*8way */
+-	l2x0_init(IOMEM(0xf0100000), 0x00400000, 0xc20f0fff);
 -#endif
 -
 -	i2c_register_board_info(0, i2c0_devices, ARRAY_SIZE(i2c0_devices));
--	i2c_register_board_info(2, i2c2_devices, ARRAY_SIZE(i2c2_devices));
+-	i2c_register_board_info(1, i2c1_devices, ARRAY_SIZE(i2c1_devices));
+-	i2c_register_board_info(3, i2c3_devices, ARRAY_SIZE(i2c3_devices));
 -
--	r8a7740_add_standard_devices();
+-	sh73a0_add_standard_devices();
+-	platform_add_devices(kzm_devices, ARRAY_SIZE(kzm_devices));
 -
--	platform_add_devices(eva_devices,
--			     ARRAY_SIZE(eva_devices));
--
--	rmobile_add_devices_to_domains(domain_devices,
--				       ARRAY_SIZE(domain_devices));
--	if (usb)
--		rmobile_add_device_to_domain("A3SP", usb);
--	if (sdhi1)
--		rmobile_add_device_to_domain("A3SP", sdhi1);
--
--	r8a7740_pm_init();
+-	sh73a0_pm_init();
 -}
 -
--static void __init eva_earlytimer_init(void)
+-static void kzm9g_restart(enum reboot_mode mode, const char *cmd)
 -{
--	r8a7740_clock_init(MD_CK0 | MD_CK2);
--	shmobile_earlytimer_init();
--
--	/* the rate of extal1 clock must be set before late_time_init */
--	eva_clock_init();
--}
--
 -#define RESCNT2 IOMEM(0xe6188020)
--static void eva_restart(enum reboot_mode mode, const char *cmd)
--{
 -	/* Do soft power on reset */
 -	writel((1 << 31), RESCNT2);
 -}
 -
--static const char *eva_boards_compat_dt[] __initdata = {
--	"renesas,armadillo800eva",
+-static const char *kzm9g_boards_compat_dt[] __initdata = {
+-	"renesas,kzm9g",
 -	NULL,
 -};
 -
--DT_MACHINE_START(ARMADILLO800EVA_DT, "armadillo800eva")
--	.map_io		= r8a7740_map_io,
--	.init_early	= r8a7740_add_early_devices,
--	.init_irq	= r8a7740_init_irq_of,
--	.init_machine	= eva_init,
+-DT_MACHINE_START(KZM9G_DT, "kzm9g")
+-	.smp		= smp_ops(sh73a0_smp_ops),
+-	.map_io		= sh73a0_map_io,
+-	.init_early	= sh73a0_add_early_devices,
+-	.init_irq	= sh73a0_init_irq,
+-	.init_machine	= kzm_init,
 -	.init_late	= shmobile_init_late,
--	.init_time	= eva_earlytimer_init,
--	.dt_compat	= eva_boards_compat_dt,
--	.restart	= eva_restart,
+-	.init_time	= sh73a0_earlytimer_init,
+-	.restart	= kzm9g_restart,
+-	.dt_compat	= kzm9g_boards_compat_dt,
 -MACHINE_END
+diff --git a/arch/arm/mach-shmobile/include/mach/head-kzm9g.txt b/arch/arm/mach-shmobile/include/mach/head-kzm9g.txt
+deleted file mode 100644
+index 9531f46a822a1b22..0000000000000000
+--- a/arch/arm/mach-shmobile/include/mach/head-kzm9g.txt
++++ /dev/null
+@@ -1,410 +0,0 @@
+-LIST "KZM9G low-level initialization routine."
+-LIST "Adapted from u-boot KZM9G support code."
+-
+-LIST "Copyright (C) 2013 Ulrich Hecht"
+-
+-LIST "This program is free software; you can redistribute it and/or modify"
+-LIST "it under the terms of the GNU General Public License version 2 as"
+-LIST "published by the Free Software Foundation."
+-
+-LIST "This program is distributed in the hope that it will be useful,"
+-LIST "but WITHOUT ANY WARRANTY; without even the implied warranty of"
+-LIST "MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the"
+-LIST "GNU General Public License for more details."
+-
+-
+-LIST "Register definitions:"
+-
+-LIST "Secure control register"
+-#define LIFEC_SEC_SRC (0xE6110008)
+-
+-LIST "RWDT"
+-#define RWDT_BASE   (0xE6020000)
+-#define RWTCSRA0 (RWDT_BASE + 0x04)
+-
+-LIST "HPB Semaphore Control Registers"
+-#define HPBSCR_BASE (0xE6000000)
+-#define HPBCTRL6 (HPBSCR_BASE + 0x1030)
+-
+-#define SBSC1_BASE  (0xFE400000)
+-#define SDCR0A		(SBSC1_BASE + 0x0008)
+-#define SDCR1A		(SBSC1_BASE + 0x000C)
+-#define SDPCRA		(SBSC1_BASE + 0x0010)
+-#define SDCR0SA		(SBSC1_BASE + 0x0018)
+-#define SDCR1SA		(SBSC1_BASE + 0x001C)
+-#define RTCSRA		(SBSC1_BASE + 0x0020)
+-#define RTCORA		(SBSC1_BASE + 0x0028)
+-#define RTCORHA		(SBSC1_BASE + 0x002C)
+-#define SDWCRC0A	(SBSC1_BASE + 0x0040)
+-#define SDWCRC1A	(SBSC1_BASE + 0x0044)
+-#define SDWCR00A	(SBSC1_BASE + 0x0048)
+-#define SDWCR01A	(SBSC1_BASE + 0x004C)
+-#define SDWCR10A	(SBSC1_BASE + 0x0050)
+-#define SDWCR11A	(SBSC1_BASE + 0x0054)
+-#define SDWCR2A		(SBSC1_BASE + 0x0060)
+-#define SDWCRC2A	(SBSC1_BASE + 0x0064)
+-#define ZQCCRA		(SBSC1_BASE + 0x0068)
+-#define SDMRACR0A	(SBSC1_BASE + 0x0084)
+-#define SDMRTMPCRA	(SBSC1_BASE + 0x008C)
+-#define SDMRTMPMSKA	(SBSC1_BASE + 0x0094)
+-#define SDGENCNTA	(SBSC1_BASE + 0x009C)
+-#define SDDRVCR0A	(SBSC1_BASE + 0x00B4)
+-#define DLLCNT0A	(SBSC1_BASE + 0x0354)
+-
+-#define SDMRA1  (0xFE500000)
+-#define SDMRA2  (0xFE5C0000)
+-#define SDMRA3  (0xFE504000)
+-
+-#define SBSC2_BASE  (0xFB400000)
+-#define SDCR0B		(SBSC2_BASE + 0x0008)
+-#define SDCR1B		(SBSC2_BASE + 0x000C)
+-#define SDPCRB		(SBSC2_BASE + 0x0010)
+-#define SDCR0SB		(SBSC2_BASE + 0x0018)
+-#define SDCR1SB		(SBSC2_BASE + 0x001C)
+-#define RTCSRB		(SBSC2_BASE + 0x0020)
+-#define RTCORB		(SBSC2_BASE + 0x0028)
+-#define RTCORHB		(SBSC2_BASE + 0x002C)
+-#define SDWCRC0B	(SBSC2_BASE + 0x0040)
+-#define SDWCRC1B	(SBSC2_BASE + 0x0044)
+-#define SDWCR00B	(SBSC2_BASE + 0x0048)
+-#define SDWCR01B	(SBSC2_BASE + 0x004C)
+-#define SDWCR10B	(SBSC2_BASE + 0x0050)
+-#define SDWCR11B	(SBSC2_BASE + 0x0054)
+-#define SDPDCR0B	(SBSC2_BASE + 0x0058)
+-#define SDWCR2B		(SBSC2_BASE + 0x0060)
+-#define SDWCRC2B	(SBSC2_BASE + 0x0064)
+-#define ZQCCRB		(SBSC2_BASE + 0x0068)
+-#define SDMRACR0B	(SBSC2_BASE + 0x0084)
+-#define SDMRTMPCRB	(SBSC2_BASE + 0x008C)
+-#define SDMRTMPMSKB	(SBSC2_BASE + 0x0094)
+-#define SDGENCNTB	(SBSC2_BASE + 0x009C)
+-#define DPHYCNT0B	(SBSC2_BASE + 0x00A0)
+-#define DPHYCNT1B	(SBSC2_BASE + 0x00A4)
+-#define DPHYCNT2B	(SBSC2_BASE + 0x00A8)
+-#define SDDRVCR0B	(SBSC2_BASE + 0x00B4)
+-#define DLLCNT0B	(SBSC2_BASE + 0x0354)
+-
+-#define SDMRB1  (0xFB500000)
+-#define SDMRB2  (0xFB5C0000)
+-#define SDMRB3  (0xFB504000)
+-
+-#define CPG_BASE   (0xE6150000)
+-#define FRQCRA		(CPG_BASE + 0x0000)
+-#define FRQCRB		(CPG_BASE + 0x0004)
+-#define FRQCRD		(CPG_BASE + 0x00E4)
+-#define VCLKCR1		(CPG_BASE + 0x0008)
+-#define VCLKCR2		(CPG_BASE + 0x000C)
+-#define VCLKCR3		(CPG_BASE + 0x001C)
+-#define ZBCKCR		(CPG_BASE + 0x0010)
+-#define FLCKCR		(CPG_BASE + 0x0014)
+-#define SD0CKCR		(CPG_BASE + 0x0074)
+-#define SD1CKCR		(CPG_BASE + 0x0078)
+-#define SD2CKCR		(CPG_BASE + 0x007C)
+-#define FSIACKCR	(CPG_BASE + 0x0018)
+-#define SUBCKCR		(CPG_BASE + 0x0080)
+-#define SPUACKCR	(CPG_BASE + 0x0084)
+-#define SPUVCKCR	(CPG_BASE + 0x0094)
+-#define MSUCKCR		(CPG_BASE + 0x0088)
+-#define HSICKCR		(CPG_BASE + 0x008C)
+-#define FSIBCKCR	(CPG_BASE + 0x0090)
+-#define MFCK1CR		(CPG_BASE + 0x0098)
+-#define MFCK2CR		(CPG_BASE + 0x009C)
+-#define DSITCKCR	(CPG_BASE + 0x0060)
+-#define DSI0PCKCR	(CPG_BASE + 0x0064)
+-#define DSI1PCKCR	(CPG_BASE + 0x0068)
+-#define DSI0PHYCR	(CPG_BASE + 0x006C)
+-#define DVFSCR3		(CPG_BASE + 0x0174)
+-#define DVFSCR4		(CPG_BASE + 0x0178)
+-#define DVFSCR5		(CPG_BASE + 0x017C)
+-#define MPMODE		(CPG_BASE + 0x00CC)
+-
+-#define PLLECR		(CPG_BASE + 0x00D0)
+-#define PLL0CR		(CPG_BASE + 0x00D8)
+-#define PLL1CR		(CPG_BASE + 0x0028)
+-#define PLL2CR		(CPG_BASE + 0x002C)
+-#define PLL3CR		(CPG_BASE + 0x00DC)
+-#define PLL0STPCR	(CPG_BASE + 0x00F0)
+-#define PLL1STPCR	(CPG_BASE + 0x00C8)
+-#define PLL2STPCR	(CPG_BASE + 0x00F8)
+-#define PLL3STPCR	(CPG_BASE + 0x00FC)
+-#define RMSTPCR0	(CPG_BASE + 0x0110)
+-#define RMSTPCR1	(CPG_BASE + 0x0114)
+-#define RMSTPCR2	(CPG_BASE + 0x0118)
+-#define RMSTPCR3	(CPG_BASE + 0x011C)
+-#define RMSTPCR4	(CPG_BASE + 0x0120)
+-#define RMSTPCR5	(CPG_BASE + 0x0124)
+-#define SMSTPCR0	(CPG_BASE + 0x0130)
+-#define SMSTPCR2	(CPG_BASE + 0x0138)
+-#define SMSTPCR3	(CPG_BASE + 0x013C)
+-#define CPGXXCR4	(CPG_BASE + 0x0150)
+-#define SRCR0		(CPG_BASE + 0x80A0)
+-#define SRCR2		(CPG_BASE + 0x80B0)
+-#define SRCR3		(CPG_BASE + 0x80A8)
+-#define VREFCR		(CPG_BASE + 0x00EC)
+-#define PCLKCR		(CPG_BASE + 0x1020)
+-
+-#define PORT32CR (0xE6051020)
+-#define PORT33CR (0xE6051021)
+-#define PORT34CR (0xE6051022)
+-#define PORT35CR (0xE6051023)
+-
+-LIST "DRAM initialization code:"
+-
+-EW RWTCSRA0, 0xA507
+-
+-ED_AND LIFEC_SEC_SRC, 0xFFFF7FFF
+-
+-ED_AND SMSTPCR3,0xFFFF7FFF
+-ED_AND SRCR3, 0xFFFF7FFF
+-ED_AND SMSTPCR2,0xFFFBFFFF
+-ED_AND SRCR2, 0xFFFBFFFF
+-ED PLLECR, 0x00000000
+-
+-WAIT_MASK PLLECR, 0x00000F00, 0x00000000
+-WAIT_MASK FRQCRB, 0x80000000, 0x00000000
+-
+-ED PLL0CR, 0x2D000000
+-ED PLL1CR, 0x17100000
+-ED FRQCRB, 0x96235880
+-WAIT_MASK FRQCRB, 0x80000000, 0x00000000
+-
+-ED FLCKCR, 0x0000000B
+-ED_AND SMSTPCR0, 0xFFFFFFFD
+-
+-ED_AND SRCR0, 0xFFFFFFFD
+-ED 0xE6001628, 0x514
+-ED 0xE6001648, 0x514
+-ED 0xE6001658, 0x514
+-ED 0xE6001678, 0x514
+-
+-ED DVFSCR4, 0x00092000
+-ED DVFSCR5, 0x000000DC
+-ED PLLECR, 0x00000000
+-WAIT_MASK PLLECR, 0x00000F00, 0x00000000
+-
+-ED FRQCRA, 0x0012453C
+-ED FRQCRB, 0x80431350
+-WAIT_MASK FRQCRB, 0x80000000, 0x00000000
+-ED FRQCRD, 0x00000B0B
+-WAIT_MASK FRQCRD, 0x80000000, 0x00000000
+-
+-ED PCLKCR, 0x00000003
+-ED VCLKCR1, 0x0000012F
+-ED VCLKCR2, 0x00000119
+-ED VCLKCR3, 0x00000119
+-ED ZBCKCR, 0x00000002
+-ED FLCKCR, 0x00000005
+-ED SD0CKCR, 0x00000080
+-ED SD1CKCR, 0x00000080
+-ED SD2CKCR, 0x00000080
+-ED FSIACKCR, 0x0000003F
+-ED FSIBCKCR, 0x0000003F
+-ED SUBCKCR, 0x00000080
+-ED SPUACKCR, 0x0000000B
+-ED SPUVCKCR, 0x0000000B
+-ED MSUCKCR, 0x0000013F
+-ED HSICKCR, 0x00000080
+-ED MFCK1CR, 0x0000003F
+-ED MFCK2CR, 0x0000003F
+-ED DSITCKCR, 0x00000107
+-ED DSI0PCKCR, 0x00000313
+-ED DSI1PCKCR, 0x0000130D
+-ED DSI0PHYCR, 0x2A800E0E
+-ED PLL0CR, 0x1E000000
+-ED PLL0CR, 0x2D000000
+-ED PLL1CR, 0x17100000
+-ED PLL2CR, 0x27000080
+-ED PLL3CR, 0x1D000000
+-ED PLL0STPCR, 0x00080000
+-ED PLL1STPCR, 0x000120C0
+-ED PLL2STPCR, 0x00012000
+-ED PLL3STPCR, 0x00000030
+-ED PLLECR, 0x0000000B
+-WAIT_MASK PLLECR, 0x00000B00, 0x00000B00
+-
+-ED DVFSCR3, 0x000120F0
+-ED MPMODE, 0x00000020
+-ED VREFCR, 0x0000028A
+-ED RMSTPCR0, 0xE4628087
+-ED RMSTPCR1, 0xFFFFFFFF
+-ED RMSTPCR2, 0x53FFFFFF
+-ED RMSTPCR3, 0xFFFFFFFF
+-ED RMSTPCR4, 0x00800D3D
+-ED RMSTPCR5, 0xFFFFF3FF
+-ED SMSTPCR2, 0x00000000
+-ED SRCR2,  0x00040000
+-ED_AND PLLECR, 0xFFFFFFF7
+-WAIT_MASK PLLECR, 0x00000800, 0x00000000
+-
+-LIST "set SBSC operational"
+-ED HPBCTRL6, 0x00000001
+-WAIT_MASK HPBCTRL6, 0x00000001, 0x00000001
+-
+-LIST "set SBSC operating frequency"
+-ED FRQCRD, 0x00001414
+-WAIT_MASK FRQCRD, 0x80000000, 0x00000000
+-ED PLL3CR, 0x1D000000
+-ED_OR PLLECR, 0x00000008
+-WAIT_MASK PLLECR, 0x00000800, 0x00000800
+-
+-LIST "enable DLL oscillation in DDRPHY"
+-ED_OR DLLCNT0A, 0x00000002
+-
+-LIST "wait >= 100 ns"
+-ED SDGENCNTA, 0x00000005
+-WAIT_MASK SDGENCNTA, 0xFFFFFFFF, 0x00000000
+-
+-LIST "target LPDDR2 device settings"
+-ED SDCR0A, 0xACC90159
+-ED SDCR1A, 0x00010059
+-ED SDWCRC0A, 0x50874114
+-ED SDWCRC1A, 0x33199B37
+-ED SDWCRC2A, 0x008F2313
+-ED SDWCR00A, 0x31020707
+-ED SDWCR01A, 0x0017040A
+-ED SDWCR10A, 0x31020707
+-ED SDWCR11A, 0x0017040A
+-
+-ED SDDRVCR0A, 0x055557ff
+-
+-ED SDWCR2A, 0x30000000
+-
+-LIST "drive CKE high"
+-ED_OR SDPCRA, 0x00000080
+-WAIT_MASK SDPCRA, 0x00000080, 0x00000080
+-
+-LIST "wait >= 200 us"
+-ED SDGENCNTA, 0x00002710
+-WAIT_MASK SDGENCNTA, 0xFFFFFFFF, 0x00000000
+-
+-LIST "issue reset command to LPDDR2 device"
+-ED SDMRACR0A, 0x0000003F
+-ED SDMRA1, 0x00000000
+-
+-LIST "wait >= 10 (or 1) us (docs inconsistent)"
+-ED SDGENCNTA, 0x000001F4
+-WAIT_MASK SDGENCNTA, 0xFFFFFFFF, 0x00000000
+-
+-LIST "MRW ZS initialization calibration command"
+-ED SDMRACR0A, 0x0000FF0A
+-ED SDMRA3, 0x00000000
+-
+-LIST "wait >= 1 us"
+-ED SDGENCNTA, 0x00000032
+-WAIT_MASK SDGENCNTA, 0xFFFFFFFF, 0x00000000
+-
+-LIST "specify operating mode in LPDDR2"
+-ED SDMRACR0A, 0x00002201
+-ED SDMRA1, 0x00000000
+-ED SDMRACR0A, 0x00000402
+-ED SDMRA1, 0x00000000
+-ED SDMRACR0A, 0x00000203
+-ED SDMRA1, 0x00000000
+-
+-LIST "initialize DDR interface"
+-ED SDMRA2, 0x00000000
+-
+-LIST "temperature sensor control"
+-ED SDMRTMPCRA, 0x88800004
+-ED SDMRTMPMSKA,0x00000004
+-
+-LIST "auto-refreshing control"
+-ED RTCORA, 0xA55A0032
+-ED RTCORHA, 0xA55A000C
+-ED RTCSRA, 0xA55A2048
+-
+-ED_OR SDCR0A, 0x00000800
+-ED_OR SDCR1A, 0x00000400
+-
+-LIST "auto ZQ calibration control"
+-ED ZQCCRA, 0xFFF20000
+-
+-ED_OR DLLCNT0B, 0x00000002
+-ED SDGENCNTB, 0x00000005
+-WAIT_MASK SDGENCNTB, 0xFFFFFFFF, 0x00000000
+-
+-ED SDCR0B, 0xACC90159
+-ED SDCR1B, 0x00010059
+-ED SDWCRC0B, 0x50874114
+-ED SDWCRC1B, 0x33199B37
+-ED SDWCRC2B, 0x008F2313
+-ED SDWCR00B, 0x31020707
+-ED SDWCR01B, 0x0017040A
+-ED SDWCR10B, 0x31020707
+-ED SDWCR11B, 0x0017040A
+-ED SDDRVCR0B, 0x055557ff
+-ED SDWCR2B, 0x30000000
+-ED_OR SDPCRB, 0x00000080
+-WAIT_MASK SDPCRB, 0x00000080, 0x00000080
+-
+-ED SDGENCNTB, 0x00002710
+-WAIT_MASK SDGENCNTB, 0xFFFFFFFF, 0x00000000
+-ED SDMRACR0B, 0x0000003F
+-
+-LIST "upstream u-boot writes to SDMRA1A for both SBSC 1 and 2, which does"
+-LIST "not seem to make a lot of sense..."
+-ED SDMRB1, 0x00000000
+-
+-ED SDGENCNTB, 0x000001F4
+-WAIT_MASK SDGENCNTB, 0xFFFFFFFF, 0x00000000
+-
+-ED SDMRACR0B, 0x0000FF0A
+-ED SDMRB3, 0x00000000
+-ED SDGENCNTB, 0x00000032
+-WAIT_MASK SDGENCNTB, 0xFFFFFFFF, 0x00000000
+-
+-ED SDMRACR0B, 0x00002201
+-ED SDMRB1, 0x00000000
+-ED SDMRACR0B, 0x00000402
+-ED SDMRB1, 0x00000000
+-ED SDMRACR0B, 0x00000203
+-ED SDMRB1, 0x00000000
+-ED SDMRB2, 0x00000000
+-ED SDMRTMPCRB, 0x88800004
+-ED SDMRTMPMSKB, 0x00000004
+-ED RTCORB,  0xA55A0032
+-ED RTCORHB, 0xA55A000C
+-ED RTCSRB,  0xA55A2048
+-ED_OR SDCR0B, 0x00000800
+-ED_OR SDCR1B, 0x00000400
+-ED ZQCCRB, 0xFFF20000
+-ED_OR SDPDCR0B, 0x00030000
+-ED DPHYCNT1B, 0xA5390000
+-ED DPHYCNT0B, 0x00001200
+-ED DPHYCNT1B, 0x07CE0000
+-ED DPHYCNT0B, 0x00001247
+-WAIT_MASK DPHYCNT2B, 0xFFFFFFFF, 0x07CE0000
+-
+-ED_AND SDPDCR0B, 0xFFFCFFFF
+-
+-ED FRQCRD, 0x00000B0B
+-WAIT_MASK FRQCRD, 0x80000000, 0x00000000
+-
+-ED CPGXXCR4, 0xfffffffc
+-
+-LIST "Setup SCIF4 / workaround"
+-EB PORT32CR, 0x12
+-EB PORT33CR, 0x22
+-EB PORT34CR, 0x12
+-EB PORT35CR, 0x22
+-
+-EW 0xE6C80000, 0
+-EB 0xE6C80004, 0x19
+-EW 0xE6C80008, 0x0030
+-EW 0xE6C80018, 0
+-EW 0xE6C80030, 0x0014
+-
+-LIST "Magic to avoid hangs and corruption on DRAM writes."
+-
+-LIST "It has been observed that the system would most often hang while"
+-LIST "decompressing the kernel, and if it didn't it would always write"
+-LIST "a corrupt image to DRAM."
+-LIST "This problem does not occur in u-boot, and the reason is that"
+-LIST "u-boot performs an additional cache invalidation after setting up"
+-LIST "the DRAM controller. Such an invalidation should not be necessary at"
+-LIST "this point, and attempts at removing parts of the routine to arrive"
+-LIST "at the minimal snippet of code necessary to avoid the DRAM stability"
+-LIST "problem yielded the following:"
+-
+-MRC p15, 0, r0, c1, c0, 0
+-MCR p15, 0, r0, c1, c0, 0
+diff --git a/arch/arm/mach-shmobile/include/mach/zboot.h b/arch/arm/mach-shmobile/include/mach/zboot.h
+index 175ee05465da19eb..80f599f4b5ab5733 100644
+--- a/arch/arm/mach-shmobile/include/mach/zboot.h
++++ b/arch/arm/mach-shmobile/include/mach/zboot.h
+@@ -9,11 +9,6 @@
+  *
+  **************************************************/
+ 
+-#ifdef CONFIG_MACH_KZM9G
+-#define MEMORY_START	0x43000000
+-#include "mach/head-kzm9g.txt"
+-#else
+ #error "unsupported board."
+-#endif
+ 
+ #endif /* ZBOOT_H */
+diff --git a/arch/arm/mach-shmobile/intc-sh73a0.c b/arch/arm/mach-shmobile/intc-sh73a0.c
+deleted file mode 100644
+index fd63ae6532fc9ab2..0000000000000000
+--- a/arch/arm/mach-shmobile/intc-sh73a0.c
++++ /dev/null
+@@ -1,337 +0,0 @@
+-/*
+- * sh73a0 processor support - INTC hardware block
+- *
+- * Copyright (C) 2010  Magnus Damm
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License as published by
+- * the Free Software Foundation; version 2 of the License.
+- *
+- * This program is distributed in the hope that it will be useful,
+- * but WITHOUT ANY WARRANTY; without even the implied warranty of
+- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+- * GNU General Public License for more details.
+- */
+-#include <linux/kernel.h>
+-#include <linux/init.h>
+-#include <linux/interrupt.h>
+-#include <linux/module.h>
+-#include <linux/irq.h>
+-#include <linux/io.h>
+-#include <linux/irqchip.h>
+-#include <linux/irqchip/arm-gic.h>
+-
+-#include <asm/mach-types.h>
+-#include <asm/mach/arch.h>
+-
+-#include "intc.h"
+-#include "irqs.h"
+-#include "sh73a0.h"
+-
+-enum {
+-	UNUSED = 0,
+-
+-	/* interrupt sources INTCS */
+-	PINTCS_PINT1, PINTCS_PINT2,
+-	RTDMAC_0_DEI0, RTDMAC_0_DEI1, RTDMAC_0_DEI2, RTDMAC_0_DEI3,
+-	CEU, MFI, BBIF2, VPU, TSIF1, _3DG_SGX543, _2DDMAC_2DDM0,
+-	RTDMAC_1_DEI4, RTDMAC_1_DEI5, RTDMAC_1_DADERR,
+-	KEYSC_KEY, VINT, MSIOF,
+-	TMU0_TUNI00, TMU0_TUNI01, TMU0_TUNI02,
+-	CMT0, TSIF0, CMT2, LMB, MSUG, MSU_MSU, MSU_MSU2,
+-	CTI, RWDT0, ICB, PEP, ASA, JPU_JPEG, LCDC, LCRC,
+-	RTDMAC_2_DEI6, RTDMAC_2_DEI7, RTDMAC_2_DEI8, RTDMAC_2_DEI9,
+-	RTDMAC_3_DEI10, RTDMAC_3_DEI11,
+-	FRC, GCU, LCDC1, CSIRX,
+-	DSITX0_DSITX00, DSITX0_DSITX01,
+-	SPU2_SPU0, SPU2_SPU1, FSI,
+-	TMU1_TUNI10, TMU1_TUNI11, TMU1_TUNI12,
+-	TSIF2, CMT4, MFIS2, CPORTS2R, TSG, DMASCH1, SCUW,
+-	VIO60, VIO61, CEU21, CSI21, DSITX1_DSITX10, DSITX1_DSITX11,
+-	DISP, DSRV, EMUX2_EMUX20I, EMUX2_EMUX21I,
+-	MSTIF0_MST00I, MSTIF0_MST01I, MSTIF1_MST10I, MSTIF1_MST11I,
+-	SPUV,
+-
+-	/* interrupt groups INTCS */
+-	RTDMAC_0, RTDMAC_1, RTDMAC_2, RTDMAC_3,
+-	DSITX0, SPU2, TMU1, MSU,
+-};
+-
+-static struct intc_vect intcs_vectors[] = {
+-	INTCS_VECT(PINTCS_PINT1, 0x0600), INTCS_VECT(PINTCS_PINT2, 0x0620),
+-	INTCS_VECT(RTDMAC_0_DEI0, 0x0800), INTCS_VECT(RTDMAC_0_DEI1, 0x0820),
+-	INTCS_VECT(RTDMAC_0_DEI2, 0x0840), INTCS_VECT(RTDMAC_0_DEI3, 0x0860),
+-	INTCS_VECT(CEU, 0x0880), INTCS_VECT(MFI, 0x0900),
+-	INTCS_VECT(BBIF2, 0x0960), INTCS_VECT(VPU, 0x0980),
+-	INTCS_VECT(TSIF1, 0x09a0), INTCS_VECT(_3DG_SGX543, 0x09e0),
+-	INTCS_VECT(_2DDMAC_2DDM0, 0x0a00),
+-	INTCS_VECT(RTDMAC_1_DEI4, 0x0b80), INTCS_VECT(RTDMAC_1_DEI5, 0x0ba0),
+-	INTCS_VECT(RTDMAC_1_DADERR, 0x0bc0),
+-	INTCS_VECT(KEYSC_KEY, 0x0be0), INTCS_VECT(VINT, 0x0c80),
+-	INTCS_VECT(MSIOF, 0x0d20),
+-	INTCS_VECT(TMU0_TUNI00, 0x0e80), INTCS_VECT(TMU0_TUNI01, 0x0ea0),
+-	INTCS_VECT(TMU0_TUNI02, 0x0ec0),
+-	INTCS_VECT(CMT0, 0x0f00), INTCS_VECT(TSIF0, 0x0f20),
+-	INTCS_VECT(CMT2, 0x0f40), INTCS_VECT(LMB, 0x0f60),
+-	INTCS_VECT(MSUG, 0x0f80),
+-	INTCS_VECT(MSU_MSU, 0x0fa0), INTCS_VECT(MSU_MSU2, 0x0fc0),
+-	INTCS_VECT(CTI, 0x0400), INTCS_VECT(RWDT0, 0x0440),
+-	INTCS_VECT(ICB, 0x0480), INTCS_VECT(PEP, 0x04a0),
+-	INTCS_VECT(ASA, 0x04c0), INTCS_VECT(JPU_JPEG, 0x0560),
+-	INTCS_VECT(LCDC, 0x0580), INTCS_VECT(LCRC, 0x05a0),
+-	INTCS_VECT(RTDMAC_2_DEI6, 0x1300), INTCS_VECT(RTDMAC_2_DEI7, 0x1320),
+-	INTCS_VECT(RTDMAC_2_DEI8, 0x1340), INTCS_VECT(RTDMAC_2_DEI9, 0x1360),
+-	INTCS_VECT(RTDMAC_3_DEI10, 0x1380), INTCS_VECT(RTDMAC_3_DEI11, 0x13a0),
+-	INTCS_VECT(FRC, 0x1700), INTCS_VECT(GCU, 0x1760),
+-	INTCS_VECT(LCDC1, 0x1780), INTCS_VECT(CSIRX, 0x17a0),
+-	INTCS_VECT(DSITX0_DSITX00, 0x17c0), INTCS_VECT(DSITX0_DSITX01, 0x17e0),
+-	INTCS_VECT(SPU2_SPU0, 0x1800), INTCS_VECT(SPU2_SPU1, 0x1820),
+-	INTCS_VECT(FSI, 0x1840),
+-	INTCS_VECT(TMU1_TUNI10, 0x1900), INTCS_VECT(TMU1_TUNI11, 0x1920),
+-	INTCS_VECT(TMU1_TUNI12, 0x1940),
+-	INTCS_VECT(TSIF2, 0x1960), INTCS_VECT(CMT4, 0x1980),
+-	INTCS_VECT(MFIS2, 0x1a00), INTCS_VECT(CPORTS2R, 0x1a20),
+-	INTCS_VECT(TSG, 0x1ae0), INTCS_VECT(DMASCH1, 0x1b00),
+-	INTCS_VECT(SCUW, 0x1b40),
+-	INTCS_VECT(VIO60, 0x1b60), INTCS_VECT(VIO61, 0x1b80),
+-	INTCS_VECT(CEU21, 0x1ba0), INTCS_VECT(CSI21, 0x1be0),
+-	INTCS_VECT(DSITX1_DSITX10, 0x1c00), INTCS_VECT(DSITX1_DSITX11, 0x1c20),
+-	INTCS_VECT(DISP, 0x1c40), INTCS_VECT(DSRV, 0x1c60),
+-	INTCS_VECT(EMUX2_EMUX20I, 0x1c80), INTCS_VECT(EMUX2_EMUX21I, 0x1ca0),
+-	INTCS_VECT(MSTIF0_MST00I, 0x1cc0), INTCS_VECT(MSTIF0_MST01I, 0x1ce0),
+-	INTCS_VECT(MSTIF1_MST10I, 0x1d00), INTCS_VECT(MSTIF1_MST11I, 0x1d20),
+-	INTCS_VECT(SPUV, 0x2300),
+-};
+-
+-static struct intc_group intcs_groups[] __initdata = {
+-	INTC_GROUP(RTDMAC_0, RTDMAC_0_DEI0, RTDMAC_0_DEI1,
+-		   RTDMAC_0_DEI2, RTDMAC_0_DEI3),
+-	INTC_GROUP(RTDMAC_1, RTDMAC_1_DEI4, RTDMAC_1_DEI5, RTDMAC_1_DADERR),
+-	INTC_GROUP(RTDMAC_2, RTDMAC_2_DEI6, RTDMAC_2_DEI7,
+-		   RTDMAC_2_DEI8, RTDMAC_2_DEI9),
+-	INTC_GROUP(RTDMAC_3, RTDMAC_3_DEI10, RTDMAC_3_DEI11),
+-	INTC_GROUP(TMU1, TMU1_TUNI12, TMU1_TUNI11, TMU1_TUNI10),
+-	INTC_GROUP(DSITX0, DSITX0_DSITX00, DSITX0_DSITX01),
+-	INTC_GROUP(SPU2, SPU2_SPU0, SPU2_SPU1),
+-	INTC_GROUP(MSU, MSU_MSU, MSU_MSU2),
+-};
+-
+-static struct intc_mask_reg intcs_mask_registers[] = {
+-	{ 0xffd20184, 0xffd201c4, 8, /* IMR1SA / IMCR1SA */
+-	  { 0, 0, 0, CEU,
+-	    0, 0, 0, 0 } },
+-	{ 0xffd20188, 0xffd201c8, 8, /* IMR2SA / IMCR2SA */
+-	  { 0, 0, 0, VPU,
+-	    BBIF2, 0, 0, MFI } },
+-	{ 0xffd2018c, 0xffd201cc, 8, /* IMR3SA / IMCR3SA */
+-	  { 0, 0, 0, _2DDMAC_2DDM0,
+-	    0, ASA, PEP, ICB } },
+-	{ 0xffd20190, 0xffd201d0, 8, /* IMR4SA / IMCR4SA */
+-	  { 0, 0, 0, CTI,
+-	    JPU_JPEG, 0, LCRC, LCDC } },
+-	{ 0xffd20194, 0xffd201d4, 8, /* IMR5SA / IMCR5SA */
+-	  { KEYSC_KEY, RTDMAC_1_DADERR, RTDMAC_1_DEI5, RTDMAC_1_DEI4,
+-	    RTDMAC_0_DEI3, RTDMAC_0_DEI2, RTDMAC_0_DEI1, RTDMAC_0_DEI0 } },
+-	{ 0xffd20198, 0xffd201d8, 8, /* IMR6SA / IMCR6SA */
+-	  { 0, 0, MSIOF, 0,
+-	    _3DG_SGX543, 0, 0, 0 } },
+-	{ 0xffd2019c, 0xffd201dc, 8, /* IMR7SA / IMCR7SA */
+-	  { 0, TMU0_TUNI02, TMU0_TUNI01, TMU0_TUNI00,
+-	    0, 0, 0, 0 } },
+-	{ 0xffd201a0, 0xffd201e0, 8, /* IMR8SA / IMCR8SA */
+-	  { 0, 0, 0, 0,
+-	    0, MSU_MSU, MSU_MSU2, MSUG } },
+-	{ 0xffd201a4, 0xffd201e4, 8, /* IMR9SA / IMCR9SA */
+-	  { 0, RWDT0, CMT2, CMT0,
+-	    0, 0, 0, 0 } },
+-	{ 0xffd201ac, 0xffd201ec, 8, /* IMR11SA / IMCR11SA */
+-	  { 0, 0, 0, 0,
+-	    0, TSIF1, LMB, TSIF0 } },
+-	{ 0xffd201b0, 0xffd201f0, 8, /* IMR12SA / IMCR12SA */
+-	  { 0, 0, 0, 0,
+-	    0, 0, PINTCS_PINT2, PINTCS_PINT1 } },
+-	{ 0xffd50180, 0xffd501c0, 8, /* IMR0SA3 / IMCR0SA3 */
+-	  { RTDMAC_2_DEI6, RTDMAC_2_DEI7, RTDMAC_2_DEI8, RTDMAC_2_DEI9,
+-	    RTDMAC_3_DEI10, RTDMAC_3_DEI11, 0, 0 } },
+-	{ 0xffd50190, 0xffd501d0, 8, /* IMR4SA3 / IMCR4SA3 */
+-	  { FRC, 0, 0, GCU,
+-	    LCDC1, CSIRX, DSITX0_DSITX00, DSITX0_DSITX01 } },
+-	{ 0xffd50194, 0xffd501d4, 8, /* IMR5SA3 / IMCR5SA3 */
+-	  { SPU2_SPU0, SPU2_SPU1, FSI, 0,
+-	    0, 0, 0, 0 } },
+-	{ 0xffd50198, 0xffd501d8, 8, /* IMR6SA3 / IMCR6SA3 */
+-	  { TMU1_TUNI10, TMU1_TUNI11, TMU1_TUNI12, 0,
+-	    TSIF2, CMT4, 0, 0 } },
+-	{ 0xffd5019c, 0xffd501dc, 8, /* IMR7SA3 / IMCR7SA3 */
+-	  { MFIS2, CPORTS2R, 0, 0,
+-	    0, 0, 0, TSG } },
+-	{ 0xffd501a0, 0xffd501e0, 8, /* IMR8SA3 / IMCR8SA3 */
+-	  { DMASCH1, 0, SCUW, VIO60,
+-	    VIO61, CEU21, 0, CSI21 } },
+-	{ 0xffd501a4, 0xffd501e4, 8, /* IMR9SA3 / IMCR9SA3 */
+-	  { DSITX1_DSITX10, DSITX1_DSITX11, DISP, DSRV,
+-	    EMUX2_EMUX20I, EMUX2_EMUX21I, MSTIF0_MST00I, MSTIF0_MST01I } },
+-	{ 0xffd501a8, 0xffd501e8, 8, /* IMR10SA3 / IMCR10SA3 */
+-	  { MSTIF0_MST00I, MSTIF0_MST01I, 0, 0,
+-	    0, 0, 0, 0  } },
+-	{ 0xffd60180, 0xffd601c0, 8, /* IMR0SA4 / IMCR0SA4 */
+-	  { SPUV, 0, 0, 0,
+-	    0, 0, 0, 0  } },
+-};
+-
+-/* Priority is needed for INTCA to receive the INTCS interrupt */
+-static struct intc_prio_reg intcs_prio_registers[] = {
+-	{ 0xffd20000, 0, 16, 4, /* IPRAS */ { CTI, 0, _2DDMAC_2DDM0, ICB } },
+-	{ 0xffd20004, 0, 16, 4, /* IPRBS */ { JPU_JPEG, LCDC, 0, LCRC } },
+-	{ 0xffd20008, 0, 16, 4, /* IPRCS */ { BBIF2, 0, 0, 0 } },
+-	{ 0xffd2000c, 0, 16, 4, /* IPRDS */ { PINTCS_PINT1, PINTCS_PINT2,
+-					      0, 0 } },
+-	{ 0xffd20010, 0, 16, 4, /* IPRES */ { RTDMAC_0, CEU, MFI, VPU } },
+-	{ 0xffd20014, 0, 16, 4, /* IPRFS */ { KEYSC_KEY, RTDMAC_1,
+-					      CMT2, CMT0 } },
+-	{ 0xffd20018, 0, 16, 4, /* IPRGS */ { TMU0_TUNI00, TMU0_TUNI01,
+-					      TMU0_TUNI02, TSIF1 } },
+-	{ 0xffd2001c, 0, 16, 4, /* IPRHS */ { VINT, 0, 0, 0 } },
+-	{ 0xffd20020, 0, 16, 4, /* IPRIS */ { 0, MSIOF, TSIF0, 0 } },
+-	{ 0xffd20024, 0, 16, 4, /* IPRJS */ { 0, _3DG_SGX543, MSUG, MSU } },
+-	{ 0xffd20028, 0, 16, 4, /* IPRKS */ { 0, ASA, LMB, PEP } },
+-	{ 0xffd20030, 0, 16, 4, /* IPRMS */ { 0, 0, 0, RWDT0 } },
+-	{ 0xffd50000, 0, 16, 4, /* IPRAS3 */ { RTDMAC_2, 0, 0, 0 } },
+-	{ 0xffd50004, 0, 16, 4, /* IPRBS3 */ { RTDMAC_3, 0, 0, 0 } },
+-	{ 0xffd50020, 0, 16, 4, /* IPRIS3 */ { FRC, 0, 0, 0 } },
+-	{ 0xffd50024, 0, 16, 4, /* IPRJS3 */ { LCDC1, CSIRX, DSITX0, 0 } },
+-	{ 0xffd50028, 0, 16, 4, /* IPRKS3 */ { SPU2, 0, FSI, 0 } },
+-	{ 0xffd50030, 0, 16, 4, /* IPRMS3 */ { TMU1, 0, 0, TSIF2 } },
+-	{ 0xffd50034, 0, 16, 4, /* IPRNS3 */ { CMT4, 0, 0, 0 } },
+-	{ 0xffd50038, 0, 16, 4, /* IPROS3 */ { MFIS2, CPORTS2R, 0, 0 } },
+-	{ 0xffd50040, 0, 16, 4, /* IPRQS3 */ { DMASCH1, 0, SCUW, VIO60 } },
+-	{ 0xffd50044, 0, 16, 4, /* IPRRS3 */ { VIO61, CEU21, 0, CSI21 } },
+-	{ 0xffd50048, 0, 16, 4, /* IPRSS3 */ { DSITX1_DSITX10, DSITX1_DSITX11,
+-					       DISP, DSRV } },
+-	{ 0xffd5004c, 0, 16, 4, /* IPRTS3 */ { EMUX2_EMUX20I, EMUX2_EMUX21I,
+-					       MSTIF0_MST00I, MSTIF0_MST01I } },
+-	{ 0xffd50050, 0, 16, 4, /* IPRUS3 */ { MSTIF1_MST10I, MSTIF1_MST11I,
+-					       0, 0 } },
+-	{ 0xffd60000, 0, 16, 4, /* IPRAS4 */ { SPUV, 0, 0, 0 } },
+-};
+-
+-static struct resource intcs_resources[] __initdata = {
+-	[0] = {
+-		.start	= 0xffd20000,
+-		.end	= 0xffd201ff,
+-		.flags	= IORESOURCE_MEM,
+-	},
+-	[1] = {
+-		.start	= 0xffd50000,
+-		.end	= 0xffd501ff,
+-		.flags	= IORESOURCE_MEM,
+-	},
+-	[2] = {
+-		.start	= 0xffd60000,
+-		.end	= 0xffd601ff,
+-		.flags	= IORESOURCE_MEM,
+-	}
+-};
+-
+-static struct intc_desc intcs_desc __initdata = {
+-	.name = "sh73a0-intcs",
+-	.resource = intcs_resources,
+-	.num_resources = ARRAY_SIZE(intcs_resources),
+-	.hw = INTC_HW_DESC(intcs_vectors, intcs_groups, intcs_mask_registers,
+-			   intcs_prio_registers, NULL, NULL),
+-};
+-
+-static struct irqaction sh73a0_intcs_cascade;
+-
+-static irqreturn_t sh73a0_intcs_demux(int irq, void *dev_id)
+-{
+-	unsigned int evtcodeas = ioread32((void __iomem *)dev_id);
+-
+-	generic_handle_irq(intcs_evt2irq(evtcodeas));
+-
+-	return IRQ_HANDLED;
+-}
+-
+-#define PINTER0_PHYS 0xe69000a0
+-#define PINTER1_PHYS 0xe69000a4
+-#define PINTER0_VIRT IOMEM(0xe69000a0)
+-#define PINTER1_VIRT IOMEM(0xe69000a4)
+-#define PINTRR0 IOMEM(0xe69000d0)
+-#define PINTRR1 IOMEM(0xe69000d4)
+-
+-#define PINT0A_IRQ(n, irq) INTC_IRQ((n), SH73A0_PINT0_IRQ(irq))
+-#define PINT0B_IRQ(n, irq) INTC_IRQ((n), SH73A0_PINT0_IRQ(irq + 8))
+-#define PINT0C_IRQ(n, irq) INTC_IRQ((n), SH73A0_PINT0_IRQ(irq + 16))
+-#define PINT0D_IRQ(n, irq) INTC_IRQ((n), SH73A0_PINT0_IRQ(irq + 24))
+-#define PINT1E_IRQ(n, irq) INTC_IRQ((n), SH73A0_PINT1_IRQ(irq))
+-
+-INTC_PINT(intc_pint0, PINTER0_PHYS, 0xe69000b0, "sh73a0-pint0",		\
+-  INTC_PINT_E(A), INTC_PINT_E(B), INTC_PINT_E(C), INTC_PINT_E(D),	\
+-  INTC_PINT_V(A, PINT0A_IRQ), INTC_PINT_V(B, PINT0B_IRQ),		\
+-  INTC_PINT_V(C, PINT0C_IRQ), INTC_PINT_V(D, PINT0D_IRQ),		\
+-  INTC_PINT_E(A), INTC_PINT_E(B), INTC_PINT_E(C), INTC_PINT_E(D),	\
+-  INTC_PINT_E(A), INTC_PINT_E(B), INTC_PINT_E(C), INTC_PINT_E(D));
+-
+-INTC_PINT(intc_pint1, PINTER1_PHYS, 0xe69000c0, "sh73a0-pint1",		\
+-  INTC_PINT_E(E), INTC_PINT_E_EMPTY, INTC_PINT_E_EMPTY, INTC_PINT_E_EMPTY, \
+-  INTC_PINT_V(E, PINT1E_IRQ), INTC_PINT_V_NONE,				\
+-  INTC_PINT_V_NONE, INTC_PINT_V_NONE,					\
+-  INTC_PINT_E_NONE, INTC_PINT_E_NONE, INTC_PINT_E_NONE, INTC_PINT_E(E), \
+-  INTC_PINT_E(E), INTC_PINT_E_NONE, INTC_PINT_E_NONE, INTC_PINT_E_NONE);
+-
+-static struct irqaction sh73a0_pint0_cascade;
+-static struct irqaction sh73a0_pint1_cascade;
+-
+-static void pint_demux(void __iomem *rr, void __iomem *er, int base_irq)
+-{
+-	unsigned long value =  ioread32(rr) & ioread32(er);
+-	int k;
+-
+-	for (k = 0; k < 32; k++) {
+-		if (value & (1 << (31 - k))) {
+-			generic_handle_irq(base_irq + k);
+-			iowrite32(~(1 << (31 - k)), rr);
+-		}
+-	}
+-}
+-
+-static irqreturn_t sh73a0_pint0_demux(int irq, void *dev_id)
+-{
+-	pint_demux(PINTRR0, PINTER0_VIRT, SH73A0_PINT0_IRQ(0));
+-	return IRQ_HANDLED;
+-}
+-
+-static irqreturn_t sh73a0_pint1_demux(int irq, void *dev_id)
+-{
+-	pint_demux(PINTRR1, PINTER1_VIRT, SH73A0_PINT1_IRQ(0));
+-	return IRQ_HANDLED;
+-}
+-
+-void __init sh73a0_init_irq(void)
+-{
+-	void __iomem *gic_dist_base = IOMEM(0xf0001000);
+-	void __iomem *gic_cpu_base = IOMEM(0xf0000100);
+-	void __iomem *intevtsa = ioremap_nocache(0xffd20100, PAGE_SIZE);
+-
+-	gic_set_irqchip_flags(IRQCHIP_SKIP_SET_WAKE);
+-	gic_init(0, 29, gic_dist_base, gic_cpu_base);
+-
+-	register_intc_controller(&intcs_desc);
+-	register_intc_controller(&intc_pint0_desc);
+-	register_intc_controller(&intc_pint1_desc);
+-
+-	/* demux using INTEVTSA */
+-	sh73a0_intcs_cascade.name = "INTCS cascade";
+-	sh73a0_intcs_cascade.handler = sh73a0_intcs_demux;
+-	sh73a0_intcs_cascade.dev_id = intevtsa;
+-	setup_irq(gic_spi(50), &sh73a0_intcs_cascade);
+-
+-	/* PINT pins are sanely tied to the GIC as SPI */
+-	sh73a0_pint0_cascade.name = "PINT0 cascade";
+-	sh73a0_pint0_cascade.handler = sh73a0_pint0_demux;
+-	setup_irq(gic_spi(33), &sh73a0_pint0_cascade);
+-
+-	sh73a0_pint1_cascade.name = "PINT1 cascade";
+-	sh73a0_pint1_cascade.handler = sh73a0_pint1_demux;
+-	setup_irq(gic_spi(34), &sh73a0_pint1_cascade);
+-}
 -- 
 1.9.1
