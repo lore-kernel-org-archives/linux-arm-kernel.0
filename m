@@ -1,141 +1,101 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 17 Jun 2015 15:06:34 +0100
-Subject: [PATCH v3 06/10] arm: simplify MMIO dispatching
-In-Reply-To: <55817B07.8010502@arm.com>
-References: <1434540121-21283-1-git-send-email-andre.przywara@arm.com>
- <1434540121-21283-7-git-send-email-andre.przywara@arm.com>
- <55816C9F.1090500@arm.com> <55817B07.8010502@arm.com>
-Message-ID: <55817EEA.9060402@arm.com>
+From: tglx@linutronix.de (Thomas Gleixner)
+Date: Wed, 17 Jun 2015 16:10:02 +0200 (CEST)
+Subject: [PATCH 1/9] irq: add irq_set_chained_handler_and_data()
+In-Reply-To: <E1Z4yzs-0002Rw-4B@rmk-PC.arm.linux.org.uk>
+References: <E1Z4yzs-0002Rw-4B@rmk-PC.arm.linux.org.uk>
+Message-ID: <alpine.DEB.2.11.1506171609390.4107@nanos>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 17/06/15 14:49, Andre Przywara wrote:
-> Hi Marc,
-> 
-> On 06/17/2015 01:48 PM, Marc Zyngier wrote:
->> On 17/06/15 12:21, Andre Przywara wrote:
->>> Currently we separate any incoming MMIO request into one of the ARM
->>> memory map regions and take care to spare the GIC.
->>> It turns out that this is unnecessary, as we only have one special
->>> region (the IO port area in the first 64 KByte). The MMIO rbtree
->>> takes care about unhandled MMIO ranges, so we can simply drop all the
->>> special range checking (except that for the IO range) in
->>> kvm_cpu__emulate_mmio().
->>> As the GIC is handled in the kernel, a GIC MMIO access should never
->>> reach userland (and we don't know what to do with it anyway).
->>> This lets us delete some more code and simplifies future extensions
->>> (like expanding the GIC regions).
->>> To be in line with the other architectures, move the now simpler
->>> code into a header file.
->>>
->>> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
->>> ---
->>>  arm/include/arm-common/kvm-arch.h     | 12 ------------
->>>  arm/include/arm-common/kvm-cpu-arch.h | 14 ++++++++++++--
->>>  arm/kvm-cpu.c                         | 16 ----------------
->>>  3 files changed, 12 insertions(+), 30 deletions(-)
->>>
->>> diff --git a/arm/include/arm-common/kvm-arch.h b/arm/include/arm-common/kvm-arch.h
->>> index 082131d..90d6733 100644
->>> --- a/arm/include/arm-common/kvm-arch.h
->>> +++ b/arm/include/arm-common/kvm-arch.h
->>> @@ -45,18 +45,6 @@ static inline bool arm_addr_in_ioport_region(u64 phys_addr)
->>>  	return phys_addr >= KVM_IOPORT_AREA && phys_addr < limit;
->>>  }
->>>  
->>> -static inline bool arm_addr_in_virtio_mmio_region(u64 phys_addr)
->>> -{
->>> -	u64 limit = KVM_VIRTIO_MMIO_AREA + ARM_VIRTIO_MMIO_SIZE;
->>> -	return phys_addr >= KVM_VIRTIO_MMIO_AREA && phys_addr < limit;
->>> -}
->>> -
->>> -static inline bool arm_addr_in_pci_region(u64 phys_addr)
->>> -{
->>> -	u64 limit = KVM_PCI_CFG_AREA + ARM_PCI_CFG_SIZE + ARM_PCI_MMIO_SIZE;
->>> -	return phys_addr >= KVM_PCI_CFG_AREA && phys_addr < limit;
->>> -}
->>> -
->>>  struct kvm_arch {
->>>  	/*
->>>  	 * We may have to align the guest memory for virtio, so keep the
->>> diff --git a/arm/include/arm-common/kvm-cpu-arch.h b/arm/include/arm-common/kvm-cpu-arch.h
->>> index 36c7872..329979a 100644
->>> --- a/arm/include/arm-common/kvm-cpu-arch.h
->>> +++ b/arm/include/arm-common/kvm-cpu-arch.h
->>> @@ -44,8 +44,18 @@ static inline bool kvm_cpu__emulate_io(struct kvm_cpu *vcpu, u16 port, void *dat
->>>  	return false;
->>>  }
->>>  
->>> -bool kvm_cpu__emulate_mmio(struct kvm_cpu *vcpu, u64 phys_addr, u8 *data,
->>> -			   u32 len, u8 is_write);
->>> +static inline bool kvm_cpu__emulate_mmio(struct kvm_cpu *vcpu, u64 phys_addr,
->>> +					 u8 *data, u32 len, u8 is_write)
->>> +{
->>> +	if (arm_addr_in_ioport_region(phys_addr)) {
->>> +		int direction = is_write ? KVM_EXIT_IO_OUT : KVM_EXIT_IO_IN;
->>> +		u16 port = (phys_addr - KVM_IOPORT_AREA) & USHRT_MAX;
->>> +
->>> +		return kvm__emulate_io(vcpu, port, data, direction, len, 1);
->>> +	}
->>> +
->>> +	return kvm__emulate_mmio(vcpu, phys_addr, data, len, is_write);
->>> +}
->>>  
->>>  unsigned long kvm_cpu__get_vcpu_mpidr(struct kvm_cpu *vcpu);
->>>  
->>> diff --git a/arm/kvm-cpu.c b/arm/kvm-cpu.c
->>> index ab08815..7780251 100644
->>> --- a/arm/kvm-cpu.c
->>> +++ b/arm/kvm-cpu.c
->>> @@ -139,22 +139,6 @@ bool kvm_cpu__handle_exit(struct kvm_cpu *vcpu)
->>>  	return false;
->>>  }
->>>  
->>> -bool kvm_cpu__emulate_mmio(struct kvm_cpu *vcpu, u64 phys_addr, u8 *data,
->>> -			   u32 len, u8 is_write)
->>> -{
->>> -	if (arm_addr_in_virtio_mmio_region(phys_addr)) {
->>> -		return kvm__emulate_mmio(vcpu, phys_addr, data, len, is_write);
->>> -	} else if (arm_addr_in_ioport_region(phys_addr)) {
->>> -		int direction = is_write ? KVM_EXIT_IO_OUT : KVM_EXIT_IO_IN;
->>> -		u16 port = (phys_addr - KVM_IOPORT_AREA) & USHRT_MAX;
->>> -		return kvm__emulate_io(vcpu, port, data, direction, len, 1);
->>> -	} else if (arm_addr_in_pci_region(phys_addr)) {
->>> -		return kvm__emulate_mmio(vcpu, phys_addr, data, len, is_write);
->>> -	}
->>
->> Can you explain why this arm_addr_in_pci_region(phys_addr) check has
->> disappeared in your updated version on this function? It may be a non
->> issue, but I'd very much like to understand.
-> 
-> If you look above the calls to kvm__emulate_mmio() are exactly the same
-> for the PCI and the virtio_mmio region, also as the areas are
-> non-overlapping the if branches can be reordered.
-> arm_addr_in_virtio_mmio_region() is true between 64k and (1GB - GIC),
-> while arm_addr_in_pci_region() gives true between 1GB and 2GB.
-> 
-> So this translates into: do kvm__emulate_io() for anything below 64K and
-> kvm__emulate_mmio() for everything else except for the GIC area,
-> admittedly in a quite convoluted way.
-> 
-> So my patch just removes the check for the GIC region and rewrites it to
-> match that description in the last sentence, with the rationale given in
-> the commit message.
-> Does that make sense?
-> If you desperately want some extra barfing for misguided GIC requests,
-> I'd rather introduce that to the "no match" code path in
-> kvm__emulate_mmio or register some dummy MMIO regions for the GIC with
-> panic() handlers.
+On Tue, 16 Jun 2015, Russell King wrote:
 
-No, that's fine.
+> Driver authors seem to get the ordering of irq_set_chained_handler()
+> and irq_set_handler_data() wrong - ordering the former before the
+> latter.  This opens a race window where, if there is an interrupt
+> pending, the handler will be called between these two calls,
+> potentially resulting in an oops.
+> 
+> Provide a single interface to set both of these together, especially
+> as that's commonly what is required.
+> 
+> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+> ---
+> It probably makes sense to convert everything over to this new
+> registration function, and kill all users of irq_set_chained_handler()
+> to prevent this problem recurring.  Thoughts?
 
-I just wondered what was the rational behind having the
-arm_addr_in_pci_region() call there. It might have guarded something,
-but if you're absolutely positive that this doesn't cause a regression,
-that's OK with me.
+Yes. Classic coccinelle problem. Here is the semantic patch:
 
-Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
+@@
+expression E1, E2, E3;
+@@
+-irq_set_chained_handler(E1, E3);
+...
+-irq_set_handler_data(E1, E2);
++irq_set_chained_handler_and_data(E1, E3, E2);
 
-	M.
--- 
-Jazz is not dead. It just smells funny...
+This finds and corrects all instances which get it wrong:
+
+arch:
+ arm/common/locomo.c                   |    3 +--
+ arm/common/sa1111.c                   |    3 +--
+ arm/mach-gemini/gpio.c                |    4 ++--
+ avr32/mach-at32ap/extint.c            |    3 +--
+ m68k/mac/psc.c                        |   12 ++++--------
+ mips/ath25/ar2315.c                   |    4 ++--
+ mips/ath25/ar5312.c                   |    4 ++--
+ mips/pci/pci-ar2315.c                 |    4 ++--
+ mips/ralink/irq.c                     |    3 +--
+ sh/intc/core.c                        |    5 +++--
+
+drivers:
+ dma/ipu/ipu_irq.c                     |    6 ++----
+ gpio/gpio-bcm-kona.c                  |    5 +++--
+ gpio/gpio-davinci.c                   |   10 ++--------
+ gpio/gpio-dwapb.c                     |    4 ++--
+ gpio/gpio-msic.c                      |    3 +--
+ gpio/gpio-mxc.c                       |   10 +++++-----
+ gpio/gpio-mxs.c                       |    4 ++--
+ gpio/gpio-tegra.c                     |    4 ++--
+ gpu/ipu-v3/ipu-common.c               |   13 +++++--------
+ irqchip/irq-keystone.c                |    4 ++--
+ irqchip/spear-shirq.c                 |    3 +--
+ mfd/pm8921-core.c                     |    6 ++----
+ mfd/t7l66xb.c                         |    3 +--
+ mfd/tc6393xb.c                        |    3 +--
+ pci/host/pci-keystone.c               |    7 +++----
+ pinctrl/mediatek/pinctrl-mtk-common.c |    3 +--
+ pinctrl/pinctrl-adi2.c                |    4 ++--
+ pinctrl/pinctrl-st.c                  |    4 ++--
+ pinctrl/samsung/pinctrl-exynos.c      |    4 ++--
+ pinctrl/samsung/pinctrl-s3c24xx.c     |    3 +--
+ pinctrl/samsung/pinctrl-s3c64xx.c     |    8 ++++----
+ pinctrl/sunxi/pinctrl-sunxi.c         |    6 +++---
+ spmi/spmi-pmic-arb.c                  |    6 ++----
+ 33 files changed, 70 insertions(+), 98 deletions(-)
+
+If we revert the search pattern we get the ones which got it right:
+
+@@
+expression E1, E2, E3;
+@@
+-irq_set_handler_data(E1, E2);
+...
+-irq_set_chained_handler(E1, E3);
++irq_set_chained_handler_and_data(E1, E3, E2);
+
+That handles another bunch and leaves us with 135 instances of
+irq_set_chained_handler() which do not set handler data. So its
+trivial to change them to
+
+ irq_set_chained_handler_and_data(irq, handler, NULL);
+
+and then remove irq_set_chained_handler()
+
+If thats ok for you, then i apply the lot you sent and run the cocci
+scripts right at rc1. I have another set of transformations in that
+area pending.
+
+Thanks,
+
+	tglx
