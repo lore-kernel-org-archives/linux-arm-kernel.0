@@ -1,63 +1,139 @@
 From: dave.long@linaro.org (David Long)
-Date: Wed, 17 Jun 2015 14:30:40 -0400
-Subject: [PATCH 1/2] Move the pt_regs_offset struct definition from arch
- to common include file
-In-Reply-To: <CAL_JsqK3L9Hv9bhAtwAAXVYjLJBTOG9=4ddOo-SFqnD-_KieCQ@mail.gmail.com>
-References: <1434386579-6045-1-git-send-email-dave.long@linaro.org>
- <1434386579-6045-2-git-send-email-dave.long@linaro.org>
- <CAL_JsqK3L9Hv9bhAtwAAXVYjLJBTOG9=4ddOo-SFqnD-_KieCQ@mail.gmail.com>
-Message-ID: <5581BCD0.2040405@linaro.org>
+Date: Wed, 17 Jun 2015 14:37:00 -0400
+Subject: [PATCH v7 5/7] arm64: Add trampoline code for kretprobes
+In-Reply-To: <55803C47.6030000@redhat.com>
+References: <1434395229-6654-1-git-send-email-dave.long@linaro.org>
+ <1434395229-6654-6-git-send-email-dave.long@linaro.org>
+ <55803C47.6030000@redhat.com>
+Message-ID: <5581BE4C.8070604@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/16/15 09:17, Rob Herring wrote:
-> On Mon, Jun 15, 2015 at 11:42 AM, David Long <dave.long@linaro.org> wrote:
->> From: "David A. Long" <dave.long@linaro.org>
+On 06/16/15 11:09, William Cohen wrote:
+> On 06/15/2015 03:07 PM, David Long wrote:
+>> From: William Cohen <wcohen@redhat.com>
 >>
->> The pt_regs_offset structure is used for HAVE_REGS_AND_STACK_ACCESS_API
->>   feature and has identical definitions in four different arch ptrace.h
->> include files. It seems unlikely that definition would ever need to be
->> changed regardless of architecture so lets move it into
->> include/linux/ptrace.h.
+>> The trampoline code is used by kretprobes to capture a return from a probed
+>> function.  This is done by saving the registers, calling the handler, and
+>> restoring the registers.  The code then returns to the roginal saved caller
+>
+> s/roginal/original
+>
+
+Hopefully no one wants a v8 if it turns out only to be to fix this typo 
+in the commit description.  I'll keep this in mind if a respin is needed 
+for other reasons.
+
+>> return address.  It is necessary to do this directly instead of using a
+>> software breakpoint because the code used in processing that breakpoint
+>> could itself be kprobe'd and cause a problematic reentry into the debug
+>> exception handler.
 >>
+>> Signed-off-by: William Cohen <wcohen@redhat.com>
 >> Signed-off-by: David A. Long <dave.long@linaro.org>
 >> ---
->>   arch/arm/kernel/ptrace.c     | 5 -----
->>   arch/powerpc/kernel/ptrace.c | 5 -----
->>   arch/sh/include/asm/ptrace.h | 5 -----
->>   arch/x86/kernel/ptrace.c     | 5 -----
->>   include/linux/ptrace.h       | 9 +++++++++
->>   5 files changed, 9 insertions(+), 20 deletions(-)
+>>   arch/arm64/include/asm/kprobes.h  |  1 +
+>>   arch/arm64/kernel/kprobes-arm64.h | 41 +++++++++++++++++++++++++++++++++++++++
+>>   arch/arm64/kernel/kprobes.c       | 26 +++++++++++++++++++++++++
+>>   3 files changed, 68 insertions(+)
 >>
->> diff --git a/arch/arm/kernel/ptrace.c b/arch/arm/kernel/ptrace.c
->> index ef9119f..fb45cf1 100644
->> --- a/arch/arm/kernel/ptrace.c
->> +++ b/arch/arm/kernel/ptrace.c
->> @@ -59,11 +59,6 @@
->>   #define BREAKINST_THUMB        0xde01
->>   #endif
+>> diff --git a/arch/arm64/include/asm/kprobes.h b/arch/arm64/include/asm/kprobes.h
+>> index af31c4d..d081f49 100644
+>> --- a/arch/arm64/include/asm/kprobes.h
+>> +++ b/arch/arm64/include/asm/kprobes.h
+>> @@ -58,5 +58,6 @@ int kprobe_exceptions_notify(struct notifier_block *self,
+>>   			     unsigned long val, void *data);
+>>   int kprobe_breakpoint_handler(struct pt_regs *regs, unsigned int esr);
+>>   int kprobe_single_step_handler(struct pt_regs *regs, unsigned int esr);
+>> +void kretprobe_trampoline(void);
 >>
->> -struct pt_regs_offset {
->> -       const char *name;
->> -       int offset;
->> -};
->> -
->>   #define REG_OFFSET_NAME(r) \
->>          {.name = #r, .offset = offsetof(struct pt_regs, ARM_##r)}
->>   #define REG_OFFSET_END {.name = NULL, .offset = 0}
+>>   #endif /* _ARM_KPROBES_H */
+>> diff --git a/arch/arm64/kernel/kprobes-arm64.h b/arch/arm64/kernel/kprobes-arm64.h
+>> index ff8a55f..bdcfa62 100644
+>> --- a/arch/arm64/kernel/kprobes-arm64.h
+>> +++ b/arch/arm64/kernel/kprobes-arm64.h
+>> @@ -27,4 +27,45 @@ extern kprobes_pstate_check_t * const kprobe_condition_checks[16];
+>>   enum kprobe_insn __kprobes
+>>   arm_kprobe_decode_insn(kprobe_opcode_t insn, struct arch_specific_insn *asi);
+>>
+>> +#define SAVE_REGS_STRING\
+>> +	"	stp x0, x1, [sp, #16 * 0]\n"	\
+>> +	"	stp x2, x3, [sp, #16 * 1]\n"	\
+>> +	"	stp x4, x5, [sp, #16 * 2]\n"	\
+>> +	"	stp x6, x7, [sp, #16 * 3]\n"	\
+>> +	"	stp x8, x9, [sp, #16 * 4]\n"	\
+>> +	"	stp x10, x11, [sp, #16 * 5]\n"	\
+>> +	"	stp x12, x13, [sp, #16 * 6]\n"	\
+>> +	"	stp x14, x15, [sp, #16 * 7]\n"	\
+>> +	"	stp x16, x17, [sp, #16 * 8]\n"	\
+>> +	"	stp x18, x19, [sp, #16 * 9]\n"	\
+>> +	"	stp x20, x21, [sp, #16 * 10]\n"	\
+>> +	"	stp x22, x23, [sp, #16 * 11]\n"	\
+>> +	"	stp x24, x25, [sp, #16 * 12]\n"	\
+>> +	"	stp x26, x27, [sp, #16 * 13]\n"	\
+>> +	"	stp x28, x29, [sp, #16 * 14]\n"	\
+>> +	"	str x30,   [sp, #16 * 15]\n"    \
+>> +	"	mrs x0, nzcv\n"			\
+>> +	"	str x0, [sp, #8 * 33]\n"
+>> +
+>> +
+>> +#define RESTORE_REGS_STRING\
+>> +	"	ldr x0, [sp, #8 * 33]\n"	\
+>> +	"	msr nzcv, x0\n"			\
+>> +	"	ldp x0, x1, [sp, #16 * 0]\n"	\
+>> +	"	ldp x2, x3, [sp, #16 * 1]\n"	\
+>> +	"	ldp x4, x5, [sp, #16 * 2]\n"	\
+>> +	"	ldp x6, x7, [sp, #16 * 3]\n"	\
+>> +	"	ldp x8, x9, [sp, #16 * 4]\n"	\
+>> +	"	ldp x10, x11, [sp, #16 * 5]\n"	\
+>> +	"	ldp x12, x13, [sp, #16 * 6]\n"	\
+>> +	"	ldp x14, x15, [sp, #16 * 7]\n"	\
+>> +	"	ldp x16, x17, [sp, #16 * 8]\n"	\
+>> +	"	ldp x18, x19, [sp, #16 * 9]\n"	\
+>> +	"	ldp x20, x21, [sp, #16 * 10]\n"	\
+>> +	"	ldp x22, x23, [sp, #16 * 11]\n"	\
+>> +	"	ldp x24, x25, [sp, #16 * 12]\n"	\
+>> +	"	ldp x26, x27, [sp, #16 * 13]\n"	\
+>> +	"	ldp x28, x29, [sp, #16 * 14]\n"	\
+>> +	"	ldr x30,   [sp, #16 * 15]\n"
+>> +
+>>   #endif /* _ARM_KERNEL_KPROBES_ARM64_H */
+>> diff --git a/arch/arm64/kernel/kprobes.c b/arch/arm64/kernel/kprobes.c
+>> index 6255814..570218c 100644
+>> --- a/arch/arm64/kernel/kprobes.c
+>> +++ b/arch/arm64/kernel/kprobes.c
+>> @@ -560,6 +560,32 @@ int __kprobes longjmp_break_handler(struct kprobe *p, struct pt_regs *regs)
+>>   	return 0;
+>>   }
+>>
+>> +/*
+>> + * When a retprobed function returns, this code saves registers and
+>> + * calls trampoline_handler() runs, which calls the kretprobe's handler.
+>> + */
+>> +static void __used __kprobes kretprobe_trampoline_holder(void)
+>> +{
+>> +	asm volatile (".global kretprobe_trampoline\n"
+>> +			"kretprobe_trampoline:\n"
+>> +			"sub sp, sp, %0\n"
+>> +			SAVE_REGS_STRING
+>> +			"mov x0, sp\n"
+>> +			"bl trampoline_probe_handler\n"
+>> +			/* Replace trampoline address in lr with actual
+>> +			   orig_ret_addr return address. */
+>> +			"str x0, [sp, #16 * 15]\n"
+>> +			RESTORE_REGS_STRING
+>> +			"add sp, sp, %0\n"
+>> +			"ret\n"
+>> +		      : : "I"(sizeof(struct pt_regs)) : "memory");
+>> +}
+>> +
+>> +static void __kprobes __used *trampoline_probe_handler(struct pt_regs *regs)
+>> +{
+>> +	return (void *) 0;
+>> +}
+>> +
+>>   int __init arch_init_kprobes(void)
+>>   {
+>>   	return 0;
+>>
 >
-> Can't you also move these? ARM is complicated with the "ARM_"
-> prefixing, but the others appear to be the same. Maybe you can remove
-> the prefix or redefine the macro for ARM.
->
-> Rob
->
-
-That would mandate that all the architecture-specific pt_regs structures 
-would have to use a top-level named field for each named register.  That 
-seems to me like an unnecessary restriction when the point of 
-regs_offset_table is to provide the offset of the register inside an 
-arbitarily complex pt_regs struct.  The often redundant definition of 
-these two macros doesn't seem to me that high a price for that.
-
--dl
