@@ -1,23 +1,76 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Wed, 17 Jun 2015 18:27:19 +0100
-Subject: [PATCH 06/13] of/platform: Set fwnode field for new devices
-In-Reply-To: <1434548543-22949-7-git-send-email-tomeu.vizoso@collabora.com>
-References: <1434548543-22949-1-git-send-email-tomeu.vizoso@collabora.com>
- <1434548543-22949-7-git-send-email-tomeu.vizoso@collabora.com>
-Message-ID: <20150617172719.GY14071@sirena.org.uk>
+From: aisheng.dong@freescale.com (Dong Aisheng)
+Date: Thu, 18 Jun 2015 01:33:33 +0800
+Subject: [PATCH 0/5] dts: imx: fix sd card gpio polarity specified in device
+ tree
+Message-ID: <1434562418-24090-1-git-send-email-aisheng.dong@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 17, 2015 at 03:42:16PM +0200, Tomeu Vizoso wrote:
+Commit 8d86e4f mmc: sdhci-esdhc-imx: Call mmc_of_parse()
+serious break the sd card detect/write protect function
+since a lot of GPIO flags of cd-gpios/wp-gpios are wrongly set
+in devicetree.
+Before commit 8d86e4f, we do not use GPIO flags passed from
+devicetree. But after it, GPIO flags specfied in dt becomes valid
+and will affect the normal cd/wp function.
 
-> When allocating a new platform device, set the fwnode field in the
-> struct device to point to the device_node.
+This patch series fixes all wrongly set GPIO flags in devicetree.
 
-Why?
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150617/65482507/attachment.sig>
+Because the eSDHC/uSDHC host driver only supports
+MMC_CAP2_RO_ACTIVE_HIGH and no MMC_CAP2_CD_ACTIVE_HIGH,
+so i changed the dts accordingly.
+
+It is supposed to not cause any function break since all boards
+affected work well before commit 8d86e4f with this type of CAPs.
+
+However, i still CCed each board maintainer affected by this change,
+Please help review and let me know if any wrong change.
+
+The series is based on shawn/for-next tree.
+
+Fixes: 8d86e4fcccf6 ("mmc: sdhci-esdhc-imx: Call mmc_of_parse()")
+
+Dong Aisheng (5):
+  dts: imx51: fix sd card gpio polarity specified in device tree
+  dts: imx53: fix sd card gpio polarity specified in device tree
+  dts: imx6: fix sd card gpio polarity specified in device tree
+  dts: imx25: fix sd card gpio polarity specified in device tree
+  dts: imx7: fix sd card gpio polarity specified in device tree
+
+ arch/arm/boot/dts/imx25-pdk.dts              |  4 ++--
+ arch/arm/boot/dts/imx51-apf51dev.dts         |  2 +-
+ arch/arm/boot/dts/imx53-ard.dts              |  4 ++--
+ arch/arm/boot/dts/imx53-m53evk.dts           |  4 ++--
+ arch/arm/boot/dts/imx53-qsb-common.dtsi      |  4 ++--
+ arch/arm/boot/dts/imx53-smd.dts              |  4 ++--
+ arch/arm/boot/dts/imx53-tqma53.dtsi          |  4 ++--
+ arch/arm/boot/dts/imx53-tx53.dtsi            |  4 ++--
+ arch/arm/boot/dts/imx53-voipac-bsb.dts       |  4 ++--
+ arch/arm/boot/dts/imx6dl-riotboard.dts       |  8 ++++----
+ arch/arm/boot/dts/imx6q-arm2.dts             |  5 +++--
+ arch/arm/boot/dts/imx6q-gk802.dts            |  3 ++-
+ arch/arm/boot/dts/imx6q-tbs2910.dts          |  4 ++--
+ arch/arm/boot/dts/imx6qdl-aristainetos.dtsi  |  4 ++--
+ arch/arm/boot/dts/imx6qdl-aristainetos2.dtsi |  4 ++--
+ arch/arm/boot/dts/imx6qdl-cubox-i.dtsi       |  2 +-
+ arch/arm/boot/dts/imx6qdl-dfi-fs700-m60.dtsi |  4 +++-
+ arch/arm/boot/dts/imx6qdl-gw52xx.dtsi        |  2 +-
+ arch/arm/boot/dts/imx6qdl-gw53xx.dtsi        |  2 +-
+ arch/arm/boot/dts/imx6qdl-gw54xx.dtsi        |  2 +-
+ arch/arm/boot/dts/imx6qdl-hummingboard.dtsi  |  2 +-
+ arch/arm/boot/dts/imx6qdl-nitrogen6x.dtsi    |  4 ++--
+ arch/arm/boot/dts/imx6qdl-phytec-pfla02.dtsi |  8 ++++----
+ arch/arm/boot/dts/imx6qdl-rex.dtsi           |  4 ++--
+ arch/arm/boot/dts/imx6qdl-sabreauto.dtsi     |  4 ++--
+ arch/arm/boot/dts/imx6qdl-sabrelite.dtsi     |  6 +++---
+ arch/arm/boot/dts/imx6qdl-sabresd.dtsi       |  8 ++++----
+ arch/arm/boot/dts/imx6qdl-tx6.dtsi           |  4 ++--
+ arch/arm/boot/dts/imx6qdl-wandboard.dtsi     |  6 ++++--
+ arch/arm/boot/dts/imx6sl-evk.dts             | 10 +++++-----
+ arch/arm/boot/dts/imx6sx-sabreauto.dts       |  4 ++--
+ arch/arm/boot/dts/imx6sx-sdb.dtsi            |  4 ++--
+ arch/arm/boot/dts/imx7d-sdb.dts              |  4 ++--
+ 33 files changed, 74 insertions(+), 68 deletions(-)
+
+-- 
+1.9.1
