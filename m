@@ -1,70 +1,48 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Wed, 17 Jun 2015 14:40:39 +0200
-Subject: [PATCH v2 2/2] clk: at91: modify PMC peripheral clock to deal with
- newer register layout
-In-Reply-To: <62604b586c61f119ffb5942b77eb9b759c17a790.1434544584.git.nicolas.ferre@atmel.com>
-References: <62604b586c61f119ffb5942b77eb9b759c17a790.1434544584.git.nicolas.ferre@atmel.com>
-Message-ID: <00aa7c245a7960d6101dad4b284a19cab766ee4a.1434544584.git.nicolas.ferre@atmel.com>
+From: ludovic.desroches@atmel.com (Ludovic Desroches)
+Date: Wed, 17 Jun 2015 14:42:53 +0200
+Subject: [RESEND PATCH 2/2] pinctrl: introduce complex pin description
+In-Reply-To: <557EF6D9.6050503@wwwdotorg.org>
+References: <1433948699-19800-1-git-send-email-ludovic.desroches@atmel.com>
+ <1433948699-19800-3-git-send-email-ludovic.desroches@atmel.com>
+ <557EF6D9.6050503@wwwdotorg.org>
+Message-ID: <20150617124253.GC12295@odux.rfo.atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As some more information is added to the PCR register, we'd better use
-a copy of its content and modify just the peripheral-related bits.
-Implement a read-modify-write for the enable() and disable() callbacks.
+On Mon, Jun 15, 2015 at 10:01:29AM -0600, Stephen Warren wrote:
+> On 06/10/2015 09:04 AM, Ludovic Desroches wrote:
+> >Using a string to describe a pin in the device tree can be not enough.
+> >Some controllers may need extra information to fully describe a pin. It
+> >concerns mainly controllers which have a per pin muxing approach which
+> >don't fit well the notions of groups and functions.
+> >Instead of using a pin name, a 32 bit value is used. The 16 least
+> >significant bits are used for the pin number. Other 16 bits can be used to
+> >store extra parameters.
+> 
+> The driver for the pin controller is supposed to provide this information in
+> a table. The whole point of having a driver, rather than a table/list of raw
+> register values in the DT, is so the driver can provide this information at
+> a semantic level. This information is fixed per SoC and so make sense to put
+> into a driver, while the board-specific configuration varies wildly, and
+> hence makes sense to put into DT.
+> 
+> 
 
-Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
----
-v2: - modify header file beforehand so that we can use consistent field naming
+I didn't think the controversery part would be about having this
+information in a driver or in the device tree. I think there are pros
+and cons for both cases.
+
+We already have this description in our dt file with the previous at91
+pin controller and I think it is a good thing to not have to update the
+driver for each new SoC using the same pio controller. Tables could become
+huge, embedding several one into a 'single zImage' is something I am not
+confortable with. I know that some people could tell me that doing that
+may increase the boot time.                                     
+                                                                                
+We should debate about this patch later. If there is no acceptance for
+the previous one, I have to clarify if I need it.
 
 
- drivers/clk/at91/clk-peripheral.c | 20 ++++++++++++++------
- 1 file changed, 14 insertions(+), 6 deletions(-)
+Regards
 
-diff --git a/drivers/clk/at91/clk-peripheral.c b/drivers/clk/at91/clk-peripheral.c
-index 61d0adda7088..1e7dcc57925a 100644
---- a/drivers/clk/at91/clk-peripheral.c
-+++ b/drivers/clk/at91/clk-peripheral.c
-@@ -161,14 +161,18 @@ static int clk_sam9x5_peripheral_enable(struct clk_hw *hw)
- {
- 	struct clk_sam9x5_peripheral *periph = to_clk_sam9x5_peripheral(hw);
- 	struct at91_pmc *pmc = periph->pmc;
-+	u32 tmp;
- 
- 	if (periph->id < PERIPHERAL_ID_MIN)
- 		return 0;
- 
--	pmc_write(pmc, AT91_PMC_PCR, (periph->id & AT91_PMC_PCR_PID_MASK) |
--				     AT91_PMC_PCR_CMD |
--				     AT91_PMC_PCR_DIV(periph->div) |
--				     AT91_PMC_PCR_EN);
-+	pmc_lock(pmc);
-+	pmc_write(pmc, AT91_PMC_PCR, (periph->id & AT91_PMC_PCR_PID_MASK));
-+	tmp = pmc_read(pmc, AT91_PMC_PCR) & ~AT91_PMC_PCR_DIV_MASK;
-+	pmc_write(pmc, AT91_PMC_PCR, tmp | AT91_PMC_PCR_DIV(periph->div)
-+					 | AT91_PMC_PCR_CMD
-+					 | AT91_PMC_PCR_EN);
-+	pmc_unlock(pmc);
- 	return 0;
- }
- 
-@@ -176,12 +180,16 @@ static void clk_sam9x5_peripheral_disable(struct clk_hw *hw)
- {
- 	struct clk_sam9x5_peripheral *periph = to_clk_sam9x5_peripheral(hw);
- 	struct at91_pmc *pmc = periph->pmc;
-+	u32 tmp;
- 
- 	if (periph->id < PERIPHERAL_ID_MIN)
- 		return;
- 
--	pmc_write(pmc, AT91_PMC_PCR, (periph->id & AT91_PMC_PCR_PID_MASK) |
--				     AT91_PMC_PCR_CMD);
-+	pmc_lock(pmc);
-+	pmc_write(pmc, AT91_PMC_PCR, (periph->id & AT91_PMC_PCR_PID_MASK));
-+	tmp = pmc_read(pmc, AT91_PMC_PCR) & ~AT91_PMC_PCR_EN;
-+	pmc_write(pmc, AT91_PMC_PCR, tmp | AT91_PMC_PCR_CMD);
-+	pmc_unlock(pmc);
- }
- 
- static int clk_sam9x5_peripheral_is_enabled(struct clk_hw *hw)
--- 
-2.1.3
+Ludovic   
