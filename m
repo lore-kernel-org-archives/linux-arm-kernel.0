@@ -1,72 +1,44 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Wed, 17 Jun 2015 16:53:40 +0200
-Subject: [PATCH] ARM: orion5x: Use vsprintf %pM extension
-In-Reply-To: <20150615032842.GD10886@lunn.ch>
-References: <1434333690.2507.30.camel@perches.com>
- <20150615032842.GD10886@lunn.ch>
-Message-ID: <558189F4.2010509@free-electrons.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Wed, 17 Jun 2015 16:59:29 +0200
+Subject: [PATCH] clk: at91: trivial: typo in peripheral clock description
+In-Reply-To: <20150617144517.GJ6549@piout.net>
+References: <1434547371-12123-1-git-send-email-nicolas.ferre@atmel.com>
+ <20150617144517.GJ6549@piout.net>
+Message-ID: <55818B51.4090506@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Andrew, Joe,
+Le 17/06/2015 16:45, Alexandre Belloni a ?crit :
+> It is mandatory to always include a commit message :)
 
-On 15/06/2015 05:28, Andrew Lunn wrote:
-> On Sun, Jun 14, 2015 at 07:01:30PM -0700, Joe Perches wrote:
->> Format mac addresses with the normal kernel extension.
->>
->> Signed-off-by: Joe Perches <joe@perches.com>
-> 
-> Acked-by: Andrew Lunn <andrew@lunn.ch>
+Something like:
+s/system/peripheral/g
+I suppose?
 
-applied on mvebu/cleanup-4.3
-
-Thanks,
-
-Gregory
-> 
-> 	  Andrew
-> 
+> On 17/06/2015 at 15:22:51 +0200, Nicolas Ferre wrote :
+>> Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
 >> ---
->>  arch/arm/mach-orion5x/dns323-setup.c | 4 +---
->>  arch/arm/mach-orion5x/tsx09-common.c | 4 +---
->>  2 files changed, 2 insertions(+), 6 deletions(-)
+>>  Documentation/devicetree/bindings/clock/at91-clock.txt | 2 +-
+>>  1 file changed, 1 insertion(+), 1 deletion(-)
 >>
->> diff --git a/arch/arm/mach-orion5x/dns323-setup.c b/arch/arm/mach-orion5x/dns323-setup.c
->> index 09d2a26..f267e58 100644
->> --- a/arch/arm/mach-orion5x/dns323-setup.c
->> +++ b/arch/arm/mach-orion5x/dns323-setup.c
->> @@ -236,9 +236,7 @@ static int __init dns323_read_mac_addr(void)
->>  	}
->>  
->>  	iounmap(mac_page);
->> -	printk("DNS-323: Found ethernet MAC address: ");
->> -	for (i = 0; i < 6; i++)
->> -		printk("%.2x%s", addr[i], (i < 5) ? ":" : ".\n");
->> +	printk("DNS-323: Found ethernet MAC address: %pM\n", addr);
->>  
->>  	memcpy(dns323_eth_data.mac_addr, addr, 6);
->>  
->> diff --git a/arch/arm/mach-orion5x/tsx09-common.c b/arch/arm/mach-orion5x/tsx09-common.c
->> index 7189827..24b2959 100644
->> --- a/arch/arm/mach-orion5x/tsx09-common.c
->> +++ b/arch/arm/mach-orion5x/tsx09-common.c
->> @@ -101,9 +101,7 @@ static int __init qnap_tsx09_check_mac_addr(const char *addr_str)
->>  		addr[i] = byte;
->>  	}
->>  
->> -	printk(KERN_INFO "tsx09: found ethernet mac address ");
->> -	for (i = 0; i < 6; i++)
->> -		printk("%.2x%s", addr[i], (i < 5) ? ":" : ".\n");
->> +	printk(KERN_INFO "tsx09: found ethernet mac address %pM\n", addr);
->>  
->>  	memcpy(qnap_tsx09_eth_data.mac_addr, addr, 6);
->>  
+>> diff --git a/Documentation/devicetree/bindings/clock/at91-clock.txt b/Documentation/devicetree/bindings/clock/at91-clock.txt
+>> index 7a4d4926f44e..5ba6450693b9 100644
+>> --- a/Documentation/devicetree/bindings/clock/at91-clock.txt
+>> +++ b/Documentation/devicetree/bindings/clock/at91-clock.txt
+>> @@ -248,7 +248,7 @@ Required properties for peripheral clocks:
+>>  - #address-cells : shall be 1 (reg is used to encode clk id).
+>>  - clocks : shall be the master clock phandle.
+>>  	e.g. clocks = <&mck>;
+>> -- name: device tree node describing a specific system clock.
+>> +- name: device tree node describing a specific peripheral clock.
+>>  	* #clock-cells : from common clock binding; shall be set to 0.
+>>  	* reg: peripheral id. See Atmel's datasheets to get a full
+>>  	  list of peripheral ids.
+>> -- 
+>> 2.1.3
 >>
->>
+> 
 
 
 -- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+Nicolas Ferre
