@@ -1,57 +1,110 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Wed, 17 Jun 2015 13:47:58 +0100
-Subject: [PATCH 2/3] spi: mediatek: Add spi bus for Mediatek MT8173
-In-Reply-To: <1434532083.19346.27.camel@mtksdaap41>
-References: <1431434356.2128.9.camel@mhfsdcap03>
- <20150512160540.GB3066@sirena.org.uk>
- <1431675522.2128.13.camel@mhfsdcap03>
- <20150515092543.GY2761@sirena.org.uk>
- <1433758546.19786.16.camel@mtksdaap41>
- <20150608175927.GO14071@sirena.org.uk>
- <1433844321.16178.6.camel@mtksdaap41>
- <20150609103951.GA14071@sirena.org.uk>
- <1433923569.22080.1.camel@mtksdaap41>
- <1434532083.19346.27.camel@mtksdaap41>
-Message-ID: <20150617124758.GE3214@sirena.org.uk>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Wed, 17 Jun 2015 13:48:31 +0100
+Subject: [PATCH v3 06/10] arm: simplify MMIO dispatching
+In-Reply-To: <1434540121-21283-7-git-send-email-andre.przywara@arm.com>
+References: <1434540121-21283-1-git-send-email-andre.przywara@arm.com>
+ <1434540121-21283-7-git-send-email-andre.przywara@arm.com>
+Message-ID: <55816C9F.1090500@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 17, 2015 at 05:08:03PM +0800, Eddie Huang wrote:
+On 17/06/15 12:21, Andre Przywara wrote:
+> Currently we separate any incoming MMIO request into one of the ARM
+> memory map regions and take care to spare the GIC.
+> It turns out that this is unnecessary, as we only have one special
+> region (the IO port area in the first 64 KByte). The MMIO rbtree
+> takes care about unhandled MMIO ranges, so we can simply drop all the
+> special range checking (except that for the IO range) in
+> kvm_cpu__emulate_mmio().
+> As the GIC is handled in the kernel, a GIC MMIO access should never
+> reach userland (and we don't know what to do with it anyway).
+> This lets us delete some more code and simplifies future extensions
+> (like expanding the GIC regions).
+> To be in line with the other architectures, move the now simpler
+> code into a header file.
+> 
+> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
+> ---
+>  arm/include/arm-common/kvm-arch.h     | 12 ------------
+>  arm/include/arm-common/kvm-cpu-arch.h | 14 ++++++++++++--
+>  arm/kvm-cpu.c                         | 16 ----------------
+>  3 files changed, 12 insertions(+), 30 deletions(-)
+> 
+> diff --git a/arm/include/arm-common/kvm-arch.h b/arm/include/arm-common/kvm-arch.h
+> index 082131d..90d6733 100644
+> --- a/arm/include/arm-common/kvm-arch.h
+> +++ b/arm/include/arm-common/kvm-arch.h
+> @@ -45,18 +45,6 @@ static inline bool arm_addr_in_ioport_region(u64 phys_addr)
+>  	return phys_addr >= KVM_IOPORT_AREA && phys_addr < limit;
+>  }
+>  
+> -static inline bool arm_addr_in_virtio_mmio_region(u64 phys_addr)
+> -{
+> -	u64 limit = KVM_VIRTIO_MMIO_AREA + ARM_VIRTIO_MMIO_SIZE;
+> -	return phys_addr >= KVM_VIRTIO_MMIO_AREA && phys_addr < limit;
+> -}
+> -
+> -static inline bool arm_addr_in_pci_region(u64 phys_addr)
+> -{
+> -	u64 limit = KVM_PCI_CFG_AREA + ARM_PCI_CFG_SIZE + ARM_PCI_MMIO_SIZE;
+> -	return phys_addr >= KVM_PCI_CFG_AREA && phys_addr < limit;
+> -}
+> -
+>  struct kvm_arch {
+>  	/*
+>  	 * We may have to align the guest memory for virtio, so keep the
+> diff --git a/arm/include/arm-common/kvm-cpu-arch.h b/arm/include/arm-common/kvm-cpu-arch.h
+> index 36c7872..329979a 100644
+> --- a/arm/include/arm-common/kvm-cpu-arch.h
+> +++ b/arm/include/arm-common/kvm-cpu-arch.h
+> @@ -44,8 +44,18 @@ static inline bool kvm_cpu__emulate_io(struct kvm_cpu *vcpu, u16 port, void *dat
+>  	return false;
+>  }
+>  
+> -bool kvm_cpu__emulate_mmio(struct kvm_cpu *vcpu, u64 phys_addr, u8 *data,
+> -			   u32 len, u8 is_write);
+> +static inline bool kvm_cpu__emulate_mmio(struct kvm_cpu *vcpu, u64 phys_addr,
+> +					 u8 *data, u32 len, u8 is_write)
+> +{
+> +	if (arm_addr_in_ioport_region(phys_addr)) {
+> +		int direction = is_write ? KVM_EXIT_IO_OUT : KVM_EXIT_IO_IN;
+> +		u16 port = (phys_addr - KVM_IOPORT_AREA) & USHRT_MAX;
+> +
+> +		return kvm__emulate_io(vcpu, port, data, direction, len, 1);
+> +	}
+> +
+> +	return kvm__emulate_mmio(vcpu, phys_addr, data, len, is_write);
+> +}
+>  
+>  unsigned long kvm_cpu__get_vcpu_mpidr(struct kvm_cpu *vcpu);
+>  
+> diff --git a/arm/kvm-cpu.c b/arm/kvm-cpu.c
+> index ab08815..7780251 100644
+> --- a/arm/kvm-cpu.c
+> +++ b/arm/kvm-cpu.c
+> @@ -139,22 +139,6 @@ bool kvm_cpu__handle_exit(struct kvm_cpu *vcpu)
+>  	return false;
+>  }
+>  
+> -bool kvm_cpu__emulate_mmio(struct kvm_cpu *vcpu, u64 phys_addr, u8 *data,
+> -			   u32 len, u8 is_write)
+> -{
+> -	if (arm_addr_in_virtio_mmio_region(phys_addr)) {
+> -		return kvm__emulate_mmio(vcpu, phys_addr, data, len, is_write);
+> -	} else if (arm_addr_in_ioport_region(phys_addr)) {
+> -		int direction = is_write ? KVM_EXIT_IO_OUT : KVM_EXIT_IO_IN;
+> -		u16 port = (phys_addr - KVM_IOPORT_AREA) & USHRT_MAX;
+> -		return kvm__emulate_io(vcpu, port, data, direction, len, 1);
+> -	} else if (arm_addr_in_pci_region(phys_addr)) {
+> -		return kvm__emulate_mmio(vcpu, phys_addr, data, len, is_write);
+> -	}
 
-> Here comes the problem, although total length of tx, rx is the same,
-> each entry in rx and tx scatterlist may not be the same (in the case
-> data buffer allocate from vmalloc). Other vendor have dmaengine driver
-> to send entry-by-entry automatically, so it is ok due to total length is
-> the same.But mediatek hw can only send tx and rx scatterlist entry one
-> by on, which means in full duplex, mediatek SPI hardware need send each
-> entry separately, will cause full duplex fail because tx/rx entry size
-> or entry number may not be the same.
+Can you explain why this arm_addr_in_pci_region(phys_addr) check has
+disappeared in your updated version on this function? It may be a non
+issue, but I'd very much like to understand.
 
-I don't see why this is a problem - your driver is going to have to do
-more work to overcome the limitations of the hardware but surely it's
-just a question of how you parse the scatterlists (or rewriting them if
-that's appropriate)?
+Thanks,
 
-> The problem is not dma map discuss earlier, it is mediatek spi hardware
-> limitation that can't support scatterlist dma transfer in full-duplex
-> mode. We can only support both tx and rx has the same size continuous
-> memory data in full-duplex mode. I don't know whether should modify
-> spi.c to support mediatek spi, or we just return can_dma() false and do
-> transfer one continuous data in transfer function.
-
-> By the way, I think maybe it is better to change can_dma() to
-> can_dma_sg().
-
-Don't you just need to handle the scatterlists in page sized chunks
-here?  There's nothing about passing information about the memory that
-was mapped around in a scatterlist that means you have to pass the whole
-list to the hardware at once - at heart the scatterlist is just a
-convenient structure for passing around where the data to be transferred
-is.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150617/fac8a28e/attachment.sig>
+	M.
+-- 
+Jazz is not dead. It just smells funny...
