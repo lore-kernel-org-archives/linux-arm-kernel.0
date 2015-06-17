@@ -1,49 +1,80 @@
 From: tomeu.vizoso@collabora.com (Tomeu Vizoso)
-Date: Wed, 17 Jun 2015 15:42:12 +0200
-Subject: [PATCH 02/13] driver-core: defer all probes until late_initcall
+Date: Wed, 17 Jun 2015 15:42:13 +0200
+Subject: [PATCH 03/13] ARM: tegra: Add gpio-ranges property
 In-Reply-To: <1434548543-22949-1-git-send-email-tomeu.vizoso@collabora.com>
 References: <1434548543-22949-1-git-send-email-tomeu.vizoso@collabora.com>
-Message-ID: <1434548543-22949-3-git-send-email-tomeu.vizoso@collabora.com>
+Message-ID: <1434548543-22949-4-git-send-email-tomeu.vizoso@collabora.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-To decrease the chances of devices deferring their probes because of
-dependencies not having probed yet because of their drivers not having
-registered yet, delay all probing until the late initcall level.
+Specify how the GPIOs map to the pins in Tegra SoCs, so the dependency is
+explicit.
 
-This will allow us to avoid deferred probes completely later by probing
-dependencies on demand, or by probing them in dependency order.
+This currently will add a duplicated entry in the map from pins to gpios
+in the pinmux controller but it should be harmless and will be fixed in a
+later commit.
 
 Signed-off-by: Tomeu Vizoso <tomeu.vizoso@collabora.com>
----
- drivers/base/dd.c | 8 +++++++-
- 1 file changed, 7 insertions(+), 1 deletion(-)
 
-diff --git a/drivers/base/dd.c b/drivers/base/dd.c
-index a638bbb..18438aa 100644
---- a/drivers/base/dd.c
-+++ b/drivers/base/dd.c
-@@ -407,6 +407,12 @@ int driver_probe_device(struct device_driver *drv, struct device *dev)
- 	if (!device_is_registered(dev))
- 		return -ENODEV;
+---
+
+v2:	* Change number of gpios to 251 to match pinctrl-tegra124.c
+	* Add note about duplicated mapping
+	* Add the property to all the other Tegra SoCs
+---
+ arch/arm/boot/dts/tegra114.dtsi | 1 +
+ arch/arm/boot/dts/tegra124.dtsi | 1 +
+ arch/arm/boot/dts/tegra20.dtsi  | 1 +
+ arch/arm/boot/dts/tegra30.dtsi  | 1 +
+ 4 files changed, 4 insertions(+)
+
+diff --git a/arch/arm/boot/dts/tegra114.dtsi b/arch/arm/boot/dts/tegra114.dtsi
+index f58a3d9..7e1e171 100644
+--- a/arch/arm/boot/dts/tegra114.dtsi
++++ b/arch/arm/boot/dts/tegra114.dtsi
+@@ -234,6 +234,7 @@
+ 		gpio-controller;
+ 		#interrupt-cells = <2>;
+ 		interrupt-controller;
++		gpio-ranges = <&pinmux 0 0 246>;
+ 	};
  
-+	/* Defer all probes until we start processing the queue */
-+	if (!driver_deferred_probe_enable) {
-+		driver_deferred_probe_add(dev);
-+		return 0;
-+	}
-+
- 	pr_debug("bus: '%s': %s: matched device %s with driver %s\n",
- 		 drv->bus->name, __func__, dev_name(dev), drv->name);
+ 	apbmisc at 70000800 {
+diff --git a/arch/arm/boot/dts/tegra124.dtsi b/arch/arm/boot/dts/tegra124.dtsi
+index 87318a7..4779df3 100644
+--- a/arch/arm/boot/dts/tegra124.dtsi
++++ b/arch/arm/boot/dts/tegra124.dtsi
+@@ -255,6 +255,7 @@
+ 		gpio-controller;
+ 		#interrupt-cells = <2>;
+ 		interrupt-controller;
++		gpio-ranges = <&pinmux 0 0 251>;
+ 	};
  
-@@ -585,7 +591,7 @@ EXPORT_SYMBOL_GPL(device_attach);
+ 	apbdma: dma at 0,60020000 {
+diff --git a/arch/arm/boot/dts/tegra20.dtsi b/arch/arm/boot/dts/tegra20.dtsi
+index f444b67..b44277c 100644
+--- a/arch/arm/boot/dts/tegra20.dtsi
++++ b/arch/arm/boot/dts/tegra20.dtsi
+@@ -244,6 +244,7 @@
+ 		gpio-controller;
+ 		#interrupt-cells = <2>;
+ 		interrupt-controller;
++		gpio-ranges = <&pinmux 0 0 224>;
+ 	};
  
- void device_initial_probe(struct device *dev)
- {
--	__device_attach(dev, true);
-+	__device_attach(dev, driver_deferred_probe_enable);
- }
+ 	apbmisc at 70000800 {
+diff --git a/arch/arm/boot/dts/tegra30.dtsi b/arch/arm/boot/dts/tegra30.dtsi
+index 782b11b..28c547f 100644
+--- a/arch/arm/boot/dts/tegra30.dtsi
++++ b/arch/arm/boot/dts/tegra30.dtsi
+@@ -349,6 +349,7 @@
+ 		gpio-controller;
+ 		#interrupt-cells = <2>;
+ 		interrupt-controller;
++		gpio-ranges = <&pinmux 0 0 248>;
+ 	};
  
- static int __driver_attach(struct device *dev, void *data)
+ 	apbmisc at 70000800 {
 -- 
 2.4.1
