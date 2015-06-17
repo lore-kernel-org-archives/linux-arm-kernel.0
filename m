@@ -1,14 +1,14 @@
 From: geert+renesas@glider.be (Geert Uytterhoeven)
-Date: Wed, 17 Jun 2015 15:03:34 +0200
-Subject: [PATCH 3/5] ARM: shmobile: r8a7791 dtsi: Use "arm,gic-400" for GIC
+Date: Wed, 17 Jun 2015 15:03:32 +0200
+Subject: [PATCH 1/5] ARM: shmobile: r8a73a4 dtsi: Use "arm,gic-400" for GIC
 In-Reply-To: <1434546216-10773-1-git-send-email-geert+renesas@glider.be>
 References: <1434546216-10773-1-git-send-email-geert+renesas@glider.be>
-Message-ID: <1434546216-10773-4-git-send-email-geert+renesas@glider.be>
+Message-ID: <1434546216-10773-2-git-send-email-geert+renesas@glider.be>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Replace the "arm,cortex-a15-gic" compatible value for the GIC by
-"arm,gic-400", as the R-Car Gen2 GIC is assumed to be a GIC-400.
+"arm,gic-400", as the documentation states it's a GIC-400.
 This has been confirmed by reading the GICD_IIDR register, which reports
 0x0200043b (GIC-400 = 0x02, ARM = 0x43b).
 
@@ -21,14 +21,14 @@ You can read the GICD_IIDR register from U-Boot using
 
     md 0xf1001008 1
 ---
- arch/arm/boot/dts/r8a7791.dtsi | 2 +-
+ arch/arm/boot/dts/r8a73a4.dtsi | 2 +-
  1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm/boot/dts/r8a7791.dtsi b/arch/arm/boot/dts/r8a7791.dtsi
-index dc1cd3f166060712..07ea2bebe4966da0 100644
---- a/arch/arm/boot/dts/r8a7791.dtsi
-+++ b/arch/arm/boot/dts/r8a7791.dtsi
-@@ -70,7 +70,7 @@
+diff --git a/arch/arm/boot/dts/r8a73a4.dtsi b/arch/arm/boot/dts/r8a73a4.dtsi
+index 7ee22a41c6c97488..5090d1a8f652e8be 100644
+--- a/arch/arm/boot/dts/r8a73a4.dtsi
++++ b/arch/arm/boot/dts/r8a73a4.dtsi
+@@ -434,7 +434,7 @@
  	};
  
  	gic: interrupt-controller at f1001000 {
