@@ -1,58 +1,42 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Wed, 17 Jun 2015 17:32:42 +0200
-Subject: [PATCH 3/9] ARM: mvebu: do not check machine in mvebu_pm_init()
-In-Reply-To: <1434456785-23696-4-git-send-email-thomas.petazzoni@free-electrons.com>
-References: <1434456785-23696-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1434456785-23696-4-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <5581931A.7080800@free-electrons.com>
+From: boris.brezillon@free-electrons.com (Boris Brezillon)
+Date: Wed, 17 Jun 2015 17:34:02 +0200
+Subject: [PATCH v7 05/14] crypto: marvell/CESA: add TDMA support
+In-Reply-To: <20150617150808.GA14915@gondor.apana.org.au>
+References: <20150617122533.GA13185@gondor.apana.org.au>
+ <1434547922-10363-1-git-send-email-boris.brezillon@free-electrons.com>
+ <20150617150808.GA14915@gondor.apana.org.au>
+Message-ID: <20150617173402.7946bbb0@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Thomas,
+On Wed, 17 Jun 2015 23:08:08 +0800
+Herbert Xu <herbert@gondor.apana.org.au> wrote:
 
-On 16/06/2015 14:12, Thomas Petazzoni wrote:
-> The mvebu_pm_init() initializes the support for suspend/resume, and
-> before doing that, it checks if we are on a board on which
-> suspend/resume is actually supported. However, this check is already
-> done by mvebu_armada_xp_gp_pm_init(), and there is no need to
-> duplicate the check: callers of mvebu_pm_init() should now what they
-> are doing.
+> On Wed, Jun 17, 2015 at 03:32:02PM +0200, Boris Brezillon wrote:
+> >
+> > Hi Herbert,
+> > 
+> > I send you this patch alone so that you can verify I'm now properly
+> > manipulating the SG list. Once I have your confirmation I'll send
+> > the whole series again and annoy all the people in Cc one more time
+> > ;-).
 > 
-> This commit is done in preparation to the addition of suspend/resume
-> support on Armada 38x.
-> 
-> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+> Thanks.  The only problem that I can see is the fact you're not
+> checking for req->src == req->dst.  If they're equal then you must
+> not map it twice.  Instead it should be mapped as DMA_BIDIRECTIONAL.
 
-Acked-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
-
+I can check for that too, but note that it doesn't prevent one from
+providing different scatterlist structures pointing to the same memory
+region.
+This being said, checking for req->src == req->dst should fix the case
+where dst and src are pointing to the same scatterlist, which is a good
+start.
 
 Thanks,
 
-Gregory
-
-> ---
->  arch/arm/mach-mvebu/pm.c | 3 ---
->  1 file changed, 3 deletions(-)
-> 
-> diff --git a/arch/arm/mach-mvebu/pm.c b/arch/arm/mach-mvebu/pm.c
-> index 6573a8f..eca650b 100644
-> --- a/arch/arm/mach-mvebu/pm.c
-> +++ b/arch/arm/mach-mvebu/pm.c
-> @@ -182,9 +182,6 @@ int mvebu_pm_init(void (*board_pm_enter)(void __iomem *sdram_reg, u32 srcmd))
->  	struct device_node *np;
->  	struct resource res;
->  
-> -	if (!of_machine_is_compatible("marvell,armadaxp"))
-> -		return -ENODEV;
-> -
->  	np = of_find_compatible_node(NULL, NULL,
->  				     "marvell,armada-xp-sdram-controller");
->  	if (!np)
-> 
-
+Boris
 
 -- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
+Boris Brezillon, Free Electrons
+Embedded Linux and Kernel engineering
 http://free-electrons.com
