@@ -1,48 +1,133 @@
-From: dianders@chromium.org (Doug Anderson)
-Date: Wed, 17 Jun 2015 10:01:48 -0700
-Subject: [PATCH] ARM: dts: rockchip: Add dmac_bus rx and tx for uart2
-In-Reply-To: <34159914.9nlETdacuk@phil>
-References: <1434390468-27296-1-git-send-email-romain.perier@gmail.com>
- <34159914.9nlETdacuk@phil>
-Message-ID: <CAD=FV=UdrE1PCnfHiYKDm985joX4OLLYemhqm+niPUgYQO4s3Q@mail.gmail.com>
+From: vikrams@codeaurora.org (Vikram Sethi)
+Date: Wed, 17 Jun 2015 12:13:50 -0500
+Subject: [PATCH v2] arm: KVM: force execution of HCPTR access on VM exit
+In-Reply-To: <1434533239-16145-1-git-send-email-marc.zyngier@arm.com>
+References: <1434533239-16145-1-git-send-email-marc.zyngier@arm.com>
+Message-ID: <5581AACE.5060602@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Marc, this version of the patch works for me.
+Tested-by: Vikram Sethi <vikrams@codeaurora.org>
 
-On Tue, Jun 16, 2015 at 4:37 AM, Heiko Stuebner <heiko@sntech.de> wrote:
-> Just for the record and if anybody is interested to work in this, we have an
-> issue with the dma implementation [0] that is not yet solved upstream. From
-> what I've remember, that mostly got triggered on higher speeds, like higher
-> spi-speeds or i2s audio stuff (poping).
+Thanks,
+Vikram
+On 06/17/15 04:27, Marc Zyngier wrote:
+> On VM entry, we disable access to the VFP registers in order to
+> perform a lazy save/restore of these registers.
 >
+> On VM exit, we restore access, test if we did enable them before,
+> and save/restore the guest/host registers if necessary. In this
+> sequence, the FPEXC register is always accessed, irrespective
+> of the trapping configuration.
 >
-> Heiko
+> If the guest didn't touch the VFP registers, then the HCPTR access
+> has now enabled such access, but we're missing a barrier to ensure
+> architectural execution of the new HCPTR configuration. If the HCPTR
+> access has been delayed/reordered, the subsequent access to FPEXC
+> will cause a trap, which we aren't prepared to handle at all.
 >
-> [0]
-> https://chromium.googlesource.com/chromiumos/third_party/kernel/+/93c3b192dca7e8c773c4d28873114c325382b63e%5E%21/#F0
+> The same condition exists when trapping to enable VFP for the guest.
+>
+> The fix is to introduce a barrier after enabling VFP access. In the
+> vmexit case, it can be relaxed to only takes place if the guest hasn't
+> accessed its view of the VFP registers, making the access to FPEXC safe.
+>
+> The set_hcptr macro is modified to deal with both vmenter/vmexit and
+> vmtrap operations, and now takes an optional label that is branched to
+> when the guest hasn't touched the VFP registers.
+>
+> Reported-by: Vikram Sethi <vikrams@codeaurora.org>
+> Cc: stable at kernel.org	# v3.9+
+> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+> ---
+> * From v1:
+>   - Changed from a discrete fix to be integrated in set_hcptr
+>   - Also introduce an ISB on vmtrap (reported by Vikram)
+>   - Dropped Christoffer Reviewed-by, due to significant changes
+>
+>  arch/arm/kvm/interrupts.S      | 10 ++++------
+>  arch/arm/kvm/interrupts_head.S | 20 ++++++++++++++++++--
+>  2 files changed, 22 insertions(+), 8 deletions(-)
+>
+> diff --git a/arch/arm/kvm/interrupts.S b/arch/arm/kvm/interrupts.S
+> index 79caf79..f7db3a5 100644
+> --- a/arch/arm/kvm/interrupts.S
+> +++ b/arch/arm/kvm/interrupts.S
+> @@ -170,13 +170,9 @@ __kvm_vcpu_return:
+>  	@ Don't trap coprocessor accesses for host kernel
+>  	set_hstr vmexit
+>  	set_hdcr vmexit
+> -	set_hcptr vmexit, (HCPTR_TTA | HCPTR_TCP(10) | HCPTR_TCP(11))
+> +	set_hcptr vmexit, (HCPTR_TTA | HCPTR_TCP(10) | HCPTR_TCP(11)), after_vfp_restore
+>  
+>  #ifdef CONFIG_VFPv3
+> -	@ Save floating point registers we if let guest use them.
+> -	tst	r2, #(HCPTR_TCP(10) | HCPTR_TCP(11))
+> -	bne	after_vfp_restore
+> -
+>  	@ Switch VFP/NEON hardware state to the host's
+>  	add	r7, vcpu, #VCPU_VFP_GUEST
+>  	store_vfp_state r7
+> @@ -188,6 +184,8 @@ after_vfp_restore:
+>  	@ Restore FPEXC_EN which we clobbered on entry
+>  	pop	{r2}
+>  	VFPFMXR FPEXC, r2
+> +#else
+> +after_vfp_restore:
+>  #endif
+>  
+>  	@ Reset Hyp-role
+> @@ -483,7 +481,7 @@ switch_to_guest_vfp:
+>  	push	{r3-r7}
+>  
+>  	@ NEON/VFP used.  Turn on VFP access.
+> -	set_hcptr vmexit, (HCPTR_TCP(10) | HCPTR_TCP(11))
+> +	set_hcptr vmtrap, (HCPTR_TCP(10) | HCPTR_TCP(11))
+>  
+>  	@ Switch VFP/NEON hardware state to the guest's
+>  	add	r7, r0, #VCPU_VFP_HOST
+> diff --git a/arch/arm/kvm/interrupts_head.S b/arch/arm/kvm/interrupts_head.S
+> index 35e4a3a..48efe2e 100644
+> --- a/arch/arm/kvm/interrupts_head.S
+> +++ b/arch/arm/kvm/interrupts_head.S
+> @@ -591,8 +591,13 @@ ARM_BE8(rev	r6, r6  )
+>  .endm
+>  
+>  /* Configures the HCPTR (Hyp Coprocessor Trap Register) on entry/return
+> - * (hardware reset value is 0). Keep previous value in r2. */
+> -.macro set_hcptr operation, mask
+> + * (hardware reset value is 0). Keep previous value in r2.
+> + * An ISB is emited on vmexit/vmtrap, but executed on vmexit only if
+> + * VFP wasn't already enabled (always executed on vmtrap).
+> + * If a label is specified with vmexit, it is branched to if VFP wasn't
+> + * enabled.
+> + */
+> +.macro set_hcptr operation, mask, label = none
+>  	mrc	p15, 4, r2, c1, c1, 2
+>  	ldr	r3, =\mask
+>  	.if \operation == vmentry
+> @@ -601,6 +606,17 @@ ARM_BE8(rev	r6, r6  )
+>  	bic	r3, r2, r3		@ Don't trap defined coproc-accesses
+>  	.endif
+>  	mcr	p15, 4, r3, c1, c1, 2
+> +	.if \operation != vmentry
+> +	.if \operation == vmexit
+> +	tst	r2, #(HCPTR_TCP(10) | HCPTR_TCP(11))
+> +	beq	1f
+> +	.endif
+> +	isb
+> +	.if \label != none
+> +	b	\label
+> +	.endif
+> +1:
+> +	.endif
+>  .endm
+>  
+>  /* Configures the HDCR (Hyp Debug Configuration Register) on entry/return
 
-Right.  In the ChromeOS tree (used for rk3288-based Chromebooks) we
-think we solved the DMA issues for the most part by using burst mode.
-...but we weren't brave enough to enable DMA for SPI and UART because
-we didn't want to track down any additional weird issues and PIO mode
-was working well enough.
 
-
-The full list of things I see in the PL330 driver in ChromeOS:
-
-3e12510 CHROMIUM: dmaengine: pl330: add quirk for broken no flushp
-ded3780 CHROMIUM: dmaengine: pl330: support quirks for some broken
-7af450f FROMLIST: DMA: pl330: support burst mode for dev-to-mem and
-mem-to-dev transmit
-
-Skimming through the i2s driver (which we definitely use with DMA):
-
-21fee4b CHROMIUM: ASoC: rockchip_i2s: modify DMA max burst to 1
-4001251 UPSTREAM: ASoC: rockchip: i2s: fix maxburst of dma data to 4
-
-...I was only peripherally involved here, but as you can see it looks
-like there were not only changes needed to the PL330 driver but also
-changes needed to the DMA client.
-
-You can find links to patches from the same git tree that Heiko pointed at.
+-- 
+Vikram Sethi
+Qualcomm Technologies Inc, on behalf of Qualcomm Innovation Center, Inc.
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, a Linux Foundation Collaborative Project
