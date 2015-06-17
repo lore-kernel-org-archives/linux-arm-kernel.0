@@ -1,61 +1,51 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Wed, 17 Jun 2015 14:11:01 +0200
-Subject: [PATCH] ata: ahci_mvebu: add suspend/resume support
-Message-ID: <1434543061-3066-1-git-send-email-thomas.petazzoni@free-electrons.com>
+Date: Wed, 17 Jun 2015 14:12:17 +0200
+Subject: [PATCH RESEND 0/4] dmaengine: mv_xor improvements
+Message-ID: <1434543141-3242-1-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This commit adds suspend/resume support to the ahci_mvebu driver. The
-suspend hook doesn't do anything special despite calling the generic
-ahci_platform_suspend_host() function. However, the resume hook has to
-restore the MBus windows configuration, as well as the regret option.
+Hello,
 
-Tested on Marvell Armada 388 GP.
+(Same patches as previous iteration, only this time the relevant
+mailing list are in Cc. Sorry for the noise.)
 
-Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
----
- drivers/ata/ahci_mvebu.c | 22 ++++++++++++++++++++++
- 1 file changed, 22 insertions(+)
+The following four patches implement various improvements in the
+support of XOR on Marvell EBU platforms:
 
-diff --git a/drivers/ata/ahci_mvebu.c b/drivers/ata/ahci_mvebu.c
-index 5928d07..8490d37 100644
---- a/drivers/ata/ahci_mvebu.c
-+++ b/drivers/ata/ahci_mvebu.c
-@@ -62,6 +62,26 @@ static void ahci_mvebu_regret_option(struct ahci_host_priv *hpriv)
- 	writel(0x80, hpriv->mmio + AHCI_VENDOR_SPECIFIC_0_DATA);
- }
- 
-+static int ahci_mvebu_suspend(struct platform_device *pdev, pm_message_t state)
-+{
-+	return ahci_platform_suspend_host(&pdev->dev);
-+}
-+
-+static int ahci_mvebu_resume(struct platform_device *pdev)
-+{
-+	struct ata_host *host = platform_get_drvdata(pdev);
-+	struct ahci_host_priv *hpriv = host->private_data;
-+	const struct mbus_dram_target_info *dram;
-+
-+	dram = mv_mbus_dram_info();
-+	if (dram)
-+		ahci_mvebu_mbus_config(hpriv, dram);
-+
-+	ahci_mvebu_regret_option(hpriv);
-+
-+	return ahci_platform_resume_host(&pdev->dev);
-+}
-+
- static const struct ata_port_info ahci_mvebu_port_info = {
- 	.flags	   = AHCI_FLAG_COMMON,
- 	.pio_mask  = ATA_PIO4,
-@@ -120,6 +140,8 @@ MODULE_DEVICE_TABLE(of, ahci_mvebu_of_match);
- static struct platform_driver ahci_mvebu_driver = {
- 	.probe = ahci_mvebu_probe,
- 	.remove = ata_platform_remove_one,
-+	.suspend = ahci_mvebu_suspend,
-+	.resume = ahci_mvebu_resume,
- 	.driver = {
- 		.name = DRV_NAME,
- 		.of_match_table = ahci_mvebu_of_match,
+ - It adds support for suspend/resume to mv_xor.
+
+ - It removes the need for the dmacap,* Device Tree properties, which
+   are quite useful.
+
+ - It updates the Device Tree according to the removal of the dmacap,*
+   removal, and make Armada 38x and Armada 39x use the new
+   capabilities of the XOR hardware using the armada-380-xor
+   compatible string.
+
+The patches are on top of Vinod Koul's next branch, since he already
+has a number of mv_xor changes queued up.
+
+Thanks,
+
+Thomas
+
+Thomas Petazzoni (4):
+  dmaengine: mv_xor: add suspend/resume support
+  dmaengine: mv_xor: remove support for dmacap,* DT properties
+  ARM: mvebu: remove unneeded dmacap,* properties in Device Trees
+  ARM: mvebu: use armada-380-xor on Armada 38x and 39x
+
+ Documentation/devicetree/bindings/dma/mv-xor.txt | 10 ++---
+ arch/arm/boot/dts/armada-370.dtsi                | 10 -----
+ arch/arm/boot/dts/armada-375.dtsi                | 10 -----
+ arch/arm/boot/dts/armada-38x.dtsi                | 14 +-----
+ arch/arm/boot/dts/armada-39x.dtsi                | 14 +-----
+ arch/arm/boot/dts/armada-xp.dtsi                 | 10 -----
+ arch/arm/boot/dts/dove.dtsi                      |  8 ----
+ drivers/dma/mv_xor.c                             | 56 +++++++++++++++++++++---
+ drivers/dma/mv_xor.h                             |  1 +
+ 9 files changed, 59 insertions(+), 74 deletions(-)
+
 -- 
 2.1.0
