@@ -1,52 +1,38 @@
 From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Wed, 17 Jun 2015 09:56:47 +0200
-Subject: [PATCH 5/5] ARM64: MediaTek MT8173: Add SCPSYS device node
-In-Reply-To: <7hlhfjy0tq.fsf@deeprootsystems.com>
-References: <1433839623-10804-1-git-send-email-s.hauer@pengutronix.de>
- <1433839623-10804-6-git-send-email-s.hauer@pengutronix.de>
- <7hlhfjy0tq.fsf@deeprootsystems.com>
-Message-ID: <20150617075647.GG6325@pengutronix.de>
+Date: Wed, 17 Jun 2015 10:00:06 +0200
+Subject: [PATCH v5 04/11] nvmem: Add a simple NVMEM framework for consumers
+In-Reply-To: <5580A345.30204@codeaurora.org>
+References: <1432226535-8640-1-git-send-email-srinivas.kandagatla@linaro.org>
+ <1432226593-8817-1-git-send-email-srinivas.kandagatla@linaro.org>
+ <5580A345.30204@codeaurora.org>
+Message-ID: <20150617080006.GH6325@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 16, 2015 at 11:17:53AM -0700, Kevin Hilman wrote:
-> Sascha Hauer <s.hauer@pengutronix.de> writes:
+On Tue, Jun 16, 2015 at 03:29:25PM -0700, Stephen Boyd wrote:
+> On 05/21/2015 09:43 AM, Srinivas Kandagatla wrote:
+> > +	/* if it's not end on byte boundary */
+> > +	if ((nbits + bit_offset) % BITS_PER_BYTE) {
+> > +		/* setup the last byte with msb bits from nvmem */
+> > +		rc = regmap_raw_read(nvmem->regmap,
+> > +				    cell->offset + cell->bytes - 1, &v, 1);
+> > +		*p |= GENMASK(7, (nbits + bit_offset) % BITS_PER_BYTE) & v;
+> > +
+> > +	}
+> > +
+> > +	return buf;
+> > +}
+> > +
+> > +/**
+> > + * nvmem_cell_write(): Write to a given nvmem cell
 > 
-> > This adds the SCPSYS device node to the MT8173 dtsi file.
-> >
-> > Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
-> > ---
-> >  arch/arm64/boot/dts/mediatek/mt8173.dtsi | 10 ++++++++++
-> >  1 file changed, 10 insertions(+)
-> >
-> > diff --git a/arch/arm64/boot/dts/mediatek/mt8173.dtsi b/arch/arm64/boot/dts/mediatek/mt8173.dtsi
-> > index 924fdb6..12430f0 100644
-> > --- a/arch/arm64/boot/dts/mediatek/mt8173.dtsi
-> > +++ b/arch/arm64/boot/dts/mediatek/mt8173.dtsi
-> > @@ -125,6 +125,16 @@
-> >  						<GIC_SPI 147 IRQ_TYPE_LEVEL_HIGH>;
-> >  		};
-> >  
-> > +		scpsys: scpsys at 10006000 {
-> > +			compatible = "mediatek,mt8173-scpsys";
-> > +			#power-domain-cells = <1>;
-> > +			reg = <0 0x10006000 0 0x1000>;
-> > +			clocks = <&clk26m>,
-> > +				 <&topckgen CLK_TOP_MM_SEL>;
+> This isn't kernel doc notation. It should be like
 > 
-> Neither your binding doc (nor the generic one) mentions these clock
-> properties or what they are used for.  They appear to define a clock
-> that must be enabled in order to for the power domain to be on.
+>     nvmem_cell_write - Write to a given nvmem cell
 
-Ok, will add documentation for this.
+Almost. Should be:
 
-> 
-> Also the order here seems rather important and probably needs
-> documenting in the binding (e.g. the clk_id order is hard-coded in the
-> driver.)
-
-The order is not important, the clock-names property defines which clock
-is which.
+      nvmem_cell_write() - Write to a given nvmem cell
 
 Sascha
 
