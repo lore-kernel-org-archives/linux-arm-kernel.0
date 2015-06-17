@@ -1,110 +1,192 @@
 From: geert+renesas@glider.be (Geert Uytterhoeven)
-Date: Wed, 17 Jun 2015 11:31:25 +0200
-Subject: [PATCH 09/15] ARM: shmobile: Remove unused dma-register.h
+Date: Wed, 17 Jun 2015 11:31:18 +0200
+Subject: [PATCH 02/15] ARM: shmobile: Remove legacy kzm9g_defconfig
 In-Reply-To: <1434533491-21979-1-git-send-email-geert+renesas@glider.be>
 References: <1434533491-21979-1-git-send-email-geert+renesas@glider.be>
-Message-ID: <1434533491-21979-10-git-send-email-geert+renesas@glider.be>
+Message-ID: <1434533491-21979-3-git-send-email-geert+renesas@glider.be>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The last users of "dma-register.h" were the sh73a0 and r8a7740 legacy
-SoC code, which have been removed.
+The legacy board code for KZM-A9-GT has been removed.
 
 Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
 ---
- arch/arm/mach-shmobile/dma-register.h | 84 -----------------------------------
- 1 file changed, 84 deletions(-)
- delete mode 100644 arch/arm/mach-shmobile/dma-register.h
+ MAINTAINERS                      |   1 -
+ arch/arm/configs/kzm9g_defconfig | 154 ---------------------------------------
+ 2 files changed, 155 deletions(-)
+ delete mode 100644 arch/arm/configs/kzm9g_defconfig
 
-diff --git a/arch/arm/mach-shmobile/dma-register.h b/arch/arm/mach-shmobile/dma-register.h
+diff --git a/MAINTAINERS b/MAINTAINERS
+index eaadc4a87d38bf64..f1fe0cc0dadee9df 100644
+--- a/MAINTAINERS
++++ b/MAINTAINERS
+@@ -1457,7 +1457,6 @@ F:	arch/arm/boot/dts/r8a*
+ F:	arch/arm/boot/dts/sh*
+ F:	arch/arm/configs/armadillo800eva_defconfig
+ F:	arch/arm/configs/bockw_defconfig
+-F:	arch/arm/configs/kzm9g_defconfig
+ F:	arch/arm/configs/marzen_defconfig
+ F:	arch/arm/configs/shmobile_defconfig
+ F:	arch/arm/include/debug/renesas-scif.S
+diff --git a/arch/arm/configs/kzm9g_defconfig b/arch/arm/configs/kzm9g_defconfig
 deleted file mode 100644
-index 52a2f66e600f2995..0000000000000000
---- a/arch/arm/mach-shmobile/dma-register.h
+index 23e8d146dc16972f..0000000000000000
+--- a/arch/arm/configs/kzm9g_defconfig
 +++ /dev/null
-@@ -1,84 +0,0 @@
--/*
-- * SH-ARM CPU-specific DMA definitions, used by both DMA drivers
-- *
-- * Copyright (C) 2012 Renesas Solutions Corp
-- *
-- * Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
-- *
-- * Based on arch/sh/include/cpu-sh4/cpu/dma-register.h
-- * Copyright (C) 2010 Guennadi Liakhovetski <g.liakhovetski@gmx.de>
-- *
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License version 2 as
-- * published by the Free Software Foundation.
-- */
--
--#ifndef DMA_REGISTER_H
--#define DMA_REGISTER_H
--
--/*
-- *		Direct Memory Access Controller
-- */
--
--/* Transmit sizes and respective CHCR register values */
--enum {
--	XMIT_SZ_8BIT		= 0,
--	XMIT_SZ_16BIT		= 1,
--	XMIT_SZ_32BIT		= 2,
--	XMIT_SZ_64BIT		= 7,
--	XMIT_SZ_128BIT		= 3,
--	XMIT_SZ_256BIT		= 4,
--	XMIT_SZ_512BIT		= 5,
--};
--
--/* log2(size / 8) - used to calculate number of transfers */
--static const unsigned int dma_ts_shift[] = {
--	[XMIT_SZ_8BIT]		= 0,
--	[XMIT_SZ_16BIT]		= 1,
--	[XMIT_SZ_32BIT]		= 2,
--	[XMIT_SZ_64BIT]		= 3,
--	[XMIT_SZ_128BIT]	= 4,
--	[XMIT_SZ_256BIT]	= 5,
--	[XMIT_SZ_512BIT]	= 6,
--};
--
--#define TS_LOW_BIT	0x3 /* --xx */
--#define TS_HI_BIT	0xc /* xx-- */
--
--#define TS_LOW_SHIFT	(3)
--#define TS_HI_SHIFT	(20 - 2)	/* 2 bits for shifted low TS */
--
--#define TS_INDEX2VAL(i) \
--	((((i) & TS_LOW_BIT) << TS_LOW_SHIFT) |\
--	 (((i) & TS_HI_BIT)  << TS_HI_SHIFT))
--
--#define CHCR_TX(xmit_sz) (DM_FIX | SM_INC | RS_ERS | TS_INDEX2VAL((xmit_sz)))
--#define CHCR_RX(xmit_sz) (DM_INC | SM_FIX | RS_ERS | TS_INDEX2VAL((xmit_sz)))
--
--
--/*
-- *		USB High-Speed DMAC
-- */
--/* Transmit sizes and respective CHCR register values */
--enum {
--	USBTS_XMIT_SZ_8BYTE		= 0,
--	USBTS_XMIT_SZ_16BYTE		= 1,
--	USBTS_XMIT_SZ_32BYTE		= 2,
--};
--
--/* log2(size / 8) - used to calculate number of transfers */
--static const unsigned int dma_usbts_shift[] = {
--	[USBTS_XMIT_SZ_8BYTE]	= 3,
--	[USBTS_XMIT_SZ_16BYTE]	= 4,
--	[USBTS_XMIT_SZ_32BYTE]	= 5,
--};
--
--#define USBTS_LOW_BIT	0x3 /* --xx */
--#define USBTS_HI_BIT	0x0 /* ---- */
--
--#define USBTS_LOW_SHIFT	6
--#define USBTS_HI_SHIFT	0
--
--#define USBTS_INDEX2VAL(i) (((i) & 3) << 6)
--
--#endif /* DMA_REGISTER_H */
+@@ -1,154 +0,0 @@
+-# CONFIG_ARM_PATCH_PHYS_VIRT is not set
+-CONFIG_EXPERIMENTAL=y
+-# CONFIG_LOCALVERSION_AUTO is not set
+-CONFIG_SYSVIPC=y
+-CONFIG_IKCONFIG=y
+-CONFIG_IKCONFIG_PROC=y
+-CONFIG_LOG_BUF_SHIFT=16
+-CONFIG_NAMESPACES=y
+-# CONFIG_UTS_NS is not set
+-# CONFIG_IPC_NS is not set
+-# CONFIG_USER_NS is not set
+-# CONFIG_PID_NS is not set
+-# CONFIG_NET_NS is not set
+-CONFIG_CC_OPTIMIZE_FOR_SIZE=y
+-CONFIG_SYSCTL_SYSCALL=y
+-CONFIG_EMBEDDED=y
+-CONFIG_PERF_EVENTS=y
+-CONFIG_SLAB=y
+-CONFIG_MODULES=y
+-CONFIG_MODULE_FORCE_LOAD=y
+-CONFIG_MODULE_UNLOAD=y
+-# CONFIG_BLK_DEV_BSG is not set
+-# CONFIG_IOSCHED_DEADLINE is not set
+-# CONFIG_IOSCHED_CFQ is not set
+-CONFIG_ARCH_SHMOBILE_LEGACY=y
+-CONFIG_ARCH_SH73A0=y
+-CONFIG_MACH_KZM9G=y
+-CONFIG_MEMORY_START=0x41000000
+-CONFIG_MEMORY_SIZE=0x1f000000
+-CONFIG_ARM_ERRATA_743622=y
+-CONFIG_ARM_ERRATA_754322=y
+-CONFIG_NO_HZ=y
+-CONFIG_HIGH_RES_TIMERS=y
+-CONFIG_SMP=y
+-CONFIG_SCHED_MC=y
+-CONFIG_AEABI=y
+-# CONFIG_OABI_COMPAT is not set
+-CONFIG_HIGHMEM=y
+-CONFIG_ZBOOT_ROM_TEXT=0x0
+-CONFIG_ZBOOT_ROM_BSS=0x0
+-CONFIG_ARM_APPENDED_DTB=y
+-CONFIG_KEXEC=y
+-CONFIG_VFP=y
+-CONFIG_NEON=y
+-# CONFIG_CORE_DUMP_DEFAULT_ELF_HEADERS is not set
+-CONFIG_PM=y
+-CONFIG_NET=y
+-CONFIG_PACKET=y
+-CONFIG_UNIX=y
+-CONFIG_INET=y
+-CONFIG_IP_PNP=y
+-CONFIG_IP_PNP_DHCP=y
+-# CONFIG_INET_XFRM_MODE_TRANSPORT is not set
+-# CONFIG_INET_XFRM_MODE_TUNNEL is not set
+-# CONFIG_INET_XFRM_MODE_BEET is not set
+-# CONFIG_INET_LRO is not set
+-# CONFIG_INET_DIAG is not set
+-# CONFIG_IPV6 is not set
+-CONFIG_IRDA=y
+-CONFIG_SH_IRDA=y
+-# CONFIG_WIRELESS is not set
+-CONFIG_UEVENT_HELPER_PATH="/sbin/hotplug"
+-CONFIG_DEVTMPFS=y
+-CONFIG_DEVTMPFS_MOUNT=y
+-CONFIG_SCSI=y
+-CONFIG_BLK_DEV_SD=y
+-CONFIG_NETDEVICES=y
+-CONFIG_SMSC911X=y
+-# CONFIG_WLAN is not set
+-CONFIG_INPUT_SPARSEKMAP=y
+-# CONFIG_INPUT_MOUSEDEV is not set
+-CONFIG_INPUT_EVDEV=y
+-# CONFIG_KEYBOARD_ATKBD is not set
+-CONFIG_KEYBOARD_GPIO=y
+-# CONFIG_INPUT_MOUSE is not set
+-CONFIG_INPUT_TOUCHSCREEN=y
+-CONFIG_TOUCHSCREEN_ST1232=y
+-CONFIG_INPUT_MISC=y
+-CONFIG_INPUT_ADXL34X=y
+-# CONFIG_LEGACY_PTYS is not set
+-CONFIG_SERIAL_SH_SCI=y
+-CONFIG_SERIAL_SH_SCI_NR_UARTS=9
+-CONFIG_SERIAL_SH_SCI_CONSOLE=y
+-# CONFIG_HW_RANDOM is not set
+-CONFIG_I2C_CHARDEV=y
+-CONFIG_I2C_SH_MOBILE=y
+-CONFIG_GPIO_PCF857X=y
+-# CONFIG_HWMON is not set
+-CONFIG_MFD_AS3711=y
+-CONFIG_REGULATOR=y
+-CONFIG_REGULATOR_AS3711=y
+-CONFIG_FB=y
+-CONFIG_FB_SH_MOBILE_LCDC=y
+-CONFIG_BACKLIGHT_AS3711=y
+-CONFIG_FRAMEBUFFER_CONSOLE=y
+-CONFIG_LOGO=y
+-CONFIG_FB_SH_MOBILE_MERAM=y
+-CONFIG_SOUND=y
+-CONFIG_SND=y
+-# CONFIG_SND_SUPPORT_OLD_API is not set
+-# CONFIG_SND_VERBOSE_PROCFS is not set
+-# CONFIG_SND_DRIVERS is not set
+-# CONFIG_SND_ARM is not set
+-# CONFIG_SND_USB is not set
+-CONFIG_SND_SOC=y
+-CONFIG_SND_SOC_SH4_FSI=y
+-# CONFIG_HID_SUPPORT is not set
+-CONFIG_USB=y
+-CONFIG_USB_R8A66597_HCD=y
+-CONFIG_USB_RENESAS_USBHS=y
+-CONFIG_USB_STORAGE=y
+-CONFIG_USB_GADGET=y
+-CONFIG_USB_RENESAS_USBHS_UDC=y
+-CONFIG_USB_ETH=m
+-CONFIG_USB_MASS_STORAGE=m
+-CONFIG_MMC=y
+-# CONFIG_MMC_BLOCK_BOUNCE is not set
+-CONFIG_MMC_SDHI=y
+-CONFIG_MMC_SH_MMCIF=y
+-CONFIG_NEW_LEDS=y
+-CONFIG_LEDS_CLASS=y
+-CONFIG_LEDS_GPIO=y
+-CONFIG_RTC_CLASS=y
+-CONFIG_RTC_DRV_RS5C372=y
+-CONFIG_DMADEVICES=y
+-CONFIG_SH_DMAE=y
+-CONFIG_ASYNC_TX_DMA=y
+-CONFIG_STAGING=y
+-CONFIG_IIO=y
+-CONFIG_AK8975=y
+-# CONFIG_DNOTIFY is not set
+-CONFIG_VFAT_FS=y
+-CONFIG_TMPFS=y
+-# CONFIG_MISC_FILESYSTEMS is not set
+-CONFIG_NFS_FS=y
+-CONFIG_NFS_V3=y
+-CONFIG_NFS_V3_ACL=y
+-CONFIG_NFS_V4=y
+-CONFIG_NFS_V4_1=y
+-CONFIG_ROOT_NFS=y
+-CONFIG_NLS_CODEPAGE_437=y
+-CONFIG_NLS_ISO8859_1=y
+-# CONFIG_ENABLE_WARN_DEPRECATED is not set
+-# CONFIG_ENABLE_MUST_CHECK is not set
+-# CONFIG_SCHED_DEBUG is not set
+-# CONFIG_DEBUG_PREEMPT is not set
+-# CONFIG_DEBUG_BUGVERBOSE is not set
+-# CONFIG_FTRACE is not set
+-# CONFIG_ARM_UNWIND is not set
+-CONFIG_CRYPTO=y
+-CONFIG_CRYPTO_CBC=y
+-CONFIG_CRYPTO_MD5=y
+-CONFIG_CRYPTO_DES=y
+-CONFIG_CRC16=y
 -- 
 1.9.1
