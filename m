@@ -1,41 +1,59 @@
 From: geert+renesas@glider.be (Geert Uytterhoeven)
-Date: Wed, 17 Jun 2015 15:03:32 +0200
-Subject: [PATCH 1/5] ARM: shmobile: r8a73a4 dtsi: Use "arm,gic-400" for GIC
-In-Reply-To: <1434546216-10773-1-git-send-email-geert+renesas@glider.be>
-References: <1434546216-10773-1-git-send-email-geert+renesas@glider.be>
-Message-ID: <1434546216-10773-2-git-send-email-geert+renesas@glider.be>
+Date: Wed, 17 Jun 2015 15:03:31 +0200
+Subject: [PATCH 0/5] ARM: shmobile: R-Mobile APE6 / R-Car Gen2: Use "arm,
+ gic-400"
+Message-ID: <1434546216-10773-1-git-send-email-geert+renesas@glider.be>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Replace the "arm,cortex-a15-gic" compatible value for the GIC by
-"arm,gic-400", as the documentation states it's a GIC-400.
-This has been confirmed by reading the GICD_IIDR register, which reports
-0x0200043b (GIC-400 = 0x02, ARM = 0x43b).
+	Hi Simon, Magnus,
 
-This has no effect on runtime behavior, as currently the GIC driver
-treats both compatible values the same.
+This patch series replaces the "arm,cortex-a15-gic" compatible value for
+the GIC device node by "arm,gic-400" in the R-Mobile APE6 and R-Car Gen2
+device trees:
+  - The R-Mobile APE6 documentation states it has a GIC-400,
+  - The R-Car Gen2 is assumed to have a GIC-400, too.
 
-Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
----
-You can read the GICD_IIDR register from U-Boot using
+The presence of a GIC-400 has been confirmed on APE6 and R-Car M2 by
+reading the GICD_IIDR register[1], which reports 0x0200043b (GIC-400 =
+0x02, ARM = 0x43b).
 
-    md 0xf1001008 1
----
+This change has no effect on runtime behavior, as currently[2] the GIC
+driver treats both compatible values the same.
+
+This has been tested on r8a73a4/ape6evm and r8a7791/koelsch.
+
+Thanks for applying!
+
+[1] Using Mark Rutland's patch in https://lkml.org/lkml/2015/4/29/259,
+    or from U-Boot using "md 0xf1001008 1",
+[2] Backporter's note: since commit 144cb08864ed44be ("irqchip: gic: Add
+    binding probe for ARM GIC400").
+
+Geert Uytterhoeven (5):
+  ARM: shmobile: r8a73a4 dtsi: Use "arm,gic-400" for GIC
+  ARM: shmobile: r8a7790 dtsi: Use "arm,gic-400" for GIC
+  ARM: shmobile: r8a7791 dtsi: Use "arm,gic-400" for GIC
+  ARM: shmobile: r8a7793 dtsi: Use "arm,gic-400" for GIC
+  ARM: shmobile: r8a7794 dtsi: Use "arm,gic-400" for GIC
+
  arch/arm/boot/dts/r8a73a4.dtsi | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ arch/arm/boot/dts/r8a7790.dtsi | 2 +-
+ arch/arm/boot/dts/r8a7791.dtsi | 2 +-
+ arch/arm/boot/dts/r8a7793.dtsi | 2 +-
+ arch/arm/boot/dts/r8a7794.dtsi | 2 +-
+ 5 files changed, 5 insertions(+), 5 deletions(-)
 
-diff --git a/arch/arm/boot/dts/r8a73a4.dtsi b/arch/arm/boot/dts/r8a73a4.dtsi
-index 7ee22a41c6c97488..5090d1a8f652e8be 100644
---- a/arch/arm/boot/dts/r8a73a4.dtsi
-+++ b/arch/arm/boot/dts/r8a73a4.dtsi
-@@ -434,7 +434,7 @@
- 	};
- 
- 	gic: interrupt-controller at f1001000 {
--		compatible = "arm,cortex-a15-gic";
-+		compatible = "arm,gic-400";
- 		#interrupt-cells = <3>;
- 		#address-cells = <0>;
- 		interrupt-controller;
 -- 
 1.9.1
+
+Gr{oetje,eeting}s,
+
+						Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+							    -- Linus Torvalds
