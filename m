@@ -1,47 +1,51 @@
-From: Dave.Martin@arm.com (Dave Martin)
-Date: Wed, 17 Jun 2015 12:13:10 +0100
-Subject: [PATCH 10/10] arm64/BUG: Show explicit backtrace for WARNs
-In-Reply-To: <20150616144944.GF30522@arm.com>
-References: <1434036566-9848-1-git-send-email-Dave.Martin@arm.com>
- <1434036566-9848-11-git-send-email-Dave.Martin@arm.com>
- <20150616144944.GF30522@arm.com>
-Message-ID: <20150617111310.GD3651@e103592.cambridge.arm.com>
+From: andre.przywara@arm.com (Andre Przywara)
+Date: Wed, 17 Jun 2015 12:21:54 +0100
+Subject: [PATCH v3 03/10] irq: add irq__get_nr_allocated_lines
+In-Reply-To: <1434540121-21283-1-git-send-email-andre.przywara@arm.com>
+References: <1434540121-21283-1-git-send-email-andre.przywara@arm.com>
+Message-ID: <1434540121-21283-4-git-send-email-andre.przywara@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 16, 2015 at 03:49:44PM +0100, Will Deacon wrote:
-> On Thu, Jun 11, 2015 at 04:29:24PM +0100, Dave P Martin wrote:
-> > The generic slowpath WARN implementation prints a backtrace, but
-> > the report_bug() based implementation does not, opting to print the
-> > registers instead which is generally not as useful.
-> > 
-> > Ideally, report_bug() should be fixed to make the behaviour more
-> > consistent, but in the meantime this patch generates a backtrace
-> > directly from the arm64 backend instead so that this functionality
-> > is not lost with the migration to report_bug().
-> > 
-> > As a side-effect, the backtrace will be outside the oops end
-> > marker, but that's hard to avoid without modifying generic code.
-> > 
-> > This patch can go away if report_bug() grows the ability in the
-> > future to generate a backtrace directly or call an arch hook at the
-> > appropriate time.
-> 
-> Could you propose a patch to the core code, please? I'm happy to merge this
-> in the interim, but it sounds like a simple oversight.
+From: Marc Zyngier <marc.zyngier@arm.com>
 
-Already done[1], but it's late in the cycle and people are
-understandably busy with other stuff.
+The ARM GIC emulation needs to be told the number of interrupts
+it has to support. As commit 1c262fa1dc7bc ("kvm tools: irq: make
+irq__alloc_line generic") made the interrupt counter private,
+add a new accessor returning the number of interrupt lines we've
+allocated so far.
 
-The purpose of this arm64-specific patch is simply to decouple the
-dependency.
+Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+Signed-off-by: Andre Przywara <andre.przywara@arm.com>
+---
+ include/kvm/irq.h | 1 +
+ irq.c             | 5 +++++
+ 2 files changed, 6 insertions(+)
 
-None of this is urgent -- I plan to repost everything after the merge
-window when people are less swamped.
-
-[1] http://marc.info/?l=linux-kernel&m=143403763612397&w=2
-
-[...]
-
-Cheers
----Dave
+diff --git a/include/kvm/irq.h b/include/kvm/irq.h
+index 4cec6f0..8a78e43 100644
+--- a/include/kvm/irq.h
++++ b/include/kvm/irq.h
+@@ -11,6 +11,7 @@
+ struct kvm;
+ 
+ int irq__alloc_line(void);
++int irq__get_nr_allocated_lines(void);
+ 
+ int irq__init(struct kvm *kvm);
+ int irq__exit(struct kvm *kvm);
+diff --git a/irq.c b/irq.c
+index 33ea8d2..71eaa05 100644
+--- a/irq.c
++++ b/irq.c
+@@ -7,3 +7,8 @@ int irq__alloc_line(void)
+ {
+ 	return next_line++;
+ }
++
++int irq__get_nr_allocated_lines(void)
++{
++	return next_line - KVM_IRQ_OFFSET;
++}
+-- 
+2.3.5
