@@ -1,30 +1,54 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 17 Jun 2015 09:42:56 +0100
-Subject: [PATCHv2 1/7] arm: perf: factor arm_pmu core out to drivers
-In-Reply-To: <20150616214432.GV7557@n2100.arm.linux.org.uk>
-References: <1434041060-16378-1-git-send-email-mark.rutland@arm.com>
- <1434041060-16378-2-git-send-email-mark.rutland@arm.com>
- <20150616161728.GI30522@arm.com>
- <20150616214432.GV7557@n2100.arm.linux.org.uk>
-Message-ID: <20150617084255.GA6303@arm.com>
+From: robert.richter@caviumnetworks.com (Robert Richter)
+Date: Wed, 17 Jun 2015 10:48:52 +0200
+Subject: [PATCH] ahci, msix: Fix build error for !PCI_MSI
+In-Reply-To: <20150616201341.GD22637@mtj.duckdns.org>
+References: <1433526566-21136-1-git-send-email-rric@kernel.org>
+ <20150616132434.GO10428@rric.localhost>
+ <20150616201341.GD22637@mtj.duckdns.org>
+Message-ID: <20150617084852.GL4914@rric.localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 16, 2015 at 10:44:32PM +0100, Russell King - ARM Linux wrote:
-> On Tue, Jun 16, 2015 at 05:17:28PM +0100, Will Deacon wrote:
-> > I wonder whether that's such a good name for the subsystem. We already
-> > have a bunch of perf_* headers directly under include/linux/ for the perf
-> > core interfaces, so maybe drivers/pmu/ would be better?
-> 
-> I think drivers/perf/ is better than drivers/pmu/.  PMU can mean many
-> things - performance monitor unit, power management unit, ...
-> 
-> There comes a point where the use of TLAs becomes excessive, confusing
-> and annoying, and I think this is it.
+>From fd984f3be22f27b8d3c4cf577dbbf0a39792ea89 Mon Sep 17 00:00:00 2001
+From: Robert Richter <rrichter@cavium.com>
+Date: Wed, 17 Jun 2015 10:33:22 +0200
+Subject: [PATCH] ahci, msix: Fix build error for !PCI_MSI
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
 
-Okey doke, if the perf core guys don't mind the slightly odd namespace
-split of <include/linux/perf_*.h> for the core stuff and
-<include/linux/perf/*.h> for the PMU drivers, then we can stick with
-Mark's proposal.
+Fixing a build error if PCI_MSI is unset:
 
-Will
+ drivers/ata/ahci.c: In function ?msix_get_desc?:
+ drivers/ata/ahci.c:1210:2: error: ?struct pci_dev? has no member named ?msi_list?
+
+Catched by Fengguang's build bot.
+
+Reported-by: kbuild test robot <fengguang.wu@intel.com>
+Signed-off-by: Robert Richter <rrichter@cavium.com>
+---
+ drivers/ata/ahci.c | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
+
+diff --git a/drivers/ata/ahci.c b/drivers/ata/ahci.c
+index bdedaa4f9d7b..99cc9526ae95 100644
+--- a/drivers/ata/ahci.c
++++ b/drivers/ata/ahci.c
+@@ -1205,13 +1205,14 @@ static inline void ahci_gtf_filter_workaround(struct ata_host *host)
+ 
+ static struct msi_desc *msix_get_desc(struct pci_dev *dev, u16 entry)
+ {
++#ifdef CONFIG_PCI_MSI
+ 	struct msi_desc *desc;
+ 
+ 	list_for_each_entry(desc, &dev->msi_list, list) {
+ 		if (desc->msi_attrib.entry_nr == entry)
+ 			return desc;
+ 	}
+-
++#endif
+ 	return NULL;
+ }
+ 
+-- 
+2.1.1
