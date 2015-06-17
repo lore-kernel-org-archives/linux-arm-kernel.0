@@ -1,56 +1,57 @@
-From: andre.przywara@arm.com (Andre Przywara)
-Date: Wed, 17 Jun 2015 17:37:36 +0100
-Subject: [PATCH] arm: cmpxchg: update macro to prevent compiler warning
-Message-ID: <1434559056-20558-1-git-send-email-andre.przywara@arm.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 17 Jun 2015 17:42:28 +0100
+Subject: [PATCH 09/10] arm64/BUG: Use BRK instruction for generic BUG traps
+In-Reply-To: <20150617113518.GE3651@e103592.cambridge.arm.com>
+References: <1434036566-9848-1-git-send-email-Dave.Martin@arm.com>
+ <1434036566-9848-10-git-send-email-Dave.Martin@arm.com>
+ <20150616144810.GE30522@arm.com>
+ <20150617113518.GE3651@e103592.cambridge.arm.com>
+Message-ID: <20150617164228.GA31594@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In kernel/acct.c we call the cmpxchg() macro without using it's
-return value, so the compiler complains when compiling for ARM:
+Hi Dave,
 
-kernel/acct.c: In function 'acct_pin_kill':
-arch/arm/include/asm/cmpxchg.h:205:3: warning: value computed is not used [-Wunused-value]
-  ((__typeof__(*(ptr)))__cmpxchg_mb((ptr),   \
-   ^
-kernel/acct.c:174:2: note: in expansion of macro 'cmpxchg'
-  cmpxchg(&acct->ns->bacct, pin, NULL);
-  ^
+On Wed, Jun 17, 2015 at 12:35:18PM +0100, Dave P Martin wrote:
+> On Tue, Jun 16, 2015 at 03:48:10PM +0100, Will Deacon wrote:
+> > On Thu, Jun 11, 2015 at 04:29:23PM +0100, Dave P Martin wrote:
+> > > diff --git a/arch/arm64/include/asm/brk.h b/arch/arm64/include/asm/brk.h
+> > > index 99b8dfb..f4d5894 100644
+> > > --- a/arch/arm64/include/asm/brk.h
+> > > +++ b/arch/arm64/include/asm/brk.h
+> > > @@ -27,5 +27,6 @@
+> > >  #define FAULT_BRK_IMM			0x100
+> > >  #define KGDB_DYN_DBG_BRK_IMM		0x400
+> > >  #define KGDB_COMPILED_DBG_BRK_IMM	0x401
+> > > +#define BUG_BRK_IMM			0x7ff
+> > 
+> > Just curious, but how did you come up with this number?
+> 
+> There's a comment in debug-monitors.h that the "allowed values for
+> kgbd" (sic) are 0x400..0x7ff.
+> 
+> So 0x7ff seemed unlikely to clash with any other use, and well
+> out of the way of the values that kgbd currently uses.
+> 
+> It's debatable that the BUG value shouldn't be in the range at all.
+> However, BUG_BRK_IMM is a contract between the kernel and itself for
+> EL1 only, so it can be changed at any time in the future with minimal
+> impact.
+> 
+> What's your view?
 
-Rearrange the macro along the lines of a similar patch for arm64
-60010e508111 ("arm64: cmpxchg: update macros to prevent warnings")
-to fix the warning.
+I wonder if that kgdb range is inclusive? Maybe best to use 0x800 to be
+sure.
 
-Signed-off-by: Andre Przywara <andre.przywara@arm.com>
-Cc: Mark Hambleton <Mark.Hambleton@arm.com>
----
- arch/arm/include/asm/cmpxchg.h | 15 ++++++++++-----
- 1 file changed, 10 insertions(+), 5 deletions(-)
+> > Could we define is_valid_bugaddr as a macro in the header file and avoid
+> > the potential out-of-line call?
+> 
+> We could, but it would require a change to <linux/bug.h>.  Since
+> this is slowpath anyway, I wasn't sure it was worth it.
+> 
+> Happy to add that and try to push it as part of this series if
+> you like -- let me know.
 
-diff --git a/arch/arm/include/asm/cmpxchg.h b/arch/arm/include/asm/cmpxchg.h
-index abb2c37..dc27aaf 100644
---- a/arch/arm/include/asm/cmpxchg.h
-+++ b/arch/arm/include/asm/cmpxchg.h
-@@ -201,11 +201,16 @@ static inline unsigned long __cmpxchg_mb(volatile void *ptr, unsigned long old,
- 	return ret;
- }
- 
--#define cmpxchg(ptr,o,n)						\
--	((__typeof__(*(ptr)))__cmpxchg_mb((ptr),			\
--					  (unsigned long)(o),		\
--					  (unsigned long)(n),		\
--					  sizeof(*(ptr))))
-+#define cmpxchg(ptr, o, n)						\
-+({									\
-+	__typeof__(*(ptr)) __ret;					\
-+	__ret = (__typeof__(*(ptr)))					\
-+		__cmpxchg_mb((ptr),					\
-+			     (unsigned long)(o),			\
-+			     (unsigned long)(n),			\
-+			     sizeof(*(ptr)));				\
-+	__ret;								\
-+})
- 
- static inline unsigned long __cmpxchg_local(volatile void *ptr,
- 					    unsigned long old,
--- 
-2.3.5
+Nah, it's fine. I hadn't spotted the declaration.
+
+Will
