@@ -1,139 +1,56 @@
-From: dave.long@linaro.org (David Long)
-Date: Wed, 17 Jun 2015 14:37:00 -0400
-Subject: [PATCH v7 5/7] arm64: Add trampoline code for kretprobes
-In-Reply-To: <55803C47.6030000@redhat.com>
-References: <1434395229-6654-1-git-send-email-dave.long@linaro.org>
- <1434395229-6654-6-git-send-email-dave.long@linaro.org>
- <55803C47.6030000@redhat.com>
-Message-ID: <5581BE4C.8070604@linaro.org>
+From: alexander.sverdlin@gmail.com (Alexander Sverdlin)
+Date: Wed, 17 Jun 2015 20:38:42 +0200
+Subject: [PATCH RESEND] i2c: omap: improve duty cycle on SCL
+In-Reply-To: <20150617180052.GF18421@saruman.tx.rr.com>
+References: <1434482445-1818-1-git-send-email-balbi@ti.com>
+ <55813BA0.3010001@nokia.com> <20150617180052.GF18421@saruman.tx.rr.com>
+Message-ID: <5581BEB2.6070007@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/16/15 11:09, William Cohen wrote:
-> On 06/15/2015 03:07 PM, David Long wrote:
->> From: William Cohen <wcohen@redhat.com>
->>
->> The trampoline code is used by kretprobes to capture a return from a probed
->> function.  This is done by saving the registers, calling the handler, and
->> restoring the registers.  The code then returns to the roginal saved caller
->
-> s/roginal/original
->
+Hello Felipe,
 
-Hopefully no one wants a v8 if it turns out only to be to fix this typo 
-in the commit description.  I'll keep this in mind if a respin is needed 
-for other reasons.
+On 17/06/15 20:00, Felipe Balbi wrote:
+>>> With this patch we try to be as close to 50%
+>>> > > duty cycle as possible. The reason for this
+>>> > > is that some devices present an erratic behavior
+>>> > > with certain duty cycles.
+>>> > > 
+>>> > > One such example is TPS65218 PMIC which fails
+>>> > > to change voltages when running @ 400kHz and
+>>> > > duty cycle is lower than 34%.
+>>> > > 
+>>> > > The idea of the patch is simple:
+>>> > > 
+>>> > > calculate desired scl_period from requested scl
+>>> > > and use 50% for tLow and 50% for tHigh.
+>>> > > 
+>>> > > tLow is calculated with a DIV_ROUND_UP() to make
+>>> > > sure it's slightly higher than tHigh and to make
+>>> > > sure that we end up within I2C specifications.
+>>> > > 
+>>> > > Kudos to Nishanth Menon and Dave Gerlach for helping
+>>> > > debugging the TPS65218 problem found on AM437x SK.
+>>> > > 
+>>> > > Signed-off-by: Felipe Balbi <balbi@ti.com>
+>> > 
+>> > NAK.
+>> > This is a direct violation of PHILIPS I2C-bus Specification v.2.1,
+>> > section 15.
+>> > Namely, you will have LOW period of SCL clock shorter than required
+>> > 1.3uS.
+> how is this out of spec ?
+> 
+> http://i.imgur.com/jEDlZT7.png
+> 
+> -Width = 1.4us, frequency 373.1kHz, duty cycle of 47.76%
+> 
+> In any case, I have to send v2 anyway (found a bug which would show up
+> on frequencies above 400kHz), so I'll resend this patch.
 
->> return address.  It is necessary to do this directly instead of using a
->> software breakpoint because the code used in processing that breakpoint
->> could itself be kprobe'd and cause a problematic reentry into the debug
->> exception handler.
->>
->> Signed-off-by: William Cohen <wcohen@redhat.com>
->> Signed-off-by: David A. Long <dave.long@linaro.org>
->> ---
->>   arch/arm64/include/asm/kprobes.h  |  1 +
->>   arch/arm64/kernel/kprobes-arm64.h | 41 +++++++++++++++++++++++++++++++++++++++
->>   arch/arm64/kernel/kprobes.c       | 26 +++++++++++++++++++++++++
->>   3 files changed, 68 insertions(+)
->>
->> diff --git a/arch/arm64/include/asm/kprobes.h b/arch/arm64/include/asm/kprobes.h
->> index af31c4d..d081f49 100644
->> --- a/arch/arm64/include/asm/kprobes.h
->> +++ b/arch/arm64/include/asm/kprobes.h
->> @@ -58,5 +58,6 @@ int kprobe_exceptions_notify(struct notifier_block *self,
->>   			     unsigned long val, void *data);
->>   int kprobe_breakpoint_handler(struct pt_regs *regs, unsigned int esr);
->>   int kprobe_single_step_handler(struct pt_regs *regs, unsigned int esr);
->> +void kretprobe_trampoline(void);
->>
->>   #endif /* _ARM_KPROBES_H */
->> diff --git a/arch/arm64/kernel/kprobes-arm64.h b/arch/arm64/kernel/kprobes-arm64.h
->> index ff8a55f..bdcfa62 100644
->> --- a/arch/arm64/kernel/kprobes-arm64.h
->> +++ b/arch/arm64/kernel/kprobes-arm64.h
->> @@ -27,4 +27,45 @@ extern kprobes_pstate_check_t * const kprobe_condition_checks[16];
->>   enum kprobe_insn __kprobes
->>   arm_kprobe_decode_insn(kprobe_opcode_t insn, struct arch_specific_insn *asi);
->>
->> +#define SAVE_REGS_STRING\
->> +	"	stp x0, x1, [sp, #16 * 0]\n"	\
->> +	"	stp x2, x3, [sp, #16 * 1]\n"	\
->> +	"	stp x4, x5, [sp, #16 * 2]\n"	\
->> +	"	stp x6, x7, [sp, #16 * 3]\n"	\
->> +	"	stp x8, x9, [sp, #16 * 4]\n"	\
->> +	"	stp x10, x11, [sp, #16 * 5]\n"	\
->> +	"	stp x12, x13, [sp, #16 * 6]\n"	\
->> +	"	stp x14, x15, [sp, #16 * 7]\n"	\
->> +	"	stp x16, x17, [sp, #16 * 8]\n"	\
->> +	"	stp x18, x19, [sp, #16 * 9]\n"	\
->> +	"	stp x20, x21, [sp, #16 * 10]\n"	\
->> +	"	stp x22, x23, [sp, #16 * 11]\n"	\
->> +	"	stp x24, x25, [sp, #16 * 12]\n"	\
->> +	"	stp x26, x27, [sp, #16 * 13]\n"	\
->> +	"	stp x28, x29, [sp, #16 * 14]\n"	\
->> +	"	str x30,   [sp, #16 * 15]\n"    \
->> +	"	mrs x0, nzcv\n"			\
->> +	"	str x0, [sp, #8 * 33]\n"
->> +
->> +
->> +#define RESTORE_REGS_STRING\
->> +	"	ldr x0, [sp, #8 * 33]\n"	\
->> +	"	msr nzcv, x0\n"			\
->> +	"	ldp x0, x1, [sp, #16 * 0]\n"	\
->> +	"	ldp x2, x3, [sp, #16 * 1]\n"	\
->> +	"	ldp x4, x5, [sp, #16 * 2]\n"	\
->> +	"	ldp x6, x7, [sp, #16 * 3]\n"	\
->> +	"	ldp x8, x9, [sp, #16 * 4]\n"	\
->> +	"	ldp x10, x11, [sp, #16 * 5]\n"	\
->> +	"	ldp x12, x13, [sp, #16 * 6]\n"	\
->> +	"	ldp x14, x15, [sp, #16 * 7]\n"	\
->> +	"	ldp x16, x17, [sp, #16 * 8]\n"	\
->> +	"	ldp x18, x19, [sp, #16 * 9]\n"	\
->> +	"	ldp x20, x21, [sp, #16 * 10]\n"	\
->> +	"	ldp x22, x23, [sp, #16 * 11]\n"	\
->> +	"	ldp x24, x25, [sp, #16 * 12]\n"	\
->> +	"	ldp x26, x27, [sp, #16 * 13]\n"	\
->> +	"	ldp x28, x29, [sp, #16 * 14]\n"	\
->> +	"	ldr x30,   [sp, #16 * 15]\n"
->> +
->>   #endif /* _ARM_KERNEL_KPROBES_ARM64_H */
->> diff --git a/arch/arm64/kernel/kprobes.c b/arch/arm64/kernel/kprobes.c
->> index 6255814..570218c 100644
->> --- a/arch/arm64/kernel/kprobes.c
->> +++ b/arch/arm64/kernel/kprobes.c
->> @@ -560,6 +560,32 @@ int __kprobes longjmp_break_handler(struct kprobe *p, struct pt_regs *regs)
->>   	return 0;
->>   }
->>
->> +/*
->> + * When a retprobed function returns, this code saves registers and
->> + * calls trampoline_handler() runs, which calls the kretprobe's handler.
->> + */
->> +static void __used __kprobes kretprobe_trampoline_holder(void)
->> +{
->> +	asm volatile (".global kretprobe_trampoline\n"
->> +			"kretprobe_trampoline:\n"
->> +			"sub sp, sp, %0\n"
->> +			SAVE_REGS_STRING
->> +			"mov x0, sp\n"
->> +			"bl trampoline_probe_handler\n"
->> +			/* Replace trampoline address in lr with actual
->> +			   orig_ret_addr return address. */
->> +			"str x0, [sp, #16 * 15]\n"
->> +			RESTORE_REGS_STRING
->> +			"add sp, sp, %0\n"
->> +			"ret\n"
->> +		      : : "I"(sizeof(struct pt_regs)) : "memory");
->> +}
->> +
->> +static void __kprobes __used *trampoline_probe_handler(struct pt_regs *regs)
->> +{
->> +	return (void *) 0;
->> +}
->> +
->>   int __init arch_init_kprobes(void)
->>   {
->>   	return 0;
->>
->
+If you really target 50% duty cycle and there will be no rounding/truncation
+error, you will end up with 1.25uS at 400kHz. I understand why you want to
+make HIGH phase longer, but 50% is a bad target at 400hHz. Probably more safe
+value?
+
+Alex.
