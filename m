@@ -1,37 +1,99 @@
 From: andre.przywara@arm.com (Andre Przywara)
-Date: Wed, 17 Jun 2015 12:21:52 +0100
-Subject: [PATCH v3 01/10] AArch64: Reserve two 64k pages for GIC CPU interface
-In-Reply-To: <1434540121-21283-1-git-send-email-andre.przywara@arm.com>
-References: <1434540121-21283-1-git-send-email-andre.przywara@arm.com>
-Message-ID: <1434540121-21283-2-git-send-email-andre.przywara@arm.com>
+Date: Wed, 17 Jun 2015 12:21:51 +0100
+Subject: [PATCH v3 00/10] kvmtool: arm64: GICv3 guest support
+Message-ID: <1434540121-21283-1-git-send-email-andre.przywara@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Marc Zyngier <marc.zyngier@arm.com>
+Hi,
 
-On AArch64 system with a GICv2, the GICC range can be aligned
-to the last 4k block of a 64k page, ending up straddling two
-64k pages. In order not to conflict with the distributor mapping,
-allocate two 64k pages to the CPU interface.
+a new version of the GICv3 support series for kvmtool.
 
-Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-Signed-off-by: Andre Przywara <andre.przywara@arm.com>
----
- arm/aarch64/include/kvm/kvm-arch.h | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+I got rid of passing the number of redistributors around kvmtool.
+The new patch 06/10 simplifies ARM's MMIO dispatching, so that we no
+longer need to know the GIC size at this point. The FDT code uses
+base and size values now directly and these values are private to
+arm/gic.c.
 
-diff --git a/arm/aarch64/include/kvm/kvm-arch.h b/arm/aarch64/include/kvm/kvm-arch.h
-index 2f08a26..4925736 100644
---- a/arm/aarch64/include/kvm/kvm-arch.h
-+++ b/arm/aarch64/include/kvm/kvm-arch.h
-@@ -2,7 +2,7 @@
- #define KVM__KVM_ARCH_H
- 
- #define ARM_GIC_DIST_SIZE	0x10000
--#define ARM_GIC_CPUI_SIZE	0x10000
-+#define ARM_GIC_CPUI_SIZE	0x20000
- 
- #define ARM_KERN_OFFSET(kvm)	((kvm)->cfg.arch.aarch32_guest	?	\
- 				0x8000				:	\
+The new 07/10 patch aims to solve the number-of-VCPUs problem Marc
+mentioned. Instead of letting kvmtool have knowledge about particular
+limits, let the kernel decide on this matter. Since KVM_CAP_MAX_VCPUS
+is not really reliable on ARM, let's be a bit more relaxed about
+KVM_CREATE_VCPU failing and stop with creating more VCPUs if we get
+an EINVAL in return.
+
+I also addressed the other comments Marcs gave, but I had to leave
+some of the default switch-cases in due to the compiler complaining
+otherwise.
+
+Cheers,
+Andre.
+-----
+
+Since Linux 3.19 the kernel can emulate a GICv3 for KVM guests.
+This allows more than 8 VCPUs in a guest and enables in-kernel irqchip
+for non-backwards-compatible GICv3 implementations.
+
+This series updates kvmtool to support this feature.
+The first half of the series is mostly from Marc and supports some
+newer features of the virtual GIC which we later depend on. The second
+part enables support for a guest GICv3 by adding a new command line
+parameter (--irqchip=).
+
+We now use the KVM_CREATE_DEVICE interface to create a virtual GIC
+and only fall back to the now legacy KVM_CREATE_IRQCHIP call if the
+former is not supported by the kernel.
+Also we use two new features the KVM_CREATE_DEVICE interface
+introduces:
+* We now set the number of actually used interrupts to avoid
+  allocating too many of them without ever using them.
+* We tell the kernel explicitly that we are finished with the GIC
+  initialisation. This is a requirement for future VGIC versions.
+
+The final three patches introduce virtual GICv3 support, so on
+supported hardware (and given kernel support) the user can ask KVM to
+emulate a GICv3, lifting the 8 VCPU limit of KVM. This is done by
+specifying "--irqchip=gicv3" on the command line.
+For the time being the kernel only supports a virtual GICv3 on ARM64,
+but as the GIC is shared in kvmtool, I had to add the macro
+definitions to not break the build on ARM.
+
+This series goes on top of the new official stand-alone repo hosted
+on Will's kernel.org git [1].
+Find a branch with those patches included at my repo [2].
+
+[1] git://git.kernel.org/pub/scm/linux/kernel/git/will/kvmtool.git
+[2] git://linux-arm.org/kvmtool.git (branch gicv3/v3)
+    http://www.linux-arm.org/git?p=kvmtool.git;a=log;h=refs/heads/gicv3/v3
+
+Andre Przywara (6):
+  arm: finish VGIC initialisation explicitly
+  arm: simplify MMIO dispatching
+  limit number of VCPUs on demand
+  arm: prepare for instantiating different IRQ chip devices
+  arm: add support for supplying GICv3 redistributor addresses
+  arm: use new irqchip parameter to create different vGIC types
+
+Marc Zyngier (4):
+  AArch64: Reserve two 64k pages for GIC CPU interface
+  AArch{32,64}: use KVM_CREATE_DEVICE & co to instanciate the GIC
+  irq: add irq__get_nr_allocated_lines
+  AArch{32,64}: dynamically configure the number of GIC interrupts
+
+ arm/aarch32/arm-cpu.c                    |   2 +-
+ arm/aarch64/arm-cpu.c                    |   2 +-
+ arm/aarch64/include/kvm/kvm-arch.h       |   2 +-
+ arm/gic.c                                | 190 +++++++++++++++++++++++++++++--
+ arm/include/arm-common/gic.h             |   9 +-
+ arm/include/arm-common/kvm-arch.h        |  19 ++--
+ arm/include/arm-common/kvm-config-arch.h |   9 +-
+ arm/include/arm-common/kvm-cpu-arch.h    |  14 ++-
+ arm/kvm-cpu.c                            |  27 ++---
+ arm/kvm.c                                |   6 +-
+ include/kvm/irq.h                        |   1 +
+ irq.c                                    |   5 +
+ kvm-cpu.c                                |   7 ++
+ 13 files changed, 242 insertions(+), 51 deletions(-)
+
 -- 
 2.3.5
