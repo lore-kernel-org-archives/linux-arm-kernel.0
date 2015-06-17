@@ -1,75 +1,59 @@
 From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Wed, 17 Jun 2015 17:15:28 +0200
-Subject: [PATCH v2 1/3] net: mvneta: introduce compatible string "marvell,
- armada-xp-neta"
-In-Reply-To: <55818E64.20007@free-electrons.com>
-References: <1434547162-6275-1-git-send-email-simon.guinot@sequanux.org>
- <1434547162-6275-2-git-send-email-simon.guinot@sequanux.org>
- <55818E64.20007@free-electrons.com>
-Message-ID: <55818F10.8030304@free-electrons.com>
+Date: Wed, 17 Jun 2015 17:24:23 +0200
+Subject: [PATCH 1/9] ARM: mvebu: fix suspend to RAM on big-endian
+ configurations
+In-Reply-To: <1434456785-23696-2-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1434456785-23696-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1434456785-23696-2-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <55819127.1040306@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 17/06/2015 17:12, Gregory CLEMENT wrote:
-> Hi Simon,
-> 
-> On 17/06/2015 15:19, Simon Guinot wrote:
->> The mvneta driver supports the Ethernet IP found in the Armada 370, XP,
->> 380 and 385 SoCs. Since at least one more hardware feature is available
->> for the Armada XP SoCs then a way to identify them is needed.
->>
->> This patch introduces a new compatible string "marvell,armada-xp-neta".
-> 
-> Let's be future proof by going further. I would like to have an compatible string
-> for each SoC even if we currently we don't use them.
-> 
-> You even don't have to use add it in the mvneta.c file if you use:
-> "marvell,armada-380-neta", "marvell,armada-xp-neta"
+Hi Thomas,
 
-Actually I meant:
-"marvell,armada-380-neta", "marvell,armada-370-neta"
+On 16/06/2015 14:12, Thomas Petazzoni wrote:
+> The current Armada XP suspend to RAM implementation, as added in
+> commit 27432825ae19f ("ARM: mvebu: Armada XP GP specific
+> suspend/resume code") does not handle big-endian configurations
+> properly: the small bit of assembly code putting the DRAM in
+> self-refresh and toggling the GPIOs to turn off power forgets to
+> convert the values to little-endian.
+> 
+> This commit fixes that by making sure the two values we will write to
+> the DRAM controller register and GPIO register are already in
+> little-endian before entering the critical assembly code.
+> 
+> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+> Cc: <stable@vger.kernel.org> # v3.19+
+> Fixes: 27432825ae19f ("ARM: mvebu: Armada XP GP specific suspend/resume code")
 
+
+Acked-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+
+applied on mvebu/fixes
+
+Thanks,
+
+Gregory
+
+> ---
+>  arch/arm/mach-mvebu/pm-board.c | 3 +++
+>  1 file changed, 3 insertions(+)
 > 
-> 
-> Thanks,
-> 
-> Gregory
-> 
-> 
->> Signed-off-by: Simon Guinot <simon.guinot@sequanux.org>
->> Cc: <stable@vger.kernel.org> # v3.8+
->> ---
->>  Documentation/devicetree/bindings/net/marvell-armada-370-neta.txt | 2 +-
->>  drivers/net/ethernet/marvell/mvneta.c                             | 1 +
->>  2 files changed, 2 insertions(+), 1 deletion(-)
->>
->> diff --git a/Documentation/devicetree/bindings/net/marvell-armada-370-neta.txt b/Documentation/devicetree/bindings/net/marvell-armada-370-neta.txt
->> index 750d577e8083..f5a8ca29aff0 100644
->> --- a/Documentation/devicetree/bindings/net/marvell-armada-370-neta.txt
->> +++ b/Documentation/devicetree/bindings/net/marvell-armada-370-neta.txt
->> @@ -1,7 +1,7 @@
->>  * Marvell Armada 370 / Armada XP Ethernet Controller (NETA)
->>  
->>  Required properties:
->> -- compatible: should be "marvell,armada-370-neta".
->> +- compatible: "marvell,armada-370-neta" or "marvell,armada-xp-neta".
->>  - reg: address and length of the register set for the device.
->>  - interrupts: interrupt for the device
->>  - phy: See ethernet.txt file in the same directory.
->> diff --git a/drivers/net/ethernet/marvell/mvneta.c b/drivers/net/ethernet/marvell/mvneta.c
->> index ce5f7f9cff06..aceb977b104d 100644
->> --- a/drivers/net/ethernet/marvell/mvneta.c
->> +++ b/drivers/net/ethernet/marvell/mvneta.c
->> @@ -3179,6 +3179,7 @@ static int mvneta_remove(struct platform_device *pdev)
->>  
->>  static const struct of_device_id mvneta_match[] = {
->>  	{ .compatible = "marvell,armada-370-neta" },
->> +	{ .compatible = "marvell,armada-xp-neta" },
->>  	{ }
->>  };
->>  MODULE_DEVICE_TABLE(of, mvneta_match);
->>
-> 
+> diff --git a/arch/arm/mach-mvebu/pm-board.c b/arch/arm/mach-mvebu/pm-board.c
+> index 6dfd4ab..301ab38 100644
+> --- a/arch/arm/mach-mvebu/pm-board.c
+> +++ b/arch/arm/mach-mvebu/pm-board.c
+> @@ -43,6 +43,9 @@ static void mvebu_armada_xp_gp_pm_enter(void __iomem *sdram_reg, u32 srcmd)
+>  	for (i = 0; i < ARMADA_XP_GP_PIC_NR_GPIOS; i++)
+>  		ackcmd |= BIT(pic_raw_gpios[i]);
+>  
+> +	srcmd = cpu_to_le32(srcmd);
+> +	ackcmd = cpu_to_le32(ackcmd);
+> +
+>  	/*
+>  	 * Wait a while, the PIC needs quite a bit of time between the
+>  	 * two GPIO commands.
 > 
 
 
