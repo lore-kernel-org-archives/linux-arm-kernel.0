@@ -1,57 +1,130 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Wed, 17 Jun 2015 08:47:35 -0500
-Subject: [PATCH V7 2/3] OPP: Allow multiple OPP tables to be passed via DT
-In-Reply-To: <20150617133314.GB15153@linux>
-References: <cover.1433434659.git.viresh.kumar@linaro.org>
- <263c128844f5a3c9280c8be71f6c9eb1869a5188.1433434659.git.viresh.kumar@linaro.org>
- <CAL_Jsq+EOOeQw42wZi+H82ovLn8LcQUuK9HGT+FvewdhTf7Q1w@mail.gmail.com>
- <20150617133314.GB15153@linux>
-Message-ID: <CAL_Jsq+SdgAf7=Yq7Jk_1d9jTpAOLCEuEDCZvD=-h=2MWsNfFw@mail.gmail.com>
+From: andre.przywara@arm.com (Andre Przywara)
+Date: Wed, 17 Jun 2015 14:49:59 +0100
+Subject: [PATCH v3 06/10] arm: simplify MMIO dispatching
+In-Reply-To: <55816C9F.1090500@arm.com>
+References: <1434540121-21283-1-git-send-email-andre.przywara@arm.com>
+ <1434540121-21283-7-git-send-email-andre.przywara@arm.com>
+ <55816C9F.1090500@arm.com>
+Message-ID: <55817B07.8010502@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 17, 2015 at 8:33 AM, Viresh Kumar <viresh.kumar@linaro.org> wrote:
-> On 17-06-15, 08:23, Rob Herring wrote:
->> > +                       operating-points-v2 = <&cpu0_opp_table_slow>, <&cpu0_opp_table_fast>;
+Hi Marc,
+
+On 06/17/2015 01:48 PM, Marc Zyngier wrote:
+> On 17/06/15 12:21, Andre Przywara wrote:
+>> Currently we separate any incoming MMIO request into one of the ARM
+>> memory map regions and take care to spare the GIC.
+>> It turns out that this is unnecessary, as we only have one special
+>> region (the IO port area in the first 64 KByte). The MMIO rbtree
+>> takes care about unhandled MMIO ranges, so we can simply drop all the
+>> special range checking (except that for the IO range) in
+>> kvm_cpu__emulate_mmio().
+>> As the GIC is handled in the kernel, a GIC MMIO access should never
+>> reach userland (and we don't know what to do with it anyway).
+>> This lets us delete some more code and simplifies future extensions
+>> (like expanding the GIC regions).
+>> To be in line with the other architectures, move the now simpler
+>> code into a header file.
 >>
->> You've made a fundamental change here in that this can now be a list
->> of phandles. There should be some description on what a list means
->> (merge the tables?, select one?).
->
-> Did you miss the description I wrote few lines earlier or are you
-> asking for something else? This is what I wrote earlier:
->
->> > +Devices may want to choose OPP tables at runtime and so can provide a list of
->> > +phandles here. But only *one* of them should be chosen at runtime.
->
-> So, clearly only ONE of the tables should be used.
+>> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
+>> ---
+>>  arm/include/arm-common/kvm-arch.h     | 12 ------------
+>>  arm/include/arm-common/kvm-cpu-arch.h | 14 ++++++++++++--
+>>  arm/kvm-cpu.c                         | 16 ----------------
+>>  3 files changed, 12 insertions(+), 30 deletions(-)
+>>
+>> diff --git a/arm/include/arm-common/kvm-arch.h b/arm/include/arm-common/kvm-arch.h
+>> index 082131d..90d6733 100644
+>> --- a/arm/include/arm-common/kvm-arch.h
+>> +++ b/arm/include/arm-common/kvm-arch.h
+>> @@ -45,18 +45,6 @@ static inline bool arm_addr_in_ioport_region(u64 phys_addr)
+>>  	return phys_addr >= KVM_IOPORT_AREA && phys_addr < limit;
+>>  }
+>>  
+>> -static inline bool arm_addr_in_virtio_mmio_region(u64 phys_addr)
+>> -{
+>> -	u64 limit = KVM_VIRTIO_MMIO_AREA + ARM_VIRTIO_MMIO_SIZE;
+>> -	return phys_addr >= KVM_VIRTIO_MMIO_AREA && phys_addr < limit;
+>> -}
+>> -
+>> -static inline bool arm_addr_in_pci_region(u64 phys_addr)
+>> -{
+>> -	u64 limit = KVM_PCI_CFG_AREA + ARM_PCI_CFG_SIZE + ARM_PCI_MMIO_SIZE;
+>> -	return phys_addr >= KVM_PCI_CFG_AREA && phys_addr < limit;
+>> -}
+>> -
+>>  struct kvm_arch {
+>>  	/*
+>>  	 * We may have to align the guest memory for virtio, so keep the
+>> diff --git a/arm/include/arm-common/kvm-cpu-arch.h b/arm/include/arm-common/kvm-cpu-arch.h
+>> index 36c7872..329979a 100644
+>> --- a/arm/include/arm-common/kvm-cpu-arch.h
+>> +++ b/arm/include/arm-common/kvm-cpu-arch.h
+>> @@ -44,8 +44,18 @@ static inline bool kvm_cpu__emulate_io(struct kvm_cpu *vcpu, u16 port, void *dat
+>>  	return false;
+>>  }
+>>  
+>> -bool kvm_cpu__emulate_mmio(struct kvm_cpu *vcpu, u64 phys_addr, u8 *data,
+>> -			   u32 len, u8 is_write);
+>> +static inline bool kvm_cpu__emulate_mmio(struct kvm_cpu *vcpu, u64 phys_addr,
+>> +					 u8 *data, u32 len, u8 is_write)
+>> +{
+>> +	if (arm_addr_in_ioport_region(phys_addr)) {
+>> +		int direction = is_write ? KVM_EXIT_IO_OUT : KVM_EXIT_IO_IN;
+>> +		u16 port = (phys_addr - KVM_IOPORT_AREA) & USHRT_MAX;
+>> +
+>> +		return kvm__emulate_io(vcpu, port, data, direction, len, 1);
+>> +	}
+>> +
+>> +	return kvm__emulate_mmio(vcpu, phys_addr, data, len, is_write);
+>> +}
+>>  
+>>  unsigned long kvm_cpu__get_vcpu_mpidr(struct kvm_cpu *vcpu);
+>>  
+>> diff --git a/arm/kvm-cpu.c b/arm/kvm-cpu.c
+>> index ab08815..7780251 100644
+>> --- a/arm/kvm-cpu.c
+>> +++ b/arm/kvm-cpu.c
+>> @@ -139,22 +139,6 @@ bool kvm_cpu__handle_exit(struct kvm_cpu *vcpu)
+>>  	return false;
+>>  }
+>>  
+>> -bool kvm_cpu__emulate_mmio(struct kvm_cpu *vcpu, u64 phys_addr, u8 *data,
+>> -			   u32 len, u8 is_write)
+>> -{
+>> -	if (arm_addr_in_virtio_mmio_region(phys_addr)) {
+>> -		return kvm__emulate_mmio(vcpu, phys_addr, data, len, is_write);
+>> -	} else if (arm_addr_in_ioport_region(phys_addr)) {
+>> -		int direction = is_write ? KVM_EXIT_IO_OUT : KVM_EXIT_IO_IN;
+>> -		u16 port = (phys_addr - KVM_IOPORT_AREA) & USHRT_MAX;
+>> -		return kvm__emulate_io(vcpu, port, data, direction, len, 1);
+>> -	} else if (arm_addr_in_pci_region(phys_addr)) {
+>> -		return kvm__emulate_mmio(vcpu, phys_addr, data, len, is_write);
+>> -	}
+> 
+> Can you explain why this arm_addr_in_pci_region(phys_addr) check has
+> disappeared in your updated version on this function? It may be a non
+> issue, but I'd very much like to understand.
 
-Yes, never mind.
+If you look above the calls to kvm__emulate_mmio() are exactly the same
+for the PCI and the virtio_mmio region, also as the areas are
+non-overlapping the if branches can be reordered.
+arm_addr_in_virtio_mmio_region() is true between 64k and (1GB - GIC),
+while arm_addr_in_pci_region() gives true between 1GB and 2GB.
 
->
->> I think this needs to have a defined order and the platform should
->> know what that is. For example, if you read the efuses and decide you
->> need the "slow" table, you know to pick the first entry. Then you
->> don't need opp-name. Does that work for QCom?
->
-> Why forcing on the order here? For example, consider a case where the
-> platform can have four tables, A B C D. Now DT is free to pass all
-> four or just a subset of those. Like, for some boards table B doesn't
-> stand valid. And so it may wanna pass just A C D. And so keeping these
-> tables in order is going to break for sure. Flexibility is probably
-> better in this case.
+So this translates into: do kvm__emulate_io() for anything below 64K and
+kvm__emulate_mmio() for everything else except for the GIC area,
+admittedly in a quite convoluted way.
 
-Defined order is a key part of DT bindings. We solve the variable
-length problem with name lists associated with variable length
-property like:
+So my patch just removes the check for the GIC region and rewrites it to
+match that description in the last sentence, with the rationale given in
+the commit message.
+Does that make sense?
+If you desperately want some extra barfing for misguided GIC requests,
+I'd rather introduce that to the "no match" code path in
+kvm__emulate_mmio or register some dummy MMIO regions for the GIC with
+panic() handlers.
 
-operating-point-names = "slow", "fast";
-
-I'm not a fan of doing this if we can avoid it, but we should at least
-follow the same pattern. Don't send me a patch with that yet, I want
-to hear from Stephen.
-
-You can also use "status" to disable specific tables rather than
-removing from the list.
-
-Rob
+Cheers,
+Andre.
