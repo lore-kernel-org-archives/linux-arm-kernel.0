@@ -1,45 +1,94 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Wed, 17 Jun 2015 17:24:58 +0200
-Subject: [PATCH v2 0/3] Fix Ethernet jumbo frames support for Armada 370
- and 38x
-In-Reply-To: <1434547162-6275-1-git-send-email-simon.guinot@sequanux.org>
-References: <1434547162-6275-1-git-send-email-simon.guinot@sequanux.org>
-Message-ID: <20150617172458.3e373b8a@free-electrons.com>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Wed, 17 Jun 2015 17:28:18 +0200
+Subject: [PATCH 2/9] ARM: mvebu: prepare set_cpu_coherent() for future
+ extension
+In-Reply-To: <1434456785-23696-3-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1434456785-23696-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1434456785-23696-3-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <55819212.8020404@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Simon Guinot,
+Hi Thomas,
 
-On Wed, 17 Jun 2015 15:19:19 +0200, Simon Guinot wrote:
-
-> This patch series fixes the Ethernet jumbo frames support for the SoCs
-> Armada 370, 380 and 385. Unlike Armada XP, the Ethernet controller for
-> this SoCs don't support TCP/IP checksumming with a frame size larger
-> than 1600 bytes.
+On 16/06/2015 14:12, Thomas Petazzoni wrote:
+> From: Nadav Haklai <nadavh@marvell.com>
 > 
-> This patches should be applied to the -stable kernels 3.8 and onwards.
+> This patch prepares the set_cpu_coherent() function in coherency.c to
+> be extended to support other SoCs than Armada XP. It will be needed on
+> Armada 38x to re-enable the coherency after exiting from suspend to
+> RAM.
+> 
+> This preparation simply moves the function further down in coherency.c
+> so that it can use coherency_type(), and uses that function to only do
+> the Armada XP specific work if we are on Armada XP.
+> 
+> Signed-off-by: Nadav Haklai <nadavh@marvell.com>
+> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 
-You should add a Fixes: tag to each commit to indicate which commit is
-being fixed by your patches.
+Acked-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
 
-Also, I was a bit surprised by your statement that Armada 38x is also
-affected by the problem, since Armada 38x is more recent than Armada
-XP. but indeed, according to the Armada 38x datasheet:
 
-  IPv4 and TCP/UDP over IPv4/IPv6 checksum generation on transmit
-  frames for standard Ethernet packet size
+Thanks,
 
-While the Armada XP datasheet says:
+Gregory
 
-  Long frames transmission (including jumbo frames), with
-  IPv4/v6/TCP/UDP checksum generation
+> ---
+>  arch/arm/mach-mvebu/coherency.c | 29 +++++++++++++++++------------
+>  1 file changed, 17 insertions(+), 12 deletions(-)
+> 
+> diff --git a/arch/arm/mach-mvebu/coherency.c b/arch/arm/mach-mvebu/coherency.c
+> index e46e9ea..44eedf3 100644
+> --- a/arch/arm/mach-mvebu/coherency.c
+> +++ b/arch/arm/mach-mvebu/coherency.c
+> @@ -65,18 +65,6 @@ static const struct of_device_id of_coherency_table[] = {
+>  int ll_enable_coherency(void);
+>  void ll_add_cpu_to_smp_group(void);
+>  
+> -int set_cpu_coherent(void)
+> -{
+> -	if (!coherency_base) {
+> -		pr_warn("Can't make current CPU cache coherent.\n");
+> -		pr_warn("Coherency fabric is not initialized\n");
+> -		return 1;
+> -	}
+> -
+> -	ll_add_cpu_to_smp_group();
+> -	return ll_enable_coherency();
+> -}
+> -
+>  static int mvebu_hwcc_notifier(struct notifier_block *nb,
+>  			       unsigned long event, void *__dev)
+>  {
+> @@ -206,6 +194,23 @@ static int coherency_type(void)
+>  	return type;
+>  }
+>  
+> +int set_cpu_coherent(void)
+> +{
+> +	int type = coherency_type();
+> +
+> +	if (type == COHERENCY_FABRIC_TYPE_ARMADA_370_XP) {
+> +		if (!coherency_base) {
+> +			pr_warn("Can't make current CPU cache coherent.\n");
+> +			pr_warn("Coherency fabric is not initialized\n");
+> +			return 1;
+> +		}
+> +		ll_add_cpu_to_smp_group();
+> +		return ll_enable_coherency();
+> +	}
+> +
+> +	return 0;
+> +}
+> +
+>  int coherency_available(void)
+>  {
+>  	return coherency_type() != COHERENCY_FABRIC_TYPE_NONE;
+> 
 
-So it seems like you're right about this!
 
-Best regards,
-
-Thomas
 -- 
-Thomas Petazzoni, CTO, Free Electrons
-Embedded Linux, Kernel and Android engineering
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
 http://free-electrons.com
