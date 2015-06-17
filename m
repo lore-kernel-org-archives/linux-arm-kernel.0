@@ -1,101 +1,100 @@
-From: vaibhav.hiremath@linaro.org (Vaibhav Hiremath)
-Date: Thu, 18 Jun 2015 00:28:05 +0530
-Subject: [PATCH-v2 1/3] mfd: 88pm800: Add device tree support
-In-Reply-To: <1434567488-6477-1-git-send-email-vaibhav.hiremath@linaro.org>
-References: <vaibhav.hiremath@linaro.org>
- <1434567488-6477-1-git-send-email-vaibhav.hiremath@linaro.org>
-Message-ID: <1434567488-6477-2-git-send-email-vaibhav.hiremath@linaro.org>
+From: alexander.sverdlin@gmail.com (Alexander Sverdlin)
+Date: Wed, 17 Jun 2015 21:21:33 +0200
+Subject: [PATCH RESEND] i2c: omap: improve duty cycle on SCL
+In-Reply-To: <20150617185714.GH18421@saruman.tx.rr.com>
+References: <1434482445-1818-1-git-send-email-balbi@ti.com>
+ <55813BA0.3010001@nokia.com> <20150617180052.GF18421@saruman.tx.rr.com>
+ <5581BEB2.6070007@gmail.com> <20150617185714.GH18421@saruman.tx.rr.com>
+Message-ID: <5581C8BD.9060405@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add DT support to the 88pm800 driver, along with compatible
-field for it's sub-devices (rtc, onkey and regulator)
+Hello!
 
-Signed-off-by: Chao Xie <chao.xie@marvell.com>
-Signed-off-by: Vaibhav Hiremath <vaibhav.hiremath@linaro.org>
----
- drivers/mfd/88pm800.c | 25 +++++++++++++++++++++++++
- 1 file changed, 25 insertions(+)
+On 17/06/15 20:57, Felipe Balbi wrote:
+>>>>>>> duty cycle as possible. The reason for this
+>>>>>>> > >>> > > is that some devices present an erratic behavior
+>>>>>>> > >>> > > with certain duty cycles.
+>>>>>>> > >>> > > 
+>>>>>>> > >>> > > One such example is TPS65218 PMIC which fails
+>>>>>>> > >>> > > to change voltages when running @ 400kHz and
+>>>>>>> > >>> > > duty cycle is lower than 34%.
+>>>>>>> > >>> > > 
+>>>>>>> > >>> > > The idea of the patch is simple:
+>>>>>>> > >>> > > 
+>>>>>>> > >>> > > calculate desired scl_period from requested scl
+>>>>>>> > >>> > > and use 50% for tLow and 50% for tHigh.
+>>>>>>> > >>> > > 
+>>>>>>> > >>> > > tLow is calculated with a DIV_ROUND_UP() to make
+>>>>>>> > >>> > > sure it's slightly higher than tHigh and to make
+>>>>>>> > >>> > > sure that we end up within I2C specifications.
+>>>>>>> > >>> > > 
+>>>>>>> > >>> > > Kudos to Nishanth Menon and Dave Gerlach for helping
+>>>>>>> > >>> > > debugging the TPS65218 problem found on AM437x SK.
+>>>>>>> > >>> > > 
+>>>>>>> > >>> > > Signed-off-by: Felipe Balbi <balbi@ti.com>
+>>>>> > >> > 
+>>>>> > >> > NAK.
+>>>>> > >> > This is a direct violation of PHILIPS I2C-bus Specification v.2.1,
+>>>>> > >> > section 15.
+>>>>> > >> > Namely, you will have LOW period of SCL clock shorter than required
+>>>>> > >> > 1.3uS.
+>>> > > how is this out of spec ?
+>>> > > 
+>>> > > http://i.imgur.com/jEDlZT7.png
+>>> > > 
+>>> > > -Width = 1.4us, frequency 373.1kHz, duty cycle of 47.76%
+>>> > > 
+>>> > > In any case, I have to send v2 anyway (found a bug which would show up
+>>> > > on frequencies above 400kHz), so I'll resend this patch.
+>> > 
+>> > If you really target 50% duty cycle and there will be no
+>> > rounding/truncation error, you will end up with 1.25uS at 400kHz. I
+>> > understand why you want to make HIGH phase longer, but 50% is a bad
+>> > target at 400hHz. Probably more safe value?
+> We can't generate exactly 400kHz anyway, and we're not getting exactly
+> 50% duty cycle, it just brings it *closer* to that. I even mention the
+> reason for the DIV_ROUND_UP() there. Let's just go through the math
+> using TRM equation:
+> 
+> @400kHz with 12MHz internal clock:
+> 
+> tLow = (SCLL + 7) * iclk_period
+> 
+> 1250 = (SCLL + 7) * 1/12MHz
+> 
+> SCLL = DIV_ROUND_UP(1250, 83) - 7
+> SCLL = (1250 + 82)/83 - 7
+> SCLL = 9
+> 
+> Now if we do the reverse to find actual tLow:
+> 
+> tLow = (9 + 7) * 83
+> tLow = 1328ns
+> 
+> Likewise if we do it for tHigh:
+> 
+> tHigh = (SCLH + 5) iclk_period
+> 
+> SCLH = 1250 / 83 - 5
+> SCLH = 10
+> 
+> tHigh = 15 * 83
+> tHigh = 1245
+> 
+> tHigh + tLow (SCL period) = 2573ns. That gives us SCL of 388.65kHz. An
 
-diff --git a/drivers/mfd/88pm800.c b/drivers/mfd/88pm800.c
-index 841717a..059f01a 100644
---- a/drivers/mfd/88pm800.c
-+++ b/drivers/mfd/88pm800.c
-@@ -27,6 +27,7 @@
- #include <linux/mfd/core.h>
- #include <linux/mfd/88pm80x.h>
- #include <linux/slab.h>
-+#include <linux/of_device.h>
- 
- /* Interrupt Registers */
- #define PM800_INT_STATUS1		(0x05)
-@@ -121,6 +122,11 @@ static const struct i2c_device_id pm80x_id_table[] = {
- };
- MODULE_DEVICE_TABLE(i2c, pm80x_id_table);
- 
-+static const struct of_device_id pm80x_of_match_table[] = {
-+	{ .compatible = "marvell,88pm800", },
-+	{},
-+};
-+
- static struct resource rtc_resources[] = {
- 	{
- 	 .name = "88pm80x-rtc",
-@@ -133,6 +139,7 @@ static struct resource rtc_resources[] = {
- static struct mfd_cell rtc_devs[] = {
- 	{
- 	 .name = "88pm80x-rtc",
-+	 .of_compatible = "marvell,88pm80x-rtc",
- 	 .num_resources = ARRAY_SIZE(rtc_resources),
- 	 .resources = &rtc_resources[0],
- 	 .id = -1,
-@@ -151,6 +158,7 @@ static struct resource onkey_resources[] = {
- static const struct mfd_cell onkey_devs[] = {
- 	{
- 	 .name = "88pm80x-onkey",
-+	 .of_compatible = "marvell,88pm80x-onkey",
- 	 .num_resources = 1,
- 	 .resources = &onkey_resources[0],
- 	 .id = -1,
-@@ -160,6 +168,7 @@ static const struct mfd_cell onkey_devs[] = {
- static const struct mfd_cell regulator_devs[] = {
- 	{
- 	 .name = "88pm80x-regulator",
-+	 .of_compatible = "marvell,88pm80x-regulator",
- 	 .id = -1,
- 	},
- };
-@@ -544,8 +553,23 @@ static int pm800_probe(struct i2c_client *client,
- 	int ret = 0;
- 	struct pm80x_chip *chip;
- 	struct pm80x_platform_data *pdata = dev_get_platdata(&client->dev);
-+	struct device_node *np = client->dev.of_node;
- 	struct pm80x_subchip *subchip;
- 
-+	if (!pdata && !np) {
-+		dev_err(&client->dev,
-+			"pm80x requires platform data or of_node\n");
-+		return -EINVAL;
-+	}
-+
-+	if (!pdata) {
-+		pdata = devm_kzalloc(&client->dev, sizeof(*pdata), GFP_KERNEL);
-+		if (!pdata) {
-+			dev_err(&client->dev, "failed to allocaate memory\n");
-+			return -ENOMEM;
-+		}
-+	}
-+
- 	ret = pm80x_init(client);
- 	if (ret) {
- 		dev_err(&client->dev, "pm800_init fail\n");
-@@ -611,6 +635,7 @@ static struct i2c_driver pm800_driver = {
- 		.name = "88PM800",
- 		.owner = THIS_MODULE,
- 		.pm = &pm80x_pm_ops,
-+		.of_match_table	= pm80x_of_match_table,
- 		},
- 	.probe = pm800_probe,
- 	.remove = pm800_remove,
--- 
-1.9.1
+The bus rate is actually 12MHz/(SCLH+5+SCLL+7), so it's ~387096Hz.
+Anyway, it's still possible to have maximum bus rate if SCLH+SCLL=12000000/400000-5-7
+
+Let say SCLH=9, SCLL=9, still within the spec and exactly 400kHz
+But you need another equations and it's not about 50% duty cycle
+
+> error of mere 3% of what we really wanted to achieve. I'd say this is
+> pretty darn good.
+> 
+> Now you tell me, how is this *ever* going to be out of spec ?
+> 
+> DIV_ROUND_UP() and the truncation at internal clock period calculation
+> makes sure that tLow will be within spec. Instead of blindly NAKing the
+> patch, you could've gone through this exercise yourself.
