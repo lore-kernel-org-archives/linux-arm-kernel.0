@@ -1,83 +1,115 @@
-From: dinguyen@opensource.altera.com (Dinh Nguyen)
-Date: Wed, 17 Jun 2015 17:12:45 -0500
-Subject: [PATCH] ARM: v7 setup function should invalidate L1 cache
-In-Reply-To: <20150617213006.GC7557@n2100.arm.linux.org.uk>
-References: <E1Yuk8W-0001tC-IK@rmk-PC.arm.linux.org.uk>
- <CAMuHMdX=T3CsLTT95H_07Si6Kd8SRraBfxADpn+VtAF4GmZ=mw@mail.gmail.com>
- <CAMuHMdUQkm_9PhSdGS8j85Uodm-o0jiki=Xh4h59PBShB=rCXw@mail.gmail.com>
- <20150601105319.GQ2067@n2100.arm.linux.org.uk>
- <CAMuHMdUXCy+87-pwLiJ7ynaM1AeFq0f7R3sJ4prdE3QN09z++w@mail.gmail.com>
- <CADhT+wdJX7jMO3_rafrZMeA5ZVMaA6b2U4zkksfJcUjh41mH9A@mail.gmail.com>
- <20150617213006.GC7557@n2100.arm.linux.org.uk>
-Message-ID: <5581F0DD.60408@opensource.altera.com>
+From: alex.williamson@redhat.com (Alex Williamson)
+Date: Wed, 17 Jun 2015 16:31:34 -0600
+Subject: [PATCH v4 0/4] VFIO platform reset
+In-Reply-To: <1434359385-19916-1-git-send-email-eric.auger@linaro.org>
+References: <1434359385-19916-1-git-send-email-eric.auger@linaro.org>
+Message-ID: <1434580294.5628.135.camel@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/17/2015 04:30 PM, Russell King - ARM Linux wrote:
-> On Wed, Jun 17, 2015 at 03:35:13PM -0500, Dinh Nguyen wrote:
->> On Mon, Jun 1, 2015 at 6:50 AM, Geert Uytterhoeven <geert@linux-m68k.org> wrote:
->>> Hi Russell,
->>>
->>> On Mon, Jun 1, 2015 at 12:53 PM, Russell King - ARM Linux
->>> <linux@arm.linux.org.uk> wrote:
->>>> On Mon, Jun 01, 2015 at 12:41:01PM +0200, Geert Uytterhoeven wrote:
->>>>> FWIW, I have the feeling this has a slight influence on boot reliability on
->>>>> two of my boards:
->>>>>   - r8a7740/armadillo, which is known to suffer from a cache-related bug in
->>>>>     its bootloader, seems to have a higher change of booting successfully on
->>>>>     cold boot,
->>>>>   - sh73a0/kzm9g, which has known cache-issues with secondary CPU boot up,
->>>>>     seems to have a lower chance of booting successfully.
->>>>>
->>>>> No time to spend all week turning this into a statistical significant test
->>>>> project... The reset button is my friend...
->>>>
->>>> Damn it, you sent this right after I merged and pushed out this change in
->>>> my for-arm-soc branch, and was just about to send it to the arm-soc people.
->>>> What excellent timing you have. :)
->>>
->>> Don't worry, I didn't send that email to make you postpone this change.
->>> Giving the fuzziness of reproduction, and the flakiness (esp. on Armadillo)
->>> of the boot loader, and these are old SoCs, please go ahead.
->>>
->>>> What happens on the kzm9g if you revert the mach-shmobile changes?
->>>
->>> Seems to make no difference.
->>>
->>>> For armadillo, do you use the decompressor?  That should be doing all the
->>>> cache cleaning already, prior to the kernel being entered.
->>>
->>> I think so.
->>>
->>> Corruption pattern ranges from lock up, over "Error: unrecognized/unsupported
->>> machine ID", to booting almost completely, but lacking a few devices due to
->>> a corrupted DTB. Been like that as long as I remember, i.e. since I got the
->>> board ca. 1 year ago. Boots fine (100%) with kexec.
->>>
->>
->> It seems like this patch is causing the SoCFPGA to not boot with SMP
->> reliably. About 1 out of every 10 reboots, I'm seeing the boot failure
->> below. The error seems to only happen when I do a cold or warm reboot,
->> but never occurs during a power-up. If I revert this patch, or put
->> back the call to v7_invalidate_l1 in socfpga_secondary_startup , then
->> its able to boot 100% of the time.
+On Mon, 2015-06-15 at 11:09 +0200, Eric Auger wrote:
+> In situations where the userspace driver is stopped abnormally and the
+> VFIO platform device is released, the assigned HW device currently is
+> left running. As a consequence the HW device might continue issuing IRQs
+> and performing DMA accesses.
 > 
-> It really sucks that you're only just testing this change now, because
-> I've frozen my tree, and removing it for the next merge window is going
-> to be an entirely non-trivial matter.  You were copied on the original
-> patch, which you failed to test... I can't say I have _much_ sympathy
-> for a bug report at this point in time.
+> On release, no physical IRQ handler is setup anymore. Also the DMA buffers
+> are unmapped leading to IOMMU aborts. So there is no serious consequence.
 > 
+> However when assigning that HW device again to another userspace driver,
+> this latter might face some unexpected IRQs and DMA accesses, which are
+> the result of the previous assignment.
+> 
+> In virtualization use-case, a VM newly granted with that HW device may be
+> impacted by the assignment of that device to a previous VM:
+> - IRQs may be injected very early when booting the new guest, even before
+>   the guest driver has initialized leading to possible driver state
+>   inconsistency.
+> - DMA accesses may hit the newly mapped VM address space at addresses that
+>   may jeopardize the integrity of the newly installed VM.
+> 
+> Obviously the criticity depends on the assigned HW device.
+> 
+> As opposed to PCI, there is no standard mechanism to reset the platform
+> device.
+> 
+> This series proposes to implement device specific reset functions in
+> separate in-kernel vfio reset modules. The vfio-platform driver holds
+> a whitelist of implemented triplets (compat string, module name,
+> reset function name). When the vfio-platform driver is probed it identifies
+> the fellow reset module/function matching the compat string of the
+> device, if any, and forces the load of this reset module.
+> 
+> A first reset module is provided: the vfio-platform-calxedaxgmac
+> module which implements a basic reset for the Calxeda xgmac.
+> 
+> The series can be found at
+> https://git.linaro.org/people/eric.auger/linux.git/shortlog/refs/heads/v4.1-rc8-reset-v4
+> 
+> History:
+> v3 -> v4:
+> - fix the commit message of "VFIO: platform: add reset struct and lookup table"
 
-I apologize for not catching this error while testing this patch. But I
-did test it when you first sent it out..I probably didn't do a stress
-test. Sometimes the reboot fails in the 1st attempt, sometimes it fails
-in the 9th attempt.
+Baptiste,
 
-I only caught this error when I was testing my recent changes to use
-CPU_METHOD_OF_DECLARE.
+Any comments?  Should we also add something like this to MAINTAINERS
+before we go much further?
 
-For me, I don't think you need to revert this patch or anything, but a
-fix can go in for a -rcX?
+diff --git a/MAINTAINERS b/MAINTAINERS
+index d8afd29..c6bf7f6 100644
+--- a/MAINTAINERS
++++ b/MAINTAINERS
+@@ -10545,6 +10545,12 @@ F:     drivers/vfio/
+ F:     include/linux/vfio.h
+ F:     include/uapi/linux/vfio.h
+ 
++VFIO PLATFORM DRIVER
++M:     Baptiste Reynal <b.reynal@virtualopensystems.com>
++L:     kvm at vger.kernel.org
++S:     Maintained
++F:     drivers/vfio/platform/
++
+ VIDEOBUF2 FRAMEWORK
+ M:     Pawel Osciak <pawel@osciak.com>
+ M:     Marek Szyprowski <m.szyprowski@samsung.com>
 
-Dinh
+I'm not sure what you want to be the primary list, maybe it's time to
+ask for a vfio list.  Thanks,
+Alex
+
+> 
+> v2 -> v3:
+> - remove void module_init/exit functions in calxeda reset module
+> - remove enum vfio_platform_reset_type
+> - for reset lookup, use ARRAY_SIZE
+> - in reset put use symbol_put_addr
+> 
+> v1 -> v2:
+> - much simplified compared to v1 although principle of external modules is
+>   kept: removed mechanism of dynamic registration of reset functions
+> - list is replaced by whitelist lookup table
+> - name of the reset function also stored in the lookup table
+> - autoload of reset modules
+> 
+> RFC -> PATCH v1:
+> - solution now based on a lookup list instead of specialized driver
+> 
+> 
+> Eric Auger (4):
+>   VFIO: platform: add reset struct and lookup table
+>   VFIO: platform: add reset callback
+>   VFIO: platform: populate the reset function on probe
+>   VFIO: platform: Calxeda xgmac reset module
+> 
+>  drivers/vfio/platform/Kconfig                      |  2 +
+>  drivers/vfio/platform/Makefile                     |  2 +
+>  drivers/vfio/platform/reset/Kconfig                |  7 ++
+>  drivers/vfio/platform/reset/Makefile               |  5 ++
+>  .../platform/reset/vfio_platform_calxedaxgmac.c    | 86 ++++++++++++++++++++++
+>  drivers/vfio/platform/vfio_platform_common.c       | 60 ++++++++++++++-
+>  drivers/vfio/platform/vfio_platform_private.h      |  7 ++
+>  7 files changed, 166 insertions(+), 3 deletions(-)
+>  create mode 100644 drivers/vfio/platform/reset/Kconfig
+>  create mode 100644 drivers/vfio/platform/reset/Makefile
+>  create mode 100644 drivers/vfio/platform/reset/vfio_platform_calxedaxgmac.c
+> 
