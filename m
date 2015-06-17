@@ -1,65 +1,53 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Wed, 17 Jun 2015 18:21:36 +0200
-Subject: [PATCH] iio: adc: at91_adc: allow to use full range of startup time
-Message-ID: <1434558096-10619-1-git-send-email-nicolas.ferre@atmel.com>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Wed, 17 Jun 2015 18:31:09 +0200
+Subject: [PATCH 9/9] ARM: mvebu: adjust board name and compatible for
+ Armada 388 GP
+In-Reply-To: <1434456785-23696-10-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1434456785-23696-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1434456785-23696-10-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <5581A0CD.30109@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Jan Leupold <leupold@rsi-elektrotechnik.de>
+Hi Thomas,
 
-The DT-Property "atmel,adc-startup-time" is stored in an u8 for a microsecond
-value. When trying to increase the value of STARTUP in Register AT91_ADC_MR
-some higher values can't be reached.
+On 16/06/2015 14:13, Thomas Petazzoni wrote:
+> As the name of the Device Tree file name suggests, the Armada 388 GP
+> really contains an Armada 388 SoC, so this commit updates the board
+> name and compatible string in the Device Tree file.
 
-Change the type in function parameter and private structure field from u8 to
-u32.
+Actually the name of the board (the one written on the box) is DB-88F6820-GP.
+And 88F6820 is the code name of Armada 385. But indeed the SoC is an Armada 388
+on our boards.
 
-Signed-off-by: Jan Leupold <leupold@rsi-elektrotechnik.de>
-[nicolas.ferre at atmel.com: change commit message, increase u16 to u32 for startup time]
-Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
----
- drivers/iio/adc/at91_adc.c | 8 ++++----
- 1 file changed, 4 insertions(+), 4 deletions(-)
+Gregory
 
-diff --git a/drivers/iio/adc/at91_adc.c b/drivers/iio/adc/at91_adc.c
-index 8a0eb4a04fb5..7b40925dd4ff 100644
---- a/drivers/iio/adc/at91_adc.c
-+++ b/drivers/iio/adc/at91_adc.c
-@@ -182,7 +182,7 @@ struct at91_adc_caps {
- 	u8	ts_pen_detect_sensitivity;
- 
- 	/* startup time calculate function */
--	u32 (*calc_startup_ticks)(u8 startup_time, u32 adc_clk_khz);
-+	u32 (*calc_startup_ticks)(u32 startup_time, u32 adc_clk_khz);
- 
- 	u8	num_channels;
- 	struct at91_adc_reg_desc registers;
-@@ -201,7 +201,7 @@ struct at91_adc_state {
- 	u8			num_channels;
- 	void __iomem		*reg_base;
- 	struct at91_adc_reg_desc *registers;
--	u8			startup_time;
-+	u32			startup_time;
- 	u8			sample_hold_time;
- 	bool			sleep_mode;
- 	struct iio_trigger	**trig;
-@@ -779,7 +779,7 @@ ret:
- 	return ret;
- }
- 
--static u32 calc_startup_ticks_9260(u8 startup_time, u32 adc_clk_khz)
-+static u32 calc_startup_ticks_9260(u32 startup_time, u32 adc_clk_khz)
- {
- 	/*
- 	 * Number of ticks needed to cover the startup time of the ADC
-@@ -790,7 +790,7 @@ static u32 calc_startup_ticks_9260(u8 startup_time, u32 adc_clk_khz)
- 	return round_up((startup_time * adc_clk_khz / 1000) - 1, 8) / 8;
- }
- 
--static u32 calc_startup_ticks_9x5(u8 startup_time, u32 adc_clk_khz)
-+static u32 calc_startup_ticks_9x5(u32 startup_time, u32 adc_clk_khz)
- {
- 	/*
- 	 * For sama5d3x and at91sam9x5, the formula changes to:
+> 
+> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+> ---
+>  arch/arm/boot/dts/armada-388-gp.dts | 4 ++--
+>  1 file changed, 2 insertions(+), 2 deletions(-)
+> 
+> diff --git a/arch/arm/boot/dts/armada-388-gp.dts b/arch/arm/boot/dts/armada-388-gp.dts
+> index 5f53a96..605f924 100644
+> --- a/arch/arm/boot/dts/armada-388-gp.dts
+> +++ b/arch/arm/boot/dts/armada-388-gp.dts
+> @@ -44,8 +44,8 @@
+>  #include <dt-bindings/gpio/gpio.h>
+>  
+>  / {
+> -	model = "Marvell Armada 385 GP";
+> -	compatible = "marvell,a385-gp", "marvell,armada388", "marvell,armada380";
+> +	model = "Marvell Armada 388 GP";
+> +	compatible = "marvell,a388-gp", "marvell,armada388", "marvell,armada380";
+>  
+>  	chosen {
+>  		stdout-path = "serial0:115200n8";
+> 
+
+
 -- 
-2.1.3
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
