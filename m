@@ -1,91 +1,38 @@
-From: paul.gortmaker@windriver.com (Paul Gortmaker)
-Date: Wed, 17 Jun 2015 17:01:33 -0400
-Subject: [PATCH v6 0/7] Add Mediatek MMC driver
-In-Reply-To: <CAPDyKFrAbAFR7_p5O4bPh6FZEBVhGZ2rq3htCKcF2QgQuCEf2g@mail.gmail.com>
-References: <1434367253-26577-1-git-send-email-chaotian.jing@mediatek.com>
- <CAPDyKFrAbAFR7_p5O4bPh6FZEBVhGZ2rq3htCKcF2QgQuCEf2g@mail.gmail.com>
-Message-ID: <CAP=VYLpBymmAVY7LoFJR5+QTxL4CN7t+PrLFCxaoAN_a9S4Jbw@mail.gmail.com>
+From: ryabinin.a.a@gmail.com (Andrey Ryabinin)
+Date: Thu, 18 Jun 2015 00:32:04 +0300
+Subject: [PATCH v2 5/5] arm64: add KASan support
+In-Reply-To: <CACRpkdZmHLMxosLXjyOPdkavo=UNzmTcHOLF5vV4cS1ULfbq6A@mail.gmail.com>
+References: <1431698344-28054-1-git-send-email-a.ryabinin@samsung.com>
+ <1431698344-28054-6-git-send-email-a.ryabinin@samsung.com>
+ <CACRpkdaRJJjCXR=vK1M2YhR26JZfGoBB+jcqz8r2MhERfxRzqA@mail.gmail.com>
+ <CAPAsAGy-r8Z2N09wKV+e0kLfbwxd-eWK6N5Xajsnqq9jfyWqcQ@mail.gmail.com>
+ <CACRpkdZmHLMxosLXjyOPdkavo=UNzmTcHOLF5vV4cS1ULfbq6A@mail.gmail.com>
+Message-ID: <CAPAsAGw-iawTpjJh66rQN5fqBFT6UBZCcv2eKx7JTqCXzhzpsw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 16, 2015 at 4:03 AM, Ulf Hansson <ulf.hansson@linaro.org> wrote:
-> On 15 June 2015 at 13:20, Chaotian Jing <chaotian.jing@mediatek.com> wrote:
->> This series enables MMC support on the MT8135/MT8173 platform.
->> MT8135 has 5 MMC controllers and MT8173 has 4 MMC controllers.
->>
->> Changes base on Ulf's comments
->> Make hclk mandatory in the driver code
->> Change host->hclk to host->src_clk_freq
->> Add linux/pm.h
->>
->> Chaotian Jing (3):
->>   mmc: dt-bindings: add Mediatek MMC bindings
->>   mmc: mediatek: Add Mediatek MMC driver.
-
-This commit breaks when merged to linux-next since it gets
-exposed as an implicit module.h user that does not include
-that header:
-
-   drivers/mmc/host/mtk-sd.c:1459:1: note: in expansion of macro
-'module_platform_driver'
-    module_platform_driver(mt_msdc_driver);
-    ^
-   include/linux/device.h:1296:1: error: type defaults to 'int' in
-declaration of 'module_init' [-Werror=implicit-int]
-    module_init(__driver##_init); \
-    ^
-
-Since the code doesn't exist in mainline, I can't fix it from
-within my header cleanup series, so can you please add
-an appropriate include of module.h to the above?
-
-Also, I noticed the Makefile addition from this commit
-is whitespace mangled; might as well fix that too if
-rebasing to fix the include problem.
-
-Thanks,
-Paul.
---
-
->>   mmc: mediatek: Add PM support for MMC driver
->>
->> Eddie Huang (2):
->>   arm64: dts: mediatek: Add MT8173 MMC dts
->>   arm64: mediatek: Add Mediatek MMC support in defconfig
->>
->> Yingjoe Chen (2):
->>   ARM: mediatek: dts: Add emmc support to mt8135
->>   ARM: multi_v7_defconfig: Enable Mediatek MMC support multi-v7
->>
->>  Documentation/devicetree/bindings/mmc/mtk-sd.txt |   32 +
->>  arch/arm/boot/dts/mt8135-evbp1.dts               |  158 +++
->>  arch/arm/boot/dts/mt8135.dtsi                    |   55 +
->>  arch/arm/configs/multi_v7_defconfig              |    1 +
->>  arch/arm64/boot/dts/mediatek/mt8173-evb.dts      |  126 ++
->>  arch/arm64/boot/dts/mediatek/mt8173.dtsi         |   45 +-
->>  arch/arm64/configs/defconfig                     |    1 +
->>  drivers/mmc/host/Kconfig                         |    8 +
->>  drivers/mmc/host/Makefile                        |    1 +
->>  drivers/mmc/host/mtk-sd.c                        | 1461 ++++++++++++++++++++++
->>  include/linux/mmc/core.h                         |    1 +
->>  11 files changed, 1888 insertions(+), 1 deletion(-)
->>  create mode 100644 Documentation/devicetree/bindings/mmc/mtk-sd.txt
->>  create mode 100644 drivers/mmc/host/mtk-sd.c
->>
->> --
->> 1.8.1.1.dirty
->>
+2015-06-13 18:25 GMT+03:00 Linus Walleij <linus.walleij@linaro.org>:
 >
-> Hi Chaotian,
+> On Fri, Jun 12, 2015 at 8:14 PM, Andrey Ryabinin <ryabinin.a.a@gmail.com> wrote:
+> > 2015-06-11 16:39 GMT+03:00 Linus Walleij <linus.walleij@linaro.org>:
+> >> On Fri, May 15, 2015 at 3:59 PM, Andrey Ryabinin <a.ryabinin@samsung.com> wrote:
+> >>
+> >>> This patch adds arch specific code for kernel address sanitizer
+> >>> (see Documentation/kasan.txt).
+> >>
+> >> I looked closer at this again ... I am trying to get KASan up for
+> >> ARM(32) with some tricks and hacks.
+> >>
+> >
+> > I have some patches for that. They still need some polishing, but works for me.
+> > I could share after I get back to office on Tuesday.
 >
-> I have applied patch 1->3 for my next branch, which thus includes the
-> mmc driver parts. I could potentially also pick the ARM patches, but
-> then those needs to be acked from the ARM SoC folks.
+> OK! I'd be happy to test!
 >
-> Kind regards
-> Uffe
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> Please read the FAQ at  http://www.tux.org/lkml/
+
+I've pushed it here : git://github.com/aryabinin/linux.git kasan/arm_v0
+
+It far from ready. Firstly I've tried it only in qemu and it works.
+Today, I've tried to run it on bare metal (exynos5420), but it hangs
+somewhere after early_irq_init().
+So, it probably doesn't  worth for trying/testing yet.
