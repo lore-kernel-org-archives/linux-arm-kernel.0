@@ -1,97 +1,47 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Wed, 17 Jun 2015 16:28:22 +0200
-Subject: [PATCH] ARM: mvebu: use DT properties to fine-tune the L2
- configuration
-In-Reply-To: <1434023472-19851-1-git-send-email-thomas.petazzoni@free-electrons.com>
-References: <1434023472-19851-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <55818406.3070703@free-electrons.com>
+From: julien.grall@citrix.com (Julien Grall)
+Date: Wed, 17 Jun 2015 15:28:07 +0100
+Subject: [PATCH v2 6/7] block/xen-blkfront: Remove invalid comment
+In-Reply-To: <1434551288-14113-1-git-send-email-julien.grall@citrix.com>
+References: <1434551288-14113-1-git-send-email-julien.grall@citrix.com>
+Message-ID: <1434551288-14113-7-git-send-email-julien.grall@citrix.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Thomas,
+From: Julien Grall <julien.grall@linaro.org>
 
-On 11/06/2015 13:51, Thomas Petazzoni wrote:
-> In order to optimize the L2 cache performance, this commit adjusts the
-> configuration of the L2 on the Cortex-A9 based Marvell EBU processors
-> (Armada 375, 38x and 39x), using the appropriate DT properties.
-> 
-> We enable double linefill, incr double linefill, data prefetch and
-> disable double linefill on wrap. This matches the configuration that
-> was fine tuned in the Marvell BSP.
-> 
-> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+Since commit b764915 "xen-blkfront: use a different scatterlist for each
+request", biovec has been replaced by scatterlist when copying back the
+data during a completion request.
 
-Acked-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+Signed-off-by: Julien Grall <julien.grall@citrix.com>
+Acked-by: Roger Pau Monn? <roger.pau@citrix.com>
+Cc: Konrad Rzeszutek Wilk <konrad.wilk@oracle.com>
+Cc: Boris Ostrovsky <boris.ostrovsky@oracle.com>
+Cc: David Vrabel <david.vrabel@citrix.com>
 
+---
+    Changes in v2:
+        - Add Roger's Acked-by
+---
+ drivers/block/xen-blkfront.c | 6 ------
+ 1 file changed, 6 deletions(-)
 
-applied on mvebu/dt-4.3
-
-Thanks,
-
-Gregory
-
-> ---
-> Enabling the data prefetching depends on a patch from "Hauke Mehrtens
-> <hauke@hauke-m.de>", [PATCH v4] ARM: l2c: add options to overwrite
-> prefetching behavior, which has been applied by Russell (see
-> http://www.arm.linux.org.uk/developer/patches/viewpatch.php?id=8391/1)
-> but does not appear yet in his for-next branch.
-> ---
->  arch/arm/boot/dts/armada-375.dtsi | 4 ++++
->  arch/arm/boot/dts/armada-38x.dtsi | 4 ++++
->  arch/arm/boot/dts/armada-39x.dtsi | 4 ++++
->  3 files changed, 12 insertions(+)
-> 
-> diff --git a/arch/arm/boot/dts/armada-375.dtsi b/arch/arm/boot/dts/armada-375.dtsi
-> index f076ff8..4d4964b 100644
-> --- a/arch/arm/boot/dts/armada-375.dtsi
-> +++ b/arch/arm/boot/dts/armada-375.dtsi
-> @@ -176,6 +176,10 @@
->  				reg = <0x8000 0x1000>;
->  				cache-unified;
->  				cache-level = <2>;
-> +				arm,double-linefill-incr = <1>;
-> +				arm,double-linefill-wrap = <0>;
-> +				arm,double-linefill = <1>;
-> +				prefetch-data = <1>;
->  			};
->  
->  			scu at c000 {
-> diff --git a/arch/arm/boot/dts/armada-38x.dtsi b/arch/arm/boot/dts/armada-38x.dtsi
-> index 218a2ac..a86d1dc 100644
-> --- a/arch/arm/boot/dts/armada-38x.dtsi
-> +++ b/arch/arm/boot/dts/armada-38x.dtsi
-> @@ -143,6 +143,10 @@
->  				reg = <0x8000 0x1000>;
->  				cache-unified;
->  				cache-level = <2>;
-> +				arm,double-linefill-incr = <1>;
-> +				arm,double-linefill-wrap = <0>;
-> +				arm,double-linefill = <1>;
-> +				prefetch-data = <1>;
->  			};
->  
->  			scu at c000 {
-> diff --git a/arch/arm/boot/dts/armada-39x.dtsi b/arch/arm/boot/dts/armada-39x.dtsi
-> index ecd1318..06d9cc5 100644
-> --- a/arch/arm/boot/dts/armada-39x.dtsi
-> +++ b/arch/arm/boot/dts/armada-39x.dtsi
-> @@ -104,6 +104,10 @@
->  				reg = <0x8000 0x1000>;
->  				cache-unified;
->  				cache-level = <2>;
-> +				arm,double-linefill-incr = <1>;
-> +				arm,double-linefill-wrap = <0>;
-> +				arm,double-linefill = <1>;
-> +				prefetch-data = <1>;
->  			};
->  
->  			scu at c000 {
-> 
-
-
+diff --git a/drivers/block/xen-blkfront.c b/drivers/block/xen-blkfront.c
+index 5c72c25..60cf1d6 100644
+--- a/drivers/block/xen-blkfront.c
++++ b/drivers/block/xen-blkfront.c
+@@ -1056,12 +1056,6 @@ static void blkif_completion(struct blk_shadow *s, struct blkfront_info *info,
+ 		s->req.u.indirect.nr_segments : s->req.u.rw.nr_segments;
+ 
+ 	if (bret->operation == BLKIF_OP_READ && info->feature_persistent) {
+-		/*
+-		 * Copy the data received from the backend into the bvec.
+-		 * Since bv_offset can be different than 0, and bv_len different
+-		 * than PAGE_SIZE, we have to keep track of the current offset,
+-		 * to be sure we are copying the data from the right shared page.
+-		 */
+ 		for_each_sg(s->sg, sg, nseg, i) {
+ 			BUG_ON(sg->offset + sg->length > PAGE_SIZE);
+ 			shared_data = kmap_atomic(
 -- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+2.1.4
