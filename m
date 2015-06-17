@@ -1,81 +1,57 @@
 From: tomeu.vizoso@collabora.com (Tomeu Vizoso)
-Date: Wed, 17 Jun 2015 15:42:19 +0200
-Subject: [PATCH 09/13] gpu: host1x: implement class.get_dependencies()
+Date: Wed, 17 Jun 2015 15:42:20 +0200
+Subject: [PATCH 10/13] driver-core: add for_each_class()
 In-Reply-To: <1434548543-22949-1-git-send-email-tomeu.vizoso@collabora.com>
 References: <1434548543-22949-1-git-send-email-tomeu.vizoso@collabora.com>
-Message-ID: <1434548543-22949-10-git-send-email-tomeu.vizoso@collabora.com>
+Message-ID: <1434548543-22949-11-git-send-email-tomeu.vizoso@collabora.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-So others can find out dependencies of host1x clients, as specified in
-bindings/gpu/nvidia,tegra20-host1x.txt.
+The purpose of this function is to allow other parts of the driver core
+to iterate over the currently registered classes.
 
 Signed-off-by: Tomeu Vizoso <tomeu.vizoso@collabora.com>
 ---
- drivers/gpu/host1x/dev.c | 47 +++++++++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 47 insertions(+)
+ drivers/base/base.h  |  2 ++
+ drivers/base/class.c | 16 ++++++++++++++++
+ 2 files changed, 18 insertions(+)
 
-diff --git a/drivers/gpu/host1x/dev.c b/drivers/gpu/host1x/dev.c
-index 53d3d1d..c86ef88 100644
---- a/drivers/gpu/host1x/dev.c
-+++ b/drivers/gpu/host1x/dev.c
-@@ -212,10 +212,57 @@ static struct platform_driver tegra_host1x_driver = {
- 	.remove = host1x_remove,
- };
+diff --git a/drivers/base/base.h b/drivers/base/base.h
+index 29c985e..be81c88 100644
+--- a/drivers/base/base.h
++++ b/drivers/base/base.h
+@@ -149,3 +149,5 @@ extern int devtmpfs_init(void);
+ #else
+ static inline int devtmpfs_init(void) { return 0; }
+ #endif
++
++extern void for_each_class(void (*fn)(struct class *, void *), void *data);
+diff --git a/drivers/base/class.c b/drivers/base/class.c
+index 6e81088..f4114a4 100644
+--- a/drivers/base/class.c
++++ b/drivers/base/class.c
+@@ -583,6 +583,22 @@ void class_compat_remove_link(struct class_compat *cls, struct device *dev,
+ }
+ EXPORT_SYMBOL_GPL(class_compat_remove_link);
  
-+static void add_dependency(struct fwnode_handle *fwnode,
-+			   const char *property,
-+			   struct list_head *list)
++void for_each_class(void (*fn)(struct class *, void *), void *data)
 +{
-+	struct fwnode_dependency *dep;
-+	struct device_node *np;
++	struct subsys_private *cp;
++	struct kobject *k;
 +
-+	np = of_parse_phandle(of_node(fwnode), property, 0);
-+	if (!np)
++	if (!class_kset)
 +		return;
 +
-+	dep = kzalloc(sizeof(*dep), GFP_KERNEL);
-+	if (!dep)
-+		return;
-+
-+	INIT_LIST_HEAD(&dep->dependency);
-+	dep->fwnode = &np->fwnode;
-+
-+	list_add_tail(&dep->dependency, list);
++	list_for_each_entry(k, &class_kset->list, entry) {
++		cp = to_subsys_private(k);
++		class_get(cp->class);
++		fn(cp->class, data);
++		class_put(cp->class);
++	}
 +}
 +
-+struct list_head *host1x_get_dependencies(struct fwnode_handle *fwnode)
-+{
-+	struct list_head *list = NULL;
-+
-+	list = kzalloc(sizeof(*list), GFP_KERNEL);
-+	if (!list)
-+		return NULL;
-+
-+	INIT_LIST_HEAD(list);
-+
-+	add_dependency(fwnode, "nvidia,dpaux", list);
-+	add_dependency(fwnode, "nvidia,panel", list);
-+
-+	return list;
-+}
-+
-+static struct class host1x_class = {
-+	.name = "tegra-host1x",
-+
-+	.get_dependencies = host1x_get_dependencies,
-+};
-+
- static int __init tegra_host1x_init(void)
+ int __init classes_init(void)
  {
- 	int err;
- 
-+	err = class_register(&host1x_class);
-+	if (err < 0)
-+		return err;
-+
- 	err = bus_register(&host1x_bus_type);
- 	if (err < 0)
- 		return err;
+ 	class_kset = kset_create_and_add("class", NULL, NULL);
 -- 
 2.4.1
