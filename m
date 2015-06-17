@@ -1,48 +1,87 @@
 From: vaibhav.hiremath@linaro.org (Vaibhav Hiremath)
-Date: Thu, 18 Jun 2015 00:28:04 +0530
-Subject: [PATCH-v2 0/3] mfd: 88pm800: Add Device tree support
-In-Reply-To: <vaibhav.hiremath@linaro.org>
+Date: Thu, 18 Jun 2015 00:28:08 +0530
+Subject: [PATCH-v2 3/3] mfd: devicetree: bindings: Add new 88pm800 mfd binding
+In-Reply-To: <1434567488-6477-1-git-send-email-vaibhav.hiremath@linaro.org>
 References: <vaibhav.hiremath@linaro.org>
-Message-ID: <1434567488-6477-1-git-send-email-vaibhav.hiremath@linaro.org>
+ <1434567488-6477-1-git-send-email-vaibhav.hiremath@linaro.org>
+Message-ID: <1434567488-6477-5-git-send-email-vaibhav.hiremath@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch-series adds support for Device tree to 88PM800 mfd driver.
-It also enabled configuration of irq clear method through DT.
+With addition of DT support to 88pm800 mfd driver, this patch
+adds new DT binding documentation along with respective properties.
 
-Testing::
- - Boot tested on PXA1928 based platform.
- - probe of mfd, rtc and regulator function passing successfully.
- - Basic read operations on registers
-
-
-V1 => V1
-=======
-Link to V1: http://lkml.iu.edu/hypermail/linux/kernel/1505.3/04386.html
-
-  - Split binding changes from original commit
-  - Updated binding info as per Rob's suggestion
-  - Dropped PATCH 4/4, as discussed during review
-  - Dropped PATCH 3/4, as it is independent RTC code change,
-    so will submit it separately to ease merging.
-  - Fixed all other minor comments
-
-Attempt has been made to push some of the patches to the list sometime
-back in 2013.
-
-Link to previous patch submission:
-        https://lkml.org/lkml/2013/8/14/86
-
-Vaibhav Hiremath (3):
-  mfd: 88pm800: Add device tree support
-  mfd: 88pm800: Allow configuration of interrupt clear method
-  mfd: devicetree: bindings: Add new 88pm800 mfd binding
-
+Signed-off-by: Vaibhav Hiremath <vaibhav.hiremath@linaro.org>
+---
  Documentation/devicetree/bindings/mfd/88pm800.txt | 60 +++++++++++++++++++++++
- drivers/mfd/88pm800.c                             | 40 +++++++++++++--
- include/linux/mfd/88pm80x.h                       |  6 ++-
- 3 files changed, 99 insertions(+), 7 deletions(-)
+ 1 file changed, 60 insertions(+)
  create mode 100644 Documentation/devicetree/bindings/mfd/88pm800.txt
 
+diff --git a/Documentation/devicetree/bindings/mfd/88pm800.txt b/Documentation/devicetree/bindings/mfd/88pm800.txt
+new file mode 100644
+index 0000000..b8e72df
+--- /dev/null
++++ b/Documentation/devicetree/bindings/mfd/88pm800.txt
+@@ -0,0 +1,60 @@
++* Marvell 88PM8xx Power Management IC
++
++Required parent device properties:
++- compatible : "marvell,88pm800", "marvell,88pm805", "marvell,88pm860"
++- reg : the I2C slave address for the 88pm8xx chip
++- interrupts : IRQ line for the 88pm8xx chip
++- interrupt-controller: describes the 88pm8xx as an interrupt controller
++- #interrupt-cells : should be 1.
++		- The cell is the 88pm8xx local IRQ number
++
++Optional parent device properties:
++- marvell,irq-clr-on-write: indicates whether interrupt status is cleared
++  by write or read.
++  If enabled, interrupt is cleared by write else just read would do.
++
++88pm8xx family of devices consists of varied group of sub-devices:
++
++Device		 	Supply Names	 Description
++------		 	------------	 -----------
++88pm80x-onkey		:		: On key
++88pm80x-rtc		:		: RTC
++88pm80x-regulator	:		: Regulators
++
++Note: More device list will follow
++
++Example:
++
++	pmic: 88pm800 at 30 {
++		compatible = "marvell,88pm800";
++		reg = <0x30>;
++		interrupts = <GIC_SPI 77 IRQ_TYPE_LEVEL_HIGH>;
++		interrupt-parent = <&gic>;
++		interrupt-controller;
++		#interrupt-cells = <1>;
++
++		marvell,irq-clr-on-write;
++
++		regulators {
++			compatible = "marvell,88pm80x-regulator";
++
++			buck1a: BUCK1A {
++				regulator-compatible = "88PM800-BUCK1A";
++				regulator-min-microvolt = <600000>;
++				regulator-max-microvolt = <1800000>;
++				regulator-boot-on;
++				regulator-always-on;
++			};
++			ldo1: LDO1 {
++				regulator-compatible = "88PM800-LDO1";
++				regulator-min-microvolt = <1700000>;
++				regulator-max-microvolt = <3300000>;
++				regulator-boot-on;
++				regulator-always-on;
++			};
++		};
++
++		rtc {
++			compatible = "marvell,88pm80x-rtc";
++		};
++	};
 -- 
 1.9.1
