@@ -1,80 +1,67 @@
 From: tomeu.vizoso@collabora.com (Tomeu Vizoso)
-Date: Wed, 17 Jun 2015 15:42:13 +0200
-Subject: [PATCH 03/13] ARM: tegra: Add gpio-ranges property
+Date: Wed, 17 Jun 2015 15:42:14 +0200
+Subject: [PATCH 04/13] pinctrl: tegra: Only set the gpio range if needed
 In-Reply-To: <1434548543-22949-1-git-send-email-tomeu.vizoso@collabora.com>
 References: <1434548543-22949-1-git-send-email-tomeu.vizoso@collabora.com>
-Message-ID: <1434548543-22949-4-git-send-email-tomeu.vizoso@collabora.com>
+Message-ID: <1434548543-22949-5-git-send-email-tomeu.vizoso@collabora.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Specify how the GPIOs map to the pins in Tegra SoCs, so the dependency is
-explicit.
+If the gpio DT node has the gpio-ranges property, the range will be
+added by the gpio core and doesn't need to be added by the pinctrl
+driver.
 
-This currently will add a duplicated entry in the map from pins to gpios
-in the pinmux controller but it should be harmless and will be fixed in a
-later commit.
+By having the gpio-ranges property, we have an explicit dependency from
+the gpio node to the pinctrl node and we can stop using the deprecated
+pinctrl_add_gpio_range() function.
+
+Note that when the GPIO device gets probed before the associated
+princtrl device, the gpio core actually won't register the gpio range.
+Thus, this patch is only safe to be merged after we have in place a way
+to assure that gpio devices are probed after their associated pinctrl
+devices (such as ordered probing).
 
 Signed-off-by: Tomeu Vizoso <tomeu.vizoso@collabora.com>
-
 ---
+ drivers/pinctrl/pinctrl-tegra.c | 19 ++++++++++++++++++-
+ 1 file changed, 18 insertions(+), 1 deletion(-)
 
-v2:	* Change number of gpios to 251 to match pinctrl-tegra124.c
-	* Add note about duplicated mapping
-	* Add the property to all the other Tegra SoCs
----
- arch/arm/boot/dts/tegra114.dtsi | 1 +
- arch/arm/boot/dts/tegra124.dtsi | 1 +
- arch/arm/boot/dts/tegra20.dtsi  | 1 +
- arch/arm/boot/dts/tegra30.dtsi  | 1 +
- 4 files changed, 4 insertions(+)
-
-diff --git a/arch/arm/boot/dts/tegra114.dtsi b/arch/arm/boot/dts/tegra114.dtsi
-index f58a3d9..7e1e171 100644
---- a/arch/arm/boot/dts/tegra114.dtsi
-+++ b/arch/arm/boot/dts/tegra114.dtsi
-@@ -234,6 +234,7 @@
- 		gpio-controller;
- 		#interrupt-cells = <2>;
- 		interrupt-controller;
-+		gpio-ranges = <&pinmux 0 0 246>;
- 	};
+diff --git a/drivers/pinctrl/pinctrl-tegra.c b/drivers/pinctrl/pinctrl-tegra.c
+index 0f982b8..0fd7fd2 100644
+--- a/drivers/pinctrl/pinctrl-tegra.c
++++ b/drivers/pinctrl/pinctrl-tegra.c
+@@ -624,6 +624,22 @@ static struct pinctrl_desc tegra_pinctrl_desc = {
+ 	.owner = THIS_MODULE,
+ };
  
- 	apbmisc at 70000800 {
-diff --git a/arch/arm/boot/dts/tegra124.dtsi b/arch/arm/boot/dts/tegra124.dtsi
-index 87318a7..4779df3 100644
---- a/arch/arm/boot/dts/tegra124.dtsi
-+++ b/arch/arm/boot/dts/tegra124.dtsi
-@@ -255,6 +255,7 @@
- 		gpio-controller;
- 		#interrupt-cells = <2>;
- 		interrupt-controller;
-+		gpio-ranges = <&pinmux 0 0 251>;
- 	};
++static bool gpio_node_has_range(void)
++{
++	struct device_node *np;
++	bool has_prop = false;
++
++	np = of_find_compatible_node(NULL, NULL, "nvidia,tegra30-gpio");
++	if (!np)
++		return has_prop;
++
++	has_prop = of_find_property(np, "gpio-ranges", NULL);
++
++	of_node_put(np);
++
++	return has_prop;
++}
++
+ int tegra_pinctrl_probe(struct platform_device *pdev,
+ 			const struct tegra_pinctrl_soc_data *soc_data)
+ {
+@@ -708,7 +724,8 @@ int tegra_pinctrl_probe(struct platform_device *pdev,
+ 		return PTR_ERR(pmx->pctl);
+ 	}
  
- 	apbdma: dma at 0,60020000 {
-diff --git a/arch/arm/boot/dts/tegra20.dtsi b/arch/arm/boot/dts/tegra20.dtsi
-index f444b67..b44277c 100644
---- a/arch/arm/boot/dts/tegra20.dtsi
-+++ b/arch/arm/boot/dts/tegra20.dtsi
-@@ -244,6 +244,7 @@
- 		gpio-controller;
- 		#interrupt-cells = <2>;
- 		interrupt-controller;
-+		gpio-ranges = <&pinmux 0 0 224>;
- 	};
+-	pinctrl_add_gpio_range(pmx->pctl, &tegra_pinctrl_gpio_range);
++	if (!gpio_node_has_range())
++		pinctrl_add_gpio_range(pmx->pctl, &tegra_pinctrl_gpio_range);
  
- 	apbmisc at 70000800 {
-diff --git a/arch/arm/boot/dts/tegra30.dtsi b/arch/arm/boot/dts/tegra30.dtsi
-index 782b11b..28c547f 100644
---- a/arch/arm/boot/dts/tegra30.dtsi
-+++ b/arch/arm/boot/dts/tegra30.dtsi
-@@ -349,6 +349,7 @@
- 		gpio-controller;
- 		#interrupt-cells = <2>;
- 		interrupt-controller;
-+		gpio-ranges = <&pinmux 0 0 248>;
- 	};
+ 	platform_set_drvdata(pdev, pmx);
  
- 	apbmisc at 70000800 {
 -- 
 2.4.1
