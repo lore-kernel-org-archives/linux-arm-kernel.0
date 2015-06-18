@@ -1,62 +1,43 @@
-From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Thu, 18 Jun 2015 15:46:29 +0200
-Subject: [PATCH v7 13/14] crypto: marvell/CESA: add support for Kirkwood and
- Dove SoCs
-In-Reply-To: <1434635190-27733-1-git-send-email-boris.brezillon@free-electrons.com>
-References: <1434635190-27733-1-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <1434635190-27733-14-git-send-email-boris.brezillon@free-electrons.com>
+From: Dave.Martin@arm.com (Dave Martin)
+Date: Thu, 18 Jun 2015 14:54:29 +0100
+Subject: [PATCH] serial/amba-pl011: Disable interrupts around TX softirq
+Message-ID: <1434635669-23367-1-git-send-email-Dave.Martin@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Arnaud Ebalard <arno@natisbad.org>
+pl011_tx_softirq() currently uses spin_{,un}lock(), which are not
+sufficient to inhibit pl011_int() from being triggered by a local
+IRQ and trying to re-take the same lock.  This can lead to
+deadlocks.
 
-Add the Kirkwood and Dove SoC descriptions, and control the allhwsupport
-module parameter to avoid probing the CESA IP when the old CESA driver is
-enabled (unless it is explicitly requested to do so).
+This patch uses the _irq() locking variants instead to ensure that
+pl011_int() handling for a given port is deferred until any
+pl011_tx_softirq() work for that port is complete.
 
-Signed-off-by: Arnaud Ebalard <arno@natisbad.org>
-Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+Fixes: 734745caeb9f serial/amba-pl011: Activate TX IRQ passively
+Signed-off-by: Dave Martin <Dave.Martin@arm.com>
+Tested-by: Robin Murphy <robin.murphy@arm.com>
+Cc: stable <stable@vger.kernel.org> # 4.1
+
 ---
- drivers/crypto/marvell/cesa.c | 13 ++++++++++++-
- 1 file changed, 12 insertions(+), 1 deletion(-)
+ drivers/tty/serial/amba-pl011.c |    4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/crypto/marvell/cesa.c b/drivers/crypto/marvell/cesa.c
-index 8e5ea72..a432633 100644
---- a/drivers/crypto/marvell/cesa.c
-+++ b/drivers/crypto/marvell/cesa.c
-@@ -215,6 +215,15 @@ static const struct mv_cesa_caps orion_caps = {
- 	.has_tdma = false,
- };
+diff --git a/drivers/tty/serial/amba-pl011.c b/drivers/tty/serial/amba-pl011.c
+index 763eb20..0cc622a 100644
+--- a/drivers/tty/serial/amba-pl011.c
++++ b/drivers/tty/serial/amba-pl011.c
+@@ -1360,9 +1360,9 @@ static void pl011_tx_softirq(struct work_struct *work)
+ 	struct uart_amba_port *uap =
+ 		container_of(dwork, struct uart_amba_port, tx_softirq_work);
  
-+static const struct mv_cesa_caps kirkwood_caps = {
-+	.nengines = 1,
-+	.cipher_algs = orion_cipher_algs,
-+	.ncipher_algs = ARRAY_SIZE(orion_cipher_algs),
-+	.ahash_algs = orion_ahash_algs,
-+	.nahash_algs = ARRAY_SIZE(orion_ahash_algs),
-+	.has_tdma = true,
-+};
-+
- static const struct mv_cesa_caps armada_370_caps = {
- 	.nengines = 1,
- 	.cipher_algs = armada_370_cipher_algs,
-@@ -235,6 +244,8 @@ static const struct mv_cesa_caps armada_xp_caps = {
+-	spin_lock(&uap->port.lock);
++	spin_lock_irq(&uap->port.lock);
+ 	while (pl011_tx_chars(uap)) ;
+-	spin_unlock(&uap->port.lock);
++	spin_unlock_irq(&uap->port.lock);
+ }
  
- static const struct of_device_id mv_cesa_of_match_table[] = {
- 	{ .compatible = "marvell,orion-crypto", .data = &orion_caps },
-+	{ .compatible = "marvell,kirkwood-crypto", .data = &kirkwood_caps },
-+	{ .compatible = "marvell,dove-crypto", .data = &kirkwood_caps },
- 	{ .compatible = "marvell,armada-370-crypto", .data = &armada_370_caps },
- 	{ .compatible = "marvell,armada-xp-crypto", .data = &armada_xp_caps },
- 	{ .compatible = "marvell,armada-375-crypto", .data = &armada_xp_caps },
-@@ -383,7 +394,7 @@ static int mv_cesa_probe(struct platform_device *pdev)
- 		caps = match->data;
- 	}
- 
--	if (caps == &orion_caps && !allhwsupport)
-+	if ((caps == &orion_caps || caps == &kirkwood_caps) && !allhwsupport)
- 		return -ENOTSUPP;
- 
- 	cesa = devm_kzalloc(dev, sizeof(*cesa), GFP_KERNEL);
+ static void pl011_tx_irq_seen(struct uart_amba_port *uap)
 -- 
-1.9.1
+1.7.10.4
