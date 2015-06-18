@@ -1,63 +1,34 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Thu, 18 Jun 2015 09:02:10 +0200
-Subject: [PATCH V3] PM / Domains: Remove intermediate states from the
- power off sequence
-In-Reply-To: <20150617200346.GC23268@linaro.org>
-References: <1434020737-13354-1-git-send-email-ulf.hansson@linaro.org>
- <20150617200346.GC23268@linaro.org>
-Message-ID: <CAPDyKFp4Bh2C5PNNJS3bUqDLADS6MKTfH8UCzbm3c-ofbVOWow@mail.gmail.com>
+From: herbert@gondor.apana.org.au (Herbert Xu)
+Date: Thu, 18 Jun 2015 15:02:59 +0800
+Subject: [PATCH v6 06/14] crypto: marvell/CESA: add DES support
+In-Reply-To: <20150618085709.2180759d@bbrezillon>
+References: <1434527142-3609-1-git-send-email-boris.brezillon@free-electrons.com>
+ <1434527142-3609-7-git-send-email-boris.brezillon@free-electrons.com>
+ <20150618085709.2180759d@bbrezillon>
+Message-ID: <20150618070259.GA28882@gondor.apana.org.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[...]
+On Thu, Jun 18, 2015 at 08:57:09AM +0200, Boris Brezillon wrote:
+> Hi Herbert,
+> 
+> On Wed, 17 Jun 2015 09:45:34 +0200
+> Boris Brezillon <boris.brezillon@free-electrons.com> wrote:
+> 
+> > Add support for DES operations.
+> 
+> The addition of DES support seems controversial. At first I thought it
+> would be good to support all the algorithms supported by the CESA
+> engine, but I think I'll drop it in the next iteration.
+> 
+> Do you think Triple-DES should be dropped too ?
 
->> @@ -671,32 +475,29 @@ static int pm_genpd_runtime_suspend(struct device
->> *dev)
->>         if (IS_ERR(genpd))
->>                 return -EINVAL;
->>
->> +       /*
->> +        * We can't allow to power off the PM domain if it holds an
->> irq_safe
->> +        * device. That's because we use mutexes to protect data while
->> power
->> +        * off and on the PM domain, thus we can't execute in atomic
->> context.
->> +        */
->> +       if (dev->power.irq_safe)
->> +               return -EBUSY;
->> +
->
-> This check will prevent the device from being saved/stopped. This should
-> be allowed. Its the mutex_lock(&genpd->lock) below that would be a
-> problem, if the device is IRQ safe. But that happens only after the
-> device is stopped.
+We're not here to make policy decisions.  So I don't see anything
+wrong with keeping it.  However, if you don't wish to add it then
+it's fine by me too.
 
-Yes, as we discussed around your patch in [1].
-
-Earlier we could invoke the ->stop|start() callbacks for an IRQ
-safe device. This version of $subject patch prevents that.
-
-I am working on a v4, that brings back that functionality, but we can
-actually do more. As from the changes in $subject patch, we don't need
-to hold the mutex while invoking the runtime PM callbacks for a
-device. This enables us to invoke them for IRQ safe devices, yet
-another positive side effect.
-
->
-> I am inclined to think that the existing check below is the correct
-> place to check. Let me know if I am missing something.
->
-
-You are correct.
-
-Still, as I intend to invoke the runtime PM callbacks for IRQ safe
-devices some minor change is also needed in pm_genpd_runtime_resume().
-
-[...]
-
-Kind regards
-Uffe
-
-[1]
-http://www.spinics.net/lists/arm-kernel/msg425162.html
+Cheers,
+-- 
+Email: Herbert Xu <herbert@gondor.apana.org.au>
+Home Page: http://gondor.apana.org.au/~herbert/
+PGP Key: http://gondor.apana.org.au/~herbert/pubkey.txt
