@@ -1,134 +1,42 @@
-From: srinivas.kandagatla@linaro.org (Srinivas Kandagatla)
-Date: Thu, 18 Jun 2015 13:57:57 +0100
-Subject: [PATCH v5 05/11] nvmem: Add nvmem_device based consumer apis.
-In-Reply-To: <5580A7EA.2090909@codeaurora.org>
-References: <1432226535-8640-1-git-send-email-srinivas.kandagatla@linaro.org>
- <1432226603-8863-1-git-send-email-srinivas.kandagatla@linaro.org>
- <5580A7EA.2090909@codeaurora.org>
-Message-ID: <5582C055.6040908@linaro.org>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Thu, 18 Jun 2015 14:59:18 +0200
+Subject: [PATCH] clk: at91: add generated clock driver
+In-Reply-To: <1434614090.2385.19.camel@x220>
+References: <1434547409-12232-1-git-send-email-nicolas.ferre@atmel.com>
+ <1434611556.2385.8.camel@x220> <20150618093344.7d486e97@bbrezillon>
+ <55827606.7020908@atmel.com> <1434614090.2385.19.camel@x220>
+Message-ID: <20150618125918.GC27492@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On 18/06/2015 at 09:54:50 +0200, Paul Bolle wrote :
+> > I'd like though that this matter of fact doesn't block this piece of
+> > code from being reviewed or even better merged in order to ease this new
+> > SoC landing...
+> 
+> The other side of that is that the sama5d2 might never make it, or take
+> very long to make it, into mainline. And this would then end up being
+> yet another chunk of code adding no value to mainline.
+> 
 
+Come on Paul, you prefer the current situation were each vendor have
+there tree and when support for an SoC lands in mainline it is already
+deprecated?
 
-On 16/06/15 23:49, Stephen Boyd wrote:
-> On 05/21/2015 09:43 AM, Srinivas Kandagatla wrote:
->> diff --git a/drivers/nvmem/core.c b/drivers/nvmem/core.c
->> index 8a4b358..68ee8d1 100644
->> --- a/drivers/nvmem/core.c
->> +++ b/drivers/nvmem/core.c
->> @@ -436,6 +436,51 @@ static int __nvmem_device_put(struct nvmem_device *nvmem)
->>   	return 0;
->>   }
->>
->> +static int nvmem_match(struct device *dev, const void *data)
->> +{
->> +	return !strcmp(dev_name(dev), (const char *)data);
->
-> Unnecessary cast.
-Sure, will fix it.
->
->> +}
->> +
->> +static struct nvmem_device *nvmem_find(const char *name)
->> +{
->> +	struct device *d;
->> +
->> +	d = class_find_device(&nvmem_class, NULL, (void *)name, nvmem_match);
->
-> Unnecessary cast
-Will fix it.
->
->> +
->> +	return d ? to_nvmem_device(d) : NULL;
->> +}
->
-> [...]
->> +
->> +void nvmem_device_put(struct nvmem_device *nvmem)
->> +{
->> +	__nvmem_device_put(nvmem);
->> +}
->> +EXPORT_SYMBOL_GPL(nvmem_device_put);
->>
->> +int nvmem_device_cell_read(struct nvmem_device *nvmem,
->> +			   struct nvmem_cell_info *info, void *buf)
->> +{
->> +}
->> +EXPORT_SYMBOL_GPL(nvmem_device_cell_read);
->> +
->> +int nvmem_device_cell_write(struct nvmem_device *nvmem,
->> +			    struct nvmem_cell_info *info, void *buf)
->> +{
->> +}
->> +EXPORT_SYMBOL_GPL(nvmem_device_cell_write);
->> +
->> +int nvmem_device_read(struct nvmem_device *nvmem,
->> +		      unsigned int offset,
->> +		      size_t bytes, void *buf)
->> +{
->> +}
->> +EXPORT_SYMBOL_GPL(nvmem_device_read);
->> +
->> +int nvmem_device_write(struct nvmem_device *nvmem,
->> +		       unsigned int offset,
->> +		       size_t bytes, void *buf)
->> +{
->> +}
->> +EXPORT_SYMBOL_GPL(nvmem_device_write);
->
-> Can you please add kernel-doc on these exported APIs?
->
-Thanks for spotting, I will add them.
+You have one vendor here, trying to get support for its SoC even before
+the silicon is available. Intel is always cited as being a good player
+in the linux community for doing exactly that. They even have to remove
+support for a CPU that was never manufactured...
+The main difference here is that we are no longer doinc everything in
+mach-xxx so we have to get the driver part mainlined and this requires
+synchronization. I really belive that you can't blame Nicolas to get the
+drivers first then the SoC in.
 
->> +
->>   static int nvmem_init(void)
->>   {
->>   	return class_register(&nvmem_class);
->> diff --git a/include/linux/nvmem-consumer.h b/include/linux/nvmem-consumer.h
->> index c3fa8c7..66c67ba 100644
->> --- a/include/linux/nvmem-consumer.h
->> +++ b/include/linux/nvmem-consumer.h
->> @@ -23,6 +32,18 @@ void nvmem_cell_put(struct nvmem_cell *cell);
->>   void *nvmem_cell_read(struct nvmem_cell *cell, ssize_t *len);
->>   int nvmem_cell_write(struct nvmem_cell *cell, void *buf, ssize_t len);
->>
->> +/* direct nvmem device read/write interface */
->> +struct nvmem_device *nvmem_device_get(struct device *dev, const char *name);
->> +void nvmem_device_put(struct nvmem_device *nvmem);
->> +int nvmem_device_read(struct nvmem_device *nvmem, unsigned int offset,
->> +		      size_t bytes, void *buf);
->> +int nvmem_device_write(struct nvmem_device *nvmem, unsigned int offset,
->> +		       size_t bytes, void *buf);
->> +int nvmem_device_cell_read(struct nvmem_device *nvmem,
->> +			   struct nvmem_cell_info *info, void *buf);
->> +int nvmem_device_cell_write(struct nvmem_device *nvmem,
->> +			    struct nvmem_cell_info *info, void *buf);
->> +
->
-> Can we also have devm_nvmem_*_get() APIs please?
-Sure, I will spin it in next version.
->
->> diff --git a/include/linux/nvmem-provider.h b/include/linux/nvmem-provider.h
->> index 4908b37..7a982cd 100644
->> --- a/include/linux/nvmem-provider.h
->> +++ b/include/linux/nvmem-provider.h
->> @@ -12,15 +12,9 @@
->>   #ifndef _LINUX_NVMEM_PROVIDER_H
->>   #define _LINUX_NVMEM_PROVIDER_H
->>
->> -struct nvmem_device;
->> +#include <linux/nvmem-consumer.h>
->>
->> -struct nvmem_cell_info {
->> -	const char		*name;
->> -	int			offset;
->> -	int			bytes;
->> -	int			bit_offset;
->> -	int			nbits;
->> -};
->> +struct nvmem_device;
->
-> Should this diff be part of an earlier patch?
-Possibly, something wrong with this diff, I will fix it.
->
+Also, Atmel has a good track record and their SocS are almost fully
+supported in mainline, you can trust that sama5d2 support is going to
+land there soon.
+
+-- 
+Alexandre Belloni, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
