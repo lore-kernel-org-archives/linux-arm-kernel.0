@@ -1,42 +1,65 @@
 From: heiko@sntech.de (Heiko Stuebner)
-Date: Thu, 18 Jun 2015 16:18:28 +0200
-Subject: [PATCH v2 1/9] clk: rockchip: rk3288: add CLK_SET_RATE_PARENT to
- sclk_mac
+Date: Thu, 18 Jun 2015 16:18:30 +0200
+Subject: [PATCH v2 3/9] clk: rockchip: protect register macros against
+ multipart values
 In-Reply-To: <1434637116-17124-1-git-send-email-heiko@sntech.de>
 References: <1434637116-17124-1-git-send-email-heiko@sntech.de>
-Message-ID: <1434637116-17124-2-git-send-email-heiko@sntech.de>
+Message-ID: <1434637116-17124-4-git-send-email-heiko@sntech.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The dwmac ethernet controller on the rk3288 supports phys connected
-via rgmii and rmii. With rgmii phys it is expected that the mac clock
-is provided externally while with rmii phys the clock can be external
-but also generated from the plls. In the later case it of course needs
-be at 50MHz, which gets set from the dwmac_rk driver.
-As most devices use a rgmii phy it never surfaced so far that the mac
-clk mux, doesn't go up one lever to the pll clock in the rmii case with
-internal clock generation, as it is missing the CLK_SET_RATE_PARENT flag,
-and thus will not set the correct frequency in most cases.
+The macros calculate the correct offset from the id in the parameter.
+If this parameter does not consist of a single number, the calculation
+will return wrong registers in the best case or create unaligned accesses
+in the worst case. So protect the calculations against such values.
 
-Fixes: b9e4ba541607 ("clk: rockchip: add clock controller for rk3288")
-Cc: stable at vger.kernel.org
 Signed-off-by: Heiko Stuebner <heiko@sntech.de>
 ---
- drivers/clk/rockchip/clk-rk3288.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ drivers/clk/rockchip/clk.h | 16 ++++++++--------
+ 1 file changed, 8 insertions(+), 8 deletions(-)
 
-diff --git a/drivers/clk/rockchip/clk-rk3288.c b/drivers/clk/rockchip/clk-rk3288.c
-index 4f817ed..0211162 100644
---- a/drivers/clk/rockchip/clk-rk3288.c
-+++ b/drivers/clk/rockchip/clk-rk3288.c
-@@ -578,7 +578,7 @@ static struct rockchip_clk_branch rk3288_clk_branches[] __initdata = {
- 	COMPOSITE(0, "mac_pll_src", mux_pll_src_npll_cpll_gpll_p, 0,
- 			RK3288_CLKSEL_CON(21), 0, 2, MFLAGS, 8, 5, DFLAGS,
- 			RK3288_CLKGATE_CON(2), 5, GFLAGS),
--	MUX(SCLK_MAC, "mac_clk", mux_mac_p, 0,
-+	MUX(SCLK_MAC, "mac_clk", mux_mac_p, CLK_SET_RATE_PARENT,
- 			RK3288_CLKSEL_CON(21), 4, 1, MFLAGS),
- 	GATE(SCLK_MACREF_OUT, "sclk_macref_out", "mac_clk", 0,
- 			RK3288_CLKGATE_CON(5), 3, GFLAGS),
+diff --git a/drivers/clk/rockchip/clk.h b/drivers/clk/rockchip/clk.h
+index 6b09267..92edb5f 100644
+--- a/drivers/clk/rockchip/clk.h
++++ b/drivers/clk/rockchip/clk.h
+@@ -31,22 +31,22 @@
+ 		((val) << (shift) | (mask) << ((shift) + 16))
+ 
+ /* register positions shared by RK2928, RK3066 and RK3188 */
+-#define RK2928_PLL_CON(x)		(x * 0x4)
++#define RK2928_PLL_CON(x)		((x) * 0x4)
+ #define RK2928_MODE_CON		0x40
+-#define RK2928_CLKSEL_CON(x)	(x * 0x4 + 0x44)
+-#define RK2928_CLKGATE_CON(x)	(x * 0x4 + 0xd0)
++#define RK2928_CLKSEL_CON(x)	((x) * 0x4 + 0x44)
++#define RK2928_CLKGATE_CON(x)	((x) * 0x4 + 0xd0)
+ #define RK2928_GLB_SRST_FST		0x100
+ #define RK2928_GLB_SRST_SND		0x104
+-#define RK2928_SOFTRST_CON(x)	(x * 0x4 + 0x110)
++#define RK2928_SOFTRST_CON(x)	((x) * 0x4 + 0x110)
+ #define RK2928_MISC_CON		0x134
+ 
+ #define RK3288_PLL_CON(x)		RK2928_PLL_CON(x)
+ #define RK3288_MODE_CON			0x50
+-#define RK3288_CLKSEL_CON(x)		(x * 0x4 + 0x60)
+-#define RK3288_CLKGATE_CON(x)		(x * 0x4 + 0x160)
++#define RK3288_CLKSEL_CON(x)		((x) * 0x4 + 0x60)
++#define RK3288_CLKGATE_CON(x)		((x) * 0x4 + 0x160)
+ #define RK3288_GLB_SRST_FST		0x1b0
+ #define RK3288_GLB_SRST_SND		0x1b4
+-#define RK3288_SOFTRST_CON(x)		(x * 0x4 + 0x1b8)
++#define RK3288_SOFTRST_CON(x)		((x) * 0x4 + 0x1b8)
+ #define RK3288_MISC_CON			0x1e8
+ #define RK3288_SDMMC_CON0		0x200
+ #define RK3288_SDMMC_CON1		0x204
+@@ -67,7 +67,7 @@ enum rockchip_pll_type {
+ 	.nr = _nr,				\
+ 	.nf = _nf,				\
+ 	.no = _no,				\
+-	.bwadj = (_nf >> 1),			\
++	.bwadj = ((_nf) >> 1),			\
+ }
+ 
+ #define RK3066_PLL_RATE_BWADJ(_rate, _nr, _nf, _no, _bw)	\
 -- 
 2.1.4
