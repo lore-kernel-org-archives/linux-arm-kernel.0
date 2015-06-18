@@ -1,68 +1,200 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Thu, 18 Jun 2015 07:50:06 +0200
-Subject: [PATCH 6/8] ARM: dts: imx: add imx6ul and imx6ul evk board support
-In-Reply-To: <1434555569-8237-7-git-send-email-Frank.Li@freescale.com>
-References: <1434555569-8237-1-git-send-email-Frank.Li@freescale.com>
- <1434555569-8237-7-git-send-email-Frank.Li@freescale.com>
-Message-ID: <20150618055006.GR6325@pengutronix.de>
+From: shengjiu.wang@freescale.com (Shengjiu Wang)
+Date: Thu, 18 Jun 2015 13:58:44 +0800
+Subject: [PATCH] ARM: dts: imx6qdl-sabreauto: Add audio support
+Message-ID: <1434607124-29870-1-git-send-email-shengjiu.wang@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 17, 2015 at 11:39:27PM +0800, Frank.Li at freescale.com wrote:
-> From: Frank Li <Frank.Li@freescale.com>
-> 
-> +&uart1 {
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&pinctrl_uart1>;
-> +	status = "okay";
-> +};
-> +
-> +&uart2 {
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&pinctrl_uart2>;
-> +	fsl,uart-has-rtscts;
-> +	/* for DTE mode, add below change */
-> +	/* fsl,dte-mode; */
-> +	/* pinctrl-0 = <&pinctrl_uart2dte>; */
-> +	status = "okay";
-> +};
-> +
-> +&usdhc1 {
-> +	pinctrl-names = "default", "state_100mhz", "state_200mhz";
-> +	pinctrl-0 = <&pinctrl_usdhc1>;
-> +	pinctrl-1 = <&pinctrl_usdhc1_100mhz>;
-> +	pinctrl-2 = <&pinctrl_usdhc1_200mhz>;
-> +	cd-gpios = <&gpio1 19 0>;
+Add ESAI, ASRC, CS42888 for imx6qdl-sabreauto board
 
-Use the correct polarity here. This is probably GPIO_ACTIVE_LOW.
+Signed-off-by: Shengjiu Wang <shengjiu.wang@freescale.com>
+---
+ arch/arm/boot/dts/imx6qdl-sabreauto.dtsi |   91 ++++++++++++++++++++++++++++++
+ arch/arm/boot/dts/imx6qdl.dtsi           |   31 ++++++++++
+ 2 files changed, 122 insertions(+)
 
-> +	keep-power-in-suspend;
-> +	enable-sdio-wakeup;
-> +	vmmc-supply = <&reg_sd1_vmmc>;
-> +	status = "okay";
-> +};
-> +
-> +&usdhc2 {
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&pinctrl_usdhc2>;
-> +	no-1-8-v;
-> +	keep-power-in-suspend;
-> +	enable-sdio-wakeup;
-> +	status = "okay";
-> +};
-> +
-> +&iomuxc {
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&pinctrl_hog_1>;
-> +	imx6ul-evk {
-
-You can put the pinctrl nodes directly under the iomux node since:
-5fcdf6a pinctrl: imx: Allow parsing DT without function nodes
-
-Sascha
-
+diff --git a/arch/arm/boot/dts/imx6qdl-sabreauto.dtsi b/arch/arm/boot/dts/imx6qdl-sabreauto.dtsi
+index 3b24b126..4f4ca2a 100644
+--- a/arch/arm/boot/dts/imx6qdl-sabreauto.dtsi
++++ b/arch/arm/boot/dts/imx6qdl-sabreauto.dtsi
+@@ -28,6 +28,51 @@
+ 		};
+ 	};
+ 
++	clocks {
++		codec_osc: anaclk2 {
++			compatible = "fixed-clock";
++			#clock-cells = <0>;
++			clock-frequency = <24576000>;
++		};
++	};
++
++	regulators {
++		compatible = "simple-bus";
++		#address-cells = <1>;
++		#size-cells = <0>;
++
++		reg_audio: regulator at 0 {
++			compatible = "regulator-fixed";
++			reg = <0>;
++			regulator-name = "cs42888_supply";
++			regulator-min-microvolt = <3300000>;
++			regulator-max-microvolt = <3300000>;
++			regulator-always-on;
++		};
++	};
++
++	sound-cs42888 {
++		compatible = "fsl,imx6-sabreauto-cs42888",
++			"fsl,imx-audio-cs42888";
++		model = "imx-cs42888";
++		audio-cpu = <&esai>;
++		audio-asrc = <&asrc>;
++		audio-codec = <&codec>;
++		audio-routing =
++			"Line Out Jack", "AOUT1L",
++			"Line Out Jack", "AOUT1R",
++			"Line Out Jack", "AOUT2L",
++			"Line Out Jack", "AOUT2R",
++			"Line Out Jack", "AOUT3L",
++			"Line Out Jack", "AOUT3R",
++			"Line Out Jack", "AOUT4L",
++			"Line Out Jack", "AOUT4R",
++			"AIN1L", "Line In Jack",
++			"AIN1R", "Line In Jack",
++			"AIN2L", "Line In Jack",
++			"AIN2R", "Line In Jack";
++	};
++
+ 	sound-spdif {
+ 		compatible = "fsl,imx-audio-spdif",
+ 			   "fsl,imx-sabreauto-spdif";
+@@ -45,6 +90,15 @@
+ 	};
+ };
+ 
++&clks {
++	assigned-clocks = <&clks IMX6QDL_PLL4_BYPASS_SRC>,
++			  <&clks IMX6QDL_PLL4_BYPASS>,
++			  <&clks IMX6QDL_CLK_PLL4_POST_DIV>;
++	assigned-clock-parents = <&clks IMX6QDL_CLK_LVDS2_IN>,
++				<&clks IMX6QDL_PLL4_BYPASS_SRC>;
++	assigned-clock-rates = <0>, <0>, <24576000>;
++};
++
+ &ecspi1 {
+ 	fsl,spi-num-chipselects = <1>;
+ 	cs-gpios = <&gpio3 19 0>;
+@@ -61,6 +115,16 @@
+ 	};
+ };
+ 
++&esai {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_esai>;
++	assigned-clocks = <&clks IMX6QDL_CLK_ESAI_SEL>,
++			  <&clks IMX6QDL_CLK_ESAI_EXTAL>;
++	assigned-clock-parents = <&clks IMX6QDL_CLK_PLL4_AUDIO_DIV>;
++	assigned-clock-rates = <0>, <24576000>;
++	status = "okay";
++};
++
+ &fec {
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&pinctrl_enet>;
+@@ -180,6 +244,18 @@
+ 			};
+ 		};
+ 	};
++
++	codec: cs42888 at 48 {
++		compatible = "cirrus,cs42888";
++		reg = <0x48>;
++		clocks = <&codec_osc>;
++		clock-names = "mclk";
++		VA-supply = <&reg_audio>;
++		VD-supply = <&reg_audio>;
++		VLS-supply = <&reg_audio>;
++		VLC-supply = <&reg_audio>;
++        };
++
+ };
+ 
+ &i2c3 {
+@@ -257,6 +333,21 @@
+ 			>;
+ 		};
+ 
++		pinctrl_esai: esaigrp {
++			fsl,pins = <
++				MX6QDL_PAD_ENET_CRS_DV__ESAI_TX_CLK 0x1b030
++				MX6QDL_PAD_ENET_RXD1__ESAI_TX_FS    0x1b030
++				MX6QDL_PAD_ENET_TX_EN__ESAI_TX3_RX2 0x1b030
++				MX6QDL_PAD_GPIO_5__ESAI_TX2_RX3     0x1b030
++				MX6QDL_PAD_ENET_TXD0__ESAI_TX4_RX1  0x1b030
++				MX6QDL_PAD_ENET_MDC__ESAI_TX5_RX0   0x1b030
++				MX6QDL_PAD_GPIO_17__ESAI_TX0        0x1b030
++				MX6QDL_PAD_NANDF_CS3__ESAI_TX1      0x1b030
++				MX6QDL_PAD_ENET_MDIO__ESAI_RX_CLK   0x1b030
++				MX6QDL_PAD_GPIO_9__ESAI_RX_FS       0x1b030
++			>;
++		};
++
+ 		pinctrl_gpio_leds: gpioledsgrp {
+ 			fsl,pins = <
+ 				MX6QDL_PAD_DISP0_DAT21__GPIO5_IO15	0x80000000
+diff --git a/arch/arm/boot/dts/imx6qdl.dtsi b/arch/arm/boot/dts/imx6qdl.dtsi
+index e6d1359..ceba982 100644
+--- a/arch/arm/boot/dts/imx6qdl.dtsi
++++ b/arch/arm/boot/dts/imx6qdl.dtsi
+@@ -300,8 +300,19 @@
+ 				};
+ 
+ 				esai: esai@02024000 {
++					#sound-dai-cells = <0>;
++					compatible = "fsl,imx35-esai";
+ 					reg = <0x02024000 0x4000>;
+ 					interrupts = <0 51 IRQ_TYPE_LEVEL_HIGH>;
++					clocks = <&clks IMX6QDL_CLK_ESAI_IPG>,
++						 <&clks IMX6QDL_CLK_ESAI_MEM>,
++						 <&clks IMX6QDL_CLK_ESAI_EXTAL>,
++						 <&clks IMX6QDL_CLK_ESAI_IPG>,
++						 <&clks IMX6QDL_CLK_SPBA>;
++					clock-names = "core", "mem", "extal", "fsys", "dma";
++					dmas = <&sdma 23 21 0>, <&sdma 24 21 0>;
++					dma-names = "rx", "tx";
++					status = "disabled";
+ 				};
+ 
+ 				ssi1: ssi at 02028000 {
+@@ -353,8 +364,28 @@
+ 				};
+ 
+ 				asrc: asrc at 02034000 {
++					compatible = "fsl,imx53-asrc";
+ 					reg = <0x02034000 0x4000>;
+ 					interrupts = <0 50 IRQ_TYPE_LEVEL_HIGH>;
++					clocks = <&clks IMX6QDL_CLK_ASRC_IPG>,
++						<&clks IMX6QDL_CLK_ASRC_MEM>, <&clks 0>,
++						<&clks 0>, <&clks 0>, <&clks 0>, <&clks 0>,
++						<&clks 0>, <&clks 0>, <&clks 0>, <&clks 0>,
++						<&clks 0>, <&clks 0>, <&clks 0>, <&clks 0>,
++						<&clks IMX6QDL_CLK_ASRC>, <&clks 0>, <&clks 0>,
++						<&clks IMX6QDL_CLK_SPBA>;
++					clock-names = "mem", "ipg", "asrck_0",
++						"asrck_1", "asrck_2", "asrck_3", "asrck_4",
++						"asrck_5", "asrck_6", "asrck_7", "asrck_8",
++						"asrck_9", "asrck_a", "asrck_b", "asrck_c",
++						"asrck_d", "asrck_e", "asrck_f", "dma";
++					dmas = <&sdma 17 23 1>, <&sdma 18 23 1>, <&sdma 19 23 1>,
++						<&sdma 20 23 1>, <&sdma 21 23 1>, <&sdma 22 23 1>;
++					dma-names = "rxa", "rxb", "rxc",
++							"txa", "txb", "txc";
++					fsl,asrc-rate  = <48000>;
++					fsl,asrc-width = <16>;
++					status = "okay";
+ 				};
+ 
+ 				spba at 0203c000 {
 -- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+1.7.9.5
