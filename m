@@ -1,49 +1,121 @@
-From: al.stone@linaro.org (Al Stone)
-Date: Thu, 18 Jun 2015 16:36:08 -0600
-Subject: [PATCH v2 3/3] ACPI / ARM64 : use the new BAD_MADT_GICC_ENTRY macro
-In-Reply-To: <1434666968-1543-1-git-send-email-al.stone@linaro.org>
-References: <1434666968-1543-1-git-send-email-al.stone@linaro.org>
-Message-ID: <1434666968-1543-4-git-send-email-al.stone@linaro.org>
+From: mturquette@linaro.org (Michael Turquette)
+Date: Thu, 18 Jun 2015 15:37:28 -0700
+Subject: [PATCH 1/2] clk: keystone: add support for post divider register
+ for main pll
+In-Reply-To: <1432915453-409-1-git-send-email-m-karicheri2@ti.com>
+References: <1432915453-409-1-git-send-email-m-karicheri2@ti.com>
+Message-ID: <20150618223728.9112.75331@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-For those parts of the arm64 ACPI code that need to check GICC subtables
-in the MADT, use the new BAD_MADT_GICC_ENTRY macro instead of the previous
-BAD_MADT_ENTRY.  The new macro takes into account differences in the size
-of the GICC subtable that the old macro did not; this caused failures even
-though the subtable entries are valid.
+Quoting Murali Karicheri (2015-05-29 09:04:12)
+> Main PLL controller has post divider bits in a separate register in
+> pll controller. Use the value from this register instead of fixed
+> divider when available.
+> 
+> Signed-off-by: Murali Karicheri <m-karicheri2@ti.com>
 
-Signed-off-by: Al Stone <al.stone@linaro.org>
----
- arch/arm64/kernel/smp.c   | 2 +-
- drivers/irqchip/irq-gic.c | 2 +-
- 2 files changed, 2 insertions(+), 2 deletions(-)
+Applied to clk-next.
 
-diff --git a/arch/arm64/kernel/smp.c b/arch/arm64/kernel/smp.c
-index 4b2121b..80d5984 100644
---- a/arch/arm64/kernel/smp.c
-+++ b/arch/arm64/kernel/smp.c
-@@ -438,7 +438,7 @@ acpi_parse_gic_cpu_interface(struct acpi_subtable_header *header,
- 	struct acpi_madt_generic_interrupt *processor;
- 
- 	processor = (struct acpi_madt_generic_interrupt *)header;
--	if (BAD_MADT_ENTRY(processor, end))
-+	if (BAD_MADT_GICC_ENTRY(processor, end))
- 		return -EINVAL;
- 
- 	acpi_table_print_madt_entry(header);
-diff --git a/drivers/irqchip/irq-gic.c b/drivers/irqchip/irq-gic.c
-index 8d7e1c8..4dd8826 100644
---- a/drivers/irqchip/irq-gic.c
-+++ b/drivers/irqchip/irq-gic.c
-@@ -1055,7 +1055,7 @@ gic_acpi_parse_madt_cpu(struct acpi_subtable_header *header,
- 
- 	processor = (struct acpi_madt_generic_interrupt *)header;
- 
--	if (BAD_MADT_ENTRY(processor, end))
-+	if (BAD_MADT_GICC_ENTRY(processor, end))
- 		return -EINVAL;
- 
- 	/*
--- 
-2.4.0
+Regards,
+Mike
+
+> ---
+>  .../devicetree/bindings/clock/keystone-pll.txt       |  8 ++++----
+>  drivers/clk/keystone/pll.c                           | 20 ++++++++++++++++++--
+>  2 files changed, 22 insertions(+), 6 deletions(-)
+> 
+> diff --git a/Documentation/devicetree/bindings/clock/keystone-pll.txt b/Documentation/devicetree/bindings/clock/keystone-pll.txt
+> index 225990f..47570d2 100644
+> --- a/Documentation/devicetree/bindings/clock/keystone-pll.txt
+> +++ b/Documentation/devicetree/bindings/clock/keystone-pll.txt
+> @@ -15,8 +15,8 @@ Required properties:
+>  - compatible : shall be "ti,keystone,main-pll-clock" or "ti,keystone,pll-clock"
+>  - clocks : parent clock phandle
+>  - reg - pll control0 and pll multipler registers
+> -- reg-names : control and multiplier. The multiplier is applicable only for
+> -               main pll clock
+> +- reg-names : control, multiplier and post-divider. The multiplier and
+> +               post-divider registers are applicable only for main pll clock
+>  - fixed-postdiv : fixed post divider value. If absent, use clkod register bits
+>                 for postdiv
+>  
+> @@ -25,8 +25,8 @@ Example:
+>                 #clock-cells = <0>;
+>                 compatible = "ti,keystone,main-pll-clock";
+>                 clocks = <&refclksys>;
+> -               reg = <0x02620350 4>, <0x02310110 4>;
+> -               reg-names = "control", "multiplier";
+> +               reg = <0x02620350 4>, <0x02310110 4>, <0x02310108 4>;
+> +               reg-names = "control", "multiplier", "post-divider";
+>                 fixed-postdiv = <2>;
+>         };
+>  
+> diff --git a/drivers/clk/keystone/pll.c b/drivers/clk/keystone/pll.c
+> index 0dd8a4b..4a375ea 100644
+> --- a/drivers/clk/keystone/pll.c
+> +++ b/drivers/clk/keystone/pll.c
+> @@ -37,7 +37,8 @@
+>   *     Main PLL or any other PLLs in the device such as ARM PLL, DDR PLL
+>   *     or PA PLL available on keystone2. These PLLs are controlled by
+>   *     this register. Main PLL is controlled by a PLL controller.
+> - * @pllm: PLL register map address
+> + * @pllm: PLL register map address for multiplier bits
+> + * @pllod: PLL register map address for post divider bits
+>   * @pll_ctl0: PLL controller map address
+>   * @pllm_lower_mask: multiplier lower mask
+>   * @pllm_upper_mask: multiplier upper mask
+> @@ -53,6 +54,7 @@ struct clk_pll_data {
+>         u32 phy_pllm;
+>         u32 phy_pll_ctl0;
+>         void __iomem *pllm;
+> +       void __iomem *pllod;
+>         void __iomem *pll_ctl0;
+>         u32 pllm_lower_mask;
+>         u32 pllm_upper_mask;
+> @@ -102,7 +104,11 @@ static unsigned long clk_pllclk_recalc(struct clk_hw *hw,
+>                 /* read post divider from od bits*/
+>                 postdiv = ((val & pll_data->clkod_mask) >>
+>                                  pll_data->clkod_shift) + 1;
+> -       else
+> +       else if (pll_data->pllod) {
+> +               postdiv = readl(pll_data->pllod);
+> +               postdiv = ((postdiv & pll_data->clkod_mask) >>
+> +                               pll_data->clkod_shift) + 1;
+> +       } else
+>                 postdiv = pll_data->postdiv;
+>  
+>         rate /= (prediv + 1);
+> @@ -172,12 +178,21 @@ static void __init _of_pll_clk_init(struct device_node *node, bool pllctrl)
+>                 /* assume the PLL has output divider register bits */
+>                 pll_data->clkod_mask = CLKOD_MASK;
+>                 pll_data->clkod_shift = CLKOD_SHIFT;
+> +
+> +               /*
+> +                * Check if there is an post-divider register. If not
+> +                * assume od bits are part of control register.
+> +                */
+> +               i = of_property_match_string(node, "reg-names",
+> +                                            "post-divider");
+> +               pll_data->pllod = of_iomap(node, i);
+>         }
+>  
+>         i = of_property_match_string(node, "reg-names", "control");
+>         pll_data->pll_ctl0 = of_iomap(node, i);
+>         if (!pll_data->pll_ctl0) {
+>                 pr_err("%s: ioremap failed\n", __func__);
+> +               iounmap(pll_data->pllod);
+>                 goto out;
+>         }
+>  
+> @@ -193,6 +208,7 @@ static void __init _of_pll_clk_init(struct device_node *node, bool pllctrl)
+>                 pll_data->pllm = of_iomap(node, i);
+>                 if (!pll_data->pllm) {
+>                         iounmap(pll_data->pll_ctl0);
+> +                       iounmap(pll_data->pllod);
+>                         goto out;
+>                 }
+>         }
+> -- 
+> 1.9.1
+> 
