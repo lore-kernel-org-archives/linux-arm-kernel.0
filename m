@@ -1,154 +1,27 @@
-From: bhelgaas@google.com (Bjorn Helgaas)
-Date: Thu, 18 Jun 2015 11:59:54 -0500
-Subject: [PATCH 10/15] PCI: kill off set_irq_flags usage
-In-Reply-To: <1433874401-27161-11-git-send-email-robh@kernel.org>
-References: <1433874401-27161-1-git-send-email-robh@kernel.org>
- <1433874401-27161-11-git-send-email-robh@kernel.org>
-Message-ID: <20150618165954.GE7710@google.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Thu, 18 Jun 2015 18:04:14 +0100
+Subject: [PATCH v2 1/2] arm64: KVM: Optimize arm64 fp/simd save/restore
+In-Reply-To: <1434491452-19177-2-git-send-email-m.smarduch@samsung.com>
+References: <1434491452-19177-1-git-send-email-m.smarduch@samsung.com>
+ <1434491452-19177-2-git-send-email-m.smarduch@samsung.com>
+Message-ID: <5582FA0E.6030409@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 09, 2015 at 01:26:36PM -0500, Rob Herring wrote:
-> set_irq_flags is ARM specific with custom flags which have genirq
-> equivalents. Convert drivers to use the genirq interfaces directly, so we
-> can kill off set_irq_flags. The translation of flags is as follows:
+On 16/06/15 22:50, Mario Smarduch wrote:
+> This patch only saves and restores FP/SIMD registers on Guest access. To do
+> this cptr_el2 FP/SIMD trap is set on Guest entry and later checked on exit.
+> lmbench, hackbench show significant improvements, for 30-50% exits FP/SIMD
+> context is not saved/restored
 > 
-> IRQF_VALID -> !IRQ_NOREQUEST
-> IRQF_PROBE -> !IRQ_NOPROBE
-> IRQF_NOAUTOEN -> IRQ_NOAUTOEN
-> 
-> For IRQs managed by an irqdomain, the irqdomain core code handles clearing
-> and setting IRQ_NOREQUEST already, so there is no need to do this in
-> .map() functions and we can simply remove the set_irq_flags calls. Some
-> users also set IRQ_NOPROBE and this has been maintained although it is not
-> clear that is really needed. There appears to be a great deal of blind
-> copy and paste of this code.
-> 
-> Signed-off-by: Rob Herring <robh@kernel.org>
-> Cc: Kishon Vijay Abraham I <kishon@ti.com>
-> Cc: Bjorn Helgaas <bhelgaas@google.com>
-> Cc: Murali Karicheri <m-karicheri2@ti.com>
-> Cc: Thierry Reding <thierry.reding@gmail.com>
-> Cc: Stephen Warren <swarren@wwwdotorg.org>
-> Cc: Alexandre Courbot <gnurou@gmail.com>
-> Cc: Jingoo Han <jingoohan1@gmail.com>
-> Cc: Pratyush Anand <pratyush.anand@gmail.com>
-> Cc: Simon Horman <horms@verge.net.au>
-> Cc: Michal Simek <michal.simek@xilinx.com>
-> Cc: "S?ren Brinkmann" <soren.brinkmann@xilinx.com>
-> Cc: linux-omap at vger.kernel.org
-> Cc: linux-pci at vger.kernel.org
-> Cc: linux-arm-kernel at lists.infradead.org
-> Cc: linux-tegra at vger.kernel.org
-> Cc: linux-sh at vger.kernel.org
+> Signed-off-by: Mario Smarduch <m.smarduch@samsung.com>
 
-This is the only part of the series on linux-pci, so I assume this will be
-merged by somebody else along with the rest.
+Looks nice and clean.
 
-Acked-by: Bjorn Helgaas <bhelgaas@google.com>
+Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
 
-> ---
->  drivers/pci/host/pci-dra7xx.c      | 1 -
->  drivers/pci/host/pci-keystone-dw.c | 2 --
->  drivers/pci/host/pci-tegra.c       | 1 -
->  drivers/pci/host/pcie-designware.c | 1 -
->  drivers/pci/host/pcie-rcar.c       | 1 -
->  drivers/pci/host/pcie-xilinx.c     | 2 --
->  6 files changed, 8 deletions(-)
-> 
-> diff --git a/drivers/pci/host/pci-dra7xx.c b/drivers/pci/host/pci-dra7xx.c
-> index 2d57e19..94cbc4d 100644
-> --- a/drivers/pci/host/pci-dra7xx.c
-> +++ b/drivers/pci/host/pci-dra7xx.c
-> @@ -160,7 +160,6 @@ static int dra7xx_pcie_intx_map(struct irq_domain *domain, unsigned int irq,
->  {
->  	irq_set_chip_and_handler(irq, &dummy_irq_chip, handle_simple_irq);
->  	irq_set_chip_data(irq, domain->host_data);
-> -	set_irq_flags(irq, IRQF_VALID);
->  
->  	return 0;
->  }
-> diff --git a/drivers/pci/host/pci-keystone-dw.c b/drivers/pci/host/pci-keystone-dw.c
-> index f34892e..f1d0749 100644
-> --- a/drivers/pci/host/pci-keystone-dw.c
-> +++ b/drivers/pci/host/pci-keystone-dw.c
-> @@ -196,7 +196,6 @@ static int ks_dw_pcie_msi_map(struct irq_domain *domain, unsigned int irq,
->  	irq_set_chip_and_handler(irq, &ks_dw_pcie_msi_irq_chip,
->  				 handle_level_irq);
->  	irq_set_chip_data(irq, domain->host_data);
-> -	set_irq_flags(irq, IRQF_VALID);
->  
->  	return 0;
->  }
-> @@ -277,7 +276,6 @@ static int ks_dw_pcie_init_legacy_irq_map(struct irq_domain *d,
->  	irq_set_chip_and_handler(irq, &ks_dw_pcie_legacy_irq_chip,
->  				 handle_level_irq);
->  	irq_set_chip_data(irq, d->host_data);
-> -	set_irq_flags(irq, IRQF_VALID);
->  
->  	return 0;
->  }
-> diff --git a/drivers/pci/host/pci-tegra.c b/drivers/pci/host/pci-tegra.c
-> index 00e9272..36bd700 100644
-> --- a/drivers/pci/host/pci-tegra.c
-> +++ b/drivers/pci/host/pci-tegra.c
-> @@ -1263,7 +1263,6 @@ static int tegra_msi_map(struct irq_domain *domain, unsigned int irq,
->  {
->  	irq_set_chip_and_handler(irq, &tegra_msi_irq_chip, handle_simple_irq);
->  	irq_set_chip_data(irq, domain->host_data);
-> -	set_irq_flags(irq, IRQF_VALID);
->  
->  	tegra_cpuidle_pcie_irqs_in_use();
->  
-> diff --git a/drivers/pci/host/pcie-designware.c b/drivers/pci/host/pcie-designware.c
-> index 2e9f84f..5caa94d 100644
-> --- a/drivers/pci/host/pcie-designware.c
-> +++ b/drivers/pci/host/pcie-designware.c
-> @@ -333,7 +333,6 @@ static int dw_pcie_msi_map(struct irq_domain *domain, unsigned int irq,
->  {
->  	irq_set_chip_and_handler(irq, &dw_msi_irq_chip, handle_simple_irq);
->  	irq_set_chip_data(irq, domain->host_data);
-> -	set_irq_flags(irq, IRQF_VALID);
->  
->  	return 0;
->  }
-> diff --git a/drivers/pci/host/pcie-rcar.c b/drivers/pci/host/pcie-rcar.c
-> index c086210..7678fe0 100644
-> --- a/drivers/pci/host/pcie-rcar.c
-> +++ b/drivers/pci/host/pcie-rcar.c
-> @@ -664,7 +664,6 @@ static int rcar_msi_map(struct irq_domain *domain, unsigned int irq,
->  {
->  	irq_set_chip_and_handler(irq, &rcar_msi_irq_chip, handle_simple_irq);
->  	irq_set_chip_data(irq, domain->host_data);
-> -	set_irq_flags(irq, IRQF_VALID);
->  
->  	return 0;
->  }
-> diff --git a/drivers/pci/host/pcie-xilinx.c b/drivers/pci/host/pcie-xilinx.c
-> index f1a06a0..72015119 100644
-> --- a/drivers/pci/host/pcie-xilinx.c
-> +++ b/drivers/pci/host/pcie-xilinx.c
-> @@ -338,7 +338,6 @@ static int xilinx_pcie_msi_map(struct irq_domain *domain, unsigned int irq,
->  {
->  	irq_set_chip_and_handler(irq, &xilinx_msi_irq_chip, handle_simple_irq);
->  	irq_set_chip_data(irq, domain->host_data);
-> -	set_irq_flags(irq, IRQF_VALID);
->  
->  	return 0;
->  }
-> @@ -377,7 +376,6 @@ static int xilinx_pcie_intx_map(struct irq_domain *domain, unsigned int irq,
->  {
->  	irq_set_chip_and_handler(irq, &dummy_irq_chip, handle_simple_irq);
->  	irq_set_chip_data(irq, domain->host_data);
-> -	set_irq_flags(irq, IRQF_VALID);
->  
->  	return 0;
->  }
-> -- 
-> 2.1.0
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> Please read the FAQ at  http://www.tux.org/lkml/
+Thanks,
+
+	M.
+-- 
+Jazz is not dead. It just smells funny...
