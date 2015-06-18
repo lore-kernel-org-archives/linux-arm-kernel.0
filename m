@@ -1,35 +1,38 @@
-From: pebolle@tiscali.nl (Paul Bolle)
-Date: Thu, 18 Jun 2015 09:54:50 +0200
-Subject: [PATCH] clk: at91: add generated clock driver
-In-Reply-To: <55827606.7020908@atmel.com>
-References: <1434547409-12232-1-git-send-email-nicolas.ferre@atmel.com>
- <1434611556.2385.8.camel@x220> <20150618093344.7d486e97@bbrezillon>
- <55827606.7020908@atmel.com>
-Message-ID: <1434614090.2385.19.camel@x220>
+From: mark.yao@rock-chips.com (Mark Yao)
+Date: Thu, 18 Jun 2015 15:55:20 +0800
+Subject: [PATCH 6/6] drm/rockchip: vop: default enable win2/3 area0 bit
+In-Reply-To: <1434613770-6608-1-git-send-email-mark.yao@rock-chips.com>
+References: <1434613770-6608-1-git-send-email-mark.yao@rock-chips.com>
+Message-ID: <1434614120-6772-1-git-send-email-mark.yao@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Nicolas,
+Win2/3 support 4 area display, but now havn't found a suitable
+way to use it, and it enable by win gate and area gate,
+so default enable area0 gate, so that its behaviour just like a
+win.
 
-On Thu, 2015-06-18 at 09:40 +0200, Nicolas Ferre wrote:
-> I am in the process, with my colleagues, of building bricks for our
-> upcoming SoC the sama5d2. So, the basic support for this chip will come
-> in the next weeks and will select this Kconfig option.
+Signed-off-by: Mark Yao <mark.yao@rock-chips.com>
+---
+ drivers/gpu/drm/rockchip/rockchip_drm_vop.c |    6 ++++++
+ 1 file changed, 6 insertions(+)
 
-Perhaps that could be added, say below the --- marker in the patch.
-Maybe I missed something to that effect. Anyhow, I didn't spot in the
-patch that this was done deliberately. It had all the looks of a silly
-mistake.
-
-> I'd like though that this matter of fact doesn't block this piece of
-> code from being reviewed or even better merged in order to ease this new
-> SoC landing...
-
-The other side of that is that the sama5d2 might never make it, or take
-very long to make it, into mainline. And this would then end up being
-yet another chunk of code adding no value to mainline.
-
-Thanks,
-
-
-Paul Bolle
+diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_vop.c b/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
+index ceac71f..1b70783 100644
+--- a/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
++++ b/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
+@@ -337,6 +337,12 @@ static const struct vop_reg_data vop_init_reg_table[] = {
+ 	{DSP_CTRL0, 0x00000000},
+ 	{WIN0_CTRL0, 0x00000080},
+ 	{WIN1_CTRL0, 0x00000080},
++	/*
++	 * Todo: win2/3 support area func, but now havn't found a suitable
++	 * way to use it, so default enable area0 as a win display.
++	 */
++	{WIN2_CTRL0, 0x00000010},
++	{WIN3_CTRL0, 0x00000010},
+ };
+ 
+ /*
+-- 
+1.7.9.5
