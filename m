@@ -1,37 +1,62 @@
 From: panand@redhat.com (Pratyush Anand)
-Date: Thu, 18 Jun 2015 09:28:51 +0530
-Subject: [RFC PATCH V2 04/10] arm64: Add helper for link pointer
+Date: Thu, 18 Jun 2015 09:28:54 +0530
+Subject: [RFC PATCH V2 07/10] arm64: Handle TRAP_BRKPT for user mode as well
 In-Reply-To: <cover.1434598237.git.panand@redhat.com>
 References: <cover.1434598237.git.panand@redhat.com>
-Message-ID: <9b12762abf045a08c930f71537edf1affcca0c5c.1434598237.git.panand@redhat.com>
+Message-ID: <89bd3896c313cc803b108da3328b38e55d813a33.1434598237.git.panand@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-At many a place we program procedure link pointer ie regs[30]. So adding
-helper to do that.
+uprobe is registered at break_hook with a unique ESR code. So, when a
+TRAP_BRKPT occurs, call_break_hook checks if it was for uprobe. If not,
+then send a SIGTRAP to user.
 
 Signed-off-by: Pratyush Anand <panand@redhat.com>
 ---
- arch/arm64/include/asm/ptrace.h | 7 +++++++
- 1 file changed, 7 insertions(+)
+ arch/arm64/kernel/debug-monitors.c | 23 +++++++++++++----------
+ 1 file changed, 13 insertions(+), 10 deletions(-)
 
-diff --git a/arch/arm64/include/asm/ptrace.h b/arch/arm64/include/asm/ptrace.h
-index 3ea7f5a04bfc..fa2c122e5bd6 100644
---- a/arch/arm64/include/asm/ptrace.h
-+++ b/arch/arm64/include/asm/ptrace.h
-@@ -227,6 +227,13 @@ static inline int valid_user_regs(struct user_pt_regs *regs)
- #include <asm-generic/ptrace.h>
- 
- #define stack_pointer(regs)		((regs)->sp)
-+#define procedure_link_pointer(regs)	((regs)->regs[30])
+diff --git a/arch/arm64/kernel/debug-monitors.c b/arch/arm64/kernel/debug-monitors.c
+index 7eb13dcf09fa..1fe912e77f62 100644
+--- a/arch/arm64/kernel/debug-monitors.c
++++ b/arch/arm64/kernel/debug-monitors.c
+@@ -311,8 +311,18 @@ static int brk_handler(unsigned long addr, unsigned int esr,
+ 		       struct pt_regs *regs)
+ {
+ 	siginfo_t info;
++	bool handler_found = false;
 +
-+static inline void procedure_link_pointer_set(struct pt_regs *regs,
-+					   unsigned long val)
-+{
-+	procedure_link_pointer(regs) = val;
-+}
++#ifdef	CONFIG_KPROBES
++	if ((esr & BRK64_ESR_MASK) == BRK64_ESR_KPROBES) {
++		if (kprobe_breakpoint_handler(regs, esr) == DBG_HOOK_HANDLED)
++			handler_found = true;
++	}
++#endif
++	if (!handler_found && call_break_hook(regs, esr) == DBG_HOOK_HANDLED)
++		handler_found = true;
  
- #ifdef CONFIG_SMP
- #undef profile_pc
+-	if (user_mode(regs)) {
++	if (!handler_found && user_mode(regs)) {
+ 		info = (siginfo_t) {
+ 			.si_signo = SIGTRAP,
+ 			.si_errno = 0,
+@@ -321,15 +331,8 @@ static int brk_handler(unsigned long addr, unsigned int esr,
+ 		};
+ 
+ 		force_sig_info(SIGTRAP, &info, current);
+-	}
+-#ifdef	CONFIG_KPROBES
+-	else if ((esr & BRK64_ESR_MASK) == BRK64_ESR_KPROBES) {
+-		if (kprobe_breakpoint_handler(regs, esr) != DBG_HOOK_HANDLED)
+-			return -EFAULT;
+-	}
+-#endif
+-	else if (call_break_hook(regs, esr) != DBG_HOOK_HANDLED) {
+-		pr_warn("Unexpected kernel BRK exception at EL1\n");
++	} else if (!handler_found) {
++		pr_warning("Unexpected kernel BRK exception at EL1\n");
+ 		return -EFAULT;
+ 	}
+ 
 -- 
 2.1.0
