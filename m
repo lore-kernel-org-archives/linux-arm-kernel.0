@@ -1,113 +1,47 @@
-From: srinivas.kandagatla@linaro.org (Srinivas Kandagatla)
-Date: Thu, 18 Jun 2015 14:22:27 +0100
-Subject: [PATCH v5 08/11] nvmem: qfprom: Add Qualcomm QFPROM support.
-In-Reply-To: <5580AA9B.7040001@codeaurora.org>
-References: <1432226535-8640-1-git-send-email-srinivas.kandagatla@linaro.org>
- <1432226675-9039-1-git-send-email-srinivas.kandagatla@linaro.org>
- <5580AA9B.7040001@codeaurora.org>
-Message-ID: <5582C613.2090201@linaro.org>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Thu, 18 Jun 2015 15:28:55 +0200
+Subject: [PATCH] clk: at91: add generated clock driver
+In-Reply-To: <20150618125918.GC27492@piout.net>
+References: <1434547409-12232-1-git-send-email-nicolas.ferre@atmel.com>
+ <1434611556.2385.8.camel@x220> <20150618093344.7d486e97@bbrezillon>
+ <55827606.7020908@atmel.com> <1434614090.2385.19.camel@x220>
+ <20150618125918.GC27492@piout.net>
+Message-ID: <5582C797.80203@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On 17/06/15 00:00, Stephen Boyd wrote:
-> On 05/21/2015 09:44 AM, Srinivas Kandagatla wrote:
->> diff --git a/drivers/nvmem/Kconfig b/drivers/nvmem/Kconfig
->> index f157b6d..e665e23 100644
->> --- a/drivers/nvmem/Kconfig
->> +++ b/drivers/nvmem/Kconfig
->> @@ -8,3 +8,18 @@ menuconfig NVMEM
->>   	  from both the Linux Kernel and the userspace.
+Le 18/06/2015 14:59, Alexandre Belloni a ?crit :
+> On 18/06/2015 at 09:54:50 +0200, Paul Bolle wrote :
+>>> I'd like though that this matter of fact doesn't block this piece of
+>>> code from being reviewed or even better merged in order to ease this new
+>>> SoC landing...
 >>
->>   	  If unsure, say no.
->> +
->> +if NVMEM
->> +
->> +config QCOM_QFPROM
->> +	tristate "QCOM QFPROM Support"
->> +	depends on ARCH_QCOM
->
->   || COMPILE_TEST?
->
-Yes, makes sense. I will add it.
->> +	select REGMAP_MMIO
->> +	help
->> +	  Say y here to enable QFPROM support. The QFPROM provides access
->> +	  functions for QFPROM data to rest of the drivers via nvmem interface.
->> +
->> +	  This driver can also be built as a module. If so, the module
->> +	  will be called nvmem-qfprom.
->> +
->> +endif
->> diff --git a/drivers/nvmem/Makefile b/drivers/nvmem/Makefile
->> index f694cfc..caea611 100644
->> --- a/drivers/nvmem/Makefile
->> +++ b/drivers/nvmem/Makefile
->> @@ -5,3 +5,7 @@
->>   obj-$(CONFIG_NVMEM)		+= nvmem_core.o
->>   nvmem_core-y			:= core.o
->>   nvmem_core-y			+= nvmem-mmio.o
->> +
->> +# Devices
->> +obj-$(CONFIG_QCOM_QFPROM)	+= nvmem_qfprom.o
->> +nvmem_qfprom-y			:= qfprom.o
->
-> Why not just
->
-> obj-$(CONFIG_QCOM_QFPROM) += nvmem_qfprom.o
->
-> ?
-I will recheck on this.
->
->> diff --git a/drivers/nvmem/qfprom.c b/drivers/nvmem/qfprom.c
->> new file mode 100644
->> index 0000000..5ea84bb
->> --- /dev/null
->> +++ b/drivers/nvmem/qfprom.c
->> @@ -0,0 +1,51 @@
->> +/*
->> + * Copyright (C) 2015 Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
->> + *
->> + * This program is free software; you can redistribute it and/or modify
->> + * it under the terms of the GNU General Public License version 2 and
->> + * only version 2 as published by the Free Software Foundation.
->> + *
->> + * This program is distributed in the hope that it will be useful,
->> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
->> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
->> + * GNU General Public License for more details.
->> + */
->> +
->> +#include <linux/module.h>
->> +#include <linux/of.h>
->> +#include "nvmem-mmio.h"
->> +
->> +static struct regmap_config qfprom_regmap_config = {
->
-> const?
-
-Will fix all the comments.
->
->> +	.reg_bits = 32,
->> +	.val_bits = 8,
->> +	.reg_stride = 1,
->> +};
->> +
->> +static struct nvmem_config econfig = {
->
-> const?
->
->> +	.name = "qfprom",
->> +	.owner = THIS_MODULE,
->> +};
->> +
->> +static struct nvmem_mmio_data qfprom_data = {
->
-> const?
->
->> +	.nvmem_config = &econfig,
->> +	.regmap_config = &qfprom_regmap_config,
->> +};
+>> The other side of that is that the sama5d2 might never make it, or take
+>> very long to make it, into mainline. And this would then end up being
+>> yet another chunk of code adding no value to mainline.
 >>
->
+> 
+> Come on Paul, you prefer the current situation were each vendor have
+> there tree and when support for an SoC lands in mainline it is already
+> deprecated?
+> 
+> You have one vendor here, trying to get support for its SoC even before
+> the silicon is available. Intel is always cited as being a good player
+> in the linux community for doing exactly that. They even have to remove
+> support for a CPU that was never manufactured...
+> The main difference here is that we are no longer doinc everything in
+> mach-xxx so we have to get the driver part mainlined and this requires
+> synchronization. I really belive that you can't blame Nicolas to get the
+> drivers first then the SoC in.
+> 
+> Also, Atmel has a good track record and their SocS are almost fully
+> supported in mainline, you can trust that sama5d2 support is going to
+> land there soon.
+
+I've just posted it BTW.
+
+And it contains the "HAVE_AT91_GENERATED" symbol.
+
+Bye,
+-- 
+Nicolas Ferre
