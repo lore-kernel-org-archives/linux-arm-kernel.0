@@ -1,43 +1,28 @@
-From: michal.simek@xilinx.com (Michal Simek)
-Date: Thu, 18 Jun 2015 13:24:48 +0200
-Subject: [PATCH] gpio: zynq: add missing module_exit function
-In-Reply-To: <1434531101-2585-1-git-send-email-yamada.masahiro@socionext.com>
-References: <1434531101-2585-1-git-send-email-yamada.masahiro@socionext.com>
-Message-ID: <5582AA80.8090603@xilinx.com>
+From: cyrille.pitchen@atmel.com (Cyrille Pitchen)
+Date: Thu, 18 Jun 2015 13:25:40 +0200
+Subject: [PATCH linux-next v2 0/1] dmaengine: at_hdmac: fix residue computation
+Message-ID: <cover.1434626239.git.cyrille.pitchen@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/17/2015 10:51 AM, Masahiro Yamada wrote:
-> This driver is tristate, so it should be cleanable.
-> 
-> Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
-> ---
-> 
->  drivers/gpio/gpio-zynq.c | 6 ++++++
->  1 file changed, 6 insertions(+)
-> 
-> diff --git a/drivers/gpio/gpio-zynq.c b/drivers/gpio/gpio-zynq.c
-> index 184c4b1..1d38da7 100644
-> --- a/drivers/gpio/gpio-zynq.c
-> +++ b/drivers/gpio/gpio-zynq.c
-> @@ -722,6 +722,12 @@ static int __init zynq_gpio_init(void)
->  }
->  postcore_initcall(zynq_gpio_init);
->  
-> +static void __exit zynq_gpio_exit(void)
-> +{
-> +	platform_driver_unregister(&zynq_gpio_driver);
-> +}
-> +module_exit(zynq_gpio_exit);
-> +
->  MODULE_AUTHOR("Xilinx Inc.");
->  MODULE_DESCRIPTION("Zynq GPIO driver");
->  MODULE_LICENSE("GPL");
-> 
+ChangeLog
 
-Looks reasonable to me.
+v2:
+- rework the processing of the linked list of DMA descriptors to take a
+  race condition risk into account. See patch comments for more details on
+  why we have chosen this implementation.
 
-Tested-by: Michal Simek <michal.simek@xilinx.com>
+v1:
+This patch fixes a bug reported by Jiri Prchal for the USART behaviour on
+some Atmel SoCs when DMA is used to receive data. More generally, it fixes
+the DMA residue computation.
 
-Thanks,
-Michal
+Cyrille Pitchen (1):
+  dmaengine: at_hdmac: fix residue computation
+
+ drivers/dma/at_hdmac.c      | 132 +++++++++++++++++++++++++++++---------------
+ drivers/dma/at_hdmac_regs.h |   3 +-
+ 2 files changed, 88 insertions(+), 47 deletions(-)
+
+-- 
+1.8.2.2
