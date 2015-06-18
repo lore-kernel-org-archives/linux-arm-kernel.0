@@ -1,64 +1,38 @@
-From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Thu, 18 Jun 2015 12:59:21 +0200
-Subject: [PATCH] clk: at91: pll: fix input range validity check
-In-Reply-To: <1427594023-9697-1-git-send-email-boris.brezillon@free-electrons.com>
-References: <1427594023-9697-1-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <20150618125921.0b807f39@bbrezillon>
+From: mcoquelin.stm32@gmail.com (Maxime Coquelin)
+Date: Thu, 18 Jun 2015 13:09:46 +0200
+Subject: [PATCH 36/41] clocksource: stm32: Migrate to new 'set-state'
+ interface
+In-Reply-To: <7fc5a0bfae6062b7fbea71a9a469e6574a1c3cf6.1434622147.git.viresh.kumar@linaro.org>
+References: <cover.1434622147.git.viresh.kumar@linaro.org>
+ <7fc5a0bfae6062b7fbea71a9a469e6574a1c3cf6.1434622147.git.viresh.kumar@linaro.org>
+Message-ID: <5582A6FA.4040108@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, 29 Mar 2015 03:53:43 +0200
-Boris Brezillon <boris.brezillon@free-electrons.com> wrote:
+Hi Viresh,
 
-> The PLL impose a certain input range to work correctly, but it appears that
-> this input range does not apply on the input clock (or parent clock) but
-> on the input clock after it has passed the PLL divisor.
-> Fix the implementation accordingly.
-
-Ping (I was expecting this patch to be part of 4.1 :-/).
-
-> 
-> Cc: <stable@vger.kernel.org> # v3.14+
-> Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
-> Reported-by: Jonas Andersson <jonas@microbit.se>
+On 06/18/2015 12:54 PM, Viresh Kumar wrote:
+> Migrate stm32 driver to the new 'set-state' interface provided by
+> clockevents core, the earlier 'set-mode' interface is marked obsolete
+> now.
+>
+> This also enables us to implement callbacks for new states of clockevent
+> devices, for example: ONESHOT_STOPPED.
+>
+> Cc: Maxime Coquelin <mcoquelin.stm32@gmail.com>
+> Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
 > ---
->  drivers/clk/at91/clk-pll.c | 12 ++++++++++--
->  1 file changed, 10 insertions(+), 2 deletions(-)
-> 
-> diff --git a/drivers/clk/at91/clk-pll.c b/drivers/clk/at91/clk-pll.c
-> index 6ec79db..cbbe403 100644
-> --- a/drivers/clk/at91/clk-pll.c
-> +++ b/drivers/clk/at91/clk-pll.c
-> @@ -173,8 +173,7 @@ static long clk_pll_get_best_div_mul(struct clk_pll *pll, unsigned long rate,
->  	int i = 0;
->  
->  	/* Check if parent_rate is a valid input rate */
-> -	if (parent_rate < characteristics->input.min ||
-> -	    parent_rate > characteristics->input.max)
-> +	if (parent_rate < characteristics->input.min)
->  		return -ERANGE;
->  
->  	/*
-> @@ -187,6 +186,15 @@ static long clk_pll_get_best_div_mul(struct clk_pll *pll, unsigned long rate,
->  	if (!mindiv)
->  		mindiv = 1;
->  
-> +	if (parent_rate > characteristics->input.max) {
-> +		tmpdiv = DIV_ROUND_UP(parent_rate, characteristics->input.max);
-> +		if (tmpdiv > PLL_DIV_MAX)
-> +			return -ERANGE;
-> +
-> +		if (tmpdiv > mindiv)
-> +			mindiv = tmpdiv;
-> +	}
-> +
->  	/*
->  	 * Calculate the maximum divider which is limited by PLL register
->  	 * layout (limited by the MUL or DIV field size).
+>   drivers/clocksource/timer-stm32.c | 30 +++++++++++++++++-------------
+>   1 file changed, 17 insertions(+), 13 deletions(-)
+>
+>
 
+Thanks for having implemented the move to the new interface.
+I just tested it, and confirm it works fine on my STM32 board.
+You can add:
 
+Tested-by: Maxime Coquelin <mcoquelin.stm32@gmail.com>
+Acked-by: Maxime Coquelin <mcoquelin.stm32@gmail.com>
 
--- 
-Boris Brezillon, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+Regards,
+Maxime
