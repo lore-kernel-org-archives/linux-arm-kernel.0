@@ -1,33 +1,63 @@
-From: tomi.valkeinen@ti.com (Tomi Valkeinen)
-Date: Thu, 18 Jun 2015 09:58:55 +0300
-Subject: [PATCH 12/12] msm: msm_fb: Remove dead code
-In-Reply-To: <5581C96C.3090101@codeaurora.org>
-References: <1426270185-19510-1-git-send-email-sboyd@codeaurora.org>
- <1426270185-19510-13-git-send-email-sboyd@codeaurora.org>
- <20150313185109.GE14457@ns203013.ovh.net> <55806E63.8020509@codeaurora.org>
- <5581443B.4080907@ti.com> <5581C96C.3090101@codeaurora.org>
-Message-ID: <55826C2F.5000201@ti.com>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Thu, 18 Jun 2015 09:02:10 +0200
+Subject: [PATCH V3] PM / Domains: Remove intermediate states from the
+ power off sequence
+In-Reply-To: <20150617200346.GC23268@linaro.org>
+References: <1434020737-13354-1-git-send-email-ulf.hansson@linaro.org>
+ <20150617200346.GC23268@linaro.org>
+Message-ID: <CAPDyKFp4Bh2C5PNNJS3bUqDLADS6MKTfH8UCzbm3c-ofbVOWow@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+[...]
 
-
-On 17/06/15 22:24, Stephen Boyd wrote:
-> On 06/17/2015 02:56 AM, Tomi Valkeinen wrote:
->> Are all the patches that this depends on already in v4.1-rcX? If so, I
->> can take this via fbdev.
+>> @@ -671,32 +475,29 @@ static int pm_genpd_runtime_suspend(struct device
+>> *dev)
+>>         if (IS_ERR(genpd))
+>>                 return -EINVAL;
 >>
-> 
-> Yes. Please take it via fbdev. Thanks.
+>> +       /*
+>> +        * We can't allow to power off the PM domain if it holds an
+>> irq_safe
+>> +        * device. That's because we use mutexes to protect data while
+>> power
+>> +        * off and on the PM domain, thus we can't execute in atomic
+>> context.
+>> +        */
+>> +       if (dev->power.irq_safe)
+>> +               return -EBUSY;
+>> +
+>
+> This check will prevent the device from being saved/stopped. This should
+> be allowed. Its the mutex_lock(&genpd->lock) below that would be a
+> problem, if the device is IRQ safe. But that happens only after the
+> device is stopped.
 
-Ok, queued for 4.2.
+Yes, as we discussed around your patch in [1].
 
- Tomi
+Earlier we could invoke the ->stop|start() callbacks for an IRQ
+safe device. This version of $subject patch prevents that.
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150618/8b43bac6/attachment.sig>
+I am working on a v4, that brings back that functionality, but we can
+actually do more. As from the changes in $subject patch, we don't need
+to hold the mutex while invoking the runtime PM callbacks for a
+device. This enables us to invoke them for IRQ safe devices, yet
+another positive side effect.
+
+>
+> I am inclined to think that the existing check below is the correct
+> place to check. Let me know if I am missing something.
+>
+
+You are correct.
+
+Still, as I intend to invoke the runtime PM callbacks for IRQ safe
+devices some minor change is also needed in pm_genpd_runtime_resume().
+
+[...]
+
+Kind regards
+Uffe
+
+[1]
+http://www.spinics.net/lists/arm-kernel/msg425162.html
