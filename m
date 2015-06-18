@@ -1,39 +1,85 @@
-From: sebastian@breakpoint.cc (Sebastian Andrzej Siewior)
-Date: Thu, 18 Jun 2015 20:27:07 +0200
-Subject: [PATCH v4 1/6] mtd: nand: vf610_nfc: Freescale NFC for VF610,
- MPC5125 and others
-In-Reply-To: <32a7fe8d8df87dfe35ea50c582077c78@agner.ch>
-References: <1427300909-20825-1-git-send-email-stefan@agner.ch>
- <1427300909-20825-2-git-send-email-stefan@agner.ch>
- <20150603130825.GA23991@breakpoint.cc>
- <b3b09b4b8c97cbfc88fa0d5fdc5e40cd@agner.ch>
- <20150609200751.GC5720@breakpoint.cc>
- <32a7fe8d8df87dfe35ea50c582077c78@agner.ch>
-Message-ID: <20150618182707.GA2254@breakpoint.cc>
+From: mturquette@linaro.org (Michael Turquette)
+Date: Thu, 18 Jun 2015 11:36:54 -0700
+Subject: [PATCH v2] clk: mvebu: flag the crypto clk as CLK_IGNORE_UNUSED
+In-Reply-To: <55816094.2020208@free-electrons.com>
+References: <1434470179-20835-1-git-send-email-boris.brezillon@free-electrons.com>
+ <55816094.2020208@free-electrons.com>
+Message-ID: <20150618183654.25948.26168@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 17, 2015 at 03:02:03PM +0200, Stefan Agner wrote:
-> On 2015-06-09 22:07, Sebastian Andrzej Siewior wrote:
-> > yeah, do you have any numbers by chance?
+Quoting Gregory CLEMENT (2015-06-17 04:57:08)
+> Hi Mike, Stephen,
 > 
-> Just reevaluated the "performance optimizations". On a VF610 SoC (with
-> L2 cache) the improvements increase performance by 2.5% and below. On a
-> VF500 SoC (without L2 cache) it seems to have slightly more impact, up
-> to 4%. Overall, it seems to influence write more than read.
+> On 16/06/2015 17:56, Boris Brezillon wrote:
+> > The crypto SRAM, used by the armada 370 cpuidle code to workaround a bug
+> > in the BootROM code, requires the crypto clk to be up and running.
+> > Flag the crypto clk as IGNORE_UNUSED until we add the proper
+> > infrastructure to define the crypto SRAM in the DT and reference the crypto
+> > clk in this SRAM node.
+> > 
+> > Reported-by: Kevin Hilman <khilman@linaro.org>
+> > Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+> > Tested-by: Kevin Hilman <khilman@linaro.org>
+> > Fixes: 29e623475c50267ee3aaa49ebb6cbe107bce8d2a ("clk: mvebu: add
+> > missing CESA gate clk").
+> > Cc: <stable@vger.kernel.org> #4.1
+> 
+> Acked-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+> 
+> Would it possible to apply this fix on 4.1-rc8 ?
 
-it could have something to do with the CPU clock and how long it is blocked
-due to the sync operation.
+Hi Gregory,
 
-> Back then, when I implemented the improvements it certainly had a bigger
-> impact. I don't have strong opinion on that...
+I'm a bit confused by this. This patch fixes "clk: mvebu: add missing
+CESA gate clk", right? That patch lives in clk-next. It was not pushed
+to Linus' tree yet via a -fixes branch.
 
-Thanks for doing that. If you could take those numbers, put them in a table
-like with/without relaxed and so one, write how you got them (modprobe bla)
-and make it part of the commit message then everybody could see about how much
-we talk here. Thanks again.
+Thus I can just apply this patch to clk-next and the problem should be
+resolved in clk-next, no?
 
-> --
-> Stefan
+Furthermore, I do not have 29e623475c50267ee3aaa49ebb6cbe107bce8d2a
+anywhere in my tree. I'm not sure where this sha1 hash came from.
 
-Sebastian
+Regards,
+Mike
+
+> 
+> Thanks,
+> 
+> Gregory
+> 
+> > ---
+> > Changes since v1:
+> > - add the Reported-by tag
+> > - add the missing trailing ','
+> > 
+> >  drivers/clk/mvebu/armada-370.c | 2 +-
+> >  1 file changed, 1 insertion(+), 1 deletion(-)
+> > 
+> > diff --git a/drivers/clk/mvebu/armada-370.c b/drivers/clk/mvebu/armada-370.c
+> > index c19fd77..2c7c108 100644
+> > --- a/drivers/clk/mvebu/armada-370.c
+> > +++ b/drivers/clk/mvebu/armada-370.c
+> > @@ -163,7 +163,7 @@ static const struct clk_gating_soc_desc a370_gating_desc[] __initconst = {
+> >       { "pex1", "pex1_en", 9, 0 },
+> >       { "sata0", NULL, 15, 0 },
+> >       { "sdio", NULL, 17, 0 },
+> > -     { "crypto", NULL, 23, 0 },
+> > +     { "crypto", NULL, 23, CLK_IGNORE_UNUSED },
+> >       { "tdm", NULL, 25, 0 },
+> >       { "ddr", NULL, 28, CLK_IGNORE_UNUSED },
+> >       { "sata1", NULL, 30, 0 },
+> > 
+> 
+> 
+> -- 
+> Gregory Clement, Free Electrons
+> Kernel, drivers, real-time and embedded Linux
+> development, consulting, training and support.
+> http://free-electrons.com
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
