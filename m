@@ -1,91 +1,135 @@
-From: xerofoify@gmail.com (nick)
-Date: Wed, 17 Jun 2015 23:10:58 -0400
-Subject: [PATCH] xilinx:Remove unused variable num_frag in the function
- axienet_start_xmit
-In-Reply-To: <20150617185848.GI2906@xsjsorenbubuntu>
-References: <1434556362-3748-1-git-send-email-xerofoify@gmail.com>
- <20150617160730.GE2906@xsjsorenbubuntu>
- <DD47523D-0DF9-46B5-9382-3C30BBD9E815@gmail.com>
- <20150617185848.GI2906@xsjsorenbubuntu>
-Message-ID: <558236C2.9030009@gmail.com>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Thu, 18 Jun 2015 08:20:34 +0530
+Subject: [PATCH V7 2/3] OPP: Allow multiple OPP tables to be passed via DT
+In-Reply-To: <20150618022543.GA28820@linux>
+References: <cover.1433434659.git.viresh.kumar@linaro.org>
+ <263c128844f5a3c9280c8be71f6c9eb1869a5188.1433434659.git.viresh.kumar@linaro.org>
+ <CAL_Jsq+EOOeQw42wZi+H82ovLn8LcQUuK9HGT+FvewdhTf7Q1w@mail.gmail.com>
+ <20150617133314.GB15153@linux>
+ <CAL_Jsq+SdgAf7=Yq7Jk_1d9jTpAOLCEuEDCZvD=-h=2MWsNfFw@mail.gmail.com>
+ <55821F30.2090802@codeaurora.org> <20150618022543.GA28820@linux>
+Message-ID: <20150618025034.GB28820@linux>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On 18-06-15, 07:55, Viresh Kumar wrote:
+> Why do you think so? For me the operating-points-v2-names property
+> will be present in CPU node (as there is no OPP node which can have
+> it) and so every CPU is free to choose what it wants to.
 
+So, I had something like this in mind:
 
-On 2015-06-17 02:58 PM, S?ren Brinkmann wrote:
-> On Wed, 2015-06-17 at 12:21PM -0400, Nicholas Krause wrote:
->>
->>
->> On June 17, 2015 12:07:30 PM EDT, "S?ren Brinkmann" <soren.brinkmann@xilinx.com> wrote:
->>> On Wed, 2015-06-17 at 11:52AM -0400, Nicholas Krause wrote:
->>>> This removes the unused variable num_frag and the setting of it
->>>> to the number of fragments from the passed sk_buff pointer by
->>>> this function's caller due to this variable never being used
->>>> in this particular function and is not declared as  global so
->>>> setting it for global use in this file is pointless.
->>>>
->>>> Signed-off-by: Nicholas Krause <xerofoify@gmail.com>
->>>> ---
->>>>  drivers/net/ethernet/xilinx/xilinx_axienet_main.c | 2 --
->>>>  1 file changed, 2 deletions(-)
->>>>
->>>> diff --git a/drivers/net/ethernet/xilinx/xilinx_axienet_main.c
->>> b/drivers/net/ethernet/xilinx/xilinx_axienet_main.c
->>>> index 28b7e7d..624dce4 100644
->>>> --- a/drivers/net/ethernet/xilinx/xilinx_axienet_main.c
->>>> +++ b/drivers/net/ethernet/xilinx/xilinx_axienet_main.c
->>>> @@ -651,7 +651,6 @@ static inline int
->>> axienet_check_tx_bd_space(struct axienet_local *lp,
->>>>  static int axienet_start_xmit(struct sk_buff *skb, struct net_device
->>> *ndev)
->>>>  {
->>>>  	u32 ii;
->>>> -	u32 num_frag;
->>>>  	u32 csum_start_off;
->>>>  	u32 csum_index_off;
->>>>  	skb_frag_t *frag;
->>>> @@ -659,7 +658,6 @@ static int axienet_start_xmit(struct sk_buff
->>> *skb, struct net_device *ndev)
->>>>  	struct axienet_local *lp = netdev_priv(ndev);
->>>>  	struct axidma_bd *cur_p;
->>>>  
->>>> -	num_frag = skb_shinfo(skb)->nr_frags;
->>>>  	cur_p = &lp->tx_bd_v[lp->tx_bd_tail];
->>>>  
->>>>  	if (axienet_check_tx_bd_space(lp, num_frag)) {
->>>
->>> It's used right here, isn't it (and further down in this function too)?
->>> Does your tree compile with this change?
->>>
->>> 	S?ren
->> My tree does compile with this change. 
-> 
-> You have to fix your testing process:
->     CHK     include/config/kernel.release
->     UPD     include/config/kernel.release
->     CHK     include/generated/uapi/linux/version.h
->     CHK     include/generated/utsrelease.h
->     UPD     include/generated/utsrelease.h
->     CHK     include/generated/bounds.h
->     CHK     include/generated/timeconst.h
->     CHK     include/generated/asm-offsets.h
->     CALL    scripts/checksyscalls.sh
->   <stdin>:1253:2: warning: #warning syscall userfaultfd not implemented [-Wcpp]
->     CC      drivers/net/ethernet/xilinx/xilinx_axienet_main.o
->   drivers/net/ethernet/xilinx/xilinx_axienet_main.c: In function 'axienet_start_xmit':
->   drivers/net/ethernet/xilinx/xilinx_axienet_main.c:667:36: error: 'num_frag' undeclared (first use in this function)
->     if (axienet_check_tx_bd_space(lp, num_frag)) {
->                                       ^
->   drivers/net/ethernet/xilinx/xilinx_axienet_main.c:667:36: note: each undeclared identifier is reported only once for each function it appears in
->   scripts/Makefile.build:258: recipe for target 'drivers/net/ethernet/xilinx/xilinx_axienet_main.o' failed
->   make[1]: *** [drivers/net/ethernet/xilinx/xilinx_axienet_main.o] Error 1
->   Makefile:1545: recipe for target 'drivers/net/ethernet/xilinx/xilinx_axienet_main.o' failed
->   make: *** [drivers/net/ethernet/xilinx/xilinx_axienet_main.o] Error 2
-> 
-> NACK for the patch.
-> 
-> 	S?ren
-> 
-Sorry about that as I tried again and it didn't build. Weird issue maybe something with ccache.
-Nick
+From: Viresh Kumar <viresh.kumar@linaro.org>
+Date: Thu, 30 Apr 2015 17:38:00 +0530
+Subject: [PATCH] OPP: Allow multiple OPP tables to be passed via DT
+
+On some platforms (Like Qualcomm's SoCs), it is not decided until
+runtime on what OPPs to use. The OPP tables can be fixed at compile
+time, but which table to use is found out only after reading some efuses
+(sort of an prom) and knowing characteristics of the SoC.
+
+To support such platform we need to pass multiple OPP tables per device
+and hardware should be able to choose one and only one table out of
+those.
+
+Update operating-points-v2 bindings to support that.
+
+Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
+---
+ Documentation/devicetree/bindings/power/opp.txt | 63 +++++++++++++++++++++++++
+ 1 file changed, 63 insertions(+)
+
+diff --git a/Documentation/devicetree/bindings/power/opp.txt b/Documentation/devicetree/bindings/power/opp.txt
+index 259bf00edf7d..72ccacaac9c9 100644
+--- a/Documentation/devicetree/bindings/power/opp.txt
++++ b/Documentation/devicetree/bindings/power/opp.txt
+@@ -45,10 +45,21 @@ Devices supporting OPPs must set their "operating-points-v2" property with
+ phandle to a OPP table in their DT node. The OPP core will use this phandle to
+ find the operating points for the device.
+ 
++Devices may want to choose OPP tables at runtime and so can provide a list of
++phandles here. But only *one* of them should be chosen at runtime. This must be
++accompanied by a corresponding "operating-points-v2-names" property, to uniquely
++identify the OPP tables.
++
+ If required, this can be extended for SoC vendor specfic bindings. Such bindings
+ should be documented as Documentation/devicetree/bindings/power/<vendor>-opp.txt
+ and should have a compatible description like: "operating-points-v2-<vendor>".
+ 
++Optional properties:
++- operating-points-v2-names: Names of OPP tables (required if multiple OPP
++  tables are present), to uniquely identify them. The same list must be present
++  for all the CPUs which are sharing clock/voltage rails and hence the OPP
++  tables.
++
+ * OPP Table Node
+ 
+ This describes the OPPs belonging to a device. This node can have following
+@@ -63,11 +74,16 @@ This describes the OPPs belonging to a device. This node can have following
+   reference an OPP.
+ 
+ Optional properties:
++- opp-name: Name of the OPP table, to uniquely identify it if more than one OPP
++  table is supplied in "operating-points-v2" property of device.
++
+ - opp-shared: Indicates that device nodes using this OPP Table Node's phandle
+   switch their DVFS state together, i.e. they share clock/voltage/current lines.
+   Missing property means devices have independent clock/voltage/current lines,
+   but they share OPP tables.
+ 
++- status: Marks the OPP table enabled/disabled.
++
+ 
+ * OPP Node
+ 
+@@ -396,3 +412,50 @@ Example 4: Handling multiple regulators
+ 		};
+ 	};
+ };
++
++Example 5: Multiple OPP tables
++
++/ {
++	cpus {
++		cpu at 0 {
++			compatible = "arm,cortex-a7";
++			...
++
++			cpu-supply = <&cpu_supply>
++			operating-points-v2 = <&cpu0_opp_table_slow>, <&cpu0_opp_table_fast>;
++			operating-points-v2-names = "slow", "fast";
++		};
++	};
++
++	cpu0_opp_table_slow: opp_table_slow {
++		compatible = "operating-points-v2";
++		status = "okay";
++		opp-shared;
++
++		opp00 {
++			opp-hz = <600000000>;
++			...
++		};
++
++		opp01 {
++			opp-hz = <800000000>;
++			...
++		};
++	};
++
++	cpu0_opp_table_fast: opp_table_fast {
++		compatible = "operating-points-v2";
++		status = "okay";
++		opp-shared;
++
++		opp10 {
++			opp-hz = <1000000000>;
++			...
++		};
++
++		opp11 {
++			opp-hz = <1100000000>;
++			...
++		};
++	};
++};
