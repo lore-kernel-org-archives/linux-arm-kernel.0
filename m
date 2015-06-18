@@ -1,157 +1,68 @@
-From: mturquette@linaro.org (Michael Turquette)
-Date: Thu, 18 Jun 2015 12:58:46 -0700
-Subject: [PATCH 1/6] clk: add CLK_RECALC_NEW_RATES clock flag for Exynos
- cpu clock support
-In-Reply-To: <55535BF9.60609@samsung.com>
-References: <'@samsung.com>
- <1428079429-4252-1-git-send-email-b.zolnierkie@samsung.com>
- <1428079429-4252-2-git-send-email-b.zolnierkie@samsung.com>
- <55535BF9.60609@samsung.com>
-Message-ID: <20150618195846.9112.7144@quantum>
+From: bhelgaas@google.com (Bjorn Helgaas)
+Date: Thu, 18 Jun 2015 15:00:53 -0500
+Subject: [PATCH 1/1] PCI: xgene: Allow config access to Root Port even
+ when link is down
+In-Reply-To: <1434653139-14461-1-git-send-email-dhdang@apm.com>
+References: <1434653139-14461-1-git-send-email-dhdang@apm.com>
+Message-ID: <20150618200053.GG7710@google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Sylwester Nawrocki (2015-05-13 07:13:13)
-> On 03/04/15 18:43, Bartlomiej Zolnierkiewicz wrote:
-> > This flag is needed to fix the issue with wrong dividers being setup
-> > by Common Clock Framework when using the new Exynos cpu clock support.
-> > 
-> > The issue happens because clk_core_set_rate_nolock()  calls
-> > clk_calc_new_rates(clk, rate) before both pre/post clock notifiers have
-> > a chance to run.  In case of Exynos cpu clock support pre/post clock
-> > notifiers are registered for mout_apll clock which is a parent of armclk
-> > cpu clock and dividers are modified in both pre and post clock notifier.
-> > This results in wrong dividers values being later programmed by
-> > clk_change_rate(top).  To workaround the problem CLK_RECALC_NEW_RATES
-> > flag is added and it is set for mout_apll clock later so the correct
-> > divider values are re-calculated after both pre and post clock notifiers
-> > had run.
-> > 
-> > For example when using "performance" governor on Exynos4210 Origen board
-> > the cpufreq-dt driver requests to change the frequency from 1000MHz to
-> > 1200MHz and after the change state of the relevant clocks is following:
-> > 
-> > Without use of CLK_GET_RATE_NOCACHE flag:
-> > 
-> >  fout_apll rate: 1200000000
-> >          fout_apll_div_2 rate: 600000000
-> >                  mout_clkout_cpu rate: 600000000
-> >                          div_clkout_cpu rate: 600000000
-> >                                  clkout_cpu rate: 600000000
-> >          mout_apll rate: 1200000000
-> >                  armclk rate: 1200000000
-> >                  mout_hpm rate: 1200000000
-> >                          div_copy rate: 300000000
-> >                                  div_hpm rate: 300000000
-> >                  mout_core rate: 1200000000
-> >                          div_core rate: 1200000000
-> >                                  div_core2 rate: 1200000000
-> >                                          arm_clk_div_2 rate: 600000000
-> >                                          div_corem0 rate: 300000000
-> >                                          div_corem1 rate: 150000000
-> >                                          div_periph rate: 300000000
-> >                          div_atb rate: 300000000
-> >                                  div_pclk_dbg rate: 150000000
-> >                  sclk_apll rate: 1200000000
-> >                          sclk_apll_div_2 rate: 600000000
-> > 
-> > 
-> > With use of CLK_GET_RATE_NOCACHE flag:
-> > 
-> >  fout_apll rate: 1200000000
-> >          fout_apll_div_2 rate: 600000000
-> >                  mout_clkout_cpu rate: 600000000
-> >                          div_clkout_cpu rate: 600000000
-> >                                  clkout_cpu rate: 600000000
-> >          mout_apll rate: 1200000000
-> >                  armclk rate: 1200000000
-> >                  mout_hpm rate: 1200000000
-> >                          div_copy rate: 200000000
-> >                                  div_hpm rate: 200000000
-> >                  mout_core rate: 1200000000
-> >                          div_core rate: 1200000000
-> >                                  div_core2 rate: 1200000000
-> >                                          arm_clk_div_2 rate: 600000000
-> >                                          div_corem0 rate: 300000000
-> >                                          div_corem1 rate: 150000000
-> >                                          div_periph rate: 300000000
-> >                          div_atb rate: 240000000
-> >                                  div_pclk_dbg rate: 120000000
-> >                  sclk_apll rate: 150000000
-> >                          sclk_apll_div_2 rate: 75000000
-> > 
-> > Without this change cpufreq-dt driver showed ~10 mA larger energy
-> > consumption when compared to cpufreq-exynos one when "performance"
-> > cpufreq governor was used on Exynos4210 SoC based Origen board.
-> > 
-> > This issue was probably meant to be workarounded by use of
-> > CLK_GET_RATE_NOCACHE and CLK_DIVIDER_READ_ONLY clock flags in
-> > the original Exynos cpu clock patchset (in "[PATCH v12 6/6] clk:
-> > samsung: remove unused clock aliases and update clock flags" patch)
-> > but usage of these flags is not sufficient to fix the issue observed.
-> > 
-> > Cc: Thomas Abraham <thomas.ab@samsung.com>
-> > Cc: Tomasz Figa <tomasz.figa@gmail.com>
-> > Cc: Mike Turquette <mturquette@linaro.org>
-> > Cc: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
-> > Signed-off-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
-> > ---
-> >  drivers/clk/clk.c            |    3 +++
-> >  include/linux/clk-provider.h |    1 +
-> >  2 files changed, 4 insertions(+)
-> > 
-> > diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
-> > index f85c8e2..97cc73e 100644
-> > --- a/drivers/clk/clk.c
-> > +++ b/drivers/clk/clk.c
-> > @@ -1771,6 +1771,9 @@ static void clk_change_rate(struct clk_core *clk)
-> >       if (clk->notifier_count && old_rate != clk->rate)
-> >               __clk_notify(clk, POST_RATE_CHANGE, old_rate, clk->rate);
-> >  
-> > +     if (clk->flags & CLK_RECALC_NEW_RATES)
-> > +             (void)clk_calc_new_rates(clk, clk->new_rate);
-> > +
-> >       /*
-> >        * Use safe iteration, as change_rate can actually swap parents
-> >        * for certain clock types.
-> > diff --git a/include/linux/clk-provider.h b/include/linux/clk-provider.h
-> > index 28abf1b..8d1aebe 100644
-> > --- a/include/linux/clk-provider.h
-> > +++ b/include/linux/clk-provider.h
-> > @@ -31,6 +31,7 @@
-> >  #define CLK_GET_RATE_NOCACHE BIT(6) /* do not use the cached clk rate */
-> >  #define CLK_SET_RATE_NO_REPARENT BIT(7) /* don't re-parent on rate change */
-> >  #define CLK_GET_ACCURACY_NOCACHE BIT(8) /* do not use the cached clk accuracy */
-> > +#define CLK_RECALC_NEW_RATES BIT(9) /* recalc rates after notifications */
+On Thu, Jun 18, 2015 at 11:45:39AM -0700, Duc Dang wrote:
+> Even if a Root Port's link is down, we should still be able to access the
+> Port's configuration space.
 > 
-> Mike, Stephen, what do you think about this? I'm rather resistant to
-> this new flag approach, it looks like a hack. I don't seem to have better
-> ideas to address the missing rate recalculation issue though.
-
-I also do not like it. The root of the problem is the use of clk
-notifiers to change clk rates. This is also a hack and it points towards
-some missing infrastructure in the clock framework.
-
-> I thought about making the cpu clk notifier callback returning a specific
-> error value, which would then trigger rate recalculation after
-> __clk_notify() call in clk_change_rate() function. This way the trigger
-> of the repeated rate recalculation would come from a notifier callback,
-> rather than from a clock definition. But in general it would be difficult
-> to handle multiple notification callbacks, each of which would attempt
-> to trigger the rate recalculation.
-
-The more complexity we add to the notifier callbacks the crazier things
-will get. For now I'd like to see Exynos continue to use the
-platform-specific CPUfreq drivers until the new coordinated clock rates
-infrastructure makes it possible to do this type of stuff without
-relying on the notifiers. I'm working on this feature Right Now. I never
-like putting dates on upstream stuff but I'd like to see this feature in
-4.3 if possible.
-
-Regards,
-Mike
-
+> Suggested-by: Bjorn Helgaas <bhelgaas@google.com>
+> Signed-off-by: Duc Dang <dhdang@apm.com>
+> Signed-off-by: Tanmay Inamdar <tinamdar@apm.com>
+> ---
+>  drivers/pci/host/pci-xgene.c | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
 > 
-> -- 
-> Regards,
-> Sylwester
+> diff --git a/drivers/pci/host/pci-xgene.c b/drivers/pci/host/pci-xgene.c
+> index 7e3cf28..2e66c87 100644
+> --- a/drivers/pci/host/pci-xgene.c
+> +++ b/drivers/pci/host/pci-xgene.c
+> @@ -139,7 +139,7 @@ static void __iomem *xgene_pcie_map_bus(struct pci_bus *bus, unsigned int devfn,
+>  {
+>  	struct xgene_pcie_port *port = bus->sysdata;
+>  
+> -	if ((pci_is_root_bus(bus) && devfn != 0) || !port->link_up ||
+> +	if ((pci_is_root_bus(bus) && devfn != 0) ||
+>  	    xgene_pcie_hide_rc_bars(bus, offset))
+>  		return NULL;
+>  
+
+Applied with changelog as follows to pci/host-xgene for v4.2, thanks!
+
+commit 979595bcb8da04381ed85d3b0eb1f471cc5863e4
+Author: Duc Dang <dhdang@apm.com>
+Date:   Thu Jun 18 11:45:39 2015 -0700
+
+    PCI: xgene: Allow config access to Root Port even when link is down
+    
+    Previously, when a Root Port's link was down, we didn't allow config access
+    to the Root Port, which meant that if the Root Port led to an empty slot,
+    "lspci" didn't even show the Root Port.
+    
+    Allow config access to Root Port even when link is down.
+    
+    [bhelgaas: changelog]
+    Suggested-by: Bjorn Helgaas <bhelgaas@google.com>
+    Signed-off-by: Duc Dang <dhdang@apm.com>
+    Signed-off-by: Tanmay Inamdar <tinamdar@apm.com>
+    Signed-off-by: Bjorn Helgaas <bhelgaas@google.com>
+
+diff --git a/drivers/pci/host/pci-xgene.c b/drivers/pci/host/pci-xgene.c
+index 70af714..1fc8910 100644
+--- a/drivers/pci/host/pci-xgene.c
++++ b/drivers/pci/host/pci-xgene.c
+@@ -139,7 +139,7 @@ static void __iomem *xgene_pcie_map_bus(struct pci_bus *bus, unsigned int devfn,
+ {
+ 	struct xgene_pcie_port *port = bus->sysdata;
+ 
+-	if ((pci_is_root_bus(bus) && devfn != 0) || !port->link_up ||
++	if ((pci_is_root_bus(bus) && devfn != 0) ||
+ 	    xgene_pcie_hide_rc_bars(bus, offset))
+ 		return NULL;
+ 
