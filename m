@@ -1,85 +1,82 @@
-From: mturquette@linaro.org (Michael Turquette)
-Date: Thu, 18 Jun 2015 11:36:54 -0700
-Subject: [PATCH v2] clk: mvebu: flag the crypto clk as CLK_IGNORE_UNUSED
-In-Reply-To: <55816094.2020208@free-electrons.com>
-References: <1434470179-20835-1-git-send-email-boris.brezillon@free-electrons.com>
- <55816094.2020208@free-electrons.com>
-Message-ID: <20150618183654.25948.26168@quantum>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Thu, 18 Jun 2015 20:37:36 +0200
+Subject: [PATCH v2 6/6] ARM: sun8i: dts: Add Ippo-q8h v1.2 with A33 and
+ 1024x600 lcd support
+In-Reply-To: <55811EB2.4060302@redhat.com>
+References: <1432997706-20172-1-git-send-email-hdegoede@redhat.com>
+ <1432997706-20172-7-git-send-email-hdegoede@redhat.com>
+ <20150602081459.GO23777@lukather> <556D6955.8030708@redhat.com>
+ <20150603094535.GI23777@lukather> <556EE104.3090803@redhat.com>
+ <20150613135002.GP19653@lukather> <557C3BD3.6030105@redhat.com>
+ <20150616174114.GI11732@lukather> <55811EB2.4060302@redhat.com>
+Message-ID: <20150618183736.GT11732@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Gregory CLEMENT (2015-06-17 04:57:08)
-> Hi Mike, Stephen,
+On Wed, Jun 17, 2015 at 09:16:02AM +0200, Hans de Goede wrote:
+> Hi,
 > 
-> On 16/06/2015 17:56, Boris Brezillon wrote:
-> > The crypto SRAM, used by the armada 370 cpuidle code to workaround a bug
-> > in the BootROM code, requires the crypto clk to be up and running.
-> > Flag the crypto clk as IGNORE_UNUSED until we add the proper
-> > infrastructure to define the crypto SRAM in the DT and reference the crypto
-> > clk in this SRAM node.
-> > 
-> > Reported-by: Kevin Hilman <khilman@linaro.org>
-> > Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
-> > Tested-by: Kevin Hilman <khilman@linaro.org>
-> > Fixes: 29e623475c50267ee3aaa49ebb6cbe107bce8d2a ("clk: mvebu: add
-> > missing CESA gate clk").
-> > Cc: <stable@vger.kernel.org> #4.1
+> On 16-06-15 19:41, Maxime Ripard wrote:
+> >Hi,
+> >
+> >On Sat, Jun 13, 2015 at 04:18:59PM +0200, Hans de Goede wrote:
+> >>>Pantelis, to sum things up, we have a case of a tablet that comes with
+> >>>the exact same board, but coming in two flavours with two differents
+> >>>screen resolutions. It looks like a great case for your DT quirks
+> >>>work, but we have no way of runtime detecting the difference between
+> >>>the two variants. What do you think about this? Should we go with
+> >>>using the DT quirks or is this simply out of scope?
+> >>>
+> >>>There's not so much example of similar cases in the kernel, and none
+> >>>of them use quirks so far (obviously) but they all boil down to either
+> >>>the solution you were suggesting in that patch or adding the alternate
+> >>>configuration as a comment.
+> >>>
+> >>>I don't think the latter would work for you, and I agree with that, so
+> >>>I guess that depending on what Pantelis says, either we go with a
+> >>>better solution using the quirks, or we end up using what you
+> >>>suggested (with a nitpick though, I'd prefer if you used the display
+> >>>standard instead of the resolution, which would make it xga I guess?)
+> >>
+> >>If we go with a separate dts file for each of the 800x480 and 1024x600
+> >>screens, I would greatly prefer to stick with the lcd1024x600 in the dts
+> >>filename instead of using something like xga, the fact that you say:
+> >>"I guess" that my answer to that is: I dunno I would need to look this
+> >>up in wikipedia or some such makes me think that using a qualifier like
+> >>xga is not going the help end users decide which dts file to pick, it
+> >>will just lead to them needing to go to wikipedia too. Also note that
+> >>the advertising of these tablets on ebay / aliexpress almost always
+> >>uses the resolution and not something like "xga".
+<> >>
+> >>So all in all if we do not decide to use quirks for this I would like
+> >>to keep the filename as is.
+> >
+> >Yeah, except that the display standard is also encoding the refresh
+> >rate and color depth
 > 
-> Acked-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+> Huh? No it does not, see e.g.:
 > 
-> Would it possible to apply this fix on 4.1-rc8 ?
+> https://en.wikipedia.org/wiki/Graphics_display_resolution
+> 
+> Note nothing about depth and refresh-rate there, and I've really never
+> heard anyone use things like xga to refer to colordepth and/or refreshrate
 
-Hi Gregory,
+I was somehow convinced it did, and
 
-I'm a bit confused by this. This patch fixes "clk: mvebu: add missing
-CESA gate clk", right? That patch lives in clk-next. It was not pushed
-to Linus' tree yet via a -fixes branch.
+https://en.wikipedia.org/wiki/Computer_display_standard
 
-Thus I can just apply this patch to clk-next and the problem should be
-resolved in clk-next, no?
+seems to say that as well... Maybe not then, my bad.
 
-Furthermore, I do not have 29e623475c50267ee3aaa49ebb6cbe107bce8d2a
-anywhere in my tree. I'm not sure where this sha1 hash came from.
+Maxime
 
-Regards,
-Mike
-
-> 
-> Thanks,
-> 
-> Gregory
-> 
-> > ---
-> > Changes since v1:
-> > - add the Reported-by tag
-> > - add the missing trailing ','
-> > 
-> >  drivers/clk/mvebu/armada-370.c | 2 +-
-> >  1 file changed, 1 insertion(+), 1 deletion(-)
-> > 
-> > diff --git a/drivers/clk/mvebu/armada-370.c b/drivers/clk/mvebu/armada-370.c
-> > index c19fd77..2c7c108 100644
-> > --- a/drivers/clk/mvebu/armada-370.c
-> > +++ b/drivers/clk/mvebu/armada-370.c
-> > @@ -163,7 +163,7 @@ static const struct clk_gating_soc_desc a370_gating_desc[] __initconst = {
-> >       { "pex1", "pex1_en", 9, 0 },
-> >       { "sata0", NULL, 15, 0 },
-> >       { "sdio", NULL, 17, 0 },
-> > -     { "crypto", NULL, 23, 0 },
-> > +     { "crypto", NULL, 23, CLK_IGNORE_UNUSED },
-> >       { "tdm", NULL, 25, 0 },
-> >       { "ddr", NULL, 28, CLK_IGNORE_UNUSED },
-> >       { "sata1", NULL, 30, 0 },
-> > 
-> 
-> 
-> -- 
-> Gregory Clement, Free Electrons
-> Kernel, drivers, real-time and embedded Linux
-> development, consulting, training and support.
-> http://free-electrons.com
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150618/527262e6/attachment.sig>
