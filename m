@@ -1,42 +1,26 @@
-From: dave.mueller@gmx.ch (=?UTF-8?q?David=20M=C3=BCller?=)
-Date: Thu, 18 Jun 2015 09:59:07 +0200
-Subject: [PATCH] ARM: imx6: Fix non-working MSI interrupts if PCIe switch is
- attached
-Message-ID: <1434614347-2154-1-git-send-email-dave.mueller@gmx.ch>
+From: tomeu.vizoso@collabora.com (Tomeu Vizoso)
+Date: Thu, 18 Jun 2015 10:06:38 +0200
+Subject: [PATCH 03/13] ARM: tegra: Add gpio-ranges property
+In-Reply-To: <20150617172554.GX14071@sirena.org.uk>
+References: <1434548543-22949-1-git-send-email-tomeu.vizoso@collabora.com>
+ <1434548543-22949-4-git-send-email-tomeu.vizoso@collabora.com>
+ <20150617172554.GX14071@sirena.org.uk>
+Message-ID: <CAAObsKDRWn6T76VQJd6EBaq1zpMouLC2ZYJ8pEStZHk_bdxV+Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This problem has already been reported as 
-https://bugzilla.kernel.org/show_bug.cgi?id=100051
+On 17 June 2015 at 19:25, Mark Brown <broonie@kernel.org> wrote:
+> On Wed, Jun 17, 2015 at 03:42:13PM +0200, Tomeu Vizoso wrote:
+>> Specify how the GPIOs map to the pins in Tegra SoCs, so the dependency is
+>> explicit.
+>
+> Can I suggest splitting this sort of patch out of the patch series (and
+> similarly the documentation fix you had), or putting them at the end or
+> something?  It's pretty confusing that early patches in the series are
+> a bit tangential rather than being dependencies for the rest of it.
 
-Signed-off-by: David M?ller <dave.mueller@gmx.ch>
----
- drivers/pci/host/pci-imx6.c | 6 +++---
- 1 file changed, 3 insertions(+), 3 deletions(-)
+Agreed, sorry about that.
 
-diff --git a/drivers/pci/host/pci-imx6.c b/drivers/pci/host/pci-imx6.c
-index c63691c..53f8dea 100644
---- a/drivers/pci/host/pci-imx6.c
-+++ b/drivers/pci/host/pci-imx6.c
-@@ -433,9 +433,6 @@ static void imx6_pcie_host_init(struct pcie_port *pp)
- 	dw_pcie_setup_rc(pp);
- 
- 	imx6_pcie_start_link(pp);
--
--	if (IS_ENABLED(CONFIG_PCI_MSI))
--		dw_pcie_msi_init(pp);
- }
- 
- static void imx6_pcie_reset_phy(struct pcie_port *pp)
-@@ -550,6 +547,9 @@ static int __init imx6_add_pcie_port(struct pcie_port *pp,
- 		return ret;
- 	}
- 
-+	if (IS_ENABLED(CONFIG_PCI_MSI))
-+		dw_pcie_msi_init(pp);
-+
- 	return 0;
- }
- 
--- 
-1.8.4
+Thanks,
+
+Tomeu
