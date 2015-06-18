@@ -1,122 +1,33 @@
-From: tinamdar@apm.com (Tanmay Inamdar)
-Date: Thu, 18 Jun 2015 11:00:22 -0700
-Subject: [PATCH v2 1/1] PCI: X-Gene: Disable Configuration Request Retry
- Status for X-Gene v1 PCIe
-In-Reply-To: <017c1ec8e3f43f86a947eaddb30c9389e0b1053b.1434154377.git.dhdang@apm.com>
-References: <CAErSpo5Oc_8ca4h7xYSkGPFE1vxWg1sy1rJRc0B=u9LrdOLY7g@mail.gmail.com>
- <017c1ec8e3f43f86a947eaddb30c9389e0b1053b.1434154377.git.dhdang@apm.com>
-Message-ID: <CACoXjcn89mnYqHrmQYK-PVq-YueAvv3zECCtDMnCoKF3xzmBew@mail.gmail.com>
+From: scott.shu@mediatek.com (Scott Shu)
+Date: Fri, 19 Jun 2015 02:01:16 +0800
+Subject: [RESEND PATCH 1/6] Document: bindings: DT: Add SMP enable method for
+ MT6580 SoC platform
+In-Reply-To: <1434650481-39421-1-git-send-email-scott.shu@mediatek.com>
+References: <Scott Shu <srv_scott.shu@mediatek.com>
+ <1434650481-39421-1-git-send-email-scott.shu@mediatek.com>
+Message-ID: <1434650481-39421-2-git-send-email-scott.shu@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+For MT6580 SoC platform, the secondary cores are in powered off state
+as default, so compared with MT65xx series SoC, one new enable method
+is needed. This method using the SPM (System Power Manager) inside
+the SCYSYS to control the CPU power.
+---
+ Documentation/devicetree/bindings/arm/cpus.txt | 1 +
+ 1 file changed, 1 insertion(+)
 
-On Fri, Jun 12, 2015 at 5:35 PM, Duc Dang <dhdang@apm.com> wrote:
-> X-Gene v1 PCIe controller has a bug in Configuration Request Retry
-> Status (CRS) logic:
->   When CPU tries to read Vendor ID and Device ID of not-existed
->   remote device, the controller returns 0xFFFF0001 instead of
->   0xFFFFFFFF; this will add significant delay in boot time as
->   pci_bus_read_dev_vendor_id will wait for 60 seconds before
->   giving up.
->
-> So for X-Gene v1 PCIe controllers, disable CRS capability
-> advertisement by clearing CRS Software Visibility bit before
-> returning the Root Capability value to the callers. This is done
-> by implementing X-Gene PCIe specific xgene_pcie_config_read32 for
-> CFG read accesses to replace the generic default pci_generic_config_read32
-> function.
->
-> v2 changes:
->         Use pci_generic_config_read32 to implement xgene_pcie_config_read32
->
-> Signed-off-by: Duc Dang <dhdang@apm.com>
-> Tested-by: Ian Campbell <ian.campbell@citrix.com>
-> Tested-by: Marcin Juszkiewicz <mjuszkiewicz@redhat.com>
-
- Acked-by: Tanmay Inamdar <tinamdar@apm.com
-
-> ---
->  drivers/pci/host/pci-xgene.c | 43 ++++++++++++++++++++++++++++++++++++++++++-
->  1 file changed, 42 insertions(+), 1 deletion(-)
->
-> diff --git a/drivers/pci/host/pci-xgene.c b/drivers/pci/host/pci-xgene.c
-> index e6c8864..7e3cf28 100644
-> --- a/drivers/pci/host/pci-xgene.c
-> +++ b/drivers/pci/host/pci-xgene.c
-> @@ -59,6 +59,12 @@
->  #define SZ_1T                          (SZ_1G*1024ULL)
->  #define PIPE_PHY_RATE_RD(src)          ((0xc000 & (u32)(src)) >> 0xe)
->
-> +#define ROOT_CAP_AND_CTRL              0x5C
-> +
-> +/* PCIe IP version */
-> +#define XGENE_PCIE_IP_VER_UNKN         0
-> +#define XGENE_PCIE_IP_VER_1            1
-> +
->  struct xgene_pcie_port {
->         struct device_node      *node;
->         struct device           *dev;
-> @@ -67,6 +73,7 @@ struct xgene_pcie_port {
->         void __iomem            *cfg_base;
->         unsigned long           cfg_addr;
->         bool                    link_up;
-> +       u32                     version;
->  };
->
->  static inline u32 pcie_bar_low_val(u32 addr, u32 flags)
-> @@ -140,9 +147,39 @@ static void __iomem *xgene_pcie_map_bus(struct pci_bus *bus, unsigned int devfn,
->         return xgene_pcie_get_cfg_base(bus) + offset;
->  }
->
-> +int xgene_pcie_config_read32(struct pci_bus *bus, unsigned int devfn,
-> +                             int where, int size, u32 *val)
-> +{
-> +       struct xgene_pcie_port *port = bus->sysdata;
-> +
-> +       if (pci_generic_config_read32(bus, devfn, where & ~0x3, 4, val) !=
-> +           PCIBIOS_SUCCESSFUL)
-> +               return PCIBIOS_DEVICE_NOT_FOUND;
-> +       /*
-> +        * X-Gene v1 PCIe controller has a bug in Configuration Request
-> +        * Retry Status (CRS) logic:
-> +        *  When CPU tries to read Vendor ID and Device ID of not-existed
-> +        *  remote device, the controller returns 0xFFFF0001 instead of
-> +        *  0xFFFFFFFF; this will add significant delay in boot time as
-> +        *  pci_bus_read_dev_vendor_id will wait for 60 seconds before
-> +        *  giving up.
-> +        * So for X-Gene v1 PCIe controllers, disable CRS capability
-> +        * advertisement by clearing CRS Software Visibility bit before
-> +        * returning the Root Capability value to the callers.
-> +        */
-> +       if (pci_is_root_bus(bus) && (port->version == XGENE_PCIE_IP_VER_1) &&
-> +           ((where & ~0x3) == ROOT_CAP_AND_CTRL))
-> +               *val &= ~(PCI_EXP_RTCAP_CRSVIS << 16);
-> +
-> +       if (size <= 2)
-> +               *val = (*val >> (8 * (where & 3))) & ((1 << (size * 8)) - 1);
-> +
-> +       return PCIBIOS_SUCCESSFUL;
-> +}
-> +
->  static struct pci_ops xgene_pcie_ops = {
->         .map_bus = xgene_pcie_map_bus,
-> -       .read = pci_generic_config_read32,
-> +       .read = xgene_pcie_config_read32,
->         .write = pci_generic_config_write32,
->  };
->
-> @@ -500,6 +537,10 @@ static int xgene_pcie_probe_bridge(struct platform_device *pdev)
->         port->node = of_node_get(pdev->dev.of_node);
->         port->dev = &pdev->dev;
->
-> +       port->version = XGENE_PCIE_IP_VER_UNKN;
-> +       if (of_device_is_compatible(port->node, "apm,xgene-pcie"))
-> +               port->version = XGENE_PCIE_IP_VER_1;
-> +
->         ret = xgene_pcie_map_reg(port, pdev);
->         if (ret)
->                 return ret;
-> --
-> 1.9.1
->
+diff --git a/Documentation/devicetree/bindings/arm/cpus.txt b/Documentation/devicetree/bindings/arm/cpus.txt
+index ac2903d..fb80b2e 100644
+--- a/Documentation/devicetree/bindings/arm/cpus.txt
++++ b/Documentation/devicetree/bindings/arm/cpus.txt
+@@ -194,6 +194,7 @@ nodes to be present and contain the properties described below.
+ 			    "marvell,armada-380-smp"
+ 			    "marvell,armada-390-smp"
+ 			    "marvell,armada-xp-smp"
++			    "mediatek,mt6580-smp"
+ 			    "mediatek,mt65xx-smp"
+ 			    "mediatek,mt81xx-tz-smp"
+ 			    "qcom,gcc-msm8660"
+-- 
+1.8.1.1.dirty
