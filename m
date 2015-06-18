@@ -1,105 +1,87 @@
 From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Thu, 18 Jun 2015 16:24:40 +0530
-Subject: [PATCH 26/41] clocksource: time-armada-370-xp: Migrate to new
- 'set-state' interface
+Date: Thu, 18 Jun 2015 16:24:31 +0530
+Subject: [PATCH 17/41] clocksource: qcom: Migrate to new 'set-state' interface
 In-Reply-To: <cover.1434622147.git.viresh.kumar@linaro.org>
 References: <cover.1434622147.git.viresh.kumar@linaro.org>
-Message-ID: <632796e451d257f8bd5f90f779e866870be02db2.1434622147.git.viresh.kumar@linaro.org>
+Message-ID: <f3bbf91cc4244796291bff383ef24a182bb3b690.1434622147.git.viresh.kumar@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Migrate time-armada-370-xp driver to the new 'set-state' interface
-provided by clockevents core, the earlier 'set-mode' interface is marked
-obsolete now.
+Migrate qcom driver to the new 'set-state' interface provided by
+clockevents core, the earlier 'set-mode' interface is marked obsolete
+now.
 
 This also enables us to implement callbacks for new states of clockevent
 devices, for example: ONESHOT_STOPPED.
 
-Cc: Jason Cooper <jason@lakedaemon.net>
-Cc: Andrew Lunn <andrew@lunn.ch>
-Cc: Gregory Clement <gregory.clement@free-electrons.com>
-Cc: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+Periodic mode isn't supported by the driver and so the callback isn't
+provided anymore.
+
+Cc: Stephen Boyd <sboyd@codeaurora.org>
+Cc: Kumar Gala <galak@codeaurora.org>
+Cc: Andy Gross <agross@codeaurora.org>
+Cc: David Brown <davidb@codeaurora.org>
 Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
 ---
- drivers/clocksource/time-armada-370-xp.c | 53 +++++++++++++++++---------------
- 1 file changed, 28 insertions(+), 25 deletions(-)
+ drivers/clocksource/qcom-timer.c | 24 +++++++-----------------
+ 1 file changed, 7 insertions(+), 17 deletions(-)
 
-diff --git a/drivers/clocksource/time-armada-370-xp.c b/drivers/clocksource/time-armada-370-xp.c
-index 0c8c5e337540..2162796fd504 100644
---- a/drivers/clocksource/time-armada-370-xp.c
-+++ b/drivers/clocksource/time-armada-370-xp.c
-@@ -121,33 +121,33 @@ armada_370_xp_clkevt_next_event(unsigned long delta,
+diff --git a/drivers/clocksource/qcom-timer.c b/drivers/clocksource/qcom-timer.c
+index cba2d015564c..f8e09f923651 100644
+--- a/drivers/clocksource/qcom-timer.c
++++ b/drivers/clocksource/qcom-timer.c
+@@ -47,7 +47,7 @@ static irqreturn_t msm_timer_interrupt(int irq, void *dev_id)
+ {
+ 	struct clock_event_device *evt = dev_id;
+ 	/* Stop the timer tick */
+-	if (evt->mode == CLOCK_EVT_MODE_ONESHOT) {
++	if (clockevent_state_oneshot(evt)) {
+ 		u32 ctrl = readl_relaxed(event_base + TIMER_ENABLE);
+ 		ctrl &= ~TIMER_ENABLE_EN;
+ 		writel_relaxed(ctrl, event_base + TIMER_ENABLE);
+@@ -75,26 +75,14 @@ static int msm_timer_set_next_event(unsigned long cycles,
  	return 0;
  }
  
--static void
--armada_370_xp_clkevt_mode(enum clock_event_mode mode,
--			  struct clock_event_device *dev)
-+static int armada_370_xp_clkevt_shutdown(struct clock_event_device *evt)
+-static void msm_timer_set_mode(enum clock_event_mode mode,
+-			      struct clock_event_device *evt)
++static int msm_timer_shutdown(struct clock_event_device *evt)
  {
--	if (mode == CLOCK_EVT_MODE_PERIODIC) {
-+	/*
-+	 * Disable timer.
-+	 */
-+	local_timer_ctrl_clrset(TIMER0_EN, 0);
+ 	u32 ctrl;
  
--		/*
--		 * Setup timer to fire at 1/HZ intervals.
--		 */
--		writel(ticks_per_jiffy - 1, local_base + TIMER0_RELOAD_OFF);
--		writel(ticks_per_jiffy - 1, local_base + TIMER0_VAL_OFF);
-+	/*
-+	 * ACK pending timer interrupt.
-+	 */
-+	writel(TIMER0_CLR_MASK, local_base + LCL_TIMER_EVENTS_STATUS);
-+	return 0;
-+}
- 
--		/*
--		 * Enable timer.
--		 */
--		local_timer_ctrl_clrset(0, TIMER0_RELOAD_EN | enable_mask);
--	} else {
--		/*
--		 * Disable timer.
--		 */
--		local_timer_ctrl_clrset(TIMER0_EN, 0);
-+static int armada_370_xp_clkevt_set_periodic(struct clock_event_device *evt)
-+{
-+	/*
-+	 * Setup timer to fire at 1/HZ intervals.
-+	 */
-+	writel(ticks_per_jiffy - 1, local_base + TIMER0_RELOAD_OFF);
-+	writel(ticks_per_jiffy - 1, local_base + TIMER0_VAL_OFF);
- 
--		/*
--		 * ACK pending timer interrupt.
--		 */
--		writel(TIMER0_CLR_MASK, local_base + LCL_TIMER_EVENTS_STATUS);
+ 	ctrl = readl_relaxed(event_base + TIMER_ENABLE);
+ 	ctrl &= ~(TIMER_ENABLE_EN | TIMER_ENABLE_CLR_ON_MATCH_EN);
+-
+-	switch (mode) {
+-	case CLOCK_EVT_MODE_RESUME:
+-	case CLOCK_EVT_MODE_PERIODIC:
+-		break;
+-	case CLOCK_EVT_MODE_ONESHOT:
+-		/* Timer is enabled in set_next_event */
+-		break;
+-	case CLOCK_EVT_MODE_UNUSED:
+-	case CLOCK_EVT_MODE_SHUTDOWN:
+-		break;
 -	}
-+	/*
-+	 * Enable timer.
-+	 */
-+	local_timer_ctrl_clrset(0, TIMER0_RELOAD_EN | enable_mask);
+ 	writel_relaxed(ctrl, event_base + TIMER_ENABLE);
 +	return 0;
  }
  
- static int armada_370_xp_clkevt_irq;
-@@ -185,7 +185,10 @@ static int armada_370_xp_timer_setup(struct clock_event_device *evt)
- 	evt->shift		= 32,
- 	evt->rating		= 300,
- 	evt->set_next_event	= armada_370_xp_clkevt_next_event,
--	evt->set_mode		= armada_370_xp_clkevt_mode,
-+	evt->set_state_shutdown	= armada_370_xp_clkevt_shutdown;
-+	evt->set_state_periodic	= armada_370_xp_clkevt_set_periodic;
-+	evt->set_state_oneshot	= armada_370_xp_clkevt_shutdown;
-+	evt->tick_resume	= armada_370_xp_clkevt_shutdown;
- 	evt->irq		= armada_370_xp_clkevt_irq;
- 	evt->cpumask		= cpumask_of(cpu);
+ static struct clock_event_device __percpu *msm_evt;
+@@ -126,7 +114,9 @@ static int msm_local_timer_setup(struct clock_event_device *evt)
+ 	evt->name = "msm_timer";
+ 	evt->features = CLOCK_EVT_FEAT_ONESHOT;
+ 	evt->rating = 200;
+-	evt->set_mode = msm_timer_set_mode;
++	evt->set_state_shutdown = msm_timer_shutdown;
++	evt->set_state_oneshot = msm_timer_shutdown;
++	evt->tick_resume = msm_timer_shutdown;
+ 	evt->set_next_event = msm_timer_set_next_event;
+ 	evt->cpumask = cpumask_of(cpu);
  
-@@ -197,7 +200,7 @@ static int armada_370_xp_timer_setup(struct clock_event_device *evt)
+@@ -147,7 +137,7 @@ static int msm_local_timer_setup(struct clock_event_device *evt)
  
- static void armada_370_xp_timer_stop(struct clock_event_device *evt)
+ static void msm_local_timer_stop(struct clock_event_device *evt)
  {
 -	evt->set_mode(CLOCK_EVT_MODE_UNUSED, evt);
 +	evt->set_state_shutdown(evt);
