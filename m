@@ -1,22 +1,91 @@
-From: jiri.prchal@aksignal.cz (=?UTF-8?B?SmnFmcOtIFByY2hhbA==?=)
-Date: Thu, 18 Jun 2015 14:09:16 +0200
-Subject: [PATCH linux-next v2 1/1] dmaengine: at_hdmac: fix residue
- computation
-In-Reply-To: <b9630cef4224b93939138b3a8c1950ea44cbcf59.1434626239.git.cyrille.pitchen@atmel.com>
-References: <cover.1434626239.git.cyrille.pitchen@atmel.com>
- <b9630cef4224b93939138b3a8c1950ea44cbcf59.1434626239.git.cyrille.pitchen@atmel.com>
-Message-ID: <5582B4EC.7030805@aksignal.cz>
+From: fransklaver@gmail.com (Frans Klaver)
+Date: Thu, 18 Jun 2015 14:14:07 +0200
+Subject: [PATCH 01/44] kernel: Add support for poweroff handler call chain
+In-Reply-To: <5582B15B.4010205@roeck-us.net>
+References: <1412659726-29957-1-git-send-email-linux@roeck-us.net>
+ <1412659726-29957-2-git-send-email-linux@roeck-us.net>
+ <55821936.4040704@codeaurora.org>
+ <CAH6sp9P7rq2y_hiQPHKUP85CwnEmp87yC7Psh4=29h-pYnb_yw@mail.gmail.com>
+ <5582B15B.4010205@roeck-us.net>
+Message-ID: <CAH6sp9O0B_BWS8cLSq=MoFbe3nB_45+K64gh7QMHO3meT-b14w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On 18.6.2015 13:25, Cyrille Pitchen wrote:
+On Thu, Jun 18, 2015 at 1:54 PM, Guenter Roeck <linux@roeck-us.net> wrote:
+> On 06/17/2015 11:53 PM, Frans Klaver wrote:
+>>
+>> On Thu, Jun 18, 2015 at 3:04 AM, Stephen Boyd <sboyd@codeaurora.org>
+>> wrote:
+>>>
+>>> On 10/06/2014 10:28 PM, Guenter Roeck wrote:
+>>>>
+>>>> Various drivers implement architecture and/or device specific means to
+>>>> remove power from the system.  For the most part, those drivers set the
+>>>> global variable pm_power_off to point to a function within the driver.
+>>>>
+>>>> This mechanism has a number of drawbacks.  Typically only one scheme
+>>>> to remove power is supported (at least if pm_power_off is used).
+>>>> At least in theory there can be multiple means remove power, some of
+>>>> which may be less desirable. For example, some mechanisms may only
+>>>> power off the CPU or the CPU card, while another may power off the
+>>>> entire system.  Others may really just execute a restart sequence
+>>>> or drop into the ROM monitor. Using pm_power_off can also be racy
+>>>> if the function pointer is set from a driver built as module, as the
+>>>> driver may be in the process of being unloaded when pm_power_off is
+>>>> called. If there are multiple poweroff handlers in the system, removing
+>>>> a module with such a handler may inadvertently reset the pointer to
+>>>> pm_power_off to NULL, leaving the system with no means to remove power.
+>>>>
+>>>> Introduce a system poweroff handler call chain to solve the described
+>>>> problems.  This call chain is expected to be executed from the
+>>>> architecture specific machine_power_off() function.  Drivers providing
+>>>> system poweroff functionality are expected to register with this call
+>>>> chain.
+>>>> By using the priority field in the notifier block, callers can control
+>>>> poweroff handler execution sequence and thus ensure that the poweroff
+>>>> handler with the optimal capabilities to remove power for a given system
+>>>> is called first.
+>>>
+>>>
+>>> What happened to this series? I want to add shutdown support to my
+>>> platform and I need to write a register on the PMIC in one driver to
+>>> configure it for shutdown instead of restart and then write an MMIO
+>>> register to tell the PMIC to actually do the shutdown in another driver.
+>>> It seems that the notifier solves this case for me, albeit with the
+>>> slight complication that I need to order the two with some priority.
+>>
+>>
+>> I was wondering the same thing. I did find out that things kind of
+>> stalled after Linus cast doubt on the chosen path [1]. I'm not sure
+>> there's any consensus on what would be best to do instead.
+>>
 >
-> Signed-off-by: Cyrille Pitchen <cyrille.pitchen@atmel.com>
+> Linus cast doubt on it, then the maintainers started picking it apart.
+> At the end, trying not to use notifier callbacks made the code so
+> complicated that even I didn't understand it anymore. With no consensus
+> in sight, I abandoned it.
+>
+> Problem is really that the notifier call chain would be perfect to solve
+> the problem, yet Linus didn't like priorities (which are essential),
+> and the power maintainers didn't like that a call chain is supposed
+> to execute _all_ callbacks, which would not be the case here. If I were
+> to start again, I would insist to use notifiers. However, I don't see
+> a chance to get that accepted, so I won't. Feel free to pick it up and
+> give it a try yourself.
 
-Tested-by: Ji?? Prchal <jiri.prchal@aksignal.cz>
+How about having two phases? One where all interested parts of the
+system get notified, one that does the final shutdown. It's a slightly
+different approach than you took, but does use the notifier chains as
+expected, and can be used to prepare peripherals for shutdown, if
+there's a use case for it.
 
-Manually applied to 4.1-rc7 and it WORKS!
-Great.
-Jiri
+The two-stage approach does keep the single place to power down. I
+expect it would become more obvious that it would be silly to have
+more than one actual system power down sequence and hiding
+pm_power_off and unifying setting of it should become more straight
+forward as well.
+
+Thoughts?
+
+Thanks,
+Frans
