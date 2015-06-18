@@ -1,80 +1,90 @@
 From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Thu, 18 Jun 2015 16:24:53 +0530
-Subject: [PATCH 39/41] clocksource: vf_pit: Migrate to new 'set-state'
- interface
+Date: Thu, 18 Jun 2015 16:24:55 +0530
+Subject: [PATCH 41/41] clocksource: zevio: Migrate to new 'set-state' interface
 In-Reply-To: <cover.1434622147.git.viresh.kumar@linaro.org>
 References: <cover.1434622147.git.viresh.kumar@linaro.org>
-Message-ID: <c9f030f57a10c1be00f8732ae2190fcc55248db5.1434622147.git.viresh.kumar@linaro.org>
+Message-ID: <2492473d6bb8f057af389d6db24af77462af2468.1434622147.git.viresh.kumar@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Migrate vf_pit driver to the new 'set-state' interface provided by
+Migrate zevio driver to the new 'set-state' interface provided by
 clockevents core, the earlier 'set-mode' interface is marked obsolete
 now.
 
 This also enables us to implement callbacks for new states of clockevent
 devices, for example: ONESHOT_STOPPED.
 
-Cc: Jingchang Lu <b35083@freescale.com>
-Cc: Stefan Agner <stefan@agner.ch>
-Cc: Shawn Guo <shawn.guo@linaro.org>
+Cc: Daniel Tang <dt.tangr@gmail.com>
 Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
 ---
- drivers/clocksource/vf_pit_timer.c | 27 ++++++++++++---------------
- 1 file changed, 12 insertions(+), 15 deletions(-)
+ drivers/clocksource/zevio-timer.c | 44 +++++++++++++++++++--------------------
+ 1 file changed, 21 insertions(+), 23 deletions(-)
 
-diff --git a/drivers/clocksource/vf_pit_timer.c b/drivers/clocksource/vf_pit_timer.c
-index b45ac6229b57..f07ba9932171 100644
---- a/drivers/clocksource/vf_pit_timer.c
-+++ b/drivers/clocksource/vf_pit_timer.c
-@@ -86,20 +86,16 @@ static int pit_set_next_event(unsigned long delta,
+diff --git a/drivers/clocksource/zevio-timer.c b/drivers/clocksource/zevio-timer.c
+index 7ce442148c3f..ceaa6133f9c2 100644
+--- a/drivers/clocksource/zevio-timer.c
++++ b/drivers/clocksource/zevio-timer.c
+@@ -76,32 +76,28 @@ static int zevio_timer_set_event(unsigned long delta,
  	return 0;
  }
  
--static void pit_set_mode(enum clock_event_mode mode,
--				struct clock_event_device *evt)
-+static int pit_shutdown(struct clock_event_device *evt)
+-static void zevio_timer_set_mode(enum clock_event_mode mode,
+-				 struct clock_event_device *dev)
++static int zevio_timer_shutdown(struct clock_event_device *dev)
  {
+ 	struct zevio_timer *timer = container_of(dev, struct zevio_timer,
+ 						 clkevt);
+ 
 -	switch (mode) {
--	case CLOCK_EVT_MODE_PERIODIC:
--		pit_set_next_event(cycle_per_jiffy, evt);
+-	case CLOCK_EVT_MODE_RESUME:
+-	case CLOCK_EVT_MODE_ONESHOT:
+-		/* Enable timer interrupts */
+-		writel(TIMER_INTR_MSK, timer->interrupt_regs + IO_INTR_MSK);
+-		writel(TIMER_INTR_ALL, timer->interrupt_regs + IO_INTR_ACK);
 -		break;
 -	case CLOCK_EVT_MODE_SHUTDOWN:
 -	case CLOCK_EVT_MODE_UNUSED:
--		pit_timer_disable();
+-		/* Disable timer interrupts */
+-		writel(0, timer->interrupt_regs + IO_INTR_MSK);
+-		writel(TIMER_INTR_ALL, timer->interrupt_regs + IO_INTR_ACK);
+-		/* Stop timer */
+-		writel(CNTL_STOP_TIMER, timer->timer1 + IO_CONTROL);
 -		break;
+-	case CLOCK_EVT_MODE_PERIODIC:
 -	default:
+-		/* Unsupported */
 -		break;
 -	}
-+	pit_timer_disable();
++	/* Disable timer interrupts */
++	writel(0, timer->interrupt_regs + IO_INTR_MSK);
++	writel(TIMER_INTR_ALL, timer->interrupt_regs + IO_INTR_ACK);
++	/* Stop timer */
++	writel(CNTL_STOP_TIMER, timer->timer1 + IO_CONTROL);
 +	return 0;
 +}
 +
-+static int pit_set_periodic(struct clock_event_device *evt)
++static int zevio_timer_set_oneshot(struct clock_event_device *dev)
 +{
-+	pit_set_next_event(cycle_per_jiffy, evt);
++	struct zevio_timer *timer = container_of(dev, struct zevio_timer,
++						 clkevt);
++
++	/* Enable timer interrupts */
++	writel(TIMER_INTR_MSK, timer->interrupt_regs + IO_INTR_MSK);
++	writel(TIMER_INTR_ALL, timer->interrupt_regs + IO_INTR_ACK);
 +	return 0;
  }
  
- static irqreturn_t pit_timer_interrupt(int irq, void *dev_id)
-@@ -114,7 +110,7 @@ static irqreturn_t pit_timer_interrupt(int irq, void *dev_id)
- 	 * and start the counter again. So software need to disable the timer
- 	 * to stop the counter loop in ONESHOT mode.
- 	 */
--	if (likely(evt->mode == CLOCK_EVT_MODE_ONESHOT))
-+	if (likely(clockevent_state_oneshot(evt)))
- 		pit_timer_disable();
- 
- 	evt->event_handler(evt);
-@@ -125,7 +121,8 @@ static irqreturn_t pit_timer_interrupt(int irq, void *dev_id)
- static struct clock_event_device clockevent_pit = {
- 	.name		= "VF pit timer",
- 	.features	= CLOCK_EVT_FEAT_PERIODIC | CLOCK_EVT_FEAT_ONESHOT,
--	.set_mode	= pit_set_mode,
-+	.set_state_shutdown = pit_shutdown,
-+	.set_state_periodic = pit_set_periodic,
- 	.set_next_event	= pit_set_next_event,
- 	.rating		= 300,
- };
+ static irqreturn_t zevio_timer_interrupt(int irq, void *dev_id)
+@@ -162,7 +158,9 @@ static int __init zevio_timer_add(struct device_node *node)
+ 	if (timer->interrupt_regs && irqnr) {
+ 		timer->clkevt.name		= timer->clockevent_name;
+ 		timer->clkevt.set_next_event	= zevio_timer_set_event;
+-		timer->clkevt.set_mode		= zevio_timer_set_mode;
++		timer->clkevt.set_state_shutdown = zevio_timer_shutdown;
++		timer->clkevt.set_state_oneshot = zevio_timer_set_oneshot;
++		timer->clkevt.tick_resume	= zevio_timer_set_oneshot;
+ 		timer->clkevt.rating		= 200;
+ 		timer->clkevt.cpumask		= cpu_all_mask;
+ 		timer->clkevt.features		= CLOCK_EVT_FEAT_ONESHOT;
 -- 
 2.4.0
