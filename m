@@ -1,148 +1,52 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Thu, 18 Jun 2015 16:10:18 +0300
-Subject: [PATCH 20/41] clocksource: sh_cmt: Migrate to new 'set-state'
- interface
-In-Reply-To: <0be5c5579b47ca1f774a89ca2388a3e9389253d1.1434622147.git.viresh.kumar@linaro.org>
-References: <cover.1434622147.git.viresh.kumar@linaro.org>
- <0be5c5579b47ca1f774a89ca2388a3e9389253d1.1434622147.git.viresh.kumar@linaro.org>
-Message-ID: <7799171.e5nEbff1LY@avalon>
+From: boris.brezillon@free-electrons.com (Boris Brezillon)
+Date: Thu, 18 Jun 2015 15:09:45 +0200
+Subject: [PATCH v2 0/2] mfd: flexcom: add a driver for Flexcom
+In-Reply-To: <cover.1434632230.git.cyrille.pitchen@atmel.com>
+References: <cover.1434632230.git.cyrille.pitchen@atmel.com>
+Message-ID: <20150618150945.5cc698be@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Viresh,
+On Thu, 18 Jun 2015 15:05:08 +0200
+Cyrille Pitchen <cyrille.pitchen@atmel.com> wrote:
 
-Thank you for the patch.
+> ChangeLog
+> 
+> v2:
+> - enhance the documentation of DT bindings and change the way the "ranges"
+>   property is used.
+> - replace __raw_readl() and __raw_writel() by readl() and writel().
+> - change the module license to "GPL" for v2 or later
+> - print the selected flexcom mode after the hardware version
+> 
+> v1:
+> This series of patches a support to the Atmel Flexcom, a wrapper which
+> integrates an USART, a SPI controller and a TWI controller. Only one
+> peripheral can be used at a time. The active function is selected though
+> the Flexcom Mode Register.
 
-On Thursday 18 June 2015 16:24:34 Viresh Kumar wrote:
-> Migrate sh_cmt driver to the new 'set-state' interface provided by
-> clockevents core, the earlier 'set-mode' interface is marked obsolete
-> now.
-> 
-> This also enables us to implement callbacks for new states of clockevent
-> devices, for example: ONESHOT_STOPPED.
-> 
-> Cc: Magnus Damm <damm+renesas@opensource.se>
-> Cc: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
-> Cc: Paul Mundt <lethal@linux-sh.org>
-> Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
+For the whole series,
 
-Acked-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
+Acked-by: Boris Brezillon <boris.brezillon@free-electrons.com>
 
-> ---
->  drivers/clocksource/sh_cmt.c | 62 ++++++++++++++++++++--------------------
->  1 file changed, 31 insertions(+), 31 deletions(-)
 > 
-> diff --git a/drivers/clocksource/sh_cmt.c b/drivers/clocksource/sh_cmt.c
-> index b8ff3c64cc45..855f42a2c64b 100644
-> --- a/drivers/clocksource/sh_cmt.c
-> +++ b/drivers/clocksource/sh_cmt.c
-> @@ -538,7 +538,7 @@ static irqreturn_t sh_cmt_interrupt(int irq, void
-> *dev_id)
+> Cyrille Pitchen (2):
+>   mfd: devicetree: add bindings for Atmel Flexcom
+>   mfd: flexcom: add a driver for Atmel Flexible Serial Communication
+>     Unit
 > 
->  	if (ch->flags & FLAG_CLOCKEVENT) {
->  		if (!(ch->flags & FLAG_SKIPEVENT)) {
-> -			if (ch->ced.mode == CLOCK_EVT_MODE_ONESHOT) {
-> +			if (clockevent_state_oneshot(&ch->ced)) {
->  				ch->next_match_value = ch->max_match_value;
->  				ch->flags |= FLAG_REPROGRAM;
->  			}
-> @@ -554,7 +554,7 @@ static irqreturn_t sh_cmt_interrupt(int irq, void
-> *dev_id) sh_cmt_clock_event_program_verify(ch, 1);
+>  .../devicetree/bindings/mfd/atmel-flexcom.txt      | 58 +++++++++++++
+>  drivers/mfd/Kconfig                                | 11 +++
+>  drivers/mfd/Makefile                               |  1 +
+>  drivers/mfd/atmel-flexcom.c                        | 97 ++++++++++++++++++++++
+>  4 files changed, 167 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/mfd/atmel-flexcom.txt
+>  create mode 100644 drivers/mfd/atmel-flexcom.c
 > 
->  		if (ch->flags & FLAG_CLOCKEVENT)
-> -			if ((ch->ced.mode == CLOCK_EVT_MODE_SHUTDOWN)
-> +			if ((clockevent_state_shutdown(&ch->ced))
-> 
->  			    || (ch->match_value == ch->next_match_value))
-> 
->  				ch->flags &= ~FLAG_REPROGRAM;
->  	}
-> @@ -720,39 +720,37 @@ static void sh_cmt_clock_event_start(struct
-> sh_cmt_channel *ch, int periodic) sh_cmt_set_next(ch, ch->max_match_value);
->  }
-> 
-> -static void sh_cmt_clock_event_mode(enum clock_event_mode mode,
-> -				    struct clock_event_device *ced)
-> +static int sh_cmt_clock_event_shutdown(struct clock_event_device *ced)
-> +{
-> +	struct sh_cmt_channel *ch = ced_to_sh_cmt(ced);
-> +
-> +	sh_cmt_stop(ch, FLAG_CLOCKEVENT);
-> +	return 0;
-> +}
-> +
-> +static int sh_cmt_clock_event_set_state(struct clock_event_device *ced,
-> +					int periodic)
->  {
->  	struct sh_cmt_channel *ch = ced_to_sh_cmt(ced);
-> 
->  	/* deal with old setting first */
-> -	switch (ced->mode) {
-> -	case CLOCK_EVT_MODE_PERIODIC:
-> -	case CLOCK_EVT_MODE_ONESHOT:
-> +	if (clockevent_state_oneshot(ced) || clockevent_state_periodic(ced))
->  		sh_cmt_stop(ch, FLAG_CLOCKEVENT);
-> -		break;
-> -	default:
-> -		break;
-> -	}
-> 
-> -	switch (mode) {
-> -	case CLOCK_EVT_MODE_PERIODIC:
-> -		dev_info(&ch->cmt->pdev->dev,
-> -			 "ch%u: used for periodic clock events\n", ch->index);
-> -		sh_cmt_clock_event_start(ch, 1);
-> -		break;
-> -	case CLOCK_EVT_MODE_ONESHOT:
-> -		dev_info(&ch->cmt->pdev->dev,
-> -			 "ch%u: used for oneshot clock events\n", ch->index);
-> -		sh_cmt_clock_event_start(ch, 0);
-> -		break;
-> -	case CLOCK_EVT_MODE_SHUTDOWN:
-> -	case CLOCK_EVT_MODE_UNUSED:
-> -		sh_cmt_stop(ch, FLAG_CLOCKEVENT);
-> -		break;
-> -	default:
-> -		break;
-> -	}
-> +	dev_info(&ch->cmt->pdev->dev, "ch%u: used for %s clock events\n",
-> +		 ch->index, periodic ? "periodic" : "oneshot");
-> +	sh_cmt_clock_event_start(ch, periodic);
-> +	return 0;
-> +}
-> +
-> +static int sh_cmt_clock_event_set_oneshot(struct clock_event_device *ced)
-> +{
-> +	return sh_cmt_clock_event_set_state(ced, 0);
-> +}
-> +
-> +static int sh_cmt_clock_event_set_periodic(struct clock_event_device *ced)
-> +{
-> +	return sh_cmt_clock_event_set_state(ced, 1);
->  }
-> 
->  static int sh_cmt_clock_event_next(unsigned long delta,
-> @@ -760,7 +758,7 @@ static int sh_cmt_clock_event_next(unsigned long delta,
->  {
->  	struct sh_cmt_channel *ch = ced_to_sh_cmt(ced);
-> 
-> -	BUG_ON(ced->mode != CLOCK_EVT_MODE_ONESHOT);
-> +	BUG_ON(!clockevent_state_oneshot(ced));
->  	if (likely(ch->flags & FLAG_IRQCONTEXT))
->  		ch->next_match_value = delta - 1;
->  	else
-> @@ -814,7 +812,9 @@ static int sh_cmt_register_clockevent(struct
-> sh_cmt_channel *ch, ced->rating = 125;
->  	ced->cpumask = cpu_possible_mask;
->  	ced->set_next_event = sh_cmt_clock_event_next;
-> -	ced->set_mode = sh_cmt_clock_event_mode;
-> +	ced->set_state_shutdown = sh_cmt_clock_event_shutdown;
-> +	ced->set_state_periodic = sh_cmt_clock_event_set_periodic;
-> +	ced->set_state_oneshot = sh_cmt_clock_event_set_oneshot;
->  	ced->suspend = sh_cmt_clock_event_suspend;
->  	ced->resume = sh_cmt_clock_event_resume;
+
+
 
 -- 
-Regards,
-
-Laurent Pinchart
+Boris Brezillon, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
