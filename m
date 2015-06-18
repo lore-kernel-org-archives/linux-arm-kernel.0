@@ -1,71 +1,98 @@
 From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Thu, 18 Jun 2015 16:24:43 +0530
-Subject: [PATCH 29/41] clocksource: atlas7: Migrate to new 'set-state'
- interface
+Date: Thu, 18 Jun 2015 16:24:44 +0530
+Subject: [PATCH 30/41] clocksource: atmel: Migrate to new 'set-state' interface
 In-Reply-To: <cover.1434622147.git.viresh.kumar@linaro.org>
 References: <cover.1434622147.git.viresh.kumar@linaro.org>
-Message-ID: <797a54c3155022b91781dfc218422de6ef0bd573.1434622147.git.viresh.kumar@linaro.org>
+Message-ID: <f6fdf1f810de1cd9ad4d9e3d45f7c5065156c79e.1434622147.git.viresh.kumar@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Migrate atlas7 driver to the new 'set-state' interface provided by
+Migrate atmel driver to the new 'set-state' interface provided by
 clockevents core, the earlier 'set-mode' interface is marked obsolete
 now.
 
 This also enables us to implement callbacks for new states of clockevent
 devices, for example: ONESHOT_STOPPED.
 
-Cc: Barry Song <baohua@kernel.org>
+Cc: Nicolas Ferre <nicolas.ferre@atmel.com>
+Cc: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+Cc: Jean-Christophe Plagniol-Villard <plagnioj@jcrosoft.com>
 Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
 ---
- drivers/clocksource/timer-atlas7.c | 19 +++++++------------
- 1 file changed, 7 insertions(+), 12 deletions(-)
+ drivers/clocksource/timer-atmel-pit.c | 41 +++++++++++++++--------------------
+ 1 file changed, 18 insertions(+), 23 deletions(-)
 
-diff --git a/drivers/clocksource/timer-atlas7.c b/drivers/clocksource/timer-atlas7.c
-index 60f9de3438b0..27fa13680be1 100644
---- a/drivers/clocksource/timer-atlas7.c
-+++ b/drivers/clocksource/timer-atlas7.c
-@@ -76,7 +76,7 @@ static irqreturn_t sirfsoc_timer_interrupt(int irq, void *dev_id)
- 	/* clear timer interrupt */
- 	writel_relaxed(BIT(cpu), sirfsoc_timer_base + SIRFSOC_TIMER_INTR_STATUS);
- 
--	if (ce->mode == CLOCK_EVT_MODE_ONESHOT)
-+	if (clockevent_state_oneshot(ce))
- 		sirfsoc_timer_count_disable(cpu);
- 
- 	ce->event_handler(ce);
-@@ -117,18 +117,11 @@ static int sirfsoc_timer_set_next_event(unsigned long delta,
- 	return 0;
+diff --git a/drivers/clocksource/timer-atmel-pit.c b/drivers/clocksource/timer-atmel-pit.c
+index c0304ff608b0..58753223585b 100644
+--- a/drivers/clocksource/timer-atmel-pit.c
++++ b/drivers/clocksource/timer-atmel-pit.c
+@@ -90,33 +90,27 @@ static cycle_t read_pit_clk(struct clocksource *cs)
+ 	return elapsed;
  }
  
--static void sirfsoc_timer_set_mode(enum clock_event_mode mode,
--	struct clock_event_device *ce)
-+/* Oneshot is enabled in set_next_event */
-+static int sirfsoc_timer_shutdown(struct clock_event_device *evt)
++static int pit_clkevt_shutdown(struct clock_event_device *dev)
++{
++	struct pit_data *data = clkevt_to_pit_data(dev);
++
++	/* disable irq, leaving the clocksource active */
++	pit_write(data->base, AT91_PIT_MR, (data->cycle - 1) | AT91_PIT_PITEN);
++	return 0;
++}
++
+ /*
+  * Clockevent device:  interrupts every 1/HZ (== pit_cycles * MCK/16)
+  */
+-static void
+-pit_clkevt_mode(enum clock_event_mode mode, struct clock_event_device *dev)
++static int pit_clkevt_set_periodic(struct clock_event_device *dev)
  {
+ 	struct pit_data *data = clkevt_to_pit_data(dev);
+ 
 -	switch (mode) {
--	case CLOCK_EVT_MODE_ONESHOT:
--		/* enable in set_next_event */
+-	case CLOCK_EVT_MODE_PERIODIC:
+-		/* update clocksource counter */
+-		data->cnt += data->cycle * PIT_PICNT(pit_read(data->base, AT91_PIT_PIVR));
+-		pit_write(data->base, AT91_PIT_MR,
+-			  (data->cycle - 1) | AT91_PIT_PITEN | AT91_PIT_PITIEN);
 -		break;
--	default:
+-	case CLOCK_EVT_MODE_ONESHOT:
+-		BUG();
+-		/* FALLTHROUGH */
+-	case CLOCK_EVT_MODE_SHUTDOWN:
+-	case CLOCK_EVT_MODE_UNUSED:
+-		/* disable irq, leaving the clocksource active */
+-		pit_write(data->base, AT91_PIT_MR,
+-			  (data->cycle - 1) | AT91_PIT_PITEN);
+-		break;
+-	case CLOCK_EVT_MODE_RESUME:
 -		break;
 -	}
--
- 	sirfsoc_timer_count_disable(smp_processor_id());
++	/* update clocksource counter */
++	data->cnt += data->cycle * PIT_PICNT(pit_read(data->base, AT91_PIT_PIVR));
++	pit_write(data->base, AT91_PIT_MR,
++		  (data->cycle - 1) | AT91_PIT_PITEN | AT91_PIT_PITIEN);
 +	return 0;
  }
  
- static void sirfsoc_clocksource_suspend(struct clocksource *cs)
-@@ -193,7 +186,9 @@ static int sirfsoc_local_timer_setup(struct clock_event_device *ce)
- 	ce->name = "local_timer";
- 	ce->features = CLOCK_EVT_FEAT_ONESHOT;
- 	ce->rating = 200;
--	ce->set_mode = sirfsoc_timer_set_mode;
-+	ce->set_state_shutdown = sirfsoc_timer_shutdown;
-+	ce->set_state_oneshot = sirfsoc_timer_shutdown;
-+	ce->tick_resume = sirfsoc_timer_shutdown;
- 	ce->set_next_event = sirfsoc_timer_set_next_event;
- 	clockevents_calc_mult_shift(ce, atlas7_timer_rate, 60);
- 	ce->max_delta_ns = clockevent_delta2ns(-2, ce);
+ static void at91sam926x_pit_suspend(struct clock_event_device *cedev)
+@@ -162,7 +156,7 @@ static irqreturn_t at91sam926x_pit_interrupt(int irq, void *dev_id)
+ 	WARN_ON_ONCE(!irqs_disabled());
+ 
+ 	/* The PIT interrupt may be disabled, and is shared */
+-	if ((data->clkevt.mode == CLOCK_EVT_MODE_PERIODIC) &&
++	if (clockevent_state_periodic(&data->clkevt) &&
+ 	    (pit_read(data->base, AT91_PIT_SR) & AT91_PIT_PITS)) {
+ 		unsigned nr_ticks;
+ 
+@@ -227,7 +221,8 @@ static void __init at91sam926x_pit_common_init(struct pit_data *data)
+ 	data->clkevt.rating = 100;
+ 	data->clkevt.cpumask = cpumask_of(0);
+ 
+-	data->clkevt.set_mode = pit_clkevt_mode;
++	data->clkevt.set_state_shutdown = pit_clkevt_shutdown;
++	data->clkevt.set_state_periodic = pit_clkevt_set_periodic;
+ 	data->clkevt.resume = at91sam926x_pit_resume;
+ 	data->clkevt.suspend = at91sam926x_pit_suspend;
+ 	clockevents_register_device(&data->clkevt);
 -- 
 2.4.0
