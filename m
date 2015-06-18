@@ -1,74 +1,132 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Thu, 18 Jun 2015 17:21:05 +0200
-Subject: [PATCH 1/3] ARM: at91/soc: add basic support for new sama5d2 SoC
-In-Reply-To: <fe6d862c640a3708e80c0cc4c694ab5d9079060b.1434632966.git.nicolas.ferre@atmel.com>
-References: <cover.1434632966.git.nicolas.ferre@atmel.com>
- <fe6d862c640a3708e80c0cc4c694ab5d9079060b.1434632966.git.nicolas.ferre@atmel.com>
-Message-ID: <20150618152105.GK27492@piout.net>
+From: b.reynal@virtualopensystems.com (Baptiste Reynal)
+Date: Thu, 18 Jun 2015 17:23:48 +0200
+Subject: [PATCH v4 0/4] VFIO platform reset
+In-Reply-To: <1434580294.5628.135.camel@redhat.com>
+References: <1434359385-19916-1-git-send-email-eric.auger@linaro.org>
+ <1434580294.5628.135.camel@redhat.com>
+Message-ID: <CAN9JPjFKVTh7h=cPFecUTP56Muq54vruas3YG1D32hXd0Mh0LQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hello everyone,
 
-On 18/06/2015 at 15:18:28 +0200, Nicolas Ferre wrote :
-> diff --git a/Documentation/arm/Atmel/README b/Documentation/arm/Atmel/README
-> index c53a19b4aab2..6650a8ffaa64 100644
-> --- a/Documentation/arm/Atmel/README
-> +++ b/Documentation/arm/Atmel/README
-> @@ -90,6 +90,12 @@ the Atmel website: http://www.atmel.com.
->          + Datasheet
->            http://www.atmel.com/Images/Atmel-11238-32-bit-Cortex-A5-Microcontroller-SAMA5D4_Datasheet.pdf
->  
-> +    * ARM Cortex-A5 + NEON based SoCs
-> +      - sama5d2 family
-> +        - sama5d27
-> +        + Datasheet
-> +          Coming soon
+I tested and reviewed the patches, everything's fine for me.
 
-Shouldn't that go directly before or after the sama5d4 family ?
+I agree to be maintainer of vfio platform drivers, though I don't
+think the volume of patches about VFIO will justify a new mailing
+list.
 
-> diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
-> index f1b157971366..140228d033c2 100644
-> --- a/arch/arm/Kconfig.debug
-> +++ b/arch/arm/Kconfig.debug
-> @@ -141,6 +141,12 @@ choice
->  		depends on ARCH_AT91
->  		depends on SOC_SAMA5
->  
-> +	config AT91_DEBUG_LL_DBGU3
-> +		bool "Kernel low-level debugging on sama5d2"
-> +		select DEBUG_AT91_UART
-> +		depends on ARCH_AT91
-> +		depends on SOC_SAMA5
+Regards,
+Baptiste
+
+On Thu, Jun 18, 2015 at 12:31 AM, Alex Williamson
+<alex.williamson@redhat.com> wrote:
+> On Mon, 2015-06-15 at 11:09 +0200, Eric Auger wrote:
+>> In situations where the userspace driver is stopped abnormally and the
+>> VFIO platform device is released, the assigned HW device currently is
+>> left running. As a consequence the HW device might continue issuing IRQs
+>> and performing DMA accesses.
+>>
+>> On release, no physical IRQ handler is setup anymore. Also the DMA buffers
+>> are unmapped leading to IOMMU aborts. So there is no serious consequence.
+>>
+>> However when assigning that HW device again to another userspace driver,
+>> this latter might face some unexpected IRQs and DMA accesses, which are
+>> the result of the previous assignment.
+>>
+>> In virtualization use-case, a VM newly granted with that HW device may be
+>> impacted by the assignment of that device to a previous VM:
+>> - IRQs may be injected very early when booting the new guest, even before
+>>   the guest driver has initialized leading to possible driver state
+>>   inconsistency.
+>> - DMA accesses may hit the newly mapped VM address space at addresses that
+>>   may jeopardize the integrity of the newly installed VM.
+>>
+>> Obviously the criticity depends on the assigned HW device.
+>>
+>> As opposed to PCI, there is no standard mechanism to reset the platform
+>> device.
+>>
+>> This series proposes to implement device specific reset functions in
+>> separate in-kernel vfio reset modules. The vfio-platform driver holds
+>> a whitelist of implemented triplets (compat string, module name,
+>> reset function name). When the vfio-platform driver is probed it identifies
+>> the fellow reset module/function matching the compat string of the
+>> device, if any, and forces the load of this reset module.
+>>
+>> A first reset module is provided: the vfio-platform-calxedaxgmac
+>> module which implements a basic reset for the Calxeda xgmac.
+>>
+>> The series can be found at
+>> https://git.linaro.org/people/eric.auger/linux.git/shortlog/refs/heads/v4.1-rc8-reset-v4
+>>
+>> History:
+>> v3 -> v4:
+>> - fix the commit message of "VFIO: platform: add reset struct and lookup table"
+>
+> Baptiste,
+>
+> Any comments?  Should we also add something like this to MAINTAINERS
+> before we go much further?
+>
+> diff --git a/MAINTAINERS b/MAINTAINERS
+> index d8afd29..c6bf7f6 100644
+> --- a/MAINTAINERS
+> +++ b/MAINTAINERS
+> @@ -10545,6 +10545,12 @@ F:     drivers/vfio/
+>  F:     include/linux/vfio.h
+>  F:     include/uapi/linux/vfio.h
+>
+> +VFIO PLATFORM DRIVER
+> +M:     Baptiste Reynal <b.reynal@virtualopensystems.com>
+> +L:     kvm at vger.kernel.org
+> +S:     Maintained
+> +F:     drivers/vfio/platform/
 > +
-
-I think that at some point we'll have to kill those AT91_DEBUG_LL_*
-which are actually board specific and not soc specific. I already have a
-patch for that that I need to rebase.
-
-> diff --git a/arch/arm/mach-at91/Kconfig b/arch/arm/mach-at91/Kconfig
-> index 43ec794d1057..e53780a28605 100644
-> --- a/arch/arm/mach-at91/Kconfig
-> +++ b/arch/arm/mach-at91/Kconfig
-> @@ -8,6 +8,18 @@ menuconfig ARCH_AT91
->  	select SOC_BUS
->  
->  if ARCH_AT91
-> +config SOC_SAMA5D2
-> +	bool "SAMA5D2 family" if ARCH_MULTI_V7
-> +	select SOC_SAMA5
-> +	select CACHE_L2X0
-> +	select HAVE_FB_ATMEL
-> +	select HAVE_AT91_UTMI
-> +	select HAVE_AT91_USB_CLK
-> +	select HAVE_AT91_H32MX
-> +	select HAVE_AT91_GENERATED
-
-Seeing that, I think HAVE_AT91_GENERATED should include CLK somewhere in
-the name as this is only related to clocks.
-
-
--- 
-Alexandre Belloni, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+>  VIDEOBUF2 FRAMEWORK
+>  M:     Pawel Osciak <pawel@osciak.com>
+>  M:     Marek Szyprowski <m.szyprowski@samsung.com>
+>
+> I'm not sure what you want to be the primary list, maybe it's time to
+> ask for a vfio list.  Thanks,
+> Alex
+>
+>>
+>> v2 -> v3:
+>> - remove void module_init/exit functions in calxeda reset module
+>> - remove enum vfio_platform_reset_type
+>> - for reset lookup, use ARRAY_SIZE
+>> - in reset put use symbol_put_addr
+>>
+>> v1 -> v2:
+>> - much simplified compared to v1 although principle of external modules is
+>>   kept: removed mechanism of dynamic registration of reset functions
+>> - list is replaced by whitelist lookup table
+>> - name of the reset function also stored in the lookup table
+>> - autoload of reset modules
+>>
+>> RFC -> PATCH v1:
+>> - solution now based on a lookup list instead of specialized driver
+>>
+>>
+>> Eric Auger (4):
+>>   VFIO: platform: add reset struct and lookup table
+>>   VFIO: platform: add reset callback
+>>   VFIO: platform: populate the reset function on probe
+>>   VFIO: platform: Calxeda xgmac reset module
+>>
+>>  drivers/vfio/platform/Kconfig                      |  2 +
+>>  drivers/vfio/platform/Makefile                     |  2 +
+>>  drivers/vfio/platform/reset/Kconfig                |  7 ++
+>>  drivers/vfio/platform/reset/Makefile               |  5 ++
+>>  .../platform/reset/vfio_platform_calxedaxgmac.c    | 86 ++++++++++++++++++++++
+>>  drivers/vfio/platform/vfio_platform_common.c       | 60 ++++++++++++++-
+>>  drivers/vfio/platform/vfio_platform_private.h      |  7 ++
+>>  7 files changed, 166 insertions(+), 3 deletions(-)
+>>  create mode 100644 drivers/vfio/platform/reset/Kconfig
+>>  create mode 100644 drivers/vfio/platform/reset/Makefile
+>>  create mode 100644 drivers/vfio/platform/reset/vfio_platform_calxedaxgmac.c
+>>
+>
+>
+>
