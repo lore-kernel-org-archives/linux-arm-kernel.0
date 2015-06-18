@@ -1,135 +1,33 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Thu, 18 Jun 2015 08:20:34 +0530
-Subject: [PATCH V7 2/3] OPP: Allow multiple OPP tables to be passed via DT
-In-Reply-To: <20150618022543.GA28820@linux>
-References: <cover.1433434659.git.viresh.kumar@linaro.org>
- <263c128844f5a3c9280c8be71f6c9eb1869a5188.1433434659.git.viresh.kumar@linaro.org>
- <CAL_Jsq+EOOeQw42wZi+H82ovLn8LcQUuK9HGT+FvewdhTf7Q1w@mail.gmail.com>
- <20150617133314.GB15153@linux>
- <CAL_Jsq+SdgAf7=Yq7Jk_1d9jTpAOLCEuEDCZvD=-h=2MWsNfFw@mail.gmail.com>
- <55821F30.2090802@codeaurora.org> <20150618022543.GA28820@linux>
-Message-ID: <20150618025034.GB28820@linux>
+From: scott.shu@mediatek.com (Scott Shu)
+Date: Thu, 18 Jun 2015 11:35:19 +0800
+Subject: [PATCH 1/6] Document: bindings: DT: Add SMP enable method for MT6580
+ SoC platform
+In-Reply-To: <1434598524-43846-1-git-send-email-scott.shu@mediatek.com>
+References: <Scott Shu <srv_scott.shu@mediatek.com>
+ <1434598524-43846-1-git-send-email-scott.shu@mediatek.com>
+Message-ID: <1434598524-43846-2-git-send-email-scott.shu@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 18-06-15, 07:55, Viresh Kumar wrote:
-> Why do you think so? For me the operating-points-v2-names property
-> will be present in CPU node (as there is no OPP node which can have
-> it) and so every CPU is free to choose what it wants to.
-
-So, I had something like this in mind:
-
-From: Viresh Kumar <viresh.kumar@linaro.org>
-Date: Thu, 30 Apr 2015 17:38:00 +0530
-Subject: [PATCH] OPP: Allow multiple OPP tables to be passed via DT
-
-On some platforms (Like Qualcomm's SoCs), it is not decided until
-runtime on what OPPs to use. The OPP tables can be fixed at compile
-time, but which table to use is found out only after reading some efuses
-(sort of an prom) and knowing characteristics of the SoC.
-
-To support such platform we need to pass multiple OPP tables per device
-and hardware should be able to choose one and only one table out of
-those.
-
-Update operating-points-v2 bindings to support that.
-
-Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
+For MT6580 SoC platform, the secondary cores are in powered off state
+as default, so compared with MT65xx series SoC, one new enable method
+is needed. This method using the SPM (System Power Manager) inside
+the SCYSYS to control the CPU power.
 ---
- Documentation/devicetree/bindings/power/opp.txt | 63 +++++++++++++++++++++++++
- 1 file changed, 63 insertions(+)
+ Documentation/devicetree/bindings/arm/cpus.txt | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/Documentation/devicetree/bindings/power/opp.txt b/Documentation/devicetree/bindings/power/opp.txt
-index 259bf00edf7d..72ccacaac9c9 100644
---- a/Documentation/devicetree/bindings/power/opp.txt
-+++ b/Documentation/devicetree/bindings/power/opp.txt
-@@ -45,10 +45,21 @@ Devices supporting OPPs must set their "operating-points-v2" property with
- phandle to a OPP table in their DT node. The OPP core will use this phandle to
- find the operating points for the device.
- 
-+Devices may want to choose OPP tables at runtime and so can provide a list of
-+phandles here. But only *one* of them should be chosen at runtime. This must be
-+accompanied by a corresponding "operating-points-v2-names" property, to uniquely
-+identify the OPP tables.
-+
- If required, this can be extended for SoC vendor specfic bindings. Such bindings
- should be documented as Documentation/devicetree/bindings/power/<vendor>-opp.txt
- and should have a compatible description like: "operating-points-v2-<vendor>".
- 
-+Optional properties:
-+- operating-points-v2-names: Names of OPP tables (required if multiple OPP
-+  tables are present), to uniquely identify them. The same list must be present
-+  for all the CPUs which are sharing clock/voltage rails and hence the OPP
-+  tables.
-+
- * OPP Table Node
- 
- This describes the OPPs belonging to a device. This node can have following
-@@ -63,11 +74,16 @@ This describes the OPPs belonging to a device. This node can have following
-   reference an OPP.
- 
- Optional properties:
-+- opp-name: Name of the OPP table, to uniquely identify it if more than one OPP
-+  table is supplied in "operating-points-v2" property of device.
-+
- - opp-shared: Indicates that device nodes using this OPP Table Node's phandle
-   switch their DVFS state together, i.e. they share clock/voltage/current lines.
-   Missing property means devices have independent clock/voltage/current lines,
-   but they share OPP tables.
- 
-+- status: Marks the OPP table enabled/disabled.
-+
- 
- * OPP Node
- 
-@@ -396,3 +412,50 @@ Example 4: Handling multiple regulators
- 		};
- 	};
- };
-+
-+Example 5: Multiple OPP tables
-+
-+/ {
-+	cpus {
-+		cpu at 0 {
-+			compatible = "arm,cortex-a7";
-+			...
-+
-+			cpu-supply = <&cpu_supply>
-+			operating-points-v2 = <&cpu0_opp_table_slow>, <&cpu0_opp_table_fast>;
-+			operating-points-v2-names = "slow", "fast";
-+		};
-+	};
-+
-+	cpu0_opp_table_slow: opp_table_slow {
-+		compatible = "operating-points-v2";
-+		status = "okay";
-+		opp-shared;
-+
-+		opp00 {
-+			opp-hz = <600000000>;
-+			...
-+		};
-+
-+		opp01 {
-+			opp-hz = <800000000>;
-+			...
-+		};
-+	};
-+
-+	cpu0_opp_table_fast: opp_table_fast {
-+		compatible = "operating-points-v2";
-+		status = "okay";
-+		opp-shared;
-+
-+		opp10 {
-+			opp-hz = <1000000000>;
-+			...
-+		};
-+
-+		opp11 {
-+			opp-hz = <1100000000>;
-+			...
-+		};
-+	};
-+};
+diff --git a/Documentation/devicetree/bindings/arm/cpus.txt b/Documentation/devicetree/bindings/arm/cpus.txt
+index ac2903d..fb80b2e 100644
+--- a/Documentation/devicetree/bindings/arm/cpus.txt
++++ b/Documentation/devicetree/bindings/arm/cpus.txt
+@@ -194,6 +194,7 @@ nodes to be present and contain the properties described below.
+ 			    "marvell,armada-380-smp"
+ 			    "marvell,armada-390-smp"
+ 			    "marvell,armada-xp-smp"
++			    "mediatek,mt6580-smp"
+ 			    "mediatek,mt65xx-smp"
+ 			    "mediatek,mt81xx-tz-smp"
+ 			    "qcom,gcc-msm8660"
+-- 
+1.8.1.1.dirty
