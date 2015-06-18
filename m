@@ -1,68 +1,45 @@
-From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Thu, 18 Jun 2015 21:47:29 +0200
-Subject: [PATCH v2] clk: mvebu: flag the crypto clk as CLK_IGNORE_UNUSED
-In-Reply-To: <20150618183654.25948.26168@quantum>
-References: <1434470179-20835-1-git-send-email-boris.brezillon@free-electrons.com>
- <55816094.2020208@free-electrons.com>
- <20150618183654.25948.26168@quantum>
-Message-ID: <20150618214729.41acfb07@bbrezillon>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Thu, 18 Jun 2015 21:51:35 +0200
+Subject: [GIT PULL] ARM: mvebu: fixes changes for v4.1
+Message-ID: <55832147.1020202@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mike,
+Hi,
 
-On Thu, 18 Jun 2015 11:36:54 -0700
-Michael Turquette <mturquette@linaro.org> wrote:
+Here is the forth pull request for fixes for mvebu for v4.1.
 
-> Quoting Gregory CLEMENT (2015-06-17 04:57:08)
-> > Hi Mike, Stephen,
-> > 
-> > On 16/06/2015 17:56, Boris Brezillon wrote:
-> > > The crypto SRAM, used by the armada 370 cpuidle code to workaround a bug
-> > > in the BootROM code, requires the crypto clk to be up and running.
-> > > Flag the crypto clk as IGNORE_UNUSED until we add the proper
-> > > infrastructure to define the crypto SRAM in the DT and reference the crypto
-> > > clk in this SRAM node.
-> > > 
-> > > Reported-by: Kevin Hilman <khilman@linaro.org>
-> > > Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
-> > > Tested-by: Kevin Hilman <khilman@linaro.org>
-> > > Fixes: 29e623475c50267ee3aaa49ebb6cbe107bce8d2a ("clk: mvebu: add
-> > > missing CESA gate clk").
-> > > Cc: <stable@vger.kernel.org> #4.1
-> > 
-> > Acked-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
-> > 
-> > Would it possible to apply this fix on 4.1-rc8 ?
-> 
-> Hi Gregory,
-> 
-> I'm a bit confused by this. This patch fixes "clk: mvebu: add missing
-> CESA gate clk", right? That patch lives in clk-next. It was not pushed
-> to Linus' tree yet via a -fixes branch.
-> 
-> Thus I can just apply this patch to clk-next and the problem should be
-> resolved in clk-next, no?
+Actually this bug can happen only on one board: the Armada XP GP,
+so if you can't pull it for 4.1, I will send it again once 4.2-rc1
+will be released.
 
-Yes. I've tagged this patch as applicable on stable 4.1 in case it
-didn't make it in the next -rc (which should be the last one before
-4.1 is released).
-I don't know if it's a good practice, but I've had several fixes which
-missed the targeted release in the past, and tagging them as stable
-helps in getting the patches applied afterwards.
+Gregory
 
-> 
-> Furthermore, I do not have 29e623475c50267ee3aaa49ebb6cbe107bce8d2a
-> anywhere in my tree. I'm not sure where this sha1 hash came from.
+The following changes since commit 885dbd154b2f2ee305cec6fd0a162e1a77ae2b06:
 
-Oops, I mixed the commit hash in my local branch and the one in clk-next
-(4d52b2acefdfceae0e47ed08324a96f511dc80b1).
+  Revert "bus: mvebu-mbus: make sure SDRAM CS for DMA don't overlap the MBus bridge window" (2015-05-28 11:14:31 +0200)
 
-Best Regards,
+are available in the git repository at:
 
-Boris
+  git://git.infradead.org/linux-mvebu.git tags/mvebu-fixes-4.1-4
 
+for you to fetch changes up to 2f5bc307be2480ba89e4c5d118f406f04a4a7299:
+
+  ARM: mvebu: fix suspend to RAM on big-endian configurations (2015-06-17 17:23:36 +0200)
+
+----------------------------------------------------------------
+mvebu fixes for 4.1 (part 4)
+
+Fix suspend to RAM on big-endian configurations on Armada XP GP board
+
+----------------------------------------------------------------
+Thomas Petazzoni (1):
+      ARM: mvebu: fix suspend to RAM on big-endian configurations
+
+ arch/arm/mach-mvebu/pm-board.c | 3 +++
+ 1 file changed, 3 insertions(+)
 -- 
-Boris Brezillon, Free Electrons
-Embedded Linux and Kernel engineering
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
 http://free-electrons.com
