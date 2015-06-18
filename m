@@ -1,27 +1,35 @@
-From: linux@roeck-us.net (Guenter Roeck)
-Date: Thu, 18 Jun 2015 08:30:03 -0700
-Subject: [PATCH 01/44] kernel: Add support for poweroff handler call chain
-In-Reply-To: <55821936.4040704@codeaurora.org>
-References: <1412659726-29957-1-git-send-email-linux@roeck-us.net>
- <1412659726-29957-2-git-send-email-linux@roeck-us.net>
- <55821936.4040704@codeaurora.org>
-Message-ID: <20150618153003.GA19224@roeck-us.net>
+From: holler@ahsoftware.de (Alexander Holler)
+Date: Thu, 18 Jun 2015 17:32:06 +0200
+Subject: [PATCH 00/13] Discover and probe dependencies
+In-Reply-To: <20150618144934.GM7557@n2100.arm.linux.org.uk>
+References: <1434548543-22949-1-git-send-email-tomeu.vizoso@collabora.com>
+ <55829269.2090309@samsung.com> <20150618103615.GC14071@sirena.org.uk>
+ <5582C437.4030108@samsung.com> <20150618144934.GM7557@n2100.arm.linux.org.uk>
+Message-ID: <5582E476.6040905@ahsoftware.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 17, 2015 at 06:04:54PM -0700, Stephen Boyd wrote:
-[ ... ]
-> 
-> What happened to this series? I want to add shutdown support to my
-> platform and I need to write a register on the PMIC in one driver to
-> configure it for shutdown instead of restart and then write an MMIO
-> register to tell the PMIC to actually do the shutdown in another driver.
-> It seems that the notifier solves this case for me, albeit with the
-> slight complication that I need to order the two with some priority.
-> 
-Can you use the .shutdown driver callback instead ?
+Am 18.06.2015 um 16:49 schrieb Russell King - ARM Linux:
 
-I see other drivers use that, and check for system_state == SYSTEM_POWER_OFF
-to power off the hardware.
+> I think you may need to pick a better example to illustrate your point. :)
 
-Guenter
+It's easy to describe: Sort driver probe calls and forget about the 
+whole device-stuff.
+
+The real target is to sort the driver probe calls and ideally the whole 
+device stuff could be ignored, leaving it as however it may work.
+
+Unfortunately, that's not as easy to implement as it sounds. ;)
+
+I've too hit the device-stuff very late in my driver-probe-ordering 
+experiment and just did it somehow, because I already was at the limit 
+of the time I wanted to spend. ;)
+
+So to repeat myself, I think the first target has to be to identify 
+drivers either without having to call their initcalls at all, or by 
+making sure their initcalls just register and do nothing else (what I've 
+called "well-done").
+
+Regards,
+
+Alexander Holler
