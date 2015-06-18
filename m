@@ -1,62 +1,104 @@
 From: panand@redhat.com (Pratyush Anand)
-Date: Thu, 18 Jun 2015 09:28:54 +0530
-Subject: [RFC PATCH V2 07/10] arm64: Handle TRAP_BRKPT for user mode as well
+Date: Thu, 18 Jun 2015 09:28:55 +0530
+Subject: [RFC PATCH V2 08/10] arm64: rename enum debug_el to enum debug_elx to
+ fix "wrong kind of tag"
 In-Reply-To: <cover.1434598237.git.panand@redhat.com>
 References: <cover.1434598237.git.panand@redhat.com>
-Message-ID: <89bd3896c313cc803b108da3328b38e55d813a33.1434598237.git.panand@redhat.com>
+Message-ID: <036a4aafb504ee9061c40a2c33592e05ec04f8ee.1434598237.git.panand@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-uprobe is registered at break_hook with a unique ESR code. So, when a
-TRAP_BRKPT occurs, call_break_hook checks if it was for uprobe. If not,
-then send a SIGTRAP to user.
+asm/debug-monitors.h contains definition for debug opcode. So, it will
+be needed by asm/uprobes.h.
+
+With enum debug_el it generates following compilation error, since
+asm/uprobes.h is included.
+
+lib/list_sort.c:160:8: error: ?debug_el? defined as wrong kind of tag
+ struct debug_el {
+
+Therefore rename enum debug_el to enum debug_elx.
 
 Signed-off-by: Pratyush Anand <panand@redhat.com>
 ---
- arch/arm64/kernel/debug-monitors.c | 23 +++++++++++++----------
- 1 file changed, 13 insertions(+), 10 deletions(-)
+ arch/arm64/include/asm/debug-monitors.h | 6 +++---
+ arch/arm64/kernel/debug-monitors.c      | 4 ++--
+ arch/arm64/kernel/hw_breakpoint.c       | 6 +++---
+ 3 files changed, 8 insertions(+), 8 deletions(-)
 
+diff --git a/arch/arm64/include/asm/debug-monitors.h b/arch/arm64/include/asm/debug-monitors.h
+index 92d7ceac9adf..d9e79b01d09e 100644
+--- a/arch/arm64/include/asm/debug-monitors.h
++++ b/arch/arm64/include/asm/debug-monitors.h
+@@ -132,13 +132,13 @@ void unregister_break_hook(struct break_hook *hook);
+ 
+ u8 debug_monitors_arch(void);
+ 
+-enum debug_el {
++enum debug_elx {
+ 	DBG_ACTIVE_EL0 = 0,
+ 	DBG_ACTIVE_EL1,
+ };
+ 
+-void enable_debug_monitors(enum debug_el el);
+-void disable_debug_monitors(enum debug_el el);
++void enable_debug_monitors(enum debug_elx el);
++void disable_debug_monitors(enum debug_elx el);
+ 
+ void user_rewind_single_step(struct task_struct *task);
+ void user_fastforward_single_step(struct task_struct *task);
 diff --git a/arch/arm64/kernel/debug-monitors.c b/arch/arm64/kernel/debug-monitors.c
-index 7eb13dcf09fa..1fe912e77f62 100644
+index 1fe912e77f62..237a21f675fd 100644
 --- a/arch/arm64/kernel/debug-monitors.c
 +++ b/arch/arm64/kernel/debug-monitors.c
-@@ -311,8 +311,18 @@ static int brk_handler(unsigned long addr, unsigned int esr,
- 		       struct pt_regs *regs)
+@@ -83,7 +83,7 @@ early_param("nodebugmon", early_debug_disable);
+ static DEFINE_PER_CPU(int, mde_ref_count);
+ static DEFINE_PER_CPU(int, kde_ref_count);
+ 
+-void enable_debug_monitors(enum debug_el el)
++void enable_debug_monitors(enum debug_elx el)
  {
- 	siginfo_t info;
-+	bool handler_found = false;
-+
-+#ifdef	CONFIG_KPROBES
-+	if ((esr & BRK64_ESR_MASK) == BRK64_ESR_KPROBES) {
-+		if (kprobe_breakpoint_handler(regs, esr) == DBG_HOOK_HANDLED)
-+			handler_found = true;
-+	}
-+#endif
-+	if (!handler_found && call_break_hook(regs, esr) == DBG_HOOK_HANDLED)
-+		handler_found = true;
+ 	u32 mdscr, enable = 0;
  
--	if (user_mode(regs)) {
-+	if (!handler_found && user_mode(regs)) {
- 		info = (siginfo_t) {
- 			.si_signo = SIGTRAP,
- 			.si_errno = 0,
-@@ -321,15 +331,8 @@ static int brk_handler(unsigned long addr, unsigned int esr,
- 		};
- 
- 		force_sig_info(SIGTRAP, &info, current);
--	}
--#ifdef	CONFIG_KPROBES
--	else if ((esr & BRK64_ESR_MASK) == BRK64_ESR_KPROBES) {
--		if (kprobe_breakpoint_handler(regs, esr) != DBG_HOOK_HANDLED)
--			return -EFAULT;
--	}
--#endif
--	else if (call_break_hook(regs, esr) != DBG_HOOK_HANDLED) {
--		pr_warn("Unexpected kernel BRK exception at EL1\n");
-+	} else if (!handler_found) {
-+		pr_warning("Unexpected kernel BRK exception at EL1\n");
- 		return -EFAULT;
+@@ -103,7 +103,7 @@ void enable_debug_monitors(enum debug_el el)
  	}
+ }
  
+-void disable_debug_monitors(enum debug_el el)
++void disable_debug_monitors(enum debug_elx el)
+ {
+ 	u32 mdscr, disable = 0;
+ 
+diff --git a/arch/arm64/kernel/hw_breakpoint.c b/arch/arm64/kernel/hw_breakpoint.c
+index e7d934d3afe0..43b74a3ddaef 100644
+--- a/arch/arm64/kernel/hw_breakpoint.c
++++ b/arch/arm64/kernel/hw_breakpoint.c
+@@ -157,7 +157,7 @@ static void write_wb_reg(int reg, int n, u64 val)
+  * Convert a breakpoint privilege level to the corresponding exception
+  * level.
+  */
+-static enum debug_el debug_exception_level(int privilege)
++static enum debug_elx debug_exception_level(int privilege)
+ {
+ 	switch (privilege) {
+ 	case AARCH64_BREAKPOINT_EL0:
+@@ -231,7 +231,7 @@ static int hw_breakpoint_control(struct perf_event *bp,
+ 	struct perf_event **slots;
+ 	struct debug_info *debug_info = &current->thread.debug;
+ 	int i, max_slots, ctrl_reg, val_reg, reg_enable;
+-	enum debug_el dbg_el = debug_exception_level(info->ctrl.privilege);
++	enum debug_elx dbg_el = debug_exception_level(info->ctrl.privilege);
+ 	u32 ctrl;
+ 
+ 	if (info->ctrl.type == ARM_BREAKPOINT_EXECUTE) {
+@@ -538,7 +538,7 @@ int arch_validate_hwbkpt_settings(struct perf_event *bp)
+  * exception level at the register level.
+  * This is used when single-stepping after a breakpoint exception.
+  */
+-static void toggle_bp_registers(int reg, enum debug_el el, int enable)
++static void toggle_bp_registers(int reg, enum debug_elx el, int enable)
+ {
+ 	int i, max_slots, privilege;
+ 	u32 ctrl;
 -- 
 2.1.0
