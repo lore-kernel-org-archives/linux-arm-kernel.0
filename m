@@ -1,77 +1,40 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Thu, 18 Jun 2015 16:02:32 +0200
-Subject: [PATCH] iio: adc: at91_adc: allow to use full range of startup
- time
-In-Reply-To: <1434558096-10619-1-git-send-email-nicolas.ferre@atmel.com>
-References: <1434558096-10619-1-git-send-email-nicolas.ferre@atmel.com>
-Message-ID: <20150618140232.GE27492@piout.net>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Thu, 18 Jun 2015 16:04:48 +0200
+Subject: ARMADA-XP cpu1 .. cpu3 does not come online
+In-Reply-To: <20150618133607.GB312@lunn.ch>
+References: <20150618123833.GA28005@t440.home> <20150618133607.GB312@lunn.ch>
+Message-ID: <20150618160448.011bf726@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 17/06/2015 at 18:21:36 +0200, Nicolas Ferre wrote :
-> From: Jan Leupold <leupold@rsi-elektrotechnik.de>
-> 
-> The DT-Property "atmel,adc-startup-time" is stored in an u8 for a microsecond
-> value. When trying to increase the value of STARTUP in Register AT91_ADC_MR
-> some higher values can't be reached.
-> 
-> Change the type in function parameter and private structure field from u8 to
-> u32.
-> 
-> Signed-off-by: Jan Leupold <leupold@rsi-elektrotechnik.de>
-> [nicolas.ferre at atmel.com: change commit message, increase u16 to u32 for startup time]
-> Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
-Acked-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+Dear Andrew Lunn,
 
-> ---
->  drivers/iio/adc/at91_adc.c | 8 ++++----
->  1 file changed, 4 insertions(+), 4 deletions(-)
-> 
-> diff --git a/drivers/iio/adc/at91_adc.c b/drivers/iio/adc/at91_adc.c
-> index 8a0eb4a04fb5..7b40925dd4ff 100644
-> --- a/drivers/iio/adc/at91_adc.c
-> +++ b/drivers/iio/adc/at91_adc.c
-> @@ -182,7 +182,7 @@ struct at91_adc_caps {
->  	u8	ts_pen_detect_sensitivity;
->  
->  	/* startup time calculate function */
-> -	u32 (*calc_startup_ticks)(u8 startup_time, u32 adc_clk_khz);
-> +	u32 (*calc_startup_ticks)(u32 startup_time, u32 adc_clk_khz);
->  
->  	u8	num_channels;
->  	struct at91_adc_reg_desc registers;
-> @@ -201,7 +201,7 @@ struct at91_adc_state {
->  	u8			num_channels;
->  	void __iomem		*reg_base;
->  	struct at91_adc_reg_desc *registers;
-> -	u8			startup_time;
-> +	u32			startup_time;
->  	u8			sample_hold_time;
->  	bool			sleep_mode;
->  	struct iio_trigger	**trig;
-> @@ -779,7 +779,7 @@ ret:
->  	return ret;
->  }
->  
-> -static u32 calc_startup_ticks_9260(u8 startup_time, u32 adc_clk_khz)
-> +static u32 calc_startup_ticks_9260(u32 startup_time, u32 adc_clk_khz)
->  {
->  	/*
->  	 * Number of ticks needed to cover the startup time of the ADC
-> @@ -790,7 +790,7 @@ static u32 calc_startup_ticks_9260(u8 startup_time, u32 adc_clk_khz)
->  	return round_up((startup_time * adc_clk_khz / 1000) - 1, 8) / 8;
->  }
->  
-> -static u32 calc_startup_ticks_9x5(u8 startup_time, u32 adc_clk_khz)
-> +static u32 calc_startup_ticks_9x5(u32 startup_time, u32 adc_clk_khz)
->  {
->  	/*
->  	 * For sama5d3x and at91sam9x5, the formula changes to:
-> -- 
-> 2.1.3
-> 
+On Thu, 18 Jun 2015 15:36:07 +0200, Andrew Lunn wrote:
 
+> > Uncompressing Linux... done, booting the kernel.                               
+> > [    0.000000] Booting Linux on physical CPU 0x0                               
+> > [    0.000000] Linux version 4.0.5-00001-g8b87c3c (peter at t440) (gcc version 4.95
+> > [    0.000000] CPU: ARMv7 Processor [562f5842] revision 2 (ARMv7), cr=10c5387d 
+> > [    0.000000] CPU: PIPT / VIPT nonaliasing data cache, PIPT instruction cache 
+> > [    0.000000] Machine model: AXP-TEST-BOARD 
+> > [    0.000000] bootconsole [earlycon0] enabled
+> > [    0.000000] Truncating RAM at 0x00000000-0xffffffff to -0x2f800000 
+> > 
+> > ^^ This is worrying to me, firstly because memory is being truncated down, secondly because my dts file only specifies memory from 0x00000000 to 0xf000000 (see attached dts file)
+> 
+> 0x2f800000 suggests you have an old boot loader, with IO at
+> 0xd000,0000. Upgrading to a newer uboot will allow you to use more of
+> the 4G of RAM. It might also fix your SMP issue.
+
+Nope, I don't think so: his DT is using 0xf1000000 and the platform
+boots successfully (serial port working). He is also using 0xf1012000
+as the UART earlyprintk physical address, and it boots. So his internal
+registers are set at 0xf1000000.
+
+Best regards,
+
+Thomas
 -- 
-Alexandre Belloni, Free Electrons
+Thomas Petazzoni, CTO, Free Electrons
 Embedded Linux, Kernel and Android engineering
 http://free-electrons.com
