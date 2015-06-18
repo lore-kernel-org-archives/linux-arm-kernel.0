@@ -1,75 +1,20 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Wed, 17 Jun 2015 18:30:24 -0700
-Subject: [PATCH V7 2/3] OPP: Allow multiple OPP tables to be passed via DT
-In-Reply-To: <CAL_Jsq+SdgAf7=Yq7Jk_1d9jTpAOLCEuEDCZvD=-h=2MWsNfFw@mail.gmail.com>
-References: <cover.1433434659.git.viresh.kumar@linaro.org>
- <263c128844f5a3c9280c8be71f6c9eb1869a5188.1433434659.git.viresh.kumar@linaro.org>
- <CAL_Jsq+EOOeQw42wZi+H82ovLn8LcQUuK9HGT+FvewdhTf7Q1w@mail.gmail.com>
- <20150617133314.GB15153@linux>
- <CAL_Jsq+SdgAf7=Yq7Jk_1d9jTpAOLCEuEDCZvD=-h=2MWsNfFw@mail.gmail.com>
-Message-ID: <55821F30.2090802@codeaurora.org>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Thu, 18 Jun 2015 03:29:38 +0200
+Subject: [ehci-orion] ETIMEOUT with ehci_setup()'s ehci_halt()
+In-Reply-To: <557FE719.8040609@keymile.com>
+References: <5571B38E.7080505@keymile.com> <20150605151930.GA16909@lunn.ch>
+ <5572E4E8.2060405@gmail.com> <55758095.2030609@keymile.com>
+ <557AC490.5040405@keymile.com> <557FE719.8040609@keymile.com>
+Message-ID: <20150618012938.GD22072@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/17/2015 06:47 AM, Rob Herring wrote:
-> On Wed, Jun 17, 2015 at 8:33 AM, Viresh Kumar <viresh.kumar@linaro.org> wrote:
->> On 17-06-15, 08:23, Rob Herring wrote:
->>>> +                       operating-points-v2 = <&cpu0_opp_table_slow>, <&cpu0_opp_table_fast>;
->>> You've made a fundamental change here in that this can now be a list
->>> of phandles. There should be some description on what a list means
->>> (merge the tables?, select one?).
->> Did you miss the description I wrote few lines earlier or are you
->> asking for something else? This is what I wrote earlier:
->>
->>>> +Devices may want to choose OPP tables at runtime and so can provide a list of
->>>> +phandles here. But only *one* of them should be chosen at runtime.
->> So, clearly only ONE of the tables should be used.
-> Yes, never mind.
->
->>> I think this needs to have a defined order and the platform should
->>> know what that is. For example, if you read the efuses and decide you
->>> need the "slow" table, you know to pick the first entry. Then you
->>> don't need opp-name. Does that work for QCom?
->> Why forcing on the order here? For example, consider a case where the
->> platform can have four tables, A B C D. Now DT is free to pass all
->> four or just a subset of those. Like, for some boards table B doesn't
->> stand valid. And so it may wanna pass just A C D. And so keeping these
->> tables in order is going to break for sure. Flexibility is probably
->> better in this case.
-> Defined order is a key part of DT bindings. We solve the variable
-> length problem with name lists associated with variable length
-> property like:
->
-> operating-point-names = "slow", "fast";
->
-> I'm not a fan of doing this if we can avoid it, but we should at least
-> follow the same pattern. Don't send me a patch with that yet, I want
-> to hear from Stephen.
->
-> You can also use "status" to disable specific tables rather than
-> removing from the list.
->
+> One final update on this topic: the kernel config was missing the
+> CONFIG_USB_EHCI_ROOT_HUB_TT option. It turns out that the USB IP embeded a
+> Transaction Translator and there is a check in ehci_halt() that aborts the
+> routine in case of a Transaction Translator in the ehci controller. The check
+> however only works in the above option is enabled.
 
-An operating-point(s?)-names property seems ok... but doesn't that mean
-that every CPU that uses the OPP has to have the same list of
-operating-point-names? It would make sense to me if the operating points
-were called something different depending on *which* CPU is using them,
-but in this case the only name for the operating point is "slow" or
-"fast", etc.
+Maybe it would be worth detecting this and issuing a warning?
 
-In reality we've assigned them names like speedX-binY-vZ so that we know
-which speed bin, voltage bin, and version they're part of. Maybe OPP
-node properties like qcom,speed-bin = <u32>, qcom,pvs-bin = <u32>, etc.
-would be better? It would make the parsing code slightly more
-complicated because it needs to look for 2 or 3 properties instead of a
-name property though. Or would having different node names be
-acceptable? That would avoid this list of strings.
-
-At the least, operating-points-names will be required on qcom platforms.
-A fixed ordering known to the platform would mean that we know exactly
-how many voltage bins and speed bins and how many voltage bins per speed
-bin are used for a particular SoC, which we've avoided knowing so far.
-
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+      Andrew
