@@ -1,43 +1,104 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Thu, 18 Jun 2015 11:36:15 +0100
-Subject: [PATCH 00/13] Discover and probe dependencies
-In-Reply-To: <55829269.2090309@samsung.com>
-References: <1434548543-22949-1-git-send-email-tomeu.vizoso@collabora.com>
- <55829269.2090309@samsung.com>
-Message-ID: <20150618103615.GC14071@sirena.org.uk>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Thu, 18 Jun 2015 16:24:15 +0530
+Subject: [PATCH 01/41] clocksource: asm9260: Migrate to new 'set-state'
+ interface
+In-Reply-To: <cover.1434622147.git.viresh.kumar@linaro.org>
+References: <cover.1434622147.git.viresh.kumar@linaro.org>
+Message-ID: <57ae9434bbb7218961c3ad45a26fbe1fffe40cbd.1434622147.git.viresh.kumar@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 18, 2015 at 11:42:01AM +0200, Andrzej Hajda wrote:
+Migrate asm9260 driver to the new 'set-state' interface provided by
+clockevents core, the earlier 'set-mode' interface is marked obsolete
+now.
 
-There's something really messed up with how your mailer is word wrapping
-paragraphs, might want to check it out - it looks like it's making lines
-that are longer than 80 columns and then randomly breaking them 80
-columns in rather than reflowing things.
+This also enables us to implement callbacks for new states of clockevent
+devices, for example: ONESHOT_STOPPED.
 
-> 3. Dependencies are mandatory, ie without it driver will not be able to
-> successfully finish
-> the probe.
->     It should be not true. Sometimes device will require given resource
-> only in specific
->     scenario, or it can still probe successfully and ask for the
-> resource later.
->     I can also imagine that firmware can describe more information than
-> given driver require,
->     some resources even if they are present in the dts, will be not
-> requested by the driver, it
->     can be the case of drivers providing limited functionality, or just
-> obsolete bindings.
+Cc: Oleksij Rempel <linux@rempel-privat.de>
+Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
+---
+ drivers/clocksource/asm9260_timer.c | 61 ++++++++++++++++++++++---------------
+ 1 file changed, 36 insertions(+), 25 deletions(-)
 
-Well, this isn't clear - the model here seems to be that the
-dependencies are those that are explicitly listed for a given platform.
-For those our current expectation is that we will try to control them
-and will defer probe until the resources that are mapped in on the
-platform are present so this doesn't seem like a change.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150618/c2c55b2b/attachment-0001.sig>
+diff --git a/drivers/clocksource/asm9260_timer.c b/drivers/clocksource/asm9260_timer.c
+index 4c2ba59897e8..67ff6f2abf19 100644
+--- a/drivers/clocksource/asm9260_timer.c
++++ b/drivers/clocksource/asm9260_timer.c
+@@ -120,38 +120,49 @@ static int asm9260_timer_set_next_event(unsigned long delta,
+ 	return 0;
+ }
+ 
+-static void asm9260_timer_set_mode(enum clock_event_mode mode,
+-				    struct clock_event_device *evt)
++static int asm9260_timer_shutdown(struct clock_event_device *evt)
+ {
+ 	/* stop timer0 */
+ 	writel_relaxed(BM_C0_EN, priv.base + HW_TCR + CLR_REG);
++	return 0;
++}
++
++static int asm9260_timer_set_oneshot(struct clock_event_device *evt)
++{
++	/* stop timer0 */
++	writel_relaxed(BM_C0_EN, priv.base + HW_TCR + CLR_REG);
++
++	/* enable reset and stop on match */
++	writel_relaxed(BM_MCR_RES_EN(0) | BM_MCR_STOP_EN(0),
++		       priv.base + HW_MCR + SET_REG);
++	return 0;
++}
+ 
+-	switch (mode) {
+-	case CLOCK_EVT_MODE_PERIODIC:
+-		/* disable reset and stop on match */
+-		writel_relaxed(BM_MCR_RES_EN(0) | BM_MCR_STOP_EN(0),
+-				priv.base + HW_MCR + CLR_REG);
+-		/* configure match count for TC0 */
+-		writel_relaxed(priv.ticks_per_jiffy, priv.base + HW_MR0);
+-		/* enable TC0 */
+-		writel_relaxed(BM_C0_EN, priv.base + HW_TCR + SET_REG);
+-		break;
+-	case CLOCK_EVT_MODE_ONESHOT:
+-		/* enable reset and stop on match */
+-		writel_relaxed(BM_MCR_RES_EN(0) | BM_MCR_STOP_EN(0),
+-				priv.base + HW_MCR + SET_REG);
+-		break;
+-	default:
+-		break;
+-	}
++static int asm9260_timer_set_periodic(struct clock_event_device *evt)
++{
++	/* stop timer0 */
++	writel_relaxed(BM_C0_EN, priv.base + HW_TCR + CLR_REG);
++
++	/* disable reset and stop on match */
++	writel_relaxed(BM_MCR_RES_EN(0) | BM_MCR_STOP_EN(0),
++		       priv.base + HW_MCR + CLR_REG);
++	/* configure match count for TC0 */
++	writel_relaxed(priv.ticks_per_jiffy, priv.base + HW_MR0);
++	/* enable TC0 */
++	writel_relaxed(BM_C0_EN, priv.base + HW_TCR + SET_REG);
++	return 0;
+ }
+ 
+ static struct clock_event_device event_dev = {
+-	.name		= DRIVER_NAME,
+-	.rating		= 200,
+-	.features       = CLOCK_EVT_FEAT_PERIODIC | CLOCK_EVT_FEAT_ONESHOT,
+-	.set_next_event	= asm9260_timer_set_next_event,
+-	.set_mode	= asm9260_timer_set_mode,
++	.name			= DRIVER_NAME,
++	.rating			= 200,
++	.features		= CLOCK_EVT_FEAT_PERIODIC |
++				  CLOCK_EVT_FEAT_ONESHOT,
++	.set_next_event		= asm9260_timer_set_next_event,
++	.set_state_shutdown	= asm9260_timer_shutdown,
++	.set_state_periodic	= asm9260_timer_set_periodic,
++	.set_state_oneshot	= asm9260_timer_set_oneshot,
++	.tick_resume		= asm9260_timer_shutdown,
+ };
+ 
+ static irqreturn_t asm9260_timer_interrupt(int irq, void *dev_id)
+-- 
+2.4.0
