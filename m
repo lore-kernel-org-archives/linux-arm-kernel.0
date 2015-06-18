@@ -1,119 +1,104 @@
-From: srinivas.kandagatla@linaro.org (Srinivas Kandagatla)
-Date: Thu, 18 Jun 2015 14:08:48 +0100
-Subject: [PATCH v5 07/11] nvmem: Add simple nvmem-mmio consumer helper
- functions.
-In-Reply-To: <5580AA05.90709@codeaurora.org>
-References: <1432226535-8640-1-git-send-email-srinivas.kandagatla@linaro.org>
- <1432226665-8994-1-git-send-email-srinivas.kandagatla@linaro.org>
- <5580AA05.90709@codeaurora.org>
-Message-ID: <5582C2E0.9080503@linaro.org>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Thu, 18 Jun 2015 16:10:15 +0300
+Subject: [PATCH 21/41] clocksource: sh_mtu2: Migrate to new 'set-state'
+ interface
+In-Reply-To: <b0ba582aafb8b505ee1c2d001d6e442d5532f701.1434622147.git.viresh.kumar@linaro.org>
+References: <cover.1434622147.git.viresh.kumar@linaro.org>
+ <b0ba582aafb8b505ee1c2d001d6e442d5532f701.1434622147.git.viresh.kumar@linaro.org>
+Message-ID: <4571147.CDMpTVja90@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Viresh,
 
+Thank you for the patch.
 
-On 16/06/15 23:58, Stephen Boyd wrote:
-> On 05/21/2015 09:44 AM, Srinivas Kandagatla wrote:
->> diff --git a/drivers/nvmem/nvmem-mmio.c b/drivers/nvmem/nvmem-mmio.c
->> new file mode 100644
->> index 0000000..0d8131f
->> --- /dev/null
->> +++ b/drivers/nvmem/nvmem-mmio.c
->> @@ -0,0 +1,69 @@
->> +/*
->> + * Copyright (C) 2015 Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
->> + *
->> + * This program is free software; you can redistribute it and/or modify
->> + * it under the terms of the GNU General Public License version 2 and
->> + * only version 2 as published by the Free Software Foundation.
->> + *
->> + * This program is distributed in the hope that it will be useful,
->> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
->> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
->> + * GNU General Public License for more details.
->> + */
->> +
->> +#include <linux/device.h>
->> +#include <linux/module.h>
->> +#include <linux/err.h>
->> +#include <linux/of.h>
->> +#include <linux/of_device.h>
->
-> #include <linux/platform_device.h>
-> #include <linux/nvmem_provider.h>
-> #include <linux/regmap.h>
->
-These are included in nvmem-mmio.h, however for clarity sake I could add 
-them here too.
->> +#include "nvmem-mmio.h"
->> +
->> +int nvmem_mmio_remove(struct platform_device *pdev)
->> +{
->> +	struct nvmem_device *nvmem = platform_get_drvdata(pdev);
->> +
->> +	return nvmem_unregister(nvmem);
->> +}
->> +EXPORT_SYMBOL_GPL(nvmem_mmio_remove);
->> +
->> +int nvmem_mmio_probe(struct platform_device *pdev)
->> +{
->> +
-> [...]
->> +
->> +	platform_set_drvdata(pdev, nvmem);
->
-> It may be better to return the nvmem device instead so that the one
-> drvdata member is usable by the calling driver.
-Makes sense.. I will give it a try.
+On Thursday 18 June 2015 16:24:35 Viresh Kumar wrote:
+> Migrate sh_mtu2 driver to the new 'set-state' interface provided by
+> clockevents core, the earlier 'set-mode' interface is marked obsolete
+> now.
+> 
+> This also enables us to implement callbacks for new states of clockevent
+> devices, for example: ONESHOT_STOPPED.
+> 
+> Cc: Magnus Damm <damm+renesas@opensource.se>
+> Cc: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
+> Cc: Paul Mundt <lethal@linux-sh.org>
+> Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
 
->
->> +
->> +	return 0;
->> +}
->> +EXPORT_SYMBOL_GPL(nvmem_mmio_probe);
->
-> Kernel-doc on these exported functions?
-Yep, thanks for spotting, I will fix it.
->
->> diff --git a/drivers/nvmem/nvmem-mmio.h b/drivers/nvmem/nvmem-mmio.h
->> new file mode 100644
->> index 0000000..a2ad4e5
->> --- /dev/null
->> +++ b/drivers/nvmem/nvmem-mmio.h
->> @@ -0,0 +1,41 @@
->> +/*
->> + * MMIO based nvmem providers.
->> + *
->> + * Copyright (C) 2015 Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
->> + *
->> + * This file is licensed under the terms of the GNU General Public
->> + * License version 2.  This program is licensed "as is" without any
->> + * warranty of any kind, whether express or implied.
->> + */
->> +
->> +#ifndef _LINUX_NVMEM_MMIO_H
->> +#define _LINUX_NVMEM_MMIO_H
->> +
->> +#include <linux/platform_device.h>
->
-> Forward declare struct platform_device instead.
->
->> +#include <linux/nvmem-provider.h>
->
-> Forward declare nvmem_config instead.
->
->> +#include <linux/regmap.h>
->
-> Forward declare regmap_config instead.
->
->> +
->> +struct nvmem_mmio_data {
->> +	struct regmap_config *regmap_config;
->> +	struct nvmem_config *nvmem_config;
->> +};
->> +
->> +#if IS_ENABLED(CONFIG_NVMEM)
->> +
->> +int nvmem_mmio_probe(struct platform_device *pdev);
->> +int nvmem_mmio_remove(struct platform_device *pdev);
->
+Acked-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
+
+> ---
+>  drivers/clocksource/sh_mtu2.c | 42 ++++++++++++++------------------------
+>  1 file changed, 16 insertions(+), 26 deletions(-)
+> 
+> diff --git a/drivers/clocksource/sh_mtu2.c b/drivers/clocksource/sh_mtu2.c
+> index 3d88698cf2b8..f1985da8113f 100644
+> --- a/drivers/clocksource/sh_mtu2.c
+> +++ b/drivers/clocksource/sh_mtu2.c
+> @@ -276,36 +276,25 @@ static struct sh_mtu2_channel *ced_to_sh_mtu2(struct
+> clock_event_device *ced) return container_of(ced, struct sh_mtu2_channel,
+> ced);
+>  }
+> 
+> -static void sh_mtu2_clock_event_mode(enum clock_event_mode mode,
+> -				    struct clock_event_device *ced)
+> +static int sh_mtu2_clock_event_shutdown(struct clock_event_device *ced)
+>  {
+>  	struct sh_mtu2_channel *ch = ced_to_sh_mtu2(ced);
+> -	int disabled = 0;
+> 
+> -	/* deal with old setting first */
+> -	switch (ced->mode) {
+> -	case CLOCK_EVT_MODE_PERIODIC:
+> +	sh_mtu2_disable(ch);
+> +	return 0;
+> +}
+> +
+> +static int sh_mtu2_clock_event_set_periodic(struct clock_event_device *ced)
+> +{
+> +	struct sh_mtu2_channel *ch = ced_to_sh_mtu2(ced);
+> +
+> +	if (clockevent_state_periodic(ced))
+>  		sh_mtu2_disable(ch);
+> -		disabled = 1;
+> -		break;
+> -	default:
+> -		break;
+> -	}
+> 
+> -	switch (mode) {
+> -	case CLOCK_EVT_MODE_PERIODIC:
+> -		dev_info(&ch->mtu->pdev->dev,
+> -			 "ch%u: used for periodic clock events\n", ch->index);
+> -		sh_mtu2_enable(ch);
+> -		break;
+> -	case CLOCK_EVT_MODE_UNUSED:
+> -		if (!disabled)
+> -			sh_mtu2_disable(ch);
+> -		break;
+> -	case CLOCK_EVT_MODE_SHUTDOWN:
+> -	default:
+> -		break;
+> -	}
+> +	dev_info(&ch->mtu->pdev->dev, "ch%u: used for periodic clock events\n",
+> +		 ch->index);
+> +	sh_mtu2_enable(ch);
+> +	return 0;
+>  }
+> 
+>  static void sh_mtu2_clock_event_suspend(struct clock_event_device *ced)
+> @@ -327,7 +316,8 @@ static void sh_mtu2_register_clockevent(struct
+> sh_mtu2_channel *ch, ced->features = CLOCK_EVT_FEAT_PERIODIC;
+>  	ced->rating = 200;
+>  	ced->cpumask = cpu_possible_mask;
+> -	ced->set_mode = sh_mtu2_clock_event_mode;
+> +	ced->set_state_shutdown = sh_mtu2_clock_event_shutdown;
+> +	ced->set_state_periodic = sh_mtu2_clock_event_set_periodic;
+>  	ced->suspend = sh_mtu2_clock_event_suspend;
+>  	ced->resume = sh_mtu2_clock_event_resume;
+
+-- 
+Regards,
+
+Laurent Pinchart
