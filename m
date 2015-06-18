@@ -1,50 +1,42 @@
 From: heiko@sntech.de (Heiko Stuebner)
-Date: Thu, 18 Jun 2015 16:18:31 +0200
-Subject: [PATCH v2 4/9] clk: rockchip: add COMPOSITE_NOGATE_DIVTBL variant
+Date: Thu, 18 Jun 2015 16:18:29 +0200
+Subject: [PATCH v2 2/9] clk: rockchip: fix faulty vip parent name on rk3288
 In-Reply-To: <1434637116-17124-1-git-send-email-heiko@sntech.de>
 References: <1434637116-17124-1-git-send-email-heiko@sntech.de>
-Message-ID: <1434637116-17124-5-git-send-email-heiko@sntech.de>
+Message-ID: <1434637116-17124-3-git-send-email-heiko@sntech.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-A clock branch consisting of a mux and divider with non-standard
-divider values.
+The video input processor (vip) was called camera interface (cif) on
+older socs which seems to have resulted in a copy'n'paste error when
+creating the rk3288 camera clocks.
 
 Signed-off-by: Heiko Stuebner <heiko@sntech.de>
 ---
- drivers/clk/rockchip/clk.h | 20 ++++++++++++++++++++
- 1 file changed, 20 insertions(+)
+ drivers/clk/rockchip/clk-rk3288.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/clk/rockchip/clk.h b/drivers/clk/rockchip/clk.h
-index 92edb5f..501f02e 100644
---- a/drivers/clk/rockchip/clk.h
-+++ b/drivers/clk/rockchip/clk.h
-@@ -308,6 +308,26 @@ struct rockchip_clk_branch {
- 		.gate_offset	= -1,				\
- 	}
+diff --git a/drivers/clk/rockchip/clk-rk3288.c b/drivers/clk/rockchip/clk-rk3288.c
+index 0211162..df9dc96 100644
+--- a/drivers/clk/rockchip/clk-rk3288.c
++++ b/drivers/clk/rockchip/clk-rk3288.c
+@@ -189,7 +189,7 @@ PNAME(mux_uart1_p)	= { "uart1_src", "uart1_frac", "xin24m" };
+ PNAME(mux_uart2_p)	= { "uart2_src", "uart2_frac", "xin24m" };
+ PNAME(mux_uart3_p)	= { "uart3_src", "uart3_frac", "xin24m" };
+ PNAME(mux_uart4_p)	= { "uart4_src", "uart4_frac", "xin24m" };
+-PNAME(mux_cif_out_p)	= { "cif_src", "xin24m" };
++PNAME(mux_vip_out_p)	= { "vip_src", "xin24m" };
+ PNAME(mux_mac_p)	= { "mac_pll_src", "ext_gmac" };
+ PNAME(mux_hsadcout_p)	= { "hsadc_src", "ext_hsadc" };
+ PNAME(mux_edp_24m_p)	= { "ext_edp_24m", "xin24m" };
+@@ -434,7 +434,7 @@ static struct rockchip_clk_branch rk3288_clk_branches[] __initdata = {
+ 	COMPOSITE_NODIV(0, "vip_src", mux_pll_src_cpll_gpll_p, 0,
+ 			RK3288_CLKSEL_CON(26), 8, 1, MFLAGS,
+ 			RK3288_CLKGATE_CON(3), 7, GFLAGS),
+-	COMPOSITE_NOGATE(0, "sclk_vip_out", mux_cif_out_p, 0,
++	COMPOSITE_NOGATE(0, "sclk_vip_out", mux_vip_out_p, 0,
+ 			RK3288_CLKSEL_CON(26), 15, 1, MFLAGS, 9, 5, DFLAGS),
  
-+#define COMPOSITE_NOGATE_DIVTBL(_id, cname, pnames, f, mo, ms,	\
-+				mw, mf, ds, dw, df, dt)		\
-+	{							\
-+		.id		= _id,				\
-+		.branch_type	= branch_composite,		\
-+		.name		= cname,			\
-+		.parent_names	= pnames,			\
-+		.num_parents	= ARRAY_SIZE(pnames),		\
-+		.flags		= f,				\
-+		.muxdiv_offset	= mo,				\
-+		.mux_shift	= ms,				\
-+		.mux_width	= mw,				\
-+		.mux_flags	= mf,				\
-+		.div_shift	= ds,				\
-+		.div_width	= dw,				\
-+		.div_flags	= df,				\
-+		.div_table	= dt,				\
-+		.gate_offset	= -1,				\
-+	}
-+
- #define COMPOSITE_FRAC(_id, cname, pname, f, mo, df, go, gs, gf)\
- 	{							\
- 		.id		= _id,				\
+ 	DIV(0, "pclk_pd_alive", "gpll", 0,
 -- 
 2.1.4
