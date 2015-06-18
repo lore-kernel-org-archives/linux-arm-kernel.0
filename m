@@ -1,28 +1,48 @@
 From: bjorn.andersson@sonymobile.com (Bjorn Andersson)
-Date: Thu, 18 Jun 2015 14:13:41 -0700
-Subject: [PATCH 0/4] Qualcomm Switch-Mode Battery Charger and Boost
-Message-ID: <1434662025-9485-1-git-send-email-bjorn.andersson@sonymobile.com>
+Date: Thu, 18 Jun 2015 14:13:45 -0700
+Subject: [PATCH 4/4] ARM: dts: qcom-pm8941: Add charger node
+In-Reply-To: <1434662025-9485-1-git-send-email-bjorn.andersson@sonymobile.com>
+References: <1434662025-9485-1-git-send-email-bjorn.andersson@sonymobile.com>
+Message-ID: <1434662025-9485-5-git-send-email-bjorn.andersson@sonymobile.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This series adds bindings and a device driver for the Qualcomm Switch-Mode
-Battery Charger and Boost block found in pm8941.
+Signed-off-by: Bjorn Andersson <bjorn.andersson@sonymobile.com>
+---
+ arch/arm/boot/dts/qcom-pm8941.dtsi | 21 +++++++++++++++++++++
+ 1 file changed, 21 insertions(+)
 
-Bjorn Andersson (4):
-  spmi: pmic-arb: add irq_get_irqchip_state implementation
-  dt-binding: power: Add Qualcomm SMBB binding
-  power: Add Qualcomm SMBB driver
-  ARM: dts: qcom-pm8941: Add charger node
-
- .../devicetree/bindings/power_supply/qcom_smbb.txt | 137 +++
- arch/arm/boot/dts/qcom-pm8941.dtsi                 |  21 +
- drivers/power/Kconfig                              |  12 +
- drivers/power/Makefile                             |   1 +
- drivers/power/qcom_smbb.c                          | 952 +++++++++++++++++++++
- drivers/spmi/spmi-pmic-arb.c                       |  17 +
- 6 files changed, 1140 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/power_supply/qcom_smbb.txt
- create mode 100644 drivers/power/qcom_smbb.c
-
+diff --git a/arch/arm/boot/dts/qcom-pm8941.dtsi b/arch/arm/boot/dts/qcom-pm8941.dtsi
+index aa774e685018..6063c7ddda0f 100644
+--- a/arch/arm/boot/dts/qcom-pm8941.dtsi
++++ b/arch/arm/boot/dts/qcom-pm8941.dtsi
+@@ -26,6 +26,27 @@
+ 			bias-pull-up;
+ 		};
+ 
++		charger at 1000 {
++			compatible = "qcom,pm8941-charger";
++			reg = <0x1000 0x700>;
++			interrupts = <0x0 0x10 7 IRQ_TYPE_EDGE_BOTH>,
++				     <0x0 0x10 5 IRQ_TYPE_EDGE_BOTH>,
++				     <0x0 0x10 4 IRQ_TYPE_EDGE_BOTH>,
++				     <0x0 0x12 1 IRQ_TYPE_EDGE_BOTH>,
++				     <0x0 0x12 0 IRQ_TYPE_EDGE_BOTH>,
++				     <0x0 0x13 2 IRQ_TYPE_EDGE_BOTH>,
++				     <0x0 0x13 1 IRQ_TYPE_EDGE_BOTH>,
++				     <0x0 0x14 1 IRQ_TYPE_EDGE_BOTH>;
++			interrupt-names = "chg-done",
++					  "chg-fast",
++					  "chg-trkl",
++					  "bat-temp-ok",
++					  "bat-present",
++					  "chg-gone",
++					  "usb-valid",
++					  "dc-valid";
++		};
++
+ 		pm8941_gpios: gpios at c000 {
+ 			compatible = "qcom,pm8941-gpio";
+ 			reg = <0xc000 0x2400>;
 -- 
 1.8.2.2
