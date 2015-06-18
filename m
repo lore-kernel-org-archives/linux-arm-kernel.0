@@ -1,132 +1,85 @@
 From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Thu, 18 Jun 2015 15:41:32 +0100
-Subject: [PATCH v2 1/3] arm64: kernel: rename __cpu_suspend to keep it aligned
- with arm
+Date: Thu, 18 Jun 2015 15:41:33 +0100
+Subject: [PATCH v2 2/3] drivers: firmware: psci: define more generic
+ PSCI_FN_NATIVE macro
 In-Reply-To: <1434638494-514-1-git-send-email-sudeep.holla@arm.com>
 References: <1434462640-19613-1-git-send-email-sudeep.holla@arm.com>
  <1434638494-514-1-git-send-email-sudeep.holla@arm.com>
-Message-ID: <1434638494-514-2-git-send-email-sudeep.holla@arm.com>
+Message-ID: <1434638494-514-3-git-send-email-sudeep.holla@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch renames __cpu_suspend to cpu_suspend so that it's aligned
-with ARM32. It also removes the redundant wrapper created.
-
-This is in preparation to implement generic PSCI system suspend using
-the cpu_{suspend,resume} which now has the same interface on both ARM
-and ARM64.
+This patch replaces the definition and usage of PSCI_0_2_FN_NATIVE with
+the new and more generic macro PSCI_FN_NATIVE that can be used with any
+version. This will be useful for the new features introduced in PSCIv1.0
+and for any future revisions.
 
 Cc: Mark Rutland <mark.rutland@arm.com>
-Reviewed-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
 Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
 ---
- arch/arm64/include/asm/cpuidle.h | 8 ++------
- arch/arm64/include/asm/suspend.h | 2 +-
- arch/arm64/kernel/cpuidle.c      | 4 ++--
- arch/arm64/kernel/psci.c         | 2 +-
- arch/arm64/kernel/suspend.c      | 6 +++---
- 5 files changed, 9 insertions(+), 13 deletions(-)
+ drivers/firmware/psci.c | 17 +++++++++--------
+ 1 file changed, 9 insertions(+), 8 deletions(-)
 
-diff --git a/arch/arm64/include/asm/cpuidle.h b/arch/arm64/include/asm/cpuidle.h
-index 141b2fcabaa6..0f74f05d662a 100644
---- a/arch/arm64/include/asm/cpuidle.h
-+++ b/arch/arm64/include/asm/cpuidle.h
-@@ -5,20 +5,16 @@
- 
- #ifdef CONFIG_CPU_IDLE
- extern int arm_cpuidle_init(unsigned int cpu);
--extern int cpu_suspend(unsigned long arg);
-+extern int arm_cpuidle_suspend(int index);
- #else
- static inline int arm_cpuidle_init(unsigned int cpu)
- {
- 	return -EOPNOTSUPP;
- }
- 
--static inline int cpu_suspend(unsigned long arg)
-+static inline int arm_cpuidle_suspend(int index)
- {
- 	return -EOPNOTSUPP;
- }
- #endif
--static inline int arm_cpuidle_suspend(int index)
--{
--	return cpu_suspend(index);
--}
- #endif
-diff --git a/arch/arm64/include/asm/suspend.h b/arch/arm64/include/asm/suspend.h
-index 003802f58963..59a5b0f1e81c 100644
---- a/arch/arm64/include/asm/suspend.h
-+++ b/arch/arm64/include/asm/suspend.h
-@@ -21,6 +21,6 @@ struct sleep_save_sp {
- 	phys_addr_t save_ptr_stash_phys;
- };
- 
--extern int __cpu_suspend(unsigned long arg, int (*fn)(unsigned long));
-+extern int cpu_suspend(unsigned long arg, int (*fn)(unsigned long));
- extern void cpu_resume(void);
- #endif
-diff --git a/arch/arm64/kernel/cpuidle.c b/arch/arm64/kernel/cpuidle.c
-index f8aa16973318..7ce589ca54a4 100644
---- a/arch/arm64/kernel/cpuidle.c
-+++ b/arch/arm64/kernel/cpuidle.c
-@@ -32,7 +32,7 @@ int arm_cpuidle_init(unsigned int cpu)
-  * Return: 0 on success, -EOPNOTSUPP if CPU suspend hook not initialized, CPU
-  * operations back-end error code otherwise.
+diff --git a/drivers/firmware/psci.c b/drivers/firmware/psci.c
+index 68d0c2f6d004..752ca7c9eb97 100644
+--- a/drivers/firmware/psci.c
++++ b/drivers/firmware/psci.c
+@@ -29,13 +29,13 @@
+ /*
+  * While a 64-bit OS can make calls with SMC32 calling conventions, for some
+  * calls it is necessary to use SMC64 to pass or return 64-bit values. For such
+- * calls PSCI_0_2_FN_NATIVE(x) will choose the appropriate (native-width)
++ * calls PSCI_FN_NATIVE(x) will choose the appropriate (native-width)
+  * function ID.
   */
--int cpu_suspend(unsigned long arg)
-+int arm_cpuidle_suspend(int index)
- {
- 	int cpu = smp_processor_id();
- 
-@@ -42,5 +42,5 @@ int cpu_suspend(unsigned long arg)
- 	 */
- 	if (!cpu_ops[cpu] || !cpu_ops[cpu]->cpu_suspend)
- 		return -EOPNOTSUPP;
--	return cpu_ops[cpu]->cpu_suspend(arg);
-+	return cpu_ops[cpu]->cpu_suspend(index);
- }
-diff --git a/arch/arm64/kernel/psci.c b/arch/arm64/kernel/psci.c
-index a0fc99a518b8..4be597228b14 100644
---- a/arch/arm64/kernel/psci.c
-+++ b/arch/arm64/kernel/psci.c
-@@ -203,7 +203,7 @@ static int __maybe_unused cpu_psci_cpu_suspend(unsigned long index)
- 	if (!psci_power_state_loses_context(state[index - 1]))
- 		ret = psci_ops.cpu_suspend(state[index - 1], 0);
- 	else
--		ret = __cpu_suspend(index, psci_suspend_finisher);
-+		ret = cpu_suspend(index, psci_suspend_finisher);
- 
- 	return ret;
- }
-diff --git a/arch/arm64/kernel/suspend.c b/arch/arm64/kernel/suspend.c
-index d7daf45ae7a2..400e1265e205 100644
---- a/arch/arm64/kernel/suspend.c
-+++ b/arch/arm64/kernel/suspend.c
-@@ -51,13 +51,13 @@ void __init cpu_suspend_set_dbg_restorer(void (*hw_bp_restore)(void *))
- }
+ #ifdef CONFIG_64BIT
+-#define PSCI_0_2_FN_NATIVE(name)	PSCI_0_2_FN64_##name
++#define PSCI_FN_NATIVE(version, name)	PSCI_##version##_FN64_##name
+ #else
+-#define PSCI_0_2_FN_NATIVE(name)	PSCI_0_2_FN_##name
++#define PSCI_FN_NATIVE(version, name)	PSCI_##version##_FN_##name
+ #endif
  
  /*
-- * __cpu_suspend
-+ * cpu_suspend
-  *
-  * arg: argument to pass to the finisher function
-  * fn: finisher function pointer
-  *
-  */
--int __cpu_suspend(unsigned long arg, int (*fn)(unsigned long))
-+int cpu_suspend(unsigned long arg, int (*fn)(unsigned long))
+@@ -169,7 +169,7 @@ static int psci_migrate(unsigned long cpuid)
+ static int psci_affinity_info(unsigned long target_affinity,
+ 		unsigned long lowest_affinity_level)
  {
- 	struct mm_struct *mm = current->active_mm;
- 	int ret;
-@@ -82,7 +82,7 @@ int __cpu_suspend(unsigned long arg, int (*fn)(unsigned long))
- 		 * We are resuming from reset with TTBR0_EL1 set to the
- 		 * idmap to enable the MMU; restore the active_mm mappings in
- 		 * TTBR0_EL1 unless the active_mm == &init_mm, in which case
--		 * the thread entered __cpu_suspend with TTBR0_EL1 set to
-+		 * the thread entered cpu_suspend with TTBR0_EL1 set to
- 		 * reserved TTBR0 page tables and should be restored as such.
- 		 */
- 		if (mm == &init_mm)
+-	return invoke_psci_fn(PSCI_0_2_FN_NATIVE(AFFINITY_INFO),
++	return invoke_psci_fn(PSCI_FN_NATIVE(0_2, AFFINITY_INFO),
+ 			      target_affinity, lowest_affinity_level, 0);
+ }
+ 
+@@ -180,7 +180,7 @@ static int psci_migrate_info_type(void)
+ 
+ static unsigned long psci_migrate_info_up_cpu(void)
+ {
+-	return invoke_psci_fn(PSCI_0_2_FN_NATIVE(MIGRATE_INFO_UP_CPU),
++	return invoke_psci_fn(PSCI_FN_NATIVE(0_2, MIGRATE_INFO_UP_CPU),
+ 			      0, 0, 0);
+ }
+ 
+@@ -267,16 +267,17 @@ static void __init psci_init_migrate(void)
+ static void __init psci_0_2_set_functions(void)
+ {
+ 	pr_info("Using standard PSCI v0.2 function IDs\n");
+-	psci_function_id[PSCI_FN_CPU_SUSPEND] = PSCI_0_2_FN_NATIVE(CPU_SUSPEND);
++	psci_function_id[PSCI_FN_CPU_SUSPEND] =
++					PSCI_FN_NATIVE(0_2, CPU_SUSPEND);
+ 	psci_ops.cpu_suspend = psci_cpu_suspend;
+ 
+ 	psci_function_id[PSCI_FN_CPU_OFF] = PSCI_0_2_FN_CPU_OFF;
+ 	psci_ops.cpu_off = psci_cpu_off;
+ 
+-	psci_function_id[PSCI_FN_CPU_ON] = PSCI_0_2_FN_NATIVE(CPU_ON);
++	psci_function_id[PSCI_FN_CPU_ON] = PSCI_FN_NATIVE(0_2, CPU_ON);
+ 	psci_ops.cpu_on = psci_cpu_on;
+ 
+-	psci_function_id[PSCI_FN_MIGRATE] = PSCI_0_2_FN_NATIVE(MIGRATE);
++	psci_function_id[PSCI_FN_MIGRATE] = PSCI_FN_NATIVE(0_2, MIGRATE);
+ 	psci_ops.migrate = psci_migrate;
+ 
+ 	psci_ops.affinity_info = psci_affinity_info;
 -- 
 1.9.1
