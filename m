@@ -1,88 +1,71 @@
 From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Thu, 18 Jun 2015 16:24:42 +0530
-Subject: [PATCH 28/41] clocksource: orion: Migrate to new 'set-state' interface
+Date: Thu, 18 Jun 2015 16:24:43 +0530
+Subject: [PATCH 29/41] clocksource: atlas7: Migrate to new 'set-state'
+ interface
 In-Reply-To: <cover.1434622147.git.viresh.kumar@linaro.org>
 References: <cover.1434622147.git.viresh.kumar@linaro.org>
-Message-ID: <7797e21f79565a7c078df1c789a2f10cefb37f78.1434622147.git.viresh.kumar@linaro.org>
+Message-ID: <797a54c3155022b91781dfc218422de6ef0bd573.1434622147.git.viresh.kumar@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Migrate orion driver to the new 'set-state' interface provided by
+Migrate atlas7 driver to the new 'set-state' interface provided by
 clockevents core, the earlier 'set-mode' interface is marked obsolete
 now.
 
 This also enables us to implement callbacks for new states of clockevent
 devices, for example: ONESHOT_STOPPED.
 
-Cc: Jason Cooper <jason@lakedaemon.net>
-Cc: Andrew Lunn <andrew@lunn.ch>
-Cc: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
-Cc: Gregory Clement <gregory.clement@free-electrons.com>
+Cc: Barry Song <baohua@kernel.org>
 Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
 ---
- drivers/clocksource/time-orion.c | 46 +++++++++++++++++++++++-----------------
- 1 file changed, 26 insertions(+), 20 deletions(-)
+ drivers/clocksource/timer-atlas7.c | 19 +++++++------------
+ 1 file changed, 7 insertions(+), 12 deletions(-)
 
-diff --git a/drivers/clocksource/time-orion.c b/drivers/clocksource/time-orion.c
-index 0b3ce0399c51..0ece7427b497 100644
---- a/drivers/clocksource/time-orion.c
-+++ b/drivers/clocksource/time-orion.c
-@@ -60,30 +60,36 @@ static int orion_clkevt_next_event(unsigned long delta,
+diff --git a/drivers/clocksource/timer-atlas7.c b/drivers/clocksource/timer-atlas7.c
+index 60f9de3438b0..27fa13680be1 100644
+--- a/drivers/clocksource/timer-atlas7.c
++++ b/drivers/clocksource/timer-atlas7.c
+@@ -76,7 +76,7 @@ static irqreturn_t sirfsoc_timer_interrupt(int irq, void *dev_id)
+ 	/* clear timer interrupt */
+ 	writel_relaxed(BIT(cpu), sirfsoc_timer_base + SIRFSOC_TIMER_INTR_STATUS);
+ 
+-	if (ce->mode == CLOCK_EVT_MODE_ONESHOT)
++	if (clockevent_state_oneshot(ce))
+ 		sirfsoc_timer_count_disable(cpu);
+ 
+ 	ce->event_handler(ce);
+@@ -117,18 +117,11 @@ static int sirfsoc_timer_set_next_event(unsigned long delta,
  	return 0;
  }
  
--static void orion_clkevt_mode(enum clock_event_mode mode,
--			      struct clock_event_device *dev)
-+static int orion_clkevt_shutdown(struct clock_event_device *dev)
+-static void sirfsoc_timer_set_mode(enum clock_event_mode mode,
+-	struct clock_event_device *ce)
++/* Oneshot is enabled in set_next_event */
++static int sirfsoc_timer_shutdown(struct clock_event_device *evt)
  {
--	if (mode == CLOCK_EVT_MODE_PERIODIC) {
--		/* setup and enable periodic timer at 1/HZ intervals */
--		writel(ticks_per_jiffy - 1, timer_base + TIMER1_RELOAD);
--		writel(ticks_per_jiffy - 1, timer_base + TIMER1_VAL);
--		atomic_io_modify(timer_base + TIMER_CTRL,
--			TIMER1_RELOAD_EN | TIMER1_EN,
--			TIMER1_RELOAD_EN | TIMER1_EN);
--	} else {
--		/* disable timer */
--		atomic_io_modify(timer_base + TIMER_CTRL,
--			TIMER1_RELOAD_EN | TIMER1_EN, 0);
+-	switch (mode) {
+-	case CLOCK_EVT_MODE_ONESHOT:
+-		/* enable in set_next_event */
+-		break;
+-	default:
+-		break;
 -	}
-+	/* disable timer */
-+	atomic_io_modify(timer_base + TIMER_CTRL,
-+			 TIMER1_RELOAD_EN | TIMER1_EN, 0);
-+	return 0;
-+}
-+
-+static int orion_clkevt_set_periodic(struct clock_event_device *dev)
-+{
-+	/* setup and enable periodic timer at 1/HZ intervals */
-+	writel(ticks_per_jiffy - 1, timer_base + TIMER1_RELOAD);
-+	writel(ticks_per_jiffy - 1, timer_base + TIMER1_VAL);
-+	atomic_io_modify(timer_base + TIMER_CTRL,
-+			 TIMER1_RELOAD_EN | TIMER1_EN,
-+			 TIMER1_RELOAD_EN | TIMER1_EN);
+-
+ 	sirfsoc_timer_count_disable(smp_processor_id());
 +	return 0;
  }
  
- static struct clock_event_device orion_clkevt = {
--	.name		= "orion_event",
--	.features	= CLOCK_EVT_FEAT_ONESHOT | CLOCK_EVT_FEAT_PERIODIC,
--	.shift		= 32,
--	.rating		= 300,
--	.set_next_event	= orion_clkevt_next_event,
--	.set_mode	= orion_clkevt_mode,
-+	.name			= "orion_event",
-+	.features		= CLOCK_EVT_FEAT_ONESHOT |
-+				  CLOCK_EVT_FEAT_PERIODIC,
-+	.shift			= 32,
-+	.rating			= 300,
-+	.set_next_event		= orion_clkevt_next_event,
-+	.set_state_shutdown	= orion_clkevt_shutdown,
-+	.set_state_periodic	= orion_clkevt_set_periodic,
-+	.set_state_oneshot	= orion_clkevt_shutdown,
-+	.tick_resume		= orion_clkevt_shutdown,
- };
- 
- static irqreturn_t orion_clkevt_irq_handler(int irq, void *dev_id)
+ static void sirfsoc_clocksource_suspend(struct clocksource *cs)
+@@ -193,7 +186,9 @@ static int sirfsoc_local_timer_setup(struct clock_event_device *ce)
+ 	ce->name = "local_timer";
+ 	ce->features = CLOCK_EVT_FEAT_ONESHOT;
+ 	ce->rating = 200;
+-	ce->set_mode = sirfsoc_timer_set_mode;
++	ce->set_state_shutdown = sirfsoc_timer_shutdown;
++	ce->set_state_oneshot = sirfsoc_timer_shutdown;
++	ce->tick_resume = sirfsoc_timer_shutdown;
+ 	ce->set_next_event = sirfsoc_timer_set_next_event;
+ 	clockevents_calc_mult_shift(ce, atlas7_timer_rate, 60);
+ 	ce->max_delta_ns = clockevent_delta2ns(-2, ce);
 -- 
 2.4.0
