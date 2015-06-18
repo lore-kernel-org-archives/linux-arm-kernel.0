@@ -1,70 +1,56 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Thu, 18 Jun 2015 09:31:51 +0200
-Subject: [PATCH v2 1/3] net: mvneta: introduce compatible string
- "marvell, armada-xp-neta"
-In-Reply-To: <20150617213926.GE2917@io.lakedaemon.net>
-References: <1434547162-6275-1-git-send-email-simon.guinot@sequanux.org>
- <1434547162-6275-2-git-send-email-simon.guinot@sequanux.org>
- <55818E64.20007@free-electrons.com>
- <55818F10.8030304@free-electrons.com>
- <20150617170112.GD2917@io.lakedaemon.net>
- <20150617224312.3bfc80d9@free-electrons.com>
- <20150617213926.GE2917@io.lakedaemon.net>
-Message-ID: <20150618093151.6efcd32a@free-electrons.com>
+From: boris.brezillon@free-electrons.com (Boris Brezillon)
+Date: Thu, 18 Jun 2015 09:33:44 +0200
+Subject: [PATCH] clk: at91: add generated clock driver
+In-Reply-To: <1434611556.2385.8.camel@x220>
+References: <1434547409-12232-1-git-send-email-nicolas.ferre@atmel.com>
+ <1434611556.2385.8.camel@x220>
+Message-ID: <20150618093344.7d486e97@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Jason Cooper,
+Hi Paul,
 
-On Wed, 17 Jun 2015 21:39:26 +0000, Jason Cooper wrote:
+On Thu, 18 Jun 2015 09:12:36 +0200
+Paul Bolle <pebolle@tiscali.nl> wrote:
 
-> Odd, I'd use that as an example of the process working.  ;-)  we have
-> everyone using 'armada-370-neta' for a given block.  We discovered that
-> the original IP block (on the 370s) had a limitation (no hw checksum
-> for greater than 1600 bytes).  A newer version of the IP block (XP)
-> doesn't have the limitation.
+> On Wed, 2015-06-17 at 15:23 +0200, Nicolas Ferre wrote:
 > 
-> So we change the driver to honor the limit for the 370 compatible
-> string.  We create a new compatible string for xp where the block
-> doesn't have the limitation.
+> > --- a/arch/arm/mach-at91/Kconfig
+> > +++ b/arch/arm/mach-at91/Kconfig
+>  
+> > +config HAVE_AT91_GENERATED
+> > +	bool
 > 
-> How did the process fail?
+> This will always be 'n'.  
+> 
+> > --- a/drivers/clk/at91/Makefile
+> > +++ b/drivers/clk/at91/Makefile
+> 
+> > +obj-$(CONFIG_HAVE_AT91_GENERATED)	+= clk-generated.o
+> 
+> And clk-generated.o will never be built.
+> 
+> I think your options are to use
+> 	config HAVE_AT91_GENERATED
+> 		def_bool y
+> 
+> or
+> 	config HAVE_AT91_GENERATED
+> 		bool "Yadda yadda yadda"
+> 
+> or add
+> 	select HAVE_AT91_GENERATED
+> 
+> somewhere (possibly even in a second patch). But as it stands the patch
+> looks like an elaborate NOP.
 
-Because now all Armada XP users of jumbo frames are looking the HW
-checksum on their jumbo frames, which you can consider to be a
-regression: it was working, it is no longer working.
+I guess it will be selected by platforms embedding such clks. We just
+have to wait for those platform to reach mainline ;-). 
 
-Of course, since it falls back to SW checksumming, it still "works",
-but some users can complain of the performance penalty and consider it
-to be a regression.
+Best Regards,
 
-If on Armada XP, we had used for the beginning:
-
-	compatible = "marvell,armada-xp-neta", "marvell,armada-370-neta"
-
-with only marvell,armada-370-neta supported originally, we could have
-added this fix without breaking HW checksumming on jumbo frames for
-Armada XP users.
-
-So I'm sorry, but the process indeed failed, because Armada XP users
-keeping their old Device Tree blob will see a regression.
-
-> I'm not seeing where backwards compatibility was broken?  A device with
-> an old dtb booting a newer kernel gets a bugfix.  In the case of an XP
-> board with an old dtb (armada-370-neta), the hardware still works, but
-> not optimally.  Upgrading the dtb will enable hw checksumming for jumbo
-> packets.
-
-"not optimally" is still a breakage.
-
-Again, I personally don't care about DT backward compatibility as I
-think it's a stupid requirement. But I like to point out to the
-DT backward compatibility fanatics when it was actually broken :-)
-
-Best regards,
-
-Thomas
+Boris
 -- 
-Thomas Petazzoni, CTO, Free Electrons
-Embedded Linux, Kernel and Android engineering
+Boris Brezillon, Free Electrons
+Embedded Linux and Kernel engineering
 http://free-electrons.com
