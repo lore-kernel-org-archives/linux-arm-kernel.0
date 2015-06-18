@@ -1,41 +1,57 @@
 From: l.stach@pengutronix.de (Lucas Stach)
-Date: Thu, 18 Jun 2015 10:27:01 +0200
-Subject: [PATCH] ARM: imx6: Fix "BUG: scheduling while atomic" if PCIe
+Date: Thu, 18 Jun 2015 10:29:29 +0200
+Subject: [PATCH] ARM: imx6: Fix non-working MSI interrupts if PCIe
  switch is attached
-In-Reply-To: <1434614214-2085-1-git-send-email-dave.mueller@gmx.ch>
-References: <1434614214-2085-1-git-send-email-dave.mueller@gmx.ch>
-Message-ID: <1434616021.3061.2.camel@pengutronix.de>
+In-Reply-To: <1434614347-2154-1-git-send-email-dave.mueller@gmx.ch>
+References: <1434614347-2154-1-git-send-email-dave.mueller@gmx.ch>
+Message-ID: <1434616169.3061.5.camel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Donnerstag, den 18.06.2015, 09:56 +0200 schrieb David M?ller:
+Am Donnerstag, den 18.06.2015, 09:59 +0200 schrieb David M?ller:
 > This problem has already been reported as 
-> https://bugzilla.kernel.org/show_bug.cgi?id=100031
+> https://bugzilla.kernel.org/show_bug.cgi?id=100051
 > 
+
+I need more explanation for this one. MSI interrupts were certainly
+working fine even with a PCIe switchin between some time back. I think I
+personally tested things with 3.19.
+
+In the bug report you mention that the MSI_ADDR registers are
+overwritten. Where does the write come from and why is it done?
+
+Regards,
+Lucas
+
 > Signed-off-by: David M?ller <dave.mueller@gmx.ch>
 > ---
->  drivers/pci/host/pci-imx6.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
+>  drivers/pci/host/pci-imx6.c | 6 +++---
+>  1 file changed, 3 insertions(+), 3 deletions(-)
 > 
 > diff --git a/drivers/pci/host/pci-imx6.c b/drivers/pci/host/pci-imx6.c
-> index fdb9536..c63691c 100644
+> index c63691c..53f8dea 100644
 > --- a/drivers/pci/host/pci-imx6.c
 > +++ b/drivers/pci/host/pci-imx6.c
-> @@ -489,7 +489,7 @@ static int imx6_pcie_link_up(struct pcie_port *pp)
->  		 * Wait a little bit, then re-check if the link finished
->  		 * the training.
->  		 */
-> -		usleep_range(1000, 2000);
-> +		mdelay(20);
-
-While switching to mdelay might be the right thing to do here, you are
-also changing the timeout. This is a change in behavior and so not okay.
-Especially as you keep the CPU spinning for the duration of that
-timeout.
- 
+> @@ -433,9 +433,6 @@ static void imx6_pcie_host_init(struct pcie_port *pp)
+>  	dw_pcie_setup_rc(pp);
+>  
+>  	imx6_pcie_start_link(pp);
+> -
+> -	if (IS_ENABLED(CONFIG_PCI_MSI))
+> -		dw_pcie_msi_init(pp);
+>  }
+>  
+>  static void imx6_pcie_reset_phy(struct pcie_port *pp)
+> @@ -550,6 +547,9 @@ static int __init imx6_add_pcie_port(struct pcie_port *pp,
+>  		return ret;
 >  	}
->  	/*
->  	 * From L0, initiate MAC entry to gen2 if EP/RC supports gen2.
+>  
+> +	if (IS_ENABLED(CONFIG_PCI_MSI))
+> +		dw_pcie_msi_init(pp);
+> +
+>  	return 0;
+>  }
+>  
 
 -- 
 Pengutronix e.K.             | Lucas Stach                 |
