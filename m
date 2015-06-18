@@ -1,34 +1,52 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Thu, 18 Jun 2015 14:40:18 -0700
-Subject: [PATCH 01/44] kernel: Add support for poweroff handler call chain
-In-Reply-To: <20150618153003.GA19224@roeck-us.net>
-References: <1412659726-29957-1-git-send-email-linux@roeck-us.net>
- <1412659726-29957-2-git-send-email-linux@roeck-us.net>
- <55821936.4040704@codeaurora.org> <20150618153003.GA19224@roeck-us.net>
-Message-ID: <55833AC2.5080700@codeaurora.org>
+From: al.stone@linaro.org (Al Stone)
+Date: Thu, 18 Jun 2015 16:36:05 -0600
+Subject: [PATCH v2 0/3] Correct for ACPI 5.1->6.0 spec changes in MADT GICC
+ entries
+Message-ID: <1434666968-1543-1-git-send-email-al.stone@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/18/2015 08:30 AM, Guenter Roeck wrote:
-> On Wed, Jun 17, 2015 at 06:04:54PM -0700, Stephen Boyd wrote:
-> [ ... ]
->> What happened to this series? I want to add shutdown support to my
->> platform and I need to write a register on the PMIC in one driver to
->> configure it for shutdown instead of restart and then write an MMIO
->> register to tell the PMIC to actually do the shutdown in another driver.
->> It seems that the notifier solves this case for me, albeit with the
->> slight complication that I need to order the two with some priority.
->>
-> Can you use the .shutdown driver callback instead ?
->
-> I see other drivers use that, and check for system_state == SYSTEM_POWER_OFF
-> to power off the hardware.
->
+In the ACPI 5.1 version of the spec, the struct for the GICC subtable
+(struct acpi_madt_generic_interrupt) of the MADT is 76 bytes long; in
+ACPI 6.0, the struct is 80 bytes long.  But, there is only one definition
+in ACPICA for this struct -- and that is the 6.0 version.  Hence, when
+BAD_MADT_ENTRY() compares the struct size to the length in the GICC
+subtable, it fails if 5.1 structs are in use, and there are systems in
+the wild that have them.
 
-Yes I think that will work. I'll still have to hook pm_power_off() for
-the mmio register, but I guess that's ok and I don't need to worry about
-this series then.
+Note that this was found in linux-next and these patches apply against
+that tree and the arm64 kernel tree; 4.1-rc8 does not appear to have this
+problem since it still has the 5.1 struct definition.
+
+Even though there is precendent in ia64 code for ignoring the changes in
+size, this patch set instead tries to verify correctness.  The first patch
+in the set adds macros for easily using the ACPI spec version.  The second
+patch adds the BAD_MADT_GICC_ENTRY() macro that uses the version macros to
+check the GICC subtable only, accounting for the difference in specification
+versions that are possible.  The final patch replaces BAD_MADT_ENTRY usage
+with the BAD_MADT_GICC_ENTRY macro in arm64 code, which is currently the
+only architecture affected.  The BAD_MADT_ENTRY() will continue to work as
+is for all other MADT subtables.
+
+I have tested these patches on an APM Mustang with version 1.15 firmware,
+where the problem was found, and they fix the problem.
+
+Changes for v2:
+  -- Replace magic constants with proper defines (Lorenzo)
+  -- Minor syntax clean-up noted by checkpatch
+  -- Send out CCs properly this time
+  -- Minor clean-up of the paragraphs in this cover letter
+
+
+Al Stone (3):
+  ACPI : introduce macros for using the ACPI specification version
+  ACPI: add BAD_MADT_GICC_ENTRY() macro
+  ACPI / ARM64 : use the new BAD_MADT_GICC_ENTRY macro
+
+ arch/arm64/kernel/smp.c   |  2 +-
+ drivers/irqchip/irq-gic.c |  2 +-
+ include/linux/acpi.h      | 15 +++++++++++++++
+ 3 files changed, 17 insertions(+), 2 deletions(-)
 
 -- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+2.4.0
