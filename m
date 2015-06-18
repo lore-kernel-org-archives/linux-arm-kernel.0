@@ -1,104 +1,80 @@
-From: lorenx4@gmail.com (Lorenzo Nava)
-Date: Thu, 18 Jun 2015 23:44:22 +0200
-Subject: [RFC PATCH v3] arm DMA: Fix allocation from CMA for coherent DMA
-Message-ID: <1434663862-17858-1-git-send-email-lorenx4@gmail.com>
+From: dhdang@apm.com (Duc Dang)
+Date: Thu, 18 Jun 2015 15:09:20 -0700
+Subject: [PATCH 1/1] PCI: xgene: Allow config access to Root Port even
+ when link is down
+In-Reply-To: <20150618200053.GG7710@google.com>
+References: <1434653139-14461-1-git-send-email-dhdang@apm.com>
+ <20150618200053.GG7710@google.com>
+Message-ID: <CADaLNDkwgPeFJG2LqM73-gWeoQxvUQJ-XUpXC2vAvVq0_PsR9g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Thu, Jun 18, 2015 at 1:00 PM, Bjorn Helgaas <bhelgaas@google.com> wrote:
+> On Thu, Jun 18, 2015 at 11:45:39AM -0700, Duc Dang wrote:
+>> Even if a Root Port's link is down, we should still be able to access the
+>> Port's configuration space.
+>>
+>> Suggested-by: Bjorn Helgaas <bhelgaas@google.com>
+>> Signed-off-by: Duc Dang <dhdang@apm.com>
+>> Signed-off-by: Tanmay Inamdar <tinamdar@apm.com>
+>> ---
+>>  drivers/pci/host/pci-xgene.c | 2 +-
+>>  1 file changed, 1 insertion(+), 1 deletion(-)
+>>
+>> diff --git a/drivers/pci/host/pci-xgene.c b/drivers/pci/host/pci-xgene.c
+>> index 7e3cf28..2e66c87 100644
+>> --- a/drivers/pci/host/pci-xgene.c
+>> +++ b/drivers/pci/host/pci-xgene.c
+>> @@ -139,7 +139,7 @@ static void __iomem *xgene_pcie_map_bus(struct pci_bus *bus, unsigned int devfn,
+>>  {
+>>       struct xgene_pcie_port *port = bus->sysdata;
+>>
+>> -     if ((pci_is_root_bus(bus) && devfn != 0) || !port->link_up ||
+>> +     if ((pci_is_root_bus(bus) && devfn != 0) ||
+>>           xgene_pcie_hide_rc_bars(bus, offset))
+>>               return NULL;
+>>
+>
+> Applied with changelog as follows to pci/host-xgene for v4.2, thanks!
 
-This patch allows the use of CMA for DMA coherent memory allocation.
-At the moment if the input parameter "is_coherent" is set to true
-the allocation is not made using the CMA, which I think is not the
-desired behaviour.
+It was my fault that I missed a compilation warning due to struct
+xgene_pcie_port *port
+becomes unused variable. I will send another patch that fix this
+compilation warning right after this email.
 
-Signed-off-by: Lorenzo Nava <lorenx4@xxxxxxxx>
----
-Changes in v2:
- correct __arm_dma_free() according to __dma_alloc() allocation
----
-Changes in v3:
- now __dma_alloc(), if 'is_coherent' is true, returns memory from CMA 
- if there is no need for atomic allocation. If CMA is not available 
- the function returns the result of __alloc_simple_buffer().
- __arm_dma_free() frees memory according to the new alloc function
- avoiding __dma_free_remap() for coherent DMA if CMA is not enable.
- arm_dma_alloc() mark pages as cacheable if attrs are set by default
- to NULL. If attrs is not NULL, attributes are preserved in the allocation.
+>
+> commit 979595bcb8da04381ed85d3b0eb1f471cc5863e4
+> Author: Duc Dang <dhdang@apm.com>
+> Date:   Thu Jun 18 11:45:39 2015 -0700
+>
+>     PCI: xgene: Allow config access to Root Port even when link is down
+>
+>     Previously, when a Root Port's link was down, we didn't allow config access
+>     to the Root Port, which meant that if the Root Port led to an empty slot,
+>     "lspci" didn't even show the Root Port.
+>
+>     Allow config access to Root Port even when link is down.
+>
+>     [bhelgaas: changelog]
+>     Suggested-by: Bjorn Helgaas <bhelgaas@google.com>
+>     Signed-off-by: Duc Dang <dhdang@apm.com>
+>     Signed-off-by: Tanmay Inamdar <tinamdar@apm.com>
+>     Signed-off-by: Bjorn Helgaas <bhelgaas@google.com>
+>
+> diff --git a/drivers/pci/host/pci-xgene.c b/drivers/pci/host/pci-xgene.c
+> index 70af714..1fc8910 100644
+> --- a/drivers/pci/host/pci-xgene.c
+> +++ b/drivers/pci/host/pci-xgene.c
+> @@ -139,7 +139,7 @@ static void __iomem *xgene_pcie_map_bus(struct pci_bus *bus, unsigned int devfn,
+>  {
+>         struct xgene_pcie_port *port = bus->sysdata;
+>
+> -       if ((pci_is_root_bus(bus) && devfn != 0) || !port->link_up ||
+> +       if ((pci_is_root_bus(bus) && devfn != 0) ||
+>             xgene_pcie_hide_rc_bars(bus, offset))
+>                 return NULL;
+>
 
- Coherent allocation tested on Xilinx Zynq processor.
----
- arch/arm/mm/dma-mapping.c |   35 +++++++++++++++++++++++++++--------
- 1 file changed, 27 insertions(+), 8 deletions(-)
-
-diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
-index 7e7583d..8e7f402 100644
---- a/arch/arm/mm/dma-mapping.c
-+++ b/arch/arm/mm/dma-mapping.c
-@@ -645,15 +645,29 @@ static void *__dma_alloc(struct device *dev, size_t size, dma_addr_t *handle,
- 	size = PAGE_ALIGN(size);
- 	want_vaddr = !dma_get_attr(DMA_ATTR_NO_KERNEL_MAPPING, attrs);
- 
--	if (is_coherent || nommu())
-+	if (nommu()) {
- 		addr = __alloc_simple_buffer(dev, size, gfp, &page);
--	else if (!(gfp & __GFP_WAIT))
-+		goto dma_alloc_done;
-+	}
-+
-+	if (dev_get_cma_area(dev) && (gfp & __GFP_WAIT)) {
-+		addr = __alloc_from_contiguous(dev, size, prot, &page,
-+					       caller, want_vaddr);
-+		goto dma_alloc_done;
-+	}
-+
-+	if (is_coherent) {
-+		addr = __alloc_simple_buffer(dev, size, gfp, &page);
-+		goto dma_alloc_done;
-+	}
-+
-+	if (!(gfp & __GFP_WAIT))
- 		addr = __alloc_from_pool(size, &page);
--	else if (!dev_get_cma_area(dev))
--		addr = __alloc_remap_buffer(dev, size, gfp, prot, &page, caller, want_vaddr);
- 	else
--		addr = __alloc_from_contiguous(dev, size, prot, &page, caller, want_vaddr);
-+		addr = __alloc_remap_buffer(dev, size, gfp, prot, &page,
-+					    caller, want_vaddr);
- 
-+dma_alloc_done:
- 	if (page)
- 		*handle = pfn_to_dma(dev, page_to_pfn(page));
- 
-@@ -680,9 +694,14 @@ void *arm_dma_alloc(struct device *dev, size_t size, dma_addr_t *handle,
- static void *arm_coherent_dma_alloc(struct device *dev, size_t size,
- 	dma_addr_t *handle, gfp_t gfp, struct dma_attrs *attrs)
- {
--	pgprot_t prot = __get_dma_pgprot(attrs, PAGE_KERNEL);
-+	pgprot_t prot;
- 	void *memory;
- 
-+	if (attrs == NULL)
-+		 prot  = PAGE_KERNEL;
-+	else
-+		 prot  = __get_dma_pgprot(attrs, PAGE_KERNEL);
-+
- 	if (dma_alloc_from_coherent(dev, size, handle, &memory))
- 		return memory;
- 
-@@ -735,12 +754,12 @@ static void __arm_dma_free(struct device *dev, size_t size, void *cpu_addr,
- 
- 	size = PAGE_ALIGN(size);
- 
--	if (is_coherent || nommu()) {
-+	if (nommu()) {
- 		__dma_free_buffer(page, size);
- 	} else if (__free_from_pool(cpu_addr, size)) {
- 		return;
- 	} else if (!dev_get_cma_area(dev)) {
--		if (want_vaddr)
-+		if (want_vaddr && !is_coherent)
- 			__dma_free_remap(cpu_addr, size);
- 		__dma_free_buffer(page, size);
- 	} else {
--- 
-1.7.10.4
+-
+Thanks,
+Duc Dang.
