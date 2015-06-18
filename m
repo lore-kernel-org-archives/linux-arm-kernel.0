@@ -1,159 +1,157 @@
-From: mturquette@baylibre.com (Michael Turquette)
-Date: Thu, 18 Jun 2015 12:51:55 -0700
-Subject: [PATCH v7 5/6] ARM: dts: enable clock support for Broadcom Cygnus
-In-Reply-To: <1430849603-15849-6-git-send-email-rjui@broadcom.com>
-References: <1430849603-15849-1-git-send-email-rjui@broadcom.com>
- <1430849603-15849-6-git-send-email-rjui@broadcom.com>
-Message-ID: <20150618195155.9112.72056@quantum>
+From: mturquette@linaro.org (Michael Turquette)
+Date: Thu, 18 Jun 2015 12:58:46 -0700
+Subject: [PATCH 1/6] clk: add CLK_RECALC_NEW_RATES clock flag for Exynos
+ cpu clock support
+In-Reply-To: <55535BF9.60609@samsung.com>
+References: <'@samsung.com>
+ <1428079429-4252-1-git-send-email-b.zolnierkie@samsung.com>
+ <1428079429-4252-2-git-send-email-b.zolnierkie@samsung.com>
+ <55535BF9.60609@samsung.com>
+Message-ID: <20150618195846.9112.7144@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Ray Jui (2015-05-05 11:13:22)
-> Replace current device tree dummy clocks with real clock support for
-> Broadcom Cygnus SoC
+Quoting Sylwester Nawrocki (2015-05-13 07:13:13)
+> On 03/04/15 18:43, Bartlomiej Zolnierkiewicz wrote:
+> > This flag is needed to fix the issue with wrong dividers being setup
+> > by Common Clock Framework when using the new Exynos cpu clock support.
+> > 
+> > The issue happens because clk_core_set_rate_nolock()  calls
+> > clk_calc_new_rates(clk, rate) before both pre/post clock notifiers have
+> > a chance to run.  In case of Exynos cpu clock support pre/post clock
+> > notifiers are registered for mout_apll clock which is a parent of armclk
+> > cpu clock and dividers are modified in both pre and post clock notifier.
+> > This results in wrong dividers values being later programmed by
+> > clk_change_rate(top).  To workaround the problem CLK_RECALC_NEW_RATES
+> > flag is added and it is set for mout_apll clock later so the correct
+> > divider values are re-calculated after both pre and post clock notifiers
+> > had run.
+> > 
+> > For example when using "performance" governor on Exynos4210 Origen board
+> > the cpufreq-dt driver requests to change the frequency from 1000MHz to
+> > 1200MHz and after the change state of the relevant clocks is following:
+> > 
+> > Without use of CLK_GET_RATE_NOCACHE flag:
+> > 
+> >  fout_apll rate: 1200000000
+> >          fout_apll_div_2 rate: 600000000
+> >                  mout_clkout_cpu rate: 600000000
+> >                          div_clkout_cpu rate: 600000000
+> >                                  clkout_cpu rate: 600000000
+> >          mout_apll rate: 1200000000
+> >                  armclk rate: 1200000000
+> >                  mout_hpm rate: 1200000000
+> >                          div_copy rate: 300000000
+> >                                  div_hpm rate: 300000000
+> >                  mout_core rate: 1200000000
+> >                          div_core rate: 1200000000
+> >                                  div_core2 rate: 1200000000
+> >                                          arm_clk_div_2 rate: 600000000
+> >                                          div_corem0 rate: 300000000
+> >                                          div_corem1 rate: 150000000
+> >                                          div_periph rate: 300000000
+> >                          div_atb rate: 300000000
+> >                                  div_pclk_dbg rate: 150000000
+> >                  sclk_apll rate: 1200000000
+> >                          sclk_apll_div_2 rate: 600000000
+> > 
+> > 
+> > With use of CLK_GET_RATE_NOCACHE flag:
+> > 
+> >  fout_apll rate: 1200000000
+> >          fout_apll_div_2 rate: 600000000
+> >                  mout_clkout_cpu rate: 600000000
+> >                          div_clkout_cpu rate: 600000000
+> >                                  clkout_cpu rate: 600000000
+> >          mout_apll rate: 1200000000
+> >                  armclk rate: 1200000000
+> >                  mout_hpm rate: 1200000000
+> >                          div_copy rate: 200000000
+> >                                  div_hpm rate: 200000000
+> >                  mout_core rate: 1200000000
+> >                          div_core rate: 1200000000
+> >                                  div_core2 rate: 1200000000
+> >                                          arm_clk_div_2 rate: 600000000
+> >                                          div_corem0 rate: 300000000
+> >                                          div_corem1 rate: 150000000
+> >                                          div_periph rate: 300000000
+> >                          div_atb rate: 240000000
+> >                                  div_pclk_dbg rate: 120000000
+> >                  sclk_apll rate: 150000000
+> >                          sclk_apll_div_2 rate: 75000000
+> > 
+> > Without this change cpufreq-dt driver showed ~10 mA larger energy
+> > consumption when compared to cpufreq-exynos one when "performance"
+> > cpufreq governor was used on Exynos4210 SoC based Origen board.
+> > 
+> > This issue was probably meant to be workarounded by use of
+> > CLK_GET_RATE_NOCACHE and CLK_DIVIDER_READ_ONLY clock flags in
+> > the original Exynos cpu clock patchset (in "[PATCH v12 6/6] clk:
+> > samsung: remove unused clock aliases and update clock flags" patch)
+> > but usage of these flags is not sufficient to fix the issue observed.
+> > 
+> > Cc: Thomas Abraham <thomas.ab@samsung.com>
+> > Cc: Tomasz Figa <tomasz.figa@gmail.com>
+> > Cc: Mike Turquette <mturquette@linaro.org>
+> > Cc: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
+> > Signed-off-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
+> > ---
+> >  drivers/clk/clk.c            |    3 +++
+> >  include/linux/clk-provider.h |    1 +
+> >  2 files changed, 4 insertions(+)
+> > 
+> > diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
+> > index f85c8e2..97cc73e 100644
+> > --- a/drivers/clk/clk.c
+> > +++ b/drivers/clk/clk.c
+> > @@ -1771,6 +1771,9 @@ static void clk_change_rate(struct clk_core *clk)
+> >       if (clk->notifier_count && old_rate != clk->rate)
+> >               __clk_notify(clk, POST_RATE_CHANGE, old_rate, clk->rate);
+> >  
+> > +     if (clk->flags & CLK_RECALC_NEW_RATES)
+> > +             (void)clk_calc_new_rates(clk, clk->new_rate);
+> > +
+> >       /*
+> >        * Use safe iteration, as change_rate can actually swap parents
+> >        * for certain clock types.
+> > diff --git a/include/linux/clk-provider.h b/include/linux/clk-provider.h
+> > index 28abf1b..8d1aebe 100644
+> > --- a/include/linux/clk-provider.h
+> > +++ b/include/linux/clk-provider.h
+> > @@ -31,6 +31,7 @@
+> >  #define CLK_GET_RATE_NOCACHE BIT(6) /* do not use the cached clk rate */
+> >  #define CLK_SET_RATE_NO_REPARENT BIT(7) /* don't re-parent on rate change */
+> >  #define CLK_GET_ACCURACY_NOCACHE BIT(8) /* do not use the cached clk accuracy */
+> > +#define CLK_RECALC_NEW_RATES BIT(9) /* recalc rates after notifications */
 > 
-> Signed-off-by: Ray Jui <rjui@broadcom.com>
-> Reviewed-by: Scott Branden <sbranden@broadcom.com>
+> Mike, Stephen, what do you think about this? I'm rather resistant to
+> this new flag approach, it looks like a hack. I don't seem to have better
+> ideas to address the missing rate recalculation issue though.
 
-Patches 1-4 & 6 are applied to clk-next. You can add my Ack to this
-patch:
+I also do not like it. The root of the problem is the use of clk
+notifiers to change clk rates. This is also a hack and it points towards
+some missing infrastructure in the clock framework.
 
-Acked-by: Michael Turquette <mturquette@baylibre.com>
+> I thought about making the cpu clk notifier callback returning a specific
+> error value, which would then trigger rate recalculation after
+> __clk_notify() call in clk_change_rate() function. This way the trigger
+> of the repeated rate recalculation would come from a notifier callback,
+> rather than from a clock definition. But in general it would be difficult
+> to handle multiple notification callbacks, each of which would attempt
+> to trigger the rate recalculation.
 
-arm-soc guys,
-
-Any chance you can pick this up? Alternatively I can take it through the
-clk tree with an Ack.
+The more complexity we add to the notifier callbacks the crazier things
+will get. For now I'd like to see Exynos continue to use the
+platform-specific CPUfreq drivers until the new coordinated clock rates
+infrastructure makes it possible to do this type of stuff without
+relying on the notifiers. I'm working on this feature Right Now. I never
+like putting dates on upstream stuff but I'd like to see this feature in
+4.3 if possible.
 
 Regards,
 Mike
 
-> ---
->  arch/arm/boot/dts/bcm-cygnus-clock.dtsi |   89 +++++++++++++++++++++----------
->  1 file changed, 61 insertions(+), 28 deletions(-)
 > 
-> diff --git a/arch/arm/boot/dts/bcm-cygnus-clock.dtsi b/arch/arm/boot/dts/bcm-cygnus-clock.dtsi
-> index 60d8389..32bcd45 100644
-> --- a/arch/arm/boot/dts/bcm-cygnus-clock.dtsi
-> +++ b/arch/arm/boot/dts/bcm-cygnus-clock.dtsi
-> @@ -36,56 +36,89 @@ clocks {
->         ranges;
->  
->         osc: oscillator {
-> +               #clock-cells = <0>;
->                 compatible = "fixed-clock";
-> -               #clock-cells = <1>;
->                 clock-frequency = <25000000>;
->         };
->  
-> -       apb_clk: apb_clk {
-> -               compatible = "fixed-clock";
-> +       /* Cygnus ARM PLL */
-> +       armpll: armpll {
->                 #clock-cells = <0>;
-> -               clock-frequency = <1000000000>;
-> +               compatible = "brcm,cygnus-armpll";
-> +               clocks = <&osc>;
-> +               reg = <0x19000000 0x1000>;
->         };
->  
-> -       periph_clk: periph_clk {
-> -               compatible = "fixed-clock";
-> +       /* peripheral clock for system timer */
-> +       periph_clk: arm_periph_clk {
->                 #clock-cells = <0>;
-> -               clock-frequency = <500000000>;
-> +               compatible = "fixed-factor-clock";
-> +               clocks = <&armpll>;
-> +               clock-div = <2>;
-> +               clock-mult = <1>;
->         };
->  
-> -       sdio_clk: lcpll_ch2 {
-> -               compatible = "fixed-clock";
-> +       /* APB bus clock */
-> +       apb_clk: apb_clk {
->                 #clock-cells = <0>;
-> -               clock-frequency = <200000000>;
-> +               compatible = "fixed-factor-clock";
-> +               clocks = <&armpll>;
-> +               clock-div = <4>;
-> +               clock-mult = <1>;
->         };
->  
-> -       axi81_clk: axi81_clk {
-> -               compatible = "fixed-clock";
-> -               #clock-cells = <0>;
-> -               clock-frequency = <100000000>;
-> +       genpll: genpll {
-> +               #clock-cells = <1>;
-> +               compatible = "brcm,cygnus-genpll";
-> +               reg = <0x0301d000 0x2c>, <0x0301c020 0x4>;
-> +               clocks = <&osc>;
-> +               clock-output-names = "genpll", "axi21", "250mhz", "ihost_sys",
-> +                                    "enet_sw", "audio_125", "can";
->         };
->  
-> -       keypad_clk: keypad_clk {
-> -               compatible = "fixed-clock";
-> +       /* always 1/2 of the axi21 clock */
-> +       axi41_clk: axi41_clk {
->                 #clock-cells = <0>;
-> -               clock-frequency = <31806>;
-> +               compatible = "fixed-factor-clock";
-> +               clocks = <&genpll 1>;
-> +               clock-div = <2>;
-> +               clock-mult = <1>;
->         };
->  
-> -       adc_clk: adc_clk {
-> -               compatible = "fixed-clock";
-> +       /* always 1/4 of the axi21 clock */
-> +       axi81_clk: axi81_clk {
->                 #clock-cells = <0>;
-> -               clock-frequency = <1562500>;
-> +               compatible = "fixed-factor-clock";
-> +               clocks = <&genpll 1>;
-> +               clock-div = <4>;
-> +               clock-mult = <1>;
->         };
->  
-> -       pwm_clk: pwm_clk {
-> -               compatible = "fixed-clock";
-> -               #clock-cells = <0>;
-> -               clock-frequency = <1000000>;
-> +       lcpll0: lcpll0 {
-> +               #clock-cells = <1>;
-> +               compatible = "brcm,cygnus-lcpll0";
-> +               reg = <0x0301d02c 0x1c>, <0x0301c020 0x4>;
-> +               clocks = <&osc>;
-> +               clock-output-names = "lcpll0", "pcie_phy", "ddr_phy", "sdio",
-> +                                    "usb_phy", "smart_card", "ch5";
->         };
->  
-> -       lcd_clk: mipipll_ch1 {
-> -               compatible = "fixed-clock";
-> -               #clock-cells = <0>;
-> -               clock-frequency = <100000000>;
-> +       mipipll: mipipll {
-> +               #clock-cells = <1>;
-> +               compatible = "brcm,cygnus-mipipll";
-> +               reg = <0x180a9800 0x2c>, <0x0301c020 0x4>, <0x180aa024 0x4>;
-> +               clocks = <&osc>;
-> +               clock-output-names = "mipipll", "ch0_unused", "ch1_lcd",
-> +                                    "ch2_v3d", "ch3_unused", "ch4_unused",
-> +                                    "ch5_unused";
-> +       };
-> +
-> +       asiu_clks: asiu_clks {
-> +               #clock-cells = <1>;
-> +               compatible = "brcm,cygnus-asiu-clk";
-> +               reg = <0x0301d048 0xc>, <0x180aa024 0x4>;
-> +
-> +               clocks = <&osc>;
-> +               clock-output-names = "keypad", "adc/touch", "pwm";
->         };
->  };
 > -- 
-> 1.7.9.5
-> 
+> Regards,
+> Sylwester
