@@ -1,94 +1,52 @@
 From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Thu, 18 Jun 2015 16:24:23 +0530
-Subject: [PATCH 09/41] clocksource: meson6: Migrate to new 'set-state'
+Date: Thu, 18 Jun 2015 16:24:17 +0530
+Subject: [PATCH 03/41] clocksource: clps711x: Migrate to new 'set-state'
  interface
 In-Reply-To: <cover.1434622147.git.viresh.kumar@linaro.org>
 References: <cover.1434622147.git.viresh.kumar@linaro.org>
-Message-ID: <31c070cb211232dbe5f03f7afa62ac27d65481ba.1434622147.git.viresh.kumar@linaro.org>
+Message-ID: <1d4c008b44c41c5ee8f124a93e520e566b621503.1434622147.git.viresh.kumar@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Migrate meson6 driver to the new 'set-state' interface provided by
+Migrate clps711x driver to the new 'set-state' interface provided by
 clockevents core, the earlier 'set-mode' interface is marked obsolete
 now.
 
 This also enables us to implement callbacks for new states of clockevent
 devices, for example: ONESHOT_STOPPED.
 
-Cc: Carlo Caione <carlo@caione.org>
+We weren't doing anything in the ->set_mode() callback. So, this patch
+doesn't provide any set-state callbacks.
+
+Cc: Alexander Shiyan <shc_work@mail.ru>
 Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
 ---
- drivers/clocksource/meson6_timer.c | 50 ++++++++++++++++++++------------------
- 1 file changed, 27 insertions(+), 23 deletions(-)
+ drivers/clocksource/clps711x-timer.c | 6 ------
+ 1 file changed, 6 deletions(-)
 
-diff --git a/drivers/clocksource/meson6_timer.c b/drivers/clocksource/meson6_timer.c
-index 5c15cba41dca..1fa22c4d2d49 100644
---- a/drivers/clocksource/meson6_timer.c
-+++ b/drivers/clocksource/meson6_timer.c
-@@ -67,25 +67,25 @@ static void meson6_clkevt_time_start(unsigned char timer, bool periodic)
- 	writel(val | TIMER_ENABLE_BIT(timer), timer_base + TIMER_ISA_MUX);
+diff --git a/drivers/clocksource/clps711x-timer.c b/drivers/clocksource/clps711x-timer.c
+index d83ec1f2fddc..cdd86e3525bb 100644
+--- a/drivers/clocksource/clps711x-timer.c
++++ b/drivers/clocksource/clps711x-timer.c
+@@ -61,11 +61,6 @@ static irqreturn_t clps711x_timer_interrupt(int irq, void *dev_id)
+ 	return IRQ_HANDLED;
  }
  
--static void meson6_clkevt_mode(enum clock_event_mode mode,
--			       struct clock_event_device *clk)
-+static int meson6_shutdown(struct clock_event_device *evt)
+-static void clps711x_clockevent_set_mode(enum clock_event_mode mode,
+-					 struct clock_event_device *evt)
+-{
+-}
+-
+ static int __init _clps711x_clkevt_init(struct clk *clock, void __iomem *base,
+ 					unsigned int irq)
  {
--	switch (mode) {
--	case CLOCK_EVT_MODE_PERIODIC:
--		meson6_clkevt_time_stop(CED_ID);
--		meson6_clkevt_time_setup(CED_ID, USEC_PER_SEC/HZ - 1);
--		meson6_clkevt_time_start(CED_ID, true);
--		break;
--	case CLOCK_EVT_MODE_ONESHOT:
--		meson6_clkevt_time_stop(CED_ID);
--		meson6_clkevt_time_start(CED_ID, false);
--		break;
--	case CLOCK_EVT_MODE_UNUSED:
--	case CLOCK_EVT_MODE_SHUTDOWN:
--	default:
--		meson6_clkevt_time_stop(CED_ID);
--		break;
--	}
-+	meson6_clkevt_time_stop(CED_ID);
-+	return 0;
-+}
-+
-+static int meson6_set_oneshot(struct clock_event_device *evt)
-+{
-+	meson6_clkevt_time_stop(CED_ID);
-+	meson6_clkevt_time_start(CED_ID, false);
-+	return 0;
-+}
-+
-+static int meson6_set_periodic(struct clock_event_device *evt)
-+{
-+	meson6_clkevt_time_stop(CED_ID);
-+	meson6_clkevt_time_setup(CED_ID, USEC_PER_SEC / HZ - 1);
-+	meson6_clkevt_time_start(CED_ID, true);
-+	return 0;
- }
+@@ -91,7 +86,6 @@ static int __init _clps711x_clkevt_init(struct clk *clock, void __iomem *base,
+ 	clkevt->name = "clps711x-clockevent";
+ 	clkevt->rating = 300;
+ 	clkevt->features = CLOCK_EVT_FEAT_PERIODIC | CLOCK_EVT_FEAT_C3STOP;
+-	clkevt->set_mode = clps711x_clockevent_set_mode;
+ 	clkevt->cpumask = cpumask_of(0);
+ 	clockevents_config_and_register(clkevt, HZ, 0, 0);
  
- static int meson6_clkevt_next_event(unsigned long evt,
-@@ -99,11 +99,15 @@ static int meson6_clkevt_next_event(unsigned long evt,
- }
- 
- static struct clock_event_device meson6_clockevent = {
--	.name		= "meson6_tick",
--	.rating		= 400,
--	.features	= CLOCK_EVT_FEAT_PERIODIC | CLOCK_EVT_FEAT_ONESHOT,
--	.set_mode	= meson6_clkevt_mode,
--	.set_next_event	= meson6_clkevt_next_event,
-+	.name			= "meson6_tick",
-+	.rating			= 400,
-+	.features		= CLOCK_EVT_FEAT_PERIODIC |
-+				  CLOCK_EVT_FEAT_ONESHOT,
-+	.set_state_shutdown	= meson6_shutdown,
-+	.set_state_periodic	= meson6_set_periodic,
-+	.set_state_oneshot	= meson6_set_oneshot,
-+	.tick_resume		= meson6_shutdown,
-+	.set_next_event		= meson6_clkevt_next_event,
- };
- 
- static irqreturn_t meson6_timer_interrupt(int irq, void *dev_id)
 -- 
 2.4.0
