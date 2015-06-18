@@ -1,180 +1,145 @@
 From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Thu, 18 Jun 2015 16:24:20 +0530
-Subject: [PATCH 06/41] clocksource: exynos_mct: Migrate to new 'set-state'
- interface
+Date: Thu, 18 Jun 2015 16:24:22 +0530
+Subject: [PATCH 08/41] clocksource: i8253: Migrate to new 'set-state' interface
 In-Reply-To: <cover.1434622147.git.viresh.kumar@linaro.org>
 References: <cover.1434622147.git.viresh.kumar@linaro.org>
-Message-ID: <a1d7ad942bfc08b91b7ae0d9ba3b19b579f469c9.1434622147.git.viresh.kumar@linaro.org>
+Message-ID: <d30aeb9bfee60f4121a4b6c73f7d09915a9503b2.1434622147.git.viresh.kumar@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Migrate exynos_mct driver to the new 'set-state' interface provided by
+Migrate i8253 driver to the new 'set-state' interface provided by
 clockevents core, the earlier 'set-mode' interface is marked obsolete
 now.
 
 This also enables us to implement callbacks for new states of clockevent
 devices, for example: ONESHOT_STOPPED.
 
-Cc: Kukjin Kim <kgene.kim@samsung.com>
+Cc: Russell King <rmk+kernel@arm.linux.org.uk>
 Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
 ---
- drivers/clocksource/exynos_mct.c | 85 +++++++++++++++++++---------------------
- 1 file changed, 40 insertions(+), 45 deletions(-)
+ arch/x86/kernel/i8253.c     |  2 +-
+ drivers/clocksource/i8253.c | 77 ++++++++++++++++++++++-----------------------
+ 2 files changed, 39 insertions(+), 40 deletions(-)
 
-diff --git a/drivers/clocksource/exynos_mct.c b/drivers/clocksource/exynos_mct.c
-index 935b05936dbd..82e060cb7b95 100644
---- a/drivers/clocksource/exynos_mct.c
-+++ b/drivers/clocksource/exynos_mct.c
-@@ -257,15 +257,14 @@ static void exynos4_mct_comp0_stop(void)
- 	exynos4_mct_write(0, EXYNOS4_MCT_G_INT_ENB);
- }
+diff --git a/arch/x86/kernel/i8253.c b/arch/x86/kernel/i8253.c
+index f2b96de3c7c1..efb82f07b29c 100644
+--- a/arch/x86/kernel/i8253.c
++++ b/arch/x86/kernel/i8253.c
+@@ -34,7 +34,7 @@ static int __init init_pit_clocksource(void)
+ 	  * - when local APIC timer is active (PIT is switched off)
+ 	  */
+ 	if (num_possible_cpus() > 1 || is_hpet_enabled() ||
+-	    i8253_clockevent.mode != CLOCK_EVT_MODE_PERIODIC)
++	    !clockevent_state_periodic(&i8253_clockevent))
+ 		return 0;
  
--static void exynos4_mct_comp0_start(enum clock_event_mode mode,
--				    unsigned long cycles)
-+static void exynos4_mct_comp0_start(bool periodic, unsigned long cycles)
+ 	return clocksource_i8253_init();
+diff --git a/drivers/clocksource/i8253.c b/drivers/clocksource/i8253.c
+index 14ee3efcc404..0efd36e483ab 100644
+--- a/drivers/clocksource/i8253.c
++++ b/drivers/clocksource/i8253.c
+@@ -100,44 +100,40 @@ int __init clocksource_i8253_init(void)
+ #endif
+ 
+ #ifdef CONFIG_CLKEVT_I8253
+-/*
+- * Initialize the PIT timer.
+- *
+- * This is also called after resume to bring the PIT into operation again.
+- */
+-static void init_pit_timer(enum clock_event_mode mode,
+-			   struct clock_event_device *evt)
++static int pit_shutdown(struct clock_event_device *evt)
  {
- 	unsigned int tcon;
- 	cycle_t comp_cycle;
- 
- 	tcon = readl_relaxed(reg_base + EXYNOS4_MCT_G_TCON);
- 
--	if (mode == CLOCK_EVT_MODE_PERIODIC) {
-+	if (periodic) {
- 		tcon |= MCT_G_TCON_COMP0_AUTO_INC;
- 		exynos4_mct_write(cycles, EXYNOS4_MCT_G_COMP0_ADD_INCR);
- 	}
-@@ -283,38 +282,38 @@ static void exynos4_mct_comp0_start(enum clock_event_mode mode,
- static int exynos4_comp_set_next_event(unsigned long cycles,
- 				       struct clock_event_device *evt)
- {
--	exynos4_mct_comp0_start(evt->mode, cycles);
-+	exynos4_mct_comp0_start(false, cycles);
- 
- 	return 0;
- }
- 
--static void exynos4_comp_set_mode(enum clock_event_mode mode,
--				  struct clock_event_device *evt)
-+static int mct_set_state_shutdown(struct clock_event_device *evt)
- {
--	unsigned long cycles_per_jiffy;
- 	exynos4_mct_comp0_stop();
-+	return 0;
-+}
++	if (!clockevent_state_oneshot(evt) && !clockevent_state_periodic(evt))
++		return 0;
++
+ 	raw_spin_lock(&i8253_lock);
  
 -	switch (mode) {
 -	case CLOCK_EVT_MODE_PERIODIC:
--		cycles_per_jiffy =
--			(((unsigned long long) NSEC_PER_SEC / HZ * evt->mult) >> evt->shift);
--		exynos4_mct_comp0_start(mode, cycles_per_jiffy);
+-		/* binary, mode 2, LSB/MSB, ch 0 */
+-		outb_p(0x34, PIT_MODE);
+-		outb_p(PIT_LATCH & 0xff , PIT_CH0);	/* LSB */
+-		outb_p(PIT_LATCH >> 8 , PIT_CH0);		/* MSB */
 -		break;
-+static int mct_set_state_periodic(struct clock_event_device *evt)
-+{
-+	unsigned long cycles_per_jiffy;
- 
--	case CLOCK_EVT_MODE_ONESHOT:
--	case CLOCK_EVT_MODE_UNUSED:
+-
 -	case CLOCK_EVT_MODE_SHUTDOWN:
+-	case CLOCK_EVT_MODE_UNUSED:
+-		if (evt->mode == CLOCK_EVT_MODE_PERIODIC ||
+-		    evt->mode == CLOCK_EVT_MODE_ONESHOT) {
+-			outb_p(0x30, PIT_MODE);
+-			outb_p(0, PIT_CH0);
+-			outb_p(0, PIT_CH0);
+-		}
+-		break;
+-
+-	case CLOCK_EVT_MODE_ONESHOT:
+-		/* One shot setup */
+-		outb_p(0x38, PIT_MODE);
+-		break;
+-
 -	case CLOCK_EVT_MODE_RESUME:
+-		/* Nothing to do here */
 -		break;
 -	}
-+	cycles_per_jiffy = (((unsigned long long)NSEC_PER_SEC / HZ * evt->mult)
-+			    >> evt->shift);
-+	exynos4_mct_comp0_stop();
-+	exynos4_mct_comp0_start(true, cycles_per_jiffy);
-+	return 0;
- }
- 
- static struct clock_event_device mct_comp_device = {
--	.name		= "mct-comp",
--	.features       = CLOCK_EVT_FEAT_PERIODIC | CLOCK_EVT_FEAT_ONESHOT,
--	.rating		= 250,
--	.set_next_event	= exynos4_comp_set_next_event,
--	.set_mode	= exynos4_comp_set_mode,
-+	.name			= "mct-comp",
-+	.features		= CLOCK_EVT_FEAT_PERIODIC |
-+				  CLOCK_EVT_FEAT_ONESHOT,
-+	.rating			= 250,
-+	.set_next_event		= exynos4_comp_set_next_event,
-+	.set_state_periodic	= mct_set_state_periodic,
-+	.set_state_shutdown	= mct_set_state_shutdown,
-+	.set_state_oneshot	= mct_set_state_shutdown,
-+	.tick_resume		= mct_set_state_shutdown,
- };
- 
- static irqreturn_t exynos4_mct_comp_isr(int irq, void *dev_id)
-@@ -390,39 +389,32 @@ static int exynos4_tick_set_next_event(unsigned long cycles,
- 	return 0;
- }
- 
--static inline void exynos4_tick_set_mode(enum clock_event_mode mode,
--					 struct clock_event_device *evt)
-+static int set_state_shutdown(struct clock_event_device *evt)
-+{
-+	exynos4_mct_tick_stop(this_cpu_ptr(&percpu_mct_tick));
++	outb_p(0x30, PIT_MODE);
++	outb_p(0, PIT_CH0);
++	outb_p(0, PIT_CH0);
++
++	raw_spin_unlock(&i8253_lock);
 +	return 0;
 +}
 +
-+static int set_state_periodic(struct clock_event_device *evt)
- {
- 	struct mct_clock_event_device *mevt = this_cpu_ptr(&percpu_mct_tick);
- 	unsigned long cycles_per_jiffy;
- 
-+	cycles_per_jiffy = (((unsigned long long)NSEC_PER_SEC / HZ * evt->mult)
-+			    >> evt->shift);
- 	exynos4_mct_tick_stop(mevt);
--
--	switch (mode) {
--	case CLOCK_EVT_MODE_PERIODIC:
--		cycles_per_jiffy =
--			(((unsigned long long) NSEC_PER_SEC / HZ * evt->mult) >> evt->shift);
--		exynos4_mct_tick_start(cycles_per_jiffy, mevt);
--		break;
--
--	case CLOCK_EVT_MODE_ONESHOT:
--	case CLOCK_EVT_MODE_UNUSED:
--	case CLOCK_EVT_MODE_SHUTDOWN:
--	case CLOCK_EVT_MODE_RESUME:
--		break;
--	}
-+	exynos4_mct_tick_start(cycles_per_jiffy, mevt);
++static int pit_set_oneshot(struct clock_event_device *evt)
++{
++	raw_spin_lock(&i8253_lock);
++	outb_p(0x38, PIT_MODE);
++	raw_spin_unlock(&i8253_lock);
++	return 0;
++}
++
++static int pit_set_periodic(struct clock_event_device *evt)
++{
++	raw_spin_lock(&i8253_lock);
++
++	/* binary, mode 2, LSB/MSB, ch 0 */
++	outb_p(0x34, PIT_MODE);
++	outb_p(PIT_LATCH & 0xff, PIT_CH0);	/* LSB */
++	outb_p(PIT_LATCH >> 8, PIT_CH0);	/* MSB */
++
+ 	raw_spin_unlock(&i8253_lock);
 +	return 0;
  }
  
- static void exynos4_mct_tick_clear(struct mct_clock_event_device *mevt)
+ /*
+@@ -160,10 +156,11 @@ static int pit_next_event(unsigned long delta, struct clock_event_device *evt)
+  * it can be solely used for the global tick.
+  */
+ struct clock_event_device i8253_clockevent = {
+-	.name		= "pit",
+-	.features	= CLOCK_EVT_FEAT_PERIODIC,
+-	.set_mode	= init_pit_timer,
+-	.set_next_event = pit_next_event,
++	.name			= "pit",
++	.features		= CLOCK_EVT_FEAT_PERIODIC,
++	.set_state_shutdown	= pit_shutdown,
++	.set_state_periodic	= pit_set_periodic,
++	.set_next_event		= pit_next_event,
+ };
+ 
+ /*
+@@ -172,8 +169,10 @@ struct clock_event_device i8253_clockevent = {
+  */
+ void __init clockevent_i8253_init(bool oneshot)
  {
--	struct clock_event_device *evt = &mevt->evt;
--
+-	if (oneshot)
++	if (oneshot) {
+ 		i8253_clockevent.features |= CLOCK_EVT_FEAT_ONESHOT;
++		i8253_clockevent.set_state_oneshot = pit_set_oneshot;
++	}
  	/*
- 	 * This is for supporting oneshot mode.
- 	 * Mct would generate interrupt periodically
- 	 * without explicit stopping.
- 	 */
--	if (evt->mode != CLOCK_EVT_MODE_PERIODIC)
-+	if (!clockevent_state_periodic(&mevt->evt))
- 		exynos4_mct_tick_stop(mevt);
- 
- 	/* Clear the MCT tick interrupt */
-@@ -455,7 +447,10 @@ static int exynos4_local_timer_setup(struct clock_event_device *evt)
- 	evt->name = mevt->name;
- 	evt->cpumask = cpumask_of(cpu);
- 	evt->set_next_event = exynos4_tick_set_next_event;
--	evt->set_mode = exynos4_tick_set_mode;
-+	evt->set_state_periodic = set_state_periodic;
-+	evt->set_state_shutdown = set_state_shutdown;
-+	evt->set_state_oneshot = set_state_shutdown;
-+	evt->tick_resume = set_state_shutdown;
- 	evt->features = CLOCK_EVT_FEAT_PERIODIC | CLOCK_EVT_FEAT_ONESHOT;
- 	evt->rating = 450;
- 
-@@ -482,7 +477,7 @@ static int exynos4_local_timer_setup(struct clock_event_device *evt)
- 
- static void exynos4_local_timer_stop(struct clock_event_device *evt)
- {
--	evt->set_mode(CLOCK_EVT_MODE_UNUSED, evt);
-+	evt->set_state_shutdown(evt);
- 	if (mct_int_type == MCT_INT_SPI)
- 		free_irq(evt->irq, this_cpu_ptr(&percpu_mct_tick));
- 	else
+ 	 * Start pit with the boot cpu mask. x86 might make it global
+ 	 * when it is used as broadcast device later.
 -- 
 2.4.0
