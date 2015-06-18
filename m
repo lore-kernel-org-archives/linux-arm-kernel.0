@@ -1,42 +1,120 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Thu, 18 Jun 2015 14:59:18 +0200
-Subject: [PATCH] clk: at91: add generated clock driver
-In-Reply-To: <1434614090.2385.19.camel@x220>
-References: <1434547409-12232-1-git-send-email-nicolas.ferre@atmel.com>
- <1434611556.2385.8.camel@x220> <20150618093344.7d486e97@bbrezillon>
- <55827606.7020908@atmel.com> <1434614090.2385.19.camel@x220>
-Message-ID: <20150618125918.GC27492@piout.net>
+From: srinivas.kandagatla@linaro.org (Srinivas Kandagatla)
+Date: Thu, 18 Jun 2015 14:01:40 +0100
+Subject: [PATCH v5 06/11] nvmem: Add bindings for simple nvmem framework
+In-Reply-To: <5580A900.9070902@codeaurora.org>
+References: <1432226535-8640-1-git-send-email-srinivas.kandagatla@linaro.org>
+ <1432226652-8947-1-git-send-email-srinivas.kandagatla@linaro.org>
+ <5580A900.9070902@codeaurora.org>
+Message-ID: <5582C134.50709@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 18/06/2015 at 09:54:50 +0200, Paul Bolle wrote :
-> > I'd like though that this matter of fact doesn't block this piece of
-> > code from being reviewed or even better merged in order to ease this new
-> > SoC landing...
-> 
-> The other side of that is that the sama5d2 might never make it, or take
-> very long to make it, into mainline. And this would then end up being
-> yet another chunk of code adding no value to mainline.
-> 
 
-Come on Paul, you prefer the current situation were each vendor have
-there tree and when support for an SoC lands in mainline it is already
-deprecated?
 
-You have one vendor here, trying to get support for its SoC even before
-the silicon is available. Intel is always cited as being a good player
-in the linux community for doing exactly that. They even have to remove
-support for a CPU that was never manufactured...
-The main difference here is that we are no longer doinc everything in
-mach-xxx so we have to get the driver part mainlined and this requires
-synchronization. I really belive that you can't blame Nicolas to get the
-drivers first then the SoC in.
+On 16/06/15 23:53, Stephen Boyd wrote:
+> On 05/21/2015 09:44 AM, Srinivas Kandagatla wrote:
+>> diff --git a/Documentation/devicetree/bindings/nvmem/nvmem.txt b/Documentation/devicetree/bindings/nvmem/nvmem.txt
+>> new file mode 100644
+>> index 0000000..ecea654
+>> --- /dev/null
+>> +++ b/Documentation/devicetree/bindings/nvmem/nvmem.txt
+>> @@ -0,0 +1,84 @@
+>> += NVMEM Data Device Tree Bindings =
+>> +
+>> +This binding is intended to represent the location of hardware
+>> +configuration data stored in NVMEMs.
+>
+> It would be worthwhile spelling out what NVMEM stands for.
+>
+>> +
+>> +On a significant proportion of boards, the manufacturer has stored
+>> +some data on NVMEM, for the OS to be able to retrieve these information
+>> +and act upon it. Obviously, the OS has to know about where to retrieve
+>> +these data from, and where they are stored on the storage device.
+>> +
+>> +This document is here to document this.
+>> +
+>> += Data providers =
+>> +Contains bindings specific to provider drivers and data cells as children
+>> +to this node.
+>
+> children of this node?
+>
+Yep, will fix the text
+>> +
+>> +Optional properties:
+>> + read-only: Mark the provider as read only.
+>> +
+>> += Data cells =
+>> +These are the child nodes of the provider which contain data cell
+>> +information like offset and size in nvmem provider.
+>> +
+>> +Required properties:
+>> +reg:	specifies the offset in byte within that storage device, start bit
+>> +	in the byte and the length in bits of the data we care about.
+>> +	There could be more then one offset-length pairs in this property.
+>
+> s/then/than/
+Yep.
+>
+>> +
+>> +Optional properties:
+>> +
+>> +bit-offset: specifies the offset in bit within the address range specified
+>> +	by reg property. Can take values from 0-7.
+>> +nbits: specifies number of bits this cell occupies starting from bit-offset.
+>> +
+>
+> Hopefully the consumer knows the endianness of the data stored.
 
-Also, Atmel has a good track record and their SocS are almost fully
-supported in mainline, you can trust that sama5d2 support is going to
-land there soon.
+As we read byte-byte, does it matter, as long as consumer gets them in 
+the same order as its stored.
 
--- 
-Alexandre Belloni, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+
+>
+>> +For example:
+>> +
+>> +	/* Provider */
+>> +	qfprom: qfprom at 00700000 {
+>> +		...
+>> +
+>> +		/* Data cells */
+>> +		tsens_calibration: calib at 404 {
+>> +			reg = <0x404 0x10>;
+>> +		};
+>> +
+>> +		tsens_calibration_bckp: calib_bckp at 504 {
+>> +			reg = <0x504 0x11>;
+>> +			bit-offset = 6;
+>> +			nbits = 128;
+>> +		};
+>> +
+>> +		pvs_version: pvs-version at 6 {
+>> +			reg = <0x6 0x2>
+>> +			bit-offset = 7;
+>> +			nbits = 2;
+>> +		};
+>> +
+>> +		speed_bin: speed-bin at c{
+>> +			reg = <0xc 0x1>;
+>> +			bit-offset = 2;
+>> +			nbits	= 3;
+>> +
+>> +		};
+>> +		...
+>> +	};
+>> +
+>> += Data consumers =
+>> +Are device nodes which consume nvmem data cells/providers.
+>> +
+>> +Required-properties:
+>> +nvmem-cell: list of phandle to the nvmem data cells.
+>> +nvmem-cell-names: names for the each nvmem-cell specified
+>> +
+>> +Optional-properties:
+>> +nvmem	: list of phandles to nvmem providers.
+>> +nvmem-names: names for the each nvmem provider.
+>
+> Is nvmem-names required if nvmem is used?
+Yes, will fix it.
+>
