@@ -1,34 +1,45 @@
-From: noralf@tronnes.org (=?UTF-8?B?Tm9yYWxmIFRyw7hubmVz?=)
-Date: Thu, 18 Jun 2015 18:23:34 +0200
-Subject: [PATCH] irqchip: bcm2835: Add FIQ support
-In-Reply-To: <5582C87C.20008@tronnes.org>
-References: <1434130016-26574-1-git-send-email-noralf@tronnes.org>
- <55822C71.2040409@wwwdotorg.org> <5582C87C.20008@tronnes.org>
-Message-ID: <5582F086.30301@tronnes.org>
+From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
+Date: Thu, 18 Jun 2015 09:25:05 -0700
+Subject: [PATCH v2 5/7] samples: kdbus: disable for mn10300
+In-Reply-To: <20150618161905.GB21198@sudip-PC>
+References: <1434629873-11668-1-git-send-email-sudipm.mukherjee@gmail.com>
+ <1434629873-11668-6-git-send-email-sudipm.mukherjee@gmail.com>
+ <20150618143958.GA8830@kroah.com> <20150618161905.GB21198@sudip-PC>
+Message-ID: <20150618162505.GA25500@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Thu, Jun 18, 2015 at 09:49:05PM +0530, Sudip Mukherjee wrote:
+> On Thu, Jun 18, 2015 at 07:39:58AM -0700, Greg Kroah-Hartman wrote:
+> > On Thu, Jun 18, 2015 at 05:47:51PM +0530, Sudip Mukherjee wrote:
+> > > While building it failed with:
+> > > In function 'prime_new':
+> > > error: '__NR_memfd_create' undeclared (first use in this function)
+> > > 
+> > > memfd_create syscall has not yet been implemented for mn10300.
+> > > so disable compilation of samples/kdbus for now with mn10300.
+> > > 
+> > > Signed-off-by: Sudip Mukherjee <sudip@vectorindia.org>
+> > > ---
+> > >  samples/Kconfig | 2 +-
+> > >  1 file changed, 1 insertion(+), 1 deletion(-)
+> > > 
+> > > diff --git a/samples/Kconfig b/samples/Kconfig
+> > > index a4c6b2f..20c55af 100644
+> > > --- a/samples/Kconfig
+> > > +++ b/samples/Kconfig
+> > > @@ -57,7 +57,7 @@ config SAMPLE_KDB
+> > >  
+> > >  config SAMPLE_KDBUS
+> > >  	bool "Build kdbus API example"
+> > > -	depends on KDBUS
+> > > +	depends on KDBUS && !MN10300
+> > 
+> > Why not just add the memfd syscall to this arch?
+> Yes, I intend to. But for now this will fix allmodconfig.
+> >I thought someone had already sent such a patch in a while ago.
+> Then it is still not merged. :(
+> I will try to find that patch adding memfd syscall. And if i find it whom
+> shall I forward it to?
 
-Den 18.06.2015 15:32, skrev Noralf Tr?nnes:
->
-> Den 18.06.2015 04:26, skrev Stephen Warren:
->> On 06/12/2015 11:26 AM, Noralf Tr?nnes wrote:
->>> Add a duplicate irq range with an offset on the hwirq's so the
->>> driver can detect that enable_fiq() is used.
->>> Tested with downstream dwc_otg USB controller driver.
->> This basically looks OK, but a few comments/thoughts:
->>
-
->> c) The DT binding needs updating to describe the extra IRQs:
->>
->>> Documentation/devicetree/bindings/interrupt-controller/brcm,bcm28armctrl-ic.txt 
->>>
->
-> Ok.
->
-
-I have seconds thoughts on this:
-This patch does not change the DT bindings so I don't see what update
-I should make. This patch only adds support for the Linux way of
-handling FIQ's through enable_fiq(). It doesn't change how interrupts
-are described in the DT.
+The maintainers of this arch.
