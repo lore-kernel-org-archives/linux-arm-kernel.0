@@ -1,63 +1,73 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Thu, 18 Jun 2015 12:24:28 -0500
-Subject: [PATCH] i2c: omap: improve duty cycle on SCL
-In-Reply-To: <5582678F.4010505@gmx.de>
-References: <1434482276-1210-1-git-send-email-balbi@ti.com>
- <55815581.80807@gmx.de> <20150617153812.GB18421@saruman.tx.rr.com>
- <5582678F.4010505@gmx.de>
-Message-ID: <20150618172428.GB27790@saruman.tx.rr.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Thu, 18 Jun 2015 18:27:18 +0100
+Subject: [PATCH v2 2/2] arm: KVM: keep arm vfp/simd exit handling
+ consistent with arm64
+In-Reply-To: <1434491452-19177-3-git-send-email-m.smarduch@samsung.com>
+References: <1434491452-19177-1-git-send-email-m.smarduch@samsung.com>
+ <1434491452-19177-3-git-send-email-m.smarduch@samsung.com>
+Message-ID: <5582FF76.6060100@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 18, 2015 at 08:39:11AM +0200, Michael Lawnick wrote:
-> Am 17.06.2015 um 17:38 schrieb Felipe Balbi:
-> >Hi,
-> >
-> >On Wed, Jun 17, 2015 at 01:09:53PM +0200, Michael Lawnick wrote:
-> >>Am 16.06.2015 um 21:17 schrieb Felipe Balbi:
-> >>>With this patch we try to be as close to 50%
-> >>>duty cycle as possible. The reason for this
-> >>>is that some devices present an erratic behavior
-> >>>with certain duty cycles.
-> >>>
-> >>>One such example is TPS65218 PMIC which fails
-> >>>to change voltages when running @ 400kHz and
-> >>>duty cycle is lower than 34%.
-> >>>
-> >>>The idea of the patch is simple:
-> >>>
-> >>>calculate desired scl_period from requested scl
-> >>>and use 50% for tLow and 50% for tHigh.
-> >>...
-> >>Hmm, and what's about  Philips I2C specification 2.1, Jan 2000, Table 5?
-> >>
-> >>>PARAMETER                       SYMBOL  STANDARD-MODE   FAST-MODE     UNIT
-> >>>                                          MIN. MAX.     MIN. MAX.
-> >>>LOW period of the SCL clock     tLOW      4.7   ?       1.3   ?       ?s
-> >>>HIGH period of the SCL clock    tHIGH     4.0   ?       0.6   ?       ?s
-> >>
-> >>Your signal is in spec (0.85 ?s high, 1,65 low).
-> >>Maybe your TPS65218 is just buggy or signals are bad?
-> >
-> >yes, tps is buggy, it's written in the commit log itself.
-> >
+On 16/06/15 22:50, Mario Smarduch wrote:
+> After enhancing arm64 FP/SIMD exit handling, FP/SIMD exit branch is moved
+> to guest trap handling. This keeps exiting handling flow between both
+> architectures consistent.
 > 
-> So I think it is unacceptable to change the adapters code violating
-> specification because some buggy device doesn't work properly.
+> Signed-off-by: Mario Smarduch <m.smarduch@samsung.com>
+> ---
+>  arch/arm/kvm/interrupts.S |   12 +++++++-----
+>  1 file changed, 7 insertions(+), 5 deletions(-)
+> 
+> diff --git a/arch/arm/kvm/interrupts.S b/arch/arm/kvm/interrupts.S
+> index 79caf79..fca2c56 100644
+> --- a/arch/arm/kvm/interrupts.S
+> +++ b/arch/arm/kvm/interrupts.S
+> @@ -363,10 +363,6 @@ hyp_hvc:
+>  	@ Check syndrome register
+>  	mrc	p15, 4, r1, c5, c2, 0	@ HSR
+>  	lsr	r0, r1, #HSR_EC_SHIFT
+> -#ifdef CONFIG_VFPv3
+> -	cmp	r0, #HSR_EC_CP_0_13
+> -	beq	switch_to_guest_vfp
+> -#endif
+>  	cmp	r0, #HSR_EC_HVC
+>  	bne	guest_trap		@ Not HVC instr.
+>  
+> @@ -406,6 +402,12 @@ THUMB(	orr	lr, #1)
+>  1:	eret
+>  
+>  guest_trap:
+> +#ifdef CONFIG_VFPv3
+> +	/* Guest accessed VFP/SIMD registers, save host, restore Guest */
+> +	cmp	r0, #HSR_EC_CP_0_13
+> +	beq	switch_to_guest_fpsimd
+> +#endif
+> +
+>  	load_vcpu			@ Load VCPU pointer to r0
+>  	str	r1, [vcpu, #VCPU_HSR]
+>  
+> @@ -478,7 +480,7 @@ guest_trap:
+>   * inject an undefined exception to the guest.
+>   */
+>  #ifdef CONFIG_VFPv3
+> -switch_to_guest_vfp:
+> +switch_to_guest_fpsimd:
 
-read the other thread and you'll see that it's not violating jack
+Ah, I think I managed to confuse you in my previous comment.
+On ARMv7, we call the floating point stuff VFP.
+On ARMv8, we call it FP/SIMD.
 
-> This change for your device has chance to blow up many correctly
-> working ones.
+Not very consistent, I know...
 
-How ?
+>  	load_vcpu			@ Load VCPU pointer to r0
 
+It would be interesting to find out if we can make this load_vcpu part
+of the common sequence (without spilling another register, of course).
+Probably involves moving the exception class to r2.
+
+Thanks,
+
+	M.
 -- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150618/2359f2bf/attachment.sig>
+Jazz is not dead. It just smells funny...
