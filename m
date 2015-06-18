@@ -1,242 +1,81 @@
-From: eric.auger@linaro.org (Eric Auger)
-Date: Thu, 18 Jun 2015 19:51:28 +0200
-Subject: [PATCH 10/10] KVM: arm/arm64: vgic: Allow non-shared device HW
- interrupts
-In-Reply-To: <55828343.30408@arm.com>
-References: <1433783045-8002-1-git-send-email-marc.zyngier@arm.com>
- <1433783045-8002-11-git-send-email-marc.zyngier@arm.com>
- <55818E06.8010400@linaro.org> <55819445.4090309@arm.com>
- <5581975A.8070509@linaro.org> <55828343.30408@arm.com>
-Message-ID: <55830520.7030506@linaro.org>
+From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
+Date: Thu, 18 Jun 2015 19:53:14 +0200
+Subject: [PATCH 0/6] cpufreq: use generic cpufreq drivers
+ forExynos4210platform
+In-Reply-To: <556F8C1D.9050906@kernel.org>
+References: <'@samsung.com> <55549E03.6040105@kernel.org>
+ <556F8C1D.9050906@kernel.org>
+Message-ID: <1705390.i4bNz9zR7Y@amdc1976>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/18/2015 10:37 AM, Marc Zyngier wrote:
-> On 17/06/15 16:50, Eric Auger wrote:
->> On 06/17/2015 05:37 PM, Marc Zyngier wrote:
->>> On 17/06/15 16:11, Eric Auger wrote:
->>>> Hi Marc,
->>>> On 06/08/2015 07:04 PM, Marc Zyngier wrote:
->>>>> So far, the only use of the HW interrupt facility is the timer,
->>>>> implying that the active state is context-switched for each vcpu,
->>>>> as the device is is shared across all vcpus.
->>>> s/is//
->>>>>
->>>>> This does not work for a device that has been assigned to a VM,
->>>>> as the guest is entierely in control of that device (the HW is
->>>> entirely?
->>>>> not shared). In that case, it makes sense to bypass the whole
->>>>> active state srtwitchint, and only track the deactivation of the
->>>> switching
->>>
->>> Congratulations, I think you're now ready to try deciphering my
->>> handwriting... ;-)
->> good to see you're not a machine or maybe you do it on purpose some
->> times ;-)
->>>
->>>>> interrupt.
->>>>>
->>>>> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
->>>>> ---
->>>>>  include/kvm/arm_vgic.h    |  5 +++--
->>>>>  virt/kvm/arm/arch_timer.c |  2 +-
->>>>>  virt/kvm/arm/vgic.c       | 37 ++++++++++++++++++++++++-------------
->>>>>  3 files changed, 28 insertions(+), 16 deletions(-)
->>>>>
->>>>> diff --git a/include/kvm/arm_vgic.h b/include/kvm/arm_vgic.h
->>>>> index 1c653c1..5d47d60 100644
->>>>> --- a/include/kvm/arm_vgic.h
->>>>> +++ b/include/kvm/arm_vgic.h
->>>>> @@ -164,7 +164,8 @@ struct irq_phys_map {
->>>>>  	u32			virt_irq;
->>>>>  	u32			phys_irq;
->>>>>  	u32			irq;
->>>>> -	bool			active;
->>>>> +	bool			shared;
->>>>> +	bool			active; /* Only valid if shared */
->>>>>  };
->>>>>  
->>>>>  struct vgic_dist {
->>>>> @@ -347,7 +348,7 @@ void vgic_v3_dispatch_sgi(struct kvm_vcpu *vcpu, u64 reg);
->>>>>  int kvm_vgic_vcpu_pending_irq(struct kvm_vcpu *vcpu);
->>>>>  int kvm_vgic_vcpu_active_irq(struct kvm_vcpu *vcpu);
->>>>>  struct irq_phys_map *vgic_map_phys_irq(struct kvm_vcpu *vcpu,
->>>>> -				       int virt_irq, int irq);
->>>>> +				       int virt_irq, int irq, bool shared);
->>>>>  int vgic_unmap_phys_irq(struct kvm_vcpu *vcpu, struct irq_phys_map *map);
->>>>>  bool vgic_get_phys_irq_active(struct irq_phys_map *map);
->>>>>  void vgic_set_phys_irq_active(struct irq_phys_map *map, bool active);
->>>>> diff --git a/virt/kvm/arm/arch_timer.c b/virt/kvm/arm/arch_timer.c
->>>>> index b9fff78..9544d79 100644
->>>>> --- a/virt/kvm/arm/arch_timer.c
->>>>> +++ b/virt/kvm/arm/arch_timer.c
->>>>> @@ -202,7 +202,7 @@ void kvm_timer_vcpu_reset(struct kvm_vcpu *vcpu,
->>>>>  	 * Tell the VGIC that the virtual interrupt is tied to a
->>>>>  	 * physical interrupt. We do that once per VCPU.
->>>>>  	 */
->>>>> -	timer->map = vgic_map_phys_irq(vcpu, irq->irq, host_vtimer_irq);
->>>>> +	timer->map = vgic_map_phys_irq(vcpu, irq->irq, host_vtimer_irq, true);
->>>>>  	WARN_ON(!timer->map);
->>>>>  }
->>>>>  
->>>>> diff --git a/virt/kvm/arm/vgic.c b/virt/kvm/arm/vgic.c
->>>>> index f376b56..4223166 100644
->>>>> --- a/virt/kvm/arm/vgic.c
->>>>> +++ b/virt/kvm/arm/vgic.c
->>>>> @@ -1125,18 +1125,21 @@ static void vgic_queue_irq_to_lr(struct kvm_vcpu *vcpu, int irq,
->>>>>  		map = vgic_irq_map_search(vcpu, irq);
->>>>>  
->>>>>  		if (map) {
->>>>> -			int ret;
->>>>> -
->>>>> -			BUG_ON(!map->active);
->>>>>  			vlr.hwirq = map->phys_irq;
->>>>>  			vlr.state |= LR_HW;
->>>>>  			vlr.state &= ~LR_EOI_INT;
->>>>>  
->>>>> -			ret = irq_set_irqchip_state(map->irq,
->>>>> -						    IRQCHIP_STATE_ACTIVE,
->>>>> -						    true);
->>>>>  			vgic_irq_set_queued(vcpu, irq);
->>>>
->>>> the queued state is set again in vgic_queue_hwirq for level_sensitive
->>>> IRQs although not harmful.
->>>
->>> Indeed. We still need it for edge interrupts though. I'll try to find a
->>> nicer way...
->>>
->>>>> -			WARN_ON(ret);
->>>>> +
->>>>> +			if (map->shared) {
->>>>> +				int ret;
->>>>> +
->>>>> +				BUG_ON(!map->active);
->>>>> +				ret = irq_set_irqchip_state(map->irq,
->>>>> +							    IRQCHIP_STATE_ACTIVE,
->>>>> +							    true);
->>>>> +				WARN_ON(ret);
->>>>> +			}
->>>>>  		}
->>>>>  	}
->>>>>  
->>>>> @@ -1368,21 +1371,28 @@ static bool vgic_process_maintenance(struct kvm_vcpu *vcpu)
->>>>>  static int vgic_sync_hwirq(struct kvm_vcpu *vcpu, struct vgic_lr vlr)
->>>>>  {
->>>>>  	struct irq_phys_map *map;
->>>>> +	bool active;
->>>>>  	int ret;
->>>>>  
->>>>>  	if (!(vlr.state & LR_HW))
->>>>>  		return 0;
->>>>>  
->>>>>  	map = vgic_irq_map_search(vcpu, vlr.irq);
->>>>> -	BUG_ON(!map || !map->active);
->>>>> +	BUG_ON(!map);
->>>>> +	BUG_ON(map->shared && !map->active);
->>>>>  
->>>>>  	ret = irq_get_irqchip_state(map->irq,
->>>>>  				    IRQCHIP_STATE_ACTIVE,
->>>>> -				    &map->active);
->>>>> +				    &active);
->>>>>  
->>>> In case of non shared and EOIMode = 1 - I know this is not your current
->>>> interest here though ;-) - , once the guest EOIs its virtual IRQ and GIC
->>>> deactivates the physical one, a new phys IRQ can hit immediatly, the
->>>> physical handler can be entered and the state is seen as active here.
->>>> The queued state is never reset in such a case and the system gets stuck
->>>> since the can_sample fails I think. What I mean here is sounds the state
->>>> machine as is does not work for my VFIO case. So some adaptations still
->>>> are needed I think. Do you share my diagnosis?
->>>
->>> Yup, there is something that doesn't quite work here.
->>>
->>> I think the mistake is to sample the distributor active state. I wonder
->>> if I can simply rely on the LR state. If it is neither pending nor
->>> active, it means that we have done the deactivation, and we can then
->>> reset the queued state.
->>
->> I tried to use the LR in the past - it was also Christoffer's will - but
->> it was not working. I observed injection before seeing the LR voided.
->> This is why I resorted to using the pending state instead and treated
->> forwarded IRQ as edge in vgic_queue_hwirq.  sampling could be done only
->> if the IRQ was pending.
-> 
-> Of course, you're right. The LR state is not used at all for a physical
-> interrupt (the HW bit really says "use the distributor").
-> 
-> I've given it more thoughts last night, and I think we can solve this is
-> a fairly simple way. In the scenario you outline, we do not observe the
-> ACTIVE to INACTIVE transition because the interrupt has fired again,
-> leaving the interrupt flagged as queued.
-> 
-> I think we can clear the "queued" bit on injection, as we're guaranteed
-> that seeing a new interrupt is the proof that the previous one has been
-> deactivated (how could we see it otherwise?).
-> 
-> How about the following (untested) patch:
 
-If think in EOIMode =1 it is indeed fairly safe. I will do some testing
-and let you know ...
+Hi,
 
-Best Regards
+Mike, could you please take a look at patches #1 and #2 (#1 is a 4 line
+change to a Common Clock Framework and #2 is ARM Exynos specific)?
 
-Eric
+This series has been waiting on your feedback since 3rd of April. :(
+
+Best regards,
+--
+Bartlomiej Zolnierkiewicz
+Samsung R&D Institute Poland
+Samsung Electronics
+
+On Thursday, June 04, 2015 08:22:05 AM Kukjin Kim wrote:
+> On 05/14/15 22:07, Kukjin Kim wrote:
+> > On 05/14/15 14:10, Viresh Kumar wrote:
+> >> On 14-05-15, 13:07, Kukjin Kim wrote:
+> >>> On 05/13/15 23:08, Bartlomiej Zolnierkiewicz wrote:
+> >>>>
+> >>>> Hi,
+> >>>>
+> >>> Hi Bart,
+> >>>
+> >>>> On Friday, April 03, 2015 06:43:43 PM Bartlomiej Zolnierkiewicz wrote:
+> >>>>> Hi,
+> >>>>>
+> >>>>> This patch series removes the use of Exynos4210 specific support
+> >>>>> from cpufreq-exynos driver and enables the use of cpufreq-dt driver
+> >>>>> for this platform.
+> >>>>
+> >>>> Gentle Ping.  Mike/Kukjin/Viresh could you please review/ack relevant
+> >>>> patches (patches #1-3 are for clock subsystem, patches #4-5 for Exynos
+> >>>> mach/dts and patch #6 is for cpufreq subsystem)?
+> >>
+> >> Sorry I thought I already Acked an older version of this set and so
+> >> didn't went for it again. Done now.
+> >>
+> >>> Yes, I totally agreed with this patches for arch side changes and this
+> >>> approach when Thomas posted.
+> >>>
+> >>>> Also what is your
+> >>>> preferred way to upstream them (patches are not independent so it would
+> >>>> be best to merge them through one tree, otherwise synchronization of
+> >>>> git pulls between different subsystem trees will be needed)?
+> >>>>
+> >>> I can provide topic branch for arch side changes even it is small. I
+> >>> think once Viresh and Mike make each topic branch based on -rc or the
+> >>> smallest changes from each subsystem then I could handle this series or
+> >>> Viresh or Mike need to handle this series with merging each topic
+> >>> branches in subsystem. I'm fine either way.
+> >>>
+> >>> Viresh and Mike, how do you think about that?
+> >>
+> >> For cpufreq subsystem changes, you can take them in your tree.
+> >>
+> > Hi Viresh, OK, I will take the cpufreq changes with your ack. Thanks for
+> > your confirmation.
+> > 
+> > Hi Mike and Sylwester,
+> > How can we handle this series well without any problems? hmm...
+> > 
+> Still I need to get clock guys' ack or any comments on this series...
 > 
-> diff --git a/virt/kvm/arm/vgic.c b/virt/kvm/arm/vgic.c
-> index 6687ac4..a01f821 100644
-> --- a/virt/kvm/arm/vgic.c
-> +++ b/virt/kvm/arm/vgic.c
-> @@ -1387,8 +1387,17 @@ static int vgic_sync_hwirq(struct kvm_vcpu *vcpu,
-> struct vgic_lr vlr)
+> - Kukjin
 > 
->  	WARN_ON(ret);
-> 
-> +	/*
-> +	 * For a non-shared interrupt, we have to cater for two
-> +	 * possible deactivation conditions
-> +	 *
-> +	 * - the interrupt is now inactive
-> +	 * - the interrupt is still active, but is flagged as not
-> +	 *   queued, indicating another interrupt has fired before we
-> +	 *   could observe the deactivate.
-> +	 */
->  	if (!map->shared)
-> -		return !active;
-> +		return !active || !vgic_irq_is_queued(vcpu, vlr.irq);
-> 
->  	map->active = active;
-> 
-> @@ -1534,6 +1543,7 @@ static int vgic_update_irq_pending(struct kvm
-> *kvm, int cpuid,
->  	int edge_triggered, level_triggered;
->  	int enabled;
->  	bool ret = true, can_inject = true;
-> +	struct irq_phys_map *map;
-> 
->  	spin_lock(&dist->lock);
-> 
-> @@ -1580,6 +1590,18 @@ static int vgic_update_irq_pending(struct kvm
-> *kvm, int cpuid,
->  		goto out;
->  	}
-> 
-> +	map = vgic_irq_map_search(vcpu, irq_num);
-> +	if (map && !map->shared) {
-> +		/*
-> +		 * We are told to inject a HW irq, so we have to trust
-> +		 * the caller that the previous one has been EOIed,
-> +		 * and that a new one is now active. Clearing the
-> +		 * queued state will have the effect of making it
-> +		 * sample-able again.
-> +		 */
-> +		vgic_irq_clear_queued(vcpu, irq_num);
-> +	}
-> +
->  	if (!vgic_can_sample_irq(vcpu, irq_num)) {
->  		/*
->  		 * Level interrupt in progress, will be picked up
-> 
-> Thoughts?
-> 
-> 	M.
-> 
+> >>>> I'm still hoping that this patchset will make it into v4.2 as there are
+> >>>> no known issues with it (except minor coding nit for patch #5)...
+> >>>>
+> >>> Sure, why not :-)
