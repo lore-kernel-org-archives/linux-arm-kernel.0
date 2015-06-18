@@ -1,74 +1,248 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Thu, 18 Jun 2015 14:43:29 +0200
-Subject: [PATCH] clk: at91: add PMC sama5d2 support
-Message-ID: <1434631409-4919-1-git-send-email-nicolas.ferre@atmel.com>
+From: srinivas.kandagatla@linaro.org (Srinivas Kandagatla)
+Date: Thu, 18 Jun 2015 13:46:38 +0100
+Subject: [PATCH v5 03/11] nvmem: Add a simple NVMEM framework for nvmem
+ providers
+In-Reply-To: <5580A678.4080304@codeaurora.org>
+References: <1432226535-8640-1-git-send-email-srinivas.kandagatla@linaro.org>
+ <1432226583-8775-1-git-send-email-srinivas.kandagatla@linaro.org>
+ <5580A678.4080304@codeaurora.org>
+Message-ID: <5582BDAE.5040008@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add support for the new sama5d2 SoC and adapt capabilities.
+Many thanks for review.
 
-Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
----
- drivers/clk/at91/pmc.c           | 15 +++++++++++++++
- include/dt-bindings/clock/at91.h |  1 +
- include/linux/clk/at91_pmc.h     |  1 +
- 3 files changed, 17 insertions(+)
+On 16/06/15 23:43, Stephen Boyd wrote:
+> On 05/21/2015 09:43 AM, Srinivas Kandagatla wrote:
+>>
+>> diff --git a/drivers/nvmem/core.c b/drivers/nvmem/core.c
+>> new file mode 100644
+>> index 0000000..6c2f0b1
+>> --- /dev/null
+>> +++ b/drivers/nvmem/core.c
+>> @@ -0,0 +1,398 @@
+>> +/*
+>> + * nvmem framework core.
+>> + *
+>> + * Copyright (C) 2015 Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
+>> + * Copyright (C) 2013 Maxime Ripard <maxime.ripard@free-electrons.com>
+>> + *
+>> + * This program is free software; you can redistribute it and/or modify
+>> + * it under the terms of the GNU General Public License version 2 and
+>> + * only version 2 as published by the Free Software Foundation.
+>> + *
+>> + * This program is distributed in the hope that it will be useful,
+>> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+>> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+>> + * GNU General Public License for more details.
+>> + */
+>> +
+>> +#include <linux/device.h>
+>> +#include <linux/nvmem-provider.h>
+>> +#include <linux/export.h>
+>> +#include <linux/fs.h>
+>> +#include <linux/idr.h>
+>> +#include <linux/init.h>
+>> +#include <linux/regmap.h>
+>> +#include <linux/module.h>
+>> +#include <linux/of.h>
+>> +#include <linux/slab.h>
+>> +#include <linux/uaccess.h>
+>
+> Is this include used?
+>
+Yep, not required.
+>> +
+>> +static int of_nvmem_match(struct device *dev, const void *nvmem_np)
+>> +{
+>> +	return dev->of_node == nvmem_np;
+>> +}
+>> +
+>> +static struct nvmem_device *of_nvmem_find(struct device_node *nvmem_np)
+>
+> const?
+Sure,
+>
+>> +{
+>> +	struct device *d;
+>> +
+>> +	if (!nvmem_np)
+>> +		return NULL;
+>> +
+>> +	d = class_find_device(&nvmem_class, NULL, nvmem_np, of_nvmem_match);
+>> +
+>> +	return d ? to_nvmem_device(d) : NULL;
+>> +}
+>> +
+>> +static struct nvmem_cell *nvmem_find_cell(const char *cell_id)
+>> +{
+>> +	struct nvmem_cell *p;
+>> +
+>> +	list_for_each_entry(p, &nvmem_cells, node) {
+>
+> Unnecessary braces.
+Yep, Will remove it.
+>
+>> +		if (p && !strcmp(p->name, cell_id))
+>> +			return p;
+>> +	}
+>> +
+>> +	return NULL;
+>> +}
+>> +
+>> +static void nvmem_cell_drop(struct nvmem_cell *cell)
+>> +{
+>> +	mutex_lock(&nvmem_cells_mutex);
+>> +	list_del(&cell->node);
+>> +	mutex_unlock(&nvmem_cells_mutex);
+>> +	kfree(cell);
+>> +}
+>> +
+>> +static void nvmem_device_remove_all_cells(struct nvmem_device *nvmem)
+>> +{
+>> +	struct nvmem_cell *cell = NULL;
+>
+> Unnecessary initialization
+Yes.
+>
+>> +	struct list_head *p, *n;
+>> +
+>> +	list_for_each_safe(p, n, &nvmem_cells) {
+>> +		cell = list_entry(p, struct nvmem_cell, node);
+>> +		if (cell->nvmem == nvmem)
+>> +			nvmem_cell_drop(cell);
+>> +	}
+> [..]
+>> +
+>> +static int nvmem_add_cells(struct nvmem_device *nvmem,
+>> +			   struct nvmem_config *cfg)
+>> +{
+>> +	struct nvmem_cell **cells;
+>> +	struct nvmem_cell_info *info = cfg->cells;
+>> +	int i, rval;
+>> +
+>> +	cells = kzalloc(sizeof(*cells) * cfg->ncells, GFP_KERNEL);
+>
+> kcalloc
+This is temporary array, I did this on intention, to make it easy to 
+kfree cells which are found invalid at runtime.
+>
+>> +	if (!cells)
+>> +		return -ENOMEM;
+>> +
+>> +	for (i = 0; i < cfg->ncells; i++) {
+>> +		cells[i] = kzalloc(sizeof(struct nvmem_cell), GFP_KERNEL);
+>
+> sizeof(**cells) ?
+Yep.
 
-diff --git a/drivers/clk/at91/pmc.c b/drivers/clk/at91/pmc.c
-index bed2ce6b3cb9..3ac059678486 100644
---- a/drivers/clk/at91/pmc.c
-+++ b/drivers/clk/at91/pmc.c
-@@ -207,6 +207,14 @@ static const struct at91_pmc_caps at91sam9x5_caps = {
- 			  AT91_PMC_MOSCRCS | AT91_PMC_CFDEV,
- };
- 
-+static const struct at91_pmc_caps sama5d2_caps = {
-+	.available_irqs = AT91_PMC_MOSCS | AT91_PMC_LOCKA | AT91_PMC_MCKRDY |
-+			  AT91_PMC_LOCKU | AT91_PMC_PCK0RDY |
-+			  AT91_PMC_PCK1RDY | AT91_PMC_PCK2RDY |
-+			  AT91_PMC_MOSCSELS | AT91_PMC_MOSCRCS |
-+			  AT91_PMC_CFDEV | AT91_PMC_GCKRDY,
-+};
-+
- static const struct at91_pmc_caps sama5d3_caps = {
- 	.available_irqs = AT91_PMC_MOSCS | AT91_PMC_LOCKA | AT91_PMC_MCKRDY |
- 			  AT91_PMC_LOCKU | AT91_PMC_PCK0RDY |
-@@ -443,6 +451,13 @@ static void __init of_at91sam9x5_pmc_setup(struct device_node *np)
- CLK_OF_DECLARE(at91sam9x5_clk_pmc, "atmel,at91sam9x5-pmc",
- 	       of_at91sam9x5_pmc_setup);
- 
-+static void __init of_sama5d2_pmc_setup(struct device_node *np)
-+{
-+	of_at91_pmc_setup(np, &sama5d2_caps);
-+}
-+CLK_OF_DECLARE(sama5d2_clk_pmc, "atmel,sama5d2-pmc",
-+	       of_sama5d2_pmc_setup);
-+
- static void __init of_sama5d3_pmc_setup(struct device_node *np)
- {
- 	of_at91_pmc_setup(np, &sama5d3_caps);
-diff --git a/include/dt-bindings/clock/at91.h b/include/dt-bindings/clock/at91.h
-index 0b4cb999a3f7..ab3ee241d10c 100644
---- a/include/dt-bindings/clock/at91.h
-+++ b/include/dt-bindings/clock/at91.h
-@@ -18,5 +18,6 @@
- #define AT91_PMC_MOSCSELS	16		/* Main Oscillator Selection */
- #define AT91_PMC_MOSCRCS	17		/* Main On-Chip RC */
- #define AT91_PMC_CFDEV		18		/* Clock Failure Detector Event */
-+#define AT91_PMC_GCKRDY		24		/* Generated Clocks */
- 
- #endif
-diff --git a/include/linux/clk/at91_pmc.h b/include/linux/clk/at91_pmc.h
-index ae61860e6892..1e6932222e11 100644
---- a/include/linux/clk/at91_pmc.h
-+++ b/include/linux/clk/at91_pmc.h
-@@ -164,6 +164,7 @@ extern void __iomem *at91_pmc_base;
- #define		AT91_PMC_MOSCSELS	(1 << 16)		/* Main Oscillator Selection [some SAM9] */
- #define		AT91_PMC_MOSCRCS	(1 << 17)		/* Main On-Chip RC [some SAM9] */
- #define		AT91_PMC_CFDEV		(1 << 18)		/* Clock Failure Detector Event [some SAM9] */
-+#define		AT91_PMC_GCKRDY		(1 << 24)		/* Generated Clocks */
- #define	AT91_PMC_IMR		0x6c			/* Interrupt Mask Register */
- 
- #define AT91_PMC_PLLICPR	0x80			/* PLL Charge Pump Current Register */
--- 
-2.1.3
+>
+>> +
+>> +/**
+>> + * nvmem_register(): Register a nvmem device for given nvmem.
+>> + * Also creates an binary entry in /sys/class/nvmem/dev-name/nvmem
+>> + *
+>> + * @nvmem: nvmem device that needs to be created
+>
+> You mean @config?
+>
+Yes, I will fix it.
+
+>> + *
+>> + * The return value will be an ERR_PTR() on error or a valid pointer
+>> +	nvmem->dev.of_node = config->dev->of_node;
+>> +	dev_set_name(&nvmem->dev, "%s%d",
+>> +		     config->name ? : "nvmem", config->id);
+>
+> It may be better to always name it nvmem%d so that we don't allow the
+> possibility of conflicts.
+We can do that, but I wanted to make the sysfs and dev entries more 
+readable than just nvmem0, nvmem1...
+>
+>> +
+>> +	nvmem->read_only = of_property_read_bool(nvmem->dev.of_node,
+>> +						 "read-only");
+>
+> What if we're not using DT? How would we specify read_only?
+>
+Thanks for spotting, you are correct, I need to add read_only flag to 
+nvmem_config too.
+
+
+>> +
+>> +	device_initialize(&nvmem->dev);
+>> +
+>> +	dev_dbg(&nvmem->dev, "Registering nvmem device %s\n",
+>> +		dev_name(&nvmem->dev));
+>> +
+>> +	rval = device_add(&nvmem->dev);
+>> +	if (rval) {
+>> +		ida_simple_remove(&nvmem_ida, nvmem->id);
+>> +		kfree(nvmem);
+>> +		return ERR_PTR(rval);
+>> +	}
+>> +
+>> +	/* update sysfs attributes */
+>> +	if (nvmem->read_only)
+>> +		sysfs_update_group(&nvmem->dev.kobj, &nvmem_bin_ro_group);
+>
+> It would be nice if this could be done before the device was registered.
+> Perhaps have two device_types, one for read-only and one for read/write?
+
+The attributes are actually coming from the class object, so we have no 
+choice to update the attributes before the device is registered.
+
+May it would be more safe to have default as read-only and modify it to 
+read/write based on read-only flag?
+
+
+>
+>> +
+>> + */
+>> +int nvmem_unregister(struct nvmem_device *nvmem)
+>> +{
+>> +	mutex_lock(&nvmem_mutex);
+>> +	if (nvmem->users) {
+>> +		mutex_unlock(&nvmem_mutex);
+>> +		return -EBUSY;
+>
+> Hmm... that doesn't seem nice. Typically when something is unregistered
+> we have to pull the rug out from underneath the users and start
+> returning errors to them. The provider needs to be free to unregister
+> because it's been forcibly removed. So really this function should
+> return void.
+>
+The consumer api is get/put style, so consumers who already have 
+references to the provider, removing provider forcefully might lead to 
+dangling pointer. Having said that I can give a try and see how it looks.
+
+>> +	}
+>> +	mutex_unlock(&nvmem_mutex);
+>> +
+>> +	nvmem_device_remove_all_cells(nvmem);
+>> +	device_del(&nvmem->dev);
+>> +
+>> +	return 0;
+>> +}
+>> +EXPORT_SYMBOL_GPL(nvmem_unregister);
+>> +
+>> +static int nvmem_init(void)
+>
+> __init? And __exit on nvmem_exit?
+yep, will do that.
+>
+>> +{
+>> +	return class_register(&nvmem_class);
+>
+> I thought class was on the way out? Aren't we supposed to use bus types
+> for new stuff?
+Do you remember any conversation on the list about this? I could not 
+find it on web.
+
+on the other hand, nvmem is not really a bus, making it a bus type 
+sounds incorrect to me.
+
+
+--srini
+
+>
