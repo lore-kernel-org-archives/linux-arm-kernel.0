@@ -1,96 +1,49 @@
-From: shengjiu.wang@freescale.com (Shengjiu Wang)
-Date: Thu, 18 Jun 2015 14:08:01 +0800
-Subject: [PATCH] ARM: imx_v6_v7_defconfig: build in audio driver
-Message-ID: <1434607681-30088-1-git-send-email-shengjiu.wang@freescale.com>
+From: ml.lawnick@gmx.de (Michael Lawnick)
+Date: Thu, 18 Jun 2015 08:39:11 +0200
+Subject: [PATCH] i2c: omap: improve duty cycle on SCL
+In-Reply-To: <20150617153812.GB18421@saruman.tx.rr.com>
+References: <1434482276-1210-1-git-send-email-balbi@ti.com>
+ <55815581.80807@gmx.de> <20150617153812.GB18421@saruman.tx.rr.com>
+Message-ID: <5582678F.4010505@gmx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add ASRC, FSL_ASOC_CARD, CS42xx8 support
+Am 17.06.2015 um 17:38 schrieb Felipe Balbi:
+> Hi,
+>
+> On Wed, Jun 17, 2015 at 01:09:53PM +0200, Michael Lawnick wrote:
+>> Am 16.06.2015 um 21:17 schrieb Felipe Balbi:
+>>> With this patch we try to be as close to 50%
+>>> duty cycle as possible. The reason for this
+>>> is that some devices present an erratic behavior
+>>> with certain duty cycles.
+>>>
+>>> One such example is TPS65218 PMIC which fails
+>>> to change voltages when running @ 400kHz and
+>>> duty cycle is lower than 34%.
+>>>
+>>> The idea of the patch is simple:
+>>>
+>>> calculate desired scl_period from requested scl
+>>> and use 50% for tLow and 50% for tHigh.
+>> ...
+>> Hmm, and what's about  Philips I2C specification 2.1, Jan 2000, Table 5?
+>>
+>>> PARAMETER                       SYMBOL  STANDARD-MODE   FAST-MODE     UNIT
+>>>                                           MIN. MAX.     MIN. MAX.
+>>> LOW period of the SCL clock     tLOW      4.7   ?       1.3   ?       ?s
+>>> HIGH period of the SCL clock    tHIGH     4.0   ?       0.6   ?       ?s
+>>
+>> Your signal is in spec (0.85 ?s high, 1,65 low).
+>> Maybe your TPS65218 is just buggy or signals are bad?
+>
+> yes, tps is buggy, it's written in the commit log itself.
+>
 
-Signed-off-by: Shengjiu Wang <shengjiu.wang@freescale.com>
----
- arch/arm/configs/imx_v6_v7_defconfig |   23 +++++++++++------------
- 1 file changed, 11 insertions(+), 12 deletions(-)
-
-diff --git a/arch/arm/configs/imx_v6_v7_defconfig b/arch/arm/configs/imx_v6_v7_defconfig
-index b47863d..75416411 100644
---- a/arch/arm/configs/imx_v6_v7_defconfig
-+++ b/arch/arm/configs/imx_v6_v7_defconfig
-@@ -39,8 +39,8 @@ CONFIG_SOC_IMX6Q=y
- CONFIG_SOC_IMX6SL=y
- CONFIG_SOC_IMX6SX=y
- CONFIG_SOC_IMX7D=y
--CONFIG_SOC_VF610=y
- CONFIG_SOC_LS1021A=y
-+CONFIG_SOC_VF610=y
- CONFIG_PCI=y
- CONFIG_PCI_IMX6=y
- CONFIG_SMP=y
-@@ -56,7 +56,6 @@ CONFIG_ARM_IMX6Q_CPUFREQ=y
- CONFIG_VFP=y
- CONFIG_NEON=y
- CONFIG_BINFMT_MISC=m
--CONFIG_PM=y
- CONFIG_PM_DEBUG=y
- CONFIG_PM_TEST_SUSPEND=y
- CONFIG_NET=y
-@@ -219,10 +218,16 @@ CONFIG_SOC_CAMERA_OV2640=y
- CONFIG_IMX_IPUV3_CORE=y
- CONFIG_DRM=y
- CONFIG_DRM_PANEL_SIMPLE=y
-+CONFIG_DRM_IMX=y
-+CONFIG_DRM_IMX_FB_HELPER=y
-+CONFIG_DRM_IMX_PARALLEL_DISPLAY=y
-+CONFIG_DRM_IMX_TVE=y
-+CONFIG_DRM_IMX_LDB=y
-+CONFIG_DRM_IMX_HDMI=y
-+CONFIG_FB_MXS=y
- CONFIG_LCD_CLASS_DEVICE=y
- CONFIG_LCD_L4F00242T03=y
- CONFIG_LCD_PLATFORM=y
--CONFIG_FB_MXS=y
- CONFIG_BACKLIGHT_PWM=y
- CONFIG_BACKLIGHT_GPIO=y
- CONFIG_FRAMEBUFFER_CONSOLE=y
-@@ -231,7 +236,7 @@ CONFIG_SOUND=y
- CONFIG_SND=y
- CONFIG_SND_USB_AUDIO=m
- CONFIG_SND_SOC=y
--CONFIG_SND_SOC_FSL_SAI=y
-+CONFIG_SND_SOC_FSL_ASRC=y
- CONFIG_SND_IMX_SOC=y
- CONFIG_SND_SOC_PHYCORE_AC97=y
- CONFIG_SND_SOC_EUKREA_TLV320=y
-@@ -239,6 +244,8 @@ CONFIG_SND_SOC_IMX_WM8962=y
- CONFIG_SND_SOC_IMX_SGTL5000=y
- CONFIG_SND_SOC_IMX_SPDIF=y
- CONFIG_SND_SOC_IMX_MC13783=y
-+CONFIG_SND_SOC_FSL_ASOC_CARD=y
-+CONFIG_SND_SOC_CS42XX8_I2C=y
- CONFIG_SND_SOC_TLV320AIC3X=y
- CONFIG_SND_SIMPLE_CARD=y
- CONFIG_USB=y
-@@ -301,13 +308,6 @@ CONFIG_IMX_SDMA=y
- CONFIG_MXS_DMA=y
- CONFIG_FSL_EDMA=y
- CONFIG_STAGING=y
--CONFIG_DRM_IMX=y
--CONFIG_DRM_IMX_FB_HELPER=y
--CONFIG_DRM_IMX_PARALLEL_DISPLAY=y
--CONFIG_DRM_IMX_TVE=y
--CONFIG_DRM_IMX_LDB=y
--CONFIG_DRM_IMX_IPUV3=y
--CONFIG_DRM_IMX_HDMI=y
- # CONFIG_IOMMU_SUPPORT is not set
- CONFIG_PWM=y
- CONFIG_PWM_IMX=y
-@@ -354,7 +354,6 @@ CONFIG_PROVE_LOCKING=y
- # CONFIG_FTRACE is not set
- # CONFIG_ARM_UNWIND is not set
- CONFIG_SECURITYFS=y
--# CONFIG_CRYPTO_ANSI_CPRNG is not set
- # CONFIG_CRYPTO_HW is not set
- CONFIG_CRC_CCITT=m
- CONFIG_CRC_T10DIF=y
+So I think it is unacceptable to change the adapters code violating 
+specification because some buggy device doesn't work properly.
+This change for your device has chance to blow up many correctly working 
+ones.
 -- 
-1.7.9.5
+KR
+Michael
