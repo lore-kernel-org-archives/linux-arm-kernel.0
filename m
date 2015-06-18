@@ -1,39 +1,35 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 18 Jun 2015 10:04:00 +0100
-Subject: [PATCH v6 05/14] crypto: marvell/CESA: add TDMA support
-In-Reply-To: <20150617095001.GA11538@gondor.apana.org.au>
-References: <1434527142-3609-1-git-send-email-boris.brezillon@free-electrons.com>
- <1434527142-3609-6-git-send-email-boris.brezillon@free-electrons.com>
- <20150617095001.GA11538@gondor.apana.org.au>
-Message-ID: <20150618090400.GG7557@n2100.arm.linux.org.uk>
+From: ohad@wizery.com (Ohad Ben-Cohen)
+Date: Thu, 18 Jun 2015 12:04:16 +0300
+Subject: [PATCH v5 1/4] remoteproc: introduce rproc_get_by_phandle API
+In-Reply-To: <1434566762-40702-1-git-send-email-d-gerlach@ti.com>
+References: <1432327530-48032-2-git-send-email-d-gerlach@ti.com>
+ <1434566762-40702-1-git-send-email-d-gerlach@ti.com>
+Message-ID: <CAK=Wgbb1e6O574Bpicy4Y623vtiigauT22H-zk+JXGCz070i5g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 17, 2015 at 05:50:01PM +0800, Herbert Xu wrote:
-> On Wed, Jun 17, 2015 at 09:45:33AM +0200, Boris Brezillon wrote:
-> >
-> > +	ret = dma_map_sg(cesa_dev->dev, req->src, creq->src_nents,
-> > +			 DMA_TO_DEVICE);
-> > +	if (!ret)
-> > +		return -ENOMEM;
-> > +
-> > +	creq->src_nents = ret;
-> 
-> DMA-API-HOWTO says that you must retain the original nents and
-> use it when you call dma_unmap_sg.  So I'm afraid one more repost
-> is needed :)
+Hi Dave,
 
-It's worse than that...  You're right on that point, but there's an
-additional point.
+On Wed, Jun 17, 2015 at 9:46 PM, Dave Gerlach <d-gerlach@ti.com> wrote:
+> Allow users of remoteproc the ability to get a handle to an rproc by
+> passing a phandle supplied in the user's device tree node. This is
+> useful in situations that require manual booting of the rproc.
+>
+> This patch uses the code removed by commit 40e575b1d0b3 ("remoteproc:
+> remove the get_by_name/put API") for the ref counting but is modified
+> to use a simple list and locking mechanism and has rproc_get_by_name
+> replaced with an rproc_get_by_phandle API.
+>
+> Signed-off-by: Dave Gerlach <d-gerlach@ti.com>
+> Signed-off-by: Suman Anna <s-anna@ti.com>
+> ---
+> v4->v5: Fixed build error from of_find_node_by_phandle when !CONFIG_OF
+>         based on offline discussion.
 
-If dma_map_sg() coalesces scatterlist entries, then ret will be smaller
-than src_nents, and ret indicates how many scatterlist entries to be
-walked during DMA - you should not use src_nents for that.  I couldn't
-see where the driver used that information.  In fact, the driver seems
-to be capable of walking more than src_nents/ret numbers of scatterlist
-entries: it just keeps going with sg_next() until it hits the end of
-the allocated scatterlist.
+We can't rebase our for-next branch, so I've applied a
+similar fix in a separate patch.
 
--- 
-FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
-according to speedtest.net.
+Please check our for-next branch to make sure things still work for you.
+
+Thanks,
+Ohad.
