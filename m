@@ -1,157 +1,37 @@
 From: panand@redhat.com (Pratyush Anand)
-Date: Thu, 18 Jun 2015 09:28:48 +0530
-Subject: [RFC PATCH V2 01/10] arm64: kprobe: Make prepare and handler function
- independent of 'struct kprobe'
+Date: Thu, 18 Jun 2015 09:28:51 +0530
+Subject: [RFC PATCH V2 04/10] arm64: Add helper for link pointer
 In-Reply-To: <cover.1434598237.git.panand@redhat.com>
 References: <cover.1434598237.git.panand@redhat.com>
-Message-ID: <0091224459129b3da73b9ff1bfadd9865f0c4a27.1434598237.git.panand@redhat.com>
+Message-ID: <9b12762abf045a08c930f71537edf1affcca0c5c.1434598237.git.panand@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-prepare and handler function will also be used by uprobe. So, make them
-struct kprobe independent.
+At many a place we program procedure link pointer ie regs[30]. So adding
+helper to do that.
 
 Signed-off-by: Pratyush Anand <panand@redhat.com>
 ---
- arch/arm64/include/asm/probes.h   |  5 +++--
- arch/arm64/kernel/kprobes-arm64.c | 33 +++++++++++++--------------------
- arch/arm64/kernel/kprobes.c       |  7 ++++---
- 3 files changed, 20 insertions(+), 25 deletions(-)
+ arch/arm64/include/asm/ptrace.h | 7 +++++++
+ 1 file changed, 7 insertions(+)
 
-diff --git a/arch/arm64/include/asm/probes.h b/arch/arm64/include/asm/probes.h
-index 7f5a27fa071c..f07968f1335f 100644
---- a/arch/arm64/include/asm/probes.h
-+++ b/arch/arm64/include/asm/probes.h
-@@ -21,9 +21,10 @@ struct arch_specific_insn;
- typedef u32 kprobe_opcode_t;
- typedef unsigned long (kprobes_pstate_check_t)(unsigned long);
- typedef unsigned long
--(probes_condition_check_t)(struct kprobe *p, struct pt_regs *);
-+(probes_condition_check_t)(u32 opcode, struct arch_specific_insn *asi,
-+		struct pt_regs *);
- typedef void
--(probes_prepare_t)(struct kprobe *, struct arch_specific_insn *);
-+(probes_prepare_t)(u32 insn, struct arch_specific_insn *);
- typedef void (kprobes_handler_t) (u32 opcode, long addr, struct pt_regs *);
+diff --git a/arch/arm64/include/asm/ptrace.h b/arch/arm64/include/asm/ptrace.h
+index 3ea7f5a04bfc..fa2c122e5bd6 100644
+--- a/arch/arm64/include/asm/ptrace.h
++++ b/arch/arm64/include/asm/ptrace.h
+@@ -227,6 +227,13 @@ static inline int valid_user_regs(struct user_pt_regs *regs)
+ #include <asm-generic/ptrace.h>
  
- enum pc_restore_type {
-diff --git a/arch/arm64/kernel/kprobes-arm64.c b/arch/arm64/kernel/kprobes-arm64.c
-index 8a7e6b0290a7..d8f6e79b4de0 100644
---- a/arch/arm64/kernel/kprobes-arm64.c
-+++ b/arch/arm64/kernel/kprobes-arm64.c
-@@ -26,68 +26,61 @@
-  * condition check functions for kprobes simulation
-  */
- static unsigned long __kprobes
--__check_pstate(struct kprobe *p, struct pt_regs *regs)
-+__check_pstate(u32 opcode, struct arch_specific_insn *asi, struct pt_regs *regs)
- {
--	struct arch_specific_insn *asi = &p->ainsn;
- 	unsigned long pstate = regs->pstate & 0xffffffff;
+ #define stack_pointer(regs)		((regs)->sp)
++#define procedure_link_pointer(regs)	((regs)->regs[30])
++
++static inline void procedure_link_pointer_set(struct pt_regs *regs,
++					   unsigned long val)
++{
++	procedure_link_pointer(regs) = val;
++}
  
- 	return asi->pstate_cc(pstate);
- }
- 
- static unsigned long __kprobes
--__check_cbz(struct kprobe *p, struct pt_regs *regs)
-+__check_cbz(u32 opcode, struct arch_specific_insn *asi, struct pt_regs *regs)
- {
--	return check_cbz((u32)p->opcode, regs);
-+	return check_cbz(opcode, regs);
- }
- 
- static unsigned long __kprobes
--__check_cbnz(struct kprobe *p, struct pt_regs *regs)
-+__check_cbnz(u32 opcode, struct arch_specific_insn *asi, struct pt_regs *regs)
- {
--	return check_cbnz((u32)p->opcode, regs);
-+	return check_cbnz(opcode, regs);
- }
- 
- static unsigned long __kprobes
--__check_tbz(struct kprobe *p, struct pt_regs *regs)
-+__check_tbz(u32 opcode, struct arch_specific_insn *asi, struct pt_regs *regs)
- {
--	return check_tbz((u32)p->opcode, regs);
-+	return check_tbz(opcode, regs);
- }
- 
- static unsigned long __kprobes
--__check_tbnz(struct kprobe *p, struct pt_regs *regs)
-+__check_tbnz(u32 opcode, struct arch_specific_insn *asi, struct pt_regs *regs)
- {
--	return check_tbnz((u32)p->opcode, regs);
-+	return check_tbnz(opcode, regs);
- }
- 
- /*
-  * prepare functions for instruction simulation
-  */
- static void __kprobes
--prepare_none(struct kprobe *p, struct arch_specific_insn *asi)
-+prepare_none(u32 insn, struct arch_specific_insn *asi)
- {
- }
- 
- static void __kprobes
--prepare_bcond(struct kprobe *p, struct arch_specific_insn *asi)
-+prepare_bcond(u32 insn, struct arch_specific_insn *asi)
- {
--	kprobe_opcode_t insn = p->opcode;
--
- 	asi->check_condn = __check_pstate;
- 	asi->pstate_cc = kprobe_condition_checks[insn & 0xf];
- }
- 
- static void __kprobes
--prepare_cbz_cbnz(struct kprobe *p, struct arch_specific_insn *asi)
-+prepare_cbz_cbnz(u32 insn, struct arch_specific_insn *asi)
- {
--	kprobe_opcode_t insn = p->opcode;
--
- 	asi->check_condn = (insn & (1 << 24)) ? __check_cbnz : __check_cbz;
- }
- 
- static void __kprobes
--prepare_tbz_tbnz(struct kprobe *p, struct arch_specific_insn *asi)
-+prepare_tbz_tbnz(u32 insn, struct arch_specific_insn *asi)
- {
--	kprobe_opcode_t insn = p->opcode;
--
- 	asi->check_condn = (insn & (1 << 24)) ? __check_tbnz : __check_tbz;
- }
- 
-diff --git a/arch/arm64/kernel/kprobes.c b/arch/arm64/kernel/kprobes.c
-index 7e34ef381055..740f71695b07 100644
---- a/arch/arm64/kernel/kprobes.c
-+++ b/arch/arm64/kernel/kprobes.c
-@@ -60,7 +60,7 @@ static void __kprobes arch_prepare_ss_slot(struct kprobe *p)
- static void __kprobes arch_prepare_simulate(struct kprobe *p)
- {
- 	if (p->ainsn.prepare)
--		p->ainsn.prepare(p, &p->ainsn);
-+		p->ainsn.prepare(p->opcode, &p->ainsn);
- 
- 	/* This instructions is not executed xol. No need to adjust the PC */
- 	p->ainsn.restore.addr = 0;
-@@ -271,7 +271,8 @@ static int __kprobes reenter_kprobe(struct kprobe *p,
- 	switch (kcb->kprobe_status) {
- 	case KPROBE_HIT_SSDONE:
- 	case KPROBE_HIT_ACTIVE:
--		if (!p->ainsn.check_condn || p->ainsn.check_condn(p, regs)) {
-+		if (!p->ainsn.check_condn ||
-+			p->ainsn.check_condn((u32)p->opcode, &p->ainsn, regs)) {
- 			kprobes_inc_nmissed_count(p);
- 			setup_singlestep(p, regs, kcb, 1);
- 		} else	{
-@@ -402,7 +403,7 @@ void __kprobes kprobe_handler(struct pt_regs *regs)
- 			if (reenter_kprobe(p, regs, kcb))
- 				return;
- 		} else if (!p->ainsn.check_condn ||
--			   p->ainsn.check_condn(p, regs)) {
-+			p->ainsn.check_condn((u32)p->opcode, &p->ainsn, regs)) {
- 			/* Probe hit and conditional execution check ok. */
- 			set_current_kprobe(p);
- 			kcb->kprobe_status = KPROBE_HIT_ACTIVE;
+ #ifdef CONFIG_SMP
+ #undef profile_pc
 -- 
 2.1.0
