@@ -1,51 +1,35 @@
-From: cov@codeaurora.org (Christopher Covington)
-Date: Thu, 18 Jun 2015 08:16:07 -0400
-Subject: how aarch32 jump to aarch64
-In-Reply-To: <CADUS3o=mu7f9=_MMRt9ijdnC+saE-B+68hnyGtHeaAB=2Gd2DA@mail.gmail.com>
-References: <CADUS3okH9M-=zpeu_UH55sTT0wrPoxNzYxyT=Yzrb9NgUezgDg@mail.gmail.com>
- <10952759.0QA4gdRIiH@wuerfel>
- <CADUS3o=VKkyXD-r8rPpgqe2+EtXeHjuVJJZ621aFL3iqp62BXA@mail.gmail.com>
- <CADUS3o=mu7f9=_MMRt9ijdnC+saE-B+68hnyGtHeaAB=2Gd2DA@mail.gmail.com>
-Message-ID: <5582B687.40902@codeaurora.org>
+From: sudipm.mukherjee@gmail.com (Sudip Mukherjee)
+Date: Thu, 18 Jun 2015 17:47:46 +0530
+Subject: [PATCH v2 0/7] fix build failure of mn10300
+Message-ID: <1434629873-11668-1-git-send-email-sudipm.mukherjee@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/18/2015 08:08 AM, yoma sophian wrote:
-> hi arnd:
-> 
-> 2015-06-15 9:19 GMT+08:00 yoma sophian <sophian.yoma@gmail.com>:
->> hi Arnd:
->>
->> 2015-06-15 3:39 GMT+08:00 Arnd Bergmann <arnd@arndb.de>:
->>> On Sunday 14 June 2015 23:06:49 yoma sophian wrote:
->>>> hi all:
->>>> as far as I know, we can use pseudo eret to let aarch64 jump to aarch32.
->>>> But how could we let aarch32 --> aarch64?
->>>>
->>>
->>> I believe the only way is to trap into a higher privilege level, e.g. from
->>> user space to the kernel, or from kernel into hypervisor mode. If you
->>> want to implement mode switching within one binary, you would then add
->>> a syscall/hypercall/... that returns without switching back to aarch32.
->> Do you mean to use HVC, SVC, in aarch32?
->> But as far as I remember, they are exception instructions which let
->> processor jump to aarch32 hypervisio, and aarch32 supervisor mode
->> seperately.
->> Is there any exception instruction which will let aarch32 jump to aarch64?
-> in so far aarch64 kernel enviornemnt, the kernel is running in
-> Ns-aarch64-EL1 and user mode support aarch32 binary.
-> so there should be some instruction, which can let processor jump from
-> aarch32 --> aarch64, right?
-> 
-> appreciate your help,
+Hi,
+This is an attempt to fix the build failures when building mn10300 with
+allmodconfig. As I have never worked with arch files so I hope you will
+point me to right direction to correct my mistakes in this attempt.
 
-The instruction is SVC, which has no ability to change the register width of
-the destination exception level. If EL0 is AArch32 and EL1 is AArch64 then SVC
-will cause an A32 -> A64 transition.
+regards
+sudip
 
-Chris
+Sudip Mukherjee (7):
+  mn10300: fix build failure
+  mn10300: Provide dummy dma_alloc_attrs() and dma_free_attrs()
+  mmc: mediatek: build as module
+  USB: mos7720: rename DCR
+  samples: kdbus: disable for mn10300
+  mn10300: kgdb_arch_set_pc
+  mn10300: add early_init_dt_*
+
+ arch/mn10300/include/asm/dma-mapping.h | 13 +++++++++++++
+ arch/mn10300/include/asm/kprobes.h     | 12 ++++++++++++
+ arch/mn10300/kernel/kgdb.c             |  5 +++++
+ arch/mn10300/kernel/setup.c            | 15 +++++++++++++++
+ drivers/mmc/host/mtk-sd.c              |  1 +
+ drivers/usb/serial/mos7720.c           | 16 ++++++++--------
+ samples/Kconfig                        |  2 +-
+ 7 files changed, 55 insertions(+), 9 deletions(-)
 
 -- 
-Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-a Linux Foundation Collaborative Project
+1.8.1.2
