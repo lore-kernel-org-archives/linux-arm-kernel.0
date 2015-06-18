@@ -1,110 +1,140 @@
-From: hdegoede@redhat.com (Hans de Goede)
-Date: Thu, 18 Jun 2015 18:16:01 +0200
-Subject: [PATCH 09/20] ARM: dts: sun4i: Enable USB DRC on the Cubieboard
-In-Reply-To: <20150618155935.GR11732@lukather>
-References: <1433530943-12599-1-git-send-email-hdegoede@redhat.com>
- <1433530943-12599-10-git-send-email-hdegoede@redhat.com>
- <20150618155935.GR11732@lukather>
-Message-ID: <5582EEC1.80505@redhat.com>
+From: alex.williamson@redhat.com (Alex Williamson)
+Date: Thu, 18 Jun 2015 10:17:57 -0600
+Subject: [PATCH v4 0/4] VFIO platform reset
+In-Reply-To: <CAN9JPjFKVTh7h=cPFecUTP56Muq54vruas3YG1D32hXd0Mh0LQ@mail.gmail.com>
+References: <1434359385-19916-1-git-send-email-eric.auger@linaro.org>
+ <1434580294.5628.135.camel@redhat.com>
+ <CAN9JPjFKVTh7h=cPFecUTP56Muq54vruas3YG1D32hXd0Mh0LQ@mail.gmail.com>
+Message-ID: <1434644277.3700.41.camel@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Thu, 2015-06-18 at 17:23 +0200, Baptiste Reynal wrote:
+> Hello everyone,
+> 
+> I tested and reviewed the patches, everything's fine for me.
 
-On 18-06-15 17:59, Maxime Ripard wrote:
-> Hi Hans,
->
-> On Fri, Jun 05, 2015 at 09:02:12PM +0200, Hans de Goede wrote:
->> Enable the otg/drc usb controller on the Cubieboard. Note that the
->> 5V of the otg is directly connected to the general 5V, so we only use
->> the id pin.
->>
->> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
->> ---
->>   arch/arm/boot/dts/sun4i-a10-cubieboard.dts | 19 +++++++++++++++++++
->>   1 file changed, 19 insertions(+)
->>
->> diff --git a/arch/arm/boot/dts/sun4i-a10-cubieboard.dts b/arch/arm/boot/dts/sun4i-a10-cubieboard.dts
->> index 9afb4e0..046a84d 100644
->> --- a/arch/arm/boot/dts/sun4i-a10-cubieboard.dts
->> +++ b/arch/arm/boot/dts/sun4i-a10-cubieboard.dts
->> @@ -155,6 +155,10 @@
->>   	status = "okay";
->>   };
->>
->> +&otg_sram {
->> +	status = "okay";
->> +};
->> +
->>   &pio {
->>   	led_pins_cubieboard: led_pins at 0 {
->>   		allwinner,pins = "PH20", "PH21";
->> @@ -162,6 +166,13 @@
->>   		allwinner,drive = <SUN4I_PINCTRL_20_MA>;
->>   		allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
->>   	};
->> +
->> +	usb0_id_detect_pin: usb0_id_detect_pin at 0 {
->> +		allwinner,pins = "PH4";
->> +		allwinner,function = "gpio_in";
->> +		allwinner,drive = <SUN4I_PINCTRL_10_MA>;
->> +		allwinner,pull = <SUN4I_PINCTRL_PULL_UP>;
->> +	};
->>   };
->>
->>   &reg_ahci_5v {
->> @@ -216,7 +227,15 @@
->>   	status = "okay";
->>   };
->>
->> +&usb_otg {
->> +	dr_mode = "otg";
->> +	status = "okay";
->> +};
->> +
->>   &usbphy {
->> +	pinctrl-names = "default";
->> +	pinctrl-0 = <&usb0_id_detect_pin>;
->> +	usb0_id_det-gpio = <&pio 7 4 GPIO_ACTIVE_HIGH>; /* PH4 */
->
-> Does that work?
+Hi Baptiste,
 
-Yes :)
+Would you like to provide a Sign-off/Ack/Review tag for the series then?
 
-> Your phy driver seem to actively check at probe time for both the ID
-> detect and VBUS detect pins to be set in the DT, which is not the case
-> here.
+> I agree to be maintainer of vfio platform drivers, though I don't
+> think the volume of patches about VFIO will justify a new mailing
+> list.
 
-My initial version did, later on I added a patch adding special handling
-for boards which have Vusb hardwired to the 5V of the board such as the
-cubieboard (the schematics show both a current regulator and an optional
-0 ohm resistor to short-circuit that, it seems that the boards are
-shipped with short-circuiting resistor, at least all mine are (both a10
-and a20 variants).
+Ok, I'll officially post the patch for MAINTAINERS then.  Until someone
+complains, we'll continue to use the kvm list.  Thanks,
 
-See here for the patch:
-https://github.com/jwrdegoede/linux-sunxi/commit/b73922986cab2bad9d54a2a1223583008e155bc4
+Alex
 
-This is part of the v5 phy-sun4i-usb series I send to Kishon a week ago.
-
-> I don't really get either why VBUS detect has to be set. Can't it work
-> just fine if you have a regulator that you can control and the ID pin
-> alone ?
-
-Not really, we can work around it as done in the above commit, but it
-is not ideal.
-
-Vbus detect going low is used by the musb silicon to determine that the
-current session has ended, and without this happening it will not
-switch from host to device mode or vice versa no matter what the id pin
-does.
-
-Vbus detect is also used to not provide power to the port if external
-power is present as doing so is not a good idea.
-
-Last vbus-detect is used to detect that the devices connected to the
-port are using too much power.
-
-Regards,
-
-Hans
+> On Thu, Jun 18, 2015 at 12:31 AM, Alex Williamson
+> <alex.williamson@redhat.com> wrote:
+> > On Mon, 2015-06-15 at 11:09 +0200, Eric Auger wrote:
+> >> In situations where the userspace driver is stopped abnormally and the
+> >> VFIO platform device is released, the assigned HW device currently is
+> >> left running. As a consequence the HW device might continue issuing IRQs
+> >> and performing DMA accesses.
+> >>
+> >> On release, no physical IRQ handler is setup anymore. Also the DMA buffers
+> >> are unmapped leading to IOMMU aborts. So there is no serious consequence.
+> >>
+> >> However when assigning that HW device again to another userspace driver,
+> >> this latter might face some unexpected IRQs and DMA accesses, which are
+> >> the result of the previous assignment.
+> >>
+> >> In virtualization use-case, a VM newly granted with that HW device may be
+> >> impacted by the assignment of that device to a previous VM:
+> >> - IRQs may be injected very early when booting the new guest, even before
+> >>   the guest driver has initialized leading to possible driver state
+> >>   inconsistency.
+> >> - DMA accesses may hit the newly mapped VM address space at addresses that
+> >>   may jeopardize the integrity of the newly installed VM.
+> >>
+> >> Obviously the criticity depends on the assigned HW device.
+> >>
+> >> As opposed to PCI, there is no standard mechanism to reset the platform
+> >> device.
+> >>
+> >> This series proposes to implement device specific reset functions in
+> >> separate in-kernel vfio reset modules. The vfio-platform driver holds
+> >> a whitelist of implemented triplets (compat string, module name,
+> >> reset function name). When the vfio-platform driver is probed it identifies
+> >> the fellow reset module/function matching the compat string of the
+> >> device, if any, and forces the load of this reset module.
+> >>
+> >> A first reset module is provided: the vfio-platform-calxedaxgmac
+> >> module which implements a basic reset for the Calxeda xgmac.
+> >>
+> >> The series can be found at
+> >> https://git.linaro.org/people/eric.auger/linux.git/shortlog/refs/heads/v4.1-rc8-reset-v4
+> >>
+> >> History:
+> >> v3 -> v4:
+> >> - fix the commit message of "VFIO: platform: add reset struct and lookup table"
+> >
+> > Baptiste,
+> >
+> > Any comments?  Should we also add something like this to MAINTAINERS
+> > before we go much further?
+> >
+> > diff --git a/MAINTAINERS b/MAINTAINERS
+> > index d8afd29..c6bf7f6 100644
+> > --- a/MAINTAINERS
+> > +++ b/MAINTAINERS
+> > @@ -10545,6 +10545,12 @@ F:     drivers/vfio/
+> >  F:     include/linux/vfio.h
+> >  F:     include/uapi/linux/vfio.h
+> >
+> > +VFIO PLATFORM DRIVER
+> > +M:     Baptiste Reynal <b.reynal@virtualopensystems.com>
+> > +L:     kvm at vger.kernel.org
+> > +S:     Maintained
+> > +F:     drivers/vfio/platform/
+> > +
+> >  VIDEOBUF2 FRAMEWORK
+> >  M:     Pawel Osciak <pawel@osciak.com>
+> >  M:     Marek Szyprowski <m.szyprowski@samsung.com>
+> >
+> > I'm not sure what you want to be the primary list, maybe it's time to
+> > ask for a vfio list.  Thanks,
+> > Alex
+> >
+> >>
+> >> v2 -> v3:
+> >> - remove void module_init/exit functions in calxeda reset module
+> >> - remove enum vfio_platform_reset_type
+> >> - for reset lookup, use ARRAY_SIZE
+> >> - in reset put use symbol_put_addr
+> >>
+> >> v1 -> v2:
+> >> - much simplified compared to v1 although principle of external modules is
+> >>   kept: removed mechanism of dynamic registration of reset functions
+> >> - list is replaced by whitelist lookup table
+> >> - name of the reset function also stored in the lookup table
+> >> - autoload of reset modules
+> >>
+> >> RFC -> PATCH v1:
+> >> - solution now based on a lookup list instead of specialized driver
+> >>
+> >>
+> >> Eric Auger (4):
+> >>   VFIO: platform: add reset struct and lookup table
+> >>   VFIO: platform: add reset callback
+> >>   VFIO: platform: populate the reset function on probe
+> >>   VFIO: platform: Calxeda xgmac reset module
+> >>
+> >>  drivers/vfio/platform/Kconfig                      |  2 +
+> >>  drivers/vfio/platform/Makefile                     |  2 +
+> >>  drivers/vfio/platform/reset/Kconfig                |  7 ++
+> >>  drivers/vfio/platform/reset/Makefile               |  5 ++
+> >>  .../platform/reset/vfio_platform_calxedaxgmac.c    | 86 ++++++++++++++++++++++
+> >>  drivers/vfio/platform/vfio_platform_common.c       | 60 ++++++++++++++-
+> >>  drivers/vfio/platform/vfio_platform_private.h      |  7 ++
+> >>  7 files changed, 166 insertions(+), 3 deletions(-)
+> >>  create mode 100644 drivers/vfio/platform/reset/Kconfig
+> >>  create mode 100644 drivers/vfio/platform/reset/Makefile
+> >>  create mode 100644 drivers/vfio/platform/reset/vfio_platform_calxedaxgmac.c
+> >>
+> >
+> >
+> >
