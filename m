@@ -1,34 +1,34 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Thu, 18 Jun 2015 16:52:23 +0200
-Subject: [PATCH v2 0/2] mfd: flexcom: add a driver for Flexcom
-In-Reply-To: <cover.1434632230.git.cyrille.pitchen@atmel.com>
-References: <cover.1434632230.git.cyrille.pitchen@atmel.com>
-Message-ID: <20150618145223.GJ27492@piout.net>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Thu, 18 Jun 2015 15:54:58 +0100
+Subject: [PATCH] KVM: arm/arm64: vgic: Remove useless arm-gic.h #include
+Message-ID: <1434639298-10303-1-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 18/06/2015 at 15:05:08 +0200, Cyrille Pitchen wrote :
-> ChangeLog
-> 
-> v2:
-> - enhance the documentation of DT bindings and change the way the "ranges"
->   property is used.
-> - replace __raw_readl() and __raw_writel() by readl() and writel().
-> - change the module license to "GPL" for v2 or later
-> - print the selected flexcom mode after the hardware version
-> 
-> v1:
-> This series of patches a support to the Atmel Flexcom, a wrapper which
-> integrates an USART, a SPI controller and a TWI controller. Only one
-> peripheral can be used at a time. The active function is selected though
-> the Flexcom Mode Register.
-> 
+Back in the days, vgic.c used to have an intimate knowledge of
+the actual GICv2. These days, this has been abstracted away into
+hardware-specific backends.
 
-For the whole set:
-Acked-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+Remove the now useless arm-gic.h #include directive, making it
+clear that GICv2 specific code doesn't belong here.
 
+Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+---
+ virt/kvm/arm/vgic.c | 2 --
+ 1 file changed, 2 deletions(-)
 
+diff --git a/virt/kvm/arm/vgic.c b/virt/kvm/arm/vgic.c
+index 950064a..f94d887 100644
+--- a/virt/kvm/arm/vgic.c
++++ b/virt/kvm/arm/vgic.c
+@@ -26,8 +26,6 @@
+ #include <linux/of_irq.h>
+ #include <linux/uaccess.h>
+ 
+-#include <linux/irqchip/arm-gic.h>
+-
+ #include <asm/kvm_emulate.h>
+ #include <asm/kvm_arm.h>
+ #include <asm/kvm_mmu.h>
 -- 
-Alexandre Belloni, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+2.1.4
