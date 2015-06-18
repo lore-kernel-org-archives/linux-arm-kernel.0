@@ -1,103 +1,35 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Thu, 18 Jun 2015 20:49:27 +0200
-Subject: [PATCH v2] clk: mvebu: flag the crypto clk as CLK_IGNORE_UNUSED
-In-Reply-To: <20150618183654.25948.26168@quantum>
-References: <1434470179-20835-1-git-send-email-boris.brezillon@free-electrons.com>
- <55816094.2020208@free-electrons.com> <20150618183654.25948.26168@quantum>
-Message-ID: <558312B7.6010708@free-electrons.com>
+From: andre.przywara@arm.com (Andre Przywara)
+Date: Thu, 18 Jun 2015 20:20:31 +0100
+Subject: [PATCH 13/13] KVM: arm64: enable ITS emulation as a virtual MSI
+ controller
+In-Reply-To: <01a401d0a9d7$e87997d0$b96cc770$@samsung.com>
+References: <1432893209-27313-1-git-send-email-andre.przywara@arm.com>
+ <1432893209-27313-14-git-send-email-andre.przywara@arm.com>
+ <558284B4.104@linaro.org> <5582D410.60708@arm.com>
+ <01a401d0a9d7$e87997d0$b96cc770$@samsung.com>
+Message-ID: <558319FF.4090809@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mike,
-
-On 18/06/2015 20:36, Michael Turquette wrote:
-> Quoting Gregory CLEMENT (2015-06-17 04:57:08)
->> Hi Mike, Stephen,
->>
->> On 16/06/2015 17:56, Boris Brezillon wrote:
->>> The crypto SRAM, used by the armada 370 cpuidle code to workaround a bug
->>> in the BootROM code, requires the crypto clk to be up and running.
->>> Flag the crypto clk as IGNORE_UNUSED until we add the proper
->>> infrastructure to define the crypto SRAM in the DT and reference the crypto
->>> clk in this SRAM node.
->>>
->>> Reported-by: Kevin Hilman <khilman@linaro.org>
->>> Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
->>> Tested-by: Kevin Hilman <khilman@linaro.org>
->>> Fixes: 29e623475c50267ee3aaa49ebb6cbe107bce8d2a ("clk: mvebu: add
->>> missing CESA gate clk").
->>> Cc: <stable@vger.kernel.org> #4.1
->>
->> Acked-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
->>
->> Would it possible to apply this fix on 4.1-rc8 ?
+On 06/18/2015 04:03 PM, Pavel Fedin wrote:
+>  Hello!
 > 
-> Hi Gregory,
+>> But that fails compilation on ARM (which uses this file as well),
+>> because we have a dummy fail function in the header if
+>> CONFIG_HAVE_KVM_MSI is not defined.
 > 
-> I'm a bit confused by this. This patch fixes "clk: mvebu: add missing
-> CESA gate clk", right? That patch lives in clk-next. It was not pushed
-> to Linus' tree yet via a -fixes branch.
-> 
-> Thus I can just apply this patch to clk-next and the problem should be
-> resolved in clk-next, no?
+>  May be then remove that fail function too? Too many #ifdef's are not good...
 
-You're right I was confused by the "<stable@vger.kernel.org> #4.1" tag,
-and I thought it was already part of 4.1. So indeed you just have to apply
-it in clk-next. You can remove the Fixes: and CC: line. And even better
-you can squashed it into 4d52b2acefdf "clk: mvebu: add missing CESA
-gate clk", if your clk-next branch is not immutable.
+Yes, that seems to work - now. I think I had more code in there before
+that prevented exposure without #ifdef guarding.
 
+Cheers,
+Andre.
 
 > 
-> Furthermore, I do not have 29e623475c50267ee3aaa49ebb6cbe107bce8d2a
-> anywhere in my tree. I'm not sure where this sha1 hash came from.
-
-Me neither :)
-
-
-Thanks,
-
-Gregory
-
->>
->>> ---
->>> Changes since v1:
->>> - add the Reported-by tag
->>> - add the missing trailing ','
->>>
->>>  drivers/clk/mvebu/armada-370.c | 2 +-
->>>  1 file changed, 1 insertion(+), 1 deletion(-)
->>>
->>> diff --git a/drivers/clk/mvebu/armada-370.c b/drivers/clk/mvebu/armada-370.c
->>> index c19fd77..2c7c108 100644
->>> --- a/drivers/clk/mvebu/armada-370.c
->>> +++ b/drivers/clk/mvebu/armada-370.c
->>> @@ -163,7 +163,7 @@ static const struct clk_gating_soc_desc a370_gating_desc[] __initconst = {
->>>       { "pex1", "pex1_en", 9, 0 },
->>>       { "sata0", NULL, 15, 0 },
->>>       { "sdio", NULL, 17, 0 },
->>> -     { "crypto", NULL, 23, 0 },
->>> +     { "crypto", NULL, 23, CLK_IGNORE_UNUSED },
->>>       { "tdm", NULL, 25, 0 },
->>>       { "ddr", NULL, 28, CLK_IGNORE_UNUSED },
->>>       { "sata1", NULL, 30, 0 },
->>>
->>
->>
->> -- 
->> Gregory Clement, Free Electrons
->> Kernel, drivers, real-time and embedded Linux
->> development, consulting, training and support.
->> http://free-electrons.com
->>
->> _______________________________________________
->> linux-arm-kernel mailing list
->> linux-arm-kernel at lists.infradead.org
->> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-
-
--- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+> Kind regards,
+> Pavel Fedin
+> Expert Engineer
+> Samsung Electronics Research center Russia
+> 
+> 
