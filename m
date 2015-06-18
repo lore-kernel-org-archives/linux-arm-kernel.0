@@ -1,87 +1,93 @@
 From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Thu, 18 Jun 2015 16:24:30 +0530
-Subject: [PATCH 16/41] clocksource: pxa: Migrate to new 'set-state' interface
+Date: Thu, 18 Jun 2015 16:24:26 +0530
+Subject: [PATCH 12/41] clocksource: moxart: Migrate to new 'set-state'
+ interface
 In-Reply-To: <cover.1434622147.git.viresh.kumar@linaro.org>
 References: <cover.1434622147.git.viresh.kumar@linaro.org>
-Message-ID: <3aa5c1a740911258698769cbbb8f60ee02178848.1434622147.git.viresh.kumar@linaro.org>
+Message-ID: <8a06c6c0fd6fbb4150ef9313af74d7ed81451910.1434622147.git.viresh.kumar@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Migrate pxa driver to the new 'set-state' interface provided by
+Migrate moxart driver to the new 'set-state' interface provided by
 clockevents core, the earlier 'set-mode' interface is marked obsolete
 now.
 
 This also enables us to implement callbacks for new states of clockevent
 devices, for example: ONESHOT_STOPPED.
 
-Both oneshot and shutdown modes had exactly same code and so only a
-single callback is sufficient now, which will be called for both the
-modes.
-
-Cc: Robert Jarzmik <robert.jarzmik@free.fr>
-Cc: Russell King <linux@arm.linux.org.uk>
+Cc: Jonas Jensen <jonas.jensen@gmail.com>
 Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
 ---
- drivers/clocksource/pxa_timer.c | 39 +++++++++++++--------------------------
- 1 file changed, 13 insertions(+), 26 deletions(-)
+ drivers/clocksource/moxart_timer.c | 49 ++++++++++++++++++++------------------
+ 1 file changed, 26 insertions(+), 23 deletions(-)
 
-diff --git a/drivers/clocksource/pxa_timer.c b/drivers/clocksource/pxa_timer.c
-index d9438af2bbd6..45b6a4999713 100644
---- a/drivers/clocksource/pxa_timer.c
-+++ b/drivers/clocksource/pxa_timer.c
-@@ -88,26 +88,12 @@ pxa_osmr0_set_next_event(unsigned long delta, struct clock_event_device *dev)
- 	return (signed)(next - oscr) <= MIN_OSCR_DELTA ? -ETIME : 0;
- }
+diff --git a/drivers/clocksource/moxart_timer.c b/drivers/clocksource/moxart_timer.c
+index 5eb2c35932b1..19857af651c1 100644
+--- a/drivers/clocksource/moxart_timer.c
++++ b/drivers/clocksource/moxart_timer.c
+@@ -58,25 +58,24 @@
+ static void __iomem *base;
+ static unsigned int clock_count_per_tick;
  
--static void
--pxa_osmr0_set_mode(enum clock_event_mode mode, struct clock_event_device *dev)
-+static int pxa_osmr0_shutdown(struct clock_event_device *evt)
+-static void moxart_clkevt_mode(enum clock_event_mode mode,
+-			       struct clock_event_device *clk)
++static int moxart_shutdown(struct clock_event_device *evt)
  {
 -	switch (mode) {
+-	case CLOCK_EVT_MODE_RESUME:
 -	case CLOCK_EVT_MODE_ONESHOT:
--		timer_writel(timer_readl(OIER) & ~OIER_E0, OIER);
--		timer_writel(OSSR_M0, OSSR);
+-		writel(TIMER1_DISABLE, base + TIMER_CR);
+-		writel(~0, base + TIMER1_BASE + REG_LOAD);
 -		break;
--
+-	case CLOCK_EVT_MODE_PERIODIC:
+-		writel(clock_count_per_tick, base + TIMER1_BASE + REG_LOAD);
+-		writel(TIMER1_ENABLE, base + TIMER_CR);
+-		break;
 -	case CLOCK_EVT_MODE_UNUSED:
 -	case CLOCK_EVT_MODE_SHUTDOWN:
--		/* initializing, released, or preparing for suspend */
--		timer_writel(timer_readl(OIER) & ~OIER_E0, OIER);
--		timer_writel(OSSR_M0, OSSR);
--		break;
--
--	case CLOCK_EVT_MODE_RESUME:
--	case CLOCK_EVT_MODE_PERIODIC:
+-	default:
+-		writel(TIMER1_DISABLE, base + TIMER_CR);
 -		break;
 -	}
-+	/* initializing, released, or preparing for suspend */
-+	timer_writel(timer_readl(OIER) & ~OIER_E0, OIER);
-+	timer_writel(OSSR_M0, OSSR);
++	writel(TIMER1_DISABLE, base + TIMER_CR);
++	return 0;
++}
++
++static int moxart_set_oneshot(struct clock_event_device *evt)
++{
++	writel(TIMER1_DISABLE, base + TIMER_CR);
++	writel(~0, base + TIMER1_BASE + REG_LOAD);
++	return 0;
++}
++
++static int moxart_set_periodic(struct clock_event_device *evt)
++{
++	writel(clock_count_per_tick, base + TIMER1_BASE + REG_LOAD);
++	writel(TIMER1_ENABLE, base + TIMER_CR);
 +	return 0;
  }
  
- #ifdef CONFIG_PM
-@@ -147,13 +133,14 @@ static void pxa_timer_resume(struct clock_event_device *cedev)
- #endif
+ static int moxart_clkevt_next_event(unsigned long cycles,
+@@ -95,11 +94,15 @@ static int moxart_clkevt_next_event(unsigned long cycles,
+ }
  
- static struct clock_event_device ckevt_pxa_osmr0 = {
--	.name		= "osmr0",
--	.features	= CLOCK_EVT_FEAT_ONESHOT,
+ static struct clock_event_device moxart_clockevent = {
+-	.name		= "moxart_timer",
 -	.rating		= 200,
--	.set_next_event	= pxa_osmr0_set_next_event,
--	.set_mode	= pxa_osmr0_set_mode,
--	.suspend	= pxa_timer_suspend,
--	.resume		= pxa_timer_resume,
-+	.name			= "osmr0",
-+	.features		= CLOCK_EVT_FEAT_ONESHOT,
+-	.features	= CLOCK_EVT_FEAT_PERIODIC | CLOCK_EVT_FEAT_ONESHOT,
+-	.set_mode	= moxart_clkevt_mode,
+-	.set_next_event	= moxart_clkevt_next_event,
++	.name			= "moxart_timer",
 +	.rating			= 200,
-+	.set_next_event		= pxa_osmr0_set_next_event,
-+	.set_state_shutdown	= pxa_osmr0_shutdown,
-+	.set_state_oneshot	= pxa_osmr0_shutdown,
-+	.suspend		= pxa_timer_suspend,
-+	.resume			= pxa_timer_resume,
++	.features		= CLOCK_EVT_FEAT_PERIODIC |
++				  CLOCK_EVT_FEAT_ONESHOT,
++	.set_state_shutdown	= moxart_shutdown,
++	.set_state_periodic	= moxart_set_periodic,
++	.set_state_oneshot	= moxart_set_oneshot,
++	.tick_resume		= moxart_set_oneshot,
++	.set_next_event		= moxart_clkevt_next_event,
  };
  
- static struct irqaction pxa_ost0_irq = {
+ static irqreturn_t moxart_timer_interrupt(int irq, void *dev_id)
 -- 
 2.4.0
