@@ -1,57 +1,110 @@
-From: heiko@sntech.de (Heiko Stuebner)
-Date: Thu, 18 Jun 2015 18:15:03 +0200
-Subject: [PATCH] arm64: dts: mt8173: add clock_null
-In-Reply-To: <1434605351-64592-1-git-send-email-eddie.huang@mediatek.com>
-References: <1434605351-64592-1-git-send-email-eddie.huang@mediatek.com>
-Message-ID: <2333431.ttvjElY3ps@phil>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Thu, 18 Jun 2015 18:16:01 +0200
+Subject: [PATCH 09/20] ARM: dts: sun4i: Enable USB DRC on the Cubieboard
+In-Reply-To: <20150618155935.GR11732@lukather>
+References: <1433530943-12599-1-git-send-email-hdegoede@redhat.com>
+ <1433530943-12599-10-git-send-email-hdegoede@redhat.com>
+ <20150618155935.GR11732@lukather>
+Message-ID: <5582EEC1.80505@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Donnerstag, 18. Juni 2015, 13:29:11 schrieb Eddie Huang:
-> Add clk_null, which represents clocks that can not / need not
-> controlled by software.
-> There are many clocks' parent set to clk_null.
+Hi,
 
-Devicetree is supposed to describe hardware, and ideally not what software 
-does with it. If the clock simply cannot be controlled by software, it will 
-still have a rate and I think it should probably be modelled - similarly we 
-sometimes have fixed regulators that also are not software controllable.
+On 18-06-15 17:59, Maxime Ripard wrote:
+> Hi Hans,
+>
+> On Fri, Jun 05, 2015 at 09:02:12PM +0200, Hans de Goede wrote:
+>> Enable the otg/drc usb controller on the Cubieboard. Note that the
+>> 5V of the otg is directly connected to the general 5V, so we only use
+>> the id pin.
+>>
+>> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+>> ---
+>>   arch/arm/boot/dts/sun4i-a10-cubieboard.dts | 19 +++++++++++++++++++
+>>   1 file changed, 19 insertions(+)
+>>
+>> diff --git a/arch/arm/boot/dts/sun4i-a10-cubieboard.dts b/arch/arm/boot/dts/sun4i-a10-cubieboard.dts
+>> index 9afb4e0..046a84d 100644
+>> --- a/arch/arm/boot/dts/sun4i-a10-cubieboard.dts
+>> +++ b/arch/arm/boot/dts/sun4i-a10-cubieboard.dts
+>> @@ -155,6 +155,10 @@
+>>   	status = "okay";
+>>   };
+>>
+>> +&otg_sram {
+>> +	status = "okay";
+>> +};
+>> +
+>>   &pio {
+>>   	led_pins_cubieboard: led_pins at 0 {
+>>   		allwinner,pins = "PH20", "PH21";
+>> @@ -162,6 +166,13 @@
+>>   		allwinner,drive = <SUN4I_PINCTRL_20_MA>;
+>>   		allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
+>>   	};
+>> +
+>> +	usb0_id_detect_pin: usb0_id_detect_pin at 0 {
+>> +		allwinner,pins = "PH4";
+>> +		allwinner,function = "gpio_in";
+>> +		allwinner,drive = <SUN4I_PINCTRL_10_MA>;
+>> +		allwinner,pull = <SUN4I_PINCTRL_PULL_UP>;
+>> +	};
+>>   };
+>>
+>>   &reg_ahci_5v {
+>> @@ -216,7 +227,15 @@
+>>   	status = "okay";
+>>   };
+>>
+>> +&usb_otg {
+>> +	dr_mode = "otg";
+>> +	status = "okay";
+>> +};
+>> +
+>>   &usbphy {
+>> +	pinctrl-names = "default";
+>> +	pinctrl-0 = <&usb0_id_detect_pin>;
+>> +	usb0_id_det-gpio = <&pio 7 4 GPIO_ACTIVE_HIGH>; /* PH4 */
+>
+> Does that work?
 
+Yes :)
 
-While it might be ok to define dummy clocks as a temporary stopgap, these 
-should definitly be marked as such. This clk_null at least sounds like there is 
-no plan to replace this with a real solution at some point.
+> Your phy driver seem to actively check at probe time for both the ID
+> detect and VBUS detect pins to be set in the DT, which is not the case
+> here.
 
-And of course a bit of context would be cool, to know which type of clocks 
-this actually replaces.
+My initial version did, later on I added a patch adding special handling
+for boards which have Vusb hardwired to the 5V of the board such as the
+cubieboard (the schematics show both a current regulator and an optional
+0 ohm resistor to short-circuit that, it seems that the boards are
+shipped with short-circuiting resistor, at least all mine are (both a10
+and a20 variants).
 
+See here for the patch:
+https://github.com/jwrdegoede/linux-sunxi/commit/b73922986cab2bad9d54a2a1223583008e155bc4
 
-Heiko
+This is part of the v5 phy-sun4i-usb series I send to Kishon a week ago.
 
-> Signed-off-by: James Liao <jamesjj.liao@mediatek.com>
-> Signed-off-by: Eddie Huang <eddie.huang@mediatek.com>
-> ---
-> Base on 4.1-rc1
-> 
-> Change-Id: I4db9b40d07e28f54f7bae9b676316cbd6a962124
-> ---
->  arch/arm64/boot/dts/mediatek/mt8173.dtsi | 6 ++++++
->  1 file changed, 6 insertions(+)
-> 
-> diff --git a/arch/arm64/boot/dts/mediatek/mt8173.dtsi
-> b/arch/arm64/boot/dts/mediatek/mt8173.dtsi index 924fdb6..4798f44 100644
-> --- a/arch/arm64/boot/dts/mediatek/mt8173.dtsi
-> +++ b/arch/arm64/boot/dts/mediatek/mt8173.dtsi
-> @@ -81,6 +81,12 @@
->  		cpu_on	      = <0x84000003>;
->  	};
-> 
-> +	clk_null: clk_null {
-> +		compatible = "fixed-clock";
-> +		clock-frequency = <0>;
-> +		#clock-cells = <0>;
-> +	};
-> +
->  	uart_clk: dummy26m {
->  		compatible = "fixed-clock";
->  		clock-frequency = <26000000>;
+> I don't really get either why VBUS detect has to be set. Can't it work
+> just fine if you have a regulator that you can control and the ID pin
+> alone ?
+
+Not really, we can work around it as done in the above commit, but it
+is not ideal.
+
+Vbus detect going low is used by the musb silicon to determine that the
+current session has ended, and without this happening it will not
+switch from host to device mode or vice versa no matter what the id pin
+does.
+
+Vbus detect is also used to not provide power to the port if external
+power is present as doing so is not a good idea.
+
+Last vbus-detect is used to detect that the devices connected to the
+port are using too much power.
+
+Regards,
+
+Hans
