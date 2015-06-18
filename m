@@ -1,111 +1,48 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Thu, 18 Jun 2015 16:24:16 +0530
-Subject: [PATCH 02/41] clocksource: cadence_ttc: Migrate to new 'set-state'
- interface
-In-Reply-To: <cover.1434622147.git.viresh.kumar@linaro.org>
-References: <cover.1434622147.git.viresh.kumar@linaro.org>
-Message-ID: <effe1fbb8239a26043a7e7bc5340f9ddd9aabd81.1434622147.git.viresh.kumar@linaro.org>
+From: simon.guinot@sequanux.org (Simon Guinot)
+Date: Thu, 18 Jun 2015 13:52:50 +0200
+Subject: [PATCH v2 0/3] Add DT support for netxbig LEDs
+Message-ID: <1434628373-11834-1-git-send-email-simon.guinot@sequanux.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Migrate cadence_ttc driver to the new 'set-state' interface provided by
-clockevents core, the earlier 'set-mode' interface is marked obsolete
-now.
+Hello,
 
-This also enables us to implement callbacks for new states of clockevent
-devices, for example: ONESHOT_STOPPED.
+This patch series adds DT support for the LEDs found on the Kirkwood-based
+LaCie boards 2Big and 5Big Network v2.
 
-Cc: Michal Simek <michal.simek@xilinx.com>
-Cc: S?ren Brinkmann <soren.brinkmann@xilinx.com>
-Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
----
- drivers/clocksource/cadence_ttc_timer.c | 59 ++++++++++++++++++---------------
- 1 file changed, 32 insertions(+), 27 deletions(-)
+Changes since v1:
+- Check timer mode value retrieved from DT.
+- In netxbig_leds_get_of_pdata, don't use unsigned long variables to get
+  timer delay values from DT with function of_property_read_u32_index.
+  Instead, use a temporary u32 variable. This allows to silence a static
+  checker warning.
+- Make timer property optional in the binding documentation. It is now
+  aligned with the driver code.
 
-diff --git a/drivers/clocksource/cadence_ttc_timer.c b/drivers/clocksource/cadence_ttc_timer.c
-index 510c8a1d37b3..e47e0e0887eb 100644
---- a/drivers/clocksource/cadence_ttc_timer.c
-+++ b/drivers/clocksource/cadence_ttc_timer.c
-@@ -191,40 +191,42 @@ static int ttc_set_next_event(unsigned long cycles,
- }
- 
- /**
-- * ttc_set_mode - Sets the mode of timer
-+ * ttc_set_{shutdown|oneshot|periodic} - Sets the state of timer
-  *
-- * @mode:	Mode to be set
-  * @evt:	Address of clock event instance
-  **/
--static void ttc_set_mode(enum clock_event_mode mode,
--					struct clock_event_device *evt)
-+static int ttc_shutdown(struct clock_event_device *evt)
- {
- 	struct ttc_timer_clockevent *ttce = to_ttc_timer_clkevent(evt);
- 	struct ttc_timer *timer = &ttce->ttc;
- 	u32 ctrl_reg;
- 
--	switch (mode) {
--	case CLOCK_EVT_MODE_PERIODIC:
--		ttc_set_interval(timer, DIV_ROUND_CLOSEST(ttce->ttc.freq,
--						PRESCALE * HZ));
--		break;
--	case CLOCK_EVT_MODE_ONESHOT:
--	case CLOCK_EVT_MODE_UNUSED:
--	case CLOCK_EVT_MODE_SHUTDOWN:
--		ctrl_reg = readl_relaxed(timer->base_addr +
--					TTC_CNT_CNTRL_OFFSET);
--		ctrl_reg |= TTC_CNT_CNTRL_DISABLE_MASK;
--		writel_relaxed(ctrl_reg,
--				timer->base_addr + TTC_CNT_CNTRL_OFFSET);
--		break;
--	case CLOCK_EVT_MODE_RESUME:
--		ctrl_reg = readl_relaxed(timer->base_addr +
--					TTC_CNT_CNTRL_OFFSET);
--		ctrl_reg &= ~TTC_CNT_CNTRL_DISABLE_MASK;
--		writel_relaxed(ctrl_reg,
--				timer->base_addr + TTC_CNT_CNTRL_OFFSET);
--		break;
--	}
-+	ctrl_reg = readl_relaxed(timer->base_addr + TTC_CNT_CNTRL_OFFSET);
-+	ctrl_reg |= TTC_CNT_CNTRL_DISABLE_MASK;
-+	writel_relaxed(ctrl_reg, timer->base_addr + TTC_CNT_CNTRL_OFFSET);
-+	return 0;
-+}
-+
-+static int ttc_set_periodic(struct clock_event_device *evt)
-+{
-+	struct ttc_timer_clockevent *ttce = to_ttc_timer_clkevent(evt);
-+	struct ttc_timer *timer = &ttce->ttc;
-+
-+	ttc_set_interval(timer,
-+			 DIV_ROUND_CLOSEST(ttce->ttc.freq, PRESCALE * HZ));
-+	return 0;
-+}
-+
-+static int ttc_resume(struct clock_event_device *evt)
-+{
-+	struct ttc_timer_clockevent *ttce = to_ttc_timer_clkevent(evt);
-+	struct ttc_timer *timer = &ttce->ttc;
-+	u32 ctrl_reg;
-+
-+	ctrl_reg = readl_relaxed(timer->base_addr + TTC_CNT_CNTRL_OFFSET);
-+	ctrl_reg &= ~TTC_CNT_CNTRL_DISABLE_MASK;
-+	writel_relaxed(ctrl_reg, timer->base_addr + TTC_CNT_CNTRL_OFFSET);
-+	return 0;
- }
- 
- static int ttc_rate_change_clocksource_cb(struct notifier_block *nb,
-@@ -430,7 +432,10 @@ static void __init ttc_setup_clockevent(struct clk *clk,
- 	ttcce->ce.name = "ttc_clockevent";
- 	ttcce->ce.features = CLOCK_EVT_FEAT_PERIODIC | CLOCK_EVT_FEAT_ONESHOT;
- 	ttcce->ce.set_next_event = ttc_set_next_event;
--	ttcce->ce.set_mode = ttc_set_mode;
-+	ttcce->ce.set_state_shutdown = ttc_shutdown;
-+	ttcce->ce.set_state_periodic = ttc_set_periodic;
-+	ttcce->ce.set_state_oneshot = ttc_shutdown;
-+	ttcce->ce.tick_resume = ttc_resume;
- 	ttcce->ce.rating = 200;
- 	ttcce->ce.irq = irq;
- 	ttcce->ce.cpumask = cpu_possible_mask;
+Simon
+
+Simon Guinot (3):
+  leds: netxbig: add device tree binding
+  ARM: Kirkwood: add LED DT entries for netxbig boards
+  ARM: mvebu: remove static LED setup for netxbig boards
+
+ .../devicetree/bindings/gpio/netxbig-gpio-ext.txt  |  22 ++
+ .../devicetree/bindings/leds/leds-netxbig.txt      |  92 ++++++++
+ arch/arm/boot/dts/kirkwood-net5big.dts             |  60 +++++
+ arch/arm/boot/dts/kirkwood-netxbig.dtsi            |  80 +++++++
+ arch/arm/mach-mvebu/Kconfig                        |   7 -
+ arch/arm/mach-mvebu/Makefile                       |   1 -
+ arch/arm/mach-mvebu/board.h                        |  21 --
+ arch/arm/mach-mvebu/kirkwood.c                     |   4 -
+ arch/arm/mach-mvebu/netxbig.c                      | 191 ----------------
+ drivers/leds/leds-netxbig.c                        | 250 +++++++++++++++++++--
+ include/dt-bindings/leds/leds-netxbig.h            |  18 ++
+ 11 files changed, 501 insertions(+), 245 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/gpio/netxbig-gpio-ext.txt
+ create mode 100644 Documentation/devicetree/bindings/leds/leds-netxbig.txt
+ delete mode 100644 arch/arm/mach-mvebu/board.h
+ delete mode 100644 arch/arm/mach-mvebu/netxbig.c
+ create mode 100644 include/dt-bindings/leds/leds-netxbig.h
+
 -- 
-2.4.0
+2.1.4
