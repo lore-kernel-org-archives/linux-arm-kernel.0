@@ -1,123 +1,235 @@
-From: srinivas.kandagatla@linaro.org (Srinivas Kandagatla)
-Date: Thu, 18 Jun 2015 09:29:31 +0100
-Subject: [PATCH v2 0/3] Add the efuse driver on rockchip platform
-In-Reply-To: <55826D9D.2060106@i2se.com>
-References: <1434439665-27781-1-git-send-email-wxt@rock-chips.com>
- <557FE3EA.4000306@i2se.com> <557FEAB2.1040101@linaro.org>
- <557FF50C.10809@rock-chips.com> <55800070.5030509@linaro.org>
- <55826D9D.2060106@i2se.com>
-Message-ID: <5582816B.5020208@linaro.org>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Thu, 18 Jun 2015 09:37:23 +0100
+Subject: [PATCH 10/10] KVM: arm/arm64: vgic: Allow non-shared device HW
+ interrupts
+In-Reply-To: <5581975A.8070509@linaro.org>
+References: <1433783045-8002-1-git-send-email-marc.zyngier@arm.com>
+ <1433783045-8002-11-git-send-email-marc.zyngier@arm.com>
+ <55818E06.8010400@linaro.org> <55819445.4090309@arm.com>
+ <5581975A.8070509@linaro.org>
+Message-ID: <55828343.30408@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On 18/06/15 08:05, Stefan Wahren wrote:
-> Hi Srinivas,
->
-> Am 16.06.2015 um 12:54 schrieb Srinivas Kandagatla:
+On 17/06/15 16:50, Eric Auger wrote:
+> On 06/17/2015 05:37 PM, Marc Zyngier wrote:
+>> On 17/06/15 16:11, Eric Auger wrote:
+>>> Hi Marc,
+>>> On 06/08/2015 07:04 PM, Marc Zyngier wrote:
+>>>> So far, the only use of the HW interrupt facility is the timer,
+>>>> implying that the active state is context-switched for each vcpu,
+>>>> as the device is is shared across all vcpus.
+>>> s/is//
+>>>>
+>>>> This does not work for a device that has been assigned to a VM,
+>>>> as the guest is entierely in control of that device (the HW is
+>>> entirely?
+>>>> not shared). In that case, it makes sense to bypass the whole
+>>>> active state srtwitchint, and only track the deactivation of the
+>>> switching
 >>
+>> Congratulations, I think you're now ready to try deciphering my
+>> handwriting... ;-)
+> good to see you're not a machine or maybe you do it on purpose some
+> times ;-)
 >>
->> On 16/06/15 11:06, Caesar Wang wrote:
->>> Hi Srinivas,
+>>>> interrupt.
+>>>>
+>>>> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+>>>> ---
+>>>>  include/kvm/arm_vgic.h    |  5 +++--
+>>>>  virt/kvm/arm/arch_timer.c |  2 +-
+>>>>  virt/kvm/arm/vgic.c       | 37 ++++++++++++++++++++++++-------------
+>>>>  3 files changed, 28 insertions(+), 16 deletions(-)
+>>>>
+>>>> diff --git a/include/kvm/arm_vgic.h b/include/kvm/arm_vgic.h
+>>>> index 1c653c1..5d47d60 100644
+>>>> --- a/include/kvm/arm_vgic.h
+>>>> +++ b/include/kvm/arm_vgic.h
+>>>> @@ -164,7 +164,8 @@ struct irq_phys_map {
+>>>>  	u32			virt_irq;
+>>>>  	u32			phys_irq;
+>>>>  	u32			irq;
+>>>> -	bool			active;
+>>>> +	bool			shared;
+>>>> +	bool			active; /* Only valid if shared */
+>>>>  };
+>>>>  
+>>>>  struct vgic_dist {
+>>>> @@ -347,7 +348,7 @@ void vgic_v3_dispatch_sgi(struct kvm_vcpu *vcpu, u64 reg);
+>>>>  int kvm_vgic_vcpu_pending_irq(struct kvm_vcpu *vcpu);
+>>>>  int kvm_vgic_vcpu_active_irq(struct kvm_vcpu *vcpu);
+>>>>  struct irq_phys_map *vgic_map_phys_irq(struct kvm_vcpu *vcpu,
+>>>> -				       int virt_irq, int irq);
+>>>> +				       int virt_irq, int irq, bool shared);
+>>>>  int vgic_unmap_phys_irq(struct kvm_vcpu *vcpu, struct irq_phys_map *map);
+>>>>  bool vgic_get_phys_irq_active(struct irq_phys_map *map);
+>>>>  void vgic_set_phys_irq_active(struct irq_phys_map *map, bool active);
+>>>> diff --git a/virt/kvm/arm/arch_timer.c b/virt/kvm/arm/arch_timer.c
+>>>> index b9fff78..9544d79 100644
+>>>> --- a/virt/kvm/arm/arch_timer.c
+>>>> +++ b/virt/kvm/arm/arch_timer.c
+>>>> @@ -202,7 +202,7 @@ void kvm_timer_vcpu_reset(struct kvm_vcpu *vcpu,
+>>>>  	 * Tell the VGIC that the virtual interrupt is tied to a
+>>>>  	 * physical interrupt. We do that once per VCPU.
+>>>>  	 */
+>>>> -	timer->map = vgic_map_phys_irq(vcpu, irq->irq, host_vtimer_irq);
+>>>> +	timer->map = vgic_map_phys_irq(vcpu, irq->irq, host_vtimer_irq, true);
+>>>>  	WARN_ON(!timer->map);
+>>>>  }
+>>>>  
+>>>> diff --git a/virt/kvm/arm/vgic.c b/virt/kvm/arm/vgic.c
+>>>> index f376b56..4223166 100644
+>>>> --- a/virt/kvm/arm/vgic.c
+>>>> +++ b/virt/kvm/arm/vgic.c
+>>>> @@ -1125,18 +1125,21 @@ static void vgic_queue_irq_to_lr(struct kvm_vcpu *vcpu, int irq,
+>>>>  		map = vgic_irq_map_search(vcpu, irq);
+>>>>  
+>>>>  		if (map) {
+>>>> -			int ret;
+>>>> -
+>>>> -			BUG_ON(!map->active);
+>>>>  			vlr.hwirq = map->phys_irq;
+>>>>  			vlr.state |= LR_HW;
+>>>>  			vlr.state &= ~LR_EOI_INT;
+>>>>  
+>>>> -			ret = irq_set_irqchip_state(map->irq,
+>>>> -						    IRQCHIP_STATE_ACTIVE,
+>>>> -						    true);
+>>>>  			vgic_irq_set_queued(vcpu, irq);
 >>>
->>> ? 2015?06?16? 17:21, Srinivas Kandagatla ??:
->>>> Hi Stefan,
->>>>
->>>>
->>>> On 16/06/15 09:52, Stefan Wahren wrote:
->>>>> Hi Caesar,
->>>>>
->>>>> [add Maxime and Srinivas]
->>>>>
->>>>> Am 16.06.2015 um 09:27 schrieb Caesar Wang:
->>>>>> The original driver is uploaded by Jianqun.
->>>>>> Here is his patchs:
->>>>>>       https://patchwork.kernel.org/patch/5410341/
->>>>>>       https://patchwork.kernel.org/patch/5410351/
->>>>>>
->>>>>> Jianqun, nevermind!
->>>>>> I check-pick it and re-upload the driver for the upstream.
->>>>>> e.g.:
->>>>>>       Tested by on minnie board.(kernel-4.1-rc8)
->>>>>>       cd /sys/devices/platform/ffb40000.efuse
->>>>>>       localhost ffb40000.efuse # cat cpu_leakage_show
->>>>>>       cpu_version_show
->>>>>>       The results:
->>>>>>               19
->>>>>>               2
->>>>>>
->>>>>> Changes in v2:
->>>>>> - Change the document decription.
->>>>>> - Move the efuse driver into driver/soc/vendor.
->>>>>> - update the efuse driver.
->>>>>> - Add the dts node on RK3288.
->>>>>>
->>>>>>
->>>>>
->>>>> i want to mention that there is a upcoming new framework suitable for
->>>>> efuse drivers:
->>>>>
->>>>> https://lkml.org/lkml/2015/5/21/643
->>>>>
->>>>> Unfortunately i don't know the current development state.
->>>>>
->>>>
->>>> Currently this framework is used by atleast 3 drivers(qcom-tsens,
->>>> qcom-cpr, begel-bone-cape manager) which are still floating in the
->>>> mailing list.
->>>>
->>>> I was hoping that these 3 users would getback with tested-by.. which
->>>> did not happen for last 3-4 weeks.
->>>>
->>>> I would appreciate, If you could try framework too, and let me know.
->>>
->
-> yes i work on OCOTP driver for MXS platform and i will try ...
->
+>>> the queued state is set again in vgic_queue_hwirq for level_sensitive
+>>> IRQs although not harmful.
 >>
->> int rockchip_efuse_reg_read(void *context, unsigned int reg, unsigned
->> int *val)
->> {
->>      /* efuse specific read sequence */
->>      ...
->> }
->
-> I will need a specific read sequence too.
+>> Indeed. We still need it for edge interrupts though. I'll try to find a
+>> nicer way...
+>>
+>>>> -			WARN_ON(ret);
+>>>> +
+>>>> +			if (map->shared) {
+>>>> +				int ret;
+>>>> +
+>>>> +				BUG_ON(!map->active);
+>>>> +				ret = irq_set_irqchip_state(map->irq,
+>>>> +							    IRQCHIP_STATE_ACTIVE,
+>>>> +							    true);
+>>>> +				WARN_ON(ret);
+>>>> +			}
+>>>>  		}
+>>>>  	}
+>>>>  
+>>>> @@ -1368,21 +1371,28 @@ static bool vgic_process_maintenance(struct kvm_vcpu *vcpu)
+>>>>  static int vgic_sync_hwirq(struct kvm_vcpu *vcpu, struct vgic_lr vlr)
+>>>>  {
+>>>>  	struct irq_phys_map *map;
+>>>> +	bool active;
+>>>>  	int ret;
+>>>>  
+>>>>  	if (!(vlr.state & LR_HW))
+>>>>  		return 0;
+>>>>  
+>>>>  	map = vgic_irq_map_search(vcpu, vlr.irq);
+>>>> -	BUG_ON(!map || !map->active);
+>>>> +	BUG_ON(!map);
+>>>> +	BUG_ON(map->shared && !map->active);
+>>>>  
+>>>>  	ret = irq_get_irqchip_state(map->irq,
+>>>>  				    IRQCHIP_STATE_ACTIVE,
+>>>> -				    &map->active);
+>>>> +				    &active);
+>>>>  
+>>> In case of non shared and EOIMode = 1 - I know this is not your current
+>>> interest here though ;-) - , once the guest EOIs its virtual IRQ and GIC
+>>> deactivates the physical one, a new phys IRQ can hit immediatly, the
+>>> physical handler can be entered and the state is seen as active here.
+>>> The queued state is never reset in such a case and the system gets stuck
+>>> since the can_sample fails I think. What I mean here is sounds the state
+>>> machine as is does not work for my VFIO case. So some adaptations still
+>>> are needed I think. Do you share my diagnosis?
+>>
+>> Yup, there is something that doesn't quite work here.
+>>
+>> I think the mistake is to sample the distributor active state. I wonder
+>> if I can simply rely on the LR state. If it is neither pending nor
+>> active, it means that we have done the deactivation, and we can then
+>> reset the queued state.
+> 
+> I tried to use the LR in the past - it was also Christoffer's will - but
+> it was not working. I observed injection before seeing the LR voided.
+> This is why I resorted to using the pending state instead and treated
+> forwarded IRQ as edge in vgic_queue_hwirq.  sampling could be done only
+> if the IRQ was pending.
 
-You can have a look at 
-https://git.linaro.org/people/srinivas.kandagatla/linux.git/blob/b4c3ad253747767511233687436f20144e850d67:/drivers/nvmem/rockchip-efuse.c
+Of course, you're right. The LR state is not used at all for a physical
+interrupt (the HW bit really says "use the distributor").
 
-I did modify the rockchip driver, which I guess should be very much 
-similar to what OCOTP driver would need.
+I've given it more thoughts last night, and I think we can solve this is
+a fairly simple way. In the scenario you outline, we do not observe the
+ACTIVE to INACTIVE transition because the interrupt has fired again,
+leaving the interrupt flagged as queued.
 
+I think we can clear the "queued" bit on injection, as we're guaranteed
+that seeing a new interrupt is the proof that the previous one has been
+deactivated (how could we see it otherwise?).
 
->
-> Sorry for these newbie questions:
->
-> What data structure does context points to for this reg_read opteration?
->
-> Do we need range checking of reg or is it handled by the framework?
->
-We already have that in place.
+How about the following (untested) patch:
 
-> Are there any limitation for reg_read regarding sleeping or locking
-> operations?
-There are no limitaions as such from nvmem framework, regmap might have 
-limitations w.r.t to sleeping and fast_io, as fast_io would take 
-spinlocks, AFAIK the providers would not have fast_io, as they not IO 
-devices.
->
-> In case of a read only driver, is everything handle by devicetree or do
-> we need an empty write operation?
-Yes, if you pass read-only flag in the provider, the framework would not 
-attempt to even write.
+diff --git a/virt/kvm/arm/vgic.c b/virt/kvm/arm/vgic.c
+index 6687ac4..a01f821 100644
+--- a/virt/kvm/arm/vgic.c
++++ b/virt/kvm/arm/vgic.c
+@@ -1387,8 +1387,17 @@ static int vgic_sync_hwirq(struct kvm_vcpu *vcpu,
+struct vgic_lr vlr)
 
-You will find answers to most of your question in the rochip-efuse.c file.
+ 	WARN_ON(ret);
 
++	/*
++	 * For a non-shared interrupt, we have to cater for two
++	 * possible deactivation conditions
++	 *
++	 * - the interrupt is now inactive
++	 * - the interrupt is still active, but is flagged as not
++	 *   queued, indicating another interrupt has fired before we
++	 *   could observe the deactivate.
++	 */
+ 	if (!map->shared)
+-		return !active;
++		return !active || !vgic_irq_is_queued(vcpu, vlr.irq);
 
---srini
->
-> Best regards
-> Stefan
->
+ 	map->active = active;
+
+@@ -1534,6 +1543,7 @@ static int vgic_update_irq_pending(struct kvm
+*kvm, int cpuid,
+ 	int edge_triggered, level_triggered;
+ 	int enabled;
+ 	bool ret = true, can_inject = true;
++	struct irq_phys_map *map;
+
+ 	spin_lock(&dist->lock);
+
+@@ -1580,6 +1590,18 @@ static int vgic_update_irq_pending(struct kvm
+*kvm, int cpuid,
+ 		goto out;
+ 	}
+
++	map = vgic_irq_map_search(vcpu, irq_num);
++	if (map && !map->shared) {
++		/*
++		 * We are told to inject a HW irq, so we have to trust
++		 * the caller that the previous one has been EOIed,
++		 * and that a new one is now active. Clearing the
++		 * queued state will have the effect of making it
++		 * sample-able again.
++		 */
++		vgic_irq_clear_queued(vcpu, irq_num);
++	}
++
+ 	if (!vgic_can_sample_irq(vcpu, irq_num)) {
+ 		/*
+ 		 * Level interrupt in progress, will be picked up
+
+Thoughts?
+
+	M.
+-- 
+Jazz is not dead. It just smells funny...
