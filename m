@@ -1,50 +1,119 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Thu, 18 Jun 2015 15:07:35 +0200
-Subject: [PATCH] irqchip: atmel-aic5: Add sama5d2 support
-Message-ID: <1434632855-27272-1-git-send-email-nicolas.ferre@atmel.com>
+From: srinivas.kandagatla@linaro.org (Srinivas Kandagatla)
+Date: Thu, 18 Jun 2015 14:08:48 +0100
+Subject: [PATCH v5 07/11] nvmem: Add simple nvmem-mmio consumer helper
+ functions.
+In-Reply-To: <5580AA05.90709@codeaurora.org>
+References: <1432226535-8640-1-git-send-email-srinivas.kandagatla@linaro.org>
+ <1432226665-8994-1-git-send-email-srinivas.kandagatla@linaro.org>
+ <5580AA05.90709@codeaurora.org>
+Message-ID: <5582C2E0.9080503@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add sama5d2 support to irq-atmel-aic5.
 
-Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
----
- .../devicetree/bindings/interrupt-controller/atmel,aic.txt       | 2 +-
- drivers/irqchip/irq-atmel-aic5.c                                 | 9 +++++++++
- 2 files changed, 10 insertions(+), 1 deletion(-)
 
-diff --git a/Documentation/devicetree/bindings/interrupt-controller/atmel,aic.txt b/Documentation/devicetree/bindings/interrupt-controller/atmel,aic.txt
-index f292917fa00d..0e9f09a6a2fe 100644
---- a/Documentation/devicetree/bindings/interrupt-controller/atmel,aic.txt
-+++ b/Documentation/devicetree/bindings/interrupt-controller/atmel,aic.txt
-@@ -2,7 +2,7 @@
- 
- Required properties:
- - compatible: Should be "atmel,<chip>-aic"
--  <chip> can be "at91rm9200", "sama5d3" or "sama5d4"
-+  <chip> can be "at91rm9200", "sama5d2", "sama5d3" or "sama5d4"
- - interrupt-controller: Identifies the node as an interrupt controller.
- - interrupt-parent: For single AIC system, it is an empty property.
- - #interrupt-cells: The number of cells to define the interrupts. It should be 3.
-diff --git a/drivers/irqchip/irq-atmel-aic5.c b/drivers/irqchip/irq-atmel-aic5.c
-index a2e8c3f876cb..459bf4429d36 100644
---- a/drivers/irqchip/irq-atmel-aic5.c
-+++ b/drivers/irqchip/irq-atmel-aic5.c
-@@ -339,6 +339,15 @@ static int __init aic5_of_init(struct device_node *node,
- 	return 0;
- }
- 
-+#define NR_SAMA5D2_IRQS		77
-+
-+static int __init sama5d2_aic5_of_init(struct device_node *node,
-+				       struct device_node *parent)
-+{
-+	return aic5_of_init(node, parent, NR_SAMA5D2_IRQS);
-+}
-+IRQCHIP_DECLARE(sama5d2_aic5, "atmel,sama5d2-aic", sama5d2_aic5_of_init);
-+
- #define NR_SAMA5D3_IRQS		48
- 
- static int __init sama5d3_aic5_of_init(struct device_node *node,
--- 
-2.1.3
+On 16/06/15 23:58, Stephen Boyd wrote:
+> On 05/21/2015 09:44 AM, Srinivas Kandagatla wrote:
+>> diff --git a/drivers/nvmem/nvmem-mmio.c b/drivers/nvmem/nvmem-mmio.c
+>> new file mode 100644
+>> index 0000000..0d8131f
+>> --- /dev/null
+>> +++ b/drivers/nvmem/nvmem-mmio.c
+>> @@ -0,0 +1,69 @@
+>> +/*
+>> + * Copyright (C) 2015 Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
+>> + *
+>> + * This program is free software; you can redistribute it and/or modify
+>> + * it under the terms of the GNU General Public License version 2 and
+>> + * only version 2 as published by the Free Software Foundation.
+>> + *
+>> + * This program is distributed in the hope that it will be useful,
+>> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+>> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+>> + * GNU General Public License for more details.
+>> + */
+>> +
+>> +#include <linux/device.h>
+>> +#include <linux/module.h>
+>> +#include <linux/err.h>
+>> +#include <linux/of.h>
+>> +#include <linux/of_device.h>
+>
+> #include <linux/platform_device.h>
+> #include <linux/nvmem_provider.h>
+> #include <linux/regmap.h>
+>
+These are included in nvmem-mmio.h, however for clarity sake I could add 
+them here too.
+>> +#include "nvmem-mmio.h"
+>> +
+>> +int nvmem_mmio_remove(struct platform_device *pdev)
+>> +{
+>> +	struct nvmem_device *nvmem = platform_get_drvdata(pdev);
+>> +
+>> +	return nvmem_unregister(nvmem);
+>> +}
+>> +EXPORT_SYMBOL_GPL(nvmem_mmio_remove);
+>> +
+>> +int nvmem_mmio_probe(struct platform_device *pdev)
+>> +{
+>> +
+> [...]
+>> +
+>> +	platform_set_drvdata(pdev, nvmem);
+>
+> It may be better to return the nvmem device instead so that the one
+> drvdata member is usable by the calling driver.
+Makes sense.. I will give it a try.
+
+>
+>> +
+>> +	return 0;
+>> +}
+>> +EXPORT_SYMBOL_GPL(nvmem_mmio_probe);
+>
+> Kernel-doc on these exported functions?
+Yep, thanks for spotting, I will fix it.
+>
+>> diff --git a/drivers/nvmem/nvmem-mmio.h b/drivers/nvmem/nvmem-mmio.h
+>> new file mode 100644
+>> index 0000000..a2ad4e5
+>> --- /dev/null
+>> +++ b/drivers/nvmem/nvmem-mmio.h
+>> @@ -0,0 +1,41 @@
+>> +/*
+>> + * MMIO based nvmem providers.
+>> + *
+>> + * Copyright (C) 2015 Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
+>> + *
+>> + * This file is licensed under the terms of the GNU General Public
+>> + * License version 2.  This program is licensed "as is" without any
+>> + * warranty of any kind, whether express or implied.
+>> + */
+>> +
+>> +#ifndef _LINUX_NVMEM_MMIO_H
+>> +#define _LINUX_NVMEM_MMIO_H
+>> +
+>> +#include <linux/platform_device.h>
+>
+> Forward declare struct platform_device instead.
+>
+>> +#include <linux/nvmem-provider.h>
+>
+> Forward declare nvmem_config instead.
+>
+>> +#include <linux/regmap.h>
+>
+> Forward declare regmap_config instead.
+>
+>> +
+>> +struct nvmem_mmio_data {
+>> +	struct regmap_config *regmap_config;
+>> +	struct nvmem_config *nvmem_config;
+>> +};
+>> +
+>> +#if IS_ENABLED(CONFIG_NVMEM)
+>> +
+>> +int nvmem_mmio_probe(struct platform_device *pdev);
+>> +int nvmem_mmio_remove(struct platform_device *pdev);
+>
