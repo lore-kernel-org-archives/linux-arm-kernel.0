@@ -1,24 +1,74 @@
-From: tglx@linutronix.de (Thomas Gleixner)
-Date: Fri, 19 Jun 2015 01:52:10 +0200 (CEST)
-Subject: [PATCH v2 2/3] IRQ/Gic-V3: Change arm-gic-its to support the
- Mbigen interrupt
-In-Reply-To: <557E794D.2080705@huawei.com>
-References: <1434077399-32200-1-git-send-email-majun258@huawei.com>
- <1434077399-32200-3-git-send-email-majun258@huawei.com>
- <alpine.DEB.2.11.1506121230320.3786@nanos> <557E794D.2080705@huawei.com>
-Message-ID: <alpine.DEB.2.11.1506190150000.4107@nanos>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Fri, 19 Jun 2015 08:52:51 +0900
+Subject: [PATCH] ARM: dts: exynos5422-odroidxu3: Add ramp delay for
+ regulators
+In-Reply-To: <1434628563-3477-1-git-send-email-linux.amoon@gmail.com>
+References: <1434628563-3477-1-git-send-email-linux.amoon@gmail.com>
+Message-ID: <558359D3.9060201@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 15 Jun 2015, majun (F) wrote:
-> ? 2015/6/12 18:48, Thomas Gleixner ??:
-> > Can you please provide a proper description of this mbigen chip and
-> > explain WHY you think that it needs all this special hackery?
+On 18.06.2015 20:56, Anand Moon wrote:
+> Adds ramp delay for the vdd_ldo9, vdd_ldo13,
+> vdd_ldo15 and vdd_sd regulator. Changes removes
+> warning "ramp_delay not set" for all the above regulator.
+> 
+> Signed-off-by: Anand Moon <linux.amoon@gmail.com>
+> ---
+> Changes based on https://github.com/krzk/linux.git branch dt-for-next
+> Console message:
+> [    3.756440] vdd_ldo9: ramp_delay not set
+> [    3.767731] vdd_ldo13: ramp_delay not set
+> [    3.775260] vdd_ldo15: ramp_delay not set
+> [    3.786269] vdd_sd: ramp_delay not set
+> ---
+>  arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi | 8 ++++++++
+>  1 file changed, 8 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi b/arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi
+> index 1565667..7c97740 100644
+> --- a/arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi
+> +++ b/arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi
+> @@ -218,6 +218,8 @@
+>  				regulator-name = "vdd_ldo9";
+>  				regulator-min-microvolt = <3000000>;
+>  				regulator-max-microvolt = <3000000>;
+> +				regulator-enable-ramp-delay = <200>;
+> +				regulator-ramp-delay = <8000>;
 
-You carefully avoided to provide a proper description of this mbigen
-chip and how it needs to be integrated into the GIC/ITS whatever
-scenario.
+How did you get this values?
 
-Thanks,
+Best regards,
+Krzysztof
 
-	tglx
+>  				regulator-always-on;
+>  			};
+>  
+> @@ -246,6 +248,8 @@
+>  				regulator-name = "vdd_ldo13";
+>  				regulator-min-microvolt = <2800000>;
+>  				regulator-max-microvolt = <2800000>;
+> +				regulator-enable-ramp-delay = <200>;
+> +				regulator-ramp-delay = <8000>;
+>  				regulator-always-on;
+>  			};
+>  
+> @@ -253,6 +257,8 @@
+>  				regulator-name = "vdd_ldo15";
+>  				regulator-min-microvolt = <3100000>;
+>  				regulator-max-microvolt = <3100000>;
+> +				regulator-enable-ramp-delay = <200>;
+> +				regulator-ramp-delay = <8000>;
+>  				regulator-always-on;
+>  			};
+>  
+> @@ -274,6 +280,8 @@
+>  				regulator-name = "vdd_sd";
+>  				regulator-min-microvolt = <2800000>;
+>  				regulator-max-microvolt = <2800000>;
+> +				regulator-enable-ramp-delay = <200>;
+> +				regulator-ramp-delay = <8000>;
+>  				regulator-always-on;
+>  			};
+>  
+> 
