@@ -1,88 +1,46 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu, 18 Jun 2015 17:59:35 +0200
-Subject: [PATCH 09/20] ARM: dts: sun4i: Enable USB DRC on the Cubieboard
-In-Reply-To: <1433530943-12599-10-git-send-email-hdegoede@redhat.com>
-References: <1433530943-12599-1-git-send-email-hdegoede@redhat.com>
- <1433530943-12599-10-git-send-email-hdegoede@redhat.com>
-Message-ID: <20150618155935.GR11732@lukather>
+From: d-gerlach@ti.com (Dave Gerlach)
+Date: Thu, 18 Jun 2015 11:01:21 -0500
+Subject: [PATCH v5 1/4] remoteproc: introduce rproc_get_by_phandle API
+In-Reply-To: <CAK=Wgbb1e6O574Bpicy4Y623vtiigauT22H-zk+JXGCz070i5g@mail.gmail.com>
+References: <1432327530-48032-2-git-send-email-d-gerlach@ti.com>
+ <1434566762-40702-1-git-send-email-d-gerlach@ti.com>
+ <CAK=Wgbb1e6O574Bpicy4Y623vtiigauT22H-zk+JXGCz070i5g@mail.gmail.com>
+Message-ID: <5582EB51.8010406@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Hans,
-
-On Fri, Jun 05, 2015 at 09:02:12PM +0200, Hans de Goede wrote:
-> Enable the otg/drc usb controller on the Cubieboard. Note that the
-> 5V of the otg is directly connected to the general 5V, so we only use
-> the id pin.
+Ohad,
+On 06/18/2015 04:04 AM, Ohad Ben-Cohen wrote:
+> Hi Dave,
 > 
-> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
-> ---
->  arch/arm/boot/dts/sun4i-a10-cubieboard.dts | 19 +++++++++++++++++++
->  1 file changed, 19 insertions(+)
+> On Wed, Jun 17, 2015 at 9:46 PM, Dave Gerlach <d-gerlach@ti.com> wrote:
+>> Allow users of remoteproc the ability to get a handle to an rproc by
+>> passing a phandle supplied in the user's device tree node. This is
+>> useful in situations that require manual booting of the rproc.
+>>
+>> This patch uses the code removed by commit 40e575b1d0b3 ("remoteproc:
+>> remove the get_by_name/put API") for the ref counting but is modified
+>> to use a simple list and locking mechanism and has rproc_get_by_name
+>> replaced with an rproc_get_by_phandle API.
+>>
+>> Signed-off-by: Dave Gerlach <d-gerlach@ti.com>
+>> Signed-off-by: Suman Anna <s-anna@ti.com>
+>> ---
+>> v4->v5: Fixed build error from of_find_node_by_phandle when !CONFIG_OF
+>>         based on offline discussion.
 > 
-> diff --git a/arch/arm/boot/dts/sun4i-a10-cubieboard.dts b/arch/arm/boot/dts/sun4i-a10-cubieboard.dts
-> index 9afb4e0..046a84d 100644
-> --- a/arch/arm/boot/dts/sun4i-a10-cubieboard.dts
-> +++ b/arch/arm/boot/dts/sun4i-a10-cubieboard.dts
-> @@ -155,6 +155,10 @@
->  	status = "okay";
->  };
->  
-> +&otg_sram {
-> +	status = "okay";
-> +};
-> +
->  &pio {
->  	led_pins_cubieboard: led_pins at 0 {
->  		allwinner,pins = "PH20", "PH21";
-> @@ -162,6 +166,13 @@
->  		allwinner,drive = <SUN4I_PINCTRL_20_MA>;
->  		allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
->  	};
-> +
-> +	usb0_id_detect_pin: usb0_id_detect_pin at 0 {
-> +		allwinner,pins = "PH4";
-> +		allwinner,function = "gpio_in";
-> +		allwinner,drive = <SUN4I_PINCTRL_10_MA>;
-> +		allwinner,pull = <SUN4I_PINCTRL_PULL_UP>;
-> +	};
->  };
->  
->  &reg_ahci_5v {
-> @@ -216,7 +227,15 @@
->  	status = "okay";
->  };
->  
-> +&usb_otg {
-> +	dr_mode = "otg";
-> +	status = "okay";
-> +};
-> +
->  &usbphy {
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&usb0_id_detect_pin>;
-> +	usb0_id_det-gpio = <&pio 7 4 GPIO_ACTIVE_HIGH>; /* PH4 */
+> We can't rebase our for-next branch, so I've applied a
+> similar fix in a separate patch.
+> 
+> Please check our for-next branch to make sure things still work for you.
+> 
 
-Does that work? 
+Oh sorry about. Pulled your for-next, tried it out, everything looks good to me,
+thanks!
 
-Your phy driver seem to actively check at probe time for both the ID
-detect and VBUS detect pins to be set in the DT, which is not the case
-here.
+Regards,
+Dave
 
-I don't really get either why VBUS detect has to be set. Can't it work
-just fine if you have a regulator that you can control and the ID pin
-alone ?
-
-Maxime
-
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150618/c483ce68/attachment.sig>
+> Thanks,
+> Ohad.
+> 
