@@ -1,80 +1,47 @@
-From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Thu, 18 Jun 2015 11:52:36 +0200
-Subject: [PATCH v6 05/14] crypto: marvell/CESA: add TDMA support
-In-Reply-To: <20150618094803.GH7557@n2100.arm.linux.org.uk>
-References: <1434527142-3609-1-git-send-email-boris.brezillon@free-electrons.com>
- <1434527142-3609-6-git-send-email-boris.brezillon@free-electrons.com>
- <20150617095001.GA11538@gondor.apana.org.au>
- <20150618090400.GG7557@n2100.arm.linux.org.uk>
- <20150618113324.2d469103@bbrezillon>
- <20150618094803.GH7557@n2100.arm.linux.org.uk>
-Message-ID: <20150618115236.51e70ab9@bbrezillon>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 18 Jun 2015 10:57:54 +0100
+Subject: [PATCH 00/13] Discover and probe dependencies
+In-Reply-To: <55829269.2090309@samsung.com>
+References: <1434548543-22949-1-git-send-email-tomeu.vizoso@collabora.com>
+ <55829269.2090309@samsung.com>
+Message-ID: <20150618095754.GI7557@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 18 Jun 2015 10:48:03 +0100
-Russell King - ARM Linux <linux@arm.linux.org.uk> wrote:
+On Thu, Jun 18, 2015 at 11:42:01AM +0200, Andrzej Hajda wrote:
+> 2. Provider create/register their resources only during probe.
+>     It is not always the case - for example componentized drivers in
+> probe often
+>     calls only component_add, the real initialization is performed in
+> bind callback.
 
-> On Thu, Jun 18, 2015 at 11:33:24AM +0200, Boris Brezillon wrote:
-> > Hi Russel,
-> > 
-> > On Thu, 18 Jun 2015 10:04:00 +0100
-> > Russell King - ARM Linux <linux@arm.linux.org.uk> wrote:
-> > 
-> > > On Wed, Jun 17, 2015 at 05:50:01PM +0800, Herbert Xu wrote:
-> > > > On Wed, Jun 17, 2015 at 09:45:33AM +0200, Boris Brezillon wrote:
-> > > > >
-> > > > > +	ret = dma_map_sg(cesa_dev->dev, req->src, creq->src_nents,
-> > > > > +			 DMA_TO_DEVICE);
-> > > > > +	if (!ret)
-> > > > > +		return -ENOMEM;
-> > > > > +
-> > > > > +	creq->src_nents = ret;
-> > > > 
-> > > > DMA-API-HOWTO says that you must retain the original nents and
-> > > > use it when you call dma_unmap_sg.  So I'm afraid one more repost
-> > > > is needed :)
-> > > 
-> > > It's worse than that...  You're right on that point, but there's an
-> > > additional point.
-> > > 
-> > > If dma_map_sg() coalesces scatterlist entries, then ret will be smaller
-> > > than src_nents, and ret indicates how many scatterlist entries to be
-> > > walked during DMA - you should not use src_nents for that.  I couldn't
-> > > see where the driver used that information.  In fact, the driver seems
-> > > to be capable of walking more than src_nents/ret numbers of scatterlist
-> > > entries: it just keeps going with sg_next() until it hits the end of
-> > > the allocated scatterlist.
-> > 
-> > Yes, I realized that, and I never used the value returned by
-> > dma_map_sg() to walk the scatterlist anyway: I was using the sg_next()
-> > and sg->length value (which I replaced by sg_dma_len() in v7 as
-> > suggested by Herbert).
-> > So the ->src_nents assignment to dma_map_sg() return value was just a
-> > silly mistake caused by an uncareful read of the DMA-API-HOWTO.
-> > 
-> > Am I missing something else ?
-> 
-> Yes.  'ret' should be used to indicate the number of scatterlist entries
-> to walk for DMA purposes after the scatterlist has been mapped.  For PIO
-> purposes, using src_nents is still acceptable.
-> 
-> As Herbert points out, you're stopping after the sum of transferred bytes
-> matches, so I suppose that's fine.
-> 
-> One other point though: you should use sg_dma_address() rather than
-> dereferencing sg->dma_address directly.
-> 
+bind is called in _a_ probe callback, but it may not be the probe callback
+associated with the device.  (It'll be the final component's callback.)
 
-Okay, I'll fix that before submitting a new version.
+I'm willing to be less critical of componentised drivers claiming their
+resources in ->probe _iff_ they separate their data structures, like:
 
-Thanks,
+	struct foo_priv {
+		void *base;
+		struct clk *clk;
+		struct dma_chan *chan;
+		... other resource data ...;
+		struct foo_runtime {
+			... runtime data ...
+		} rt;
+	};
 
-Boris
+and then, in their bind callback, they memset the foo_runtime structure
+to zero, to ensure that the driver always re-binds in the same state as
+the first bind.
 
-
+I've seen too many lax drivers over the years that this is a point I'm
+very insistant on: either componentised drivers don't do any resource
+claiming in their probe function, or they take steps to ensure non-
+resource struct members are properly separated such that they can
+guarantee that they aren't going to accidentally use something from a
+previous binding.
 
 -- 
-Boris Brezillon, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
+according to speedtest.net.
