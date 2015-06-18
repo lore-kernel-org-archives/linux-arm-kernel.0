@@ -1,69 +1,80 @@
 From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Thu, 18 Jun 2015 16:24:54 +0530
-Subject: [PATCH 40/41] clocksource: vt8500: Migrate to new 'set-state'
+Date: Thu, 18 Jun 2015 16:24:53 +0530
+Subject: [PATCH 39/41] clocksource: vf_pit: Migrate to new 'set-state'
  interface
 In-Reply-To: <cover.1434622147.git.viresh.kumar@linaro.org>
 References: <cover.1434622147.git.viresh.kumar@linaro.org>
-Message-ID: <e44528fefd0db9e8d716f54eb741f463eb706a44.1434622147.git.viresh.kumar@linaro.org>
+Message-ID: <c9f030f57a10c1be00f8732ae2190fcc55248db5.1434622147.git.viresh.kumar@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Migrate vt8500 driver to the new 'set-state' interface provided by
+Migrate vf_pit driver to the new 'set-state' interface provided by
 clockevents core, the earlier 'set-mode' interface is marked obsolete
 now.
 
 This also enables us to implement callbacks for new states of clockevent
 devices, for example: ONESHOT_STOPPED.
 
-Cc: Tony Prisk <linux@prisktech.co.nz>
+Cc: Jingchang Lu <b35083@freescale.com>
+Cc: Stefan Agner <stefan@agner.ch>
+Cc: Shawn Guo <shawn.guo@linaro.org>
 Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
 ---
- drivers/clocksource/vt8500_timer.c | 29 ++++++++++-------------------
- 1 file changed, 10 insertions(+), 19 deletions(-)
+ drivers/clocksource/vf_pit_timer.c | 27 ++++++++++++---------------
+ 1 file changed, 12 insertions(+), 15 deletions(-)
 
-diff --git a/drivers/clocksource/vt8500_timer.c b/drivers/clocksource/vt8500_timer.c
-index 1098ed3b9b89..a92e94b40b5b 100644
---- a/drivers/clocksource/vt8500_timer.c
-+++ b/drivers/clocksource/vt8500_timer.c
-@@ -88,29 +88,20 @@ static int vt8500_timer_set_next_event(unsigned long cycles,
+diff --git a/drivers/clocksource/vf_pit_timer.c b/drivers/clocksource/vf_pit_timer.c
+index b45ac6229b57..f07ba9932171 100644
+--- a/drivers/clocksource/vf_pit_timer.c
++++ b/drivers/clocksource/vf_pit_timer.c
+@@ -86,20 +86,16 @@ static int pit_set_next_event(unsigned long delta,
  	return 0;
  }
  
--static void vt8500_timer_set_mode(enum clock_event_mode mode,
--			      struct clock_event_device *evt)
-+static int vt8500_shutdown(struct clock_event_device *evt)
+-static void pit_set_mode(enum clock_event_mode mode,
+-				struct clock_event_device *evt)
++static int pit_shutdown(struct clock_event_device *evt)
  {
 -	switch (mode) {
--	case CLOCK_EVT_MODE_RESUME:
 -	case CLOCK_EVT_MODE_PERIODIC:
+-		pit_set_next_event(cycle_per_jiffy, evt);
 -		break;
--	case CLOCK_EVT_MODE_ONESHOT:
--	case CLOCK_EVT_MODE_UNUSED:
 -	case CLOCK_EVT_MODE_SHUTDOWN:
--		writel(readl(regbase + TIMER_CTRL_VAL) | 1,
--			regbase + TIMER_CTRL_VAL);
--		writel(0, regbase + TIMER_IER_VAL);
+-	case CLOCK_EVT_MODE_UNUSED:
+-		pit_timer_disable();
+-		break;
+-	default:
 -		break;
 -	}
-+	writel(readl(regbase + TIMER_CTRL_VAL) | 1, regbase + TIMER_CTRL_VAL);
-+	writel(0, regbase + TIMER_IER_VAL);
++	pit_timer_disable();
++	return 0;
++}
++
++static int pit_set_periodic(struct clock_event_device *evt)
++{
++	pit_set_next_event(cycle_per_jiffy, evt);
 +	return 0;
  }
  
- static struct clock_event_device clockevent = {
--	.name           = "vt8500_timer",
--	.features       = CLOCK_EVT_FEAT_ONESHOT,
--	.rating         = 200,
--	.set_next_event = vt8500_timer_set_next_event,
--	.set_mode       = vt8500_timer_set_mode,
-+	.name			= "vt8500_timer",
-+	.features		= CLOCK_EVT_FEAT_ONESHOT,
-+	.rating			= 200,
-+	.set_next_event		= vt8500_timer_set_next_event,
-+	.set_state_shutdown	= vt8500_shutdown,
-+	.set_state_oneshot	= vt8500_shutdown,
- };
+ static irqreturn_t pit_timer_interrupt(int irq, void *dev_id)
+@@ -114,7 +110,7 @@ static irqreturn_t pit_timer_interrupt(int irq, void *dev_id)
+ 	 * and start the counter again. So software need to disable the timer
+ 	 * to stop the counter loop in ONESHOT mode.
+ 	 */
+-	if (likely(evt->mode == CLOCK_EVT_MODE_ONESHOT))
++	if (likely(clockevent_state_oneshot(evt)))
+ 		pit_timer_disable();
  
- static irqreturn_t vt8500_timer_interrupt(int irq, void *dev_id)
+ 	evt->event_handler(evt);
+@@ -125,7 +121,8 @@ static irqreturn_t pit_timer_interrupt(int irq, void *dev_id)
+ static struct clock_event_device clockevent_pit = {
+ 	.name		= "VF pit timer",
+ 	.features	= CLOCK_EVT_FEAT_PERIODIC | CLOCK_EVT_FEAT_ONESHOT,
+-	.set_mode	= pit_set_mode,
++	.set_state_shutdown = pit_shutdown,
++	.set_state_periodic = pit_set_periodic,
+ 	.set_next_event	= pit_set_next_event,
+ 	.rating		= 300,
+ };
 -- 
 2.4.0
