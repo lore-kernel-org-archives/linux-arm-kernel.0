@@ -1,54 +1,26 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Thu, 18 Jun 2015 14:38:40 +0200
-Subject: [PATCH 2/3] ARM: mvebu: update EEPROM description of Armada 388 GP
-In-Reply-To: <1434631121-32014-1-git-send-email-thomas.petazzoni@free-electrons.com>
-References: <1434631121-32014-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1434631121-32014-3-git-send-email-thomas.petazzoni@free-electrons.com>
+Date: Thu, 18 Jun 2015 14:38:38 +0200
+Subject: [PATCH 0/3] ARM: mvebu: minor improvements to Armada 388 GP support
+Message-ID: <1434631121-32014-1-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Contrary to what the Device Tree indicates, the EEPROM at 0x54 is not
-populated, so we get rid of this comment.
+Hello,
 
-However, there is an EEPROM at 0x57, so we add support for this
-AT24C64 EEPROM:
+This small set of three commits makes some minor improvements to the
+Armada 388 GP board support.
 
-$ hexdump -C /sys/bus/i2c/devices/0-0057/eeprom
-00000000  0c ff f3 ff ff ff ff ff  ff ff ff ff ff ff ff ff  |................|
-00000010  ff ff ff ff ff ff ff ff  ff ff ff ff ff ff ff ff  |................|
-*
-00002000
+Thomas
 
-Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
----
- arch/arm/boot/dts/armada-388-gp.dts | 8 ++++----
- 1 file changed, 4 insertions(+), 4 deletions(-)
+Thomas Petazzoni (3):
+  ARM: mvebu: fix description of pwr-sata0 regulator on Armada 388 GP
+  ARM: mvebu: update EEPROM description of Armada 388 GP
+  ARM: mvebu: update mvebu_v7_defconfig with features needed for Armada
+    388 GP
 
-diff --git a/arch/arm/boot/dts/armada-388-gp.dts b/arch/arm/boot/dts/armada-388-gp.dts
-index 5164b9a..fc1ee3e 100644
---- a/arch/arm/boot/dts/armada-388-gp.dts
-+++ b/arch/arm/boot/dts/armada-388-gp.dts
-@@ -81,10 +81,6 @@
- 				pinctrl-0 = <&i2c0_pins>;
- 				status = "okay";
- 				clock-frequency = <100000>;
--				/*
--				 * The EEPROM located at adresse 54 is needed
--				 * for the boot - DO NOT ERASE IT -
--				 */
- 
- 				expander0: pca9555 at 20 {
- 					compatible = "nxp,pca9555";
-@@ -111,6 +107,10 @@
- 					reg = <0x21>;
- 				};
- 
-+				eeprom at 57 {
-+					compatible = "atmel,24c64";
-+					reg = <0x57>;
-+				};
- 			};
- 
- 			serial at 12000 {
+ arch/arm/boot/dts/armada-388-gp.dts | 12 +++++++-----
+ arch/arm/configs/mvebu_v7_defconfig |  4 ++++
+ 2 files changed, 11 insertions(+), 5 deletions(-)
+
 -- 
 2.1.0
