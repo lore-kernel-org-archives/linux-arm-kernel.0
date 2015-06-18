@@ -1,69 +1,59 @@
 From: panand@redhat.com (Pratyush Anand)
-Date: Thu, 18 Jun 2015 09:28:53 +0530
-Subject: [RFC PATCH V2 06/10] arm64: Handle TRAP_HWBRKPT for user mode as well
+Date: Thu, 18 Jun 2015 09:28:52 +0530
+Subject: [RFC PATCH V2 05/10] arm64: Re-factor flush_ptrace_access
 In-Reply-To: <cover.1434598237.git.panand@redhat.com>
 References: <cover.1434598237.git.panand@redhat.com>
-Message-ID: <a8c7a05683635bf86a3f90d8e420862950d7ac6c.1434598237.git.panand@redhat.com>
+Message-ID: <0456902c7747698bc57bf78c46cc77826b754855.1434598237.git.panand@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-uprobe registers a handler at step_hook. So, single_step_handler now
-checks for user mode as well if there is a valid hook.
+Re-factor flush_ptrace_access to reuse vma independent part, which is
+needed for functions like arch_uprobe_copy_ixol where we do not have
+a vma.
 
 Signed-off-by: Pratyush Anand <panand@redhat.com>
 ---
- arch/arm64/kernel/debug-monitors.c | 32 +++++++++++++++-----------------
- 1 file changed, 15 insertions(+), 17 deletions(-)
+ arch/arm64/mm/flush.c | 24 +++++++++++++++---------
+ 1 file changed, 15 insertions(+), 9 deletions(-)
 
-diff --git a/arch/arm64/kernel/debug-monitors.c b/arch/arm64/kernel/debug-monitors.c
-index 486ee94304a0..7eb13dcf09fa 100644
---- a/arch/arm64/kernel/debug-monitors.c
-+++ b/arch/arm64/kernel/debug-monitors.c
-@@ -238,7 +238,14 @@ static int single_step_handler(unsigned long addr, unsigned int esr,
- 	if (!reinstall_suspended_bps(regs))
- 		return 0;
+diff --git a/arch/arm64/mm/flush.c b/arch/arm64/mm/flush.c
+index b6f14e8d2121..9a4dd6f39cfb 100644
+--- a/arch/arm64/mm/flush.c
++++ b/arch/arm64/mm/flush.c
+@@ -34,19 +34,25 @@ void flush_cache_range(struct vm_area_struct *vma, unsigned long start,
+ 		__flush_icache_all();
+ }
  
--	if (user_mode(regs)) {
-+#ifdef	CONFIG_KPROBES
-+	if (kprobe_single_step_handler(regs, esr) == DBG_HOOK_HANDLED)
-+		handler_found = true;
-+#endif
-+	if (!handler_found && call_step_hook(regs, esr) == DBG_HOOK_HANDLED)
-+		handler_found = true;
++static void __flush_ptrace_access(struct page *page, unsigned long uaddr,
++		void *kaddr, unsigned long len)
++{
++	unsigned long addr = (unsigned long)kaddr;
 +
-+	if (!handler_found && user_mode(regs)) {
- 		info.si_signo = SIGTRAP;
- 		info.si_errno = 0;
- 		info.si_code  = TRAP_HWBKPT;
-@@ -252,22 +259,13 @@ static int single_step_handler(unsigned long addr, unsigned int esr,
- 		 * to the active-not-pending state).
- 		 */
- 		user_rewind_single_step(current);
--	} else {
--#ifdef	CONFIG_KPROBES
--		if (kprobe_single_step_handler(regs, esr) == DBG_HOOK_HANDLED)
--			handler_found = true;
--#endif
--		if (call_step_hook(regs, esr) == DBG_HOOK_HANDLED)
--			handler_found = true;
--
--		if (!handler_found) {
--			pr_warn("Unexpected kernel single-step exception at EL1\n");
--			/*
--			 * Re-enable stepping since we know that we will be
--			 * returning to regs.
--			 */
--			set_regs_spsr_ss(regs);
++	if (icache_is_aliasing()) {
++		__flush_dcache_area(kaddr, len);
++		__flush_icache_all();
++	} else {
++		flush_icache_range(addr, addr + len);
++	}
++}
++
+ static void flush_ptrace_access(struct vm_area_struct *vma, struct page *page,
+ 				unsigned long uaddr, void *kaddr,
+ 				unsigned long len)
+ {
+-	if (vma->vm_flags & VM_EXEC) {
+-		unsigned long addr = (unsigned long)kaddr;
+-		if (icache_is_aliasing()) {
+-			__flush_dcache_area(kaddr, len);
+-			__flush_icache_all();
+-		} else {
+-			flush_icache_range(addr, addr + len);
 -		}
-+	} else if (!handler_found) {
-+		pr_warning("Unexpected kernel single-step exception at EL1\n");
-+		/*
-+		 * Re-enable stepping since we know that we will be
-+		 * returning to regs.
-+		 */
-+		set_regs_spsr_ss(regs);
- 	}
+-	}
++	if (vma->vm_flags & VM_EXEC)
++		__flush_ptrace_access(page, uaddr, kaddr, len);
+ }
  
- 	return 0;
+ /*
 -- 
 2.1.0
