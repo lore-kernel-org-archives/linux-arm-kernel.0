@@ -1,38 +1,60 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Thu, 18 Jun 2015 11:20:05 +0200
-Subject: [PATCH] ARM: mvebu: use armada-370-sata for SATA on Armada 375
-Message-ID: <1434619205-24873-1-git-send-email-thomas.petazzoni@free-electrons.com>
+From: boris.brezillon@free-electrons.com (Boris Brezillon)
+Date: Thu, 18 Jun 2015 11:33:24 +0200
+Subject: [PATCH v6 05/14] crypto: marvell/CESA: add TDMA support
+In-Reply-To: <20150618090400.GG7557@n2100.arm.linux.org.uk>
+References: <1434527142-3609-1-git-send-email-boris.brezillon@free-electrons.com>
+ <1434527142-3609-6-git-send-email-boris.brezillon@free-electrons.com>
+ <20150617095001.GA11538@gondor.apana.org.au>
+ <20150618090400.GG7557@n2100.arm.linux.org.uk>
+Message-ID: <20150618113324.2d469103@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Lior Amsalem <alior@marvell.com>
+Hi Russel,
 
-The Armada 375 has the same SATA IP as Armada 370 and Armada XP, which
-requires the PHY speed to be set in the LP_PHY_CTL register for SATA
-hotplug to work.
+On Thu, 18 Jun 2015 10:04:00 +0100
+Russell King - ARM Linux <linux@arm.linux.org.uk> wrote:
 
-Therefore, this commit updates the compatible string used to describe
-the SATA IP in Armada 375 from marvell,orion-nand to
-marvell,armada-370-nand.
+> On Wed, Jun 17, 2015 at 05:50:01PM +0800, Herbert Xu wrote:
+> > On Wed, Jun 17, 2015 at 09:45:33AM +0200, Boris Brezillon wrote:
+> > >
+> > > +	ret = dma_map_sg(cesa_dev->dev, req->src, creq->src_nents,
+> > > +			 DMA_TO_DEVICE);
+> > > +	if (!ret)
+> > > +		return -ENOMEM;
+> > > +
+> > > +	creq->src_nents = ret;
+> > 
+> > DMA-API-HOWTO says that you must retain the original nents and
+> > use it when you call dma_unmap_sg.  So I'm afraid one more repost
+> > is needed :)
+> 
+> It's worse than that...  You're right on that point, but there's an
+> additional point.
+> 
+> If dma_map_sg() coalesces scatterlist entries, then ret will be smaller
+> than src_nents, and ret indicates how many scatterlist entries to be
+> walked during DMA - you should not use src_nents for that.  I couldn't
+> see where the driver used that information.  In fact, the driver seems
+> to be capable of walking more than src_nents/ret numbers of scatterlist
+> entries: it just keeps going with sg_next() until it hits the end of
+> the allocated scatterlist.
 
-Signed-off-by: Lior Amsalem <alior@marvell.com>
-Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
----
- arch/arm/boot/dts/armada-375.dtsi | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+Yes, I realized that, and I never used the value returned by
+dma_map_sg() to walk the scatterlist anyway: I was using the sg_next()
+and sg->length value (which I replaced by sg_dma_len() in v7 as
+suggested by Herbert).
+So the ->src_nents assignment to dma_map_sg() return value was just a
+silly mistake caused by an uncareful read of the DMA-API-HOWTO.
 
-diff --git a/arch/arm/boot/dts/armada-375.dtsi b/arch/arm/boot/dts/armada-375.dtsi
-index f076ff8..07f61bb 100644
---- a/arch/arm/boot/dts/armada-375.dtsi
-+++ b/arch/arm/boot/dts/armada-375.dtsi
-@@ -508,7 +508,7 @@
- 			};
- 
- 			sata at a0000 {
--				compatible = "marvell,orion-sata";
-+				compatible = "marvell,armada-370-sata";
- 				reg = <0xa0000 0x5000>;
- 				interrupts = <GIC_SPI 26 IRQ_TYPE_LEVEL_HIGH>;
- 				clocks = <&gateclk 14>, <&gateclk 20>;
+Am I missing something else ?
+
+Best Regards,
+
+Boris
+
+
 -- 
-2.1.0
+Boris Brezillon, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
