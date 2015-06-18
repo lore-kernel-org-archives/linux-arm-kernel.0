@@ -1,84 +1,91 @@
-From: eddie.huang@mediatek.com (Eddie Huang)
-Date: Thu, 18 Jun 2015 10:28:33 +0800
-Subject: [PATCH v6 4/7] arm64: dts: mediatek: Add MT8173 MMC dts
-In-Reply-To: <1434593063.23303.3.camel@mtksdaap41>
-References: <1434367253-26577-1-git-send-email-chaotian.jing@mediatek.com>
- <1434367253-26577-5-git-send-email-chaotian.jing@mediatek.com>
- <CAGS+omCwxH5vTTKNOEcN9C9s=1yBpYEqbMz1NygYoLY9OFKchg@mail.gmail.com>
- <CAGS+omDMprTvjwpXfdh7mg9i=WXdzO_Fv-oEop3z6AEVCG=DFQ@mail.gmail.com>
- <1434593063.23303.3.camel@mtksdaap41>
-Message-ID: <1434594513.26032.6.camel@mtksdaap41>
+From: xerofoify@gmail.com (nick)
+Date: Wed, 17 Jun 2015 23:10:58 -0400
+Subject: [PATCH] xilinx:Remove unused variable num_frag in the function
+ axienet_start_xmit
+In-Reply-To: <20150617185848.GI2906@xsjsorenbubuntu>
+References: <1434556362-3748-1-git-send-email-xerofoify@gmail.com>
+ <20150617160730.GE2906@xsjsorenbubuntu>
+ <DD47523D-0DF9-46B5-9382-3C30BBD9E815@gmail.com>
+ <20150617185848.GI2906@xsjsorenbubuntu>
+Message-ID: <558236C2.9030009@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Dan,
 
-On Thu, 2015-06-18 at 10:04 +0800, Eddie Huang wrote:
-> Hi Dan,
-> 
-> On Tue, 2015-06-16 at 20:20 +0800, Daniel Kurtz wrote:
-> > On Tue, Jun 16, 2015 at 7:39 PM, Daniel Kurtz <djkurtz@chromium.org> wrote:
-> > > On Mon, Jun 15, 2015 at 7:20 PM, Chaotian Jing
-> > > <chaotian.jing@mediatek.com> wrote:
-> > >> From: Eddie Huang <eddie.huang@mediatek.com>
-> > >>
-> > >> Add node mmc0 ~ mmc3 for mt8173.dtsi
-> > >> Add node mmc0, mmc1 for mt8173-evb.dts
-> > >>
-> > >> Signed-off-by: Chaotian Jing <chaotian.jing@mediatek.com>
-> > >> Signed-off-by: Eddie Huang <eddie.huang@mediatek.com>
-> > >> ---
-> > >>  arch/arm64/boot/dts/mediatek/mt8173-evb.dts | 126 ++++++++++++++++++++++++++++
-> > >>  arch/arm64/boot/dts/mediatek/mt8173.dtsi    |  45 +++++++++-
-> > >>  2 files changed, 170 insertions(+), 1 deletion(-)
-> > >>
-> > >> diff --git a/arch/arm64/boot/dts/mediatek/mt8173-evb.dts b/arch/arm64/boot/dts/mediatek/mt8173-evb.dts
-> > >> index b1560c9..762ec61 100644
-> > >> --- a/arch/arm64/boot/dts/mediatek/mt8173-evb.dts
-> > >> +++ b/arch/arm64/boot/dts/mediatek/mt8173-evb.dts
-> > >> @@ -33,6 +33,132 @@
-> > >>         chosen { };
-> > >>  };
-> > >>
-> > >> +&mmc0 {
-> > >> +       pinctrl-names = "default", "state_uhs";
-> > >> +       pinctrl-0 = <&mmc0_pins_default>;
-> > >> +       pinctrl-1 = <&mmc0_pins_uhs>;
-> > >> +       status = "okay";
-> > >> +       bus-width = <8>;
-> > >> +       max-frequency = <50000000>;
-> > >> +       cap-mmc-highspeed;
-> > >> +       vmmc-supply = <&mt6397_vemc_3v3_reg>;
-> > >> +       vqmmc-supply = <&mt6397_vio18_reg>;
-> > 
-> > I also can't find phandles for these regulators.
-> > 
-> > >> +       non-removable;
-> > >> +};
-> > >> +
-> > >> +&mmc1 {
-> > >> +       pinctrl-names = "default", "state_uhs";
-> > >> +       pinctrl-0 = <&mmc1_pins_default>;
-> > >> +       pinctrl-1 = <&mmc1_pins_uhs>;
-> > >> +       status = "okay";
-> > >> +       bus-width = <4>;
-> > >> +       max-frequency = <50000000>;
-> > >> +       cap-sd-highspeed;
-> > >> +       sd-uhs-sdr25;
-> > >> +       cd-gpios = <&pio 132 0>;
-> > >> +       vmmc-supply = <&mt6397_vmch_reg>;
-> > >> +       vqmmc-supply = <&mt6397_vmc_reg>;
-> > 
-> > nor these regulators.
-> > 
-> > Which kernel branch are you basing your patch set on?
-> > 
-> It is based on 4.1-rc1, and Sascha's regulator dts patch.
-> [3/4] ARM: dts: mt8135-evbp1: Add PMIC support:
-> https://patchwork.kernel.org/patch/6261161/
-> 
-My mistake, we only sent mt8135-evbp1.dts, but this patch need
-mt8173-evb.dts, we will send this.
 
-Eddie
-Thanks
+On 2015-06-17 02:58 PM, S?ren Brinkmann wrote:
+> On Wed, 2015-06-17 at 12:21PM -0400, Nicholas Krause wrote:
+>>
+>>
+>> On June 17, 2015 12:07:30 PM EDT, "S?ren Brinkmann" <soren.brinkmann@xilinx.com> wrote:
+>>> On Wed, 2015-06-17 at 11:52AM -0400, Nicholas Krause wrote:
+>>>> This removes the unused variable num_frag and the setting of it
+>>>> to the number of fragments from the passed sk_buff pointer by
+>>>> this function's caller due to this variable never being used
+>>>> in this particular function and is not declared as  global so
+>>>> setting it for global use in this file is pointless.
+>>>>
+>>>> Signed-off-by: Nicholas Krause <xerofoify@gmail.com>
+>>>> ---
+>>>>  drivers/net/ethernet/xilinx/xilinx_axienet_main.c | 2 --
+>>>>  1 file changed, 2 deletions(-)
+>>>>
+>>>> diff --git a/drivers/net/ethernet/xilinx/xilinx_axienet_main.c
+>>> b/drivers/net/ethernet/xilinx/xilinx_axienet_main.c
+>>>> index 28b7e7d..624dce4 100644
+>>>> --- a/drivers/net/ethernet/xilinx/xilinx_axienet_main.c
+>>>> +++ b/drivers/net/ethernet/xilinx/xilinx_axienet_main.c
+>>>> @@ -651,7 +651,6 @@ static inline int
+>>> axienet_check_tx_bd_space(struct axienet_local *lp,
+>>>>  static int axienet_start_xmit(struct sk_buff *skb, struct net_device
+>>> *ndev)
+>>>>  {
+>>>>  	u32 ii;
+>>>> -	u32 num_frag;
+>>>>  	u32 csum_start_off;
+>>>>  	u32 csum_index_off;
+>>>>  	skb_frag_t *frag;
+>>>> @@ -659,7 +658,6 @@ static int axienet_start_xmit(struct sk_buff
+>>> *skb, struct net_device *ndev)
+>>>>  	struct axienet_local *lp = netdev_priv(ndev);
+>>>>  	struct axidma_bd *cur_p;
+>>>>  
+>>>> -	num_frag = skb_shinfo(skb)->nr_frags;
+>>>>  	cur_p = &lp->tx_bd_v[lp->tx_bd_tail];
+>>>>  
+>>>>  	if (axienet_check_tx_bd_space(lp, num_frag)) {
+>>>
+>>> It's used right here, isn't it (and further down in this function too)?
+>>> Does your tree compile with this change?
+>>>
+>>> 	S?ren
+>> My tree does compile with this change. 
+> 
+> You have to fix your testing process:
+>     CHK     include/config/kernel.release
+>     UPD     include/config/kernel.release
+>     CHK     include/generated/uapi/linux/version.h
+>     CHK     include/generated/utsrelease.h
+>     UPD     include/generated/utsrelease.h
+>     CHK     include/generated/bounds.h
+>     CHK     include/generated/timeconst.h
+>     CHK     include/generated/asm-offsets.h
+>     CALL    scripts/checksyscalls.sh
+>   <stdin>:1253:2: warning: #warning syscall userfaultfd not implemented [-Wcpp]
+>     CC      drivers/net/ethernet/xilinx/xilinx_axienet_main.o
+>   drivers/net/ethernet/xilinx/xilinx_axienet_main.c: In function 'axienet_start_xmit':
+>   drivers/net/ethernet/xilinx/xilinx_axienet_main.c:667:36: error: 'num_frag' undeclared (first use in this function)
+>     if (axienet_check_tx_bd_space(lp, num_frag)) {
+>                                       ^
+>   drivers/net/ethernet/xilinx/xilinx_axienet_main.c:667:36: note: each undeclared identifier is reported only once for each function it appears in
+>   scripts/Makefile.build:258: recipe for target 'drivers/net/ethernet/xilinx/xilinx_axienet_main.o' failed
+>   make[1]: *** [drivers/net/ethernet/xilinx/xilinx_axienet_main.o] Error 1
+>   Makefile:1545: recipe for target 'drivers/net/ethernet/xilinx/xilinx_axienet_main.o' failed
+>   make: *** [drivers/net/ethernet/xilinx/xilinx_axienet_main.o] Error 2
+> 
+> NACK for the patch.
+> 
+> 	S?ren
+> 
+Sorry about that as I tried again and it didn't build. Weird issue maybe something with ccache.
+Nick
