@@ -1,49 +1,41 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 17 Jun 2015 23:51:57 +0100
-Subject: [PATCH] ARM: v7 setup function should invalidate L1 cache
-In-Reply-To: <5581F542.708@opensource.altera.com>
-References: <E1Yuk8W-0001tC-IK@rmk-PC.arm.linux.org.uk>
- <CAMuHMdX=T3CsLTT95H_07Si6Kd8SRraBfxADpn+VtAF4GmZ=mw@mail.gmail.com>
- <CAMuHMdUQkm_9PhSdGS8j85Uodm-o0jiki=Xh4h59PBShB=rCXw@mail.gmail.com>
- <20150601105319.GQ2067@n2100.arm.linux.org.uk>
- <CAMuHMdUXCy+87-pwLiJ7ynaM1AeFq0f7R3sJ4prdE3QN09z++w@mail.gmail.com>
- <CADhT+wdJX7jMO3_rafrZMeA5ZVMaA6b2U4zkksfJcUjh41mH9A@mail.gmail.com>
- <20150617213006.GC7557@n2100.arm.linux.org.uk>
- <5581F0DD.60408@opensource.altera.com>
- <5581F542.708@opensource.altera.com>
-Message-ID: <20150617225157.GD7557@n2100.arm.linux.org.uk>
+From: gregory.0xf0@gmail.com (Gregory Fong)
+Date: Wed, 17 Jun 2015 18:00:39 -0700
+Subject: [PATCH v3 0/4] GPIO support for BRCMSTB
+Message-ID: <1434589243-502-1-git-send-email-gregory.0xf0@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 17, 2015 at 05:31:30PM -0500, Dinh Nguyen wrote:
-> Also, I am not seeing the error on the SoCFPGA Arria 10 platform at all.
-> This Arria10 platform is running a different version of bootloader than
-> the Cyclone5. Although, I also did test with the latest version of
-> U-Boot on the Cyclone5.
+Adds interrupt support for the GPIO controller (UPG GIO) used on Broadcom's
+various BRCMSTB SoCs (BCM7XXX and others).  For all existing hardware, this
+block hooks up to the BCM7120 L2 IRQ controller and so will require
+CONFIG_BCM7120_L2_IRQ=y.
 
-It _shouldn't_ cause any issue, unless secondary_startup is called with
-caches already enabled (which it shouldn't.)
+New in v3:
+- fix a null pointer dereference noticed by Tim Ross
+- use the gpiolib irqchip helpers as recommended by Linus Walleij
+- update device tree bindings as suggested by Brian Norris:
+  https://lkml.org/lkml/2015/5/29/802
+- add S5 (cold boot) support
 
-If caches are enabled, that's incredibly dodgy even with the old code -
-cache lines could be migrated to the incoming CPU which v7_invalidate_l1()
-would then invalidate, resulting in the loss of data in those migrated
-cache lines.
+The following are not included in this patchset:
+- Initial device tree bindings (merged from v1 to GPIO tree)
+- Initial GPIO support w/o interrupts (merged from v2 to GPIO tree)
+- ARM Kconfig changes (merged from v2 to arm-soc tree)
 
-If caches are not enabled, this change should have no effect: caches
-should not be searched if the C bit is clear, and we still end up
-invalidating the local L1 cache later in the normal boot sequence.
+Previous revisions:
+v1: https://lkml.org/lkml/2015/5/6/199
+v2: https://lkml.org/lkml/2015/5/28/853
 
-(If caches are searched with the C bit clear, and the caches initialise
-in an unpredictable state, the ARM ARM requires an implementation specific
-routine to be executed immediately on CPU startup.  The idea is that if
-this option were to be chosen, the vendor must guarantee a certain code
-sequence can't be disrupted by the uninitialised state in the caches,
-which, if you're searching the caches for instruction fetches, is pretty
-much impossible to guarantee no matter what kind of code sequence you
-specify: even the first instruction fetched from the CPU reset vector
-could ultimately be sourced from the instruction cache if the i-cache
-reports that it thinks it has valid data.)
+Gregory Fong (4):
+  gpio: brcmstb: fix null ptr dereference in driver remove
+  dt-bindings: brcmstb-gpio: document properties for wakeup
+  gpio: brcmstb: Add interrupt and wakeup source support
+  gpio: brcmstb: support wakeup from S5 cold boot
+
+ .../devicetree/bindings/gpio/brcm,brcmstb-gpio.txt |  35 ++-
+ drivers/gpio/Kconfig                               |   1 +
+ drivers/gpio/gpio-brcmstb.c                        | 321 ++++++++++++++++++++-
+ 3 files changed, 341 insertions(+), 16 deletions(-)
 
 -- 
-FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
-according to speedtest.net.
+1.9.1
