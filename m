@@ -1,114 +1,418 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Thu, 18 Jun 2015 13:08:34 +0900
-Subject: [PATCH v2 0/7] staging: board: armadillo800eva: Board staging
- for sh_mobile_lcdc_fb
-In-Reply-To: <1434530336-15073-1-git-send-email-geert+renesas@glider.be>
-References: <1434530336-15073-1-git-send-email-geert+renesas@glider.be>
-Message-ID: <20150618040834.GB23629@verge.net.au>
+From: panand@redhat.com (Pratyush Anand)
+Date: Thu, 18 Jun 2015 09:28:56 +0530
+Subject: [RFC PATCH V2 09/10] arm64: Add uprobe support
+In-Reply-To: <cover.1434598237.git.panand@redhat.com>
+References: <cover.1434598237.git.panand@redhat.com>
+Message-ID: <53c5e6020ec5d367a870312018e6191dc2bcd9c3.1434598237.git.panand@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 17, 2015 at 10:38:49AM +0200, Geert Uytterhoeven wrote:
-> 	Hi Greg, Simon, Magnus,
-> 
-> This patch series adds board staging support for the Renesas R-Mobile A1
-> (r8a7740) based Armadillo-800 EVA board. It allows to support the frame
-> buffer device for the on-board LCD (which isn't supported by a DT-aware
-> driver yet) in modern DT-based multi-platform kernels.
-> 
-> The board staging area was introduced last year to allow continuous
-> upstream in-tree development and integration of platform devices. It
-> helps developers integrate devices as platform devices for device
-> drivers that only provide platform device bindings.  This in turn allows
-> for incremental development of both hardware feature support and DT
-> binding work in parallel.
-> 
-> The goal is to complete the move to ARM multi-platform kernels for all
-> shmobile platforms, and drop the existing board files
-> (arch/arm/mach-shmobile/board-*). Once this series is accepted, more
-> than 3000 lines of legacy armadillo board code and r8a7740 SoC code can
-> be removed.
-> 
-> This series consists of 5 parts:
->   - Patch 1 re-enables compilation of the board staging area, which was
->     disabled after a compile breakage, but has been fixed in the mean
->     time,
->   - Path 2 moves initialization of staging board code to an earlier
->     moment, as currently it happens after unused PM domains are powered
->     down,
->   - Patches 3 and 4 (hopefully) fix the existing kzm9d board staging
->     code, which was presumably "broken" by commit 9a1091ef0017c40a
->     ("irqchip: gic: Support hierarchy irq domain."),
->   - Patches 5 and 6 add support for registering platform devices with
->     complex dependencies (clocks and PM domains), and add armadillo
->     board staging code for enabling a frame buffer on the on-board LCD,
->   - Patch 7 (new) adds pinctrl and gpio-hog configuration to enable the
->     LCD.
-> 
-> The first 6 patches should go in through the staging tree, the last one
-> through the shmobile tree.
-> 
-> Major changes since v1 (more detailed changelogs in the individual
-> patches):
->   - Add support for low/high edge/level interrupts in hwirq translation,
->   - Move pinctrl and GPIO configuration from board staging code to DT,
->   - Use clk_add_alias() instead of open coding.
-> 
-> Dependencies:
->   - This is against next-20150617,
->   - The gpio-hog in patch 7 depends on a bug fix like "[PATCH] [RFC]
->     gpio: Retry deferred GPIO hogging on pin range change"
->     (https://lkml.org/lkml/2015/6/16/455). It can be applied as-is
->     though.
-> 
-> This was tested on r8a7740/armadillo.
-> This was not tested on emev2/kzm9d, due to lack of hardware.
+This patch adds support for uprobe on ARM64 architecture.
 
-I have verified that kzm9d still boots with your patches applied on top
-of renesas-devel-20150617-v4.1-rc8. I used shmobile_defconfig and
-then enabled CONFIG_STAGING and in turn CONFIG_STAGING_BOARD.
+Unit test for following has been done so far and they have been found
+working
+1. Step-able instructions, like sub, ldr, add etc.
+2. Simulation-able like ret.
+3. uretprobe
+4. Reject-able instructions like sev, wfe etc.
+5. trapped and abort xol path
+6. probe at unaligned user address.
 
-Let me know if you think further testing is appropriate.
+Currently it does not support aarch32 instruction probing.
 
-> Thanks for applying!
-> 
-> Geert Uytterhoeven (7):
->   Revert "staging: board: disable as it breaks the build"
->   staging: board: Initialize staging board code earlier
->   staging: board: Add support for translating hwirq to virq numbers
->   staging: board: kzm9d: Translate hwirq numbers to virq numbers
->   staging: board: Add support for devices with complex dependencies
->   staging: board: armadillo800eva: Board staging for sh_mobile_lcdc_fb
+Signed-off-by: Pratyush Anand <panand@redhat.com>
+---
+ arch/arm64/Kconfig                      |   3 +
+ arch/arm64/include/asm/debug-monitors.h |   3 +
+ arch/arm64/include/asm/probes.h         |   1 +
+ arch/arm64/include/asm/thread_info.h    |   5 +-
+ arch/arm64/include/asm/uprobes.h        |  37 ++++++
+ arch/arm64/kernel/Makefile              |   3 +
+ arch/arm64/kernel/signal.c              |   4 +-
+ arch/arm64/kernel/uprobes.c             | 213 ++++++++++++++++++++++++++++++++
+ arch/arm64/mm/flush.c                   |   6 +
+ 9 files changed, 273 insertions(+), 2 deletions(-)
+ create mode 100644 arch/arm64/include/asm/uprobes.h
+ create mode 100644 arch/arm64/kernel/uprobes.c
 
-Feel free to add:
-
-Acked-by: Simon Horman <horms+renesas@verge.net.au>
-
-to the above.
-
->   ARM: shmobile: armadillo800eva dts: Add pinctrl and gpio-hog for lcdc0
-> 
->  arch/arm/boot/dts/r8a7740-armadillo800eva.dts |  13 +++
->  drivers/staging/board/Kconfig                 |   1 -
->  drivers/staging/board/Makefile                |   3 +-
->  drivers/staging/board/armadillo800eva.c       | 105 ++++++++++++++++++++
->  drivers/staging/board/board.c                 | 136 ++++++++++++++++++++++++++
->  drivers/staging/board/board.h                 |  27 ++++-
->  drivers/staging/board/kzm9d.c                 |  10 +-
->  7 files changed, 290 insertions(+), 5 deletions(-)
->  create mode 100644 drivers/staging/board/armadillo800eva.c
-> 
-> -- 
-> 1.9.1
-> 
-> Gr{oetje,eeting}s,
-> 
-> 						Geert
-> 
-> --
-> Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-> 
-> In personal conversations with technical people, I call myself a hacker. But
-> when I'm talking to journalists I just say "programmer" or something like that.
-> 							    -- Linus Torvalds
-> 
+diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+index 5312be5b40ad..3ff4e038a365 100644
+--- a/arch/arm64/Kconfig
++++ b/arch/arm64/Kconfig
+@@ -156,6 +156,9 @@ config PGTABLE_LEVELS
+ 	default 3 if ARM64_4K_PAGES && ARM64_VA_BITS_39
+ 	default 4 if ARM64_4K_PAGES && ARM64_VA_BITS_48
+ 
++config ARCH_SUPPORTS_UPROBES
++	def_bool y
++
+ source "init/Kconfig"
+ 
+ source "kernel/Kconfig.freezer"
+diff --git a/arch/arm64/include/asm/debug-monitors.h b/arch/arm64/include/asm/debug-monitors.h
+index d9e79b01d09e..1c3a4e635f1c 100644
+--- a/arch/arm64/include/asm/debug-monitors.h
++++ b/arch/arm64/include/asm/debug-monitors.h
+@@ -94,6 +94,9 @@
+ #define BRK64_ESR_MASK		0xFFFF
+ #define BRK64_ESR_KPROBES	0x0004
+ #define BRK64_OPCODE_KPROBES	(AARCH64_BREAK_MON | (BRK64_ESR_KPROBES << 5))
++/* uprobes BRK opcodes with ESR encoding  */
++#define BRK64_ESR_UPROBES	0x0008
++#define BRK64_OPCODE_UPROBES	(AARCH64_BREAK_MON | (BRK64_ESR_UPROBES << 5))
+ 
+ /* AArch32 */
+ #define DBG_ESR_EVT_BKPT	0x4
+diff --git a/arch/arm64/include/asm/probes.h b/arch/arm64/include/asm/probes.h
+index f07968f1335f..52db4e4c47c7 100644
+--- a/arch/arm64/include/asm/probes.h
++++ b/arch/arm64/include/asm/probes.h
+@@ -19,6 +19,7 @@ struct kprobe;
+ struct arch_specific_insn;
+ 
+ typedef u32 kprobe_opcode_t;
++typedef u32 uprobe_opcode_t;
+ typedef unsigned long (kprobes_pstate_check_t)(unsigned long);
+ typedef unsigned long
+ (probes_condition_check_t)(u32 opcode, struct arch_specific_insn *asi,
+diff --git a/arch/arm64/include/asm/thread_info.h b/arch/arm64/include/asm/thread_info.h
+index dcd06d18a42a..2e0644e0600e 100644
+--- a/arch/arm64/include/asm/thread_info.h
++++ b/arch/arm64/include/asm/thread_info.h
+@@ -101,6 +101,7 @@ static inline struct thread_info *current_thread_info(void)
+ #define TIF_NEED_RESCHED	1
+ #define TIF_NOTIFY_RESUME	2	/* callback before returning to user */
+ #define TIF_FOREIGN_FPSTATE	3	/* CPU's FP state is not current's */
++#define TIF_UPROBE		4	/* uprobe breakpoint or singlestep */
+ #define TIF_NOHZ		7
+ #define TIF_SYSCALL_TRACE	8
+ #define TIF_SYSCALL_AUDIT	9
+@@ -122,10 +123,12 @@ static inline struct thread_info *current_thread_info(void)
+ #define _TIF_SYSCALL_AUDIT	(1 << TIF_SYSCALL_AUDIT)
+ #define _TIF_SYSCALL_TRACEPOINT	(1 << TIF_SYSCALL_TRACEPOINT)
+ #define _TIF_SECCOMP		(1 << TIF_SECCOMP)
++#define _TIF_UPROBE		(1 << TIF_UPROBE)
+ #define _TIF_32BIT		(1 << TIF_32BIT)
+ 
+ #define _TIF_WORK_MASK		(_TIF_NEED_RESCHED | _TIF_SIGPENDING | \
+-				 _TIF_NOTIFY_RESUME | _TIF_FOREIGN_FPSTATE)
++				 _TIF_NOTIFY_RESUME | _TIF_FOREIGN_FPSTATE | \
++				 _TIF_UPROBE)
+ 
+ #define _TIF_SYSCALL_WORK	(_TIF_SYSCALL_TRACE | _TIF_SYSCALL_AUDIT | \
+ 				 _TIF_SYSCALL_TRACEPOINT | _TIF_SECCOMP | \
+diff --git a/arch/arm64/include/asm/uprobes.h b/arch/arm64/include/asm/uprobes.h
+new file mode 100644
+index 000000000000..9d64317d1e21
+--- /dev/null
++++ b/arch/arm64/include/asm/uprobes.h
+@@ -0,0 +1,37 @@
++/*
++ * Copyright (C) 2014-2015 Pratyush Anand <panand@redhat.com>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ */
++
++#ifndef _ASM_UPROBES_H
++#define _ASM_UPROBES_H
++
++#include <asm/debug-monitors.h>
++#include <asm/insn.h>
++#include <asm/probes.h>
++
++#define MAX_UINSN_BYTES		AARCH64_INSN_SIZE
++
++#define UPROBE_SWBP_INSN	BRK64_OPCODE_UPROBES
++#define UPROBE_SWBP_INSN_SIZE	4
++#define UPROBE_XOL_SLOT_BYTES	MAX_UINSN_BYTES
++
++struct arch_uprobe_task {
++	unsigned long saved_fault_code;
++};
++
++struct arch_uprobe {
++	union {
++		u8 insn[MAX_UINSN_BYTES];
++		u8 ixol[MAX_UINSN_BYTES];
++	};
++	struct arch_specific_insn ainsn;
++	bool simulate;
++};
++
++extern void flush_uprobe_xol_access(struct page *page, unsigned long uaddr,
++		void *kaddr, unsigned long len);
++#endif
+diff --git a/arch/arm64/kernel/Makefile b/arch/arm64/kernel/Makefile
+index 5e9d54f2763c..181659e8c371 100644
+--- a/arch/arm64/kernel/Makefile
++++ b/arch/arm64/kernel/Makefile
+@@ -35,6 +35,9 @@ arm64-obj-$(CONFIG_KGDB)		+= kgdb.o
+ arm64-obj-$(CONFIG_KPROBES)		+= kprobes.o kprobes-arm64.o		\
+ 					   probes-simulate-insn.o		\
+ 					   probes-condn-check.o
++arm64-obj-$(CONFIG_UPROBES)		+= uprobes.o kprobes-arm64.o		\
++					   probes-simulate-insn.o		\
++					   probes-condn-check.o
+ arm64-obj-$(CONFIG_EFI)			+= efi.o efi-stub.o efi-entry.o
+ arm64-obj-$(CONFIG_PCI)			+= pci.o
+ arm64-obj-$(CONFIG_ARMV8_DEPRECATED)	+= armv8_deprecated.o
+diff --git a/arch/arm64/kernel/signal.c b/arch/arm64/kernel/signal.c
+index e18c48cb6db1..6da825923864 100644
+--- a/arch/arm64/kernel/signal.c
++++ b/arch/arm64/kernel/signal.c
+@@ -402,6 +402,9 @@ static void do_signal(struct pt_regs *regs)
+ asmlinkage void do_notify_resume(struct pt_regs *regs,
+ 				 unsigned int thread_flags)
+ {
++	if (thread_flags & _TIF_UPROBE)
++		uprobe_notify_resume(regs);
++
+ 	if (thread_flags & _TIF_SIGPENDING)
+ 		do_signal(regs);
+ 
+@@ -412,5 +415,4 @@ asmlinkage void do_notify_resume(struct pt_regs *regs,
+ 
+ 	if (thread_flags & _TIF_FOREIGN_FPSTATE)
+ 		fpsimd_restore_current_state();
+-
+ }
+diff --git a/arch/arm64/kernel/uprobes.c b/arch/arm64/kernel/uprobes.c
+new file mode 100644
+index 000000000000..2cc9114deac2
+--- /dev/null
++++ b/arch/arm64/kernel/uprobes.c
+@@ -0,0 +1,213 @@
++/*
++ * Copyright (C) 2014-2015 Pratyush Anand <panand@redhat.com>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ */
++#include <linux/highmem.h>
++#include <linux/ptrace.h>
++#include <linux/uprobes.h>
++
++#include "kprobes-arm64.h"
++
++#define UPROBE_INV_FAULT_CODE	UINT_MAX
++
++void arch_uprobe_copy_ixol(struct page *page, unsigned long vaddr,
++		void *src, unsigned long len)
++{
++	void *xol_page_kaddr = kmap_atomic(page);
++	void *dst = xol_page_kaddr + (vaddr & ~PAGE_MASK);
++
++	preempt_disable();
++
++	/* Initialize the slot */
++	memcpy(dst, src, len);
++
++	/* flush caches (dcache/icache) */
++	flush_uprobe_xol_access(page, vaddr, dst, len);
++
++	preempt_enable();
++
++	kunmap_atomic(xol_page_kaddr);
++}
++
++unsigned long uprobe_get_swbp_addr(struct pt_regs *regs)
++{
++	return instruction_pointer(regs);
++}
++
++int arch_uprobe_analyze_insn(struct arch_uprobe *auprobe, struct mm_struct *mm,
++		unsigned long addr)
++{
++	kprobe_opcode_t insn;
++
++	/* TODO: Currently we do not support AARCH32 instruction probing */
++
++	if (!IS_ALIGNED(addr, AARCH64_INSN_SIZE))
++		return -EINVAL;
++
++	insn = *(kprobe_opcode_t *)(&auprobe->insn[0]);
++
++	switch (arm_kprobe_decode_insn(insn, &auprobe->ainsn)) {
++	case INSN_REJECTED:
++		return -EINVAL;
++
++	case INSN_GOOD_NO_SLOT:
++		auprobe->simulate = true;
++		if (auprobe->ainsn.prepare)
++			auprobe->ainsn.prepare(insn, &auprobe->ainsn);
++		break;
++
++	case INSN_GOOD:
++	default:
++		break;
++	}
++
++	return 0;
++}
++
++int arch_uprobe_pre_xol(struct arch_uprobe *auprobe, struct pt_regs *regs)
++{
++	struct uprobe_task *utask = current->utask;
++
++	/* saved fault code is restored in post_xol */
++	utask->autask.saved_fault_code = current->thread.fault_code;
++
++	/* An invalid fault code between pre/post xol event */
++	current->thread.fault_code = UPROBE_INV_FAULT_CODE;
++
++	/* Instruction point to execute ol */
++	instruction_pointer_set(regs, utask->xol_vaddr);
++
++	user_enable_single_step(current);
++
++	return 0;
++}
++
++int arch_uprobe_post_xol(struct arch_uprobe *auprobe, struct pt_regs *regs)
++{
++	struct uprobe_task *utask = current->utask;
++
++	WARN_ON_ONCE(current->thread.fault_code != UPROBE_INV_FAULT_CODE);
++
++	/* restore fault code */
++	current->thread.fault_code = utask->autask.saved_fault_code;
++
++	/* Instruction point to execute next to breakpoint address */
++	instruction_pointer_set(regs, utask->vaddr + 4);
++
++	user_disable_single_step(current);
++
++	return 0;
++}
++bool arch_uprobe_xol_was_trapped(struct task_struct *t)
++{
++	/*
++	 * Between arch_uprobe_pre_xol and arch_uprobe_post_xol, if an xol
++	 * insn itself is trapped, then detect the case with the help of
++	 * invalid fault code which is being set in arch_uprobe_pre_xol and
++	 * restored in arch_uprobe_post_xol.
++	 */
++	if (t->thread.fault_code != UPROBE_INV_FAULT_CODE)
++		return true;
++
++	return false;
++}
++
++bool arch_uprobe_skip_sstep(struct arch_uprobe *auprobe, struct pt_regs *regs)
++{
++	kprobe_opcode_t insn;
++	unsigned long addr;
++
++	if (!auprobe->simulate)
++		return false;
++
++	insn = *(kprobe_opcode_t *)(&auprobe->insn[0]);
++	addr = instruction_pointer(regs);
++
++	if (auprobe->ainsn.handler)
++		auprobe->ainsn.handler(insn, addr, regs);
++
++	return true;
++}
++
++void arch_uprobe_abort_xol(struct arch_uprobe *auprobe, struct pt_regs *regs)
++{
++	struct uprobe_task *utask = current->utask;
++
++	current->thread.fault_code = utask->autask.saved_fault_code;
++	/*
++	 * Task has received a fatal signal, so reset back to probbed
++	 * address.
++	 */
++	instruction_pointer_set(regs, utask->vaddr);
++
++	user_disable_single_step(current);
++}
++
++unsigned long
++arch_uretprobe_hijack_return_addr(unsigned long trampoline_vaddr,
++				  struct pt_regs *regs)
++{
++	unsigned long orig_ret_vaddr;
++
++	orig_ret_vaddr = procedure_link_pointer(regs);
++	/* Replace the return addr with trampoline addr */
++	procedure_link_pointer_set(regs, trampoline_vaddr);
++
++	return orig_ret_vaddr;
++}
++
++int arch_uprobe_exception_notify(struct notifier_block *self,
++				 unsigned long val, void *data)
++{
++	return NOTIFY_DONE;
++}
++
++static int __kprobes uprobe_breakpoint_handler(struct pt_regs *regs,
++		unsigned int esr)
++{
++	if (user_mode(regs) && uprobe_pre_sstep_notifier(regs))
++		return DBG_HOOK_HANDLED;
++
++	return DBG_HOOK_ERROR;
++}
++
++static int __kprobes uprobe_single_step_handler(struct pt_regs *regs,
++		unsigned int esr)
++{
++	struct uprobe_task *utask = current->utask;
++
++	if (user_mode(regs)) {
++		WARN_ON(utask &&
++			(instruction_pointer(regs) != utask->xol_vaddr + 4));
++
++		if (uprobe_post_sstep_notifier(regs))
++			return DBG_HOOK_HANDLED;
++	}
++
++	return DBG_HOOK_ERROR;
++}
++
++/* uprobe breakpoint handler hook */
++static struct break_hook uprobes_break_hook = {
++	.esr_mask = BRK64_ESR_MASK,
++	.esr_val = BRK64_ESR_UPROBES,
++	.fn = uprobe_breakpoint_handler,
++};
++
++/* uprobe single step handler hook */
++static struct step_hook uprobes_step_hook = {
++	.fn = uprobe_single_step_handler,
++};
++
++static int __init arch_init_uprobes(void)
++{
++	register_break_hook(&uprobes_break_hook);
++	register_step_hook(&uprobes_step_hook);
++
++	return 0;
++}
++
++device_initcall(arch_init_uprobes);
+diff --git a/arch/arm64/mm/flush.c b/arch/arm64/mm/flush.c
+index 9a4dd6f39cfb..04fe6671907e 100644
+--- a/arch/arm64/mm/flush.c
++++ b/arch/arm64/mm/flush.c
+@@ -55,6 +55,12 @@ static void flush_ptrace_access(struct vm_area_struct *vma, struct page *page,
+ 		__flush_ptrace_access(page, uaddr, kaddr, len);
+ }
+ 
++void flush_uprobe_xol_access(struct page *page, unsigned long uaddr,
++		void *kaddr, unsigned long len)
++{
++	__flush_ptrace_access(page, uaddr, kaddr, len);
++}
++
+ /*
+  * Copy user data from/to a page which is mapped into a different processes
+  * address space.  Really, we want to allow our "user space" model to handle
+-- 
+2.1.0
