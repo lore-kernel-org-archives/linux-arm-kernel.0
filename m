@@ -1,26 +1,40 @@
-From: tomeu.vizoso@collabora.com (Tomeu Vizoso)
-Date: Thu, 18 Jun 2015 10:06:38 +0200
-Subject: [PATCH 03/13] ARM: tegra: Add gpio-ranges property
-In-Reply-To: <20150617172554.GX14071@sirena.org.uk>
-References: <1434548543-22949-1-git-send-email-tomeu.vizoso@collabora.com>
- <1434548543-22949-4-git-send-email-tomeu.vizoso@collabora.com>
- <20150617172554.GX14071@sirena.org.uk>
-Message-ID: <CAAObsKDRWn6T76VQJd6EBaq1zpMouLC2ZYJ8pEStZHk_bdxV+Q@mail.gmail.com>
+From: alexander.sverdlin@nokia.com (Alexander Sverdlin)
+Date: Thu, 18 Jun 2015 10:09:59 +0200
+Subject: [PATCH v3] i2c: omap: improve duty cycle on SCL
+In-Reply-To: <1434569475-17378-1-git-send-email-balbi@ti.com>
+References: <1434569475-17378-1-git-send-email-balbi@ti.com>
+Message-ID: <55827CD7.7030207@nokia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 17 June 2015 at 19:25, Mark Brown <broonie@kernel.org> wrote:
-> On Wed, Jun 17, 2015 at 03:42:13PM +0200, Tomeu Vizoso wrote:
->> Specify how the GPIOs map to the pins in Tegra SoCs, so the dependency is
->> explicit.
->
-> Can I suggest splitting this sort of patch out of the patch series (and
-> similarly the documentation fix you had), or putting them at the end or
-> something?  It's pretty confusing that early patches in the series are
-> a bit tangential rather than being dependencies for the rest of it.
+Hello Felipe,
 
-Agreed, sorry about that.
+On 17/06/15 21:31, ext Felipe Balbi wrote:
+> With this patch we try to be as close to 50%
+> duty cycle as possible. The reason for this
+> is that some devices present an erratic behavior
+> with certain duty cycles.
+> 
+> One such example is TPS65218 PMIC which fails
+> to change voltages when running @ 400kHz and
+> duty cycle is lower than 34%.
+> 
+> The idea of the patch is simple:
+> 
+> calculate desired scl_period from requested scl
+> and use 50% for tLow and 50% for tHigh.
+> 
+> tLow is calculated with a DIV_ROUND_UP() to make
+> sure it's slightly higher than tHigh and to make
+> sure that we end up within I2C specifications.
 
-Thanks,
+if you refuse to change the calculations to achieve maximum possible
+bus rate (as I've shown you with SCLL=9 and SCLH=9), maybe you want to
+change the description? Because you are doing something else than is
+written here. You are only in spec because you are not doing 50% duty
+cycle. And you didn't mention here that you lower the bus speed below
+400kHz to achieve this.
 
-Tomeu
+-- 
+Best regards,
+Alexander Sverdlin.
