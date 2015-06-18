@@ -1,200 +1,96 @@
 From: shengjiu.wang@freescale.com (Shengjiu Wang)
-Date: Thu, 18 Jun 2015 13:58:44 +0800
-Subject: [PATCH] ARM: dts: imx6qdl-sabreauto: Add audio support
-Message-ID: <1434607124-29870-1-git-send-email-shengjiu.wang@freescale.com>
+Date: Thu, 18 Jun 2015 14:08:01 +0800
+Subject: [PATCH] ARM: imx_v6_v7_defconfig: build in audio driver
+Message-ID: <1434607681-30088-1-git-send-email-shengjiu.wang@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add ESAI, ASRC, CS42888 for imx6qdl-sabreauto board
+Add ASRC, FSL_ASOC_CARD, CS42xx8 support
 
 Signed-off-by: Shengjiu Wang <shengjiu.wang@freescale.com>
 ---
- arch/arm/boot/dts/imx6qdl-sabreauto.dtsi |   91 ++++++++++++++++++++++++++++++
- arch/arm/boot/dts/imx6qdl.dtsi           |   31 ++++++++++
- 2 files changed, 122 insertions(+)
+ arch/arm/configs/imx_v6_v7_defconfig |   23 +++++++++++------------
+ 1 file changed, 11 insertions(+), 12 deletions(-)
 
-diff --git a/arch/arm/boot/dts/imx6qdl-sabreauto.dtsi b/arch/arm/boot/dts/imx6qdl-sabreauto.dtsi
-index 3b24b126..4f4ca2a 100644
---- a/arch/arm/boot/dts/imx6qdl-sabreauto.dtsi
-+++ b/arch/arm/boot/dts/imx6qdl-sabreauto.dtsi
-@@ -28,6 +28,51 @@
- 		};
- 	};
- 
-+	clocks {
-+		codec_osc: anaclk2 {
-+			compatible = "fixed-clock";
-+			#clock-cells = <0>;
-+			clock-frequency = <24576000>;
-+		};
-+	};
-+
-+	regulators {
-+		compatible = "simple-bus";
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+
-+		reg_audio: regulator at 0 {
-+			compatible = "regulator-fixed";
-+			reg = <0>;
-+			regulator-name = "cs42888_supply";
-+			regulator-min-microvolt = <3300000>;
-+			regulator-max-microvolt = <3300000>;
-+			regulator-always-on;
-+		};
-+	};
-+
-+	sound-cs42888 {
-+		compatible = "fsl,imx6-sabreauto-cs42888",
-+			"fsl,imx-audio-cs42888";
-+		model = "imx-cs42888";
-+		audio-cpu = <&esai>;
-+		audio-asrc = <&asrc>;
-+		audio-codec = <&codec>;
-+		audio-routing =
-+			"Line Out Jack", "AOUT1L",
-+			"Line Out Jack", "AOUT1R",
-+			"Line Out Jack", "AOUT2L",
-+			"Line Out Jack", "AOUT2R",
-+			"Line Out Jack", "AOUT3L",
-+			"Line Out Jack", "AOUT3R",
-+			"Line Out Jack", "AOUT4L",
-+			"Line Out Jack", "AOUT4R",
-+			"AIN1L", "Line In Jack",
-+			"AIN1R", "Line In Jack",
-+			"AIN2L", "Line In Jack",
-+			"AIN2R", "Line In Jack";
-+	};
-+
- 	sound-spdif {
- 		compatible = "fsl,imx-audio-spdif",
- 			   "fsl,imx-sabreauto-spdif";
-@@ -45,6 +90,15 @@
- 	};
- };
- 
-+&clks {
-+	assigned-clocks = <&clks IMX6QDL_PLL4_BYPASS_SRC>,
-+			  <&clks IMX6QDL_PLL4_BYPASS>,
-+			  <&clks IMX6QDL_CLK_PLL4_POST_DIV>;
-+	assigned-clock-parents = <&clks IMX6QDL_CLK_LVDS2_IN>,
-+				<&clks IMX6QDL_PLL4_BYPASS_SRC>;
-+	assigned-clock-rates = <0>, <0>, <24576000>;
-+};
-+
- &ecspi1 {
- 	fsl,spi-num-chipselects = <1>;
- 	cs-gpios = <&gpio3 19 0>;
-@@ -61,6 +115,16 @@
- 	};
- };
- 
-+&esai {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_esai>;
-+	assigned-clocks = <&clks IMX6QDL_CLK_ESAI_SEL>,
-+			  <&clks IMX6QDL_CLK_ESAI_EXTAL>;
-+	assigned-clock-parents = <&clks IMX6QDL_CLK_PLL4_AUDIO_DIV>;
-+	assigned-clock-rates = <0>, <24576000>;
-+	status = "okay";
-+};
-+
- &fec {
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&pinctrl_enet>;
-@@ -180,6 +244,18 @@
- 			};
- 		};
- 	};
-+
-+	codec: cs42888 at 48 {
-+		compatible = "cirrus,cs42888";
-+		reg = <0x48>;
-+		clocks = <&codec_osc>;
-+		clock-names = "mclk";
-+		VA-supply = <&reg_audio>;
-+		VD-supply = <&reg_audio>;
-+		VLS-supply = <&reg_audio>;
-+		VLC-supply = <&reg_audio>;
-+        };
-+
- };
- 
- &i2c3 {
-@@ -257,6 +333,21 @@
- 			>;
- 		};
- 
-+		pinctrl_esai: esaigrp {
-+			fsl,pins = <
-+				MX6QDL_PAD_ENET_CRS_DV__ESAI_TX_CLK 0x1b030
-+				MX6QDL_PAD_ENET_RXD1__ESAI_TX_FS    0x1b030
-+				MX6QDL_PAD_ENET_TX_EN__ESAI_TX3_RX2 0x1b030
-+				MX6QDL_PAD_GPIO_5__ESAI_TX2_RX3     0x1b030
-+				MX6QDL_PAD_ENET_TXD0__ESAI_TX4_RX1  0x1b030
-+				MX6QDL_PAD_ENET_MDC__ESAI_TX5_RX0   0x1b030
-+				MX6QDL_PAD_GPIO_17__ESAI_TX0        0x1b030
-+				MX6QDL_PAD_NANDF_CS3__ESAI_TX1      0x1b030
-+				MX6QDL_PAD_ENET_MDIO__ESAI_RX_CLK   0x1b030
-+				MX6QDL_PAD_GPIO_9__ESAI_RX_FS       0x1b030
-+			>;
-+		};
-+
- 		pinctrl_gpio_leds: gpioledsgrp {
- 			fsl,pins = <
- 				MX6QDL_PAD_DISP0_DAT21__GPIO5_IO15	0x80000000
-diff --git a/arch/arm/boot/dts/imx6qdl.dtsi b/arch/arm/boot/dts/imx6qdl.dtsi
-index e6d1359..ceba982 100644
---- a/arch/arm/boot/dts/imx6qdl.dtsi
-+++ b/arch/arm/boot/dts/imx6qdl.dtsi
-@@ -300,8 +300,19 @@
- 				};
- 
- 				esai: esai@02024000 {
-+					#sound-dai-cells = <0>;
-+					compatible = "fsl,imx35-esai";
- 					reg = <0x02024000 0x4000>;
- 					interrupts = <0 51 IRQ_TYPE_LEVEL_HIGH>;
-+					clocks = <&clks IMX6QDL_CLK_ESAI_IPG>,
-+						 <&clks IMX6QDL_CLK_ESAI_MEM>,
-+						 <&clks IMX6QDL_CLK_ESAI_EXTAL>,
-+						 <&clks IMX6QDL_CLK_ESAI_IPG>,
-+						 <&clks IMX6QDL_CLK_SPBA>;
-+					clock-names = "core", "mem", "extal", "fsys", "dma";
-+					dmas = <&sdma 23 21 0>, <&sdma 24 21 0>;
-+					dma-names = "rx", "tx";
-+					status = "disabled";
- 				};
- 
- 				ssi1: ssi at 02028000 {
-@@ -353,8 +364,28 @@
- 				};
- 
- 				asrc: asrc at 02034000 {
-+					compatible = "fsl,imx53-asrc";
- 					reg = <0x02034000 0x4000>;
- 					interrupts = <0 50 IRQ_TYPE_LEVEL_HIGH>;
-+					clocks = <&clks IMX6QDL_CLK_ASRC_IPG>,
-+						<&clks IMX6QDL_CLK_ASRC_MEM>, <&clks 0>,
-+						<&clks 0>, <&clks 0>, <&clks 0>, <&clks 0>,
-+						<&clks 0>, <&clks 0>, <&clks 0>, <&clks 0>,
-+						<&clks 0>, <&clks 0>, <&clks 0>, <&clks 0>,
-+						<&clks IMX6QDL_CLK_ASRC>, <&clks 0>, <&clks 0>,
-+						<&clks IMX6QDL_CLK_SPBA>;
-+					clock-names = "mem", "ipg", "asrck_0",
-+						"asrck_1", "asrck_2", "asrck_3", "asrck_4",
-+						"asrck_5", "asrck_6", "asrck_7", "asrck_8",
-+						"asrck_9", "asrck_a", "asrck_b", "asrck_c",
-+						"asrck_d", "asrck_e", "asrck_f", "dma";
-+					dmas = <&sdma 17 23 1>, <&sdma 18 23 1>, <&sdma 19 23 1>,
-+						<&sdma 20 23 1>, <&sdma 21 23 1>, <&sdma 22 23 1>;
-+					dma-names = "rxa", "rxb", "rxc",
-+							"txa", "txb", "txc";
-+					fsl,asrc-rate  = <48000>;
-+					fsl,asrc-width = <16>;
-+					status = "okay";
- 				};
- 
- 				spba at 0203c000 {
+diff --git a/arch/arm/configs/imx_v6_v7_defconfig b/arch/arm/configs/imx_v6_v7_defconfig
+index b47863d..75416411 100644
+--- a/arch/arm/configs/imx_v6_v7_defconfig
++++ b/arch/arm/configs/imx_v6_v7_defconfig
+@@ -39,8 +39,8 @@ CONFIG_SOC_IMX6Q=y
+ CONFIG_SOC_IMX6SL=y
+ CONFIG_SOC_IMX6SX=y
+ CONFIG_SOC_IMX7D=y
+-CONFIG_SOC_VF610=y
+ CONFIG_SOC_LS1021A=y
++CONFIG_SOC_VF610=y
+ CONFIG_PCI=y
+ CONFIG_PCI_IMX6=y
+ CONFIG_SMP=y
+@@ -56,7 +56,6 @@ CONFIG_ARM_IMX6Q_CPUFREQ=y
+ CONFIG_VFP=y
+ CONFIG_NEON=y
+ CONFIG_BINFMT_MISC=m
+-CONFIG_PM=y
+ CONFIG_PM_DEBUG=y
+ CONFIG_PM_TEST_SUSPEND=y
+ CONFIG_NET=y
+@@ -219,10 +218,16 @@ CONFIG_SOC_CAMERA_OV2640=y
+ CONFIG_IMX_IPUV3_CORE=y
+ CONFIG_DRM=y
+ CONFIG_DRM_PANEL_SIMPLE=y
++CONFIG_DRM_IMX=y
++CONFIG_DRM_IMX_FB_HELPER=y
++CONFIG_DRM_IMX_PARALLEL_DISPLAY=y
++CONFIG_DRM_IMX_TVE=y
++CONFIG_DRM_IMX_LDB=y
++CONFIG_DRM_IMX_HDMI=y
++CONFIG_FB_MXS=y
+ CONFIG_LCD_CLASS_DEVICE=y
+ CONFIG_LCD_L4F00242T03=y
+ CONFIG_LCD_PLATFORM=y
+-CONFIG_FB_MXS=y
+ CONFIG_BACKLIGHT_PWM=y
+ CONFIG_BACKLIGHT_GPIO=y
+ CONFIG_FRAMEBUFFER_CONSOLE=y
+@@ -231,7 +236,7 @@ CONFIG_SOUND=y
+ CONFIG_SND=y
+ CONFIG_SND_USB_AUDIO=m
+ CONFIG_SND_SOC=y
+-CONFIG_SND_SOC_FSL_SAI=y
++CONFIG_SND_SOC_FSL_ASRC=y
+ CONFIG_SND_IMX_SOC=y
+ CONFIG_SND_SOC_PHYCORE_AC97=y
+ CONFIG_SND_SOC_EUKREA_TLV320=y
+@@ -239,6 +244,8 @@ CONFIG_SND_SOC_IMX_WM8962=y
+ CONFIG_SND_SOC_IMX_SGTL5000=y
+ CONFIG_SND_SOC_IMX_SPDIF=y
+ CONFIG_SND_SOC_IMX_MC13783=y
++CONFIG_SND_SOC_FSL_ASOC_CARD=y
++CONFIG_SND_SOC_CS42XX8_I2C=y
+ CONFIG_SND_SOC_TLV320AIC3X=y
+ CONFIG_SND_SIMPLE_CARD=y
+ CONFIG_USB=y
+@@ -301,13 +308,6 @@ CONFIG_IMX_SDMA=y
+ CONFIG_MXS_DMA=y
+ CONFIG_FSL_EDMA=y
+ CONFIG_STAGING=y
+-CONFIG_DRM_IMX=y
+-CONFIG_DRM_IMX_FB_HELPER=y
+-CONFIG_DRM_IMX_PARALLEL_DISPLAY=y
+-CONFIG_DRM_IMX_TVE=y
+-CONFIG_DRM_IMX_LDB=y
+-CONFIG_DRM_IMX_IPUV3=y
+-CONFIG_DRM_IMX_HDMI=y
+ # CONFIG_IOMMU_SUPPORT is not set
+ CONFIG_PWM=y
+ CONFIG_PWM_IMX=y
+@@ -354,7 +354,6 @@ CONFIG_PROVE_LOCKING=y
+ # CONFIG_FTRACE is not set
+ # CONFIG_ARM_UNWIND is not set
+ CONFIG_SECURITYFS=y
+-# CONFIG_CRYPTO_ANSI_CPRNG is not set
+ # CONFIG_CRYPTO_HW is not set
+ CONFIG_CRC_CCITT=m
+ CONFIG_CRC_T10DIF=y
 -- 
 1.7.9.5
