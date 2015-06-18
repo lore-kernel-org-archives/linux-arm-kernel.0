@@ -1,45 +1,39 @@
-From: klimov.linux@gmail.com (Alexey Klimov)
-Date: Thu, 18 Jun 2015 21:23:04 +0300
-Subject: [RESEND PATCH 0/6] This series adds SMP support for the MediaTek
- MT6580.
-In-Reply-To: <1434650481-39421-1-git-send-email-scott.shu@mediatek.com>
-References: <srv_scott.shu@mediatek.com>
- <1434650481-39421-1-git-send-email-scott.shu@mediatek.com>
-Message-ID: <CALW4P++UdJ_G2vm0+gLxdB3P6t+WP7mLw0P=fT9DLf7FU=C3bw@mail.gmail.com>
+From: sebastian@breakpoint.cc (Sebastian Andrzej Siewior)
+Date: Thu, 18 Jun 2015 20:27:07 +0200
+Subject: [PATCH v4 1/6] mtd: nand: vf610_nfc: Freescale NFC for VF610,
+ MPC5125 and others
+In-Reply-To: <32a7fe8d8df87dfe35ea50c582077c78@agner.ch>
+References: <1427300909-20825-1-git-send-email-stefan@agner.ch>
+ <1427300909-20825-2-git-send-email-stefan@agner.ch>
+ <20150603130825.GA23991@breakpoint.cc>
+ <b3b09b4b8c97cbfc88fa0d5fdc5e40cd@agner.ch>
+ <20150609200751.GC5720@breakpoint.cc>
+ <32a7fe8d8df87dfe35ea50c582077c78@agner.ch>
+Message-ID: <20150618182707.GA2254@breakpoint.cc>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 18, 2015 at 9:01 PM, Scott Shu <scott.shu@mediatek.com> wrote:
-> This patchset adds support SMP on MediaTek MT6580 Cortex-A7 qual core SoC.
+On Wed, Jun 17, 2015 at 03:02:03PM +0200, Stefan Agner wrote:
+> On 2015-06-09 22:07, Sebastian Andrzej Siewior wrote:
+> > yeah, do you have any numbers by chance?
+> 
+> Just reevaluated the "performance optimizations". On a VF610 SoC (with
+> L2 cache) the improvements increase performance by 2.5% and below. On a
+> VF500 SoC (without L2 cache) it seems to have slightly more impact, up
+> to 4%. Overall, it seems to influence write more than read.
 
-quad?
+it could have something to do with the CPU clock and how long it is blocked
+due to the sync operation.
 
-> This is based on v4.1-rc1 and following patch series:
-> (1) Yingjoe Chen's "Add SMP bringup support for mt65xx socs" [1]
-> (2) Mars Cheng's "Add mt6580 basic chip support" [2]
-> (3) Sascha Hauer's "Mediatek SCPSYS power domain support" [3]
->
-> The secondary cores are power off as default on MT6580, this change adds
-> a new enable-method to turn on power to the cores during booting process.
->
-> The System Power Manager (SPM) inside the SCPSYS is for the CPU MTCMOS
-> power domain control. Please check [3] for more information about SCPSYS.
->
-> [1] https://lkml.org/lkml/2015/5/16/33
-> [2] https://lkml.org/lkml/2015/6/3/113
-> [3] https://lkml.org/lkml/2015/6/9/172
->
->
-> Scott Shu (6):
->   Document: bindings: DT: Add SMP enable method for MT6580 SoC platform
->   soc: Mediatek: Add SCPSYS CPU power domain driver
->   ARM: mediatek: add smp bringup code
->   ARM: Mediatek: enable GPT6 on boot up to make arch timer working for MT6580
->   ARM: dts: mt6580: Add device nodes to the MT6580 dtsi file.
->   ARM: dts: mt6580: enable basic SMP bringup for MT6580
+> Back then, when I implemented the improvements it certainly had a bigger
+> impact. I don't have strong opinion on that...
 
-Most of your patches are missing Signed-off-by.
+Thanks for doing that. If you could take those numbers, put them in a table
+like with/without relaxed and so one, write how you got them (modprobe bla)
+and make it part of the commit message then everybody could see about how much
+we talk here. Thanks again.
 
+> --
+> Stefan
 
--- 
-Best regards, Klimov Alexey
+Sebastian
