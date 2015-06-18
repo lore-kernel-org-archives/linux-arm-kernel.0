@@ -1,70 +1,62 @@
 From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Thu, 18 Jun 2015 15:46:30 +0200
-Subject: [PATCH v7 14/14] crypto: marvell/CESA: add DT bindings documentation
+Date: Thu, 18 Jun 2015 15:46:29 +0200
+Subject: [PATCH v7 13/14] crypto: marvell/CESA: add support for Kirkwood and
+ Dove SoCs
 In-Reply-To: <1434635190-27733-1-git-send-email-boris.brezillon@free-electrons.com>
 References: <1434635190-27733-1-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <1434635190-27733-15-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <1434635190-27733-14-git-send-email-boris.brezillon@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add DT bindings documentation for the new marvell-cesa driver.
+From: Arnaud Ebalard <arno@natisbad.org>
 
+Add the Kirkwood and Dove SoC descriptions, and control the allhwsupport
+module parameter to avoid probing the CESA IP when the old CESA driver is
+enabled (unless it is explicitly requested to do so).
+
+Signed-off-by: Arnaud Ebalard <arno@natisbad.org>
 Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
 ---
- .../devicetree/bindings/crypto/marvell-cesa.txt    | 45 ++++++++++++++++++++++
- 1 file changed, 45 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/crypto/marvell-cesa.txt
+ drivers/crypto/marvell/cesa.c | 13 ++++++++++++-
+ 1 file changed, 12 insertions(+), 1 deletion(-)
 
-diff --git a/Documentation/devicetree/bindings/crypto/marvell-cesa.txt b/Documentation/devicetree/bindings/crypto/marvell-cesa.txt
-new file mode 100644
-index 0000000..c6c6a4a0
---- /dev/null
-+++ b/Documentation/devicetree/bindings/crypto/marvell-cesa.txt
-@@ -0,0 +1,45 @@
-+Marvell Cryptographic Engines And Security Accelerator
+diff --git a/drivers/crypto/marvell/cesa.c b/drivers/crypto/marvell/cesa.c
+index 8e5ea72..a432633 100644
+--- a/drivers/crypto/marvell/cesa.c
++++ b/drivers/crypto/marvell/cesa.c
+@@ -215,6 +215,15 @@ static const struct mv_cesa_caps orion_caps = {
+ 	.has_tdma = false,
+ };
+ 
++static const struct mv_cesa_caps kirkwood_caps = {
++	.nengines = 1,
++	.cipher_algs = orion_cipher_algs,
++	.ncipher_algs = ARRAY_SIZE(orion_cipher_algs),
++	.ahash_algs = orion_ahash_algs,
++	.nahash_algs = ARRAY_SIZE(orion_ahash_algs),
++	.has_tdma = true,
++};
 +
-+Required properties:
-+- compatible: should be one of the following string
-+	      "marvell,orion-crypto"
-+	      "marvell,kirkwood-crypto"
-+	      "marvell,dove-crypto"
-+	      "marvell,armada-370-crypto"
-+	      "marvell,armada-xp-crypto"
-+	      "marvell,armada-375-crypto"
-+	      "marvell,armada-38x-crypto"
-+- reg: base physical address of the engine and length of memory mapped
-+       region. Can also contain an entry for the SRAM attached to the CESA,
-+       but this representation is deprecated and marvell,crypto-srams should
-+       be used instead
-+- reg-names: "regs". Can contain an "sram" entry, but this representation
-+	     is deprecated and marvell,crypto-srams should be used instead
-+- interrupts: interrupt number
-+- clocks: reference to the crypto engines clocks. This property is not
-+	  required for orion and kirkwood platforms
-+- clock-names: "cesaX" and "cesazX", X should be replaced by the crypto engine
-+	       id.
-+	       This property is not required for the orion and kirkwoord
-+	       platforms.
-+	       "cesazX" clocks are not required on armada-370 platforms
-+- marvell,crypto-srams: phandle to crypto SRAM definitions
-+
-+Optional properties:
-+- marvell,crypto-sram-size: SRAM size reserved for crypto operations, if not
-+			    specified the whole SRAM is used (2KB)
-+
-+
-+Examples:
-+
-+	crypto at 90000 {
-+		compatible = "marvell,armada-xp-crypto";
-+		reg = <0x90000 0x10000>;
-+		reg-names = "regs";
-+		interrupts = <48>, <49>;
-+		clocks = <&gateclk 23>, <&gateclk 23>;
-+		clock-names = "cesa0", "cesa1";
-+		marvell,crypto-srams = <&crypto_sram0>, <&crypto_sram1>;
-+		marvell,crypto-sram-size = <0x600>;
-+		status = "okay";
-+	};
+ static const struct mv_cesa_caps armada_370_caps = {
+ 	.nengines = 1,
+ 	.cipher_algs = armada_370_cipher_algs,
+@@ -235,6 +244,8 @@ static const struct mv_cesa_caps armada_xp_caps = {
+ 
+ static const struct of_device_id mv_cesa_of_match_table[] = {
+ 	{ .compatible = "marvell,orion-crypto", .data = &orion_caps },
++	{ .compatible = "marvell,kirkwood-crypto", .data = &kirkwood_caps },
++	{ .compatible = "marvell,dove-crypto", .data = &kirkwood_caps },
+ 	{ .compatible = "marvell,armada-370-crypto", .data = &armada_370_caps },
+ 	{ .compatible = "marvell,armada-xp-crypto", .data = &armada_xp_caps },
+ 	{ .compatible = "marvell,armada-375-crypto", .data = &armada_xp_caps },
+@@ -383,7 +394,7 @@ static int mv_cesa_probe(struct platform_device *pdev)
+ 		caps = match->data;
+ 	}
+ 
+-	if (caps == &orion_caps && !allhwsupport)
++	if ((caps == &orion_caps || caps == &kirkwood_caps) && !allhwsupport)
+ 		return -ENOTSUPP;
+ 
+ 	cesa = devm_kzalloc(dev, sizeof(*cesa), GFP_KERNEL);
 -- 
 1.9.1
