@@ -1,65 +1,50 @@
 From: heiko@sntech.de (Heiko Stuebner)
-Date: Thu, 18 Jun 2015 16:18:30 +0200
-Subject: [PATCH v2 3/9] clk: rockchip: protect register macros against
- multipart values
+Date: Thu, 18 Jun 2015 16:18:31 +0200
+Subject: [PATCH v2 4/9] clk: rockchip: add COMPOSITE_NOGATE_DIVTBL variant
 In-Reply-To: <1434637116-17124-1-git-send-email-heiko@sntech.de>
 References: <1434637116-17124-1-git-send-email-heiko@sntech.de>
-Message-ID: <1434637116-17124-4-git-send-email-heiko@sntech.de>
+Message-ID: <1434637116-17124-5-git-send-email-heiko@sntech.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The macros calculate the correct offset from the id in the parameter.
-If this parameter does not consist of a single number, the calculation
-will return wrong registers in the best case or create unaligned accesses
-in the worst case. So protect the calculations against such values.
+A clock branch consisting of a mux and divider with non-standard
+divider values.
 
 Signed-off-by: Heiko Stuebner <heiko@sntech.de>
 ---
- drivers/clk/rockchip/clk.h | 16 ++++++++--------
- 1 file changed, 8 insertions(+), 8 deletions(-)
+ drivers/clk/rockchip/clk.h | 20 ++++++++++++++++++++
+ 1 file changed, 20 insertions(+)
 
 diff --git a/drivers/clk/rockchip/clk.h b/drivers/clk/rockchip/clk.h
-index 6b09267..92edb5f 100644
+index 92edb5f..501f02e 100644
 --- a/drivers/clk/rockchip/clk.h
 +++ b/drivers/clk/rockchip/clk.h
-@@ -31,22 +31,22 @@
- 		((val) << (shift) | (mask) << ((shift) + 16))
+@@ -308,6 +308,26 @@ struct rockchip_clk_branch {
+ 		.gate_offset	= -1,				\
+ 	}
  
- /* register positions shared by RK2928, RK3066 and RK3188 */
--#define RK2928_PLL_CON(x)		(x * 0x4)
-+#define RK2928_PLL_CON(x)		((x) * 0x4)
- #define RK2928_MODE_CON		0x40
--#define RK2928_CLKSEL_CON(x)	(x * 0x4 + 0x44)
--#define RK2928_CLKGATE_CON(x)	(x * 0x4 + 0xd0)
-+#define RK2928_CLKSEL_CON(x)	((x) * 0x4 + 0x44)
-+#define RK2928_CLKGATE_CON(x)	((x) * 0x4 + 0xd0)
- #define RK2928_GLB_SRST_FST		0x100
- #define RK2928_GLB_SRST_SND		0x104
--#define RK2928_SOFTRST_CON(x)	(x * 0x4 + 0x110)
-+#define RK2928_SOFTRST_CON(x)	((x) * 0x4 + 0x110)
- #define RK2928_MISC_CON		0x134
- 
- #define RK3288_PLL_CON(x)		RK2928_PLL_CON(x)
- #define RK3288_MODE_CON			0x50
--#define RK3288_CLKSEL_CON(x)		(x * 0x4 + 0x60)
--#define RK3288_CLKGATE_CON(x)		(x * 0x4 + 0x160)
-+#define RK3288_CLKSEL_CON(x)		((x) * 0x4 + 0x60)
-+#define RK3288_CLKGATE_CON(x)		((x) * 0x4 + 0x160)
- #define RK3288_GLB_SRST_FST		0x1b0
- #define RK3288_GLB_SRST_SND		0x1b4
--#define RK3288_SOFTRST_CON(x)		(x * 0x4 + 0x1b8)
-+#define RK3288_SOFTRST_CON(x)		((x) * 0x4 + 0x1b8)
- #define RK3288_MISC_CON			0x1e8
- #define RK3288_SDMMC_CON0		0x200
- #define RK3288_SDMMC_CON1		0x204
-@@ -67,7 +67,7 @@ enum rockchip_pll_type {
- 	.nr = _nr,				\
- 	.nf = _nf,				\
- 	.no = _no,				\
--	.bwadj = (_nf >> 1),			\
-+	.bwadj = ((_nf) >> 1),			\
- }
- 
- #define RK3066_PLL_RATE_BWADJ(_rate, _nr, _nf, _no, _bw)	\
++#define COMPOSITE_NOGATE_DIVTBL(_id, cname, pnames, f, mo, ms,	\
++				mw, mf, ds, dw, df, dt)		\
++	{							\
++		.id		= _id,				\
++		.branch_type	= branch_composite,		\
++		.name		= cname,			\
++		.parent_names	= pnames,			\
++		.num_parents	= ARRAY_SIZE(pnames),		\
++		.flags		= f,				\
++		.muxdiv_offset	= mo,				\
++		.mux_shift	= ms,				\
++		.mux_width	= mw,				\
++		.mux_flags	= mf,				\
++		.div_shift	= ds,				\
++		.div_width	= dw,				\
++		.div_flags	= df,				\
++		.div_table	= dt,				\
++		.gate_offset	= -1,				\
++	}
++
+ #define COMPOSITE_FRAC(_id, cname, pname, f, mo, df, go, gs, gf)\
+ 	{							\
+ 		.id		= _id,				\
 -- 
 2.1.4
