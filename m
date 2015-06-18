@@ -1,45 +1,77 @@
-From: yingjoe.chen@mediatek.com (Yingjoe Chen)
-Date: Thu, 18 Jun 2015 21:58:59 +0800
-Subject: [PATCH v2 2/2] pwm: add MediaTek display PWM driver support
-In-Reply-To: <1434622784.18278.39.camel@mtksdaap41>
-References: <1432214964-40644-1-git-send-email-yh.huang@mediatek.com>
- <1432214964-40644-3-git-send-email-yh.huang@mediatek.com>
- <20150612102046.GF19400@ulmo.nvidia.com>
- <1434622784.18278.39.camel@mtksdaap41>
-Message-ID: <1434635939.22029.7.camel@mtksdaap41>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Thu, 18 Jun 2015 16:02:32 +0200
+Subject: [PATCH] iio: adc: at91_adc: allow to use full range of startup
+ time
+In-Reply-To: <1434558096-10619-1-git-send-email-nicolas.ferre@atmel.com>
+References: <1434558096-10619-1-git-send-email-nicolas.ferre@atmel.com>
+Message-ID: <20150618140232.GE27492@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2015-06-18 at 18:19 +0800, YH Huang wrote:
-> On Fri, 2015-06-12 at 12:20 +0200, Thierry Reding wrote:
-> > > +/* Shift log2(PWM_PERIOD_MAX + 1) as divisor */
-> > > +#define PWM_PERIOD_BIT_SHIFT	12
-> > 
-> > I wasn't very clear about this in my earlier review, so let me try to
-> > explain why I think this is confusing. You use this as a divisor, but
-> > you encode it as a shift. It's also PWM_PERIOD_MAX + 1, so I think it
-> > would make more sense to drop this, keep PWM_PERIOD_MAX as above and
-> > then replace the
-> > 
-> > 	>> PWM_PERIOD_BIT_SHIFT
-> > 	
-> > below by
-> > 
-> > 	/ (PWM_PERIOD_MAX + 1)
-> > 
+On 17/06/2015 at 18:21:36 +0200, Nicolas Ferre wrote :
+> From: Jan Leupold <leupold@rsi-elektrotechnik.de>
 > 
-> Maybe I can change in this way:
-> Remove this: #define PWM_PERIOD_MAX		0x00000fff
-> Using ">> PWM_PERIOD_BIT_SHIFT" is faster than "/ (PWM_PERIOD_MAX + 1)"
-> Is this right?
+> The DT-Property "atmel,adc-startup-time" is stored in an u8 for a microsecond
+> value. When trying to increase the value of STARTUP in Register AT91_ADC_MR
+> some higher values can't be reached.
+> 
+> Change the type in function parameter and private structure field from u8 to
+> u32.
+> 
+> Signed-off-by: Jan Leupold <leupold@rsi-elektrotechnik.de>
+> [nicolas.ferre at atmel.com: change commit message, increase u16 to u32 for startup time]
+> Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+Acked-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
 
+> ---
+>  drivers/iio/adc/at91_adc.c | 8 ++++----
+>  1 file changed, 4 insertions(+), 4 deletions(-)
+> 
+> diff --git a/drivers/iio/adc/at91_adc.c b/drivers/iio/adc/at91_adc.c
+> index 8a0eb4a04fb5..7b40925dd4ff 100644
+> --- a/drivers/iio/adc/at91_adc.c
+> +++ b/drivers/iio/adc/at91_adc.c
+> @@ -182,7 +182,7 @@ struct at91_adc_caps {
+>  	u8	ts_pen_detect_sensitivity;
+>  
+>  	/* startup time calculate function */
+> -	u32 (*calc_startup_ticks)(u8 startup_time, u32 adc_clk_khz);
+> +	u32 (*calc_startup_ticks)(u32 startup_time, u32 adc_clk_khz);
+>  
+>  	u8	num_channels;
+>  	struct at91_adc_reg_desc registers;
+> @@ -201,7 +201,7 @@ struct at91_adc_state {
+>  	u8			num_channels;
+>  	void __iomem		*reg_base;
+>  	struct at91_adc_reg_desc *registers;
+> -	u8			startup_time;
+> +	u32			startup_time;
+>  	u8			sample_hold_time;
+>  	bool			sleep_mode;
+>  	struct iio_trigger	**trig;
+> @@ -779,7 +779,7 @@ ret:
+>  	return ret;
+>  }
+>  
+> -static u32 calc_startup_ticks_9260(u8 startup_time, u32 adc_clk_khz)
+> +static u32 calc_startup_ticks_9260(u32 startup_time, u32 adc_clk_khz)
+>  {
+>  	/*
+>  	 * Number of ticks needed to cover the startup time of the ADC
+> @@ -790,7 +790,7 @@ static u32 calc_startup_ticks_9260(u8 startup_time, u32 adc_clk_khz)
+>  	return round_up((startup_time * adc_clk_khz / 1000) - 1, 8) / 8;
+>  }
+>  
+> -static u32 calc_startup_ticks_9x5(u8 startup_time, u32 adc_clk_khz)
+> +static u32 calc_startup_ticks_9x5(u32 startup_time, u32 adc_clk_khz)
+>  {
+>  	/*
+>  	 * For sama5d3x and at91sam9x5, the formula changes to:
+> -- 
+> 2.1.3
+> 
 
-The place which use this shift is:
-
-	clk_div = div_u64(rate * period_ns, NSEC_PER_SEC) >> 
-			  PWM_PERIOD_BIT_SHIFT;
-
-div_u64 return u64. If we change >> to /, and somehow compiler didn't
-optimize that div into shift, it will cause build error.
-
-Joe.C
+-- 
+Alexandre Belloni, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
