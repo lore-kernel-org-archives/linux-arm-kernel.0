@@ -1,97 +1,38 @@
-From: stefan.wahren@i2se.com (Stefan Wahren)
-Date: Thu, 18 Jun 2015 09:05:01 +0200
-Subject: [PATCH v2 0/3] Add the efuse driver on rockchip platform
-In-Reply-To: <55800070.5030509@linaro.org>
-References: <1434439665-27781-1-git-send-email-wxt@rock-chips.com>
- <557FE3EA.4000306@i2se.com> <557FEAB2.1040101@linaro.org>
- <557FF50C.10809@rock-chips.com> <55800070.5030509@linaro.org>
-Message-ID: <55826D9D.2060106@i2se.com>
+From: tomeu.vizoso@collabora.com (Tomeu Vizoso)
+Date: Thu, 18 Jun 2015 09:09:29 +0200
+Subject: [PATCH v3] ARM: tegra: cpuidle: implement
+ cpuidle_state.enter_freeze()
+In-Reply-To: <1773599.T1QStsTFTH@vostro.rjw.lan>
+References: <1432046953-12945-1-git-send-email-tomeu.vizoso@collabora.com>
+ <1773599.T1QStsTFTH@vostro.rjw.lan>
+Message-ID: <CAAObsKCURyo-ujcA7r+UYqSw6ie-aBxKiYEdTKwe-HrL14RkBw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Srinivas,
-
-Am 16.06.2015 um 12:54 schrieb Srinivas Kandagatla:
->
->
-> On 16/06/15 11:06, Caesar Wang wrote:
->> Hi Srinivas,
+On 21 May 2015 at 03:02, Rafael J. Wysocki <rjw@rjwysocki.net> wrote:
+> On Tuesday, May 19, 2015 04:49:12 PM Tomeu Vizoso wrote:
+>> This callback is expected to do the same as enter() but it has to
+>> guarantee that interrupts aren't enabled at any point in its execution,
+>> as the tick is frozen.
 >>
->> ? 2015?06?16? 17:21, Srinivas Kandagatla ??:
->>> Hi Stefan,
->>>
->>>
->>> On 16/06/15 09:52, Stefan Wahren wrote:
->>>> Hi Caesar,
->>>>
->>>> [add Maxime and Srinivas]
->>>>
->>>> Am 16.06.2015 um 09:27 schrieb Caesar Wang:
->>>>> The original driver is uploaded by Jianqun.
->>>>> Here is his patchs:
->>>>>      https://patchwork.kernel.org/patch/5410341/
->>>>>      https://patchwork.kernel.org/patch/5410351/
->>>>>
->>>>> Jianqun, nevermind!
->>>>> I check-pick it and re-upload the driver for the upstream.
->>>>> e.g.:
->>>>>      Tested by on minnie board.(kernel-4.1-rc8)
->>>>>      cd /sys/devices/platform/ffb40000.efuse
->>>>>      localhost ffb40000.efuse # cat cpu_leakage_show
->>>>>      cpu_version_show
->>>>>      The results:
->>>>>              19
->>>>>              2
->>>>>
->>>>> Changes in v2:
->>>>> - Change the document decription.
->>>>> - Move the efuse driver into driver/soc/vendor.
->>>>> - update the efuse driver.
->>>>> - Add the dts node on RK3288.
->>>>>
->>>>>
->>>>
->>>> i want to mention that there is a upcoming new framework suitable for
->>>> efuse drivers:
->>>>
->>>> https://lkml.org/lkml/2015/5/21/643
->>>>
->>>> Unfortunately i don't know the current development state.
->>>>
->>>
->>> Currently this framework is used by atleast 3 drivers(qcom-tsens,
->>> qcom-cpr, begel-bone-cape manager) which are still floating in the
->>> mailing list.
->>>
->>> I was hoping that these 3 users would getback with tested-by.. which
->>> did not happen for last 3-4 weeks.
->>>
->>> I would appreciate, If you could try framework too, and let me know.
+>> It will be called when the system goes to suspend-to-idle and will
+>> reduce power usage because CPUs won't be awaken for unnecessary IRQs.
 >>
-
-yes i work on OCOTP driver for MXS platform and i will try ...
-
+>> By setting the CPUIDLE_FLAG_TIMER_STOP flag, we can reuse the same code
+>> for both the enter() and enter_freeze() callbacks.
+>>
+>> Signed-off-by: Tomeu Vizoso <tomeu.vizoso@collabora.com>
+>> Cc: Rafael J. Wysocki <rafael.j.wysocki@intel.com>
 >
-> int rockchip_efuse_reg_read(void *context, unsigned int reg, unsigned
-> int *val)
-> {
->     /* efuse specific read sequence */
->     ...
-> }
+> Makes sense to me, but I suppose it should go in via arm-soc.
 
-I will need a specific read sequence too.
+Hi Thierry,
 
-Sorry for these newbie questions:
+what's the plan regarding merging of this patch?
 
-What data structure does context points to for this reg_read opteration?
+It needs df8d9ee ("cpuidle: Run tick_broadcast_exit() with disabled
+interrupts") so it doesn't break boot.
 
-Do we need range checking of reg or is it handled by the framework?
+Thanks,
 
-Are there any limitation for reg_read regarding sleeping or locking
-operations?
-
-In case of a read only driver, is everything handle by devicetree or do
-we need an empty write operation?
-
-Best regards
-Stefan
+Tomeu
