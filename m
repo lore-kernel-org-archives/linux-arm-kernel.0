@@ -1,63 +1,82 @@
-From: eddie.huang@mediatek.com (Eddie Huang)
-Date: Thu, 18 Jun 2015 16:11:47 +0800
-Subject: [PATCH 2/3] spi: mediatek: Add spi bus for Mediatek MT8173
-In-Reply-To: <20150617163531.GU14071@sirena.org.uk>
-References: <1431675522.2128.13.camel@mhfsdcap03>
- <20150515092543.GY2761@sirena.org.uk>
- <1433758546.19786.16.camel@mtksdaap41>
- <20150608175927.GO14071@sirena.org.uk>
- <1433844321.16178.6.camel@mtksdaap41>
- <20150609103951.GA14071@sirena.org.uk>
- <1433923569.22080.1.camel@mtksdaap41>
- <1434532083.19346.27.camel@mtksdaap41>
- <20150617124758.GE3214@sirena.org.uk>
- <1434550251.23617.38.camel@mtksdaap41>
- <20150617163531.GU14071@sirena.org.uk>
-Message-ID: <1434615107.22739.1.camel@mtksdaap41>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Thu, 18 Jun 2015 10:12:20 +0200
+Subject: Linkstation Mini and __machine_arch_type problem, not booting
+ since 3.8
+In-Reply-To: <97db3502cd014faf1c710b1cc0fe8848@dolka.fr>
+References: <97db3502cd014faf1c710b1cc0fe8848@dolka.fr>
+Message-ID: <55827D64.1090307@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2015-06-17 at 17:35 +0100, Mark Brown wrote:
-> On Wed, Jun 17, 2015 at 10:10:51PM +0800, Eddie Huang wrote:
-> 
-> > Our hardware limitation is: we don't have separate dma tx, rx channel
-> > with transfer finish interrupt, only have spi trigger operation.So the
-> > mediatek SPI dma full duplex operation steps are:
-> > 1. Set TX DMA address.
-> > 2. Set RX DMA address.
-> > 3. Set length (this step assume TX, RX are the same size).
-> > 4. Set TX DMA enable, RX DMA enable bit in spi config register. (not
-> > trigger DMA, just told spi use dma)
-> > 5. Trigger spi operations.
-> > 6. Wait spi operations finish interrupt.
-> 
-> Sure, that's what I understood.
-> 
-> > If tx scatterlist per list data size are 128, 4096, 256. rx scatterlist
-> > per list data size are 128, 4096, 256. So we need to go through above
-> > steps three times. If tx scatterlists per list data size are 128, 4096,
-> > 256. rx scatterlists per list data size are 256, 4096, 128. If we start
-> > sending first entry, tx size is 128, rx size is 256, this will cause
-> > hardware malfunction because tx, rx data length are not the same.
-> 
-> > The solution I think is copy scatterlist data into one single buffer in
-> > mediatek spi transfer function, but I think this is odd because
-> > __spi_map_msg() map single buffer into scatterlist, then our driver map
-> > scatterlist into single buffer again. I hope this explaination is more
-> > clear than before.
-> 
-> To repeat what I said in my last mail: there's no need to use the
-> scatterlists as-is, your driver can do whatever set of DMA transfers it
-> likes to keep the lengths of each transfer the same.  Attempting to
-> linearise the transfers in memory isn't going to work unless you
-> allocate physically contiguous memory (which could get painful) and will
-> add substantial overhead.
-> 
-> For example with your above example you could split the transfers up to
-> be 128, 128, 3968, 128, 128.
+Hi Benjamin,
 
-This is a workable way.
-Thanks your suggestion.We will try to implement this,
 
-Eddie
-Thanks
+
+On 15/06/2015 15:51, Benjamin Cama wrote:
+> Hi everyone,
+> 
+> First, I am new here (and not subscribed, so Cc me please). I hope I am
+> on the right list [edit: resent to the correct one, again].
+> 
+> I usually run old kernels (3.2) on my Linkstation Mini
+> (CONFIG_MACH_LINKSTATION_MINI, Marvell Orion based, non-DT) but I 
+> wanted
+> to try a newer one and found that after 3.7, it didn't boot anymore at
+> all: no message at all displayed, not even with earlyprintk. I bisected
+> the faulty commit down to b8b499c86be58cb309964fcab5b62ac4a240a878 
+> ?ARM:
+> 7602/1: Pass real "__machine_arch_type" variable to 
+> setup_machine_tags()
+> procedure? which looks like a quite broad change, and makes me 1) not
+> really understand what it does 2) astonished not to see someone else
+> affected (judging by the time since it doesn't work). Using the version
+> prior to this commit works, but trying to revert it on some newer
+> version (4.1-rc7) also fails, so the change must be something deeper
+> that I can handle. Note that when I disable CONFIG_CPU_FEROCEON_OLD_ID
+> (it is such an old Feroceon), it still correctly displays at boot
+> ?Error: unrecognized/unsupported processor variant (0x41069260).?, so
+> the machine ID is somewhat read correctly.
+> 
+> Also, my intent at first was to try converting this machine to DT, so 
+> maybe
+> the solution to my problem would simply be to try converting it and see
+> if it fixes the problem?
+
+Indeed it is your best option given the problem you exposed later in this
+thread. Our plan in mid-term is to completely remove the non-DT support.
+So converting the board is definitely the right thing to do.
+
+The conversation should not be too hard to achieve, you will have mainly to
+write a dts, build a dtb an append it to your kernel.
+You can have a look on waht was done for the LaCie d2 Network platform, see
+94b0bd366e36379c994bdaa84f 'ARM: orion5x: convert d2net to Device Tree'
+
+
+If you have any trouble or question during the conversion we will help you.
+
+
+Thanks,
+
+Gregory
+
+
+
+> 
+> Thanks for any thought on this problem,
+> --
+> benjamin
+> 
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
+
+
+-- 
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
