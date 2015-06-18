@@ -1,73 +1,52 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu, 18 Jun 2015 18:27:18 +0100
-Subject: [PATCH v2 2/2] arm: KVM: keep arm vfp/simd exit handling
- consistent with arm64
-In-Reply-To: <1434491452-19177-3-git-send-email-m.smarduch@samsung.com>
-References: <1434491452-19177-1-git-send-email-m.smarduch@samsung.com>
- <1434491452-19177-3-git-send-email-m.smarduch@samsung.com>
-Message-ID: <5582FF76.6060100@arm.com>
+From: balbi@ti.com (Felipe Balbi)
+Date: Thu, 18 Jun 2015 12:25:58 -0500
+Subject: [PATCH v3] i2c: omap: improve duty cycle on SCL
+In-Reply-To: <55827CD7.7030207@nokia.com>
+References: <1434569475-17378-1-git-send-email-balbi@ti.com>
+ <55827CD7.7030207@nokia.com>
+Message-ID: <20150618172558.GC27790@saruman.tx.rr.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 16/06/15 22:50, Mario Smarduch wrote:
-> After enhancing arm64 FP/SIMD exit handling, FP/SIMD exit branch is moved
-> to guest trap handling. This keeps exiting handling flow between both
-> architectures consistent.
+On Thu, Jun 18, 2015 at 10:09:59AM +0200, Alexander Sverdlin wrote:
+> Hello Felipe,
 > 
-> Signed-off-by: Mario Smarduch <m.smarduch@samsung.com>
-> ---
->  arch/arm/kvm/interrupts.S |   12 +++++++-----
->  1 file changed, 7 insertions(+), 5 deletions(-)
+> On 17/06/15 21:31, ext Felipe Balbi wrote:
+> > With this patch we try to be as close to 50%
+> > duty cycle as possible. The reason for this
+> > is that some devices present an erratic behavior
+> > with certain duty cycles.
+> > 
+> > One such example is TPS65218 PMIC which fails
+> > to change voltages when running @ 400kHz and
+> > duty cycle is lower than 34%.
+> > 
+> > The idea of the patch is simple:
+> > 
+> > calculate desired scl_period from requested scl
+> > and use 50% for tLow and 50% for tHigh.
+> > 
+> > tLow is calculated with a DIV_ROUND_UP() to make
+> > sure it's slightly higher than tHigh and to make
+> > sure that we end up within I2C specifications.
 > 
-> diff --git a/arch/arm/kvm/interrupts.S b/arch/arm/kvm/interrupts.S
-> index 79caf79..fca2c56 100644
-> --- a/arch/arm/kvm/interrupts.S
-> +++ b/arch/arm/kvm/interrupts.S
-> @@ -363,10 +363,6 @@ hyp_hvc:
->  	@ Check syndrome register
->  	mrc	p15, 4, r1, c5, c2, 0	@ HSR
->  	lsr	r0, r1, #HSR_EC_SHIFT
-> -#ifdef CONFIG_VFPv3
-> -	cmp	r0, #HSR_EC_CP_0_13
-> -	beq	switch_to_guest_vfp
-> -#endif
->  	cmp	r0, #HSR_EC_HVC
->  	bne	guest_trap		@ Not HVC instr.
->  
-> @@ -406,6 +402,12 @@ THUMB(	orr	lr, #1)
->  1:	eret
->  
->  guest_trap:
-> +#ifdef CONFIG_VFPv3
-> +	/* Guest accessed VFP/SIMD registers, save host, restore Guest */
-> +	cmp	r0, #HSR_EC_CP_0_13
-> +	beq	switch_to_guest_fpsimd
-> +#endif
-> +
->  	load_vcpu			@ Load VCPU pointer to r0
->  	str	r1, [vcpu, #VCPU_HSR]
->  
-> @@ -478,7 +480,7 @@ guest_trap:
->   * inject an undefined exception to the guest.
->   */
->  #ifdef CONFIG_VFPv3
-> -switch_to_guest_vfp:
-> +switch_to_guest_fpsimd:
+> if you refuse to change the calculations to achieve maximum possible
+> bus rate (as I've shown you with SCLL=9 and SCLH=9), maybe you want to
+> change the description? Because you are doing something else than is
+> written here. You are only in spec because you are not doing 50% duty
+> cycle. And you didn't mention here that you lower the bus speed below
+> 400kHz to achieve this.
 
-Ah, I think I managed to confuse you in my previous comment.
-On ARMv7, we call the floating point stuff VFP.
-On ARMv8, we call it FP/SIMD.
+and there's a comment where the calculation goes which states "as close
+to 50% as possible but we make sure tLow is higher than tHigh so we're
+still within spec".
 
-Not very consistent, I know...
-
->  	load_vcpu			@ Load VCPU pointer to r0
-
-It would be interesting to find out if we can make this load_vcpu part
-of the common sequence (without spilling another register, of course).
-Probably involves moving the exception class to r2.
-
-Thanks,
-
-	M.
 -- 
-Jazz is not dead. It just smells funny...
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150618/4fb0ce66/attachment.sig>
