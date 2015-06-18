@@ -1,64 +1,94 @@
 From: heiko@sntech.de (Heiko Stuebner)
-Date: Thu, 18 Jun 2015 16:18:27 +0200
-Subject: [PATCH v2 0/9] clk: rockchip: add support for the clock-tree of the
- rk3368
-Message-ID: <1434637116-17124-1-git-send-email-heiko@sntech.de>
+Date: Thu, 18 Jun 2015 16:18:34 +0200
+Subject: [PATCH v2 7/9] dt-bindings: add documentation of rk3668 clock
+ controller
+In-Reply-To: <1434637116-17124-1-git-send-email-heiko@sntech.de>
+References: <1434637116-17124-1-git-send-email-heiko@sntech.de>
+Message-ID: <1434637116-17124-8-git-send-email-heiko@sntech.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This series adds support for the clock controller of rk3368
-ARM64 socs.
+Add the devicetree binding for the cru on the rk3368 which quite similar
+structured as previous clock controllers.
 
-The first 3 patches are fixes for small issues I found while
-building the clocktree. The first one fixes an issue if a rmii
-phy is used on the rk3288 and the later two do not harm the
-functionality of the older socs, as there is no camera interface
-driver in them anyway and the issue with the defines only surfaced
-on the rk3368.
-
-Patch 4 then adds a new definition for a branch-type.
-
-Some clocks (mainly the hsadc and camera interfaces) have a phase
-inverter connected to the clock that makes it possible to adjust
-the clock phase by 180 degrees. Patches 5 and 6 finally add
-support for these inverters and add the currently missing
-definitions to the already present clock drivers.
-
-Patches 7, 8 and 9 finally add the shared dt-binding header and
-the rk3368 clock tree itself. The cpu-clocks in there where
-tested sucessfully with the big_little_cpufreq driver.
-
-changes since v1:
-- add CLK_SET_RATE_PARENT to sclk_mac to provide sane rates
-  when using a rmii phy with soc-side clock generation.
-  Both as fix for the 3288 and in the newly added rk3368.
-
-
-Heiko Stuebner (9):
-  clk: rockchip: rk3288: add CLK_SET_RATE_PARENT to sclk_mac
-  clk: rockchip: fix faulty vip parent name on rk3288
-  clk: rockchip: protect register macros against multipart values
-  clk: rockchip: add COMPOSITE_NOGATE_DIVTBL variant
-  clk: rockchip: add support for phase inverters
-  clk: rockchip: define the inverters of rk3066/rk3188 and rk3288
-  dt-bindings: add documentation of rk3668 clock controller
-  clk: rockchip: add dt-binding header for rk3368
-  clk: rockchip: add rk3368 clock controller
-
- .../bindings/clock/rockchip,rk3368-cru.txt         |  61 ++
- drivers/clk/rockchip/Makefile                      |   2 +
- drivers/clk/rockchip/clk-inverter.c                | 126 +++
- drivers/clk/rockchip/clk-rk3188.c                  |   9 +-
- drivers/clk/rockchip/clk-rk3288.c                  |  13 +-
- drivers/clk/rockchip/clk-rk3368.c                  | 881 +++++++++++++++++++++
- drivers/clk/rockchip/clk.c                         |   7 +
- drivers/clk/rockchip/clk.h                         |  72 +-
- include/dt-bindings/clock/rk3368-cru.h             | 379 +++++++++
- 9 files changed, 1537 insertions(+), 13 deletions(-)
+Signed-off-by: Heiko Stuebner <heiko@sntech.de>
+Cc: Rob Herring <robh+dt@kernel.org>
+Cc: Pawel Moll <pawel.moll@arm.com>
+Cc: Mark Rutland <mark.rutland@arm.com>
+Cc: Ian Campbell <ijc+devicetree@hellion.org.uk>
+Cc: Kumar Gala <galak@codeaurora.org>
+Cc: devicetree at vger.kernel.org
+---
+ .../bindings/clock/rockchip,rk3368-cru.txt         | 61 ++++++++++++++++++++++
+ 1 file changed, 61 insertions(+)
  create mode 100644 Documentation/devicetree/bindings/clock/rockchip,rk3368-cru.txt
- create mode 100644 drivers/clk/rockchip/clk-inverter.c
- create mode 100644 drivers/clk/rockchip/clk-rk3368.c
- create mode 100644 include/dt-bindings/clock/rk3368-cru.h
 
+diff --git a/Documentation/devicetree/bindings/clock/rockchip,rk3368-cru.txt b/Documentation/devicetree/bindings/clock/rockchip,rk3368-cru.txt
+new file mode 100644
+index 0000000..7c8bbcf
+--- /dev/null
++++ b/Documentation/devicetree/bindings/clock/rockchip,rk3368-cru.txt
+@@ -0,0 +1,61 @@
++* Rockchip RK3368 Clock and Reset Unit
++
++The RK3368 clock controller generates and supplies clock to various
++controllers within the SoC and also implements a reset controller for SoC
++peripherals.
++
++Required Properties:
++
++- compatible: should be "rockchip,rk3368-cru"
++- reg: physical base address of the controller and length of memory mapped
++  region.
++- #clock-cells: should be 1.
++- #reset-cells: should be 1.
++
++Optional Properties:
++
++- rockchip,grf: phandle to the syscon managing the "general register files"
++  If missing, pll rates are not changeable, due to the missing pll lock status.
++
++Each clock is assigned an identifier and client nodes can use this identifier
++to specify the clock which they consume. All available clocks are defined as
++preprocessor macros in the dt-bindings/clock/rk3368-cru.h headers and can be
++used in device tree sources. Similar macros exist for the reset sources in
++these files.
++
++External clocks:
++
++There are several clocks that are generated outside the SoC. It is expected
++that they are defined using standard clock bindings with following
++clock-output-names:
++ - "xin24m" - crystal input - required,
++ - "xin32k" - rtc clock - optional,
++ - "ext_i2s" - external I2S clock - optional,
++ - "ext_gmac" - external GMAC clock - optional
++ - "ext_hsadc" - external HSADC clock - optional,
++ - "ext_isp" - external ISP clock - optional,
++ - "ext_jtag" - external JTAG clock - optional
++ - "ext_vip" - external VIP clock - optional,
++ - "usbotg_out" - output clock of the pll in the otg phy
++
++Example: Clock controller node:
++
++	cru: clock-controller at ff760000 {
++		compatible = "rockchip,rk3368-cru";
++		reg = <0x0 0xff760000 0x0 0x1000>;
++		rockchip,grf = <&grf>;
++		#clock-cells = <1>;
++		#reset-cells = <1>;
++	};
++
++Example: UART controller node that consumes the clock generated by the clock
++  controller:
++
++	uart0: serial at 10124000 {
++		compatible = "snps,dw-apb-uart";
++		reg = <0x10124000 0x400>;
++		interrupts = <GIC_SPI 34 IRQ_TYPE_LEVEL_HIGH>;
++		reg-shift = <2>;
++		reg-io-width = <1>;
++		clocks = <&cru SCLK_UART0>;
++	};
 -- 
 2.1.4
