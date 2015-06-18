@@ -1,77 +1,154 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Thu, 18 Jun 2015 17:54:29 +0100
-Subject: [PATCH v2 2/4] iommu: Implement common IOMMU ops for DMA mapping
-In-Reply-To: <1434639625.26953.12.camel@mhfsdcap03>
-References: <cover.1434036796.git.robin.murphy@arm.com>	
- <bf63d80c36533aa4dcc401b5a4b312ba00237e1c.1434036796.git.robin.murphy@arm.com>
- <1434639625.26953.12.camel@mhfsdcap03>
-Message-ID: <5582F7C5.8060901@arm.com>
+From: bhelgaas@google.com (Bjorn Helgaas)
+Date: Thu, 18 Jun 2015 11:59:54 -0500
+Subject: [PATCH 10/15] PCI: kill off set_irq_flags usage
+In-Reply-To: <1433874401-27161-11-git-send-email-robh@kernel.org>
+References: <1433874401-27161-1-git-send-email-robh@kernel.org>
+ <1433874401-27161-11-git-send-email-robh@kernel.org>
+Message-ID: <20150618165954.GE7710@google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 18/06/15 16:00, Yong Wu wrote:
-> Hi Robin,
->      while our drm test, we meet a problem while dma-mmap.
->
->   On Thu, 2015-06-11 at 16:54 +0100, Robin Murphy wrote:
->> Taking inspiration from the existing arch/arm code, break out some
->> generic functions to interface the DMA-API to the IOMMU-API. This will
->> do the bulk of the heavy lifting for IOMMU-backed dma-mapping.
->>
->> Signed-off-by: Robin Murphy <robin.murphy@arm.com>
->> ---
->>   drivers/iommu/Kconfig     |   7 +
->>   drivers/iommu/Makefile    |   1 +
->>   drivers/iommu/dma-iommu.c | 560 ++++++++++++++++++++++++++++++++++++++++++++++
->>   include/linux/dma-iommu.h |  94 ++++++++
->>   4 files changed, 662 insertions(+)
->>   create mode 100644 drivers/iommu/dma-iommu.c
->>   create mode 100644 include/linux/dma-iommu.h
->>
-> [snip]
->> +/**
->> + * iommu_dma_mmap - Map a buffer into provided user VMA
->> + * @pages: Array representing buffer from iommu_dma_alloc()
->> + * @size: Size of buffer in bytes
->> + * @vma: VMA describing requested userspace mapping
->> + *
->> + * Maps the pages of the buffer in @pages into @vma. The caller is responsible
->> + * for verifying the correct size and protection of @vma beforehand.
->> + */
->> +
->> +int iommu_dma_mmap(struct page **pages, size_t size, struct vm_area_struct *vma)
->> +{
->> +	unsigned long uaddr = vma->vm_start;
->> +	unsigned int i, count = PAGE_ALIGN(size) >> PAGE_SHIFT;
->> +	int ret = -ENXIO;
->> +
->> +	for (i = vma->vm_pgoff; i < count && uaddr < vma->vm_end; i++) {
-> Is it :  for (i = 0; i < count && uaddr < vma->vm_end; i++)
+On Tue, Jun 09, 2015 at 01:26:36PM -0500, Rob Herring wrote:
+> set_irq_flags is ARM specific with custom flags which have genirq
+> equivalents. Convert drivers to use the genirq interfaces directly, so we
+> can kill off set_irq_flags. The translation of flags is as follows:
+> 
+> IRQF_VALID -> !IRQ_NOREQUEST
+> IRQF_PROBE -> !IRQ_NOPROBE
+> IRQF_NOAUTOEN -> IRQ_NOAUTOEN
+> 
+> For IRQs managed by an irqdomain, the irqdomain core code handles clearing
+> and setting IRQ_NOREQUEST already, so there is no need to do this in
+> .map() functions and we can simply remove the set_irq_flags calls. Some
+> users also set IRQ_NOPROBE and this has been maintained although it is not
+> clear that is really needed. There appears to be a great deal of blind
+> copy and paste of this code.
+> 
+> Signed-off-by: Rob Herring <robh@kernel.org>
+> Cc: Kishon Vijay Abraham I <kishon@ti.com>
+> Cc: Bjorn Helgaas <bhelgaas@google.com>
+> Cc: Murali Karicheri <m-karicheri2@ti.com>
+> Cc: Thierry Reding <thierry.reding@gmail.com>
+> Cc: Stephen Warren <swarren@wwwdotorg.org>
+> Cc: Alexandre Courbot <gnurou@gmail.com>
+> Cc: Jingoo Han <jingoohan1@gmail.com>
+> Cc: Pratyush Anand <pratyush.anand@gmail.com>
+> Cc: Simon Horman <horms@verge.net.au>
+> Cc: Michal Simek <michal.simek@xilinx.com>
+> Cc: "S?ren Brinkmann" <soren.brinkmann@xilinx.com>
+> Cc: linux-omap at vger.kernel.org
+> Cc: linux-pci at vger.kernel.org
+> Cc: linux-arm-kernel at lists.infradead.org
+> Cc: linux-tegra at vger.kernel.org
+> Cc: linux-sh at vger.kernel.org
 
-According to the patches at [1], respecting vma->pgoff is necessary for 
-users who only want to mmap part of the buffer. Does your DRM driver by 
-any chance need the same fix as the Rockchip one?
+This is the only part of the series on linux-pci, so I assume this will be
+merged by somebody else along with the rest.
 
->> +		ret = vm_insert_page(vma, uaddr, pages[i]);
->> +		if (ret)
->> +			break;
->> +		uaddr += PAGE_SIZE;
->> +	}
->> +	return ret;
->> +}
->> +
+Acked-by: Bjorn Helgaas <bhelgaas@google.com>
 
-And to save another email:
-
- >> +	if (WARN_ON(!area || area->pages))
- > Is it:    if (WARN_ON(!area || !area->pages))
- >> +		return -ENXIO;
-
-You're absolutely right, thanks. I've got a couple more bugfixes in 
-progress too, so I'll try to get an updated branch pushed out soon; I'll 
-hold off posting a v3 to the list until after the upcoming merge window, 
-though.
-
-Robin.
-
-[1]:http://thread.gmane.org/gmane.linux.kernel/1932343
+> ---
+>  drivers/pci/host/pci-dra7xx.c      | 1 -
+>  drivers/pci/host/pci-keystone-dw.c | 2 --
+>  drivers/pci/host/pci-tegra.c       | 1 -
+>  drivers/pci/host/pcie-designware.c | 1 -
+>  drivers/pci/host/pcie-rcar.c       | 1 -
+>  drivers/pci/host/pcie-xilinx.c     | 2 --
+>  6 files changed, 8 deletions(-)
+> 
+> diff --git a/drivers/pci/host/pci-dra7xx.c b/drivers/pci/host/pci-dra7xx.c
+> index 2d57e19..94cbc4d 100644
+> --- a/drivers/pci/host/pci-dra7xx.c
+> +++ b/drivers/pci/host/pci-dra7xx.c
+> @@ -160,7 +160,6 @@ static int dra7xx_pcie_intx_map(struct irq_domain *domain, unsigned int irq,
+>  {
+>  	irq_set_chip_and_handler(irq, &dummy_irq_chip, handle_simple_irq);
+>  	irq_set_chip_data(irq, domain->host_data);
+> -	set_irq_flags(irq, IRQF_VALID);
+>  
+>  	return 0;
+>  }
+> diff --git a/drivers/pci/host/pci-keystone-dw.c b/drivers/pci/host/pci-keystone-dw.c
+> index f34892e..f1d0749 100644
+> --- a/drivers/pci/host/pci-keystone-dw.c
+> +++ b/drivers/pci/host/pci-keystone-dw.c
+> @@ -196,7 +196,6 @@ static int ks_dw_pcie_msi_map(struct irq_domain *domain, unsigned int irq,
+>  	irq_set_chip_and_handler(irq, &ks_dw_pcie_msi_irq_chip,
+>  				 handle_level_irq);
+>  	irq_set_chip_data(irq, domain->host_data);
+> -	set_irq_flags(irq, IRQF_VALID);
+>  
+>  	return 0;
+>  }
+> @@ -277,7 +276,6 @@ static int ks_dw_pcie_init_legacy_irq_map(struct irq_domain *d,
+>  	irq_set_chip_and_handler(irq, &ks_dw_pcie_legacy_irq_chip,
+>  				 handle_level_irq);
+>  	irq_set_chip_data(irq, d->host_data);
+> -	set_irq_flags(irq, IRQF_VALID);
+>  
+>  	return 0;
+>  }
+> diff --git a/drivers/pci/host/pci-tegra.c b/drivers/pci/host/pci-tegra.c
+> index 00e9272..36bd700 100644
+> --- a/drivers/pci/host/pci-tegra.c
+> +++ b/drivers/pci/host/pci-tegra.c
+> @@ -1263,7 +1263,6 @@ static int tegra_msi_map(struct irq_domain *domain, unsigned int irq,
+>  {
+>  	irq_set_chip_and_handler(irq, &tegra_msi_irq_chip, handle_simple_irq);
+>  	irq_set_chip_data(irq, domain->host_data);
+> -	set_irq_flags(irq, IRQF_VALID);
+>  
+>  	tegra_cpuidle_pcie_irqs_in_use();
+>  
+> diff --git a/drivers/pci/host/pcie-designware.c b/drivers/pci/host/pcie-designware.c
+> index 2e9f84f..5caa94d 100644
+> --- a/drivers/pci/host/pcie-designware.c
+> +++ b/drivers/pci/host/pcie-designware.c
+> @@ -333,7 +333,6 @@ static int dw_pcie_msi_map(struct irq_domain *domain, unsigned int irq,
+>  {
+>  	irq_set_chip_and_handler(irq, &dw_msi_irq_chip, handle_simple_irq);
+>  	irq_set_chip_data(irq, domain->host_data);
+> -	set_irq_flags(irq, IRQF_VALID);
+>  
+>  	return 0;
+>  }
+> diff --git a/drivers/pci/host/pcie-rcar.c b/drivers/pci/host/pcie-rcar.c
+> index c086210..7678fe0 100644
+> --- a/drivers/pci/host/pcie-rcar.c
+> +++ b/drivers/pci/host/pcie-rcar.c
+> @@ -664,7 +664,6 @@ static int rcar_msi_map(struct irq_domain *domain, unsigned int irq,
+>  {
+>  	irq_set_chip_and_handler(irq, &rcar_msi_irq_chip, handle_simple_irq);
+>  	irq_set_chip_data(irq, domain->host_data);
+> -	set_irq_flags(irq, IRQF_VALID);
+>  
+>  	return 0;
+>  }
+> diff --git a/drivers/pci/host/pcie-xilinx.c b/drivers/pci/host/pcie-xilinx.c
+> index f1a06a0..72015119 100644
+> --- a/drivers/pci/host/pcie-xilinx.c
+> +++ b/drivers/pci/host/pcie-xilinx.c
+> @@ -338,7 +338,6 @@ static int xilinx_pcie_msi_map(struct irq_domain *domain, unsigned int irq,
+>  {
+>  	irq_set_chip_and_handler(irq, &xilinx_msi_irq_chip, handle_simple_irq);
+>  	irq_set_chip_data(irq, domain->host_data);
+> -	set_irq_flags(irq, IRQF_VALID);
+>  
+>  	return 0;
+>  }
+> @@ -377,7 +376,6 @@ static int xilinx_pcie_intx_map(struct irq_domain *domain, unsigned int irq,
+>  {
+>  	irq_set_chip_and_handler(irq, &dummy_irq_chip, handle_simple_irq);
+>  	irq_set_chip_data(irq, domain->host_data);
+> -	set_irq_flags(irq, IRQF_VALID);
+>  
+>  	return 0;
+>  }
+> -- 
+> 2.1.0
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> Please read the FAQ at  http://www.tux.org/lkml/
