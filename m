@@ -1,18 +1,29 @@
-From: pebolle@tiscali.nl (Paul Bolle)
-Date: Thu, 18 Jun 2015 09:44:58 +0200
-Subject: [PATCH] clk: at91: add generated clock driver
-In-Reply-To: <20150618093344.7d486e97@bbrezillon>
-References: <1434547409-12232-1-git-send-email-nicolas.ferre@atmel.com>
- <1434611556.2385.8.camel@x220> <20150618093344.7d486e97@bbrezillon>
-Message-ID: <1434613498.2385.11.camel@x220>
+From: mark.yao@rock-chips.com (Mark Yao)
+Date: Thu, 18 Jun 2015 15:49:24 +0800
+Subject: [PATCH 0/6] drm/rockchip: support yuv overlay and plane scale
+Message-ID: <1434613770-6608-1-git-send-email-mark.yao@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2015-06-18 at 09:33 +0200, Boris Brezillon wrote:
-> I guess it will be selected by platforms embedding such clks. We just
-> have to wait for those platform to reach mainline ;-). 
+This series patches are used for yuv image overlay display.
 
-So what's the point of this patch at this moment?
+Rockchip vop support NV11, NV16, NV24 yuv format,
+and can scale the image scale 1/8 to 8.
 
+Mark Yao (6):
+  drm/rockchip: import dma_buf to gem
+  drm/rockchip: vop: optimize virtual stride calculate
+  drm/rockchip: vop: fix yuv plane support
+  drm/rockchip: vop: support plane scale
+  drm/rockchip: vop: switch cursor plane to window 3
+  drm/rockchip: vop: default enable win2/3 area0 bit
 
-Paul Bolle
+ drivers/gpu/drm/rockchip/rockchip_drm_drv.c |    1 +
+ drivers/gpu/drm/rockchip/rockchip_drm_gem.c |   45 ++-
+ drivers/gpu/drm/rockchip/rockchip_drm_gem.h |    5 +-
+ drivers/gpu/drm/rockchip/rockchip_drm_vop.c |  445 ++++++++++++++++++++++++++-
+ drivers/gpu/drm/rockchip/rockchip_drm_vop.h |   96 ++++++
+ 5 files changed, 581 insertions(+), 11 deletions(-)
+
+-- 
+1.7.9.5
