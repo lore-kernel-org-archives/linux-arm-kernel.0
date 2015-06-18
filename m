@@ -1,22 +1,40 @@
-From: santosh.shilimkar@oracle.com (santosh shilimkar)
-Date: Thu, 18 Jun 2015 15:55:32 -0700
-Subject: [PATCH 1/2] clk: keystone: add support for post divider register
- for main pll
-In-Reply-To: <20150618223728.9112.75331@quantum>
-References: <1432915453-409-1-git-send-email-m-karicheri2@ti.com>
- <20150618223728.9112.75331@quantum>
-Message-ID: <55834C64.6020703@oracle.com>
+From: bhelgaas@google.com (Bjorn Helgaas)
+Date: Thu, 18 Jun 2015 17:57:50 -0500
+Subject: [PATCH 1/1] pci: xgene: Fix compilation warning
+In-Reply-To: <1434665458-28354-1-git-send-email-dhdang@apm.com>
+References: <1434665458-28354-1-git-send-email-dhdang@apm.com>
+Message-ID: <CAErSpo6fn++u3uyE+Z-h9T6qmy30f2eyuO4929a=_xShhHHeDQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 6/18/2015 3:37 PM, Michael Turquette wrote:
-> Quoting Murali Karicheri (2015-05-29 09:04:12)
->> Main PLL controller has post divider bits in a separate register in
->> pll controller. Use the value from this register instead of fixed
->> divider when available.
->>
->> Signed-off-by: Murali Karicheri <m-karicheri2@ti.com>
+On Thu, Jun 18, 2015 at 5:10 PM, Duc Dang <dhdang@apm.com> wrote:
+> commit 979595bcb8da ("PCI: xgene: Allow config access to Root Port even
+> when link is down") removes the port->link_up check, which makes 'port'
+> become unused variable. This patch remove struct xgene_pcie_port *port
+> declaration to avoid compilation warning.
 >
-> Applied to clk-next.
+> Signed-off-by: Duc Dang <dhdang@apm.com>
+> Signed-off-by: Tanmay Inamdar <tinamdar@apm.com>
+
+I folded this fix into the original patch and updated my branch.  Thanks!
+
+> ---
+>  drivers/pci/host/pci-xgene.c | 2 --
+>  1 file changed, 2 deletions(-)
 >
-Thanks Mike !!
+> diff --git a/drivers/pci/host/pci-xgene.c b/drivers/pci/host/pci-xgene.c
+> index 3684126..105fd83 100644
+> --- a/drivers/pci/host/pci-xgene.c
+> +++ b/drivers/pci/host/pci-xgene.c
+> @@ -137,8 +137,6 @@ static bool xgene_pcie_hide_rc_bars(struct pci_bus *bus, int offset)
+>  static void __iomem *xgene_pcie_map_bus(struct pci_bus *bus, unsigned int devfn,
+>                               int offset)
+>  {
+> -       struct xgene_pcie_port *port = bus->sysdata;
+> -
+>         if ((pci_is_root_bus(bus) && devfn != 0) ||
+>             xgene_pcie_hide_rc_bars(bus, offset))
+>                 return NULL;
+> --
+> 1.9.1
+>
