@@ -1,24 +1,45 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Thu, 18 Jun 2015 17:17:55 +0100
-Subject: [PATCH v3] arm64: dts: add device tree for ARM SMM-A53x2 on
- LogicTile Express 20MG
-In-Reply-To: <1434108762-5637-1-git-send-email-kristina.martsenko@arm.com>
-References: <1434108762-5637-1-git-send-email-kristina.martsenko@arm.com>
-Message-ID: <5582EF33.7070707@arm.com>
+From: sudipm.mukherjee@gmail.com (Sudip Mukherjee)
+Date: Thu, 18 Jun 2015 21:49:05 +0530
+Subject: [PATCH v2 5/7] samples: kdbus: disable for mn10300
+In-Reply-To: <20150618143958.GA8830@kroah.com>
+References: <1434629873-11668-1-git-send-email-sudipm.mukherjee@gmail.com>
+ <1434629873-11668-6-git-send-email-sudipm.mukherjee@gmail.com>
+ <20150618143958.GA8830@kroah.com>
+Message-ID: <20150618161905.GB21198@sudip-PC>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Thu, Jun 18, 2015 at 07:39:58AM -0700, Greg Kroah-Hartman wrote:
+> On Thu, Jun 18, 2015 at 05:47:51PM +0530, Sudip Mukherjee wrote:
+> > While building it failed with:
+> > In function 'prime_new':
+> > error: '__NR_memfd_create' undeclared (first use in this function)
+> > 
+> > memfd_create syscall has not yet been implemented for mn10300.
+> > so disable compilation of samples/kdbus for now with mn10300.
+> > 
+> > Signed-off-by: Sudip Mukherjee <sudip@vectorindia.org>
+> > ---
+> >  samples/Kconfig | 2 +-
+> >  1 file changed, 1 insertion(+), 1 deletion(-)
+> > 
+> > diff --git a/samples/Kconfig b/samples/Kconfig
+> > index a4c6b2f..20c55af 100644
+> > --- a/samples/Kconfig
+> > +++ b/samples/Kconfig
+> > @@ -57,7 +57,7 @@ config SAMPLE_KDB
+> >  
+> >  config SAMPLE_KDBUS
+> >  	bool "Build kdbus API example"
+> > -	depends on KDBUS
+> > +	depends on KDBUS && !MN10300
+> 
+> Why not just add the memfd syscall to this arch?
+Yes, I intend to. But for now this will fix allmodconfig.
+>I thought someone had already sent such a patch in a while ago.
+Then it is still not merged. :(
+I will try to find that patch adding memfd syscall. And if i find it whom
+shall I forward it to?
 
-
-On 12/06/15 12:32, Kristina Martsenko wrote:
-> Add a DTS file for the MP2 Cortex-A53 Soft Macrocell Model implemented
-> on a LogicTile Express 20MG (V2F-1XV7) daughterboard. This is based on
-> the version that's currently available from the ARM DTS repository [1].
->
-
-Acked-by: Sudeep Holla <sudeep.holla@arm.com>
-
-Need to check if it's possible to get this in for v4.2.
-
-Regards,
-Sudeep
+regards
+sudip
