@@ -1,57 +1,33 @@
 From: sudipm.mukherjee@gmail.com (Sudip Mukherjee)
-Date: Thu, 18 Jun 2015 17:47:48 +0530
-Subject: [PATCH v2 2/7] mn10300: Provide dummy dma_alloc_attrs() and
- dma_free_attrs()
+Date: Thu, 18 Jun 2015 17:47:49 +0530
+Subject: [PATCH v2 3/7] mmc: mediatek: build as module
 In-Reply-To: <1434629873-11668-1-git-send-email-sudipm.mukherjee@gmail.com>
 References: <1434629873-11668-1-git-send-email-sudipm.mukherjee@gmail.com>
-Message-ID: <1434629873-11668-3-git-send-email-sudipm.mukherjee@gmail.com>
+Message-ID: <1434629873-11668-4-git-send-email-sudipm.mukherjee@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-allmodconfig fails to build with following errors.
+while building as module with mn10300 it failed with:
 
-drivers/media/platform/sti/bdisp/bdisp-hw.c:
-	In function 'bdisp_hw_free_nodes':
-drivers/media/platform/sti/bdisp/bdisp-hw.c:132:3: error:
-	implicit declaration of function 'dma_free_attrs'
-
-drivers/media/platform/sti/bdisp/bdisp-hw.c:
-	In function 'bdisp_hw_alloc_nodes':
-drivers/media/platform/sti/bdisp/bdisp-hw.c:157:2: error:
-	implicit declaration of function 'dma_alloc_attrs'
-
-mn10300 does not provide those functions at this time.
-Provide dummy implementations to avoid build errors.
+warning: data definition has no type or storage class
+	module_init(__driver##_init);
 
 Signed-off-by: Sudip Mukherjee <sudip@vectorindia.org>
 ---
+ drivers/mmc/host/mtk-sd.c | 1 +
+ 1 file changed, 1 insertion(+)
 
-copied from https://lkml.org/lkml/2015/4/22/346
-
- arch/mn10300/include/asm/dma-mapping.h | 13 +++++++++++++
- 1 file changed, 13 insertions(+)
-
-diff --git a/arch/mn10300/include/asm/dma-mapping.h b/arch/mn10300/include/asm/dma-mapping.h
-index a18abfc..d589c5e 100644
---- a/arch/mn10300/include/asm/dma-mapping.h
-+++ b/arch/mn10300/include/asm/dma-mapping.h
-@@ -183,4 +183,17 @@ static inline int dma_get_sgtable(struct device *dev, struct sg_table *sgt,
- 	return -EINVAL;
- }
+diff --git a/drivers/mmc/host/mtk-sd.c b/drivers/mmc/host/mtk-sd.c
+index 7c20f28..ea6ae36 100644
+--- a/drivers/mmc/host/mtk-sd.c
++++ b/drivers/mmc/host/mtk-sd.c
+@@ -33,6 +33,7 @@
+ #include <linux/mmc/mmc.h>
+ #include <linux/mmc/sd.h>
+ #include <linux/mmc/sdio.h>
++#include <linux/module.h>
  
-+static inline void *dma_alloc_attrs(struct device *dev, size_t size,
-+				    dma_addr_t *dma_handle, gfp_t flag,
-+				    struct dma_attrs *attrs)
-+{
-+	return NULL;
-+}
-+
-+static inline void dma_free_attrs(struct device *dev, size_t size,
-+				  void *vaddr, dma_addr_t dma_handle,
-+				  struct dma_attrs *attrs)
-+{
-+}
-+
- #endif
+ #define MAX_BD_NUM          1024
+ 
 -- 
 1.8.1.2
