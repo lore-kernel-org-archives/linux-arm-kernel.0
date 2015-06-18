@@ -1,35 +1,52 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Thu, 18 Jun 2015 15:55:05 +0100
-Subject: [PATCH v2 1/3] arm64: kernel: rename __cpu_suspend to keep it
- aligned with arm
-In-Reply-To: <1434638494-514-2-git-send-email-sudeep.holla@arm.com>
-References: <1434462640-19613-1-git-send-email-sudeep.holla@arm.com>
- <1434638494-514-1-git-send-email-sudeep.holla@arm.com>
- <1434638494-514-2-git-send-email-sudeep.holla@arm.com>
-Message-ID: <20150618145505.GE31480@e104818-lin.cambridge.arm.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Thu, 18 Jun 2015 15:56:30 +0100
+Subject: [PATCH] KVM: arm/arm64: vgic: Avoid injecting reserved IRQ numbers
+Message-ID: <1434639390-10450-1-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 18, 2015 at 03:41:32PM +0100, Sudeep Holla wrote:
-> This patch renames __cpu_suspend to cpu_suspend so that it's aligned
-> with ARM32. It also removes the redundant wrapper created.
-> 
-> This is in preparation to implement generic PSCI system suspend using
-> the cpu_{suspend,resume} which now has the same interface on both ARM
-> and ARM64.
-> 
-> Cc: Mark Rutland <mark.rutland@arm.com>
-> Reviewed-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-> Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
-> ---
->  arch/arm64/include/asm/cpuidle.h | 8 ++------
->  arch/arm64/include/asm/suspend.h | 2 +-
->  arch/arm64/kernel/cpuidle.c      | 4 ++--
->  arch/arm64/kernel/psci.c         | 2 +-
->  arch/arm64/kernel/suspend.c      | 6 +++---
->  5 files changed, 9 insertions(+), 13 deletions(-)
+Commit fd1d0ddf2ae9 (KVM: arm/arm64: check IRQ number on userland
+injection) rightly limited the range of interrupts userspace can
+inject in a guest, but failed to consider the (unlikely) case where
+a guest is configured with 1024 interrupts.
 
-Acked-by: Catalin Marinas <catalin.marinas@arm.com>
+In this case, interrupts ranging from 1020 to 1023 are unuseable,
+as they have a special meaning for the GIC CPU interface.
 
-Does this patch depend on the other patches from Mark and Lorenzo or it
-can be merged earlier?
+Make sure that these number cannot be used as an IRQ. Also delete
+a redundant (and similarily buggy) check in kvm_set_irq.
+
+Reported-by: Peter Maydell <peter.maydell@linaro.org>
+Cc: Andre Przywara <andre.przywara@arm.com>
+Cc: <stable@vger.kernel.org> # 4.1, 4.0, 3.19, 3.18
+Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+---
+ virt/kvm/arm/vgic.c | 5 +----
+ 1 file changed, 1 insertion(+), 4 deletions(-)
+
+diff --git a/virt/kvm/arm/vgic.c b/virt/kvm/arm/vgic.c
+index 78fb820..950064a 100644
+--- a/virt/kvm/arm/vgic.c
++++ b/virt/kvm/arm/vgic.c
+@@ -1561,7 +1561,7 @@ int kvm_vgic_inject_irq(struct kvm *kvm, int cpuid, unsigned int irq_num,
+ 			goto out;
+ 	}
+ 
+-	if (irq_num >= kvm->arch.vgic.nr_irqs)
++	if (irq_num >= min(kvm->arch.vgic.nr_irqs, 1020))
+ 		return -EINVAL;
+ 
+ 	vcpu_id = vgic_update_irq_pending(kvm, cpuid, irq_num, level);
+@@ -2161,10 +2161,7 @@ int kvm_set_irq(struct kvm *kvm, int irq_source_id,
+ 
+ 	BUG_ON(!vgic_initialized(kvm));
+ 
+-	if (spi > kvm->arch.vgic.nr_irqs)
+-		return -EINVAL;
+ 	return kvm_vgic_inject_irq(kvm, 0, spi, level);
+-
+ }
+ 
+ /* MSI not implemented yet */
+-- 
+2.1.4
