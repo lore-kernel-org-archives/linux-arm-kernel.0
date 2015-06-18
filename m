@@ -1,63 +1,27 @@
-From: vladimir_zapolskiy@mentor.com (Vladimir Zapolskiy)
-Date: Thu, 18 Jun 2015 18:26:02 +0300
-Subject: [PATCH v2 0/2] genalloc: add support of multiple gen_pools per device
-Message-ID: <1434641162-23908-1-git-send-email-vladimir_zapolskiy@mentor.com>
+From: linux@roeck-us.net (Guenter Roeck)
+Date: Thu, 18 Jun 2015 08:30:03 -0700
+Subject: [PATCH 01/44] kernel: Add support for poweroff handler call chain
+In-Reply-To: <55821936.4040704@codeaurora.org>
+References: <1412659726-29957-1-git-send-email-linux@roeck-us.net>
+ <1412659726-29957-2-git-send-email-linux@roeck-us.net>
+ <55821936.4040704@codeaurora.org>
+Message-ID: <20150618153003.GA19224@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This is continuation of development of a proposed earlier
-functionality to have multiple gen_pools per device, see
-https://lkml.org/lkml/2015/6/8/588 discussion.
+On Wed, Jun 17, 2015 at 06:04:54PM -0700, Stephen Boyd wrote:
+[ ... ]
+> 
+> What happened to this series? I want to add shutdown support to my
+> platform and I need to write a register on the PMIC in one driver to
+> configure it for shutdown instead of restart and then write an MMIO
+> register to tell the PMIC to actually do the shutdown in another driver.
+> It seems that the notifier solves this case for me, albeit with the
+> slight complication that I need to order the two with some priority.
+> 
+Can you use the .shutdown driver callback instead ?
 
-The main difference with the originally sent change is that instead of
-adding two new interfaces gen_pool_get_named() and
-devm_gen_pool_create_named(), it is considered better to change
-signatures of the existing exported functions, because
-devm_gen_pool_create() may be misused -- it is permitted to create
-several gen_pool objects assigned to the same device and
-gen_pool_get() returns only the first found object from device devres
-data due to missing devres_match helper, fortunately currently
-existing genalloc clients are not tainted -- at the moment the sole
-user of devm_gen_pool_create() is drivers/misc/sram.c.
+I see other drivers use that, and check for system_state == SYSTEM_POWER_OFF
+to power off the hardware.
 
-The change is split into two parts:
-- update gen_pool_get() and devm_gen_pool_create() interfaces
-  on client side
-- implement proper handling of new gen_pool "name" argument
-  and extend of_gen_pool_get() functionality based on it
-
-Both changes are backward compatible in sense of functionality.
-
-The lib/genalloc.c changes are based on two patches from -mm tree:
-- http://ozlabs.org/~akpm/mmots/broken-out/genalloc-rename-dev_get_gen_pool-to-gen_pool_get.patch
-- http://ozlabs.org/~akpm/mmots/broken-out/genalloc-rename-of_get_named_gen_pool-to-of_gen_pool_get.patch
-
-The client side changes are based on linux-next/master branch.
-
-Changes from v1 to v2:
-- addressed Andrew's valuable review comments, namely
--- devm_gen_pool_create() is aware of attempts to register ambiguously
-   addressed gen_pool objects and now it returns ERR_PTR() on error,
--- memory management to store gen_pool name literal is done on
-   genalloc side,
--- replaced -1 with NUMA_NO_NODE in nid argument description,
-- minor updates in of_gen_pool_get() change to respect OF_DYNAMIC
-- instead of adding two new functions the existing functions
-  gen_pool_get() (at91, imx5m, imx6 and CODA driver clients) and
-  devm_gen_pool_create() (sram client) are updated.
-
-Vladimir Zapolskiy (2):
-  genalloc: add name arg to gen_pool_get() and devm_gen_pool_create()
-  genalloc: add support of multiple gen_pools per device
-
- arch/arm/mach-at91/pm.c                   |  2 +-
- arch/arm/mach-imx/pm-imx5.c               |  2 +-
- arch/arm/mach-imx/pm-imx6.c               |  2 +-
- drivers/media/platform/coda/coda-common.c |  2 +-
- drivers/misc/sram.c                       |  8 +--
- include/linux/genalloc.h                  |  6 +-
- lib/genalloc.c                            | 99 +++++++++++++++++++++++--------
- 7 files changed, 85 insertions(+), 36 deletions(-)
-
--- 
-2.1.4
+Guenter
