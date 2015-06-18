@@ -1,52 +1,45 @@
 From: al.stone@linaro.org (Al Stone)
-Date: Thu, 18 Jun 2015 16:36:05 -0600
-Subject: [PATCH v2 0/3] Correct for ACPI 5.1->6.0 spec changes in MADT GICC
- entries
-Message-ID: <1434666968-1543-1-git-send-email-al.stone@linaro.org>
+Date: Thu, 18 Jun 2015 16:36:06 -0600
+Subject: [PATCH v2 1/3] ACPI : introduce macros for using the ACPI
+ specification version
+In-Reply-To: <1434666968-1543-1-git-send-email-al.stone@linaro.org>
+References: <1434666968-1543-1-git-send-email-al.stone@linaro.org>
+Message-ID: <1434666968-1543-2-git-send-email-al.stone@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In the ACPI 5.1 version of the spec, the struct for the GICC subtable
-(struct acpi_madt_generic_interrupt) of the MADT is 76 bytes long; in
-ACPI 6.0, the struct is 80 bytes long.  But, there is only one definition
-in ACPICA for this struct -- and that is the 6.0 version.  Hence, when
-BAD_MADT_ENTRY() compares the struct size to the length in the GICC
-subtable, it fails if 5.1 structs are in use, and there are systems in
-the wild that have them.
+Add the ACPI_SPEC_VERSION() macro to build a proper version number from
+a major and minor revision number.  Add also the ACPI_FADT_SPEC_VERSION
+that constructs a proper version number from the entries in the current
+FADT.
 
-Note that this was found in linux-next and these patches apply against
-that tree and the arm64 kernel tree; 4.1-rc8 does not appear to have this
-problem since it still has the 5.1 struct definition.
+These macros are added in order to simplify retrieving and comparing ACPI
+specification version numbers, since this is becoming a more frequent need.
+In particular, there are some architectures that require at least a certain
+version of the spec, and there are differences in some structure sizes that
+have changed with recent versions but can only be tracked by spec version
+number.
 
-Even though there is precendent in ia64 code for ignoring the changes in
-size, this patch set instead tries to verify correctness.  The first patch
-in the set adds macros for easily using the ACPI spec version.  The second
-patch adds the BAD_MADT_GICC_ENTRY() macro that uses the version macros to
-check the GICC subtable only, accounting for the difference in specification
-versions that are possible.  The final patch replaces BAD_MADT_ENTRY usage
-with the BAD_MADT_GICC_ENTRY macro in arm64 code, which is currently the
-only architecture affected.  The BAD_MADT_ENTRY() will continue to work as
-is for all other MADT subtables.
+Signed-off-by: Al Stone <al.stone@linaro.org>
+---
+ include/linux/acpi.h | 5 +++++
+ 1 file changed, 5 insertions(+)
 
-I have tested these patches on an APM Mustang with version 1.15 firmware,
-where the problem was found, and they fix the problem.
-
-Changes for v2:
-  -- Replace magic constants with proper defines (Lorenzo)
-  -- Minor syntax clean-up noted by checkpatch
-  -- Send out CCs properly this time
-  -- Minor clean-up of the paragraphs in this cover letter
-
-
-Al Stone (3):
-  ACPI : introduce macros for using the ACPI specification version
-  ACPI: add BAD_MADT_GICC_ENTRY() macro
-  ACPI / ARM64 : use the new BAD_MADT_GICC_ENTRY macro
-
- arch/arm64/kernel/smp.c   |  2 +-
- drivers/irqchip/irq-gic.c |  2 +-
- include/linux/acpi.h      | 15 +++++++++++++++
- 3 files changed, 17 insertions(+), 2 deletions(-)
-
+diff --git a/include/linux/acpi.h b/include/linux/acpi.h
+index a4acb55..33ed313 100644
+--- a/include/linux/acpi.h
++++ b/include/linux/acpi.h
+@@ -48,6 +48,11 @@
+ #include <acpi/acpi_io.h>
+ #include <asm/acpi.h>
+ 
++#define ACPI_SPEC_VERSION(major, minor)	((major<<8)|minor)
++#define ACPI_FADT_SPEC_VERSION	\
++	ACPI_SPEC_VERSION(acpi_gbl_FADT.header.revision, \
++			  acpi_gbl_FADT.minor_revision)
++
+ static inline acpi_handle acpi_device_handle(struct acpi_device *adev)
+ {
+ 	return adev ? adev->handle : NULL;
 -- 
 2.4.0
