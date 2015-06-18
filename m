@@ -1,98 +1,24 @@
-From: m.smarduch@samsung.com (Mario Smarduch)
-Date: Thu, 18 Jun 2015 16:49:36 -0700
-Subject: [PATCH v2 2/2] arm: KVM: keep arm vfp/simd exit handling
- consistent with arm64
-In-Reply-To: <5582FF76.6060100@arm.com>
-References: <1434491452-19177-1-git-send-email-m.smarduch@samsung.com>
- <1434491452-19177-3-git-send-email-m.smarduch@samsung.com>
- <5582FF76.6060100@arm.com>
-Message-ID: <55835910.3060601@samsung.com>
+From: tglx@linutronix.de (Thomas Gleixner)
+Date: Fri, 19 Jun 2015 01:52:10 +0200 (CEST)
+Subject: [PATCH v2 2/3] IRQ/Gic-V3: Change arm-gic-its to support the
+ Mbigen interrupt
+In-Reply-To: <557E794D.2080705@huawei.com>
+References: <1434077399-32200-1-git-send-email-majun258@huawei.com>
+ <1434077399-32200-3-git-send-email-majun258@huawei.com>
+ <alpine.DEB.2.11.1506121230320.3786@nanos> <557E794D.2080705@huawei.com>
+Message-ID: <alpine.DEB.2.11.1506190150000.4107@nanos>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/18/2015 10:27 AM, Marc Zyngier wrote:
-> On 16/06/15 22:50, Mario Smarduch wrote:
->> After enhancing arm64 FP/SIMD exit handling, FP/SIMD exit branch is moved
->> to guest trap handling. This keeps exiting handling flow between both
->> architectures consistent.
->>
->> Signed-off-by: Mario Smarduch <m.smarduch@samsung.com>
->> ---
->>  arch/arm/kvm/interrupts.S |   12 +++++++-----
->>  1 file changed, 7 insertions(+), 5 deletions(-)
->>
->> diff --git a/arch/arm/kvm/interrupts.S b/arch/arm/kvm/interrupts.S
->> index 79caf79..fca2c56 100644
->> --- a/arch/arm/kvm/interrupts.S
->> +++ b/arch/arm/kvm/interrupts.S
->> @@ -363,10 +363,6 @@ hyp_hvc:
->>  	@ Check syndrome register
->>  	mrc	p15, 4, r1, c5, c2, 0	@ HSR
->>  	lsr	r0, r1, #HSR_EC_SHIFT
->> -#ifdef CONFIG_VFPv3
->> -	cmp	r0, #HSR_EC_CP_0_13
->> -	beq	switch_to_guest_vfp
->> -#endif
->>  	cmp	r0, #HSR_EC_HVC
->>  	bne	guest_trap		@ Not HVC instr.
->>  
->> @@ -406,6 +402,12 @@ THUMB(	orr	lr, #1)
->>  1:	eret
->>  
->>  guest_trap:
->> +#ifdef CONFIG_VFPv3
->> +	/* Guest accessed VFP/SIMD registers, save host, restore Guest */
->> +	cmp	r0, #HSR_EC_CP_0_13
->> +	beq	switch_to_guest_fpsimd
->> +#endif
->> +
->>  	load_vcpu			@ Load VCPU pointer to r0
->>  	str	r1, [vcpu, #VCPU_HSR]
->>  
->> @@ -478,7 +480,7 @@ guest_trap:
->>   * inject an undefined exception to the guest.
->>   */
->>  #ifdef CONFIG_VFPv3
->> -switch_to_guest_vfp:
->> +switch_to_guest_fpsimd:
-> 
-> Ah, I think I managed to confuse you in my previous comment.
-> On ARMv7, we call the floating point stuff VFP.
-> On ARMv8, we call it FP/SIMD.
+On Mon, 15 Jun 2015, majun (F) wrote:
+> ? 2015/6/12 18:48, Thomas Gleixner ??:
+> > Can you please provide a proper description of this mbigen chip and
+> > explain WHY you think that it needs all this special hackery?
 
-Ah I see, I'll update.
-> 
-> Not very consistent, I know...
-> 
->>  	load_vcpu			@ Load VCPU pointer to r0
+You carefully avoided to provide a proper description of this mbigen
+chip and how it needs to be integrated into the GIC/ITS whatever
+scenario.
 
-How about move it here - then it does not stick out like
-before.
+Thanks,
 
-guest_trap:
-        load_vcpu                       @ Load VCPU pointer to r0
-        str     r1, [vcpu, #VCPU_HSR]
-
-        @ Check if we need the fault information
-        lsr     r1, r1, #HSR_EC_SHIFT
-#ifdef CONFIG_VFPv3
-        /* Guest accessed VFP/SIMD registers, save host, restore Guest */
-        cmp     r1, #HSR_EC_CP_0_13
-        beq     switch_to_guest_vfp
-#endif
-
-
-Regarding "host_switch_to_hyp:" it has no reference but appears
-like a clean separator, that's on purpose?
-
-Thanks
-
-> 
-> It would be interesting to find out if we can make this load_vcpu part
-> of the common sequence (without spilling another register, of course).
-> Probably involves moving the exception class to r2.
-> 
-> Thanks,
-> 
-> 	M.
-> 
+	tglx
