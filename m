@@ -1,234 +1,97 @@
 From: heiko@sntech.de (Heiko Stuebner)
-Date: Thu, 18 Jun 2015 16:18:32 +0200
-Subject: [PATCH v2 5/9] clk: rockchip: add support for phase inverters
+Date: Thu, 18 Jun 2015 16:18:33 +0200
+Subject: [PATCH v2 6/9] clk: rockchip: define the inverters of rk3066/rk3188
+ and rk3288
 In-Reply-To: <1434637116-17124-1-git-send-email-heiko@sntech.de>
 References: <1434637116-17124-1-git-send-email-heiko@sntech.de>
-Message-ID: <1434637116-17124-6-git-send-email-heiko@sntech.de>
+Message-ID: <1434637116-17124-7-git-send-email-heiko@sntech.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Most Rockchip socs have optional phase inverters connected to some
-clocks that move the clock-phase by 180 degrees.
-While not having any actual influence on the rate, the inverter
-provides its own simple recalc_rate callback as relying on the
-fallback in the framework is for "lazy developers" according
-to the documentation in the code.
+Both soc series' have inverters on the hsadc and camera interface clock
+paths. So define them using the newly added inverter type.
 
 Signed-off-by: Heiko Stuebner <heiko@sntech.de>
 ---
- drivers/clk/rockchip/Makefile       |   1 +
- drivers/clk/rockchip/clk-inverter.c | 126 ++++++++++++++++++++++++++++++++++++
- drivers/clk/rockchip/clk.c          |   7 ++
- drivers/clk/rockchip/clk.h          |  20 ++++++
- 4 files changed, 154 insertions(+)
- create mode 100644 drivers/clk/rockchip/clk-inverter.c
+ drivers/clk/rockchip/clk-rk3188.c | 9 ++++++++-
+ drivers/clk/rockchip/clk-rk3288.c | 7 ++++++-
+ 2 files changed, 14 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/clk/rockchip/Makefile b/drivers/clk/rockchip/Makefile
-index 2714097..fd71c7d 100644
---- a/drivers/clk/rockchip/Makefile
-+++ b/drivers/clk/rockchip/Makefile
-@@ -6,6 +6,7 @@ obj-y	+= clk-rockchip.o
- obj-y	+= clk.o
- obj-y	+= clk-pll.o
- obj-y	+= clk-cpu.o
-+obj-y	+= clk-inverter.o
- obj-y	+= clk-mmc-phase.o
- obj-$(CONFIG_RESET_CONTROLLER)	+= softrst.o
+diff --git a/drivers/clk/rockchip/clk-rk3188.c b/drivers/clk/rockchip/clk-rk3188.c
+index e4f9d47..a9ab4f9 100644
+--- a/drivers/clk/rockchip/clk-rk3188.c
++++ b/drivers/clk/rockchip/clk-rk3188.c
+@@ -235,6 +235,7 @@ static struct rockchip_pll_clock rk3188_pll_clks[] __initdata = {
+ #define MFLAGS CLK_MUX_HIWORD_MASK
+ #define DFLAGS CLK_DIVIDER_HIWORD_MASK
+ #define GFLAGS (CLK_GATE_HIWORD_MASK | CLK_GATE_SET_TO_DISABLE)
++#define IFLAGS ROCKCHIP_INVERTER_HIWORD_MASK
  
-diff --git a/drivers/clk/rockchip/clk-inverter.c b/drivers/clk/rockchip/clk-inverter.c
-new file mode 100644
-index 0000000..db852cd
---- /dev/null
-+++ b/drivers/clk/rockchip/clk-inverter.c
-@@ -0,0 +1,126 @@
-+/*
-+ * Copyright 2015 Heiko Stuebner <heiko@sntech.de>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License as published by
-+ * the Free Software Foundation; either version 2 of the License, or
-+ * (at your option) any later version.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ */
-+
-+#include <linux/slab.h>
-+#include <linux/clk-provider.h>
-+#include "clk.h"
-+
-+struct rockchip_inv_clock {
-+	struct clk_hw	hw;
-+	void __iomem	*reg;
-+	int		shift;
-+	int		flags;
-+	spinlock_t	*lock;
-+};
-+
-+#define to_inv_clock(_hw) container_of(_hw, struct rockchip_inv_clock, hw)
-+
-+#define INVERTER_MASK 0x1
-+
-+static unsigned long rockchip_inv_recalc(struct clk_hw *hw,
-+					 unsigned long parent_rate)
-+{
-+	return parent_rate;
-+}
-+
-+static int rockchip_inv_get_phase(struct clk_hw *hw)
-+{
-+	struct rockchip_inv_clock *inv_clock = to_inv_clock(hw);
-+	u32 val;
-+
-+	val = readl(inv_clock->reg) >> (inv_clock->shift) & INVERTER_MASK;
-+	return val ? 180 : 0;
-+}
-+
-+static int rockchip_inv_set_phase(struct clk_hw *hw, int degrees)
-+{
-+	struct rockchip_inv_clock *inv_clock = to_inv_clock(hw);
-+	u32 val;
-+
-+	switch (degrees) {
-+	case 0:
-+		val = 0;
-+		break;
-+	case 180:
-+		val = 1;
-+		break;
-+	default:
-+		pr_err("%s: unsupported phase %d for %s\n",
-+		       __func__, degrees, __clk_get_name(hw->clk));
-+		return -EINVAL;
-+	}
-+
-+	if (inv_clock->flags & ROCKCHIP_INVERTER_HIWORD_MASK) {
-+		writel(HIWORD_UPDATE(val, INVERTER_MASK, inv_clock->shift),
-+		       inv_clock->reg);
-+	} else {
-+		unsigned long flags;
-+		u32 reg;
-+
-+		spin_lock_irqsave(inv_clock->lock, flags);
-+
-+		reg = readl(inv_clock->reg);
-+		reg &= ~BIT(inv_clock->shift);
-+		reg |= val;
-+		writel(reg, inv_clock->reg);
-+
-+		spin_unlock_irqrestore(inv_clock->lock, flags);
-+	}
-+
-+	return 0;
-+}
-+
-+static const struct clk_ops rockchip_inv_clk_ops = {
-+	.recalc_rate	= rockchip_inv_recalc,
-+	.get_phase	= rockchip_inv_get_phase,
-+	.set_phase	= rockchip_inv_set_phase,
-+};
-+
-+struct clk *rockchip_clk_register_inverter(const char *name,
-+				const char *const *parent_names, u8 num_parents,
-+				void __iomem *reg, int shift, int flags,
-+				spinlock_t *lock)
-+{
-+	struct clk_init_data init;
-+	struct rockchip_inv_clock *inv_clock;
-+	struct clk *clk;
-+
-+	inv_clock = kmalloc(sizeof(*inv_clock), GFP_KERNEL);
-+	if (!inv_clock)
-+		return NULL;
-+
-+	init.num_parents = num_parents;
-+	init.flags = CLK_SET_RATE_PARENT;
-+	init.parent_names = parent_names;
-+	init.ops = &rockchip_inv_clk_ops;
-+
-+	inv_clock->hw.init = &init;
-+	inv_clock->reg = reg;
-+	inv_clock->shift = shift;
-+	inv_clock->flags = flags;
-+	inv_clock->lock = lock;
-+
-+	if (name)
-+		init.name = name;
-+
-+	clk = clk_register(NULL, &inv_clock->hw);
-+	if (IS_ERR(clk))
-+		goto err_free;
-+
-+	return clk;
-+
-+err_free:
-+	kfree(inv_clock);
-+	return NULL;
-+}
-diff --git a/drivers/clk/rockchip/clk.c b/drivers/clk/rockchip/clk.c
-index 052b94d..2493881 100644
---- a/drivers/clk/rockchip/clk.c
-+++ b/drivers/clk/rockchip/clk.c
-@@ -277,6 +277,13 @@ void __init rockchip_clk_register_branches(
- 				list->div_shift
- 			);
- 			break;
-+		case branch_inverter:
-+			clk = rockchip_clk_register_inverter(
-+				list->name, list->parent_names,
-+				list->num_parents,
-+				reg_base + list->muxdiv_offset,
-+				list->div_shift, list->div_flags, &clk_lock);
-+			break;
- 		}
+ /* 2 ^ (val + 1) */
+ static struct clk_div_table div_core_peri_t[] = {
+@@ -310,6 +311,8 @@ static struct rockchip_clk_branch common_clk_branches[] __initdata = {
  
- 		/* none of the cases above matched */
-diff --git a/drivers/clk/rockchip/clk.h b/drivers/clk/rockchip/clk.h
-index 501f02e..b72dad0 100644
---- a/drivers/clk/rockchip/clk.h
-+++ b/drivers/clk/rockchip/clk.h
-@@ -182,6 +182,13 @@ struct clk *rockchip_clk_register_mmc(const char *name,
- 				const char *const *parent_names, u8 num_parents,
- 				void __iomem *reg, int shift);
+ 	GATE(0, "pclkin_cif0", "ext_cif0", 0,
+ 			RK2928_CLKGATE_CON(3), 3, GFLAGS),
++	INVERTER(0, "pclk_cif0", "pclkin_cif0",
++			RK2928_CLKSEL_CON(30), 8, IFLAGS),
  
-+#define ROCKCHIP_INVERTER_HIWORD_MASK	BIT(0)
-+
-+struct clk *rockchip_clk_register_inverter(const char *name,
-+				const char *const *parent_names, u8 num_parents,
-+				void __iomem *reg, int shift, int flags,
-+				spinlock_t *lock);
-+
- #define PNAME(x) static const char *const x[] __initconst
+ 	/*
+ 	 * the 480m are generated inside the usb block from these clocks,
+@@ -334,8 +337,10 @@ static struct rockchip_clk_branch common_clk_branches[] __initdata = {
+ 	COMPOSITE_FRAC(0, "hsadc_frac", "hsadc_src", 0,
+ 			RK2928_CLKSEL_CON(23), 0,
+ 			RK2928_CLKGATE_CON(2), 7, GFLAGS),
+-	MUX(SCLK_HSADC, "sclk_hsadc", mux_sclk_hsadc_p, 0,
++	MUX(0, "sclk_hsadc_out", mux_sclk_hsadc_p, 0,
+ 			RK2928_CLKSEL_CON(22), 4, 2, MFLAGS),
++	INVERTER(SCLK_HSADC, "sclk_hsadc", "sclk_hsadc_out",
++			RK2928_CLKSEL_CON(22), 7, IFLAGS),
  
- enum rockchip_clk_branch_type {
-@@ -191,6 +198,7 @@ enum rockchip_clk_branch_type {
- 	branch_fraction_divider,
- 	branch_gate,
- 	branch_mmc,
-+	branch_inverter,
+ 	COMPOSITE_NOMUX(SCLK_SARADC, "sclk_saradc", "xin24m", 0,
+ 			RK2928_CLKSEL_CON(24), 8, 8, DFLAGS,
+@@ -557,6 +562,8 @@ static struct rockchip_clk_branch rk3066a_clk_branches[] __initdata = {
+ 
+ 	GATE(0, "pclkin_cif1", "ext_cif1", 0,
+ 			RK2928_CLKGATE_CON(3), 4, GFLAGS),
++	INVERTER(0, "pclk_cif1", "pclkin_cif1",
++			RK2928_CLKSEL_CON(30), 12, IFLAGS),
+ 
+ 	COMPOSITE(0, "aclk_gpu_src", mux_pll_src_cpll_gpll_p, 0,
+ 			RK2928_CLKSEL_CON(33), 8, 1, MFLAGS, 0, 5, DFLAGS,
+diff --git a/drivers/clk/rockchip/clk-rk3288.c b/drivers/clk/rockchip/clk-rk3288.c
+index df9dc96..a8bad7d 100644
+--- a/drivers/clk/rockchip/clk-rk3288.c
++++ b/drivers/clk/rockchip/clk-rk3288.c
+@@ -223,6 +223,7 @@ static struct clk_div_table div_hclk_cpu_t[] = {
+ #define MFLAGS CLK_MUX_HIWORD_MASK
+ #define DFLAGS CLK_DIVIDER_HIWORD_MASK
+ #define GFLAGS (CLK_GATE_HIWORD_MASK | CLK_GATE_SET_TO_DISABLE)
++#define IFLAGS ROCKCHIP_INVERTER_HIWORD_MASK
+ 
+ static struct rockchip_clk_branch rk3288_clk_branches[] __initdata = {
+ 	/*
+@@ -592,8 +593,10 @@ static struct rockchip_clk_branch rk3288_clk_branches[] __initdata = {
+ 	COMPOSITE(0, "hsadc_src", mux_pll_src_cpll_gpll_p, 0,
+ 			RK3288_CLKSEL_CON(22), 0, 1, MFLAGS, 8, 8, DFLAGS,
+ 			RK3288_CLKGATE_CON(2), 6, GFLAGS),
+-	MUX(SCLK_HSADC, "sclk_hsadc_out", mux_hsadcout_p, 0,
++	MUX(0, "sclk_hsadc_out", mux_hsadcout_p, 0,
+ 			RK3288_CLKSEL_CON(22), 4, 1, MFLAGS),
++	INVERTER(SCLK_HSADC, "sclk_hsadc", "sclk_hsadc_out",
++			RK3288_CLKSEL_CON(22), 7, IFLAGS),
+ 
+ 	GATE(0, "jtag", "ext_jtag", 0,
+ 			RK3288_CLKGATE_CON(4), 14, GFLAGS),
+@@ -768,7 +771,9 @@ static struct rockchip_clk_branch rk3288_clk_branches[] __initdata = {
+ 	 */
+ 
+ 	GATE(0, "pclk_vip_in", "ext_vip", 0, RK3288_CLKGATE_CON(16), 0, GFLAGS),
++	INVERTER(0, "pclk_vip", "pclk_vip_in", RK3288_CLKSEL_CON(29), 4, IFLAGS),
+ 	GATE(0, "pclk_isp_in", "ext_isp", 0, RK3288_CLKGATE_CON(16), 3, GFLAGS),
++	INVERTER(0, "pclk_isp", "pclk_isp_in", RK3288_CLKSEL_CON(29), 3, IFLAGS),
  };
  
- struct rockchip_clk_branch {
-@@ -414,6 +422,18 @@ struct rockchip_clk_branch {
- 		.div_shift	= shift,			\
- 	}
- 
-+#define INVERTER(_id, cname, pname, io, is, if)			\
-+	{							\
-+		.id		= _id,				\
-+		.branch_type	= branch_inverter,		\
-+		.name		= cname,			\
-+		.parent_names	= (const char *[]){ pname },	\
-+		.num_parents	= 1,				\
-+		.muxdiv_offset	= io,				\
-+		.div_shift	= is,				\
-+		.div_flags	= if,				\
-+	}
-+
- void rockchip_clk_init(struct device_node *np, void __iomem *base,
- 		       unsigned long nr_clks);
- struct regmap *rockchip_clk_get_grf(void);
+ static const char *const rk3288_critical_clocks[] __initconst = {
 -- 
 2.1.4
