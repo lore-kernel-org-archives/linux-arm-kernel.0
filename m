@@ -1,43 +1,45 @@
-From: Dave.Martin@arm.com (Dave Martin)
-Date: Thu, 18 Jun 2015 14:54:29 +0100
-Subject: [PATCH] serial/amba-pl011: Disable interrupts around TX softirq
-Message-ID: <1434635669-23367-1-git-send-email-Dave.Martin@arm.com>
+From: yingjoe.chen@mediatek.com (Yingjoe Chen)
+Date: Thu, 18 Jun 2015 21:58:59 +0800
+Subject: [PATCH v2 2/2] pwm: add MediaTek display PWM driver support
+In-Reply-To: <1434622784.18278.39.camel@mtksdaap41>
+References: <1432214964-40644-1-git-send-email-yh.huang@mediatek.com>
+ <1432214964-40644-3-git-send-email-yh.huang@mediatek.com>
+ <20150612102046.GF19400@ulmo.nvidia.com>
+ <1434622784.18278.39.camel@mtksdaap41>
+Message-ID: <1434635939.22029.7.camel@mtksdaap41>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-pl011_tx_softirq() currently uses spin_{,un}lock(), which are not
-sufficient to inhibit pl011_int() from being triggered by a local
-IRQ and trying to re-take the same lock.  This can lead to
-deadlocks.
+On Thu, 2015-06-18 at 18:19 +0800, YH Huang wrote:
+> On Fri, 2015-06-12 at 12:20 +0200, Thierry Reding wrote:
+> > > +/* Shift log2(PWM_PERIOD_MAX + 1) as divisor */
+> > > +#define PWM_PERIOD_BIT_SHIFT	12
+> > 
+> > I wasn't very clear about this in my earlier review, so let me try to
+> > explain why I think this is confusing. You use this as a divisor, but
+> > you encode it as a shift. It's also PWM_PERIOD_MAX + 1, so I think it
+> > would make more sense to drop this, keep PWM_PERIOD_MAX as above and
+> > then replace the
+> > 
+> > 	>> PWM_PERIOD_BIT_SHIFT
+> > 	
+> > below by
+> > 
+> > 	/ (PWM_PERIOD_MAX + 1)
+> > 
+> 
+> Maybe I can change in this way:
+> Remove this: #define PWM_PERIOD_MAX		0x00000fff
+> Using ">> PWM_PERIOD_BIT_SHIFT" is faster than "/ (PWM_PERIOD_MAX + 1)"
+> Is this right?
 
-This patch uses the _irq() locking variants instead to ensure that
-pl011_int() handling for a given port is deferred until any
-pl011_tx_softirq() work for that port is complete.
 
-Fixes: 734745caeb9f serial/amba-pl011: Activate TX IRQ passively
-Signed-off-by: Dave Martin <Dave.Martin@arm.com>
-Tested-by: Robin Murphy <robin.murphy@arm.com>
-Cc: stable <stable@vger.kernel.org> # 4.1
+The place which use this shift is:
 
----
- drivers/tty/serial/amba-pl011.c |    4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+	clk_div = div_u64(rate * period_ns, NSEC_PER_SEC) >> 
+			  PWM_PERIOD_BIT_SHIFT;
 
-diff --git a/drivers/tty/serial/amba-pl011.c b/drivers/tty/serial/amba-pl011.c
-index 763eb20..0cc622a 100644
---- a/drivers/tty/serial/amba-pl011.c
-+++ b/drivers/tty/serial/amba-pl011.c
-@@ -1360,9 +1360,9 @@ static void pl011_tx_softirq(struct work_struct *work)
- 	struct uart_amba_port *uap =
- 		container_of(dwork, struct uart_amba_port, tx_softirq_work);
- 
--	spin_lock(&uap->port.lock);
-+	spin_lock_irq(&uap->port.lock);
- 	while (pl011_tx_chars(uap)) ;
--	spin_unlock(&uap->port.lock);
-+	spin_unlock_irq(&uap->port.lock);
- }
- 
- static void pl011_tx_irq_seen(struct uart_amba_port *uap)
--- 
-1.7.10.4
+div_u64 return u64. If we change >> to /, and somehow compiler didn't
+optimize that div into shift, it will cause build error.
+
+Joe.C
