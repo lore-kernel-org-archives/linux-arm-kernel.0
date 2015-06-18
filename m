@@ -1,39 +1,32 @@
-From: peter@senient.com (Peter Morrow)
-Date: Thu, 18 Jun 2015 15:25:24 +0100
-Subject: ARMADA-XP cpu1 .. cpu3 does not come online
-In-Reply-To: <20150618161245.56907a89@free-electrons.com>
-References: <20150618123833.GA28005@t440.home>
- <20150618161245.56907a89@free-electrons.com>
-Message-ID: <20150618142524.GB5323@t440.home>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Thu, 18 Jun 2015 16:27:19 +0200
+Subject: [PATCH v2 0/4] net/macb: add sama5d2 support
+Message-ID: <cover.1434637286.git.nicolas.ferre@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Thomas,
+Hi,
 
-On Thu, Jun 18, 2015 at 04:12:45PM +0200, Thomas Petazzoni wrote:
-> Dear Peter Morrow,
-> 
-> On Thu, 18 Jun 2015 13:38:33 +0100, Peter Morrow wrote:
-> 
-> > Linux: 4.0.5
-> > U-boot: v2015.04
-> 
-> So you're using the mainline U-Boot ? It's true that on our side,
-> we're only using the U-Boot provided by Marvell. I personally never had
-> the time to test the mainline U-Boot, so I have no idea what are the
-> usual issues/pitfalls in terms of compatibility with the mainline
-> kernel.
+This series is basically the support for another flavor of the GEM IP
+configuration. It ended up being a series because of some little fixes made to
+the binding documentation before adding the new compatibility string.
 
-That's correct.  Latest u-boot supports the mv78460-db so I had hoped
-to use mainline u-boot instead of the marvell supplied one.  I will
-however give the marvell u-boot a go this afternoon.
+Bye,
 
-Cheers,
-Peter
+v2: - fix bindings
+    - add sama5d2 compatibility string to the binding documentation
 
-> 
-> Thomas
-> -- 
-> Thomas Petazzoni, CTO, Free Electrons
-> Embedded Linux, Kernel and Android engineering
-> http://free-electrons.com
+Cyrille Pitchen (1):
+  net/macb: add config for Atmel sama5d2 SoCs
+
+Nicolas Ferre (3):
+  net/macb: bindings doc: fix compatibility string
+  net/macb: bindings doc/trivial: fix sama5d4 comment
+  net/macb: bindings doc: add sama5d2 compatibility sting
+
+ Documentation/devicetree/bindings/net/macb.txt | 5 +++--
+ drivers/net/ethernet/cadence/macb.c            | 8 ++++++++
+ 2 files changed, 11 insertions(+), 2 deletions(-)
+
+-- 
+2.1.3
