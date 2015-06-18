@@ -1,48 +1,30 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Thu, 18 Jun 2015 16:08:45 +0100
-Subject: [PATCH v2 1/3] arm64: kernel: rename __cpu_suspend to keep it
- aligned with arm
-In-Reply-To: <20150618145505.GE31480@e104818-lin.cambridge.arm.com>
-References: <1434462640-19613-1-git-send-email-sudeep.holla@arm.com>
- <1434638494-514-1-git-send-email-sudeep.holla@arm.com>
- <1434638494-514-2-git-send-email-sudeep.holla@arm.com>
- <20150618145505.GE31480@e104818-lin.cambridge.arm.com>
-Message-ID: <5582DEFD.8070106@arm.com>
+From: pebolle@tiscali.nl (Paul Bolle)
+Date: Thu, 18 Jun 2015 17:11:52 +0200
+Subject: [PATCH] clk: at91: add generated clock driver
+In-Reply-To: <20150618125918.GC27492@piout.net>
+References: <1434547409-12232-1-git-send-email-nicolas.ferre@atmel.com>
+ <1434611556.2385.8.camel@x220> <20150618093344.7d486e97@bbrezillon>
+ <55827606.7020908@atmel.com> <1434614090.2385.19.camel@x220>
+ <20150618125918.GC27492@piout.net>
+Message-ID: <1434640312.2385.112.camel@x220>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Alexandre,
+
+You know, I can't read Nicolas' mind, so I couldn't say from the patch
+itself that it was not a silly mistake.
+
+I also can't look into the future. I can however check lkml (at least
+the few weeks of lkml I keep at hand) and see whether there's another
+patch pending that would allow this driver to build.
+
+Discussing those two disabilities doesn't require a (much broader)
+discussion on how Atmel goes about their Linux business. At least, I
+hope it doesn't, because I don't actually have an opinion in that
+matter.
+
+Thanks,
 
 
-On 18/06/15 15:55, Catalin Marinas wrote:
-> On Thu, Jun 18, 2015 at 03:41:32PM +0100, Sudeep Holla wrote:
->> This patch renames __cpu_suspend to cpu_suspend so that it's aligned
->> with ARM32. It also removes the redundant wrapper created.
->>
->> This is in preparation to implement generic PSCI system suspend using
->> the cpu_{suspend,resume} which now has the same interface on both ARM
->> and ARM64.
->>
->> Cc: Mark Rutland <mark.rutland@arm.com>
->> Reviewed-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
->> Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
->> ---
->>   arch/arm64/include/asm/cpuidle.h | 8 ++------
->>   arch/arm64/include/asm/suspend.h | 2 +-
->>   arch/arm64/kernel/cpuidle.c      | 4 ++--
->>   arch/arm64/kernel/psci.c         | 2 +-
->>   arch/arm64/kernel/suspend.c      | 6 +++---
->>   5 files changed, 9 insertions(+), 13 deletions(-)
->
-> Acked-by: Catalin Marinas <catalin.marinas@arm.com>
->
-> Does this patch depend on the other patches from Mark and Lorenzo or it
-> can be merged earlier?
->
-
-Though it's independent patch, I think it will conflict with Mark's
-changes. But since all the ARM64 related changes in that series are
-already in ARM64 for-next/core, it applies cleanly on it and I even gave
-it a quick testing. So it can be merged earlier if you are fine with that.
-
-Regards,
-Sudeep
+Paul Bolle
