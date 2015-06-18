@@ -1,36 +1,32 @@
 From: sudipm.mukherjee@gmail.com (Sudip Mukherjee)
-Date: Thu, 18 Jun 2015 17:47:51 +0530
-Subject: [PATCH v2 5/7] samples: kdbus: disable for mn10300
+Date: Thu, 18 Jun 2015 17:47:52 +0530
+Subject: [PATCH v2 6/7] mn10300: kgdb_arch_set_pc
 In-Reply-To: <1434629873-11668-1-git-send-email-sudipm.mukherjee@gmail.com>
 References: <1434629873-11668-1-git-send-email-sudipm.mukherjee@gmail.com>
-Message-ID: <1434629873-11668-6-git-send-email-sudipm.mukherjee@gmail.com>
+Message-ID: <1434629873-11668-7-git-send-email-sudipm.mukherjee@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 While building it failed with:
-In function 'prime_new':
-error: '__NR_memfd_create' undeclared (first use in this function)
-
-memfd_create syscall has not yet been implemented for mn10300.
-so disable compilation of samples/kdbus for now with mn10300.
+undefined reference to `kgdb_arch_set_pc'
 
 Signed-off-by: Sudip Mukherjee <sudip@vectorindia.org>
 ---
- samples/Kconfig | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ arch/mn10300/kernel/kgdb.c | 5 +++++
+ 1 file changed, 5 insertions(+)
 
-diff --git a/samples/Kconfig b/samples/Kconfig
-index a4c6b2f..20c55af 100644
---- a/samples/Kconfig
-+++ b/samples/Kconfig
-@@ -57,7 +57,7 @@ config SAMPLE_KDB
- 
- config SAMPLE_KDBUS
- 	bool "Build kdbus API example"
--	depends on KDBUS
-+	depends on KDBUS && !MN10300
- 	help
- 	  Build an example of how the kdbus API can be used from
- 	  userspace.
+diff --git a/arch/mn10300/kernel/kgdb.c b/arch/mn10300/kernel/kgdb.c
+index 9977082..8a0ae2b 100644
+--- a/arch/mn10300/kernel/kgdb.c
++++ b/arch/mn10300/kernel/kgdb.c
+@@ -499,3 +499,8 @@ void kgdb_roundup_cpus(unsigned long flags)
+ 	smp_jump_to_debugger();
+ }
+ #endif
++
++void kgdb_arch_set_pc(struct pt_regs *regs, unsigned long ip)
++{
++	regs->pc = ip;
++}
 -- 
 1.8.1.2
