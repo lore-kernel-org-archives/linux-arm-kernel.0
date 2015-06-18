@@ -1,43 +1,57 @@
 From: sudipm.mukherjee@gmail.com (Sudip Mukherjee)
-Date: Thu, 18 Jun 2015 17:47:47 +0530
-Subject: [PATCH v2 1/7] mn10300: fix build failure
+Date: Thu, 18 Jun 2015 17:47:48 +0530
+Subject: [PATCH v2 2/7] mn10300: Provide dummy dma_alloc_attrs() and
+ dma_free_attrs()
 In-Reply-To: <1434629873-11668-1-git-send-email-sudipm.mukherjee@gmail.com>
 References: <1434629873-11668-1-git-send-email-sudipm.mukherjee@gmail.com>
-Message-ID: <1434629873-11668-2-git-send-email-sudipm.mukherjee@gmail.com>
+Message-ID: <1434629873-11668-3-git-send-email-sudipm.mukherjee@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-allmodconfig build fails with the error:
-invalid use of undefined type 'struct kprobe_ctlblk'
+allmodconfig fails to build with following errors.
 
-just declared the two basic structures after checking the struct in other
-architectures.
+drivers/media/platform/sti/bdisp/bdisp-hw.c:
+	In function 'bdisp_hw_free_nodes':
+drivers/media/platform/sti/bdisp/bdisp-hw.c:132:3: error:
+	implicit declaration of function 'dma_free_attrs'
+
+drivers/media/platform/sti/bdisp/bdisp-hw.c:
+	In function 'bdisp_hw_alloc_nodes':
+drivers/media/platform/sti/bdisp/bdisp-hw.c:157:2: error:
+	implicit declaration of function 'dma_alloc_attrs'
+
+mn10300 does not provide those functions at this time.
+Provide dummy implementations to avoid build errors.
 
 Signed-off-by: Sudip Mukherjee <sudip@vectorindia.org>
 ---
- arch/mn10300/include/asm/kprobes.h | 12 ++++++++++++
- 1 file changed, 12 insertions(+)
 
-diff --git a/arch/mn10300/include/asm/kprobes.h b/arch/mn10300/include/asm/kprobes.h
-index c800b59..c90d2b1 100644
---- a/arch/mn10300/include/asm/kprobes.h
-+++ b/arch/mn10300/include/asm/kprobes.h
-@@ -47,4 +47,16 @@ extern int kprobe_exceptions_notify(struct notifier_block *self,
+copied from https://lkml.org/lkml/2015/4/22/346
+
+ arch/mn10300/include/asm/dma-mapping.h | 13 +++++++++++++
+ 1 file changed, 13 insertions(+)
+
+diff --git a/arch/mn10300/include/asm/dma-mapping.h b/arch/mn10300/include/asm/dma-mapping.h
+index a18abfc..d589c5e 100644
+--- a/arch/mn10300/include/asm/dma-mapping.h
++++ b/arch/mn10300/include/asm/dma-mapping.h
+@@ -183,4 +183,17 @@ static inline int dma_get_sgtable(struct device *dev, struct sg_table *sgt,
+ 	return -EINVAL;
+ }
  
- extern void arch_remove_kprobe(struct kprobe *p);
- 
-+struct prev_kprobe {
-+	struct kprobe *kp;
-+	unsigned long status;
-+};
++static inline void *dma_alloc_attrs(struct device *dev, size_t size,
++				    dma_addr_t *dma_handle, gfp_t flag,
++				    struct dma_attrs *attrs)
++{
++	return NULL;
++}
 +
-+struct kprobe_ctlblk {
-+	unsigned int kprobe_status;
-+	struct pt_regs jprobe_saved_regs;
-+	char jprobes_stack[MAX_STACK_SIZE];
-+	struct prev_kprobe prev_kprobe;
-+};
++static inline void dma_free_attrs(struct device *dev, size_t size,
++				  void *vaddr, dma_addr_t dma_handle,
++				  struct dma_attrs *attrs)
++{
++}
 +
- #endif /* _ASM_KPROBES_H */
+ #endif
 -- 
 1.8.1.2
