@@ -1,27 +1,42 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Thu, 18 Jun 2015 16:12:45 +0200
-Subject: ARMADA-XP cpu1 .. cpu3 does not come online
-In-Reply-To: <20150618123833.GA28005@t440.home>
-References: <20150618123833.GA28005@t440.home>
-Message-ID: <20150618161245.56907a89@free-electrons.com>
+From: heiko@sntech.de (Heiko Stuebner)
+Date: Thu, 18 Jun 2015 16:18:28 +0200
+Subject: [PATCH v2 1/9] clk: rockchip: rk3288: add CLK_SET_RATE_PARENT to
+ sclk_mac
+In-Reply-To: <1434637116-17124-1-git-send-email-heiko@sntech.de>
+References: <1434637116-17124-1-git-send-email-heiko@sntech.de>
+Message-ID: <1434637116-17124-2-git-send-email-heiko@sntech.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Peter Morrow,
+The dwmac ethernet controller on the rk3288 supports phys connected
+via rgmii and rmii. With rgmii phys it is expected that the mac clock
+is provided externally while with rmii phys the clock can be external
+but also generated from the plls. In the later case it of course needs
+be at 50MHz, which gets set from the dwmac_rk driver.
+As most devices use a rgmii phy it never surfaced so far that the mac
+clk mux, doesn't go up one lever to the pll clock in the rmii case with
+internal clock generation, as it is missing the CLK_SET_RATE_PARENT flag,
+and thus will not set the correct frequency in most cases.
 
-On Thu, 18 Jun 2015 13:38:33 +0100, Peter Morrow wrote:
+Fixes: b9e4ba541607 ("clk: rockchip: add clock controller for rk3288")
+Cc: stable at vger.kernel.org
+Signed-off-by: Heiko Stuebner <heiko@sntech.de>
+---
+ drivers/clk/rockchip/clk-rk3288.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-> Linux: 4.0.5
-> U-boot: v2015.04
-
-So you're using the mainline U-Boot ? It's true that on our side,
-we're only using the U-Boot provided by Marvell. I personally never had
-the time to test the mainline U-Boot, so I have no idea what are the
-usual issues/pitfalls in terms of compatibility with the mainline
-kernel.
-
-Thomas
+diff --git a/drivers/clk/rockchip/clk-rk3288.c b/drivers/clk/rockchip/clk-rk3288.c
+index 4f817ed..0211162 100644
+--- a/drivers/clk/rockchip/clk-rk3288.c
++++ b/drivers/clk/rockchip/clk-rk3288.c
+@@ -578,7 +578,7 @@ static struct rockchip_clk_branch rk3288_clk_branches[] __initdata = {
+ 	COMPOSITE(0, "mac_pll_src", mux_pll_src_npll_cpll_gpll_p, 0,
+ 			RK3288_CLKSEL_CON(21), 0, 2, MFLAGS, 8, 5, DFLAGS,
+ 			RK3288_CLKGATE_CON(2), 5, GFLAGS),
+-	MUX(SCLK_MAC, "mac_clk", mux_mac_p, 0,
++	MUX(SCLK_MAC, "mac_clk", mux_mac_p, CLK_SET_RATE_PARENT,
+ 			RK3288_CLKSEL_CON(21), 4, 1, MFLAGS),
+ 	GATE(SCLK_MACREF_OUT, "sclk_macref_out", "mac_clk", 0,
+ 			RK3288_CLKGATE_CON(5), 3, GFLAGS),
 -- 
-Thomas Petazzoni, CTO, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+2.1.4
