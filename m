@@ -1,29 +1,23 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Thu, 18 Jun 2015 12:58:08 +0900
-Subject: [PATCH v2] ARM: dts: Update video-phy node with syscon phandle for
- Exynos3250
-In-Reply-To: <1434355966-4566-1-git-send-email-b.michalska@samsung.com>
-References: <1434355966-4566-1-git-send-email-b.michalska@samsung.com>
-Message-ID: <558241D0.50002@samsung.com>
+From: linux@roeck-us.net (Guenter Roeck)
+Date: Wed, 17 Jun 2015 20:58:47 -0700
+Subject: [PATCH v3] watchdog: bcm2835: Fix poweroff behaviour
+In-Reply-To: <1434549844-11704-1-git-send-email-noralf@tronnes.org>
+References: <1434549844-11704-1-git-send-email-noralf@tronnes.org>
+Message-ID: <558241F7.6070600@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 15.06.2015 17:12, Beata Michalska wrote:
-> As a follow-up to recent changes to Exynos mipi video phy
-> driver, introducing support for PMU regmap in commit
-> e4b3d38088df6f3acd40 ("phy: exynos-video-mipi: Fix regression
-> by adding support for PMU regmap") add a syscon phandle to
-> video-phy node to bring back to life both MIPI DSI display
-> and MIPI CSIS-2 camera sensor on Exynos3250.
-> 
-> Signed-off-by: Beata Michalska <b.michalska@samsung.com>
-> Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
-> Tested-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
-> Reviewed-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
+On 06/17/2015 07:04 AM, Noralf Tr?nnes wrote:
+> Currently poweroff/halt results in a reboot on the Raspberry Pi.
+> The firmware uses the RSTS register to know which partiton to
+> boot from. The partiton value is spread into bits
+> 0, 2, 4, 6, 8, 10. Partiton 63 is a special partition used by
+> the firmware to indicate halt.
+>
+> The firmware made this change in 19 Aug 2013 and was matched
+> by the downstream commit:
+> Changes for new NOOBS multi partition booting from gsh
+>
+> Signed-off-by: Noralf Tr?nnes <noralf@tronnes.org>
 
-Thanks for the patch, I applied it to my tree. Since it is a fix for
-regression, I'll sent it to Kukjin for v4.2-rc cycle, unless he picks it
-up from LKML.
-
-Best regards,
-Krzysztof
+Reviewed-by: Guenter Roeck <linux@roeck-us.net>
