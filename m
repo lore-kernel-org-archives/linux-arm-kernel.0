@@ -1,41 +1,75 @@
 From: gregory.0xf0@gmail.com (Gregory Fong)
-Date: Wed, 17 Jun 2015 18:00:39 -0700
-Subject: [PATCH v3 0/4] GPIO support for BRCMSTB
-Message-ID: <1434589243-502-1-git-send-email-gregory.0xf0@gmail.com>
+Date: Wed, 17 Jun 2015 18:00:40 -0700
+Subject: [PATCH v3 1/4] gpio: brcmstb: fix null ptr dereference in driver
+ remove
+In-Reply-To: <1434589243-502-1-git-send-email-gregory.0xf0@gmail.com>
+References: <1434589243-502-1-git-send-email-gregory.0xf0@gmail.com>
+Message-ID: <1434589243-502-2-git-send-email-gregory.0xf0@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Adds interrupt support for the GPIO controller (UPG GIO) used on Broadcom's
-various BRCMSTB SoCs (BCM7XXX and others).  For all existing hardware, this
-block hooks up to the BCM7120 L2 IRQ controller and so will require
-CONFIG_BCM7120_L2_IRQ=y.
+If a failure occurs during probe, brcmstb_gpio_remove() is called. In
+remove, we call platform_get_drvdata(), but at the time of failure in
+the probe the driver data hadn't yet been set which leads to a NULL
+ptr dereference in the remove's list_for_each.  Call
+platform_set_drvdata() and set up list head right after allocating the
+priv struct to both avoid the null pointer dereference that could
+occur today.  To guard against potential future changes, check for
+null pointer in remove.
 
-New in v3:
-- fix a null pointer dereference noticed by Tim Ross
-- use the gpiolib irqchip helpers as recommended by Linus Walleij
-- update device tree bindings as suggested by Brian Norris:
-  https://lkml.org/lkml/2015/5/29/802
-- add S5 (cold boot) support
+Reported-by: Tim Ross <tross@broadcom.com>
+Signed-off-by: Gregory Fong <gregory.0xf0@gmail.com>
+---
+New in v3.
 
-The following are not included in this patchset:
-- Initial device tree bindings (merged from v1 to GPIO tree)
-- Initial GPIO support w/o interrupts (merged from v2 to GPIO tree)
-- ARM Kconfig changes (merged from v2 to arm-soc tree)
+ drivers/gpio/gpio-brcmstb.c | 14 +++++++++++---
+ 1 file changed, 11 insertions(+), 3 deletions(-)
 
-Previous revisions:
-v1: https://lkml.org/lkml/2015/5/6/199
-v2: https://lkml.org/lkml/2015/5/28/853
-
-Gregory Fong (4):
-  gpio: brcmstb: fix null ptr dereference in driver remove
-  dt-bindings: brcmstb-gpio: document properties for wakeup
-  gpio: brcmstb: Add interrupt and wakeup source support
-  gpio: brcmstb: support wakeup from S5 cold boot
-
- .../devicetree/bindings/gpio/brcm,brcmstb-gpio.txt |  35 ++-
- drivers/gpio/Kconfig                               |   1 +
- drivers/gpio/gpio-brcmstb.c                        | 321 ++++++++++++++++++++-
- 3 files changed, 341 insertions(+), 16 deletions(-)
-
+diff --git a/drivers/gpio/gpio-brcmstb.c b/drivers/gpio/gpio-brcmstb.c
+index 7a3cb1f..4630a81 100644
+--- a/drivers/gpio/gpio-brcmstb.c
++++ b/drivers/gpio/gpio-brcmstb.c
+@@ -87,6 +87,15 @@ static int brcmstb_gpio_remove(struct platform_device *pdev)
+ 	struct brcmstb_gpio_bank *bank;
+ 	int ret = 0;
+ 
++	if (!priv) {
++		dev_err(&pdev->dev, "called %s without drvdata!\n", __func__);
++		return -EFAULT;
++	}
++
++	/*
++	 * You can lose return values below, but we report all errors, and it's
++	 * more important to actually perform all of the steps.
++	 */
+ 	list_for_each(pos, &priv->bank_list) {
+ 		bank = list_entry(pos, struct brcmstb_gpio_bank, node);
+ 		ret = bgpio_remove(&bank->bgc);
+@@ -143,6 +152,8 @@ static int brcmstb_gpio_probe(struct platform_device *pdev)
+ 	priv = devm_kzalloc(dev, sizeof(*priv), GFP_KERNEL);
+ 	if (!priv)
+ 		return -ENOMEM;
++	platform_set_drvdata(pdev, priv);
++	INIT_LIST_HEAD(&priv->bank_list);
+ 
+ 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+ 	reg_base = devm_ioremap_resource(dev, res);
+@@ -153,7 +164,6 @@ static int brcmstb_gpio_probe(struct platform_device *pdev)
+ 	priv->reg_base = reg_base;
+ 	priv->pdev = pdev;
+ 
+-	INIT_LIST_HEAD(&priv->bank_list);
+ 	if (brcmstb_gpio_sanity_check_banks(dev, np, res))
+ 		return -EINVAL;
+ 
+@@ -221,8 +231,6 @@ static int brcmstb_gpio_probe(struct platform_device *pdev)
+ 	dev_info(dev, "Registered %d banks (GPIO(s): %d-%d)\n",
+ 			priv->num_banks, priv->gpio_base, gpio_base - 1);
+ 
+-	platform_set_drvdata(pdev, priv);
+-
+ 	return 0;
+ 
+ fail:
 -- 
 1.9.1
