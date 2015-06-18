@@ -1,50 +1,23 @@
-From: yong.wu@mediatek.com (Yong Wu)
-Date: Thu, 18 Jun 2015 23:00:50 +0800
-Subject: [PATCH v2 3/4] arm64: Add IOMMU dma_ops
-In-Reply-To: <4e298538ccedbe6f593d8edc40eb3a08ad9e4df5.1434036796.git.robin.murphy@arm.com>
-References: <cover.1434036796.git.robin.murphy@arm.com>
- <4e298538ccedbe6f593d8edc40eb3a08ad9e4df5.1434036796.git.robin.murphy@arm.com>
-Message-ID: <1434639650.26953.13.camel@mhfsdcap03>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 18 Jun 2015 16:44:41 +0100
+Subject: [Linux-am33-list] [PATCH v2 0/7] fix build failure of mn10300
+In-Reply-To: <CAA0PaPGMtePS+fmpi1QBZi8uHtuU3Z7_Y+9f0+O38o+8xfo+1Q@mail.gmail.com>
+References: <1434629873-11668-1-git-send-email-sudipm.mukherjee@gmail.com>
+ <20150618145138.GN7557@n2100.arm.linux.org.uk>
+ <CAA0PaPGMtePS+fmpi1QBZi8uHtuU3Z7_Y+9f0+O38o+8xfo+1Q@mail.gmail.com>
+Message-ID: <20150618154441.GP7557@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2015-06-11 at 16:54 +0100, Robin Murphy wrote:
-> Taking some inspiration from the arch/arm code, implement the
-> arch-specific side of the DMA mapping ops using the new IOMMU-DMA layer.
-> 
-> Whilst proliferating per-device private IOMMU data via dev->archdata is
-> less than ideal, it will do the job for now, especially since we can't
-> easily handle the kind of problematic system topologies in the current
-> IOMMU API anyway.
-> 
-> Signed-off-by: Robin Murphy <robin.murphy@arm.com>
-> ---
->  arch/arm64/include/asm/device.h      |   3 +
->  arch/arm64/include/asm/dma-mapping.h |  14 ++
->  arch/arm64/mm/dma-mapping.c          | 342 +++++++++++++++++++++++++++++++++++
->  include/linux/dma-iommu.h            |   4 +-
->  4 files changed, 361 insertions(+), 2 deletions(-)
-[snip]
-> +static int __iommu_mmap_attrs(struct device *dev, struct vm_area_struct *vma,
-> +			      void *cpu_addr, dma_addr_t dma_addr, size_t size,
-> +			      struct dma_attrs *attrs)
-> +{
-> +	struct vm_struct *area;
-> +	int ret;
-> +
-> +	vma->vm_page_prot = __get_dma_pgprot(attrs, vma->vm_page_prot,
-> +					     is_device_dma_coherent(dev));
-> +
-> +	if (dma_mmap_from_coherent(dev, vma, cpu_addr, size, &ret))
-> +		return ret;
-> +
-> +	area = find_vm_area(cpu_addr);
-> +	if (WARN_ON(!area || area->pages))
-Is it:    if (WARN_ON(!area || !area->pages))
-> +		return -ENXIO;
-> +
-> +	return iommu_dma_mmap(area->pages, size, vma);
-> +}
-[snip]
->  #endif	/* __KERNEL__ */
->  #endif	/* __DMA_IOMMU_H */
+On Thu, Jun 18, 2015 at 10:31:07AM -0500, Jay C. Polmar wrote:
+> I am on this list by mistake and 5/15/2011 we requested to be removed,
+> can someone remove me from this list?
+
+There are six mailing lists in the Cc line.  For all of the lists
+present there, I can't help you, but you should be able to unsubscribe
+yourself.  Look at the footer on any message you receive from the list
+and it should tell you how to get more information on that subject.
+
+-- 
+FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
+according to speedtest.net.
