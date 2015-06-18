@@ -1,24 +1,57 @@
-From: sudipm.mukherjee@gmail.com (Sudip Mukherjee)
-Date: Thu, 18 Jun 2015 21:43:04 +0530
-Subject: [PATCH v2 0/7] fix build failure of mn10300
-In-Reply-To: <20150618145138.GN7557@n2100.arm.linux.org.uk>
-References: <1434629873-11668-1-git-send-email-sudipm.mukherjee@gmail.com>
- <20150618145138.GN7557@n2100.arm.linux.org.uk>
-Message-ID: <20150618161304.GA21198@sudip-PC>
+From: heiko@sntech.de (Heiko Stuebner)
+Date: Thu, 18 Jun 2015 18:15:03 +0200
+Subject: [PATCH] arm64: dts: mt8173: add clock_null
+In-Reply-To: <1434605351-64592-1-git-send-email-eddie.huang@mediatek.com>
+References: <1434605351-64592-1-git-send-email-eddie.huang@mediatek.com>
+Message-ID: <2333431.ttvjElY3ps@phil>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 18, 2015 at 03:51:38PM +0100, Russell King - ARM Linux wrote:
-> On Thu, Jun 18, 2015 at 05:47:46PM +0530, Sudip Mukherjee wrote:
-> > This is an attempt to fix the build failures when building mn10300 with
-> > allmodconfig. As I have never worked with arch files so I hope you will
-> > point me to right direction to correct my mistakes in this attempt.
-> 
-> Why has the linux-arm-kernel mailing list been copied for something
-> which clearly has nothing to do with ARM?  Am I missing something
-> in this series?
-get_maintainer.pl is giving linux-arm-kernel mailing list for
-patch 3/7 ("mmc: mediatek: build as module").
+Am Donnerstag, 18. Juni 2015, 13:29:11 schrieb Eddie Huang:
+> Add clk_null, which represents clocks that can not / need not
+> controlled by software.
+> There are many clocks' parent set to clk_null.
 
-regards
-sudip
+Devicetree is supposed to describe hardware, and ideally not what software 
+does with it. If the clock simply cannot be controlled by software, it will 
+still have a rate and I think it should probably be modelled - similarly we 
+sometimes have fixed regulators that also are not software controllable.
+
+
+While it might be ok to define dummy clocks as a temporary stopgap, these 
+should definitly be marked as such. This clk_null at least sounds like there is 
+no plan to replace this with a real solution at some point.
+
+And of course a bit of context would be cool, to know which type of clocks 
+this actually replaces.
+
+
+Heiko
+
+> Signed-off-by: James Liao <jamesjj.liao@mediatek.com>
+> Signed-off-by: Eddie Huang <eddie.huang@mediatek.com>
+> ---
+> Base on 4.1-rc1
+> 
+> Change-Id: I4db9b40d07e28f54f7bae9b676316cbd6a962124
+> ---
+>  arch/arm64/boot/dts/mediatek/mt8173.dtsi | 6 ++++++
+>  1 file changed, 6 insertions(+)
+> 
+> diff --git a/arch/arm64/boot/dts/mediatek/mt8173.dtsi
+> b/arch/arm64/boot/dts/mediatek/mt8173.dtsi index 924fdb6..4798f44 100644
+> --- a/arch/arm64/boot/dts/mediatek/mt8173.dtsi
+> +++ b/arch/arm64/boot/dts/mediatek/mt8173.dtsi
+> @@ -81,6 +81,12 @@
+>  		cpu_on	      = <0x84000003>;
+>  	};
+> 
+> +	clk_null: clk_null {
+> +		compatible = "fixed-clock";
+> +		clock-frequency = <0>;
+> +		#clock-cells = <0>;
+> +	};
+> +
+>  	uart_clk: dummy26m {
+>  		compatible = "fixed-clock";
+>  		clock-frequency = <26000000>;
