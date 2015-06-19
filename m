@@ -1,59 +1,40 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Fri, 19 Jun 2015 10:40:15 +0200
-Subject: [PATCH v7 04/14] crypto: add a new driver for Marvell's CESA
-In-Reply-To: <20150619102407.01187ff0@free-electrons.com>
-References: <1434635190-27733-1-git-send-email-boris.brezillon@free-electrons.com>	<1434635190-27733-5-git-send-email-boris.brezillon@free-electrons.com>	<20150619064256.GA10246@gondor.apana.org.au>
- <20150619102407.01187ff0@free-electrons.com>
-Message-ID: <5583D56F.7020808@free-electrons.com>
+From: michael@smart-africa.com (Michael van der Westhuizen)
+Date: Fri, 19 Jun 2015 10:43:53 +0200
+Subject: [PATCH 0/2] spi: dw: Reintroduce optional 16 bit data register I/O
+Message-ID: <1434703435-25198-1-git-send-email-michael@smart-africa.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Thomas, Herbert,
+The commit dd11444327ce ("spi: dw-spi: Convert 16bit accesses to 32bit
+accesses") globally changed all register access in the dw_apb_ssi driver
+to 32 bit access, which breaks data register (FIFO) access on picoXcell
+platforms.
 
-On 19/06/2015 10:24, Thomas Petazzoni wrote:
-> Hello Herbert,
-> 
-> On Fri, 19 Jun 2015 14:42:56 +0800, Herbert Xu wrote:
->> On Thu, Jun 18, 2015 at 03:46:20PM +0200, Boris Brezillon wrote:
->>>
->>> +	dram = mv_mbus_dram_info_nooverlap();
->>
->> This doesn't compile because it hasn't made it into mainline yet.
->> I'm afraid this patch-set will have to wait until that happens.
-> 
-> We have two options here:
-> 
->  1/ We can ask the mach-mvebu maintainers to provide a branch with just
->     the commit implementing mv_mbus_dram_info_nooverlap(), and you
->     merge that branch into your tree as a dependency.
+This series introduces a boolean to the core spi-dw driver to indicate
+to the core that 16 bit data register access is appropriate, implements
+the code that respects that flag and updates the dw-spi-mmio driver to
+allow setting this boolean from the device tree.
 
-For this option you can use the branch mvebu/drivers located at
- git://git.infradead.org/linux-mvebu.git.
+A binding documentation fix is included in this series.
 
-In this branch there is the commit "bus: mvebu-mbus: add mv_mbus_dram_info_nooverlap()"
-but not only this one because it depends also on fixes which have been
-merged in this same branch.
+Prior to applying this change the following error presents on
+a picoCell pc3x3 platform:
+  spi_master spi32766: interrupt_transfer: fifo overrun/underrun
+  m25p80 spi32766.0: error -5 reading 9f
+  m25p80: probe of spi32766.0 failed with error -5
 
-This branch is immutable and have already been merged in arm-soc.
+With this series applied:
+  m25p80 spi32766.0: m25p40 (512 Kbytes)
 
-Thanks,
+Michael van der Westhuizen (2):
+  dt: snps,dw-apb-ssi: Describe 16 bit data register usage limitations
+  spi: dw: Allow interface drivers to limit data I/O to word sizes
 
-Gregory
-
-> 
->  2/ We temporarily revert back to using mv_mbus_dram_info(). For the
->     vast majority of platforms, this is OK. It's only if you have 4 GB
->     of RAM or more that it causes problem. And then we switch to
->     mv_mbus_dram_info_nooverlap() as part of the -rc cycle.
-> 
-> (2) is probably easier. Herbert, what do you think?
-> 
-> Thomas
-> 
-
+ Documentation/devicetree/bindings/spi/snps,dw-apb-ssi.txt |  3 +++
+ drivers/spi/spi-dw-mmio.c                                 |  5 +++++
+ drivers/spi/spi-dw.c                                      | 13 +++++++++++--
+ drivers/spi/spi-dw.h                                      | 11 +++++++++++
+ 4 files changed, 30 insertions(+), 2 deletions(-)
 
 -- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+2.1.4
