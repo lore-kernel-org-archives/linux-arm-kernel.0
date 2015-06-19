@@ -1,52 +1,201 @@
 From: hanjun.guo@linaro.org (Hanjun Guo)
-Date: Fri, 19 Jun 2015 16:46:05 +0800
-Subject: [PATCH v2 2/9] ACPICA: ACPI 6.0: Add values for MADT GIC version
- field.
+Date: Fri, 19 Jun 2015 16:46:06 +0800
+Subject: [PATCH v2 3/9] irqchip / GIC: Add GIC version support in ACPI MADT
 In-Reply-To: <1434703572-26221-1-git-send-email-hanjun.guo@linaro.org>
 References: <1434703572-26221-1-git-send-email-hanjun.guo@linaro.org>
-Message-ID: <1434703572-26221-3-git-send-email-hanjun.guo@linaro.org>
+Message-ID: <1434703572-26221-4-git-send-email-hanjun.guo@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-ACPICA commit 4b100dc43e8baee8c8b4891b23bc7ad03eba6a28
+There is a field added in ACPI MADT table to indicate the
+GIC version, so parse the table to get its value for later
+use.
 
-Support for the new version field in the generic distributor
-subtable. Hanjun Guo <hanjun.guo@linaro.org>
+If GIC version presented in MADT is 0, we need to fallback
+to hardware discovery to get the GIC version.
 
-Link: https://github.com/acpica/acpica/commit/4b100dc4
+In ACPI MADT table there is no compatible strings to indicate
+various irqchips and also ACPI doesn't support irqchips which
+are not compatible with ARM GIC spec, so GIC version can be used
+to load different GIC drivers which is needed for the later patch.
+
 Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
-Signed-off-by: Bob Moore <robert.moore@intel.com>
-Signed-off-by: Lv Zheng <lv.zheng@intel.com>
 ---
+ arch/arm64/Kconfig                   |   1 +
+ drivers/irqchip/Kconfig              |   3 +
+ drivers/irqchip/Makefile             |   1 +
+ drivers/irqchip/irq-gic-acpi.c       | 112 +++++++++++++++++++++++++++++++++++
+ include/linux/irqchip/arm-gic-acpi.h |   1 +
+ 5 files changed, 118 insertions(+)
+ create mode 100644 drivers/irqchip/irq-gic-acpi.c
 
-This patch is also for review purpose only, already merged into
-ACPICA core and sent out for review for linux ACPICA by Lv Zheng.
-(Thank you, Bob and Lv :) )
-
- include/acpi/actbl1.h | 11 +++++++++++
- 1 file changed, 11 insertions(+)
-
-diff --git a/include/acpi/actbl1.h b/include/acpi/actbl1.h
-index cadf21c..a21bc50 100644
---- a/include/acpi/actbl1.h
-+++ b/include/acpi/actbl1.h
-@@ -834,6 +834,17 @@ struct acpi_madt_generic_distributor {
- 	u8 reserved2[3];	/* reserved - must be zero */
- };
+diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+index c273e4a..9d62bbb 100644
+--- a/arch/arm64/Kconfig
++++ b/arch/arm64/Kconfig
+@@ -16,6 +16,7 @@ config ARM64
+ 	select ARM_AMBA
+ 	select ARM_ARCH_TIMER
+ 	select ARM_GIC
++	select ARM_GIC_ACPI if ACPI
+ 	select AUDIT_ARCH_COMPAT_GENERIC
+ 	select ARM_GIC_V2M if PCI_MSI
+ 	select ARM_GIC_V3
+diff --git a/drivers/irqchip/Kconfig b/drivers/irqchip/Kconfig
+index 6de62a9..0dd64c5 100644
+--- a/drivers/irqchip/Kconfig
++++ b/drivers/irqchip/Kconfig
+@@ -46,6 +46,9 @@ config ARM_VIC_NR
+ 	  The maximum number of VICs available in the system, for
+ 	  power management.
  
-+/* Values for Version field above */
++config ARM_GIC_ACPI
++	bool
 +
-+enum acpi_madt_gic_version {
-+	ACPI_MADT_GIC_VERSION_NONE = 0,
-+	ACPI_MADT_GIC_VERSION_V1 = 1,
-+	ACPI_MADT_GIC_VERSION_V2 = 2,
-+	ACPI_MADT_GIC_VERSION_V3 = 3,
-+	ACPI_MADT_GIC_VERSION_V4 = 4,
-+	ACPI_MADT_GIC_VERSION_RESERVED = 5	/* 5 and greater are reserved */
-+};
+ config ATMEL_AIC_IRQ
+ 	bool
+ 	select GENERIC_IRQ_CHIP
+diff --git a/drivers/irqchip/Makefile b/drivers/irqchip/Makefile
+index dda4927..0bd8e49 100644
+--- a/drivers/irqchip/Makefile
++++ b/drivers/irqchip/Makefile
+@@ -23,6 +23,7 @@ obj-$(CONFIG_ARM_GIC)			+= irq-gic.o irq-gic-common.o
+ obj-$(CONFIG_ARM_GIC_V2M)		+= irq-gic-v2m.o
+ obj-$(CONFIG_ARM_GIC_V3)		+= irq-gic-v3.o irq-gic-common.o
+ obj-$(CONFIG_ARM_GIC_V3_ITS)		+= irq-gic-v3-its.o
++obj-$(CONFIG_ARM_GIC_ACPI)		+= irq-gic-acpi.o
+ obj-$(CONFIG_ARM_NVIC)			+= irq-nvic.o
+ obj-$(CONFIG_ARM_VIC)			+= irq-vic.o
+ obj-$(CONFIG_ATMEL_AIC_IRQ)		+= irq-atmel-aic-common.o irq-atmel-aic.o
+diff --git a/drivers/irqchip/irq-gic-acpi.c b/drivers/irqchip/irq-gic-acpi.c
+new file mode 100644
+index 0000000..58f7831
+--- /dev/null
++++ b/drivers/irqchip/irq-gic-acpi.c
+@@ -0,0 +1,112 @@
++/*
++ * ACPI based support for ARM GIC init
++ *
++ * Copyright (C) 2015, Linaro Ltd.
++ * 	Author: Hanjun Guo <hanjun.guo@linaro.org>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ */
 +
- /* 13: Generic MSI Frame (ACPI 5.1) */
++#define pr_fmt(fmt) "ACPI: GIC: " fmt
++
++#include <linux/acpi.h>
++#include <linux/init.h>
++#include <linux/irqchip/arm-gic-acpi.h>
++#include <linux/irqchip/arm-gic-v3.h>
++
++/* GIC version presented in MADT GIC distributor structure */
++static u8 gic_version __initdata = ACPI_MADT_GIC_VERSION_NONE;
++
++static phys_addr_t dist_phy_base __initdata;
++
++static int __init
++acpi_gic_parse_distributor(struct acpi_subtable_header *header,
++				const unsigned long end)
++{
++	struct acpi_madt_generic_distributor *dist;
++
++	dist = (struct acpi_madt_generic_distributor *)header;
++
++	if (BAD_MADT_ENTRY(dist, end))
++		return -EINVAL;
++
++	gic_version = dist->version;
++	dist_phy_base = dist->base_address;
++	return 0;
++}
++
++static int __init
++match_gic_redist(struct acpi_subtable_header *header, const unsigned long end)
++{
++	return 0;
++}
++
++static bool __init acpi_gic_redist_is_present(void)
++{
++	int count;
++
++	/* scan MADT table to find if we have redistributor entries */
++	count  =  acpi_table_parse_madt(ACPI_MADT_TYPE_GENERIC_REDISTRIBUTOR,
++					match_gic_redist, 0);
++
++	/* has at least one GIC redistributor entry */
++	if (count > 0)
++		return true;
++	else
++		return false;
++}
++
++static int __init acpi_gic_version_init(void)
++{
++	int count;
++	void __iomem *dist_base;
++	u32 reg;
++
++	count = acpi_table_parse_madt(ACPI_MADT_TYPE_GENERIC_DISTRIBUTOR,
++					acpi_gic_parse_distributor, 0);
++
++	if (count <= 0) {
++		pr_err("No valid GIC distributor entry exists\n");
++		return -ENODEV;
++	}
++
++	if (gic_version >= ACPI_MADT_GIC_VERSION_RESERVED) {
++		pr_err("Invalid GIC version %d in MADT\n", gic_version);
++		return -EINVAL;
++	}
++
++	/*
++	 * when the GIC version is 0, we fallback to hardware discovery.
++	 * this is also needed to keep compatiable with ACPI 5.1,
++	 * which has no gic_version field in distributor structure and
++	 * reserved as 0.
++	 *
++	 * For hardware discovery, the offset for GICv1/2 and GICv3/4 to
++	 * get the GIC version is different (0xFE8 for GICv1/2 and 0xFFE8
++	 * for GICv3/4), so we need to handle it separately.
++	 */
++	if (gic_version	== ACPI_MADT_GIC_VERSION_NONE) {
++		/* it's GICv3/v4 if redistributor is present */
++		if (acpi_gic_redist_is_present()) {
++			dist_base = ioremap(dist_phy_base,
++					    ACPI_GICV3_DIST_MEM_SIZE);
++			if (!dist_base)
++				return -ENOMEM;
++
++			reg = readl_relaxed(dist_base + GICD_PIDR2) &
++					    GIC_PIDR2_ARCH_MASK;
++			if (reg == GIC_PIDR2_ARCH_GICv3)
++				gic_version = ACPI_MADT_GIC_VERSION_V3;
++			else
++				gic_version = ACPI_MADT_GIC_VERSION_V4;
++
++			iounmap(dist_base);
++		} else {
++			gic_version = ACPI_MADT_GIC_VERSION_V2;
++		}
++	}
++
++	return 0;
++}
+diff --git a/include/linux/irqchip/arm-gic-acpi.h b/include/linux/irqchip/arm-gic-acpi.h
+index de3419e..13bc676 100644
+--- a/include/linux/irqchip/arm-gic-acpi.h
++++ b/include/linux/irqchip/arm-gic-acpi.h
+@@ -19,6 +19,7 @@
+  */
+ #define ACPI_GICV2_DIST_MEM_SIZE	(SZ_4K)
+ #define ACPI_GIC_CPU_IF_MEM_SIZE	(SZ_8K)
++#define ACPI_GICV3_DIST_MEM_SIZE	(SZ_64K)
  
- struct acpi_madt_generic_msi_frame {
+ struct acpi_table_header;
+ 
 -- 
 1.9.1
