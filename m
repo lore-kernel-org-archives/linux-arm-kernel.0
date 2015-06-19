@@ -1,60 +1,103 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Fri, 19 Jun 2015 15:25:52 +0000
-Subject: [PATCH] Re: Linkstation Mini and __machine_arch_type problem,
- not booting since 3.8
-In-Reply-To: <d6d361113992920900137899ae4d1f7b@dolka.fr>
-References: <97db3502cd014faf1c710b1cc0fe8848@dolka.fr>
- <1434446447.4785.7.camel@dolka.fr>
- <1434593555.13334.14.camel@dolka.fr> <558278A8.2050406@arm.com>
- <1434677895.4767.11.camel@dolka.fr> <5583DD23.90505@arm.com>
- <1434716194.17448.28.camel@x60s>
- <20150619131315.GR7557@n2100.arm.linux.org.uk>
- <d6d361113992920900137899ae4d1f7b@dolka.fr>
-Message-ID: <20150619152552.GF2936@io.lakedaemon.net>
+From: Frank.Li@freescale.com (Frank.Li at freescale.com)
+Date: Fri, 19 Jun 2015 23:32:24 +0800
+Subject: [PATCH v2 1/8] ARM: imx: add i.mx6ul msl support
+In-Reply-To: <1434727951-4852-1-git-send-email-Frank.Li@freescale.com>
+References: <1434727951-4852-1-git-send-email-Frank.Li@freescale.com>
+Message-ID: <1434727951-4852-2-git-send-email-Frank.Li@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 19, 2015 at 03:46:45PM +0200, Benjamin Cama wrote:
-> Le 2015-06-19 15:13, Russell King - ARM Linux a ??crit??:
-> >On Fri, Jun 19, 2015 at 02:16:34PM +0200, Benjamin Cama wrote:
-...
-> >>I was not talking about the irq handler, but the irq initialization
-> >>routine (on orion5x, orion_irq_init calls irq_alloc_generic_chip
-> >>with 0), which takes the starting irq number and may warn when it is
-> >>zero (well, it may also start allocating at zero but never use it,
-> >>so this may not be a totally correct assumption, but I think this
-> >>comes close, and it's just a warning).
-> >
-> >It needs fixing nevertheless - arguments along the lines of "this
-> >used to work" don't work for this topic.
-> >
-> >The simple answer is to adjust the initialisation to bump the IRQ
-> >numbers up by one, and them adjust the interrupt numbers in
-> >arch/arm/mach-whatever/include/asm/irqs.h also up by one.  That's
-> >far easier to do than spending ages trying to argue against the
-> >"IRQ0 is not valid" issue, only to ultimately get nowhere, and end
-> >up with that as the only way forward anyway.
-> 
-> Do not misunderstand me: I am not at all for keeping the situation
-> like this!  What I ask is just for users to be notified of this new
-> requirement: for my case, my board simply couldn't boot anymore,
-> without any explanation. If there was a message along the lines ???You
-> are setting up IRQs starting from 0, which is not supported by the
-> kernel anymore??? just before crashing, maybe it would help debugging
-> the issue.
-> 
-> I could try to write a patch for it, but I was first wondering if this
-> is a good idea or not.
+From: Frank Li <Frank.Li@freescale.com>
 
-Let's just get the dts patch reviewed and merged first.  Russell
-actually wrote the patch to do what he's describing for mach-dove.
+i.MX6UL is a new SOC, add MSL support
 
-  http://lists.infradead.org/pipermail/linux-arm-kernel/2014-December/309684.html
+Signed-off-by: Frank Li <Frank.Li@freescale.com>
+---
+ arch/arm/mach-imx/Kconfig       |  8 ++++++++
+ arch/arm/mach-imx/Makefile      |  1 +
+ arch/arm/mach-imx/mach-imx6ul.c | 43 +++++++++++++++++++++++++++++++++++++++++
+ 3 files changed, 52 insertions(+)
+ create mode 100644 arch/arm/mach-imx/mach-imx6ul.c
 
-Although, it looks like it never got updated for submission...
-
-  http://lists.infradead.org/pipermail/linux-arm-kernel/2014-December/311800.html
-
-thx,
-
-Jason.
+diff --git a/arch/arm/mach-imx/Kconfig b/arch/arm/mach-imx/Kconfig
+index 573536f..8ceda28 100644
+--- a/arch/arm/mach-imx/Kconfig
++++ b/arch/arm/mach-imx/Kconfig
+@@ -548,6 +548,14 @@ config SOC_IMX6SX
+ 	help
+ 	  This enables support for Freescale i.MX6 SoloX processor.
+ 
++config SOC_IMX6UL
++	bool "i.MX6 UltraLite support"
++	select PINCTRL_IMX6UL
++	select SOC_IMX6
++
++	help
++	  This enables support for Freescale i.MX6 UltraLite processor.
++
+ config SOC_IMX7D
+ 	bool "i.MX7 Dual support"
+ 	select PINCTRL_IMX7D
+diff --git a/arch/arm/mach-imx/Makefile b/arch/arm/mach-imx/Makefile
+index 37c502a..fb689d8 100644
+--- a/arch/arm/mach-imx/Makefile
++++ b/arch/arm/mach-imx/Makefile
+@@ -83,6 +83,7 @@ endif
+ obj-$(CONFIG_SOC_IMX6Q) += mach-imx6q.o
+ obj-$(CONFIG_SOC_IMX6SL) += mach-imx6sl.o
+ obj-$(CONFIG_SOC_IMX6SX) += mach-imx6sx.o
++obj-$(CONFIG_SOC_IMX6UL) += mach-imx6ul.o
+ obj-$(CONFIG_SOC_IMX7D) += mach-imx7d.o
+ 
+ ifeq ($(CONFIG_SUSPEND),y)
+diff --git a/arch/arm/mach-imx/mach-imx6ul.c b/arch/arm/mach-imx/mach-imx6ul.c
+new file mode 100644
+index 0000000..706d5f6
+--- /dev/null
++++ b/arch/arm/mach-imx/mach-imx6ul.c
+@@ -0,0 +1,43 @@
++/*
++ * Copyright (C) 2015 Freescale Semiconductor, Inc.
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ */
++#include <linux/irqchip.h>
++#include <linux/of_platform.h>
++#include <asm/mach/arch.h>
++#include <asm/mach/map.h>
++
++#include "common.h"
++
++static void __init imx6ul_init_machine(void)
++{
++	struct device *parent;
++
++	parent = imx_soc_device_init();
++	if (parent == NULL)
++		pr_warn("failed to initialize soc device\n");
++
++	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
++	imx_anatop_init();
++}
++
++static void __init imx6ul_init_irq(void)
++{
++	imx_init_revision_from_anatop();
++	imx_src_init();
++	irqchip_init();
++}
++
++static const char *imx6ul_dt_compat[] __initconst = {
++	"fsl,imx6ul",
++	NULL,
++};
++
++DT_MACHINE_START(IMX7D, "Freescale i.MX6 Ultralite (Device Tree)")
++	.init_irq	= imx6ul_init_irq,
++	.init_machine	= imx6ul_init_machine,
++	.dt_compat	= imx6ul_dt_compat,
++MACHINE_END
+-- 
+1.9.1
