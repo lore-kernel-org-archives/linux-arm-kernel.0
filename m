@@ -1,31 +1,32 @@
-From: herbert@gondor.apana.org.au (Herbert Xu)
-Date: Fri, 19 Jun 2015 22:03:15 +0800
-Subject: [PATCH v7 04/14] crypto: add a new driver for Marvell's CESA
-In-Reply-To: <5583D56F.7020808@free-electrons.com>
-References: <1434635190-27733-1-git-send-email-boris.brezillon@free-electrons.com>
- <1434635190-27733-5-git-send-email-boris.brezillon@free-electrons.com>
- <20150619064256.GA10246@gondor.apana.org.au>
- <20150619102407.01187ff0@free-electrons.com>
- <5583D56F.7020808@free-electrons.com>
-Message-ID: <20150619140315.GA14692@gondor.apana.org.au>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Fri, 19 Jun 2015 15:10:07 +0100
+Subject: [PATCH] arm64: vdso: work-around broken ELF toolchains in Makefile
+In-Reply-To: <1434718593-3648-1-git-send-email-will.deacon@arm.com>
+References: <1434718593-3648-1-git-send-email-will.deacon@arm.com>
+Message-ID: <20150619141007.GB20798@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 19, 2015 at 10:40:15AM +0200, Gregory CLEMENT wrote:
+On Fri, Jun 19, 2015 at 01:56:33PM +0100, Will Deacon wrote:
+> When building the kernel with a bare-metal (ELF) toolchain, the -shared
+> option may not be passed down to collect2, resulting in silent corruption
+> of the vDSO image (in particular, the DYNAMIC section is omitted).
 > 
-> For this option you can use the branch mvebu/drivers located at
->  git://git.infradead.org/linux-mvebu.git.
+> The effect of this corruption is that the dynamic linker fails to find
+> the vDSO symbols and libc is instead used for the syscalls that we
+> intended to optimise (e.g. gettimeofday). Functionally, there is no
+> issue as the sigreturn trampoline is still intact and located by the
+> kernel.
 > 
-> In this branch there is the commit "bus: mvebu-mbus: add mv_mbus_dram_info_nooverlap()"
-> but not only this one because it depends also on fixes which have been
-> merged in this same branch.
+> This patch fixes the problem by explicitly passing -shared to the linker
+> when building the vDSO.
+> 
+> Cc: <stable@vger.kernel.org>
+> Reported-by: Szabolcs Nagy <Szabolcs.Nagy@arm.com>
+> Reported-by: James Greenlaigh <james.greenhalgh@arm.com>
+> Signed-off-by: Will Deacon <will.deacon@arm.com>
 
-It looks like the parent of this changeset is already in the mainline
-so it's literally just a single patch.  I'll try to pull it into
-cryptodev.
+Queued for 4.2. Thanks.
 
-Thanks,
 -- 
-Email: Herbert Xu <herbert@gondor.apana.org.au>
-Home Page: http://gondor.apana.org.au/~herbert/
-PGP Key: http://gondor.apana.org.au/~herbert/pubkey.txt
+Catalin
