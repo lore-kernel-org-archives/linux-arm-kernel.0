@@ -1,168 +1,162 @@
 From: hanjun.guo@linaro.org (Hanjun Guo)
-Date: Fri, 19 Jun 2015 16:46:09 +0800
-Subject: [PATCH v2 6/9] irqchip / gic: Add stacked irqdomain support for ACPI
- based GICv2 init
+Date: Fri, 19 Jun 2015 16:46:10 +0800
+Subject: [PATCH v2 7/9] irqchip / GICv3: Refactor gic_of_init() for GICv3
+ driver
 In-Reply-To: <1434703572-26221-1-git-send-email-hanjun.guo@linaro.org>
 References: <1434703572-26221-1-git-send-email-hanjun.guo@linaro.org>
-Message-ID: <1434703572-26221-7-git-send-email-hanjun.guo@linaro.org>
+Message-ID: <1434703572-26221-8-git-send-email-hanjun.guo@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Introduce acpi_irq_domain for GICv2 core domain instead of referring
-to the irq_default_domain, based on that, pass gsi as the argument and
-get the gsi in gic_irq_domain_alloc() to add stacked irqdomain support
-for ACPI based GICv2 init.
+From: Tomasz Nowicki <tomasz.nowicki@linaro.org>
 
+Isolate hardware abstraction (FDT) code to gic_of_init().
+Rest of the logic goes to gic_init_bases() and expects well
+defined data to initialize GIC properly. The same solution
+is used for GICv2 driver.
+
+This is needed for ACPI initialization later.
+
+Signed-off-by: Tomasz Nowicki <tomasz.nowicki@linaro.org>
 Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
 ---
- drivers/acpi/gsi.c                   | 28 +++++++++++++---------------
- drivers/irqchip/irq-gic.c            | 32 +++++++++++++++++---------------
- include/linux/irqchip/arm-gic-acpi.h |  2 ++
- 3 files changed, 32 insertions(+), 30 deletions(-)
+ drivers/irqchip/irq-gic-v3.c | 105 +++++++++++++++++++++++++------------------
+ 1 file changed, 61 insertions(+), 44 deletions(-)
 
-diff --git a/drivers/acpi/gsi.c b/drivers/acpi/gsi.c
-index 38208f2..55b5f31 100644
---- a/drivers/acpi/gsi.c
-+++ b/drivers/acpi/gsi.c
-@@ -3,6 +3,7 @@
-  *
-  * Copyright (C) 2015 ARM Ltd.
-  * Author: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-+ *         Hanjun Guo <hanjun.guo@linaro.org> for stacked irqdomains support
-  *
-  * This program is free software; you can redistribute it and/or modify
-  * it under the terms of the GNU General Public License version 2 as
-@@ -13,6 +14,8 @@
- #include <linux/irqdomain.h>
+diff --git a/drivers/irqchip/irq-gic-v3.c b/drivers/irqchip/irq-gic-v3.c
+index 49875ad..87cf81b 100644
+--- a/drivers/irqchip/irq-gic-v3.c
++++ b/drivers/irqchip/irq-gic-v3.c
+@@ -765,17 +765,69 @@ static const struct irq_domain_ops gic_irq_domain_ops = {
+ 	.free = gic_irq_domain_free,
+ };
  
- enum acpi_irq_model_id acpi_irq_model;
-+/* ACPI core domian pointing to GICv2/3 core domain */
-+struct irq_domain *acpi_irq_domain __read_mostly;
- 
- static unsigned int acpi_gsi_get_irq_type(int trigger, int polarity)
- {
-@@ -45,12 +48,7 @@ static unsigned int acpi_gsi_get_irq_type(int trigger, int polarity)
-  */
- int acpi_gsi_to_irq(u32 gsi, unsigned int *irq)
- {
--	/*
--	 * Only default domain is supported at present, always find
--	 * the mapping corresponding to default domain by passing NULL
--	 * as irq_domain parameter
--	 */
--	*irq = irq_find_mapping(NULL, gsi);
-+	*irq = irq_find_mapping(acpi_irq_domain, gsi);
- 	/*
- 	 * *irq == 0 means no mapping, that should
- 	 * be reported as a failure
-@@ -72,16 +70,16 @@ EXPORT_SYMBOL_GPL(acpi_gsi_to_irq);
- int acpi_register_gsi(struct device *dev, u32 gsi, int trigger,
- 		      int polarity)
- {
--	unsigned int irq;
-+	int irq;
- 	unsigned int irq_type = acpi_gsi_get_irq_type(trigger, polarity);
- 
--	/*
--	 * There is no way at present to look-up the IRQ domain on ACPI,
--	 * hence always create mapping referring to the default domain
--	 * by passing NULL as irq_domain parameter
--	 */
--	irq = irq_create_mapping(NULL, gsi);
--	if (!irq)
-+	irq = irq_find_mapping(acpi_irq_domain, gsi);
-+	if (irq > 0)
-+		return irq;
++static int __init gic_init_bases(void __iomem *dist_base,
++			    struct redist_region *rdist_regs,
++			    u32 nr_redist_regions,
++			    u64 redist_stride,
++			    struct device_node *node)
++{
++	u32 typer;
++	int gic_irqs;
++	int err;
 +
-+	irq = irq_domain_alloc_irqs(acpi_irq_domain, 1, dev_to_node(dev),
-+				    &gsi);
-+	if (irq <= 0)
- 		return -EINVAL;
- 
- 	/* Set irq type if specified and different than the current one */
-@@ -98,7 +96,7 @@ EXPORT_SYMBOL_GPL(acpi_register_gsi);
-  */
- void acpi_unregister_gsi(u32 gsi)
- {
--	int irq = irq_find_mapping(NULL, gsi);
-+	int irq = irq_find_mapping(acpi_irq_domain, gsi);
- 
- 	irq_dispose_mapping(irq);
- }
-diff --git a/drivers/irqchip/irq-gic.c b/drivers/irqchip/irq-gic.c
-index 8fc67bc..d1b2131 100644
---- a/drivers/irqchip/irq-gic.c
-+++ b/drivers/irqchip/irq-gic.c
-@@ -851,15 +851,22 @@ static struct notifier_block gic_cpu_notifier = {
- static int gic_irq_domain_alloc(struct irq_domain *domain, unsigned int virq,
- 				unsigned int nr_irqs, void *arg)
- {
--	int i, ret;
-+	int i;
- 	irq_hw_number_t hwirq;
--	unsigned int type = IRQ_TYPE_NONE;
--	struct of_phandle_args *irq_data = arg;
- 
--	ret = gic_irq_domain_xlate(domain, irq_data->np, irq_data->args,
--				   irq_data->args_count, &hwirq, &type);
--	if (ret)
--		return ret;
-+	if (domain->of_node) {	/* DT case */
-+		int ret;
-+		unsigned int type = IRQ_TYPE_NONE;
-+		struct of_phandle_args *irq_data = arg;
++	gic_data.dist_base = dist_base;
++	gic_data.redist_regions = rdist_regs;
++	gic_data.nr_redist_regions = nr_redist_regions;
++	gic_data.redist_stride = redist_stride;
 +
-+		ret = gic_irq_domain_xlate(domain, irq_data->np,
-+					irq_data->args,
-+					irq_data->args_count, &hwirq, &type);
-+		if (ret)
-+			return ret;
-+	} else {	/* ACPI case */
-+		hwirq = (irq_hw_number_t)*(u32 *)arg;
++	/*
++	 * Find out how many interrupts are supported.
++	 * The GIC only supports up to 1020 interrupt sources (SGI+PPI+SPI)
++	 */
++	typer = readl_relaxed(gic_data.dist_base + GICD_TYPER);
++	gic_data.rdists.id_bits = GICD_TYPER_ID_BITS(typer);
++	gic_irqs = GICD_TYPER_IRQS(typer);
++	if (gic_irqs > 1020)
++		gic_irqs = 1020;
++	gic_data.irq_nr = gic_irqs;
++
++	gic_data.domain = irq_domain_add_tree(node, &gic_irq_domain_ops,
++					      &gic_data);
++	gic_data.rdists.rdist = alloc_percpu(typeof(*gic_data.rdists.rdist));
++
++	if (WARN_ON(!gic_data.domain) || WARN_ON(!gic_data.rdists.rdist)) {
++		err = -ENOMEM;
++		goto out_free;
 +	}
- 
- 	for (i = 0; i < nr_irqs; i++)
- 		gic_irq_domain_map(domain, virq + i, hwirq + i);
-@@ -945,11 +952,11 @@ void __init gic_init_bases(unsigned int gic_nr, int irq_start,
- 		gic_irqs = 1020;
- 	gic->gic_irqs = gic_irqs;
- 
--	if (node) {		/* DT case */
-+	if (node || !acpi_disabled) {		/* DT or ACPI case */
- 		gic->domain = irq_domain_add_linear(node, gic_irqs,
- 						    &gic_irq_domain_hierarchy_ops,
- 						    gic);
--	} else {		/* Non-DT case */
-+	} else {		/* Non-DT and ACPI case */
- 		/*
- 		 * For primary GICs, skip over SGIs.
- 		 * For secondary GICs, skip over PPIs, too.
-@@ -1130,13 +1137,8 @@ gic_v2_acpi_init(struct acpi_table_header *table)
- 		return -ENOMEM;
- 	}
- 
--	/*
--	 * Initialize zero GIC instance (no multi-GIC support). Also, set GIC
--	 * as default IRQ domain to allow for GSI registration and GSI to IRQ
--	 * number translation (see acpi_register_gsi() and acpi_gsi_to_irq()).
--	 */
- 	gic_init_bases(0, -1, dist_base, cpu_base, 0, NULL);
--	irq_set_default_host(gic_data[0].domain);
-+	acpi_irq_domain = gic_data[0].domain;
- 
- 	acpi_irq_model = ACPI_IRQ_MODEL_GIC;
- 	return 0;
-diff --git a/include/linux/irqchip/arm-gic-acpi.h b/include/linux/irqchip/arm-gic-acpi.h
-index 56cd82c..a4a5edb 100644
---- a/include/linux/irqchip/arm-gic-acpi.h
-+++ b/include/linux/irqchip/arm-gic-acpi.h
-@@ -21,5 +21,7 @@
- #define ACPI_GIC_CPU_IF_MEM_SIZE	(SZ_8K)
- #define ACPI_GICV3_DIST_MEM_SIZE	(SZ_64K)
- 
-+extern struct irq_domain *acpi_irq_domain;
 +
- #endif /* CONFIG_ACPI */
- #endif /* ARM_GIC_ACPI_H_ */
++	set_handle_irq(gic_handle_irq);
++
++	if (IS_ENABLED(CONFIG_ARM_GIC_V3_ITS) && gic_dist_supports_lpis())
++		its_init(node, &gic_data.rdists, gic_data.domain);
++
++	gic_smp_init();
++	gic_dist_init();
++	gic_cpu_init();
++	gic_cpu_pm_init();
++
++	return 0;
++
++out_free:
++	if (gic_data.domain)
++		irq_domain_remove(gic_data.domain);
++	free_percpu(gic_data.rdists.rdist);
++	return err;
++}
++
++#ifdef CONFIG_OF
+ static int __init gic_of_init(struct device_node *node, struct device_node *parent)
+ {
+ 	void __iomem *dist_base;
+ 	struct redist_region *rdist_regs;
+ 	u64 redist_stride;
+ 	u32 nr_redist_regions;
+-	u32 typer;
+ 	u32 reg;
+-	int gic_irqs;
+-	int err;
+-	int i;
++	int err, i;
+ 
+ 	dist_base = of_iomap(node, 0);
+ 	if (!dist_base) {
+@@ -819,47 +871,11 @@ static int __init gic_of_init(struct device_node *node, struct device_node *pare
+ 	if (of_property_read_u64(node, "redistributor-stride", &redist_stride))
+ 		redist_stride = 0;
+ 
+-	gic_data.dist_base = dist_base;
+-	gic_data.redist_regions = rdist_regs;
+-	gic_data.nr_redist_regions = nr_redist_regions;
+-	gic_data.redist_stride = redist_stride;
+-
+-	/*
+-	 * Find out how many interrupts are supported.
+-	 * The GIC only supports up to 1020 interrupt sources (SGI+PPI+SPI)
+-	 */
+-	typer = readl_relaxed(gic_data.dist_base + GICD_TYPER);
+-	gic_data.rdists.id_bits = GICD_TYPER_ID_BITS(typer);
+-	gic_irqs = GICD_TYPER_IRQS(typer);
+-	if (gic_irqs > 1020)
+-		gic_irqs = 1020;
+-	gic_data.irq_nr = gic_irqs;
++	err = gic_init_bases(dist_base, rdist_regs, nr_redist_regions,
++			     redist_stride, node);
++	if (!err)
++		return 0;
+ 
+-	gic_data.domain = irq_domain_add_tree(node, &gic_irq_domain_ops,
+-					      &gic_data);
+-	gic_data.rdists.rdist = alloc_percpu(typeof(*gic_data.rdists.rdist));
+-
+-	if (WARN_ON(!gic_data.domain) || WARN_ON(!gic_data.rdists.rdist)) {
+-		err = -ENOMEM;
+-		goto out_free;
+-	}
+-
+-	set_handle_irq(gic_handle_irq);
+-
+-	if (IS_ENABLED(CONFIG_ARM_GIC_V3_ITS) && gic_dist_supports_lpis())
+-		its_init(node, &gic_data.rdists, gic_data.domain);
+-
+-	gic_smp_init();
+-	gic_dist_init();
+-	gic_cpu_init();
+-	gic_cpu_pm_init();
+-
+-	return 0;
+-
+-out_free:
+-	if (gic_data.domain)
+-		irq_domain_remove(gic_data.domain);
+-	free_percpu(gic_data.rdists.rdist);
+ out_unmap_rdist:
+ 	for (i = 0; i < nr_redist_regions; i++)
+ 		if (rdist_regs[i].redist_base)
+@@ -871,3 +887,4 @@ out_unmap_dist:
+ }
+ 
+ IRQCHIP_DECLARE(gic_v3, "arm,gic-v3", gic_of_init);
++#endif
 -- 
 1.9.1
