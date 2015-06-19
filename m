@@ -1,219 +1,55 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Sat, 20 Jun 2015 00:38:47 +0200
-Subject: Linkstation Mini and __machine_arch_type problem, not booting
- since 3.8
-In-Reply-To: <1434678624.4767.22.camel@dolka.fr>
-References: <97db3502cd014faf1c710b1cc0fe8848@dolka.fr>
- <55827D64.1090307@free-electrons.com>
- <1434678624.4767.22.camel@dolka.fr>
-Message-ID: <20150619223847.GC1116@lunn.ch>
+From: rjw@rjwysocki.net (Rafael J. Wysocki)
+Date: Sat, 20 Jun 2015 01:20:46 +0200
+Subject: [PATCH 02/13] driver-core: defer all probes until late_initcall
+In-Reply-To: <CAAObsKDGLVx5wtsiY_o_-r6bp4qTgOfAExbSr7w=xn2eM-CQ6A@mail.gmail.com>
+References: <1434548543-22949-1-git-send-email-tomeu.vizoso@collabora.com>
+ <2834968.DlsDAmbXkG@vostro.rjw.lan>
+ <CAAObsKDGLVx5wtsiY_o_-r6bp4qTgOfAExbSr7w=xn2eM-CQ6A@mail.gmail.com>
+Message-ID: <1585940.7Lfuk0LdBK@vostro.rjw.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-/dts-v1/;
+On Friday, June 19, 2015 03:36:46 PM Tomeu Vizoso wrote:
+> On 18 June 2015 at 23:50, Rafael J. Wysocki <rjw@rjwysocki.net> wrote:
+> > On Wednesday, June 17, 2015 03:42:12 PM Tomeu Vizoso wrote:
+> >> To decrease the chances of devices deferring their probes because of
+> >> dependencies not having probed yet because of their drivers not having
+> >> registered yet, delay all probing until the late initcall level.
+> >>
+> >> This will allow us to avoid deferred probes completely later by probing
+> >> dependencies on demand, or by probing them in dependency order.
+> >>
+> >> Signed-off-by: Tomeu Vizoso <tomeu.vizoso@collabora.com>
+> >> ---
+> >>  drivers/base/dd.c | 8 +++++++-
+> >>  1 file changed, 7 insertions(+), 1 deletion(-)
+> >>
+> >> diff --git a/drivers/base/dd.c b/drivers/base/dd.c
+> >> index a638bbb..18438aa 100644
+> >> --- a/drivers/base/dd.c
+> >> +++ b/drivers/base/dd.c
+> >> @@ -407,6 +407,12 @@ int driver_probe_device(struct device_driver *drv, struct device *dev)
+> >>       if (!device_is_registered(dev))
+> >>               return -ENODEV;
+> >>
+> >> +     /* Defer all probes until we start processing the queue */
+> >> +     if (!driver_deferred_probe_enable) {
+> >> +             driver_deferred_probe_add(dev);
+> >
+> > Do I think correctly that this will effectively force everybody to use deferred
+> > probing?
+> 
+> Guess it depends on the meaning of "using deferred probing". It will
+> defer the probe of the first device to late_initcall (which will
+> happen much earlier in time than before), but afterwards all built-in
+> drivers will be available and depending on the order in which we try
+> to probe devices, none may actually ask to defer its probe.
 
-/* TODO: the specific power off method */
+So this will break things like the PNP system driver which relies on probing
+stuff at the fs_initcall stage for correctness.  It may also break other
+things with similar assumptions.
 
-You can achieve this using the restart-poweroff driver. See the
-kirkwood linkstation DTS files for an example.
 
-#include <dt-bindings/gpio/gpio.h>
-#include <dt-bindings/input/input.h>
-#include <dt-bindings/interrupt-controller/irq.h>
-#include "orion5x-mv88f5182.dtsi"
-
-/ {
-	model = "Buffalo Linkstation Mini (LS-WSGL)";
-	compatible = "buffalo,linkstation_mini", "marvell,orion5x-88f5182", "marvell,orion5x";
-
-	memory {
-		reg = <0x00000000 0x8000000>; /* 128 MB */
-	};
-
-	chosen {
-		bootargs = "console=ttyS0,115200";
-		linux,stdout-path = &uart0;
-	};
-
-	soc {
-		ranges = <MBUS_ID(0xf0, 0x01) 0 0xf1000000 0x100000>,
-			 <MBUS_ID(0x09, 0x00) 0 0xf2200000 0x800>,
-			 <MBUS_ID(0x01, 0x0f) 0 0xf4000000 0x40000>;
-	};
-
-	gpio-keys {
-		compatible = "gpio-keys";
-		pinctrl-0 = <&pmx_buttons>;
-		pinctrl-names = "default";
-		#address-cells = <1>;
-		#size-cells = <0>;
-		func {
-			label = "Function Button";
-			linux,code = <KEY_OPTION>;
-			gpios = <&gpio0 15 GPIO_ACTIVE_LOW>;
-		};
-
-		power {
-			label = "Power-on Switch";
-			linux,input-type = <5>; /* EV_SW */
-			linux,code = <0>; /* LSMINI_SW_POWER */
-			gpios = <&gpio0 18 GPIO_ACTIVE_LOW>;
-		};
-
-		autopower {
-			label = "Power-auto Switch";
-			linux,input-type = <5>; /* EV_SW */
-			linux,code = <1>; /* LSMINI_SW_AUTOPOWER */
-			gpios = <&gpio0 17 GPIO_ACTIVE_LOW>;
-		};
-
-There is a contribute for two other linkstation devices also made
-today, which have these two same buttons. I'm not sure these are the
-best choice of keys, but what every we decide, we should use the same
-for all linkstation devices.
-
-	};
-
-	gpio-leds {
-		compatible = "gpio-leds";
-		pinctrl-0 = <&pmx_leds>;
-		pinctrl-names = "default";
-
-		alarm {
-			label = "alarm:red";
-
-The board name should be in here. "lswsgl:alarm:red". Same for all the
-LEDs.
-
-			gpio = <&gpio0 2 GPIO_ACTIVE_LOW>;
-		};
-
-		info {
-			label = "info:amber";
-			gpio = <&gpio0 3 GPIO_ACTIVE_LOW>;
-		};
-
-		func {
-			label = "func:blue:top";
-			gpio = <&gpio0 9 GPIO_ACTIVE_LOW>;
-		};
-
-		power {
-			label = "power:blue:bottom";
-			gpio = <&gpio0 14 GPIO_ACTIVE_LOW>;
-			default-state = "on";
-		};
-	};
-
-	regulators {
-		compatible = "simple-bus";
-		#address-cells = <1>;
-		#size-cells = <0>;
-		pinctrl-0 = <&pmx_sata0_power &pmx_sata1_power &pmx_usb_power>;
-		pinctrl-names = "default";
-
-		sata0_power: regulator at 0 {
-			compatible = "regulator-fixed";
-			reg = <0>;
-			regulator-name = "SATA0 Power";
-			regulator-min-microvolt = <5000000>;
-			regulator-max-microvolt = <5000000>;
-			enable-active-high;
-			regulator-always-on;
-			regulator-boot-on;
-			gpio = <&gpio0 1 GPIO_ACTIVE_HIGH>;
-		};
-
-		sata1_power: regulator at 1 {
-			compatible = "regulator-fixed";
-			reg = <1>;
-			regulator-name = "SATA1 Power";
-			regulator-min-microvolt = <5000000>;
-			regulator-max-microvolt = <5000000>;
-			enable-active-high;
-			regulator-always-on;
-			regulator-boot-on;
-			gpio = <&gpio0 19 GPIO_ACTIVE_HIGH>;
-		};
-
-		usb_power: regulator at 2 {
-			compatible = "regulator-fixed";
-			reg = <2>;
-			regulator-name = "USB Power";
-			regulator-min-microvolt = <5000000>;
-			regulator-max-microvolt = <5000000>;
-			enable-active-high;
-			regulator-always-on;
-			regulator-boot-on;
-			gpio = <&gpio0 16 GPIO_ACTIVE_HIGH>;
-		};
-	};
-};
-
-&devbus_bootcs {
-	status = "okay";
-
-	devbus,keep-config;
-
-	flash at 0 {
-		compatible = "cfi-flash";
-		reg = <0 0x40000>;
-		bank-width = <1>;
-                #address-cells = <1>;
-		#size-cells = <1>;
-
-		partition at 0 {
-			label = "Full256Kb";
-			reg = <0 0x40000>;
-			read-only;
-		};
-	};
-};
-
-&mdio {
-	status = "okay";
-
-	ethphy: ethernet-phy {
-		reg = <8>;
-	};
-};
-
-&ehci0 {
-	status = "okay";
-};
-
-&eth {
-	status = "okay";
-
-	ethernet-port at 0 {
-		phy-handle = <&ethphy>;
-	};
-};
-
-&i2c {
-	status = "okay";
-	clock-frequency = <100000>;
-	#address-cells = <1>;
-
-	rtc at 32 {
-		compatible = "ricoh,rs5c372a";
-		reg = <0x32>;
-	};
-};
-
-&pinctrl {
-	pmx_buttons: pmx-buttons {
-		marvell,pins = "mpp15", "mpp17", "mpp18";
-		marvell,function = "gpio";
-	};
-
-	pmx_leds: pmx-leds {
-		marvell,pins = "mpp2", "mpp3", "mpp9", "mpp14";
-		marvell,function = "gpio";
-	};
-
-It would be normal to have four separate entries for these leds.
-
-Otherwise, this looks pretty good.
-
-	   Andrew
+-- 
+I speak only for myself.
+Rafael J. Wysocki, Intel Open Source Technology Center.
