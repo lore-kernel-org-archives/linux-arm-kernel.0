@@ -1,50 +1,52 @@
-From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Fri, 19 Jun 2015 15:52:46 +0200
-Subject: [PULL] clk: at91: fixes for 4.1
-Message-ID: <20150619155246.18af1068@bbrezillon>
+From: michael@smart-africa.com (Michael van der Westhuizen)
+Date: Fri, 19 Jun 2015 15:55:51 +0200
+Subject: [PATCH] arm: crypto: picoxcell: Update to the current clk API
+Message-ID: <1434722151-4309-1-git-send-email-michael@smart-africa.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mike,
+The picoXcell hardware crypto accelerator driver was using an
+older version of the clk framework, and not (un)preparing the
+clock before enabling/disabling it.  This change uses the handy
+clk_prepare_enable function to interact with the current clk
+framework correctly.
 
-As you suggested, here is a PR including several fixes for the at91 clk
-drivers. BTW, thanks for accepting to take this PR so late in the release
-cycle.
+Signed-off-by: Michael van der Westhuizen <michael@smart-africa.com>
+---
+ drivers/crypto/picoxcell_crypto.c | 8 ++++----
+ 1 file changed, 4 insertions(+), 4 deletions(-)
 
-Best Regards,
-
-Boris
-
-The following changes since commit 03bc10ab5b0f9b8f81bffbe6e40c944f9d3dbcc5:
-
-  clk: check ->determine/round_rate() return value in clk_calc_new_rates (2015-04-12 21:09:49 -0700)
-
-are available in the git repository at:
-
-  https://github.com/bbrezillon/linux-at91.git ccf/atmel-fixes-for-4.1
-
-for you to fetch changes up to 28df9c2fb6f896179fcffd5a3f5a86e2d1dff0a5:
-
-  clk: at91: fix h32mx prototype inclusion in pmc header (2015-06-19 15:48:34 +0200)
-
-----------------------------------------------------------------
-Boris Brezillon (2):
-      clk: at91: pll: fix input range validity check
-      clk: at91: fix PERIPHERAL_MAX_SHIFT definition
-
-Nicolas Ferre (2):
-      clk: at91: trivial: typo in peripheral clock description
-      clk: at91: fix h32mx prototype inclusion in pmc header
-
- Documentation/devicetree/bindings/clock/at91-clock.txt |  2 +-
- drivers/clk/at91/clk-peripheral.c                      |  8 ++++----
- drivers/clk/at91/clk-pll.c                             | 12 ++++++++++--
- drivers/clk/at91/pmc.h                                 |  2 +-
- 4 files changed, 16 insertions(+), 8 deletions(-)
-
-
-
+diff --git a/drivers/crypto/picoxcell_crypto.c b/drivers/crypto/picoxcell_crypto.c
+index 5da5b98..c5a9e5d 100644
+--- a/drivers/crypto/picoxcell_crypto.c
++++ b/drivers/crypto/picoxcell_crypto.c
+@@ -1754,15 +1754,15 @@ static int spacc_probe(struct platform_device *pdev)
+ 		return PTR_ERR(engine->clk);
+ 	}
+ 
+-	if (clk_enable(engine->clk)) {
+-		dev_info(&pdev->dev, "unable to enable clk\n");
++	if (clk_prepare_enable(engine->clk)) {
++		dev_info(&pdev->dev, "unable to prepare/enable clk\n");
+ 		clk_put(engine->clk);
+ 		return -EIO;
+ 	}
+ 
+ 	err = device_create_file(&pdev->dev, &dev_attr_stat_irq_thresh);
+ 	if (err) {
+-		clk_disable(engine->clk);
++		clk_disable_unprepare(engine->clk);
+ 		clk_put(engine->clk);
+ 		return err;
+ 	}
+@@ -1830,7 +1830,7 @@ static int spacc_remove(struct platform_device *pdev)
+ 		crypto_unregister_alg(&alg->alg);
+ 	}
+ 
+-	clk_disable(engine->clk);
++	clk_disable_unprepare(engine->clk);
+ 	clk_put(engine->clk);
+ 
+ 	return 0;
 -- 
-Boris Brezillon, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+2.1.4
