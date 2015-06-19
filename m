@@ -1,40 +1,36 @@
 From: michael@smart-africa.com (Michael van der Westhuizen)
-Date: Fri, 19 Jun 2015 10:43:53 +0200
-Subject: [PATCH 0/2] spi: dw: Reintroduce optional 16 bit data register I/O
-Message-ID: <1434703435-25198-1-git-send-email-michael@smart-africa.com>
+Date: Fri, 19 Jun 2015 10:43:54 +0200
+Subject: [PATCH 2/2] dt: snps,
+ dw-apb-ssi: Describe 16 bit data register usage limitations
+In-Reply-To: <1434703435-25198-1-git-send-email-michael@smart-africa.com>
+References: <1434703435-25198-1-git-send-email-michael@smart-africa.com>
+Message-ID: <1434703435-25198-2-git-send-email-michael@smart-africa.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The commit dd11444327ce ("spi: dw-spi: Convert 16bit accesses to 32bit
-accesses") globally changed all register access in the dw_apb_ssi driver
-to 32 bit access, which breaks data register (FIFO) access on picoXcell
-platforms.
+This change documents a new property for the snps,dw-apb-ssi device,
+allowing an implementer to interact with the SPI controller data
+register in 16 bit mode only.  This supports a change that unbreaks
+this driver on picoXcell platforms.
 
-This series introduces a boolean to the core spi-dw driver to indicate
-to the core that 16 bit data register access is appropriate, implements
-the code that respects that flag and updates the dw-spi-mmio driver to
-allow setting this boolean from the device tree.
+Signed-off-by: Michael van der Westhuizen <michael@smart-africa.com>
+---
+ Documentation/devicetree/bindings/spi/snps,dw-apb-ssi.txt | 3 +++
+ 1 file changed, 3 insertions(+)
 
-A binding documentation fix is included in this series.
-
-Prior to applying this change the following error presents on
-a picoCell pc3x3 platform:
-  spi_master spi32766: interrupt_transfer: fifo overrun/underrun
-  m25p80 spi32766.0: error -5 reading 9f
-  m25p80: probe of spi32766.0 failed with error -5
-
-With this series applied:
-  m25p80 spi32766.0: m25p40 (512 Kbytes)
-
-Michael van der Westhuizen (2):
-  dt: snps,dw-apb-ssi: Describe 16 bit data register usage limitations
-  spi: dw: Allow interface drivers to limit data I/O to word sizes
-
- Documentation/devicetree/bindings/spi/snps,dw-apb-ssi.txt |  3 +++
- drivers/spi/spi-dw-mmio.c                                 |  5 +++++
- drivers/spi/spi-dw.c                                      | 13 +++++++++++--
- drivers/spi/spi-dw.h                                      | 11 +++++++++++
- 4 files changed, 30 insertions(+), 2 deletions(-)
-
+diff --git a/Documentation/devicetree/bindings/spi/snps,dw-apb-ssi.txt b/Documentation/devicetree/bindings/spi/snps,dw-apb-ssi.txt
+index bd99193..3b2a86f 100644
+--- a/Documentation/devicetree/bindings/spi/snps,dw-apb-ssi.txt
++++ b/Documentation/devicetree/bindings/spi/snps,dw-apb-ssi.txt
+@@ -10,6 +10,9 @@ Required properties:
+ Optional properties:
+ - cs-gpios : Specifies the gpio pis to be used for chipselects.
+ - num-cs : The number of chipselects. If omitted, this will default to 4.
++- snps,data-io-16bit : A boolean property that, when present, causes
++  the driver to interact with the data register using 16 bit I/O instead
++  of the default 32 bit I/O.
+ 
+ Child nodes as per the generic SPI binding.
+ 
 -- 
 2.1.4
