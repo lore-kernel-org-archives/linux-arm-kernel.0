@@ -1,43 +1,365 @@
 From: rogershimizu@gmail.com (Roger Shimizu)
-Date: Fri, 19 Jun 2015 20:28:37 +0900
-Subject: [PATCH 0/2] ARM: dts: add buffalo linkstation ls-wxl/wsxl & ls-wvl/vl
-Message-ID: <1434713319-8691-1-git-send-email-rogershimizu@gmail.com>
+Date: Fri, 19 Jun 2015 20:28:38 +0900
+Subject: [PATCH 1/2] ARM: dts: add buffalo linkstation ls-wxl/wsxl
+In-Reply-To: <1434713319-8691-1-git-send-email-rogershimizu@gmail.com>
+References: <1434713319-8691-1-git-send-email-rogershimizu@gmail.com>
+Message-ID: <1434713319-8691-2-git-send-email-rogershimizu@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Here's the dts-patch support for 2 series of NAS products from Buffalo.
+Add dts file to support Buffalo Linkstation LS-WXL and LS-WSXL,
+which are 2-bay NAS with 3.5" and 2.5" HDD respectively.
 
-  kirkwood-lswxl.dtsi to support:
-    - http://buffalo.jp/product/hdd/network/ls-wxl_r1/
-    - http://buffalo.jp/products/catalog/storage/ls-wsxl_r1/
-
-  kirkwood-lswvl.dtsi to support:
-    - http://buffalo.jp/product/hdd/network/ls-wvl_r1/
-    - http://buffalo.jp/product/hdd/network/ls-vl/
-
-I have tested the patches againt latest next/dt branch (commit: 
-1647e3c73ce54fc32536bb3a834eccad39b23572) and found they're booting and working 
-fine on the real Buffalo NAS boxes.
-
-These two dts patches are encouraged and reviewed by Iwamatsu-san from Debian 
-project. Here I'd like to appreciate his kindness help. 
-
-Since I'm merely a newbie contributor to kernel, if there's any mistake or 
-something need to be adjusted, please just let know.
-
-It'd be great if you could consider to merge the patches. Thank you!
-
-Roger Shimizu (2):
-  ARM: dts: add buffalo linkstation ls-wxl/wsxl
-  ARM: dts: add buffalo linkstation ls-wvl/vl
-
- .../devicetree/bindings/arm/marvell,kirkwood.txt   |   2 +
- arch/arm/boot/dts/Makefile                         |   2 +
- arch/arm/boot/dts/kirkwood-lswvl.dts               | 307 ++++++++++++++++++++
+Signed-off-by: Roger Shimizu <rogershimizu@gmail.com>
+Reviewed-by: Nobuhiro Iwamatsu <iwamatsu@nigauri.org>
+---
+ .../devicetree/bindings/arm/marvell,kirkwood.txt   |   1 +
+ arch/arm/boot/dts/Makefile                         |   1 +
  arch/arm/boot/dts/kirkwood-lswxl.dts               | 312 +++++++++++++++++++++
- 4 files changed, 623 insertions(+)
- create mode 100644 arch/arm/boot/dts/kirkwood-lswvl.dts
+ 3 files changed, 314 insertions(+)
  create mode 100644 arch/arm/boot/dts/kirkwood-lswxl.dts
 
+diff --git a/Documentation/devicetree/bindings/arm/marvell,kirkwood.txt b/Documentation/devicetree/bindings/arm/marvell,kirkwood.txt
+index 4f40ff3..f541506 100644
+--- a/Documentation/devicetree/bindings/arm/marvell,kirkwood.txt
++++ b/Documentation/devicetree/bindings/arm/marvell,kirkwood.txt
+@@ -22,6 +22,7 @@ board. Currently known boards are:
+ "buffalo,lschlv2"
+ "buffalo,lsxhl"
+ "buffalo,lsxl"
++"buffalo,lswxl"
+ "dlink,dns-320"
+ "dlink,dns-320-a1"
+ "dlink,dns-325"
+diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+index a8bf702..e0ebd59 100644
+--- a/arch/arm/boot/dts/Makefile
++++ b/arch/arm/boot/dts/Makefile
+@@ -177,6 +177,7 @@ dtb-$(CONFIG_MACH_KIRKWOOD) += \
+ 	kirkwood-laplug.dtb \
+ 	kirkwood-lschlv2.dtb \
+ 	kirkwood-lsxhl.dtb \
++	kirkwood-lswxl.dtb \
+ 	kirkwood-mplcec4.dtb \
+ 	kirkwood-mv88f6281gtw-ge.dtb \
+ 	kirkwood-nas2big.dtb \
+diff --git a/arch/arm/boot/dts/kirkwood-lswxl.dts b/arch/arm/boot/dts/kirkwood-lswxl.dts
+new file mode 100644
+index 0000000..3dcf6fd
+--- /dev/null
++++ b/arch/arm/boot/dts/kirkwood-lswxl.dts
+@@ -0,0 +1,312 @@
++/*
++ * Device Tree file for Buffalo Linkstation LS-WXL/WSXL
++ *
++ * Copyright (C) 2015, rogershimizu at gmail.com
++ *
++ * This program is free software; you can redistribute it and/or
++ * modify it under the terms of the GNU General Public License
++ * as published by the Free Software Foundation; either version
++ * 2 of the License, or (at your option) any later version.
++ */
++
++/dts-v1/;
++
++#include "kirkwood.dtsi"
++#include "kirkwood-6281.dtsi"
++
++/ {
++	model = "Buffalo Linkstation LS-WXL/WSXL";
++	compatible = "buffalo,linkstation,lswxl", "buffalo,lswxl", "marvell,kirkwood-88f6281", "marvell,kirkwood";
++
++	memory { /* 128 MB */
++		device_type = "memory";
++		reg = <0x00000000 0x8000000>;
++	};
++
++	chosen {
++		bootargs = "console=ttyS0,115200n8 earlyprintk";
++		stdout-path = &uart0;
++	};
++
++	mbus {
++		pcie-controller {
++			status = "okay";
++			pcie at 1,0 {
++				status = "okay";
++			};
++		};
++	};
++
++	ocp at f1000000 {
++		pinctrl: pin-controller at 10000 {
++			pmx_power_hdd0: pmx-power-hdd0 {
++				marvell,pins = "mpp28";
++				marvell,function = "gpio";
++			};
++			pmx_power_hdd1: pmx-power-hdd1 {
++				marvell,pins = "mpp29";
++				marvell,function = "gpio";
++			};
++			pmx_usb_vbus: pmx-usb-vbus {
++				marvell,pins = "mpp37";
++				marvell,function = "gpio";
++			};
++			pmx_fan_high: pmx-fan-high {
++				marvell,pins = "mpp47";
++				marvell,function = "gpio";
++			};
++			pmx_fan_low: pmx-fan-low {
++				marvell,pins = "mpp48";
++				marvell,function = "gpio";
++			};
++			pmx_led_hdderr0: pmx-led-hdderr0 {
++				marvell,pins = "mpp8";
++				marvell,function = "gpio";
++			};
++			pmx_led_hdderr1: pmx-led-hdderr1 {
++				marvell,pins = "mpp46";
++				marvell,function = "gpio";
++			};
++			pmx_led_alarm: pmx-led-alarm {
++				marvell,pins = "mpp49";
++				marvell,function = "gpio";
++			};
++			pmx_led_function_red: pmx-led-function_red {
++				marvell,pins = "mpp34";
++				marvell,function = "gpio";
++			};
++			pmx_led_function_blue: pmx-led-function-blue {
++				marvell,pins = "mpp36";
++				marvell,function = "gpio";
++			};
++			pmx_led_info: pmx-led-info {
++				marvell,pins = "mpp38";
++				marvell,function = "gpio";
++			};
++			pmx_led_power: pmx-led-power {
++				marvell,pins = "mpp39";
++				marvell,function = "gpio";
++			};
++			pmx_fan_lock: pmx-fan-lock {
++				marvell,pins = "mpp40";
++				marvell,function = "gpio";
++			};
++			pmx_button_function: pmx-button-function {
++				marvell,pins = "mpp41";
++				marvell,function = "gpio";
++			};
++			pmx_power_switch: pmx-power-switch {
++				marvell,pins = "mpp42";
++				marvell,function = "gpio";
++			};
++			pmx_power_auto_switch: pmx-power-auto-switch {
++				marvell,pins = "mpp43";
++				marvell,function = "gpio";
++			};
++		};
++
++		serial at 12000 {
++			pinctrl-0 = <&pmx_uart0>;
++			pinctrl-names = "default";
++			status = "okay";
++		};
++
++		sata at 80000 {
++			status = "okay";
++			nr-ports = <2>;
++		};
++
++		spi at 10600 {
++			status = "okay";
++
++			m25p40 at 0 {
++				#address-cells = <1>;
++				#size-cells = <1>;
++				compatible = "m25p40";
++				reg = <0>;
++				spi-max-frequency = <25000000>;
++				mode = <0>;
++
++				partition at 0 {
++					reg = <0x0 0x60000>;
++					label = "uboot";
++					read-only;
++				};
++
++				partition at 60000 {
++					reg = <0x60000 0x10000>;
++					label = "dtb";
++					read-only;
++				};
++
++				partition at 70000 {
++					reg = <0x70000 0x10000>;
++					label = "uboot_env";
++				};
++			};
++		};
++	};
++
++	gpio_keys {
++		compatible = "gpio-keys";
++		#address-cells = <1>;
++		#size-cells = <0>;
++		pinctrl-0 = <&pmx_button_function &pmx_power_switch
++			     &pmx_power_auto_switch>;
++		pinctrl-names = "default";
++
++		button at 1 {
++			label = "Function Button";
++			linux,code = <KEY_OPTION>;
++			gpios = <&gpio1 41 GPIO_ACTIVE_LOW>;
++		};
++
++		button at 2 {
++			label = "Power-on Switch";
++			linux,code = <KEY_RESERVED>;
++			linux,input-type = <5>;
++			gpios = <&gpio1 42 GPIO_ACTIVE_LOW>;
++		};
++
++		button at 3 {
++			label = "Power-auto Switch";
++			linux,code = <KEY_ESC>;
++			linux,input-type = <5>;
++			gpios = <&gpio1 43 GPIO_ACTIVE_LOW>;
++		};
++	};
++
++	gpio_leds {
++		compatible = "gpio-leds";
++		pinctrl-0 = <&pmx_led_function_red &pmx_led_alarm
++			     &pmx_led_info &pmx_led_power
++			     &pmx_led_function_blue
++			     &pmx_led_hdderr0
++			     &pmx_led_hdderr1>;
++		pinctrl-names = "default";
++
++		led at 1 {
++			label = "lswxl:blue:func";
++			gpios = <&gpio1 36 GPIO_ACTIVE_LOW>;
++		};
++
++		led at 2 {
++			label = "lswxl:red:alarm";
++			gpios = <&gpio1 49 GPIO_ACTIVE_LOW>;
++		};
++
++		led at 3 {
++			label = "lswxl:amber:info";
++			gpios = <&gpio1 6 GPIO_ACTIVE_LOW>;
++		};
++
++		led at 4 {
++			label = "lswxl:blue:power";
++			gpios = <&gpio1 8 GPIO_ACTIVE_LOW>;
++			default-state = "keep";
++		};
++
++		led at 5 {
++			label = "lswxl:red:func";
++			gpios = <&gpio1 5 GPIO_ACTIVE_LOW>;
++			default-state = "keep";
++			linux,default-trigger = "heartbeat";
++		};
++
++		led at 6 {
++			label = "lswxl:red:hdderr0";
++			gpios = <&gpio1 2 GPIO_ACTIVE_LOW>;
++		};
++
++		led at 7 {
++			label = "lswxl:red:hdderr1";
++			gpios = <&gpio1 3 GPIO_ACTIVE_LOW>;
++		};
++	};
++
++	gpio_fan {
++		compatible = "gpio-fan";
++		pinctrl-0 = <&pmx_fan_low &pmx_fan_high &pmx_fan_lock>;
++		pinctrl-names = "default";
++
++		gpios = <&gpio0 47 GPIO_ACTIVE_LOW
++			 &gpio0 48 GPIO_ACTIVE_LOW>;
++
++		gpio-fan,speed-map = <0 3
++				1500 2
++				3250 1
++				5000 0>;
++
++		alarm-gpios = <&gpio1 49 GPIO_ACTIVE_HIGH>;
++	};
++
++	restart_poweroff {
++		compatible = "restart-poweroff";
++	};
++
++	regulators {
++		compatible = "simple-bus";
++		#address-cells = <1>;
++		#size-cells = <0>;
++		pinctrl-0 = <&pmx_power_hdd0 &pmx_power_hdd1 &pmx_usb_vbus>;
++		pinctrl-names = "default";
++
++		usb_power: regulator at 1 {
++			compatible = "regulator-fixed";
++			reg = <1>;
++			regulator-name = "USB Power";
++			regulator-min-microvolt = <5000000>;
++			regulator-max-microvolt = <5000000>;
++			enable-active-high;
++			regulator-always-on;
++			regulator-boot-on;
++			gpio = <&gpio0 37 GPIO_ACTIVE_HIGH>;
++		};
++		hdd_power0: regulator at 2 {
++			compatible = "regulator-fixed";
++			reg = <2>;
++			regulator-name = "HDD0 Power";
++			regulator-min-microvolt = <5000000>;
++			regulator-max-microvolt = <5000000>;
++			enable-active-high;
++			regulator-always-on;
++			regulator-boot-on;
++			gpio = <&gpio0 28 GPIO_ACTIVE_HIGH>;
++		};
++		hdd_power1: regulator at 3 {
++			compatible = "regulator-fixed";
++			reg = <3>;
++			regulator-name = "HDD1 Power";
++			regulator-min-microvolt = <5000000>;
++			regulator-max-microvolt = <5000000>;
++			enable-active-high;
++			regulator-always-on;
++			regulator-boot-on;
++			gpio = <&gpio0 29 GPIO_ACTIVE_HIGH>;
++		};
++	};
++};
++
++&mdio {
++	status = "okay";
++
++	ethphy0: ethernet-phy at 0 {
++		device_type = "ethernet-phy";
++		reg = <0>;
++	};
++
++	ethphy1: ethernet-phy at 8 {
++		device_type = "ethernet-phy";
++		reg = <8>;
++	};
++};
++
++&eth0 {
++	status = "okay";
++	reg = <0x76000 0x4000>;
++	clocks = <&gate_clk 19>;
++	ethernet0-port at 0 {
++		phy-handle = <&ethphy1>;
++		interrupts = <15>;
++	};
++};
 -- 
 1.9.1
