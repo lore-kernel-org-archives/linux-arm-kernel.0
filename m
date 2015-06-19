@@ -1,76 +1,39 @@
-From: nicolae.rosia@gmail.com (Nicolae Rosia)
-Date: Fri, 19 Jun 2015 19:43:04 +0300
-Subject: [PATCH v2 0/8] add basic support for i.mx6 ul chip
-In-Reply-To: <1434727951-4852-1-git-send-email-Frank.Li@freescale.com>
-References: <1434727951-4852-1-git-send-email-Frank.Li@freescale.com>
-Message-ID: <CAH=tA9FyfB4PR+YXnHBssnSirvQfSw6AAY1gJz3=L=a9UL0Z6g@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 19 Jun 2015 17:44:12 +0100
+Subject: [PATCH v5 1/6] drm: bridge/dw_hdmi: add audio support for more
+ display resolutions
+In-Reply-To: <1434730752-10829-1-git-send-email-ykk@rock-chips.com>
+References: <1434730417-10629-1-git-send-email-ykk@rock-chips.com>
+ <1434730752-10829-1-git-send-email-ykk@rock-chips.com>
+Message-ID: <20150619164411.GU7557@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Sat, Jun 20, 2015 at 12:19:12AM +0800, Yakir Yang wrote:
+> Just like HDMISpecification 1.4 document descripted, the soure shall
+> determine the fractional relationship between the TMDS clock an an
+> audio reference clock, the sink may then recreate the audio clock from
+> the TMDS clock by using an clock divider. So if we can make sink generate
+> the correct samplerate, then we can say those display resolutions with
+> this pixelclock could support audio play.
+> 
+> The exact relationship between the two clocks will be:
+> 	128 * SampleRate = TmdsClock * N / CTS.
+> So this patch would generate the correct N/CTS values, add audio support
+> for the below  tmds clocks:
+> 25.175MHz, 40MHz, 54MHz, 65MHz, 74.25MHz, 83.5MHz, 106.5MHz, 108Mhz
 
-I can't seem to find a datasheet for this series.
+I think I've said this before.  The documentation for iMX6 (which is
+freely available, unlike Rock-chips documentation, so you can look at
+it yourself) specifies that only certain audio and video rates are
+supported.  See the iMX6 manuals, the section on the HDMI Tx, sub-
+section "CTS calculation".
 
-Best regards,
-Nicolae Rosia
+It clearly states that values which do not appear in the table there
+are "not supported".
 
-On Fri, Jun 19, 2015 at 6:32 PM,  <Frank.Li@freescale.com> wrote:
-> From: Frank Li <Frank.Li@freescale.com>
->
-> Add basic function support i.mx6ul.
-> add simple dts.
-> add full pin function define
-> add clock support.
-> add low level debug
->
-> Change from v1 to v2:
->  - Remove unnecessary clk_register_clkdev for gpt
->  - use fat iomux in dts
->  - use macro GPIO_ACTIVE_LOW
->
-> Anson Huang (1):
->   ARM: imx: add low-level debug support for i.mx6ul
->
-> Frank Li (7):
->   ARM: imx: add i.mx6ul msl support
->   ARM: imx: add imx6ul clk tree support
->   Document: dt: binding: imx: update document for imx6ul support
->   ARM: pinctrl: imx: add i.mx6ul pinctrl driver
->   ARM: dts: add i.mx6ul pin function include file
->   ARM: dts: imx: add imx6ul and imx6ul evk board support
->   ARM: imx: imx_v6_v7_defconfig enable imx6ul support
->
->  .../devicetree/bindings/clock/imx6ul-clock.txt     |  13 +
->  .../bindings/pinctrl/fsl,imx6ul-pinctrl.txt        |  36 +
->  arch/arm/Kconfig.debug                             |   9 +
->  arch/arm/boot/dts/Makefile                         |   2 +
->  arch/arm/boot/dts/imx6ul-14x14-evk.dts             | 335 ++++++++
->  arch/arm/boot/dts/imx6ul-pinfunc.h                 | 938 +++++++++++++++++++++
->  arch/arm/boot/dts/imx6ul.dtsi                      | 645 ++++++++++++++
->  arch/arm/configs/imx_v6_v7_defconfig               |   1 +
->  arch/arm/include/debug/imx-uart.h                  |  13 +
->  arch/arm/mach-imx/Kconfig                          |   8 +
->  arch/arm/mach-imx/Makefile                         |   1 +
->  arch/arm/mach-imx/mach-imx6ul.c                    |  43 +
->  drivers/clk/imx/Makefile                           |   1 +
->  drivers/clk/imx/clk-imx6ul.c                       | 432 ++++++++++
->  drivers/pinctrl/freescale/Kconfig                  |   7 +
->  drivers/pinctrl/freescale/Makefile                 |   1 +
->  drivers/pinctrl/freescale/pinctrl-imx6ul.c         | 323 +++++++
->  include/dt-bindings/clock/imx6ul-clock.h           | 240 ++++++
->  18 files changed, 3048 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/clock/imx6ul-clock.txt
->  create mode 100644 Documentation/devicetree/bindings/pinctrl/fsl,imx6ul-pinctrl.txt
->  create mode 100644 arch/arm/boot/dts/imx6ul-14x14-evk.dts
->  create mode 100644 arch/arm/boot/dts/imx6ul-pinfunc.h
->  create mode 100644 arch/arm/boot/dts/imx6ul.dtsi
->  create mode 100644 arch/arm/mach-imx/mach-imx6ul.c
->  create mode 100644 drivers/clk/imx/clk-imx6ul.c
->  create mode 100644 drivers/pinctrl/freescale/pinctrl-imx6ul.c
->  create mode 100644 include/dt-bindings/clock/imx6ul-clock.h
->
-> --
-> 1.9.1
->
-> --
-> To unsubscribe from this list: send the line "unsubscribe devicetree" in
+Adding more rates to this code puts iMX6 outside of its specification.
+
+-- 
+FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
+according to speedtest.net.
