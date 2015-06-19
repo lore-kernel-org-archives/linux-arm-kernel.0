@@ -1,35 +1,33 @@
-From: jiri.prchal@aksignal.cz (=?UTF-8?B?SmnFmcOtIFByY2hhbA==?=)
-Date: Fri, 19 Jun 2015 16:36:06 +0200
-Subject: [PATCH linux-next v2 1/1] dmaengine: at_hdmac: fix residue
- computation
-In-Reply-To: <55841767.7010608@atmel.com>
-References: <cover.1434626239.git.cyrille.pitchen@atmel.com>
- <b9630cef4224b93939138b3a8c1950ea44cbcf59.1434626239.git.cyrille.pitchen@atmel.com>
- <5582B4EC.7030805@aksignal.cz> <55841767.7010608@atmel.com>
-Message-ID: <558428D6.2080405@aksignal.cz>
+From: p.zabel@pengutronix.de (Philipp Zabel)
+Date: Fri, 19 Jun 2015 16:38:39 +0200
+Subject: [PATCH] ARM: dts: imx53-qsb: fix TVE entry
+Message-ID: <1434724719-8105-1-git-send-email-p.zabel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Correct HSYNC/VSYNC pins and add ddc-i2c-bus property
 
+Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
+---
+ arch/arm/boot/dts/imx53-qsb-common.dtsi | 5 +++--
+ 1 file changed, 3 insertions(+), 2 deletions(-)
 
-On 19.6.2015 15:21, Nicolas Ferre wrote:
-> Le 18/06/2015 14:09, Ji?? Prchal a ?crit :
->>
->>
->> On 18.6.2015 13:25, Cyrille Pitchen wrote:
->>>
->>> Signed-off-by: Cyrille Pitchen <cyrille.pitchen@atmel.com>
->>
->> Tested-by: Ji?? Prchal <jiri.prchal@aksignal.cz>
-
-It's already here.
-
->>
->> Manually applied to 4.1-rc7 and it WORKS!
->
-> Good piece of new indeed.
->
-> Can you add your "Tested-by" tag?
->
-> Bye,
->
+diff --git a/arch/arm/boot/dts/imx53-qsb-common.dtsi b/arch/arm/boot/dts/imx53-qsb-common.dtsi
+index 181ae5e..ab4ba39 100644
+--- a/arch/arm/boot/dts/imx53-qsb-common.dtsi
++++ b/arch/arm/boot/dts/imx53-qsb-common.dtsi
+@@ -295,9 +295,10 @@
+ &tve {
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&pinctrl_vga_sync>;
++	ddc-i2c-bus = <&i2c2>;
+ 	fsl,tve-mode = "vga";
+-	fsl,hsync-pin = <4>;
+-	fsl,vsync-pin = <6>;
++	fsl,hsync-pin = <7>;	/* IPU DI1 PIN7 via EIM_OE */
++	fsl,vsync-pin = <8>;	/* IPU DI1 PIN8 via EIM_RW */
+ 	status = "okay";
+ };
+ 
+-- 
+2.1.4
