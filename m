@@ -1,33 +1,20 @@
-From: p.zabel@pengutronix.de (Philipp Zabel)
-Date: Fri, 19 Jun 2015 16:38:39 +0200
-Subject: [PATCH] ARM: dts: imx53-qsb: fix TVE entry
-Message-ID: <1434724719-8105-1-git-send-email-p.zabel@pengutronix.de>
+From: Nathan_Lynch@mentor.com (Nathan Lynch)
+Date: Fri, 19 Jun 2015 09:47:46 -0500
+Subject: [PATCH] arm64: vdso: work-around broken ELF toolchains in Makefile
+In-Reply-To: <1434718593-3648-1-git-send-email-will.deacon@arm.com>
+References: <1434718593-3648-1-git-send-email-will.deacon@arm.com>
+Message-ID: <55842B92.4090702@mentor.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Correct HSYNC/VSYNC pins and add ddc-i2c-bus property
+On 06/19/2015 07:56 AM, Will Deacon wrote:
+> When building the kernel with a bare-metal (ELF) toolchain, the -shared
+> option may not be passed down to collect2, resulting in silent corruption
+> of the vDSO image (in particular, the DYNAMIC section is omitted).
 
-Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
----
- arch/arm/boot/dts/imx53-qsb-common.dtsi | 5 +++--
- 1 file changed, 3 insertions(+), 2 deletions(-)
+I checked arch/arm with
 
-diff --git a/arch/arm/boot/dts/imx53-qsb-common.dtsi b/arch/arm/boot/dts/imx53-qsb-common.dtsi
-index 181ae5e..ab4ba39 100644
---- a/arch/arm/boot/dts/imx53-qsb-common.dtsi
-+++ b/arch/arm/boot/dts/imx53-qsb-common.dtsi
-@@ -295,9 +295,10 @@
- &tve {
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&pinctrl_vga_sync>;
-+	ddc-i2c-bus = <&i2c2>;
- 	fsl,tve-mode = "vga";
--	fsl,hsync-pin = <4>;
--	fsl,vsync-pin = <6>;
-+	fsl,hsync-pin = <7>;	/* IPU DI1 PIN7 via EIM_OE */
-+	fsl,vsync-pin = <8>;	/* IPU DI1 PIN8 via EIM_RW */
- 	status = "okay";
- };
- 
--- 
-2.1.4
+arm-none-eabi-gcc (Fedora 4.9.2-3.fc21) 4.9.2
+
+and it doesn't seem to be affected.  Do you know whether the toolchain
+issue is aarch64-specific?
