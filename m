@@ -1,360 +1,53 @@
-From: rogershimizu@gmail.com (Roger Shimizu)
-Date: Fri, 19 Jun 2015 20:28:39 +0900
-Subject: [PATCH 2/2] ARM: dts: add buffalo linkstation ls-wvl/vl
-In-Reply-To: <1434713319-8691-1-git-send-email-rogershimizu@gmail.com>
-References: <1434713319-8691-1-git-send-email-rogershimizu@gmail.com>
-Message-ID: <1434713319-8691-3-git-send-email-rogershimizu@gmail.com>
+From: heiko@sntech.de (Heiko Stuebner)
+Date: Fri, 19 Jun 2015 13:36:40 +0200
+Subject: [PATCH] arm64: dts: mt8173: add clock_null
+In-Reply-To: <2333431.ttvjElY3ps@phil>
+References: <1434605351-64592-1-git-send-email-eddie.huang@mediatek.com>
+ <2333431.ttvjElY3ps@phil>
+Message-ID: <8371528.SNAmOgosfF@phil>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add dts file to support Buffalo Linkstation LS-WVL and LS-VL,
-which are 3.5" HDD NAS in 2-bay and 1-bay respectively.
+Am Donnerstag, 18. Juni 2015, 18:15:03 schrieb Heiko Stuebner:
+> Am Donnerstag, 18. Juni 2015, 13:29:11 schrieb Eddie Huang:
+> > Add clk_null, which represents clocks that can not / need not
+> > controlled by software.
+> > There are many clocks' parent set to clk_null.
+> 
+> Devicetree is supposed to describe hardware, and ideally not what software
+> does with it. If the clock simply cannot be controlled by software, it will
+> still have a rate and I think it should probably be modelled - similarly we
+> sometimes have fixed regulators that also are not software controllable.
+> 
+> 
+> While it might be ok to define dummy clocks as a temporary stopgap, these
+> should definitly be marked as such. This clk_null at least sounds like there
+> is no plan to replace this with a real solution at some point.
+> 
+> And of course a bit of context would be cool, to know which type of clocks
+> this actually replaces.
 
-Signed-off-by: Roger Shimizu <rogershimizu@gmail.com>
-Reviewed-by: Nobuhiro Iwamatsu <iwamatsu@nigauri.org>
----
- .../devicetree/bindings/arm/marvell,kirkwood.txt   |   1 +
- arch/arm/boot/dts/Makefile                         |   1 +
- arch/arm/boot/dts/kirkwood-lswvl.dts               | 307 +++++++++++++++++++++
- 3 files changed, 309 insertions(+)
- create mode 100644 arch/arm/boot/dts/kirkwood-lswvl.dts
+After looking a bit more into this, I'm feel that the clk_null approach is 
+wrong.
 
-diff --git a/Documentation/devicetree/bindings/arm/marvell,kirkwood.txt b/Documentation/devicetree/bindings/arm/marvell,kirkwood.txt
-index f541506..c7c9243 100644
---- a/Documentation/devicetree/bindings/arm/marvell,kirkwood.txt
-+++ b/Documentation/devicetree/bindings/arm/marvell,kirkwood.txt
-@@ -23,6 +23,7 @@ board. Currently known boards are:
- "buffalo,lsxhl"
- "buffalo,lsxl"
- "buffalo,lswxl"
-+"buffalo,lswvl"
- "dlink,dns-320"
- "dlink,dns-320-a1"
- "dlink,dns-325"
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index e0ebd59..a16cfca 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -178,6 +178,7 @@ dtb-$(CONFIG_MACH_KIRKWOOD) += \
- 	kirkwood-lschlv2.dtb \
- 	kirkwood-lsxhl.dtb \
- 	kirkwood-lswxl.dtb \
-+	kirkwood-lswvl.dtb \
- 	kirkwood-mplcec4.dtb \
- 	kirkwood-mv88f6281gtw-ge.dtb \
- 	kirkwood-nas2big.dtb \
-diff --git a/arch/arm/boot/dts/kirkwood-lswvl.dts b/arch/arm/boot/dts/kirkwood-lswvl.dts
-new file mode 100644
-index 0000000..a12941a
---- /dev/null
-+++ b/arch/arm/boot/dts/kirkwood-lswvl.dts
-@@ -0,0 +1,307 @@
-+/*
-+ * Device Tree file for Buffalo Linkstation LS-WVL/VL
-+ *
-+ * Copyright (C) 2015, rogershimizu at gmail.com
-+ *
-+ * This program is free software; you can redistribute it and/or
-+ * modify it under the terms of the GNU General Public License
-+ * as published by the Free Software Foundation; either version
-+ * 2 of the License, or (at your option) any later version.
-+ */
-+
-+/dts-v1/;
-+
-+#include "kirkwood.dtsi"
-+#include "kirkwood-6282.dtsi"
-+
-+/ {
-+	model = "Buffalo Linkstation LS-WVL/VL";
-+	compatible = "buffalo,linkstation,lswvl", "buffalo,lswvl", "buffalo,linkstation,lsvl", "buffalo,lsvl", "marvell,kirkwood-88f6282", "marvell,kirkwood";
-+
-+	memory { /* 256 MB */
-+		device_type = "memory";
-+		reg = <0x00000000 0x10000000>;
-+	};
-+
-+	chosen {
-+		bootargs = "console=ttyS0,115200n8 earlyprintk";
-+		stdout-path = &uart0;
-+	};
-+
-+	mbus {
-+		pcie-controller {
-+			status = "okay";
-+			pcie at 1,0 {
-+				status = "okay";
-+			};
-+		};
-+	};
-+
-+	ocp at f1000000 {
-+		pinctrl: pin-controller at 10000 {
-+			pmx_power_hdd0: pmx-power-hdd0 {
-+				marvell,pins = "mpp8";
-+				marvell,function = "gpio";
-+			};
-+			pmx_power_hdd1: pmx-power-hdd1 {
-+				marvell,pins = "mpp9";
-+				marvell,function = "gpio";
-+			};
-+			pmx_usb_vbus: pmx-usb-vbus {
-+				marvell,pins = "mpp12";
-+				marvell,function = "gpio";
-+			};
-+			pmx_fan_high: pmx-fan-high {
-+				marvell,pins = "mpp16";
-+				marvell,function = "gpio";
-+			};
-+			pmx_fan_low: pmx-fan-low {
-+				marvell,pins = "mpp17";
-+				marvell,function = "gpio";
-+			};
-+			pmx_led_hdderr0: pmx-led-hdderr0 {
-+				marvell,pins = "mpp34";
-+				marvell,function = "gpio";
-+			};
-+			pmx_led_hdderr1: pmx-led-hdderr1 {
-+				marvell,pins = "mpp35";
-+				marvell,function = "gpio";
-+			};
-+			pmx_led_alarm: pmx-led-alarm {
-+				marvell,pins = "mpp36";
-+				marvell,function = "gpio";
-+			};
-+			pmx_led_function_red: pmx-led-function_red {
-+				marvell,pins = "mpp37";
-+				marvell,function = "gpio";
-+			};
-+			pmx_led_info: pmx-led-info {
-+				marvell,pins = "mpp38";
-+				marvell,function = "gpio";
-+			};
-+			pmx_led_function_blue: pmx-led-function-blue {
-+				marvell,pins = "mpp39";
-+				marvell,function = "gpio";
-+			};
-+			pmx_led_power: pmx-led-power {
-+				marvell,pins = "mpp40";
-+				marvell,function = "gpio";
-+			};
-+			pmx_fan_lock: pmx-fan-lock {
-+				marvell,pins = "mpp43";
-+				marvell,function = "gpio";
-+			};
-+			pmx_button_function: pmx-button-function {
-+				marvell,pins = "mpp45";
-+				marvell,function = "gpio";
-+			};
-+			pmx_power_switch: pmx-power-switch {
-+				marvell,pins = "mpp46";
-+				marvell,function = "gpio";
-+			};
-+			pmx_power_auto_switch: pmx-power-auto-switch {
-+				marvell,pins = "mpp47";
-+				marvell,function = "gpio";
-+			};
-+
-+		};
-+
-+		i2c at 11000 {
-+			status = "okay";
-+		};
-+
-+		serial at 12000 {
-+			pinctrl-0 = <&pmx_uart0>;
-+			pinctrl-names = "default";
-+			status = "okay";
-+		};
-+
-+		sata at 80000 {
-+			status = "okay";
-+			nr-ports = <2>;
-+		};
-+
-+		spi at 10600 {
-+			status = "okay";
-+
-+			m25p40 at 0 {
-+				#address-cells = <1>;
-+				#size-cells = <1>;
-+				compatible = "m25p40";
-+				reg = <0>;
-+				spi-max-frequency = <25000000>;
-+				mode = <0>;
-+
-+				partition at 0 {
-+					reg = <0x0 0x60000>;
-+					label = "uboot";
-+					read-only;
-+				};
-+
-+				partition at 60000 {
-+					reg = <0x60000 0x10000>;
-+					label = "dtb";
-+					read-only;
-+				};
-+
-+				partition at 70000 {
-+					reg = <0x70000 0x10000>;
-+					label = "uboot_env";
-+				};
-+			};
-+		};
-+	};
-+
-+
-+	gpio_keys {
-+		compatible = "gpio-keys";
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+		pinctrl-0 = <&pmx_button_function &pmx_power_switch
-+			     &pmx_power_auto_switch>;
-+		pinctrl-names = "default";
-+
-+		button at 1 {
-+			label = "Function Button";
-+			linux,code = <KEY_OPTION>;
-+			gpios = <&gpio0 45 GPIO_ACTIVE_LOW>;
-+		};
-+
-+		button at 2 {
-+			label = "Power-on Switch";
-+			linux,code = <KEY_RESERVED>;
-+			linux,input-type = <5>;
-+			gpios = <&gpio0 46 GPIO_ACTIVE_LOW>;
-+		};
-+
-+		button at 3 {
-+			label = "Power-auto Switch";
-+			linux,code = <KEY_ESC>;
-+			linux,input-type = <5>;
-+			gpios = <&gpio0 47 GPIO_ACTIVE_LOW>;
-+		};
-+	};
-+
-+	gpio_leds {
-+		compatible = "gpio-leds";
-+		pinctrl-0 = <&pmx_led_function_red &pmx_led_alarm
-+			     &pmx_led_info &pmx_led_power
-+			     &pmx_led_function_blue
-+			     &pmx_led_hdderr0
-+			     &pmx_led_hdderr1>;
-+		pinctrl-names = "default";
-+
-+		led at 1 {
-+			label = "lswvl:red:alarm";
-+			gpios = <&gpio0 36 GPIO_ACTIVE_LOW>;
-+		};
-+
-+		led at 2 {
-+			label = "lswvl:red:func";
-+			gpios = <&gpio0 37 GPIO_ACTIVE_LOW>;
-+		};
-+
-+		led at 3 {
-+			label = "lswvl:amber:info";
-+			gpios = <&gpio0 38 GPIO_ACTIVE_LOW>;
-+		};
-+
-+		led at 4 {
-+			label = "lswvl:blue:func";
-+			gpios = <&gpio0 39 GPIO_ACTIVE_LOW>;
-+		};
-+
-+		led at 5 {
-+			label = "lswvl:blue:power";
-+			gpios = <&gpio0 40 GPIO_ACTIVE_LOW>;
-+			default-state = "keep";
-+		};
-+
-+		led at 6 {
-+			label = "lswvl:red:hdderr0";
-+			gpios = <&gpio0 34 GPIO_ACTIVE_HIGH>;
-+		};
-+
-+		led at 7 {
-+			label = "lswvl:red:hdderr1";
-+			gpios = <&gpio0 35 GPIO_ACTIVE_HIGH>;
-+		};
-+	};
-+
-+	gpio_fan {
-+		compatible = "gpio-fan";
-+		pinctrl-0 = <&pmx_fan_low &pmx_fan_high &pmx_fan_lock>;
-+		pinctrl-names = "default";
-+
-+		gpios = <&gpio0 17 GPIO_ACTIVE_LOW
-+			 &gpio0 16 GPIO_ACTIVE_LOW>;
-+
-+		gpio-fan,speed-map = <0 3
-+				1500 2
-+				3250 1
-+				5000 0>;
-+
-+		alarm-gpios = <&gpio0 43 GPIO_ACTIVE_HIGH>;
-+	};
-+
-+	restart_poweroff {
-+		compatible = "restart-poweroff";
-+	};
-+
-+	regulators {
-+		compatible = "simple-bus";
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+		pinctrl-0 = <&pmx_power_hdd0 &pmx_power_hdd1 &pmx_usb_vbus>;
-+		pinctrl-names = "default";
-+
-+		usb_power: regulator at 1 {
-+			compatible = "regulator-fixed";
-+			reg = <1>;
-+			regulator-name = "USB Power";
-+			regulator-min-microvolt = <5000000>;
-+			regulator-max-microvolt = <5000000>;
-+			enable-active-high;
-+			regulator-always-on;
-+			regulator-boot-on;
-+			gpio = <&gpio0 12 GPIO_ACTIVE_LOW>;
-+		};
-+		hdd_power0: regulator at 2 {
-+			compatible = "regulator-fixed";
-+			reg = <2>;
-+			regulator-name = "HDD0 Power";
-+			regulator-min-microvolt = <5000000>;
-+			regulator-max-microvolt = <5000000>;
-+			enable-active-high;
-+			regulator-always-on;
-+			regulator-boot-on;
-+			gpio = <&gpio0 8 GPIO_ACTIVE_LOW>;
-+		};
-+		hdd_power1: regulator at 3 {
-+			compatible = "regulator-fixed";
-+			reg = <3>;
-+			regulator-name = "HDD1 Power";
-+			regulator-min-microvolt = <5000000>;
-+			regulator-max-microvolt = <5000000>;
-+			enable-active-high;
-+			regulator-always-on;
-+			regulator-boot-on;
-+			gpio = <&gpio0 9 GPIO_ACTIVE_LOW>;
-+		};
-+	};
-+};
-+
-+&mdio {
-+	status = "okay";
-+	ethphy0: ethernet-phy at 0 {
-+		device_type = "ethernet-phy";
-+		reg = <0>;
-+	};
-+};
-+
-+&eth0 {
-+	status = "okay";
-+	ethernet0-port at 0 {
-+		phy-handle = <&ethphy0>;
-+	};
-+};
--- 
-1.9.1
+For one, even if the clk_null stuff would be ok, the binding doc of the clock 
+controller does not describe the need of this specific clock at all.
+
+
+The other more important point, looking at clk-mt8173 I see at least these 
+clocks being set as children of "clk_null":
+
+static const struct mtk_fixed_factor root_clk_alias[] __initconst = {
+	FACTOR(CLK_TOP_CLKPH_MCK_O, "clkph_mck_o", "clk_null", 1, 1),
+	FACTOR(CLK_TOP_DPI, "dpi_ck", "clk_null", 1, 1),
+	FACTOR(CLK_TOP_USB_SYSPLL_125M, "usb_syspll_125m", "clk_null", 1, 1),
+	FACTOR(CLK_TOP_HDMITX_DIG_CTS, "hdmitx_dig_cts", "clk_null", 1, 1),
+};
+
+
+These look more like they are fed from some external source to the clock 
+controller? I did ask Matthias but he also couldn't find anything describing 
+where these clocks actually come from.
+
+
+Heiko
