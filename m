@@ -1,43 +1,37 @@
-From: nicolae.rosia@gmail.com (Nicolae Rosia)
-Date: Fri, 19 Jun 2015 20:05:22 +0300
-Subject: [PATCH v2 6/8] ARM: dts: imx: add imx6ul and imx6ul evk board
- support
-In-Reply-To: <1434727951-4852-7-git-send-email-Frank.Li@freescale.com>
-References: <1434727951-4852-1-git-send-email-Frank.Li@freescale.com>
- <1434727951-4852-7-git-send-email-Frank.Li@freescale.com>
-Message-ID: <CAH=tA9G_x=6wNTOWbOc2FGGARTxioikUSwqyENKk74wL=7uzaw@mail.gmail.com>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Fri, 19 Jun 2015 17:13:46 +0000
+Subject: [PATCH] Re: Linkstation Mini and __machine_arch_type problem,
+ not booting since 3.8
+In-Reply-To: <20150619154850.GT7557@n2100.arm.linux.org.uk>
+References: <1434446447.4785.7.camel@dolka.fr>
+ <1434593555.13334.14.camel@dolka.fr> <558278A8.2050406@arm.com>
+ <1434677895.4767.11.camel@dolka.fr> <5583DD23.90505@arm.com>
+ <1434716194.17448.28.camel@x60s>
+ <20150619131315.GR7557@n2100.arm.linux.org.uk>
+ <d6d361113992920900137899ae4d1f7b@dolka.fr>
+ <20150619152552.GF2936@io.lakedaemon.net>
+ <20150619154850.GT7557@n2100.arm.linux.org.uk>
+Message-ID: <20150619171346.GG2936@io.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Fri, Jun 19, 2015 at 04:48:50PM +0100, Russell King - ARM Linux wrote:
+> On Fri, Jun 19, 2015 at 03:25:52PM +0000, Jason Cooper wrote:
+> > Let's just get the dts patch reviewed and merged first.  Russell
+> > actually wrote the patch to do what he's describing for mach-dove.
+> > 
+> >   http://lists.infradead.org/pipermail/linux-arm-kernel/2014-December/309684.html
+> > 
+> > Although, it looks like it never got updated for submission...
+> > 
+> >   http://lists.infradead.org/pipermail/linux-arm-kernel/2014-December/311800.html
+> 
+> I do still have that patch, it's based on v4.0 though - like all my
+> Dove work, it only builds on the previous -final kernel release.
 
-On Fri, Jun 19, 2015 at 6:32 PM,  <Frank.Li@freescale.com> wrote:
-> From: Frank Li <Frank.Li@freescale.com>
-[...]
-> +       cpus {
-> +               #address-cells = <1>;
-> +               #size-cells = <0>;
-> +
-> +               cpu0: cpu at 0 {
-> +                       compatible = "arm,cortex-a7";
-> +                       device_type = "cpu";
-> +                       reg = <0>;
-> +                       clock-latency = <61036>; /* two CLK32 periods */
-> +                       operating-points = <
-> +                               /* kHz  uV */
-> +                               528000  1250000
-> +                               396000  1150000
-> +                               198000  1150000
-> +                       >;
-> +                       fsl,soc-operating-points = <
-> +                               /* KHz  uV */
-> +                               528000  1250000
-> +                               396000  1150000
-> +                               198000  1150000
-> +                       >;
-Why is this necessary? Can't you adapt the driver to use operating-points?
-I have looked through other imx dts and saw that some had different
-values in these two tables.
+Benjamin, after the dts, would you mind picking up Russell's dove patch and
+making a cooresponding orion5x patch?
 
-Best regards,
-Nicolae Rosia
+thx,
+
+Jason.
