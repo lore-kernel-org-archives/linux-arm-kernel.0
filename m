@@ -1,147 +1,58 @@
-From: maitysanchayan@gmail.com (maitysanchayan at gmail.com)
-Date: Fri, 19 Jun 2015 16:06:47 +0530
-Subject: [PATCH v5 06/11] nvmem: Add bindings for simple nvmem framework
-In-Reply-To: <1432226652-8947-1-git-send-email-srinivas.kandagatla@linaro.org>
-References: <1432226535-8640-1-git-send-email-srinivas.kandagatla@linaro.org>
- <1432226652-8947-1-git-send-email-srinivas.kandagatla@linaro.org>
-Message-ID: <20150619103647.GA3913@Sanchayan-Arch>
+From: hanjun.guo@linaro.org (Hanjun Guo)
+Date: Fri, 19 Jun 2015 18:49:11 +0800
+Subject: [PATCH v2 1/3] ACPI : introduce macros for using the ACPI
+ specification version
+In-Reply-To: <1434666968-1543-2-git-send-email-al.stone@linaro.org>
+References: <1434666968-1543-1-git-send-email-al.stone@linaro.org>
+ <1434666968-1543-2-git-send-email-al.stone@linaro.org>
+Message-ID: <5583F3A7.4020202@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Srinivas,
-
-On 15-05-21 17:44:12, Srinivas Kandagatla wrote:
-> This patch adds bindings for simple nvmem framework which allows nvmem
-> consumers to talk to nvmem providers to get access to nvmem cell data.
-> 
-> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-> [Maxime Ripard: intial version of eeprom framework]
-> Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
+On 06/19/2015 06:36 AM, Al Stone wrote:
+> Add the ACPI_SPEC_VERSION() macro to build a proper version number from
+> a major and minor revision number.  Add also the ACPI_FADT_SPEC_VERSION
+> that constructs a proper version number from the entries in the current
+> FADT.
+>
+> These macros are added in order to simplify retrieving and comparing ACPI
+> specification version numbers, since this is becoming a more frequent need.
+> In particular, there are some architectures that require at least a certain
+> version of the spec, and there are differences in some structure sizes that
+> have changed with recent versions but can only be tracked by spec version
+> number.
+>
+> Signed-off-by: Al Stone <al.stone@linaro.org>
 > ---
->  Documentation/devicetree/bindings/nvmem/nvmem.txt | 84 +++++++++++++++++++++++
->  1 file changed, 84 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/nvmem/nvmem.txt
-> 
-> diff --git a/Documentation/devicetree/bindings/nvmem/nvmem.txt b/Documentation/devicetree/bindings/nvmem/nvmem.txt
-> new file mode 100644
-> index 0000000..ecea654
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/nvmem/nvmem.txt
-> @@ -0,0 +1,84 @@
-> += NVMEM Data Device Tree Bindings =
-> +
-> +This binding is intended to represent the location of hardware
-> +configuration data stored in NVMEMs.
-> +
-> +On a significant proportion of boards, the manufacturer has stored
-> +some data on NVMEM, for the OS to be able to retrieve these information
-> +and act upon it. Obviously, the OS has to know about where to retrieve
-> +these data from, and where they are stored on the storage device.
-> +
-> +This document is here to document this.
-> +
-> += Data providers =
-> +Contains bindings specific to provider drivers and data cells as children
-> +to this node.
-> +
-> +Optional properties:
-> + read-only: Mark the provider as read only.
-> +
-> += Data cells =
-> +These are the child nodes of the provider which contain data cell
-> +information like offset and size in nvmem provider.
-> +
-> +Required properties:
-> +reg:	specifies the offset in byte within that storage device, start bit
-> +	in the byte and the length in bits of the data we care about.
-> +	There could be more then one offset-length pairs in this property.
-> +
-> +Optional properties:
-> +
-> +bit-offset: specifies the offset in bit within the address range specified
-> +	by reg property. Can take values from 0-7.
-> +nbits: specifies number of bits this cell occupies starting from bit-offset.
-> +
-> +For example:
-> +
-> +	/* Provider */
-> +	qfprom: qfprom at 00700000 {
-> +		...
-> +
-> +		/* Data cells */
-> +		tsens_calibration: calib at 404 {
-> +			reg = <0x404 0x10>;
-> +		};
-> +
-> +		tsens_calibration_bckp: calib_bckp at 504 {
-> +			reg = <0x504 0x11>;
-> +			bit-offset = 6;
-> +			nbits = 128;
-> +		};
-> +
-> +		pvs_version: pvs-version at 6 {
-> +			reg = <0x6 0x2>
-> +			bit-offset = 7;
-> +			nbits = 2;
-> +		};
-> +
-> +		speed_bin: speed-bin at c{
-> +			reg = <0xc 0x1>;
-> +			bit-offset = 2;
-> +			nbits	= 3;
-> +
-> +		};
-> +		...
-> +	};
+>   include/linux/acpi.h | 5 +++++
+>   1 file changed, 5 insertions(+)
+>
+> diff --git a/include/linux/acpi.h b/include/linux/acpi.h
+> index a4acb55..33ed313 100644
+> --- a/include/linux/acpi.h
+> +++ b/include/linux/acpi.h
+> @@ -48,6 +48,11 @@
+>   #include <acpi/acpi_io.h>
+>   #include <asm/acpi.h>
+>
+> +#define ACPI_SPEC_VERSION(major, minor)	((major<<8)|minor)
 
-We have a need of exposing information like SoC ID, revision and such
-which is what this nvmem framework proposes to be suitable for. Till
-now I was trying a different approach for the same [1].
+and minor comments for code style
 
-The On Chip One Time Programmable block on the Vybrid can be handled
-nicely with this nvmem framework however I had a few queries with
-regards to the framework after trying it on a Vybrid VF61 SoC. 
+((major<<8)|minor) - > ((major << 8) | minor)
 
-1. From what I understand, getting the information in hex is the only
-way possible as of now? Would it be possible to expose the information
-as strings from different paths under /sys/class/nvmem/*/nvmem/?
+other than that:
 
-For example, if I have a sub node as below
+Reviewed-by: Hanjun Guo <hanjun.guo@linaro.org>
 
-ocotp: ocotp at 400a5000 {
-	compatible = "fsl,vf610-ocotp";
-	reg = <0x400a5000 0x1000>;
+Thanks
+Hanjun
 
-	ocotp_cfg0: cfg0 at 410 {
-		reg = <0x410 0x1>;
-	};
-
-	ocotp_cfg1: cfg1 at 420 {
-		reg = <0x420 0x1>;
-	};
-};
-
-The values from the above register locations represented by the two
-sub nodes above can perhaps be exposed as strings? Even if they are
-not exposed as strings, making them available in separate paths, is
-that something which can be done? So depending on the sub node as
-above, /sys/class/nvmem/ocotp0/nvmem/cfg0/ would give values from
-the registers specified.
-
-Basically the output of /sys/class/nvmem/*/nvmem being restricted
-to only the subnodes specified is what I was hoping to get along
-with separate paths.
-
-2. What if the required information is scattered across different memory
-regions? In my case, the SoC ID is available from one OCOTP peripheral
-block, the revision is in a separate ROM area at the start of the memory
-map and some CPU information I am interested in is in another memory
-region. I am not sure what would be the right way to approach it with
-the nvmem framework.
-
-[1] https://lkml.org/lkml/2015/6/5/189
-
-Thanks & Regards,
-Sanchayan Maity.
-
-<snip>
+> +#define ACPI_FADT_SPEC_VERSION	\
+> +	ACPI_SPEC_VERSION(acpi_gbl_FADT.header.revision, \
+> +			  acpi_gbl_FADT.minor_revision)
+> +
+>   static inline acpi_handle acpi_device_handle(struct acpi_device *adev)
+>   {
+>   	return adev ? adev->handle : NULL;
+>
