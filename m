@@ -1,55 +1,93 @@
-From: rjw@rjwysocki.net (Rafael J. Wysocki)
-Date: Sat, 20 Jun 2015 01:20:46 +0200
-Subject: [PATCH 02/13] driver-core: defer all probes until late_initcall
-In-Reply-To: <CAAObsKDGLVx5wtsiY_o_-r6bp4qTgOfAExbSr7w=xn2eM-CQ6A@mail.gmail.com>
-References: <1434548543-22949-1-git-send-email-tomeu.vizoso@collabora.com>
- <2834968.DlsDAmbXkG@vostro.rjw.lan>
- <CAAObsKDGLVx5wtsiY_o_-r6bp4qTgOfAExbSr7w=xn2eM-CQ6A@mail.gmail.com>
-Message-ID: <1585940.7Lfuk0LdBK@vostro.rjw.lan>
+From: computersforpeace@gmail.com (Brian Norris)
+Date: Fri, 19 Jun 2015 15:55:23 -0700
+Subject: [PATCH 0/7] soc: brcmstb: add system suspend support for STB SoCs
+In-Reply-To: <20150619224123.GL4917@ld-irv-0074>
+References: <1434672696-13632-1-git-send-email-computersforpeace@gmail.com>
+ <CADtm3G7GQNuaZDoNe84YAh7pRV9s_2VhUuW8YpaCoNuozoyVZA@mail.gmail.com>
+ <20150619224123.GL4917@ld-irv-0074>
+Message-ID: <CAN8TOE8NwLw5mfs9N+H_VKkEYHDkTNWgpX_MQzsc1Rg0d-hmFA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday, June 19, 2015 03:36:46 PM Tomeu Vizoso wrote:
-> On 18 June 2015 at 23:50, Rafael J. Wysocki <rjw@rjwysocki.net> wrote:
-> > On Wednesday, June 17, 2015 03:42:12 PM Tomeu Vizoso wrote:
-> >> To decrease the chances of devices deferring their probes because of
-> >> dependencies not having probed yet because of their drivers not having
-> >> registered yet, delay all probing until the late initcall level.
-> >>
-> >> This will allow us to avoid deferred probes completely later by probing
-> >> dependencies on demand, or by probing them in dependency order.
-> >>
-> >> Signed-off-by: Tomeu Vizoso <tomeu.vizoso@collabora.com>
-> >> ---
-> >>  drivers/base/dd.c | 8 +++++++-
-> >>  1 file changed, 7 insertions(+), 1 deletion(-)
-> >>
-> >> diff --git a/drivers/base/dd.c b/drivers/base/dd.c
-> >> index a638bbb..18438aa 100644
-> >> --- a/drivers/base/dd.c
-> >> +++ b/drivers/base/dd.c
-> >> @@ -407,6 +407,12 @@ int driver_probe_device(struct device_driver *drv, struct device *dev)
-> >>       if (!device_is_registered(dev))
-> >>               return -ENODEV;
-> >>
-> >> +     /* Defer all probes until we start processing the queue */
-> >> +     if (!driver_deferred_probe_enable) {
-> >> +             driver_deferred_probe_add(dev);
-> >
-> > Do I think correctly that this will effectively force everybody to use deferred
-> > probing?
-> 
-> Guess it depends on the meaning of "using deferred probing". It will
-> defer the probe of the first device to late_initcall (which will
-> happen much earlier in time than before), but afterwards all built-in
-> drivers will be available and depending on the order in which we try
-> to probe devices, none may actually ask to defer its probe.
+On Fri, Jun 19, 2015 at 3:41 PM, Brian Norris
+<computersforpeace@gmail.com> wrote:
+> + tglx, Kevin
 
-So this will break things like the PNP system driver which relies on probing
-stuff at the fs_initcall stage for correctness.  It may also break other
-things with similar assumptions.
+^^ for real this time
 
-
--- 
-I speak only for myself.
-Rafael J. Wysocki, Intel Open Source Technology Center.
+> On Thu, Jun 18, 2015 at 08:20:52PM -0700, Gregory Fong wrote:
+>> On Thu, Jun 18, 2015 at 5:11 PM, Brian Norris <computersforpeace@gmail.com> wrote:
+>> > This patch set introduces system suspend/resume support for Broadcom STB SoCs.
+>> > There are two suspend modes (S2 and S3) as well as a related low-power shutdown
+>> > mode (S5).
+>> >
+>> > Along with the core PM support, include a driver for the wakeup-timer, which
+>> > allows for simple testing of suspend/resume wakeup cycles.
+>> >
+>> > Brian
+>> >
+>> > Brian Norris (7):
+>> >   Documentation: dt: brcmstb: add system PM bindings
+>> >   Documentation: dt: brcmstb: add waketimer documentation
+>> >   soc: add stubs for brcmstb SoC's
+>> >   soc: brcmstb: add PM suspend/resume support (S2/S3/S5)
+>> >   soc: brcmstb: add wake-timer driver
+>> >   ARM: brcmstb: mask GIC IRQs on suspend
+>> >   ARM: dts: brcmstb: add BCM7445 system PM DT nodes
+>> >
+>>
+>> I tested this series two ways: with the device tree built into the
+>> bootloader (BOLT) on BCM7445 and by using
+>> arch/arm/boot/dts/bcm7445-bcm97445svmb.dtb
+>>
+>> With the device tree from BOLT, everything works fine.  Tested the
+>> waketimer for S2, S3, and S5.
+>
+> Thanks for the testing!
+>
+>> With the device tree in arch/arm/boot/dts/bcm7445-bcm97445svmb.dts, S2
+>> works, but S3 and S5 do not.  It comes back up but doesn't reach the
+>> prompt:
+>>
+>> [    6.050808] PM: suspend of devices complete after 1.425 msecs
+>> [    6.051760] PM: late suspend of devices complete after 0.947 msecs
+>> [    6.052535] PM: noirq suspend of devices complete after 0.770 msecs
+>> [    6.052537] Disabling non-boot CPUs ...
+>> [    6.053005] CPU1: shutdown
+>> [    6.065914] CPU2: shutdown
+>> [    6.080756] CPU3: shutdown
+>> [    6.095214] Enabling non-boot CPUs ...
+>> [    6.111496] CPU1 is up
+>> [    6.126934] CPU2 is up
+>> [    6.142511] CPU3 is up
+>> [    6.145308] PM: noirq resume of devices complete after 2.772 msecs
+>> [    6.148022] PM: early resume of devices complete after 2.626 msecs
+>> [    6.151017] PM: resume of devices complete after 2.976 msecs
+>> [    6.212771] Restarting tasks ... done.
+>> [[[ output stops here ]]]
+>
+> Right, I noticed this problem, but found that it was independent of the
+> core PM code. UART interrupts are dead, but nothing else is.
+>
+>> I suspect there might be an issue somewhere in
+>> [PATCH 7/7] ARM: dts: brcmstb: add BCM7445 system PM DT nodes.
+>
+> It's not a problem with patch 7, exactly, it's a problem with the
+> irqchip driver which handles the UART interrupt mask (irq-bcm7120-l2.c).
+> The problem is that with a trimmed down device tree (such as the one
+> found at arch/arm/boot/dts/bcm7445-bcm97445svmb.dtb), none of the child
+> interrupts of the 'irq0_intc' node are described -- we don't have device
+> tree nodes for them yet -- but we still require saving and restoring the
+> forwarding mask (see 'brcm,int-fwd-mask') in order for the UART
+> interrupts to continue operating.
+>
+> This is all a problem because when irq_chip_generic::installed == 0, the
+> irq_{suspend,resume} functions never get called in irq-bcm7120-l2.c.
+>
+> Anyway, I think this suggests that irq-bcm7120-l2.c needs a slightly
+> different semantics to its PM callbacks; they must be called regardless
+> of whether there are any child interrupts. I've cooked up some patches
+> for this and will send them shortly in reply to this thread.
+>
+> Thanks,
+> Brian
