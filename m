@@ -1,43 +1,30 @@
-From: alex.bennee@linaro.org (=?UTF-8?q?Alex=20Benn=C3=A9e?=)
-Date: Fri, 19 Jun 2015 13:23:49 +0100
-Subject: [PATCH v6 11/12] KVM: arm64: enable KVM_CAP_SET_GUEST_DEBUG
-In-Reply-To: <1434716630-18260-1-git-send-email-alex.bennee@linaro.org>
-References: <1434716630-18260-1-git-send-email-alex.bennee@linaro.org>
-Message-ID: <1434716630-18260-12-git-send-email-alex.bennee@linaro.org>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Fri, 19 Jun 2015 15:21:43 +0200
+Subject: [PATCH linux-next v2 1/1] dmaengine: at_hdmac: fix residue
+ computation
+In-Reply-To: <5582B4EC.7030805@aksignal.cz>
+References: <cover.1434626239.git.cyrille.pitchen@atmel.com>
+ <b9630cef4224b93939138b3a8c1950ea44cbcf59.1434626239.git.cyrille.pitchen@atmel.com>
+ <5582B4EC.7030805@aksignal.cz>
+Message-ID: <55841767.7010608@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Finally advertise the KVM capability for SET_GUEST_DEBUG. Once arm
-support is added this check can be moved to the common
-kvm_vm_ioctl_check_extension() code.
+Le 18/06/2015 14:09, Ji?? Prchal a ?crit :
+> 
+> 
+> On 18.6.2015 13:25, Cyrille Pitchen wrote:
+>>
+>> Signed-off-by: Cyrille Pitchen <cyrille.pitchen@atmel.com>
+> 
+> Tested-by: Ji?? Prchal <jiri.prchal@aksignal.cz>
+> 
+> Manually applied to 4.1-rc7 and it WORKS!
 
-Signed-off-by: Alex Benn?e <alex.bennee@linaro.org>
-Acked-by: Christoffer Dall <christoffer.dall@linaro.org>
+Good piece of new indeed.
 
----
+Can you add your "Tested-by" tag?
 
-v3:
- - separated capability check from previous patches
- - moved into arm64 specific ioctl handler.
-v4:
- - add a-b-tag
----
- arch/arm64/kvm/reset.c | 3 +++
- 1 file changed, 3 insertions(+)
-
-diff --git a/arch/arm64/kvm/reset.c b/arch/arm64/kvm/reset.c
-index 21d5a62..88e5331 100644
---- a/arch/arm64/kvm/reset.c
-+++ b/arch/arm64/kvm/reset.c
-@@ -76,6 +76,9 @@ int kvm_arch_dev_ioctl_check_extension(long ext)
- 	case KVM_CAP_GUEST_DEBUG_HW_WPS:
- 		r  = get_num_wrps();
- 		break;
-+	case KVM_CAP_SET_GUEST_DEBUG:
-+		r = 1;
-+		break;
- 	default:
- 		r = 0;
- 	}
+Bye,
 -- 
-2.4.3
+Nicolas Ferre
