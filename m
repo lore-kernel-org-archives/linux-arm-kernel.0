@@ -1,119 +1,105 @@
-From: michael@smart-africa.com (Michael van der Westhuizen)
-Date: Fri, 19 Jun 2015 10:43:55 +0200
-Subject: [PATCH 1/2] spi: dw: Allow interface drivers to limit data I/O to
- word sizes
-In-Reply-To: <1434703435-25198-1-git-send-email-michael@smart-africa.com>
-References: <1434703435-25198-1-git-send-email-michael@smart-africa.com>
-Message-ID: <1434703435-25198-3-git-send-email-michael@smart-africa.com>
+From: hanjun.guo@linaro.org (Hanjun Guo)
+Date: Fri, 19 Jun 2015 16:46:03 +0800
+Subject: [PATCH v2 0/9] Add self-probe infrastructure and stacked irqdomain
+ support for ACPI based GICv2/3 init
+Message-ID: <1434703572-26221-1-git-send-email-hanjun.guo@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The commit dd11444327ce ("spi: dw-spi: Convert 16bit accesses to 32bit
-accesses") changed all 16bit accesses in the DW_apb_ssi driver to 32bit.
-This, unfortunately, breaks data register access on picoXcell, where the
-DW IP needs data register accesses to be word accesses (all other
-accesses appear to be OK).
+This patch set introduce self-probe infrastructure to init IRQ
+controllers and stacked irqdomain support for ACPI based GICv2/3
+init.
 
-This change introduces a new master variable to allow interface drivers
-to specify that 16bit data transfer I/O is required.  This change also
-introduces the ability to set this variable via device tree bindings in
-the MMIO interface driver.
+The self-probe infrastructure for ACPI GIC init is similar as
+IRQCHIP_DECLARE() and based on the GIC version support in ACPI
+MADT table. we match the GIC version and GIC driver and load
+it.
 
-Before this change, on a picoXcell pc3x3:
- spi_master spi32766: interrupt_transfer: fifo overrun/underrun
- m25p80 spi32766.0: error -5 reading 9f
- m25p80: probe of spi32766.0 failed with error -5
+We introduce acpi_irq_domain for GICv2/3 core domain to support
+stacked irqdomain, and pass the gsi (global system interrupt) as
+the agument (void *arg) for gic_irq_domain_alloc(), then we can
+alloc virqs via acpi_register_gsi() with stacked irqdomain.
 
-After this change:
- m25p80 spi32766.0: m25p40 (512 Kbytes)
+The stacked irq domain will be:
 
-Signed-off-by: Michael van der Westhuizen <michael@smart-africa.com>
----
- drivers/spi/spi-dw-mmio.c |  5 +++++
- drivers/spi/spi-dw.c      | 13 +++++++++++--
- drivers/spi/spi-dw.h      | 11 +++++++++++
- 3 files changed, 27 insertions(+), 2 deletions(-)
+    acpi_irq_domain == gicv2 or gicv3 core domain
+                   ^
+                   |   (parent)
+                   |
+       ITS domain or GIv2m domain
+                   ^
+                   |
+                   |
+           MSI chip irq domain
 
-diff --git a/drivers/spi/spi-dw-mmio.c b/drivers/spi/spi-dw-mmio.c
-index eb03e12..1397424 100644
---- a/drivers/spi/spi-dw-mmio.c
-+++ b/drivers/spi/spi-dw-mmio.c
-@@ -74,6 +74,11 @@ static int dw_spi_mmio_probe(struct platform_device *pdev)
- 
- 	dws->max_freq = clk_get_rate(dwsmmio->clk);
- 
-+	if (pdev->dev.of_node)
-+		dws->data_io_16bit =
-+			of_property_read_bool(pdev->dev.of_node,
-+					      "snps,data-io-16bit");
-+
- 	num_cs = 4;
- 
- 	if (pdev->dev.of_node)
-diff --git a/drivers/spi/spi-dw.c b/drivers/spi/spi-dw.c
-index 8d67d03..862b001 100644
---- a/drivers/spi/spi-dw.c
-+++ b/drivers/spi/spi-dw.c
-@@ -194,7 +194,12 @@ static void dw_writer(struct dw_spi *dws)
- 			else
- 				txw = *(u16 *)(dws->tx);
- 		}
--		dw_writel(dws, DW_SPI_DR, txw);
-+
-+		if (dws->data_io_16bit)
-+			dw_writew(dws, DW_SPI_DR, txw);
-+		else
-+			dw_writel(dws, DW_SPI_DR, txw);
-+
- 		dws->tx += dws->n_bytes;
- 	}
- }
-@@ -205,7 +210,11 @@ static void dw_reader(struct dw_spi *dws)
- 	u16 rxw;
- 
- 	while (max--) {
--		rxw = dw_readl(dws, DW_SPI_DR);
-+		if (dws->data_io_16bit)
-+			rxw = dw_readw(dws, DW_SPI_DR);
-+		else
-+			rxw = dw_readl(dws, DW_SPI_DR);
-+
- 		/* Care rx only if the transfer's original "rx" is not null */
- 		if (dws->rx_end - dws->len) {
- 			if (dws->n_bytes == 1)
-diff --git a/drivers/spi/spi-dw.h b/drivers/spi/spi-dw.h
-index 6c91391..ced276a 100644
---- a/drivers/spi/spi-dw.h
-+++ b/drivers/spi/spi-dw.h
-@@ -109,6 +109,7 @@ struct dw_spi {
- 	u32			fifo_len;	/* depth of the FIFO buffer */
- 	u32			max_freq;	/* max bus freq supported */
- 
-+	bool			data_io_16bit;	/* DR is only 16 bits wide */
- 	u16			bus_num;
- 	u16			num_cs;		/* supported slave numbers */
- 
-@@ -145,11 +146,21 @@ static inline u32 dw_readl(struct dw_spi *dws, u32 offset)
- 	return __raw_readl(dws->regs + offset);
- }
- 
-+static inline u16 dw_readw(struct dw_spi *dws, u32 offset)
-+{
-+	return __raw_readw(dws->regs + offset);
-+}
-+
- static inline void dw_writel(struct dw_spi *dws, u32 offset, u32 val)
- {
- 	__raw_writel(val, dws->regs + offset);
- }
- 
-+static inline void dw_writew(struct dw_spi *dws, u32 offset, u16 val)
-+{
-+	__raw_writew(val, dws->regs + offset);
-+}
-+
- static inline void spi_enable_chip(struct dw_spi *dws, int enable)
- {
- 	dw_writel(dws, DW_SPI_SSIENR, (enable ? 1 : 0));
+Since there is one GICD supported for now, so there will be only
+one irqdomain created when GICv2/3 initialized, for all the wired
+hardware irqs for PPI, SGI and SPI, they will have unique hardware
+irq number (GSI), so we can match the device to the acpi_irq_domain
+with unique GSI and it will work. If there will be multi GICD in the
+future, this will still works to follow the solution for x86 of ACPI
+(mutil IOAPICs).
+
+
+Note: patch 1~2 already merged in ACPICA core, I just send them out
+for helping of better understanding later 7 patches.
+
+Any comments are warmly welcomed.
+
+update from RFC version:
+ - Consolidate all the GIC init code into drivers/irqchip/irq-gic-acpi.c
+
+v1->v2:
+ - Remove the gicv2/v3 related driver code in drivers/irqchip/irq-gic-acpi.c
+   which I was trying to consolidate them in one file, then arm-gic.h and
+   arm-gic-v3.h will be used separately within parent driver only
+
+ - Drop the gsi_mutex patch
+
+ - Use the GIC version to match the GIC driver, then no need to test
+   for the version in each driver
+
+ - Move acpi_irq_init() to drivers/irqchip/irq-gic-acpi.c instead of
+   in drivers/acpi/irq.c. maybe we need to rename acpi_irq_init() as
+   acpi_gic_init() but I keep that name to accommodate of_irq_init(),
+   any objections please let me know.
+
+Bob Moore (1):
+  ACPICA: ACPI 6.0: Add changes for MADT table.
+
+Hanjun Guo (6):
+  ACPICA: ACPI 6.0: Add values for MADT GIC version field.
+  irqchip / GIC: Add GIC version support in ACPI MADT
+  ACPI / irqchip: Add self-probe infrastructure to initialize IRQ
+    controller
+  irqchip / GIC / ACPI: Use IRQCHIP_ACPI_DECLARE to simplify GICv2 init
+    code
+  irqchip / gic: Add stacked irqdomain support for ACPI based GICv2 init
+  irqchip / GICv3: Add stacked irqdomain support for ACPI based init
+
+Tomasz Nowicki (2):
+  irqchip / GICv3: Refactor gic_of_init() for GICv3 driver
+  irqchip / GICv3: Add ACPI support for GICv3+ initialization
+
+ arch/arm64/Kconfig                   |   1 +
+ arch/arm64/include/asm/acpi.h        |   1 -
+ arch/arm64/include/asm/irq.h         |  13 --
+ arch/arm64/kernel/acpi.c             |  25 ----
+ drivers/acpi/gsi.c                   |  28 ++--
+ drivers/irqchip/Kconfig              |   3 +
+ drivers/irqchip/Makefile             |   1 +
+ drivers/irqchip/irq-gic-acpi.c       | 141 +++++++++++++++++++
+ drivers/irqchip/irq-gic-v3.c         | 264 ++++++++++++++++++++++++++++-------
+ drivers/irqchip/irq-gic.c            |  35 ++---
+ drivers/irqchip/irqchip.h            |  12 ++
+ include/acpi/actbl1.h                |  33 ++++-
+ include/asm-generic/vmlinux.lds.h    |  13 ++
+ include/linux/acpi.h                 |  16 +++
+ include/linux/acpi_irq.h             |   4 +-
+ include/linux/irqchip/arm-gic-acpi.h |  10 +-
+ include/linux/mod_devicetable.h      |   8 ++
+ 17 files changed, 473 insertions(+), 135 deletions(-)
+ create mode 100644 drivers/irqchip/irq-gic-acpi.c
+
 -- 
-2.1.4
+1.9.1
