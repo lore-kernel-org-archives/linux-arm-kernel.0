@@ -1,52 +1,103 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 19 Jun 2015 14:13:15 +0100
-Subject: [PATCH] Re: Linkstation Mini and __machine_arch_type problem,
- not booting since 3.8
-In-Reply-To: <1434716194.17448.28.camel@x60s>
-References: <97db3502cd014faf1c710b1cc0fe8848@dolka.fr>
- <1434446447.4785.7.camel@dolka.fr>
- <1434593555.13334.14.camel@dolka.fr> <558278A8.2050406@arm.com>
- <1434677895.4767.11.camel@dolka.fr> <5583DD23.90505@arm.com>
- <1434716194.17448.28.camel@x60s>
-Message-ID: <20150619131315.GR7557@n2100.arm.linux.org.uk>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Fri, 19 Jun 2015 13:53:14 +0100
+Subject: [PATCH 10/12] arm/arm64: KVM: vgic: Do not save GICH_HCR / ICH_HCR_EL2
+In-Reply-To: <1434718396-13110-1-git-send-email-marc.zyngier@arm.com>
+References: <1434718396-13110-1-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1434718396-13110-11-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 19, 2015 at 02:16:34PM +0200, Benjamin Cama wrote:
-> Le vendredi 19 juin 2015 ? 10:13 +0100, Marc Zyngier a ?crit :
-> > On 19/06/15 02:38, Benjamin Cama wrote:
-> > > Le jeudi 18 juin 2015 ? 08:52 +0100, Marc Zyngier a ?crit :
-> > >> Unfortunately, this is the wrong thing to do. IRQ0 is invalid, has been
-> > >> for a very long time, and actually represents the lack of interrupt.
-> > > 
-> > > OK, sorry for the mistake, I didn't know. Shouldn't the IRQ
-> > > initialization routine check this and warn the user that it may cause
-> > > problems? ?Silently? making IRQ0 forbidden doesn't help for the
-> > > platforms that are not fixed yet.
-> > 
-> > Well, this is hardly a new rule. It has been like this for quite a long
-> > time: http://yarchive.net/comp/linux/zero.html
-> > 
-> > As for the checking and warning, this is on a very hot path, for an
-> > error case that really shouldn't occur.
-> 
-> I was not talking about the irq handler, but the irq initialization
-> routine (on orion5x, orion_irq_init calls irq_alloc_generic_chip with
-> 0), which takes the starting irq number and may warn when it is zero
-> (well, it may also start allocating at zero but never use it, so this
-> may not be a totally correct assumption, but I think this comes close,
-> and it's just a warning).
+The GIC Hypervisor Configuration Register is used to enable
+the delivery of virtual interupts to a guest, as well as to
+define in which conditions maintenance interrupts are delivered
+to the host.
 
-It needs fixing nevertheless - arguments along the lines of "this used
-to work" don't work for this topic.
+This register doesn't contain any information that we need to
+read back (the EOIcount is utterly useless for us).
 
-The simple answer is to adjust the initialisation to bump the IRQ
-numbers up by one, and them adjust the interrupt numbers in
-arch/arm/mach-whatever/include/asm/irqs.h also up by one.  That's
-far easier to do than spending ages trying to argue against the
-"IRQ0 is not valid" issue, only to ultimately get nowhere, and end
-up with that as the only way forward anyway.
+So let's save ourselves some cycles, and not save it before
+writing zero to it.
 
+Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+---
+ arch/arm/kvm/interrupts_head.S  | 3 ---
+ arch/arm64/kvm/vgic-v2-switch.S | 3 ---
+ arch/arm64/kvm/vgic-v3-switch.S | 2 --
+ 3 files changed, 8 deletions(-)
+
+diff --git a/arch/arm/kvm/interrupts_head.S b/arch/arm/kvm/interrupts_head.S
+index 48efe2e..702740d 100644
+--- a/arch/arm/kvm/interrupts_head.S
++++ b/arch/arm/kvm/interrupts_head.S
+@@ -412,7 +412,6 @@ vcpu	.req	r0		@ vcpu pointer always in r0
+ 	add	r11, vcpu, #VCPU_VGIC_CPU
+ 
+ 	/* Save all interesting registers */
+-	ldr	r3, [r2, #GICH_HCR]
+ 	ldr	r4, [r2, #GICH_VMCR]
+ 	ldr	r5, [r2, #GICH_MISR]
+ 	ldr	r6, [r2, #GICH_EISR0]
+@@ -420,7 +419,6 @@ vcpu	.req	r0		@ vcpu pointer always in r0
+ 	ldr	r8, [r2, #GICH_ELRSR0]
+ 	ldr	r9, [r2, #GICH_ELRSR1]
+ 	ldr	r10, [r2, #GICH_APR]
+-ARM_BE8(rev	r3, r3	)
+ ARM_BE8(rev	r4, r4	)
+ ARM_BE8(rev	r5, r5	)
+ ARM_BE8(rev	r6, r6	)
+@@ -429,7 +427,6 @@ ARM_BE8(rev	r8, r8	)
+ ARM_BE8(rev	r9, r9	)
+ ARM_BE8(rev	r10, r10	)
+ 
+-	str	r3, [r11, #VGIC_V2_CPU_HCR]
+ 	str	r4, [r11, #VGIC_V2_CPU_VMCR]
+ 	str	r5, [r11, #VGIC_V2_CPU_MISR]
+ #ifdef CONFIG_CPU_ENDIAN_BE8
+diff --git a/arch/arm64/kvm/vgic-v2-switch.S b/arch/arm64/kvm/vgic-v2-switch.S
+index f002fe1..3f00071 100644
+--- a/arch/arm64/kvm/vgic-v2-switch.S
++++ b/arch/arm64/kvm/vgic-v2-switch.S
+@@ -47,7 +47,6 @@ __save_vgic_v2_state:
+ 	add	x3, x0, #VCPU_VGIC_CPU
+ 
+ 	/* Save all interesting registers */
+-	ldr	w4, [x2, #GICH_HCR]
+ 	ldr	w5, [x2, #GICH_VMCR]
+ 	ldr	w6, [x2, #GICH_MISR]
+ 	ldr	w7, [x2, #GICH_EISR0]
+@@ -55,7 +54,6 @@ __save_vgic_v2_state:
+ 	ldr	w9, [x2, #GICH_ELRSR0]
+ 	ldr	w10, [x2, #GICH_ELRSR1]
+ 	ldr	w11, [x2, #GICH_APR]
+-CPU_BE(	rev	w4,  w4  )
+ CPU_BE(	rev	w5,  w5  )
+ CPU_BE(	rev	w6,  w6  )
+ CPU_BE(	rev	w7,  w7  )
+@@ -64,7 +62,6 @@ CPU_BE(	rev	w9,  w9  )
+ CPU_BE(	rev	w10, w10 )
+ CPU_BE(	rev	w11, w11 )
+ 
+-	str	w4, [x3, #VGIC_V2_CPU_HCR]
+ 	str	w5, [x3, #VGIC_V2_CPU_VMCR]
+ 	str	w6, [x3, #VGIC_V2_CPU_MISR]
+ CPU_LE(	str	w7, [x3, #VGIC_V2_CPU_EISR] )
+diff --git a/arch/arm64/kvm/vgic-v3-switch.S b/arch/arm64/kvm/vgic-v3-switch.S
+index 617a012..3c20730 100644
+--- a/arch/arm64/kvm/vgic-v3-switch.S
++++ b/arch/arm64/kvm/vgic-v3-switch.S
+@@ -48,13 +48,11 @@
+ 	dsb	st
+ 
+ 	// Save all interesting registers
+-	mrs_s	x4, ICH_HCR_EL2
+ 	mrs_s	x5, ICH_VMCR_EL2
+ 	mrs_s	x6, ICH_MISR_EL2
+ 	mrs_s	x7, ICH_EISR_EL2
+ 	mrs_s	x8, ICH_ELSR_EL2
+ 
+-	str	w4, [x3, #VGIC_V3_CPU_HCR]
+ 	str	w5, [x3, #VGIC_V3_CPU_VMCR]
+ 	str	w6, [x3, #VGIC_V3_CPU_MISR]
+ 	str	w7, [x3, #VGIC_V3_CPU_EISR]
 -- 
-FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
-according to speedtest.net.
+2.1.4
