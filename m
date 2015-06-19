@@ -1,77 +1,43 @@
-From: keescook@chromium.org (Kees Cook)
-Date: Fri, 19 Jun 2015 09:58:45 -0700
-Subject: [PATCH 1/2] Move the pt_regs_offset struct definition from arch
- to common include file
-In-Reply-To: <5584234E.2040701@linaro.org>
-References: <1434386579-6045-1-git-send-email-dave.long@linaro.org>
- <1434386579-6045-2-git-send-email-dave.long@linaro.org>
- <1434687583.23771.5.camel@ellerman.id.au>
- <5584234E.2040701@linaro.org>
-Message-ID: <CAGXu5jJFkv=ma0SJ-5N+GKQ3xoPw8193+kxO0F3M0c0_c=ZTtg@mail.gmail.com>
+From: nicolae.rosia@gmail.com (Nicolae Rosia)
+Date: Fri, 19 Jun 2015 20:05:22 +0300
+Subject: [PATCH v2 6/8] ARM: dts: imx: add imx6ul and imx6ul evk board
+ support
+In-Reply-To: <1434727951-4852-7-git-send-email-Frank.Li@freescale.com>
+References: <1434727951-4852-1-git-send-email-Frank.Li@freescale.com>
+ <1434727951-4852-7-git-send-email-Frank.Li@freescale.com>
+Message-ID: <CAH=tA9G_x=6wNTOWbOc2FGGARTxioikUSwqyENKk74wL=7uzaw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 19, 2015 at 7:12 AM, David Long <dave.long@linaro.org> wrote:
-> On 06/19/15 00:19, Michael Ellerman wrote:
->>
->> On Mon, 2015-06-15 at 12:42 -0400, David Long wrote:
->>>
->>> From: "David A. Long" <dave.long@linaro.org>
->>>
->>> The pt_regs_offset structure is used for HAVE_REGS_AND_STACK_ACCESS_API
->>>   feature and has identical definitions in four different arch ptrace.h
->>> include files. It seems unlikely that definition would ever need to be
->>> changed regardless of architecture so lets move it into
->>> include/linux/ptrace.h.
->>>
->>> Signed-off-by: David A. Long <dave.long@linaro.org>
->>> ---
->>>   arch/powerpc/kernel/ptrace.c | 5 -----
->>
->>
->> Built and booted on powerpc, but is there an easy way to actually test the
->> code
->> paths in question?
->>
->
-> There is an easy way to "smoke test" it on all archiectures that also
-> implement kprobes (which powerpc does).  If I'm understanding the powerpc
-> code correctly (WRT register naming conventions) just do the following:
->
-> cd /sys/kernel/debug/tracing
-> echo 'p do_fork %gpr0' > kprobe_events
-> echo 1 > events/kprobes/enable
-> ls
-> cat trace
-> echo 0 > events/kprobes/enable
->
-> Every fork() call done on the system between those two echo commands (hence
-> the "ls") should append a line to the trace file.  For a more exhaustive
-> test one could repeat this sequence for every register in the architecture.
->
-> This should work the same on all architectures supporting kprobes.  You just
-> have to use the appropriate register names for your architecture after the
-> "%".
+Hi,
 
-Is this something we could codify into the selftests directory? It
-seems like a great thing to capture in a single place somewhere (the
-register lists, that is).
+On Fri, Jun 19, 2015 at 6:32 PM,  <Frank.Li@freescale.com> wrote:
+> From: Frank Li <Frank.Li@freescale.com>
+[...]
+> +       cpus {
+> +               #address-cells = <1>;
+> +               #size-cells = <0>;
+> +
+> +               cpu0: cpu at 0 {
+> +                       compatible = "arm,cortex-a7";
+> +                       device_type = "cpu";
+> +                       reg = <0>;
+> +                       clock-latency = <61036>; /* two CLK32 periods */
+> +                       operating-points = <
+> +                               /* kHz  uV */
+> +                               528000  1250000
+> +                               396000  1150000
+> +                               198000  1150000
+> +                       >;
+> +                       fsl,soc-operating-points = <
+> +                               /* KHz  uV */
+> +                               528000  1250000
+> +                               396000  1150000
+> +                               198000  1150000
+> +                       >;
+Why is this necessary? Can't you adapt the driver to use operating-points?
+I have looked through other imx dts and saw that some had different
+values in these two tables.
 
--Kees
-
->
->> Acked-by: Michael Ellerman <mpe@ellerman.id.au>
->>
->> cheers
->>
->>
->
-> Thanks,
-> -dl
->
-
-
-
--- 
-Kees Cook
-Chrome OS Security
+Best regards,
+Nicolae Rosia
