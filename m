@@ -1,312 +1,52 @@
-From: alex.bennee@linaro.org (=?UTF-8?q?Alex=20Benn=C3=A9e?=)
-Date: Fri, 19 Jun 2015 13:23:48 +0100
-Subject: [PATCH v6 10/12] KVM: arm64: guest debug, HW assisted debug support
-In-Reply-To: <1434716630-18260-1-git-send-email-alex.bennee@linaro.org>
-References: <1434716630-18260-1-git-send-email-alex.bennee@linaro.org>
-Message-ID: <1434716630-18260-11-git-send-email-alex.bennee@linaro.org>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 19 Jun 2015 14:13:15 +0100
+Subject: [PATCH] Re: Linkstation Mini and __machine_arch_type problem,
+ not booting since 3.8
+In-Reply-To: <1434716194.17448.28.camel@x60s>
+References: <97db3502cd014faf1c710b1cc0fe8848@dolka.fr>
+ <1434446447.4785.7.camel@dolka.fr>
+ <1434593555.13334.14.camel@dolka.fr> <558278A8.2050406@arm.com>
+ <1434677895.4767.11.camel@dolka.fr> <5583DD23.90505@arm.com>
+ <1434716194.17448.28.camel@x60s>
+Message-ID: <20150619131315.GR7557@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This adds support for userspace to control the HW debug registers for
-guest debug. In the debug ioctl we copy the IMPDEF defined number of
-registers into a new register set called host_debug_state. There is now
-a new vcpu parameter called debug_ptr which selects which register set
-is to copied into the real registers when world switch occurs.
+On Fri, Jun 19, 2015 at 02:16:34PM +0200, Benjamin Cama wrote:
+> Le vendredi 19 juin 2015 ? 10:13 +0100, Marc Zyngier a ?crit :
+> > On 19/06/15 02:38, Benjamin Cama wrote:
+> > > Le jeudi 18 juin 2015 ? 08:52 +0100, Marc Zyngier a ?crit :
+> > >> Unfortunately, this is the wrong thing to do. IRQ0 is invalid, has been
+> > >> for a very long time, and actually represents the lack of interrupt.
+> > > 
+> > > OK, sorry for the mistake, I didn't know. Shouldn't the IRQ
+> > > initialization routine check this and warn the user that it may cause
+> > > problems? ?Silently? making IRQ0 forbidden doesn't help for the
+> > > platforms that are not fixed yet.
+> > 
+> > Well, this is hardly a new rule. It has been like this for quite a long
+> > time: http://yarchive.net/comp/linux/zero.html
+> > 
+> > As for the checking and warning, this is on a very hot path, for an
+> > error case that really shouldn't occur.
+> 
+> I was not talking about the irq handler, but the irq initialization
+> routine (on orion5x, orion_irq_init calls irq_alloc_generic_chip with
+> 0), which takes the starting irq number and may warn when it is zero
+> (well, it may also start allocating at zero but never use it, so this
+> may not be a totally correct assumption, but I think this comes close,
+> and it's just a warning).
 
-I've moved some helper functions into the hw_breakpoint.h header for
-re-use.
+It needs fixing nevertheless - arguments along the lines of "this used
+to work" don't work for this topic.
 
-As with single step we need to tweak the guest registers to enable the
-exceptions so we need to save and restore those bits.
+The simple answer is to adjust the initialisation to bump the IRQ
+numbers up by one, and them adjust the interrupt numbers in
+arch/arm/mach-whatever/include/asm/irqs.h also up by one.  That's
+far easier to do than spending ages trying to argue against the
+"IRQ0 is not valid" issue, only to ultimately get nowhere, and end
+up with that as the only way forward anyway.
 
-Two new capabilities have been added to the KVM_EXTENSION ioctl to allow
-userspace to query the number of hardware break and watch points
-available on the host hardware.
-
-Signed-off-by: Alex Benn?e <alex.bennee@linaro.org>
-
----
-v2
-   - switched to C setup
-   - replace host debug registers directly into context
-   - minor tweak to api docs
-   - setup right register for debug
-   - add FAR_EL2 to debug exit structure
-   - add support for trapping debug register access
-v3
-   - remove stray trace statement
-   - fix spacing around operators (various)
-   - clean-up usage of trap_debug
-   - introduce debug_ptr, replace excessive memcpy stuff
-   - don't use memcpy in ioctl, just assign
-   - update cap ioctl documentation
-   - reword a number comments
-   - rename host_debug_state->external_debug_state
-v4
-   - use the new u32/u64 split debug_ptr approach
-   - fix some wording/comments
-v5
-   - don't set MDSCR_EL1.KDE (not needed)
-v6
-   - update wording given change in commentary
-   - KVM_GUESTDBG_USE_HW_BP->KVM_GUESTDBG_USE_HW
----
- Documentation/virtual/kvm/api.txt      |  7 ++++++-
- arch/arm/kvm/arm.c                     |  7 +++++++
- arch/arm64/include/asm/hw_breakpoint.h | 12 +++++++++++
- arch/arm64/include/asm/kvm_host.h      |  6 +++++-
- arch/arm64/kernel/hw_breakpoint.c      | 12 -----------
- arch/arm64/kvm/debug.c                 | 37 +++++++++++++++++++++++++++++-----
- arch/arm64/kvm/handle_exit.c           |  6 ++++++
- arch/arm64/kvm/reset.c                 | 12 +++++++++++
- include/uapi/linux/kvm.h               |  2 ++
- 9 files changed, 82 insertions(+), 19 deletions(-)
-
-diff --git a/Documentation/virtual/kvm/api.txt b/Documentation/virtual/kvm/api.txt
-index 33c8143..ada57df 100644
---- a/Documentation/virtual/kvm/api.txt
-+++ b/Documentation/virtual/kvm/api.txt
-@@ -2668,7 +2668,7 @@ The top 16 bits of the control field are architecture specific control
- flags which can include the following:
- 
-   - KVM_GUESTDBG_USE_SW_BP:     using software breakpoints [x86, arm64]
--  - KVM_GUESTDBG_USE_HW_BP:     using hardware breakpoints [x86, s390]
-+  - KVM_GUESTDBG_USE_HW_BP:     using hardware breakpoints [x86, s390, arm64]
-   - KVM_GUESTDBG_INJECT_DB:     inject DB type exception [x86]
-   - KVM_GUESTDBG_INJECT_BP:     inject BP type exception [x86]
-   - KVM_GUESTDBG_EXIT_PENDING:  trigger an immediate guest exit [s390]
-@@ -2683,6 +2683,11 @@ updated to the correct (supplied) values.
- The second part of the structure is architecture specific and
- typically contains a set of debug registers.
- 
-+For arm64 the number of debug registers is implementation defined and
-+can be determined by querying the KVM_CAP_GUEST_DEBUG_HW_BPS and
-+KVM_CAP_GUEST_DEBUG_HW_WPS capabilities which return a positive number
-+indicating the number of supported registers.
-+
- When debug events exit the main run loop with the reason
- KVM_EXIT_DEBUG with the kvm_debug_exit_arch part of the kvm_run
- structure containing architecture specific debug information.
-diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
-index 0d17c7b..60c4045 100644
---- a/arch/arm/kvm/arm.c
-+++ b/arch/arm/kvm/arm.c
-@@ -307,6 +307,7 @@ void kvm_arch_vcpu_put(struct kvm_vcpu *vcpu)
- 
- #define KVM_GUESTDBG_VALID_MASK (KVM_GUESTDBG_ENABLE |    \
- 			    KVM_GUESTDBG_USE_SW_BP | \
-+			    KVM_GUESTDBG_USE_HW | \
- 			    KVM_GUESTDBG_SINGLESTEP)
- 
- /**
-@@ -327,6 +328,12 @@ int kvm_arch_vcpu_ioctl_set_guest_debug(struct kvm_vcpu *vcpu,
- 
- 	if (dbg->control & KVM_GUESTDBG_ENABLE) {
- 		vcpu->guest_debug = dbg->control;
-+
-+		/* Hardware assisted Break and Watch points */
-+		if (vcpu->guest_debug & KVM_GUESTDBG_USE_HW) {
-+			vcpu->arch.external_debug_state = dbg->arch;
-+		}
-+
- 	} else {
- 		/* If not enabled clear all flags */
- 		vcpu->guest_debug = 0;
-diff --git a/arch/arm64/include/asm/hw_breakpoint.h b/arch/arm64/include/asm/hw_breakpoint.h
-index 52b484b..c450552 100644
---- a/arch/arm64/include/asm/hw_breakpoint.h
-+++ b/arch/arm64/include/asm/hw_breakpoint.h
-@@ -130,6 +130,18 @@ static inline void ptrace_hw_copy_thread(struct task_struct *task)
- }
- #endif
- 
-+/* Determine number of BRP registers available. */
-+static inline int get_num_brps(void)
-+{
-+	return ((read_cpuid(ID_AA64DFR0_EL1) >> 12) & 0xf) + 1;
-+}
-+
-+/* Determine number of WRP registers available. */
-+static inline int get_num_wrps(void)
-+{
-+	return ((read_cpuid(ID_AA64DFR0_EL1) >> 20) & 0xf) + 1;
-+}
-+
- extern struct pmu perf_ops_bp;
- 
- #endif	/* __KERNEL__ */
-diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
-index 9697daf..0a3ee7b 100644
---- a/arch/arm64/include/asm/kvm_host.h
-+++ b/arch/arm64/include/asm/kvm_host.h
-@@ -116,13 +116,17 @@ struct kvm_vcpu_arch {
- 	 * debugging the guest from the host and to maintain separate host and
- 	 * guest state during world switches. vcpu_debug_state are the debug
- 	 * registers of the vcpu as the guest sees them.  host_debug_state are
--	 * the host registers which are saved and restored during world switches.
-+	 * the host registers which are saved and restored during
-+	 * world switches. external_debug_state contains the debug
-+	 * values we want to debugging the guest. This is set via the
-+	 * KVM_SET_GUEST_DEBUG ioctl.
- 	 *
- 	 * debug_ptr points to the set of debug registers that should be loaded
- 	 * onto the hardware when running the guest.
- 	 */
- 	struct kvm_guest_debug_arch *debug_ptr;
- 	struct kvm_guest_debug_arch vcpu_debug_state;
-+	struct kvm_guest_debug_arch external_debug_state;
- 
- 	/* Pointer to host CPU context */
- 	kvm_cpu_context_t *host_cpu_context;
-diff --git a/arch/arm64/kernel/hw_breakpoint.c b/arch/arm64/kernel/hw_breakpoint.c
-index e7d934d..3a41bbf 100644
---- a/arch/arm64/kernel/hw_breakpoint.c
-+++ b/arch/arm64/kernel/hw_breakpoint.c
-@@ -49,18 +49,6 @@ static DEFINE_PER_CPU(int, stepping_kernel_bp);
- static int core_num_brps;
- static int core_num_wrps;
- 
--/* Determine number of BRP registers available. */
--static int get_num_brps(void)
--{
--	return ((read_cpuid(ID_AA64DFR0_EL1) >> 12) & 0xf) + 1;
--}
--
--/* Determine number of WRP registers available. */
--static int get_num_wrps(void)
--{
--	return ((read_cpuid(ID_AA64DFR0_EL1) >> 20) & 0xf) + 1;
--}
--
- int hw_breakpoint_slots(int type)
- {
- 	/*
-diff --git a/arch/arm64/kvm/debug.c b/arch/arm64/kvm/debug.c
-index d439eb8..b287bbc 100644
---- a/arch/arm64/kvm/debug.c
-+++ b/arch/arm64/kvm/debug.c
-@@ -96,10 +96,6 @@ void kvm_arm_setup_debug(struct kvm_vcpu *vcpu)
- 				MDCR_EL2_TDRA |
- 				MDCR_EL2_TDOSA);
- 
--	/* Trap on access to debug registers? */
--	if (trap_debug)
--		vcpu->arch.mdcr_el2 |= MDCR_EL2_TDA;
--
- 	/* Is Guest debugging in effect? */
- 	if (vcpu->guest_debug) {
- 		/* Route all software debug exceptions to EL2 */
-@@ -134,11 +130,42 @@ void kvm_arm_setup_debug(struct kvm_vcpu *vcpu)
- 		} else {
- 			vcpu_sys_reg(vcpu, MDSCR_EL1) &= ~DBG_MDSCR_SS;
- 		}
-+
-+		/*
-+		 * HW Breakpoints and watchpoints
-+		 *
-+		 * We simply switch the debug_ptr to point to our new
-+		 * external_debug_state which has been populated by the
-+		 * debug ioctl. The existing KVM_ARM64_DEBUG_DIRTY
-+		 * mechanism ensures the registers are updated on the
-+		 * world switch.
-+		 */
-+		if (vcpu->guest_debug & KVM_GUESTDBG_USE_HW) {
-+			/* Enable breakpoints/watchpoints */
-+			vcpu_sys_reg(vcpu, MDSCR_EL1) |= DBG_MDSCR_MDE;
-+
-+			vcpu->arch.debug_ptr = &vcpu->arch.external_debug_state;
-+			vcpu->arch.debug_flags |= KVM_ARM64_DEBUG_DIRTY;
-+			trap_debug = true;
-+		}
- 	}
-+
-+	/* Trap debug register access */
-+	if (trap_debug)
-+		vcpu->arch.mdcr_el2 |= MDCR_EL2_TDA;
- }
- 
- void kvm_arm_clear_debug(struct kvm_vcpu *vcpu)
- {
--	if (vcpu->guest_debug)
-+	if (vcpu->guest_debug) {
- 		restore_guest_debug_regs(vcpu);
-+
-+		/*
-+		 * If we were using HW debug we need to restore the
-+		 * debug_ptr to the guest debug state.
-+		 */
-+		if (vcpu->guest_debug & KVM_GUESTDBG_USE_HW)
-+			vcpu->arch.debug_ptr = &vcpu->arch.vcpu_debug_state;
-+
-+	}
- }
-diff --git a/arch/arm64/kvm/handle_exit.c b/arch/arm64/kvm/handle_exit.c
-index e9de13e..68a0759 100644
---- a/arch/arm64/kvm/handle_exit.c
-+++ b/arch/arm64/kvm/handle_exit.c
-@@ -103,7 +103,11 @@ static int kvm_handle_guest_debug(struct kvm_vcpu *vcpu, struct kvm_run *run)
- 	run->debug.arch.hsr = hsr;
- 
- 	switch (hsr >> ESR_ELx_EC_SHIFT) {
-+	case ESR_ELx_EC_WATCHPT_LOW:
-+		run->debug.arch.far = vcpu->arch.fault.far_el2;
-+		/* fall through */
- 	case ESR_ELx_EC_SOFTSTP_LOW:
-+	case ESR_ELx_EC_BREAKPT_LOW:
- 	case ESR_ELx_EC_BKPT32:
- 	case ESR_ELx_EC_BRK64:
- 		break;
-@@ -132,6 +136,8 @@ static exit_handle_fn arm_exit_handlers[] = {
- 	[ESR_ELx_EC_IABT_LOW]	= kvm_handle_guest_abort,
- 	[ESR_ELx_EC_DABT_LOW]	= kvm_handle_guest_abort,
- 	[ESR_ELx_EC_SOFTSTP_LOW]= kvm_handle_guest_debug,
-+	[ESR_ELx_EC_WATCHPT_LOW]= kvm_handle_guest_debug,
-+	[ESR_ELx_EC_BREAKPT_LOW]= kvm_handle_guest_debug,
- 	[ESR_ELx_EC_BKPT32]	= kvm_handle_guest_debug,
- 	[ESR_ELx_EC_BRK64]	= kvm_handle_guest_debug,
- };
-diff --git a/arch/arm64/kvm/reset.c b/arch/arm64/kvm/reset.c
-index 0b43265..21d5a62 100644
---- a/arch/arm64/kvm/reset.c
-+++ b/arch/arm64/kvm/reset.c
-@@ -56,6 +56,12 @@ static bool cpu_has_32bit_el1(void)
- 	return !!(pfr0 & 0x20);
- }
- 
-+/**
-+ * kvm_arch_dev_ioctl_check_extension
-+ *
-+ * We currently assume that the number of HW registers is uniform
-+ * across all CPUs (see cpuinfo_sanity_check).
-+ */
- int kvm_arch_dev_ioctl_check_extension(long ext)
- {
- 	int r;
-@@ -64,6 +70,12 @@ int kvm_arch_dev_ioctl_check_extension(long ext)
- 	case KVM_CAP_ARM_EL1_32BIT:
- 		r = cpu_has_32bit_el1();
- 		break;
-+	case KVM_CAP_GUEST_DEBUG_HW_BPS:
-+		r = get_num_brps();
-+		break;
-+	case KVM_CAP_GUEST_DEBUG_HW_WPS:
-+		r  = get_num_wrps();
-+		break;
- 	default:
- 		r = 0;
- 	}
-diff --git a/include/uapi/linux/kvm.h b/include/uapi/linux/kvm.h
-index 70ac641..f020dd0 100644
---- a/include/uapi/linux/kvm.h
-+++ b/include/uapi/linux/kvm.h
-@@ -817,6 +817,8 @@ struct kvm_ppc_smmu_info {
- #define KVM_CAP_S390_INJECT_IRQ 113
- #define KVM_CAP_S390_IRQ_STATE 114
- #define KVM_CAP_PPC_HWRNG 115
-+#define KVM_CAP_GUEST_DEBUG_HW_BPS 116
-+#define KVM_CAP_GUEST_DEBUG_HW_WPS 117
- 
- #ifdef KVM_CAP_IRQ_ROUTING
- 
 -- 
-2.4.3
+FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
+according to speedtest.net.
