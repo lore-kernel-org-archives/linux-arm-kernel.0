@@ -1,27 +1,35 @@
-From: p.zabel@pengutronix.de (Philipp Zabel)
+From: jiri.prchal@aksignal.cz (=?UTF-8?B?SmnFmcOtIFByY2hhbA==?=)
 Date: Fri, 19 Jun 2015 16:36:06 +0200
-Subject: [PATCH] GPU: ipu: fix lockup caused by pending chained interrupts
-In-Reply-To: <E1Z4zMT-0004Y7-KJ@rmk-PC.arm.linux.org.uk>
-References: <E1Z4yzs-0002Rw-4B@rmk-PC.arm.linux.org.uk>
- <E1Z4zMT-0004Y7-KJ@rmk-PC.arm.linux.org.uk>
-Message-ID: <1434724566.3039.50.camel@pengutronix.de>
+Subject: [PATCH linux-next v2 1/1] dmaengine: at_hdmac: fix residue
+ computation
+In-Reply-To: <55841767.7010608@atmel.com>
+References: <cover.1434626239.git.cyrille.pitchen@atmel.com>
+ <b9630cef4224b93939138b3a8c1950ea44cbcf59.1434626239.git.cyrille.pitchen@atmel.com>
+ <5582B4EC.7030805@aksignal.cz> <55841767.7010608@atmel.com>
+Message-ID: <558428D6.2080405@aksignal.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Dienstag, den 16.06.2015, 23:29 +0100 schrieb Russell King:
-> Even with the oops fixed by a previous patch, the system still fails to
-> kexec, due to a stuck chained interrupt locking the system.  We must
-> disable the child interrupts prior to setting up the irq chip to ensure
-> we don't get stuck here.
-> 
-> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 
-Applied, thank you.
 
-> Maybe this is all that's really needed... would also be nice if this
-> path had an etry in MAINTAINERS...
+On 19.6.2015 15:21, Nicolas Ferre wrote:
+> Le 18/06/2015 14:09, Ji?? Prchal a ?crit :
+>>
+>>
+>> On 18.6.2015 13:25, Cyrille Pitchen wrote:
+>>>
+>>> Signed-off-by: Cyrille Pitchen <cyrille.pitchen@atmel.com>
+>>
+>> Tested-by: Ji?? Prchal <jiri.prchal@aksignal.cz>
 
-I'll send a patch to add it to the imx-drm driver section.
+It's already here.
 
-regards
-Philipp
+>>
+>> Manually applied to 4.1-rc7 and it WORKS!
+>
+> Good piece of new indeed.
+>
+> Can you add your "Tested-by" tag?
+>
+> Bye,
+>
