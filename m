@@ -1,80 +1,100 @@
-From: benoar@dolka.fr (Benjamin Cama)
-Date: Fri, 19 Jun 2015 15:46:45 +0200
-Subject: [PATCH] Re: Linkstation Mini and =?UTF-8?Q?=5F=5Fmachine=5Far?=
- =?UTF-8?Q?ch=5Ftype=20problem=2C=20not=20booting=20since=20=33=2E=38?=
-In-Reply-To: <20150619131315.GR7557@n2100.arm.linux.org.uk>
-References: <97db3502cd014faf1c710b1cc0fe8848@dolka.fr>
- <1434446447.4785.7.camel@dolka.fr> <1434593555.13334.14.camel@dolka.fr>
- <558278A8.2050406@arm.com> <1434677895.4767.11.camel@dolka.fr>
- <5583DD23.90505@arm.com> <1434716194.17448.28.camel@x60s>
- <20150619131315.GR7557@n2100.arm.linux.org.uk>
-Message-ID: <d6d361113992920900137899ae4d1f7b@dolka.fr>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Fri, 19 Jun 2015 14:50:33 +0100
+Subject: [PATCH v2 2/2] arm: KVM: keep arm vfp/simd exit handling
+ consistent with arm64
+In-Reply-To: <55835910.3060601@samsung.com>
+References: <1434491452-19177-1-git-send-email-m.smarduch@samsung.com>
+ <1434491452-19177-3-git-send-email-m.smarduch@samsung.com>
+ <5582FF76.6060100@arm.com> <55835910.3060601@samsung.com>
+Message-ID: <55841E29.7070004@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Russell,
-
-Le 2015-06-19 15:13, Russell King - ARM Linux a ?crit?:
-> On Fri, Jun 19, 2015 at 02:16:34PM +0200, Benjamin Cama wrote:
->> Le vendredi 19 juin 2015 ? 10:13 +0100, Marc Zyngier a ?crit :
->> > On 19/06/15 02:38, Benjamin Cama wrote:
->> > > Le jeudi 18 juin 2015 ? 08:52 +0100, Marc Zyngier a ?crit :
->> > >> Unfortunately, this is the wrong thing to do. IRQ0 is invalid, 
->> has been
->> > >> for a very long time, and actually represents the lack of 
->> interrupt.
->> > >
->> > > OK, sorry for the mistake, I didn't know. Shouldn't the IRQ
->> > > initialization routine check this and warn the user that it may 
->> cause
->> > > problems? ?Silently? making IRQ0 forbidden doesn't help for the
->> > > platforms that are not fixed yet.
->> >
->> > Well, this is hardly a new rule. It has been like this for quite a 
->> long
->> > time: http://yarchive.net/comp/linux/zero.html
->> >
->> > As for the checking and warning, this is on a very hot path, for 
->> an
->> > error case that really shouldn't occur.
+On 19/06/15 00:49, Mario Smarduch wrote:
+> On 06/18/2015 10:27 AM, Marc Zyngier wrote:
+>> On 16/06/15 22:50, Mario Smarduch wrote:
+>>> After enhancing arm64 FP/SIMD exit handling, FP/SIMD exit branch is moved
+>>> to guest trap handling. This keeps exiting handling flow between both
+>>> architectures consistent.
+>>>
+>>> Signed-off-by: Mario Smarduch <m.smarduch@samsung.com>
+>>> ---
+>>>  arch/arm/kvm/interrupts.S |   12 +++++++-----
+>>>  1 file changed, 7 insertions(+), 5 deletions(-)
+>>>
+>>> diff --git a/arch/arm/kvm/interrupts.S b/arch/arm/kvm/interrupts.S
+>>> index 79caf79..fca2c56 100644
+>>> --- a/arch/arm/kvm/interrupts.S
+>>> +++ b/arch/arm/kvm/interrupts.S
+>>> @@ -363,10 +363,6 @@ hyp_hvc:
+>>>  	@ Check syndrome register
+>>>  	mrc	p15, 4, r1, c5, c2, 0	@ HSR
+>>>  	lsr	r0, r1, #HSR_EC_SHIFT
+>>> -#ifdef CONFIG_VFPv3
+>>> -	cmp	r0, #HSR_EC_CP_0_13
+>>> -	beq	switch_to_guest_vfp
+>>> -#endif
+>>>  	cmp	r0, #HSR_EC_HVC
+>>>  	bne	guest_trap		@ Not HVC instr.
+>>>  
+>>> @@ -406,6 +402,12 @@ THUMB(	orr	lr, #1)
+>>>  1:	eret
+>>>  
+>>>  guest_trap:
+>>> +#ifdef CONFIG_VFPv3
+>>> +	/* Guest accessed VFP/SIMD registers, save host, restore Guest */
+>>> +	cmp	r0, #HSR_EC_CP_0_13
+>>> +	beq	switch_to_guest_fpsimd
+>>> +#endif
+>>> +
+>>>  	load_vcpu			@ Load VCPU pointer to r0
+>>>  	str	r1, [vcpu, #VCPU_HSR]
+>>>  
+>>> @@ -478,7 +480,7 @@ guest_trap:
+>>>   * inject an undefined exception to the guest.
+>>>   */
+>>>  #ifdef CONFIG_VFPv3
+>>> -switch_to_guest_vfp:
+>>> +switch_to_guest_fpsimd:
 >>
->> I was not talking about the irq handler, but the irq initialization
->> routine (on orion5x, orion_irq_init calls irq_alloc_generic_chip 
->> with
->> 0), which takes the starting irq number and may warn when it is zero
->> (well, it may also start allocating at zero but never use it, so 
->> this
->> may not be a totally correct assumption, but I think this comes 
->> close,
->> and it's just a warning).
->
-> It needs fixing nevertheless - arguments along the lines of "this 
-> used
-> to work" don't work for this topic.
->
-> The simple answer is to adjust the initialisation to bump the IRQ
-> numbers up by one, and them adjust the interrupt numbers in
-> arch/arm/mach-whatever/include/asm/irqs.h also up by one.  That's
-> far easier to do than spending ages trying to argue against the
-> "IRQ0 is not valid" issue, only to ultimately get nowhere, and end
-> up with that as the only way forward anyway.
+>> Ah, I think I managed to confuse you in my previous comment.
+>> On ARMv7, we call the floating point stuff VFP.
+>> On ARMv8, we call it FP/SIMD.
+> 
+> Ah I see, I'll update.
+>>
+>> Not very consistent, I know...
+>>
+>>>  	load_vcpu			@ Load VCPU pointer to r0
+> 
+> How about move it here - then it does not stick out like
+> before.
+> 
+> guest_trap:
+>         load_vcpu                       @ Load VCPU pointer to r0
+>         str     r1, [vcpu, #VCPU_HSR]
+> 
+>         @ Check if we need the fault information
+>         lsr     r1, r1, #HSR_EC_SHIFT
+> #ifdef CONFIG_VFPv3
+>         /* Guest accessed VFP/SIMD registers, save host, restore Guest */
+>         cmp     r1, #HSR_EC_CP_0_13
+>         beq     switch_to_guest_vfp
+> #endif
 
-Do not misunderstand me: I am not at all for keeping the situation like 
-this!
-What I ask is just for users to be notified of this new requirement: 
-for my
-case, my board simply couldn't boot anymore, without any explanation. 
-If there
-was a message along the lines ?You are setting up IRQs starting from 0, 
-which
-is not supported by the kernel anymore? just before crashing, maybe it 
-would
-help debugging the issue.
+That would work.
 
-I could try to write a patch for it, but I was first wondering if this 
-is a
-good idea or not.
+> Regarding "host_switch_to_hyp:" it has no reference but appears
+> like a clean separator, that's on purpose?
 
-Regards,
---
-benjamin
+Not really. It looks like a leftover from the original HYP calling
+method that we used to have, before the code got merged.
+
+You could replace it by a simple comment saying that from this point on,
+we're dealing with a HVC call from the host.
+
+Thanks,
+
+	M.
+-- 
+Jazz is not dead. It just smells funny...
