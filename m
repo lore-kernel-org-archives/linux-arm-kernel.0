@@ -1,28 +1,72 @@
-From: manabian@gmail.com (Joachim Eastwood)
-Date: Fri, 19 Jun 2015 18:01:27 +0200
-Subject: [PATCH v4 1/3] clk: Add regmap support
-In-Reply-To: <1434464615-9080-2-git-send-email-matthias.bgg@gmail.com>
-References: <1434464615-9080-1-git-send-email-matthias.bgg@gmail.com>
- <1434464615-9080-2-git-send-email-matthias.bgg@gmail.com>
-Message-ID: <CAGhQ9Vx3qxvawiUYtEjr7z=o6mS3TirCzRd9-UZ0FP=equWEaQ@mail.gmail.com>
+From: p.zabel@pengutronix.de (Philipp Zabel)
+Date: Fri, 19 Jun 2015 18:09:50 +0200
+Subject: [PATCH] ARM: dts: imx53-qsb: select open-drain mode for i2c1 pads
+Message-ID: <1434730190-15945-1-git-send-email-p.zabel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Matthias,
+From: Lucas Stach <l.stach@pengutronix.de>
 
-On 16 June 2015 at 16:23, Matthias Brugger <matthias.bgg@gmail.com> wrote:
-> Some devices like SoCs from Mediatek need to use the clock
-> through a regmap interface.
-> This patch adds regmap support for the simple multiplexer clock,
-> the divider clock and the clock gate code.
->
-> Signed-off-by: Matthias Brugger <matthias.bgg@gmail.com>
+Both imx53-qsb and imx53-qsrb don't have external pull-up resistors
+on the I2C1 SCL and SDA lines populated. Select open-drain mode and
+enable the internal pull-up for both.
 
-I think it looks fine now and I have no further comments, so:
-Acked-by: Joachim Eastwood <manabian@gmail.com>
+Signed-off-by: Lucas Stach <l.stach@pengutronix.de>
+Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
+---
+ arch/arm/boot/dts/imx53-qsb-common.dtsi |  5 +++--
+ arch/arm/boot/dts/imx53-qsrb.dts        | 14 +-------------
+ 2 files changed, 4 insertions(+), 15 deletions(-)
 
-Hope this can go in for 4.3.
-
-
-regards,
-Joachim Eastwood
+diff --git a/arch/arm/boot/dts/imx53-qsb-common.dtsi b/arch/arm/boot/dts/imx53-qsb-common.dtsi
+index 181ae5e..43932bb 100644
+--- a/arch/arm/boot/dts/imx53-qsb-common.dtsi
++++ b/arch/arm/boot/dts/imx53-qsb-common.dtsi
+@@ -228,10 +228,11 @@
+ 			>;
+ 		};
+ 
++		/* open drain */
+ 		pinctrl_i2c1: i2c1grp {
+ 			fsl,pins = <
+-				MX53_PAD_CSI0_DAT8__I2C1_SDA		0xc0000000
+-				MX53_PAD_CSI0_DAT9__I2C1_SCL		0xc0000000
++				MX53_PAD_CSI0_DAT8__I2C1_SDA		0x400001ec
++				MX53_PAD_CSI0_DAT9__I2C1_SCL		0x400001ec
+ 			>;
+ 		};
+ 
+diff --git a/arch/arm/boot/dts/imx53-qsrb.dts b/arch/arm/boot/dts/imx53-qsrb.dts
+index 82d623d..66e47de 100644
+--- a/arch/arm/boot/dts/imx53-qsrb.dts
++++ b/arch/arm/boot/dts/imx53-qsrb.dts
+@@ -20,15 +20,7 @@
+ };
+ 
+ &iomuxc {
+-	i2c1 {
+-		/* open drain */
+-		pinctrl_i2c1_qsrb: i2c1grp-1 {
+-			fsl,pins = <
+-				MX53_PAD_CSI0_DAT8__I2C1_SDA      0x400001ec
+-				MX53_PAD_CSI0_DAT9__I2C1_SCL      0x400001ec
+-			>;
+-		};
+-
++	imx53-qsrb {
+ 		pinctrl_pmic: pmicgrp {
+ 			fsl,pins = <
+ 				MX53_PAD_CSI0_DAT5__GPIO5_23	0x1e4 /* IRQ */
+@@ -38,10 +30,6 @@
+ };
+ 
+ &i2c1 {
+-	pinctrl-names = "default";
+-	pinctrl-0 = <&pinctrl_i2c1_qsrb>;
+-	status = "okay";
+-
+ 	pmic: mc34708 at 8 {
+ 		compatible = "fsl,mc34708";
+ 		pinctrl-names = "default";
+-- 
+2.1.4
