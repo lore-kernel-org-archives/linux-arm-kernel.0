@@ -1,100 +1,52 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri, 19 Jun 2015 14:50:33 +0100
-Subject: [PATCH v2 2/2] arm: KVM: keep arm vfp/simd exit handling
- consistent with arm64
-In-Reply-To: <55835910.3060601@samsung.com>
-References: <1434491452-19177-1-git-send-email-m.smarduch@samsung.com>
- <1434491452-19177-3-git-send-email-m.smarduch@samsung.com>
- <5582FF76.6060100@arm.com> <55835910.3060601@samsung.com>
-Message-ID: <55841E29.7070004@arm.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Fri, 19 Jun 2015 14:50:57 +0100
+Subject: [PATCH v2 1/3] arm64: kernel: rename __cpu_suspend to keep it
+ aligned with arm
+In-Reply-To: <5582DEFD.8070106@arm.com>
+References: <1434462640-19613-1-git-send-email-sudeep.holla@arm.com>
+ <1434638494-514-1-git-send-email-sudeep.holla@arm.com>
+ <1434638494-514-2-git-send-email-sudeep.holla@arm.com>
+ <20150618145505.GE31480@e104818-lin.cambridge.arm.com>
+ <5582DEFD.8070106@arm.com>
+Message-ID: <20150619135057.GA20798@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 19/06/15 00:49, Mario Smarduch wrote:
-> On 06/18/2015 10:27 AM, Marc Zyngier wrote:
->> On 16/06/15 22:50, Mario Smarduch wrote:
->>> After enhancing arm64 FP/SIMD exit handling, FP/SIMD exit branch is moved
->>> to guest trap handling. This keeps exiting handling flow between both
->>> architectures consistent.
->>>
->>> Signed-off-by: Mario Smarduch <m.smarduch@samsung.com>
->>> ---
->>>  arch/arm/kvm/interrupts.S |   12 +++++++-----
->>>  1 file changed, 7 insertions(+), 5 deletions(-)
->>>
->>> diff --git a/arch/arm/kvm/interrupts.S b/arch/arm/kvm/interrupts.S
->>> index 79caf79..fca2c56 100644
->>> --- a/arch/arm/kvm/interrupts.S
->>> +++ b/arch/arm/kvm/interrupts.S
->>> @@ -363,10 +363,6 @@ hyp_hvc:
->>>  	@ Check syndrome register
->>>  	mrc	p15, 4, r1, c5, c2, 0	@ HSR
->>>  	lsr	r0, r1, #HSR_EC_SHIFT
->>> -#ifdef CONFIG_VFPv3
->>> -	cmp	r0, #HSR_EC_CP_0_13
->>> -	beq	switch_to_guest_vfp
->>> -#endif
->>>  	cmp	r0, #HSR_EC_HVC
->>>  	bne	guest_trap		@ Not HVC instr.
->>>  
->>> @@ -406,6 +402,12 @@ THUMB(	orr	lr, #1)
->>>  1:	eret
->>>  
->>>  guest_trap:
->>> +#ifdef CONFIG_VFPv3
->>> +	/* Guest accessed VFP/SIMD registers, save host, restore Guest */
->>> +	cmp	r0, #HSR_EC_CP_0_13
->>> +	beq	switch_to_guest_fpsimd
->>> +#endif
->>> +
->>>  	load_vcpu			@ Load VCPU pointer to r0
->>>  	str	r1, [vcpu, #VCPU_HSR]
->>>  
->>> @@ -478,7 +480,7 @@ guest_trap:
->>>   * inject an undefined exception to the guest.
->>>   */
->>>  #ifdef CONFIG_VFPv3
->>> -switch_to_guest_vfp:
->>> +switch_to_guest_fpsimd:
->>
->> Ah, I think I managed to confuse you in my previous comment.
->> On ARMv7, we call the floating point stuff VFP.
->> On ARMv8, we call it FP/SIMD.
+On Thu, Jun 18, 2015 at 04:08:45PM +0100, Sudeep Holla wrote:
+> On 18/06/15 15:55, Catalin Marinas wrote:
+> >On Thu, Jun 18, 2015 at 03:41:32PM +0100, Sudeep Holla wrote:
+> >>This patch renames __cpu_suspend to cpu_suspend so that it's aligned
+> >>with ARM32. It also removes the redundant wrapper created.
+> >>
+> >>This is in preparation to implement generic PSCI system suspend using
+> >>the cpu_{suspend,resume} which now has the same interface on both ARM
+> >>and ARM64.
+> >>
+> >>Cc: Mark Rutland <mark.rutland@arm.com>
+> >>Reviewed-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+> >>Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
+> >>---
+> >>  arch/arm64/include/asm/cpuidle.h | 8 ++------
+> >>  arch/arm64/include/asm/suspend.h | 2 +-
+> >>  arch/arm64/kernel/cpuidle.c      | 4 ++--
+> >>  arch/arm64/kernel/psci.c         | 2 +-
+> >>  arch/arm64/kernel/suspend.c      | 6 +++---
+> >>  5 files changed, 9 insertions(+), 13 deletions(-)
+> >
+> >Acked-by: Catalin Marinas <catalin.marinas@arm.com>
+> >
+> >Does this patch depend on the other patches from Mark and Lorenzo or it
+> >can be merged earlier?
 > 
-> Ah I see, I'll update.
->>
->> Not very consistent, I know...
->>
->>>  	load_vcpu			@ Load VCPU pointer to r0
-> 
-> How about move it here - then it does not stick out like
-> before.
-> 
-> guest_trap:
->         load_vcpu                       @ Load VCPU pointer to r0
->         str     r1, [vcpu, #VCPU_HSR]
-> 
->         @ Check if we need the fault information
->         lsr     r1, r1, #HSR_EC_SHIFT
-> #ifdef CONFIG_VFPv3
->         /* Guest accessed VFP/SIMD registers, save host, restore Guest */
->         cmp     r1, #HSR_EC_CP_0_13
->         beq     switch_to_guest_vfp
-> #endif
+> Though it's independent patch, I think it will conflict with Mark's
+> changes. But since all the ARM64 related changes in that series are
+> already in ARM64 for-next/core, it applies cleanly on it and I even gave
+> it a quick testing. So it can be merged earlier if you are fine with that.
 
-That would work.
+I queued it for 4.2 (it was something already discussed with Lorenzo
+previously).
 
-> Regarding "host_switch_to_hyp:" it has no reference but appears
-> like a clean separator, that's on purpose?
+Thanks.
 
-Not really. It looks like a leftover from the original HYP calling
-method that we used to have, before the code got merged.
-
-You could replace it by a simple comment saying that from this point on,
-we're dealing with a HVC call from the host.
-
-Thanks,
-
-	M.
 -- 
-Jazz is not dead. It just smells funny...
+Catalin
