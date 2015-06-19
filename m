@@ -1,52 +1,50 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Fri, 19 Jun 2015 14:50:57 +0100
-Subject: [PATCH v2 1/3] arm64: kernel: rename __cpu_suspend to keep it
- aligned with arm
-In-Reply-To: <5582DEFD.8070106@arm.com>
-References: <1434462640-19613-1-git-send-email-sudeep.holla@arm.com>
- <1434638494-514-1-git-send-email-sudeep.holla@arm.com>
- <1434638494-514-2-git-send-email-sudeep.holla@arm.com>
- <20150618145505.GE31480@e104818-lin.cambridge.arm.com>
- <5582DEFD.8070106@arm.com>
-Message-ID: <20150619135057.GA20798@e104818-lin.cambridge.arm.com>
+From: boris.brezillon@free-electrons.com (Boris Brezillon)
+Date: Fri, 19 Jun 2015 15:52:46 +0200
+Subject: [PULL] clk: at91: fixes for 4.1
+Message-ID: <20150619155246.18af1068@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 18, 2015 at 04:08:45PM +0100, Sudeep Holla wrote:
-> On 18/06/15 15:55, Catalin Marinas wrote:
-> >On Thu, Jun 18, 2015 at 03:41:32PM +0100, Sudeep Holla wrote:
-> >>This patch renames __cpu_suspend to cpu_suspend so that it's aligned
-> >>with ARM32. It also removes the redundant wrapper created.
-> >>
-> >>This is in preparation to implement generic PSCI system suspend using
-> >>the cpu_{suspend,resume} which now has the same interface on both ARM
-> >>and ARM64.
-> >>
-> >>Cc: Mark Rutland <mark.rutland@arm.com>
-> >>Reviewed-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-> >>Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
-> >>---
-> >>  arch/arm64/include/asm/cpuidle.h | 8 ++------
-> >>  arch/arm64/include/asm/suspend.h | 2 +-
-> >>  arch/arm64/kernel/cpuidle.c      | 4 ++--
-> >>  arch/arm64/kernel/psci.c         | 2 +-
-> >>  arch/arm64/kernel/suspend.c      | 6 +++---
-> >>  5 files changed, 9 insertions(+), 13 deletions(-)
-> >
-> >Acked-by: Catalin Marinas <catalin.marinas@arm.com>
-> >
-> >Does this patch depend on the other patches from Mark and Lorenzo or it
-> >can be merged earlier?
-> 
-> Though it's independent patch, I think it will conflict with Mark's
-> changes. But since all the ARM64 related changes in that series are
-> already in ARM64 for-next/core, it applies cleanly on it and I even gave
-> it a quick testing. So it can be merged earlier if you are fine with that.
+Hi Mike,
 
-I queued it for 4.2 (it was something already discussed with Lorenzo
-previously).
+As you suggested, here is a PR including several fixes for the at91 clk
+drivers. BTW, thanks for accepting to take this PR so late in the release
+cycle.
 
-Thanks.
+Best Regards,
+
+Boris
+
+The following changes since commit 03bc10ab5b0f9b8f81bffbe6e40c944f9d3dbcc5:
+
+  clk: check ->determine/round_rate() return value in clk_calc_new_rates (2015-04-12 21:09:49 -0700)
+
+are available in the git repository at:
+
+  https://github.com/bbrezillon/linux-at91.git ccf/atmel-fixes-for-4.1
+
+for you to fetch changes up to 28df9c2fb6f896179fcffd5a3f5a86e2d1dff0a5:
+
+  clk: at91: fix h32mx prototype inclusion in pmc header (2015-06-19 15:48:34 +0200)
+
+----------------------------------------------------------------
+Boris Brezillon (2):
+      clk: at91: pll: fix input range validity check
+      clk: at91: fix PERIPHERAL_MAX_SHIFT definition
+
+Nicolas Ferre (2):
+      clk: at91: trivial: typo in peripheral clock description
+      clk: at91: fix h32mx prototype inclusion in pmc header
+
+ Documentation/devicetree/bindings/clock/at91-clock.txt |  2 +-
+ drivers/clk/at91/clk-peripheral.c                      |  8 ++++----
+ drivers/clk/at91/clk-pll.c                             | 12 ++++++++++--
+ drivers/clk/at91/pmc.h                                 |  2 +-
+ 4 files changed, 16 insertions(+), 8 deletions(-)
+
+
 
 -- 
-Catalin
+Boris Brezillon, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
