@@ -1,45 +1,44 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 19 Jun 2015 13:56:33 +0100
-Subject: [PATCH] arm64: vdso: work-around broken ELF toolchains in Makefile
-Message-ID: <1434718593-3648-1-git-send-email-will.deacon@arm.com>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Fri, 19 Jun 2015 13:01:01 +0000
+Subject: [PATCH] Re: Linkstation Mini and __machine_arch_type problem,
+ not booting since 3.8
+In-Reply-To: <1434716194.17448.28.camel@x60s>
+References: <97db3502cd014faf1c710b1cc0fe8848@dolka.fr>
+ <1434446447.4785.7.camel@dolka.fr>
+ <1434593555.13334.14.camel@dolka.fr> <558278A8.2050406@arm.com>
+ <1434677895.4767.11.camel@dolka.fr> <5583DD23.90505@arm.com>
+ <1434716194.17448.28.camel@x60s>
+Message-ID: <20150619130101.GD2936@io.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When building the kernel with a bare-metal (ELF) toolchain, the -shared
-option may not be passed down to collect2, resulting in silent corruption
-of the vDSO image (in particular, the DYNAMIC section is omitted).
+Benjamin,
 
-The effect of this corruption is that the dynamic linker fails to find
-the vDSO symbols and libc is instead used for the syscalls that we
-intended to optimise (e.g. gettimeofday). Functionally, there is no
-issue as the sigreturn trampoline is still intact and located by the
-kernel.
+On Fri, Jun 19, 2015 at 02:16:34PM +0200, Benjamin Cama wrote:
+> Le vendredi 19 juin 2015 ?? 10:13 +0100, Marc Zyngier a ??crit :
+> > On 19/06/15 02:38, Benjamin Cama wrote:
+...
+> > > I read quite a bit about all this virtual/hardware IRQ stuff, and the
+> > > irq domains, interesting. I see that orion5x seems to be one of the
+> > > last platforms not using it (appart from DT-converted boards); is it a
+> > > bad sign about its durability????
+> > 
+> > No, we have platforms that will most probably never be converted to DT,
+> > and they are very far from rotting in the tree.
+> 
+> Nice to know. One of the reasons for converting my board to DT was fear
+> that it may one day be mandatory. Is there any particular reason for
+> keeping some boards non-DT while still being maintained?
 
-This patch fixes the problem by explicitly passing -shared to the linker
-when building the vDSO.
+If folks are using the sub-arch and interested in maintaining them, they
+stick around.  mach-orion5x/ is a wierd case because there aren't many
+users.  The mvebu folks have put a lot of work into supporting /
+converting the legacy platforms (kirkwood, dove).  Thomas did most of
+the work converting orion5x, but there simply aren't many users to test.
+So it's in a half-converted state.
 
-Cc: <stable@vger.kernel.org>
-Reported-by: Szabolcs Nagy <Szabolcs.Nagy@arm.com>
-Reported-by: James Greenlaigh <james.greenhalgh@arm.com>
-Signed-off-by: Will Deacon <will.deacon@arm.com>
----
- arch/arm64/kernel/vdso/Makefile | 4 ++++
- 1 file changed, 4 insertions(+)
+iow, we're glad to see you contributing patches for orion5x.  ;-)
 
-diff --git a/arch/arm64/kernel/vdso/Makefile b/arch/arm64/kernel/vdso/Makefile
-index ff3bddea482d..f6fe17d88da5 100644
---- a/arch/arm64/kernel/vdso/Makefile
-+++ b/arch/arm64/kernel/vdso/Makefile
-@@ -15,6 +15,10 @@ ccflags-y := -shared -fno-common -fno-builtin
- ccflags-y += -nostdlib -Wl,-soname=linux-vdso.so.1 \
- 		$(call cc-ldoption, -Wl$(comma)--hash-style=sysv)
- 
-+# Workaround for bare-metal (ELF) toolchains that neglect to pass -shared
-+# down to collect2, resulting in silent corruption of the vDSO image.
-+ccflags-y += -Wl,-shared
-+
- obj-y += vdso.o
- extra-y += vdso.lds vdso-offsets.h
- CPPFLAGS_vdso.lds += -P -C -U$(ARCH)
--- 
-2.1.4
+thx,
+
+Jason.
