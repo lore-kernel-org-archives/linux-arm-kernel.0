@@ -1,84 +1,102 @@
-From: lznuaa@gmail.com (Zhi Li)
-Date: Fri, 19 Jun 2015 11:50:28 -0500
-Subject: [PATCH v2 0/8] add basic support for i.mx6 ul chip
-In-Reply-To: <CAH=tA9FyfB4PR+YXnHBssnSirvQfSw6AAY1gJz3=L=a9UL0Z6g@mail.gmail.com>
-References: <1434727951-4852-1-git-send-email-Frank.Li@freescale.com>
- <CAH=tA9FyfB4PR+YXnHBssnSirvQfSw6AAY1gJz3=L=a9UL0Z6g@mail.gmail.com>
-Message-ID: <CAHrpEqTyRYkHMrOYuO0-23-p=rjOx25NEB02yxhnZD+RjWbLnw@mail.gmail.com>
+From: computersforpeace@gmail.com (Brian Norris)
+Date: Fri, 19 Jun 2015 10:36:08 -0700
+Subject: [PATCH 5/7] soc: brcmstb: add wake-timer driver
+In-Reply-To: <CADtm3G7qui2Yi6j-pFSGO9sGdHde1hy-c9wAWfQ38Dg8rKq2Qg@mail.gmail.com>
+References: <1434672696-13632-1-git-send-email-computersforpeace@gmail.com>
+ <1434672696-13632-6-git-send-email-computersforpeace@gmail.com>
+ <CADtm3G7qui2Yi6j-pFSGO9sGdHde1hy-c9wAWfQ38Dg8rKq2Qg@mail.gmail.com>
+Message-ID: <20150619173608.GJ4917@ld-irv-0074>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 19, 2015 at 11:43 AM, Nicolae Rosia <nicolae.rosia@gmail.com> wrote:
-> Hi,
->
-> I can't seem to find a datasheet for this series.
+On Thu, Jun 18, 2015 at 07:20:26PM -0700, Gregory Fong wrote:
+> On Thu, Jun 18, 2015 at 5:11 PM, Brian Norris
+> <computersforpeace@gmail.com> wrote:
+> > Useful for waking the system from suspend after a specified period of
+> > time.
+> >
+> > This IP could potentially be supported as an RTC driver (for use with
+> > the 'rtcwake' utility), but it is not battery backed, so that's not a
+> > great fit. Implement a custom sysfs interface instead.
+> >
+> > Signed-off-by: Brian Norris <computersforpeace@gmail.com>
+> > ---
+> >  .../ABI/testing/sysfs-driver-wktmr-brcmstb         |  12 +
+> >  drivers/soc/brcmstb/Kconfig                        |   3 +
+> >  drivers/soc/brcmstb/Makefile                       |   1 +
+> >  drivers/soc/brcmstb/wktmr.c                        | 242 +++++++++++++++++++++
+> >  4 files changed, 258 insertions(+)
+> >  create mode 100644 Documentation/ABI/testing/sysfs-driver-wktmr-brcmstb
+> >  create mode 100644 drivers/soc/brcmstb/wktmr.c
+> >
+> > diff --git a/Documentation/ABI/testing/sysfs-driver-wktmr-brcmstb b/Documentation/ABI/testing/sysfs-driver-wktmr-brcmstb
+> > new file mode 100644
+> > index 000000000000..e563f8b8d969
+> > --- /dev/null
+> > +++ b/Documentation/ABI/testing/sysfs-driver-wktmr-brcmstb
+> > @@ -0,0 +1,12 @@
+> > +What:          /sys/bus/platform/drivers/brcm-waketimer/<MMIO-address>.waketimer/timeout
+> > +Date:          November 21, 2014
+> > +KernelVersion: 3.14
+> > +Contact:       Brian Norris <norris@broadcom.com>
+> 
+> Shouldn't this be "Brian Norris <computersforpeace@gmail.com>"?
 
-Have not public yet.
+Indeed, thanks. Wouldn't want things bouncing...
 
-best regards
-Frank Li
+> > +Description:   The control file for the wakeup timer. This integer value
+> > +               represents the number of seconds between a suspend operation
+> > +               (e.g., S3 suspend-to-RAM) and the time at which the wakeup
+> > +               timer should fire.
+> > [...]
+> > diff --git a/drivers/soc/brcmstb/wktmr.c b/drivers/soc/brcmstb/wktmr.c
+> > new file mode 100644
+> > index 000000000000..89f989724d3c
+> > --- /dev/null
+> > +++ b/drivers/soc/brcmstb/wktmr.c
+> > @@ -0,0 +1,242 @@
+> > [...]
+> > +
+> > +static void brcmstb_waketmr_set_alarm(struct brcmstb_waketmr *timer,
+> > +               unsigned int secs)
+> > +{
+> > +       unsigned int t;
+> 
+> Use u32.
 
->
-> Best regards,
-> Nicolae Rosia
->
-> On Fri, Jun 19, 2015 at 6:32 PM,  <Frank.Li@freescale.com> wrote:
->> From: Frank Li <Frank.Li@freescale.com>
->>
->> Add basic function support i.mx6ul.
->> add simple dts.
->> add full pin function define
->> add clock support.
->> add low level debug
->>
->> Change from v1 to v2:
->>  - Remove unnecessary clk_register_clkdev for gpt
->>  - use fat iomux in dts
->>  - use macro GPIO_ACTIVE_LOW
->>
->> Anson Huang (1):
->>   ARM: imx: add low-level debug support for i.mx6ul
->>
->> Frank Li (7):
->>   ARM: imx: add i.mx6ul msl support
->>   ARM: imx: add imx6ul clk tree support
->>   Document: dt: binding: imx: update document for imx6ul support
->>   ARM: pinctrl: imx: add i.mx6ul pinctrl driver
->>   ARM: dts: add i.mx6ul pin function include file
->>   ARM: dts: imx: add imx6ul and imx6ul evk board support
->>   ARM: imx: imx_v6_v7_defconfig enable imx6ul support
->>
->>  .../devicetree/bindings/clock/imx6ul-clock.txt     |  13 +
->>  .../bindings/pinctrl/fsl,imx6ul-pinctrl.txt        |  36 +
->>  arch/arm/Kconfig.debug                             |   9 +
->>  arch/arm/boot/dts/Makefile                         |   2 +
->>  arch/arm/boot/dts/imx6ul-14x14-evk.dts             | 335 ++++++++
->>  arch/arm/boot/dts/imx6ul-pinfunc.h                 | 938 +++++++++++++++++++++
->>  arch/arm/boot/dts/imx6ul.dtsi                      | 645 ++++++++++++++
->>  arch/arm/configs/imx_v6_v7_defconfig               |   1 +
->>  arch/arm/include/debug/imx-uart.h                  |  13 +
->>  arch/arm/mach-imx/Kconfig                          |   8 +
->>  arch/arm/mach-imx/Makefile                         |   1 +
->>  arch/arm/mach-imx/mach-imx6ul.c                    |  43 +
->>  drivers/clk/imx/Makefile                           |   1 +
->>  drivers/clk/imx/clk-imx6ul.c                       | 432 ++++++++++
->>  drivers/pinctrl/freescale/Kconfig                  |   7 +
->>  drivers/pinctrl/freescale/Makefile                 |   1 +
->>  drivers/pinctrl/freescale/pinctrl-imx6ul.c         | 323 +++++++
->>  include/dt-bindings/clock/imx6ul-clock.h           | 240 ++++++
->>  18 files changed, 3048 insertions(+)
->>  create mode 100644 Documentation/devicetree/bindings/clock/imx6ul-clock.txt
->>  create mode 100644 Documentation/devicetree/bindings/pinctrl/fsl,imx6ul-pinctrl.txt
->>  create mode 100644 arch/arm/boot/dts/imx6ul-14x14-evk.dts
->>  create mode 100644 arch/arm/boot/dts/imx6ul-pinfunc.h
->>  create mode 100644 arch/arm/boot/dts/imx6ul.dtsi
->>  create mode 100644 arch/arm/mach-imx/mach-imx6ul.c
->>  create mode 100644 drivers/clk/imx/clk-imx6ul.c
->>  create mode 100644 drivers/pinctrl/freescale/pinctrl-imx6ul.c
->>  create mode 100644 include/dt-bindings/clock/imx6ul-clock.h
->>
->> --
->> 1.9.1
->>
->> --
->> To unsubscribe from this list: send the line "unsubscribe devicetree" in
+Sure.
+
+> > +
+> > +       brcmstb_waketmr_clear_alarm(timer);
+> > +
+> > +       t = readl_relaxed(timer->base + BRCMSTB_WKTMR_COUNTER);
+> > +       writel_relaxed(t + secs + 1, timer->base + BRCMSTB_WKTMR_ALARM);
+> > +}
+> > +
+> > [...]
+> > +static int brcmstb_waketmr_probe(struct platform_device *pdev)
+> > +{
+> > [...]
+> > +       /*
+> > +        * Set wakeup capability before requesting wakeup interrupt, so we can
+> > +        * process boot-time "wakeups" (e.g., from S5 soft-off)
+> > +        */
+> > +       device_set_wakeup_capable(dev, true);
+> > +       device_wakeup_enable(dev);
+> > +
+> > +       timer->irq = platform_get_irq(pdev, 0);
+> > +       if ((int)timer->irq < 0)
+> 
+> Probably better to just have timer->irq be a signed int so you don't
+> need this cast.
+
+That's the only place where it needs to be signed. All other APIs are
+unsigned, I think. But sure, I can change that.
+
+> > [snip]
+> 
+> Acked-by: Gregory Fong <gregory.0xf0@gmail.com>
+
+Thanks for the review!
+
+Brian
