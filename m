@@ -1,173 +1,145 @@
 From: computersforpeace@gmail.com (Brian Norris)
-Date: Thu, 18 Jun 2015 17:11:30 -0700
-Subject: [PATCH 1/7] Documentation: dt: brcmstb: add system PM bindings
+Date: Thu, 18 Jun 2015 17:11:32 -0700
+Subject: [PATCH 3/7] soc: add stubs for brcmstb SoC's
 In-Reply-To: <1434672696-13632-1-git-send-email-computersforpeace@gmail.com>
 References: <1434672696-13632-1-git-send-email-computersforpeace@gmail.com>
-Message-ID: <1434672696-13632-2-git-send-email-computersforpeace@gmail.com>
+Message-ID: <1434672696-13632-4-git-send-email-computersforpeace@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Used on BCM7xxx Set-Top Box chips (e.g., BCM7445).
+
 Signed-off-by: Brian Norris <computersforpeace@gmail.com>
 ---
- .../devicetree/bindings/arm/bcm/brcm,brcmstb.txt   | 142 ++++++++++++++++++++-
- 1 file changed, 140 insertions(+), 2 deletions(-)
+ arch/arm/mach-bcm/Kconfig    |  1 +
+ drivers/soc/Kconfig          |  1 +
+ drivers/soc/Makefile         |  1 +
+ drivers/soc/brcmstb/Kconfig  |  9 +++++++++
+ drivers/soc/brcmstb/Makefile |  1 +
+ drivers/soc/brcmstb/common.c | 33 +++++++++++++++++++++++++++++++++
+ include/soc/brcmstb/common.h | 15 +++++++++++++++
+ 7 files changed, 61 insertions(+)
+ create mode 100644 drivers/soc/brcmstb/Kconfig
+ create mode 100644 drivers/soc/brcmstb/Makefile
+ create mode 100644 drivers/soc/brcmstb/common.c
+ create mode 100644 include/soc/brcmstb/common.h
 
-diff --git a/Documentation/devicetree/bindings/arm/bcm/brcm,brcmstb.txt b/Documentation/devicetree/bindings/arm/bcm/brcm,brcmstb.txt
-index 430608ec09f0..94429649687e 100644
---- a/Documentation/devicetree/bindings/arm/bcm/brcm,brcmstb.txt
-+++ b/Documentation/devicetree/bindings/arm/bcm/brcm,brcmstb.txt
-@@ -43,8 +43,7 @@ example:
-         };
-     };
+diff --git a/arch/arm/mach-bcm/Kconfig b/arch/arm/mach-bcm/Kconfig
+index e9184feffc4e..11cf1c97093f 100644
+--- a/arch/arm/mach-bcm/Kconfig
++++ b/arch/arm/mach-bcm/Kconfig
+@@ -146,6 +146,7 @@ config ARCH_BRCMSTB
+ 	select BRCMSTB_L2_IRQ
+ 	select BCM7120_L2_IRQ
+ 	select ARCH_WANT_OPTIONAL_GPIOLIB
++	select SOC_BRCMSTB
+ 	help
+ 	  Say Y if you intend to run the kernel on a Broadcom ARM-based STB
+ 	  chipset.
+diff --git a/drivers/soc/Kconfig b/drivers/soc/Kconfig
+index 96ddecb92254..c9c0fcce98a7 100644
+--- a/drivers/soc/Kconfig
++++ b/drivers/soc/Kconfig
+@@ -1,5 +1,6 @@
+ menu "SOC (System On Chip) specific Drivers"
  
--Lastly, nodes that allow for support of SMP initialization and reboot are
--required:
-+Nodes that allow for support of SMP initialization and reboot are required:
++source "drivers/soc/brcmstb/Kconfig"
+ source "drivers/soc/mediatek/Kconfig"
+ source "drivers/soc/qcom/Kconfig"
+ source "drivers/soc/sunxi/Kconfig"
+diff --git a/drivers/soc/Makefile b/drivers/soc/Makefile
+index 7dc7c0d8a2c1..2706b1159e32 100644
+--- a/drivers/soc/Makefile
++++ b/drivers/soc/Makefile
+@@ -2,6 +2,7 @@
+ # Makefile for the Linux Kernel SOC specific device drivers.
+ #
  
- smpboot
- -------
-@@ -95,3 +94,142 @@ example:
-         compatible = "brcm,brcmstb-reboot";
-         syscon = <&sun_top_ctrl 0x304 0x308>;
-     };
++obj-$(CONFIG_SOC_BRCMSTB)	+= brcmstb/
+ obj-$(CONFIG_ARCH_MEDIATEK)	+= mediatek/
+ obj-$(CONFIG_ARCH_QCOM)		+= qcom/
+ obj-$(CONFIG_ARCH_SUNXI)	+= sunxi/
+diff --git a/drivers/soc/brcmstb/Kconfig b/drivers/soc/brcmstb/Kconfig
+new file mode 100644
+index 000000000000..39cab3bd544d
+--- /dev/null
++++ b/drivers/soc/brcmstb/Kconfig
+@@ -0,0 +1,9 @@
++menuconfig SOC_BRCMSTB
++	bool "Broadcom STB SoC drivers"
++	depends on ARM
++	help
++	  Enables drivers for the Broadcom Set-Top Box (STB) series of chips.
++	  This option alone enables only some support code, while the drivers
++	  can be enabled individually within this menu.
 +
++	  If unsure, say N.
+diff --git a/drivers/soc/brcmstb/Makefile b/drivers/soc/brcmstb/Makefile
+new file mode 100644
+index 000000000000..183280e39f80
+--- /dev/null
++++ b/drivers/soc/brcmstb/Makefile
+@@ -0,0 +1 @@
++obj-y				+= common.o
+diff --git a/drivers/soc/brcmstb/common.c b/drivers/soc/brcmstb/common.c
+new file mode 100644
+index 000000000000..c262c029b1b8
+--- /dev/null
++++ b/drivers/soc/brcmstb/common.c
+@@ -0,0 +1,33 @@
++/*
++ * Copyright ? 2014 NVIDIA Corporation
++ * Copyright ? 2015 Broadcom Corporation
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
++ * GNU General Public License for more details.
++ */
 +
++#include <linux/of.h>
 +
-+Power management
-+----------------
++#include <soc/brcmstb/common.h>
 +
-+For power management (particularly, S2/S3/S5 system suspend), the following SoC
-+components are needed:
-+
-+= Always-On control block (AON CTRL)
-+
-+This hardware provides control registers for the "always-on" (even in low-power
-+modes) hardware, such as the Power Management State Machine (PMSM).
-+
-+Required properties:
-+- compatible     : should contain "brcm,brcmstb-aon-ctrl"
-+- reg            : the register start and length for the AON CTRL block
-+
-+Example:
-+
-+aon-ctrl at 410000 {
-+	compatible = "brcm,brcmstb-aon-ctrl";
-+	reg = <0x410000 0x400>;
++static const struct of_device_id brcmstb_machine_match[] = {
++	{ .compatible = "brcm,brcmstb", },
++	{ }
 +};
 +
-+= Memory controllers
++bool soc_is_brcmstb(void)
++{
++	struct device_node *root;
 +
-+A Broadcom STB SoC typically has a number of independent memory controllers,
-+each of which may have several associated hardware blocks, which are versioned
-+independently (control registers, DDR PHYs, etc.). One might consider
-+describing these controllers as a parent "memory controllers" block, which
-+contains N sub-nodes (one for each controller in the system), each of which is
-+associated with a number of hardware register resources (e.g., its PHY). See
-+the example device tree snippet below.
++	root = of_find_node_by_path("/");
++	if (!root)
++		return false;
 +
-+== MEMC (MEMory Controller)
++	return of_match_node(brcmstb_machine_match, root) != NULL;
++}
+diff --git a/include/soc/brcmstb/common.h b/include/soc/brcmstb/common.h
+new file mode 100644
+index 000000000000..cfb5335f2a15
+--- /dev/null
++++ b/include/soc/brcmstb/common.h
+@@ -0,0 +1,15 @@
++/*
++ * Copyright ? 2014 NVIDIA Corporation
++ * Copyright ? 2015 Broadcom Corporation
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ */
 +
-+Represents a single memory controller instance.
++#ifndef __SOC_BRCMSTB_COMMON_H__
++#define __SOC_BRCMSTB_COMMON_H__
 +
-+Required properties:
-+- compatible     : should contain "brcm,brcmstb-memc" and "simple-bus"
++bool soc_is_brcmstb(void);
 +
-+Should contain subnodes for any of the following relevant hardware resources:
-+
-+== DDR PHY control
-+
-+Control registers for this memory controller's DDR PHY.
-+
-+Required properties:
-+- compatible     : should contain one of these
-+	"brcm,brcmstb-ddr-phy-v225.1"
-+	"brcm,brcmstb-ddr-phy-v240.1"
-+	"brcm,brcmstb-ddr-phy-v240.2"
-+
-+- reg            : the DDR PHY register range
-+
-+== DDR SHIMPHY
-+
-+Control registers for this memory controller's DDR SHIMPHY.
-+
-+Required properties:
-+- compatible     : should contain "brcm,brcmstb-ddr-shimphy-v1.0"
-+- reg            : the DDR SHIMPHY register range
-+
-+== MEMC DDR control
-+
-+Sequencer DRAM parameters and control registers. Used for Self-Refresh
-+Power-Down (SRPD), among other things.
-+
-+Required properties:
-+- compatible     : should contain "brcm,brcmstb-memc-ddr"
-+- reg            : the MEMC DDR register range
-+
-+Example:
-+
-+memory_controllers {
-+	ranges;
-+	compatible = "simple-bus";
-+
-+	memc at 0 {
-+		compatible = "brcm,brcmstb-memc", "simple-bus";
-+		ranges;
-+
-+		ddr-phy at f1106000 {
-+			compatible = "brcm,brcmstb-ddr-phy-v240.1";
-+			reg = <0xf1106000 0x21c>;
-+		};
-+
-+		shimphy at f1108000 {
-+			compatible = "brcm,brcmstb-ddr-shimphy-v1.0";
-+			reg = <0xf1108000 0xe4>;
-+		};
-+
-+		memc-ddr at f1102000 {
-+			reg = <0xf1102000 0x800>;
-+			compatible = "brcm,brcmstb-memc-ddr";
-+		};
-+	};
-+
-+	memc at 1 {
-+		compatible = "brcm,brcmstb-memc", "simple-bus";
-+		ranges;
-+
-+		ddr-phy at f1186000 {
-+			compatible = "brcm,brcmstb-ddr-phy-v240.1";
-+			reg = <0xf1186000 0x21c>;
-+		};
-+
-+		shimphy at f1188000 {
-+			compatible = "brcm,brcmstb-ddr-shimphy-v1.0";
-+			reg = <0xf1188000 0xe4>;
-+		};
-+
-+		memc-ddr at f1182000 {
-+			reg = <0xf1182000 0x800>;
-+			compatible = "brcm,brcmstb-memc-ddr";
-+		};
-+	};
-+
-+	memc at 2 {
-+		compatible = "brcm,brcmstb-memc", "simple-bus";
-+		ranges;
-+
-+		ddr-phy at f1206000 {
-+			compatible = "brcm,brcmstb-ddr-phy-v240.1";
-+			reg = <0xf1206000 0x21c>;
-+		};
-+
-+		shimphy at f1208000 {
-+			compatible = "brcm,brcmstb-ddr-shimphy-v1.0";
-+			reg = <0xf1208000 0xe4>;
-+		};
-+
-+		memc-ddr at f1202000 {
-+			reg = <0xf1202000 0x800>;
-+			compatible = "brcm,brcmstb-memc-ddr";
-+		};
-+	};
-+};
++#endif /* __SOC_BRCMSTB_COMMON_H__ */
 -- 
 1.9.1
