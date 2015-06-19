@@ -1,57 +1,56 @@
-From: robert.jarzmik@free.fr (Robert Jarzmik)
-Date: Fri, 19 Jun 2015 20:38:17 +0200
-Subject: [PATCH v2 1/6] ARM: dts: pxa: add dma controller
-Message-ID: <1434739102-26217-1-git-send-email-robert.jarzmik@free.fr>
+From: m.smarduch@samsung.com (Mario Smarduch)
+Date: Fri, 19 Jun 2015 11:41:45 -0700
+Subject: [RESEND PATCH v2 2/2] arm: KVM: keep arm vfp/simd exit handling
+ consistent with arm64
+Message-ID: <1434739306-23417-1-git-send-email-m.smarduch@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the SoC embedded DMA controller, shared with the mmp architecture.
+After enhancing arm64 FP/SIMD exit handling, 32-bit VFP exit branch is moved
+to guest trap handling, keeping exit handling flow for both architectures 
+consistent.
 
-Signed-off-by: Robert Jarzmik <robert.jarzmik@free.fr>
+Also replaced an unused label with a comment.
+
+Signed-off-by: Mario Smarduch <m.smarduch@samsung.com>
 ---
- arch/arm/boot/dts/pxa27x.dtsi | 9 +++++++++
- arch/arm/boot/dts/pxa3xx.dtsi | 9 +++++++++
- 2 files changed, 18 insertions(+)
+ arch/arm/kvm/interrupts.S |   10 +++++-----
+ 1 file changed, 5 insertions(+), 5 deletions(-)
 
-diff --git a/arch/arm/boot/dts/pxa27x.dtsi b/arch/arm/boot/dts/pxa27x.dtsi
-index 90b9971..506db86 100644
---- a/arch/arm/boot/dts/pxa27x.dtsi
-+++ b/arch/arm/boot/dts/pxa27x.dtsi
-@@ -7,6 +7,15 @@
- 	compatible = "marvell,pxa27x";
+diff --git a/arch/arm/kvm/interrupts.S b/arch/arm/kvm/interrupts.S
+index 79caf79..16f00f1 100644
+--- a/arch/arm/kvm/interrupts.S
++++ b/arch/arm/kvm/interrupts.S
+@@ -363,10 +363,6 @@ hyp_hvc:
+ 	@ Check syndrome register
+ 	mrc	p15, 4, r1, c5, c2, 0	@ HSR
+ 	lsr	r0, r1, #HSR_EC_SHIFT
+-#ifdef CONFIG_VFPv3
+-	cmp	r0, #HSR_EC_CP_0_13
+-	beq	switch_to_guest_vfp
+-#endif
+ 	cmp	r0, #HSR_EC_HVC
+ 	bne	guest_trap		@ Not HVC instr.
  
- 	pxabus {
-+		pdma: dma-controller at 40000000 {
-+			compatible = "marvell,pdma-1.0";
-+			reg = <0x40000000 0x10000>;
-+			interrupts = <25>;
-+			#dma-channels = <32>;
-+			#dma-cells = <2>;
-+			status = "okay";
-+		};
-+
- 		pxairq: interrupt-controller at 40d00000 {
- 			marvell,intc-priority;
- 			marvell,intc-nr-irqs = <34>;
-diff --git a/arch/arm/boot/dts/pxa3xx.dtsi b/arch/arm/boot/dts/pxa3xx.dtsi
-index 7ad0b17..4eb1563 100644
---- a/arch/arm/boot/dts/pxa3xx.dtsi
-+++ b/arch/arm/boot/dts/pxa3xx.dtsi
-@@ -6,6 +6,15 @@
- 	compatible = "marvell,pxa3xx";
+@@ -380,7 +376,7 @@ hyp_hvc:
+ 	cmp     r2, #0
+ 	bne	guest_trap		@ Guest called HVC
  
- 	pxabus {
-+		pdma: dma-controller at 40000000 {
-+			compatible = "marvell,pdma-1.0";
-+			reg = <0x40000000 0x10000>;
-+			interrupts = <25>;
-+			#dma-channels = <32>;
-+			#dma-cells = <2>;
-+			status = "okay";
-+		};
-+
- 		pwri2c: i2c at 40f500c0 {
- 			compatible = "mrvl,pwri2c";
- 			reg = <0x40f500c0 0x30>;
+-host_switch_to_hyp:
++	/* Guest is calling a hyp function, save minimum context branch to it */
+ 	pop	{r0, r1, r2}
+ 
+ 	/* Check for __hyp_get_vectors */
+@@ -411,6 +407,10 @@ guest_trap:
+ 
+ 	@ Check if we need the fault information
+ 	lsr	r1, r1, #HSR_EC_SHIFT
++#ifdef CONFIG_VFPv3
++	cmp	r1, #HSR_EC_CP_0_13
++	beq	switch_to_guest_vfp
++#endif
+ 	cmp	r1, #HSR_EC_IABT
+ 	mrceq	p15, 4, r2, c6, c0, 2	@ HIFAR
+ 	beq	2f
 -- 
-2.1.4
+1.7.9.5
