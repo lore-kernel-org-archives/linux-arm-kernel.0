@@ -1,50 +1,42 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Fri, 19 Jun 2015 21:44:31 +0300
-Subject: [PATCH v2 6/6] ARM: dts: pxa: add the usb host controller
-In-Reply-To: <1434739102-26217-6-git-send-email-robert.jarzmik@free.fr>
-References: <1434739102-26217-1-git-send-email-robert.jarzmik@free.fr>
- <1434739102-26217-6-git-send-email-robert.jarzmik@free.fr>
-Message-ID: <5584630F.2070402@cogentembedded.com>
+From: robert.jarzmik@free.fr (Robert Jarzmik)
+Date: Fri, 19 Jun 2015 20:43:24 +0200
+Subject: [PATCH 1/3] ARM: pxa: add gpio-charger configuration on poodle
+In-Reply-To: <CALT56yOwU2Lu2y1NDiD45KBm=FSm_V+m_0VbN1D5Gfcz7Xd7Pg@mail.gmail.com>
+ (Dmitry Eremin-Solenikov's message of "Fri, 3 Apr 2015 22:23:41
+ +0300")
+References: <1427711971-8164-1-git-send-email-dbaryshkov@gmail.com>
+ <874moxt42l.fsf@free.fr>
+ <CALT56yOwU2Lu2y1NDiD45KBm=FSm_V+m_0VbN1D5Gfcz7Xd7Pg@mail.gmail.com>
+Message-ID: <87lhffa69f.fsf@belgarion.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+Dmitry Eremin-Solenikov <dbaryshkov@gmail.com> writes:
 
-On 06/19/2015 09:38 PM, Robert Jarzmik wrote:
-
-> Add the usb host controller to pxa27x and pxa3xx.
-
-> Signed-off-by: Robert Jarzmik <robert.jarzmik@free.fr>
-> ---
->   arch/arm/boot/dts/pxa27x.dtsi | 8 ++++++++
->   arch/arm/boot/dts/pxa3xx.dtsi | 8 ++++++++
->   2 files changed, 16 insertions(+)
-
-> diff --git a/arch/arm/boot/dts/pxa27x.dtsi b/arch/arm/boot/dts/pxa27x.dtsi
-> index fc79df9..97220ac 100644
-> --- a/arch/arm/boot/dts/pxa27x.dtsi
-> +++ b/arch/arm/boot/dts/pxa27x.dtsi
-> @@ -26,6 +26,14 @@
->   			clocks = <&clks CLK_NONE>;
->   		};
+> 2015-04-03 22:16 GMT+03:00 Robert Jarzmik <robert.jarzmik@free.fr>:
+>> Dmitry Eremin-Solenikov <dbaryshkov@gmail.com> writes:
+>>
+>>> Add declration of gpio-charger device for Sharp SL-5600 poodle device.
+>> Typo here ^.
+>>
+>> And I'd like in the commit message to know :
+>>  - is it the main battery charger (I could look into the code, I know, but I'd
+>>    like it to be in the commit message anyway) ?
 >
-> +		pxa27x_ohci: ohci at 4c000000 {
+> I'll add it to v2.
+>
+>>  - was it successfully tested on Sharp SL-5600 ?
+>
+> :)) I wouldn't dare to submit a code that wasn't tested on hw w/o
+> special notice.
 
-    Sigh. ePAPR standardizes the "usb" name for such nodes.
-[...]
-> diff --git a/arch/arm/boot/dts/pxa3xx.dtsi b/arch/arm/boot/dts/pxa3xx.dtsi
-> index 29aeac5..67bd4fe 100644
-> --- a/arch/arm/boot/dts/pxa3xx.dtsi
-> +++ b/arch/arm/boot/dts/pxa3xx.dtsi
-> @@ -86,6 +86,14 @@
->   			dma-names = "rx", "tx";
->   			status = "disabled";
->   		};
-> +
-> +		pxa3xx_ohci: ohci at 4c000000 {
+Hi Dmitry,
 
-    Ditto.
+I'll drop that from my radar, I didn't see any update lately. Once the poodle
+battery driver is accepted and once you provide an update on these patches, I'll
+come back to these patches.
 
-[...]
+Cheers.
 
-WBR, Sergei
+-- 
+Robert
