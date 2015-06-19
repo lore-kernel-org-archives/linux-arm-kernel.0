@@ -1,109 +1,45 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri, 19 Jun 2015 10:49:39 +0100
-Subject: [PATCH 06/11] ACPI / gsi: Add gsi_mutex to synchronize
- acpi_register_gsi()/acpi_unregister_gsi()
-In-Reply-To: <5583C536.1060201@linaro.org>
-References: <1431953961-22706-1-git-send-email-hanjun.guo@linaro.org>
- <1431953961-22706-7-git-send-email-hanjun.guo@linaro.org>
- <55785E8D.1000909@arm.com> <55798A28.3080000@linaro.org>
- <5583C536.1060201@linaro.org>
-Message-ID: <5583E5B3.7000701@arm.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Fri, 19 Jun 2015 12:06:04 +0200
+Subject: [PATCHv2 3/5] dmaengine: mv_xor: remove support for dmacap,* DT
+ properties
+In-Reply-To: <1434557086-9520-4-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1434557086-9520-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1434557086-9520-4-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <20150619100604.GY11732@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 19/06/15 08:31, Hanjun Guo wrote:
-> On 06/11/2015 09:16 PM, Hanjun Guo wrote:
->> On 06/10/2015 11:58 PM, Marc Zyngier wrote:
->>> On 18/05/15 13:59, Hanjun Guo wrote:
->>>> Add a mutex for acpi_register_gsi()/acpi_unregister_gsi() to avoid
->>>> concurrency issues.
->>>>
->>>> Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
->>>> ---
->>>>   drivers/acpi/gsi.c | 17 +++++++++++++----
->>>>   1 file changed, 13 insertions(+), 4 deletions(-)
->>>>
->>>> diff --git a/drivers/acpi/gsi.c b/drivers/acpi/gsi.c
->>>> index 55b5f31..ab0dcb4 100644
->>>> --- a/drivers/acpi/gsi.c
->>>> +++ b/drivers/acpi/gsi.c
->>>> @@ -16,6 +16,7 @@
->>>>   enum acpi_irq_model_id acpi_irq_model;
->>>>   /* ACPI core domian pointing to GICv2/3 core domain */
->>>>   struct irq_domain *acpi_irq_domain __read_mostly;
->>>> +static DEFINE_MUTEX(gsi_mutex);
->>>>
->>>>   static unsigned int acpi_gsi_get_irq_type(int trigger, int polarity)
->>>>   {
->>>> @@ -73,20 +74,24 @@ int acpi_register_gsi(struct device *dev, u32
->>>> gsi, int trigger,
->>>>       int irq;
->>>>       unsigned int irq_type = acpi_gsi_get_irq_type(trigger, polarity);
->>>>
->>>> +    mutex_lock(&gsi_mutex);
->>>>       irq = irq_find_mapping(acpi_irq_domain, gsi);
->>>>       if (irq > 0)
->>>> -        return irq;
->>>> +        goto out;
->>>>
->>>>       irq = irq_domain_alloc_irqs(acpi_irq_domain, 1, dev_to_node(dev),
->>>>                       &gsi);
->>>>       if (irq <= 0)
->>>> -        return -EINVAL;
->>>> +        goto out;
->>>>
->>>>       /* Set irq type if specified and different than the current one */
->>>>       if (irq_type != IRQ_TYPE_NONE &&
->>>>           irq_type != irq_get_trigger_type(irq))
->>>>           irq_set_irq_type(irq, irq_type);
->>>> -    return irq;
->>>> +
->>>> +out:
->>>> +    mutex_unlock(&gsi_mutex);
->>>> +    return irq > 0 ? irq : -EINVAL;
->>>>   }
->>>>   EXPORT_SYMBOL_GPL(acpi_register_gsi);
->>>>
->>>> @@ -96,8 +101,12 @@ EXPORT_SYMBOL_GPL(acpi_register_gsi);
->>>>    */
->>>>   void acpi_unregister_gsi(u32 gsi)
->>>>   {
->>>> -    int irq = irq_find_mapping(acpi_irq_domain, gsi);
->>>> +    int irq;
->>>> +
->>>> +    mutex_lock(&gsi_mutex);
->>>> +    irq = irq_find_mapping(acpi_irq_domain, gsi);
->>>>
->>>>       irq_dispose_mapping(irq);
->>>> +    mutex_unlock(&gsi_mutex);
->>>>   }
->>>>   EXPORT_SYMBOL_GPL(acpi_unregister_gsi);
->>>>
->>>
->>> Can you point out why we need this locking? The rest of the kernel seems
->>> to live without it pretty well. And if we really have an issue, I'd
->>
->> Hmm, I'm not so sure, I will look deep into that and come back later.
+On Wed, Jun 17, 2015 at 06:04:44PM +0200, Thomas Petazzoni wrote:
+> The only reason why we had dmacap,* properties is because back when
+> DMA_MEMSET was supported, only one out of the two channels per engine
+> could do a memset operation. But this is something that the driver
+> already knows anyway, and since then, the DMA_MEMSET support has been
+> removed.
 > 
-> Sorry for the late reply, I finally recalled that why I introduced
-> the lock here.
+> The driver is already well aware of what each channel supports and the
+> one to one mapping between Linux specific implementation details (such
+> as dmacap,interrupt enabling DMA_INTERRUPT) and DT properties is a
+> good indication that these DT properties are wrong.
 > 
-> The lock introduced here is because of I assume ACPI based container
-> (such as CPU socket) hotplug will be available on ARM64 in the future,
-> then we may online/offline a irqchip at the same time (similar way of
-> IOAPIC hotplug which introduced by Jiang Liu), it turns out that only
-> one GICD for now so it's not the case for ARM64 in the near future,
+> Therefore, this commit simply gets rid of these dmacap,* properties,
+> they are now ignored, and the driver is responsible for knowing the
+> capabilities of the hardware with regard to the dmaengine subsystem
+> expectations.
+> 
+> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 
-Well, there can only be one GICD, or at least only one that is visible.
-If the HW uses multiple GICDs (one per socket?), it must make ensure
-that they are all synchronized transparently. That's a strong
-requirement from the architecture. Otherwise, we enter the FrankeinGIC
-realm, and ACPI has no business with it.
+Reviewed-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 
-> I will drop this patch in next version.
+Maxime
 
-Thanks,
-
-	M.
 -- 
-Jazz is not dead. It just smells funny...
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150619/a304e919/attachment-0001.sig>
