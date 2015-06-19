@@ -1,63 +1,87 @@
 From: Frank.Li@freescale.com (Frank.Li at freescale.com)
-Date: Fri, 19 Jun 2015 23:32:23 +0800
-Subject: [PATCH v2 0/8] add basic support for i.mx6 ul chip
-Message-ID: <1434727951-4852-1-git-send-email-Frank.Li@freescale.com>
+Date: Fri, 19 Jun 2015 23:32:26 +0800
+Subject: [PATCH v2 3/8] Document: dt: binding: imx: update document for imx6ul
+ support
+In-Reply-To: <1434727951-4852-1-git-send-email-Frank.Li@freescale.com>
+References: <1434727951-4852-1-git-send-email-Frank.Li@freescale.com>
+Message-ID: <1434727951-4852-4-git-send-email-Frank.Li@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Frank Li <Frank.Li@freescale.com>
 
-Add basic function support i.mx6ul.
-add simple dts.
-add full pin function define
-add clock support.
-add low level debug
+This part just add necessary change to boot imx6ul.
+Update clock and pinctrl for imx6ul
 
-Change from v1 to v2:
- - Remove unnecessary clk_register_clkdev for gpt
- - use fat iomux in dts
- - use macro GPIO_ACTIVE_LOW
-
-Anson Huang (1):
-  ARM: imx: add low-level debug support for i.mx6ul
-
-Frank Li (7):
-  ARM: imx: add i.mx6ul msl support
-  ARM: imx: add imx6ul clk tree support
-  Document: dt: binding: imx: update document for imx6ul support
-  ARM: pinctrl: imx: add i.mx6ul pinctrl driver
-  ARM: dts: add i.mx6ul pin function include file
-  ARM: dts: imx: add imx6ul and imx6ul evk board support
-  ARM: imx: imx_v6_v7_defconfig enable imx6ul support
-
- .../devicetree/bindings/clock/imx6ul-clock.txt     |  13 +
- .../bindings/pinctrl/fsl,imx6ul-pinctrl.txt        |  36 +
- arch/arm/Kconfig.debug                             |   9 +
- arch/arm/boot/dts/Makefile                         |   2 +
- arch/arm/boot/dts/imx6ul-14x14-evk.dts             | 335 ++++++++
- arch/arm/boot/dts/imx6ul-pinfunc.h                 | 938 +++++++++++++++++++++
- arch/arm/boot/dts/imx6ul.dtsi                      | 645 ++++++++++++++
- arch/arm/configs/imx_v6_v7_defconfig               |   1 +
- arch/arm/include/debug/imx-uart.h                  |  13 +
- arch/arm/mach-imx/Kconfig                          |   8 +
- arch/arm/mach-imx/Makefile                         |   1 +
- arch/arm/mach-imx/mach-imx6ul.c                    |  43 +
- drivers/clk/imx/Makefile                           |   1 +
- drivers/clk/imx/clk-imx6ul.c                       | 432 ++++++++++
- drivers/pinctrl/freescale/Kconfig                  |   7 +
- drivers/pinctrl/freescale/Makefile                 |   1 +
- drivers/pinctrl/freescale/pinctrl-imx6ul.c         | 323 +++++++
- include/dt-bindings/clock/imx6ul-clock.h           | 240 ++++++
- 18 files changed, 3048 insertions(+)
+Signed-off-by: Frank Li <Frank.Li@freescale.com>
+Signed-off-by: Frank Li <Frank.Li@freescale.com>
+---
+ .../devicetree/bindings/clock/imx6ul-clock.txt     | 13 ++++++++
+ .../bindings/pinctrl/fsl,imx6ul-pinctrl.txt        | 36 ++++++++++++++++++++++
+ 2 files changed, 49 insertions(+)
  create mode 100644 Documentation/devicetree/bindings/clock/imx6ul-clock.txt
  create mode 100644 Documentation/devicetree/bindings/pinctrl/fsl,imx6ul-pinctrl.txt
- create mode 100644 arch/arm/boot/dts/imx6ul-14x14-evk.dts
- create mode 100644 arch/arm/boot/dts/imx6ul-pinfunc.h
- create mode 100644 arch/arm/boot/dts/imx6ul.dtsi
- create mode 100644 arch/arm/mach-imx/mach-imx6ul.c
- create mode 100644 drivers/clk/imx/clk-imx6ul.c
- create mode 100644 drivers/pinctrl/freescale/pinctrl-imx6ul.c
- create mode 100644 include/dt-bindings/clock/imx6ul-clock.h
 
+diff --git a/Documentation/devicetree/bindings/clock/imx6ul-clock.txt b/Documentation/devicetree/bindings/clock/imx6ul-clock.txt
+new file mode 100644
+index 0000000..3ff362e
+--- /dev/null
++++ b/Documentation/devicetree/bindings/clock/imx6ul-clock.txt
+@@ -0,0 +1,13 @@
++* Clock bindings for Freescale i.MX6 UltraLite
++
++Required properties:
++- compatible: Should be "fsl,imx6ul-ccm"
++- reg: Address and length of the register set
++- #clock-cells: Should be <1>
++- clocks: list of clock specifiers, must contain an entry for each required
++  entry in clock-names
++- clock-names: should include entries "ckil", "osc", "ipp_di0" and "ipp_di1"
++
++The clock consumer should specify the desired clock by having the clock
++ID in its "clocks" phandle cell.  See include/dt-bindings/clock/imx6ul-clock.h
++for the full list of i.MX6 UltraLite  clock IDs.
+diff --git a/Documentation/devicetree/bindings/pinctrl/fsl,imx6ul-pinctrl.txt b/Documentation/devicetree/bindings/pinctrl/fsl,imx6ul-pinctrl.txt
+new file mode 100644
+index 0000000..a81bbf3
+--- /dev/null
++++ b/Documentation/devicetree/bindings/pinctrl/fsl,imx6ul-pinctrl.txt
+@@ -0,0 +1,36 @@
++* Freescale i.MX6 UltraLite IOMUX Controller
++
++Please refer to fsl,imx-pinctrl.txt in this directory for common binding part
++and usage.
++
++Required properties:
++- compatible: "fsl,imx6ul-iomuxc"
++- fsl,pins: each entry consists of 6 integers and represents the mux and config
++  setting for one pin.  The first 5 integers <mux_reg conf_reg input_reg mux_val
++  input_val> are specified using a PIN_FUNC_ID macro, which can be found in
++  imx6ul-pinfunc.h under device tree source folder.  The last integer CONFIG is
++  the pad setting value like pull-up on this pin.  Please refer to i.MX6 UltraLite
++  Reference Manual for detailed CONFIG settings.
++
++CONFIG bits definition:
++PAD_CTL_HYS                     (1 << 16)
++PAD_CTL_PUS_100K_DOWN           (0 << 14)
++PAD_CTL_PUS_47K_UP              (1 << 14)
++PAD_CTL_PUS_100K_UP             (2 << 14)
++PAD_CTL_PUS_22K_UP              (3 << 14)
++PAD_CTL_PUE                     (1 << 13)
++PAD_CTL_PKE                     (1 << 12)
++PAD_CTL_ODE                     (1 << 11)
++PAD_CTL_SPEED_LOW               (0 << 6)
++PAD_CTL_SPEED_MED               (1 << 6)
++PAD_CTL_SPEED_HIGH              (3 << 6)
++PAD_CTL_DSE_DISABLE             (0 << 3)
++PAD_CTL_DSE_260ohm              (1 << 3)
++PAD_CTL_DSE_130ohm              (2 << 3)
++PAD_CTL_DSE_87ohm               (3 << 3)
++PAD_CTL_DSE_65ohm               (4 << 3)
++PAD_CTL_DSE_52ohm               (5 << 3)
++PAD_CTL_DSE_43ohm               (6 << 3)
++PAD_CTL_DSE_37ohm               (7 << 3)
++PAD_CTL_SRE_FAST                (1 << 0)
++PAD_CTL_SRE_SLOW                (0 << 0)
 -- 
 1.9.1
