@@ -1,54 +1,51 @@
 From: hanjun.guo@linaro.org (Hanjun Guo)
-Date: Fri, 19 Jun 2015 18:49:57 +0800
-Subject: [PATCH v2 2/3] ACPI: add BAD_MADT_GICC_ENTRY() macro
-In-Reply-To: <1434666968-1543-3-git-send-email-al.stone@linaro.org>
+Date: Fri, 19 Jun 2015 18:52:12 +0800
+Subject: [PATCH v2 3/3] ACPI / ARM64 : use the new BAD_MADT_GICC_ENTRY
+ macro
+In-Reply-To: <1434666968-1543-4-git-send-email-al.stone@linaro.org>
 References: <1434666968-1543-1-git-send-email-al.stone@linaro.org>
- <1434666968-1543-3-git-send-email-al.stone@linaro.org>
-Message-ID: <5583F3D5.2020004@linaro.org>
+ <1434666968-1543-4-git-send-email-al.stone@linaro.org>
+Message-ID: <5583F45C.2070708@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On 06/19/2015 06:36 AM, Al Stone wrote:
-> The BAD_MADT_ENTRY() macro is designed to work for all of the subtables
-> of the MADT.  In the ACPI 5.1 version of the spec, the struct for the
-> GICC subtable (struct acpi_madt_generic_interrupt) is 76 bytes long; in
-> ACPI 6.0, the struct is 80 bytes long.  But, there is only one definition
-> in ACPICA for this struct -- and that is the 6.0 version.  Hence, when
-> BAD_MADT_ENTRY() compares the struct size to the length in the GICC
-> subtable, it fails if 5.1 structs are in use, and there are systems in
-> the wild that have them.
->
-> This patch adds the BAD_MADT_GICC_ENTRY() that checks the GICC subtable
-> only, accounting for the difference in specification versions that are
-> possible.  The BAD_MADT_ENTRY() will continue to work as is for all other
-> MADT subtables.
+> For those parts of the arm64 ACPI code that need to check GICC subtables
+> in the MADT, use the new BAD_MADT_GICC_ENTRY macro instead of the previous
+> BAD_MADT_ENTRY.  The new macro takes into account differences in the size
+> of the GICC subtable that the old macro did not; this caused failures even
+> though the subtable entries are valid.
 >
 > Signed-off-by: Al Stone <al.stone@linaro.org>
 > ---
->   include/linux/acpi.h | 10 ++++++++++
->   1 file changed, 10 insertions(+)
+>   arch/arm64/kernel/smp.c   | 2 +-
+>   drivers/irqchip/irq-gic.c | 2 +-
+>   2 files changed, 2 insertions(+), 2 deletions(-)
 >
-> diff --git a/include/linux/acpi.h b/include/linux/acpi.h
-> index 33ed313..d3a1758 100644
-> --- a/include/linux/acpi.h
-> +++ b/include/linux/acpi.h
-> @@ -127,6 +127,16 @@ static inline void acpi_initrd_override(void *data, size_t size)
->   		(!entry) || (unsigned long)entry + sizeof(*entry) > end ||  \
->   		((struct acpi_subtable_header *)entry)->length < sizeof(*entry))
+> diff --git a/arch/arm64/kernel/smp.c b/arch/arm64/kernel/smp.c
+> index 4b2121b..80d5984 100644
+> --- a/arch/arm64/kernel/smp.c
+> +++ b/arch/arm64/kernel/smp.c
+> @@ -438,7 +438,7 @@ acpi_parse_gic_cpu_interface(struct acpi_subtable_header *header,
+>   	struct acpi_madt_generic_interrupt *processor;
 >
-> +#define ACPI_MADT_GICC_51_LENGTH	76
-> +#define ACPI_MADT_GICC_60_LENGTH	80
-> +
-> +#define BAD_MADT_GICC_ENTRY(entry, end) (				    \
-> +		(!entry) || (unsigned long)entry + sizeof(*entry) > end ||  \
-> +		((ACPI_FADT_SPEC_VERSION == ACPI_SPEC_VERSION(5, 1)) &&	    \
-> +		 (entry->header.length != ACPI_MADT_GICC_51_LENGTH))	||  \
-> +		((ACPI_FADT_SPEC_VERSION == ACPI_SPEC_VERSION(6, 0)) &&	    \
-> +		 (entry->header.length != ACPI_MADT_GICC_60_LENGTH)))
-> +
->   char * __acpi_map_table (unsigned long phys_addr, unsigned long size);
->   void __acpi_unmap_table(char *map, unsigned long size);
->   int early_acpi_boot_init(void);
+>   	processor = (struct acpi_madt_generic_interrupt *)header;
+> -	if (BAD_MADT_ENTRY(processor, end))
+> +	if (BAD_MADT_GICC_ENTRY(processor, end))
+>   		return -EINVAL;
+>
+>   	acpi_table_print_madt_entry(header);
+> diff --git a/drivers/irqchip/irq-gic.c b/drivers/irqchip/irq-gic.c
+> index 8d7e1c8..4dd8826 100644
+> --- a/drivers/irqchip/irq-gic.c
+> +++ b/drivers/irqchip/irq-gic.c
+> @@ -1055,7 +1055,7 @@ gic_acpi_parse_madt_cpu(struct acpi_subtable_header *header,
+>
+>   	processor = (struct acpi_madt_generic_interrupt *)header;
+>
+> -	if (BAD_MADT_ENTRY(processor, end))
+> +	if (BAD_MADT_GICC_ENTRY(processor, end))
+>   		return -EINVAL;
 
 Reviewed-by: Hanjun Guo <hanjun.guo@linaro.org>
 
