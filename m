@@ -1,70 +1,83 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Fri, 19 Jun 2015 11:33:13 +0200
-Subject: Linkstation Mini and __machine_arch_type problem, not booting
- since 3.8
-In-Reply-To: <1434678624.4767.22.camel@dolka.fr>
-References: <97db3502cd014faf1c710b1cc0fe8848@dolka.fr>	
- <55827D64.1090307@free-electrons.com> <1434678624.4767.22.camel@dolka.fr>
-Message-ID: <5583E1D9.2010002@free-electrons.com>
+From: vigneshr@codeaurora.org (Vignesh Radhakrishnan)
+Date: Fri, 19 Jun 2015 15:05:52 +0530
+Subject: [PATCH] ARM: module: Add ".ref.text" to arm unwind tables
+In-Reply-To: <20150610123334.GO7557@n2100.arm.linux.org.uk>
+References: <20150610123334.GO7557@n2100.arm.linux.org.uk>
+Message-ID: <1434706552-23034-1-git-send-email-vigneshr@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Benjamin,
+Functions inside kernel modules that use __ref
+will end up being placed in .ARM.exidx.ref.text
+section by gcc.
 
-On 19/06/2015 03:50, Benjamin Cama wrote:
-> Hi Gr?gory, Andrew and Arnd,
-> 
-> Le jeudi 18 juin 2015 ? 10:12 +0200, Gregory CLEMENT a ?crit :
->> On 15/06/2015 15:51, Benjamin Cama wrote:
->>> Also, my intent at first was to try converting this machine to DT, so 
->>> maybe
->>> the solution to my problem would simply be to try converting it and see
->>> if it fixes the problem?
->>
->> Indeed it is your best option given the problem you exposed later in this
->> thread. Our plan in mid-term is to completely remove the non-DT support.
->> So converting the board is definitely the right thing to do.
->>
->> The conversation should not be too hard to achieve, you will have mainly to
->> write a dts, build a dtb an append it to your kernel.
->> You can have a look on waht was done for the LaCie d2 Network platform, see
->> 94b0bd366e36379c994bdaa84f 'ARM: orion5x: convert d2net to Device Tree'
-> 
-> OK, I tried following you advice, and copied step by step the dts with
-> values corresponding to my board.
-> 
->> If you have any trouble or question during the conversion we will 
->> help you.
-> 
-> It took several iterations to get done, but attached is the dts I
-> wrote. Still, it doesn't boot and I get no message after the
-> decompressor message. But I get something: the leds change according to
-> the configuration of the dts, so something is going on (I noticed the
-> change after several failed boot where no led changed and fixing a typo
-> made it).
-> 
-> My main problem is getting some debug messages: no amount of "debug"
-> and "loglevel" on the command line seems to change anything. Is it too
-> early in the boot process to get anything output or am I doing
-> something wrong? (I activated some configs for debugging, but I may
-> have missed the good one)
+Currently we don't consider adding these functions
+to arm unwind tables.
 
-Try to activate earlyprintk. For this you have to select CONFIG_EARLY_PRINTK
-which depend on DEBUG_LL. You will also have to add the argument
-"earlyprintk" to your kernel parameters.
+Hence, if we turn slub debug on by default we end up
+with the messages of this sort:
 
-Gregory
+unwind: Index not found bf0011e0
 
+This is because slub debug saves stack trace of
+allocation's and free's. Therefore, we end up seeing
+a flood of these messages in dmesg since its not
+able to locate these functions.
 
-> 
-> Thanks,
-> --
-> benjamin
-> 
+Fix this by adding .ref.text section to arm unwind tables.
 
+Tested-by: Laura Abbott <labbott@redhat.com>
+Signed-off-by: Vignesh Radhakrishnan <vigneshr@codeaurora.org>
+CC: Russell King <linux@arm.linux.org.uk>
+CC: Andrew Morton <akpm@linux-foundation.org>
+CC: Laura Abbott <labbott@redhat.com>
+CC: Andrey Ryabinin <a.ryabinin@samsung.com>
+CC: Andrey Konovalov <adech.fo@gmail.com>
+---
+ arch/arm/include/asm/module.h | 1 +
+ arch/arm/kernel/module.c      | 4 ++++
+ 2 files changed, 5 insertions(+)
+
+diff --git a/arch/arm/include/asm/module.h b/arch/arm/include/asm/module.h
+index ed690c4..17640c9 100644
+--- a/arch/arm/include/asm/module.h
++++ b/arch/arm/include/asm/module.h
+@@ -14,6 +14,7 @@ enum {
+ 	ARM_SEC_DEVEXIT,
+ 	ARM_SEC_HOT,
+ 	ARM_SEC_UNLIKELY,
++	ARM_SEC_REF,
+ 	ARM_SEC_MAX,
+ };
+ 
+diff --git a/arch/arm/kernel/module.c b/arch/arm/kernel/module.c
+index 2e11961..846b888 100644
+--- a/arch/arm/kernel/module.c
++++ b/arch/arm/kernel/module.c
+@@ -308,6 +308,8 @@ int module_finalize(const Elf32_Ehdr *hdr, const Elf_Shdr *sechdrs,
+ 			maps[ARM_SEC_UNLIKELY].unw_sec = s;
+ 		else if (strcmp(".ARM.exidx.text.hot", secname) == 0)
+ 			maps[ARM_SEC_HOT].unw_sec = s;
++		else if (strcmp(".ARM.exidx.ref.text", secname) == 0)
++			maps[ARM_SEC_REF].unw_sec = s;
+ 		else if (strcmp(".init.text", secname) == 0)
+ 			maps[ARM_SEC_INIT].txt_sec = s;
+ 		else if (strcmp(".text", secname) == 0)
+@@ -318,6 +320,8 @@ int module_finalize(const Elf32_Ehdr *hdr, const Elf_Shdr *sechdrs,
+ 			maps[ARM_SEC_UNLIKELY].txt_sec = s;
+ 		else if (strcmp(".text.hot", secname) == 0)
+ 			maps[ARM_SEC_HOT].txt_sec = s;
++		else if (strcmp(".ref.text", secname) == 0)
++			maps[ARM_SEC_REF].txt_sec = s;
+ 	}
+ 
+ 	for (i = 0; i < ARM_SEC_MAX; i++)
+-- 
+1.8.2.1
 
 -- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+Thanks and regards,
+Vignesh Radhakrishnan
+
+QUALCOMM INDIA, on behalf of Qualcomm Innovation Center, Inc. is a
+member of the Code Aurora Forum, hosted by The Linux Foundation.
