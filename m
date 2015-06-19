@@ -1,53 +1,48 @@
-From: stripathi@apm.com (Suman Tripathi)
-Date: Fri, 19 Jun 2015 17:58:02 +0530
-Subject: [PATCH v8 2/2] mmc: host: sdhci: Disable 1.8V signaling for
- arasan 4.9a version of SDHCI controller.
-In-Reply-To: <1434715227-27399-3-git-send-email-stripathi@apm.com>
-References: <1434715227-27399-1-git-send-email-stripathi@apm.com>
- <1434715227-27399-3-git-send-email-stripathi@apm.com>
-Message-ID: <CAOHikRBkDinUfcOR3Dg12e2Xy_P5TABOpHSnkSpZhRyhLRWGFA@mail.gmail.com>
+From: simon.guinot@sequanux.org (Simon Guinot)
+Date: Fri, 19 Jun 2015 14:32:53 +0200
+Subject: [PATCH v2 1/3] net: mvneta: introduce compatible string
+ "marvell, armada-xp-neta"
+In-Reply-To: <20150617170112.GD2917@io.lakedaemon.net>
+References: <1434547162-6275-1-git-send-email-simon.guinot@sequanux.org>
+ <1434547162-6275-2-git-send-email-simon.guinot@sequanux.org>
+ <55818E64.20007@free-electrons.com>
+ <55818F10.8030304@free-electrons.com>
+ <20150617170112.GD2917@io.lakedaemon.net>
+Message-ID: <20150619123253.GB4853@kw.sim.vm.gnt>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi ,
+On Wed, Jun 17, 2015 at 05:01:12PM +0000, Jason Cooper wrote:
+> Hi Gregory,
+> 
+> On Wed, Jun 17, 2015 at 05:15:28PM +0200, Gregory CLEMENT wrote:
+> > On 17/06/2015 17:12, Gregory CLEMENT wrote:
+> > > On 17/06/2015 15:19, Simon Guinot wrote:
+> > >> The mvneta driver supports the Ethernet IP found in the Armada 370, XP,
+> > >> 380 and 385 SoCs. Since at least one more hardware feature is available
+> > >> for the Armada XP SoCs then a way to identify them is needed.
+> > >>
+> > >> This patch introduces a new compatible string "marvell,armada-xp-neta".
+> > > 
+> > > Let's be future proof by going further. I would like to have an compatible string
+> > > for each SoC even if we currently we don't use them.
+> 
+> I disagree with this.  We can't predict what incosistencies we'll discover in
+> the future.  We should only assign new compatible strings based on known IP
+> variations when we discover them.  This seems fraught with demons since we
+> can't predict the scope of affected IP blocks (some steppings of one SoC, three
+> SoCs plus two steppings of a fourth, etc)
+> 
+> imho, the 'future-proofing' lies in being specific as to the naming of the
+> compatible strings against known hardware variations at the time.
 
-On Fri, Jun 19, 2015 at 5:30 PM, Suman Tripathi <stripathi@apm.com> wrote:
-> This patch disables the 1.8V signaling for arasan 4.9a version
-> of SDHCI controller with the help SDHCI_QUIRK2_NO_1_8_V quirk.
->
-> Signed-off-by: Suman Tripathi <stripathi@apm.com>
-> ---
-> ---
->  drivers/mmc/host/sdhci-of-arasan.c | 3 ++-
->  1 file changed, 2 insertions(+), 1 deletion(-)
->
-> diff --git a/drivers/mmc/host/sdhci-of-arasan.c b/drivers/mmc/host/sdhci-of-arasan.c
-> index 21c0c08..4c99ea4 100644
-> --- a/drivers/mmc/host/sdhci-of-arasan.c
-> +++ b/drivers/mmc/host/sdhci-of-arasan.c
-> @@ -171,7 +171,8 @@ static int sdhci_arasan_probe(struct platform_device *pdev)
->
->         if (of_device_is_compatible(pdev->dev.of_node, "arasan,sdhci-4.9a")) {
->                 host->quirks |= SDHCI_QUIRK_NO_HISPD_BIT;
-> -               host->quirks2 |= SDHCI_QUIRK2_HOST_NO_CMD23;
-> +               host->quirks2 |= SDHCI_QUIRK2_HOST_NO_CMD23 |
-> +                                SDHCI_QUIRK2_NO_1_8_V;
->         }
+So, should I add more compatible strings or not ?
 
-
-I think I am  wrong here. No-1.8v is something related to board
-regulator circuitry not related to IP version. So it should be dts
-driven.
-
->
->         sdhci_get_of_property(pdev);
-> --
-> 1.8.2.1
->
-
-
-
--- 
-Thanks,
-with regards,
-Suman Tripathi
+Simon
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 181 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150619/5bc99def/attachment.sig>
