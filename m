@@ -1,51 +1,34 @@
-From: lznuaa@gmail.com (Zhi Li)
-Date: Fri, 19 Jun 2015 13:55:46 -0500
-Subject: [PATCH v2 6/8] ARM: dts: imx: add imx6ul and imx6ul evk board
- support
-In-Reply-To: <CAH=tA9G_x=6wNTOWbOc2FGGARTxioikUSwqyENKk74wL=7uzaw@mail.gmail.com>
-References: <1434727951-4852-1-git-send-email-Frank.Li@freescale.com>
- <1434727951-4852-7-git-send-email-Frank.Li@freescale.com>
- <CAH=tA9G_x=6wNTOWbOc2FGGARTxioikUSwqyENKk74wL=7uzaw@mail.gmail.com>
-Message-ID: <CAHrpEqQMtaL_ReeFP4VR2bfg_HDaQAHc0BUMB3X4KM3b23ra0A@mail.gmail.com>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Fri, 19 Jun 2015 12:10:50 -0700
+Subject: [PATCH 17/41] clocksource: qcom: Migrate to new 'set-state'
+ interface
+In-Reply-To: <f3bbf91cc4244796291bff383ef24a182bb3b690.1434622147.git.viresh.kumar@linaro.org>
+References: <cover.1434622147.git.viresh.kumar@linaro.org>
+ <f3bbf91cc4244796291bff383ef24a182bb3b690.1434622147.git.viresh.kumar@linaro.org>
+Message-ID: <20150619191050.GF22132@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 19, 2015 at 12:05 PM, Nicolae Rosia <nicolae.rosia@gmail.com> wrote:
-> Hi,
->
-> On Fri, Jun 19, 2015 at 6:32 PM,  <Frank.Li@freescale.com> wrote:
->> From: Frank Li <Frank.Li@freescale.com>
-> [...]
->> +       cpus {
->> +               #address-cells = <1>;
->> +               #size-cells = <0>;
->> +
->> +               cpu0: cpu at 0 {
->> +                       compatible = "arm,cortex-a7";
->> +                       device_type = "cpu";
->> +                       reg = <0>;
->> +                       clock-latency = <61036>; /* two CLK32 periods */
->> +                       operating-points = <
->> +                               /* kHz  uV */
->> +                               528000  1250000
->> +                               396000  1150000
->> +                               198000  1150000
->> +                       >;
->> +                       fsl,soc-operating-points = <
->> +                               /* KHz  uV */
->> +                               528000  1250000
->> +                               396000  1150000
->> +                               198000  1150000
->> +                       >;
-> Why is this necessary? Can't you adapt the driver to use operating-points?
-> I have looked through other imx dts and saw that some had different
-> values in these two tables.
+On 06/18, Viresh Kumar wrote:
+> Migrate qcom driver to the new 'set-state' interface provided by
+> clockevents core, the earlier 'set-mode' interface is marked obsolete
+> now.
+> 
+> This also enables us to implement callbacks for new states of clockevent
+> devices, for example: ONESHOT_STOPPED.
+> 
+> Periodic mode isn't supported by the driver and so the callback isn't
+> provided anymore.
+> 
+> Cc: Stephen Boyd <sboyd@codeaurora.org>
+> Cc: Kumar Gala <galak@codeaurora.org>
+> Cc: Andy Gross <agross@codeaurora.org>
+> Cc: David Brown <davidb@codeaurora.org>
+> Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
+> ---
 
-It is used by internal busfreq driver. I will remove it at next version.
+Acked-by: Stephen Boyd <sboyd@codeaurora.org>
 
-best regards
-Frank Li
-
->
-> Best regards,
-> Nicolae Rosia
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
