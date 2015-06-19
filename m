@@ -1,85 +1,46 @@
 From: alex.bennee@linaro.org (=?UTF-8?q?Alex=20Benn=C3=A9e?=)
-Date: Fri, 19 Jun 2015 13:23:42 +0100
-Subject: [PATCH v6 04/12] KVM: arm: guest debug,
- add stub KVM_SET_GUEST_DEBUG ioctl
+Date: Fri, 19 Jun 2015 13:23:40 +0100
+Subject: [PATCH v6 02/12] KVM: arm64: fix misleading comments in save/restore
 In-Reply-To: <1434716630-18260-1-git-send-email-alex.bennee@linaro.org>
 References: <1434716630-18260-1-git-send-email-alex.bennee@linaro.org>
-Message-ID: <1434716630-18260-5-git-send-email-alex.bennee@linaro.org>
+Message-ID: <1434716630-18260-3-git-send-email-alex.bennee@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This commit adds a stub function to support the KVM_SET_GUEST_DEBUG
-ioctl. Any unsupported flag will return -EINVAL. For now, only
-KVM_GUESTDBG_ENABLE is supported, although it won't have any effects.
+The elr_el2 and spsr_el2 registers in fact contain the processor state
+before entry into the hypervisor code. In the case of guest state it
+could be in either el0 or el1.
 
-Signed-off-by: Alex Benn?e <alex.bennee@linaro.org>.
-Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
-
+Signed-off-by: Alex Benn?e <alex.bennee@linaro.org>
 ---
-v2
-  - simplified form of the ioctl (stuff will go into setup_debug)
-v3
- - KVM_GUESTDBG_VALID->KVM_GUESTDBG_VALID_MASK
- - move mask check to the top of function
- - add ioctl doc header
- - split capability into separate patch
- - tweaked commit wording w.r.t return of -EINVAL
-v4
- - add r-b-tag
----
- Documentation/virtual/kvm/api.txt |  2 +-
- arch/arm/kvm/arm.c                | 23 ++++++++++++++++++++++-
- 2 files changed, 23 insertions(+), 2 deletions(-)
+ arch/arm64/kvm/hyp.S | 8 ++++----
+ 1 file changed, 4 insertions(+), 4 deletions(-)
 
-diff --git a/Documentation/virtual/kvm/api.txt b/Documentation/virtual/kvm/api.txt
-index c34c32d..ba635c7 100644
---- a/Documentation/virtual/kvm/api.txt
-+++ b/Documentation/virtual/kvm/api.txt
-@@ -2645,7 +2645,7 @@ handled.
- 4.87 KVM_SET_GUEST_DEBUG
+diff --git a/arch/arm64/kvm/hyp.S b/arch/arm64/kvm/hyp.S
+index 5befd01..cb9bdd8 100644
+--- a/arch/arm64/kvm/hyp.S
++++ b/arch/arm64/kvm/hyp.S
+@@ -50,8 +50,8 @@
+ 	stp	x29, lr, [x3, #80]
  
- Capability: KVM_CAP_SET_GUEST_DEBUG
--Architectures: x86, s390, ppc
-+Architectures: x86, s390, ppc, arm64
- Type: vcpu ioctl
- Parameters: struct kvm_guest_debug (in)
- Returns: 0 on success; -1 on error
-diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
-index d9631ec..52a1d4d38 100644
---- a/arch/arm/kvm/arm.c
-+++ b/arch/arm/kvm/arm.c
-@@ -302,10 +302,31 @@ void kvm_arch_vcpu_put(struct kvm_vcpu *vcpu)
- 	kvm_arm_set_running_vcpu(NULL);
- }
+ 	mrs	x19, sp_el0
+-	mrs	x20, elr_el2		// EL1 PC
+-	mrs	x21, spsr_el2		// EL1 pstate
++	mrs	x20, elr_el2		// PC before hyp entry
++	mrs	x21, spsr_el2		// pstate before hyp entry
  
-+#define KVM_GUESTDBG_VALID_MASK (KVM_GUESTDBG_ENABLE)
-+
-+/**
-+ * kvm_arch_vcpu_ioctl_set_guest_debug - set up guest debugging
-+ * @kvm:	pointer to the KVM struct
-+ * @kvm_guest_debug: the ioctl data buffer
-+ *
-+ * This sets up and enables the VM for guest debugging. Userspace
-+ * passes in a control flag to enable different debug types and
-+ * potentially other architecture specific information in the rest of
-+ * the structure.
-+ */
- int kvm_arch_vcpu_ioctl_set_guest_debug(struct kvm_vcpu *vcpu,
- 					struct kvm_guest_debug *dbg)
- {
--	return -EINVAL;
-+	if (dbg->control & ~KVM_GUESTDBG_VALID_MASK)
-+		return -EINVAL;
-+
-+	if (dbg->control & KVM_GUESTDBG_ENABLE) {
-+		vcpu->guest_debug = dbg->control;
-+	} else {
-+		/* If not enabled clear all flags */
-+		vcpu->guest_debug = 0;
-+	}
-+	return 0;
- }
+ 	stp	x19, x20, [x3, #96]
+ 	str	x21, [x3, #112]
+@@ -82,8 +82,8 @@
+ 	ldr	x21, [x3, #16]
  
+ 	msr	sp_el0, x19
+-	msr	elr_el2, x20 				// EL1 PC
+-	msr	spsr_el2, x21 				// EL1 pstate
++	msr	elr_el2, x20 		// PC to restore
++	msr	spsr_el2, x21 		// pstate to restore
  
+ 	add	x3, x2, #CPU_XREG_OFFSET(19)
+ 	ldp	x19, x20, [x3]
 -- 
 2.4.3
