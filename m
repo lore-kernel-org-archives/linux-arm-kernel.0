@@ -1,105 +1,98 @@
 From: hanjun.guo@linaro.org (Hanjun Guo)
-Date: Fri, 19 Jun 2015 16:46:03 +0800
-Subject: [PATCH v2 0/9] Add self-probe infrastructure and stacked irqdomain
- support for ACPI based GICv2/3 init
-Message-ID: <1434703572-26221-1-git-send-email-hanjun.guo@linaro.org>
+Date: Fri, 19 Jun 2015 16:46:04 +0800
+Subject: [PATCH v2 1/9] ACPICA: ACPI 6.0: Add changes for MADT table.
+In-Reply-To: <1434703572-26221-1-git-send-email-hanjun.guo@linaro.org>
+References: <1434703572-26221-1-git-send-email-hanjun.guo@linaro.org>
+Message-ID: <1434703572-26221-2-git-send-email-hanjun.guo@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch set introduce self-probe infrastructure to init IRQ
-controllers and stacked irqdomain support for ACPI based GICv2/3
-init.
+From: Bob Moore <robert.moore@intel.com>
 
-The self-probe infrastructure for ACPI GIC init is similar as
-IRQCHIP_DECLARE() and based on the GIC version support in ACPI
-MADT table. we match the GIC version and GIC driver and load
-it.
+ACPICA commit 02cbb41232bccf7a91967140cab95d5f48291f21
 
-We introduce acpi_irq_domain for GICv2/3 core domain to support
-stacked irqdomain, and pass the gsi (global system interrupt) as
-the agument (void *arg) for gic_irq_domain_alloc(), then we can
-alloc virqs via acpi_register_gsi() with stacked irqdomain.
+New subtable type. Some additions to existing subtables.
 
-The stacked irq domain will be:
+Link: https://github.com/acpica/acpica/commit/02cbb412
+Signed-off-by: Bob Moore <robert.moore@intel.com>
+Signed-off-by: Lv Zheng <lv.zheng@intel.com>
+Signed-off-by: Rafael J. Wysocki <rafael.j.wysocki@intel.com>
+---
 
-    acpi_irq_domain == gicv2 or gicv3 core domain
-                   ^
-                   |   (parent)
-                   |
-       ITS domain or GIv2m domain
-                   ^
-                   |
-                   |
-           MSI chip irq domain
+This patch is already merged into APCICA core, sending
+them out just for the help of better understanding later
+GIC related code.
 
-Since there is one GICD supported for now, so there will be only
-one irqdomain created when GICv2/3 initialized, for all the wired
-hardware irqs for PPI, SGI and SPI, they will have unique hardware
-irq number (GSI), so we can match the device to the acpi_irq_domain
-with unique GSI and it will work. If there will be multi GICD in the
-future, this will still works to follow the solution for x86 of ACPI
-(mutil IOAPICs).
+ include/acpi/actbl1.h | 22 ++++++++++++++++++----
+ 1 file changed, 18 insertions(+), 4 deletions(-)
 
-
-Note: patch 1~2 already merged in ACPICA core, I just send them out
-for helping of better understanding later 7 patches.
-
-Any comments are warmly welcomed.
-
-update from RFC version:
- - Consolidate all the GIC init code into drivers/irqchip/irq-gic-acpi.c
-
-v1->v2:
- - Remove the gicv2/v3 related driver code in drivers/irqchip/irq-gic-acpi.c
-   which I was trying to consolidate them in one file, then arm-gic.h and
-   arm-gic-v3.h will be used separately within parent driver only
-
- - Drop the gsi_mutex patch
-
- - Use the GIC version to match the GIC driver, then no need to test
-   for the version in each driver
-
- - Move acpi_irq_init() to drivers/irqchip/irq-gic-acpi.c instead of
-   in drivers/acpi/irq.c. maybe we need to rename acpi_irq_init() as
-   acpi_gic_init() but I keep that name to accommodate of_irq_init(),
-   any objections please let me know.
-
-Bob Moore (1):
-  ACPICA: ACPI 6.0: Add changes for MADT table.
-
-Hanjun Guo (6):
-  ACPICA: ACPI 6.0: Add values for MADT GIC version field.
-  irqchip / GIC: Add GIC version support in ACPI MADT
-  ACPI / irqchip: Add self-probe infrastructure to initialize IRQ
-    controller
-  irqchip / GIC / ACPI: Use IRQCHIP_ACPI_DECLARE to simplify GICv2 init
-    code
-  irqchip / gic: Add stacked irqdomain support for ACPI based GICv2 init
-  irqchip / GICv3: Add stacked irqdomain support for ACPI based init
-
-Tomasz Nowicki (2):
-  irqchip / GICv3: Refactor gic_of_init() for GICv3 driver
-  irqchip / GICv3: Add ACPI support for GICv3+ initialization
-
- arch/arm64/Kconfig                   |   1 +
- arch/arm64/include/asm/acpi.h        |   1 -
- arch/arm64/include/asm/irq.h         |  13 --
- arch/arm64/kernel/acpi.c             |  25 ----
- drivers/acpi/gsi.c                   |  28 ++--
- drivers/irqchip/Kconfig              |   3 +
- drivers/irqchip/Makefile             |   1 +
- drivers/irqchip/irq-gic-acpi.c       | 141 +++++++++++++++++++
- drivers/irqchip/irq-gic-v3.c         | 264 ++++++++++++++++++++++++++++-------
- drivers/irqchip/irq-gic.c            |  35 ++---
- drivers/irqchip/irqchip.h            |  12 ++
- include/acpi/actbl1.h                |  33 ++++-
- include/asm-generic/vmlinux.lds.h    |  13 ++
- include/linux/acpi.h                 |  16 +++
- include/linux/acpi_irq.h             |   4 +-
- include/linux/irqchip/arm-gic-acpi.h |  10 +-
- include/linux/mod_devicetable.h      |   8 ++
- 17 files changed, 473 insertions(+), 135 deletions(-)
- create mode 100644 drivers/irqchip/irq-gic-acpi.c
-
+diff --git a/include/acpi/actbl1.h b/include/acpi/actbl1.h
+index b80b0e6..cadf21c 100644
+--- a/include/acpi/actbl1.h
++++ b/include/acpi/actbl1.h
+@@ -673,7 +673,8 @@ enum acpi_madt_type {
+ 	ACPI_MADT_TYPE_GENERIC_DISTRIBUTOR = 12,
+ 	ACPI_MADT_TYPE_GENERIC_MSI_FRAME = 13,
+ 	ACPI_MADT_TYPE_GENERIC_REDISTRIBUTOR = 14,
+-	ACPI_MADT_TYPE_RESERVED = 15	/* 15 and greater are reserved */
++	ACPI_MADT_TYPE_GENERIC_TRANSLATOR = 15,
++	ACPI_MADT_TYPE_RESERVED = 16	/* 16 and greater are reserved */
+ };
+ 
+ /*
+@@ -794,7 +795,7 @@ struct acpi_madt_local_x2apic_nmi {
+ 	u8 reserved[3];		/* reserved - must be zero */
+ };
+ 
+-/* 11: Generic Interrupt (ACPI 5.0) */
++/* 11: Generic Interrupt (ACPI 5.0 + ACPI 6.0 changes) */
+ 
+ struct acpi_madt_generic_interrupt {
+ 	struct acpi_subtable_header header;
+@@ -811,6 +812,8 @@ struct acpi_madt_generic_interrupt {
+ 	u32 vgic_interrupt;
+ 	u64 gicr_base_address;
+ 	u64 arm_mpidr;
++	u8 efficiency_class;
++	u8 reserved2[3];
+ };
+ 
+ /* Masks for Flags field above */
+@@ -819,7 +822,7 @@ struct acpi_madt_generic_interrupt {
+ #define ACPI_MADT_PERFORMANCE_IRQ_MODE  (1<<1)	/* 01: Performance Interrupt Mode */
+ #define ACPI_MADT_VGIC_IRQ_MODE         (1<<2)	/* 02: VGIC Maintenance Interrupt mode */
+ 
+-/* 12: Generic Distributor (ACPI 5.0) */
++/* 12: Generic Distributor (ACPI 5.0 + ACPI 6.0 changes) */
+ 
+ struct acpi_madt_generic_distributor {
+ 	struct acpi_subtable_header header;
+@@ -827,7 +830,8 @@ struct acpi_madt_generic_distributor {
+ 	u32 gic_id;
+ 	u64 base_address;
+ 	u32 global_irq_base;
+-	u32 reserved2;		/* reserved - must be zero */
++	u8 version;
++	u8 reserved2[3];	/* reserved - must be zero */
+ };
+ 
+ /* 13: Generic MSI Frame (ACPI 5.1) */
+@@ -855,6 +859,16 @@ struct acpi_madt_generic_redistributor {
+ 	u32 length;
+ };
+ 
++/* 15: Generic Translator (ACPI 6.0) */
++
++struct acpi_madt_generic_translator {
++	struct acpi_subtable_header header;
++	u16 reserved;		/* reserved - must be zero */
++	u32 translation_id;
++	u64 base_address;
++	u32 reserved2;
++};
++
+ /*
+  * Common flags fields for MADT subtables
+  */
 -- 
 1.9.1
