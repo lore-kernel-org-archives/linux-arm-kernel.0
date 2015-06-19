@@ -1,40 +1,30 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Fri, 19 Jun 2015 12:43:24 +0900
-Subject: [PATCH 0/5] ARM: shmobile: R-Mobile APE6 / R-Car Gen2: Use
- "arm,gic-400"
-In-Reply-To: <1434546216-10773-1-git-send-email-geert+renesas@glider.be>
-References: <1434546216-10773-1-git-send-email-geert+renesas@glider.be>
-Message-ID: <20150619034323.GD22912@verge.net.au>
+From: mpe@ellerman.id.au (Michael Ellerman)
+Date: Fri, 19 Jun 2015 14:19:43 +1000
+Subject: [PATCH 1/2] Move the pt_regs_offset struct definition from arch
+ to common include file
+In-Reply-To: <1434386579-6045-2-git-send-email-dave.long@linaro.org>
+References: <1434386579-6045-1-git-send-email-dave.long@linaro.org>
+ <1434386579-6045-2-git-send-email-dave.long@linaro.org>
+Message-ID: <1434687583.23771.5.camel@ellerman.id.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 17, 2015 at 03:03:31PM +0200, Geert Uytterhoeven wrote:
-> 	Hi Simon, Magnus,
+On Mon, 2015-06-15 at 12:42 -0400, David Long wrote:
+> From: "David A. Long" <dave.long@linaro.org>
 > 
-> This patch series replaces the "arm,cortex-a15-gic" compatible value for
-> the GIC device node by "arm,gic-400" in the R-Mobile APE6 and R-Car Gen2
-> device trees:
->   - The R-Mobile APE6 documentation states it has a GIC-400,
->   - The R-Car Gen2 is assumed to have a GIC-400, too.
+> The pt_regs_offset structure is used for HAVE_REGS_AND_STACK_ACCESS_API
+>  feature and has identical definitions in four different arch ptrace.h
+> include files. It seems unlikely that definition would ever need to be
+> changed regardless of architecture so lets move it into
+> include/linux/ptrace.h.
 > 
-> The presence of a GIC-400 has been confirmed on APE6 and R-Car M2 by
-> reading the GICD_IIDR register[1], which reports 0x0200043b (GIC-400 =
-> 0x02, ARM = 0x43b).
-> 
-> This change has no effect on runtime behavior, as currently[2] the GIC
-> driver treats both compatible values the same.
-> 
-> This has been tested on r8a73a4/ape6evm and r8a7791/koelsch.
-> 
-> Thanks for applying!
-> 
-> [1] Using Mark Rutland's patch in https://lkml.org/lkml/2015/4/29/259,
->     or from U-Boot using "md 0xf1001008 1",
-> [2] Backporter's note: since commit 144cb08864ed44be ("irqchip: gic: Add
->     binding probe for ARM GIC400").
+> Signed-off-by: David A. Long <dave.long@linaro.org>
+> ---
+>  arch/powerpc/kernel/ptrace.c | 5 -----
 
-Thanks, I have queued these up after testing that the following still boot.
+Built and booted on powerpc, but is there an easy way to actually test the code
+paths in question?
 
-r8a73a4/ape6evm, r8a7790/lager r8a7791/koelsch, r8a7794/alt
+Acked-by: Michael Ellerman <mpe@ellerman.id.au>
 
-I am unable to test the r8a7794/gose at this time.
+cheers
