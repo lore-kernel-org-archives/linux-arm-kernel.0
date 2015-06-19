@@ -1,30 +1,33 @@
-From: pbonzini@redhat.com (Paolo Bonzini)
-Date: Fri, 19 Jun 2015 17:16:14 +0200
-Subject: [PULL] KVM/ARM changes for 4.2
-In-Reply-To: <1434718396-13110-1-git-send-email-marc.zyngier@arm.com>
-References: <1434718396-13110-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <5584323E.9020004@redhat.com>
+From: dianders@chromium.org (Doug Anderson)
+Date: Fri, 19 Jun 2015 08:24:21 -0700
+Subject: [PATCH] ARM: dts: rockchip: fix rk3288 watchdog irq
+In-Reply-To: <1961157.dsytR1KvKa@phil>
+References: <1961157.dsytR1KvKa@phil>
+Message-ID: <CAD=FV=U3AQY1y6PJP4uBzqBgBkX3GdKtN7iLjGv62w4eZ3W2bQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Heiko,
 
+On Fri, Jun 19, 2015 at 7:31 AM, Heiko Stuebner <heiko@sntech.de> wrote:
+> The watchdog irq is actually SPI 79, which translates to the original
+> 111 in the manual where the SPI irqs start at 32.
+> The current dw_wdt driver does not use the irq at all, so this issue
+> never surfaced. Nevertheless fix this for a time we want to use the irq.
+>
+> Fixes: 2ab557b72d46 ("ARM: dts: rockchip: add core rk3288 dtsi")
+> Signed-off-by: Heiko Stuebner <heiko@sntech.de>
+> ---
+> Found while verifying the data for the quite similar rk3368 arm64 soc.
+>
+>  arch/arm/boot/dts/rk3288.dtsi | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
 
-On 19/06/2015 14:53, Marc Zyngier wrote:
->   git://git.kernel.org/pub/scm/linux/kernel/git/kvmarm/kvmarm.git tags/kvm-arm-for-4.2
-> 
-> for you to fetch changes up to c62e631d4a8e41493c6341d8259e996ed5fc11e3:
-> 
->   KVM: arm/arm64: vgic: Remove useless arm-gic.h #include (2015-06-18 15:50:31 +0100)
-> 
-> ----------------------------------------------------------------
-> KVM/ARM changes for v4.2:
-> 
-> - Proper guest time accounting
-> - FP access fix for 32bit
-> - The usual pile of GIC fixes
-> - PSCI fixes
-> - Random cleanups
+* gpio0 shows up in TRM as 113
+* gpio0 is in dts as SPI 81
+* wdt shows up in TRM as 111
+* so wdt should be in dts as SPI 79
 
-Pulled, thanks.
+...so yup.
 
-Paolo
+Reviewed-by: Douglas Anderson <dianders@chromium.org>
