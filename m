@@ -1,89 +1,95 @@
 From: alex.bennee@linaro.org (=?UTF-8?q?Alex=20Benn=C3=A9e?=)
-Date: Fri, 19 Jun 2015 13:23:38 +0100
-Subject: [PATCH v6 00/12] KVM Guest Debug support for arm64
-Message-ID: <1434716630-18260-1-git-send-email-alex.bennee@linaro.org>
+Date: Fri, 19 Jun 2015 13:23:41 +0100
+Subject: [PATCH v6 03/12] KVM: arm64: guest debug, define API headers
+In-Reply-To: <1434716630-18260-1-git-send-email-alex.bennee@linaro.org>
+References: <1434716630-18260-1-git-send-email-alex.bennee@linaro.org>
+Message-ID: <1434716630-18260-4-git-send-email-alex.bennee@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Here is V6 of the KVM Guest Debug support for arm64.
+This commit defines the API headers for guest debugging. There are two
+architecture specific debug structures:
 
-The changes are even more minimal than the last round which is
-hopefully a good indication the series is ready for merging:
+  - kvm_guest_debug_arch, allows us to pass in HW debug registers
+  - kvm_debug_exit_arch, signals exception and possible faulting address
 
-  API/ABI Changes:
-    - returned to using u64 for control registers
-    - renamed KVM_GUESTDBG_USE_HW_BP->KVM_GUESTDBG_USE_HW
+The type of debugging being used is controlled by the architecture
+specific control bits of the kvm_guest_debug->control flags in the ioctl
+structure.
 
-  Keeping the control registers as 64 bit simplifies a lot of the code
-  especially around sys_regs code which is used for trap and emulate
-  as well as the GET/SET_ONE_REG interface which treats everything as
-  a 64 bit register. Hints have also been dropped that the
-  architecture could possibly expand the register one day and this
-  makes the ABI future proof against that.
+Signed-off-by: Alex Benn?e <alex.bennee@linaro.org>
+Reviewed-by: David Hildenbrand <dahi@linux.vnet.ibm.com>
+Reviewed-by: Andrew Jones <drjones@redhat.com>
+Acked-by: Christoffer Dall <christoffer.dall@linaro.org>
 
-  The ioctl flag re-name was to make it clear that we are setting both
-  HW breakpoints and watchpoints.
+---
+v2
+   - expose hsr and pc directly to user-space
+v3
+   - s/control/controlled/ in commit message
+   - add v8 to ARM ARM comment (ARM Architecture Reference Manual)
+   - add rb tag
+   - rm pc, add far
+   - re-word comments on alignment
+   - rename KVM_ARM_NDBG_REGS -> KVM_ARM_MAX_DBG_REGS
+v4
+   - now uses common HW/SW BP define
+   - add a-b-tag
+   - use u32 for control regs
+v5
+   - revert to have arch specific KVM_GUESTDBG_USE_SW/HW_BP
+   - rm stale comments dbgctrl was stored as u64
+v6
+   - mv far comment from later patch
+   - KVM_GUESTDBG_USE_HW_BP -> KVM_GUESTDBG_USE_HW
+   - revert control regs to u64 (parity with GET/SET_ONE_REG)
+---
+ arch/arm64/include/uapi/asm/kvm.h | 27 +++++++++++++++++++++++++++
+ 1 file changed, 27 insertions(+)
 
-  Code Changes:
-    - Fix endian issues trapped aarch32 debug regs
-    - Changes due to control regs -> 64 bit
-      - Simplification of the sys_regs
-      - Simpler save/restore macro for hyp.S
-      - Tracing fixes for new register size
-
-The rest of the changes cover whitespace, spelling, and re-wording of
-some of the comments. I've also added some more r-b and s-o-b tags
-from the last round of review.
-
-For full details see the changelog on each of the patches.
-
-GIT Repos:
-
-The patches for this series are based off v4.1-rc8 and can be found
-at:
-
-Kernel:
-https://git.linaro.org/people/alex.bennee/linux.git
-branch: guest-debug/4.1-rc8-v8
-
-QEMU:
-https://github.com/stsquad/qemu
-branch: kvm/guest-debug-v6
-
-Alex Benn?e (12):
-  KVM: add comments for kvm_debug_exit_arch struct
-  KVM: arm64: fix misleading comments in save/restore
-  KVM: arm64: guest debug, define API headers
-  KVM: arm: guest debug, add stub KVM_SET_GUEST_DEBUG ioctl
-  KVM: arm: introduce kvm_arm_init/setup/clear_debug
-  KVM: arm64: guest debug, add SW break point support
-  KVM: arm64: guest debug, add support for single-step
-  KVM: arm64: re-factor hyp.S debug register code
-  KVM: arm64: introduce vcpu->arch.debug_ptr
-  KVM: arm64: guest debug, HW assisted debug support
-  KVM: arm64: enable KVM_CAP_SET_GUEST_DEBUG
-  KVM: arm64: add trace points for guest_debug debug
-
- Documentation/virtual/kvm/api.txt      |  15 +-
- arch/arm/include/asm/kvm_host.h        |   4 +
- arch/arm/kvm/arm.c                     |  46 ++-
- arch/arm/kvm/trace.h                   |  17 +
- arch/arm64/include/asm/hw_breakpoint.h |  12 +
- arch/arm64/include/asm/kvm_asm.h       |  26 +-
- arch/arm64/include/asm/kvm_host.h      |  36 ++-
- arch/arm64/include/uapi/asm/kvm.h      |  27 ++
- arch/arm64/kernel/asm-offsets.c        |   7 +
- arch/arm64/kernel/hw_breakpoint.c      |  12 -
- arch/arm64/kvm/Makefile                |   2 +-
- arch/arm64/kvm/debug.c                 | 204 ++++++++++++
- arch/arm64/kvm/handle_exit.c           |  44 +++
- arch/arm64/kvm/hyp.S                   | 550 ++++++++++-----------------------
- arch/arm64/kvm/reset.c                 |  15 +
- arch/arm64/kvm/sys_regs.c              | 158 +++++++---
- arch/arm64/kvm/trace.h                 | 105 +++++++
- include/uapi/linux/kvm.h               |   5 +
- 18 files changed, 821 insertions(+), 464 deletions(-)
- create mode 100644 arch/arm64/kvm/debug.c
-
+diff --git a/arch/arm64/include/uapi/asm/kvm.h b/arch/arm64/include/uapi/asm/kvm.h
+index d268320..d82f3f3 100644
+--- a/arch/arm64/include/uapi/asm/kvm.h
++++ b/arch/arm64/include/uapi/asm/kvm.h
+@@ -100,12 +100,39 @@ struct kvm_sregs {
+ struct kvm_fpu {
+ };
+ 
++/*
++ * See v8 ARM ARM D7.3: Debug Registers
++ *
++ * The architectural limit is 16 debug registers of each type although
++ * in practice there are usually less (see ID_AA64DFR0_EL1).
++ *
++ * Although the control registers are architecturally defined as 32
++ * bits wide we use a 64 bit structure here to keep parity with
++ * KVM_GET/SET_ONE_REG behaviour which treats all system registers as
++ * 64 bit values. It also allows for the possibility of the
++ * architecture expanding the control registers without having to
++ * change the userspace ABI.
++ */
++#define KVM_ARM_MAX_DBG_REGS 16
+ struct kvm_guest_debug_arch {
++	__u64 dbg_bcr[KVM_ARM_MAX_DBG_REGS];
++	__u64 dbg_bvr[KVM_ARM_MAX_DBG_REGS];
++	__u64 dbg_wcr[KVM_ARM_MAX_DBG_REGS];
++	__u64 dbg_wvr[KVM_ARM_MAX_DBG_REGS];
+ };
+ 
+ struct kvm_debug_exit_arch {
++	__u32 hsr;
++	__u64 far;	/* used for watchpoints */
+ };
+ 
++/*
++ * Architecture specific defines for kvm_guest_debug->control
++ */
++
++#define KVM_GUESTDBG_USE_SW_BP		(1 << 16)
++#define KVM_GUESTDBG_USE_HW		(1 << 17)
++
+ struct kvm_sync_regs {
+ };
+ 
 -- 
 2.4.3
