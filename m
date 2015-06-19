@@ -1,88 +1,219 @@
-From: computersforpeace@gmail.com (Brian Norris)
-Date: Fri, 19 Jun 2015 15:41:23 -0700
-Subject: [PATCH 0/7] soc: brcmstb: add system suspend support for STB SoCs
-In-Reply-To: <CADtm3G7GQNuaZDoNe84YAh7pRV9s_2VhUuW8YpaCoNuozoyVZA@mail.gmail.com>
-References: <1434672696-13632-1-git-send-email-computersforpeace@gmail.com>
- <CADtm3G7GQNuaZDoNe84YAh7pRV9s_2VhUuW8YpaCoNuozoyVZA@mail.gmail.com>
-Message-ID: <20150619224123.GL4917@ld-irv-0074>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Sat, 20 Jun 2015 00:38:47 +0200
+Subject: Linkstation Mini and __machine_arch_type problem, not booting
+ since 3.8
+In-Reply-To: <1434678624.4767.22.camel@dolka.fr>
+References: <97db3502cd014faf1c710b1cc0fe8848@dolka.fr>
+ <55827D64.1090307@free-electrons.com>
+ <1434678624.4767.22.camel@dolka.fr>
+Message-ID: <20150619223847.GC1116@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-+ tglx, Kevin
+/dts-v1/;
 
-On Thu, Jun 18, 2015 at 08:20:52PM -0700, Gregory Fong wrote:
-> On Thu, Jun 18, 2015 at 5:11 PM, Brian Norris <computersforpeace@gmail.com> wrote:
-> > This patch set introduces system suspend/resume support for Broadcom STB SoCs.
-> > There are two suspend modes (S2 and S3) as well as a related low-power shutdown
-> > mode (S5).
-> >
-> > Along with the core PM support, include a driver for the wakeup-timer, which
-> > allows for simple testing of suspend/resume wakeup cycles.
-> >
-> > Brian
-> >
-> > Brian Norris (7):
-> >   Documentation: dt: brcmstb: add system PM bindings
-> >   Documentation: dt: brcmstb: add waketimer documentation
-> >   soc: add stubs for brcmstb SoC's
-> >   soc: brcmstb: add PM suspend/resume support (S2/S3/S5)
-> >   soc: brcmstb: add wake-timer driver
-> >   ARM: brcmstb: mask GIC IRQs on suspend
-> >   ARM: dts: brcmstb: add BCM7445 system PM DT nodes
-> >
-> 
-> I tested this series two ways: with the device tree built into the
-> bootloader (BOLT) on BCM7445 and by using
-> arch/arm/boot/dts/bcm7445-bcm97445svmb.dtb
-> 
-> With the device tree from BOLT, everything works fine.  Tested the
-> waketimer for S2, S3, and S5.
+/* TODO: the specific power off method */
 
-Thanks for the testing!
+You can achieve this using the restart-poweroff driver. See the
+kirkwood linkstation DTS files for an example.
 
-> With the device tree in arch/arm/boot/dts/bcm7445-bcm97445svmb.dts, S2
-> works, but S3 and S5 do not.  It comes back up but doesn't reach the
-> prompt:
-> 
-> [    6.050808] PM: suspend of devices complete after 1.425 msecs
-> [    6.051760] PM: late suspend of devices complete after 0.947 msecs
-> [    6.052535] PM: noirq suspend of devices complete after 0.770 msecs
-> [    6.052537] Disabling non-boot CPUs ...
-> [    6.053005] CPU1: shutdown
-> [    6.065914] CPU2: shutdown
-> [    6.080756] CPU3: shutdown
-> [    6.095214] Enabling non-boot CPUs ...
-> [    6.111496] CPU1 is up
-> [    6.126934] CPU2 is up
-> [    6.142511] CPU3 is up
-> [    6.145308] PM: noirq resume of devices complete after 2.772 msecs
-> [    6.148022] PM: early resume of devices complete after 2.626 msecs
-> [    6.151017] PM: resume of devices complete after 2.976 msecs
-> [    6.212771] Restarting tasks ... done.
-> [[[ output stops here ]]]
+#include <dt-bindings/gpio/gpio.h>
+#include <dt-bindings/input/input.h>
+#include <dt-bindings/interrupt-controller/irq.h>
+#include "orion5x-mv88f5182.dtsi"
 
-Right, I noticed this problem, but found that it was independent of the
-core PM code. UART interrupts are dead, but nothing else is.
+/ {
+	model = "Buffalo Linkstation Mini (LS-WSGL)";
+	compatible = "buffalo,linkstation_mini", "marvell,orion5x-88f5182", "marvell,orion5x";
 
-> I suspect there might be an issue somewhere in
-> [PATCH 7/7] ARM: dts: brcmstb: add BCM7445 system PM DT nodes.
+	memory {
+		reg = <0x00000000 0x8000000>; /* 128 MB */
+	};
 
-It's not a problem with patch 7, exactly, it's a problem with the
-irqchip driver which handles the UART interrupt mask (irq-bcm7120-l2.c).
-The problem is that with a trimmed down device tree (such as the one
-found at arch/arm/boot/dts/bcm7445-bcm97445svmb.dtb), none of the child
-interrupts of the 'irq0_intc' node are described -- we don't have device
-tree nodes for them yet -- but we still require saving and restoring the
-forwarding mask (see 'brcm,int-fwd-mask') in order for the UART
-interrupts to continue operating.
+	chosen {
+		bootargs = "console=ttyS0,115200";
+		linux,stdout-path = &uart0;
+	};
 
-This is all a problem because when irq_chip_generic::installed == 0, the
-irq_{suspend,resume} functions never get called in irq-bcm7120-l2.c.
+	soc {
+		ranges = <MBUS_ID(0xf0, 0x01) 0 0xf1000000 0x100000>,
+			 <MBUS_ID(0x09, 0x00) 0 0xf2200000 0x800>,
+			 <MBUS_ID(0x01, 0x0f) 0 0xf4000000 0x40000>;
+	};
 
-Anyway, I think this suggests that irq-bcm7120-l2.c needs a slightly
-different semantics to its PM callbacks; they must be called regardless
-of whether there are any child interrupts. I've cooked up some patches
-for this and will send them shortly in reply to this thread.
+	gpio-keys {
+		compatible = "gpio-keys";
+		pinctrl-0 = <&pmx_buttons>;
+		pinctrl-names = "default";
+		#address-cells = <1>;
+		#size-cells = <0>;
+		func {
+			label = "Function Button";
+			linux,code = <KEY_OPTION>;
+			gpios = <&gpio0 15 GPIO_ACTIVE_LOW>;
+		};
 
-Thanks,
-Brian
+		power {
+			label = "Power-on Switch";
+			linux,input-type = <5>; /* EV_SW */
+			linux,code = <0>; /* LSMINI_SW_POWER */
+			gpios = <&gpio0 18 GPIO_ACTIVE_LOW>;
+		};
+
+		autopower {
+			label = "Power-auto Switch";
+			linux,input-type = <5>; /* EV_SW */
+			linux,code = <1>; /* LSMINI_SW_AUTOPOWER */
+			gpios = <&gpio0 17 GPIO_ACTIVE_LOW>;
+		};
+
+There is a contribute for two other linkstation devices also made
+today, which have these two same buttons. I'm not sure these are the
+best choice of keys, but what every we decide, we should use the same
+for all linkstation devices.
+
+	};
+
+	gpio-leds {
+		compatible = "gpio-leds";
+		pinctrl-0 = <&pmx_leds>;
+		pinctrl-names = "default";
+
+		alarm {
+			label = "alarm:red";
+
+The board name should be in here. "lswsgl:alarm:red". Same for all the
+LEDs.
+
+			gpio = <&gpio0 2 GPIO_ACTIVE_LOW>;
+		};
+
+		info {
+			label = "info:amber";
+			gpio = <&gpio0 3 GPIO_ACTIVE_LOW>;
+		};
+
+		func {
+			label = "func:blue:top";
+			gpio = <&gpio0 9 GPIO_ACTIVE_LOW>;
+		};
+
+		power {
+			label = "power:blue:bottom";
+			gpio = <&gpio0 14 GPIO_ACTIVE_LOW>;
+			default-state = "on";
+		};
+	};
+
+	regulators {
+		compatible = "simple-bus";
+		#address-cells = <1>;
+		#size-cells = <0>;
+		pinctrl-0 = <&pmx_sata0_power &pmx_sata1_power &pmx_usb_power>;
+		pinctrl-names = "default";
+
+		sata0_power: regulator at 0 {
+			compatible = "regulator-fixed";
+			reg = <0>;
+			regulator-name = "SATA0 Power";
+			regulator-min-microvolt = <5000000>;
+			regulator-max-microvolt = <5000000>;
+			enable-active-high;
+			regulator-always-on;
+			regulator-boot-on;
+			gpio = <&gpio0 1 GPIO_ACTIVE_HIGH>;
+		};
+
+		sata1_power: regulator at 1 {
+			compatible = "regulator-fixed";
+			reg = <1>;
+			regulator-name = "SATA1 Power";
+			regulator-min-microvolt = <5000000>;
+			regulator-max-microvolt = <5000000>;
+			enable-active-high;
+			regulator-always-on;
+			regulator-boot-on;
+			gpio = <&gpio0 19 GPIO_ACTIVE_HIGH>;
+		};
+
+		usb_power: regulator at 2 {
+			compatible = "regulator-fixed";
+			reg = <2>;
+			regulator-name = "USB Power";
+			regulator-min-microvolt = <5000000>;
+			regulator-max-microvolt = <5000000>;
+			enable-active-high;
+			regulator-always-on;
+			regulator-boot-on;
+			gpio = <&gpio0 16 GPIO_ACTIVE_HIGH>;
+		};
+	};
+};
+
+&devbus_bootcs {
+	status = "okay";
+
+	devbus,keep-config;
+
+	flash at 0 {
+		compatible = "cfi-flash";
+		reg = <0 0x40000>;
+		bank-width = <1>;
+                #address-cells = <1>;
+		#size-cells = <1>;
+
+		partition at 0 {
+			label = "Full256Kb";
+			reg = <0 0x40000>;
+			read-only;
+		};
+	};
+};
+
+&mdio {
+	status = "okay";
+
+	ethphy: ethernet-phy {
+		reg = <8>;
+	};
+};
+
+&ehci0 {
+	status = "okay";
+};
+
+&eth {
+	status = "okay";
+
+	ethernet-port at 0 {
+		phy-handle = <&ethphy>;
+	};
+};
+
+&i2c {
+	status = "okay";
+	clock-frequency = <100000>;
+	#address-cells = <1>;
+
+	rtc at 32 {
+		compatible = "ricoh,rs5c372a";
+		reg = <0x32>;
+	};
+};
+
+&pinctrl {
+	pmx_buttons: pmx-buttons {
+		marvell,pins = "mpp15", "mpp17", "mpp18";
+		marvell,function = "gpio";
+	};
+
+	pmx_leds: pmx-leds {
+		marvell,pins = "mpp2", "mpp3", "mpp9", "mpp14";
+		marvell,function = "gpio";
+	};
+
+It would be normal to have four separate entries for these leds.
+
+Otherwise, this looks pretty good.
+
+	   Andrew
