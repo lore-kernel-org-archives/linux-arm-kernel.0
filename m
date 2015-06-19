@@ -1,66 +1,69 @@
-From: ml.lawnick@gmx.de (Michael Lawnick)
-Date: Fri, 19 Jun 2015 07:41:49 +0200
-Subject: [PATCH] i2c: omap: improve duty cycle on SCL
-In-Reply-To: <20150618172428.GB27790@saruman.tx.rr.com>
-References: <1434482276-1210-1-git-send-email-balbi@ti.com>
- <55815581.80807@gmx.de> <20150617153812.GB18421@saruman.tx.rr.com>
- <5582678F.4010505@gmx.de> <20150618172428.GB27790@saruman.tx.rr.com>
-Message-ID: <5583AB9D.6090805@gmx.de>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Fri, 19 Jun 2015 14:46:15 +0900
+Subject: [PATCH] drm/exynos: Remove unused vma field of exynos_drm_gem_obj
+In-Reply-To: <5583A87F.5090807@samsung.com>
+References: <1434691409-9509-1-git-send-email-k.kozlowski@samsung.com>
+ <5583A87F.5090807@samsung.com>
+Message-ID: <CAJKOXPe5M-nxjcuopOo7GiSHELG6pQ8VOTN8VMVvt=AZ+AM_HA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am 18.06.2015 um 19:24 schrieb Felipe Balbi:
-> On Thu, Jun 18, 2015 at 08:39:11AM +0200, Michael Lawnick wrote:
->> Am 17.06.2015 um 17:38 schrieb Felipe Balbi:
->>> Hi,
->>>
->>> On Wed, Jun 17, 2015 at 01:09:53PM +0200, Michael Lawnick wrote:
->>>> Am 16.06.2015 um 21:17 schrieb Felipe Balbi:
->>>>> With this patch we try to be as close to 50%
->>>>> duty cycle as possible. The reason for this
->>>>> is that some devices present an erratic behavior
->>>>> with certain duty cycles.
->>>>>
->>>>> One such example is TPS65218 PMIC which fails
->>>>> to change voltages when running @ 400kHz and
->>>>> duty cycle is lower than 34%.
->>>>>
->>>>> The idea of the patch is simple:
->>>>>
->>>>> calculate desired scl_period from requested scl
->>>>> and use 50% for tLow and 50% for tHigh.
->>>> ...
->>>> Hmm, and what's about  Philips I2C specification 2.1, Jan 2000, Table 5?
->>>>
->>>>> PARAMETER                       SYMBOL  STANDARD-MODE   FAST-MODE     UNIT
->>>>>                                           MIN. MAX.     MIN. MAX.
->>>>> LOW period of the SCL clock     tLOW      4.7   ?       1.3   ?       ?s
->>>>> HIGH period of the SCL clock    tHIGH     4.0   ?       0.6   ?       ?s
->>>>
->>>> Your signal is in spec (0.85 ?s high, 1,65 low).
->>>> Maybe your TPS65218 is just buggy or signals are bad?
->>>
->>> yes, tps is buggy, it's written in the commit log itself.
->>>
+2015-06-19 14:28 GMT+09:00 Inki Dae <inki.dae@samsung.com>:
+> On 2015? 06? 19? 14:23, Krzysztof Kozlowski wrote:
+>> The field 'vma' of 'exynos_drm_gem_obj' structure was introduced in
+>> 2a3098ff6c21 ("drm/exynos: add userptr feature for g2d module") but is
+>> not referenced anywhere.
 >>
->> So I think it is unacceptable to change the adapters code violating
->> specification because some buggy device doesn't work properly.
+>> One instance of 'exynos_drm_gem_obj' may be mapped to multiple
+>> user-space VMAs so 'vma' field does not look useful anyway.
 >
-> read the other thread and you'll see that it's not violating jack
+> Krzysztof,
 >
->> This change for your device has chance to blow up many correctly
->> working ones.
+> The vma member would be removed by below patch,
+> http://lists.freedesktop.org/archives/dri-devel/2015-May/082764.html
 >
-> How ?
->
-The answer is so obvious that I'm a bit irritated.
-Your patch description tells: 'and use 50% for tLow and 50% for tHigh'
-For 400kHz this means 1.25 us for high and low. This clearly violates 
-the specification for minimum low period and will not work with any 
-device that relies on it.
-In the other thread it is discussed that your patch does effectively not 
-do what you describe but this is something completely independent.
 
--- 
-KR
-Michael
+I think it is a different object. The patch above removes it from
+struct g2d_cmdlist_userptr.
+However I removed it from struct exynos_drm_gem_obj, where it was
+never referenced.
+
+Best regards,
+Krzysztof
+
+> Thanks,
+> Inki Dae
+>
+>>
+>> Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+>> ---
+>>  drivers/gpu/drm/exynos/exynos_drm_gem.h | 2 --
+>>  1 file changed, 2 deletions(-)
+>>
+>> diff --git a/drivers/gpu/drm/exynos/exynos_drm_gem.h b/drivers/gpu/drm/exynos/exynos_drm_gem.h
+>> index 308173cb4f0a..6f42e2248288 100644
+>> --- a/drivers/gpu/drm/exynos/exynos_drm_gem.h
+>> +++ b/drivers/gpu/drm/exynos/exynos_drm_gem.h
+>> @@ -61,7 +61,6 @@ struct exynos_drm_gem_buf {
+>>   *   or at framebuffer creation.
+>>   * @size: size requested from user, in bytes and this size is aligned
+>>   *   in page unit.
+>> - * @vma: a pointer to vm_area.
+>>   * @flags: indicate memory type to allocated buffer and cache attruibute.
+>>   *
+>>   * P.S. this object would be transferred to user as kms_bo.handle so
+>> @@ -71,7 +70,6 @@ struct exynos_drm_gem_obj {
+>>       struct drm_gem_object           base;
+>>       struct exynos_drm_gem_buf       *buffer;
+>>       unsigned long                   size;
+>> -     struct vm_area_struct           *vma;
+>>       unsigned int                    flags;
+>>  };
+>>
+>>
+>
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
