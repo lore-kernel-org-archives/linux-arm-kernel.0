@@ -1,33 +1,60 @@
 From: aalonso@freescale.com (Adrian Alonso)
-Date: Fri, 19 Jun 2015 14:59:08 -0500
-Subject: [PATCH 2/4] ARM: dts: imx: imx7d add iomuxc lpsr register base address
+Date: Fri, 19 Jun 2015 14:59:10 -0500
+Subject: [PATCH 4/4] ARM: imx: pinctrl-imx7d: add iomuxc-lpsr gpio group ids
 In-Reply-To: <1434743950-7771-1-git-send-email-aalonso@freescale.com>
 References: <1434743950-7771-1-git-send-email-aalonso@freescale.com>
-Message-ID: <1434743950-7771-2-git-send-email-aalonso@freescale.com>
+Message-ID: <1434743950-7771-4-git-send-email-aalonso@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Add iomuxc lpsr register base address to extend
-  pinctrl-imx driver to support the iomux settings for pins
-  that support LPSR operation mode.
+* Add imx7d SoC iomuxc-lpsr gpio group id's
+* Add IOMUXC_LPSR_SUPPORT flag for pinctrl-imx driver to
+  support iomuxc-lpsr controller.
 
 Signed-off-by: Adrian Alonso <aalonso@freescale.com>
 ---
- arch/arm/boot/dts/imx7d.dtsi | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ drivers/pinctrl/freescale/pinctrl-imx7d.c | 17 +++++++++++++++++
+ 1 file changed, 17 insertions(+)
 
-diff --git a/arch/arm/boot/dts/imx7d.dtsi b/arch/arm/boot/dts/imx7d.dtsi
-index c42cf8d..294a6c6 100644
---- a/arch/arm/boot/dts/imx7d.dtsi
-+++ b/arch/arm/boot/dts/imx7d.dtsi
-@@ -253,7 +253,7 @@
+diff --git a/drivers/pinctrl/freescale/pinctrl-imx7d.c b/drivers/pinctrl/freescale/pinctrl-imx7d.c
+index 1fa7530..cf89275 100644
+--- a/drivers/pinctrl/freescale/pinctrl-imx7d.c
++++ b/drivers/pinctrl/freescale/pinctrl-imx7d.c
+@@ -172,6 +172,14 @@ enum imx7d_pads {
+ 	MX7D_PAD_ENET1_RX_CLK = 152,
+ 	MX7D_PAD_ENET1_CRS = 153,
+ 	MX7D_PAD_ENET1_COL = 154,
++	MX7D_PAD_GPIO1_IO00 = 155,
++	MX7D_PAD_GPIO1_IO01 = 156,
++	MX7D_PAD_GPIO1_IO02 = 157,
++	MX7D_PAD_GPIO1_IO03 = 158,
++	MX7D_PAD_GPIO1_IO04 = 159,
++	MX7D_PAD_GPIO1_IO05 = 160,
++	MX7D_PAD_GPIO1_IO06 = 161,
++	MX7D_PAD_GPIO1_IO07 = 162,
+ };
  
- 			iomuxc: iomuxc at 30330000 {
- 				compatible = "fsl,imx7d-iomuxc";
--				reg = <0x30330000 0x10000>;
-+				reg = <0x30330000 0x10000>, <0x302c0000 0x10000>;
- 			};
+ /* Pad names for the pinmux subsystem */
+@@ -331,11 +339,20 @@ static const struct pinctrl_pin_desc imx7d_pinctrl_pads[] = {
+ 	IMX_PINCTRL_PIN(MX7D_PAD_ENET1_RX_CLK),
+ 	IMX_PINCTRL_PIN(MX7D_PAD_ENET1_CRS),
+ 	IMX_PINCTRL_PIN(MX7D_PAD_ENET1_COL),
++	IMX_PINCTRL_PIN(MX7D_PAD_GPIO1_IO00),
++	IMX_PINCTRL_PIN(MX7D_PAD_GPIO1_IO01),
++	IMX_PINCTRL_PIN(MX7D_PAD_GPIO1_IO02),
++	IMX_PINCTRL_PIN(MX7D_PAD_GPIO1_IO03),
++	IMX_PINCTRL_PIN(MX7D_PAD_GPIO1_IO04),
++	IMX_PINCTRL_PIN(MX7D_PAD_GPIO1_IO05),
++	IMX_PINCTRL_PIN(MX7D_PAD_GPIO1_IO06),
++	IMX_PINCTRL_PIN(MX7D_PAD_GPIO1_IO07),
+ };
  
- 			gpr: iomuxc-gpr at 30340000 {
+ static struct imx_pinctrl_soc_info imx7d_pinctrl_info = {
+ 	.pins = imx7d_pinctrl_pads,
+ 	.npins = ARRAY_SIZE(imx7d_pinctrl_pads),
++	.flags = IOMUXC_LPSR_SUPPORT,
+ };
+ 
+ static struct of_device_id imx7d_pinctrl_of_match[] = {
 -- 
 2.1.4
