@@ -1,66 +1,68 @@
-From: torfl6749@gmail.com (Torsten Fleischer)
-Date: Fri, 19 Jun 2015 10:04:44 +0200
-Subject: [PATCH linux-next 1/1] dmaengine: at_hdmac: fix residue
- computation
-In-Reply-To: <2899583.NPB62C1E0l@linux-1fbo.site>
-References: <cover.1434380729.git.cyrille.pitchen@atmel.com>
- <381ecf2427a6aae4b7109d930121df9f36aef81e.1434380729.git.cyrille.pitchen@atmel.com>
- <2899583.NPB62C1E0l@linux-1fbo.site>
-Message-ID: <1922467.ZSxkKTyNbQ@linux-1fbo.site>
+From: horms@verge.net.au (Simon Horman)
+Date: Fri, 19 Jun 2015 17:17:10 +0900
+Subject: [PATCH 00/15] ARM: shmobile: Remove legacy sh73a0/kzm9g and
+ r8a7740/armadillo
+In-Reply-To: <CAMuHMdUqO2_rMpx0akeS1j+pNmQ_S150ei0B6a1ubFu_iTBF3g@mail.gmail.com>
+References: <1434533491-21979-1-git-send-email-geert+renesas@glider.be>
+ <20150619034052.GA22912@verge.net.au>
+ <CAMuHMdUqO2_rMpx0akeS1j+pNmQ_S150ei0B6a1ubFu_iTBF3g@mail.gmail.com>
+Message-ID: <20150619081709.GB434@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 16 June 2015 at 18:11:56 Torsten Fleischer wrote:
-> On Monday 15 June 2015 at 17:17:51 Cyrille Pitchen wrote:
-[...]
-> > @@ -365,16 +371,13 @@ static int atc_get_bytes_left(struct dma_chan *chan,
-> > dma_cookie_t cookie) }
-> > 
-> >  		/*
-> > 
-> > -		 * For the last descriptor in the chain we can calculate
-> > +		 * For the current descriptor in the chain we can calculate
-> > 
-> >  		 * the remaining bytes using the channel's register.
-> > 
-> > -		 * Note that the transfer width of the first and last
-> > -		 * descriptor may differ.
-> > 
-> >  		 */
-> > 
-> > -		if (!desc->lli.dscr)
-> > -			ret = atc_calc_bytes_left_from_reg(ret, atchan, desc);
-> > +		ret = atc_calc_bytes_left_from_reg(ret, atchan);
+On Fri, Jun 19, 2015 at 09:30:56AM +0200, Geert Uytterhoeven wrote:
+> On Fri, Jun 19, 2015 at 5:41 AM, Simon Horman <horms@verge.net.au> wrote:
+> > [ CC Linus, Laurent, linux-gpio ]
+> >
+> > On Wed, Jun 17, 2015 at 11:31:16AM +0200, Geert Uytterhoeven wrote:
+> >>       Hi Simon, Magnus,
+> >>
+> >> The KZM-A9-GT and Armadillo-800 EVA boards are now sufficiently
+> >> supported by DT-based and board-less SH-Mobile AG5 (sh73a0) and R-Mobile
+> >> A1 (r8a7740) multi-platform kernels.
 > 
-> I see two issues here.
+> >> Hence this patch series removes legacy board and SoC code for
+> >> sh73a0/kzm9g and r8a7740/armadillo.
 > 
-> First this always returns the number if remaining bytes of the current child
-> transfer and not of the entire hardware linked list transfer.
+> >> Geert Uytterhoeven (15):
+> >>   ARM: shmobile: Remove legacy board code for KZM-A9-GT
+> >>   ARM: shmobile: Remove legacy kzm9g_defconfig
+> >>   ARM: shmobile: Drop sh73a0-kzm9g.dtb for legacy builds
+> >>   ARM: shmobile: Remove legacy SoC code for SH-Mobile AG5
+> >>   ARM: shmobile: Remove legacy board code for Armadillo-800 EVA
+> >>   ARM: shmobile: Remove legacy armadillo800eva_defconfig
+> >>   ARM: shmobile: Drop r8a7740-armadillo800eva.dtb for legacy builds
+> >>   ARM: shmobile: Remove legacy SoC code for R-Mobile A1
+> >>   ARM: shmobile: Remove unused dma-register.h
+> >>   ARM: shmobile: R-Mobile: Remove legacy PM Domain code
+> >>   ARM: shmobile: Remove obsolete zboot support
+> >
+> > I have queued up the above patches for v4.3.
 > 
-Oops, I was wrong with the first issue. Please ignore this.
-Sorry for that.
+> Thanks!
+> 
+> >>   pinctrl: sh-pfc: sh73a0: Remove obsolete multi-platform check
+> >>   pinctrl: sh-pfc: Remove obsolete sh73a0 platform_device_id entry
+> >>   pinctrl: sh-pfc: r8a7740: Remove obsolete multi-platform check
+> >>   pinctrl: sh-pfc: Remove obsolete r8a7740 platform_device_id entry
+> >
+> > As the above patches are sh-pfc patches they would typically
+> > be steered through Linus's tree via Laurent. If they wish
+> > to take that path then I'm happy for this to be attached:
+> >
+> > Acked-by: Simon Horman <horms+renesas@verge.net.au>
+> >
+> > FWIW the above path is the one that the removal of mackerel/sh7372 took.
+> >
+> > Alternatively, I am happy to take the above sh-pfc patches through
+> > my tree but I would like to do so with an Ack from at least Linus.
+> 
+> I didn't CC Linus and linux-gpio at this stage yet, to prevent the pfc
+> patches from getting applied prematurely.
+> But things have gone more smoothly (esp. w.r.t. board staging) than expected,
+> which is always pleasant.
+> 
+> I can resend later, I have a few more areas of sh73a0/r8a7740 cleanup
+> outside arch/arm/mach-shmobile waiting anyway...
 
-> Finally, for the calculation of the remaining bytes of a hardware linked
-> list the value of DSCR is used to get the current child transfer.
-> But regarding to a running DMA transfer, reading DSCR and CTRLA is not
-> atomic. If you read CTRLA after DSCR then the value may not refer to the
-> child transfer as read from DSCR, but to a subsequent one.
-> Its only safe for the first transfer where CTRLA is read before DSCR and for
-> the last transfer where CTRLA is read after DSCR.
-> 
-> >  	} else {
-> >  	
-> >  		/* single transfer */
-> > 
-> > -		ret = atc_calc_bytes_left_from_reg(ret, atchan, desc_first);
-> > +		ret = atc_calc_bytes_left_from_reg(ret, atchan);
-> > 
-> >  	}
-> >  	
-> >  	return ret;
-> > 
-[...]
-
-Regards,
-
-Torsten
+I'm happy with whatever timing you think is best.
