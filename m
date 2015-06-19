@@ -1,36 +1,45 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri, 19 Jun 2015 13:53:16 +0100
-Subject: [PATCH 12/12] KVM: arm/arm64: vgic: Remove useless arm-gic.h #include
-In-Reply-To: <1434718396-13110-1-git-send-email-marc.zyngier@arm.com>
-References: <1434718396-13110-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1434718396-13110-13-git-send-email-marc.zyngier@arm.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Fri, 19 Jun 2015 13:56:33 +0100
+Subject: [PATCH] arm64: vdso: work-around broken ELF toolchains in Makefile
+Message-ID: <1434718593-3648-1-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Back in the days, vgic.c used to have an intimate knowledge of
-the actual GICv2. These days, this has been abstracted away into
-hardware-specific backends.
+When building the kernel with a bare-metal (ELF) toolchain, the -shared
+option may not be passed down to collect2, resulting in silent corruption
+of the vDSO image (in particular, the DYNAMIC section is omitted).
 
-Remove the now useless arm-gic.h #include directive, making it
-clear that GICv2 specific code doesn't belong here.
+The effect of this corruption is that the dynamic linker fails to find
+the vDSO symbols and libc is instead used for the syscalls that we
+intended to optimise (e.g. gettimeofday). Functionally, there is no
+issue as the sigreturn trampoline is still intact and located by the
+kernel.
 
-Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+This patch fixes the problem by explicitly passing -shared to the linker
+when building the vDSO.
+
+Cc: <stable@vger.kernel.org>
+Reported-by: Szabolcs Nagy <Szabolcs.Nagy@arm.com>
+Reported-by: James Greenlaigh <james.greenhalgh@arm.com>
+Signed-off-by: Will Deacon <will.deacon@arm.com>
 ---
- virt/kvm/arm/vgic.c | 2 --
- 1 file changed, 2 deletions(-)
+ arch/arm64/kernel/vdso/Makefile | 4 ++++
+ 1 file changed, 4 insertions(+)
 
-diff --git a/virt/kvm/arm/vgic.c b/virt/kvm/arm/vgic.c
-index 950064a..f94d887 100644
---- a/virt/kvm/arm/vgic.c
-+++ b/virt/kvm/arm/vgic.c
-@@ -26,8 +26,6 @@
- #include <linux/of_irq.h>
- #include <linux/uaccess.h>
+diff --git a/arch/arm64/kernel/vdso/Makefile b/arch/arm64/kernel/vdso/Makefile
+index ff3bddea482d..f6fe17d88da5 100644
+--- a/arch/arm64/kernel/vdso/Makefile
++++ b/arch/arm64/kernel/vdso/Makefile
+@@ -15,6 +15,10 @@ ccflags-y := -shared -fno-common -fno-builtin
+ ccflags-y += -nostdlib -Wl,-soname=linux-vdso.so.1 \
+ 		$(call cc-ldoption, -Wl$(comma)--hash-style=sysv)
  
--#include <linux/irqchip/arm-gic.h>
--
- #include <asm/kvm_emulate.h>
- #include <asm/kvm_arm.h>
- #include <asm/kvm_mmu.h>
++# Workaround for bare-metal (ELF) toolchains that neglect to pass -shared
++# down to collect2, resulting in silent corruption of the vDSO image.
++ccflags-y += -Wl,-shared
++
+ obj-y += vdso.o
+ extra-y += vdso.lds vdso-offsets.h
+ CPPFLAGS_vdso.lds += -P -C -U$(ARCH)
 -- 
 2.1.4
