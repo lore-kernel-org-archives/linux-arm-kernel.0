@@ -1,79 +1,147 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Fri, 19 Jun 2015 12:30:08 +0200
-Subject: [PATCH 23/41] clocksource: sun4i: Migrate to new 'set-state'
- interface
-In-Reply-To: <20150618122336.GB1982@linux>
-References: <cover.1434622147.git.viresh.kumar@linaro.org>
- <fe0d96a4671d94c60f7b252d1c038cd62ed71162.1434622147.git.viresh.kumar@linaro.org>
- <20150618120105.GM11732@lukather> <20150618122336.GB1982@linux>
-Message-ID: <20150619103008.GB11732@lukather>
+From: maitysanchayan@gmail.com (maitysanchayan at gmail.com)
+Date: Fri, 19 Jun 2015 16:06:47 +0530
+Subject: [PATCH v5 06/11] nvmem: Add bindings for simple nvmem framework
+In-Reply-To: <1432226652-8947-1-git-send-email-srinivas.kandagatla@linaro.org>
+References: <1432226535-8640-1-git-send-email-srinivas.kandagatla@linaro.org>
+ <1432226652-8947-1-git-send-email-srinivas.kandagatla@linaro.org>
+Message-ID: <20150619103647.GA3913@Sanchayan-Arch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 18, 2015 at 05:53:36PM +0530, Viresh Kumar wrote:
-> On 18-06-15, 14:01, Maxime Ripard wrote:
-> > On Thu, Jun 18, 2015 at 04:24:37PM +0530, Viresh Kumar wrote:
-> > > +static int sun4i_clkevt_shutdown(struct clock_event_device *evt)
-> > >  {
-> > > -	switch (mode) {
-> > > -	case CLOCK_EVT_MODE_PERIODIC:
-> > > -		sun4i_clkevt_time_stop(0);
-> > > -		sun4i_clkevt_time_setup(0, ticks_per_jiffy);
-> > > -		sun4i_clkevt_time_start(0, true);
-> > > -		break;
-> > > -	case CLOCK_EVT_MODE_ONESHOT:
-> > > -		sun4i_clkevt_time_stop(0);
-> > > -		sun4i_clkevt_time_start(0, false);
-> > > -		break;
-> > > -	case CLOCK_EVT_MODE_UNUSED:
-> > > -	case CLOCK_EVT_MODE_SHUTDOWN:
-> > > -	default:
-> > > -		sun4i_clkevt_time_stop(0);
-> > > -		break;
-> 
-> Because sun4i_clkevt_time_stop() is getting called in default case, it
-> is getting called for tick-resume mode already with the old set_mode
-> interface.
-> 
-> > > +	.tick_resume = sun4i_clkevt_shutdown,
-> > 
-> > I'm not exactly sure of the context here, but I wouldn't expect a
-> > callback called tick_resume to stop a timer. Is this expected?
-> 
-> And so this patch carried the same logic here.
-> 
-> At suspend: clockevents core calls ->set_state_shutdown() and at
-> resume it calls ->tick_resume() followed by setting to the proper
-> mode, i.e. periodic or oneshot.
-> 
-> Many driver authors didn't knew about these details and so did
-> shutdown in resume path as well.
-> 
-> For me, you might not even need a tick_resume() at all, as your driver
-> would have already shutted down on suspend and is just required to be
-> put to the right mode again.
+Hello Srinivas,
 
-Ok, thanks for the explanation.
+On 15-05-21 17:44:12, Srinivas Kandagatla wrote:
+> This patch adds bindings for simple nvmem framework which allows nvmem
+> consumers to talk to nvmem providers to get access to nvmem cell data.
+> 
+> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> [Maxime Ripard: intial version of eeprom framework]
+> Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
+> ---
+>  Documentation/devicetree/bindings/nvmem/nvmem.txt | 84 +++++++++++++++++++++++
+>  1 file changed, 84 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/nvmem/nvmem.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/nvmem/nvmem.txt b/Documentation/devicetree/bindings/nvmem/nvmem.txt
+> new file mode 100644
+> index 0000000..ecea654
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/nvmem/nvmem.txt
+> @@ -0,0 +1,84 @@
+> += NVMEM Data Device Tree Bindings =
+> +
+> +This binding is intended to represent the location of hardware
+> +configuration data stored in NVMEMs.
+> +
+> +On a significant proportion of boards, the manufacturer has stored
+> +some data on NVMEM, for the OS to be able to retrieve these information
+> +and act upon it. Obviously, the OS has to know about where to retrieve
+> +these data from, and where they are stored on the storage device.
+> +
+> +This document is here to document this.
+> +
+> += Data providers =
+> +Contains bindings specific to provider drivers and data cells as children
+> +to this node.
+> +
+> +Optional properties:
+> + read-only: Mark the provider as read only.
+> +
+> += Data cells =
+> +These are the child nodes of the provider which contain data cell
+> +information like offset and size in nvmem provider.
+> +
+> +Required properties:
+> +reg:	specifies the offset in byte within that storage device, start bit
+> +	in the byte and the length in bits of the data we care about.
+> +	There could be more then one offset-length pairs in this property.
+> +
+> +Optional properties:
+> +
+> +bit-offset: specifies the offset in bit within the address range specified
+> +	by reg property. Can take values from 0-7.
+> +nbits: specifies number of bits this cell occupies starting from bit-offset.
+> +
+> +For example:
+> +
+> +	/* Provider */
+> +	qfprom: qfprom at 00700000 {
+> +		...
+> +
+> +		/* Data cells */
+> +		tsens_calibration: calib at 404 {
+> +			reg = <0x404 0x10>;
+> +		};
+> +
+> +		tsens_calibration_bckp: calib_bckp at 504 {
+> +			reg = <0x504 0x11>;
+> +			bit-offset = 6;
+> +			nbits = 128;
+> +		};
+> +
+> +		pvs_version: pvs-version at 6 {
+> +			reg = <0x6 0x2>
+> +			bit-offset = 7;
+> +			nbits = 2;
+> +		};
+> +
+> +		speed_bin: speed-bin at c{
+> +			reg = <0xc 0x1>;
+> +			bit-offset = 2;
+> +			nbits	= 3;
+> +
+> +		};
+> +		...
+> +	};
 
-It looks good for both this patch and the sun5i one. You can add my
-Acked-by.
+We have a need of exposing information like SoC ID, revision and such
+which is what this nvmem framework proposes to be suitable for. Till
+now I was trying a different approach for the same [1].
 
-> But, I didn't wanted to change the way things behaved until now. I can
-> add another patch to get things fixed separately if you want me to.
+The On Chip One Time Programmable block on the Vybrid can be handled
+nicely with this nvmem framework however I had a few queries with
+regards to the framework after trying it on a Vybrid VF61 SoC. 
 
-If you have some spare time, it would be great :)
+1. From what I understand, getting the information in hex is the only
+way possible as of now? Would it be possible to expose the information
+as strings from different paths under /sys/class/nvmem/*/nvmem/?
 
-Thanks!
-Maxime
+For example, if I have a sub node as below
 
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150619/06f8ce21/attachment.sig>
+ocotp: ocotp at 400a5000 {
+	compatible = "fsl,vf610-ocotp";
+	reg = <0x400a5000 0x1000>;
+
+	ocotp_cfg0: cfg0 at 410 {
+		reg = <0x410 0x1>;
+	};
+
+	ocotp_cfg1: cfg1 at 420 {
+		reg = <0x420 0x1>;
+	};
+};
+
+The values from the above register locations represented by the two
+sub nodes above can perhaps be exposed as strings? Even if they are
+not exposed as strings, making them available in separate paths, is
+that something which can be done? So depending on the sub node as
+above, /sys/class/nvmem/ocotp0/nvmem/cfg0/ would give values from
+the registers specified.
+
+Basically the output of /sys/class/nvmem/*/nvmem being restricted
+to only the subnodes specified is what I was hoping to get along
+with separate paths.
+
+2. What if the required information is scattered across different memory
+regions? In my case, the SoC ID is available from one OCOTP peripheral
+block, the revision is in a separate ROM area at the start of the memory
+map and some CPU information I am interested in is in another memory
+region. I am not sure what would be the right way to approach it with
+the nvmem framework.
+
+[1] https://lkml.org/lkml/2015/6/5/189
+
+Thanks & Regards,
+Sanchayan Maity.
+
+<snip>
