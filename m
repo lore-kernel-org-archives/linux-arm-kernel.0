@@ -1,74 +1,61 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Fri, 19 Jun 2015 08:52:51 +0900
-Subject: [PATCH] ARM: dts: exynos5422-odroidxu3: Add ramp delay for
- regulators
-In-Reply-To: <1434628563-3477-1-git-send-email-linux.amoon@gmail.com>
-References: <1434628563-3477-1-git-send-email-linux.amoon@gmail.com>
-Message-ID: <558359D3.9060201@samsung.com>
+From: computersforpeace@gmail.com (Brian Norris)
+Date: Thu, 18 Jun 2015 17:11:29 -0700
+Subject: [PATCH 0/7] soc: brcmstb: add system suspend support for STB SoCs
+Message-ID: <1434672696-13632-1-git-send-email-computersforpeace@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 18.06.2015 20:56, Anand Moon wrote:
-> Adds ramp delay for the vdd_ldo9, vdd_ldo13,
-> vdd_ldo15 and vdd_sd regulator. Changes removes
-> warning "ramp_delay not set" for all the above regulator.
-> 
-> Signed-off-by: Anand Moon <linux.amoon@gmail.com>
-> ---
-> Changes based on https://github.com/krzk/linux.git branch dt-for-next
-> Console message:
-> [    3.756440] vdd_ldo9: ramp_delay not set
-> [    3.767731] vdd_ldo13: ramp_delay not set
-> [    3.775260] vdd_ldo15: ramp_delay not set
-> [    3.786269] vdd_sd: ramp_delay not set
-> ---
->  arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi | 8 ++++++++
->  1 file changed, 8 insertions(+)
-> 
-> diff --git a/arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi b/arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi
-> index 1565667..7c97740 100644
-> --- a/arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi
-> +++ b/arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi
-> @@ -218,6 +218,8 @@
->  				regulator-name = "vdd_ldo9";
->  				regulator-min-microvolt = <3000000>;
->  				regulator-max-microvolt = <3000000>;
-> +				regulator-enable-ramp-delay = <200>;
-> +				regulator-ramp-delay = <8000>;
+Hi,
 
-How did you get this values?
+This patch set introduces system suspend/resume support for Broadcom STB SoCs.
+There are two suspend modes (S2 and S3) as well as a related low-power shutdown
+mode (S5).
 
-Best regards,
-Krzysztof
+Along with the core PM support, include a driver for the wakeup-timer, which
+allows for simple testing of suspend/resume wakeup cycles.
 
->  				regulator-always-on;
->  			};
->  
-> @@ -246,6 +248,8 @@
->  				regulator-name = "vdd_ldo13";
->  				regulator-min-microvolt = <2800000>;
->  				regulator-max-microvolt = <2800000>;
-> +				regulator-enable-ramp-delay = <200>;
-> +				regulator-ramp-delay = <8000>;
->  				regulator-always-on;
->  			};
->  
-> @@ -253,6 +257,8 @@
->  				regulator-name = "vdd_ldo15";
->  				regulator-min-microvolt = <3100000>;
->  				regulator-max-microvolt = <3100000>;
-> +				regulator-enable-ramp-delay = <200>;
-> +				regulator-ramp-delay = <8000>;
->  				regulator-always-on;
->  			};
->  
-> @@ -274,6 +280,8 @@
->  				regulator-name = "vdd_sd";
->  				regulator-min-microvolt = <2800000>;
->  				regulator-max-microvolt = <2800000>;
-> +				regulator-enable-ramp-delay = <200>;
-> +				regulator-ramp-delay = <8000>;
->  				regulator-always-on;
->  			};
->  
-> 
+Brian
+
+Brian Norris (7):
+  Documentation: dt: brcmstb: add system PM bindings
+  Documentation: dt: brcmstb: add waketimer documentation
+  soc: add stubs for brcmstb SoC's
+  soc: brcmstb: add PM suspend/resume support (S2/S3/S5)
+  soc: brcmstb: add wake-timer driver
+  ARM: brcmstb: mask GIC IRQs on suspend
+  ARM: dts: brcmstb: add BCM7445 system PM DT nodes
+
+ .../ABI/testing/sysfs-driver-wktmr-brcmstb         |  12 +
+ .../devicetree/bindings/arm/bcm/brcm,brcmstb.txt   | 142 +++++-
+ .../soc/brcmstb/brcm,brcmstb-waketimer.txt         |  20 +
+ arch/arm/boot/dts/bcm7445.dtsi                     | 102 ++++
+ arch/arm/mach-bcm/Kconfig                          |   1 +
+ arch/arm/mach-bcm/brcmstb.c                        |  10 +
+ drivers/soc/Kconfig                                |   1 +
+ drivers/soc/Makefile                               |   1 +
+ drivers/soc/brcmstb/Kconfig                        |  22 +
+ drivers/soc/brcmstb/Makefile                       |   4 +
+ drivers/soc/brcmstb/common.c                       |  33 ++
+ drivers/soc/brcmstb/pm/Makefile                    |   1 +
+ drivers/soc/brcmstb/pm/aon_defs.h                  |  85 ++++
+ drivers/soc/brcmstb/pm/pm.c                        | 512 +++++++++++++++++++++
+ drivers/soc/brcmstb/pm/pm.h                        |  40 ++
+ drivers/soc/brcmstb/pm/s2.S                        |  73 +++
+ drivers/soc/brcmstb/wktmr.c                        | 242 ++++++++++
+ include/soc/brcmstb/common.h                       |  15 +
+ 18 files changed, 1314 insertions(+), 2 deletions(-)
+ create mode 100644 Documentation/ABI/testing/sysfs-driver-wktmr-brcmstb
+ create mode 100644 Documentation/devicetree/bindings/soc/brcmstb/brcm,brcmstb-waketimer.txt
+ create mode 100644 drivers/soc/brcmstb/Kconfig
+ create mode 100644 drivers/soc/brcmstb/Makefile
+ create mode 100644 drivers/soc/brcmstb/common.c
+ create mode 100644 drivers/soc/brcmstb/pm/Makefile
+ create mode 100644 drivers/soc/brcmstb/pm/aon_defs.h
+ create mode 100644 drivers/soc/brcmstb/pm/pm.c
+ create mode 100644 drivers/soc/brcmstb/pm/pm.h
+ create mode 100644 drivers/soc/brcmstb/pm/s2.S
+ create mode 100644 drivers/soc/brcmstb/wktmr.c
+ create mode 100644 include/soc/brcmstb/common.h
+
+-- 
+1.9.1
