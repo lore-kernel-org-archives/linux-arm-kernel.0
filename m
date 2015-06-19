@@ -1,90 +1,77 @@
-From: jeremy.trimble@gmail.com (Jeremy Trimble)
-Date: Fri, 19 Jun 2015 12:49:25 -0400
-Subject: [PATCH v7] dma: Add Xilinx AXI Direct Memory Access Engine driver
- support
-In-Reply-To: <1433831736-18253-1-git-send-email-appanad@xilinx.com>
-References: <1433831736-18253-1-git-send-email-appanad@xilinx.com>
-Message-ID: <CAHYiM2+hVn1s5ky6He4+ApvsM_adMfo=q+T_owXd7wkJ6rjHNg@mail.gmail.com>
+From: keescook@chromium.org (Kees Cook)
+Date: Fri, 19 Jun 2015 09:58:45 -0700
+Subject: [PATCH 1/2] Move the pt_regs_offset struct definition from arch
+ to common include file
+In-Reply-To: <5584234E.2040701@linaro.org>
+References: <1434386579-6045-1-git-send-email-dave.long@linaro.org>
+ <1434386579-6045-2-git-send-email-dave.long@linaro.org>
+ <1434687583.23771.5.camel@ellerman.id.au>
+ <5584234E.2040701@linaro.org>
+Message-ID: <CAGXu5jJFkv=ma0SJ-5N+GKQ3xoPw8193+kxO0F3M0c0_c=ZTtg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> +/**
-> + * xilinx_dma_start_transfer - Starts DMA transfer
-> + * @chan: Driver specific channel struct pointer
-> + */
-> +static void xilinx_dma_start_transfer(struct xilinx_dma_chan *chan)
-> +{
-> +       struct xilinx_dma_tx_descriptor *desc;
-> +       struct xilinx_dma_tx_segment *head, *tail = NULL;
-> +
-> +       if (chan->err)
-> +               return;
-> +
-> +       if (list_empty(&chan->pending_list))
-> +               return;
-> +
-> +       if (!chan->idle)
-> +               return;
-> +
-> +       desc = list_first_entry(&chan->pending_list,
-> +                               struct xilinx_dma_tx_descriptor, node);
-> +
-> +       if (chan->has_sg && xilinx_dma_is_running(chan) &&
-> +           !xilinx_dma_is_idle(chan)) {
-> +               tail = list_entry(desc->segments.prev,
-> +                                 struct xilinx_dma_tx_segment, node);
-> +               dma_ctrl_write(chan, XILINX_DMA_REG_TAILDESC, tail->phys);
-> +               goto out_free_desc;
-> +       }
-> +
-> +       if (chan->has_sg) {
-> +               head = list_first_entry(&desc->segments,
-> +                                       struct xilinx_dma_tx_segment, node);
-> +               tail = list_entry(desc->segments.prev,
-> +                                 struct xilinx_dma_tx_segment, node);
-> +               dma_ctrl_write(chan, XILINX_DMA_REG_CURDESC, head->phys);
-> +       }
-> +
-> +       /* Enable interrupts */
-> +       dma_ctrl_set(chan, XILINX_DMA_REG_CONTROL,
-> +                    XILINX_DMA_XR_IRQ_ALL_MASK);
-> +
-> +       xilinx_dma_start(chan);
-> +       if (chan->err)
-> +               return;
-> +
-> +       /* Start the transfer */
-> +       if (chan->has_sg) {
-> +               dma_ctrl_write(chan, XILINX_DMA_REG_TAILDESC, tail->phys);
-> +       } else {
-> +               struct xilinx_dma_tx_segment *segment;
-> +               struct xilinx_dma_desc_hw *hw;
-> +
-> +               segment = list_first_entry(&desc->segments,
-> +                                          struct xilinx_dma_tx_segment, node);
-> +               hw = &segment->hw;
-> +
-> +               if (desc->direction == DMA_MEM_TO_DEV)
-> +                       dma_ctrl_write(chan, XILINX_DMA_REG_SRCADDR,
-> +                                      hw->buf_addr);
-> +               else
-> +                       dma_ctrl_write(chan, XILINX_DMA_REG_DSTADDR,
-> +                                      hw->buf_addr);
-> +
-> +               /* Start the transfer */
-> +               dma_ctrl_write(chan, XILINX_DMA_REG_BTT,
-> +                              hw->control & XILINX_DMA_MAX_TRANS_LEN);
-> +       }
-> +
-> +out_free_desc:
-> +       list_del(&desc->node);
-> +       chan->idle = false;
-> +       chan->active_desc = desc;
-> +}
+On Fri, Jun 19, 2015 at 7:12 AM, David Long <dave.long@linaro.org> wrote:
+> On 06/19/15 00:19, Michael Ellerman wrote:
+>>
+>> On Mon, 2015-06-15 at 12:42 -0400, David Long wrote:
+>>>
+>>> From: "David A. Long" <dave.long@linaro.org>
+>>>
+>>> The pt_regs_offset structure is used for HAVE_REGS_AND_STACK_ACCESS_API
+>>>   feature and has identical definitions in four different arch ptrace.h
+>>> include files. It seems unlikely that definition would ever need to be
+>>> changed regardless of architecture so lets move it into
+>>> include/linux/ptrace.h.
+>>>
+>>> Signed-off-by: David A. Long <dave.long@linaro.org>
+>>> ---
+>>>   arch/powerpc/kernel/ptrace.c | 5 -----
+>>
+>>
+>> Built and booted on powerpc, but is there an easy way to actually test the
+>> code
+>> paths in question?
+>>
+>
+> There is an easy way to "smoke test" it on all archiectures that also
+> implement kprobes (which powerpc does).  If I'm understanding the powerpc
+> code correctly (WRT register naming conventions) just do the following:
+>
+> cd /sys/kernel/debug/tracing
+> echo 'p do_fork %gpr0' > kprobe_events
+> echo 1 > events/kprobes/enable
+> ls
+> cat trace
+> echo 0 > events/kprobes/enable
+>
+> Every fork() call done on the system between those two echo commands (hence
+> the "ls") should append a line to the trace file.  For a more exhaustive
+> test one could repeat this sequence for every register in the architecture.
+>
+> This should work the same on all architectures supporting kprobes.  You just
+> have to use the appropriate register names for your architecture after the
+> "%".
 
-What prevents chan->active_desc from being overwritten before the
-previous descriptor is transferred to done_list.  For instance, if two
-transfers are queued with issue_pending() in quick succession (such
-that xilinx_dma_start_transfer() is called twice before the interrupt
-for the first transfer occurs), won't the first descriptor be
-overwritten and lost?
+Is this something we could codify into the selftests directory? It
+seems like a great thing to capture in a single place somewhere (the
+register lists, that is).
+
+-Kees
+
+>
+>> Acked-by: Michael Ellerman <mpe@ellerman.id.au>
+>>
+>> cheers
+>>
+>>
+>
+> Thanks,
+> -dl
+>
+
+
+
+-- 
+Kees Cook
+Chrome OS Security
