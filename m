@@ -1,87 +1,43 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri, 19 Jun 2015 13:53:12 +0100
-Subject: [PATCH 08/12] ARM: kvm: psci: fix handling of unimplemented functions
-In-Reply-To: <1434718396-13110-1-git-send-email-marc.zyngier@arm.com>
-References: <1434718396-13110-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1434718396-13110-9-git-send-email-marc.zyngier@arm.com>
+From: alex.bennee@linaro.org (=?UTF-8?q?Alex=20Benn=C3=A9e?=)
+Date: Fri, 19 Jun 2015 13:23:49 +0100
+Subject: [PATCH v6 11/12] KVM: arm64: enable KVM_CAP_SET_GUEST_DEBUG
+In-Reply-To: <1434716630-18260-1-git-send-email-alex.bennee@linaro.org>
+References: <1434716630-18260-1-git-send-email-alex.bennee@linaro.org>
+Message-ID: <1434716630-18260-12-git-send-email-alex.bennee@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+Finally advertise the KVM capability for SET_GUEST_DEBUG. Once arm
+support is added this check can be moved to the common
+kvm_vm_ioctl_check_extension() code.
 
-According to the PSCI specification and the SMC/HVC calling
-convention, PSCI function_ids that are not implemented must
-return NOT_SUPPORTED as return value.
+Signed-off-by: Alex Benn?e <alex.bennee@linaro.org>
+Acked-by: Christoffer Dall <christoffer.dall@linaro.org>
 
-Current KVM implementation takes an unhandled PSCI function_id
-as an error and injects an undefined instruction into the guest
-if PSCI implementation is called with a function_id that is not
-handled by the resident PSCI version (ie it is not implemented),
-which is not the behaviour expected by a guest when calling a
-PSCI function_id that is not implemented.
-
-This patch fixes this issue by returning NOT_SUPPORTED whenever
-the kvm PSCI call is executed for a function_id that is not
-implemented by the PSCI kvm layer.
-
-Cc: <stable@vger.kernel.org> # 3.18+
-Cc: Christoffer Dall <christoffer.dall@linaro.org>
-Acked-by: Sudeep Holla <sudeep.holla@arm.com>
-Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm/kvm/psci.c | 16 +++-------------
- 1 file changed, 3 insertions(+), 13 deletions(-)
 
-diff --git a/arch/arm/kvm/psci.c b/arch/arm/kvm/psci.c
-index 02fa8ef..531e922 100644
---- a/arch/arm/kvm/psci.c
-+++ b/arch/arm/kvm/psci.c
-@@ -230,10 +230,6 @@ static int kvm_psci_0_2_call(struct kvm_vcpu *vcpu)
- 	case PSCI_0_2_FN64_AFFINITY_INFO:
- 		val = kvm_psci_vcpu_affinity_info(vcpu);
+v3:
+ - separated capability check from previous patches
+ - moved into arm64 specific ioctl handler.
+v4:
+ - add a-b-tag
+---
+ arch/arm64/kvm/reset.c | 3 +++
+ 1 file changed, 3 insertions(+)
+
+diff --git a/arch/arm64/kvm/reset.c b/arch/arm64/kvm/reset.c
+index 21d5a62..88e5331 100644
+--- a/arch/arm64/kvm/reset.c
++++ b/arch/arm64/kvm/reset.c
+@@ -76,6 +76,9 @@ int kvm_arch_dev_ioctl_check_extension(long ext)
+ 	case KVM_CAP_GUEST_DEBUG_HW_WPS:
+ 		r  = get_num_wrps();
  		break;
--	case PSCI_0_2_FN_MIGRATE:
--	case PSCI_0_2_FN64_MIGRATE:
--		val = PSCI_RET_NOT_SUPPORTED;
--		break;
- 	case PSCI_0_2_FN_MIGRATE_INFO_TYPE:
- 		/*
- 		 * Trusted OS is MP hence does not require migration
-@@ -242,10 +238,6 @@ static int kvm_psci_0_2_call(struct kvm_vcpu *vcpu)
- 		 */
- 		val = PSCI_0_2_TOS_MP;
- 		break;
--	case PSCI_0_2_FN_MIGRATE_INFO_UP_CPU:
--	case PSCI_0_2_FN64_MIGRATE_INFO_UP_CPU:
--		val = PSCI_RET_NOT_SUPPORTED;
--		break;
- 	case PSCI_0_2_FN_SYSTEM_OFF:
- 		kvm_psci_system_off(vcpu);
- 		/*
-@@ -271,7 +263,8 @@ static int kvm_psci_0_2_call(struct kvm_vcpu *vcpu)
- 		ret = 0;
- 		break;
- 	default:
--		return -EINVAL;
-+		val = PSCI_RET_NOT_SUPPORTED;
++	case KVM_CAP_SET_GUEST_DEBUG:
++		r = 1;
 +		break;
+ 	default:
+ 		r = 0;
  	}
- 
- 	*vcpu_reg(vcpu, 0) = val;
-@@ -291,12 +284,9 @@ static int kvm_psci_0_1_call(struct kvm_vcpu *vcpu)
- 	case KVM_PSCI_FN_CPU_ON:
- 		val = kvm_psci_vcpu_on(vcpu);
- 		break;
--	case KVM_PSCI_FN_CPU_SUSPEND:
--	case KVM_PSCI_FN_MIGRATE:
-+	default:
- 		val = PSCI_RET_NOT_SUPPORTED;
- 		break;
--	default:
--		return -EINVAL;
- 	}
- 
- 	*vcpu_reg(vcpu, 0) = val;
 -- 
-2.1.4
+2.4.3
