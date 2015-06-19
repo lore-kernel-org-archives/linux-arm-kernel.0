@@ -1,108 +1,159 @@
 From: scottwood@freescale.com (Scott Wood)
-Date: Thu, 18 Jun 2015 21:49:17 -0500
-Subject: [RFC PATCH 7/8] clk: qoriq: Expose OF clocks directly from the
- clockgen node
+Date: Thu, 18 Jun 2015 21:49:16 -0500
+Subject: [RFC PATCH 6/8] cpufreq: qoriq: Remove frequency masking and minimum
 In-Reply-To: <1434682158-7243-1-git-send-email-scottwood@freescale.com>
 References: <1434682158-7243-1-git-send-email-scottwood@freescale.com>
-Message-ID: <1434682158-7243-8-git-send-email-scottwood@freescale.com>
+Message-ID: <1434682158-7243-7-git-send-email-scottwood@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This allows the "clocks" property to be used in the absence of
-legacy nodes, and for clocks that the legacy nodes do not describe.
+The clock driver now takes care of ensuring that the mux only
+exposes options that are valid.  The driver was currently being overly
+conservative in some cases -- for example, the "min_cpufreq =
+get_bus_freq()" restriction only applies to chips with erratum
+A-004510, and whether the freq_mask used on p5020 is needed depends on
+the actual frequencies of the PLLs (FWIW, p5040 has a similar
+limitation but its .freq_mask was zero).
+
+Further, the freq_mask mechanism makes assumptions about the number and
+order of the clock parents.  The new driver does not adhere to those
+assumptions (in particular, it removes invalid options).
 
 Signed-off-by: Scott Wood <scottwood@freescale.com>
 ---
- drivers/clk/clk-qoriq.c | 63 ++++++++++++++++++++++++++++++++++++++++++++++++-
- 1 file changed, 62 insertions(+), 1 deletion(-)
+ drivers/cpufreq/qoriq-cpufreq.c | 92 +----------------------------------------
+ 1 file changed, 2 insertions(+), 90 deletions(-)
 
-diff --git a/drivers/clk/clk-qoriq.c b/drivers/clk/clk-qoriq.c
-index f6aa106..e408965 100644
---- a/drivers/clk/clk-qoriq.c
-+++ b/drivers/clk/clk-qoriq.c
-@@ -938,6 +938,61 @@ static void __init pltfrm_pll_init(struct device_node *np)
- 	legacy_pll_init(np, PLATFORM_PLL);
- }
+diff --git a/drivers/cpufreq/qoriq-cpufreq.c b/drivers/cpufreq/qoriq-cpufreq.c
+index 32ab99e..514395f 100644
+--- a/drivers/cpufreq/qoriq-cpufreq.c
++++ b/drivers/cpufreq/qoriq-cpufreq.c
+@@ -36,53 +36,6 @@ struct cpu_data {
+ 	struct cpufreq_frequency_table *table;
+ };
  
-+static struct clk *clockgen_clk_get(struct of_phandle_args *clkspec, void *data)
-+{
-+	struct clockgen *cg = data;
-+	struct clk *clk;
-+	struct clockgen_pll *pll;
-+	u32 type, idx;
-+
-+	if (clkspec->args_count < 2) {
-+		pr_err("%s: insufficient phandle args\n", __func__);
-+		return ERR_PTR(-EINVAL);
-+	}
-+
-+	type = clkspec->args[0];
-+	idx = clkspec->args[1];
-+
-+	switch (type) {
-+	case 0:
-+		if (idx != 0)
-+			goto bad_args;
-+		clk = cg->sysclk;
-+		break;
-+	case 1:
-+		if (idx >= ARRAY_SIZE(cg->cmux))
-+			goto bad_args;
-+		clk = cg->cmux[idx];
-+		break;
-+	case 2:
-+		if (idx >= ARRAY_SIZE(cg->hwaccel))
-+			goto bad_args;
-+		clk = cg->hwaccel[idx];
-+		break;
-+	case 3:
-+		if (idx >= ARRAY_SIZE(cg->fman))
-+			goto bad_args;
-+		clk = cg->fman[idx];
-+		break;
-+	case 4:
-+		pll = &cg->pll[PLATFORM_PLL];
-+		if (idx >= ARRAY_SIZE(pll->div))
-+			goto bad_args;
-+		clk = pll->div[idx].clk;
-+		break;
-+	default:
-+		goto bad_args;
-+	}
-+
-+	if (!clk)
-+		return ERR_PTR(-ENOENT);
-+	return clk;
-+
-+bad_args:
-+	pr_err("%s: Bad phandle args %u %u\n", __func__, type, idx);
-+	return ERR_PTR(-EINVAL);
-+}
-+
- #ifdef CONFIG_PPC
- #include <asm/mpc85xx.h>
- 
-@@ -982,7 +1037,7 @@ static bool __init has_erratum_a4510(void)
- 
- static void __init clockgen_init(struct device_node *np)
+-/**
+- * struct soc_data - SoC specific data
+- * @freq_mask: mask the disallowed frequencies
+- * @flag: unique flags
+- */
+-struct soc_data {
+-	u32 freq_mask[4];
+-	u32 flag;
+-};
+-
+-#define FREQ_MASK	1
+-/* see hardware specification for the allowed frqeuencies */
+-static const struct soc_data sdata[] = {
+-	{ /* used by p2041 and p3041 */
+-		.freq_mask = {0x8, 0x8, 0x2, 0x2},
+-		.flag = FREQ_MASK,
+-	},
+-	{ /* used by p5020 */
+-		.freq_mask = {0x8, 0x2},
+-		.flag = FREQ_MASK,
+-	},
+-	{ /* used by p4080, p5040 */
+-		.freq_mask = {0},
+-		.flag = 0,
+-	},
+-};
+-
+-/*
+- * the minimum allowed core frequency, in Hz
+- * for chassis v1.0, >= platform frequency
+- * for chassis v2.0, >= platform frequency / 2
+- */
+-static u32 min_cpufreq;
+-static const u32 *fmask;
+-
+-#if defined(CONFIG_ARM)
+-static int get_cpu_physical_id(int cpu)
+-{
+-	return topology_core_id(cpu);
+-}
+-#else
+-static int get_cpu_physical_id(int cpu)
+-{
+-	return get_hard_smp_processor_id(cpu);
+-}
+-#endif
+-
+ static u32 get_bus_freq(void)
  {
--	int i;
-+	int i, ret;
+ 	struct device_node *soc;
+@@ -195,7 +148,7 @@ static int qoriq_cpufreq_cpu_init(struct cpufreq_policy *policy)
+ {
+ 	struct device_node *np, *pnode;
+ 	int i, count, ret;
+-	u32 freq, mask;
++	u32 freq;
+ 	struct clk *clk;
+ 	struct cpufreq_frequency_table *table;
+ 	struct cpu_data *data;
+@@ -230,23 +183,11 @@ static int qoriq_cpufreq_cpu_init(struct cpufreq_policy *policy)
+ 		goto err_pclk;
+ 	}
  
- 	clockgen.node = np;
- 	clockgen.regs = of_iomap(np, 0);
-@@ -1028,6 +1083,12 @@ static void __init clockgen_init(struct device_node *np)
- 	if (clockgen.info.init_periph)
- 		clockgen.info.init_periph(&clockgen);
+-	if (fmask)
+-		mask = fmask[get_cpu_physical_id(cpu)];
+-	else
+-		mask = 0x0;
+-
+ 	for (i = 0; i < count; i++) {
+ 		clk = clk_get_parent_by_index(policy->clk, i);
+ 		data->pclk[i] = clk;
+ 		freq = clk_get_rate(clk);
+-		/*
+-		 * the clock is valid if its frequency is not masked
+-		 * and large than minimum allowed frequency.
+-		 */
+-		if (freq < min_cpufreq || (mask & (1 << i)))
+-			table[i].frequency = CPUFREQ_ENTRY_INVALID;
+-		else
+-			table[i].frequency = freq / 1000;
++		table[i].frequency = freq / 1000;
+ 		table[i].driver_data = i;
+ 	}
+ 	freq_table_redup(table, count);
+@@ -321,38 +262,9 @@ static struct cpufreq_driver qoriq_cpufreq_driver = {
+ 	.attr		= cpufreq_generic_attr,
+ };
  
-+	ret = of_clk_add_provider(np, clockgen_clk_get, &clockgen);
-+	if (ret) {
-+		pr_err("%s: Couldn't register clk provider for node %s: %d\n",
-+		       __func__, np->name, ret);
-+	}
-+
- 	return;
- err:
- 	iounmap(clockgen.regs);
+-static const struct of_device_id node_matches[] __initconst = {
+-	{ .compatible = "fsl,p2041-clockgen", .data = &sdata[0], },
+-	{ .compatible = "fsl,p3041-clockgen", .data = &sdata[0], },
+-	{ .compatible = "fsl,p5020-clockgen", .data = &sdata[1], },
+-	{ .compatible = "fsl,p4080-clockgen", .data = &sdata[2], },
+-	{ .compatible = "fsl,p5040-clockgen", .data = &sdata[2], },
+-	{ .compatible = "fsl,qoriq-clockgen-2.0", },
+-	{}
+-};
+-
+ static int __init qoriq_cpufreq_init(void)
+ {
+ 	int ret;
+-	struct device_node  *np;
+-	const struct of_device_id *match;
+-	const struct soc_data *data;
+-
+-	np = of_find_matching_node(NULL, node_matches);
+-	if (!np)
+-		return -ENODEV;
+-
+-	match = of_match_node(node_matches, np);
+-	data = match->data;
+-	if (data) {
+-		if (data->flag)
+-			fmask = data->freq_mask;
+-		min_cpufreq = get_bus_freq();
+-	} else {
+-		min_cpufreq = get_bus_freq() / 2;
+-	}
+-
+-	of_node_put(np);
+ 
+ 	ret = cpufreq_register_driver(&qoriq_cpufreq_driver);
+ 	if (!ret)
 -- 
 2.1.4
