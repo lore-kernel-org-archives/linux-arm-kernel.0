@@ -1,54 +1,24 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Sat, 20 Jun 2015 00:22:39 +0200
-Subject: [PATCH 2/2] ARM: dts: add buffalo linkstation ls-wvl/vl
-In-Reply-To: <1434713319-8691-3-git-send-email-rogershimizu@gmail.com>
-References: <1434713319-8691-1-git-send-email-rogershimizu@gmail.com>
- <1434713319-8691-3-git-send-email-rogershimizu@gmail.com>
-Message-ID: <20150619222239.GB1116@lunn.ch>
+From: timur@codeaurora.org (Timur Tabi)
+Date: Fri, 19 Jun 2015 17:28:53 -0500
+Subject: [PATCH 1/2] arm64: qcom: Add define for ARMv8 implementer (MIDR)
+In-Reply-To: <20150615105933.GE17322@e104818-lin.cambridge.arm.com>
+References: <1434146263-30972-1-git-send-email-timur@codeaurora.org>
+ <20150615105933.GE17322@e104818-lin.cambridge.arm.com>
+Message-ID: <558497A5.4020700@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> +++ b/Documentation/devicetree/bindings/arm/marvell,kirkwood.txt
-> @@ -23,6 +23,7 @@ board. Currently known boards are:
->  "buffalo,lsxhl"
->  "buffalo,lsxl"
->  "buffalo,lswxl"
-> +"buffalo,lswvl"
->  "dlink,dns-320"
->  "dlink,dns-320-a1"
->  "dlink,dns-325"
-> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-> index e0ebd59..a16cfca 100644
-> --- a/arch/arm/boot/dts/Makefile
-> +++ b/arch/arm/boot/dts/Makefile
-> @@ -178,6 +178,7 @@ dtb-$(CONFIG_MACH_KIRKWOOD) += \
->  	kirkwood-lschlv2.dtb \
->  	kirkwood-lsxhl.dtb \
->  	kirkwood-lswxl.dtb \
-> +	kirkwood-lswvl.dtb \
->  	kirkwood-mplcec4.dtb \
->  	kirkwood-mv88f6281gtw-ge.dtb \
->  	kirkwood-nas2big.dtb \
+On 06/15/2015 05:59 AM, Catalin Marinas wrote:
+> I think this patch together with the second one could go through the kvm
+> tree. For the core arm64 part:
+>
+> Acked-by: Catalin Marinas<catalin.marinas@arm.com>
 
-We try to keep these in alphabetical order. So lswvl.dtb should be
-before lswxl.dtb in both these lists.
+Suzuki Poulose posted a patch that adds generic support for ARMv8 KVM 
+targets.  I want to drop my second patch, so can we pick up this first 
+patch through the ARM tree?
 
-> +		i2c at 11000 {
-> +			status = "okay";
-> +		};
-
-Is there something on the i2c bus?
-
-> +
-> +		serial at 12000 {
-> +			pinctrl-0 = <&pmx_uart0>;
-> +			pinctrl-names = "default";
-
-You don't need the pinctrl properties. 
-
-> +			status = "okay";
-> +		};
-> +
-
-Thanks
-	Andrew
+-- 
+Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the
+Code Aurora Forum, a Linux Foundation Collaborative Project.
