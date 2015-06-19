@@ -1,53 +1,63 @@
-From: heiko@sntech.de (Heiko Stuebner)
-Date: Fri, 19 Jun 2015 13:36:40 +0200
-Subject: [PATCH] arm64: dts: mt8173: add clock_null
-In-Reply-To: <2333431.ttvjElY3ps@phil>
-References: <1434605351-64592-1-git-send-email-eddie.huang@mediatek.com>
- <2333431.ttvjElY3ps@phil>
-Message-ID: <8371528.SNAmOgosfF@phil>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Fri, 19 Jun 2015 11:41:52 +0000
+Subject: Linkstation Mini and __machine_arch_type problem, not booting
+ since 3.8
+In-Reply-To: <5583E1D9.2010002@free-electrons.com>
+References: <97db3502cd014faf1c710b1cc0fe8848@dolka.fr>
+ <55827D64.1090307@free-electrons.com>
+ <1434678624.4767.22.camel@dolka.fr>
+ <5583E1D9.2010002@free-electrons.com>
+Message-ID: <20150619114152.GA2936@io.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Donnerstag, 18. Juni 2015, 18:15:03 schrieb Heiko Stuebner:
-> Am Donnerstag, 18. Juni 2015, 13:29:11 schrieb Eddie Huang:
-> > Add clk_null, which represents clocks that can not / need not
-> > controlled by software.
-> > There are many clocks' parent set to clk_null.
+On Fri, Jun 19, 2015 at 11:33:13AM +0200, Gregory CLEMENT wrote:
+> Hi Benjamin,
 > 
-> Devicetree is supposed to describe hardware, and ideally not what software
-> does with it. If the clock simply cannot be controlled by software, it will
-> still have a rate and I think it should probably be modelled - similarly we
-> sometimes have fixed regulators that also are not software controllable.
+> On 19/06/2015 03:50, Benjamin Cama wrote:
+> > Hi Gr??gory, Andrew and Arnd,
+> > 
+> > Le jeudi 18 juin 2015 ?? 10:12 +0200, Gregory CLEMENT a ??crit :
+> >> On 15/06/2015 15:51, Benjamin Cama wrote:
+> >>> Also, my intent at first was to try converting this machine to DT, so 
+> >>> maybe
+> >>> the solution to my problem would simply be to try converting it and see
+> >>> if it fixes the problem?
+> >>
+> >> Indeed it is your best option given the problem you exposed later in this
+> >> thread. Our plan in mid-term is to completely remove the non-DT support.
+> >> So converting the board is definitely the right thing to do.
+> >>
+> >> The conversation should not be too hard to achieve, you will have mainly to
+> >> write a dts, build a dtb an append it to your kernel.
+> >> You can have a look on waht was done for the LaCie d2 Network platform, see
+> >> 94b0bd366e36379c994bdaa84f 'ARM: orion5x: convert d2net to Device Tree'
+> > 
+> > OK, I tried following you advice, and copied step by step the dts with
+> > values corresponding to my board.
+> > 
+> >> If you have any trouble or question during the conversion we will 
+> >> help you.
+> > 
+> > It took several iterations to get done, but attached is the dts I
+> > wrote. Still, it doesn't boot and I get no message after the
+> > decompressor message. But I get something: the leds change according to
+> > the configuration of the dts, so something is going on (I noticed the
+> > change after several failed boot where no led changed and fixing a typo
+> > made it).
+> > 
+> > My main problem is getting some debug messages: no amount of "debug"
+> > and "loglevel" on the command line seems to change anything. Is it too
+> > early in the boot process to get anything output or am I doing
+> > something wrong? (I activated some configs for debugging, but I may
+> > have missed the good one)
 > 
-> 
-> While it might be ok to define dummy clocks as a temporary stopgap, these
-> should definitly be marked as such. This clk_null at least sounds like there
-> is no plan to replace this with a real solution at some point.
-> 
-> And of course a bit of context would be cool, to know which type of clocks
-> this actually replaces.
+> Try to activate earlyprintk. For this you have to select CONFIG_EARLY_PRINTK
+> which depend on DEBUG_LL. You will also have to add the argument
+> "earlyprintk" to your kernel parameters.
 
-After looking a bit more into this, I'm feel that the clk_null approach is 
-wrong.
+SERIAL_OF_PLATFORM?
 
-For one, even if the clk_null stuff would be ok, the binding doc of the clock 
-controller does not describe the need of this specific clock at all.
+thx,
 
-
-The other more important point, looking at clk-mt8173 I see at least these 
-clocks being set as children of "clk_null":
-
-static const struct mtk_fixed_factor root_clk_alias[] __initconst = {
-	FACTOR(CLK_TOP_CLKPH_MCK_O, "clkph_mck_o", "clk_null", 1, 1),
-	FACTOR(CLK_TOP_DPI, "dpi_ck", "clk_null", 1, 1),
-	FACTOR(CLK_TOP_USB_SYSPLL_125M, "usb_syspll_125m", "clk_null", 1, 1),
-	FACTOR(CLK_TOP_HDMITX_DIG_CTS, "hdmitx_dig_cts", "clk_null", 1, 1),
-};
-
-
-These look more like they are fed from some external source to the clock 
-controller? I did ask Matthias but he also couldn't find anything describing 
-where these clocks actually come from.
-
-
-Heiko
+Jason.
