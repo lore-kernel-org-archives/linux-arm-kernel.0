@@ -1,33 +1,60 @@
-From: dianders@chromium.org (Doug Anderson)
-Date: Fri, 19 Jun 2015 08:24:21 -0700
-Subject: [PATCH] ARM: dts: rockchip: fix rk3288 watchdog irq
-In-Reply-To: <1961157.dsytR1KvKa@phil>
-References: <1961157.dsytR1KvKa@phil>
-Message-ID: <CAD=FV=U3AQY1y6PJP4uBzqBgBkX3GdKtN7iLjGv62w4eZ3W2bQ@mail.gmail.com>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Fri, 19 Jun 2015 15:25:52 +0000
+Subject: [PATCH] Re: Linkstation Mini and __machine_arch_type problem,
+ not booting since 3.8
+In-Reply-To: <d6d361113992920900137899ae4d1f7b@dolka.fr>
+References: <97db3502cd014faf1c710b1cc0fe8848@dolka.fr>
+ <1434446447.4785.7.camel@dolka.fr>
+ <1434593555.13334.14.camel@dolka.fr> <558278A8.2050406@arm.com>
+ <1434677895.4767.11.camel@dolka.fr> <5583DD23.90505@arm.com>
+ <1434716194.17448.28.camel@x60s>
+ <20150619131315.GR7557@n2100.arm.linux.org.uk>
+ <d6d361113992920900137899ae4d1f7b@dolka.fr>
+Message-ID: <20150619152552.GF2936@io.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Heiko,
+On Fri, Jun 19, 2015 at 03:46:45PM +0200, Benjamin Cama wrote:
+> Le 2015-06-19 15:13, Russell King - ARM Linux a ??crit??:
+> >On Fri, Jun 19, 2015 at 02:16:34PM +0200, Benjamin Cama wrote:
+...
+> >>I was not talking about the irq handler, but the irq initialization
+> >>routine (on orion5x, orion_irq_init calls irq_alloc_generic_chip
+> >>with 0), which takes the starting irq number and may warn when it is
+> >>zero (well, it may also start allocating at zero but never use it,
+> >>so this may not be a totally correct assumption, but I think this
+> >>comes close, and it's just a warning).
+> >
+> >It needs fixing nevertheless - arguments along the lines of "this
+> >used to work" don't work for this topic.
+> >
+> >The simple answer is to adjust the initialisation to bump the IRQ
+> >numbers up by one, and them adjust the interrupt numbers in
+> >arch/arm/mach-whatever/include/asm/irqs.h also up by one.  That's
+> >far easier to do than spending ages trying to argue against the
+> >"IRQ0 is not valid" issue, only to ultimately get nowhere, and end
+> >up with that as the only way forward anyway.
+> 
+> Do not misunderstand me: I am not at all for keeping the situation
+> like this!  What I ask is just for users to be notified of this new
+> requirement: for my case, my board simply couldn't boot anymore,
+> without any explanation. If there was a message along the lines ???You
+> are setting up IRQs starting from 0, which is not supported by the
+> kernel anymore??? just before crashing, maybe it would help debugging
+> the issue.
+> 
+> I could try to write a patch for it, but I was first wondering if this
+> is a good idea or not.
 
-On Fri, Jun 19, 2015 at 7:31 AM, Heiko Stuebner <heiko@sntech.de> wrote:
-> The watchdog irq is actually SPI 79, which translates to the original
-> 111 in the manual where the SPI irqs start at 32.
-> The current dw_wdt driver does not use the irq at all, so this issue
-> never surfaced. Nevertheless fix this for a time we want to use the irq.
->
-> Fixes: 2ab557b72d46 ("ARM: dts: rockchip: add core rk3288 dtsi")
-> Signed-off-by: Heiko Stuebner <heiko@sntech.de>
-> ---
-> Found while verifying the data for the quite similar rk3368 arm64 soc.
->
->  arch/arm/boot/dts/rk3288.dtsi | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
+Let's just get the dts patch reviewed and merged first.  Russell
+actually wrote the patch to do what he's describing for mach-dove.
 
-* gpio0 shows up in TRM as 113
-* gpio0 is in dts as SPI 81
-* wdt shows up in TRM as 111
-* so wdt should be in dts as SPI 79
+  http://lists.infradead.org/pipermail/linux-arm-kernel/2014-December/309684.html
 
-...so yup.
+Although, it looks like it never got updated for submission...
 
-Reviewed-by: Douglas Anderson <dianders@chromium.org>
+  http://lists.infradead.org/pipermail/linux-arm-kernel/2014-December/311800.html
+
+thx,
+
+Jason.
