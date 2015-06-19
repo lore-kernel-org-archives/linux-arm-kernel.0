@@ -1,83 +1,59 @@
-From: vigneshr@codeaurora.org (Vignesh Radhakrishnan)
-Date: Fri, 19 Jun 2015 15:05:52 +0530
-Subject: [PATCH] ARM: module: Add ".ref.text" to arm unwind tables
-In-Reply-To: <20150610123334.GO7557@n2100.arm.linux.org.uk>
-References: <20150610123334.GO7557@n2100.arm.linux.org.uk>
-Message-ID: <1434706552-23034-1-git-send-email-vigneshr@codeaurora.org>
+From: will.deacon@arm.com (Will Deacon)
+Date: Fri, 19 Jun 2015 10:46:58 +0100
+Subject: [PATCH v2 3/3] ACPI / ARM64 : use the new BAD_MADT_GICC_ENTRY
+ macro
+In-Reply-To: <1434666968-1543-4-git-send-email-al.stone@linaro.org>
+References: <1434666968-1543-1-git-send-email-al.stone@linaro.org>
+ <1434666968-1543-4-git-send-email-al.stone@linaro.org>
+Message-ID: <20150619094658.GB18017@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Functions inside kernel modules that use __ref
-will end up being placed in .ARM.exidx.ref.text
-section by gcc.
+On Thu, Jun 18, 2015 at 11:36:08PM +0100, Al Stone wrote:
+> For those parts of the arm64 ACPI code that need to check GICC subtables
+> in the MADT, use the new BAD_MADT_GICC_ENTRY macro instead of the previous
+> BAD_MADT_ENTRY.  The new macro takes into account differences in the size
+> of the GICC subtable that the old macro did not; this caused failures even
+> though the subtable entries are valid.
+> 
+> Signed-off-by: Al Stone <al.stone@linaro.org>
+> ---
+>  arch/arm64/kernel/smp.c   | 2 +-
+>  drivers/irqchip/irq-gic.c | 2 +-
+>  2 files changed, 2 insertions(+), 2 deletions(-)
 
-Currently we don't consider adding these functions
-to arm unwind tables.
+Acked-by: Will Deacon <will.deacon@arm.com>
 
-Hence, if we turn slub debug on by default we end up
-with the messages of this sort:
+Good to see this stuff is holding up so well...
 
-unwind: Index not found bf0011e0
+Will
 
-This is because slub debug saves stack trace of
-allocation's and free's. Therefore, we end up seeing
-a flood of these messages in dmesg since its not
-able to locate these functions.
-
-Fix this by adding .ref.text section to arm unwind tables.
-
-Tested-by: Laura Abbott <labbott@redhat.com>
-Signed-off-by: Vignesh Radhakrishnan <vigneshr@codeaurora.org>
-CC: Russell King <linux@arm.linux.org.uk>
-CC: Andrew Morton <akpm@linux-foundation.org>
-CC: Laura Abbott <labbott@redhat.com>
-CC: Andrey Ryabinin <a.ryabinin@samsung.com>
-CC: Andrey Konovalov <adech.fo@gmail.com>
----
- arch/arm/include/asm/module.h | 1 +
- arch/arm/kernel/module.c      | 4 ++++
- 2 files changed, 5 insertions(+)
-
-diff --git a/arch/arm/include/asm/module.h b/arch/arm/include/asm/module.h
-index ed690c4..17640c9 100644
---- a/arch/arm/include/asm/module.h
-+++ b/arch/arm/include/asm/module.h
-@@ -14,6 +14,7 @@ enum {
- 	ARM_SEC_DEVEXIT,
- 	ARM_SEC_HOT,
- 	ARM_SEC_UNLIKELY,
-+	ARM_SEC_REF,
- 	ARM_SEC_MAX,
- };
- 
-diff --git a/arch/arm/kernel/module.c b/arch/arm/kernel/module.c
-index 2e11961..846b888 100644
---- a/arch/arm/kernel/module.c
-+++ b/arch/arm/kernel/module.c
-@@ -308,6 +308,8 @@ int module_finalize(const Elf32_Ehdr *hdr, const Elf_Shdr *sechdrs,
- 			maps[ARM_SEC_UNLIKELY].unw_sec = s;
- 		else if (strcmp(".ARM.exidx.text.hot", secname) == 0)
- 			maps[ARM_SEC_HOT].unw_sec = s;
-+		else if (strcmp(".ARM.exidx.ref.text", secname) == 0)
-+			maps[ARM_SEC_REF].unw_sec = s;
- 		else if (strcmp(".init.text", secname) == 0)
- 			maps[ARM_SEC_INIT].txt_sec = s;
- 		else if (strcmp(".text", secname) == 0)
-@@ -318,6 +320,8 @@ int module_finalize(const Elf32_Ehdr *hdr, const Elf_Shdr *sechdrs,
- 			maps[ARM_SEC_UNLIKELY].txt_sec = s;
- 		else if (strcmp(".text.hot", secname) == 0)
- 			maps[ARM_SEC_HOT].txt_sec = s;
-+		else if (strcmp(".ref.text", secname) == 0)
-+			maps[ARM_SEC_REF].txt_sec = s;
- 	}
- 
- 	for (i = 0; i < ARM_SEC_MAX; i++)
--- 
-1.8.2.1
-
--- 
-Thanks and regards,
-Vignesh Radhakrishnan
-
-QUALCOMM INDIA, on behalf of Qualcomm Innovation Center, Inc. is a
-member of the Code Aurora Forum, hosted by The Linux Foundation.
+> diff --git a/arch/arm64/kernel/smp.c b/arch/arm64/kernel/smp.c
+> index 4b2121b..80d5984 100644
+> --- a/arch/arm64/kernel/smp.c
+> +++ b/arch/arm64/kernel/smp.c
+> @@ -438,7 +438,7 @@ acpi_parse_gic_cpu_interface(struct acpi_subtable_header *header,
+>  	struct acpi_madt_generic_interrupt *processor;
+>  
+>  	processor = (struct acpi_madt_generic_interrupt *)header;
+> -	if (BAD_MADT_ENTRY(processor, end))
+> +	if (BAD_MADT_GICC_ENTRY(processor, end))
+>  		return -EINVAL;
+>  
+>  	acpi_table_print_madt_entry(header);
+> diff --git a/drivers/irqchip/irq-gic.c b/drivers/irqchip/irq-gic.c
+> index 8d7e1c8..4dd8826 100644
+> --- a/drivers/irqchip/irq-gic.c
+> +++ b/drivers/irqchip/irq-gic.c
+> @@ -1055,7 +1055,7 @@ gic_acpi_parse_madt_cpu(struct acpi_subtable_header *header,
+>  
+>  	processor = (struct acpi_madt_generic_interrupt *)header;
+>  
+> -	if (BAD_MADT_ENTRY(processor, end))
+> +	if (BAD_MADT_GICC_ENTRY(processor, end))
+>  		return -EINVAL;
+>  
+>  	/*
+> -- 
+> 2.4.0
+> 
