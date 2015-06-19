@@ -1,49 +1,77 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri, 19 Jun 2015 13:53:11 +0100
-Subject: [PATCH 07/12] KVM: arm64: fix misleading comments in save/restore
+Date: Fri, 19 Jun 2015 13:53:10 +0100
+Subject: [PATCH 06/12] KVM: arm/arm64: Enable the KVM-VFIO device
 In-Reply-To: <1434718396-13110-1-git-send-email-marc.zyngier@arm.com>
 References: <1434718396-13110-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1434718396-13110-8-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1434718396-13110-7-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Alex Benn?e <alex.bennee@linaro.org>
+From: Kim Phillips <kim.phillips@linaro.org>
 
-The elr_el2 and spsr_el2 registers in fact contain the processor state
-before entry into EL2. In the case of guest state it could be in either
-el0 or el1.
+The KVM-VFIO device is used by the QEMU VFIO device. It is used to
+record the list of in-use VFIO groups so that KVM can manipulate
+them.
 
-Signed-off-by: Alex Benn?e <alex.bennee@linaro.org>
+Signed-off-by: Kim Phillips <kim.phillips@linaro.org>
+Signed-off-by: Eric Auger <eric.auger@linaro.org>
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm64/kvm/hyp.S | 8 ++++----
- 1 file changed, 4 insertions(+), 4 deletions(-)
+ arch/arm/kvm/Kconfig    | 1 +
+ arch/arm/kvm/Makefile   | 2 +-
+ arch/arm64/kvm/Kconfig  | 1 +
+ arch/arm64/kvm/Makefile | 2 +-
+ 4 files changed, 4 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm64/kvm/hyp.S b/arch/arm64/kvm/hyp.S
-index 5befd01..519805f 100644
---- a/arch/arm64/kvm/hyp.S
-+++ b/arch/arm64/kvm/hyp.S
-@@ -50,8 +50,8 @@
- 	stp	x29, lr, [x3, #80]
+diff --git a/arch/arm/kvm/Kconfig b/arch/arm/kvm/Kconfig
+index f1f79d1..bfb915d 100644
+--- a/arch/arm/kvm/Kconfig
++++ b/arch/arm/kvm/Kconfig
+@@ -28,6 +28,7 @@ config KVM
+ 	select KVM_GENERIC_DIRTYLOG_READ_PROTECT
+ 	select SRCU
+ 	select MMU_NOTIFIER
++	select KVM_VFIO
+ 	select HAVE_KVM_EVENTFD
+ 	select HAVE_KVM_IRQFD
+ 	depends on ARM_VIRT_EXT && ARM_LPAE && ARM_ARCH_TIMER
+diff --git a/arch/arm/kvm/Makefile b/arch/arm/kvm/Makefile
+index 139e46c..c5eef02c 100644
+--- a/arch/arm/kvm/Makefile
++++ b/arch/arm/kvm/Makefile
+@@ -15,7 +15,7 @@ AFLAGS_init.o := -Wa,-march=armv7-a$(plus_virt)
+ AFLAGS_interrupts.o := -Wa,-march=armv7-a$(plus_virt)
  
- 	mrs	x19, sp_el0
--	mrs	x20, elr_el2		// EL1 PC
--	mrs	x21, spsr_el2		// EL1 pstate
-+	mrs	x20, elr_el2		// pc before entering el2
-+	mrs	x21, spsr_el2		// pstate before entering el2
+ KVM := ../../../virt/kvm
+-kvm-arm-y = $(KVM)/kvm_main.o $(KVM)/coalesced_mmio.o $(KVM)/eventfd.o
++kvm-arm-y = $(KVM)/kvm_main.o $(KVM)/coalesced_mmio.o $(KVM)/eventfd.o $(KVM)/vfio.o
  
- 	stp	x19, x20, [x3, #96]
- 	str	x21, [x3, #112]
-@@ -82,8 +82,8 @@
- 	ldr	x21, [x3, #16]
+ obj-y += kvm-arm.o init.o interrupts.o
+ obj-y += arm.o handle_exit.o guest.o mmu.o emulate.o reset.o
+diff --git a/arch/arm64/kvm/Kconfig b/arch/arm64/kvm/Kconfig
+index 5105e29..bfffe8f 100644
+--- a/arch/arm64/kvm/Kconfig
++++ b/arch/arm64/kvm/Kconfig
+@@ -28,6 +28,7 @@ config KVM
+ 	select KVM_ARM_HOST
+ 	select KVM_GENERIC_DIRTYLOG_READ_PROTECT
+ 	select SRCU
++	select KVM_VFIO
+ 	select HAVE_KVM_EVENTFD
+ 	select HAVE_KVM_IRQFD
+ 	---help---
+diff --git a/arch/arm64/kvm/Makefile b/arch/arm64/kvm/Makefile
+index d5904f8..f90f4aa 100644
+--- a/arch/arm64/kvm/Makefile
++++ b/arch/arm64/kvm/Makefile
+@@ -11,7 +11,7 @@ ARM=../../../arch/arm/kvm
  
- 	msr	sp_el0, x19
--	msr	elr_el2, x20 				// EL1 PC
--	msr	spsr_el2, x21 				// EL1 pstate
-+	msr	elr_el2, x20 		// pc on return from el2
-+	msr	spsr_el2, x21 		// pstate on return from el2
+ obj-$(CONFIG_KVM_ARM_HOST) += kvm.o
  
- 	add	x3, x2, #CPU_XREG_OFFSET(19)
- 	ldp	x19, x20, [x3]
+-kvm-$(CONFIG_KVM_ARM_HOST) += $(KVM)/kvm_main.o $(KVM)/coalesced_mmio.o $(KVM)/eventfd.o
++kvm-$(CONFIG_KVM_ARM_HOST) += $(KVM)/kvm_main.o $(KVM)/coalesced_mmio.o $(KVM)/eventfd.o $(KVM)/vfio.o
+ kvm-$(CONFIG_KVM_ARM_HOST) += $(ARM)/arm.o $(ARM)/mmu.o $(ARM)/mmio.o
+ kvm-$(CONFIG_KVM_ARM_HOST) += $(ARM)/psci.o $(ARM)/perf.o
+ 
 -- 
 2.1.4
