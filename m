@@ -1,59 +1,109 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 19 Jun 2015 10:46:58 +0100
-Subject: [PATCH v2 3/3] ACPI / ARM64 : use the new BAD_MADT_GICC_ENTRY
- macro
-In-Reply-To: <1434666968-1543-4-git-send-email-al.stone@linaro.org>
-References: <1434666968-1543-1-git-send-email-al.stone@linaro.org>
- <1434666968-1543-4-git-send-email-al.stone@linaro.org>
-Message-ID: <20150619094658.GB18017@arm.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Fri, 19 Jun 2015 10:49:39 +0100
+Subject: [PATCH 06/11] ACPI / gsi: Add gsi_mutex to synchronize
+ acpi_register_gsi()/acpi_unregister_gsi()
+In-Reply-To: <5583C536.1060201@linaro.org>
+References: <1431953961-22706-1-git-send-email-hanjun.guo@linaro.org>
+ <1431953961-22706-7-git-send-email-hanjun.guo@linaro.org>
+ <55785E8D.1000909@arm.com> <55798A28.3080000@linaro.org>
+ <5583C536.1060201@linaro.org>
+Message-ID: <5583E5B3.7000701@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 18, 2015 at 11:36:08PM +0100, Al Stone wrote:
-> For those parts of the arm64 ACPI code that need to check GICC subtables
-> in the MADT, use the new BAD_MADT_GICC_ENTRY macro instead of the previous
-> BAD_MADT_ENTRY.  The new macro takes into account differences in the size
-> of the GICC subtable that the old macro did not; this caused failures even
-> though the subtable entries are valid.
+On 19/06/15 08:31, Hanjun Guo wrote:
+> On 06/11/2015 09:16 PM, Hanjun Guo wrote:
+>> On 06/10/2015 11:58 PM, Marc Zyngier wrote:
+>>> On 18/05/15 13:59, Hanjun Guo wrote:
+>>>> Add a mutex for acpi_register_gsi()/acpi_unregister_gsi() to avoid
+>>>> concurrency issues.
+>>>>
+>>>> Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
+>>>> ---
+>>>>   drivers/acpi/gsi.c | 17 +++++++++++++----
+>>>>   1 file changed, 13 insertions(+), 4 deletions(-)
+>>>>
+>>>> diff --git a/drivers/acpi/gsi.c b/drivers/acpi/gsi.c
+>>>> index 55b5f31..ab0dcb4 100644
+>>>> --- a/drivers/acpi/gsi.c
+>>>> +++ b/drivers/acpi/gsi.c
+>>>> @@ -16,6 +16,7 @@
+>>>>   enum acpi_irq_model_id acpi_irq_model;
+>>>>   /* ACPI core domian pointing to GICv2/3 core domain */
+>>>>   struct irq_domain *acpi_irq_domain __read_mostly;
+>>>> +static DEFINE_MUTEX(gsi_mutex);
+>>>>
+>>>>   static unsigned int acpi_gsi_get_irq_type(int trigger, int polarity)
+>>>>   {
+>>>> @@ -73,20 +74,24 @@ int acpi_register_gsi(struct device *dev, u32
+>>>> gsi, int trigger,
+>>>>       int irq;
+>>>>       unsigned int irq_type = acpi_gsi_get_irq_type(trigger, polarity);
+>>>>
+>>>> +    mutex_lock(&gsi_mutex);
+>>>>       irq = irq_find_mapping(acpi_irq_domain, gsi);
+>>>>       if (irq > 0)
+>>>> -        return irq;
+>>>> +        goto out;
+>>>>
+>>>>       irq = irq_domain_alloc_irqs(acpi_irq_domain, 1, dev_to_node(dev),
+>>>>                       &gsi);
+>>>>       if (irq <= 0)
+>>>> -        return -EINVAL;
+>>>> +        goto out;
+>>>>
+>>>>       /* Set irq type if specified and different than the current one */
+>>>>       if (irq_type != IRQ_TYPE_NONE &&
+>>>>           irq_type != irq_get_trigger_type(irq))
+>>>>           irq_set_irq_type(irq, irq_type);
+>>>> -    return irq;
+>>>> +
+>>>> +out:
+>>>> +    mutex_unlock(&gsi_mutex);
+>>>> +    return irq > 0 ? irq : -EINVAL;
+>>>>   }
+>>>>   EXPORT_SYMBOL_GPL(acpi_register_gsi);
+>>>>
+>>>> @@ -96,8 +101,12 @@ EXPORT_SYMBOL_GPL(acpi_register_gsi);
+>>>>    */
+>>>>   void acpi_unregister_gsi(u32 gsi)
+>>>>   {
+>>>> -    int irq = irq_find_mapping(acpi_irq_domain, gsi);
+>>>> +    int irq;
+>>>> +
+>>>> +    mutex_lock(&gsi_mutex);
+>>>> +    irq = irq_find_mapping(acpi_irq_domain, gsi);
+>>>>
+>>>>       irq_dispose_mapping(irq);
+>>>> +    mutex_unlock(&gsi_mutex);
+>>>>   }
+>>>>   EXPORT_SYMBOL_GPL(acpi_unregister_gsi);
+>>>>
+>>>
+>>> Can you point out why we need this locking? The rest of the kernel seems
+>>> to live without it pretty well. And if we really have an issue, I'd
+>>
+>> Hmm, I'm not so sure, I will look deep into that and come back later.
 > 
-> Signed-off-by: Al Stone <al.stone@linaro.org>
-> ---
->  arch/arm64/kernel/smp.c   | 2 +-
->  drivers/irqchip/irq-gic.c | 2 +-
->  2 files changed, 2 insertions(+), 2 deletions(-)
-
-Acked-by: Will Deacon <will.deacon@arm.com>
-
-Good to see this stuff is holding up so well...
-
-Will
-
-> diff --git a/arch/arm64/kernel/smp.c b/arch/arm64/kernel/smp.c
-> index 4b2121b..80d5984 100644
-> --- a/arch/arm64/kernel/smp.c
-> +++ b/arch/arm64/kernel/smp.c
-> @@ -438,7 +438,7 @@ acpi_parse_gic_cpu_interface(struct acpi_subtable_header *header,
->  	struct acpi_madt_generic_interrupt *processor;
->  
->  	processor = (struct acpi_madt_generic_interrupt *)header;
-> -	if (BAD_MADT_ENTRY(processor, end))
-> +	if (BAD_MADT_GICC_ENTRY(processor, end))
->  		return -EINVAL;
->  
->  	acpi_table_print_madt_entry(header);
-> diff --git a/drivers/irqchip/irq-gic.c b/drivers/irqchip/irq-gic.c
-> index 8d7e1c8..4dd8826 100644
-> --- a/drivers/irqchip/irq-gic.c
-> +++ b/drivers/irqchip/irq-gic.c
-> @@ -1055,7 +1055,7 @@ gic_acpi_parse_madt_cpu(struct acpi_subtable_header *header,
->  
->  	processor = (struct acpi_madt_generic_interrupt *)header;
->  
-> -	if (BAD_MADT_ENTRY(processor, end))
-> +	if (BAD_MADT_GICC_ENTRY(processor, end))
->  		return -EINVAL;
->  
->  	/*
-> -- 
-> 2.4.0
+> Sorry for the late reply, I finally recalled that why I introduced
+> the lock here.
 > 
+> The lock introduced here is because of I assume ACPI based container
+> (such as CPU socket) hotplug will be available on ARM64 in the future,
+> then we may online/offline a irqchip at the same time (similar way of
+> IOAPIC hotplug which introduced by Jiang Liu), it turns out that only
+> one GICD for now so it's not the case for ARM64 in the near future,
+
+Well, there can only be one GICD, or at least only one that is visible.
+If the HW uses multiple GICDs (one per socket?), it must make ensure
+that they are all synchronized transparently. That's a strong
+requirement from the architecture. Otherwise, we enter the FrankeinGIC
+realm, and ACPI has no business with it.
+
+> I will drop this patch in next version.
+
+Thanks,
+
+	M.
+-- 
+Jazz is not dead. It just smells funny...
