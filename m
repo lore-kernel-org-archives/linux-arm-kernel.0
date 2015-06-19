@@ -1,42 +1,87 @@
-From: robert.jarzmik@free.fr (Robert Jarzmik)
-Date: Fri, 19 Jun 2015 20:43:24 +0200
-Subject: [PATCH 1/3] ARM: pxa: add gpio-charger configuration on poodle
-In-Reply-To: <CALT56yOwU2Lu2y1NDiD45KBm=FSm_V+m_0VbN1D5Gfcz7Xd7Pg@mail.gmail.com>
- (Dmitry Eremin-Solenikov's message of "Fri, 3 Apr 2015 22:23:41
- +0300")
-References: <1427711971-8164-1-git-send-email-dbaryshkov@gmail.com>
- <874moxt42l.fsf@free.fr>
- <CALT56yOwU2Lu2y1NDiD45KBm=FSm_V+m_0VbN1D5Gfcz7Xd7Pg@mail.gmail.com>
-Message-ID: <87lhffa69f.fsf@belgarion.home>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Fri, 19 Jun 2015 11:47:47 -0700
+Subject: [PATCH V7 2/3] OPP: Allow multiple OPP tables to be passed via DT
+In-Reply-To: <20150618025034.GB28820@linux>
+References: <cover.1433434659.git.viresh.kumar@linaro.org>
+ <263c128844f5a3c9280c8be71f6c9eb1869a5188.1433434659.git.viresh.kumar@linaro.org>
+ <CAL_Jsq+EOOeQw42wZi+H82ovLn8LcQUuK9HGT+FvewdhTf7Q1w@mail.gmail.com>
+ <20150617133314.GB15153@linux>
+ <CAL_Jsq+SdgAf7=Yq7Jk_1d9jTpAOLCEuEDCZvD=-h=2MWsNfFw@mail.gmail.com>
+ <55821F30.2090802@codeaurora.org> <20150618022543.GA28820@linux>
+ <20150618025034.GB28820@linux>
+Message-ID: <20150619184747.GD22132@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dmitry Eremin-Solenikov <dbaryshkov@gmail.com> writes:
+On 06/18, Viresh Kumar wrote:
+> On 18-06-15, 07:55, Viresh Kumar wrote:
+> > Why do you think so? For me the operating-points-v2-names property
+> > will be present in CPU node (as there is no OPP node which can have
+> > it) and so every CPU is free to choose what it wants to.
+> 
+> So, I had something like this in mind:
+> 
+> From: Viresh Kumar <viresh.kumar@linaro.org>
+> Date: Thu, 30 Apr 2015 17:38:00 +0530
+> Subject: [PATCH] OPP: Allow multiple OPP tables to be passed via DT
+> 
+> On some platforms (Like Qualcomm's SoCs), it is not decided until
+> runtime on what OPPs to use. The OPP tables can be fixed at compile
+> time, but which table to use is found out only after reading some efuses
+> (sort of an prom) and knowing characteristics of the SoC.
+> 
+> To support such platform we need to pass multiple OPP tables per device
+> and hardware should be able to choose one and only one table out of
+> those.
+> 
+> Update operating-points-v2 bindings to support that.
+> 
+> Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
 
-> 2015-04-03 22:16 GMT+03:00 Robert Jarzmik <robert.jarzmik@free.fr>:
->> Dmitry Eremin-Solenikov <dbaryshkov@gmail.com> writes:
->>
->>> Add declration of gpio-charger device for Sharp SL-5600 poodle device.
->> Typo here ^.
->>
->> And I'd like in the commit message to know :
->>  - is it the main battery charger (I could look into the code, I know, but I'd
->>    like it to be in the commit message anyway) ?
->
-> I'll add it to v2.
->
->>  - was it successfully tested on Sharp SL-5600 ?
->
-> :)) I wouldn't dare to submit a code that wasn't tested on hw w/o
-> special notice.
+Looks mostly ok..
 
-Hi Dmitry,
+> ---
+>  Documentation/devicetree/bindings/power/opp.txt | 63 +++++++++++++++++++++++++
+>  1 file changed, 63 insertions(+)
+> 
+> diff --git a/Documentation/devicetree/bindings/power/opp.txt b/Documentation/devicetree/bindings/power/opp.txt
+> index 259bf00edf7d..72ccacaac9c9 100644
+> --- a/Documentation/devicetree/bindings/power/opp.txt
+> +++ b/Documentation/devicetree/bindings/power/opp.txt
+> @@ -45,10 +45,21 @@ Devices supporting OPPs must set their "operating-points-v2" property with
+>  phandle to a OPP table in their DT node. The OPP core will use this phandle to
+>  find the operating points for the device.
+>  
+> +Devices may want to choose OPP tables at runtime and so can provide a list of
+> +phandles here. But only *one* of them should be chosen at runtime. This must be
+> +accompanied by a corresponding "operating-points-v2-names" property, to uniquely
+> +identify the OPP tables.
+> +
+>  If required, this can be extended for SoC vendor specfic bindings. Such bindings
+>  should be documented as Documentation/devicetree/bindings/power/<vendor>-opp.txt
+>  and should have a compatible description like: "operating-points-v2-<vendor>".
+>  
+> +Optional properties:
+> +- operating-points-v2-names: Names of OPP tables (required if multiple OPP
+> +  tables are present), to uniquely identify them. The same list must be present
+> +  for all the CPUs which are sharing clock/voltage rails and hence the OPP
+> +  tables.
+> +
+>  * OPP Table Node
+>  
+>  This describes the OPPs belonging to a device. This node can have following
+> @@ -63,11 +74,16 @@ This describes the OPPs belonging to a device. This node can have following
+>    reference an OPP.
+>  
+>  Optional properties:
+> +- opp-name: Name of the OPP table, to uniquely identify it if more than one OPP
+> +  table is supplied in "operating-points-v2" property of device.
+> +
 
-I'll drop that from my radar, I didn't see any update lately. Once the poodle
-battery driver is accepted and once you provide an update on these patches, I'll
-come back to these patches.
+But isn't this being removed? If it is removed, feel free to add
 
-Cheers.
+Reviewed-by: Stephen Boyd <sboyd@codeaurora.org>
 
 -- 
-Robert
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
