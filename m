@@ -1,49 +1,84 @@
-From: ykk@rock-chips.com (Yakir Yang)
-Date: Sat, 20 Jun 2015 00:33:21 +0800
-Subject: [PATCH v5 6/6] dt-bindings: Add documentation for rockchip-hdmi-audio
- driver
-In-Reply-To: <1434730417-10629-1-git-send-email-ykk@rock-chips.com>
-References: <1434730417-10629-1-git-send-email-ykk@rock-chips.com>
-Message-ID: <1434731601-11152-1-git-send-email-ykk@rock-chips.com>
+From: lznuaa@gmail.com (Zhi Li)
+Date: Fri, 19 Jun 2015 11:50:28 -0500
+Subject: [PATCH v2 0/8] add basic support for i.mx6 ul chip
+In-Reply-To: <CAH=tA9FyfB4PR+YXnHBssnSirvQfSw6AAY1gJz3=L=a9UL0Z6g@mail.gmail.com>
+References: <1434727951-4852-1-git-send-email-Frank.Li@freescale.com>
+ <CAH=tA9FyfB4PR+YXnHBssnSirvQfSw6AAY1gJz3=L=a9UL0Z6g@mail.gmail.com>
+Message-ID: <CAHrpEqTyRYkHMrOYuO0-23-p=rjOx25NEB02yxhnZD+RjWbLnw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Required properties:
-- compatible: platform specific
-- i2s-controller: the i2s controller device node
+On Fri, Jun 19, 2015 at 11:43 AM, Nicolae Rosia <nicolae.rosia@gmail.com> wrote:
+> Hi,
+>
+> I can't seem to find a datasheet for this series.
 
-Signed-off-by: Yakir Yang <ykk@rock-chips.com>
----
-Changes in v5: None
-Changes in v4: None
-Changes in v3:
-- modify cpu-of-node to i2s-controller
+Have not public yet.
 
-Changes in v2:
-- remove codec-name and codec-dai-name
-- rename rockchip,rockchip-hdmi-audio.txt to rockchip,rockchip-dw-hdmi-audio.txt
+best regards
+Frank Li
 
- .../bindings/sound/rockchip,rockchip-dw-hdmi-audio.txt       | 12 ++++++++++++
- 1 file changed, 12 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/sound/rockchip,rockchip-dw-hdmi-audio.txt
-
-diff --git a/Documentation/devicetree/bindings/sound/rockchip,rockchip-dw-hdmi-audio.txt b/Documentation/devicetree/bindings/sound/rockchip,rockchip-dw-hdmi-audio.txt
-new file mode 100644
-index 0000000..f0d23c5
---- /dev/null
-+++ b/Documentation/devicetree/bindings/sound/rockchip,rockchip-dw-hdmi-audio.txt
-@@ -0,0 +1,12 @@
-+Rockchip hdmi audio bindings
-+
-+Required properties:
-+- compatible: platform specific
-+- i2s-controller: the i2s controller device node
-+
-+Example:
-+
-+sound {
-+	compatible = "rockchip,rk3288-hdmi-audio";
-+	i2s-controller = <&i2s>;
-+};
--- 
-2.1.2
+>
+> Best regards,
+> Nicolae Rosia
+>
+> On Fri, Jun 19, 2015 at 6:32 PM,  <Frank.Li@freescale.com> wrote:
+>> From: Frank Li <Frank.Li@freescale.com>
+>>
+>> Add basic function support i.mx6ul.
+>> add simple dts.
+>> add full pin function define
+>> add clock support.
+>> add low level debug
+>>
+>> Change from v1 to v2:
+>>  - Remove unnecessary clk_register_clkdev for gpt
+>>  - use fat iomux in dts
+>>  - use macro GPIO_ACTIVE_LOW
+>>
+>> Anson Huang (1):
+>>   ARM: imx: add low-level debug support for i.mx6ul
+>>
+>> Frank Li (7):
+>>   ARM: imx: add i.mx6ul msl support
+>>   ARM: imx: add imx6ul clk tree support
+>>   Document: dt: binding: imx: update document for imx6ul support
+>>   ARM: pinctrl: imx: add i.mx6ul pinctrl driver
+>>   ARM: dts: add i.mx6ul pin function include file
+>>   ARM: dts: imx: add imx6ul and imx6ul evk board support
+>>   ARM: imx: imx_v6_v7_defconfig enable imx6ul support
+>>
+>>  .../devicetree/bindings/clock/imx6ul-clock.txt     |  13 +
+>>  .../bindings/pinctrl/fsl,imx6ul-pinctrl.txt        |  36 +
+>>  arch/arm/Kconfig.debug                             |   9 +
+>>  arch/arm/boot/dts/Makefile                         |   2 +
+>>  arch/arm/boot/dts/imx6ul-14x14-evk.dts             | 335 ++++++++
+>>  arch/arm/boot/dts/imx6ul-pinfunc.h                 | 938 +++++++++++++++++++++
+>>  arch/arm/boot/dts/imx6ul.dtsi                      | 645 ++++++++++++++
+>>  arch/arm/configs/imx_v6_v7_defconfig               |   1 +
+>>  arch/arm/include/debug/imx-uart.h                  |  13 +
+>>  arch/arm/mach-imx/Kconfig                          |   8 +
+>>  arch/arm/mach-imx/Makefile                         |   1 +
+>>  arch/arm/mach-imx/mach-imx6ul.c                    |  43 +
+>>  drivers/clk/imx/Makefile                           |   1 +
+>>  drivers/clk/imx/clk-imx6ul.c                       | 432 ++++++++++
+>>  drivers/pinctrl/freescale/Kconfig                  |   7 +
+>>  drivers/pinctrl/freescale/Makefile                 |   1 +
+>>  drivers/pinctrl/freescale/pinctrl-imx6ul.c         | 323 +++++++
+>>  include/dt-bindings/clock/imx6ul-clock.h           | 240 ++++++
+>>  18 files changed, 3048 insertions(+)
+>>  create mode 100644 Documentation/devicetree/bindings/clock/imx6ul-clock.txt
+>>  create mode 100644 Documentation/devicetree/bindings/pinctrl/fsl,imx6ul-pinctrl.txt
+>>  create mode 100644 arch/arm/boot/dts/imx6ul-14x14-evk.dts
+>>  create mode 100644 arch/arm/boot/dts/imx6ul-pinfunc.h
+>>  create mode 100644 arch/arm/boot/dts/imx6ul.dtsi
+>>  create mode 100644 arch/arm/mach-imx/mach-imx6ul.c
+>>  create mode 100644 drivers/clk/imx/clk-imx6ul.c
+>>  create mode 100644 drivers/pinctrl/freescale/pinctrl-imx6ul.c
+>>  create mode 100644 include/dt-bindings/clock/imx6ul-clock.h
+>>
+>> --
+>> 1.9.1
+>>
+>> --
+>> To unsubscribe from this list: send the line "unsubscribe devicetree" in
