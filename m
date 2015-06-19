@@ -1,48 +1,202 @@
-From: simon.guinot@sequanux.org (Simon Guinot)
-Date: Fri, 19 Jun 2015 14:32:53 +0200
-Subject: [PATCH v2 1/3] net: mvneta: introduce compatible string
- "marvell, armada-xp-neta"
-In-Reply-To: <20150617170112.GD2917@io.lakedaemon.net>
-References: <1434547162-6275-1-git-send-email-simon.guinot@sequanux.org>
- <1434547162-6275-2-git-send-email-simon.guinot@sequanux.org>
- <55818E64.20007@free-electrons.com>
- <55818F10.8030304@free-electrons.com>
- <20150617170112.GD2917@io.lakedaemon.net>
-Message-ID: <20150619123253.GB4853@kw.sim.vm.gnt>
+From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
+Date: Fri, 19 Jun 2015 14:35:23 +0200
+Subject: [PATCH 1/6] clk: add CLK_RECALC_NEW_RATES clock flag for Exynos
+ cpu clock support
+In-Reply-To: <15113828.ygxT0eaek9@amdc1976>
+References: <'@samsung.com> <20150618195846.9112.7144@quantum>
+ <15113828.ygxT0eaek9@amdc1976>
+Message-ID: <3554100.H9OH7Yrz4m@amdc1976>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 17, 2015 at 05:01:12PM +0000, Jason Cooper wrote:
-> Hi Gregory,
+On Friday, June 19, 2015 01:19:06 PM Bartlomiej Zolnierkiewicz wrote:
 > 
-> On Wed, Jun 17, 2015 at 05:15:28PM +0200, Gregory CLEMENT wrote:
-> > On 17/06/2015 17:12, Gregory CLEMENT wrote:
-> > > On 17/06/2015 15:19, Simon Guinot wrote:
-> > >> The mvneta driver supports the Ethernet IP found in the Armada 370, XP,
-> > >> 380 and 385 SoCs. Since at least one more hardware feature is available
-> > >> for the Armada XP SoCs then a way to identify them is needed.
-> > >>
-> > >> This patch introduces a new compatible string "marvell,armada-xp-neta".
+> Hi,
+> 
+> On Thursday, June 18, 2015 12:58:46 PM Michael Turquette wrote:
+> > Quoting Sylwester Nawrocki (2015-05-13 07:13:13)
+> > > On 03/04/15 18:43, Bartlomiej Zolnierkiewicz wrote:
+> > > > This flag is needed to fix the issue with wrong dividers being setup
+> > > > by Common Clock Framework when using the new Exynos cpu clock support.
+> > > > 
+> > > > The issue happens because clk_core_set_rate_nolock()  calls
+> > > > clk_calc_new_rates(clk, rate) before both pre/post clock notifiers have
+> > > > a chance to run.  In case of Exynos cpu clock support pre/post clock
+> > > > notifiers are registered for mout_apll clock which is a parent of armclk
+> > > > cpu clock and dividers are modified in both pre and post clock notifier.
+> > > > This results in wrong dividers values being later programmed by
+> > > > clk_change_rate(top).  To workaround the problem CLK_RECALC_NEW_RATES
+> > > > flag is added and it is set for mout_apll clock later so the correct
+> > > > divider values are re-calculated after both pre and post clock notifiers
+> > > > had run.
+> > > > 
+> > > > For example when using "performance" governor on Exynos4210 Origen board
+> > > > the cpufreq-dt driver requests to change the frequency from 1000MHz to
+> > > > 1200MHz and after the change state of the relevant clocks is following:
+> > > > 
+> > > > Without use of CLK_GET_RATE_NOCACHE flag:
+> > > > 
+> > > >  fout_apll rate: 1200000000
+> > > >          fout_apll_div_2 rate: 600000000
+> > > >                  mout_clkout_cpu rate: 600000000
+> > > >                          div_clkout_cpu rate: 600000000
+> > > >                                  clkout_cpu rate: 600000000
+> > > >          mout_apll rate: 1200000000
+> > > >                  armclk rate: 1200000000
+> > > >                  mout_hpm rate: 1200000000
+> > > >                          div_copy rate: 300000000
+> > > >                                  div_hpm rate: 300000000
+> > > >                  mout_core rate: 1200000000
+> > > >                          div_core rate: 1200000000
+> > > >                                  div_core2 rate: 1200000000
+> > > >                                          arm_clk_div_2 rate: 600000000
+> > > >                                          div_corem0 rate: 300000000
+> > > >                                          div_corem1 rate: 150000000
+> > > >                                          div_periph rate: 300000000
+> > > >                          div_atb rate: 300000000
+> > > >                                  div_pclk_dbg rate: 150000000
+> > > >                  sclk_apll rate: 1200000000
+> > > >                          sclk_apll_div_2 rate: 600000000
+> > > > 
+> > > > 
+> > > > With use of CLK_GET_RATE_NOCACHE flag:
+> > > > 
+> > > >  fout_apll rate: 1200000000
+> > > >          fout_apll_div_2 rate: 600000000
+> > > >                  mout_clkout_cpu rate: 600000000
+> > > >                          div_clkout_cpu rate: 600000000
+> > > >                                  clkout_cpu rate: 600000000
+> > > >          mout_apll rate: 1200000000
+> > > >                  armclk rate: 1200000000
+> > > >                  mout_hpm rate: 1200000000
+> > > >                          div_copy rate: 200000000
+> > > >                                  div_hpm rate: 200000000
+> > > >                  mout_core rate: 1200000000
+> > > >                          div_core rate: 1200000000
+> > > >                                  div_core2 rate: 1200000000
+> > > >                                          arm_clk_div_2 rate: 600000000
+> > > >                                          div_corem0 rate: 300000000
+> > > >                                          div_corem1 rate: 150000000
+> > > >                                          div_periph rate: 300000000
+> > > >                          div_atb rate: 240000000
+> > > >                                  div_pclk_dbg rate: 120000000
+> > > >                  sclk_apll rate: 150000000
+> > > >                          sclk_apll_div_2 rate: 75000000
+> > > > 
+> > > > Without this change cpufreq-dt driver showed ~10 mA larger energy
+> > > > consumption when compared to cpufreq-exynos one when "performance"
+> > > > cpufreq governor was used on Exynos4210 SoC based Origen board.
+> > > > 
+> > > > This issue was probably meant to be workarounded by use of
+> > > > CLK_GET_RATE_NOCACHE and CLK_DIVIDER_READ_ONLY clock flags in
+> > > > the original Exynos cpu clock patchset (in "[PATCH v12 6/6] clk:
+> > > > samsung: remove unused clock aliases and update clock flags" patch)
+> > > > but usage of these flags is not sufficient to fix the issue observed.
+> > > > 
+> > > > Cc: Thomas Abraham <thomas.ab@samsung.com>
+> > > > Cc: Tomasz Figa <tomasz.figa@gmail.com>
+> > > > Cc: Mike Turquette <mturquette@linaro.org>
+> > > > Cc: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
+> > > > Signed-off-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
+> > > > ---
+> > > >  drivers/clk/clk.c            |    3 +++
+> > > >  include/linux/clk-provider.h |    1 +
+> > > >  2 files changed, 4 insertions(+)
+> > > > 
+> > > > diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
+> > > > index f85c8e2..97cc73e 100644
+> > > > --- a/drivers/clk/clk.c
+> > > > +++ b/drivers/clk/clk.c
+> > > > @@ -1771,6 +1771,9 @@ static void clk_change_rate(struct clk_core *clk)
+> > > >       if (clk->notifier_count && old_rate != clk->rate)
+> > > >               __clk_notify(clk, POST_RATE_CHANGE, old_rate, clk->rate);
+> > > >  
+> > > > +     if (clk->flags & CLK_RECALC_NEW_RATES)
+> > > > +             (void)clk_calc_new_rates(clk, clk->new_rate);
+> > > > +
+> > > >       /*
+> > > >        * Use safe iteration, as change_rate can actually swap parents
+> > > >        * for certain clock types.
+> > > > diff --git a/include/linux/clk-provider.h b/include/linux/clk-provider.h
+> > > > index 28abf1b..8d1aebe 100644
+> > > > --- a/include/linux/clk-provider.h
+> > > > +++ b/include/linux/clk-provider.h
+> > > > @@ -31,6 +31,7 @@
+> > > >  #define CLK_GET_RATE_NOCACHE BIT(6) /* do not use the cached clk rate */
+> > > >  #define CLK_SET_RATE_NO_REPARENT BIT(7) /* don't re-parent on rate change */
+> > > >  #define CLK_GET_ACCURACY_NOCACHE BIT(8) /* do not use the cached clk accuracy */
+> > > > +#define CLK_RECALC_NEW_RATES BIT(9) /* recalc rates after notifications */
 > > > 
-> > > Let's be future proof by going further. I would like to have an compatible string
-> > > for each SoC even if we currently we don't use them.
+> > > Mike, Stephen, what do you think about this? I'm rather resistant to
+> > > this new flag approach, it looks like a hack. I don't seem to have better
+> > > ideas to address the missing rate recalculation issue though.
+> > 
+> > I also do not like it. The root of the problem is the use of clk
+> > notifiers to change clk rates. This is also a hack and it points towards
+> > some missing infrastructure in the clock framework.
 > 
-> I disagree with this.  We can't predict what incosistencies we'll discover in
-> the future.  We should only assign new compatible strings based on known IP
-> variations when we discover them.  This seems fraught with demons since we
-> can't predict the scope of affected IP blocks (some steppings of one SoC, three
-> SoCs plus two steppings of a fourth, etc)
+> I'm very surprised by this.  Clock changes using clock notifiers in
+> Thomas' original patchset were Acked by you:
 > 
-> imho, the 'future-proofing' lies in being specific as to the naming of the
-> compatible strings against known hardware variations at the time.
+> "[PATCH v12 1/6] clk: samsung: add infrastructure to register cpu clocks"
+> https://www.marc.info/?l=linux-arm-kernel&m=141657613203808&w=2
+> 
+> I've only fixed issues present within the original code (this 4 lines
+> workaround/hack change to clock subsystem is a result of this), I have
+> not changed it fundamentally.
 
-So, should I add more compatible strings or not ?
+Moreover similar changes for rockchip SoCs (which were explicitly based
+on Thomas' patches as noted in the code!) have already been merged in
+3.18:
 
-Simon
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 181 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150619/5bc99def/attachment.sig>
+http://lkml.iu.edu/hypermail/linux/kernel/1410.1/02644.html
+
+and are available in commit f6fba5f6967dbc062a7c138d67e2314220f5dd04
+("clk: rockchip: add new clock-type for the cpuclk").
+
+I understand that my findings have uncovered some clock subsystem
+deficiencies which resulted in afterthought about fundamental design
+of cpu clocks but I have a feeling that our patches are now being
+unjustly punished for making these issues public.
+
+I agree that current patches are not perfect (especially this patch)
+but they are good enough IMO.  Please also understand that there were
+some serious work put into validating and reviewing them.
+
+Best regards,
+--
+Bartlomiej Zolnierkiewicz
+Samsung R&D Institute Poland
+Samsung Electronics
+
+> > > I thought about making the cpu clk notifier callback returning a specific
+> > > error value, which would then trigger rate recalculation after
+> > > __clk_notify() call in clk_change_rate() function. This way the trigger
+> > > of the repeated rate recalculation would come from a notifier callback,
+> > > rather than from a clock definition. But in general it would be difficult
+> > > to handle multiple notification callbacks, each of which would attempt
+> > > to trigger the rate recalculation.
+> > 
+> > The more complexity we add to the notifier callbacks the crazier things
+> > will get. For now I'd like to see Exynos continue to use the
+> > platform-specific CPUfreq drivers until the new coordinated clock rates
+> > infrastructure makes it possible to do this type of stuff without
+> > relying on the notifiers. I'm working on this feature Right Now. I never
+> > like putting dates on upstream stuff but I'd like to see this feature in
+> > 4.3 if possible.
+>
+> So after 2.5 months of waiting on your feedback you're saying that the
+> current patches (Acked by all other Maintainers and tested on affected
+> platforms) should be just abandoned and we should wait with re-doing
+> them on some not yet implemented feature of clock subsystem which would
+> be available 2 months from now (at earliest)?
+> 
+> Also what should I do about CPUfreq support for SoCs that don't have
+> platform specific CPUfreq drivers currently and that need current patches
+> to work (I mean Exynos542x, Exynos5800 and Exynos5433 in the future)?
+> 
+> Best regards,
+> --
+> Bartlomiej Zolnierkiewicz
+> Samsung R&D Institute Poland
+> Samsung Electronics
