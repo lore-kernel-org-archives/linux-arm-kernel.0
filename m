@@ -1,24 +1,19 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Sat, 20 Jun 2015 16:36:09 +0200
-Subject: Linkstation Mini and __machine_arch_type problem, not booting
- since 3.8
-In-Reply-To: <1434760119.5177.6.camel@dolka.fr>
-References: <97db3502cd014faf1c710b1cc0fe8848@dolka.fr>
- <55827D64.1090307@free-electrons.com>
- <1434678624.4767.22.camel@dolka.fr>
- <5583E1D9.2010002@free-electrons.com>
- <20150619114152.GA2936@io.lakedaemon.net>
- <1434760119.5177.6.camel@dolka.fr>
-Message-ID: <20150620143609.GE1116@lunn.ch>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Sat, 20 Jun 2015 11:43:48 -0300
+Subject: [PATCH v2 2/6] imx35: define two clocks for rtc
+In-Reply-To: <1434809732-8996-3-git-send-email-tremyfr@gmail.com>
+References: <1434809732-8996-1-git-send-email-tremyfr@gmail.com>
+ <1434809732-8996-3-git-send-email-tremyfr@gmail.com>
+Message-ID: <CAOMZO5DOC2WXAVLxv_srHAZVAtnhTaP1yqYL9iQvJivKHRj1jA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> > SERIAL_OF_PLATFORM?
-> 
-> Oh, and that was it!
+On Sat, Jun 20, 2015 at 11:15 AM, Philippe Reynes <tremyfr@gmail.com> wrote:
 
-This used to catch us all out a lot. What configuration are you using?
-orion5x_defconfig? Very likely a patch adding it to that would be
-accepted.
+> @@ -240,6 +241,9 @@ int __init mx35_clocks_init(void)
+>         clk_register_clkdev(clk[ipg], "ipg", "imx21-uart.1");
+>         clk_register_clkdev(clk[uart3_gate], "per", "imx21-uart.2");
+>         clk_register_clkdev(clk[ipg], "ipg", "imx21-uart.2");
+> +       /* i.mx35 has the i.mx21 type uart */
 
-	Andrew
+I think you meant rtc, not uart :-)
