@@ -1,48 +1,56 @@
-From: benoar@dolka.fr (Benjamin Cama)
-Date: Sat, 20 Jun 2015 02:28:39 +0200
-Subject: Linkstation Mini and __machine_arch_type problem, not booting
- since 3.8
-In-Reply-To: <20150619114152.GA2936@io.lakedaemon.net>
-References: <97db3502cd014faf1c710b1cc0fe8848@dolka.fr>
- <55827D64.1090307@free-electrons.com> <1434678624.4767.22.camel@dolka.fr>
- <5583E1D9.2010002@free-electrons.com>
- <20150619114152.GA2936@io.lakedaemon.net>
-Message-ID: <1434760119.5177.6.camel@dolka.fr>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Sat, 20 Jun 2015 02:43:54 +0200
+Subject: [rtc-linux] [PATCH-v2] rtc: 88pm80x: add device tree support
+In-Reply-To: <1434567488-6477-3-git-send-email-vaibhav.hiremath@linaro.org>
+References: <vaibhav.hiremath@linaro.org>
+ <1434567488-6477-1-git-send-email-vaibhav.hiremath@linaro.org>
+ <1434567488-6477-3-git-send-email-vaibhav.hiremath@linaro.org>
+Message-ID: <20150620004354.GY27492@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le vendredi 19 juin 2015 ? 11:41 +0000, Jason Cooper a ?crit :
-> On Fri, Jun 19, 2015 at 11:33:13AM +0200, Gregory CLEMENT wrote:
-> > On 19/06/2015 03:50, Benjamin Cama wrote:
-> > > My main problem is getting some debug messages: no amount of "debug"
-> > > and "loglevel" on the command line seems to change anything. Is it too
-> > > early in the boot process to get anything output or am I doing
-> > > something wrong? (I activated some configs for debugging, but I may
-> > > have missed the good one)
-> > 
-> > Try to activate earlyprintk. For this you have to select CONFIG_EARLY_PRINTK
-> > which depend on DEBUG_LL. You will also have to add the argument
-> > "earlyprintk" to your kernel parameters.
+Hi,
 
-Yes, this is what I tried before without success, but then I looked
-again and realized? that I missed the option to choose the correct
-output just below the ?Kernel low-level debugging functions? option
-because the text line was too long and I didn't see it chose
-?EmbeddedICE DCC channel? by default instead of the UART. Big fail for
-me here.
+On 18/06/2015 at 00:28:06 +0530, Vaibhav Hiremath wrote :
+> -	pdata = dev_get_platdata(&pdev->dev);
+> -	if (pdata == NULL)
+> -		dev_warn(&pdev->dev, "No platform data!\n");
+> +	if (!pdata && !node) {
+> +		dev_err(&pdev->dev,
+> +			"pm80x-rtc requires platform data or of_node\n");
+> +		return -EINVAL;
+> +	}
+> +
+> +	if (!pdata) {
+> +		pdata = devm_kzalloc(&pdev->dev, sizeof(*pdata), GFP_KERNEL);
 
-Still, no output.
+I had troubles to follow the rtc_wakeup initialization cleanup but it
+seems OK. However, I'm wondering why you are adding DT support as this
+will always be probed from the MFD driver which pass the platform_data
+and avoids that allocation.
 
-> SERIAL_OF_PLATFORM?
+> +		if (!pdata) {
+> +			dev_err(&pdev->dev, "failed to allocate memory\n");
+> +			return -ENOMEM;
+> +		}
+> +	}
+>  
+>  	info =
+>  	    devm_kzalloc(&pdev->dev, sizeof(struct pm80x_rtc_info), GFP_KERNEL);
+> @@ -327,11 +336,8 @@ static int pm80x_rtc_probe(struct platform_device *pdev)
+>  	regmap_update_bits(info->map, PM800_RTC_CONTROL, PM800_RTC1_USE_XO,
+>  			   PM800_RTC1_USE_XO);
+>  
+> -	if (pm80x_pdata) {
+> -		pdata = pm80x_pdata->rtc;
+> -		if (pdata)
+> -			info->rtc_dev->dev.platform_data = &pdata->rtc_wakeup;
+> -	}
+> +	/* remeber whether this power up is caused by PMIC RTC or not */
+remember -^
 
-Oh, and that was it! Why isn't it selected by the DT config? I see that
-it's in the defconfigs, but selected nowhere by any option. Is there a
-particular reason for this?
 
-Then I saw the kernel log, I witnessed that it worked well, it just
-couldn't find a root fs (I was booting with dummy parameters). So the
-DT I made is actually working!
-
-Thanks for your help, the patch will be following,
---
-benjamin
+-- 
+Alexandre Belloni, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
