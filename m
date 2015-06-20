@@ -1,42 +1,57 @@
-From: carlo@caione.org (Carlo Caione)
-Date: Sat, 20 Jun 2015 09:36:38 +0200
-Subject: [PATCH 0/4] meson: Add and enable DTS for Odroid-C1 and Tronfy MXQ
-In-Reply-To: <1433753545-7980-1-git-send-email-carlo@caione.org>
-References: <1433753545-7980-1-git-send-email-carlo@caione.org>
-Message-ID: <CAOQ7t2b-3YCruU=QcBvN23gRy9zQVmcaYFr2eHoF-uzD96ChFw@mail.gmail.com>
+From: robert.jarzmik@free.fr (Robert Jarzmik)
+Date: Sat, 20 Jun 2015 10:17:26 +0200
+Subject: [PATCH v3 1/6] ARM: dts: pxa: add dma controller
+Message-ID: <1434788251-11839-1-git-send-email-robert.jarzmik@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 8, 2015 at 10:52 AM, Carlo Caione <carlo@caione.org> wrote:
-> From: Carlo Caione <carlo@endlessm.com>
->
-> This patchset enables Meson8b and add the DTS files for Hardkernel Odroid-C1
-> and Tronfy MXQ.
->
-> Note that the DTS files depend on the header file that is already submitted
-> with the clock driver patches and already present in the clk tree in the
-> clk-meson8b branch.
->
-> Carlo Caione (4):
->   of: documentation: Add vedor prefix for Hardkernel and Tronfy
->   of: documentation: add bindings documentation for Meson8b
->   ARM: meson: Add DTS for Odroid-C1 and Tronfy MXQ boards
->   ARM: meson: Enable Meson8b SoCs
->
->  Documentation/devicetree/bindings/arm/amlogic.txt  |   6 +
->  .../devicetree/bindings/vendor-prefixes.txt        |   2 +
->  arch/arm/boot/dts/Makefile                         |   3 +
->  arch/arm/boot/dts/meson8b-mxq.dts                  |  65 +++++++++
->  arch/arm/boot/dts/meson8b-odroidc1.dts             |  65 +++++++++
->  arch/arm/boot/dts/meson8b.dtsi                     | 151 +++++++++++++++++++++
->  arch/arm/mach-meson/Kconfig                        |   5 +
->  arch/arm/mach-meson/meson.c                        |   1 +
->  8 files changed, 298 insertions(+)
->  create mode 100644 arch/arm/boot/dts/meson8b-mxq.dts
->  create mode 100644 arch/arm/boot/dts/meson8b-odroidc1.dts
->  create mode 100644 arch/arm/boot/dts/meson8b.dtsi
+Add the SoC embedded DMA controller, shared with the mmp architecture.
 
-Any feedback on this?
+Signed-off-by: Robert Jarzmik <robert.jarzmik@free.fr>
+---
+ arch/arm/boot/dts/pxa27x.dtsi | 9 +++++++++
+ arch/arm/boot/dts/pxa3xx.dtsi | 9 +++++++++
+ 2 files changed, 18 insertions(+)
 
+diff --git a/arch/arm/boot/dts/pxa27x.dtsi b/arch/arm/boot/dts/pxa27x.dtsi
+index 90b9971..506db86 100644
+--- a/arch/arm/boot/dts/pxa27x.dtsi
++++ b/arch/arm/boot/dts/pxa27x.dtsi
+@@ -7,6 +7,15 @@
+ 	compatible = "marvell,pxa27x";
+ 
+ 	pxabus {
++		pdma: dma-controller at 40000000 {
++			compatible = "marvell,pdma-1.0";
++			reg = <0x40000000 0x10000>;
++			interrupts = <25>;
++			#dma-channels = <32>;
++			#dma-cells = <2>;
++			status = "okay";
++		};
++
+ 		pxairq: interrupt-controller at 40d00000 {
+ 			marvell,intc-priority;
+ 			marvell,intc-nr-irqs = <34>;
+diff --git a/arch/arm/boot/dts/pxa3xx.dtsi b/arch/arm/boot/dts/pxa3xx.dtsi
+index 7ad0b17..4eb1563 100644
+--- a/arch/arm/boot/dts/pxa3xx.dtsi
++++ b/arch/arm/boot/dts/pxa3xx.dtsi
+@@ -6,6 +6,15 @@
+ 	compatible = "marvell,pxa3xx";
+ 
+ 	pxabus {
++		pdma: dma-controller at 40000000 {
++			compatible = "marvell,pdma-1.0";
++			reg = <0x40000000 0x10000>;
++			interrupts = <25>;
++			#dma-channels = <32>;
++			#dma-cells = <2>;
++			status = "okay";
++		};
++
+ 		pwri2c: i2c at 40f500c0 {
+ 			compatible = "mrvl,pwri2c";
+ 			reg = <0x40f500c0 0x30>;
 -- 
-Carlo Caione
+2.1.4
