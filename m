@@ -1,23 +1,24 @@
-From: francisco.friedman@p3nw8sh293.shr.prod.phx3.secureserver.net (FedEx Standard Overnight)
-Date: Sat, 20 Jun 2015 07:39:17 -0700
-Subject: Unable to deliver your item, #000768504
-Message-ID: <0816a87128fd859d9aca2dc0f9539a02@p3nw8sh293.shr.prod.phx3.secureserver.net>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Sat, 20 Jun 2015 16:36:09 +0200
+Subject: Linkstation Mini and __machine_arch_type problem, not booting
+ since 3.8
+In-Reply-To: <1434760119.5177.6.camel@dolka.fr>
+References: <97db3502cd014faf1c710b1cc0fe8848@dolka.fr>
+ <55827D64.1090307@free-electrons.com>
+ <1434678624.4767.22.camel@dolka.fr>
+ <5583E1D9.2010002@free-electrons.com>
+ <20150619114152.GA2936@io.lakedaemon.net>
+ <1434760119.5177.6.camel@dolka.fr>
+Message-ID: <20150620143609.GE1116@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Customer,
+> > SERIAL_OF_PLATFORM?
+> 
+> Oh, and that was it!
 
-Courier was unable to deliver the parcel to you.
-Delivery Label is attached to this email.
+This used to catch us all out a lot. What configuration are you using?
+orion5x_defconfig? Very likely a patch adding it to that would be
+accepted.
 
-Thank you for choosing FedEx,
-Francisco Friedman,
-Sr. Operation Manager.
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: 000768504.zip
-Type: application/zip
-Size: 1786 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150620/01d1778a/attachment.zip>
+	Andrew
