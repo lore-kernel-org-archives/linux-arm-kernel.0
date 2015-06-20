@@ -1,82 +1,209 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Sat, 20 Jun 2015 20:08:39 +0200
-Subject: [RFC PATCH] ARM: dts: Convert Linkstation Mini to Device Tree
-In-Reply-To: <20150620173421.GJ2936@io.lakedaemon.net>
-References: <1434765234.5177.25.camel@dolka.fr>
- <20150620173421.GJ2936@io.lakedaemon.net>
-Message-ID: <20150620180839.GB9863@lunn.ch>
+From: mturquette@linaro.org (Michael Turquette)
+Date: Sat, 20 Jun 2015 12:13:37 -0700
+Subject: [PATCH 1/6] clk: add CLK_RECALC_NEW_RATES clock flag for Exynos
+ cpu clock support
+In-Reply-To: <558539E8.5050101@samsung.com>
+References: <'@samsung.com> <20150618195846.9112.7144@quantum>
+ <15113828.ygxT0eaek9@amdc1976> <3554100.H9OH7Yrz4m@amdc1976>
+ <20150619145357.9112.63998@quantum> <558539E8.5050101@samsung.com>
+Message-ID: <20150620191337.9112.76018@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> >  arch/arm/boot/dts/Makefile           |   3 +-
-> >  arch/arm/boot/dts/orion5x-lswsgl.dts | 241 ++++++++++++++++++++++++++++++
-> >  arch/arm/mach-orion5x/Kconfig        |   6 +-
-> >  arch/arm/mach-orion5x/lsmini-setup.c | 280 -----------------------------------
-> >  4 files changed, 246 insertions(+), 284 deletions(-)
-> >  create mode 100644 arch/arm/boot/dts/orion5x-lswsgl.dts
-> >  delete mode 100644 arch/arm/mach-orion5x/lsmini-setup.c
+Quoting Krzysztof Kozlowski (2015-06-20 03:01:12)
+> W dniu 19.06.2015 o 23:53, Michael Turquette pisze:
+> > Quoting Bartlomiej Zolnierkiewicz (2015-06-19 05:35:23)
+> >> On Friday, June 19, 2015 01:19:06 PM Bartlomiej Zolnierkiewicz wrote:
+> >>>
+> >>> Hi,
+> >>>
+> >>> On Thursday, June 18, 2015 12:58:46 PM Michael Turquette wrote:
+> >>>> Quoting Sylwester Nawrocki (2015-05-13 07:13:13)
+> >>>>> On 03/04/15 18:43, Bartlomiej Zolnierkiewicz wrote:
+> >>>>>> This flag is needed to fix the issue with wrong dividers being setup
+> >>>>>> by Common Clock Framework when using the new Exynos cpu clock support.
+> >>>>>>
+> >>>>>> The issue happens because clk_core_set_rate_nolock()  calls
+> >>>>>> clk_calc_new_rates(clk, rate) before both pre/post clock notifiers have
+> >>>>>> a chance to run.  In case of Exynos cpu clock support pre/post clock
+> >>>>>> notifiers are registered for mout_apll clock which is a parent of armclk
+> >>>>>> cpu clock and dividers are modified in both pre and post clock notifier.
+> >>>>>> This results in wrong dividers values being later programmed by
+> >>>>>> clk_change_rate(top).  To workaround the problem CLK_RECALC_NEW_RATES
+> >>>>>> flag is added and it is set for mout_apll clock later so the correct
+> >>>>>> divider values are re-calculated after both pre and post clock notifiers
+> >>>>>> had run.
+> >>>>>>
+> >>>>>> For example when using "performance" governor on Exynos4210 Origen board
+> >>>>>> the cpufreq-dt driver requests to change the frequency from 1000MHz to
+> >>>>>> 1200MHz and after the change state of the relevant clocks is following:
+> >>>>>>
+> >>>>>> Without use of CLK_GET_RATE_NOCACHE flag:
+> >>>>>>
+> >>>>>>  fout_apll rate: 1200000000
+> >>>>>>          fout_apll_div_2 rate: 600000000
+> >>>>>>                  mout_clkout_cpu rate: 600000000
+> >>>>>>                          div_clkout_cpu rate: 600000000
+> >>>>>>                                  clkout_cpu rate: 600000000
+> >>>>>>          mout_apll rate: 1200000000
+> >>>>>>                  armclk rate: 1200000000
+> >>>>>>                  mout_hpm rate: 1200000000
+> >>>>>>                          div_copy rate: 300000000
+> >>>>>>                                  div_hpm rate: 300000000
+> >>>>>>                  mout_core rate: 1200000000
+> >>>>>>                          div_core rate: 1200000000
+> >>>>>>                                  div_core2 rate: 1200000000
+> >>>>>>                                          arm_clk_div_2 rate: 600000000
+> >>>>>>                                          div_corem0 rate: 300000000
+> >>>>>>                                          div_corem1 rate: 150000000
+> >>>>>>                                          div_periph rate: 300000000
+> >>>>>>                          div_atb rate: 300000000
+> >>>>>>                                  div_pclk_dbg rate: 150000000
+> >>>>>>                  sclk_apll rate: 1200000000
+> >>>>>>                          sclk_apll_div_2 rate: 600000000
+> >>>>>>
+> >>>>>>
+> >>>>>> With use of CLK_GET_RATE_NOCACHE flag:
+> >>>>>>
+> >>>>>>  fout_apll rate: 1200000000
+> >>>>>>          fout_apll_div_2 rate: 600000000
+> >>>>>>                  mout_clkout_cpu rate: 600000000
+> >>>>>>                          div_clkout_cpu rate: 600000000
+> >>>>>>                                  clkout_cpu rate: 600000000
+> >>>>>>          mout_apll rate: 1200000000
+> >>>>>>                  armclk rate: 1200000000
+> >>>>>>                  mout_hpm rate: 1200000000
+> >>>>>>                          div_copy rate: 200000000
+> >>>>>>                                  div_hpm rate: 200000000
+> >>>>>>                  mout_core rate: 1200000000
+> >>>>>>                          div_core rate: 1200000000
+> >>>>>>                                  div_core2 rate: 1200000000
+> >>>>>>                                          arm_clk_div_2 rate: 600000000
+> >>>>>>                                          div_corem0 rate: 300000000
+> >>>>>>                                          div_corem1 rate: 150000000
+> >>>>>>                                          div_periph rate: 300000000
+> >>>>>>                          div_atb rate: 240000000
+> >>>>>>                                  div_pclk_dbg rate: 120000000
+> >>>>>>                  sclk_apll rate: 150000000
+> >>>>>>                          sclk_apll_div_2 rate: 75000000
+> >>>>>>
+> >>>>>> Without this change cpufreq-dt driver showed ~10 mA larger energy
+> >>>>>> consumption when compared to cpufreq-exynos one when "performance"
+> >>>>>> cpufreq governor was used on Exynos4210 SoC based Origen board.
+> >>>>>>
+> >>>>>> This issue was probably meant to be workarounded by use of
+> >>>>>> CLK_GET_RATE_NOCACHE and CLK_DIVIDER_READ_ONLY clock flags in
+> >>>>>> the original Exynos cpu clock patchset (in "[PATCH v12 6/6] clk:
+> >>>>>> samsung: remove unused clock aliases and update clock flags" patch)
+> >>>>>> but usage of these flags is not sufficient to fix the issue observed.
+> >>>>>>
+> >>>>>> Cc: Thomas Abraham <thomas.ab@samsung.com>
+> >>>>>> Cc: Tomasz Figa <tomasz.figa@gmail.com>
+> >>>>>> Cc: Mike Turquette <mturquette@linaro.org>
+> >>>>>> Cc: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
+> >>>>>> Signed-off-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
+> >>>>>> ---
+> >>>>>>  drivers/clk/clk.c            |    3 +++
+> >>>>>>  include/linux/clk-provider.h |    1 +
+> >>>>>>  2 files changed, 4 insertions(+)
+> >>>>>>
+> >>>>>> diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
+> >>>>>> index f85c8e2..97cc73e 100644
+> >>>>>> --- a/drivers/clk/clk.c
+> >>>>>> +++ b/drivers/clk/clk.c
+> >>>>>> @@ -1771,6 +1771,9 @@ static void clk_change_rate(struct clk_core *clk)
+> >>>>>>       if (clk->notifier_count && old_rate != clk->rate)
+> >>>>>>               __clk_notify(clk, POST_RATE_CHANGE, old_rate, clk->rate);
+> >>>>>>  
+> >>>>>> +     if (clk->flags & CLK_RECALC_NEW_RATES)
+> >>>>>> +             (void)clk_calc_new_rates(clk, clk->new_rate);
+> >>>>>> +
+> >>>>>>       /*
+> >>>>>>        * Use safe iteration, as change_rate can actually swap parents
+> >>>>>>        * for certain clock types.
+> >>>>>> diff --git a/include/linux/clk-provider.h b/include/linux/clk-provider.h
+> >>>>>> index 28abf1b..8d1aebe 100644
+> >>>>>> --- a/include/linux/clk-provider.h
+> >>>>>> +++ b/include/linux/clk-provider.h
+> >>>>>> @@ -31,6 +31,7 @@
+> >>>>>>  #define CLK_GET_RATE_NOCACHE BIT(6) /* do not use the cached clk rate */
+> >>>>>>  #define CLK_SET_RATE_NO_REPARENT BIT(7) /* don't re-parent on rate change */
+> >>>>>>  #define CLK_GET_ACCURACY_NOCACHE BIT(8) /* do not use the cached clk accuracy */
+> >>>>>> +#define CLK_RECALC_NEW_RATES BIT(9) /* recalc rates after notifications */
+> >>>>>
+> >>>>> Mike, Stephen, what do you think about this? I'm rather resistant to
+> >>>>> this new flag approach, it looks like a hack. I don't seem to have better
+> >>>>> ideas to address the missing rate recalculation issue though.
+> >>>>
+> >>>> I also do not like it. The root of the problem is the use of clk
+> >>>> notifiers to change clk rates. This is also a hack and it points towards
+> >>>> some missing infrastructure in the clock framework.
+> >>>
+> >>> I'm very surprised by this.  Clock changes using clock notifiers in
+> >>> Thomas' original patchset were Acked by you:
+> >>>
+> >>> "[PATCH v12 1/6] clk: samsung: add infrastructure to register cpu clocks"
+> >>> https://www.marc.info/?l=linux-arm-kernel&m=141657613203808&w=2
+> >>>
+> >>> I've only fixed issues present within the original code (this 4 lines
+> >>> workaround/hack change to clock subsystem is a result of this), I have
+> >>> not changed it fundamentally.
+> >>
+> >> Moreover similar changes for rockchip SoCs (which were explicitly based
+> >> on Thomas' patches as noted in the code!) have already been merged in
+> >> 3.18:
+> >>
+> >> http://lkml.iu.edu/hypermail/linux/kernel/1410.1/02644.html
+> >>
+> >> and are available in commit f6fba5f6967dbc062a7c138d67e2314220f5dd04
+> >> ("clk: rockchip: add new clock-type for the cpuclk").
+> >>
+> >> I understand that my findings have uncovered some clock subsystem
+> >> deficiencies which resulted in afterthought about fundamental design
+> >> of cpu clocks but I have a feeling that our patches are now being
+> >> unjustly punished for making these issues public.
+> >>
+> >> I agree that current patches are not perfect (especially this patch)
+> >> but they are good enough IMO.  Please also understand that there were
+> >> some serious work put into validating and reviewing them.
+> > 
+> > You know what? You're right.
+> > 
+> > I don't really like this cpu-clock code (and similarly I don't like
+> > Tegra's EMC code which requires access to clk_hw_reparent). But I slept
+> > on this issue overnight and it doesn't seem right for me to hold back
+> > these patches when the better solution is currently vaporware (I have
+> > some code but it's far from ready).
+> > 
+> > It occurs to me that the best decision I can take is to merge it now and
+> > then force you guys to switch over when the new infrastructure is
+> > available. That is more reasonable than delaying the patches getting
+> > pulled.
+> > 
+> > So how to merge it? Viresh has given his Ack and is OK for the cpufreq
+> > changes to go through another tree. I can take the whole thing with
+> > Kukjin's Ack on the ARM dts patch, or we can set up an immutable
+> > branch.
 > 
-> Ahhh, that's always refreshing to see...
+> I already acked the DTS [0] patch and I'm fine with it. However there
+> would be some conflicts if this went through tree different than
+> Samsung. There are many Exynos4 DTS changes in the queue for 4.2.
+> 
+> Are there any objections for picking the DTS patch to Samsung tree?
 
-And i missed it all together. More discussion below.
+That's fine with me. I don't foresee any build problems if I take
+patches 1-3 and 5-6. So I'll take those and you'll take #4, sound good?
+
+Regards,
+Mike
 
 > 
-> > diff --git a/arch/arm/boot/dts/orion5x-lswsgl.dts b/arch/arm/boot/dts/orion5x-lswsgl.dts
-> > new file mode 100644
-> > index 0000000..c7537a6
-> > --- /dev/null
-> > +++ b/arch/arm/boot/dts/orion5x-lswsgl.dts
-> > @@ -0,0 +1,241 @@
-> > +/*
-> > + * Copyright (C) 2015 Benjamin Cama <benoar@dolka.fr>
-> > + * Copyright (C) 2014 Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-> > + * Copyright (C) 2008 Alexey Kopytko <alexey@kopytko.ru>
+> Best regards,
+> Krzysztof
 > 
-> It may be preferable to say "Based on the board file
-> arch/arm/mach-orion5x/lsmini-setup.c, Copyright (C) 2008 Alexey Kopytko
-> <alexey@kopytko.ru>"  But that's very nit-picky.  As long as Alexey is
-> recognized, it should be fine.
+> [0] https://lkml.org/lkml/2015/5/7/999
 > 
-> > + *
-> > + * This file is licensed under the terms of the GNU General Public
-> > + * License version 2. This program is licensed "as is" without any
-> > + * warranty of any kind, whether express or implied.
-> > + */
-> 
-> We're trying to move the dts{i} files to dual license.  Please take a
-> look at the current armada-*.dts{i} license blocks.  If you are ok with
-> it, please change the above to match.
-
-For orion5x we have a chance to make this happen, since most of
-orion5x.dtsi comes from the usual suspects.
-
-So, yes, this makes sense.
- 
-> > diff --git a/arch/arm/mach-orion5x/Kconfig b/arch/arm/mach-orion5x/Kconfig
-> > index 2412efb..08d2be2 100644
-> > --- a/arch/arm/mach-orion5x/Kconfig
-> > +++ b/arch/arm/mach-orion5x/Kconfig
-> > @@ -78,11 +78,11 @@ config MACH_LINKSTATION_LSCHL
-> >  	  Buffalo Linkstation Live v3 (LS-CHL) platform.
-> >  
-> >  config MACH_LINKSTATION_MINI
-> > -	bool "Buffalo Linkstation Mini"
-> > -	select I2C_BOARDINFO
-> > +	bool "Buffalo Linkstation Mini (Flattened Device Tree)"
-> > +	select ARCH_ORION5X_DT
-> >  	help
-> >  	  Say 'Y' here if you want your kernel to support the
-> > -	  Buffalo Linkstation Mini platform.
-> > +	  Buffalo Linkstation Mini (LS-WSGL) platform.
-> 
-> Hmmm, this question is for the other mvebu maintainers:  When we
-> originally converted kirkwood and dove, we put a lot of effort into
-> keeping the board files and the dts files around in parallel for a
-> while.  Do we need to do that here?  All the drivers are converted, so
-> we don't need to keep the legacy board files for that reason.
-
-We get so little interest in orion5x, and it has been shown to be
-broken for quite a while with respect to IRQ0, that if a real user
-comes by and swaps his platform to DT only, i say we go with it.
-
-      Andrew
+> > 
+> > If you really want to make my life easy you can send a pull request for
+> > these patches (and the other Exynos cpufreq/cpu-clock series).
+> >
