@@ -1,28 +1,23 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Sat, 20 Jun 2015 16:31:09 +0200
-Subject: [RFC PATCH] ARM: dts: Convert Linkstation Mini to Device Tree
-In-Reply-To: <1434796392.17448.31.camel@x60s>
-References: <1434765234.5177.25.camel@dolka.fr>
- <1434796392.17448.31.camel@x60s>
-Message-ID: <20150620143109.GD1116@lunn.ch>
+From: francisco.friedman@p3nw8sh293.shr.prod.phx3.secureserver.net (FedEx Standard Overnight)
+Date: Sat, 20 Jun 2015 07:39:17 -0700
+Subject: Unable to deliver your item, #000768504
+Message-ID: <0816a87128fd859d9aca2dc0f9539a02@p3nw8sh293.shr.prod.phx3.secureserver.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Jun 20, 2015 at 12:33:12PM +0200, Benjamin Cama wrote:
-> Le samedi 20 juin 2015 ? 03:53 +0200, Benjamin Cama a ?crit :
-> > Reviewed-by: Andrew Lunn <andrew@lunn.ch>
-> 
-> Please ignore this Reviewed-by, it is a mistake, Andrew did not find it
-> acceptable yet. I was not sure of the meaning of this and sent this
-> email too soon. I apologize for this.
+Dear Customer,
 
-Hi Benjamin
+Courier was unable to deliver the parcel to you.
+Delivery Label is attached to this email.
 
-Thanks for revoking the Reviewed-by. You can expect to get an Acked-by
-from me once the patch is good.
+Thank you for choosing FedEx,
+Francisco Friedman,
+Sr. Operation Manager.
 
-You can find details about these tags starting here:
-
-http://lxr.free-electrons.com/source/Documentation/SubmittingPatches#L407
-
-	Andrew
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: 000768504.zip
+Type: application/zip
+Size: 1786 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150620/01d1778a/attachment.zip>
