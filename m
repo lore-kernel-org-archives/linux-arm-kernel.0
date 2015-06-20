@@ -1,84 +1,52 @@
 From: tremyfr@gmail.com (Philippe Reynes)
-Date: Sat, 20 Jun 2015 19:12:37 +0200
-Subject: [PATCH v3 3/6] rtc: mxc: use a second rtc clock
+Date: Sat, 20 Jun 2015 19:12:40 +0200
+Subject: [PATCH v3 6/6] apf27: dt: add support of internal rtc
 In-Reply-To: <1434820360-21935-1-git-send-email-tremyfr@gmail.com>
 References: <1434820360-21935-1-git-send-email-tremyfr@gmail.com>
-Message-ID: <1434820360-21935-4-git-send-email-tremyfr@gmail.com>
+Message-ID: <1434820360-21935-7-git-send-email-tremyfr@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The mxc RTC needs two clocks, one for the input
-reference, and one for the IP. But this driver
-was only using one clock (for the reference).
-This patch add the second clock (for the IP).
+Enable the internal mxc rtc driver on apf27.
 
 Signed-off-by: Philippe Reynes <tremyfr@gmail.com>
 ---
- drivers/rtc/rtc-mxc.c |   26 +++++++++++++++++---------
- 1 files changed, 17 insertions(+), 9 deletions(-)
+ arch/arm/boot/dts/imx27-apf27.dts |    4 ++++
+ arch/arm/boot/dts/imx27.dtsi      |   10 ++++++++++
+ 2 files changed, 14 insertions(+), 0 deletions(-)
 
-diff --git a/drivers/rtc/rtc-mxc.c b/drivers/rtc/rtc-mxc.c
-index 09d422b..e916a91 100644
---- a/drivers/rtc/rtc-mxc.c
-+++ b/drivers/rtc/rtc-mxc.c
-@@ -79,7 +79,8 @@ struct rtc_plat_data {
- 	struct rtc_device *rtc;
- 	void __iomem *ioaddr;
- 	int irq;
--	struct clk *clk;
-+	struct clk *clk_rtc;
-+	struct clk *clk_ipg;
- 	struct rtc_time g_rtc_alarm;
- 	enum imx_rtc_type devtype;
+diff --git a/arch/arm/boot/dts/imx27-apf27.dts b/arch/arm/boot/dts/imx27-apf27.dts
+index 73aae4f..590d37a 100644
+--- a/arch/arm/boot/dts/imx27-apf27.dts
++++ b/arch/arm/boot/dts/imx27-apf27.dts
+@@ -122,3 +122,7 @@
+ 		reg = <0x800000 0xf800000>;
+ 	};
  };
-@@ -373,17 +374,24 @@ static int mxc_rtc_probe(struct platform_device *pdev)
- 	if (IS_ERR(pdata->ioaddr))
- 		return PTR_ERR(pdata->ioaddr);
- 
--	pdata->clk = devm_clk_get(&pdev->dev, NULL);
--	if (IS_ERR(pdata->clk)) {
--		dev_err(&pdev->dev, "unable to get clock!\n");
--		return PTR_ERR(pdata->clk);
-+	pdata->clk_ipg = devm_clk_get(&pdev->dev, "ipg");
-+	if (IS_ERR(pdata->clk_ipg)) {
-+		dev_err(&pdev->dev, "unable to get ipg clock!\n");
-+		return PTR_ERR(pdata->clk_ipg);
- 	}
- 
--	ret = clk_prepare_enable(pdata->clk);
-+	ret = clk_prepare_enable(pdata->clk_ipg);
- 	if (ret)
- 		return ret;
- 
--	rate = clk_get_rate(pdata->clk);
-+	pdata->clk_rtc = devm_clk_get(&pdev->dev, "rtc");
-+	if (IS_ERR(pdata->clk_rtc)) {
-+		dev_err(&pdev->dev, "unable to get rtc clock!\n");
-+		ret = PTR_ERR(pdata->clk_rtc);
-+		goto exit_put_clk;
-+	}
 +
-+	rate = clk_get_rate(pdata->clk_rtc);
++&rtc {
++	status = "okay";
++};
+diff --git a/arch/arm/boot/dts/imx27.dtsi b/arch/arm/boot/dts/imx27.dtsi
+index bc215e4..57fda6c 100644
+--- a/arch/arm/boot/dts/imx27.dtsi
++++ b/arch/arm/boot/dts/imx27.dtsi
+@@ -144,6 +144,16 @@
+ 				clock-names = "ipg", "per";
+ 			};
  
- 	if (rate == 32768)
- 		reg = RTC_INPUT_CLK_32768HZ;
-@@ -432,7 +440,7 @@ static int mxc_rtc_probe(struct platform_device *pdev)
- 	return 0;
- 
- exit_put_clk:
--	clk_disable_unprepare(pdata->clk);
-+	clk_disable_unprepare(pdata->clk_ipg);
- 
- 	return ret;
- }
-@@ -441,7 +449,7 @@ static int mxc_rtc_remove(struct platform_device *pdev)
- {
- 	struct rtc_plat_data *pdata = platform_get_drvdata(pdev);
- 
--	clk_disable_unprepare(pdata->clk);
-+	clk_disable_unprepare(pdata->clk_ipg);
- 
- 	return 0;
- }
++			rtc: rtc at 10007000 {
++				compatible = "fsl,imx21-rtc";
++				reg = <0x10007000 0x1000>;
++				interrupts = <22>;
++				clocks = <&clks IMX27_CLK_CKIL>,
++					 <&clks IMX27_CLK_RTC_IPG_GATE>;
++				clock-names = "rtc", "ipg";
++				status = "disabled";
++			};
++
+ 			kpp: kpp at 10008000 {
+ 				compatible = "fsl,imx27-kpp", "fsl,imx21-kpp";
+ 				reg = <0x10008000 0x1000>;
 -- 
 1.7.4.4
