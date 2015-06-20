@@ -1,80 +1,35 @@
-From: robert.jarzmik@free.fr (Robert Jarzmik)
-Date: Sat, 20 Jun 2015 10:17:28 +0200
-Subject: [PATCH v3 3/6] ARM: dts: pxa: add dma pxamci nodes to pxa3xx
-In-Reply-To: <1434788251-11839-1-git-send-email-robert.jarzmik@free.fr>
-References: <1434788251-11839-1-git-send-email-robert.jarzmik@free.fr>
-Message-ID: <1434788251-11839-3-git-send-email-robert.jarzmik@free.fr>
+From: stefan.wahren@i2se.com (Stefan Wahren)
+Date: Sat, 20 Jun 2015 11:09:37 +0200 (CEST)
+Subject: [PATCH] serial/amba-pl011: Disable interrupts around TX softirq
+In-Reply-To: <1434635669-23367-1-git-send-email-Dave.Martin@arm.com>
+References: <1434635669-23367-1-git-send-email-Dave.Martin@arm.com>
+Message-ID: <416658426.177742.1434791378036.JavaMail.open-xchange@oxbsltgw09.schlund.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the 3 possible mmc controllers on pxa3xx SoCs to the devicetree
-description. Add the dma and clocks to the device-tree description of
-pxa27x and pxa3xx at the same time.
 
-Signed-off-by: Robert Jarzmik <robert.jarzmik@free.fr>
----
- arch/arm/boot/dts/pxa2xx.dtsi |  4 ++++
- arch/arm/boot/dts/pxa3xx.dtsi | 33 +++++++++++++++++++++++++++++++++
- 2 files changed, 37 insertions(+)
+> Dave Martin <Dave.Martin@arm.com> hat am 18. Juni 2015 um 15:54 geschrieben:
+>
+>
+> pl011_tx_softirq() currently uses spin_{,un}lock(), which are not
+> sufficient to inhibit pl011_int() from being triggered by a local
+> IRQ and trying to re-take the same lock. This can lead to
+> deadlocks.
+>
+> This patch uses the _irq() locking variants instead to ensure that
+> pl011_int() handling for a given port is deferred until any
+> pl011_tx_softirq() work for that port is complete.
+>
+> Fixes: 734745caeb9f serial/amba-pl011: Activate TX IRQ passively
+> Signed-off-by: Dave Martin <Dave.Martin@arm.com>
+> Tested-by: Robin Murphy <robin.murphy@arm.com>
+> Cc: stable <stable@vger.kernel.org> # 4.1
+>
 
-diff --git a/arch/arm/boot/dts/pxa2xx.dtsi b/arch/arm/boot/dts/pxa2xx.dtsi
-index 71a0cd7..5e5af07 100644
---- a/arch/arm/boot/dts/pxa2xx.dtsi
-+++ b/arch/arm/boot/dts/pxa2xx.dtsi
-@@ -128,6 +128,10 @@
- 			compatible = "marvell,pxa-mmc";
- 			reg = <0x41100000 0x1000>;
- 			interrupts = <23>;
-+			clocks = <&clks CLK_MMC>;
-+			dmas = <&pdma 21 3
-+				&pdma 22 3>;
-+			dma-names = "rx", "tx";
- 			status = "disabled";
- 		};
- 
-diff --git a/arch/arm/boot/dts/pxa3xx.dtsi b/arch/arm/boot/dts/pxa3xx.dtsi
-index d90489b..29aeac5 100644
---- a/arch/arm/boot/dts/pxa3xx.dtsi
-+++ b/arch/arm/boot/dts/pxa3xx.dtsi
-@@ -53,6 +53,39 @@
- 			interrupt-controller;
- 			#interrupt-cells = <0x2>;
- 		};
-+
-+		mmc0: mmc at 41100000 {
-+			compatible = "marvell,pxa-mmc";
-+			reg = <0x41100000 0x1000>;
-+			interrupts = <23>;
-+			clocks = <&clks CLK_MMC>;
-+			dmas = <&pdma 21 3
-+				&pdma 22 3>;
-+			dma-names = "rx", "tx";
-+			status = "disabled";
-+		};
-+
-+		mmc1: mmc at 42000000 {
-+			compatible = "marvell,pxa-mmc";
-+			reg = <0x42000000 0x1000>;
-+			interrupts = <41>;
-+			clocks = <&clks CLK_MMC1>;
-+			dmas = <&pdma 93 3
-+				&pdma 94 3>;
-+			dma-names = "rx", "tx";
-+			status = "disabled";
-+		};
-+
-+		mmc2: mmc at 42500000 {
-+			compatible = "marvell,pxa-mmc";
-+			reg = <0x42500000 0x1000>;
-+			interrupts = <55>;
-+			clocks = <&clks CLK_MMC2>;
-+			dmas = <&pdma 46 3
-+				&pdma 47 3>;
-+			dma-names = "rx", "tx";
-+			status = "disabled";
-+		};
- 	};
- 
- 	clocks {
--- 
-2.1.4
+I also get info messages about inconsistent lock state on my mx28 board,
+after applying the patch the messages disappeared.
+
+Tested-by: Stefan Wahren <stefan.wahren@i2se.com>
+
+Regards
+Stefan
