@@ -1,52 +1,74 @@
 From: tremyfr@gmail.com (Philippe Reynes)
-Date: Sat, 20 Jun 2015 19:12:40 +0200
-Subject: [PATCH v3 6/6] apf27: dt: add support of internal rtc
+Date: Sat, 20 Jun 2015 19:12:38 +0200
+Subject: [PATCH v3 4/6] rtc: mxc: add support of device tree
 In-Reply-To: <1434820360-21935-1-git-send-email-tremyfr@gmail.com>
 References: <1434820360-21935-1-git-send-email-tremyfr@gmail.com>
-Message-ID: <1434820360-21935-7-git-send-email-tremyfr@gmail.com>
+Message-ID: <1434820360-21935-5-git-send-email-tremyfr@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enable the internal mxc rtc driver on apf27.
+Add device tree support for the mxc rtc driver.
 
 Signed-off-by: Philippe Reynes <tremyfr@gmail.com>
 ---
- arch/arm/boot/dts/imx27-apf27.dts |    4 ++++
- arch/arm/boot/dts/imx27.dtsi      |   10 ++++++++++
- 2 files changed, 14 insertions(+), 0 deletions(-)
+ drivers/rtc/rtc-mxc.c |   19 ++++++++++++++++++-
+ 1 files changed, 18 insertions(+), 1 deletions(-)
 
-diff --git a/arch/arm/boot/dts/imx27-apf27.dts b/arch/arm/boot/dts/imx27-apf27.dts
-index 73aae4f..590d37a 100644
---- a/arch/arm/boot/dts/imx27-apf27.dts
-+++ b/arch/arm/boot/dts/imx27-apf27.dts
-@@ -122,3 +122,7 @@
- 		reg = <0x800000 0xf800000>;
- 	};
- };
-+
-+&rtc {
-+	status = "okay";
-+};
-diff --git a/arch/arm/boot/dts/imx27.dtsi b/arch/arm/boot/dts/imx27.dtsi
-index bc215e4..57fda6c 100644
---- a/arch/arm/boot/dts/imx27.dtsi
-+++ b/arch/arm/boot/dts/imx27.dtsi
-@@ -144,6 +144,16 @@
- 				clock-names = "ipg", "per";
- 			};
+diff --git a/drivers/rtc/rtc-mxc.c b/drivers/rtc/rtc-mxc.c
+index e916a91..befe2c2 100644
+--- a/drivers/rtc/rtc-mxc.c
++++ b/drivers/rtc/rtc-mxc.c
+@@ -16,6 +16,8 @@
+ #include <linux/interrupt.h>
+ #include <linux/platform_device.h>
+ #include <linux/clk.h>
++#include <linux/of.h>
++#include <linux/of_device.h>
  
-+			rtc: rtc at 10007000 {
-+				compatible = "fsl,imx21-rtc";
-+				reg = <0x10007000 0x1000>;
-+				interrupts = <22>;
-+				clocks = <&clks IMX27_CLK_CKIL>,
-+					 <&clks IMX27_CLK_RTC_IPG_GATE>;
-+				clock-names = "rtc", "ipg";
-+				status = "disabled";
-+			};
+ #define RTC_INPUT_CLK_32768HZ	(0x00 << 5)
+ #define RTC_INPUT_CLK_32000HZ	(0x01 << 5)
+@@ -98,6 +100,15 @@ static struct platform_device_id imx_rtc_devtype[] = {
+ };
+ MODULE_DEVICE_TABLE(platform, imx_rtc_devtype);
+ 
++#ifdef CONFIG_OF
++static const struct of_device_id imx_rtc_dt_ids[] = {
++	{ .compatible = "fsl,imx1-rtc", .data = (const void *)IMX1_RTC },
++	{ .compatible = "fsl,imx21-rtc", .data = (const void *)IMX21_RTC },
++	{}
++};
++MODULE_DEVICE_TABLE(of, imx_rtc_dt_ids);
++#endif
 +
- 			kpp: kpp at 10008000 {
- 				compatible = "fsl,imx27-kpp", "fsl,imx21-kpp";
- 				reg = <0x10008000 0x1000>;
+ static inline int is_imx1_rtc(struct rtc_plat_data *data)
+ {
+ 	return data->devtype == IMX1_RTC;
+@@ -362,12 +373,17 @@ static int mxc_rtc_probe(struct platform_device *pdev)
+ 	u32 reg;
+ 	unsigned long rate;
+ 	int ret;
++	const struct of_device_id *of_id;
+ 
+ 	pdata = devm_kzalloc(&pdev->dev, sizeof(*pdata), GFP_KERNEL);
+ 	if (!pdata)
+ 		return -ENOMEM;
+ 
+-	pdata->devtype = pdev->id_entry->driver_data;
++	of_id = of_match_device(imx_rtc_dt_ids, &pdev->dev);
++	if (of_id)
++		pdata->devtype = (enum imx_rtc_type)of_id->data;
++	else
++		pdata->devtype = pdev->id_entry->driver_data;
+ 
+ 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+ 	pdata->ioaddr = devm_ioremap_resource(&pdev->dev, res);
+@@ -481,6 +497,7 @@ static SIMPLE_DEV_PM_OPS(mxc_rtc_pm_ops, mxc_rtc_suspend, mxc_rtc_resume);
+ static struct platform_driver mxc_rtc_driver = {
+ 	.driver = {
+ 		   .name	= "mxc_rtc",
++		   .of_match_table = of_match_ptr(imx_rtc_dt_ids),
+ 		   .pm		= &mxc_rtc_pm_ops,
+ 	},
+ 	.id_table = imx_rtc_devtype,
 -- 
 1.7.4.4
