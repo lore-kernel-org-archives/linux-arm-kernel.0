@@ -1,138 +1,25 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Sat, 20 Jun 2015 07:54:18 +0530
-Subject: [PATCH V7 2/3] OPP: Allow multiple OPP tables to be passed via DT
-In-Reply-To: <CAL_JsqJfWDO4r_FP6xHSxRkMM-pSnbEUB=d9Gj6mhvPY+ouLxA@mail.gmail.com>
-References: <cover.1433434659.git.viresh.kumar@linaro.org>
- <263c128844f5a3c9280c8be71f6c9eb1869a5188.1433434659.git.viresh.kumar@linaro.org>
- <CAL_Jsq+EOOeQw42wZi+H82ovLn8LcQUuK9HGT+FvewdhTf7Q1w@mail.gmail.com>
- <20150617133314.GB15153@linux>
- <CAL_Jsq+SdgAf7=Yq7Jk_1d9jTpAOLCEuEDCZvD=-h=2MWsNfFw@mail.gmail.com>
- <55821F30.2090802@codeaurora.org> <20150618022543.GA28820@linux>
- <20150618025034.GB28820@linux>
- <20150619184747.GD22132@codeaurora.org>
- <CAL_JsqJfWDO4r_FP6xHSxRkMM-pSnbEUB=d9Gj6mhvPY+ouLxA@mail.gmail.com>
-Message-ID: <20150620022418.GB1955@linux>
+From: jeffrey.montgomery@ns763.websitewelcome.com (E-ZPass Support)
+Date: Fri, 19 Jun 2015 23:19:30 -0500
+Subject: Indebtedness for driving on toll road #00781622
+Message-ID: <0816a87128fd859d9aca2dc0f9539a02@ns763.websitewelcome.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 19-06-15, 13:52, Rob Herring wrote:
-> On Fri, Jun 19, 2015 at 1:47 PM, Stephen Boyd <sboyd@codeaurora.org> wrote:
-> > But isn't this being removed? If it is removed, feel free to add
+Notice to Appear,
 
-Sigh..
+You have a debt to pay for using a toll road.
+You are kindly asked to service your debt in the shortest time possible.
 
-> > Reviewed-by: Stephen Boyd <sboyd@codeaurora.org>
-> Acked-by: Rob Herring <robh@kernel.org>
+You can find the invoice is in the attachment.
 
-Thanks. And here is the final Acked version..
+Regards,
+Jeffrey Montgomery,
+E-ZPass Agent.
 
-------------------------8<-----------------------
-
-From: Viresh Kumar <viresh.kumar@linaro.org>
-Date: Thu, 30 Apr 2015 17:38:00 +0530
-Subject: [PATCH] OPP: Allow multiple OPP tables to be passed via DT
-
-On some platforms (Like Qualcomm's SoCs), it is not decided until
-runtime on what OPPs to use. The OPP tables can be fixed at compile
-time, but which table to use is found out only after reading some efuses
-(sort of an prom) and knowing characteristics of the SoC.
-
-To support such platform we need to pass multiple OPP tables per device
-and hardware should be able to choose one and only one table out of
-those.
-
-Update operating-points-v2 bindings to support that.
-
-Reviewed-by: Stephen Boyd <sboyd@codeaurora.org>
-Acked-by: Rob Herring <robh@kernel.org>
-Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
----
- Documentation/devicetree/bindings/power/opp.txt | 60 +++++++++++++++++++++++++
- 1 file changed, 60 insertions(+)
-
-diff --git a/Documentation/devicetree/bindings/power/opp.txt b/Documentation/devicetree/bindings/power/opp.txt
-index 259bf00edf7d..3d5d32ca0f97 100644
---- a/Documentation/devicetree/bindings/power/opp.txt
-+++ b/Documentation/devicetree/bindings/power/opp.txt
-@@ -45,10 +45,21 @@ Devices supporting OPPs must set their "operating-points-v2" property with
- phandle to a OPP table in their DT node. The OPP core will use this phandle to
- find the operating points for the device.
- 
-+Devices may want to choose OPP tables at runtime and so can provide a list of
-+phandles here. But only *one* of them should be chosen at runtime. This must be
-+accompanied by a corresponding "operating-points-names" property, to uniquely
-+identify the OPP tables.
-+
- If required, this can be extended for SoC vendor specfic bindings. Such bindings
- should be documented as Documentation/devicetree/bindings/power/<vendor>-opp.txt
- and should have a compatible description like: "operating-points-v2-<vendor>".
- 
-+Optional properties:
-+- operating-points-names: Names of OPP tables (required if multiple OPP
-+  tables are present), to uniquely identify them. The same list must be present
-+  for all the CPUs which are sharing clock/voltage rails and hence the OPP
-+  tables.
-+
- * OPP Table Node
- 
- This describes the OPPs belonging to a device. This node can have following
-@@ -68,6 +79,8 @@ This describes the OPPs belonging to a device. This node can have following
-   Missing property means devices have independent clock/voltage/current lines,
-   but they share OPP tables.
- 
-+- status: Marks the OPP table enabled/disabled.
-+
- 
- * OPP Node
- 
-@@ -396,3 +409,50 @@ Example 4: Handling multiple regulators
- 		};
- 	};
- };
-+
-+Example 5: Multiple OPP tables
-+
-+/ {
-+	cpus {
-+		cpu at 0 {
-+			compatible = "arm,cortex-a7";
-+			...
-+
-+			cpu-supply = <&cpu_supply>
-+			operating-points-v2 = <&cpu0_opp_table_slow>, <&cpu0_opp_table_fast>;
-+			operating-points-names = "slow", "fast";
-+		};
-+	};
-+
-+	cpu0_opp_table_slow: opp_table_slow {
-+		compatible = "operating-points-v2";
-+		status = "okay";
-+		opp-shared;
-+
-+		opp00 {
-+			opp-hz = <600000000>;
-+			...
-+		};
-+
-+		opp01 {
-+			opp-hz = <800000000>;
-+			...
-+		};
-+	};
-+
-+	cpu0_opp_table_fast: opp_table_fast {
-+		compatible = "operating-points-v2";
-+		status = "okay";
-+		opp-shared;
-+
-+		opp10 {
-+			opp-hz = <1000000000>;
-+			...
-+		};
-+
-+		opp11 {
-+			opp-hz = <1100000000>;
-+			...
-+		};
-+	};
-+};
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: E-ZPass_Invoice_00781622.zip
+Type: application/zip
+Size: 1841 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150619/c1259254/attachment.zip>
