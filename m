@@ -1,59 +1,28 @@
-From: tremyfr@gmail.com (Philippe Reynes)
-Date: Sat, 20 Jun 2015 16:15:31 +0200
-Subject: [PATCH v2 5/6] dt-binding: document the binding for mxc rtc
-In-Reply-To: <1434809732-8996-1-git-send-email-tremyfr@gmail.com>
-References: <1434809732-8996-1-git-send-email-tremyfr@gmail.com>
-Message-ID: <1434809732-8996-6-git-send-email-tremyfr@gmail.com>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Sat, 20 Jun 2015 16:31:09 +0200
+Subject: [RFC PATCH] ARM: dts: Convert Linkstation Mini to Device Tree
+In-Reply-To: <1434796392.17448.31.camel@x60s>
+References: <1434765234.5177.25.camel@dolka.fr>
+ <1434796392.17448.31.camel@x60s>
+Message-ID: <20150620143109.GD1116@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This adds documentation of device tree bindings for the
-mxc rtc.
+On Sat, Jun 20, 2015 at 12:33:12PM +0200, Benjamin Cama wrote:
+> Le samedi 20 juin 2015 ? 03:53 +0200, Benjamin Cama a ?crit :
+> > Reviewed-by: Andrew Lunn <andrew@lunn.ch>
+> 
+> Please ignore this Reviewed-by, it is a mistake, Andrew did not find it
+> acceptable yet. I was not sure of the meaning of this and sent this
+> email too soon. I apologize for this.
 
-Cc: Rob Herring <robh+dt@kernel.org>
-Cc: Pawel Moll <pawel.moll@arm.com>
-Cc: Mark Rutland <mark.rutland@arm.com>
-Cc: Ian Campbell <ijc+devicetree@hellion.org.uk>
-Cc: Kumar Gala <galak@codeaurora.org>
-Cc: devicetree at vger.kernel.org
-Signed-off-by: Philippe Reynes <tremyfr@gmail.com>
----
- Documentation/devicetree/bindings/rtc/rtc-mxc.txt |   27 +++++++++++++++++++++
- 1 files changed, 27 insertions(+), 0 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/rtc/rtc-mxc.txt
+Hi Benjamin
 
-diff --git a/Documentation/devicetree/bindings/rtc/rtc-mxc.txt b/Documentation/devicetree/bindings/rtc/rtc-mxc.txt
-new file mode 100644
-index 0000000..5505493
---- /dev/null
-+++ b/Documentation/devicetree/bindings/rtc/rtc-mxc.txt
-@@ -0,0 +1,27 @@
-+* Real Time Clock of the i.MX SoCs
-+
-+RTC controller for the i.MX SoCs
-+
-+Required properties:
-+- compatible: Should be "fsl,imx1-rtc" or "fsl,imx21-rtc".
-+- reg: physical base address of the controller and length of memory mapped
-+  region.
-+- interrupts: IRQ line for the RTC.
-+- clocks: should contain two entries:
-+  * one for the input reference
-+  * one for the the SoC RTC
-+- clock-names: should contain:
-+  * "rtc" for the input reference clock
-+  * "ipg" for the SoC RTC clock
-+
-+Example:
-+
-+rtc at 10007000 {
-+	compatible = "fsl,imx21-rtc";
-+	reg = <0x10007000 0x1000>;
-+	interrupts = <22>;
-+	clocks = <&clks IMX27_CLK_CKIL>,
-+	       	 <&clks IMX27_CLK_RTC_IPG_GATE>;
-+	clock-names = "rtc, "ipg";
-+	status = "disabled";
-+};
--- 
-1.7.4.4
+Thanks for revoking the Reviewed-by. You can expect to get an Acked-by
+from me once the patch is good.
+
+You can find details about these tags starting here:
+
+http://lxr.free-electrons.com/source/Documentation/SubmittingPatches#L407
+
+	Andrew
