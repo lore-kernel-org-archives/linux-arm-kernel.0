@@ -1,53 +1,32 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Sat, 20 Jun 2015 21:35:53 +0200
-Subject: [RFC PATCH] ARM: dts: Convert Linkstation Mini to Device Tree
-In-Reply-To: <20150620173421.GJ2936@io.lakedaemon.net>
-References: <1434765234.5177.25.camel@dolka.fr>
- <20150620173421.GJ2936@io.lakedaemon.net>
-Message-ID: <20150620213553.1b6b7ae2@free-electrons.com>
+From: paul.gortmaker@windriver.com (Paul Gortmaker)
+Date: Sat, 20 Jun 2015 16:32:16 -0400
+Subject: [PATCH v7 00/14] crypto: add a new driver for Marvell's CESA
+In-Reply-To: <20150619142444.GA15234@gondor.apana.org.au>
+References: <1434635190-27733-1-git-send-email-boris.brezillon@free-electrons.com>
+ <20150619142444.GA15234@gondor.apana.org.au>
+Message-ID: <CAP=VYLqQynCNRTpm4JnOxeO6DH_739fO2QNcDMxaXqCKCHiTtQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Jason,
+On Fri, Jun 19, 2015 at 10:24 AM, Herbert Xu
+<herbert@gondor.apana.org.au> wrote:
+> On Thu, Jun 18, 2015 at 03:46:16PM +0200, Boris Brezillon wrote:
+>> Hello,
+>>
+>> This patch series adds a new driver supporting Marvell's CESA IP.
+>> This driver addresses some limitations of the existing one.
+>> >From a performance and CPU load point of view the most important
+>> limitation in the existing driver is the lack of DMA support, thus
+>> preventing us from chaining crypto operations.
+>
+> All applied to cryptodev.  Thanks a lot!
 
-On Sat, 20 Jun 2015 17:34:21 +0000, Jason Cooper wrote:
+It seems this breaks linux-next allmodconfig on i386:
 
-> >  config MACH_LINKSTATION_MINI
-> > -	bool "Buffalo Linkstation Mini"
-> > -	select I2C_BOARDINFO
-> > +	bool "Buffalo Linkstation Mini (Flattened Device Tree)"
-> > +	select ARCH_ORION5X_DT
-> >  	help
-> >  	  Say 'Y' here if you want your kernel to support the
-> > -	  Buffalo Linkstation Mini platform.
-> > +	  Buffalo Linkstation Mini (LS-WSGL) platform.
-> 
-> Hmmm, this question is for the other mvebu maintainers:  When we
-> originally converted kirkwood and dove, we put a lot of effort into
-> keeping the board files and the dts files around in parallel for a
-> while.  Do we need to do that here?  All the drivers are converted, so
-> we don't need to keep the legacy board files for that reason.
-> 
-> I'm not sure it's necessary myself, but I'm thinking it might be a good
-> idea on general principal to deprecate the board file over time.
-> Thoughts?
+http://kisskb.ellerman.id.au/kisskb/buildresult/12445342/
 
-I don't think it's necessary to keep both the DT and legacy versions
-around. If the DT conversion is as functional as the legacy one (even
-if it requires doing some legacy probing of certain devices that don't
-yet have a DT binding), then there is no point in keeping the legacy
-board file.
+ERROR: "phys_to_dma" [drivers/crypto/marvell/marvell-cesa.ko] undefined!
+make[2]: *** [__modpost] Error 1
 
-There is only one board for which I've kept both the DT and legacy
-versions: the rd88f5182. That's because it's a board I have, and
-keeping both the DT and legacy versions allowed me to make sure that
-legacy booting is not broken by the progressive conversion do DT for
-other boards.
-
-Best regards,
-
-Thomas
--- 
-Thomas Petazzoni, CTO, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+Paul.
+--
