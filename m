@@ -1,81 +1,66 @@
-From: jic23@kernel.org (Jonathan Cameron)
-Date: Sun, 21 Jun 2015 14:07:04 +0100
-Subject: [PATCH] iio: adc: at91_adc: allow to use full range of startup
- time
-In-Reply-To: <20150618140232.GE27492@piout.net>
-References: <1434558096-10619-1-git-send-email-nicolas.ferre@atmel.com>
- <20150618140232.GE27492@piout.net>
-Message-ID: <5586B6F8.9020806@kernel.org>
+From: rogershimizu@gmail.com (Roger Shimizu)
+Date: Mon, 22 Jun 2015 00:16:11 +0900
+Subject: [PATCH 1/2] ARM: dts: add buffalo linkstation ls-wxl/wsxl
+In-Reply-To: <20150620160331.GG1116@lunn.ch>
+References: <1434713319-8691-1-git-send-email-rogershimizu@gmail.com>
+ <1434713319-8691-2-git-send-email-rogershimizu@gmail.com>
+ <20150619221448.GA1116@lunn.ch>
+ <CAEQ9gEkSYtBtmzN3+0FXFeYJZfGFQNQz=nX+54LDTbniQREqPQ@mail.gmail.com>
+ <20150620145108.GF1116@lunn.ch>
+ <CAEQ9gEm9xi53oB+tOuJAcDVka-VtSc=vmU_MyKWzNMjKLeDgLw@mail.gmail.com>
+ <20150620160331.GG1116@lunn.ch>
+Message-ID: <CAEQ9gEkubRtcdDBuhJHpP0H=Qhc1KvG-4QAMbExopt786XbMuA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 18/06/15 15:02, Alexandre Belloni wrote:
-> On 17/06/2015 at 18:21:36 +0200, Nicolas Ferre wrote :
->> From: Jan Leupold <leupold@rsi-elektrotechnik.de>
->>
->> The DT-Property "atmel,adc-startup-time" is stored in an u8 for a microsecond
->> value. When trying to increase the value of STARTUP in Register AT91_ADC_MR
->> some higher values can't be reached.
->>
->> Change the type in function parameter and private structure field from u8 to
->> u32.
->>
->> Signed-off-by: Jan Leupold <leupold@rsi-elektrotechnik.de>
->> [nicolas.ferre at atmel.com: change commit message, increase u16 to u32 for startup time]
->> Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
-> Acked-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
-Applied to the fixes-togreg branch of iio.git and marked for stable.
-Probably won't now go upstream until post merge window.
+Dear Andrew,
 
-Thanks,
+> No. The name in DT should not give the name of the interface. It
+> should be possible to give this eth0 as expected, even if in DT it is
+> eth1. The names here are separate things. The kernel will assign a
+> name to the interface when it is registered to the network
+> stack. Since this is the first registered interface, if should get the
+> name eth0. What i think is happening is that something is later
+> renaming the interface to eth1. We have to find out what is doing this
+> rename.
 
-Jonathan
-> 
->> ---
->>  drivers/iio/adc/at91_adc.c | 8 ++++----
->>  1 file changed, 4 insertions(+), 4 deletions(-)
->>
->> diff --git a/drivers/iio/adc/at91_adc.c b/drivers/iio/adc/at91_adc.c
->> index 8a0eb4a04fb5..7b40925dd4ff 100644
->> --- a/drivers/iio/adc/at91_adc.c
->> +++ b/drivers/iio/adc/at91_adc.c
->> @@ -182,7 +182,7 @@ struct at91_adc_caps {
->>  	u8	ts_pen_detect_sensitivity;
->>  
->>  	/* startup time calculate function */
->> -	u32 (*calc_startup_ticks)(u8 startup_time, u32 adc_clk_khz);
->> +	u32 (*calc_startup_ticks)(u32 startup_time, u32 adc_clk_khz);
->>  
->>  	u8	num_channels;
->>  	struct at91_adc_reg_desc registers;
->> @@ -201,7 +201,7 @@ struct at91_adc_state {
->>  	u8			num_channels;
->>  	void __iomem		*reg_base;
->>  	struct at91_adc_reg_desc *registers;
->> -	u8			startup_time;
->> +	u32			startup_time;
->>  	u8			sample_hold_time;
->>  	bool			sleep_mode;
->>  	struct iio_trigger	**trig;
->> @@ -779,7 +779,7 @@ ret:Acked-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
->>  	return ret;
->>  }
->>  
->> -static u32 calc_startup_ticks_9260(u8 startup_time, u32 adc_clk_khz)
->> +static u32 calc_startup_ticks_9260(u32 startup_time, u32 adc_clk_khz)
->>  {
->>  	/*
->>  	 * Number of ticks needed to cover the startup time of the ADC
->> @@ -790,7 +790,7 @@ static u32 calc_startup_ticks_9260(u8 startup_time, u32 adc_clk_khz)
->>  	return round_up((startup_time * adc_clk_khz / 1000) - 1, 8) / 8;
->>  }
->>  
->> -static u32 calc_startup_ticks_9x5(u8 startup_time, u32 adc_clk_khz)
->> +static u32 calc_startup_ticks_9x5(u32 startup_time, u32 adc_clk_khz)
->>  {
->>  	/*
->>  	 * For sama5d3x and at91sam9x5, the formula changes to:
->> -- 
->> 2.1.3
->>
-> 
+Yes, I confirmed what you said is absolutely right.
+Your detailed info is really appreciated. Thank you!
+
+Now I changed the ethernet part of dts like the following:
+
++&mdio {
++       status = "okay";
++
++       ethphy1: ethernet-phy at 8 {
++               device_type = "ethernet-phy";
++               reg = <8>;
++       };
++};
++
++&eth1 {
++       status = "okay";
++
++       ethernet1-port at 0 {
++               phy-handle = <&ethphy1>;
++       };
++};
+
+and dmesg is like:
+[    0.237167] [Firmware Info]:
+/ocp at f1000000/ethernet-controller at 76000/ethernet1-port at 0:
+local-mac-address is not set
+[    1.820596] mv643xx_eth: MV-643xx 10/100/1000 ethernet driver version 1.4
+[    1.907565] mv643xx_eth_port mv643xx_eth_port.0 eth0: port 0 with
+MAC address xx:xx:xx:xx:xx:xx
+[    5.524704] mv643xx_eth_port mv643xx_eth_port.0 eth0: link up, 100
+Mb/s, full duplex, flow control disabled
+
+For other part of dts, I assume you agreed with my changes explained
+in previous email.
+If you feel alright, I'll make the similar changes to
+"kirkwood-lswvl.dts", and submit the "PATCH v2" to you.
+Thank you!
+
+Cheers,
+Roger
