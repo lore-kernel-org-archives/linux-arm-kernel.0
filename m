@@ -1,24 +1,26 @@
-From: herbert@gondor.apana.org.au (Herbert Xu)
-Date: Sun, 21 Jun 2015 16:27:17 +0800
-Subject: [PATCH v7 00/14] crypto: add a new driver for Marvell's CESA
-In-Reply-To: <20150621102418.2ea74910@bbrezillon>
-References: <1434635190-27733-1-git-send-email-boris.brezillon@free-electrons.com>
- <20150619142444.GA15234@gondor.apana.org.au>
- <CAP=VYLqQynCNRTpm4JnOxeO6DH_739fO2QNcDMxaXqCKCHiTtQ@mail.gmail.com>
- <CAP=VYLpSrTvXRovWo4G7AXWv1OKFQRpQR255hS5z+=h4+XOLhg@mail.gmail.com>
- <20150621102418.2ea74910@bbrezillon>
-Message-ID: <20150621082717.GA29128@gondor.apana.org.au>
+From: zyw@rock-chips.com (Chris Zhong)
+Date: Sun, 21 Jun 2015 17:44:37 +0800
+Subject: [PATCH 0/2] add support holding 24Mhz osc during suspend
+Message-ID: <1434879879-25162-1-git-send-email-zyw@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jun 21, 2015 at 10:24:18AM +0200, Boris Brezillon wrote:
-> 
-> Indeed. Here is a patch fixing that.
+Since the usb-phy clocks are not connected to the 32khz clock-in, they
+only have 24Mhz as the clock source. If we want to wake up system via
+usb device, we should hold the 24Mhz osc during suspend.
+This Patch has tested on chromebook jerry board, with another patch[0],
+we can wakeup system via usb keyboard.
 
-I think you should just kill COMPILE_TEST instead of adding ARM.
+[0] https://chromium-review.googlesource.com/#/c/277811/3
 
-Cheers,
+
+Chris Zhong (2):
+  ARM: rockchip: add support holding 24Mhz osc during suspend
+  ARM: rockchip: remove some useless macro in pm.h
+
+ arch/arm/mach-rockchip/pm.c | 34 +++++++++++++++++++++++++++++++---
+ arch/arm/mach-rockchip/pm.h |  7 -------
+ 2 files changed, 31 insertions(+), 10 deletions(-)
+
 -- 
-Email: Herbert Xu <herbert@gondor.apana.org.au>
-Home Page: http://gondor.apana.org.au/~herbert/
-PGP Key: http://gondor.apana.org.au/~herbert/pubkey.txt
+1.9.1
