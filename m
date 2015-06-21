@@ -1,105 +1,39 @@
 From: zyw@rock-chips.com (Chris Zhong)
-Date: Sun, 21 Jun 2015 18:00:46 +0800
-Subject: [PATCH v2 1/2] ARM: rockchip: add support holding 24Mhz osc during
- suspend
+Date: Sun, 21 Jun 2015 18:00:47 +0800
+Subject: [PATCH v2 2/2] ARM: rockchip: remove some useless macro in pm.h
 In-Reply-To: <1434880847-29505-1-git-send-email-zyw@rock-chips.com>
 References: <1434880847-29505-1-git-send-email-zyw@rock-chips.com>
-Message-ID: <1434880847-29505-2-git-send-email-zyw@rock-chips.com>
+Message-ID: <1434880847-29505-3-git-send-email-zyw@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-If we want to wake up system via usb, the 24Mhz osc could not be
-disabled during suspend, read the usb phy SIDDQ bit to decide whether
-to switch to 32khz clock-in.
+These are actually not used in the pm code, as we moved suspend handling
+to the clock driver, remove them here.
 
 Signed-off-by: Chris Zhong <zyw@rock-chips.com>
+
 ---
 
- arch/arm/mach-rockchip/pm.c | 38 ++++++++++++++++++++++++++++++++++++--
- 1 file changed, 36 insertions(+), 2 deletions(-)
+ arch/arm/mach-rockchip/pm.h | 7 -------
+ 1 file changed, 7 deletions(-)
 
-diff --git a/arch/arm/mach-rockchip/pm.c b/arch/arm/mach-rockchip/pm.c
-index b0dcbe2..fda81d3 100644
---- a/arch/arm/mach-rockchip/pm.c
-+++ b/arch/arm/mach-rockchip/pm.c
-@@ -29,6 +29,11 @@
+diff --git a/arch/arm/mach-rockchip/pm.h b/arch/arm/mach-rockchip/pm.h
+index 3e8d39c..b6494c2 100644
+--- a/arch/arm/mach-rockchip/pm.h
++++ b/arch/arm/mach-rockchip/pm.h
+@@ -59,13 +59,6 @@ static inline void rockchip_suspend_init(void)
+ #define SGRF_DAPDEVICEEN		BIT(0)
+ #define SGRF_DAPDEVICEEN_WRITE		BIT(16)
  
- #include "pm.h"
+-#define RK3288_CRU_MODE_CON		0x50
+-#define RK3288_CRU_SEL0_CON		0x60
+-#define RK3288_CRU_SEL1_CON		0x64
+-#define RK3288_CRU_SEL10_CON		0x88
+-#define RK3288_CRU_SEL33_CON		0xe4
+-#define RK3288_CRU_SEL37_CON		0xf4
+-
+ /* PMU_WAKEUP_CFG1 bits */
+ #define PMU_ARMINT_WAKEUP_EN		BIT(0)
  
-+#define GRF_UOC0_CON0			0x320
-+#define GRF_UOC1_CON0			0x334
-+#define GRF_UOC2_CON0			0x348
-+#define GRF_SIDDQ			BIT(13)
-+
- /* These enum are option of low power mode */
- enum {
- 	ROCKCHIP_ARM_OFF_LOGIC_NORMAL = 0,
-@@ -45,6 +50,7 @@ static phys_addr_t rk3288_bootram_phy;
- 
- static struct regmap *pmu_regmap;
- static struct regmap *sgrf_regmap;
-+static struct regmap *grf_regmap;
- 
- static u32 rk3288_pmu_pwr_mode_con;
- static u32 rk3288_sgrf_soc_con0;
-@@ -66,9 +72,28 @@ static void rk3288_config_bootdata(void)
- 	rkpm_bootdata_l2ctlr = rk3288_l2_config();
- }
- 
-+static bool rk3288_slp_disable_osc(void)
-+{
-+	static const u32 reg_offset[] = { GRF_UOC0_CON0, GRF_UOC1_CON0,
-+					  GRF_UOC2_CON0 };
-+	u32 reg, i;
-+
-+	/* if any usb phy is still on(GRF_SIDDQ==0), that means we need the
-+	 * function of usb wakeup, so do not switch to 32khz, since the usb phy
-+	 * clk does not connect to 32khz osc*/
-+	for (i = 0; i < ARRAY_SIZE(reg_offset); i++) {
-+		regmap_read(grf_regmap, reg_offset[i], &reg);
-+		if (!(reg & GRF_SIDDQ))
-+			return false;
-+	}
-+
-+	return true;
-+}
-+
- static void rk3288_slp_mode_set(int level)
- {
- 	u32 mode_set, mode_set1;
-+	bool osc_switch_to_32k = rk3288_slp_disable_osc();
- 
- 	regmap_read(sgrf_regmap, RK3288_SGRF_SOC_CON0, &rk3288_sgrf_soc_con0);
- 
-@@ -107,11 +132,13 @@ static void rk3288_slp_mode_set(int level)
- 
- 	if (level == ROCKCHIP_ARM_OFF_LOGIC_DEEP) {
- 		/* arm off, logic deep sleep */
--		mode_set |= BIT(PMU_BUS_PD_EN) |
-+		mode_set |= BIT(PMU_BUS_PD_EN) | BIT(PMU_PMU_USE_LF) |
- 			    BIT(PMU_DDR1IO_RET_EN) | BIT(PMU_DDR0IO_RET_EN) |
--			    BIT(PMU_OSC_24M_DIS) | BIT(PMU_PMU_USE_LF) |
- 			    BIT(PMU_ALIVE_USE_LF) | BIT(PMU_PLL_PD_EN);
- 
-+		if (osc_switch_to_32k)
-+			mode_set |= BIT(PMU_OSC_24M_DIS);
-+
- 		mode_set1 |= BIT(PMU_CLR_ALIVE) | BIT(PMU_CLR_BUS) |
- 			     BIT(PMU_CLR_PERI) | BIT(PMU_CLR_DMA);
- 	} else {
-@@ -193,6 +220,13 @@ static int rk3288_suspend_init(struct device_node *np)
- 		return PTR_ERR(pmu_regmap);
- 	}
- 
-+	grf_regmap = syscon_regmap_lookup_by_compatible(
-+				"rockchip,rk3288-grf");
-+	if (IS_ERR(grf_regmap)) {
-+		pr_err("%s: could not find grf regmap\n", __func__);
-+		return PTR_ERR(pmu_regmap);
-+	}
-+
- 	sram_np = of_find_compatible_node(NULL, NULL,
- 					  "rockchip,rk3288-pmu-sram");
- 	if (!sram_np) {
 -- 
 1.9.1
