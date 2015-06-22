@@ -1,58 +1,35 @@
-From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Mon, 22 Jun 2015 23:01:24 +0200
-Subject: [PATCH v2 1/2] ARM: rockchip: add support holding 24Mhz osc
- during suspend
-In-Reply-To: <CAD=FV=Ux+gKJQtr1Qq+ubTNBKNGKTuCGx-3hTAj0j6fAEEJq2A@mail.gmail.com>
-References: <1434880847-29505-1-git-send-email-zyw@rock-chips.com>
- <1434880847-29505-2-git-send-email-zyw@rock-chips.com>
- <CAD=FV=Ux+gKJQtr1Qq+ubTNBKNGKTuCGx-3hTAj0j6fAEEJq2A@mail.gmail.com>
-Message-ID: <3011002.V7itPuvDk4@diego>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 22 Jun 2015 22:18:57 +0100
+Subject: Build regressions/improvements in v4.1
+In-Reply-To: <CAMuHMdXprKyxirhUZBzNV97oxymcMqeugKixTEC8ojcMq3EeDw@mail.gmail.com>
+References: <1435006096-12470-1-git-send-email-geert@linux-m68k.org>
+ <CAMuHMdXprKyxirhUZBzNV97oxymcMqeugKixTEC8ojcMq3EeDw@mail.gmail.com>
+Message-ID: <20150622211857.GY7557@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Montag, 22. Juni 2015, 13:04:02 schrieb Doug Anderson:
-> Chris,
+On Mon, Jun 22, 2015 at 10:52:13PM +0200, Geert Uytterhoeven wrote:
+> On Mon, Jun 22, 2015 at 10:48 PM, Geert Uytterhoeven
+> <geert@linux-m68k.org> wrote:
+> > JFYI, when comparing v4.1[1] to v4.1-rc8[3], the summaries are:
+> >   - build errors: +44/-7
 > 
-> On Sun, Jun 21, 2015 at 3:00 AM, Chris Zhong <zyw@rock-chips.com> wrote:
-> > If we want to wake up system via usb, the 24Mhz osc could not be
-> > disabled during suspend, read the usb phy SIDDQ bit to decide whether
-> > to switch to 32khz clock-in.
-> > 
-> > Signed-off-by: Chris Zhong <zyw@rock-chips.com>
-> > ---
-> > 
-> >  arch/arm/mach-rockchip/pm.c | 38 ++++++++++++++++++++++++++++++++++++--
-> >  1 file changed, 36 insertions(+), 2 deletions(-)
-> 
-> As talked about privately, this patch is ugly.  ...but I don't see a
-> solution that is less ugly.  This method has the advantages that it is
-> "automatic"--the system figures out whether it needs the 24MHz clock
-> automatically based on whether the PHYs were left on.  No other
-> communication / device tree stuff is needed.
+>   + /home/kisskb/slave/src/arch/arm/mm/dump.c: error:
+> 'L_PTE_MT_BUFFERABLE' undeclared here (not in a function):  => 81:10
+>   + /home/kisskb/slave/src/arch/arm/mm/dump.c: error:
+> 'L_PTE_MT_DEV_CACHED' undeclared here (not in a function):  => 117:10
+>   + /home/kisskb/slave/src/arch/arm/mm/dump.c: error:
+> 'L_PTE_MT_DEV_NONSHARED' undeclared here (not in a function):  =>
+> 108:10
 
-Yep, fully agreed :-) .
+I'm rather ignoring this because I don't see these errors here.  This
+is one of the problems of just throwing out build reports.  With zero
+information such as a configuration or a method on how to cause the
+errors, it's pretty much worthless to post errors.
 
-As I said before, another possible solution would probably involve checking 
-the phy clocks themselfs, but getting these out of the devicetree would make 
-this even more ugly.
+Folk who do build testing need to be smarter, and consider what it's
+like to be on the receiving end of their report emails...
 
-
-So I'll let this sit for some more days in case somebody wants to complain 
-(middle of the merge window anyway) and apply these two after.
-
-
-> 
-> > +       /* if any usb phy is still on(GRF_SIDDQ==0), that means we need
-> > the
-> > +        * function of usb wakeup, so do not switch to 32khz, since the
-> > usb phy +        * clk does not connect to 32khz osc*/
-> 
-> This is not _quite_ the block commenting style used in this file.  It
-> would be a bit nicer if it matched.
-> 
-> Other than that:
-> 
-> Reviewed-by: Douglas Anderson <dianders@chromium.org>
-> 
-> On the chromeos-3.14 kernel (with the WIP dwc2 patches):
-> Tested-by: Douglas Anderson <dianders@chromium.org>
+-- 
+FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
+according to speedtest.net.
