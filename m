@@ -1,127 +1,251 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Mon, 22 Jun 2015 17:07:23 +0200
-Subject: [PATCH v2 01/14] clk: shmobile: Add CPG Clock Domain support
-In-Reply-To: <1432839219-475-2-git-send-email-geert+renesas@glider.be>
-References: <1432839219-475-1-git-send-email-geert+renesas@glider.be>
- <1432839219-475-2-git-send-email-geert+renesas@glider.be>
-Message-ID: <CAMuHMdUuQkz9oiKdntd9KhMM9NGy1gMkiJ9jVZvkHA2yQNWBTg@mail.gmail.com>
+From: nm@ti.com (Nishanth Menon)
+Date: Mon, 22 Jun 2015 10:12:14 -0500
+Subject: [PATCH] ARM: DRA7: Provide proper IO map table
+Message-ID: <1434985934-29132-1-git-send-email-nm@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 28, 2015 at 8:53 PM, Geert Uytterhoeven
-<geert+renesas@glider.be> wrote:
-> Add Clock Domain support to the Clock Pulse Generator (CPG) Module Stop
-> (MSTP) Clocks driver using the generic PM Domain.  This allows to
-> power-manage the module clocks of SoC devices that are part of the CPG
-> Clock Domain using Runtime PM, or for system suspend/resume.
->
-> SoC devices that are part of a CPG Clock Domain and can be
-> power-managed through an MSTP clock should be tagged in DT with a
-> proper "power-domains" property.
->
-> The CPG Clock Domain code will scan such devices for clocks that are
-> suitable for power-managing the device, by looking for a clock that is
-> compatible with "renesas,cpg-mstp-clocks".
->
-> Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
-> Acked-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
-> Reviewed-by: Ulf Hansson <ulf.hansson@linaro.org>
-> Reviewed-by: Kevin Hilman <khilman@linaro.org>
-> ---
-> v2:
->   - Add Acked-by and Reviewed-by,
->   - Move core CPG Clock Domain code from the R-Car Gen2 driver to the
->     CPG MSTP Clocks driver, as it's generic, and can be used on other
->     Renesas SoCs that have a CPG/MSTP block,
->   - Scan for an MSTP clock instead of using the first clock tied to the
->     device (con_id NULL),
->   - Extract R-Car Gen2 specifics to a separate patch.
-> ---
->  drivers/clk/shmobile/clk-mstp.c      | 86 ++++++++++++++++++++++++++++++++++++
->  drivers/clk/shmobile/clk-rcar-gen2.c |  2 +
->  include/linux/clk/shmobile.h         | 12 +++++
->  3 files changed, 100 insertions(+)
->
-> diff --git a/drivers/clk/shmobile/clk-mstp.c b/drivers/clk/shmobile/clk-mstp.c
-> index 2d2fe773ac8168f9..619f3eccefd4884f 100644
-> --- a/drivers/clk/shmobile/clk-mstp.c
-> +++ b/drivers/clk/shmobile/clk-mstp.c
+DRA7 uses OMAP5 IO table at the moment. This is purely spurious since
+the OMAP5 and DRA7 register maps are different in many aspects.
 
-> @@ -236,3 +241,84 @@ static void __init cpg_mstp_clocks_init(struct device_node *np)
->         of_clk_add_provider(np, of_clk_src_onecell_get, &group->data);
->  }
->  CLK_OF_DECLARE(cpg_mstp_clks, "renesas,cpg-mstp-clocks", cpg_mstp_clocks_init);
-> +
-> +
-> +#ifdef CONFIG_PM_GENERIC_DOMAINS_OF
-> +int cpg_mstp_attach_dev(struct generic_pm_domain *domain, struct device *dev)
-> +{
-> +       struct device_node *np = dev->of_node;
-> +       struct of_phandle_args clkspec;
-> +       struct clk *clk;
-> +       int i = 0;
-> +       int error;
-> +
-> +       while (!of_parse_phandle_with_args(np, "clocks", "#clock-cells", i,
-> +                                          &clkspec)) {
-> +               if (of_device_is_compatible(clkspec.np,
-> +                                           "renesas,cpg-mstp-clocks"))
-> +                       goto found;
-> +
-> +               of_node_put(clkspec.np);
-> +               i++;
-> +       }
-> +
-> +       return 0;
-> +
-> +found:
-> +       clk = of_clk_get_from_provider(&clkspec);
-> +       of_node_put(clkspec.np);
-> +
-> +       if (IS_ERR(clk))
-> +               return PTR_ERR(clk);
-> +
-> +       error = pm_clk_create(dev);
-> +       if (error) {
-> +               dev_err(dev, "pm_clk_create failed %d\n", error);
-> +               goto fail_put;
-> +       }
-> +
-> +       error = pm_clk_add_clk(dev, clk);
-> +       if (error) {
-> +               dev_err(dev, "pm_clk_add_clk %pC failed %d\n", clk, error);
-> +               goto fail_destroy;
-> +       }
-> +
-> +       return 0;
-> +
-> +fail_destroy:
-> +       pm_clk_destroy(dev);
-> +fail_put:
-> +       clk_put(clk);
-> +       return error;
-> +}
-> +
-> +void cpg_mstp_detach_dev(struct generic_pm_domain *domain, struct device *dev)
-> +{
-> +       pm_clk_destroy(dev);
+AM57xx/DRA7 TRM Reference: http://www.ti.com/lit/ug/spruhz6/spruhz6.pdf
 
-This should only be done if cpg_mstp_attach_dev() actually added a clock, i.e.
+NOTE: Most of the drivers are already doing ioremap, so, there should'nt
+be any functional improvement involved here, other than making the
+initial iotable more accurate.
 
-        if (!list_empty(&dev->power.subsys_data->clock_list))
-                pm_clk_destroy(dev);
+Fixes: a3a9384a1157 ("ARM: DRA7: Reuse io tables and add a new .init_early")
+Signed-off-by: Nishanth Menon <nm@ti.com>
+---
 
-Else it will free the subsys_data allocated by genpd_alloc_dev_data()
-prematurely, and genpd_free_dev_data() will crash when dereferencing
-dev->power.subsys_data.
+NOTE: there are a few >80c checkpatch warnings in this patch, which i decided
+to ignore since it helps readability of the macros and overall code formatting
+already used in the header.
 
-Gr{oetje,eeting}s,
+Baseline: v4.1
+Test (boot):
+	AM57xx-BeagleBoard-X15: http://pastebin.ubuntu.com/11757238/
+	DRA72x Evm: http://pastebin.ubuntu.com/11757252/
+	DRA74x Evm: http://pastebin.ubuntu.com/11757259/
 
-                        Geert
+ arch/arm/mach-omap2/board-generic.c |    4 +--
+ arch/arm/mach-omap2/common.h        |    1 +
+ arch/arm/mach-omap2/io.c            |   58 ++++++++++++++++++++++++++++++--
+ arch/arm/mach-omap2/iomap.h         |   63 +++++++++++++++++++++++++++++++++++
+ arch/arm/mach-omap2/omap54xx.h      |    8 +++++
+ 5 files changed, 130 insertions(+), 4 deletions(-)
 
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+diff --git a/arch/arm/mach-omap2/board-generic.c b/arch/arm/mach-omap2/board-generic.c
+index 34ff14b7beab..b4fbe50672a3 100644
+--- a/arch/arm/mach-omap2/board-generic.c
++++ b/arch/arm/mach-omap2/board-generic.c
+@@ -297,7 +297,7 @@ static const char *const dra74x_boards_compat[] __initconst = {
+ DT_MACHINE_START(DRA74X_DT, "Generic DRA74X (Flattened Device Tree)")
+ 	.reserve	= omap_reserve,
+ 	.smp		= smp_ops(omap4_smp_ops),
+-	.map_io		= omap5_map_io,
++	.map_io		= dra7xx_map_io,
+ 	.init_early	= dra7xx_init_early,
+ 	.init_late	= dra7xx_init_late,
+ 	.init_irq	= omap_gic_of_init,
+@@ -316,7 +316,7 @@ static const char *const dra72x_boards_compat[] __initconst = {
+ 
+ DT_MACHINE_START(DRA72X_DT, "Generic DRA72X (Flattened Device Tree)")
+ 	.reserve	= omap_reserve,
+-	.map_io		= omap5_map_io,
++	.map_io		= dra7xx_map_io,
+ 	.init_early	= dra7xx_init_early,
+ 	.init_late	= dra7xx_init_late,
+ 	.init_irq	= omap_gic_of_init,
+diff --git a/arch/arm/mach-omap2/common.h b/arch/arm/mach-omap2/common.h
+index cf3cf22ecd42..749d50bb4ca5 100644
+--- a/arch/arm/mach-omap2/common.h
++++ b/arch/arm/mach-omap2/common.h
+@@ -198,6 +198,7 @@ void __init omap3_map_io(void);
+ void __init am33xx_map_io(void);
+ void __init omap4_map_io(void);
+ void __init omap5_map_io(void);
++void __init dra7xx_map_io(void);
+ void __init ti81xx_map_io(void);
+ 
+ /**
+diff --git a/arch/arm/mach-omap2/io.c b/arch/arm/mach-omap2/io.c
+index 820dde8b5b04..c10fb291b99f 100644
+--- a/arch/arm/mach-omap2/io.c
++++ b/arch/arm/mach-omap2/io.c
+@@ -236,7 +236,7 @@ static struct map_desc omap44xx_io_desc[] __initdata = {
+ };
+ #endif
+ 
+-#if defined(CONFIG_SOC_OMAP5) || defined(CONFIG_SOC_DRA7XX)
++#ifdef CONFIG_SOC_OMAP5
+ static struct map_desc omap54xx_io_desc[] __initdata = {
+ 	{
+ 		.virtual	= L3_54XX_VIRT,
+@@ -265,6 +265,53 @@ static struct map_desc omap54xx_io_desc[] __initdata = {
+ };
+ #endif
+ 
++#ifdef CONFIG_SOC_DRA7XX
++static struct map_desc dra7xx_io_desc[] __initdata = {
++	{
++		.virtual	= L4_CFG_MPU_DRA7XX_VIRT,
++		.pfn		= __phys_to_pfn(L4_CFG_MPU_DRA7XX_PHYS),
++		.length		= L4_CFG_MPU_DRA7XX_SIZE,
++		.type		= MT_DEVICE,
++	},
++	{
++		.virtual	= L3_MAIN_SN_DRA7XX_VIRT,
++		.pfn		= __phys_to_pfn(L3_MAIN_SN_DRA7XX_PHYS),
++		.length		= L3_MAIN_SN_DRA7XX_SIZE,
++		.type		= MT_DEVICE,
++	},
++	{
++		.virtual	= L4_PER1_DRA7XX_VIRT,
++		.pfn		= __phys_to_pfn(L4_PER1_DRA7XX_PHYS),
++		.length		= L4_PER1_DRA7XX_SIZE,
++		.type		= MT_DEVICE,
++	},
++	{
++		.virtual	= L4_PER2_DRA7XX_VIRT,
++		.pfn		= __phys_to_pfn(L4_PER2_DRA7XX_PHYS),
++		.length		= L4_PER2_DRA7XX_SIZE,
++		.type		= MT_DEVICE,
++	},
++	{
++		.virtual	= L4_PER3_DRA7XX_VIRT,
++		.pfn		= __phys_to_pfn(L4_PER3_DRA7XX_PHYS),
++		.length		= L4_PER3_DRA7XX_SIZE,
++		.type		= MT_DEVICE,
++	},
++	{
++		.virtual	= L4_CFG_DRA7XX_VIRT,
++		.pfn		= __phys_to_pfn(L4_CFG_DRA7XX_PHYS),
++		.length		= L4_CFG_DRA7XX_SIZE,
++		.type		= MT_DEVICE,
++	},
++	{
++		.virtual	= L4_WKUP_DRA7XX_VIRT,
++		.pfn		= __phys_to_pfn(L4_WKUP_DRA7XX_PHYS),
++		.length		= L4_WKUP_DRA7XX_SIZE,
++		.type		= MT_DEVICE,
++	},
++};
++#endif
++
+ #ifdef CONFIG_SOC_OMAP2420
+ void __init omap242x_map_io(void)
+ {
+@@ -309,12 +356,19 @@ void __init omap4_map_io(void)
+ }
+ #endif
+ 
+-#if defined(CONFIG_SOC_OMAP5) ||  defined(CONFIG_SOC_DRA7XX)
++#ifdef CONFIG_SOC_OMAP5
+ void __init omap5_map_io(void)
+ {
+ 	iotable_init(omap54xx_io_desc, ARRAY_SIZE(omap54xx_io_desc));
+ }
+ #endif
++
++#ifdef CONFIG_SOC_DRA7XX
++void __init dra7xx_map_io(void)
++{
++	iotable_init(dra7xx_io_desc, ARRAY_SIZE(dra7xx_io_desc));
++}
++#endif
+ /*
+  * omap2_init_reprogram_sdrc - reprogram SDRC timing parameters
+  *
+diff --git a/arch/arm/mach-omap2/iomap.h b/arch/arm/mach-omap2/iomap.h
+index cce2b65039f1..6191d244438a 100644
+--- a/arch/arm/mach-omap2/iomap.h
++++ b/arch/arm/mach-omap2/iomap.h
+@@ -194,3 +194,66 @@
+ #define L4_PER_54XX_PHYS	L4_PER_54XX_BASE /* 0x48000000 --> 0xfa000000 */
+ #define L4_PER_54XX_VIRT	(L4_PER_54XX_PHYS + OMAP2_L4_IO_OFFSET)
+ #define L4_PER_54XX_SIZE	SZ_4M
++
++/*
++ * ----------------------------------------------------------------------------
++ * DRA7xx specific IO mapping
++ * ----------------------------------------------------------------------------
++ */
++/*
++ * L3_MAIN_SN_DRA7XX_PHYS 0x44000000 --> 0xf8000000
++ * The overall space is 24MiB (0x4400_0000<->0x457F_FFFF), but mapping
++ * everything is just inefficient, since, there are too many address holes.
++ */
++#define L3_MAIN_SN_DRA7XX_PHYS		L3_MAIN_SN_DRA7XX_BASE
++#define L3_MAIN_SN_DRA7XX_VIRT		(L3_MAIN_SN_DRA7XX_PHYS + OMAP4_L3_IO_OFFSET)
++#define L3_MAIN_SN_DRA7XX_SIZE		SZ_1M
++
++/*
++ * L4_PER1_DRA7XX_PHYS	(0x4800_000<>0x480D_2FFF) -> 0.82MiB (alloc 1MiB)
++ *	(0x48000000<->0x48100000) <=> (0xFA000000<->0xFA100000)
++ */
++#define L4_PER1_DRA7XX_PHYS		L4_PER1_DRA7XX_BASE
++#define L4_PER1_DRA7XX_VIRT		(L4_PER1_DRA7XX_PHYS + OMAP2_L4_IO_OFFSET)
++#define L4_PER1_DRA7XX_SIZE		SZ_1M
++
++/*
++ * L4_CFG_MPU_DRA7XX_PHYS	(0x48210000<>0x482A_F2FF) -> 0.62MiB (alloc 1MiB)
++ *	(0x48210000<->0x48310000) <=> (0xFA210000<->0xFA310000)
++ * NOTE: This is a bit of an orphan memory map sitting isolated in TRM
++ */
++#define L4_CFG_MPU_DRA7XX_PHYS		L4_CFG_MPU_DRA7XX_BASE
++#define L4_CFG_MPU_DRA7XX_VIRT		(L4_CFG_MPU_DRA7XX_PHYS + OMAP2_L4_IO_OFFSET)
++#define L4_CFG_MPU_DRA7XX_SIZE		SZ_1M
++
++/*
++ * L4_PER2_DRA7XX_PHYS	(0x4840_0000<>0x4848_8FFF) -> .53MiB (alloc 1MiB)
++ *	(0x48400000<->0x48500000) <=> (0xFA400000<->0xFA500000)
++ */
++#define L4_PER2_DRA7XX_PHYS		L4_PER2_DRA7XX_BASE
++#define L4_PER2_DRA7XX_VIRT		(L4_PER2_DRA7XX_PHYS + OMAP2_L4_IO_OFFSET)
++#define L4_PER2_DRA7XX_SIZE		SZ_1M
++
++/*
++ * L4_PER3_DRA7XX_PHYS	(0x4880_0000<>0x489E_0FFF) -> 1.87MiB (alloc 2MiB)
++ *	(0x48800000<->0x48A00000) <=> (0xFA800000<->0xFAA00000)
++ */
++#define L4_PER3_DRA7XX_PHYS		L4_PER3_DRA7XX_BASE
++#define L4_PER3_DRA7XX_VIRT		(L4_PER3_DRA7XX_PHYS + OMAP2_L4_IO_OFFSET)
++#define L4_PER3_DRA7XX_SIZE		SZ_2M
++
++/*
++ * L4_CFG_DRA7XX_PHYS	(0x4A00_0000<>0x4A22_BFFF) ->2.17MiB (alloc 3MiB)?
++ *	(0x4A000000<->0x4A300000) <=> (0xFC000000<->0xFC300000)
++ */
++#define L4_CFG_DRA7XX_PHYS		L4_CFG_DRA7XX_BASE
++#define L4_CFG_DRA7XX_VIRT		(L4_CFG_DRA7XX_PHYS + OMAP2_L4_IO_OFFSET)
++#define L4_CFG_DRA7XX_SIZE		(SZ_1M + SZ_2M)
++
++/*
++ * L4_WKUP_DRA7XX_PHYS	(0x4AE0_0000<>0x4AE3_EFFF) -> .24 mb (alloc 1MiB)?
++ *	(0x4AE00000<->4AF00000)	<=> (0xFCE00000<->0xFCF00000)
++ */
++#define L4_WKUP_DRA7XX_PHYS		L4_WKUP_DRA7XX_BASE
++#define L4_WKUP_DRA7XX_VIRT		(L4_WKUP_DRA7XX_PHYS + OMAP2_L4_IO_OFFSET)
++#define L4_WKUP_DRA7XX_SIZE		SZ_1M
+diff --git a/arch/arm/mach-omap2/omap54xx.h b/arch/arm/mach-omap2/omap54xx.h
+index 2d35c5709408..0ca8e938096b 100644
+--- a/arch/arm/mach-omap2/omap54xx.h
++++ b/arch/arm/mach-omap2/omap54xx.h
+@@ -30,6 +30,14 @@
+ #define OMAP54XX_CTRL_BASE		0x4a002800
+ #define OMAP54XX_SAR_RAM_BASE		0x4ae26000
+ 
++/* DRA7 specific base addresses */
++#define L3_MAIN_SN_DRA7XX_BASE		0x44000000
++#define L4_PER1_DRA7XX_BASE		0x48000000
++#define L4_CFG_MPU_DRA7XX_BASE		0x48210000
++#define L4_PER2_DRA7XX_BASE		0x48400000
++#define L4_PER3_DRA7XX_BASE		0x48800000
++#define L4_CFG_DRA7XX_BASE		0x4A000000
++#define L4_WKUP_DRA7XX_BASE		0x4ae00000
+ #define DRA7XX_CM_CORE_AON_BASE		0x4a005000
+ #define DRA7XX_CTRL_BASE		0x4a003400
+ #define DRA7XX_TAP_BASE			0x4ae0c000
+-- 
+1.7.9.5
