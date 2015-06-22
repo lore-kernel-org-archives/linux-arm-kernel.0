@@ -1,25 +1,45 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 22 Jun 2015 11:10:38 +0100
-Subject: [PATCH v5 4/6] drm: bridge/dw_hdmi-i2s-audio: add audio driver
-In-Reply-To: <1434967564.31094.20.camel@x220>
-References: <1434730417-10629-1-git-send-email-ykk@rock-chips.com>
- <1434731295-11060-1-git-send-email-ykk@rock-chips.com>
- <1434967564.31094.20.camel@x220>
-Message-ID: <20150622101038.GV7557@n2100.arm.linux.org.uk>
+From: cyrille.pitchen@atmel.com (Cyrille Pitchen)
+Date: Mon, 22 Jun 2015 12:12:52 +0200
+Subject: [PATCH v4 0/2] mfd: flexcom: add a driver for Flexcom
+Message-ID: <cover.1434967670.git.cyrille.pitchen@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 22, 2015 at 12:06:04PM +0200, Paul Bolle wrote:
-> But I think there's no platform_device with a "dw-hdmi-i2s-audio" name.
-> So I wonder whether this MODULE_ALIAS() is actually needed. What breaks
-> if you leave it out?
+ChangeLog
 
-+       } else if (hdmi_readb(hdmi, HDMI_CONFIG0_ID) & HDMI_CONFIG0_I2S) {
-+               pdevinfo.name = "dw-hdmi-ahb-audio";
+v4:
+- check clk_prepare_enable() return code in atmel_flexcom_probe()
+- add a commit message to the DT binding patch
 
-This should be "dw-hdmi-i2s-audio" to avoid picking up on my AHB audio
-driver.
+v3:
+- remove MODULE_ALIAS()
+- add Acked-by from Boris Brezillon and Alexandre Belloni
+
+v2:
+- enhance the documentation of DT bindings and change the way the "ranges"
+  property is used.
+- replace __raw_readl() and __raw_writel() by readl() and writel().
+- change the module license to "GPL" for v2 or later
+- print the selected flexcom mode after the hardware version
+
+v1:
+This series of patches a support to the Atmel Flexcom, a wrapper which
+integrates an USART, a SPI controller and a TWI controller. Only one
+peripheral can be used at a time. The active function is selected though
+the Flexcom Mode Register.
+
+Cyrille Pitchen (2):
+  mfd: devicetree: add bindings for Atmel Flexcom
+  mfd: flexcom: add a driver for Atmel Flexible Serial Communication
+    Unit
+
+ .../devicetree/bindings/mfd/atmel-flexcom.txt      | 58 +++++++++++++
+ drivers/mfd/Kconfig                                | 11 +++
+ drivers/mfd/Makefile                               |  1 +
+ drivers/mfd/atmel-flexcom.c                        | 98 ++++++++++++++++++++++
+ 4 files changed, 168 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/mfd/atmel-flexcom.txt
+ create mode 100644 drivers/mfd/atmel-flexcom.c
 
 -- 
-FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
-according to speedtest.net.
+1.8.2.2
