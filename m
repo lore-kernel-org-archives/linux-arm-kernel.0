@@ -1,19 +1,19 @@
 From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Mon, 22 Jun 2015 16:36 +0200
-Subject: [PATCH] ARM: dts: rockchip: Add ramp delay for vdd_cpu in firefly
- board dts
-In-Reply-To: <1434390101-27000-1-git-send-email-romain.perier@gmail.com>
-References: <1434390101-27000-1-git-send-email-romain.perier@gmail.com>
-Message-ID: <239166562.834dQUR87q@diego>
+Date: Mon, 22 Jun 2015 16:38:10 +0200
+Subject: [PATCH] ARM: dts: rockchip: fix rk3288 watchdog irq
+In-Reply-To: <1961157.dsytR1KvKa@phil>
+References: <1961157.dsytR1KvKa@phil>
+Message-ID: <4785881.zacpjkQbnc@diego>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Montag, 15. Juni 2015, 17:41:41 schrieb Romain Perier:
-> Adds ramp delay for the vdd_cpu output. It removes warning "ramp_delay not
-> set" emitted by the function regulator_set_voltage_time_sel() by the same
-> time, which floods kernel logs.
+Am Freitag, 19. Juni 2015, 16:31:14 schrieb Heiko Stuebner:
+> The watchdog irq is actually SPI 79, which translates to the original
+> 111 in the manual where the SPI irqs start at 32.
+> The current dw_wdt driver does not use the irq at all, so this issue
+> never surfaced. Nevertheless fix this for a time we want to use the irq.
 > 
-> Signed-off-by: Romain Perier <romain.perier@gmail.com>
-> ---
+> Fixes: 2ab557b72d46 ("ARM: dts: rockchip: add core rk3288 dtsi")
+> Signed-off-by: Heiko Stuebner <heiko@sntech.de>
 
 applied to dts changes for 4.3
