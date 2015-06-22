@@ -1,32 +1,32 @@
-From: hdegoede@redhat.com (Hans de Goede)
-Date: Mon, 22 Jun 2015 10:28:16 +0200
-Subject: [linux-sunxi] [PATCH 1/4] ARM: dts: sunxi: Add regulator-boot-on
- to usb host port regulator nodes
-In-Reply-To: <CAGRGNgU7179K408=PekziP9ZzzG7+rvhm=e7TWjZk1UhkAnVZQ@mail.gmail.com>
-References: <1434814810-26285-1-git-send-email-hdegoede@redhat.com>
- <1434814810-26285-2-git-send-email-hdegoede@redhat.com>
- <CAGRGNgU7179K408=PekziP9ZzzG7+rvhm=e7TWjZk1UhkAnVZQ@mail.gmail.com>
-Message-ID: <5587C720.9040007@redhat.com>
+From: peter.maydell@linaro.org (Peter Maydell)
+Date: Mon, 22 Jun 2015 09:44:48 +0100
+Subject: [PATCH] arm64/kvm: Add generic v8 KVM target
+In-Reply-To: <1434531646-4873-1-git-send-email-suzuki.poulose@arm.com>
+References: <1434531646-4873-1-git-send-email-suzuki.poulose@arm.com>
+Message-ID: <CAFEAcA92uymQ3LjPQnuFiwvjSgc+jY54VrfK_Sh4v1DJ+=OPpw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On 22-06-15 02:30, Julian Calaby wrote:
-> Hi Hans,
+On 17 June 2015 at 10:00, Suzuki K. Poulose <suzuki.poulose@arm.com> wrote:
+> From: "Suzuki K. Poulose" <suzuki.poulose@arm.com>
 >
-> On Sun, Jun 21, 2015 at 1:40 AM, Hans de Goede <hdegoede@redhat.com> wrote:
->> u-boot will have turned on the power to the usb host ports, so mark them
->> as regulator-boot-on, this stops the power on the ports from temporarily
->> getting turned off during boot, causing issues with e.g. usb powered
->> harddisks.
->
-> Stupid question: shouldn't u-boot set this property?
+> This patch adds a generic ARM v8 KVM target cpu type for use
+> by the new CPUs which eventualy ends up using the common sys_reg
+> table. For backward compatibility the existing targets have been
+> preserved. Any new target CPU that can be covered by generic v8
+> sys_reg tables should make use of the new generic target.
 
-We could make u-boot set this property but that will require a lot of code on
-u-boot's side which is simply not there atm. And traditionally this property
-is is simply a part of the dts files as shipped with the kernel.
+How do you intend this to work for cross-host migration?
+Is the idea that the kernel guarantees that "generic" looks
+100% the same to the guest regardless of host hardware? I'm
+not sure that can be made to work, given impdef differences
+in ID register values, bp/wp registers, and so on.
 
-Regards,
+Given that, it seems to me that we still need to provide
+KVM_ARM_TARGET_$THISCPU defines so userspace can request
+a specific guest CPU flavour; so what does this patch
+provide that isn't already provided by just having userspace
+query for the "preferred" CPU type as it does already?
 
-Hans
+thanks
+-- PMM
