@@ -1,251 +1,94 @@
-From: nm@ti.com (Nishanth Menon)
-Date: Mon, 22 Jun 2015 10:12:14 -0500
-Subject: [PATCH] ARM: DRA7: Provide proper IO map table
-Message-ID: <1434985934-29132-1-git-send-email-nm@ti.com>
+From: dan.carpenter@oracle.com (Dan Carpenter)
+Date: Mon, 22 Jun 2015 18:12:24 +0300
+Subject: [patch v2 1/2] pinctrl: samsung: don't truncate the last char
+In-Reply-To: <20150619085203.GO28762@mwanda>
+Message-ID: <20150622151223.GA14156@mwanda>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-DRA7 uses OMAP5 IO table at the moment. This is purely spurious since
-the OMAP5 and DRA7 register maps are different in many aspects.
+We were allocating enough space because sizeof("-grp") and
+sizeof("-mux") are both equal to 5 but in the snprintf() we only allowed
+for 4 characters so the last 'p' and 'x' characters were truncated.
 
-AM57xx/DRA7 TRM Reference: http://www.ti.com/lit/ug/spruhz6/spruhz6.pdf
+The allocate and sprintf can be done in one step with the kasprintf().
 
-NOTE: Most of the drivers are already doing ioremap, so, there should'nt
-be any functional improvement involved here, other than making the
-initial iotable more accurate.
+Signed-off-by: Dan Carpenter <dan.carpenter@oracle.com>
 
-Fixes: a3a9384a1157 ("ARM: DRA7: Reuse io tables and add a new .init_early")
-Signed-off-by: Nishanth Menon <nm@ti.com>
----
-
-NOTE: there are a few >80c checkpatch warnings in this patch, which i decided
-to ignore since it helps readability of the macros and overall code formatting
-already used in the header.
-
-Baseline: v4.1
-Test (boot):
-	AM57xx-BeagleBoard-X15: http://pastebin.ubuntu.com/11757238/
-	DRA72x Evm: http://pastebin.ubuntu.com/11757252/
-	DRA74x Evm: http://pastebin.ubuntu.com/11757259/
-
- arch/arm/mach-omap2/board-generic.c |    4 +--
- arch/arm/mach-omap2/common.h        |    1 +
- arch/arm/mach-omap2/io.c            |   58 ++++++++++++++++++++++++++++++--
- arch/arm/mach-omap2/iomap.h         |   63 +++++++++++++++++++++++++++++++++++
- arch/arm/mach-omap2/omap54xx.h      |    8 +++++
- 5 files changed, 130 insertions(+), 4 deletions(-)
-
-diff --git a/arch/arm/mach-omap2/board-generic.c b/arch/arm/mach-omap2/board-generic.c
-index 34ff14b7beab..b4fbe50672a3 100644
---- a/arch/arm/mach-omap2/board-generic.c
-+++ b/arch/arm/mach-omap2/board-generic.c
-@@ -297,7 +297,7 @@ static const char *const dra74x_boards_compat[] __initconst = {
- DT_MACHINE_START(DRA74X_DT, "Generic DRA74X (Flattened Device Tree)")
- 	.reserve	= omap_reserve,
- 	.smp		= smp_ops(omap4_smp_ops),
--	.map_io		= omap5_map_io,
-+	.map_io		= dra7xx_map_io,
- 	.init_early	= dra7xx_init_early,
- 	.init_late	= dra7xx_init_late,
- 	.init_irq	= omap_gic_of_init,
-@@ -316,7 +316,7 @@ static const char *const dra72x_boards_compat[] __initconst = {
+diff --git a/drivers/pinctrl/samsung/pinctrl-exynos5440.c b/drivers/pinctrl/samsung/pinctrl-exynos5440.c
+index f5619fb..fa84db6 100644
+--- a/drivers/pinctrl/samsung/pinctrl-exynos5440.c
++++ b/drivers/pinctrl/samsung/pinctrl-exynos5440.c
+@@ -44,9 +44,7 @@
+ #define PIN_NAME_LENGTH		10
  
- DT_MACHINE_START(DRA72X_DT, "Generic DRA72X (Flattened Device Tree)")
- 	.reserve	= omap_reserve,
--	.map_io		= omap5_map_io,
-+	.map_io		= dra7xx_map_io,
- 	.init_early	= dra7xx_init_early,
- 	.init_late	= dra7xx_init_late,
- 	.init_irq	= omap_gic_of_init,
-diff --git a/arch/arm/mach-omap2/common.h b/arch/arm/mach-omap2/common.h
-index cf3cf22ecd42..749d50bb4ca5 100644
---- a/arch/arm/mach-omap2/common.h
-+++ b/arch/arm/mach-omap2/common.h
-@@ -198,6 +198,7 @@ void __init omap3_map_io(void);
- void __init am33xx_map_io(void);
- void __init omap4_map_io(void);
- void __init omap5_map_io(void);
-+void __init dra7xx_map_io(void);
- void __init ti81xx_map_io(void);
+ #define GROUP_SUFFIX		"-grp"
+-#define GSUFFIX_LEN		sizeof(GROUP_SUFFIX)
+ #define FUNCTION_SUFFIX		"-mux"
+-#define FSUFFIX_LEN		sizeof(FUNCTION_SUFFIX)
  
- /**
-diff --git a/arch/arm/mach-omap2/io.c b/arch/arm/mach-omap2/io.c
-index 820dde8b5b04..c10fb291b99f 100644
---- a/arch/arm/mach-omap2/io.c
-+++ b/arch/arm/mach-omap2/io.c
-@@ -236,7 +236,7 @@ static struct map_desc omap44xx_io_desc[] __initdata = {
- };
- #endif
- 
--#if defined(CONFIG_SOC_OMAP5) || defined(CONFIG_SOC_DRA7XX)
-+#ifdef CONFIG_SOC_OMAP5
- static struct map_desc omap54xx_io_desc[] __initdata = {
- 	{
- 		.virtual	= L3_54XX_VIRT,
-@@ -265,6 +265,53 @@ static struct map_desc omap54xx_io_desc[] __initdata = {
- };
- #endif
- 
-+#ifdef CONFIG_SOC_DRA7XX
-+static struct map_desc dra7xx_io_desc[] __initdata = {
-+	{
-+		.virtual	= L4_CFG_MPU_DRA7XX_VIRT,
-+		.pfn		= __phys_to_pfn(L4_CFG_MPU_DRA7XX_PHYS),
-+		.length		= L4_CFG_MPU_DRA7XX_SIZE,
-+		.type		= MT_DEVICE,
-+	},
-+	{
-+		.virtual	= L3_MAIN_SN_DRA7XX_VIRT,
-+		.pfn		= __phys_to_pfn(L3_MAIN_SN_DRA7XX_PHYS),
-+		.length		= L3_MAIN_SN_DRA7XX_SIZE,
-+		.type		= MT_DEVICE,
-+	},
-+	{
-+		.virtual	= L4_PER1_DRA7XX_VIRT,
-+		.pfn		= __phys_to_pfn(L4_PER1_DRA7XX_PHYS),
-+		.length		= L4_PER1_DRA7XX_SIZE,
-+		.type		= MT_DEVICE,
-+	},
-+	{
-+		.virtual	= L4_PER2_DRA7XX_VIRT,
-+		.pfn		= __phys_to_pfn(L4_PER2_DRA7XX_PHYS),
-+		.length		= L4_PER2_DRA7XX_SIZE,
-+		.type		= MT_DEVICE,
-+	},
-+	{
-+		.virtual	= L4_PER3_DRA7XX_VIRT,
-+		.pfn		= __phys_to_pfn(L4_PER3_DRA7XX_PHYS),
-+		.length		= L4_PER3_DRA7XX_SIZE,
-+		.type		= MT_DEVICE,
-+	},
-+	{
-+		.virtual	= L4_CFG_DRA7XX_VIRT,
-+		.pfn		= __phys_to_pfn(L4_CFG_DRA7XX_PHYS),
-+		.length		= L4_CFG_DRA7XX_SIZE,
-+		.type		= MT_DEVICE,
-+	},
-+	{
-+		.virtual	= L4_WKUP_DRA7XX_VIRT,
-+		.pfn		= __phys_to_pfn(L4_WKUP_DRA7XX_PHYS),
-+		.length		= L4_WKUP_DRA7XX_SIZE,
-+		.type		= MT_DEVICE,
-+	},
-+};
-+#endif
-+
- #ifdef CONFIG_SOC_OMAP2420
- void __init omap242x_map_io(void)
- {
-@@ -309,12 +356,19 @@ void __init omap4_map_io(void)
- }
- #endif
- 
--#if defined(CONFIG_SOC_OMAP5) ||  defined(CONFIG_SOC_DRA7XX)
-+#ifdef CONFIG_SOC_OMAP5
- void __init omap5_map_io(void)
- {
- 	iotable_init(omap54xx_io_desc, ARRAY_SIZE(omap54xx_io_desc));
- }
- #endif
-+
-+#ifdef CONFIG_SOC_DRA7XX
-+void __init dra7xx_map_io(void)
-+{
-+	iotable_init(dra7xx_io_desc, ARRAY_SIZE(dra7xx_io_desc));
-+}
-+#endif
  /*
-  * omap2_init_reprogram_sdrc - reprogram SDRC timing parameters
-  *
-diff --git a/arch/arm/mach-omap2/iomap.h b/arch/arm/mach-omap2/iomap.h
-index cce2b65039f1..6191d244438a 100644
---- a/arch/arm/mach-omap2/iomap.h
-+++ b/arch/arm/mach-omap2/iomap.h
-@@ -194,3 +194,66 @@
- #define L4_PER_54XX_PHYS	L4_PER_54XX_BASE /* 0x48000000 --> 0xfa000000 */
- #define L4_PER_54XX_VIRT	(L4_PER_54XX_PHYS + OMAP2_L4_IO_OFFSET)
- #define L4_PER_54XX_SIZE	SZ_4M
-+
-+/*
-+ * ----------------------------------------------------------------------------
-+ * DRA7xx specific IO mapping
-+ * ----------------------------------------------------------------------------
-+ */
-+/*
-+ * L3_MAIN_SN_DRA7XX_PHYS 0x44000000 --> 0xf8000000
-+ * The overall space is 24MiB (0x4400_0000<->0x457F_FFFF), but mapping
-+ * everything is just inefficient, since, there are too many address holes.
-+ */
-+#define L3_MAIN_SN_DRA7XX_PHYS		L3_MAIN_SN_DRA7XX_BASE
-+#define L3_MAIN_SN_DRA7XX_VIRT		(L3_MAIN_SN_DRA7XX_PHYS + OMAP4_L3_IO_OFFSET)
-+#define L3_MAIN_SN_DRA7XX_SIZE		SZ_1M
-+
-+/*
-+ * L4_PER1_DRA7XX_PHYS	(0x4800_000<>0x480D_2FFF) -> 0.82MiB (alloc 1MiB)
-+ *	(0x48000000<->0x48100000) <=> (0xFA000000<->0xFA100000)
-+ */
-+#define L4_PER1_DRA7XX_PHYS		L4_PER1_DRA7XX_BASE
-+#define L4_PER1_DRA7XX_VIRT		(L4_PER1_DRA7XX_PHYS + OMAP2_L4_IO_OFFSET)
-+#define L4_PER1_DRA7XX_SIZE		SZ_1M
-+
-+/*
-+ * L4_CFG_MPU_DRA7XX_PHYS	(0x48210000<>0x482A_F2FF) -> 0.62MiB (alloc 1MiB)
-+ *	(0x48210000<->0x48310000) <=> (0xFA210000<->0xFA310000)
-+ * NOTE: This is a bit of an orphan memory map sitting isolated in TRM
-+ */
-+#define L4_CFG_MPU_DRA7XX_PHYS		L4_CFG_MPU_DRA7XX_BASE
-+#define L4_CFG_MPU_DRA7XX_VIRT		(L4_CFG_MPU_DRA7XX_PHYS + OMAP2_L4_IO_OFFSET)
-+#define L4_CFG_MPU_DRA7XX_SIZE		SZ_1M
-+
-+/*
-+ * L4_PER2_DRA7XX_PHYS	(0x4840_0000<>0x4848_8FFF) -> .53MiB (alloc 1MiB)
-+ *	(0x48400000<->0x48500000) <=> (0xFA400000<->0xFA500000)
-+ */
-+#define L4_PER2_DRA7XX_PHYS		L4_PER2_DRA7XX_BASE
-+#define L4_PER2_DRA7XX_VIRT		(L4_PER2_DRA7XX_PHYS + OMAP2_L4_IO_OFFSET)
-+#define L4_PER2_DRA7XX_SIZE		SZ_1M
-+
-+/*
-+ * L4_PER3_DRA7XX_PHYS	(0x4880_0000<>0x489E_0FFF) -> 1.87MiB (alloc 2MiB)
-+ *	(0x48800000<->0x48A00000) <=> (0xFA800000<->0xFAA00000)
-+ */
-+#define L4_PER3_DRA7XX_PHYS		L4_PER3_DRA7XX_BASE
-+#define L4_PER3_DRA7XX_VIRT		(L4_PER3_DRA7XX_PHYS + OMAP2_L4_IO_OFFSET)
-+#define L4_PER3_DRA7XX_SIZE		SZ_2M
-+
-+/*
-+ * L4_CFG_DRA7XX_PHYS	(0x4A00_0000<>0x4A22_BFFF) ->2.17MiB (alloc 3MiB)?
-+ *	(0x4A000000<->0x4A300000) <=> (0xFC000000<->0xFC300000)
-+ */
-+#define L4_CFG_DRA7XX_PHYS		L4_CFG_DRA7XX_BASE
-+#define L4_CFG_DRA7XX_VIRT		(L4_CFG_DRA7XX_PHYS + OMAP2_L4_IO_OFFSET)
-+#define L4_CFG_DRA7XX_SIZE		(SZ_1M + SZ_2M)
-+
-+/*
-+ * L4_WKUP_DRA7XX_PHYS	(0x4AE0_0000<>0x4AE3_EFFF) -> .24 mb (alloc 1MiB)?
-+ *	(0x4AE00000<->4AF00000)	<=> (0xFCE00000<->0xFCF00000)
-+ */
-+#define L4_WKUP_DRA7XX_PHYS		L4_WKUP_DRA7XX_BASE
-+#define L4_WKUP_DRA7XX_VIRT		(L4_WKUP_DRA7XX_PHYS + OMAP2_L4_IO_OFFSET)
-+#define L4_WKUP_DRA7XX_SIZE		SZ_1M
-diff --git a/arch/arm/mach-omap2/omap54xx.h b/arch/arm/mach-omap2/omap54xx.h
-index 2d35c5709408..0ca8e938096b 100644
---- a/arch/arm/mach-omap2/omap54xx.h
-+++ b/arch/arm/mach-omap2/omap54xx.h
-@@ -30,6 +30,14 @@
- #define OMAP54XX_CTRL_BASE		0x4a002800
- #define OMAP54XX_SAR_RAM_BASE		0x4ae26000
+  * pin configuration type and its value are packed together into a 16-bits.
+@@ -215,12 +213,11 @@ static int exynos5440_dt_node_to_map(struct pinctrl_dev *pctldev,
+ 	 * Allocate memory for pin group name. The pin group name is derived
+ 	 * from the node name from which these map entries are be created.
+ 	 */
+-	gname = kzalloc(strlen(np->name) + GSUFFIX_LEN, GFP_KERNEL);
++	gname = kasprintf(GFP_KERNEL, "%s%s", np->name, GROUP_SUFFIX);
+ 	if (!gname) {
+ 		dev_err(dev, "failed to alloc memory for group name\n");
+ 		goto free_map;
+ 	}
+-	snprintf(gname, strlen(np->name) + 4, "%s%s", np->name, GROUP_SUFFIX);
  
-+/* DRA7 specific base addresses */
-+#define L3_MAIN_SN_DRA7XX_BASE		0x44000000
-+#define L4_PER1_DRA7XX_BASE		0x48000000
-+#define L4_CFG_MPU_DRA7XX_BASE		0x48210000
-+#define L4_PER2_DRA7XX_BASE		0x48400000
-+#define L4_PER3_DRA7XX_BASE		0x48800000
-+#define L4_CFG_DRA7XX_BASE		0x4A000000
-+#define L4_WKUP_DRA7XX_BASE		0x4ae00000
- #define DRA7XX_CM_CORE_AON_BASE		0x4a005000
- #define DRA7XX_CTRL_BASE		0x4a003400
- #define DRA7XX_TAP_BASE			0x4ae0c000
--- 
-1.7.9.5
+ 	/*
+ 	 * don't have config options? then skip over to creating function
+@@ -254,13 +251,12 @@ static int exynos5440_dt_node_to_map(struct pinctrl_dev *pctldev,
+ skip_cfgs:
+ 	/* create the function map entry */
+ 	if (of_find_property(np, "samsung,exynos5440-pin-function", NULL)) {
+-		fname = kzalloc(strlen(np->name) + FSUFFIX_LEN,	GFP_KERNEL);
++		fname = kasprintf(GFP_KERNEL,
++				  "%s%s", np->name, FUNCTION_SUFFIX);
+ 		if (!fname) {
+ 			dev_err(dev, "failed to alloc memory for func name\n");
+ 			goto free_cfg;
+ 		}
+-		snprintf(fname, strlen(np->name) + 4, "%s%s", np->name,
+-			 FUNCTION_SUFFIX);
+ 
+ 		map[*nmaps].data.mux.group = gname;
+ 		map[*nmaps].data.mux.function = fname;
+@@ -710,14 +706,12 @@ static int exynos5440_pinctrl_parse_dt(struct platform_device *pdev,
+ 		}
+ 
+ 		/* derive pin group name from the node name */
+-		gname = devm_kzalloc(dev, strlen(cfg_np->name) + GSUFFIX_LEN,
+-					GFP_KERNEL);
++		gname = devm_kasprintf(dev, GFP_KERNEL,
++				       "%s%s", cfg_np->name, GROUP_SUFFIX);
+ 		if (!gname) {
+ 			dev_err(dev, "failed to alloc memory for group name\n");
+ 			return -ENOMEM;
+ 		}
+-		snprintf(gname, strlen(cfg_np->name) + 4, "%s%s", cfg_np->name,
+-			 GROUP_SUFFIX);
+ 
+ 		grp->name = gname;
+ 		grp->pins = pin_list;
+@@ -731,14 +725,12 @@ skip_to_pin_function:
+ 			continue;
+ 
+ 		/* derive function name from the node name */
+-		fname = devm_kzalloc(dev, strlen(cfg_np->name) + FSUFFIX_LEN,
+-					GFP_KERNEL);
++		fname = devm_kasprintf(dev, GFP_KERNEL,
++				       "%s%s", cfg_np->name, FUNCTION_SUFFIX);
+ 		if (!fname) {
+ 			dev_err(dev, "failed to alloc memory for func name\n");
+ 			return -ENOMEM;
+ 		}
+-		snprintf(fname, strlen(cfg_np->name) + 4, "%s%s", cfg_np->name,
+-			 FUNCTION_SUFFIX);
+ 
+ 		func->name = fname;
+ 		func->groups = devm_kzalloc(dev, sizeof(char *), GFP_KERNEL);
