@@ -1,44 +1,62 @@
-From: dianders@chromium.org (Doug Anderson)
-Date: Mon, 22 Jun 2015 13:04:02 -0700
-Subject: [PATCH v2 1/2] ARM: rockchip: add support holding 24Mhz osc
- during suspend
-In-Reply-To: <1434880847-29505-2-git-send-email-zyw@rock-chips.com>
-References: <1434880847-29505-1-git-send-email-zyw@rock-chips.com>
- <1434880847-29505-2-git-send-email-zyw@rock-chips.com>
-Message-ID: <CAD=FV=Ux+gKJQtr1Qq+ubTNBKNGKTuCGx-3hTAj0j6fAEEJq2A@mail.gmail.com>
+From: mturquette@linaro.org (Michael Turquette)
+Date: Mon, 22 Jun 2015 13:05:49 -0700
+Subject: [PATCH v2 13/14] clk: shmobile: mstp: Consider "zb_clk" suitable
+ for power management
+In-Reply-To: <1432839219-475-14-git-send-email-geert+renesas@glider.be>
+References: <1432839219-475-1-git-send-email-geert+renesas@glider.be>
+ <1432839219-475-14-git-send-email-geert+renesas@glider.be>
+Message-ID: <20150622200549.9112.2411@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Chris,
-
-On Sun, Jun 21, 2015 at 3:00 AM, Chris Zhong <zyw@rock-chips.com> wrote:
-> If we want to wake up system via usb, the 24Mhz osc could not be
-> disabled during suspend, read the usb phy SIDDQ bit to decide whether
-> to switch to 32khz clock-in.
->
-> Signed-off-by: Chris Zhong <zyw@rock-chips.com>
+Quoting Geert Uytterhoeven (2015-05-28 11:53:38)
+> Currently the CPG Clock Domain code looks for MSTP clocks to power
+> manage a device.
+> 
+> Unfortunately, on R-Mobile APE6 (r8a73a4) and SH-Mobile AG5 (sh73a0),
+> the Bus State Controller (BSC) is not power-managed by an MSTP clock,
+> but by a plain CPG clock (zb_clk).  Add a special case to handle this,
+> so the clock is properly managed, and devices connected to the BSC work
+> as expected.
+> 
+> Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
 > ---
->
->  arch/arm/mach-rockchip/pm.c | 38 ++++++++++++++++++++++++++++++++++++--
->  1 file changed, 36 insertions(+), 2 deletions(-)
+> v2:
+>   - New.
+> ---
+>  drivers/clk/shmobile/clk-mstp.c | 4 ++++
+>  1 file changed, 4 insertions(+)
+> 
+> diff --git a/drivers/clk/shmobile/clk-mstp.c b/drivers/clk/shmobile/clk-mstp.c
+> index 619f3eccefd4884f..19e2b11953383587 100644
+> --- a/drivers/clk/shmobile/clk-mstp.c
+> +++ b/drivers/clk/shmobile/clk-mstp.c
+> @@ -258,6 +258,10 @@ int cpg_mstp_attach_dev(struct generic_pm_domain *domain, struct device *dev)
+>                                             "renesas,cpg-mstp-clocks"))
+>                         goto found;
+>  
+> +               /* BSC on r8a73a4/sh73a0 uses zb_clk instead of an mstp clock*/
+> +               if (!strcmp(clkspec.np->name, "zb_clk"))
+> +                       goto found;
 
-As talked about privately, this patch is ugly.  ...but I don't see a
-solution that is less ugly.  This method has the advantages that it is
-"automatic"--the system figures out whether it needs the 24MHz clock
-automatically based on whether the PHYs were left on.  No other
-communication / device tree stuff is needed.
+Hello Geert,
 
+Is the driver the right place to handle this corner case? What do you
+think about linking zb_clk up to the bsc devicetree node for
+r8a73a4/sh73a0?
 
-> +       /* if any usb phy is still on(GRF_SIDDQ==0), that means we need the
-> +        * function of usb wakeup, so do not switch to 32khz, since the usb phy
-> +        * clk does not connect to 32khz osc*/
+Regards,
+Mike
 
-This is not _quite_ the block commenting style used in this file.  It
-would be a bit nicer if it matched.
-
-Other than that:
-
-Reviewed-by: Douglas Anderson <dianders@chromium.org>
-
-On the chromeos-3.14 kernel (with the WIP dwc2 patches):
-Tested-by: Douglas Anderson <dianders@chromium.org>
+> +
+>                 of_node_put(clkspec.np);
+>                 i++;
+>         }
+> -- 
+> 1.9.1
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> Please read the FAQ at  http://www.tux.org/lkml/
