@@ -1,61 +1,197 @@
-From: alex.williamson@redhat.com (Alex Williamson)
-Date: Mon, 22 Jun 2015 10:26:01 -0600
-Subject: [PATCH] VFIO: platform: enable ARM64 build
-In-Reply-To: <55883038.9060405@linaro.org>
-References: <1434359632-20278-1-git-send-email-eric.auger@linaro.org>
- <CAN9JPjHh_DPzB1PRhkyaXjKvq47SYb6a4M0M=fO78Mp+YYefrQ@mail.gmail.com>
- <55883038.9060405@linaro.org>
-Message-ID: <1434990361.3700.228.camel@redhat.com>
+From: rmk+kernel@arm.linux.org.uk (Russell King)
+Date: Mon, 22 Jun 2015 17:34:40 +0100
+Subject: [PATCH] ARM: dove: fix legacy dove IRQ numbers
+Message-ID: <E1Z74gC-0005X6-0C@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2015-06-22 at 17:56 +0200, Eric Auger wrote:
-> Hi Baptiste,
-> 
-> No unfortunately I don't have any HW to test this currently. I just
-> test-compiled this. Up to you to decide whether you prefer waiting for a
-> functional test for this. I sent that patch since I expect ARM64 to be
-> the main platform where the VFIO platform drivermight be used for
-> virtualization use case.
+v3.18 changed handle_IRQ() to call __handle_domain_irq(), which now
+rejects attempts to deliver IRQ0.  Since IRQ 0 is used as the timer
+interrupt (just like the PIT on x86), this causes boot to fail as the
+bogomips calibration never completes.
 
-FWIW, I've been occasionally removing the arch condition entirely to
-build test on x86 as well.  The Intel VT-d code certainly allows for
-devices described by ACPI, which I assume would fall under the platform
-category, but I don't know of any systems that do this, let alone any
-x86 platform devices that we'd actually want to expose to the user.
-Eventually we might want to consider decoupling this from an arch-based
-Kconfig option, but we could just as easily let the first non-ARM user
-think about that problem.  Thanks,
+Fix this by shuffling all interrupts up by one.
 
-Alex
+Fixes: a71b092a9c68 ("ARM: Convert handle_IRQ to use __handle_domain_irq")
+Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+---
+As my Cubox tree is now at 4.1, here's this same old patch from 3.18 times
+rebased to 4.1 to fix this long standing problem.
 
-> On 06/22/2015 05:49 PM, Baptiste Reynal wrote:
-> > Acked-by: Baptiste Reynal <b.reynal@virtualopensystems.com>
-> > Tested-by: Baptiste Reynal <b.reynal@virtualopensystems.com>
-> > 
-> > Out of curiosity, have you get VFIO running on ARM64 without any problems ?
-> > 
-> > On Mon, Jun 15, 2015 at 11:13 AM, Eric Auger <eric.auger@linaro.org> wrote:
-> >> This patch enables building VFIO platform and derivatives on ARM64.
-> >>
-> >> Signed-off-by: Eric Auger <eric.auger@linaro.org>
-> >> ---
-> >>  drivers/vfio/platform/Kconfig | 2 +-
-> >>  1 file changed, 1 insertion(+), 1 deletion(-)
-> >>
-> >> diff --git a/drivers/vfio/platform/Kconfig b/drivers/vfio/platform/Kconfig
-> >> index 1df7477..bb30128 100644
-> >> --- a/drivers/vfio/platform/Kconfig
-> >> +++ b/drivers/vfio/platform/Kconfig
-> >> @@ -1,6 +1,6 @@
-> >>  config VFIO_PLATFORM
-> >>         tristate "VFIO support for platform devices"
-> >> -       depends on VFIO && EVENTFD && ARM
-> >> +       depends on VFIO && EVENTFD && (ARM || ARM64)
-> >>         select VFIO_VIRQFD
-> >>         help
-> >>           Support for platform devices with VFIO. This is required to make
-> >> --
-> >> 1.9.1
-> >>
-> 
+ arch/arm/mach-dove/include/mach/irqs.h | 120 ++++++++++++++++-----------------
+ arch/arm/mach-dove/irq.c               |   8 +--
+ 2 files changed, 64 insertions(+), 64 deletions(-)
+
+diff --git a/arch/arm/mach-dove/include/mach/irqs.h b/arch/arm/mach-dove/include/mach/irqs.h
+index 03d401d20453..0acf74b9ac34 100644
+--- a/arch/arm/mach-dove/include/mach/irqs.h
++++ b/arch/arm/mach-dove/include/mach/irqs.h
+@@ -14,74 +14,74 @@
+ /*
+  * Dove Low Interrupt Controller
+  */
+-#define IRQ_DOVE_BRIDGE		0
+-#define IRQ_DOVE_H2C		1
+-#define IRQ_DOVE_C2H		2
+-#define IRQ_DOVE_NAND		3
+-#define IRQ_DOVE_PDMA		4
+-#define IRQ_DOVE_SPI1		5
+-#define IRQ_DOVE_SPI0		6
+-#define IRQ_DOVE_UART_0		7
+-#define IRQ_DOVE_UART_1		8
+-#define IRQ_DOVE_UART_2		9
+-#define IRQ_DOVE_UART_3		10
+-#define IRQ_DOVE_I2C		11
+-#define IRQ_DOVE_GPIO_0_7	12
+-#define IRQ_DOVE_GPIO_8_15	13
+-#define IRQ_DOVE_GPIO_16_23	14
+-#define IRQ_DOVE_PCIE0_ERR	15
+-#define IRQ_DOVE_PCIE0		16
+-#define IRQ_DOVE_PCIE1_ERR	17
+-#define IRQ_DOVE_PCIE1		18
+-#define IRQ_DOVE_I2S0		19
+-#define IRQ_DOVE_I2S0_ERR	20
+-#define IRQ_DOVE_I2S1		21
+-#define IRQ_DOVE_I2S1_ERR	22
+-#define IRQ_DOVE_USB_ERR	23
+-#define IRQ_DOVE_USB0		24
+-#define IRQ_DOVE_USB1		25
+-#define IRQ_DOVE_GE00_RX	26
+-#define IRQ_DOVE_GE00_TX	27
+-#define IRQ_DOVE_GE00_MISC	28
+-#define IRQ_DOVE_GE00_SUM	29
+-#define IRQ_DOVE_GE00_ERR	30
+-#define IRQ_DOVE_CRYPTO		31
++#define IRQ_DOVE_BRIDGE		(1 + 0)
++#define IRQ_DOVE_H2C		(1 + 1)
++#define IRQ_DOVE_C2H		(1 + 2)
++#define IRQ_DOVE_NAND		(1 + 3)
++#define IRQ_DOVE_PDMA		(1 + 4)
++#define IRQ_DOVE_SPI1		(1 + 5)
++#define IRQ_DOVE_SPI0		(1 + 6)
++#define IRQ_DOVE_UART_0		(1 + 7)
++#define IRQ_DOVE_UART_1		(1 + 8)
++#define IRQ_DOVE_UART_2		(1 + 9)
++#define IRQ_DOVE_UART_3		(1 + 10)
++#define IRQ_DOVE_I2C		(1 + 11)
++#define IRQ_DOVE_GPIO_0_7	(1 + 12)
++#define IRQ_DOVE_GPIO_8_15	(1 + 13)
++#define IRQ_DOVE_GPIO_16_23	(1 + 14)
++#define IRQ_DOVE_PCIE0_ERR	(1 + 15)
++#define IRQ_DOVE_PCIE0		(1 + 16)
++#define IRQ_DOVE_PCIE1_ERR	(1 + 17)
++#define IRQ_DOVE_PCIE1		(1 + 18)
++#define IRQ_DOVE_I2S0		(1 + 19)
++#define IRQ_DOVE_I2S0_ERR	(1 + 20)
++#define IRQ_DOVE_I2S1		(1 + 21)
++#define IRQ_DOVE_I2S1_ERR	(1 + 22)
++#define IRQ_DOVE_USB_ERR	(1 + 23)
++#define IRQ_DOVE_USB0		(1 + 24)
++#define IRQ_DOVE_USB1		(1 + 25)
++#define IRQ_DOVE_GE00_RX	(1 + 26)
++#define IRQ_DOVE_GE00_TX	(1 + 27)
++#define IRQ_DOVE_GE00_MISC	(1 + 28)
++#define IRQ_DOVE_GE00_SUM	(1 + 29)
++#define IRQ_DOVE_GE00_ERR	(1 + 30)
++#define IRQ_DOVE_CRYPTO		(1 + 31)
+ 
+ /*
+  * Dove High Interrupt Controller
+  */
+-#define IRQ_DOVE_AC97		32
+-#define IRQ_DOVE_PMU		33
+-#define IRQ_DOVE_CAM		34
+-#define IRQ_DOVE_SDIO0		35
+-#define IRQ_DOVE_SDIO1		36
+-#define IRQ_DOVE_SDIO0_WAKEUP	37
+-#define IRQ_DOVE_SDIO1_WAKEUP	38
+-#define IRQ_DOVE_XOR_00		39
+-#define IRQ_DOVE_XOR_01		40
+-#define IRQ_DOVE_XOR0_ERR	41
+-#define IRQ_DOVE_XOR_10		42
+-#define IRQ_DOVE_XOR_11		43
+-#define IRQ_DOVE_XOR1_ERR	44
+-#define IRQ_DOVE_LCD_DCON	45
+-#define IRQ_DOVE_LCD1		46
+-#define IRQ_DOVE_LCD0		47
+-#define IRQ_DOVE_GPU		48
+-#define IRQ_DOVE_PERFORM_MNTR	49
+-#define IRQ_DOVE_VPRO_DMA1	51
+-#define IRQ_DOVE_SSP_TIMER	54
+-#define IRQ_DOVE_SSP		55
+-#define IRQ_DOVE_MC_L2_ERR	56
+-#define IRQ_DOVE_CRYPTO_ERR	59
+-#define IRQ_DOVE_GPIO_24_31	60
+-#define IRQ_DOVE_HIGH_GPIO	61
+-#define IRQ_DOVE_SATA		62
++#define IRQ_DOVE_AC97		(1 + 32)
++#define IRQ_DOVE_PMU		(1 + 33)
++#define IRQ_DOVE_CAM		(1 + 34)
++#define IRQ_DOVE_SDIO0		(1 + 35)
++#define IRQ_DOVE_SDIO1		(1 + 36)
++#define IRQ_DOVE_SDIO0_WAKEUP	(1 + 37)
++#define IRQ_DOVE_SDIO1_WAKEUP	(1 + 38)
++#define IRQ_DOVE_XOR_00		(1 + 39)
++#define IRQ_DOVE_XOR_01		(1 + 40)
++#define IRQ_DOVE_XOR0_ERR	(1 + 41)
++#define IRQ_DOVE_XOR_10		(1 + 42)
++#define IRQ_DOVE_XOR_11		(1 + 43)
++#define IRQ_DOVE_XOR1_ERR	(1 + 44)
++#define IRQ_DOVE_LCD_DCON	(1 + 45)
++#define IRQ_DOVE_LCD1		(1 + 46)
++#define IRQ_DOVE_LCD0		(1 + 47)
++#define IRQ_DOVE_GPU		(1 + 48)
++#define IRQ_DOVE_PERFORM_MNTR	(1 + 49)
++#define IRQ_DOVE_VPRO_DMA1	(1 + 51)
++#define IRQ_DOVE_SSP_TIMER	(1 + 54)
++#define IRQ_DOVE_SSP		(1 + 55)
++#define IRQ_DOVE_MC_L2_ERR	(1 + 56)
++#define IRQ_DOVE_CRYPTO_ERR	(1 + 59)
++#define IRQ_DOVE_GPIO_24_31	(1 + 60)
++#define IRQ_DOVE_HIGH_GPIO	(1 + 61)
++#define IRQ_DOVE_SATA		(1 + 62)
+ 
+ /*
+  * DOVE General Purpose Pins
+  */
+-#define IRQ_DOVE_GPIO_START	64
+-#define NR_GPIO_IRQS		64
++#define IRQ_DOVE_GPIO_START	65
++#define NR_GPIO_IRQS		65
+ 
+ /*
+  * PMU interrupts
+diff --git a/arch/arm/mach-dove/irq.c b/arch/arm/mach-dove/irq.c
+index 4a5a7aedcb76..df0223f76fa9 100644
+--- a/arch/arm/mach-dove/irq.c
++++ b/arch/arm/mach-dove/irq.c
+@@ -126,14 +126,14 @@ __exception_irq_entry dove_legacy_handle_irq(struct pt_regs *regs)
+ 	stat = readl_relaxed(dove_irq_base + IRQ_CAUSE_LOW_OFF);
+ 	stat &= readl_relaxed(dove_irq_base + IRQ_MASK_LOW_OFF);
+ 	if (stat) {
+-		unsigned int hwirq = __fls(stat);
++		unsigned int hwirq = 1 + __fls(stat);
+ 		handle_IRQ(hwirq, regs);
+ 		return;
+ 	}
+ 	stat = readl_relaxed(dove_irq_base + IRQ_CAUSE_HIGH_OFF);
+ 	stat &= readl_relaxed(dove_irq_base + IRQ_MASK_HIGH_OFF);
+ 	if (stat) {
+-		unsigned int hwirq = 32 + __fls(stat);
++		unsigned int hwirq = 33 + __fls(stat);
+ 		handle_IRQ(hwirq, regs);
+ 		return;
+ 	}
+@@ -144,8 +144,8 @@ void __init dove_init_irq(void)
+ {
+ 	int i;
+ 
+-	orion_irq_init(0, IRQ_VIRT_BASE + IRQ_MASK_LOW_OFF);
+-	orion_irq_init(32, IRQ_VIRT_BASE + IRQ_MASK_HIGH_OFF);
++	orion_irq_init(1, IRQ_VIRT_BASE + IRQ_MASK_LOW_OFF);
++	orion_irq_init(33, IRQ_VIRT_BASE + IRQ_MASK_HIGH_OFF);
+ 
+ #ifdef CONFIG_MULTI_IRQ_HANDLER
+ 	set_handle_irq(dove_legacy_handle_irq);
+-- 
+2.1.0
