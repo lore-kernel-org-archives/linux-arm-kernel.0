@@ -1,95 +1,80 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Mon, 22 Jun 2015 16:21:14 -0700
-Subject: [PATCH v3 2/3] clk: stm32: Add clock driver for STM32F4[23]xxx
- devices
-In-Reply-To: <1433966978-24422-3-git-send-email-daniel.thompson@linaro.org>
-References: <1432327273-6810-1-git-send-email-daniel.thompson@linaro.org>
- <1433966978-24422-1-git-send-email-daniel.thompson@linaro.org>
- <1433966978-24422-3-git-send-email-daniel.thompson@linaro.org>
-Message-ID: <20150622232114.GK22132@codeaurora.org>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Tue, 23 Jun 2015 08:46:33 +0900
+Subject: [PATCH 4/6] ARM: dts: Exynos4210: add CPU OPP and regulator supply
+ property
+In-Reply-To: <20150622150421.9112.96812@quantum>
+References: <'@samsung.com>
+ <1428079429-4252-1-git-send-email-b.zolnierkie@samsung.com>
+ <1428079429-4252-5-git-send-email-b.zolnierkie@samsung.com>
+ <CAJKOXPfR5JS546YS3M-8orxO7+SxnzE06h2cyesExyt8Y9fVKw@mail.gmail.com>
+ <CAJKOXPfdXV8qxR3AQEzQJTf6MojUN7Z=06ikxF8u5BuMihDfJQ@mail.gmail.com>
+ <00f801d0ac8c$344dfeb0$9ce9fc10$@kernel.org> <558767FC.4090405@samsung.com>
+ <011f01d0ac8d$40a25110$c1e6f330$@kernel.org>
+ <20150622150421.9112.96812@quantum>
+Message-ID: <55889E59.1070001@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/10, Daniel Thompson wrote:
-> The driver supports decoding and statically modelling PLL state (i.e.
-> we inherit state from bootloader) and provides support for all
-> peripherals that support simple one-bit gated clocks. The covers all
-> peripherals whose clocks come from the AHB, APB1 or APB2 buses.
+On 23.06.2015 00:04, Michael Turquette wrote:
+> Quoting Kukjin Kim (2015-06-21 18:46:26)
+>> Krzysztof Kozlowski wrote:
+>>>
+>>> On 22.06.2015 10:38, Kukjin Kim wrote:
+>>>> Krzysztof Kozlowski wrote:
+>>>>> 2015-05-08 9:18 GMT+09:00 Krzysztof Kozlowski <k.kozlowski@samsung.com>:
+>>>>>> 2015-04-04 1:43 GMT+09:00 Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>:
+>>>>>>> From: Thomas Abraham <thomas.ab@samsung.com>
+>>>>>>>
+>>>>>>> For Exynos4210 platforms, add CPU operating points and CPU
+>>>>>>> regulator supply properties for migrating from Exynos specific
+>>>>>>> cpufreq driver to using generic cpufreq driver.
+>>>>>>>
+>>>>>>> Changes by Bartlomiej:
+>>>>>>> - removed Exynos5250 and Exynos5420 support for now
+>>>>>>>
+>>>>>>> Cc: Kukjin Kim <kgene.kim@samsung.com>
+>>>>>>> Cc: Doug Anderson <dianders@chromium.org>
+>>>>>>> Cc: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
+>>>>>>> Cc: Andreas Faerber <afaerber@suse.de>
+>>>>>>> Cc: Sachin Kamat <sachin.kamat@linaro.org>
+>>>>>>> Cc: Andreas Farber <afaerber@suse.de>
+>>>>>>> Cc: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
+>>>>>>> Signed-off-by: Thomas Abraham <thomas.ab@samsung.com>
+>>>>>>> Signed-off-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
+>>>>>>
+>>>>>> Acked-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+>>>>>
+>>>>> Rebased and applied to my tree, I'll sent it later to Kukjin unless he
+>>>>> picks it by himself from LKML.
+>>>>>
+>>>> Hi, as far as I know, this is for v4.2 not v4.1 so it will be applied based on
+>>>> v4.2-rc1 after v4.2-rc1 release.
+>>>
+>>> You mean it is for v4.3, not v4.2?
+>>>
+>> Oops, yes v4.3.
+>>
+>> Thanks for the correction.
 > 
-> It has been tested on an STM32F429I-Discovery board. The clock counts
-> for TIM2, USART1 and SYSTICK are all set correctly and the wall clock
-> looks OK when checked with a stopwatch. I have also tested a prototype
-> driver for the RNG hardware. The RNG clock is correctly enabled by the
-> framework (also did inverse test and proved that by changing DT to
-> configure the wrong clock bit then we observe the RNG driver to fail).
+> Kukjin & Krzysztof,
 > 
-> Signed-off-by: Daniel Thompson <daniel.thompson@linaro.org>
-> Reviewed-by: Maxime Coquelin <mcoquelin.stm32@gmail.com>
+> I'm confused on this point. I was planning to take patches 1, 2, 3, 5
+> and 6 towards 4.2 (e.g. in the pull request that I'll send out this
+> week).
+> 
+> Is patch 4 going out for 4.2 or 4.3?
 
-I also squashed in some sparse fixes. Please check.
+It is quite late for sending pull request to arm-soc for 4.2.
+For example SoCFPGA pull request from last week was rejected:
+http://comments.gmane.org/gmane.linux.ports.arm.kernel/417980
 
-drivers/clk/clk-stm32f4.c:135:44:
-warning: constant 0x000000f17ef417ff is so big it is long
-drivers/clk/clk-stm32f4.c:137:44:
-warning: constant 0x04777f33f6fec9ff is so big it is long
-drivers/clk/clk-stm32f4.c:206:12:
-warning: symbol 'clk_register_apb_mul' was not declared. Should
-it be static?
-drivers/clk/clk-stm32f4.c:285:12:
-warning: symbol 'stm32f4_rcc_lookup_clk' was not declared. Should
-it be static?
+If you want to take it for 4.2 then I am fine with it but this will
+cause some easy but annoying conflicts. There aren't difficult - just
+most of nodes in board DTS changed their place.
 
----8<----
-diff --git a/drivers/clk/clk-stm32f4.c b/drivers/clk/clk-stm32f4.c
-index c825bbd4335f..b9b12a742970 100644
---- a/drivers/clk/clk-stm32f4.c
-+++ b/drivers/clk/clk-stm32f4.c
-@@ -132,9 +132,9 @@ enum { SYSTICK, FCLK };
-  * This bitmask tells us which bit offsets (0..192) on STM32F4[23]xxx
-  * have gate bits associated with them. Its combined hweight is 71.
-  */
--static const u64 stm32f42xx_gate_map[] = { 0x000000f17ef417ff,
--					   0x0000000000000001,
--					   0x04777f33f6fec9ff };
-+static const u64 stm32f42xx_gate_map[] = { 0x000000f17ef417ffull,
-+					   0x0000000000000001ull,
-+					   0x04777f33f6fec9ffull };
- 
- static struct clk *clks[MAX_CLKS];
- static DEFINE_SPINLOCK(stm32f4_clk_lock);
-@@ -186,7 +186,7 @@ static long clk_apb_mul_round_rate(struct clk_hw *hw, unsigned long rate,
- }
- 
- static int clk_apb_mul_set_rate(struct clk_hw *hw, unsigned long rate,
--				 unsigned long parent_rate)
-+				unsigned long parent_rate)
- {
- 	/*
- 	 * We must report success but we can do so unconditionally because
-@@ -203,9 +203,9 @@ static const struct clk_ops clk_apb_mul_factor_ops = {
- 	.recalc_rate = clk_apb_mul_recalc_rate,
- };
- 
--struct clk *clk_register_apb_mul(struct device *dev, const char *name,
--				 const char *parent_name, unsigned long flags,
--				 u8 bit_idx)
-+static struct clk *clk_register_apb_mul(struct device *dev, const char *name,
-+					const char *parent_name,
-+					unsigned long flags, u8 bit_idx)
- {
- 	struct clk_apb_mul *am;
- 	struct clk_init_data init;
-@@ -282,7 +282,8 @@ static int stm32f4_rcc_lookup_clk_idx(u8 primary, u8 secondary)
- 	       (BIT_ULL_WORD(secondary) >= 2 ? hweight64(table[2]) : 0);
- }
- 
--struct clk *stm32f4_rcc_lookup_clk(struct of_phandle_args *clkspec, void *data)
-+static struct clk *
-+stm32f4_rcc_lookup_clk(struct of_phandle_args *clkspec, void *data)
- {
- 	int i = stm32f4_rcc_lookup_clk_idx(clkspec->args[0], clkspec->args[1]);
- 
+Example of resolution (target file after merge, with cpu nodes reordered
+alphabetically):
+https://github.com/krzk/linux/commit/2cec3cb48abaf44848c62f1c0836b772eb4680dd
 
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+Best regards,
+Krzysztof
