@@ -1,83 +1,127 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Mon, 22 Jun 2015 22:17:03 +0200
-Subject: [PATCH v2 13/14] clk: shmobile: mstp: Consider "zb_clk" suitable
- for power management
-In-Reply-To: <20150622200549.9112.2411@quantum>
-References: <1432839219-475-1-git-send-email-geert+renesas@glider.be>
- <1432839219-475-14-git-send-email-geert+renesas@glider.be>
- <20150622200549.9112.2411@quantum>
-Message-ID: <CAMuHMdWYJNWZ+NW4se_H2Ks9nyza9BZJp3RUZ=PDwiqyO+Azdg@mail.gmail.com>
+From: m-karicheri2@ti.com (Murali Karicheri)
+Date: Mon, 22 Jun 2015 16:23:43 -0400
+Subject: [PATCH] ARM: keystone: ecc: add ddr3 ecc interrupt handling
+In-Reply-To: <558436C1.3050402@oracle.com>
+References: <1434654589-28157-1-git-send-email-vitalya@ti.com>
+ <558436C1.3050402@oracle.com>
+Message-ID: <55886ECF.9070402@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mike,
-
-On Mon, Jun 22, 2015 at 10:05 PM, Michael Turquette
-<mturquette@linaro.org> wrote:
-
-Still sending email from Linaro, which will cause me to receive an autoreply?
-
-> Quoting Geert Uytterhoeven (2015-05-28 11:53:38)
->> Currently the CPG Clock Domain code looks for MSTP clocks to power
->> manage a device.
+On 06/19/2015 11:35 AM, santosh shilimkar wrote:
+> On 6/18/2015 12:09 PM, Vitaly Andrianov wrote:
+>> This patch adds ARM L1/L2 ECC handler support and DDR3 ECC interrupt
+>> handling for Keystone II devices, the kernel will reboot if the error
+>> is 2-bit error for DDR ECC or L1/L2 ECC error.
 >>
->> Unfortunately, on R-Mobile APE6 (r8a73a4) and SH-Mobile AG5 (sh73a0),
->> the Bus State Controller (BSC) is not power-managed by an MSTP clock,
->> but by a plain CPG clock (zb_clk).  Add a special case to handle this,
->> so the clock is properly managed, and devices connected to the BSC work
->> as expected.
->>
->> Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+>> Signed-off-by: Hao Zhang <hzhang@ti.com>
+>> Signed-off-by: Murali Karicheri <m-karicheri2@ti.com>
+>> Signed-off-by: Vitaly Andrianov <vitalya@ti.com>
 >> ---
->> v2:
->>   - New.
->> ---
->>  drivers/clk/shmobile/clk-mstp.c | 4 ++++
->>  1 file changed, 4 insertions(+)
+>>   arch/arm/mach-keystone/Makefile       |  2 +-
+>>   arch/arm/mach-keystone/keystone.c     | 63 ++++++++++++++++++++++++--
+>>   arch/arm/mach-keystone/keystone.h     |  1 +
+>>   arch/arm/mach-keystone/keystone_ecc.c | 85
+>> +++++++++++++++++++++++++++++++++++
+>>   arch/arm/mach-keystone/platsmp.c      |  3 +-
+>>   5 files changed, 148 insertions(+), 6 deletions(-)
+>>   create mode 100644 arch/arm/mach-keystone/keystone_ecc.c
 >>
->> diff --git a/drivers/clk/shmobile/clk-mstp.c b/drivers/clk/shmobile/clk-mstp.c
->> index 619f3eccefd4884f..19e2b11953383587 100644
->> --- a/drivers/clk/shmobile/clk-mstp.c
->> +++ b/drivers/clk/shmobile/clk-mstp.c
->> @@ -258,6 +258,10 @@ int cpg_mstp_attach_dev(struct generic_pm_domain *domain, struct device *dev)
->>                                             "renesas,cpg-mstp-clocks"))
->>                         goto found;
+>
+>> +/* DDR3 controller registers */
+>> +#define DDR3_EOI            0x0A0
+>> +#define DDR3_IRQ_STATUS_RAW_SYS        0x0A4
+>> +#define DDR3_IRQ_STATUS_SYS        0x0AC
+>> +#define DDR3_IRQ_ENABLE_SET_SYS        0x0B4
+>> +#define DDR3_IRQ_ENABLE_CLR_SYS        0x0BC
+>> +#define DDR3_ECC_CTRL            0x110
+>> +#define DDR3_ONE_BIT_ECC_ERR_CNT    0x130
+>> +
+>> +#define DDR3_1B_ECC_ERR            BIT(5)
+>> +#define DDR3_2B_ECC_ERR            BIT(4)
+>> +#define DDR3_WR_ECC_ERR            BIT(3)
+>> +
+>> +static irqreturn_t ddr3_ecc_err_irq_handler(int irq, void *reg_virt)
+>> +{
+>> +    int ret = IRQ_NONE;
+>> +    u32 irq_status;
+>> +    void __iomem *ddr_reg = (void __iomem *)reg_virt;
+>> +
+>> +    irq_status = readl(ddr_reg + DDR3_IRQ_STATUS_SYS);
+>> +    if ((irq_status & DDR3_2B_ECC_ERR) ||
+>> +        (irq_status & DDR3_WR_ECC_ERR)) {
+>> +        pr_err("Unrecoverable DDR3 ECC error, irq status 0x%x,
+>> rebooting kernel ..\n",
+>> +               irq_status);
+>> +        machine_restart(NULL);
+>> +        ret = IRQ_HANDLED;
+>> +    }
+>> +    return ret;
+>> +}
+>> +
+>> +int keystone_init_ddr3_ecc(struct device_node *node)
+>> +{
+>> +    void __iomem *ddr_reg;
+>> +    int error_irq = 0;
+>> +    int ret;
+>> +
+>> +    /* ddr3 controller reg is configured in the sysctrl node at index
+>> 0 */
+>> +    ddr_reg = of_iomap(node, 0);
+>> +    if (!ddr_reg) {
+>> +        pr_warn("Warning!! DDR3 controller regs not defined\n");
+>> +        return -ENODEV;
+>> +    }
+>> +
+>> +    /* add DDR3 ECC error handler */
+>> +    error_irq = irq_of_parse_and_map(node, 1);
+>> +    if (!error_irq) {
+>> +        /* No GIC interrupt, need to map CIC2 interrupt to GIC */
+>> +        pr_warn("Warning!! DDR3 ECC irq number not defined\n");
+>> +        return -ENODEV;
+>> +    }
+>> +
+> You should probably check here if there is already an ECC error happened
+> till you reach here and take appropriate action. If its not safe to
+> boot because of double bit error, you need to abort the boot.
+
+Santosh,
+
+How is this any different from the case when ECC error interrupt happen 
+while the system is running? I would imagine the system can run the 
+handler if the software can make it this far and handled uniformly
+through the handler in both cases.
+
+Murali
+
+>> +    ret = request_irq(error_irq, ddr3_ecc_err_irq_handler, 0,
+>> +        "ddr3-ecc-err-irq", (void *)ddr_reg);
+>> +    if (ret) {
+>> +        WARN_ON("request_irq fail for DDR3 ECC error irq\n");
+>> +        return ret;
+>> +    }
+>> +
+>> +    return 0;
+>> +}
+>> diff --git a/arch/arm/mach-keystone/platsmp.c
+>> b/arch/arm/mach-keystone/platsmp.c
+>> index 5f46a7c..07402b9 100644
+>> --- a/arch/arm/mach-keystone/platsmp.c
+>> +++ b/arch/arm/mach-keystone/platsmp.c
+>> @@ -13,8 +13,9 @@
+>>    */
 >>
->> +               /* BSC on r8a73a4/sh73a0 uses zb_clk instead of an mstp clock*/
->> +               if (!strcmp(clkspec.np->name, "zb_clk"))
->> +                       goto found;
+>>   #include <linux/init.h>
+>> -#include <linux/smp.h>
+>>   #include <linux/io.h>
+>> +#include <linux/of.h>
+>> +#include <linux/smp.h>
+>>
+> Why do you need of.h in this file ?
 >
-> Hello Geert,
 >
-> Is the driver the right place to handle this corner case? What do you
-> think about linking zb_clk up to the bsc devicetree node for
-> r8a73a4/sh73a0?
 
-It already is linked:
 
-        bsc: bus at fec10000 {
-                compatible = "renesas,bsc-r8a73a4", "renesas,bsc",
-                    "simple-pm-bus";
-                #address-cells = <1>;
-                #size-cells = <1>;
-               ranges = <0 0 0 0x20000000>;
-               reg = <0 0xfec10000 0 0x400>;
-                clocks = <&zb_clk>;
-               power-domains = <&pd_c4>;
-        };
-
-        https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/tree/arch/arm/boot/dts/r8a73a4.dtsi#n446
-
-But without this hack in clk-mstp, the clock domain controller doesn't know
-it can use this clock for power management like an ordinary mstp clock.
-
-Gr{oetje,eeting}s,
-
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+-- 
+Murali Karicheri
+Linux Kernel, Keystone
