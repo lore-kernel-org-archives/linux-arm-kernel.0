@@ -1,80 +1,105 @@
 From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Tue, 23 Jun 2015 08:46:33 +0900
-Subject: [PATCH 4/6] ARM: dts: Exynos4210: add CPU OPP and regulator supply
- property
-In-Reply-To: <20150622150421.9112.96812@quantum>
-References: <'@samsung.com>
- <1428079429-4252-1-git-send-email-b.zolnierkie@samsung.com>
- <1428079429-4252-5-git-send-email-b.zolnierkie@samsung.com>
- <CAJKOXPfR5JS546YS3M-8orxO7+SxnzE06h2cyesExyt8Y9fVKw@mail.gmail.com>
- <CAJKOXPfdXV8qxR3AQEzQJTf6MojUN7Z=06ikxF8u5BuMihDfJQ@mail.gmail.com>
- <00f801d0ac8c$344dfeb0$9ce9fc10$@kernel.org> <558767FC.4090405@samsung.com>
- <011f01d0ac8d$40a25110$c1e6f330$@kernel.org>
- <20150622150421.9112.96812@quantum>
-Message-ID: <55889E59.1070001@samsung.com>
+Date: Tue, 23 Jun 2015 08:51:27 +0900
+Subject: [patch v2 1/2] pinctrl: samsung: don't truncate the last char
+In-Reply-To: <20150622151223.GA14156@mwanda>
+References: <20150622151223.GA14156@mwanda>
+Message-ID: <55889F7F.9090106@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 23.06.2015 00:04, Michael Turquette wrote:
-> Quoting Kukjin Kim (2015-06-21 18:46:26)
->> Krzysztof Kozlowski wrote:
->>>
->>> On 22.06.2015 10:38, Kukjin Kim wrote:
->>>> Krzysztof Kozlowski wrote:
->>>>> 2015-05-08 9:18 GMT+09:00 Krzysztof Kozlowski <k.kozlowski@samsung.com>:
->>>>>> 2015-04-04 1:43 GMT+09:00 Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>:
->>>>>>> From: Thomas Abraham <thomas.ab@samsung.com>
->>>>>>>
->>>>>>> For Exynos4210 platforms, add CPU operating points and CPU
->>>>>>> regulator supply properties for migrating from Exynos specific
->>>>>>> cpufreq driver to using generic cpufreq driver.
->>>>>>>
->>>>>>> Changes by Bartlomiej:
->>>>>>> - removed Exynos5250 and Exynos5420 support for now
->>>>>>>
->>>>>>> Cc: Kukjin Kim <kgene.kim@samsung.com>
->>>>>>> Cc: Doug Anderson <dianders@chromium.org>
->>>>>>> Cc: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
->>>>>>> Cc: Andreas Faerber <afaerber@suse.de>
->>>>>>> Cc: Sachin Kamat <sachin.kamat@linaro.org>
->>>>>>> Cc: Andreas Farber <afaerber@suse.de>
->>>>>>> Cc: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
->>>>>>> Signed-off-by: Thomas Abraham <thomas.ab@samsung.com>
->>>>>>> Signed-off-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
->>>>>>
->>>>>> Acked-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
->>>>>
->>>>> Rebased and applied to my tree, I'll sent it later to Kukjin unless he
->>>>> picks it by himself from LKML.
->>>>>
->>>> Hi, as far as I know, this is for v4.2 not v4.1 so it will be applied based on
->>>> v4.2-rc1 after v4.2-rc1 release.
->>>
->>> You mean it is for v4.3, not v4.2?
->>>
->> Oops, yes v4.3.
->>
->> Thanks for the correction.
+On 23.06.2015 00:12, Dan Carpenter wrote:
+> We were allocating enough space because sizeof("-grp") and
+> sizeof("-mux") are both equal to 5 but in the snprintf() we only allowed
+> for 4 characters so the last 'p' and 'x' characters were truncated.
 > 
-> Kukjin & Krzysztof,
+> The allocate and sprintf can be done in one step with the kasprintf().
 > 
-> I'm confused on this point. I was planning to take patches 1, 2, 3, 5
-> and 6 towards 4.2 (e.g. in the pull request that I'll send out this
-> week).
-> 
-> Is patch 4 going out for 4.2 or 4.3?
+> Signed-off-by: Dan Carpenter <dan.carpenter@oracle.com>
 
-It is quite late for sending pull request to arm-soc for 4.2.
-For example SoCFPGA pull request from last week was rejected:
-http://comments.gmane.org/gmane.linux.ports.arm.kernel/417980
-
-If you want to take it for 4.2 then I am fine with it but this will
-cause some easy but annoying conflicts. There aren't difficult - just
-most of nodes in board DTS changed their place.
-
-Example of resolution (target file after merge, with cpu nodes reordered
-alphabetically):
-https://github.com/krzk/linux/commit/2cec3cb48abaf44848c62f1c0836b772eb4680dd
+Looks good:
+Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
 
 Best regards,
 Krzysztof
+
+
+> 
+> diff --git a/drivers/pinctrl/samsung/pinctrl-exynos5440.c b/drivers/pinctrl/samsung/pinctrl-exynos5440.c
+> index f5619fb..fa84db6 100644
+> --- a/drivers/pinctrl/samsung/pinctrl-exynos5440.c
+> +++ b/drivers/pinctrl/samsung/pinctrl-exynos5440.c
+> @@ -44,9 +44,7 @@
+>  #define PIN_NAME_LENGTH		10
+>  
+>  #define GROUP_SUFFIX		"-grp"
+> -#define GSUFFIX_LEN		sizeof(GROUP_SUFFIX)
+>  #define FUNCTION_SUFFIX		"-mux"
+> -#define FSUFFIX_LEN		sizeof(FUNCTION_SUFFIX)
+>  
+>  /*
+>   * pin configuration type and its value are packed together into a 16-bits.
+> @@ -215,12 +213,11 @@ static int exynos5440_dt_node_to_map(struct pinctrl_dev *pctldev,
+>  	 * Allocate memory for pin group name. The pin group name is derived
+>  	 * from the node name from which these map entries are be created.
+>  	 */
+> -	gname = kzalloc(strlen(np->name) + GSUFFIX_LEN, GFP_KERNEL);
+> +	gname = kasprintf(GFP_KERNEL, "%s%s", np->name, GROUP_SUFFIX);
+>  	if (!gname) {
+>  		dev_err(dev, "failed to alloc memory for group name\n");
+>  		goto free_map;
+>  	}
+> -	snprintf(gname, strlen(np->name) + 4, "%s%s", np->name, GROUP_SUFFIX);
+>  
+>  	/*
+>  	 * don't have config options? then skip over to creating function
+> @@ -254,13 +251,12 @@ static int exynos5440_dt_node_to_map(struct pinctrl_dev *pctldev,
+>  skip_cfgs:
+>  	/* create the function map entry */
+>  	if (of_find_property(np, "samsung,exynos5440-pin-function", NULL)) {
+> -		fname = kzalloc(strlen(np->name) + FSUFFIX_LEN,	GFP_KERNEL);
+> +		fname = kasprintf(GFP_KERNEL,
+> +				  "%s%s", np->name, FUNCTION_SUFFIX);
+>  		if (!fname) {
+>  			dev_err(dev, "failed to alloc memory for func name\n");
+>  			goto free_cfg;
+>  		}
+> -		snprintf(fname, strlen(np->name) + 4, "%s%s", np->name,
+> -			 FUNCTION_SUFFIX);
+>  
+>  		map[*nmaps].data.mux.group = gname;
+>  		map[*nmaps].data.mux.function = fname;
+> @@ -710,14 +706,12 @@ static int exynos5440_pinctrl_parse_dt(struct platform_device *pdev,
+>  		}
+>  
+>  		/* derive pin group name from the node name */
+> -		gname = devm_kzalloc(dev, strlen(cfg_np->name) + GSUFFIX_LEN,
+> -					GFP_KERNEL);
+> +		gname = devm_kasprintf(dev, GFP_KERNEL,
+> +				       "%s%s", cfg_np->name, GROUP_SUFFIX);
+>  		if (!gname) {
+>  			dev_err(dev, "failed to alloc memory for group name\n");
+>  			return -ENOMEM;
+>  		}
+> -		snprintf(gname, strlen(cfg_np->name) + 4, "%s%s", cfg_np->name,
+> -			 GROUP_SUFFIX);
+>  
+>  		grp->name = gname;
+>  		grp->pins = pin_list;
+> @@ -731,14 +725,12 @@ skip_to_pin_function:
+>  			continue;
+>  
+>  		/* derive function name from the node name */
+> -		fname = devm_kzalloc(dev, strlen(cfg_np->name) + FSUFFIX_LEN,
+> -					GFP_KERNEL);
+> +		fname = devm_kasprintf(dev, GFP_KERNEL,
+> +				       "%s%s", cfg_np->name, FUNCTION_SUFFIX);
+>  		if (!fname) {
+>  			dev_err(dev, "failed to alloc memory for func name\n");
+>  			return -ENOMEM;
+>  		}
+> -		snprintf(fname, strlen(cfg_np->name) + 4, "%s%s", cfg_np->name,
+> -			 FUNCTION_SUFFIX);
+>  
+>  		func->name = fname;
+>  		func->groups = devm_kzalloc(dev, sizeof(char *), GFP_KERNEL);
+> 
