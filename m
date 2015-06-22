@@ -1,32 +1,118 @@
-From: peter.maydell@linaro.org (Peter Maydell)
-Date: Mon, 22 Jun 2015 09:44:48 +0100
-Subject: [PATCH] arm64/kvm: Add generic v8 KVM target
-In-Reply-To: <1434531646-4873-1-git-send-email-suzuki.poulose@arm.com>
-References: <1434531646-4873-1-git-send-email-suzuki.poulose@arm.com>
-Message-ID: <CAFEAcA92uymQ3LjPQnuFiwvjSgc+jY54VrfK_Sh4v1DJ+=OPpw@mail.gmail.com>
+From: l.stach@pengutronix.de (Lucas Stach)
+Date: Mon, 22 Jun 2015 11:22:12 +0200
+Subject: [PATCH v2 1/2] watchdog: imx2_wdt: add external reset support
+ via 'ext-reset-output' dt prop
+In-Reply-To: <1433448960-9257-2-git-send-email-tharvey@gateworks.com>
+References: <1432853677-5150-1-git-send-email-tharvey@gateworks.com>
+ <1433448960-9257-1-git-send-email-tharvey@gateworks.com>
+ <1433448960-9257-2-git-send-email-tharvey@gateworks.com>
+Message-ID: <1434964932.3014.7.camel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 17 June 2015 at 10:00, Suzuki K. Poulose <suzuki.poulose@arm.com> wrote:
-> From: "Suzuki K. Poulose" <suzuki.poulose@arm.com>
->
-> This patch adds a generic ARM v8 KVM target cpu type for use
-> by the new CPUs which eventualy ends up using the common sys_reg
-> table. For backward compatibility the existing targets have been
-> preserved. Any new target CPU that can be covered by generic v8
-> sys_reg tables should make use of the new generic target.
+Am Donnerstag, den 04.06.2015, 13:15 -0700 schrieb Tim Harvey:
+> The IMX6 watchdog supports assertion of a signal (WDOG_B) which
+> can be pinmux'd to an external pin. This is typically used for boards that
+> have PMIC's in control of the IMX6 power rails. In fact, failure to use
+> such an external reset on boards with external PMIC's can result in various
+> hangs due to the IMX6 not being fully reset [1] as well as the board failing
+> to reset because its PMIC has not been reset to provide adequate voltage for
+> the CPU when coming out of reset at 800Mhz.
+> 
+> This uses a new device-tree property 'ext-reset-output' to indicate the
+> board has such a reset and to cause the watchdog to be configured to assert
+> WDOG_B instead of an internal reset both on a watchdog timeout and in
+> system_restart.
+> 
+> [1] http://lists.infradead.org/pipermail/linux-arm-kernel/2015-March/333689.html
+> 
+> Cc: Lucas Stach <l.stach@pengutronix.de>
+> Signed-off-by: Tim Harvey <tharvey@gateworks.com>
 
-How do you intend this to work for cross-host migration?
-Is the idea that the kernel guarantees that "generic" looks
-100% the same to the guest regardless of host hardware? I'm
-not sure that can be made to work, given impdef differences
-in ID register values, bp/wp registers, and so on.
+Reviewed-by: Lucas Stach <l.stach@pengutronix.de>
 
-Given that, it seems to me that we still need to provide
-KVM_ARM_TARGET_$THISCPU defines so userspace can request
-a specific guest CPU flavour; so what does this patch
-provide that isn't already provided by just having userspace
-query for the "preferred" CPU type as it does already?
+> ---
+> v2:
+>  - rename property to 'ext-reset-output' based on ML feedback
+>  - simplify setting SRS bit if external-reset
+>  - update comments and commit msg
+> 
+> Signed-off-by: Tim Harvey <tharvey@gateworks.com>
+> ---
+>  .../devicetree/bindings/watchdog/fsl-imx-wdt.txt        |  2 ++
+>  drivers/watchdog/imx2_wdt.c                             | 17 +++++++++++++++--
+>  2 files changed, 17 insertions(+), 2 deletions(-)
+> 
+> diff --git a/Documentation/devicetree/bindings/watchdog/fsl-imx-wdt.txt b/Documentation/devicetree/bindings/watchdog/fsl-imx-wdt.txt
+> index 8dab6fd..9b89b3a 100644
+> --- a/Documentation/devicetree/bindings/watchdog/fsl-imx-wdt.txt
+> +++ b/Documentation/devicetree/bindings/watchdog/fsl-imx-wdt.txt
+> @@ -9,6 +9,8 @@ Optional property:
+>  - big-endian: If present the watchdog device's registers are implemented
+>    in big endian mode, otherwise in native mode(same with CPU), for more
+>    detail please see: Documentation/devicetree/bindings/regmap/regmap.txt.
+> +- ext-reset-output: If present the watchdog device is configured to assert its
+> +  external reset (WDOG_B) instead of issuing a software reset.
+>  
+>  Examples:
+>  
+> diff --git a/drivers/watchdog/imx2_wdt.c b/drivers/watchdog/imx2_wdt.c
+> index 5e6d808..7b8eeaf 100644
+> --- a/drivers/watchdog/imx2_wdt.c
+> +++ b/drivers/watchdog/imx2_wdt.c
+> @@ -41,6 +41,7 @@
+>  
+>  #define IMX2_WDT_WCR		0x00		/* Control Register */
+>  #define IMX2_WDT_WCR_WT		(0xFF << 8)	/* -> Watchdog Timeout Field */
+> +#define IMX2_WDT_WCR_SRS	(1 << 4)	/* -> Software Reset Signal */
+>  #define IMX2_WDT_WCR_WRE	(1 << 3)	/* -> WDOG Reset Enable */
+>  #define IMX2_WDT_WCR_WDE	(1 << 2)	/* -> Watchdog Enable */
+>  #define IMX2_WDT_WCR_WDZST	(1 << 0)	/* -> Watchdog timer Suspend */
+> @@ -65,6 +66,7 @@ struct imx2_wdt_device {
+>  	struct timer_list timer;	/* Pings the watchdog when closed */
+>  	struct watchdog_device wdog;
+>  	struct notifier_block restart_handler;
+> +	bool ext_reset;
+>  };
+>  
+>  static bool nowayout = WATCHDOG_NOWAYOUT;
+> @@ -90,6 +92,11 @@ static int imx2_restart_handler(struct notifier_block *this, unsigned long mode,
+>  	struct imx2_wdt_device *wdev = container_of(this,
+>  						    struct imx2_wdt_device,
+>  						    restart_handler);
+> +
+> +	/* Use external reset */
+> +	if (wdev->ext_reset)
+> +		wcr_enable |= IMX2_WDT_WCR_SRS;
+> +
+>  	/* Assert SRS signal */
+>  	regmap_write(wdev->regmap, 0, wcr_enable);
+>  	/*
+> @@ -119,8 +126,12 @@ static inline void imx2_wdt_setup(struct watchdog_device *wdog)
+>  	val |= IMX2_WDT_WCR_WDZST;
+>  	/* Strip the old watchdog Time-Out value */
+>  	val &= ~IMX2_WDT_WCR_WT;
+> -	/* Generate reset if WDOG times out */
+> -	val &= ~IMX2_WDT_WCR_WRE;
+> +	/* Generate internal chip-level reset if WDOG times out */
+> +	if (!wdev->ext_reset)
+> +		val &= ~IMX2_WDT_WCR_WRE;
+> +	/* Or if external-reset assert WDOG_B reset only on time-out */
+> +	else
+> +		val |= IMX2_WDT_WCR_WRE;
+>  	/* Keep Watchdog Disabled */
+>  	val &= ~IMX2_WDT_WCR_WDE;
+>  	/* Set the watchdog's Time-Out value */
+> @@ -262,6 +273,8 @@ static int __init imx2_wdt_probe(struct platform_device *pdev)
+>  	regmap_read(wdev->regmap, IMX2_WDT_WRSR, &val);
+>  	wdog->bootstatus = val & IMX2_WDT_WRSR_TOUT ? WDIOF_CARDRESET : 0;
+>  
+> +	wdev->ext_reset = of_property_read_bool(pdev->dev.of_node,
+> +						"ext-reset-output");
+>  	wdog->timeout = clamp_t(unsigned, timeout, 1, IMX2_WDT_MAX_TIME);
+>  	if (wdog->timeout != timeout)
+>  		dev_warn(&pdev->dev, "Initial timeout out of range! Clamped from %u to %u\n",
 
-thanks
--- PMM
+-- 
+Pengutronix e.K.             | Lucas Stach                 |
+Industrial Linux Solutions   | http://www.pengutronix.de/  |
