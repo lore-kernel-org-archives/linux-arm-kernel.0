@@ -1,123 +1,210 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Mon, 22 Jun 2015 17:45:20 +0100
-Subject: [PATCH v2 3/9] irqchip / GIC: Add GIC version support in ACPI MADT
-In-Reply-To: <1434703572-26221-4-git-send-email-hanjun.guo@linaro.org>
-References: <1434703572-26221-1-git-send-email-hanjun.guo@linaro.org>
- <1434703572-26221-4-git-send-email-hanjun.guo@linaro.org>
-Message-ID: <20150622164520.GA26129@red-moon>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Mon, 22 Jun 2015 18:41:53 +0200
+Subject: [PATCH] ARM: dove: fix legacy dove IRQ numbers
+In-Reply-To: <E1Z74gC-0005X6-0C@rmk-PC.arm.linux.org.uk>
+References: <E1Z74gC-0005X6-0C@rmk-PC.arm.linux.org.uk>
+Message-ID: <20150622164153.GA7281@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 19, 2015 at 09:46:06AM +0100, Hanjun Guo wrote:
+On Mon, Jun 22, 2015 at 05:34:40PM +0100, Russell King wrote:
+> v3.18 changed handle_IRQ() to call __handle_domain_irq(), which now
+> rejects attempts to deliver IRQ0.  Since IRQ 0 is used as the timer
+> interrupt (just like the PIT on x86), this causes boot to fail as the
+> bogomips calibration never completes.
+> 
+> Fix this by shuffling all interrupts up by one.
+> 
+> Fixes: a71b092a9c68 ("ARM: Convert handle_IRQ to use __handle_domain_irq")
+> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 
-[...]
+Hi Russell
 
-> +
-> +static int __init
-> +match_gic_redist(struct acpi_subtable_header *header, const unsigned long end)
-> +{
-> +	return 0;
-> +}
-> +static bool __init acpi_gic_redist_is_present(void)
-> +{
-> +	int count;
-> +
-> +	/* scan MADT table to find if we have redistributor entries */
-> +	count  =  acpi_table_parse_madt(ACPI_MADT_TYPE_GENERIC_REDISTRIBUTOR,
-> +					match_gic_redist, 0);
-> +
-> +	/* has at least one GIC redistributor entry */
-> +	if (count > 0)
-> +		return true;
-> +	else
-> +		return false;
-> +}
+Thanks for submitting this patch. It applies cleanly to linux-next, so
+there is a good chance it will apply to -rc1 in a couple of weeks. We
+can pick it up then.
 
-return count > 0;
+    Andrew
 
-What about systems where the redistributor data is in the GICC subtable ? Do
-you treat them as GIC V2 :) ?
-
-On a side note, having to define an empty function like match_gic_redist is
-horrible.
-
-I wonder whether it is not better to refactor map_madt_entry(), create
-a MADT subtable iterator out of it and make that code generic, instead
-of being forced to add these useless MADT handlers just to count
-entries, it is not the first I noticed.
-
-> +static int __init acpi_gic_version_init(void)
-> +{
-> +	int count;
-> +	void __iomem *dist_base;
-> +	u32 reg;
-> +
-> +	count = acpi_table_parse_madt(ACPI_MADT_TYPE_GENERIC_DISTRIBUTOR,
-> +					acpi_gic_parse_distributor, 0);
-> +
-> +	if (count <= 0) {
-> +		pr_err("No valid GIC distributor entry exists\n");
-> +		return -ENODEV;
-> +	}
-> +
-> +	if (gic_version >= ACPI_MADT_GIC_VERSION_RESERVED) {
-> +		pr_err("Invalid GIC version %d in MADT\n", gic_version);
-> +		return -EINVAL;
-> +	}
-> +
-> +	/*
-> +	 * when the GIC version is 0, we fallback to hardware discovery.
-> +	 * this is also needed to keep compatiable with ACPI 5.1,
-> +	 * which has no gic_version field in distributor structure and
-> +	 * reserved as 0.
-> +	 *
-> +	 * For hardware discovery, the offset for GICv1/2 and GICv3/4 to
-> +	 * get the GIC version is different (0xFE8 for GICv1/2 and 0xFFE8
-> +	 * for GICv3/4), so we need to handle it separately.
-
-> +	 */
-> +	if (gic_version	== ACPI_MADT_GIC_VERSION_NONE) {
-> +		/* it's GICv3/v4 if redistributor is present */
-> +		if (acpi_gic_redist_is_present()) {
-
-See above, IIUC you might have systems with GIC v3 where this call
-would fail, and we do not want to fall back to GIC v2.
-
-Lorenzo
-
-> +			dist_base = ioremap(dist_phy_base,
-> +					    ACPI_GICV3_DIST_MEM_SIZE);
-> +			if (!dist_base)
-> +				return -ENOMEM;
-> +
-> +			reg = readl_relaxed(dist_base + GICD_PIDR2) &
-> +					    GIC_PIDR2_ARCH_MASK;
-> +			if (reg == GIC_PIDR2_ARCH_GICv3)
-> +				gic_version = ACPI_MADT_GIC_VERSION_V3;
-> +			else
-> +				gic_version = ACPI_MADT_GIC_VERSION_V4;
-> +
-> +			iounmap(dist_base);
-> +		} else {
-> +			gic_version = ACPI_MADT_GIC_VERSION_V2;
-> +		}
-
-> +	}
-> +
-> +	return 0;
-> +}
-> diff --git a/include/linux/irqchip/arm-gic-acpi.h b/include/linux/irqchip/arm-gic-acpi.h
-> index de3419e..13bc676 100644
-> --- a/include/linux/irqchip/arm-gic-acpi.h
-> +++ b/include/linux/irqchip/arm-gic-acpi.h
-> @@ -19,6 +19,7 @@
+> ---
+> As my Cubox tree is now at 4.1, here's this same old patch from 3.18 times
+> rebased to 4.1 to fix this long standing problem.
+> 
+>  arch/arm/mach-dove/include/mach/irqs.h | 120 ++++++++++++++++-----------------
+>  arch/arm/mach-dove/irq.c               |   8 +--
+>  2 files changed, 64 insertions(+), 64 deletions(-)
+> 
+> diff --git a/arch/arm/mach-dove/include/mach/irqs.h b/arch/arm/mach-dove/include/mach/irqs.h
+> index 03d401d20453..0acf74b9ac34 100644
+> --- a/arch/arm/mach-dove/include/mach/irqs.h
+> +++ b/arch/arm/mach-dove/include/mach/irqs.h
+> @@ -14,74 +14,74 @@
+>  /*
+>   * Dove Low Interrupt Controller
 >   */
->  #define ACPI_GICV2_DIST_MEM_SIZE	(SZ_4K)
->  #define ACPI_GIC_CPU_IF_MEM_SIZE	(SZ_8K)
-> +#define ACPI_GICV3_DIST_MEM_SIZE	(SZ_64K)
+> -#define IRQ_DOVE_BRIDGE		0
+> -#define IRQ_DOVE_H2C		1
+> -#define IRQ_DOVE_C2H		2
+> -#define IRQ_DOVE_NAND		3
+> -#define IRQ_DOVE_PDMA		4
+> -#define IRQ_DOVE_SPI1		5
+> -#define IRQ_DOVE_SPI0		6
+> -#define IRQ_DOVE_UART_0		7
+> -#define IRQ_DOVE_UART_1		8
+> -#define IRQ_DOVE_UART_2		9
+> -#define IRQ_DOVE_UART_3		10
+> -#define IRQ_DOVE_I2C		11
+> -#define IRQ_DOVE_GPIO_0_7	12
+> -#define IRQ_DOVE_GPIO_8_15	13
+> -#define IRQ_DOVE_GPIO_16_23	14
+> -#define IRQ_DOVE_PCIE0_ERR	15
+> -#define IRQ_DOVE_PCIE0		16
+> -#define IRQ_DOVE_PCIE1_ERR	17
+> -#define IRQ_DOVE_PCIE1		18
+> -#define IRQ_DOVE_I2S0		19
+> -#define IRQ_DOVE_I2S0_ERR	20
+> -#define IRQ_DOVE_I2S1		21
+> -#define IRQ_DOVE_I2S1_ERR	22
+> -#define IRQ_DOVE_USB_ERR	23
+> -#define IRQ_DOVE_USB0		24
+> -#define IRQ_DOVE_USB1		25
+> -#define IRQ_DOVE_GE00_RX	26
+> -#define IRQ_DOVE_GE00_TX	27
+> -#define IRQ_DOVE_GE00_MISC	28
+> -#define IRQ_DOVE_GE00_SUM	29
+> -#define IRQ_DOVE_GE00_ERR	30
+> -#define IRQ_DOVE_CRYPTO		31
+> +#define IRQ_DOVE_BRIDGE		(1 + 0)
+> +#define IRQ_DOVE_H2C		(1 + 1)
+> +#define IRQ_DOVE_C2H		(1 + 2)
+> +#define IRQ_DOVE_NAND		(1 + 3)
+> +#define IRQ_DOVE_PDMA		(1 + 4)
+> +#define IRQ_DOVE_SPI1		(1 + 5)
+> +#define IRQ_DOVE_SPI0		(1 + 6)
+> +#define IRQ_DOVE_UART_0		(1 + 7)
+> +#define IRQ_DOVE_UART_1		(1 + 8)
+> +#define IRQ_DOVE_UART_2		(1 + 9)
+> +#define IRQ_DOVE_UART_3		(1 + 10)
+> +#define IRQ_DOVE_I2C		(1 + 11)
+> +#define IRQ_DOVE_GPIO_0_7	(1 + 12)
+> +#define IRQ_DOVE_GPIO_8_15	(1 + 13)
+> +#define IRQ_DOVE_GPIO_16_23	(1 + 14)
+> +#define IRQ_DOVE_PCIE0_ERR	(1 + 15)
+> +#define IRQ_DOVE_PCIE0		(1 + 16)
+> +#define IRQ_DOVE_PCIE1_ERR	(1 + 17)
+> +#define IRQ_DOVE_PCIE1		(1 + 18)
+> +#define IRQ_DOVE_I2S0		(1 + 19)
+> +#define IRQ_DOVE_I2S0_ERR	(1 + 20)
+> +#define IRQ_DOVE_I2S1		(1 + 21)
+> +#define IRQ_DOVE_I2S1_ERR	(1 + 22)
+> +#define IRQ_DOVE_USB_ERR	(1 + 23)
+> +#define IRQ_DOVE_USB0		(1 + 24)
+> +#define IRQ_DOVE_USB1		(1 + 25)
+> +#define IRQ_DOVE_GE00_RX	(1 + 26)
+> +#define IRQ_DOVE_GE00_TX	(1 + 27)
+> +#define IRQ_DOVE_GE00_MISC	(1 + 28)
+> +#define IRQ_DOVE_GE00_SUM	(1 + 29)
+> +#define IRQ_DOVE_GE00_ERR	(1 + 30)
+> +#define IRQ_DOVE_CRYPTO		(1 + 31)
 >  
->  struct acpi_table_header;
+>  /*
+>   * Dove High Interrupt Controller
+>   */
+> -#define IRQ_DOVE_AC97		32
+> -#define IRQ_DOVE_PMU		33
+> -#define IRQ_DOVE_CAM		34
+> -#define IRQ_DOVE_SDIO0		35
+> -#define IRQ_DOVE_SDIO1		36
+> -#define IRQ_DOVE_SDIO0_WAKEUP	37
+> -#define IRQ_DOVE_SDIO1_WAKEUP	38
+> -#define IRQ_DOVE_XOR_00		39
+> -#define IRQ_DOVE_XOR_01		40
+> -#define IRQ_DOVE_XOR0_ERR	41
+> -#define IRQ_DOVE_XOR_10		42
+> -#define IRQ_DOVE_XOR_11		43
+> -#define IRQ_DOVE_XOR1_ERR	44
+> -#define IRQ_DOVE_LCD_DCON	45
+> -#define IRQ_DOVE_LCD1		46
+> -#define IRQ_DOVE_LCD0		47
+> -#define IRQ_DOVE_GPU		48
+> -#define IRQ_DOVE_PERFORM_MNTR	49
+> -#define IRQ_DOVE_VPRO_DMA1	51
+> -#define IRQ_DOVE_SSP_TIMER	54
+> -#define IRQ_DOVE_SSP		55
+> -#define IRQ_DOVE_MC_L2_ERR	56
+> -#define IRQ_DOVE_CRYPTO_ERR	59
+> -#define IRQ_DOVE_GPIO_24_31	60
+> -#define IRQ_DOVE_HIGH_GPIO	61
+> -#define IRQ_DOVE_SATA		62
+> +#define IRQ_DOVE_AC97		(1 + 32)
+> +#define IRQ_DOVE_PMU		(1 + 33)
+> +#define IRQ_DOVE_CAM		(1 + 34)
+> +#define IRQ_DOVE_SDIO0		(1 + 35)
+> +#define IRQ_DOVE_SDIO1		(1 + 36)
+> +#define IRQ_DOVE_SDIO0_WAKEUP	(1 + 37)
+> +#define IRQ_DOVE_SDIO1_WAKEUP	(1 + 38)
+> +#define IRQ_DOVE_XOR_00		(1 + 39)
+> +#define IRQ_DOVE_XOR_01		(1 + 40)
+> +#define IRQ_DOVE_XOR0_ERR	(1 + 41)
+> +#define IRQ_DOVE_XOR_10		(1 + 42)
+> +#define IRQ_DOVE_XOR_11		(1 + 43)
+> +#define IRQ_DOVE_XOR1_ERR	(1 + 44)
+> +#define IRQ_DOVE_LCD_DCON	(1 + 45)
+> +#define IRQ_DOVE_LCD1		(1 + 46)
+> +#define IRQ_DOVE_LCD0		(1 + 47)
+> +#define IRQ_DOVE_GPU		(1 + 48)
+> +#define IRQ_DOVE_PERFORM_MNTR	(1 + 49)
+> +#define IRQ_DOVE_VPRO_DMA1	(1 + 51)
+> +#define IRQ_DOVE_SSP_TIMER	(1 + 54)
+> +#define IRQ_DOVE_SSP		(1 + 55)
+> +#define IRQ_DOVE_MC_L2_ERR	(1 + 56)
+> +#define IRQ_DOVE_CRYPTO_ERR	(1 + 59)
+> +#define IRQ_DOVE_GPIO_24_31	(1 + 60)
+> +#define IRQ_DOVE_HIGH_GPIO	(1 + 61)
+> +#define IRQ_DOVE_SATA		(1 + 62)
 >  
+>  /*
+>   * DOVE General Purpose Pins
+>   */
+> -#define IRQ_DOVE_GPIO_START	64
+> -#define NR_GPIO_IRQS		64
+> +#define IRQ_DOVE_GPIO_START	65
+> +#define NR_GPIO_IRQS		65
+>  
+>  /*
+>   * PMU interrupts
+> diff --git a/arch/arm/mach-dove/irq.c b/arch/arm/mach-dove/irq.c
+> index 4a5a7aedcb76..df0223f76fa9 100644
+> --- a/arch/arm/mach-dove/irq.c
+> +++ b/arch/arm/mach-dove/irq.c
+> @@ -126,14 +126,14 @@ __exception_irq_entry dove_legacy_handle_irq(struct pt_regs *regs)
+>  	stat = readl_relaxed(dove_irq_base + IRQ_CAUSE_LOW_OFF);
+>  	stat &= readl_relaxed(dove_irq_base + IRQ_MASK_LOW_OFF);
+>  	if (stat) {
+> -		unsigned int hwirq = __fls(stat);
+> +		unsigned int hwirq = 1 + __fls(stat);
+>  		handle_IRQ(hwirq, regs);
+>  		return;
+>  	}
+>  	stat = readl_relaxed(dove_irq_base + IRQ_CAUSE_HIGH_OFF);
+>  	stat &= readl_relaxed(dove_irq_base + IRQ_MASK_HIGH_OFF);
+>  	if (stat) {
+> -		unsigned int hwirq = 32 + __fls(stat);
+> +		unsigned int hwirq = 33 + __fls(stat);
+>  		handle_IRQ(hwirq, regs);
+>  		return;
+>  	}
+> @@ -144,8 +144,8 @@ void __init dove_init_irq(void)
+>  {
+>  	int i;
+>  
+> -	orion_irq_init(0, IRQ_VIRT_BASE + IRQ_MASK_LOW_OFF);
+> -	orion_irq_init(32, IRQ_VIRT_BASE + IRQ_MASK_HIGH_OFF);
+> +	orion_irq_init(1, IRQ_VIRT_BASE + IRQ_MASK_LOW_OFF);
+> +	orion_irq_init(33, IRQ_VIRT_BASE + IRQ_MASK_HIGH_OFF);
+>  
+>  #ifdef CONFIG_MULTI_IRQ_HANDLER
+>  	set_handle_irq(dove_legacy_handle_irq);
 > -- 
-> 1.9.1
+> 2.1.0
 > 
