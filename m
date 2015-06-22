@@ -1,61 +1,61 @@
-From: mikko.perttunen@kapsi.fi (Mikko Perttunen)
-Date: Mon, 22 Jun 2015 10:03:33 +0300
-Subject: [GIT PULL 4/8] clk: tegra: Changes for v4.2-rc1
-In-Reply-To: <5587B243.2070300@kapsi.fi>
-References: <1431524980-13599-1-git-send-email-thierry.reding@gmail.com>
- <1431524980-13599-5-git-send-email-thierry.reding@gmail.com>
- <20150520195459.GU31753@codeaurora.org> <555D7A5B.1070901@nvidia.com>
- <20150527195021.GA24204@codeaurora.org> <5566BDA5.5080104@nvidia.com>
- <20150618234126.9112.80705@quantum> <20150620204104.9112.83328@quantum>
- <5587B243.2070300@kapsi.fi>
-Message-ID: <5587B345.1040202@kapsi.fi>
+From: boris.brezillon@free-electrons.com (Boris Brezillon)
+Date: Mon, 22 Jun 2015 09:23:36 +0200
+Subject: [PATCH v7 00/14] crypto: add a new driver for Marvell's CESA
+In-Reply-To: <20150621082717.GA29128@gondor.apana.org.au>
+References: <1434635190-27733-1-git-send-email-boris.brezillon@free-electrons.com>
+ <20150619142444.GA15234@gondor.apana.org.au>
+ <CAP=VYLqQynCNRTpm4JnOxeO6DH_739fO2QNcDMxaXqCKCHiTtQ@mail.gmail.com>
+ <CAP=VYLpSrTvXRovWo4G7AXWv1OKFQRpQR255hS5z+=h4+XOLhg@mail.gmail.com>
+ <20150621102418.2ea74910@bbrezillon>
+ <20150621082717.GA29128@gondor.apana.org.au>
+Message-ID: <20150622092336.5949e258@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Fixing Mike's mail address
+Hi Herbert,
 
-On 06/22/15 09:59, Mikko Perttunen wrote:
-> On 06/20/15 23:41, Michael Turquette wrote:
->> Quoting Michael Turquette (2015-06-18 16:41:26)
->> ...
->> I've decided to pull this in the interest of fairness. I'm taking the
->> Exynos cpu clock patches, which will need to be updated in the future to
->> use some new infrastructure for coordinating rate changes across
->> multiple clock nodes. I'm merging the EMC stuff with the same
->> expectation that it will need to migrate to the new infrastructure when
->> it becomes available and we'll get rid of clk_hw_reparent.
->>
->> Sound good?
->
-> Sounds good! Please keep us informed and once the framework changes land
-> we'll fix up this one.
->
->>
->> Regards,
->> Mike
->>
->
-> Thanks,
-> Mikko.
->
->>>
->>> I'm working on some core infrastructure to fix this. I'd like to get
->>> that on the list asap and possibly merged for 4.3. I think it can
->>> benefit your case and remove the need to export clk_hw_reparent, which
->>> is pretty nasty.
->>>
->>> What exactly will break if this is not pulled? I appreciate your offer
->>> to update this driver when the core changes are merged, but I would
->>> prefer to do it the right way first, instead of fixing up something that
->>> is already merged after the fact.
->>>
->>> Regards,
->>> Mike
->>>
->>>>
->>>> Thanks,
->>>> Mikko.
->> --
->> To unsubscribe from this list: send the line "unsubscribe linux-tegra" in
->>
->
+On Sun, 21 Jun 2015 16:27:17 +0800
+Herbert Xu <herbert@gondor.apana.org.au> wrote:
+
+> On Sun, Jun 21, 2015 at 10:24:18AM +0200, Boris Brezillon wrote:
+> > 
+> > Indeed. Here is a patch fixing that.
+> 
+> I think you should just kill COMPILE_TEST instead of adding ARM.
+
+The following patch is killing the COMPILE_TEST dependency.
+
+-- >8 --
+
+>From 772232fe4f5e597e45701dd9c3ab68c4a065342f Mon Sep 17 00:00:00 2001
+From: Boris Brezillon <boris.brezillon@free-electrons.com>
+Date: Mon, 22 Jun 2015 09:22:14 +0200
+Subject: [PATCH] crypto: marvell/CESA: remove COMPILE_TEST dependency
+
+The CESA driver calls phys_to_virt() which is not available on all
+architectures.
+Remove the depency on COMPILE_TEST to prevent building this driver on
+non ARM architectures.
+
+Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+Reported-by: Paul Gortmaker <paul.gortmaker@windriver.com>
+Suggested-by: Herbert Xu <herbert@gondor.apana.org.au>
+---
+ drivers/crypto/Kconfig | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/drivers/crypto/Kconfig b/drivers/crypto/Kconfig
+index cdca762..f965d0c 100644
+--- a/drivers/crypto/Kconfig
++++ b/drivers/crypto/Kconfig
+@@ -176,7 +176,7 @@ config CRYPTO_DEV_MV_CESA
+ 
+ config CRYPTO_DEV_MARVELL_CESA
+ 	tristate "New Marvell's Cryptographic Engine driver"
+-	depends on (PLAT_ORION || ARCH_MVEBU || COMPILE_TEST) && HAS_DMA && HAS_IOMEM
++	depends on PLAT_ORION || ARCH_MVEBU
+ 	select CRYPTO_AES
+ 	select CRYPTO_DES
+ 	select CRYPTO_BLKCIPHER
+-- 
+1.9.1
