@@ -1,81 +1,37 @@
-From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Mon, 22 Jun 2015 14:53:38 +0200
-Subject: [PATCH] arm64: dts: mt8173: add clock_null
-In-Reply-To: <1434944317.25948.8.camel@mtksdaap41>
-References: <1434605351-64592-1-git-send-email-eddie.huang@mediatek.com>
- <8371528.SNAmOgosfF@phil> <1434944317.25948.8.camel@mtksdaap41>
-Message-ID: <8860488.JuX1EN5tWB@diego>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Mon, 22 Jun 2015 14:57:16 +0200
+Subject: Device Tree Blob (DTB) licence
+In-Reply-To: <CAOS_Y6Q37ps+VEnzUZ_uwX++qrRm9Hgx45Q_pmiZSLSNjmKwZg@mail.gmail.com>
+References: <1430820315.19516.26.camel@opteya.com>
+ <CAL_Jsq+T5c7qornpRVCduEjUSCeM+0xqbtVYovtH76y=4BqhLQ@mail.gmail.com>
+ <1432289148.5304.58.camel@opteya.com>
+ <1432322832.5304.63.camel@opteya.com>
+ <CAOS_Y6Q37ps+VEnzUZ_uwX++qrRm9Hgx45Q_pmiZSLSNjmKwZg@mail.gmail.com>
+Message-ID: <20150622125716.GC26143@xo-6d-61-c0.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi James,
-
-Am Montag, 22. Juni 2015, 11:38:37 schrieb James Liao:
-> On Fri, 2015-06-19 at 13:36 +0200, Heiko Stuebner wrote:
-> > Am Donnerstag, 18. Juni 2015, 18:15:03 schrieb Heiko Stuebner:
-> > > Am Donnerstag, 18. Juni 2015, 13:29:11 schrieb Eddie Huang:
-> > > > Add clk_null, which represents clocks that can not / need not
-> > > > controlled by software.
-> > > > There are many clocks' parent set to clk_null.
-> > > 
-> > > Devicetree is supposed to describe hardware, and ideally not what
-> > > software
-> > > does with it. If the clock simply cannot be controlled by software, it
-> > > will
-> > > still have a rate and I think it should probably be modelled - similarly
-> > > we
-> > > sometimes have fixed regulators that also are not software controllable.
-> > > 
-> > > 
-> > > While it might be ok to define dummy clocks as a temporary stopgap,
-> > > these
-> > > should definitly be marked as such. This clk_null at least sounds like
-> > > there is no plan to replace this with a real solution at some point.
-> > > 
-> > > And of course a bit of context would be cool, to know which type of
-> > > clocks
-> > > this actually replaces.
-> > 
-> > After looking a bit more into this, I'm feel that the clk_null approach is
-> > wrong.
-> > 
-> > For one, even if the clk_null stuff would be ok, the binding doc of the
-> > clock controller does not describe the need of this specific clock at
-> > all.
-> > 
-> > 
-> > The other more important point, looking at clk-mt8173 I see at least these
-> > clocks being set as children of "clk_null":
-> > 
-> > static const struct mtk_fixed_factor root_clk_alias[] __initconst = {
-> > 
-> > 	FACTOR(CLK_TOP_CLKPH_MCK_O, "clkph_mck_o", "clk_null", 1, 1),
-> > 	FACTOR(CLK_TOP_DPI, "dpi_ck", "clk_null", 1, 1),
-> > 	FACTOR(CLK_TOP_USB_SYSPLL_125M, "usb_syspll_125m", "clk_null", 1, 1),
-> > 	FACTOR(CLK_TOP_HDMITX_DIG_CTS, "hdmitx_dig_cts", "clk_null", 1, 1),
-> > 
-> > };
-> > 
-> > 
-> > These look more like they are fed from some external source to the clock
-> > controller? I did ask Matthias but he also couldn't find anything
-> > describing where these clocks actually come from.
+On Mon 2015-05-25 02:14:28, Rob Landley wrote:
+> On Fri, May 22, 2015 at 2:27 PM, Yann Droneaud <ydroneaud@opteya.com> wrote:
+> > I've added licensing at fsf.ogrg in Cc: in my previous message to have an
+> > advice on this subject, but I failed to notice licensing at fsf.org
+> > is not a mailing list: I was assigned request ID [gnu.org #1017262].
+> >
+> > Regards.
 > 
-> Some clocks such as clkph_mck_o, we don't really care where they come
-> from and what frequencies are. We model these clocks just because they
-> or their derived clocks can be the source of topckgen muxes. Is there a
-> better way to model "don't care" clocks?
+> They're also not an unbiased source. Their job is to reply "you should
+> license it under GPLv3" without actually looking at your message.
+> (This is a slight oversimplification, they may instead recomend the
+> GFDL. They will never _not_ recommend one of their licenses.)
 
-There are two different concepts at work here. You might not care in your 
-kernel driver implementation _at the moment_ where the clocks come from; but 
-the devicetree is supposed to model how the hardware is structured and not 
-contain implementation specific details.
+Actually, I got FSF to change license on piece of code from GPLv2 to LGPLv2
+before. They are not completely evil :-).
 
-So the clock tree should be modeled according to how the hardware is layed out 
-not how you want to use the clocks at the moment :-) .
+> Personally, I'm sad we're starting to get ACPI for arm but if device
+> tree data files are only available under GPL, people will hold their
+> nose and deploy ACPI.
 
-It would it any case be good, if you could describe where these clocks come 
-from in the hardware, so we can find the best solution on how to model those.
-
-
-Heiko
+									Pavel
+-- 
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
