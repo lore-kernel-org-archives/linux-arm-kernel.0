@@ -1,86 +1,28 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Mon, 22 Jun 2015 11:59:23 +0100
-Subject: [PATCH 2/9] ARM: sa1100: convert SA11x0 related code to use new
- chained handler helper
-In-Reply-To: <E1Z4yzx-0002S6-7p@rmk-PC.arm.linux.org.uk>
-References: <E1Z4yzx-0002S6-7p@rmk-PC.arm.linux.org.uk>
-Message-ID: <20150622105923.GE19061@x1>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Mon, 22 Jun 2015 12:09:33 +0100
+Subject: [PATCH 1/2] arm64: qcom: Add define for ARMv8 implementer (MIDR)
+In-Reply-To: <558497A5.4020700@codeaurora.org>
+References: <1434146263-30972-1-git-send-email-timur@codeaurora.org>
+ <20150615105933.GE17322@e104818-lin.cambridge.arm.com>
+ <558497A5.4020700@codeaurora.org>
+Message-ID: <20150622110932.GB16018@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 16 Jun 2015, Russell King wrote:
-
-> Convert SA11x0 (Neponset, SA1111, and UCB1x00 code) to use the new
-> irq_set_chained_handler_and_data() helper.
+On Fri, Jun 19, 2015 at 05:28:53PM -0500, Timur Tabi wrote:
+> On 06/15/2015 05:59 AM, Catalin Marinas wrote:
+> >I think this patch together with the second one could go through the kvm
+> >tree. For the core arm64 part:
+> >
+> >Acked-by: Catalin Marinas<catalin.marinas@arm.com>
 > 
-> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
-> ---
-> Depends on patch 1.
-> 
->  arch/arm/common/sa1111.c        | 7 +++----
->  arch/arm/mach-sa1100/neponset.c | 3 +--
->  drivers/mfd/ucb1x00-core.c      | 3 +--
+> Suzuki Poulose posted a patch that adds generic support for ARMv8 KVM
+> targets.  I want to drop my second patch, so can we pick up this first patch
+> through the ARM tree?
 
-Acked-by: Lee Jones <lee.jones@linaro.org>
-
->  3 files changed, 5 insertions(+), 8 deletions(-)
-> 
-> diff --git a/arch/arm/common/sa1111.c b/arch/arm/common/sa1111.c
-> index 5cc779c8e9c6..93ee70dbbdd3 100644
-> --- a/arch/arm/common/sa1111.c
-> +++ b/arch/arm/common/sa1111.c
-> @@ -501,8 +501,8 @@ static int sa1111_setup_irq(struct sa1111 *sachip, unsigned irq_base)
->  	 * Register SA1111 interrupt
->  	 */
->  	irq_set_irq_type(sachip->irq, IRQ_TYPE_EDGE_RISING);
-> -	irq_set_handler_data(sachip->irq, sachip);
-> -	irq_set_chained_handler(sachip->irq, sa1111_irq_handler);
-> +	irq_set_chained_handler_and_data(sachip->irq, sa1111_irq_handler,
-> +					 sachip);
->  
->  	dev_info(sachip->dev, "Providing IRQ%u-%u\n",
->  		sachip->irq_base, sachip->irq_base + SA1111_IRQ_NR - 1);
-> @@ -836,8 +836,7 @@ static void __sa1111_remove(struct sa1111 *sachip)
->  	clk_unprepare(sachip->clk);
->  
->  	if (sachip->irq != NO_IRQ) {
-> -		irq_set_chained_handler(sachip->irq, NULL);
-> -		irq_set_handler_data(sachip->irq, NULL);
-> +		irq_set_chained_handler_and_data(sachip->irq, NULL, NULL);
->  		irq_free_descs(sachip->irq_base, SA1111_IRQ_NR);
->  
->  		release_mem_region(sachip->phys + SA1111_INTC, 512);
-> diff --git a/arch/arm/mach-sa1100/neponset.c b/arch/arm/mach-sa1100/neponset.c
-> index af868d258e66..99d9a3b1bf34 100644
-> --- a/arch/arm/mach-sa1100/neponset.c
-> +++ b/arch/arm/mach-sa1100/neponset.c
-> @@ -327,8 +327,7 @@ static int neponset_probe(struct platform_device *dev)
->  	irq_set_chip(d->irq_base + NEP_IRQ_SA1111, &nochip);
->  
->  	irq_set_irq_type(irq, IRQ_TYPE_EDGE_RISING);
-> -	irq_set_handler_data(irq, d);
-> -	irq_set_chained_handler(irq, neponset_irq_handler);
-> +	irq_set_chained_handler_and_data(irq, neponset_irq_handler, d);
->  
->  	/*
->  	 * We would set IRQ_GPIO25 to be a wake-up IRQ, but unfortunately
-> diff --git a/drivers/mfd/ucb1x00-core.c b/drivers/mfd/ucb1x00-core.c
-> index 58ea9fdd3a15..3591550598ad 100644
-> --- a/drivers/mfd/ucb1x00-core.c
-> +++ b/drivers/mfd/ucb1x00-core.c
-> @@ -566,8 +566,7 @@ static int ucb1x00_probe(struct mcp *mcp)
->  	}
->  
->  	irq_set_irq_type(ucb->irq, IRQ_TYPE_EDGE_RISING);
-> -	irq_set_handler_data(ucb->irq, ucb);
-> -	irq_set_chained_handler(ucb->irq, ucb1x00_irq);
-> +	irq_set_chained_handler_and_data(ucb->irq, ucb1x00_irq, ucb);
->  
->  	if (pdata && pdata->gpio_base) {
->  		ucb->gpio.label = dev_name(&ucb->dev);
+So if the second patch is no longer needed, what's using this patch? I
+would defer merging it until actually required in some part of the
+kernel.
 
 -- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Catalin
