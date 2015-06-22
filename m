@@ -1,110 +1,84 @@
-From: mturquette@linaro.org (Michael Turquette)
-Date: Mon, 22 Jun 2015 13:46:17 -0700
-Subject: [PATCH v2 00/14] ARM: shmobile: Add CPG Clock Domains
-In-Reply-To: <CAMuHMdXntR6c4-uUNGVGx7D7941e8hvnmtVBvDu2+iUsNHQ=Qw@mail.gmail.com>
-References: <1432839219-475-1-git-send-email-geert+renesas@glider.be>
- <CAMuHMdXntR6c4-uUNGVGx7D7941e8hvnmtVBvDu2+iUsNHQ=Qw@mail.gmail.com>
-Message-ID: <20150622204617.9112.71054@quantum>
+From: m-karicheri2@ti.com (Murali Karicheri)
+Date: Mon, 22 Jun 2015 16:50:41 -0400
+Subject: [PATCH] ARM: keystone: ecc: add ddr3 ecc interrupt handling
+In-Reply-To: <558436C1.3050402@oracle.com>
+References: <1434654589-28157-1-git-send-email-vitalya@ti.com>
+ <558436C1.3050402@oracle.com>
+Message-ID: <55887521.7010708@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Geert Uytterhoeven (2015-06-15 09:15:04)
-> On Thu, May 28, 2015 at 8:53 PM, Geert Uytterhoeven
-> <geert+renesas@glider.be> wrote:
-> >         Hi all,
-> >
-> > This patch series adds Clock Domain support to the Clock Pulse Generator
-> > (CPG) Module Stop (MSTP) Clocks driver using the generic PM Domain, to
-> > be used on shmobile SoCs without device power domains (R-Car Gen1 and
-> > Gen2, RZ).  This allows to power-manage the module clocks of SoC devices
-> > that are part of the CPG Clock Domain using Runtime PM, or for system
-> > suspend/resume, similar to SoCs with device power domains (SH-Mobile and
-> > R-Mobile).
-> >
-> > SoC devices that are part of the CPG Clock Domain and can be
-> > power-managed through an MSTP clock are tagged in DT with a proper
-> > "power-domains" property. This applies to most on-SoC devices, which
-> > have a one-to-one mapping from SoC device to DT device node.
-> > Notable exceptions are "display" and "sound" device nodes, which
-> > represent multiple SoC devices, each having their own MSTP clocks. Hence
-> > drivers for such devices still have to manage their (multiple module)
-> > clocks themselves.
-> >
-> > The (MSTP) clock to use for power-management is found by scanning for
-> > clocks that are compatible with "renesas,cpg-mstp-clocks".
-> > Before, the "first" clock tied to each device (con_id NULL) was used,
-> > being a bit ad-hoc. It was suggested to use the "fck" clock instead,
-> > but this may conflict with DT bindings for devices we don't control
-> > (e.g. GIC-400 plans to mandate "clk" for the clk-name of its single
-> > clock). Looking for real MSTP clocks avoids this problem.
-> >
-> > Logically, the CPG Clock Domain operates on the SoC CPG/MSTP block.
-> > As there's no single device node in DT representing this block (there
-> > are separate device nodes for the CPG and for the individual MSTP
-> > clocks), I bound the logic to the CPG device node.
-> > Perhaps this is something we should change for future SoCs?
-> 
+On 06/19/2015 11:35 AM, santosh shilimkar wrote:
+> On 6/18/2015 12:09 PM, Vitaly Andrianov wrote:
+>> This patch adds ARM L1/L2 ECC handler support and DDR3 ECC interrupt
+>> handling for Keystone II devices, the kernel will reboot if the error
+>> is 2-bit error for DDR ECC or L1/L2 ECC error.
+>>
+>> Signed-off-by: Hao Zhang <hzhang@ti.com>
+>> Signed-off-by: Murali Karicheri <m-karicheri2@ti.com>
+>> Signed-off-by: Vitaly Andrianov <vitalya@ti.com>
+>> ---
+>>   arch/arm/mach-keystone/Makefile       |  2 +-
+>>   arch/arm/mach-keystone/keystone.c     | 63 ++++++++++++++++++++++++--
+>>   arch/arm/mach-keystone/keystone.h     |  1 +
+>>   arch/arm/mach-keystone/keystone_ecc.c | 85
+>> +++++++++++++++++++++++++++++++++++
+>>   arch/arm/mach-keystone/platsmp.c      |  3 +-
+>>   5 files changed, 148 insertions(+), 6 deletions(-)
+>>   create mode 100644 arch/arm/mach-keystone/keystone_ecc.c
+>>
 
-Hello Geert,
+>>
+>> @@ -49,6 +54,56 @@ static int keystone_platform_notifier(struct
+>> notifier_block *nb,
+>>       return NOTIFY_OK;
+>>   }
+>>
+> +RMK. Would like to know if he wish to have below code in
+> generic ARM code
+>
+>> +#define L2_INTERN_ASYNC_ERROR  BIT(30)
+>> +
+>> +static irqreturn_t arm_l1l2_ecc_err_irq_handler(int irq, void *reg_virt)
+>> +{
+>> +    int ret = IRQ_NONE;
+>> +    u32 status, fault;
+>> +
+>> +    /* read and clear L2ECTLR CP15 register for L2 ECC error */
+>> +    asm("mrc p15, 1, %0, c9, c0, 3" : "=r"(status));
+>> +
+>> +    if (status & L2_INTERN_ASYNC_ERROR) {
+>> +        status &= ~L2_INTERN_ASYNC_ERROR;
+>> +        asm("mcr p15, 1, %0, c9, c0, 3" : : "r" (status));
+>> +        asm("mcr p15, 0, %0, c5, c1, 0" : "=r" (fault));
+>> +        /*
+>> +         * Do a machine restart as this is double bit ECC error
+>> +         * that can't be corrected
+>> +         */
+>> +        pr_err("ARM Cortex A15 L1/L2 ECC error, CP15 ADFSR 0x%x\n",
+>> +               fault);
+>> +        machine_restart(NULL);
+>> +        ret = IRQ_HANDLED;
+>> +    }
+>> +    return ret;
+> So your non-double bit errors even though handled returns as IRQ_NONE.
 
-I'm still going through this series but I have a few comments/questions.
+looking at the A15 TRM, I see only single and double bit errors
+are documented. There is no discussion about more than 2 bit errors.
+Single bit errors don't raise an interrupt. So only case this gets 
+called should be for double bit which is handled. So just log an error 
+message as below and return IRQ_HANDLED?
 
-> Inside Renesas, we've been discussing this face-to-face, but haven't
-> reached a conclusion yet.
-> 
-> In Linux terminology, "PM domain" is a higher-level abstraction than
-> just (hardware) "power domain" (sometimes called "power area").
-> A "PM domain" is any collection of devices that are power-managed
-> similarly. As such it covers not only hardware power domains, but also
-> clock domains, and even firmware controlled devices (e.g. as used by the
-> Linux ACPI subsystem).
-> 
-> I find it a bit unfortunate this was not reflected in the DT bindings
-> for Generic PM domains, which use "power-domains" properties, making
-> believe people this is about hardware power domains only.
+pr_err("Unexpected ARM Cortex A15 L1/L2 multi bit error");
 
-"Power island" is used commonly to describe the hardware power domain.
-I like that one since it conveys the concept of power isolation/clamping
-in a power distribution network.  It might be more clear to refer to the
-hardware as power islands and reserve "power domains" for the Linux
-construct?
+Murali
 
-> 
-> One other point of confusion is that there are multiple kernel
-> subsystems that can (or seem to be able to) be used for the same
-> purpose. Both regulators and power domains are used to "control power".
-> The same is true for clocks vs. clock domains.
-> My point of view is that the regulator and clock subsystems are more
-> about the properties of regulators (voltage, current) resp. clocks
-> (frequencies), while power/clock domains are about being active or
-> inactive.
+>
+>> +}
+>> +
+>> +static int __init keystone_init_misc(void)
 
-Only speaking for the clock framework, but the prepare/unprepare and
-enable/disable semantics are very important here, not just the
-rate-change stuff.
 
-> 
-> On Renesas SoCs (SH/R-Mobile, R-Car, RZ), the MSTP (Module Standby and
-> Software Reset) block is very intimately tied to the CPG (Clock Pulse
-> Generator) block.
-> 
-> The MSTP block provides two functions:
->   1. Module Standby: "Clock supply to specified modules is stopped by
->      setting the module stop control register bits."
->      However, the clock supply to a module is not stopped until all CPUs
->      in the SoC agree.  Indeed, there are separate MSTP registers for
->      application (Cortex-A) and real-time (SH and/or Cortex-R) cores.
->   2. Reset control. to perform a software reset of a specific module.
-> 
-> Given the second function, perhaps the MSTP bits shouldn't have been
-> moduled as clocks, but it made sense at the time of introduction, and
-> IMHO it still does.
-
-Does the clk.enable_count refcount for an MSTP "clock" mirror your
-statement, "the clock supply to a module is not stopped until all CPUs
-in the SoC agree"? Put another way, is it possble in a shmobile system
-for an MSTP "clock" to have an enable_count of zero, but still by
-physically enabled in hardware?
-
-Regards,
-Mike
+-- 
+Murali Karicheri
+Linux Kernel, Keystone
