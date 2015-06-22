@@ -1,197 +1,69 @@
-From: djkurtz@chromium.org (Daniel Kurtz)
-Date: Mon, 22 Jun 2015 21:57:58 +0800
-Subject: [PATCH 1/4] soc: mediatek: Add infracfg misc driver support
-In-Reply-To: <1434954942-30179-2-git-send-email-s.hauer@pengutronix.de>
-References: <1434954942-30179-1-git-send-email-s.hauer@pengutronix.de>
- <1434954942-30179-2-git-send-email-s.hauer@pengutronix.de>
-Message-ID: <CAGS+omAJvpUQRGbeRcAAvZw+1HfEokkfV2XBy2LsuP7rdfHJvA@mail.gmail.com>
+From: robherring2@gmail.com (Rob Herring)
+Date: Mon, 22 Jun 2015 08:59:06 -0500
+Subject: [PATCH v3 5/6] dt-binding: document the binding for mxc rtc
+In-Reply-To: <1434820360-21935-6-git-send-email-tremyfr@gmail.com>
+References: <1434820360-21935-1-git-send-email-tremyfr@gmail.com>
+ <1434820360-21935-6-git-send-email-tremyfr@gmail.com>
+Message-ID: <CAL_JsqKQzC=aSuORGhsuPQ0Ciha2JVpYOGU91M2iHaG8RousnQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 22, 2015 at 2:35 PM, Sascha Hauer <s.hauer@pengutronix.de> wrote:
-> This adds support for some miscellaneous bits of the infracfg controller.
-> The mtk_infracfg_set/clear_bus_protection functions are necessary for
-> the scpsys power domain driver to handle the bus protection bits which
-> are contained in the infacfg register space.
->
-> Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
+On Sat, Jun 20, 2015 at 12:12 PM, Philippe Reynes <tremyfr@gmail.com> wrote:
+> This adds documentation of device tree bindings for the
+> mxc rtc.
+
+Perhaps don't further propagate the long dead MXC name and use "imx"
+everywhere. What the Linux driver is called doesn't matter here.
+
+> Cc: Rob Herring <robh+dt@kernel.org>
+> Cc: Pawel Moll <pawel.moll@arm.com>
+> Cc: Mark Rutland <mark.rutland@arm.com>
+> Cc: Ian Campbell <ijc+devicetree@hellion.org.uk>
+> Cc: Kumar Gala <galak@codeaurora.org>
+> Cc: devicetree at vger.kernel.org
+> Signed-off-by: Philippe Reynes <tremyfr@gmail.com>
 > ---
->  drivers/soc/mediatek/Kconfig          |  9 ++++
->  drivers/soc/mediatek/Makefile         |  1 +
->  drivers/soc/mediatek/mtk-infracfg.c   | 91 +++++++++++++++++++++++++++++++++++
->  include/linux/soc/mediatek/infracfg.h | 26 ++++++++++
->  4 files changed, 127 insertions(+)
->  create mode 100644 drivers/soc/mediatek/mtk-infracfg.c
->  create mode 100644 include/linux/soc/mediatek/infracfg.h
+>  Documentation/devicetree/bindings/rtc/rtc-mxc.txt |   27 +++++++++++++++++++++
+>  1 files changed, 27 insertions(+), 0 deletions(-)
+>  create mode 100644 Documentation/devicetree/bindings/rtc/rtc-mxc.txt
 >
-> diff --git a/drivers/soc/mediatek/Kconfig b/drivers/soc/mediatek/Kconfig
-> index bcdb22d..e4f37a3 100644
-> --- a/drivers/soc/mediatek/Kconfig
-> +++ b/drivers/soc/mediatek/Kconfig
-> @@ -1,6 +1,15 @@
->  #
->  # MediaTek SoC drivers
->  #
-> +config MTK_INFRACFG
-> +       bool "MediaTek INFRACFG Support"
-> +       depends on ARCH_MEDIATEK
-> +       select REGMAP
-> +       help
-> +         Say yes here to add support for the MediaTek INFRACFG controller. The
-> +         INFRACFG controller contains various infrastructure registers not
-> +         directly associated to any device.
-> +
->  config MTK_PMIC_WRAP
->         tristate "MediaTek PMIC Wrapper Support"
->         depends on ARCH_MEDIATEK
-> diff --git a/drivers/soc/mediatek/Makefile b/drivers/soc/mediatek/Makefile
-> index ecaf4de..3fa940f 100644
-> --- a/drivers/soc/mediatek/Makefile
-> +++ b/drivers/soc/mediatek/Makefile
-> @@ -1 +1,2 @@
-> +obj-$(CONFIG_MTK_INFRACFG) += mtk-infracfg.o
->  obj-$(CONFIG_MTK_PMIC_WRAP) += mtk-pmic-wrap.o
-> diff --git a/drivers/soc/mediatek/mtk-infracfg.c b/drivers/soc/mediatek/mtk-infracfg.c
+> diff --git a/Documentation/devicetree/bindings/rtc/rtc-mxc.txt b/Documentation/devicetree/bindings/rtc/rtc-mxc.txt
 > new file mode 100644
-> index 0000000..ca786e0
+> index 0000000..5505493
 > --- /dev/null
-> +++ b/drivers/soc/mediatek/mtk-infracfg.c
-> @@ -0,0 +1,91 @@
-> +/*
-> + * Copyright (c) 2015 Pengutronix, Sascha Hauer <kernel@pengutronix.de>
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
-> + *
-> + * This program is distributed in the hope that it will be useful,
-> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + * GNU General Public License for more details.
-> + */
+> +++ b/Documentation/devicetree/bindings/rtc/rtc-mxc.txt
+> @@ -0,0 +1,27 @@
+> +* Real Time Clock of the i.MX SoCs
 > +
-> +#include <linux/export.h>
-> +#include <linux/jiffies.h>
-> +#include <linux/regmap.h>
-> +#include <linux/soc/mediatek/infracfg.h>
-> +#include <asm/processor.h>
+> +RTC controller for the i.MX SoCs
 > +
-> +#define INFRA_TOPAXI_PROTECTEN         0x0220
-> +#define INFRA_TOPAXI_PROTECTSTA1       0x0228
-> +
-> +/**
-> + * mtk_infracfg_set_bus_protection - enable bus protection
-> + * @regmap: The infracfg regmap
-> + * @mask: The mask containing the protection bits to be enabled.
-> + *
-> + * This function enables the bus protection bits for disabled power
-> + * domains so that the system does not hanf when some unit accesses the
+> +Required properties:
+> +- compatible: Should be "fsl,imx1-rtc" or "fsl,imx21-rtc".
 
-typo: hanf -> hang
+What about newer versions with the secure functionality. IIRC, that
+was in MX31 and later.
 
-Other than that tiny nit, this one is:
-
-Reviewed-by: Daniel Kurtz <djkurtz@chromium.org>
-
-> + * bus while in power down.
-> + */
-> +int mtk_infracfg_set_bus_protection(struct regmap *infracfg, u32 mask)
-> +{
-> +       unsigned long expired;
-> +       u32 val;
-> +       int ret;
+> +- reg: physical base address of the controller and length of memory mapped
+> +  region.
+> +- interrupts: IRQ line for the RTC.
+> +- clocks: should contain two entries:
+> +  * one for the input reference
+> +  * one for the the SoC RTC
+> +- clock-names: should contain:
+> +  * "rtc" for the input reference clock
+> +  * "ipg" for the SoC RTC clock
 > +
-> +       regmap_update_bits(infracfg, INFRA_TOPAXI_PROTECTEN, mask, mask);
+> +Example:
 > +
-> +       expired = jiffies + HZ;
-> +
-> +       while (1) {
-> +               ret = regmap_read(infracfg, INFRA_TOPAXI_PROTECTSTA1, &val);
-> +               if (ret)
-> +                       return ret;
-> +
-> +               if ((val & mask) == mask)
-> +                       break;
-> +
-> +               cpu_relax();
-> +               if (time_after(jiffies, expired))
-> +                       return -EIO;
-> +       }
-> +
-> +       return 0;
-> +}
-> +
-> +/**
-> + * mtk_infracfg_clear_bus_protection - disable bus protection
-> + * @regmap: The infracfg regmap
-> + * @mask: The mask containing the protection bits to be disabled.
-> + *
-> + * This function disables the bus protection bits previously enabled with
-> + * mtk_infracfg_set_bus_protection.
-> + */
-> +int mtk_infracfg_clear_bus_protection(struct regmap *infracfg, u32 mask)
-> +{
-> +       unsigned long expired;
-> +       int ret;
-> +
-> +       regmap_update_bits(infracfg, INFRA_TOPAXI_PROTECTEN, mask, 0);
-> +
-> +       expired = jiffies + HZ;
-> +
-> +       while (1) {
-> +               u32 val;
-> +
-> +               ret = regmap_read(infracfg, INFRA_TOPAXI_PROTECTSTA1, &val);
-> +               if (ret)
-> +                       return ret;
-> +
-> +               if (!(val & mask))
-> +                       break;
-> +
-> +               cpu_relax();
-> +               if (time_after(jiffies, expired))
-> +                       return -EIO;
-> +       }
-> +
-> +       return 0;
-> +}
-> diff --git a/include/linux/soc/mediatek/infracfg.h b/include/linux/soc/mediatek/infracfg.h
-> new file mode 100644
-> index 0000000..a5714e9
-> --- /dev/null
-> +++ b/include/linux/soc/mediatek/infracfg.h
-> @@ -0,0 +1,26 @@
-> +#ifndef __SOC_MEDIATEK_INFRACFG_H
-> +#define __SOC_MEDIATEK_INFRACFG_H
-> +
-> +#define MT8173_TOP_AXI_PROT_EN_MCI_M2          BIT(0)
-> +#define MT8173_TOP_AXI_PROT_EN_MM_M0           BIT(1)
-> +#define MT8173_TOP_AXI_PROT_EN_MM_M1           BIT(2)
-> +#define MT8173_TOP_AXI_PROT_EN_MMAPB_S         BIT(6)
-> +#define MT8173_TOP_AXI_PROT_EN_L2C_M2          BIT(9)
-> +#define MT8173_TOP_AXI_PROT_EN_L2SS_SMI                BIT(11)
-> +#define MT8173_TOP_AXI_PROT_EN_L2SS_ADD                BIT(12)
-> +#define MT8173_TOP_AXI_PROT_EN_CCI_M2          BIT(13)
-> +#define MT8173_TOP_AXI_PROT_EN_MFG_S           BIT(14)
-> +#define MT8173_TOP_AXI_PROT_EN_PERI_M0         BIT(15)
-> +#define MT8173_TOP_AXI_PROT_EN_PERI_M1         BIT(16)
-> +#define MT8173_TOP_AXI_PROT_EN_DEBUGSYS                BIT(17)
-> +#define MT8173_TOP_AXI_PROT_EN_CQ_DMA          BIT(18)
-> +#define MT8173_TOP_AXI_PROT_EN_GCPU            BIT(19)
-> +#define MT8173_TOP_AXI_PROT_EN_IOMMU           BIT(20)
-> +#define MT8173_TOP_AXI_PROT_EN_MFG_M0          BIT(21)
-> +#define MT8173_TOP_AXI_PROT_EN_MFG_M1          BIT(22)
-> +#define MT8173_TOP_AXI_PROT_EN_MFG_SNOOP_OUT   BIT(23)
-> +
-> +int mtk_infracfg_set_bus_protection(struct regmap *infracfg, u32 mask);
-> +int mtk_infracfg_clear_bus_protection(struct regmap *infracfg, u32 mask);
-> +
-> +#endif /* __SOC_MEDIATEK_INFRACFG_H */
+> +rtc at 10007000 {
+> +       compatible = "fsl,imx21-rtc";
+> +       reg = <0x10007000 0x1000>;
+> +       interrupts = <22>;
+> +       clocks = <&clks IMX27_CLK_CKIL>,
+> +                <&clks IMX27_CLK_RTC_IPG_GATE>;
+> +       clock-names = "rtc, "ipg";
+> +       status = "disabled";
+> +};
 > --
-> 2.1.4
+> 1.7.4.4
 >
->
-> _______________________________________________
-> Linux-mediatek mailing list
-> Linux-mediatek at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-mediatek
