@@ -1,127 +1,110 @@
-From: m-karicheri2@ti.com (Murali Karicheri)
-Date: Mon, 22 Jun 2015 16:23:43 -0400
-Subject: [PATCH] ARM: keystone: ecc: add ddr3 ecc interrupt handling
-In-Reply-To: <558436C1.3050402@oracle.com>
-References: <1434654589-28157-1-git-send-email-vitalya@ti.com>
- <558436C1.3050402@oracle.com>
-Message-ID: <55886ECF.9070402@ti.com>
+From: mturquette@linaro.org (Michael Turquette)
+Date: Mon, 22 Jun 2015 13:46:17 -0700
+Subject: [PATCH v2 00/14] ARM: shmobile: Add CPG Clock Domains
+In-Reply-To: <CAMuHMdXntR6c4-uUNGVGx7D7941e8hvnmtVBvDu2+iUsNHQ=Qw@mail.gmail.com>
+References: <1432839219-475-1-git-send-email-geert+renesas@glider.be>
+ <CAMuHMdXntR6c4-uUNGVGx7D7941e8hvnmtVBvDu2+iUsNHQ=Qw@mail.gmail.com>
+Message-ID: <20150622204617.9112.71054@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/19/2015 11:35 AM, santosh shilimkar wrote:
-> On 6/18/2015 12:09 PM, Vitaly Andrianov wrote:
->> This patch adds ARM L1/L2 ECC handler support and DDR3 ECC interrupt
->> handling for Keystone II devices, the kernel will reboot if the error
->> is 2-bit error for DDR ECC or L1/L2 ECC error.
->>
->> Signed-off-by: Hao Zhang <hzhang@ti.com>
->> Signed-off-by: Murali Karicheri <m-karicheri2@ti.com>
->> Signed-off-by: Vitaly Andrianov <vitalya@ti.com>
->> ---
->>   arch/arm/mach-keystone/Makefile       |  2 +-
->>   arch/arm/mach-keystone/keystone.c     | 63 ++++++++++++++++++++++++--
->>   arch/arm/mach-keystone/keystone.h     |  1 +
->>   arch/arm/mach-keystone/keystone_ecc.c | 85
->> +++++++++++++++++++++++++++++++++++
->>   arch/arm/mach-keystone/platsmp.c      |  3 +-
->>   5 files changed, 148 insertions(+), 6 deletions(-)
->>   create mode 100644 arch/arm/mach-keystone/keystone_ecc.c
->>
->
->> +/* DDR3 controller registers */
->> +#define DDR3_EOI            0x0A0
->> +#define DDR3_IRQ_STATUS_RAW_SYS        0x0A4
->> +#define DDR3_IRQ_STATUS_SYS        0x0AC
->> +#define DDR3_IRQ_ENABLE_SET_SYS        0x0B4
->> +#define DDR3_IRQ_ENABLE_CLR_SYS        0x0BC
->> +#define DDR3_ECC_CTRL            0x110
->> +#define DDR3_ONE_BIT_ECC_ERR_CNT    0x130
->> +
->> +#define DDR3_1B_ECC_ERR            BIT(5)
->> +#define DDR3_2B_ECC_ERR            BIT(4)
->> +#define DDR3_WR_ECC_ERR            BIT(3)
->> +
->> +static irqreturn_t ddr3_ecc_err_irq_handler(int irq, void *reg_virt)
->> +{
->> +    int ret = IRQ_NONE;
->> +    u32 irq_status;
->> +    void __iomem *ddr_reg = (void __iomem *)reg_virt;
->> +
->> +    irq_status = readl(ddr_reg + DDR3_IRQ_STATUS_SYS);
->> +    if ((irq_status & DDR3_2B_ECC_ERR) ||
->> +        (irq_status & DDR3_WR_ECC_ERR)) {
->> +        pr_err("Unrecoverable DDR3 ECC error, irq status 0x%x,
->> rebooting kernel ..\n",
->> +               irq_status);
->> +        machine_restart(NULL);
->> +        ret = IRQ_HANDLED;
->> +    }
->> +    return ret;
->> +}
->> +
->> +int keystone_init_ddr3_ecc(struct device_node *node)
->> +{
->> +    void __iomem *ddr_reg;
->> +    int error_irq = 0;
->> +    int ret;
->> +
->> +    /* ddr3 controller reg is configured in the sysctrl node at index
->> 0 */
->> +    ddr_reg = of_iomap(node, 0);
->> +    if (!ddr_reg) {
->> +        pr_warn("Warning!! DDR3 controller regs not defined\n");
->> +        return -ENODEV;
->> +    }
->> +
->> +    /* add DDR3 ECC error handler */
->> +    error_irq = irq_of_parse_and_map(node, 1);
->> +    if (!error_irq) {
->> +        /* No GIC interrupt, need to map CIC2 interrupt to GIC */
->> +        pr_warn("Warning!! DDR3 ECC irq number not defined\n");
->> +        return -ENODEV;
->> +    }
->> +
-> You should probably check here if there is already an ECC error happened
-> till you reach here and take appropriate action. If its not safe to
-> boot because of double bit error, you need to abort the boot.
+Quoting Geert Uytterhoeven (2015-06-15 09:15:04)
+> On Thu, May 28, 2015 at 8:53 PM, Geert Uytterhoeven
+> <geert+renesas@glider.be> wrote:
+> >         Hi all,
+> >
+> > This patch series adds Clock Domain support to the Clock Pulse Generator
+> > (CPG) Module Stop (MSTP) Clocks driver using the generic PM Domain, to
+> > be used on shmobile SoCs without device power domains (R-Car Gen1 and
+> > Gen2, RZ).  This allows to power-manage the module clocks of SoC devices
+> > that are part of the CPG Clock Domain using Runtime PM, or for system
+> > suspend/resume, similar to SoCs with device power domains (SH-Mobile and
+> > R-Mobile).
+> >
+> > SoC devices that are part of the CPG Clock Domain and can be
+> > power-managed through an MSTP clock are tagged in DT with a proper
+> > "power-domains" property. This applies to most on-SoC devices, which
+> > have a one-to-one mapping from SoC device to DT device node.
+> > Notable exceptions are "display" and "sound" device nodes, which
+> > represent multiple SoC devices, each having their own MSTP clocks. Hence
+> > drivers for such devices still have to manage their (multiple module)
+> > clocks themselves.
+> >
+> > The (MSTP) clock to use for power-management is found by scanning for
+> > clocks that are compatible with "renesas,cpg-mstp-clocks".
+> > Before, the "first" clock tied to each device (con_id NULL) was used,
+> > being a bit ad-hoc. It was suggested to use the "fck" clock instead,
+> > but this may conflict with DT bindings for devices we don't control
+> > (e.g. GIC-400 plans to mandate "clk" for the clk-name of its single
+> > clock). Looking for real MSTP clocks avoids this problem.
+> >
+> > Logically, the CPG Clock Domain operates on the SoC CPG/MSTP block.
+> > As there's no single device node in DT representing this block (there
+> > are separate device nodes for the CPG and for the individual MSTP
+> > clocks), I bound the logic to the CPG device node.
+> > Perhaps this is something we should change for future SoCs?
+> 
 
-Santosh,
+Hello Geert,
 
-How is this any different from the case when ECC error interrupt happen 
-while the system is running? I would imagine the system can run the 
-handler if the software can make it this far and handled uniformly
-through the handler in both cases.
+I'm still going through this series but I have a few comments/questions.
 
-Murali
+> Inside Renesas, we've been discussing this face-to-face, but haven't
+> reached a conclusion yet.
+> 
+> In Linux terminology, "PM domain" is a higher-level abstraction than
+> just (hardware) "power domain" (sometimes called "power area").
+> A "PM domain" is any collection of devices that are power-managed
+> similarly. As such it covers not only hardware power domains, but also
+> clock domains, and even firmware controlled devices (e.g. as used by the
+> Linux ACPI subsystem).
+> 
+> I find it a bit unfortunate this was not reflected in the DT bindings
+> for Generic PM domains, which use "power-domains" properties, making
+> believe people this is about hardware power domains only.
 
->> +    ret = request_irq(error_irq, ddr3_ecc_err_irq_handler, 0,
->> +        "ddr3-ecc-err-irq", (void *)ddr_reg);
->> +    if (ret) {
->> +        WARN_ON("request_irq fail for DDR3 ECC error irq\n");
->> +        return ret;
->> +    }
->> +
->> +    return 0;
->> +}
->> diff --git a/arch/arm/mach-keystone/platsmp.c
->> b/arch/arm/mach-keystone/platsmp.c
->> index 5f46a7c..07402b9 100644
->> --- a/arch/arm/mach-keystone/platsmp.c
->> +++ b/arch/arm/mach-keystone/platsmp.c
->> @@ -13,8 +13,9 @@
->>    */
->>
->>   #include <linux/init.h>
->> -#include <linux/smp.h>
->>   #include <linux/io.h>
->> +#include <linux/of.h>
->> +#include <linux/smp.h>
->>
-> Why do you need of.h in this file ?
->
->
+"Power island" is used commonly to describe the hardware power domain.
+I like that one since it conveys the concept of power isolation/clamping
+in a power distribution network.  It might be more clear to refer to the
+hardware as power islands and reserve "power domains" for the Linux
+construct?
 
+> 
+> One other point of confusion is that there are multiple kernel
+> subsystems that can (or seem to be able to) be used for the same
+> purpose. Both regulators and power domains are used to "control power".
+> The same is true for clocks vs. clock domains.
+> My point of view is that the regulator and clock subsystems are more
+> about the properties of regulators (voltage, current) resp. clocks
+> (frequencies), while power/clock domains are about being active or
+> inactive.
 
--- 
-Murali Karicheri
-Linux Kernel, Keystone
+Only speaking for the clock framework, but the prepare/unprepare and
+enable/disable semantics are very important here, not just the
+rate-change stuff.
+
+> 
+> On Renesas SoCs (SH/R-Mobile, R-Car, RZ), the MSTP (Module Standby and
+> Software Reset) block is very intimately tied to the CPG (Clock Pulse
+> Generator) block.
+> 
+> The MSTP block provides two functions:
+>   1. Module Standby: "Clock supply to specified modules is stopped by
+>      setting the module stop control register bits."
+>      However, the clock supply to a module is not stopped until all CPUs
+>      in the SoC agree.  Indeed, there are separate MSTP registers for
+>      application (Cortex-A) and real-time (SH and/or Cortex-R) cores.
+>   2. Reset control. to perform a software reset of a specific module.
+> 
+> Given the second function, perhaps the MSTP bits shouldn't have been
+> moduled as clocks, but it made sense at the time of introduction, and
+> IMHO it still does.
+
+Does the clk.enable_count refcount for an MSTP "clock" mirror your
+statement, "the clock supply to a module is not stopped until all CPUs
+in the SoC agree"? Put another way, is it possble in a shmobile system
+for an MSTP "clock" to have an enable_count of zero, but still by
+physically enabled in hardware?
+
+Regards,
+Mike
