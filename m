@@ -1,210 +1,173 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Mon, 22 Jun 2015 18:41:53 +0200
-Subject: [PATCH] ARM: dove: fix legacy dove IRQ numbers
-In-Reply-To: <E1Z74gC-0005X6-0C@rmk-PC.arm.linux.org.uk>
-References: <E1Z74gC-0005X6-0C@rmk-PC.arm.linux.org.uk>
-Message-ID: <20150622164153.GA7281@lunn.ch>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Mon, 22 Jun 2015 18:50:49 +0200
+Subject: [PATCH] clk: at91: add generated clock driver
+In-Reply-To: <20150618172534.57b09c0b@bbrezillon>
+References: <1434547409-12232-1-git-send-email-nicolas.ferre@atmel.com>
+ <20150618172534.57b09c0b@bbrezillon>
+Message-ID: <55883CE9.2060904@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 22, 2015 at 05:34:40PM +0100, Russell King wrote:
-> v3.18 changed handle_IRQ() to call __handle_domain_irq(), which now
-> rejects attempts to deliver IRQ0.  Since IRQ 0 is used as the timer
-> interrupt (just like the PIT on x86), this causes boot to fail as the
-> bogomips calibration never completes.
-> 
-> Fix this by shuffling all interrupts up by one.
-> 
-> Fixes: a71b092a9c68 ("ARM: Convert handle_IRQ to use __handle_domain_irq")
-> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+Le 18/06/2015 17:25, Boris Brezillon a ?crit :
+> Hi Nicolas,
 
-Hi Russell
+Thanks for your review Boris. I'll address your remarks by sending
+another revision of this series in several days...
 
-Thanks for submitting this patch. It applies cleanly to linux-next, so
-there is a good chance it will apply to -rc1 in a couple of weeks. We
-can pick it up then.
+Bye,
 
-    Andrew
+> I haven't run checkpatch on your patch, but there seems to be a few
+> things to fix ;-).
+> 
+> On Wed, 17 Jun 2015 15:23:29 +0200
+> Nicolas Ferre <nicolas.ferre@atmel.com> wrote:
+> 
+> 
+> 
+> 
+>> +
+>> +static long clk_generated_determine_rate(struct clk_hw *hw,
+>> +					 unsigned long rate,
+>> +					 unsigned long *best_parent_rate,
+>> +					 struct clk_hw **best_parent_hw)
+> 
+> The ->determine_rate() prototype has changed (see [1]).
+> 
+> 
+>> +/* No modification of hardware as we have the flag CLK_SET_RATE_GATE set */
+>> +static int clk_generated_set_rate(struct clk_hw *hw,
+>> +				    unsigned long rate,
+>> +				    unsigned long parent_rate)
+>> +{
+>> +	struct clk_generated *gck = to_clk_generated(hw);
+>> +	u32 div;
+>> +
+>> +	if (!rate)
+>> +		return -EINVAL;
+>> +
+>> +	if (gck->id < PERIPHERAL_ID_MIN || !gck->range.max) {
+>> +		if (parent_rate == rate) {
+>> +			gck->gckdiv = 0;
+>> +			return 0;
+>> +		} else {
+>> +			return -EINVAL;
+>> +		}
+>> +	}
+> 
+> Do you really need the above check ?
+> AFAICT, periph ids inferior to 2 are invalid ids, so they should be
+> detected at probe time.
+> The !gck->range.max will be caught by the rate > gck->range.max test.
+> And finally, the case parent_rate == rate will just give you a div of 1,
+> which in turns give a gckdiv of 0.
+> 
+>> +
+>> +	if (rate > gck->range.max)
+>> +		return -EINVAL;
+>> +
+>> +	div = DIV_ROUND_CLOSEST(parent_rate, rate);
+>> +	if (div > GENERATED_MAX_DIV + 1 || !div)
+>> +		return -EINVAL;
+>> +
+>> +	gck->gckdiv = div - 1;
+>> +	return 0;
+>> +}
+>> +
+>> +static const struct clk_ops generated_ops = {
+>> +	.enable = clk_generated_enable,
+>> +	.disable = clk_generated_disable,
+>> +	.is_enabled = clk_generated_is_enabled,
+>> +	.recalc_rate = clk_generated_recalc_rate,
+>> +	.determine_rate = clk_generated_determine_rate,
+>> +	.get_parent = clk_generated_get_parent,
+>> +	.set_parent = clk_generated_set_parent,
+>> +	.set_rate = clk_generated_set_rate,
+>> +};
+>> +
+>> +/**
+>> + * clk_generated_startup - Initialize a given clock to its default parent and
+>> + * divisor parameter.
+>> + *
+>> + * @gck:	Generated clock to set the startup parameters for.
+>> + *
+>> + * Take parameters from the hardware and update local clock configuration
+>> + * accordingly.
+>> + */
+>> +static void clk_generated_startup(struct clk_generated *gck)
+>> +{
+>> +	struct at91_pmc *pmc = gck->pmc;
+>> +	u32 tmp;
+>> +
+>> +	pmc_lock(pmc);
+>> +	pmc_write(pmc, AT91_PMC_PCR, (gck->id & AT91_PMC_PCR_PID_MASK));
+>> +	tmp = pmc_read(pmc, AT91_PMC_PCR);
+>> +	pmc_unlock(pmc);
+>> +
+>> +	gck->parent_id = (tmp & AT91_PMC_PCR_GCKCSS_MASK) >> AT91_PMC_PCR_GCKCSS_OFFSET;
+>> +	gck->gckdiv = (tmp & AT91_PMC_PCR_GCKDIV_MASK) >> AT91_PMC_PCR_GCKDIV_OFFSET;
+>> +}
+>> +
+>> +static struct clk * __init
+>> +at91_clk_register_generated(struct at91_pmc *pmc, const char *name,
+>> +			    const char **parent_names, u8 num_parents,
+>> +			    u8 id, const struct clk_range *range)
+>> +{
+>> +	struct clk_generated *gck;
+>> +	struct clk *clk = NULL;
+>> +	struct clk_init_data init;
+>> +
+>> +	gck = kzalloc(sizeof(*gck), GFP_KERNEL);
+>> +	if (!gck)
+>> +		return ERR_PTR(-ENOMEM);
+>> +
+>> +	init.name = name;
+>> +	init.ops = &generated_ops;
+>> +	init.parent_names = parent_names;
+>> +	init.num_parents = num_parents;
+>> +	init.flags = CLK_SET_RATE_GATE | CLK_SET_PARENT_GATE;
+>> +
+>> +	gck->id = id;
+>> +	gck->hw.init = &init;
+>> +	gck->pmc = pmc;
+>> +	gck->range = *range;
+>> +
+>> +	clk = clk_register(NULL, &gck->hw);
+>> +	if (IS_ERR(clk))
+>> +		kfree(gck);
+>> +	else
+>> +		clk_generated_startup(gck);
+>> +
+>> +	return clk;
+>> +}
+>> +
+>> +void __init of_sama5d2_clk_generated_setup(struct device_node *np,
+>> +					   struct at91_pmc *pmc)
+>> +{
+>> +	int i;
+>> +	int num;
+>> +	u32 id;
+>> +	const char *name;
+>> +	struct clk *clk;
+>> +	int num_parents;
+>> +	const char *parent_names[GENERATED_SOURCE_MAX];
+>> +	struct device_node *gcknp;
+>> +	struct clk_range range = CLK_RANGE(0, 0);
+>> +
+>> +	num_parents = of_count_phandle_with_args(np, "clocks", "#clock-cells");
+> 
+> Use the of_clk_get_parent_count() [2].
+> 
+> That's all I got for now.
+> 
+> Thanks,
+> 
+> Boris
+> 
+> 
+> [1]http://lxr.free-electrons.com/source/include/linux/clk-provider.h#L178
+> [2]http://lxr.free-electrons.com/source/include/linux/clk-provider.h#L626
+> 
 
-> ---
-> As my Cubox tree is now at 4.1, here's this same old patch from 3.18 times
-> rebased to 4.1 to fix this long standing problem.
-> 
->  arch/arm/mach-dove/include/mach/irqs.h | 120 ++++++++++++++++-----------------
->  arch/arm/mach-dove/irq.c               |   8 +--
->  2 files changed, 64 insertions(+), 64 deletions(-)
-> 
-> diff --git a/arch/arm/mach-dove/include/mach/irqs.h b/arch/arm/mach-dove/include/mach/irqs.h
-> index 03d401d20453..0acf74b9ac34 100644
-> --- a/arch/arm/mach-dove/include/mach/irqs.h
-> +++ b/arch/arm/mach-dove/include/mach/irqs.h
-> @@ -14,74 +14,74 @@
->  /*
->   * Dove Low Interrupt Controller
->   */
-> -#define IRQ_DOVE_BRIDGE		0
-> -#define IRQ_DOVE_H2C		1
-> -#define IRQ_DOVE_C2H		2
-> -#define IRQ_DOVE_NAND		3
-> -#define IRQ_DOVE_PDMA		4
-> -#define IRQ_DOVE_SPI1		5
-> -#define IRQ_DOVE_SPI0		6
-> -#define IRQ_DOVE_UART_0		7
-> -#define IRQ_DOVE_UART_1		8
-> -#define IRQ_DOVE_UART_2		9
-> -#define IRQ_DOVE_UART_3		10
-> -#define IRQ_DOVE_I2C		11
-> -#define IRQ_DOVE_GPIO_0_7	12
-> -#define IRQ_DOVE_GPIO_8_15	13
-> -#define IRQ_DOVE_GPIO_16_23	14
-> -#define IRQ_DOVE_PCIE0_ERR	15
-> -#define IRQ_DOVE_PCIE0		16
-> -#define IRQ_DOVE_PCIE1_ERR	17
-> -#define IRQ_DOVE_PCIE1		18
-> -#define IRQ_DOVE_I2S0		19
-> -#define IRQ_DOVE_I2S0_ERR	20
-> -#define IRQ_DOVE_I2S1		21
-> -#define IRQ_DOVE_I2S1_ERR	22
-> -#define IRQ_DOVE_USB_ERR	23
-> -#define IRQ_DOVE_USB0		24
-> -#define IRQ_DOVE_USB1		25
-> -#define IRQ_DOVE_GE00_RX	26
-> -#define IRQ_DOVE_GE00_TX	27
-> -#define IRQ_DOVE_GE00_MISC	28
-> -#define IRQ_DOVE_GE00_SUM	29
-> -#define IRQ_DOVE_GE00_ERR	30
-> -#define IRQ_DOVE_CRYPTO		31
-> +#define IRQ_DOVE_BRIDGE		(1 + 0)
-> +#define IRQ_DOVE_H2C		(1 + 1)
-> +#define IRQ_DOVE_C2H		(1 + 2)
-> +#define IRQ_DOVE_NAND		(1 + 3)
-> +#define IRQ_DOVE_PDMA		(1 + 4)
-> +#define IRQ_DOVE_SPI1		(1 + 5)
-> +#define IRQ_DOVE_SPI0		(1 + 6)
-> +#define IRQ_DOVE_UART_0		(1 + 7)
-> +#define IRQ_DOVE_UART_1		(1 + 8)
-> +#define IRQ_DOVE_UART_2		(1 + 9)
-> +#define IRQ_DOVE_UART_3		(1 + 10)
-> +#define IRQ_DOVE_I2C		(1 + 11)
-> +#define IRQ_DOVE_GPIO_0_7	(1 + 12)
-> +#define IRQ_DOVE_GPIO_8_15	(1 + 13)
-> +#define IRQ_DOVE_GPIO_16_23	(1 + 14)
-> +#define IRQ_DOVE_PCIE0_ERR	(1 + 15)
-> +#define IRQ_DOVE_PCIE0		(1 + 16)
-> +#define IRQ_DOVE_PCIE1_ERR	(1 + 17)
-> +#define IRQ_DOVE_PCIE1		(1 + 18)
-> +#define IRQ_DOVE_I2S0		(1 + 19)
-> +#define IRQ_DOVE_I2S0_ERR	(1 + 20)
-> +#define IRQ_DOVE_I2S1		(1 + 21)
-> +#define IRQ_DOVE_I2S1_ERR	(1 + 22)
-> +#define IRQ_DOVE_USB_ERR	(1 + 23)
-> +#define IRQ_DOVE_USB0		(1 + 24)
-> +#define IRQ_DOVE_USB1		(1 + 25)
-> +#define IRQ_DOVE_GE00_RX	(1 + 26)
-> +#define IRQ_DOVE_GE00_TX	(1 + 27)
-> +#define IRQ_DOVE_GE00_MISC	(1 + 28)
-> +#define IRQ_DOVE_GE00_SUM	(1 + 29)
-> +#define IRQ_DOVE_GE00_ERR	(1 + 30)
-> +#define IRQ_DOVE_CRYPTO		(1 + 31)
->  
->  /*
->   * Dove High Interrupt Controller
->   */
-> -#define IRQ_DOVE_AC97		32
-> -#define IRQ_DOVE_PMU		33
-> -#define IRQ_DOVE_CAM		34
-> -#define IRQ_DOVE_SDIO0		35
-> -#define IRQ_DOVE_SDIO1		36
-> -#define IRQ_DOVE_SDIO0_WAKEUP	37
-> -#define IRQ_DOVE_SDIO1_WAKEUP	38
-> -#define IRQ_DOVE_XOR_00		39
-> -#define IRQ_DOVE_XOR_01		40
-> -#define IRQ_DOVE_XOR0_ERR	41
-> -#define IRQ_DOVE_XOR_10		42
-> -#define IRQ_DOVE_XOR_11		43
-> -#define IRQ_DOVE_XOR1_ERR	44
-> -#define IRQ_DOVE_LCD_DCON	45
-> -#define IRQ_DOVE_LCD1		46
-> -#define IRQ_DOVE_LCD0		47
-> -#define IRQ_DOVE_GPU		48
-> -#define IRQ_DOVE_PERFORM_MNTR	49
-> -#define IRQ_DOVE_VPRO_DMA1	51
-> -#define IRQ_DOVE_SSP_TIMER	54
-> -#define IRQ_DOVE_SSP		55
-> -#define IRQ_DOVE_MC_L2_ERR	56
-> -#define IRQ_DOVE_CRYPTO_ERR	59
-> -#define IRQ_DOVE_GPIO_24_31	60
-> -#define IRQ_DOVE_HIGH_GPIO	61
-> -#define IRQ_DOVE_SATA		62
-> +#define IRQ_DOVE_AC97		(1 + 32)
-> +#define IRQ_DOVE_PMU		(1 + 33)
-> +#define IRQ_DOVE_CAM		(1 + 34)
-> +#define IRQ_DOVE_SDIO0		(1 + 35)
-> +#define IRQ_DOVE_SDIO1		(1 + 36)
-> +#define IRQ_DOVE_SDIO0_WAKEUP	(1 + 37)
-> +#define IRQ_DOVE_SDIO1_WAKEUP	(1 + 38)
-> +#define IRQ_DOVE_XOR_00		(1 + 39)
-> +#define IRQ_DOVE_XOR_01		(1 + 40)
-> +#define IRQ_DOVE_XOR0_ERR	(1 + 41)
-> +#define IRQ_DOVE_XOR_10		(1 + 42)
-> +#define IRQ_DOVE_XOR_11		(1 + 43)
-> +#define IRQ_DOVE_XOR1_ERR	(1 + 44)
-> +#define IRQ_DOVE_LCD_DCON	(1 + 45)
-> +#define IRQ_DOVE_LCD1		(1 + 46)
-> +#define IRQ_DOVE_LCD0		(1 + 47)
-> +#define IRQ_DOVE_GPU		(1 + 48)
-> +#define IRQ_DOVE_PERFORM_MNTR	(1 + 49)
-> +#define IRQ_DOVE_VPRO_DMA1	(1 + 51)
-> +#define IRQ_DOVE_SSP_TIMER	(1 + 54)
-> +#define IRQ_DOVE_SSP		(1 + 55)
-> +#define IRQ_DOVE_MC_L2_ERR	(1 + 56)
-> +#define IRQ_DOVE_CRYPTO_ERR	(1 + 59)
-> +#define IRQ_DOVE_GPIO_24_31	(1 + 60)
-> +#define IRQ_DOVE_HIGH_GPIO	(1 + 61)
-> +#define IRQ_DOVE_SATA		(1 + 62)
->  
->  /*
->   * DOVE General Purpose Pins
->   */
-> -#define IRQ_DOVE_GPIO_START	64
-> -#define NR_GPIO_IRQS		64
-> +#define IRQ_DOVE_GPIO_START	65
-> +#define NR_GPIO_IRQS		65
->  
->  /*
->   * PMU interrupts
-> diff --git a/arch/arm/mach-dove/irq.c b/arch/arm/mach-dove/irq.c
-> index 4a5a7aedcb76..df0223f76fa9 100644
-> --- a/arch/arm/mach-dove/irq.c
-> +++ b/arch/arm/mach-dove/irq.c
-> @@ -126,14 +126,14 @@ __exception_irq_entry dove_legacy_handle_irq(struct pt_regs *regs)
->  	stat = readl_relaxed(dove_irq_base + IRQ_CAUSE_LOW_OFF);
->  	stat &= readl_relaxed(dove_irq_base + IRQ_MASK_LOW_OFF);
->  	if (stat) {
-> -		unsigned int hwirq = __fls(stat);
-> +		unsigned int hwirq = 1 + __fls(stat);
->  		handle_IRQ(hwirq, regs);
->  		return;
->  	}
->  	stat = readl_relaxed(dove_irq_base + IRQ_CAUSE_HIGH_OFF);
->  	stat &= readl_relaxed(dove_irq_base + IRQ_MASK_HIGH_OFF);
->  	if (stat) {
-> -		unsigned int hwirq = 32 + __fls(stat);
-> +		unsigned int hwirq = 33 + __fls(stat);
->  		handle_IRQ(hwirq, regs);
->  		return;
->  	}
-> @@ -144,8 +144,8 @@ void __init dove_init_irq(void)
->  {
->  	int i;
->  
-> -	orion_irq_init(0, IRQ_VIRT_BASE + IRQ_MASK_LOW_OFF);
-> -	orion_irq_init(32, IRQ_VIRT_BASE + IRQ_MASK_HIGH_OFF);
-> +	orion_irq_init(1, IRQ_VIRT_BASE + IRQ_MASK_LOW_OFF);
-> +	orion_irq_init(33, IRQ_VIRT_BASE + IRQ_MASK_HIGH_OFF);
->  
->  #ifdef CONFIG_MULTI_IRQ_HANDLER
->  	set_handle_irq(dove_legacy_handle_irq);
-> -- 
-> 2.1.0
-> 
+
+-- 
+Nicolas Ferre
