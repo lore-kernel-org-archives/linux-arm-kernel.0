@@ -1,173 +1,102 @@
-From: cyrille.pitchen@atmel.com (Cyrille Pitchen)
-Date: Mon, 22 Jun 2015 12:12:54 +0200
-Subject: [PATCH v4 2/2] mfd: flexcom: add a driver for Atmel Flexible Serial
- Communication Unit
-In-Reply-To: <cover.1434967670.git.cyrille.pitchen@atmel.com>
-References: <cover.1434967670.git.cyrille.pitchen@atmel.com>
-Message-ID: <dddf7a6d750967785255733a7931780b3c465d5f.1434967670.git.cyrille.pitchen@atmel.com>
+From: vinod.koul@intel.com (Vinod Koul)
+Date: Mon, 22 Jun 2015 15:45:27 +0530
+Subject: [PATCH v5 2/2] dma: Add Xilinx AXI Central Direct Memory Access
+ Engine driver support
+In-Reply-To: <1433839690-5491-1-git-send-email-appanad@xilinx.com>
+References: <1433839690-5491-1-git-send-email-appanad@xilinx.com>
+Message-ID: <20150622101527.GB19530@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This driver supports the new Atmel Flexcom. The Flexcom is a wrapper which
-integrates one SPI controller, one I2C controller and one USART. Only one
-function can be enabled at a time. This driver selects the function once
-for all, when the Flexcom is probed, according to the value of the new
-"atmel,flexcom-mode" device tree property.
+On Tue, Jun 09, 2015 at 02:18:10PM +0530, Kedareswara rao Appana wrote:
 
-This driver has chosen to present the Flexcom to the system as a MFD so
-the implementation is seamless for the existing Atmel SPI, I2C and USART
-drivers.
+pls conform to the subsystem naming convention which git log on
+subsystem should have told you that it is dmaengine: xxx......
 
-Also the Flexcom embeds FIFOs: the latest patches of the SPI, I2C and
-USART drivers take advantage of this new feature.
+> This is the driver for the AXI Central Direct Memory Access (AXI
+> CDMA) core, which is a soft Xilinx IP core that provides high-bandwidth
+> Direct Memory Access (DMA) between a memory-mapped source address and a
+> memory-mapped destination address.
+> 
+> This module works on Zynq (ARM Based SoC) and Microblaze platforms.
+> 
+> Signed-off-by: Srikanth Thokala <sthokal@xilinx.com>
+> Signed-off-by: Kedareswara rao Appana <appanad@xilinx.com>
+> ---
+> This patch is rebased on the commit
+> Merge git://git.kernel.org/pub/scm/linux/kernel/git/davem/net
+why a random, unrelated commit? and no mention of tree..
 
-Signed-off-by: Cyrille Pitchen <cyrille.pitchen@atmel.com>
-Acked-by: Boris Brezillon <boris.brezillon@free-electrons.com>
-Acked-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
----
- drivers/mfd/Kconfig         | 11 +++++
- drivers/mfd/Makefile        |  1 +
- drivers/mfd/atmel-flexcom.c | 98 +++++++++++++++++++++++++++++++++++++++++++++
- 3 files changed, 110 insertions(+)
- create mode 100644 drivers/mfd/atmel-flexcom.c
+> +static struct dma_async_tx_descriptor *
+> +xilinx_cdma_prep_memcpy(struct dma_chan *dchan, dma_addr_t dma_dst,
+> +			dma_addr_t dma_src, size_t len, unsigned long flags)
+> +{
+> +	struct xilinx_cdma_chan *chan = to_xilinx_chan(dchan);
+> +	struct xilinx_cdma_desc_hw *hw;
+> +	struct xilinx_cdma_tx_descriptor *desc;
+> +	struct xilinx_cdma_tx_segment *segment, *prev;
+> +
+> +	if (!len || len > XILINX_CDMA_MAX_TRANS_LEN)
+> +		return NULL;
+> +
+> +	desc = xilinx_cdma_alloc_tx_descriptor(chan);
+> +	if (!desc)
+> +		return NULL;
+> +
+> +	dma_async_tx_descriptor_init(&desc->async_tx, &chan->common);
+> +	desc->async_tx.tx_submit = xilinx_cdma_tx_submit;
+> +	async_tx_ack(&desc->async_tx);
+and why are you doing this ?
 
-diff --git a/drivers/mfd/Kconfig b/drivers/mfd/Kconfig
-index d5ad04d..9b33ad0 100644
---- a/drivers/mfd/Kconfig
-+++ b/drivers/mfd/Kconfig
-@@ -59,6 +59,17 @@ config MFD_AAT2870_CORE
- 	  additional drivers must be enabled in order to use the
- 	  functionality of the device.
- 
-+config MFD_ATMEL_FLEXCOM
-+	tristate "Atmel Flexcom (Flexible Serial Communication Unit)"
-+	select MFD_CORE
-+	depends on OF
-+	help
-+	  Select this to get support for Atmel Flexcom. This is a wrapper
-+	  which embeds a SPI controller, a I2C controller and a USART. Only
-+	  one function can be used at a time. The choice is done at boot time
-+	  by the probe function of this MFD driver according to a device tree
-+	  property.
-+
- config MFD_ATMEL_HLCDC
- 	tristate "Atmel HLCDC (High-end LCD Controller)"
- 	select MFD_CORE
-diff --git a/drivers/mfd/Makefile b/drivers/mfd/Makefile
-index 0e5cfeb..c666bf5 100644
---- a/drivers/mfd/Makefile
-+++ b/drivers/mfd/Makefile
-@@ -160,6 +160,7 @@ obj-$(CONFIG_MFD_SPMI_PMIC)	+= qcom-spmi-pmic.o
- obj-$(CONFIG_TPS65911_COMPARATOR)	+= tps65911-comparator.o
- obj-$(CONFIG_MFD_TPS65090)	+= tps65090.o
- obj-$(CONFIG_MFD_AAT2870_CORE)	+= aat2870-core.o
-+obj-$(CONFIG_MFD_ATMEL_FLEXCOM)	+= atmel-flexcom.o
- obj-$(CONFIG_MFD_ATMEL_HLCDC)	+= atmel-hlcdc.o
- obj-$(CONFIG_MFD_INTEL_MSIC)	+= intel_msic.o
- obj-$(CONFIG_MFD_PALMAS)	+= palmas.o
-diff --git a/drivers/mfd/atmel-flexcom.c b/drivers/mfd/atmel-flexcom.c
-new file mode 100644
-index 0000000..7e7d4b8
---- /dev/null
-+++ b/drivers/mfd/atmel-flexcom.c
-@@ -0,0 +1,98 @@
-+/*
-+ * Driver for Atmel Flexcom
-+ *
-+ * Copyright (C) 2015 Atmel Corporation
-+ *
-+ * Author: Cyrille Pitchen <cyrille.pitchen@atmel.com>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License as published by
-+ * the Free Software Foundation; either version 2 of the License, or
-+ * (at your option) any later version.
-+ *
-+ */
-+
-+#include <linux/module.h>
-+#include <linux/types.h>
-+#include <linux/kernel.h>
-+#include <linux/platform_device.h>
-+#include <linux/of.h>
-+#include <linux/of_platform.h>
-+#include <linux/err.h>
-+#include <linux/io.h>
-+#include <linux/clk.h>
-+
-+#define FX_MR		0x0
-+#define FX_RHR		0x10
-+#define FX_THR		0x20
-+#define FX_VERSION	0xfc
-+
-+#define FX_MR_NO_COM	0
-+#define FX_MR_USART	1
-+#define FX_MR_SPI	2
-+#define FX_MR_TWI	3
-+
-+
-+static int atmel_flexcom_probe(struct platform_device *pdev)
-+{
-+	struct clk *clk;
-+	struct resource *res;
-+	unsigned char __iomem *map;
-+	unsigned int version, mr;
-+	const char *mode;
-+	int err;
-+
-+	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-+	map = devm_ioremap_resource(&pdev->dev, res);
-+	if (IS_ERR(map))
-+		return PTR_ERR(map);
-+
-+	clk = devm_clk_get(&pdev->dev, NULL);
-+	if (IS_ERR(clk))
-+		return PTR_ERR(clk);
-+
-+	err = of_property_read_string(pdev->dev.of_node,
-+				      "atmel,flexcom-mode", &mode);
-+	if (err)
-+		return err;
-+
-+	if (!strcmp(mode, "usart"))
-+		mr = FX_MR_USART;
-+	else if (!strcmp(mode, "spi"))
-+		mr = FX_MR_SPI;
-+	else if (!strcmp(mode, "twi") || !strcmp(mode, "i2c"))
-+		mr = FX_MR_TWI;
-+	else
-+		return -EINVAL;
-+
-+	err = clk_prepare_enable(clk);
-+	if (err)
-+		return err;
-+	version = readl(map + FX_VERSION);
-+	writel(mr, map + FX_MR);
-+	clk_disable_unprepare(clk);
-+
-+	dev_info(&pdev->dev, "version: %#x, mode: %s\n", version, mode);
-+
-+	return of_platform_populate(pdev->dev.of_node, NULL, NULL, &pdev->dev);
-+}
-+
-+static const struct of_device_id atmel_flexcom_of_match[] = {
-+	{ .compatible = "atmel,sama5d2-flexcom" },
-+	{ /* sentinel */ }
-+};
-+MODULE_DEVICE_TABLE(of, atmel_flexcom_of_match);
-+
-+static struct platform_driver atmel_flexcom_driver = {
-+	.driver		= {
-+		.name	= "atmel_flexcom",
-+		.of_match_table = atmel_flexcom_of_match,
-+	},
-+	.probe		= atmel_flexcom_probe,
-+};
-+
-+module_platform_driver(atmel_flexcom_driver);
-+
-+MODULE_AUTHOR("Cyrille Pitchen <cyrille.pitchen@atmel.com>");
-+MODULE_DESCRIPTION("Atmel Flexcom MFD driver");
-+MODULE_LICENSE("GPL");
+> +int xilinx_cdma_channel_set_config(struct dma_chan *dchan,
+> +					struct xilinx_cdma_config *cfg)
+> +{
+> +	struct xilinx_cdma_chan *chan = to_xilinx_chan(dchan);
+> +	u32 reg = cdma_read(chan, XILINX_CDMA_CONTROL_OFFSET);
+> +
+> +	if (!xilinx_cdma_is_idle(chan))
+> +		return -EBUSY;
+Why cant it be like dma_slave_config and take effect on next descriptor
+prepare?
+
+> +
+> +	if (cfg->reset)
+> +		return xilinx_cdma_chan_reset(chan);
+Why do you want to reset this externally, that sounds bad to me
+
+> +
+> +	if (cfg->coalesc <= XILINX_CDMA_COALESCE_MAX) {
+> +		reg &= ~XILINX_CDMA_XR_COALESCE_MASK;
+> +		reg |= cfg->coalesc << XILINX_CDMA_COALESCE_SHIFT;
+> +	}
+Can you explain what coalesc means here?
+
+> +
+> +	if (cfg->delay <= XILINX_CDMA_DELAY_MAX) {
+> +		reg &= ~XILINX_CDMA_XR_DELAY_MASK;
+> +		reg |= cfg->delay << XILINX_CDMA_DELAY_SHIFT;
+> +	}
+> +
+> +	cdma_write(chan, XILINX_CDMA_CONTROL_OFFSET, reg);
+Shouldn't you save it apply for a descriptor?
+> +
+> +	return 0;
+> +}
+> +EXPORT_SYMBOL(xilinx_cdma_channel_set_config);
+not EXPORT_SYMBOL_GPL?
+
+
+> +static int xilinx_cdma_chan_probe(struct xilinx_cdma_device *xdev,
+> +					struct device_node *node)
+> +{
+> +	struct xilinx_cdma_chan *chan;
+> +	bool has_dre;
+> +	u32 value, width;
+> +	int err;
+> +
+> +	/* Alloc channel */
+> +	chan = devm_kzalloc(xdev->dev, sizeof(*chan), GFP_NOWAIT);
+Why do you use GFP_NOWAIT in probe?
+
 -- 
-1.8.2.2
+~Vinod
