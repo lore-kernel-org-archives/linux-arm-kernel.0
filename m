@@ -1,54 +1,40 @@
-From: kgene@kernel.org (Kukjin Kim)
-Date: Mon, 22 Jun 2015 10:46:26 +0900
-Subject: [PATCH 4/6] ARM: dts: Exynos4210: add CPU OPP and regulator supply
- property
-In-Reply-To: <558767FC.4090405@samsung.com>
-References: <'@samsung.com>
- <1428079429-4252-1-git-send-email-b.zolnierkie@samsung.com>
- <1428079429-4252-5-git-send-email-b.zolnierkie@samsung.com>
- <CAJKOXPfR5JS546YS3M-8orxO7+SxnzE06h2cyesExyt8Y9fVKw@mail.gmail.com>
- <CAJKOXPfdXV8qxR3AQEzQJTf6MojUN7Z=06ikxF8u5BuMihDfJQ@mail.gmail.com>
- <00f801d0ac8c$344dfeb0$9ce9fc10$@kernel.org> <558767FC.4090405@samsung.com>
-Message-ID: <011f01d0ac8d$40a25110$c1e6f330$@kernel.org>
+From: m.smarduch@samsung.com (Mario Smarduch)
+Date: Sun, 21 Jun 2015 20:17:22 -0700
+Subject: [RESEND PATCH v2 2/2] arm: KVM: keep arm vfp/simd exit handling
+ consistent with arm64
+In-Reply-To: <1434739306-23417-1-git-send-email-m.smarduch@samsung.com>
+References: <1434739306-23417-1-git-send-email-m.smarduch@samsung.com>
+Message-ID: <55877E42.5070205@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Krzysztof Kozlowski wrote:
-> 
-> On 22.06.2015 10:38, Kukjin Kim wrote:
-> > Krzysztof Kozlowski wrote:
-> >> 2015-05-08 9:18 GMT+09:00 Krzysztof Kozlowski <k.kozlowski@samsung.com>:
-> >>> 2015-04-04 1:43 GMT+09:00 Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>:
-> >>>> From: Thomas Abraham <thomas.ab@samsung.com>
-> >>>>
-> >>>> For Exynos4210 platforms, add CPU operating points and CPU
-> >>>> regulator supply properties for migrating from Exynos specific
-> >>>> cpufreq driver to using generic cpufreq driver.
-> >>>>
-> >>>> Changes by Bartlomiej:
-> >>>> - removed Exynos5250 and Exynos5420 support for now
-> >>>>
-> >>>> Cc: Kukjin Kim <kgene.kim@samsung.com>
-> >>>> Cc: Doug Anderson <dianders@chromium.org>
-> >>>> Cc: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
-> >>>> Cc: Andreas Faerber <afaerber@suse.de>
-> >>>> Cc: Sachin Kamat <sachin.kamat@linaro.org>
-> >>>> Cc: Andreas Farber <afaerber@suse.de>
-> >>>> Cc: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
-> >>>> Signed-off-by: Thomas Abraham <thomas.ab@samsung.com>
-> >>>> Signed-off-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
-> >>>
-> >>> Acked-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
-> >>
-> >> Rebased and applied to my tree, I'll sent it later to Kukjin unless he
-> >> picks it by himself from LKML.
-> >>
-> > Hi, as far as I know, this is for v4.2 not v4.1 so it will be applied based on
-> > v4.2-rc1 after v4.2-rc1 release.
-> 
-> You mean it is for v4.3, not v4.2?
-> 
-Oops, yes v4.3.
+On 06/19/2015 11:41 AM, Mario Smarduch wrote:
+[...]
 
-Thanks for the correction.
-Kukjin
+>
+>  
+> -host_switch_to_hyp:
+> +	/* Guest is calling a hyp function, save minimum context branch to it */ 
+
+Hi Marc,
+    please correct Guest to Host (or word this to your preference).
+Somehow wondered off on Friday :)
+
+Thanks,
+- Mario
+
+>  	pop	{r0, r1, r2}
+>  
+>  	/* Check for __hyp_get_vectors */
+> @@ -411,6 +407,10 @@ guest_trap:
+>  
+>  	@ Check if we need the fault information
+>  	lsr	r1, r1, #HSR_EC_SHIFT
+> +#ifdef CONFIG_VFPv3
+> +	cmp	r1, #HSR_EC_CP_0_13
+> +	beq	switch_to_guest_vfp
+> +#endif
+>  	cmp	r1, #HSR_EC_IABT
+>  	mrceq	p15, 4, r2, c6, c0, 2	@ HIFAR
+>  	beq	2f
+> 
