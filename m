@@ -1,175 +1,182 @@
 From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Mon, 22 Jun 2015 08:35:38 +0200
-Subject: [PATCH v5] Mediatek SCPSYS power domain support
-Message-ID: <1434954942-30179-1-git-send-email-s.hauer@pengutronix.de>
+Date: Mon, 22 Jun 2015 08:35:39 +0200
+Subject: [PATCH 1/4] soc: mediatek: Add infracfg misc driver support
+In-Reply-To: <1434954942-30179-1-git-send-email-s.hauer@pengutronix.de>
+References: <1434954942-30179-1-git-send-email-s.hauer@pengutronix.de>
+Message-ID: <1434954942-30179-2-git-send-email-s.hauer@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This series adds support for the MediaTek SCPSYS unit.
+This adds support for some miscellaneous bits of the infracfg controller.
+The mtk_infracfg_set/clear_bus_protection functions are necessary for
+the scpsys power domain driver to handle the bus protection bits which
+are contained in the infacfg register space.
 
-The SCPSYS unit handles several power management related tasks such
-as thermal measurement, DVFS, interrupt filter and low level sleep
-control.
+Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
+---
+ drivers/soc/mediatek/Kconfig          |  9 ++++
+ drivers/soc/mediatek/Makefile         |  1 +
+ drivers/soc/mediatek/mtk-infracfg.c   | 91 +++++++++++++++++++++++++++++++++++
+ include/linux/soc/mediatek/infracfg.h | 26 ++++++++++
+ 4 files changed, 127 insertions(+)
+ create mode 100644 drivers/soc/mediatek/mtk-infracfg.c
+ create mode 100644 include/linux/soc/mediatek/infracfg.h
 
-The initial support only contains the generic power domain handling.
-This is needed to turn on power to the different power domains.
-
-The driver is quite straight forward now. Due to the lack of a better
-place I have put it to drivers/soc/mediatek. As the SCPSYS unit has
-several other tasks that also do not fit into some specific subsystem
-this probably is a good place for this driver.
-
-Please review, any input welcome.
-
-Sascha
-
-Changes since v4:
-- move Kconfig dependency "select PM_GENERIC_DOMAINS if PM" from arch/arm64
-  next to the driver which needs this dependency
-- drop unnecessary clk[] array from struct scp and make the array local to
-  the function which needs it.
-- Disable clock when enabling the domain fails
-- Drop error message when devm_clk_get fails. The core already issues a
-  similar warning
-- Add clocks/clock-names description to the binding doc
-
-Changes since v3:
-- Drop unnecessary MODULE_* macros for builtin code
-- introduce scpsys_domain_is_on() function instead of open coding this
-  twice
-- Drop unnecessary initialisation of power_o[ff|n]_latencies. The kernel
-  updates them with the measured values anyway.
-
-changes since v2:
-- Add missing include/linux/soc/mediatek/infracfg.h file
-- rename VDE -> VDEC, VEN -> VENC, DIS -> DISP and VEN2 -> VENC_LT
-  to make the abbreviatons more clear
-- make of_device_id const
-- remove double loop
-- fix hunk in wrong patch
-- Fix order of domains. Some domains depend on other domains. Reorder
-  the domains so that all domains can be turned on in order when
-  CONFIG_PM is disabled. Also fixes earlier mixups in the domain array
-- Do not allow compilation as modules. pm_domains cannot be removed, so
-  compilation as module is not that useful
-- reorder Kconfig items alphabetically
-- reorder #includes alphabetically
-- select MTK_INFRACFG instead of depending on it
-- Use only two clocks as dependencies for the domains. The previously
-  used 5 clocks are not necessary as confirmed by the hardware designers
-- use 'genpd' as variable name for struct generic_pm_domain like done in
-  other pm code
-
-changes since v1:
-- make MFG_ASYNC a subdomain of MFG_2D and MFG_2D a subdomain of MFG
-- Add (now hopefully properly) infracfg register handling again
-- Add clock handling
-- Fix on/off mixup in error message
-- Make readonly data const
-- Fix MODULE_LICENSE to GPL v2
-
-changes since RFC:
-
-- add a commit log to driver patch
-- drop manipulating infracfg registers for now, can be added (properly)
-  later
-- Add warning messages when errors occur
-- add NULL pointer check for kmalloc
------BEGIN PGP SIGNATURE-----
-Version: GnuPG v1
-
-iQIcBAABCAAGBQJVdqbqAAoJEPFlmONMx+ezvloP/jpQ1JBTkYvivy4oB+t8GuxU
-J6xLeo5k4uBKHNbTVm/2YbpROwwxA8Q+B/S4iG5mKNSydW6pf9jfA05XFpto0yKr
-CXkbSoWWS2emP3HlnObnW5DYf6ggSq349E5Sopl5G4nW+tOBc1GceND4k9HoRNSu
-MRRlZE0YK+QZ0Mz2x+RVNBnfiI8EU4gXcNdPq/aMEXIj+gSHtMeg2s7Zlg7zzyTQ
-x4ambA2DiGSumqYMWscJUGxJT1GLH7cMmfe5pKDFu9P0z11Og/8A7ix00x0UTdto
-DKqxOyGE4qdQ3Ma8Fb7j15VZ56Y21e7EKkSrv1FK5qSKcfzXnoOWu1xmBL2q0Jht
-X/kfEShfoeU8AMDf89zwxmUTqNx3nPuhsPpQeuVEIiO70cWvJ0dchL4Kp0t8a+xs
-nTmnS6S6Mm8MEUfhYmkJJ7p8WR4roQ+b+W5yeVFPWL9ft81CuioLrAEr/57GeIdR
-bhd4MgWlatNprBRvv/I6aBhFklWoSY87ERKJC9w9vvogZ7of/TEv1lMOI91qKMNL
-eg9y4Pw/FWkZyK0bIysykGHwQcNGLxqlKX52QLbefAM0jzdaljtbyHr3u7SnvpZS
-AikPoSJ+RC3jbP15Fx7IuD/XUCFt3fuSmUbyODpZJZM9MNo6xgmfsqmtwGUoTsbP
-DAFexU9wsU/2Xny1Ygjk
-=UL1E
------END PGP SIGNATURE-----
-
-commit 5e33965ca0b265401349229773ee7a3732a63388
-Author: Sascha Hauer <s.hauer@pengutronix.de>
-Date:   Mon Mar 9 08:41:36 2015 +0100
-
-    ARM64: MediaTek MT8173: Add SCPSYS device node
-
-    This adds the SCPSYS device node to the MT8173 dtsi file.
-
-    Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
-
-diff --git a/arch/arm64/boot/dts/mediatek/mt8173.dtsi b/arch/arm64/boot/dts/mediatek/mt8173.dtsi
-index 924fdb6..12430f0 100644
---- a/arch/arm64/boot/dts/mediatek/mt8173.dtsi
-+++ b/arch/arm64/boot/dts/mediatek/mt8173.dtsi
-@@ -125,6 +125,16 @@
- 						<GIC_SPI 147 IRQ_TYPE_LEVEL_HIGH>;
- 		};
-
-+		scpsys: scpsys at 10006000 {
-+			compatible = "mediatek,mt8173-scpsys";
-+			#power-domain-cells = <1>;
-+			reg = <0 0x10006000 0 0x1000>;
-+			clocks = <&clk26m>,
-+				 <&topckgen CLK_TOP_MM_SEL>;
-+			clock-names = "mfg", "mm";
-+			infracfg = <&infracfg>;
-+		};
+diff --git a/drivers/soc/mediatek/Kconfig b/drivers/soc/mediatek/Kconfig
+index bcdb22d..e4f37a3 100644
+--- a/drivers/soc/mediatek/Kconfig
++++ b/drivers/soc/mediatek/Kconfig
+@@ -1,6 +1,15 @@
+ #
+ # MediaTek SoC drivers
+ #
++config MTK_INFRACFG
++	bool "MediaTek INFRACFG Support"
++	depends on ARCH_MEDIATEK
++	select REGMAP
++	help
++	  Say yes here to add support for the MediaTek INFRACFG controller. The
++	  INFRACFG controller contains various infrastructure registers not
++	  directly associated to any device.
 +
- 		sysirq: intpol-controller at 10200620 {
- 			compatible = "mediatek,mt8173-sysirq",
- 					"mediatek,mt6577-sysirq";
------BEGIN PGP SIGNATURE-----
-Version: GnuPG v1
-
-iQIcBAABCAAGBQJVh6xeAAoJEPFlmONMx+ezuAQP/3OsxylPoreCDqeqJ/JMToPw
-WUp9Yrxu9BJPg7zV56nZAf+3gKNXgMkV5wyb6WpCYT0rRRabX6iALs0taPysYoRY
-IUkq57w8bl+oWS0rJwagXx6BclH2uzjlBor9DTLU7PKjRRmPBvfiLwqJjiGABxf3
-yz4AFptnKkaj6IAudQDl1d2xJevmnzDDL3dMYhZy/VddaC8Gi/CmP86Pxnmr1Vt/
-dTzwDsw3NSF0Hhuy601OFnwRiLDH+8C8xwg+j68kYfWbftrhHrTJZLCeJ+WvCSPL
-aCyrM0MZN+RkBzBgg1ZcdMAJPkjnxie4jERofafiEusLNEmiNln47bIPECMs7/7U
-IVVyCTLFuHljnVC/7Kf5t6RStlohzSgs3FdOs0raV9ObbnEb9Tg9mwSLHJIk6wmr
-xO6X5gqIURHkAODBvmi6MDWTTKmVv0Ep/N6c/HqLaEJEkeS5bP/gge3/l6O7LN9t
-1ZGAjvGQwELszivh0YcFXsN+g1iDjIFSzwvXCCbeCmE1pZoa4JQsKCgLxQWJw3d/
-dtWGtVt4IEX9qAb2UCIwU3HREP6JPn3Zd9QfOOXV2A9Lt0gfFqO7tiKrG4T4QBcx
-4f9h48W4MmygCkNu87jG/3QLpn2p40MzNtvK3ffvP5acaoUtuQL1z1bCoEktDQ58
-MIZ0jg9h66cFyJumlwbm
-=ZIEi
------END PGP SIGNATURE-----
-
-commit 4aa48202b3f22a71685f66d66beff0f040781bfd
-Author: Sascha Hauer <s.hauer@pengutronix.de>
-Date:   Mon Mar 9 08:41:36 2015 +0100
-
-    ARM64: MediaTek MT8173: Add SCPSYS device node
-    
-    This adds the SCPSYS device node to the MT8173 dtsi file.
-    
-    Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
-
-diff --git a/arch/arm64/boot/dts/mediatek/mt8173.dtsi b/arch/arm64/boot/dts/mediatek/mt8173.dtsi
-index 924fdb6..12430f0 100644
---- a/arch/arm64/boot/dts/mediatek/mt8173.dtsi
-+++ b/arch/arm64/boot/dts/mediatek/mt8173.dtsi
-@@ -125,6 +125,16 @@
- 						<GIC_SPI 147 IRQ_TYPE_LEVEL_HIGH>;
- 		};
- 
-+		scpsys: scpsys at 10006000 {
-+			compatible = "mediatek,mt8173-scpsys";
-+			#power-domain-cells = <1>;
-+			reg = <0 0x10006000 0 0x1000>;
-+			clocks = <&clk26m>,
-+				 <&topckgen CLK_TOP_MM_SEL>;
-+			clock-names = "mfg", "mm";
-+			infracfg = <&infracfg>;
-+		};
+ config MTK_PMIC_WRAP
+ 	tristate "MediaTek PMIC Wrapper Support"
+ 	depends on ARCH_MEDIATEK
+diff --git a/drivers/soc/mediatek/Makefile b/drivers/soc/mediatek/Makefile
+index ecaf4de..3fa940f 100644
+--- a/drivers/soc/mediatek/Makefile
++++ b/drivers/soc/mediatek/Makefile
+@@ -1 +1,2 @@
++obj-$(CONFIG_MTK_INFRACFG) += mtk-infracfg.o
+ obj-$(CONFIG_MTK_PMIC_WRAP) += mtk-pmic-wrap.o
+diff --git a/drivers/soc/mediatek/mtk-infracfg.c b/drivers/soc/mediatek/mtk-infracfg.c
+new file mode 100644
+index 0000000..ca786e0
+--- /dev/null
++++ b/drivers/soc/mediatek/mtk-infracfg.c
+@@ -0,0 +1,91 @@
++/*
++ * Copyright (c) 2015 Pengutronix, Sascha Hauer <kernel@pengutronix.de>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ */
 +
- 		sysirq: intpol-controller at 10200620 {
- 			compatible = "mediatek,mt8173-sysirq",
- 					"mediatek,mt6577-sysirq";
++#include <linux/export.h>
++#include <linux/jiffies.h>
++#include <linux/regmap.h>
++#include <linux/soc/mediatek/infracfg.h>
++#include <asm/processor.h>
++
++#define INFRA_TOPAXI_PROTECTEN		0x0220
++#define INFRA_TOPAXI_PROTECTSTA1	0x0228
++
++/**
++ * mtk_infracfg_set_bus_protection - enable bus protection
++ * @regmap: The infracfg regmap
++ * @mask: The mask containing the protection bits to be enabled.
++ *
++ * This function enables the bus protection bits for disabled power
++ * domains so that the system does not hanf when some unit accesses the
++ * bus while in power down.
++ */
++int mtk_infracfg_set_bus_protection(struct regmap *infracfg, u32 mask)
++{
++	unsigned long expired;
++	u32 val;
++	int ret;
++
++	regmap_update_bits(infracfg, INFRA_TOPAXI_PROTECTEN, mask, mask);
++
++	expired = jiffies + HZ;
++
++	while (1) {
++		ret = regmap_read(infracfg, INFRA_TOPAXI_PROTECTSTA1, &val);
++		if (ret)
++			return ret;
++
++		if ((val & mask) == mask)
++			break;
++
++		cpu_relax();
++		if (time_after(jiffies, expired))
++			return -EIO;
++	}
++
++	return 0;
++}
++
++/**
++ * mtk_infracfg_clear_bus_protection - disable bus protection
++ * @regmap: The infracfg regmap
++ * @mask: The mask containing the protection bits to be disabled.
++ *
++ * This function disables the bus protection bits previously enabled with
++ * mtk_infracfg_set_bus_protection.
++ */
++int mtk_infracfg_clear_bus_protection(struct regmap *infracfg, u32 mask)
++{
++	unsigned long expired;
++	int ret;
++
++	regmap_update_bits(infracfg, INFRA_TOPAXI_PROTECTEN, mask, 0);
++
++	expired = jiffies + HZ;
++
++	while (1) {
++		u32 val;
++
++		ret = regmap_read(infracfg, INFRA_TOPAXI_PROTECTSTA1, &val);
++		if (ret)
++			return ret;
++
++		if (!(val & mask))
++			break;
++
++		cpu_relax();
++		if (time_after(jiffies, expired))
++			return -EIO;
++	}
++
++	return 0;
++}
+diff --git a/include/linux/soc/mediatek/infracfg.h b/include/linux/soc/mediatek/infracfg.h
+new file mode 100644
+index 0000000..a5714e9
+--- /dev/null
++++ b/include/linux/soc/mediatek/infracfg.h
+@@ -0,0 +1,26 @@
++#ifndef __SOC_MEDIATEK_INFRACFG_H
++#define __SOC_MEDIATEK_INFRACFG_H
++
++#define MT8173_TOP_AXI_PROT_EN_MCI_M2		BIT(0)
++#define MT8173_TOP_AXI_PROT_EN_MM_M0		BIT(1)
++#define MT8173_TOP_AXI_PROT_EN_MM_M1		BIT(2)
++#define MT8173_TOP_AXI_PROT_EN_MMAPB_S		BIT(6)
++#define MT8173_TOP_AXI_PROT_EN_L2C_M2		BIT(9)
++#define MT8173_TOP_AXI_PROT_EN_L2SS_SMI		BIT(11)
++#define MT8173_TOP_AXI_PROT_EN_L2SS_ADD		BIT(12)
++#define MT8173_TOP_AXI_PROT_EN_CCI_M2		BIT(13)
++#define MT8173_TOP_AXI_PROT_EN_MFG_S		BIT(14)
++#define MT8173_TOP_AXI_PROT_EN_PERI_M0		BIT(15)
++#define MT8173_TOP_AXI_PROT_EN_PERI_M1		BIT(16)
++#define MT8173_TOP_AXI_PROT_EN_DEBUGSYS		BIT(17)
++#define MT8173_TOP_AXI_PROT_EN_CQ_DMA		BIT(18)
++#define MT8173_TOP_AXI_PROT_EN_GCPU		BIT(19)
++#define MT8173_TOP_AXI_PROT_EN_IOMMU		BIT(20)
++#define MT8173_TOP_AXI_PROT_EN_MFG_M0		BIT(21)
++#define MT8173_TOP_AXI_PROT_EN_MFG_M1		BIT(22)
++#define MT8173_TOP_AXI_PROT_EN_MFG_SNOOP_OUT	BIT(23)
++
++int mtk_infracfg_set_bus_protection(struct regmap *infracfg, u32 mask);
++int mtk_infracfg_clear_bus_protection(struct regmap *infracfg, u32 mask);
++
++#endif /* __SOC_MEDIATEK_INFRACFG_H */
+-- 
+2.1.4
