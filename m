@@ -1,99 +1,77 @@
 From: zhichao.huang@linaro.org (Zhichao Huang)
-Date: Mon, 22 Jun 2015 18:41:26 +0800
-Subject: [PATCH v3 03/11] KVM: arm: enable to use the ARM_DSCR_MDBGEN macro
- from KVM assembly code
+Date: Mon, 22 Jun 2015 18:41:28 +0800
+Subject: [PATCH v3 05/11] KVM: arm: check ordering of all system register
+ tables
 In-Reply-To: <1434969694-7432-1-git-send-email-zhichao.huang@linaro.org>
 References: <1434969694-7432-1-git-send-email-zhichao.huang@linaro.org>
-Message-ID: <1434969694-7432-4-git-send-email-zhichao.huang@linaro.org>
+Message-ID: <1434969694-7432-6-git-send-email-zhichao.huang@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add #ifndef __ASSEMBLY__ in hw_breakpoint.h, in order to use
-the ARM_DSCR_MDBGEN macro from KVM assembly code.
+We now have multiple tables for the various system registers
+we trap. Make sure we check the order of all of them, as it is
+critical that we get the order right (been there, done that...).
 
 Signed-off-by: Zhichao Huang <zhichao.huang@linaro.org>
-Reviewed-by: Alex Bennee <alex.bennee@linaro.org>
 ---
- arch/arm/include/asm/hw_breakpoint.h | 54 +++++++++++++++++++-----------------
- 1 file changed, 29 insertions(+), 25 deletions(-)
+ arch/arm/kvm/coproc.c | 26 +++++++++++++++++++++-----
+ 1 file changed, 21 insertions(+), 5 deletions(-)
 
-diff --git a/arch/arm/include/asm/hw_breakpoint.h b/arch/arm/include/asm/hw_breakpoint.h
-index 8e427c7..f2f4c61 100644
---- a/arch/arm/include/asm/hw_breakpoint.h
-+++ b/arch/arm/include/asm/hw_breakpoint.h
-@@ -3,6 +3,8 @@
+diff --git a/arch/arm/kvm/coproc.c b/arch/arm/kvm/coproc.c
+index d23395b..16d5f69 100644
+--- a/arch/arm/kvm/coproc.c
++++ b/arch/arm/kvm/coproc.c
+@@ -737,6 +737,9 @@ static struct coproc_reg invariant_cp15[] = {
+ 	{ CRn( 0), CRm( 0), Op1( 0), Op2( 3), is32, NULL, get_TLBTR },
+ 	{ CRn( 0), CRm( 0), Op1( 0), Op2( 6), is32, NULL, get_REVIDR },
  
- #ifdef __KERNEL__
- 
-+#ifndef __ASSEMBLY__
++	{ CRn( 0), CRm( 0), Op1( 1), Op2( 1), is32, NULL, get_CLIDR },
++	{ CRn( 0), CRm( 0), Op1( 1), Op2( 7), is32, NULL, get_AIDR },
 +
- struct task_struct;
+ 	{ CRn( 0), CRm( 1), Op1( 0), Op2( 0), is32, NULL, get_ID_PFR0 },
+ 	{ CRn( 0), CRm( 1), Op1( 0), Op2( 1), is32, NULL, get_ID_PFR1 },
+ 	{ CRn( 0), CRm( 1), Op1( 0), Op2( 2), is32, NULL, get_ID_DFR0 },
+@@ -752,9 +755,6 @@ static struct coproc_reg invariant_cp15[] = {
+ 	{ CRn( 0), CRm( 2), Op1( 0), Op2( 3), is32, NULL, get_ID_ISAR3 },
+ 	{ CRn( 0), CRm( 2), Op1( 0), Op2( 4), is32, NULL, get_ID_ISAR4 },
+ 	{ CRn( 0), CRm( 2), Op1( 0), Op2( 5), is32, NULL, get_ID_ISAR5 },
+-
+-	{ CRn( 0), CRm( 0), Op1( 1), Op2( 1), is32, NULL, get_CLIDR },
+-	{ CRn( 0), CRm( 0), Op1( 1), Op2( 7), is32, NULL, get_AIDR },
+ };
  
- #ifdef CONFIG_HAVE_HW_BREAKPOINT
-@@ -44,6 +46,33 @@ static inline void decode_ctrl_reg(u32 reg,
- 	ctrl->mismatch	= reg & 0x1;
+ /*
+@@ -1297,13 +1297,29 @@ int kvm_arm_copy_coproc_indices(struct kvm_vcpu *vcpu, u64 __user *uindices)
+ 	return write_demux_regids(uindices);
  }
  
-+struct notifier_block;
-+struct perf_event;
-+struct pmu;
++static int check_sysreg_table(const struct coproc_reg *table, unsigned int n)
++{
++	unsigned int i;
 +
-+extern struct pmu perf_ops_bp;
-+extern int arch_bp_generic_fields(struct arch_hw_breakpoint_ctrl ctrl,
-+				  int *gen_len, int *gen_type);
-+extern int arch_check_bp_in_kernelspace(struct perf_event *bp);
-+extern int arch_validate_hwbkpt_settings(struct perf_event *bp);
-+extern int hw_breakpoint_exceptions_notify(struct notifier_block *unused,
-+					   unsigned long val, void *data);
++	for (i = 1; i < n; i++) {
++		if (cmp_reg(&table[i-1], &table[i]) >= 0) {
++			kvm_err("sys_reg table %p out of order (%d)\n",
++					table, i - 1);
++			return 1;
++		}
++	}
 +
-+extern u8 arch_get_debug_arch(void);
-+extern u8 arch_get_max_wp_len(void);
-+extern void clear_ptrace_hw_breakpoint(struct task_struct *tsk);
++	return 0;
++}
 +
-+int arch_install_hw_breakpoint(struct perf_event *bp);
-+void arch_uninstall_hw_breakpoint(struct perf_event *bp);
-+void hw_breakpoint_pmu_read(struct perf_event *bp);
-+int hw_breakpoint_slots(int type);
-+
-+#else
-+static inline void clear_ptrace_hw_breakpoint(struct task_struct *tsk) {}
-+
-+#endif	/* CONFIG_HAVE_HW_BREAKPOINT */
-+#endif  /* __ASSEMBLY */
-+
- /* Debug architecture numbers. */
- #define ARM_DEBUG_ARCH_RESERVED	0	/* In case of ptrace ABI updates. */
- #define ARM_DEBUG_ARCH_V6	1
-@@ -110,30 +139,5 @@ static inline void decode_ctrl_reg(u32 reg,
- 	asm volatile("mcr p14, 0, %0, " #N "," #M ", " #OP2 : : "r" (VAL));\
- } while (0)
+ void kvm_coproc_table_init(void)
+ {
+ 	unsigned int i;
  
--struct notifier_block;
--struct perf_event;
--struct pmu;
--
--extern struct pmu perf_ops_bp;
--extern int arch_bp_generic_fields(struct arch_hw_breakpoint_ctrl ctrl,
--				  int *gen_len, int *gen_type);
--extern int arch_check_bp_in_kernelspace(struct perf_event *bp);
--extern int arch_validate_hwbkpt_settings(struct perf_event *bp);
--extern int hw_breakpoint_exceptions_notify(struct notifier_block *unused,
--					   unsigned long val, void *data);
--
--extern u8 arch_get_debug_arch(void);
--extern u8 arch_get_max_wp_len(void);
--extern void clear_ptrace_hw_breakpoint(struct task_struct *tsk);
--
--int arch_install_hw_breakpoint(struct perf_event *bp);
--void arch_uninstall_hw_breakpoint(struct perf_event *bp);
--void hw_breakpoint_pmu_read(struct perf_event *bp);
--int hw_breakpoint_slots(int type);
--
--#else
--static inline void clear_ptrace_hw_breakpoint(struct task_struct *tsk) {}
--
--#endif	/* CONFIG_HAVE_HW_BREAKPOINT */
- #endif	/* __KERNEL__ */
- #endif	/* _ARM_HW_BREAKPOINT_H */
+ 	/* Make sure tables are unique and in order. */
+-	for (i = 1; i < ARRAY_SIZE(cp15_regs); i++)
+-		BUG_ON(cmp_reg(&cp15_regs[i-1], &cp15_regs[i]) >= 0);
++	BUG_ON(check_sysreg_table(cp14_regs, ARRAY_SIZE(cp14_regs)));
++	BUG_ON(check_sysreg_table(cp15_regs, ARRAY_SIZE(cp15_regs)));
++	BUG_ON(check_sysreg_table(invariant_cp15, ARRAY_SIZE(invariant_cp15)));
+ 
+ 	/* We abuse the reset function to overwrite the table itself. */
+ 	for (i = 0; i < ARRAY_SIZE(invariant_cp15); i++)
 -- 
 1.7.12.4
