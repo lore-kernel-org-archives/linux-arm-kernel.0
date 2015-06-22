@@ -1,115 +1,63 @@
-From: eddie.huang@mediatek.com (Eddie Huang)
-Date: Mon, 22 Jun 2015 11:36:10 +0800
-Subject: [PATCH v4 2/2] arm64: dts: mt8173: Add I2C device node
-In-Reply-To: <CAGS+omCVFwHndKSN0A7PrYUArfPLfCoL6iiSJYEik1PVkMBrKA@mail.gmail.com>
-References: <1434553683-11651-1-git-send-email-eddie.huang@mediatek.com>
- <1434553683-11651-3-git-send-email-eddie.huang@mediatek.com>
- <CAGS+omCVFwHndKSN0A7PrYUArfPLfCoL6iiSJYEik1PVkMBrKA@mail.gmail.com>
-Message-ID: <1434944170.25921.6.camel@mtksdaap41>
+From: jamesjj.liao@mediatek.com (James Liao)
+Date: Mon, 22 Jun 2015 11:38:37 +0800
+Subject: [PATCH] arm64: dts: mt8173: add clock_null
+In-Reply-To: <8371528.SNAmOgosfF@phil>
+References: <1434605351-64592-1-git-send-email-eddie.huang@mediatek.com>
+ <2333431.ttvjElY3ps@phil> <8371528.SNAmOgosfF@phil>
+Message-ID: <1434944317.25948.8.camel@mtksdaap41>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Dan,
+Hi Heiko,
 
-On Thu, 2015-06-18 at 23:16 +0800, Daniel Kurtz wrote:
-> On Wed, Jun 17, 2015 at 11:08 PM, Eddie Huang <eddie.huang@mediatek.com> wrote:
-> > Add MT8173 I2C device nodes, include I2C controllers and pins.
-> > MT8173 has six I2C controllers, from i2c0 to i2c6, exclude i2c5.
-> > The 6th I2C controller register base doesn't next to 5th I2C,
-> > and there is a hardware between 5th and 6th I2C controller. So
-> > SoC designer name 6th controller as "i2c6", not "i2c5".
-> >
-> > Signed-off-by: Eddie Huang <eddie.huang@mediatek.com>
-> > ---
-> >  arch/arm64/boot/dts/mediatek/mt8173.dtsi | 144 +++++++++++++++++++++++++++++++
-> >  1 file changed, 144 insertions(+)
-> >
-> > diff --git a/arch/arm64/boot/dts/mediatek/mt8173.dtsi b/arch/arm64/boot/dts/mediatek/mt8173.dtsi
-> > index b52ec43..1816c8f 100644
-> > --- a/arch/arm64/boot/dts/mediatek/mt8173.dtsi
-> > +++ b/arch/arm64/boot/dts/mediatek/mt8173.dtsi
-> > @@ -158,6 +158,54 @@
-> >                         interrupts = <GIC_SPI 145 IRQ_TYPE_LEVEL_HIGH>,
-> >                                                 <GIC_SPI 146 IRQ_TYPE_LEVEL_HIGH>,
-> >                                                 <GIC_SPI 147 IRQ_TYPE_LEVEL_HIGH>;
-> > +
-> > +                       i2c0_pins_a: i2c0 {
-> > +                               pins1 {
-> > +                                       pinmux = <MT8173_PIN_45_SDA0__FUNC_SDA0>,
-> > +                                                <MT8173_PIN_46_SCL0__FUNC_SCL0>;
-> > +                                       bias-disable;
-> > +                               };
-> > +                       };
-> > +
-> > +                       i2c1_pins_a: i2c1 {
-> > +                               pins1 {
-> > +                                       pinmux = <MT8173_PIN_125_SDA1__FUNC_SDA1>,
-> > +                                                <MT8173_PIN_126_SCL1__FUNC_SCL1>;
-> > +                                       bias-disable;
-> > +                               };
-> > +                       };
-> > +
-> > +                       i2c2_pins_a: i2c2 {
-> > +                               pins1 {
-> > +                                       pinmux = <MT8173_PIN_43_SDA2__FUNC_SDA2>,
-> > +                                                <MT8173_PIN_44_SCL2__FUNC_SCL2>;
-> > +                                       bias-disable;
-> > +                               };
-> > +                       };
-> > +
-> > +                       i2c3_pins_a: i2c3 {
-> > +                               pins1 {
-> > +                                       pinmux = <MT8173_PIN_106_SDA3__FUNC_SDA3>,
-> > +                                                <MT8173_PIN_107_SCL3__FUNC_SCL3>;
-> > +                                       bias-disable;
-> > +                               };
-> > +                       };
-> > +
-> > +                       i2c4_pins_a: i2c4 {
-> > +                               pins1 {
-> > +                                       pinmux = <MT8173_PIN_133_SDA4__FUNC_SDA4>,
-> > +                                                <MT8173_PIN_134_SCL4__FUNC_SCL4>;
-> > +                                       bias-disable;
-> > +                               };
-> > +                       };
-> > +
-> > +                       i2c6_pins_a: i2c6 {
-> > +                               pins1 {
-> > +                                       pinmux = <MT8173_PIN_100_MSDC2_DAT0__FUNC_SDA5>,
-> > +                                                <MT8173_PIN_101_MSDC2_DAT1__FUNC_SCL5>;
-> > +                                       bias-disable;
-> > +                               };
-> > +                       };
-> >                 };
-> >
-> >                 watchdog: watchdog at 10007000 {
-> > @@ -229,6 +277,102 @@
-> >                         clocks = <&uart_clk>;
-> >                         status = "disabled";
-> >                 };
-> > +
-> > +               i2c0: i2c at 11007000 {
-> > +                       compatible = "mediatek,mt8173-i2c";
-> > +                       reg = <0 0x11007000 0 0x70>,
-> > +                             <0 0x11000100 0 0x80>;
-> > +                       interrupts = <GIC_SPI 76 IRQ_TYPE_LEVEL_LOW>;
-> > +                       clock-div = <16>;
+On Fri, 2015-06-19 at 13:36 +0200, Heiko Stuebner wrote:
+> Am Donnerstag, 18. Juni 2015, 18:15:03 schrieb Heiko Stuebner:
+> > Am Donnerstag, 18. Juni 2015, 13:29:11 schrieb Eddie Huang:
+> > > Add clk_null, which represents clocks that can not / need not
+> > > controlled by software.
+> > > There are many clocks' parent set to clk_null.
+> > 
+> > Devicetree is supposed to describe hardware, and ideally not what software
+> > does with it. If the clock simply cannot be controlled by software, it will
+> > still have a rate and I think it should probably be modelled - similarly we
+> > sometimes have fixed regulators that also are not software controllable.
+> > 
+> > 
+> > While it might be ok to define dummy clocks as a temporary stopgap, these
+> > should definitly be marked as such. This clk_null at least sounds like there
+> > is no plan to replace this with a real solution at some point.
+> > 
+> > And of course a bit of context would be cool, to know which type of clocks
+> > this actually replaces.
 > 
-> According to the i2c-mt6577 dt binding:
->    - clock-div: the fixed value for frequency divider of clock source in i2c
->      module. Each IC may be different.
+> After looking a bit more into this, I'm feel that the clk_null approach is 
+> wrong.
 > 
-> For other drivers I've seen this kind of hardware-specific value
-> implemented as a table in the driver that is indexed based on the
-> compatible.
+> For one, even if the clk_null stuff would be ok, the binding doc of the clock 
+> controller does not describe the need of this specific clock at all.
 > 
-> Any particular reason to specify it here in every device tree node instead?
 > 
+> The other more important point, looking at clk-mt8173 I see at least these 
+> clocks being set as children of "clk_null":
+> 
+> static const struct mtk_fixed_factor root_clk_alias[] __initconst = {
+> 	FACTOR(CLK_TOP_CLKPH_MCK_O, "clkph_mck_o", "clk_null", 1, 1),
+> 	FACTOR(CLK_TOP_DPI, "dpi_ck", "clk_null", 1, 1),
+> 	FACTOR(CLK_TOP_USB_SYSPLL_125M, "usb_syspll_125m", "clk_null", 1, 1),
+> 	FACTOR(CLK_TOP_HDMITX_DIG_CTS, "hdmitx_dig_cts", "clk_null", 1, 1),
+> };
+> 
+> 
+> These look more like they are fed from some external source to the clock 
+> controller? I did ask Matthias but he also couldn't find anything describing 
+> where these clocks actually come from.
 
-If put in device tree, it is not necessary to add new compatible if new
-SoC has the same I2C controller hardware except clock-div.The benefit is
-keep driver clean, but the side-effect is add clock-div in device node.I
-assume clock-div has the same concept of clock, so I put in device tree.
+Some clocks such as clkph_mck_o, we don't really care where they come
+from and what frequencies are. We model these clocks just because they
+or their derived clocks can be the source of topckgen muxes. Is there a
+better way to model "don't care" clocks?
 
-Eddie
-Thanks
+
+Best regards,
+
+James
