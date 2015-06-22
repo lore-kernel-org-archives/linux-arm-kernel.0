@@ -1,111 +1,79 @@
-From: benoar@dolka.fr (Benjamin Cama)
-Date: Mon, 22 Jun 2015 21:42:42 +0200
-Subject: SERIAL_OF_PLATFORM default setting for DT headless systems
-In-Reply-To: <20150622182348.GP2936@io.lakedaemon.net>
-References: <97db3502cd014faf1c710b1cc0fe8848@dolka.fr>
- <55827D64.1090307@free-electrons.com> <1434678624.4767.22.camel@dolka.fr>
- <5583E1D9.2010002@free-electrons.com>
- <20150619114152.GA2936@io.lakedaemon.net>
- <1434760119.5177.6.camel@dolka.fr> <20150620143609.GE1116@lunn.ch>
- <1434908164.5657.15.camel@dolka.fr> <20150621200757.GA12665@lunn.ch>
- <1434995000.5657.42.camel@dolka.fr>
- <20150622182348.GP2936@io.lakedaemon.net>
-Message-ID: <1435002162.5657.56.camel@dolka.fr>
+From: computersforpeace@gmail.com (Brian Norris)
+Date: Mon, 22 Jun 2015 12:47:14 -0700
+Subject: [PATCH 0/7] soc: brcmstb: add system suspend support for STB SoCs
+In-Reply-To: <1434672696-13632-1-git-send-email-computersforpeace@gmail.com>
+References: <1434672696-13632-1-git-send-email-computersforpeace@gmail.com>
+Message-ID: <20150622194714.GM4917@ld-irv-0074>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le lundi 22 juin 2015 ? 18:23 +0000, Jason Cooper a ?crit :
-> On Mon, Jun 22, 2015 at 07:43:20PM +0200, Benjamin Cama wrote:
-> > Le dimanche 21 juin 2015 ?? 22:07 +0200, Andrew Lunn a ??crit :
-> > > On Sun, Jun 21, 2015 at 07:36:04PM +0200, Benjamin Cama wrote:
-> > > > Le samedi 20 juin 2015 ?? 16:36 +0200, Andrew Lunn a ??crit :
-> > > > > > 
-> > > > > > > SERIAL_OF_PLATFORM?
-> > > > > > 
-> > > > > > Oh, and that was it!
-> > > > > 
-> > > > > This used to catch us all out a lot. What configuration are you using?
-> > > > > orion5x_defconfig? Very likely a patch adding it to that would be
-> > > > > accepted.
-> > > > 
-> > > > None. Sorry, I am used to the x86 world where I almost never used
-> > > > default configs (and it's been a long time, too). I admit I never fully
-> > > > understood the logic behind the defconfigs, apart from it meaning some
-> > > > kind of ???less important??? dependency on some specific options. Shouldn't
-> > > > the main UART be a ???hard??? dependency on every board?!
-> > > 
-> > > You say you are from the x86 world. When did you last use a serial
-> > > console on an x86?
-> > 
-> > Almost daily on my headless VMs ;-) But more seriously, yes, this is
-> > very uncommon today. But on x86 you have virtual terminals on your
-> > graphic output; NAS boxes don't have them (well, maybe some high-end
-> > model, but it is uncommon).
-> > 
-> > > Anyway, the thinking at the time was that for most
-> > > NAS boxes, there is no DB-9 on the back. You have to open up the case,
-> > > and connect to a header, or even solder wires to the board, in order
-> > > to use a TTL-Serial converter. Very few people actually do that, so
-> > > why make the kernel a bit bigger?
-> > 
-> > Is this really a size problem? Because having a serial port on a
-> > *headless* machine is the most useful thing I can think of. So, to me,
-> > this option should definitely be activated on headless systems by
-> > default, even if the kernel grows a bit because of it. But I agree that
-> > it is useless without some advanced access to the serial port, which is
-> > not very common. OTOH, I think only people who have such access run non
-> > -stock kernels (i.e. the very one we are integrating right here,
-> > because vendors don't care after they shipped their device).
-> > 
-> > > But we have moved on since then, mostly because we ourselves have
-> > > forgotten this option too many times. We have SERIAL_OF_PLATFORM
-> > > enabled in the _defconfig.
-> > 
-> > That is nice to have it in the defconfig, thanks for that. But I really
-> > think one should consider again having some dependency on it for some
-> > headless platforms. I would really like to have other arguments against
-> > my view apart from size problems.
++ others
+
+On Thu, Jun 18, 2015 at 05:11:29PM -0700, Brian Norris wrote:
+> Hi,
 > 
-> Well, it really comes down to the roles for Kconfig vice defconfigs.  If
-> we say a driver or a board 'selects' or 'depends' on something, then we
-> are saying either "The build will break without it", or "The board will
-> fail to boot without it".  Neither is true for SERIAL_OF_PLATFORM.
+> This patch set introduces system suspend/resume support for Broadcom STB SoCs.
+> There are two suspend modes (S2 and S3) as well as a related low-power shutdown
+> mode (S5).
+> 
+> Along with the core PM support, include a driver for the wakeup-timer, which
+> allows for simple testing of suspend/resume wakeup cycles.
+> 
+> Brian
 
-OK, I get that.
+Somehow I completely missed out on sending this to a few of the right
+places, like linux-pm and the PM maintainers. I guess I just trusted
+get_maintainer.pl (which doesn't know what to do with drivers/soc/) too
+much, and forgot to turn my brain on...
 
-> The defconfigs have a much looser accepted definition of "a generally
-> minimal, but useful set of features for an SoC, platform or
-> multi-platform".
+Anyway, if y'all can track down the patches via archives, feel free. Or
+I will resend this shortly as a v2, with a few suggested fixes and with
+a more complete CC list.
 
-OK. That is the difference I was trying to understand when talking
-about ?hard? or ?less important? dependency. Now I understand what are
-the Kconfigs about: just the minimal stuff.
+Regards,
+Brian
 
-> Since the Kconfigs make something a hard requirement for *all* users, we
-> try to avoid setting those unless necessary.  I know I can't predict all
-> the various usecases for an arm kernel, so we try to avoid forcing
-> decisions on users.
->
-> The defconfigs fill the gap nicely because a user can start with a
-> defconfig, then enable/disable features according to their specific
-> use-case.
-
-OK, I get the idea of their use. The assumption I had about defconfig
-was right, but I didn't know the Kconfig was the absolute minimal
-stuff; I thought it was maybe some ?good default without too much
-cruft?, but I was wrong.
-
-> As for arguments other than size (which I think is a good one, but
-> still), I like security posture.  I have implemented several systems,
-> where the design criteria was to remove everything not actually in use.
-> The serial port driver was one of many features removed from the system.
-> The physical serial port remained if we needed to run the debug image on
-> a board.  If SERIAL_OF_PLATFORM was a depend, then I would have had to
-> carry yet another patch outside of mainline.
-
-Thanks for pointing that out, too, I hadn't think of it. And sorry if I
-sounded too assertive.
-
-Thanks again for the very good explanation,
---
-benjamin
+> Brian Norris (7):
+>   Documentation: dt: brcmstb: add system PM bindings
+>   Documentation: dt: brcmstb: add waketimer documentation
+>   soc: add stubs for brcmstb SoC's
+>   soc: brcmstb: add PM suspend/resume support (S2/S3/S5)
+>   soc: brcmstb: add wake-timer driver
+>   ARM: brcmstb: mask GIC IRQs on suspend
+>   ARM: dts: brcmstb: add BCM7445 system PM DT nodes
+> 
+>  .../ABI/testing/sysfs-driver-wktmr-brcmstb         |  12 +
+>  .../devicetree/bindings/arm/bcm/brcm,brcmstb.txt   | 142 +++++-
+>  .../soc/brcmstb/brcm,brcmstb-waketimer.txt         |  20 +
+>  arch/arm/boot/dts/bcm7445.dtsi                     | 102 ++++
+>  arch/arm/mach-bcm/Kconfig                          |   1 +
+>  arch/arm/mach-bcm/brcmstb.c                        |  10 +
+>  drivers/soc/Kconfig                                |   1 +
+>  drivers/soc/Makefile                               |   1 +
+>  drivers/soc/brcmstb/Kconfig                        |  22 +
+>  drivers/soc/brcmstb/Makefile                       |   4 +
+>  drivers/soc/brcmstb/common.c                       |  33 ++
+>  drivers/soc/brcmstb/pm/Makefile                    |   1 +
+>  drivers/soc/brcmstb/pm/aon_defs.h                  |  85 ++++
+>  drivers/soc/brcmstb/pm/pm.c                        | 512 +++++++++++++++++++++
+>  drivers/soc/brcmstb/pm/pm.h                        |  40 ++
+>  drivers/soc/brcmstb/pm/s2.S                        |  73 +++
+>  drivers/soc/brcmstb/wktmr.c                        | 242 ++++++++++
+>  include/soc/brcmstb/common.h                       |  15 +
+>  18 files changed, 1314 insertions(+), 2 deletions(-)
+>  create mode 100644 Documentation/ABI/testing/sysfs-driver-wktmr-brcmstb
+>  create mode 100644 Documentation/devicetree/bindings/soc/brcmstb/brcm,brcmstb-waketimer.txt
+>  create mode 100644 drivers/soc/brcmstb/Kconfig
+>  create mode 100644 drivers/soc/brcmstb/Makefile
+>  create mode 100644 drivers/soc/brcmstb/common.c
+>  create mode 100644 drivers/soc/brcmstb/pm/Makefile
+>  create mode 100644 drivers/soc/brcmstb/pm/aon_defs.h
+>  create mode 100644 drivers/soc/brcmstb/pm/pm.c
+>  create mode 100644 drivers/soc/brcmstb/pm/pm.h
+>  create mode 100644 drivers/soc/brcmstb/pm/s2.S
+>  create mode 100644 drivers/soc/brcmstb/wktmr.c
+>  create mode 100644 include/soc/brcmstb/common.h
+> 
+> -- 
+> 1.9.1
+> 
