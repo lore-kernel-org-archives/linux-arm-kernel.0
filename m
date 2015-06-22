@@ -1,27 +1,64 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Mon, 22 Jun 2015 15:48:32 -0700
-Subject: [PATCH v3 0/3] clk: stm32: Add clock driver for STM32F4[23]xxx
- devices
-In-Reply-To: <1433966978-24422-1-git-send-email-daniel.thompson@linaro.org>
-References: <1432327273-6810-1-git-send-email-daniel.thompson@linaro.org>
- <1433966978-24422-1-git-send-email-daniel.thompson@linaro.org>
-Message-ID: <20150622224832.GI22132@codeaurora.org>
+From: ankgupta@codeaurora.org (Ankit Gupta)
+Date: Mon, 22 Jun 2015 17:05:10 -0600
+Subject: [PATCH v2] trace/events: add chip name and hwirq to irq entry
+ tracepoint
+Message-ID: <1435014310-2080-1-git-send-email-ankgupta@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/10, Daniel Thompson wrote:
-> This patchset implements a clock driver for STM32F42xxx and STM32F43xxx
-> series devices. It supports decoding the state configured by the
-> bootloader (PLL, clock select, bus dividers) and all the gates clocks.
-> It does not currently support the I2S and SAI PLLs.
-> 
-> Relies on "Add support to STMicroeletronics STM32 family" v9 by Maxime
-> Coquelin: http://thread.gmane.org/gmane.linux.kernel/1961049 .
-> 
+Add chip name and hw-irq number to the trace_irq_handler_entry()
+tracepoint. When tracing interrupt events the chip-name and hw-irq
+numbers are stable and known in advance. This makes them a better
+choice as a filtering criteria for the trace buffer dump. On the
+flipside, the os-irq numbers are dynamically allocated which makes
+them difficult to use for the same purpose.
 
-I applied 1 and 2. Looks like #3 should go through arm-soc at
-some later time?
+Dump messages will look like:
+...irq_handler_entry: irq=22 name=msm_serial0 domain=GIC hwirq=140
 
+Suggested-by: Stephen Boyd <sboyd@codeaurora.org>
+Reviewed-by: Andy Gross <agross@codeaurora.org>
+Signed-off-by: Gilad Avidov <gavidov@codeaurora.org>
+Signed-off-by: Ankit Gupta <ankgupta@codeaurora.org>
+---
+Changes since V1:
+- added reviewed by Andy Gross
+---
+ include/trace/events/irq.h | 15 ++++++++++++++-
+ 1 file changed, 14 insertions(+), 1 deletion(-)
+
+diff --git a/include/trace/events/irq.h b/include/trace/events/irq.h
+index 3608beb..5370075 100644
+--- a/include/trace/events/irq.h
++++ b/include/trace/events/irq.h
+@@ -23,6 +23,17 @@ struct softirq_action;
+ 			 softirq_name(HRTIMER),		\
+ 			 softirq_name(RCU))
+ 
++
++#define show_chip_name(irq)					\
++	(irq_get_irq_data(irq)					\
++			 ? irq_get_irq_data(irq)->chip->name	\
++			 : "NULL")
++
++#define show_hwirq(irq)						\
++	(irq_get_irq_data(irq)					\
++			 ? irq_get_irq_data(irq)->hwirq		\
++			 : -ENODEV)
++
+ /**
+  * irq_handler_entry - called immediately before the irq action handler
+  * @irq: irq number
+@@ -50,7 +61,9 @@ TRACE_EVENT(irq_handler_entry,
+ 		__assign_str(name, action->name);
+ 	),
+ 
+-	TP_printk("irq=%d name=%s", __entry->irq, __get_str(name))
++	TP_printk("irq=%d name=%s chip_name=%s hwirq=%ld", __entry->irq,
++	  __get_str(name), show_chip_name(__entry->irq),
++	  show_hwirq(__entry->irq))
+ );
+ 
+ /**
 -- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+1.8.5.2
