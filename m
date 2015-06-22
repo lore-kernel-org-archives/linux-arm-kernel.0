@@ -1,34 +1,50 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Mon, 22 Jun 2015 16:43:49 +0100
-Subject: [PATCH 0/8] cpufreq: Introduce support for ST's cpufreq functionality
-Message-ID: <1434987837-24212-1-git-send-email-lee.jones@linaro.org>
+Date: Mon, 22 Jun 2015 16:43:50 +0100
+Subject: [PATCH 1/8] ARM: STi: STiH407: Provide generic (safe) DVFS
+ configuration
+In-Reply-To: <1434987837-24212-1-git-send-email-lee.jones@linaro.org>
+References: <1434987837-24212-1-git-send-email-lee.jones@linaro.org>
+Message-ID: <1434987837-24212-2-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This driver reads very platform specific information in from Device Tree
-and translates it into frequency tables.  The generic drivers then use the
-tables to conduct frequency and voltage scaling in the normal way.
+You'll notice that the voltage cell is populated with 0's.  Voltage
+information is very platform specific, even depends on 'cut' and
+'substrate' versions.  Thus it is left blank for a generic (safe)
+implementation.  If other nodes/properties are provided by the
+bootloader, the ST CPUFreq driver will over-ride these generic
+values.
 
-Lee Jones (8):
-  ARM: STi: STiH407: Provide generic (safe) DVFS configuration
-  ARM: STi: STiH407: Provide CPU with clocking information
-  ARM: STi: STiH407: Link CPU with its voltage supply
-  ARM: STi: STiH407: Provide a node for CPUFreq
-  ARM: STi: STiH407: Move PWM nodes STiH407 => STiH407-family
-  ARM: multi_v7_defconfig: Enable support for PWM Regulators
-  cpufreq: st: Provide runtime initialised driver for ST's platforms
-  dt: cpufreq: st: Provide bindings for ST's CPUFreq implementation
+Signed-off-by: Lee Jones <lee.jones@linaro.org>
+---
+ arch/arm/boot/dts/stih407-family.dtsi | 10 ++++++++++
+ 1 file changed, 10 insertions(+)
 
- .../devicetree/bindings/cpufreq/cpufreq-st.txt     |  48 +++
- arch/arm/boot/dts/stih407-family.dtsi              |  49 +++
- arch/arm/boot/dts/stih407.dtsi                     |  28 --
- arch/arm/configs/multi_v7_defconfig                |   1 +
- drivers/cpufreq/Kconfig.arm                        |   7 +
- drivers/cpufreq/Makefile                           |   1 +
- drivers/cpufreq/st-cpufreq.c                       | 450 +++++++++++++++++++++
- 7 files changed, 556 insertions(+), 28 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/cpufreq/cpufreq-st.txt
- create mode 100644 drivers/cpufreq/st-cpufreq.c
-
+diff --git a/arch/arm/boot/dts/stih407-family.dtsi b/arch/arm/boot/dts/stih407-family.dtsi
+index be201aa..2680ac7 100644
+--- a/arch/arm/boot/dts/stih407-family.dtsi
++++ b/arch/arm/boot/dts/stih407-family.dtsi
+@@ -22,11 +22,21 @@
+ 			device_type = "cpu";
+ 			compatible = "arm,cortex-a9";
+ 			reg = <0>;
++					 /* kHz     uV   */
++			operating-points = <1500000 0
++					    1200000 0
++					    800000  0
++					    500000  0>;
+ 		};
+ 		cpu at 1 {
+ 			device_type = "cpu";
+ 			compatible = "arm,cortex-a9";
+ 			reg = <1>;
++					 /* kHz     uV   */
++			operating-points = <1500000 0
++					    1200000 0
++					    800000  0
++					    500000  0>;
+ 		};
+ 	};
+ 
 -- 
 1.9.1
