@@ -1,84 +1,130 @@
-From: m-karicheri2@ti.com (Murali Karicheri)
-Date: Mon, 22 Jun 2015 16:50:41 -0400
-Subject: [PATCH] ARM: keystone: ecc: add ddr3 ecc interrupt handling
-In-Reply-To: <558436C1.3050402@oracle.com>
-References: <1434654589-28157-1-git-send-email-vitalya@ti.com>
- <558436C1.3050402@oracle.com>
-Message-ID: <55887521.7010708@ti.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Mon, 22 Jun 2015 22:52:13 +0200
+Subject: Build regressions/improvements in v4.1
+In-Reply-To: <1435006096-12470-1-git-send-email-geert@linux-m68k.org>
+References: <1435006096-12470-1-git-send-email-geert@linux-m68k.org>
+Message-ID: <CAMuHMdXprKyxirhUZBzNV97oxymcMqeugKixTEC8ojcMq3EeDw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/19/2015 11:35 AM, santosh shilimkar wrote:
-> On 6/18/2015 12:09 PM, Vitaly Andrianov wrote:
->> This patch adds ARM L1/L2 ECC handler support and DDR3 ECC interrupt
->> handling for Keystone II devices, the kernel will reboot if the error
->> is 2-bit error for DDR ECC or L1/L2 ECC error.
->>
->> Signed-off-by: Hao Zhang <hzhang@ti.com>
->> Signed-off-by: Murali Karicheri <m-karicheri2@ti.com>
->> Signed-off-by: Vitaly Andrianov <vitalya@ti.com>
->> ---
->>   arch/arm/mach-keystone/Makefile       |  2 +-
->>   arch/arm/mach-keystone/keystone.c     | 63 ++++++++++++++++++++++++--
->>   arch/arm/mach-keystone/keystone.h     |  1 +
->>   arch/arm/mach-keystone/keystone_ecc.c | 85
->> +++++++++++++++++++++++++++++++++++
->>   arch/arm/mach-keystone/platsmp.c      |  3 +-
->>   5 files changed, 148 insertions(+), 6 deletions(-)
->>   create mode 100644 arch/arm/mach-keystone/keystone_ecc.c
->>
+On Mon, Jun 22, 2015 at 10:48 PM, Geert Uytterhoeven
+<geert@linux-m68k.org> wrote:
+> JFYI, when comparing v4.1[1] to v4.1-rc8[3], the summaries are:
+>   - build errors: +44/-7
 
->>
->> @@ -49,6 +54,56 @@ static int keystone_platform_notifier(struct
->> notifier_block *nb,
->>       return NOTIFY_OK;
->>   }
->>
-> +RMK. Would like to know if he wish to have below code in
-> generic ARM code
->
->> +#define L2_INTERN_ASYNC_ERROR  BIT(30)
->> +
->> +static irqreturn_t arm_l1l2_ecc_err_irq_handler(int irq, void *reg_virt)
->> +{
->> +    int ret = IRQ_NONE;
->> +    u32 status, fault;
->> +
->> +    /* read and clear L2ECTLR CP15 register for L2 ECC error */
->> +    asm("mrc p15, 1, %0, c9, c0, 3" : "=r"(status));
->> +
->> +    if (status & L2_INTERN_ASYNC_ERROR) {
->> +        status &= ~L2_INTERN_ASYNC_ERROR;
->> +        asm("mcr p15, 1, %0, c9, c0, 3" : : "r" (status));
->> +        asm("mcr p15, 0, %0, c5, c1, 0" : "=r" (fault));
->> +        /*
->> +         * Do a machine restart as this is double bit ECC error
->> +         * that can't be corrected
->> +         */
->> +        pr_err("ARM Cortex A15 L1/L2 ECC error, CP15 ADFSR 0x%x\n",
->> +               fault);
->> +        machine_restart(NULL);
->> +        ret = IRQ_HANDLED;
->> +    }
->> +    return ret;
-> So your non-double bit errors even though handled returns as IRQ_NONE.
+  + /home/kisskb/slave/src/arch/arm/mm/dump.c: error:
+'L_PTE_MT_BUFFERABLE' undeclared here (not in a function):  => 81:10
+  + /home/kisskb/slave/src/arch/arm/mm/dump.c: error:
+'L_PTE_MT_DEV_CACHED' undeclared here (not in a function):  => 117:10
+  + /home/kisskb/slave/src/arch/arm/mm/dump.c: error:
+'L_PTE_MT_DEV_NONSHARED' undeclared here (not in a function):  =>
+108:10
+  + /home/kisskb/slave/src/arch/arm/mm/dump.c: error:
+'L_PTE_MT_DEV_SHARED' undeclared here (not in a function):  => 103:10
+  + /home/kisskb/slave/src/arch/arm/mm/dump.c: error:
+'L_PTE_MT_DEV_WC' undeclared here (not in a function):  => 113:10
+  + /home/kisskb/slave/src/arch/arm/mm/dump.c: error: 'L_PTE_MT_MASK'
+undeclared here (not in a function):  => 76:11
+  + /home/kisskb/slave/src/arch/arm/mm/dump.c: error:
+'L_PTE_MT_MINICACHE' undeclared here (not in a function):  => 94:10
+  + /home/kisskb/slave/src/arch/arm/mm/dump.c: error:
+'L_PTE_MT_UNCACHED' undeclared here (not in a function):  => 77:10
+  + /home/kisskb/slave/src/arch/arm/mm/dump.c: error:
+'L_PTE_MT_WRITEALLOC' undeclared here (not in a function):  => 99:10
+  + /home/kisskb/slave/src/arch/arm/mm/dump.c: error:
+'L_PTE_MT_WRITEBACK' undeclared here (not in a function):  => 89:10
+  + /home/kisskb/slave/src/arch/arm/mm/dump.c: error:
+'L_PTE_MT_WRITETHROUGH' undeclared here (not in a function):  => 85:10
+  + /home/kisskb/slave/src/arch/arm/mm/dump.c: error: 'L_PTE_RDONLY'
+undeclared here (not in a function):  => 61:11
+  + /home/kisskb/slave/src/arch/arm/mm/dump.c: error: 'L_PTE_SHARED'
+undeclared here (not in a function):  => 71:11
+  + /home/kisskb/slave/src/arch/arm/mm/dump.c: error: 'L_PTE_USER'
+undeclared here (not in a function):  => 56:11
+  + /home/kisskb/slave/src/arch/arm/mm/dump.c: error: 'L_PTE_XN'
+undeclared here (not in a function):  => 66:11
+  + /home/kisskb/slave/src/arch/arm/mm/dump.c: error:
+'PMD_SECT_AP_READ' undeclared here (not in a function):  => 153:13
+  + /home/kisskb/slave/src/arch/arm/mm/dump.c: error:
+'PMD_SECT_AP_WRITE' undeclared here (not in a function):  => 153:32
+  + /home/kisskb/slave/src/arch/arm/mm/dump.c: error: 'PMD_SECT_S'
+undeclared here (not in a function):  => 175:11
+  + /home/kisskb/slave/src/arch/arm/mm/dump.c: error: 'PMD_SECT_XN'
+undeclared here (not in a function):  => 170:11
+  + /home/kisskb/slave/src/arch/arm/mm/dump.c: error: 'PMD_SIZE'
+undeclared (first use in this function):  => 276:22
+  + /home/kisskb/slave/src/arch/arm/mm/dump.c: error: 'PTRS_PER_PGD'
+undeclared (first use in this function):  => 314:18
+  + /home/kisskb/slave/src/arch/arm/mm/dump.c: error: 'PTRS_PER_PMD'
+undeclared (first use in this function):  => 275:18
+  + /home/kisskb/slave/src/arch/arm/mm/dump.c: error: 'PTRS_PER_PTE'
+undeclared (first use in this function):  => 263:18
+  + /home/kisskb/slave/src/arch/arm/mm/dump.c: error: 'SECTION_SIZE'
+undeclared (first use in this function):  => 282:7
+  + /home/kisskb/slave/src/arch/arm/mm/dump.c: error: (near
+initialization for 'section_bits[0].mask'):  => 153:3
+  + /home/kisskb/slave/src/arch/arm/mm/dump.c: error: (near
+initialization for 'section_bits[1].mask'):  => 157:3
+  + /home/kisskb/slave/src/arch/arm/mm/dump.c: error: (near
+initialization for 'section_bits[1].val'):  => 158:3
+  + /home/kisskb/slave/src/arch/arm/mm/dump.c: error: (near
+initialization for 'section_bits[2].mask'):  => 161:3
+  + /home/kisskb/slave/src/arch/arm/mm/dump.c: error: (near
+initialization for 'section_bits[2].val'):  => 162:3
+  + /home/kisskb/slave/src/arch/arm/mm/dump.c: error: (near
+initialization for 'section_bits[3].mask'):  => 165:3
+  + /home/kisskb/slave/src/arch/arm/mm/dump.c: error: (near
+initialization for 'section_bits[3].val'):  => 166:3
+  + /home/kisskb/slave/src/arch/arm/mm/dump.c: error: (near
+initialization for 'section_bits[4].mask'):  => 170:3
+  + /home/kisskb/slave/src/arch/arm/mm/dump.c: error: (near
+initialization for 'section_bits[4].val'):  => 171:3
+  + /home/kisskb/slave/src/arch/arm/mm/dump.c: error: (near
+initialization for 'section_bits[5].mask'):  => 175:3
+  + /home/kisskb/slave/src/arch/arm/mm/dump.c: error: (near
+initialization for 'section_bits[5].val'):  => 176:3
+  + /home/kisskb/slave/src/arch/arm/mm/dump.c: error: implicit
+declaration of function 'pmd_large'
+[-Werror=implicit-function-declaration]:  => 277:3
+  + /home/kisskb/slave/src/arch/arm/mm/dump.c: error: implicit
+declaration of function 'pmd_none'
+[-Werror=implicit-function-declaration]:  => 277:3
+  + /home/kisskb/slave/src/arch/arm/mm/dump.c: error: implicit
+declaration of function 'pmd_present'
+[-Werror=implicit-function-declaration]:  => 277:3
+  + /home/kisskb/slave/src/arch/arm/mm/dump.c: error: implicit
+declaration of function 'pte_offset_kernel'
+[-Werror=implicit-function-declaration]:  => 259:2
+  + /home/kisskb/slave/src/arch/arm/mm/dump.c: error: initializer
+element is not constant:  => 153:3, 176:3, 170:3, 161:3, 166:3, 175:3,
+162:3, 171:3, 158:3, 165:3, 157:3
+  + /home/kisskb/slave/src/arch/arm/mm/dump.c: error: invalid operands
+to binary * (have 'unsigned int' and 'const struct prot_bits *'):  =>
+276:20
+  + /home/kisskb/slave/src/arch/arm/mm/dump.c: error: invalid operands
+to binary | (have 'const struct prot_bits *' and 'const struct
+prot_bits *'):  => 157:30, 166:30, 165:30, 161:30, 153:30
 
-looking at the A15 TRM, I see only single and double bit errors
-are documented. There is no discussion about more than 2 bit errors.
-Single bit errors don't raise an interrupt. So only case this gets 
-called should be for double bit which is handled. So just log an error 
-message as below and return IRQ_HANDLED?
+arm-randconfig
 
-pr_err("Unexpected ARM Cortex A15 L1/L2 multi bit error");
+  + /home/kisskb/slave/src/drivers/media/i2c/ov2659.c: error: 'struct
+v4l2_subdev_fh' has no member named 'pad':  => 1264:38
+  + /home/kisskb/slave/src/drivers/media/i2c/ov2659.c: error: implicit
+declaration of function 'v4l2_subdev_get_try_format'
+[-Werror=implicit-function-declaration]:  => 1054:3
 
-Murali
+x86_64-randconfig
 
->
->> +}
->> +
->> +static int __init keystone_init_misc(void)
+> [1] http://kisskb.ellerman.id.au/kisskb/head/9038/ (all 254 configs)
+> [3] http://kisskb.ellerman.id.au/kisskb/head/9008/ (all 254 configs)
 
+Gr{oetje,eeting}s,
 
--- 
-Murali Karicheri
-Linux Kernel, Keystone
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
