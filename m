@@ -1,28 +1,41 @@
-From: julian.calaby@gmail.com (Julian Calaby)
-Date: Mon, 22 Jun 2015 10:30:38 +1000
-Subject: [linux-sunxi] [PATCH 1/4] ARM: dts: sunxi: Add regulator-boot-on
- to usb host port regulator nodes
-In-Reply-To: <1434814810-26285-2-git-send-email-hdegoede@redhat.com>
-References: <1434814810-26285-1-git-send-email-hdegoede@redhat.com>
- <1434814810-26285-2-git-send-email-hdegoede@redhat.com>
-Message-ID: <CAGRGNgU7179K408=PekziP9ZzzG7+rvhm=e7TWjZk1UhkAnVZQ@mail.gmail.com>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Mon, 22 Jun 2015 09:31:15 +0900
+Subject: [PATCH 4/6] ARM: dts: Exynos4210: add CPU OPP and regulator
+ supply property
+In-Reply-To: <CAJKOXPfR5JS546YS3M-8orxO7+SxnzE06h2cyesExyt8Y9fVKw@mail.gmail.com>
+References: <'@samsung.com>
+ <1428079429-4252-1-git-send-email-b.zolnierkie@samsung.com>
+ <1428079429-4252-5-git-send-email-b.zolnierkie@samsung.com>
+ <CAJKOXPfR5JS546YS3M-8orxO7+SxnzE06h2cyesExyt8Y9fVKw@mail.gmail.com>
+Message-ID: <CAJKOXPfdXV8qxR3AQEzQJTf6MojUN7Z=06ikxF8u5BuMihDfJQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Hans,
+2015-05-08 9:18 GMT+09:00 Krzysztof Kozlowski <k.kozlowski@samsung.com>:
+> 2015-04-04 1:43 GMT+09:00 Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>:
+>> From: Thomas Abraham <thomas.ab@samsung.com>
+>>
+>> For Exynos4210 platforms, add CPU operating points and CPU
+>> regulator supply properties for migrating from Exynos specific
+>> cpufreq driver to using generic cpufreq driver.
+>>
+>> Changes by Bartlomiej:
+>> - removed Exynos5250 and Exynos5420 support for now
+>>
+>> Cc: Kukjin Kim <kgene.kim@samsung.com>
+>> Cc: Doug Anderson <dianders@chromium.org>
+>> Cc: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
+>> Cc: Andreas Faerber <afaerber@suse.de>
+>> Cc: Sachin Kamat <sachin.kamat@linaro.org>
+>> Cc: Andreas Farber <afaerber@suse.de>
+>> Cc: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
+>> Signed-off-by: Thomas Abraham <thomas.ab@samsung.com>
+>> Signed-off-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
+>
+> Acked-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
 
-On Sun, Jun 21, 2015 at 1:40 AM, Hans de Goede <hdegoede@redhat.com> wrote:
-> u-boot will have turned on the power to the usb host ports, so mark them
-> as regulator-boot-on, this stops the power on the ports from temporarily
-> getting turned off during boot, causing issues with e.g. usb powered
-> harddisks.
+Rebased and applied to my tree, I'll sent it later to Kukjin unless he
+picks it by himself from LKML.
 
-Stupid question: shouldn't u-boot set this property?
-
-Thanks,
-
--- 
-Julian Calaby
-
-Email: julian.calaby at gmail.com
-Profile: http://www.google.com/profiles/julian.calaby/
+Best regards,
+Krzysztof
