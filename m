@@ -1,60 +1,67 @@
 From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Mon, 22 Jun 2015 08:35:39 +0200
-Subject: [PATCH 1/4] soc: mediatek: Add infracfg misc driver support
+Date: Mon, 22 Jun 2015 08:35:41 +0200
+Subject: [PATCH 3/4] soc: Mediatek: Add SCPSYS power domain driver
 In-Reply-To: <1434954942-30179-1-git-send-email-s.hauer@pengutronix.de>
 References: <1434954942-30179-1-git-send-email-s.hauer@pengutronix.de>
-Message-ID: <1434954942-30179-2-git-send-email-s.hauer@pengutronix.de>
+Message-ID: <1434954942-30179-4-git-send-email-s.hauer@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This adds support for some miscellaneous bits of the infracfg controller.
-The mtk_infracfg_set/clear_bus_protection functions are necessary for
-the scpsys power domain driver to handle the bus protection bits which
-are contained in the infacfg register space.
+This adds a power domain driver for the Mediatek SCPSYS unit.
+
+The System Control Processor System (SCPSYS) has several power
+management related tasks in the system. The tasks include thermal
+measurement, dynamic voltage frequency scaling (DVFS), interrupt
+filter and lowlevel sleep control. The System Power Manager (SPM)
+inside the SCPSYS is for the MTCMOS power domain control.
+
+For now this driver only adds power domain support, the more
+advanced features are not yet supported. The driver implements
+the generic PM domain device tree bindings, the first user will
+most likely be the Mediatek AFE audio driver.
 
 Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
 ---
- drivers/soc/mediatek/Kconfig          |  9 ++++
- drivers/soc/mediatek/Makefile         |  1 +
- drivers/soc/mediatek/mtk-infracfg.c   | 91 +++++++++++++++++++++++++++++++++++
- include/linux/soc/mediatek/infracfg.h | 26 ++++++++++
- 4 files changed, 127 insertions(+)
- create mode 100644 drivers/soc/mediatek/mtk-infracfg.c
- create mode 100644 include/linux/soc/mediatek/infracfg.h
+ drivers/soc/mediatek/Kconfig             |  10 +
+ drivers/soc/mediatek/Makefile            |   1 +
+ drivers/soc/mediatek/mtk-scpsys.c        | 487 +++++++++++++++++++++++++++++++
+ include/dt-bindings/power/mt8173-power.h |  15 +
+ 4 files changed, 513 insertions(+)
+ create mode 100644 drivers/soc/mediatek/mtk-scpsys.c
+ create mode 100644 include/dt-bindings/power/mt8173-power.h
 
 diff --git a/drivers/soc/mediatek/Kconfig b/drivers/soc/mediatek/Kconfig
-index bcdb22d..e4f37a3 100644
+index e4f37a3..32eff1b 100644
 --- a/drivers/soc/mediatek/Kconfig
 +++ b/drivers/soc/mediatek/Kconfig
-@@ -1,6 +1,15 @@
- #
- # MediaTek SoC drivers
- #
-+config MTK_INFRACFG
-+	bool "MediaTek INFRACFG Support"
-+	depends on ARCH_MEDIATEK
-+	select REGMAP
-+	help
-+	  Say yes here to add support for the MediaTek INFRACFG controller. The
-+	  INFRACFG controller contains various infrastructure registers not
-+	  directly associated to any device.
+@@ -18,3 +18,13 @@ config MTK_PMIC_WRAP
+ 	  Say yes here to add support for MediaTek PMIC Wrapper found
+ 	  on different MediaTek SoCs. The PMIC wrapper is a proprietary
+ 	  hardware to connect the PMIC.
 +
- config MTK_PMIC_WRAP
- 	tristate "MediaTek PMIC Wrapper Support"
- 	depends on ARCH_MEDIATEK
++config MTK_SCPSYS
++	bool "MediaTek SCPSYS Support"
++	depends on ARCH_MEDIATEK || COMPILE_TEST
++	select REGMAP
++	select MTK_INFRACFG
++	select PM_GENERIC_DOMAINS if PM
++	help
++	  Say yes here to add support for the MediaTek SCPSYS power domain
++	  driver.
 diff --git a/drivers/soc/mediatek/Makefile b/drivers/soc/mediatek/Makefile
-index ecaf4de..3fa940f 100644
+index 3fa940f..12998b0 100644
 --- a/drivers/soc/mediatek/Makefile
 +++ b/drivers/soc/mediatek/Makefile
-@@ -1 +1,2 @@
-+obj-$(CONFIG_MTK_INFRACFG) += mtk-infracfg.o
+@@ -1,2 +1,3 @@
+ obj-$(CONFIG_MTK_INFRACFG) += mtk-infracfg.o
  obj-$(CONFIG_MTK_PMIC_WRAP) += mtk-pmic-wrap.o
-diff --git a/drivers/soc/mediatek/mtk-infracfg.c b/drivers/soc/mediatek/mtk-infracfg.c
++obj-$(CONFIG_MTK_SCPSYS) += mtk-scpsys.o
+diff --git a/drivers/soc/mediatek/mtk-scpsys.c b/drivers/soc/mediatek/mtk-scpsys.c
 new file mode 100644
-index 0000000..ca786e0
+index 0000000..84c306a
 --- /dev/null
-+++ b/drivers/soc/mediatek/mtk-infracfg.c
-@@ -0,0 +1,91 @@
++++ b/drivers/soc/mediatek/mtk-scpsys.c
+@@ -0,0 +1,487 @@
 +/*
 + * Copyright (c) 2015 Pengutronix, Sascha Hauer <kernel@pengutronix.de>
 + *
@@ -67,116 +74,501 @@ index 0000000..ca786e0
 + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 + * GNU General Public License for more details.
 + */
-+
-+#include <linux/export.h>
-+#include <linux/jiffies.h>
++#include <linux/clk.h>
++#include <linux/delay.h>
++#include <linux/io.h>
++#include <linux/kernel.h>
++#include <linux/mfd/syscon.h>
++#include <linux/of_device.h>
++#include <linux/platform_device.h>
++#include <linux/pm_domain.h>
 +#include <linux/regmap.h>
 +#include <linux/soc/mediatek/infracfg.h>
-+#include <asm/processor.h>
++#include <dt-bindings/power/mt8173-power.h>
 +
-+#define INFRA_TOPAXI_PROTECTEN		0x0220
-+#define INFRA_TOPAXI_PROTECTSTA1	0x0228
++#define SPM_VDE_PWR_CON			0x0210
++#define SPM_MFG_PWR_CON			0x0214
++#define SPM_VEN_PWR_CON			0x0230
++#define SPM_ISP_PWR_CON			0x0238
++#define SPM_DIS_PWR_CON			0x023c
++#define SPM_VEN2_PWR_CON		0x0298
++#define SPM_AUDIO_PWR_CON		0x029c
++#define SPM_MFG_2D_PWR_CON		0x02c0
++#define SPM_MFG_ASYNC_PWR_CON		0x02c4
++#define SPM_USB_PWR_CON			0x02cc
++#define SPM_PWR_STATUS			0x060c
++#define SPM_PWR_STATUS_2ND		0x0610
 +
-+/**
-+ * mtk_infracfg_set_bus_protection - enable bus protection
-+ * @regmap: The infracfg regmap
-+ * @mask: The mask containing the protection bits to be enabled.
-+ *
-+ * This function enables the bus protection bits for disabled power
-+ * domains so that the system does not hanf when some unit accesses the
-+ * bus while in power down.
-+ */
-+int mtk_infracfg_set_bus_protection(struct regmap *infracfg, u32 mask)
++#define PWR_RST_B_BIT			BIT(0)
++#define PWR_ISO_BIT			BIT(1)
++#define PWR_ON_BIT			BIT(2)
++#define PWR_ON_2ND_BIT			BIT(3)
++#define PWR_CLK_DIS_BIT			BIT(4)
++
++#define PWR_STATUS_DISP			BIT(3)
++#define PWR_STATUS_MFG			BIT(4)
++#define PWR_STATUS_ISP			BIT(5)
++#define PWR_STATUS_VDEC			BIT(7)
++#define PWR_STATUS_VENC_LT		BIT(20)
++#define PWR_STATUS_VENC			BIT(21)
++#define PWR_STATUS_MFG_2D		BIT(22)
++#define PWR_STATUS_MFG_ASYNC		BIT(23)
++#define PWR_STATUS_AUDIO		BIT(24)
++#define PWR_STATUS_USB			BIT(25)
++
++enum clk_id {
++	MT8173_CLK_NONE,
++	MT8173_CLK_MM,
++	MT8173_CLK_MFG,
++	MT8173_CLK_MAX = MT8173_CLK_MFG,
++};
++
++struct scp_domain_data {
++	const char *name;
++	u32 sta_mask;
++	int ctl_offs;
++	u32 sram_pdn_bits;
++	u32 sram_pdn_ack_bits;
++	u32 bus_prot_mask;
++	enum clk_id clk_id;
++};
++
++static const struct scp_domain_data scp_domain_data[] __initconst = {
++	[MT8173_POWER_DOMAIN_VDEC] = {
++		.name = "vdec",
++		.sta_mask = PWR_STATUS_VDEC,
++		.ctl_offs = SPM_VDE_PWR_CON,
++		.sram_pdn_bits = GENMASK(11, 8),
++		.sram_pdn_ack_bits = GENMASK(12, 12),
++		.clk_id = MT8173_CLK_MM,
++	},
++	[MT8173_POWER_DOMAIN_VENC] = {
++		.name = "venc",
++		.sta_mask = PWR_STATUS_VENC,
++		.ctl_offs = SPM_VEN_PWR_CON,
++		.sram_pdn_bits = GENMASK(11, 8),
++		.sram_pdn_ack_bits = GENMASK(15, 12),
++		.clk_id = MT8173_CLK_MM,
++	},
++	[MT8173_POWER_DOMAIN_ISP] = {
++		.name = "isp",
++		.sta_mask = PWR_STATUS_ISP,
++		.ctl_offs = SPM_ISP_PWR_CON,
++		.sram_pdn_bits = GENMASK(11, 8),
++		.sram_pdn_ack_bits = GENMASK(13, 12),
++		.clk_id = MT8173_CLK_MM,
++	},
++	[MT8173_POWER_DOMAIN_MM] = {
++		.name = "mm",
++		.sta_mask = PWR_STATUS_DISP,
++		.ctl_offs = SPM_DIS_PWR_CON,
++		.sram_pdn_bits = GENMASK(11, 8),
++		.sram_pdn_ack_bits = GENMASK(12, 12),
++		.clk_id = MT8173_CLK_MM,
++		.bus_prot_mask = MT8173_TOP_AXI_PROT_EN_MM_M0 |
++			MT8173_TOP_AXI_PROT_EN_MM_M1,
++	},
++	[MT8173_POWER_DOMAIN_VENC_LT] = {
++		.name = "venc_lt",
++		.sta_mask = PWR_STATUS_VENC_LT,
++		.ctl_offs = SPM_VEN2_PWR_CON,
++		.sram_pdn_bits = GENMASK(11, 8),
++		.sram_pdn_ack_bits = GENMASK(15, 12),
++		.clk_id = MT8173_CLK_MM,
++	},
++	[MT8173_POWER_DOMAIN_AUDIO] = {
++		.name = "audio",
++		.sta_mask = PWR_STATUS_AUDIO,
++		.ctl_offs = SPM_AUDIO_PWR_CON,
++		.sram_pdn_bits = GENMASK(11, 8),
++		.sram_pdn_ack_bits = GENMASK(15, 12),
++		.clk_id = MT8173_CLK_NONE,
++	},
++	[MT8173_POWER_DOMAIN_USB] = {
++		.name = "usb",
++		.sta_mask = PWR_STATUS_USB,
++		.ctl_offs = SPM_USB_PWR_CON,
++		.sram_pdn_bits = GENMASK(11, 8),
++		.sram_pdn_ack_bits = GENMASK(15, 12),
++		.clk_id = MT8173_CLK_NONE,
++	},
++	[MT8173_POWER_DOMAIN_MFG_ASYNC] = {
++		.name = "mfg_async",
++		.sta_mask = PWR_STATUS_MFG_ASYNC,
++		.ctl_offs = SPM_MFG_ASYNC_PWR_CON,
++		.sram_pdn_bits = GENMASK(11, 8),
++		.sram_pdn_ack_bits = 0,
++		.clk_id = MT8173_CLK_MFG,
++	},
++	[MT8173_POWER_DOMAIN_MFG_2D] = {
++		.name = "mfg_2d",
++		.sta_mask = PWR_STATUS_MFG_2D,
++		.ctl_offs = SPM_MFG_2D_PWR_CON,
++		.sram_pdn_bits = GENMASK(11, 8),
++		.sram_pdn_ack_bits = GENMASK(13, 12),
++		.clk_id = MT8173_CLK_NONE,
++	},
++	[MT8173_POWER_DOMAIN_MFG] = {
++		.name = "mfg",
++		.sta_mask = PWR_STATUS_MFG,
++		.ctl_offs = SPM_MFG_PWR_CON,
++		.sram_pdn_bits = GENMASK(13, 8),
++		.sram_pdn_ack_bits = GENMASK(21, 16),
++		.clk_id = MT8173_CLK_NONE,
++		.bus_prot_mask = MT8173_TOP_AXI_PROT_EN_MFG_S |
++			MT8173_TOP_AXI_PROT_EN_MFG_M0 |
++			MT8173_TOP_AXI_PROT_EN_MFG_M1 |
++			MT8173_TOP_AXI_PROT_EN_MFG_SNOOP_OUT,
++	},
++};
++
++#define NUM_DOMAINS	ARRAY_SIZE(scp_domain_data)
++
++struct scp;
++
++struct scp_domain {
++	struct generic_pm_domain genpd;
++	struct scp *scp;
++	struct clk *clk;
++	u32 sta_mask;
++	void __iomem *ctl_addr;
++	u32 sram_pdn_bits;
++	u32 sram_pdn_ack_bits;
++	u32 bus_prot_mask;
++};
++
++struct scp {
++	struct scp_domain domains[NUM_DOMAINS];
++	struct genpd_onecell_data pd_data;
++	struct device *dev;
++	void __iomem *base;
++	struct regmap *infracfg;
++};
++
++static int scpsys_domain_is_on(struct scp_domain *scpd)
 +{
-+	unsigned long expired;
++	struct scp *scp = scpd->scp;
++
++	u32 status = readl(scp->base + SPM_PWR_STATUS) & scpd->sta_mask;
++	u32 status2 = readl(scp->base + SPM_PWR_STATUS_2ND) & scpd->sta_mask;
++
++	/*
++	 * A domain is on when both status bits are set. If only one is set
++	 * return an error. This happens while powering up a domain
++	 */
++
++	if (status && status2)
++		return true;
++	if (!status && !status2)
++		return false;
++
++	return -EINVAL;
++}
++
++static int scpsys_power_on(struct generic_pm_domain *genpd)
++{
++	struct scp_domain *scpd = container_of(genpd, struct scp_domain, genpd);
++	struct scp *scp = scpd->scp;
++	unsigned long timeout;
++	bool expired;
++	void __iomem *ctl_addr = scpd->ctl_addr;
++	u32 sram_pdn_ack = scpd->sram_pdn_ack_bits;
 +	u32 val;
 +	int ret;
 +
-+	regmap_update_bits(infracfg, INFRA_TOPAXI_PROTECTEN, mask, mask);
-+
-+	expired = jiffies + HZ;
-+
-+	while (1) {
-+		ret = regmap_read(infracfg, INFRA_TOPAXI_PROTECTSTA1, &val);
++	if (scpd->clk) {
++		ret = clk_prepare_enable(scpd->clk);
 +		if (ret)
-+			return ret;
++			goto err_clk;
++	}
 +
-+		if ((val & mask) == mask)
++	val = readl(ctl_addr);
++	val |= PWR_ON_BIT;
++	writel(val, ctl_addr);
++	val |= PWR_ON_2ND_BIT;
++	writel(val, ctl_addr);
++
++	/* wait until PWR_ACK = 1 */
++	timeout = jiffies + HZ;
++	expired = false;
++	while (1) {
++		ret = scpsys_domain_is_on(scpd);
++		if (ret > 0)
 +			break;
 +
++		if (expired) {
++			ret = -ETIMEDOUT;
++			goto err_pwr_ack;
++		}
++
 +		cpu_relax();
-+		if (time_after(jiffies, expired))
-+			return -EIO;
++
++		if (time_after(jiffies, timeout))
++			expired = true;
++	}
++
++	val &= ~PWR_CLK_DIS_BIT;
++	writel(val, ctl_addr);
++
++	val &= ~PWR_ISO_BIT;
++	writel(val, ctl_addr);
++
++	val |= PWR_RST_B_BIT;
++	writel(val, ctl_addr);
++
++	val &= ~scpd->sram_pdn_bits;
++	writel(val, ctl_addr);
++
++	/* wait until SRAM_PDN_ACK all 0 */
++	timeout = jiffies + HZ;
++	expired = false;
++	while (sram_pdn_ack && (readl(ctl_addr) & sram_pdn_ack)) {
++
++		if (expired) {
++			ret = -ETIMEDOUT;
++			goto err_pwr_ack;
++		}
++
++		cpu_relax();
++
++		if (time_after(jiffies, timeout))
++			expired = true;
++	}
++
++	if (scpd->bus_prot_mask) {
++		ret = mtk_infracfg_clear_bus_protection(scp->infracfg,
++				scpd->bus_prot_mask);
++		if (ret)
++			goto err_pwr_ack;
 +	}
 +
 +	return 0;
++
++err_pwr_ack:
++	clk_disable_unprepare(scpd->clk);
++err_clk:
++	dev_err(scp->dev, "Failed to power on domain %s\n", genpd->name);
++
++	return ret;
 +}
 +
-+/**
-+ * mtk_infracfg_clear_bus_protection - disable bus protection
-+ * @regmap: The infracfg regmap
-+ * @mask: The mask containing the protection bits to be disabled.
-+ *
-+ * This function disables the bus protection bits previously enabled with
-+ * mtk_infracfg_set_bus_protection.
-+ */
-+int mtk_infracfg_clear_bus_protection(struct regmap *infracfg, u32 mask)
++static int scpsys_power_off(struct generic_pm_domain *genpd)
 +{
-+	unsigned long expired;
++	struct scp_domain *scpd = container_of(genpd, struct scp_domain, genpd);
++	struct scp *scp = scpd->scp;
++	unsigned long timeout;
++	bool expired;
++	void __iomem *ctl_addr = scpd->ctl_addr;
++	u32 pdn_ack = scpd->sram_pdn_ack_bits;
++	u32 val;
 +	int ret;
 +
-+	regmap_update_bits(infracfg, INFRA_TOPAXI_PROTECTEN, mask, 0);
-+
-+	expired = jiffies + HZ;
-+
-+	while (1) {
-+		u32 val;
-+
-+		ret = regmap_read(infracfg, INFRA_TOPAXI_PROTECTSTA1, &val);
++	if (scpd->bus_prot_mask) {
++		ret = mtk_infracfg_set_bus_protection(scp->infracfg,
++				scpd->bus_prot_mask);
 +		if (ret)
-+			return ret;
++			goto out;
++	}
 +
-+		if (!(val & mask))
-+			break;
++	val = readl(ctl_addr);
++	val |= scpd->sram_pdn_bits;
++	writel(val, ctl_addr);
++
++	/* wait until SRAM_PDN_ACK all 1 */
++	timeout = jiffies + HZ;
++	expired = false;
++	while (pdn_ack && (readl(ctl_addr) & pdn_ack) != pdn_ack) {
++		if (expired) {
++			ret = -ETIMEDOUT;
++			goto out;
++		}
 +
 +		cpu_relax();
-+		if (time_after(jiffies, expired))
-+			return -EIO;
++
++		if (time_after(jiffies, timeout))
++			expired = true;
 +	}
++
++	val |= PWR_ISO_BIT;
++	writel(val, ctl_addr);
++
++	val &= ~PWR_RST_B_BIT;
++	writel(val, ctl_addr);
++
++	val |= PWR_CLK_DIS_BIT;
++	writel(val, ctl_addr);
++
++	val &= ~PWR_ON_BIT;
++	writel(val, ctl_addr);
++
++	val &= ~PWR_ON_2ND_BIT;
++	writel(val, ctl_addr);
++
++	/* wait until PWR_ACK = 0 */
++	timeout = jiffies + HZ;
++	expired = false;
++	while (1) {
++		ret = scpsys_domain_is_on(scpd);
++		if (ret == 0)
++			break;
++
++		if (expired) {
++			ret = -ETIMEDOUT;
++			goto out;
++		}
++
++		cpu_relax();
++
++		if (time_after(jiffies, timeout))
++			expired = true;
++	}
++
++	if (scpd->clk)
++		clk_disable_unprepare(scpd->clk);
++
++	return 0;
++
++out:
++	dev_err(scp->dev, "Failed to power off domain %s\n", genpd->name);
++
++	return ret;
++}
++
++static int __init scpsys_probe(struct platform_device *pdev)
++{
++	struct genpd_onecell_data *pd_data;
++	struct resource *res;
++	int i, ret;
++	struct scp *scp;
++	struct clk *clk[MT8173_CLK_MAX];
++
++	scp = devm_kzalloc(&pdev->dev, sizeof(*scp), GFP_KERNEL);
++	if (!scp)
++		return -ENOMEM;
++
++	scp->dev = &pdev->dev;
++
++	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
++	scp->base = devm_ioremap_resource(&pdev->dev, res);
++	if (IS_ERR(scp->base))
++		return PTR_ERR(scp->base);
++
++	pd_data = &scp->pd_data;
++
++	pd_data->domains = devm_kzalloc(&pdev->dev,
++			sizeof(*pd_data->domains) * NUM_DOMAINS, GFP_KERNEL);
++	if (!pd_data->domains)
++		return -ENOMEM;
++
++	clk[MT8173_CLK_MM] = devm_clk_get(&pdev->dev, "mm");
++	if (IS_ERR(clk[MT8173_CLK_MM]))
++		return PTR_ERR(clk[MT8173_CLK_MM]);
++
++	clk[MT8173_CLK_MFG] = devm_clk_get(&pdev->dev, "mfg");
++	if (IS_ERR(clk[MT8173_CLK_MFG]))
++		return PTR_ERR(clk[MT8173_CLK_MFG]);
++
++	scp->infracfg = syscon_regmap_lookup_by_phandle(pdev->dev.of_node,
++			"infracfg");
++	if (IS_ERR(scp->infracfg)) {
++		dev_err(&pdev->dev, "Cannot find infracfg controller: %ld\n",
++				PTR_ERR(scp->infracfg));
++		return PTR_ERR(scp->infracfg);
++	}
++
++	pd_data->num_domains = NUM_DOMAINS;
++
++	for (i = 0; i < NUM_DOMAINS; i++) {
++		struct scp_domain *scpd = &scp->domains[i];
++		struct generic_pm_domain *genpd = &scpd->genpd;
++		const struct scp_domain_data *data = &scp_domain_data[i];
++
++		pd_data->domains[i] = genpd;
++		scpd->scp = scp;
++
++		scpd->sta_mask = data->sta_mask;
++		scpd->ctl_addr = scp->base + data->ctl_offs;
++		scpd->sram_pdn_bits = data->sram_pdn_bits;
++		scpd->sram_pdn_ack_bits = data->sram_pdn_ack_bits;
++		scpd->bus_prot_mask = data->bus_prot_mask;
++		if (data->clk_id != MT8173_CLK_NONE)
++			scpd->clk = clk[data->clk_id];
++
++		genpd->name = data->name;
++		genpd->power_off = scpsys_power_off;
++		genpd->power_on = scpsys_power_on;
++
++		/*
++		 * Initially turn on all domains to make the domains usable
++		 * with !CONFIG_PM and to get the hardware in sync with the
++		 * software.  The unused domains will be switched off during
++		 * late_init time.
++		 */
++		genpd->power_on(genpd);
++
++		pm_genpd_init(genpd, NULL, false);
++	}
++
++	/*
++	 * We are not allowed to fail here since there is no way to unregister
++	 * a power domain. Once registered above we have to keep the domains
++	 * valid.
++	 */
++
++	ret = pm_genpd_add_subdomain(pd_data->domains[MT8173_POWER_DOMAIN_MFG_ASYNC],
++		pd_data->domains[MT8173_POWER_DOMAIN_MFG_2D]);
++	if (ret && IS_ENABLED(CONFIG_PM))
++		dev_err(&pdev->dev, "Failed to add subdomain: %d\n", ret);
++
++	ret = pm_genpd_add_subdomain(pd_data->domains[MT8173_POWER_DOMAIN_MFG_2D],
++		pd_data->domains[MT8173_POWER_DOMAIN_MFG]);
++	if (ret && IS_ENABLED(CONFIG_PM))
++		dev_err(&pdev->dev, "Failed to add subdomain: %d\n", ret);
++
++	ret = of_genpd_add_provider_onecell(pdev->dev.of_node, pd_data);
++	if (ret)
++		dev_err(&pdev->dev, "Failed to add OF provider: %d\n", ret);
 +
 +	return 0;
 +}
-diff --git a/include/linux/soc/mediatek/infracfg.h b/include/linux/soc/mediatek/infracfg.h
++
++static const struct of_device_id of_scpsys_match_tbl[] = {
++	{
++		.compatible = "mediatek,mt8173-scpsys",
++	}, {
++		/* sentinel */
++	}
++};
++
++static struct platform_driver scpsys_drv = {
++	.driver = {
++		.name = "mtk-scpsys",
++		.owner = THIS_MODULE,
++		.of_match_table = of_match_ptr(of_scpsys_match_tbl),
++	},
++};
++
++module_platform_driver_probe(scpsys_drv, scpsys_probe);
+diff --git a/include/dt-bindings/power/mt8173-power.h b/include/dt-bindings/power/mt8173-power.h
 new file mode 100644
-index 0000000..a5714e9
+index 0000000..b34cee9
 --- /dev/null
-+++ b/include/linux/soc/mediatek/infracfg.h
-@@ -0,0 +1,26 @@
-+#ifndef __SOC_MEDIATEK_INFRACFG_H
-+#define __SOC_MEDIATEK_INFRACFG_H
++++ b/include/dt-bindings/power/mt8173-power.h
+@@ -0,0 +1,15 @@
++#ifndef _DT_BINDINGS_POWER_MT8183_POWER_H
++#define _DT_BINDINGS_POWER_MT8183_POWER_H
 +
-+#define MT8173_TOP_AXI_PROT_EN_MCI_M2		BIT(0)
-+#define MT8173_TOP_AXI_PROT_EN_MM_M0		BIT(1)
-+#define MT8173_TOP_AXI_PROT_EN_MM_M1		BIT(2)
-+#define MT8173_TOP_AXI_PROT_EN_MMAPB_S		BIT(6)
-+#define MT8173_TOP_AXI_PROT_EN_L2C_M2		BIT(9)
-+#define MT8173_TOP_AXI_PROT_EN_L2SS_SMI		BIT(11)
-+#define MT8173_TOP_AXI_PROT_EN_L2SS_ADD		BIT(12)
-+#define MT8173_TOP_AXI_PROT_EN_CCI_M2		BIT(13)
-+#define MT8173_TOP_AXI_PROT_EN_MFG_S		BIT(14)
-+#define MT8173_TOP_AXI_PROT_EN_PERI_M0		BIT(15)
-+#define MT8173_TOP_AXI_PROT_EN_PERI_M1		BIT(16)
-+#define MT8173_TOP_AXI_PROT_EN_DEBUGSYS		BIT(17)
-+#define MT8173_TOP_AXI_PROT_EN_CQ_DMA		BIT(18)
-+#define MT8173_TOP_AXI_PROT_EN_GCPU		BIT(19)
-+#define MT8173_TOP_AXI_PROT_EN_IOMMU		BIT(20)
-+#define MT8173_TOP_AXI_PROT_EN_MFG_M0		BIT(21)
-+#define MT8173_TOP_AXI_PROT_EN_MFG_M1		BIT(22)
-+#define MT8173_TOP_AXI_PROT_EN_MFG_SNOOP_OUT	BIT(23)
++#define MT8173_POWER_DOMAIN_VDEC	0
++#define MT8173_POWER_DOMAIN_VENC	1
++#define MT8173_POWER_DOMAIN_ISP		2
++#define MT8173_POWER_DOMAIN_MM		3
++#define MT8173_POWER_DOMAIN_VENC_LT	4
++#define MT8173_POWER_DOMAIN_AUDIO	5
++#define MT8173_POWER_DOMAIN_USB		6
++#define MT8173_POWER_DOMAIN_MFG_ASYNC	7
++#define MT8173_POWER_DOMAIN_MFG_2D	8
++#define MT8173_POWER_DOMAIN_MFG		9
 +
-+int mtk_infracfg_set_bus_protection(struct regmap *infracfg, u32 mask);
-+int mtk_infracfg_clear_bus_protection(struct regmap *infracfg, u32 mask);
-+
-+#endif /* __SOC_MEDIATEK_INFRACFG_H */
++#endif /* _DT_BINDINGS_POWER_MT8183_POWER_H */
 -- 
 2.1.4
