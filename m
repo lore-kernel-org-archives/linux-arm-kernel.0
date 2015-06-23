@@ -1,17 +1,37 @@
-From: davem@davemloft.net (David Miller)
-Date: Tue, 23 Jun 2015 07:19:48 -0700 (PDT)
-Subject: [PATCH net-next v0 0/4] drivers: net: xgene: Fix the ACPI
- support for RGMII/SGMII0/XFI ethernet interfaces of APM X-Gene SoC.
-In-Reply-To: <1435051037-21753-1-git-send-email-stripathi@apm.com>
-References: <1435051037-21753-1-git-send-email-stripathi@apm.com>
-Message-ID: <20150623.071948.1459721943136237909.davem@davemloft.net>
+From: gabriel.fernandez@linaro.org (Gabriel Fernandez)
+Date: Tue, 23 Jun 2015 16:09:18 +0200
+Subject: [PATCH 0/9] clk: ST clock fixes
+Message-ID: <1435068567-30995-1-git-send-email-gabriel.fernandez@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Suman Tripathi <stripathi@apm.com>
-Date: Tue, 23 Jun 2015 14:47:13 +0530
+This first patch-set contains various clock fixes for ST SoC.
 
-> Signed-off-by: Iyappan Subramanian <isubramanian@apm.com>
-> Signed-off-by: Suman Tripathi <stripathi@apm.com>
+Gabriel Fernandez (7):
+  drivers: clk: st: Incorrect clocks status
+  drivers: clk: st: Incorrect register offset used for lock_status
+  drivers: clk: st: Remove unused code
+  drivers: clk: st: Fix FSYN channel values
+  drivers: clk: st: Fix mux bit-setting for Cortex A9 clocks
+  drivers: clk: st: Rename st_pll3200c32_407_c0_x into
+    st_pll3200c32_cx_x
+  ARM: STi: DT: Rename st_pll3200c32_407_c0_x into st_pll3200c32_cx_x
 
-Series applied, thanks.
+Giuseppe Cavallaro (1):
+  drivers: clk: st: Fix flexgen lock init
+
+Pankaj Dev (1):
+  drivers: clk: st: Add CLK_GET_RATE_NOCACHE flag to clocks
+
+ .../devicetree/bindings/clock/st/st,clkgen-pll.txt |  4 ++--
+ arch/arm/boot/dts/stih407-clock.dtsi               |  4 ++--
+ arch/arm/boot/dts/stih410-clock.dtsi               |  4 ++--
+ arch/arm/boot/dts/stih418-clock.dtsi               |  4 ++--
+ drivers/clk/st/clk-flexgen.c                       |  4 +++-
+ drivers/clk/st/clkgen-fsyn.c                       | 20 +++++++----------
+ drivers/clk/st/clkgen-mux.c                        | 25 +++++++++++++---------
+ drivers/clk/st/clkgen-pll.c                        | 14 ++++++------
+ 8 files changed, 41 insertions(+), 38 deletions(-)
+
+-- 
+1.9.1
