@@ -1,70 +1,123 @@
-From: stefan.wahren@i2se.com (Stefan Wahren)
-Date: Tue, 23 Jun 2015 21:47:34 +0200 (CEST)
-Subject: [PATCH v6 0/9] Add simple NVMEM Framework via regmap.
-In-Reply-To: <1435014459-26138-1-git-send-email-srinivas.kandagatla@linaro.org>
-References: <1435014459-26138-1-git-send-email-srinivas.kandagatla@linaro.org>
-Message-ID: <235181230.251177.1435088854197.JavaMail.open-xchange@oxbsltgw00.schlund.de>
+From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
+Date: Tue, 23 Jun 2015 12:54:24 -0700
+Subject: [PATCH] touchscreen: sun4i-ts: Really fix A10 temperature
+ reporting
+In-Reply-To: <5589B78C.4080600@redhat.com>
+References: <1425893870-28715-1-git-send-email-hdegoede@redhat.com>
+ <41a7a857-96fd-48ab-9778-127cfc091ef0@googlegroups.com>
+ <5589B78C.4080600@redhat.com>
+Message-ID: <20150623195424.GE40168@dtor-ws>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Srinivas,
+On Tue, Jun 23, 2015 at 09:46:20PM +0200, Hans de Goede wrote:
+> Hi,
+> 
+> On 06/23/2015 05:06 PM, m.silentcreek at gmail.com wrote:
+> >Hi Hans,
+> >
+> >is it possible that this patch (and the parent commit "Input: sun4i-ts - allow controlling filter and sensitivity via DT") has quite an adversial effect on other boards than the ones tested?
+> >
+> >On my Lemaker Bananapi the temperature is now being reported as somwhere between -15?C to -10?C with the latest Kernel 4.1.0. These negative values are obviously way off. On Kernel 4.0.5 the temperature reading was usually around 40?C. While that might not have been accurate either, it was at least plausible.
+> 
+> The temperature curve for the A20 SoC was not changed, if it did change then
+> you're using an old dtb file with a new kernel, you must always update your
+> dtb file together with the kernel.
 
-> Srinivas Kandagatla <srinivas.kandagatla@linaro.org> hat am 23. Juni 2015 um
-> 01:07 geschrieben:
->
->
-> [...]
->
-> Device Tree:
->
-> /* Provider */
-> qfprom: qfprom at 00700000 {
-> ...
->
-> /* Data cells */
-> tsens_calibration: calib at 404 {
-> reg = <0x404 0x10>;
-> };
->
-> tsens_calibration_bckp: calib_bckp at 504 {
-> reg = <0x504 0x11>;
-> bit-offset = 6;
-> nbits = 128;
-> };
->
-> pvs_version: pvs-version at 6 {
-> reg = <0x6 0x2>
-> bit-offset = 7;
-> nbits = 2;
-> };
->
-> speed_bin: speed-bin at c{
-> reg = <0xc 0x1>;
-> bit-offset = 2;
-> nbits = 3;
->
-> };
-> ...
-> };
->
-> userspace interface: binary file in /sys/class/nvmem/*/nvmem
->
-> ex:
-> hexdump /sys/class/nvmem/qfprom0/nvmem
->
-> 0000000 0000 0000 0000 0000 0000 0000 0000 0000
-> *
-> 00000a0 db10 2240 0000 e000 0c00 0c00 0000 0c00
-> 0000000 0000 0000 0000 0000 0000 0000 0000 0000
-> ...
-> *
-> 0001000
->
+Umm, we should keep compatibility with old DTS...
 
-i want to port OCOTP driver for MXS, which hasn't MMIO. From my understanding
-hexdump would readout the complete register range defined in provider DT node.
+> 
+> 
+> 
+> >
+> >Given that there is no Documentation and things seem quite board-specific, I really don't know how this could be improved, so I can merely report my observation.
+> >
+> >Kind regards,
+> >
+> >Timo
+> >
+> >
+> >Am Montag, 9. M?rz 2015 10:38:02 UTC+1 schrieb Hans de Goede:
+> >>The commit titled:
+> >>"touchscreen: sun4i-ts: A10 (sun4i) has a different temperature curve"
+> >>contains a math error, the offset it uses is in degrees, but the actual code
+> >>applies the offset before multiplying by stepsize :|
+> >>
+> >>Given that this is rather backwards (every math course ever thought applies
+> >>the multiplication before the offset for linear functions), this commit
+> >>fixes things by changing the code applying the offset to do the logical
+> >>thing, adjusting the offset for the other models accordingly.
+> >>
+> >>This has been tested on an A10, A13, A20 and A31 to make sure everything really
+> >>is correct now.
+> >>
+> >>Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+> >>---
+> >>Note if possible this commit should be squashed into the original
+> >>"touchscreen: sun4i-ts: A10 (sun4i) has a different temperature curve"
+> >>commit as a fixup.
+> >>---
+> >>  drivers/input/touchscreen/sun4i-ts.c | 14 +++++++-------
+> >>  1 file changed, 7 insertions(+), 7 deletions(-)
+> >>
+> >>diff --git a/drivers/input/touchscreen/sun4i-ts.c b/drivers/input/touchscreen/sun4i-ts.c
+> >>index 66ccd5a..178d2ef 100644
+> >>--- a/drivers/input/touchscreen/sun4i-ts.c
+> >>+++ b/drivers/input/touchscreen/sun4i-ts.c
+> >>@@ -193,7 +193,7 @@ static int sun4i_get_temp(const struct sun4i_ts_data *ts, long *temp)
+> >>  	if (ts->temp_data == -1)
+> >>  		return -EAGAIN;
+> >>
+> >>-	*temp = (ts->temp_data - ts->temp_offset) * ts->temp_step;
+> >>+	*temp = ts->temp_data * ts->temp_step - ts->temp_offset;
+> >>
+> >>  	return 0;
+> >>  }
+> >>@@ -255,17 +255,17 @@ static int sun4i_ts_probe(struct platform_device *pdev)
+> >>  	ts->ignore_fifo_data = true;
+> >>  	ts->temp_data = -1;
+> >>  	if (of_device_is_compatible(np, "allwinner,sun6i-a31-ts")) {
+> >>-		/* Allwinner SDK has temperature = -271 + (value / 6) (C) */
+> >>-		ts->temp_offset = 1626;
+> >>+		/* Allwinner SDK has temperature (C) = (value / 6) - 271 */
+> >>+		ts->temp_offset = 271000;
+> >>  		ts->temp_step = 167;
+> >>  	} else if (of_device_is_compatible(np, "allwinner,sun4i-a10-ts")) {
+> >>  		/*
+> >>  		 * The A10 temperature sensor has quite a wide spread, these
+> >>  		 * parameters are based on the averaging of the calibration
+> >>  		 * results of 4 completely different boards, with a spread of
+> >>-		 * temp_step from 96 - 170 and temp_offset from 1758 - 3310.
+> >>+		 * temp_step from 0.096 - 0.170 and temp_offset from 176 - 331.
+> >>  		 */
+> >>-		ts->temp_offset = 2570;
+> >>+		ts->temp_offset = 257000;
+> >>  		ts->temp_step = 133;
+> >>  	} else {
+> >>  		/*
+> >>@@ -273,13 +273,13 @@ static int sun4i_ts_probe(struct platform_device *pdev)
+> >>  		 * the temperature. The formula used here is from the AXP209,
+> >>  		 * which is designed by X-Powers, an affiliate of Allwinner:
+> >>  		 *
+> >>-		 *     temperature = -144.7 + (value * 0.1)
+> >>+		 *     temperature (C) = (value * 0.1) - 144.7
+> >>  		 *
+> >>  		 * Allwinner does not have any documentation whatsoever for
+> >>  		 * this hardware. Moreover, it is claimed that the sensor
+> >>  		 * is inaccurate and cannot work properly.
+> >>  		 */
+> >>-		ts->temp_offset = 1447;
+> >>+		ts->temp_offset = 144700;
+> >>  		ts->temp_step = 100;
+> >>  	}
+> >>
+> >>--
+> >>2.3.1
+> >
+> 
+> Regards,
+> 
+> Hans
 
-How can i achieve that hexdump only reads the data area within the register
-range?
-
-Stefan
+-- 
+Dmitry
