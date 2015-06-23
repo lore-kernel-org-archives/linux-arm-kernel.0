@@ -1,41 +1,29 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Tue, 23 Jun 2015 14:39:59 +0200
-Subject: [PATCH] arm64/kvm: Add generic v8 KVM target
-In-Reply-To: <CAFEAcA92uymQ3LjPQnuFiwvjSgc+jY54VrfK_Sh4v1DJ+=OPpw@mail.gmail.com>
-References: <1434531646-4873-1-git-send-email-suzuki.poulose@arm.com>
- <CAFEAcA92uymQ3LjPQnuFiwvjSgc+jY54VrfK_Sh4v1DJ+=OPpw@mail.gmail.com>
-Message-ID: <20150623123959.GF4035@cbox>
+From: zyw@rock-chips.com (Chris Zhong)
+Date: Tue, 23 Jun 2015 20:53:38 +0800
+Subject: [PATCH v3 0/2] add support holding 24Mhz osc during suspend
+Message-ID: <1435064020-7057-1-git-send-email-zyw@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 22, 2015 at 09:44:48AM +0100, Peter Maydell wrote:
-> On 17 June 2015 at 10:00, Suzuki K. Poulose <suzuki.poulose@arm.com> wrote:
-> > From: "Suzuki K. Poulose" <suzuki.poulose@arm.com>
-> >
-> > This patch adds a generic ARM v8 KVM target cpu type for use
-> > by the new CPUs which eventualy ends up using the common sys_reg
-> > table. For backward compatibility the existing targets have been
-> > preserved. Any new target CPU that can be covered by generic v8
-> > sys_reg tables should make use of the new generic target.
-> 
-> How do you intend this to work for cross-host migration?
-> Is the idea that the kernel guarantees that "generic" looks
-> 100% the same to the guest regardless of host hardware? I'm
-> not sure that can be made to work, given impdef differences
-> in ID register values, bp/wp registers, and so on.
-> 
-> Given that, it seems to me that we still need to provide
-> KVM_ARM_TARGET_$THISCPU defines so userspace can request
-> a specific guest CPU flavour; so what does this patch
-> provide that isn't already provided by just having userspace
-> query for the "preferred" CPU type as it does already?
-> 
-I'm guessing the intention is to avoid having to add code in the kernel
-to support KVM on a new CPU where nothing else needs to be done to
-support KVM on that system.
+Since the usb-phy clocks are not connected to the 32khz clock-in, they
+only have 24Mhz as the clock source. If we want to wake up system via
+usb device, we should hold the 24Mhz osc during suspend.
+This Patch has tested on chromebook jerry board, with another patch[0],
+we can wakeup system via usb keyboard.
 
-Wrt. migration, I was also wondering about this.  Would the differences
-in the CPU architecture be detected when feeding back the invariant
-sysregs from userspace on VM restore?
+[0] https://chromium-review.googlesource.com/#/c/277811/3
 
--Christoffer
+Changes in v3:
+- Fixed commenting style
+- Move the #define-s above the rk3288_slp_disable_osc function
+
+Chris Zhong (2):
+  ARM: rockchip: add support holding 24Mhz osc during suspend
+  ARM: rockchip: remove some useless macro in pm.h
+
+ arch/arm/mach-rockchip/pm.c | 40 ++++++++++++++++++++++++++++++++++++++--
+ arch/arm/mach-rockchip/pm.h |  7 -------
+ 2 files changed, 38 insertions(+), 9 deletions(-)
+
+-- 
+1.9.1
