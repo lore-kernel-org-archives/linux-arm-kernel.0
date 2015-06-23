@@ -1,95 +1,42 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Tue, 23 Jun 2015 10:37:58 -0500
-Subject: [PATCH-v2 3/3] mfd: devicetree: bindings: Add new 88pm800 mfd
- binding
-In-Reply-To: <1434567488-6477-5-git-send-email-vaibhav.hiremath@linaro.org>
-References: <vaibhav.hiremath@linaro.org>
- <1434567488-6477-1-git-send-email-vaibhav.hiremath@linaro.org>
- <1434567488-6477-5-git-send-email-vaibhav.hiremath@linaro.org>
-Message-ID: <CAL_JsqKe9AjnDuAKmjx4nqvnfZ3ac0tjto2G2rjHjYVVTjqr-Q@mail.gmail.com>
+From: achandran@mvista.com (Arun Chandran)
+Date: Tue, 23 Jun 2015 21:08:31 +0530
+Subject: BUG: Bad page state in process swapper pfn:XXXXX
+In-Reply-To: <20150622151647.GW7557@n2100.arm.linux.org.uk>
+References: <CAFdej03jedihbdNCb8e+at3M3ikKxn+s6eAvBvfGPdtsHShQdQ@mail.gmail.com>
+ <20150622151647.GW7557@n2100.arm.linux.org.uk>
+Message-ID: <CAFdej03_ddqhOTbmsA-hoxb+te1yXpdHP_wt8_iKyA0DQ9XrFg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 17, 2015 at 1:58 PM, Vaibhav Hiremath
-<vaibhav.hiremath@linaro.org> wrote:
-> With addition of DT support to 88pm800 mfd driver, this patch
-> adds new DT binding documentation along with respective properties.
+On Mon, Jun 22, 2015 at 8:46 PM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Mon, Jun 22, 2015 at 08:04:17PM +0530, Arun Chandran wrote:
+>> Hi,
+>>
+>> I am booting the latest linus tree on altera cyclone5 soc development kit.
+>> (https://www.altera.com/products/boards_and_kits/dev-kits/altera/kit-cyclone-v-soc.html)
+>> With the dtb file arch/arm/boot/dts/socfpga_cyclone5_socdk.dtb.
+>>
+>> I get these BUGS (page dumped because: non-NULL mapping) randomly; occurs
+>> around 1 in 5 times during cold boots.
 >
-> Signed-off-by: Vaibhav Hiremath <vaibhav.hiremath@linaro.org>
+> When did the problem start?  Are older kernel versions stable?
+>
 
-Acked-by: Rob Herring <robh@kernel.org>
+It took sometime for me; as the issue is random.  I did bisect with the
+conditions
 
-> ---
->  Documentation/devicetree/bindings/mfd/88pm800.txt | 60 +++++++++++++++++++++++
->  1 file changed, 60 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/mfd/88pm800.txt
->
-> diff --git a/Documentation/devicetree/bindings/mfd/88pm800.txt b/Documentation/devicetree/bindings/mfd/88pm800.txt
-> new file mode 100644
-> index 0000000..b8e72df
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/mfd/88pm800.txt
-> @@ -0,0 +1,60 @@
-> +* Marvell 88PM8xx Power Management IC
-> +
-> +Required parent device properties:
-> +- compatible : "marvell,88pm800", "marvell,88pm805", "marvell,88pm860"
-> +- reg : the I2C slave address for the 88pm8xx chip
-> +- interrupts : IRQ line for the 88pm8xx chip
-> +- interrupt-controller: describes the 88pm8xx as an interrupt controller
-> +- #interrupt-cells : should be 1.
-> +               - The cell is the 88pm8xx local IRQ number
-> +
-> +Optional parent device properties:
-> +- marvell,irq-clr-on-write: indicates whether interrupt status is cleared
-> +  by write or read.
-> +  If enabled, interrupt is cleared by write else just read would do.
-> +
-> +88pm8xx family of devices consists of varied group of sub-devices:
-> +
-> +Device                 Supply Names     Description
-> +------                 ------------     -----------
-> +88pm80x-onkey          :               : On key
-> +88pm80x-rtc            :               : RTC
-> +88pm80x-regulator      :               : Regulators
-> +
-> +Note: More device list will follow
-> +
-> +Example:
-> +
-> +       pmic: 88pm800 at 30 {
-> +               compatible = "marvell,88pm800";
-> +               reg = <0x30>;
-> +               interrupts = <GIC_SPI 77 IRQ_TYPE_LEVEL_HIGH>;
-> +               interrupt-parent = <&gic>;
-> +               interrupt-controller;
-> +               #interrupt-cells = <1>;
-> +
-> +               marvell,irq-clr-on-write;
-> +
-> +               regulators {
-> +                       compatible = "marvell,88pm80x-regulator";
-> +
-> +                       buck1a: BUCK1A {
-> +                               regulator-compatible = "88PM800-BUCK1A";
-> +                               regulator-min-microvolt = <600000>;
-> +                               regulator-max-microvolt = <1800000>;
-> +                               regulator-boot-on;
-> +                               regulator-always-on;
-> +                       };
-> +                       ldo1: LDO1 {
-> +                               regulator-compatible = "88PM800-LDO1";
-> +                               regulator-min-microvolt = <1700000>;
-> +                               regulator-max-microvolt = <3300000>;
-> +                               regulator-boot-on;
-> +                               regulator-always-on;
-> +                       };
-> +               };
-> +
-> +               rtc {
-> +                       compatible = "marvell,88pm80x-rtc";
-> +               };
-> +       };
-> --
-> 1.9.1
->
+a) All the good commit was tested for more than 25 cold boots
+b) Testing of a bad commit stopped as soon as I met with
+"BUG: Bad page state in process swapper  pfn:XXXXX"
+
+I found that problem is between v3.13(good) and v3.14(bad) and
+the problem commit is "84f452b1e8fc73ac0e31254c66e3e2260ce5263d ARM:
+mm: Remove bootmem code and switch to NO_BOOTMEM"
+
+If I boot v3.14 with the above commit reverted, the problem is not seen.
+
+I don't know whether my board lacks any platform code
+to support the above commit.
+
+--Arun
