@@ -1,36 +1,21 @@
-From: baruch@tkos.co.il (Baruch Siach)
-Date: Tue, 23 Jun 2015 13:17:12 +0300
-Subject: [PATCH 32/41] clocksource: digicolor: Migrate to new 'set-state'
- interface
-In-Reply-To: <6809c28328450f138517daa6c22f97f283f3fd01.1434622147.git.viresh.kumar@linaro.org>
-References: <cover.1434622147.git.viresh.kumar@linaro.org>
- <6809c28328450f138517daa6c22f97f283f3fd01.1434622147.git.viresh.kumar@linaro.org>
-Message-ID: <20150623101712.GY2303@tarshish>
+From: szabolcs.nagy@arm.com (Szabolcs Nagy)
+Date: Tue, 23 Jun 2015 11:35:05 +0100
+Subject: build failure with VDSO on non-glibc based systems
+Message-ID: <55893659.80607@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Viresh,
+if the host toolchain is not glibc based then the arm kernel build fails with
 
-On Thu, Jun 18, 2015 at 04:24:46PM +0530, Viresh Kumar wrote:
-> Migrate digicolor driver to the new 'set-state' interface provided by
-> clockevents core, the earlier 'set-mode' interface is marked obsolete
-> now.
-> 
-> This also enables us to implement callbacks for new states of clockevent
-> devices, for example: ONESHOT_STOPPED.
-> 
-> Cc: Baruch Siach <baruch@tkos.co.il>
-> Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
+ arch/arm/vdso/vdsomunge.c:53:19: fatal error: error.h: No such file or directory
 
-Tested on a Conexant CX92755 Equinox board.
+error.h is a glibc only header (ie not available in musl, newlib and bsd libcs).
 
-Acked-by: Baruch Siach <baruch@tkos.co.il>
-Tested-by: Baruch Siach <baruch@tkos.co.il>
-
-Thanks,
-baruch
-
--- 
-     http://baruch.siach.name/blog/                  ~. .~   Tk Open Systems
-=}------------------------------------------------ooO--U--Ooo------------{=
-   - baruch at tkos.co.il - tel: +972.2.679.5364, http://www.tkos.co.il -
+i attached a patch that fixes the build failure for me.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: 0001-fix-arm-vdsomunge-not-to-depend-on-glibc-specific-er.patch
+Type: text/x-patch
+Size: 4168 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150623/81f37be6/attachment.bin>
