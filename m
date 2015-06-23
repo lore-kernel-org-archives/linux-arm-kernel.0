@@ -1,21 +1,127 @@
-From: szabolcs.nagy@arm.com (Szabolcs Nagy)
-Date: Tue, 23 Jun 2015 11:35:05 +0100
-Subject: build failure with VDSO on non-glibc based systems
-Message-ID: <55893659.80607@arm.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Tue, 23 Jun 2015 12:57:36 +0200
+Subject: [PATCH V3] PM / Domains: Remove intermediate states from the
+ power off sequence
+In-Reply-To: <7ha8w01qir.fsf@deeprootsystems.com>
+References: <1434020737-13354-1-git-send-email-ulf.hansson@linaro.org>
+ <7ha8w01qir.fsf@deeprootsystems.com>
+Message-ID: <CAMuHMdWCo+U26x9Z5vUu+5ZVSpSOFF1LDO7jkezuXzVR2mC6qA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-if the host toolchain is not glibc based then the arm kernel build fails with
+On Tue, Jun 16, 2015 at 1:49 AM, Kevin Hilman <khilman@kernel.org> wrote:
+> Ulf Hansson <ulf.hansson@linaro.org> writes:
+>
+>> Genpd's ->runtime_suspend() (assigned to pm_genpd_runtime_suspend())
+>> doesn't immediately walk the hierarchy of ->runtime_suspend() callbacks.
+>> Instead, pm_genpd_runtime_suspend() calls pm_genpd_poweroff() which
+>> postpones that until *all* the devices in the genpd are runtime suspended.
+>>
+>> When pm_genpd_poweroff() discovers that the last device in the genpd is
+>> about to be runtime suspended, it calls __pm_genpd_save_device() for *all*
+>> the devices in the genpd sequentially. Furthermore,
+>> __pm_genpd_save_device() invokes the ->start() callback, walks the
+>> hierarchy of the ->runtime_suspend() callbacks and invokes the ->stop()
+>> callback. This causes a "thundering herd" problem.
+>>
+>> Let's address this issue by having pm_genpd_runtime_suspend() immediately
+>> walk the hierarchy of the ->runtime_suspend() callbacks, instead of
+>> postponing that to the power off sequence via pm_genpd_poweroff(). If the
+>> selected ->runtime_suspend() callback doesn't return an error code, call
+>> pm_genpd_poweroff() to see if it's feasible to also power off the PM
+>> domain.
+>>
+>> Adopting this change enables us to simplify parts of the code in genpd,
+>> for example the locking mechanism. Additionally, it gives some positive
+>> side effects, as described below.
+>>
+>> i)
+>> One device's ->runtime_resume() latency is no longer affected by other
+>> devices' latencies in a genpd.
+>>
+>> The complexity genpd has to support the option to abort the power off
+>> sequence suffers from latency issues. More precisely, a device that is
+>> requested to be runtime resumed, may end up waiting for
+>> __pm_genpd_save_device() to complete its operations for *another* device.
+>> That's because pm_genpd_poweroff() can't confirm an abort request while it
+>> waits for __pm_genpd_save_device() to return.
+>>
+>> As this patch removes the intermediate states in pm_genpd_poweroff() while
+>> powering off the PM domain, we no longer need the ability to abort that
+>> sequence.
+>>
+>> ii)
+>> Make pm_runtime[_status]_suspended() reliable when used with genpd.
+>>
+>> Until the last device in a genpd becomes idle, pm_genpd_runtime_suspend()
+>> will return 0 without actually walking the hierarchy of the
+>> ->runtime_suspend() callbacks. However, by returning 0 the runtime PM core
+>> considers the device as runtime_suspended, so
+>> pm_runtime[_status]_suspended() will return true, even though the device
+>> isn't (yet) runtime suspended.
+>>
+>> After this patch, since pm_genpd_runtime_suspend() immediately walks the
+>> hierarchy of the ->runtime_suspend() callbacks,
+>> pm_runtime[_status]_suspended() will accurately reflect the status of the
+>> device.
+>>
+>> iii)
+>> Enable fine-grained PM through runtime PM callbacks in drivers/subsystems.
+>>
+>> There are currently cases were drivers/subsystems implements runtime PM
+>> callbacks to deploy fine-grained PM (e.g. gate clocks, move pinctrl to
+>> power-save state, etc.). While using the genpd, pm_genpd_runtime_suspend()
+>> postpones invoking these callbacks until *all* the devices in the genpd
+>> are runtime suspended. In essence, one runtime resumed device prevents
+>> fine-grained PM for other devices within the same genpd.
+>>
+>> After this patch, since pm_genpd_runtime_suspend() immediately walks the
+>> hierarchy of the ->runtime_suspend() callbacks, fine-grained PM is enabled
+>> throughout all the levels of runtime PM callbacks.
+>>
+>> Unfortunately this patch also comes with a drawback, as described in the
+>> summary below.
+>>
+>> Driver's/subsystem's runtime PM callbacks may be invoked even when the
+>> genpd hasn't actually powered off the PM domain, potentially introducing
+>> unnecessary latency.
+>>
+>> However, in most cases, saving/restoring register contexts for devices are
+>> typically fast operations or can be optimized in device specific ways
+>> (e.g. shadow copies of register contents in memory, device-specific checks
+>> to see if context has been lost before restoring context, etc.).
+>>
+>> Still, in some cases the driver/subsystem may suffer from latency if
+>> runtime PM is used in a very fine-grained manner (e.g. for each IO request
+>> or xfer). To prevent that extra overhead, the driver/subsystem may deploy
+>> the runtime PM autosuspend feature.
+>>
+>> Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
 
- arch/arm/vdso/vdsomunge.c:53:19: fatal error: error.h: No such file or directory
+Thanks!
 
-error.h is a glibc only header (ie not available in musl, newlib and bsd libcs).
+> I know Lina has been testing this (or an earlier version) on qcom
+> hardware so would be nice to get a tested-by from her, and would also be
+> nice to see if Geert has a chance to take this for a spin on his Renesas
+> hardware and anyone can take this for a spin on Exynos.
 
-i attached a patch that fixes the build failure for me.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: 0001-fix-arm-vdsomunge-not-to-depend-on-glibc-specific-er.patch
-Type: text/x-patch
-Size: 4168 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150623/81f37be6/attachment.bin>
+I needed some athletics to make this apply to my current tree, but I did
+manage to test it on:
+  - sh73a0/kzm9g (SYSC PM Domain/pm-rmobile),
+  - r8a7740/armadillo (SYSC PM Domain/pm-rmobile),
+  - r8a73a4/ape6evm (SYSC PM Domain/pm-rmobile),
+  - r8a7791/koelsch (CPG Clock Domain + SYSC PM Domain/pm-rcar).
+I didn't notice any regressions or other oddities.
+
+Tested-by: Geert Uytterhoeven <geert+renesas@glider.be>
+
+Gr{oetje,eeting}s,
+
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
