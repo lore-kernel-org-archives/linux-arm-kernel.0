@@ -1,48 +1,22 @@
-From: stefan.wahren@i2se.com (Stefan Wahren)
-Date: Tue, 23 Jun 2015 21:31:41 +0200 (CEST)
-Subject: [RFC PATCH v6 2/2] nvmem: Add Vybrid OCOTP and OCROM support
-In-Reply-To: <b4a52f6c229bdabbfe9d21c03cb04593dde33ec4.1435066190.git.maitysanchayan@gmail.com>
-References: <cover.1435066190.git.maitysanchayan@gmail.com>
- <b4a52f6c229bdabbfe9d21c03cb04593dde33ec4.1435066190.git.maitysanchayan@gmail.com>
-Message-ID: <1037424954.250728.1435087901102.JavaMail.open-xchange@oxbsltgw00.schlund.de>
+From: matthias.bgg@gmail.com (Matthias Brugger)
+Date: Tue, 23 Jun 2015 21:36:32 +0200
+Subject: [PATCH 1/3] arm64: dts: mt8173: Add clock controller device nodes
+In-Reply-To: <1432128766-4445-2-git-send-email-s.hauer@pengutronix.de>
+References: <1432128766-4445-1-git-send-email-s.hauer@pengutronix.de>
+ <1432128766-4445-2-git-send-email-s.hauer@pengutronix.de>
+Message-ID: <7038138.YVtZV1WZ5z@ubix>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sanchayan,
-
-> Sanchayan Maity <maitysanchayan@gmail.com> hat am 23. Juni 2015 um 15:44
-> geschrieben:
->
->
-> The patch adds support for the On Chip One Time Programmable Peripheral
-> (OCOTP) and On Chip ROM (OCROM) support.
->
-> On Vybrid OCOTP contain data like SoC ID, MAC address and OCROM has the
-> revision ID.
->
-> Signed-off-by: Sanchayan Maity <maitysanchayan@gmail.com>
+On Wednesday, May 20, 2015 03:32:44 PM Sascha Hauer wrote:
+> This adds the device nodes providing clocks on the Mediatek MT8173.
+> These are: topckgen, infracfg, pericfg and apmixedsys. These are
+> fed by two oscillators also added by this patch.
+> 
+> Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
+> Reviewed-by: Daniel Kurtz <djkurtz@chromium.org>
 > ---
-> drivers/nvmem/Kconfig | 11 +++++++++
-> drivers/nvmem/Makefile | 2 ++
-> drivers/nvmem/vf610-ocotp.c | 60 +++++++++++++++++++++++++++++++++++++++++++++
-> 3 files changed, 73 insertions(+)
-> create mode 100644 drivers/nvmem/vf610-ocotp.c
->
-> diff --git a/drivers/nvmem/Kconfig b/drivers/nvmem/Kconfig
-> index 17f1a57..557c1e0 100644
-> --- a/drivers/nvmem/Kconfig
-> +++ b/drivers/nvmem/Kconfig
-> @@ -33,4 +33,15 @@ config NVMEM_SUNXI_SID
-> This driver can also be built as a module. If so, the module
-> will be called eeprom-sunxi-sid.
->
-> +config NVMEM_VF610_OCOTP
-> + tristate "VF610 SoCs OCOTP support"
-> + depends on SOC_VF610
-> + select REGMAP_MMIO
+>  arch/arm64/boot/dts/mediatek/mt8173.dtsi | 41
+> ++++++++++++++++++++++++++++++++ 1 file changed, 41 insertions(+)
 
-how do you come to the conclusion that Vybrid On-Chip OTP is accessable via
-MMIO?
-
-Regards
-Stefan
+Applied now to v4.2-next/arm64
