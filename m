@@ -1,25 +1,60 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Tue, 23 Jun 2015 13:27:37 +0530
-Subject: [PATCH 4/8] ARM: STi: STiH407: Provide a node for CPUFreq
-In-Reply-To: <20150623071045.GC3245@x1>
+From: pebolle@tiscali.nl (Paul Bolle)
+Date: Tue, 23 Jun 2015 10:00:11 +0200
+Subject: [PATCH 7/8] cpufreq: st: Provide runtime initialised driver for
+ ST's platforms
+In-Reply-To: <1434987837-24212-8-git-send-email-lee.jones@linaro.org>
 References: <1434987837-24212-1-git-send-email-lee.jones@linaro.org>
- <1434987837-24212-5-git-send-email-lee.jones@linaro.org>
- <20150623021622.GA16776@linux> <20150623071045.GC3245@x1>
-Message-ID: <20150623075737.GH16776@linux>
+ <1434987837-24212-8-git-send-email-lee.jones@linaro.org>
+Message-ID: <1435046411.4528.6.camel@tiscali.nl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 23-06-15, 08:10, Lee Jones wrote:
-> > These virtual nodes aren't allowed in DT and you have added them
-> > before the bindings patch :).
+On Mon, 2015-06-22 at 16:43 +0100, Lee Jones wrote:
+> --- a/drivers/cpufreq/Kconfig.arm
+> +++ b/drivers/cpufreq/Kconfig.arm
+ 
+> +config ARM_ST_CPUFREQ
+> +> 	> bool "ST CPUFreq support"
+> +> 	> depends on SOC_STIH407
+> +> 	> help
+> +> 	>   OPP list for cpufreq-dt driver can be provided through DT or can be
+> +> 	>   created at runtime.  Select this if you want create OPP list at runtime.
+
+
+> --- a/drivers/cpufreq/Makefile
+> +++ b/drivers/cpufreq/Makefile
+
+> +obj-$(CONFIG_ARM_ST_CPUFREQ)		+= st-cpufreq.o
+
+> --- /dev/null
+> +++ b/drivers/cpufreq/st-cpufreq.c
+
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License as published by
+> + * the Free Software Foundation; either version 2 of the License, or
+> + * (at your option) any later version.
+
+> +#include <linux/module.h>
+
+> +MODULE_DEVICE_TABLE(of, sti_cpufreq_of_match);
 > 
-> This isn't a virtual node, but you bring up a good point.
+> +module_platform_driver(sti_cpufreq);
 
-Hmm, wrong choice of words. Sorry.. 
+> 
+> +MODULE_AUTHOR("Ajitpal Singh <ajitpal.singh@st.com>");
+> +MODULE_DESCRIPTION("Creates an OPP list for cpufreq-cpu0 at runtime");
+> +MODULE_LICENSE("GPL v2");
 
-So, its a node for a virtual device :). The device is CPU and it
-already has a node for itself. And so such nodes were discouraged
-earlier by DT maintainers.
 
--- 
-viresh
+(There's a mismatch between the license used in the comment at the top
+of this file and the ident used in the MODULE_LICENSE() macro. See
+include/linux/module.h.)
+
+st-cpufreq.o can only be built-in. But the code contains of few lines
+that are only useful if the code can be modular. Was ARM_ST_CPUFREQ
+perhaps meant to be tristate?
+
+Thanks,
+
+
+Paul Bolle
