@@ -1,79 +1,87 @@
-From: b.reynal@virtualopensystems.com (Baptiste Reynal)
-Date: Tue, 23 Jun 2015 08:56:40 +0200
-Subject: [PATCH] VFIO: platform: enable ARM64 build
-In-Reply-To: <1434990361.3700.228.camel@redhat.com>
-References: <1434359632-20278-1-git-send-email-eric.auger@linaro.org>
- <CAN9JPjHh_DPzB1PRhkyaXjKvq47SYb6a4M0M=fO78Mp+YYefrQ@mail.gmail.com>
- <55883038.9060405@linaro.org>
- <1434990361.3700.228.camel@redhat.com>
-Message-ID: <CAN9JPjFNZrgiK5dVQcLAhvE1_ceJ=mc3qXfKy7Q3gmVOmjwY0A@mail.gmail.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Tue, 23 Jun 2015 08:06:51 +0100
+Subject: [PATCH 8/8] dt: cpufreq: st: Provide bindings for ST's CPUFreq
+ implementation
+In-Reply-To: <20150623023458.GC16776@linux>
+References: <1434987837-24212-1-git-send-email-lee.jones@linaro.org>
+ <1434987837-24212-9-git-send-email-lee.jones@linaro.org>
+ <20150623023458.GC16776@linux>
+Message-ID: <20150623070651.GA3245@x1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 22, 2015 at 6:26 PM, Alex Williamson
-<alex.williamson@redhat.com> wrote:
-> On Mon, 2015-06-22 at 17:56 +0200, Eric Auger wrote:
->> Hi Baptiste,
->>
->> No unfortunately I don't have any HW to test this currently. I just
->> test-compiled this. Up to you to decide whether you prefer waiting for a
->> functional test for this. I sent that patch since I expect ARM64 to be
->> the main platform where the VFIO platform drivermight be used for
->> virtualization use case.
+> [Adding Rob]
 
+Rob is not the only DT Maintainer, there are many of them.  The DT
+list was CC'ed, which they are all part of.  Adding them all
+separately is not required IMO.
 
-On my side, VFIO has been tested on ARM64 using Fastmodels without
-problems, we can go ahead with the patch.
+> On 22-06-15, 16:43, Lee Jones wrote:
+> 
+> At least some description was required here on why you need additional
+> bindings are what are they.
 
->
-> FWIW, I've been occasionally removing the arch condition entirely to
-> build test on x86 as well.  The Intel VT-d code certainly allows for
-> devices described by ACPI, which I assume would fall under the platform
-> category, but I don't know of any systems that do this, let alone any
-> x86 platform devices that we'd actually want to expose to the user.
-> Eventually we might want to consider decoupling this from an arch-based
-> Kconfig option, but we could just as easily let the first non-ARM user
-> think about that problem.  Thanks,
->
-> Alex
->
+Sure, I can do that.
 
-Indeed, I'd rather wait for someone to show up with some use cases and
-tests before removing this condition.
+> Over that, this patch should have been present before any other
+> patches using these bindings.
 
-Regards,
-Baptiste
+I've never heard that one before, but it's easy to re-order the set.
 
->> On 06/22/2015 05:49 PM, Baptiste Reynal wrote:
->> > Acked-by: Baptiste Reynal <b.reynal@virtualopensystems.com>
->> > Tested-by: Baptiste Reynal <b.reynal@virtualopensystems.com>
->> >
->> > Out of curiosity, have you get VFIO running on ARM64 without any problems ?
->> >
->> > On Mon, Jun 15, 2015 at 11:13 AM, Eric Auger <eric.auger@linaro.org> wrote:
->> >> This patch enables building VFIO platform and derivatives on ARM64.
->> >>
->> >> Signed-off-by: Eric Auger <eric.auger@linaro.org>
->> >> ---
->> >>  drivers/vfio/platform/Kconfig | 2 +-
->> >>  1 file changed, 1 insertion(+), 1 deletion(-)
->> >>
->> >> diff --git a/drivers/vfio/platform/Kconfig b/drivers/vfio/platform/Kconfig
->> >> index 1df7477..bb30128 100644
->> >> --- a/drivers/vfio/platform/Kconfig
->> >> +++ b/drivers/vfio/platform/Kconfig
->> >> @@ -1,6 +1,6 @@
->> >>  config VFIO_PLATFORM
->> >>         tristate "VFIO support for platform devices"
->> >> -       depends on VFIO && EVENTFD && ARM
->> >> +       depends on VFIO && EVENTFD && (ARM || ARM64)
->> >>         select VFIO_VIRQFD
->> >>         help
->> >>           Support for platform devices with VFIO. This is required to make
->> >> --
->> >> 1.9.1
->> >>
->>
->
->
->
+> > Cc: devicetree at vger.kernel.org
+> > Signed-off-by: Lee Jones <lee.jones@linaro.org>
+> > ---
+> >  .../devicetree/bindings/cpufreq/cpufreq-st.txt     | 48 ++++++++++++++++++++++
+> >  1 file changed, 48 insertions(+)
+> >  create mode 100644 Documentation/devicetree/bindings/cpufreq/cpufreq-st.txt
+> > 
+> > diff --git a/Documentation/devicetree/bindings/cpufreq/cpufreq-st.txt b/Documentation/devicetree/bindings/cpufreq/cpufreq-st.txt
+> > new file mode 100644
+> > index 0000000..cfa8952
+> > --- /dev/null
+> > +++ b/Documentation/devicetree/bindings/cpufreq/cpufreq-st.txt
+> > @@ -0,0 +1,48 @@
+> > +Binding for ST's CPUFreq driver
+> > +===============================
+> 
+> OPP-v2 bindings are out now and you can probably use them to make life
+> simple, they are part of Rafael's recent pull request:
+> https://lkml.org/lkml/2015/6/22/606
+> 
+> > +Required properties:
+> > +-------------------
+> > +- compatible		: Supported values are:
+> > +				"st,stih407-cpufreq"
+> 
+> Nodes for virtual devices aren't allowed in DT.
+
+Then why do Exynos, Spear, HREF and Snowball have CPUFreq nodes?
+
+One rule for one ... ?
+
+> > +Required properties [for working voltage scaling]:
+> > +-------------------------------------------------
+> > +
+> > +Located in CPUFreq's node:
+> > +
+> > +- st,syscfg		: Phandle to Major number register
+> > +				First cell: offset to major number
+> > +- st,syscfg-eng		: Phandle to Minor number and Pcode registers
+> > +				First cell: offset to process code
+> > +				Second cell: offset to minor number
+> > +
+> > +Located in CPU's node:
+> > +
+> > +- st,opp-list		: Bootloader provided node containing one or more 'opp at X' sub-nodes
+> 
+> I can see that this will be passed in from the bootloader. But at
+> least an example on how exactly things would actually look would have
+> been good. In logs if not in this file.
+
+Sure.
+
+-- 
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
