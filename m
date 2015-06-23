@@ -1,161 +1,94 @@
-From: pi-cheng.chen@linaro.org (Pi-Cheng Chen)
-Date: Tue, 23 Jun 2015 23:31:33 +0800
-Subject: [PATCH 1/2] dt-bindings: mediatek: Add MT8173 cpufreq driver
+From: robherring2@gmail.com (Rob Herring)
+Date: Tue, 23 Jun 2015 10:37:58 -0500
+Subject: [PATCH-v2 3/3] mfd: devicetree: bindings: Add new 88pm800 mfd
  binding
-In-Reply-To: <1433766561-1330-2-git-send-email-pi-cheng.chen@linaro.org>
-References: <1433766561-1330-1-git-send-email-pi-cheng.chen@linaro.org>
- <1433766561-1330-2-git-send-email-pi-cheng.chen@linaro.org>
-Message-ID: <CALx668UShfd3HW1ptzHnMr9xAUVyLGt=q2CmYHn3vqASZug6kw@mail.gmail.com>
+In-Reply-To: <1434567488-6477-5-git-send-email-vaibhav.hiremath@linaro.org>
+References: <vaibhav.hiremath@linaro.org>
+ <1434567488-6477-1-git-send-email-vaibhav.hiremath@linaro.org>
+ <1434567488-6477-5-git-send-email-vaibhav.hiremath@linaro.org>
+Message-ID: <CAL_JsqKe9AjnDuAKmjx4nqvnfZ3ac0tjto2G2rjHjYVVTjqr-Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-May I get some comments for this patch to get this series proceeding?
-
-Pi-Cheng
-
-On Mon, Jun 8, 2015 at 8:29 PM, Pi-Cheng Chen <pi-cheng.chen@linaro.org> wrote:
-> This patch adds device tree binding document for MT8173 cpufreq driver.
+On Wed, Jun 17, 2015 at 1:58 PM, Vaibhav Hiremath
+<vaibhav.hiremath@linaro.org> wrote:
+> With addition of DT support to 88pm800 mfd driver, this patch
+> adds new DT binding documentation along with respective properties.
 >
-> Signed-off-by: Pi-Cheng Chen <pi-cheng.chen@linaro.org>
+> Signed-off-by: Vaibhav Hiremath <vaibhav.hiremath@linaro.org>
+
+Acked-by: Rob Herring <robh@kernel.org>
+
 > ---
->  .../devicetree/bindings/cpufreq/cpufreq-mt8173.txt | 127 +++++++++++++++++++++
->  1 file changed, 127 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/cpufreq/cpufreq-mt8173.txt
+>  Documentation/devicetree/bindings/mfd/88pm800.txt | 60 +++++++++++++++++++++++
+>  1 file changed, 60 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/mfd/88pm800.txt
 >
-> diff --git a/Documentation/devicetree/bindings/cpufreq/cpufreq-mt8173.txt b/Documentation/devicetree/bindings/cpufreq/cpufreq-mt8173.txt
+> diff --git a/Documentation/devicetree/bindings/mfd/88pm800.txt b/Documentation/devicetree/bindings/mfd/88pm800.txt
 > new file mode 100644
-> index 0000000..7708a65
+> index 0000000..b8e72df
 > --- /dev/null
-> +++ b/Documentation/devicetree/bindings/cpufreq/cpufreq-mt8173.txt
-> @@ -0,0 +1,127 @@
+> +++ b/Documentation/devicetree/bindings/mfd/88pm800.txt
+> @@ -0,0 +1,60 @@
+> +* Marvell 88PM8xx Power Management IC
 > +
-> +Mediatek MT8173 cpufreq driver
-> +-------------------
+> +Required parent device properties:
+> +- compatible : "marvell,88pm800", "marvell,88pm805", "marvell,88pm860"
+> +- reg : the I2C slave address for the 88pm8xx chip
+> +- interrupts : IRQ line for the 88pm8xx chip
+> +- interrupt-controller: describes the 88pm8xx as an interrupt controller
+> +- #interrupt-cells : should be 1.
+> +               - The cell is the 88pm8xx local IRQ number
 > +
-> +Mediatek MT8173 cpufreq driver for CPU frequency scaling.
+> +Optional parent device properties:
+> +- marvell,irq-clr-on-write: indicates whether interrupt status is cleared
+> +  by write or read.
+> +  If enabled, interrupt is cleared by write else just read would do.
 > +
-> +Required properties:
-> +- clocks: A list of phandle + clock-specifier pairs for the clocks listed in clock names.
-> +- clock-names: Should contain the following:
-> +       "cpu"           - The multiplexer for clock input of CPU cluster.
-> +       "intermediate"  - A parent of "cpu" clock which is used as "intermediate" clock
-> +                         source (usually MAINPLL) when the original CPU PLL is under
-> +                         transition and not stable yet.
-> +- operating-points: Table of frequencies and voltage CPU could be transitioned into,
-> +                   Frequency should be in KHz units and voltage should be in microvolts.
-> +- proc-supply: Regulator for Vproc of CPU cluster.
+> +88pm8xx family of devices consists of varied group of sub-devices:
 > +
-> +Optional properties:
-> +- sram-supply: Regulator for Vsram of CPU cluster. When present, the cpufreq driver
-> +              needs to do "voltage trace" to step by step scale up/down Vproc and
-> +              Vsram to fit SoC specific needs. When absent, the voltage scaling
-> +              flow is handled by hardware, hence no software "voltage trace" is
-> +              needed.
+> +Device                 Supply Names     Description
+> +------                 ------------     -----------
+> +88pm80x-onkey          :               : On key
+> +88pm80x-rtc            :               : RTC
+> +88pm80x-regulator      :               : Regulators
+> +
+> +Note: More device list will follow
 > +
 > +Example:
-> +--------
-> +       cpu0: cpu at 0 {
-> +               device_type = "cpu";
-> +               compatible = "arm,cortex-a53";
-> +               reg = <0x000>;
-> +               enable-method = "psci";
-> +               cpu-idle-states = <&CPU_SLEEP_0>;
-> +               clocks = <&infracfg CLK_INFRA_CA53SEL>,
-> +                        <&apmixedsys CLK_APMIXED_MAINPLL>;
-> +               clock-names = "cpu", "intermediate";
-> +               operating-points = <
-> +                       507000  859000
-> +                       702000  908000
-> +                       1001000 983000
-> +                       1105000 1009000
-> +                       1183000 1028000
-> +                       1404000 1083000
-> +                       1508000 1109000
-> +                       1573000 1125000
-> +               >;
-> +       };
 > +
-> +       cpu1: cpu at 1 {
-> +               device_type = "cpu";
-> +               compatible = "arm,cortex-a53";
-> +               reg = <0x001>;
-> +               enable-method = "psci";
-> +               cpu-idle-states = <&CPU_SLEEP_0>;
-> +               clocks = <&infracfg CLK_INFRA_CA53SEL>,
-> +                        <&apmixedsys CLK_APMIXED_MAINPLL>;
-> +               clock-names = "cpu", "intermediate";
-> +               operating-points = <
-> +                       507000  859000
-> +                       702000  908000
-> +                       1001000 983000
-> +                       1105000 1009000
-> +                       1183000 1028000
-> +                       1404000 1083000
-> +                       1508000 1109000
-> +                       1573000 1125000
-> +               >;
-> +       };
+> +       pmic: 88pm800 at 30 {
+> +               compatible = "marvell,88pm800";
+> +               reg = <0x30>;
+> +               interrupts = <GIC_SPI 77 IRQ_TYPE_LEVEL_HIGH>;
+> +               interrupt-parent = <&gic>;
+> +               interrupt-controller;
+> +               #interrupt-cells = <1>;
 > +
-> +       cpu2: cpu at 100 {
-> +               device_type = "cpu";
-> +               compatible = "arm,cortex-a57";
-> +               reg = <0x100>;
-> +               enable-method = "psci";
-> +               cpu-idle-states = <&CPU_SLEEP_0>;
-> +               clocks = <&infracfg CLK_INFRA_CA57SEL>,
-> +                        <&apmixedsys CLK_APMIXED_MAINPLL>;
-> +               clock-names = "cpu", "intermediate";
-> +               operating-points = <
-> +                       507000  828000
-> +                       702000  867000
-> +                       1001000 927000
-> +                       1209000 968000
-> +                       1404000 1007000
-> +                       1612000 1049000
-> +                       1807000 1089000
-> +                       1989000 1125000
-> +               >;
-> +       };
+> +               marvell,irq-clr-on-write;
 > +
-> +       cpu3: cpu at 101 {
-> +               device_type = "cpu";
-> +               compatible = "arm,cortex-a57";
-> +               reg = <0x101>;
-> +               enable-method = "psci";
-> +               cpu-idle-states = <&CPU_SLEEP_0>;
-> +               clocks = <&infracfg CLK_INFRA_CA57SEL>,
-> +                        <&apmixedsys CLK_APMIXED_MAINPLL>;
-> +               clock-names = "cpu", "intermediate";
-> +               operating-points = <
-> +                       507000  828000
-> +                       702000  867000
-> +                       1001000 927000
-> +                       1209000 968000
-> +                       1404000 1007000
-> +                       1612000 1049000
-> +                       1807000 1089000
-> +                       1989000 1125000
-> +               >;
-> +       };
+> +               regulators {
+> +                       compatible = "marvell,88pm80x-regulator";
 > +
-> +       &cpu0 {
-> +               proc-supply = <&mt6397_vpca15_reg>;
-> +       };
+> +                       buck1a: BUCK1A {
+> +                               regulator-compatible = "88PM800-BUCK1A";
+> +                               regulator-min-microvolt = <600000>;
+> +                               regulator-max-microvolt = <1800000>;
+> +                               regulator-boot-on;
+> +                               regulator-always-on;
+> +                       };
+> +                       ldo1: LDO1 {
+> +                               regulator-compatible = "88PM800-LDO1";
+> +                               regulator-min-microvolt = <1700000>;
+> +                               regulator-max-microvolt = <3300000>;
+> +                               regulator-boot-on;
+> +                               regulator-always-on;
+> +                       };
+> +               };
 > +
-> +       &cpu1 {
-> +               proc-supply = <&mt6397_vpca15_reg>;
-> +       };
-> +
-> +       &cpu2 {
-> +               proc-supply = <&da9211_vcpu_reg>;
-> +               sram-supply = <&mt6397_vsramca7_reg>;
-> +       };
-> +
-> +       &cpu3 {
-> +               proc-supply = <&da9211_vcpu_reg>;
-> +               sram-supply = <&mt6397_vsramca7_reg>;
+> +               rtc {
+> +                       compatible = "marvell,88pm80x-rtc";
+> +               };
 > +       };
 > --
 > 1.9.1
