@@ -1,49 +1,33 @@
-From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Tue, 23 Jun 2015 17:29:02 +0530
-Subject: [PATCH 17/17] ARM: dts: omap4: Use "syscon-otghs" instead of
- "ctrl-module" in USB node
-In-Reply-To: <1435060743-5511-1-git-send-email-kishon@ti.com>
-References: <1435060743-5511-1-git-send-email-kishon@ti.com>
-Message-ID: <1435060743-5511-18-git-send-email-kishon@ti.com>
+From: sricharan@codeaurora.org (Sricharan R)
+Date: Tue, 23 Jun 2015 17:37:26 +0530
+Subject: [PATCH] iommu/arm-smmu: Fix bug in ARM_SMMU_FEAT_TRANS_OPS condition
+ check
+Message-ID: <1435061246-14690-1-git-send-email-sricharan@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add "syscon-otghs" property and remove the deprecated "ctrl-module"
-property from MUSB devicetree node.
+Patch 'fix ARM_SMMU_FEAT_TRANS_OPS condition' changed the check
+for ARM_SMMU_FEAT_TRANS_OPS to be based on presence of stage1 check,
+but used (id & ID0_ATOSNS) instead of !(id & ID0_ATOSNS).
+Fix it here.
 
-Since "omap_control_usbotg" devicetree node is no longer used, remove
-it.
-
-Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
+Signed-off-by: Sricharan R <sricharan@codeaurora.org>
 ---
- arch/arm/boot/dts/omap4.dtsi |    8 +-------
- 1 file changed, 1 insertion(+), 7 deletions(-)
+ drivers/iommu/arm-smmu.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm/boot/dts/omap4.dtsi b/arch/arm/boot/dts/omap4.dtsi
-index d0e0960..3bc77b1 100644
---- a/arch/arm/boot/dts/omap4.dtsi
-+++ b/arch/arm/boot/dts/omap4.dtsi
-@@ -852,12 +852,6 @@
- 			};
- 		};
+diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
+index 09091e9..fbf4af6 100644
+--- a/drivers/iommu/arm-smmu.c
++++ b/drivers/iommu/arm-smmu.c
+@@ -1866,7 +1866,7 @@ static int arm_smmu_device_cfg_probe(struct arm_smmu_device *smmu)
+ 		return -ENODEV;
+ 	}
  
--		omap_control_usbotg: control-phy at 4a00233c {
--			compatible = "ti,control-phy-otghs";
--			reg = <0x4a00233c 0x4>;
--			reg-names = "otghs_control";
--		};
--
- 		usb_otg_hs: usb_otg_hs at 4a0ab000 {
- 			compatible = "ti,omap4-musb";
- 			reg = <0x4a0ab000 0x7ff>;
-@@ -870,7 +864,7 @@
- 			multipoint = <1>;
- 			num-eps = <16>;
- 			ram-bits = <12>;
--			ctrl-module = <&omap_control_usbotg>;
-+			syscon-otghs = <&scm_conf 0x33c>;
- 		};
- 
- 		aes: aes at 4b501000 {
+-	if ((id & ID0_S1TS) && ((smmu->version == 1) || (id & ID0_ATOSNS))) {
++	if ((id & ID0_S1TS) && ((smmu->version == 1) || !(id & ID0_ATOSNS))) {
+ 		smmu->features |= ARM_SMMU_FEAT_TRANS_OPS;
+ 		dev_notice(smmu->dev, "\taddress translation ops\n");
+ 	}
 -- 
-1.7.9.5
+QUALCOMM INDIA, on behalf of Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by The Linux Foundation
