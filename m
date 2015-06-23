@@ -1,54 +1,35 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 23 Jun 2015 21:41:54 +0100
-Subject: mx6 hdmi resolution behaviour
-In-Reply-To: <CAOMZO5BjuOGgqsUNG6K6N-QU1a4oWTdynxsoAECYLeQK_9Kk9g@mail.gmail.com>
-References: <CAOMZO5AbC8PCo7J7ovw4izPBK08UkDgKGG++d+9xty4GJ0SzKQ@mail.gmail.com>
- <20150623164443.GC7557@n2100.arm.linux.org.uk>
- <CAOMZO5BjuOGgqsUNG6K6N-QU1a4oWTdynxsoAECYLeQK_9Kk9g@mail.gmail.com>
-Message-ID: <20150623204154.GD7557@n2100.arm.linux.org.uk>
+From: stefan.wahren@i2se.com (Stefan Wahren)
+Date: Tue, 23 Jun 2015 22:44:32 +0200 (CEST)
+Subject: [PATCH v6 8/9] nvmem: sunxi: Move the SID driver to the nvmem
+ framework
+In-Reply-To: <1435014583-26478-1-git-send-email-srinivas.kandagatla@linaro.org>
+References: <1435014459-26138-1-git-send-email-srinivas.kandagatla@linaro.org>
+ <1435014583-26478-1-git-send-email-srinivas.kandagatla@linaro.org>
+Message-ID: <1335062615.252618.1435092272970.JavaMail.open-xchange@oxbsltgw00.schlund.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 23, 2015 at 01:52:50PM -0300, Fabio Estevam wrote:
-> On Tue, Jun 23, 2015 at 1:44 PM, Russell King - ARM Linux
-> <linux@arm.linux.org.uk> wrote:
-> 
-> > If you have no connected connectors, then you get 1024x768:
-> >
-> > imx-drm display-subsystem: No connectors reported connected with modes
-> > [drm] Cannot find any crtc or sizes - going 1024x768
-> >
-> > as that's what DRM defaults to when it has no other timing information
-> > available.
-> 
-> Agreed, but after the cable is connected we could try to find a more
-> suitable timing?
-> 
-> >> [   16.310548] imx-ipuv3 2400000.ipu: videomode adapted for IPU restrictions
-> >
-> > I don't see this message booting on a Hummingboard with HDMI
-> > disconnected.
-> 
-> I see this message in the following case:
-> 
-> - Boot the board with HDMI disconnected
-> 
-> - Connect the HDMI cable and then such message is displayed.
 
-I've just tried this (the HBi1 was booted previously with the HDMI socket
-disconnected).  Just now, I turned the TV on, and then connected it to
-the HDMI.
+> Srinivas Kandagatla <srinivas.kandagatla@linaro.org> hat am 23. Juni 2015 um
+> 01:09 geschrieben:
+>
+>
+> From: Maxime Ripard <maxime.ripard@free-electrons.com>
+>
+> Now that we have the nvmem framework, we can consolidate the common
+> driver code. Move the driver to the framework, and hopefully, it will
+> fix the sysfs file creation race.
+> --- /dev/null
+> +++ b/drivers/nvmem/sunxi-sid.c
+> [...]
+> +
+> +static int sunxi_sid_write(void *context, const void *data, size_t count)
+> +{
+> + /* Unimplemented */
+> + return 0;
+> +}
+> +
 
-The TV reported a resolution of 1024x768, and the kernel log was silent.
-
-My guess would be that your HDMI sink is reporting slightly non-standard
-1024x768 timings, which cause the IPU restrictions to be violated.  Maybe
-dumping the EDID of the HDMI device would reveal this?
-
-# edid-decode < /sys/class/drm/card0-HDMI-A-1/edid
-
-might provide some hints?
-
--- 
-FTTC broadband for 0.8mile line: currently@10.5Mbps down 400kbps up
-according to speedtest.net.
+I think it should be clear that the write operation isn't implemented. It's more
+important to know the function should make
+regmap_init happy.
