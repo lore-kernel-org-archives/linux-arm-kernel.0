@@ -1,114 +1,130 @@
-From: hanjun.guo@linaro.org (Hanjun Guo)
-Date: Tue, 23 Jun 2015 19:18:55 +0800
-Subject: [PATCH v2 3/9] irqchip / GIC: Add GIC version support in ACPI MADT
-In-Reply-To: <20150622164520.GA26129@red-moon>
-References: <1434703572-26221-1-git-send-email-hanjun.guo@linaro.org>
- <1434703572-26221-4-git-send-email-hanjun.guo@linaro.org>
- <20150622164520.GA26129@red-moon>
-Message-ID: <5589409F.8020208@linaro.org>
+From: romain.perier@gmail.com (Romain Perier)
+Date: Tue, 23 Jun 2015 13:55:52 +0200
+Subject: [PATCH] ARM: dts: rockchip: Add DMA tx and rx channels in UART
+ interfaces for RK3288 SoCs
+In-Reply-To: <1475991.JRcDMpQrFc@diego>
+References: <1434475166-30338-1-git-send-email-romain.perier@gmail.com>
+ <CABgxDo+8MafT8hOzpG=gjju=S7bVtNBOKxmi_JPHv1bDZSGeCQ@mail.gmail.com>
+ <1475991.JRcDMpQrFc@diego>
+Message-ID: <CABgxDoJo4=LafA+rf+gN_U=QY0reK3ux8RzHCaYXWfw9FkiLYA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/23/2015 12:45 AM, Lorenzo Pieralisi wrote:
-> On Fri, Jun 19, 2015 at 09:46:06AM +0100, Hanjun Guo wrote:
->
-> [...]
->
->> +
->> +static int __init
->> +match_gic_redist(struct acpi_subtable_header *header, const unsigned long end)
->> +{
->> +	return 0;
->> +}
->> +static bool __init acpi_gic_redist_is_present(void)
->> +{
->> +	int count;
->> +
->> +	/* scan MADT table to find if we have redistributor entries */
->> +	count  =  acpi_table_parse_madt(ACPI_MADT_TYPE_GENERIC_REDISTRIBUTOR,
->> +					match_gic_redist, 0);
->> +
->> +	/* has at least one GIC redistributor entry */
->> +	if (count > 0)
->> +		return true;
->> +	else
->> +		return false;
->> +}
->
-> return count > 0;
->
-> What about systems where the redistributor data is in the GICC subtable ? Do
-> you treat them as GIC V2 :) ?
+Hi Heiko,
 
-Good catch :)
+Oh sure, I completly forgot this issue ^^ , no problem. If you want
+some help feel free to ping on IRC.
+I did not notice regressions or issues, but my system was not under
+load, I will try to investigate and/or test with care.
 
-It's in my TODO list and I didn't put some notes here, my bad.
+Have a nice day,
+Romain
 
-If we want to support that feature, it seems we need to refactor
-the GICv3 code for rdist too, in gic_populate_rdist(), it use
-redistributor regions and jump to each cpu's redistributor using
-the stride, but with the redistributor data is in the GICC subtable,
-we only have the base address for each cpu's redistributor, have
-no regions.
-
-Another way to do that we can repack all the base address for
-redistributors into regions then no need to refactor the code,
-but all the CPUs in MADT have to be listed in order which is
-insane.
-
+2015-06-23 13:09 GMT+02:00 Heiko St?bner <heiko@sntech.de>:
+> Hi Romain,
 >
-> On a side note, having to define an empty function like match_gic_redist is
-> horrible.
+> Am Dienstag, 23. Juni 2015, 08:53:17 schrieb Romain Perier:
+>> ping :)
 >
-> I wonder whether it is not better to refactor map_madt_entry(), create
-> a MADT subtable iterator out of it and make that code generic, instead
-> of being forced to add these useless MADT handlers just to count
-> entries, it is not the first I noticed.
-
-I agree, I also think that parse GICC for each driver (SMP, GIC) is
-duplicate, trying to consolidate them, but I haven't figure out a
-good way to do that.
-
+> I haven't forgotten this patch :-)
 >
->> +static int __init acpi_gic_version_init(void)
->> +{
->> +	int count;
->> +	void __iomem *dist_base;
->> +	u32 reg;
->> +
->> +	count = acpi_table_parse_madt(ACPI_MADT_TYPE_GENERIC_DISTRIBUTOR,
->> +					acpi_gic_parse_distributor, 0);
->> +
->> +	if (count <= 0) {
->> +		pr_err("No valid GIC distributor entry exists\n");
->> +		return -ENODEV;
->> +	}
->> +
->> +	if (gic_version >= ACPI_MADT_GIC_VERSION_RESERVED) {
->> +		pr_err("Invalid GIC version %d in MADT\n", gic_version);
->> +		return -EINVAL;
->> +	}
->> +
->> +	/*
->> +	 * when the GIC version is 0, we fallback to hardware discovery.
->> +	 * this is also needed to keep compatiable with ACPI 5.1,
->> +	 * which has no gic_version field in distributor structure and
->> +	 * reserved as 0.
->> +	 *
->> +	 * For hardware discovery, the offset for GICv1/2 and GICv3/4 to
->> +	 * get the GIC version is different (0xFE8 for GICv1/2 and 0xFFE8
->> +	 * for GICv3/4), so we need to handle it separately.
+> I just haven't fully made up my mind concerning the bug in the pl330
+> implementation on Rockchip SoCs - aka if we'll make it worse by also enabling
+> dma on the uarts.
 >
->> +	 */
->> +	if (gic_version	== ACPI_MADT_GIC_VERSION_NONE) {
->> +		/* it's GICv3/v4 if redistributor is present */
->> +		if (acpi_gic_redist_is_present()) {
+> So far the problem reports I read only mentioned degraded functionality like
+> popping sounds in audio, not full system failures or freezes. So I tend to
+> include the patch and see what happens ;-)
 >
-> See above, IIUC you might have systems with GIC v3 where this call
-> would fail, and we do not want to fall back to GIC v2.
-
-Yes, but we need to find a way to refactor the GICv3 code for
-populating redistributors first.
-
-Thanks
-Hanjun
+>
+> Heiko
+>
+>
+>
+>> 2015-06-16 19:19 GMT+02:00 Romain Perier <romain.perier@gmail.com>:
+>> > This enable DMA capability for the corresponding UART interfaces, also it
+>> > removes warning "ttyS%d - Failed to request dma" from kernel logs.
+>> >
+>> > Signed-off-by: Romain Perier <romain.perier@gmail.com>
+>> > ---
+>> >
+>> > Changes since v1 ("[PATCH] ARM: dts: rockchip: Add dmac_bus rx and tx for
+> uart2"):
+>> >         - Add DMA tx and rx channels for all UART interfaces
+>> >         - Rename commit summary
+>> >
+>> >  arch/arm/boot/dts/rk3288.dtsi | 10 ++++++++++
+>> >  1 file changed, 10 insertions(+)
+>> >
+>> > diff --git a/arch/arm/boot/dts/rk3288.dtsi b/arch/arm/boot/dts/rk3288.dtsi
+>> > index 22316d0..1996452 100644
+>> > --- a/arch/arm/boot/dts/rk3288.dtsi
+>> > +++ b/arch/arm/boot/dts/rk3288.dtsi
+>> > @@ -359,6 +359,8 @@
+>> >
+>> >                 clock-names = "baudclk", "apb_pclk";
+>> >                 pinctrl-names = "default";
+>> >                 pinctrl-0 = <&uart0_xfer>;
+>> >
+>> > +               dmas = <&dmac_peri 1>, <&dmac_peri 2>;
+>> > +               dma-names = "tx", "rx";
+>> >
+>> >                 status = "disabled";
+>> >
+>> >         };
+>> >
+>> > @@ -372,6 +374,8 @@
+>> >
+>> >                 clock-names = "baudclk", "apb_pclk";
+>> >                 pinctrl-names = "default";
+>> >                 pinctrl-0 = <&uart1_xfer>;
+>> >
+>> > +               dmas = <&dmac_peri 3>, <&dmac_peri 4>;
+>> > +               dma-names = "tx", "rx";
+>> >
+>> >                 status = "disabled";
+>> >
+>> >         };
+>> >
+>> > @@ -385,6 +389,8 @@
+>> >
+>> >                 clock-names = "baudclk", "apb_pclk";
+>> >                 pinctrl-names = "default";
+>> >                 pinctrl-0 = <&uart2_xfer>;
+>> >
+>> > +               dmas = <&dmac_bus_s 4>, <&dmac_bus_s 5>;
+>> > +               dma-names = "tx", "rx";
+>> >
+>> >                 status = "disabled";
+>> >
+>> >         };
+>> >
+>> > @@ -398,6 +404,8 @@
+>> >
+>> >                 clock-names = "baudclk", "apb_pclk";
+>> >                 pinctrl-names = "default";
+>> >                 pinctrl-0 = <&uart3_xfer>;
+>> >
+>> > +               dmas = <&dmac_peri 7>, <&dmac_peri 8>;
+>> > +               dma-names = "tx", "rx";
+>> >
+>> >                 status = "disabled";
+>> >
+>> >         };
+>> >
+>> > @@ -411,6 +419,8 @@
+>> >
+>> >                 clock-names = "baudclk", "apb_pclk";
+>> >                 pinctrl-names = "default";
+>> >                 pinctrl-0 = <&uart4_xfer>;
+>> >
+>> > +               dmas = <&dmac_peri 9>, <&dmac_peri 10>;
+>> > +               dma-names = "tx", "rx";
+>> >
+>> >                 status = "disabled";
+>> >
+>> >         };
+>> >
+>> > --
+>> > 1.9.1
+>
