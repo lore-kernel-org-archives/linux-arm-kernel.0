@@ -1,35 +1,37 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 23 Jun 2015 17:44:43 +0100
-Subject: mx6 hdmi resolution behaviour
-In-Reply-To: <CAOMZO5AbC8PCo7J7ovw4izPBK08UkDgKGG++d+9xty4GJ0SzKQ@mail.gmail.com>
-References: <CAOMZO5AbC8PCo7J7ovw4izPBK08UkDgKGG++d+9xty4GJ0SzKQ@mail.gmail.com>
-Message-ID: <20150623164443.GC7557@n2100.arm.linux.org.uk>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Tue, 23 Jun 2015 16:52:00 -0000
+Subject: [PATCH] Show proper respect for Heinrich Hertz by using the
+ correct unit for frequency
+In-Reply-To: <20150511131952.GD2067@n2100.arm.linux.org.uk>
+References: <20150511131952.GD2067@n2100.arm.linux.org.uk>
+Message-ID: <20150502145947.GA8156@xo-6d-61-c0.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 23, 2015 at 01:41:46PM -0300, Fabio Estevam wrote:
-> Hi,
+Hi!
+
+> The SI unit of frequency is Hertz, named after Heinrich Hertz, and is
+> given the symbol "Hz" to denote this.  "hz" is not the unit of frequency,
+> and is in fact meaningless.
 > 
-> On a imx6q-cubox-i running 4.1 kernel I am getting 1920x1080 HDMI
-> resolution if I boot the board with the HDMI cable connected.
+> Fix arch/arm to correctly use "Hz", thereby acknowledging Heinrich Hertz
+> contribution to the modern world.
 > 
-> If I boot it without the HDMI cable and then connect it afterwards,
-> the resolution goes to only 1024 x 768 and the following IPU message
-> is seen:
 
-If you have no connected connectors, then you get 1024x768:
+> --- a/arch/arm/mach-ixp4xx/include/mach/platform.h
+> +++ b/arch/arm/mach-ixp4xx/include/mach/platform.h
+> @@ -74,7 +74,7 @@ extern unsigned long ixp4xx_exp_bus_size;
+>  /*
+>   * Clock Speed Definitions.
+>   */
+> -#define IXP4XX_PERIPHERAL_BUS_CLOCK 	(66) /* 66Mhzi APB BUS   */ 
+> +#define IXP4XX_PERIPHERAL_BUS_CLOCK 	(66) /* 66MHzi APB BUS   */ 
+>  #define IXP4XX_UART_XTAL        	14745600
+>  
 
-imx-drm display-subsystem: No connectors reported connected with modes
-[drm] Cannot find any crtc or sizes - going 1024x768
+Speaking about meaningless... What is MHzi supposed to mean?
 
-as that's what DRM defaults to when it has no other timing information
-available.
-
-> [   16.310548] imx-ipuv3 2400000.ipu: videomode adapted for IPU restrictions
-
-I don't see this message booting on a Hummingboard with HDMI
-disconnected.
-
+ACK for the rest.
 -- 
-FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
-according to speedtest.net.
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
