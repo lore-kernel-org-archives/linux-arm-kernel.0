@@ -1,57 +1,55 @@
-From: julien.grall@citrix.com (Julien Grall)
-Date: Tue, 23 Jun 2015 15:37:33 +0100
-Subject: [RFC 23/23] arm/xen: Add support for 64KB page granularity
-In-Reply-To: <alpine.DEB.2.02.1506231508050.16917@kaball.uk.xensource.com>
-References: <1431622863-28575-1-git-send-email-julien.grall@citrix.com>
- <1431622863-28575-24-git-send-email-julien.grall@citrix.com>
- <alpine.DEB.2.02.1506231508050.16917@kaball.uk.xensource.com>
-Message-ID: <55896F2D.5030405@citrix.com>
+From: rogerq@ti.com (Roger Quadros)
+Date: Tue, 23 Jun 2015 17:47:23 +0300
+Subject: [PATCH 01/17] phy: ti-pipe3: use ti_pipe3_power_off to power
+ off the PHY during probe
+In-Reply-To: <1435060743-5511-2-git-send-email-kishon@ti.com>
+References: <1435060743-5511-1-git-send-email-kishon@ti.com>
+ <1435060743-5511-2-git-send-email-kishon@ti.com>
+Message-ID: <20150623174723.f6d28a668421d6c16289770f@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Tue, 23 Jun 2015 17:28:46 +0530
+Kishon Vijay Abraham I <kishon@ti.com> wrote:
 
-On 23/06/15 15:19, Stefano Stabellini wrote:
->> diff --git a/arch/arm/xen/enlighten.c b/arch/arm/xen/enlighten.c
->> index 224081c..dcfe251 100644
->> --- a/arch/arm/xen/enlighten.c
->> +++ b/arch/arm/xen/enlighten.c
->> @@ -93,8 +93,8 @@ static void xen_percpu_init(void)
->>  	pr_info("Xen: initializing cpu%d\n", cpu);
->>  	vcpup = per_cpu_ptr(xen_vcpu_info, cpu);
->>  
->> -	info.mfn = __pa(vcpup) >> PAGE_SHIFT;
->> -	info.offset = offset_in_page(vcpup);
->> +	info.mfn = __pa(vcpup) >> XEN_PAGE_SHIFT;
->> +	info.offset = xen_offset_in_page(vcpup);
->>  
->>  	err = HYPERVISOR_vcpu_op(VCPUOP_register_vcpu_info, cpu, &info);
->>  	BUG_ON(err);
->> @@ -204,7 +204,7 @@ static int __init xen_guest_init(void)
->>  	xatp.domid = DOMID_SELF;
->>  	xatp.idx = 0;
->>  	xatp.space = XENMAPSPACE_shared_info;
->> -	xatp.gpfn = __pa(shared_info_page) >> PAGE_SHIFT;
->> +	xatp.gpfn = __pa(shared_info_page) >> XEN_PAGE_SHIFT;
->>  	if (HYPERVISOR_memory_op(XENMEM_add_to_physmap, &xatp))
->>  		BUG();
+> No functional change. Previously omap_control_phy_power() was used to power
+> off the PHY during probe. But once PIPE3 driver is adapted to use syscon,
+> omap_control_phy_power() cannot be used. Hence used ti_pipe3_power_off
+> to power off the PHY.
 > 
-> What about xen_remap_domain_mfn_range? I guess we don't support that use
-> case on 64K guests? If so, I would appreaciate an assert and/or an error
-> message.
+> Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
 
-The implementation of xen_remap_domain_mfn_range return -ENOSYS no
-matter the page granularity.
+Acked-by: Roger Quadros <rogerq@ti.com>
 
-This function is PV specific and has been added few months ago just for
-a stub. See comment in the code:
-"/* Not used by XENFEAT_auto_translated guests */"
+cheers,
+-roger
 
-Any logging/BUG_ON within this function is out of scope for this series.
-And I don't think this will be really useful. Feel free to send a patch
-for it.
-
-Regards,
-
--- 
-Julien Grall
+> ---
+>  drivers/phy/phy-ti-pipe3.c |    4 ++--
+>  1 file changed, 2 insertions(+), 2 deletions(-)
+> 
+> diff --git a/drivers/phy/phy-ti-pipe3.c b/drivers/phy/phy-ti-pipe3.c
+> index 08020dc..d784426 100644
+> --- a/drivers/phy/phy-ti-pipe3.c
+> +++ b/drivers/phy/phy-ti-pipe3.c
+> @@ -431,8 +431,6 @@ static int ti_pipe3_probe(struct platform_device *pdev)
+>  
+>  	phy->control_dev = &control_pdev->dev;
+>  
+> -	omap_control_phy_power(phy->control_dev, 0);
+> -
+>  	platform_set_drvdata(pdev, phy);
+>  	pm_runtime_enable(phy->dev);
+>  
+> @@ -451,6 +449,8 @@ static int ti_pipe3_probe(struct platform_device *pdev)
+>  		return PTR_ERR(generic_phy);
+>  
+>  	phy_set_drvdata(generic_phy, phy);
+> +	ti_pipe3_power_off(generic_phy);
+> +
+>  	phy_provider = devm_of_phy_provider_register(phy->dev,
+>  			of_phy_simple_xlate);
+>  	if (IS_ERR(phy_provider))
+> -- 
+> 1.7.9.5
+> 
