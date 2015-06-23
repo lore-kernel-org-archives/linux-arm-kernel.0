@@ -1,60 +1,79 @@
-From: moritz.fischer@ettus.com (Moritz Fischer)
-Date: Tue, 23 Jun 2015 11:23:51 -0700
-Subject: [PATCHv5 1/2] dts: Adding docs for Xilinx LogiCORE IP mailbox
- driver.
-In-Reply-To: <20150623180513.GE20178@xsjsorenbubuntu>
-References: <1435082402-29239-1-git-send-email-moritz.fischer@ettus.com>
- <1435082402-29239-2-git-send-email-moritz.fischer@ettus.com>
- <20150623180513.GE20178@xsjsorenbubuntu>
-Message-ID: <CAAtXAHd9zcrUGpYcPFaMDF-eDMN+-t4tuB7KmH7A2B1AzW+psg@mail.gmail.com>
+From: computersforpeace@gmail.com (Brian Norris)
+Date: Tue, 23 Jun 2015 11:26:33 -0700
+Subject: [PATCH 04/11] mtd: ofpart: do not fail probe when no partitions
+ exist
+In-Reply-To: <36e315552c849a4d22ac0fcff7958f6ffcafb160.1433364398.git.hramrach@gmail.com>
+References: <cover.1433364398.git.hramrach@gmail.com>
+ <36e315552c849a4d22ac0fcff7958f6ffcafb160.1433364398.git.hramrach@gmail.com>
+Message-ID: <20150623182633.GO4917@ld-irv-0074>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 23, 2015 at 11:05 AM, S?ren Brinkmann
-<soren.brinkmann@xilinx.com> wrote:
-> On Tue, 2015-06-23 at 11:00AM -0700, Moritz Fischer wrote:
->> Changes from v4:
->> - Changed mbox cells property from 1 to 0
->> - Fixed interrupt property
->>
->> Changes from v3:
->> - Changed reg size to 0x100
->>
->> Changes from v2:
->> - Addressed Michal's stylistic comments
->> - Fixed typo in compatible string
->>
->> Changes from v1:
->> - Added common clock framework support
->>
->> Changes from v0:
->> - Fixed example bindings
->>
->> Signed-off-by: Moritz Fischer <moritz.fischer@ettus.com>
->> Acked-by: Michal Simek <michal.simek@xilinx.com>
->> ---
->>  .../devicetree/bindings/mailbox/xilinx-mailbox.txt | 44 ++++++++++++++++++++++
->>  1 file changed, 44 insertions(+)
->>  create mode 100644 Documentation/devicetree/bindings/mailbox/xilinx-mailbox.txt
->>
->> diff --git a/Documentation/devicetree/bindings/mailbox/xilinx-mailbox.txt b/Documentation/devicetree/bindings/mailbox/xilinx-mailbox.txt
->> new file mode 100644
->> index 0000000..269c026
->> --- /dev/null
->> +++ b/Documentation/devicetree/bindings/mailbox/xilinx-mailbox.txt
->> @@ -0,0 +1,44 @@
->> +Xilinx Mailbox Driver
->> +=====================
->> +
->> +Required properties:
->> +- compatible       : "xlnx,mailbox-2.1".
->> +- reg              :  physical base address of the mailbox and length of
->> +                      memory mapped region.
->> +- #mbox-cells      :  common mailbox binding property to identify the number
->> +                      of cells required for the mailbox specifier, should be 1
->
-> I guess this should say "should be 0" now?
+On Wed, Jun 03, 2015 at 09:26:40PM -0000, Michal Suchanek wrote:
+> On Exynos it is necessary to set SPI controller parameters that apply to
+> a SPI slave in a DT subnode of the slave device. The ofpart code returns
+> an error when there are subnodes of the SPI flash but no partitions are
+> found. Change this condition to a warning so that flash without
+> partitions can be accessed on Exynos.
 
-D'Oh, yeah ...
+So judging by the subsequent discussion, you're looking at handling
+nodes like this:
 
-Moritz
+	flash at ... {
+		compatible = "m25p80";
+		...
+
+		controller-data {
+			samsung,spi-feedback-delay = <0>;
+		};
+	};
+
+Now, I'm not a real fan of this controller-data node in the first place
+(did that binding get reviewed?). But this is especially bad since
+we now have collisions on what to do with subnodes that don't have a
+compatible property. By legacy, ofpart has already claimed ownership of
+subnodes of an MTD node, where the subnode does not have a compatible
+property. See Documentation/devicetree/bindings/mtd/partition.txt:
+
+  "NOTE: if the sub-node has a compatible string, then it is not a
+  partition."
+
+So it seems the natural solution is to just define a proper
+compatibile property for this subnode, and ofpart.c will naturally
+handle this. See:
+
+commit e79265ba6bdb31437bd4c3e7911950f9d1262a07
+Author: Josh Wu <josh.wu@atmel.com>
+Date:   Mon Aug 5 19:14:38 2013 +0800
+
+    mtd: ofpart: add compatible check for child nodes
+
+
+
+Brian
+
+> Signed-off-by: Michal Suchanek <hramrach@gmail.com>
+> ---
+>  drivers/mtd/ofpart.c | 4 ++--
+>  1 file changed, 2 insertions(+), 2 deletions(-)
+> 
+> diff --git a/drivers/mtd/ofpart.c b/drivers/mtd/ofpart.c
+> index aa26c32..a29d29f 100644
+> --- a/drivers/mtd/ofpart.c
+> +++ b/drivers/mtd/ofpart.c
+> @@ -94,10 +94,10 @@ static int parse_ofpart_partitions(struct mtd_info *master,
+>  
+>  	if (!i) {
+>  		of_node_put(pp);
+> -		pr_err("No valid partition found on %s\n", node->full_name);
+> +		pr_warn("No valid partition found on %s\n", node->full_name);
+>  		kfree(*pparts);
+>  		*pparts = NULL;
+> -		return -EINVAL;
+> +		return 0;
+>  	}
+>  
+>  	return nr_parts;
+> -- 
+> 2.1.4
+> 
