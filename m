@@ -1,32 +1,33 @@
 From: gabriel.fernandez@linaro.org (Gabriel Fernandez)
-Date: Tue, 23 Jun 2015 16:09:20 +0200
-Subject: [PATCH 2/9] drivers: clk: st: Incorrect register offset used for
- lock_status
+Date: Tue, 23 Jun 2015 16:09:21 +0200
+Subject: [PATCH 3/9] drivers: clk: st: Remove unused code
 In-Reply-To: <1435068567-30995-1-git-send-email-gabriel.fernandez@linaro.org>
 References: <1435068567-30995-1-git-send-email-gabriel.fernandez@linaro.org>
-Message-ID: <1435068567-30995-3-git-send-email-gabriel.fernandez@linaro.org>
+Message-ID: <1435068567-30995-4-git-send-email-gabriel.fernandez@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Incorrect register offset used for sthi407 clockgenC
+Remove this duplicated code due to a bad copy / paste.
 
-Signed-off-by: Pankaj Dev <pankaj.dev@st.com>
+Signed-off-by: Gabriel Fernandez <gabriel.fernandez@linaro.org>
 ---
- drivers/clk/st/clkgen-fsyn.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ drivers/clk/st/clkgen-fsyn.c | 4 ----
+ 1 file changed, 4 deletions(-)
 
 diff --git a/drivers/clk/st/clkgen-fsyn.c b/drivers/clk/st/clkgen-fsyn.c
-index e94197f..e6d7073 100644
+index e6d7073..e7e6782 100644
 --- a/drivers/clk/st/clkgen-fsyn.c
 +++ b/drivers/clk/st/clkgen-fsyn.c
-@@ -340,7 +340,7 @@ static const struct clkgen_quadfs_data st_fs660c32_C_407 = {
- 		    CLKGEN_FIELD(0x30c, 0xf, 20),
- 		    CLKGEN_FIELD(0x310, 0xf, 20) },
- 	.lockstatus_present = true,
--	.lock_status = CLKGEN_FIELD(0x2A0, 0x1, 24),
-+	.lock_status = CLKGEN_FIELD(0x2f0, 0x1, 24),
- 	.powerup_polarity = 1,
- 	.standby_polarity = 1,
- 	.pll_ops	= &st_quadfs_pll_c32_ops,
+@@ -1082,10 +1082,6 @@ static const struct of_device_id quadfs_of_match[] = {
+ 		.compatible = "st,stih407-quadfs660-D",
+ 		.data = &st_fs660c32_D_407
+ 	},
+-	{
+-		.compatible = "st,stih407-quadfs660-D",
+-		.data = (void *)&st_fs660c32_D_407
+-	},
+ 	{}
+ };
+ 
 -- 
 1.9.1
