@@ -1,22 +1,18 @@
 From: matthias.bgg@gmail.com (Matthias Brugger)
-Date: Tue, 23 Jun 2015 21:36:53 +0200
-Subject: [PATCH 2/3] arm64: dts: mt8173: Use real clock for UARTs
-In-Reply-To: <1432128766-4445-3-git-send-email-s.hauer@pengutronix.de>
+Date: Tue, 23 Jun 2015 21:37:15 +0200
+Subject: [PATCH 3/3] arm64: dts: mt8173: Add PMIC wrapper device node
+In-Reply-To: <1432128766-4445-4-git-send-email-s.hauer@pengutronix.de>
 References: <1432128766-4445-1-git-send-email-s.hauer@pengutronix.de>
- <1432128766-4445-3-git-send-email-s.hauer@pengutronix.de>
-Message-ID: <4544810.sNeuKeAioW@ubix>
+ <1432128766-4445-4-git-send-email-s.hauer@pengutronix.de>
+Message-ID: <2161419.mroB1I0Y5E@ubix>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday, May 20, 2015 03:32:45 PM Sascha Hauer wrote:
-> We used to use a fixed rate clock for the UARTs. Now that we have clock
-> support we can associate the correct clocks to the UARTs and drop the
-> 26MHz fixed rate UART clock.
+On Wednesday, May 20, 2015 03:32:46 PM Sascha Hauer wrote:
+> This adds the device node for the PMIC wrapper.
 > 
 > Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
+> Reviewed-by: Daniel Kurtz <djkurtz@chromium.org>
 > ---
->  arch/arm64/boot/dts/mediatek/mt8173.dtsi | 18 ++++++++----------
->  1 file changed, 8 insertions(+), 10 deletions(-)
-> 
 
 Applied now to v4.2-next/arm64
