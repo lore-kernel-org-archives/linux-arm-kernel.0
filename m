@@ -1,64 +1,49 @@
 From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Tue, 23 Jun 2015 17:28:58 +0530
-Subject: [PATCH 13/17] ARM: dts: am4372: Use "syscon-phy-power" instead of
+Date: Tue, 23 Jun 2015 17:29:01 +0530
+Subject: [PATCH 16/17] ARM: dts: omap4: Use "syscon-phy-power" instead of
  "ctrl-module" in USB PHY node
 In-Reply-To: <1435060743-5511-1-git-send-email-kishon@ti.com>
 References: <1435060743-5511-1-git-send-email-kishon@ti.com>
-Message-ID: <1435060743-5511-14-git-send-email-kishon@ti.com>
+Message-ID: <1435060743-5511-17-git-send-email-kishon@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Add "syscon-phy-power" property and remove the deprecated "ctrl-module"
-property from USB PHY device tree node.
+property from USB PHY dt node.
 
-Since "am43xx_control_usb2phy1" and "am43xx_control_usb2phy2"
-devicetree nodes are no longer used, remove it.
+Since "omap_control_usb2phy" devicetree node is no longer used,
+remove it.
 
 Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
 ---
- arch/arm/boot/dts/am4372.dtsi |   16 ++--------------
- 1 file changed, 2 insertions(+), 14 deletions(-)
+ arch/arm/boot/dts/omap4.dtsi |    8 +-------
+ 1 file changed, 1 insertion(+), 7 deletions(-)
 
-diff --git a/arch/arm/boot/dts/am4372.dtsi b/arch/arm/boot/dts/am4372.dtsi
-index c80a3e2..0754e0da 100644
---- a/arch/arm/boot/dts/am4372.dtsi
-+++ b/arch/arm/boot/dts/am4372.dtsi
-@@ -796,18 +796,6 @@
- 			status = "disabled";
+diff --git a/arch/arm/boot/dts/omap4.dtsi b/arch/arm/boot/dts/omap4.dtsi
+index f884d6a..d0e0960 100644
+--- a/arch/arm/boot/dts/omap4.dtsi
++++ b/arch/arm/boot/dts/omap4.dtsi
+@@ -701,7 +701,7 @@
+ 			usb2_phy: usb2phy at 4a0ad080 {
+ 				compatible = "ti,omap-usb2";
+ 				reg = <0x4a0ad080 0x58>;
+-				ctrl-module = <&omap_control_usb2phy>;
++				syscon-phy-power = <&scm_conf 0x300>;
+ 				clocks = <&usb_phy_cm_clk32k>;
+ 				clock-names = "wkupclk";
+ 				#phy-cells = <0>;
+@@ -852,12 +852,6 @@
+ 			};
  		};
  
--		am43xx_control_usb2phy1: control-phy at 44e10620 {
--			compatible = "ti,control-phy-usb2-am437";
--			reg = <0x44e10620 0x4>;
+-		omap_control_usb2phy: control-phy at 4a002300 {
+-			compatible = "ti,control-phy-usb2";
+-			reg = <0x4a002300 0x4>;
 -			reg-names = "power";
 -		};
 -
--		am43xx_control_usb2phy2: control-phy at 0x44e10628 {
--			compatible = "ti,control-phy-usb2-am437";
--			reg = <0x44e10628 0x4>;
--			reg-names = "power";
--		};
--
- 		ocp2scp0: ocp2scp at 483a8000 {
- 			compatible = "ti,am437x-ocp2scp", "ti,omap-ocp2scp";
- 			#address-cells = <1>;
-@@ -818,7 +806,7 @@
- 			usb2_phy1: phy at 483a8000 {
- 				compatible = "ti,am437x-usb2";
- 				reg = <0x483a8000 0x8000>;
--				ctrl-module = <&am43xx_control_usb2phy1>;
-+				syscon-phy-power = <&scm_conf 0x620>;
- 				clocks = <&usb_phy0_always_on_clk32k>,
- 					 <&usb_otg_ss0_refclk960m>;
- 				clock-names = "wkupclk", "refclk";
-@@ -837,7 +825,7 @@
- 			usb2_phy2: phy at 483e8000 {
- 				compatible = "ti,am437x-usb2";
- 				reg = <0x483e8000 0x8000>;
--				ctrl-module = <&am43xx_control_usb2phy2>;
-+				syscon-phy-power = <&scm_conf 0x628>;
- 				clocks = <&usb_phy1_always_on_clk32k>,
- 					 <&usb_otg_ss1_refclk960m>;
- 				clock-names = "wkupclk", "refclk";
+ 		omap_control_usbotg: control-phy at 4a00233c {
+ 			compatible = "ti,control-phy-otghs";
+ 			reg = <0x4a00233c 0x4>;
 -- 
 1.7.9.5
