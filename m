@@ -1,49 +1,38 @@
-From: majun258@huawei.com (majun (F))
-Date: Tue, 23 Jun 2015 17:03:59 +0800
-Subject: [PATCH v2 2/3] IRQ/Gic-V3: Change arm-gic-its to support the
- Mbigen interrupt
-In-Reply-To: <alpine.DEB.2.11.1506190150000.4107@nanos>
-References: <1434077399-32200-1-git-send-email-majun258@huawei.com>
- <1434077399-32200-3-git-send-email-majun258@huawei.com>
- <alpine.DEB.2.11.1506121230320.3786@nanos> <557E794D.2080705@huawei.com>
- <alpine.DEB.2.11.1506190150000.4107@nanos>
-Message-ID: <558920FF.8030405@huawei.com>
+From: mcoquelin.stm32@gmail.com (Maxime Coquelin)
+Date: Tue, 23 Jun 2015 11:24:26 +0200
+Subject: [PATCH v3 0/3] clk: stm32: Add clock driver for STM32F4[23]xxx
+ devices
+In-Reply-To: <55891729.7070809@linaro.org>
+References: <1432327273-6810-1-git-send-email-daniel.thompson@linaro.org>
+ <1433966978-24422-1-git-send-email-daniel.thompson@linaro.org>
+ <20150622224832.GI22132@codeaurora.org>
+ <55891729.7070809@linaro.org>
+Message-ID: <CALszF6Dw7hWATpjVvpxmitKWSJ458JXWOZFXMjudcW_jaNiZdw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+2015-06-23 10:22 GMT+02:00 Daniel Thompson <daniel.thompson@linaro.org>:
+> On 22/06/15 23:48, Stephen Boyd wrote:
+>>
+>> On 06/10, Daniel Thompson wrote:
+>>>
+>>> This patchset implements a clock driver for STM32F42xxx and STM32F43xxx
+>>> series devices. It supports decoding the state configured by the
+>>> bootloader (PLL, clock select, bus dividers) and all the gates clocks.
+>>> It does not currently support the I2S and SAI PLLs.
+>>>
+>>> Relies on "Add support to STMicroeletronics STM32 family" v9 by Maxime
+>>> Coquelin: http://thread.gmane.org/gmane.linux.kernel/1961049 .
+>>>
+>>
+>> I applied 1 and 2. Looks like #3 should go through arm-soc at
+>> some later time?
+>
+>
+> Agreed (that is also the patch that must be correctly ordered w.r.t.
+> Maxime's patches).
 
+Indeed, I will take care of patch 3.
 
-? 2015/6/19 7:52, Thomas Gleixner ??:
-> On Mon, 15 Jun 2015, majun (F) wrote:
->> ? 2015/6/12 18:48, Thomas Gleixner ??:
->>> Can you please provide a proper description of this mbigen chip and
->>> explain WHY you think that it needs all this special hackery?
-> 
-> You carefully avoided to provide a proper description of this mbigen
-> chip and how it needs to be integrated into the GIC/ITS whatever
-> scenario.
-> 
-Mbigen means Message Based Interrupt Generator.
-Its a kind of interrupt controller collects
-the interrupts from external devices and generate msi interrupt.
-
-Mbigen is applied to reduce the number of wire connected interrupts.
-
-As the peripherals increasing, the interrupts lines needed is increasing
-much, especially on the Arm64 server soc.
-
-Therefore, the interrupt pin in gic is not enought for so many perpherals.
-
-Mbigen is designed to fix this problem.
-
-Mbigen chip locates in ITS or outside of ITS.
-
-The working flow of Mbigen shows as below:
-
-external devices ------> MBIGEN ------->ITS
-
-The devices connect to Mbigen chip through wire connecting way.
-Mbigen detects and collectes the interrupts from the these devices.
-
-Then, Mbigen generats the MBI interrupts by writting the ITS
-Translator register.
+Thanks,
+Maxime
