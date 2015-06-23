@@ -1,38 +1,37 @@
-From: rteysseyre@gmail.com (=?ISO-8859-1?Q?Rapha=EBl?= Teysseyre)
-Date: Tue, 23 Jun 2015 15:14:40 +0200
-Subject: [PATCH] gpio/xilinx: Use correct address when setting initial values.
-Message-ID: <1435065280.13545.6.camel@localhost>
+From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
+Date: Tue, 23 Jun 2015 14:25:34 +0100
+Subject: [RFC 09/23] arm/xen: Drop duplicate define mfn_to_virt
+In-Reply-To: <1431622863-28575-10-git-send-email-julien.grall@citrix.com>
+References: <1431622863-28575-1-git-send-email-julien.grall@citrix.com>
+ <1431622863-28575-10-git-send-email-julien.grall@citrix.com>
+Message-ID: <alpine.DEB.2.02.1506231425260.16917@kaball.uk.xensource.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
->From 670209328307a198b80723a917957269a815fc32 Mon Sep 17 00:00:00 2001
-From: =?UTF-8?q?Rapha=C3=ABl=20Teysseyre?= <rteysseyre@gmail.com>
-Date: Tue, 23 Jun 2015 14:49:31 +0200
-Subject: [PATCH] gpio/xilinx: Use correct address when setting initial values.
-MIME-Version: 1.0
-Content-Type: text/plain; charset=UTF-8
-Content-Transfer-Encoding: 8bit
+On Thu, 14 May 2015, Julien Grall wrote:
+> From: Julien Grall <julien.grall@linaro.org>
+> 
+> Signed-off-by: Julien Grall <julien.grall@citrix.com>
+> Cc: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
 
-Signed-off-by: Rapha?l Teysseyre <rteysseyre@gmail.com>
----
- drivers/gpio/gpio-xilinx.c |    4 ++--
- 1 files changed, 2 insertions(+), 2 deletions(-)
+Reviewed-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
 
-diff --git a/drivers/gpio/gpio-xilinx.c b/drivers/gpio/gpio-xilinx.c
-index 61243d1..e544b7a 100644
---- a/drivers/gpio/gpio-xilinx.c
-+++ b/drivers/gpio/gpio-xilinx.c
-@@ -220,9 +220,9 @@ static void xgpio_save_regs(struct of_mm_gpio_chip *mm_gc)
- 	if (!chip->gpio_width[1])
- 		return;
- 
--	xgpio_writereg(mm_gc->regs + XGPIO_DATA_OFFSET + XGPIO_TRI_OFFSET,
-+	xgpio_writereg(mm_gc->regs + XGPIO_DATA_OFFSET + XGPIO_CHANNEL_OFFSET,
- 		       chip->gpio_state[1]);
--	xgpio_writereg(mm_gc->regs + XGPIO_TRI_OFFSET + XGPIO_TRI_OFFSET,
-+	xgpio_writereg(mm_gc->regs + XGPIO_TRI_OFFSET + XGPIO_CHANNEL_OFFSET,
- 		       chip->gpio_dir[1]);
- }
- 
--- 
-1.7.1
+
+>  arch/arm/include/asm/xen/page.h | 1 -
+>  1 file changed, 1 deletion(-)
+> 
+> diff --git a/arch/arm/include/asm/xen/page.h b/arch/arm/include/asm/xen/page.h
+> index 0b579b2..1bee8ca 100644
+> --- a/arch/arm/include/asm/xen/page.h
+> +++ b/arch/arm/include/asm/xen/page.h
+> @@ -12,7 +12,6 @@
+>  #include <xen/interface/grant_table.h>
+>  
+>  #define phys_to_machine_mapping_valid(pfn) (1)
+> -#define mfn_to_virt(m)			(__va(mfn_to_pfn(m) << PAGE_SHIFT))
+>  
+>  #define pte_mfn	    pte_pfn
+>  #define mfn_pte	    pfn_pte
+> -- 
+> 2.1.4
+> 
