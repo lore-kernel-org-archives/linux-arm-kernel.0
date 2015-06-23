@@ -1,33 +1,39 @@
-From: tglx@linutronix.de (Thomas Gleixner)
-Date: Tue, 23 Jun 2015 10:25:14 +0200 (CEST)
-Subject: [PATCH v2] trace/events: add chip name and hwirq to irq entry
- tracepoint
-In-Reply-To: <1435014310-2080-1-git-send-email-ankgupta@codeaurora.org>
-References: <1435014310-2080-1-git-send-email-ankgupta@codeaurora.org>
-Message-ID: <alpine.DEB.2.11.1506231024250.4037@nanos>
+From: daniel.thompson@linaro.org (Daniel Thompson)
+Date: Tue, 23 Jun 2015 09:25:17 +0100
+Subject: [PATCH v3 2/3] clk: stm32: Add clock driver for STM32F4[23]xxx
+ devices
+In-Reply-To: <20150622232114.GK22132@codeaurora.org>
+References: <1432327273-6810-1-git-send-email-daniel.thompson@linaro.org>
+ <1433966978-24422-1-git-send-email-daniel.thompson@linaro.org>
+ <1433966978-24422-3-git-send-email-daniel.thompson@linaro.org>
+ <20150622232114.GK22132@codeaurora.org>
+Message-ID: <558917ED.8080404@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 22 Jun 2015, Ankit Gupta wrote:
+On 23/06/15 00:21, Stephen Boyd wrote:
+> On 06/10, Daniel Thompson wrote:
+>> The driver supports decoding and statically modelling PLL state (i.e.
+>> we inherit state from bootloader) and provides support for all
+>> peripherals that support simple one-bit gated clocks. The covers all
+>> peripherals whose clocks come from the AHB, APB1 or APB2 buses.
+>>
+>> It has been tested on an STM32F429I-Discovery board. The clock counts
+>> for TIM2, USART1 and SYSTICK are all set correctly and the wall clock
+>> looks OK when checked with a stopwatch. I have also tested a prototype
+>> driver for the RNG hardware. The RNG clock is correctly enabled by the
+>> framework (also did inverse test and proved that by changing DT to
+>> configure the wrong clock bit then we observe the RNG driver to fail).
+>>
+>> Signed-off-by: Daniel Thompson <daniel.thompson@linaro.org>
+>> Reviewed-by: Maxime Coquelin <mcoquelin.stm32@gmail.com>
+>
+> I also squashed in some sparse fixes. Please check.
 
-> Add chip name and hw-irq number to the trace_irq_handler_entry()
-> tracepoint. When tracing interrupt events the chip-name and hw-irq
-> numbers are stable and known in advance. This makes them a better
-> choice as a filtering criteria for the trace buffer dump. On the
-> flipside, the os-irq numbers are dynamically allocated which makes
-> them difficult to use for the same purpose.
-> 
-> Dump messages will look like:
-> ...irq_handler_entry: irq=22 name=msm_serial0 domain=GIC hwirq=140
+That was extremely generous! Thanks.
 
-I can't see the domain name being captured/printed in the code below.
- 
-> -	TP_printk("irq=%d name=%s", __entry->irq, __get_str(name))
-> +	TP_printk("irq=%d name=%s chip_name=%s hwirq=%ld", __entry->irq,
-> +	  __get_str(name), show_chip_name(__entry->irq),
-> +	  show_hwirq(__entry->irq))
->  );
+The changes all eyeball OK but I'll double check things tonight just in 
+case.
 
-Thanks,
 
-	tglx
+Daniel.
