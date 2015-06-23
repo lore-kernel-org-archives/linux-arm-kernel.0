@@ -1,25 +1,45 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Tue, 23 Jun 2015 08:08:22 +0100
-Subject: [PATCH 5/8] ARM: STi: STiH407: Move PWM nodes STiH407 =>
- STiH407-family
-In-Reply-To: <20150623021708.GB16776@linux>
+Date: Tue, 23 Jun 2015 08:10:45 +0100
+Subject: [PATCH 4/8] ARM: STi: STiH407: Provide a node for CPUFreq
+In-Reply-To: <20150623021622.GA16776@linux>
 References: <1434987837-24212-1-git-send-email-lee.jones@linaro.org>
- <1434987837-24212-6-git-send-email-lee.jones@linaro.org>
- <20150623021708.GB16776@linux>
-Message-ID: <20150623070822.GB3245@x1>
+ <1434987837-24212-5-git-send-email-lee.jones@linaro.org>
+ <20150623021622.GA16776@linux>
+Message-ID: <20150623071045.GC3245@x1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Tue, 23 Jun 2015, Viresh Kumar wrote:
+
+> [Ccing Rob]
+
+Rob is already Cc'ed.
+
 > On 22-06-15, 16:43, Lee Jones wrote:
-> > This also incorporates the STiH410.
+> > Signed-off-by: Lee Jones <lee.jones@linaro.org>
+> > ---
+> >  arch/arm/boot/dts/stih407-family.dtsi | 5 +++++
+> >  1 file changed, 5 insertions(+)
+> > 
+> > diff --git a/arch/arm/boot/dts/stih407-family.dtsi b/arch/arm/boot/dts/stih407-family.dtsi
+> > index f48767e..f57fd83 100644
+> > --- a/arch/arm/boot/dts/stih407-family.dtsi
+> > +++ b/arch/arm/boot/dts/stih407-family.dtsi
+> > @@ -98,6 +98,11 @@
+> >  		ranges;
+> >  		compatible = "simple-bus";
+> >  
+> > +		cpufreq {
+> > +			compatible = "st,stih407-cpufreq";
+> > +			st,syscfg = <&syscfg_core 0x8e0>;
+> > +		};
 > 
-> Any explanation to why this patch is part of this series ?
+> These virtual nodes aren't allowed in DT and you have added them
+> before the bindings patch :).
 
-Because the CPUFreq regulator is controlled with PWM and CPUFreq will
-fail on STiH410 (my main development platform) without it.
+This isn't a virtual node, but you bring up a good point.
 
-It's safe for you to ignore it though.
+The compatible string should also contain "syscon".
 
 -- 
 Lee Jones
