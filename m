@@ -1,31 +1,117 @@
-From: koro.chen@mediatek.com (Koro Chen)
-Date: Tue, 23 Jun 2015 19:01:20 +0800
-Subject: [PATCH] ASoC: mediatek: Fix unbalanced calls to runtime suspend/resume
-Message-ID: <1435057280-21316-1-git-send-email-koro.chen@mediatek.com>
+From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
+Date: Tue, 23 Jun 2015 13:09:18 +0200
+Subject: [PATCH] ARM: dts: rockchip: Add DMA tx and rx channels in UART
+ interfaces for RK3288 SoCs
+In-Reply-To: <CABgxDo+8MafT8hOzpG=gjju=S7bVtNBOKxmi_JPHv1bDZSGeCQ@mail.gmail.com>
+References: <1434475166-30338-1-git-send-email-romain.perier@gmail.com>
+ <CABgxDo+8MafT8hOzpG=gjju=S7bVtNBOKxmi_JPHv1bDZSGeCQ@mail.gmail.com>
+Message-ID: <1475991.JRcDMpQrFc@diego>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This adds call to runtime suspend in dev remove. It fixs the problem that
-suspend is not called in the case of CONFIG_PM=n. It also fixs build
-warning when CONFIG_PM=n.
+Hi Romain,
 
-Signed-off-by: Koro Chen <koro.chen@mediatek.com>
----
- sound/soc/mediatek/mtk-afe-pcm.c | 2 ++
- 1 file changed, 2 insertions(+)
+Am Dienstag, 23. Juni 2015, 08:53:17 schrieb Romain Perier:
+> ping :)
 
-diff --git a/sound/soc/mediatek/mtk-afe-pcm.c b/sound/soc/mediatek/mtk-afe-pcm.c
-index cc228db..9863da7 100644
---- a/sound/soc/mediatek/mtk-afe-pcm.c
-+++ b/sound/soc/mediatek/mtk-afe-pcm.c
-@@ -1199,6 +1199,8 @@ err_pm_disable:
- static int mtk_afe_pcm_dev_remove(struct platform_device *pdev)
- {
- 	pm_runtime_disable(&pdev->dev);
-+	if (!pm_runtime_status_suspended(&pdev->dev))
-+		mtk_afe_runtime_suspend(&pdev->dev);
- 	snd_soc_unregister_component(&pdev->dev);
- 	snd_soc_unregister_platform(&pdev->dev);
- 	return 0;
--- 
-1.8.1.1.dirty
+I haven't forgotten this patch :-)
+
+I just haven't fully made up my mind concerning the bug in the pl330 
+implementation on Rockchip SoCs - aka if we'll make it worse by also enabling 
+dma on the uarts.
+
+So far the problem reports I read only mentioned degraded functionality like 
+popping sounds in audio, not full system failures or freezes. So I tend to 
+include the patch and see what happens ;-)
+
+
+Heiko
+
+
+
+> 2015-06-16 19:19 GMT+02:00 Romain Perier <romain.perier@gmail.com>:
+> > This enable DMA capability for the corresponding UART interfaces, also it
+> > removes warning "ttyS%d - Failed to request dma" from kernel logs.
+> > 
+> > Signed-off-by: Romain Perier <romain.perier@gmail.com>
+> > ---
+> > 
+> > Changes since v1 ("[PATCH] ARM: dts: rockchip: Add dmac_bus rx and tx for 
+uart2"):
+> >         - Add DMA tx and rx channels for all UART interfaces
+> >         - Rename commit summary
+> >  
+> >  arch/arm/boot/dts/rk3288.dtsi | 10 ++++++++++
+> >  1 file changed, 10 insertions(+)
+> > 
+> > diff --git a/arch/arm/boot/dts/rk3288.dtsi b/arch/arm/boot/dts/rk3288.dtsi
+> > index 22316d0..1996452 100644
+> > --- a/arch/arm/boot/dts/rk3288.dtsi
+> > +++ b/arch/arm/boot/dts/rk3288.dtsi
+> > @@ -359,6 +359,8 @@
+> > 
+> >                 clock-names = "baudclk", "apb_pclk";
+> >                 pinctrl-names = "default";
+> >                 pinctrl-0 = <&uart0_xfer>;
+> > 
+> > +               dmas = <&dmac_peri 1>, <&dmac_peri 2>;
+> > +               dma-names = "tx", "rx";
+> > 
+> >                 status = "disabled";
+> >         
+> >         };
+> > 
+> > @@ -372,6 +374,8 @@
+> > 
+> >                 clock-names = "baudclk", "apb_pclk";
+> >                 pinctrl-names = "default";
+> >                 pinctrl-0 = <&uart1_xfer>;
+> > 
+> > +               dmas = <&dmac_peri 3>, <&dmac_peri 4>;
+> > +               dma-names = "tx", "rx";
+> > 
+> >                 status = "disabled";
+> >         
+> >         };
+> > 
+> > @@ -385,6 +389,8 @@
+> > 
+> >                 clock-names = "baudclk", "apb_pclk";
+> >                 pinctrl-names = "default";
+> >                 pinctrl-0 = <&uart2_xfer>;
+> > 
+> > +               dmas = <&dmac_bus_s 4>, <&dmac_bus_s 5>;
+> > +               dma-names = "tx", "rx";
+> > 
+> >                 status = "disabled";
+> >         
+> >         };
+> > 
+> > @@ -398,6 +404,8 @@
+> > 
+> >                 clock-names = "baudclk", "apb_pclk";
+> >                 pinctrl-names = "default";
+> >                 pinctrl-0 = <&uart3_xfer>;
+> > 
+> > +               dmas = <&dmac_peri 7>, <&dmac_peri 8>;
+> > +               dma-names = "tx", "rx";
+> > 
+> >                 status = "disabled";
+> >         
+> >         };
+> > 
+> > @@ -411,6 +419,8 @@
+> > 
+> >                 clock-names = "baudclk", "apb_pclk";
+> >                 pinctrl-names = "default";
+> >                 pinctrl-0 = <&uart4_xfer>;
+> > 
+> > +               dmas = <&dmac_peri 9>, <&dmac_peri 10>;
+> > +               dma-names = "tx", "rx";
+> > 
+> >                 status = "disabled";
+> >         
+> >         };
+> > 
+> > --
+> > 1.9.1
