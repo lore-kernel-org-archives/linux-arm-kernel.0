@@ -1,41 +1,50 @@
 From: nm@ti.com (Nishanth Menon)
-Date: Tue, 23 Jun 2015 11:15:14 -0500
-Subject: [TMP PATCH V2 5/5] ARM: dts: am57xx-beagle-x15: Add wakeup irq for
- mcp79410
+Date: Tue, 23 Jun 2015 11:15:11 -0500
+Subject: [PATCH V2 2/5] drivers/rtc/rtc-ds1307.c: Switch to managed irq
+ allocation
 In-Reply-To: <1435076114-12416-1-git-send-email-nm@ti.com>
 References: <1435076114-12416-1-git-send-email-nm@ti.com>
-Message-ID: <1435076114-12416-6-git-send-email-nm@ti.com>
+Message-ID: <1435076114-12416-3-git-send-email-nm@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-With the support in the generic PM framework for wakeirq and capability
-added to the rtc-ds1307 driver to support this, we can now define the
-optional wakeup irq to allow the RTC to wakeup the system from low power
-modes as part of suspend.
+Since we are not doing anything fancy in remove function that requires
+us to sequence IRQ free operation, we might as well switch over to devm_
+equivalent of managed IRQ allocation and remove the explicit free_irq
+since it'd be done automatically at remove.
 
 Signed-off-by: Nishanth Menon <nm@ti.com>
 ---
+ drivers/rtc/rtc-ds1307.c |   10 ++++------
+ 1 file changed, 4 insertions(+), 6 deletions(-)
 
-Please do not merge this patch -> since this needs to come via linux-omap
-tree and also needs to be done with a few other changes on other peripherals.
-This is meant for illustration only.
-
- arch/arm/boot/dts/am57xx-beagle-x15.dts |    3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
-
-diff --git a/arch/arm/boot/dts/am57xx-beagle-x15.dts b/arch/arm/boot/dts/am57xx-beagle-x15.dts
-index a42cc377a862..5c9ce2df260a 100644
---- a/arch/arm/boot/dts/am57xx-beagle-x15.dts
-+++ b/arch/arm/boot/dts/am57xx-beagle-x15.dts
-@@ -517,7 +517,8 @@
- 	mcp_rtc: rtc at 6f {
- 		compatible = "microchip,mcp7941x";
- 		reg = <0x6f>;
--		interrupts = <GIC_SPI 2 IRQ_TYPE_EDGE_RISING>;  /* IRQ_SYS_1N */
-+		interrupts-extended = <&crossbar_mpu GIC_SPI 2 IRQ_TYPE_EDGE_RISING>,
-+				      <&dra7_pmx_core 0x424>;
+diff --git a/drivers/rtc/rtc-ds1307.c b/drivers/rtc/rtc-ds1307.c
+index 8ea496e54a2e..0a98d8a52791 100644
+--- a/drivers/rtc/rtc-ds1307.c
++++ b/drivers/rtc/rtc-ds1307.c
+@@ -1156,9 +1156,10 @@ read_rtc:
+ 	}
  
- 		pinctrl-names = "default";
- 		pinctrl-0 = <&mcp79410_pins_default>;
+ 	if (want_irq) {
+-		err = request_threaded_irq(client->irq, NULL, irq_handler,
+-					   IRQF_SHARED | IRQF_ONESHOT,
+-					   ds1307->rtc->name, client);
++		err = devm_request_threaded_irq(&client->dev,
++						client->irq, NULL, irq_handler,
++						IRQF_SHARED | IRQF_ONESHOT,
++						ds1307->rtc->name, client);
+ 		if (err) {
+ 			client->irq = 0;
+ 			dev_err(&client->dev, "unable to request IRQ!\n");
+@@ -1212,9 +1213,6 @@ static int ds1307_remove(struct i2c_client *client)
+ {
+ 	struct ds1307 *ds1307 = i2c_get_clientdata(client);
+ 
+-	if (test_and_clear_bit(HAS_ALARM, &ds1307->flags))
+-		free_irq(client->irq, client);
+-
+ 	if (test_and_clear_bit(HAS_NVRAM, &ds1307->flags))
+ 		sysfs_remove_bin_file(&client->dev.kobj, ds1307->nvram);
+ 
 -- 
 1.7.9.5
