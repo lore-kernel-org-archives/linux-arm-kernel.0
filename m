@@ -1,34 +1,93 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Tue, 23 Jun 2015 14:00:55 +0530
-Subject: [PATCH 7/8] cpufreq: st: Provide runtime initialised driver for
- ST's platforms
-In-Reply-To: <20150623082759.GF3245@x1>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Tue, 23 Jun 2015 09:38:56 +0100
+Subject: [PATCH 8/8] dt: cpufreq: st: Provide bindings for ST's CPUFreq
+ implementation
+In-Reply-To: <20150623075509.GF16776@linux>
 References: <1434987837-24212-1-git-send-email-lee.jones@linaro.org>
- <1434987837-24212-8-git-send-email-lee.jones@linaro.org>
- <20150623025031.GD16776@linux> <20150623071647.GD3245@x1>
- <20150623080309.GI16776@linux> <20150623082759.GF3245@x1>
-Message-ID: <20150623083055.GJ16776@linux>
+ <1434987837-24212-9-git-send-email-lee.jones@linaro.org>
+ <20150623023458.GC16776@linux> <20150623070651.GA3245@x1>
+ <20150623075509.GF16776@linux>
+Message-ID: <20150623083856.GH3245@x1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 23-06-15, 09:27, Lee Jones wrote:
-> Okay, but the reasoning is the same.  I consider the function to have
-> failed, but the over-all failure culminates in just a warning that
-> voltage scaling has indeed failed, but we can still go on with
-> frequency scaling.
+On Tue, 23 Jun 2015, Viresh Kumar wrote:
+> On 23-06-15, 08:06, Lee Jones wrote:
+> > > [Adding Rob]
+> > 
+> > Rob is not the only DT Maintainer, there are many of them.  The DT
+> > list was CC'ed, which they are all part of.  Adding them all
+> > separately is not required IMO.
+> 
+> I didn't Cc him because you missed him, but because we have been
+> discussing opp-v2 bindings recently and this was somehow related to
+> that. :)
 
-Ahh, I thought that the other opp-table will also have voltages.
+Okay, fair point.
 
-> Unless his is a big blocker for you, I would like to keep these
-> semantics.
+> > > On 22-06-15, 16:43, Lee Jones wrote:
+> > > 
+> > > At least some description was required here on why you need additional
+> > > bindings are what are they.
+> > 
+> > Sure, I can do that.
+> > 
+> > > Over that, this patch should have been present before any other
+> > > patches using these bindings.
+> > 
+> > I've never heard that one before, but it's easy to re-order the set.
+> 
+> I don't know, but it seems obvious to me: Bindings first and then the
+> code.
 
-No, the print is actually fine.
+Do you always write your documentation before implementing a
+feature?
 
-> So technically you are correct, but it makes the code slightly more
-> confusing IMHO.  Yes, it's one more line of code, but it's worth it to
-> add clarity.
+Surely it goes;
+  Requirements Gathering
+  Plan and Prepare
+  Implement
+  Test
+  Document
+  Deliver
 
-Your call :)
+;)
+
+... but as I say, I can re-order if required.  It's really not a problem.
+
+> > > > +Required properties:
+> > > > +-------------------
+> > > > +- compatible		: Supported values are:
+> > > > +				"st,stih407-cpufreq"
+> > > 
+> > > Nodes for virtual devices aren't allowed in DT.
+> > 
+> > Then why do Exynos, Spear, HREF and Snowball have CPUFreq nodes?
+> > 
+> > One rule for one ... ?
+> 
+> Not really, but I got a bit confused now with your reply.
+> 
+> So, what I meant when I wrote: "Nodes for virtual devices aren't
+> allowed in DT", was that we aren't supposed to do something like:
+> 
+> cpufreq {
+>  ...
+> }
+> 
+> in DT as cpufreq isn't a device here. A CPU is a device and that can
+> contain whatever property we feel is reasonable.
+> 
+> What SPEAr and Exyons did was putting something in the cpu-node. Not a
+> node for cpufreq device itself. Couldn't find HREF and snowball's
+> bindings though..
+
+That's not what it looks like to me:
+
+git grep -C20 "compatible.*cpufreq" -- arch
 
 -- 
-viresh
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
