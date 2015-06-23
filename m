@@ -1,58 +1,38 @@
-From: vaibhav.hiremath@linaro.org (Vaibhav Hiremath)
-Date: Tue, 23 Jun 2015 10:37:12 +0530
-Subject: [PATCH-v2 0/3] mfd: 88pm800: Add Device tree support
-In-Reply-To: <1434567488-6477-1-git-send-email-vaibhav.hiremath@linaro.org>
-References: <vaibhav.hiremath@linaro.org>
- <1434567488-6477-1-git-send-email-vaibhav.hiremath@linaro.org>
-Message-ID: <5588E980.2010603@linaro.org>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Tue, 23 Jun 2015 07:53:51 +0200
+Subject: [RESEND PATCH 2/6] soc: Mediatek: Add SCPSYS CPU power domain
+ driver
+In-Reply-To: <1434650481-39421-3-git-send-email-scott.shu@mediatek.com>
+References: <srv_scott.shu@mediatek.com>
+ <1434650481-39421-1-git-send-email-scott.shu@mediatek.com>
+ <1434650481-39421-3-git-send-email-scott.shu@mediatek.com>
+Message-ID: <20150623055351.GA22419@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Scott,
+
+On Fri, Jun 19, 2015 at 02:01:17AM +0800, Scott Shu wrote:
+> This adds a CPU power domain driver for the Mediatek SCPSYS unit on
+> MT6580.
+
+This seems to be support for the very same hardware as I am posting
+here:
+
+https://lkml.org/lkml/2015/6/22/41
+
+We should consolidate this.
+
+My driver is currently handles all power domains except the CPUs while
+yours handles only the CPUs.
+I currently haven't looked whether CPUs can just be part of a power
+domain aswell, but if that works this would probably be the way to go.
+
+Sascha
 
 
-On Thursday 18 June 2015 12:28 AM, Vaibhav Hiremath wrote:
-> This patch-series adds support for Device tree to 88PM800 mfd driver.
-> It also enabled configuration of irq clear method through DT.
->
-> Testing::
->   - Boot tested on PXA1928 based platform.
->   - probe of mfd, rtc and regulator function passing successfully.
->   - Basic read operations on registers
->
->
-> V1 => V1
-> =======
-> Link to V1: http://lkml.iu.edu/hypermail/linux/kernel/1505.3/04386.html
->
->    - Split binding changes from original commit
->    - Updated binding info as per Rob's suggestion
->    - Dropped PATCH 4/4, as discussed during review
->    - Dropped PATCH 3/4, as it is independent RTC code change,
->      so will submit it separately to ease merging.
->    - Fixed all other minor comments
->
-> Attempt has been made to push some of the patches to the list sometime
-> back in 2013.
->
-> Link to previous patch submission:
->          https://lkml.org/lkml/2013/8/14/86
->
-> Vaibhav Hiremath (3):
->    mfd: 88pm800: Add device tree support
->    mfd: 88pm800: Allow configuration of interrupt clear method
->    mfd: devicetree: bindings: Add new 88pm800 mfd binding
->
->   Documentation/devicetree/bindings/mfd/88pm800.txt | 60 +++++++++++++++++++++++
->   drivers/mfd/88pm800.c                             | 40 +++++++++++++--
->   include/linux/mfd/88pm80x.h                       |  6 ++-
->   3 files changed, 99 insertions(+), 7 deletions(-)
->   create mode 100644 Documentation/devicetree/bindings/mfd/88pm800.txt
->
-
-
-Any update on this?
-
-If there are no review comments, then can it be queued ?
-
-Thanks,
-Vaibhav
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
