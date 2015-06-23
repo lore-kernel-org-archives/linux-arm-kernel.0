@@ -1,51 +1,17 @@
-From: Suzuki.Poulose@arm.com (Suzuki K. Poulose)
-Date: Tue, 23 Jun 2015 15:03:04 +0100
-Subject: [PATCH] arm64/kvm: Add generic v8 KVM target
-In-Reply-To: <20150623123959.GF4035@cbox>
-References: <1434531646-4873-1-git-send-email-suzuki.poulose@arm.com>
- <CAFEAcA92uymQ3LjPQnuFiwvjSgc+jY54VrfK_Sh4v1DJ+=OPpw@mail.gmail.com>
- <20150623123959.GF4035@cbox>
-Message-ID: <55896718.9080600@arm.com>
+From: davem@davemloft.net (David Miller)
+Date: Tue, 23 Jun 2015 07:19:48 -0700 (PDT)
+Subject: [PATCH net-next v0 0/4] drivers: net: xgene: Fix the ACPI
+ support for RGMII/SGMII0/XFI ethernet interfaces of APM X-Gene SoC.
+In-Reply-To: <1435051037-21753-1-git-send-email-stripathi@apm.com>
+References: <1435051037-21753-1-git-send-email-stripathi@apm.com>
+Message-ID: <20150623.071948.1459721943136237909.davem@davemloft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 23/06/15 13:39, Christoffer Dall wrote:
-> On Mon, Jun 22, 2015 at 09:44:48AM +0100, Peter Maydell wrote:
->> On 17 June 2015 at 10:00, Suzuki K. Poulose <suzuki.poulose@arm.com> wrote:
->>> From: "Suzuki K. Poulose" <suzuki.poulose@arm.com>
->>>
->>> This patch adds a generic ARM v8 KVM target cpu type for use
->>> by the new CPUs which eventualy ends up using the common sys_reg
->>> table. For backward compatibility the existing targets have been
->>> preserved. Any new target CPU that can be covered by generic v8
->>> sys_reg tables should make use of the new generic target.
->>
->> How do you intend this to work for cross-host migration?
->> Is the idea that the kernel guarantees that "generic" looks
->> 100% the same to the guest regardless of host hardware? I'm
->> not sure that can be made to work, given impdef differences
->> in ID register values, bp/wp registers, and so on.
->>
->> Given that, it seems to me that we still need to provide
->> KVM_ARM_TARGET_$THISCPU defines so userspace can request
->> a specific guest CPU flavour; so what does this patch
->> provide that isn't already provided by just having userspace
->> query for the "preferred" CPU type as it does already?
->>
-> I'm guessing the intention is to avoid having to add code in the kernel
-> to support KVM on a new CPU where nothing else needs to be done to
-> support KVM on that system.
-Yes, thats the *only* motivation behind the patch and doesn't address
-the migration issue. May be we can create a dummy set of values for
-the ID registers, which doesn't provide any 'special functionality'
-so that it is safe to be migrated across any host ?
+From: Suman Tripathi <stripathi@apm.com>
+Date: Tue, 23 Jun 2015 14:47:13 +0530
 
->
-> Wrt. migration, I was also wondering about this.  Would the differences
-> in the CPU architecture be detected when feeding back the invariant
-> sysregs from userspace on VM restore?
->
-> -Christoffer
->
+> Signed-off-by: Iyappan Subramanian <isubramanian@apm.com>
+> Signed-off-by: Suman Tripathi <stripathi@apm.com>
 
-Suzuki
+Series applied, thanks.
