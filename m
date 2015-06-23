@@ -1,65 +1,36 @@
 From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Tue, 23 Jun 2015 07:35:05 +0530
-Subject: [PATCH 0/6] cpufreq: use generic cpufreq drivers for Exynos4x12
- platform
-In-Reply-To: <1428688742-15578-1-git-send-email-b.zolnierkie@samsung.com>
-References: <1428688742-15578-1-git-send-email-b.zolnierkie@samsung.com>
-Message-ID: <20150623020505.GA408@linux>
+Date: Tue, 23 Jun 2015 07:46:22 +0530
+Subject: [PATCH 4/8] ARM: STi: STiH407: Provide a node for CPUFreq
+In-Reply-To: <1434987837-24212-5-git-send-email-lee.jones@linaro.org>
+References: <1434987837-24212-1-git-send-email-lee.jones@linaro.org>
+ <1434987837-24212-5-git-send-email-lee.jones@linaro.org>
+Message-ID: <20150623021622.GA16776@linux>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Bartlomiej,
+[Ccing Rob]
 
-[Adding Rafael & Rob to cc list. Please don't forget for any PM
-specific patches :)]
+On 22-06-15, 16:43, Lee Jones wrote:
+> Signed-off-by: Lee Jones <lee.jones@linaro.org>
+> ---
+>  arch/arm/boot/dts/stih407-family.dtsi | 5 +++++
+>  1 file changed, 5 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/stih407-family.dtsi b/arch/arm/boot/dts/stih407-family.dtsi
+> index f48767e..f57fd83 100644
+> --- a/arch/arm/boot/dts/stih407-family.dtsi
+> +++ b/arch/arm/boot/dts/stih407-family.dtsi
+> @@ -98,6 +98,11 @@
+>  		ranges;
+>  		compatible = "simple-bus";
+>  
+> +		cpufreq {
+> +			compatible = "st,stih407-cpufreq";
+> +			st,syscfg = <&syscfg_core 0x8e0>;
+> +		};
 
-First of all, really sorry for missing this mail thread. Don't know
-how I missed it though. And please please please, do send a ping
-reminder (to me at least), if you think the mail thread is
-missed/ignored by the Maintainers.
-
-Its been two months, and not a single reminder :).. And I wouldn't
-have seen this email if you wouldn't have pinged me on IRC ..
-
-On 10-04-15, 19:58, Bartlomiej Zolnierkiewicz wrote:
-> This patch series removes the use of Exynos4x12 specific support
-> from cpufreq-exynos driver and enables the use of cpufreq-dt driver
-> for this platform.
-
-Excellent.
-
-> In order to preserve support for Exynos4x12 'boost' mode cpufreq-dt
-> driver is made aware of 'boost' mode frequencies and boost-opps
-> binding is provided.
-
-That's good too..
-
-> boost-opps binding is currently limited to cpufreq-dt but once there is
-> a need for cpufreq wide and/or generic Linux device support for 'boost'
-> mode cpufreq-dt can be updated to handle the new code without changing
-> the binding itself.
-
-You already know that operating-points-v2 bindings are already
-accepted and applied by Rafael. Its not that the earlier bindings are
-discarded or obsolete now, but are only present for simple use cases.
-
-There are NO plans for extending the earlier OPP bindings Unless its
-really required. And what you are trying to do in cpufreq-dt's
-bindings, really belongs to OPP bindings.
-
-As the new bindings will be present in 4.2, getting the code (at least
-the basic code) for them into 4.3 wouldn't be that difficult. Anyway,
-your stuff isn't going out in 4.2 either and so you *shall* adopt
-to opp-v2 bindings in your next version.
-
-Migrating platforms to opp-v2 wouldn't be that difficult, mostly
-changes required only in dts files, unless you are using a driver of
-your own.
-
-I would be updating cpufreq-dt at the earlier to support basic
-features of opp-v2 for 4.3. Some code is already posted:
-
-http://permalink.gmane.org/gmane.linux.power-management.general/61326
+These virtual nodes aren't allowed in DT and you have added them
+before the bindings patch :).
 
 -- 
 viresh
