@@ -1,37 +1,36 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Tue, 23 Jun 2015 16:52:00 -0000
-Subject: [PATCH] Show proper respect for Heinrich Hertz by using the
- correct unit for frequency
-In-Reply-To: <20150511131952.GD2067@n2100.arm.linux.org.uk>
-References: <20150511131952.GD2067@n2100.arm.linux.org.uk>
-Message-ID: <20150502145947.GA8156@xo-6d-61-c0.localdomain>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Tue, 23 Jun 2015 13:52:50 -0300
+Subject: mx6 hdmi resolution behaviour
+In-Reply-To: <20150623164443.GC7557@n2100.arm.linux.org.uk>
+References: <CAOMZO5AbC8PCo7J7ovw4izPBK08UkDgKGG++d+9xty4GJ0SzKQ@mail.gmail.com>
+ <20150623164443.GC7557@n2100.arm.linux.org.uk>
+Message-ID: <CAOMZO5BjuOGgqsUNG6K6N-QU1a4oWTdynxsoAECYLeQK_9Kk9g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi!
+On Tue, Jun 23, 2015 at 1:44 PM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
 
-> The SI unit of frequency is Hertz, named after Heinrich Hertz, and is
-> given the symbol "Hz" to denote this.  "hz" is not the unit of frequency,
-> and is in fact meaningless.
-> 
-> Fix arch/arm to correctly use "Hz", thereby acknowledging Heinrich Hertz
-> contribution to the modern world.
-> 
+> If you have no connected connectors, then you get 1024x768:
+>
+> imx-drm display-subsystem: No connectors reported connected with modes
+> [drm] Cannot find any crtc or sizes - going 1024x768
+>
+> as that's what DRM defaults to when it has no other timing information
+> available.
 
-> --- a/arch/arm/mach-ixp4xx/include/mach/platform.h
-> +++ b/arch/arm/mach-ixp4xx/include/mach/platform.h
-> @@ -74,7 +74,7 @@ extern unsigned long ixp4xx_exp_bus_size;
->  /*
->   * Clock Speed Definitions.
->   */
-> -#define IXP4XX_PERIPHERAL_BUS_CLOCK 	(66) /* 66Mhzi APB BUS   */ 
-> +#define IXP4XX_PERIPHERAL_BUS_CLOCK 	(66) /* 66MHzi APB BUS   */ 
->  #define IXP4XX_UART_XTAL        	14745600
->  
+Agreed, but after the cable is connected we could try to find a more
+suitable timing?
 
-Speaking about meaningless... What is MHzi supposed to mean?
+>> [   16.310548] imx-ipuv3 2400000.ipu: videomode adapted for IPU restrictions
+>
+> I don't see this message booting on a Hummingboard with HDMI
+> disconnected.
 
-ACK for the rest.
--- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+I see this message in the following case:
+
+- Boot the board with HDMI disconnected
+
+- Connect the HDMI cable and then such message is displayed.
+
+Thanks
