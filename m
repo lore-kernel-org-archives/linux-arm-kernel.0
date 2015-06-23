@@ -1,62 +1,42 @@
 From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Tue, 23 Jun 2015 17:28:50 +0530
-Subject: [PATCH 05/17] phy: omap-usb2: Add a new compatible string for USB2
- PHY2
+Date: Tue, 23 Jun 2015 17:28:49 +0530
+Subject: [PATCH 04/17] phy: omap-usb2: use omap_usb_power_off to power off the
+ PHY during probe
 In-Reply-To: <1435060743-5511-1-git-send-email-kishon@ti.com>
 References: <1435060743-5511-1-git-send-email-kishon@ti.com>
-Message-ID: <1435060743-5511-6-git-send-email-kishon@ti.com>
+Message-ID: <1435060743-5511-5-git-send-email-kishon@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The USB2 PHY2 has a different register map compared to USB2 PHY1
-to power on/off the PHY. In order to handle it, add a new
-"compatible" string.
+No functional change. Previously omap_control_phy_power() was used to power
+off the PHY during probe. But once phy-omap-usb2 driver is adapted to
+use syscon, omap_control_phy_power() cannot be used. Hence used
+omap_usb_power_off to power off the PHY.
 
 Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
 ---
- Documentation/devicetree/bindings/phy/ti-phy.txt |    2 ++
- drivers/phy/phy-omap-usb2.c                      |    9 +++++++++
- 2 files changed, 11 insertions(+)
+ drivers/phy/phy-omap-usb2.c |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/Documentation/devicetree/bindings/phy/ti-phy.txt b/Documentation/devicetree/bindings/phy/ti-phy.txt
-index 52c7a92..b9101b9 100644
---- a/Documentation/devicetree/bindings/phy/ti-phy.txt
-+++ b/Documentation/devicetree/bindings/phy/ti-phy.txt
-@@ -31,6 +31,8 @@ OMAP USB2 PHY
- 
- Required properties:
-  - compatible: Should be "ti,omap-usb2"
-+	       Should be "ti,dra7x-usb2-phy2" for the 2nd instance of USB2 PHY
-+			in DRA7x
-  - reg : Address and length of the register set for the device.
-  - #phy-cells: determine the number of cells that should be given in the
-    phandle while referencing this phy.
 diff --git a/drivers/phy/phy-omap-usb2.c b/drivers/phy/phy-omap-usb2.c
-index b5c266a..2f7220f 100644
+index c1a4686..b5c266a 100644
 --- a/drivers/phy/phy-omap-usb2.c
 +++ b/drivers/phy/phy-omap-usb2.c
-@@ -159,6 +159,11 @@ static const struct usb_phy_data dra7x_usb2_data = {
- 	.flags = OMAP_USB2_CALIBRATE_FALSE_DISCONNECT,
- };
+@@ -241,7 +241,6 @@ static int omap_usb2_probe(struct platform_device *pdev)
+ 	}
  
-+static const struct usb_phy_data dra7x_usb2_phy2_data = {
-+	.label = "dra7x_usb2_phy2",
-+	.flags = OMAP_USB2_CALIBRATE_FALSE_DISCONNECT,
-+};
-+
- static const struct usb_phy_data am437x_usb2_data = {
- 	.label = "am437x_usb2",
- 	.flags =  0,
-@@ -178,6 +183,10 @@ static const struct of_device_id omap_usb2_id_table[] = {
- 		.data = &dra7x_usb2_data,
- 	},
- 	{
-+		.compatible = "ti,dra7x-usb2-phy2",
-+		.data = &dra7x_usb2_phy2_data,
-+	},
-+	{
- 		.compatible = "ti,am437x-usb2",
- 		.data = &am437x_usb2_data,
- 	},
+ 	phy->control_dev = &control_pdev->dev;
+-	omap_control_phy_power(phy->control_dev, 0);
+ 
+ 	otg->set_host		= omap_usb_set_host;
+ 	otg->set_peripheral	= omap_usb_set_peripheral;
+@@ -261,6 +260,7 @@ static int omap_usb2_probe(struct platform_device *pdev)
+ 	}
+ 
+ 	phy_set_drvdata(generic_phy, phy);
++	omap_usb_power_off(generic_phy);
+ 
+ 	phy_provider = devm_of_phy_provider_register(phy->dev,
+ 			of_phy_simple_xlate);
 -- 
 1.7.9.5
