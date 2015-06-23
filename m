@@ -1,58 +1,49 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Mon, 22 Jun 2015 19:07:08 -0500
-Subject: [PATCH 02/13] driver-core: defer all probes until late_initcall
-In-Reply-To: <1585940.7Lfuk0LdBK@vostro.rjw.lan>
-References: <1434548543-22949-1-git-send-email-tomeu.vizoso@collabora.com>
- <2834968.DlsDAmbXkG@vostro.rjw.lan>
- <CAAObsKDGLVx5wtsiY_o_-r6bp4qTgOfAExbSr7w=xn2eM-CQ6A@mail.gmail.com>
- <1585940.7Lfuk0LdBK@vostro.rjw.lan>
-Message-ID: <CAL_JsqKTm-F2oajuj07W=DBBjH03FTnqNkGbizERmajCPgjnGg@mail.gmail.com>
+From: jistone@redhat.com (Josh Stone)
+Date: Mon, 22 Jun 2015 17:08:54 -0700
+Subject: [PATCH] ARM: enable_irq before ret_fast_syscall tracing
+In-Reply-To: <20150604100625.GI7557@n2100.arm.linux.org.uk>
+References: <20150604100625.GI7557@n2100.arm.linux.org.uk>
+Message-ID: <1435018134-9653-1-git-send-email-jistone@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 19, 2015 at 6:20 PM, Rafael J. Wysocki <rjw@rjwysocki.net> wrote:
-> On Friday, June 19, 2015 03:36:46 PM Tomeu Vizoso wrote:
->> On 18 June 2015 at 23:50, Rafael J. Wysocki <rjw@rjwysocki.net> wrote:
->> > On Wednesday, June 17, 2015 03:42:12 PM Tomeu Vizoso wrote:
->> >> To decrease the chances of devices deferring their probes because of
->> >> dependencies not having probed yet because of their drivers not having
->> >> registered yet, delay all probing until the late initcall level.
->> >>
->> >> This will allow us to avoid deferred probes completely later by probing
->> >> dependencies on demand, or by probing them in dependency order.
->> >>
->> >> Signed-off-by: Tomeu Vizoso <tomeu.vizoso@collabora.com>
->> >> ---
->> >>  drivers/base/dd.c | 8 +++++++-
->> >>  1 file changed, 7 insertions(+), 1 deletion(-)
->> >>
->> >> diff --git a/drivers/base/dd.c b/drivers/base/dd.c
->> >> index a638bbb..18438aa 100644
->> >> --- a/drivers/base/dd.c
->> >> +++ b/drivers/base/dd.c
->> >> @@ -407,6 +407,12 @@ int driver_probe_device(struct device_driver *drv, struct device *dev)
->> >>       if (!device_is_registered(dev))
->> >>               return -ENODEV;
->> >>
->> >> +     /* Defer all probes until we start processing the queue */
->> >> +     if (!driver_deferred_probe_enable) {
->> >> +             driver_deferred_probe_add(dev);
->> >
->> > Do I think correctly that this will effectively force everybody to use deferred
->> > probing?
->>
->> Guess it depends on the meaning of "using deferred probing". It will
->> defer the probe of the first device to late_initcall (which will
->> happen much earlier in time than before), but afterwards all built-in
->> drivers will be available and depending on the order in which we try
->> to probe devices, none may actually ask to defer its probe.
->
-> So this will break things like the PNP system driver which relies on probing
-> stuff at the fs_initcall stage for correctness.  It may also break other
-> things with similar assumptions.
+When reached via the slow path __sys_trace, __sys_trace_return and its
+callees usually have interrupts still enabled.  This is important if any
+will schedule, like for a ptrace syscall-exit-stop.
 
-Yes, but I think that this can be done for only OF based devices
-rather than globally for all platform devices and solve that problem.
-Matching is already dependent of the type of device.
+In the rarer case where tracing was not enabled on syscall entry, and
+then ret_fast_syscall sees tracing was enabled mid-syscall, then it
+also ought to branch to __sys_trace_return with interrupts enabled.
 
-Rob
+Cc: Russell King <rmk+kernel@arm.linux.org.uk>
+Signed-off-by: Josh Stone <jistone@redhat.com>
+---
+ arch/arm/kernel/entry-common.S | 6 +++++-
+ 1 file changed, 5 insertions(+), 1 deletion(-)
+
+diff --git a/arch/arm/kernel/entry-common.S b/arch/arm/kernel/entry-common.S
+index 4e7f40c577e6..5d8eb11b8571 100644
+--- a/arch/arm/kernel/entry-common.S
++++ b/arch/arm/kernel/entry-common.S
+@@ -35,7 +35,7 @@ ret_fast_syscall:
+ 	disable_irq				@ disable interrupts
+ 	ldr	r1, [tsk, #TI_FLAGS]		@ re-check for syscall tracing
+ 	tst	r1, #_TIF_SYSCALL_WORK
+-	bne	__sys_trace_return
++	bne	ret_fast_syscall_trace
+ 	tst	r1, #_TIF_WORK_MASK
+ 	bne	fast_work_pending
+ 	asm_trace_hardirqs_on
+@@ -45,6 +45,10 @@ ret_fast_syscall:
+ 	ct_user_enter
+ 
+ 	restore_user_regs fast = 1, offset = S_OFF
++
++ret_fast_syscall_trace:
++	enable_irq				@ enable interrupts
++	b	__sys_trace_return
+  UNWIND(.fnend		)
+ 
+ /*
+-- 
+2.4.2
