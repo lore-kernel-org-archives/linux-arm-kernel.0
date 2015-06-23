@@ -1,34 +1,47 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Tue, 23 Jun 2015 19:04:24 -0300
-Subject: mx6 hdmi resolution behaviour
-In-Reply-To: <20150623205837.GE7557@n2100.arm.linux.org.uk>
-References: <CAOMZO5AbC8PCo7J7ovw4izPBK08UkDgKGG++d+9xty4GJ0SzKQ@mail.gmail.com>
- <20150623164443.GC7557@n2100.arm.linux.org.uk>
- <CAOMZO5BjuOGgqsUNG6K6N-QU1a4oWTdynxsoAECYLeQK_9Kk9g@mail.gmail.com>
- <20150623204154.GD7557@n2100.arm.linux.org.uk>
- <CAOMZO5CkxjtH7ZnOcbDWdwwwHH4xT4UhXXWpA3O9afbP9XRBaQ@mail.gmail.com>
- <20150623205837.GE7557@n2100.arm.linux.org.uk>
-Message-ID: <CAOMZO5DG7OM7Rcvu5JcdeZdsswju-a2r+7_p2VpefzVC=kGBXg@mail.gmail.com>
+From: benh@kernel.crashing.org (Benjamin Herrenschmidt)
+Date: Wed, 24 Jun 2015 08:32:14 +1000
+Subject: [RFC 3/4] arm64: Do not call enable PCI resources when specify
+ PCI_PROBE_ONLY
+In-Reply-To: <1411937610-22125-4-git-send-email-suravee.suthikulpanit@amd.com>
+References: <1411937610-22125-1-git-send-email-suravee.suthikulpanit@amd.com>
+ <1411937610-22125-4-git-send-email-suravee.suthikulpanit@amd.com>
+Message-ID: <1435098734.3996.5.camel@kernel.crashing.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 23, 2015 at 5:58 PM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
+On Sun, 2014-09-28 at 15:53 -0500, suravee.suthikulpanit at amd.com wrote:
+> From: Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com>
+> 
+> When specify PCI_PROBE_ONLY, the resource parent does not get assigned.
+> Therefore, pci_enable_resources() return error saying that
+> "BAR x not claimed".
+> 
+> Note: This same logic is also used in the arch/arm/kernel/bios32.c
 
->> That's the point that makes me confused: shouldn't it report a higher
->> resolution like 1080p?
->
-> No - it won't go higher than the initial mode that was set.  See
-> drm_fb_helper_hotplug_event():
->
->         max_width = fb_helper->fb->width;
->         max_height = fb_helper->fb->height;
->
->         drm_fb_helper_probe_connector_modes(fb_helper, max_width, max_height);
->
-> This calls connector->funcs->fill_modes with the max width/height,
-> which calls down into drm_helper_probe_single_connector_modes_merge_bits()
-> and there's limitations in there which means that we won't try to
-> increase the size of the framebuffer.
+This looks broken. Why don't you assign the resource parent ?
 
-Got it, thanks for the clarification, Russell.
+> Cc: Liviu Dudau <Liviu.Dudau@arm.com>
+> Cc: Bjorn Helgaas <bhelgaas@google.com>
+> Cc: Will Deacon <will.deacon@arm.com>
+> Cc: Catalin Marinas <catalin.marinas@arm.com>
+> Signed-off-by: Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com>
+> ---
+>  arch/arm64/kernel/pci.c | 8 ++++++++
+>  1 file changed, 8 insertions(+)
+> 
+> diff --git a/arch/arm64/kernel/pci.c b/arch/arm64/kernel/pci.c
+> index ce5836c..7fd4d2b 100644
+> --- a/arch/arm64/kernel/pci.c
+> +++ b/arch/arm64/kernel/pci.c
+> @@ -68,3 +68,11 @@ void pci_bus_assign_domain_nr(struct pci_bus *bus, struct device *parent)
+>  	bus->domain_nr = domain;
+>  }
+>  #endif
+> +
+> +int pcibios_enable_device(struct pci_dev *dev, int mask)
+> +{
+> +	if (pci_has_flag(PCI_PROBE_ONLY))
+> +		return 0;
+> +
+> +	return pci_enable_resources(dev, mask);
+> +}
