@@ -1,39 +1,32 @@
-From: fabio.estevam@freescale.com (Fabio Estevam)
-Date: Tue, 23 Jun 2015 13:03:37 -0300
-Subject: [PATCH] ARM: dts: imx6qdl-sabresd: Allow HDMI and LVDS to work
- simultaneously
-Message-ID: <1435075417-28708-1-git-send-email-fabio.estevam@freescale.com>
+From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
+Date: Tue, 23 Jun 2015 17:12:11 +0100
+Subject: [Xen-devel] [RFC 23/23] arm/xen: Add support for 64KB page
+ granularity
+In-Reply-To: <55897517.9000306@citrix.com>
+References: <1431622863-28575-1-git-send-email-julien.grall@citrix.com>
+ <1431622863-28575-24-git-send-email-julien.grall@citrix.com>
+ <alpine.DEB.2.02.1506231508050.16917@kaball.uk.xensource.com>
+ <55896F2D.5030405@citrix.com>
+ <alpine.DEB.2.02.1506231545370.18681@kaball.uk.xensource.com>
+ <55897517.9000306@citrix.com>
+Message-ID: <alpine.DEB.2.02.1506231711250.18681@kaball.uk.xensource.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently it is not possible to have HDMI and LVDS working simultaneously,
-because both ports try to use PLL5.
+On Tue, 23 Jun 2015, Julien Grall wrote:
+> On 23/06/15 15:49, Stefano Stabellini wrote:
+> > Yes, you are right, I was reading an older version of Linux that still
+> > had xen_remap_domain_mfn_range properly implemented.
+> > 
+> > The new function is called xen_remap_domain_mfn_array which calls
+> > xen_xlate_remap_gfn_array.
+> > 
+> > I'll rephrase my question then: What about xen_remap_domain_mfn_array? I
+> > guess we don't support that use case on 64K guests? If so, I would
+> > appreaciate an assert and/or an error message.
+> 
+> See https://lkml.org/lkml/2015/5/14/563
 
-Move the LVDS to PLL3_USB_OTG, so that HDMI and LVDS can be driven from
-independent sources.
+Ah, that's fantastic! In that case:
 
-With this change the LDB pixel clock goes to 68.57 MHz, which is still
-within the valid range for the HSD100PXN1 LVDS panel.
-
-Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
----
- arch/arm/boot/dts/imx6qdl-sabresd.dtsi | 4 ++++
- 1 file changed, 4 insertions(+)
-
-diff --git a/arch/arm/boot/dts/imx6qdl-sabresd.dtsi b/arch/arm/boot/dts/imx6qdl-sabresd.dtsi
-index a626e6d..dd1bedb 100644
---- a/arch/arm/boot/dts/imx6qdl-sabresd.dtsi
-+++ b/arch/arm/boot/dts/imx6qdl-sabresd.dtsi
-@@ -494,6 +494,10 @@
- };
- 
- &ldb {
-+	assigned-clocks = <&clks IMX6QDL_CLK_LDB_DI0_SEL>,
-+			  <&clks IMX6QDL_CLK_LDB_DI1_SEL>;
-+	assigned-clock-parents = <&clks IMX6QDL_CLK_PLL3_USB_OTG>,
-+				 <&clks IMX6QDL_CLK_PLL3_USB_OTG>;
- 	status = "okay";
- 
- 	lvds-channel at 1 {
--- 
-1.9.1
+Reviewed-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
