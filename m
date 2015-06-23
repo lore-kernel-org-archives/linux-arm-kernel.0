@@ -1,98 +1,103 @@
 From: gabriel.fernandez@linaro.org (Gabriel Fernandez)
-Date: Tue, 23 Jun 2015 16:09:24 +0200
-Subject: [PATCH 6/9] drivers: clk: st: Add CLK_GET_RATE_NOCACHE flag to clocks
+Date: Tue, 23 Jun 2015 16:09:27 +0200
+Subject: [PATCH 9/9] ARM: STi: DT: Rename st_pll3200c32_407_c0_x into
+ st_pll3200c32_cx_x
 In-Reply-To: <1435068567-30995-1-git-send-email-gabriel.fernandez@linaro.org>
 References: <1435068567-30995-1-git-send-email-gabriel.fernandez@linaro.org>
-Message-ID: <1435068567-30995-7-git-send-email-gabriel.fernandez@linaro.org>
+Message-ID: <1435068567-30995-10-git-send-email-gabriel.fernandez@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Pankaj Dev <pankaj.dev@st.com>
+Use a generic name for this kind of PLL
 
-Add the CLK_GET_RATE_NOCACHE flag to all the clocks with recalc ops,
-so that they reflect Hw rate after CPS wake-up when a clk_get_rate()
-is called
-
-Signed-off-by: Pankaj Dev <pankaj.dev@st.com>
 Signed-off-by: Gabriel Fernandez <gabriel.fernandez@linaro.org>
 ---
- drivers/clk/st/clk-flexgen.c | 2 +-
- drivers/clk/st/clkgen-fsyn.c | 2 +-
- drivers/clk/st/clkgen-mux.c  | 8 +++++---
- drivers/clk/st/clkgen-pll.c  | 2 +-
- 4 files changed, 8 insertions(+), 6 deletions(-)
+ Documentation/devicetree/bindings/clock/st/st,clkgen-pll.txt | 4 ++--
+ arch/arm/boot/dts/stih407-clock.dtsi                         | 4 ++--
+ arch/arm/boot/dts/stih410-clock.dtsi                         | 4 ++--
+ arch/arm/boot/dts/stih418-clock.dtsi                         | 4 ++--
+ 4 files changed, 8 insertions(+), 8 deletions(-)
 
-diff --git a/drivers/clk/st/clk-flexgen.c b/drivers/clk/st/clk-flexgen.c
-index be06d2a..8dd8cce 100644
---- a/drivers/clk/st/clk-flexgen.c
-+++ b/drivers/clk/st/clk-flexgen.c
-@@ -190,7 +190,7 @@ static struct clk *clk_register_flexgen(const char *name,
+diff --git a/Documentation/devicetree/bindings/clock/st/st,clkgen-pll.txt b/Documentation/devicetree/bindings/clock/st/st,clkgen-pll.txt
+index efb51cf..d8b168e 100644
+--- a/Documentation/devicetree/bindings/clock/st/st,clkgen-pll.txt
++++ b/Documentation/devicetree/bindings/clock/st/st,clkgen-pll.txt
+@@ -21,8 +21,8 @@ Required properties:
+ 	"st,stih416-plls-c32-ddr",	"st,clkgen-plls-c32"
+ 	"st,stih407-plls-c32-a0",	"st,clkgen-plls-c32"
+ 	"st,stih407-plls-c32-a9",	"st,clkgen-plls-c32"
+-	"st,stih407-plls-c32-c0_0",	"st,clkgen-plls-c32"
+-	"st,stih407-plls-c32-c0_1",	"st,clkgen-plls-c32"
++	"sst,plls-c32-cx_0",		"st,clkgen-plls-c32"
++	"sst,plls-c32-cx_1",		"st,clkgen-plls-c32"
  
- 	init.name = name;
- 	init.ops = &flexgen_ops;
--	init.flags = CLK_IS_BASIC | flexgen_flags;
-+	init.flags = CLK_IS_BASIC | CLK_GET_RATE_NOCACHE | flexgen_flags;
- 	init.parent_names = parent_names;
- 	init.num_parents = num_parents;
+ 	"st,stih415-gpu-pll-c32",	"st,clkgengpu-pll-c32"
+ 	"st,stih416-gpu-pll-c32",	"st,clkgengpu-pll-c32"
+diff --git a/arch/arm/boot/dts/stih407-clock.dtsi b/arch/arm/boot/dts/stih407-clock.dtsi
+index e65744f..ad45f5e 100644
+--- a/arch/arm/boot/dts/stih407-clock.dtsi
++++ b/arch/arm/boot/dts/stih407-clock.dtsi
+@@ -134,7 +134,7 @@
  
-diff --git a/drivers/clk/st/clkgen-fsyn.c b/drivers/clk/st/clkgen-fsyn.c
-index 9e26099..d9eb2e1 100644
---- a/drivers/clk/st/clkgen-fsyn.c
-+++ b/drivers/clk/st/clkgen-fsyn.c
-@@ -635,7 +635,7 @@ static struct clk * __init st_clk_register_quadfs_pll(
+ 			clk_s_c0_pll0: clk-s-c0-pll0 {
+ 				#clock-cells = <1>;
+-				compatible = "st,stih407-plls-c32-c0_0", "st,clkgen-plls-c32";
++				compatible = "st,plls-c32-cx_0", "st,clkgen-plls-c32";
  
- 	init.name = name;
- 	init.ops = quadfs->pll_ops;
--	init.flags = CLK_IS_BASIC;
-+	init.flags = CLK_IS_BASIC | CLK_GET_RATE_NOCACHE;
- 	init.parent_names = &parent_name;
- 	init.num_parents = 1;
+ 				clocks = <&clk_sysin>;
  
-diff --git a/drivers/clk/st/clkgen-mux.c b/drivers/clk/st/clkgen-mux.c
-index c94b56b..3919a67 100644
---- a/drivers/clk/st/clkgen-mux.c
-+++ b/drivers/clk/st/clkgen-mux.c
-@@ -239,7 +239,7 @@ static struct clk *clk_register_genamux(const char *name,
+@@ -143,7 +143,7 @@
  
- 	init.name = name;
- 	init.ops = &clkgena_divmux_ops;
--	init.flags = CLK_IS_BASIC;
-+	init.flags = CLK_IS_BASIC | CLK_GET_RATE_NOCACHE;
- 	init.parent_names = parent_names;
- 	init.num_parents = num_parents;
+ 			clk_s_c0_pll1: clk-s-c0-pll1 {
+ 				#clock-cells = <1>;
+-				compatible = "st,stih407-plls-c32-c0_1", "st,clkgen-plls-c32";
++				compatible = "st,plls-c32-cx_1", "st,clkgen-plls-c32";
  
-@@ -516,7 +516,8 @@ static void __init st_of_clkgena_prediv_setup(struct device_node *np)
- 					  0, &clk_name))
- 		return;
+ 				clocks = <&clk_sysin>;
  
--	clk = clk_register_divider_table(NULL, clk_name, parent_name, 0,
-+	clk = clk_register_divider_table(NULL, clk_name, parent_name,
-+					 CLK_GET_RATE_NOCACHE,
- 					 reg + data->offset, data->shift, 1,
- 					 0, data->table, NULL);
- 	if (IS_ERR(clk))
-@@ -789,7 +790,8 @@ static void __init st_of_clkgen_vcc_setup(struct device_node *np)
- 					     &mux->hw, &clk_mux_ops,
- 					     &div->hw, &clk_divider_ops,
- 					     &gate->hw, &clk_gate_ops,
--					     data->clk_flags);
-+					     data->clk_flags |
-+					     CLK_GET_RATE_NOCACHE);
- 		if (IS_ERR(clk)) {
- 			kfree(gate);
- 			kfree(div);
-diff --git a/drivers/clk/st/clkgen-pll.c b/drivers/clk/st/clkgen-pll.c
-index 1065322..72d1c27 100644
---- a/drivers/clk/st/clkgen-pll.c
-+++ b/drivers/clk/st/clkgen-pll.c
-@@ -406,7 +406,7 @@ static struct clk * __init clkgen_pll_register(const char *parent_name,
- 	init.name = clk_name;
- 	init.ops = pll_data->ops;
+diff --git a/arch/arm/boot/dts/stih410-clock.dtsi b/arch/arm/boot/dts/stih410-clock.dtsi
+index 6b5803a..d1f2aca 100644
+--- a/arch/arm/boot/dts/stih410-clock.dtsi
++++ b/arch/arm/boot/dts/stih410-clock.dtsi
+@@ -137,7 +137,7 @@
  
--	init.flags = CLK_IS_BASIC;
-+	init.flags = CLK_IS_BASIC | CLK_GET_RATE_NOCACHE;
- 	init.parent_names = &parent_name;
- 	init.num_parents  = 1;
+ 			clk_s_c0_pll0: clk-s-c0-pll0 {
+ 				#clock-cells = <1>;
+-				compatible = "st,stih407-plls-c32-c0_0", "st,clkgen-plls-c32";
++				compatible = "st,plls-c32-cx_0", "st,clkgen-plls-c32";
+ 
+ 				clocks = <&clk_sysin>;
+ 
+@@ -146,7 +146,7 @@
+ 
+ 			clk_s_c0_pll1: clk-s-c0-pll1 {
+ 				#clock-cells = <1>;
+-				compatible = "st,stih407-plls-c32-c0_1", "st,clkgen-plls-c32";
++				compatible = "st,plls-c32-cx_1", "st,clkgen-plls-c32";
+ 
+ 				clocks = <&clk_sysin>;
+ 
+diff --git a/arch/arm/boot/dts/stih418-clock.dtsi b/arch/arm/boot/dts/stih418-clock.dtsi
+index 0ab23da..148e177 100644
+--- a/arch/arm/boot/dts/stih418-clock.dtsi
++++ b/arch/arm/boot/dts/stih418-clock.dtsi
+@@ -137,7 +137,7 @@
+ 
+ 			clk_s_c0_pll0: clk-s-c0-pll0 {
+ 				#clock-cells = <1>;
+-				compatible = "st,stih407-plls-c32-c0_0", "st,clkgen-plls-c32";
++				compatible = "st,plls-c32-cx_0", "st,clkgen-plls-c32";
+ 
+ 				clocks = <&clk_sysin>;
+ 
+@@ -146,7 +146,7 @@
+ 
+ 			clk_s_c0_pll1: clk-s-c0-pll1 {
+ 				#clock-cells = <1>;
+-				compatible = "st,stih407-plls-c32-c0_1", "st,clkgen-plls-c32";
++				compatible = "st,plls-c32-cx_1", "st,clkgen-plls-c32";
+ 
+ 				clocks = <&clk_sysin>;
  
 -- 
 1.9.1
