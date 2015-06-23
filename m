@@ -1,49 +1,88 @@
 From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Tue, 23 Jun 2015 17:28:54 +0530
-Subject: [PATCH 09/17] ARM: dts: dra7: Use "syscon-phy-power" instead of
- "ctrl-module" in SATA PHY node
+Date: Tue, 23 Jun 2015 17:28:55 +0530
+Subject: [PATCH 10/17] ARM: dts: dra7: Use "syscon-phy-power" and "syscon-pcs"
+ in PCIe PHY node
 In-Reply-To: <1435060743-5511-1-git-send-email-kishon@ti.com>
 References: <1435060743-5511-1-git-send-email-kishon@ti.com>
-Message-ID: <1435060743-5511-10-git-send-email-kishon@ti.com>
+Message-ID: <1435060743-5511-11-git-send-email-kishon@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add "syscon-phy-power" property and remove the deprecated "ctrl-module"
-property from SATA PHY node. Since "omap_control_sata" note is no longer
-used, remove it.
+Add "syscon-phy-power" property and "syscon-pcs" property which can
+be used to perform the control module initializations and remove
+the deprecated "ctrl-module" property from PCIe PHY dt nodes.
+
+Phandle to "sysclk" clock node is also added to the PCIe PHY node
+since some of the syscon initializations is based on system clock
+frequency.
+
+Since "omap_control_pcie1phy" and "omap_control_pcie2phy" devicetree
+nodes are no longer used, remove it.
 
 Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
 ---
- arch/arm/boot/dts/dra7.dtsi |   10 +---------
- 1 file changed, 1 insertion(+), 9 deletions(-)
+ arch/arm/boot/dts/dra7.dtsi |   28 +++++++---------------------
+ 1 file changed, 7 insertions(+), 21 deletions(-)
 
 diff --git a/arch/arm/boot/dts/dra7.dtsi b/arch/arm/boot/dts/dra7.dtsi
-index 3f434f7..92e0741 100644
+index 92e0741..f69db70 100644
 --- a/arch/arm/boot/dts/dra7.dtsi
 +++ b/arch/arm/boot/dts/dra7.dtsi
-@@ -1115,14 +1115,6 @@
- 			status = "disabled";
+@@ -1141,16 +1141,18 @@
+ 				reg = <0x4a094000 0x80>, /* phy_rx */
+ 				      <0x4a094400 0x64>; /* phy_tx */
+ 				reg-names = "phy_rx", "phy_tx";
+-				ctrl-module = <&omap_control_pcie1phy>;
++				syscon-phy-power = <&dra7_ctrl_pcie 0x40>;
++				syscon-pcs = <&dra7_ctrl_pcie 0x34>;
+ 				clocks = <&dpll_pcie_ref_ck>,
+ 					 <&dpll_pcie_ref_m2ldo_ck>,
+ 					 <&optfclk_pciephy1_32khz>,
+ 					 <&optfclk_pciephy1_clk>,
+ 					 <&optfclk_pciephy1_div_clk>,
+-					 <&optfclk_pciephy_div>;
++					 <&optfclk_pciephy_div>,
++					 <&sys_clkin1>;
+ 				clock-names = "dpll_ref", "dpll_ref_m2",
+ 					      "wkupclk", "refclk",
+-					      "div-clk", "phy-div";
++					      "div-clk", "phy-div", "sysclk";
+ 				#phy-cells = <0>;
+ 			};
+ 
+@@ -1159,7 +1161,8 @@
+ 				reg = <0x4a095000 0x80>, /* phy_rx */
+ 				      <0x4a095400 0x64>; /* phy_tx */
+ 				reg-names = "phy_rx", "phy_tx";
+-				ctrl-module = <&omap_control_pcie2phy>;
++				syscon-phy-power = <&dra7_ctrl_pcie 0x44>;
++				syscon-pcs = <&dra7_ctrl_pcie 0x34>;
+ 				clocks = <&dpll_pcie_ref_ck>,
+ 					 <&dpll_pcie_ref_m2ldo_ck>,
+ 					 <&optfclk_pciephy2_32khz>,
+@@ -1184,23 +1187,6 @@
+ 			ti,hwmods = "sata";
  		};
  
--		omap_control_sata: control-phy at 4a002374 {
--			compatible = "ti,control-phy-pipe3";
--			reg = <0x4a002374 0x4>;
--			reg-names = "power";
+-		omap_control_pcie1phy: control-phy at 0x4a003c40 {
+-			compatible = "ti,control-phy-pcie";
+-			reg = <0x4a003c40 0x4>, <0x4a003c14 0x4>, <0x4a003c34 0x4>;
+-			reg-names = "power", "control_sma", "pcie_pcs";
 -			clocks = <&sys_clkin1>;
 -			clock-names = "sysclk";
 -		};
 -
- 		/* OCP2SCP3 */
- 		ocp2scp at 4a090000 {
- 			compatible = "ti,omap-ocp2scp";
-@@ -1137,7 +1129,7 @@
- 				      <0x4A096400 0x64>, /* phy_tx */
- 				      <0x4A096800 0x40>; /* pll_ctrl */
- 				reg-names = "phy_rx", "phy_tx", "pll_ctrl";
--				ctrl-module = <&omap_control_sata>;
-+				syscon-phy-power = <&dra7_ctrl_core 0x374>;
- 				clocks = <&sys_clkin1>, <&sata_ref_clk>;
- 				clock-names = "sysclk", "refclk";
- 				syscon-pllreset = <&dra7_ctrl_core 0x3fc>;
+-		omap_control_pcie2phy: control-pcie at 0x4a003c44 {
+-			compatible = "ti,control-phy-pcie";
+-			reg = <0x4a003c44 0x4>, <0x4a003c14 0x4>, <0x4a003c34 0x4>;
+-			reg-names = "power", "control_sma", "pcie_pcs";
+-			clocks = <&sys_clkin1>;
+-			clock-names = "sysclk";
+-			status = "disabled";
+-		};
+-
+ 		rtc: rtc at 48838000 {
+ 			compatible = "ti,am3352-rtc";
+ 			reg = <0x48838000 0x100>;
 -- 
 1.7.9.5
