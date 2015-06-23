@@ -1,44 +1,73 @@
-From: peter.maydell@linaro.org (Peter Maydell)
-Date: Tue, 23 Jun 2015 15:16:16 +0100
-Subject: [PATCH] arm64/kvm: Add generic v8 KVM target
-In-Reply-To: <55896718.9080600@arm.com>
-References: <1434531646-4873-1-git-send-email-suzuki.poulose@arm.com>
- <CAFEAcA92uymQ3LjPQnuFiwvjSgc+jY54VrfK_Sh4v1DJ+=OPpw@mail.gmail.com>
- <20150623123959.GF4035@cbox> <55896718.9080600@arm.com>
-Message-ID: <CAFEAcA-1T8+KAym4Ow4RP3YNvKc1h3iFsX4Xj1kBb=ny_fOb6w@mail.gmail.com>
+From: tomeu.vizoso@collabora.com (Tomeu Vizoso)
+Date: Tue, 23 Jun 2015 16:17:29 +0200
+Subject: [PATCH 02/13] driver-core: defer all probes until late_initcall
+In-Reply-To: <2342676.6ZCmGB6KsR@vostro.rjw.lan>
+References: <1434548543-22949-1-git-send-email-tomeu.vizoso@collabora.com>
+ <1585940.7Lfuk0LdBK@vostro.rjw.lan>
+ <CAL_JsqKTm-F2oajuj07W=DBBjH03FTnqNkGbizERmajCPgjnGg@mail.gmail.com>
+ <2342676.6ZCmGB6KsR@vostro.rjw.lan>
+Message-ID: <CAAObsKAMn6xSs4-NCmvXO=EccXxdhv_Y4+KeYJ0Wj3Q5NHsYRg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 23 June 2015 at 15:03, Suzuki K. Poulose <Suzuki.Poulose@arm.com> wrote:
-> On 23/06/15 13:39, Christoffer Dall wrote:
->> On Mon, Jun 22, 2015 at 09:44:48AM +0100, Peter Maydell wrote:
->> I'm guessing the intention is to avoid having to add code in the kernel
->> to support KVM on a new CPU where nothing else needs to be done to
->> support KVM on that system.
+On 23 June 2015 at 16:37, Rafael J. Wysocki <rjw@rjwysocki.net> wrote:
+> On Monday, June 22, 2015 07:07:08 PM Rob Herring wrote:
+>> On Fri, Jun 19, 2015 at 6:20 PM, Rafael J. Wysocki <rjw@rjwysocki.net> wrote:
+>> > On Friday, June 19, 2015 03:36:46 PM Tomeu Vizoso wrote:
+>> >> On 18 June 2015 at 23:50, Rafael J. Wysocki <rjw@rjwysocki.net> wrote:
+>> >> > On Wednesday, June 17, 2015 03:42:12 PM Tomeu Vizoso wrote:
+>> >> >> To decrease the chances of devices deferring their probes because of
+>> >> >> dependencies not having probed yet because of their drivers not having
+>> >> >> registered yet, delay all probing until the late initcall level.
+>> >> >>
+>> >> >> This will allow us to avoid deferred probes completely later by probing
+>> >> >> dependencies on demand, or by probing them in dependency order.
+>> >> >>
+>> >> >> Signed-off-by: Tomeu Vizoso <tomeu.vizoso@collabora.com>
+>> >> >> ---
+>> >> >>  drivers/base/dd.c | 8 +++++++-
+>> >> >>  1 file changed, 7 insertions(+), 1 deletion(-)
+>> >> >>
+>> >> >> diff --git a/drivers/base/dd.c b/drivers/base/dd.c
+>> >> >> index a638bbb..18438aa 100644
+>> >> >> --- a/drivers/base/dd.c
+>> >> >> +++ b/drivers/base/dd.c
+>> >> >> @@ -407,6 +407,12 @@ int driver_probe_device(struct device_driver *drv, struct device *dev)
+>> >> >>       if (!device_is_registered(dev))
+>> >> >>               return -ENODEV;
+>> >> >>
+>> >> >> +     /* Defer all probes until we start processing the queue */
+>> >> >> +     if (!driver_deferred_probe_enable) {
+>> >> >> +             driver_deferred_probe_add(dev);
+>> >> >
+>> >> > Do I think correctly that this will effectively force everybody to use deferred
+>> >> > probing?
+>> >>
+>> >> Guess it depends on the meaning of "using deferred probing". It will
+>> >> defer the probe of the first device to late_initcall (which will
+>> >> happen much earlier in time than before), but afterwards all built-in
+>> >> drivers will be available and depending on the order in which we try
+>> >> to probe devices, none may actually ask to defer its probe.
+>> >
+>> > So this will break things like the PNP system driver which relies on probing
+>> > stuff at the fs_initcall stage for correctness.  It may also break other
+>> > things with similar assumptions.
+>>
+>> Yes, but I think that this can be done for only OF based devices
+>> rather than globally for all platform devices and solve that problem.
+>> Matching is already dependent of the type of device.
 >
-> Yes, thats the *only* motivation behind the patch
+> Well, the current patch is not OF-only, though.
 
-I'm not convinced we really want to change the userspace ABI design
-principles just for convenience of internal kernel implementation.
-At the moment the approach is:
- (1) if you want a specific guest CPU, you ask for it; the kernel
-guarantees that if this succeeds, you can cross-migrate between
-this and another kernel that also lets you init that guest CPU
-[at the moment this implies no cross-host-type migration, of course]
- (2) if you don't care, you ask the kernel what its preferred
-CPU type is, and use it
+Yeah, I'm currently looking at only delaying probing of devices
+created from OF data.
 
-If we want to change away from this model (which has at least
-the advantages of being coherent and sort-of similar to
-how x86 does things), what's the model we're moving to?
+Note that calculating dependencies and trying to probe them before
+they are needed can be done independently of this patch, but it isn't
+that useful because devices will still defer their probes because the
+drivers of some dependencies won't have been registered until
+late_initcall.
 
-> May be we can create a dummy set of values for
-> the ID registers, which doesn't provide any 'special functionality'
-> so that it is safe to be migrated across any host ?
+Regards,
 
-I suspect this problem is larger and requires a more complex
-solution than merely providing funky ID register values. If we
-can do it successfully that would be really handy, though...
-
-thanks
--- PMM
+Tomeu
