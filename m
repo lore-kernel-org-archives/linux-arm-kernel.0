@@ -1,117 +1,23 @@
-From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Tue, 23 Jun 2015 13:09:18 +0200
-Subject: [PATCH] ARM: dts: rockchip: Add DMA tx and rx channels in UART
- interfaces for RK3288 SoCs
-In-Reply-To: <CABgxDo+8MafT8hOzpG=gjju=S7bVtNBOKxmi_JPHv1bDZSGeCQ@mail.gmail.com>
-References: <1434475166-30338-1-git-send-email-romain.perier@gmail.com>
- <CABgxDo+8MafT8hOzpG=gjju=S7bVtNBOKxmi_JPHv1bDZSGeCQ@mail.gmail.com>
-Message-ID: <1475991.JRcDMpQrFc@diego>
+From: broonie@kernel.org (Mark Brown)
+Date: Tue, 23 Jun 2015 12:11:15 +0100
+Subject: [PATCH] ASoC: mediatek: Fix unbalanced calls to runtime
+ suspend/resume
+In-Reply-To: <1435057280-21316-1-git-send-email-koro.chen@mediatek.com>
+References: <1435057280-21316-1-git-send-email-koro.chen@mediatek.com>
+Message-ID: <20150623111115.GC14071@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Romain,
+On Tue, Jun 23, 2015 at 07:01:20PM +0800, Koro Chen wrote:
+> This adds call to runtime suspend in dev remove. It fixs the problem that
+> suspend is not called in the case of CONFIG_PM=n. It also fixs build
+> warning when CONFIG_PM=n.
 
-Am Dienstag, 23. Juni 2015, 08:53:17 schrieb Romain Perier:
-> ping :)
-
-I haven't forgotten this patch :-)
-
-I just haven't fully made up my mind concerning the bug in the pl330 
-implementation on Rockchip SoCs - aka if we'll make it worse by also enabling 
-dma on the uarts.
-
-So far the problem reports I read only mentioned degraded functionality like 
-popping sounds in audio, not full system failures or freezes. So I tend to 
-include the patch and see what happens ;-)
-
-
-Heiko
-
-
-
-> 2015-06-16 19:19 GMT+02:00 Romain Perier <romain.perier@gmail.com>:
-> > This enable DMA capability for the corresponding UART interfaces, also it
-> > removes warning "ttyS%d - Failed to request dma" from kernel logs.
-> > 
-> > Signed-off-by: Romain Perier <romain.perier@gmail.com>
-> > ---
-> > 
-> > Changes since v1 ("[PATCH] ARM: dts: rockchip: Add dmac_bus rx and tx for 
-uart2"):
-> >         - Add DMA tx and rx channels for all UART interfaces
-> >         - Rename commit summary
-> >  
-> >  arch/arm/boot/dts/rk3288.dtsi | 10 ++++++++++
-> >  1 file changed, 10 insertions(+)
-> > 
-> > diff --git a/arch/arm/boot/dts/rk3288.dtsi b/arch/arm/boot/dts/rk3288.dtsi
-> > index 22316d0..1996452 100644
-> > --- a/arch/arm/boot/dts/rk3288.dtsi
-> > +++ b/arch/arm/boot/dts/rk3288.dtsi
-> > @@ -359,6 +359,8 @@
-> > 
-> >                 clock-names = "baudclk", "apb_pclk";
-> >                 pinctrl-names = "default";
-> >                 pinctrl-0 = <&uart0_xfer>;
-> > 
-> > +               dmas = <&dmac_peri 1>, <&dmac_peri 2>;
-> > +               dma-names = "tx", "rx";
-> > 
-> >                 status = "disabled";
-> >         
-> >         };
-> > 
-> > @@ -372,6 +374,8 @@
-> > 
-> >                 clock-names = "baudclk", "apb_pclk";
-> >                 pinctrl-names = "default";
-> >                 pinctrl-0 = <&uart1_xfer>;
-> > 
-> > +               dmas = <&dmac_peri 3>, <&dmac_peri 4>;
-> > +               dma-names = "tx", "rx";
-> > 
-> >                 status = "disabled";
-> >         
-> >         };
-> > 
-> > @@ -385,6 +389,8 @@
-> > 
-> >                 clock-names = "baudclk", "apb_pclk";
-> >                 pinctrl-names = "default";
-> >                 pinctrl-0 = <&uart2_xfer>;
-> > 
-> > +               dmas = <&dmac_bus_s 4>, <&dmac_bus_s 5>;
-> > +               dma-names = "tx", "rx";
-> > 
-> >                 status = "disabled";
-> >         
-> >         };
-> > 
-> > @@ -398,6 +404,8 @@
-> > 
-> >                 clock-names = "baudclk", "apb_pclk";
-> >                 pinctrl-names = "default";
-> >                 pinctrl-0 = <&uart3_xfer>;
-> > 
-> > +               dmas = <&dmac_peri 7>, <&dmac_peri 8>;
-> > +               dma-names = "tx", "rx";
-> > 
-> >                 status = "disabled";
-> >         
-> >         };
-> > 
-> > @@ -411,6 +419,8 @@
-> > 
-> >                 clock-names = "baudclk", "apb_pclk";
-> >                 pinctrl-names = "default";
-> >                 pinctrl-0 = <&uart4_xfer>;
-> > 
-> > +               dmas = <&dmac_peri 9>, <&dmac_peri 10>;
-> > +               dma-names = "tx", "rx";
-> > 
-> >                 status = "disabled";
-> >         
-> >         };
-> > 
-> > --
-> > 1.9.1
+Applied, thanks (the stub does the right thing here if !CONFIG_PM).
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150623/5fc19c56/attachment.sig>
