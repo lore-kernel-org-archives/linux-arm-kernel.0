@@ -1,48 +1,128 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 23 Jun 2015 21:58:37 +0100
-Subject: mx6 hdmi resolution behaviour
-In-Reply-To: <CAOMZO5CkxjtH7ZnOcbDWdwwwHH4xT4UhXXWpA3O9afbP9XRBaQ@mail.gmail.com>
-References: <CAOMZO5AbC8PCo7J7ovw4izPBK08UkDgKGG++d+9xty4GJ0SzKQ@mail.gmail.com>
- <20150623164443.GC7557@n2100.arm.linux.org.uk>
- <CAOMZO5BjuOGgqsUNG6K6N-QU1a4oWTdynxsoAECYLeQK_9Kk9g@mail.gmail.com>
- <20150623204154.GD7557@n2100.arm.linux.org.uk>
- <CAOMZO5CkxjtH7ZnOcbDWdwwwHH4xT4UhXXWpA3O9afbP9XRBaQ@mail.gmail.com>
-Message-ID: <20150623205837.GE7557@n2100.arm.linux.org.uk>
+From: m.silentcreek@gmail.com (m.silentcreek at gmail.com)
+Date: Tue, 23 Jun 2015 14:06:34 -0700 (PDT)
+Subject: [PATCH] touchscreen: sun4i-ts: Really fix A10 temperature
+ reporting
+In-Reply-To: <5589B78C.4080600@redhat.com>
+References: <1425893870-28715-1-git-send-email-hdegoede@redhat.com>
+ <41a7a857-96fd-48ab-9778-127cfc091ef0@googlegroups.com>
+ <5589B78C.4080600@redhat.com>
+Message-ID: <2b011bd9-f8a8-4fa9-adc8-2ee91b0e6527@googlegroups.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 23, 2015 at 05:48:51PM -0300, Fabio Estevam wrote:
-> On Tue, Jun 23, 2015 at 5:41 PM, Russell King - ARM Linux
-> <linux@arm.linux.org.uk> wrote:
+Hi again,
+
+Am Dienstag, 23. Juni 2015 21:46:25 UTC+2 schrieb Hans de Goede:
+> Hi,
 > 
-> > I've just tried this (the HBi1 was booted previously with the HDMI socket
-> > disconnected).  Just now, I turned the TV on, and then connected it to
-> > the HDMI.
+> On 06/23/2015 05:06 PM, m.silentcreek at gmail.com wrote:
+> > Hi Hans,
+> >
+> > is it possible that this patch (and the parent commit "Input: sun4i-ts - allow controlling filter and sensitivity via DT") has quite an adversial effect on other boards than the ones tested?
+> >
+> > On my Lemaker Bananapi the temperature is now being reported as somwhere between -15?C to -10?C with the latest Kernel 4.1.0. These negative values are obviously way off. On Kernel 4.0.5 the temperature reading was usually around 40?C. While that might not have been accurate either, it was at least plausible.
 > 
-> Thanks for testing it.
+> The temperature curve for the A20 SoC was not changed, if it did change then
+> you're using an old dtb file with a new kernel, you must always update your
+> dtb file together with the kernel.
+
+I just checked the diff for Linux 4.0 and 4.1 and noticed that sun7i-a20.dtsi in fact has not changed. Is it possible that something that should have been merged got delayed?
+
+I looked in Maxime's tree "dt-for-4.2" and found this patch that looks like it could be related: https://git.kernel.org/cgit/linux/kernel/git/mripard/linux.git/commit/?h=sunxi/dt-for-4.2&id=8bf1b9b3d90194a174493febc731f7783f2adf1a
+
 > 
-> > The TV reported a resolution of 1024x768, and the kernel log was silent.
 > 
-> That's the point that makes me confused: shouldn't it report a higher
-> resolution like 1080p?
+> 
+> >
+> > Given that there is no Documentation and things seem quite board-specific, I really don't know how this could be improved, so I can merely report my observation.
+> >
+> > Kind regards,
+> >
+> > Timo
+> >
+> >
+> > Am Montag, 9. M?rz 2015 10:38:02 UTC+1 schrieb Hans de Goede:
+> >> The commit titled:
+> >> "touchscreen: sun4i-ts: A10 (sun4i) has a different temperature curve"
+> >> contains a math error, the offset it uses is in degrees, but the actual code
+> >> applies the offset before multiplying by stepsize :|
+> >>
+> >> Given that this is rather backwards (every math course ever thought applies
+> >> the multiplication before the offset for linear functions), this commit
+> >> fixes things by changing the code applying the offset to do the logical
+> >> thing, adjusting the offset for the other models accordingly.
+> >>
+> >> This has been tested on an A10, A13, A20 and A31 to make sure everything really
+> >> is correct now.
+> >>
+> >> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+> >> ---
+> >> Note if possible this commit should be squashed into the original
+> >> "touchscreen: sun4i-ts: A10 (sun4i) has a different temperature curve"
+> >> commit as a fixup.
+> >> ---
+> >>   drivers/input/touchscreen/sun4i-ts.c | 14 +++++++-------
+> >>   1 file changed, 7 insertions(+), 7 deletions(-)
+> >>
+> >> diff --git a/drivers/input/touchscreen/sun4i-ts.c b/drivers/input/touchscreen/sun4i-ts.c
+> >> index 66ccd5a..178d2ef 100644
+> >> --- a/drivers/input/touchscreen/sun4i-ts.c
+> >> +++ b/drivers/input/touchscreen/sun4i-ts.c
+> >> @@ -193,7 +193,7 @@ static int sun4i_get_temp(const struct sun4i_ts_data *ts, long *temp)
+> >>   	if (ts->temp_data == -1)
+> >>   		return -EAGAIN;
+> >>
+> >> -	*temp = (ts->temp_data - ts->temp_offset) * ts->temp_step;
+> >> +	*temp = ts->temp_data * ts->temp_step - ts->temp_offset;
+> >>
+> >>   	return 0;
+> >>   }
+> >> @@ -255,17 +255,17 @@ static int sun4i_ts_probe(struct platform_device *pdev)
+> >>   	ts->ignore_fifo_data = true;
+> >>   	ts->temp_data = -1;
+> >>   	if (of_device_is_compatible(np, "allwinner,sun6i-a31-ts")) {
+> >> -		/* Allwinner SDK has temperature = -271 + (value / 6) (C) */
+> >> -		ts->temp_offset = 1626;
+> >> +		/* Allwinner SDK has temperature (C) = (value / 6) - 271 */
+> >> +		ts->temp_offset = 271000;
+> >>   		ts->temp_step = 167;
+> >>   	} else if (of_device_is_compatible(np, "allwinner,sun4i-a10-ts")) {
+> >>   		/*
+> >>   		 * The A10 temperature sensor has quite a wide spread, these
+> >>   		 * parameters are based on the averaging of the calibration
+> >>   		 * results of 4 completely different boards, with a spread of
+> >> -		 * temp_step from 96 - 170 and temp_offset from 1758 - 3310.
+> >> +		 * temp_step from 0.096 - 0.170 and temp_offset from 176 - 331.
+> >>   		 */
+> >> -		ts->temp_offset = 2570;
+> >> +		ts->temp_offset = 257000;
+> >>   		ts->temp_step = 133;
+> >>   	} else {
+> >>   		/*
+> >> @@ -273,13 +273,13 @@ static int sun4i_ts_probe(struct platform_device *pdev)
+> >>   		 * the temperature. The formula used here is from the AXP209,
+> >>   		 * which is designed by X-Powers, an affiliate of Allwinner:
+> >>   		 *
+> >> -		 *     temperature = -144.7 + (value * 0.1)
+> >> +		 *     temperature (C) = (value * 0.1) - 144.7
+> >>   		 *
+> >>   		 * Allwinner does not have any documentation whatsoever for
+> >>   		 * this hardware. Moreover, it is claimed that the sensor
+> >>   		 * is inaccurate and cannot work properly.
+> >>   		 */
+> >> -		ts->temp_offset = 1447;
+> >> +		ts->temp_offset = 144700;
+> >>   		ts->temp_step = 100;
+> >>   	}
+> >>
+> >> --
+> >> 2.3.1
+> >
+> 
+> Regards,
+> 
+> Hans
 
-No - it won't go higher than the initial mode that was set.  See
-drm_fb_helper_hotplug_event():
+Regards,
 
-        max_width = fb_helper->fb->width;
-        max_height = fb_helper->fb->height;
-
-        drm_fb_helper_probe_connector_modes(fb_helper, max_width, max_height);
-
-This calls connector->funcs->fill_modes with the max width/height,
-which calls down into drm_helper_probe_single_connector_modes_merge_bits()
-and there's limitations in there which means that we won't try to
-increase the size of the framebuffer.
-
-You do get that behaviour if you have the X server running, and that's
-all down to the X server itself doing that (reacting to the hotplug
-event which DRM generates.)
-
--- 
-FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
-according to speedtest.net.
+Timo
