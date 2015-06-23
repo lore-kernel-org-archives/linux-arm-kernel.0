@@ -1,55 +1,44 @@
-From: gnurou@gmail.com (Alexandre Courbot)
-Date: Tue, 23 Jun 2015 23:11:52 +0900
-Subject: [PATCH] gpio/xilinx: Use correct address when setting initial
- values.
-In-Reply-To: <1435065280.13545.6.camel@localhost>
-References: <1435065280.13545.6.camel@localhost>
-Message-ID: <CAAVeFu+HR2sV2XgR0QWWP3rediE4V7J9wrT+qXhcu_++Tb_qEw@mail.gmail.com>
+From: peter.maydell@linaro.org (Peter Maydell)
+Date: Tue, 23 Jun 2015 15:16:16 +0100
+Subject: [PATCH] arm64/kvm: Add generic v8 KVM target
+In-Reply-To: <55896718.9080600@arm.com>
+References: <1434531646-4873-1-git-send-email-suzuki.poulose@arm.com>
+ <CAFEAcA92uymQ3LjPQnuFiwvjSgc+jY54VrfK_Sh4v1DJ+=OPpw@mail.gmail.com>
+ <20150623123959.GF4035@cbox> <55896718.9080600@arm.com>
+Message-ID: <CAFEAcA-1T8+KAym4Ow4RP3YNvKc1h3iFsX4Xj1kBb=ny_fOb6w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 23, 2015 at 10:14 PM, Rapha?l Teysseyre
-<rteysseyre@gmail.com> wrote:
-> From 670209328307a198b80723a917957269a815fc32 Mon Sep 17 00:00:00 2001
-> From: =?UTF-8?q?Rapha=C3=ABl=20Teysseyre?= <rteysseyre@gmail.com>
-> Date: Tue, 23 Jun 2015 14:49:31 +0200
-> Subject: [PATCH] gpio/xilinx: Use correct address when setting initial values.
-> MIME-Version: 1.0
-> Content-Type: text/plain; charset=UTF-8
-> Content-Transfer-Encoding: 8bit
+On 23 June 2015 at 15:03, Suzuki K. Poulose <Suzuki.Poulose@arm.com> wrote:
+> On 23/06/15 13:39, Christoffer Dall wrote:
+>> On Mon, Jun 22, 2015 at 09:44:48AM +0100, Peter Maydell wrote:
+>> I'm guessing the intention is to avoid having to add code in the kernel
+>> to support KVM on a new CPU where nothing else needs to be done to
+>> support KVM on that system.
+>
+> Yes, thats the *only* motivation behind the patch
 
-Mmm this looks like you copy/pasted the output of git format-patch
-into your email client. Use git send-email instead, or avoid the mail
-headers if you wish to use another client.
+I'm not convinced we really want to change the userspace ABI design
+principles just for convenience of internal kernel implementation.
+At the moment the approach is:
+ (1) if you want a specific guest CPU, you ask for it; the kernel
+guarantees that if this succeeds, you can cross-migrate between
+this and another kernel that also lets you init that guest CPU
+[at the moment this implies no cross-host-type migration, of course]
+ (2) if you don't care, you ask the kernel what its preferred
+CPU type is, and use it
 
->
-> Signed-off-by: Rapha?l Teysseyre <rteysseyre@gmail.com>
+If we want to change away from this model (which has at least
+the advantages of being coherent and sort-of similar to
+how x86 does things), what's the model we're moving to?
 
-A commit message beyond the subject would be appreciated. What did you
-fix exactly? What was incorrect?
+> May be we can create a dummy set of values for
+> the ID registers, which doesn't provide any 'special functionality'
+> so that it is safe to be migrated across any host ?
 
-> ---
->  drivers/gpio/gpio-xilinx.c |    4 ++--
->  1 files changed, 2 insertions(+), 2 deletions(-)
->
-> diff --git a/drivers/gpio/gpio-xilinx.c b/drivers/gpio/gpio-xilinx.c
-> index 61243d1..e544b7a 100644
-> --- a/drivers/gpio/gpio-xilinx.c
-> +++ b/drivers/gpio/gpio-xilinx.c
-> @@ -220,9 +220,9 @@ static void xgpio_save_regs(struct of_mm_gpio_chip *mm_gc)
->         if (!chip->gpio_width[1])
->                 return;
->
-> -       xgpio_writereg(mm_gc->regs + XGPIO_DATA_OFFSET + XGPIO_TRI_OFFSET,
-> +       xgpio_writereg(mm_gc->regs + XGPIO_DATA_OFFSET + XGPIO_CHANNEL_OFFSET,
->                        chip->gpio_state[1]);
-> -       xgpio_writereg(mm_gc->regs + XGPIO_TRI_OFFSET + XGPIO_TRI_OFFSET,
-> +       xgpio_writereg(mm_gc->regs + XGPIO_TRI_OFFSET + XGPIO_CHANNEL_OFFSET,
->                        chip->gpio_dir[1]);
->  }
->
-> --
-> 1.7.1
->
->
->
+I suspect this problem is larger and requires a more complex
+solution than merely providing funky ID register values. If we
+can do it successfully that would be really handy, though...
+
+thanks
+-- PMM
