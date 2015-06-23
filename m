@@ -1,39 +1,114 @@
-From: Dave.Martin@arm.com (Dave P Martin)
-Date: Tue, 23 Jun 2015 12:13:10 +0100
-Subject: [PATCH] serial/amba-pl011: Disable interrupts around TX softirq
-In-Reply-To: <416658426.177742.1434791378036.JavaMail.open-xchange@oxbsltgw09.schlund.de>
-References: <1434635669-23367-1-git-send-email-Dave.Martin@arm.com>
- <416658426.177742.1434791378036.JavaMail.open-xchange@oxbsltgw09.schlund.de>
-Message-ID: <20150623111310.GB3645@e103592.cambridge.arm.com>
+From: hanjun.guo@linaro.org (Hanjun Guo)
+Date: Tue, 23 Jun 2015 19:18:55 +0800
+Subject: [PATCH v2 3/9] irqchip / GIC: Add GIC version support in ACPI MADT
+In-Reply-To: <20150622164520.GA26129@red-moon>
+References: <1434703572-26221-1-git-send-email-hanjun.guo@linaro.org>
+ <1434703572-26221-4-git-send-email-hanjun.guo@linaro.org>
+ <20150622164520.GA26129@red-moon>
+Message-ID: <5589409F.8020208@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Jun 20, 2015 at 10:09:37AM +0100, Stefan Wahren wrote:
-> 
-> > Dave Martin <Dave.Martin@arm.com> hat am 18. Juni 2015 um 15:54 geschrieben:
-> >
-> >
-> > pl011_tx_softirq() currently uses spin_{,un}lock(), which are not
-> > sufficient to inhibit pl011_int() from being triggered by a local
-> > IRQ and trying to re-take the same lock. This can lead to
-> > deadlocks.
-> >
-> > This patch uses the _irq() locking variants instead to ensure that
-> > pl011_int() handling for a given port is deferred until any
-> > pl011_tx_softirq() work for that port is complete.
-> >
-> > Fixes: 734745caeb9f serial/amba-pl011: Activate TX IRQ passively
-> > Signed-off-by: Dave Martin <Dave.Martin@arm.com>
-> > Tested-by: Robin Murphy <robin.murphy@arm.com>
-> > Cc: stable <stable@vger.kernel.org> # 4.1
-> >
-> 
-> I also get info messages about inconsistent lock state on my mx28 board,
-> after applying the patch the messages disappeared.
-> 
-> Tested-by: Stefan Wahren <stefan.wahren@i2se.com>
+On 06/23/2015 12:45 AM, Lorenzo Pieralisi wrote:
+> On Fri, Jun 19, 2015 at 09:46:06AM +0100, Hanjun Guo wrote:
+>
+> [...]
+>
+>> +
+>> +static int __init
+>> +match_gic_redist(struct acpi_subtable_header *header, const unsigned long end)
+>> +{
+>> +	return 0;
+>> +}
+>> +static bool __init acpi_gic_redist_is_present(void)
+>> +{
+>> +	int count;
+>> +
+>> +	/* scan MADT table to find if we have redistributor entries */
+>> +	count  =  acpi_table_parse_madt(ACPI_MADT_TYPE_GENERIC_REDISTRIBUTOR,
+>> +					match_gic_redist, 0);
+>> +
+>> +	/* has at least one GIC redistributor entry */
+>> +	if (count > 0)
+>> +		return true;
+>> +	else
+>> +		return false;
+>> +}
+>
+> return count > 0;
+>
+> What about systems where the redistributor data is in the GICC subtable ? Do
+> you treat them as GIC V2 :) ?
 
-Thanks for the confirmation.
+Good catch :)
 
-Cheers
----Dave
+It's in my TODO list and I didn't put some notes here, my bad.
+
+If we want to support that feature, it seems we need to refactor
+the GICv3 code for rdist too, in gic_populate_rdist(), it use
+redistributor regions and jump to each cpu's redistributor using
+the stride, but with the redistributor data is in the GICC subtable,
+we only have the base address for each cpu's redistributor, have
+no regions.
+
+Another way to do that we can repack all the base address for
+redistributors into regions then no need to refactor the code,
+but all the CPUs in MADT have to be listed in order which is
+insane.
+
+>
+> On a side note, having to define an empty function like match_gic_redist is
+> horrible.
+>
+> I wonder whether it is not better to refactor map_madt_entry(), create
+> a MADT subtable iterator out of it and make that code generic, instead
+> of being forced to add these useless MADT handlers just to count
+> entries, it is not the first I noticed.
+
+I agree, I also think that parse GICC for each driver (SMP, GIC) is
+duplicate, trying to consolidate them, but I haven't figure out a
+good way to do that.
+
+>
+>> +static int __init acpi_gic_version_init(void)
+>> +{
+>> +	int count;
+>> +	void __iomem *dist_base;
+>> +	u32 reg;
+>> +
+>> +	count = acpi_table_parse_madt(ACPI_MADT_TYPE_GENERIC_DISTRIBUTOR,
+>> +					acpi_gic_parse_distributor, 0);
+>> +
+>> +	if (count <= 0) {
+>> +		pr_err("No valid GIC distributor entry exists\n");
+>> +		return -ENODEV;
+>> +	}
+>> +
+>> +	if (gic_version >= ACPI_MADT_GIC_VERSION_RESERVED) {
+>> +		pr_err("Invalid GIC version %d in MADT\n", gic_version);
+>> +		return -EINVAL;
+>> +	}
+>> +
+>> +	/*
+>> +	 * when the GIC version is 0, we fallback to hardware discovery.
+>> +	 * this is also needed to keep compatiable with ACPI 5.1,
+>> +	 * which has no gic_version field in distributor structure and
+>> +	 * reserved as 0.
+>> +	 *
+>> +	 * For hardware discovery, the offset for GICv1/2 and GICv3/4 to
+>> +	 * get the GIC version is different (0xFE8 for GICv1/2 and 0xFFE8
+>> +	 * for GICv3/4), so we need to handle it separately.
+>
+>> +	 */
+>> +	if (gic_version	== ACPI_MADT_GIC_VERSION_NONE) {
+>> +		/* it's GICv3/v4 if redistributor is present */
+>> +		if (acpi_gic_redist_is_present()) {
+>
+> See above, IIUC you might have systems with GIC v3 where this call
+> would fail, and we do not want to fall back to GIC v2.
+
+Yes, but we need to find a way to refactor the GICv3 code for
+populating redistributors first.
+
+Thanks
+Hanjun
