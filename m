@@ -1,117 +1,58 @@
 From: robherring2@gmail.com (Rob Herring)
-Date: Mon, 22 Jun 2015 19:01:32 -0500
-Subject: [PATCH 00/21] On-demand device registration
-In-Reply-To: <CAAObsKCdv_X+YPFacO7NjbRMnvuDisAmiQOWE-Xb3xFFrn6Qog@mail.gmail.com>
-References: <1432565608-26036-1-git-send-email-tomeu.vizoso@collabora.com>
- <CAL_Jsq+EWLEJhRudTGAwYsOg4tX2-pGhygeQGHae9RL8rBpMiA@mail.gmail.com>
- <CAAObsKCdv_X+YPFacO7NjbRMnvuDisAmiQOWE-Xb3xFFrn6Qog@mail.gmail.com>
-Message-ID: <CAL_JsqKAWs2McpAP-47UwDMtuBoR+0xkJYvu8+-7yOQwiUfvpw@mail.gmail.com>
+Date: Mon, 22 Jun 2015 19:07:08 -0500
+Subject: [PATCH 02/13] driver-core: defer all probes until late_initcall
+In-Reply-To: <1585940.7Lfuk0LdBK@vostro.rjw.lan>
+References: <1434548543-22949-1-git-send-email-tomeu.vizoso@collabora.com>
+ <2834968.DlsDAmbXkG@vostro.rjw.lan>
+ <CAAObsKDGLVx5wtsiY_o_-r6bp4qTgOfAExbSr7w=xn2eM-CQ6A@mail.gmail.com>
+ <1585940.7Lfuk0LdBK@vostro.rjw.lan>
+Message-ID: <CAL_JsqKTm-F2oajuj07W=DBBjH03FTnqNkGbizERmajCPgjnGg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 22, 2015 at 10:23 AM, Tomeu Vizoso
-<tomeu.vizoso@collabora.com> wrote:
-> On 28 May 2015 at 06:33, Rob Herring <robherring2@gmail.com> wrote:
->> On Mon, May 25, 2015 at 9:53 AM, Tomeu Vizoso
->> <tomeu.vizoso@collabora.com> wrote:
->>> Hello,
->>>
->>> I have a problem with the panel on my Tegra Chromebook taking longer than
->>> expected to be ready during boot (St?phane Marchesin reported what is
->>> basically the same issue in [0]), and have looked into ordered probing as a
->>> better way of solving this than moving nodes around in the DT or playing with
->>> initcall levels.
->>>
->>> While reading the thread [1] that Alexander Holler started with his series to
->>> make probing order deterministic, it occurred to me that it should be possible
->>> to achieve the same by registering devices as they are referenced by other
->>> devices.
+On Fri, Jun 19, 2015 at 6:20 PM, Rafael J. Wysocki <rjw@rjwysocki.net> wrote:
+> On Friday, June 19, 2015 03:36:46 PM Tomeu Vizoso wrote:
+>> On 18 June 2015 at 23:50, Rafael J. Wysocki <rjw@rjwysocki.net> wrote:
+>> > On Wednesday, June 17, 2015 03:42:12 PM Tomeu Vizoso wrote:
+>> >> To decrease the chances of devices deferring their probes because of
+>> >> dependencies not having probed yet because of their drivers not having
+>> >> registered yet, delay all probing until the late initcall level.
+>> >>
+>> >> This will allow us to avoid deferred probes completely later by probing
+>> >> dependencies on demand, or by probing them in dependency order.
+>> >>
+>> >> Signed-off-by: Tomeu Vizoso <tomeu.vizoso@collabora.com>
+>> >> ---
+>> >>  drivers/base/dd.c | 8 +++++++-
+>> >>  1 file changed, 7 insertions(+), 1 deletion(-)
+>> >>
+>> >> diff --git a/drivers/base/dd.c b/drivers/base/dd.c
+>> >> index a638bbb..18438aa 100644
+>> >> --- a/drivers/base/dd.c
+>> >> +++ b/drivers/base/dd.c
+>> >> @@ -407,6 +407,12 @@ int driver_probe_device(struct device_driver *drv, struct device *dev)
+>> >>       if (!device_is_registered(dev))
+>> >>               return -ENODEV;
+>> >>
+>> >> +     /* Defer all probes until we start processing the queue */
+>> >> +     if (!driver_deferred_probe_enable) {
+>> >> +             driver_deferred_probe_add(dev);
+>> >
+>> > Do I think correctly that this will effectively force everybody to use deferred
+>> > probing?
 >>
->> I like the concept and novel approach.
->>
->>> This basically reuses the information that is already implicit in the probe()
->>> implementations, saving us from refactoring existing drivers or adding
->>> information to DTBs.
->>>
->>> Something I'm not completely happy with is that I have had to move the call to
->>> of_platform_populate after all platform drivers have been registered.
->>> Otherwise I don't see how I could register drivers on demand as we don't have
->>> yet each driver's compatible strings.
->>
->> Yeah, this is the opposite of what we'd really like.
+>> Guess it depends on the meaning of "using deferred probing". It will
+>> defer the probe of the first device to late_initcall (which will
+>> happen much earlier in time than before), but afterwards all built-in
+>> drivers will be available and depending on the order in which we try
+>> to probe devices, none may actually ask to defer its probe.
 >
-> Can you elaborate on the reasons why we would like to have devices
-> registered before built-in drivers finish registering, even if we
-> don't probe them yet?
+> So this will break things like the PNP system driver which relies on probing
+> stuff at the fs_initcall stage for correctness.  It may also break other
+> things with similar assumptions.
 
-My main thought was for modules we will almost always have devices
-appearing first. More generally, we can have devices and drivers
-coming or going at any point in time and should not put restrictions
-on ordering.
-
-Also, I think all the probe ordering and dependency tracking should be
-done within the driver core (i.e. dependencies are a list of struct
-devices). At some level it has to become firmware specific, but we
-want to minimize that part. I could be convinced otherwise and you
-have put more thought into this problem than I have.
-
->> Ideally, we would
->> have a solution that works for modules too. However, we're no worse
->> off. We pretty much build-in dependencies to avoid module ordering
->> problems.
->
-> Nod, I haven't looked yet at requesting modules on-demand, but I guess
-> it should be doable. Modules that have dependencies described in the
-> firmware should get them probed automatically already though.
->
->> Perhaps we need to make the probing on-demand rather than simply on
->> device<->driver match occurring.
->
-> I'm afraid that too much old code depends on that. For example, Rafael
-> pointed out to the PNP subsystem, which registers a driver that will
-> probe devices with the EISA ID PNP0c02 to reserve memory regions for
-> devices that will be probed later.
->
-> http://lxr.free-electrons.com/source/drivers/pnp/system.c
->
-> My understanding is that probing of PNP0c02 devices must happen before
-> the actual devices that depend on those regions are probed, so if we
-> decoupled the probing from the driver/device registration, we would be
-> breaking that assumption.
-
-That shouldn't matter as PNP matching is PNP specific. We already have
-different ways of matching with device/driver name or of_match_table
-for example. Changing how and when OF matching occurs would not affect
-PNP matching. We do matching on device and driver add currently. For
-the "when" part, we would need to add what I'll call async matching or
-deferred matching which in addition to matching on the of_match_table
-also matches on the dependency list having probed. Your last series
-essentially does this, but the difference is yours is not OF specific
-and I think it needs to be. I mean it is OF specific only in the
-aspect that matching already is. From a driver and subsystem
-standpoint, it should not be OF specific much like deferred probe is
-not OF specific, but in reality only occurs (currently) on OF probed
-drivers.
-
->>> For machs that don't move of_platform_populate() to a later point, these
->>> patches shouldn't cause any problems but it's not guaranteed that we'll avoid
->>> all the deferred probes as some drivers may not be registered yet.
->>
->> Ideally, of_platform_populate is not explicitly called by each
->> platform. So I think we need to make this work for the default case.
->
-> The problem is that some platforms will need fixing because some
-> initcalls assume that some devices will have been registered already,
-> or even probed. I think removing those assumptions shouldn't be
-> problematic because I haven't had much trouble with this on the four
-> platforms I have tested with, but I cannot test every board that is
-> supported upstream.
->
-> I can ask though the KernelCI folks to boot my branch in all their
-> boards and make sure that those work when of_platform_populate is
-> called in late_initcall.
-
-I'd imagine Kevin would be happy to. That is still a subset of h/w, so
-we'd need a way to disable any solution.
+Yes, but I think that this can be done for only OF based devices
+rather than globally for all platform devices and solve that problem.
+Matching is already dependent of the type of device.
 
 Rob
