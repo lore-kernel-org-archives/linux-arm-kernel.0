@@ -1,77 +1,47 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Tue, 23 Jun 2015 13:33:09 +0530
-Subject: [PATCH 7/8] cpufreq: st: Provide runtime initialised driver for
- ST's platforms
-In-Reply-To: <20150623071647.GD3245@x1>
-References: <1434987837-24212-1-git-send-email-lee.jones@linaro.org>
- <1434987837-24212-8-git-send-email-lee.jones@linaro.org>
- <20150623025031.GD16776@linux> <20150623071647.GD3245@x1>
-Message-ID: <20150623080309.GI16776@linux>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Tue, 23 Jun 2015 09:16:46 +0200
+Subject: [linux-sunxi] [PATCH 1/4] ARM: dts: sunxi: Add regulator-boot-on
+ to usb host port regulator nodes
+In-Reply-To: <5587C720.9040007@redhat.com>
+References: <1434814810-26285-1-git-send-email-hdegoede@redhat.com>
+ <1434814810-26285-2-git-send-email-hdegoede@redhat.com>
+ <CAGRGNgU7179K408=PekziP9ZzzG7+rvhm=e7TWjZk1UhkAnVZQ@mail.gmail.com>
+ <5587C720.9040007@redhat.com>
+Message-ID: <20150623071646.GL2266@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 23-06-15, 08:16, Lee Jones wrote:
-> Thanks for your timely review Viresh.
-
-Your welcome Lee :)
-
-> On Tue, 23 Jun 2015, Viresh Kumar wrote:
-> > On 22-06-15, 16:43, Lee Jones wrote:
-> > > +config ARM_ST_CPUFREQ
-> > > +	bool "ST CPUFreq support"
-> > 
-> > Isn't using ST just too generic? There are multiple SoCs ST has been
-> > involved with, I have worked on a completely different series.
-> > Probably a more relative string is required here, like stih407 ?
+On Mon, Jun 22, 2015 at 10:28:16AM +0200, Hans de Goede wrote:
+> Hi,
 > 
-> This is ST's only CPUFreq implementation and is pretty board
-> agnostic.  This particular driver only currently supports the STiH407
-> family, but internally it supports some others too.  I'll have a chat
-> and see if we can make it more specific somehow.
-
-So, SPEAr is also from ST. And it already have a driver for itself.
-
-> > > +	if (!ddata->dvfs_tab_count) {
-> > > +		dev_err(&pdev->dev, "No suitable AVS table found\n");
-> > 
-> > Why is this an error? I thought in this case you will go ahead with
-> > the normal OPP-table.
+> On 22-06-15 02:30, Julian Calaby wrote:
+> >Hi Hans,
+> >
+> >On Sun, Jun 21, 2015 at 1:40 AM, Hans de Goede <hdegoede@redhat.com> wrote:
+> >>u-boot will have turned on the power to the usb host ports, so mark them
+> >>as regulator-boot-on, this stops the power on the ports from temporarily
+> >>getting turned off during boot, causing issues with e.g. usb powered
+> >>harddisks.
+> >
+> >Stupid question: shouldn't u-boot set this property?
 > 
-> I've written it so it's an error within this function, as it makes the
-> function fail, but is downgraded by the caller to a warning and
-> gracefully bypassed to still allow frequency scaling.
+> We could make u-boot set this property but that will require a lot of code on
+> u-boot's side which is simply not there atm. And traditionally this property
+> is is simply a part of the dts files as shipped with the kernel.
 
-Not that, I was asking about the print. I thought we will still try to
-find OPP from the CPU node and a warning or a error might not be the
-right choice. You can surely add a debug print. Currently you are
-doing a dev_err() here, followed by a dev_warn() I think..
+What happens if the property is set but the regulator is not actually
+enabled?
 
-> > So you have added new OPPs here, but cpufreq-dt will try to add old
-> > OPPs. You must be getting lots of warnings ?
-> 
-> Yes, we recieve the 'duplicate OPPs detected' warning, but there is
-> nothing we can do about that.
-
-:)
-
-OPP-v2 will get that solved too..
-
-> > > +	if (ddata->substrate < 0)
-> > > +		goto set_default;
-> > 
-> > Maybe:
-> > 
-> > 	if (ddata->substrate >= 0)
-> >                 return;
-> 
-> 0 is a valid substrate value.
-
-I had >= in the comparison. Wasn't that right?
-And I was just suggesting that a single return can be used instead of
-
-if (xyz)
-        goto set_default;
-return;
+Maxime
 
 -- 
-viresh
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150623/87bae54c/attachment.sig>
