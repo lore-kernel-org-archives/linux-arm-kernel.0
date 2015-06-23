@@ -1,42 +1,38 @@
-From: zyw@rock-chips.com (Chris Zhong)
-Date: Tue, 23 Jun 2015 20:53:40 +0800
-Subject: [PATCH v3 2/2] ARM: rockchip: remove some useless macro in pm.h
-In-Reply-To: <1435064020-7057-1-git-send-email-zyw@rock-chips.com>
-References: <1435064020-7057-1-git-send-email-zyw@rock-chips.com>
-Message-ID: <1435064020-7057-3-git-send-email-zyw@rock-chips.com>
+From: rteysseyre@gmail.com (=?ISO-8859-1?Q?Rapha=EBl?= Teysseyre)
+Date: Tue, 23 Jun 2015 15:14:40 +0200
+Subject: [PATCH] gpio/xilinx: Use correct address when setting initial values.
+Message-ID: <1435065280.13545.6.camel@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-These are actually not used in the pm code, as we moved suspend handling
-to the clock driver, remove them here.
+>From 670209328307a198b80723a917957269a815fc32 Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?Rapha=C3=ABl=20Teysseyre?= <rteysseyre@gmail.com>
+Date: Tue, 23 Jun 2015 14:49:31 +0200
+Subject: [PATCH] gpio/xilinx: Use correct address when setting initial values.
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
 
-Signed-off-by: Chris Zhong <zyw@rock-chips.com>
-Reviewed-by: Douglas Anderson <dianders@chromium.org>
-
+Signed-off-by: Rapha?l Teysseyre <rteysseyre@gmail.com>
 ---
+ drivers/gpio/gpio-xilinx.c |    4 ++--
+ 1 files changed, 2 insertions(+), 2 deletions(-)
 
-Changes in v3: None
-
- arch/arm/mach-rockchip/pm.h | 7 -------
- 1 file changed, 7 deletions(-)
-
-diff --git a/arch/arm/mach-rockchip/pm.h b/arch/arm/mach-rockchip/pm.h
-index 3e8d39c..b6494c2 100644
---- a/arch/arm/mach-rockchip/pm.h
-+++ b/arch/arm/mach-rockchip/pm.h
-@@ -59,13 +59,6 @@ static inline void rockchip_suspend_init(void)
- #define SGRF_DAPDEVICEEN		BIT(0)
- #define SGRF_DAPDEVICEEN_WRITE		BIT(16)
+diff --git a/drivers/gpio/gpio-xilinx.c b/drivers/gpio/gpio-xilinx.c
+index 61243d1..e544b7a 100644
+--- a/drivers/gpio/gpio-xilinx.c
++++ b/drivers/gpio/gpio-xilinx.c
+@@ -220,9 +220,9 @@ static void xgpio_save_regs(struct of_mm_gpio_chip *mm_gc)
+ 	if (!chip->gpio_width[1])
+ 		return;
  
--#define RK3288_CRU_MODE_CON		0x50
--#define RK3288_CRU_SEL0_CON		0x60
--#define RK3288_CRU_SEL1_CON		0x64
--#define RK3288_CRU_SEL10_CON		0x88
--#define RK3288_CRU_SEL33_CON		0xe4
--#define RK3288_CRU_SEL37_CON		0xf4
--
- /* PMU_WAKEUP_CFG1 bits */
- #define PMU_ARMINT_WAKEUP_EN		BIT(0)
+-	xgpio_writereg(mm_gc->regs + XGPIO_DATA_OFFSET + XGPIO_TRI_OFFSET,
++	xgpio_writereg(mm_gc->regs + XGPIO_DATA_OFFSET + XGPIO_CHANNEL_OFFSET,
+ 		       chip->gpio_state[1]);
+-	xgpio_writereg(mm_gc->regs + XGPIO_TRI_OFFSET + XGPIO_TRI_OFFSET,
++	xgpio_writereg(mm_gc->regs + XGPIO_TRI_OFFSET + XGPIO_CHANNEL_OFFSET,
+ 		       chip->gpio_dir[1]);
+ }
  
 -- 
-1.9.1
+1.7.1
