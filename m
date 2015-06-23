@@ -1,84 +1,65 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Tue, 23 Jun 2015 09:24:40 +0900
-Subject: [PATCH 4/6] ARM: dts: Exynos4210: add CPU OPP and regulator supply
- property
-In-Reply-To: <55889E59.1070001@samsung.com>
-References: <'@samsung.com>
- <1428079429-4252-1-git-send-email-b.zolnierkie@samsung.com>
- <1428079429-4252-5-git-send-email-b.zolnierkie@samsung.com>
- <CAJKOXPfR5JS546YS3M-8orxO7+SxnzE06h2cyesExyt8Y9fVKw@mail.gmail.com>
- <CAJKOXPfdXV8qxR3AQEzQJTf6MojUN7Z=06ikxF8u5BuMihDfJQ@mail.gmail.com>
- <00f801d0ac8c$344dfeb0$9ce9fc10$@kernel.org> <558767FC.4090405@samsung.com>
- <011f01d0ac8d$40a25110$c1e6f330$@kernel.org>
- <20150622150421.9112.96812@quantum> <55889E59.1070001@samsung.com>
-Message-ID: <5588A748.2070407@samsung.com>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Tue, 23 Jun 2015 07:35:05 +0530
+Subject: [PATCH 0/6] cpufreq: use generic cpufreq drivers for Exynos4x12
+ platform
+In-Reply-To: <1428688742-15578-1-git-send-email-b.zolnierkie@samsung.com>
+References: <1428688742-15578-1-git-send-email-b.zolnierkie@samsung.com>
+Message-ID: <20150623020505.GA408@linux>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 23.06.2015 08:46, Krzysztof Kozlowski wrote:
-> On 23.06.2015 00:04, Michael Turquette wrote:
->> Quoting Kukjin Kim (2015-06-21 18:46:26)
->>> Krzysztof Kozlowski wrote:
->>>>
->>>> On 22.06.2015 10:38, Kukjin Kim wrote:
->>>>> Krzysztof Kozlowski wrote:
->>>>>> 2015-05-08 9:18 GMT+09:00 Krzysztof Kozlowski <k.kozlowski@samsung.com>:
->>>>>>> 2015-04-04 1:43 GMT+09:00 Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>:
->>>>>>>> From: Thomas Abraham <thomas.ab@samsung.com>
->>>>>>>>
->>>>>>>> For Exynos4210 platforms, add CPU operating points and CPU
->>>>>>>> regulator supply properties for migrating from Exynos specific
->>>>>>>> cpufreq driver to using generic cpufreq driver.
->>>>>>>>
->>>>>>>> Changes by Bartlomiej:
->>>>>>>> - removed Exynos5250 and Exynos5420 support for now
->>>>>>>>
->>>>>>>> Cc: Kukjin Kim <kgene.kim@samsung.com>
->>>>>>>> Cc: Doug Anderson <dianders@chromium.org>
->>>>>>>> Cc: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
->>>>>>>> Cc: Andreas Faerber <afaerber@suse.de>
->>>>>>>> Cc: Sachin Kamat <sachin.kamat@linaro.org>
->>>>>>>> Cc: Andreas Farber <afaerber@suse.de>
->>>>>>>> Cc: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
->>>>>>>> Signed-off-by: Thomas Abraham <thomas.ab@samsung.com>
->>>>>>>> Signed-off-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
->>>>>>>
->>>>>>> Acked-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
->>>>>>
->>>>>> Rebased and applied to my tree, I'll sent it later to Kukjin unless he
->>>>>> picks it by himself from LKML.
->>>>>>
->>>>> Hi, as far as I know, this is for v4.2 not v4.1 so it will be applied based on
->>>>> v4.2-rc1 after v4.2-rc1 release.
->>>>
->>>> You mean it is for v4.3, not v4.2?
->>>>
->>> Oops, yes v4.3.
->>>
->>> Thanks for the correction.
->>
->> Kukjin & Krzysztof,
->>
->> I'm confused on this point. I was planning to take patches 1, 2, 3, 5
->> and 6 towards 4.2 (e.g. in the pull request that I'll send out this
->> week).
->>
->> Is patch 4 going out for 4.2 or 4.3?
-> 
-> It is quite late for sending pull request to arm-soc for 4.2.
-> For example SoCFPGA pull request from last week was rejected:
-> http://comments.gmane.org/gmane.linux.ports.arm.kernel/417980
+Hi Bartlomiej,
 
-Oh, that was wrong link. Here it is:
-http://www.spinics.net/lists/arm-kernel/msg425911.html
+[Adding Rafael & Rob to cc list. Please don't forget for any PM
+specific patches :)]
 
-> If you want to take it for 4.2 then I am fine with it but this will
-> cause some easy but annoying conflicts. There aren't difficult - just
-> most of nodes in board DTS changed their place.
-> 
-> Example of resolution (target file after merge, with cpu nodes reordered
-> alphabetically):
-> https://github.com/krzk/linux/commit/2cec3cb48abaf44848c62f1c0836b772eb4680dd
+First of all, really sorry for missing this mail thread. Don't know
+how I missed it though. And please please please, do send a ping
+reminder (to me at least), if you think the mail thread is
+missed/ignored by the Maintainers.
 
-Best regards,
-Krzysztof
+Its been two months, and not a single reminder :).. And I wouldn't
+have seen this email if you wouldn't have pinged me on IRC ..
+
+On 10-04-15, 19:58, Bartlomiej Zolnierkiewicz wrote:
+> This patch series removes the use of Exynos4x12 specific support
+> from cpufreq-exynos driver and enables the use of cpufreq-dt driver
+> for this platform.
+
+Excellent.
+
+> In order to preserve support for Exynos4x12 'boost' mode cpufreq-dt
+> driver is made aware of 'boost' mode frequencies and boost-opps
+> binding is provided.
+
+That's good too..
+
+> boost-opps binding is currently limited to cpufreq-dt but once there is
+> a need for cpufreq wide and/or generic Linux device support for 'boost'
+> mode cpufreq-dt can be updated to handle the new code without changing
+> the binding itself.
+
+You already know that operating-points-v2 bindings are already
+accepted and applied by Rafael. Its not that the earlier bindings are
+discarded or obsolete now, but are only present for simple use cases.
+
+There are NO plans for extending the earlier OPP bindings Unless its
+really required. And what you are trying to do in cpufreq-dt's
+bindings, really belongs to OPP bindings.
+
+As the new bindings will be present in 4.2, getting the code (at least
+the basic code) for them into 4.3 wouldn't be that difficult. Anyway,
+your stuff isn't going out in 4.2 either and so you *shall* adopt
+to opp-v2 bindings in your next version.
+
+Migrating platforms to opp-v2 wouldn't be that difficult, mostly
+changes required only in dts files, unless you are using a driver of
+your own.
+
+I would be updating cpufreq-dt at the earlier to support basic
+features of opp-v2 for 4.3. Some code is already posted:
+
+http://permalink.gmane.org/gmane.linux.power-management.general/61326
+
+-- 
+viresh
