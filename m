@@ -1,61 +1,127 @@
-From: stefan.wahren@i2se.com (Stefan Wahren)
-Date: Tue, 23 Jun 2015 22:35:35 +0200 (CEST)
-Subject: [PATCH v6 4/9] nvmem: Add bindings for simple nvmem framework
-In-Reply-To: <1435014538-26308-1-git-send-email-srinivas.kandagatla@linaro.org>
-References: <1435014459-26138-1-git-send-email-srinivas.kandagatla@linaro.org>
- <1435014538-26308-1-git-send-email-srinivas.kandagatla@linaro.org>
-Message-ID: <1670081084.252423.1435091735127.JavaMail.open-xchange@oxbsltgw00.schlund.de>
+From: m.silentcreek@gmail.com (m.silentcreek at gmail.com)
+Date: Tue, 23 Jun 2015 13:39:23 -0700 (PDT)
+Subject: [PATCH] touchscreen: sun4i-ts: Really fix A10 temperature
+ reporting
+In-Reply-To: <5589B78C.4080600@redhat.com>
+References: <1425893870-28715-1-git-send-email-hdegoede@redhat.com>
+ <41a7a857-96fd-48ab-9778-127cfc091ef0@googlegroups.com>
+ <5589B78C.4080600@redhat.com>
+Message-ID: <33d3fc39-c232-4022-b7fb-47de84735987@googlegroups.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi,
 
-> Srinivas Kandagatla <srinivas.kandagatla@linaro.org> hat am 23. Juni 2015 um
-> 01:08 geschrieben:
->
->
-> This patch adds bindings for simple nvmem framework which allows nvmem
-> consumers to talk to nvmem providers to get access to nvmem cell data.
->
-> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-> [Maxime Ripard: intial version of eeprom framework]
-> Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
-> ---
-> Documentation/devicetree/bindings/nvmem/nvmem.txt | 85 +++++++++++++++++++++++
-> 1 file changed, 85 insertions(+)
-> create mode 100644 Documentation/devicetree/bindings/nvmem/nvmem.txt
->
-> diff --git a/Documentation/devicetree/bindings/nvmem/nvmem.txt
-> b/Documentation/devicetree/bindings/nvmem/nvmem.txt
-> new file mode 100644
-> index 0000000..d1a37e7
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/nvmem/nvmem.txt
-> @@ -0,0 +1,85 @@
-> += NVMEM(Non Volatile Memory) Data Device Tree Bindings =
-> +
-> +This binding is intended to represent the location of hardware
-> +configuration data stored in NVMEMs like eeprom, efuses and so on.
-> +
-> +On a significant proportion of boards, the manufacturer has stored
-> +some data on NVMEM, for the OS to be able to retrieve these information
-> +and act upon it. Obviously, the OS has to know about where to retrieve
-> +these data from, and where they are stored on the storage device.
-> +
-> +This document is here to document this.
-> +
-> += Data providers =
-> +Contains bindings specific to provider drivers and data cells as children
-> +of this node.
-> +
-> +Optional properties:
-> + read-only: Mark the provider as read only.
-> +
-> += Data cells =
-> +These are the child nodes of the provider which contain data cell
-> +information like offset and size in nvmem provider.
-> +
-> +Required properties:
-> +reg: specifies the offset in byte within that storage device, start bit
-> + in the byte and the length in bits of the data we care about.
+Am Dienstag, 23. Juni 2015 21:46:25 UTC+2 schrieb Hans de Goede:
+> Hi,
+> 
+> On 06/23/2015 05:06 PM, m.silentcreek at gmail.com wrote:
+> > Hi Hans,
+> >
+> > is it possible that this patch (and the parent commit "Input: sun4i-ts - allow controlling filter and sensitivity via DT") has quite an adversial effect on other boards than the ones tested?
+> >
+> > On my Lemaker Bananapi the temperature is now being reported as somwhere between -15?C to -10?C with the latest Kernel 4.1.0. These negative values are obviously way off. On Kernel 4.0.5 the temperature reading was usually around 40?C. While that might not have been accurate either, it was at least plausible.
+> 
+> The temperature curve for the A20 SoC was not changed, if it did change then
+> you're using an old dtb file with a new kernel, you must always update your
+> dtb file together with the kernel.
 
-Is the second parameter really in bits, not bytes?
+I always compile the dts that comes with the kernel tree from scratch. So this is up to date. I guess I have to dig in deeper then what caused that change. Any other hint where to look for?
+
+
+> 
+> 
+> 
+> >
+> > Given that there is no Documentation and things seem quite board-specific, I really don't know how this could be improved, so I can merely report my observation.
+> >
+> > Kind regards,
+> >
+> > Timo
+> >
+> >
+> > Am Montag, 9. M?rz 2015 10:38:02 UTC+1 schrieb Hans de Goede:
+> >> The commit titled:
+> >> "touchscreen: sun4i-ts: A10 (sun4i) has a different temperature curve"
+> >> contains a math error, the offset it uses is in degrees, but the actual code
+> >> applies the offset before multiplying by stepsize :|
+> >>
+> >> Given that this is rather backwards (every math course ever thought applies
+> >> the multiplication before the offset for linear functions), this commit
+> >> fixes things by changing the code applying the offset to do the logical
+> >> thing, adjusting the offset for the other models accordingly.
+> >>
+> >> This has been tested on an A10, A13, A20 and A31 to make sure everything really
+> >> is correct now.
+> >>
+> >> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+> >> ---
+> >> Note if possible this commit should be squashed into the original
+> >> "touchscreen: sun4i-ts: A10 (sun4i) has a different temperature curve"
+> >> commit as a fixup.
+> >> ---
+> >>   drivers/input/touchscreen/sun4i-ts.c | 14 +++++++-------
+> >>   1 file changed, 7 insertions(+), 7 deletions(-)
+> >>
+> >> diff --git a/drivers/input/touchscreen/sun4i-ts.c b/drivers/input/touchscreen/sun4i-ts.c
+> >> index 66ccd5a..178d2ef 100644
+> >> --- a/drivers/input/touchscreen/sun4i-ts.c
+> >> +++ b/drivers/input/touchscreen/sun4i-ts.c
+> >> @@ -193,7 +193,7 @@ static int sun4i_get_temp(const struct sun4i_ts_data *ts, long *temp)
+> >>   	if (ts->temp_data == -1)
+> >>   		return -EAGAIN;
+> >>
+> >> -	*temp = (ts->temp_data - ts->temp_offset) * ts->temp_step;
+> >> +	*temp = ts->temp_data * ts->temp_step - ts->temp_offset;
+> >>
+> >>   	return 0;
+> >>   }
+> >> @@ -255,17 +255,17 @@ static int sun4i_ts_probe(struct platform_device *pdev)
+> >>   	ts->ignore_fifo_data = true;
+> >>   	ts->temp_data = -1;
+> >>   	if (of_device_is_compatible(np, "allwinner,sun6i-a31-ts")) {
+> >> -		/* Allwinner SDK has temperature = -271 + (value / 6) (C) */
+> >> -		ts->temp_offset = 1626;
+> >> +		/* Allwinner SDK has temperature (C) = (value / 6) - 271 */
+> >> +		ts->temp_offset = 271000;
+> >>   		ts->temp_step = 167;
+> >>   	} else if (of_device_is_compatible(np, "allwinner,sun4i-a10-ts")) {
+> >>   		/*
+> >>   		 * The A10 temperature sensor has quite a wide spread, these
+> >>   		 * parameters are based on the averaging of the calibration
+> >>   		 * results of 4 completely different boards, with a spread of
+> >> -		 * temp_step from 96 - 170 and temp_offset from 1758 - 3310.
+> >> +		 * temp_step from 0.096 - 0.170 and temp_offset from 176 - 331.
+> >>   		 */
+> >> -		ts->temp_offset = 2570;
+> >> +		ts->temp_offset = 257000;
+> >>   		ts->temp_step = 133;
+> >>   	} else {
+> >>   		/*
+> >> @@ -273,13 +273,13 @@ static int sun4i_ts_probe(struct platform_device *pdev)
+> >>   		 * the temperature. The formula used here is from the AXP209,
+> >>   		 * which is designed by X-Powers, an affiliate of Allwinner:
+> >>   		 *
+> >> -		 *     temperature = -144.7 + (value * 0.1)
+> >> +		 *     temperature (C) = (value * 0.1) - 144.7
+> >>   		 *
+> >>   		 * Allwinner does not have any documentation whatsoever for
+> >>   		 * this hardware. Moreover, it is claimed that the sensor
+> >>   		 * is inaccurate and cannot work properly.
+> >>   		 */
+> >> -		ts->temp_offset = 1447;
+> >> +		ts->temp_offset = 144700;
+> >>   		ts->temp_step = 100;
+> >>   	}
+> >>
+> >> --
+> >> 2.3.1
+> >
+> 
+> Regards,
+> 
+> Hans
+
+Thanks,
+
+Timo
