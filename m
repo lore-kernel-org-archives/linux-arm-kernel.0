@@ -1,38 +1,39 @@
-From: mcoquelin.stm32@gmail.com (Maxime Coquelin)
-Date: Tue, 23 Jun 2015 11:24:26 +0200
-Subject: [PATCH v3 0/3] clk: stm32: Add clock driver for STM32F4[23]xxx
- devices
-In-Reply-To: <55891729.7070809@linaro.org>
-References: <1432327273-6810-1-git-send-email-daniel.thompson@linaro.org>
- <1433966978-24422-1-git-send-email-daniel.thompson@linaro.org>
- <20150622224832.GI22132@codeaurora.org>
- <55891729.7070809@linaro.org>
-Message-ID: <CALszF6Dw7hWATpjVvpxmitKWSJ458JXWOZFXMjudcW_jaNiZdw@mail.gmail.com>
+From: rnayak@codeaurora.org (Rajendra Nayak)
+Date: Tue, 23 Jun 2015 14:55:22 +0530
+Subject: [PATCH v6 7/9] nvmem: qfprom: Add bindings for qfprom
+In-Reply-To: <1435014570-26434-1-git-send-email-srinivas.kandagatla@linaro.org>
+References: <1435014459-26138-1-git-send-email-srinivas.kandagatla@linaro.org>
+ <1435014570-26434-1-git-send-email-srinivas.kandagatla@linaro.org>
+Message-ID: <55892602.2030809@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2015-06-23 10:22 GMT+02:00 Daniel Thompson <daniel.thompson@linaro.org>:
-> On 22/06/15 23:48, Stephen Boyd wrote:
->>
->> On 06/10, Daniel Thompson wrote:
->>>
->>> This patchset implements a clock driver for STM32F42xxx and STM32F43xxx
->>> series devices. It supports decoding the state configured by the
->>> bootloader (PLL, clock select, bus dividers) and all the gates clocks.
->>> It does not currently support the I2S and SAI PLLs.
->>>
->>> Relies on "Add support to STMicroeletronics STM32 family" v9 by Maxime
->>> Coquelin: http://thread.gmane.org/gmane.linux.kernel/1961049 .
->>>
->>
->> I applied 1 and 2. Looks like #3 should go through arm-soc at
->> some later time?
->
->
-> Agreed (that is also the patch that must be correctly ordered w.r.t.
-> Maxime's patches).
+[]..
 
-Indeed, I will take care of patch 3.
+> +Example:
+> +
+> +	qfprom: qfprom at 00700000 {
+> +		compatible 	= "qcom,qfprom";
+> +		reg		= <0x00700000 0x8000>;
+> +		...
+> +		/* Data cells */
+> +		tsens_calibration: calib at 404 {
+> +			reg = <0x4404 0x10>;
+> +		};
+> +	};
+> +
+> +
+> += Data consumers =
+> +Are device nodes which consume nvmem data cells.
+> +
+> +For example:
+> +
+> +	tsens {
+> +		...
+> +		nvmem-cell = <&tsens_calibration>;
 
-Thanks,
-Maxime
+Shouldn't this be nvmem-cells instead?
+
+> +		nvmem-cell-names = "calibration";
+> +	};
+>
