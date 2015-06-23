@@ -1,10 +1,10 @@
 From: stefan.wahren@i2se.com (Stefan Wahren)
-Date: Tue, 23 Jun 2015 22:28:50 +0200 (CEST)
-Subject: [PATCH v6 3/9] nvmem: Add nvmem_device based consumer apis.
-In-Reply-To: <1435014527-26265-1-git-send-email-srinivas.kandagatla@linaro.org>
+Date: Tue, 23 Jun 2015 22:35:35 +0200 (CEST)
+Subject: [PATCH v6 4/9] nvmem: Add bindings for simple nvmem framework
+In-Reply-To: <1435014538-26308-1-git-send-email-srinivas.kandagatla@linaro.org>
 References: <1435014459-26138-1-git-send-email-srinivas.kandagatla@linaro.org>
- <1435014527-26265-1-git-send-email-srinivas.kandagatla@linaro.org>
-Message-ID: <1344600420.252283.1435091331020.JavaMail.open-xchange@oxbsltgw00.schlund.de>
+ <1435014538-26308-1-git-send-email-srinivas.kandagatla@linaro.org>
+Message-ID: <1670081084.252423.1435091735127.JavaMail.open-xchange@oxbsltgw00.schlund.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -13,49 +13,49 @@ List-Id: linux-arm-kernel.lists.infradead.org
 > 01:08 geschrieben:
 >
 >
-> This patch adds read/write apis which are based on nvmem_device. It is
-> common that the drivers like omap cape manager or qcom cpr driver to
-> access bytes directly at particular offset in the eeprom and not from
-> nvmem cell info in DT. These driver would need to get access to the nvmem
-> directly, which is what these new APIS provide.
+> This patch adds bindings for simple nvmem framework which allows nvmem
+> consumers to talk to nvmem providers to get access to nvmem cell data.
 >
-> [...]
-> diff --git a/include/linux/nvmem-consumer.h b/include/linux/nvmem-consumer.h
-> index 123af62..f9acc43 100644
-> --- a/include/linux/nvmem-consumer.h
-> +++ b/include/linux/nvmem-consumer.h
-> @@ -15,6 +15,15 @@
-> struct device;
-> /* consumer cookie */
-> struct nvmem_cell;
-> +struct nvmem_device;
+> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> [Maxime Ripard: intial version of eeprom framework]
+> Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
+> ---
+> Documentation/devicetree/bindings/nvmem/nvmem.txt | 85 +++++++++++++++++++++++
+> 1 file changed, 85 insertions(+)
+> create mode 100644 Documentation/devicetree/bindings/nvmem/nvmem.txt
+>
+> diff --git a/Documentation/devicetree/bindings/nvmem/nvmem.txt
+> b/Documentation/devicetree/bindings/nvmem/nvmem.txt
+> new file mode 100644
+> index 0000000..d1a37e7
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/nvmem/nvmem.txt
+> @@ -0,0 +1,85 @@
+> += NVMEM(Non Volatile Memory) Data Device Tree Bindings =
 > +
-> +struct nvmem_cell_info {
-> + const char *name;
-> + int offset;
-> + int bytes;
-> + int bit_offset;
-> + int nbits;
-> +};
->
-> #if IS_ENABLED(CONFIG_NVMEM)
->
-> @@ -26,6 +35,21 @@ void devm_nvmem_cell_put(struct device *dev, struct
-> nvmem_cell *cell);
-> void *nvmem_cell_read(struct nvmem_cell *cell, ssize_t *len);
-> int nvmem_cell_write(struct nvmem_cell *cell, void *buf, ssize_t len);
->
-> +/* direct nvmem device read/write interface */
-> +struct nvmem_device *nvmem_device_get(struct device *dev, const char *name);
-> +struct nvmem_device *devm_nvmem_device_get(struct device *dev,
-> + const char *name);
-> +void nvmem_device_put(struct nvmem_device *nvmem);
-> +void devm_nvmem_device_put(struct device *dev, struct nvmem_device *nvmem);
-> +int nvmem_device_read(struct nvmem_device *nvmem, unsigned int offset,
-> + size_t bytes, void *buf);
-> +int nvmem_device_write(struct nvmem_device *nvmem, unsigned int offset,
-> + size_t bytes, void *buf);
+> +This binding is intended to represent the location of hardware
+> +configuration data stored in NVMEMs like eeprom, efuses and so on.
+> +
+> +On a significant proportion of boards, the manufacturer has stored
+> +some data on NVMEM, for the OS to be able to retrieve these information
+> +and act upon it. Obviously, the OS has to know about where to retrieve
+> +these data from, and where they are stored on the storage device.
+> +
+> +This document is here to document this.
+> +
+> += Data providers =
+> +Contains bindings specific to provider drivers and data cells as children
+> +of this node.
+> +
+> +Optional properties:
+> + read-only: Mark the provider as read only.
+> +
+> += Data cells =
+> +These are the child nodes of the provider which contain data cell
+> +information like offset and size in nvmem provider.
+> +
+> +Required properties:
+> +reg: specifies the offset in byte within that storage device, start bit
+> + in the byte and the length in bits of the data we care about.
 
-Maybe i mixed something but those functions use the datatype unsigned int for
-offset
-and the offset in the structs use datatype int. Looks a little bit inconsistent.
+Is the second parameter really in bits, not bytes?
