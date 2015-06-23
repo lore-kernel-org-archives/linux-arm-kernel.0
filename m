@@ -1,35 +1,22 @@
 From: festevam@gmail.com (Fabio Estevam)
-Date: Tue, 23 Jun 2015 13:32:24 -0300
-Subject: [PATCH] ARM: dts: imx6qdl-sabresd: Allow HDMI and LVDS to work
- simultaneously
-In-Reply-To: <1435076593.3155.30.camel@pengutronix.de>
-References: <1435075417-28708-1-git-send-email-fabio.estevam@freescale.com>
- <1435076593.3155.30.camel@pengutronix.de>
-Message-ID: <CAOMZO5DvURaPsCsksfU2BRPxVwHRi8=z+PJEd2Feuuxuco0+wg@mail.gmail.com>
+Date: Tue, 23 Jun 2015 13:41:46 -0300
+Subject: mx6 hdmi resolution behaviour
+Message-ID: <CAOMZO5AbC8PCo7J7ovw4izPBK08UkDgKGG++d+9xty4GJ0SzKQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Phillip,
+Hi,
 
-On Tue, Jun 23, 2015 at 1:23 PM, Philipp Zabel <p.zabel@pengutronix.de> wrote:
+On a imx6q-cubox-i running 4.1 kernel I am getting 1920x1080 HDMI
+resolution if I boot the board with the HDMI cable connected.
 
-> Please remember that on i.MX6QDL in general we can't change the LDB
-> clock parent without risking a breakdown in the divider:
->
-> http://lists.infradead.org/pipermail/linux-arm-kernel/2015-January/313618.html
-> http://lists.infradead.org/pipermail/linux-arm-kernel/2015-January/313619.html
-> http://lists.infradead.org/pipermail/linux-arm-kernel/2015-January/313620.html
+If I boot it without the HDMI cable and then connect it afterwards,
+the resolution goes to only 1024 x 768 and the following IPU message
+is seen:
 
-Yes, I am aware of this issue.
+[   16.310548] imx-ipuv3 2400000.ipu: videomode adapted for IPU restrictions
 
-However this patch does not make things worse with this respect.
-Instead of changing the LDB parent to PLL5 this patch changes to PLL3
-instead.
-
-> Has there been an erratum for this issue yet?
-
-I was told we should see it online within a few weeks. Hopefully we
-would be able to revisit your patch series after this happens.
+Shouldn't we get 1920x1080 in this case as well?
 
 Regards,
 
