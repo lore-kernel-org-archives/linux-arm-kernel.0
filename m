@@ -1,89 +1,59 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Tue, 23 Jun 2015 18:38:45 +0100
-Subject: [PATCH v2 6/9] irqchip / gic: Add stacked irqdomain support for
- ACPI based GICv2 init
-In-Reply-To: <5589772A.8070708@linaro.org>
-References: <1434703572-26221-1-git-send-email-hanjun.guo@linaro.org>
- <1434703572-26221-7-git-send-email-hanjun.guo@linaro.org>
- <20150622172014.GB26129@red-moon> <5589772A.8070708@linaro.org>
-Message-ID: <20150623173845.GC31466@red-moon>
+From: moritz.fischer@ettus.com (Moritz Fischer)
+Date: Tue, 23 Jun 2015 11:00:00 -0700
+Subject: [PATCHv5 0/2] Adding driver for Xilinx LogiCORE IP mailbox.
+Message-ID: <1435082402-29239-1-git-send-email-moritz.fischer@ettus.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 23, 2015 at 04:11:38PM +0100, Hanjun Guo wrote:
+This patchset adds mailbox framework integration for the Xilinx LogiCORE IP
+mailbox.  The Xilinx LogiCORE IP mailbox is a fpga softcore that allows
+interprocessor communication between AXI4 stream / memory mapped
+processors.
 
-[...]
+Changes from v4:
+- Have separate mbox_ops structs for polling / irq mode
+- Moved clk handling to startup / shutdown
+- Embedded struct mbox_chan in struct xilinx_mbox
+- Fixed mbox-cells in devicetree documentation
+- Misc stylistic issues
 
-> >> diff --git a/drivers/irqchip/irq-gic.c b/drivers/irqchip/irq-gic.c
-> >> index 8fc67bc..d1b2131 100644
-> >> --- a/drivers/irqchip/irq-gic.c
-> >> +++ b/drivers/irqchip/irq-gic.c
-> >> @@ -851,15 +851,22 @@ static struct notifier_block gic_cpu_notifier = {
-> >>   static int gic_irq_domain_alloc(struct irq_domain *domain, unsigned int virq,
-> >>   				unsigned int nr_irqs, void *arg)
-> >>   {
-> >> -	int i, ret;
-> >> +	int i;
-> >>   	irq_hw_number_t hwirq;
-> >> -	unsigned int type = IRQ_TYPE_NONE;
-> >> -	struct of_phandle_args *irq_data = arg;
-> >>
-> >> -	ret = gic_irq_domain_xlate(domain, irq_data->np, irq_data->args,
-> >> -				   irq_data->args_count, &hwirq, &type);
-> >> -	if (ret)
-> >> -		return ret;
-> >> +	if (domain->of_node) {	/* DT case */
-> >> +		int ret;
-> >> +		unsigned int type = IRQ_TYPE_NONE;
-> >> +		struct of_phandle_args *irq_data = arg;
-> >> +
-> >> +		ret = gic_irq_domain_xlate(domain, irq_data->np,
-> >> +					irq_data->args,
-> >> +					irq_data->args_count, &hwirq, &type);
-> >> +		if (ret)
-> >> +			return ret;
-> >> +	} else {	/* ACPI case */
-> >> +		hwirq = (irq_hw_number_t)*(u32 *)arg;
-> >> +	}
-> >
-> > If domain->of_node is NULL and system booted with DT the code above
-> > does not fail (and if it fails almost certainly that won't be graceful)
-> > but it should.
-> 
-> how about the following logic?
-> 
-> if (!domain->of_node && acpi_disabled)
-> 	return -ENODEV;
-> else if (domain->of_node)
-> 	dt related code;
-> else
-> 	ACPI related code;
+Changes from v3:
+- Stylistic changes
+- Changed reg size in dts to 0x100
 
-Code is not checking the node at present so:
+Changes from v2:
+- Fixed error condition for IRQ from >= 0 to > 0
+- Fixed clock enable
+- Cleaned up docs
 
-if (acpi_disabled)
-	dt code;
-else
-	ACPI code;
+Changes from v1:
+- Added common clock framework support
+- Deal with IRQs that happend before driver load,
+  since HW will not let us know about them when we enable IRQs
 
-would do, but that's a nit.
+Changes from v0:
+- Several stylistic issues
+- Dropped superfluous intr_mode member
+- Really masking the IRQs on mailbox_shutdown
+- No longer using polling by accident in non-IRQ mode
+- Swapped doc and driver commits
 
-> >>   	for (i = 0; i < nr_irqs; i++)
-> >>   		gic_irq_domain_map(domain, virq + i, hwirq + i);
-> >> @@ -945,11 +952,11 @@ void __init gic_init_bases(unsigned int gic_nr, int irq_start,
-> >>   		gic_irqs = 1020;
-> >>   	gic->gic_irqs = gic_irqs;
-> >>
-> >> -	if (node) {		/* DT case */
-> >> +	if (node || !acpi_disabled) {		/* DT or ACPI case */
-> >>   		gic->domain = irq_domain_add_linear(node, gic_irqs,
-> >>   						    &gic_irq_domain_hierarchy_ops,
-> >>   						    gic);
+Happy hacking,
 
-I think this is a bit more worrying, I mean passing a NULL node pointer to
-the irqdomain layer which basically means you are booting out of ACPI
-(for you, if that's true for the irq_domain_add_linear implementation
-that's another story), the node pointer should be optional but you
-need feedback from IRQ layer maintainers here.
+Moritz
 
-Lorenzo
+Moritz Fischer (2):
+  dts: Adding docs for Xilinx LogiCORE IP mailbox driver.
+  mailbox: Adding driver for Xilinx LogiCORE IP mailbox.
+
+ .../devicetree/bindings/mailbox/xilinx-mailbox.txt |  44 +++
+ MAINTAINERS                                        |   7 +
+ drivers/mailbox/Kconfig                            |   8 +
+ drivers/mailbox/Makefile                           |   2 +
+ drivers/mailbox/mailbox-xilinx.c                   | 375 +++++++++++++++++++++
+ 5 files changed, 436 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/mailbox/xilinx-mailbox.txt
+ create mode 100644 drivers/mailbox/mailbox-xilinx.c
+
+-- 
+2.4.2
