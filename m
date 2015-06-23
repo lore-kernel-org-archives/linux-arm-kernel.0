@@ -1,63 +1,45 @@
-From: tglx@linutronix.de (Thomas Gleixner)
-Date: Tue, 23 Jun 2015 11:29:13 +0200 (CEST)
-Subject: [PATCH v2 2/3] IRQ/Gic-V3: Change arm-gic-its to support the
- Mbigen interrupt
-In-Reply-To: <558920FF.8030405@huawei.com>
-References: <1434077399-32200-1-git-send-email-majun258@huawei.com>
- <1434077399-32200-3-git-send-email-majun258@huawei.com>
- <alpine.DEB.2.11.1506121230320.3786@nanos> <557E794D.2080705@huawei.com>
- <alpine.DEB.2.11.1506190150000.4107@nanos>
- <558920FF.8030405@huawei.com>
-Message-ID: <alpine.DEB.2.11.1506231125580.4037@nanos>
+From: johan@kernel.org (Johan Hovold)
+Date: Tue, 23 Jun 2015 12:09:18 +0200
+Subject: [PATCH v2 4/7] USB: mos7720: rename DCR
+In-Reply-To: <1434629873-11668-5-git-send-email-sudipm.mukherjee@gmail.com>
+References: <1434629873-11668-1-git-send-email-sudipm.mukherjee@gmail.com>
+ <1434629873-11668-5-git-send-email-sudipm.mukherjee@gmail.com>
+Message-ID: <20150623100918.GG28202@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 23 Jun 2015, majun (F) wrote:
-> ? 2015/6/19 7:52, Thomas Gleixner ??:
-> > On Mon, 15 Jun 2015, majun (F) wrote:
-> >> ? 2015/6/12 18:48, Thomas Gleixner ??:
-> >>> Can you please provide a proper description of this mbigen chip and
-> >>> explain WHY you think that it needs all this special hackery?
-> > 
-> > You carefully avoided to provide a proper description of this mbigen
-> > chip and how it needs to be integrated into the GIC/ITS whatever
-> > scenario.
-> > 
-> Mbigen means Message Based Interrupt Generator.
-> Its a kind of interrupt controller collects
-> the interrupts from external devices and generate msi interrupt.
+On Thu, Jun 18, 2015 at 05:47:50PM +0530, Sudip Mukherjee wrote:
+> While building with mn10300 it failed with:
+> error: expected identifier before '(' token
+>  #define __SYSREG(ADDR, TYPE) (*(volatile TYPE *)(ADDR))
+> note: in expansion of macro '__SYSREG'
+>  #define DCR   __SYSREG(0xc0000030, u16) /* Debug control register */
 > 
-> Mbigen is applied to reduce the number of wire connected interrupts.
+> mn10300 has a register named as DCR, so when this driver used an enum
+> named as DCR, build failed.
+> Just rename the DCR in the driver to parport_DCR.
 > 
-> As the peripherals increasing, the interrupts lines needed is increasing
-> much, especially on the Arm64 server soc.
+> Signed-off-by: Sudip Mukherjee <sudip@vectorindia.org>
+> ---
+>  drivers/usb/serial/mos7720.c | 16 ++++++++--------
+>  1 file changed, 8 insertions(+), 8 deletions(-)
 > 
-> Therefore, the interrupt pin in gic is not enought for so many perpherals.
-> 
-> Mbigen is designed to fix this problem.
-> 
-> Mbigen chip locates in ITS or outside of ITS.
-> 
-> The working flow of Mbigen shows as below:
-> 
-> external devices ------> MBIGEN ------->ITS
-> 
-> The devices connect to Mbigen chip through wire connecting way.
-> Mbigen detects and collectes the interrupts from the these devices.
-> 
-> Then, Mbigen generats the MBI interrupts by writting the ITS
-> Translator register.
+> diff --git a/drivers/usb/serial/mos7720.c b/drivers/usb/serial/mos7720.c
+> index 4f70df3..3263125 100644
+> --- a/drivers/usb/serial/mos7720.c
+> +++ b/drivers/usb/serial/mos7720.c
+> @@ -135,7 +135,7 @@ enum mos_regs {
+>  	DLM,
+>  	DPR,              /* parallel port regs */
+>  	DSR,
+> -	DCR,
+> +	parport_DCR,
+>  	ECR,
+>  	SP1_REG,          /* device control regs */
+>  	SP2_REG,          /* serial port 2 (7720 only) */
 
-So it's nothing else than a non PCI based MSI implementation which
-means it can simply use the generic MSI infrastructure and implement a
-interrupt domain/chip which implements the MBI specific parts and has
-the ITS as its parent domain.
-
-No hackery in ITS and no extra functionality in the core irq code. It
-just can use the existing infrastructure. The only extra you need is a
-proper way to retrieve the pointer to the ITS domain. Everything else
-just falls in place.
+Please use a MOS_ (or MOS7720_) prefix instead and add it to all the
+registers.
 
 Thanks,
-
-	tglx
+Johan
