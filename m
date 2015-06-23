@@ -1,39 +1,43 @@
-From: rnayak@codeaurora.org (Rajendra Nayak)
-Date: Tue, 23 Jun 2015 14:55:22 +0530
-Subject: [PATCH v6 7/9] nvmem: qfprom: Add bindings for qfprom
-In-Reply-To: <1435014570-26434-1-git-send-email-srinivas.kandagatla@linaro.org>
+From: pantelis.antoniou@konsulko.com (Pantelis Antoniou)
+Date: Tue, 23 Jun 2015 10:26:28 +0100
+Subject: [PATCH v6 1/9] nvmem: Add a simple NVMEM framework for nvmem
+ providers
+In-Reply-To: <1435035173.9808.35.camel@perches.com>
 References: <1435014459-26138-1-git-send-email-srinivas.kandagatla@linaro.org>
- <1435014570-26434-1-git-send-email-srinivas.kandagatla@linaro.org>
-Message-ID: <55892602.2030809@codeaurora.org>
+ <1435014507-26181-1-git-send-email-srinivas.kandagatla@linaro.org>
+ <1435035173.9808.35.camel@perches.com>
+Message-ID: <7BE8C921-180A-411D-A3C0-5D2A7AE3AB6A@konsulko.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[]..
+Hi Joe,
 
-> +Example:
-> +
-> +	qfprom: qfprom at 00700000 {
-> +		compatible 	= "qcom,qfprom";
-> +		reg		= <0x00700000 0x8000>;
-> +		...
-> +		/* Data cells */
-> +		tsens_calibration: calib at 404 {
-> +			reg = <0x4404 0x10>;
-> +		};
-> +	};
-> +
-> +
-> += Data consumers =
-> +Are device nodes which consume nvmem data cells.
-> +
-> +For example:
-> +
-> +	tsens {
-> +		...
-> +		nvmem-cell = <&tsens_calibration>;
+> On Jun 23, 2015, at 05:52 , Joe Perches <joe@perches.com> wrote:
+> 
+> On Tue, 2015-06-23 at 00:08 +0100, Srinivas Kandagatla wrote:
+>> This patch adds just providers part of the framework just to enable easy
+>> review.
+> []
+>> include/linux/nvmem-provider.h |  54 ++++++
+> 
+> Unless there are going to be users of nvmem-provider.h
+> outside of the drivers/nvmem directory, perhaps that
+> file (and nvmem-consumer.h) should be in drivers/nvmem/
+> 
+> 
 
-Shouldn't this be nvmem-cells instead?
+nvmem-consumer.h should be accessible from any driver, no?
 
-> +		nvmem-cell-names = "calibration";
-> +	};
->
+And unfortunately nvmem-provider should be accessible too.
+There are already eeprom drivers in the eeprom/misc directory that
+cannot be moved yet to drivers/nvmem (like at24).
+
+They need the provider definitions while they provide both the old
+style interface, and the new NVMEM based one.
+
+When we move them to the drivers/nvmem directory, then yes the
+provider header file should move there.
+
+Regards
+
+? Pantelis
