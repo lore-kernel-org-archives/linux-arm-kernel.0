@@ -1,185 +1,149 @@
-From: joshc@ni.com (Josh Cartwright)
-Date: Tue, 23 Jun 2015 13:51:10 -0500
-Subject: [PATCHv5 2/2] mailbox: Adding driver for Xilinx LogiCORE IP
- mailbox.
-In-Reply-To: <1435082402-29239-3-git-send-email-moritz.fischer@ettus.com>
-References: <1435082402-29239-1-git-send-email-moritz.fischer@ettus.com>
- <1435082402-29239-3-git-send-email-moritz.fischer@ettus.com>
-Message-ID: <20150623185110.GB9591@jcartwri.amer.corp.natinst.com>
+From: srinivas.kandagatla@linaro.org (Srinivas Kandagatla)
+Date: Tue, 23 Jun 2015 20:03:31 +0100
+Subject: [RFC PATCH v6 2/2] nvmem: Add Vybrid OCOTP and OCROM support
+In-Reply-To: <b4a52f6c229bdabbfe9d21c03cb04593dde33ec4.1435066190.git.maitysanchayan@gmail.com>
+References: <cover.1435066190.git.maitysanchayan@gmail.com>
+ <b4a52f6c229bdabbfe9d21c03cb04593dde33ec4.1435066190.git.maitysanchayan@gmail.com>
+Message-ID: <5589AD83.8050704@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hey Moritz-
+Hi Sanchayan,
 
-Just a couple more nits, nothing big.  Looks pretty clean!
 
-On Tue, Jun 23, 2015 at 11:00:02AM -0700, Moritz Fischer wrote:
-> The Xilinx LogiCORE IP mailbox is a FPGA core that allows for
-> interprocessor communication via AXI4 memory mapped / AXI4 stream
-> interfaces.
-> 
-> It is single channel per core and allows for transmit and receive.
-> 
-> Changes from v4:
-> - Have separate mbox_ops structs for polling / irq mode
-> - Moved clk handling to startup / shutdown
-> - Embedded struct mbox_chan in struct xilinx_mbox
-> - Misc stylistic issues
-> 
-> Changes from v3:
-> - Stylistic
-> 
-> Changes from v2:
-> - Fixed error handling for IRQ from >= 0 to > 0
-> - Fixed error handling for clock enabling
-> - Addressed Michal's stylistic comments
-> 
-> Changes from v1:
-> - Added common clock framework support
-> - Deal with IRQs that happend before driver load,
->   since HW will not let us know about them when we enable IRQs
-> 
-> Changes from v0:
-> - Several stylistic issues
-> - Dropped superfluous intr_mode member
-> - Really masking the IRQs on mailbox_shutdown
-> - No longer using polling by accident in non-IRQ mode
-> - Swapped doc and driver commits
-> 
-> Signed-off-by: Moritz Fischer <moritz.fischer@ettus.com>
-> Acked-by: Michal Simek <michal.simek@xilinx.com>
-> 
-> mailbox: Address some feedback, make ops const.
-> 
-> Signed-off-by: Moritz Fischer <moritz.fischer@ettus.com>
-> 
-> mailbox: xilinx-mailbox: Addressed more of Josh's feedback.
-> 
-> Signed-off-by: Moritz Fischer <moritz.fischer@ettus.com>
+On 23/06/15 14:44, Sanchayan Maity wrote:
+> The patch adds support for the On Chip One Time Programmable Peripheral
+> (OCOTP) and On Chip ROM (OCROM) support.
+>
+> On Vybrid OCOTP contain data like SoC ID, MAC address and OCROM has the
+> revision ID.
+>
+> Signed-off-by: Sanchayan Maity <maitysanchayan@gmail.com>
+> ---
+>   drivers/nvmem/Kconfig       | 11 +++++++++
+>   drivers/nvmem/Makefile      |  2 ++
+>   drivers/nvmem/vf610-ocotp.c | 60 +++++++++++++++++++++++++++++++++++++++++++++
+>   3 files changed, 73 insertions(+)
+>   create mode 100644 drivers/nvmem/vf610-ocotp.c
+>
 
-Did you intend for this intermediate history to exist?  Seems verbose,
-doesn't provide any meaningful detail?
+Fantastic! diff is already looking good, when compared to v5 patches,
+"drivers/soc/fsl/soc-vf610.c | 166 
++++++++++++++++++++++++++++++++++++++++++++"
 
-[..]
-> +++ b/drivers/mailbox/mailbox-xilinx.c
-[..]
-> +static int xilinx_mbox_poll_startup(struct mbox_chan *chan)
-> +{
-> +	struct xilinx_mbox *mbox = mbox_chan_to_xilinx_mbox(chan);
+I think, We could even do a better job by moving qfprom and this driver 
+to a simple-mmio-nvmem provider, see below comments.
+
+> diff --git a/drivers/nvmem/Kconfig b/drivers/nvmem/Kconfig
+> index 17f1a57..557c1e0 100644
+> --- a/drivers/nvmem/Kconfig
+> +++ b/drivers/nvmem/Kconfig
+> @@ -33,4 +33,15 @@ config NVMEM_SUNXI_SID
+>   	  This driver can also be built as a module. If so, the module
+>   	  will be called eeprom-sunxi-sid.
+>
+> +config NVMEM_VF610_OCOTP
+> +	tristate "VF610 SoCs OCOTP support"
+> +	depends on SOC_VF610
+> +	select REGMAP_MMIO
+> +	help
+> +	  This is a driver for the 'OCOTP' available on various Vybrid
+> +	  devices.
 > +
-> +	/* prep and enable the clock */
-
-Nit: Is this comment conveying anything useful?
-
-> +	clk_prepare_enable(mbox->clk);
+> +	  This driver can also be built as a module. If so, the module
+> +	  will be called nvmem-vf610-ocotp.
 > +
-> +	/* setup polling timer */
-
-Nit: Same here.
-
-> +	setup_timer(&mbox->rxpoll_timer, xilinx_mbox_poll_rx,
-> +		    (unsigned long)chan);
-
-setup_timer() could conceivably be done in probe().
-
-[..]
-> +static int xilinx_mbox_poll_send_data(struct mbox_chan *chan, void *data)
-> +{
-> +	struct xilinx_mbox *mbox = mbox_chan_to_xilinx_mbox(chan);
-> +	u32 *udata = data;
+>   endif
+> diff --git a/drivers/nvmem/Makefile b/drivers/nvmem/Makefile
+> index cc46791..a9ed113 100644
+> --- a/drivers/nvmem/Makefile
+> +++ b/drivers/nvmem/Makefile
+> @@ -11,3 +11,5 @@ obj-$(CONFIG_QCOM_QFPROM)	+= nvmem_qfprom.o
+>   nvmem_qfprom-y			:= qfprom.o
+>   obj-$(CONFIG_NVMEM_SUNXI_SID)	+= nvmem-sunxi-sid.o
+>   nvmem-sunxi-sid-y		:= sunxi-sid.o
+> +obj-$(CONFIG_NVMEM_VF610_OCOTP)	+= nvmem-vf610-ocotp.o
+> +nvmem-vf610-ocotp-y		:= vf610-ocotp.o
+> diff --git a/drivers/nvmem/vf610-ocotp.c b/drivers/nvmem/vf610-ocotp.c
+> new file mode 100644
+> index 0000000..d98772d
+> --- /dev/null
+> +++ b/drivers/nvmem/vf610-ocotp.c
+> @@ -0,0 +1,60 @@
+> +/*
+> + * Copyright (C) 2015 Sanchayan Maity <sanchayan.maity@toradex.com>
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 and
+> + * only version 2 as published by the Free Software Foundation.
+> + *
+> + * This program is distributed in the hope that it will be useful,
+> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + * GNU General Public License for more details.
+> + */
 > +
-> +	if (!mbox || !data)
-
-Nit: How could this happen?
-
-> +		return -EINVAL;
+> +#include <linux/module.h>
+> +#include <linux/of.h>
+> +#include "nvmem-mmio.h"
 > +
-> +	if (xilinx_mbox_full(mbox))
-> +		return -EBUSY;
-> +
-> +	writel_relaxed(*udata, mbox->mbox_base + MAILBOX_REG_WRDATA);
-> +
-> +	return 0;
-> +}
-[..]
-> +static struct mbox_chan_ops xilinx_mbox_irq_ops = {
+> +static struct regmap_config regmap_config = {
+> +	.reg_bits = 32,
+> +	.val_bits = 32,
+> +	.reg_stride = 4,
 
-const?
+Any particular reason why it cant support byte reads?
 
-> +	.send_data = xilinx_mbox_irq_send_data,
-> +	.startup = xilinx_mbox_irq_startup,
-> +	.shutdown = xilinx_mbox_irq_shutdown,
-> +	.last_tx_done = xilinx_mbox_last_tx_done,
-> +	.peek_data = xilinx_mbox_peek_data,
+This driver looks exactly same as qcom,qfprom driver, except the 
+regmap_config.
+
 > +};
 > +
-> +static struct mbox_chan_ops xilinx_mbox_poll_ops = {
-
-const?
-
-> +	.send_data = xilinx_mbox_poll_send_data,
-> +	.startup = xilinx_mbox_poll_startup,
-> +	.shutdown = xilinx_mbox_poll_shutdown,
-> +	.last_tx_done = xilinx_mbox_last_tx_done,
-> +	.peek_data = xilinx_mbox_peek_data,
+> +static struct nvmem_config ocotp_config = {
+> +	.name = "soc_id",
 > +};
+> +
+> +static struct nvmem_config rom_config = {
+> +	.name = "rom_rev",
+> +};
+> +
+> +static struct nvmem_mmio_data ocotp_data = {
+> +	.nvmem_config = &ocotp_config,
+> +	.regmap_config = &regmap_config,
+> +};
+> +
+> +static struct nvmem_mmio_data rom_data = {
+> +	.nvmem_config = &rom_config,
+> +	.regmap_config = &regmap_config,
+> +};
+> +
+> +static const struct of_device_id ocotp_of_match[] = {
+> +	{ .compatible = "fsl,vf610-ocotp", .data = &ocotp_data},
+> +	{ .compatible = "fsl,vf610-ocrom", .data = &rom_data},
+> +	{/* sentinel */},
+> +};
+> +MODULE_DEVICE_TABLE(of, ocotp_of_match);
+> +
+> +static struct platform_driver vf610_ocotp_driver = {
+> +	.probe = nvmem_mmio_probe,
+> +	.remove = nvmem_mmio_remove,
+> +	.driver = {
+> +		.name = "vf610-nvmem",
+> +		.of_match_table = ocotp_of_match,
+> +	},
+> +};
+> +module_platform_driver(vf610_ocotp_driver);
+> +MODULE_AUTHOR("Sanchayan Maity <sanchayan.maity@toradex.com>");
+> +MODULE_DESCRIPTION("Vybrid NVMEM driver");
+> +MODULE_LICENSE("GPL v2");
+>
 
-Splitting up the ops seemed to clean things up quite a bit!
 
-> +
-> +static int xilinx_mbox_probe(struct platform_device *pdev)
-> +{
-> +	struct xilinx_mbox *mbox;
-> +	struct resource	*regs;
-> +	int ret;
-> +
-> +	mbox = devm_kzalloc(&pdev->dev, sizeof(*mbox), GFP_KERNEL);
-> +	if (!mbox)
-> +		return -ENOMEM;
-> +
-> +	/* get clk and enable */
-> +	mbox->clk = devm_clk_get(&pdev->dev, "mbox");
-> +	if (IS_ERR(mbox->clk)) {
-> +		dev_err(&pdev->dev, "Couldn't get clk.\n");
-> +		return PTR_ERR(mbox->clk);
-> +	}
-> +
-> +	regs = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-> +
-> +	mbox->mbox_base = devm_ioremap_resource(&pdev->dev, regs);
-> +	if (IS_ERR(mbox->mbox_base))
-> +		return PTR_ERR(mbox->mbox_base);
-> +
-> +	mbox->irq = platform_get_irq(pdev, 0);
-> +	/* if irq is present, we can use it, otherwise, poll */
-> +	if (mbox->irq > 0) {
-> +		mbox->controller.txdone_irq = true;
-> +	} else {
-> +		dev_info(&pdev->dev, "IRQ not found, fallback to polling.\n");
-> +		mbox->controller.txdone_poll = true;
-> +		mbox->controller.txpoll_period = MBOX_POLLING_MS;
-> +	}
-> +
-> +	mbox->dev = &pdev->dev;
-> +
-> +	/* hardware supports only one channel. */
-> +	mbox->controller.dev = mbox->dev;
-> +	mbox->controller.num_chans = 1;
-> +	mbox->controller.chans = &mbox->chan;
-> +
-> +	if (mbox->irq > 0)
-> +		mbox->controller.ops = &xilinx_mbox_irq_ops;
-> +	else
-> +		mbox->controller.ops = &xilinx_mbox_poll_ops;
+I moved the nvmem_mmio to qfprom as I did not any other user for that in 
+v6 patches.
 
-Nit: you're already checking this above, seems like you can just move
-the .ops assignment there.
+Now that Vybrid can be another user I should probably put it back, or 
+may be I should create a simple-mmio-nvmem driver which both qcom,qfprom 
+and Vybrid can use.
 
-  Josh
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150623/003bd8b8/attachment.sig>
+--srini
