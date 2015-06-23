@@ -1,58 +1,50 @@
-From: daniel@ffwll.ch (Daniel Vetter)
-Date: Tue, 23 Jun 2015 23:26:40 +0200
-Subject: mx6 hdmi resolution behaviour
-In-Reply-To: <20150623205837.GE7557@n2100.arm.linux.org.uk>
-References: <CAOMZO5AbC8PCo7J7ovw4izPBK08UkDgKGG++d+9xty4GJ0SzKQ@mail.gmail.com>
- <20150623164443.GC7557@n2100.arm.linux.org.uk>
- <CAOMZO5BjuOGgqsUNG6K6N-QU1a4oWTdynxsoAECYLeQK_9Kk9g@mail.gmail.com>
- <20150623204154.GD7557@n2100.arm.linux.org.uk>
- <CAOMZO5CkxjtH7ZnOcbDWdwwwHH4xT4UhXXWpA3O9afbP9XRBaQ@mail.gmail.com>
- <20150623205837.GE7557@n2100.arm.linux.org.uk>
-Message-ID: <20150623212640.GS25769@phenom.ffwll.local>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 23 Jun 2015 22:48:18 +0100
+Subject: [PATCH 1/9] arm: select different compiler flags for ARM CortexM3
+In-Reply-To: <1435094387-20146-2-git-send-email-pawelo@king.net.pl>
+References: <1435094387-20146-1-git-send-email-pawelo@king.net.pl>
+ <1435094387-20146-2-git-send-email-pawelo@king.net.pl>
+Message-ID: <20150623214818.GF7557@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 23, 2015 at 09:58:37PM +0100, Russell King - ARM Linux wrote:
-> On Tue, Jun 23, 2015 at 05:48:51PM -0300, Fabio Estevam wrote:
-> > On Tue, Jun 23, 2015 at 5:41 PM, Russell King - ARM Linux
-> > <linux@arm.linux.org.uk> wrote:
-> > 
-> > > I've just tried this (the HBi1 was booted previously with the HDMI socket
-> > > disconnected).  Just now, I turned the TV on, and then connected it to
-> > > the HDMI.
-> > 
-> > Thanks for testing it.
-> > 
-> > > The TV reported a resolution of 1024x768, and the kernel log was silent.
-> > 
-> > That's the point that makes me confused: shouldn't it report a higher
-> > resolution like 1080p?
+On Tue, Jun 23, 2015 at 11:19:39PM +0200, Paul Osmialowski wrote:
+> This one is inspired by two commits published on Emcraft git repo:
 > 
-> No - it won't go higher than the initial mode that was set.  See
-> drm_fb_helper_hotplug_event():
+> https://github.com/EmcraftSystems/linux-emcraft.git
 > 
->         max_width = fb_helper->fb->width;
->         max_height = fb_helper->fb->height;
+> 1) 6302b692f570ff9d5645a6e72c11f87b0c1aa409
+>  RT #62654. Fixed kernel crashes while running httpd by enabling
+>  "-mfix-cortex-m3-ldrd" compiler option, which prevents compiler from
+>  generating code like 'ldrd Ra, Rb, [Ra, #Imm]' - according to the 602117
+>  Cortex-M3 Errata it may result in incorrect base register when interrupted
+>  or faulted.
 > 
->         drm_fb_helper_probe_connector_modes(fb_helper, max_width, max_height);
+> by: Yuri Tikhonov <yur@emcraft.com>
 > 
-> This calls connector->funcs->fill_modes with the max width/height,
-> which calls down into drm_helper_probe_single_connector_modes_merge_bits()
-> and there's limitations in there which means that we won't try to
-> increase the size of the framebuffer.
+> 2) 359d3cda84c01c0f3fae1a519b97a31f318f57ab
+>  RT #62654. Removed "--march=..." leaving only "-mcpu=cortex-m3" to make
+>  sure only the correct instructions will be generated.
 > 
-> You do get that behaviour if you have the X server running, and that's
-> all down to the X server itself doing that (reacting to the hotplug
-> event which DRM generates.)
+> by: Sergei Poselenov <sposelenov@emcraft.com>
+> 
+> I reworked these patches to make them less intrusive.
+> 
+> Signed-off-by: Paul Osmialowski <pawelo@king.net.pl>
 
-The initial fb allocated for fbdev emulation does indeed restrict what
-fbdev/con will show. But it should in now way affect the mode list (that's
-only the fbdev code doing the filtering there) or X. You should be able to
-list/set 1080p. Might be useful to figure out with drm.debug whether the
-mode was kicked out for some driver/hw restriction reason, that should get
-logged.
--Daniel
+NAK.
+
+The EFM32 code already added core support for Cortex-M3 cores, under
+the symbol CPU_V7M.  Rather than implementing a whole new set of
+Cortex-M3 support alongside the existing code, please work with the
+EFM32 maintainer (Uwe Kleine-K?nig) to come up with a common set of
+core changes that you can all agree on for Cortex-M3.
+
+Please also try to be a little smarter with whom you're sending your
+patches to, the Cc list looks to be excessively long - having soo many
+recipients on your message is a good way to get your message rejected
+by mailing lists as spam.
+
 -- 
-Daniel Vetter
-Software Engineer, Intel Corporation
-http://blog.ffwll.ch
+FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
+according to speedtest.net.
