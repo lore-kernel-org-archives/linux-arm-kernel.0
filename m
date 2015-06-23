@@ -1,101 +1,66 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Tue, 23 Jun 2015 09:27:59 +0100
+Date: Tue, 23 Jun 2015 09:28:57 +0100
 Subject: [PATCH 7/8] cpufreq: st: Provide runtime initialised driver for
  ST's platforms
-In-Reply-To: <20150623080309.GI16776@linux>
+In-Reply-To: <1435046411.4528.6.camel@tiscali.nl>
 References: <1434987837-24212-1-git-send-email-lee.jones@linaro.org>
  <1434987837-24212-8-git-send-email-lee.jones@linaro.org>
- <20150623025031.GD16776@linux> <20150623071647.GD3245@x1>
- <20150623080309.GI16776@linux>
-Message-ID: <20150623082759.GF3245@x1>
+ <1435046411.4528.6.camel@tiscali.nl>
+Message-ID: <20150623082857.GG3245@x1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 23 Jun 2015, Viresh Kumar wrote:
+On Tue, 23 Jun 2015, Paul Bolle wrote:
 
-> On 23-06-15, 08:16, Lee Jones wrote:
-> > Thanks for your timely review Viresh.
+> On Mon, 2015-06-22 at 16:43 +0100, Lee Jones wrote:
+> > --- a/drivers/cpufreq/Kconfig.arm
+> > +++ b/drivers/cpufreq/Kconfig.arm
+>  
+> > +config ARM_ST_CPUFREQ
+> > +> 	> bool "ST CPUFreq support"
+> > +> 	> depends on SOC_STIH407
+> > +> 	> help
+> > +> 	>   OPP list for cpufreq-dt driver can be provided through DT or can be
+> > +> 	>   created at runtime.  Select this if you want create OPP list at runtime.
 > 
-> Your welcome Lee :)
 > 
-> > On Tue, 23 Jun 2015, Viresh Kumar wrote:
-> > > On 22-06-15, 16:43, Lee Jones wrote:
-> > > > +config ARM_ST_CPUFREQ
-> > > > +	bool "ST CPUFreq support"
-> > > 
-> > > Isn't using ST just too generic? There are multiple SoCs ST has been
-> > > involved with, I have worked on a completely different series.
-> > > Probably a more relative string is required here, like stih407 ?
+> > --- a/drivers/cpufreq/Makefile
+> > +++ b/drivers/cpufreq/Makefile
+> 
+> > +obj-$(CONFIG_ARM_ST_CPUFREQ)		+= st-cpufreq.o
+> 
+> > --- /dev/null
+> > +++ b/drivers/cpufreq/st-cpufreq.c
+> 
+> > + * This program is free software; you can redistribute it and/or modify
+> > + * it under the terms of the GNU General Public License as published by
+> > + * the Free Software Foundation; either version 2 of the License, or
+> > + * (at your option) any later version.
+> 
+> > +#include <linux/module.h>
+> 
+> > +MODULE_DEVICE_TABLE(of, sti_cpufreq_of_match);
 > > 
-> > This is ST's only CPUFreq implementation and is pretty board
-> > agnostic.  This particular driver only currently supports the STiH407
-> > family, but internally it supports some others too.  I'll have a chat
-> > and see if we can make it more specific somehow.
+> > +module_platform_driver(sti_cpufreq);
 > 
-> So, SPEAr is also from ST. And it already have a driver for itself.
-
-Sure.  I will use STI as suggested by Maxime.
-
-> > > > +	if (!ddata->dvfs_tab_count) {
-> > > > +		dev_err(&pdev->dev, "No suitable AVS table found\n");
-> > > 
-> > > Why is this an error? I thought in this case you will go ahead with
-> > > the normal OPP-table.
 > > 
-> > I've written it so it's an error within this function, as it makes the
-> > function fail, but is downgraded by the caller to a warning and
-> > gracefully bypassed to still allow frequency scaling.
+> > +MODULE_AUTHOR("Ajitpal Singh <ajitpal.singh@st.com>");
+> > +MODULE_DESCRIPTION("Creates an OPP list for cpufreq-cpu0 at runtime");
+> > +MODULE_LICENSE("GPL v2");
 > 
-> Not that, I was asking about the print. I thought we will still try to
-> find OPP from the CPU node and a warning or a error might not be the
-> right choice. You can surely add a debug print. Currently you are
-> doing a dev_err() here, followed by a dev_warn() I think..
-
-Okay, but the reasoning is the same.  I consider the function to have
-failed, but the over-all failure culminates in just a warning that
-voltage scaling has indeed failed, but we can still go on with
-frequency scaling.
-
-Unless his is a big blocker for you, I would like to keep these
-semantics.
-
-> > > So you have added new OPPs here, but cpufreq-dt will try to add old
-> > > OPPs. You must be getting lots of warnings ?
-> > 
-> > Yes, we recieve the 'duplicate OPPs detected' warning, but there is
-> > nothing we can do about that.
 > 
-> :)
+> (There's a mismatch between the license used in the comment at the top
+> of this file and the ident used in the MODULE_LICENSE() macro. See
+> include/linux/module.h.)
 > 
-> OPP-v2 will get that solved too..
+> st-cpufreq.o can only be built-in. But the code contains of few lines
+> that are only useful if the code can be modular. Was ARM_ST_CPUFREQ
+> perhaps meant to be tristate?
 
-I'll take another look at them to see if there is anything we can
-use.
+All noted.  Will fix.  Thanks Paul.
 
-> > > > +	if (ddata->substrate < 0)
-> > > > +		goto set_default;
-> > > 
-> > > Maybe:
-> > > 
-> > > 	if (ddata->substrate >= 0)
-> > >                 return;
-> > 
-> > 0 is a valid substrate value.
-> 
-> I had >= in the comparison. Wasn't that right?
-
-Oh, you reversed the condition, I see now.
-
-> And I was just suggesting that a single return can be used instead of
-
-So technically you are correct, but it makes the code slightly more
-confusing IMHO.  Yes, it's one more line of code, but it's worth it to
-add clarity.
- 
-> if (xyz)
->         goto set_default;
-> return;
-> 
+BTW, do you have a script that does this now, or are you still
+hand-rolling these?
 
 -- 
 Lee Jones
