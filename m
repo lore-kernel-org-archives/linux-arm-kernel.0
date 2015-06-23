@@ -1,39 +1,104 @@
-From: daniel.thompson@linaro.org (Daniel Thompson)
-Date: Tue, 23 Jun 2015 09:25:17 +0100
-Subject: [PATCH v3 2/3] clk: stm32: Add clock driver for STM32F4[23]xxx
- devices
-In-Reply-To: <20150622232114.GK22132@codeaurora.org>
-References: <1432327273-6810-1-git-send-email-daniel.thompson@linaro.org>
- <1433966978-24422-1-git-send-email-daniel.thompson@linaro.org>
- <1433966978-24422-3-git-send-email-daniel.thompson@linaro.org>
- <20150622232114.GK22132@codeaurora.org>
-Message-ID: <558917ED.8080404@linaro.org>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Tue, 23 Jun 2015 09:27:59 +0100
+Subject: [PATCH 7/8] cpufreq: st: Provide runtime initialised driver for
+ ST's platforms
+In-Reply-To: <20150623080309.GI16776@linux>
+References: <1434987837-24212-1-git-send-email-lee.jones@linaro.org>
+ <1434987837-24212-8-git-send-email-lee.jones@linaro.org>
+ <20150623025031.GD16776@linux> <20150623071647.GD3245@x1>
+ <20150623080309.GI16776@linux>
+Message-ID: <20150623082759.GF3245@x1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 23/06/15 00:21, Stephen Boyd wrote:
-> On 06/10, Daniel Thompson wrote:
->> The driver supports decoding and statically modelling PLL state (i.e.
->> we inherit state from bootloader) and provides support for all
->> peripherals that support simple one-bit gated clocks. The covers all
->> peripherals whose clocks come from the AHB, APB1 or APB2 buses.
->>
->> It has been tested on an STM32F429I-Discovery board. The clock counts
->> for TIM2, USART1 and SYSTICK are all set correctly and the wall clock
->> looks OK when checked with a stopwatch. I have also tested a prototype
->> driver for the RNG hardware. The RNG clock is correctly enabled by the
->> framework (also did inverse test and proved that by changing DT to
->> configure the wrong clock bit then we observe the RNG driver to fail).
->>
->> Signed-off-by: Daniel Thompson <daniel.thompson@linaro.org>
->> Reviewed-by: Maxime Coquelin <mcoquelin.stm32@gmail.com>
->
-> I also squashed in some sparse fixes. Please check.
+On Tue, 23 Jun 2015, Viresh Kumar wrote:
 
-That was extremely generous! Thanks.
+> On 23-06-15, 08:16, Lee Jones wrote:
+> > Thanks for your timely review Viresh.
+> 
+> Your welcome Lee :)
+> 
+> > On Tue, 23 Jun 2015, Viresh Kumar wrote:
+> > > On 22-06-15, 16:43, Lee Jones wrote:
+> > > > +config ARM_ST_CPUFREQ
+> > > > +	bool "ST CPUFreq support"
+> > > 
+> > > Isn't using ST just too generic? There are multiple SoCs ST has been
+> > > involved with, I have worked on a completely different series.
+> > > Probably a more relative string is required here, like stih407 ?
+> > 
+> > This is ST's only CPUFreq implementation and is pretty board
+> > agnostic.  This particular driver only currently supports the STiH407
+> > family, but internally it supports some others too.  I'll have a chat
+> > and see if we can make it more specific somehow.
+> 
+> So, SPEAr is also from ST. And it already have a driver for itself.
 
-The changes all eyeball OK but I'll double check things tonight just in 
-case.
+Sure.  I will use STI as suggested by Maxime.
 
+> > > > +	if (!ddata->dvfs_tab_count) {
+> > > > +		dev_err(&pdev->dev, "No suitable AVS table found\n");
+> > > 
+> > > Why is this an error? I thought in this case you will go ahead with
+> > > the normal OPP-table.
+> > 
+> > I've written it so it's an error within this function, as it makes the
+> > function fail, but is downgraded by the caller to a warning and
+> > gracefully bypassed to still allow frequency scaling.
+> 
+> Not that, I was asking about the print. I thought we will still try to
+> find OPP from the CPU node and a warning or a error might not be the
+> right choice. You can surely add a debug print. Currently you are
+> doing a dev_err() here, followed by a dev_warn() I think..
 
-Daniel.
+Okay, but the reasoning is the same.  I consider the function to have
+failed, but the over-all failure culminates in just a warning that
+voltage scaling has indeed failed, but we can still go on with
+frequency scaling.
+
+Unless his is a big blocker for you, I would like to keep these
+semantics.
+
+> > > So you have added new OPPs here, but cpufreq-dt will try to add old
+> > > OPPs. You must be getting lots of warnings ?
+> > 
+> > Yes, we recieve the 'duplicate OPPs detected' warning, but there is
+> > nothing we can do about that.
+> 
+> :)
+> 
+> OPP-v2 will get that solved too..
+
+I'll take another look at them to see if there is anything we can
+use.
+
+> > > > +	if (ddata->substrate < 0)
+> > > > +		goto set_default;
+> > > 
+> > > Maybe:
+> > > 
+> > > 	if (ddata->substrate >= 0)
+> > >                 return;
+> > 
+> > 0 is a valid substrate value.
+> 
+> I had >= in the comparison. Wasn't that right?
+
+Oh, you reversed the condition, I see now.
+
+> And I was just suggesting that a single return can be used instead of
+
+So technically you are correct, but it makes the code slightly more
+confusing IMHO.  Yes, it's one more line of code, but it's worth it to
+add clarity.
+ 
+> if (xyz)
+>         goto set_default;
+> return;
+> 
+
+-- 
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
