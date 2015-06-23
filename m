@@ -1,47 +1,47 @@
-From: Nathan_Lynch@mentor.com (Nathan Lynch)
-Date: Tue, 23 Jun 2015 10:16:15 -0500
-Subject: build failure with VDSO on non-glibc based systems
-In-Reply-To: <55893659.80607@arm.com>
-References: <55893659.80607@arm.com>
-Message-ID: <5589783F.6040605@mentor.com>
+From: ankgupta@codeaurora.org (Ankit Gupta)
+Date: Tue, 23 Jun 2015 09:16:39 -0600
+Subject: [PATCH v2] trace/events: add chip name and hwirq to irq entry
+ tracepoint
+In-Reply-To: <alpine.DEB.2.11.1506231024250.4037@nanos>
+References: <1435014310-2080-1-git-send-email-ankgupta@codeaurora.org>
+ <alpine.DEB.2.11.1506231024250.4037@nanos>
+Message-ID: <f4fcf5e480035d355525306fc8743bac.squirrel@www.codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/23/2015 05:35 AM, Szabolcs Nagy wrote:
-> if the host toolchain is not glibc based then the arm kernel build fails with
-> 
->  arch/arm/vdso/vdsomunge.c:53:19: fatal error: error.h: No such file or directory
-> 
-> error.h is a glibc only header (ie not available in musl, newlib and bsd libcs).
+> On Mon, 22 Jun 2015, Ankit Gupta wrote:
+>
+>> Add chip name and hw-irq number to the trace_irq_handler_entry()
+>> tracepoint. When tracing interrupt events the chip-name and hw-irq
+>> numbers are stable and known in advance. This makes them a better
+>> choice as a filtering criteria for the trace buffer dump. On the
+>> flipside, the os-irq numbers are dynamically allocated which makes
+>> them difficult to use for the same purpose.
+>>
+>> Dump messages will look like:
+>> ...irq_handler_entry: irq=22 name=msm_serial0 domain=GIC hwirq=140
 
-Thanks for the report and the patch.  I agree it is inappropriate to
-unnecessarily depend on glibc features in host programs.
+>
+> I can't see the domain name being captured/printed in the code below.
+>
+>> -	TP_printk("irq=%d name=%s", __entry->irq, __get_str(name))
+>> +	TP_printk("irq=%d name=%s chip_name=%s hwirq=%ld", __entry->irq,
+>> +	  __get_str(name), show_chip_name(__entry->irq),
+>> +	  show_hwirq(__entry->irq))
+>>  );
 
+Thanks Thomas for your comment. Its actually printing a chipname and not
+the domain. Will correct the dump message in the next patch. It will print
+as follow.
+...irq_handler_entry: irq=22 name=msm_serial0 Chip=GIC hwirq=140
 
-> i attached a patch that fixes the build failure for me.
-
-A few issues with the patch prevent me from accepting it as-is.
-
-The patch lacks the required Signed-off-by: line; see part 11 in
-Documentation/SubmittingPatches.
-
-The body of your email would suffice as the commit log; please include
-it in the patch itself.
-
-
->  
-> +#define fail(...) ( \
-> +	failed = 1, \
-> +	fprintf(stderr, "%s: ", argv0), \
-> +	fprintf(stderr, __VA_ARGS__), \
-> +	exit(EXIT_FAILURE))
-> +
-
-It would be more in keeping with Linux coding style to write this as a
-do { ... } while (0) block (Chapter 12 of Documentation/CodingStyle).
-
-Writing it as a function, if possible, would be best.
-
-Please attend to these issues and resubmit.  Alternatively, I have a
-musl installation I can test with and develop an equivalent fix
-(crediting you with the initial report, of course).
+>
+> Thanks,
+>
+> 	tglx
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-arm-msm"
+> in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+>
