@@ -1,53 +1,41 @@
-From: rogerq@ti.com (Roger Quadros)
-Date: Wed, 24 Jun 2015 13:58:09 +0300
-Subject: [PATCH 04/17] phy: omap-usb2: use omap_usb_power_off to power
- off the PHY during probe
-In-Reply-To: <1435060743-5511-5-git-send-email-kishon@ti.com>
-References: <1435060743-5511-1-git-send-email-kishon@ti.com>
- <1435060743-5511-5-git-send-email-kishon@ti.com>
-Message-ID: <20150624135809.ccf19caf000c0213dd9ff45c@ti.com>
+From: djkurtz@chromium.org (Daniel Kurtz)
+Date: Wed, 24 Jun 2015 19:00:42 +0800
+Subject: [PATCH v2 2/2] arm64: dts: mt8173: Add I2C device node
+In-Reply-To: <5279457.I1q8kC8mJN@ubix>
+References: <1433164107-26568-1-git-send-email-eddie.huang@mediatek.com>
+ <1433164107-26568-3-git-send-email-eddie.huang@mediatek.com>
+ <5279457.I1q8kC8mJN@ubix>
+Message-ID: <CAGS+omC0n1eADRCy58a4C=w9LikPvQv=bHopNTE1XXW3h7zRLA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 23 Jun 2015 17:28:49 +0530
-Kishon Vijay Abraham I <kishon@ti.com> wrote:
+Hi Matthias,
 
-> No functional change. Previously omap_control_phy_power() was used to power
-> off the PHY during probe. But once phy-omap-usb2 driver is adapted to
-> use syscon, omap_control_phy_power() cannot be used. Hence used
-> omap_usb_power_off to power off the PHY.
-> 
-> Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
+On Wed, Jun 24, 2015 at 4:04 AM, Matthias Brugger
+<matthias.bgg@gmail.com> wrote:
+> On Monday, June 01, 2015 09:08:27 PM Eddie Huang wrote:
+>> Add MT8173 I2C device nodes, include I2C controllers and pins.
+>> MT8173 has six I2C controllers, from i2c0 to i2c6, exclude i2c5.
+>> The 6th I2C controller register base doesn't next to 5th I2C,
+>> and there is a hardware between 5th and 6th I2C controller. So
+>> SoC designer name 6th controller as "i2c6", not "i2c5".
+>>
+>> Signed-off-by: Eddie Huang <eddie.huang@mediatek.com>
+>> ---
+>
+> applied to v4.2-next/arm64
 
-Acked-by: Roger Quadros <rogerq@ti.com>
+It looks like [0] has the pinctrl changes, but lost the actual i2c nodes.
 
-cheers,
--roger
+[0] https://github.com/mbgg/linux-mediatek/commit/0afbf26eda52831560e9f60427751ab8b2641eef
 
-> ---
->  drivers/phy/phy-omap-usb2.c |    2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/drivers/phy/phy-omap-usb2.c b/drivers/phy/phy-omap-usb2.c
-> index c1a4686..b5c266a 100644
-> --- a/drivers/phy/phy-omap-usb2.c
-> +++ b/drivers/phy/phy-omap-usb2.c
-> @@ -241,7 +241,6 @@ static int omap_usb2_probe(struct platform_device *pdev)
->  	}
->  
->  	phy->control_dev = &control_pdev->dev;
-> -	omap_control_phy_power(phy->control_dev, 0);
->  
->  	otg->set_host		= omap_usb_set_host;
->  	otg->set_peripheral	= omap_usb_set_peripheral;
-> @@ -261,6 +260,7 @@ static int omap_usb2_probe(struct platform_device *pdev)
->  	}
->  
->  	phy_set_drvdata(generic_phy, phy);
-> +	omap_usb_power_off(generic_phy);
->  
->  	phy_provider = devm_of_phy_provider_register(phy->dev,
->  			of_phy_simple_xlate);
-> -- 
-> 1.7.9.5
-> 
+Thanks,
+-Dan
+
+>
+> Thanks.
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> Please read the FAQ at  http://www.tux.org/lkml/
