@@ -1,68 +1,71 @@
-From: sr@denx.de (Stefan Roese)
-Date: Wed, 24 Jun 2015 14:12:42 +0200
-Subject: mvebu: Problem booting Armada XP with mainline U-Boot
-Message-ID: <558A9EBA.9000902@denx.de>
+From: rogerq@ti.com (Roger Quadros)
+Date: Wed, 24 Jun 2015 15:12:57 +0300
+Subject: [PATCH 09/17] ARM: dts: dra7: Use "syscon-phy-power" instead of
+ "ctrl-module" in SATA PHY node
+In-Reply-To: <20150624150602.0e73fc8f9dda1624f22059db@ti.com>
+References: <1435060743-5511-1-git-send-email-kishon@ti.com>
+ <1435060743-5511-10-git-send-email-kishon@ti.com>
+ <20150624150602.0e73fc8f9dda1624f22059db@ti.com>
+Message-ID: <20150624151257.fe5f1594db1afe4c1da8027d@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi!
+On Wed, 24 Jun 2015 15:06:02 +0300
+Roger Quadros <rogerq@ti.com> wrote:
 
-I'm currently testing Linux booting from mainline U-Boot (full version
-with DDR training integrated as SPL - no bin_hdr) on the Marvell
-Armada XP Development Board DB-MV784MP-GP. And this results in 
-(at least) those 2 problems:
+> On Tue, 23 Jun 2015 17:28:54 +0530
+> Kishon Vijay Abraham I <kishon@ti.com> wrote:
+> 
+> > Add "syscon-phy-power" property and remove the deprecated "ctrl-module"
+> > property from SATA PHY node. Since "omap_control_sata" note is no longer
+> > used, remove it.
+> > 
+> > Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
+> 
+> Acked-by: Roger Quadros <rogerq@ti.com>
 
-a) Secondary CPU(s) fail to come online:
+One comment though.
 
-...
-[    0.130692] CPU: Testing write buffer coherency: ok
-[    0.135785] CPU0: thread -1, cpu 0, socket 0, mpidr 80000000
-[    0.141892] Setting up static identity map for 0x82c0 - 0x8318
-[    0.148013] mvebu-soc-id: MVEBU SoC ID=0x7846, Rev=0x2
-[    0.153357] mvebu-pmsu: Initializing Power Management Service Unit
-[    0.160323] Booting CPU 1
-[    1.158867] CPU1: failed to come online
-[    1.162960] Booting CPU 2
-[    2.158866] CPU2: failed to come online
-[    2.162954] Booting CPU 3
-[    3.158865] CPU3: failed to come online
-[    3.162810] Brought up 1 CPUs
-[    3.165870] SMP: Total of 1 processors activated (1594.16 BogoMIPS).
-[    3.172329] CPU: All CPU(s) started in SVC mode.
-...
+> 
+> > ---
+> >  arch/arm/boot/dts/dra7.dtsi |   10 +---------
+> >  1 file changed, 1 insertion(+), 9 deletions(-)
+> > 
+> > diff --git a/arch/arm/boot/dts/dra7.dtsi b/arch/arm/boot/dts/dra7.dtsi
+> > index 3f434f7..92e0741 100644
+> > --- a/arch/arm/boot/dts/dra7.dtsi
+> > +++ b/arch/arm/boot/dts/dra7.dtsi
+> > @@ -1115,14 +1115,6 @@
+> >  			status = "disabled";
+> >  		};
+> >  
+> > -		omap_control_sata: control-phy at 4a002374 {
+> > -			compatible = "ti,control-phy-pipe3";
+> > -			reg = <0x4a002374 0x4>;
+> > -			reg-names = "power";
+> > -			clocks = <&sys_clkin1>;
+> > -			clock-names = "sysclk";
+> > -		};
+> > -
+> >  		/* OCP2SCP3 */
+> >  		ocp2scp at 4a090000 {
+> >  			compatible = "ti,omap-ocp2scp";
+> > @@ -1137,7 +1129,7 @@
+> >  				      <0x4A096400 0x64>, /* phy_tx */
+> >  				      <0x4A096800 0x40>; /* pll_ctrl */
+> >  				reg-names = "phy_rx", "phy_tx", "pll_ctrl";
+> > -				ctrl-module = <&omap_control_sata>;
+> > +				syscon-phy-power = <&dra7_ctrl_core 0x374>;
 
-b) Booting hangs completely while/after loading some device drivers:
+why can't we use scm_conf instead of dra7_ctrl_core?
+dra7_ctrl_core seems to be redundant and wrongly placed.
 
-...
-[    4.031651] ehci_hcd: USB 2.0 'Enhanced' Host Controller (EHCI) Driver
-[    4.038209] ehci-pci: EHCI PCI platform driver
-[    4.042694] ehci-orion: EHCI orion driver
-[    4.046784] orion-ehci f1050000.usb: EHCI Host Controller
-[    4.052207] orion-ehci f1050000.usb: new USB bus registered, assigned bus number 1
-[    4.059851] orion-ehci f1050000.usb: irq 27, io mem 0xf1050000
+> >  				clocks = <&sys_clkin1>, <&sata_ref_clk>;
+> >  				clock-names = "sysclk", "refclk";
+> >  				syscon-pllreset = <&dra7_ctrl_core 0x3fc>;
+> > -- 
+> > 1.7.9.5
+> > 
 
-Disabling USB results in this hangup :
-
-...
-[    4.076795] Registering SWP/SWPB emulation handler
-[    4.082575] rtc-mv f1010300.rtc: setting system clock to 2013-01-01 13:27:46 UTC (1357046866)
-
-etc...
-
-This happens with v4.1 and v4.0.5. Please find the complete boot
-log attached.
-
-Any ideas why those problems might occur with mainline U-Boot?
-Most likely some register setup is missing that is usually done
-in bin_hdr. Where could I check / test for this CPU online
-problem?
-
-Thanks,
-Stefan
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: linux-boot.log
-Type: text/x-log
-Size: 12484 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150624/0c5e7993/attachment.bin>
+cheers,
+-roger
