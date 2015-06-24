@@ -1,61 +1,77 @@
-From: rogerq@ti.com (Roger Quadros)
-Date: Wed, 24 Jun 2015 15:02:22 +0300
-Subject: [PATCH 17/17] ARM: dts: omap4: Use "syscon-otghs" instead of
- "ctrl-module" in USB node
-In-Reply-To: <20150624104116.GC4156@atomide.com>
-References: <1435060743-5511-1-git-send-email-kishon@ti.com>
- <1435060743-5511-18-git-send-email-kishon@ti.com>
- <20150624104116.GC4156@atomide.com>
-Message-ID: <20150624150222.98f9bfec890438c67e4d52eb@ti.com>
+From: vaibhav.hiremath@linaro.org (Vaibhav Hiremath)
+Date: Wed, 24 Jun 2015 17:34:23 +0530
+Subject: Use of pinctrl-single for external device over I2C
+In-Reply-To: <55893B2C.1070800@linaro.org>
+References: <55893B2C.1070800@linaro.org>
+Message-ID: <558A9CC7.6070409@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 24 Jun 2015 03:41:16 -0700
-Tony Lindgren <tony@atomide.com> wrote:
 
-> * Kishon Vijay Abraham I <kishon@ti.com> [150623 05:02]:
-> > --- a/arch/arm/boot/dts/omap4.dtsi
-> > +++ b/arch/arm/boot/dts/omap4.dtsi
-> > @@ -852,12 +852,6 @@
-> >  			};
-> >  		};
-> >  
-> > -		omap_control_usbotg: control-phy at 4a00233c {
-> > -			compatible = "ti,control-phy-otghs";
-> > -			reg = <0x4a00233c 0x4>;
-> > -			reg-names = "otghs_control";
-> > -		};
-> > -
-> >  		usb_otg_hs: usb_otg_hs at 4a0ab000 {
-> >  			compatible = "ti,omap4-musb";
-> >  			reg = <0x4a0ab000 0x7ff>;
-> > @@ -870,7 +864,7 @@
-> >  			multipoint = <1>;
-> >  			num-eps = <16>;
-> >  			ram-bits = <12>;
-> > -			ctrl-module = <&omap_control_usbotg>;
-> > +			syscon-otghs = <&scm_conf 0x33c>;
-> >  		};
-> >  
-> >  		aes: aes at 4b501000 {
-> 
-> We should still keep a separate entry for the phy in the dtsi
-> files. And the phy should be a child of the scm_conf area in the
-> dtsi file.
 
-The PHY already has a separate entry with its own set of registers.
-Just that some bits have been shoved into the control module space
-not only for PHY but for other modules as well like DSS, DCAN, etc.
+On Tuesday 23 June 2015 04:25 PM, Vaibhav Hiremath wrote:
+> Hi,
 
-> 
-> This is because the scm and usb_otg_hs are separate devices and
-> can be clocked separately. So the phy driver needs to be a
-> separate driver to avoid spaghetti code and issues with clocking.
++ linux-arm-kernel & MFD
 
-for the PHY register space this is already done.
-
-But for the register bits that lie in control module space isn't that
-taken care by syscon driver?
-
-cheers,
--roger
+Thanks,
+Vaibhav
+>
+> I am working on enabling support for PMIC 88PM860 device in the
+> mainline.
+>
+> In 88PM860 (and family of devices) few pins are labelled as GPIO's, to
+> be precise, in 88PM860, we have 8 GPIO's (ana & dig).
+>
+>
+> I was looking at pinctrl-single driver, as it seems it can not handle
+> pinmux configuration of external device (in this case its over I2C), as
+> it uses raw read/write api's.
+>
+> I see below lines in the driver,
+>
+>
+> /*
+>   * REVISIT: Reads and writes could eventually use regmap or something
+>   * generic. But at least on omaps, some mux registers are performance
+>   * critical as they may need to be remuxed every time before and after
+>   * idle. Adding tests for register access width for every read and
+>   * write like regmap is doing is not desired, and caching the registers
+>   * does not help in this case.
+>   */
+>
+>
+> Should be not have flag for this and use regmap_ variants? If we
+> implement flag based approach then same driver can be reused for pinmux
+> configuration of external device.
+>
+>
+> Just to give more clarity, Let me describe my use-case below,
+>
+> The platform which I have is based on PXA1928 and 88PM860 chipsets,
+> where 88PM860.GPIO_0 is connected back to PXA1928.EXT_32K_IN.
+>
+> GPIO_0 need to configured in mode '4'.
+>
+> As per spec, 88PM860.GPIO_0 can be configured to
+>
+>   000 = GPIO input mode
+>   001 = GPIO output mode
+>   010 = SLEEPOUTN mirror mode
+>   011 = Buck4 FPWM enable
+>   100 = 32 Khz output buffer mode
+>   101 = PMICINTN output mode
+>   110 = HW_RESET1 mode
+>   111 = HW_RESET2 mode
+>
+>
+> Please let me know if there is already an alternative for this, which I
+> missed.
+>
+> Thanks,
+> Vaibhav
+>
+>
+>
+> Thanks,
+> Vaibhav
