@@ -1,28 +1,110 @@
-From: robert.daniels@vantagecontrols.com (Robert Daniels)
-Date: Wed, 24 Jun 2015 17:10:26 +0000
-Subject: L2 Cache enable on i.MX5
-Message-ID: <DBXPR06MB5891810D431F1AE9AEB1CE985AF0@DBXPR06MB589.eurprd06.prod.outlook.com>
+From: appana.durga.rao@xilinx.com (Appana Durga Kedareswara Rao)
+Date: Wed, 24 Jun 2015 17:12:10 +0000
+Subject: [PATCH v7] dma: Add Xilinx AXI Direct Memory Access Engine
+ driver support
+In-Reply-To: <CAHYiM2+hVn1s5ky6He4+ApvsM_adMfo=q+T_owXd7wkJ6rjHNg@mail.gmail.com>
+References: <1433831736-18253-1-git-send-email-appanad@xilinx.com>
+ <CAHYiM2+hVn1s5ky6He4+ApvsM_adMfo=q+T_owXd7wkJ6rjHNg@mail.gmail.com>
+Message-ID: <C246CAC1457055469EF09E3A7AC4E11A49A918FF@XAP-PVEXMBX01.xlnx.xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Jeremy Trimble,
 
-?I recently discovered an issue with an i.MX53 based product where we had an older version of Das U-Boot which disabled the L2 cache on startup but in a later version would re-enable it once the L2 cache was configured. Since we had the version that did not re-enable it, we run our Linux kernel with the L2 cache disabled.
+> -----Original Message-----
+> From: Jeremy Trimble [mailto:jeremy.trimble at gmail.com]
+> Sent: Friday, June 19, 2015 10:19 PM
+> To: Appana Durga Kedareswara Rao
+> Cc: Vinod Koul; dan.j.williams at intel.com; Michal Simek; Soren Brinkmann;
+> Appana Durga Kedareswara Rao; Anirudha Sarangi; Punnaiah Choudary
+> Kalluri; dmaengine at vger.kernel.org; linux-arm-kernel at lists.infradead.org;
+> linux-kernel at vger.kernel.org; Srikanth Thokala
+> Subject: Re: [PATCH v7] dma: Add Xilinx AXI Direct Memory Access Engine
+> driver support
+>
+> > +/**
+> > + * xilinx_dma_start_transfer - Starts DMA transfer
+> > + * @chan: Driver specific channel struct pointer  */ static void
+> > +xilinx_dma_start_transfer(struct xilinx_dma_chan *chan) {
+> > +       struct xilinx_dma_tx_descriptor *desc;
+> > +       struct xilinx_dma_tx_segment *head, *tail = NULL;
+> > +
+> > +       if (chan->err)
+> > +               return;
+> > +
+> > +       if (list_empty(&chan->pending_list))
+> > +               return;
+> > +
+> > +       if (!chan->idle)
+> > +               return;
+> > +
+> > +       desc = list_first_entry(&chan->pending_list,
+> > +                               struct xilinx_dma_tx_descriptor,
+> > + node);
+> > +
+> > +       if (chan->has_sg && xilinx_dma_is_running(chan) &&
+> > +           !xilinx_dma_is_idle(chan)) {
+> > +               tail = list_entry(desc->segments.prev,
+> > +                                 struct xilinx_dma_tx_segment, node);
+> > +               dma_ctrl_write(chan, XILINX_DMA_REG_TAILDESC, tail->phys);
+> > +               goto out_free_desc;
+> > +       }
+> > +
+> > +       if (chan->has_sg) {
+> > +               head = list_first_entry(&desc->segments,
+> > +                                       struct xilinx_dma_tx_segment, node);
+> > +               tail = list_entry(desc->segments.prev,
+> > +                                 struct xilinx_dma_tx_segment, node);
+> > +               dma_ctrl_write(chan, XILINX_DMA_REG_CURDESC, head->phys);
+> > +       }
+> > +
+> > +       /* Enable interrupts */
+> > +       dma_ctrl_set(chan, XILINX_DMA_REG_CONTROL,
+> > +                    XILINX_DMA_XR_IRQ_ALL_MASK);
+> > +
+> > +       xilinx_dma_start(chan);
+> > +       if (chan->err)
+> > +               return;
+> > +
+> > +       /* Start the transfer */
+> > +       if (chan->has_sg) {
+> > +               dma_ctrl_write(chan, XILINX_DMA_REG_TAILDESC, tail->phys);
+> > +       } else {
+> > +               struct xilinx_dma_tx_segment *segment;
+> > +               struct xilinx_dma_desc_hw *hw;
+> > +
+> > +               segment = list_first_entry(&desc->segments,
+> > +                                          struct xilinx_dma_tx_segment, node);
+> > +               hw = &segment->hw;
+> > +
+> > +               if (desc->direction == DMA_MEM_TO_DEV)
+> > +                       dma_ctrl_write(chan, XILINX_DMA_REG_SRCADDR,
+> > +                                      hw->buf_addr);
+> > +               else
+> > +                       dma_ctrl_write(chan, XILINX_DMA_REG_DSTADDR,
+> > +                                      hw->buf_addr);
+> > +
+> > +               /* Start the transfer */
+> > +               dma_ctrl_write(chan, XILINX_DMA_REG_BTT,
+> > +                              hw->control & XILINX_DMA_MAX_TRANS_LEN);
+> > +       }
+> > +
+> > +out_free_desc:
+> > +       list_del(&desc->node);
+> > +       chan->idle = false;
+> > +       chan->active_desc = desc;
+> > +}
+>
+> What prevents chan->active_desc from being overwritten before the
+> previous descriptor is transferred to done_list.  For instance, if two transfers
+> are queued with issue_pending() in quick succession (such that
+> xilinx_dma_start_transfer() is called twice before the interrupt for the first
+> transfer occurs), won't the first descriptor be overwritten and lost?
 
-I'd like to have the Linux kernel enable the L2 cache on initialization - where is the correct place to do this? Currently, I've added it to the initialization assembly in arch/arm/boot/compressed/head.S for the decompress kernel loader to get the cache enabled as soon as possible but I wonder if there's a better place.
+Yes there is some flaws in this implementation. Will fix it in the next version of the patch.
 
-Once I get things squared away, I can submit this patch to the list to have it added to the kernel.
-
-Thanks,
-
-Robert Daniels
+Regards,
+Kedar.
 
 
-
-________________________________
-
-Ce message, ainsi que tous les fichiers joints ? ce message, peuvent contenir des informations sensibles et/ ou confidentielles ne devant pas ?tre divulgu?es. Si vous n'?tes pas le destinataire de ce message (ou que vous recevez ce message par erreur), nous vous remercions de le notifier imm?diatement ? son exp?diteur, et de d?truire ce message. Toute copie, divulgation, modification, utilisation ou diffusion, non autoris?e, directe ou indirecte, de tout ou partie de ce message, est strictement interdite.
-Se d?sabonner: Si vous souhaitez ?tre retir? de notre liste de diffusion, s'il vous pla?t envoyer vos coordonn?es ? CASL.unsubscribe at legrand.ca<mailto:casl.unsubscribe@legrand.ca> et indiquer quels sont les messages que vous ne souhaitez plus recevoir.
-
-
-This e-mail, and any document attached hereby, may contain confidential and/or privileged information. If you are not the intended recipient (or have received this e-mail in error) please notify the sender immediately and destroy this e-mail. Any unauthorized, direct or indirect, copying, disclosure, distribution or other use of the material or parts thereof is strictly forbidden.
-Unsubscribe: If you would like to be removed from our mailing list, please send your contact information to CASL.unsubscribe at legrand.ca<mailto:casl.unsubscribe@legrand.ca> and indicate what messages you no longer wish to receive.
+This email and any attachments are intended for the sole use of the named recipient(s) and contain(s) confidential information that may be proprietary, privileged or copyrighted under applicable law. If you are not the intended recipient, do not read, copy, or forward this email message or any attachments. Delete this email message and any attachments immediately.
