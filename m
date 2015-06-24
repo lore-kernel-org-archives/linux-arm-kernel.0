@@ -1,49 +1,34 @@
-From: rteysseyre@gmail.com (=?ISO-8859-1?Q?Rapha=EBl?= Teysseyre)
-Date: Wed, 24 Jun 2015 09:19:45 +0200
-Subject: [PATCH v2] gpio/xilinx: Use correct address when setting initial
- values.
-Message-ID: <1435130385.30543.3.camel@localhost>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Wed, 24 Jun 2015 09:28:40 +0200
+Subject: [PATCH] touchscreen: sun4i-ts: Really fix A10 temperature
+ reporting
+In-Reply-To: <558A5966.9010908@redhat.com>
+References: <1425893870-28715-1-git-send-email-hdegoede@redhat.com>
+ <41a7a857-96fd-48ab-9778-127cfc091ef0@googlegroups.com>
+ <5589B78C.4080600@redhat.com> <20150623195424.GE40168@dtor-ws>
+ <558A5966.9010908@redhat.com>
+Message-ID: <20150624072840.GV2266@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-xgpio_save_regs() is used in this driver to setup the initial
-values of the registers in the hardware.
+Hi,
 
-The relevant registers at that time are:
-0x0 -> channel 0 data (32 bits, one for each GPIO on this channel).
-0x4 -> channel 0 tri, controls in/out status for each GPIO of this channel.
-0x8 -> channel 1 data
-0xC -> channel 1 tri
+On Wed, Jun 24, 2015 at 09:16:54AM +0200, Hans de Goede wrote:
+> Maxime I think we should send the mentioned dts patch to stable for
+> 4.1 , do you agree ?
 
-gpio-xilinx.c defines these:
-XGPIO_DATA_OFFSET   (0x0)
-XGPIO_TRI_OFFSET    (0x4)
-XGPIO_CHANNEL_OFFSET	0x8
+Yep. We should definitely do that. You take care of this?
 
-Before this patch, the "data" register value of channel 1 was written
-at 0x4 intead of 0x8 (overwriting the channel 0 "tri" register),
-and the "tri" register value for channel 1 was written at 0x8 instead of 0xC.
+Maxime
 
-Signed-off-by: Rapha?l Teysseyre <rteysseyre@gmail.com>
----
- drivers/gpio/gpio-xilinx.c |    4 ++--
- 1 files changed, 2 insertions(+), 2 deletions(-)
-
-diff --git a/drivers/gpio/gpio-xilinx.c b/drivers/gpio/gpio-xilinx.c
-index 61243d1..e544b7a 100644
---- a/drivers/gpio/gpio-xilinx.c
-+++ b/drivers/gpio/gpio-xilinx.c
-@@ -220,9 +220,9 @@ static void xgpio_save_regs(struct of_mm_gpio_chip *mm_gc)
- 	if (!chip->gpio_width[1])
- 		return;
- 
--	xgpio_writereg(mm_gc->regs + XGPIO_DATA_OFFSET + XGPIO_TRI_OFFSET,
-+	xgpio_writereg(mm_gc->regs + XGPIO_DATA_OFFSET + XGPIO_CHANNEL_OFFSET,
- 		       chip->gpio_state[1]);
--	xgpio_writereg(mm_gc->regs + XGPIO_TRI_OFFSET + XGPIO_TRI_OFFSET,
-+	xgpio_writereg(mm_gc->regs + XGPIO_TRI_OFFSET + XGPIO_CHANNEL_OFFSET,
- 		       chip->gpio_dir[1]);
- }
- 
 -- 
-1.7.1
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150624/69db289c/attachment.sig>
