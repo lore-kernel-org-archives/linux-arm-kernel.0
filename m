@@ -1,46 +1,57 @@
-From: p.zabel@pengutronix.de (Philipp Zabel)
-Date: Wed, 24 Jun 2015 11:21:34 +0200
-Subject: [PATCH] ARM: dts: imx6qdl-sabresd: Allow HDMI and LVDS to work
- simultaneously
-In-Reply-To: <CAOMZO5DvURaPsCsksfU2BRPxVwHRi8=z+PJEd2Feuuxuco0+wg@mail.gmail.com>
-References: <1435075417-28708-1-git-send-email-fabio.estevam@freescale.com>
- <1435076593.3155.30.camel@pengutronix.de>
- <CAOMZO5DvURaPsCsksfU2BRPxVwHRi8=z+PJEd2Feuuxuco0+wg@mail.gmail.com>
-Message-ID: <1435137694.4433.7.camel@pengutronix.de>
+From: vaibhav.hiremath@linaro.org (Vaibhav Hiremath)
+Date: Wed, 24 Jun 2015 14:51:10 +0530
+Subject: [PATCH-v3 0/3] mfd: 88pm800: Add Device tree support
+Message-ID: <1435137673-1629-1-git-send-email-vaibhav.hiremath@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Fabio,
+This patch-series adds support for Device tree to 88PM800 mfd driver.
+It also enabled configuration of irq clear method through DT.
 
-Am Dienstag, den 23.06.2015, 13:32 -0300 schrieb Fabio Estevam:
-> Hi Phillip,
-> 
-> On Tue, Jun 23, 2015 at 1:23 PM, Philipp Zabel <p.zabel@pengutronix.de> wrote:
-> 
-> > Please remember that on i.MX6QDL in general we can't change the LDB
-> > clock parent without risking a breakdown in the divider:
-> >
-> > http://lists.infradead.org/pipermail/linux-arm-kernel/2015-January/313618.html
-> > http://lists.infradead.org/pipermail/linux-arm-kernel/2015-January/313619.html
-> > http://lists.infradead.org/pipermail/linux-arm-kernel/2015-January/313620.html
-> 
-> Yes, I am aware of this issue.
-> 
-> However this patch does not make things worse with this respect.
-> Instead of changing the LDB parent to PLL5 this patch changes to PLL3
-> instead.
+Testing::
+ - Boot tested on PXA1928 based platform.
+ - probe of mfd, rtc and regulator function passing successfully.
+ - Basic read operations on registers
 
-If we later make the ldb_di_sel muxes read-only (patch 2 above), this
-change will not work anymore. If my (version of your initial) patch 3
-gets accepted, the assigned-clock-parents property will keep working for
-ldb_di_sel only if it is placed in the clks device tree node.
+V2 => V3
+=======
+Link to V2: https://www.mail-archive.com/linux-kernel at vger.kernel.org/msg914299.html
 
-> > Has there been an erratum for this issue yet?
-> 
-> I was told we should see it online within a few weeks. Hopefully we
-> would be able to revisit your patch series after this happens.
+   - Replaced deprecated "regulator-compatible" property with "regulator-name".
+   - Added Rob's Acked-by  to [PATCH 3/3]
 
-Good news, thank you.
+V1 => V2
+=======
+Link to V1: http://lkml.iu.edu/hypermail/linux/kernel/1505.3/04386.html
 
-regards
-Philipp
+  - Split binding changes from original commit
+  - Updated binding info as per Rob's suggestion
+  - Dropped PATCH 4/4, as discussed during review
+  - Dropped PATCH 3/4, as it is independent RTC code change,
+    so will submit it separately to ease merging.
+  - Fixed all other minor comments
+
+Attempt has been made to push some of the patches to the list sometime
+back in 2013.
+
+Link to previous patch submission:
+        https://lkml.org/lkml/2013/8/14/86
+
+TODO:
+=====
+   - init config for 88PM860 device
+   - Rgulator driver changes to add support for 88PM860 device
+
+Vaibhav Hiremath (3):
+  mfd: 88pm800: Add device tree support
+  mfd: 88pm800: Allow configuration of interrupt clear method
+  mfd: devicetree: bindings: Add new 88pm800 mfd binding
+
+ Documentation/devicetree/bindings/mfd/88pm800.txt | 60 +++++++++++++++++++++++
+ drivers/mfd/88pm800.c                             | 40 +++++++++++++--
+ include/linux/mfd/88pm80x.h                       |  6 ++-
+ 3 files changed, 99 insertions(+), 7 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/mfd/88pm800.txt
+
+-- 
+1.9.1
