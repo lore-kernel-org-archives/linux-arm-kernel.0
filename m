@@ -1,110 +1,161 @@
 From: appana.durga.rao@xilinx.com (Appana Durga Kedareswara Rao)
-Date: Wed, 24 Jun 2015 17:12:10 +0000
-Subject: [PATCH v7] dma: Add Xilinx AXI Direct Memory Access Engine
- driver support
-In-Reply-To: <CAHYiM2+hVn1s5ky6He4+ApvsM_adMfo=q+T_owXd7wkJ6rjHNg@mail.gmail.com>
-References: <1433831736-18253-1-git-send-email-appanad@xilinx.com>
- <CAHYiM2+hVn1s5ky6He4+ApvsM_adMfo=q+T_owXd7wkJ6rjHNg@mail.gmail.com>
-Message-ID: <C246CAC1457055469EF09E3A7AC4E11A49A918FF@XAP-PVEXMBX01.xlnx.xilinx.com>
+Date: Wed, 24 Jun 2015 17:12:12 +0000
+Subject: [PATCH v5 2/2] dma: Add Xilinx AXI Central Direct Memory Access
+ Engine driver support
+In-Reply-To: <20150622101527.GB19530@localhost>
+References: <1433839690-5491-1-git-send-email-appanad@xilinx.com>
+ <20150622101527.GB19530@localhost>
+Message-ID: <C246CAC1457055469EF09E3A7AC4E11A49A9190C@XAP-PVEXMBX01.xlnx.xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jeremy Trimble,
+Hi Vinod,
 
 > -----Original Message-----
-> From: Jeremy Trimble [mailto:jeremy.trimble at gmail.com]
-> Sent: Friday, June 19, 2015 10:19 PM
+> From: dmaengine-owner at vger.kernel.org [mailto:dmaengine-
+> owner at vger.kernel.org] On Behalf Of Vinod Koul
+> Sent: Monday, June 22, 2015 3:45 PM
 > To: Appana Durga Kedareswara Rao
-> Cc: Vinod Koul; dan.j.williams at intel.com; Michal Simek; Soren Brinkmann;
-> Appana Durga Kedareswara Rao; Anirudha Sarangi; Punnaiah Choudary
-> Kalluri; dmaengine at vger.kernel.org; linux-arm-kernel at lists.infradead.org;
-> linux-kernel at vger.kernel.org; Srikanth Thokala
-> Subject: Re: [PATCH v7] dma: Add Xilinx AXI Direct Memory Access Engine
-> driver support
+> Cc: dan.j.williams at intel.com; Michal Simek; Soren Brinkmann; Appana Durga
+> Kedareswara Rao; Anirudha Sarangi; Punnaiah Choudary Kalluri;
+> dmaengine at vger.kernel.org; linux-arm-kernel at lists.infradead.org; linux-
+> kernel at vger.kernel.org; Srikanth Thokala
+> Subject: Re: [PATCH v5 2/2] dma: Add Xilinx AXI Central Direct Memory
+> Access Engine driver support
 >
-> > +/**
-> > + * xilinx_dma_start_transfer - Starts DMA transfer
-> > + * @chan: Driver specific channel struct pointer  */ static void
-> > +xilinx_dma_start_transfer(struct xilinx_dma_chan *chan) {
-> > +       struct xilinx_dma_tx_descriptor *desc;
-> > +       struct xilinx_dma_tx_segment *head, *tail = NULL;
-> > +
-> > +       if (chan->err)
-> > +               return;
-> > +
-> > +       if (list_empty(&chan->pending_list))
-> > +               return;
-> > +
-> > +       if (!chan->idle)
-> > +               return;
-> > +
-> > +       desc = list_first_entry(&chan->pending_list,
-> > +                               struct xilinx_dma_tx_descriptor,
-> > + node);
-> > +
-> > +       if (chan->has_sg && xilinx_dma_is_running(chan) &&
-> > +           !xilinx_dma_is_idle(chan)) {
-> > +               tail = list_entry(desc->segments.prev,
-> > +                                 struct xilinx_dma_tx_segment, node);
-> > +               dma_ctrl_write(chan, XILINX_DMA_REG_TAILDESC, tail->phys);
-> > +               goto out_free_desc;
-> > +       }
-> > +
-> > +       if (chan->has_sg) {
-> > +               head = list_first_entry(&desc->segments,
-> > +                                       struct xilinx_dma_tx_segment, node);
-> > +               tail = list_entry(desc->segments.prev,
-> > +                                 struct xilinx_dma_tx_segment, node);
-> > +               dma_ctrl_write(chan, XILINX_DMA_REG_CURDESC, head->phys);
-> > +       }
-> > +
-> > +       /* Enable interrupts */
-> > +       dma_ctrl_set(chan, XILINX_DMA_REG_CONTROL,
-> > +                    XILINX_DMA_XR_IRQ_ALL_MASK);
-> > +
-> > +       xilinx_dma_start(chan);
-> > +       if (chan->err)
-> > +               return;
-> > +
-> > +       /* Start the transfer */
-> > +       if (chan->has_sg) {
-> > +               dma_ctrl_write(chan, XILINX_DMA_REG_TAILDESC, tail->phys);
-> > +       } else {
-> > +               struct xilinx_dma_tx_segment *segment;
-> > +               struct xilinx_dma_desc_hw *hw;
-> > +
-> > +               segment = list_first_entry(&desc->segments,
-> > +                                          struct xilinx_dma_tx_segment, node);
-> > +               hw = &segment->hw;
-> > +
-> > +               if (desc->direction == DMA_MEM_TO_DEV)
-> > +                       dma_ctrl_write(chan, XILINX_DMA_REG_SRCADDR,
-> > +                                      hw->buf_addr);
-> > +               else
-> > +                       dma_ctrl_write(chan, XILINX_DMA_REG_DSTADDR,
-> > +                                      hw->buf_addr);
-> > +
-> > +               /* Start the transfer */
-> > +               dma_ctrl_write(chan, XILINX_DMA_REG_BTT,
-> > +                              hw->control & XILINX_DMA_MAX_TRANS_LEN);
-> > +       }
-> > +
-> > +out_free_desc:
-> > +       list_del(&desc->node);
-> > +       chan->idle = false;
-> > +       chan->active_desc = desc;
-> > +}
+> On Tue, Jun 09, 2015 at 02:18:10PM +0530, Kedareswara rao Appana wrote:
 >
-> What prevents chan->active_desc from being overwritten before the
-> previous descriptor is transferred to done_list.  For instance, if two transfers
-> are queued with issue_pending() in quick succession (such that
-> xilinx_dma_start_transfer() is called twice before the interrupt for the first
-> transfer occurs), won't the first descriptor be overwritten and lost?
+> pls conform to the subsystem naming convention which git log on subsystem
+> should have told you that it is dmaengine: xxx......
 
-Yes there is some flaws in this implementation. Will fix it in the next version of the patch.
+Ok Sure will take care of it in the next version of the patch.
+
+>
+> > This is the driver for the AXI Central Direct Memory Access (AXI
+> > CDMA) core, which is a soft Xilinx IP core that provides
+> > high-bandwidth Direct Memory Access (DMA) between a memory-
+> mapped
+> > source address and a memory-mapped destination address.
+> >
+> > This module works on Zynq (ARM Based SoC) and Microblaze platforms.
+> >
+> > Signed-off-by: Srikanth Thokala <sthokal@xilinx.com>
+> > Signed-off-by: Kedareswara rao Appana <appanad@xilinx.com>
+> > ---
+> > This patch is rebased on the commit
+> > Merge git://git.kernel.org/pub/scm/linux/kernel/git/davem/net
+> why a random, unrelated commit? and no mention of tree..
+
+Ok will fix in the next iteration of the patch.
+
+>
+> > +static struct dma_async_tx_descriptor *
+> > +xilinx_cdma_prep_memcpy(struct dma_chan *dchan, dma_addr_t
+> dma_dst,
+> > +                   dma_addr_t dma_src, size_t len, unsigned long flags)
+> {
+> > +   struct xilinx_cdma_chan *chan = to_xilinx_chan(dchan);
+> > +   struct xilinx_cdma_desc_hw *hw;
+> > +   struct xilinx_cdma_tx_descriptor *desc;
+> > +   struct xilinx_cdma_tx_segment *segment, *prev;
+> > +
+> > +   if (!len || len > XILINX_CDMA_MAX_TRANS_LEN)
+> > +           return NULL;
+> > +
+> > +   desc = xilinx_cdma_alloc_tx_descriptor(chan);
+> > +   if (!desc)
+> > +           return NULL;
+> > +
+> > +   dma_async_tx_descriptor_init(&desc->async_tx, &chan->common);
+> > +   desc->async_tx.tx_submit = xilinx_cdma_tx_submit;
+> > +   async_tx_ack(&desc->async_tx);
+> and why are you doing this ?
+
+Ok will remove.
+
+>
+> > +int xilinx_cdma_channel_set_config(struct dma_chan *dchan,
+> > +                                   struct xilinx_cdma_config *cfg)
+> > +{
+> > +   struct xilinx_cdma_chan *chan = to_xilinx_chan(dchan);
+> > +   u32 reg = cdma_read(chan, XILINX_CDMA_CONTROL_OFFSET);
+> > +
+> > +   if (!xilinx_cdma_is_idle(chan))
+> > +           return -EBUSY;
+> Why cant it be like dma_slave_config and take effect on next descriptor
+> prepare?
+
+Will fix this part.
+
+>
+> > +
+> > +   if (cfg->reset)
+> > +           return xilinx_cdma_chan_reset(chan);
+> Why do you want to reset this externally, that sounds bad to me
+
+If someone (client driver) want to reset the controller externally. It will be useful right?
+
+
+>
+> > +
+> > +   if (cfg->coalesc <= XILINX_CDMA_COALESCE_MAX) {
+> > +           reg &= ~XILINX_CDMA_XR_COALESCE_MASK;
+> > +           reg |= cfg->coalesc << XILINX_CDMA_COALESCE_SHIFT;
+> > +   }
+> Can you explain what coalesc means here?
+
+Coalesc means interrupt threshold
+This value is used for setting the interrupt threshold. When IOC (interrupt on complete) interrupt events occur, an internal counter
+Counts down from the Interrupt Threshold setting. When the count reaches zero, an interrupt out is generated by the DMA engine.
+This will be useful in case of SG transfer.
+
+>
+> > +
+> > +   if (cfg->delay <= XILINX_CDMA_DELAY_MAX) {
+> > +           reg &= ~XILINX_CDMA_XR_DELAY_MASK;
+> > +           reg |= cfg->delay << XILINX_CDMA_DELAY_SHIFT;
+> > +   }
+> > +
+> > +   cdma_write(chan, XILINX_CDMA_CONTROL_OFFSET, reg);
+> Shouldn't you save it apply for a descriptor?
+
+Currently I am not making efficient use of it will use take care of it.
+
+> > +
+> > +   return 0;
+> > +}
+> > +EXPORT_SYMBOL(xilinx_cdma_channel_set_config);
+> not EXPORT_SYMBOL_GPL?
+
+Ok will modify.
+
+>
+>
+> > +static int xilinx_cdma_chan_probe(struct xilinx_cdma_device *xdev,
+> > +                                   struct device_node *node)
+> > +{
+> > +   struct xilinx_cdma_chan *chan;
+> > +   bool has_dre;
+> > +   u32 value, width;
+> > +   int err;
+> > +
+> > +   /* Alloc channel */
+> > +   chan = devm_kzalloc(xdev->dev, sizeof(*chan), GFP_NOWAIT);
+> Why do you use GFP_NOWAIT in probe?
+
+Ok will fix in the next version of patch.
+
+Thanks for the review.
 
 Regards,
 Kedar.
+
+>
+> --
+> ~Vinod
+>
+> --
+> To unsubscribe from this list: send the line "unsubscribe dmaengine" in
 
 
 This email and any attachments are intended for the sole use of the named recipient(s) and contain(s) confidential information that may be proprietary, privileged or copyrighted under applicable law. If you are not the intended recipient, do not read, copy, or forward this email message or any attachments. Delete this email message and any attachments immediately.
