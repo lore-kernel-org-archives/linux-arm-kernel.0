@@ -1,58 +1,86 @@
-From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Wed, 24 Jun 2015 16:51:09 +0530
-Subject: [PATCH 17/17] ARM: dts: omap4: Use "syscon-otghs" instead of
- "ctrl-module" in USB node
-In-Reply-To: <20150624104116.GC4156@atomide.com>
-References: <1435060743-5511-1-git-send-email-kishon@ti.com>
- <1435060743-5511-18-git-send-email-kishon@ti.com>
- <20150624104116.GC4156@atomide.com>
-Message-ID: <558A92A5.5070506@ti.com>
+From: stefan@agner.ch (Stefan Agner)
+Date: Wed, 24 Jun 2015 13:20:56 +0200
+Subject: [RFC PATCH v6 2/2] nvmem: Add Vybrid OCOTP and OCROM support
+In-Reply-To: <558A7EBE.5030108@i2se.com>
+References: <cover.1435066190.git.maitysanchayan@gmail.com>
+ <b4a52f6c229bdabbfe9d21c03cb04593dde33ec4.1435066190.git.maitysanchayan@gmail.com>
+ <1037424954.250728.1435087901102.JavaMail.open-xchange@oxbsltgw00.schlund.de>
+ <20150624051903.GA11753@Sanchayan-Arch.toradex.int>
+ <558A7EBE.5030108@i2se.com>
+Message-ID: <1794e55295ed14ea397ca330f3b2b1a3@agner.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tony,
-
-On Wednesday 24 June 2015 04:11 PM, Tony Lindgren wrote:
-> * Kishon Vijay Abraham I <kishon@ti.com> [150623 05:02]:
->> --- a/arch/arm/boot/dts/omap4.dtsi
->> +++ b/arch/arm/boot/dts/omap4.dtsi
->> @@ -852,12 +852,6 @@
->>   			};
->>   		};
+On 2015-06-24 11:56, Stefan Wahren wrote:
+> Hi Sanchayan,
+> 
+> Am 24.06.2015 um 07:19 schrieb maitysanchayan at gmail.com:
+>> On 15-06-23 21:31:41, Stefan Wahren wrote:
+>>> Hi Sanchayan,
+>>>
+>>>> Sanchayan Maity <maitysanchayan@gmail.com> hat am 23. Juni 2015 um 15:44
+>>>> geschrieben:
+>>>>
+>>>>
+>>>> The patch adds support for the On Chip One Time Programmable Peripheral
+>>>> (OCOTP) and On Chip ROM (OCROM) support.
+>>>>
+>>>> On Vybrid OCOTP contain data like SoC ID, MAC address and OCROM has the
+>>>> revision ID.
+>>>>
+>>>> Signed-off-by: Sanchayan Maity <maitysanchayan@gmail.com>
+>>>> ---
+>>>> drivers/nvmem/Kconfig | 11 +++++++++
+>>>> drivers/nvmem/Makefile | 2 ++
+>>>> drivers/nvmem/vf610-ocotp.c | 60 +++++++++++++++++++++++++++++++++++++++++++++
+>>>> 3 files changed, 73 insertions(+)
+>>>> create mode 100644 drivers/nvmem/vf610-ocotp.c
+>>>>
+>>>> diff --git a/drivers/nvmem/Kconfig b/drivers/nvmem/Kconfig
+>>>> index 17f1a57..557c1e0 100644
+>>>> --- a/drivers/nvmem/Kconfig
+>>>> +++ b/drivers/nvmem/Kconfig
+>>>> @@ -33,4 +33,15 @@ config NVMEM_SUNXI_SID
+>>>> This driver can also be built as a module. If so, the module
+>>>> will be called eeprom-sunxi-sid.
+>>>>
+>>>> +config NVMEM_VF610_OCOTP
+>>>> + tristate "VF610 SoCs OCOTP support"
+>>>> + depends on SOC_VF610
+>>>> + select REGMAP_MMIO
+>>> how do you come to the conclusion that Vybrid On-Chip OTP is accessable via
+>>> MMIO?
+>> Frankly speaking I just changed the naming conventions and followed the qfrom
+>> and sunxi sid examples in Srinivas's patches.
 >>
->> -		omap_control_usbotg: control-phy at 4a00233c {
->> -			compatible = "ti,control-phy-otghs";
->> -			reg = <0x4a00233c 0x4>;
->> -			reg-names = "otghs_control";
->> -		};
->> -
->>   		usb_otg_hs: usb_otg_hs at 4a0ab000 {
->>   			compatible = "ti,omap4-musb";
->>   			reg = <0x4a0ab000 0x7ff>;
->> @@ -870,7 +864,7 @@
->>   			multipoint = <1>;
->>   			num-eps = <16>;
->>   			ram-bits = <12>;
->> -			ctrl-module = <&omap_control_usbotg>;
->> +			syscon-otghs = <&scm_conf 0x33c>;
->>   		};
+>> I just tested it without the "select REGMAP_MMIO" and it works just fine.
 >>
->>   		aes: aes at 4b501000 {
->
-> We should still keep a separate entry for the phy in the dtsi
-> files. And the phy should be a child of the scm_conf area in the
-> dtsi file.
->
-> This is because the scm and usb_otg_hs are separate devices and
-> can be clocked separately. So the phy driver needs to be a
-> separate driver to avoid spaghetti code and issues with clocking.
+>> - Sanchayan.
+> 
+> sorry for the confusion. My question refers to the whole driver
+> implementation not only to the REGMAP_MMIO.
+> 
+> According to
+> 
+> Vybrid Reference Manual F-Series
+> Document Number: VYBRIDRM
+> Rev 7, 06/2014
+> 
+> 35.5 OCOTP memory map/register definition
+> 
+> the memory region is organized in control and shadow registers. I'm very
+> sceptical that using REGMAP_MMIO is the right way for accessing the OCOTP.
+> 
+> It possible that it works in your case. But in the case the lock bits
+> are set the driver won't work correctly.
 
-AFAIK SCM is clocked by L4CFG_L4_GICLK which is either free running or is 
-managed automatically by the HW i.e gated when there is no access to the 
-CTRL_MODULE_CORE registers.
+The OCOTP represents fuses, starting from 0x400A5400 one can access the
+shadowed registers containing the fuses values. The reference manual
+also says: "All shadow registers are always readable through the APB bus
+except some secret key"
 
-Having a separate control-PHY driver only to do a regmap update to SCM is 
-unnecessary IMHO.
+The driver does not need write access. I guess it is fine to use only
+reads through regmap...?
 
-Thanks
-Kishon
+--
+Stefan
