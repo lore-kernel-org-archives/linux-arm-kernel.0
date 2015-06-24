@@ -1,63 +1,37 @@
 From: peter.griffin@linaro.org (Peter Griffin)
-Date: Wed, 24 Jun 2015 16:11:01 +0100
-Subject: [PATCH 03/12] [media] stv0367: Refine i2c error trace to include i2c
- address
+Date: Wed, 24 Jun 2015 16:11:02 +0100
+Subject: [PATCH 04/12] [media] stv0367: Add support for 16Mhz reference clock
 In-Reply-To: <1435158670-7195-1-git-send-email-peter.griffin@linaro.org>
 References: <1435158670-7195-1-git-send-email-peter.griffin@linaro.org>
-Message-ID: <1435158670-7195-4-git-send-email-peter.griffin@linaro.org>
+Message-ID: <1435158670-7195-5-git-send-email-peter.griffin@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When using stv0367 demodulator with STi STB platforms,
-we can have easily have four or more stv0367 demods running
-in the system at one time.
-
-As typically the b2120 reference design ships with a b2004a daughter
-board, which can accept two dvb NIM cards, and each b2100A NIM
-has 2x stv0367 demods and 2x NXPs tuner on it.
-
-In such circumstances it is useful to print the i2c address
-on error messages to know which one is failing due to I2C issues.
+The B2100A dvb NIM card from ST has 2x stv0367 demodulators
+and 2x TDA18212 silicon tuners, with a 16Mhz crystal. To
+get this working properly with the upstream driver we need
+to add support for the 16Mhz reference clock.
 
 Signed-off-by: Peter Griffin <peter.griffin@linaro.org>
 ---
- drivers/media/dvb-frontends/stv0367.c | 12 ++++++++----
- 1 file changed, 8 insertions(+), 4 deletions(-)
+ drivers/media/dvb-frontends/stv0367.c | 5 +++++
+ 1 file changed, 5 insertions(+)
 
 diff --git a/drivers/media/dvb-frontends/stv0367.c b/drivers/media/dvb-frontends/stv0367.c
-index b31ff26..c3b7e6c 100644
+index c3b7e6c..ad7cab7 100644
 --- a/drivers/media/dvb-frontends/stv0367.c
 +++ b/drivers/media/dvb-frontends/stv0367.c
-@@ -791,11 +791,13 @@ int stv0367_writeregs(struct stv0367_state *state, u16 reg, u8 *data, int len)
- 	memcpy(buf + 2, data, len);
+@@ -1554,6 +1554,11 @@ static int stv0367ter_init(struct dvb_frontend *fe)
  
- 	if (i2cdebug)
--		printk(KERN_DEBUG "%s: %02x: %02x\n", __func__, reg, buf[2]);
-+		printk(KERN_DEBUG "%s: [%02x] %02x: %02x\n", __func__,
-+			state->config->demod_address, reg, buf[2]);
- 
- 	ret = i2c_transfer(state->i2c, &msg, 1);
- 	if (ret != 1)
--		printk(KERN_ERR "%s: i2c write error!\n", __func__);
-+		printk(KERN_ERR "%s: i2c write error! ([%02x] %02x: %02x)\n",
-+			__func__, state->config->demod_address, reg, buf[2]);
- 
- 	return (ret != 1) ? -EREMOTEIO : 0;
- }
-@@ -829,10 +831,12 @@ static u8 stv0367_readreg(struct stv0367_state *state, u16 reg)
- 
- 	ret = i2c_transfer(state->i2c, msg, 2);
- 	if (ret != 2)
--		printk(KERN_ERR "%s: i2c read error\n", __func__);
-+		printk(KERN_ERR "%s: i2c read error ([%02x] %02x: %02x)\n",
-+			__func__, state->config->demod_address, reg, b1[0]);
- 
- 	if (i2cdebug)
--		printk(KERN_DEBUG "%s: %02x: %02x\n", __func__, reg, b1[0]);
-+		printk(KERN_DEBUG "%s: [%02x] %02x: %02x\n", __func__,
-+			state->config->demod_address, reg, b1[0]);
- 
- 	return b1[0];
- }
+ 	switch (state->config->xtal) {
+ 		/*set internal freq to 53.125MHz */
++	case 16000000:
++		stv0367_writereg(state, R367TER_PLLMDIV, 0x2);
++		stv0367_writereg(state, R367TER_PLLNDIV, 0x1b);
++		stv0367_writereg(state, R367TER_PLLSETUP, 0x18);
++		break;
+ 	case 25000000:
+ 		stv0367_writereg(state, R367TER_PLLMDIV, 0xa);
+ 		stv0367_writereg(state, R367TER_PLLNDIV, 0x55);
 -- 
 1.9.1
