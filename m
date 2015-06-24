@@ -1,86 +1,54 @@
-From: vaibhav.hiremath@linaro.org (Vaibhav Hiremath)
-Date: Wed, 24 Jun 2015 10:49:47 +0530
-Subject: [PATCH-v2 3/3] mfd: devicetree: bindings: Add new 88pm800 mfd
- binding
-In-Reply-To: <CAJKOXPf7OuGfxsZeewoimyyCRKGqjH+j-S81cAH=6DSRQmaS0A@mail.gmail.com>
-References: <vaibhav.hiremath@linaro.org>	<1434567488-6477-1-git-send-email-vaibhav.hiremath@linaro.org>	<1434567488-6477-5-git-send-email-vaibhav.hiremath@linaro.org>
- <CAJKOXPf7OuGfxsZeewoimyyCRKGqjH+j-S81cAH=6DSRQmaS0A@mail.gmail.com>
-Message-ID: <558A3DF3.5030804@linaro.org>
+From: maitysanchayan@gmail.com (maitysanchayan at gmail.com)
+Date: Wed, 24 Jun 2015 10:49:04 +0530
+Subject: [RFC PATCH v6 2/2] nvmem: Add Vybrid OCOTP and OCROM support
+In-Reply-To: <1037424954.250728.1435087901102.JavaMail.open-xchange@oxbsltgw00.schlund.de>
+References: <cover.1435066190.git.maitysanchayan@gmail.com>
+ <b4a52f6c229bdabbfe9d21c03cb04593dde33ec4.1435066190.git.maitysanchayan@gmail.com>
+ <1037424954.250728.1435087901102.JavaMail.open-xchange@oxbsltgw00.schlund.de>
+Message-ID: <20150624051903.GA11753@Sanchayan-Arch.toradex.int>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On 15-06-23 21:31:41, Stefan Wahren wrote:
+> Hi Sanchayan,
+> 
+> > Sanchayan Maity <maitysanchayan@gmail.com> hat am 23. Juni 2015 um 15:44
+> > geschrieben:
+> >
+> >
+> > The patch adds support for the On Chip One Time Programmable Peripheral
+> > (OCOTP) and On Chip ROM (OCROM) support.
+> >
+> > On Vybrid OCOTP contain data like SoC ID, MAC address and OCROM has the
+> > revision ID.
+> >
+> > Signed-off-by: Sanchayan Maity <maitysanchayan@gmail.com>
+> > ---
+> > drivers/nvmem/Kconfig | 11 +++++++++
+> > drivers/nvmem/Makefile | 2 ++
+> > drivers/nvmem/vf610-ocotp.c | 60 +++++++++++++++++++++++++++++++++++++++++++++
+> > 3 files changed, 73 insertions(+)
+> > create mode 100644 drivers/nvmem/vf610-ocotp.c
+> >
+> > diff --git a/drivers/nvmem/Kconfig b/drivers/nvmem/Kconfig
+> > index 17f1a57..557c1e0 100644
+> > --- a/drivers/nvmem/Kconfig
+> > +++ b/drivers/nvmem/Kconfig
+> > @@ -33,4 +33,15 @@ config NVMEM_SUNXI_SID
+> > This driver can also be built as a module. If so, the module
+> > will be called eeprom-sunxi-sid.
+> >
+> > +config NVMEM_VF610_OCOTP
+> > + tristate "VF610 SoCs OCOTP support"
+> > + depends on SOC_VF610
+> > + select REGMAP_MMIO
+> 
+> how do you come to the conclusion that Vybrid On-Chip OTP is accessable via
+> MMIO?
 
+Frankly speaking I just changed the naming conventions and followed the qfrom
+and sunxi sid examples in Srinivas's patches.
 
-On Wednesday 24 June 2015 05:59 AM, Krzysztof Kozlowski wrote:
-> 2015-06-18 3:58 GMT+09:00 Vaibhav Hiremath <vaibhav.hiremath@linaro.org>:
->> With addition of DT support to 88pm800 mfd driver, this patch
->> adds new DT binding documentation along with respective properties.
->>
->> Signed-off-by: Vaibhav Hiremath <vaibhav.hiremath@linaro.org>
->> ---
->>   Documentation/devicetree/bindings/mfd/88pm800.txt | 60 +++++++++++++++++++++++
->>   1 file changed, 60 insertions(+)
->>   create mode 100644 Documentation/devicetree/bindings/mfd/88pm800.txt
->>
->> diff --git a/Documentation/devicetree/bindings/mfd/88pm800.txt b/Documentation/devicetree/bindings/mfd/88pm800.txt
->> new file mode 100644
->> index 0000000..b8e72df
->> --- /dev/null
->> +++ b/Documentation/devicetree/bindings/mfd/88pm800.txt
->> @@ -0,0 +1,60 @@
->> +* Marvell 88PM8xx Power Management IC
->> +
->> +Required parent device properties:
->> +- compatible : "marvell,88pm800", "marvell,88pm805", "marvell,88pm860"
->> +- reg : the I2C slave address for the 88pm8xx chip
->> +- interrupts : IRQ line for the 88pm8xx chip
->> +- interrupt-controller: describes the 88pm8xx as an interrupt controller
->> +- #interrupt-cells : should be 1.
->> +               - The cell is the 88pm8xx local IRQ number
->> +
->> +Optional parent device properties:
->> +- marvell,irq-clr-on-write: indicates whether interrupt status is cleared
->> +  by write or read.
->> +  If enabled, interrupt is cleared by write else just read would do.
->> +
->> +88pm8xx family of devices consists of varied group of sub-devices:
->> +
->> +Device                 Supply Names     Description
->> +------                 ------------     -----------
->> +88pm80x-onkey          :               : On key
->> +88pm80x-rtc            :               : RTC
->> +88pm80x-regulator      :               : Regulators
->> +
->> +Note: More device list will follow
->> +
->> +Example:
->> +
->> +       pmic: 88pm800 at 30 {
->> +               compatible = "marvell,88pm800";
->> +               reg = <0x30>;
->> +               interrupts = <GIC_SPI 77 IRQ_TYPE_LEVEL_HIGH>;
->> +               interrupt-parent = <&gic>;
->> +               interrupt-controller;
->> +               #interrupt-cells = <1>;
->> +
->> +               marvell,irq-clr-on-write;
->> +
->> +               regulators {
->> +                       compatible = "marvell,88pm80x-regulator";
->> +
->> +                       buck1a: BUCK1A {
->> +                               regulator-compatible = "88PM800-BUCK1A";
->
-> That's a deprecated property.
-> Documentation/devicetree/bindings/regulator/regulator.txt
->
+I just tested it without the "select REGMAP_MMIO" and it works just fine.
 
-Yes,
-
-Will replace with regulator-name and resubmit shortly with Rob's
-Acked-by.
-
-
-
-Thanks,
-Vaibhav
+- Sanchayan.
