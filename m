@@ -1,47 +1,43 @@
-From: sfr@canb.auug.org.au (Stephen Rothwell)
-Date: Wed, 24 Jun 2015 13:31:33 +1000
-Subject: linux-next: manual merge of the dt-rh tree with the arm-soc tree
-Message-ID: <20150624133133.435a979d@canb.auug.org.au>
+From: linux@roeck-us.net (Guenter Roeck)
+Date: Tue, 23 Jun 2015 20:49:05 -0700
+Subject: [PATCH v2] ARM: Fix build if CLKDEV_LOOKUP is not configured
+Message-ID: <1435117745-19032-1-git-send-email-linux@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rob,
+mips:allmodconfig fails to build with
 
-Today's linux-next merge of the dt-rh tree got a conflict in:
+drivers/clocksource/timer-sp804.c:
+	In function '__sp804_clocksource_and_sched_clock_init':
+drivers/clocksource/timer-sp804.c:88:3: error:
+	implicit declaration of function 'clk_get_sys'
 
-  Documentation/devicetree/bindings/vendor-prefixes.txt
+because CLKDEV_LOOKUP is not configured and the driver depends on it.
 
-between commit:
+Fixes: 0b7402dce445 ("ARM: 8366/1: move Dual-Timer SP804 driver to
+	drivers/clocksource")
+Cc: Sudeep Holla <sudeep.holla@arm.com>
+Acked-by: Sudeep Holla <sudeep.holla@arm.com>
+Signed-off-by: Guenter Roeck <linux@roeck-us.net>
+---
+v2: Added Ack
+    Send to ARM mailing list and maintainer
 
-  d5553cb05a04 ("ARM: dts: zx: add an initial zx296702 dts and doc")
+ drivers/clocksource/Kconfig | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-from the arm-soc tree and commit:
-
-  72d942e23cda ("of: Add vendor prefix for Zodiac Inflight Innovations")
-
-from the dt-rh tree.
-
-I fixed it up (see below) and can carry the fix as necessary (no action
-is required).
-
+diff --git a/drivers/clocksource/Kconfig b/drivers/clocksource/Kconfig
+index 60d7d3d204d3..d2a26f1f30e9 100644
+--- a/drivers/clocksource/Kconfig
++++ b/drivers/clocksource/Kconfig
+@@ -144,7 +144,7 @@ config ARM_GLOBAL_TIMER
+ 
+ config ARM_TIMER_SP804
+ 	bool "Support for Dual Timer SP804 module"
+-	depends on GENERIC_SCHED_CLOCK
++	depends on GENERIC_SCHED_CLOCK && CLKDEV_LOOKUP
+ 	select CLKSRC_MMIO
+ 	select CLKSRC_OF if OF
+ 
 -- 
-Cheers,
-Stephen Rothwell                    sfr at canb.auug.org.au
-
-diff --cc Documentation/devicetree/bindings/vendor-prefixes.txt
-index a0aa80bb3480,c400c95abc67..000000000000
---- a/Documentation/devicetree/bindings/vendor-prefixes.txt
-+++ b/Documentation/devicetree/bindings/vendor-prefixes.txt
-@@@ -225,4 -211,4 +225,5 @@@ xillybus	Xillybus Ltd
-  xlnx	Xilinx
-  zyxel	ZyXEL Communications Corp.
-  zarlink	Zarlink Semiconductor
-+ zii	Zodiac Inflight Innovations
- +zte	ZTE Corp.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150624/db857e71/attachment.sig>
+2.1.0
