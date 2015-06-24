@@ -1,59 +1,35 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Wed, 24 Jun 2015 09:34:32 -0500
-Subject: [PATCH V2 0/5] drivers/rtc/rtc-ds1307.c: Basic cleanups and
- support for wakeupirq
-In-Reply-To: <1435076114-12416-1-git-send-email-nm@ti.com>
-References: <1435076114-12416-1-git-send-email-nm@ti.com>
-Message-ID: <20150624143432.GE21232@saruman.tx.rr.com>
+From: javier@dowhile0.org (Javier Martinez Canillas)
+Date: Wed, 24 Jun 2015 16:52:20 +0200
+Subject: [PATCH v2 7/9] ARM: multi_v7_defconfig: Enable support for PWM
+ Regulators
+In-Reply-To: <1435154348-28840-8-git-send-email-lee.jones@linaro.org>
+References: <1435154348-28840-1-git-send-email-lee.jones@linaro.org>
+ <1435154348-28840-8-git-send-email-lee.jones@linaro.org>
+Message-ID: <CABxcv==J2hi0y+=s3nK_U=-jkjTW3L9jCC2JfebnWwRfpDGLAQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hello Lee,
 
-On Tue, Jun 23, 2015 at 11:15:09AM -0500, Nishanth Menon wrote:
-> Hi,
-> 
-> Here is the revamp of the patch posted eariler to support wakeupirq.
-> This series does a few cleanups as well prior to introducing the
-> generic apis required to support the wakeirq mechanism used on certain
-> TI SoCs. Cleanups done here are just minimal set of the cleanups we
-> discussed in [2].
-> 
-> Series is based on next-20150623
-> 
-> Test log: http://pastebin.ubuntu.com/11763002/
-> 
-> NOTE1: I have only tested in mcp79410 device, and not on other
-> ds1307-rtc driver compatbile devices as I dont have any other.
-> additional testing might be nice to have.
-> NOTE2: there are additional fixes that linux-next seems to need but
-> those are in omap-rtc, cpufreq etc, but those are not related by the
-> ds-1307.
-> 
-> V1: https://patchwork.kernel.org/patch/4759171/
-> 
-> NOTE: Patch 5/5 of the series is meant to indicate the usage, and will
-> be reposted along with other wakeup sources to be enabled once the
-> driver changes are accepted.
-> 
-> Felipe Balbi (1):
->   drivers/rtc/rtc-ds1307.c: Convert to threaded IRQ
-> 
-> Nishanth Menon (4):
->   drivers/rtc/rtc-ds1307.c: Switch to managed irq allocation
->   drivers/rtc/rtc-ds1307.c: Sort the headers
->   drivers/rtc/rtc-ds1307.c: Support optional wakeup interrupt source
+On Wed, Jun 24, 2015 at 3:59 PM, Lee Jones <lee.jones@linaro.org> wrote:
+> Signed-off-by: Lee Jones <lee.jones@linaro.org>
+> ---
+>  arch/arm/configs/multi_v7_defconfig | 1 +
+>  1 file changed, 1 insertion(+)
+>
+> diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
+> index f632af0..6666973 100644
+> --- a/arch/arm/configs/multi_v7_defconfig
+> +++ b/arch/arm/configs/multi_v7_defconfig
+> @@ -365,6 +365,7 @@ CONFIG_REGULATOR_MAX8907=y
+>  CONFIG_REGULATOR_MAX8973=y
+>  CONFIG_REGULATOR_MAX77686=y
+>  CONFIG_REGULATOR_PALMAS=y
+> +CONFIG_REGULATOR_PWM=y
 
-for the series, except the patch which I wrote :
+The current policy is to build as much as possible as a module in
+multi_v7_defconfig. Since this is a tristate Kconfig symbol, could you
+please change it to =m ?
 
-Acked-by: Felipe Balbi <balbi@ti.com>
-
--- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150624/b96e0f2f/attachment.sig>
+Best regards,
+Javier
