@@ -1,30 +1,26 @@
-From: matthias.bgg@gmail.com (Matthias Brugger)
-Date: Wed, 24 Jun 2015 22:25:56 +0200
-Subject: [PATCH 2/2] ARM: dts: mediatek: add mt6580 basic support
-In-Reply-To: <1435147153.3792.9.camel@mtkswgap22>
-References: <1433319533-24803-1-git-send-email-mars.cheng@mediatek.com>
- <3799922.TWv12CPu81@ubix> <1435147153.3792.9.camel@mtkswgap22>
-Message-ID: <2753320.5M4yQIm8Im@ubix>
+From: pebolle@tiscali.nl (Paul Bolle)
+Date: Wed, 24 Jun 2015 22:36:45 +0200
+Subject: [PATCHv5 2/2] mailbox: Adding driver for Xilinx LogiCORE IP
+ mailbox.
+In-Reply-To: <1435082402-29239-3-git-send-email-moritz.fischer@ettus.com>
+References: <1435082402-29239-1-git-send-email-moritz.fischer@ettus.com>
+ <1435082402-29239-3-git-send-email-moritz.fischer@ettus.com>
+Message-ID: <1435178205.4528.77.camel@tiscali.nl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday, June 24, 2015 07:59:13 PM Mars Cheng wrote:
-> On Tue, 2015-06-23 at 21:45 +0200, Matthias Brugger wrote:
-> > > +	soc {
-> > 
-> > Please drop the soc node as well and just add the components directly.
-> > 
-> > Thanks,
-> > Matthias
-> 
-> May I know the reason to remove the soc node? I follow other xxxx.dtsi
-> to add this node.
+On Tue, 2015-06-23 at 11:00 -0700, Moritz Fischer wrote:
+> +MODULE_ALIAS("platform:xilinx-mailbox");
 
-The device tree is reflecting the hardware, if you add a soc node like this, it 
-is seen like a bus, but there is not really a bus.
+So I think this MODULE_ALIAS() is only useful if, in short, there's a
+corresponding platform_device created. Ie, a platform_device with a
+name "xilinx-mailbox" that will fire of a "MODALIAS=platform:xilinx
+-mailbox" when it's created.
 
-I think point of view about this has change over time and nowadays it is 
-preferred not to add a soc node.
+I couldn't spot such a platform_device. Provided git grep didn't let me
+down here: what breaks if this line is dropped?
 
-Regards,
-Matthias
+Thanks,
+
+
+Paul Bolle
