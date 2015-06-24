@@ -1,51 +1,75 @@
-From: srinivas.kandagatla@linaro.org (Srinivas Kandagatla)
-Date: Wed, 24 Jun 2015 10:56:11 +0100
-Subject: [PATCH v6 1/9] nvmem: Add a simple NVMEM framework for nvmem
- providers
-In-Reply-To: <7BE8C921-180A-411D-A3C0-5D2A7AE3AB6A@konsulko.com>
-References: <1435014459-26138-1-git-send-email-srinivas.kandagatla@linaro.org>
- <1435014507-26181-1-git-send-email-srinivas.kandagatla@linaro.org>
- <1435035173.9808.35.camel@perches.com>
- <7BE8C921-180A-411D-A3C0-5D2A7AE3AB6A@konsulko.com>
-Message-ID: <558A7EBB.6000304@linaro.org>
+From: stefan.wahren@i2se.com (Stefan Wahren)
+Date: Wed, 24 Jun 2015 11:56:14 +0200
+Subject: [RFC PATCH v6 2/2] nvmem: Add Vybrid OCOTP and OCROM support
+In-Reply-To: <20150624051903.GA11753@Sanchayan-Arch.toradex.int>
+References: <cover.1435066190.git.maitysanchayan@gmail.com>
+ <b4a52f6c229bdabbfe9d21c03cb04593dde33ec4.1435066190.git.maitysanchayan@gmail.com>
+ <1037424954.250728.1435087901102.JavaMail.open-xchange@oxbsltgw00.schlund.de>
+ <20150624051903.GA11753@Sanchayan-Arch.toradex.int>
+Message-ID: <558A7EBE.5030108@i2se.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Sanchayan,
 
+Am 24.06.2015 um 07:19 schrieb maitysanchayan at gmail.com:
+> On 15-06-23 21:31:41, Stefan Wahren wrote:
+>> Hi Sanchayan,
+>>
+>>> Sanchayan Maity <maitysanchayan@gmail.com> hat am 23. Juni 2015 um 15:44
+>>> geschrieben:
+>>>
+>>>
+>>> The patch adds support for the On Chip One Time Programmable Peripheral
+>>> (OCOTP) and On Chip ROM (OCROM) support.
+>>>
+>>> On Vybrid OCOTP contain data like SoC ID, MAC address and OCROM has the
+>>> revision ID.
+>>>
+>>> Signed-off-by: Sanchayan Maity <maitysanchayan@gmail.com>
+>>> ---
+>>> drivers/nvmem/Kconfig | 11 +++++++++
+>>> drivers/nvmem/Makefile | 2 ++
+>>> drivers/nvmem/vf610-ocotp.c | 60 +++++++++++++++++++++++++++++++++++++++++++++
+>>> 3 files changed, 73 insertions(+)
+>>> create mode 100644 drivers/nvmem/vf610-ocotp.c
+>>>
+>>> diff --git a/drivers/nvmem/Kconfig b/drivers/nvmem/Kconfig
+>>> index 17f1a57..557c1e0 100644
+>>> --- a/drivers/nvmem/Kconfig
+>>> +++ b/drivers/nvmem/Kconfig
+>>> @@ -33,4 +33,15 @@ config NVMEM_SUNXI_SID
+>>> This driver can also be built as a module. If so, the module
+>>> will be called eeprom-sunxi-sid.
+>>>
+>>> +config NVMEM_VF610_OCOTP
+>>> + tristate "VF610 SoCs OCOTP support"
+>>> + depends on SOC_VF610
+>>> + select REGMAP_MMIO
+>> how do you come to the conclusion that Vybrid On-Chip OTP is accessable via
+>> MMIO?
+> Frankly speaking I just changed the naming conventions and followed the qfrom
+> and sunxi sid examples in Srinivas's patches.
+>
+> I just tested it without the "select REGMAP_MMIO" and it works just fine.
+>
+> - Sanchayan.
 
-On 23/06/15 10:26, Pantelis Antoniou wrote:
-> Hi Joe,
->
->> >On Jun 23, 2015, at 05:52 , Joe Perches<joe@perches.com>  wrote:
->> >
->> >On Tue, 2015-06-23 at 00:08 +0100, Srinivas Kandagatla wrote:
->>> >>This patch adds just providers part of the framework just to enable easy
->>> >>review.
->> >[]
->>> >>include/linux/nvmem-provider.h |  54 ++++++
->> >
->> >Unless there are going to be users of nvmem-provider.h
->> >outside of the drivers/nvmem directory, perhaps that
->> >file (and nvmem-consumer.h) should be in drivers/nvmem/
->> >
->> >
-> nvmem-consumer.h should be accessible from any driver, no?
->
-> And unfortunately nvmem-provider should be accessible too.
-> There are already eeprom drivers in the eeprom/misc directory that
-> cannot be moved yet to drivers/nvmem (like at24).
->
-> They need the provider definitions while they provide both the old
-> style interface, and the new NVMEM based one.
->
-> When we move them to the drivers/nvmem directory, then yes the
-> provider header file should move there.
+sorry for the confusion. My question refers to the whole driver
+implementation not only to the REGMAP_MMIO.
 
-Yep, that's the plan.
+According to
 
----srini
->
-> Regards
->
-> ? Pantelis
->
+Vybrid Reference Manual F-Series
+Document Number: VYBRIDRM
+Rev 7, 06/2014
+
+35.5 OCOTP memory map/register definition
+
+the memory region is organized in control and shadow registers. I'm very
+sceptical that using REGMAP_MMIO is the right way for accessing the OCOTP.
+
+It possible that it works in your case. But in the case the lock bits
+are set the driver won't work correctly.
+
+Stefan
