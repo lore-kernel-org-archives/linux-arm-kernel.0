@@ -1,47 +1,124 @@
-From: rogerq@ti.com (Roger Quadros)
-Date: Wed, 24 Jun 2015 14:50:17 +0300
-Subject: [PATCH 08/17] ARM: dts: dra7: Add dt node for the sycon pcie
-In-Reply-To: <1435060743-5511-9-git-send-email-kishon@ti.com>
-References: <1435060743-5511-1-git-send-email-kishon@ti.com>
- <1435060743-5511-9-git-send-email-kishon@ti.com>
-Message-ID: <20150624145017.9b70a1fba477d8b99ce85702@ti.com>
+From: stefan.wahren@i2se.com (Stefan Wahren)
+Date: Wed, 24 Jun 2015 13:52:28 +0200
+Subject: [RFC PATCH v6 2/2] nvmem: Add Vybrid OCOTP and OCROM support
+In-Reply-To: <20150624104552.GA32208@Sanchayan-Arch.toradex.int>
+References: <cover.1435066190.git.maitysanchayan@gmail.com>
+ <b4a52f6c229bdabbfe9d21c03cb04593dde33ec4.1435066190.git.maitysanchayan@gmail.com>
+ <1037424954.250728.1435087901102.JavaMail.open-xchange@oxbsltgw00.schlund.de>
+ <20150624051903.GA11753@Sanchayan-Arch.toradex.int>
+ <558A7EBE.5030108@i2se.com>
+ <20150624104552.GA32208@Sanchayan-Arch.toradex.int>
+Message-ID: <558A99FC.2070902@i2se.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 23 Jun 2015 17:28:53 +0530
-Kishon Vijay Abraham I <kishon@ti.com> wrote:
+Hi Srinivas,
 
-> Add new device tree node for the control module register space where
-> PCIe registers are present.
-> 
-> Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
-> ---
->  arch/arm/boot/dts/dra7.dtsi |    5 +++++
->  1 file changed, 5 insertions(+)
-> 
-> diff --git a/arch/arm/boot/dts/dra7.dtsi b/arch/arm/boot/dts/dra7.dtsi
-> index 260f300..3f434f7 100644
-> --- a/arch/arm/boot/dts/dra7.dtsi
-> +++ b/arch/arm/boot/dts/dra7.dtsi
-> @@ -291,6 +291,11 @@
->  			reg = <0x4a002e00 0x7c>;
->  		};
->  
-> +		dra7_ctrl_pcie: tisyscon at 4a003c00 {
-> +			compatible = "syscon";
-> +			reg = <0x4a003c00 0x48>;
-> +		};
-> +
+Am 24.06.2015 um 12:45 schrieb maitysanchayan at gmail.com:
+> Hello Stefan,
+>
+> On 15-06-24 11:56:14, Stefan Wahren wrote:
+>> Hi Sanchayan,
+>>
+>> Am 24.06.2015 um 07:19 schrieb maitysanchayan at gmail.com:
+>>> On 15-06-23 21:31:41, Stefan Wahren wrote:
+>>>> Hi Sanchayan,
+>>>>
+>>>>> Sanchayan Maity <maitysanchayan@gmail.com> hat am 23. Juni 2015 um 15:44
+>>>>> geschrieben:
+>>>>>
+>>>>>
+>>>>> The patch adds support for the On Chip One Time Programmable Peripheral
+>>>>> (OCOTP) and On Chip ROM (OCROM) support.
+>>>>>
+>>>>> On Vybrid OCOTP contain data like SoC ID, MAC address and OCROM has the
+>>>>> revision ID.
+>>>>>
+>>>>> Signed-off-by: Sanchayan Maity <maitysanchayan@gmail.com>
+>>>>> ---
+>>>>> drivers/nvmem/Kconfig | 11 +++++++++
+>>>>> drivers/nvmem/Makefile | 2 ++
+>>>>> drivers/nvmem/vf610-ocotp.c | 60 +++++++++++++++++++++++++++++++++++++++++++++
+>>>>> 3 files changed, 73 insertions(+)
+>>>>> create mode 100644 drivers/nvmem/vf610-ocotp.c
+>>>>>
+>>>>> diff --git a/drivers/nvmem/Kconfig b/drivers/nvmem/Kconfig
+>>>>> index 17f1a57..557c1e0 100644
+>>>>> --- a/drivers/nvmem/Kconfig
+>>>>> +++ b/drivers/nvmem/Kconfig
+>>>>> @@ -33,4 +33,15 @@ config NVMEM_SUNXI_SID
+>>>>> This driver can also be built as a module. If so, the module
+>>>>> will be called eeprom-sunxi-sid.
+>>>>>
+>>>>> +config NVMEM_VF610_OCOTP
+>>>>> + tristate "VF610 SoCs OCOTP support"
+>>>>> + depends on SOC_VF610
+>>>>> + select REGMAP_MMIO
+>>>> how do you come to the conclusion that Vybrid On-Chip OTP is accessable via
+>>>> MMIO?
+>>> Frankly speaking I just changed the naming conventions and followed the qfrom
+>>> and sunxi sid examples in Srinivas's patches.
+>>>
+>>> I just tested it without the "select REGMAP_MMIO" and it works just fine.
+>>>
+>>> - Sanchayan.
+>> sorry for the confusion. My question refers to the whole driver
+>> implementation not only to the REGMAP_MMIO.
+>>
+>> According to
+>>
+>> Vybrid Reference Manual F-Series
+>> Document Number: VYBRIDRM
+>> Rev 7, 06/2014
+>>
+>> 35.5 OCOTP memory map/register definition
+>>
+>> the memory region is organized in control and shadow registers. I'm very
+>> sceptical that using REGMAP_MMIO is the right way for accessing the OCOTP.
+> Sorry I am not well versed with the regmap stuff. Can you please tell me why
+> REGMAP_MMIO is not the right way for accessing the OCOTP?
 
-Why do you need to start from 0x4a003c00?
-CTRL_CORE_PCIESS1_PCS1 is at 0x4a003c24
+i think the implementation of OCOTP driver should be more like this:
 
->  		sdma: dma-controller at 4a056000 {
->  			compatible = "ti,omap4430-sdma";
->  			reg = <0x4a056000 0x1000>;
-> -- 
-> 1.7.9.5
-> 
+https://git.linaro.org/people/srinivas.kandagatla/linux.git/commit/b4c3ad253747767511233687436f20144e850d67
 
-cheers,
--roger
+It uses REGMAP with a specialized read function.
+
+>
+> If this is not the right way, I assume you are referring to the procedures
+> in section 35.3.1.5 and 35.3.1.6 for reading and writing from these areas?
+
+Yes. I think writing isn't needed. But the read function should check
+at least for OCOTP_CTRL[BUSY] and OCOTP_CTRL[ERROR]. If one of the
+bits is set, the read function should return with an error.
+
+This is the same behavior of my OCOTP driver for MXS platform.
+
+Unfortunately i haven't push the driver to my github account.
+
+>> It possible that it works in your case. But in the case the lock bits
+>> are set the driver won't work correctly.
+> As such the previous implementations were very different.
+>
+> Currently I only expect to provide a way for users to read the SoC ID from
+> the OCOTP block. My understanding was even if the lock bits are set, reading
+> from the registers will return 0xBADABADA.
+>
+> For example, currently for three locations I see this from ocotp block
+>
+> *
+> 0000080 bada bada bada bada bada bada bada bada
+> *
+> 0000500 bada bada bada bada bada bada bada bada
+> *
+> 0000c80 bada bada bada bada bada bada bada bada
+> *
+>
+> - Sanchayan.
+
+Until somebody comes to the idea to fetch the MAC address from the OCOTP
+block ...
+
+How about doing it right at this point, instead of fixing it later?
+
+Stefan
