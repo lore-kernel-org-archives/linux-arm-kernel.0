@@ -1,31 +1,53 @@
-From: maitysanchayan@gmail.com (Sanchayan Maity)
-Date: Wed, 24 Jun 2015 15:14:32 +0530
-Subject: [RFC PATCH v6 2/2] nvmem: Add Vybrid OCOTP and OCROM support
-In-Reply-To: <558A7A67.806@linaro.org>
-References: <cover.1435066190.git.maitysanchayan@gmail.com>
- <b4a52f6c229bdabbfe9d21c03cb04593dde33ec4.1435066190.git.maitysanchayan@gmail.com>
- <1037424954.250728.1435087901102.JavaMail.open-xchange@oxbsltgw00.schlund.de>
- <20150624051903.GA11753@Sanchayan-Arch.toradex.int>
- <558A7A67.806@linaro.org>
-Message-ID: <20150624094432.GD11753@Sanchayan-Arch.toradex.int>
+From: srinivas.kandagatla@linaro.org (Srinivas Kandagatla)
+Date: Wed, 24 Jun 2015 10:48:56 +0100
+Subject: [PATCH v6 8/9] nvmem: sunxi: Move the SID driver to the nvmem
+ framework
+In-Reply-To: <1335062615.252618.1435092272970.JavaMail.open-xchange@oxbsltgw00.schlund.de>
+References: <1435014459-26138-1-git-send-email-srinivas.kandagatla@linaro.org>
+ <1435014583-26478-1-git-send-email-srinivas.kandagatla@linaro.org>
+ <1335062615.252618.1435092272970.JavaMail.open-xchange@oxbsltgw00.schlund.de>
+Message-ID: <558A7D08.1000403@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 15-06-24 10:37:43, Srinivas Kandagatla wrote:
-> 
-> 
-> On 24/06/15 06:19, maitysanchayan at gmail.com wrote:
-> >I just tested it without the "select REGMAP_MMIO" and it works just fine.
-> You just got lucky in this case, as REGMAP_MMIO is getting selected
-> somewhere else.
-> 
-> Drivers should directly select the dependecies. In this case this driver
-> actually is going to use REGMAP_MMIO, so keeping it selected is the right
-> thing.
 
-Yes, you are right. Checking the .config file shows that this is enabled even
-with the explicit selection removed in my driver's kconfig.
 
-Sorry about missing that Stefan and Srinivas.
+On 23/06/15 21:44, Stefan Wahren wrote:
+>
+>> Srinivas Kandagatla <srinivas.kandagatla@linaro.org> hat am 23. Juni 2015 um
+>> 01:09 geschrieben:
+>>
+>>
+>> From: Maxime Ripard <maxime.ripard@free-electrons.com>
+>>
+>> Now that we have the nvmem framework, we can consolidate the common
+>> driver code. Move the driver to the framework, and hopefully, it will
+>> fix the sysfs file creation race.
+>> --- /dev/null
+>> +++ b/drivers/nvmem/sunxi-sid.c
+>> [...]
+>> +
+>> +static int sunxi_sid_write(void *context, const void *data, size_t count)
+>> +{
+>> + /* Unimplemented */
+>> + return 0;
+>> +}
+>> +
+>
+> I think it should be clear that the write operation isn't implemented. It's more
+> important to know the function should make
+> regmap_init happy.
 
-- Sanchayan.
+
+I totally agree with you.. It was just to make regmap_init happy. Indeed 
+I thought of adding this comment, but forgot over the time :-) I will 
+fix it.
+
+--srini
+
+
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-arm-msm" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+>
