@@ -1,33 +1,139 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 24 Jun 2015 06:33:50 -0700
-Subject: Use of pinctrl-single for external device over I2C
-In-Reply-To: <558A9CC7.6070409@linaro.org>
-References: <55893B2C.1070800@linaro.org>
- <558A9CC7.6070409@linaro.org>
-Message-ID: <20150624133349.GI4156@atomide.com>
+From: rogerq@ti.com (Roger Quadros)
+Date: Wed, 24 Jun 2015 16:48:13 +0300
+Subject: [PATCH 03/17] phy: ti-pipe3: use *syscon* framework to set PCS
+ value of the PHY
+In-Reply-To: <558AAD98.1090602@ti.com>
+References: <1435060743-5511-1-git-send-email-kishon@ti.com>
+ <1435060743-5511-4-git-send-email-kishon@ti.com>
+ <20150624133443.6ad1262fcf174c755e9ad7b2@ti.com>
+ <558AAD98.1090602@ti.com>
+Message-ID: <20150624164813.5624c9aa34df0d1cfdda5c19@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Vaibhav Hiremath <vaibhav.hiremath@linaro.org> [150624 05:06]:
-> On Tuesday 23 June 2015 04:25 PM, Vaibhav Hiremath wrote:
-> >
-> >/*
-> >  * REVISIT: Reads and writes could eventually use regmap or something
-> >  * generic. But at least on omaps, some mux registers are performance
-> >  * critical as they may need to be remuxed every time before and after
-> >  * idle. Adding tests for register access width for every read and
-> >  * write like regmap is doing is not desired, and caching the registers
-> >  * does not help in this case.
-> >  */
-> >
-> >
-> >Should be not have flag for this and use regmap_ variants? If we
-> >implement flag based approach then same driver can be reused for pinmux
-> >configuration of external device.
+On Wed, 24 Jun 2015 18:46:08 +0530
+Kishon Vijay Abraham I <kishon@ti.com> wrote:
 
-Nothing stopping you from adding regmap support to it. It just needs
-to be made optional as the users so far don't need it.
+> Hi,
+> 
+> On Wednesday 24 June 2015 04:04 PM, Roger Quadros wrote:
+> > On Tue, 23 Jun 2015 17:28:48 +0530
+> > Kishon Vijay Abraham I <kishon@ti.com> wrote:
+> > 
+> >> Deprecate using phy-omap-control driver to set PCS value of the PHY
+> >> and start using *syscon* framework to do the same.
+> >>
+> >> Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
+> >> ---
+> >>   Documentation/devicetree/bindings/phy/ti-phy.txt |    2 ++
+> >>   drivers/phy/phy-ti-pipe3.c                       |   32 +++++++++++++++++++++-
+> >>   2 files changed, 33 insertions(+), 1 deletion(-)
+> >>
+> >> diff --git a/Documentation/devicetree/bindings/phy/ti-phy.txt b/Documentation/devicetree/bindings/phy/ti-phy.txt
+> >> index d3ad3bf..52c7a92 100644
+> >> --- a/Documentation/devicetree/bindings/phy/ti-phy.txt
+> >> +++ b/Documentation/devicetree/bindings/phy/ti-phy.txt
+> >> @@ -83,6 +83,8 @@ Optional properties:
+> >>    - syscon-pllreset: Handle to system control region that contains the
+> >>      CTRL_CORE_SMA_SW_0 register and register offset to the CTRL_CORE_SMA_SW_0
+> >>      register that contains the SATA_PLL_SOFT_RESET bit. Only valid for sata_phy.
+> >> + - syscon-pcs : phandle/offset pair. Phandle to the system control module and the
+> >> +   register offset to write the PCS delay value.
+> > 
+> > What is PCS?
+> 
+> IIRC physical coding subsystem.
+> > Is this valid only for PCIe? If yes we could mention it here.
+> 
+> This is introduced specifically for PCIe. But there are other PCS registers
+> with a different register map altogether for USB. I'm not sure if we will ever
+> have to do those settings.
 
-Regards,
+OK then let's not say it is PCIe specific.
 
-Tony
+cheers,
+-roger
+
+> 
+> > 
+> >>   
+> >>   Deprecated properties:
+> >>    - ctrl-module : phandle of the control module used by PHY driver to power on
+> >> diff --git a/drivers/phy/phy-ti-pipe3.c b/drivers/phy/phy-ti-pipe3.c
+> >> index 78bac00..e2f9ad7 100644
+> >> --- a/drivers/phy/phy-ti-pipe3.c
+> >> +++ b/drivers/phy/phy-ti-pipe3.c
+> >> @@ -65,6 +65,9 @@
+> >>   #define PIPE3_PHY_TX_RX_POWERON		0x3
+> >>   #define PIPE3_PHY_TX_RX_POWEROFF	0x0
+> >>   
+> >> +#define PCIE_PCS_MASK			0xFF0000
+> >> +#define PCIE_PCS_DELAY_COUNT_SHIFT	0x10
+> >> +
+> >>   /*
+> >>    * This is an Empirical value that works, need to confirm the actual
+> >>    * value required for the PIPE3PHY_PLL_CONFIGURATION2.PLL_IDLE status
+> >> @@ -96,9 +99,11 @@ struct ti_pipe3 {
+> >>   	struct clk		*div_clk;
+> >>   	struct pipe3_dpll_map	*dpll_map;
+> >>   	struct regmap		*phy_power_syscon; /* ctrl. reg. acces */
+> >> +	struct regmap		*pcs_syscon; /* ctrl. reg. acces */
+> >>   	struct regmap		*dpll_reset_syscon; /* ctrl. reg. acces */
+> >>   	unsigned int		dpll_reset_reg; /* reg. index within syscon */
+> >>   	unsigned int		power_reg; /* power reg. index within syscon */
+> >> +	unsigned int		pcie_pcs_reg; /* pcs reg. index in syscon */
+> >>   	bool			sata_refclk_enabled;
+> >>   };
+> >>   
+> >> @@ -271,7 +276,16 @@ static int ti_pipe3_init(struct phy *x)
+> >>   	 * 18-1804.
+> >>   	 */
+> >>   	if (of_device_is_compatible(phy->dev->of_node, "ti,phy-pipe3-pcie")) {
+> >> -		omap_control_pcie_pcs(phy->control_dev, 0x96);
+> >> +		if (phy->pcs_syscon) {
+> >> +			val = 0x96 << OMAP_CTRL_PCIE_PCS_DELAY_COUNT_SHIFT;
+> >> +			ret = regmap_update_bits(phy->pcs_syscon,
+> >> +						 phy->pcie_pcs_reg,
+> >> +						 PCIE_PCS_MASK, val);
+> >> +			if (ret < 0)
+> >> +				return ret;
+> >> +		} else {
+> >> +			omap_control_pcie_pcs(phy->control_dev, 0x96);
+> >> +		}
+> >>   		return 0;
+> >>   	}
+> >>   
+> >> @@ -455,6 +469,22 @@ static int ti_pipe3_probe(struct platform_device *pdev)
+> >>   			dev_err(&pdev->dev, "unable to get div-clk\n");
+> >>   			return PTR_ERR(phy->div_clk);
+> >>   		}
+> >> +
+> >> +		phy->pcs_syscon = syscon_regmap_lookup_by_phandle(node,
+> >> +								  "syscon-pcs");
+> >> +		if (IS_ERR(phy->pcs_syscon)) {
+> >> +			dev_dbg(&pdev->dev,
+> >> +				 "can't get syscon-pcs, using omap control\n");
+> >> +			phy->pcs_syscon = NULL;
+> >> +		} else {
+> >> +			if (of_property_read_u32_index(node,
+> >> +						       "syscon-pcs", 1,
+> >> +						       &phy->pcie_pcs_reg)) {
+> >> +				dev_err(&pdev->dev,
+> >> +					"couldn't get pcie pcs reg. offset\n");
+> >> +				return -EINVAL;
+> >> +			}
+> >> +		}
+> >>   	} else {
+> >>   		phy->div_clk = ERR_PTR(-ENODEV);
+> >>   	}
+> >> -- 
+> >> 1.7.9.5
+> >>
+> > 
+> > Other than that,
+> > 
+> > Acked-by: Roger Quadros <rogerq@ti.com>
+> > 
+> > cheers,
+> > -roger
+> > 
