@@ -1,100 +1,114 @@
 From: vaibhav.hiremath@linaro.org (Vaibhav Hiremath)
-Date: Wed, 24 Jun 2015 14:51:11 +0530
-Subject: [PATCH-v3 1/3] mfd: 88pm800: Add device tree support
+Date: Wed, 24 Jun 2015 14:51:12 +0530
+Subject: [PATCH-v3 2/3] mfd: 88pm800: Allow configuration of interrupt clear
+ method
 In-Reply-To: <1435137673-1629-1-git-send-email-vaibhav.hiremath@linaro.org>
 References: <1435137673-1629-1-git-send-email-vaibhav.hiremath@linaro.org>
-Message-ID: <1435137673-1629-2-git-send-email-vaibhav.hiremath@linaro.org>
+Message-ID: <1435137673-1629-3-git-send-email-vaibhav.hiremath@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add DT support to the 88pm800 driver, along with compatible
-field for it's sub-devices (rtc, onkey and regulator)
+As per the spec, bit 1 (INT_CLEAR_MODE) of reg addr 0xe
+(page 0) controls the method of clearing interrupt
+status of 88pm800 family of devices;
 
-Signed-off-by: Chao Xie <chao.xie@marvell.com>
+  0: clear on read
+  1: clear on write
+
+This patch allows to configure this field, through DT.
+
+Also, as suggested by "Lee Jones" renaming DT property and variable
+field to appropriate name.
+
+Signed-off-by: Zhao Ye <zhaoy@marvell.com>
 Signed-off-by: Vaibhav Hiremath <vaibhav.hiremath@linaro.org>
 ---
- drivers/mfd/88pm800.c | 25 +++++++++++++++++++++++++
- 1 file changed, 25 insertions(+)
+ drivers/mfd/88pm800.c       | 15 ++++++++++-----
+ include/linux/mfd/88pm80x.h |  6 ++++--
+ 2 files changed, 14 insertions(+), 7 deletions(-)
 
 diff --git a/drivers/mfd/88pm800.c b/drivers/mfd/88pm800.c
-index 841717a..059f01a 100644
+index 059f01a..c1a6306 100644
 --- a/drivers/mfd/88pm800.c
 +++ b/drivers/mfd/88pm800.c
-@@ -27,6 +27,7 @@
- #include <linux/mfd/core.h>
- #include <linux/mfd/88pm80x.h>
- #include <linux/slab.h>
-+#include <linux/of_device.h>
+@@ -376,7 +376,7 @@ static int device_irq_init_800(struct pm80x_chip *chip)
+ {
+ 	struct regmap *map = chip->regmap;
+ 	unsigned long flags = IRQF_ONESHOT;
+-	int data, mask, ret = -EINVAL;
++	int irq_clr_mode, mask, ret = -EINVAL;
  
- /* Interrupt Registers */
- #define PM800_INT_STATUS1		(0x05)
-@@ -121,6 +122,11 @@ static const struct i2c_device_id pm80x_id_table[] = {
- };
- MODULE_DEVICE_TABLE(i2c, pm80x_id_table);
+ 	if (!map || !chip->irq) {
+ 		dev_err(chip->dev, "incorrect parameters\n");
+@@ -384,15 +384,16 @@ static int device_irq_init_800(struct pm80x_chip *chip)
+ 	}
  
-+static const struct of_device_id pm80x_of_match_table[] = {
-+	{ .compatible = "marvell,88pm800", },
-+	{},
-+};
-+
- static struct resource rtc_resources[] = {
- 	{
- 	 .name = "88pm80x-rtc",
-@@ -133,6 +139,7 @@ static struct resource rtc_resources[] = {
- static struct mfd_cell rtc_devs[] = {
- 	{
- 	 .name = "88pm80x-rtc",
-+	 .of_compatible = "marvell,88pm80x-rtc",
- 	 .num_resources = ARRAY_SIZE(rtc_resources),
- 	 .resources = &rtc_resources[0],
- 	 .id = -1,
-@@ -151,6 +158,7 @@ static struct resource onkey_resources[] = {
- static const struct mfd_cell onkey_devs[] = {
- 	{
- 	 .name = "88pm80x-onkey",
-+	 .of_compatible = "marvell,88pm80x-onkey",
- 	 .num_resources = 1,
- 	 .resources = &onkey_resources[0],
- 	 .id = -1,
-@@ -160,6 +168,7 @@ static const struct mfd_cell onkey_devs[] = {
- static const struct mfd_cell regulator_devs[] = {
- 	{
- 	 .name = "88pm80x-regulator",
-+	 .of_compatible = "marvell,88pm80x-regulator",
- 	 .id = -1,
- 	},
- };
-@@ -544,8 +553,23 @@ static int pm800_probe(struct i2c_client *client,
- 	int ret = 0;
- 	struct pm80x_chip *chip;
- 	struct pm80x_platform_data *pdata = dev_get_platdata(&client->dev);
-+	struct device_node *np = client->dev.of_node;
- 	struct pm80x_subchip *subchip;
+ 	/*
+-	 * irq_mode defines the way of clearing interrupt. it's read-clear by
+-	 * default.
++	 * irq_clr_on_wr defines the way of clearing interrupt by
++	 * read/write(0/1).  It's read-clear by default.
+ 	 */
+ 	mask =
+ 	    PM800_WAKEUP2_INV_INT | PM800_WAKEUP2_INT_CLEAR |
+ 	    PM800_WAKEUP2_INT_MASK;
  
-+	if (!pdata && !np) {
-+		dev_err(&client->dev,
-+			"pm80x requires platform data or of_node\n");
-+		return -EINVAL;
-+	}
+-	data = PM800_WAKEUP2_INT_CLEAR;
+-	ret = regmap_update_bits(map, PM800_WAKEUP2, mask, data);
++	irq_clr_mode = (chip->irq_clr_on_wr) ?
++		PM800_WAKEUP2_INT_WRITE_CLEAR : PM800_WAKEUP2_INT_READ_CLEAR;
++	ret = regmap_update_bits(map, PM800_WAKEUP2, mask, irq_clr_mode);
+ 
+ 	if (ret < 0)
+ 		goto out;
+@@ -514,6 +515,7 @@ static int device_800_init(struct pm80x_chip *chip,
+ 	}
+ 
+ 	chip->regmap_irq_chip = &pm800_irq_chip;
++	chip->irq_clr_on_wr = pdata->irq_clr_on_wr;
+ 
+ 	ret = device_irq_init_800(chip);
+ 	if (ret < 0) {
+@@ -568,6 +570,9 @@ static int pm800_probe(struct i2c_client *client,
+ 			dev_err(&client->dev, "failed to allocaate memory\n");
+ 			return -ENOMEM;
+ 		}
 +
-+	if (!pdata) {
-+		pdata = devm_kzalloc(&client->dev, sizeof(*pdata), GFP_KERNEL);
-+		if (!pdata) {
-+			dev_err(&client->dev, "failed to allocaate memory\n");
-+			return -ENOMEM;
-+		}
-+	}
-+
++		pdata->irq_clr_on_wr = of_property_read_bool(np,
++					"marvell,irq-clr-on-write");
+ 	}
+ 
  	ret = pm80x_init(client);
- 	if (ret) {
- 		dev_err(&client->dev, "pm800_init fail\n");
-@@ -611,6 +635,7 @@ static struct i2c_driver pm800_driver = {
- 		.name = "88PM800",
- 		.owner = THIS_MODULE,
- 		.pm = &pm80x_pm_ops,
-+		.of_match_table	= pm80x_of_match_table,
- 		},
- 	.probe = pm800_probe,
- 	.remove = pm800_remove,
+diff --git a/include/linux/mfd/88pm80x.h b/include/linux/mfd/88pm80x.h
+index 97cb283..94b3dcd 100644
+--- a/include/linux/mfd/88pm80x.h
++++ b/include/linux/mfd/88pm80x.h
+@@ -77,6 +77,8 @@ enum {
+ #define PM800_WAKEUP2		(0x0E)
+ #define PM800_WAKEUP2_INV_INT		(1 << 0)
+ #define PM800_WAKEUP2_INT_CLEAR		(1 << 1)
++#define PM800_WAKEUP2_INT_READ_CLEAR		(0 << 1)
++#define PM800_WAKEUP2_INT_WRITE_CLEAR		(1 << 1)
+ #define PM800_WAKEUP2_INT_MASK		(1 << 2)
+ 
+ #define PM800_POWER_UP_LOG	(0x10)
+@@ -300,7 +302,7 @@ struct pm80x_chip {
+ 	struct regmap_irq_chip_data *irq_data;
+ 	int type;
+ 	int irq;
+-	int irq_mode;
++	int irq_clr_on_wr;	/* '1': Clear on write, '0': Clear on read*/
+ 	unsigned long wu_flag;
+ 	spinlock_t lock;
+ };
+@@ -315,7 +317,7 @@ struct pm80x_platform_data {
+ 	 */
+ 	struct regulator_init_data *regulators[PM800_ID_RG_MAX];
+ 	unsigned int num_regulators;
+-	int irq_mode;		/* Clear interrupt by read/write(0/1) */
++	int irq_clr_on_wr;		/* Clear interrupt by read/write(0/1) */
+ 	int batt_det;		/* enable/disable */
+ 	int (*plat_config)(struct pm80x_chip *chip,
+ 				struct pm80x_platform_data *pdata);
 -- 
 1.9.1
