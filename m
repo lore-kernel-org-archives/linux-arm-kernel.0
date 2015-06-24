@@ -1,59 +1,57 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 24 Jun 2015 05:09:39 -0700
-Subject: [PATCH 08/17] ARM: dts: dra7: Add dt node for the sycon pcie
-In-Reply-To: <20150624145617.e5248d466fe5b2e0eb1ca087@ti.com>
-References: <1435060743-5511-1-git-send-email-kishon@ti.com>
- <1435060743-5511-9-git-send-email-kishon@ti.com>
- <20150624145017.9b70a1fba477d8b99ce85702@ti.com>
- <20150624145617.e5248d466fe5b2e0eb1ca087@ti.com>
-Message-ID: <20150624120938.GG4156@atomide.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Wed, 24 Jun 2015 14:11:26 +0200
+Subject: [PATCH/RFC 02/15] ARM: shmobile: R-Car: Add DT support for PM
+ domains
+In-Reply-To: <1433444021-22167-3-git-send-email-geert+renesas@glider.be>
+References: <1433444021-22167-1-git-send-email-geert+renesas@glider.be>
+ <1433444021-22167-3-git-send-email-geert+renesas@glider.be>
+Message-ID: <CAMuHMdUfRBkBEU4CyTPVZ7BW=xk-6jn9BYwzL7-F_VMUwJC0YQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Roger Quadros <rogerq@ti.com> [150624 04:58]:
-> On Wed, 24 Jun 2015 14:50:17 +0300
-> Roger Quadros <rogerq@ti.com> wrote:
-> 
-> > On Tue, 23 Jun 2015 17:28:53 +0530
-> > Kishon Vijay Abraham I <kishon@ti.com> wrote:
-> > 
-> > > Add new device tree node for the control module register space where
-> > > PCIe registers are present.
-> > > 
-> > > Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
-> > > ---
-> > >  arch/arm/boot/dts/dra7.dtsi |    5 +++++
-> > >  1 file changed, 5 insertions(+)
-> > > 
-> > > diff --git a/arch/arm/boot/dts/dra7.dtsi b/arch/arm/boot/dts/dra7.dtsi
-> > > index 260f300..3f434f7 100644
-> > > --- a/arch/arm/boot/dts/dra7.dtsi
-> > > +++ b/arch/arm/boot/dts/dra7.dtsi
-> > > @@ -291,6 +291,11 @@
-> > >  			reg = <0x4a002e00 0x7c>;
-> > >  		};
-> > >  
-> > > +		dra7_ctrl_pcie: tisyscon at 4a003c00 {
-> > > +			compatible = "syscon";
-> > > +			reg = <0x4a003c00 0x48>;
-> > > +		};
-> > > +
-> > 
-> > Why do you need to start from 0x4a003c00?
-> > CTRL_CORE_PCIESS1_PCS1 is at 0x4a003c24
-> 
-> Also, why can't this dra7_ctrl_pcie node be where scm_conf is.
+On Thu, Jun 4, 2015 at 8:53 PM, Geert Uytterhoeven
+<geert+renesas@glider.be> wrote:
+> --- a/arch/arm/mach-shmobile/pm-rcar.c
+> +++ b/arch/arm/mach-shmobile/pm-rcar.c
 
-Yes all the scm children should be under scm at 2000 entry in the
-dra7.dtsi file.
+> @@ -51,11 +54,29 @@
+>  static void __iomem *rcar_sysc_base;
+>  static DEFINE_SPINLOCK(rcar_sysc_lock); /* SMP CPUs + I/O devices */
+>
+> +static unsigned int rcar_gen;
+> +
+>  static int rcar_sysc_pwr_on_off(const struct rcar_sysc_ch *sysc_ch, bool on)
+>  {
+>         unsigned int sr_bit, reg_offs;
+>         int k;
+>
+> +       /*
+> +        * Only R-Car H1 can control power to CPUs
+> +        * Use WFI to power off, CPG/APMU to resume ARM cores on later R-Car
+> +        * Generations
+> +        */
+> +       switch (rcar_gen) {
+> +       case 2:
+> +               /* FIXME Check rcar_pm_domain.cpu instead? */
+> +               switch (sysc_ch->chan_offs) {
+> +               case SYSC_PWR_CA15_CPU:
+> +               case SYSC_PWR_CA7_CPU:
 
-And BTW, there's nothing stopping a driver doing of_ioremap
-on a larger range and be a child under scm at 2000 in the dra7.dtsi
-if that range is dedicated to a single driver.
+Woops, this patch lacked:
 
-My take is we should only use regmap for the scm_conf area
-in general.
++/*
++ * SYSC Power Control Register Base Addresses (R-Car Gen2)
++ */
++#define SYSC_PWR_CA15_CPU      0x40    /* CA15 cores (incl. L1C) (H2/M2/V2H) */
++#define SYSC_PWR_CA7_CPU       0x1c0   /* CA7 cores (incl. L1C) (H2/E2) */
 
-Regards,
+Gr{oetje,eeting}s,
 
-Tony
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
