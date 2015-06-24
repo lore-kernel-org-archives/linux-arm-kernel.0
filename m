@@ -1,87 +1,61 @@
-From: vaibhav.hiremath@linaro.org (Vaibhav Hiremath)
-Date: Wed, 24 Jun 2015 14:51:13 +0530
-Subject: [PATCH-v3 3/3] mfd: devicetree: bindings: Add new 88pm800 mfd binding
-In-Reply-To: <1435137673-1629-1-git-send-email-vaibhav.hiremath@linaro.org>
-References: <1435137673-1629-1-git-send-email-vaibhav.hiremath@linaro.org>
-Message-ID: <1435137673-1629-4-git-send-email-vaibhav.hiremath@linaro.org>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Wed, 24 Jun 2015 10:32:38 +0100
+Subject: [PATCH] arm64/kvm: Add generic v8 KVM target
+In-Reply-To: <20150624085128.GA22785@cbox>
+References: <1434531646-4873-1-git-send-email-suzuki.poulose@arm.com>
+ <CAFEAcA92uymQ3LjPQnuFiwvjSgc+jY54VrfK_Sh4v1DJ+=OPpw@mail.gmail.com>
+ <558A6A84.5020603@arm.com> <20150624085128.GA22785@cbox>
+Message-ID: <558A7936.7020109@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-With addition of DT support to 88pm800 mfd driver, this patch
-adds new DT binding documentation along with respective properties.
+Hi Christoffer,
 
-Signed-off-by: Vaibhav Hiremath <vaibhav.hiremath@linaro.org>
-Acked-by: Rob Herring <robh@kernel.org>
----
- Documentation/devicetree/bindings/mfd/88pm800.txt | 60 +++++++++++++++++++++++
- 1 file changed, 60 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/mfd/88pm800.txt
+On 24/06/15 09:51, Christoffer Dall wrote:
+> On Wed, Jun 24, 2015 at 09:29:56AM +0100, Marc Zyngier wrote:
+>> On 22/06/15 09:44, Peter Maydell wrote:
+>>> On 17 June 2015 at 10:00, Suzuki K. Poulose <suzuki.poulose@arm.com> wrote:
+>>>> From: "Suzuki K. Poulose" <suzuki.poulose@arm.com>
+>>>>
+>>>> This patch adds a generic ARM v8 KVM target cpu type for use
+>>>> by the new CPUs which eventualy ends up using the common sys_reg
+>>>> table. For backward compatibility the existing targets have been
+>>>> preserved. Any new target CPU that can be covered by generic v8
+>>>> sys_reg tables should make use of the new generic target.
+>>>
+>>> How do you intend this to work for cross-host migration?
+>>
+>> It is not meant to work for cross migration at all.
+>>
+>>> Is the idea that the kernel guarantees that "generic" looks
+>>> 100% the same to the guest regardless of host hardware? I'm
+>>> not sure that can be made to work, given impdef differences
+>>> in ID register values, bp/wp registers, and so on.
+>>>
+>>> Given that, it seems to me that we still need to provide
+>>> KVM_ARM_TARGET_$THISCPU defines so userspace can request
+>>> a specific guest CPU flavour; so what does this patch
+>>> provide that isn't already provided by just having userspace
+>>> query for the "preferred" CPU type as it does already?
+>>
+>> The way I see this working is that a "generic" CPU cannot be migrated
+>> (because we don't know anything about it). If it can be identified as a
+>> known (non generic) implementation, then we can migrate it.
+>>
+> Concretely, how should this work?  Be enforced by userspace or should we
+> deny certain SET_ONE_REG operations from working on this target?
 
-diff --git a/Documentation/devicetree/bindings/mfd/88pm800.txt b/Documentation/devicetree/bindings/mfd/88pm800.txt
-new file mode 100644
-index 0000000..6897119
---- /dev/null
-+++ b/Documentation/devicetree/bindings/mfd/88pm800.txt
-@@ -0,0 +1,60 @@
-+* Marvell 88PM8xx Power Management IC
-+
-+Required parent device properties:
-+- compatible : "marvell,88pm800", "marvell,88pm805", "marvell,88pm860"
-+- reg : the I2C slave address for the 88pm8xx chip
-+- interrupts : IRQ line for the 88pm8xx chip
-+- interrupt-controller: describes the 88pm8xx as an interrupt controller
-+- #interrupt-cells : should be 1.
-+		- The cell is the 88pm8xx local IRQ number
-+
-+Optional parent device properties:
-+- marvell,irq-clr-on-write: indicates whether interrupt status is cleared
-+  by write or read.
-+  If enabled, interrupt is cleared by write else just read would do.
-+
-+88pm8xx family of devices consists of varied group of sub-devices:
-+
-+Device		 	Supply Names	 Description
-+------		 	------------	 -----------
-+88pm80x-onkey		:		: On key
-+88pm80x-rtc		:		: RTC
-+88pm80x-regulator	:		: Regulators
-+
-+Note: More device list will follow
-+
-+Example:
-+
-+	pmic: 88pm800 at 30 {
-+		compatible = "marvell,88pm800";
-+		reg = <0x30>;
-+		interrupts = <GIC_SPI 77 IRQ_TYPE_LEVEL_HIGH>;
-+		interrupt-parent = <&gic>;
-+		interrupt-controller;
-+		#interrupt-cells = <1>;
-+
-+		marvell,irq-clr-on-write;
-+
-+		regulators {
-+			compatible = "marvell,88pm80x-regulator";
-+
-+			buck1a: BUCK1A {
-+				regulator-name = "BUCK1A";
-+				regulator-min-microvolt = <600000>;
-+				regulator-max-microvolt = <1800000>;
-+				regulator-boot-on;
-+				regulator-always-on;
-+			};
-+			ldo1: LDO1 {
-+				regulator-name = "LDO1";
-+				regulator-min-microvolt = <1700000>;
-+				regulator-max-microvolt = <3300000>;
-+				regulator-boot-on;
-+				regulator-always-on;
-+			};
-+		};
-+
-+		rtc {
-+			compatible = "marvell,88pm80x-rtc";
-+		};
-+	};
+I can definitely see MIDR overriding failing on a generic CPU. Also, you
+shouldn't be able to select a generic CPU if we know about the physical CPU.
+
+> 
+> Also, can we imagine any scenario where the generic CPU cannot me
+> modeled for a VM on a specific piece of hardware (current or future)?
+
+What is the definition of a generic CPU here? In the above, generic
+really means "Unknown", so I can't immediately see what it would mean to
+model this.
+
+	M.
 -- 
-1.9.1
+Jazz is not dead. It just smells funny...
