@@ -1,49 +1,22 @@
-From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
-Date: Wed, 24 Jun 2015 14:28:57 -0700
-Subject: [linux-sunxi] Re: [PATCH] input: axp20x-pek: Fix reporting
- button state as inverted
-In-Reply-To: <CAOQ7t2a+3TvmgfW3dJBc=FJk1sXNAT+SE6qP0r5ovG7yx9fYHA@mail.gmail.com>
-References: <1434278541-21355-1-git-send-email-hdegoede@redhat.com>
- <20150622213051.GD2350@dtor-ws>
- <CAGb2v64AF3bnd-QBRCszjD7MSfCnGSvfu3wUT2W+7fNTE76d5g@mail.gmail.com>
- <CAOQ7t2a+3TvmgfW3dJBc=FJk1sXNAT+SE6qP0r5ovG7yx9fYHA@mail.gmail.com>
-Message-ID: <20150624212857.GA3636@dtor-ws>
+From: peterz@infradead.org (Peter Zijlstra)
+Date: Wed, 24 Jun 2015 23:29:30 +0200
+Subject: [PATCH] ARM64: smp: Silence suspicious RCU usage with ipi
+ tracepoints
+In-Reply-To: <1435176858-9568-1-git-send-email-sboyd@codeaurora.org>
+References: <1435176858-9568-1-git-send-email-sboyd@codeaurora.org>
+Message-ID: <20150624212930.GC12596@twins.programming.kicks-ass.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 24, 2015 at 11:19:39AM +0200, Carlo Caione wrote:
-> On Wed, Jun 24, 2015 at 3:42 AM, Chen-Yu Tsai <wens@csie.org> wrote:
-> > On Tue, Jun 23, 2015 at 5:30 AM, Dmitry Torokhov
-> > <dmitry.torokhov@gmail.com> wrote:
-> >> On Sun, Jun 14, 2015 at 12:42:21PM +0200, Hans de Goede wrote:
-> >>> Currently we are reporting the button state as inverted on all boards with
-> >>> an axp209 pmic, tested on a ba10-tvbox, bananapi, bananapro, cubietruck and
-> >>> utoo-p66 tablet.
-> >>>
-> >>> The axp209 datasheet clearly states that the power button must be connected
-> >>> between the PWRON key and ground. Which means that on a press we will get
-> >>> a falling edge (dbf) irq not a rising one, and likewise on release we will
-> >>> get a rising edge (dbr) irq, not a falling one.
-> >>>
-> >>> This commit swaps the check for the 2 irqs fixing the inverted reporting of
-> >>> the power button state.
-> >>>
-> >>> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
-> >>
-> >> Carlo, Chen-Yu, could you please give this patch a spin and let us know
-> >> if it works on your boards?
-> >
-> > I've not actually tested this patch on my boards, but I can confirm that
-> > the original code had the state inverted, by checking /proc/interrupts
-> > counters, before and after releasing the power button.
-> >
-> > Acked-by: Chen-Yu Tsai <wens@csie.org>
+On Wed, Jun 24, 2015 at 01:14:18PM -0700, Stephen Boyd wrote:
+> John Stultz reported an RCU splat on ARM with ipi trace events
+> enabled. It looks like the same problem exists on ARM64.
 > 
-> Same here (I don't have the board anymore)
-> 
-> Acked-by: Carlo Caione <carlo@caione.org>
+> At this point in the IPI handling path we haven't called
+> irq_enter() yet, so RCU doesn't know that we're about to exit
+> idle and properly warns that we're using RCU from an idle CPU.
+> Use trace_ipi_entry_rcuidle() instead of trace_ipi_entry() so
+> that RCU is informed about our exit from idle.
 
-Applied, thank you.
-
--- 
-Dmitry
+I have a problem with $subject. It says 'silence', whereas afaict this
+fixes an actual bug, so it should be 'fixes'.
