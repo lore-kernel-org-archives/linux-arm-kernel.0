@@ -1,49 +1,28 @@
-From: vaibhav.hiremath@linaro.org (Vaibhav Hiremath)
-Date: Wed, 24 Jun 2015 22:40:16 +0530
-Subject: Use of pinctrl-single for external device over I2C
-In-Reply-To: <20150624133349.GI4156@atomide.com>
-References: <55893B2C.1070800@linaro.org> <558A9CC7.6070409@linaro.org>
- <20150624133349.GI4156@atomide.com>
-Message-ID: <558AE478.2080802@linaro.org>
+From: robert.daniels@vantagecontrols.com (Robert Daniels)
+Date: Wed, 24 Jun 2015 17:10:26 +0000
+Subject: L2 Cache enable on i.MX5
+Message-ID: <DBXPR06MB5891810D431F1AE9AEB1CE985AF0@DBXPR06MB589.eurprd06.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
+?I recently discovered an issue with an i.MX53 based product where we had an older version of Das U-Boot which disabled the L2 cache on startup but in a later version would re-enable it once the L2 cache was configured. Since we had the version that did not re-enable it, we run our Linux kernel with the L2 cache disabled.
 
-On Wednesday 24 June 2015 07:03 PM, Tony Lindgren wrote:
-> * Vaibhav Hiremath <vaibhav.hiremath@linaro.org> [150624 05:06]:
->> On Tuesday 23 June 2015 04:25 PM, Vaibhav Hiremath wrote:
->>>
->>> /*
->>>   * REVISIT: Reads and writes could eventually use regmap or something
->>>   * generic. But at least on omaps, some mux registers are performance
->>>   * critical as they may need to be remuxed every time before and after
->>>   * idle. Adding tests for register access width for every read and
->>>   * write like regmap is doing is not desired, and caching the registers
->>>   * does not help in this case.
->>>   */
->>>
->>>
->>> Should be not have flag for this and use regmap_ variants? If we
->>> implement flag based approach then same driver can be reused for pinmux
->>> configuration of external device.
->
-> Nothing stopping you from adding regmap support to it. It just needs
-> to be made optional as the users so far don't need it.
->
+I'd like to have the Linux kernel enable the L2 cache on initialization - where is the correct place to do this? Currently, I've added it to the initialization assembly in arch/arm/boot/compressed/head.S for the decompress kernel loader to get the cache enabled as soon as possible but I wonder if there's a better place.
 
-Yeah, absolutely.
-
-Thinking more on this,
-
-
-I do not like this, as this is not HW feature, so DT may not be right
-approach.
-
-
-So I will dig more from either runtime or Compile time option to use
-regmap_ Vs raw read/writes.
-
+Once I get things squared away, I can submit this patch to the list to have it added to the kernel.
 
 Thanks,
-Vaibhav
+
+Robert Daniels
+
+
+
+________________________________
+
+Ce message, ainsi que tous les fichiers joints ? ce message, peuvent contenir des informations sensibles et/ ou confidentielles ne devant pas ?tre divulgu?es. Si vous n'?tes pas le destinataire de ce message (ou que vous recevez ce message par erreur), nous vous remercions de le notifier imm?diatement ? son exp?diteur, et de d?truire ce message. Toute copie, divulgation, modification, utilisation ou diffusion, non autoris?e, directe ou indirecte, de tout ou partie de ce message, est strictement interdite.
+Se d?sabonner: Si vous souhaitez ?tre retir? de notre liste de diffusion, s'il vous pla?t envoyer vos coordonn?es ? CASL.unsubscribe at legrand.ca<mailto:casl.unsubscribe@legrand.ca> et indiquer quels sont les messages que vous ne souhaitez plus recevoir.
+
+
+This e-mail, and any document attached hereby, may contain confidential and/or privileged information. If you are not the intended recipient (or have received this e-mail in error) please notify the sender immediately and destroy this e-mail. Any unauthorized, direct or indirect, copying, disclosure, distribution or other use of the material or parts thereof is strictly forbidden.
+Unsubscribe: If you would like to be removed from our mailing list, please send your contact information to CASL.unsubscribe at legrand.ca<mailto:casl.unsubscribe@legrand.ca> and indicate what messages you no longer wish to receive.
