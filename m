@@ -1,24 +1,45 @@
 From: srinivas.kandagatla@linaro.org (Srinivas Kandagatla)
-Date: Wed, 24 Jun 2015 10:37:43 +0100
-Subject: [RFC PATCH v6 2/2] nvmem: Add Vybrid OCOTP and OCROM support
-In-Reply-To: <20150624051903.GA11753@Sanchayan-Arch.toradex.int>
-References: <cover.1435066190.git.maitysanchayan@gmail.com>
- <b4a52f6c229bdabbfe9d21c03cb04593dde33ec4.1435066190.git.maitysanchayan@gmail.com>
- <1037424954.250728.1435087901102.JavaMail.open-xchange@oxbsltgw00.schlund.de>
- <20150624051903.GA11753@Sanchayan-Arch.toradex.int>
-Message-ID: <558A7A67.806@linaro.org>
+Date: Wed, 24 Jun 2015 10:46:58 +0100
+Subject: [PATCH v6 0/9] Add simple NVMEM Framework via regmap.
+In-Reply-To: <235181230.251177.1435088854197.JavaMail.open-xchange@oxbsltgw00.schlund.de>
+References: <1435014459-26138-1-git-send-email-srinivas.kandagatla@linaro.org>
+ <235181230.251177.1435088854197.JavaMail.open-xchange@oxbsltgw00.schlund.de>
+Message-ID: <558A7C92.2040102@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
 
-On 24/06/15 06:19, maitysanchayan at gmail.com wrote:
-> I just tested it without the "select REGMAP_MMIO" and it works just fine.
-You just got lucky in this case, as REGMAP_MMIO is getting selected 
-somewhere else.
+On 23/06/15 20:47, Stefan Wahren wrote:
+>> 0001000
+>> >
+> i want to port OCOTP driver for MXS, which hasn't MMIO. From my understanding
+That's cool.
 
-Drivers should directly select the dependecies. In this case this driver 
-actually is going to use REGMAP_MMIO, so keeping it selected is the 
-right thing.
+> hexdump would readout the complete register range defined in provider DT node.
+>
+> How can i achieve that hexdump only reads the data area within the register
+> range?
+
+If the question is just about hexdump, then hexdump itself can read file 
+from given offset and size.
+
+But I believe the real question is "How can we dump each nvmem cell 
+independently"
+
+In one of my replies I mentioned that am planning to add sysfs entries 
+under /sys/class/nvmem/<provider>/cells/
+
+ex:
+for qfprom tsens calibration it would look like:
+
+$ hexdump /sys/class/nvmem/qfprom0/cells/tsens_calibration
+
+0000000 e000 0c00 0c00 0000 0c00
+...
+
+Is that what you guys are looking for?
 
 --srini
+>
+> Stefan
