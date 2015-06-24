@@ -1,40 +1,40 @@
-From: maitysanchayan@gmail.com (Sanchayan Maity)
-Date: Wed, 24 Jun 2015 14:03:41 +0530
-Subject: [PATCH v2 2/2] ARM: dts: vfxxx: Add property for minimum sample time
-In-Reply-To: <cover.1435134626.git.maitysanchayan@gmail.com>
-References: <cover.1435134626.git.maitysanchayan@gmail.com>
-Message-ID: <36fa3cef10b6a21b39e96283ea5d6961e9f6d972.1435134626.git.maitysanchayan@gmail.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Wed, 24 Jun 2015 10:35:29 +0200
+Subject: [RFC PATCH v6 2/2] nvmem: Add Vybrid OCOTP and OCROM support
+In-Reply-To: <b4a52f6c229bdabbfe9d21c03cb04593dde33ec4.1435066190.git.maitysanchayan@gmail.com>
+References: <cover.1435066190.git.maitysanchayan@gmail.com>
+ <b4a52f6c229bdabbfe9d21c03cb04593dde33ec4.1435066190.git.maitysanchayan@gmail.com>
+Message-ID: <20150624083529.GY2266@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add a device tree property which allows to specify the minimum sample
-time which can be used to calculate the actual ADC cycles required
-depending on the hardware.
+Hi, 
 
-Signed-off-by: Sanchayan Maity <maitysanchayan@gmail.com>
----
- arch/arm/boot/dts/vfxxx.dtsi | 2 ++
- 1 file changed, 2 insertions(+)
+On Tue, Jun 23, 2015 at 07:14:57PM +0530, Sanchayan Maity wrote:
+> +static struct nvmem_config ocotp_config = {
+> +	.name = "soc_id",
+> +};
+> +
+> +static struct nvmem_config rom_config = {
+> +	.name = "rom_rev",
+> +};
 
-diff --git a/arch/arm/boot/dts/vfxxx.dtsi b/arch/arm/boot/dts/vfxxx.dtsi
-index 90a03d5..71d9c08 100644
---- a/arch/arm/boot/dts/vfxxx.dtsi
-+++ b/arch/arm/boot/dts/vfxxx.dtsi
-@@ -229,6 +229,7 @@
- 				status = "disabled";
- 				fsl,adck-max-frequency = <30000000>, <40000000>,
- 							<20000000>;
-+				min-sample-time = <1000>;
- 			};
- 
- 			wdoga5: wdog at 4003e000 {
-@@ -447,6 +448,7 @@
- 				status = "disabled";
- 				fsl,adck-max-frequency = <30000000>, <40000000>,
- 							<20000000>;
-+				min-sample-time = <1000>;
- 			};
- 
- 			esdhc1: esdhc at 400b2000 {
+Srinivas, shouldn't we use the DT to setup these names, just like
+clock-output-names does for example?
+
+This is very likely to change from one board to another, and defining
+a new compatible and/or driver for each board seems a bit fishy.
+
+Maxime
+
 -- 
-2.4.4
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150624/ed090e33/attachment.sig>
