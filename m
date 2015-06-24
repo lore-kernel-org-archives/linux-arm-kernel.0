@@ -1,48 +1,42 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Wed, 24 Jun 2015 10:51:28 +0200
-Subject: [PATCH] arm64/kvm: Add generic v8 KVM target
-In-Reply-To: <558A6A84.5020603@arm.com>
-References: <1434531646-4873-1-git-send-email-suzuki.poulose@arm.com>
- <CAFEAcA92uymQ3LjPQnuFiwvjSgc+jY54VrfK_Sh4v1DJ+=OPpw@mail.gmail.com>
- <558A6A84.5020603@arm.com>
-Message-ID: <20150624085128.GA22785@cbox>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Wed, 24 Jun 2015 14:26:58 +0530
+Subject: [PATCH 2/2] cpufreq: mediatek: Add MT8173 cpufreq driver
+In-Reply-To: <CALx668UUUCzswiXyM9e4v9fhu6PTXq5DLu_O3swTPhJUjJPBFg@mail.gmail.com>
+References: <1433766561-1330-1-git-send-email-pi-cheng.chen@linaro.org>
+ <1433766561-1330-3-git-send-email-pi-cheng.chen@linaro.org>
+ <20150622114511.GA28340@linux>
+ <CALx668VmT+90y712QO4JQCh-nTCxStWYY+ygJ_1KiVN7VnmmpQ@mail.gmail.com>
+ <20150624005759.GA6424@linux>
+ <CALx668UUUCzswiXyM9e4v9fhu6PTXq5DLu_O3swTPhJUjJPBFg@mail.gmail.com>
+Message-ID: <20150624085658.GF27188@linux>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 24, 2015 at 09:29:56AM +0100, Marc Zyngier wrote:
-> On 22/06/15 09:44, Peter Maydell wrote:
-> > On 17 June 2015 at 10:00, Suzuki K. Poulose <suzuki.poulose@arm.com> wrote:
-> >> From: "Suzuki K. Poulose" <suzuki.poulose@arm.com>
-> >>
-> >> This patch adds a generic ARM v8 KVM target cpu type for use
-> >> by the new CPUs which eventualy ends up using the common sys_reg
-> >> table. For backward compatibility the existing targets have been
-> >> preserved. Any new target CPU that can be covered by generic v8
-> >> sys_reg tables should make use of the new generic target.
-> > 
-> > How do you intend this to work for cross-host migration?
-> 
-> It is not meant to work for cross migration at all.
-> 
-> > Is the idea that the kernel guarantees that "generic" looks
-> > 100% the same to the guest regardless of host hardware? I'm
-> > not sure that can be made to work, given impdef differences
-> > in ID register values, bp/wp registers, and so on.
-> > 
-> > Given that, it seems to me that we still need to provide
-> > KVM_ARM_TARGET_$THISCPU defines so userspace can request
-> > a specific guest CPU flavour; so what does this patch
-> > provide that isn't already provided by just having userspace
-> > query for the "preferred" CPU type as it does already?
-> 
-> The way I see this working is that a "generic" CPU cannot be migrated
-> (because we don't know anything about it). If it can be identified as a
-> known (non generic) implementation, then we can migrate it.
-> 
-Concretely, how should this work?  Be enforced by userspace or should we
-deny certain SET_ONE_REG operations from working on this target?
+On 24-06-15, 16:44, Pi-Cheng Chen wrote:
+> One reason to put those initialization and resource allocation in probe is
+> that it's easier to handle the return value -PROBE_DEFER from clock
+> and regulator framework when trying to get clocks and regulators
+> consumed by cpufreq driver.
 
-Also, can we imagine any scenario where the generic CPU cannot me
-modeled for a VM on a specific piece of hardware (current or future)?
+This is the sequence of events if you move these things to ->init().
 
--Christoffer
+- your driver's probe()
+  -> cpufreq_register_driver()
+    -> init()
+      -> clk/reg get, failed, return -EPROBE_DEFER
+
+And the failure here will be propagated to probe(). So, it should
+work IMHO.
+
+> The other reason is when the whole system is resuming from suspend,
+> the other subsystem e.g. i2c on which cpufreq driver depends might not
+> ready yet during cpufreq driver initialization. In this case, the cpufreq
+> driver will be blocked when trying to get resources e.g. regulator on i2c
+> bus, and the whole system will stuck for seconds.
+
+That's something else you must investigate on. This dependency should
+be resolved in some other way, I thought DT might have taken care of
+such dependencies.
+
+-- 
+viresh
