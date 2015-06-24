@@ -1,167 +1,63 @@
 From: peter.griffin@linaro.org (Peter Griffin)
-Date: Wed, 24 Jun 2015 16:11:00 +0100
-Subject: [PATCH 02/12] [media] dvb-pll: Add support for THOMSON DTT7546X tuner.
+Date: Wed, 24 Jun 2015 16:11:01 +0100
+Subject: [PATCH 03/12] [media] stv0367: Refine i2c error trace to include i2c
+ address
 In-Reply-To: <1435158670-7195-1-git-send-email-peter.griffin@linaro.org>
 References: <1435158670-7195-1-git-send-email-peter.griffin@linaro.org>
-Message-ID: <1435158670-7195-3-git-send-email-peter.griffin@linaro.org>
+Message-ID: <1435158670-7195-4-git-send-email-peter.griffin@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This is used in conjunction with the STV0367 demodulator on
-the STV0367-NIM-V1.0 NIM card which can be used with the STi
-STB SoC's.
+When using stv0367 demodulator with STi STB platforms,
+we can have easily have four or more stv0367 demods running
+in the system at one time.
 
-This tuner has a fifth register, so some changes have been made
-to accommodate this.
+As typically the b2120 reference design ships with a b2004a daughter
+board, which can accept two dvb NIM cards, and each b2100A NIM
+has 2x stv0367 demods and 2x NXPs tuner on it.
+
+In such circumstances it is useful to print the i2c address
+on error messages to know which one is failing due to I2C issues.
 
 Signed-off-by: Peter Griffin <peter.griffin@linaro.org>
 ---
- drivers/media/dvb-frontends/dvb-pll.c | 74 +++++++++++++++++++++++++++++------
- drivers/media/dvb-frontends/dvb-pll.h |  1 +
- 2 files changed, 64 insertions(+), 11 deletions(-)
+ drivers/media/dvb-frontends/stv0367.c | 12 ++++++++----
+ 1 file changed, 8 insertions(+), 4 deletions(-)
 
-diff --git a/drivers/media/dvb-frontends/dvb-pll.c b/drivers/media/dvb-frontends/dvb-pll.c
-index 6d8fe88..f7381c7 100644
---- a/drivers/media/dvb-frontends/dvb-pll.c
-+++ b/drivers/media/dvb-frontends/dvb-pll.c
-@@ -141,6 +141,35 @@ static struct dvb_pll_desc dvb_pll_thomson_dtt7520x = {
- 	},
- };
+diff --git a/drivers/media/dvb-frontends/stv0367.c b/drivers/media/dvb-frontends/stv0367.c
+index b31ff26..c3b7e6c 100644
+--- a/drivers/media/dvb-frontends/stv0367.c
++++ b/drivers/media/dvb-frontends/stv0367.c
+@@ -791,11 +791,13 @@ int stv0367_writeregs(struct stv0367_state *state, u16 reg, u8 *data, int len)
+ 	memcpy(buf + 2, data, len);
  
-+static void thomson_dtt7546x_bw(struct dvb_frontend *fe, u8 *buf)
-+{
-+	/* set CB2 reg - set ATC, XTO */
-+	buf[4] = 0xc3;
-+}
-+
-+static struct dvb_pll_desc dvb_pll_thomson_dtt7546x = {
-+	.name  = "Thomson dtt7546x",
-+	.min   = 44250000,
-+	.max   = 863250000,
-+	.set   = thomson_dtt7546x_bw,
-+	.iffreq= 36166667,
-+	.count = 12,
-+	.entries = {
-+		{  121000000, 166667, 0x88, 0x01 },
-+		{  141000000, 166667, 0x88, 0x41 },
-+		{  166000000, 166667, 0x88, 0x81 },
-+		{  182000000, 166667, 0x88, 0xc1 },
-+		{  286000000, 166667, 0x88, 0x02 },
-+		{  386000000, 166667, 0x88, 0x42 },
-+		{  446000000, 166667, 0x88, 0x82 },
-+		{  466000000, 166667, 0x88, 0xc2 },
-+		{  506000000, 166667, 0x88, 0x08 },
-+		{  761000000, 166667, 0x88, 0x48 },
-+		{  846000000, 166667, 0x88, 0x88 },
-+		{  905000000, 166667, 0x88, 0xc8 },
-+	},
-+};
-+
- static struct dvb_pll_desc dvb_pll_lg_z201 = {
- 	.name  = "LG z201",
- 	.min   = 174000000,
-@@ -537,6 +566,7 @@ static struct dvb_pll_desc dvb_pll_alps_tdee4 = {
- static struct dvb_pll_desc *pll_list[] = {
- 	[DVB_PLL_UNDEFINED]              = NULL,
- 	[DVB_PLL_THOMSON_DTT7579]        = &dvb_pll_thomson_dtt7579,
-+	[DVB_PLL_THOMSON_DTT7546X]       = &dvb_pll_thomson_dtt7546x,
- 	[DVB_PLL_THOMSON_DTT759X]        = &dvb_pll_thomson_dtt759x,
- 	[DVB_PLL_THOMSON_DTT7520X]       = &dvb_pll_thomson_dtt7520x,
- 	[DVB_PLL_LG_Z201]                = &dvb_pll_lg_z201,
-@@ -561,7 +591,7 @@ static struct dvb_pll_desc *pll_list[] = {
- /* code                                                        */
+ 	if (i2cdebug)
+-		printk(KERN_DEBUG "%s: %02x: %02x\n", __func__, reg, buf[2]);
++		printk(KERN_DEBUG "%s: [%02x] %02x: %02x\n", __func__,
++			state->config->demod_address, reg, buf[2]);
  
- static int dvb_pll_configure(struct dvb_frontend *fe, u8 *buf,
--			     const u32 frequency)
-+			const u32 frequency, const u32 len)
- {
- 	struct dvb_pll_priv *priv = fe->tuner_priv;
- 	struct dvb_pll_desc *desc = priv->pll_desc;
-@@ -593,11 +623,15 @@ static int dvb_pll_configure(struct dvb_frontend *fe, u8 *buf,
- 	if (desc->set)
- 		desc->set(fe, buf);
+ 	ret = i2c_transfer(state->i2c, &msg, 1);
+ 	if (ret != 1)
+-		printk(KERN_ERR "%s: i2c write error!\n", __func__);
++		printk(KERN_ERR "%s: i2c write error! ([%02x] %02x: %02x)\n",
++			__func__, state->config->demod_address, reg, buf[2]);
  
--	if (debug)
--		printk("pll: %s: div=%d | buf=0x%02x,0x%02x,0x%02x,0x%02x\n",
--		       desc->name, div, buf[0], buf[1], buf[2], buf[3]);
-+	if (debug) {
-+		printk(KERN_DEBUG "pll: %s: div=%d | buf=", desc->name, div);
-+		for (i = 0; i < len; i++)
-+			printk(KERN_DEBUG "0x%02x,", buf[i]);
- 
--	// calculate the frequency we set it to
-+		printk(KERN_DEBUG "\n");
-+	}
-+
-+	/* calculate the frequency we set it to */
- 	return (div * desc->entries[i].stepsize) - desc->iffreq;
+ 	return (ret != 1) ? -EREMOTEIO : 0;
  }
+@@ -829,10 +831,12 @@ static u8 stv0367_readreg(struct stv0367_state *state, u16 reg)
  
-@@ -634,21 +668,39 @@ static int dvb_pll_sleep(struct dvb_frontend *fe)
- 	return -EINVAL;
+ 	ret = i2c_transfer(state->i2c, msg, 2);
+ 	if (ret != 2)
+-		printk(KERN_ERR "%s: i2c read error\n", __func__);
++		printk(KERN_ERR "%s: i2c read error ([%02x] %02x: %02x)\n",
++			__func__, state->config->demod_address, reg, b1[0]);
+ 
+ 	if (i2cdebug)
+-		printk(KERN_DEBUG "%s: %02x: %02x\n", __func__, reg, b1[0]);
++		printk(KERN_DEBUG "%s: [%02x] %02x: %02x\n", __func__,
++			state->config->demod_address, reg, b1[0]);
+ 
+ 	return b1[0];
  }
- 
-+static int dvb_pll_get_num_regs(struct dvb_pll_priv *priv)
-+{
-+	int num_regs = 4;
-+
-+	if (strncmp(priv->pll_desc->name, "Thomson dtt7546x", 16) == 0)
-+		num_regs = 5;
-+
-+	return num_regs;
-+}
-+
- static int dvb_pll_set_params(struct dvb_frontend *fe)
- {
- 	struct dtv_frontend_properties *c = &fe->dtv_property_cache;
- 	struct dvb_pll_priv *priv = fe->tuner_priv;
--	u8 buf[4];
--	struct i2c_msg msg =
--		{ .addr = priv->pll_i2c_address, .flags = 0,
--		  .buf = buf, .len = sizeof(buf) };
-+	struct i2c_msg msg;
-+	u8 *bufp;
- 	int result;
- 	u32 frequency = 0;
- 
-+	bufp = kzalloc(dvb_pll_get_num_regs(priv), GFP_KERNEL);
-+
-+	if (!bufp)
-+		return -ENOMEM;
-+
-+	msg.addr = priv->pll_i2c_address;
-+	msg.flags = 0;
-+	msg.buf = bufp;
-+	msg.len = dvb_pll_get_num_regs(priv);
-+
- 	if (priv->i2c == NULL)
- 		return -EINVAL;
- 
--	result = dvb_pll_configure(fe, buf, c->frequency);
-+	result = dvb_pll_configure(fe, bufp, c->frequency, msg.len);
- 	if (result < 0)
- 		return result;
- 	else
-@@ -677,7 +729,7 @@ static int dvb_pll_calc_regs(struct dvb_frontend *fe,
- 	if (buf_len < 5)
- 		return -EINVAL;
- 
--	result = dvb_pll_configure(fe, buf + 1, c->frequency);
-+	result = dvb_pll_configure(fe, buf + 1, c->frequency, buf_len - 1);
- 	if (result < 0)
- 		return result;
- 	else
-diff --git a/drivers/media/dvb-frontends/dvb-pll.h b/drivers/media/dvb-frontends/dvb-pll.h
-index bf9602a..f523f42 100644
---- a/drivers/media/dvb-frontends/dvb-pll.h
-+++ b/drivers/media/dvb-frontends/dvb-pll.h
-@@ -28,6 +28,7 @@
- #define DVB_PLL_SAMSUNG_TBMU24112      17
- #define DVB_PLL_TDEE4		       18
- #define DVB_PLL_THOMSON_DTT7520X       19
-+#define DVB_PLL_THOMSON_DTT7546X       20
- 
- /**
-  * Attach a dvb-pll to the supplied frontend structure.
 -- 
 1.9.1
