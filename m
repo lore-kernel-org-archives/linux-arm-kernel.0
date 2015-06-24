@@ -1,89 +1,117 @@
-From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Wed, 24 Jun 2015 12:24:42 +0200
-Subject: [PATCH] arm64: dts: mt8173: add clock_null
-In-Reply-To: <1435132455.28866.21.camel@mtksdaap41>
-References: <1434605351-64592-1-git-send-email-eddie.huang@mediatek.com>
- <8860488.JuX1EN5tWB@diego> <1435132455.28866.21.camel@mtksdaap41>
-Message-ID: <1510058.fTE6dlSRsH@diego>
+From: rogerq@ti.com (Roger Quadros)
+Date: Wed, 24 Jun 2015 13:34:43 +0300
+Subject: [PATCH 03/17] phy: ti-pipe3: use *syscon* framework to set PCS
+ value of the PHY
+In-Reply-To: <1435060743-5511-4-git-send-email-kishon@ti.com>
+References: <1435060743-5511-1-git-send-email-kishon@ti.com>
+ <1435060743-5511-4-git-send-email-kishon@ti.com>
+Message-ID: <20150624133443.6ad1262fcf174c755e9ad7b2@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi James,
+On Tue, 23 Jun 2015 17:28:48 +0530
+Kishon Vijay Abraham I <kishon@ti.com> wrote:
 
-Am Mittwoch, 24. Juni 2015, 15:54:15 schrieb James Liao:
-> On Mon, 2015-06-22 at 14:53 +0200, Heiko St?bner wrote:
-> > Hi James,
-> > 
-> > Am Montag, 22. Juni 2015, 11:38:37 schrieb James Liao:
-> > > On Fri, 2015-06-19 at 13:36 +0200, Heiko Stuebner wrote:
-> > > 
-> > > Some clocks such as clkph_mck_o, we don't really care where they come
-> > > from and what frequencies are. We model these clocks just because they
-> > > or their derived clocks can be the source of topckgen muxes. Is there a
-> > > better way to model "don't care" clocks?
-> > 
-> > There are two different concepts at work here. You might not care in your
-> > kernel driver implementation _at the moment_ where the clocks come from;
-> > but the devicetree is supposed to model how the hardware is structured
-> > and not contain implementation specific details.
+> Deprecate using phy-omap-control driver to set PCS value of the PHY
+> and start using *syscon* framework to do the same.
 > 
-> If we model "don't care" clocks inside the driver (i.e. create clk_null
-> in clock driver), then we don't need to model the dummy clock in device.
-> Is it an acceptable way?
+> Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
+> ---
+>  Documentation/devicetree/bindings/phy/ti-phy.txt |    2 ++
+>  drivers/phy/phy-ti-pipe3.c                       |   32 +++++++++++++++++++++-
+>  2 files changed, 33 insertions(+), 1 deletion(-)
 > 
-> > So the clock tree should be modeled according to how the hardware is layed
-> > out not how you want to use the clocks at the moment :-) .
-> > 
-> > It would it any case be good, if you could describe where these clocks
-> > come
-> > from in the hardware, so we can find the best solution on how to model
-> > those.
-> In fact, I don't know where these clocks come from at all, especially
-> when they come from outside of SoC. Besides, some clocks don't need to
-> model in CCF, but they can be the source of clocks that controlled by
-> CCF.
+> diff --git a/Documentation/devicetree/bindings/phy/ti-phy.txt b/Documentation/devicetree/bindings/phy/ti-phy.txt
+> index d3ad3bf..52c7a92 100644
+> --- a/Documentation/devicetree/bindings/phy/ti-phy.txt
+> +++ b/Documentation/devicetree/bindings/phy/ti-phy.txt
+> @@ -83,6 +83,8 @@ Optional properties:
+>   - syscon-pllreset: Handle to system control region that contains the
+>     CTRL_CORE_SMA_SW_0 register and register offset to the CTRL_CORE_SMA_SW_0
+>     register that contains the SATA_PLL_SOFT_RESET bit. Only valid for sata_phy.
+> + - syscon-pcs : phandle/offset pair. Phandle to the system control module and the
+> +   register offset to write the PCS delay value.
 
-If a clock is used inside the ccf driver, its tree should be modeled according 
-to the hardware - including these external clocks. Somebody (at least some 
-chip designer or so) should know where these clocks actually come from ;-) .
+What is PCS?
+Is this valid only for PCIe? If yes we could mention it here.
 
+>  
+>  Deprecated properties:
+>   - ctrl-module : phandle of the control module used by PHY driver to power on
+> diff --git a/drivers/phy/phy-ti-pipe3.c b/drivers/phy/phy-ti-pipe3.c
+> index 78bac00..e2f9ad7 100644
+> --- a/drivers/phy/phy-ti-pipe3.c
+> +++ b/drivers/phy/phy-ti-pipe3.c
+> @@ -65,6 +65,9 @@
+>  #define PIPE3_PHY_TX_RX_POWERON		0x3
+>  #define PIPE3_PHY_TX_RX_POWEROFF	0x0
+>  
+> +#define PCIE_PCS_MASK			0xFF0000
+> +#define PCIE_PCS_DELAY_COUNT_SHIFT	0x10
+> +
+>  /*
+>   * This is an Empirical value that works, need to confirm the actual
+>   * value required for the PIPE3PHY_PLL_CONFIGURATION2.PLL_IDLE status
+> @@ -96,9 +99,11 @@ struct ti_pipe3 {
+>  	struct clk		*div_clk;
+>  	struct pipe3_dpll_map	*dpll_map;
+>  	struct regmap		*phy_power_syscon; /* ctrl. reg. acces */
+> +	struct regmap		*pcs_syscon; /* ctrl. reg. acces */
+>  	struct regmap		*dpll_reset_syscon; /* ctrl. reg. acces */
+>  	unsigned int		dpll_reset_reg; /* reg. index within syscon */
+>  	unsigned int		power_reg; /* power reg. index within syscon */
+> +	unsigned int		pcie_pcs_reg; /* pcs reg. index in syscon */
+>  	bool			sata_refclk_enabled;
+>  };
+>  
+> @@ -271,7 +276,16 @@ static int ti_pipe3_init(struct phy *x)
+>  	 * 18-1804.
+>  	 */
+>  	if (of_device_is_compatible(phy->dev->of_node, "ti,phy-pipe3-pcie")) {
+> -		omap_control_pcie_pcs(phy->control_dev, 0x96);
+> +		if (phy->pcs_syscon) {
+> +			val = 0x96 << OMAP_CTRL_PCIE_PCS_DELAY_COUNT_SHIFT;
+> +			ret = regmap_update_bits(phy->pcs_syscon,
+> +						 phy->pcie_pcs_reg,
+> +						 PCIE_PCS_MASK, val);
+> +			if (ret < 0)
+> +				return ret;
+> +		} else {
+> +			omap_control_pcie_pcs(phy->control_dev, 0x96);
+> +		}
+>  		return 0;
+>  	}
+>  
+> @@ -455,6 +469,22 @@ static int ti_pipe3_probe(struct platform_device *pdev)
+>  			dev_err(&pdev->dev, "unable to get div-clk\n");
+>  			return PTR_ERR(phy->div_clk);
+>  		}
+> +
+> +		phy->pcs_syscon = syscon_regmap_lookup_by_phandle(node,
+> +								  "syscon-pcs");
+> +		if (IS_ERR(phy->pcs_syscon)) {
+> +			dev_dbg(&pdev->dev,
+> +				 "can't get syscon-pcs, using omap control\n");
+> +			phy->pcs_syscon = NULL;
+> +		} else {
+> +			if (of_property_read_u32_index(node,
+> +						       "syscon-pcs", 1,
+> +						       &phy->pcie_pcs_reg)) {
+> +				dev_err(&pdev->dev,
+> +					"couldn't get pcie pcs reg. offset\n");
+> +				return -EINVAL;
+> +			}
+> +		}
+>  	} else {
+>  		phy->div_clk = ERR_PTR(-ENODEV);
+>  	}
+> -- 
+> 1.7.9.5
+> 
 
-> I don't think ALL clocks on a SoC need to be handled in CCF, so there
-> should be some clocks don't have a "real" or "correct" parent. In
-> current implementation I use a dummy clock (clk_null) to be the unreal
-> parent.
+Other than that,
 
-You are right that not all clocks needs to be implemented in a ccf _driver_, 
-but as the devicetree binding describes the hardware and is supposed to be 
-stable and (nearly) unchangeable outside-connections of the clock block need 
-to be defined carefully.
+Acked-by: Roger Quadros <rogerq@ti.com>
 
-
-> Do you think we should model as more clocks as we can in CCF even we
-> don't need them? If no, how do we handle those clocks which are not
-> handled in CCF but can be parent of CCF clocks?
-
-In general I think everything that has a connection to the outside (external 
-source clock and clocks used by soc ips) should be modeled precisely. What 
-then happens inside the clock controller is less important, as it normally can 
-be fixed later on too.
-
-
-Citing my own code [which got inspired on how Samsung did this], Rockchip 
-clock controllers also have numerous possible external clock inputs with only 
-the 24MHz oscillator being required [0].
-
-All the other clocks may or may not be present. For example xin32k normally 
-comes from an i2c-connected rtc or pmic chip which gets probed a lot later in 
-the boot process, so we rely on the orphan-handling of the ccf for these.
-
-
-So please really try to find out what these clocks are in the first place ... 
-somebody must know this ;-)
-
-
-Heiko
-
-
-[0] 
-https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/tree/Documentation/devicetree/bindings/clock/rockchip,rk3288-cru.txt#n26
+cheers,
+-roger
