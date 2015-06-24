@@ -1,61 +1,47 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 24 Jun 2015 10:32:38 +0100
-Subject: [PATCH] arm64/kvm: Add generic v8 KVM target
-In-Reply-To: <20150624085128.GA22785@cbox>
-References: <1434531646-4873-1-git-send-email-suzuki.poulose@arm.com>
- <CAFEAcA92uymQ3LjPQnuFiwvjSgc+jY54VrfK_Sh4v1DJ+=OPpw@mail.gmail.com>
- <558A6A84.5020603@arm.com> <20150624085128.GA22785@cbox>
-Message-ID: <558A7936.7020109@arm.com>
+From: srinivas.kandagatla@linaro.org (Srinivas Kandagatla)
+Date: Wed, 24 Jun 2015 10:34:43 +0100
+Subject: [RFC PATCH v6 2/2] nvmem: Add Vybrid OCOTP and OCROM support
+In-Reply-To: <20150624083529.GY2266@lukather>
+References: <cover.1435066190.git.maitysanchayan@gmail.com>
+ <b4a52f6c229bdabbfe9d21c03cb04593dde33ec4.1435066190.git.maitysanchayan@gmail.com>
+ <20150624083529.GY2266@lukather>
+Message-ID: <558A79B3.1010205@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Christoffer,
 
-On 24/06/15 09:51, Christoffer Dall wrote:
-> On Wed, Jun 24, 2015 at 09:29:56AM +0100, Marc Zyngier wrote:
->> On 22/06/15 09:44, Peter Maydell wrote:
->>> On 17 June 2015 at 10:00, Suzuki K. Poulose <suzuki.poulose@arm.com> wrote:
->>>> From: "Suzuki K. Poulose" <suzuki.poulose@arm.com>
->>>>
->>>> This patch adds a generic ARM v8 KVM target cpu type for use
->>>> by the new CPUs which eventualy ends up using the common sys_reg
->>>> table. For backward compatibility the existing targets have been
->>>> preserved. Any new target CPU that can be covered by generic v8
->>>> sys_reg tables should make use of the new generic target.
->>>
->>> How do you intend this to work for cross-host migration?
->>
->> It is not meant to work for cross migration at all.
->>
->>> Is the idea that the kernel guarantees that "generic" looks
->>> 100% the same to the guest regardless of host hardware? I'm
->>> not sure that can be made to work, given impdef differences
->>> in ID register values, bp/wp registers, and so on.
->>>
->>> Given that, it seems to me that we still need to provide
->>> KVM_ARM_TARGET_$THISCPU defines so userspace can request
->>> a specific guest CPU flavour; so what does this patch
->>> provide that isn't already provided by just having userspace
->>> query for the "preferred" CPU type as it does already?
->>
->> The way I see this working is that a "generic" CPU cannot be migrated
->> (because we don't know anything about it). If it can be identified as a
->> known (non generic) implementation, then we can migrate it.
->>
-> Concretely, how should this work?  Be enforced by userspace or should we
-> deny certain SET_ONE_REG operations from working on this target?
 
-I can definitely see MIDR overriding failing on a generic CPU. Also, you
-shouldn't be able to select a generic CPU if we know about the physical CPU.
+On 24/06/15 09:35, Maxime Ripard wrote:
+> Hi,
+>
+> On Tue, Jun 23, 2015 at 07:14:57PM +0530, Sanchayan Maity wrote:
+>> +static struct nvmem_config ocotp_config = {
+>> +	.name = "soc_id",
+>> +};
+>> +
+>> +static struct nvmem_config rom_config = {
+>> +	.name = "rom_rev",
+>> +};
+>
+> Srinivas, shouldn't we use the DT to setup these names, just like
+> clock-output-names does for example?
+These are the provider names, which would not change per board, I think. :-)
 
-> 
-> Also, can we imagine any scenario where the generic CPU cannot me
-> modeled for a VM on a specific piece of hardware (current or future)?
+On the other hand if we are going to use generic drivers like 
+"simple-mmio-nvmem" then having name DT bindings makes sense.
 
-What is the definition of a generic CPU here? In the above, generic
-really means "Unknown", so I can't immediately see what it would mean to
-model this.
+IMO, clock-output-names are analogous to nvmem consumers, which are 
+obviously getting there names from cell node name ATM.
 
-	M.
--- 
-Jazz is not dead. It just smells funny...
+
+>
+> This is very likely to change from one board to another, and defining
+> a new compatible and/or driver for each board seems a bit fishy.
+>
+Do you have any particular example in mind, where the provider names 
+would change per board?
+
+--srini
+
+> Maxime
+>
