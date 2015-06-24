@@ -1,76 +1,170 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Wed, 24 Jun 2015 09:29:04 +0900
-Subject: [PATCH-v2 3/3] mfd: devicetree: bindings: Add new 88pm800 mfd
- binding
-In-Reply-To: <1434567488-6477-5-git-send-email-vaibhav.hiremath@linaro.org>
-References: <vaibhav.hiremath@linaro.org>
- <1434567488-6477-1-git-send-email-vaibhav.hiremath@linaro.org>
- <1434567488-6477-5-git-send-email-vaibhav.hiremath@linaro.org>
-Message-ID: <CAJKOXPf7OuGfxsZeewoimyyCRKGqjH+j-S81cAH=6DSRQmaS0A@mail.gmail.com>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Wed, 24 Jun 2015 06:27:59 +0530
+Subject: [PATCH 2/2] cpufreq: mediatek: Add MT8173 cpufreq driver
+In-Reply-To: <CALx668VmT+90y712QO4JQCh-nTCxStWYY+ygJ_1KiVN7VnmmpQ@mail.gmail.com>
+References: <1433766561-1330-1-git-send-email-pi-cheng.chen@linaro.org>
+ <1433766561-1330-3-git-send-email-pi-cheng.chen@linaro.org>
+ <20150622114511.GA28340@linux>
+ <CALx668VmT+90y712QO4JQCh-nTCxStWYY+ygJ_1KiVN7VnmmpQ@mail.gmail.com>
+Message-ID: <20150624005759.GA6424@linux>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2015-06-18 3:58 GMT+09:00 Vaibhav Hiremath <vaibhav.hiremath@linaro.org>:
-> With addition of DT support to 88pm800 mfd driver, this patch
-> adds new DT binding documentation along with respective properties.
->
-> Signed-off-by: Vaibhav Hiremath <vaibhav.hiremath@linaro.org>
-> ---
->  Documentation/devicetree/bindings/mfd/88pm800.txt | 60 +++++++++++++++++++++++
->  1 file changed, 60 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/mfd/88pm800.txt
->
-> diff --git a/Documentation/devicetree/bindings/mfd/88pm800.txt b/Documentation/devicetree/bindings/mfd/88pm800.txt
-> new file mode 100644
-> index 0000000..b8e72df
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/mfd/88pm800.txt
-> @@ -0,0 +1,60 @@
-> +* Marvell 88PM8xx Power Management IC
-> +
-> +Required parent device properties:
-> +- compatible : "marvell,88pm800", "marvell,88pm805", "marvell,88pm860"
-> +- reg : the I2C slave address for the 88pm8xx chip
-> +- interrupts : IRQ line for the 88pm8xx chip
-> +- interrupt-controller: describes the 88pm8xx as an interrupt controller
-> +- #interrupt-cells : should be 1.
-> +               - The cell is the 88pm8xx local IRQ number
-> +
-> +Optional parent device properties:
-> +- marvell,irq-clr-on-write: indicates whether interrupt status is cleared
-> +  by write or read.
-> +  If enabled, interrupt is cleared by write else just read would do.
-> +
-> +88pm8xx family of devices consists of varied group of sub-devices:
-> +
-> +Device                 Supply Names     Description
-> +------                 ------------     -----------
-> +88pm80x-onkey          :               : On key
-> +88pm80x-rtc            :               : RTC
-> +88pm80x-regulator      :               : Regulators
-> +
-> +Note: More device list will follow
-> +
-> +Example:
-> +
-> +       pmic: 88pm800 at 30 {
-> +               compatible = "marvell,88pm800";
-> +               reg = <0x30>;
-> +               interrupts = <GIC_SPI 77 IRQ_TYPE_LEVEL_HIGH>;
-> +               interrupt-parent = <&gic>;
-> +               interrupt-controller;
-> +               #interrupt-cells = <1>;
-> +
-> +               marvell,irq-clr-on-write;
-> +
-> +               regulators {
-> +                       compatible = "marvell,88pm80x-regulator";
-> +
-> +                       buck1a: BUCK1A {
-> +                               regulator-compatible = "88PM800-BUCK1A";
+On 23-06-15, 23:25, Pi-Cheng Chen wrote:
+> On Mon, Jun 22, 2015 at 7:45 PM, Viresh Kumar <viresh.kumar@linaro.org> wrote:
+> >> +static struct mtk_cpu_dvfs_info *mtk_cpu_dvfs_info_get(int cpu)
+> >
+> > A very bad name to a routine with very specific functionality.
+> 
+> Would get_mtk_cpu_dvfs_info() or cpu_to_mtk_cpu_dvfs_info() be better?
+> 
+> >
+> >> +{
+> >> +     struct mtk_cpu_dvfs_info *info;
+> >> +     struct list_head *list;
+> >> +
+> >> +     list_for_each(list, &cpu_dvfs_info_list) {
+> >> +             info = to_mtk_cpu_dvfs_info(list);
+> >> +
+> >> +             if (cpumask_test_cpu(cpu, info->cpus))
+> >> +                     return info;
+> >> +     }
 
-That's a deprecated property.
-Documentation/devicetree/bindings/regulator/regulator.txt
+Firstly there is no need of extra long name for static routines. Just
+keep them simple. i.e. no need of mtk_cpu_.
 
-Best regards,
-Krzysztof
+And then I was a bit confused about the functionality earlier and your
+initial name wasn't that bad. Sorry :(
+
+So maybe just, get_dvfs_info().
+
+> >> +     freq_hz = freq_table[index].frequency * 1000;
+> >
+> > A blank line here.
+> 
+> Will remove it.
+> 
+
+I was asking you to add it :)
+
+> >> +     rcu_read_lock();
+
+
+> >> +static int mtk_cpu_dvfs_info_init(int cpu)
+> >> +{
+> >> +     struct device *cpu_dev;
+> >> +     struct regulator *proc_reg = ERR_PTR(-ENODEV);
+> >> +     struct regulator *sram_reg = ERR_PTR(-ENODEV);
+> >> +     struct clk *cpu_clk = ERR_PTR(-ENODEV);
+> >> +     struct clk *inter_clk = ERR_PTR(-ENODEV);
+> >> +     struct mtk_cpu_dvfs_info *info;
+> >> +     struct cpufreq_frequency_table *freq_table;
+> >> +     struct dev_pm_opp *opp;
+> >> +     unsigned long rate;
+> >> +     int ret;
+> >> +
+> >> +     cpu_dev = get_cpu_device(cpu);
+> >> +     if (!cpu_dev) {
+> >> +             pr_err("failed to get cpu%d device\n", cpu);
+> >> +             return -ENODEV;
+> >> +     }
+> >> +
+> >> +     ret = of_init_opp_table(cpu_dev);
+> >> +     if (ret) {
+> >> +             pr_warn("no OPP table for cpu%d\n", cpu);
+> >> +             return ret;
+> >> +     }
+> >> +
+> >> +     cpu_clk = clk_get(cpu_dev, "cpu");
+> >> +     if (IS_ERR(cpu_clk)) {
+> >> +             if (PTR_ERR(cpu_clk) == -EPROBE_DEFER)
+> >> +                     pr_warn("cpu clk for cpu%d not ready, retry.\n", cpu);
+> >> +             else
+> >> +                     pr_err("failed to get cpu clk for cpu%d\n", cpu);
+> >> +
+> >> +             ret = PTR_ERR(cpu_clk);
+> >> +             goto out_free_opp_table;
+> >> +     }
+> >> +
+> >> +     inter_clk = clk_get(cpu_dev, "intermediate");
+> >> +     if (IS_ERR(inter_clk)) {
+> >> +             if (PTR_ERR(inter_clk) == -EPROBE_DEFER)
+> >> +                     pr_warn("intermediate clk for cpu%d not ready, retry.\n",
+> >> +                             cpu);
+> >> +             else
+> >> +                     pr_err("failed to get intermediate clk for cpu%d\n",
+> >> +                            cpu);
+> >> +
+> >> +             ret = PTR_ERR(cpu_clk);
+> >> +             goto out_free_resources;
+> >> +     }
+> >> +
+> >> +     proc_reg = regulator_get_exclusive(cpu_dev, "proc");
+> >> +     if (IS_ERR(proc_reg)) {
+> >> +             if (PTR_ERR(proc_reg) == -EPROBE_DEFER)
+> >> +                     pr_warn("proc regulator for cpu%d not ready, retry.\n",
+> >> +                             cpu);
+> >> +             else
+> >> +                     pr_err("failed to get proc regulator for cpu%d\n",
+> >> +                            cpu);
+> >> +
+> >> +             ret = PTR_ERR(proc_reg);
+> >> +             goto out_free_resources;
+> >> +     }
+> >> +
+> >> +     /* Both presence and absence of sram regulator are valid cases. */
+> >> +     sram_reg = regulator_get_exclusive(cpu_dev, "sram");
+> >> +
+> >> +     info = kzalloc(sizeof(*info), GFP_KERNEL);
+> >> +     if (!info) {
+> >> +             ret = -ENOMEM;
+> >> +             goto out_free_resources;
+> >> +     }
+> >> +
+> >> +     ret = dev_pm_opp_init_cpufreq_table(cpu_dev, &freq_table);
+> >> +     if (ret) {
+> >> +             pr_err("failed to init cpufreq table for cpu%d: %d\n",
+> >> +                    cpu, ret);
+> >> +             goto out_free_mtk_cpu_dvfs_info;
+> >> +     }
+> >> +
+> >> +     if (!alloc_cpumask_var(&info->cpus, GFP_KERNEL))
+> >
+> > Why getting into such trouble? What about just saving policy's pointer
+> > in info and use it for freq_table, cpus mask, etc ?
+> 
+> This function is called from driver probe function. At this moment, cpufreq
+> driver is not yet registered and the policy struct for each cluster is not yet
+> allocated.
+
+This should be called from ->init() callback of the cpufreq driver.
+
+> Also, the mtk_cpu_dvfs_info structs for all clusters are stored in a list
+> after probe done. cpus mask is used to find out the proper info struct
+> for corresponding cpu.
+
+Yeah, but this will be exactly same to policy->related_cpus, just use
+that. Why allocate another mask for same purpose?
+
+> For freq_table, I simply don't want to free and allocate the table
+> every time when cpu is unplugged and plugged so I just allocate it
+> in the probe function call path, and cache it in the info struct.
+
+->exit() will be called only when all the CPUs from a policy are
+hotplugged out. Not on every hotplug. So you probably have 4 big and 4
+little cores. So policy for big cluster will be removed only when all
+the CPUs are down. And so no point storing things from probe.
+
+Or is there anything special with your usecase?
+
+> But for module_platform_driver(mt8173_cpufreq_platdrv), I saw many
+> built-in drivers in kernel call module_platform_driver() also so I use it.
+
+That was wrong for them as well :)
+
+> Would it be better to use platform_driver_register() instead?
+
+Hmm.. 
+
+-- 
+viresh
