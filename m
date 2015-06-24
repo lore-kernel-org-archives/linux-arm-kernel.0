@@ -1,91 +1,59 @@
-From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
-Date: Wed, 24 Jun 2015 16:25:51 +0200
-Subject: [PATCH 4/6] ARM: dts: Exynos4210: add CPU OPP and regulator supply
- property
-In-Reply-To: <55889E59.1070001@samsung.com>
-References: <'@samsung.com> <20150622150421.9112.96812@quantum>
- <55889E59.1070001@samsung.com>
-Message-ID: <14660850.Y17AZAAdgl@amdc1976>
+From: balbi@ti.com (Felipe Balbi)
+Date: Wed, 24 Jun 2015 09:34:32 -0500
+Subject: [PATCH V2 0/5] drivers/rtc/rtc-ds1307.c: Basic cleanups and
+ support for wakeupirq
+In-Reply-To: <1435076114-12416-1-git-send-email-nm@ti.com>
+References: <1435076114-12416-1-git-send-email-nm@ti.com>
+Message-ID: <20150624143432.GE21232@saruman.tx.rr.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
 Hi,
 
-On Tuesday, June 23, 2015 08:46:33 AM Krzysztof Kozlowski wrote:
-> On 23.06.2015 00:04, Michael Turquette wrote:
-> > Quoting Kukjin Kim (2015-06-21 18:46:26)
-> >> Krzysztof Kozlowski wrote:
-> >>>
-> >>> On 22.06.2015 10:38, Kukjin Kim wrote:
-> >>>> Krzysztof Kozlowski wrote:
-> >>>>> 2015-05-08 9:18 GMT+09:00 Krzysztof Kozlowski <k.kozlowski@samsung.com>:
-> >>>>>> 2015-04-04 1:43 GMT+09:00 Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>:
-> >>>>>>> From: Thomas Abraham <thomas.ab@samsung.com>
-> >>>>>>>
-> >>>>>>> For Exynos4210 platforms, add CPU operating points and CPU
-> >>>>>>> regulator supply properties for migrating from Exynos specific
-> >>>>>>> cpufreq driver to using generic cpufreq driver.
-> >>>>>>>
-> >>>>>>> Changes by Bartlomiej:
-> >>>>>>> - removed Exynos5250 and Exynos5420 support for now
-> >>>>>>>
-> >>>>>>> Cc: Kukjin Kim <kgene.kim@samsung.com>
-> >>>>>>> Cc: Doug Anderson <dianders@chromium.org>
-> >>>>>>> Cc: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
-> >>>>>>> Cc: Andreas Faerber <afaerber@suse.de>
-> >>>>>>> Cc: Sachin Kamat <sachin.kamat@linaro.org>
-> >>>>>>> Cc: Andreas Farber <afaerber@suse.de>
-> >>>>>>> Cc: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
-> >>>>>>> Signed-off-by: Thomas Abraham <thomas.ab@samsung.com>
-> >>>>>>> Signed-off-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
-> >>>>>>
-> >>>>>> Acked-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
-> >>>>>
-> >>>>> Rebased and applied to my tree, I'll sent it later to Kukjin unless he
-> >>>>> picks it by himself from LKML.
-> >>>>>
-> >>>> Hi, as far as I know, this is for v4.2 not v4.1 so it will be applied based on
-> >>>> v4.2-rc1 after v4.2-rc1 release.
-> >>>
-> >>> You mean it is for v4.3, not v4.2?
-> >>>
-> >> Oops, yes v4.3.
-> >>
-> >> Thanks for the correction.
-> > 
-> > Kukjin & Krzysztof,
-> > 
-> > I'm confused on this point. I was planning to take patches 1, 2, 3, 5
-> > and 6 towards 4.2 (e.g. in the pull request that I'll send out this
-> > week).
-> > 
-> > Is patch 4 going out for 4.2 or 4.3?
+On Tue, Jun 23, 2015 at 11:15:09AM -0500, Nishanth Menon wrote:
+> Hi,
 > 
-> It is quite late for sending pull request to arm-soc for 4.2.
-> For example SoCFPGA pull request from last week was rejected:
-> http://comments.gmane.org/gmane.linux.ports.arm.kernel/417980
+> Here is the revamp of the patch posted eariler to support wakeupirq.
+> This series does a few cleanups as well prior to introducing the
+> generic apis required to support the wakeirq mechanism used on certain
+> TI SoCs. Cleanups done here are just minimal set of the cleanups we
+> discussed in [2].
 > 
-> If you want to take it for 4.2 then I am fine with it but this will
-> cause some easy but annoying conflicts. There aren't difficult - just
-> most of nodes in board DTS changed their place.
-
-Taking all patches together would be a preferred solution from my POV.
-
-It would also be great if it could happen in v4.2 (all code changes are
-practically limited to our Exynos4210 platform so I hope that it should
-be fine) as it would be easier to work on Exynos4x12, Exynos5250 and
-Exynos542x/5800 patch series.
-
-Best regards,
---
-Bartlomiej Zolnierkiewicz
-Samsung R&D Institute Poland
-Samsung Electronics
-
-> Example of resolution (target file after merge, with cpu nodes reordered
-> alphabetically):
-> https://github.com/krzk/linux/commit/2cec3cb48abaf44848c62f1c0836b772eb4680dd
+> Series is based on next-20150623
 > 
-> Best regards,
-> Krzysztof
+> Test log: http://pastebin.ubuntu.com/11763002/
+> 
+> NOTE1: I have only tested in mcp79410 device, and not on other
+> ds1307-rtc driver compatbile devices as I dont have any other.
+> additional testing might be nice to have.
+> NOTE2: there are additional fixes that linux-next seems to need but
+> those are in omap-rtc, cpufreq etc, but those are not related by the
+> ds-1307.
+> 
+> V1: https://patchwork.kernel.org/patch/4759171/
+> 
+> NOTE: Patch 5/5 of the series is meant to indicate the usage, and will
+> be reposted along with other wakeup sources to be enabled once the
+> driver changes are accepted.
+> 
+> Felipe Balbi (1):
+>   drivers/rtc/rtc-ds1307.c: Convert to threaded IRQ
+> 
+> Nishanth Menon (4):
+>   drivers/rtc/rtc-ds1307.c: Switch to managed irq allocation
+>   drivers/rtc/rtc-ds1307.c: Sort the headers
+>   drivers/rtc/rtc-ds1307.c: Support optional wakeup interrupt source
+
+for the series, except the patch which I wrote :
+
+Acked-by: Felipe Balbi <balbi@ti.com>
+
+-- 
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150624/b96e0f2f/attachment.sig>
