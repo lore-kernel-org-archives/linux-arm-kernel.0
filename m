@@ -1,26 +1,49 @@
-From: pebolle@tiscali.nl (Paul Bolle)
-Date: Wed, 24 Jun 2015 22:36:45 +0200
-Subject: [PATCHv5 2/2] mailbox: Adding driver for Xilinx LogiCORE IP
- mailbox.
-In-Reply-To: <1435082402-29239-3-git-send-email-moritz.fischer@ettus.com>
-References: <1435082402-29239-1-git-send-email-moritz.fischer@ettus.com>
- <1435082402-29239-3-git-send-email-moritz.fischer@ettus.com>
-Message-ID: <1435178205.4528.77.camel@tiscali.nl>
+From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
+Date: Wed, 24 Jun 2015 14:28:57 -0700
+Subject: [linux-sunxi] Re: [PATCH] input: axp20x-pek: Fix reporting
+ button state as inverted
+In-Reply-To: <CAOQ7t2a+3TvmgfW3dJBc=FJk1sXNAT+SE6qP0r5ovG7yx9fYHA@mail.gmail.com>
+References: <1434278541-21355-1-git-send-email-hdegoede@redhat.com>
+ <20150622213051.GD2350@dtor-ws>
+ <CAGb2v64AF3bnd-QBRCszjD7MSfCnGSvfu3wUT2W+7fNTE76d5g@mail.gmail.com>
+ <CAOQ7t2a+3TvmgfW3dJBc=FJk1sXNAT+SE6qP0r5ovG7yx9fYHA@mail.gmail.com>
+Message-ID: <20150624212857.GA3636@dtor-ws>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2015-06-23 at 11:00 -0700, Moritz Fischer wrote:
-> +MODULE_ALIAS("platform:xilinx-mailbox");
+On Wed, Jun 24, 2015 at 11:19:39AM +0200, Carlo Caione wrote:
+> On Wed, Jun 24, 2015 at 3:42 AM, Chen-Yu Tsai <wens@csie.org> wrote:
+> > On Tue, Jun 23, 2015 at 5:30 AM, Dmitry Torokhov
+> > <dmitry.torokhov@gmail.com> wrote:
+> >> On Sun, Jun 14, 2015 at 12:42:21PM +0200, Hans de Goede wrote:
+> >>> Currently we are reporting the button state as inverted on all boards with
+> >>> an axp209 pmic, tested on a ba10-tvbox, bananapi, bananapro, cubietruck and
+> >>> utoo-p66 tablet.
+> >>>
+> >>> The axp209 datasheet clearly states that the power button must be connected
+> >>> between the PWRON key and ground. Which means that on a press we will get
+> >>> a falling edge (dbf) irq not a rising one, and likewise on release we will
+> >>> get a rising edge (dbr) irq, not a falling one.
+> >>>
+> >>> This commit swaps the check for the 2 irqs fixing the inverted reporting of
+> >>> the power button state.
+> >>>
+> >>> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+> >>
+> >> Carlo, Chen-Yu, could you please give this patch a spin and let us know
+> >> if it works on your boards?
+> >
+> > I've not actually tested this patch on my boards, but I can confirm that
+> > the original code had the state inverted, by checking /proc/interrupts
+> > counters, before and after releasing the power button.
+> >
+> > Acked-by: Chen-Yu Tsai <wens@csie.org>
+> 
+> Same here (I don't have the board anymore)
+> 
+> Acked-by: Carlo Caione <carlo@caione.org>
 
-So I think this MODULE_ALIAS() is only useful if, in short, there's a
-corresponding platform_device created. Ie, a platform_device with a
-name "xilinx-mailbox" that will fire of a "MODALIAS=platform:xilinx
--mailbox" when it's created.
+Applied, thank you.
 
-I couldn't spot such a platform_device. Provided git grep didn't let me
-down here: what breaks if this line is dropped?
-
-Thanks,
-
-
-Paul Bolle
+-- 
+Dmitry
