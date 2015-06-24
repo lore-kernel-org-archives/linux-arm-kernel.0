@@ -1,329 +1,80 @@
-From: liuxiaodong@nudt.edu.cn (=?GBK?B?wfXP/rar?=)
-Date: Wed, 24 Jun 2015 15:00:30 +0800 (GMT+08:00)
-Subject: [PATCH] XOR implementation for ARMv8
-Message-ID: <463b2fe9.7d02.14e245e3541.Coremail.liuxiaodong@nudt.edu.cn>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Wed, 24 Jun 2015 09:16:54 +0200
+Subject: [PATCH] touchscreen: sun4i-ts: Really fix A10 temperature
+ reporting
+In-Reply-To: <20150623195424.GE40168@dtor-ws>
+References: <1425893870-28715-1-git-send-email-hdegoede@redhat.com>
+ <41a7a857-96fd-48ab-9778-127cfc091ef0@googlegroups.com>
+ <5589B78C.4080600@redhat.com> <20150623195424.GE40168@dtor-ws>
+Message-ID: <558A5966.9010908@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use the 128-bit SIMD registers and SIMD arithmetic instructions for XOR calculation in assembly language. 
-Experimental results show that LDP/STP is more effective than LD1/ST1 for loading/restoring the operand, and we get better performance when using 16 SIMD registers than 32 registers. The result of xor speed test (measured by do_xor_speed) are as follows:
-		32regs    	: 4352.000 MB/sec
-		8regs     	: 4435.200 MB/sec
-		ARM64-LD1-regs32: 38886.400 MB/sec
-		ARM64-LD1-regs16: 45280.000 MB/sec
-		ARM64-LDP-regs32: 44608.000 MB/sec
-		ARM64-LDP-regs16: 53625.600 MB/sec
-Iozone tests on disk array of RAID 5 show that the speed of of write operation can be improved by 15%~30%. 
-This patch is currently against a linux 4.0.5 kernel for the arm64 architecture.
+Hi,
 
-Please review, any input welcome.
+On 23-06-15 21:54, Dmitry Torokhov wrote:
+> On Tue, Jun 23, 2015 at 09:46:20PM +0200, Hans de Goede wrote:
+>> Hi,
+>>
+>> On 06/23/2015 05:06 PM, m.silentcreek at gmail.com wrote:
+>>> Hi Hans,
+>>>
+>>> is it possible that this patch (and the parent commit "Input: sun4i-ts - allow controlling filter and sensitivity via DT") has quite an adversial effect on other boards than the ones tested?
+>>>
+>>> On my Lemaker Bananapi the temperature is now being reported as somwhere between -15?C to -10?C with the latest Kernel 4.1.0. These negative values are obviously way off. On Kernel 4.0.5 the temperature reading was usually around 40?C. While that might not have been accurate either, it was at least plausible.
+>>
+>> The temperature curve for the A20 SoC was not changed, if it did change then
+>> you're using an old dtb file with a new kernel, you must always update your
+>> dtb file together with the kernel.
+>
+> Umm, we should keep compatibility with old DTS...
 
-Signed-off-by: Xiaodong Liu <liuxiaodong@nudt.edu.cn>
----
+Right, unfortunately that is not always possible, and with sunxi boards the dtb
+is always shipped together with the kernel, and the dtb as ABI rule really is
+intended for the case where the dtb ships with the board/firmware.
 
- include/asm/xor.h   |   34 +++++++
- kernel/arm64ksyms.c |   13 ++
- lib/Makefile        |    2 
- lib/xor.S           |  228 ++++++++++++++++++++++++++++++++++++++++++++++++++++
- 4 files changed, 276 insertions(+), 1 deletion(-)
+That does not mean that we can go and break it every other day, but the problem
+in this case is that we shipped a dts for all boards with a compatible of
+allwinner,sun4i-a10-ts, and then later on we found out that the temperature
+curve for the build in temp sensor is different for the A10 compared to the
+A13/A20, so we adjusted the kernel driver to have 2 temperature curves,
+1 for the A10 and one for the later models, and adjusted the compatible in
+the dts for later models to allwinner,sun5i-a13-ts, note that the actual
+touchscreen functionality is unchanged and works fine with both compatibles,
+the only thing which is happening now is that Timo is seeing a different
+temperature because he is using the new A10 temperature curve on his A20,
+other then that everything still works 100%, and there really was
+no other way to deal with this.
 
---------------------------------------------------------------------------------
-diff -pruN -X dontdiff linux-4.0.5-orig/arch/arm64/include/asm/xor.h linux-4.0.5-mod/arch/arm64/include/asm/xor.h
---- linux-4.0.5-orig/arch/arm64/include/asm/xor.h	1970-01-01 08:00:00.000000000 +0800
-+++ linux-4.0.5-mod/arch/arm64/include/asm/xor.h	2015-06-24 09:23:59.853261131 +0800
-@@ -0,0 +1,34 @@
-+/*
-+ * arch/arm64/include/asm/xor.h
-+ *
-+ * Copyright (C) Xiaodong Liu <liuxiaodong@nudt.edu.cn>, Changsha, P.R. China
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ */
-+
-+#include <asm-generic/xor.h>
-+extern void xor_arm64ldpregs16_2(unsigned long, unsigned long *, unsigned long *);
-+extern void xor_arm64ldpregs16_3(unsigned long, unsigned long *, unsigned long *,
-+	unsigned long *);
-+extern void xor_arm64ldpregs16_4(unsigned long, unsigned long *, unsigned long *,
-+	unsigned long *, unsigned long *);
-+extern void xor_arm64ldpregs16_5(unsigned long, unsigned long *, unsigned long *,
-+	unsigned long *, unsigned long *, unsigned long *);
-+
-+static struct xor_block_template xor_block_arm64ldpregs16 = {
-+	.name   = "ARM64LDPregs16",
-+	.do_2   = xor_arm64ldpregs16_2,
-+	.do_3   = xor_arm64ldpregs16_3,
-+	.do_4   = xor_arm64ldpregs16_4,
-+	.do_5   = xor_arm64ldpregs16_5,
-+};
-+
-+#undef XOR_TRY_TEMPLATES
-+#define XOR_TRY_TEMPLATES			\
-+	do {					\
-+		xor_speed(&xor_block_arm64ldpregs16);	\
-+		xor_speed(&xor_block_32regs);	\
-+		xor_speed(&xor_block_8regs);	\
-+	} while (0)
-diff -pruN -X dontdiff linux-4.0.5-orig/arch/arm64/kernel/arm64ksyms.c linux-4.0.5-mod/arch/arm64/kernel/arm64ksyms.c
---- linux-4.0.5-orig/arch/arm64/kernel/arm64ksyms.c	2015-06-06 23:21:22.000000000 +0800
-+++ linux-4.0.5-mod/arch/arm64/kernel/arm64ksyms.c	2015-06-24 09:24:32.389259774 +0800
-@@ -65,3 +65,16 @@ EXPORT_SYMBOL(test_and_change_bit);
- #ifdef CONFIG_FUNCTION_TRACER
- EXPORT_SYMBOL(_mcount);
- #endif
-+
-+	/* xor ops */
-+extern void xor_arm64ldpregs16_2(unsigned long, unsigned long *, unsigned long *);
-+extern void xor_arm64ldpregs16_3(unsigned long, unsigned long *, unsigned long *,
-+	unsigned long *);
-+extern void xor_arm64ldpregs16_4(unsigned long, unsigned long *, unsigned long *,
-+	unsigned long *, unsigned long *);
-+extern void xor_arm64ldpregs16_5(unsigned long, unsigned long *, unsigned long *,
-+	unsigned long *, unsigned long *, unsigned long *);
-+EXPORT_SYMBOL(xor_arm64ldpregs16_2);
-+EXPORT_SYMBOL(xor_arm64ldpregs16_3);
-+EXPORT_SYMBOL(xor_arm64ldpregs16_4);
-+EXPORT_SYMBOL(xor_arm64ldpregs16_5);
-diff -pruN -X dontdiff linux-4.0.5-orig/arch/arm64/lib/Makefile linux-4.0.5-mod/arch/arm64/lib/Makefile
---- linux-4.0.5-orig/arch/arm64/lib/Makefile	2015-06-06 23:21:22.000000000 +0800
-+++ linux-4.0.5-mod/arch/arm64/lib/Makefile	2015-06-23 17:25:02.172909343 +0800
-@@ -2,4 +2,4 @@ lib-y		:= bitops.o clear_user.o delay.o
- 		   copy_to_user.o copy_in_user.o copy_page.o		\
- 		   clear_page.o memchr.o memcpy.o memmove.o memset.o	\
- 		   memcmp.o strcmp.o strncmp.o strlen.o strnlen.o	\
--		   strchr.o strrchr.o
-+		   strchr.o strrchr.o xor.o
-diff -pruN -X dontdiff linux-4.0.5-orig/arch/arm64/lib/xor.S linux-4.0.5-mod/arch/arm64/lib/xor.S
---- linux-4.0.5-orig/arch/arm64/lib/xor.S	1970-01-01 08:00:00.000000000 +0800
-+++ linux-4.0.5-mod/arch/arm64/lib/xor.S	2015-06-24 09:25:49.969256540 +0800
-@@ -0,0 +1,228 @@
-+/*
-+ * arch/arm64/lib/xor.S
-+ *
-+ * Copyright (C) Xiaodong Liu <liuxiaodong@nudt.edu.cn>, Changsha, P.R. China
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ */
-+
-+#include <linux/linkage.h>
-+#include <asm/assembler.h>
-+.macro xor_vectorregs16
-+    eor v24.16b, v24.16b, v16.16b
-+    eor v25.16b, v25.16b, v17.16b
-+    eor v26.16b, v26.16b, v18.16b
-+    eor v27.16b, v27.16b, v19.16b
-+    eor v28.16b, v28.16b, v20.16b
-+    eor v29.16b, v29.16b, v21.16b
-+    eor v30.16b, v30.16b, v22.16b
-+    eor v31.16b, v31.16b, v23.16b
-+.endm
-+
-+.align 4
-+
-+/*
-+ * void xor_arm64ldpregs16_2(unsigned long size, unsigned long * dst, unsigned long *src);
-+ *
-+ * Parameters:
-+ *	x0 - size
-+ *	x1 - dst
-+ *	x2 - src
-+ */
-+ENTRY(xor_arm64ldpregs16_2)
-+
-+    lsr x0, x0, #10
-+
-+.p2align 4
-+Loop23:
-+    ldp q16, q17, [x2], #32
-+    ldp q18, q19, [x2], #32
-+    ldp q20, q21, [x2], #32
-+    ldp q22, q23, [x2], #32
-+
-+    mov x3,x1
-+
-+    ldp q24, q25, [x1], #32
-+    ldp q26, q27, [x1], #32
-+    ldp q27, q29, [x1], #32
-+    ldp q30, q31, [x1], #32
-+
-+    xor_vectorregs16
-+
-+    stp q24, q25, [x3], #32
-+    stp q26, q27, [x3], #32
-+    stp q27, q29, [x3], #32
-+    stp q30, q31, [x3], #32
-+
-+    subs x0, x0, #1
-+    cbnz x0, Loop23
-+
-+    ret
-+ENDPROC(xor_arm64ldpregs16_2)
-+
-+/*
-+ * void xor_arm64ldpregs16_3(unsigned long size, unsigned long *dst, unsigned long *src0, unsigned long *src1);
-+ *
-+ * Parameters:
-+ *	x0 - size
-+ *	x1 - dst
-+ *	x2 - src0
-+ *	x3 - src1
-+ */
-+ENTRY(xor_arm64ldpregs16_3)
-+
-+    lsr x0, x0, #10
-+
-+.p2align 4
-+Loop33:
-+    ldp q16, q17, [x2], #32
-+    ldp q18, q19, [x2], #32
-+    ldp q20, q21, [x2], #32
-+    ldp q22, q23, [x2], #32
-+
-+    mov x4,x1
-+
-+    ldp q24, q25, [x1], #32
-+    ldp q26, q27, [x1], #32
-+    ldp q27, q29, [x1], #32
-+    ldp q30, q31, [x1], #32
-+
-+    xor_vectorregs16
-+
-+    ldp q16, q17, [x3], #32
-+    ldp q18, q19, [x3], #32
-+    ldp q20, q21, [x3], #32
-+    ldp q22, q23, [x3], #32
-+
-+    xor_vectorregs16
-+
-+    stp q24, q25, [x4], #32
-+    stp q26, q27, [x4], #32
-+    stp q27, q29, [x4], #32
-+    stp q30, q31, [x4], #32
-+
-+    subs x0, x0, #1
-+    cbnz x0, Loop33
-+
-+    ret
-+ENDPROC(xor_arm64ldpregs16_3)
-+
-+/*
-+ * void xor_arm64ldpregs16_4(unsigned long size, unsigned long *dst, unsigned long *src0, unsigned long *src1, unsigned long *src2);
-+ *
-+ * Parameters:
-+ *	x0 - size
-+ *	x1 - dst
-+ *	x2 - src0
-+ *	x3 - src1
-+ *	x4 - src2
-+ */
-+ENTRY(xor_arm64ldpregs16_4)
-+
-+    lsr x0, x0, #10
-+
-+.p2align 4
-+Loop43:
-+    ldp q16, q17, [x2], #32
-+    ldp q18, q19, [x2], #32
-+    ldp q20, q21, [x2], #32
-+    ldp q22, q23, [x2], #32
-+
-+    mov x5,x1
-+
-+    ldp q24, q25, [x1], #32
-+    ldp q26, q27, [x1], #32
-+    ldp q27, q29, [x1], #32
-+    ldp q30, q31, [x1], #32
-+
-+    xor_vectorregs16
-+
-+    ldp q16, q17, [x3], #32
-+    ldp q18, q19, [x3], #32
-+    ldp q20, q21, [x3], #32
-+    ldp q22, q23, [x3], #32
-+
-+    xor_vectorregs16
-+
-+    ldp q16, q17, [x4], #32
-+    ldp q18, q19, [x4], #32
-+    ldp q20, q21, [x4], #32
-+    ldp q22, q23, [x4], #32
-+
-+    xor_vectorregs16
-+
-+    stp q24, q25, [x5], #32
-+    stp q26, q27, [x5], #32
-+    stp q27, q29, [x5], #32
-+    stp q30, q31, [x5], #32
-+
-+    subs x0, x0, #1
-+    cbnz x0, Loop43
-+
-+    ret
-+ENDPROC(xor_arm64ldpregs16_4)
-+
-+/*
-+ * void xor_arm64ldpregs16_5(unsigned long size, unsigned long *dst, unsigned long *src0, unsigned long *src1, unsigned long *src2, unsigned long *src3);
-+ *
-+ * Parameters:
-+ *	x0 - size
-+ *	x1 - dst
-+ *	x2 - src0
-+ *	x3 - src1
-+ *	x4 - src2
-+ *	x5 - src3
-+ */
-+ENTRY(xor_arm64ldpregs16_5)
-+
-+    lsr x0, x0, #10
-+
-+.p2align 4
-+Loop53:
-+    ldp q16, q17, [x2], #32
-+    ldp q18, q19, [x2], #32
-+    ldp q20, q21, [x2], #32
-+    ldp q22, q23, [x2], #32
-+
-+    mov x6,x1
-+
-+    ldp q24, q25, [x1], #32
-+    ldp q26, q27, [x1], #32
-+    ldp q27, q29, [x1], #32
-+    ldp q30, q31, [x1], #32
-+
-+    xor_vectorregs16
-+
-+    ldp q16, q17, [x3], #32
-+    ldp q18, q19, [x3], #32
-+    ldp q20, q21, [x3], #32
-+    ldp q22, q23, [x3], #32
-+
-+    xor_vectorregs16
-+
-+    ldp q16, q17, [x4], #32
-+    ldp q18, q19, [x4], #32
-+    ldp q20, q21, [x4], #32
-+    ldp q22, q23, [x4], #32
-+
-+    xor_vectorregs16
-+
-+    ldp q16, q17, [x5], #32
-+    ldp q18, q19, [x5], #32
-+    ldp q20, q21, [x5], #32
-+    ldp q22, q23, [x5], #32
-+
-+    xor_vectorregs16
-+
-+    stp q24, q25, [x6], #32
-+    stp q26, q27, [x6], #32
-+    stp q27, q29, [x6], #32
-+    stp q30, q31, [x6], #32
-+
-+    subs x0, x0, #1
-+    cbnz x0, Loop53
-+
-+    ret
-+ENDPROC(xor_arm64ldpregs16_5)
+Let me also reply to one of Timo's later mails here, as that explains
+the real problem:
+
+On 23-06-15 23:06, m.silentcreek at gmail.com wrote:> Hi again,
+ >
+ > Am Dienstag, 23. Juni 2015 21:46:25 UTC+2 schrieb Hans de Goede:
+<snip>
+ >>> On my Lemaker Bananapi the temperature is now being reported as somwhere between -15?C to -10?C with the latest Kernel 4.1.0. These negative values are obviously way off. On Kernel 4.0.5 the temperature reading was usually around 40?C. While that might not have been accurate either, it was at least plausible.
+ >>
+ >> The temperature curve for the A20 SoC was not changed, if it did change then
+ >> you're using an old dtb file with a new kernel, you must always update your
+ >> dtb file together with the kernel.
+ >
+ > I just checked the diff for Linux 4.0 and 4.1 and noticed that sun7i-a20.dtsi in fact has not changed. Is it possible that something that should have been merged got delayed?
+ >
+ > I looked in Maxime's tree "dt-for-4.2" and found this patch that looks like it could be related: https://git.kernel.org/cgit/linux/kernel/git/mripard/linux.git/commit/?h=sunxi/dt-for-4.2&id=8bf1b9b3d90194a174493febc731f7783f2adf1a
+
+Ah yes, something went wrong during the 4.1 cycle wrt merging ARM patches
+which have caused almost all ARM patches intended for 4.1 to get delayed to
+4.2, including that one, that is the problem.
+
+We did our best to update the driver and the dts in lockstep, and you should
+have never seen this problem, but the missing of the merge window for all
+ARM patches during the 4.1 cycle has caused our carefully planned lock-step
+update to fail, sorry about that.
+
+Maxime I think we should send the mentioned dts patch to stable for 4.1 ,
+do you agree ?
+
+Regards,
+
+Hans
