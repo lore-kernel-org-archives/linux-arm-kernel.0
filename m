@@ -1,63 +1,92 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 25 Jun 2015 00:13:42 +0100
-Subject: L2 Cache enable on i.MX5
-In-Reply-To: <DBXPR06MB58911B5FD193722EC5BD34185AF0@DBXPR06MB589.eurprd06.prod.outlook.com>
-References: <DBXPR06MB5891810D431F1AE9AEB1CE985AF0@DBXPR06MB589.eurprd06.prod.outlook.com>
- <20150624172900.GN7557@n2100.arm.linux.org.uk>
- <DBXPR06MB58911B5FD193722EC5BD34185AF0@DBXPR06MB589.eurprd06.prod.outlook.com>
-Message-ID: <20150624231342.GQ7557@n2100.arm.linux.org.uk>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Thu, 25 Jun 2015 08:57:57 +0900
+Subject: [PATCH-v3 1/3] mfd: 88pm800: Add device tree support
+In-Reply-To: <1435137673-1629-2-git-send-email-vaibhav.hiremath@linaro.org>
+References: <1435137673-1629-1-git-send-email-vaibhav.hiremath@linaro.org>
+ <1435137673-1629-2-git-send-email-vaibhav.hiremath@linaro.org>
+Message-ID: <CAJKOXPfc4rf4rB54CjPVzZ=v3uWVhciygqN7=gNYMShFf+eatQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 24, 2015 at 10:53:01PM +0000, Robert Daniels wrote:
-> 
-> >> I recently discovered an issue with an i.MX53 based product where we had
-> >> an older version of Das U-Boot which disabled the L2 cache on startup but
-> >> in a later version would re-enable it once the L2 cache was configured.
-> 
-> > The kernel is supposed to be booted with caches disabled, and in particular,
-> > the L2 cache disabled during the decompressor run.
-> 
-> > If the L2 cache is configured, it will enable it during it's boot sequence.
-> 
-> I see - so the boot loader is not supposed to enable the L2 cache and it
-> should not be enabled until after the decompressor runs.
-> 
-> In that case, where should the kernel be enabling the L2 cache? I'm using
-> the 3.14 kernel for this i.MX53 product and the L2 cache is definitely not
-> enabled.
+2015-06-24 18:21 GMT+09:00 Vaibhav Hiremath <vaibhav.hiremath@linaro.org>:
+> Add DT support to the 88pm800 driver, along with compatible
+> field for it's sub-devices (rtc, onkey and regulator)
+>
+> Signed-off-by: Chao Xie <chao.xie@marvell.com>
+> Signed-off-by: Vaibhav Hiremath <vaibhav.hiremath@linaro.org>
+> ---
+>  drivers/mfd/88pm800.c | 25 +++++++++++++++++++++++++
+>  1 file changed, 25 insertions(+)
+>
+> diff --git a/drivers/mfd/88pm800.c b/drivers/mfd/88pm800.c
+> index 841717a..059f01a 100644
+> --- a/drivers/mfd/88pm800.c
+> +++ b/drivers/mfd/88pm800.c
+> @@ -27,6 +27,7 @@
+>  #include <linux/mfd/core.h>
+>  #include <linux/mfd/88pm80x.h>
+>  #include <linux/slab.h>
+> +#include <linux/of_device.h>
+>
+>  /* Interrupt Registers */
+>  #define PM800_INT_STATUS1              (0x05)
+> @@ -121,6 +122,11 @@ static const struct i2c_device_id pm80x_id_table[] = {
+>  };
+>  MODULE_DEVICE_TABLE(i2c, pm80x_id_table);
+>
+> +static const struct of_device_id pm80x_of_match_table[] = {
+> +       { .compatible = "marvell,88pm800", },
+> +       {},
+> +};
+> +
+>  static struct resource rtc_resources[] = {
+>         {
+>          .name = "88pm80x-rtc",
+> @@ -133,6 +139,7 @@ static struct resource rtc_resources[] = {
+>  static struct mfd_cell rtc_devs[] = {
+>         {
+>          .name = "88pm80x-rtc",
+> +        .of_compatible = "marvell,88pm80x-rtc",
+>          .num_resources = ARRAY_SIZE(rtc_resources),
+>          .resources = &rtc_resources[0],
+>          .id = -1,
+> @@ -151,6 +158,7 @@ static struct resource onkey_resources[] = {
+>  static const struct mfd_cell onkey_devs[] = {
+>         {
+>          .name = "88pm80x-onkey",
+> +        .of_compatible = "marvell,88pm80x-onkey",
+>          .num_resources = 1,
+>          .resources = &onkey_resources[0],
+>          .id = -1,
+> @@ -160,6 +168,7 @@ static const struct mfd_cell onkey_devs[] = {
+>  static const struct mfd_cell regulator_devs[] = {
+>         {
+>          .name = "88pm80x-regulator",
+> +        .of_compatible = "marvell,88pm80x-regulator",
+>          .id = -1,
+>         },
+>  };
+> @@ -544,8 +553,23 @@ static int pm800_probe(struct i2c_client *client,
+>         int ret = 0;
+>         struct pm80x_chip *chip;
+>         struct pm80x_platform_data *pdata = dev_get_platdata(&client->dev);
+> +       struct device_node *np = client->dev.of_node;
+>         struct pm80x_subchip *subchip;
+>
+> +       if (!pdata && !np) {
+> +               dev_err(&client->dev,
+> +                       "pm80x requires platform data or of_node\n");
+> +               return -EINVAL;
+> +       }
+> +
+> +       if (!pdata) {
+> +               pdata = devm_kzalloc(&client->dev, sizeof(*pdata), GFP_KERNEL);
+> +               if (!pdata) {
+> +                       dev_err(&client->dev, "failed to allocaate memory\n");
 
-I don't know, I don't have any knowledge of iMX35 - all I can do is say
-what the generic requirements are of the kernel.
+Generic error message for ENOMEM is not needed. Just return ENOMEM and
+the core code will print the error.
 
-The problem with having the L2 cache enabled when calling into the kernel
-is that the decompressor knows nothing of the L2 cache, and doesn't
-have the capability to do any cache maintanence there, which it would
-need to do.  That adds a _lot_ of extra complexity.
-
-> I see that there is a imx_init_l2cache defined which is being called by
-> the imx6 and imx35 platform code but it is not being called for the
-> i.mx5... should it?
-
-Searching google, I see there was some discussion on this topic back in
-2011, which concluded that the kernel should enable the cache.  However,
-as it's now four years later, and you've found that the kernel still
-does not enable the cache, the conclusion is that the code has never
-been submitted.
-
-The kernel also needs to know not only how to enable the L2 cache, but
-how to perform cache maintanence on that cache, so things like DMA will
-work (it's no good trying to DMA data to a device when it's sitting in
-a CPU cache.)
-
-As the information for the iMX5 doesn't seem to be public (or not in
-google's index), I'm not sure who could help you.
-
-If you have some ideas about how to deal with this, the place to go
-looking for L2 cache support stuff is arch/arm/mm.  If the cache is
-significantly different from the others there, it'd be better to
-start a new file rather than trying to merge it into cache-l2x0.c.
-
--- 
-FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
-according to speedtest.net.
+Rest looks fine,
+Best regards,
+Krzysztof
