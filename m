@@ -1,86 +1,94 @@
-From: stefan@agner.ch (Stefan Agner)
-Date: Wed, 24 Jun 2015 13:20:56 +0200
-Subject: [RFC PATCH v6 2/2] nvmem: Add Vybrid OCOTP and OCROM support
-In-Reply-To: <558A7EBE.5030108@i2se.com>
-References: <cover.1435066190.git.maitysanchayan@gmail.com>
- <b4a52f6c229bdabbfe9d21c03cb04593dde33ec4.1435066190.git.maitysanchayan@gmail.com>
- <1037424954.250728.1435087901102.JavaMail.open-xchange@oxbsltgw00.schlund.de>
- <20150624051903.GA11753@Sanchayan-Arch.toradex.int>
- <558A7EBE.5030108@i2se.com>
-Message-ID: <1794e55295ed14ea397ca330f3b2b1a3@agner.ch>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Wed, 24 Jun 2015 12:23:33 +0100
+Subject: [PATCH v2 3/4] mfd: axp20x: Add a cell for the usb power_supply
+ part of the axp20x PMICs
+In-Reply-To: <1434211748-25572-4-git-send-email-hdegoede@redhat.com>
+References: <1434211748-25572-1-git-send-email-hdegoede@redhat.com>
+ <1434211748-25572-4-git-send-email-hdegoede@redhat.com>
+Message-ID: <20150624112333.GH15013@x1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2015-06-24 11:56, Stefan Wahren wrote:
-> Hi Sanchayan,
-> 
-> Am 24.06.2015 um 07:19 schrieb maitysanchayan at gmail.com:
->> On 15-06-23 21:31:41, Stefan Wahren wrote:
->>> Hi Sanchayan,
->>>
->>>> Sanchayan Maity <maitysanchayan@gmail.com> hat am 23. Juni 2015 um 15:44
->>>> geschrieben:
->>>>
->>>>
->>>> The patch adds support for the On Chip One Time Programmable Peripheral
->>>> (OCOTP) and On Chip ROM (OCROM) support.
->>>>
->>>> On Vybrid OCOTP contain data like SoC ID, MAC address and OCROM has the
->>>> revision ID.
->>>>
->>>> Signed-off-by: Sanchayan Maity <maitysanchayan@gmail.com>
->>>> ---
->>>> drivers/nvmem/Kconfig | 11 +++++++++
->>>> drivers/nvmem/Makefile | 2 ++
->>>> drivers/nvmem/vf610-ocotp.c | 60 +++++++++++++++++++++++++++++++++++++++++++++
->>>> 3 files changed, 73 insertions(+)
->>>> create mode 100644 drivers/nvmem/vf610-ocotp.c
->>>>
->>>> diff --git a/drivers/nvmem/Kconfig b/drivers/nvmem/Kconfig
->>>> index 17f1a57..557c1e0 100644
->>>> --- a/drivers/nvmem/Kconfig
->>>> +++ b/drivers/nvmem/Kconfig
->>>> @@ -33,4 +33,15 @@ config NVMEM_SUNXI_SID
->>>> This driver can also be built as a module. If so, the module
->>>> will be called eeprom-sunxi-sid.
->>>>
->>>> +config NVMEM_VF610_OCOTP
->>>> + tristate "VF610 SoCs OCOTP support"
->>>> + depends on SOC_VF610
->>>> + select REGMAP_MMIO
->>> how do you come to the conclusion that Vybrid On-Chip OTP is accessable via
->>> MMIO?
->> Frankly speaking I just changed the naming conventions and followed the qfrom
->> and sunxi sid examples in Srinivas's patches.
->>
->> I just tested it without the "select REGMAP_MMIO" and it works just fine.
->>
->> - Sanchayan.
-> 
-> sorry for the confusion. My question refers to the whole driver
-> implementation not only to the REGMAP_MMIO.
-> 
-> According to
-> 
-> Vybrid Reference Manual F-Series
-> Document Number: VYBRIDRM
-> Rev 7, 06/2014
-> 
-> 35.5 OCOTP memory map/register definition
-> 
-> the memory region is organized in control and shadow registers. I'm very
-> sceptical that using REGMAP_MMIO is the right way for accessing the OCOTP.
-> 
-> It possible that it works in your case. But in the case the lock bits
-> are set the driver won't work correctly.
+> Add a cell for the usb power_supply part of the axp20x PMICs.
 
-The OCOTP represents fuses, starting from 0x400A5400 one can access the
-shadowed registers containing the fuses values. The reference manual
-also says: "All shadow registers are always readable through the APB bus
-except some secret key"
+Why are you duplicating the subject line?
 
-The driver does not need write access. I guess it is fine to use only
-reads through regmap...?
+> Note that this cell is only for the usb power_supply part and not the
+> ac-power / battery-charger / rtc-backup-bat-charger bits.
+> 
+> Depending on the board each of those must be enabled / disabled separately
+> in devicetree as most boards do not use all 4. So in dt each one needs its
+> own child-node of the axp20x node. Another reason for using separate child
+> nodes for each is so that other devicetree nodes can have a power-supply
+> property with a phandle referencing a node representing a single
+> power-supply.
+> 
+> The decision to use a separate devicetree node for each is reflected on
+> the kernel side by each getting its own mfd-cell / platform_device and
+> platform-driver.
 
---
-Stefan
+You don't really need to say any of this, as this is the 'norm'.
+
+What you didn't mention however, is that you're taking the opportunity
+to fix some formatting issues and that there are no functional changes
+in these lines.
+
+> Cc: Bruno Pr?mont <bonbons@linux-vserver.org>
+> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+> ---
+> Changes in v2:
+> -Use DEFINE_RES_IRQ_NAMED
+> -Change indentation of axp20x_cells initializers to avoid line wrapping
+> ---
+>  drivers/mfd/axp20x.c | 20 ++++++++++++++++----
+>  1 file changed, 16 insertions(+), 4 deletions(-)
+
+Patch looks okay however:
+
+Acked-by: Lee Jones <lee.jones@linaro.org>
+
+> diff --git a/drivers/mfd/axp20x.c b/drivers/mfd/axp20x.c
+> index f9a3c2d..ca4a604 100644
+> --- a/drivers/mfd/axp20x.c
+> +++ b/drivers/mfd/axp20x.c
+> @@ -113,6 +113,13 @@ static struct resource axp20x_pek_resources[] = {
+>  	},
+>  };
+>  
+> +static struct resource axp20x_usb_power_supply_resources[] = {
+> +	DEFINE_RES_IRQ_NAMED(AXP20X_IRQ_VBUS_PLUGIN, "VBUS_PLUGIN"),
+> +	DEFINE_RES_IRQ_NAMED(AXP20X_IRQ_VBUS_REMOVAL, "VBUS_REMOVAL"),
+> +	DEFINE_RES_IRQ_NAMED(AXP20X_IRQ_VBUS_VALID, "VBUS_VALID"),
+> +	DEFINE_RES_IRQ_NAMED(AXP20X_IRQ_VBUS_NOT_VALID, "VBUS_NOT_VALID"),
+> +};
+> +
+>  static struct resource axp22x_pek_resources[] = {
+>  	{
+>  		.name   = "PEK_DBR",
+> @@ -363,11 +370,16 @@ static const struct regmap_irq_chip axp288_regmap_irq_chip = {
+>  
+>  static struct mfd_cell axp20x_cells[] = {
+>  	{
+> -		.name			= "axp20x-pek",
+> -		.num_resources		= ARRAY_SIZE(axp20x_pek_resources),
+> -		.resources		= axp20x_pek_resources,
+> +		.name		= "axp20x-pek",
+> +		.num_resources	= ARRAY_SIZE(axp20x_pek_resources),
+> +		.resources	= axp20x_pek_resources,
+>  	}, {
+> -		.name			= "axp20x-regulator",
+> +		.name		= "axp20x-regulator",
+> +	}, {
+> +		.name		= "axp20x-usb-power-supply",
+> +		.of_compatible	= "x-powers,axp202-usb-power-supply",
+> +		.num_resources	= ARRAY_SIZE(axp20x_usb_power_supply_resources),
+> +		.resources	= axp20x_usb_power_supply_resources,
+>  	},
+>  };
+>  
+
+-- 
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
