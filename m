@@ -1,61 +1,39 @@
-From: j.anaszewski@samsung.com (Jacek Anaszewski)
-Date: Wed, 24 Jun 2015 09:34:45 +0200
-Subject: [RESEND PATCH 1/4] leds: leds-ns2: move LED modes mapping outside
- of the driver
-In-Reply-To: <20150623181203.GE4853@kw.sim.vm.gnt>
-References: <1434640650-28086-1-git-send-email-simon.guinot@sequanux.org>
- <1434640650-28086-2-git-send-email-simon.guinot@sequanux.org>
- <55881C85.1050809@samsung.com> <20150623181203.GE4853@kw.sim.vm.gnt>
-Message-ID: <558A5D95.9040807@samsung.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Wed, 24 Jun 2015 08:33:08 +0100
+Subject: [PATCH 7/8] cpufreq: st: Provide runtime initialised driver for
+ ST's platforms
+In-Reply-To: <1435089796.4528.53.camel@tiscali.nl>
+References: <1434987837-24212-1-git-send-email-lee.jones@linaro.org>
+ <1434987837-24212-8-git-send-email-lee.jones@linaro.org>
+ <1435046411.4528.6.camel@tiscali.nl> <20150623082857.GG3245@x1>
+ <1435089796.4528.53.camel@tiscali.nl>
+Message-ID: <20150624073308.GA15013@x1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Simon,
+On Tue, 23 Jun 2015, Paul Bolle wrote:
+> On Tue, 2015-06-23 at 09:28 +0100, Lee Jones wrote:
+> > BTW, do you have a script that does this now, or are you still
+> > hand-rolling these?
+> 
+> There was a script detecting Kconfig problems that is basically
+> retired. (The messages I sent were always manually written.) That
+> script's function is now performed, much better, by the undertaker
+> -checkpatch bot (courtesy of a group of people apparently all
+> affiliated with the university of Erlangen, Germany). We're in virtual
+> contact but that group is doing fine so I'm basically not contributing.
+> 
+> Anyhow, my reply to your patch was the result of a manual scan for a
+> small set of common (and mostly trivial) mistakes in patches that I try
+> to do regularly. All pretty basic stuff, otherwise I wouldn't been able
+> to spot these mistakes.
+> 
+> Does this answer your question?
 
-On 06/23/2015 08:12 PM, Simon Guinot wrote:
-[...]
->
->>> +	led = leds;
->>>   	for_each_child_of_node(np, child) {
->>>   		const char *string;
->>> -		int ret;
->>> +		int ret, i, num_modes;
->>> +		struct ns2_led_modval *modval;
->>>
->>>   		ret = of_get_named_gpio(child, "cmd-gpio", 0);
->>>   		if (ret < 0)
->>>   			return ret;
->>> -		leds[i].cmd = ret;
->>> +		led->cmd = ret;
->>>   		ret = of_get_named_gpio(child, "slow-gpio", 0);
->>>   		if (ret < 0)
->>>   			return ret;
->>> -		leds[i].slow = ret;
->>> +		led->slow = ret;
->>>   		ret = of_property_read_string(child, "label", &string);
->>> -		leds[i].name = (ret == 0) ? string : child->name;
->>> +		led->name = (ret == 0) ? string : child->name;
->>>   		ret = of_property_read_string(child, "linux,default-trigger",
->>>   					      &string);
->>>   		if (ret == 0)
->>> -			leds[i].default_trigger = string;
->>> +			led->default_trigger = string;
->>> +
->>> +		ret = of_property_count_u32_elems(child, "modes-map");
->>
->> I think that we shouldn't fail if the property is absent, but default
->> to the mapping that is currently hard coded in the driver. Otherwise
->> we would break existing users.
->
-> I don't think there is a risk of breaking existing users. On platforms
-> where the leds-ns2 driver is used, DTB will be updated with the kernel
-> image. Moreover, removing the hard coded mapping is a nice clean-up.
->
-> Let me know if you still want me to add a fallback.
-
-Since you modify also dts file in this patch set this is OK.
-You can keep this part as is.
+Certainly does, thanks.
 
 -- 
-Best Regards,
-Jacek Anaszewski
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
