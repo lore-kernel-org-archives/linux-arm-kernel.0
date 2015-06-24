@@ -1,124 +1,233 @@
-From: stefan.wahren@i2se.com (Stefan Wahren)
-Date: Wed, 24 Jun 2015 13:52:28 +0200
-Subject: [RFC PATCH v6 2/2] nvmem: Add Vybrid OCOTP and OCROM support
-In-Reply-To: <20150624104552.GA32208@Sanchayan-Arch.toradex.int>
-References: <cover.1435066190.git.maitysanchayan@gmail.com>
- <b4a52f6c229bdabbfe9d21c03cb04593dde33ec4.1435066190.git.maitysanchayan@gmail.com>
- <1037424954.250728.1435087901102.JavaMail.open-xchange@oxbsltgw00.schlund.de>
- <20150624051903.GA11753@Sanchayan-Arch.toradex.int>
- <558A7EBE.5030108@i2se.com>
- <20150624104552.GA32208@Sanchayan-Arch.toradex.int>
-Message-ID: <558A99FC.2070902@i2se.com>
+From: mars.cheng@mediatek.com (Mars Cheng)
+Date: Wed, 24 Jun 2015 19:54:51 +0800
+Subject: [PATCH 2/2] ARM: dts: mediatek: add mt6580 basic support
+In-Reply-To: <2095356.mBfrh10yW4@ubix>
+References: <1433319533-24803-1-git-send-email-mars.cheng@mediatek.com>
+ <1433319533-24803-3-git-send-email-mars.cheng@mediatek.com>
+ <2095356.mBfrh10yW4@ubix>
+Message-ID: <1435146891.3792.5.camel@mtkswgap22>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Srinivas,
+On Tue, 2015-06-23 at 12:29 -0700, Matthias Brugger wrote:
+> On Wednesday, June 03, 2015 04:18:53 PM Mars Cheng wrote:
+> > This enables mt6580 basic support: interrupt, timer & uart.
+> > 
+> > Signed-off-by: Mars Cheng <mars.cheng@mediatek.com>
+> > ---
+> >  arch/arm/boot/dts/Makefile         |   1 +
+> >  arch/arm/boot/dts/mt6580-evbp1.dts |  34 ++++++++++
+> >  arch/arm/boot/dts/mt6580.dtsi      | 130
+> > +++++++++++++++++++++++++++++++++++++ 3 files changed, 165 insertions(+)
+> >  create mode 100644 arch/arm/boot/dts/mt6580-evbp1.dts
+> >  create mode 100644 arch/arm/boot/dts/mt6580.dtsi
+> > 
+> > diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+> > index 86217db..9298531 100644
+> > --- a/arch/arm/boot/dts/Makefile
+> > +++ b/arch/arm/boot/dts/Makefile
+> > @@ -656,6 +656,7 @@ dtb-$(CONFIG_MACH_DOVE) += \
+> >  	dove-d3plug.dtb \
+> >  	dove-dove-db.dtb
+> >  dtb-$(CONFIG_ARCH_MEDIATEK) += \
+> > +	mt6580-evbp1.dtb \
+> >  	mt6589-aquaris5.dtb \
+> >  	mt6592-evb.dtb \
+> >  	mt8127-moose.dtb \
+> > diff --git a/arch/arm/boot/dts/mt6580-evbp1.dts
+> > b/arch/arm/boot/dts/mt6580-evbp1.dts new file mode 100644
+> > index 0000000..fbc0e10
+> > --- /dev/null
+> > +++ b/arch/arm/boot/dts/mt6580-evbp1.dts
+> > @@ -0,0 +1,34 @@
+> > +/*
+> > + * Copyright (c) 2015 MediaTek Inc.
+> > + * Author: Mars.C <mars.cheng@mediatek.com>
+> > + *
+> > + * This program is free software; you can redistribute it and/or modify
+> > + * it under the terms of the GNU General Public License version 2 as
+> > + * published by the Free Software Foundation.
+> > + *
+> > + * This program is distributed in the hope that it will be useful,
+> > + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> > + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> > + * GNU General Public License for more details.
+> > + */
+> > +
+> > +/dts-v1/;
+> > +#include "mt6580.dtsi"
+> > +
+> > +/ {
+> > +	model = "MediaTek MT6580 evaluation board";
+> > +	compatible = "mediatek,mt6580-evbp1", "mediatek,mt6580";
+> > +
+> > +	chosen {
+> > +		bootargs = "console=ttyS0,921600n8 root=/dev/ram
+> > initrd=0x88000000,0x400000 earlyprintk"; +	};
+> 
+> the root and initrd parameters seems really specific for your way you boot the 
+> board, but are not necessary to boot e.g. with a initramfs.
+> Please delete this two parameters.
+Thanks for this suggestion. I will remove these two parameters in next
+version.
+> 
+> Apart instead of console please use stdout-path to specify to which uart the 
+> console should be connected.
+Got it, the chosen node in the next version will be:
+chosen {
+        bootargs = "console=ttyS0,921600n8 earlyprintk";
+        stdout-path = &uart0;
+};
 
-Am 24.06.2015 um 12:45 schrieb maitysanchayan at gmail.com:
-> Hello Stefan,
->
-> On 15-06-24 11:56:14, Stefan Wahren wrote:
->> Hi Sanchayan,
->>
->> Am 24.06.2015 um 07:19 schrieb maitysanchayan at gmail.com:
->>> On 15-06-23 21:31:41, Stefan Wahren wrote:
->>>> Hi Sanchayan,
->>>>
->>>>> Sanchayan Maity <maitysanchayan@gmail.com> hat am 23. Juni 2015 um 15:44
->>>>> geschrieben:
->>>>>
->>>>>
->>>>> The patch adds support for the On Chip One Time Programmable Peripheral
->>>>> (OCOTP) and On Chip ROM (OCROM) support.
->>>>>
->>>>> On Vybrid OCOTP contain data like SoC ID, MAC address and OCROM has the
->>>>> revision ID.
->>>>>
->>>>> Signed-off-by: Sanchayan Maity <maitysanchayan@gmail.com>
->>>>> ---
->>>>> drivers/nvmem/Kconfig | 11 +++++++++
->>>>> drivers/nvmem/Makefile | 2 ++
->>>>> drivers/nvmem/vf610-ocotp.c | 60 +++++++++++++++++++++++++++++++++++++++++++++
->>>>> 3 files changed, 73 insertions(+)
->>>>> create mode 100644 drivers/nvmem/vf610-ocotp.c
->>>>>
->>>>> diff --git a/drivers/nvmem/Kconfig b/drivers/nvmem/Kconfig
->>>>> index 17f1a57..557c1e0 100644
->>>>> --- a/drivers/nvmem/Kconfig
->>>>> +++ b/drivers/nvmem/Kconfig
->>>>> @@ -33,4 +33,15 @@ config NVMEM_SUNXI_SID
->>>>> This driver can also be built as a module. If so, the module
->>>>> will be called eeprom-sunxi-sid.
->>>>>
->>>>> +config NVMEM_VF610_OCOTP
->>>>> + tristate "VF610 SoCs OCOTP support"
->>>>> + depends on SOC_VF610
->>>>> + select REGMAP_MMIO
->>>> how do you come to the conclusion that Vybrid On-Chip OTP is accessable via
->>>> MMIO?
->>> Frankly speaking I just changed the naming conventions and followed the qfrom
->>> and sunxi sid examples in Srinivas's patches.
->>>
->>> I just tested it without the "select REGMAP_MMIO" and it works just fine.
->>>
->>> - Sanchayan.
->> sorry for the confusion. My question refers to the whole driver
->> implementation not only to the REGMAP_MMIO.
->>
->> According to
->>
->> Vybrid Reference Manual F-Series
->> Document Number: VYBRIDRM
->> Rev 7, 06/2014
->>
->> 35.5 OCOTP memory map/register definition
->>
->> the memory region is organized in control and shadow registers. I'm very
->> sceptical that using REGMAP_MMIO is the right way for accessing the OCOTP.
-> Sorry I am not well versed with the regmap stuff. Can you please tell me why
-> REGMAP_MMIO is not the right way for accessing the OCOTP?
-
-i think the implementation of OCOTP driver should be more like this:
-
-https://git.linaro.org/people/srinivas.kandagatla/linux.git/commit/b4c3ad253747767511233687436f20144e850d67
-
-It uses REGMAP with a specialized read function.
-
->
-> If this is not the right way, I assume you are referring to the procedures
-> in section 35.3.1.5 and 35.3.1.6 for reading and writing from these areas?
-
-Yes. I think writing isn't needed. But the read function should check
-at least for OCOTP_CTRL[BUSY] and OCOTP_CTRL[ERROR]. If one of the
-bits is set, the read function should return with an error.
-
-This is the same behavior of my OCOTP driver for MXS platform.
-
-Unfortunately i haven't push the driver to my github account.
-
->> It possible that it works in your case. But in the case the lock bits
->> are set the driver won't work correctly.
-> As such the previous implementations were very different.
->
-> Currently I only expect to provide a way for users to read the SoC ID from
-> the OCOTP block. My understanding was even if the lock bits are set, reading
-> from the registers will return 0xBADABADA.
->
-> For example, currently for three locations I see this from ocotp block
->
-> *
-> 0000080 bada bada bada bada bada bada bada bada
-> *
-> 0000500 bada bada bada bada bada bada bada bada
-> *
-> 0000c80 bada bada bada bada bada bada bada bada
-> *
->
-> - Sanchayan.
-
-Until somebody comes to the idea to fetch the MAC address from the OCOTP
-block ...
-
-How about doing it right at this point, instead of fixing it later?
-
-Stefan
+Thanks.
+> 
+> Thanks,
+> Matthias
+> 
+> > +
+> > +	memory {
+> > +		reg = <0x80000000 0x20000000>;
+> > +	};
+> > +};
+> > +
+> > +&uart0 {
+> > +	status = "okay";
+> > +};
+> > +
+> > diff --git a/arch/arm/boot/dts/mt6580.dtsi b/arch/arm/boot/dts/mt6580.dtsi
+> > new file mode 100644
+> > index 0000000..de669e2
+> > --- /dev/null
+> > +++ b/arch/arm/boot/dts/mt6580.dtsi
+> > @@ -0,0 +1,130 @@
+> > +/*
+> > + * Copyright (c) 2015 MediaTek Inc.
+> > + * Author: Mars.C <mars.cheng@mediatek.com>
+> > + *
+> > + * This program is free software; you can redistribute it and/or modify
+> > + * it under the terms of the GNU General Public License version 2 as
+> > + * published by the Free Software Foundation.
+> > + *
+> > + * This program is distributed in the hope that it will be useful,
+> > + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> > + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> > + * GNU General Public License for more details.
+> > + */
+> > +
+> > +#include <dt-bindings/interrupt-controller/irq.h>
+> > +#include <dt-bindings/interrupt-controller/arm-gic.h>
+> > +#include "skeleton.dtsi"
+> > +
+> > +/ {
+> > +	compatible = "mediatek,mt6580";
+> > +	interrupt-parent = <&sysirq>;
+> > +
+> > +	cpus {
+> > +		#address-cells = <1>;
+> > +		#size-cells = <0>;
+> > +
+> > +		cpu at 0 {
+> > +			device_type = "cpu";
+> > +			compatible = "arm,cortex-a7";
+> > +			reg = <0x0>;
+> > +		};
+> > +		cpu at 1 {
+> > +			device_type = "cpu";
+> > +			compatible = "arm,cortex-a7";
+> > +			reg = <0x1>;
+> > +		};
+> > +		cpu at 2 {
+> > +			device_type = "cpu";
+> > +			compatible = "arm,cortex-a7";
+> > +			reg = <0x2>;
+> > +		};
+> > +		cpu at 3 {
+> > +			device_type = "cpu";
+> > +			compatible = "arm,cortex-a7";
+> > +			reg = <0x3>;
+> > +		};
+> > +
+> > +	};
+> > +
+> > +	clocks {
+> > +		#address-cells = <1>;
+> > +		#size-cells = <1>;
+> > +		compatible = "simple-bus";
+> > +		ranges;
+> > +
+> > +		system_clk: dummy13m {
+> > +			compatible = "fixed-clock";
+> > +			clock-frequency = <13000000>;
+> > +			#clock-cells = <0>;
+> > +		};
+> > +
+> > +		rtc_clk: dummy32k {
+> > +			compatible = "fixed-clock";
+> > +			clock-frequency = <32000>;
+> > +			#clock-cells = <0>;
+> > +		};
+> > +
+> > +		uart_clk: dummy26m {
+> > +			compatible = "fixed-clock";
+> > +			clock-frequency = <26000000>;
+> > +			#clock-cells = <0>;
+> > +		};
+> > +	};
+> > +
+> > +	soc {
+> > +		#address-cells = <1>;
+> > +		#size-cells = <1>;
+> > +		compatible = "simple-bus";
+> > +		ranges;
+> > +
+> > +		timer: timer at 10008000 {
+> > +			compatible = "mediatek,mt6580-timer",
+> > +				     "mediatek,mt6577-timer";
+> > +			reg = <0x10008000 0x80>;
+> > +			interrupts = <GIC_SPI 92 IRQ_TYPE_LEVEL_LOW>;
+> > +			clocks = <&system_clk>, <&rtc_clk>;
+> > +			clock-names = "system-clk", "rtc-clk";
+> > +		};
+> > +
+> > +		sysirq: interrupt-controller at 10200100 {
+> > +			compatible = "mediatek,mt6580-sysirq",
+> > +				     "mediatek,mt6577-sysirq";
+> > +			interrupt-controller;
+> > +			#interrupt-cells = <3>;
+> > +			interrupt-parent = <&gic>;
+> > +			reg = <0x10200100 0x1c>;
+> > +		};
+> > +
+> > +		gic: interrupt-controller at 10211000 {
+> > +			compatible = "arm,cortex-a7-gic";
+> > +			interrupt-controller;
+> > +			#interrupt-cells = <3>;
+> > +			interrupt-parent = <&gic>;
+> > +			reg = <0x10211000 0x1000>,
+> > +			      <0x10212000 0x1000>,
+> > +			      <0x10214000 0x2000>,
+> > +			      <0x10216000 0x2000>;
+> > +		};
+> > +
+> > +		uart0: serial at 11005000 {
+> > +			compatible = "mediatek,mt6580-uart",
+> > +				     "mediatek,mt6577-uart";
+> > +			reg = <0x11005000 0x400>;
+> > +			interrupts = <GIC_SPI 44 IRQ_TYPE_LEVEL_LOW>;
+> > +			clocks = <&uart_clk>;
+> > +			clock-names = "baud";
+> > +			status = "disabled";
+> > +		};
+> > +
+> > +		uart1: serial at 11006000 {
+> > +			compatible = "mediatek,mt6580-uart",
+> > +				     "mediatek,mt6577-uart";
+> > +			reg = <0x11006000 0x400>;
+> > +			interrupts = <GIC_SPI 45 IRQ_TYPE_LEVEL_LOW>;
+> > +			clocks = <&uart_clk>;
+> > +			clock-names = "baud";
+> > +			status = "disabled";
+> > +		};
+> > +	};
+> > +};
+> 
