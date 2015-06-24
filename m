@@ -1,78 +1,67 @@
-From: mpe@ellerman.id.au (Michael Ellerman)
-Date: Wed, 24 Jun 2015 14:07:59 +1000
-Subject: [PATCH 1/2] Move the pt_regs_offset struct definition from arch
- to common include file
-In-Reply-To: <558963A3.4070503@linaro.org>
-References: <1434386579-6045-1-git-send-email-dave.long@linaro.org>
- <1434386579-6045-2-git-send-email-dave.long@linaro.org>
- <1434687583.23771.5.camel@ellerman.id.au> <5584234E.2040701@linaro.org>
- <1435030328.28070.5.camel@ellerman.id.au> <558963A3.4070503@linaro.org>
-Message-ID: <1435118879.3620.5.camel@ellerman.id.au>
+From: pawelo@king.net.pl (Paul Osmialowski)
+Date: Wed, 24 Jun 2015 06:22:42 +0200 (CEST)
+Subject: [PATCH 1/9] arm: select different compiler flags for ARM CortexM3
+In-Reply-To: <20150623214818.GF7557@n2100.arm.linux.org.uk>
+References: <1435094387-20146-1-git-send-email-pawelo@king.net.pl>
+ <1435094387-20146-2-git-send-email-pawelo@king.net.pl>
+ <20150623214818.GF7557@n2100.arm.linux.org.uk>
+Message-ID: <alpine.LNX.2.00.1506240614540.24366@localhost.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2015-06-23 at 09:48 -0400, David Long wrote:
-> On 06/22/15 23:32, Michael Ellerman wrote:
-> > On Fri, 2015-06-19 at 10:12 -0400, David Long wrote:
-> >> On 06/19/15 00:19, Michael Ellerman wrote:
-> >>> On Mon, 2015-06-15 at 12:42 -0400, David Long wrote:
-> >>>> From: "David A. Long" <dave.long@linaro.org>
-> >>>>
-> >>>> The pt_regs_offset structure is used for HAVE_REGS_AND_STACK_ACCESS_API
-> >>>>    feature and has identical definitions in four different arch ptrace.h
-> >>>> include files. It seems unlikely that definition would ever need to be
-> >>>> changed regardless of architecture so lets move it into
-> >>>> include/linux/ptrace.h.
-> >>>>
-> >>>> Signed-off-by: David A. Long <dave.long@linaro.org>
-> >>>> ---
-> >>>>    arch/powerpc/kernel/ptrace.c | 5 -----
-> >>>
-> >>> Built and booted on powerpc, but is there an easy way to actually test the code
-> >>> paths in question?
-> >>
-> >> There is an easy way to "smoke test" it on all archiectures that also
-> >> implement kprobes (which powerpc does).  If I'm understanding the
-> >> powerpc code correctly (WRT register naming conventions) just do the
-> >> following:
-> >>
-> >> cd /sys/kernel/debug/tracing
-> >> echo 'p do_fork %gpr0' > kprobe_events
-> >> echo 1 > events/kprobes/enable
-> >> ls
-> >> cat trace
-> >> echo 0 > events/kprobes/enable
-> >>
-> >> Every fork() call done on the system between those two echo commands
-> >> (hence the "ls") should append a line to the trace file.  For a more
-> >> exhaustive test one could repeat this sequence for every register in the
-> >> architecture.
-> >
-> > OK, so I went the whole hog and did:
-> >
-> > $ echo 'p do_fork %gpr0 %gpr1 %gpr2 %gpr3 %gpr4 %gpr5 %gpr6 %gpr7 %gpr8 %gpr9 %gpr10 %gpr11 %gpr12 %gpr13 %gpr14 %gpr15 %gpr16 %gpr17 %gpr18 %gpr19 %gpr20 %gpr21 %gpr22 %gpr23 %gpr24 %gpr25 %gpr26 %gpr27 %gpr28 %gpr29 %gpr30 %gpr31 %nip %msr %ctr %link %xer %ccr %softe %trap %dar %dsisr' > kprobe_events
-> >
-> > And I get:
-> >
-> >              bash-2057  [001] d...   535.433941: p_do_fork_0: (do_fork+0x8/0x490) arg1=0xc0000000000094d0 arg2=0xc0000001fbe9be30 arg3=0xc000000001133bb8 arg4=0x1200011 arg5=0x0 arg6=0x0 arg7=0x0 arg8=0x3fff7c885940 arg9=0x1 arg10=0xc0000001fbe9bea0 arg11=0x0 arg12=0xc01 arg13=0xc0000000000094c8 arg14=0xc00000000fdc0480 arg15=0x0 arg16=0x22000000 arg17=0x1016d6e8 arg18=0x0 arg19=0x44000000 arg20=0x0 arg21=0x10037c82208 arg22=0x1017b008 arg23=0x10143d18 arg24=0x10178854 arg25=0x10144f90 arg26=0x10037c821e8 arg27=0x0 arg28=0x0 arg29=0x0 arg30=0x0 arg31=0x809 arg32=0x3ffff788c010 arg33=0xc0000000000a7fe8 arg34=0x8000000000029033 arg35=0xc0000000000094c8 arg36=0xc0000000000094d0 arg37=0x0 arg38=0x42222844 arg39=0x1 arg40=0x700 arg41=0xc0000001fbe9bd50 arg42=0xc0000001fbe9bd30
-> >
-> > Which is ugly as hell, but appears unchanged since before your patch.
-> >
-> 
-> Excellent.  Many thanks.
+Hi Russell,
 
-No worries.
+Thanks for the input. Seems like I trusted get_maintainer.pl blindly and 
+wasn't selective - it resulted in recipient list much too long.
 
-Did I already send you an ack? Have another one in case:
+As for this patch, I think I went too far with adding it. The board boots 
+without it properly, and since it covers more general Cortex-M related 
+problems I guess it should be excluded from next iteration of the whole 
+patchset.
 
-Acked-by: Michael Ellerman <mpe@ellerman.id.au>
+The problems it adresses may still required further discussion, but I 
+think it should not block the whole thing.
 
+On Tue, 23 Jun 2015, Russell King - ARM Linux wrote:
 
-> > I take it it's expected that the names are not decoded in the output?
+> On Tue, Jun 23, 2015 at 11:19:39PM +0200, Paul Osmialowski wrote:
+>> This one is inspired by two commits published on Emcraft git repo:
+>>
+>> https://github.com/EmcraftSystems/linux-emcraft.git
+>>
+>> 1) 6302b692f570ff9d5645a6e72c11f87b0c1aa409
+>>  RT #62654. Fixed kernel crashes while running httpd by enabling
+>>  "-mfix-cortex-m3-ldrd" compiler option, which prevents compiler from
+>>  generating code like 'ldrd Ra, Rb, [Ra, #Imm]' - according to the 602117
+>>  Cortex-M3 Errata it may result in incorrect base register when interrupted
+>>  or faulted.
+>>
+>> by: Yuri Tikhonov <yur@emcraft.com>
+>>
+>> 2) 359d3cda84c01c0f3fae1a519b97a31f318f57ab
+>>  RT #62654. Removed "--march=..." leaving only "-mcpu=cortex-m3" to make
+>>  sure only the correct instructions will be generated.
+>>
+>> by: Sergei Poselenov <sposelenov@emcraft.com>
+>>
+>> I reworked these patches to make them less intrusive.
+>>
+>> Signed-off-by: Paul Osmialowski <pawelo@king.net.pl>
 >
-> Yes.
-
-In fact I don't see anywhere that uses the reverse decoding, ie.
-regs_query_register_name().
-
-cheers
+> NAK.
+>
+> The EFM32 code already added core support for Cortex-M3 cores, under
+> the symbol CPU_V7M.  Rather than implementing a whole new set of
+> Cortex-M3 support alongside the existing code, please work with the
+> EFM32 maintainer (Uwe Kleine-K?nig) to come up with a common set of
+> core changes that you can all agree on for Cortex-M3.
+>
+> Please also try to be a little smarter with whom you're sending your
+> patches to, the Cc list looks to be excessively long - having soo many
+> recipients on your message is a good way to get your message rejected
+> by mailing lists as spam.
+>
+> -- 
+> FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
+> according to speedtest.net.
+>
