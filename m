@@ -1,81 +1,129 @@
-From: rostedt@goodmis.org (Steven Rostedt)
-Date: Wed, 24 Jun 2015 12:42:27 -0400
-Subject: [PATCH V3] trace/events: add chip name and hwirq to irq entry
- tracepoint
-In-Reply-To: <1435162650-32266-1-git-send-email-ankgupta@codeaurora.org>
-References: <1435162650-32266-1-git-send-email-ankgupta@codeaurora.org>
-Message-ID: <20150624124227.1cddbbac@gandalf.local.home>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Wed, 24 Jun 2015 18:43:33 +0200
+Subject: [PATCH] md/raid6: delta syndrome for ARM NEON
+Message-ID: <1435164213-25410-1-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 24 Jun 2015 10:17:30 -0600
-Ankit Gupta <ankgupta@codeaurora.org> wrote:
+This implements XOR syndrome calculation using NEON intrinsics.
+As before, the module can be built for ARM and arm64 from the
+same source.
 
-> Add chip name and hw-irq number to the trace_irq_handler_entry()
-> tracepoint. When tracing interrupt events the chip-name and hw-irq
-> numbers are stable and known in advance. This makes them a better
-> choice as a filtering criteria for the trace buffer dump. On the
-> flipside, the os-irq numbers are dynamically allocated which makes
-> them difficult to use for the same purpose.
-> 
-> Dump messages will look like:
-> ...irq_handler_entry: irq=22 name=msm_serial0 chip_name=GIC hwirq=140
-> 
-> Suggested-by: Stephen Boyd <sboyd@codeaurora.org>
-> Reviewed-by: Andy Gross <agross@codeaurora.org>
-> Signed-off-by: Gilad Avidov <gavidov@codeaurora.org>
-> Signed-off-by: Ankit Gupta <ankgupta@codeaurora.org>
-> ---
-> Changes since V2:
-> - fixed dump message in commit text to reflect Chip name
->   instead of domain.
-> ---
-> Changes since V1:
-> - added reviewed by Andy Gross
-> ---
->  include/trace/events/irq.h | 15 ++++++++++++++-
->  1 file changed, 14 insertions(+), 1 deletion(-)
-> 
-> diff --git a/include/trace/events/irq.h b/include/trace/events/irq.h
-> index 3608beb..5370075 100644
-> --- a/include/trace/events/irq.h
-> +++ b/include/trace/events/irq.h
-> @@ -23,6 +23,17 @@ struct softirq_action;
->  			 softirq_name(HRTIMER),		\
->  			 softirq_name(RCU))
->  
-> +
-> +#define show_chip_name(irq)					\
-> +	(irq_get_irq_data(irq)					\
-> +			 ? irq_get_irq_data(irq)->chip->name	\
-> +			 : "NULL")
-> +
-> +#define show_hwirq(irq)						\
-> +	(irq_get_irq_data(irq)					\
-> +			 ? irq_get_irq_data(irq)->hwirq		\
-> +			 : -ENODEV)
+Relative performance on a Cortex-A57 based system:
 
-Note these magic functions will only be useful for the tracefs reads of
-the trace files. Userspace tools that extract the data (like perf and
-trace-cmd), will have no idea of how to parse it.
+  raid6: int64x1  gen()   905 MB/s
+  raid6: int64x1  xor()   881 MB/s
+  raid6: int64x2  gen()  1343 MB/s
+  raid6: int64x2  xor()  1286 MB/s
+  raid6: int64x4  gen()  1896 MB/s
+  raid6: int64x4  xor()  1321 MB/s
+  raid6: int64x8  gen()  1773 MB/s
+  raid6: int64x8  xor()  1165 MB/s
+  raid6: neonx1   gen()  1834 MB/s
+  raid6: neonx1   xor()  1278 MB/s
+  raid6: neonx2   gen()  2528 MB/s
+  raid6: neonx2   xor()  1942 MB/s
+  raid6: neonx4   gen()  2888 MB/s
+  raid6: neonx4   xor()  2334 MB/s
+  raid6: neonx8   gen()  2957 MB/s
+  raid6: neonx8   xor()  2232 MB/s
+  raid6: using algorithm neonx8 gen() 2957 MB/s
+  raid6: .... xor() 2232 MB/s, rmw enabled
 
-I'm not against doing this, but I'm just letting you know what the
-effect of this change will be.
+Cc: Markus Stockhausen <stockhausen@collogia.de>
+Cc: Neil Brown <neilb@suse.de>
+Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+---
+ lib/raid6/neon.c  | 13 ++++++++++++-
+ lib/raid6/neon.uc | 46 ++++++++++++++++++++++++++++++++++++++++++++++
+ 2 files changed, 58 insertions(+), 1 deletion(-)
 
--- Steve
-
-> +
->  /**
->   * irq_handler_entry - called immediately before the irq action handler
->   * @irq: irq number
-> @@ -50,7 +61,9 @@ TRACE_EVENT(irq_handler_entry,
->  		__assign_str(name, action->name);
->  	),
->  
-> -	TP_printk("irq=%d name=%s", __entry->irq, __get_str(name))
-> +	TP_printk("irq=%d name=%s chip_name=%s hwirq=%ld", __entry->irq,
-> +	  __get_str(name), show_chip_name(__entry->irq),
-> +	  show_hwirq(__entry->irq))
->  );
->  
->  /**
+diff --git a/lib/raid6/neon.c b/lib/raid6/neon.c
+index d9ad6ee284f4..7076ef1ba3dd 100644
+--- a/lib/raid6/neon.c
++++ b/lib/raid6/neon.c
+@@ -40,9 +40,20 @@
+ 					(unsigned long)bytes, ptrs);	\
+ 		kernel_neon_end();					\
+ 	}								\
++	static void raid6_neon ## _n ## _xor_syndrome(int disks,	\
++					int start, int stop, 		\
++					size_t bytes, void **ptrs)	\
++	{								\
++		void raid6_neon ## _n  ## _xor_syndrome_real(int,	\
++				int, int, unsigned long, void**);	\
++		kernel_neon_begin();					\
++		raid6_neon ## _n ## _xor_syndrome_real(disks,		\
++			start, stop, (unsigned long)bytes, ptrs);	\
++		kernel_neon_end();					\
++	}								\
+ 	struct raid6_calls const raid6_neonx ## _n = {			\
+ 		raid6_neon ## _n ## _gen_syndrome,			\
+-		NULL,		/* XOR not yet implemented */		\
++		raid6_neon ## _n ## _xor_syndrome,			\
+ 		raid6_have_neon,					\
+ 		"neonx" #_n,						\
+ 		0							\
+diff --git a/lib/raid6/neon.uc b/lib/raid6/neon.uc
+index 1b9ed793342d..4fa51b761dd0 100644
+--- a/lib/raid6/neon.uc
++++ b/lib/raid6/neon.uc
+@@ -3,6 +3,7 @@
+  *   neon.uc - RAID-6 syndrome calculation using ARM NEON instructions
+  *
+  *   Copyright (C) 2012 Rob Herring
++ *   Copyright (C) 2015 Linaro Ltd. <ard.biesheuvel@linaro.org>
+  *
+  *   Based on altivec.uc:
+  *     Copyright 2002-2004 H. Peter Anvin - All Rights Reserved
+@@ -78,3 +79,48 @@ void raid6_neon$#_gen_syndrome_real(int disks, unsigned long bytes, void **ptrs)
+ 		vst1q_u8(&q[d+NSIZE*$$], wq$$);
+ 	}
+ }
++
++void raid6_neon$#_xor_syndrome_real(int disks, int start, int stop,
++				    unsigned long bytes, void **ptrs)
++{
++	uint8_t **dptr = (uint8_t **)ptrs;
++	uint8_t *p, *q;
++	int d, z, z0;
++
++	register unative_t wd$$, wq$$, wp$$, w1$$, w2$$;
++	const unative_t x1d = NBYTES(0x1d);
++
++	z0 = stop;		/* P/Q right side optimization */
++	p = dptr[disks-2];	/* XOR parity */
++	q = dptr[disks-1];	/* RS syndrome */
++
++	for ( d = 0 ; d < bytes ; d += NSIZE*$# ) {
++		wq$$ = vld1q_u8(&dptr[z0][d+$$*NSIZE]);
++		wp$$ = veorq_u8(vld1q_u8(&p[d+$$*NSIZE]), wq$$);
++
++		/* P/Q data pages */
++		for ( z = z0-1 ; z >= start ; z-- ) {
++			wd$$ = vld1q_u8(&dptr[z][d+$$*NSIZE]);
++			wp$$ = veorq_u8(wp$$, wd$$);
++			w2$$ = MASK(wq$$);
++			w1$$ = SHLBYTE(wq$$);
++
++			w2$$ = vandq_u8(w2$$, x1d);
++			w1$$ = veorq_u8(w1$$, w2$$);
++			wq$$ = veorq_u8(w1$$, wd$$);
++		}
++		/* P/Q left side optimization */
++		for ( z = start-1 ; z >= 0 ; z-- ) {
++			w2$$ = MASK(wq$$);
++			w1$$ = SHLBYTE(wq$$);
++
++			w2$$ = vandq_u8(w2$$, x1d);
++			wq$$ = veorq_u8(w1$$, w2$$);
++		}
++		w1$$ = vld1q_u8(&q[d+NSIZE*$$]);
++		wq$$ = veorq_u8(wq$$, w1$$);
++
++		vst1q_u8(&p[d+NSIZE*$$], wp$$);
++		vst1q_u8(&q[d+NSIZE*$$], wq$$);
++	}
++}
+-- 
+1.9.1
