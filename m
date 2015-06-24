@@ -1,22 +1,52 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 24 Jun 2015 18:29:00 +0100
-Subject: L2 Cache enable on i.MX5
-In-Reply-To: <DBXPR06MB5891810D431F1AE9AEB1CE985AF0@DBXPR06MB589.eurprd06.prod.outlook.com>
-References: <DBXPR06MB5891810D431F1AE9AEB1CE985AF0@DBXPR06MB589.eurprd06.prod.outlook.com>
-Message-ID: <20150624172900.GN7557@n2100.arm.linux.org.uk>
+From: mugunthanvnm@ti.com (Mugunthan V N)
+Date: Wed, 24 Jun 2015 23:15:33 +0530
+Subject: [PATCH 1/1] arm: dts: am43xx-clock: Add qspi clock node.
+Message-ID: <1435167933-5249-1-git-send-email-mugunthanvnm@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 24, 2015 at 05:10:26PM +0000, Robert Daniels wrote:
-> I recently discovered an issue with an i.MX53 based product where we had
-> an older version of Das U-Boot which disabled the L2 cache on startup but
-> in a later version would re-enable it once the L2 cache was configured.
+From: Sourav Poddar <sourav.poddar@ti.com>
 
-The kernel is supposed to be booted with caches disabled, and in particular,
-the L2 cache disabled during the decompressor run.
+Add clock node for qspi controller driver on am437x.
 
-If the L2 cache is configured, it will enable it during it's boot sequence.
+Cc: Keerthy <j-keerthy@ti.com>
+Cc: Tero Kristo <t-kristo@ti.com>
+Signed-off-by: Sourav Poddar <sourav.poddar@ti.com>
+Signed-off-by: Mugunthan V N <mugunthanvnm@ti.com>
+---
+ arch/arm/boot/dts/am4372.dtsi        | 2 ++
+ arch/arm/boot/dts/am43xx-clocks.dtsi | 8 ++++++++
+ 2 files changed, 10 insertions(+)
 
+diff --git a/arch/arm/boot/dts/am4372.dtsi b/arch/arm/boot/dts/am4372.dtsi
+index 649e7b9..8ab7831 100644
+--- a/arch/arm/boot/dts/am4372.dtsi
++++ b/arch/arm/boot/dts/am4372.dtsi
+@@ -903,6 +903,8 @@
+ 			#address-cells = <1>;
+ 			#size-cells = <0>;
+ 			ti,hwmods = "qspi";
++			clocks = <&qspi_fclk>;
++			clock-names = "fck";
+ 			interrupts = <0 138 0x4>;
+ 			num-cs = <4>;
+ 			status = "disabled";
+diff --git a/arch/arm/boot/dts/am43xx-clocks.dtsi b/arch/arm/boot/dts/am43xx-clocks.dtsi
+index cc88728..1506585 100644
+--- a/arch/arm/boot/dts/am43xx-clocks.dtsi
++++ b/arch/arm/boot/dts/am43xx-clocks.dtsi
+@@ -763,4 +763,12 @@
+ 		ti,bit-shift = <8>;
+ 		reg = <0x8a68>;
+ 	};
++
++	qspi_fclk: qspi_fclk {
++		#clock-cells = <0>;
++		compatible = "ti,fixed-factor-clock";
++		clocks = <&dpll_per_m2_div4_ck>;
++		clock-mult = <1>;
++		clock-div = <1>;
++	};
+ };
 -- 
-FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
-according to speedtest.net.
+2.4.2.387.gf86f31a
