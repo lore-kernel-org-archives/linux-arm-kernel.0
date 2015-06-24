@@ -1,29 +1,61 @@
-From: hdegoede@redhat.com (Hans de Goede)
-Date: Wed, 24 Jun 2015 09:31:41 +0200
-Subject: [PATCH] touchscreen: sun4i-ts: Really fix A10 temperature
- reporting
-In-Reply-To: <20150624072840.GV2266@lukather>
-References: <1425893870-28715-1-git-send-email-hdegoede@redhat.com>
- <41a7a857-96fd-48ab-9778-127cfc091ef0@googlegroups.com>
- <5589B78C.4080600@redhat.com> <20150623195424.GE40168@dtor-ws>
- <558A5966.9010908@redhat.com> <20150624072840.GV2266@lukather>
-Message-ID: <558A5CDD.1070704@redhat.com>
+From: j.anaszewski@samsung.com (Jacek Anaszewski)
+Date: Wed, 24 Jun 2015 09:34:45 +0200
+Subject: [RESEND PATCH 1/4] leds: leds-ns2: move LED modes mapping outside
+ of the driver
+In-Reply-To: <20150623181203.GE4853@kw.sim.vm.gnt>
+References: <1434640650-28086-1-git-send-email-simon.guinot@sequanux.org>
+ <1434640650-28086-2-git-send-email-simon.guinot@sequanux.org>
+ <55881C85.1050809@samsung.com> <20150623181203.GE4853@kw.sim.vm.gnt>
+Message-ID: <558A5D95.9040807@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Simon,
 
-On 24-06-15 09:28, Maxime Ripard wrote:
-> Hi,
+On 06/23/2015 08:12 PM, Simon Guinot wrote:
+[...]
 >
-> On Wed, Jun 24, 2015 at 09:16:54AM +0200, Hans de Goede wrote:
->> Maxime I think we should send the mentioned dts patch to stable for
->> 4.1 , do you agree ?
+>>> +	led = leds;
+>>>   	for_each_child_of_node(np, child) {
+>>>   		const char *string;
+>>> -		int ret;
+>>> +		int ret, i, num_modes;
+>>> +		struct ns2_led_modval *modval;
+>>>
+>>>   		ret = of_get_named_gpio(child, "cmd-gpio", 0);
+>>>   		if (ret < 0)
+>>>   			return ret;
+>>> -		leds[i].cmd = ret;
+>>> +		led->cmd = ret;
+>>>   		ret = of_get_named_gpio(child, "slow-gpio", 0);
+>>>   		if (ret < 0)
+>>>   			return ret;
+>>> -		leds[i].slow = ret;
+>>> +		led->slow = ret;
+>>>   		ret = of_property_read_string(child, "label", &string);
+>>> -		leds[i].name = (ret == 0) ? string : child->name;
+>>> +		led->name = (ret == 0) ? string : child->name;
+>>>   		ret = of_property_read_string(child, "linux,default-trigger",
+>>>   					      &string);
+>>>   		if (ret == 0)
+>>> -			leds[i].default_trigger = string;
+>>> +			led->default_trigger = string;
+>>> +
+>>> +		ret = of_property_count_u32_elems(child, "modes-map");
+>>
+>> I think that we shouldn't fail if the property is absent, but default
+>> to the mapping that is currently hard coded in the driver. Otherwise
+>> we would break existing users.
 >
-> Yep. We should definitely do that. You take care of this?
+> I don't think there is a risk of breaking existing users. On platforms
+> where the leds-ns2 driver is used, DTB will be updated with the kernel
+> image. Moreover, removing the hard coded mapping is a nice clean-up.
+>
+> Let me know if you still want me to add a fallback.
 
-Yes I'll try to do so later today.
+Since you modify also dts file in this patch set this is OK.
+You can keep this part as is.
 
-Regards,
-
-Hans
+-- 
+Best Regards,
+Jacek Anaszewski
