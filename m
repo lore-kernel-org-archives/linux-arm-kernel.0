@@ -1,67 +1,83 @@
 From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Wed, 24 Jun 2015 08:17:03 +0200
-Subject: [PATCH 2/4] dt-bindings: soc: Add documentation for the MediaTek
- SCPSYS unit
-In-Reply-To: <1435126625-9634-1-git-send-email-s.hauer@pengutronix.de>
-References: <1435126625-9634-1-git-send-email-s.hauer@pengutronix.de>
-Message-ID: <1435126625-9634-3-git-send-email-s.hauer@pengutronix.de>
+Date: Wed, 24 Jun 2015 08:17:01 +0200
+Subject: [PATCH v6] Mediatek SCPSYS power domain support
+Message-ID: <1435126625-9634-1-git-send-email-s.hauer@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This adds documentation for the MediaTek SCPSYS unit found in MT8173 SoCs.
+Just a small update to this series with a memory corruption bug fixed.
 
-Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
----
- .../devicetree/bindings/soc/mediatek/scpsys.txt    | 41 ++++++++++++++++++++++
- 1 file changed, 41 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/soc/mediatek/scpsys.txt
+This series adds support for the MediaTek SCPSYS unit.
 
-diff --git a/Documentation/devicetree/bindings/soc/mediatek/scpsys.txt b/Documentation/devicetree/bindings/soc/mediatek/scpsys.txt
-new file mode 100644
-index 0000000..c051114
---- /dev/null
-+++ b/Documentation/devicetree/bindings/soc/mediatek/scpsys.txt
-@@ -0,0 +1,41 @@
-+MediaTek SCPSYS
-+===============
-+
-+The System Control Processor System (SCPSYS) has several power management
-+related tasks in the system. The tasks include thermal measurement, dynamic
-+voltage frequency scaling (DVFS), interrupt filter and lowlevel sleep control.
-+The System Power Manager (SPM) inside the SCPSYS is for the MTCMOS power
-+domain control.
-+
-+The driver implements the Generic PM domain bindings described in
-+power/power_domain.txt. It provides the power domains defined in
-+include/dt-bindings/power/mt8173-power.h.
-+
-+Required properties:
-+- compatible: Must be "mediatek,mt8173-scpsys"
-+- #power-domain-cells: Must be 1
-+- reg: Address range of the SCPSYS unit
-+- infracfg: must contain a phandle to the infracfg controller
-+- clock, clock-names: clocks according to the common clock binding.
-+                      The clocks needed "mm" and "mfg". These are the
-+		      clocks which hardware needs to be enabled before
-+		      enabling certain power domains.
-+
-+Example:
-+
-+	scpsys: scpsys at 10006000 {
-+		#power-domain-cells = <1>;
-+		compatible = "mediatek,mt8173-scpsys";
-+		reg = <0 0x10006000 0 0x1000>;
-+		infracfg = <&infracfg>;
-+		clocks = <&clk26m>,
-+			 <&topckgen CLK_TOP_MM_SEL>;
-+		clock-names = "mfg", "mm";
-+	};
-+
-+Example consumer:
-+
-+	afe: mt8173-afe-pcm at 11220000 {
-+		compatible = "mediatek,mt8173-afe-pcm";
-+		power-domains = <&scpsys MT8173_POWER_DOMAIN_AUDIO>;
-+	};
--- 
-2.1.4
+The SCPSYS unit handles several power management related tasks such
+as thermal measurement, DVFS, interrupt filter and low level sleep
+control.
+
+The initial support only contains the generic power domain handling.
+This is needed to turn on power to the different power domains.
+
+The driver is quite straight forward now. Due to the lack of a better
+place I have put it to drivers/soc/mediatek. As the SCPSYS unit has
+several other tasks that also do not fit into some specific subsystem
+this probably is a good place for this driver.
+
+Please review, any input welcome.
+
+Sascha
+
+changes since v5:
+- Fix array out of bounds access
+- Fix typo
+
+Changes since v4:
+- move Kconfig dependency "select PM_GENERIC_DOMAINS if PM" from arch/arm64
+  next to the driver which needs this dependency
+- drop unnecessary clk[] array from struct scp and make the array local to
+  the function which needs it.
+- Disable clock when enabling the domain fails
+- Drop error message when devm_clk_get fails. The core already issues a
+  similar warning
+- Add clocks/clock-names description to the binding doc
+
+Changes since v3:
+- Drop unnecessary MODULE_* macros for builtin code
+- introduce scpsys_domain_is_on() function instead of open coding this
+  twice
+- Drop unnecessary initialisation of power_o[ff|n]_latencies. The kernel
+  updates them with the measured values anyway.
+
+changes since v2:
+- Add missing include/linux/soc/mediatek/infracfg.h file
+- rename VDE -> VDEC, VEN -> VENC, DIS -> DISP and VEN2 -> VENC_LT
+  to make the abbreviatons more clear
+- make of_device_id const
+- remove double loop
+- fix hunk in wrong patch
+- Fix order of domains. Some domains depend on other domains. Reorder
+  the domains so that all domains can be turned on in order when
+  CONFIG_PM is disabled. Also fixes earlier mixups in the domain array
+- Do not allow compilation as modules. pm_domains cannot be removed, so
+  compilation as module is not that useful
+- reorder Kconfig items alphabetically
+- reorder #includes alphabetically
+- select MTK_INFRACFG instead of depending on it
+- Use only two clocks as dependencies for the domains. The previously
+  used 5 clocks are not necessary as confirmed by the hardware designers
+- use 'genpd' as variable name for struct generic_pm_domain like done in
+  other pm code
+
+changes since v1:
+- make MFG_ASYNC a subdomain of MFG_2D and MFG_2D a subdomain of MFG
+- Add (now hopefully properly) infracfg register handling again
+- Add clock handling
+- Fix on/off mixup in error message
+- Make readonly data const
+- Fix MODULE_LICENSE to GPL v2
+
+changes since RFC:
+
+- add a commit log to driver patch
+- drop manipulating infracfg registers for now, can be added (properly)
+  later
+- Add warning messages when errors occur
+- add NULL pointer check for kmalloc
