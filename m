@@ -1,76 +1,41 @@
-From: maitysanchayan@gmail.com (Sanchayan Maity)
-Date: Wed, 24 Jun 2015 11:24:29 +0530
-Subject: [PATCH v6 0/9] Add simple NVMEM Framework via regmap.
-In-Reply-To: <235181230.251177.1435088854197.JavaMail.open-xchange@oxbsltgw00.schlund.de>
-References: <1435014459-26138-1-git-send-email-srinivas.kandagatla@linaro.org>
- <235181230.251177.1435088854197.JavaMail.open-xchange@oxbsltgw00.schlund.de>
-Message-ID: <20150624055429.GC11753@Sanchayan-Arch.toradex.int>
+From: michael.vanderwesthuizen@smart-africa.com (Michael van der Westhuizen)
+Date: Wed, 24 Jun 2015 08:14:58 +0200
+Subject: [PATCH] ARM: ep93xx: toss the device ID into the entropy pool
+In-Reply-To: <2274537.5rEXu4xPQS@wuerfel>
+References: <1434638859-27381-1-git-send-email-linus.walleij@linaro.org>
+ <2274537.5rEXu4xPQS@wuerfel>
+Message-ID: <CAB5YaOmRW+gvToyJCkYYpaYp6A=QV55ws52C9anddELoYx8LEA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+On 23 June 2015 at 22:39, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Thursday 18 June 2015 16:47:39 Linus Walleij wrote:
+>> @@ -862,6 +863,12 @@ static const char __init *ep93xx_get_soc_id(void)
+>>         if (id != id2)
+>>                 return "invalid";
+>>
+>> +       /* Toss the unique ID into the entropy pool */
+>> +       add_device_randomness(&id2, 4);
+>> +       add_device_randomness(&id3, 4);
+>> +       add_device_randomness(&id4, 4);
+>> +       add_device_randomness(&id5, 4);
+>> +
+>>
+>
+> A stupid question from someone who does not understand computer
+> security: Is there any concern about being able to identify a
+> particular machine based on the random numbers generated at
+> runtime afterwards?
 
-On 15-06-23 21:47:34, Stefan Wahren wrote:
-> Hi Srinivas,
-> 
-> > Srinivas Kandagatla <srinivas.kandagatla@linaro.org> hat am 23. Juni 2015 um
-> > 01:07 geschrieben:
-> >
-> >
-> > [...]
-> >
-> > Device Tree:
-> >
-> > /* Provider */
-> > qfprom: qfprom at 00700000 {
-> > ...
-> >
-> > /* Data cells */
-> > tsens_calibration: calib at 404 {
-> > reg = <0x404 0x10>;
-> > };
-> >
-> > tsens_calibration_bckp: calib_bckp at 504 {
-> > reg = <0x504 0x11>;
-> > bit-offset = 6;
-> > nbits = 128;
-> > };
-> >
-> > pvs_version: pvs-version at 6 {
-> > reg = <0x6 0x2>
-> > bit-offset = 7;
-> > nbits = 2;
-> > };
-> >
-> > speed_bin: speed-bin at c{
-> > reg = <0xc 0x1>;
-> > bit-offset = 2;
-> > nbits = 3;
-> >
-> > };
-> > ...
-> > };
-> >
-> > userspace interface: binary file in /sys/class/nvmem/*/nvmem
-> >
-> > ex:
-> > hexdump /sys/class/nvmem/qfprom0/nvmem
-> >
-> > 0000000 0000 0000 0000 0000 0000 0000 0000 0000
-> > *
-> > 00000a0 db10 2240 0000 e000 0c00 0c00 0000 0c00
-> > 0000000 0000 0000 0000 0000 0000 0000 0000 0000
-> > ...
-> > *
-> > 0001000
-> >
-> 
-> i want to port OCOTP driver for MXS, which hasn't MMIO. From my understanding
-> hexdump would readout the complete register range defined in provider DT node.
-> 
-> How can i achieve that hexdump only reads the data area within the register
-> range?
+No, not in this case.  The reason for this pattern (where any SoC specific
+data that is not visible out of the SoC is mixed in to the initial entropy pool)
+is to avoid class attacks against device families due to similarity of initial
+random numbers affecting this quality of early ephemeral keys.
 
-I also had a similar question in my mind.
+A general guideline is that any data that cannot be determined unless
+you're actually running within the SoC can be mixed into the entropy pool.
 
-- Sanchayan.
+Of course, nothing beats a half-decent hardware RNG as an initial entropy
+source.
+
+Michael
