@@ -1,48 +1,68 @@
-From: nm@ti.com (Nishanth Menon)
-Date: Wed, 24 Jun 2015 11:07:13 -0500
-Subject: [PATCH V2 4/5] drivers/rtc/rtc-ds1307.c: Support optional wakeup
- interrupt source
-In-Reply-To: <558ACE87.6040509@ti.com>
-References: <1435076114-12416-1-git-send-email-nm@ti.com>
- <1435076114-12416-5-git-send-email-nm@ti.com> <558ACE87.6040509@ti.com>
-Message-ID: <558AD5B1.8030406@ti.com>
+From: ankgupta@codeaurora.org (Ankit Gupta)
+Date: Wed, 24 Jun 2015 10:17:30 -0600
+Subject: [PATCH V3] trace/events: add chip name and hwirq to irq entry
+ tracepoint
+Message-ID: <1435162650-32266-1-git-send-email-ankgupta@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/24/2015 10:36 AM, Grygorii Strashko wrote:
-> On 06/23/2015 07:15 PM, Nishanth Menon wrote:
-[...]
+Add chip name and hw-irq number to the trace_irq_handler_entry()
+tracepoint. When tracing interrupt events the chip-name and hw-irq
+numbers are stable and known in advance. This makes them a better
+choice as a filtering criteria for the trace buffer dump. On the
+flipside, the os-irq numbers are dynamically allocated which makes
+them difficult to use for the same purpose.
 
->> +		ds1307->wakeirq = of_irq_get(node, 1);
->> +		if (ds1307->wakeirq <= 0) {
->> +			if (ds1307->wakeirq == -EPROBE_DEFER) {
->> +				err = ds1307->wakeirq;
->> +				goto exit;
->> +			}
->> +			ds1307->wakeirq = 0;
->> +			goto no_irq;
->> +		}
-> 
-> Might be above code could be done a little bit simpler?
-> 
-> 		err = of_irq_get(node, 1);
-> 		if (err <= 0) {
-> 			if (err == -EPROBE_DEFER)
-> 				goto exit;
-> 			goto no_irq;
+Dump messages will look like:
+...irq_handler_entry: irq=22 name=msm_serial0 chip_name=GIC hwirq=140
 
-I had considered it, but problem with this approach is that is err
-does not get reset back to 0 and probe will fail as it flows through
-the rest of the code.. which is not our intent.
+Suggested-by: Stephen Boyd <sboyd@codeaurora.org>
+Reviewed-by: Andy Gross <agross@codeaurora.org>
+Signed-off-by: Gilad Avidov <gavidov@codeaurora.org>
+Signed-off-by: Ankit Gupta <ankgupta@codeaurora.org>
+---
+Changes since V2:
+- fixed dump message in commit text to reflect Chip name
+  instead of domain.
+---
+Changes since V1:
+- added reviewed by Andy Gross
+---
+ include/trace/events/irq.h | 15 ++++++++++++++-
+ 1 file changed, 14 insertions(+), 1 deletion(-)
 
-> 		}
-> 		ds1307->wakeirq = err;
-> 
-
-
-
-
-
+diff --git a/include/trace/events/irq.h b/include/trace/events/irq.h
+index 3608beb..5370075 100644
+--- a/include/trace/events/irq.h
++++ b/include/trace/events/irq.h
+@@ -23,6 +23,17 @@ struct softirq_action;
+ 			 softirq_name(HRTIMER),		\
+ 			 softirq_name(RCU))
+ 
++
++#define show_chip_name(irq)					\
++	(irq_get_irq_data(irq)					\
++			 ? irq_get_irq_data(irq)->chip->name	\
++			 : "NULL")
++
++#define show_hwirq(irq)						\
++	(irq_get_irq_data(irq)					\
++			 ? irq_get_irq_data(irq)->hwirq		\
++			 : -ENODEV)
++
+ /**
+  * irq_handler_entry - called immediately before the irq action handler
+  * @irq: irq number
+@@ -50,7 +61,9 @@ TRACE_EVENT(irq_handler_entry,
+ 		__assign_str(name, action->name);
+ 	),
+ 
+-	TP_printk("irq=%d name=%s", __entry->irq, __get_str(name))
++	TP_printk("irq=%d name=%s chip_name=%s hwirq=%ld", __entry->irq,
++	  __get_str(name), show_chip_name(__entry->irq),
++	  show_hwirq(__entry->irq))
+ );
+ 
+ /**
 -- 
-Regards,
-Nishanth Menon
+1.8.5.2
