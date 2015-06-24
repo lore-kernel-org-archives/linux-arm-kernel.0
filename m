@@ -1,74 +1,84 @@
-From: rogerq@ti.com (Roger Quadros)
-Date: Wed, 24 Jun 2015 14:03:54 +0300
-Subject: [PATCH 05/17] phy: omap-usb2: Add a new compatible string for
- USB2 PHY2
-In-Reply-To: <1435060743-5511-6-git-send-email-kishon@ti.com>
-References: <1435060743-5511-1-git-send-email-kishon@ti.com>
- <1435060743-5511-6-git-send-email-kishon@ti.com>
-Message-ID: <20150624140354.c3c1b0fc24dc37eae5097b4c@ti.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Wed, 24 Jun 2015 12:19:04 +0100
+Subject: [PATCH v2 2/4] mfd: axp20x: Add missing registers, and mark more
+ registers volatile
+In-Reply-To: <1434211748-25572-3-git-send-email-hdegoede@redhat.com>
+References: <1434211748-25572-1-git-send-email-hdegoede@redhat.com>
+ <1434211748-25572-3-git-send-email-hdegoede@redhat.com>
+Message-ID: <20150624111904.GG15013@x1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 23 Jun 2015 17:28:50 +0530
-Kishon Vijay Abraham I <kishon@ti.com> wrote:
+On Sat, 13 Jun 2015, Hans de Goede wrote:
 
-> The USB2 PHY2 has a different register map compared to USB2 PHY1
-> to power on/off the PHY. In order to handle it, add a new
-> "compatible" string.
+> From: Bruno Pr?mont <bonbons@linux-vserver.org>
 > 
-> Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
+> Add an extra set of registers which is necessary tu support the PMICs
+> battery charger function, and mark registers which contain status bits,
+> gpio status, and adc readings as volatile.
+> 
+> Cc: Bruno Pr?mont <bonbons@linux-vserver.org>
+> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
 > ---
->  Documentation/devicetree/bindings/phy/ti-phy.txt |    2 ++
->  drivers/phy/phy-omap-usb2.c                      |    9 +++++++++
->  2 files changed, 11 insertions(+)
-> 
-> diff --git a/Documentation/devicetree/bindings/phy/ti-phy.txt b/Documentation/devicetree/bindings/phy/ti-phy.txt
-> index 52c7a92..b9101b9 100644
-> --- a/Documentation/devicetree/bindings/phy/ti-phy.txt
-> +++ b/Documentation/devicetree/bindings/phy/ti-phy.txt
-> @@ -31,6 +31,8 @@ OMAP USB2 PHY
->  
->  Required properties:
->   - compatible: Should be "ti,omap-usb2"
-> +	       Should be "ti,dra7x-usb2-phy2" for the 2nd instance of USB2 PHY
-> +			in DRA7x
->   - reg : Address and length of the register set for the device.
->   - #phy-cells: determine the number of cells that should be given in the
->     phandle while referencing this phy.
-> diff --git a/drivers/phy/phy-omap-usb2.c b/drivers/phy/phy-omap-usb2.c
-> index b5c266a..2f7220f 100644
-> --- a/drivers/phy/phy-omap-usb2.c
-> +++ b/drivers/phy/phy-omap-usb2.c
-> @@ -159,6 +159,11 @@ static const struct usb_phy_data dra7x_usb2_data = {
->  	.flags = OMAP_USB2_CALIBRATE_FALSE_DISCONNECT,
+> Changes in v2:
+> -Add a AXP20X_OCV_MAX define
+> ---
+>  drivers/mfd/axp20x.c       | 8 +++++++-
+>  include/linux/mfd/axp20x.h | 6 ++++++
+>  2 files changed, 13 insertions(+), 1 deletion(-)
+
+Patch looks good, but you're missing Bruno's SoB.
+
+> diff --git a/drivers/mfd/axp20x.c b/drivers/mfd/axp20x.c
+> index 6df9155..f9a3c2d 100644
+> --- a/drivers/mfd/axp20x.c
+> +++ b/drivers/mfd/axp20x.c
+> @@ -39,10 +39,16 @@ static const char * const axp20x_model_names[] = {
+>  static const struct regmap_range axp20x_writeable_ranges[] = {
+>  	regmap_reg_range(AXP20X_DATACACHE(0), AXP20X_IRQ5_STATE),
+>  	regmap_reg_range(AXP20X_DCDC_MODE, AXP20X_FG_RES),
+> +	regmap_reg_range(AXP20X_RDC_H, AXP20X_OCV(15)),
 >  };
 >  
-> +static const struct usb_phy_data dra7x_usb2_phy2_data = {
-> +	.label = "dra7x_usb2_phy2",
-> +	.flags = OMAP_USB2_CALIBRATE_FALSE_DISCONNECT,
-
-Isn't it better to define the register map in usb_phy_data
-so that you don't need to check for compatible flag everytime?
-
-> +};
+>  static const struct regmap_range axp20x_volatile_ranges[] = {
+> +	regmap_reg_range(AXP20X_PWR_INPUT_STATUS, AXP20X_USB_OTG_STATUS),
+> +	regmap_reg_range(AXP20X_CHRG_CTRL1, AXP20X_CHRG_CTRL2),
+>  	regmap_reg_range(AXP20X_IRQ1_EN, AXP20X_IRQ5_STATE),
+> +	regmap_reg_range(AXP20X_ACIN_V_ADC_H, AXP20X_IPSOUT_V_HIGH_L),
+> +	regmap_reg_range(AXP20X_GPIO20_SS, AXP20X_GPIO3_CTRL),
+> +	regmap_reg_range(AXP20X_FG_RES, AXP20X_RDC_L),
+>  };
+>  
+>  static const struct regmap_access_table axp20x_writeable_table = {
+> @@ -159,7 +165,7 @@ static const struct regmap_config axp20x_regmap_config = {
+>  	.val_bits	= 8,
+>  	.wr_table	= &axp20x_writeable_table,
+>  	.volatile_table	= &axp20x_volatile_table,
+> -	.max_register	= AXP20X_FG_RES,
+> +	.max_register	= AXP20X_OCV(AXP20X_OCV_MAX),
+>  	.cache_type	= REGCACHE_RBTREE,
+>  };
+>  
+> diff --git a/include/linux/mfd/axp20x.h b/include/linux/mfd/axp20x.h
+> index 5275423..6d8b39a 100644
+> --- a/include/linux/mfd/axp20x.h
+> +++ b/include/linux/mfd/axp20x.h
+> @@ -151,6 +151,12 @@ enum {
+>  #define AXP20X_CC_CTRL			0xb8
+>  #define AXP20X_FG_RES			0xb9
+>  
+> +/* OCV */
+> +#define AXP20X_RDC_H			0xba
+> +#define AXP20X_RDC_L			0xbb
+> +#define AXP20X_OCV(m)			(0xc0 + (m))
+> +#define AXP20X_OCV_MAX			0xf
 > +
->  static const struct usb_phy_data am437x_usb2_data = {
->  	.label = "am437x_usb2",
->  	.flags =  0,
-> @@ -178,6 +183,10 @@ static const struct of_device_id omap_usb2_id_table[] = {
->  		.data = &dra7x_usb2_data,
->  	},
->  	{
-> +		.compatible = "ti,dra7x-usb2-phy2",
-> +		.data = &dra7x_usb2_phy2_data,
-> +	},
-> +	{
->  		.compatible = "ti,am437x-usb2",
->  		.data = &am437x_usb2_data,
->  	},
-> -- 
-> 1.7.9.5
-> 
+>  /* AXP22X specific registers */
+>  #define AXP22X_BATLOW_THRES1		0xe6
+>  
 
-cheers,
--roger
+-- 
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
