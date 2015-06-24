@@ -1,188 +1,91 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Wed, 24 Jun 2015 15:24:56 +0100
-Subject: [PATCH v4 2/2] mfd: flexcom: add a driver for Atmel Flexible
- Serial Communication Unit
-In-Reply-To: <dddf7a6d750967785255733a7931780b3c465d5f.1434967670.git.cyrille.pitchen@atmel.com>
-References: <cover.1434967670.git.cyrille.pitchen@atmel.com>
- <dddf7a6d750967785255733a7931780b3c465d5f.1434967670.git.cyrille.pitchen@atmel.com>
-Message-ID: <20150624142456.GS15013@x1>
+From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
+Date: Wed, 24 Jun 2015 16:25:51 +0200
+Subject: [PATCH 4/6] ARM: dts: Exynos4210: add CPU OPP and regulator supply
+ property
+In-Reply-To: <55889E59.1070001@samsung.com>
+References: <'@samsung.com> <20150622150421.9112.96812@quantum>
+ <55889E59.1070001@samsung.com>
+Message-ID: <14660850.Y17AZAAdgl@amdc1976>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 22 Jun 2015, Cyrille Pitchen wrote:
 
-> This driver supports the new Atmel Flexcom. The Flexcom is a wrapper which
-> integrates one SPI controller, one I2C controller and one USART. Only one
-> function can be enabled at a time. This driver selects the function once
-> for all, when the Flexcom is probed, according to the value of the new
-> "atmel,flexcom-mode" device tree property.
+Hi,
+
+On Tuesday, June 23, 2015 08:46:33 AM Krzysztof Kozlowski wrote:
+> On 23.06.2015 00:04, Michael Turquette wrote:
+> > Quoting Kukjin Kim (2015-06-21 18:46:26)
+> >> Krzysztof Kozlowski wrote:
+> >>>
+> >>> On 22.06.2015 10:38, Kukjin Kim wrote:
+> >>>> Krzysztof Kozlowski wrote:
+> >>>>> 2015-05-08 9:18 GMT+09:00 Krzysztof Kozlowski <k.kozlowski@samsung.com>:
+> >>>>>> 2015-04-04 1:43 GMT+09:00 Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>:
+> >>>>>>> From: Thomas Abraham <thomas.ab@samsung.com>
+> >>>>>>>
+> >>>>>>> For Exynos4210 platforms, add CPU operating points and CPU
+> >>>>>>> regulator supply properties for migrating from Exynos specific
+> >>>>>>> cpufreq driver to using generic cpufreq driver.
+> >>>>>>>
+> >>>>>>> Changes by Bartlomiej:
+> >>>>>>> - removed Exynos5250 and Exynos5420 support for now
+> >>>>>>>
+> >>>>>>> Cc: Kukjin Kim <kgene.kim@samsung.com>
+> >>>>>>> Cc: Doug Anderson <dianders@chromium.org>
+> >>>>>>> Cc: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
+> >>>>>>> Cc: Andreas Faerber <afaerber@suse.de>
+> >>>>>>> Cc: Sachin Kamat <sachin.kamat@linaro.org>
+> >>>>>>> Cc: Andreas Farber <afaerber@suse.de>
+> >>>>>>> Cc: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
+> >>>>>>> Signed-off-by: Thomas Abraham <thomas.ab@samsung.com>
+> >>>>>>> Signed-off-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
+> >>>>>>
+> >>>>>> Acked-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+> >>>>>
+> >>>>> Rebased and applied to my tree, I'll sent it later to Kukjin unless he
+> >>>>> picks it by himself from LKML.
+> >>>>>
+> >>>> Hi, as far as I know, this is for v4.2 not v4.1 so it will be applied based on
+> >>>> v4.2-rc1 after v4.2-rc1 release.
+> >>>
+> >>> You mean it is for v4.3, not v4.2?
+> >>>
+> >> Oops, yes v4.3.
+> >>
+> >> Thanks for the correction.
+> > 
+> > Kukjin & Krzysztof,
+> > 
+> > I'm confused on this point. I was planning to take patches 1, 2, 3, 5
+> > and 6 towards 4.2 (e.g. in the pull request that I'll send out this
+> > week).
+> > 
+> > Is patch 4 going out for 4.2 or 4.3?
 > 
-> This driver has chosen to present the Flexcom to the system as a MFD so
-> the implementation is seamless for the existing Atmel SPI, I2C and USART
-> drivers.
-
-No need for this driver.
-
-Just create your 3 platform drivers and get them to read the mode at
-probe time.  If the mode isn't the one pertaining to itself return
--ENODEV and the Device Driver API will attempt the probe the next
-device.  Ensure all of the devices have the same compatible string
-i.e. atmel,sama5d2-flexcom.
-
-> Also the Flexcom embeds FIFOs: the latest patches of the SPI, I2C and
-> USART drivers take advantage of this new feature.
+> It is quite late for sending pull request to arm-soc for 4.2.
+> For example SoCFPGA pull request from last week was rejected:
+> http://comments.gmane.org/gmane.linux.ports.arm.kernel/417980
 > 
-> Signed-off-by: Cyrille Pitchen <cyrille.pitchen@atmel.com>
-> Acked-by: Boris Brezillon <boris.brezillon@free-electrons.com>
-> Acked-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
-> ---
->  drivers/mfd/Kconfig         | 11 +++++
->  drivers/mfd/Makefile        |  1 +
->  drivers/mfd/atmel-flexcom.c | 98 +++++++++++++++++++++++++++++++++++++++++++++
->  3 files changed, 110 insertions(+)
->  create mode 100644 drivers/mfd/atmel-flexcom.c
-> 
-> diff --git a/drivers/mfd/Kconfig b/drivers/mfd/Kconfig
-> index d5ad04d..9b33ad0 100644
-> --- a/drivers/mfd/Kconfig
-> +++ b/drivers/mfd/Kconfig
-> @@ -59,6 +59,17 @@ config MFD_AAT2870_CORE
->  	  additional drivers must be enabled in order to use the
->  	  functionality of the device.
->  
-> +config MFD_ATMEL_FLEXCOM
-> +	tristate "Atmel Flexcom (Flexible Serial Communication Unit)"
-> +	select MFD_CORE
-> +	depends on OF
-> +	help
-> +	  Select this to get support for Atmel Flexcom. This is a wrapper
-> +	  which embeds a SPI controller, a I2C controller and a USART. Only
-> +	  one function can be used at a time. The choice is done at boot time
-> +	  by the probe function of this MFD driver according to a device tree
-> +	  property.
-> +
->  config MFD_ATMEL_HLCDC
->  	tristate "Atmel HLCDC (High-end LCD Controller)"
->  	select MFD_CORE
-> diff --git a/drivers/mfd/Makefile b/drivers/mfd/Makefile
-> index 0e5cfeb..c666bf5 100644
-> --- a/drivers/mfd/Makefile
-> +++ b/drivers/mfd/Makefile
-> @@ -160,6 +160,7 @@ obj-$(CONFIG_MFD_SPMI_PMIC)	+= qcom-spmi-pmic.o
->  obj-$(CONFIG_TPS65911_COMPARATOR)	+= tps65911-comparator.o
->  obj-$(CONFIG_MFD_TPS65090)	+= tps65090.o
->  obj-$(CONFIG_MFD_AAT2870_CORE)	+= aat2870-core.o
-> +obj-$(CONFIG_MFD_ATMEL_FLEXCOM)	+= atmel-flexcom.o
->  obj-$(CONFIG_MFD_ATMEL_HLCDC)	+= atmel-hlcdc.o
->  obj-$(CONFIG_MFD_INTEL_MSIC)	+= intel_msic.o
->  obj-$(CONFIG_MFD_PALMAS)	+= palmas.o
-> diff --git a/drivers/mfd/atmel-flexcom.c b/drivers/mfd/atmel-flexcom.c
-> new file mode 100644
-> index 0000000..7e7d4b8
-> --- /dev/null
-> +++ b/drivers/mfd/atmel-flexcom.c
-> @@ -0,0 +1,98 @@
-> +/*
-> + * Driver for Atmel Flexcom
-> + *
-> + * Copyright (C) 2015 Atmel Corporation
-> + *
-> + * Author: Cyrille Pitchen <cyrille.pitchen@atmel.com>
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License as published by
-> + * the Free Software Foundation; either version 2 of the License, or
-> + * (at your option) any later version.
-> + *
-> + */
-> +
-> +#include <linux/module.h>
-> +#include <linux/types.h>
-> +#include <linux/kernel.h>
-> +#include <linux/platform_device.h>
-> +#include <linux/of.h>
-> +#include <linux/of_platform.h>
-> +#include <linux/err.h>
-> +#include <linux/io.h>
-> +#include <linux/clk.h>
-> +
-> +#define FX_MR		0x0
-> +#define FX_RHR		0x10
-> +#define FX_THR		0x20
-> +#define FX_VERSION	0xfc
-> +
-> +#define FX_MR_NO_COM	0
-> +#define FX_MR_USART	1
-> +#define FX_MR_SPI	2
-> +#define FX_MR_TWI	3
-> +
-> +
-> +static int atmel_flexcom_probe(struct platform_device *pdev)
-> +{
-> +	struct clk *clk;
-> +	struct resource *res;
-> +	unsigned char __iomem *map;
-> +	unsigned int version, mr;
-> +	const char *mode;
-> +	int err;
-> +
-> +	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-> +	map = devm_ioremap_resource(&pdev->dev, res);
-> +	if (IS_ERR(map))
-> +		return PTR_ERR(map);
-> +
-> +	clk = devm_clk_get(&pdev->dev, NULL);
-> +	if (IS_ERR(clk))
-> +		return PTR_ERR(clk);
-> +
-> +	err = of_property_read_string(pdev->dev.of_node,
-> +				      "atmel,flexcom-mode", &mode);
-> +	if (err)
-> +		return err;
-> +
-> +	if (!strcmp(mode, "usart"))
-> +		mr = FX_MR_USART;
-> +	else if (!strcmp(mode, "spi"))
-> +		mr = FX_MR_SPI;
-> +	else if (!strcmp(mode, "twi") || !strcmp(mode, "i2c"))
-> +		mr = FX_MR_TWI;
-> +	else
-> +		return -EINVAL;
-> +
-> +	err = clk_prepare_enable(clk);
-> +	if (err)
-> +		return err;
-> +	version = readl(map + FX_VERSION);
-> +	writel(mr, map + FX_MR);
-> +	clk_disable_unprepare(clk);
-> +
-> +	dev_info(&pdev->dev, "version: %#x, mode: %s\n", version, mode);
-> +
-> +	return of_platform_populate(pdev->dev.of_node, NULL, NULL, &pdev->dev);
-> +}
-> +
-> +static const struct of_device_id atmel_flexcom_of_match[] = {
-> +	{ .compatible = "atmel,sama5d2-flexcom" },
-> +	{ /* sentinel */ }
-> +};
-> +MODULE_DEVICE_TABLE(of, atmel_flexcom_of_match);
-> +
-> +static struct platform_driver atmel_flexcom_driver = {
-> +	.driver		= {
-> +		.name	= "atmel_flexcom",
-> +		.of_match_table = atmel_flexcom_of_match,
-> +	},
-> +	.probe		= atmel_flexcom_probe,
-> +};
-> +
-> +module_platform_driver(atmel_flexcom_driver);
-> +
-> +MODULE_AUTHOR("Cyrille Pitchen <cyrille.pitchen@atmel.com>");
-> +MODULE_DESCRIPTION("Atmel Flexcom MFD driver");
-> +MODULE_LICENSE("GPL");
+> If you want to take it for 4.2 then I am fine with it but this will
+> cause some easy but annoying conflicts. There aren't difficult - just
+> most of nodes in board DTS changed their place.
 
--- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Taking all patches together would be a preferred solution from my POV.
+
+It would also be great if it could happen in v4.2 (all code changes are
+practically limited to our Exynos4210 platform so I hope that it should
+be fine) as it would be easier to work on Exynos4x12, Exynos5250 and
+Exynos542x/5800 patch series.
+
+Best regards,
+--
+Bartlomiej Zolnierkiewicz
+Samsung R&D Institute Poland
+Samsung Electronics
+
+> Example of resolution (target file after merge, with cpu nodes reordered
+> alphabetically):
+> https://github.com/krzk/linux/commit/2cec3cb48abaf44848c62f1c0836b772eb4680dd
+> 
+> Best regards,
+> Krzysztof
