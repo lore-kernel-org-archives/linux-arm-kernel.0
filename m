@@ -1,37 +1,35 @@
-From: santosh.shilimkar@oracle.com (santosh shilimkar)
-Date: Wed, 24 Jun 2015 12:22:48 -0700
-Subject: [PATCH] ARM: use phys_addr_t in pfn_to_kaddr()
-In-Reply-To: <1435072386-13527-1-git-send-email-vitalya@ti.com>
-References: <1435072386-13527-1-git-send-email-vitalya@ti.com>
-Message-ID: <558B0388.1040006@oracle.com>
+From: matthias.bgg@gmail.com (Matthias Brugger)
+Date: Wed, 24 Jun 2015 21:47:51 +0200
+Subject: [PATCH v2 2/2] arm64: dts: mt8173: Add I2C device node
+In-Reply-To: <CAGS+omC0n1eADRCy58a4C=w9LikPvQv=bHopNTE1XXW3h7zRLA@mail.gmail.com>
+References: <1433164107-26568-1-git-send-email-eddie.huang@mediatek.com>
+ <1433164107-26568-3-git-send-email-eddie.huang@mediatek.com>
+ <5279457.I1q8kC8mJN@ubix>
+ <CAGS+omC0n1eADRCy58a4C=w9LikPvQv=bHopNTE1XXW3h7zRLA@mail.gmail.com>
+Message-ID: <CABuKBeJesxK2_tFwxkbFi8w2Tb3p=RQpehLp2nNmM_VWz-rOGg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 6/23/2015 8:13 AM, Vitaly Andrianov wrote:
-> This patch fixes pfn_to_kaddr() to use phys_addr_t.  Without this,
-> this macro is broken on LPAE systems. For physical addresses above
-> first 4GB result of shifting pfn with PAGE_SHIFT may be truncated.
+2015-06-24 13:00 GMT+02:00 Daniel Kurtz <djkurtz@chromium.org>:
+> Hi Matthias,
 >
-> Signed-off-by: Vitaly Andrianov <vitalya@ti.com>
-> ---
-Looks a valid fix.
+> On Wed, Jun 24, 2015 at 4:04 AM, Matthias Brugger
+> <matthias.bgg@gmail.com> wrote:
+>> On Monday, June 01, 2015 09:08:27 PM Eddie Huang wrote:
+>>> Add MT8173 I2C device nodes, include I2C controllers and pins.
+>>> MT8173 has six I2C controllers, from i2c0 to i2c6, exclude i2c5.
+>>> The 6th I2C controller register base doesn't next to 5th I2C,
+>>> and there is a hardware between 5th and 6th I2C controller. So
+>>> SoC designer name 6th controller as "i2c6", not "i2c5".
+>>>
+>>> Signed-off-by: Eddie Huang <eddie.huang@mediatek.com>
+>>> ---
+>>
+>> applied to v4.2-next/arm64
+>
+> It looks like [0] has the pinctrl changes, but lost the actual i2c nodes.
 
-RMK, Nico, what you say ?
+Huh, thanks for noting that. I just fixed it.
 
->   arch/arm/include/asm/memory.h | 2 +-
->   1 file changed, 1 insertion(+), 1 deletion(-)
->
-> diff --git a/arch/arm/include/asm/memory.h b/arch/arm/include/asm/memory.h
-> index 184def0..063ef31 100644
-> --- a/arch/arm/include/asm/memory.h
-> +++ b/arch/arm/include/asm/memory.h
-> @@ -291,7 +291,7 @@ static inline void *phys_to_virt(phys_addr_t x)
->    */
->   #define __pa(x)			__virt_to_phys((unsigned long)(x))
->   #define __va(x)			((void *)__phys_to_virt((phys_addr_t)(x)))
-> -#define pfn_to_kaddr(pfn)	__va((pfn) << PAGE_SHIFT)
-> +#define pfn_to_kaddr(pfn)	__va((phys_addr_t)(pfn) << PAGE_SHIFT)
->
->   extern phys_addr_t (*arch_virt_to_idmap)(unsigned long x);
->
->
+Regards,
+Matthias
