@@ -1,67 +1,94 @@
-From: pawelo@king.net.pl (Paul Osmialowski)
-Date: Wed, 24 Jun 2015 06:22:42 +0200 (CEST)
-Subject: [PATCH 1/9] arm: select different compiler flags for ARM CortexM3
-In-Reply-To: <20150623214818.GF7557@n2100.arm.linux.org.uk>
-References: <1435094387-20146-1-git-send-email-pawelo@king.net.pl>
- <1435094387-20146-2-git-send-email-pawelo@king.net.pl>
- <20150623214818.GF7557@n2100.arm.linux.org.uk>
-Message-ID: <alpine.LNX.2.00.1506240614540.24366@localhost.localdomain>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Tue, 23 Jun 2015 21:47:17 -0700
+Subject: [PATCH 0/7] soc: brcmstb: add system suspend support for STB SoCs
+In-Reply-To: <20150622194714.GM4917@ld-irv-0074>
+References: <1434672696-13632-1-git-send-email-computersforpeace@gmail.com>
+ <20150622194714.GM4917@ld-irv-0074>
+Message-ID: <558A3655.9070705@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Russell,
+Le 06/22/15 12:47, Brian Norris a ?crit :
+> + others
+> 
+> On Thu, Jun 18, 2015 at 05:11:29PM -0700, Brian Norris wrote:
+>> Hi,
+>>
+>> This patch set introduces system suspend/resume support for Broadcom STB SoCs.
+>> There are two suspend modes (S2 and S3) as well as a related low-power shutdown
+>> mode (S5).
+>>
+>> Along with the core PM support, include a driver for the wakeup-timer, which
+>> allows for simple testing of suspend/resume wakeup cycles.
+>>
+>> Brian
+> 
+> Somehow I completely missed out on sending this to a few of the right
+> places, like linux-pm and the PM maintainers. I guess I just trusted
+> get_maintainer.pl (which doesn't know what to do with drivers/soc/) too
+> much, and forgot to turn my brain on...
+> 
+> Anyway, if y'all can track down the patches via archives, feel free. Or
+> I will resend this shortly as a v2, with a few suggested fixes and with
+> a more complete CC list.
 
-Thanks for the input. Seems like I trusted get_maintainer.pl blindly and 
-wasn't selective - it resulted in recipient list much too long.
+Works for me, thanks for getting this out:
 
-As for this patch, I think I went too far with adding it. The board boots 
-without it properly, and since it covers more general Cortex-M related 
-problems I guess it should be excluded from next iteration of the whole 
-patchset.
+Reviewed-by: Florian Fainelli <f.fainelli@gmail.com>
 
-The problems it adresses may still required further discussion, but I 
-think it should not block the whole thing.
+I would like some comments on the Device Tree binding portion so I can
+take these patches and submit them for our next Broadcom arm-soc pull
+requests, thanks!
 
-On Tue, 23 Jun 2015, Russell King - ARM Linux wrote:
+> 
+> Regards,
+> Brian
+> 
+>> Brian Norris (7):
+>>   Documentation: dt: brcmstb: add system PM bindings
+>>   Documentation: dt: brcmstb: add waketimer documentation
+>>   soc: add stubs for brcmstb SoC's
+>>   soc: brcmstb: add PM suspend/resume support (S2/S3/S5)
+>>   soc: brcmstb: add wake-timer driver
+>>   ARM: brcmstb: mask GIC IRQs on suspend
+>>   ARM: dts: brcmstb: add BCM7445 system PM DT nodes
+>>
+>>  .../ABI/testing/sysfs-driver-wktmr-brcmstb         |  12 +
+>>  .../devicetree/bindings/arm/bcm/brcm,brcmstb.txt   | 142 +++++-
+>>  .../soc/brcmstb/brcm,brcmstb-waketimer.txt         |  20 +
+>>  arch/arm/boot/dts/bcm7445.dtsi                     | 102 ++++
+>>  arch/arm/mach-bcm/Kconfig                          |   1 +
+>>  arch/arm/mach-bcm/brcmstb.c                        |  10 +
+>>  drivers/soc/Kconfig                                |   1 +
+>>  drivers/soc/Makefile                               |   1 +
+>>  drivers/soc/brcmstb/Kconfig                        |  22 +
+>>  drivers/soc/brcmstb/Makefile                       |   4 +
+>>  drivers/soc/brcmstb/common.c                       |  33 ++
+>>  drivers/soc/brcmstb/pm/Makefile                    |   1 +
+>>  drivers/soc/brcmstb/pm/aon_defs.h                  |  85 ++++
+>>  drivers/soc/brcmstb/pm/pm.c                        | 512 +++++++++++++++++++++
+>>  drivers/soc/brcmstb/pm/pm.h                        |  40 ++
+>>  drivers/soc/brcmstb/pm/s2.S                        |  73 +++
+>>  drivers/soc/brcmstb/wktmr.c                        | 242 ++++++++++
+>>  include/soc/brcmstb/common.h                       |  15 +
+>>  18 files changed, 1314 insertions(+), 2 deletions(-)
+>>  create mode 100644 Documentation/ABI/testing/sysfs-driver-wktmr-brcmstb
+>>  create mode 100644 Documentation/devicetree/bindings/soc/brcmstb/brcm,brcmstb-waketimer.txt
+>>  create mode 100644 drivers/soc/brcmstb/Kconfig
+>>  create mode 100644 drivers/soc/brcmstb/Makefile
+>>  create mode 100644 drivers/soc/brcmstb/common.c
+>>  create mode 100644 drivers/soc/brcmstb/pm/Makefile
+>>  create mode 100644 drivers/soc/brcmstb/pm/aon_defs.h
+>>  create mode 100644 drivers/soc/brcmstb/pm/pm.c
+>>  create mode 100644 drivers/soc/brcmstb/pm/pm.h
+>>  create mode 100644 drivers/soc/brcmstb/pm/s2.S
+>>  create mode 100644 drivers/soc/brcmstb/wktmr.c
+>>  create mode 100644 include/soc/brcmstb/common.h
+>>
+>> -- 
+>> 1.9.1
+>>
 
-> On Tue, Jun 23, 2015 at 11:19:39PM +0200, Paul Osmialowski wrote:
->> This one is inspired by two commits published on Emcraft git repo:
->>
->> https://github.com/EmcraftSystems/linux-emcraft.git
->>
->> 1) 6302b692f570ff9d5645a6e72c11f87b0c1aa409
->>  RT #62654. Fixed kernel crashes while running httpd by enabling
->>  "-mfix-cortex-m3-ldrd" compiler option, which prevents compiler from
->>  generating code like 'ldrd Ra, Rb, [Ra, #Imm]' - according to the 602117
->>  Cortex-M3 Errata it may result in incorrect base register when interrupted
->>  or faulted.
->>
->> by: Yuri Tikhonov <yur@emcraft.com>
->>
->> 2) 359d3cda84c01c0f3fae1a519b97a31f318f57ab
->>  RT #62654. Removed "--march=..." leaving only "-mcpu=cortex-m3" to make
->>  sure only the correct instructions will be generated.
->>
->> by: Sergei Poselenov <sposelenov@emcraft.com>
->>
->> I reworked these patches to make them less intrusive.
->>
->> Signed-off-by: Paul Osmialowski <pawelo@king.net.pl>
->
-> NAK.
->
-> The EFM32 code already added core support for Cortex-M3 cores, under
-> the symbol CPU_V7M.  Rather than implementing a whole new set of
-> Cortex-M3 support alongside the existing code, please work with the
-> EFM32 maintainer (Uwe Kleine-K?nig) to come up with a common set of
-> core changes that you can all agree on for Cortex-M3.
->
-> Please also try to be a little smarter with whom you're sending your
-> patches to, the Cc list looks to be excessively long - having soo many
-> recipients on your message is a good way to get your message rejected
-> by mailing lists as spam.
->
-> -- 
-> FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
-> according to speedtest.net.
->
+
+-- 
+Florian
