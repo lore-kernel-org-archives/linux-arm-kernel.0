@@ -1,29 +1,56 @@
 From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Wed, 24 Jun 2015 14:59:30 -0700
-Subject: [PATCH] ARM64: smp: Silence suspicious RCU usage with ipi
- tracepoints
-In-Reply-To: <20150624212930.GC12596@twins.programming.kicks-ass.net>
-References: <1435176858-9568-1-git-send-email-sboyd@codeaurora.org>
- <20150624212930.GC12596@twins.programming.kicks-ass.net>
-Message-ID: <558B2842.2030007@codeaurora.org>
+Date: Wed, 24 Jun 2015 15:07:05 -0700
+Subject: [PATCH v6 6/9] nvmem: qfprom: Add Qualcomm QFPROM support.
+In-Reply-To: <1435014556-26392-1-git-send-email-srinivas.kandagatla@linaro.org>
+References: <1435014459-26138-1-git-send-email-srinivas.kandagatla@linaro.org>
+ <1435014556-26392-1-git-send-email-srinivas.kandagatla@linaro.org>
+Message-ID: <558B2A09.3020407@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/24/2015 02:29 PM, Peter Zijlstra wrote:
-> On Wed, Jun 24, 2015 at 01:14:18PM -0700, Stephen Boyd wrote:
->> John Stultz reported an RCU splat on ARM with ipi trace events
->> enabled. It looks like the same problem exists on ARM64.
->>
->> At this point in the IPI handling path we haven't called
->> irq_enter() yet, so RCU doesn't know that we're about to exit
->> idle and properly warns that we're using RCU from an idle CPU.
->> Use trace_ipi_entry_rcuidle() instead of trace_ipi_entry() so
->> that RCU is informed about our exit from idle.
-> I have a problem with $subject. It says 'silence', whereas afaict this
-> fixes an actual bug, so it should be 'fixes'.
+On 06/22/2015 04:09 PM, Srinivas Kandagatla wrote:
+> diff --git a/drivers/nvmem/qfprom.c b/drivers/nvmem/qfprom.c
+> new file mode 100644
+> index 0000000..7f7a82f
+> --- /dev/null
+> +++ b/drivers/nvmem/qfprom.c
+> @@ -0,0 +1,89 @@
+>
+> +
+> +#include <linux/platform_device.h>
+> +#include <linux/nvmem-provider.h>
+> +#include <linux/slab.h>
+> +#include <linux/regmap.h>
+> +#include <linux/device.h>
+> +#include <linux/io.h>
 
-Fair enough. I can resend or whoever applies this patch can
-s/Silence/Fix/ on the $subject.
+Is this include used?
+
+> +#include <linux/module.h>
+> +#include <linux/delay.h>
+
+Is this include used?
+
+> +#include <linux/of.h>
+> +
+> +static struct regmap_config qfprom_regmap_config = {
+
+Can this be const?
+
+> +	.reg_bits = 32,
+> +	.val_bits = 8,
+> +	.reg_stride = 1,
+> +};
+> +
+> +static struct nvmem_config econfig = {
+
+And this one too?
+
+> +	.name = "qfprom",
+> +	.owner = THIS_MODULE,
+> +};
+> +
+
 
 -- 
 Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
