@@ -1,233 +1,101 @@
-From: computersforpeace@gmail.com (Brian Norris)
-Date: Tue, 23 Jun 2015 16:30:03 -0700
-Subject: [PATCH v4 1/2] mtd: nand: sunxi: Replace failsafe timing cfg
- with calculated value
-In-Reply-To: <1434034637-9804-1-git-send-email-r.spliet@ultimaker.com>
-References: <1434034637-9804-1-git-send-email-r.spliet@ultimaker.com>
-Message-ID: <20150623233003.GR4917@ld-irv-0074>
+From: rjw@rjwysocki.net (Rafael J. Wysocki)
+Date: Wed, 24 Jun 2015 02:14:30 +0200
+Subject: [PATCH 02/13] driver-core: defer all probes until late_initcall
+In-Reply-To: <CAAObsKBa_P1nue3QYQ6FW6MX518e+4sfuZPSVDa3jqGuyLRnaA@mail.gmail.com>
+References: <1434548543-22949-1-git-send-email-tomeu.vizoso@collabora.com>
+ <1513496.zoUTpU2Ou0@vostro.rjw.lan>
+ <CAAObsKBa_P1nue3QYQ6FW6MX518e+4sfuZPSVDa3jqGuyLRnaA@mail.gmail.com>
+Message-ID: <7645555.3VxbZC5b7u@vostro.rjw.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 11, 2015 at 04:57:16PM +0200, Roy Spliet wrote:
-> The TIMING_CFG register was previously statically set to a magic value
-> (extracted from Allwinner's BSP) when initializing the NAND controller.
-> Now that we have more details about the TIMING_CFG register layout
-> (extracted from the A83 user manual) we can dynamically calculate the
-> appropriate value for each NAND chip and set it when selecting the
-> chip.
+On Tuesday, June 23, 2015 04:37:57 PM Tomeu Vizoso wrote:
+> On 23 June 2015 at 16:51, Rafael J. Wysocki <rjw@rjwysocki.net> wrote:
+> > On Tuesday, June 23, 2015 04:17:29 PM Tomeu Vizoso wrote:
+> >> On 23 June 2015 at 16:37, Rafael J. Wysocki <rjw@rjwysocki.net> wrote:
+> >> > On Monday, June 22, 2015 07:07:08 PM Rob Herring wrote:
+> >> >> On Fri, Jun 19, 2015 at 6:20 PM, Rafael J. Wysocki <rjw@rjwysocki.net> wrote:
+> >> >> > On Friday, June 19, 2015 03:36:46 PM Tomeu Vizoso wrote:
+> >> >> >> On 18 June 2015 at 23:50, Rafael J. Wysocki <rjw@rjwysocki.net> wrote:
+> >> >> >> > On Wednesday, June 17, 2015 03:42:12 PM Tomeu Vizoso wrote:
+> >> >> >> >> To decrease the chances of devices deferring their probes because of
+> >> >> >> >> dependencies not having probed yet because of their drivers not having
+> >> >> >> >> registered yet, delay all probing until the late initcall level.
+> >> >> >> >>
+> >> >> >> >> This will allow us to avoid deferred probes completely later by probing
+> >> >> >> >> dependencies on demand, or by probing them in dependency order.
+> >> >> >> >>
+> >> >> >> >> Signed-off-by: Tomeu Vizoso <tomeu.vizoso@collabora.com>
+> >> >> >> >> ---
+> >> >> >> >>  drivers/base/dd.c | 8 +++++++-
+> >> >> >> >>  1 file changed, 7 insertions(+), 1 deletion(-)
+> >> >> >> >>
+> >> >> >> >> diff --git a/drivers/base/dd.c b/drivers/base/dd.c
+> >> >> >> >> index a638bbb..18438aa 100644
+> >> >> >> >> --- a/drivers/base/dd.c
+> >> >> >> >> +++ b/drivers/base/dd.c
+> >> >> >> >> @@ -407,6 +407,12 @@ int driver_probe_device(struct device_driver *drv, struct device *dev)
+> >> >> >> >>       if (!device_is_registered(dev))
+> >> >> >> >>               return -ENODEV;
+> >> >> >> >>
+> >> >> >> >> +     /* Defer all probes until we start processing the queue */
+> >> >> >> >> +     if (!driver_deferred_probe_enable) {
+> >> >> >> >> +             driver_deferred_probe_add(dev);
+> >> >> >> >
+> >> >> >> > Do I think correctly that this will effectively force everybody to use deferred
+> >> >> >> > probing?
+> >> >> >>
+> >> >> >> Guess it depends on the meaning of "using deferred probing". It will
+> >> >> >> defer the probe of the first device to late_initcall (which will
+> >> >> >> happen much earlier in time than before), but afterwards all built-in
+> >> >> >> drivers will be available and depending on the order in which we try
+> >> >> >> to probe devices, none may actually ask to defer its probe.
+> >> >> >
+> >> >> > So this will break things like the PNP system driver which relies on probing
+> >> >> > stuff at the fs_initcall stage for correctness.  It may also break other
+> >> >> > things with similar assumptions.
+> >> >>
+> >> >> Yes, but I think that this can be done for only OF based devices
+> >> >> rather than globally for all platform devices and solve that problem.
+> >> >> Matching is already dependent of the type of device.
+> >> >
+> >> > Well, the current patch is not OF-only, though.
+> >>
+> >> Yeah, I'm currently looking at only delaying probing of devices
+> >> created from OF data.
+> >
+> > I'm not sure if tying it hard to OF is not too restrictive.
+> >
+> > Maybe we can use some general opt-in mechanism that OF will just always use?
 > 
-> Signed-off-by: Roy Spliet <r.spliet@ultimaker.com>
+> Would it help if buses called fwnode_driver_match_device() instead of
+> the existing OF and ACPI variants and we did it in there?
+
+Probably it would, but I'd need to see the actual patch. :-)
+
+> I'm still not sure of how fwnode is used in machines with ACPI.
+
+I'm not sure what you mean.  On ACPI systems struct fwnode_handle is embedded
+in struct acpi_device and there is a pointer from struct device to that field
+in the companion ACPI device object.
+
+> But that would be quite a bit of work that I think should be left for
+> a later series because otherwise this one is going to balloon in size
+> really quickly.
+
+Well, I'd prefer not to leave anything to a "later series" that may never be
+submitted ...
+
+> > In fact, we have a similar problem in ACPI where we have the _DEP object which
+> > is used by firmware to describe dependencies between devices.
 > 
-> V2:
-> - Fix crippled comments
-> 
-> V3:
-> - Warn for invalid timings
-> - Style
-> 
-> V4:
-> - Make better use of return types
-> - Style and comments
-> - Remove superfluous initialisation
+> I would expect that classes/subsystems would be able to use that data
+> in their class.get_dependencies() callback, if the passed fwnode is a
+> ACPI node.
 
-You've got some checkpatch issues. The first one is not quite right, but the
-second is.
+Yes, something like that.
 
-ERROR:MULTISTATEMENT_MACRO_USE_DO_WHILE: Macros with multiple statements should be enclosed in a do - while loop
-#42: FILE: drivers/mtd/nand/sunxi_nand.c:103:
-+#define NFC_TIMING_CFG(tWB, tADL, tWHR, tRHW, tCAD)		\
-+	((tWB) & 0x3) | (((tADL) & 0x3) << 2) |			\
-+	(((tWHR) & 0x3) << 4) | (((tRHW) & 0x3) << 6) |		\
-+	(((tCAD) & 0x7) << 8);
+But the point is that this really isn't OF-specific.
 
-WARNING:TRAILING_SEMICOLON: macros should not use a trailing semicolon
-#42: FILE: drivers/mtd/nand/sunxi_nand.c:103:
-+#define NFC_TIMING_CFG(tWB, tADL, tWHR, tRHW, tCAD)		\
-+	((tWB) & 0x3) | (((tADL) & 0x3) << 2) |			\
-+	(((tWHR) & 0x3) << 4) | (((tRHW) & 0x3) << 6) |		\
-+	(((tCAD) & 0x7) << 8);
-
-ERROR:SPACING: space required after that ',' (ctx:VxV)
-#97: FILE: drivers/mtd/nand/sunxi_nand.c:838:
-+#define sunxi_nand_lookup_timing(l,p,c) \
-                                   ^
-
-ERROR:SPACING: space required after that ',' (ctx:VxV)
-#97: FILE: drivers/mtd/nand/sunxi_nand.c:838:
-+#define sunxi_nand_lookup_timing(l,p,c) \
-                                     ^
-
-total: 3 errors, 1 warnings, 128 lines checked
-
-
-> ---
->  drivers/mtd/nand/sunxi_nand.c | 74 ++++++++++++++++++++++++++++++++++++++++---
->  1 file changed, 69 insertions(+), 5 deletions(-)
-> 
-> diff --git a/drivers/mtd/nand/sunxi_nand.c b/drivers/mtd/nand/sunxi_nand.c
-> index 6f93b29..79de4ef 100644
-> --- a/drivers/mtd/nand/sunxi_nand.c
-> +++ b/drivers/mtd/nand/sunxi_nand.c
-> @@ -99,6 +99,13 @@
->  				 NFC_CMD_INT_ENABLE | \
->  				 NFC_DMA_INT_ENABLE)
->  
-> +/* define NFC_TIMING_CFG register layout */
-> +#define NFC_TIMING_CFG(tWB, tADL, tWHR, tRHW, tCAD)		\
-> +	((tWB) & 0x3) | (((tADL) & 0x3) << 2) |			\
-> +	(((tWHR) & 0x3) << 4) | (((tRHW) & 0x3) << 6) |		\
-> +	(((tCAD) & 0x7) << 8);
-
-checkpatch didn't like this for other reasons (which you should also address),
-but it didn't point out the fact that you need some parentheses around the
-whole expression here, so you don't get weird results for things like:
-
-	foo = NFC_TIMING_CFG(a, b, c, d, e) & bar;
-
-> +
-> +
->  /* define bit use in NFC_CMD */
->  #define NFC_CMD_LOW_BYTE	GENMASK(7, 0)
->  #define NFC_CMD_HIGH_BYTE	GENMASK(15, 8)
-> @@ -208,6 +215,7 @@ struct sunxi_nand_hw_ecc {
->   * @nand:		base NAND chip structure
->   * @mtd:		base MTD structure
->   * @clk_rate:		clk_rate required for this NAND chip
-> + * @timing_cfg		TIMING_CFG register value for this NAND chip
->   * @selected:		current active CS
->   * @nsels:		number of CS lines required by the NAND chip
->   * @sels:		array of CS lines descriptions
-> @@ -217,6 +225,7 @@ struct sunxi_nand_chip {
->  	struct nand_chip nand;
->  	struct mtd_info mtd;
->  	unsigned long clk_rate;
-> +	u32 timing_cfg;
->  	int selected;
->  	int nsels;
->  	struct sunxi_nand_chip_sel sels[0];
-> @@ -403,6 +412,7 @@ static void sunxi_nfc_select_chip(struct mtd_info *mtd, int chip)
->  		}
->  	}
->  
-> +	writel(sunxi_nand->timing_cfg, nfc->regs + NFC_REG_TIMING_CFG);
->  	writel(ctl, nfc->regs + NFC_REG_CTL);
->  
->  	sunxi_nand->selected = chip;
-> @@ -807,10 +817,33 @@ static int sunxi_nfc_hw_syndrome_ecc_write_page(struct mtd_info *mtd,
->  	return 0;
->  }
->  
-> +static const s32 tWB_lut[] = {6, 12, 16, 20};
-> +static const s32 tRHW_lut[] = {4, 8, 12, 20};
-> +
-> +static int _sunxi_nand_lookup_timing(const s32 *lut, int lut_size, u32 duration,
-> +		u32 clk_period)
-> +{
-> +	u32 clk_cycles = DIV_ROUND_UP(duration, clk_period);
-> +	int i;
-> +
-> +	for (i = 0; i < lut_size; i++) {
-> +		if (clk_cycles <= lut[i])
-> +			return i;
-> +	}
-> +
-> +	/* Doesn't fit */
-> +	return -EINVAL;
-> +}
-> +
-> +#define sunxi_nand_lookup_timing(l,p,c) \
-> +			_sunxi_nand_lookup_timing(l, ARRAY_SIZE(l), p, c)
-> +
->  static int sunxi_nand_chip_set_timings(struct sunxi_nand_chip *chip,
->  				       const struct nand_sdr_timings *timings)
->  {
-> +	struct sunxi_nfc *nfc = to_sunxi_nfc(chip->nand.controller);
->  	u32 min_clk_period = 0;
-> +	u32 tWB, tADL, tWHR, tRHW, tCAD;
->  
->  	/* T1 <=> tCLS */
->  	if (timings->tCLS_min > min_clk_period)
-> @@ -872,6 +905,41 @@ static int sunxi_nand_chip_set_timings(struct sunxi_nand_chip *chip,
->  	if (timings->tWC_min > (min_clk_period * 2))
->  		min_clk_period = DIV_ROUND_UP(timings->tWC_min, 2);
->  
-> +	/* T16 - T19 + tCAD */
-> +	tWB  = sunxi_nand_lookup_timing(tWB_lut, timings->tWB_max,
-> +					min_clk_period);
-> +	if (tWB < 0) {
-
-smatch and gcc complain:
-
-drivers/mtd/nand/sunxi_nand.c: In function ?sunxi_nand_chip_set_timings?:
-drivers/mtd/nand/sunxi_nand.c:916:2: warning: comparison of unsigned expression < 0 is always false [-Wtype-limits]
-  if (tWB < 0) {
-  ^
-drivers/mtd/nand/sunxi_nand.c:916 sunxi_nand_chip_set_timings() warn: unsigned 'tWB' is never less than zero. [smatch]
-
-
-> +		dev_err(nfc->dev, "unsupported tWB\n");
-> +		return tWB;
-> +	}
-> +
-> +	tADL = DIV_ROUND_UP(timings->tADL_min, min_clk_period) >> 3;
-> +	if (tADL > 3) {
-> +		dev_err(nfc->dev, "unsupported tADL\n");
-> +		return -EINVAL;
-> +	}
-> +
-> +	tWHR = DIV_ROUND_UP(timings->tWHR_min, min_clk_period) >> 3;
-> +	if (tWHR > 3) {
-> +		dev_err(nfc->dev, "unsupported tWHR\n");
-> +		return -EINVAL;
-> +	}
-> +
-> +	tRHW = sunxi_nand_lookup_timing(tRHW_lut, timings->tRHW_min,
-> +					min_clk_period);
-> +	if (tRHW < 0) {
-
-smatch and gcc compalin:
-
-drivers/mtd/nand/sunxi_nand.c:935 sunxi_nand_chip_set_timings() warn: unsigned 'tRHW' is never less than zero. [smatch]
-drivers/mtd/nand/sunxi_nand.c:935:2: warning: comparison of unsigned expression < 0 is always false [-Wtype-limits]
-  if (tRHW < 0) {
-  ^
-
-> +		dev_err(nfc->dev, "unsupported tRHW\n");
-> +		return tRHW;
-> +	}
-> +
-> +	/*
-> +	 * TODO: according to ONFI specs this value only applies for DDR NAND,
-> +	 * but Allwinner seems to set this to 0x7. Mimic them for now.
-> +	 */
-> +	tCAD = 0x7;
-> +
-> +	/* TODO: A83 has some more bits for CDQSS, CS, CLHZ, CCS, WC */
-> +	chip->timing_cfg = NFC_TIMING_CFG(tWB, tADL, tWHR, tRHW, tCAD);
->  
->  	/* Convert min_clk_period from picoseconds to nanoseconds */
->  	min_clk_period = DIV_ROUND_UP(min_clk_period, 1000);
-> @@ -884,8 +952,6 @@ static int sunxi_nand_chip_set_timings(struct sunxi_nand_chip *chip,
->  	 */
->  	chip->clk_rate = (2 * NSEC_PER_SEC) / min_clk_period;
->  
-> -	/* TODO: configure T16-T19 */
-> -
->  	return 0;
->  }
->  
-> @@ -1377,11 +1443,9 @@ static int sunxi_nfc_probe(struct platform_device *pdev)
->  	platform_set_drvdata(pdev, nfc);
->  
->  	/*
-> -	 * TODO: replace these magic values with proper flags as soon as we
-> -	 * know what they are encoding.
-> +	 * TODO: replace this magic value with EDO flag
->  	 */
->  	writel(0x100, nfc->regs + NFC_REG_TIMING_CTL);
-> -	writel(0x7ff, nfc->regs + NFC_REG_TIMING_CFG);
->  
->  	ret = sunxi_nand_chips_init(dev, nfc);
->  	if (ret) {
-
-Brian
+Thanks,
+Rafael
