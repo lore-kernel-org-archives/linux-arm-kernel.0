@@ -1,22 +1,61 @@
-From: mars.cheng@mediatek.com (Mars Cheng)
-Date: Wed, 24 Jun 2015 19:59:13 +0800
-Subject: [PATCH 2/2] ARM: dts: mediatek: add mt6580 basic support
-In-Reply-To: <3799922.TWv12CPu81@ubix>
-References: <1433319533-24803-1-git-send-email-mars.cheng@mediatek.com>
- <1433319533-24803-3-git-send-email-mars.cheng@mediatek.com>
- <3799922.TWv12CPu81@ubix>
-Message-ID: <1435147153.3792.9.camel@mtkswgap22>
+From: rogerq@ti.com (Roger Quadros)
+Date: Wed, 24 Jun 2015 15:02:22 +0300
+Subject: [PATCH 17/17] ARM: dts: omap4: Use "syscon-otghs" instead of
+ "ctrl-module" in USB node
+In-Reply-To: <20150624104116.GC4156@atomide.com>
+References: <1435060743-5511-1-git-send-email-kishon@ti.com>
+ <1435060743-5511-18-git-send-email-kishon@ti.com>
+ <20150624104116.GC4156@atomide.com>
+Message-ID: <20150624150222.98f9bfec890438c67e4d52eb@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2015-06-23 at 21:45 +0200, Matthias Brugger wrote:
-> > +	soc {
-> 
-> Please drop the soc node as well and just add the components directly.
-> 
-> Thanks,
-> Matthias
-May I know the reason to remove the soc node? I follow other xxxx.dtsi
-to add this node.
+On Wed, 24 Jun 2015 03:41:16 -0700
+Tony Lindgren <tony@atomide.com> wrote:
 
-Thanks.
+> * Kishon Vijay Abraham I <kishon@ti.com> [150623 05:02]:
+> > --- a/arch/arm/boot/dts/omap4.dtsi
+> > +++ b/arch/arm/boot/dts/omap4.dtsi
+> > @@ -852,12 +852,6 @@
+> >  			};
+> >  		};
+> >  
+> > -		omap_control_usbotg: control-phy at 4a00233c {
+> > -			compatible = "ti,control-phy-otghs";
+> > -			reg = <0x4a00233c 0x4>;
+> > -			reg-names = "otghs_control";
+> > -		};
+> > -
+> >  		usb_otg_hs: usb_otg_hs at 4a0ab000 {
+> >  			compatible = "ti,omap4-musb";
+> >  			reg = <0x4a0ab000 0x7ff>;
+> > @@ -870,7 +864,7 @@
+> >  			multipoint = <1>;
+> >  			num-eps = <16>;
+> >  			ram-bits = <12>;
+> > -			ctrl-module = <&omap_control_usbotg>;
+> > +			syscon-otghs = <&scm_conf 0x33c>;
+> >  		};
+> >  
+> >  		aes: aes at 4b501000 {
+> 
+> We should still keep a separate entry for the phy in the dtsi
+> files. And the phy should be a child of the scm_conf area in the
+> dtsi file.
+
+The PHY already has a separate entry with its own set of registers.
+Just that some bits have been shoved into the control module space
+not only for PHY but for other modules as well like DSS, DCAN, etc.
+
+> 
+> This is because the scm and usb_otg_hs are separate devices and
+> can be clocked separately. So the phy driver needs to be a
+> separate driver to avoid spaghetti code and issues with clocking.
+
+for the PHY register space this is already done.
+
+But for the register bits that lie in control module space isn't that
+taken care by syscon driver?
+
+cheers,
+-roger
