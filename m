@@ -1,35 +1,56 @@
-From: matthias.bgg@gmail.com (Matthias Brugger)
-Date: Wed, 24 Jun 2015 21:47:51 +0200
-Subject: [PATCH v2 2/2] arm64: dts: mt8173: Add I2C device node
-In-Reply-To: <CAGS+omC0n1eADRCy58a4C=w9LikPvQv=bHopNTE1XXW3h7zRLA@mail.gmail.com>
-References: <1433164107-26568-1-git-send-email-eddie.huang@mediatek.com>
- <1433164107-26568-3-git-send-email-eddie.huang@mediatek.com>
- <5279457.I1q8kC8mJN@ubix>
- <CAGS+omC0n1eADRCy58a4C=w9LikPvQv=bHopNTE1XXW3h7zRLA@mail.gmail.com>
-Message-ID: <CABuKBeJesxK2_tFwxkbFi8w2Tb3p=RQpehLp2nNmM_VWz-rOGg@mail.gmail.com>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Wed, 24 Jun 2015 13:02:31 -0700
+Subject: [PATCH 1/9] drivers: clk: st: Incorrect clocks status
+In-Reply-To: <1435068567-30995-2-git-send-email-gabriel.fernandez@linaro.org>
+References: <1435068567-30995-1-git-send-email-gabriel.fernandez@linaro.org>
+ <1435068567-30995-2-git-send-email-gabriel.fernandez@linaro.org>
+Message-ID: <558B0CD7.6040302@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2015-06-24 13:00 GMT+02:00 Daniel Kurtz <djkurtz@chromium.org>:
-> Hi Matthias,
+On 06/23/2015 07:09 AM, Gabriel Fernandez wrote:
+> In the clk_summary output, the h/w status of DivMux is incorrect
+> (Parent and Enable status), since the clk_mux_ops.get_parent()
+> returns -ERRCODE when clock is OFF.
 >
-> On Wed, Jun 24, 2015 at 4:04 AM, Matthias Brugger
-> <matthias.bgg@gmail.com> wrote:
->> On Monday, June 01, 2015 09:08:27 PM Eddie Huang wrote:
->>> Add MT8173 I2C device nodes, include I2C controllers and pins.
->>> MT8173 has six I2C controllers, from i2c0 to i2c6, exclude i2c5.
->>> The 6th I2C controller register base doesn't next to 5th I2C,
->>> and there is a hardware between 5th and 6th I2C controller. So
->>> SoC designer name 6th controller as "i2c6", not "i2c5".
->>>
->>> Signed-off-by: Eddie Huang <eddie.huang@mediatek.com>
->>> ---
->>
->> applied to v4.2-next/arm64
+> Signed-off-by: Pankaj Dev <pankaj.dev@st.com>
+> Signed-off-by: Gabriel Fernandez <gabriel.fernandez@linaro.org>
+> ---
+>  drivers/clk/st/clkgen-mux.c | 15 +++++++++------
+>  1 file changed, 9 insertions(+), 6 deletions(-)
 >
-> It looks like [0] has the pinctrl changes, but lost the actual i2c nodes.
+> diff --git a/drivers/clk/st/clkgen-mux.c b/drivers/clk/st/clkgen-mux.c
+> index 4fbe6e0..c94b56b 100644
+> --- a/drivers/clk/st/clkgen-mux.c
+> +++ b/drivers/clk/st/clkgen-mux.c
+> @@ -128,7 +128,7 @@ static int clkgena_divmux_is_enabled(struct clk_hw *hw)
+>  
+>  	__clk_hw_set_clk(mux_hw, hw);
+>  
+> -	return (s8)clk_mux_ops.get_parent(mux_hw) > 0;
+> +	return ((s8)clk_mux_ops.get_parent(mux_hw) >= 0);
 
-Huh, thanks for noting that. I just fixed it.
+Useless parentheses around it all, please drop.
 
-Regards,
-Matthias
+>  }
+>  
+>  static u8 clkgena_divmux_get_parent(struct clk_hw *hw)
+> @@ -138,11 +138,13 @@ static u8 clkgena_divmux_get_parent(struct clk_hw *hw)
+>  
+>  	__clk_hw_set_clk(mux_hw, hw);
+>  
+> -	genamux->muxsel = clk_mux_ops.get_parent(mux_hw);
+> -	if ((s8)genamux->muxsel < 0) {
+> -		pr_debug("%s: %s: Invalid parent, setting to default.\n",
+> -		      __func__, __clk_get_name(hw->clk));
+> -		genamux->muxsel = 0;
+> +	if (genamux->muxsel == CKGAX_CLKOPSRC_SWITCH_OFF) {
+> +		genamux->muxsel = clk_mux_ops.get_parent(mux_hw);
+
+Hm.. maybe we should fix clk_mux_ops to return 0 if it can't find the
+parent? Or when this clock is registered we should read the hardware and
+set a default parent so that we can't get an error code here.
+
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
