@@ -1,30 +1,53 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 24 Jun 2015 03:54:21 -0700
-Subject: [PATCH V2 4/5] drivers/rtc/rtc-ds1307.c: Support optional wakeup
- interrupt source
-In-Reply-To: <1435076114-12416-5-git-send-email-nm@ti.com>
-References: <1435076114-12416-1-git-send-email-nm@ti.com>
- <1435076114-12416-5-git-send-email-nm@ti.com>
-Message-ID: <20150624105421.GD4156@atomide.com>
+From: rogerq@ti.com (Roger Quadros)
+Date: Wed, 24 Jun 2015 13:58:09 +0300
+Subject: [PATCH 04/17] phy: omap-usb2: use omap_usb_power_off to power
+ off the PHY during probe
+In-Reply-To: <1435060743-5511-5-git-send-email-kishon@ti.com>
+References: <1435060743-5511-1-git-send-email-kishon@ti.com>
+ <1435060743-5511-5-git-send-email-kishon@ti.com>
+Message-ID: <20150624135809.ccf19caf000c0213dd9ff45c@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Nishanth Menon <nm@ti.com> [150623 09:21]:
-> With the recent pinctrl-single changes, SoCs such as Texas
-> Instrument's OMAP processors can treat wake-up events from deeper idle
-> states as interrupts.
-> 
-> Let's add support for the optional second interrupt for wake-up using
-> the generic wakeirq support added in commit 4990d4fe327b ("PM /
-> Wakeirq: Add automated device wake IRQ handling")
-> 
-> Finally, to pass the wake-up interrupt in the dts file,
-> interrupts-extended property needs to be passed.
-> 
-> This is similar in approach to commit 2a0b965cfb6e ("serial: omap: Add
-> support for optional wake-up") + ee83bd3b6483 ("serial: omap: Switch
-> wake-up interrupt to generic wakeirq")
+On Tue, 23 Jun 2015 17:28:49 +0530
+Kishon Vijay Abraham I <kishon@ti.com> wrote:
 
-The wakeirq related changes look good to me:
+> No functional change. Previously omap_control_phy_power() was used to power
+> off the PHY during probe. But once phy-omap-usb2 driver is adapted to
+> use syscon, omap_control_phy_power() cannot be used. Hence used
+> omap_usb_power_off to power off the PHY.
+> 
+> Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
 
-Acked-by: Tony Lindgren <tony@atomide.com>
+Acked-by: Roger Quadros <rogerq@ti.com>
+
+cheers,
+-roger
+
+> ---
+>  drivers/phy/phy-omap-usb2.c |    2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/drivers/phy/phy-omap-usb2.c b/drivers/phy/phy-omap-usb2.c
+> index c1a4686..b5c266a 100644
+> --- a/drivers/phy/phy-omap-usb2.c
+> +++ b/drivers/phy/phy-omap-usb2.c
+> @@ -241,7 +241,6 @@ static int omap_usb2_probe(struct platform_device *pdev)
+>  	}
+>  
+>  	phy->control_dev = &control_pdev->dev;
+> -	omap_control_phy_power(phy->control_dev, 0);
+>  
+>  	otg->set_host		= omap_usb_set_host;
+>  	otg->set_peripheral	= omap_usb_set_peripheral;
+> @@ -261,6 +260,7 @@ static int omap_usb2_probe(struct platform_device *pdev)
+>  	}
+>  
+>  	phy_set_drvdata(generic_phy, phy);
+> +	omap_usb_power_off(generic_phy);
+>  
+>  	phy_provider = devm_of_phy_provider_register(phy->dev,
+>  			of_phy_simple_xlate);
+> -- 
+> 1.7.9.5
+> 
