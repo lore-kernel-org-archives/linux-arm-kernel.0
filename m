@@ -1,71 +1,78 @@
-From: rogerq@ti.com (Roger Quadros)
-Date: Wed, 24 Jun 2015 15:12:57 +0300
-Subject: [PATCH 09/17] ARM: dts: dra7: Use "syscon-phy-power" instead of
- "ctrl-module" in SATA PHY node
-In-Reply-To: <20150624150602.0e73fc8f9dda1624f22059db@ti.com>
-References: <1435060743-5511-1-git-send-email-kishon@ti.com>
- <1435060743-5511-10-git-send-email-kishon@ti.com>
- <20150624150602.0e73fc8f9dda1624f22059db@ti.com>
-Message-ID: <20150624151257.fe5f1594db1afe4c1da8027d@ti.com>
+From: hramrach@gmail.com (Michal Suchanek)
+Date: Wed, 24 Jun 2015 14:18:48 +0200
+Subject: [linux-sunxi] [PATCH 2/8] mfd: axp20x: Add a cell for the usb
+ power_supply part of the axp20x PMICs
+In-Reply-To: <20150613135055.GQ19653@lukather>
+References: <1433885881-19809-1-git-send-email-hdegoede@redhat.com>
+ <1433885881-19809-3-git-send-email-hdegoede@redhat.com>
+ <CAGb2v652W+i6L1k5-CnHtXZXdJjFswkcyFGromhWSYaXtitW_w@mail.gmail.com>
+ <5577EDD9.8020900@redhat.com> <20150613135055.GQ19653@lukather>
+Message-ID: <CAOMqctS=-Go-ETa=G__4hpBc13GJ7M7D3c0EUnQxc-a_fyX1rA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 24 Jun 2015 15:06:02 +0300
-Roger Quadros <rogerq@ti.com> wrote:
+Hello,
 
-> On Tue, 23 Jun 2015 17:28:54 +0530
-> Kishon Vijay Abraham I <kishon@ti.com> wrote:
-> 
-> > Add "syscon-phy-power" property and remove the deprecated "ctrl-module"
-> > property from SATA PHY node. Since "omap_control_sata" note is no longer
-> > used, remove it.
-> > 
-> > Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
-> 
-> Acked-by: Roger Quadros <rogerq@ti.com>
+On 13 June 2015 at 15:50, Maxime Ripard
+<maxime.ripard@free-electrons.com> wrote:
+> On Wed, Jun 10, 2015 at 09:57:13AM +0200, Hans de Goede wrote:
+>> >>@@ -368,6 +392,12 @@ static struct mfd_cell axp20x_cells[] = {
+>> >>                 .resources              = axp20x_pek_resources,
+>> >>         }, {
+>> >>                 .name                   = "axp20x-regulator",
+>> >>+       }, {
+>> >>+               .name                   = "axp20x-usb-power-supply",
+>> >
+>> >Could we use either "vbus-power-supply" to match the AXP datasheets,
+>> >or "otg-power-supply" which is slightly more obvious to board owners?
+>>
+>> I do not like the vbus name, since it does not indicate which bus
+>> it is, OTOH you are right that is what it is called in the datasheet.
+>>
+>> As for using otg, I think that usb is better then.
+>>
+>> All in all I believe that the current usb name is best, but if others
+>> disagree I'm open to renaming this.
+>>
+>> So anyone else have an opinion on what would be a good name for the
+>> cell and the compatible ?
+>
+> I usually prefer to use the name mentionned in the datasheet, but if
+> that doesn't make sense, feel free to use an alternative like this
+> one.
 
-One comment though.
+The power source is known as USB power since the reference Allwinner
+design connects this pin to the USB OTG connector and all known boards
+that use the AXP copy the design.
 
-> 
-> > ---
-> >  arch/arm/boot/dts/dra7.dtsi |   10 +---------
-> >  1 file changed, 1 insertion(+), 9 deletions(-)
-> > 
-> > diff --git a/arch/arm/boot/dts/dra7.dtsi b/arch/arm/boot/dts/dra7.dtsi
-> > index 3f434f7..92e0741 100644
-> > --- a/arch/arm/boot/dts/dra7.dtsi
-> > +++ b/arch/arm/boot/dts/dra7.dtsi
-> > @@ -1115,14 +1115,6 @@
-> >  			status = "disabled";
-> >  		};
-> >  
-> > -		omap_control_sata: control-phy at 4a002374 {
-> > -			compatible = "ti,control-phy-pipe3";
-> > -			reg = <0x4a002374 0x4>;
-> > -			reg-names = "power";
-> > -			clocks = <&sys_clkin1>;
-> > -			clock-names = "sysclk";
-> > -		};
-> > -
-> >  		/* OCP2SCP3 */
-> >  		ocp2scp at 4a090000 {
-> >  			compatible = "ti,omap-ocp2scp";
-> > @@ -1137,7 +1129,7 @@
-> >  				      <0x4A096400 0x64>, /* phy_tx */
-> >  				      <0x4A096800 0x40>; /* pll_ctrl */
-> >  				reg-names = "phy_rx", "phy_tx", "pll_ctrl";
-> > -				ctrl-module = <&omap_control_sata>;
-> > +				syscon-phy-power = <&dra7_ctrl_core 0x374>;
+If somebody gets creative with the vbus input or there is another
+manufacturer using AXP with different design it might get problematic
+naming it usb.
 
-why can't we use scm_conf instead of dra7_ctrl_core?
-dra7_ctrl_core seems to be redundant and wrongly placed.
+However, either name is pretty much arbitrary and there is no need for
+the vbus to be connected to a bus connector. You could design a board
+with two plain power jacks and the AXP would switch between those
+according to its priority. If this priority is not configurable then I
+think it would be most descriptive to name the inputs as primary and
+secondary AC.
 
-> >  				clocks = <&sys_clkin1>, <&sata_ref_clk>;
-> >  				clock-names = "sysclk", "refclk";
-> >  				syscon-pllreset = <&dra7_ctrl_core 0x3fc>;
-> > -- 
-> > 1.7.9.5
-> > 
+The most important part is adding proper documentation so whatever the
+name the user can understand that this is the part that is called vbus
+in datasheed and is typically wired to the usb otg port.
 
-cheers,
--roger
+I only found very terse doc patch.
+It adds a new file without a reference in the main axp20x file. IMHO
+there should be a reference for the sub-nodes or they should be all in
+one file. Spreading the text into multitude of files that contain 2
+lines of explanation and an example seems counter-productive. The
+examples can be combined in one.
+
+Another nit is that the doc shows axp202-usb-power-supply compatible
+while the usb power is available on all AXP regulators for which there
+are drivers since axp152. IMHO this can be just
+x-powers,usb-power-supply since it can only appear as subnode of the
+axp, anyway.
+
+Thanks
+
+Michal
