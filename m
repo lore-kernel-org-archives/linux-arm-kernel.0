@@ -1,70 +1,56 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu, 25 Jun 2015 13:40:41 +0100
-Subject: [PATCH] arm64/kvm: Add generic v8 KVM target
-In-Reply-To: <20150625123034.GE28244@cbox>
-References: <1434531646-4873-1-git-send-email-suzuki.poulose@arm.com>
- <CAFEAcA92uymQ3LjPQnuFiwvjSgc+jY54VrfK_Sh4v1DJ+=OPpw@mail.gmail.com>
- <558A6A84.5020603@arm.com> <20150624085128.GA22785@cbox>
- <558A7936.7020109@arm.com> <20150625123034.GE28244@cbox>
-Message-ID: <558BF6C9.3000009@arm.com>
+From: xi.wang@gmail.com (Xi Wang)
+Date: Thu, 25 Jun 2015 05:47:39 -0700
+Subject: [PATCH] arm64: bpf: fix out-of-bounds read in bpf2a64_offset()
+Message-ID: <1435236459-15141-1-git-send-email-xi.wang@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 25/06/15 13:30, Christoffer Dall wrote:
-> On Wed, Jun 24, 2015 at 10:32:38AM +0100, Marc Zyngier wrote:
->> Hi Christoffer,
->>
->> On 24/06/15 09:51, Christoffer Dall wrote:
->>> On Wed, Jun 24, 2015 at 09:29:56AM +0100, Marc Zyngier wrote:
->>>> On 22/06/15 09:44, Peter Maydell wrote:
->>>>> On 17 June 2015 at 10:00, Suzuki K. Poulose <suzuki.poulose@arm.com> wrote:
->>>>>> From: "Suzuki K. Poulose" <suzuki.poulose@arm.com>
->>>>>>
->>>>>> This patch adds a generic ARM v8 KVM target cpu type for use
->>>>>> by the new CPUs which eventualy ends up using the common sys_reg
->>>>>> table. For backward compatibility the existing targets have been
->>>>>> preserved. Any new target CPU that can be covered by generic v8
->>>>>> sys_reg tables should make use of the new generic target.
->>>>>
->>>>> How do you intend this to work for cross-host migration?
->>>>
->>>> It is not meant to work for cross migration at all.
->>>>
->>>>> Is the idea that the kernel guarantees that "generic" looks
->>>>> 100% the same to the guest regardless of host hardware? I'm
->>>>> not sure that can be made to work, given impdef differences
->>>>> in ID register values, bp/wp registers, and so on.
->>>>>
->>>>> Given that, it seems to me that we still need to provide
->>>>> KVM_ARM_TARGET_$THISCPU defines so userspace can request
->>>>> a specific guest CPU flavour; so what does this patch
->>>>> provide that isn't already provided by just having userspace
->>>>> query for the "preferred" CPU type as it does already?
->>>>
->>>> The way I see this working is that a "generic" CPU cannot be migrated
->>>> (because we don't know anything about it). If it can be identified as a
->>>> known (non generic) implementation, then we can migrate it.
->>>>
->>> Concretely, how should this work?  Be enforced by userspace or should we
->>> deny certain SET_ONE_REG operations from working on this target?
->>
->> I can definitely see MIDR overriding failing on a generic CPU. Also, you
->> shouldn't be able to select a generic CPU if we know about the physical CPU.
->>
-> 
-> If I am migrating from an A57 to an A53, but the VM was started as
-> "generic CPU" then we rely on the user discovering that this is not
-> supported when trying to set the MIDR from userspace in KVM?
+Problems occur when bpf_to or bpf_from has value prog->len - 1 (e.g.,
+"Very long jump backwards" in test_bpf where the last instruction is a
+jump): since ctx->offset has length prog->len, ctx->offset[bpf_to + 1]
+or ctx->offset[bpf_from + 1] will cause an out-of-bounds read, leading
+to a bogus jump offset and kernel panic.
 
-A57 to A53 is probably a bad example because we actively support both.
-So let's replace your A57 with an A72. With this patch, the A72 would be
-reported as "generic CPU", and MIDR access would fail on the A53.
+This patch moves updating ctx->offset to after calling build_insn(),
+and changes indexing to use bpf_to and bpf_from without + 1.
 
-Admittedly, this is a bit late. We could also refuse to instantiate a
-"generic CPU" on A53, but that's not much better timing wise.
+Cc: Zi Shen Lim <zlim.lnx@gmail.com>
+Cc: Alexei Starovoitov <ast@plumgrid.com>
+Cc: Will Deacon <will.deacon@arm.com>
+Fixes: e54bcde3d69d ("arm64: eBPF JIT compiler")
+Signed-off-by: Xi Wang <xi.wang@gmail.com>
+---
+ arch/arm64/net/bpf_jit_comp.c | 7 ++++---
+ 1 file changed, 4 insertions(+), 3 deletions(-)
 
-Not sure we can do much better though.
-
-	M.
+diff --git a/arch/arm64/net/bpf_jit_comp.c b/arch/arm64/net/bpf_jit_comp.c
+index dc6a484..c81ddd4 100644
+--- a/arch/arm64/net/bpf_jit_comp.c
++++ b/arch/arm64/net/bpf_jit_comp.c
+@@ -113,9 +113,9 @@ static inline void emit_a64_mov_i(const int is64, const int reg,
+ static inline int bpf2a64_offset(int bpf_to, int bpf_from,
+ 				 const struct jit_ctx *ctx)
+ {
+-	int to = ctx->offset[bpf_to + 1];
++	int to = ctx->offset[bpf_to];
+ 	/* -1 to account for the Branch instruction */
+-	int from = ctx->offset[bpf_from + 1] - 1;
++	int from = ctx->offset[bpf_from] - 1;
+ 
+ 	return to - from;
+ }
+@@ -640,10 +640,11 @@ static int build_body(struct jit_ctx *ctx)
+ 		const struct bpf_insn *insn = &prog->insnsi[i];
+ 		int ret;
+ 
++		ret = build_insn(insn, ctx);
++
+ 		if (ctx->image == NULL)
+ 			ctx->offset[i] = ctx->idx;
+ 
+-		ret = build_insn(insn, ctx);
+ 		if (ret > 0) {
+ 			i++;
+ 			continue;
 -- 
-Jazz is not dead. It just smells funny...
+2.1.4
