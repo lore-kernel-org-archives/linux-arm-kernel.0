@@ -1,78 +1,99 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Thu, 25 Jun 2015 12:00:25 +0100
-Subject: BUG: Bad page state in process swapper pfn:XXXXX
-In-Reply-To: <CAFdej029n2DHQRZmFp78hNUgA=rWGYK0fXG1+AxQEZrUGf3WdA@mail.gmail.com>
-References: <CAFdej03jedihbdNCb8e+at3M3ikKxn+s6eAvBvfGPdtsHShQdQ@mail.gmail.com>
- <CAFdej029n2DHQRZmFp78hNUgA=rWGYK0fXG1+AxQEZrUGf3WdA@mail.gmail.com>
-Message-ID: <558BDF49.7020908@arm.com>
+From: vaibhav.hiremath@linaro.org (Vaibhav Hiremath)
+Date: Thu, 25 Jun 2015 16:40:47 +0530
+Subject: [PATCH-v4 1/3] mfd: 88pm800: Add device tree support
+In-Reply-To: <20150625101916.GB15013@x1>
+References: <1435217189-19578-1-git-send-email-vaibhav.hiremath@linaro.org>
+ <1435217189-19578-2-git-send-email-vaibhav.hiremath@linaro.org>
+ <20150625101916.GB15013@x1>
+Message-ID: <558BE1B7.2060308@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arun,
 
-On 25/06/15 11:08, Arun Chandran wrote:
-[...]
-> A u-boot memtest for those areas resulted in errors[1 in 5 boots]
->
-> SOCFPGA_ARRIA5 #  mtest 0x1ff3a000 0x1ff4ffff
-> Pattern 00000002  Writing...  Reading...
-> Mem error @ 0x1FF4A714: found FFFFFFFF, expected 000041C7
->
-> Mem error @ 0x1FF4A718: found 1C00FFFF, expected 000041C8
->
-> Mem error @ 0x1FF4A71C: found 143DCB25, expected 000041C9
->
-> Mem error @ 0x1FF4A720: found 01000608, expected 000041CA
->
-> Mem error @ 0x1FF4A724: found 04060008, expected 000041CB
->
-> Mem error @ 0x1FF4A728: found 1C000100, expected 000041CC
->
-> Mem error @ 0x1FF4A72C: found 143DCB25, expected 000041CD
->
-> Mem error @ 0x1FF4A730: found 1967A20A, expected 000041CE
->
-> Mem error @ 0x1FF4A734: found 00000000, expected 000041CF
->
-> Mem error @ 0x1FF4A738: found A20A0000, expected 000041D0
->
-> Mem error @ 0x1FF4A73C: found 00001667, expected 000041D1
->
-> Mem error @ 0x1FF4A740: found 00000000, expected 000041D2
->
-> Mem error @ 0x1FF4A744: found 00000000, expected 000041D3
->
-> Mem error @ 0x1FF4A748: found 00000000, expected 000041D4
->
-> Mem error @ 0x1FF4A74C: found 00000000, expected 000041D5
->
-> Mem error @ 0x1FF4A750: found E3D2A784, expected 000041D6
-> Pattern 0000000A  Writing...  Reading...
-> Mem error @ 0x1FF3AE14: found 005A0320, expected 0000038F
-> Pattern FFFFFFF4  Writing...  Reading...
-> Mem error @ 0x1FF3AE14: found 00400320, expected FFFFFC6F
-> Pattern FFFFFFEF  Writing...  Reading...
->
->
-> That means there is problem with my RAM [or board reset].
 
-Or that your bootloader is leaving the network controller DMA'ing over 
-kernel memory. That 'corruption' has a suspiciously familiar shape to 
-it, and sure enough, turns out to be a valid ethernet packet - Wireshark 
-had this to say about it:
+On Thursday 25 June 2015 03:49 PM, Lee Jones wrote:
+> On Thu, 25 Jun 2015, Vaibhav Hiremath wrote:
+>
+>> Add DT support to the 88pm800 driver, along with compatible
+>> field for it's sub-devices (rtc, onkey and regulator)
+>>
+>> Signed-off-by: Chao Xie <chao.xie@marvell.com>
+>> Signed-off-by: Vaibhav Hiremath <vaibhav.hiremath@linaro.org>
+>> ---
+>>   drivers/mfd/88pm800.c | 23 +++++++++++++++++++++++
+>>   1 file changed, 23 insertions(+)
+>>
+>> diff --git a/drivers/mfd/88pm800.c b/drivers/mfd/88pm800.c
+>> index 841717a..40fd014 100644
+>> --- a/drivers/mfd/88pm800.c
+>> +++ b/drivers/mfd/88pm800.c
+>> @@ -27,6 +27,7 @@
+>>   #include <linux/mfd/core.h>
+>>   #include <linux/mfd/88pm80x.h>
+>>   #include <linux/slab.h>
+>> +#include <linux/of_device.h>
+>>
+>>   /* Interrupt Registers */
+>>   #define PM800_INT_STATUS1		(0x05)
+>> @@ -121,6 +122,11 @@ static const struct i2c_device_id pm80x_id_table[] = {
+>>   };
+>>   MODULE_DEVICE_TABLE(i2c, pm80x_id_table);
+>>
+>> +static const struct of_device_id pm80x_of_match_table[] = {
+>> +	{ .compatible = "marvell,88pm800", },
+>> +	{},
+>> +};
+>> +
+>>   static struct resource rtc_resources[] = {
+>>   	{
+>>   	 .name = "88pm80x-rtc",
+>> @@ -133,6 +139,7 @@ static struct resource rtc_resources[] = {
+>>   static struct mfd_cell rtc_devs[] = {
+>>   	{
+>>   	 .name = "88pm80x-rtc",
+>> +	 .of_compatible = "marvell,88pm80x-rtc",
+>>   	 .num_resources = ARRAY_SIZE(rtc_resources),
+>>   	 .resources = &rtc_resources[0],
+>>   	 .id = -1,
+>> @@ -151,6 +158,7 @@ static struct resource onkey_resources[] = {
+>>   static const struct mfd_cell onkey_devs[] = {
+>>   	{
+>>   	 .name = "88pm80x-onkey",
+>> +	 .of_compatible = "marvell,88pm80x-onkey",
+>>   	 .num_resources = 1,
+>>   	 .resources = &onkey_resources[0],
+>>   	 .id = -1,
+>> @@ -160,6 +168,7 @@ static const struct mfd_cell onkey_devs[] = {
+>>   static const struct mfd_cell regulator_devs[] = {
+>>   	{
+>>   	 .name = "88pm80x-regulator",
+>> +	 .of_compatible = "marvell,88pm80x-regulator",
+>>   	 .id = -1,
+>>   	},
+>>   };
+>> @@ -544,8 +553,21 @@ static int pm800_probe(struct i2c_client *client,
+>>   	int ret = 0;
+>>   	struct pm80x_chip *chip;
+>>   	struct pm80x_platform_data *pdata = dev_get_platdata(&client->dev);
+>> +	struct device_node *np = client->dev.of_node;
+>>   	struct pm80x_subchip *subchip;
+>>
+>> +	if (!pdata && !np) {
+>> +		dev_err(&client->dev,
+>> +			"pm80x requires platform data or of_node\n");
+>> +		return -EINVAL;
+>> +	}
+>> +
+>> +	if (!pdata) {
+>> +		pdata = devm_kzalloc(&client->dev, sizeof(*pdata), GFP_KERNEL);
+>> +		if (!pdata)
+>> +			return -ENOMEM;
+>> +	}
+>
+> Why have you allocated data for pdata, then done nothing with it?
+>
 
-1	0.000000000	HonHaiPr_cb:3d:14	Broadcast	ARP	64	Who has 10.162.103.22? 
-  Tell 10.162.103.25
+Not in this patch, but subsequent patches would use it.
 
-Robin.
-
->
-> Sorry for the noise.
->
-> --Arun
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->
+Thanks,
+Vaibhav
