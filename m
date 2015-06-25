@@ -1,141 +1,24 @@
-From: dinguyen@opensource.altera.com (Dinh Nguyen)
-Date: Thu, 25 Jun 2015 12:05:53 -0500
-Subject: [PATCH v2] ARM: socfpga: dts: Add adxl34x
-In-Reply-To: <CABxpGwCYjw87pgHczooC4qTebGO1_vc+CH_1fkD0XjEDpbAVzQ@mail.gmail.com>
-References: <1419462712-14151-1-git-send-email-walter@vanguardiasur.com.ar>
- <20150105092153.GJ13070@pengutronix.de>
- <CABxpGwCbFF+pJ0H_sMjqk6c9awdRuxi6j0CL_d3mH5z4Qht+ng@mail.gmail.com>
- <CABxpGwAFdLET+fg3WvMWqXdzsPQHv3hKx9cFwk9RQE9w6+rEbg@mail.gmail.com>
- <550F8297.80809@opensource.altera.com>
- <CABxpGwA3cs11Wtvs_8iGka9anb2+vHhfph19VKbTwBJOeh9bbw@mail.gmail.com>
- <CABxpGwC_Eaz593gvPsS=jRpgxY1SM17hsArGfFPBjow-oBYB9g@mail.gmail.com>
- <CAMuHMdW5EG+LnWE7sFYVJKHjN=k7mUUp7U5-r3hMjQvsKgf3ug@mail.gmail.com>
- <CABxpGwCYjw87pgHczooC4qTebGO1_vc+CH_1fkD0XjEDpbAVzQ@mail.gmail.com>
-Message-ID: <558C34F1.4080407@opensource.altera.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Thu, 25 Jun 2015 18:20:57 +0100
+Subject: [PATCH] keystone: psci: adds cpu_die implementation
+In-Reply-To: <20150625165741.GA10564@leverpostej>
+References: <1435240970-30869-1-git-send-email-vitalya@ti.com>
+ <20150625144511.GA6844@leverpostej> <558C174F.80108@oracle.com>
+ <558C25E0.3010102@ti.com> <20150625161308.GF6844@leverpostej>
+ <558C328C.5070803@ti.com> <20150625165741.GA10564@leverpostej>
+Message-ID: <20150625172057.GA11952@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On 6/25/15 12:01 PM, Walter Lozano wrote:
-> On Thu, Jun 25, 2015 at 4:28 AM, Geert Uytterhoeven
-> <geert@linux-m68k.org> wrote:
->> On Tue, Jun 23, 2015 at 10:20 PM, Walter Lozano
->> <walter@vanguardiasur.com.ar> wrote:
->>> On Mon, Mar 23, 2015 at 11:29 PM, Walter Lozano
->>> <walter@vanguardiasur.com.ar> wrote:
->>>> On Mon, Mar 23, 2015 at 12:03 AM, Dinh Nguyen
->>>> <dinguyen@opensource.altera.com> wrote:
->>>>> On 3/19/15 4:27 PM, Walter Lozano wrote:
->>>>>> On Mon, Mar 16, 2015 at 10:10 AM, Walter Lozano
->>>>>> <walter@vanguardiasur.com.ar> wrote:
->>>>>>> On Mon, Jan 5, 2015 at 6:21 AM, Steffen Trumtrar
->>>>>>> <s.trumtrar@pengutronix.de> wrote:
->>>>>>>> On Wed, Dec 24, 2014 at 08:11:52PM -0300, Walter Lozano wrote:
->>>>>>>>> This patch adds the DTS bindings for the adxl34x digital
->>>>>>>>> accelerometer.
->>>>>>>>>
->>>>>>>>> Signed-off-by: Walter Lozano <walter@vanguardiasur.com.ar>
->>>>>>>>> ---
->>>>>>>>>  arch/arm/boot/dts/socfpga_cyclone5_sockit.dts |   16 ++++++++++++++++
->>>>>>>>>  1 file changed, 16 insertions(+)
->>>>>>>>>
->>>>>>>>> diff --git a/arch/arm/boot/dts/socfpga_cyclone5_sockit.dts b/arch/arm/boot/dts/socfpga_cyclone5_sockit.dts
->>>>>>>>> index 16ea6f5..d343e03 100644
->>>>>>>>> --- a/arch/arm/boot/dts/socfpga_cyclone5_sockit.dts
->>>>>>>>> +++ b/arch/arm/boot/dts/socfpga_cyclone5_sockit.dts
->>>>>>>>> @@ -60,6 +60,22 @@
->>>>>>>>>       rxc-skew-ps = <2000>;
->>>>>>>>>  };
->>>>>>>>>
->>>>>>>>> +&gpio2 {
->>>>>>>>> +     status = "okay";
->>>>>>>>> +};
->>>>>>>>> +
->>>>>>>>> +&i2c1 {
->>>>>>>>> +     status = "okay";
->>>>>>>>> +
->>>>>>>>> +     accel1: accelerometer at 53 {
->>>>>>>>> +             compatible = "adxl34x";
->>>>>
->>>>> Shouldn't this be "adi,adxl34x"? At least that's what the documentation
->>>>> says.
->>>>>
->>>>>>>>> +             reg = <0x53>;
->>>>>>>>> +
->>>>>>>>> +             interrupt-parent = <&portc>;
->>>>>>>>> +             interrupts = <3 2>;
->>>>>>>>> +     };
->>>>>>>>> +};
->>>>>>>>> +
->>>>>>>>>  &mmc0 {
->>>>>>>>>       vmmc-supply = <&regulator_3_3v>;
->>>>>>>>>       vqmmc-supply = <&regulator_3_3v>;
->>>>>>>>
->>>>>>>> I just gave it a short spin. I get some interrupts and the position property
->>>>>>>> changes, so it seems to work:
->>>>>>>>
->>>>>>>>         Acked-by: Steffen Trumtrar <s.trumtrar@pengutronix.de>
->>>>>>>>
->>>>>>>
->>>>>>> Ping?
->>>>>>> How should this continue?
->>>>>>
->>>>>> Any news about this patch? It has been acked by Pavel Machek and
->>>>>> Steffen Trumtrar a while ago.
->>>>>>
->>>>>
->>>>> Sorry, since I wasn't CC on the original patch and somehow my filter
->>>>> didn't catch it, I didn't see this patch until now.
->>>>
->>>> No problem, I know it was my fault as I trust the output of get_maintainer.pl
->>>>
->>>
->>> Ping?
->>>
->>> --
->>> Walter Lozano, VanguardiaSur
->>> www.vanguardiasur.com.ar
->>> --
->>> To unsubscribe from this list: send the line "unsubscribe devicetree" in
->>> the body of a message to majordomo at vger.kernel.org
->>> More majordomo info at  http://vger.kernel.org/majordomo-info.html
->>
->> Now these commits are in:
->>   - 3a38958d2477b718 ("Input: adxl34x - add OF match support") [1]
->>   - e465bf6fc55d5ce2 ("DT: i2c: Deprecate adi,adxl34x compatible string") [2]
->>
->> you can use "adi,adxl345" (or "adi,adxl346", "adi,adxl345").
->>
->> [1] http://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=3a38958d2477b718d1011fb88c24c4f264ee9700
->> [2] http://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=e465bf6fc55d5ce21fb45a75c3fa613505e6be20
->>
->> Gr{oetje,eeting}s,
->>
->>                         Geert
->>
->> --
->> Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
->>
->> In personal conversations with technical people, I call myself a hacker. But
->> when I'm talking to journalists I just say "programmer" or something like that.
->>                                 -- Linus Torvalds
+> > I need rework and re-test the patch.
+> > One more question. Shall I post the dts related commit, which add PSCI 
+> > command together with this commit? Or it may be posted later independently?
 > 
-> 
-> Thanks for the information Geert.
-> 
-> Dihn, as I can see you have apply an old version of the this patch
-> (V1), instead of V2 which has some format corrections suggested by
-> Steffen Trumtrar. I addition, as Geert points, the compatibility
-> string should now be updated.
-> 
-> How would you like to proceed?
-> 
+> The DTS and Kconfig changes can be seaprate patches, but they'll need to
+> go through at the same time.
 
-Your commit is staged for v4.2 in the arm-soc tree[1]. Please submit a
-patch to correct it for an -rc.
+If your bootloader patches the DTB then you don't even need a dts
+update. That should make things less confusing for existing users...
 
-[1]
-https://git.kernel.org/cgit/linux/kernel/git/arm/arm-soc.git/commit/arch/arm/boot/dts/socfpga_cyclone5_sockit.dts?h=for-next&id=bf513bf04660321eb6181082def79ee1fd93b48f
-
-Dinh
+Thanks,
+Mark.
