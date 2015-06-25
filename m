@@ -1,46 +1,44 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 25 Jun 2015 10:34:09 +0100
-Subject: Build regressions/improvements in v4.1
-In-Reply-To: <20150625093007.GS7557@n2100.arm.linux.org.uk>
-References: <1435006096-12470-1-git-send-email-geert@linux-m68k.org>
- <CAMuHMdXprKyxirhUZBzNV97oxymcMqeugKixTEC8ojcMq3EeDw@mail.gmail.com>
- <20150622211857.GY7557@n2100.arm.linux.org.uk>
- <CAMuHMdXyaS65sTdkB88btchm5NzwgNK969QNcaoGBj9-77eFXQ@mail.gmail.com>
- <20150625091815.GR7557@n2100.arm.linux.org.uk>
- <20150625093007.GS7557@n2100.arm.linux.org.uk>
-Message-ID: <20150625093408.GA15091@n2100.arm.linux.org.uk>
+From: pebolle@tiscali.nl (Paul Bolle)
+Date: Thu, 25 Jun 2015 11:35:37 +0200
+Subject: [PATCHv5 2/2] mailbox: Adding driver for Xilinx LogiCORE IP
+ mailbox.
+In-Reply-To: <558BB217.5080200@xilinx.com>
+References: <1435082402-29239-1-git-send-email-moritz.fischer@ettus.com>
+ <1435082402-29239-3-git-send-email-moritz.fischer@ettus.com>
+ <1435178205.4528.77.camel@tiscali.nl> <558BA5D4.8060903@xilinx.com>
+ <1435217491.16792.5.camel@tiscali.nl> <558BB217.5080200@xilinx.com>
+Message-ID: <1435224937.16792.19.camel@tiscali.nl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 25, 2015 at 10:30:07AM +0100, Russell King - ARM Linux wrote:
-> On Thu, Jun 25, 2015 at 10:18:15AM +0100, Russell King - ARM Linux wrote:
-> > On Tue, Jun 23, 2015 at 09:50:00AM +0200, Geert Uytterhoeven wrote:
-> > As for the build errors you're reporting, that doesn't seem to be
-> > anything new.  It seems to be down to a missing dependency between
-> > ARM_PTDUMP and MMU, which means that ARM_PTDUMP is selectable on !MMU
-> > systems.  I'll add that dependency, but that's just a small drop in
-> > the ocean - it looks like it's the least of the problems with ARM
-> > randconfig...
+On Thu, 2015-06-25 at 09:47 +0200, Michal Simek wrote:
+> It has to be platform_device somewhere for sure.
+> In past we had folder in arch/microblaze/platform folder.
+> Currently you can add this code to for example
+> arch/microblaze/kernel/platform.c
 > 
-> Now that the build has finished... even with that fixed...
-> 
-> arch/arm/mach-versatile/built-in.o: In function `pci_versatile_setup':
-> arch/arm/mach-versatile/pci.c:249: undefined reference to `pci_ioremap_io'
-> kernel/built-in.o: In function `set_section_ro_nx':
-> kernel/module.c:1738: undefined reference to `set_memory_nx'
-> kernel/built-in.o: In function `set_page_attributes':
-> kernel/module.c:1709: undefined reference to `set_memory_ro'
-> ...
-> 
-> which means that DEBUG_SET_MODULE_RONX also needs to depend on MMU.
-> As for the pci_ioremap_io, I'm not sure what to do about that.
-> 
-> In any case, I'll queue up both of these dependency fixes as low
-> priority.  Thanks.
+> But as I said I don't think it is really important. There will be a 
+> lot
+> of others drivers in the kernel which can be used as platform drivers
+> but you are not able to find out platform_device for it.
 
-No I won't.  Arnd has already caught the one you originally reported,
-and there's a fix already queued for it to be merged during this window...
+Because, like probably happens with this driver, the OF infrastructure
+makes sure the .probe and .remove functions will eventually called?
 
--- 
-FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
-according to speedtest.net.
+> The important part is that driver can work as is.
+
+Sure.
+
+But I was talking about the MODULE_ALIAS() macro. Trivial as it is,
+since I still don't see where a "MODALIAS=platform:xilinx-mailbox"
+uevent could come from I still don't see the point of this line. As I
+asked in my first message: what breaks if this line is dropped?
+
+> Also it is quite common that users create own BSP for their custom
+> boards but they don't push it to mainline.
+
+I can't recall what BSP means. Anyhow, why should we care about boards
+not pushed into mainline?
+
+
+Paul Bolle
