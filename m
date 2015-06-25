@@ -1,7 +1,7 @@
 From: elfring@users.sourceforge.net (SF Markus Elfring)
-Date: Thu, 25 Jun 2015 15:30:51 +0200
-Subject: [PATCH 1/2] ARM-kernel: Delete an unnecessary check before the
- function call "smp_set_ops"
+Date: Thu, 25 Jun 2015 15:32:52 +0200
+Subject: [PATCH 2/2] ARM-kernel: Delete an unnecessary check before the
+ function call "unwind_table_del"
 In-Reply-To: <558C01C5.4060303@users.sourceforge.net>
 References: <5307CAA2.8060406@users.sourceforge.net>
  <alpine.DEB.2.02.1402212321410.2043@localhost6.localdomain6>
@@ -20,35 +20,35 @@ References: <5307CAA2.8060406@users.sourceforge.net>
  <530DD06F.4090703@users.sourceforge.net>
  <alpine.DEB.2.02.1402262129250.2221@localhost6.localdomain6>
  <5317A59D.4@users.sourceforge.net> <558C01C5.4060303@users.sourceforge.net>
-Message-ID: <558C028B.7020907@users.sourceforge.net>
+Message-ID: <558C0304.6050204@users.sourceforge.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Markus Elfring <elfring@users.sourceforge.net>
-Date: Thu, 25 Jun 2015 15:00:17 +0200
+Date: Thu, 25 Jun 2015 15:05:21 +0200
 
-The smp_set_ops() function tests whether its argument is NULL and then
+The unwind_table_del() function tests whether its argument is NULL and then
 returns immediately. Thus the test around the call is not needed.
 
 This issue was detected by using the Coccinelle software.
 
 Signed-off-by: Markus Elfring <elfring@users.sourceforge.net>
 ---
- arch/arm/kernel/setup.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ arch/arm/kernel/module.c | 3 +--
+ 1 file changed, 1 insertion(+), 2 deletions(-)
 
-diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
-index e6d8c76..9ac786d 100644
---- a/arch/arm/kernel/setup.c
-+++ b/arch/arm/kernel/setup.c
-@@ -977,7 +977,7 @@ void __init setup_arch(char **cmdline_p)
- 		if (!mdesc->smp_init || !mdesc->smp_init()) {
- 			if (psci_smp_available())
- 				smp_set_ops(&psci_smp_ops);
--			else if (mdesc->smp)
-+			else
- 				smp_set_ops(mdesc->smp);
- 		}
- 		smp_init_cpus();
+diff --git a/arch/arm/kernel/module.c b/arch/arm/kernel/module.c
+index efdddcb..0cc1afa 100644
+--- a/arch/arm/kernel/module.c
++++ b/arch/arm/kernel/module.c
+@@ -390,7 +390,6 @@ module_arch_cleanup(struct module *mod)
+ 	int i;
+ 
+ 	for (i = 0; i < ARM_SEC_MAX; i++)
+-		if (mod->arch.unwind[i])
+-			unwind_table_del(mod->arch.unwind[i]);
++		unwind_table_del(mod->arch.unwind[i]);
+ #endif
+ }
 -- 
 2.4.4
