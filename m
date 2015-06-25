@@ -1,49 +1,24 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Thu, 25 Jun 2015 12:33:18 -0400 (EDT)
-Subject: [PATCH] ARM: use phys_addr_t in pfn_to_kaddr()
-In-Reply-To: <558B0388.1040006@oracle.com>
-References: <1435072386-13527-1-git-send-email-vitalya@ti.com>
- <558B0388.1040006@oracle.com>
-Message-ID: <alpine.LFD.2.11.1506251232050.2617@knanqh.ubzr>
+From: samuel.thibault@ens-lyon.org (Samuel Thibault)
+Date: Thu, 25 Jun 2015 18:25:56 +0200
+Subject: [PATCHv7 0/2] INPUT: Route keyboard LEDs through the generic
+ LEDs layer
+In-Reply-To: <20150625153032.GE3093@type.bordeaux.inria.fr>
+References: <20150217191527.GA9594@type.youpi.perso.aquilenet.fr>
+ <201504012200.07408@pali>
+ <20150401211140.GI2901@type.youpi.perso.aquilenet.fr>
+ <20150402144410.GB18125@amd> <20150423165544.GG7646@pali>
+ <CAKdAkRSk4t2PKHB33f0=V2-zAhV9LXABp1TQ9NsiFLBQet66BQ@mail.gmail.com>
+ <20150605152806.GE2267@type>
+ <20150625153032.GE3093@type.bordeaux.inria.fr>
+Message-ID: <20150625162556.GB2943@type.youpi.perso.aquilenet.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 24 Jun 2015, santosh shilimkar wrote:
+Samuel Thibault, le Thu 25 Jun 2015 17:30:32 +0200, a ?crit :
+> Just to give an update to people who where Cc-ed at some point in the
+> discussion: a version reworked by Dmitry got pulled into Linus' tree, so
+> it should get into 4.2!
 
-> On 6/23/2015 8:13 AM, Vitaly Andrianov wrote:
-> > This patch fixes pfn_to_kaddr() to use phys_addr_t.  Without this,
-> > this macro is broken on LPAE systems. For physical addresses above
-> > first 4GB result of shifting pfn with PAGE_SHIFT may be truncated.
-> >
-> > Signed-off-by: Vitaly Andrianov <vitalya@ti.com>
-> > ---
-> Looks a valid fix.
-> 
-> RMK, Nico, what you say ?
+(5 years after first submission, but better late than never :) )
 
-Looks fine to me.
-
-Acked-by: Nicolas Pitre <nico@linaro.org>
-
-
-> 
-> >   arch/arm/include/asm/memory.h | 2 +-
-> >   1 file changed, 1 insertion(+), 1 deletion(-)
-> >
-> > diff --git a/arch/arm/include/asm/memory.h b/arch/arm/include/asm/memory.h
-> > index 184def0..063ef31 100644
-> > --- a/arch/arm/include/asm/memory.h
-> > +++ b/arch/arm/include/asm/memory.h
-> > @@ -291,7 +291,7 @@ static inline void *phys_to_virt(phys_addr_t x)
-> >   */
-> >   #define __pa(x)			__virt_to_phys((unsigned long)(x))
-> >   #define __va(x)			((void
-> >   *)__phys_to_virt((phys_addr_t)(x)))
-> > -#define pfn_to_kaddr(pfn)	__va((pfn) << PAGE_SHIFT)
-> > +#define pfn_to_kaddr(pfn)	__va((phys_addr_t)(pfn) << PAGE_SHIFT)
-> >
-> >   extern phys_addr_t (*arch_virt_to_idmap)(unsigned long x);
-> >
-> >
-> 
-> 
+Samuel
