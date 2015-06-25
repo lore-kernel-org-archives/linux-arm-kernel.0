@@ -1,33 +1,37 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Thu, 25 Jun 2015 14:34:50 -0500
-Subject: [PATCH 3/3] i2c: omap: on ->remove() call pm_runtime_put_sync()
-In-Reply-To: <1435260890-32335-1-git-send-email-balbi@ti.com>
-References: <1435260890-32335-1-git-send-email-balbi@ti.com>
-Message-ID: <1435260890-32335-3-git-send-email-balbi@ti.com>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Thu, 25 Jun 2015 22:25:41 +0200
+Subject: Please revert 3eea8b5d68c801fec788b411582b803463834752 as it
+ breaks touchscreen on n900.
+In-Reply-To: <20150602180855.GC11297@dtor-ws>
+References: <20150601095556.GH17267@lukather> <20150601140605.GA26908@amd>
+ <20150601145825.GA20557@lukather> <20150601152111.GA14015@amd>
+ <20150601174730.GA30024@dtor-ws> <20150601212226.GH23777@lukather>
+ <20150601213213.GB14395@dtor-ws> <20150602094447.GW23777@lukather>
+ <20150602175845.GB11297@dtor-ws> <20150602180855.GC11297@dtor-ws>
+Message-ID: <20150625202541.GA12659@amd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-we're about to remove the module, so we can't
-really schedule a PM transition in the future,
-we must wait for it to finish.
+Hi!
 
-Signed-off-by: Felipe Balbi <balbi@ti.com>
----
- drivers/i2c/busses/i2c-omap.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+> By the way, the previous version was busted, this one should compile.
 
-diff --git a/drivers/i2c/busses/i2c-omap.c b/drivers/i2c/busses/i2c-omap.c
-index 828d5caccfcb..b57d84e01562 100644
---- a/drivers/i2c/busses/i2c-omap.c
-+++ b/drivers/i2c/busses/i2c-omap.c
-@@ -1395,7 +1395,7 @@ static int omap_i2c_remove(struct platform_device *pdev)
- 		return ret;
- 
- 	omap_i2c_write_reg(omap, OMAP_I2C_CON_REG, 0);
--	pm_runtime_put(&pdev->dev);
-+	pm_runtime_put_sync(&pdev->dev);
- 	pm_runtime_disable(&pdev->dev);
- 	return 0;
- }
+> Input: improve parsing OF parameters for touchscreens
+> 
+> From: Dmitry Torokhov <dmitry.torokhov@gmail.com>
+> 
+> When applying touchscreen parameters specified in device tree let's
+> make
+> sure we keep whatever setup was done by the driver and not reset the
+> missing values to zero.
+> 
+> Reported-by: Pavel Machek <pavel@ucw.cz>
+> Signed-off-by: Dmitry Torokhov <dmitry.torokhov@gmail.com>
+
+Tested-by: Pavel Machek <pavel@ucw.cz>
+
+Thanks!
+									Pavel
 -- 
-2.4.4
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
