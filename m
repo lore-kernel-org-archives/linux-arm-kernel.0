@@ -1,56 +1,41 @@
-From: claudio.fontana@huawei.com (Claudio Fontana)
-Date: Thu, 25 Jun 2015 11:25:31 +0200
-Subject: [RFC PATCH] KVM: arm/arm64: Don't let userspace update CNTVOFF
- once guest is running
-In-Reply-To: <CAFEAcA_RzWSppaYA9vuAaL-MO6sQV1SgpXf3w-LScUdaarpOEQ@mail.gmail.com>
-References: <1435157697-28579-1-git-send-email-marc.zyngier@arm.com>
- <20150625080457.GD28244@cbox> <558BC2F5.9010303@huawei.com>
- <CAFEAcA_RzWSppaYA9vuAaL-MO6sQV1SgpXf3w-LScUdaarpOEQ@mail.gmail.com>
-Message-ID: <558BC90B.4060806@huawei.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 25 Jun 2015 10:30:07 +0100
+Subject: Build regressions/improvements in v4.1
+In-Reply-To: <20150625091815.GR7557@n2100.arm.linux.org.uk>
+References: <1435006096-12470-1-git-send-email-geert@linux-m68k.org>
+ <CAMuHMdXprKyxirhUZBzNV97oxymcMqeugKixTEC8ojcMq3EeDw@mail.gmail.com>
+ <20150622211857.GY7557@n2100.arm.linux.org.uk>
+ <CAMuHMdXyaS65sTdkB88btchm5NzwgNK969QNcaoGBj9-77eFXQ@mail.gmail.com>
+ <20150625091815.GR7557@n2100.arm.linux.org.uk>
+Message-ID: <20150625093007.GS7557@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 25.06.2015 11:10, Peter Maydell wrote:
-> On 25 June 2015 at 09:59, Claudio Fontana <claudio.fontana@huawei.com> wrote:
->> Once the VM is created, I think QEMU should not request kvm to
->> change the virtual offset of the VM anymore: maybe an unexpected
->> consequence of QEMU's target-arm/kvm64.c::kvm_arch_put_registers ?
-> 
-> Hmm. In general we assume that we can:
->  * stop the VM
->  * read all the guest system registers
->  * write those values back again
->  * restart the VM
-> 
-> if we need to. Is that what's happening here, or are we doing
-> something odder?
-> 
-> -- PMM
-> 
+On Thu, Jun 25, 2015 at 10:18:15AM +0100, Russell King - ARM Linux wrote:
+> On Tue, Jun 23, 2015 at 09:50:00AM +0200, Geert Uytterhoeven wrote:
+> As for the build errors you're reporting, that doesn't seem to be
+> anything new.  It seems to be down to a missing dependency between
+> ARM_PTDUMP and MMU, which means that ARM_PTDUMP is selectable on !MMU
+> systems.  I'll add that dependency, but that's just a small drop in
+> the ocean - it looks like it's the least of the problems with ARM
+> randconfig...
 
-What I guess could be happening by looking at the code in linux
+Now that the build has finished... even with that fixed...
 
-virt/kvm/arm/arch_timer.c::kvm_arm_timer_set_reg
+arch/arm/mach-versatile/built-in.o: In function `pci_versatile_setup':
+arch/arm/mach-versatile/pci.c:249: undefined reference to `pci_ioremap_io'
+kernel/built-in.o: In function `set_section_ro_nx':
+kernel/module.c:1738: undefined reference to `set_memory_nx'
+kernel/built-in.o: In function `set_page_attributes':
+kernel/module.c:1709: undefined reference to `set_memory_ro'
+...
 
-is that QEMU tries to set the KVM_REG_ARM_TIMER_CNT register from exactly the previous value,
-but just because of the fact that the set function is called, cntvoff is updated,
-since the value provided by the user is apparently assumed to be _relative_ to the physical timer.
+which means that DEBUG_SET_MODULE_RONX also needs to depend on MMU.
+As for the pci_ioremap_io, I'm not sure what to do about that.
 
-This is apparent to me in the code in that function which says:
+In any case, I'll queue up both of these dependency fixes as low
+priority.  Thanks.
 
-case KVM_REG_ARM_TIMER_CNT: {
-/* ... */
-    u64 cntvoff = kvm_phys_timer_read() - value;
-/* ... */
-}
-
-And this is matched by the corresponding get function kvm_arm_timer_get_reg where it says:
-
-case KVM_REG_ARM_TIMER_CNT:
-   return kvm_phys_timer_read() - vcpu->kvm->arch.timer.cntvoff;
-
-The time difference between when the GET is issued by QEMU and when the PUT is issued then would account for the difference.
-
-Thanks,
-
-Claudio
+-- 
+FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
+according to speedtest.net.
