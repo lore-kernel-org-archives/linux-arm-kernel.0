@@ -1,7 +1,7 @@
 From: elfring@users.sourceforge.net (SF Markus Elfring)
-Date: Thu, 25 Jun 2015 13:38:17 +0200
-Subject: [PATCH 1/2] ARM-OMAP2+: Delete an unnecessary check before the
- function call "omap_device_delete"
+Date: Thu, 25 Jun 2015 13:40:31 +0200
+Subject: [PATCH 2/2] ARM-OMAP2+: Delete an unnecessary check before the
+ function call "of_node_put"
 In-Reply-To: <558BE713.1020409@users.sourceforge.net>
 References: <5307CAA2.8060406@users.sourceforge.net>
  <alpine.DEB.2.02.1402212321410.2043@localhost6.localdomain6>
@@ -20,36 +20,36 @@ References: <5307CAA2.8060406@users.sourceforge.net>
  <530DD06F.4090703@users.sourceforge.net>
  <alpine.DEB.2.02.1402262129250.2221@localhost6.localdomain6>
  <5317A59D.4@users.sourceforge.net> <558BE713.1020409@users.sourceforge.net>
-Message-ID: <558BE829.4070901@users.sourceforge.net>
+Message-ID: <558BE8AF.5000709@users.sourceforge.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Markus Elfring <elfring@users.sourceforge.net>
-Date: Thu, 25 Jun 2015 13:00:11 +0200
+Date: Thu, 25 Jun 2015 13:05:28 +0200
 
-The omap_device_delete() function tests whether its argument is NULL and
-then returns immediately. Thus the test around the call is not needed.
+The of_node_put() function tests whether its argument is NULL and then
+returns immediately. Thus the test around the call is not needed.
 
 This issue was detected by using the Coccinelle software.
 
 Signed-off-by: Markus Elfring <elfring@users.sourceforge.net>
 ---
- arch/arm/mach-omap2/omap_device.c | 3 +--
+ arch/arm/mach-omap2/timer.c | 3 +--
  1 file changed, 1 insertion(+), 2 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/omap_device.c b/arch/arm/mach-omap2/omap_device.c
-index 4cb8fd9..196366e 100644
---- a/arch/arm/mach-omap2/omap_device.c
-+++ b/arch/arm/mach-omap2/omap_device.c
-@@ -193,8 +193,7 @@ static int _omap_device_notifier_call(struct notifier_block *nb,
+diff --git a/arch/arm/mach-omap2/timer.c b/arch/arm/mach-omap2/timer.c
+index cac46d8..15448221 100644
+--- a/arch/arm/mach-omap2/timer.c
++++ b/arch/arm/mach-omap2/timer.c
+@@ -208,8 +208,7 @@ static void __init omap_dmtimer_init(void)
+ 	/* If we are a secure device, remove any secure timer nodes */
+ 	if ((omap_type() != OMAP2_DEVICE_TYPE_GP)) {
+ 		np = omap_get_timer_dt(omap_timer_match, "ti,timer-secure");
+-		if (np)
+-			of_node_put(np);
++		of_node_put(np);
+ 	}
+ }
  
- 	switch (event) {
- 	case BUS_NOTIFY_DEL_DEVICE:
--		if (pdev->archdata.od)
--			omap_device_delete(pdev->archdata.od);
-+		omap_device_delete(pdev->archdata.od);
- 		break;
- 	case BUS_NOTIFY_ADD_DEVICE:
- 		if (pdev->dev.of_node)
 -- 
 2.4.4
