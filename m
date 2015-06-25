@@ -1,63 +1,48 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Thu, 25 Jun 2015 13:20:09 +0000
-Subject: [PATCH v2 1/3] net: mvneta: introduce compatible string
- "marvell, armada-xp-neta"
-In-Reply-To: <20150625091323.GH4853@kw.sim.vm.gnt>
-References: <1434547162-6275-1-git-send-email-simon.guinot@sequanux.org>
- <1434547162-6275-2-git-send-email-simon.guinot@sequanux.org>
- <55818E64.20007@free-electrons.com>
- <55818F10.8030304@free-electrons.com>
- <20150617170112.GD2917@io.lakedaemon.net>
- <20150619123253.GB4853@kw.sim.vm.gnt>
- <20150625091323.GH4853@kw.sim.vm.gnt>
-Message-ID: <20150625132009.GC23515@io.lakedaemon.net>
+From: bernhard.nortmann@web.de (Bernhard Nortmann)
+Date: Thu, 25 Jun 2015 15:21:33 +0200
+Subject: [PATCH] Remove deprecated symbol from defconfig files
+Message-ID: <1435238493-32614-1-git-send-email-bernhard.nortmann@web.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 25, 2015 at 11:13:23AM +0200, Simon Guinot wrote:
-> On Fri, Jun 19, 2015 at 02:32:53PM +0200, Simon Guinot wrote:
-> > On Wed, Jun 17, 2015 at 05:01:12PM +0000, Jason Cooper wrote:
-> > > On Wed, Jun 17, 2015 at 05:15:28PM +0200, Gregory CLEMENT wrote:
-> > > > On 17/06/2015 17:12, Gregory CLEMENT wrote:
-> > > > > On 17/06/2015 15:19, Simon Guinot wrote:
-> > > > >> The mvneta driver supports the Ethernet IP found in the Armada 370, XP,
-> > > > >> 380 and 385 SoCs. Since at least one more hardware feature is available
-> > > > >> for the Armada XP SoCs then a way to identify them is needed.
-> > > > >>
-> > > > >> This patch introduces a new compatible string "marvell,armada-xp-neta".
-> > > > > 
-> > > > > Let's be future proof by going further. I would like to have an compatible string
-> > > > > for each SoC even if we currently we don't use them.
-> > > 
-> > > I disagree with this.  We can't predict what incosistencies we'll discover in
-> > > the future.  We should only assign new compatible strings based on known IP
-> > > variations when we discover them.  This seems fraught with demons since we
-> > > can't predict the scope of affected IP blocks (some steppings of one SoC, three
-> > > SoCs plus two steppings of a fourth, etc)
-> > > 
-> > > imho, the 'future-proofing' lies in being specific as to the naming of the
-> > > compatible strings against known hardware variations at the time.
-> > 
-> > So, should I add more compatible strings or not ?
-> 
-> How do you want me to handle this ? Did you reach an agreement ?
+This patch is to re-apply the changes from
+https://groups.google.com/forum/#!topic/linux-sunxi/Hhx2CR2YWhI
 
-Sorry, this slipped off my radar.  Probably EBKAC.  :)
+It removes the deprecated/obsolete symbol CONFIG_POWER_RESET_SUN6I
+from multi_v7_defconfig and sunxi_defconfig in arch/arm/configs/.
 
-I'm still of the opinion that future-proofing equates to guessing.
-It has the advantage of, if we guess correctly, things are easier down
-the road when we discover differences between similar IP blocks.
-However, if we guess incorrectly, then we have a mess on our hands.
-iow, this proposal fails poorly.
+mripard's tree incorporated the changes, but they somehow didn't
+make it upstream. The symbol is still present as of v4.1.
 
-I've no problem breaking DT compatibility when it's determined that we
-made a mistake (or mistakes) in the past.  See the irqchip rework that
-Marc did a few cycles ago.
+Signed-off-by: Bernhard Nortmann <bernhard.nortmann@web.de>
+---
+ arch/arm/configs/multi_v7_defconfig | 1 -
+ arch/arm/configs/sunxi_defconfig    | 1 -
+ 2 files changed, 2 deletions(-)
 
-The difference here is that we know better.  We *know* that dtbs are
-upgraded with the kernel.  We *know* that no one is shipping products
-with dtbs in ROMs.  So what are we really trying to protect against?
-
-thx,
-
-Jason.
+diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
+index fbbb191..0d686b1 100644
+--- a/arch/arm/configs/multi_v7_defconfig
++++ b/arch/arm/configs/multi_v7_defconfig
+@@ -322,7 +322,6 @@ CONFIG_POWER_RESET_AS3722=y
+ CONFIG_POWER_RESET_GPIO=y
+ CONFIG_POWER_RESET_GPIO_RESTART=y
+ CONFIG_POWER_RESET_KEYSTONE=y
+-CONFIG_POWER_RESET_SUN6I=y
+ CONFIG_POWER_RESET_RMOBILE=y
+ CONFIG_SENSORS_LM90=y
+ CONFIG_SENSORS_LM95245=y
+diff --git a/arch/arm/configs/sunxi_defconfig b/arch/arm/configs/sunxi_defconfig
+index 8ecba00..2c7af0a 100644
+--- a/arch/arm/configs/sunxi_defconfig
++++ b/arch/arm/configs/sunxi_defconfig
+@@ -77,7 +77,6 @@ CONFIG_SPI_SUN6I=y
+ CONFIG_GPIO_SYSFS=y
+ CONFIG_POWER_SUPPLY=y
+ CONFIG_POWER_RESET=y
+-CONFIG_POWER_RESET_SUN6I=y
+ CONFIG_THERMAL=y
+ CONFIG_CPU_THERMAL=y
+ CONFIG_WATCHDOG=y
+-- 
+2.0.5
