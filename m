@@ -1,35 +1,41 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Thu, 25 Jun 2015 14:24:54 +0100
-Subject: [PATCH] ARM64: smp: Silence suspicious RCU usage with ipi
- tracepoints
-In-Reply-To: <558B2842.2030007@codeaurora.org>
-References: <1435176858-9568-1-git-send-email-sboyd@codeaurora.org>
- <20150624212930.GC12596@twins.programming.kicks-ass.net>
- <558B2842.2030007@codeaurora.org>
-Message-ID: <20150625132453.GA13892@localhost>
+From: elfring@users.sourceforge.net (SF Markus Elfring)
+Date: Thu, 25 Jun 2015 15:27:33 +0200
+Subject: [PATCH 0/2] ARM-kernel: Deletion of unnecessary checks before two
+ function calls
+In-Reply-To: <5317A59D.4@users.sourceforge.net>
+References: <5307CAA2.8060406@users.sourceforge.net>
+ <alpine.DEB.2.02.1402212321410.2043@localhost6.localdomain6>
+ <530A086E.8010901@users.sourceforge.net>
+ <alpine.DEB.2.02.1402231635510.1985@localhost6.localdomain6>
+ <530A72AA.3000601@users.sourceforge.net>
+ <alpine.DEB.2.02.1402240658210.2090@localhost6.localdomain6>
+ <530B5FB6.6010207@users.sourceforge.net>
+ <alpine.DEB.2.10.1402241710370.2074@hadrien>
+ <530C5E18.1020800@users.sourceforge.net>
+ <alpine.DEB.2.10.1402251014170.2080@hadrien>
+ <530CD2C4.4050903@users.sourceforge.net>
+ <alpine.DEB.2.10.1402251840450.7035@hadrien>
+ <530CF8FF.8080600@users.sourceforge.net>
+ <alpine.DEB.2.02.1402252117150.2047@localhost6.localdomain6>
+ <530DD06F.4090703@users.sourceforge.net>
+ <alpine.DEB.2.02.1402262129250.2221@localhost6.localdomain6>
+ <5317A59D.4@users.sourceforge.net>
+Message-ID: <558C01C5.4060303@users.sourceforge.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 24, 2015 at 02:59:30PM -0700, Stephen Boyd wrote:
-> On 06/24/2015 02:29 PM, Peter Zijlstra wrote:
-> > On Wed, Jun 24, 2015 at 01:14:18PM -0700, Stephen Boyd wrote:
-> >> John Stultz reported an RCU splat on ARM with ipi trace events
-> >> enabled. It looks like the same problem exists on ARM64.
-> >>
-> >> At this point in the IPI handling path we haven't called
-> >> irq_enter() yet, so RCU doesn't know that we're about to exit
-> >> idle and properly warns that we're using RCU from an idle CPU.
-> >> Use trace_ipi_entry_rcuidle() instead of trace_ipi_entry() so
-> >> that RCU is informed about our exit from idle.
-> > I have a problem with $subject. It says 'silence', whereas afaict this
-> > fixes an actual bug, so it should be 'fixes'.
-> 
-> Fair enough. I can resend or whoever applies this patch can
-> s/Silence/Fix/ on the $subject.
+From: Markus Elfring <elfring@users.sourceforge.net>
 
-I'll apply the patch and change the subject as well.
+Some functions tolerate the passing of a null pointer. I do not see a need
+because of this fact that a function caller repeats a corresponding check.
 
-Thanks.
+Markus Elfring (2):
+  Delete a check before the function call "smp_set_ops"
+  Delete a check before the function call "unwind_table_del"
+
+ arch/arm/kernel/module.c | 3 +--
+ arch/arm/kernel/setup.c  | 2 +-
+ 2 files changed, 2 insertions(+), 3 deletions(-)
 
 -- 
-Catalin
+2.4.4
