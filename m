@@ -1,60 +1,52 @@
-From: jassisinghbrar@gmail.com (Jassi Brar)
-Date: Thu, 25 Jun 2015 21:28:48 +0530
-Subject: [GIT PULL] Mailbox changes for v4.2
-Message-ID: <CABb+yY2N+thoJEBfNdpsyEpDjpvnJ4-GbhTEJM-e7earmZpDAQ@mail.gmail.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Thu, 25 Jun 2015 17:13:08 +0100
+Subject: [PATCH] keystone: psci: adds cpu_die implementation
+In-Reply-To: <558C25E0.3010102@ti.com>
+References: <1435240970-30869-1-git-send-email-vitalya@ti.com>
+ <20150625144511.GA6844@leverpostej> <558C174F.80108@oracle.com>
+ <558C25E0.3010102@ti.com>
+Message-ID: <20150625161308.GF6844@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Linus,
+On Thu, Jun 25, 2015 at 05:01:36PM +0100, Vitaly Andrianov wrote:
+> 
+> 
+> On 06/25/2015 10:59 AM, santosh shilimkar wrote:
+> > On 6/25/2015 7:45 AM, Mark Rutland wrote:
+> >> Hi,
+> >>
+> >> On Thu, Jun 25, 2015 at 03:02:50PM +0100, Vitaly Andrianov wrote:
+> >>> This commit add cpu_die implementation using psci api
+> >>
+> >> I don't understand. If you have a PSCI implementation, it should be
+> >> sufficient to have a PSCI node (and enable-method) in your DT, and the
+> >> generic code will be used. Nothing should be required in your board
+> >> code.
+> >>
+> >> You should also use CPU_ON to bring secondaries online rather than
+> >> mixing up PSCI and platform-specific mechanisms.
+> >>
+> > Good point about CPU_ON. We need that as well.
+> >
+> Does it mean that keystone_defconfig must always have CONFIG_HOTPLUG_CPU 
+> and CONFIG_ARM_PSCI enabled?
 
-The following changes since commit 030bbdbf4c833bc69f502eae58498bc5572db736:
+No.
 
-  Linux 4.1-rc3 (2015-05-10 15:12:29 -0700)
+You need CONFIG_ARM_PSCI for PSCI CPU_ON. Without CONFIG_HOTPLUG_CPU,
+you'll get PSCI CPU_ON but not PSCI CPU_OFF.
 
-are available in the git repository at:
+> What is if someone doesn't want to have HOTPLUG_CPU?
 
-  http://git.linaro.org/landing-teams/working/fujitsu/integration.git
-mailbox-for-next
+Then you don't get PSCI CPU_OFF, but can still have PSCI CPU_ON.
 
-for you to fetch changes up to 7d641938aa2ae433a97cc65ec622547cfe08f2ed:
+Only the portions of the PSCI code required for turning CPUs off are
+dependent on HOTPLUG_CPU.
 
-  mailbox/bcm2835: Fix mailbox full detection. (2015-06-13 16:20:39 +0530)
+> How he can boot secondary CPU w/o platform-specific mechanizm?
 
-----------------------------------------------------------------
-Andrew Bresticker (1):
-      mailbox: Make mbox_chan_ops const
+By using PSCI CPU_ON.
 
-Benson Leung (1):
-      mailbox: Fix up error handling in mbox_request_channel()
-
-Eric Anholt (1):
-      mailbox/bcm2835: Fix mailbox full detection.
-
-Lee Jones (2):
-      mailbox: Add ability for clients to request channels by name
-      dt: mailbox: Remove 'mbox-names property is discouraged' message
-from binding
-
-Lubomir Rintel (2):
-      dt/bindings: Add binding for the BCM2835 mailbox driver
-      mailbox: Enable BCM2835 mailbox support
-
-Richard Weinberger (1):
-      mailbox: altera: Add dependency on HAS_IOMEM
-
- .../bindings/mailbox/brcm,bcm2835-mbox.txt         |  26 +++
- .../devicetree/bindings/mailbox/mailbox.txt        |  10 +-
- drivers/mailbox/Kconfig                            |  10 +
- drivers/mailbox/Makefile                           |   2 +
- drivers/mailbox/arm_mhu.c                          |   2 +-
- drivers/mailbox/bcm2835-mailbox.c                  | 217 +++++++++++++++++++++
- drivers/mailbox/mailbox-altera.c                   |   2 +-
- drivers/mailbox/mailbox.c                          |  40 +++-
- drivers/mailbox/omap-mailbox.c                     |   8 +-
- drivers/mailbox/pcc.c                              |   2 +-
- include/linux/mailbox_client.h                     |   2 +
- include/linux/mailbox_controller.h                 |   2 +-
- 12 files changed, 304 insertions(+), 19 deletions(-)
- create mode 100644
-Documentation/devicetree/bindings/mailbox/brcm,bcm2835-mbox.txt
- create mode 100644 drivers/mailbox/bcm2835-mailbox.c
+Thanks,
+Mark
