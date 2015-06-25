@@ -1,37 +1,43 @@
-From: santosh.shilimkar@oracle.com (santosh shilimkar)
-Date: Thu, 25 Jun 2015 11:43:50 -0700
-Subject: [PATCH] ARM: use phys_addr_t in pfn_to_kaddr()
-In-Reply-To: <alpine.LFD.2.11.1506251232050.2617@knanqh.ubzr>
-References: <1435072386-13527-1-git-send-email-vitalya@ti.com>
- <558B0388.1040006@oracle.com>
- <alpine.LFD.2.11.1506251232050.2617@knanqh.ubzr>
-Message-ID: <558C4BE6.20009@oracle.com>
+From: balbi@ti.com (Felipe Balbi)
+Date: Thu, 25 Jun 2015 14:34:48 -0500
+Subject: [PATCH 1/3] i2c: omap: switch to dev_get_drvdata()
+Message-ID: <1435260890-32335-1-git-send-email-balbi@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 6/25/2015 9:33 AM, Nicolas Pitre wrote:
-> On Wed, 24 Jun 2015, santosh shilimkar wrote:
->
->> On 6/23/2015 8:13 AM, Vitaly Andrianov wrote:
->>> This patch fixes pfn_to_kaddr() to use phys_addr_t.  Without this,
->>> this macro is broken on LPAE systems. For physical addresses above
->>> first 4GB result of shifting pfn with PAGE_SHIFT may be truncated.
->>>
->>> Signed-off-by: Vitaly Andrianov <vitalya@ti.com>
->>> ---
->> Looks a valid fix.
->>
->> RMK, Nico, what you say ?
->
-> Looks fine to me.
->
-> Acked-by: Nicolas Pitre <nico@linaro.org>
->
-Thanks Nico.
+there's no need to fetch the platform_device
+in order to dereference it back to the dev
+pointer to access drvdata, we can use
+dev_get_drvdata() instead.
 
-Vitaly,
-I suggest you to drop this patch into RMK's patch system with
-mine and Nico's ack.
+Signed-off-by: Felipe Balbi <balbi@ti.com>
+---
+ drivers/i2c/busses/i2c-omap.c | 6 ++----
+ 1 file changed, 2 insertions(+), 4 deletions(-)
 
-Regards,
-Santosh
+diff --git a/drivers/i2c/busses/i2c-omap.c b/drivers/i2c/busses/i2c-omap.c
+index 0e894193accf..00712c1cf3c0 100644
+--- a/drivers/i2c/busses/i2c-omap.c
++++ b/drivers/i2c/busses/i2c-omap.c
+@@ -1403,8 +1403,7 @@ static int omap_i2c_remove(struct platform_device *pdev)
+ #ifdef CONFIG_PM
+ static int omap_i2c_runtime_suspend(struct device *dev)
+ {
+-	struct platform_device *pdev = to_platform_device(dev);
+-	struct omap_i2c_dev *_dev = platform_get_drvdata(pdev);
++	struct omap_i2c_dev *_dev = dev_get_drvdata(dev);
+ 
+ 	_dev->iestate = omap_i2c_read_reg(_dev, OMAP_I2C_IE_REG);
+ 
+@@ -1428,8 +1427,7 @@ static int omap_i2c_runtime_suspend(struct device *dev)
+ 
+ static int omap_i2c_runtime_resume(struct device *dev)
+ {
+-	struct platform_device *pdev = to_platform_device(dev);
+-	struct omap_i2c_dev *_dev = platform_get_drvdata(pdev);
++	struct omap_i2c_dev *_dev = dev_get_drvdata(dev);
+ 
+ 	if (!_dev->regs)
+ 		return 0;
+-- 
+2.4.4
