@@ -1,218 +1,169 @@
-From: vitalya@ti.com (Vitaly Andrianov)
-Date: Thu, 25 Jun 2015 10:31:50 -0400
-Subject: [PATCH v2 3/3] ARM: keystone: ecc: add DDR3 ecc interrupt handling
-In-Reply-To: <1435242710-31346-1-git-send-email-vitalya@ti.com>
-References: <1435242710-31346-1-git-send-email-vitalya@ti.com>
-Message-ID: <1435242710-31346-4-git-send-email-vitalya@ti.com>
+From: andriy.shevchenko@linux.intel.com (Andy Shevchenko)
+Date: Thu, 25 Jun 2015 17:41:45 +0300
+Subject: [PATCH v2 2/2] spi: dw: Allow interface drivers to limit data
+ I/O to word sizes
+In-Reply-To: <1435163696-14767-3-git-send-email-michael@smart-africa.com>
+References: <1434703435-25198-1-git-send-email-michael@smart-africa.com>
+ <1435163696-14767-1-git-send-email-michael@smart-africa.com>
+ <1435163696-14767-3-git-send-email-michael@smart-africa.com>
+Message-ID: <1435243305.10393.103.camel@linux.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds DDR3 ECC handler support interrupt handling
-for Keystone II devices, the kernel will reboot if the error
-is 2-bit error for DDR3 ECC error.
+On Wed, 2015-06-24 at 18:34 +0200, Michael van der Westhuizen wrote:
+> The commit dd11444327ce ("spi: dw-spi: Convert 16bit accesses to 
+> 32bit
+> accesses") changed all 16bit accesses in the DW_apb_ssi driver to 
+> 32bit.
+> This, unfortunately, breaks data register access on picoXcell, where 
+> the
+> DW IP needs data register accesses to be word accesses (all other
+> accesses appear to be OK).
+> 
+> This change introduces a new master variable to allow interface 
+> drivers
+> to specify that 16bit data transfer I/O is required.  This change 
+> also
+> introduces the ability to set this variable via device tree bindings 
+> in
+> the MMIO interface driver.
+> 
+> Before this change, on a picoXcell pc3x3:
+>  spi_master spi32766: interrupt_transfer: fifo overrun/underrun
+>  m25p80 spi32766.0: error -5 reading 9f
+>  m25p80: probe of spi32766.0 failed with error -5
+> 
+> After this change:
+>  m25p80 spi32766.0: m25p40 (512 Kbytes)
 
-Signed-off-by: Hao Zhang <hzhang@ti.com>
-Signed-off-by: Murali Karicheri <m-karicheri2@ti.com>
-Signed-off-by: Vitaly Andrianov <vitalya@ti.com>
----
- .../devicetree/bindings/arm/keystone/keystone.txt  |  17 +++
- arch/arm/mach-keystone/Makefile                    |   2 +-
- arch/arm/mach-keystone/keystone.c                  |   3 +-
- arch/arm/mach-keystone/keystone.h                  |   1 +
- arch/arm/mach-keystone/keystone_ecc.c              | 117 +++++++++++++++++++++
- 5 files changed, 138 insertions(+), 2 deletions(-)
- create mode 100644 arch/arm/mach-keystone/keystone_ecc.c
+Reviewed-by: Andy Shevchenko <andriy.shevchenko@linux.intel.com>
 
-diff --git a/Documentation/devicetree/bindings/arm/keystone/keystone.txt b/Documentation/devicetree/bindings/arm/keystone/keystone.txt
-index 59d7a46..7d09cc5 100644
---- a/Documentation/devicetree/bindings/arm/keystone/keystone.txt
-+++ b/Documentation/devicetree/bindings/arm/keystone/keystone.txt
-@@ -18,3 +18,20 @@ Boards:
- 
- -  Keystone 2 Edison EVM
-    compatible = "ti,k2e-evm","ti,keystone"
-+
-+TI Keystone SoC specific Device Tree Bindings
-+---------------------------------------------
-+
-+DDR3 ECC error interrupt handling
-+---------------------------------
-+
-+Boards that has DDR3 ECC enabled will have a device node with following
-+compatibility string to to allow handle double bit ECC error interrupts:-
-+
-+   compatible = "ti,keystone-ddr3-ecc"
-+
-+Required properties:
-+
-+- reg:  index 0 - base address of ECC specific register region
-+
-+- interrupts: DDR3 ECC error interrupt line
-diff --git a/arch/arm/mach-keystone/Makefile b/arch/arm/mach-keystone/Makefile
-index 25d9239..ea3b9a2 100644
---- a/arch/arm/mach-keystone/Makefile
-+++ b/arch/arm/mach-keystone/Makefile
-@@ -1,4 +1,4 @@
--obj-y					:= keystone.o smc.o
-+obj-y					:= keystone.o smc.o keystone_ecc.o
- 
- plus_sec := $(call as-instr,.arch_extension sec,+sec)
- AFLAGS_smc.o				:=-Wa,-march=armv7-a$(plus_sec)
-diff --git a/arch/arm/mach-keystone/keystone.c b/arch/arm/mach-keystone/keystone.c
-index 0b28fca..87f9bf1 100644
---- a/arch/arm/mach-keystone/keystone.c
-+++ b/arch/arm/mach-keystone/keystone.c
-@@ -97,7 +97,7 @@ static int __init keystone_init_misc(void)
- 	check_ecc_error();
- 
- 	/* add ARM ECC L1/L2 cache error handler */
--	node = of_find_compatible_node(NULL, NULL, "ti,keystone-sys");
-+	node = of_find_compatible_node(NULL, NULL, "ti,keystone-ddr3-ecc");
- 	if (node)
- 		error_irq = irq_of_parse_and_map(node, 0);
- 
-@@ -111,6 +111,7 @@ static int __init keystone_init_misc(void)
- 		WARN_ON("request_irq fail for arm L1/L2 ECC error irq\n");
- 	}
- 
-+	ret = keystone_init_ddr3_ecc(node);
- 	return ret;
- }
- subsys_initcall(keystone_init_misc);
-diff --git a/arch/arm/mach-keystone/keystone.h b/arch/arm/mach-keystone/keystone.h
-index cd04a1c..ff52243 100644
---- a/arch/arm/mach-keystone/keystone.h
-+++ b/arch/arm/mach-keystone/keystone.h
-@@ -19,6 +19,7 @@ extern struct smp_operations keystone_smp_ops;
- extern void secondary_startup(void);
- extern u32 keystone_cpu_smc(u32 command, u32 cpu, u32 addr);
- extern int keystone_pm_runtime_init(void);
-+extern int keystone_init_ddr3_ecc(struct device_node *node);
- 
- #endif /* __ASSEMBLER__ */
- #endif /* __KEYSTONE_H__ */
-diff --git a/arch/arm/mach-keystone/keystone_ecc.c b/arch/arm/mach-keystone/keystone_ecc.c
-new file mode 100644
-index 0000000..cab3013
---- /dev/null
-+++ b/arch/arm/mach-keystone/keystone_ecc.c
-@@ -0,0 +1,117 @@
-+/*
-+ * Copyright 2014 Texas Instruments, Inc.
-+ *
-+ * This program is free software; you can redistribute it and/or modify it
-+ * under the terms and conditions of the GNU General Public License,
-+ * version 2, as published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope it will be useful, but WITHOUT
-+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
-+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
-+ * more details.
-+ *
-+ * You should have received a copy of the GNU General Public License along with
-+ * this program.  If not, see <http://www.gnu.org/licenses/>.
-+ */
-+#include <linux/io.h>
-+#include <linux/interrupt.h>
-+#include <linux/of_irq.h>
-+#include <linux/of_address.h>
-+#include <linux/reboot.h>
-+#include "keystone.h"
-+
-+/* DDR3 controller registers */
-+#define DDR3_EOI			0x0A0
-+#define DDR3_IRQ_STATUS_RAW_SYS		0x0A4
-+#define DDR3_IRQ_STATUS_SYS		0x0AC
-+#define DDR3_IRQ_ENABLE_SET_SYS		0x0B4
-+#define DDR3_IRQ_ENABLE_CLR_SYS		0x0BC
-+#define DDR3_ECC_CTRL			0x110
-+#define DDR3_ONE_BIT_ECC_ERR_CNT	0x130
-+
-+#define DDR3_1B_ECC_ERR			BIT(5)
-+#define DDR3_2B_ECC_ERR			BIT(4)
-+#define DDR3_WR_ECC_ERR			BIT(3)
-+#define DDR3_SYS_ERR			BIT(0)
-+
-+static void check_ecc_error(void __iomem *ddr_reg)
-+{
-+	u32 irq_status;
-+
-+	irq_status = readl(ddr_reg + DDR3_IRQ_STATUS_SYS);
-+	if ((irq_status & DDR3_2B_ECC_ERR) ||
-+	    (irq_status & DDR3_WR_ECC_ERR)) {
-+		pr_err("Unrecoverable DDR3 ECC error, irq status 0x%x, rebooting kernel ..\n",
-+		       irq_status);
-+		machine_restart(NULL);
-+		/* we shouldn't return after that */
-+	}
-+}
-+
-+static irqreturn_t ddr3_ecc_err_irq_handler(int irq, void *reg_virt)
-+{
-+	void __iomem *ddr_reg = (void __iomem *)reg_virt;
-+
-+	check_ecc_error(ddr_reg);
-+
-+	/*
-+	 * Other errors should be handled by hardware
-+	 * So, nothing to do here
-+	 */
-+
-+	return IRQ_HANDLED;
-+}
-+
-+int keystone_init_ddr3_ecc(struct device_node *node)
-+{
-+	void __iomem *ddr_reg;
-+	int error_irq = 0;
-+	int ret;
-+
-+	/* ddr3 controller reg is configured in the sysctrl node at index 0 */
-+	ddr_reg = of_iomap(node, 0);
-+	if (!ddr_reg) {
-+		pr_warn("Warning!! DDR3 controller regs not defined\n");
-+		return -ENODEV;
-+	}
-+
-+	/* disable and clear unused ECC interrupts */
-+	writel(DDR3_1B_ECC_ERR | DDR3_SYS_ERR,
-+	       ddr_reg + DDR3_IRQ_ENABLE_CLR_SYS);
-+
-+	writel(DDR3_1B_ECC_ERR | DDR3_SYS_ERR,
-+	       ddr_reg + DDR3_IRQ_STATUS_SYS);
-+
-+	/*
-+	 * check if we already have unrecoverable errors
-+	 * reboot in that case
-+	 */
-+	check_ecc_error(ddr_reg);
-+
-+	writel(DDR3_2B_ECC_ERR | DDR3_WR_ECC_ERR,
-+	       ddr_reg + DDR3_IRQ_ENABLE_CLR_SYS);
-+
-+	/* add DDR3 ECC error handler */
-+	error_irq = irq_of_parse_and_map(node, 1);
-+	if (!error_irq) {
-+		/* No GIC interrupt, need to map CIC2 interrupt to GIC */
-+		pr_warn("Warning!! DDR3 ECC irq number not defined\n");
-+		ret = -ENODEV;
-+		goto err;
-+	}
-+
-+	ret = request_irq(error_irq, ddr3_ecc_err_irq_handler, 0,
-+		"ddr3-ecc-err-irq", (void *)ddr_reg);
-+	if (ret) {
-+		WARN_ON("request_irq fail for DDR3 ECC error irq\n");
-+		goto err;
-+	}
-+
-+	writel(DDR3_2B_ECC_ERR | DDR3_WR_ECC_ERR,
-+	       ddr_reg + DDR3_IRQ_ENABLE_SET_SYS);
-+
-+	return 0;
-+err:
-+	iounmap(ddr_reg);
-+	return ret;
-+}
+> 
+> Fixes: dd11444327ce ("spi: dw-spi: Convert 16bit accesses to 32bit 
+> accesses")
+> Signed-off-by: Michael van der Westhuizen <michael@smart-africa.com>
+> ---
+> 
+> Changes in v2:
+>   - Incorporate review feedback from Andy Shevchenko
+>     - Rework the DT bindings to accept an I/O register width as a
+>       number of bytes rather than using a boolean spefifying the
+>       width preference to be 16 bits.
+>     - Add data register access wrapper functions and use them when
+>       reading and writing the data register.
+> 
+>  drivers/spi/spi-dw-mmio.c |  4 ++++
+>  drivers/spi/spi-dw.c      |  4 ++--
+>  drivers/spi/spi-dw.h      | 35 +++++++++++++++++++++++++++++++++++
+>  3 files changed, 41 insertions(+), 2 deletions(-)
+> 
+> diff --git a/drivers/spi/spi-dw-mmio.c b/drivers/spi/spi-dw-mmio.c
+> index eb03e12..e76bf72 100644
+> --- a/drivers/spi/spi-dw-mmio.c
+> +++ b/drivers/spi/spi-dw-mmio.c
+> @@ -74,6 +74,10 @@ static int dw_spi_mmio_probe(struct 
+> platform_device *pdev)
+>  
+>  	dws->max_freq = clk_get_rate(dwsmmio->clk);
+>  
+> +	if (pdev->dev.of_node)
+> +		of_property_read_u32(pdev->dev.of_node, "snps,reg-io
+> -width",
+> +				     &dws->reg_io_width);
+> +
+>  	num_cs = 4;
+>  
+>  	if (pdev->dev.of_node)
+> diff --git a/drivers/spi/spi-dw.c b/drivers/spi/spi-dw.c
+> index 8d67d03..4fbfcdc 100644
+> --- a/drivers/spi/spi-dw.c
+> +++ b/drivers/spi/spi-dw.c
+> @@ -194,7 +194,7 @@ static void dw_writer(struct dw_spi *dws)
+>  			else
+>  				txw = *(u16 *)(dws->tx);
+>  		}
+> -		dw_writel(dws, DW_SPI_DR, txw);
+> +		dw_write_io_reg(dws, DW_SPI_DR, txw);
+>  		dws->tx += dws->n_bytes;
+>  	}
+>  }
+> @@ -205,7 +205,7 @@ static void dw_reader(struct dw_spi *dws)
+>  	u16 rxw;
+>  
+>  	while (max--) {
+> -		rxw = dw_readl(dws, DW_SPI_DR);
+> +		rxw = dw_read_io_reg(dws, DW_SPI_DR);
+>  		/* Care rx only if the transfer's original "rx" is 
+> not null */
+>  		if (dws->rx_end - dws->len) {
+>  			if (dws->n_bytes == 1)
+> diff --git a/drivers/spi/spi-dw.h b/drivers/spi/spi-dw.h
+> index 6c91391..b75ed32 100644
+> --- a/drivers/spi/spi-dw.h
+> +++ b/drivers/spi/spi-dw.h
+> @@ -109,6 +109,7 @@ struct dw_spi {
+>  	u32			fifo_len;	/* depth of the FIFO 
+> buffer */
+>  	u32			max_freq;	/* max bus freq 
+> supported */
+>  
+> +	u32			reg_io_width;	/* DR I/O width in 
+> bytes */
+>  	u16			bus_num;
+>  	u16			num_cs;		/* supported 
+> slave numbers */
+>  
+> @@ -145,11 +146,45 @@ static inline u32 dw_readl(struct dw_spi *dws, 
+> u32 offset)
+>  	return __raw_readl(dws->regs + offset);
+>  }
+>  
+> +static inline u16 dw_readw(struct dw_spi *dws, u32 offset)
+> +{
+> +	return __raw_readw(dws->regs + offset);
+> +}
+> +
+>  static inline void dw_writel(struct dw_spi *dws, u32 offset, u32 
+> val)
+>  {
+>  	__raw_writel(val, dws->regs + offset);
+>  }
+>  
+> +static inline void dw_writew(struct dw_spi *dws, u32 offset, u16 
+> val)
+> +{
+> +	__raw_writew(val, dws->regs + offset);
+> +}
+> +
+> +static inline u32 dw_read_io_reg(struct dw_spi *dws, u32 offset)
+> +{
+> +	switch (dws->reg_io_width) {
+> +	case 2:
+> +		return dw_readw(dws, offset);
+> +	case 4:
+> +	default:
+> +		return dw_readl(dws, offset);
+> +	}
+> +}
+> +
+> +static inline void dw_write_io_reg(struct dw_spi *dws, u32 offset, 
+> u32 val)
+> +{
+> +	switch (dws->reg_io_width) {
+> +	case 2:
+> +		dw_writew(dws, offset, val);
+> +		break;
+> +	case 4:
+> +	default:
+> +		dw_writel(dws, offset, val);
+> +		break;
+> +	}
+> +}
+> +
+>  static inline void spi_enable_chip(struct dw_spi *dws, int enable)
+>  {
+>  	dw_writel(dws, DW_SPI_SSIENR, (enable ? 1 : 0));
+
 -- 
-1.9.1
+Andy Shevchenko <andriy.shevchenko@linux.intel.com>
+Intel Finland Oy
