@@ -1,46 +1,65 @@
-From: simon.guinot@sequanux.org (Simon Guinot)
-Date: Thu, 25 Jun 2015 10:46:03 +0200
-Subject: [PATCH v3 1/3] leds: netxbig: add device tree binding
-In-Reply-To: <558A736D.8030503@samsung.com>
-References: <1434639590-27389-1-git-send-email-simon.guinot@sequanux.org>
- <1434639590-27389-2-git-send-email-simon.guinot@sequanux.org>
- <55894D0A.8000306@samsung.com>
- <20150623211711.GF4853@kw.sim.vm.gnt>
- <558A736D.8030503@samsung.com>
-Message-ID: <20150625084603.GG4853@kw.sim.vm.gnt>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Thu, 25 Jun 2015 09:48:43 +0100
+Subject: [RFC PATCH] KVM: arm/arm64: Don't let userspace update CNTVOFF
+ once guest is running
+In-Reply-To: <20150625080457.GD28244@cbox>
+References: <1435157697-28579-1-git-send-email-marc.zyngier@arm.com>
+ <20150625080457.GD28244@cbox>
+Message-ID: <558BC06B.3090204@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 24, 2015 at 11:07:57AM +0200, Jacek Anaszewski wrote:
-> >>BTW how do you compile the driver? I've tried to use
-> >>multi_v5_defconfig and mvebu_v5_defconfig and I have build breaks
-> >>with both of them on the recent linux-next.
-> >
-> >For the original patch set version (Linux 4.0 at the time), I have used
-> >the mvebu_v5_defconfig. Now I am using a lighter configuration because
-> >I don't need to build the whole mvebu stuff.
-> >
-> >What kind of error do you get ? I remember something about setting
-> >CONFIG_HZ to 250.
-> 
-> I am getting:
-> 
-> drivers/crypto/mv_cesa.c:1037:2: error: implicit declaration of
-> function ?of_get_named_gen_pool?
-> [-Werror=implicit-function-declaration]
-> 
-> Compilation succeeded after disabling CONFIG_CRYPTO_DEV_MV_CESA.
+Hi Christoffer,
 
-It is because the merge in linux-next missed the renaming of
-of_get_named_gen_pool() in of_gen_pool_get() for the mv_cesa driver.
+On 25/06/15 09:04, Christoffer Dall wrote:
+> On Wed, Jun 24, 2015 at 03:54:57PM +0100, Marc Zyngier wrote:
+>> Userspace is allowed to set the guest's view of CNTVCT, which turns
+>> into setting CNTVOFF for the whole VM. One thing userspace is not supposed
+>> to do is to update that register while the guest is running. Time will
+>> either move forward (best case) or backward (really bad idea). Either way,
+>> this shouldn't happen.
+>>
+>> This patch prevents userspace from touching CNTVOFF as soon as a vcpu
+>> has been started. This ensures that time will keep monotonically increase.
+>>
+>> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+>> ---
+>>
+>> QEMU seems to trigger this at boot time, and I have no idea why it does so.
+>> It would be good to find out, hence the RFC tag.
+> 
+> Is this at kernel boot time you see this, or at system startup time?
 
-I have sent a patch, just in case.
+When the kernel boots. The OSV guys also have seen this (time going
+backward), and this patch seems to have solved their problem.
 
-Simon
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 181 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150625/19613b06/attachment.sig>
+> IIRC, QEMU creates a throw-away VM with the default CPU target time,
+> reads out all the system registers to get the KVM reset values of those,
+> then creates the real VM, and feeds back in all the system register
+> reset values, as a method for QEMU and KVM to be in sync about the reset
+> state of the machine.  If we do this, and include CNTVCT, then that
+> would probably trigger this, but the VCPU really shouldn't have been run
+> at that time...
+
+I definitely see this process happening, but that doesn't seem to be the
+problem.
+
+> We should prevent userspace from fiddling with this register post VCPU
+> start regardless, but yes, it would be good to find out why this is
+> happening in the first place.
+
+My main problem is that I cannot easily correlate what is happening in
+the guest at that time with something touching CNTVCT. That's just odd.
+
+> How did you notice this and does it manifest itself in some user-visible
+> ugliness?
+
+It was first reported by the OSV guys, and I then spotted some
+interesting hrtimers taking too long at guest boot time. Putting some
+traces quickly identified the issue.
+
+Thanks,
+
+	M.
+-- 
+Jazz is not dead. It just smells funny...
