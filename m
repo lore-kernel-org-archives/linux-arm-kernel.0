@@ -1,137 +1,100 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Thu, 25 Jun 2015 15:46:27 +0100
-Subject: [PATCH-v4 2/3] mfd: 88pm800: Set default interrupt clear method
-In-Reply-To: <558BE3D6.2010801@linaro.org>
+Date: Thu, 25 Jun 2015 15:48:00 +0100
+Subject: [PATCH-v4 1/3] mfd: 88pm800: Add device tree support
+In-Reply-To: <558BE1B7.2060308@linaro.org>
 References: <1435217189-19578-1-git-send-email-vaibhav.hiremath@linaro.org>
- <1435217189-19578-3-git-send-email-vaibhav.hiremath@linaro.org>
- <20150625102618.GC15013@x1> <558BE3D6.2010801@linaro.org>
-Message-ID: <20150625144627.GB23990@x1>
+ <1435217189-19578-2-git-send-email-vaibhav.hiremath@linaro.org>
+ <20150625101916.GB15013@x1> <558BE1B7.2060308@linaro.org>
+Message-ID: <20150625144800.GC23990@x1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Thu, 25 Jun 2015, Vaibhav Hiremath wrote:
-> On Thursday 25 June 2015 03:56 PM, Lee Jones wrote:
+> On Thursday 25 June 2015 03:49 PM, Lee Jones wrote:
 > >On Thu, 25 Jun 2015, Vaibhav Hiremath wrote:
 > >
-> >>As per the spec, bit 1 (INT_CLEAR_MODE) of reg addr 0xe
-> >>(page 0) controls the method of clearing interrupt
-> >>status of 88pm800 family of devices;
+> >>Add DT support to the 88pm800 driver, along with compatible
+> >>field for it's sub-devices (rtc, onkey and regulator)
 > >>
-> >>   0: clear on read
-> >>   1: clear on write
-> >>
-> >>If pdata is not coming from board file, then set the
-> >>default irq clear method to "irq clear on write"
-> >>
-> >>Also, as suggested by "Lee Jones" renaming variable field
-> >>to appropriate name.
-> >>
-> >>Signed-off-by: Zhao Ye <zhaoy@marvell.com>
+> >>Signed-off-by: Chao Xie <chao.xie@marvell.com>
 > >>Signed-off-by: Vaibhav Hiremath <vaibhav.hiremath@linaro.org>
 > >>---
-> >>  drivers/mfd/88pm800.c       | 15 ++++++++++-----
-> >>  include/linux/mfd/88pm80x.h |  6 ++++--
-> >>  2 files changed, 14 insertions(+), 7 deletions(-)
+> >>  drivers/mfd/88pm800.c | 23 +++++++++++++++++++++++
+> >>  1 file changed, 23 insertions(+)
 > >>
 > >>diff --git a/drivers/mfd/88pm800.c b/drivers/mfd/88pm800.c
-> >>index 40fd014..e0cd7ad 100644
+> >>index 841717a..40fd014 100644
 > >>--- a/drivers/mfd/88pm800.c
 > >>+++ b/drivers/mfd/88pm800.c
-
-[...]
-
-> >>+		PM800_WAKEUP2_INT_WRITE_CLEAR : PM800_WAKEUP2_INT_READ_CLEAR;
-> >>+	ret = regmap_update_bits(map, PM800_WAKEUP2, mask, irq_clr_mode);
+> >>@@ -27,6 +27,7 @@
+> >>  #include <linux/mfd/core.h>
+> >>  #include <linux/mfd/88pm80x.h>
+> >>  #include <linux/slab.h>
+> >>+#include <linux/of_device.h>
 > >>
-> >>  	if (ret < 0)
-> >>  		goto out;
-> >>@@ -514,6 +515,7 @@ static int device_800_init(struct pm80x_chip *chip,
-> >>  	}
+> >>  /* Interrupt Registers */
+> >>  #define PM800_INT_STATUS1		(0x05)
+> >>@@ -121,6 +122,11 @@ static const struct i2c_device_id pm80x_id_table[] = {
+> >>  };
+> >>  MODULE_DEVICE_TABLE(i2c, pm80x_id_table);
 > >>
-> >>  	chip->regmap_irq_chip = &pm800_irq_chip;
-> >>+	chip->irq_clr_on_wr = pdata->irq_clr_on_wr;
+> >>+static const struct of_device_id pm80x_of_match_table[] = {
+> >>+	{ .compatible = "marvell,88pm800", },
+> >>+	{},
+> >>+};
+> >>+
+> >>  static struct resource rtc_resources[] = {
+> >>  	{
+> >>  	 .name = "88pm80x-rtc",
+> >>@@ -133,6 +139,7 @@ static struct resource rtc_resources[] = {
+> >>  static struct mfd_cell rtc_devs[] = {
+> >>  	{
+> >>  	 .name = "88pm80x-rtc",
+> >>+	 .of_compatible = "marvell,88pm80x-rtc",
+> >>  	 .num_resources = ARRAY_SIZE(rtc_resources),
+> >>  	 .resources = &rtc_resources[0],
+> >>  	 .id = -1,
+> >>@@ -151,6 +158,7 @@ static struct resource onkey_resources[] = {
+> >>  static const struct mfd_cell onkey_devs[] = {
+> >>  	{
+> >>  	 .name = "88pm80x-onkey",
+> >>+	 .of_compatible = "marvell,88pm80x-onkey",
+> >>  	 .num_resources = 1,
+> >>  	 .resources = &onkey_resources[0],
+> >>  	 .id = -1,
+> >>@@ -160,6 +168,7 @@ static const struct mfd_cell onkey_devs[] = {
+> >>  static const struct mfd_cell regulator_devs[] = {
+> >>  	{
+> >>  	 .name = "88pm80x-regulator",
+> >>+	 .of_compatible = "marvell,88pm80x-regulator",
+> >>  	 .id = -1,
+> >>  	},
+> >>  };
+> >>@@ -544,8 +553,21 @@ static int pm800_probe(struct i2c_client *client,
+> >>  	int ret = 0;
+> >>  	struct pm80x_chip *chip;
+> >>  	struct pm80x_platform_data *pdata = dev_get_platdata(&client->dev);
+> >>+	struct device_node *np = client->dev.of_node;
+> >>  	struct pm80x_subchip *subchip;
+> >>
+> >>+	if (!pdata && !np) {
+> >>+		dev_err(&client->dev,
+> >>+			"pm80x requires platform data or of_node\n");
+> >>+		return -EINVAL;
+> >>+	}
+> >>+
+> >>+	if (!pdata) {
+> >>+		pdata = devm_kzalloc(&client->dev, sizeof(*pdata), GFP_KERNEL);
+> >>+		if (!pdata)
+> >>+			return -ENOMEM;
+> >>+	}
 > >
-> >You have protection around pdata everywhere else in the file, I
-> >suggest you supply some here too.
-> >
-> 
-> Actually it is not really needed, as the PATCH 1/1 introduces
-> 
-> 
->         if (!pdata && !np) {
->                 dev_err(&client->dev,
->                         "pm80x requires platform data or of_node\n");
->                 return -EINVAL;
->         }
-> 
->         if (!pdata && !np) {
->                 dev_err(&client->dev,
->                         "pm80x requires platform data or of_node\n");
->                 return -EINVAL;
->         }
-> 
-> 
-> So there is no way you can have pdata = NULL beyond this point.
-
-I saw that.  I want you to remove that too.
-
-[...]
-
-> >>--- a/include/linux/mfd/88pm80x.h
-> >>+++ b/include/linux/mfd/88pm80x.h
-> >>@@ -77,6 +77,8 @@ enum {
-> >>  #define PM800_WAKEUP2		(0x0E)
-> >>  #define PM800_WAKEUP2_INV_INT		(1 << 0)
-> >>  #define PM800_WAKEUP2_INT_CLEAR		(1 << 1)
-> >>+#define PM800_WAKEUP2_INT_READ_CLEAR		(0 << 1)
-> >>+#define PM800_WAKEUP2_INT_WRITE_CLEAR		(1 << 1)
-> >>  #define PM800_WAKEUP2_INT_MASK		(1 << 2)
-> >
-> >Use the BIT() macro.
-> >
-> 
-> I thought about this, but the whole file doesn't use it, so I also
-> chose not to.
-
-Then the whole file needs moving over.
-
-Patches accepted.
-
-> >>  #define PM800_POWER_UP_LOG	(0x10)
-> >>@@ -300,7 +302,7 @@ struct pm80x_chip {
-> >>  	struct regmap_irq_chip_data *irq_data;
-> >>  	int type;
-> >>  	int irq;
-> >>-	int irq_mode;
-> >>+	int irq_clr_on_wr;	/* '1': Clear on write, '0': Clear on read*/
-> >
-> >Whitespace issue.
-> 
-> Didn't see any...and I also ran checkpatch.
-
-You have no space before the '*/'.
-
-> >Shouldn't this be a bool?
+> >Why have you allocated data for pdata, then done nothing with it?
 > >
 > 
-> Just was not sure about any older board file interface.
-> Ideally it should be bool only.
+> Not in this patch, but subsequent patches would use it.
 
-Right.
-
-> >Actually even better, I would define; CLR_ON_WRITE and CLR_ON_READ,
-> >and call the variable irq_clear_method, or something.
-> >
-> >Much clearer that way I think.
-> >
-> 
-> We have slowly decided to almost hardcode it to one value if there is
-> no board file. I feel we should just keep it to simple.
-> 
-> If you still insist, I can implement.
-
-I like clarity and by your own admission (by warranting an additional
-comment) it's not clear.  Please make it as clear as you can.
+Only provide it when you start using it please.
 
 -- 
 Lee Jones
