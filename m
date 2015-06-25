@@ -1,63 +1,71 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu, 25 Jun 2015 13:12:05 +0200
-Subject: [linux-sunxi] [PATCH 1/4] ARM: dts: sunxi: Add regulator-boot-on
- to usb host port regulator nodes
-In-Reply-To: <5589167E.4020905@redhat.com>
-References: <1434814810-26285-1-git-send-email-hdegoede@redhat.com>
- <1434814810-26285-2-git-send-email-hdegoede@redhat.com>
- <CAGRGNgU7179K408=PekziP9ZzzG7+rvhm=e7TWjZk1UhkAnVZQ@mail.gmail.com>
- <5587C720.9040007@redhat.com> <20150623071646.GL2266@lukather>
- <5589167E.4020905@redhat.com>
-Message-ID: <20150625111205.GC2266@lukather>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Thu, 25 Jun 2015 13:17:07 +0200
+Subject: [PATCH] PM / Domains: Try power off masters in error path of
+ __pm_genpd_poweron()
+In-Reply-To: <55798031.50205@gmail.com>
+References: <1434023511-4263-1-git-send-email-ulf.hansson@linaro.org>
+ <55798031.50205@gmail.com>
+Message-ID: <CAPDyKFo7OarmJpc7teHjOkxgoEToa_SJaRMRW-_cfSmJ-5MLtw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 23, 2015 at 10:19:10AM +0200, Hans de Goede wrote:
-> Hi,
-> 
-> On 23-06-15 09:16, Maxime Ripard wrote:
-> >On Mon, Jun 22, 2015 at 10:28:16AM +0200, Hans de Goede wrote:
-> >>Hi,
-> >>
-> >>On 22-06-15 02:30, Julian Calaby wrote:
-> >>>Hi Hans,
-> >>>
-> >>>On Sun, Jun 21, 2015 at 1:40 AM, Hans de Goede <hdegoede@redhat.com> wrote:
-> >>>>u-boot will have turned on the power to the usb host ports, so mark them
-> >>>>as regulator-boot-on, this stops the power on the ports from temporarily
-> >>>>getting turned off during boot, causing issues with e.g. usb powered
-> >>>>harddisks.
-> >>>
-> >>>Stupid question: shouldn't u-boot set this property?
-> >>
-> >>We could make u-boot set this property but that will require a lot of code on
-> >>u-boot's side which is simply not there atm. And traditionally this property
-> >>is is simply a part of the dts files as shipped with the kernel.
-> >
-> >What happens if the property is set but the regulator is not actually
-> >enabled?
-> 
-> Then its gets enabled when the regulator loads, so assuming that the usb driver
-> is enabled in the kernel config 0.5 (built-in) - 3 (module) seconds earlier then
-> it otherwise would.
+On 11 June 2015 at 14:33, Krzysztof Kozlowski <k.kozlowski.k@gmail.com> wrote:
+> W dniu 11.06.2015 o 20:51, Ulf Hansson pisze:
+>> While powering up a genpd, its domain masters are first being powered up.
+>> In the error path of __pm_genpd_poweron(), we didn't care to try power off
+>> these domain masters. Let's deal with that to avoid leaving unused PM
+>> domains powered.
+>>
+>> Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
+>> ---
+>>  drivers/base/power/domain.c | 30 +++++++++++++++++-------------
+>>  1 file changed, 17 insertions(+), 13 deletions(-)
+>>
+>> diff --git a/drivers/base/power/domain.c b/drivers/base/power/domain.c
+>> index 2327613..32dcb80 100644
+>> --- a/drivers/base/power/domain.c
+>> +++ b/drivers/base/power/domain.c
+>> @@ -235,6 +235,18 @@ static int genpd_power_off(struct generic_pm_domain *genpd)
+>>  }
+>>
+>>  /**
+>> + * genpd_queue_power_off_work - Queue up the execution of pm_genpd_poweroff().
+>> + * @genpd: PM domait to power off.
+>> + *
+>> + * Queue up the execution of pm_genpd_poweroff() unless it's already been done
+>> + * before.
+>> + */
+>> +static void genpd_queue_power_off_work(struct generic_pm_domain *genpd)
+>> +{
+>> +     queue_work(pm_wq, &genpd->power_off_work);
+>> +}
+>> +
+>> +/**
+>>   * __pm_genpd_poweron - Restore power to a given PM domain and its masters.
+>>   * @genpd: PM domain to power up.
+>>   *
+>> @@ -315,8 +327,12 @@ static int __pm_genpd_poweron(struct generic_pm_domain *genpd)
+>>       return 0;
+>>
+>>   err:
+>> -     list_for_each_entry_continue_reverse(link, &genpd->slave_links, slave_node)
+>> +     list_for_each_entry_continue_reverse(link,
+>> +                                     &genpd->slave_links,
+>> +                                     slave_node) {
+>>               genpd_sd_counter_dec(link->master);
+>> +             genpd_queue_power_off_work(link->master);
+>
+> It looks sensible to revert work already done however I wonder if this
+> is necessary for each slave. The first successful call to
+> pm_genpd_poweroff() will also walk through slave_links and queue the work.
+>
 
-Ok, perfect then.
+For the current genpd, each slave link represents that the current
+genpd is a subdomain to another genpd. The corresponding master for
+each link is the "link->master". As genpds are allowed to have several
+masters, we can't just try to power off one of them.
 
-> This is not a problem since usb-ports are normally always powered anyways
+Sorry for a delayed response and thanks for your review!
 
-That might be true using mainline u-boot, but might not be on other
-bootloaders, hence why I asked that.
-
-Maxime
-
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150625/3954901b/attachment-0001.sig>
+Kind regards
+Uffe
