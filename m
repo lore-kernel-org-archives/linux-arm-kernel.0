@@ -1,84 +1,65 @@
-From: khilman@kernel.org (Kevin Hilman)
-Date: Wed, 24 Jun 2015 17:24:55 -0700
-Subject: [GIT PULL]Hisilicon hip04 soc and D01 board DT updates for v4.2
-In-Reply-To: <2091000.vbEIJY2sm3@wuerfel>
-References: <554CC781.9010705@hisilicon.com>
- <CANMBJr6bOu9-w_gODrJO_4-VczXOo024wnyhAtndFGTGrWUs6g@mail.gmail.com>
- <5554E035.6020004@hisilicon.com> <2091000.vbEIJY2sm3@wuerfel>
-Message-ID: <CAMAWPa8LZsmcc-fvcM7UcvJ1+QR8hQjUkY1QcFU+MW2s1nxj2Q@mail.gmail.com>
+From: javier@dowhile0.org (Javier Martinez Canillas)
+Date: Thu, 25 Jun 2015 02:33:43 +0200
+Subject: [PATCH v7 00/14] crypto: add a new driver for Marvell's CESA
+In-Reply-To: <20150625000037.GK31584@windriver.com>
+References: <1434635190-27733-1-git-send-email-boris.brezillon@free-electrons.com>
+ <20150619142444.GA15234@gondor.apana.org.au>
+ <CAP=VYLqQynCNRTpm4JnOxeO6DH_739fO2QNcDMxaXqCKCHiTtQ@mail.gmail.com>
+ <CAP=VYLpSrTvXRovWo4G7AXWv1OKFQRpQR255hS5z+=h4+XOLhg@mail.gmail.com>
+ <20150621102418.2ea74910@bbrezillon>
+ <20150621082717.GA29128@gondor.apana.org.au>
+ <20150622092336.5949e258@bbrezillon>
+ <20150622075910.GA7659@gondor.apana.org.au>
+ <20150625000037.GK31584@windriver.com>
+Message-ID: <CABxcv=m4juAMHaMYSB+8O8cEX+YZCJ0cArS2wN-YGpTBgWe-CA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 15, 2015 at 2:28 AM, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Thursday 14 May 2015 18:49:41 Wei Xu wrote:
->> On 5/14/2015 2:55 PM, Tyler Baker wrote:
->> > On 14 May 2015 at 06:36, Tyler Baker <tyler.baker@linaro.org> wrote:
->> >> On 14 May 2015 at 01:49, Wei Xu <xuwei5@hisilicon.com> wrote:
->> >>> On 5/13/2015 8:20 PM, Tyler Baker wrote:
->> >>>> On 12 May 2015 at 08:09, Wei Xu <xuwei5@hisilicon.com> wrote:
->> >>>> When this was pulled into arm-soc, the kernelci.org bot reported
->> >>>> hip04-d01 boot failures[1]. Before bisecting, I decided to wait a day
->> >>>> and double check the status of -next in case there were needed
->> >>>> dependencies from other trees. However, now there are the same
->> >>>> hip04-d01 boot failures in next-20150513[2]. My robot has bisected[3]
->> >>>> these boot failures down to...
->> >>>>
->> >>>> 828fcfe3c84ade68ecc3f1ba78baebc1654977f3 is the first bad commit
->> >>>> commit 828fcfe3c84ade68ecc3f1ba78baebc1654977f3
->> >>>> Author: Zhou Wang <wangzhou.bry@gmail.com>
->> >>>> Date:   Wed Mar 25 14:57:45 2015 +0800
->> >>>>
->> >>>>     ARM: dts: hip04: add GPIO pieces
->> >>>>
->> >>>>     Hisilicon Soc hip04 has four GPIO controllers, each one has 32
->> >>>>     GPIOs and can be configured to be an interrupt controller.The GPIO
->> >>>>     controllers are compatible with the snps,dw-apb-gpio driver.
->> >>>>     This patch add the corresponding device tree nodes.
->> >>>>
->> >>>>     Acked-by: Linus Walleij <linus.walleij@linaro.org>
->> >>>>     Signed-off-by: Zhou Wang <wangzhou1@hisilicon.com>
->> >>>>     Signed-off-by: Wei Xu <xuwei5@hisilicon.com>
->> >>>
->> >>>
->> >>> It is a little strange.
->> >>> I checked to this commit "28837bc3e732610ebc7c88ce205dbe43245b1cb8"
->> >>> at "git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc.git".
->> >>> and compiled with "hisi_defconfig".
->> >>>
->> >>> It is booting OK and the log is as below.
->> >>> And I have also uploaded the binary at "https://github.com/hisilicon/boards/tree/master/D01/for-tyler".
->> >>> Could you please confirm it again?
->> >>
->> >> It appears we are using different image formats to boot. The link
->> >> above shows .kernel, .monitor, .text...can I split the kernel//dtb out
->> >> from .kernel?
->> >>
->> >> I am using zImage and hip04-d01.dtb directly[1] with UEFI to TFTP
->> >> boot. Could you try this method?
->>
->> > For good measure, I tried booting next-20150514 on the D01 hardware in
->> > the Linaro lab to confirm the same failure I see locally. It fails to
->> > boot as well[1].
->>
->> Thanks!
->> I have tried your binary files and found it is stuck in the UEFI.
->> I will continue to investigate this issue.
->>
->> Hi Arnd,
->>
->> Could you please revert that branch?
->> After I resolve this issue I will send another pull request.
->> Sorry to bother you!
->> Thanks!
->>
+Hello Paul,
+
+On Thu, Jun 25, 2015 at 2:00 AM, Paul Gortmaker
+<paul.gortmaker@windriver.com> wrote:
+> [Re: [PATCH v7 00/14] crypto: add a new driver for Marvell's CESA] On 22/06/2015 (Mon 15:59) Herbert Xu wrote:
 >
-> I have applied the patch below on the for-next branch now, to revert everything
-> from this pull request. I have not changed the contents of the next/dt branch
-> for now, and am still waiting for a bug fix. Once you know what caused the
-> problem, please send a fix that applies on top of the next/dt branch in arm-soc,
-> and I'll reactivate it.
+>> On Mon, Jun 22, 2015 at 09:23:36AM +0200, Boris Brezillon wrote:
+>> > Hi Herbert,
+>> >
+>> > On Sun, 21 Jun 2015 16:27:17 +0800
+>> > Herbert Xu <herbert@gondor.apana.org.au> wrote:
+>> >
+>> > > On Sun, Jun 21, 2015 at 10:24:18AM +0200, Boris Brezillon wrote:
+>> > > >
+>> > > > Indeed. Here is a patch fixing that.
+>> > >
+>> > > I think you should just kill COMPILE_TEST instead of adding ARM.
+>> >
+>> > The following patch is killing the COMPILE_TEST dependency.
+>>
+>> Patch applied.
+>
+> Just a heads up, this driver is still killing a couple of linux-next
+> builds today and for the past few days.
+>
+> drivers/crypto/mv_cesa.c:1037:2: error: implicit declaration of function
+> 'of_get_named_gen_pool' [-Werror=implicit-function-declaration]
+>
+> http://kisskb.ellerman.id.au/kisskb/buildresult/12448851/
+> http://kisskb.ellerman.id.au/kisskb/buildresult/12448776/
+>
+> Missing dependency on CONFIG_OF_<blah> presumably.
+>
 
-FYI... I'm not aware of any fixes  for this, so I'll be removing this
-branch from the next/dt branch of arm-soc before sending to Linus.
+I haven't looked at the series but <linux/genalloc.h> has a stub
+of_get_named_gen_pool() function if CONFIG_OF is not enabled [0].
 
-Kevin
+So it seems that the problem is rather that the header is not being
+included in some file.
+
+> Paul.
+> --
+>
+
+Best regards,
+Javier
+
+[0]: http://lxr.free-electrons.com/source/include/linux/genalloc.h#L131
