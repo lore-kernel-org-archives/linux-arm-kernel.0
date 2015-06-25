@@ -1,35 +1,38 @@
-From: weigelt@melag.de (Enrico Weigelt, metux IT consult)
-Date: Thu, 25 Jun 2015 10:37:41 +0200
-Subject: L2 Cache enable on i.MX5
-In-Reply-To: <DBXPR06MB58911B5FD193722EC5BD34185AF0@DBXPR06MB589.eurprd06.prod.outlook.com>
-References: <DBXPR06MB5891810D431F1AE9AEB1CE985AF0@DBXPR06MB589.eurprd06.prod.outlook.com>,
- <20150624172900.GN7557@n2100.arm.linux.org.uk>
- <DBXPR06MB58911B5FD193722EC5BD34185AF0@DBXPR06MB589.eurprd06.prod.outlook.com>
-Message-ID: <558BBDD5.3020306@melag.de>
+From: simon.guinot@sequanux.org (Simon Guinot)
+Date: Thu, 25 Jun 2015 10:37:50 +0200
+Subject: [PATCH] crypto: mv_cesa - fix up for of_get_named_gen_pool() rename
+In-Reply-To: <CABxcv=m4juAMHaMYSB+8O8cEX+YZCJ0cArS2wN-YGpTBgWe-CA@mail.gmail.com>
+References: <CABxcv=m4juAMHaMYSB+8O8cEX+YZCJ0cArS2wN-YGpTBgWe-CA@mail.gmail.com>
+Message-ID: <1435221470-5382-1-git-send-email-simon.guinot@sequanux.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am 25.06.2015 um 00:53 schrieb Robert Daniels:
+This patch fixes the following build error:
 
-Hi,
+drivers/crypto/mv_cesa.c: In function 'mv_cesa_get_sram':
+drivers/crypto/mv_cesa.c:1037: error: implicit declaration of function 'of_get_named_gen_pool'
+drivers/crypto/mv_cesa.c:1038: warning: assignment makes pointer from integer without a cast
+scripts/Makefile.build:258: recipe for target 'drivers/crypto/mv_cesa.o' failed
 
+Signed-off-by: Simon Guinot <simon.guinot@sequanux.org>
+---
+ drivers/crypto/mv_cesa.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-> In that case, where should the kernel be enabling the L2 cache? I'm using the
-> 3.14 kernel for this i.MX53 product and the L2 cache is definitely not enabled.
-
-I'm working on an mx53, too (tqma53 board), but with an 4.1 kernel.
-How can I check whether L2 cache is enabled ?
-
-Can you estimate, how much performance gain we can actually get from the
-L2 cache (under which kind of workloads) ?
-
-
---mtx
-
---
-Enrico Weigelt, metux IT consult
-+49-151-27565287
-MELAG Medizintechnik oHG Sitz Berlin Registergericht AG Charlottenburg HRA 21333 B
-
-Wichtiger Hinweis: Diese Nachricht kann vertrauliche oder nur f?r einen begrenzten Personenkreis bestimmte Informationen enthalten. Sie ist ausschlie?lich f?r denjenigen bestimmt, an den sie gerichtet worden ist. Wenn Sie nicht der Adressat dieser E-Mail sind, d?rfen Sie diese nicht kopieren, weiterleiten, weitergeben oder sie ganz oder teilweise in irgendeiner Weise nutzen. Sollten Sie diese E-Mail irrt?mlich erhalten haben, so benachrichtigen Sie bitte den Absender, indem Sie auf diese Nachricht antworten. Bitte l?schen Sie in diesem Fall diese Nachricht und alle Anh?nge, ohne eine Kopie zu behalten.
-Important Notice: This message may contain confidential or privileged information. It is intended only for the person it was addressed to. If you are not the intended recipient of this email you may not copy, forward, disclose or otherwise use it or any part of it in any form whatsoever. If you received this email in error please notify the sender by replying and delete this message and any attachments without retaining a copy.
+diff --git a/drivers/crypto/mv_cesa.c b/drivers/crypto/mv_cesa.c
+index 5bcd575fa96f..e6b658faef63 100644
+--- a/drivers/crypto/mv_cesa.c
++++ b/drivers/crypto/mv_cesa.c
+@@ -1034,8 +1034,8 @@ static int mv_cesa_get_sram(struct platform_device *pdev,
+ 			     &sram_size);
+ 
+ 	cp->sram_size = sram_size;
+-	cp->sram_pool = of_get_named_gen_pool(pdev->dev.of_node,
+-					      "marvell,crypto-srams", 0);
++	cp->sram_pool = of_gen_pool_get(pdev->dev.of_node,
++					"marvell,crypto-srams", 0);
+ 	if (cp->sram_pool) {
+ 		cp->sram = gen_pool_dma_alloc(cp->sram_pool, sram_size,
+ 					      &cp->sram_dma);
+-- 
+2.1.4
