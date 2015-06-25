@@ -1,76 +1,53 @@
-From: santosh.shilimkar@oracle.com (santosh shilimkar)
-Date: Thu, 25 Jun 2015 07:59:27 -0700
-Subject: [PATCH] keystone: psci: adds cpu_die implementation
-In-Reply-To: <20150625144511.GA6844@leverpostej>
-References: <1435240970-30869-1-git-send-email-vitalya@ti.com>
- <20150625144511.GA6844@leverpostej>
-Message-ID: <558C174F.80108@oracle.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Thu, 25 Jun 2015 16:02:55 +0100
+Subject: [PATCH v2 7/9] ARM: multi_v7_defconfig: Enable support for PWM
+ Regulators
+In-Reply-To: <CABxcv==_YZ7BCCzfbLXYxwUL_kKLtBxOVTCvcUnvGVnrD4bVpg@mail.gmail.com>
+References: <1435154348-28840-1-git-send-email-lee.jones@linaro.org>
+ <1435154348-28840-8-git-send-email-lee.jones@linaro.org>
+ <CABxcv==J2hi0y+=s3nK_U=-jkjTW3L9jCC2JfebnWwRfpDGLAQ@mail.gmail.com>
+ <20150625084204.GW15013@x1>
+ <CABxcv==_YZ7BCCzfbLXYxwUL_kKLtBxOVTCvcUnvGVnrD4bVpg@mail.gmail.com>
+Message-ID: <20150625150255.GE23990@x1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 6/25/2015 7:45 AM, Mark Rutland wrote:
-> Hi,
->
-> On Thu, Jun 25, 2015 at 03:02:50PM +0100, Vitaly Andrianov wrote:
->> This commit add cpu_die implementation using psci api
->
-> I don't understand. If you have a PSCI implementation, it should be
-> sufficient to have a PSCI node (and enable-method) in your DT, and the
-> generic code will be used. Nothing should be required in your board
-> code.
->
-> You should also use CPU_ON to bring secondaries online rather than
-> mixing up PSCI and platform-specific mechanisms.
->
-Good point about CPU_ON. We need that as well.
+On Thu, 25 Jun 2015, Javier Martinez Canillas wrote:
+> On Thu, Jun 25, 2015 at 10:42 AM, Lee Jones <lee.jones@linaro.org> wrote:
+> > On Wed, 24 Jun 2015, Javier Martinez Canillas wrote:
+> 
+> [...]
+> 
+> >> > diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
+> >> > index f632af0..6666973 100644
+> >> > --- a/arch/arm/configs/multi_v7_defconfig
+> >> > +++ b/arch/arm/configs/multi_v7_defconfig
+> >> > @@ -365,6 +365,7 @@ CONFIG_REGULATOR_MAX8907=y
+> >> >  CONFIG_REGULATOR_MAX8973=y
+> >> >  CONFIG_REGULATOR_MAX77686=y
+> >> >  CONFIG_REGULATOR_PALMAS=y
+> >> > +CONFIG_REGULATOR_PWM=y
+> >>
+> >> The current policy is to build as much as possible as a module in
+> >> multi_v7_defconfig. Since this is a tristate Kconfig symbol, could you
+> >> please change it to =m ?
+> >
+> > I would prefer that it stays built-in.
+> >
+> 
+> Ok, I've no strong opinion on this. I was just mentioning what arm-soc
+> maintainers prefer nowadays.
+> 
+> May I ask what's the rationale for leaving this option built-in?
 
->>
->> Signed-off-by: Vitaly Andrianov <vitalya@ti.com>
->> ---
->>   arch/arm/mach-keystone/platsmp.c | 32 ++++++++++++++++++++++++++++++++
->>   1 file changed, 32 insertions(+)
->>
->> diff --git a/arch/arm/mach-keystone/platsmp.c b/arch/arm/mach-keystone/platsmp.c
->> index 5f46a7c..2c40cc0 100644
->> --- a/arch/arm/mach-keystone/platsmp.c
->> +++ b/arch/arm/mach-keystone/platsmp.c
->> @@ -20,6 +20,7 @@
->>   #include <asm/prom.h>
->>   #include <asm/tlbflush.h>
->>   #include <asm/pgtable.h>
->> +#include <asm/psci.h>
->>
->>   #include "keystone.h"
->>
->> @@ -51,7 +52,38 @@ static inline void __cpuinit keystone_smp_secondary_initmem(unsigned int cpu)
->>   {}
->>   #endif
->>
->> +
->> +#ifdef CONFIG_HOTPLUG_CPU
->> +static void keystone_cpu_die(unsigned int cpu)
->> +{
->> +#ifdef CONFIG_ARM_PSCI
->> +	struct psci_power_state pwr_state = {0, 0, 0};
->> +
->> +	pr_info("keystone_cpu_die(%d) from %d using PSCI\n", cpu,
->> +	       smp_processor_id());
->> +
->> +	if (psci_ops.cpu_off)
->> +		psci_ops.cpu_off(pwr_state);
->> +#else
->> +	/*
->> +	 * We may want to add here a direct smc call to monitor
->> +	 * if the kernel doesn't support PSCI API
->> +	 */
->> +#endif
->
-> You should determine this from your DT. Your FW/bootloader can patch in
-> the relevant nodes and properties when support is present, so the
-> presence of such nodes should guarantee that PSCI is available.
->
-That will be a nice trick. FW already does some tweaks of dts for
-LPAE/non_LPAE tweaks.
+My view is that multi_v7 is used for prototyping, testing and to
+ensure all of the vendors are playing nice together.  Hopefully
+vendors aren't actually releasing kernels built with this defconfig!
+During testing/prototyping time; installing and messing around with
+modules is an over-head I can do without.
 
-Regards,
-Santosh
+-- 
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
