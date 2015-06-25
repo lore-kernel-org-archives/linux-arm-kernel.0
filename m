@@ -1,43 +1,69 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Thu, 25 Jun 2015 14:24:04 +0200
-Subject: [PATCH V3] PM / Domains: Remove intermediate states from the
- power off sequence
-In-Reply-To: <CAMuHMdWCo+U26x9Z5vUu+5ZVSpSOFF1LDO7jkezuXzVR2mC6qA@mail.gmail.com>
-References: <1434020737-13354-1-git-send-email-ulf.hansson@linaro.org>
- <7ha8w01qir.fsf@deeprootsystems.com>
- <CAMuHMdWCo+U26x9Z5vUu+5ZVSpSOFF1LDO7jkezuXzVR2mC6qA@mail.gmail.com>
-Message-ID: <CAMuHMdU7jGd2O_StrVgZPL3-WZRJkzSJ1d-Xe-utb2=4L2gqEQ@mail.gmail.com>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Thu, 25 Jun 2015 14:30:34 +0200
+Subject: [PATCH] arm64/kvm: Add generic v8 KVM target
+In-Reply-To: <558A7936.7020109@arm.com>
+References: <1434531646-4873-1-git-send-email-suzuki.poulose@arm.com>
+ <CAFEAcA92uymQ3LjPQnuFiwvjSgc+jY54VrfK_Sh4v1DJ+=OPpw@mail.gmail.com>
+ <558A6A84.5020603@arm.com> <20150624085128.GA22785@cbox>
+ <558A7936.7020109@arm.com>
+Message-ID: <20150625123034.GE28244@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ulf,
+On Wed, Jun 24, 2015 at 10:32:38AM +0100, Marc Zyngier wrote:
+> Hi Christoffer,
+> 
+> On 24/06/15 09:51, Christoffer Dall wrote:
+> > On Wed, Jun 24, 2015 at 09:29:56AM +0100, Marc Zyngier wrote:
+> >> On 22/06/15 09:44, Peter Maydell wrote:
+> >>> On 17 June 2015 at 10:00, Suzuki K. Poulose <suzuki.poulose@arm.com> wrote:
+> >>>> From: "Suzuki K. Poulose" <suzuki.poulose@arm.com>
+> >>>>
+> >>>> This patch adds a generic ARM v8 KVM target cpu type for use
+> >>>> by the new CPUs which eventualy ends up using the common sys_reg
+> >>>> table. For backward compatibility the existing targets have been
+> >>>> preserved. Any new target CPU that can be covered by generic v8
+> >>>> sys_reg tables should make use of the new generic target.
+> >>>
+> >>> How do you intend this to work for cross-host migration?
+> >>
+> >> It is not meant to work for cross migration at all.
+> >>
+> >>> Is the idea that the kernel guarantees that "generic" looks
+> >>> 100% the same to the guest regardless of host hardware? I'm
+> >>> not sure that can be made to work, given impdef differences
+> >>> in ID register values, bp/wp registers, and so on.
+> >>>
+> >>> Given that, it seems to me that we still need to provide
+> >>> KVM_ARM_TARGET_$THISCPU defines so userspace can request
+> >>> a specific guest CPU flavour; so what does this patch
+> >>> provide that isn't already provided by just having userspace
+> >>> query for the "preferred" CPU type as it does already?
+> >>
+> >> The way I see this working is that a "generic" CPU cannot be migrated
+> >> (because we don't know anything about it). If it can be identified as a
+> >> known (non generic) implementation, then we can migrate it.
+> >>
+> > Concretely, how should this work?  Be enforced by userspace or should we
+> > deny certain SET_ONE_REG operations from working on this target?
+> 
+> I can definitely see MIDR overriding failing on a generic CPU. Also, you
+> shouldn't be able to select a generic CPU if we know about the physical CPU.
+> 
 
-On Tue, Jun 23, 2015 at 12:57 PM, Geert Uytterhoeven
-<geert@linux-m68k.org> wrote:
->> I know Lina has been testing this (or an earlier version) on qcom
->> hardware so would be nice to get a tested-by from her, and would also be
->> nice to see if Geert has a chance to take this for a spin on his Renesas
->> hardware and anyone can take this for a spin on Exynos.
->
-> I needed some athletics to make this apply to my current tree, but I did
-> manage to test it on:
->   - sh73a0/kzm9g (SYSC PM Domain/pm-rmobile),
->   - r8a7740/armadillo (SYSC PM Domain/pm-rmobile),
->   - r8a73a4/ape6evm (SYSC PM Domain/pm-rmobile),
->   - r8a7791/koelsch (CPG Clock Domain + SYSC PM Domain/pm-rcar).
-> I didn't notice any regressions or other oddities.
->
-> Tested-by: Geert Uytterhoeven <geert+renesas@glider.be>
+If I am migrating from an A57 to an A53, but the VM was started as
+"generic CPU" then we rely on the user discovering that this is not
+supported when trying to set the MIDR from userspace in KVM?
 
-I accidentally tested v2 instead of v4. Retested with v4, everything still fine.
+> > 
+> > Also, can we imagine any scenario where the generic CPU cannot me
+> > modeled for a VM on a specific piece of hardware (current or future)?
+> 
+> What is the definition of a generic CPU here? In the above, generic
+> really means "Unknown", so I can't immediately see what it would mean to
+> model this.
+> 
+ok, good way to phrase it, I suppose that's a non-issue then.
 
-Gr{oetje,eeting}s,
-
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+Thanks,
+-Christoffer
