@@ -1,199 +1,179 @@
 From: khilman@kernel.org (Kevin Hilman)
-Date: Thu, 25 Jun 2015 15:31:03 -0700
-Subject: [GIT PULL 4/5] ARM: SoC: driver updates for v4.2
+Date: Thu, 25 Jun 2015 15:31:04 -0700
+Subject: [GIT PULL 5/5] ARM: SoC: defconfig updates for v4.2
 In-Reply-To: <1435271464-11455-1-git-send-email-khilman@kernel.org>
 References: <1435271464-11455-1-git-send-email-khilman@kernel.org>
-Message-ID: <1435271464-11455-5-git-send-email-khilman@kernel.org>
+Message-ID: <1435271464-11455-6-git-send-email-khilman@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Some of these are for drivers/soc, where we're now putting
-SoC-specific drivers these days. Some are for other driver subsystems
-where we have received acks from the appropriate maintainers.
+We keep collecting defconfig updates in a separate branch mostly to encourage
+people to handle them separately and avoid conflicts between different topics.
 
-Some highlights:
+Most of these are enablement of new SoCs, boards or drivers that have
+come in, or minor config refreshes due to reorderings in Kconfig
+files, etc. I.e. mostly minor churn of various kinds.
 
-- simple-mfd: document DT bindings and misc updates
-- migrate mach-berlin to simple-mfd for clock, pinctrl and reset
-- memory: support for Tegra132 SoC
-- memory: introduce tegra EMC driver for scaling memory frequency
-- misc. updates for ARM CCI and CCN busses
-
-Conflicts:
-	arch/arm64/boot/dts/arm/juno-motherboard.dtsi
-
-Trivial add/add conflict with our dt branch.
-Resolution: take both sides.
+Conflicts: None
 
 ----------------------------------------------------------------
 
-The following changes since commit 39e79b873e1bafc5637a1a704495b01edbe469b1:
+The following changes since commit 32270e805a1e0baf39aa040177ef1896f03b7266:
 
-  Merge tag 'armsoc-dt' into test-merge
+  Merge tag 'armsoc-drivers' into test-merge
 
 are available in the git repository at:
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc.git tags/armsoc-drivers
+  git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc.git tags/armsoc-defconfig
 
-for you to fetch changes up to 4af34b572a85c44c55491a10693535a79627c478:
+for you to fetch changes up to dec36f6ab89db2ae80a0a61f26e1ca1f6a61b651:
 
-  drivers: soc: sunxi: Introduce SoC driver to map SRAMs
+  ARM: multi_v7_defconfig: remove duplicate CONFIG_COMMON_CLK_QCOM=y
 
 ----------------------------------------------------------------
 
-Antoine Tenart (15):
-      ARM: berlin: select MFD_SYSCON by default
-      ARM: berlin: prepare simple-mfd/syscon conversion of sys/chip ctrl nodes
-      reset: berlin: convert to a platform driver
-      ARM: berlin: move reset to simple-mfd nodes
-      reset: berlin: drop arch_initcall initialization
-      pinctrl: berlin: prepare to use regmap provided by syscon
-      ARM: berlin: move pinctrl to simple-mfd nodes
-      pinctrl: berlin: drop SoC stub provided regmap
-      clk: berlin: prepare simple-mfd conversion
-      ARM: berlin: move BG2 clock node
-      ARM: berlin: move BG2CD clock node
-      ARM: berlin: move BG2Q clock node
-      clk: berlin: drop direct of_iomap of nodes reg property
-      ARM: berlin: remove useless chip and system ctrl compatibles
-      ARM: berlin: add an ADC node for the BG2Q
+Alexandre Belloni (1):
+      ARM: multi_v7_defconfig: Add Atmel SAMA5 family
 
-Arnd Bergmann (9):
-      Merge tag 'simple-mfd' of git://git.kernel.org/.../linusw/linux-integrator into next/drivers
-      Merge tag 'ccn/updates-for-4.2' of git://git.linaro.org/people/pawel.moll/linux into next/drivers
-      Merge tag 'tegra-for-4.2-memory' of git://git.kernel.org/.../tegra/linux into next/drivers
-      Merge tag 'tegra-for-4.2-ramcode' of git://git.kernel.org/.../tegra/linux into next/drivers
-      Merge tag 'tegra-for-4.2-emc' of git://git.kernel.org/.../tegra/linux into next/drivers
-      Merge tag 'berlin-simple-mfd-4.2-1' of git://git.infradead.org/users/hesselba/linux-berlin into next/drivers
-      Merge tag 'v4.1-next-soc' of https://github.com/mbgg/linux-mediatek into next/drivers
-      Merge tag 'qcom-soc-for-4.2-1' of git://git.kernel.org/.../galak/linux-qcom into next/drivers
-      Merge tag 'mvebu-drivers-4.2' of git://git.infradead.org/linux-mvebu into next/drivers
+Anand Moon (2):
+      ARM: exynos_defconfig: Enable CONFIG_SENSORS_PWM_FAN for Odroid-XU3
+      ARM: exynos_defconfig: Enable CONFIG_SENSORS_INA2XX for Odroid-XU3
 
-Kumar Gala (1):
-      firmware: qcom: scm: Split out 32-bit specific SCM code
+Anthoine Bourgeois (1):
+      ARM: omap2plus_defconifg: Enable DM9000 in omap2plus_defconfig
 
-Lina Iyer (1):
-      ARM: qcom: Add Subsystem Power Manager (SPM) driver
+Ard Biesheuvel (1):
+      ARM: multi_v7_defconfig: enable asm and NEON accelerated crypto modules
 
-Linus Walleij (5):
-      MFD/OF: document MFD devices and handle simple-mfd
-      ARM: dts: update syscons to use simple-mfd
-      leds: syscon: instantiate from platform device
-      arm64: juno: Add APB registers and LEDs using syscon
-      arm64: add LEDs and some trigger support to defconfig
+Arnd Bergmann (10):
+      Merge tag 'sti-defconfig-for-v4.2-1' of git://git.kernel.org/.../mcoquelin/sti into next/defconfig
+      Merge tag 'hip04-config-for-4.2' of git://github.com/hisilicon/linux-hisi into next/defconfig
+      Merge tag 'tegra-for-4.2-defconfig' of git://git.kernel.org/.../tegra/linux into next/defconfig
+      Merge tag 'renesas-defconfig-for-v4.2' of git://git.kernel.org/.../horms/renesas into next/defconfig
+      ARM: xz: do not try to use a ramdisk in defconfig
+      ARM: stm32: do not try to use a ramdisk in defconfig
+      Merge tag 'at91-defconfig' of git://git.kernel.org/.../nferre/linux-at91 into next/defconfig
+      Merge tag 'qcom-defconfig-for-4.2' of git://git.kernel.org/.../galak/linux-qcom into next/defconfig
+      Merge tag 'renesas-defconfig2-for-v4.2' of git://git.kernel.org/.../horms/renesas into next/defconfig
+      Merge tag 'imx-defconfig-4.2' of git://git.kernel.org/.../shawnguo/linux into next/defconfig
 
-Maxime Ripard (1):
-      drivers: soc: sunxi: Introduce SoC driver to map SRAMs
+Baruch Siach (1):
+      ARM: multi_v7_defconfig: enable Conexant Digicolor platform
 
-Mikko Perttunen (5):
-      soc/tegra: fuse: Add RAM code reader helper
-      of: Add Tegra124 EMC bindings
-      memory: tegra: Add API needed by the EMC driver
-      memory: tegra: Add EMC (external memory controller) driver
-      memory: tegra: Add EMC frequency debugfs entry
+Fabio Estevam (2):
+      ARM: imx_v6_v7_defconfig: Enable RTC PCF8523 support
+      ARM: imx_v6_v7_defconfig: Select LS1021A
 
-Pawel Moll (6):
-      bus: arm-ccn: Fix node->XP config conversion
-      bus: arm-ccn: cpumask attribute
-      bus: arm-ccn: Provide required event arguments
-      bus: arm-ccn: Do not group CCN events with other PMUs
-      bus: arm-ccn: Allocate event when it is being added, not initialised
-      bus: arm-ccn: Use hrtimer_start() again
+Fathi Boudra (1):
+      ARM: defconfig: hisi: enable HiSilicon hip04 ethernet controller
 
-Suzuki K. Poulose (7):
-      arm-cci: Do not enable CCI-400 PMU by default
-      arm-cci: Cleanup PMU driver code
-      arm-cci: Abstract out the PMU counter details
-      arm-cci: Abstract handling for CCI events
-      arm-cci: Sanitise CCI400 PMU driver specific code
-      arm-cci: Add CCI-500 PMU support
-      arm-cci: Add aliases for PMU events
+Frank Li (1):
+      ARM: config: imx_v6_v7_defconfig add imx7d support
 
-Thierry Reding (4):
-      memory: tegra: Add SWGROUP names
-      iommu/tegra-smmu: Add debugfs support
-      memory: tegra: Add Tegra132 support
-      Merge branch 'for-4.2/ramcode' into for-4.2/emc
+Geert Uytterhoeven (5):
+      ARM: shmobile: defconfig: Replace USB_RCAR_GEN2_PHY by PHY_RCAR_GEN2
+      ARM: multi_v7_defconfig: Replace USB_RCAR_GEN2_PHY by PHY_RCAR_GEN2
+      ARM: multi_v7_defconfig: Enable shmobile r8a7778/bockw platform
+      ARM: multi_v7_defconfig: Make sound support modular
+      ARM: multi_v7_defconfig: Make media support modular
 
-Thomas Petazzoni (1):
-      bus: mvebu-mbus: add mv_mbus_dram_info_nooverlap()
+Javier Martinez Canillas (9):
+      ARM: multi_v7_defconfig: Enable support for Samsung S3C64XX SPI
+      ARM: multi_v7_defconfig: Enable max77802 regulator, rtc and clock drivers
+      ARM: multi_v7_defconfig: Enable Exynos USB PHY drivers support
+      ARM: multi_v7_defconfig: Enable support for missing ChromeOS EC drivers
+      ARM: multi_v7_defconfig: Enable Samsung PWM support
+      ARM: multi_v7_defconfig: Enable Samsung S3C SoC RTC
+      ARM: multi_v7_defconfig: Enable options for Exynos display support
+      ARM: multi_v7_defconfig: Enable GPIO-based I2C arbitration support
+      ARM: multi_v7_defconfig: Enable Cypress APA I2C Trackpad support
 
-Tomeu Vizoso (3):
-      of: Document long-ram-code property in nvidia,tegra20-apbmisc
-      memory: tegra: Disable ARBITRATION_EMEM interrupt
-      of: Document timings subnode of nvidia,tegra-mc
+Joachim Eastwood (2):
+      ARM: lpc18xx: add kernel config
+      ARM: lpc18xx: remove DEBUG_LL_UART_8250 from defconfig
 
-jilai wang (1):
-      firmware: qcom: scm: Add HDCP Support
+Jun Nie (1):
+      ARM: zx: Add basic defconfig support for ZX296702
+
+Kevin Hilman (3):
+      Merge tag 'samsung-defconfig-2' of git://git.kernel.org/.../kgene/linux-samsung into next/defconfig
+      Merge tag 'omap-for-v4.2/o2_dc' of git://git.kernel.org/.../tmlind/linux-omap into next/defconfig
+      ARM: multi_v7_defconfig: remove duplicate CONFIG_COMMON_CLK_QCOM=y
+
+Krzysztof Kozlowski (6):
+      ARM: multi_v7_defconfig: Enable CPU idle for exynos SoCs
+      ARM: multi_v7_defconfig: Enable PMIC and MUIC drivers for exynos
+      ARM: multi_v7_defconfig: Enable TMU for exynos SoCs
+      ARM: multi_v7_defconfig: Enable OHCI on exynos SoCs
+      ARM: exynos_defconfig: Enable display on Trats2 board
+      ARM: multi_v7_defconfig: Enable display on Trats2 board
+
+Kukjin Kim (1):
+      ARM: exynos_defconfig: savedefconfig
+
+Lee Jones (2):
+      ARM: multi_v7_defconfig: Enable support for ST's LPC Watchdog
+      ARM: multi_v7_defconfig: Enable support for ST's LPC RTC
+
+Lina Iyer (2):
+      ARM: config: Update qcom_defconfig to enable cpuidle
+      ARM: config: multi_v7: Update to enable cpuidle for QCOM SoCs
+
+Linus Walleij (3):
+      ARM: ux500: add PERF_EVENTS to defconfig
+      ARM: ux500: enable CoreSight in defconfig
+      ARM64: add GPIO keys to the defconfig
+
+Masahiro Yamada (1):
+      ARM: multi_v7_defconfig: enable UniPhier SoC family
+
+Maxime Coquelin (1):
+      ARM: configs: Add STM32 defconfig
+
+Murali Karicheri (1):
+      ARM: keystone: defconfig: enable netcp driver by default
+
+Nicolas Ferre (1):
+      ARM: at91/defconfig: add CONFIG_REGULATOR_FIXED_VOLTAGE for mmc driver
+
+Roger Quadros (1):
+      ARM: omap2plus_defconfig: Enable TOUCHSCREEN_PIXCIR
+
+Stefan Agner (2):
+      ARM: vf610m4: add defconfig for Linux on Vybrids Cortex-M4
+      ARM: add ARM_SINGLE_ARMV7M in ARMv7-M defconfigs
+
+S?bastien Szymanski (1):
+      ARM: imx_v6_v7_defconfig: updates for Armadeus Systems APF6 boards
+
+Thierry Reding (1):
+      ARM: tegra: Update default configuration
+
+Tony Lindgren (1):
+      ARM: omap2plus_defconfig: Add dm816x USB PHY as a loadable module
+
+Zhou Wang (1):
+      ARM: hip04: add GPIO configure in hisi_defconfig
 
 
- Documentation/arm/CCN.txt                       |   17 +-
- Documentation/devicetree/bindings/arm/cci.txt   |    4 +-
- .../memory-controllers/nvidia,tegra-mc.txt      |   84 +-
- .../bindings/memory-controllers/tegra-emc.txt   |  374 ++++++
- Documentation/devicetree/bindings/mfd/mfd.txt   |   41 +
- .../bindings/misc/nvidia,tegra20-apbmisc.txt    |    2 +
- .../devicetree/bindings/soc/sunxi/sram.txt      |   72 ++
- arch/arm/boot/dts/arm-realview-pb1176.dts       |    2 +-
- arch/arm/boot/dts/berlin2.dtsi                  |   90 +-
- arch/arm/boot/dts/berlin2cd.dtsi                |   66 +-
- arch/arm/boot/dts/berlin2q.dtsi                 |  120 +-
- arch/arm/boot/dts/integrator.dtsi               |    4 +-
- arch/arm/mach-berlin/Kconfig                    |    1 +
- arch/arm64/boot/dts/arm/juno-motherboard.dtsi   |   68 ++
- arch/arm64/configs/defconfig                    |    6 +
- drivers/bus/Kconfig                             |   31 +-
- drivers/bus/arm-cci.c                           |  905 +++++++++++---
- drivers/bus/arm-ccn.c                           |  270 ++++-
- drivers/bus/mvebu-mbus.c                        |  117 ++
- drivers/clk/berlin/bg2.c                        |    7 +-
- drivers/clk/berlin/bg2q.c                       |    7 +-
- drivers/firmware/Makefile                       |    3 +-
- drivers/firmware/qcom_scm-32.c                  |  503 ++++++++
- drivers/firmware/qcom_scm.c                     |  474 +-------
- drivers/firmware/qcom_scm.h                     |   47 +
- drivers/iommu/Kconfig                           |    2 +-
- drivers/iommu/tegra-smmu.c                      |  109 ++
- drivers/leds/leds-syscon.c                      |  170 +--
- drivers/memory/tegra/Kconfig                    |   10 +
- drivers/memory/tegra/Makefile                   |    3 +
- drivers/memory/tegra/mc.c                       |  143 ++-
- drivers/memory/tegra/mc.h                       |    4 +
- drivers/memory/tegra/tegra114.c                 |   32 +-
- drivers/memory/tegra/tegra124-emc.c             | 1140 ++++++++++++++++++
- drivers/memory/tegra/tegra124.c                 |  123 +-
- drivers/memory/tegra/tegra30.c                  |   32 +-
- drivers/of/platform.c                           |    1 +
- drivers/pinctrl/berlin/berlin-bg2.c             |   26 +-
- drivers/pinctrl/berlin/berlin-bg2cd.c           |   26 +-
- drivers/pinctrl/berlin/berlin-bg2q.c            |   26 +-
- drivers/pinctrl/berlin/berlin.c                 |    9 +-
- drivers/reset/reset-berlin.c                    |   74 +-
- drivers/soc/Kconfig                             |    1 +
- drivers/soc/Makefile                            |    1 +
- drivers/soc/qcom/Kconfig                        |    7 +
- drivers/soc/qcom/Makefile                       |    1 +
- drivers/soc/qcom/spm.c                          |  385 ++++++
- drivers/soc/sunxi/Kconfig                       |   10 +
- drivers/soc/sunxi/Makefile                      |    1 +
- drivers/soc/sunxi/sunxi_sram.c                  |  284 +++++
- drivers/soc/tegra/fuse/tegra-apbmisc.c          |   21 +
- include/linux/mbus.h                            |    5 +
- include/linux/qcom_scm.h                        |   13 +-
- include/linux/soc/sunxi/sunxi_sram.h            |   19 +
- include/soc/tegra/emc.h                         |   19 +
- include/soc/tegra/fuse.h                        |    1 +
- include/soc/tegra/mc.h                          |   20 +-
- 57 files changed, 4966 insertions(+), 1067 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/memory-controllers/tegra-emc.txt
- create mode 100644 Documentation/devicetree/bindings/mfd/mfd.txt
- create mode 100644 Documentation/devicetree/bindings/soc/sunxi/sram.txt
- create mode 100644 drivers/firmware/qcom_scm-32.c
- create mode 100644 drivers/firmware/qcom_scm.h
- create mode 100644 drivers/memory/tegra/tegra124-emc.c
- create mode 100644 drivers/soc/qcom/spm.c
- create mode 100644 drivers/soc/sunxi/Kconfig
- create mode 100644 drivers/soc/sunxi/Makefile
- create mode 100644 drivers/soc/sunxi/sunxi_sram.c
- create mode 100644 include/linux/soc/sunxi/sunxi_sram.h
- create mode 100644 include/soc/tegra/emc.h
+ arch/arm/configs/at91_dt_defconfig   |   2 +
+ arch/arm/configs/efm32_defconfig     |   1 -
+ arch/arm/configs/exynos_defconfig    |  50 ++++------
+ arch/arm/configs/hisi_defconfig      |   2 +
+ arch/arm/configs/imx_v6_v7_defconfig |   9 ++
+ arch/arm/configs/keystone_defconfig  |   6 ++
+ arch/arm/configs/lpc18xx_defconfig   | 151 ++++++++++++++++++++++++++++++
+ arch/arm/configs/multi_v7_defconfig  | 110 +++++++++++++++++++---
+ arch/arm/configs/omap2plus_defconfig |   3 +
+ arch/arm/configs/qcom_defconfig      |   2 +
+ arch/arm/configs/sama5_defconfig     |   1 +
+ arch/arm/configs/shmobile_defconfig  |   4 +-
+ arch/arm/configs/stm32_defconfig     |  70 ++++++++++++++
+ arch/arm/configs/tegra_defconfig     |  10 ++
+ arch/arm/configs/u8500_defconfig     |   5 +
+ arch/arm/configs/vf610m4_defconfig   |  42 +++++++++
+ arch/arm64/configs/defconfig         |   1 +
+ 17 files changed, 419 insertions(+), 50 deletions(-)
+ create mode 100644 arch/arm/configs/lpc18xx_defconfig
+ create mode 100644 arch/arm/configs/stm32_defconfig
+ create mode 100644 arch/arm/configs/vf610m4_defconfig
