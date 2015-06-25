@@ -1,99 +1,140 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Thu, 25 Jun 2015 15:45:11 +0100
-Subject: [PATCH] keystone: psci: adds cpu_die implementation
-In-Reply-To: <1435240970-30869-1-git-send-email-vitalya@ti.com>
-References: <1435240970-30869-1-git-send-email-vitalya@ti.com>
-Message-ID: <20150625144511.GA6844@leverpostej>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Thu, 25 Jun 2015 15:46:27 +0100
+Subject: [PATCH-v4 2/3] mfd: 88pm800: Set default interrupt clear method
+In-Reply-To: <558BE3D6.2010801@linaro.org>
+References: <1435217189-19578-1-git-send-email-vaibhav.hiremath@linaro.org>
+ <1435217189-19578-3-git-send-email-vaibhav.hiremath@linaro.org>
+ <20150625102618.GC15013@x1> <558BE3D6.2010801@linaro.org>
+Message-ID: <20150625144627.GB23990@x1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Thu, 25 Jun 2015, Vaibhav Hiremath wrote:
+> On Thursday 25 June 2015 03:56 PM, Lee Jones wrote:
+> >On Thu, 25 Jun 2015, Vaibhav Hiremath wrote:
+> >
+> >>As per the spec, bit 1 (INT_CLEAR_MODE) of reg addr 0xe
+> >>(page 0) controls the method of clearing interrupt
+> >>status of 88pm800 family of devices;
+> >>
+> >>   0: clear on read
+> >>   1: clear on write
+> >>
+> >>If pdata is not coming from board file, then set the
+> >>default irq clear method to "irq clear on write"
+> >>
+> >>Also, as suggested by "Lee Jones" renaming variable field
+> >>to appropriate name.
+> >>
+> >>Signed-off-by: Zhao Ye <zhaoy@marvell.com>
+> >>Signed-off-by: Vaibhav Hiremath <vaibhav.hiremath@linaro.org>
+> >>---
+> >>  drivers/mfd/88pm800.c       | 15 ++++++++++-----
+> >>  include/linux/mfd/88pm80x.h |  6 ++++--
+> >>  2 files changed, 14 insertions(+), 7 deletions(-)
+> >>
+> >>diff --git a/drivers/mfd/88pm800.c b/drivers/mfd/88pm800.c
+> >>index 40fd014..e0cd7ad 100644
+> >>--- a/drivers/mfd/88pm800.c
+> >>+++ b/drivers/mfd/88pm800.c
 
-On Thu, Jun 25, 2015 at 03:02:50PM +0100, Vitaly Andrianov wrote:
-> This commit add cpu_die implementation using psci api
+[...]
 
-I don't understand. If you have a PSCI implementation, it should be
-sufficient to have a PSCI node (and enable-method) in your DT, and the
-generic code will be used. Nothing should be required in your board
-code.
-
-You should also use CPU_ON to bring secondaries online rather than
-mixing up PSCI and platform-specific mechanisms.
-
+> >>+		PM800_WAKEUP2_INT_WRITE_CLEAR : PM800_WAKEUP2_INT_READ_CLEAR;
+> >>+	ret = regmap_update_bits(map, PM800_WAKEUP2, mask, irq_clr_mode);
+> >>
+> >>  	if (ret < 0)
+> >>  		goto out;
+> >>@@ -514,6 +515,7 @@ static int device_800_init(struct pm80x_chip *chip,
+> >>  	}
+> >>
+> >>  	chip->regmap_irq_chip = &pm800_irq_chip;
+> >>+	chip->irq_clr_on_wr = pdata->irq_clr_on_wr;
+> >
+> >You have protection around pdata everywhere else in the file, I
+> >suggest you supply some here too.
+> >
 > 
-> Signed-off-by: Vitaly Andrianov <vitalya@ti.com>
-> ---
->  arch/arm/mach-keystone/platsmp.c | 32 ++++++++++++++++++++++++++++++++
->  1 file changed, 32 insertions(+)
-> 
-> diff --git a/arch/arm/mach-keystone/platsmp.c b/arch/arm/mach-keystone/platsmp.c
-> index 5f46a7c..2c40cc0 100644
-> --- a/arch/arm/mach-keystone/platsmp.c
-> +++ b/arch/arm/mach-keystone/platsmp.c
-> @@ -20,6 +20,7 @@
->  #include <asm/prom.h>
->  #include <asm/tlbflush.h>
->  #include <asm/pgtable.h>
-> +#include <asm/psci.h>
->  
->  #include "keystone.h"
->  
-> @@ -51,7 +52,38 @@ static inline void __cpuinit keystone_smp_secondary_initmem(unsigned int cpu)
->  {}
->  #endif
->  
-> +
-> +#ifdef CONFIG_HOTPLUG_CPU
-> +static void keystone_cpu_die(unsigned int cpu)
-> +{
-> +#ifdef CONFIG_ARM_PSCI
-> +	struct psci_power_state pwr_state = {0, 0, 0};
-> +
-> +	pr_info("keystone_cpu_die(%d) from %d using PSCI\n", cpu,
-> +	       smp_processor_id());
-> +
-> +	if (psci_ops.cpu_off)
-> +		psci_ops.cpu_off(pwr_state);
-> +#else
-> +	/*
-> +	 * We may want to add here a direct smc call to monitor
-> +	 * if the kernel doesn't support PSCI API
-> +	 */
-> +#endif
-
-You should determine this from your DT. Your FW/bootloader can patch in
-the relevant nodes and properties when support is present, so the
-presence of such nodes should guarantee that PSCI is available.
-
-> +
-> +	/*
-> +	 * we shouldn't come here. But in case something went
-> +	 * wrong the code below prevents kernel from crush
-> +	 */
-> +	while (1)
-> +		cpu_do_idle();
-
-This will make kexec appear to work, yet it won't. 
-
-Thanks,
-Mark.
-
-> +}
-> +#endif
-> +
->  struct smp_operations keystone_smp_ops __initdata = {
->  	.smp_boot_secondary	= keystone_smp_boot_secondary,
->  	.smp_secondary_init     = keystone_smp_secondary_initmem,
-> +#ifdef CONFIG_HOTPLUG_CPU
-> +	.cpu_die		= keystone_cpu_die,
-> +#endif
->  };
-> -- 
-> 1.9.1
+> Actually it is not really needed, as the PATCH 1/1 introduces
 > 
 > 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>         if (!pdata && !np) {
+>                 dev_err(&client->dev,
+>                         "pm80x requires platform data or of_node\n");
+>                 return -EINVAL;
+>         }
 > 
+>         if (!pdata && !np) {
+>                 dev_err(&client->dev,
+>                         "pm80x requires platform data or of_node\n");
+>                 return -EINVAL;
+>         }
+> 
+> 
+> So there is no way you can have pdata = NULL beyond this point.
+
+I saw that.  I want you to remove that too.
+
+[...]
+
+> >>--- a/include/linux/mfd/88pm80x.h
+> >>+++ b/include/linux/mfd/88pm80x.h
+> >>@@ -77,6 +77,8 @@ enum {
+> >>  #define PM800_WAKEUP2		(0x0E)
+> >>  #define PM800_WAKEUP2_INV_INT		(1 << 0)
+> >>  #define PM800_WAKEUP2_INT_CLEAR		(1 << 1)
+> >>+#define PM800_WAKEUP2_INT_READ_CLEAR		(0 << 1)
+> >>+#define PM800_WAKEUP2_INT_WRITE_CLEAR		(1 << 1)
+> >>  #define PM800_WAKEUP2_INT_MASK		(1 << 2)
+> >
+> >Use the BIT() macro.
+> >
+> 
+> I thought about this, but the whole file doesn't use it, so I also
+> chose not to.
+
+Then the whole file needs moving over.
+
+Patches accepted.
+
+> >>  #define PM800_POWER_UP_LOG	(0x10)
+> >>@@ -300,7 +302,7 @@ struct pm80x_chip {
+> >>  	struct regmap_irq_chip_data *irq_data;
+> >>  	int type;
+> >>  	int irq;
+> >>-	int irq_mode;
+> >>+	int irq_clr_on_wr;	/* '1': Clear on write, '0': Clear on read*/
+> >
+> >Whitespace issue.
+> 
+> Didn't see any...and I also ran checkpatch.
+
+You have no space before the '*/'.
+
+> >Shouldn't this be a bool?
+> >
+> 
+> Just was not sure about any older board file interface.
+> Ideally it should be bool only.
+
+Right.
+
+> >Actually even better, I would define; CLR_ON_WRITE and CLR_ON_READ,
+> >and call the variable irq_clear_method, or something.
+> >
+> >Much clearer that way I think.
+> >
+> 
+> We have slowly decided to almost hardcode it to one value if there is
+> no board file. I feel we should just keep it to simple.
+> 
+> If you still insist, I can implement.
+
+I like clarity and by your own admission (by warranting an additional
+comment) it's not clear.  Please make it as clear as you can.
+
+-- 
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
