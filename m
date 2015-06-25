@@ -1,28 +1,30 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 24 Jun 2015 21:38:39 -0700
-Subject: Use of pinctrl-single for external device over I2C
-In-Reply-To: <558AE478.2080802@linaro.org>
-References: <55893B2C.1070800@linaro.org> <558A9CC7.6070409@linaro.org>
- <20150624133349.GI4156@atomide.com> <558AE478.2080802@linaro.org>
-Message-ID: <20150625043838.GK4156@atomide.com>
+From: maninder1.s@samsung.com (Maninder Singh)
+Date: Thu, 25 Jun 2015 10:17:50 +0530
+Subject: [RESUBMIT PATCH 1/1] arm/hw_breakpoint.c: remove unnecessary header
+Message-ID: <1435207670-34196-1-git-send-email-maninder1.s@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Vaibhav Hiremath <vaibhav.hiremath@linaro.org> [150624 10:12]:
-> 
-> I do not like this, as this is not HW feature, so DT may not be right
-> approach.
-> 
-> So I will dig more from either runtime or Compile time option to use
-> regmap_ Vs raw read/writes.
+Header <asm/kdebug.h> is not needed for arm/hw_breakpoint.c,
+Removing the same.
 
-Can't you just check if the pinctrl node has compatible = "syscon"
-property?
+Signed-off-by: Maninder Singh <maninder1.s@samsung.com>
+Reviewed-by: Vaneet Narang <v.narang@samsung.com>
+---
+ arch/arm/kernel/hw_breakpoint.c |    1 -
+ 1 files changed, 0 insertions(+), 1 deletions(-)
 
-A compile time option won't work for sure. I don't know what you
-would check at runtime as you do not know what the bus is behind
-syscon.
-
-Regards,
-
-Tony
+diff --git a/arch/arm/kernel/hw_breakpoint.c b/arch/arm/kernel/hw_breakpoint.c
+index dc7d0a9..6284779 100644
+--- a/arch/arm/kernel/hw_breakpoint.c
++++ b/arch/arm/kernel/hw_breakpoint.c
+@@ -35,7 +35,6 @@
+ #include <asm/cputype.h>
+ #include <asm/current.h>
+ #include <asm/hw_breakpoint.h>
+-#include <asm/kdebug.h>
+ #include <asm/traps.h>
+ 
+ /* Breakpoint currently in use for each BRP. */
+-- 
+1.7.1
