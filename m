@@ -1,52 +1,39 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Thu, 25 Jun 2015 17:13:08 +0100
-Subject: [PATCH] keystone: psci: adds cpu_die implementation
-In-Reply-To: <558C25E0.3010102@ti.com>
-References: <1435240970-30869-1-git-send-email-vitalya@ti.com>
- <20150625144511.GA6844@leverpostej> <558C174F.80108@oracle.com>
- <558C25E0.3010102@ti.com>
-Message-ID: <20150625161308.GF6844@leverpostej>
+From: robert.daniels@vantagecontrols.com (Robert Daniels)
+Date: Thu, 25 Jun 2015 16:15:34 +0000
+Subject: L2 Cache enable on i.MX5
+In-Reply-To: <558BBDD5.3020306@melag.de>
+References: <DBXPR06MB5891810D431F1AE9AEB1CE985AF0@DBXPR06MB589.eurprd06.prod.outlook.com>,
+ <20150624172900.GN7557@n2100.arm.linux.org.uk>
+ <DBXPR06MB58911B5FD193722EC5BD34185AF0@DBXPR06MB589.eurprd06.prod.outlook.com>,
+ <558BBDD5.3020306@melag.de>
+Message-ID: <DBXPR06MB58914F4112C5F73FF89C14A85AE0@DBXPR06MB589.eurprd06.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 25, 2015 at 05:01:36PM +0100, Vitaly Andrianov wrote:
-> 
-> 
-> On 06/25/2015 10:59 AM, santosh shilimkar wrote:
-> > On 6/25/2015 7:45 AM, Mark Rutland wrote:
-> >> Hi,
-> >>
-> >> On Thu, Jun 25, 2015 at 03:02:50PM +0100, Vitaly Andrianov wrote:
-> >>> This commit add cpu_die implementation using psci api
-> >>
-> >> I don't understand. If you have a PSCI implementation, it should be
-> >> sufficient to have a PSCI node (and enable-method) in your DT, and the
-> >> generic code will be used. Nothing should be required in your board
-> >> code.
-> >>
-> >> You should also use CPU_ON to bring secondaries online rather than
-> >> mixing up PSCI and platform-specific mechanisms.
-> >>
-> > Good point about CPU_ON. We need that as well.
-> >
-> Does it mean that keystone_defconfig must always have CONFIG_HOTPLUG_CPU 
-> and CONFIG_ARM_PSCI enabled?
+> I'm working on an mx53, too (tqma53 board), but with an 4.1 kernel.
+> How can I check whether L2 cache is enabled ?
 
-No.
+I discovered our problem by comparing the version of Das U-Boot we are using
+with the latest from Freescale's repository. In this comparison, I discovered that
+there had been a patch introduced to enable the L2 cache.  The L2 cache enable
+patch is also in the mainline U-Boot source too so if you check in this file:
+arch/arm/cpu/armv7/mx5/lowlevel_init.S
+around line 49 you should see a comment about enabling the L2 cache. If it's there
+you're good to go.
 
-You need CONFIG_ARM_PSCI for PSCI CPU_ON. Without CONFIG_HOTPLUG_CPU,
-you'll get PSCI CPU_ON but not PSCI CPU_OFF.
+> Can you estimate, how much performance gain we can actually get from the
+> L2 cache (under which kind of workloads) ?
 
-> What is if someone doesn't want to have HOTPLUG_CPU?
+In our testing we are seeing a 1.5x - 2.0x improvement. Of course, this may not
+affect you at all - we just got unlucky and get our bootloader at the wrong time.
 
-Then you don't get PSCI CPU_OFF, but can still have PSCI CPU_ON.
+- Robert
 
-Only the portions of the PSCI code required for turning CPUs off are
-dependent on HOTPLUG_CPU.
+________________________________
 
-> How he can boot secondary CPU w/o platform-specific mechanizm?
+Ce message, ainsi que tous les fichiers joints ? ce message, peuvent contenir des informations sensibles et/ ou confidentielles ne devant pas ?tre divulgu?es. Si vous n'?tes pas le destinataire de ce message (ou que vous recevez ce message par erreur), nous vous remercions de le notifier imm?diatement ? son exp?diteur, et de d?truire ce message. Toute copie, divulgation, modification, utilisation ou diffusion, non autoris?e, directe ou indirecte, de tout ou partie de ce message, est strictement interdite.
+Se d?sabonner: Si vous souhaitez ?tre retir? de notre liste de diffusion, s'il vous pla?t envoyer vos coordonn?es ? CASL.unsubscribe at legrand.ca<mailto:casl.unsubscribe@legrand.ca> et indiquer quels sont les messages que vous ne souhaitez plus recevoir.
 
-By using PSCI CPU_ON.
 
-Thanks,
-Mark
+This e-mail, and any document attached hereby, may contain confidential and/or privileged information. If you are not the intended recipient (or have received this e-mail in error) please notify the sender immediately and destroy this e-mail. Any unauthorized, direct or indirect, copying, disclosure, distribution or other use of the material or parts thereof is strictly forbidden.
+Unsubscribe: If you would like to be removed from our mailing list, please send your contact information to CASL.unsubscribe at legrand.ca<mailto:casl.unsubscribe@legrand.ca> and indicate what messages you no longer wish to receive.
