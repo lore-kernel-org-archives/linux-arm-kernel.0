@@ -1,55 +1,78 @@
-From: vladimir_zapolskiy@mentor.com (Vladimir Zapolskiy)
-Date: Thu, 25 Jun 2015 19:22:07 +0300
-Subject: [PATCH v2 2/2] clk: imx: clk-imx6q: Provide initial IPU clock
- settings for mx6dl
-In-Reply-To: <1435241830-20187-2-git-send-email-fabio.estevam@freescale.com>
-References: <1435241830-20187-1-git-send-email-fabio.estevam@freescale.com>
- <1435241830-20187-2-git-send-email-fabio.estevam@freescale.com>
-Message-ID: <558C2AAF.1010707@mentor.com>
+From: javier@dowhile0.org (Javier Martinez Canillas)
+Date: Thu, 25 Jun 2015 18:29:52 +0200
+Subject: [PATCH v2 7/9] ARM: multi_v7_defconfig: Enable support for PWM
+ Regulators
+In-Reply-To: <20150625150255.GE23990@x1>
+References: <1435154348-28840-1-git-send-email-lee.jones@linaro.org>
+ <1435154348-28840-8-git-send-email-lee.jones@linaro.org>
+ <CABxcv==J2hi0y+=s3nK_U=-jkjTW3L9jCC2JfebnWwRfpDGLAQ@mail.gmail.com>
+ <20150625084204.GW15013@x1>
+ <CABxcv==_YZ7BCCzfbLXYxwUL_kKLtBxOVTCvcUnvGVnrD4bVpg@mail.gmail.com>
+ <20150625150255.GE23990@x1>
+Message-ID: <CABxcv==dWX_J_+zhqjn61QXGtxCKmK62_HEj4R7wsMAWcC=H=Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Fabio,
+Hello Lee,
 
-On 25.06.2015 17:17, Fabio Estevam wrote:
-> Currently it is not possible to use HDMI and LVDS at the same time on a 
-> imx6dl-sabresd board.
-> 
-> Fix this usecase by setting IMX6QDL_CLK_PLL3_PFD1_540M to 540MHz and
-> also by setting it as the parent of IMX6QDL_CLK_IPU1_SEL.
-> 
-> Based on the configuration done in the FSL kernel.
-> 
-> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
-> ---
-> Changes since v1:
-> - None. Newly introduced.
-> 
->  drivers/clk/imx/clk-imx6q.c | 5 +++++
->  1 file changed, 5 insertions(+)
-> 
-> diff --git a/drivers/clk/imx/clk-imx6q.c b/drivers/clk/imx/clk-imx6q.c
-> index d046f8e..d735d8f 100644
-> --- a/drivers/clk/imx/clk-imx6q.c
-> +++ b/drivers/clk/imx/clk-imx6q.c
-> @@ -494,6 +494,11 @@ static void __init imx6q_clocks_init(struct device_node *ccm_node)
->  		clk_set_parent(clk[IMX6QDL_CLK_LDB_DI1_SEL], clk[IMX6QDL_CLK_PLL5_VIDEO_DIV]);
->  	}
->  
-> +	if (clk_on_imx6dl()) {
-> +		clk_set_rate(clk[IMX6QDL_CLK_PLL3_PFD1_540M], 540000000);
+On Thu, Jun 25, 2015 at 5:02 PM, Lee Jones <lee.jones@linaro.org> wrote:
+> On Thu, 25 Jun 2015, Javier Martinez Canillas wrote:
+>> On Thu, Jun 25, 2015 at 10:42 AM, Lee Jones <lee.jones@linaro.org> wrote:
+>> > On Wed, 24 Jun 2015, Javier Martinez Canillas wrote:
+>>
+>> [...]
+>>
+>> >> > diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
+>> >> > index f632af0..6666973 100644
+>> >> > --- a/arch/arm/configs/multi_v7_defconfig
+>> >> > +++ b/arch/arm/configs/multi_v7_defconfig
+>> >> > @@ -365,6 +365,7 @@ CONFIG_REGULATOR_MAX8907=y
+>> >> >  CONFIG_REGULATOR_MAX8973=y
+>> >> >  CONFIG_REGULATOR_MAX77686=y
+>> >> >  CONFIG_REGULATOR_PALMAS=y
+>> >> > +CONFIG_REGULATOR_PWM=y
+>> >>
+>> >> The current policy is to build as much as possible as a module in
+>> >> multi_v7_defconfig. Since this is a tristate Kconfig symbol, could you
+>> >> please change it to =m ?
+>> >
+>> > I would prefer that it stays built-in.
+>> >
+>>
+>> Ok, I've no strong opinion on this. I was just mentioning what arm-soc
+>> maintainers prefer nowadays.
+>>
+>> May I ask what's the rationale for leaving this option built-in?
+>
+> My view is that multi_v7 is used for prototyping, testing and to
+> ensure all of the vendors are playing nice together.  Hopefully
+> vendors aren't actually releasing kernels built with this defconfig!
 
-I believe here IMX6QDL_CLK_PLL3_PFD1_540M rate can be set independently
-of SoC flavour.
+Agreed and same for the per SoC family defconfigs, vendors should ship
+kernels with a customized defconfig.
 
-> +		clk_set_parent(clk[IMX6QDL_CLK_IPU1_SEL], clk[IMX6QDL_CLK_PLL3_PFD1_540M]);
-> +	}
-> +
->  	clk_set_parent(clk[IMX6QDL_CLK_IPU1_DI0_PRE_SEL], clk[IMX6QDL_CLK_PLL5_VIDEO_DIV]);
->  	clk_set_parent(clk[IMX6QDL_CLK_IPU1_DI1_PRE_SEL], clk[IMX6QDL_CLK_PLL5_VIDEO_DIV]);
->  	clk_set_parent(clk[IMX6QDL_CLK_IPU2_DI0_PRE_SEL], clk[IMX6QDL_CLK_PLL5_VIDEO_DIV]);
-> 
+> During testing/prototyping time; installing and messing around with
+> modules is an over-head I can do without.
+>
 
---
-With best wishes,
-Vladimir
+Right but my question wasn't whether multi_v7 should have the options
+as built-in or as modules. That has already been decided by the
+arm-soc maintainers who want to have as much as possible as modules.
+In fact, there have been patches posted recently to change the current
+multi_v7 options from built-in to modules.
+
+Instead my question was what makes this driver special to not follow
+the current convention.
+
+I agree that there is a trade off between having options as built-in
+or modules and I believe that is why most SoC specific defconfigs have
+the opposite policy,  that is to enable everything as built-in so one
+doesn't have to mess with modules as you said.
+
+But again, I don't have a strong opinion on this. What I think though
+is that this should be documented somewhere so the options are enabled
+following a documented rule instead of just whatever fits in someone
+workflow.
+
+Best regards,
+Javier
