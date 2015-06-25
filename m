@@ -1,27 +1,82 @@
-From: ast@plumgrid.com (Alexei Starovoitov)
-Date: Thu, 25 Jun 2015 06:34:12 -0700
-Subject: [PATCH] arm64: bpf: fix out-of-bounds read in bpf2a64_offset()
-In-Reply-To: <1435236459-15141-1-git-send-email-xi.wang@gmail.com>
-References: <1435236459-15141-1-git-send-email-xi.wang@gmail.com>
-Message-ID: <558C0354.4080809@plumgrid.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Thu, 25 Jun 2015 14:44:09 +0100
+Subject: [PATCH] arm64/kvm: Add generic v8 KVM target
+In-Reply-To: <558BF6C9.3000009@arm.com>
+References: <1434531646-4873-1-git-send-email-suzuki.poulose@arm.com>
+ <CAFEAcA92uymQ3LjPQnuFiwvjSgc+jY54VrfK_Sh4v1DJ+=OPpw@mail.gmail.com>
+ <558A6A84.5020603@arm.com> <20150624085128.GA22785@cbox>
+ <558A7936.7020109@arm.com> <20150625123034.GE28244@cbox>
+ <558BF6C9.3000009@arm.com>
+Message-ID: <558C05A9.8080201@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 6/25/15 5:47 AM, Xi Wang wrote:
-> Problems occur when bpf_to or bpf_from has value prog->len - 1 (e.g.,
-> "Very long jump backwards" in test_bpf where the last instruction is a
-> jump): since ctx->offset has length prog->len, ctx->offset[bpf_to + 1]
-> or ctx->offset[bpf_from + 1] will cause an out-of-bounds read, leading
-> to a bogus jump offset and kernel panic.
->
-> This patch moves updating ctx->offset to after calling build_insn(),
-> and changes indexing to use bpf_to and bpf_from without + 1.
->
-> Cc: Zi Shen Lim<zlim.lnx@gmail.com>
-> Cc: Alexei Starovoitov<ast@plumgrid.com>
-> Cc: Will Deacon<will.deacon@arm.com>
-> Fixes: e54bcde3d69d ("arm64: eBPF JIT compiler")
-> Signed-off-by: Xi Wang<xi.wang@gmail.com>
+On 25/06/15 13:40, Marc Zyngier wrote:
+> On 25/06/15 13:30, Christoffer Dall wrote:
+>> On Wed, Jun 24, 2015 at 10:32:38AM +0100, Marc Zyngier wrote:
+>>> Hi Christoffer,
+>>>
+>>> On 24/06/15 09:51, Christoffer Dall wrote:
+>>>> On Wed, Jun 24, 2015 at 09:29:56AM +0100, Marc Zyngier wrote:
+>>>>> On 22/06/15 09:44, Peter Maydell wrote:
+>>>>>> On 17 June 2015 at 10:00, Suzuki K. Poulose <suzuki.poulose@arm.com> wrote:
+>>>>>>> From: "Suzuki K. Poulose" <suzuki.poulose@arm.com>
+>>>>>>>
+>>>>>>> This patch adds a generic ARM v8 KVM target cpu type for use
+>>>>>>> by the new CPUs which eventualy ends up using the common sys_reg
+>>>>>>> table. For backward compatibility the existing targets have been
+>>>>>>> preserved. Any new target CPU that can be covered by generic v8
+>>>>>>> sys_reg tables should make use of the new generic target.
+>>>>>>
+>>>>>> How do you intend this to work for cross-host migration?
+>>>>>
+>>>>> It is not meant to work for cross migration at all.
+>>>>>
+>>>>>> Is the idea that the kernel guarantees that "generic" looks
+>>>>>> 100% the same to the guest regardless of host hardware? I'm
+>>>>>> not sure that can be made to work, given impdef differences
+>>>>>> in ID register values, bp/wp registers, and so on.
+>>>>>>
+>>>>>> Given that, it seems to me that we still need to provide
+>>>>>> KVM_ARM_TARGET_$THISCPU defines so userspace can request
+>>>>>> a specific guest CPU flavour; so what does this patch
+>>>>>> provide that isn't already provided by just having userspace
+>>>>>> query for the "preferred" CPU type as it does already?
+>>>>>
+>>>>> The way I see this working is that a "generic" CPU cannot be migrated
+>>>>> (because we don't know anything about it). If it can be identified as a
+>>>>> known (non generic) implementation, then we can migrate it.
+>>>>>
+>>>> Concretely, how should this work?  Be enforced by userspace or should we
+>>>> deny certain SET_ONE_REG operations from working on this target?
+>>>
+>>> I can definitely see MIDR overriding failing on a generic CPU. Also, you
+>>> shouldn't be able to select a generic CPU if we know about the physical CPU.
+>>>
+>>
+>> If I am migrating from an A57 to an A53, but the VM was started as
+>> "generic CPU" then we rely on the user discovering that this is not
+>> supported when trying to set the MIDR from userspace in KVM?
+> 
+> A57 to A53 is probably a bad example because we actively support both.
+> So let's replace your A57 with an A72. With this patch, the A72 would be
+> reported as "generic CPU", and MIDR access would fail on the A53.
 
-Nice catch! Looks good to me.
-Acked-by: Alexei Starovoitov <ast@plumgrid.com>
+Having thought about this a bit more...
+
+It should always be possible to emulate a "known" CPU on a generic host,
+and it should be able to migrate. The case we can't migrate is when we
+let the guest be generic (which I guess should really be unknown, and
+not generic).
+
+So if the user specify "-cpu cortex-a57" on the command line, the guest
+should be able to migrate from an A72 to an A53. if the user specified
+"-cpu host", the resulting guest won't be able to migrate.
+
+Does it make sense?
+
+Thanks,
+
+	M.
+-- 
+Jazz is not dead. It just smells funny...
