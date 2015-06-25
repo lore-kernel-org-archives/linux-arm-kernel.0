@@ -1,99 +1,59 @@
-From: vaibhav.hiremath@linaro.org (Vaibhav Hiremath)
-Date: Thu, 25 Jun 2015 16:40:47 +0530
-Subject: [PATCH-v4 1/3] mfd: 88pm800: Add device tree support
-In-Reply-To: <20150625101916.GB15013@x1>
-References: <1435217189-19578-1-git-send-email-vaibhav.hiremath@linaro.org>
- <1435217189-19578-2-git-send-email-vaibhav.hiremath@linaro.org>
- <20150625101916.GB15013@x1>
-Message-ID: <558BE1B7.2060308@linaro.org>
+From: michal.simek@xilinx.com (Michal Simek)
+Date: Thu, 25 Jun 2015 13:12:38 +0200
+Subject: [PATCHv5 2/2] mailbox: Adding driver for Xilinx LogiCORE IP
+ mailbox.
+In-Reply-To: <1435224937.16792.19.camel@tiscali.nl>
+References: <1435082402-29239-1-git-send-email-moritz.fischer@ettus.com>
+ <1435082402-29239-3-git-send-email-moritz.fischer@ettus.com>
+ <1435178205.4528.77.camel@tiscali.nl> <558BA5D4.8060903@xilinx.com>
+ <1435217491.16792.5.camel@tiscali.nl> <558BB217.5080200@xilinx.com>
+ <1435224937.16792.19.camel@tiscali.nl>
+Message-ID: <558BE226.2060907@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On 06/25/2015 11:35 AM, Paul Bolle wrote:
+> On Thu, 2015-06-25 at 09:47 +0200, Michal Simek wrote:
+>> It has to be platform_device somewhere for sure.
+>> In past we had folder in arch/microblaze/platform folder.
+>> Currently you can add this code to for example
+>> arch/microblaze/kernel/platform.c
+>>
+>> But as I said I don't think it is really important. There will be a 
+>> lot
+>> of others drivers in the kernel which can be used as platform drivers
+>> but you are not able to find out platform_device for it.
+> 
+> Because, like probably happens with this driver, the OF infrastructure
+> makes sure the .probe and .remove functions will eventually called?
+> 
+>> The important part is that driver can work as is.
+> 
+> Sure.
+> 
+> But I was talking about the MODULE_ALIAS() macro. Trivial as it is,
+> since I still don't see where a "MODALIAS=platform:xilinx-mailbox"
+> uevent could come from I still don't see the point of this line. As I
+> asked in my first message: what breaks if this line is dropped?
 
+TBH probably nothing because all will just use OF because it is just
+common for a long time on all xilinx platforms.
 
-On Thursday 25 June 2015 03:49 PM, Lee Jones wrote:
-> On Thu, 25 Jun 2015, Vaibhav Hiremath wrote:
->
->> Add DT support to the 88pm800 driver, along with compatible
->> field for it's sub-devices (rtc, onkey and regulator)
->>
->> Signed-off-by: Chao Xie <chao.xie@marvell.com>
->> Signed-off-by: Vaibhav Hiremath <vaibhav.hiremath@linaro.org>
->> ---
->>   drivers/mfd/88pm800.c | 23 +++++++++++++++++++++++
->>   1 file changed, 23 insertions(+)
->>
->> diff --git a/drivers/mfd/88pm800.c b/drivers/mfd/88pm800.c
->> index 841717a..40fd014 100644
->> --- a/drivers/mfd/88pm800.c
->> +++ b/drivers/mfd/88pm800.c
->> @@ -27,6 +27,7 @@
->>   #include <linux/mfd/core.h>
->>   #include <linux/mfd/88pm80x.h>
->>   #include <linux/slab.h>
->> +#include <linux/of_device.h>
->>
->>   /* Interrupt Registers */
->>   #define PM800_INT_STATUS1		(0x05)
->> @@ -121,6 +122,11 @@ static const struct i2c_device_id pm80x_id_table[] = {
->>   };
->>   MODULE_DEVICE_TABLE(i2c, pm80x_id_table);
->>
->> +static const struct of_device_id pm80x_of_match_table[] = {
->> +	{ .compatible = "marvell,88pm800", },
->> +	{},
->> +};
->> +
->>   static struct resource rtc_resources[] = {
->>   	{
->>   	 .name = "88pm80x-rtc",
->> @@ -133,6 +139,7 @@ static struct resource rtc_resources[] = {
->>   static struct mfd_cell rtc_devs[] = {
->>   	{
->>   	 .name = "88pm80x-rtc",
->> +	 .of_compatible = "marvell,88pm80x-rtc",
->>   	 .num_resources = ARRAY_SIZE(rtc_resources),
->>   	 .resources = &rtc_resources[0],
->>   	 .id = -1,
->> @@ -151,6 +158,7 @@ static struct resource onkey_resources[] = {
->>   static const struct mfd_cell onkey_devs[] = {
->>   	{
->>   	 .name = "88pm80x-onkey",
->> +	 .of_compatible = "marvell,88pm80x-onkey",
->>   	 .num_resources = 1,
->>   	 .resources = &onkey_resources[0],
->>   	 .id = -1,
->> @@ -160,6 +168,7 @@ static const struct mfd_cell onkey_devs[] = {
->>   static const struct mfd_cell regulator_devs[] = {
->>   	{
->>   	 .name = "88pm80x-regulator",
->> +	 .of_compatible = "marvell,88pm80x-regulator",
->>   	 .id = -1,
->>   	},
->>   };
->> @@ -544,8 +553,21 @@ static int pm800_probe(struct i2c_client *client,
->>   	int ret = 0;
->>   	struct pm80x_chip *chip;
->>   	struct pm80x_platform_data *pdata = dev_get_platdata(&client->dev);
->> +	struct device_node *np = client->dev.of_node;
->>   	struct pm80x_subchip *subchip;
->>
->> +	if (!pdata && !np) {
->> +		dev_err(&client->dev,
->> +			"pm80x requires platform data or of_node\n");
->> +		return -EINVAL;
->> +	}
->> +
->> +	if (!pdata) {
->> +		pdata = devm_kzalloc(&client->dev, sizeof(*pdata), GFP_KERNEL);
->> +		if (!pdata)
->> +			return -ENOMEM;
->> +	}
->
-> Why have you allocated data for pdata, then done nothing with it?
->
+> 
+>> Also it is quite common that users create own BSP for their custom
+>> boards but they don't push it to mainline.
+> 
+> I can't recall what BSP means. Anyhow, why should we care about boards
+> not pushed into mainline?
 
-Not in this patch, but subsequent patches would use it.
+I am not the right person to answer this in general. For SoC tree I
+maintain I tend to accept these patches if they are useful and
+definitely don't want to have support for various platforms. But having
+shared drivers is fine.
+
+For this case if Moritz tested OF and platform device probes and both
+work I am fine to keep it there. If only OF part is tested then I would
+remove this line.
 
 Thanks,
-Vaibhav
+Michal
