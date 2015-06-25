@@ -1,36 +1,39 @@
-From: b18965@freescale.com (Alison Wang)
-Date: Thu, 25 Jun 2015 11:34:38 +0800
-Subject: [PATCH] net/fsl: remove dependency FSL_SOC for Gianfar
-Message-ID: <1435203278-40383-1-git-send-email-b18965@freescale.com>
+From: Haikun.Wang@freescale.com (Wang Haikun)
+Date: Thu, 25 Jun 2015 03:50:12 +0000
+Subject: [PATCH v1] arm: configs: Add Freescale LS1021A defconfig
+References: <1431951726-10992-1-git-send-email-haikun.wang@freescale.com>
+ <6265444.OllNdeKdQh@wuerfel>
+Message-ID: <BN1PR0301MB0612502F3D47D2033C80BC4BF8AE0@BN1PR0301MB0612.namprd03.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-CONFIG_GIANFAR is not depended on FSL_SOC, it
-can be built on non-PPC platforms.
+On 5/20/2015 11:36 PM, Arnd Bergmann wrote:
+> On Monday 18 May 2015 20:22:06 Haikun Wang wrote:
+>> Add Freescale LS1021A initial defconfig file.
+>> Enable I2C, LPUART, eDMA, WDT default.
+>> LS1021AQDS and LS1021ATWR boot successfully with patch.
+>> Above IPs also been verified successfully.
+>>
+>> Signed-off-by: Haikun Wang <haikun.wang@freescale.com>
+>>
+>
+> Can you explain why you need a separate defconfig, aside from imx_v6_v7_defconfig
+> and multi_v7_defconfig? Please put a reason into the description above,
+Hi Arnd,
 
-Signed-off-by: Alison Wang <alison.wang@freescale.com>
----
- drivers/net/ethernet/freescale/Kconfig | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+I have verified that if we want to use multi_v7_defconfig to boot 
+LS1021A up, we need add below configurations:
++CONFIG_THUMB2_KERNEL=y
++CONFIG_VMSPLIT_2G=y
++CONFIG_VFP=y.
 
-diff --git a/drivers/net/ethernet/freescale/Kconfig b/drivers/net/ethernet/freescale/Kconfig
-index b8de87b..ff76d4e 100644
---- a/drivers/net/ethernet/freescale/Kconfig
-+++ b/drivers/net/ethernet/freescale/Kconfig
-@@ -83,12 +83,12 @@ config UGETH_TX_ON_DEMAND
- 
- config GIANFAR
- 	tristate "Gianfar Ethernet"
--	depends on FSL_SOC
- 	select FSL_PQ_MDIO
- 	select PHYLIB
- 	select CRC32
- 	---help---
- 	  This driver supports the Gigabit TSEC on the MPC83xx, MPC85xx,
--	  and MPC86xx family of chips, and the FEC on the 8540.
-+	  and MPC86xx family of chips, the eTSEC on LS1021A and the FEC
-+	  on the 8540.
- 
- endif # NET_VENDOR_FREESCALE
--- 
-2.1.0.27.g96db324
+If we add those to multi_v7_defconfig, it may destroy other platforms.
+
+Best Regards
+Wang Haikun
+> as we normally try to have only one defconfig per machine directory.
+>
+> Does this machine require LPAE to function correctly?
+>
+> 	Arnd
+>
