@@ -1,31 +1,115 @@
-From: pali.rohar@gmail.com (Pali =?utf-8?B?Um9ow6Fy?=)
-Date: Thu, 25 Jun 2015 09:27:11 +0200
-Subject: [RESEND] [PATCH v2 1/2] arm: devtree: Set system_rev from DT
- revision
-In-Reply-To: <20150625072205.GO4156@atomide.com>
-References: <1430902142-17035-1-git-send-email-pali.rohar@gmail.com>
- <3577431.y872Foi4kj@wuerfel> <20150506103752.GG30910@pali>
- <3529567.PeFp1NNa1q@wuerfel> <20150506114417.GI30910@pali>
- <20150625050138.GL4156@atomide.com> <20150625071851.GB2890@pali>
- <20150625072205.GO4156@atomide.com>
-Message-ID: <20150625072711.GD2890@pali>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Thu, 25 Jun 2015 09:28:44 +0200
+Subject: [PATCH v2] ARM: socfpga: dts: Add adxl34x
+In-Reply-To: <CABxpGwC_Eaz593gvPsS=jRpgxY1SM17hsArGfFPBjow-oBYB9g@mail.gmail.com>
+References: <1419462712-14151-1-git-send-email-walter@vanguardiasur.com.ar>
+ <20150105092153.GJ13070@pengutronix.de>
+ <CABxpGwCbFF+pJ0H_sMjqk6c9awdRuxi6j0CL_d3mH5z4Qht+ng@mail.gmail.com>
+ <CABxpGwAFdLET+fg3WvMWqXdzsPQHv3hKx9cFwk9RQE9w6+rEbg@mail.gmail.com>
+ <550F8297.80809@opensource.altera.com>
+ <CABxpGwA3cs11Wtvs_8iGka9anb2+vHhfph19VKbTwBJOeh9bbw@mail.gmail.com>
+ <CABxpGwC_Eaz593gvPsS=jRpgxY1SM17hsArGfFPBjow-oBYB9g@mail.gmail.com>
+Message-ID: <CAMuHMdW5EG+LnWE7sFYVJKHjN=k7mUUp7U5-r3hMjQvsKgf3ug@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 25 June 2015 00:22:05 Tony Lindgren wrote:
-> * Pali Roh?r <pali.rohar@gmail.com> [150625 00:21]:
-> > 
-> > Ok, but what do you mean to forget any string conversion?
-> 
-> No need for tohexstr() in the uncommpress code if the system_rev
-> value is a number coming from the dts.
-> 
-> Regards,
-> 
-> Tony
+On Tue, Jun 23, 2015 at 10:20 PM, Walter Lozano
+<walter@vanguardiasur.com.ar> wrote:
+> On Mon, Mar 23, 2015 at 11:29 PM, Walter Lozano
+> <walter@vanguardiasur.com.ar> wrote:
+>> On Mon, Mar 23, 2015 at 12:03 AM, Dinh Nguyen
+>> <dinguyen@opensource.altera.com> wrote:
+>>> On 3/19/15 4:27 PM, Walter Lozano wrote:
+>>>> On Mon, Mar 16, 2015 at 10:10 AM, Walter Lozano
+>>>> <walter@vanguardiasur.com.ar> wrote:
+>>>>> On Mon, Jan 5, 2015 at 6:21 AM, Steffen Trumtrar
+>>>>> <s.trumtrar@pengutronix.de> wrote:
+>>>>>> On Wed, Dec 24, 2014 at 08:11:52PM -0300, Walter Lozano wrote:
+>>>>>>> This patch adds the DTS bindings for the adxl34x digital
+>>>>>>> accelerometer.
+>>>>>>>
+>>>>>>> Signed-off-by: Walter Lozano <walter@vanguardiasur.com.ar>
+>>>>>>> ---
+>>>>>>>  arch/arm/boot/dts/socfpga_cyclone5_sockit.dts |   16 ++++++++++++++++
+>>>>>>>  1 file changed, 16 insertions(+)
+>>>>>>>
+>>>>>>> diff --git a/arch/arm/boot/dts/socfpga_cyclone5_sockit.dts b/arch/arm/boot/dts/socfpga_cyclone5_sockit.dts
+>>>>>>> index 16ea6f5..d343e03 100644
+>>>>>>> --- a/arch/arm/boot/dts/socfpga_cyclone5_sockit.dts
+>>>>>>> +++ b/arch/arm/boot/dts/socfpga_cyclone5_sockit.dts
+>>>>>>> @@ -60,6 +60,22 @@
+>>>>>>>       rxc-skew-ps = <2000>;
+>>>>>>>  };
+>>>>>>>
+>>>>>>> +&gpio2 {
+>>>>>>> +     status = "okay";
+>>>>>>> +};
+>>>>>>> +
+>>>>>>> +&i2c1 {
+>>>>>>> +     status = "okay";
+>>>>>>> +
+>>>>>>> +     accel1: accelerometer at 53 {
+>>>>>>> +             compatible = "adxl34x";
+>>>
+>>> Shouldn't this be "adi,adxl34x"? At least that's what the documentation
+>>> says.
+>>>
+>>>>>>> +             reg = <0x53>;
+>>>>>>> +
+>>>>>>> +             interrupt-parent = <&portc>;
+>>>>>>> +             interrupts = <3 2>;
+>>>>>>> +     };
+>>>>>>> +};
+>>>>>>> +
+>>>>>>>  &mmc0 {
+>>>>>>>       vmmc-supply = <&regulator_3_3v>;
+>>>>>>>       vqmmc-supply = <&regulator_3_3v>;
+>>>>>>
+>>>>>> I just gave it a short spin. I get some interrupts and the position property
+>>>>>> changes, so it seems to work:
+>>>>>>
+>>>>>>         Acked-by: Steffen Trumtrar <s.trumtrar@pengutronix.de>
+>>>>>>
+>>>>>
+>>>>> Ping?
+>>>>> How should this continue?
+>>>>
+>>>> Any news about this patch? It has been acked by Pavel Machek and
+>>>> Steffen Trumtrar a while ago.
+>>>>
+>>>
+>>> Sorry, since I wasn't CC on the original patch and somehow my filter
+>>> didn't catch it, I didn't see this patch until now.
+>>
+>> No problem, I know it was my fault as I trust the output of get_maintainer.pl
+>>
+>
+> Ping?
+>
+> --
+> Walter Lozano, VanguardiaSur
+> www.vanguardiasur.com.ar
+> --
+> To unsubscribe from this list: send the line "unsubscribe devicetree" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
 
-So /revision DT property will be (binary) value, right?
+Now these commits are in:
+  - 3a38958d2477b718 ("Input: adxl34x - add OF match support") [1]
+  - e465bf6fc55d5ce2 ("DT: i2c: Deprecate adi,adxl34x compatible string") [2]
 
--- 
-Pali Roh?r
-pali.rohar at gmail.com
+you can use "adi,adxl345" (or "adi,adxl346", "adi,adxl345").
+
+[1] http://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=3a38958d2477b718d1011fb88c24c4f264ee9700
+[2] http://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=e465bf6fc55d5ce21fb45a75c3fa613505e6be20
+
+Gr{oetje,eeting}s,
+
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
