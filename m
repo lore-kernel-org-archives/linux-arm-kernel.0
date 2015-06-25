@@ -1,54 +1,35 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Thu, 25 Jun 2015 10:30:03 +0200
-Subject: [PATCH] md/raid6: delta syndrome for ARM NEON
-In-Reply-To: <12EF8D94C6F8734FB2FF37B9FBEDD1735FCC7052@EXCHANGE.collogia.de>
-References: <1435164213-25410-1-git-send-email-ard.biesheuvel@linaro.org>
- <12EF8D94C6F8734FB2FF37B9FBEDD1735FCC7052@EXCHANGE.collogia.de>
-Message-ID: <CAKv+Gu9aTCyEQi9g_7oBzOBYay5H_z2mUxK4_D7CQjGs40Lwpw@mail.gmail.com>
+From: weigelt@melag.de (Enrico Weigelt, metux IT consult)
+Date: Thu, 25 Jun 2015 10:37:41 +0200
+Subject: L2 Cache enable on i.MX5
+In-Reply-To: <DBXPR06MB58911B5FD193722EC5BD34185AF0@DBXPR06MB589.eurprd06.prod.outlook.com>
+References: <DBXPR06MB5891810D431F1AE9AEB1CE985AF0@DBXPR06MB589.eurprd06.prod.outlook.com>,
+ <20150624172900.GN7557@n2100.arm.linux.org.uk>
+ <DBXPR06MB58911B5FD193722EC5BD34185AF0@DBXPR06MB589.eurprd06.prod.outlook.com>
+Message-ID: <558BBDD5.3020306@melag.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 25 June 2015 at 08:32, Markus Stockhausen <stockhausen@collogia.de> wrote:
->> Von: Ard Biesheuvel [ard.biesheuvel at linaro.org]
->> Gesendet: Mittwoch, 24. Juni 2015 18:43
->> An: linux-arm-kernel at lists.infradead.org; hpa at zytor.com
->> Cc: Ard Biesheuvel; Markus Stockhausen; Neil Brown
->> Betreff: [PATCH] md/raid6: delta syndrome for ARM NEON
->>
->> This implements XOR syndrome calculation using NEON intrinsics.
->> As before, the module can be built for ARM and arm64 from the
->> same source.
->
->> Relative performance on a Cortex-A57 based system:
->>
->>   raid6: int64x1  gen()   905 MB/s
->>   raid6: int64x1  xor()   881 MB/s
->>   raid6: int64x2  gen()  1343 MB/s
->>   raid6: int64x2  xor()  1286 MB/s
->>   raid6: int64x4  gen()  1896 MB/s
->>   raid6: int64x4  xor()  1321 MB/s
->>   raid6: int64x8  gen()  1773 MB/s
->>   raid6: int64x8  xor()  1165 MB/s
->>   raid6: neonx1   gen()  1834 MB/s
->>   raid6: neonx1   xor()  1278 MB/s
->>   raid6: neonx2   gen()  2528 MB/s
->>   raid6: neonx2   xor()  1942 MB/s
->>   raid6: neonx4   gen()  2888 MB/s
->>   raid6: neonx4   xor()  2334 MB/s
->>   raid6: neonx8   gen()  2957 MB/s
->>   raid6: neonx8   xor()  2232 MB/s
->>   raid6: using algorithm neonx8 gen() 2957 MB/s
->>   raid6: .... xor() 2232 MB/s, rmw enabled
->>
->
-> Nice to see that the placeholders get filled.
-> Did you have a chance to do some real tests?
->
+Am 25.06.2015 um 00:53 schrieb Robert Daniels:
 
-Hello Markus,
+Hi,
 
-I haven't done any real world testing yet. Can you recommend any test
-tools or test suites in particular?
 
-Thanks,
-Ard.
+> In that case, where should the kernel be enabling the L2 cache? I'm using the
+> 3.14 kernel for this i.MX53 product and the L2 cache is definitely not enabled.
+
+I'm working on an mx53, too (tqma53 board), but with an 4.1 kernel.
+How can I check whether L2 cache is enabled ?
+
+Can you estimate, how much performance gain we can actually get from the
+L2 cache (under which kind of workloads) ?
+
+
+--mtx
+
+--
+Enrico Weigelt, metux IT consult
++49-151-27565287
+MELAG Medizintechnik oHG Sitz Berlin Registergericht AG Charlottenburg HRA 21333 B
+
+Wichtiger Hinweis: Diese Nachricht kann vertrauliche oder nur f?r einen begrenzten Personenkreis bestimmte Informationen enthalten. Sie ist ausschlie?lich f?r denjenigen bestimmt, an den sie gerichtet worden ist. Wenn Sie nicht der Adressat dieser E-Mail sind, d?rfen Sie diese nicht kopieren, weiterleiten, weitergeben oder sie ganz oder teilweise in irgendeiner Weise nutzen. Sollten Sie diese E-Mail irrt?mlich erhalten haben, so benachrichtigen Sie bitte den Absender, indem Sie auf diese Nachricht antworten. Bitte l?schen Sie in diesem Fall diese Nachricht und alle Anh?nge, ohne eine Kopie zu behalten.
+Important Notice: This message may contain confidential or privileged information. It is intended only for the person it was addressed to. If you are not the intended recipient of this email you may not copy, forward, disclose or otherwise use it or any part of it in any form whatsoever. If you received this email in error please notify the sender by replying and delete this message and any attachments without retaining a copy.
