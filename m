@@ -1,38 +1,60 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 24 Jun 2015 22:06:04 -0700
-Subject: [PATCH 1/2] arm: devtree: Save atags if are in DT atags field
-In-Reply-To: <2802980.ITgIdpK9OB@wuerfel>
+Date: Wed, 24 Jun 2015 22:12:53 -0700
+Subject: [PATCH 2/2] arm: boot: store ATAG structure into DT atags field
+In-Reply-To: <46811670.AspmkHD9JS@wuerfel>
 References: <1430902142-17035-1-git-send-email-pali.rohar@gmail.com>
- <1431719407-18230-1-git-send-email-pali.rohar@gmail.com>
- <1431719407-18230-2-git-send-email-pali.rohar@gmail.com>
- <2802980.ITgIdpK9OB@wuerfel>
-Message-ID: <20150625050604.GM4156@atomide.com>
+ <3513646.XX80DTTJbc@wuerfel> <201505152216.24622@pali>
+ <46811670.AspmkHD9JS@wuerfel>
+Message-ID: <20150625051253.GN4156@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Arnd Bergmann <arnd@arndb.de> [150515 13:11]:
-> On Friday 15 May 2015 21:50:06 Pali Roh?r wrote:
-> > @@ -256,5 +257,10 @@ const struct machine_desc * __init setup_machine_fdt(unsigned int dt_phys)
-> >                         system_rev = 0;
-> >         }
-> >  
-> > +       /* Save atags */
-> > +       prop = of_get_flat_dt_prop(dt_root, "atags", NULL);
-> > +       if (prop)
-> > +               save_atags((void *)prop);
-> > +
-> >         return mdesc;
+* Arnd Bergmann <arnd@arndb.de> [150515 13:23]:
+> On Friday 15 May 2015 22:16:24 Pali Roh?r wrote:
+> > On Friday 15 May 2015 22:12:41 Arnd Bergmann wrote:
+> > > On Friday 15 May 2015 21:50:07 Pali Roh?r wrote:
+> > > >                 }
+> > > >         
+> > > >         }
+> > > > 
+> > > > +       /* include the terminating ATAG_NONE */
+> > > > +       atag_size = (char *)atag - (char *)atag_list +
+> > > > sizeof(struct tag_header); +       setprop(fdt, "/", "atags",
+> > > > atag_list, atag_size);
+> > > > +
+> > > > 
+> > > >         if (memcount) {
+> > > >         
+> > > >                 setprop(fdt, "/memory", "reg", mem_reg_property,
+> > > >                 
+> > > >                         4 * memcount * memsize);
+> > > 
+> > > The property should probably have a DT binding, and be named
+> > > "linux,atags".
+> > > 
+> > > It may also help to check if the "linux,atags" property already
+> > > exists and not create it otherwise. That way we can put it into the
+> > > n900 dts file and have it updated by the compat code, but not expose
+> > > the atags on other platforms unless they opt in.
+
+Using "linux,atags" sounds good to me. And yes checking it with
+getprop before doing setprop makes sense.
+
+> > Maybe what would help: Is there a way to tell decompressor/kernel to not 
+> > touch atag memory and then after kernel/board-code starts it save copy 
+> > of atags? I think it is not possible right now, but correct me if I'm 
+> > wrong...
 > > 
 > 
-> How about checking whether this is actually running on the one board
-> that needs it first?
-> 
-> I'd rather not introduce something that may end up being considered
-> an ABI on other machines.
+> I don't think that is possible without an incompatible change to the
+> boot protocol.
 
-It seems having this within CONFIG_ARM_ATAG_DTB_COMPAT should be
-enough here.
+Agreed, let's keep the changes to minimum.
 
-Regards,
+Looks like with the comments posted all the pending four patches
+from Pali become quite a minimal set of three patches if we keep
+the rev string as hex.
+
+Regrds,
 
 Tony
