@@ -1,45 +1,71 @@
-From: pebolle@tiscali.nl (Paul Bolle)
-Date: Thu, 25 Jun 2015 09:31:31 +0200
-Subject: [PATCHv5 2/2] mailbox: Adding driver for Xilinx LogiCORE IP
- mailbox.
-In-Reply-To: <558BA5D4.8060903@xilinx.com>
-References: <1435082402-29239-1-git-send-email-moritz.fischer@ettus.com>
- <1435082402-29239-3-git-send-email-moritz.fischer@ettus.com>
- <1435178205.4528.77.camel@tiscali.nl> <558BA5D4.8060903@xilinx.com>
-Message-ID: <1435217491.16792.5.camel@tiscali.nl>
+From: vaibhav.hiremath@linaro.org (Vaibhav Hiremath)
+Date: Thu, 25 Jun 2015 12:56:26 +0530
+Subject: [PATCH-v4 0/3] mfd: 88pm800: Add Device tree support
+Message-ID: <1435217189-19578-1-git-send-email-vaibhav.hiremath@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2015-06-25 at 08:55 +0200, Michal Simek wrote:
-> On 06/24/2015 10:36 PM, Paul Bolle wrote:
-> > On Tue, 2015-06-23 at 11:00 -0700, Moritz Fischer wrote:
-> > > +MODULE_ALIAS("platform:xilinx-mailbox");
-> > 
-> > So I think this MODULE_ALIAS() is only useful if, in short, there's 
-> > a corresponding platform_device created. Ie, a platform_device with 
-> > a name "xilinx-mailbox" that will fire of a "MODALIAS=platform:xili
-> > nx-mailbox" when it's created.
-> > 
-> > I couldn't spot such a platform_device. Provided git grep didn't 
-> > let me down here: what breaks if this line is dropped?
-> 
-> IRC you don't need to have this platform_device in the kernel 
-> present. Only one thing which should be check is that this driver can 
-> be used as platform device driver.
-> 
-> The only one problematic part is devm_clk_get() and this should be
-> checked if you can use this as platform driver. From the first look 
-> it looks like that this will break it.
-> 
-> Anyway if Moritz is able to use this a platform driver he can keep 
-> this line there. If not, it should be removed.
+This patch-series adds support for Device tree to 88PM800 mfd driver.
+It also sets default configuration of irq clear method if board file
+doesn't exist.
 
-But, assuming this works as a platform driver, where does the "xilinx
--mailbox" platform device originate?
+Testing::
+ - Boot tested on PXA1928 based platform.
+ - probe of mfd, rtc and regulator function passing successfully.
+ - Basic read operations on registers
+ - irq clear configuration
+
+V3 => V4
+=======
+Link to V3: https://lkml.org/lkml/2015/6/24/143
+
+   - Removed generic error msg when returning -ENOMEM
+   - irq clear method is 88PM800 feature, which is not dependent on board or
+     doesn't require any wiring changes, so DT is not the way.
+     Hardcoded to "irq clear on write" if board file doesn't exist.
+   - Updated binding patch (PATCH 3/3) to remove irq-clr-on-wr entry.
+   - Since PATCH 3/3 changed from original, removed Rob's Acked-by.
+
+V2 => V3
+=======
+Link to V2: https://www.mail-archive.com/linux-kernel at vger.kernel.org/msg914299.html
+
+   - Replaced deprecated "regulator-compatible" property with "regulator-name".
+   - Added Rob's Acked-by  to [PATCH 3/3]
+
+V1 => V2
+=======
+Link to V1: http://lkml.iu.edu/hypermail/linux/kernel/1505.3/04386.html
+
+  - Split binding changes from original commit
+  - Updated binding info as per Rob's suggestion
+  - Dropped PATCH 4/4, as discussed during review
+  - Dropped PATCH 3/4, as it is independent RTC code change,
+    so will submit it separately to ease merging.
+  - Fixed all other minor comments
+
+Attempt has been made to push some of the patches to the list sometime
+back in 2013.
+
+Link to previous patch submission:
+        https://lkml.org/lkml/2013/8/14/86
+
+TODO:
+=====
+   - init config for 88PM860 device
+   - Rgulator driver changes to add support for 88PM860 device
 
 
-Paul Bolle
+Vaibhav Hiremath (3):
+  mfd: 88pm800: Add device tree support
+  mfd: 88pm800: Set default interrupt clear method
+  mfd: devicetree: bindings: Add new 88pm800 mfd binding
 
-PS Evolution 3.16 is nearly unbearable in its handling of replies to
-plain text messages. Doe anyone know how to make it handle them
-sensibly?
+ Documentation/devicetree/bindings/mfd/88pm800.txt | 54 +++++++++++++++++++++++
+ drivers/mfd/88pm800.c                             | 38 +++++++++++++---
+ include/linux/mfd/88pm80x.h                       |  6 ++-
+ 3 files changed, 91 insertions(+), 7 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/mfd/88pm800.txt
+
+-- 
+1.9.1
