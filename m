@@ -1,78 +1,43 @@
-From: achandran@mvista.com (Arun Chandran)
-Date: Thu, 25 Jun 2015 17:50:36 +0530
-Subject: BUG: Bad page state in process swapper pfn:XXXXX
-In-Reply-To: <558BDF49.7020908@arm.com>
-References: <CAFdej03jedihbdNCb8e+at3M3ikKxn+s6eAvBvfGPdtsHShQdQ@mail.gmail.com>
- <CAFdej029n2DHQRZmFp78hNUgA=rWGYK0fXG1+AxQEZrUGf3WdA@mail.gmail.com>
- <558BDF49.7020908@arm.com>
-Message-ID: <CAFdej01D6T7r3fhLXGSOj0BFO=TPJmc0oKAt0RLhWWQjyT_Wkw@mail.gmail.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Thu, 25 Jun 2015 14:24:04 +0200
+Subject: [PATCH V3] PM / Domains: Remove intermediate states from the
+ power off sequence
+In-Reply-To: <CAMuHMdWCo+U26x9Z5vUu+5ZVSpSOFF1LDO7jkezuXzVR2mC6qA@mail.gmail.com>
+References: <1434020737-13354-1-git-send-email-ulf.hansson@linaro.org>
+ <7ha8w01qir.fsf@deeprootsystems.com>
+ <CAMuHMdWCo+U26x9Z5vUu+5ZVSpSOFF1LDO7jkezuXzVR2mC6qA@mail.gmail.com>
+Message-ID: <CAMuHMdU7jGd2O_StrVgZPL3-WZRJkzSJ1d-Xe-utb2=4L2gqEQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 25, 2015 at 4:30 PM, Robin Murphy <robin.murphy@arm.com> wrote:
-> Hi Arun,
->
-> On 25/06/15 11:08, Arun Chandran wrote:
-> [...]
->
->> A u-boot memtest for those areas resulted in errors[1 in 5 boots]
->>
->> SOCFPGA_ARRIA5 #  mtest 0x1ff3a000 0x1ff4ffff
->> Pattern 00000002  Writing...  Reading...
->> Mem error @ 0x1FF4A714: found FFFFFFFF, expected 000041C7
->>
->> Mem error @ 0x1FF4A718: found 1C00FFFF, expected 000041C8
->>
->> Mem error @ 0x1FF4A71C: found 143DCB25, expected 000041C9
->>
->> Mem error @ 0x1FF4A720: found 01000608, expected 000041CA
->>
->> Mem error @ 0x1FF4A724: found 04060008, expected 000041CB
->>
->> Mem error @ 0x1FF4A728: found 1C000100, expected 000041CC
->>
->> Mem error @ 0x1FF4A72C: found 143DCB25, expected 000041CD
->>
->> Mem error @ 0x1FF4A730: found 1967A20A, expected 000041CE
->>
->> Mem error @ 0x1FF4A734: found 00000000, expected 000041CF
->>
->> Mem error @ 0x1FF4A738: found A20A0000, expected 000041D0
->>
->> Mem error @ 0x1FF4A73C: found 00001667, expected 000041D1
->>
->> Mem error @ 0x1FF4A740: found 00000000, expected 000041D2
->>
->> Mem error @ 0x1FF4A744: found 00000000, expected 000041D3
->>
->> Mem error @ 0x1FF4A748: found 00000000, expected 000041D4
->>
->> Mem error @ 0x1FF4A74C: found 00000000, expected 000041D5
->>
->> Mem error @ 0x1FF4A750: found E3D2A784, expected 000041D6
->> Pattern 0000000A  Writing...  Reading...
->> Mem error @ 0x1FF3AE14: found 005A0320, expected 0000038F
->> Pattern FFFFFFF4  Writing...  Reading...
->> Mem error @ 0x1FF3AE14: found 00400320, expected FFFFFC6F
->> Pattern FFFFFFEF  Writing...  Reading...
->>
->>
->> That means there is problem with my RAM [or board reset].
->
->
-> Or that your bootloader is leaving the network controller DMA'ing over
-> kernel memory. That 'corruption' has a suspiciously familiar shape to it,
-> and sure enough, turns out to be a valid ethernet packet - Wireshark had
-> this to say about it:
->
-> 1       0.000000000     HonHaiPr_cb:3d:14       Broadcast       ARP     64
-> Who has 10.162.103.22?  Tell 10.162.103.25
->
-> Robin.
+Hi Ulf,
 
+On Tue, Jun 23, 2015 at 12:57 PM, Geert Uytterhoeven
+<geert@linux-m68k.org> wrote:
+>> I know Lina has been testing this (or an earlier version) on qcom
+>> hardware so would be nice to get a tested-by from her, and would also be
+>> nice to see if Geert has a chance to take this for a spin on his Renesas
+>> hardware and anyone can take this for a spin on Exynos.
+>
+> I needed some athletics to make this apply to my current tree, but I did
+> manage to test it on:
+>   - sh73a0/kzm9g (SYSC PM Domain/pm-rmobile),
+>   - r8a7740/armadillo (SYSC PM Domain/pm-rmobile),
+>   - r8a73a4/ape6evm (SYSC PM Domain/pm-rmobile),
+>   - r8a7791/koelsch (CPG Clock Domain + SYSC PM Domain/pm-rcar).
+> I didn't notice any regressions or other oddities.
+>
+> Tested-by: Geert Uytterhoeven <geert+renesas@glider.be>
 
-Hi Robin,
+I accidentally tested v2 instead of v4. Retested with v4, everything still fine.
 
-Nice catch. Thanks for pointing that out.
+Gr{oetje,eeting}s,
 
---Arun
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
