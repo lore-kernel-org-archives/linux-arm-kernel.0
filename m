@@ -1,73 +1,43 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Thu, 25 Jun 2015 10:09:35 +0200
-Subject: [PATCH V3] PM / Domains: Remove intermediate states from the
- power off sequence
-In-Reply-To: <7hy4j9q9aq.fsf@deeprootsystems.com>
-References: <1434020737-13354-1-git-send-email-ulf.hansson@linaro.org>
- <7ha8w01qir.fsf@deeprootsystems.com>
- <CAPDyKFqvNp0PcjikZqj4XapfbrNqAUW=ZBFQvvzQZLPMcpS1oQ@mail.gmail.com>
- <7hy4j9q9aq.fsf@deeprootsystems.com>
-Message-ID: <CAPDyKFrhjCZTf=-oXUXp=4siMQbU5aMp5sfq_Yc-jHGapM=-og@mail.gmail.com>
+From: michal.simek@xilinx.com (Michal Simek)
+Date: Thu, 25 Jun 2015 10:29:19 +0200
+Subject: [PATCH] gpio: zynq: Fix problem with unbalanced pm_runtime_enable
+Message-ID: <b4b2bb2d7747f8c9223fb50fd2868f77a7c7f63a.1435220957.git.michal.simek@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 24 June 2015 at 19:57, Kevin Hilman <khilman@kernel.org> wrote:
-> Ulf Hansson <ulf.hansson@linaro.org> writes:
->
-> [...]
->
->>> Minor nit: I think you should leave these 3 helpers and just simplify
->>> them.  It will make the changes below easier to read as well.
->>
->> I would rather like to remove them. The reason is to create consistency.
->>
->> For the locking part, there are currently mixtures of
->> mutex_lock|unlock() and genpd_acquire|release_lock(). Following your
->> suggestion will leave around 6-7 places where mutex_lock() will remain
->> used (additionally for mutex_unlock()). So removing the helper
->> functions creates a consistent behaviour.
->
-> OK, that makes more sense.
->
->> For the genpd->status, it's currently being assigned at various places
->> without using a helper function. Again I wanted to create a consistent
->> behaviour and make the code more readable.
->>
->>>
->>> Also, for the locking, Lina will be adding these locking functions back
->>> anyways, so let's just avoid the extra churn.
->>
->> Actually I think it becomes more evident what Lina's patchset does if
->> she re-introduces an API to deal with the locking. Moreover we can
->> "force" that patchset to not break consistently around the locking.
->>
->>>
->>> Otherwise, I think this version is looking really good.
->>>
->>> With the above tweaks, feel free to add
->>>
->>> Reviewed-by: Kevin Hilman <khilman@linaro.org>
->>>
->>> Kevin
->>
->> Thanks a lot for reviewing!
->>
->> If you have a strong opinion about your suggestions, I will happily
->> adapt to them, please let me know.
->
-> No strong option, you convinced me your way will actually make things
-> more consistent, and Lina prefers them gone as well, so I'm fine with
-> them gone (as you've done in V4).
->
-> Kevin
->
->
+Add missing pm_runtime_disabled to remove().
 
-Kevin, thanks for your review!
+Error log:
+root at zynqmp:~# modprobe gpio_zynq
+root at zynqmp:~# lsmod
+    Not tainted
+gpio_zynq 7086 0 - Live 0xffffffbffc00a000
+root at zynqmp:~# rmmod gpio_zynq
+root at zynqmp:~# lsmod
+    Not tainted
+root at zynqmp:~# modprobe gpio_zynq
+[  246.924438] zynq-gpio ff0a0000.gpio: Unbalanced pm_runtime_enable!
+root at zynqmp:~# rmmod gpio_zynq
+root at zynqmp:~# lsmod
+    Not tainted
 
-I haven't applied your Reviewed-by tag to V4, as there where one more
-minor additional change added, regarding IRQ safe devices. I
-appreciate if could have a look, whenever you have some time.
+Signed-off-by: Michal Simek <michal.simek@xilinx.com>
+---
 
-Kind regards
-Uffe
+ drivers/gpio/gpio-zynq.c | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/drivers/gpio/gpio-zynq.c b/drivers/gpio/gpio-zynq.c
+index 2e87c4b8da26..a78882389836 100644
+--- a/drivers/gpio/gpio-zynq.c
++++ b/drivers/gpio/gpio-zynq.c
+@@ -757,6 +757,7 @@ static int zynq_gpio_remove(struct platform_device *pdev)
+ 	gpiochip_remove(&gpio->chip);
+ 	clk_disable_unprepare(gpio->clk);
+ 	device_set_wakeup_capable(&pdev->dev, 0);
++	pm_runtime_disable(&pdev->dev);
+ 	return 0;
+ }
+ 
+-- 
+2.3.5
