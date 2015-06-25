@@ -1,67 +1,66 @@
-From: m.smarduch@samsung.com (Mario Smarduch)
-Date: Wed, 24 Jun 2015 17:04:12 -0700
-Subject: [PATCH v3 2/2] arm: KVM: keep arm vfp/simd exit handling consistent
- with arm64
-In-Reply-To: <1435190652-5831-1-git-send-email-m.smarduch@samsung.com>
-References: <1435190652-5831-1-git-send-email-m.smarduch@samsung.com>
-Message-ID: <1435190652-5831-3-git-send-email-m.smarduch@samsung.com>
+From: labbott@redhat.com (Laura Abbott)
+Date: Wed, 24 Jun 2015 17:07:27 -0700
+Subject: [PATCH] arm: Update memblock limit after mapping lowmem
+In-Reply-To: <20150611130700.GA8153@leverpostej>
+References: <1433445349-12497-1-git-send-email-labbott@fedoraproject.org>
+ <20150611130700.GA8153@leverpostej>
+Message-ID: <558B463F.5050200@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-After enhancing arm64 FP/SIMD exit handling, ARMv7 VFP exit branch is moved
-to guest trap handling. This allows us to keep exit handling flow between both
-architectures consistent.
+On 06/11/2015 06:07 AM, Mark Rutland wrote:
+> On Thu, Jun 04, 2015 at 08:15:49PM +0100, Laura Abbott wrote:
+>>
+>> The memblock limit is currently used in find_limits
+>> to find the bounds for ZONE_NORMAL. The memblock
+>> limit may need to be rounded down a PMD size to ensure
+>> allocations are fully mapped though. This has the side
+>> effect of reducing the amount of memory in ZONE_NORMAL.
+>> Once all lowmem is mapped, it's safe to change the memblock
+>> limit back to include the unaligned section. Adjust the
+>> memblock limit after lowmem mapping is complete.
+>>
+>> Before:
+>>   # cat /proc/zoneinfo | grep managed
+>>          managed  62907
+>>          managed  424
+>>
+>> After:
+>>   # cat /proc/zoneinfo | grep managed
+>>          managed  63331
+>>
+>> Signed-off-by: Laura Abbott <labbott@fedoraproject.org>
+>> ---
+>> This is a replacement for
+>> 'arm: Don't use memblock limit for the lowmem bound' which
+>> doesn't actually work on NOMMU systems.
+>
+> Works for me on TC2, atop v4.1-rc7. Before this patch, with a few byes
+> carved out of the memory node I would see:
+>
+> Memory: 1030380K/1046528K available (4832K kernel code, 154K rwdata, 1376K rodata, 260K init, 147K bss, 16148K reserved, 0K cma-reserved)
+>
+> $ cat /proc/zoneinfo | grep managed
+>          managed  257660
+>
+> With the patch I see:
+>
+> Memory: 1032424K/1048572K available (4832K kernel code, 154K rwdata, 1376K rodata, 260K init, 147K bss, 16148K reserved, 0K cma-reserved)
+>
+> $ cat /proc/zoneinfo | grep managed
+>          managed  258171
+>
+> The patch itself looks good to me.
+>
+> Reviewed-by: Mark Rutland <mark.rutland@arm.com>
+> Tested-by: Mark Rutland <mark.rutland@arm.com>
+>
+> Thanks,
+> Mark.
+>
 
-Signed-off-by: Mario Smarduch <m.smarduch@samsung.com>
----
- arch/arm/kvm/interrupts.S |   14 ++++++++------
- 1 file changed, 8 insertions(+), 6 deletions(-)
+FYI, I put this in the patch tracker. I was on vacation when the Reviewed-by/Tested-by
+came in so I'm only getting to it now.
 
-diff --git a/arch/arm/kvm/interrupts.S b/arch/arm/kvm/interrupts.S
-index 79caf79..b245b4e 100644
---- a/arch/arm/kvm/interrupts.S
-+++ b/arch/arm/kvm/interrupts.S
-@@ -363,10 +363,6 @@ hyp_hvc:
- 	@ Check syndrome register
- 	mrc	p15, 4, r1, c5, c2, 0	@ HSR
- 	lsr	r0, r1, #HSR_EC_SHIFT
--#ifdef CONFIG_VFPv3
--	cmp	r0, #HSR_EC_CP_0_13
--	beq	switch_to_guest_vfp
--#endif
- 	cmp	r0, #HSR_EC_HVC
- 	bne	guest_trap		@ Not HVC instr.
- 
-@@ -380,7 +376,10 @@ hyp_hvc:
- 	cmp     r2, #0
- 	bne	guest_trap		@ Guest called HVC
- 
--host_switch_to_hyp:
-+	/*
-+	 * Getting here means host called HVC, we shift parameters and branch
-+	 * to Hyp function.
-+	 */
- 	pop	{r0, r1, r2}
- 
- 	/* Check for __hyp_get_vectors */
-@@ -411,6 +410,10 @@ guest_trap:
- 
- 	@ Check if we need the fault information
- 	lsr	r1, r1, #HSR_EC_SHIFT
-+#ifdef CONFIG_VFPv3
-+	cmp	r1, #HSR_EC_CP_0_13
-+	beq	switch_to_guest_vfp
-+#endif
- 	cmp	r1, #HSR_EC_IABT
- 	mrceq	p15, 4, r2, c6, c0, 2	@ HIFAR
- 	beq	2f
-@@ -479,7 +482,6 @@ guest_trap:
-  */
- #ifdef CONFIG_VFPv3
- switch_to_guest_vfp:
--	load_vcpu			@ Load VCPU pointer to r0
- 	push	{r3-r7}
- 
- 	@ NEON/VFP used.  Turn on VFP access.
--- 
-1.7.9.5
+Thanks,
+Laura
