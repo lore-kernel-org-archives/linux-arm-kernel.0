@@ -1,48 +1,35 @@
-From: bernhard.nortmann@web.de (Bernhard Nortmann)
-Date: Thu, 25 Jun 2015 15:21:33 +0200
-Subject: [PATCH] Remove deprecated symbol from defconfig files
-Message-ID: <1435238493-32614-1-git-send-email-bernhard.nortmann@web.de>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Thu, 25 Jun 2015 14:24:54 +0100
+Subject: [PATCH] ARM64: smp: Silence suspicious RCU usage with ipi
+ tracepoints
+In-Reply-To: <558B2842.2030007@codeaurora.org>
+References: <1435176858-9568-1-git-send-email-sboyd@codeaurora.org>
+ <20150624212930.GC12596@twins.programming.kicks-ass.net>
+ <558B2842.2030007@codeaurora.org>
+Message-ID: <20150625132453.GA13892@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch is to re-apply the changes from
-https://groups.google.com/forum/#!topic/linux-sunxi/Hhx2CR2YWhI
+On Wed, Jun 24, 2015 at 02:59:30PM -0700, Stephen Boyd wrote:
+> On 06/24/2015 02:29 PM, Peter Zijlstra wrote:
+> > On Wed, Jun 24, 2015 at 01:14:18PM -0700, Stephen Boyd wrote:
+> >> John Stultz reported an RCU splat on ARM with ipi trace events
+> >> enabled. It looks like the same problem exists on ARM64.
+> >>
+> >> At this point in the IPI handling path we haven't called
+> >> irq_enter() yet, so RCU doesn't know that we're about to exit
+> >> idle and properly warns that we're using RCU from an idle CPU.
+> >> Use trace_ipi_entry_rcuidle() instead of trace_ipi_entry() so
+> >> that RCU is informed about our exit from idle.
+> > I have a problem with $subject. It says 'silence', whereas afaict this
+> > fixes an actual bug, so it should be 'fixes'.
+> 
+> Fair enough. I can resend or whoever applies this patch can
+> s/Silence/Fix/ on the $subject.
 
-It removes the deprecated/obsolete symbol CONFIG_POWER_RESET_SUN6I
-from multi_v7_defconfig and sunxi_defconfig in arch/arm/configs/.
+I'll apply the patch and change the subject as well.
 
-mripard's tree incorporated the changes, but they somehow didn't
-make it upstream. The symbol is still present as of v4.1.
+Thanks.
 
-Signed-off-by: Bernhard Nortmann <bernhard.nortmann@web.de>
----
- arch/arm/configs/multi_v7_defconfig | 1 -
- arch/arm/configs/sunxi_defconfig    | 1 -
- 2 files changed, 2 deletions(-)
-
-diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
-index fbbb191..0d686b1 100644
---- a/arch/arm/configs/multi_v7_defconfig
-+++ b/arch/arm/configs/multi_v7_defconfig
-@@ -322,7 +322,6 @@ CONFIG_POWER_RESET_AS3722=y
- CONFIG_POWER_RESET_GPIO=y
- CONFIG_POWER_RESET_GPIO_RESTART=y
- CONFIG_POWER_RESET_KEYSTONE=y
--CONFIG_POWER_RESET_SUN6I=y
- CONFIG_POWER_RESET_RMOBILE=y
- CONFIG_SENSORS_LM90=y
- CONFIG_SENSORS_LM95245=y
-diff --git a/arch/arm/configs/sunxi_defconfig b/arch/arm/configs/sunxi_defconfig
-index 8ecba00..2c7af0a 100644
---- a/arch/arm/configs/sunxi_defconfig
-+++ b/arch/arm/configs/sunxi_defconfig
-@@ -77,7 +77,6 @@ CONFIG_SPI_SUN6I=y
- CONFIG_GPIO_SYSFS=y
- CONFIG_POWER_SUPPLY=y
- CONFIG_POWER_RESET=y
--CONFIG_POWER_RESET_SUN6I=y
- CONFIG_THERMAL=y
- CONFIG_CPU_THERMAL=y
- CONFIG_WATCHDOG=y
 -- 
-2.0.5
+Catalin
