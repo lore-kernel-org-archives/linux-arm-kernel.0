@@ -1,67 +1,45 @@
-From: vitalya@ti.com (Vitaly Andrianov)
-Date: Thu, 25 Jun 2015 10:02:50 -0400
-Subject: [PATCH] keystone: psci: adds cpu_die implementation
-Message-ID: <1435240970-30869-1-git-send-email-vitalya@ti.com>
+From: fabio.estevam@freescale.com (Fabio Estevam)
+Date: Thu, 25 Jun 2015 11:17:09 -0300
+Subject: [PATCH v2 1/2] ARM: dts: imx6qdl-sabresd: Allow HDMI and LVDS to work
+ simultaneously
+Message-ID: <1435241830-20187-1-git-send-email-fabio.estevam@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This commit add cpu_die implementation using psci api
+Currently it is not possible to have HDMI and LVDS working simultaneously,
+because both ports try to use PLL5.
 
-Signed-off-by: Vitaly Andrianov <vitalya@ti.com>
+Move the LVDS clock parent to PLL3_USB_OTG, so that HDMI and LVDS can be
+driven from independent sources.
+
+With this change the LDB pixel clock goes to 68.57 MHz, which is still
+within the valid range for the HSD100PXN1 LVDS panel.
+
+Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
 ---
- arch/arm/mach-keystone/platsmp.c | 32 ++++++++++++++++++++++++++++++++
- 1 file changed, 32 insertions(+)
+Changes since v1:
+- Move the clock assignment inside &clks as suggested by Philipp
 
-diff --git a/arch/arm/mach-keystone/platsmp.c b/arch/arm/mach-keystone/platsmp.c
-index 5f46a7c..2c40cc0 100644
---- a/arch/arm/mach-keystone/platsmp.c
-+++ b/arch/arm/mach-keystone/platsmp.c
-@@ -20,6 +20,7 @@
- #include <asm/prom.h>
- #include <asm/tlbflush.h>
- #include <asm/pgtable.h>
-+#include <asm/psci.h>
- 
- #include "keystone.h"
- 
-@@ -51,7 +52,38 @@ static inline void __cpuinit keystone_smp_secondary_initmem(unsigned int cpu)
- {}
- #endif
- 
-+
-+#ifdef CONFIG_HOTPLUG_CPU
-+static void keystone_cpu_die(unsigned int cpu)
-+{
-+#ifdef CONFIG_ARM_PSCI
-+	struct psci_power_state pwr_state = {0, 0, 0};
-+
-+	pr_info("keystone_cpu_die(%d) from %d using PSCI\n", cpu,
-+	       smp_processor_id());
-+
-+	if (psci_ops.cpu_off)
-+		psci_ops.cpu_off(pwr_state);
-+#else
-+	/*
-+	 * We may want to add here a direct smc call to monitor
-+	 * if the kernel doesn't support PSCI API
-+	 */
-+#endif
-+
-+	/*
-+	 * we shouldn't come here. But in case something went
-+	 * wrong the code below prevents kernel from crush
-+	 */
-+	while (1)
-+		cpu_do_idle();
-+}
-+#endif
-+
- struct smp_operations keystone_smp_ops __initdata = {
- 	.smp_boot_secondary	= keystone_smp_boot_secondary,
- 	.smp_secondary_init     = keystone_smp_secondary_initmem,
-+#ifdef CONFIG_HOTPLUG_CPU
-+	.cpu_die		= keystone_cpu_die,
-+#endif
+ arch/arm/boot/dts/imx6qdl-sabresd.dtsi | 7 +++++++
+ 1 file changed, 7 insertions(+)
+
+diff --git a/arch/arm/boot/dts/imx6qdl-sabresd.dtsi b/arch/arm/boot/dts/imx6qdl-sabresd.dtsi
+index a626e6d..cca847e 100644
+--- a/arch/arm/boot/dts/imx6qdl-sabresd.dtsi
++++ b/arch/arm/boot/dts/imx6qdl-sabresd.dtsi
+@@ -141,6 +141,13 @@
+ 	status = "okay";
  };
+ 
++&clks {
++	assigned-clocks = <&clks IMX6QDL_CLK_LDB_DI0_SEL>,
++			  <&clks IMX6QDL_CLK_LDB_DI1_SEL>;
++	assigned-clock-parents = <&clks IMX6QDL_CLK_PLL3_USB_OTG>,
++				 <&clks IMX6QDL_CLK_PLL3_USB_OTG>;
++};
++
+ &ecspi1 {
+ 	fsl,spi-num-chipselects = <1>;
+ 	cs-gpios = <&gpio4 9 0>;
 -- 
 1.9.1
