@@ -1,86 +1,73 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Thu, 25 Jun 2015 10:04:57 +0200
-Subject: [RFC PATCH] KVM: arm/arm64: Don't let userspace update CNTVOFF
- once guest is running
-In-Reply-To: <1435157697-28579-1-git-send-email-marc.zyngier@arm.com>
-References: <1435157697-28579-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <20150625080457.GD28244@cbox>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Thu, 25 Jun 2015 10:09:35 +0200
+Subject: [PATCH V3] PM / Domains: Remove intermediate states from the
+ power off sequence
+In-Reply-To: <7hy4j9q9aq.fsf@deeprootsystems.com>
+References: <1434020737-13354-1-git-send-email-ulf.hansson@linaro.org>
+ <7ha8w01qir.fsf@deeprootsystems.com>
+ <CAPDyKFqvNp0PcjikZqj4XapfbrNqAUW=ZBFQvvzQZLPMcpS1oQ@mail.gmail.com>
+ <7hy4j9q9aq.fsf@deeprootsystems.com>
+Message-ID: <CAPDyKFrhjCZTf=-oXUXp=4siMQbU5aMp5sfq_Yc-jHGapM=-og@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 24, 2015 at 03:54:57PM +0100, Marc Zyngier wrote:
-> Userspace is allowed to set the guest's view of CNTVCT, which turns
-> into setting CNTVOFF for the whole VM. One thing userspace is not supposed
-> to do is to update that register while the guest is running. Time will
-> either move forward (best case) or backward (really bad idea). Either way,
-> this shouldn't happen.
-> 
-> This patch prevents userspace from touching CNTVOFF as soon as a vcpu
-> has been started. This ensures that time will keep monotonically increase.
-> 
-> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-> ---
-> 
-> QEMU seems to trigger this at boot time, and I have no idea why it does so.
-> It would be good to find out, hence the RFC tag.
+On 24 June 2015 at 19:57, Kevin Hilman <khilman@kernel.org> wrote:
+> Ulf Hansson <ulf.hansson@linaro.org> writes:
+>
+> [...]
+>
+>>> Minor nit: I think you should leave these 3 helpers and just simplify
+>>> them.  It will make the changes below easier to read as well.
+>>
+>> I would rather like to remove them. The reason is to create consistency.
+>>
+>> For the locking part, there are currently mixtures of
+>> mutex_lock|unlock() and genpd_acquire|release_lock(). Following your
+>> suggestion will leave around 6-7 places where mutex_lock() will remain
+>> used (additionally for mutex_unlock()). So removing the helper
+>> functions creates a consistent behaviour.
+>
+> OK, that makes more sense.
+>
+>> For the genpd->status, it's currently being assigned at various places
+>> without using a helper function. Again I wanted to create a consistent
+>> behaviour and make the code more readable.
+>>
+>>>
+>>> Also, for the locking, Lina will be adding these locking functions back
+>>> anyways, so let's just avoid the extra churn.
+>>
+>> Actually I think it becomes more evident what Lina's patchset does if
+>> she re-introduces an API to deal with the locking. Moreover we can
+>> "force" that patchset to not break consistently around the locking.
+>>
+>>>
+>>> Otherwise, I think this version is looking really good.
+>>>
+>>> With the above tweaks, feel free to add
+>>>
+>>> Reviewed-by: Kevin Hilman <khilman@linaro.org>
+>>>
+>>> Kevin
+>>
+>> Thanks a lot for reviewing!
+>>
+>> If you have a strong opinion about your suggestions, I will happily
+>> adapt to them, please let me know.
+>
+> No strong option, you convinced me your way will actually make things
+> more consistent, and Lina prefers them gone as well, so I'm fine with
+> them gone (as you've done in V4).
+>
+> Kevin
+>
+>
 
-Is this at kernel boot time you see this, or at system startup time?
+Kevin, thanks for your review!
 
-IIRC, QEMU creates a throw-away VM with the default CPU target time,
-reads out all the system registers to get the KVM reset values of those,
-then creates the real VM, and feeds back in all the system register
-reset values, as a method for QEMU and KVM to be in sync about the reset
-state of the machine.  If we do this, and include CNTVCT, then that
-would probably trigger this, but the VCPU really shouldn't have been run
-at that time...
+I haven't applied your Reviewed-by tag to V4, as there where one more
+minor additional change added, regarding IRQ safe devices. I
+appreciate if could have a look, whenever you have some time.
 
-We should prevent userspace from fiddling with this register post VCPU
-start regardless, but yes, it would be good to find out why this is
-happening in the first place.
-
-How did you notice this and does it manifest itself in some user-visible
-ugliness?
-
-Thanks,
--Christoffer
-
-> 
->  virt/kvm/arm/arch_timer.c | 21 +++++++++++++++++++--
->  1 file changed, 19 insertions(+), 2 deletions(-)
-> 
-> diff --git a/virt/kvm/arm/arch_timer.c b/virt/kvm/arm/arch_timer.c
-> index 98c95f2..660f348 100644
-> --- a/virt/kvm/arm/arch_timer.c
-> +++ b/virt/kvm/arm/arch_timer.c
-> @@ -220,9 +220,26 @@ int kvm_arm_timer_set_reg(struct kvm_vcpu *vcpu, u64 regid, u64 value)
->  	case KVM_REG_ARM_TIMER_CTL:
->  		timer->cntv_ctl = value;
->  		break;
-> -	case KVM_REG_ARM_TIMER_CNT:
-> -		vcpu->kvm->arch.timer.cntvoff = kvm_phys_timer_read() - value;
-> +	case KVM_REG_ARM_TIMER_CNT: {
-> +		struct kvm_vcpu *tmp;
-> +		int i;
-> +		u64 cntvoff = kvm_phys_timer_read() - value;
-> +
-> +		/*
-> +		 * If any of the vcpus has started, don't update
-> +		 * CNTVOFF. Userspace is severely brain damaged.
-> +		 */
-> +		kvm_for_each_vcpu(i, tmp, vcpu->kvm) {
-> +			if (tmp->arch.has_run_once) {
-> +				kvm_debug("Won't set CNTVOFF to %llx (%llx)\n",
-> +					  cntvoff,
-> +					  vcpu->kvm->arch.timer.cntvoff);
-> +				return -1;
-> +			}
-> +		}
-> +		vcpu->kvm->arch.timer.cntvoff = cntvoff;
->  		break;
-> +	}
->  	case KVM_REG_ARM_TIMER_CVAL:
->  		timer->cntv_cval = value;
->  		break;
-> -- 
-> 2.1.4
-> 
+Kind regards
+Uffe
