@@ -1,55 +1,80 @@
-From: elfring@users.sourceforge.net (SF Markus Elfring)
-Date: Thu, 25 Jun 2015 13:40:31 +0200
-Subject: [PATCH 2/2] ARM-OMAP2+: Delete an unnecessary check before the
- function call "of_node_put"
-In-Reply-To: <558BE713.1020409@users.sourceforge.net>
-References: <5307CAA2.8060406@users.sourceforge.net>
- <alpine.DEB.2.02.1402212321410.2043@localhost6.localdomain6>
- <530A086E.8010901@users.sourceforge.net>
- <alpine.DEB.2.02.1402231635510.1985@localhost6.localdomain6>
- <530A72AA.3000601@users.sourceforge.net>
- <alpine.DEB.2.02.1402240658210.2090@localhost6.localdomain6>
- <530B5FB6.6010207@users.sourceforge.net>
- <alpine.DEB.2.10.1402241710370.2074@hadrien>
- <530C5E18.1020800@users.sourceforge.net>
- <alpine.DEB.2.10.1402251014170.2080@hadrien>
- <530CD2C4.4050903@users.sourceforge.net>
- <alpine.DEB.2.10.1402251840450.7035@hadrien>
- <530CF8FF.8080600@users.sourceforge.net>
- <alpine.DEB.2.02.1402252117150.2047@localhost6.localdomain6>
- <530DD06F.4090703@users.sourceforge.net>
- <alpine.DEB.2.02.1402262129250.2221@localhost6.localdomain6>
- <5317A59D.4@users.sourceforge.net> <558BE713.1020409@users.sourceforge.net>
-Message-ID: <558BE8AF.5000709@users.sourceforge.net>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Thu, 25 Jun 2015 20:45:22 +0900
+Subject: [PATCH-v4 2/3] mfd: 88pm800: Set default interrupt clear method
+In-Reply-To: <558BE3D6.2010801@linaro.org>
+References: <1435217189-19578-1-git-send-email-vaibhav.hiremath@linaro.org>
+ <1435217189-19578-3-git-send-email-vaibhav.hiremath@linaro.org>
+ <20150625102618.GC15013@x1> <558BE3D6.2010801@linaro.org>
+Message-ID: <CAJKOXPfbSV-WVVQrxrzvBJwpLaLskZVmnTQ5SUv=kV3SL_1SMQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Markus Elfring <elfring@users.sourceforge.net>
-Date: Thu, 25 Jun 2015 13:05:28 +0200
+2015-06-25 20:19 GMT+09:00 Vaibhav Hiremath <vaibhav.hiremath@linaro.org>:
+>
+>
+> On Thursday 25 June 2015 03:56 PM, Lee Jones wrote:
 
-The of_node_put() function tests whether its argument is NULL and then
-returns immediately. Thus the test around the call is not needed.
+(...)
 
-This issue was detected by using the Coccinelle software.
+>>> diff --git a/include/linux/mfd/88pm80x.h b/include/linux/mfd/88pm80x.h
+>>> index 97cb283..94b3dcd 100644
+>>> --- a/include/linux/mfd/88pm80x.h
+>>> +++ b/include/linux/mfd/88pm80x.h
+>>> @@ -77,6 +77,8 @@ enum {
+>>>   #define PM800_WAKEUP2         (0x0E)
+>>>   #define PM800_WAKEUP2_INV_INT         (1 << 0)
+>>>   #define PM800_WAKEUP2_INT_CLEAR               (1 << 1)
+>>> +#define PM800_WAKEUP2_INT_READ_CLEAR           (0 << 1)
+>>> +#define PM800_WAKEUP2_INT_WRITE_CLEAR          (1 << 1)
+>>>   #define PM800_WAKEUP2_INT_MASK                (1 << 2)
+>>
+>>
+>> Use the BIT() macro.
+>>
+>
+> I thought about this, but the whole file doesn't use it, so I also
+> chose not to.
+>
+>
+>>>   #define PM800_POWER_UP_LOG    (0x10)
+>>> @@ -300,7 +302,7 @@ struct pm80x_chip {
+>>>         struct regmap_irq_chip_data *irq_data;
+>>>         int type;
+>>>         int irq;
+>>> -       int irq_mode;
+>>> +       int irq_clr_on_wr;      /* '1': Clear on write, '0': Clear on
+>>> read*/
+>>
+>>
+>> Whitespace issue.
+>>
+>
+> Didn't see any...and I also ran checkpatch.
+>
+>> Shouldn't this be a bool?
+>>
+>
+> Just was not sure about any older board file interface.
+> Ideally it should be bool only.
+>
+>> Actually even better, I would define; CLR_ON_WRITE and CLR_ON_READ,
+>> and call the variable irq_clear_method, or something.
+>>
+>> Much clearer that way I think.
+>>
+>
+> We have slowly decided to almost hardcode it to one value if there is
+> no board file. I feel we should just keep it to simple.
+>
+> If you still insist, I can implement.
 
-Signed-off-by: Markus Elfring <elfring@users.sourceforge.net>
----
- arch/arm/mach-omap2/timer.c | 3 +--
- 1 file changed, 1 insertion(+), 2 deletions(-)
+The bool would be indeed nicer and still you could hard-code the
+desired value on DT system:
++               /* by default, set irq clear method on write */
++               pdata->irq_clear_method = CLR_ON_WRITE;
 
-diff --git a/arch/arm/mach-omap2/timer.c b/arch/arm/mach-omap2/timer.c
-index cac46d8..15448221 100644
---- a/arch/arm/mach-omap2/timer.c
-+++ b/arch/arm/mach-omap2/timer.c
-@@ -208,8 +208,7 @@ static void __init omap_dmtimer_init(void)
- 	/* If we are a secure device, remove any secure timer nodes */
- 	if ((omap_type() != OMAP2_DEVICE_TYPE_GP)) {
- 		np = omap_get_timer_dt(omap_timer_match, "ti,timer-secure");
--		if (np)
--			of_node_put(np);
-+		of_node_put(np);
- 	}
- }
- 
--- 
-2.4.4
+However the question is how this would influence existing platforms
+using board files. Are there any in kernel or in downstream?
+
+Best regards,
+Krzysztof
