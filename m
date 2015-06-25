@@ -1,65 +1,55 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu, 25 Jun 2015 09:48:43 +0100
-Subject: [RFC PATCH] KVM: arm/arm64: Don't let userspace update CNTVOFF
- once guest is running
-In-Reply-To: <20150625080457.GD28244@cbox>
-References: <1435157697-28579-1-git-send-email-marc.zyngier@arm.com>
- <20150625080457.GD28244@cbox>
-Message-ID: <558BC06B.3090204@arm.com>
+From: michal.simek@xilinx.com (Michal Simek)
+Date: Thu, 25 Jun 2015 10:50:19 +0200
+Subject: [PATCH v2] gpio/xilinx: Use correct address when setting initial
+ values.
+In-Reply-To: <1435130385.30543.3.camel@localhost>
+References: <1435130385.30543.3.camel@localhost>
+Message-ID: <558BC0CB.4000908@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Christoffer,
-
-On 25/06/15 09:04, Christoffer Dall wrote:
-> On Wed, Jun 24, 2015 at 03:54:57PM +0100, Marc Zyngier wrote:
->> Userspace is allowed to set the guest's view of CNTVCT, which turns
->> into setting CNTVOFF for the whole VM. One thing userspace is not supposed
->> to do is to update that register while the guest is running. Time will
->> either move forward (best case) or backward (really bad idea). Either way,
->> this shouldn't happen.
->>
->> This patch prevents userspace from touching CNTVOFF as soon as a vcpu
->> has been started. This ensures that time will keep monotonically increase.
->>
->> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
->> ---
->>
->> QEMU seems to trigger this at boot time, and I have no idea why it does so.
->> It would be good to find out, hence the RFC tag.
+On 06/24/2015 09:19 AM, Rapha?l Teysseyre wrote:
+> xgpio_save_regs() is used in this driver to setup the initial
+> values of the registers in the hardware.
 > 
-> Is this at kernel boot time you see this, or at system startup time?
+> The relevant registers at that time are:
+> 0x0 -> channel 0 data (32 bits, one for each GPIO on this channel).
+> 0x4 -> channel 0 tri, controls in/out status for each GPIO of this channel.
+> 0x8 -> channel 1 data
+> 0xC -> channel 1 tri
+> 
+> gpio-xilinx.c defines these:
+> XGPIO_DATA_OFFSET   (0x0)
+> XGPIO_TRI_OFFSET    (0x4)
+> XGPIO_CHANNEL_OFFSET	0x8
+> 
+> Before this patch, the "data" register value of channel 1 was written
+> at 0x4 intead of 0x8 (overwriting the channel 0 "tri" register),
+> and the "tri" register value for channel 1 was written at 0x8 instead of 0xC.
+> 
+> Signed-off-by: Rapha?l Teysseyre <rteysseyre@gmail.com>
+> ---
+>  drivers/gpio/gpio-xilinx.c |    4 ++--
+>  1 files changed, 2 insertions(+), 2 deletions(-)
+> 
+> diff --git a/drivers/gpio/gpio-xilinx.c b/drivers/gpio/gpio-xilinx.c
+> index 61243d1..e544b7a 100644
+> --- a/drivers/gpio/gpio-xilinx.c
+> +++ b/drivers/gpio/gpio-xilinx.c
+> @@ -220,9 +220,9 @@ static void xgpio_save_regs(struct of_mm_gpio_chip *mm_gc)
+>  	if (!chip->gpio_width[1])
+>  		return;
+>  
+> -	xgpio_writereg(mm_gc->regs + XGPIO_DATA_OFFSET + XGPIO_TRI_OFFSET,
+> +	xgpio_writereg(mm_gc->regs + XGPIO_DATA_OFFSET + XGPIO_CHANNEL_OFFSET,
+>  		       chip->gpio_state[1]);
+> -	xgpio_writereg(mm_gc->regs + XGPIO_TRI_OFFSET + XGPIO_TRI_OFFSET,
+> +	xgpio_writereg(mm_gc->regs + XGPIO_TRI_OFFSET + XGPIO_CHANNEL_OFFSET,
+>  		       chip->gpio_dir[1]);
+>  }
 
-When the kernel boots. The OSV guys also have seen this (time going
-backward), and this patch seems to have solved their problem.
 
-> IIRC, QEMU creates a throw-away VM with the default CPU target time,
-> reads out all the system registers to get the KVM reset values of those,
-> then creates the real VM, and feeds back in all the system register
-> reset values, as a method for QEMU and KVM to be in sync about the reset
-> state of the machine.  If we do this, and include CNTVCT, then that
-> would probably trigger this, but the VCPU really shouldn't have been run
-> at that time...
-
-I definitely see this process happening, but that doesn't seem to be the
-problem.
-
-> We should prevent userspace from fiddling with this register post VCPU
-> start regardless, but yes, it would be good to find out why this is
-> happening in the first place.
-
-My main problem is that I cannot easily correlate what is happening in
-the guest at that time with something touching CNTVCT. That's just odd.
-
-> How did you notice this and does it manifest itself in some user-visible
-> ugliness?
-
-It was first reported by the OSV guys, and I then spotted some
-interesting hrtimers taking too long at guest boot time. Putting some
-traces quickly identified the issue.
+Reviewed-by: Michal Simek <michal.simek@xilinx.com>
 
 Thanks,
-
-	M.
--- 
-Jazz is not dead. It just smells funny...
+Michal
