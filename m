@@ -1,89 +1,166 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Thu, 25 Jun 2015 15:05:34 +0900
-Subject: [PATCH-v3 2/3] mfd: 88pm800: Allow configuration of interrupt
- clear method
-In-Reply-To: <558B984D.9040309@linaro.org>
-References: <1435137673-1629-1-git-send-email-vaibhav.hiremath@linaro.org>
- <1435137673-1629-3-git-send-email-vaibhav.hiremath@linaro.org>
- <CAJKOXPdqTnkB6Lw4fsJ-=o4=QcYcAtZK0zgOM9aqgesTU=Dw+A@mail.gmail.com>
- <558B90F7.80700@linaro.org> <558B9272.6090100@samsung.com>
- <558B9549.5010705@linaro.org> <558B96B7.3030501@samsung.com>
- <558B984D.9040309@linaro.org>
-Message-ID: <558B9A2E.4020009@samsung.com>
+From: pi-cheng.chen@linaro.org (Pi-Cheng Chen)
+Date: Thu, 25 Jun 2015 14:20:58 +0800
+Subject: [PATCH 1/2] dt-bindings: mediatek: Add MT8173 cpufreq driver
+ binding
+In-Reply-To: <20150624010621.GB6424@linux>
+References: <1433766561-1330-1-git-send-email-pi-cheng.chen@linaro.org>
+ <1433766561-1330-2-git-send-email-pi-cheng.chen@linaro.org>
+ <CALx668UShfd3HW1ptzHnMr9xAUVyLGt=q2CmYHn3vqASZug6kw@mail.gmail.com>
+ <20150624010621.GB6424@linux>
+Message-ID: <CALx668V-M+9c78K56j7rt=R5FP-2k-y1RUSp2=6q7wM9TyQgxg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 25.06.2015 14:57, Vaibhav Hiremath wrote:
-> 
-> 
-> On Thursday 25 June 2015 11:20 AM, Krzysztof Kozlowski wrote:
->> On 25.06.2015 14:44, Vaibhav Hiremath wrote:
->>>
->>>
->>> On Thursday 25 June 2015 11:02 AM, Krzysztof Kozlowski wrote:
->>>> On 25.06.2015 14:26, Vaibhav Hiremath wrote:
->>>>>
->>>>>
->>>>> On Thursday 25 June 2015 05:33 AM, Krzysztof Kozlowski wrote:
->>>>>> 2015-06-24 18:21 GMT+09:00 Vaibhav Hiremath
->>>>>> <vaibhav.hiremath@linaro.org>:
->>>>>>> As per the spec, bit 1 (INT_CLEAR_MODE) of reg addr 0xe
->>>>>>> (page 0) controls the method of clearing interrupt
->>>>>>> status of 88pm800 family of devices;
->>>>>>>
->>>>>>>      0: clear on read
->>>>>>>      1: clear on write
->>>>>>>
->>>>>>> This patch allows to configure this field, through DT.
->>>>>>>
->>>>>>> Also, as suggested by "Lee Jones" renaming DT property and variable
->>>>>>> field to appropriate name.
->>>>>>>
->>>>>>> Signed-off-by: Zhao Ye <zhaoy@marvell.com>
->>>>>>> Signed-off-by: Vaibhav Hiremath <vaibhav.hiremath@linaro.org>
->>>>>>
->>>>
-> 
-> <snip>
-> 
->>>
->>> Yes,
->>> Fair enough...
->>>
->>> I see very little value in runtime configuration, why not just do it
->>> only way (either read or write)?
->>> I would prefer to just set it by default (during init), to clear irq on
->>> write.
->>
->> Hard-coding a default value, if board files are not present, looks OK
->> to me.
->>
-> 
-> This is how it will look, I will also update the binding information
-> with this.
-> 
-> 
-> hvaibhav at hvaibhav-ThinkPad-T440p:~/projects/mainline/linux$ git diff
-> --cached
-> diff --git a/drivers/mfd/88pm800.c b/drivers/mfd/88pm800.c
-> index 0a417ac..e415a06 100644
-> --- a/drivers/mfd/88pm800.c
-> +++ b/drivers/mfd/88pm800.c
-> @@ -645,9 +645,8 @@ static int pm800_probe(struct i2c_client *client,
->                         dev_err(&client->dev, "failed to allocaate
-> memory\n");
->                         return -ENOMEM;
->                 }
-> -
-> -               pdata->irq_clr_on_wr = of_property_read_bool(np,
-> -                                       "marvell,irq-clr-on-write");
-> +               /* Setting irq clear method on write */
-> +               pdata->irq_clr_on_wr = true;
->         }
-> 
->         ret = pm80x_init(client);
+Hi Matthias and Mark,
 
-IMHO it is good.
+May I have some review comments for this patch from you to get this
+series moving forwards?
 
-Best regards,
-Krzysztof
+Thanks.
+Pi-Cheng
+
+On Wed, Jun 24, 2015 at 9:06 AM, Viresh Kumar <viresh.kumar@linaro.org> wrote:
+> Adding Mike's new email address..
+>
+> On 23-06-15, 23:31, Pi-Cheng Chen wrote:
+>> On Mon, Jun 8, 2015 at 8:29 PM, Pi-Cheng Chen <pi-cheng.chen@linaro.org> wrote:
+>> > This patch adds device tree binding document for MT8173 cpufreq driver.
+>> >
+>> > Signed-off-by: Pi-Cheng Chen <pi-cheng.chen@linaro.org>
+>> > ---
+>> >  .../devicetree/bindings/cpufreq/cpufreq-mt8173.txt | 127 +++++++++++++++++++++
+>> >  1 file changed, 127 insertions(+)
+>> >  create mode 100644 Documentation/devicetree/bindings/cpufreq/cpufreq-mt8173.txt
+>> >
+>> > diff --git a/Documentation/devicetree/bindings/cpufreq/cpufreq-mt8173.txt b/Documentation/devicetree/bindings/cpufreq/cpufreq-mt8173.txt
+>> > new file mode 100644
+>> > index 0000000..7708a65
+>> > --- /dev/null
+>> > +++ b/Documentation/devicetree/bindings/cpufreq/cpufreq-mt8173.txt
+>> > @@ -0,0 +1,127 @@
+>> > +
+>> > +Mediatek MT8173 cpufreq driver
+>> > +-------------------
+>
+> Few more ---- required.
+>
+>> > +
+>> > +Mediatek MT8173 cpufreq driver for CPU frequency scaling.
+>> > +
+>> > +Required properties:
+>> > +- clocks: A list of phandle + clock-specifier pairs for the clocks listed in clock names.
+>> > +- clock-names: Should contain the following:
+>> > +       "cpu"           - The multiplexer for clock input of CPU cluster.
+>> > +       "intermediate"  - A parent of "cpu" clock which is used as "intermediate" clock
+>> > +                         source (usually MAINPLL) when the original CPU PLL is under
+>> > +                         transition and not stable yet.
+>
+> These belong to Mike.
+>
+>> > +- operating-points: Table of frequencies and voltage CPU could be transitioned into,
+>> > +                   Frequency should be in KHz units and voltage should be in microvolts.
+>
+> That's not complete. You should just mention the path to opp bindings
+> here. And that's it.
+>
+>> > +- proc-supply: Regulator for Vproc of CPU cluster.
+>> > +
+>> > +Optional properties:
+>> > +- sram-supply: Regulator for Vsram of CPU cluster. When present, the cpufreq driver
+>> > +              needs to do "voltage trace" to step by step scale up/down Vproc and
+>> > +              Vsram to fit SoC specific needs. When absent, the voltage scaling
+>> > +              flow is handled by hardware, hence no software "voltage trace" is
+>> > +              needed.
+>> > +
+>> > +Example:
+>> > +--------
+>> > +       cpu0: cpu at 0 {
+>> > +               device_type = "cpu";
+>> > +               compatible = "arm,cortex-a53";
+>> > +               reg = <0x000>;
+>> > +               enable-method = "psci";
+>> > +               cpu-idle-states = <&CPU_SLEEP_0>;
+>> > +               clocks = <&infracfg CLK_INFRA_CA53SEL>,
+>> > +                        <&apmixedsys CLK_APMIXED_MAINPLL>;
+>> > +               clock-names = "cpu", "intermediate";
+>> > +               operating-points = <
+>> > +                       507000  859000
+>> > +                       702000  908000
+>> > +                       1001000 983000
+>> > +                       1105000 1009000
+>> > +                       1183000 1028000
+>> > +                       1404000 1083000
+>> > +                       1508000 1109000
+>> > +                       1573000 1125000
+>> > +               >;
+>> > +       };
+>> > +
+>> > +       cpu1: cpu at 1 {
+>> > +               device_type = "cpu";
+>> > +               compatible = "arm,cortex-a53";
+>> > +               reg = <0x001>;
+>> > +               enable-method = "psci";
+>> > +               cpu-idle-states = <&CPU_SLEEP_0>;
+>> > +               clocks = <&infracfg CLK_INFRA_CA53SEL>,
+>> > +                        <&apmixedsys CLK_APMIXED_MAINPLL>;
+>> > +               clock-names = "cpu", "intermediate";
+>> > +               operating-points = <
+>> > +                       507000  859000
+>> > +                       702000  908000
+>> > +                       1001000 983000
+>> > +                       1105000 1009000
+>> > +                       1183000 1028000
+>> > +                       1404000 1083000
+>> > +                       1508000 1109000
+>> > +                       1573000 1125000
+>> > +               >;
+>> > +       };
+>> > +
+>> > +       cpu2: cpu at 100 {
+>> > +               device_type = "cpu";
+>> > +               compatible = "arm,cortex-a57";
+>> > +               reg = <0x100>;
+>> > +               enable-method = "psci";
+>> > +               cpu-idle-states = <&CPU_SLEEP_0>;
+>> > +               clocks = <&infracfg CLK_INFRA_CA57SEL>,
+>> > +                        <&apmixedsys CLK_APMIXED_MAINPLL>;
+>> > +               clock-names = "cpu", "intermediate";
+>> > +               operating-points = <
+>> > +                       507000  828000
+>> > +                       702000  867000
+>> > +                       1001000 927000
+>> > +                       1209000 968000
+>> > +                       1404000 1007000
+>> > +                       1612000 1049000
+>> > +                       1807000 1089000
+>> > +                       1989000 1125000
+>> > +               >;
+>> > +       };
+>> > +
+>> > +       cpu3: cpu at 101 {
+>> > +               device_type = "cpu";
+>> > +               compatible = "arm,cortex-a57";
+>> > +               reg = <0x101>;
+>> > +               enable-method = "psci";
+>> > +               cpu-idle-states = <&CPU_SLEEP_0>;
+>> > +               clocks = <&infracfg CLK_INFRA_CA57SEL>,
+>> > +                        <&apmixedsys CLK_APMIXED_MAINPLL>;
+>> > +               clock-names = "cpu", "intermediate";
+>> > +               operating-points = <
+>> > +                       507000  828000
+>> > +                       702000  867000
+>> > +                       1001000 927000
+>> > +                       1209000 968000
+>> > +                       1404000 1007000
+>> > +                       1612000 1049000
+>> > +                       1807000 1089000
+>> > +                       1989000 1125000
+>> > +               >;
+>> > +       };
+>
+> I remember Mark Rutland asking you about the replicated stuff for all
+> CPUs, but happened to his comments later on ? Were you asked to put
+> these for all the CPUs ?
+>
+> --
+> viresh
