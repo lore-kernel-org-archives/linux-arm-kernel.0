@@ -1,91 +1,60 @@
-From: vitalya@ti.com (Vitaly Andrianov)
-Date: Thu, 25 Jun 2015 12:01:36 -0400
-Subject: [PATCH] keystone: psci: adds cpu_die implementation
-In-Reply-To: <558C174F.80108@oracle.com>
-References: <1435240970-30869-1-git-send-email-vitalya@ti.com>
- <20150625144511.GA6844@leverpostej> <558C174F.80108@oracle.com>
-Message-ID: <558C25E0.3010102@ti.com>
+From: jassisinghbrar@gmail.com (Jassi Brar)
+Date: Thu, 25 Jun 2015 21:28:48 +0530
+Subject: [GIT PULL] Mailbox changes for v4.2
+Message-ID: <CABb+yY2N+thoJEBfNdpsyEpDjpvnJ4-GbhTEJM-e7earmZpDAQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Linus,
 
+The following changes since commit 030bbdbf4c833bc69f502eae58498bc5572db736:
 
-On 06/25/2015 10:59 AM, santosh shilimkar wrote:
-> On 6/25/2015 7:45 AM, Mark Rutland wrote:
->> Hi,
->>
->> On Thu, Jun 25, 2015 at 03:02:50PM +0100, Vitaly Andrianov wrote:
->>> This commit add cpu_die implementation using psci api
->>
->> I don't understand. If you have a PSCI implementation, it should be
->> sufficient to have a PSCI node (and enable-method) in your DT, and the
->> generic code will be used. Nothing should be required in your board
->> code.
->>
->> You should also use CPU_ON to bring secondaries online rather than
->> mixing up PSCI and platform-specific mechanisms.
->>
-> Good point about CPU_ON. We need that as well.
->
-Does it mean that keystone_defconfig must always have CONFIG_HOTPLUG_CPU 
-and CONFIG_ARM_PSCI enabled?
+  Linux 4.1-rc3 (2015-05-10 15:12:29 -0700)
 
-What is if someone doesn't want to have HOTPLUG_CPU?
-How he can boot secondary CPU w/o platform-specific mechanizm?
+are available in the git repository at:
 
+  http://git.linaro.org/landing-teams/working/fujitsu/integration.git
+mailbox-for-next
 
->>>
->>> Signed-off-by: Vitaly Andrianov <vitalya@ti.com>
->>> ---
->>>   arch/arm/mach-keystone/platsmp.c | 32 ++++++++++++++++++++++++++++++++
->>>   1 file changed, 32 insertions(+)
->>>
->>> diff --git a/arch/arm/mach-keystone/platsmp.c
->>> b/arch/arm/mach-keystone/platsmp.c
->>> index 5f46a7c..2c40cc0 100644
->>> --- a/arch/arm/mach-keystone/platsmp.c
->>> +++ b/arch/arm/mach-keystone/platsmp.c
->>> @@ -20,6 +20,7 @@
->>>   #include <asm/prom.h>
->>>   #include <asm/tlbflush.h>
->>>   #include <asm/pgtable.h>
->>> +#include <asm/psci.h>
->>>
->>>   #include "keystone.h"
->>>
->>> @@ -51,7 +52,38 @@ static inline void __cpuinit
->>> keystone_smp_secondary_initmem(unsigned int cpu)
->>>   {}
->>>   #endif
->>>
->>> +
->>> +#ifdef CONFIG_HOTPLUG_CPU
->>> +static void keystone_cpu_die(unsigned int cpu)
->>> +{
->>> +#ifdef CONFIG_ARM_PSCI
->>> +    struct psci_power_state pwr_state = {0, 0, 0};
->>> +
->>> +    pr_info("keystone_cpu_die(%d) from %d using PSCI\n", cpu,
->>> +           smp_processor_id());
->>> +
->>> +    if (psci_ops.cpu_off)
->>> +        psci_ops.cpu_off(pwr_state);
->>> +#else
->>> +    /*
->>> +     * We may want to add here a direct smc call to monitor
->>> +     * if the kernel doesn't support PSCI API
->>> +     */
->>> +#endif
->>
->> You should determine this from your DT. Your FW/bootloader can patch in
->> the relevant nodes and properties when support is present, so the
->> presence of such nodes should guarantee that PSCI is available.
->>
-> That will be a nice trick. FW already does some tweaks of dts for
-> LPAE/non_LPAE tweaks.
->
-> Regards,
-> Santosh
+for you to fetch changes up to 7d641938aa2ae433a97cc65ec622547cfe08f2ed:
 
-Thanks,
--Vitaly
+  mailbox/bcm2835: Fix mailbox full detection. (2015-06-13 16:20:39 +0530)
+
+----------------------------------------------------------------
+Andrew Bresticker (1):
+      mailbox: Make mbox_chan_ops const
+
+Benson Leung (1):
+      mailbox: Fix up error handling in mbox_request_channel()
+
+Eric Anholt (1):
+      mailbox/bcm2835: Fix mailbox full detection.
+
+Lee Jones (2):
+      mailbox: Add ability for clients to request channels by name
+      dt: mailbox: Remove 'mbox-names property is discouraged' message
+from binding
+
+Lubomir Rintel (2):
+      dt/bindings: Add binding for the BCM2835 mailbox driver
+      mailbox: Enable BCM2835 mailbox support
+
+Richard Weinberger (1):
+      mailbox: altera: Add dependency on HAS_IOMEM
+
+ .../bindings/mailbox/brcm,bcm2835-mbox.txt         |  26 +++
+ .../devicetree/bindings/mailbox/mailbox.txt        |  10 +-
+ drivers/mailbox/Kconfig                            |  10 +
+ drivers/mailbox/Makefile                           |   2 +
+ drivers/mailbox/arm_mhu.c                          |   2 +-
+ drivers/mailbox/bcm2835-mailbox.c                  | 217 +++++++++++++++++++++
+ drivers/mailbox/mailbox-altera.c                   |   2 +-
+ drivers/mailbox/mailbox.c                          |  40 +++-
+ drivers/mailbox/omap-mailbox.c                     |   8 +-
+ drivers/mailbox/pcc.c                              |   2 +-
+ include/linux/mailbox_client.h                     |   2 +
+ include/linux/mailbox_controller.h                 |   2 +-
+ 12 files changed, 304 insertions(+), 19 deletions(-)
+ create mode 100644
+Documentation/devicetree/bindings/mailbox/brcm,bcm2835-mbox.txt
+ create mode 100644 drivers/mailbox/bcm2835-mailbox.c
