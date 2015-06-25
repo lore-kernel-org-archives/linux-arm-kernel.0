@@ -1,30 +1,58 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 25 Jun 2015 00:41:30 -0700
-Subject: [RESEND] [PATCH v2 1/2] arm: devtree: Set system_rev from DT
- revision
-In-Reply-To: <20150625072711.GD2890@pali>
-References: <1430902142-17035-1-git-send-email-pali.rohar@gmail.com>
- <3577431.y872Foi4kj@wuerfel> <20150506103752.GG30910@pali>
- <3529567.PeFp1NNa1q@wuerfel> <20150506114417.GI30910@pali>
- <20150625050138.GL4156@atomide.com> <20150625071851.GB2890@pali>
- <20150625072205.GO4156@atomide.com> <20150625072711.GD2890@pali>
-Message-ID: <20150625074130.GP4156@atomide.com>
+From: vaibhav.hiremath@linaro.org (Vaibhav Hiremath)
+Date: Thu, 25 Jun 2015 13:16:09 +0530
+Subject: [rtc-linux] [PATCH-v2] rtc: 88pm80x: add device tree support
+In-Reply-To: <20150620004354.GY27492@piout.net>
+References: <vaibhav.hiremath@linaro.org>
+ <1434567488-6477-1-git-send-email-vaibhav.hiremath@linaro.org>
+ <1434567488-6477-3-git-send-email-vaibhav.hiremath@linaro.org>
+ <20150620004354.GY27492@piout.net>
+Message-ID: <558BB1C1.2090400@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Pali Roh?r <pali.rohar@gmail.com> [150625 00:29]:
-> On Thursday 25 June 2015 00:22:05 Tony Lindgren wrote:
-> > * Pali Roh?r <pali.rohar@gmail.com> [150625 00:21]:
-> > > 
-> > > Ok, but what do you mean to forget any string conversion?
-> > 
-> > No need for tohexstr() in the uncommpress code if the system_rev
-> > value is a number coming from the dts.
-> 
-> So /revision DT property will be (binary) value, right?
 
-Right just u32 value.
 
-Regards,
+On Saturday 20 June 2015 06:13 AM, Alexandre Belloni wrote:
+> Hi,
+>
 
-Tony
+Sorry I missed this email.
+Just wanted to send reminder email and saw this :)
+
+> On 18/06/2015 at 00:28:06 +0530, Vaibhav Hiremath wrote :
+>> -	pdata = dev_get_platdata(&pdev->dev);
+>> -	if (pdata == NULL)
+>> -		dev_warn(&pdev->dev, "No platform data!\n");
+>> +	if (!pdata && !node) {
+>> +		dev_err(&pdev->dev,
+>> +			"pm80x-rtc requires platform data or of_node\n");
+>> +		return -EINVAL;
+>> +	}
+>> +
+>> +	if (!pdata) {
+>> +		pdata = devm_kzalloc(&pdev->dev, sizeof(*pdata), GFP_KERNEL);
+>
+> I had troubles to follow the rtc_wakeup initialization cleanup but it
+> seems OK.
+
+Probably, once we have complete PM support ready then it would be
+easier to understand. I think as of now lets have this minimal code for
+rtc_wakeup.
+
+> However, I'm wondering why you are adding DT support as this
+> will always be probed from the MFD driver which pass the platform_data
+> and avoids that allocation.
+>
+
+You are right.
+
+Originally, it was cleanup patch,
+
+  - remove pm80x_pdata
+  - Add check for pdata and np
+  - and around rtc_wakeup
+
+While doing that I added this nice to have allocation.
+
+Thanks,
+Vaibhav
