@@ -1,40 +1,26 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Thu, 25 Jun 2015 11:08:28 +0200
-Subject: imx6 GPIO1 interrupts
-In-Reply-To: <CAMB+bfKULf-2wJbw8LH7r345_EvTOktS6zBJnNzAh69dZPtStw@mail.gmail.com>
-References: <CAMB+bfKULf-2wJbw8LH7r345_EvTOktS6zBJnNzAh69dZPtStw@mail.gmail.com>
-Message-ID: <20150625090828.GB6035@pengutronix.de>
+From: peter.maydell@linaro.org (Peter Maydell)
+Date: Thu, 25 Jun 2015 10:10:04 +0100
+Subject: [RFC PATCH] KVM: arm/arm64: Don't let userspace update CNTVOFF
+ once guest is running
+In-Reply-To: <558BC2F5.9010303@huawei.com>
+References: <1435157697-28579-1-git-send-email-marc.zyngier@arm.com>
+ <20150625080457.GD28244@cbox> <558BC2F5.9010303@huawei.com>
+Message-ID: <CAFEAcA_RzWSppaYA9vuAaL-MO6sQV1SgpXf3w-LScUdaarpOEQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+On 25 June 2015 at 09:59, Claudio Fontana <claudio.fontana@huawei.com> wrote:
+> Once the VM is created, I think QEMU should not request kvm to
+> change the virtual offset of the VM anymore: maybe an unexpected
+> consequence of QEMU's target-arm/kvm64.c::kvm_arch_put_registers ?
 
-probably not helpful for your original question, but ...
+Hmm. In general we assume that we can:
+ * stop the VM
+ * read all the guest system registers
+ * write those values back again
+ * restart the VM
 
-On Thu, Feb 19, 2015 at 10:09:40AM -0800, Joshua Clayton wrote:
-> Freescale imx6 has gpios use shared irqs that trigger across 16 pins
-> at a time. These are supported in the mainline kernel.
-> 
-> The first 8 pins on GPIO1 also have their own interrupts on the GIC.
-> I have a kluge sort of working,  and am wondering what it would take
-> for me to fully support these in a way that might be mainlined.
-> 
-> What I am doing:
-> (error checking removed for brevity)
-> 
->         /* request the shared gpio irq to set the correct edge bits */
->         gpiod = gpiod_get(my->dev, "diffirq");
->         ret = gpiod_direction_input(gpiod);
-... you should make this read:
+if we need to. Is that what's happening here, or are we doing
+something odder?
 
-	gpiod = gpiod_get(my->dev, "diffirq", GPIOD_IN);
-
-instead. It's easier and gpiod_get with only two parameters will go away
-soon.
-
-Best regards
-Uwe
-
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+-- PMM
