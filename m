@@ -1,56 +1,63 @@
-From: xi.wang@gmail.com (Xi Wang)
-Date: Thu, 25 Jun 2015 05:47:39 -0700
-Subject: [PATCH] arm64: bpf: fix out-of-bounds read in bpf2a64_offset()
-Message-ID: <1435236459-15141-1-git-send-email-xi.wang@gmail.com>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Thu, 25 Jun 2015 13:20:09 +0000
+Subject: [PATCH v2 1/3] net: mvneta: introduce compatible string
+ "marvell, armada-xp-neta"
+In-Reply-To: <20150625091323.GH4853@kw.sim.vm.gnt>
+References: <1434547162-6275-1-git-send-email-simon.guinot@sequanux.org>
+ <1434547162-6275-2-git-send-email-simon.guinot@sequanux.org>
+ <55818E64.20007@free-electrons.com>
+ <55818F10.8030304@free-electrons.com>
+ <20150617170112.GD2917@io.lakedaemon.net>
+ <20150619123253.GB4853@kw.sim.vm.gnt>
+ <20150625091323.GH4853@kw.sim.vm.gnt>
+Message-ID: <20150625132009.GC23515@io.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Problems occur when bpf_to or bpf_from has value prog->len - 1 (e.g.,
-"Very long jump backwards" in test_bpf where the last instruction is a
-jump): since ctx->offset has length prog->len, ctx->offset[bpf_to + 1]
-or ctx->offset[bpf_from + 1] will cause an out-of-bounds read, leading
-to a bogus jump offset and kernel panic.
+On Thu, Jun 25, 2015 at 11:13:23AM +0200, Simon Guinot wrote:
+> On Fri, Jun 19, 2015 at 02:32:53PM +0200, Simon Guinot wrote:
+> > On Wed, Jun 17, 2015 at 05:01:12PM +0000, Jason Cooper wrote:
+> > > On Wed, Jun 17, 2015 at 05:15:28PM +0200, Gregory CLEMENT wrote:
+> > > > On 17/06/2015 17:12, Gregory CLEMENT wrote:
+> > > > > On 17/06/2015 15:19, Simon Guinot wrote:
+> > > > >> The mvneta driver supports the Ethernet IP found in the Armada 370, XP,
+> > > > >> 380 and 385 SoCs. Since at least one more hardware feature is available
+> > > > >> for the Armada XP SoCs then a way to identify them is needed.
+> > > > >>
+> > > > >> This patch introduces a new compatible string "marvell,armada-xp-neta".
+> > > > > 
+> > > > > Let's be future proof by going further. I would like to have an compatible string
+> > > > > for each SoC even if we currently we don't use them.
+> > > 
+> > > I disagree with this.  We can't predict what incosistencies we'll discover in
+> > > the future.  We should only assign new compatible strings based on known IP
+> > > variations when we discover them.  This seems fraught with demons since we
+> > > can't predict the scope of affected IP blocks (some steppings of one SoC, three
+> > > SoCs plus two steppings of a fourth, etc)
+> > > 
+> > > imho, the 'future-proofing' lies in being specific as to the naming of the
+> > > compatible strings against known hardware variations at the time.
+> > 
+> > So, should I add more compatible strings or not ?
+> 
+> How do you want me to handle this ? Did you reach an agreement ?
 
-This patch moves updating ctx->offset to after calling build_insn(),
-and changes indexing to use bpf_to and bpf_from without + 1.
+Sorry, this slipped off my radar.  Probably EBKAC.  :)
 
-Cc: Zi Shen Lim <zlim.lnx@gmail.com>
-Cc: Alexei Starovoitov <ast@plumgrid.com>
-Cc: Will Deacon <will.deacon@arm.com>
-Fixes: e54bcde3d69d ("arm64: eBPF JIT compiler")
-Signed-off-by: Xi Wang <xi.wang@gmail.com>
----
- arch/arm64/net/bpf_jit_comp.c | 7 ++++---
- 1 file changed, 4 insertions(+), 3 deletions(-)
+I'm still of the opinion that future-proofing equates to guessing.
+It has the advantage of, if we guess correctly, things are easier down
+the road when we discover differences between similar IP blocks.
+However, if we guess incorrectly, then we have a mess on our hands.
+iow, this proposal fails poorly.
 
-diff --git a/arch/arm64/net/bpf_jit_comp.c b/arch/arm64/net/bpf_jit_comp.c
-index dc6a484..c81ddd4 100644
---- a/arch/arm64/net/bpf_jit_comp.c
-+++ b/arch/arm64/net/bpf_jit_comp.c
-@@ -113,9 +113,9 @@ static inline void emit_a64_mov_i(const int is64, const int reg,
- static inline int bpf2a64_offset(int bpf_to, int bpf_from,
- 				 const struct jit_ctx *ctx)
- {
--	int to = ctx->offset[bpf_to + 1];
-+	int to = ctx->offset[bpf_to];
- 	/* -1 to account for the Branch instruction */
--	int from = ctx->offset[bpf_from + 1] - 1;
-+	int from = ctx->offset[bpf_from] - 1;
- 
- 	return to - from;
- }
-@@ -640,10 +640,11 @@ static int build_body(struct jit_ctx *ctx)
- 		const struct bpf_insn *insn = &prog->insnsi[i];
- 		int ret;
- 
-+		ret = build_insn(insn, ctx);
-+
- 		if (ctx->image == NULL)
- 			ctx->offset[i] = ctx->idx;
- 
--		ret = build_insn(insn, ctx);
- 		if (ret > 0) {
- 			i++;
- 			continue;
--- 
-2.1.4
+I've no problem breaking DT compatibility when it's determined that we
+made a mistake (or mistakes) in the past.  See the irqchip rework that
+Marc did a few cycles ago.
+
+The difference here is that we know better.  We *know* that dtbs are
+upgraded with the kernel.  We *know* that no one is shipping products
+with dtbs in ROMs.  So what are we really trying to protect against?
+
+thx,
+
+Jason.
