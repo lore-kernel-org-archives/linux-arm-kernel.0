@@ -1,69 +1,102 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Thu, 25 Jun 2015 14:30:34 +0200
-Subject: [PATCH] arm64/kvm: Add generic v8 KVM target
-In-Reply-To: <558A7936.7020109@arm.com>
-References: <1434531646-4873-1-git-send-email-suzuki.poulose@arm.com>
- <CAFEAcA92uymQ3LjPQnuFiwvjSgc+jY54VrfK_Sh4v1DJ+=OPpw@mail.gmail.com>
- <558A6A84.5020603@arm.com> <20150624085128.GA22785@cbox>
- <558A7936.7020109@arm.com>
-Message-ID: <20150625123034.GE28244@cbox>
+From: vaibhav.hiremath@linaro.org (Vaibhav Hiremath)
+Date: Thu, 25 Jun 2015 18:06:07 +0530
+Subject: [PATCH-v4 2/3] mfd: 88pm800: Set default interrupt clear method
+In-Reply-To: <CAJKOXPfbSV-WVVQrxrzvBJwpLaLskZVmnTQ5SUv=kV3SL_1SMQ@mail.gmail.com>
+References: <1435217189-19578-1-git-send-email-vaibhav.hiremath@linaro.org>	<1435217189-19578-3-git-send-email-vaibhav.hiremath@linaro.org>	<20150625102618.GC15013@x1>	<558BE3D6.2010801@linaro.org>
+ <CAJKOXPfbSV-WVVQrxrzvBJwpLaLskZVmnTQ5SUv=kV3SL_1SMQ@mail.gmail.com>
+Message-ID: <558BF5B7.6070708@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 24, 2015 at 10:32:38AM +0100, Marc Zyngier wrote:
-> Hi Christoffer,
-> 
-> On 24/06/15 09:51, Christoffer Dall wrote:
-> > On Wed, Jun 24, 2015 at 09:29:56AM +0100, Marc Zyngier wrote:
-> >> On 22/06/15 09:44, Peter Maydell wrote:
-> >>> On 17 June 2015 at 10:00, Suzuki K. Poulose <suzuki.poulose@arm.com> wrote:
-> >>>> From: "Suzuki K. Poulose" <suzuki.poulose@arm.com>
-> >>>>
-> >>>> This patch adds a generic ARM v8 KVM target cpu type for use
-> >>>> by the new CPUs which eventualy ends up using the common sys_reg
-> >>>> table. For backward compatibility the existing targets have been
-> >>>> preserved. Any new target CPU that can be covered by generic v8
-> >>>> sys_reg tables should make use of the new generic target.
-> >>>
-> >>> How do you intend this to work for cross-host migration?
-> >>
-> >> It is not meant to work for cross migration at all.
-> >>
-> >>> Is the idea that the kernel guarantees that "generic" looks
-> >>> 100% the same to the guest regardless of host hardware? I'm
-> >>> not sure that can be made to work, given impdef differences
-> >>> in ID register values, bp/wp registers, and so on.
-> >>>
-> >>> Given that, it seems to me that we still need to provide
-> >>> KVM_ARM_TARGET_$THISCPU defines so userspace can request
-> >>> a specific guest CPU flavour; so what does this patch
-> >>> provide that isn't already provided by just having userspace
-> >>> query for the "preferred" CPU type as it does already?
-> >>
-> >> The way I see this working is that a "generic" CPU cannot be migrated
-> >> (because we don't know anything about it). If it can be identified as a
-> >> known (non generic) implementation, then we can migrate it.
-> >>
-> > Concretely, how should this work?  Be enforced by userspace or should we
-> > deny certain SET_ONE_REG operations from working on this target?
-> 
-> I can definitely see MIDR overriding failing on a generic CPU. Also, you
-> shouldn't be able to select a generic CPU if we know about the physical CPU.
-> 
 
-If I am migrating from an A57 to an A53, but the VM was started as
-"generic CPU" then we rely on the user discovering that this is not
-supported when trying to set the MIDR from userspace in KVM?
 
-> > 
-> > Also, can we imagine any scenario where the generic CPU cannot me
-> > modeled for a VM on a specific piece of hardware (current or future)?
-> 
-> What is the definition of a generic CPU here? In the above, generic
-> really means "Unknown", so I can't immediately see what it would mean to
-> model this.
-> 
-ok, good way to phrase it, I suppose that's a non-issue then.
+On Thursday 25 June 2015 05:15 PM, Krzysztof Kozlowski wrote:
+> 2015-06-25 20:19 GMT+09:00 Vaibhav Hiremath <vaibhav.hiremath@linaro.org>:
+>>
+>>
+>> On Thursday 25 June 2015 03:56 PM, Lee Jones wrote:
+>
+> (...)
+>
+>>>> diff --git a/include/linux/mfd/88pm80x.h b/include/linux/mfd/88pm80x.h
+>>>> index 97cb283..94b3dcd 100644
+>>>> --- a/include/linux/mfd/88pm80x.h
+>>>> +++ b/include/linux/mfd/88pm80x.h
+>>>> @@ -77,6 +77,8 @@ enum {
+>>>>    #define PM800_WAKEUP2         (0x0E)
+>>>>    #define PM800_WAKEUP2_INV_INT         (1 << 0)
+>>>>    #define PM800_WAKEUP2_INT_CLEAR               (1 << 1)
+>>>> +#define PM800_WAKEUP2_INT_READ_CLEAR           (0 << 1)
+>>>> +#define PM800_WAKEUP2_INT_WRITE_CLEAR          (1 << 1)
+>>>>    #define PM800_WAKEUP2_INT_MASK                (1 << 2)
+>>>
+>>>
+>>> Use the BIT() macro.
+>>>
+>>
+>> I thought about this, but the whole file doesn't use it, so I also
+>> chose not to.
+>>
+>>
+>>>>    #define PM800_POWER_UP_LOG    (0x10)
+>>>> @@ -300,7 +302,7 @@ struct pm80x_chip {
+>>>>          struct regmap_irq_chip_data *irq_data;
+>>>>          int type;
+>>>>          int irq;
+>>>> -       int irq_mode;
+>>>> +       int irq_clr_on_wr;      /* '1': Clear on write, '0': Clear on
+>>>> read*/
+>>>
+>>>
+>>> Whitespace issue.
+>>>
+>>
+>> Didn't see any...and I also ran checkpatch.
+>>
+>>> Shouldn't this be a bool?
+>>>
+>>
+>> Just was not sure about any older board file interface.
+>> Ideally it should be bool only.
+>>
+>>> Actually even better, I would define; CLR_ON_WRITE and CLR_ON_READ,
+>>> and call the variable irq_clear_method, or something.
+>>>
+>>> Much clearer that way I think.
+>>>
+>>
+>> We have slowly decided to almost hardcode it to one value if there is
+>> no board file. I feel we should just keep it to simple.
+>>
+>> If you still insist, I can implement.
+>
+> The bool would be indeed nicer and still you could hard-code the
+> desired value on DT system:
+> +               /* by default, set irq clear method on write */
+> +               pdata->irq_clear_method = CLR_ON_WRITE;
+>
+> However the question is how this would influence existing platforms
+> using board files. Are there any in kernel or in downstream?
+>
+
+No, not atleast I am aware of.
+I did grep on mainline kernel, and here is what I got
+
+
+drivers/regulator/88pm800.c:	struct pm80x_platform_data *pdata = 
+dev_get_platdata(pdev->dev.parent);
+drivers/mfd/88pm800.c:				       struct pm80x_platform_data *pdata)
+drivers/mfd/88pm800.c:				struct pm80x_platform_data *pdata)
+drivers/mfd/88pm800.c:				struct pm80x_platform_data *pdata)
+drivers/mfd/88pm800.c:					   struct pm80x_platform_data *pdata)
+drivers/mfd/88pm800.c:				     struct pm80x_platform_data *pdata)
+drivers/mfd/88pm800.c:	struct pm80x_platform_data *pdata = 
+dev_get_platdata(&client->dev);
+drivers/mfd/88pm805.c:	struct pm80x_platform_data *pdata = 
+dev_get_platdata(&client->dev);
+include/linux/mfd/88pm80x.h:struct pm80x_platform_data {
+include/linux/mfd/88pm80x.h:				struct pm80x_platform_data *pdata);
+
 
 Thanks,
--Christoffer
+Vaibhav
