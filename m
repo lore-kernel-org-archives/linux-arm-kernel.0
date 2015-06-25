@@ -1,35 +1,57 @@
-From: santosh.shilimkar@oracle.com (santosh shilimkar)
-Date: Thu, 25 Jun 2015 08:04:43 -0700
-Subject: [PATCH v2 0/3] ARM: keystone: add ecc error interrupt handling
-In-Reply-To: <1435242710-31346-1-git-send-email-vitalya@ti.com>
-References: <1435242710-31346-1-git-send-email-vitalya@ti.com>
-Message-ID: <558C188B.5060107@oracle.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Thu, 25 Jun 2015 16:09:38 +0100
+Subject: [PATCH v0] arm64: dts: Add poweroff button device node for APM
+ X-Gene platform
+In-Reply-To: <1434505312-27977-1-git-send-email-yvo@apm.com>
+References: <1434505312-27977-1-git-send-email-yvo@apm.com>
+Message-ID: <20150625150938.GB6844@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 6/25/2015 7:31 AM, Vitaly Andrianov wrote:
-> This patch series adds support for arm L1/L2 ecc and ddr3 ecc error handling
-> for Keystone devices
->
-> Change Log
->
-> v2:
-> - removing unused and sorting headers of keystone.c are moved to a separate
->    patch.
-> - l1l2 ecc and ddr3 ecc error handling are split it to separate patches
-> - removed unused headers from keystone_ecc.c
-> - platsmp.c removed from the patch.
-> - return IRQ_HANDLED for 1 bit error in l1l2 ecc handler
-> - checked and handled existing ecc error before enabling ddr3 interrupt
-> - 1 bit ddr3 interrupt is disabled, because it is handled by hardware and
->    there is no reason to handle it by software
->
-This version looks good to me. As already commented, I would have liked
-the patch 2/3(L2 ECC) code in ARM generic code so will give some more 
-time for others to come back. Otherwise I will queue this up for next
-window.
+On Wed, Jun 17, 2015 at 02:41:52AM +0100, Y Vo wrote:
+> This patch adds poweroff button device node to support poweroff feature
+> on APM X-Gene Mustang platform.
+> 
+> Signed-off-by: Y Vo <yvo@apm.com>
+> ---
+>  arch/arm64/boot/dts/apm/apm-mustang.dts |   11 +++++++++++
+>  1 files changed, 11 insertions(+), 0 deletions(-)
+> 
+> diff --git a/arch/arm64/boot/dts/apm/apm-mustang.dts b/arch/arm64/boot/dts/apm/apm-mustang.dts
+> index 83578e7..67979c8 100644
+> --- a/arch/arm64/boot/dts/apm/apm-mustang.dts
+> +++ b/arch/arm64/boot/dts/apm/apm-mustang.dts
+> @@ -23,6 +23,17 @@
+>  		device_type = "memory";
+>  		reg = < 0x1 0x00000000 0x0 0x80000000 >; /* Updated by bootloader */
+>  	};
+> +
+> +	gpio-keys {
+> +		compatible = "gpio-keys";
+> +		apm_ctrl_name = "Power Button";
 
-Thanks for follow up Vitaly.
+Huh?
 
-Regards,
-Santosh
+Undocumented, unused, and doesn't follwo the "vendor,property" naming
+scheme...
+
+Mark.
+
+> +		btn3 {
+> +			label = "EXT_PWR";
+> +			linux,code = <116>;
+> +			linux,input-type = <0x1>;     /* EV_KEY */
+> +			interrupts = <0x0 0x2d 0x1>;
+> +		};
+> +	};
+>  };
+>  
+>  &pcie0clk {
+> -- 
+> 1.7.1
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe devicetree" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> 
