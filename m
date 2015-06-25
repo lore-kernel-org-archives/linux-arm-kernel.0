@@ -1,45 +1,129 @@
 From: m.smarduch@samsung.com (Mario Smarduch)
-Date: Wed, 24 Jun 2015 20:30:25 -0700
-Subject: [PATCH 0/3] arm: KVM: VFP lazy switch in KVM Host Mode may save upto
- 98%
-Message-ID: <1435203028-23142-1-git-send-email-m.smarduch@samsung.com>
+Date: Wed, 24 Jun 2015 20:30:27 -0700
+Subject: [PATCH 2/3] arm: KVM: Implement lazy VFP switching outside of Hyp Mode
+In-Reply-To: <1435203028-23142-1-git-send-email-m.smarduch@samsung.com>
+References: <1435203028-23142-1-git-send-email-m.smarduch@samsung.com>
+Message-ID: <1435203028-23142-3-git-send-email-m.smarduch@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently we do a lazy VFP switch in Hyp mode, but once we exit and re-enter hyp
-mode we trap again on VFP access. This mode has shown around 30-50% improvement
-running hackbench and lmbench.
+This patch implements the VFP context switch code called from vcpu_put in
+Host KVM. In addition it implements the logic to skip setting a VFP trap if one
+is not needed. Also resets the flag if Host KVM switched registers to trap new
+guest vfp accesses.
 
-This patch series extends lazy VFP switch beyond Hyp mode to KVM host mode.
 
-1 - On guest access we switch from host to guest and set a flag accessible to 
-    host
-2 - On exit to KVM host, VFP state is restored on vcpu_put if flag is marked (1)
-3 - Otherwise guest is resumed and continues to use its VFP registers. 
-4 - In case of 2 on VM entry we set VFP trap flag to repeat 1.
+Signed-off-by: Mario Smarduch <m.smarduch@samsung.com>
+---
+ arch/arm/kvm/interrupts.S |   49 ++++++++++++++++++++++++++++-----------------
+ 1 file changed, 31 insertions(+), 18 deletions(-)
 
-If guest does not access VFP registers them implemenation remains the same.
-
-Executing hackbench on Fast Models and Exynos arm32 board shows good
-results. Considering all exits 2% of the time KVM host lazy vfp switch is 
-invoked.
-
-Howeverr this patch set requires more burn in time and testing under various 
-loads.
-
-Currently ARM32 is addressed later ARM64.
-
-Mario Smarduch (3):
-  define headers and offsets to mange VFP state
-  Implement lazy VFP switching outside of Hyp Mode
-  Add VFP lazy switch hooks in Host KVM
-
- arch/arm/include/asm/kvm_asm.h  |    1 +
- arch/arm/include/asm/kvm_host.h |    3 +++
- arch/arm/kernel/asm-offsets.c   |    1 +
- arch/arm/kvm/arm.c              |   15 ++++++++++++
- arch/arm/kvm/interrupts.S       |   49 +++++++++++++++++++++++++--------------
- 5 files changed, 51 insertions(+), 18 deletions(-)
-
+diff --git a/arch/arm/kvm/interrupts.S b/arch/arm/kvm/interrupts.S
+index 79caf79..0912edd 100644
+--- a/arch/arm/kvm/interrupts.S
++++ b/arch/arm/kvm/interrupts.S
+@@ -96,6 +96,21 @@ ENTRY(__kvm_flush_vm_context)
+ 	bx	lr
+ ENDPROC(__kvm_flush_vm_context)
+ 
++ENTRY(__kvm_restore_host_vfp_state)
++	push    {r3-r7}
++
++	mov     r1, #0
++	str     r1, [r0, #VCPU_VFP_SAVED]
++
++	add     r7, r0, #VCPU_VFP_GUEST
++	store_vfp_state r7
++	add     r7, r0, #VCPU_VFP_HOST
++	ldr     r7, [r7]
++	restore_vfp_state r7
++
++	pop     {r3-r7}
++	bx      lr
++ENDPROC(__kvm_restore_host_vfp_state)
+ 
+ /********************************************************************
+  *  Hypervisor world-switch code
+@@ -131,7 +146,13 @@ ENTRY(__kvm_vcpu_run)
+ 
+ 	@ Trap coprocessor CRx accesses
+ 	set_hstr vmentry
++
++	ldr	r1, [vcpu, #VCPU_VFP_SAVED]
++	cmp	r1, #1
++	beq     skip_guest_vfp_trap
+ 	set_hcptr vmentry, (HCPTR_TTA | HCPTR_TCP(10) | HCPTR_TCP(11))
++skip_guest_vfp_trap:
++
+ 	set_hdcr vmentry
+ 
+ 	@ Write configured ID register into MIDR alias
+@@ -173,18 +194,6 @@ __kvm_vcpu_return:
+ 	set_hcptr vmexit, (HCPTR_TTA | HCPTR_TCP(10) | HCPTR_TCP(11))
+ 
+ #ifdef CONFIG_VFPv3
+-	@ Save floating point registers we if let guest use them.
+-	tst	r2, #(HCPTR_TCP(10) | HCPTR_TCP(11))
+-	bne	after_vfp_restore
+-
+-	@ Switch VFP/NEON hardware state to the host's
+-	add	r7, vcpu, #VCPU_VFP_GUEST
+-	store_vfp_state r7
+-	add	r7, vcpu, #VCPU_VFP_HOST
+-	ldr	r7, [r7]
+-	restore_vfp_state r7
+-
+-after_vfp_restore:
+ 	@ Restore FPEXC_EN which we clobbered on entry
+ 	pop	{r2}
+ 	VFPFMXR FPEXC, r2
+@@ -363,10 +372,6 @@ hyp_hvc:
+ 	@ Check syndrome register
+ 	mrc	p15, 4, r1, c5, c2, 0	@ HSR
+ 	lsr	r0, r1, #HSR_EC_SHIFT
+-#ifdef CONFIG_VFPv3
+-	cmp	r0, #HSR_EC_CP_0_13
+-	beq	switch_to_guest_vfp
+-#endif
+ 	cmp	r0, #HSR_EC_HVC
+ 	bne	guest_trap		@ Not HVC instr.
+ 
+@@ -380,7 +385,10 @@ hyp_hvc:
+ 	cmp     r2, #0
+ 	bne	guest_trap		@ Guest called HVC
+ 
+-host_switch_to_hyp:
++	/*
++	 * Getting here means host called HVC, we shift parameters and branch
++	 * to Hyp function.
++	 */
+ 	pop	{r0, r1, r2}
+ 
+ 	/* Check for __hyp_get_vectors */
+@@ -411,6 +419,10 @@ guest_trap:
+ 
+ 	@ Check if we need the fault information
+ 	lsr	r1, r1, #HSR_EC_SHIFT
++#ifdef CONFIG_VFPv3
++	cmp	r1, #HSR_EC_CP_0_13
++	beq	switch_to_guest_vfp
++#endif
+ 	cmp	r1, #HSR_EC_IABT
+ 	mrceq	p15, 4, r2, c6, c0, 2	@ HIFAR
+ 	beq	2f
+@@ -479,11 +491,12 @@ guest_trap:
+  */
+ #ifdef CONFIG_VFPv3
+ switch_to_guest_vfp:
+-	load_vcpu			@ Load VCPU pointer to r0
+ 	push	{r3-r7}
+ 
+ 	@ NEON/VFP used.  Turn on VFP access.
+ 	set_hcptr vmexit, (HCPTR_TCP(10) | HCPTR_TCP(11))
++	mov	r1, #1
++	str	r1, [vcpu, #VCPU_VFP_SAVED]
+ 
+ 	@ Switch VFP/NEON hardware state to the guest's
+ 	add	r7, r0, #VCPU_VFP_HOST
 -- 
 1.7.9.5
