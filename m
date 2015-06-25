@@ -1,93 +1,55 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Thu, 25 Jun 2015 11:28:23 +0100
-Subject: [PATCH-v4 3/3] mfd: devicetree: bindings: Add new 88pm800 mfd
- binding
-In-Reply-To: <1435217189-19578-4-git-send-email-vaibhav.hiremath@linaro.org>
-References: <1435217189-19578-1-git-send-email-vaibhav.hiremath@linaro.org>
- <1435217189-19578-4-git-send-email-vaibhav.hiremath@linaro.org>
-Message-ID: <20150625102823.GD15013@x1>
+From: sr@denx.de (Stefan Roese)
+Date: Thu, 25 Jun 2015 12:33:57 +0200
+Subject: mvebu: Problem booting Armada XP with mainline U-Boot
+In-Reply-To: <20150624192401.650b0206@free-electrons.com>
+References: <558A9EBA.9000902@denx.de>
+ <20150624192401.650b0206@free-electrons.com>
+Message-ID: <558BD915.4090000@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 25 Jun 2015, Vaibhav Hiremath wrote:
+Hi Thomas,
 
-> With addition of DT support to 88pm800 mfd driver, this patch
-> adds new DT binding documentation along with respective properties.
-> 
-> Signed-off-by: Vaibhav Hiremath <vaibhav.hiremath@linaro.org>
-> ---
->  Documentation/devicetree/bindings/mfd/88pm800.txt | 54 +++++++++++++++++++++++
->  1 file changed, 54 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/mfd/88pm800.txt
-> 
-> diff --git a/Documentation/devicetree/bindings/mfd/88pm800.txt b/Documentation/devicetree/bindings/mfd/88pm800.txt
-> new file mode 100644
-> index 0000000..f56b751
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/mfd/88pm800.txt
-> @@ -0,0 +1,54 @@
-> +* Marvell 88PM8xx Power Management IC
-> +
-> +Required parent device properties:
-> +- compatible : "marvell,88pm800", "marvell,88pm805", "marvell,88pm860"
-> +- reg : the I2C slave address for the 88pm8xx chip
-> +- interrupts : IRQ line for the 88pm8xx chip
-> +- interrupt-controller: describes the 88pm8xx as an interrupt controller
-> +- #interrupt-cells : should be 1.
-> +		- The cell is the 88pm8xx local IRQ number
+On 24.06.2015 19:24, Thomas Petazzoni wrote:
 
-Might just be a personal thing, but I would line up the ':', it's much
-easier on the eyes that way.
+<snip>
 
-> +88pm8xx family of devices consists of varied group of sub-devices:
-> +
-> +Device		 	Supply Names	 Description
-> +------		 	------------	 -----------
-> +88pm80x-onkey		:		: On key
-> +88pm80x-rtc		:		: RTC
-> +88pm80x-regulator	:		: Regulators
-> +
-> +Note: More device list will follow
+>> b) Booting hangs completely while/after loading some device drivers:
+>>
+>> ...
+>> [    4.031651] ehci_hcd: USB 2.0 'Enhanced' Host Controller (EHCI) Driver
+>> [    4.038209] ehci-pci: EHCI PCI platform driver
+>> [    4.042694] ehci-orion: EHCI orion driver
+>> [    4.046784] orion-ehci f1050000.usb: EHCI Host Controller
+>> [    4.052207] orion-ehci f1050000.usb: new USB bus registered, assigned bus number 1
+>> [    4.059851] orion-ehci f1050000.usb: irq 27, io mem 0xf1050000
+>
+> Maybe missing USB PHY initialization or SERDES lanes initialization.
+> These are done by the binary header, so I guess they are missing in the
+> mainline U-Boot.
 
-No real need for this.
+This SERDES / PHY initialization code from the Marvell bin_hdr is 
+already integrated in mainline U-Boot SPL. So this is most likely not 
+the root cause for this hangup.
 
-> +Example:
-> +
-> +	pmic: 88pm800 at 30 {
-> +		compatible = "marvell,88pm800";
-> +		reg = <0x30>;
-> +		interrupts = <GIC_SPI 77 IRQ_TYPE_LEVEL_HIGH>;
-> +		interrupt-parent = <&gic>;
-> +		interrupt-controller;
-> +		#interrupt-cells = <1>;
-> +
-> +		regulators {
-> +			compatible = "marvell,88pm80x-regulator";
-> +
-> +			buck1a: BUCK1A {
-> +				regulator-name = "BUCK1A";
-> +				regulator-min-microvolt = <600000>;
-> +				regulator-max-microvolt = <1800000>;
-> +				regulator-boot-on;
-> +				regulator-always-on;
-> +			};
-> +
-> +			ldo1: LDO1 {
-> +				regulator-name = "LDO1";
-> +				regulator-min-microvolt = <1700000>;
-> +				regulator-max-microvolt = <3300000>;
-> +				regulator-boot-on;
-> +				regulator-always-on;
-> +			};
-> +		};
-> +
-> +		rtc {
-> +			compatible = "marvell,88pm80x-rtc";
-> +		};
-> +	};
+> We are hoping to work on such topics in the kernel in
+> the near future, though, so that the kernel is taking of PHY and SERDES
+> lanes initialization, and can also power them up/down for power
+> management needs.
 
--- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Good to know. Thanks.
+
+>> Any ideas why those problems might occur with mainline U-Boot?
+>> Most likely some register setup is missing that is usually done
+>> in bin_hdr. Where could I check / test for this CPU online
+>> problem?
+>
+> Hard to say, probably the easiest is to read the binary header code to
+> see what they are doing.
+
+I thought that somebody might have a quick idea about something obvious 
+going wrong here. If this is not the case, then I'll dig into the 
+bin_hdr code again...
+
+Thanks,
+Stefan
