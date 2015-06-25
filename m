@@ -1,45 +1,51 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Thu, 25 Jun 2015 18:29:13 -0300
-Subject: L2 Cache enable on i.MX5
-In-Reply-To: <DBXPR06MB58911B5FD193722EC5BD34185AF0@DBXPR06MB589.eurprd06.prod.outlook.com>
-References: <DBXPR06MB5891810D431F1AE9AEB1CE985AF0@DBXPR06MB589.eurprd06.prod.outlook.com>
- <20150624172900.GN7557@n2100.arm.linux.org.uk>
- <DBXPR06MB58911B5FD193722EC5BD34185AF0@DBXPR06MB589.eurprd06.prod.outlook.com>
-Message-ID: <CAOMZO5A6B+m_HXZXeyWOWs2GAOXmhLunTgaOsQQL-OwSC8597w@mail.gmail.com>
+From: santosh.shilimkar@oracle.com (santosh shilimkar)
+Date: Thu, 25 Jun 2015 14:30:19 -0700
+Subject: [PATCH v2 0/3] ARM: keystone: add ecc error interrupt handling
+In-Reply-To: <558C6C4F.1090102@codeaurora.org>
+References: <1435242710-31346-1-git-send-email-vitalya@ti.com>
+ <558C188B.5060107@oracle.com> <558C6C4F.1090102@codeaurora.org>
+Message-ID: <558C72EB.8010502@oracle.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 24, 2015 at 7:53 PM, Robert Daniels
-<robert.daniels@vantagecontrols.com> wrote:
-
-> I see - so the boot loader is not supposed to enable the L2 cache and it should
-> not be enabled until after the decompressor runs.
+On 6/25/2015 2:02 PM, Stephen Boyd wrote:
+> On 06/25/2015 08:04 AM, santosh shilimkar wrote:
+>> On 6/25/2015 7:31 AM, Vitaly Andrianov wrote:
+>>> This patch series adds support for arm L1/L2 ecc and ddr3 ecc error
+>>> handling
+>>> for Keystone devices
+>>>
+>>> Change Log
+>>>
+>>> v2:
+>>> - removing unused and sorting headers of keystone.c are moved to a
+>>> separate
+>>>     patch.
+>>> - l1l2 ecc and ddr3 ecc error handling are split it to separate patches
+>>> - removed unused headers from keystone_ecc.c
+>>> - platsmp.c removed from the patch.
+>>> - return IRQ_HANDLED for 1 bit error in l1l2 ecc handler
+>>> - checked and handled existing echttps://lwn.net/Articles/593336/c
+>>> error before enabling ddr3 interrupt
+>>> - 1 bit ddr3 interrupt is disabled, because it is handled by hardware
+>>> and
+>>>     there is no reason to handle it by software
+>>>
+>> This version looks good to me. As already commented, I would have liked
+>> the patch 2/3(L2 ECC) code in ARM generic code so will give some more
+>> time for others to come back. Otherwise I will queue this up for next
+>> window.
 >
-> In that case, where should the kernel be enabling the L2 cache? I'm using the
-> 3.14 kernel for this i.MX53 product and the L2 cache is definitely not enabled.
+> Why not make this into an edac driver? I sent out an L1/L2 error
+> detection edac driver for Krait processors a year ago, but it stalled
+> due to some DT binding stuff[1]. This looks fairly similar.
 >
-> I see that there is a imx_init_l2cache defined which is being called by the imx6
-> and imx35 platform code but it is not being called for the i.mx5... should it?
+Indeed the error detection part is very similar(expected as well
+considering the same processor L2 regs). I am not sure we need
+full driver only for that but at least the IRQ error handler
+related code can reside together. Lets see what RMK thinks
+on this.
 
-Should we enable the L2 cache like it is done in Barebox?
 
---- a/arch/arm/mach-imx/mach-imx53.c
-+++ b/arch/arm/mach-imx/mach-imx53.c
-@@ -25,7 +25,13 @@
-
- static void __init imx53_init_early(void)
- {
-+    unsigned int r;
-+
-     mxc_set_cpu_type(MXC_CPU_MX53);
-+
-+    __asm__ __volatile__("mrc 15, 0, %0, c1, c0, 1":"=r"(r));
-+    r |= 1 << 1;     /* enable L2 cache */
-+    __asm__ __volatile__("mcr 15, 0, %0, c1, c0, 1" : : "r"(r));
- }
-
- static void __init imx53_dt_init(void)
-
-Regards,
-
-Fabio Estevam
+> [1] https://lwn.net/Articles/593336/
+>
