@@ -1,23 +1,32 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 25 Jun 2015 00:22:05 -0700
-Subject: [RESEND] [PATCH v2 1/2] arm: devtree: Set system_rev from DT
- revision
-In-Reply-To: <20150625071851.GB2890@pali>
-References: <1430902142-17035-1-git-send-email-pali.rohar@gmail.com>
- <3577431.y872Foi4kj@wuerfel> <20150506103752.GG30910@pali>
- <3529567.PeFp1NNa1q@wuerfel> <20150506114417.GI30910@pali>
- <20150625050138.GL4156@atomide.com> <20150625071851.GB2890@pali>
-Message-ID: <20150625072205.GO4156@atomide.com>
+From: pebolle@tiscali.nl (Paul Bolle)
+Date: Thu, 25 Jun 2015 09:23:18 +0200
+Subject: [PATCH 11/12] [media] tsin: c8sectpfe: Add Kconfig and Makefile
+ for the driver.
+In-Reply-To: <1435158670-7195-12-git-send-email-peter.griffin@linaro.org>
+References: <1435158670-7195-1-git-send-email-peter.griffin@linaro.org>
+ <1435158670-7195-12-git-send-email-peter.griffin@linaro.org>
+Message-ID: <1435216998.4528.100.camel@tiscali.nl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Pali Roh?r <pali.rohar@gmail.com> [150625 00:21]:
-> 
-> Ok, but what do you mean to forget any string conversion?
+On Wed, 2015-06-24 at 16:11 +0100, Peter Griffin wrote:
+> --- /dev/null
+> +++ b/drivers/media/tsin/c8sectpfe/Makefile
 
-No need for tohexstr() in the uncommpress code if the system_rev
-value is a number coming from the dts.
+> +c8sectpfe-y += c8sectpfe-core.o c8sectpfe-common.o c8sectpfe-dvb.o
+> +
+> +obj-$(CONFIG_DVB_C8SECTPFE) += c8sectpfe.o
+> +
+> +ifneq ($(CONFIG_DVB_C8SECTPFE),)
+> +	c8sectpfe-y += c8sectpfe-debugfs.o
+> +endif
 
-Regards,
+Isn't the above equivalent to
+    c8sectpfe-y += c8sectpfe-core.o c8sectpfe-common.o c8sectpfe-dvb.o c8sectpfe-debugfs.o
 
-Tony
+    obj-$(CONFIG_DVB_C8SECTPFE) += c8sectpfe.o
+
+Or am I missing something subtle here?
+
+
+Paul Bolle
