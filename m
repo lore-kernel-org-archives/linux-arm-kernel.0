@@ -1,71 +1,180 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Thu, 25 Jun 2015 13:17:07 +0200
-Subject: [PATCH] PM / Domains: Try power off masters in error path of
- __pm_genpd_poweron()
-In-Reply-To: <55798031.50205@gmail.com>
-References: <1434023511-4263-1-git-send-email-ulf.hansson@linaro.org>
- <55798031.50205@gmail.com>
-Message-ID: <CAPDyKFo7OarmJpc7teHjOkxgoEToa_SJaRMRW-_cfSmJ-5MLtw@mail.gmail.com>
+From: vaibhav.hiremath@linaro.org (Vaibhav Hiremath)
+Date: Thu, 25 Jun 2015 16:49:50 +0530
+Subject: [PATCH-v4 2/3] mfd: 88pm800: Set default interrupt clear method
+In-Reply-To: <20150625102618.GC15013@x1>
+References: <1435217189-19578-1-git-send-email-vaibhav.hiremath@linaro.org>
+ <1435217189-19578-3-git-send-email-vaibhav.hiremath@linaro.org>
+ <20150625102618.GC15013@x1>
+Message-ID: <558BE3D6.2010801@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11 June 2015 at 14:33, Krzysztof Kozlowski <k.kozlowski.k@gmail.com> wrote:
-> W dniu 11.06.2015 o 20:51, Ulf Hansson pisze:
->> While powering up a genpd, its domain masters are first being powered up.
->> In the error path of __pm_genpd_poweron(), we didn't care to try power off
->> these domain masters. Let's deal with that to avoid leaving unused PM
->> domains powered.
+
+
+On Thursday 25 June 2015 03:56 PM, Lee Jones wrote:
+> On Thu, 25 Jun 2015, Vaibhav Hiremath wrote:
+>
+>> As per the spec, bit 1 (INT_CLEAR_MODE) of reg addr 0xe
+>> (page 0) controls the method of clearing interrupt
+>> status of 88pm800 family of devices;
 >>
->> Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
+>>    0: clear on read
+>>    1: clear on write
+>>
+>> If pdata is not coming from board file, then set the
+>> default irq clear method to "irq clear on write"
+>>
+>> Also, as suggested by "Lee Jones" renaming variable field
+>> to appropriate name.
+>>
+>> Signed-off-by: Zhao Ye <zhaoy@marvell.com>
+>> Signed-off-by: Vaibhav Hiremath <vaibhav.hiremath@linaro.org>
 >> ---
->>  drivers/base/power/domain.c | 30 +++++++++++++++++-------------
->>  1 file changed, 17 insertions(+), 13 deletions(-)
+>>   drivers/mfd/88pm800.c       | 15 ++++++++++-----
+>>   include/linux/mfd/88pm80x.h |  6 ++++--
+>>   2 files changed, 14 insertions(+), 7 deletions(-)
 >>
->> diff --git a/drivers/base/power/domain.c b/drivers/base/power/domain.c
->> index 2327613..32dcb80 100644
->> --- a/drivers/base/power/domain.c
->> +++ b/drivers/base/power/domain.c
->> @@ -235,6 +235,18 @@ static int genpd_power_off(struct generic_pm_domain *genpd)
->>  }
+>> diff --git a/drivers/mfd/88pm800.c b/drivers/mfd/88pm800.c
+>> index 40fd014..e0cd7ad 100644
+>> --- a/drivers/mfd/88pm800.c
+>> +++ b/drivers/mfd/88pm800.c
+>> @@ -376,7 +376,7 @@ static int device_irq_init_800(struct pm80x_chip *chip)
+>>   {
+>>   	struct regmap *map = chip->regmap;
+>>   	unsigned long flags = IRQF_ONESHOT;
+>> -	int data, mask, ret = -EINVAL;
+>> +	int irq_clr_mode, mask, ret = -EINVAL;
 >>
->>  /**
->> + * genpd_queue_power_off_work - Queue up the execution of pm_genpd_poweroff().
->> + * @genpd: PM domait to power off.
->> + *
->> + * Queue up the execution of pm_genpd_poweroff() unless it's already been done
->> + * before.
->> + */
->> +static void genpd_queue_power_off_work(struct generic_pm_domain *genpd)
->> +{
->> +     queue_work(pm_wq, &genpd->power_off_work);
->> +}
+>>   	if (!map || !chip->irq) {
+>>   		dev_err(chip->dev, "incorrect parameters\n");
+>> @@ -384,15 +384,16 @@ static int device_irq_init_800(struct pm80x_chip *chip)
+>>   	}
+>>
+>>   	/*
+>> -	 * irq_mode defines the way of clearing interrupt. it's read-clear by
+>> -	 * default.
+>> +	 * irq_clr_on_wr defines the way of clearing interrupt by
+>> +	 * read/write(0/1).  It's read-clear by default.
+>>   	 */
+>>   	mask =
+>>   	    PM800_WAKEUP2_INV_INT | PM800_WAKEUP2_INT_CLEAR |
+>>   	    PM800_WAKEUP2_INT_MASK;
+>>
+>> -	data = PM800_WAKEUP2_INT_CLEAR;
+>> -	ret = regmap_update_bits(map, PM800_WAKEUP2, mask, data);
+>> +	irq_clr_mode = (chip->irq_clr_on_wr) ?
+>
+> Drop the brackets.
+>
+
+Ok
+
+>> +		PM800_WAKEUP2_INT_WRITE_CLEAR : PM800_WAKEUP2_INT_READ_CLEAR;
+>> +	ret = regmap_update_bits(map, PM800_WAKEUP2, mask, irq_clr_mode);
+>>
+>>   	if (ret < 0)
+>>   		goto out;
+>> @@ -514,6 +515,7 @@ static int device_800_init(struct pm80x_chip *chip,
+>>   	}
+>>
+>>   	chip->regmap_irq_chip = &pm800_irq_chip;
+>> +	chip->irq_clr_on_wr = pdata->irq_clr_on_wr;
+>
+> You have protection around pdata everywhere else in the file, I
+> suggest you supply some here too.
+>
+
+Actually it is not really needed, as the PATCH 1/1 introduces
+
+
+         if (!pdata && !np) {
+                 dev_err(&client->dev,
+                         "pm80x requires platform data or of_node\n");
+                 return -EINVAL;
+         }
+
+         if (!pdata && !np) {
+                 dev_err(&client->dev,
+                         "pm80x requires platform data or of_node\n");
+                 return -EINVAL;
+         }
+
+
+So there is no way you can have pdata = NULL beyond this point.
+
+
+>>   	ret = device_irq_init_800(chip);
+>>   	if (ret < 0) {
+>> @@ -566,6 +568,9 @@ static int pm800_probe(struct i2c_client *client,
+>>   		pdata = devm_kzalloc(&client->dev, sizeof(*pdata), GFP_KERNEL);
+>>   		if (!pdata)
+>>   			return -ENOMEM;
 >> +
->> +/**
->>   * __pm_genpd_poweron - Restore power to a given PM domain and its masters.
->>   * @genpd: PM domain to power up.
->>   *
->> @@ -315,8 +327,12 @@ static int __pm_genpd_poweron(struct generic_pm_domain *genpd)
->>       return 0;
+>> +		/* by default, set irq clear method on write */
+>> +		pdata->irq_clr_on_wr = true;
+>
+> You can save yourself some memory here, by removing this seemingly
+> pointless allocation and do this above:
+>
+>          chip->irq_clr_on_wr = pdata ? pdata->irq_clr_on_wr : true;
+>
+
+Yes certainly better way of doing it :)
+I will change it.
+
+
+>>   	}
 >>
->>   err:
->> -     list_for_each_entry_continue_reverse(link, &genpd->slave_links, slave_node)
->> +     list_for_each_entry_continue_reverse(link,
->> +                                     &genpd->slave_links,
->> +                                     slave_node) {
->>               genpd_sd_counter_dec(link->master);
->> +             genpd_queue_power_off_work(link->master);
+>>   	ret = pm80x_init(client);
+>> diff --git a/include/linux/mfd/88pm80x.h b/include/linux/mfd/88pm80x.h
+>> index 97cb283..94b3dcd 100644
+>> --- a/include/linux/mfd/88pm80x.h
+>> +++ b/include/linux/mfd/88pm80x.h
+>> @@ -77,6 +77,8 @@ enum {
+>>   #define PM800_WAKEUP2		(0x0E)
+>>   #define PM800_WAKEUP2_INV_INT		(1 << 0)
+>>   #define PM800_WAKEUP2_INT_CLEAR		(1 << 1)
+>> +#define PM800_WAKEUP2_INT_READ_CLEAR		(0 << 1)
+>> +#define PM800_WAKEUP2_INT_WRITE_CLEAR		(1 << 1)
+>>   #define PM800_WAKEUP2_INT_MASK		(1 << 2)
 >
-> It looks sensible to revert work already done however I wonder if this
-> is necessary for each slave. The first successful call to
-> pm_genpd_poweroff() will also walk through slave_links and queue the work.
+> Use the BIT() macro.
 >
 
-For the current genpd, each slave link represents that the current
-genpd is a subdomain to another genpd. The corresponding master for
-each link is the "link->master". As genpds are allowed to have several
-masters, we can't just try to power off one of them.
+I thought about this, but the whole file doesn't use it, so I also
+chose not to.
 
-Sorry for a delayed response and thanks for your review!
 
-Kind regards
-Uffe
+>>   #define PM800_POWER_UP_LOG	(0x10)
+>> @@ -300,7 +302,7 @@ struct pm80x_chip {
+>>   	struct regmap_irq_chip_data *irq_data;
+>>   	int type;
+>>   	int irq;
+>> -	int irq_mode;
+>> +	int irq_clr_on_wr;	/* '1': Clear on write, '0': Clear on read*/
+>
+> Whitespace issue.
+>
+
+Didn't see any...and I also ran checkpatch.
+
+> Shouldn't this be a bool?
+>
+
+Just was not sure about any older board file interface.
+Ideally it should be bool only.
+
+> Actually even better, I would define; CLR_ON_WRITE and CLR_ON_READ,
+> and call the variable irq_clear_method, or something.
+>
+> Much clearer that way I think.
+>
+
+We have slowly decided to almost hardcode it to one value if there is
+no board file. I feel we should just keep it to simple.
+
+If you still insist, I can implement.
+
+
+Thanks,
+Vaibhav
