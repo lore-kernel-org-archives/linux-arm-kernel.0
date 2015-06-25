@@ -1,92 +1,52 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Thu, 25 Jun 2015 08:57:57 +0900
-Subject: [PATCH-v3 1/3] mfd: 88pm800: Add device tree support
-In-Reply-To: <1435137673-1629-2-git-send-email-vaibhav.hiremath@linaro.org>
-References: <1435137673-1629-1-git-send-email-vaibhav.hiremath@linaro.org>
- <1435137673-1629-2-git-send-email-vaibhav.hiremath@linaro.org>
-Message-ID: <CAJKOXPfc4rf4rB54CjPVzZ=v3uWVhciygqN7=gNYMShFf+eatQ@mail.gmail.com>
+From: paul.gortmaker@windriver.com (Paul Gortmaker)
+Date: Wed, 24 Jun 2015 20:00:38 -0400
+Subject: [PATCH v7 00/14] crypto: add a new driver for Marvell's CESA
+In-Reply-To: <20150622075910.GA7659@gondor.apana.org.au>
+References: <1434635190-27733-1-git-send-email-boris.brezillon@free-electrons.com>
+ <20150619142444.GA15234@gondor.apana.org.au>
+ <CAP=VYLqQynCNRTpm4JnOxeO6DH_739fO2QNcDMxaXqCKCHiTtQ@mail.gmail.com>
+ <CAP=VYLpSrTvXRovWo4G7AXWv1OKFQRpQR255hS5z+=h4+XOLhg@mail.gmail.com>
+ <20150621102418.2ea74910@bbrezillon>
+ <20150621082717.GA29128@gondor.apana.org.au>
+ <20150622092336.5949e258@bbrezillon>
+ <20150622075910.GA7659@gondor.apana.org.au>
+Message-ID: <20150625000037.GK31584@windriver.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2015-06-24 18:21 GMT+09:00 Vaibhav Hiremath <vaibhav.hiremath@linaro.org>:
-> Add DT support to the 88pm800 driver, along with compatible
-> field for it's sub-devices (rtc, onkey and regulator)
->
-> Signed-off-by: Chao Xie <chao.xie@marvell.com>
-> Signed-off-by: Vaibhav Hiremath <vaibhav.hiremath@linaro.org>
-> ---
->  drivers/mfd/88pm800.c | 25 +++++++++++++++++++++++++
->  1 file changed, 25 insertions(+)
->
-> diff --git a/drivers/mfd/88pm800.c b/drivers/mfd/88pm800.c
-> index 841717a..059f01a 100644
-> --- a/drivers/mfd/88pm800.c
-> +++ b/drivers/mfd/88pm800.c
-> @@ -27,6 +27,7 @@
->  #include <linux/mfd/core.h>
->  #include <linux/mfd/88pm80x.h>
->  #include <linux/slab.h>
-> +#include <linux/of_device.h>
->
->  /* Interrupt Registers */
->  #define PM800_INT_STATUS1              (0x05)
-> @@ -121,6 +122,11 @@ static const struct i2c_device_id pm80x_id_table[] = {
->  };
->  MODULE_DEVICE_TABLE(i2c, pm80x_id_table);
->
-> +static const struct of_device_id pm80x_of_match_table[] = {
-> +       { .compatible = "marvell,88pm800", },
-> +       {},
-> +};
-> +
->  static struct resource rtc_resources[] = {
->         {
->          .name = "88pm80x-rtc",
-> @@ -133,6 +139,7 @@ static struct resource rtc_resources[] = {
->  static struct mfd_cell rtc_devs[] = {
->         {
->          .name = "88pm80x-rtc",
-> +        .of_compatible = "marvell,88pm80x-rtc",
->          .num_resources = ARRAY_SIZE(rtc_resources),
->          .resources = &rtc_resources[0],
->          .id = -1,
-> @@ -151,6 +158,7 @@ static struct resource onkey_resources[] = {
->  static const struct mfd_cell onkey_devs[] = {
->         {
->          .name = "88pm80x-onkey",
-> +        .of_compatible = "marvell,88pm80x-onkey",
->          .num_resources = 1,
->          .resources = &onkey_resources[0],
->          .id = -1,
-> @@ -160,6 +168,7 @@ static const struct mfd_cell onkey_devs[] = {
->  static const struct mfd_cell regulator_devs[] = {
->         {
->          .name = "88pm80x-regulator",
-> +        .of_compatible = "marvell,88pm80x-regulator",
->          .id = -1,
->         },
->  };
-> @@ -544,8 +553,23 @@ static int pm800_probe(struct i2c_client *client,
->         int ret = 0;
->         struct pm80x_chip *chip;
->         struct pm80x_platform_data *pdata = dev_get_platdata(&client->dev);
-> +       struct device_node *np = client->dev.of_node;
->         struct pm80x_subchip *subchip;
->
-> +       if (!pdata && !np) {
-> +               dev_err(&client->dev,
-> +                       "pm80x requires platform data or of_node\n");
-> +               return -EINVAL;
-> +       }
-> +
-> +       if (!pdata) {
-> +               pdata = devm_kzalloc(&client->dev, sizeof(*pdata), GFP_KERNEL);
-> +               if (!pdata) {
-> +                       dev_err(&client->dev, "failed to allocaate memory\n");
+[Re: [PATCH v7 00/14] crypto: add a new driver for Marvell's CESA] On 22/06/2015 (Mon 15:59) Herbert Xu wrote:
 
-Generic error message for ENOMEM is not needed. Just return ENOMEM and
-the core code will print the error.
+> On Mon, Jun 22, 2015 at 09:23:36AM +0200, Boris Brezillon wrote:
+> > Hi Herbert,
+> > 
+> > On Sun, 21 Jun 2015 16:27:17 +0800
+> > Herbert Xu <herbert@gondor.apana.org.au> wrote:
+> > 
+> > > On Sun, Jun 21, 2015 at 10:24:18AM +0200, Boris Brezillon wrote:
+> > > > 
+> > > > Indeed. Here is a patch fixing that.
+> > > 
+> > > I think you should just kill COMPILE_TEST instead of adding ARM.
+> > 
+> > The following patch is killing the COMPILE_TEST dependency.
+> 
+> Patch applied.
 
-Rest looks fine,
-Best regards,
-Krzysztof
+Just a heads up, this driver is still killing a couple of linux-next
+builds today and for the past few days.
+
+drivers/crypto/mv_cesa.c:1037:2: error: implicit declaration of function
+'of_get_named_gen_pool' [-Werror=implicit-function-declaration]
+
+http://kisskb.ellerman.id.au/kisskb/buildresult/12448851/
+http://kisskb.ellerman.id.au/kisskb/buildresult/12448776/
+
+Missing dependency on CONFIG_OF_<blah> presumably.
+
+Paul.
+--
+
+> -- 
+> Email: Herbert Xu <herbert@gondor.apana.org.au>
+> Home Page: http://gondor.apana.org.au/~herbert/
+> PGP Key: http://gondor.apana.org.au/~herbert/pubkey.txt
