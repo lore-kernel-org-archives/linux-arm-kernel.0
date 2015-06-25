@@ -1,30 +1,25 @@
-From: tbm@cyrius.com (Martin Michlmayr)
-Date: Thu, 25 Jun 2015 18:41:48 -0400
-Subject: ARM: add more Alpine file patterns to MAINTAINERS
-Message-ID: <20150625224148.GA11992@jirafa.cyrius.com>
+From: soren.brinkmann@xilinx.com (=?utf-8?B?U8O2cmVu?= Brinkmann)
+Date: Thu, 25 Jun 2015 16:15:35 -0700
+Subject: [PATCH 02/41] clocksource: cadence_ttc: Migrate to new
+ 'set-state' interface
+In-Reply-To: <effe1fbb8239a26043a7e7bc5340f9ddd9aabd81.1434622147.git.viresh.kumar@linaro.org>
+References: <cover.1434622147.git.viresh.kumar@linaro.org>
+ <effe1fbb8239a26043a7e7bc5340f9ddd9aabd81.1434622147.git.viresh.kumar@linaro.org>
+Message-ID: <20150625231535.GU20178@xsjsorenbubuntu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add more Alpine file patterns to MAINTAINERS.
+On Thu, 2015-06-18 at 04:24PM +0530, Viresh Kumar wrote:
+> Migrate cadence_ttc driver to the new 'set-state' interface provided by
+> clockevents core, the earlier 'set-mode' interface is marked obsolete
+> now.
+> 
+> This also enables us to implement callbacks for new states of clockevent
+> devices, for example: ONESHOT_STOPPED.
+> 
+> Cc: Michal Simek <michal.simek@xilinx.com>
+> Cc: S?ren Brinkmann <soren.brinkmann@xilinx.com>
+> Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
+Tested-by: S?ren Brinkmann <soren.brinkmann@xilinx.com>
 
-Signed-off-by: Martin Michlmayr <tbm@cyrius.com>
-
-
-diff --git a/MAINTAINERS b/MAINTAINERS
-index 246d9d8..d409d5c 100644
---- a/MAINTAINERS
-+++ b/MAINTAINERS
-@@ -890,6 +890,9 @@ ARM/Annapurna Labs ALPINE ARCHITECTURE
- M:	Tsahee Zidenberg <tsahee@annapurnalabs.com>
- S:	Maintained
- F:	arch/arm/mach-alpine/
-+F:	arch/arm/boot/dts/alpine*
-+F:	Documentation/devicetree/bindings/arm/al,alpine.txt
-+F:	Documentation/devicetree/bindings/arm/*/al,alpine*
- 
- ARM/ATMEL AT91RM9200 AND AT91SAM ARM ARCHITECTURES
- M:	Nicolas Ferre <nicolas.ferre@atmel.com>
-
--- 
-Martin Michlmayr
-http://www.cyrius.com/
+	S?ren
