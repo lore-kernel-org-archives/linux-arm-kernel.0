@@ -1,128 +1,62 @@
-From: achandran@mvista.com (Arun Chandran)
-Date: Thu, 25 Jun 2015 15:38:10 +0530
-Subject: BUG: Bad page state in process swapper pfn:XXXXX
-In-Reply-To: <CAFdej03jedihbdNCb8e+at3M3ikKxn+s6eAvBvfGPdtsHShQdQ@mail.gmail.com>
-References: <CAFdej03jedihbdNCb8e+at3M3ikKxn+s6eAvBvfGPdtsHShQdQ@mail.gmail.com>
-Message-ID: <CAFdej029n2DHQRZmFp78hNUgA=rWGYK0fXG1+AxQEZrUGf3WdA@mail.gmail.com>
+From: cyrille.pitchen@atmel.com (Cyrille Pitchen)
+Date: Thu, 25 Jun 2015 12:11:04 +0200
+Subject: [PATCH v4 2/2] mfd: flexcom: add a driver for Atmel Flexible
+ Serial Communication Unit
+In-Reply-To: <20150624142456.GS15013@x1>
+References: <cover.1434967670.git.cyrille.pitchen@atmel.com>
+ <dddf7a6d750967785255733a7931780b3c465d5f.1434967670.git.cyrille.pitchen@atmel.com>
+ <20150624142456.GS15013@x1>
+Message-ID: <558BD3B8.10709@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 22, 2015 at 8:04 PM, Arun Chandran <achandran@mvista.com> wrote:
-> Hi,
->
-> I am booting the latest linus tree on altera cyclone5 soc development kit.
-> (https://www.altera.com/products/boards_and_kits/dev-kits/altera/kit-cyclone-v-soc.html)
-> With the dtb file arch/arm/boot/dts/socfpga_cyclone5_socdk.dtb.
->
-> I get these BUGS (page dumped because: non-NULL mapping) randomly; occurs
-> around 1 in 5 times during cold boots.
->
-> The entire bootlog with 'memblock=debug' is below.
->
+Hi lee,
 
-Hi,
+Le 24/06/2015 16:24, Lee Jones a ?crit :
+> On Mon, 22 Jun 2015, Cyrille Pitchen wrote:
+> 
+>> This driver supports the new Atmel Flexcom. The Flexcom is a wrapper which
+>> integrates one SPI controller, one I2C controller and one USART. Only one
+>> function can be enabled at a time. This driver selects the function once
+>> for all, when the Flexcom is probed, according to the value of the new
+>> "atmel,flexcom-mode" device tree property.
+>>
+>> This driver has chosen to present the Flexcom to the system as a MFD so
+>> the implementation is seamless for the existing Atmel SPI, I2C and USART
+>> drivers.
+> 
+> No need for this driver.
+> 
+> Just create your 3 platform drivers and get them to read the mode at
+> probe time.  If the mode isn't the one pertaining to itself return
+> -ENODEV and the Device Driver API will attempt the probe the next
+> device.  Ensure all of the devices have the same compatible string
+> i.e. atmel,sama5d2-flexcom.
+> 
 
-I printed the physical address of the "struct page" where
-the error is happening and got[collected across multiple tests]
+The main idea of this patch was to hide the Flexcom overlay from the 3 serial
+drivers. The Flexcom is a kind of muxer which selects one of the 3 IPs: it 
+doesn't change the internal of the IPs. For instance, on sama5d2x SoCs,
+some SPI controlers are still standalone whereas others are wrapped by a
+Flexcom but all these SPI controllers share the same IP version.
 
-[    0.000000] BUG: Bad page state in process swapper  pfn:1a171
-page_phys =1ff3ae20
-[    0.000000] BUG: Bad page state in process swapper  pfn:1a5b9
-page_phys =1ff43720
-[    0.000000] BUG: Bad page state in process swapper  pfn:1a172
-page_phys =1ff3ae40
-[    0.000000] BUG: Bad page state in process swapper  pfn:1a639
-page_phys =1ff44720
-[    0.000000] BUG: Bad page state in process swapper  pfn:1a63a
-page_phys =1ff44740
-[    0.000000] BUG: Bad page state in process swapper  pfn:1a63b
-page_phys =1ff44760
-[    0.000000] BUG: Bad page state in process swapper  pfn:1a579
-page_phys =1ff42f20
-[    0.000000] BUG: Bad page state in process swapper  pfn:1a5f9
-page_phys =1ff43f20
-[    0.000000] BUG: Bad page state in process swapper  pfn:1a579
-page_phys =1ff42f20
-[    0.000000] BUG: Bad page state in process swapper  pfn:1a57a
-page_phys =1ff42f40
-[    0.000000] BUG: Bad page state in process swapper  pfn:1a172
-page_phys =1ff3ae40
-[    0.000000] BUG: Bad page state in process swapper  pfn:1a639
-page_phys =1ff44720
-[    0.000000] BUG: Bad page state in process swapper  pfn:1a63a
-page_phys =1ff44740
-[    0.000000] BUG: Bad page state in process swapper  pfn:1a63b
-page_phys =1ff44760
-[    0.000000] BUG: Bad page state in process swapper  pfn:1a5f9
-page_phys =1ff43f20
-[    0.000000] BUG: Bad page state in process swapper  pfn:1a5fa
-page_phys =1ff43f40
-[    0.000000] BUG: Bad page state in process swapper  pfn:1a5f9
-page_phys =1ff43f20
-[    0.000000] BUG: Bad page state in process swapper  pfn:1a5f9
-page_phys =1ff43f20
-[    0.000000] BUG: Bad page state in process swapper  pfn:1a5fa
-page_phys =1ff43f40
-[    0.000000] BUG: Bad page state in process swapper  pfn:1a5fb
-page_phys =1ff43f60
-[    0.000000] BUG: Bad page state in process swapper  pfn:1a5fc
-page_phys =1ff43f80
-[    0.000000] BUG: Bad page state in process swapper  pfn:1a5fd
-page_phys =1ff43fa0
-[    0.000000] BUG: Bad page state in process swapper  pfn:1a172
-page_phys =1ff3ae40
-[    0.000000] BUG: Bad page state in process swapper  pfn:1a639
-page_phys =1ff44720
-[    0.000000] BUG: Bad page state in process swapper  pfn:1a63a
-page_phys =1ff44740
-[    0.000000] BUG: Bad page state in process swapper  pfn:1a63b
-page_phys =1ff44760
+Also, the Flexcom has its own I/O range. Especially, the Flexcom Mode Register
+which selects the active peripheral is outside the I/O ranges of the SPI, I2C
+or USART IPs.
+
+The active peripheral must be selected first then its driver can access its I/O
+registers but registers of the other inactive peripherals are still unavailable
+and would be read as zero since their peripherals are still disabled.
+That's why the very first version of the driver presented the Flexcom as a
+clock because most peripherals can't be used before enabling their clock.
+However the Flexcom is not an actual clock so I was told that it would be
+better to introduce the Flexcom as an MFD.
+
+The idea is to separate the serial controller drivers and the Flexcom driver
+the same way as a clock driver and a pin controller driver are separated from
+the driver of a peripheral which uses them.
 
 
-A u-boot memtest for those areas resulted in errors[1 in 5 boots]
+Best Regards,
 
-SOCFPGA_ARRIA5 #  mtest 0x1ff3a000 0x1ff4ffff
-Pattern 00000002  Writing...  Reading...
-Mem error @ 0x1FF4A714: found FFFFFFFF, expected 000041C7
-
-Mem error @ 0x1FF4A718: found 1C00FFFF, expected 000041C8
-
-Mem error @ 0x1FF4A71C: found 143DCB25, expected 000041C9
-
-Mem error @ 0x1FF4A720: found 01000608, expected 000041CA
-
-Mem error @ 0x1FF4A724: found 04060008, expected 000041CB
-
-Mem error @ 0x1FF4A728: found 1C000100, expected 000041CC
-
-Mem error @ 0x1FF4A72C: found 143DCB25, expected 000041CD
-
-Mem error @ 0x1FF4A730: found 1967A20A, expected 000041CE
-
-Mem error @ 0x1FF4A734: found 00000000, expected 000041CF
-
-Mem error @ 0x1FF4A738: found A20A0000, expected 000041D0
-
-Mem error @ 0x1FF4A73C: found 00001667, expected 000041D1
-
-Mem error @ 0x1FF4A740: found 00000000, expected 000041D2
-
-Mem error @ 0x1FF4A744: found 00000000, expected 000041D3
-
-Mem error @ 0x1FF4A748: found 00000000, expected 000041D4
-
-Mem error @ 0x1FF4A74C: found 00000000, expected 000041D5
-
-Mem error @ 0x1FF4A750: found E3D2A784, expected 000041D6
-Pattern 0000000A  Writing...  Reading...
-Mem error @ 0x1FF3AE14: found 005A0320, expected 0000038F
-Pattern FFFFFFF4  Writing...  Reading...
-Mem error @ 0x1FF3AE14: found 00400320, expected FFFFFC6F
-Pattern FFFFFFEF  Writing...  Reading...
-
-
-That means there is problem with my RAM [or board reset].
-
-Sorry for the noise.
-
---Arun
+Cyrille
