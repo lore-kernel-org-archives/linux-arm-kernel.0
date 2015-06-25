@@ -1,37 +1,46 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Thu, 25 Jun 2015 22:25:41 +0200
-Subject: Please revert 3eea8b5d68c801fec788b411582b803463834752 as it
- breaks touchscreen on n900.
-In-Reply-To: <20150602180855.GC11297@dtor-ws>
-References: <20150601095556.GH17267@lukather> <20150601140605.GA26908@amd>
- <20150601145825.GA20557@lukather> <20150601152111.GA14015@amd>
- <20150601174730.GA30024@dtor-ws> <20150601212226.GH23777@lukather>
- <20150601213213.GB14395@dtor-ws> <20150602094447.GW23777@lukather>
- <20150602175845.GB11297@dtor-ws> <20150602180855.GC11297@dtor-ws>
-Message-ID: <20150625202541.GA12659@amd>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Thu, 25 Jun 2015 14:02:07 -0700
+Subject: [PATCH v2 0/3] ARM: keystone: add ecc error interrupt handling
+In-Reply-To: <558C188B.5060107@oracle.com>
+References: <1435242710-31346-1-git-send-email-vitalya@ti.com>
+ <558C188B.5060107@oracle.com>
+Message-ID: <558C6C4F.1090102@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi!
+On 06/25/2015 08:04 AM, santosh shilimkar wrote:
+> On 6/25/2015 7:31 AM, Vitaly Andrianov wrote:
+>> This patch series adds support for arm L1/L2 ecc and ddr3 ecc error
+>> handling
+>> for Keystone devices
+>>
+>> Change Log
+>>
+>> v2:
+>> - removing unused and sorting headers of keystone.c are moved to a
+>> separate
+>>    patch.
+>> - l1l2 ecc and ddr3 ecc error handling are split it to separate patches
+>> - removed unused headers from keystone_ecc.c
+>> - platsmp.c removed from the patch.
+>> - return IRQ_HANDLED for 1 bit error in l1l2 ecc handler
+>> - checked and handled existing echttps://lwn.net/Articles/593336/c
+>> error before enabling ddr3 interrupt
+>> - 1 bit ddr3 interrupt is disabled, because it is handled by hardware
+>> and
+>>    there is no reason to handle it by software
+>>
+> This version looks good to me. As already commented, I would have liked
+> the patch 2/3(L2 ECC) code in ARM generic code so will give some more
+> time for others to come back. Otherwise I will queue this up for next
+> window.
 
-> By the way, the previous version was busted, this one should compile.
+Why not make this into an edac driver? I sent out an L1/L2 error
+detection edac driver for Krait processors a year ago, but it stalled
+due to some DT binding stuff[1]. This looks fairly similar.
 
-> Input: improve parsing OF parameters for touchscreens
-> 
-> From: Dmitry Torokhov <dmitry.torokhov@gmail.com>
-> 
-> When applying touchscreen parameters specified in device tree let's
-> make
-> sure we keep whatever setup was done by the driver and not reset the
-> missing values to zero.
-> 
-> Reported-by: Pavel Machek <pavel@ucw.cz>
-> Signed-off-by: Dmitry Torokhov <dmitry.torokhov@gmail.com>
+[1] https://lwn.net/Articles/593336/
 
-Tested-by: Pavel Machek <pavel@ucw.cz>
-
-Thanks!
-									Pavel
 -- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
