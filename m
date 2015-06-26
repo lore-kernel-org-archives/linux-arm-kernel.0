@@ -1,167 +1,65 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri, 26 Jun 2015 09:44:17 +0100
+Date: Fri, 26 Jun 2015 09:45:01 +0100
 Subject: [PATCH v2 2/3] IRQ/Gic-V3: Change arm-gic-its to support the
  Mbigen interrupt
-In-Reply-To: <558CF1CD.5020200@huawei.com>
+In-Reply-To: <alpine.DEB.2.11.1506231125580.4037@nanos>
 References: <1434077399-32200-1-git-send-email-majun258@huawei.com>
  <1434077399-32200-3-git-send-email-majun258@huawei.com>
- <558CF1CD.5020200@huawei.com>
-Message-ID: <558D10E1.8040701@arm.com>
+ <alpine.DEB.2.11.1506121230320.3786@nanos> <557E794D.2080705@huawei.com>
+ <alpine.DEB.2.11.1506190150000.4107@nanos> <558920FF.8030405@huawei.com>
+ <alpine.DEB.2.11.1506231125580.4037@nanos>
+Message-ID: <558D110D.7050000@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 26/06/15 07:31, majun (F) wrote:
-> Hi Thomas:
+On 23/06/15 10:29, Thomas Gleixner wrote:
+> On Tue, 23 Jun 2015, majun (F) wrote:
+>> ? 2015/6/19 7:52, Thomas Gleixner ??:
+>>> On Mon, 15 Jun 2015, majun (F) wrote:
+>>>> ? 2015/6/12 18:48, Thomas Gleixner ??:
+>>>>> Can you please provide a proper description of this mbigen chip and
+>>>>> explain WHY you think that it needs all this special hackery?
+>>>
+>>> You carefully avoided to provide a proper description of this mbigen
+>>> chip and how it needs to be integrated into the GIC/ITS whatever
+>>> scenario.
+>>>
+>> Mbigen means Message Based Interrupt Generator.
+>> Its a kind of interrupt controller collects
+>> the interrupts from external devices and generate msi interrupt.
+>>
+>> Mbigen is applied to reduce the number of wire connected interrupts.
+>>
+>> As the peripherals increasing, the interrupts lines needed is increasing
+>> much, especially on the Arm64 server soc.
+>>
+>> Therefore, the interrupt pin in gic is not enought for so many perpherals.
+>>
+>> Mbigen is designed to fix this problem.
+>>
+>> Mbigen chip locates in ITS or outside of ITS.
+>>
+>> The working flow of Mbigen shows as below:
+>>
+>> external devices ------> MBIGEN ------->ITS
+>>
+>> The devices connect to Mbigen chip through wire connecting way.
+>> Mbigen detects and collectes the interrupts from the these devices.
+>>
+>> Then, Mbigen generats the MBI interrupts by writting the ITS
+>> Translator register.
 > 
-> ? 2015/6/12 10:49, Ma Jun ??:
+> So it's nothing else than a non PCI based MSI implementation which
+> means it can simply use the generic MSI infrastructure and implement a
+> interrupt domain/chip which implements the MBI specific parts and has
+> the ITS as its parent domain.
 > 
->> +static int its_mbigen_prepare(struct irq_domain *domain, struct mbi_desc *desc,
->> +								int hwirq, struct mbi_alloc_info *arg)
->> +{
->> +	struct its_node *its = domain->parent->host_data;
->> +	struct its_device *its_dev;
->> +	u32 dev_id;
->> +
->> +	dev_id = desc->msg_id;
->> +
->> +	its_dev = its_find_device(its, dev_id);
->> +	if (!its_dev) {
->> +		its_dev = its_create_device(its, dev_id, desc->lines);
->> +		if (!its_dev)
->> +			return -ENOMEM;
->> +	}
->> +
->> +	arg->scratchpad[0].ptr = its_dev;
->> +	arg->scratchpad[1].ptr = NULL;
->> +
->> +	arg->desc = desc;
->> +	arg->hwirq = hwirq;
->> +	return 0;
->> +}
->> +
->> +static struct mbigen_domain_ops its_mbigen_ops = {
->> +	.mbigen_prepare		= its_mbigen_prepare,
->> +};
->> +
->> +static struct mbigen_domain_info its_mbigen_domain_info = {
->> +	.ops	= &its_mbigen_ops,
->> +};
->> +
-> 
-> what's you opinion about the function 'its_mbigen_prepare' ?
-> put this function in irq-gic-v3-its.c or move to mbigen driver ?
-> 
-> If I move this function to mbigen driver, some its fuctions
-> (ex. its_find_device, its_create_device) and struct data (ex its_node)
-> would be used in mbigen driver.
+> No hackery in ITS and no extra functionality in the core irq code. It
+> just can use the existing infrastructure. The only extra you need is a
+> proper way to retrieve the pointer to the ITS domain. Everything else
+> just falls in place.
 
-The prepare hook is very PCI specific so far, but could easily be turned into
-something that is not. How about splitting it in two:
-
-diff --git a/drivers/irqchip/irq-gic-v3-its.c b/drivers/irqchip/irq-gic-v3-its.c
-index 1b7e155..9a68c77 100644
---- a/drivers/irqchip/irq-gic-v3-its.c
-+++ b/drivers/irqchip/irq-gic-v3-its.c
-@@ -1200,49 +1200,54 @@ static int its_get_pci_alias(struct pci_dev *pdev, u16 alias, void *data)
- 	return 0;
- }
- 
--static int its_msi_prepare(struct irq_domain *domain, struct device *dev,
--			   int nvec, msi_alloc_info_t *info)
-+int its_msi_prepare(struct irq_domain *domain, u32 dev_id,
-+		    int nvec, msi_alloc_info_t *info)
- {
--	struct pci_dev *pdev;
- 	struct its_node *its;
- 	struct its_device *its_dev;
--	struct its_pci_alias dev_alias;
- 
--	if (!dev_is_pci(dev))
--		return -EINVAL;
--
--	pdev = to_pci_dev(dev);
--	dev_alias.pdev = pdev;
--	dev_alias.count = nvec;
--
--	pci_for_each_dma_alias(pdev, its_get_pci_alias, &dev_alias);
- 	its = domain->parent->host_data;
--
--	its_dev = its_find_device(its, dev_alias.dev_id);
-+	its_dev = its_find_device(its, dev_id);
- 	if (its_dev) {
- 		/*
- 		 * We already have seen this ID, probably through
- 		 * another alias (PCI bridge of some sort). No need to
- 		 * create the device.
- 		 */
--		dev_dbg(dev, "Reusing ITT for devID %x\n", dev_alias.dev_id);
-+		pr_debug("Reusing ITT for devID %x\n", dev_id);
- 		goto out;
- 	}
- 
--	its_dev = its_create_device(its, dev_alias.dev_id, dev_alias.count);
-+	its_dev = its_create_device(its, dev_id, nvec);
- 	if (!its_dev)
- 		return -ENOMEM;
- 
--	dev_dbg(&pdev->dev, "ITT %d entries, %d bits\n",
--		dev_alias.count, ilog2(dev_alias.count));
-+	pr_debug("ITT %d entries, %d bits\n", nvec, ilog2(nvec));
- out:
- 	info->scratchpad[0].ptr = its_dev;
--	info->scratchpad[1].ptr = dev;
- 	return 0;
- }
- 
-+static int its_pci_msi_prepare(struct irq_domain *domain, struct device *dev,
-+			       int nvec, msi_alloc_info_t *info)
-+{
-+	struct pci_dev *pdev;
-+	struct its_pci_alias dev_alias;
-+
-+	if (!dev_is_pci(dev))
-+		return -EINVAL;
-+
-+	pdev = to_pci_dev(dev);
-+	dev_alias.pdev = pdev;
-+	dev_alias.count = nvec;
-+
-+	pci_for_each_dma_alias(pdev, its_get_pci_alias, &dev_alias);
-+
-+	return its_msi_prepare(domain, dev_alias.dev_id, dev_alias.count, info);
-+}
-+
- static struct msi_domain_ops its_pci_msi_ops = {
--	.msi_prepare	= its_msi_prepare,
-+	.msi_prepare	= its_pci_msi_prepare,
- };
- 
- static struct msi_domain_info its_pci_msi_domain_info = {
-@@ -1287,8 +1292,9 @@ static int its_irq_domain_alloc(struct irq_domain *domain, unsigned int virq,
- 
- 		irq_domain_set_hwirq_and_chip(domain, virq + i,
- 					      hwirq, &its_irq_chip, its_dev);
--		dev_dbg(info->scratchpad[1].ptr, "ID:%d pID:%d vID:%d\n",
--			(int)(hwirq - its_dev->lpi_base), (int)hwirq, virq + i);
-+		pr_debug("ID:%d pID:%d vID:%d\n",
-+			 (int)(hwirq - its_dev->lpi_base),
-+			 (int)hwirq, virq + i);
- 	}
- 
- 	return 0;
-
-You can then keep your MBI stuff in a separate file, and call into 
-its_msi_prepare.
-
-> Now, all these functions and data structure are defined as static.
-> to use them, I have to remove the 'static' definition and put them
-> in a head file ? create a new head file).
-
-I don't want to see these functions and structure leaking out of the
-ITS code unless we're absolutely forced to do so.  The above code
-shows you one possible way to solve the problem.
-
-Thanks,
+I may have a proposal for that. Stay tuned.
 
 	M.
 -- 
