@@ -1,181 +1,168 @@
-From: thunder.leizhen@huawei.com (Zhen Lei)
-Date: Fri, 26 Jun 2015 16:33:02 +0800
-Subject: [PATCH 6/8] iommu/arm-smmu: add support for non-pci devices
-In-Reply-To: <1435307584-9812-1-git-send-email-thunder.leizhen@huawei.com>
-References: <1435307584-9812-1-git-send-email-thunder.leizhen@huawei.com>
-Message-ID: <1435307584-9812-7-git-send-email-thunder.leizhen@huawei.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Fri, 26 Jun 2015 09:44:17 +0100
+Subject: [PATCH v2 2/3] IRQ/Gic-V3: Change arm-gic-its to support the
+ Mbigen interrupt
+In-Reply-To: <558CF1CD.5020200@huawei.com>
+References: <1434077399-32200-1-git-send-email-majun258@huawei.com>
+ <1434077399-32200-3-git-send-email-majun258@huawei.com>
+ <558CF1CD.5020200@huawei.com>
+Message-ID: <558D10E1.8040701@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now, we only support a master with only one stream id. It will cover most
-hardware platforms and coding so easy.
+On 26/06/15 07:31, majun (F) wrote:
+> Hi Thomas:
+> 
+> ? 2015/6/12 10:49, Ma Jun ??:
+> 
+>> +static int its_mbigen_prepare(struct irq_domain *domain, struct mbi_desc *desc,
+>> +								int hwirq, struct mbi_alloc_info *arg)
+>> +{
+>> +	struct its_node *its = domain->parent->host_data;
+>> +	struct its_device *its_dev;
+>> +	u32 dev_id;
+>> +
+>> +	dev_id = desc->msg_id;
+>> +
+>> +	its_dev = its_find_device(its, dev_id);
+>> +	if (!its_dev) {
+>> +		its_dev = its_create_device(its, dev_id, desc->lines);
+>> +		if (!its_dev)
+>> +			return -ENOMEM;
+>> +	}
+>> +
+>> +	arg->scratchpad[0].ptr = its_dev;
+>> +	arg->scratchpad[1].ptr = NULL;
+>> +
+>> +	arg->desc = desc;
+>> +	arg->hwirq = hwirq;
+>> +	return 0;
+>> +}
+>> +
+>> +static struct mbigen_domain_ops its_mbigen_ops = {
+>> +	.mbigen_prepare		= its_mbigen_prepare,
+>> +};
+>> +
+>> +static struct mbigen_domain_info its_mbigen_domain_info = {
+>> +	.ops	= &its_mbigen_ops,
+>> +};
+>> +
+> 
+> what's you opinion about the function 'its_mbigen_prepare' ?
+> put this function in irq-gic-v3-its.c or move to mbigen driver ?
+> 
+> If I move this function to mbigen driver, some its fuctions
+> (ex. its_find_device, its_create_device) and struct data (ex its_node)
+> would be used in mbigen driver.
 
-Please refer Documentation\devicetree\bindings\iommu\iommu.txt on how to
-bind device tree.
+The prepare hook is very PCI specific so far, but could easily be turned into
+something that is not. How about splitting it in two:
 
-Signed-off-by: Zhen Lei <thunder.leizhen@huawei.com>
----
- arch/arm64/include/asm/device.h |  2 +
- drivers/iommu/arm-smmu-v3.c     | 88 +++++++++++++++++++++++++++++++++++++++--
- 2 files changed, 87 insertions(+), 3 deletions(-)
-
-diff --git a/arch/arm64/include/asm/device.h b/arch/arm64/include/asm/device.h
-index 243ef25..225e4f9 100644
---- a/arch/arm64/include/asm/device.h
-+++ b/arch/arm64/include/asm/device.h
-@@ -20,6 +20,8 @@ struct dev_archdata {
- 	struct dma_map_ops *dma_ops;
- #ifdef CONFIG_IOMMU_API
- 	void *iommu;			/* private IOMMU data */
-+	struct device_node *of_smmu;
-+	u32 sid;
- #endif
- 	bool dma_coherent;
- };
-diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
-index 483c918..87c3d9b 100644
---- a/drivers/iommu/arm-smmu-v3.c
-+++ b/drivers/iommu/arm-smmu-v3.c
-@@ -30,9 +30,14 @@
- #include <linux/of_address.h>
- #include <linux/pci.h>
- #include <linux/platform_device.h>
-+#include <linux/amba/bus.h>
-+#include <linux/of_iommu.h>
-
- #include "io-pgtable.h"
-
-+/* Maximum number of stream IDs assigned to a single device */
-+#define MAX_MASTER_STREAMIDS		1
-+
- /* MMIO registers */
- #define ARM_SMMU_IDR0			0x0
- #define IDR0_ST_LVL_SHIFT		27
-@@ -608,6 +613,22 @@ static struct arm_smmu_domain *to_smmu_domain(struct iommu_domain *dom)
- 	return container_of(dom, struct arm_smmu_domain, domain);
+diff --git a/drivers/irqchip/irq-gic-v3-its.c b/drivers/irqchip/irq-gic-v3-its.c
+index 1b7e155..9a68c77 100644
+--- a/drivers/irqchip/irq-gic-v3-its.c
++++ b/drivers/irqchip/irq-gic-v3-its.c
+@@ -1200,49 +1200,54 @@ static int its_get_pci_alias(struct pci_dev *pdev, u16 alias, void *data)
+ 	return 0;
  }
-
-+static struct arm_smmu_device *find_smmu_for_device(struct device *dev)
-+{
-+	struct arm_smmu_device *smmu;
-+
-+	spin_lock(&arm_smmu_devices_lock);
-+	list_for_each_entry(smmu, &arm_smmu_devices, list) {
-+		if (smmu->dev->of_node == dev->archdata.of_smmu) {
-+			spin_unlock(&arm_smmu_devices_lock);
-+			return smmu;
-+		}
-+	}
-+	spin_unlock(&arm_smmu_devices_lock);
-+
-+	return NULL;
-+}
-+
- /* Low-level queue manipulation functions */
- static bool queue_full(struct arm_smmu_queue *q)
+ 
+-static int its_msi_prepare(struct irq_domain *domain, struct device *dev,
+-			   int nvec, msi_alloc_info_t *info)
++int its_msi_prepare(struct irq_domain *domain, u32 dev_id,
++		    int nvec, msi_alloc_info_t *info)
  {
-@@ -1760,9 +1781,36 @@ static int arm_smmu_add_device(struct device *dev)
- 	struct arm_smmu_group *smmu_group;
- 	struct arm_smmu_device *smmu;
-
--	/* We only support PCI, for now */
+-	struct pci_dev *pdev;
+ 	struct its_node *its;
+ 	struct its_device *its_dev;
+-	struct its_pci_alias dev_alias;
+ 
 -	if (!dev_is_pci(dev))
--		return -ENODEV;
-+	if (!dev_is_pci(dev)) {
-+		smmu = find_smmu_for_device(dev);
-+		if (!smmu)
-+			return -ENODEV;
-+
-+		group = iommu_group_alloc();
-+		if (IS_ERR(group)) {
-+			dev_err(dev, "Failed to allocate IOMMU group\n");
-+			return PTR_ERR(group);
-+		}
-+
-+		ret = iommu_group_add_device(group, dev);
-+		if (ret)
-+			goto out_put_group;
-+
-+		smmu_group = kzalloc(sizeof(*smmu_group), GFP_KERNEL);
-+		if (!smmu_group) {
-+			ret = -ENOMEM;
-+			goto out_put_group;
-+		}
-+
-+		smmu_group->ste.valid = true;
-+		smmu_group->smmu = smmu;
-+		iommu_group_set_iommudata(group, smmu_group,
-+						__arm_smmu_release_iommudata);
-+
-+		sid = dev->archdata.sid;
-+
-+		goto handle_stream_id;
-+	}
-
- 	pdev = to_pci_dev(dev);
- 	group = iommu_group_get_for_dev(dev);
-@@ -1793,6 +1841,8 @@ static int arm_smmu_add_device(struct device *dev)
-
- 	/* Assume SID == RID until firmware tells us otherwise */
- 	pci_for_each_dma_alias(pdev, __arm_smmu_get_pci_sid, &sid);
-+
-+handle_stream_id:
- 	for (i = 0; i < smmu_group->num_sids; ++i) {
- 		/* If we already know about this SID, then we're done */
- 		if (smmu_group->sids[i] == sid)
-@@ -1881,7 +1931,23 @@ out_unlock:
- 	return ret;
+-		return -EINVAL;
+-
+-	pdev = to_pci_dev(dev);
+-	dev_alias.pdev = pdev;
+-	dev_alias.count = nvec;
+-
+-	pci_for_each_dma_alias(pdev, its_get_pci_alias, &dev_alias);
+ 	its = domain->parent->host_data;
+-
+-	its_dev = its_find_device(its, dev_alias.dev_id);
++	its_dev = its_find_device(its, dev_id);
+ 	if (its_dev) {
+ 		/*
+ 		 * We already have seen this ID, probably through
+ 		 * another alias (PCI bridge of some sort). No need to
+ 		 * create the device.
+ 		 */
+-		dev_dbg(dev, "Reusing ITT for devID %x\n", dev_alias.dev_id);
++		pr_debug("Reusing ITT for devID %x\n", dev_id);
+ 		goto out;
+ 	}
+ 
+-	its_dev = its_create_device(its, dev_alias.dev_id, dev_alias.count);
++	its_dev = its_create_device(its, dev_id, nvec);
+ 	if (!its_dev)
+ 		return -ENOMEM;
+ 
+-	dev_dbg(&pdev->dev, "ITT %d entries, %d bits\n",
+-		dev_alias.count, ilog2(dev_alias.count));
++	pr_debug("ITT %d entries, %d bits\n", nvec, ilog2(nvec));
+ out:
+ 	info->scratchpad[0].ptr = its_dev;
+-	info->scratchpad[1].ptr = dev;
+ 	return 0;
  }
-
-+static int arm_smmu_of_xlate(struct device *dev, struct of_phandle_args *args)
+ 
++static int its_pci_msi_prepare(struct irq_domain *domain, struct device *dev,
++			       int nvec, msi_alloc_info_t *info)
 +{
-+	if (args->args_count > MAX_MASTER_STREAMIDS) {
-+		dev_err(dev,
-+			"reached maximum number (%d) of stream IDs for master device %s\n",
-+			MAX_MASTER_STREAMIDS, dev->of_node->name);
-+		return -ENOSPC;
-+	}
++	struct pci_dev *pdev;
++	struct its_pci_alias dev_alias;
 +
-+	dev->archdata.of_smmu = args->np;
-+	dev->archdata.sid = args->args[0];
++	if (!dev_is_pci(dev))
++		return -EINVAL;
 +
-+	return 0;
++	pdev = to_pci_dev(dev);
++	dev_alias.pdev = pdev;
++	dev_alias.count = nvec;
++
++	pci_for_each_dma_alias(pdev, its_get_pci_alias, &dev_alias);
++
++	return its_msi_prepare(domain, dev_alias.dev_id, dev_alias.count, info);
 +}
 +
- static struct iommu_ops arm_smmu_ops = {
-+	.of_xlate		= arm_smmu_of_xlate,
- 	.capable		= arm_smmu_capable,
- 	.domain_alloc		= arm_smmu_domain_alloc,
- 	.domain_free		= arm_smmu_domain_free,
-@@ -2655,6 +2721,14 @@ static int __init arm_smmu_init(void)
- 	if (ret)
- 		return ret;
+ static struct msi_domain_ops its_pci_msi_ops = {
+-	.msi_prepare	= its_msi_prepare,
++	.msi_prepare	= its_pci_msi_prepare,
+ };
+ 
+ static struct msi_domain_info its_pci_msi_domain_info = {
+@@ -1287,8 +1292,9 @@ static int its_irq_domain_alloc(struct irq_domain *domain, unsigned int virq,
+ 
+ 		irq_domain_set_hwirq_and_chip(domain, virq + i,
+ 					      hwirq, &its_irq_chip, its_dev);
+-		dev_dbg(info->scratchpad[1].ptr, "ID:%d pID:%d vID:%d\n",
+-			(int)(hwirq - its_dev->lpi_base), (int)hwirq, virq + i);
++		pr_debug("ID:%d pID:%d vID:%d\n",
++			 (int)(hwirq - its_dev->lpi_base),
++			 (int)hwirq, virq + i);
+ 	}
+ 
+ 	return 0;
 
-+	if (!iommu_present(&platform_bus_type))
-+		bus_set_iommu(&platform_bus_type, &arm_smmu_ops);
-+
-+#ifdef CONFIG_ARM_AMBA
-+	if (!iommu_present(&amba_bustype))
-+		bus_set_iommu(&amba_bustype, &arm_smmu_ops);
-+#endif
-+
- 	return bus_set_iommu(&pci_bus_type, &arm_smmu_ops);
- }
+You can then keep your MBI stuff in a separate file, and call into 
+its_msi_prepare.
 
-@@ -2666,6 +2740,14 @@ static void __exit arm_smmu_exit(void)
- subsys_initcall(arm_smmu_init);
- module_exit(arm_smmu_exit);
+> Now, all these functions and data structure are defined as static.
+> to use them, I have to remove the 'static' definition and put them
+> in a head file ? create a new head file).
 
-+static int arm_smmu_of_iommu_init(struct device_node *np)
-+{
-+	of_iommu_set_ops(np, &arm_smmu_ops);
-+
-+	return 0;
-+}
-+IOMMU_OF_DECLARE(arm_smmu_v3, "arm,smmu-v3", arm_smmu_of_iommu_init);
-+
- MODULE_DESCRIPTION("IOMMU API for ARM architected SMMUv3 implementations");
- MODULE_AUTHOR("Will Deacon <will.deacon@arm.com>");
- MODULE_LICENSE("GPL v2");
---
-1.8.0
+I don't want to see these functions and structure leaking out of the
+ITS code unless we're absolutely forced to do so.  The above code
+shows you one possible way to solve the problem.
+
+Thanks,
+
+	M.
+-- 
+Jazz is not dead. It just smells funny...
