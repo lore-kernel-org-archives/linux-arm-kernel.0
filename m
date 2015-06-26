@@ -1,44 +1,27 @@
-From: tchalamarla@caviumnetworks.com (Tirumalesh Chalamarla)
-Date: Fri, 26 Jun 2015 12:12:23 -0700
-Subject: [PATCH] GICv3: Add ITS entry to THUNDER dts
-Message-ID: <1435345943-31833-1-git-send-email-tchalamarla@caviumnetworks.com>
+From: timur@codeaurora.org (Timur Tabi)
+Date: Fri, 26 Jun 2015 14:28:38 -0500
+Subject: [PATCH 1/3] hvc_dcc: bind driver to core0 for reads and writes
+In-Reply-To: <1435344756-20901-1-git-send-email-timur@codeaurora.org>
+References: <1435344756-20901-1-git-send-email-timur@codeaurora.org>
+Message-ID: <CAOZdJXVHjhJLrxO6HCjHXLEJqxXum33B6RyRUZ5KBOu23setnA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Tirumalesh Chalamarla <tchalamarla@cavium.com>
+On Fri, Jun 26, 2015 at 1:52 PM, Timur Tabi <timur@codeaurora.org> wrote:
+>
+> Selecting this option will enable code that serializes all console
+> input and output to core 0.  The DCC driver will create input and
+> output FIFOs that all cores will use.  Reads and writes from/to DCC
+> are handled by a workqueue that runs only core 0.
+>
+> Signed-off-by: Shanker Donthineni <shankerd@codeaurora.org>
 
-The PCIe host controller uses MSIs provided by GICv3 ITS. Enable it on
-Thunder SoCs by adding an entry to DT.
+Somehow the original author got dropped when I made this patch.  This
+patch should say:
 
-Signed-off-by: Tirumalesh Chalamarla <tchalamarla@cavium.com>
-Acked-by: Marc Zyngier <marc.zyngier@arm.com>
----
- arch/arm64/boot/dts/cavium/thunder-88xx.dtsi | 9 +++++++++
- 1 file changed, 9 insertions(+)
+From: Shanker Donthineni <shankerd@codeaurora.org>
 
-diff --git a/arch/arm64/boot/dts/cavium/thunder-88xx.dtsi b/arch/arm64/boot/dts/cavium/thunder-88xx.dtsi
-index d8c0bdc..9cb7cf9 100644
---- a/arch/arm64/boot/dts/cavium/thunder-88xx.dtsi
-+++ b/arch/arm64/boot/dts/cavium/thunder-88xx.dtsi
-@@ -376,10 +376,19 @@
- 		gic0: interrupt-controller at 8010,00000000 {
- 			compatible = "arm,gic-v3";
- 			#interrupt-cells = <3>;
-+			#address-cells = <2>;
-+			#size-cells = <2>;
-+			ranges;
- 			interrupt-controller;
- 			reg = <0x8010 0x00000000 0x0 0x010000>, /* GICD */
- 			      <0x8010 0x80000000 0x0 0x600000>; /* GICR */
- 			interrupts = <1 9 0xf04>;
-+
-+			its: gic-its at 8010,00020000 {
-+				compatible = "arm,gic-v3-its";
-+				msi-controller;
-+				reg = <0x8010 0x20000 0x0 0x200000>;
-+			};
- 		};
- 
- 		uaa0: serial at 87e0,24000000 {
 -- 
-2.1.0
+Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+a Linux Foundation Collaborative Project.
