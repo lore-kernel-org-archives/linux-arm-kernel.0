@@ -1,45 +1,82 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Fri, 26 Jun 2015 17:59:29 +0100
-Subject: [PATCH] keystone: psci: adds cpu_die implementation
-In-Reply-To: <558D8492.2090503@ti.com>
-References: <1435240970-30869-1-git-send-email-vitalya@ti.com>
- <20150625144511.GA6844@leverpostej> <558C174F.80108@oracle.com>
- <558C25E0.3010102@ti.com> <20150625161308.GF6844@leverpostej>
- <558C328C.5070803@ti.com> <20150625165741.GA10564@leverpostej>
- <20150625172057.GA11952@leverpostej> <558C4B84.9030303@oracle.com>
- <558D8492.2090503@ti.com>
-Message-ID: <20150626165929.GB31602@leverpostej>
+From: simon.guinot@sequanux.org (Simon Guinot)
+Date: Fri, 26 Jun 2015 19:10:28 +0200
+Subject: [RESEND PATCH 3/4] leds: leds-ns2: handle can_sleep GPIOs
+In-Reply-To: <558ABC35.1010801@samsung.com>
+References: <1434640650-28086-1-git-send-email-simon.guinot@sequanux.org>
+ <1434640650-28086-4-git-send-email-simon.guinot@sequanux.org>
+ <558ABC35.1010801@samsung.com>
+Message-ID: <20150626171028.GL4853@kw.sim.vm.gnt>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> OK. Now I'm confused :) We may have several different configurations here:
+On Wed, Jun 24, 2015 at 04:18:29PM +0200, Jacek Anaszewski wrote:
+> On 06/18/2015 05:17 PM, Simon Guinot wrote:
+> >On the board n090401 (Seagate NAS 4-Bay), some of the LEDs are handled
+> >by the leds-ns2 driver. This LEDs are connected to an I2C GPIO expander
+> >(PCA95554PW) which means that GPIO access may sleep. This patch makes
+> >leds-ns2 compatible with such GPIOs by using the *_cansleep() variant of
+> >the GPIO functions. As a drawback this functions can't be used safely in
+> >a timer context (with the timer LED trigger for example). To fix this
+> >issue, a workqueue mechanism (copied from the leds-gpio driver) is used.
+> >
+> >Note that this patch also updates slightly the ns2_led_sata_store
+> >function. The LED state is now retrieved from cached values instead of
+> >reading the GPIOs previously. This prevents ns2_led_sata_store from
+> >working with a stale LED state (which may happen when a delayed work
+> >is pending).
+> >
+> >Signed-off-by: Simon Guinot <simon.guinot@sequanux.org>
+> >Signed-off-by: Vincent Donnefort <vdonnefort@gmail.com>
+> >---
+> >  drivers/leds/leds-ns2.c | 56 ++++++++++++++++++++++++++++++++++++-------------
+> >  1 file changed, 42 insertions(+), 14 deletions(-)
+> >
 > 
-> 1) CONFIG_HOTPLUG_CPU and CONFIG_ARM_PSCI are not set.
->     In this case keystone arch needs to have
->     keystone_smp_boot_secondary();
+> >
+> >+static void ns2_led_work(struct work_struct *work)
+> >+{
+> >+	struct ns2_led_data *led_dat =
+> >+		container_of(work, struct ns2_led_data, work);
+> >+	int i = led_dat->new_mode_index;
+> >+
+> >+	write_lock(&led_dat->rw_lock);
+> >+
+> >+	gpio_set_value_cansleep(led_dat->cmd, led_dat->modval[i].cmd_level);
+> >+	gpio_set_value_cansleep(led_dat->slow, led_dat->modval[i].slow_level);
+> >+
+> >+	write_unlock(&led_dat->rw_lock);
+> >+}
+> >+
 > 
-> 2) CONFIG_HOTPLUG_CPU=y and CONFIG_ARM_PSCI is not set.
->     keystone_smp_boot_secondary() is required and non PSCI
->     implementation of keystone_cpu_die() is also required.
-> 
-> 3) CONFIG_HOTPLUG_CPU is not set and CONFIG_ARM_PSCI=y
-> 4) CONFIG_HOTPLUG_CPU=y and CONFIG_ARM_PSCI=y
-> 
->     How do I boot secondary CPUs in cases of 3 and 4?
->     Do I need to implement PSCI version of the
->     keystone_smp_boot_secondary() of adding PSCI commands to DTB is
->     enough?
+> I've just realized that this can break one of the basic rules:
+> no sleeping should occur while holding a spinlock. Did you
+> consider this?
 
-The DTB additions alone _should_ be sufficient.
+Well, if I did, I can't say I have done a good job here :/
 
->     Do I need to implement keystone_cpu_die() if PSCI commands are
->     added to DTB?
+You have to know that this code is used on a large number of boards.
+Thus, I have to thank you for spotting this bug. As a relief, this don't
+actually lead to a bug with the configuration we are using: UP machine
+and !CONFIG_SMP.
 
-You _should not_ need to add any platform code to use PSCI.
+It should be simple to fix it because using a spinlock in ns2_led_work()
+is not needed. The GPIO writing calls are protected by the workqueue
+itself: a single instance is running at a time. We are only let with the
+new_mode_index reading which must be made coherent.
 
-However, if you have existing platform code which pokes the hardware
-logically owned by your FW PSCI implementation, you need to ensure that
-this code doesn't poke that hardware when PSCI is in use.
+Note that the very same issue also applies to ns2_led_get_mode(). And
+again using a lock here is not needed either. This function is only
+called once at probe time and there is no possible concurrency.
 
-Thanks,
-Mark.
+I'll fix all this issues with the v2.
+
+Thanks.
+
+Simon
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 181 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150626/40279a2e/attachment.sig>
