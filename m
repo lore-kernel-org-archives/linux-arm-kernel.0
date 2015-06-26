@@ -1,57 +1,70 @@
-From: bamv2005@gmail.com (Bamvor Jian Zhang)
-Date: Fri, 26 Jun 2015 12:35:58 +0800
-Subject: [PATCH 0/4] arm64: add initial support for the Rockchip rk3368
-In-Reply-To: <1650408.ovnAjReNFJ@diego>
-References: <1650408.ovnAjReNFJ@diego>
-Message-ID: <558CD6AE.7030505@gmail.com>
+From: jan.kiszka@web.de (Jan Kiszka)
+Date: Fri, 26 Jun 2015 06:49:34 +0200
+Subject: [RFC PATCH] KVM: arm/arm64: Don't let userspace update CNTVOFF
+ once guest is running
+In-Reply-To: <558BC90B.4060806@huawei.com>
+References: <1435157697-28579-1-git-send-email-marc.zyngier@arm.com>
+ <20150625080457.GD28244@cbox> <558BC2F5.9010303@huawei.com>
+ <CAFEAcA_RzWSppaYA9vuAaL-MO6sQV1SgpXf3w-LScUdaarpOEQ@mail.gmail.com>
+ <558BC90B.4060806@huawei.com>
+Message-ID: <558CD9DE.3010609@web.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi, Heiko
+On 2015-06-25 11:25, Claudio Fontana wrote:
+> On 25.06.2015 11:10, Peter Maydell wrote:
+>> On 25 June 2015 at 09:59, Claudio Fontana <claudio.fontana@huawei.com> wrote:
+>>> Once the VM is created, I think QEMU should not request kvm to
+>>> change the virtual offset of the VM anymore: maybe an unexpected
+>>> consequence of QEMU's target-arm/kvm64.c::kvm_arch_put_registers ?
+>>
+>> Hmm. In general we assume that we can:
+>>  * stop the VM
+>>  * read all the guest system registers
+>>  * write those values back again
+>>  * restart the VM
+>>
+>> if we need to. Is that what's happening here, or are we doing
+>> something odder?
+>>
+>> -- PMM
+>>
+> 
+> What I guess could be happening by looking at the code in linux
+> 
+> virt/kvm/arm/arch_timer.c::kvm_arm_timer_set_reg
+> 
+> is that QEMU tries to set the KVM_REG_ARM_TIMER_CNT register from exactly the previous value,
+> but just because of the fact that the set function is called, cntvoff is updated,
+> since the value provided by the user is apparently assumed to be _relative_ to the physical timer.
+> 
+> This is apparent to me in the code in that function which says:
+> 
+> case KVM_REG_ARM_TIMER_CNT: {
+> /* ... */
+>     u64 cntvoff = kvm_phys_timer_read() - value;
+> /* ... */
+> }
+> 
+> And this is matched by the corresponding get function kvm_arm_timer_get_reg where it says:
+> 
+> case KVM_REG_ARM_TIMER_CNT:
+>    return kvm_phys_timer_read() - vcpu->kvm->arch.timer.cntvoff;
+> 
+> The time difference between when the GET is issued by QEMU and when the PUT is issued then would account for the difference.
 
-Could I test the code on rk3368 STB such as EKB368, CSA90?
-Is there some documents about it?
+QEMU has the concept of write-back levels: KVM_PUT_RUNTIME_STATE,
+KVM_PUT_RESET_STATE and KVM_PUT_FULL_STATE. I suspect this registers is
+just sorted into the wrong category, thus written as part of the
+RUNTIME_STATE. We had such bug patterns during the x86 maturing phase as
+well.
 
-Thanks
+Jan
 
-bamvor	
-
-On 06/26/2015 02:12 AM, Heiko St?bner wrote:
-> This adds initial support for the new rk3368 ARM64 soc from Rockchip.
->
-> Overall it looks like someone dropped some A53 cores into a rk3288, so
-> it shares a lot of peripherals that only differ in details. Therefore
-> stuff like the mmc, usb, spi, i2c controllers work out of the box.
-> The support for the gmac already made it into the merge window as well
-> as the pinctrl support.
->
-> Interestingly, in its core the rk3368 seems trying to be a model student
-> with psci for smp and using scpi for ddr frequency scaling, although I
-> currently do not understand how the mailbox works yet. The display
-> controllers also are only minimally different so I'm hopefully to have
-> working graphics in the near-ish future :-)
->
->
-> As mentioned in the dts patch, this series depends on the dt-binding
-> header for the clock ids, so will need a shared branch once this is ready.
->
->
-> Heiko Stuebner (4):
->    arm64: add Rockchip architecture entry
->    arm64: defconfig: enable ARCH_ROCKCHIP
->    arm64: dts: add Rockchip rk3368 core dtsi and board dts for the r88
->      board
->    dt-bindings: document rk3368 R89 board from Rockchip
->
->   Documentation/devicetree/bindings/arm/rockchip.txt |   4 +
->   arch/arm64/Kconfig                                 |  10 +
->   arch/arm64/boot/dts/Makefile                       |   1 +
->   arch/arm64/boot/dts/rockchip/Makefile              |   5 +
->   arch/arm64/boot/dts/rockchip/rk3368-r88.dts        | 353 ++++++++
->   arch/arm64/boot/dts/rockchip/rk3368.dtsi           | 900 +++++++++++++++++++++
->   arch/arm64/configs/defconfig                       |   2 +
->   7 files changed, 1275 insertions(+)
->   create mode 100644 arch/arm64/boot/dts/rockchip/Makefile
->   create mode 100644 arch/arm64/boot/dts/rockchip/rk3368-r88.dts
->   create mode 100644 arch/arm64/boot/dts/rockchip/rk3368.dtsi
->
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 181 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150626/50b303fc/attachment.sig>
