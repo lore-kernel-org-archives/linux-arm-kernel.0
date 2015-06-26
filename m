@@ -1,19 +1,25 @@
-From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Fri, 26 Jun 2015 11:13:47 +0200
-Subject: [PATCH v3 0/2] add support holding 24Mhz osc during suspend
-In-Reply-To: <1435064020-7057-1-git-send-email-zyw@rock-chips.com>
-References: <1435064020-7057-1-git-send-email-zyw@rock-chips.com>
-Message-ID: <1819327.FqTWPKx08f@diego>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Fri, 26 Jun 2015 10:34:01 +0100
+Subject: [PATCH 3/4] arm64: dts: add Rockchip rk3368 core dtsi and board
+ dts for the r88 board
+In-Reply-To: <3220645.At1oVfRcjk@diego>
+References: <1650408.ovnAjReNFJ@diego>
+ <3220645.At1oVfRcjk@diego>
+Message-ID: <20150626093400.GA19947@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Dienstag, 23. Juni 2015, 20:53:38 schrieb Chris Zhong:
-> Since the usb-phy clocks are not connected to the 32khz clock-in, they
-> only have 24Mhz as the clock source. If we want to wake up system via
-> usb device, we should hold the 24Mhz osc during suspend.
-> This Patch has tested on chromebook jerry board, with another patch[0],
-> we can wakeup system via usb keyboard.
-> 
-> [0] https://chromium-review.googlesource.com/#/c/277811/3
+[...]
 
-applied both to my soc branch for 4.3
+> +       memory {
+> +               reg = <0x0 0x0 0x0 0x40000000>;
+> +       };
+
+This needs device_type = "memory", no?
+
+I guess the bootloader is overriding this anyway?
+
+Otherwise this looked fine to me.
+
+Thanks,
+Mark.
