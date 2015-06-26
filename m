@@ -1,30 +1,57 @@
-From: jassisinghbrar@gmail.com (Jassi Brar)
-Date: Fri, 26 Jun 2015 09:35:12 +0530
-Subject: [GIT PULL] Mailbox changes for v4.2
-In-Reply-To: <CA+55aFyp1bVGzxj7UNvyEmOBO6hM7iTkgZfCUyGj9=o7a920WA@mail.gmail.com>
-References: <CABb+yY2N+thoJEBfNdpsyEpDjpvnJ4-GbhTEJM-e7earmZpDAQ@mail.gmail.com>
- <CA+55aFyp1bVGzxj7UNvyEmOBO6hM7iTkgZfCUyGj9=o7a920WA@mail.gmail.com>
-Message-ID: <CABb+yY1KEoHB9jpzupQBnLaSGC6z_BpBP7g6HH5=_BssggZmKQ@mail.gmail.com>
+From: bamv2005@gmail.com (Bamvor Jian Zhang)
+Date: Fri, 26 Jun 2015 12:35:58 +0800
+Subject: [PATCH 0/4] arm64: add initial support for the Rockchip rk3368
+In-Reply-To: <1650408.ovnAjReNFJ@diego>
+References: <1650408.ovnAjReNFJ@diego>
+Message-ID: <558CD6AE.7030505@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 26, 2015 at 7:10 AM, Linus Torvalds
-<torvalds@linux-foundation.org> wrote:
-> On Thu, Jun 25, 2015 at 8:58 AM, Jassi Brar <jassisinghbrar@gmail.com> wrote:
->>
->>   http://git.linaro.org/landing-teams/working/fujitsu/integration.git
->> mailbox-for-next
->
-> So just looking at this pull request (and my previous merges from you)
-> it does strike me that you seem to be one of the few people who never
-> explain your pull requests..
->
-> Mind starting to write a small blurb every time you ask me to pull to
-> explain what's new and what's going on? That will improve my merge
-> logs..
->
-Sorry, the changes have been few and I thought patch names were
-suggestive enough. Will write a small para from next pull request.
-Thanks for accepting this request as such.
+Hi, Heiko
 
--Jassi
+Could I test the code on rk3368 STB such as EKB368, CSA90?
+Is there some documents about it?
+
+Thanks
+
+bamvor	
+
+On 06/26/2015 02:12 AM, Heiko St?bner wrote:
+> This adds initial support for the new rk3368 ARM64 soc from Rockchip.
+>
+> Overall it looks like someone dropped some A53 cores into a rk3288, so
+> it shares a lot of peripherals that only differ in details. Therefore
+> stuff like the mmc, usb, spi, i2c controllers work out of the box.
+> The support for the gmac already made it into the merge window as well
+> as the pinctrl support.
+>
+> Interestingly, in its core the rk3368 seems trying to be a model student
+> with psci for smp and using scpi for ddr frequency scaling, although I
+> currently do not understand how the mailbox works yet. The display
+> controllers also are only minimally different so I'm hopefully to have
+> working graphics in the near-ish future :-)
+>
+>
+> As mentioned in the dts patch, this series depends on the dt-binding
+> header for the clock ids, so will need a shared branch once this is ready.
+>
+>
+> Heiko Stuebner (4):
+>    arm64: add Rockchip architecture entry
+>    arm64: defconfig: enable ARCH_ROCKCHIP
+>    arm64: dts: add Rockchip rk3368 core dtsi and board dts for the r88
+>      board
+>    dt-bindings: document rk3368 R89 board from Rockchip
+>
+>   Documentation/devicetree/bindings/arm/rockchip.txt |   4 +
+>   arch/arm64/Kconfig                                 |  10 +
+>   arch/arm64/boot/dts/Makefile                       |   1 +
+>   arch/arm64/boot/dts/rockchip/Makefile              |   5 +
+>   arch/arm64/boot/dts/rockchip/rk3368-r88.dts        | 353 ++++++++
+>   arch/arm64/boot/dts/rockchip/rk3368.dtsi           | 900 +++++++++++++++++++++
+>   arch/arm64/configs/defconfig                       |   2 +
+>   7 files changed, 1275 insertions(+)
+>   create mode 100644 arch/arm64/boot/dts/rockchip/Makefile
+>   create mode 100644 arch/arm64/boot/dts/rockchip/rk3368-r88.dts
+>   create mode 100644 arch/arm64/boot/dts/rockchip/rk3368.dtsi
+>
