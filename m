@@ -1,74 +1,108 @@
 From: andre.przywara@arm.com (Andre Przywara)
-Date: Fri, 26 Jun 2015 14:16:13 +0100
-Subject: [PATCH v4 05/10] arm: finish VGIC initialisation explicitly
+Date: Fri, 26 Jun 2015 14:16:14 +0100
+Subject: [PATCH v4 06/10] arm: simplify MMIO dispatching
 In-Reply-To: <1435324578-21832-1-git-send-email-andre.przywara@arm.com>
 References: <1435324578-21832-1-git-send-email-andre.przywara@arm.com>
-Message-ID: <1435324578-21832-6-git-send-email-andre.przywara@arm.com>
+Message-ID: <1435324578-21832-7-git-send-email-andre.przywara@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since Linux 3.19-rc1 there is a new API to explicitly initialise
-the in-kernel GIC emulation by a userland KVM device call.
-Use that to tell the kernel we are finished with the GIC
-initialisation, since the automatic GIC init will only be provided
-as a legacy functionality in the future.
+Currently we separate any incoming MMIO request into one of the ARM
+memory map regions and take care to spare the GIC.
+It turns out that this is unnecessary, as we only have one special
+region (the IO port area in the first 64 KByte). The MMIO rbtree
+takes care about unhandled MMIO ranges, so we can simply drop all the
+special range checking (except that for the IO range) in
+kvm_cpu__emulate_mmio().
+As the GIC is handled in the kernel, a GIC MMIO access should never
+reach userland (and we don't know what to do with it anyway).
+This lets us delete some more code and simplifies future extensions
+(like expanding the GIC regions).
+To be in line with the other architectures, move the now simpler
+code into a header file.
 
 Signed-off-by: Andre Przywara <andre.przywara@arm.com>
 Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arm/gic.c | 25 ++++++++++++++++++++++---
- 1 file changed, 22 insertions(+), 3 deletions(-)
+ arm/include/arm-common/kvm-arch.h     | 12 ------------
+ arm/include/arm-common/kvm-cpu-arch.h | 14 ++++++++++++--
+ arm/kvm-cpu.c                         | 16 ----------------
+ 3 files changed, 12 insertions(+), 30 deletions(-)
 
-diff --git a/arm/gic.c b/arm/gic.c
-index 8560c9b..99f0d2b 100644
---- a/arm/gic.c
-+++ b/arm/gic.c
-@@ -98,24 +98,43 @@ int gic__create(struct kvm *kvm)
- 	return err;
+diff --git a/arm/include/arm-common/kvm-arch.h b/arm/include/arm-common/kvm-arch.h
+index 082131d..90d6733 100644
+--- a/arm/include/arm-common/kvm-arch.h
++++ b/arm/include/arm-common/kvm-arch.h
+@@ -45,18 +45,6 @@ static inline bool arm_addr_in_ioport_region(u64 phys_addr)
+ 	return phys_addr >= KVM_IOPORT_AREA && phys_addr < limit;
  }
  
-+/*
-+ * Sets the number of used interrupts and finalizes the GIC init explicitly.
-+ */
- static int gic__init_gic(struct kvm *kvm)
- {
-+	int ret;
-+
- 	int lines = irq__get_nr_allocated_lines();
- 	u32 nr_irqs = ALIGN(lines, 32) + GIC_SPI_IRQ_BASE;
- 	struct kvm_device_attr nr_irqs_attr = {
- 		.group	= KVM_DEV_ARM_VGIC_GRP_NR_IRQS,
- 		.addr	= (u64)(unsigned long)&nr_irqs,
- 	};
-+	struct kvm_device_attr vgic_init_attr = {
-+		.group	= KVM_DEV_ARM_VGIC_GRP_CTRL,
-+		.attr	= KVM_DEV_ARM_VGIC_CTRL_INIT,
-+	};
- 
+-static inline bool arm_addr_in_virtio_mmio_region(u64 phys_addr)
+-{
+-	u64 limit = KVM_VIRTIO_MMIO_AREA + ARM_VIRTIO_MMIO_SIZE;
+-	return phys_addr >= KVM_VIRTIO_MMIO_AREA && phys_addr < limit;
+-}
+-
+-static inline bool arm_addr_in_pci_region(u64 phys_addr)
+-{
+-	u64 limit = KVM_PCI_CFG_AREA + ARM_PCI_CFG_SIZE + ARM_PCI_MMIO_SIZE;
+-	return phys_addr >= KVM_PCI_CFG_AREA && phys_addr < limit;
+-}
+-
+ struct kvm_arch {
  	/*
- 	 * If we didn't use the KVM_CREATE_DEVICE method, KVM will
--	 * give us some default number of interrupts.
-+	 * give us some default number of interrupts. The GIC initialization
-+	 * will be done automatically in this case.
- 	 */
- 	if (gic_fd < 0)
- 		return 0;
+ 	 * We may have to align the guest memory for virtio, so keep the
+diff --git a/arm/include/arm-common/kvm-cpu-arch.h b/arm/include/arm-common/kvm-cpu-arch.h
+index 36c7872..329979a 100644
+--- a/arm/include/arm-common/kvm-cpu-arch.h
++++ b/arm/include/arm-common/kvm-cpu-arch.h
+@@ -44,8 +44,18 @@ static inline bool kvm_cpu__emulate_io(struct kvm_cpu *vcpu, u16 port, void *dat
+ 	return false;
+ }
  
--	if (!ioctl(gic_fd, KVM_HAS_DEVICE_ATTR, &nr_irqs_attr))
--		return ioctl(gic_fd, KVM_SET_DEVICE_ATTR, &nr_irqs_attr);
-+	if (!ioctl(gic_fd, KVM_HAS_DEVICE_ATTR, &nr_irqs_attr)) {
-+		ret = ioctl(gic_fd, KVM_SET_DEVICE_ATTR, &nr_irqs_attr);
-+		if (ret)
-+			return ret;
+-bool kvm_cpu__emulate_mmio(struct kvm_cpu *vcpu, u64 phys_addr, u8 *data,
+-			   u32 len, u8 is_write);
++static inline bool kvm_cpu__emulate_mmio(struct kvm_cpu *vcpu, u64 phys_addr,
++					 u8 *data, u32 len, u8 is_write)
++{
++	if (arm_addr_in_ioport_region(phys_addr)) {
++		int direction = is_write ? KVM_EXIT_IO_OUT : KVM_EXIT_IO_IN;
++		u16 port = (phys_addr - KVM_IOPORT_AREA) & USHRT_MAX;
++
++		return kvm__emulate_io(vcpu, port, data, direction, len, 1);
 +	}
 +
-+	if (!ioctl(gic_fd, KVM_HAS_DEVICE_ATTR, &vgic_init_attr)) {
-+		ret = ioctl(gic_fd, KVM_SET_DEVICE_ATTR, &vgic_init_attr);
-+		if (ret)
-+			return ret;
-+	}
++	return kvm__emulate_mmio(vcpu, phys_addr, data, len, is_write);
++}
  
- 	return 0;
+ unsigned long kvm_cpu__get_vcpu_mpidr(struct kvm_cpu *vcpu);
+ 
+diff --git a/arm/kvm-cpu.c b/arm/kvm-cpu.c
+index ab08815..7780251 100644
+--- a/arm/kvm-cpu.c
++++ b/arm/kvm-cpu.c
+@@ -139,22 +139,6 @@ bool kvm_cpu__handle_exit(struct kvm_cpu *vcpu)
+ 	return false;
+ }
+ 
+-bool kvm_cpu__emulate_mmio(struct kvm_cpu *vcpu, u64 phys_addr, u8 *data,
+-			   u32 len, u8 is_write)
+-{
+-	if (arm_addr_in_virtio_mmio_region(phys_addr)) {
+-		return kvm__emulate_mmio(vcpu, phys_addr, data, len, is_write);
+-	} else if (arm_addr_in_ioport_region(phys_addr)) {
+-		int direction = is_write ? KVM_EXIT_IO_OUT : KVM_EXIT_IO_IN;
+-		u16 port = (phys_addr - KVM_IOPORT_AREA) & USHRT_MAX;
+-		return kvm__emulate_io(vcpu, port, data, direction, len, 1);
+-	} else if (arm_addr_in_pci_region(phys_addr)) {
+-		return kvm__emulate_mmio(vcpu, phys_addr, data, len, is_write);
+-	}
+-
+-	return false;
+-}
+-
+ void kvm_cpu__show_page_tables(struct kvm_cpu *vcpu)
+ {
  }
 -- 
 2.3.5
