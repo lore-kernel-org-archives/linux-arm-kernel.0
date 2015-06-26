@@ -1,62 +1,37 @@
-From: a0393675@ti.com (Keerthy)
-Date: Fri, 26 Jun 2015 11:50:30 +0530
-Subject: [PATCH 1/1] arm: dts: am43xx-clock: Add qspi clock node.
-In-Reply-To: <1435167933-5249-1-git-send-email-mugunthanvnm@ti.com>
-References: <1435167933-5249-1-git-send-email-mugunthanvnm@ti.com>
-Message-ID: <558CEF2E.3050202@ti.com>
+From: khalasa@piap.pl (Krzysztof =?utf-8?Q?Ha=C5=82asa?=)
+Date: Fri, 26 Jun 2015 08:20:47 +0200
+Subject: IMX6 - PCIe device tree assignments
+In-Reply-To: <CAJ+vNU098bwhdhBPrnCWOy83=oCD0vP+7sRxVcpSGYNu52HDsw@mail.gmail.com>
+ (Tim Harvey's message of "Mon, 22 Jun 2015 06:34:37 -0700")
+References: <m34mm5tj4b.fsf@t19.piap.pl>
+ <CAJ+vNU098bwhdhBPrnCWOy83=oCD0vP+7sRxVcpSGYNu52HDsw@mail.gmail.com>
+Message-ID: <m3lhf7q9c0.fsf@t19.piap.pl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Thanks for your response.
 
+Tim Harvey <tharvey@gateworks.com> writes:
 
-On Wednesday 24 June 2015 11:15 PM, Mugunthan V N wrote:
-> From: Sourav Poddar <sourav.poddar@ti.com>
->
-> Add clock node for qspi controller driver on am437x.
->
-> Cc: Keerthy <j-keerthy@ti.com>
-> Cc: Tero Kristo <t-kristo@ti.com>
-> Signed-off-by: Sourav Poddar <sourav.poddar@ti.com>
-> Signed-off-by: Mugunthan V N <mugunthanvnm@ti.com>
-> ---
->   arch/arm/boot/dts/am4372.dtsi        | 2 ++
->   arch/arm/boot/dts/am43xx-clocks.dtsi | 8 ++++++++
->   2 files changed, 10 insertions(+)
->
-> diff --git a/arch/arm/boot/dts/am4372.dtsi b/arch/arm/boot/dts/am4372.dtsi
-> index 649e7b9..8ab7831 100644
-> --- a/arch/arm/boot/dts/am4372.dtsi
-> +++ b/arch/arm/boot/dts/am4372.dtsi
-> @@ -903,6 +903,8 @@
->   			#address-cells = <1>;
->   			#size-cells = <0>;
->   			ti,hwmods = "qspi";
-> +			clocks = <&qspi_fclk>;
-> +			clock-names = "fck";
->   			interrupts = <0 138 0x4>;
->   			num-cs = <4>;
->   			status = "disabled";
-> diff --git a/arch/arm/boot/dts/am43xx-clocks.dtsi b/arch/arm/boot/dts/am43xx-clocks.dtsi
-> index cc88728..1506585 100644
-> --- a/arch/arm/boot/dts/am43xx-clocks.dtsi
-> +++ b/arch/arm/boot/dts/am43xx-clocks.dtsi
-> @@ -763,4 +763,12 @@
->   		ti,bit-shift = <8>;
->   		reg = <0x8a68>;
->   	};
-> +
-> +	qspi_fclk: qspi_fclk {
-> +		#clock-cells = <0>;
-> +		compatible = "ti,fixed-factor-clock";
-> +		clocks = <&dpll_per_m2_div4_ck>;
+> I became aware of the interrupt mapping side-effect recently of this
+> downstream patch as well. I believe the issue is that the pci nodes
+> need to be fully described including the interrupt* properties. My
+> plan is to address this with a bootloader fixup which will dynamically
+> build the device-tree representation of the pcie nodes on the bus
+> (because some boards have PCI switches with differing number of
+> ports).
 
- From the clock tree this does not seem to be sourced from dpll_per_m2.
-I guess this needs to be changed.
+Wouldn't it be better if the device tree PCI code accepted the extra
+data (basically the "eth1" alias) without changing information which
+wasn't explicitly specified (such as IRQ mapping)?
 
--Keerthy
+> For now, do not use the down-stream patch and assign the mac addresses
+> in a different fashion if using mainline linux on the GW54xx/GW53xx.
 
-> +		clock-mult = <1>;
-> +		clock-div = <1>;
-> +	};
->   };
->
+That's what I have been doing, though the patch looks like a better,
+transparent solution.
+-- 
+Krzysztof Halasa
+
+Industrial Research Institute for Automation and Measurements PIAP
+Al. Jerozolimskie 202, 02-486 Warsaw, Poland
