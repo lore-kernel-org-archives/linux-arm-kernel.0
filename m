@@ -1,21 +1,125 @@
-From: mwelling@ieee.org (Michael Welling)
-Date: Thu, 25 Jun 2015 19:16:48 -0500
-Subject: AT91 timer/counter as clock output from devicetree
-Message-ID: <20150626001648.GA20565@deathray>
+From: dhdang@apm.com (Duc Dang)
+Date: Thu, 25 Jun 2015 18:05:56 -0700
+Subject: [PATCH 1/1] pci: xgene: Enable huge outbound bar support
+Message-ID: <1435280756-24455-1-git-send-email-dhdang@apm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-I have run into situation with AT91 based products where I am at a
-loss as to how to properly approproach implementing a driver/solution.
+X-Gene PCIe controllers support huge outbound BARs (with size upto
+64GB). This patch configures additional 1 outbound BAR for X-Gene
+PCIe controllers with size larger than 4GB. This is required to
+support devices that request huge outbound memory (nVidia K40 as an
+example)
 
-Several boards that I have dealt with are using the AT91's timer/counter pins
-to emulate a simple clock output.
+Signed-off-by: Duc Dang <dhdang@apm.com>
+Signed-off-by: Tanmay Inamdar <tinamdar@apm.com>
+---
+ arch/arm64/boot/dts/apm/apm-storm.dtsi | 33 +++++++++++++++++++--------------
+ drivers/pci/host/pci-xgene.c           |  6 +++++-
+ 2 files changed, 24 insertions(+), 15 deletions(-)
 
-Currently, the only way I have found to emulate a clock output is to enable
-the atmel,tcb-pwm driver and initialize the PWM from userspace using the
-sysfs layer.
-
-I would like to initialize the timer/counter in the kernel based on an entry
-in the devicetree.
-
-Does anyone have suggestion on how and where implement this?
+diff --git a/arch/arm64/boot/dts/apm/apm-storm.dtsi b/arch/arm64/boot/dts/apm/apm-storm.dtsi
+index d8f3a1c..039206b 100644
+--- a/arch/arm64/boot/dts/apm/apm-storm.dtsi
++++ b/arch/arm64/boot/dts/apm/apm-storm.dtsi
+@@ -404,10 +404,11 @@
+ 			#size-cells = <2>;
+ 			#address-cells = <3>;
+ 			reg = < 0x00 0x1f2b0000 0x0 0x00010000   /* Controller registers */
+-				0xe0 0xd0000000 0x0 0x00040000>; /* PCI config space */
++				0xe0 0x00000000 0x0 0x00040000>; /* PCI config space */
+ 			reg-names = "csr", "cfg";
+ 			ranges = <0x01000000 0x00 0x00000000 0xe0 0x10000000 0x00 0x00010000   /* io */
+-				  0x02000000 0x00 0x80000000 0xe1 0x80000000 0x00 0x80000000>; /* mem */
++				  0x02000000 0x00 0x80000000 0xe1 0x80000000 0x00 0x80000000   /* mem */
++				  0x02000000 0x10 0x00000000 0xf0 0x00000000 0x10 0x00000000>; /* mem */
+ 			dma-ranges = <0x42000000 0x80 0x00000000 0x80 0x00000000 0x00 0x80000000
+ 				      0x42000000 0x00 0x00000000 0x00 0x00000000 0x80 0x00000000>;
+ 			interrupt-map-mask = <0x0 0x0 0x0 0x7>;
+@@ -428,10 +429,11 @@
+ 			#size-cells = <2>;
+ 			#address-cells = <3>;
+ 			reg = < 0x00 0x1f2c0000 0x0 0x00010000   /* Controller registers */
+-				0xd0 0xd0000000 0x0 0x00040000>; /* PCI config space */
++				0xd0 0x00000000 0x0 0x00040000>; /* PCI config space */
+ 			reg-names = "csr", "cfg";
+-			ranges = <0x01000000 0x0 0x00000000 0xd0 0x10000000 0x00 0x00010000   /* io  */
+-				  0x02000000 0x0 0x80000000 0xd1 0x80000000 0x00 0x80000000>; /* mem */
++			ranges = <0x01000000 0x00 0x00000000 0xd0 0x10000000 0x00 0x00010000   /* io  */
++				  0x02000000 0x00 0x80000000 0xd1 0x80000000 0x00 0x80000000   /* mem */
++				  0x02000000 0x08 0x00000000 0xd8 0x00000000 0x08 0x00000000>; /* mem */
+ 			dma-ranges = <0x42000000 0x80 0x00000000 0x80 0x00000000 0x00 0x80000000
+ 				      0x42000000 0x00 0x00000000 0x00 0x00000000 0x80 0x00000000>;
+ 			interrupt-map-mask = <0x0 0x0 0x0 0x7>;
+@@ -452,10 +454,11 @@
+ 			#size-cells = <2>;
+ 			#address-cells = <3>;
+ 			reg =  < 0x00 0x1f2d0000 0x0 0x00010000   /* Controller registers */
+-				 0x90 0xd0000000 0x0 0x00040000>; /* PCI config space */
++				 0x90 0x00000000 0x0 0x00040000>; /* PCI config space */
+ 			reg-names = "csr", "cfg";
+-			ranges = <0x01000000 0x0 0x00000000 0x90 0x10000000 0x0 0x00010000   /* io  */
+-				  0x02000000 0x0 0x80000000 0x91 0x80000000 0x0 0x80000000>; /* mem */
++			ranges = <0x01000000 0x00 0x00000000 0x90 0x10000000 0x00 0x00010000   /* io  */
++				  0x02000000 0x00 0x80000000 0x91 0x80000000 0x00 0x80000000   /* mem */
++				  0x02000000 0x04 0x00000000 0x94 0x00000000 0x04 0x00000000>; /* mem */
+ 			dma-ranges = <0x42000000 0x80 0x00000000 0x80 0x00000000 0x00 0x80000000
+ 				      0x42000000 0x00 0x00000000 0x00 0x00000000 0x80 0x00000000>;
+ 			interrupt-map-mask = <0x0 0x0 0x0 0x7>;
+@@ -476,10 +479,11 @@
+ 			#size-cells = <2>;
+ 			#address-cells = <3>;
+ 			reg = < 0x00 0x1f500000 0x0 0x00010000   /* Controller registers */
+-				0xa0 0xd0000000 0x0 0x00040000>; /* PCI config space */
++				0xa0 0x00000000 0x0 0x00040000>; /* PCI config space */
+ 			reg-names = "csr", "cfg";
+-			ranges = <0x01000000 0x0 0x00000000 0xa0 0x10000000 0x0 0x00010000   /* io   */
+-				  0x02000000 0x0 0x80000000 0xa1 0x80000000 0x0 0x80000000>; /* mem  */
++			ranges = <0x01000000 0x00 0x00000000 0xa0 0x10000000 0x00 0x00010000   /* io  */
++				  0x02000000 0x00 0x80000000 0xa1 0x80000000 0x00 0x80000000   /* mem */
++				  0x02000000 0x10 0x00000000 0xb0 0x00000000 0x10 0x00000000>; /* mem */
+ 			dma-ranges = <0x42000000 0x80 0x00000000 0x80 0x00000000 0x00 0x80000000
+ 				      0x42000000 0x00 0x00000000 0x00 0x00000000 0x80 0x00000000>;
+ 			interrupt-map-mask = <0x0 0x0 0x0 0x7>;
+@@ -500,10 +504,11 @@
+ 			#size-cells = <2>;
+ 			#address-cells = <3>;
+ 			reg = < 0x00 0x1f510000 0x0 0x00010000   /* Controller registers */
+-				0xc0 0xd0000000 0x0 0x00200000>; /* PCI config space */
++				0xc0 0x00000000 0x0 0x00040000>; /* PCI config space */
+ 			reg-names = "csr", "cfg";
+-			ranges = <0x01000000 0x0 0x00000000 0xc0 0x10000000 0x0 0x00010000   /* io  */
+-				  0x02000000 0x0 0x80000000 0xc1 0x80000000 0x0 0x80000000>; /* mem */
++			ranges = <0x01000000 0x00 0x00000000 0xc0 0x10000000 0x00 0x00010000   /* io  */
++				  0x02000000 0x00 0x80000000 0xc1 0x80000000 0x00 0x80000000   /* mem */
++				  0x02000000 0x08 0x00000000 0xc8 0x00000000 0x08 0x00000000>; /* mem */
+ 			dma-ranges = <0x42000000 0x80 0x00000000 0x80 0x00000000 0x00 0x80000000
+ 				      0x42000000 0x00 0x00000000 0x00 0x00000000 0x80 0x00000000>;
+ 			interrupt-map-mask = <0x0 0x0 0x0 0x7>;
+diff --git a/drivers/pci/host/pci-xgene.c b/drivers/pci/host/pci-xgene.c
+index a9dfb70..62d7843 100644
+--- a/drivers/pci/host/pci-xgene.c
++++ b/drivers/pci/host/pci-xgene.c
+@@ -305,6 +305,7 @@ static int xgene_pcie_map_ranges(struct xgene_pcie_port *port,
+ 	struct resource_entry *window;
+ 	struct device *dev = port->dev;
+ 	int ret;
++	u32 omr_idx = 0;
+ 
+ 	resource_list_for_each_entry(window, res) {
+ 		struct resource *res = window->res;
+@@ -321,8 +322,11 @@ static int xgene_pcie_map_ranges(struct xgene_pcie_port *port,
+ 				return ret;
+ 			break;
+ 		case IORESOURCE_MEM:
+-			xgene_pcie_setup_ob_reg(port, res, OMR1BARL, res->start,
++			xgene_pcie_setup_ob_reg(port, res,
++						OMR1BARL + (omr_idx * 0x18),
++						res->start,
+ 						res->start - window->offset);
++			omr_idx++;
+ 			break;
+ 		case IORESOURCE_BUS:
+ 			break;
+-- 
+1.9.1
