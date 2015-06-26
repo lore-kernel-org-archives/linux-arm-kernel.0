@@ -1,44 +1,40 @@
-From: fabio.estevam@freescale.com (Fabio Estevam)
-Date: Fri, 26 Jun 2015 14:10:54 -0300
-Subject: [PATCH v3 2/2] clk: imx: clk-imx6q: Provide initial IPU clock
- settings for mx6dl
-In-Reply-To: <1435338654-9098-1-git-send-email-fabio.estevam@freescale.com>
-References: <1435338654-9098-1-git-send-email-fabio.estevam@freescale.com>
-Message-ID: <1435338654-9098-2-git-send-email-fabio.estevam@freescale.com>
+From: dhdang@apm.com (Duc Dang)
+Date: Fri, 26 Jun 2015 10:26:48 -0700
+Subject: [PATCH 1/1] pci: xgene: Enable huge outbound bar support
+In-Reply-To: <CAErSpo7rE8yAS--L+aQmN-DqfL6uGxFBxD2WOPowoBsrvOZ7eg@mail.gmail.com>
+References: <1435280756-24455-1-git-send-email-dhdang@apm.com>
+ <CAErSpo7rE8yAS--L+aQmN-DqfL6uGxFBxD2WOPowoBsrvOZ7eg@mail.gmail.com>
+Message-ID: <CADaLNDmUiZwQfyk_XE9tr03jsM_fW+aXk3b3krAFuqsfNvkLYA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently it is not possible to use HDMI and LVDS at the same time on a 
-imx6dl-sabresd board.
+On Fri, Jun 26, 2015 at 7:26 AM, Bjorn Helgaas <bhelgaas@google.com> wrote:
+> Hi Duc,
+>
+> On Thu, Jun 25, 2015 at 8:05 PM, Duc Dang <dhdang@apm.com> wrote:
+>> X-Gene PCIe controllers support huge outbound BARs (with size upto
+>> 64GB). This patch configures additional 1 outbound BAR for X-Gene
+>> PCIe controllers with size larger than 4GB. This is required to
+>> support devices that request huge outbound memory (nVidia K40 as an
+>> example)
+>
+> The PCI specs don't use the "outbound BAR" terminology.  I assume this
+> is what we normally call "windows" or "apertures" for MMIO access by
+> the CPU?  (The specs rarely use those terms either, but they're
+> commonly used in Linux, and the PCIe spec does mention them a couple
+> times.)
 
-Fix this usecase by setting IMX6QDL_CLK_PLL3_PFD1_540M to 540MHz and
-also by setting it as the parent of IMX6QDL_CLK_IPU1_SEL.
+Yes, Bjorn. The "outbound BAR" that I mentioned is the MMIO window. I
+will change these terms in next patch.
 
-Based on the configuration done in the FSL kernel.
+>
+> By "request huge outbound memory," I assume you simply mean the device
+> has a huge BAR, right?
+Yes, I meant "the device has a huge BAR". I will change the
+description for this in next patch as well
 
-Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
----
-Changes since v2:
-- Move clk_set_rate for PLL3_PFD1_540M outside the if block as suggested
-by Vladimir Zapolskiy.
+>
+> Bjorn
 
- drivers/clk/imx/clk-imx6q.c | 4 ++++
- 1 file changed, 4 insertions(+)
-
-diff --git a/drivers/clk/imx/clk-imx6q.c b/drivers/clk/imx/clk-imx6q.c
-index d046f8e..c507bca 100644
---- a/drivers/clk/imx/clk-imx6q.c
-+++ b/drivers/clk/imx/clk-imx6q.c
-@@ -494,6 +494,10 @@ static void __init imx6q_clocks_init(struct device_node *ccm_node)
- 		clk_set_parent(clk[IMX6QDL_CLK_LDB_DI1_SEL], clk[IMX6QDL_CLK_PLL5_VIDEO_DIV]);
- 	}
- 
-+	clk_set_rate(clk[IMX6QDL_CLK_PLL3_PFD1_540M], 540000000);
-+	if (clk_on_imx6dl())
-+		clk_set_parent(clk[IMX6QDL_CLK_IPU1_SEL], clk[IMX6QDL_CLK_PLL3_PFD1_540M]);
-+
- 	clk_set_parent(clk[IMX6QDL_CLK_IPU1_DI0_PRE_SEL], clk[IMX6QDL_CLK_PLL5_VIDEO_DIV]);
- 	clk_set_parent(clk[IMX6QDL_CLK_IPU1_DI1_PRE_SEL], clk[IMX6QDL_CLK_PLL5_VIDEO_DIV]);
- 	clk_set_parent(clk[IMX6QDL_CLK_IPU2_DI0_PRE_SEL], clk[IMX6QDL_CLK_PLL5_VIDEO_DIV]);
--- 
-1.9.1
+Regards,
+Duc Dang.
