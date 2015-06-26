@@ -1,30 +1,34 @@
 From: mark.yao@rock-chips.com (Mark Yao)
-Date: Fri, 26 Jun 2015 18:07:24 +0800
-Subject: [PATCH v2 0/5] drm/rockchip: support yuv overlay and plane scale
-Message-ID: <1435313249-4549-1-git-send-email-mark.yao@rock-chips.com>
+Date: Fri, 26 Jun 2015 18:07:25 +0800
+Subject: [PATCH v2 1/5] drm/rockchip: vop: optimize virtual stride calculate
+In-Reply-To: <1435313249-4549-1-git-send-email-mark.yao@rock-chips.com>
+References: <1435313249-4549-1-git-send-email-mark.yao@rock-chips.com>
+Message-ID: <1435313249-4549-2-git-send-email-mark.yao@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This series patches are used for yuv image overlay display.
+vir_stride need number words of the virtual width, and fb->pitches
+save bytes_per_pixel, so just div 4 switch to stride.
 
-Rockchip vop support NV11, NV16, NV24 yuv format,
-and can scale the image scale 1/8 to 8.
+Signed-off-by: Mark Yao <mark.yao@rock-chips.com>
+---
+Changes in v2: None
 
-Changes in v2:
-- Uv buffer not support odd offset, align it.
-- Fix error display when move yuv image. 
-- Fix scale dest info. 
+ drivers/gpu/drm/rockchip/rockchip_drm_vop.c |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-Mark Yao (5):
-  drm/rockchip: vop: optimize virtual stride calculate
-  drm/rockchip: vop: fix yuv plane support
-  drm/rockchip: vop: support plane scale
-  drm/rockchip: vop: switch cursor plane to window 3
-  drm/rockchip: default enable win2/3 area0 bit
-
- drivers/gpu/drm/rockchip/rockchip_drm_vop.c |  467 ++++++++++++++++++++++++++-
- drivers/gpu/drm/rockchip/rockchip_drm_vop.h |   96 ++++++
- 2 files changed, 551 insertions(+), 12 deletions(-)
-
+diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_vop.c b/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
+index 6188221..3c9f4f3 100644
+--- a/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
++++ b/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
+@@ -644,7 +644,7 @@ static int vop_update_plane_event(struct drm_plane *plane,
+ 	offset += (src.y1 >> 16) * fb->pitches[0];
+ 	yrgb_mst = rk_obj->dma_addr + offset;
+ 
+-	y_vir_stride = fb->pitches[0] / (fb->bits_per_pixel >> 3);
++	y_vir_stride = fb->pitches[0] >> 2;
+ 
+ 	/*
+ 	 * If this plane update changes the plane's framebuffer, (or more
 -- 
 1.7.9.5
