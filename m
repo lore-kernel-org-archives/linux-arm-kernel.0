@@ -1,40 +1,77 @@
-From: mark.yao@rock-chips.com (Mark Yao)
-Date: Fri, 26 Jun 2015 18:10:32 +0800
-Subject: [PATCH v2 5/5] drm/rockchip: default enable win2/3 area0 bit
-In-Reply-To: <1435313249-4549-1-git-send-email-mark.yao@rock-chips.com>
-References: <1435313249-4549-1-git-send-email-mark.yao@rock-chips.com>
-Message-ID: <1435313432-4923-1-git-send-email-mark.yao@rock-chips.com>
+From: andrew@ncrmnt.org (Andrew)
+Date: Fri, 26 Jun 2015 13:11:26 +0300
+Subject: [PATCH 1/4] ARM: rcm-k1879xb1: Add support for K1879XB1 SoC
+In-Reply-To: <CAL_JsqKTUM8-ufR8gGJBsNtbc94LyS7o-7v=R2Fit3+0=-SofA@mail.gmail.com>
+References: <1435074604-19312-1-git-send-email-andrew@ncrmnt.org>
+ <1435074604-19312-2-git-send-email-andrew@ncrmnt.org>
+ <CAL_JsqKTUM8-ufR8gGJBsNtbc94LyS7o-7v=R2Fit3+0=-SofA@mail.gmail.com>
+Message-ID: <fb7ebabe2ce9cac0fac05535bbabfdbc@mail.ncrmnt.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Win2/3 support 4 area display, but now havn't found a suitable
-way to use it, and it enable by win gate and area gate,
-so default enable area0 gate, so that its behaviour just like a
-win.
+Rob Herring ????? 24.06.2015 05:15:
+>> +
+>> +static void __iomem *k1879_sctl_base(void)
+>> +{
+>> +       return (void __iomem *)RCM_K1879_SCTL_VIRT_BASE;
+>> +}
+>> +
+>> +static void k1879_level_irq_i2c0_fixup(unsigned int irq, struct 
+>> irq_desc *desc)
+>> +{
+>> +       writel(1, k1879_mif_base() + RCM_K1879_MIF_I2C_INT_STAT);
+>> +       handle_level_irq(irq, desc);
+>> +}
+>> +
+>> +static void k1879_level_irq_i2c1_fixup(unsigned int irq, struct 
+>> irq_desc *desc)
+>> +{
+>> +       writel(1 << 0, k1879_sctl_base() + RCM_K1879_SCTL_INT_P_OUT);
+>> +       handle_level_irq(irq, desc);
+>> +}
+>> +
+>> +static void k1879_level_irq_i2c2_fixup(unsigned int irq, struct 
+>> irq_desc *desc)
+>> +{
+>> +       writel(1 << 1, k1879_sctl_base() + RCM_K1879_SCTL_INT_P_OUT);
+>> +       handle_level_irq(irq, desc);
+>> +}
+>> +
+>> +static void k1879_level_irq_i2c3_fixup(unsigned int irq, struct 
+>> irq_desc *desc)
+>> +{
+>> +       writel(1 << 2, k1879_sctl_base() + RCM_K1879_SCTL_INT_P_OUT);
+>> +       handle_level_irq(irq, desc);
+>> +}
+> 
+> What are all these for? They probably belong somewhere else.
 
-Signed-off-by: Mark Yao <mark.yao@rock-chips.com>
----
-Changes in v2: None
+As I've written already in response to to Russel King's review, these 
+are the workarounds
+around aeroflex i2c IP interrupt handling. Basically every interrupt 
+from i2c requires
+cleaning up respective 'pending' bit in SCTL register. This could be 
+done in i2c driver,
+but it is very platform-specific and would look ugly in the driver. If 
+you know any cleaner
+way for such a workaround, please advice. Right now I've cleaned up 
+everything, save for
+these fixups.
 
- drivers/gpu/drm/rockchip/rockchip_drm_vop.c |    6 ++++++
- 1 file changed, 6 insertions(+)
 
-diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_vop.c b/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
-index 40107bb..e001d26 100644
---- a/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
-+++ b/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
-@@ -337,6 +337,12 @@ static const struct vop_reg_data vop_init_reg_table[] = {
- 	{DSP_CTRL0, 0x00000000},
- 	{WIN0_CTRL0, 0x00000080},
- 	{WIN1_CTRL0, 0x00000080},
-+	/*
-+	 * Todo: win2/3 support area func, but now havn't found a suitable
-+	 * way to use it, so default enable area0 as a win display.
-+	 */
-+	{WIN2_CTRL0, 0x00000010},
-+	{WIN3_CTRL0, 0x00000010},
- };
- 
- /*
+>> diff --git a/arch/arm/mach-rcm-k1879xb1/cpuidle.c 
+>> b/arch/arm/mach-rcm-k1879xb1/cpuidle.c
+>> new file mode 100644
+>> index 0000000..7c621b6
+>> --- /dev/null
+>> +++ b/arch/arm/mach-rcm-k1879xb1/cpuidle.c
+> 
+> This should be a separate patch and located in drivers/cpuidle/
+
+Got it, thanks.
+
+
 -- 
-1.7.9.5
+Regards,
+Andrew
+RC Module :: http://module.ru
