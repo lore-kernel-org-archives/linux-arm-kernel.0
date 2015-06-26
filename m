@@ -1,41 +1,31 @@
-From: yvo@apm.com (Y Vo)
-Date: Fri, 26 Jun 2015 15:01:47 +0700
-Subject: [PATCH v1] arm64: dts: Add poweroff button device node for APM X-Gene
- platform
-In-Reply-To: <1435305707-22786-1-git-send-email-yvo@apm.com>
-References: <1435305707-22786-1-git-send-email-yvo@apm.com>
-Message-ID: <1435305707-22786-2-git-send-email-yvo@apm.com>
+From: pali.rohar@gmail.com (Pali =?utf-8?B?Um9ow6Fy?=)
+Date: Fri, 26 Jun 2015 10:09:54 +0200
+Subject: [PATCHv7 0/2] INPUT: Route keyboard LEDs through the generic
+ LEDs layer
+In-Reply-To: <20150625153032.GE3093@type.bordeaux.inria.fr>
+References: <20150217191527.GA9594@type.youpi.perso.aquilenet.fr>
+ <201504012200.07408@pali>
+ <20150401211140.GI2901@type.youpi.perso.aquilenet.fr>
+ <20150402144410.GB18125@amd> <20150423165544.GG7646@pali>
+ <CAKdAkRSk4t2PKHB33f0=V2-zAhV9LXABp1TQ9NsiFLBQet66BQ@mail.gmail.com>
+ <20150605152806.GE2267@type>
+ <20150625153032.GE3093@type.bordeaux.inria.fr>
+Message-ID: <20150626080954.GM2890@pali>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds poweroff button device node to support poweroff feature
-on APM X-Gene Mustang platform.
+On Thursday 25 June 2015 17:30:32 Samuel Thibault wrote:
+> Hello,
+> 
+> Just to give an update to people who where Cc-ed at some point in the
+> discussion: a version reworked by Dmitry got pulled into Linus' tree, so
+> it should get into 4.2!
+> 
+> Thanks to everybody involved,
+> Samuel
 
-Signed-off-by: Y Vo <yvo@apm.com>
----
- arch/arm64/boot/dts/apm/apm-mustang.dts |   10 ++++++++++
- 1 files changed, 10 insertions(+), 0 deletions(-)
+Thanks! I'm very very happy to hear this!
 
-diff --git a/arch/arm64/boot/dts/apm/apm-mustang.dts b/arch/arm64/boot/dts/apm/apm-mustang.dts
-index 83578e7..4c55833 100644
---- a/arch/arm64/boot/dts/apm/apm-mustang.dts
-+++ b/arch/arm64/boot/dts/apm/apm-mustang.dts
-@@ -23,6 +23,16 @@
- 		device_type = "memory";
- 		reg = < 0x1 0x00000000 0x0 0x80000000 >; /* Updated by bootloader */
- 	};
-+
-+	gpio-keys {
-+		compatible = "gpio-keys";
-+		button at 1 {
-+			label = "POWER";
-+			linux,code = <116>;
-+			linux,input-type = <0x1>;
-+			interrupts = <0x0 0x2d 0x1>;
-+		};
-+	};
- };
- 
- &pcie0clk {
 -- 
-1.7.1
+Pali Roh?r
+pali.rohar at gmail.com
