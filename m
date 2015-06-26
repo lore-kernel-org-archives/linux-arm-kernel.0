@@ -1,84 +1,171 @@
-From: vitalya@ti.com (Vitaly Andrianov)
-Date: Fri, 26 Jun 2015 08:20:15 -0400
-Subject: [PATCH v2 0/3] ARM: keystone: add ecc error interrupt handling
-In-Reply-To: <558C7437.2090306@codeaurora.org>
-References: <1435242710-31346-1-git-send-email-vitalya@ti.com>
- <558C188B.5060107@oracle.com> <558C6C4F.1090102@codeaurora.org>
- <558C72EB.8010502@oracle.com> <558C7437.2090306@codeaurora.org>
-Message-ID: <558D437F.30705@ti.com>
+From: haikun.wang@freescale.com (Haikun Wang)
+Date: Fri, 26 Jun 2015 20:19:24 +0800
+Subject: [PATCH v2] arm: configs: Add Freescale LS1021A defconfig
+Message-ID: <1435321164-48981-1-git-send-email-haikun.wang@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Add Freescale LS1021A initial defconfig file.
+The LS1021A SoC is a dual-core Cortex-A7 based processor.
 
+LS1021A has some special configure options against common V7 SOCs,
+such as CONFIG_THUMB2_KERNEL, CONFIG_VMSPLIT_2G, CONFIG_VFP...
 
-On 06/25/2015 05:35 PM, Stephen Boyd wrote:
-> On 06/25/2015 02:30 PM, santosh shilimkar wrote:
->> On 6/25/2015 2:02 PM, Stephen Boyd wrote:
->>> On 06/25/2015 08:04 AM, santosh shilimkar wrote:
->>>> On 6/25/2015 7:31 AM, Vitaly Andrianov wrote:
->>>>> This patch series adds support for arm L1/L2 ecc and ddr3 ecc error
->>>>> handling
->>>>> for Keystone devices
->>>>>
->>>>> Change Log
->>>>>
->>>>> v2:
->>>>> - removing unused and sorting headers of keystone.c are moved to a
->>>>> separate
->>>>>      patch.
->>>>> - l1l2 ecc and ddr3 ecc error handling are split it to separate
->>>>> patches
->>>>> - removed unused headers from keystone_ecc.c
->>>>> - platsmp.c removed from the patch.
->>>>> - return IRQ_HANDLED for 1 bit error in l1l2 ecc handler
->>>>> - checked and handled existing echttps://lwn.net/Articles/593336/c
->>>>> error before enabling ddr3 interrupt
->>>>> - 1 bit ddr3 interrupt is disabled, because it is handled by hardware
->>>>> and
->>>>>      there is no reason to handle it by software
->>>>>
->>>> This version looks good to me. As already commented, I would have liked
->>>> the patch 2/3(L2 ECC) code in ARM generic code so will give some more
->>>> time for others to come back. Otherwise I will queue this up for next
->>>> window.
->>>
->>> Why not make this into an edac driver? I sent out an L1/L2 error
->>> detection edac driver for Krait processors a year ago, but it stalled
->>> due to some DT binding stuff[1]. This looks fairly similar.
->>>
->> Indeed the error detection part is very similar(expected as well
->> considering the same processor L2 regs). I am not sure we need
->> full driver only for that but at least the IRQ error handler
->> related code can reside together. Lets see what RMK thinks
->> on this.
->>
->
-> There's an existing one for highbank (drivers/edac/highbank_l2_edac.c)
-> and there was a patch set for the pl310 as well[1]. I don't think we
-> want any architecture specific code for this, just use the EDAC framework.
->
-> [1] https://lkml.org/lkml/2014/3/2/87
->
+Enable I2C, LPUART, eDMA, WDT default.
+LS1021AQDS and LS1021ATWR boot successfully with patch.
+Above IPs also been verified successfully.
 
-Before porting that patch I was looking to implementation of the EDAC 
-for L2 cache and tried to use the framework. Sorry, but I couldn't 
-understand why would the Keystone platform may need it. Most likely 
-because I didn't understand the framework itself :(
+Signed-off-by: Haikun Wang <haikun.wang@freescale.com>
+---
+ arch/arm/configs/ls1021a_defconfig | 140 +++++++++++++++++++++++++++++++++++++
+ 1 file changed, 140 insertions(+)
+ create mode 100644 arch/arm/configs/ls1021a_defconfig
 
-In order the Keystone ECC works u-boot has to initialize the entire DDR3 
-and enable ECC. When kernel boots up it has to install the ECC interrupt 
-handlers for Cortex-A15 L1/L2 ECC and Keystone2 DDR3 ECC. As far as 
-1-bit errors handled and corrected by hardware the software even doesn't 
-need to handle those errors. We need to handle 2-bit errors and just 
-reboot the board.
-
-As the ECC detection has to be enable on kernel boot time and cannot be 
-disabled there is not sense to make it in a module.
-
-So, shall Keystone use the EDAC framework to install the onetime working 
-interrupt handler? What are advantages to use the framework?
-
-I appreciate your opinion.
-
-Thanks,
-Vitaly
+diff --git a/arch/arm/configs/ls1021a_defconfig b/arch/arm/configs/ls1021a_defconfig
+new file mode 100644
+index 0000000..3c893c8
+--- /dev/null
++++ b/arch/arm/configs/ls1021a_defconfig
+@@ -0,0 +1,140 @@
++CONFIG_SYSVIPC=y
++CONFIG_POSIX_MQUEUE=y
++CONFIG_NO_HZ_IDLE=y
++CONFIG_HIGH_RES_TIMERS=y
++CONFIG_LOG_BUF_SHIFT=16
++CONFIG_BLK_DEV_INITRD=y
++CONFIG_CC_OPTIMIZE_FOR_SIZE=y
++CONFIG_SYSCTL_SYSCALL=y
++CONFIG_KALLSYMS_ALL=y
++CONFIG_EMBEDDED=y
++CONFIG_PROFILING=y
++CONFIG_OPROFILE=y
++CONFIG_KPROBES=y
++CONFIG_JUMP_LABEL=y
++CONFIG_MODULES=y
++CONFIG_MODULE_FORCE_LOAD=y
++CONFIG_MODULE_UNLOAD=y
++CONFIG_BLK_CMDLINE_PARSER=y
++CONFIG_ARCH_MXC=y
++CONFIG_SOC_LS1021A=y
++CONFIG_ARM_LPAE=y
++CONFIG_SMP=y
++CONFIG_VMSPLIT_2G=y
++CONFIG_PREEMPT_VOLUNTARY=y
++CONFIG_THUMB2_KERNEL=y
++CONFIG_HIGHMEM=y
++CONFIG_CLEANCACHE=y
++CONFIG_FRONTSWAP=y
++CONFIG_CMDLINE="console=ttyS0,115200"
++CONFIG_VFP=y
++CONFIG_NEON=y
++CONFIG_KERNEL_MODE_NEON=y
++CONFIG_BINFMT_MISC=y
++CONFIG_NET=y
++CONFIG_PACKET=y
++CONFIG_UNIX=y
++CONFIG_UNIX_DIAG=y
++CONFIG_XFRM_USER=y
++CONFIG_NET_KEY=y
++CONFIG_INET=y
++CONFIG_IP_MULTICAST=y
++CONFIG_IP_ADVANCED_ROUTER=y
++CONFIG_IP_PNP=y
++CONFIG_IP_PNP_DHCP=y
++CONFIG_IP_MROUTE=y
++CONFIG_INET_AH=y
++CONFIG_INET_ESP=y
++CONFIG_INET_IPCOMP=y
++CONFIG_INET_UDP_DIAG=y
++CONFIG_NETFILTER=y
++CONFIG_DEVTMPFS=y
++CONFIG_DEVTMPFS_MOUNT=y
++CONFIG_MTD=y
++CONFIG_MTD_CMDLINE_PARTS=y
++CONFIG_MTD_BLOCK=y
++CONFIG_MTD_CFI=y
++CONFIG_MTD_CFI_ADV_OPTIONS=y
++CONFIG_MTD_CFI_BE_BYTE_SWAP=y
++CONFIG_MTD_CFI_GEOMETRY=y
++CONFIG_MTD_CFI_INTELEXT=y
++CONFIG_MTD_CFI_AMDSTD=y
++CONFIG_MTD_CFI_STAA=y
++CONFIG_MTD_PHYSMAP_OF=y
++CONFIG_MTD_SST25L=y
++CONFIG_MTD_NAND=y
++CONFIG_BLK_DEV_LOOP=y
++CONFIG_BLK_DEV_RAM=y
++CONFIG_BLK_DEV_RAM_SIZE=256000
++CONFIG_SRAM=y
++CONFIG_BLK_DEV_SD=y
++CONFIG_CHR_DEV_SG=y
++CONFIG_ATA=y
++CONFIG_NETDEVICES=y
++CONFIG_VITESSE_PHY=y
++CONFIG_BROADCOM_PHY=y
++CONFIG_REALTEK_PHY=y
++CONFIG_NATIONAL_PHY=y
++CONFIG_MICREL_PHY=y
++CONFIG_MDIO_BUS_MUX_MMIOREG=y
++CONFIG_INPUT_EVDEV=y
++CONFIG_SERIO_SERPORT=m
++CONFIG_SERIAL_8250=y
++CONFIG_SERIAL_8250_CONSOLE=y
++CONFIG_SERIAL_8250_EXTENDED=y
++CONFIG_SERIAL_8250_SHARE_IRQ=y
++CONFIG_SERIAL_OF_PLATFORM=y
++CONFIG_SERIAL_FSL_LPUART=y
++CONFIG_SERIAL_FSL_LPUART_CONSOLE=y
++CONFIG_HW_RANDOM=y
++CONFIG_I2C=y
++CONFIG_I2C_CHARDEV=y
++CONFIG_I2C_MUX=y
++CONFIG_I2C_MUX_PCA954x=y
++CONFIG_I2C_IMX=y
++CONFIG_GPIO_SYSFS=y
++CONFIG_SENSORS_LM90=y
++CONFIG_SENSORS_INA2XX=y
++CONFIG_WATCHDOG=y
++CONFIG_IMX2_WDT=y
++CONFIG_NEW_LEDS=y
++CONFIG_LEDS_CLASS=y
++CONFIG_LEDS_TRIGGERS=y
++CONFIG_RTC_CLASS=y
++CONFIG_RTC_DRV_DS3232=y
++CONFIG_DMADEVICES=y
++CONFIG_FSL_EDMA=y
++CONFIG_CLK_QORIQ=y
++CONFIG_MEMORY=y
++CONFIG_EXT2_FS=y
++CONFIG_EXT2_FS_XATTR=y
++CONFIG_EXT3_FS=y
++CONFIG_EXT4_FS=y
++CONFIG_FANOTIFY=y
++CONFIG_ISO9660_FS=m
++CONFIG_JOLIET=y
++CONFIG_ZISOFS=y
++CONFIG_UDF_FS=m
++CONFIG_MSDOS_FS=y
++CONFIG_VFAT_FS=y
++CONFIG_NTFS_FS=m
++CONFIG_TMPFS=y
++CONFIG_TMPFS_POSIX_ACL=y
++CONFIG_JFFS2_FS=y
++CONFIG_NFS_FS=y
++CONFIG_NFS_V4=y
++CONFIG_ROOT_NFS=y
++CONFIG_NLS_DEFAULT="cp437"
++CONFIG_NLS_CODEPAGE_437=y
++CONFIG_NLS_ASCII=y
++CONFIG_NLS_ISO8859_1=y
++CONFIG_NLS_ISO8859_2=y
++CONFIG_NLS_ISO8859_15=y
++CONFIG_NLS_UTF8=y
++CONFIG_DEBUG_SECTION_MISMATCH=y
++CONFIG_MAGIC_SYSRQ=y
++CONFIG_CRYPTO_LZO=y
++CONFIG_CRC_CCITT=m
++CONFIG_CRC_T10DIF=y
++CONFIG_CRC7=m
++CONFIG_LIBCRC32C=m
+-- 
+2.1.0.27.g96db324
