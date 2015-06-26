@@ -1,33 +1,32 @@
-From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Fri, 26 Jun 2015 16:57:25 +0200
-Subject: Support CONFIG_CMDLINE for arm64?
-In-Reply-To: <CAErSpo63T1qKyM1N0W=t75ooCURTZJA7X=yG2-SK1vc=i-85bw@mail.gmail.com>
-References: <CAErSpo4=11L8QPdeJRFrxR_E7sL+sg2T51TN8KcjmPQoo2Oy=g@mail.gmail.com>
- <20150626131109.GE3078@e104818-lin.cambridge.arm.com>
- <CAErSpo63T1qKyM1N0W=t75ooCURTZJA7X=yG2-SK1vc=i-85bw@mail.gmail.com>
-Message-ID: <4056280.9XjjrSUh4E@diego>
+From: joro@8bytes.org (Joerg Roedel)
+Date: Fri, 26 Jun 2015 17:44:03 +0200
+Subject: [PATCH 2/2] arm/smmu: Make use of of_parse_phandle_with_var_args
+In-Reply-To: <20150626111047.GA9791@arm.com>
+References: <1435247548-32201-1-git-send-email-joro@8bytes.org>
+ <1435247548-32201-2-git-send-email-joro@8bytes.org>
+ <20150626111047.GA9791@arm.com>
+Message-ID: <20150626154403.GD18569@8bytes.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Freitag, 26. Juni 2015, 09:10:37 schrieb Bjorn Helgaas:
-> On Fri, Jun 26, 2015 at 8:11 AM, Catalin Marinas
-> 
-> <catalin.marinas@arm.com> wrote:
-> > On Fri, Jun 26, 2015 at 10:15:47AM +0200, Heiko St?bner wrote:
-> >> Am Donnerstag, 25. Juni 2015, 17:02:41 schrieb Bjorn Helgaas:
-> >> > arch/arm64/Kconfig mentions CONFIG_CMDLINE, but I don't see any actual
-> >> > support for it.  Would you be interested in support for it?  Or would
-> >> > you rather remove it from Kconfig?
-> >> 
-> >> just stumbled over your mail by chance.
-> >> 
-> >> CONFIG_CMDLINE is for example included in drivers/of/fdt.c, so will be
-> >> handled correctly for devicetree-based arm64 platforms - and I'm
-> >> actually using it on my rk3368 board :-) .
-> > 
-> > Indeed. The early_init_dt_scan_chosen() takes it into account.
-> 
-> Excellent, now I just have to figure out why it's not working for me
+Hi Will,
 
-try with CONFIG_CMDLINE_FORCE? Without it CONFIG_CMDLINE is only used when the 
-dts itself does not contain a bootargs property.
+On Fri, Jun 26, 2015 at 12:10:47PM +0100, Will Deacon wrote:
+> Thanks for looking at this! I'm fine with the general idea, but obviously
+> the first patch needs an Ack from a devicetree person.
+
+Yeah, sure. I was looking into a simple solution that does not require
+to rewrite all the callers. Lets see what the device-tree maintainers
+think about it :)
+
+> >  out_put_masters:
+> > +
+> > +	of_free_phandle_args(masterspec);
+> 
+> Shouldn't we also free the masterspec on success?
+
+Right, thanks. This code is only the error path. I'll add this in the
+next version.
+
+
+	Joerg
