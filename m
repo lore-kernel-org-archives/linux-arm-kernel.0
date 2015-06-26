@@ -1,108 +1,107 @@
 From: andre.przywara@arm.com (Andre Przywara)
-Date: Fri, 26 Jun 2015 14:16:14 +0100
-Subject: [PATCH v4 06/10] arm: simplify MMIO dispatching
+Date: Fri, 26 Jun 2015 14:16:18 +0100
+Subject: [PATCH v4 10/10] arm: use new irqchip parameter to create different
+ vGIC types
 In-Reply-To: <1435324578-21832-1-git-send-email-andre.przywara@arm.com>
 References: <1435324578-21832-1-git-send-email-andre.przywara@arm.com>
-Message-ID: <1435324578-21832-7-git-send-email-andre.przywara@arm.com>
+Message-ID: <1435324578-21832-11-git-send-email-andre.przywara@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently we separate any incoming MMIO request into one of the ARM
-memory map regions and take care to spare the GIC.
-It turns out that this is unnecessary, as we only have one special
-region (the IO port area in the first 64 KByte). The MMIO rbtree
-takes care about unhandled MMIO ranges, so we can simply drop all the
-special range checking (except that for the IO range) in
-kvm_cpu__emulate_mmio().
-As the GIC is handled in the kernel, a GIC MMIO access should never
-reach userland (and we don't know what to do with it anyway).
-This lets us delete some more code and simplifies future extensions
-(like expanding the GIC regions).
-To be in line with the other architectures, move the now simpler
-code into a header file.
+Currently we unconditionally create a virtual GICv2 in the guest.
+Add a --irqchip= parameter to let the user specify a different GIC
+type for the guest, when omitting this parameter it still defaults to
+--irqchip=gicv2.
+For now the only other supported type is --irqchip=gicv3
 
 Signed-off-by: Andre Przywara <andre.przywara@arm.com>
-Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arm/include/arm-common/kvm-arch.h     | 12 ------------
- arm/include/arm-common/kvm-cpu-arch.h | 14 ++++++++++++--
- arm/kvm-cpu.c                         | 16 ----------------
- 3 files changed, 12 insertions(+), 30 deletions(-)
+ arm/aarch64/arm-cpu.c                    |  2 +-
+ arm/gic.c                                | 17 +++++++++++++++++
+ arm/include/arm-common/kvm-config-arch.h |  9 ++++++++-
+ arm/kvm.c                                |  2 +-
+ 4 files changed, 27 insertions(+), 3 deletions(-)
 
-diff --git a/arm/include/arm-common/kvm-arch.h b/arm/include/arm-common/kvm-arch.h
-index 082131d..90d6733 100644
---- a/arm/include/arm-common/kvm-arch.h
-+++ b/arm/include/arm-common/kvm-arch.h
-@@ -45,18 +45,6 @@ static inline bool arm_addr_in_ioport_region(u64 phys_addr)
- 	return phys_addr >= KVM_IOPORT_AREA && phys_addr < limit;
+diff --git a/arm/aarch64/arm-cpu.c b/arm/aarch64/arm-cpu.c
+index f702b9e..3dc8ea3 100644
+--- a/arm/aarch64/arm-cpu.c
++++ b/arm/aarch64/arm-cpu.c
+@@ -12,7 +12,7 @@
+ static void generate_fdt_nodes(void *fdt, struct kvm *kvm, u32 gic_phandle)
+ {
+ 	int timer_interrupts[4] = {13, 14, 11, 10};
+-	gic__generate_fdt_nodes(fdt, gic_phandle, IRQCHIP_GICV2);
++	gic__generate_fdt_nodes(fdt, gic_phandle, kvm->cfg.arch.irqchip);
+ 	timer__generate_fdt_nodes(fdt, kvm, timer_interrupts);
  }
  
--static inline bool arm_addr_in_virtio_mmio_region(u64 phys_addr)
--{
--	u64 limit = KVM_VIRTIO_MMIO_AREA + ARM_VIRTIO_MMIO_SIZE;
--	return phys_addr >= KVM_VIRTIO_MMIO_AREA && phys_addr < limit;
--}
--
--static inline bool arm_addr_in_pci_region(u64 phys_addr)
--{
--	u64 limit = KVM_PCI_CFG_AREA + ARM_PCI_CFG_SIZE + ARM_PCI_MMIO_SIZE;
--	return phys_addr >= KVM_PCI_CFG_AREA && phys_addr < limit;
--}
--
- struct kvm_arch {
- 	/*
- 	 * We may have to align the guest memory for virtio, so keep the
-diff --git a/arm/include/arm-common/kvm-cpu-arch.h b/arm/include/arm-common/kvm-cpu-arch.h
-index 36c7872..329979a 100644
---- a/arm/include/arm-common/kvm-cpu-arch.h
-+++ b/arm/include/arm-common/kvm-cpu-arch.h
-@@ -44,8 +44,18 @@ static inline bool kvm_cpu__emulate_io(struct kvm_cpu *vcpu, u16 port, void *dat
- 	return false;
- }
+diff --git a/arm/gic.c b/arm/gic.c
+index efe4b42..ff56de7 100644
+--- a/arm/gic.c
++++ b/arm/gic.c
+@@ -22,6 +22,23 @@ static int gic_fd = -1;
+ static u64 gic_redists_base;
+ static u64 gic_redists_size;
  
--bool kvm_cpu__emulate_mmio(struct kvm_cpu *vcpu, u64 phys_addr, u8 *data,
--			   u32 len, u8 is_write);
-+static inline bool kvm_cpu__emulate_mmio(struct kvm_cpu *vcpu, u64 phys_addr,
-+					 u8 *data, u32 len, u8 is_write)
++int irqchip_parser(const struct option *opt, const char *arg, int unset)
 +{
-+	if (arm_addr_in_ioport_region(phys_addr)) {
-+		int direction = is_write ? KVM_EXIT_IO_OUT : KVM_EXIT_IO_IN;
-+		u16 port = (phys_addr - KVM_IOPORT_AREA) & USHRT_MAX;
++	enum irqchip_type *type = opt->value;
 +
-+		return kvm__emulate_io(vcpu, port, data, direction, len, 1);
++	*type = IRQCHIP_GICV2;
++	if (!strcmp(arg, "gicv2")) {
++		*type = IRQCHIP_GICV2;
++	} else if (!strcmp(arg, "gicv3")) {
++		*type = IRQCHIP_GICV3;
++	} else {
++		fprintf(stderr, "irqchip: unknown type \"%s\"\n", arg);
++		return -1;
 +	}
 +
-+	return kvm__emulate_mmio(vcpu, phys_addr, data, len, is_write);
++	return 0;
 +}
- 
- unsigned long kvm_cpu__get_vcpu_mpidr(struct kvm_cpu *vcpu);
- 
-diff --git a/arm/kvm-cpu.c b/arm/kvm-cpu.c
-index ab08815..7780251 100644
---- a/arm/kvm-cpu.c
-+++ b/arm/kvm-cpu.c
-@@ -139,22 +139,6 @@ bool kvm_cpu__handle_exit(struct kvm_cpu *vcpu)
- 	return false;
- }
- 
--bool kvm_cpu__emulate_mmio(struct kvm_cpu *vcpu, u64 phys_addr, u8 *data,
--			   u32 len, u8 is_write)
--{
--	if (arm_addr_in_virtio_mmio_region(phys_addr)) {
--		return kvm__emulate_mmio(vcpu, phys_addr, data, len, is_write);
--	} else if (arm_addr_in_ioport_region(phys_addr)) {
--		int direction = is_write ? KVM_EXIT_IO_OUT : KVM_EXIT_IO_IN;
--		u16 port = (phys_addr - KVM_IOPORT_AREA) & USHRT_MAX;
--		return kvm__emulate_io(vcpu, port, data, direction, len, 1);
--	} else if (arm_addr_in_pci_region(phys_addr)) {
--		return kvm__emulate_mmio(vcpu, phys_addr, data, len, is_write);
--	}
--
--	return false;
--}
--
- void kvm_cpu__show_page_tables(struct kvm_cpu *vcpu)
++
+ static int gic__create_device(struct kvm *kvm, enum irqchip_type type)
  {
+ 	int err;
+diff --git a/arm/include/arm-common/kvm-config-arch.h b/arm/include/arm-common/kvm-config-arch.h
+index a8ebd94..9529881 100644
+--- a/arm/include/arm-common/kvm-config-arch.h
++++ b/arm/include/arm-common/kvm-config-arch.h
+@@ -8,8 +8,11 @@ struct kvm_config_arch {
+ 	unsigned int	force_cntfrq;
+ 	bool		virtio_trans_pci;
+ 	bool		aarch32_guest;
++	enum irqchip_type irqchip;
+ };
+ 
++int irqchip_parser(const struct option *opt, const char *arg, int unset);
++
+ #define OPT_ARCH_RUN(pfx, cfg)							\
+ 	pfx,									\
+ 	ARM_OPT_ARCH_RUN(cfg)							\
+@@ -21,6 +24,10 @@ struct kvm_config_arch {
+ 		     "updated to program CNTFRQ correctly*"),			\
+ 	OPT_BOOLEAN('\0', "force-pci", &(cfg)->virtio_trans_pci,		\
+ 		    "Force virtio devices to use PCI as their default "		\
+-		    "transport"),
++		    "transport"),						\
++        OPT_CALLBACK('\0', "irqchip", &(cfg)->irqchip,				\
++		     "[gicv2|gicv3]",					\
++		     "type of interrupt controller to emulate in the guest",	\
++		     irqchip_parser, NULL),
+ 
+ #endif /* ARM_COMMON__KVM_CONFIG_ARCH_H */
+diff --git a/arm/kvm.c b/arm/kvm.c
+index f9685c2..d0e4a20 100644
+--- a/arm/kvm.c
++++ b/arm/kvm.c
+@@ -82,6 +82,6 @@ void kvm__arch_init(struct kvm *kvm, const char *hugetlbfs_path, u64 ram_size)
+ 		MADV_MERGEABLE | MADV_HUGEPAGE);
+ 
+ 	/* Create the virtual GIC. */
+-	if (gic__create(kvm, IRQCHIP_GICV2))
++	if (gic__create(kvm, kvm->cfg.arch.irqchip))
+ 		die("Failed to create virtual GIC");
  }
 -- 
 2.3.5
