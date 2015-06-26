@@ -1,92 +1,73 @@
-From: r.spliet@ultimaker.com (Roy Spliet)
-Date: Fri, 26 Jun 2015 11:00:11 +0200
-Subject: [PATCH v5 2/2] mtd: nand: sunxi: Set serial access mode correctly
-In-Reply-To: <1435309211-15236-1-git-send-email-r.spliet@ultimaker.com>
-References: <1435309211-15236-1-git-send-email-r.spliet@ultimaker.com>
-Message-ID: <1435309211-15236-2-git-send-email-r.spliet@ultimaker.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Fri, 26 Jun 2015 10:00:48 +0100
+Subject: [PATCH 2/6] GICv3: Add ITS entry to THUNDER dts
+In-Reply-To: <9184A2BB-2852-4B73-B964-881A1491EEA8@caviumnetworks.com>
+References: <1411573068-12952-1-git-send-email-rric@kernel.org>
+ <1411573068-12952-3-git-send-email-rric@kernel.org>
+ <9184A2BB-2852-4B73-B964-881A1491EEA8@caviumnetworks.com>
+Message-ID: <558D14C0.6030001@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Replaces the hard coded "always use EDO" policy with that prescribed
-by the ONFI 3.1 specification that EDO mode should always be used if tRC
-is below 30ns.
+On 26/06/15 00:19, Chalamarla, Tirumalesh wrote:
+> Hi Marc,
+> 
+> Any feed back on this. 
+> Do you want me to submit this as a separate patch?so that it is easy for getting acceptance. 
 
-Signed-off-by: Roy Spliet <r.spliet@ultimaker.com>
-Acked-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+It looks good to me, so you can add my Acked-by on it.
 
----
-V4:
-- Simplify by pre-calculating the entire timing CTL register value
----
- drivers/mtd/nand/sunxi_nand.c | 17 ++++++++++++-----
- 1 file changed, 12 insertions(+), 5 deletions(-)
+I think you should repost it and get it merged through arm-soc.
 
-diff --git a/drivers/mtd/nand/sunxi_nand.c b/drivers/mtd/nand/sunxi_nand.c
-index 663e331..f97a58d 100644
---- a/drivers/mtd/nand/sunxi_nand.c
-+++ b/drivers/mtd/nand/sunxi_nand.c
-@@ -99,6 +99,9 @@
- 				 NFC_CMD_INT_ENABLE | \
- 				 NFC_DMA_INT_ENABLE)
- 
-+/* define bit use in NFC_TIMING_CTL */
-+#define NFC_TIMING_CTL_EDO	BIT(8)
-+
- /* define NFC_TIMING_CFG register layout */
- #define NFC_TIMING_CFG(tWB, tADL, tWHR, tRHW, tCAD)		\
- 	(((tWB) & 0x3) | (((tADL) & 0x3) << 2) |		\
-@@ -225,6 +228,7 @@ struct sunxi_nand_chip {
- 	struct mtd_info mtd;
- 	unsigned long clk_rate;
- 	u32 timing_cfg;
-+	u32 timing_ctl;
- 	int selected;
- 	int nsels;
- 	struct sunxi_nand_chip_sel sels[0];
-@@ -411,6 +415,7 @@ static void sunxi_nfc_select_chip(struct mtd_info *mtd, int chip)
- 		}
- 	}
- 
-+	writel(sunxi_nand->timing_ctl, nfc->regs + NFC_REG_TIMING_CTL);
- 	writel(sunxi_nand->timing_cfg, nfc->regs + NFC_REG_TIMING_CFG);
- 	writel(ctl, nfc->regs + NFC_REG_CTL);
- 
-@@ -940,6 +945,13 @@ static int sunxi_nand_chip_set_timings(struct sunxi_nand_chip *chip,
- 	/* TODO: A83 has some more bits for CDQSS, CS, CLHZ, CCS, WC */
- 	chip->timing_cfg = NFC_TIMING_CFG(tWB, tADL, tWHR, tRHW, tCAD);
- 
-+	/*
-+	 * ONFI specification 3.1, paragraph 4.15.2 dictates that EDO data
-+	 * output cycle timings shall be used if the host drives tRC less than
-+	 * 30 ns.
-+	 */
-+	chip->timing_ctl = (timings->tRC_min < 30000) ? NFC_TIMING_CTL_EDO : 0;
-+
- 	/* Convert min_clk_period from picoseconds to nanoseconds */
- 	min_clk_period = DIV_ROUND_UP(min_clk_period, 1000);
- 
-@@ -1441,11 +1453,6 @@ static int sunxi_nfc_probe(struct platform_device *pdev)
- 
- 	platform_set_drvdata(pdev, nfc);
- 
--	/*
--	 * TODO: replace this magic value with EDO flag
--	 */
--	writel(0x100, nfc->regs + NFC_REG_TIMING_CTL);
--
- 	ret = sunxi_nand_chips_init(dev, nfc);
- 	if (ret) {
- 		dev_err(dev, "failed to init nand chips\n");
--- 
-2.4.3
+Thanks,
+
+	M.
+
+> Thanks,
+> Tirumalesh. 
+> 
+>> On Sep 24, 2014, at 8:37 AM, Robert Richter <rric@kernel.org> wrote:
+>>
+>> From: Tirumalesh Chalamarla <tchalamarla@cavium.com>
+>>
+>> The PCIe host controller uses MSIs provided by GICv3 ITS. Enable it on
+>> Thunder SoCs by adding an entry to DT.
+>>
+>> Signed-off-by: Tirumalesh Chalamarla <tchalamarla@cavium.com>
+>> Signed-off-by: Robert Richter <rrichter@cavium.com>
+>> ---
+>> arch/arm64/boot/dts/thunder-88xx.dtsi | 9 +++++++++
+>> 1 file changed, 9 insertions(+)
+>>
+>> diff --git a/arch/arm64/boot/dts/thunder-88xx.dtsi b/arch/arm64/boot/dts/thunder-88xx.dtsi
+>> index d8c0bdc51882..9cb7cf94284a 100644
+>> --- a/arch/arm64/boot/dts/thunder-88xx.dtsi
+>> +++ b/arch/arm64/boot/dts/thunder-88xx.dtsi
+>> @@ -376,10 +376,19 @@
+>> 		gic0: interrupt-controller at 8010,00000000 {
+>> 			compatible = "arm,gic-v3";
+>> 			#interrupt-cells = <3>;
+>> +			#address-cells = <2>;
+>> +			#size-cells = <2>;
+>> +			ranges;
+>> 			interrupt-controller;
+>> 			reg = <0x8010 0x00000000 0x0 0x010000>, /* GICD */
+>> 			      <0x8010 0x80000000 0x0 0x600000>; /* GICR */
+>> 			interrupts = <1 9 0xf04>;
+>> +
+>> +			its: gic-its at 8010,00020000 {
+>> +				compatible = "arm,gic-v3-its";
+>> +				msi-controller;
+>> +				reg = <0x8010 0x20000 0x0 0x200000>;
+>> +			};
+>> 		};
+>>
+>> 		uaa0: serial at 87e0,24000000 {
+>> -- 
+>> 2.1.0
+>>
+> 
 
 
 -- 
-
-
-IMAGINE IT >> MAKE IT
-
-Meet us online at Twitter <http://twitter.com/ultimaker>, Facebook 
-<http://facebook.com/ultimaker>, Google+ <http://google.com/+Ultimaker>
-
-www.ultimaker.com
+Jazz is not dead. It just smells funny...
