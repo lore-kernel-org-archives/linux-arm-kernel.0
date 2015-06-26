@@ -1,141 +1,86 @@
-From: vaibhav.hiremath@linaro.org (Vaibhav Hiremath)
-Date: Fri, 26 Jun 2015 11:29:29 +0530
-Subject: [PATCH-v4 1/3] mfd: 88pm800: Add device tree support
-In-Reply-To: <20150626055317.GA32687@yizhang>
+From: yizhang@marvell.com (Yi Zhang)
+Date: Fri, 26 Jun 2015 14:05:21 +0800
+Subject: [PATCH-v4 3/3] mfd: devicetree: bindings: Add new 88pm800 mfd
+ binding
+In-Reply-To: <1435217189-19578-4-git-send-email-vaibhav.hiremath@linaro.org>
 References: <1435217189-19578-1-git-send-email-vaibhav.hiremath@linaro.org>
- <1435217189-19578-2-git-send-email-vaibhav.hiremath@linaro.org>
- <20150625101916.GB15013@x1> <558BE1B7.2060308@linaro.org>
- <20150625144800.GC23990@x1> <558C1DF5.2060103@linaro.org>
- <20150626055317.GA32687@yizhang>
-Message-ID: <558CEA41.8020508@linaro.org>
+ <1435217189-19578-4-git-send-email-vaibhav.hiremath@linaro.org>
+Message-ID: <20150626060520.GB32687@yizhang>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On Friday 26 June 2015 11:23 AM, Yi Zhang wrote:
-> On Thu, Jun 25, 2015 at 08:57:49PM +0530, Vaibhav Hiremath wrote:
->>
->>
->> On Thursday 25 June 2015 08:18 PM, Lee Jones wrote:
->>> On Thu, 25 Jun 2015, Vaibhav Hiremath wrote:
->>>> On Thursday 25 June 2015 03:49 PM, Lee Jones wrote:
->>>>> On Thu, 25 Jun 2015, Vaibhav Hiremath wrote:
->>>>>
->>>>>> Add DT support to the 88pm800 driver, along with compatible
->>>>>> field for it's sub-devices (rtc, onkey and regulator)
->>>>>>
->>>>>> Signed-off-by: Chao Xie <chao.xie@marvell.com>
->>>>>> Signed-off-by: Vaibhav Hiremath <vaibhav.hiremath@linaro.org>
->>>>>> ---
->>>>>>   drivers/mfd/88pm800.c | 23 +++++++++++++++++++++++
->>>>>>   1 file changed, 23 insertions(+)
->>>>>>
->>>>>> diff --git a/drivers/mfd/88pm800.c b/drivers/mfd/88pm800.c
->>>>>> index 841717a..40fd014 100644
->>>>>> --- a/drivers/mfd/88pm800.c
->>>>>> +++ b/drivers/mfd/88pm800.c
->>>>>> @@ -27,6 +27,7 @@
->>>>>>   #include <linux/mfd/core.h>
->>>>>>   #include <linux/mfd/88pm80x.h>
->>>>>>   #include <linux/slab.h>
->>>>>> +#include <linux/of_device.h>
->>>>>>
->>>>>>   /* Interrupt Registers */
->>>>>>   #define PM800_INT_STATUS1		(0x05)
->>>>>> @@ -121,6 +122,11 @@ static const struct i2c_device_id pm80x_id_table[] = {
->>>>>>   };
->>>>>>   MODULE_DEVICE_TABLE(i2c, pm80x_id_table);
->>>>>>
->>>>>> +static const struct of_device_id pm80x_of_match_table[] = {
->>>>>> +	{ .compatible = "marvell,88pm800", },
->>>>>> +	{},
->>>>>> +};
->>>>>> +
->>>>>>   static struct resource rtc_resources[] = {
->>>>>>   	{
->>>>>>   	 .name = "88pm80x-rtc",
->>>>>> @@ -133,6 +139,7 @@ static struct resource rtc_resources[] = {
->>>>>>   static struct mfd_cell rtc_devs[] = {
->>>>>>   	{
->>>>>>   	 .name = "88pm80x-rtc",
->>>>>> +	 .of_compatible = "marvell,88pm80x-rtc",
->>>>>>   	 .num_resources = ARRAY_SIZE(rtc_resources),
->>>>>>   	 .resources = &rtc_resources[0],
->>>>>>   	 .id = -1,
->>>>>> @@ -151,6 +158,7 @@ static struct resource onkey_resources[] = {
->>>>>>   static const struct mfd_cell onkey_devs[] = {
->>>>>>   	{
->>>>>>   	 .name = "88pm80x-onkey",
->>>>>> +	 .of_compatible = "marvell,88pm80x-onkey",
->>>>>>   	 .num_resources = 1,
->>>>>>   	 .resources = &onkey_resources[0],
->>>>>>   	 .id = -1,
->>>>>> @@ -160,6 +168,7 @@ static const struct mfd_cell onkey_devs[] = {
->>>>>>   static const struct mfd_cell regulator_devs[] = {
->>>>>>   	{
->>>>>>   	 .name = "88pm80x-regulator",
->>>>>> +	 .of_compatible = "marvell,88pm80x-regulator",
->>>>>>   	 .id = -1,
->>>>>>   	},
->>>>>>   };
->>>>>> @@ -544,8 +553,21 @@ static int pm800_probe(struct i2c_client *client,
->>>>>>   	int ret = 0;
->>>>>>   	struct pm80x_chip *chip;
->>>>>>   	struct pm80x_platform_data *pdata = dev_get_platdata(&client->dev);
->>>>>> +	struct device_node *np = client->dev.of_node;
->>>>>>   	struct pm80x_subchip *subchip;
->>>>>>
->>>>>> +	if (!pdata && !np) {
->>>>>> +		dev_err(&client->dev,
->>>>>> +			"pm80x requires platform data or of_node\n");
->>>>>> +		return -EINVAL;
->>>>>> +	}
->>>>>> +
->>>>>> +	if (!pdata) {
->>>>>> +		pdata = devm_kzalloc(&client->dev, sizeof(*pdata), GFP_KERNEL);
->>>>>> +		if (!pdata)
->>>>>> +			return -ENOMEM;
->>>>>> +	}
->>>>>
->>>>> Why have you allocated data for pdata, then done nothing with it?
->>>>>
->>>>
->>>> Not in this patch, but subsequent patches would use it.
->>>
->>> Only provide it when you start using it please.
->>>
->>
->> I will take back my earlier comment of "not using in this patch, but
->> subsequent patches".
->>
->> pdata is being used, couple of places in the driver,
->>
->>
->> @line-751
->>
->>          ret = device_800_init(chip, pdata);
->>          if (ret) {
->>                  dev_err(chip->dev, "Failed to initialize 88pm800
->> devices\n");
->>                  goto err_device_init;
->>          }
->>
->>          if (pdata && pdata->plat_config)
->>                  pdata->plat_config(chip, pdata);
->
->    this plat_config() is used in legacy non-device-tree code, it's used
->    to implement fixup for chip or board level, it exists in
->    the board configuration file
->
->    just curious, do you think we still need to keep it?
->    considering device-tree has been used. thanks;
->
-
-I do not see it anywhere in mainline kernel tree, is it part of some
-internal tree?
-
-If we know that it is being used, then lets not remove it now.
-
-Thanks,
-Vaibhav
+On Thu, Jun 25, 2015 at 03:26:29PM +0800, Vaibhav Hiremath wrote:
+> With addition of DT support to 88pm800 mfd driver, this patch
+> adds new DT binding documentation along with respective properties.
+> 
+> Signed-off-by: Vaibhav Hiremath <vaibhav.hiremath@linaro.org>
+> ---
+>  Documentation/devicetree/bindings/mfd/88pm800.txt | 54 +++++++++++++++++++++++
+>  1 file changed, 54 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/mfd/88pm800.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/mfd/88pm800.txt b/Documentation/devicetree/bindings/mfd/88pm800.txt
+> new file mode 100644
+> index 0000000..f56b751
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/mfd/88pm800.txt
+> @@ -0,0 +1,54 @@
+> +* Marvell 88PM8xx Power Management IC
+> +
+> +Required parent device properties:
+> +- compatible : "marvell,88pm800", "marvell,88pm805", "marvell,88pm860"
+> +- reg : the I2C slave address for the 88pm8xx chip
+> +- interrupts : IRQ line for the 88pm8xx chip
+> +- interrupt-controller: describes the 88pm8xx as an interrupt controller
+> +- #interrupt-cells : should be 1.
+> +		- The cell is the 88pm8xx local IRQ number
+> +
+> +88pm8xx family of devices consists of varied group of sub-devices:
+  what about using "88pm80x family of devices..."? 
+  for we also have another series of chip, with the name of 88pm88x..
+> +
+> +Device		 	Supply Names	 Description
+> +------		 	------------	 -----------
+> +88pm80x-onkey		:		: On key
+> +88pm80x-rtc		:		: RTC
+> +88pm80x-regulator	:		: Regulators
+> +
+> +Note: More device list will follow
+> +
+> +Example:
+> +
+> +	pmic: 88pm800 at 30 {
+> +		compatible = "marvell,88pm800";
+> +		reg = <0x30>;
+> +		interrupts = <GIC_SPI 77 IRQ_TYPE_LEVEL_HIGH>;
+> +		interrupt-parent = <&gic>;
+> +		interrupt-controller;
+> +		#interrupt-cells = <1>;
+> +
+> +		regulators {
+> +			compatible = "marvell,88pm80x-regulator";
+> +
+> +			buck1a: BUCK1A {
+> +				regulator-name = "BUCK1A";
+> +				regulator-min-microvolt = <600000>;
+> +				regulator-max-microvolt = <1800000>;
+> +				regulator-boot-on;
+> +				regulator-always-on;
+> +			};
+> +
+> +			ldo1: LDO1 {
+> +				regulator-name = "LDO1";
+> +				regulator-min-microvolt = <1700000>;
+> +				regulator-max-microvolt = <3300000>;
+> +				regulator-boot-on;
+> +				regulator-always-on;
+> +			};
+> +		};
+> +
+> +		rtc {
+> +			compatible = "marvell,88pm80x-rtc";
+> +		};
+> +	};
+> -- 
+> 1.9.1
+> 
