@@ -1,77 +1,54 @@
-From: andrew@ncrmnt.org (Andrew)
-Date: Fri, 26 Jun 2015 13:11:26 +0300
-Subject: [PATCH 1/4] ARM: rcm-k1879xb1: Add support for K1879XB1 SoC
-In-Reply-To: <CAL_JsqKTUM8-ufR8gGJBsNtbc94LyS7o-7v=R2Fit3+0=-SofA@mail.gmail.com>
-References: <1435074604-19312-1-git-send-email-andrew@ncrmnt.org>
- <1435074604-19312-2-git-send-email-andrew@ncrmnt.org>
- <CAL_JsqKTUM8-ufR8gGJBsNtbc94LyS7o-7v=R2Fit3+0=-SofA@mail.gmail.com>
-Message-ID: <fb7ebabe2ce9cac0fac05535bbabfdbc@mail.ncrmnt.org>
+From: will.deacon@arm.com (Will Deacon)
+Date: Fri, 26 Jun 2015 11:11:47 +0100
+Subject: arm64 allmodconfig failure =?utf-8?Q?i?=
+ =?utf-8?B?biBleHBhbnNpb24gb2YgbWFjcm8g4oCYX1jigJk=?=
+In-Reply-To: <20150626100944.GA19292@gondor.apana.org.au>
+References: <20150626100805.GC1568@arm.com>
+ <20150626100944.GA19292@gondor.apana.org.au>
+Message-ID: <20150626101147.GD1568@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Rob Herring ????? 24.06.2015 05:15:
->> +
->> +static void __iomem *k1879_sctl_base(void)
->> +{
->> +       return (void __iomem *)RCM_K1879_SCTL_VIRT_BASE;
->> +}
->> +
->> +static void k1879_level_irq_i2c0_fixup(unsigned int irq, struct 
->> irq_desc *desc)
->> +{
->> +       writel(1, k1879_mif_base() + RCM_K1879_MIF_I2C_INT_STAT);
->> +       handle_level_irq(irq, desc);
->> +}
->> +
->> +static void k1879_level_irq_i2c1_fixup(unsigned int irq, struct 
->> irq_desc *desc)
->> +{
->> +       writel(1 << 0, k1879_sctl_base() + RCM_K1879_SCTL_INT_P_OUT);
->> +       handle_level_irq(irq, desc);
->> +}
->> +
->> +static void k1879_level_irq_i2c2_fixup(unsigned int irq, struct 
->> irq_desc *desc)
->> +{
->> +       writel(1 << 1, k1879_sctl_base() + RCM_K1879_SCTL_INT_P_OUT);
->> +       handle_level_irq(irq, desc);
->> +}
->> +
->> +static void k1879_level_irq_i2c3_fixup(unsigned int irq, struct 
->> irq_desc *desc)
->> +{
->> +       writel(1 << 2, k1879_sctl_base() + RCM_K1879_SCTL_INT_P_OUT);
->> +       handle_level_irq(irq, desc);
->> +}
+On Fri, Jun 26, 2015 at 11:09:44AM +0100, Herbert Xu wrote:
+> On Fri, Jun 26, 2015 at 11:08:05AM +0100, Will Deacon wrote:
+> > Hi all,
+> > 
+> > arm64 allmodconfig fails to build with mainline due to the following:
+> > 
+> > 
+> >   In file included from include/acpi/platform/aclinux.h:74:0,
+> >                    from include/acpi/platform/acenv.h:173,
+> >                    from include/acpi/acpi.h:56,
+> >                    from include/linux/acpi.h:37,
+> >                    from ./arch/arm64/include/asm/dma-mapping.h:21,
+> >                    from include/linux/dma-mapping.h:86,
+> >                    from include/linux/skbuff.h:34,
+> >                    from include/crypto/algapi.h:18,
+> >                    from crypto/asymmetric_keys/rsa.c:16:
+> >   include/linux/ctype.h:15:12: error: expected ?;?, ?,? or ?)? before numeric constant
+> >    #define _X 0x40 /* hex digit */
+> >               ^
+> >   crypto/asymmetric_keys/rsa.c:123:47: note: in expansion of macro ?_X?
+> >    static int RSA_I2OSP(MPI x, size_t xLen, u8 **_X)
+> >                                                  ^
+> >   crypto/asymmetric_keys/rsa.c: In function ?RSA_verify_signature?:
+> >   crypto/asymmetric_keys/rsa.c:256:2: error: implicit declaration of function ?RSA_I2OSP? [-Werror=implicit-function-declaration]
+> >     ret = RSA_I2OSP(m, k, &EM);
+> > 
+> > 
+> > This is thanks to the following function type:
+> > 
+> >   static int RSA_I2OSP(MPI x, size_t xLen, u8 **__X)
+> > 
+> > conflicting with the _X #define in linux/ctype.h:
+> > 
+> >   #define _X      0x40    /* hex digit */
+> > 
+> > Simple patch below, but solving this problem with more underscores feels
+> > slightly inhumane.
 > 
-> What are all these for? They probably belong somewhere else.
+> Thanks but I've already merged a similar patch yesterday.
 
-As I've written already in response to to Russel King's review, these 
-are the workarounds
-around aeroflex i2c IP interrupt handling. Basically every interrupt 
-from i2c requires
-cleaning up respective 'pending' bit in SCTL register. This could be 
-done in i2c driver,
-but it is very platform-specific and would look ugly in the driver. If 
-you know any cleaner
-way for such a workaround, please advice. Right now I've cleaned up 
-everything, save for
-these fixups.
+Perfect, sorry for the noise.
 
-
->> diff --git a/arch/arm/mach-rcm-k1879xb1/cpuidle.c 
->> b/arch/arm/mach-rcm-k1879xb1/cpuidle.c
->> new file mode 100644
->> index 0000000..7c621b6
->> --- /dev/null
->> +++ b/arch/arm/mach-rcm-k1879xb1/cpuidle.c
-> 
-> This should be a separate patch and located in drivers/cpuidle/
-
-Got it, thanks.
-
-
--- 
-Regards,
-Andrew
-RC Module :: http://module.ru
+Will
