@@ -1,60 +1,157 @@
-From: majun258@huawei.com (majun (F))
-Date: Fri, 26 Jun 2015 14:31:41 +0800
-Subject: [PATCH v2 2/3] IRQ/Gic-V3: Change arm-gic-its to support the
- Mbigen interrupt
-In-Reply-To: <1434077399-32200-3-git-send-email-majun258@huawei.com>
-References: <1434077399-32200-1-git-send-email-majun258@huawei.com>
- <1434077399-32200-3-git-send-email-majun258@huawei.com>
-Message-ID: <558CF1CD.5020200@huawei.com>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Fri, 26 Jun 2015 15:35:29 +0900
+Subject: [PATCH-v4 1/3] mfd: 88pm800: Add device tree support
+In-Reply-To: <558CEA41.8020508@linaro.org>
+References: <1435217189-19578-1-git-send-email-vaibhav.hiremath@linaro.org>
+ <1435217189-19578-2-git-send-email-vaibhav.hiremath@linaro.org>
+ <20150625101916.GB15013@x1> <558BE1B7.2060308@linaro.org>
+ <20150625144800.GC23990@x1> <558C1DF5.2060103@linaro.org>
+ <20150626055317.GA32687@yizhang> <558CEA41.8020508@linaro.org>
+Message-ID: <CAJKOXPeAzBeLpiDJ9s8E=2-63ezcoZKFb_bYG7ahbcv61LY_Bw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Thomas:
+2015-06-26 14:59 GMT+09:00 Vaibhav Hiremath <vaibhav.hiremath@linaro.org>:
+>
+>
+> On Friday 26 June 2015 11:23 AM, Yi Zhang wrote:
+>>
+>> On Thu, Jun 25, 2015 at 08:57:49PM +0530, Vaibhav Hiremath wrote:
+>>>
+>>>
+>>>
+>>> On Thursday 25 June 2015 08:18 PM, Lee Jones wrote:
+>>>>
+>>>> On Thu, 25 Jun 2015, Vaibhav Hiremath wrote:
+>>>>>
+>>>>> On Thursday 25 June 2015 03:49 PM, Lee Jones wrote:
+>>>>>>
+>>>>>> On Thu, 25 Jun 2015, Vaibhav Hiremath wrote:
+>>>>>>
+>>>>>>> Add DT support to the 88pm800 driver, along with compatible
+>>>>>>> field for it's sub-devices (rtc, onkey and regulator)
+>>>>>>>
+>>>>>>> Signed-off-by: Chao Xie <chao.xie@marvell.com>
+>>>>>>> Signed-off-by: Vaibhav Hiremath <vaibhav.hiremath@linaro.org>
+>>>>>>> ---
+>>>>>>>   drivers/mfd/88pm800.c | 23 +++++++++++++++++++++++
+>>>>>>>   1 file changed, 23 insertions(+)
+>>>>>>>
+>>>>>>> diff --git a/drivers/mfd/88pm800.c b/drivers/mfd/88pm800.c
+>>>>>>> index 841717a..40fd014 100644
+>>>>>>> --- a/drivers/mfd/88pm800.c
+>>>>>>> +++ b/drivers/mfd/88pm800.c
+>>>>>>> @@ -27,6 +27,7 @@
+>>>>>>>   #include <linux/mfd/core.h>
+>>>>>>>   #include <linux/mfd/88pm80x.h>
+>>>>>>>   #include <linux/slab.h>
+>>>>>>> +#include <linux/of_device.h>
+>>>>>>>
+>>>>>>>   /* Interrupt Registers */
+>>>>>>>   #define PM800_INT_STATUS1             (0x05)
+>>>>>>> @@ -121,6 +122,11 @@ static const struct i2c_device_id
+>>>>>>> pm80x_id_table[] = {
+>>>>>>>   };
+>>>>>>>   MODULE_DEVICE_TABLE(i2c, pm80x_id_table);
+>>>>>>>
+>>>>>>> +static const struct of_device_id pm80x_of_match_table[] = {
+>>>>>>> +       { .compatible = "marvell,88pm800", },
+>>>>>>> +       {},
+>>>>>>> +};
+>>>>>>> +
+>>>>>>>   static struct resource rtc_resources[] = {
+>>>>>>>         {
+>>>>>>>          .name = "88pm80x-rtc",
+>>>>>>> @@ -133,6 +139,7 @@ static struct resource rtc_resources[] = {
+>>>>>>>   static struct mfd_cell rtc_devs[] = {
+>>>>>>>         {
+>>>>>>>          .name = "88pm80x-rtc",
+>>>>>>> +        .of_compatible = "marvell,88pm80x-rtc",
+>>>>>>>          .num_resources = ARRAY_SIZE(rtc_resources),
+>>>>>>>          .resources = &rtc_resources[0],
+>>>>>>>          .id = -1,
+>>>>>>> @@ -151,6 +158,7 @@ static struct resource onkey_resources[] = {
+>>>>>>>   static const struct mfd_cell onkey_devs[] = {
+>>>>>>>         {
+>>>>>>>          .name = "88pm80x-onkey",
+>>>>>>> +        .of_compatible = "marvell,88pm80x-onkey",
+>>>>>>>          .num_resources = 1,
+>>>>>>>          .resources = &onkey_resources[0],
+>>>>>>>          .id = -1,
+>>>>>>> @@ -160,6 +168,7 @@ static const struct mfd_cell onkey_devs[] = {
+>>>>>>>   static const struct mfd_cell regulator_devs[] = {
+>>>>>>>         {
+>>>>>>>          .name = "88pm80x-regulator",
+>>>>>>> +        .of_compatible = "marvell,88pm80x-regulator",
+>>>>>>>          .id = -1,
+>>>>>>>         },
+>>>>>>>   };
+>>>>>>> @@ -544,8 +553,21 @@ static int pm800_probe(struct i2c_client
+>>>>>>> *client,
+>>>>>>>         int ret = 0;
+>>>>>>>         struct pm80x_chip *chip;
+>>>>>>>         struct pm80x_platform_data *pdata =
+>>>>>>> dev_get_platdata(&client->dev);
+>>>>>>> +       struct device_node *np = client->dev.of_node;
+>>>>>>>         struct pm80x_subchip *subchip;
+>>>>>>>
+>>>>>>> +       if (!pdata && !np) {
+>>>>>>> +               dev_err(&client->dev,
+>>>>>>> +                       "pm80x requires platform data or of_node\n");
+>>>>>>> +               return -EINVAL;
+>>>>>>> +       }
+>>>>>>> +
+>>>>>>> +       if (!pdata) {
+>>>>>>> +               pdata = devm_kzalloc(&client->dev, sizeof(*pdata),
+>>>>>>> GFP_KERNEL);
+>>>>>>> +               if (!pdata)
+>>>>>>> +                       return -ENOMEM;
+>>>>>>> +       }
+>>>>>>
+>>>>>>
+>>>>>> Why have you allocated data for pdata, then done nothing with it?
+>>>>>>
+>>>>>
+>>>>> Not in this patch, but subsequent patches would use it.
+>>>>
+>>>>
+>>>> Only provide it when you start using it please.
+>>>>
+>>>
+>>> I will take back my earlier comment of "not using in this patch, but
+>>> subsequent patches".
+>>>
+>>> pdata is being used, couple of places in the driver,
+>>>
+>>>
+>>> @line-751
+>>>
+>>>          ret = device_800_init(chip, pdata);
+>>>          if (ret) {
+>>>                  dev_err(chip->dev, "Failed to initialize 88pm800
+>>> devices\n");
+>>>                  goto err_device_init;
+>>>          }
+>>>
+>>>          if (pdata && pdata->plat_config)
+>>>                  pdata->plat_config(chip, pdata);
+>>
+>>
+>>    this plat_config() is used in legacy non-device-tree code, it's used
+>>    to implement fixup for chip or board level, it exists in
+>>    the board configuration file
+>>
+>>    just curious, do you think we still need to keep it?
+>>    considering device-tree has been used. thanks;
+>>
+>
+> I do not see it anywhere in mainline kernel tree, is it part of some
+> internal tree?
+>
+> If we know that it is being used, then lets not remove it now.
 
-? 2015/6/12 10:49, Ma Jun ??:
+There aren't many board files in mainline but still downstream may use
+it. Do you know who could be the downstream for this device?
 
-> +static int its_mbigen_prepare(struct irq_domain *domain, struct mbi_desc *desc,
-> +								int hwirq, struct mbi_alloc_info *arg)
-> +{
-> +	struct its_node *its = domain->parent->host_data;
-> +	struct its_device *its_dev;
-> +	u32 dev_id;
-> +
-> +	dev_id = desc->msg_id;
-> +
-> +	its_dev = its_find_device(its, dev_id);
-> +	if (!its_dev) {
-> +		its_dev = its_create_device(its, dev_id, desc->lines);
-> +		if (!its_dev)
-> +			return -ENOMEM;
-> +	}
-> +
-> +	arg->scratchpad[0].ptr = its_dev;
-> +	arg->scratchpad[1].ptr = NULL;
-> +
-> +	arg->desc = desc;
-> +	arg->hwirq = hwirq;
-> +	return 0;
-> +}
-> +
-> +static struct mbigen_domain_ops its_mbigen_ops = {
-> +	.mbigen_prepare		= its_mbigen_prepare,
-> +};
-> +
-> +static struct mbigen_domain_info its_mbigen_domain_info = {
-> +	.ops	= &its_mbigen_ops,
-> +};
-> +
-
-what's you opinion about the function 'its_mbigen_prepare' ?
-put this function in irq-gic-v3-its.c or move to mbigen driver ?
-
-If I move this function to mbigen driver, some its fuctions
-(ex. its_find_device, its_create_device) and struct data (ex its_node)
-would be used in mbigen driver.
-
-Now, all these functions and data structure are defined as static.
-to use them, I have to remove the 'static' definition and put them
-in a head file ? create a new head file).
-
-I'm not sure which way is better .
+Best regards,
+Krzysztof
