@@ -1,51 +1,152 @@
 From: andre.przywara@arm.com (Andre Przywara)
-Date: Fri, 26 Jun 2015 14:16:11 +0100
-Subject: [PATCH v4 03/10] irq: add irq__get_nr_allocated_lines
+Date: Fri, 26 Jun 2015 14:16:10 +0100
+Subject: [PATCH v4 02/10] AArch{32,
+ 64}: use KVM_CREATE_DEVICE & co to instanciate the GIC
 In-Reply-To: <1435324578-21832-1-git-send-email-andre.przywara@arm.com>
 References: <1435324578-21832-1-git-send-email-andre.przywara@arm.com>
-Message-ID: <1435324578-21832-4-git-send-email-andre.przywara@arm.com>
+Message-ID: <1435324578-21832-3-git-send-email-andre.przywara@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Marc Zyngier <marc.zyngier@arm.com>
 
-The ARM GIC emulation needs to be told the number of interrupts
-it has to support. As commit 1c262fa1dc7bc ("kvm tools: irq: make
-irq__alloc_line generic") made the interrupt counter private,
-add a new accessor returning the number of interrupt lines we've
-allocated so far.
+As of 3.14, KVM/arm supports the creation/configuration of the GIC through
+a more generic device API, which is now the preferred way to do so.
+
+Plumb the new API in, and allow the old code to be used as a fallback.
+
+[Andre: Rename some functions on the way to differentiate between
+creation and initialisation more clearly and fix error path.]
 
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 Signed-off-by: Andre Przywara <andre.przywara@arm.com>
 ---
- include/kvm/irq.h | 1 +
- irq.c             | 5 +++++
- 2 files changed, 6 insertions(+)
+ arm/gic.c                    | 69 +++++++++++++++++++++++++++++++++++++++-----
+ arm/include/arm-common/gic.h |  2 +-
+ arm/kvm.c                    |  6 ++--
+ 3 files changed, 66 insertions(+), 11 deletions(-)
 
-diff --git a/include/kvm/irq.h b/include/kvm/irq.h
-index 4cec6f0..8a78e43 100644
---- a/include/kvm/irq.h
-+++ b/include/kvm/irq.h
-@@ -11,6 +11,7 @@
+diff --git a/arm/gic.c b/arm/gic.c
+index 5d8cbe6..1ff3663 100644
+--- a/arm/gic.c
++++ b/arm/gic.c
+@@ -7,7 +7,50 @@
+ #include <linux/byteorder.h>
+ #include <linux/kvm.h>
+ 
+-int gic__init_irqchip(struct kvm *kvm)
++static int gic_fd = -1;
++
++static int gic__create_device(struct kvm *kvm)
++{
++	int err;
++	u64 cpu_if_addr = ARM_GIC_CPUI_BASE;
++	u64 dist_addr = ARM_GIC_DIST_BASE;
++	struct kvm_create_device gic_device = {
++		.type	= KVM_DEV_TYPE_ARM_VGIC_V2,
++	};
++	struct kvm_device_attr cpu_if_attr = {
++		.group	= KVM_DEV_ARM_VGIC_GRP_ADDR,
++		.attr	= KVM_VGIC_V2_ADDR_TYPE_CPU,
++		.addr	= (u64)(unsigned long)&cpu_if_addr,
++	};
++	struct kvm_device_attr dist_attr = {
++		.group	= KVM_DEV_ARM_VGIC_GRP_ADDR,
++		.attr	= KVM_VGIC_V2_ADDR_TYPE_DIST,
++		.addr	= (u64)(unsigned long)&dist_addr,
++	};
++
++	err = ioctl(kvm->vm_fd, KVM_CREATE_DEVICE, &gic_device);
++	if (err)
++		return err;
++
++	gic_fd = gic_device.fd;
++
++	err = ioctl(gic_fd, KVM_SET_DEVICE_ATTR, &cpu_if_attr);
++	if (err)
++		goto out_err;
++
++	err = ioctl(gic_fd, KVM_SET_DEVICE_ATTR, &dist_attr);
++	if (err)
++		goto out_err;
++
++	return 0;
++
++out_err:
++	close(gic_fd);
++	gic_fd = -1;
++	return err;
++}
++
++static int gic__create_irqchip(struct kvm *kvm)
+ {
+ 	int err;
+ 	struct kvm_arm_device_addr gic_addr[] = {
+@@ -23,12 +66,6 @@ int gic__init_irqchip(struct kvm *kvm)
+ 		}
+ 	};
+ 
+-	if (kvm->nrcpus > GIC_MAX_CPUS) {
+-		pr_warning("%d CPUS greater than maximum of %d -- truncating\n",
+-				kvm->nrcpus, GIC_MAX_CPUS);
+-		kvm->nrcpus = GIC_MAX_CPUS;
+-	}
+-
+ 	err = ioctl(kvm->vm_fd, KVM_CREATE_IRQCHIP);
+ 	if (err)
+ 		return err;
+@@ -41,6 +78,24 @@ int gic__init_irqchip(struct kvm *kvm)
+ 	return err;
+ }
+ 
++int gic__create(struct kvm *kvm)
++{
++	int err;
++
++	if (kvm->nrcpus > GIC_MAX_CPUS) {
++		pr_warning("%d CPUS greater than maximum of %d -- truncating\n",
++				kvm->nrcpus, GIC_MAX_CPUS);
++		kvm->nrcpus = GIC_MAX_CPUS;
++	}
++
++	/* Try the new way first, and fallback on legacy method otherwise */
++	err = gic__create_device(kvm);
++	if (err)
++		err = gic__create_irqchip(kvm);
++
++	return err;
++}
++
+ void gic__generate_fdt_nodes(void *fdt, u32 phandle)
+ {
+ 	u64 reg_prop[] = {
+diff --git a/arm/include/arm-common/gic.h b/arm/include/arm-common/gic.h
+index 5a36f2c..44859f7 100644
+--- a/arm/include/arm-common/gic.h
++++ b/arm/include/arm-common/gic.h
+@@ -24,7 +24,7 @@
  struct kvm;
  
- int irq__alloc_line(void);
-+int irq__get_nr_allocated_lines(void);
+ int gic__alloc_irqnum(void);
+-int gic__init_irqchip(struct kvm *kvm);
++int gic__create(struct kvm *kvm);
+ void gic__generate_fdt_nodes(void *fdt, u32 phandle);
  
- int irq__init(struct kvm *kvm);
- int irq__exit(struct kvm *kvm);
-diff --git a/irq.c b/irq.c
-index 33ea8d2..71eaa05 100644
---- a/irq.c
-+++ b/irq.c
-@@ -7,3 +7,8 @@ int irq__alloc_line(void)
- {
- 	return next_line++;
+ #endif /* ARM_COMMON__GIC_H */
+diff --git a/arm/kvm.c b/arm/kvm.c
+index 58ad9fa..bcd2533 100644
+--- a/arm/kvm.c
++++ b/arm/kvm.c
+@@ -81,7 +81,7 @@ void kvm__arch_init(struct kvm *kvm, const char *hugetlbfs_path, u64 ram_size)
+ 	madvise(kvm->arch.ram_alloc_start, kvm->arch.ram_alloc_size,
+ 		MADV_MERGEABLE | MADV_HUGEPAGE);
+ 
+-	/* Initialise the virtual GIC. */
+-	if (gic__init_irqchip(kvm))
+-		die("Failed to initialise virtual GIC");
++	/* Create the virtual GIC. */
++	if (gic__create(kvm))
++		die("Failed to create virtual GIC");
  }
-+
-+int irq__get_nr_allocated_lines(void)
-+{
-+	return next_line - KVM_IRQ_OFFSET;
-+}
 -- 
 2.3.5
