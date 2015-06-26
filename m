@@ -1,187 +1,86 @@
-From: andre.przywara@arm.com (Andre Przywara)
-Date: Fri, 26 Jun 2015 14:16:16 +0100
-Subject: [PATCH v4 08/10] arm: prepare for instantiating different IRQ chip
- devices
-In-Reply-To: <1435324578-21832-1-git-send-email-andre.przywara@arm.com>
-References: <1435324578-21832-1-git-send-email-andre.przywara@arm.com>
-Message-ID: <1435324578-21832-9-git-send-email-andre.przywara@arm.com>
+From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
+Date: Fri, 26 Jun 2015 15:17:37 +0200
+Subject: [PATCH] ARM64: kernel: psci: use restart_handlers instead of
+ arm_pm_restart
+In-Reply-To: <558D169F.7000804@arm.com>
+References: <1622532.VhvqsHJ0rH@diego> <558D169F.7000804@arm.com>
+Message-ID: <3078335.RozZuJC7dp@diego>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Extend the vGIC handling code to potentially deal with different IRQ
-chip devices instead of hard-coding the GICv2 in.
-We extend most vGIC functions to take a type parameter, but still put
-GICv2 in at the top for the time being.
+Hi,
 
-Signed-off-by: Andre Przywara <andre.przywara@arm.com>
-Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
----
- arm/aarch32/arm-cpu.c        |  2 +-
- arm/aarch64/arm-cpu.c        |  2 +-
- arm/gic.c                    | 44 +++++++++++++++++++++++++++++++++++---------
- arm/include/arm-common/gic.h |  8 ++++++--
- arm/kvm.c                    |  2 +-
- 5 files changed, 44 insertions(+), 14 deletions(-)
+Am Freitag, 26. Juni 2015, 10:08:47 schrieb Sudeep Holla:
+> +Mark, Lorenzo
+> 
+> On 26/06/15 00:33, Heiko St?bner wrote:
+> > Instead of hogging the arm_pm_restart callback, register a restart_handler
+> > to make it possible for machines to register more board-specific
+> > restart functionality.
+> 
+> Just curious to know why do you need board specific restart handlers in
+> Linux. The firmware implementing PSCI is board specific and can deal
+> with all board specific handling in the firmware.
 
-diff --git a/arm/aarch32/arm-cpu.c b/arm/aarch32/arm-cpu.c
-index 946e443..d8d6293 100644
---- a/arm/aarch32/arm-cpu.c
-+++ b/arm/aarch32/arm-cpu.c
-@@ -12,7 +12,7 @@ static void generate_fdt_nodes(void *fdt, struct kvm *kvm, u32 gic_phandle)
- {
- 	int timer_interrupts[4] = {13, 14, 11, 10};
- 
--	gic__generate_fdt_nodes(fdt, gic_phandle);
-+	gic__generate_fdt_nodes(fdt, gic_phandle, IRQCHIP_GICV2);
- 	timer__generate_fdt_nodes(fdt, kvm, timer_interrupts);
- }
- 
-diff --git a/arm/aarch64/arm-cpu.c b/arm/aarch64/arm-cpu.c
-index 8efe877..f702b9e 100644
---- a/arm/aarch64/arm-cpu.c
-+++ b/arm/aarch64/arm-cpu.c
-@@ -12,7 +12,7 @@
- static void generate_fdt_nodes(void *fdt, struct kvm *kvm, u32 gic_phandle)
- {
- 	int timer_interrupts[4] = {13, 14, 11, 10};
--	gic__generate_fdt_nodes(fdt, gic_phandle);
-+	gic__generate_fdt_nodes(fdt, gic_phandle, IRQCHIP_GICV2);
- 	timer__generate_fdt_nodes(fdt, kvm, timer_interrupts);
- }
- 
-diff --git a/arm/gic.c b/arm/gic.c
-index 05f85a2..b6c5868 100644
---- a/arm/gic.c
-+++ b/arm/gic.c
-@@ -11,13 +11,13 @@
- 
- static int gic_fd = -1;
- 
--static int gic__create_device(struct kvm *kvm)
-+static int gic__create_device(struct kvm *kvm, enum irqchip_type type)
- {
- 	int err;
- 	u64 cpu_if_addr = ARM_GIC_CPUI_BASE;
- 	u64 dist_addr = ARM_GIC_DIST_BASE;
- 	struct kvm_create_device gic_device = {
--		.type	= KVM_DEV_TYPE_ARM_VGIC_V2,
-+		.flags	= 0,
- 	};
- 	struct kvm_device_attr cpu_if_attr = {
- 		.group	= KVM_DEV_ARM_VGIC_GRP_ADDR,
-@@ -26,17 +26,27 @@ static int gic__create_device(struct kvm *kvm)
- 	};
- 	struct kvm_device_attr dist_attr = {
- 		.group	= KVM_DEV_ARM_VGIC_GRP_ADDR,
--		.attr	= KVM_VGIC_V2_ADDR_TYPE_DIST,
- 		.addr	= (u64)(unsigned long)&dist_addr,
- 	};
- 
-+	switch (type) {
-+	case IRQCHIP_GICV2:
-+		gic_device.type = KVM_DEV_TYPE_ARM_VGIC_V2;
-+		dist_attr.attr  = KVM_VGIC_V2_ADDR_TYPE_DIST;
-+		break;
-+	}
-+
- 	err = ioctl(kvm->vm_fd, KVM_CREATE_DEVICE, &gic_device);
- 	if (err)
- 		return err;
- 
- 	gic_fd = gic_device.fd;
- 
--	err = ioctl(gic_fd, KVM_SET_DEVICE_ATTR, &cpu_if_attr);
-+	switch (type) {
-+	case IRQCHIP_GICV2:
-+		err = ioctl(gic_fd, KVM_SET_DEVICE_ATTR, &cpu_if_attr);
-+		break;
-+	}
- 	if (err)
- 		goto out_err;
- 
-@@ -80,13 +90,20 @@ static int gic__create_irqchip(struct kvm *kvm)
- 	return err;
- }
- 
--int gic__create(struct kvm *kvm)
-+int gic__create(struct kvm *kvm, enum irqchip_type type)
- {
- 	int err;
- 
-+	switch (type) {
-+	case IRQCHIP_GICV2:
-+		break;
-+	default:
-+		return -ENODEV;
-+	}
-+
- 	/* Try the new way first, and fallback on legacy method otherwise */
--	err = gic__create_device(kvm);
--	if (err)
-+	err = gic__create_device(kvm, type);
-+	if (err && type == IRQCHIP_GICV2)
- 		err = gic__create_irqchip(kvm);
- 
- 	return err;
-@@ -134,15 +151,24 @@ static int gic__init_gic(struct kvm *kvm)
- }
- late_init(gic__init_gic)
- 
--void gic__generate_fdt_nodes(void *fdt, u32 phandle)
-+void gic__generate_fdt_nodes(void *fdt, u32 phandle, enum irqchip_type type)
- {
-+	const char *compatible;
- 	u64 reg_prop[] = {
- 		cpu_to_fdt64(ARM_GIC_DIST_BASE), cpu_to_fdt64(ARM_GIC_DIST_SIZE),
- 		cpu_to_fdt64(ARM_GIC_CPUI_BASE), cpu_to_fdt64(ARM_GIC_CPUI_SIZE),
- 	};
- 
-+	switch (type) {
-+	case IRQCHIP_GICV2:
-+		compatible = "arm,cortex-a15-gic";
-+		break;
-+	default:
-+		return;
-+	}
-+
- 	_FDT(fdt_begin_node(fdt, "intc"));
--	_FDT(fdt_property_string(fdt, "compatible", "arm,cortex-a15-gic"));
-+	_FDT(fdt_property_string(fdt, "compatible", compatible));
- 	_FDT(fdt_property_cell(fdt, "#interrupt-cells", GIC_FDT_IRQ_NUM_CELLS));
- 	_FDT(fdt_property(fdt, "interrupt-controller", NULL, 0));
- 	_FDT(fdt_property(fdt, "reg", reg_prop, sizeof(reg_prop)));
-diff --git a/arm/include/arm-common/gic.h b/arm/include/arm-common/gic.h
-index 44859f7..d524f55 100644
---- a/arm/include/arm-common/gic.h
-+++ b/arm/include/arm-common/gic.h
-@@ -21,10 +21,14 @@
- #define GIC_MAX_CPUS			8
- #define GIC_MAX_IRQ			255
- 
-+enum irqchip_type {
-+	IRQCHIP_GICV2,
-+};
-+
- struct kvm;
- 
- int gic__alloc_irqnum(void);
--int gic__create(struct kvm *kvm);
--void gic__generate_fdt_nodes(void *fdt, u32 phandle);
-+int gic__create(struct kvm *kvm, enum irqchip_type type);
-+void gic__generate_fdt_nodes(void *fdt, u32 phandle, enum irqchip_type type);
- 
- #endif /* ARM_COMMON__GIC_H */
-diff --git a/arm/kvm.c b/arm/kvm.c
-index bcd2533..f9685c2 100644
---- a/arm/kvm.c
-+++ b/arm/kvm.c
-@@ -82,6 +82,6 @@ void kvm__arch_init(struct kvm *kvm, const char *hugetlbfs_path, u64 ram_size)
- 		MADV_MERGEABLE | MADV_HUGEPAGE);
- 
- 	/* Create the virtual GIC. */
--	if (gic__create(kvm))
-+	if (gic__create(kvm, IRQCHIP_GICV2))
- 		die("Failed to create virtual GIC");
- }
--- 
-2.3.5
+I guess in most consumer devices it will be more of a
+
+	s/and can deal/and is supposed to deal/
+
+
+> > The priority is set to 127, 1 below the "default" to facilitate for
+> > example the use of regular per-soc restart handlers at their default
+> > priority 128 and others like the gpio-restart at priority 129 or above.
+> > 
+> > Non-psci restarts can be necessary when either the psci implementation
+> > is faulty and does not implement the restart callback or devices need
+> 
+> Interesting, SYSTEM_RESET is mandatory from PSCIv0.2 and why only
+> exception for faulty PSCI system reset while it's assumed all other
+> features are never faulty. IMO it needs to be fixed in the firmware.
+
+I've asked Rockchip to also implement the SYSTEM_RESET in their psci firmware, 
+but of course there are already quite some devices on the market and the psci 
+firmware part seems to be considered non-replaceable in some devices too.
+
+In general I think people not reading the specification fully, will sadly 
+happen way to often and in the case of the rk3368 they have added a "nice"
+
+	#ifndef CONFIG_ARCH_ROCKCHIP
+		arm_pm_restart = psci_sys_reset;
+
+		pm_power_off = psci_sys_poweroff;
+	#endif
+
+in their vendor kernel. Also this psci firmware-part sadly is not publically 
+available, so fixing this myself is also not possible.
+
+
+> > even more custom restart operations, like recent rk3288-chromebooks.
+> > While the soc-level restart could restart those, an external component
+> > needed to be also reset (via gpio-restart) to allow the device to even
+> > boot again.
+> 
+> Again firmware implementing PSCI is platform specific and can deal any
+> such customization required.
+
+I don't believe the common board manufacturer (using a soc-vendor bsp) has the 
+knowledge or cares to much about following the psci specification and 
+implementing his board-specific restart method there. And in the case of the 
+Rockchip psci-implementation, I'm currently not sure if they even get the 
+sources for the psci code.
+
+
+So yes, I of course know this is not ideal, switching over to restart handlers 
+allows to circumvent these lapses in firmware implementation without damaging 
+sane psci implementations. And I guess once secondary cpu core come up, often 
+developers will stop reading the spec.
+
+
+> By the way, I am not arguing against usage of register_restart_handler
+> over arm_pm_restart, but the reasoning given here.
+
+ok - I can of course leave the reasoning out of the patch description, if this 
+helps yours (or anybodies) conscience :-D
+
+
+Heiko
