@@ -1,70 +1,144 @@
-From: rogerq@ti.com (Roger Quadros)
-Date: Fri, 26 Jun 2015 10:33:05 +0300
-Subject: [PATCH 1/1] arm: dts: am43xx-clock: Add qspi clock node.
-In-Reply-To: <558CEF2E.3050202@ti.com>
-References: <1435167933-5249-1-git-send-email-mugunthanvnm@ti.com>
- <558CEF2E.3050202@ti.com>
-Message-ID: <558D0031.1090501@ti.com>
+From: yizhang@marvell.com (Yi Zhang)
+Date: Fri, 26 Jun 2015 15:41:20 +0800
+Subject: [PATCH-v4 1/3] mfd: 88pm800: Add device tree support
+In-Reply-To: <558CEA41.8020508@linaro.org>
+References: <1435217189-19578-1-git-send-email-vaibhav.hiremath@linaro.org>
+ <1435217189-19578-2-git-send-email-vaibhav.hiremath@linaro.org>
+ <20150625101916.GB15013@x1> <558BE1B7.2060308@linaro.org>
+ <20150625144800.GC23990@x1> <558C1DF5.2060103@linaro.org>
+ <20150626055317.GA32687@yizhang> <558CEA41.8020508@linaro.org>
+Message-ID: <20150626074120.GD32687@yizhang>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 26/06/15 09:20, Keerthy wrote:
->
->
-> On Wednesday 24 June 2015 11:15 PM, Mugunthan V N wrote:
->> From: Sourav Poddar <sourav.poddar@ti.com>
->>
->> Add clock node for qspi controller driver on am437x.
->>
->> Cc: Keerthy <j-keerthy@ti.com>
->> Cc: Tero Kristo <t-kristo@ti.com>
->> Signed-off-by: Sourav Poddar <sourav.poddar@ti.com>
->> Signed-off-by: Mugunthan V N <mugunthanvnm@ti.com>
->> ---
->>   arch/arm/boot/dts/am4372.dtsi        | 2 ++
->>   arch/arm/boot/dts/am43xx-clocks.dtsi | 8 ++++++++
->>   2 files changed, 10 insertions(+)
->>
->> diff --git a/arch/arm/boot/dts/am4372.dtsi
->> b/arch/arm/boot/dts/am4372.dtsi
->> index 649e7b9..8ab7831 100644
->> --- a/arch/arm/boot/dts/am4372.dtsi
->> +++ b/arch/arm/boot/dts/am4372.dtsi
->> @@ -903,6 +903,8 @@
->>               #address-cells = <1>;
->>               #size-cells = <0>;
->>               ti,hwmods = "qspi";
->> +            clocks = <&qspi_fclk>;
->> +            clock-names = "fck";
->>               interrupts = <0 138 0x4>;
->>               num-cs = <4>;
->>               status = "disabled";
->> diff --git a/arch/arm/boot/dts/am43xx-clocks.dtsi
->> b/arch/arm/boot/dts/am43xx-clocks.dtsi
->> index cc88728..1506585 100644
->> --- a/arch/arm/boot/dts/am43xx-clocks.dtsi
->> +++ b/arch/arm/boot/dts/am43xx-clocks.dtsi
->> @@ -763,4 +763,12 @@
->>           ti,bit-shift = <8>;
->>           reg = <0x8a68>;
->>       };
->> +
->> +    qspi_fclk: qspi_fclk {
->> +        #clock-cells = <0>;
->> +        compatible = "ti,fixed-factor-clock";
->> +        clocks = <&dpll_per_m2_div4_ck>;
->
->  From the clock tree this does not seem to be sourced from dpll_per_m2.
-> I guess this needs to be changed.
+On Fri, Jun 26, 2015 at 11:29:29AM +0530, Vaibhav Hiremath wrote:
+> 
+> 
+> On Friday 26 June 2015 11:23 AM, Yi Zhang wrote:
+> >On Thu, Jun 25, 2015 at 08:57:49PM +0530, Vaibhav Hiremath wrote:
+> >>
+> >>
+> >>On Thursday 25 June 2015 08:18 PM, Lee Jones wrote:
+> >>>On Thu, 25 Jun 2015, Vaibhav Hiremath wrote:
+> >>>>On Thursday 25 June 2015 03:49 PM, Lee Jones wrote:
+> >>>>>On Thu, 25 Jun 2015, Vaibhav Hiremath wrote:
+> >>>>>
+> >>>>>>Add DT support to the 88pm800 driver, along with compatible
+> >>>>>>field for it's sub-devices (rtc, onkey and regulator)
+> >>>>>>
+> >>>>>>Signed-off-by: Chao Xie <chao.xie@marvell.com>
+> >>>>>>Signed-off-by: Vaibhav Hiremath <vaibhav.hiremath@linaro.org>
+> >>>>>>---
+> >>>>>>  drivers/mfd/88pm800.c | 23 +++++++++++++++++++++++
+> >>>>>>  1 file changed, 23 insertions(+)
+> >>>>>>
+> >>>>>>diff --git a/drivers/mfd/88pm800.c b/drivers/mfd/88pm800.c
+> >>>>>>index 841717a..40fd014 100644
+> >>>>>>--- a/drivers/mfd/88pm800.c
+> >>>>>>+++ b/drivers/mfd/88pm800.c
+> >>>>>>@@ -27,6 +27,7 @@
+> >>>>>>  #include <linux/mfd/core.h>
+> >>>>>>  #include <linux/mfd/88pm80x.h>
+> >>>>>>  #include <linux/slab.h>
+> >>>>>>+#include <linux/of_device.h>
+> >>>>>>
+> >>>>>>  /* Interrupt Registers */
+> >>>>>>  #define PM800_INT_STATUS1		(0x05)
+> >>>>>>@@ -121,6 +122,11 @@ static const struct i2c_device_id pm80x_id_table[] = {
+> >>>>>>  };
+> >>>>>>  MODULE_DEVICE_TABLE(i2c, pm80x_id_table);
+> >>>>>>
+> >>>>>>+static const struct of_device_id pm80x_of_match_table[] = {
+> >>>>>>+	{ .compatible = "marvell,88pm800", },
+> >>>>>>+	{},
+> >>>>>>+};
+> >>>>>>+
+> >>>>>>  static struct resource rtc_resources[] = {
+> >>>>>>  	{
+> >>>>>>  	 .name = "88pm80x-rtc",
+> >>>>>>@@ -133,6 +139,7 @@ static struct resource rtc_resources[] = {
+> >>>>>>  static struct mfd_cell rtc_devs[] = {
+> >>>>>>  	{
+> >>>>>>  	 .name = "88pm80x-rtc",
+> >>>>>>+	 .of_compatible = "marvell,88pm80x-rtc",
+> >>>>>>  	 .num_resources = ARRAY_SIZE(rtc_resources),
+> >>>>>>  	 .resources = &rtc_resources[0],
+> >>>>>>  	 .id = -1,
+> >>>>>>@@ -151,6 +158,7 @@ static struct resource onkey_resources[] = {
+> >>>>>>  static const struct mfd_cell onkey_devs[] = {
+> >>>>>>  	{
+> >>>>>>  	 .name = "88pm80x-onkey",
+> >>>>>>+	 .of_compatible = "marvell,88pm80x-onkey",
+> >>>>>>  	 .num_resources = 1,
+> >>>>>>  	 .resources = &onkey_resources[0],
+> >>>>>>  	 .id = -1,
+> >>>>>>@@ -160,6 +168,7 @@ static const struct mfd_cell onkey_devs[] = {
+> >>>>>>  static const struct mfd_cell regulator_devs[] = {
+> >>>>>>  	{
+> >>>>>>  	 .name = "88pm80x-regulator",
+> >>>>>>+	 .of_compatible = "marvell,88pm80x-regulator",
+> >>>>>>  	 .id = -1,
+> >>>>>>  	},
+> >>>>>>  };
+> >>>>>>@@ -544,8 +553,21 @@ static int pm800_probe(struct i2c_client *client,
+> >>>>>>  	int ret = 0;
+> >>>>>>  	struct pm80x_chip *chip;
+> >>>>>>  	struct pm80x_platform_data *pdata = dev_get_platdata(&client->dev);
+> >>>>>>+	struct device_node *np = client->dev.of_node;
+> >>>>>>  	struct pm80x_subchip *subchip;
+> >>>>>>
+> >>>>>>+	if (!pdata && !np) {
+> >>>>>>+		dev_err(&client->dev,
+> >>>>>>+			"pm80x requires platform data or of_node\n");
+> >>>>>>+		return -EINVAL;
+> >>>>>>+	}
+> >>>>>>+
+> >>>>>>+	if (!pdata) {
+> >>>>>>+		pdata = devm_kzalloc(&client->dev, sizeof(*pdata), GFP_KERNEL);
+> >>>>>>+		if (!pdata)
+> >>>>>>+			return -ENOMEM;
+> >>>>>>+	}
+> >>>>>
+> >>>>>Why have you allocated data for pdata, then done nothing with it?
+> >>>>>
+> >>>>
+> >>>>Not in this patch, but subsequent patches would use it.
+> >>>
+> >>>Only provide it when you start using it please.
+> >>>
+> >>
+> >>I will take back my earlier comment of "not using in this patch, but
+> >>subsequent patches".
+> >>
+> >>pdata is being used, couple of places in the driver,
+> >>
+> >>
+> >>@line-751
+> >>
+> >>         ret = device_800_init(chip, pdata);
+> >>         if (ret) {
+> >>                 dev_err(chip->dev, "Failed to initialize 88pm800
+> >>devices\n");
+> >>                 goto err_device_init;
+> >>         }
+> >>
+> >>         if (pdata && pdata->plat_config)
+> >>                 pdata->plat_config(chip, pdata);
+> >
+> >   this plat_config() is used in legacy non-device-tree code, it's used
+> >   to implement fixup for chip or board level, it exists in
+> >   the board configuration file
+> >
+> >   just curious, do you think we still need to keep it?
+> >   considering device-tree has been used. thanks;
+> >
+> 
+> I do not see it anywhere in mainline kernel tree, is it part of some
+> internal tree?
+> 
+> If we know that it is being used, then lets not remove it now.
 
-Right. We need to have a mux and divider.
-
-cheers,
--roger
-
->
->> +        clock-mult = <1>;
->> +        clock-div = <1>;
->> +    };
->>   };
->>
+  Yes, got your point, it may still be used by other trees, thanks;
+> 
+> Thanks,
+> Vaibhav
