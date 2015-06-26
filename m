@@ -1,38 +1,59 @@
-From: santosh.shilimkar@oracle.com (santosh shilimkar)
-Date: Fri, 26 Jun 2015 11:41:30 -0700
-Subject: [PATCH] keystone: psci: adds cpu_die implementation
-In-Reply-To: <558D902B.1050603@ti.com>
-References: <1435240970-30869-1-git-send-email-vitalya@ti.com>
- <20150625144511.GA6844@leverpostej> <558C174F.80108@oracle.com>
- <558C25E0.3010102@ti.com> <20150625161308.GF6844@leverpostej>
- <558C328C.5070803@ti.com> <20150625165741.GA10564@leverpostej>
- <20150625172057.GA11952@leverpostej> <558C4B84.9030303@oracle.com>
- <558D8492.2090503@ti.com> <558D902B.1050603@ti.com>
-Message-ID: <558D9CDA.7080001@oracle.com>
+From: timur@codeaurora.org (Timur Tabi)
+Date: Fri, 26 Jun 2015 13:52:35 -0500
+Subject: [PATCH 2/3] hvc_dcc: don't ignore errors during initialization
+In-Reply-To: <1435344756-20901-1-git-send-email-timur@codeaurora.org>
+References: <1435344756-20901-1-git-send-email-timur@codeaurora.org>
+Message-ID: <1435344756-20901-2-git-send-email-timur@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 6/26/2015 10:47 AM, Grygorii Strashko wrote:
-> Hi,
->
-> On 06/26/2015 07:57 PM, Vitaly Andrianov wrote:
->> On 06/25/2015 02:42 PM, santosh shilimkar wrote:
+hvc_instantiate() and hvc_alloc() return errors if they fail, so don't
+ignore them.
 
+Signed-off-by: Timur Tabi <timur@codeaurora.org>
+---
+ drivers/tty/hvc/hvc_dcc.c | 17 +++++++++++++----
+ 1 file changed, 13 insertions(+), 4 deletions(-)
 
-> Another question is how well current PSCI implementation supports keystone2/LPAE !?
->
-> - It seems, at least below hack should be applied :(
->
-> +++ b/arch/arm/kernel/psci_smp.c
-> @@ -51,7 +51,7 @@ static int psci_boot_secondary(unsigned int cpu, struct task_struct *idle)
->   {
->          if (psci_ops.cpu_on)
->                  return psci_ops.cpu_on(cpu_logical_map(cpu),
-> -                                      __pa(secondary_startup));
-> +                                       virt_to_idmap(&secondary_startup));
-
-This is legitimate change should be there irrespectively.
-I think you should post this as a proper patch.
-
-Regards,
-Santosh
+diff --git a/drivers/tty/hvc/hvc_dcc.c b/drivers/tty/hvc/hvc_dcc.c
+index 33657dc..f8b8cf2 100644
+--- a/drivers/tty/hvc/hvc_dcc.c
++++ b/drivers/tty/hvc/hvc_dcc.c
+@@ -225,20 +225,29 @@ static const struct hv_ops hvc_dcc_get_put_ops = {
+ 
+ static int __init hvc_dcc_console_init(void)
+ {
++	int ret;
++
++	/* This always runs on boot core */
+ 	if (!hvc_dcc_check())
+ 		return -ENODEV;
+ 
+-	hvc_instantiate(0, 0, &hvc_dcc_get_put_ops);
+-	return 0;
++	/* Returns -1 if error */
++	ret = hvc_instantiate(0, 0, &hvc_dcc_get_put_ops);
++
++	return ret < 0 ? -ENODEV : 0;
+ }
+ console_initcall(hvc_dcc_console_init);
+ 
+ static int __init hvc_dcc_init(void)
+ {
++	struct hvc_struct *p;
++
++	/* This can run on any core */
+ 	if (!hvc_dcc_check())
+ 		return -ENODEV;
+ 
+-	hvc_alloc(0, 0, &hvc_dcc_get_put_ops, 128);
+-	return 0;
++	p = hvc_alloc(0, 0, &hvc_dcc_get_put_ops, 128);
++
++	return IS_ERR(p) ? PTR_ERR(p) : 0;
+ }
+ device_initcall(hvc_dcc_init);
+-- 
+Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+a Linux Foundation Collaborative Project.
