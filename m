@@ -1,128 +1,94 @@
-From: mark.yao@rock-chips.com (Mark Yao)
-Date: Fri, 26 Jun 2015 09:27:18 +0800
-Subject: [PATCH v2] drm/rockchip: import dma_buf to gem
-Message-ID: <1435282038-23778-1-git-send-email-mark.yao@rock-chips.com>
+From: xi.wang@gmail.com (Xi Wang)
+Date: Thu, 25 Jun 2015 18:39:15 -0700
+Subject: [RFC PATCH] arm64: bpf: fix endianness conversion bugs
+Message-ID: <1435282755-12011-1-git-send-email-xi.wang@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We want to display a buffer allocated by other driver, need import
-the buffer to gem.
+Upper bits should be zeroed in endianness conversion:
 
-Signed-off-by: Mark Yao <mark.yao@rock-chips.com>
+- even when there's no need to change endianness (i.e., BPF_FROM_BE
+  on big endian or BPF_FROM_LE on little endian);
+
+- after rev16.
+
+This patch fixes such bugs by emitting extra instructions to clear
+upper bits.
+
+Cc: Zi Shen Lim <zlim.lnx@gmail.com>
+Cc: Alexei Starovoitov <ast@plumgrid.com>
+Fixes: e54bcde3d69d ("arm64: eBPF JIT compiler")
+Signed-off-by: Xi Wang <xi.wang@gmail.com>
 ---
-Changes in v2:
-Adviced by Russell King
-- check sgt-nents == 1 when get iova from scatterlist
-- remove unused dma_map_sg/dma_unmap_sg, dma_buf_map_attachment->map_dma_buf
-  should do the dma_map
+The current testsuite catches the 16-bit bugs.  I'll send a separate
+patch that extends test_bpf to catch the 32-bit ones.
+---
+ arch/arm64/net/bpf_jit.h      |  4 ++++
+ arch/arm64/net/bpf_jit_comp.c | 22 ++++++++++++++++++++--
+ 2 files changed, 24 insertions(+), 2 deletions(-)
 
- drivers/gpu/drm/rockchip/rockchip_drm_drv.c |    1 +
- drivers/gpu/drm/rockchip/rockchip_drm_gem.c |   40 +++++++++++++++++++++++++--
- drivers/gpu/drm/rockchip/rockchip_drm_gem.h |    5 +++-
- 3 files changed, 42 insertions(+), 4 deletions(-)
-
-diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_drv.c b/drivers/gpu/drm/rockchip/rockchip_drm_drv.c
-index 3962176..9001a90 100644
---- a/drivers/gpu/drm/rockchip/rockchip_drm_drv.c
-+++ b/drivers/gpu/drm/rockchip/rockchip_drm_drv.c
-@@ -287,6 +287,7 @@ static struct drm_driver rockchip_drm_driver = {
- 	.prime_handle_to_fd	= drm_gem_prime_handle_to_fd,
- 	.prime_fd_to_handle	= drm_gem_prime_fd_to_handle,
- 	.gem_prime_import	= drm_gem_prime_import,
-+	.gem_prime_import_sg_table = rockchip_gem_prime_import_sg_table,
- 	.gem_prime_export	= drm_gem_prime_export,
- 	.gem_prime_get_sg_table	= rockchip_gem_prime_get_sg_table,
- 	.gem_prime_vmap		= rockchip_gem_prime_vmap,
-diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_gem.c b/drivers/gpu/drm/rockchip/rockchip_drm_gem.c
-index eb2282c..e8c4d4e 100644
---- a/drivers/gpu/drm/rockchip/rockchip_drm_gem.c
-+++ b/drivers/gpu/drm/rockchip/rockchip_drm_gem.c
-@@ -18,6 +18,7 @@
- #include <drm/drm_vma_manager.h>
+diff --git a/arch/arm64/net/bpf_jit.h b/arch/arm64/net/bpf_jit.h
+index de0a81a..98a26ce 100644
+--- a/arch/arm64/net/bpf_jit.h
++++ b/arch/arm64/net/bpf_jit.h
+@@ -110,6 +110,10 @@
+ /* Rd = Rn >> shift; signed */
+ #define A64_ASR(sf, Rd, Rn, shift) A64_SBFM(sf, Rd, Rn, shift, (sf) ? 63 : 31)
  
- #include <linux/dma-attrs.h>
-+#include <linux/dma-buf.h>
- 
- #include "rockchip_drm_drv.h"
- #include "rockchip_drm_gem.h"
-@@ -105,6 +106,36 @@ int rockchip_gem_mmap(struct file *filp, struct vm_area_struct *vma)
- 	return ret;
- }
- 
-+struct drm_gem_object *
-+rockchip_gem_prime_import_sg_table(struct drm_device *drm,
-+				   struct dma_buf_attachment *attach,
-+				   struct sg_table *sgt)
-+{
-+	struct rockchip_gem_object *rk_obj;
-+	struct drm_gem_object *obj;
++/* Zero extend */
++#define A64_UXTH(sf, Rd, Rn) A64_UBFM(sf, Rd, Rn, 0, 15)
++#define A64_UXTW(sf, Rd, Rn) A64_UBFM(sf, Rd, Rn, 0, 31)
 +
-+	/*
-+	 * Todo: only support continuous buffer now, plan to found a method
-+	 * to import non continuous with iommu.
-+	 */
-+	if (sgt->nents != 1)
-+		return ERR_PTR(-EINVAL);
-+
-+	rk_obj = kzalloc(sizeof(*rk_obj), GFP_KERNEL);
-+	if (!rk_obj)
-+		return ERR_PTR(-ENOMEM);
-+
-+	obj = &rk_obj->base;
-+
-+	drm_gem_private_object_init(drm, obj, attach->dmabuf->size);
-+
-+	rk_obj->dma_addr = sg_dma_address(sgt->sgl);
-+	rk_obj->sgt = sgt;
-+	obj->size = sg_dma_len(sgt->sgl);
-+
-+	return obj;
-+}
-+
- struct rockchip_gem_object *
- 	rockchip_gem_create_object(struct drm_device *drm, unsigned int size,
- 				   bool alloc_kmap)
-@@ -142,11 +173,14 @@ void rockchip_gem_free_object(struct drm_gem_object *obj)
- {
- 	struct rockchip_gem_object *rk_obj;
- 
--	drm_gem_free_mmap_offset(obj);
--
- 	rk_obj = to_rockchip_obj(obj);
- 
--	rockchip_gem_free_buf(rk_obj);
-+	if (obj->import_attach) {
-+		drm_prime_gem_destroy(obj, rk_obj->sgt);
-+	} else {
-+		drm_gem_free_mmap_offset(obj);
-+		rockchip_gem_free_buf(rk_obj);
-+	}
- 
- 	kfree(rk_obj);
- }
-diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_gem.h b/drivers/gpu/drm/rockchip/rockchip_drm_gem.h
-index ad22618..9fd58e3 100644
---- a/drivers/gpu/drm/rockchip/rockchip_drm_gem.h
-+++ b/drivers/gpu/drm/rockchip/rockchip_drm_gem.h
-@@ -21,6 +21,7 @@ struct rockchip_gem_object {
- 	struct drm_gem_object base;
- 	unsigned int flags;
- 
-+	struct sg_table *sgt;
- 	void *kvaddr;
- 	dma_addr_t dma_addr;
- 	struct dma_attrs dma_attrs;
-@@ -28,8 +29,10 @@ struct rockchip_gem_object {
- 
- struct sg_table *rockchip_gem_prime_get_sg_table(struct drm_gem_object *obj);
- struct drm_gem_object *
--rockchip_gem_prime_import_sg_table(struct drm_device *dev, size_t size,
-+rockchip_gem_prime_import_sg_table(struct drm_device *drm,
-+				   struct dma_buf_attachment *attach,
- 				   struct sg_table *sgt);
-+
- void *rockchip_gem_prime_vmap(struct drm_gem_object *obj);
- void rockchip_gem_prime_vunmap(struct drm_gem_object *obj, void *vaddr);
- 
+ /* Move wide (immediate) */
+ #define A64_MOVEW(sf, Rd, imm16, shift, type) \
+ 	aarch64_insn_gen_movewide(Rd, imm16, shift, \
+diff --git a/arch/arm64/net/bpf_jit_comp.c b/arch/arm64/net/bpf_jit_comp.c
+index c81ddd4..c047598 100644
+--- a/arch/arm64/net/bpf_jit_comp.c
++++ b/arch/arm64/net/bpf_jit_comp.c
+@@ -289,23 +289,41 @@ static int build_insn(const struct bpf_insn *insn, struct jit_ctx *ctx)
+ 	case BPF_ALU | BPF_END | BPF_FROM_BE:
+ #ifdef CONFIG_CPU_BIG_ENDIAN
+ 		if (BPF_SRC(code) == BPF_FROM_BE)
+-			break;
++			goto emit_bswap_uxt;
+ #else /* !CONFIG_CPU_BIG_ENDIAN */
+ 		if (BPF_SRC(code) == BPF_FROM_LE)
+-			break;
++			goto emit_bswap_uxt;
+ #endif
+ 		switch (imm) {
+ 		case 16:
+ 			emit(A64_REV16(is64, dst, dst), ctx);
++			/* zero-extend 16 bits into 64 bits */
++			emit(A64_UXTH(is64, dst, dst), ctx);
+ 			break;
+ 		case 32:
+ 			emit(A64_REV32(is64, dst, dst), ctx);
++			/* upper 32 bits already cleared */
+ 			break;
+ 		case 64:
+ 			emit(A64_REV64(dst, dst), ctx);
+ 			break;
+ 		}
+ 		break;
++emit_bswap_uxt:
++		switch (imm) {
++		case 16:
++			/* zero-extend 16 bits into 64 bits */
++			emit(A64_UXTH(is64, dst, dst), ctx);
++			break;
++		case 32:
++			/* zero-extend 32 bits into 64 bits */
++			emit(A64_UXTW(is64, dst, dst), ctx);
++			break;
++		case 64:
++			/* nop */
++			break;
++		}
++		break;
+ 	/* dst = imm */
+ 	case BPF_ALU | BPF_MOV | BPF_K:
+ 	case BPF_ALU64 | BPF_MOV | BPF_K:
 -- 
-1.7.9.5
+2.1.4
