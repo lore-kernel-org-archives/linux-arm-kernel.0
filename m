@@ -1,125 +1,142 @@
-From: timur@codeaurora.org (Timur Tabi)
-Date: Fri, 26 Jun 2015 13:52:36 -0500
-Subject: [PATCH 3/3] [v2] ARM64: TTY: hvc_dcc: Add support for ARM64 dcc
-In-Reply-To: <1435344756-20901-1-git-send-email-timur@codeaurora.org>
-References: <1435344756-20901-1-git-send-email-timur@codeaurora.org>
-Message-ID: <1435344756-20901-3-git-send-email-timur@codeaurora.org>
+From: dhdang@apm.com (Duc Dang)
+Date: Fri, 26 Jun 2015 11:56:47 -0700
+Subject: [PATCH 1/1] pci: xgene: Enable huge outbound bar support
+In-Reply-To: <1692416.bxUuWm82Pk@wuerfel>
+References: <1435280756-24455-1-git-send-email-dhdang@apm.com>
+ <1692416.bxUuWm82Pk@wuerfel>
+Message-ID: <CADaLNDkck5TaG48sjF9y1wrXTzUeVkYOsXw7Dm8a629KqBafFg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Abhimanyu Kapur <abhimany@codeaurora.org>
+Hi Arnd,
 
-Add support for debug communications channel based
-hvc console for arm64 cpus.
+On Fri, Jun 26, 2015 at 12:59 AM, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Thursday 25 June 2015 18:05:56 Duc Dang wrote:
+>> X-Gene PCIe controllers support huge outbound BARs (with size upto
+>> 64GB). This patch configures additional 1 outbound BAR for X-Gene
+>> PCIe controllers with size larger than 4GB. This is required to
+>> support devices that request huge outbound memory (nVidia K40 as an
+>> example)
+>>
+>> Signed-off-by: Duc Dang <dhdang@apm.com>
+>> Signed-off-by: Tanmay Inamdar <tinamdar@apm.com>
+>> ---
+>>  arch/arm64/boot/dts/apm/apm-storm.dtsi | 33 +++++++++++++++++++--------------
+>>  drivers/pci/host/pci-xgene.c           |  6 +++++-
+>>  2 files changed, 24 insertions(+), 15 deletions(-)
+>
+> It seems you do multiple things here:
+>
+> - add an entry in the ranges
+> - move the config space
+> - fix driver to handle multiple memory ranges
+>
+> but your description only mentions the first one. Please submit separate
+> patches for these and explain for each patch why it is required, so we can
+> pick them up into the arm-soc and pci git repositories separately, and make
+> sure that each patch works by itself to guarantee we don't get incompatible
+> binding changes.
 
-Signed-off-by: Abhimanyu Kapur <abhimany@codeaurora.org>
-Signed-off-by: Timur Tabi <timur@codeaurora.org>
----
- arch/arm64/include/asm/dcc.h | 52 ++++++++++++++++++++++++++++++++++++++++++++
- drivers/tty/hvc/Kconfig      |  2 +-
- drivers/tty/hvc/hvc_dcc.c    | 11 ++++++++++
- 3 files changed, 64 insertions(+), 1 deletion(-)
- create mode 100644 arch/arm64/include/asm/dcc.h
+Move config space can be in a separate patch. But it is not absolutely
+necessary to move the configuration space. The reason I change it is
+to have config space starting from the beginning of SoC PCIe physical
+address space. I will drop it in next patch.
 
-diff --git a/arch/arm64/include/asm/dcc.h b/arch/arm64/include/asm/dcc.h
-new file mode 100644
-index 0000000..d550173
---- /dev/null
-+++ b/arch/arm64/include/asm/dcc.h
-@@ -0,0 +1,52 @@
-+/* Copyright (c) 2014 The Linux Foundation. All rights reserved.
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 and
-+ * only version 2 as published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ *
-+ * A call to __dcc_getchar() or __dcc_putchar() is typically followed by
-+ * a call to __dcc_getstatus().  We want to make sure that the CPU does
-+ * not speculative read the DCC status before executing the read or write
-+ * instruction.  That's what the ISBs are for.
-+ *
-+ * The 'volatile' ensures that the compiler does not cache the status bits,
-+ * and instead reads the DCC register every time.
-+ */
-+#ifndef __ASM_DCC_H
-+#define __ASM_DCC_H
-+
-+#include <asm/barrier.h>
-+
-+static inline u32 __dcc_getstatus(void)
-+{
-+	u32 ret;
-+
-+	asm volatile("mrs %0, mdccsr_el0" : "=r" (ret));
-+
-+	return ret;
-+}
-+
-+static inline char __dcc_getchar(void)
-+{
-+	char c;
-+
-+	asm volatile("mrs %0, dbgdtrrx_el0" : "=r" (c));
-+	isb();
-+
-+	return c;
-+}
-+
-+static inline void __dcc_putchar(char c)
-+{
-+	asm volatile("msr dbgdtrtx_el0, %0"
-+			: /* No output register */
-+			: "r" (c));
-+	isb();
-+}
-+
-+#endif
-diff --git a/drivers/tty/hvc/Kconfig b/drivers/tty/hvc/Kconfig
-index 2c6883c..9a60d18 100644
---- a/drivers/tty/hvc/Kconfig
-+++ b/drivers/tty/hvc/Kconfig
-@@ -88,7 +88,7 @@ config HVC_UDBG
- 
- config HVC_DCC
-        bool "ARM JTAG DCC console"
--       depends on ARM
-+       depends on ARM || ARM64
-        select HVC_DRIVER
-        help
-          This console uses the JTAG DCC on ARM to create a console under the HVC
-diff --git a/drivers/tty/hvc/hvc_dcc.c b/drivers/tty/hvc/hvc_dcc.c
-index f8b8cf2..d4c7073 100644
---- a/drivers/tty/hvc/hvc_dcc.c
-+++ b/drivers/tty/hvc/hvc_dcc.c
-@@ -226,11 +226,22 @@ static const struct hv_ops hvc_dcc_get_put_ops = {
- static int __init hvc_dcc_console_init(void)
- {
- 	int ret;
-+#ifdef CONFIG_ARM64
-+	u32 val;
-+#endif
- 
- 	/* This always runs on boot core */
- 	if (!hvc_dcc_check())
- 		return -ENODEV;
- 
-+#ifdef CONFIG_ARM64
-+	/* Disable user-space access to DCC */
-+	asm("msr mdscr_el1, %0    "
-+		"orr %0, %0, #4096    " /* TDCC */
-+		"msr %0, mdscr_el1    "
-+		: "=r" (val));
-+#endif
-+
- 	/* Returns -1 if error */
- 	ret = hvc_instantiate(0, 0, &hvc_dcc_get_put_ops);
- 
+But add 'an entry in the ranges' and 'fix driver to handle multiple
+memory ranges' should go together as single patch because the old
+driver will break when it sees multiple ranges.
+
+>
+>> diff --git a/arch/arm64/boot/dts/apm/apm-storm.dtsi b/arch/arm64/boot/dts/apm/apm-storm.dtsi
+>> index d8f3a1c..039206b 100644
+>> --- a/arch/arm64/boot/dts/apm/apm-storm.dtsi
+>> +++ b/arch/arm64/boot/dts/apm/apm-storm.dtsi
+>> @@ -404,10 +404,11 @@
+>>                       #size-cells = <2>;
+>>                       #address-cells = <3>;
+>>                       reg = < 0x00 0x1f2b0000 0x0 0x00010000   /* Controller registers */
+>> -                             0xe0 0xd0000000 0x0 0x00040000>; /* PCI config space */
+>> +                             0xe0 0x00000000 0x0 0x00040000>; /* PCI config space */
+>>                       reg-names = "csr", "cfg";
+>>                       ranges = <0x01000000 0x00 0x00000000 0xe0 0x10000000 0x00 0x00010000   /* io */
+>> -                               0x02000000 0x00 0x80000000 0xe1 0x80000000 0x00 0x80000000>; /* mem */
+>> +                               0x02000000 0x00 0x80000000 0xe1 0x80000000 0x00 0x80000000   /* mem */
+>> +                               0x02000000 0x10 0x00000000 0xf0 0x00000000 0x10 0x00000000>; /* mem */
+>>                       dma-ranges = <0x42000000 0x80 0x00000000 0x80 0x00000000 0x00 0x80000000
+>>                                     0x42000000 0x00 0x00000000 0x00 0x00000000 0x80 0x00000000>;
+>>                       interrupt-map-mask = <0x0 0x0 0x0 0x7>;
+>
+> What is the reason for picking the 0x10.00000000 address? We normally try
+> to use an identity mapping (mem_offset=0) on the bus, or fall back to starting
+> at zero (mem_offset=cpu_offset), but you use seemingly random mem_offset values.
+>
+
+I just randomly pick 0x10 00000000 as it is not used. I will change to
+use 0xf0 00000000:
+0x02000000 0xf0 0x00000000 0xf0 0x00000000 0x10 0x00000000
+
+> Could you get the same effect by extending the 0x80000000 mapping to a length
+> of 58GB (just before the start of the second window)?
+
+I don't think so. It will break with the PCIe device that requires 32-bit BAR.
+
+>
+> Can you configure one of the two windows as prefetchable for improved performance?
+>
+The new huge window will be prefetchable.
+
+> I also notice that the 0x80000000-0xffffffff bus range is list both in
+> ranges and dma-ranges. Does that mean that devices on this host cannot
+> access MMIO ranges of other devices, or should you exclude this range from
+> the dma-ranges property?
+>
+
+As I understand, the mem entries in 'ranges' are for controller to
+access remote PCIe devices (EP)  BAR; while the entries in
+'dma-ranges'
+are for remote PCIe devices (EP) to access controller memory. So they
+are different. Or are you asking about something else?
+
+
+> Style-wise, it would be nice to submit an extra patch that groups entries
+> in the ranges and reg lists like
+>
+>                         ranges = <0x01000000 0x00 0x00000000 0xe0 0x10000000 0x00 0x00010000>, /* io */
+>                                  <0x02000000 0x00 0x80000000 0xe1 0x80000000 0x00 0x80000000>, /* mem */
+>                                  <0x02000000 0x10 0x00000000 0xf0 0x00000000 0x10 0x00000000>; /* mem */
+>
+> but that is just a cosmetic change and should be kept separate.
+
+Would you mind if I make this change as well and include in next patch?
+
+>
+>> @@ -321,8 +322,11 @@ static int xgene_pcie_map_ranges(struct xgene_pcie_port *port,
+>>                               return ret;
+>>                       break;
+>>               case IORESOURCE_MEM:
+>> -                     xgene_pcie_setup_ob_reg(port, res, OMR1BARL, res->start,
+>> +                     xgene_pcie_setup_ob_reg(port, res,
+>> +                                             OMR1BARL + (omr_idx * 0x18),
+>> +                                             res->start,
+>>                                               res->start - window->offset);
+>> +                     omr_idx++;
+>>                       break;
+>>               case IORESOURCE_BUS:
+>>                       break;
+>
+> Can you describe what happens when you boot an older kernel with the new
+> dt file, or vice versa? Will that simply ignore the first ranges entries
+> and use only the last one, or does it break in interesting ways?
+
+Older kernel and new dtb: the new entry in 'ranges' will overwrite the
+old entry, so device that requires 32-bit BAR will break.
+New kernel and old dtb: works fine but without huge bar support.
+
+>
+>         Arnd
+
+
+
 -- 
-Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-a Linux Foundation Collaborative Project.
+Regards,
+Duc Dang.
