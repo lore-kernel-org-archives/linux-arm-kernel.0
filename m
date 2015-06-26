@@ -1,23 +1,39 @@
-From: torvalds@linux-foundation.org (Linus Torvalds)
-Date: Thu, 25 Jun 2015 18:40:26 -0700
-Subject: [GIT PULL] Mailbox changes for v4.2
-In-Reply-To: <CABb+yY2N+thoJEBfNdpsyEpDjpvnJ4-GbhTEJM-e7earmZpDAQ@mail.gmail.com>
-References: <CABb+yY2N+thoJEBfNdpsyEpDjpvnJ4-GbhTEJM-e7earmZpDAQ@mail.gmail.com>
-Message-ID: <CA+55aFyp1bVGzxj7UNvyEmOBO6hM7iTkgZfCUyGj9=o7a920WA@mail.gmail.com>
+From: walter@vanguardiasur.com.ar (Walter Lozano)
+Date: Thu, 25 Jun 2015 23:25:57 -0300
+Subject: [PATCH 1/3] ARM: socfpga: dts: Fix adxl34x formating
+Message-ID: <1435285559-11053-1-git-send-email-walter@vanguardiasur.com.ar>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 25, 2015 at 8:58 AM, Jassi Brar <jassisinghbrar@gmail.com> wrote:
->
->   http://git.linaro.org/landing-teams/working/fujitsu/integration.git
-> mailbox-for-next
+This patch fixes the formating of DTS bindings for the adxl34x digital
+accelerometer.
 
-So just looking at this pull request (and my previous merges from you)
-it does strike me that you seem to be one of the few people who never
-explain your pull requests..
+Signed-off-by: Walter Lozano <walter@vanguardiasur.com.ar>
+---
+ arch/arm/boot/dts/socfpga_cyclone5_sockit.dts |    6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
 
-Mind starting to write a small blurb every time you ask me to pull to
-explain what's new and what's going on? That will improve my merge
-logs..
-
-                Linus
+diff --git a/arch/arm/boot/dts/socfpga_cyclone5_sockit.dts b/arch/arm/boot/dts/socfpga_cyclone5_sockit.dts
+index 71468a7..5b60692 100644
+--- a/arch/arm/boot/dts/socfpga_cyclone5_sockit.dts
++++ b/arch/arm/boot/dts/socfpga_cyclone5_sockit.dts
+@@ -73,14 +73,14 @@
+ 	status = "okay";
+ };
+ 
+-&i2c1{
++&i2c1 {
+ 	status = "okay";
+ 
+-	accel1: accel1 at 53{
++	accel1: accelerometer at 53 {
+ 		compatible = "adxl34x";
+ 		reg = <0x53>;
+ 
+-		interrupt-parent = < &portc >;
++		interrupt-parent = <&portc>;
+ 		interrupts = <3 2>;
+ 	};
+ };
+-- 
+1.7.10.4
