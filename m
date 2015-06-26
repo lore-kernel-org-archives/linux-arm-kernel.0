@@ -1,171 +1,53 @@
-From: haikun.wang@freescale.com (Haikun Wang)
-Date: Fri, 26 Jun 2015 20:19:24 +0800
-Subject: [PATCH v2] arm: configs: Add Freescale LS1021A defconfig
-Message-ID: <1435321164-48981-1-git-send-email-haikun.wang@freescale.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Fri, 26 Jun 2015 14:24:16 +0200
+Subject: [PATCH 1/1] dmaengine: Use Pointer xt after NULL check.
+In-Reply-To: <1435314888-20491-1-git-send-email-maninder1.s@samsung.com>
+References: <1435314888-20491-1-git-send-email-maninder1.s@samsung.com>
+Message-ID: <558D4470.4090908@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add Freescale LS1021A initial defconfig file.
-The LS1021A SoC is a dual-core Cortex-A7 based processor.
+Le 26/06/2015 12:34, Maninder Singh a ?crit :
+> Removing static analysis error:-
+> Possible null pointer dereference: xt
+> 
+> Because currently xt is dereferenced before NULL check,
+> Thus Use it after NULL Check.
+> 
+> Signed-off-by: Maninder Singh <maninder1.s@samsung.com>
+> Reviewed-by: Vaneet Narang <v.narang@samsung.com>
 
-LS1021A has some special configure options against common V7 SOCs,
-such as CONFIG_THUMB2_KERNEL, CONFIG_VMSPLIT_2G, CONFIG_VFP...
+Ok:
+Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
 
-Enable I2C, LPUART, eDMA, WDT default.
-LS1021AQDS and LS1021ATWR boot successfully with patch.
-Above IPs also been verified successfully.
+> ---
+>  drivers/dma/at_hdmac.c |    6 +++---
+>  1 file changed, 3 insertions(+), 3 deletions(-)
+> 
+> diff --git a/drivers/dma/at_hdmac.c b/drivers/dma/at_hdmac.c
+> index 59892126..d313acb 100644
+> --- a/drivers/dma/at_hdmac.c
+> +++ b/drivers/dma/at_hdmac.c
+> @@ -659,14 +659,14 @@ atc_prep_dma_interleaved(struct dma_chan *chan,
+>  	size_t			len = 0;
+>  	int			i;
+>  
+> +	if (unlikely(!xt || xt->numf != 1 || !xt->frame_size))
+> +		return NULL;
+> +
+>  	dev_info(chan2dev(chan),
+>  		 "%s: src=0x%08x, dest=0x%08x, numf=%d, frame_size=%d, flags=0x%lx\n",
+>  		__func__, xt->src_start, xt->dst_start, xt->numf,
+>  		xt->frame_size, flags);
+>  
+> -	if (unlikely(!xt || xt->numf != 1 || !xt->frame_size))
+> -		return NULL;
+> -
+>  	/*
+>  	 * The controller can only "skip" X bytes every Y bytes, so we
+>  	 * need to make sure we are given a template that fit that
+> 
 
-Signed-off-by: Haikun Wang <haikun.wang@freescale.com>
----
- arch/arm/configs/ls1021a_defconfig | 140 +++++++++++++++++++++++++++++++++++++
- 1 file changed, 140 insertions(+)
- create mode 100644 arch/arm/configs/ls1021a_defconfig
 
-diff --git a/arch/arm/configs/ls1021a_defconfig b/arch/arm/configs/ls1021a_defconfig
-new file mode 100644
-index 0000000..3c893c8
---- /dev/null
-+++ b/arch/arm/configs/ls1021a_defconfig
-@@ -0,0 +1,140 @@
-+CONFIG_SYSVIPC=y
-+CONFIG_POSIX_MQUEUE=y
-+CONFIG_NO_HZ_IDLE=y
-+CONFIG_HIGH_RES_TIMERS=y
-+CONFIG_LOG_BUF_SHIFT=16
-+CONFIG_BLK_DEV_INITRD=y
-+CONFIG_CC_OPTIMIZE_FOR_SIZE=y
-+CONFIG_SYSCTL_SYSCALL=y
-+CONFIG_KALLSYMS_ALL=y
-+CONFIG_EMBEDDED=y
-+CONFIG_PROFILING=y
-+CONFIG_OPROFILE=y
-+CONFIG_KPROBES=y
-+CONFIG_JUMP_LABEL=y
-+CONFIG_MODULES=y
-+CONFIG_MODULE_FORCE_LOAD=y
-+CONFIG_MODULE_UNLOAD=y
-+CONFIG_BLK_CMDLINE_PARSER=y
-+CONFIG_ARCH_MXC=y
-+CONFIG_SOC_LS1021A=y
-+CONFIG_ARM_LPAE=y
-+CONFIG_SMP=y
-+CONFIG_VMSPLIT_2G=y
-+CONFIG_PREEMPT_VOLUNTARY=y
-+CONFIG_THUMB2_KERNEL=y
-+CONFIG_HIGHMEM=y
-+CONFIG_CLEANCACHE=y
-+CONFIG_FRONTSWAP=y
-+CONFIG_CMDLINE="console=ttyS0,115200"
-+CONFIG_VFP=y
-+CONFIG_NEON=y
-+CONFIG_KERNEL_MODE_NEON=y
-+CONFIG_BINFMT_MISC=y
-+CONFIG_NET=y
-+CONFIG_PACKET=y
-+CONFIG_UNIX=y
-+CONFIG_UNIX_DIAG=y
-+CONFIG_XFRM_USER=y
-+CONFIG_NET_KEY=y
-+CONFIG_INET=y
-+CONFIG_IP_MULTICAST=y
-+CONFIG_IP_ADVANCED_ROUTER=y
-+CONFIG_IP_PNP=y
-+CONFIG_IP_PNP_DHCP=y
-+CONFIG_IP_MROUTE=y
-+CONFIG_INET_AH=y
-+CONFIG_INET_ESP=y
-+CONFIG_INET_IPCOMP=y
-+CONFIG_INET_UDP_DIAG=y
-+CONFIG_NETFILTER=y
-+CONFIG_DEVTMPFS=y
-+CONFIG_DEVTMPFS_MOUNT=y
-+CONFIG_MTD=y
-+CONFIG_MTD_CMDLINE_PARTS=y
-+CONFIG_MTD_BLOCK=y
-+CONFIG_MTD_CFI=y
-+CONFIG_MTD_CFI_ADV_OPTIONS=y
-+CONFIG_MTD_CFI_BE_BYTE_SWAP=y
-+CONFIG_MTD_CFI_GEOMETRY=y
-+CONFIG_MTD_CFI_INTELEXT=y
-+CONFIG_MTD_CFI_AMDSTD=y
-+CONFIG_MTD_CFI_STAA=y
-+CONFIG_MTD_PHYSMAP_OF=y
-+CONFIG_MTD_SST25L=y
-+CONFIG_MTD_NAND=y
-+CONFIG_BLK_DEV_LOOP=y
-+CONFIG_BLK_DEV_RAM=y
-+CONFIG_BLK_DEV_RAM_SIZE=256000
-+CONFIG_SRAM=y
-+CONFIG_BLK_DEV_SD=y
-+CONFIG_CHR_DEV_SG=y
-+CONFIG_ATA=y
-+CONFIG_NETDEVICES=y
-+CONFIG_VITESSE_PHY=y
-+CONFIG_BROADCOM_PHY=y
-+CONFIG_REALTEK_PHY=y
-+CONFIG_NATIONAL_PHY=y
-+CONFIG_MICREL_PHY=y
-+CONFIG_MDIO_BUS_MUX_MMIOREG=y
-+CONFIG_INPUT_EVDEV=y
-+CONFIG_SERIO_SERPORT=m
-+CONFIG_SERIAL_8250=y
-+CONFIG_SERIAL_8250_CONSOLE=y
-+CONFIG_SERIAL_8250_EXTENDED=y
-+CONFIG_SERIAL_8250_SHARE_IRQ=y
-+CONFIG_SERIAL_OF_PLATFORM=y
-+CONFIG_SERIAL_FSL_LPUART=y
-+CONFIG_SERIAL_FSL_LPUART_CONSOLE=y
-+CONFIG_HW_RANDOM=y
-+CONFIG_I2C=y
-+CONFIG_I2C_CHARDEV=y
-+CONFIG_I2C_MUX=y
-+CONFIG_I2C_MUX_PCA954x=y
-+CONFIG_I2C_IMX=y
-+CONFIG_GPIO_SYSFS=y
-+CONFIG_SENSORS_LM90=y
-+CONFIG_SENSORS_INA2XX=y
-+CONFIG_WATCHDOG=y
-+CONFIG_IMX2_WDT=y
-+CONFIG_NEW_LEDS=y
-+CONFIG_LEDS_CLASS=y
-+CONFIG_LEDS_TRIGGERS=y
-+CONFIG_RTC_CLASS=y
-+CONFIG_RTC_DRV_DS3232=y
-+CONFIG_DMADEVICES=y
-+CONFIG_FSL_EDMA=y
-+CONFIG_CLK_QORIQ=y
-+CONFIG_MEMORY=y
-+CONFIG_EXT2_FS=y
-+CONFIG_EXT2_FS_XATTR=y
-+CONFIG_EXT3_FS=y
-+CONFIG_EXT4_FS=y
-+CONFIG_FANOTIFY=y
-+CONFIG_ISO9660_FS=m
-+CONFIG_JOLIET=y
-+CONFIG_ZISOFS=y
-+CONFIG_UDF_FS=m
-+CONFIG_MSDOS_FS=y
-+CONFIG_VFAT_FS=y
-+CONFIG_NTFS_FS=m
-+CONFIG_TMPFS=y
-+CONFIG_TMPFS_POSIX_ACL=y
-+CONFIG_JFFS2_FS=y
-+CONFIG_NFS_FS=y
-+CONFIG_NFS_V4=y
-+CONFIG_ROOT_NFS=y
-+CONFIG_NLS_DEFAULT="cp437"
-+CONFIG_NLS_CODEPAGE_437=y
-+CONFIG_NLS_ASCII=y
-+CONFIG_NLS_ISO8859_1=y
-+CONFIG_NLS_ISO8859_2=y
-+CONFIG_NLS_ISO8859_15=y
-+CONFIG_NLS_UTF8=y
-+CONFIG_DEBUG_SECTION_MISMATCH=y
-+CONFIG_MAGIC_SYSRQ=y
-+CONFIG_CRYPTO_LZO=y
-+CONFIG_CRC_CCITT=m
-+CONFIG_CRC_T10DIF=y
-+CONFIG_CRC7=m
-+CONFIG_LIBCRC32C=m
 -- 
-2.1.0.27.g96db324
+Nicolas Ferre
