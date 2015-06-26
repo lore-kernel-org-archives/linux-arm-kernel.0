@@ -1,77 +1,107 @@
-From: bamv2005@gmail.com (Bamvor Zhang)
-Date: Fri, 26 Jun 2015 21:30:48 +0800
-Subject: [PATCH 0/4] arm64: add initial support for the Rockchip rk3368
-In-Reply-To: <2154359.YLevLOlh2Y@diego>
-References: <1650408.ovnAjReNFJ@diego> <558CD6AE.7030505@gmail.com>
- <2154359.YLevLOlh2Y@diego>
-Message-ID: <CAOijeYKpAuBqw0t2RtbWOweGigqxTXO0dNxDGj66SWjFggOYpg@mail.gmail.com>
+From: stripathi@apm.com (Suman Tripathi)
+Date: Fri, 26 Jun 2015 19:03:45 +0530
+Subject: [PATCH v8 1/2] arm64: dts: Add the arasan mmc nodes in
+ apm-storm.dtsi
+In-Reply-To: <1434715227-27399-2-git-send-email-stripathi@apm.com>
+References: <1434715227-27399-1-git-send-email-stripathi@apm.com>
+ <1434715227-27399-2-git-send-email-stripathi@apm.com>
+Message-ID: <CAOHikRCtWqvdnO1ec7dEPNPD9TMfrC=4k0V00tuiC9GLnNy7Tg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi, Heiko
+Any comments on this patch ??
 
-2015-06-26 15:17 GMT+08:00 Heiko St?bner <heiko@sntech.de>:
-> Hi Bamvor,
+On Fri, Jun 19, 2015 at 5:30 PM, Suman Tripathi <stripathi@apm.com> wrote:
+> This patch adds the arasan mmc nodes to reuse the of-arasan
+> driver for APM X-Gene SoC.
 >
-> Am Freitag, 26. Juni 2015, 12:35:58 schrieb Bamvor Jian Zhang:
->> Could I test the code on rk3368 STB such as EKB368, CSA90?
->> Is there some documents about it?
+> Signed-off-by: Suman Tripathi <stripathi@apm.com>
+> ---
+> ---
+>  arch/arm64/boot/dts/apm/apm-mustang.dts |  4 +++
+>  arch/arm64/boot/dts/apm/apm-storm.dtsi  | 43 +++++++++++++++++++++++++++++++++
+>  2 files changed, 47 insertions(+)
 >
-> General information on flashing generic Rockchip devices can be found on [0].
-> That didn't change for the rk3368 it seems - although a device _might_ be
-> locked down to prevent reflashing it seems.
+> diff --git a/arch/arm64/boot/dts/apm/apm-mustang.dts b/arch/arm64/boot/dts/apm/apm-mustang.dts
+> index 83578e7..7a3ea72 100644
+> --- a/arch/arm64/boot/dts/apm/apm-mustang.dts
+> +++ b/arch/arm64/boot/dts/apm/apm-mustang.dts
+> @@ -52,3 +52,7 @@
+>  &xgenet {
+>         status = "ok";
+>  };
+> +
+> +&mmc0 {
+> +       status = "ok";
+> +};
+> diff --git a/arch/arm64/boot/dts/apm/apm-storm.dtsi b/arch/arm64/boot/dts/apm/apm-storm.dtsi
+> index c8d3e0e..8e03ecd 100644
+> --- a/arch/arm64/boot/dts/apm/apm-storm.dtsi
+> +++ b/arch/arm64/boot/dts/apm/apm-storm.dtsi
+> @@ -145,6 +145,40 @@
+>                                 clock-output-names = "socplldiv2";
+>                         };
 >
-> You will of course also need a serial console on the device for the time
-> being, so finding the test-points and soldering is probably required.
-Thanks, I will try it.
+> +                       ahbclk: ahbclk at 1f2ac000 {
+> +                               compatible = "apm,xgene-device-clock";
+> +                               #clock-cells = <1>;
+> +                               clocks = <&socplldiv2 0>;
+> +                               reg = <0x0 0x1f2ac000 0x0 0x1000
+> +                                       0x0 0x17000000 0x0 0x2000>;
+> +                               reg-names = "csr-reg", "div-reg";
+> +                               csr-offset = <0x0>;
+> +                               csr-mask = <0x1>;
+> +                               enable-offset = <0x8>;
+> +                               enable-mask = <0x1>;
+> +                               divider-offset = <0x164>;
+> +                               divider-width = <0x5>;
+> +                               divider-shift = <0x0>;
+> +                               clock-output-names = "ahbclk";
+> +                       };
+> +
+> +                       sdioclk: sdioclk at 1f2ac000 {
+> +                               compatible = "apm,xgene-device-clock";
+> +                               #clock-cells = <1>;
+> +                               clocks = <&socplldiv2 0>;
+> +                               reg = <0x0 0x1f2ac000 0x0 0x1000
+> +                                       0x0 0x17000000 0x0 0x2000>;
+> +                               reg-names = "csr-reg", "div-reg";
+> +                               csr-offset = <0x0>;
+> +                               csr-mask = <0x2>;
+> +                               enable-offset = <0x8>;
+> +                               enable-mask = <0x2>;
+> +                               divider-offset = <0x178>;
+> +                               divider-width = <0x8>;
+> +                               divider-shift = <0x0>;
+> +                               clock-output-names = "sdioclk";
+> +                       };
+> +
+>                         qmlclk: qmlclk {
+>                                 compatible = "apm,xgene-device-clock";
+>                                 #clock-cells = <1>;
+> @@ -533,6 +567,15 @@
+>                         interrupts = <0x0 0x4f 0x4>;
+>                 };
+>
+> +               mmc0: mmc at 1c000000 {
+> +                       compatible = "arasan,sdhci-4.9a";
+> +                       reg = <0x0 0x1c000000 0x0 0x100>;
+> +                       interrupts = <0x0 0x49 0x4>;
+> +                       dma-coherent;
+> +                       clock-names = "clk_xin", "clk_ahb";
+> +                       clocks = <&sdioclk 0>, <&ahbclk 0>;
+> +               };
+> +
+>                 phy1: phy at 1f21a000 {
+>                         compatible = "apm,xgene-phy";
+>                         reg = <0x0 0x1f21a000 0x0 0x100>;
+> --
+> 1.8.2.1
+>
 
-bamvor
->
->
-> Heiko
->
->
-> [0] http://linux-rockchip.info
->
->
->> On 06/26/2015 02:12 AM, Heiko St?bner wrote:
->> > This adds initial support for the new rk3368 ARM64 soc from Rockchip.
->> >
->> > Overall it looks like someone dropped some A53 cores into a rk3288, so
->> > it shares a lot of peripherals that only differ in details. Therefore
->> > stuff like the mmc, usb, spi, i2c controllers work out of the box.
->> > The support for the gmac already made it into the merge window as well
->> > as the pinctrl support.
->> >
->> > Interestingly, in its core the rk3368 seems trying to be a model student
->> > with psci for smp and using scpi for ddr frequency scaling, although I
->> > currently do not understand how the mailbox works yet. The display
->> > controllers also are only minimally different so I'm hopefully to have
->> > working graphics in the near-ish future :-)
->> >
->> >
->> > As mentioned in the dts patch, this series depends on the dt-binding
->> > header for the clock ids, so will need a shared branch once this is ready.
->> >
->> > Heiko Stuebner (4):
->> >    arm64: add Rockchip architecture entry
->> >    arm64: defconfig: enable ARCH_ROCKCHIP
->> >    arm64: dts: add Rockchip rk3368 core dtsi and board dts for the r88
->> >
->> >      board
->> >
->> >    dt-bindings: document rk3368 R89 board from Rockchip
->> >
->> >   Documentation/devicetree/bindings/arm/rockchip.txt |   4 +
->> >   arch/arm64/Kconfig                                 |  10 +
->> >   arch/arm64/boot/dts/Makefile                       |   1 +
->> >   arch/arm64/boot/dts/rockchip/Makefile              |   5 +
->> >   arch/arm64/boot/dts/rockchip/rk3368-r88.dts        | 353 ++++++++
->> >   arch/arm64/boot/dts/rockchip/rk3368.dtsi           | 900
->> >   +++++++++++++++++++++ arch/arm64/configs/defconfig
->> >    |   2 +
->> >   7 files changed, 1275 insertions(+)
->> >   create mode 100644 arch/arm64/boot/dts/rockchip/Makefile
->> >   create mode 100644 arch/arm64/boot/dts/rockchip/rk3368-r88.dts
->> >   create mode 100644 arch/arm64/boot/dts/rockchip/rk3368.dtsi
->
+
+
+-- 
+Thanks,
+with regards,
+Suman Tripathi
