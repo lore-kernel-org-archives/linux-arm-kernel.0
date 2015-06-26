@@ -1,144 +1,96 @@
-From: yizhang@marvell.com (Yi Zhang)
-Date: Fri, 26 Jun 2015 15:41:20 +0800
-Subject: [PATCH-v4 1/3] mfd: 88pm800: Add device tree support
-In-Reply-To: <558CEA41.8020508@linaro.org>
-References: <1435217189-19578-1-git-send-email-vaibhav.hiremath@linaro.org>
- <1435217189-19578-2-git-send-email-vaibhav.hiremath@linaro.org>
- <20150625101916.GB15013@x1> <558BE1B7.2060308@linaro.org>
- <20150625144800.GC23990@x1> <558C1DF5.2060103@linaro.org>
- <20150626055317.GA32687@yizhang> <558CEA41.8020508@linaro.org>
-Message-ID: <20150626074120.GD32687@yizhang>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 26 Jun 2015 09:59:44 +0200
+Subject: [PATCH 1/1] pci: xgene: Enable huge outbound bar support
+In-Reply-To: <1435280756-24455-1-git-send-email-dhdang@apm.com>
+References: <1435280756-24455-1-git-send-email-dhdang@apm.com>
+Message-ID: <1692416.bxUuWm82Pk@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 26, 2015 at 11:29:29AM +0530, Vaibhav Hiremath wrote:
+On Thursday 25 June 2015 18:05:56 Duc Dang wrote:
+> X-Gene PCIe controllers support huge outbound BARs (with size upto
+> 64GB). This patch configures additional 1 outbound BAR for X-Gene
+> PCIe controllers with size larger than 4GB. This is required to
+> support devices that request huge outbound memory (nVidia K40 as an
+> example)
 > 
-> 
-> On Friday 26 June 2015 11:23 AM, Yi Zhang wrote:
-> >On Thu, Jun 25, 2015 at 08:57:49PM +0530, Vaibhav Hiremath wrote:
-> >>
-> >>
-> >>On Thursday 25 June 2015 08:18 PM, Lee Jones wrote:
-> >>>On Thu, 25 Jun 2015, Vaibhav Hiremath wrote:
-> >>>>On Thursday 25 June 2015 03:49 PM, Lee Jones wrote:
-> >>>>>On Thu, 25 Jun 2015, Vaibhav Hiremath wrote:
-> >>>>>
-> >>>>>>Add DT support to the 88pm800 driver, along with compatible
-> >>>>>>field for it's sub-devices (rtc, onkey and regulator)
-> >>>>>>
-> >>>>>>Signed-off-by: Chao Xie <chao.xie@marvell.com>
-> >>>>>>Signed-off-by: Vaibhav Hiremath <vaibhav.hiremath@linaro.org>
-> >>>>>>---
-> >>>>>>  drivers/mfd/88pm800.c | 23 +++++++++++++++++++++++
-> >>>>>>  1 file changed, 23 insertions(+)
-> >>>>>>
-> >>>>>>diff --git a/drivers/mfd/88pm800.c b/drivers/mfd/88pm800.c
-> >>>>>>index 841717a..40fd014 100644
-> >>>>>>--- a/drivers/mfd/88pm800.c
-> >>>>>>+++ b/drivers/mfd/88pm800.c
-> >>>>>>@@ -27,6 +27,7 @@
-> >>>>>>  #include <linux/mfd/core.h>
-> >>>>>>  #include <linux/mfd/88pm80x.h>
-> >>>>>>  #include <linux/slab.h>
-> >>>>>>+#include <linux/of_device.h>
-> >>>>>>
-> >>>>>>  /* Interrupt Registers */
-> >>>>>>  #define PM800_INT_STATUS1		(0x05)
-> >>>>>>@@ -121,6 +122,11 @@ static const struct i2c_device_id pm80x_id_table[] = {
-> >>>>>>  };
-> >>>>>>  MODULE_DEVICE_TABLE(i2c, pm80x_id_table);
-> >>>>>>
-> >>>>>>+static const struct of_device_id pm80x_of_match_table[] = {
-> >>>>>>+	{ .compatible = "marvell,88pm800", },
-> >>>>>>+	{},
-> >>>>>>+};
-> >>>>>>+
-> >>>>>>  static struct resource rtc_resources[] = {
-> >>>>>>  	{
-> >>>>>>  	 .name = "88pm80x-rtc",
-> >>>>>>@@ -133,6 +139,7 @@ static struct resource rtc_resources[] = {
-> >>>>>>  static struct mfd_cell rtc_devs[] = {
-> >>>>>>  	{
-> >>>>>>  	 .name = "88pm80x-rtc",
-> >>>>>>+	 .of_compatible = "marvell,88pm80x-rtc",
-> >>>>>>  	 .num_resources = ARRAY_SIZE(rtc_resources),
-> >>>>>>  	 .resources = &rtc_resources[0],
-> >>>>>>  	 .id = -1,
-> >>>>>>@@ -151,6 +158,7 @@ static struct resource onkey_resources[] = {
-> >>>>>>  static const struct mfd_cell onkey_devs[] = {
-> >>>>>>  	{
-> >>>>>>  	 .name = "88pm80x-onkey",
-> >>>>>>+	 .of_compatible = "marvell,88pm80x-onkey",
-> >>>>>>  	 .num_resources = 1,
-> >>>>>>  	 .resources = &onkey_resources[0],
-> >>>>>>  	 .id = -1,
-> >>>>>>@@ -160,6 +168,7 @@ static const struct mfd_cell onkey_devs[] = {
-> >>>>>>  static const struct mfd_cell regulator_devs[] = {
-> >>>>>>  	{
-> >>>>>>  	 .name = "88pm80x-regulator",
-> >>>>>>+	 .of_compatible = "marvell,88pm80x-regulator",
-> >>>>>>  	 .id = -1,
-> >>>>>>  	},
-> >>>>>>  };
-> >>>>>>@@ -544,8 +553,21 @@ static int pm800_probe(struct i2c_client *client,
-> >>>>>>  	int ret = 0;
-> >>>>>>  	struct pm80x_chip *chip;
-> >>>>>>  	struct pm80x_platform_data *pdata = dev_get_platdata(&client->dev);
-> >>>>>>+	struct device_node *np = client->dev.of_node;
-> >>>>>>  	struct pm80x_subchip *subchip;
-> >>>>>>
-> >>>>>>+	if (!pdata && !np) {
-> >>>>>>+		dev_err(&client->dev,
-> >>>>>>+			"pm80x requires platform data or of_node\n");
-> >>>>>>+		return -EINVAL;
-> >>>>>>+	}
-> >>>>>>+
-> >>>>>>+	if (!pdata) {
-> >>>>>>+		pdata = devm_kzalloc(&client->dev, sizeof(*pdata), GFP_KERNEL);
-> >>>>>>+		if (!pdata)
-> >>>>>>+			return -ENOMEM;
-> >>>>>>+	}
-> >>>>>
-> >>>>>Why have you allocated data for pdata, then done nothing with it?
-> >>>>>
-> >>>>
-> >>>>Not in this patch, but subsequent patches would use it.
-> >>>
-> >>>Only provide it when you start using it please.
-> >>>
-> >>
-> >>I will take back my earlier comment of "not using in this patch, but
-> >>subsequent patches".
-> >>
-> >>pdata is being used, couple of places in the driver,
-> >>
-> >>
-> >>@line-751
-> >>
-> >>         ret = device_800_init(chip, pdata);
-> >>         if (ret) {
-> >>                 dev_err(chip->dev, "Failed to initialize 88pm800
-> >>devices\n");
-> >>                 goto err_device_init;
-> >>         }
-> >>
-> >>         if (pdata && pdata->plat_config)
-> >>                 pdata->plat_config(chip, pdata);
-> >
-> >   this plat_config() is used in legacy non-device-tree code, it's used
-> >   to implement fixup for chip or board level, it exists in
-> >   the board configuration file
-> >
-> >   just curious, do you think we still need to keep it?
-> >   considering device-tree has been used. thanks;
-> >
-> 
-> I do not see it anywhere in mainline kernel tree, is it part of some
-> internal tree?
-> 
-> If we know that it is being used, then lets not remove it now.
+> Signed-off-by: Duc Dang <dhdang@apm.com>
+> Signed-off-by: Tanmay Inamdar <tinamdar@apm.com>
+> ---
+>  arch/arm64/boot/dts/apm/apm-storm.dtsi | 33 +++++++++++++++++++--------------
+>  drivers/pci/host/pci-xgene.c           |  6 +++++-
+>  2 files changed, 24 insertions(+), 15 deletions(-)
 
-  Yes, got your point, it may still be used by other trees, thanks;
-> 
-> Thanks,
-> Vaibhav
+It seems you do multiple things here:
+
+- add an entry in the ranges
+- move the config space
+- fix driver to handle multiple memory ranges
+
+but your description only mentions the first one. Please submit separate
+patches for these and explain for each patch why it is required, so we can
+pick them up into the arm-soc and pci git repositories separately, and make
+sure that each patch works by itself to guarantee we don't get incompatible
+binding changes.
+
+> diff --git a/arch/arm64/boot/dts/apm/apm-storm.dtsi b/arch/arm64/boot/dts/apm/apm-storm.dtsi
+> index d8f3a1c..039206b 100644
+> --- a/arch/arm64/boot/dts/apm/apm-storm.dtsi
+> +++ b/arch/arm64/boot/dts/apm/apm-storm.dtsi
+> @@ -404,10 +404,11 @@
+>  			#size-cells = <2>;
+>  			#address-cells = <3>;
+>  			reg = < 0x00 0x1f2b0000 0x0 0x00010000   /* Controller registers */
+> -				0xe0 0xd0000000 0x0 0x00040000>; /* PCI config space */
+> +				0xe0 0x00000000 0x0 0x00040000>; /* PCI config space */
+>  			reg-names = "csr", "cfg";
+>  			ranges = <0x01000000 0x00 0x00000000 0xe0 0x10000000 0x00 0x00010000   /* io */
+> -				  0x02000000 0x00 0x80000000 0xe1 0x80000000 0x00 0x80000000>; /* mem */
+> +				  0x02000000 0x00 0x80000000 0xe1 0x80000000 0x00 0x80000000   /* mem */
+> +				  0x02000000 0x10 0x00000000 0xf0 0x00000000 0x10 0x00000000>; /* mem */
+>  			dma-ranges = <0x42000000 0x80 0x00000000 0x80 0x00000000 0x00 0x80000000
+>  				      0x42000000 0x00 0x00000000 0x00 0x00000000 0x80 0x00000000>;
+>  			interrupt-map-mask = <0x0 0x0 0x0 0x7>;
+
+What is the reason for picking the 0x10.00000000 address? We normally try
+to use an identity mapping (mem_offset=0) on the bus, or fall back to starting
+at zero (mem_offset=cpu_offset), but you use seemingly random mem_offset values.
+
+Could you get the same effect by extending the 0x80000000 mapping to a length
+of 58GB (just before the start of the second window)?
+
+Can you configure one of the two windows as prefetchable for improved performance?
+
+I also notice that the 0x80000000-0xffffffff bus range is list both in
+ranges and dma-ranges. Does that mean that devices on this host cannot
+access MMIO ranges of other devices, or should you exclude this range from
+the dma-ranges property?
+
+Style-wise, it would be nice to submit an extra patch that groups entries
+in the ranges and reg lists like
+
+			ranges = <0x01000000 0x00 0x00000000 0xe0 0x10000000 0x00 0x00010000>, /* io */
+				 <0x02000000 0x00 0x80000000 0xe1 0x80000000 0x00 0x80000000>, /* mem */
+				 <0x02000000 0x10 0x00000000 0xf0 0x00000000 0x10 0x00000000>; /* mem */
+
+but that is just a cosmetic change and should be kept separate.
+
+> @@ -321,8 +322,11 @@ static int xgene_pcie_map_ranges(struct xgene_pcie_port *port,
+>  				return ret;
+>  			break;
+>  		case IORESOURCE_MEM:
+> -			xgene_pcie_setup_ob_reg(port, res, OMR1BARL, res->start,
+> +			xgene_pcie_setup_ob_reg(port, res,
+> +						OMR1BARL + (omr_idx * 0x18),
+> +						res->start,
+>  						res->start - window->offset);
+> +			omr_idx++;
+>  			break;
+>  		case IORESOURCE_BUS:
+>  			break;
+
+Can you describe what happens when you boot an older kernel with the new
+dt file, or vice versa? Will that simply ignore the first ranges entries
+and use only the last one, or does it break in interesting ways?
+
+	Arnd
