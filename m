@@ -1,70 +1,132 @@
-From: jan.kiszka@web.de (Jan Kiszka)
-Date: Fri, 26 Jun 2015 06:49:34 +0200
-Subject: [RFC PATCH] KVM: arm/arm64: Don't let userspace update CNTVOFF
- once guest is running
-In-Reply-To: <558BC90B.4060806@huawei.com>
-References: <1435157697-28579-1-git-send-email-marc.zyngier@arm.com>
- <20150625080457.GD28244@cbox> <558BC2F5.9010303@huawei.com>
- <CAFEAcA_RzWSppaYA9vuAaL-MO6sQV1SgpXf3w-LScUdaarpOEQ@mail.gmail.com>
- <558BC90B.4060806@huawei.com>
-Message-ID: <558CD9DE.3010609@web.de>
+From: yizhang@marvell.com (Yi Zhang)
+Date: Fri, 26 Jun 2015 13:53:17 +0800
+Subject: [PATCH-v4 1/3] mfd: 88pm800: Add device tree support
+In-Reply-To: <558C1DF5.2060103@linaro.org>
+References: <1435217189-19578-1-git-send-email-vaibhav.hiremath@linaro.org>
+ <1435217189-19578-2-git-send-email-vaibhav.hiremath@linaro.org>
+ <20150625101916.GB15013@x1> <558BE1B7.2060308@linaro.org>
+ <20150625144800.GC23990@x1> <558C1DF5.2060103@linaro.org>
+Message-ID: <20150626055317.GA32687@yizhang>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2015-06-25 11:25, Claudio Fontana wrote:
-> On 25.06.2015 11:10, Peter Maydell wrote:
->> On 25 June 2015 at 09:59, Claudio Fontana <claudio.fontana@huawei.com> wrote:
->>> Once the VM is created, I think QEMU should not request kvm to
->>> change the virtual offset of the VM anymore: maybe an unexpected
->>> consequence of QEMU's target-arm/kvm64.c::kvm_arch_put_registers ?
->>
->> Hmm. In general we assume that we can:
->>  * stop the VM
->>  * read all the guest system registers
->>  * write those values back again
->>  * restart the VM
->>
->> if we need to. Is that what's happening here, or are we doing
->> something odder?
->>
->> -- PMM
->>
+On Thu, Jun 25, 2015 at 08:57:49PM +0530, Vaibhav Hiremath wrote:
 > 
-> What I guess could be happening by looking at the code in linux
 > 
-> virt/kvm/arm/arch_timer.c::kvm_arm_timer_set_reg
+> On Thursday 25 June 2015 08:18 PM, Lee Jones wrote:
+> >On Thu, 25 Jun 2015, Vaibhav Hiremath wrote:
+> >>On Thursday 25 June 2015 03:49 PM, Lee Jones wrote:
+> >>>On Thu, 25 Jun 2015, Vaibhav Hiremath wrote:
+> >>>
+> >>>>Add DT support to the 88pm800 driver, along with compatible
+> >>>>field for it's sub-devices (rtc, onkey and regulator)
+> >>>>
+> >>>>Signed-off-by: Chao Xie <chao.xie@marvell.com>
+> >>>>Signed-off-by: Vaibhav Hiremath <vaibhav.hiremath@linaro.org>
+> >>>>---
+> >>>>  drivers/mfd/88pm800.c | 23 +++++++++++++++++++++++
+> >>>>  1 file changed, 23 insertions(+)
+> >>>>
+> >>>>diff --git a/drivers/mfd/88pm800.c b/drivers/mfd/88pm800.c
+> >>>>index 841717a..40fd014 100644
+> >>>>--- a/drivers/mfd/88pm800.c
+> >>>>+++ b/drivers/mfd/88pm800.c
+> >>>>@@ -27,6 +27,7 @@
+> >>>>  #include <linux/mfd/core.h>
+> >>>>  #include <linux/mfd/88pm80x.h>
+> >>>>  #include <linux/slab.h>
+> >>>>+#include <linux/of_device.h>
+> >>>>
+> >>>>  /* Interrupt Registers */
+> >>>>  #define PM800_INT_STATUS1		(0x05)
+> >>>>@@ -121,6 +122,11 @@ static const struct i2c_device_id pm80x_id_table[] = {
+> >>>>  };
+> >>>>  MODULE_DEVICE_TABLE(i2c, pm80x_id_table);
+> >>>>
+> >>>>+static const struct of_device_id pm80x_of_match_table[] = {
+> >>>>+	{ .compatible = "marvell,88pm800", },
+> >>>>+	{},
+> >>>>+};
+> >>>>+
+> >>>>  static struct resource rtc_resources[] = {
+> >>>>  	{
+> >>>>  	 .name = "88pm80x-rtc",
+> >>>>@@ -133,6 +139,7 @@ static struct resource rtc_resources[] = {
+> >>>>  static struct mfd_cell rtc_devs[] = {
+> >>>>  	{
+> >>>>  	 .name = "88pm80x-rtc",
+> >>>>+	 .of_compatible = "marvell,88pm80x-rtc",
+> >>>>  	 .num_resources = ARRAY_SIZE(rtc_resources),
+> >>>>  	 .resources = &rtc_resources[0],
+> >>>>  	 .id = -1,
+> >>>>@@ -151,6 +158,7 @@ static struct resource onkey_resources[] = {
+> >>>>  static const struct mfd_cell onkey_devs[] = {
+> >>>>  	{
+> >>>>  	 .name = "88pm80x-onkey",
+> >>>>+	 .of_compatible = "marvell,88pm80x-onkey",
+> >>>>  	 .num_resources = 1,
+> >>>>  	 .resources = &onkey_resources[0],
+> >>>>  	 .id = -1,
+> >>>>@@ -160,6 +168,7 @@ static const struct mfd_cell onkey_devs[] = {
+> >>>>  static const struct mfd_cell regulator_devs[] = {
+> >>>>  	{
+> >>>>  	 .name = "88pm80x-regulator",
+> >>>>+	 .of_compatible = "marvell,88pm80x-regulator",
+> >>>>  	 .id = -1,
+> >>>>  	},
+> >>>>  };
+> >>>>@@ -544,8 +553,21 @@ static int pm800_probe(struct i2c_client *client,
+> >>>>  	int ret = 0;
+> >>>>  	struct pm80x_chip *chip;
+> >>>>  	struct pm80x_platform_data *pdata = dev_get_platdata(&client->dev);
+> >>>>+	struct device_node *np = client->dev.of_node;
+> >>>>  	struct pm80x_subchip *subchip;
+> >>>>
+> >>>>+	if (!pdata && !np) {
+> >>>>+		dev_err(&client->dev,
+> >>>>+			"pm80x requires platform data or of_node\n");
+> >>>>+		return -EINVAL;
+> >>>>+	}
+> >>>>+
+> >>>>+	if (!pdata) {
+> >>>>+		pdata = devm_kzalloc(&client->dev, sizeof(*pdata), GFP_KERNEL);
+> >>>>+		if (!pdata)
+> >>>>+			return -ENOMEM;
+> >>>>+	}
+> >>>
+> >>>Why have you allocated data for pdata, then done nothing with it?
+> >>>
+> >>
+> >>Not in this patch, but subsequent patches would use it.
+> >
+> >Only provide it when you start using it please.
+> >
 > 
-> is that QEMU tries to set the KVM_REG_ARM_TIMER_CNT register from exactly the previous value,
-> but just because of the fact that the set function is called, cntvoff is updated,
-> since the value provided by the user is apparently assumed to be _relative_ to the physical timer.
+> I will take back my earlier comment of "not using in this patch, but
+> subsequent patches".
 > 
-> This is apparent to me in the code in that function which says:
+> pdata is being used, couple of places in the driver,
 > 
-> case KVM_REG_ARM_TIMER_CNT: {
-> /* ... */
->     u64 cntvoff = kvm_phys_timer_read() - value;
-> /* ... */
-> }
 > 
-> And this is matched by the corresponding get function kvm_arm_timer_get_reg where it says:
+> @line-751
 > 
-> case KVM_REG_ARM_TIMER_CNT:
->    return kvm_phys_timer_read() - vcpu->kvm->arch.timer.cntvoff;
+>         ret = device_800_init(chip, pdata);
+>         if (ret) {
+>                 dev_err(chip->dev, "Failed to initialize 88pm800
+> devices\n");
+>                 goto err_device_init;
+>         }
 > 
-> The time difference between when the GET is issued by QEMU and when the PUT is issued then would account for the difference.
+>         if (pdata && pdata->plat_config)
+>                 pdata->plat_config(chip, pdata);
 
-QEMU has the concept of write-back levels: KVM_PUT_RUNTIME_STATE,
-KVM_PUT_RESET_STATE and KVM_PUT_FULL_STATE. I suspect this registers is
-just sorted into the wrong category, thus written as part of the
-RUNTIME_STATE. We had such bug patterns during the x86 maturing phase as
-well.
+  this plat_config() is used in legacy non-device-tree code, it's used
+  to implement fixup for chip or board level, it exists in
+  the board configuration file
 
-Jan
+  just curious, do you think we still need to keep it?
+  considering device-tree has been used. thanks;
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 181 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150626/50b303fc/attachment.sig>
+> 
+> Thanks,
+> Vaibhav
