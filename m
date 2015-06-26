@@ -1,85 +1,145 @@
 From: andre.przywara@arm.com (Andre Przywara)
-Date: Fri, 26 Jun 2015 14:16:15 +0100
-Subject: [PATCH v4 07/10] limit number of VCPUs on demand
+Date: Fri, 26 Jun 2015 14:16:17 +0100
+Subject: [PATCH v4 09/10] arm: add support for supplying GICv3 redistributor
+ addresses
 In-Reply-To: <1435324578-21832-1-git-send-email-andre.przywara@arm.com>
 References: <1435324578-21832-1-git-send-email-andre.przywara@arm.com>
-Message-ID: <1435324578-21832-8-git-send-email-andre.przywara@arm.com>
+Message-ID: <1435324578-21832-10-git-send-email-andre.przywara@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently the ARM GIC checks the number of VCPUs against a fixed
-limit, which is GICv2 specific. Don't pretend we know better than the
-kernel and let's get rid of that explicit check.
-Instead be more relaxed about KVM_CREATE_VCPU failing with EINVAL,
-which is the way the kernel communicates having reached a VCPU limit.
-If we see this and have at least brought up one VCPU already
-successfully, then don't panic, but limit the number of VCPUs instead.
+Instead of the GIC virtual CPU interface an emulated GICv3 needs to
+have accesses to its emulated redistributors trapped in the guest.
+Add code to tell the kernel about the mapping if a GICv3 emulation was
+requested by the user.
+
+This contains some defines which are not (yet) in the (32 bit) header
+files to allow compilation for ARM.
 
 Signed-off-by: Andre Przywara <andre.przywara@arm.com>
+Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arm/gic.c     | 6 ------
- arm/kvm-cpu.c | 7 ++++++-
- kvm-cpu.c     | 7 +++++++
- 3 files changed, 13 insertions(+), 7 deletions(-)
+ arm/gic.c                         | 36 +++++++++++++++++++++++++++++++++++-
+ arm/include/arm-common/gic.h      |  1 +
+ arm/include/arm-common/kvm-arch.h |  7 +++++++
+ 3 files changed, 43 insertions(+), 1 deletion(-)
 
 diff --git a/arm/gic.c b/arm/gic.c
-index 99f0d2b..05f85a2 100644
+index b6c5868..efe4b42 100644
 --- a/arm/gic.c
 +++ b/arm/gic.c
-@@ -84,12 +84,6 @@ int gic__create(struct kvm *kvm)
+@@ -9,7 +9,18 @@
+ #include <linux/kernel.h>
+ #include <linux/kvm.h>
+ 
++/* Those names are not defined for ARM (yet) */
++#ifndef KVM_VGIC_V3_ADDR_TYPE_DIST
++#define KVM_VGIC_V3_ADDR_TYPE_DIST 2
++#endif
++
++#ifndef KVM_VGIC_V3_ADDR_TYPE_REDIST
++#define KVM_VGIC_V3_ADDR_TYPE_REDIST 3
++#endif
++
+ static int gic_fd = -1;
++static u64 gic_redists_base;
++static u64 gic_redists_size;
+ 
+ static int gic__create_device(struct kvm *kvm, enum irqchip_type type)
  {
- 	int err;
+@@ -28,12 +39,21 @@ static int gic__create_device(struct kvm *kvm, enum irqchip_type type)
+ 		.group	= KVM_DEV_ARM_VGIC_GRP_ADDR,
+ 		.addr	= (u64)(unsigned long)&dist_addr,
+ 	};
++	struct kvm_device_attr redist_attr = {
++		.group	= KVM_DEV_ARM_VGIC_GRP_ADDR,
++		.attr	= KVM_VGIC_V3_ADDR_TYPE_REDIST,
++		.addr	= (u64)(unsigned long)&gic_redists_base,
++	};
  
--	if (kvm->nrcpus > GIC_MAX_CPUS) {
--		pr_warning("%d CPUS greater than maximum of %d -- truncating\n",
--				kvm->nrcpus, GIC_MAX_CPUS);
--		kvm->nrcpus = GIC_MAX_CPUS;
--	}
--
- 	/* Try the new way first, and fallback on legacy method otherwise */
- 	err = gic__create_device(kvm);
- 	if (err)
-diff --git a/arm/kvm-cpu.c b/arm/kvm-cpu.c
-index 7780251..b2fd6ed 100644
---- a/arm/kvm-cpu.c
-+++ b/arm/kvm-cpu.c
-@@ -51,8 +51,13 @@ struct kvm_cpu *kvm_cpu__arch_init(struct kvm *kvm, unsigned long cpu_id)
- 		return NULL;
- 
- 	vcpu->vcpu_fd = ioctl(kvm->vm_fd, KVM_CREATE_VCPU, cpu_id);
--	if (vcpu->vcpu_fd < 0)
-+	if (vcpu->vcpu_fd < 0) {
-+		if (errno == EINVAL) {
-+			free(vcpu);
-+			return NULL;
-+		}
- 		die_perror("KVM_CREATE_VCPU ioctl");
-+	}
- 
- 	mmap_size = ioctl(kvm->sys_fd, KVM_GET_VCPU_MMAP_SIZE, 0);
- 	if (mmap_size < 0)
-diff --git a/kvm-cpu.c b/kvm-cpu.c
-index 5d90664..7a9d689 100644
---- a/kvm-cpu.c
-+++ b/kvm-cpu.c
-@@ -222,11 +222,18 @@ int kvm_cpu__init(struct kvm *kvm)
- 	for (i = 0; i < kvm->nrcpus; i++) {
- 		kvm->cpus[i] = kvm_cpu__arch_init(kvm, i);
- 		if (!kvm->cpus[i]) {
-+			if (i > 0 && errno == EINVAL)
-+				break;
- 			pr_warning("unable to initialize KVM VCPU");
- 			goto fail_alloc;
- 		}
+ 	switch (type) {
+ 	case IRQCHIP_GICV2:
+ 		gic_device.type = KVM_DEV_TYPE_ARM_VGIC_V2;
+ 		dist_attr.attr  = KVM_VGIC_V2_ADDR_TYPE_DIST;
+ 		break;
++	case IRQCHIP_GICV3:
++		gic_device.type = KVM_DEV_TYPE_ARM_VGIC_V3;
++		dist_attr.attr  = KVM_VGIC_V3_ADDR_TYPE_DIST;
++		break;
  	}
  
-+	if (i < kvm->nrcpus) {
-+		kvm->nrcpus = i;
-+		printf("  # The kernel limits the number of CPUs to %d\n", i);
-+	}
-+
- 	return 0;
+ 	err = ioctl(kvm->vm_fd, KVM_CREATE_DEVICE, &gic_device);
+@@ -46,6 +66,9 @@ static int gic__create_device(struct kvm *kvm, enum irqchip_type type)
+ 	case IRQCHIP_GICV2:
+ 		err = ioctl(gic_fd, KVM_SET_DEVICE_ATTR, &cpu_if_attr);
+ 		break;
++	case IRQCHIP_GICV3:
++		err = ioctl(gic_fd, KVM_SET_DEVICE_ATTR, &redist_attr);
++		break;
+ 	}
+ 	if (err)
+ 		goto out_err;
+@@ -97,6 +120,10 @@ int gic__create(struct kvm *kvm, enum irqchip_type type)
+ 	switch (type) {
+ 	case IRQCHIP_GICV2:
+ 		break;
++	case IRQCHIP_GICV3:
++		gic_redists_size = kvm->cfg.nrcpus * ARM_GIC_REDIST_SIZE;
++		gic_redists_base = ARM_GIC_DIST_BASE - gic_redists_size;
++		break;
+ 	default:
+ 		return -ENODEV;
+ 	}
+@@ -156,12 +183,19 @@ void gic__generate_fdt_nodes(void *fdt, u32 phandle, enum irqchip_type type)
+ 	const char *compatible;
+ 	u64 reg_prop[] = {
+ 		cpu_to_fdt64(ARM_GIC_DIST_BASE), cpu_to_fdt64(ARM_GIC_DIST_SIZE),
+-		cpu_to_fdt64(ARM_GIC_CPUI_BASE), cpu_to_fdt64(ARM_GIC_CPUI_SIZE),
++		0, 0,				/* to be filled */
+ 	};
  
- fail_alloc:
+ 	switch (type) {
+ 	case IRQCHIP_GICV2:
+ 		compatible = "arm,cortex-a15-gic";
++		reg_prop[2] = cpu_to_fdt64(ARM_GIC_CPUI_BASE);
++		reg_prop[3] = cpu_to_fdt64(ARM_GIC_CPUI_SIZE);
++		break;
++	case IRQCHIP_GICV3:
++		compatible = "arm,gic-v3";
++		reg_prop[2] = cpu_to_fdt64(gic_redists_base);
++		reg_prop[3] = cpu_to_fdt64(gic_redists_size);
+ 		break;
+ 	default:
+ 		return;
+diff --git a/arm/include/arm-common/gic.h b/arm/include/arm-common/gic.h
+index d524f55..4fde5ac 100644
+--- a/arm/include/arm-common/gic.h
++++ b/arm/include/arm-common/gic.h
+@@ -23,6 +23,7 @@
+ 
+ enum irqchip_type {
+ 	IRQCHIP_GICV2,
++	IRQCHIP_GICV3,
+ };
+ 
+ struct kvm;
+diff --git a/arm/include/arm-common/kvm-arch.h b/arm/include/arm-common/kvm-arch.h
+index 90d6733..0f5fb7f 100644
+--- a/arm/include/arm-common/kvm-arch.h
++++ b/arm/include/arm-common/kvm-arch.h
+@@ -30,6 +30,13 @@
+ #define KVM_PCI_MMIO_AREA	(KVM_PCI_CFG_AREA + ARM_PCI_CFG_SIZE)
+ #define KVM_VIRTIO_MMIO_AREA	ARM_MMIO_AREA
+ 
++/*
++ * On a GICv3 there must be one redistributor per vCPU.
++ * The value here is the size for one, we multiply this at runtime with
++ * the number of requested vCPUs to get the actual size.
++ */
++#define ARM_GIC_REDIST_SIZE	0x20000
++
+ #define KVM_IRQ_OFFSET		GIC_SPI_IRQ_BASE
+ 
+ #define KVM_VM_TYPE		0
 -- 
 2.3.5
