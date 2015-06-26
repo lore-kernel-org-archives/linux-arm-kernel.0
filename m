@@ -1,151 +1,43 @@
 From: mark.yao@rock-chips.com (Mark Yao)
-Date: Fri, 26 Jun 2015 18:07:26 +0800
-Subject: [PATCH v2 2/5] drm/rockchip: vop: fix yuv plane support
+Date: Fri, 26 Jun 2015 18:07:28 +0800
+Subject: [PATCH v2 4/5] drm/rockchip: vop: switch cursor plane to window 3
 In-Reply-To: <1435313249-4549-1-git-send-email-mark.yao@rock-chips.com>
 References: <1435313249-4549-1-git-send-email-mark.yao@rock-chips.com>
-Message-ID: <1435313249-4549-3-git-send-email-mark.yao@rock-chips.com>
+Message-ID: <1435313249-4549-5-git-send-email-mark.yao@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-vop support yuv with NV12, NV16 and NV24, only 2 plane yuv.
+Window 1 support scale and yuv format, it's waste use it for a
+cursor, use window 3 is enough.
 
 Signed-off-by: Mark Yao <mark.yao@rock-chips.com>
-
-Changes in v2:
-- Uv buffer not support odd offset, align it.
-- Fix error display when move yuv image.  
-
 ---
- drivers/gpu/drm/rockchip/rockchip_drm_vop.c |   63 ++++++++++++++++++++++++---
- 1 file changed, 57 insertions(+), 6 deletions(-)
+Changes in v2: None
+
+ drivers/gpu/drm/rockchip/rockchip_drm_vop.c |    7 ++++---
+ 1 file changed, 4 insertions(+), 3 deletions(-)
 
 diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_vop.c b/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
-index 3c9f4f3..6ca08f8 100644
+index f6ef634..40107bb 100644
 --- a/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
 +++ b/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
-@@ -373,6 +373,18 @@ static enum vop_data_format vop_convert_format(uint32_t format)
- 	}
- }
+@@ -342,13 +342,14 @@ static const struct vop_reg_data vop_init_reg_table[] = {
+ /*
+  * Note: rk3288 has a dedicated 'cursor' window, however, that window requires
+  * special support to get alpha blending working.  For now, just use overlay
+- * window 1 for the drm cursor.
++ * window 3 for the drm cursor.
++ *
+  */
+ static const struct vop_win_data rk3288_vop_win_data[] = {
+ 	{ .base = 0x00, .phy = &win01_data, .type = DRM_PLANE_TYPE_PRIMARY },
+-	{ .base = 0x40, .phy = &win01_data, .type = DRM_PLANE_TYPE_CURSOR },
++	{ .base = 0x40, .phy = &win01_data, .type = DRM_PLANE_TYPE_OVERLAY },
+ 	{ .base = 0x00, .phy = &win23_data, .type = DRM_PLANE_TYPE_OVERLAY },
+-	{ .base = 0x50, .phy = &win23_data, .type = DRM_PLANE_TYPE_OVERLAY },
++	{ .base = 0x50, .phy = &win23_data, .type = DRM_PLANE_TYPE_CURSOR },
+ 	{ .base = 0x00, .phy = &cursor_data, .type = DRM_PLANE_TYPE_OVERLAY },
+ };
  
-+static bool is_yuv_support(uint32_t format)
-+{
-+	switch (format) {
-+	case DRM_FORMAT_NV12:
-+	case DRM_FORMAT_NV16:
-+	case DRM_FORMAT_NV24:
-+		return true;
-+	default:
-+		return false;
-+	}
-+}
-+
- static bool is_alpha_support(uint32_t format)
- {
- 	switch (format) {
-@@ -577,16 +589,21 @@ static int vop_update_plane_event(struct drm_plane *plane,
- 	struct vop *vop = to_vop(crtc);
- 	struct drm_gem_object *obj;
- 	struct rockchip_gem_object *rk_obj;
-+	struct drm_gem_object *uv_obj;
-+	struct rockchip_gem_object *rk_uv_obj;
- 	unsigned long offset;
- 	unsigned int actual_w;
- 	unsigned int actual_h;
- 	unsigned int dsp_stx;
- 	unsigned int dsp_sty;
- 	unsigned int y_vir_stride;
-+	unsigned int uv_vir_stride;
- 	dma_addr_t yrgb_mst;
-+	dma_addr_t uv_mst;
- 	enum vop_data_format format;
- 	uint32_t val;
- 	bool is_alpha;
-+	bool is_yuv;
- 	bool visible;
- 	int ret;
- 	struct drm_rect dest = {
-@@ -608,6 +625,12 @@ static int vop_update_plane_event(struct drm_plane *plane,
- 	};
- 	bool can_position = plane->type != DRM_PLANE_TYPE_PRIMARY;
- 
-+	if (drm_format_num_planes(fb->pixel_format) > 2) {
-+		DRM_ERROR("unsupport more than 2 plane format[%08x]\n",
-+			  fb->pixel_format);
-+		return -EINVAL;
-+	}
-+
- 	ret = drm_plane_helper_check_update(plane, crtc, fb,
- 					    &src, &dest, &clip,
- 					    DRM_PLANE_HELPER_NO_SCALING,
-@@ -624,28 +647,52 @@ static int vop_update_plane_event(struct drm_plane *plane,
- 	if (format < 0)
- 		return format;
- 
-+	is_yuv = is_yuv_support(fb->pixel_format);
-+
- 	obj = rockchip_fb_get_gem_obj(fb, 0);
- 	if (!obj) {
- 		DRM_ERROR("fail to get rockchip gem object from framebuffer\n");
- 		return -EINVAL;
- 	}
- 
-+	if (is_yuv) {
-+		src.x1 &= (~1) << 16;
-+		src.y1 &= (~1) << 16;
-+	}
-+
- 	rk_obj = to_rockchip_obj(obj);
- 
- 	actual_w = (src.x2 - src.x1) >> 16;
- 	actual_h = (src.y2 - src.y1) >> 16;
--	crtc_x = max(0, crtc_x);
--	crtc_y = max(0, crtc_y);
- 
--	dsp_stx = crtc_x + crtc->mode.htotal - crtc->mode.hsync_start;
--	dsp_sty = crtc_y + crtc->mode.vtotal - crtc->mode.vsync_start;
-+	dsp_stx = dest.x1 + crtc->mode.htotal - crtc->mode.hsync_start;
-+	dsp_sty = dest.y1 + crtc->mode.vtotal - crtc->mode.vsync_start;
- 
--	offset = (src.x1 >> 16) * (fb->bits_per_pixel >> 3);
-+	offset = (src.x1 >> 16) * drm_format_plane_cpp(fb->pixel_format, 0);
- 	offset += (src.y1 >> 16) * fb->pitches[0];
--	yrgb_mst = rk_obj->dma_addr + offset;
- 
-+	yrgb_mst = rk_obj->dma_addr + offset + fb->offsets[0];
- 	y_vir_stride = fb->pitches[0] >> 2;
- 
-+	if (is_yuv) {
-+		int hsub = drm_format_horz_chroma_subsampling(fb->pixel_format);
-+		int vsub = drm_format_vert_chroma_subsampling(fb->pixel_format);
-+		int bpp = drm_format_plane_cpp(fb->pixel_format, 1);
-+
-+		uv_obj = rockchip_fb_get_gem_obj(fb, 1);
-+		if (!uv_obj) {
-+			DRM_ERROR("fail to get uv object from framebuffer\n");
-+			return -EINVAL;
-+		}
-+		rk_uv_obj = to_rockchip_obj(uv_obj);
-+		uv_vir_stride = fb->pitches[1] >> 2;
-+
-+		offset = (src.x1 >> 16) * bpp / hsub;
-+		offset += (src.y1 >> 16) * fb->pitches[1] / vsub;
-+
-+		uv_mst = rk_uv_obj->dma_addr + offset + fb->offsets[1];
-+	}
-+
- 	/*
- 	 * If this plane update changes the plane's framebuffer, (or more
- 	 * precisely, if this update has a different framebuffer than the last
-@@ -681,6 +728,10 @@ static int vop_update_plane_event(struct drm_plane *plane,
- 	VOP_WIN_SET(vop, win, format, format);
- 	VOP_WIN_SET(vop, win, yrgb_vir, y_vir_stride);
- 	VOP_WIN_SET(vop, win, yrgb_mst, yrgb_mst);
-+	if (is_yuv) {
-+		VOP_WIN_SET(vop, win, uv_vir, uv_vir_stride);
-+		VOP_WIN_SET(vop, win, uv_mst, uv_mst);
-+	}
- 	val = (actual_h - 1) << 16;
- 	val |= (actual_w - 1) & 0xffff;
- 	VOP_WIN_SET(vop, win, act_info, val);
 -- 
 1.7.9.5
