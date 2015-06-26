@@ -1,26 +1,65 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Fri, 26 Jun 2015 14:11:10 +0100
-Subject: Support CONFIG_CMDLINE for arm64?
-In-Reply-To: <2937668.KYNC73kFne@diego>
-References: <CAErSpo4=11L8QPdeJRFrxR_E7sL+sg2T51TN8KcjmPQoo2Oy=g@mail.gmail.com>
- <2937668.KYNC73kFne@diego>
-Message-ID: <20150626131109.GE3078@e104818-lin.cambridge.arm.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Fri, 26 Jun 2015 14:14:33 +0100
+Subject: [PATCH v2 2/3] IRQ/Gic-V3: Change arm-gic-its to support the
+ Mbigen interrupt
+In-Reply-To: <558D3FDA.6000903@huawei.com>
+References: <1434077399-32200-1-git-send-email-majun258@huawei.com>
+ <1434077399-32200-3-git-send-email-majun258@huawei.com>
+ <558CF1CD.5020200@huawei.com> <558D10E1.8040701@arm.com>
+ <558D2937.7060408@huawei.com> <558D2C1A.3070702@arm.com>
+ <558D3FDA.6000903@huawei.com>
+Message-ID: <558D5039.2090803@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 26, 2015 at 10:15:47AM +0200, Heiko St?bner wrote:
-> Am Donnerstag, 25. Juni 2015, 17:02:41 schrieb Bjorn Helgaas:
-> > arch/arm64/Kconfig mentions CONFIG_CMDLINE, but I don't see any actual
-> > support for it.  Would you be interested in support for it?  Or would
-> > you rather remove it from Kconfig?
+On 26/06/15 13:04, majun (F) wrote:
 > 
-> just stumbled over your mail by chance.
 > 
-> CONFIG_CMDLINE is for example included in drivers/of/fdt.c, so will be handled 
-> correctly for devicetree-based arm64 platforms - and I'm actually using it on 
-> my rk3368 board :-) .
+> ? 2015/6/26 18:40, Marc Zyngier ??:
+>>
+>> My opinion is that we need to be able to lookup the domain from the core
+>> code without any of these hacks, and this is what I'm working on at the
+>> moment. There is no way external code will be allowed to mess with the
+>> internals of the ITS.
+>>
+>> For the time being, just expose the domain with a helper (you can match
+>> it with the of_node). 
+> Do you mean add a fucntion in ITS likes below:
+> 
+> struct irq_domain *get_its_domain(struct device_node *node)
+> {
+> 	struct its_node *its = NULL;
+> 	
+> 	list_for_each_entry(its, &its_nodes, entry) {
+> 		if(its->msi_chip.of_node == node)
+> 			break;
+> 	}
+> 
+> 	return (its)?its->domain:NULL;
+> }
 
-Indeed. The early_init_dt_scan_chosen() takes it into account.
+Yes.
 
+> 
+> How about add a '.match ' member in its_domain_ops
+> just like:
+> 	.match = get_its_domain;
+> 
+> So, I can use the fucntion 'irq_find_host' in mbigne driver
+
+And that will only return the PCI/MSI domain, which is not of any help
+to you.
+
+At the moment, we register the PCI/MSI domain with the the of_node of
+the ITS so that a PCI controller can match the its MSI controller, and
+the ITS domain is completely anonymous (it doesn't have an of_node).
+
+What I'm working on is a way to distinguish between several domains that
+are identified by the same of_node, but cater for different bus types.
+The current match function doesn't quite work for that case.
+
+Thanks,
+
+	M.
 -- 
-Catalin
+Jazz is not dead. It just smells funny...
