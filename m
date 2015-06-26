@@ -1,37 +1,60 @@
-From: khalasa@piap.pl (Krzysztof =?utf-8?Q?Ha=C5=82asa?=)
-Date: Fri, 26 Jun 2015 08:20:47 +0200
-Subject: IMX6 - PCIe device tree assignments
-In-Reply-To: <CAJ+vNU098bwhdhBPrnCWOy83=oCD0vP+7sRxVcpSGYNu52HDsw@mail.gmail.com>
- (Tim Harvey's message of "Mon, 22 Jun 2015 06:34:37 -0700")
-References: <m34mm5tj4b.fsf@t19.piap.pl>
- <CAJ+vNU098bwhdhBPrnCWOy83=oCD0vP+7sRxVcpSGYNu52HDsw@mail.gmail.com>
-Message-ID: <m3lhf7q9c0.fsf@t19.piap.pl>
+From: majun258@huawei.com (majun (F))
+Date: Fri, 26 Jun 2015 14:31:41 +0800
+Subject: [PATCH v2 2/3] IRQ/Gic-V3: Change arm-gic-its to support the
+ Mbigen interrupt
+In-Reply-To: <1434077399-32200-3-git-send-email-majun258@huawei.com>
+References: <1434077399-32200-1-git-send-email-majun258@huawei.com>
+ <1434077399-32200-3-git-send-email-majun258@huawei.com>
+Message-ID: <558CF1CD.5020200@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Thanks for your response.
+Hi Thomas:
 
-Tim Harvey <tharvey@gateworks.com> writes:
+? 2015/6/12 10:49, Ma Jun ??:
 
-> I became aware of the interrupt mapping side-effect recently of this
-> downstream patch as well. I believe the issue is that the pci nodes
-> need to be fully described including the interrupt* properties. My
-> plan is to address this with a bootloader fixup which will dynamically
-> build the device-tree representation of the pcie nodes on the bus
-> (because some boards have PCI switches with differing number of
-> ports).
+> +static int its_mbigen_prepare(struct irq_domain *domain, struct mbi_desc *desc,
+> +								int hwirq, struct mbi_alloc_info *arg)
+> +{
+> +	struct its_node *its = domain->parent->host_data;
+> +	struct its_device *its_dev;
+> +	u32 dev_id;
+> +
+> +	dev_id = desc->msg_id;
+> +
+> +	its_dev = its_find_device(its, dev_id);
+> +	if (!its_dev) {
+> +		its_dev = its_create_device(its, dev_id, desc->lines);
+> +		if (!its_dev)
+> +			return -ENOMEM;
+> +	}
+> +
+> +	arg->scratchpad[0].ptr = its_dev;
+> +	arg->scratchpad[1].ptr = NULL;
+> +
+> +	arg->desc = desc;
+> +	arg->hwirq = hwirq;
+> +	return 0;
+> +}
+> +
+> +static struct mbigen_domain_ops its_mbigen_ops = {
+> +	.mbigen_prepare		= its_mbigen_prepare,
+> +};
+> +
+> +static struct mbigen_domain_info its_mbigen_domain_info = {
+> +	.ops	= &its_mbigen_ops,
+> +};
+> +
 
-Wouldn't it be better if the device tree PCI code accepted the extra
-data (basically the "eth1" alias) without changing information which
-wasn't explicitly specified (such as IRQ mapping)?
+what's you opinion about the function 'its_mbigen_prepare' ?
+put this function in irq-gic-v3-its.c or move to mbigen driver ?
 
-> For now, do not use the down-stream patch and assign the mac addresses
-> in a different fashion if using mainline linux on the GW54xx/GW53xx.
+If I move this function to mbigen driver, some its fuctions
+(ex. its_find_device, its_create_device) and struct data (ex its_node)
+would be used in mbigen driver.
 
-That's what I have been doing, though the patch looks like a better,
-transparent solution.
--- 
-Krzysztof Halasa
+Now, all these functions and data structure are defined as static.
+to use them, I have to remove the 'static' definition and put them
+in a head file ? create a new head file).
 
-Industrial Research Institute for Automation and Measurements PIAP
-Al. Jerozolimskie 202, 02-486 Warsaw, Poland
+I'm not sure which way is better .
