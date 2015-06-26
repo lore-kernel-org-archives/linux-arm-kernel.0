@@ -1,54 +1,96 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 26 Jun 2015 11:11:47 +0100
-Subject: arm64 allmodconfig failure =?utf-8?Q?i?=
- =?utf-8?B?biBleHBhbnNpb24gb2YgbWFjcm8g4oCYX1jigJk=?=
-In-Reply-To: <20150626100944.GA19292@gondor.apana.org.au>
-References: <20150626100805.GC1568@arm.com>
- <20150626100944.GA19292@gondor.apana.org.au>
-Message-ID: <20150626101147.GD1568@arm.com>
+From: majun258@huawei.com (majun (F))
+Date: Fri, 26 Jun 2015 18:28:07 +0800
+Subject: [PATCH v2 2/3] IRQ/Gic-V3: Change arm-gic-its to support the
+ Mbigen interrupt
+In-Reply-To: <558D10E1.8040701@arm.com>
+References: <1434077399-32200-1-git-send-email-majun258@huawei.com>
+ <1434077399-32200-3-git-send-email-majun258@huawei.com>
+ <558CF1CD.5020200@huawei.com> <558D10E1.8040701@arm.com>
+Message-ID: <558D2937.7060408@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 26, 2015 at 11:09:44AM +0100, Herbert Xu wrote:
-> On Fri, Jun 26, 2015 at 11:08:05AM +0100, Will Deacon wrote:
-> > Hi all,
-> > 
-> > arm64 allmodconfig fails to build with mainline due to the following:
-> > 
-> > 
-> >   In file included from include/acpi/platform/aclinux.h:74:0,
-> >                    from include/acpi/platform/acenv.h:173,
-> >                    from include/acpi/acpi.h:56,
-> >                    from include/linux/acpi.h:37,
-> >                    from ./arch/arm64/include/asm/dma-mapping.h:21,
-> >                    from include/linux/dma-mapping.h:86,
-> >                    from include/linux/skbuff.h:34,
-> >                    from include/crypto/algapi.h:18,
-> >                    from crypto/asymmetric_keys/rsa.c:16:
-> >   include/linux/ctype.h:15:12: error: expected ?;?, ?,? or ?)? before numeric constant
-> >    #define _X 0x40 /* hex digit */
-> >               ^
-> >   crypto/asymmetric_keys/rsa.c:123:47: note: in expansion of macro ?_X?
-> >    static int RSA_I2OSP(MPI x, size_t xLen, u8 **_X)
-> >                                                  ^
-> >   crypto/asymmetric_keys/rsa.c: In function ?RSA_verify_signature?:
-> >   crypto/asymmetric_keys/rsa.c:256:2: error: implicit declaration of function ?RSA_I2OSP? [-Werror=implicit-function-declaration]
-> >     ret = RSA_I2OSP(m, k, &EM);
-> > 
-> > 
-> > This is thanks to the following function type:
-> > 
-> >   static int RSA_I2OSP(MPI x, size_t xLen, u8 **__X)
-> > 
-> > conflicting with the _X #define in linux/ctype.h:
-> > 
-> >   #define _X      0x40    /* hex digit */
-> > 
-> > Simple patch below, but solving this problem with more underscores feels
-> > slightly inhumane.
+
+Hi Marc:
+
+? 2015/6/26 16:44, Marc Zyngier ??:
 > 
-> Thanks but I've already merged a similar patch yesterday.
+> You can then keep your MBI stuff in a separate file, and call into 
+> its_msi_prepare.
+> 
+Thanks for your good suggestion!
+I have two questions:
 
-Perfect, sorry for the noise.
+Question 1:
 
-Will
+I found the ?its_msi_preapare ' defined without static.
+So,I guess you mean I can call this fucntion directly
+from mbigen driver, right?
+or I need make the code likes below and leave these code in ITS?
+
+static struct mbigen_domain_ops its_mbigen_ops = {
++	.mbigen_prepare	= its_msi_prepare,
+};
+
+static struct mbigen_domain_info its_mbigen_domain_info = {
+	.ops	= &its_mbigen_ops,
+};
+
+Question 2:
+
+@@ -1489,6 +1538,18 @@ static int its_probe(struct device_node *node, struct irq_domain *parent)
+ 		err = of_pci_msi_chip_add(&its->msi_chip);
+ 		if (err)
+ 			goto out_free_domains;
++
++		if (IS_ENABLED(CONFIG_MBIGEN_IRQ_DOMAIN)) {
++			its->mbi_chip.domain = its_mbigen_create_irq_domain(node,
++										&its_mbigen_domain_info,
++										its->domain);
++
++			if (!its->mbi_chip.domain) {
++				err = -ENOMEM;
++				pr_warn_once("ITS:no mbigen chip found\n");
++				goto out_free_mbigen;
++			}
++		}
+ 	}
+
+ 	spin_lock(&its_lock);
+@@ -1497,6 +1558,9 @@ static int its_probe(struct device_node *node, struct irq_domain *parent)
+
+ 	return 0;
+
++out_free_mbigen:
++	if (its->mbi_chip.domain)
++		irq_domain_remove(its->mbi_chip.domain);
+ out_free_domains:
+ 	if (its->msi_chip.domain)
+ 		irq_domain_remove(its->msi_chip.domain);
+
+What's you opinion about the code above
+Leave it in ITS or create the mbi irq domain in mbigen driver?
+If I have to create mbi irq domain in mbigen driver,
+I need a pointer of its domain.
+
+For this problem, I think i can solve it by using its_nodes?
+in mbigen driver *if*
+[1] add a member " struct device_node *node" in 'struct its_node'
+[2] in 'its_probe' function , add
+	its->node = node;
+[3] remove the static definition from  'static LIST_HEAD(its_nodes);'
+
+How is you opinion?
+
+Thansks again!
+
+
+
+>> Now, all these functions and data structure are defined as static.
+>> to use them, I have to remove the 'static' definition and put them
+>> in a head file ? create a new head file).
+> 
+> I don't want to see these functions and structure leaking out of the
+> ITS code unless we're absolutely forced to do so.  The above code
+> shows you one possible way to solve the problem.
+> 
