@@ -1,29 +1,28 @@
 From: bhelgaas@google.com (Bjorn Helgaas)
-Date: Fri, 26 Jun 2015 09:10:37 -0500
-Subject: Support CONFIG_CMDLINE for arm64?
-In-Reply-To: <20150626131109.GE3078@e104818-lin.cambridge.arm.com>
-References: <CAErSpo4=11L8QPdeJRFrxR_E7sL+sg2T51TN8KcjmPQoo2Oy=g@mail.gmail.com>
- <2937668.KYNC73kFne@diego>
- <20150626131109.GE3078@e104818-lin.cambridge.arm.com>
-Message-ID: <CAErSpo63T1qKyM1N0W=t75ooCURTZJA7X=yG2-SK1vc=i-85bw@mail.gmail.com>
+Date: Fri, 26 Jun 2015 09:26:21 -0500
+Subject: [PATCH 1/1] pci: xgene: Enable huge outbound bar support
+In-Reply-To: <1435280756-24455-1-git-send-email-dhdang@apm.com>
+References: <1435280756-24455-1-git-send-email-dhdang@apm.com>
+Message-ID: <CAErSpo7rE8yAS--L+aQmN-DqfL6uGxFBxD2WOPowoBsrvOZ7eg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 26, 2015 at 8:11 AM, Catalin Marinas
-<catalin.marinas@arm.com> wrote:
-> On Fri, Jun 26, 2015 at 10:15:47AM +0200, Heiko St?bner wrote:
->> Am Donnerstag, 25. Juni 2015, 17:02:41 schrieb Bjorn Helgaas:
->> > arch/arm64/Kconfig mentions CONFIG_CMDLINE, but I don't see any actual
->> > support for it.  Would you be interested in support for it?  Or would
->> > you rather remove it from Kconfig?
->>
->> just stumbled over your mail by chance.
->>
->> CONFIG_CMDLINE is for example included in drivers/of/fdt.c, so will be handled
->> correctly for devicetree-based arm64 platforms - and I'm actually using it on
->> my rk3368 board :-) .
->
-> Indeed. The early_init_dt_scan_chosen() takes it into account.
+Hi Duc,
 
-Excellent, now I just have to figure out why it's not working for me
-:)  Thanks for the pointer!
+On Thu, Jun 25, 2015 at 8:05 PM, Duc Dang <dhdang@apm.com> wrote:
+> X-Gene PCIe controllers support huge outbound BARs (with size upto
+> 64GB). This patch configures additional 1 outbound BAR for X-Gene
+> PCIe controllers with size larger than 4GB. This is required to
+> support devices that request huge outbound memory (nVidia K40 as an
+> example)
+
+The PCI specs don't use the "outbound BAR" terminology.  I assume this
+is what we normally call "windows" or "apertures" for MMIO access by
+the CPU?  (The specs rarely use those terms either, but they're
+commonly used in Linux, and the PCIe spec does mention them a couple
+times.)
+
+By "request huge outbound memory," I assume you simply mean the device
+has a huge BAR, right?
+
+Bjorn
