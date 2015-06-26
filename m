@@ -1,62 +1,57 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Fri, 26 Jun 2015 09:15:34 +0200
-Subject: [PATCH v2] ARM: l2c: Add support for the "arm,
- shared-override" property
-In-Reply-To: <558C7068.7070105@hauke-m.de>
-References: <1430990831-23825-1-git-send-email-geert+renesas@glider.be>
- <20150507160257.GA11067@e104818-lin.cambridge.arm.com>
- <20150515101028.GH2067@n2100.arm.linux.org.uk>
- <20150515135513.GH19345@e104818-lin.cambridge.arm.com>
- <556D593C.1090002@monstr.eu> <558C7068.7070105@hauke-m.de>
-Message-ID: <CAMuHMdV8MhkOP+cfZx1HHaOctccrGmKp9RQBLuqy-NS1SQCh8Q@mail.gmail.com>
+From: s.trumtrar@pengutronix.de (Steffen Trumtrar)
+Date: Fri, 26 Jun 2015 09:16:56 +0200
+Subject: [PATCH 1/3] ARM: socfpga: dts: Fix adxl34x formating
+In-Reply-To: <1435285559-11053-1-git-send-email-walter@vanguardiasur.com.ar>
+References: <1435285559-11053-1-git-send-email-walter@vanguardiasur.com.ar>
+Message-ID: <20150626071656.GC26041@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Hauke,
+Hi Walter!
 
-On Thu, Jun 25, 2015 at 11:19 PM, Hauke Mehrtens <hauke@hauke-m.de> wrote:
-> On 06/02/2015 09:20 AM, Michal Simek wrote:
->> On 05/15/2015 03:55 PM, Catalin Marinas wrote:
->>> On Fri, May 15, 2015 at 11:10:28AM +0100, Russell King - ARM
->>> Linux wrote:
->>>> On Thu, May 07, 2015 at 05:02:57PM +0100, Catalin Marinas
->>>> wrote:
->>>>> On Thu, May 07, 2015 at 11:27:11AM +0200, Geert Uytterhoeven
->>>>> wrote:
->>>>>> diff --git a/Documentation/devicetree/bindings/arm/l2cc.txt
->>>>>> b/Documentation/devicetree/bindings/arm/l2cc.txt index
->>>>>> 0dbabe9a6b0abb91..2484aed78c86546d 100644 ---
->>>>>> a/Documentation/devicetree/bindings/arm/l2cc.txt +++
->>>>>> b/Documentation/devicetree/bindings/arm/l2cc.txt @@ -67,6
->>>>>> +67,12 @@ Optional properties: disable if zero. -
->>>>>> arm,prefetch-offset : Override prefetch offset value. Valid
->>>>>> values are 0-7, 15, 23, and 31. +- arm,shared-override :
->>>>>> The default behavior of the pl310 cache controller with +
->>>>>> respect to the shareable attribute is to transform "normal
->>>>>> memory +  non-cacheable transactions" into "cacheable no
->>>>>> allocate" (for reads) or +  "write through no write
->>>>>> allocate" (for writes). +  On systems where this may cause
->>>>>> DMA buffer corruption, this property must be +  specified
->>>>>> to indicate that such transforms are precluded.
+On Thu, Jun 25, 2015 at 11:25:57PM -0300, Walter Lozano wrote:
+> This patch fixes the formating of DTS bindings for the adxl34x digital
+> accelerometer.
+> 
+> Signed-off-by: Walter Lozano <walter@vanguardiasur.com.ar>
+> ---
+>  arch/arm/boot/dts/socfpga_cyclone5_sockit.dts |    6 +++---
+>  1 file changed, 3 insertions(+), 3 deletions(-)
+> 
+> diff --git a/arch/arm/boot/dts/socfpga_cyclone5_sockit.dts b/arch/arm/boot/dts/socfpga_cyclone5_sockit.dts
+> index 71468a7..5b60692 100644
+> --- a/arch/arm/boot/dts/socfpga_cyclone5_sockit.dts
+> +++ b/arch/arm/boot/dts/socfpga_cyclone5_sockit.dts
+> @@ -73,14 +73,14 @@
+>  	status = "okay";
+>  };
+>  
+> -&i2c1{
+> +&i2c1 {
+>  	status = "okay";
+>  
+> -	accel1: accel1 at 53{
+> +	accel1: accelerometer at 53 {
+>  		compatible = "adxl34x";
+>  		reg = <0x53>;
+>  
+> -		interrupt-parent = < &portc >;
+> +		interrupt-parent = <&portc>;
+>  		interrupts = <3 2>;
+>  	};
+>  };
 
->>>>> Acked-by: Catalin Marinas <catalin.marinas@arm.com>
+I would personally squash 3/3 into this one, but otherwise:
 
-> I do not see this in linux-next, and would like to use this.
->
-> Geert have you submitted this through this patch submission page?
-> http://www.arm.linux.org.uk/developer/patches/
+Whole series
 
-Thanks for reminding me!
+	Acked-by: Steffen Trumtrar <s.trumtrar@pengutronix.de>
 
-Submitted with Catalin's Acked-by.
+Thanks,
+Steffen
 
-Gr{oetje,eeting}s,
-
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
