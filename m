@@ -1,52 +1,40 @@
-From: herbert@gondor.apana.org.au (Herbert Xu)
-Date: Fri, 26 Jun 2015 19:09:44 +0900
-Subject: arm64 allmodconfig failure =?utf-8?Q?i?=
- =?utf-8?B?biBleHBhbnNpb24gb2YgbWFjcm8g4oCYX1jigJk=?=
-In-Reply-To: <20150626100805.GC1568@arm.com>
-References: <20150626100805.GC1568@arm.com>
-Message-ID: <20150626100944.GA19292@gondor.apana.org.au>
+From: mark.yao@rock-chips.com (Mark Yao)
+Date: Fri, 26 Jun 2015 18:10:32 +0800
+Subject: [PATCH v2 5/5] drm/rockchip: default enable win2/3 area0 bit
+In-Reply-To: <1435313249-4549-1-git-send-email-mark.yao@rock-chips.com>
+References: <1435313249-4549-1-git-send-email-mark.yao@rock-chips.com>
+Message-ID: <1435313432-4923-1-git-send-email-mark.yao@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 26, 2015 at 11:08:05AM +0100, Will Deacon wrote:
-> Hi all,
-> 
-> arm64 allmodconfig fails to build with mainline due to the following:
-> 
-> 
->   In file included from include/acpi/platform/aclinux.h:74:0,
->                    from include/acpi/platform/acenv.h:173,
->                    from include/acpi/acpi.h:56,
->                    from include/linux/acpi.h:37,
->                    from ./arch/arm64/include/asm/dma-mapping.h:21,
->                    from include/linux/dma-mapping.h:86,
->                    from include/linux/skbuff.h:34,
->                    from include/crypto/algapi.h:18,
->                    from crypto/asymmetric_keys/rsa.c:16:
->   include/linux/ctype.h:15:12: error: expected ?;?, ?,? or ?)? before numeric constant
->    #define _X 0x40 /* hex digit */
->               ^
->   crypto/asymmetric_keys/rsa.c:123:47: note: in expansion of macro ?_X?
->    static int RSA_I2OSP(MPI x, size_t xLen, u8 **_X)
->                                                  ^
->   crypto/asymmetric_keys/rsa.c: In function ?RSA_verify_signature?:
->   crypto/asymmetric_keys/rsa.c:256:2: error: implicit declaration of function ?RSA_I2OSP? [-Werror=implicit-function-declaration]
->     ret = RSA_I2OSP(m, k, &EM);
-> 
-> 
-> This is thanks to the following function type:
-> 
->   static int RSA_I2OSP(MPI x, size_t xLen, u8 **__X)
-> 
-> conflicting with the _X #define in linux/ctype.h:
-> 
->   #define _X      0x40    /* hex digit */
-> 
-> Simple patch below, but solving this problem with more underscores feels
-> slightly inhumane.
+Win2/3 support 4 area display, but now havn't found a suitable
+way to use it, and it enable by win gate and area gate,
+so default enable area0 gate, so that its behaviour just like a
+win.
 
-Thanks but I've already merged a similar patch yesterday.
+Signed-off-by: Mark Yao <mark.yao@rock-chips.com>
+---
+Changes in v2: None
+
+ drivers/gpu/drm/rockchip/rockchip_drm_vop.c |    6 ++++++
+ 1 file changed, 6 insertions(+)
+
+diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_vop.c b/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
+index 40107bb..e001d26 100644
+--- a/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
++++ b/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
+@@ -337,6 +337,12 @@ static const struct vop_reg_data vop_init_reg_table[] = {
+ 	{DSP_CTRL0, 0x00000000},
+ 	{WIN0_CTRL0, 0x00000080},
+ 	{WIN1_CTRL0, 0x00000080},
++	/*
++	 * Todo: win2/3 support area func, but now havn't found a suitable
++	 * way to use it, so default enable area0 as a win display.
++	 */
++	{WIN2_CTRL0, 0x00000010},
++	{WIN3_CTRL0, 0x00000010},
+ };
+ 
+ /*
 -- 
-Email: Herbert Xu <herbert@gondor.apana.org.au>
-Home Page: http://gondor.apana.org.au/~herbert/
-PGP Key: http://gondor.apana.org.au/~herbert/pubkey.txt
+1.7.9.5
