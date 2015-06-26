@@ -1,7 +1,7 @@
 From: tchalamarla@caviumnetworks.com (Tirumalesh Chalamarla)
-Date: Fri, 26 Jun 2015 12:10:14 -0700
+Date: Fri, 26 Jun 2015 12:12:23 -0700
 Subject: [PATCH] GICv3: Add ITS entry to THUNDER dts
-Message-ID: <1435345814-31768-1-git-send-email-tchalamarla@caviumnetworks.com>
+Message-ID: <1435345943-31833-1-git-send-email-tchalamarla@caviumnetworks.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -11,6 +11,7 @@ The PCIe host controller uses MSIs provided by GICv3 ITS. Enable it on
 Thunder SoCs by adding an entry to DT.
 
 Signed-off-by: Tirumalesh Chalamarla <tchalamarla@cavium.com>
+Acked-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
  arch/arm64/boot/dts/cavium/thunder-88xx.dtsi | 9 +++++++++
  1 file changed, 9 insertions(+)
