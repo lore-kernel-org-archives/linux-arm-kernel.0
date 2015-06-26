@@ -1,57 +1,69 @@
-From: s.trumtrar@pengutronix.de (Steffen Trumtrar)
-Date: Fri, 26 Jun 2015 09:16:56 +0200
-Subject: [PATCH 1/3] ARM: socfpga: dts: Fix adxl34x formating
-In-Reply-To: <1435285559-11053-1-git-send-email-walter@vanguardiasur.com.ar>
-References: <1435285559-11053-1-git-send-email-walter@vanguardiasur.com.ar>
-Message-ID: <20150626071656.GC26041@pengutronix.de>
+From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
+Date: Fri, 26 Jun 2015 09:17:25 +0200
+Subject: [PATCH 0/4] arm64: add initial support for the Rockchip rk3368
+In-Reply-To: <558CD6AE.7030505@gmail.com>
+References: <1650408.ovnAjReNFJ@diego> <558CD6AE.7030505@gmail.com>
+Message-ID: <2154359.YLevLOlh2Y@diego>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Walter!
+Hi Bamvor,
 
-On Thu, Jun 25, 2015 at 11:25:57PM -0300, Walter Lozano wrote:
-> This patch fixes the formating of DTS bindings for the adxl34x digital
-> accelerometer.
-> 
-> Signed-off-by: Walter Lozano <walter@vanguardiasur.com.ar>
-> ---
->  arch/arm/boot/dts/socfpga_cyclone5_sockit.dts |    6 +++---
->  1 file changed, 3 insertions(+), 3 deletions(-)
-> 
-> diff --git a/arch/arm/boot/dts/socfpga_cyclone5_sockit.dts b/arch/arm/boot/dts/socfpga_cyclone5_sockit.dts
-> index 71468a7..5b60692 100644
-> --- a/arch/arm/boot/dts/socfpga_cyclone5_sockit.dts
-> +++ b/arch/arm/boot/dts/socfpga_cyclone5_sockit.dts
-> @@ -73,14 +73,14 @@
->  	status = "okay";
->  };
->  
-> -&i2c1{
-> +&i2c1 {
->  	status = "okay";
->  
-> -	accel1: accel1 at 53{
-> +	accel1: accelerometer at 53 {
->  		compatible = "adxl34x";
->  		reg = <0x53>;
->  
-> -		interrupt-parent = < &portc >;
-> +		interrupt-parent = <&portc>;
->  		interrupts = <3 2>;
->  	};
->  };
+Am Freitag, 26. Juni 2015, 12:35:58 schrieb Bamvor Jian Zhang:
+> Could I test the code on rk3368 STB such as EKB368, CSA90?
+> Is there some documents about it?
 
-I would personally squash 3/3 into this one, but otherwise:
+General information on flashing generic Rockchip devices can be found on [0]. 
+That didn't change for the rk3368 it seems - although a device _might_ be 
+locked down to prevent reflashing it seems.
 
-Whole series
+You will of course also need a serial console on the device for the time 
+being, so finding the test-points and soldering is probably required.
 
-	Acked-by: Steffen Trumtrar <s.trumtrar@pengutronix.de>
 
-Thanks,
-Steffen
+Heiko
 
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+
+[0] http://linux-rockchip.info
+
+
+> On 06/26/2015 02:12 AM, Heiko St?bner wrote:
+> > This adds initial support for the new rk3368 ARM64 soc from Rockchip.
+> > 
+> > Overall it looks like someone dropped some A53 cores into a rk3288, so
+> > it shares a lot of peripherals that only differ in details. Therefore
+> > stuff like the mmc, usb, spi, i2c controllers work out of the box.
+> > The support for the gmac already made it into the merge window as well
+> > as the pinctrl support.
+> > 
+> > Interestingly, in its core the rk3368 seems trying to be a model student
+> > with psci for smp and using scpi for ddr frequency scaling, although I
+> > currently do not understand how the mailbox works yet. The display
+> > controllers also are only minimally different so I'm hopefully to have
+> > working graphics in the near-ish future :-)
+> > 
+> > 
+> > As mentioned in the dts patch, this series depends on the dt-binding
+> > header for the clock ids, so will need a shared branch once this is ready.
+> > 
+> > Heiko Stuebner (4):
+> >    arm64: add Rockchip architecture entry
+> >    arm64: defconfig: enable ARCH_ROCKCHIP
+> >    arm64: dts: add Rockchip rk3368 core dtsi and board dts for the r88
+> >    
+> >      board
+> >    
+> >    dt-bindings: document rk3368 R89 board from Rockchip
+> >   
+> >   Documentation/devicetree/bindings/arm/rockchip.txt |   4 +
+> >   arch/arm64/Kconfig                                 |  10 +
+> >   arch/arm64/boot/dts/Makefile                       |   1 +
+> >   arch/arm64/boot/dts/rockchip/Makefile              |   5 +
+> >   arch/arm64/boot/dts/rockchip/rk3368-r88.dts        | 353 ++++++++
+> >   arch/arm64/boot/dts/rockchip/rk3368.dtsi           | 900
+> >   +++++++++++++++++++++ arch/arm64/configs/defconfig                     
+> >    |   2 +
+> >   7 files changed, 1275 insertions(+)
+> >   create mode 100644 arch/arm64/boot/dts/rockchip/Makefile
+> >   create mode 100644 arch/arm64/boot/dts/rockchip/rk3368-r88.dts
+> >   create mode 100644 arch/arm64/boot/dts/rockchip/rk3368.dtsi
