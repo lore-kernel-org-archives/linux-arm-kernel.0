@@ -1,76 +1,26 @@
-From: hdegoede@redhat.com (Hans de Goede)
-Date: Fri, 26 Jun 2015 14:47:39 +0200
-Subject: [PATCH] ARM: dts: sunxi: Adjust touchscreen compatible for sun5i and
- later
-Message-ID: <1435322859-27760-1-git-send-email-hdegoede@redhat.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Fri, 26 Jun 2015 14:11:10 +0100
+Subject: Support CONFIG_CMDLINE for arm64?
+In-Reply-To: <2937668.KYNC73kFne@diego>
+References: <CAErSpo4=11L8QPdeJRFrxR_E7sL+sg2T51TN8KcjmPQoo2Oy=g@mail.gmail.com>
+ <2937668.KYNC73kFne@diego>
+Message-ID: <20150626131109.GE3078@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This is a manual cherry pick of a commit currently queued up for merging
-into 4.2, titled:
-"ARM: dts: sunxi Adjust touchscreen compatible for sun5i and later"
+On Fri, Jun 26, 2015 at 10:15:47AM +0200, Heiko St?bner wrote:
+> Am Donnerstag, 25. Juni 2015, 17:02:41 schrieb Bjorn Helgaas:
+> > arch/arm64/Kconfig mentions CONFIG_CMDLINE, but I don't see any actual
+> > support for it.  Would you be interested in support for it?  Or would
+> > you rather remove it from Kconfig?
+> 
+> just stumbled over your mail by chance.
+> 
+> CONFIG_CMDLINE is for example included in drivers/of/fdt.c, so will be handled 
+> correctly for devicetree-based arm64 platforms - and I'm actually using it on 
+> my rk3368 board :-) .
 
-For the 4.1 stable series, fixing a regression in 4.1 where we are now
-reporting the wrong SoC temperature for sun5i and sun7i SoCs.
+Indeed. The early_init_dt_scan_chosen() takes it into account.
 
-Conflicts:
-	arch/arm/boot/dts/sun5i.dtsi
-
-Original commit message:
-
-The touchscreen controller in the A13 and later has a different temperature
-curve than the one in the original A10, change the compatible for the A13 and
-later so that the kernel will use the correct curve.
-
-Cc: stable at vger.kernel.org # 4.1
-Reported-by: m.silentcreek at gmail.com
-Reported-by: Tong Zhang <lovewilliam@gmail.com>
-Signed-off-by: Hans de Goede <hdegoede@redhat.com>
-Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
----
- arch/arm/boot/dts/sun5i-a10s.dtsi | 2 +-
- arch/arm/boot/dts/sun5i-a13.dtsi  | 2 +-
- arch/arm/boot/dts/sun7i-a20.dtsi  | 2 +-
- 3 files changed, 3 insertions(+), 3 deletions(-)
-
-diff --git a/arch/arm/boot/dts/sun5i-a10s.dtsi b/arch/arm/boot/dts/sun5i-a10s.dtsi
-index 2fd8988..3794ca1 100644
---- a/arch/arm/boot/dts/sun5i-a10s.dtsi
-+++ b/arch/arm/boot/dts/sun5i-a10s.dtsi
-@@ -573,7 +573,7 @@
- 		};
- 
- 		rtp: rtp at 01c25000 {
--			compatible = "allwinner,sun4i-a10-ts";
-+			compatible = "allwinner,sun5i-a13-ts";
- 			reg = <0x01c25000 0x100>;
- 			interrupts = <29>;
- 			#thermal-sensor-cells = <0>;
-diff --git a/arch/arm/boot/dts/sun5i-a13.dtsi b/arch/arm/boot/dts/sun5i-a13.dtsi
-index 883cb48..5098185 100644
---- a/arch/arm/boot/dts/sun5i-a13.dtsi
-+++ b/arch/arm/boot/dts/sun5i-a13.dtsi
-@@ -555,7 +555,7 @@
- 		};
- 
- 		rtp: rtp at 01c25000 {
--			compatible = "allwinner,sun4i-a10-ts";
-+			compatible = "allwinner,sun5i-a13-ts";
- 			reg = <0x01c25000 0x100>;
- 			interrupts = <29>;
- 			#thermal-sensor-cells = <0>;
-diff --git a/arch/arm/boot/dts/sun7i-a20.dtsi b/arch/arm/boot/dts/sun7i-a20.dtsi
-index fdd1817..2b4847c 100644
---- a/arch/arm/boot/dts/sun7i-a20.dtsi
-+++ b/arch/arm/boot/dts/sun7i-a20.dtsi
-@@ -1042,7 +1042,7 @@
- 		};
- 
- 		rtp: rtp at 01c25000 {
--			compatible = "allwinner,sun4i-a10-ts";
-+			compatible = "allwinner,sun5i-a13-ts";
- 			reg = <0x01c25000 0x100>;
- 			interrupts = <GIC_SPI 29 IRQ_TYPE_LEVEL_HIGH>;
- 			#thermal-sensor-cells = <0>;
 -- 
-2.4.3
+Catalin
