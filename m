@@ -1,17 +1,29 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Sat, 27 Jun 2015 18:20:21 -0300
-Subject: [PATCH] clocksource: imx: define clocksource for mx27
-In-Reply-To: <1435439504-406-1-git-send-email-tremyfr@gmail.com>
-References: <1435439504-406-1-git-send-email-tremyfr@gmail.com>
-Message-ID: <CAOMZO5CQCAQfAHrUkphsb_38QKk_c7M0S+VigcLp0kzvuakUFw@mail.gmail.com>
+From: tremyfr@gmail.com (Philippe Reynes)
+Date: Sat, 27 Jun 2015 23:30:58 +0200
+Subject: [PATCH] ARM: dts: imx27: Adjust the GPT compatible string
+In-Reply-To: <1435438273-19741-1-git-send-email-festevam@gmail.com>
+References: <1435438273-19741-1-git-send-email-festevam@gmail.com>
+Message-ID: <558F1612.4050701@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Jun 27, 2015 at 6:11 PM, Philippe Reynes <tremyfr@gmail.com> wrote:
-> The clocksource imx27 wasn't defined in timer-imx-gpt.c,
-> so the kernel no longer boot on imx27. Just define
-> clocksource imx27 as an imx21.
+On 27/06/15 22:51, Fabio Estevam wrote:
+> From: Fabio Estevam<fabio.estevam@freescale.com>
 >
-> Signed-off-by: Philippe Reynes <tremyfr@gmail.com>
+> include/soc/imx/timer.h describes well the different versions of
+> the GPT block among the imx family:
+>
+> enum imx_gpt_type {
+> 	GPT_TYPE_IMX1,		/* i.MX1 */
+> 	GPT_TYPE_IMX21,		/* i.MX21/27 */
+> 	GPT_TYPE_IMX31,		/* i.MX31/35/25/37/51/6Q */
+> 	GPT_TYPE_IMX6DL,	/* i.MX6DL/SX/SL */
+> };
+>
+> So the proper compatible string for the MX27 case should be
+> "fsl,imx21-gpt".
+>
+> Signed-off-by: Fabio Estevam<fabio.estevam@freescale.com>
 
-Reviewed-by: Fabio Estevam <fabio.estevam@freescale.com>
+
+Reviewed-by: Philippe Reynes <tremyfr@gmail.com>
