@@ -1,33 +1,59 @@
-From: vaibhav.hiremath@linaro.org (Vaibhav Hiremath)
-Date: Sat, 27 Jun 2015 11:29:12 +0530
-Subject: [PATCH] mfd: 880m80x: Make use of BIT() macro
-In-Reply-To: <CAJKOXPd3Wjs2+yFpruxMKQmjVD1+h0QPHD8TC-0YLrXhnxUkbQ@mail.gmail.com>
-References: <1435324091-2196-1-git-send-email-vaibhav.hiremath@linaro.org>
- <CAJKOXPd3Wjs2+yFpruxMKQmjVD1+h0QPHD8TC-0YLrXhnxUkbQ@mail.gmail.com>
-Message-ID: <558E3BB0.8020308@linaro.org>
+From: hanjun.guo@linaro.org (Hanjun Guo)
+Date: Sat, 27 Jun 2015 14:07:58 +0800
+Subject: [PATCH v2 3/9] irqchip / GIC: Add GIC version support in ACPI MADT
+In-Reply-To: <20150622164520.GA26129@red-moon>
+References: <1434703572-26221-1-git-send-email-hanjun.guo@linaro.org>
+ <1434703572-26221-4-git-send-email-hanjun.guo@linaro.org>
+ <20150622164520.GA26129@red-moon>
+Message-ID: <558E3DBE.2020401@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On Saturday 27 June 2015 11:06 AM, Krzysztof Kozlowski wrote:
-> 2015-06-26 22:08 GMT+09:00 Vaibhav Hiremath <vaibhav.hiremath@linaro.org>:
->> Instead of hard coding the shift for bit definition, use
->> BIT() macro.
+On 06/23/2015 12:45 AM, Lorenzo Pieralisi wrote:
+> On Fri, Jun 19, 2015 at 09:46:06AM +0100, Hanjun Guo wrote:
 >
-> I am not convinced that such change improves anything in existing
-> code. IMHO (1 << n) is quite readable and obvious. The obviousness of
-> it, is the same as obviousness of BIT(n). However I know that Lee
-> Jones likes the BIT() so it's up to him :) .
+> [...]
 >
-> In the same time you are cleaning a little the indentation in defines
-> which is nice, but messes with main change. It is difficult to find
-> the exact differences, to review it. Can you split the patch into two
-> commits - one for BIT (if this is desired by Lee Jones) and one for
-> white space clean up?
+>> +
+>> +static int __init
+>> +match_gic_redist(struct acpi_subtable_header *header, const unsigned long end)
+>> +{
+>> +	return 0;
+>> +}
+>> +static bool __init acpi_gic_redist_is_present(void)
+>> +{
+>> +	int count;
+>> +
+>> +	/* scan MADT table to find if we have redistributor entries */
+>> +	count  =  acpi_table_parse_madt(ACPI_MADT_TYPE_GENERIC_REDISTRIBUTOR,
+>> +					match_gic_redist, 0);
+>> +
+>> +	/* has at least one GIC redistributor entry */
+>> +	if (count > 0)
+>> +		return true;
+>> +	else
+>> +		return false;
+>> +}
 >
+> return count > 0;
+>
+> What about systems where the redistributor data is in the GICC subtable ? Do
+> you treat them as GIC V2 :) ?
+>
+> On a side note, having to define an empty function like match_gic_redist is
+> horrible.
+>
+> I wonder whether it is not better to refactor map_madt_entry(), create
+> a MADT subtable iterator out of it and make that code generic, instead
+> of being forced to add these useless MADT handlers just to count
+> entries, it is not the first I noticed.
 
-White spaces changes are not much...
+After digging into the code, it seems that we need more discussion for
+this comment, you suggested that refactor map_madt_entry() and create
+a MADT subtable iterator out of it, but we still need a handler
+to handle each subtable entry, right? then it will become another
+version of acpi_parse_entries() in drivers/acpi/table.c, and no
+improvement to code, did I miss something?
 
-Thanks,
-Vaibhav
+Thanks
+Hanjun
