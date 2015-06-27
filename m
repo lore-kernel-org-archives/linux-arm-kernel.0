@@ -1,31 +1,52 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Sat, 27 Jun 2015 09:25:44 -0700
-Subject: [PATCH 2/2] ARM: multi_v7_defconfig: Enable BRCMNAND driver
-In-Reply-To: <1435422344-31059-1-git-send-email-f.fainelli@gmail.com>
-References: <1435422344-31059-1-git-send-email-f.fainelli@gmail.com>
-Message-ID: <1435422344-31059-3-git-send-email-f.fainelli@gmail.com>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Sat, 27 Jun 2015 14:05:59 -0300
+Subject: imx: apf27: the board no longer boot with latest git kernel
+In-Reply-To: <558EA370.6020108@gmail.com>
+References: <558EA370.6020108@gmail.com>
+Message-ID: <CAOMZO5AcRd8UJQg9MpV6mXJKkB2JMriGHzzKYS95oWQYzMOsuw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Broadcom NAND driver is used by brcmstb, bcm63xx, bcm5301x and
-Cygnus/iProc under mach-bcm, this is enough critical mass to enable it.
+Hi Philippe,
 
-Signed-off-by: Florian Fainelli <f.fainelli@gmail.com>
----
- arch/arm/configs/multi_v7_defconfig | 1 +
- 1 file changed, 1 insertion(+)
+On Sat, Jun 27, 2015 at 10:21 AM, Philippe Reynes <tremyfr@gmail.com> wrote:
+> Hi all,
+>
+> I've tested the lastest linus git kernel, and this kernel
+> no longer boot on my armadeus apf27. The last line of the
+> log are (after, the kernel is stalled) :
+>
+> [    0.000000] CPU identified as i.MX27, silicon rev 2.1
+> [    0.000000] Switching to timer-based delay loop, resolution 60ns
+> [    0.000024] sched_clock: 32 bits at 16MHz, resolution 60ns, wraps every
+> 129171917793ns
+> [    0.008172] clocksource mxc_timer1: mask: 0xffffffff max_cycles:
+> 0xffffffff, max_idle_ns: 114963006693 ns
+> [    0.020252] Console: colour dummy device 80x30
+> [    0.024894] Calibrating delay loop (skipped), value calculated using
+> timer frequency..
+>
+> I've done a bisect and the commit that raise this issue is :
+> db2ae4b4f6b79bd11d6461d41bd0966b0006f20b
+> ARM: imx: provide gpt device specific irq functions
+>
+> Do you also reproduce this issue please ? or may be I've missed
+> to enable an new option ?
 
-diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
-index fd6a6d23bc20..6d83a1bf0c74 100644
---- a/arch/arm/configs/multi_v7_defconfig
-+++ b/arch/arm/configs/multi_v7_defconfig
-@@ -169,6 +169,7 @@ CONFIG_MTD_BLOCK=y
- CONFIG_MTD_M25P80=y
- CONFIG_MTD_NAND=y
- CONFIG_MTD_NAND_ATMEL=y
-+CONFIG_MTD_NAND_BRCMNAND=y
- CONFIG_MTD_NAND_DAVINCI=y
- CONFIG_MTD_SPI_NOR=y
- CONFIG_MTD_UBI=y
--- 
-2.1.0
+I don't have access to a mx27 board at the moment, but I am wondering
+if the change below would fix the problem:
+
+--- a/drivers/clocksource/timer-imx-gpt.c
++++ b/drivers/clocksource/timer-imx-gpt.c
+@@ -528,6 +528,7 @@ static void __init imx6dl_timer_init_dt(struct device_node *
+ }
+
+ CLOCKSOURCE_OF_DECLARE(imx1_timer, "fsl,imx1-gpt", imx1_timer_init_dt);
++CLOCKSOURCE_OF_DECLARE(imx27_timer, "fsl,imx27-gpt", imx1_timer_init_dt);
+ CLOCKSOURCE_OF_DECLARE(imx21_timer, "fsl,imx21-gpt", imx21_timer_init_dt);
+ CLOCKSOURCE_OF_DECLARE(imx31_timer, "fsl,imx31-gpt", imx31_timer_init_dt);
+ CLOCKSOURCE_OF_DECLARE(imx25_timer, "fsl,imx25-gpt", imx31_timer_init_dt);
+
+Regards,
+
+Fabio Estevam
