@@ -1,85 +1,70 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Sat, 27 Jun 2015 16:17:08 -0300
-Subject: imx: apf27: the board no longer boot with latest git kernel
-In-Reply-To: <CAOMZO5DbL8etNQAb4vOwsXSQr2SBWMzCx0P7+TUWj54T9ZrSjg@mail.gmail.com>
-References: <558EA370.6020108@gmail.com>
- <CAOMZO5AcRd8UJQg9MpV6mXJKkB2JMriGHzzKYS95oWQYzMOsuw@mail.gmail.com>
- <558EDCB2.9040603@gmail.com>
- <CAOMZO5DbL8etNQAb4vOwsXSQr2SBWMzCx0P7+TUWj54T9ZrSjg@mail.gmail.com>
-Message-ID: <CAOMZO5DgrV-divVoAa3K5QOLdxChewpGcKRLbDjMPRtpx_8KNQ@mail.gmail.com>
+From: stockhausen@collogia.de (Markus Stockhausen)
+Date: Sat, 27 Jun 2015 19:54:32 +0000
+Subject: AW: [PATCH] md/raid6: delta syndrome for ARM NEON
+In-Reply-To: <CAKv+Gu9aTCyEQi9g_7oBzOBYay5H_z2mUxK4_D7CQjGs40Lwpw@mail.gmail.com>
+References: <1435164213-25410-1-git-send-email-ard.biesheuvel@linaro.org>
+ <12EF8D94C6F8734FB2FF37B9FBEDD1735FCC7052@EXCHANGE.collogia.de>,
+ <CAKv+Gu9aTCyEQi9g_7oBzOBYay5H_z2mUxK4_D7CQjGs40Lwpw@mail.gmail.com>
+Message-ID: <12EF8D94C6F8734FB2FF37B9FBEDD1735FCC7CE4@EXCHANGE.collogia.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Philippe,
+> Von: Ard Biesheuvel [ard.biesheuvel at linaro.org]
+> Gesendet: Donnerstag, 25. Juni 2015 10:30
+> An: Markus Stockhausen
+> Cc: linux-arm-kernel at lists.infradead.org; hpa at zytor.com; Neil Brown
+> Betreff: Re: [PATCH] md/raid6: delta syndrome for ARM NEON
+> 
+> On 25 June 2015 at 08:32, Markus Stockhausen <stockhausen@collogia.de> wrote:
+> >> Von: Ard Biesheuvel [ard.biesheuvel at linaro.org]
+> >> Gesendet: Mittwoch, 24. Juni 2015 18:43
+> >> An: linux-arm-kernel at lists.infradead.org; hpa at zytor.com
+> >> Cc: Ard Biesheuvel; Markus Stockhausen; Neil Brown
+> >> Betreff: [PATCH] md/raid6: delta syndrome for ARM NEON
+> >>
+> >> This implements XOR syndrome calculation using NEON intrinsics.
+> >> As before, the module can be built for ARM and arm64 from the
+> >> same source.
+> >
+> >> Relative performance on a Cortex-A57 based system:
+> >>
+> >>   raid6: int64x1  gen()   905 MB/s
+> >>   raid6: int64x1  xor()   881 MB/s
+> >>   raid6: int64x2  gen()  1343 MB/s
+> >>   raid6: int64x2  xor()  1286 MB/s
+> >>   raid6: int64x4  gen()  1896 MB/s
+> >>   raid6: int64x4  xor()  1321 MB/s
+> >>   raid6: int64x8  gen()  1773 MB/s
+> >>   raid6: int64x8  xor()  1165 MB/s
+> >>   raid6: neonx1   gen()  1834 MB/s
+> >>   raid6: neonx1   xor()  1278 MB/s
+> >>   raid6: neonx2   gen()  2528 MB/s
+> >>   raid6: neonx2   xor()  1942 MB/s
+> >>   raid6: neonx4   gen()  2888 MB/s
+> >>   raid6: neonx4   xor()  2334 MB/s
+> >>   raid6: neonx8   gen()  2957 MB/s
+> >>   raid6: neonx8   xor()  2232 MB/s
+> >>   raid6: using algorithm neonx8 gen() 2957 MB/s
+> >>   raid6: .... xor() 2232 MB/s, rmw enabled
+> >>
+> >
+> > Nice to see that the placeholders get filled.
+> > Did you have a chance to do some real tests?
+> >
+> 
+> Hello Markus,
+> 
+> I haven't done any real world testing yet. Can you recommend any test
+> tools or test suites in particular?
 
-On Sat, Jun 27, 2015 at 2:34 PM, Fabio Estevam <festevam@gmail.com> wrote:
+Not really. I was just curious if someone with a larger setup than mine
+had a chance to do some testing. Especially because I had only discontinued
+hardware for the benchmarks.
 
-> Yes, please submit a formal patch.
->
-> I thought it was imx1_timer_init_dt because in imx27.dtsi we have:
->
-> compatible = "fsl,imx27-gpt", "fsl,imx1-gpt";
->
-> So I am wondering if this is correct or it should be
->
-> compatible = "fsl,imx27-gpt", "fsl,imx21-gpt"; instead?
+Markus
 
-In addition to the drivers/clocksource/timer-imx-gpt.c patch, could
-you also try the change below?
-
---- a/arch/arm/boot/dts/imx27.dtsi
-+++ b/arch/arm/boot/dts/imx27.dtsi
-@@ -108,7 +108,7 @@
-             };
-
-             gpt1: timer at 10003000 {
--                compatible = "fsl,imx27-gpt", "fsl,imx1-gpt";
-+                compatible = "fsl,imx27-gpt", "fsl,imx21-gpt";
-                 reg = <0x10003000 0x1000>;
-                 interrupts = <26>;
-                 clocks = <&clks IMX27_CLK_GPT1_IPG_GATE>,
-@@ -117,7 +117,7 @@
-             };
-
-             gpt2: timer at 10004000 {
--                compatible = "fsl,imx27-gpt", "fsl,imx1-gpt";
-+                compatible = "fsl,imx27-gpt", "fsl,imx21-gpt";
-                 reg = <0x10004000 0x1000>;
-                 interrupts = <25>;
-                 clocks = <&clks IMX27_CLK_GPT2_IPG_GATE>,
-@@ -126,7 +126,7 @@
-             };
-
-             gpt3: timer at 10005000 {
--                compatible = "fsl,imx27-gpt", "fsl,imx1-gpt";
-+                compatible = "fsl,imx27-gpt", "fsl,imx21-gpt";
-                 reg = <0x10005000 0x1000>;
-                 interrupts = <24>;
-                 clocks = <&clks IMX27_CLK_GPT3_IPG_GATE>,
-@@ -376,7 +376,7 @@
-             };
-
-             gpt4: timer at 10019000 {
--                compatible = "fsl,imx27-gpt", "fsl,imx1-gpt";
-+                compatible = "fsl,imx27-gpt", "fsl,imx21-gpt";
-                 reg = <0x10019000 0x1000>;
-                 interrupts = <4>;
-                 clocks = <&clks IMX27_CLK_GPT4_IPG_GATE>,
-@@ -385,7 +385,7 @@
-             };
-
-             gpt5: timer at 1001a000 {
--                compatible = "fsl,imx27-gpt", "fsl,imx1-gpt";
-+                compatible = "fsl,imx27-gpt", "fsl,imx21-gpt";
-                 reg = <0x1001a000 0x1000>;
-                 interrupts = <3>;
-                 clocks = <&clks IMX27_CLK_GPT5_IPG_GATE>,
-@@ -436,7 +436,7 @@
-             };
-
-             gpt6: timer at 1001f000 {
--                compatible = "fsl,imx27-gpt", "fsl,imx1-gpt";
-+                compatible = "fsl,imx27-gpt", "fsl,imx21-gpt";
-                 reg = <0x1001f000 0x1000>;
-                 interrupts = <2>;
-                 clocks = <&clks IMX27_CLK_GPT6_IPG_GATE>,
+Markus
+-------------- next part --------------
+An embedded and charset-unspecified text was scrubbed...
+Name: InterScan_Disclaimer.txt
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150627/2869ae5f/attachment.txt>
