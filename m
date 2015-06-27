@@ -1,52 +1,84 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Sat, 27 Jun 2015 14:05:59 -0300
-Subject: imx: apf27: the board no longer boot with latest git kernel
-In-Reply-To: <558EA370.6020108@gmail.com>
-References: <558EA370.6020108@gmail.com>
-Message-ID: <CAOMZO5AcRd8UJQg9MpV6mXJKkB2JMriGHzzKYS95oWQYzMOsuw@mail.gmail.com>
+From: elfring@users.sourceforge.net (SF Markus Elfring)
+Date: Sat, 27 Jun 2015 19:17:35 +0200
+Subject: [PATCH] GPU-DRM-Exynos: Delete unnecessary checks before two
+ function calls
+In-Reply-To: <54D329D0.7050006@samsung.com>
+References: <5307CAA2.8060406@users.sourceforge.net>
+ <alpine.DEB.2.02.1402212321410.2043@localhost6.localdomain6>
+ <530A086E.8010901@users.sourceforge.net>
+ <alpine.DEB.2.02.1402231635510.1985@localhost6.localdomain6>
+ <530A72AA.3000601@users.sourceforge.net>
+ <alpine.DEB.2.02.1402240658210.2090@localhost6.localdomain6>
+ <530B5FB6.6010207@users.sourceforge.net>
+ <alpine.DEB.2.10.1402241710370.2074@hadrien>
+ <530C5E18.1020800@users.sourceforge.net>
+ <alpine.DEB.2.10.1402251014170.2080@hadrien>
+ <530CD2C4.4050903@users.sourceforge.net>
+ <alpine.DEB.2.10.1402251840450.7035@hadrien>
+ <530CF8FF.8080600@users.sourceforge.net>
+ <alpine.DEB.2.02.1402252117150.2047@localhost6.localdomain6>
+ <530DD06F.4090703@users.sourceforge.net>
+ <alpine.DEB.2.02.1402262129250.2221@localhost6.localdomain6>
+ <5317A59D.4@users.sourceforge.net> <54D28870.3060400@users.sourceforge.net>
+ <54D329D0.7050006@samsung.com>
+Message-ID: <558EDAAF.30803@users.sourceforge.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Philippe,
+>> From: Markus Elfring <elfring@users.sourceforge.net>
+>> Date: Wed, 4 Feb 2015 21:54:45 +0100
+>>
+>> The functions phy_power_on() and vunmap() perform also input
+>> parameter validation. Thus the test around their calls is not needed.
+>>
+>> This issue was detected by using the Coccinelle software.
+>>
+>> Signed-off-by: Markus Elfring <elfring@users.sourceforge.net>
+>> ---
+>>  drivers/gpu/drm/exynos/exynos_dp_core.c   | 6 ++----
+>>  drivers/gpu/drm/exynos/exynos_drm_fbdev.c | 2 +-
+>>  2 files changed, 3 insertions(+), 5 deletions(-)
+>>
+>> diff --git a/drivers/gpu/drm/exynos/exynos_dp_core.c b/drivers/gpu/drm/exynos/exynos_dp_core.c
+>> index 34d46aa..306cf1d 100644
+>> --- a/drivers/gpu/drm/exynos/exynos_dp_core.c
+>> +++ b/drivers/gpu/drm/exynos/exynos_dp_core.c
+>> @@ -1057,14 +1057,12 @@ static int exynos_dp_create_connector(struct exynos_drm_display *display,
+>>  
+>>  static void exynos_dp_phy_init(struct exynos_dp_device *dp)
+>>  {
+>> -	if (dp->phy)
+>> -		phy_power_on(dp->phy);
+>> +	phy_power_on(dp->phy);
+>>  }
+>>  
+>>  static void exynos_dp_phy_exit(struct exynos_dp_device *dp)
+>>  {
+>> -	if (dp->phy)
+>> -		phy_power_off(dp->phy);
+>> +	phy_power_off(dp->phy);
+>>  }
+>>  
+>>  static void exynos_dp_poweron(struct exynos_drm_display *display)
+>> diff --git a/drivers/gpu/drm/exynos/exynos_drm_fbdev.c b/drivers/gpu/drm/exynos/exynos_drm_fbdev.c
+>> index e12ea90..0dd448a 100644
+>> --- a/drivers/gpu/drm/exynos/exynos_drm_fbdev.c
+>> +++ b/drivers/gpu/drm/exynos/exynos_drm_fbdev.c
+>> @@ -313,7 +313,7 @@ static void exynos_drm_fbdev_destroy(struct drm_device *dev,
+>>  	struct exynos_drm_gem_obj *exynos_gem_obj = exynos_fbd->exynos_gem_obj;
+>>  	struct drm_framebuffer *fb;
+>>  
+>> -	if (is_drm_iommu_supported(dev) && exynos_gem_obj->buffer->kvaddr)
+>> +	if (is_drm_iommu_supported(dev))
+>>  		vunmap(exynos_gem_obj->buffer->kvaddr);
+>>  
+>>  	/* release drm framebuffer and real buffer */
+>>
+> 
+> Acked-by: Joonyoung Shim <jy0922.shim@samsung.com>
 
-On Sat, Jun 27, 2015 at 10:21 AM, Philippe Reynes <tremyfr@gmail.com> wrote:
-> Hi all,
->
-> I've tested the lastest linus git kernel, and this kernel
-> no longer boot on my armadeus apf27. The last line of the
-> log are (after, the kernel is stalled) :
->
-> [    0.000000] CPU identified as i.MX27, silicon rev 2.1
-> [    0.000000] Switching to timer-based delay loop, resolution 60ns
-> [    0.000024] sched_clock: 32 bits at 16MHz, resolution 60ns, wraps every
-> 129171917793ns
-> [    0.008172] clocksource mxc_timer1: mask: 0xffffffff max_cycles:
-> 0xffffffff, max_idle_ns: 114963006693 ns
-> [    0.020252] Console: colour dummy device 80x30
-> [    0.024894] Calibrating delay loop (skipped), value calculated using
-> timer frequency..
->
-> I've done a bisect and the commit that raise this issue is :
-> db2ae4b4f6b79bd11d6461d41bd0966b0006f20b
-> ARM: imx: provide gpt device specific irq functions
->
-> Do you also reproduce this issue please ? or may be I've missed
-> to enable an new option ?
-
-I don't have access to a mx27 board at the moment, but I am wondering
-if the change below would fix the problem:
-
---- a/drivers/clocksource/timer-imx-gpt.c
-+++ b/drivers/clocksource/timer-imx-gpt.c
-@@ -528,6 +528,7 @@ static void __init imx6dl_timer_init_dt(struct device_node *
- }
-
- CLOCKSOURCE_OF_DECLARE(imx1_timer, "fsl,imx1-gpt", imx1_timer_init_dt);
-+CLOCKSOURCE_OF_DECLARE(imx27_timer, "fsl,imx27-gpt", imx1_timer_init_dt);
- CLOCKSOURCE_OF_DECLARE(imx21_timer, "fsl,imx21-gpt", imx21_timer_init_dt);
- CLOCKSOURCE_OF_DECLARE(imx31_timer, "fsl,imx31-gpt", imx31_timer_init_dt);
- CLOCKSOURCE_OF_DECLARE(imx25_timer, "fsl,imx25-gpt", imx31_timer_init_dt);
+Do the chances increase to integrate this update suggestion
+into another source code repository?
 
 Regards,
-
-Fabio Estevam
+Markus
