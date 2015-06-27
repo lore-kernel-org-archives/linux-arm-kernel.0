@@ -1,27 +1,48 @@
 From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Sat, 27 Jun 2015 09:25:42 -0700
-Subject: [PATCH 0/2] ARM: BCM: Do not select MTD_NAND_BRCMNAND
-Message-ID: <1435422344-31059-1-git-send-email-f.fainelli@gmail.com>
+Date: Sat, 27 Jun 2015 09:25:43 -0700
+Subject: [PATCH 1/2] ARM: BCM: Do not select CONFIG_MTD_NAND_BRCMNAND
+In-Reply-To: <1435422344-31059-1-git-send-email-f.fainelli@gmail.com>
+References: <1435422344-31059-1-git-send-email-f.fainelli@gmail.com>
+Message-ID: <1435422344-31059-2-git-send-email-f.fainelli@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd, Kevin, Olof,
+This reverts 7dc95b40f599293aedf30432749ad25b51549041 ("ARM: BCM: Enable
+NAND support for iProc SoCs") since it creates an unmet dependency for
+MTD_NAND_BRCMNAND which depends on MTD and MTD_NAND, this results in the
+following build failure for brcmnand:
 
-This two patches fix a linking failure when ARCH_BCM_IPROC is selected
-for the BRCMNAND driver since we end-up selecting this driver without
-its proper depdendencies. Instead do not do this select driver which is
-user-selectable, but add it to the multi_v7_defconfig.
+ LD      init/built-in.o
+drivers/built-in.o: In function `brcmnand_remove':
+/home/fainelli/dev/linux/drivers/mtd/nand/brcmnand/brcmnand.c:2234:
+undefined reference to `nand_release'
+drivers/built-in.o: In function `brcmnand_init_cs':
+/home/fainelli/dev/linux/drivers/mtd/nand/brcmnand/brcmnand.c:1933:
+undefined reference to `nand_scan_ident'
+/home/fainelli/dev/linux/drivers/mtd/nand/brcmnand/brcmnand.c:1958:
+undefined reference to `nand_scan_tail'
+Makefile:931: recipe for target 'vmlinux' failed
+make: *** [vmlinux] Error 1
 
-Let me know if you would prefer a pull request for this rather than
-individual patches. Thanks!
+Instead, select this driver an all dependencies on the
+multi_v7_defconfig.
 
-Florian Fainelli (2):
-  ARM: BCM: Do not select CONFIG_MTD_NAND_BRCMNAND
-  ARM: multi_v7_defconfig: Enable BRCMNAND driver
+Signed-off-by: Florian Fainelli <f.fainelli@gmail.com>
+---
+ arch/arm/mach-bcm/Kconfig | 1 -
+ 1 file changed, 1 deletion(-)
 
- arch/arm/configs/multi_v7_defconfig | 1 +
- arch/arm/mach-bcm/Kconfig           | 1 -
- 2 files changed, 1 insertion(+), 1 deletion(-)
-
+diff --git a/arch/arm/mach-bcm/Kconfig b/arch/arm/mach-bcm/Kconfig
+index e9184feffc4e..0ac9e4b3b265 100644
+--- a/arch/arm/mach-bcm/Kconfig
++++ b/arch/arm/mach-bcm/Kconfig
+@@ -19,7 +19,6 @@ config ARCH_BCM_IPROC
+ 	select ARCH_REQUIRE_GPIOLIB
+ 	select ARM_AMBA
+ 	select PINCTRL
+-	select MTD_NAND_BRCMNAND
+ 	help
+ 	  This enables support for systems based on Broadcom IPROC architected SoCs.
+ 	  The IPROC complex contains one or more ARM CPUs along with common
 -- 
 2.1.0
