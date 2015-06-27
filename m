@@ -1,69 +1,68 @@
 From: lina.iyer@linaro.org (Lina Iyer)
-Date: Fri, 26 Jun 2015 21:02:27 -0600
-Subject: [PATCH RFC v2 07/16] arm: domain: Synchronize CPU device runtime PM
- usage with idle state
+Date: Fri, 26 Jun 2015 21:02:30 -0600
+Subject: [PATCH RFC v2 10/16] drivers: cpuidle: Add runtime PM support for
+ CPUIdle
 In-Reply-To: <1435374156-19214-1-git-send-email-lina.iyer@linaro.org>
 References: <1435374156-19214-1-git-send-email-lina.iyer@linaro.org>
-Message-ID: <1435374156-19214-8-git-send-email-lina.iyer@linaro.org>
+Message-ID: <1435374156-19214-11-git-send-email-lina.iyer@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When a CPU is running, the runtime PM usage count should be incremented
-and decremented when the CPU is powers down. To ensure that this happens
-correctly, increment the runtime usage from that CPU.
+Notify runtime PM when the CPU is going to be powered off in the idle
+state. This allows for runtime PM suspend/resume of the CPU's PM domain.
 
 Signed-off-by: Lina Iyer <lina.iyer@linaro.org>
 ---
- arch/arm/kernel/domains.c | 24 +++++++++++++++++++++++-
- 1 file changed, 23 insertions(+), 1 deletion(-)
+ drivers/cpuidle/cpuidle-arm.c | 11 +++++++++++
+ 1 file changed, 11 insertions(+)
 
-diff --git a/arch/arm/kernel/domains.c b/arch/arm/kernel/domains.c
-index a27f825..59b0180 100644
---- a/arch/arm/kernel/domains.c
-+++ b/arch/arm/kernel/domains.c
-@@ -33,6 +33,14 @@ static int arm_pd_power_up(struct generic_pm_domain *genpd)
- 	return 0;
- }
+diff --git a/drivers/cpuidle/cpuidle-arm.c b/drivers/cpuidle/cpuidle-arm.c
+index 545069d..77fd673 100644
+--- a/drivers/cpuidle/cpuidle-arm.c
++++ b/drivers/cpuidle/cpuidle-arm.c
+@@ -11,12 +11,14 @@
  
-+static void run_cpu(void *unused)
-+{
-+	struct device *cpu_dev = get_cpu_device(smp_processor_id());
+ #define pr_fmt(fmt) "CPUidle arm: " fmt
+ 
++#include <linux/cpu.h>
+ #include <linux/cpuidle.h>
+ #include <linux/cpumask.h>
+ #include <linux/cpu_pm.h>
+ #include <linux/kernel.h>
+ #include <linux/module.h>
+ #include <linux/of.h>
++#include <linux/pm_runtime.h>
+ #include <linux/slab.h>
+ 
+ #include <asm/cpuidle.h>
+@@ -45,12 +47,20 @@ static int arm_enter_idle_state(struct cpuidle_device *dev,
+ 
+ 	ret = cpu_pm_enter();
+ 	if (!ret) {
++		struct device *cpu_dev = get_cpu_device(dev->cpu);
 +
-+	/* We are running, increment the usage count */
-+	pm_runtime_get_noresume(cpu_dev);
-+}
-+
- static int arm_domain_cpu_init(void)
- {
- 	int cpuid, ret = 0;
-@@ -50,13 +58,27 @@ static int arm_domain_cpu_init(void)
- 
- 		if (cpu_online(cpuid)) {
- 			pm_runtime_set_active(cpu_dev);
--			pm_runtime_get_noresume(cpu_dev);
-+			/*
-+			 * Execute the below on that 'cpu' to ensure that the reference
-+			 * counting is correct. Its possible that while this code is
-+			 * executing, the 'cpu' may be powerd down, but we may incorrectly
-+			 * increment the usage. By executing the get_cpu on the 'cpu',
-+			 * we can ensure that the 'cpu' and its usage count are matched.
-+			 */
-+			smp_call_function_single(cpuid, run_cpu, NULL, true);
- 		} else {
- 			pm_runtime_set_suspended(cpu_dev);
- 		}
- 		pm_runtime_irq_safe(cpu_dev);
- 		pm_runtime_enable(cpu_dev);
- 
 +		/*
-+		 * We attempt to attach the device to genpd again. We would
-+		 * have failed in our earlier attempt to attach to the domain
-+		 * provider as the CPU device would not have been IRQ safe,
-+		 * while the domain is defined as IRQ safe. IRQ safe domains
-+		 * can only have IRQ safe devices.
++		 * Notify runtime PM as well of this cpu powering down
++		 * TODO: Merge CPU_PM and runtime PM.
 +		 */
- 		ret = genpd_dev_pm_attach(cpu_dev);
- 		if (ret) {
- 			dev_warn(cpu_dev, "%s: Unable to attach to power-domain: %d\n", __func__, ret);
++		pm_runtime_put_sync(cpu_dev);
+ 		/*
+ 		 * Pass idle state index to cpu_suspend which in turn will
+ 		 * call the CPU ops suspend protocol with idle index as a
+ 		 * parameter.
+ 		 */
+ 		arm_cpuidle_suspend(idx);
++		pm_runtime_get_sync(cpu_dev);
+ 
+ 		cpu_pm_exit();
+ 	}
+@@ -146,6 +156,7 @@ static int __init arm_idle_init(void)
+ 			kfree(dev);
+ 			goto out_fail;
+ 		}
++
+ 	}
+ 
+ 	return 0;
 -- 
 2.1.4
