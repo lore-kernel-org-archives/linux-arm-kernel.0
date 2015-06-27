@@ -1,35 +1,69 @@
 From: lina.iyer@linaro.org (Lina Iyer)
-Date: Fri, 26 Jun 2015 21:02:26 -0600
-Subject: [PATCH RFC v2 06/16] arm: domain: Make CPU genpd IRQ safe
+Date: Fri, 26 Jun 2015 21:02:27 -0600
+Subject: [PATCH RFC v2 07/16] arm: domain: Synchronize CPU device runtime PM
+ usage with idle state
 In-Reply-To: <1435374156-19214-1-git-send-email-lina.iyer@linaro.org>
 References: <1435374156-19214-1-git-send-email-lina.iyer@linaro.org>
-Message-ID: <1435374156-19214-7-git-send-email-lina.iyer@linaro.org>
+Message-ID: <1435374156-19214-8-git-send-email-lina.iyer@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Generic PM domains that support runtime suspend/resume in IRQ safe
-contexts should define GENPD_FLAG_IRQ_SAFE flag for the genpd.
-
-CPUIdle powers off the CPUs in an IRQ safe context and therefore CPU
-domains that use CPUIlde for runtime suspend/resume would need to
-operate as IRQ safe domains. Define GENPD_FLAG_IRQ_SAFE for CPU domains.
+When a CPU is running, the runtime PM usage count should be incremented
+and decremented when the CPU is powers down. To ensure that this happens
+correctly, increment the runtime usage from that CPU.
 
 Signed-off-by: Lina Iyer <lina.iyer@linaro.org>
 ---
- arch/arm/kernel/domains.c | 1 +
- 1 file changed, 1 insertion(+)
+ arch/arm/kernel/domains.c | 24 +++++++++++++++++++++++-
+ 1 file changed, 23 insertions(+), 1 deletion(-)
 
 diff --git a/arch/arm/kernel/domains.c b/arch/arm/kernel/domains.c
-index 3248409..a27f825 100644
+index a27f825..59b0180 100644
 --- a/arch/arm/kernel/domains.c
 +++ b/arch/arm/kernel/domains.c
-@@ -90,6 +90,7 @@ static int arm_domain_init(void)
- 		pd->genpd.name = kstrdup(np->name, GFP_KERNEL);
- 		pd->genpd.power_off = arm_pd_power_down;
- 		pd->genpd.power_on = arm_pd_power_up;
-+		pd->genpd.flags |= GENPD_FLAG_IRQ_SAFE;
- 		platform_set_drvdata(pdev, pd);
+@@ -33,6 +33,14 @@ static int arm_pd_power_up(struct generic_pm_domain *genpd)
+ 	return 0;
+ }
  
- 		dev_dbg(dev, "adding as generic power domain.\n");
++static void run_cpu(void *unused)
++{
++	struct device *cpu_dev = get_cpu_device(smp_processor_id());
++
++	/* We are running, increment the usage count */
++	pm_runtime_get_noresume(cpu_dev);
++}
++
+ static int arm_domain_cpu_init(void)
+ {
+ 	int cpuid, ret = 0;
+@@ -50,13 +58,27 @@ static int arm_domain_cpu_init(void)
+ 
+ 		if (cpu_online(cpuid)) {
+ 			pm_runtime_set_active(cpu_dev);
+-			pm_runtime_get_noresume(cpu_dev);
++			/*
++			 * Execute the below on that 'cpu' to ensure that the reference
++			 * counting is correct. Its possible that while this code is
++			 * executing, the 'cpu' may be powerd down, but we may incorrectly
++			 * increment the usage. By executing the get_cpu on the 'cpu',
++			 * we can ensure that the 'cpu' and its usage count are matched.
++			 */
++			smp_call_function_single(cpuid, run_cpu, NULL, true);
+ 		} else {
+ 			pm_runtime_set_suspended(cpu_dev);
+ 		}
+ 		pm_runtime_irq_safe(cpu_dev);
+ 		pm_runtime_enable(cpu_dev);
+ 
++		/*
++		 * We attempt to attach the device to genpd again. We would
++		 * have failed in our earlier attempt to attach to the domain
++		 * provider as the CPU device would not have been IRQ safe,
++		 * while the domain is defined as IRQ safe. IRQ safe domains
++		 * can only have IRQ safe devices.
++		 */
+ 		ret = genpd_dev_pm_attach(cpu_dev);
+ 		if (ret) {
+ 			dev_warn(cpu_dev, "%s: Unable to attach to power-domain: %d\n", __func__, ret);
 -- 
 2.1.4
