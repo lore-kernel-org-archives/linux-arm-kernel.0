@@ -1,21 +1,59 @@
 From: zajec5@gmail.com (=?UTF-8?B?UmFmYcWCIE1pxYJlY2tp?=)
-Date: Sat, 27 Jun 2015 23:39:31 +0200
-Subject: [PATCH 1/2] ARM: BCM: Do not select CONFIG_MTD_NAND_BRCMNAND
-In-Reply-To: <1435422344-31059-2-git-send-email-f.fainelli@gmail.com>
-References: <1435422344-31059-1-git-send-email-f.fainelli@gmail.com>
- <1435422344-31059-2-git-send-email-f.fainelli@gmail.com>
-Message-ID: <CACna6rz52zv5QBewf8rc6BbJHbAn0-D420dSQe=SBXGef4Birw@mail.gmail.com>
+Date: Sun, 28 Jun 2015 00:08:05 +0200
+Subject: [PATCH] ARM: BCM5301X: Enable UART0 for SmartRG SR-400AC
+In-Reply-To: <1435103504-28592-1-git-send-email-f.fainelli@gmail.com>
+References: <1435103504-28592-1-git-send-email-f.fainelli@gmail.com>
+Message-ID: <CACna6rzJE8Gzrwvj+nCw=qCRho=6nZ+k1h_tFQLhNZvf5zWTDg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 27 June 2015 at 18:25, Florian Fainelli <f.fainelli@gmail.com> wrote:
-> This reverts 7dc95b40f599293aedf30432749ad25b51549041 ("ARM: BCM: Enable
-> NAND support for iProc SoCs") since it creates an unmet dependency for
-> MTD_NAND_BRCMNAND which depends on MTD and MTD_NAND, this results in the
-> following build failure for brcmnand:
+On 24 June 2015 at 01:51, Florian Fainelli <f.fainelli@gmail.com> wrote:
+> Enable the use of UART0 by overriding its default status property.
+>
+> Signed-off-by: Florian Fainelli <f.fainelli@gmail.com>
+> ---
+>  arch/arm/boot/dts/bcm4708-smartrg-sr400ac.dts | 4 ++++
+>  1 file changed, 4 insertions(+)
+>
+> diff --git a/arch/arm/boot/dts/bcm4708-smartrg-sr400ac.dts b/arch/arm/boot/dts/bcm4708-smartrg-sr400ac.dts
+> index d6a033b97c70..64a5e8ab65e0 100644
+> --- a/arch/arm/boot/dts/bcm4708-smartrg-sr400ac.dts
+> +++ b/arch/arm/boot/dts/bcm4708-smartrg-sr400ac.dts
+> @@ -118,3 +118,7 @@
+>                 };
+>         };
+>  };
+> +
+> +&uart0 {
+> +       status = "okay";
+> +};
 
-This commit message doesn't make too much sense to me. If
-MTD_NAND_BRCMNAND really depends on MTD and MTD_NAND then there
-couldn't be this problem you described.
+We have many more changes like this in OpenWrt, I just didn't upstream
+them because of current chipcommonA state.
 
-Maybe MTD_NAND_BRCMNAND is *missing* that dependency?
+It was added before we got "brcm,bus-axi" and I believe Hauke wanted
+move it to the "correct" place at some point. Since UART is part of
+ChipCommon device and ChipCommon is part of "brcm,bus-axi",.I guess we
+should add UARTs as a ChipCommon device subnodes. We already have
+chipcommon: chipcommon at 0 {
+        reg = <0x00000000 0x1000>;
+
+        gpio-controller;
+        #gpio-cells = <2>;
+};
+, is it possible to move UARTs there?
+
+I'm not sure if this UART cleanup should block your change. I guess it
+depends on the way it'll finally look like.
+
+I'm also wondering: is there any preference between overwriting status
+with something like
+&uart0 { };
+and
+chipcommonA {
+    uart0: serial at 0300 { };
+};
+? I don't know DT that well, just asking.
+
+-- 
+Rafa?
