@@ -1,324 +1,38 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Sun, 28 Jun 2015 21:36:15 +0200
-Subject: [PATCH 07/13] KVM: arm64: implement basic ITS register handlers
-In-Reply-To: <1432893209-27313-8-git-send-email-andre.przywara@arm.com>
-References: <1432893209-27313-1-git-send-email-andre.przywara@arm.com>
- <1432893209-27313-8-git-send-email-andre.przywara@arm.com>
-Message-ID: <20150628193615.GL28244@cbox>
+From: digetx@gmail.com (Dmitry Osipenko)
+Date: Sun, 28 Jun 2015 22:34:44 +0300
+Subject: [PATCH] ARM: tegra: paz00: set gpiod_lookup table conn_id's
+Message-ID: <1435520160-16862-1-git-send-email-digetx@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 29, 2015 at 10:53:23AM +0100, Andre Przywara wrote:
-> Add emulation for some basic MMIO registers used in the ITS emulation.
-> This includes:
-> - GITS_{CTLR,TYPER,IIDR}
-> - ID registers
-> - GITS_{CBASER,CREAD,CWRITER}
->   those implement the ITS command buffer handling
-> 
-> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
-> ---
->  include/kvm/arm_vgic.h             |   3 +
->  include/linux/irqchip/arm-gic-v3.h |   8 ++
->  virt/kvm/arm/its-emul.c            | 172 +++++++++++++++++++++++++++++++++++++
->  virt/kvm/arm/its-emul.h            |   1 +
->  virt/kvm/arm/vgic-v3-emul.c        |   2 +
->  5 files changed, 186 insertions(+)
-> 
-> diff --git a/include/kvm/arm_vgic.h b/include/kvm/arm_vgic.h
-> index d76c2d9..3b8e3a1 100644
-> --- a/include/kvm/arm_vgic.h
-> +++ b/include/kvm/arm_vgic.h
-> @@ -159,6 +159,9 @@ struct vgic_io_device {
->  struct vgic_its {
->  	bool			enabled;
->  	spinlock_t		lock;
-> +	u64			cbaser;
-> +	int			creadr;
-> +	int			cwriter;
->  };
->  
->  struct vgic_dist {
-> diff --git a/include/linux/irqchip/arm-gic-v3.h b/include/linux/irqchip/arm-gic-v3.h
-> index df4e527..0b450c7 100644
-> --- a/include/linux/irqchip/arm-gic-v3.h
-> +++ b/include/linux/irqchip/arm-gic-v3.h
-> @@ -179,15 +179,23 @@
->  #define GITS_BASER			0x0100
->  #define GITS_IDREGS_BASE		0xffd0
->  #define GITS_PIDR2			GICR_PIDR2
-> +#define GITS_PIDR4			0xffd0
-> +#define GITS_CIDR0			0xfff0
-> +#define GITS_CIDR1			0xfff4
-> +#define GITS_CIDR2			0xfff8
-> +#define GITS_CIDR3			0xfffc
->  
->  #define GITS_TRANSLATER			0x10040
->  
->  #define GITS_CTLR_ENABLE		(1U << 0)
->  #define GITS_CTLR_QUIESCENT		(1U << 31)
->  
-> +#define GITS_TYPER_PLPIS		(1UL << 0)
-> +#define GITS_TYPER_IDBITS_SHIFT		8
->  #define GITS_TYPER_DEVBITS_SHIFT	13
->  #define GITS_TYPER_DEVBITS(r)		((((r) >> GITS_TYPER_DEVBITS_SHIFT) & 0x1f) + 1)
->  #define GITS_TYPER_PTA			(1UL << 19)
-> +#define GITS_TYPER_HWCOLLCNT_SHIFT	24
->  
->  #define GITS_CBASER_VALID		(1UL << 63)
->  #define GITS_CBASER_nCnB		(0UL << 59)
-> diff --git a/virt/kvm/arm/its-emul.c b/virt/kvm/arm/its-emul.c
-> index 7b283ce..82bc34a 100644
-> --- a/virt/kvm/arm/its-emul.c
-> +++ b/virt/kvm/arm/its-emul.c
-> @@ -32,10 +32,62 @@
->  #include "vgic.h"
->  #include "its-emul.h"
->  
-> +#define BASER_BASE_ADDRESS(x) ((x) & 0xfffffffff000ULL)
-> +
-> +/* distributor lock is hold by the VGIC MMIO handler */
->  static bool handle_mmio_misc_gits(struct kvm_vcpu *vcpu,
->  				  struct kvm_exit_mmio *mmio,
->  				  phys_addr_t offset)
->  {
-> +	struct vgic_its *its = &vcpu->kvm->arch.vgic.its;
-> +	u32 reg;
-> +	bool was_enabled;
-> +
-> +	switch (offset & ~3) {
-> +	case 0x00:		/* GITS_CTLR */
-> +		/* We never defer any command execution. */
-> +		reg = GITS_CTLR_QUIESCENT;
-> +		if (its->enabled)
-> +			reg |= GITS_CTLR_ENABLE;
-> +		was_enabled = its->enabled;
-> +		vgic_reg_access(mmio, &reg, offset & 3,
-> +				ACCESS_READ_VALUE | ACCESS_WRITE_VALUE);
-> +		its->enabled = !!(reg & GITS_CTLR_ENABLE);
-> +		return !was_enabled && its->enabled;
-> +	case 0x04:		/* GITS_IIDR */
-> +		reg = (PRODUCT_ID_KVM << 24) | (IMPLEMENTER_ARM << 0);
-> +		vgic_reg_access(mmio, &reg, offset & 3,
-> +				ACCESS_READ_VALUE | ACCESS_WRITE_IGNORED);
-> +		break;
-> +	case 0x08:		/* GITS_TYPER */
-> +		/*
-> +		 * We use linear CPU numbers for redistributor addressing,
-> +		 * so GITS_TYPER.PTA is 0.
-> +		 * To avoid memory waste on the guest side, we keep the
-> +		 * number of IDBits and DevBits low for the time being.
-> +		 * This could later be made configurable by userland.
-> +		 * Since we have all collections in linked list, we claim
-> +		 * that we can hold all of the collection tables in our
-> +		 * own memory and that the ITT entry size is 1 byte (the
-> +		 * smallest possible one).
-> +		 */
-> +		reg = GITS_TYPER_PLPIS;
-> +		reg |= 0xff << GITS_TYPER_HWCOLLCNT_SHIFT;
-> +		reg |= 0x0f << GITS_TYPER_DEVBITS_SHIFT;
-> +		reg |= 0x0f << GITS_TYPER_IDBITS_SHIFT;
-> +		vgic_reg_access(mmio, &reg, offset & 3,
-> +				ACCESS_READ_VALUE | ACCESS_WRITE_IGNORED);
-> +		break;
-> +	case 0x0c:
-> +		/* The upper 32bits of TYPER are all 0 for the time being.
-> +		 * Should we need more than 256 collections, we can enable
-> +		 * some bits in here.
-> +		 */
-> +		vgic_reg_access(mmio, NULL, offset & 3,
-> +				ACCESS_READ_RAZ | ACCESS_WRITE_IGNORED);
-> +		break;
-> +	}
-> +
->  	return false;
->  }
->  
-> @@ -43,20 +95,107 @@ static bool handle_mmio_gits_idregs(struct kvm_vcpu *vcpu,
->  				    struct kvm_exit_mmio *mmio,
->  				    phys_addr_t offset)
->  {
-> +	u32 reg = 0;
-> +	int idreg = (offset & ~3) + GITS_IDREGS_BASE;
-> +
-> +	switch (idreg) {
-> +	case GITS_PIDR2:
-> +		reg = GIC_PIDR2_ARCH_GICv3;
-> +		break;
-> +	case GITS_PIDR4:
-> +		/* This is a 64K software visible page */
-> +		reg = 0x40;
-> +		break;
-> +	/* Those are the ID registers for (any) GIC. */
-> +	case GITS_CIDR0:
-> +		reg = 0x0d;
-> +		break;
-> +	case GITS_CIDR1:
-> +		reg = 0xf0;
-> +		break;
-> +	case GITS_CIDR2:
-> +		reg = 0x05;
-> +		break;
-> +	case GITS_CIDR3:
-> +		reg = 0xb1;
-> +		break;
-> +	}
-> +	vgic_reg_access(mmio, &reg, offset & 3,
-> +			ACCESS_READ_VALUE | ACCESS_WRITE_IGNORED);
->  	return false;
->  }
->  
-> +static int vits_handle_command(struct kvm_vcpu *vcpu, u64 *its_cmd)
-> +{
-> +	return -ENODEV;
-> +}
-> +
->  static bool handle_mmio_gits_cbaser(struct kvm_vcpu *vcpu,
->  				    struct kvm_exit_mmio *mmio,
->  				    phys_addr_t offset)
->  {
-> +	struct vgic_its *its = &vcpu->kvm->arch.vgic.its;
-> +	int mode = ACCESS_READ_VALUE;
-> +
-> +	mode |= its->enabled ? ACCESS_WRITE_IGNORED : ACCESS_WRITE_VALUE;
-> +
-> +	vgic_handle_base_register(vcpu, mmio, offset, &its->cbaser, mode);
-> +	if (mmio->is_write)
-> +		its->creadr = 0;
->  	return false;
->  }
->  
-> +static int its_cmd_buffer_size(struct kvm *kvm)
-> +{
-> +	struct vgic_its *its = &kvm->arch.vgic.its;
-> +
-> +	return ((its->cbaser & 0xff) + 1) << 12;
-> +}
-> +
-> +static gpa_t its_cmd_buffer_base(struct kvm *kvm)
-> +{
-> +	struct vgic_its *its = &kvm->arch.vgic.its;
-> +
-> +	return BASER_BASE_ADDRESS(its->cbaser);
-> +}
-> +
->  static bool handle_mmio_gits_cwriter(struct kvm_vcpu *vcpu,
->  				     struct kvm_exit_mmio *mmio,
->  				     phys_addr_t offset)
->  {
-> +	struct vgic_its *its = &vcpu->kvm->arch.vgic.its;
-> +	u64 cmd_buf[4];
-> +	gpa_t cbaser = its_cmd_buffer_base(vcpu->kvm);
-> +	u32 reg;
-> +	int ret;
-> +
-> +	spin_lock(&its->lock);
-> +	switch (offset & ~3) {
-> +	case 0x00:
-> +		reg = its->cwriter & 0xfffe0;
-> +		vgic_reg_access(mmio, &reg, offset & 3,
-> +				ACCESS_READ_VALUE | ACCESS_WRITE_VALUE);
-> +		reg &= 0xfffe0;
-> +		if (reg > its_cmd_buffer_size(vcpu->kvm))
-> +			break;
-> +		while (its->creadr != reg) {
-> +			ret = kvm_read_guest(vcpu->kvm, cbaser + its->creadr,
-> +					     cmd_buf, 32);
+Commit 72daceb9a10a ("net: rfkill: gpio: Add default GPIO driver mappings
+for ACPI") removed possibility to request GPIO by table index for non-ACPI
+platforms without changing it users. As result "shutdown" GPIO request
+will fail if request for "reset" GPIO succeeded or "reset" will be
+requested instead of "shutdown" if "reset" wasn't defined. Fix it by
+setting conn_id's in gpiod_lookup_table.
 
-some more potential sleeping while holding a spinlock here?
+Signed-off-by: Dmitry Osipenko <digetx@gmail.com>
+Fixes: 72daceb (net: rfkill: gpio: Add default GPIO driver mappings for ACPI)
+Cc: <stable@vger.kernel.org> # v3.19+
+---
+ arch/arm/mach-tegra/board-paz00.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-> +			if (ret)
-> +				break;
-> +			vits_handle_command(vcpu, cmd_buf);
-> +			its->creadr += 32;
-> +			if (its->creadr == its_cmd_buffer_size(vcpu->kvm))
-> +				its->creadr = 0;
-> +		}
-> +		its->cwriter = reg;
-> +		break;
-> +	case 0x04:
-> +		vgic_reg_access(mmio, &reg, offset & 3,
-> +				ACCESS_READ_RAZ | ACCESS_WRITE_IGNORED);
-> +		break;
-> +	}
-> +	spin_unlock(&its->lock);
->  	return false;
->  }
->  
-> @@ -64,6 +203,22 @@ static bool handle_mmio_gits_creadr(struct kvm_vcpu *vcpu,
->  				    struct kvm_exit_mmio *mmio,
->  				    phys_addr_t offset)
->  {
-> +	struct vgic_its *its = &vcpu->kvm->arch.vgic.its;
-> +	u32 reg;
-> +
-> +	spin_lock(&its->lock);
-> +	switch (offset & ~3) {
-> +	case 0x00:
-> +		reg = its->creadr & 0xfffe0;
-> +		vgic_reg_access(mmio, &reg, offset & 3,
-> +				ACCESS_READ_VALUE | ACCESS_WRITE_IGNORED);
-> +		break;
-> +	case 0x04:
-> +		vgic_reg_access(mmio, &reg, offset & 3,
-> +				ACCESS_READ_RAZ | ACCESS_WRITE_IGNORED);
-> +		break;
-> +	}
-> +	spin_unlock(&its->lock);
->  	return false;
->  }
->  
-> @@ -119,9 +274,26 @@ int vits_init(struct kvm *kvm)
->  	if (IS_VGIC_ADDR_UNDEF(dist->vgic_its_base))
->  		return -ENXIO;
->  
-> +	dist->pendbaser = kmalloc(sizeof(u64) * dist->nr_cpus, GFP_KERNEL);
-> +	if (!dist->pendbaser)
-> +		return -ENOMEM;
-> +
->  	spin_lock_init(&its->lock);
->  
->  	its->enabled = false;
->  
->  	return -ENXIO;
->  }
-> +
-> +void vits_destroy(struct kvm *kvm)
-> +{
-> +	struct vgic_dist *dist = &kvm->arch.vgic;
-> +	struct vgic_its *its = &dist->its;
-> +
-> +	if (!vgic_has_its(kvm))
-> +		return;
-> +
-> +	kfree(dist->pendbaser);
-> +
-> +	its->enabled = false;
-> +}
-> diff --git a/virt/kvm/arm/its-emul.h b/virt/kvm/arm/its-emul.h
-> index 5dc8e2f..472a6d0 100644
-> --- a/virt/kvm/arm/its-emul.h
-> +++ b/virt/kvm/arm/its-emul.h
-> @@ -31,5 +31,6 @@
->  
->  void vgic_enable_lpis(struct kvm_vcpu *vcpu);
->  int vits_init(struct kvm *kvm);
-> +void vits_destroy(struct kvm *kvm);
->  
->  #endif
-> diff --git a/virt/kvm/arm/vgic-v3-emul.c b/virt/kvm/arm/vgic-v3-emul.c
-> index 4e40684..fa81c4b 100644
-> --- a/virt/kvm/arm/vgic-v3-emul.c
-> +++ b/virt/kvm/arm/vgic-v3-emul.c
-> @@ -881,6 +881,8 @@ static void vgic_v3_destroy_model(struct kvm *kvm)
->  {
->  	struct vgic_dist *dist = &kvm->arch.vgic;
->  
-> +	vits_destroy(kvm);
-> +
->  	kfree(dist->irq_spi_mpidr);
->  	dist->irq_spi_mpidr = NULL;
->  }
-> -- 
-> 2.3.5
-> 
+diff --git a/arch/arm/mach-tegra/board-paz00.c b/arch/arm/mach-tegra/board-paz00.c
+index fbe74c6..67024f3 100644
+--- a/arch/arm/mach-tegra/board-paz00.c
++++ b/arch/arm/mach-tegra/board-paz00.c
+@@ -39,8 +39,8 @@ static struct platform_device wifi_rfkill_device = {
+ static struct gpiod_lookup_table wifi_gpio_lookup = {
+ 	.dev_id = "rfkill_gpio",
+ 	.table = {
+-		GPIO_LOOKUP_IDX("tegra-gpio", 25, NULL, 0, 0),
+-		GPIO_LOOKUP_IDX("tegra-gpio", 85, NULL, 1, 0),
++		GPIO_LOOKUP_IDX("tegra-gpio", 25, "reset", 0, 0),
++		GPIO_LOOKUP_IDX("tegra-gpio", 85, "shutdown", 1, 0),
+ 		{ },
+ 	},
+ };
+-- 
+2.4.4
