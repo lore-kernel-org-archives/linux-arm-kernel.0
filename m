@@ -1,539 +1,123 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Sun, 28 Jun 2015 21:41:48 +0200
-Subject: [PATCH 11/13] KVM: arm64: implement ITS command queue command
- handlers
-In-Reply-To: <1432893209-27313-12-git-send-email-andre.przywara@arm.com>
-References: <1432893209-27313-1-git-send-email-andre.przywara@arm.com>
- <1432893209-27313-12-git-send-email-andre.przywara@arm.com>
-Message-ID: <20150628194148.GM28244@cbox>
+From: lorenx4@gmail.com (Lorenzo Nava)
+Date: Sun, 28 Jun 2015 22:14:43 +0200
+Subject: [RFC PATCH v3] arm DMA: Fix allocation from CMA for coherent DMA
+In-Reply-To: <20150626162549.GK3078@e104818-lin.cambridge.arm.com>
+References: <1434663862-17858-1-git-send-email-lorenx4@gmail.com>
+ <20150626162549.GK3078@e104818-lin.cambridge.arm.com>
+Message-ID: <CAE=W-e3YUjT=KbYTizBwg+3huvFLDqHvhzZN-oPqEnOKUXAtoQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 29, 2015 at 10:53:27AM +0100, Andre Przywara wrote:
-> The connection between a device, an event ID, the LPI number and the
-> allocated CPU is stored in in-memory tables in a GICv3, but their
-> format is not specified by the spec. Instead software uses a command
-> queue to let the ITS implementation use their own format.
-> Implement handlers for the various ITS commands and let them store
-> the requested relation into our own data structures.
-> Error handling is very basic at this point, as we don't have a good
-> way of communicating errors to the guest (usually a SError).
-> 
-> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
-> ---
->  include/linux/irqchip/arm-gic-v3.h |   1 +
->  virt/kvm/arm/its-emul.c            | 422 ++++++++++++++++++++++++++++++++++++-
->  virt/kvm/arm/its-emul.h            |  11 +
->  3 files changed, 433 insertions(+), 1 deletion(-)
-> 
-> diff --git a/include/linux/irqchip/arm-gic-v3.h b/include/linux/irqchip/arm-gic-v3.h
-> index 0b450c7..651aacc 100644
-> --- a/include/linux/irqchip/arm-gic-v3.h
-> +++ b/include/linux/irqchip/arm-gic-v3.h
-> @@ -254,6 +254,7 @@
->  #define GITS_CMD_MAPD			0x08
->  #define GITS_CMD_MAPC			0x09
->  #define GITS_CMD_MAPVI			0x0a
-> +#define GITS_CMD_MAPI			0x0b
->  #define GITS_CMD_MOVI			0x01
->  #define GITS_CMD_DISCARD		0x0f
->  #define GITS_CMD_INV			0x0c
-> diff --git a/virt/kvm/arm/its-emul.c b/virt/kvm/arm/its-emul.c
-> index afd440e..574cf05 100644
-> --- a/virt/kvm/arm/its-emul.c
-> +++ b/virt/kvm/arm/its-emul.c
-> @@ -22,6 +22,7 @@
->  #include <linux/kvm_host.h>
->  #include <linux/interrupt.h>
->  #include <linux/list.h>
-> +#include <linux/slab.h>
->  
->  #include <linux/irqchip/arm-gic-v3.h>
->  #include <kvm/arm_vgic.h>
-> @@ -55,6 +56,34 @@ struct its_itte {
->  	unsigned long *pending;
->  };
->  
-> +static struct its_device *find_its_device(struct kvm *kvm, u32 device_id)
-> +{
-> +	struct vgic_its *its = &kvm->arch.vgic.its;
-> +	struct its_device *device;
-> +
-> +	list_for_each_entry(device, &its->device_list, dev_list)
-> +		if (device_id == device->device_id)
-> +			return device;
-> +
-> +	return NULL;
-> +}
-> +
-> +static struct its_itte *find_itte(struct kvm *kvm, u32 device_id, u32 event_id)
-> +{
-> +	struct its_device *device;
-> +	struct its_itte *itte;
-> +
-> +	device = find_its_device(kvm, device_id);
-> +	if (device == NULL)
-> +		return NULL;
-> +
-> +	list_for_each_entry(itte, &device->itt, itte_list)
-> +		if (itte->event_id == event_id)
-> +			return itte;
-> +
-> +	return NULL;
-> +}
-> +
->  #define for_each_lpi(dev, itte, kvm) \
->  	list_for_each_entry(dev, &(kvm)->arch.vgic.its.device_list, dev_list) \
->  		list_for_each_entry(itte, &(dev)->itt, itte_list)
-> @@ -71,6 +100,19 @@ static struct its_itte *find_itte_by_lpi(struct kvm *kvm, int lpi)
->  	return NULL;
->  }
->  
-> +static struct its_collection *find_collection(struct kvm *kvm, int coll_id)
-> +{
-> +	struct its_collection *collection;
-> +
-> +	list_for_each_entry(collection, &kvm->arch.vgic.its.collection_list,
-> +			    coll_list) {
-> +		if (coll_id == collection->collection_id)
-> +			return collection;
-> +	}
-> +
-> +	return NULL;
-> +}
-> +
->  #define LPI_PROP_ENABLE_BIT(p)	((p) & LPI_PROP_ENABLED)
->  #define LPI_PROP_PRIORITY(p)	((p) & 0xfc)
->  
-> @@ -345,9 +387,386 @@ void vits_unqueue_lpi(struct kvm_vcpu *vcpu, int lpi)
->  	spin_unlock(&its->lock);
->  }
->  
-> +static u64 its_cmd_mask_field(u64 *its_cmd, int word, int shift, int size)
-> +{
-> +	return (le64_to_cpu(its_cmd[word]) >> shift) & (BIT_ULL(size) - 1);
-> +}
-> +
-> +#define its_cmd_get_command(cmd)	its_cmd_mask_field(cmd, 0,  0,  8)
-> +#define its_cmd_get_deviceid(cmd)	its_cmd_mask_field(cmd, 0, 32, 32)
-> +#define its_cmd_get_id(cmd)		its_cmd_mask_field(cmd, 1,  0, 32)
-> +#define its_cmd_get_physical_id(cmd)	its_cmd_mask_field(cmd, 1, 32, 32)
-> +#define its_cmd_get_collection(cmd)	its_cmd_mask_field(cmd, 2,  0, 16)
-> +#define its_cmd_get_target_addr(cmd)	its_cmd_mask_field(cmd, 2, 16, 32)
-> +#define its_cmd_get_validbit(cmd)	its_cmd_mask_field(cmd, 2, 63,  1)
-> +
-> +/*
-> + * Handles the DISCARD command, which frees an ITTE.
-> + * Must be called with the ITS lock held.
-> + */
-> +static int vits_cmd_handle_discard(struct kvm *kvm, u64 *its_cmd)
-> +{
-> +	u32 device_id;
-> +	u32 event_id;
-> +	struct its_itte *itte;
-> +
-> +	device_id = its_cmd_get_deviceid(its_cmd);
-> +	event_id = its_cmd_get_id(its_cmd);
-> +
-> +	itte = find_itte(kvm, device_id, event_id);
-> +	if (!itte || !itte->collection)
-> +		return E_ITS_DISCARD_UNMAPPED_INTERRUPT;
-> +
-> +	clear_bit(itte->collection->target_addr, itte->pending);
-> +
-> +	list_del(&itte->itte_list);
-> +	kfree(itte);
-> +	return 0;
-> +}
-> +
-> +/*
-> + * Handles the MOVI command, which moves an ITTE to a different collection.
-> + * Must be called with the ITS lock held.
-> + */
-> +static int vits_cmd_handle_movi(struct kvm *kvm, u64 *its_cmd)
-> +{
-> +	u32 device_id = its_cmd_get_deviceid(its_cmd);
-> +	u32 event_id = its_cmd_get_id(its_cmd);
-> +	u32 coll_id = its_cmd_get_collection(its_cmd);
-> +	struct its_itte *itte;
-> +	struct its_collection *collection;
-> +
-> +	itte = find_itte(kvm, device_id, event_id);
-> +	if (!itte)
-> +		return E_ITS_MOVI_UNMAPPED_INTERRUPT;
-> +	if (!itte->collection)
-> +		return E_ITS_MOVI_UNMAPPED_COLLECTION;
-> +
-> +	collection = find_collection(kvm, coll_id);
-> +	if (!collection)
-> +		return E_ITS_MOVI_UNMAPPED_COLLECTION;
-> +
-> +	if (test_and_clear_bit(itte->collection->target_addr, itte->pending))
-> +		set_bit(collection->target_addr, itte->pending);
-> +
-> +	itte->collection = collection;
-> +
-> +	return 0;
-> +}
-> +
-> +static struct its_collection *vits_new_collection(struct kvm *kvm, u32 coll_id)
-> +{
-> +	struct its_collection *collection;
-> +
-> +	collection = kmalloc(sizeof(struct its_collection), GFP_KERNEL);
+On Fri, Jun 26, 2015 at 6:25 PM, Catalin Marinas
+<catalin.marinas@arm.com> wrote:
+> On Thu, Jun 18, 2015 at 11:44:22PM +0200, Lorenzo Nava wrote:
+>> diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
+>> index 7e7583d..8e7f402 100644
+>> --- a/arch/arm/mm/dma-mapping.c
+>> +++ b/arch/arm/mm/dma-mapping.c
+>> @@ -645,15 +645,29 @@ static void *__dma_alloc(struct device *dev, size_t size, dma_addr_t *handle,
+>>       size = PAGE_ALIGN(size);
+>>       want_vaddr = !dma_get_attr(DMA_ATTR_NO_KERNEL_MAPPING, attrs);
+>>
+>> -     if (is_coherent || nommu())
+>> +     if (nommu()) {
+>>               addr = __alloc_simple_buffer(dev, size, gfp, &page);
+>> -     else if (!(gfp & __GFP_WAIT))
+>> +             goto dma_alloc_done;
+>> +     }
+>> +
+>> +     if (dev_get_cma_area(dev) && (gfp & __GFP_WAIT)) {
+>> +             addr = __alloc_from_contiguous(dev, size, prot, &page,
+>> +                                            caller, want_vaddr);
+>> +             goto dma_alloc_done;
+>> +     }
+>> +
+>> +     if (is_coherent) {
+>> +             addr = __alloc_simple_buffer(dev, size, gfp, &page);
+>> +             goto dma_alloc_done;
+>> +     }
+>> +
+>> +     if (!(gfp & __GFP_WAIT))
+>>               addr = __alloc_from_pool(size, &page);
+>> -     else if (!dev_get_cma_area(dev))
+>> -             addr = __alloc_remap_buffer(dev, size, gfp, prot, &page, caller, want_vaddr);
+>>       else
+>> -             addr = __alloc_from_contiguous(dev, size, prot, &page, caller, want_vaddr);
+>> +             addr = __alloc_remap_buffer(dev, size, gfp, prot, &page,
+>> +                                         caller, want_vaddr);
+>>
+>> +dma_alloc_done:
+>>       if (page)
+>>               *handle = pfn_to_dma(dev, page_to_pfn(page));
+>
+> The logic here looks alright but I would have preferred the original
+> more concise "if ... else if" constructs than the gotos (just personal
+> preference).
+>
+Ok, I can switch back to "if..else": I thought it was becoming too
+difficult to read, but in the end the code looks good also with the
+original style.
 
-If I manage to understand the structure here, you're calling all these
-handler functions with a spinlock held so any operation that may sleep
-could cause your system to deadlock.
+>> @@ -680,9 +694,14 @@ void *arm_dma_alloc(struct device *dev, size_t size, dma_addr_t *handle,
+>>  static void *arm_coherent_dma_alloc(struct device *dev, size_t size,
+>>       dma_addr_t *handle, gfp_t gfp, struct dma_attrs *attrs)
+>>  {
+>> -     pgprot_t prot = __get_dma_pgprot(attrs, PAGE_KERNEL);
+>> +     pgprot_t prot;
+>>       void *memory;
+>>
+>> +     if (attrs == NULL)
+>> +              prot  = PAGE_KERNEL;
+>> +     else
+>> +              prot  = __get_dma_pgprot(attrs, PAGE_KERNEL);
+>> +
+>>       if (dma_alloc_from_coherent(dev, size, handle, &memory))
+>>               return memory;
+>
+> I still think this is the wrong way to fix. It doesn't address the
+> coherent dma mmap operation. I already replied on the previous version
+> that we should rather have an extra argument "coherent" to
+> __get_dma_pgprot().
+>
+I avoided touching the __get_dma_pgprot() function because it affects
+a lot of different functions.
+If you think that the implementation you suggested in previous reply
+was ok and doesn't introduce problems on the other functions using the
+__get_dma_pgprot(), for me it's of course ok as well. Do you see any
+code that maybe need a double check: I'm thinking, for example, at the
+function arm_iommu_alloc_attrs() and arm_iommu_mmap_attrs()? I agree
+with you that the extra argument in the __get_dma_pgprot() function is
+definitely the best solution, but I have to be sure that this doesn't
+affect any other functions with unexpected behaviour.
+For the dma mmap there is still the patch "[PATCH v3]
+arm/mm/dma-mapping.c: Add arm_coherent_dma_mmap" which corrects the
+behaviour of mapped attributes and makes this version of patch ok.
 
-I'll stop looking for these and recommend you go over the whole series
-for these.
+>> @@ -735,12 +754,12 @@ static void __arm_dma_free(struct device *dev, size_t size, void *cpu_addr,
+>>
+>>       size = PAGE_ALIGN(size);
+>>
+>> -     if (is_coherent || nommu()) {
+>> +     if (nommu()) {
+>>               __dma_free_buffer(page, size);
+>>       } else if (__free_from_pool(cpu_addr, size)) {
+>>               return;
+>
+> You have an unnecessary __free_from_pool() call here in the is_coherent
+> case.
+Ok, I'll fix it. Do you think that short-circuit evaluation can be
+used here or it is better to use another solution?
 
-Perhaps the right thing to do is to synchronize access to your data
-structure (why you hold the spinlock right?) with RCU if you can...
+>
+>>       } else if (!dev_get_cma_area(dev)) {
+>> -             if (want_vaddr)
+>> +             if (want_vaddr && !is_coherent)
+>>                       __dma_free_remap(cpu_addr, size);
+>>               __dma_free_buffer(page, size);
+>>       } else {
+>
+> --
+> Catalin
 
--Christoffer
-
-> +	if (!collection)
-> +		return NULL;
-> +	collection->collection_id = coll_id;
-> +
-> +	list_add_tail(&collection->coll_list,
-> +		&kvm->arch.vgic.its.collection_list);
-> +
-> +	return collection;
-> +}
-> +
-> +/*
-> + * Handles the MAPVI and MAPI command, which maps LPIs to ITTEs.
-> + * Must be called with the ITS lock held.
-> + */
-> +static int vits_cmd_handle_mapi(struct kvm *kvm, u64 *its_cmd, u8 cmd)
-> +{
-> +	struct vgic_dist *dist = &kvm->arch.vgic;
-> +	u32 device_id = its_cmd_get_deviceid(its_cmd);
-> +	u32 event_id = its_cmd_get_id(its_cmd);
-> +	u32 coll_id = its_cmd_get_collection(its_cmd);
-> +	struct its_itte *itte;
-> +	struct its_device *device;
-> +	struct its_collection *collection, *new_coll = NULL;
-> +	int lpi_nr;
-> +
-> +	device = find_its_device(kvm, device_id);
-> +	if (!device)
-> +		return E_ITS_MAPVI_UNMAPPED_DEVICE;
-> +
-> +	collection = find_collection(kvm, coll_id);
-> +	if (!collection) {
-> +		new_coll = vits_new_collection(kvm, coll_id);
-> +		if (!new_coll)
-> +			return -ENOMEM;
-> +	}
-> +
-> +	if (cmd == GITS_CMD_MAPVI)
-> +		lpi_nr = its_cmd_get_physical_id(its_cmd);
-> +	else
-> +		lpi_nr = event_id;
-> +	if (lpi_nr < GIC_LPI_OFFSET ||
-> +	    lpi_nr >= PROPBASE_TSIZE(dist->propbaser))
-> +		return E_ITS_MAPVI_PHYSICALID_OOR;
-> +
-> +	itte = find_itte(kvm, device_id, event_id);
-> +	if (!itte) {
-> +		/* Allocate a new ITTE */
-> +		itte = kzalloc(sizeof(struct its_itte), GFP_KERNEL);
-> +		if (!itte) {
-> +			kfree(new_coll);
-> +			return -ENOMEM;
-> +		}
-> +		itte->pending = kcalloc(BITS_TO_LONGS(dist->nr_cpus),
-> +					sizeof(long), GFP_KERNEL);
-> +		if (!itte->pending) {
-> +			kfree(itte);
-> +			kfree(new_coll);
-> +			return -ENOMEM;
-> +		}
-> +
-> +		itte->event_id	= event_id;
-> +
-> +		list_add_tail(&itte->itte_list, &device->itt);
-> +	}
-> +
-> +	itte->collection = collection ? collection : new_coll;
-> +	itte->lpi = lpi_nr;
-> +
-> +	return 0;
-> +}
-> +
-> +static void vits_unmap_device(struct kvm *kvm, struct its_device *device)
-> +{
-> +	struct its_itte *itte, *temp;
-> +
-> +	/*
-> +	 * The spec says that unmapping a device with still valid
-> +	 * ITTEs associated is UNPREDICTABLE. We remove all ITTEs,
-> +	 * since we cannot leave the memory unreferenced.
-> +	 */
-> +	list_for_each_entry_safe(itte, temp, &device->itt, itte_list) {
-> +		list_del(&itte->itte_list);
-> +		kfree(itte);
-> +	}
-> +
-> +	list_del(&device->dev_list);
-> +	kfree(device);
-> +}
-> +
-> +/* Must be called with the ITS lock held. */
-> +static int vits_cmd_handle_mapd(struct kvm *kvm, u64 *its_cmd)
-> +{
-> +	bool valid = its_cmd_get_validbit(its_cmd);
-> +	u32 device_id = its_cmd_get_deviceid(its_cmd);
-> +	struct its_device *device;
-> +
-> +	device = find_its_device(kvm, device_id);
-> +	if (device)
-> +		vits_unmap_device(kvm, device);
-> +
-> +	/*
-> +	 * The spec does not say whether unmapping a not-mapped device
-> +	 * is an error, so we are done in any case.
-> +	 */
-> +	if (!valid)
-> +		return 0;
-> +
-> +	device = kzalloc(sizeof(struct its_device), GFP_KERNEL);
-> +	if (!device)
-> +		return -ENOMEM;
-> +
-> +	device->device_id = device_id;
-> +	INIT_LIST_HEAD(&device->itt);
-> +
-> +	list_add_tail(&device->dev_list,
-> +		      &kvm->arch.vgic.its.device_list);
-> +
-> +	return 0;
-> +}
-> +
-> +/* Must be called with the ITS lock held. */
-> +static int vits_cmd_handle_mapc(struct kvm *kvm, u64 *its_cmd)
-> +{
-> +	u16 coll_id;
-> +	u32 target_addr;
-> +	struct its_collection *collection;
-> +	bool valid;
-> +
-> +	valid = its_cmd_get_validbit(its_cmd);
-> +	coll_id = its_cmd_get_collection(its_cmd);
-> +	target_addr = its_cmd_get_target_addr(its_cmd);
-> +
-> +	if (target_addr >= atomic_read(&kvm->online_vcpus))
-> +		return E_ITS_MAPC_PROCNUM_OOR;
-> +
-> +	collection = find_collection(kvm, coll_id);
-> +
-> +	if (!valid) {
-> +		struct its_device *device;
-> +		struct its_itte *itte;
-> +		/*
-> +		 * Clearing the mapping for that collection ID removes the
-> +		 * entry from the list. If there wasn't any before, we can
-> +		 * go home early.
-> +		 */
-> +		if (!collection)
-> +			return 0;
-> +
-> +		for_each_lpi(device, itte, kvm)
-> +			if (itte->collection &&
-> +			    itte->collection->collection_id == coll_id)
-> +				itte->collection = NULL;
-> +
-> +		list_del(&collection->coll_list);
-> +		kfree(collection);
-> +		return 0;
-> +	}
-> +
-> +	if (!collection) {
-> +		collection = vits_new_collection(kvm, coll_id);
-> +		if (!collection)
-> +			return -ENOMEM;
-> +	}
-> +
-> +	collection->target_addr = target_addr;
-> +
-> +	return 0;
-> +}
-> +
-> +/* Must be called with the ITS lock held. */
-> +static int vits_cmd_handle_clear(struct kvm *kvm, u64 *its_cmd)
-> +{
-> +	u32 device_id;
-> +	u32 event_id;
-> +	struct its_itte *itte;
-> +
-> +	device_id = its_cmd_get_deviceid(its_cmd);
-> +	event_id = its_cmd_get_id(its_cmd);
-> +
-> +	itte = find_itte(kvm, device_id, event_id);
-> +	if (!itte)
-> +		return E_ITS_CLEAR_UNMAPPED_INTERRUPT;
-> +
-> +	if (itte->collection)
-> +		clear_bit(itte->collection->target_addr, itte->pending);
-> +	return 0;
-> +}
-> +
-> +/* Must be called with the ITS lock held. */
-> +static int vits_cmd_handle_inv(struct kvm *kvm, u64 *its_cmd)
-> +{
-> +	struct vgic_dist *dist = &kvm->arch.vgic;
-> +	u32 device_id;
-> +	u32 event_id;
-> +	struct its_itte *itte;
-> +	gpa_t propbase;
-> +	int ret;
-> +	u8 prop;
-> +
-> +	device_id = its_cmd_get_deviceid(its_cmd);
-> +	event_id = its_cmd_get_id(its_cmd);
-> +
-> +	itte = find_itte(kvm, device_id, event_id);
-> +	if (!itte)
-> +		return E_ITS_INV_UNMAPPED_INTERRUPT;
-> +
-> +	propbase = BASER_BASE_ADDRESS(dist->propbaser);
-> +	ret = kvm_read_guest(kvm, propbase + itte->lpi - GIC_LPI_OFFSET,
-> +			     &prop, 1);
-> +	if (ret)
-> +		return ret;
-> +
-> +	update_lpi_property(kvm, itte, prop);
-> +	return 0;
-> +}
-> +
-> +/* Must be called with the ITS lock held. */
-> +static int vits_cmd_handle_invall(struct kvm *kvm, u64 *its_cmd)
-> +{
-> +	u32 coll_id = its_cmd_get_collection(its_cmd);
-> +	struct its_collection *collection;
-> +	struct kvm_vcpu *vcpu;
-> +
-> +	collection = find_collection(kvm, coll_id);
-> +	if (!collection)
-> +		return E_ITS_INVALL_UNMAPPED_COLLECTION;
-> +
-> +	vcpu = kvm_get_vcpu(kvm, collection->target_addr);
-> +
-> +	its_update_lpi_properties(kvm);
-> +	its_sync_lpi_pending_table(vcpu);
-> +
-> +	return 0;
-> +}
-> +
-> +/* Must be called with the ITS lock held. */
-> +static int vits_cmd_handle_movall(struct kvm *kvm, u64 *its_cmd)
-> +{
-> +	u32 target1_addr = its_cmd_get_target_addr(its_cmd);
-> +	u32 target2_addr = its_cmd_mask_field(its_cmd, 3, 16, 32);
-> +	struct its_collection *collection;
-> +	struct its_device *device;
-> +	struct its_itte *itte;
-> +
-> +	if (target1_addr >= atomic_read(&kvm->online_vcpus) ||
-> +	    target2_addr >= atomic_read(&kvm->online_vcpus))
-> +		return E_ITS_MOVALL_PROCNUM_OOR;
-> +
-> +	if (target1_addr == target2_addr)
-> +		return 0;
-> +
-> +	for_each_lpi(device, itte, kvm) {
-> +		/* remap all collections mapped to target address 1 */
-> +		collection = itte->collection;
-> +		if (collection && collection->target_addr == target1_addr)
-> +			collection->target_addr = target2_addr;
-> +
-> +		/* move pending state if LPI is affected */
-> +		if (test_and_clear_bit(target1_addr, itte->pending))
-> +			set_bit(target2_addr, itte->pending);
-> +	}
-> +
-> +	return 0;
-> +}
-> +
-> +/* Must be called with the ITS lock held. */
->  static int vits_handle_command(struct kvm_vcpu *vcpu, u64 *its_cmd)
->  {
-> -	return -ENODEV;
-> +	u8 cmd = its_cmd_get_command(its_cmd);
-> +	int ret = -ENODEV;
-> +
-> +	switch (cmd) {
-> +	case GITS_CMD_MAPD:
-> +		ret = vits_cmd_handle_mapd(vcpu->kvm, its_cmd);
-> +		break;
-> +	case GITS_CMD_MAPC:
-> +		ret = vits_cmd_handle_mapc(vcpu->kvm, its_cmd);
-> +		break;
-> +	case GITS_CMD_MAPI:
-> +		ret = vits_cmd_handle_mapi(vcpu->kvm, its_cmd, cmd);
-> +		break;
-> +	case GITS_CMD_MAPVI:
-> +		ret = vits_cmd_handle_mapi(vcpu->kvm, its_cmd, cmd);
-> +		break;
-> +	case GITS_CMD_MOVI:
-> +		ret = vits_cmd_handle_movi(vcpu->kvm, its_cmd);
-> +		break;
-> +	case GITS_CMD_DISCARD:
-> +		ret = vits_cmd_handle_discard(vcpu->kvm, its_cmd);
-> +		break;
-> +	case GITS_CMD_CLEAR:
-> +		ret = vits_cmd_handle_clear(vcpu->kvm, its_cmd);
-> +		break;
-> +	case GITS_CMD_MOVALL:
-> +		ret = vits_cmd_handle_movall(vcpu->kvm, its_cmd);
-> +		break;
-> +	case GITS_CMD_INV:
-> +		ret = vits_cmd_handle_inv(vcpu->kvm, its_cmd);
-> +		break;
-> +	case GITS_CMD_INVALL:
-> +		ret = vits_cmd_handle_invall(vcpu->kvm, its_cmd);
-> +		break;
-> +	case GITS_CMD_SYNC:
-> +		/* we ignore those commands: we are in sync all of the time */
-> +		break;
-> +	}
-> +
-> +	return ret;
->  }
->  
->  static bool handle_mmio_gits_cbaser(struct kvm_vcpu *vcpu,
-> @@ -532,6 +951,7 @@ void vits_destroy(struct kvm *kvm)
->  		list_for_each_safe(cur, temp, &dev->itt) {
->  			itte = (container_of(cur, struct its_itte, itte_list));
->  			list_del(cur);
-> +			kfree(itte->pending);
->  			kfree(itte);
->  		}
->  		list_del(dev_cur);
-> diff --git a/virt/kvm/arm/its-emul.h b/virt/kvm/arm/its-emul.h
-> index cc5d5ff..6152d04 100644
-> --- a/virt/kvm/arm/its-emul.h
-> +++ b/virt/kvm/arm/its-emul.h
-> @@ -36,4 +36,15 @@ void vits_destroy(struct kvm *kvm);
->  bool vits_queue_lpis(struct kvm_vcpu *vcpu);
->  void vits_unqueue_lpi(struct kvm_vcpu *vcpu, int irq);
->  
-> +#define E_ITS_MOVI_UNMAPPED_INTERRUPT		0x010107
-> +#define E_ITS_MOVI_UNMAPPED_COLLECTION		0x010109
-> +#define E_ITS_CLEAR_UNMAPPED_INTERRUPT		0x010507
-> +#define E_ITS_MAPC_PROCNUM_OOR			0x010902
-> +#define E_ITS_MAPVI_UNMAPPED_DEVICE		0x010a04
-> +#define E_ITS_MAPVI_PHYSICALID_OOR		0x010a06
-> +#define E_ITS_INV_UNMAPPED_INTERRUPT		0x010c07
-> +#define E_ITS_INVALL_UNMAPPED_COLLECTION	0x010d09
-> +#define E_ITS_MOVALL_PROCNUM_OOR		0x010e01
-> +#define E_ITS_DISCARD_UNMAPPED_INTERRUPT	0x010f07
-> +
->  #endif
-> -- 
-> 2.3.5
-> 
+Thanks.
+Lorenzo
