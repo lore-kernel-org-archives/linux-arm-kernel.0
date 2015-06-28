@@ -1,48 +1,48 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sun, 28 Jun 2015 23:30:40 +0100
-Subject: dma_sync_single_for_cpu takes a really long time
-In-Reply-To: <CAF6-1L6sjGc1VySi=oQGzOEm-e5jauznh+jzmdDgmJQWLbA_pA@mail.gmail.com>
-References: <CAF6-1L6sjGc1VySi=oQGzOEm-e5jauznh+jzmdDgmJQWLbA_pA@mail.gmail.com>
-Message-ID: <20150628223039.GV7557@n2100.arm.linux.org.uk>
+Date: Sun, 28 Jun 2015 23:45:43 +0100
+Subject: dma-mapping: support for DMA_ATTR_NON_CONSISTENT DMA attribute
+In-Reply-To: <CAF6-1L5c-PbK_wfpvz1xdRkquXyuQDv4mvKfYp8fwA1LK9ZOyw@mail.gmail.com>
+References: <CAF6-1L5c-PbK_wfpvz1xdRkquXyuQDv4mvKfYp8fwA1LK9ZOyw@mail.gmail.com>
+Message-ID: <20150628224543.GW7557@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jun 28, 2015 at 10:40:03PM +0200, Sylvain Munaut wrote:
-> I'm working on a DMA driver that uses the the streaming DMA API to
-> synchronize the access between host and device. The data flow is
-> exclusively from the device to the host (video grabber).
+On Sun, Jun 28, 2015 at 10:32:41PM +0200, Sylvain Munaut wrote:
+> I've found this patch from several month ago :
 > 
-> As such, I call dma_sync_single_for_cpu when the hardware is done
-> writing a frame to make sure that the cpu gets up to date data when
-> accessing the zone.
+> http://lists.infradead.org/pipermail/linux-arm-kernel/2015-February/325489.html
 > 
-> However this call takes a _long_ time to complete. For a 6 Megabytes
-> buffer, it takes about 13 ms which is just crazy ... at that rate it'd
-> be faster to just read random data from a random buffer to trash the
-> measly 512k of cache ...
+> And I find it very useful, but I couldn't find why it wasn't merged ?
 
-Flushing a large chunk of memory one cache line at a time takes a long
-time, there's really nothing "new" about that.
+It's wrong.
 
-It's the expense that has to be paid for using cacheable mappings on a
-CPU which is not DMA coherent - something which I've brought up over
-the years with ARM, but it's not something that ARM believe is wanted
-by their silicon partners.
+> What was the problem with it ?
 
-What we _could_ do is decide that if the buffer is larger than some
-factor of the cache size, to just flush the entire cache.  However, that
-penalises the case where none of the data is in the cache - and in all
-probably  very little of the frame is actually sitting in the cache at
-that moment.
+It's based on a bad assumption, the same bad assumption that you seem to
+be making below, which is an abuse of the DMA API.
 
-However, if you're going to read the entire frame through a cacheable
-mapping, you're probably going to end up flushing your cache several
-times over through doing that - but that's probably something you're
-doing in userspace, and so the kernel doesn't have the knowledge to know
-that's what userspace will be doing (nor should it.)
+> In my use case, I need to allocate fairly large buffers (holding video
+> data) and the hardware requires them to be contiguous.
 
-There isn't a trivial solution to this problem, and I wish that ARM had
-solved this issue by becoming a DMA-coherent architecture.
+So, you're allocating the buffers using the *coherent* DMA API...
+
+> I ensure the consistency by using the DMA streaming API
+> (dma_sync_single_for_{cpu,device}) and so when the buffer is "owned"
+> by the CPU, I definitely want cached access because coherent memory
+> speed is just abysmal ... (about 10x slower to read the whole buffer
+> sequentially).
+
+... and then using the *streaming* API dma_sync_* calls on it.  That
+is invalid, and will lead to undefined results on implementations of
+dma_alloc_coherent() which return remapped memory (as for older ARMs.)
+This is an abuse of the API.
+
+See Documentation/DMA-API.txt.  The API is split into two separate major
+chunks, the coherent API, and the streaming API.  It is not permissible
+to use functions from one API with memory obtained from the other API.
+
+Enable DMA debug (part III of that document) to have the kernel tell you
+that you're abusing the API. :)
 
 -- 
 FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
