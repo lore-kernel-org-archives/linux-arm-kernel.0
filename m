@@ -1,296 +1,55 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Sun, 28 Jun 2015 21:39:53 +0800
-Subject: [PATCH V2 1/1] ARM: dts: imx7d: add cortex-a7 coresight component
-In-Reply-To: <1433192081-1131-1-git-send-email-Frank.Li@freescale.com>
-References: <1433192081-1131-1-git-send-email-Frank.Li@freescale.com>
-Message-ID: <20150628133953.GE10332@tiger>
+From: elfring@users.sourceforge.net (SF Markus Elfring)
+Date: Sun, 28 Jun 2015 16:05:13 +0200
+Subject: [PATCH] iommu/arm-smmu: Delete an unnecessary check before the
+ function call "free_io_pgtable_ops"
+In-Reply-To: <5317A59D.4@users.sourceforge.net>
+References: <5307CAA2.8060406@users.sourceforge.net>
+ <alpine.DEB.2.02.1402212321410.2043@localhost6.localdomain6>
+ <530A086E.8010901@users.sourceforge.net>
+ <alpine.DEB.2.02.1402231635510.1985@localhost6.localdomain6>
+ <530A72AA.3000601@users.sourceforge.net>
+ <alpine.DEB.2.02.1402240658210.2090@localhost6.localdomain6>
+ <530B5FB6.6010207@users.sourceforge.net>
+ <alpine.DEB.2.10.1402241710370.2074@hadrien>
+ <530C5E18.1020800@users.sourceforge.net>
+ <alpine.DEB.2.10.1402251014170.2080@hadrien>
+ <530CD2C4.4050903@users.sourceforge.net>
+ <alpine.DEB.2.10.1402251840450.7035@hadrien>
+ <530CF8FF.8080600@users.sourceforge.net>
+ <alpine.DEB.2.02.1402252117150.2047@localhost6.localdomain6>
+ <530DD06F.4090703@users.sourceforge.net>
+ <alpine.DEB.2.02.1402262129250.2221@localhost6.localdomain6>
+ <5317A59D.4@users.sourceforge.net>
+Message-ID: <558FFF19.1060402@users.sourceforge.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 02, 2015 at 04:54:41AM +0800, Frank.Li at freescale.com wrote:
-> From: Frank Li <Frank.Li@freescale.com>
-> 
-> Added etm, etb, funnel and replicator
-> 
-> usage example:
-> 
->     echo 1 >/sys/bus/coresight/devices/30086000.etr/enable_sink
->     echo 1 >/sys/bus/coresight/devices/3007c000.etm/enable_source
-> 
->         coresight-tmc 30086000.etr: TMC enabled
->         coresight-replicator replicator.1: REPLICATOR enabled
->         coresight-tmc 30084000.tmc: TMC enabled
->         coresight-funnel 30083000.funnel: FUNNEL inport 0 enabled
->         coresight-funnel 30041000.funnel: FUNNEL inport 0 enabled
->         coresight-etm3x 3007c000.etm: ETM tracing enabled
-> 
->     etm enable here.
->     trace data save at /dev/30086000.etr
-> 
->     cat /dev/30086000.etr > trace.data
-> 
->         coresight-tmc 30086000.etr: TMC read start
->         coresight-tmc 30086000.etr: TMC read end
-> 
->     use ptm2human(https://github.com/hwangcc23/ptm2human) to show trace data
-> 
->     ptm2human -i trace.data
-> 
-> Signed-off-by: Frank Li <Frank.Li@freescale.com>
-> ---
-> Change from V1 to V2
->  - remove "0" after @
->  - add comments about unused funnel input port
->  - add comments about add  arm,primecell-periphid
-> 
->  arch/arm/boot/dts/imx7d.dtsi | 202 +++++++++++++++++++++++++++++++++++++++++++
->  1 file changed, 202 insertions(+)
-> 
-> diff --git a/arch/arm/boot/dts/imx7d.dtsi b/arch/arm/boot/dts/imx7d.dtsi
-> index b4cd8fd..d715501 100644
-> --- a/arch/arm/boot/dts/imx7d.dtsi
-> +++ b/arch/arm/boot/dts/imx7d.dtsi
-> @@ -121,6 +121,208 @@
->  		clock-output-names = "osc";
->  	};
->  
-> +	etr at 30086000 {
-> +		compatible = "arm,coresight-tmc", "arm,primecell";
-> +		reg = <0x30086000 0x1000>;
-> +
+From: Markus Elfring <elfring@users.sourceforge.net>
+Date: Sun, 28 Jun 2015 15:55:11 +0200
 
-Drop this new line.
+The free_io_pgtable_ops() function tests whether its argument is NULL
+and then returns immediately. Thus the test around the call is not needed.
 
-> +		clocks = <&clks IMX7D_MAIN_AXI_ROOT_CLK>;
-> +		clock-names = "apb_pclk";
-> +
-> +		port {
-> +			etr_in_port: endpoint {
-> +				slave-mode;
-> +				remote-endpoint = <&replicator_out_port1>;
-> +			};
-> +		};
-> +	};
-> +
-> +	tpiu at 30087000 {
-> +		compatible = "arm,coresight-tpiu", "arm,primecell";
-> +		reg = <0x30087000 0x1000>;
-> +
+This issue was detected by using the Coccinelle software.
 
-Ditto
+Signed-off-by: Markus Elfring <elfring@users.sourceforge.net>
+---
+ drivers/iommu/arm-smmu-v3.c | 3 +--
+ 1 file changed, 1 insertion(+), 2 deletions(-)
 
-> +		clocks = <&clks IMX7D_MAIN_AXI_ROOT_CLK>;
-> +		clock-names = "apb_pclk";
-
-Have a new line here.
-
-> +		port {
-> +			tpiu_in_port: endpoint at 0 {
-
-Why do we need a @unit-address here?
-
-> +				slave-mode;
-> +				remote-endpoint = <&replicator_out_port1>;
-> +			};
-> +		};
-> +	};
-> +
-> +	replicator {
-> +		/* non-configurable replicators don't show up on the
-> +		 * AMBA bus.  As such no need to add "arm,primecell"
-> +		 */
-
-		/*
-		 * Multiple-line comment
-		 */
-
-> +		compatible = "arm,coresight-replicator";
-> +
-> +		ports {
-> +			#address-cells = <1>;
-> +			#size-cells = <0>;
-> +
-> +			/* replicator output ports */
-> +			port at 0 {
-> +				reg = <0>;
-> +				replicator_out_port0: endpoint {
-> +					remote-endpoint = <&tpiu_in_port>;
-> +				};
-> +			};
-> +
-> +			port at 1 {
-> +				reg = <1>;
-> +				replicator_out_port1: endpoint {
-> +					remote-endpoint = <&etr_in_port>;
-> +				};
-> +			};
-> +
-> +			/* replicator input port */
-> +			port at 2 {
-> +				reg = <0>;
-> +				replicator_in_port0: endpoint {
-> +					slave-mode;
-> +					remote-endpoint = <&etf_out_port>;
-> +				};
-> +			};
-> +		};
-> +	};
-> +
-> +	etf at 30084000 {
-> +		compatible = "arm,coresight-tmc", "arm,primecell";
-> +		reg = <0x30084000 0x1000>;
-> +		clocks = <&clks IMX7D_MAIN_AXI_ROOT_CLK>;
-> +		clock-names = "apb_pclk";
-> +
-> +		ports {
-> +			#address-cells = <1>;
-> +			#size-cells = <0>;
-> +
-> +			port at 0 {
-> +				reg = <0>;
-> +				etf_in_port: endpoint {
-> +					slave-mode;
-> +					remote-endpoint = <&hugo_funnel_out_port0>;
-> +				};
-> +			};
-> +
-> +			port at 1 {
-> +				reg = <0>;
-> +				etf_out_port: endpoint {
-> +					remote-endpoint = <&replicator_in_port0>;
-> +				};
-> +			};
-> +		};
-> +	};
-> +
-> +	funnel at 30083000 {
-> +		compatible = "arm,coresight-funnel", "arm,primecell";
-> +		reg = <0x30083000 0x1000>;
-> +		clocks = <&clks IMX7D_MAIN_AXI_ROOT_CLK>;
-> +		clock-names = "apb_pclk";
-> +
-> +		ports {
-> +			#address-cells = <1>;
-> +			#size-cells = <0>;
-> +
-> +			/* funnel input ports */
-> +			port at 0 {
-> +				reg = <0>;
-> +				hugo_funnel_in_port0: endpoint {
-> +					slave-mode;
-> +					remote-endpoint = <&ca_funnel_out_port0>;
-> +				};
-> +			};
-> +
-> +			port at 1 {
-> +				reg = <1>;
-> +				hugo_funnel_in_port1: endpoint {
-> +					slave-mode; /* M4 input */
-> +				};
-> +			};
-> +
-> +			port at 2 {
-> +				reg = <0>;
-> +				hugo_funnel_out_port0: endpoint {
-> +					remote-endpoint = <&etf_in_port>;
-> +				};
-> +			};
-> +
-> +			/* the other input ports are not connect to anything */
-> +		};
-> +	};
-> +
-> +	funnel at 30041000 {
-> +		compatible = "arm,coresight-funnel", "arm,primecell";
-> +		reg = <0x30041000 0x1000>;
-> +		clocks = <&clks IMX7D_MAIN_AXI_ROOT_CLK>;
-> +		clock-names = "apb_pclk";
-> +
-> +		ports {
-> +			#address-cells = <1>;
-> +			#size-cells = <0>;
-> +
-> +			/* funnel input ports */
-> +			port at 0 {
-> +				reg = <0>;
-> +				ca_funnel_in_port0: endpoint {
-> +					slave-mode;
-> +					remote-endpoint = <&etm0_out_port>;
-> +				};
-> +			};
-> +
-> +			port at 1 {
-> +				reg = <1>;
-> +				ca_funnel_in_port1: endpoint {
-> +					slave-mode;
-> +					remote-endpoint = <&etm1_out_port>;
-> +				};
-> +			};
-> +
-> +			/* funnel output port */
-> +			port at 2 {
-> +				reg = <0>;
-> +				ca_funnel_out_port0: endpoint {
-> +					remote-endpoint = <&hugo_funnel_in_port0>;
-> +				};
-> +			};
-> +
-> +			/* the other input ports are not connect to anything */
-> +		};
-> +	};
-> +
-> +	etm at 3007c000 {
-> +		compatible = "arm,coresight-etm3x", "arm,primecell";
-> +		reg = <0x3007c000 0x1000>;
-> +		cpu = <&cpu0>;
-> +		clocks = <&clks IMX7D_MAIN_AXI_ROOT_CLK>;
-> +		clock-names = "apb_pclk";
-> +
-> +		port {
-> +			etm0_out_port: endpoint {
-> +				remote-endpoint = <&ca_funnel_in_port0>;
-> +			};
-> +		};
-> +	};
-> +
-> +	etm at 3007d000 {
-> +		compatible = "arm,coresight-etm3x", "arm,primecell";
-> +		reg = <0x3007d000 0x1000>;
-> +
-> +		/* System will hang if added nosmp in kernel command line
-> +		 * without arm,primecell-periphid because amba bus try to
-> +		 * read id and core1 power off at this time.
-> +		 */
-
-		/*
-		 * Multiple-line comment
-		 */
-
-> +		arm,primecell-periphid =  <0xbb956>;
-
-One space after '='
-
-Shawn
-
-> +		cpu = <&cpu1>;
-> +		clocks = <&clks IMX7D_MAIN_AXI_ROOT_CLK>;
-> +		clock-names = "apb_pclk";
-> +
-> +		port {
-> +			etm1_out_port: endpoint {
-> +				remote-endpoint = <&ca_funnel_in_port1>;
-> +			};
-> +		};
-> +	};
-> +
->  	soc {
->  		#address-cells = <1>;
->  		#size-cells = <1>;
-> -- 
-> 1.9.1
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
+index f141301..8e9ec81 100644
+--- a/drivers/iommu/arm-smmu-v3.c
++++ b/drivers/iommu/arm-smmu-v3.c
+@@ -1389,8 +1389,7 @@ static void arm_smmu_domain_free(struct iommu_domain *domain)
+ 	struct arm_smmu_domain *smmu_domain = to_smmu_domain(domain);
+ 	struct arm_smmu_device *smmu = smmu_domain->smmu;
+ 
+-	if (smmu_domain->pgtbl_ops)
+-		free_io_pgtable_ops(smmu_domain->pgtbl_ops);
++	free_io_pgtable_ops(smmu_domain->pgtbl_ops);
+ 
+ 	/* Free the CD and ASID, if we allocated them */
+ 	if (smmu_domain->stage == ARM_SMMU_DOMAIN_S1) {
+-- 
+2.4.4
