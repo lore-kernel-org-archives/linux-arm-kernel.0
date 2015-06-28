@@ -1,37 +1,57 @@
-From: nicolae.rosia@gmail.com (Nicolae Rosia)
-Date: Sun, 28 Jun 2015 18:06:52 +0300
-Subject: [PATCH v7] dma: Add Xilinx AXI Direct Memory Access Engine driver
- support
-In-Reply-To: <20150628144529.GZ19530@localhost>
-References: <1433831736-18253-1-git-send-email-appanad@xilinx.com>
- <20150622104932.GC19530@localhost>
- <C246CAC1457055469EF09E3A7AC4E11A49A91915@XAP-PVEXMBX01.xlnx.xilinx.com>
- <20150627144054.GW19530@localhost>
- <CAH=tA9F3=oqWi66EpkG-ecWHuVbOua+ceeiQD03WjiA=QdgA-g@mail.gmail.com>
- <20150628144529.GZ19530@localhost>
-Message-ID: <CAH=tA9EZ=C8rgB9Gb5i=SpnDJCX3R64a1w9esM0N4bTU+V=JAg@mail.gmail.com>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Sun, 28 Jun 2015 23:07:42 +0800
+Subject: [PATCH v2 1/2] watchdog: imx2_wdt: add external reset support
+ via 'ext-reset-output' dt prop
+In-Reply-To: <1433448960-9257-2-git-send-email-tharvey@gateworks.com>
+References: <1432853677-5150-1-git-send-email-tharvey@gateworks.com>
+ <1433448960-9257-1-git-send-email-tharvey@gateworks.com>
+ <1433448960-9257-2-git-send-email-tharvey@gateworks.com>
+Message-ID: <20150628150742.GF10332@tiger>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-HI,
-On Sun, Jun 28, 2015 at 5:45 PM, Vinod Koul <vinod.koul@intel.com> wrote:
-[...]
->> > I asked how the device address in configured. For both MM2S S2MM you are
->> > using sg for memory address, where are you getting device adress, are you
->> > assuming/hardcoding or getting somehow, if so how?
->> As the name says, one end is memory (MM) and the other end is an AXI4
->> Stream Bus (S) which has no concept of memory address.
->> So yes, it is hardcoded at design time.
-> So where does the data go at the end of stream bus, who configures that?
-> Shouldnt all this be at least documented...
+On Thu, Jun 04, 2015 at 01:15:59PM -0700, Tim Harvey wrote:
+> The IMX6 watchdog supports assertion of a signal (WDOG_B) which
+> can be pinmux'd to an external pin. This is typically used for boards that
+> have PMIC's in control of the IMX6 power rails. In fact, failure to use
+> such an external reset on boards with external PMIC's can result in various
+> hangs due to the IMX6 not being fully reset [1] as well as the board failing
+> to reset because its PMIC has not been reset to provide adequate voltage for
+> the CPU when coming out of reset at 800Mhz.
+> 
+> This uses a new device-tree property 'ext-reset-output' to indicate the
+> board has such a reset and to cause the watchdog to be configured to assert
+> WDOG_B instead of an internal reset both on a watchdog timeout and in
+> system_restart.
+> 
+> [1] http://lists.infradead.org/pipermail/linux-arm-kernel/2015-March/333689.html
+> 
+> Cc: Lucas Stach <l.stach@pengutronix.de>
+> Signed-off-by: Tim Harvey <tharvey@gateworks.com>
+> ---
+> v2:
+>  - rename property to 'ext-reset-output' based on ML feedback
+>  - simplify setting SRS bit if external-reset
+>  - update comments and commit msg
+> 
+> Signed-off-by: Tim Harvey <tharvey@gateworks.com>
+> ---
+>  .../devicetree/bindings/watchdog/fsl-imx-wdt.txt        |  2 ++
+>  drivers/watchdog/imx2_wdt.c                             | 17 +++++++++++++++--
+>  2 files changed, 17 insertions(+), 2 deletions(-)
+> 
+> diff --git a/Documentation/devicetree/bindings/watchdog/fsl-imx-wdt.txt b/Documentation/devicetree/bindings/watchdog/fsl-imx-wdt.txt
+> index 8dab6fd..9b89b3a 100644
+> --- a/Documentation/devicetree/bindings/watchdog/fsl-imx-wdt.txt
+> +++ b/Documentation/devicetree/bindings/watchdog/fsl-imx-wdt.txt
+> @@ -9,6 +9,8 @@ Optional property:
+>  - big-endian: If present the watchdog device's registers are implemented
+>    in big endian mode, otherwise in native mode(same with CPU), for more
+>    detail please see: Documentation/devicetree/bindings/regmap/regmap.txt.
+> +- ext-reset-output: If present the watchdog device is configured to assert its
+> +  external reset (WDOG_B) instead of issuing a software reset.
 
-You make the connection at design time. In Zynq7000 case, there's a
-dual core Cortex A9 coupled with an FPGA.
-While designing the FPGA part, you instantiate an Xilinx AXI DMA, on
-one side you connect it to an AXI4 Lite bus (which is memory mapped)
-and on the other side you connect your custom peripheral using an AXI4
-Stream bus which has no concept of addresses.
-Here's a picture which depicts all of this [0].
-Does this clear things up?
+This is a vendor specific binding property rather than generic one, so
+it should have a vendor prefix, i.e. "fsl,".  Other than that,
 
-[0] http://www.fpgadeveloper.com/wp-content/uploads/2014/08/fpga_developer_20140806_130447.png
+Acked-by: Shawn Guo <shawn.guo@linaro.org>
