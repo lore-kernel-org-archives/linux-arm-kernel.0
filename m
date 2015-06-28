@@ -1,26 +1,59 @@
-From: hauke@hauke-m.de (Hauke Mehrtens)
-Date: Sun, 28 Jun 2015 19:48:31 +0200
-Subject: [PATCH] ARM: BCM5301X: Enable UART0 on tested devices
-In-Reply-To: <1435513590-32139-1-git-send-email-zajec5@gmail.com>
-References: <1435103504-28592-1-git-send-email-f.fainelli@gmail.com>
- <1435513590-32139-1-git-send-email-zajec5@gmail.com>
-Message-ID: <5590336F.5040602@hauke-m.de>
+From: m.smarduch@samsung.com (Mario Smarduch)
+Date: Sun, 28 Jun 2015 10:57:09 -0700
+Subject: [PATCH 0/3] arm: KVM: VFP lazy switch in KVM Host Mode may save
+ upto 98%
+In-Reply-To: <1435203028-23142-1-git-send-email-m.smarduch@samsung.com>
+References: <1435203028-23142-1-git-send-email-m.smarduch@samsung.com>
+Message-ID: <55903575.8060702@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/28/2015 07:46 PM, Rafa? Mi?ecki wrote:
-> There are two possible UARTs so we have (both of) them disabled by
-> default. Override uart0 status on devices that were verified to use it.
+Hi Marc, Christoffer -
+
+to clarify - this series may be causing a conflict with the arm64
+basic approach, and arm32 exit code touch ups.
+
+The intent for this series  is more of an RFC or preview, to get some
+feedback - if this approach is sensible (I guess later applied to
+arm64 as well if it is).
+
+Thanks,
+- Mario
+
+
+On 06/24/2015 08:30 PM, Mario Smarduch wrote:
+> Currently we do a lazy VFP switch in Hyp mode, but once we exit and re-enter hyp
+> mode we trap again on VFP access. This mode has shown around 30-50% improvement
+> running hackbench and lmbench.
 > 
-> Signed-off-by: Rafa? Mi?ecki <zajec5@gmail.com>
-
-Acked-by: Hauke Mehrtens <hauke@hauke-m.de>
-
-> ---
->  arch/arm/boot/dts/bcm4708-buffalo-wzr-1750dhp.dts  | 4 ++++
->  arch/arm/boot/dts/bcm4708-luxul-xwc-1000.dts       | 4 ++++
->  arch/arm/boot/dts/bcm4708-netgear-r6250.dts        | 4 ++++
->  arch/arm/boot/dts/bcm4708-smartrg-sr400ac.dts      | 4 ++++
->  arch/arm/boot/dts/bcm47081-buffalo-wzr-600dhp2.dts | 4 ++++
->  5 files changed, 20 insertions(+)
+> This patch series extends lazy VFP switch beyond Hyp mode to KVM host mode.
+> 
+> 1 - On guest access we switch from host to guest and set a flag accessible to 
+>     host
+> 2 - On exit to KVM host, VFP state is restored on vcpu_put if flag is marked (1)
+> 3 - Otherwise guest is resumed and continues to use its VFP registers. 
+> 4 - In case of 2 on VM entry we set VFP trap flag to repeat 1.
+> 
+> If guest does not access VFP registers them implemenation remains the same.
+> 
+> Executing hackbench on Fast Models and Exynos arm32 board shows good
+> results. Considering all exits 2% of the time KVM host lazy vfp switch is 
+> invoked.
+> 
+> Howeverr this patch set requires more burn in time and testing under various 
+> loads.
+> 
+> Currently ARM32 is addressed later ARM64.
+> 
+> Mario Smarduch (3):
+>   define headers and offsets to mange VFP state
+>   Implement lazy VFP switching outside of Hyp Mode
+>   Add VFP lazy switch hooks in Host KVM
+> 
+>  arch/arm/include/asm/kvm_asm.h  |    1 +
+>  arch/arm/include/asm/kvm_host.h |    3 +++
+>  arch/arm/kernel/asm-offsets.c   |    1 +
+>  arch/arm/kvm/arm.c              |   15 ++++++++++++
+>  arch/arm/kvm/interrupts.S       |   49 +++++++++++++++++++++++++--------------
+>  5 files changed, 51 insertions(+), 18 deletions(-)
 > 
