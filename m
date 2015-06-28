@@ -1,57 +1,44 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Sun, 28 Jun 2015 23:07:42 +0800
-Subject: [PATCH v2 1/2] watchdog: imx2_wdt: add external reset support
- via 'ext-reset-output' dt prop
-In-Reply-To: <1433448960-9257-2-git-send-email-tharvey@gateworks.com>
-References: <1432853677-5150-1-git-send-email-tharvey@gateworks.com>
- <1433448960-9257-1-git-send-email-tharvey@gateworks.com>
- <1433448960-9257-2-git-send-email-tharvey@gateworks.com>
-Message-ID: <20150628150742.GF10332@tiger>
+From: zajec5@gmail.com (=?UTF-8?q?Rafa=C5=82=20Mi=C5=82ecki?=)
+Date: Sun, 28 Jun 2015 17:17:13 +0200
+Subject: [PATCH] bcma: populate bus DT subnodes as platform_device-s
+Message-ID: <1435504633-20831-1-git-send-email-zajec5@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 04, 2015 at 01:15:59PM -0700, Tim Harvey wrote:
-> The IMX6 watchdog supports assertion of a signal (WDOG_B) which
-> can be pinmux'd to an external pin. This is typically used for boards that
-> have PMIC's in control of the IMX6 power rails. In fact, failure to use
-> such an external reset on boards with external PMIC's can result in various
-> hangs due to the IMX6 not being fully reset [1] as well as the board failing
-> to reset because its PMIC has not been reset to provide adequate voltage for
-> the CPU when coming out of reset at 800Mhz.
-> 
-> This uses a new device-tree property 'ext-reset-output' to indicate the
-> board has such a reset and to cause the watchdog to be configured to assert
-> WDOG_B instead of an internal reset both on a watchdog timeout and in
-> system_restart.
-> 
-> [1] http://lists.infradead.org/pipermail/linux-arm-kernel/2015-March/333689.html
-> 
-> Cc: Lucas Stach <l.stach@pengutronix.de>
-> Signed-off-by: Tim Harvey <tharvey@gateworks.com>
-> ---
-> v2:
->  - rename property to 'ext-reset-output' based on ML feedback
->  - simplify setting SRS bit if external-reset
->  - update comments and commit msg
-> 
-> Signed-off-by: Tim Harvey <tharvey@gateworks.com>
-> ---
->  .../devicetree/bindings/watchdog/fsl-imx-wdt.txt        |  2 ++
->  drivers/watchdog/imx2_wdt.c                             | 17 +++++++++++++++--
->  2 files changed, 17 insertions(+), 2 deletions(-)
-> 
-> diff --git a/Documentation/devicetree/bindings/watchdog/fsl-imx-wdt.txt b/Documentation/devicetree/bindings/watchdog/fsl-imx-wdt.txt
-> index 8dab6fd..9b89b3a 100644
-> --- a/Documentation/devicetree/bindings/watchdog/fsl-imx-wdt.txt
-> +++ b/Documentation/devicetree/bindings/watchdog/fsl-imx-wdt.txt
-> @@ -9,6 +9,8 @@ Optional property:
->  - big-endian: If present the watchdog device's registers are implemented
->    in big endian mode, otherwise in native mode(same with CPU), for more
->    detail please see: Documentation/devicetree/bindings/regmap/regmap.txt.
-> +- ext-reset-output: If present the watchdog device is configured to assert its
-> +  external reset (WDOG_B) instead of issuing a software reset.
+Our bus should allow defining children nodes as we may want to specify
+devices attached to the bus. This is required e.g. to specify NAND or
+ChipCommon cores and use bus's address and IRQ mappings.
 
-This is a vendor specific binding property rather than generic one, so
-it should have a vendor prefix, i.e. "fsl,".  Other than that,
+Signed-off-by: Rafa? Mi?ecki <zajec5@gmail.com>
+---
+ drivers/bcma/main.c | 8 ++++++++
+ 1 file changed, 8 insertions(+)
 
-Acked-by: Shawn Guo <shawn.guo@linaro.org>
+diff --git a/drivers/bcma/main.c b/drivers/bcma/main.c
+index 9635f10..5912847 100644
+--- a/drivers/bcma/main.c
++++ b/drivers/bcma/main.c
+@@ -12,6 +12,7 @@
+ #include <linux/slab.h>
+ #include <linux/of_address.h>
+ #include <linux/of_irq.h>
++#include <linux/of_platform.h>
+ 
+ MODULE_DESCRIPTION("Broadcom's specific AMBA driver");
+ MODULE_LICENSE("GPL");
+@@ -409,6 +410,13 @@ int bcma_bus_register(struct bcma_bus *bus)
+ 		bcma_core_pci_early_init(&bus->drv_pci[0]);
+ 	}
+ 
++	if (bus->host_pdev) {
++		struct device *dev = &bus->host_pdev->dev;
++
++		of_platform_populate(dev->of_node, of_default_bus_match_table,
++				     NULL, dev);
++	}
++
+ 	/* Cores providing flash access go before SPROM init */
+ 	list_for_each_entry(core, &bus->cores, list) {
+ 		if (bcma_is_core_needed_early(core->id.id))
+-- 
+1.8.4.5
