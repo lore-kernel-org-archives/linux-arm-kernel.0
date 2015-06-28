@@ -1,31 +1,49 @@
-From: s.munaut@whatever-company.com (Sylvain Munaut)
-Date: Sun, 28 Jun 2015 22:40:03 +0200
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Sun, 28 Jun 2015 23:30:40 +0100
 Subject: dma_sync_single_for_cpu takes a really long time
-Message-ID: <CAF6-1L6sjGc1VySi=oQGzOEm-e5jauznh+jzmdDgmJQWLbA_pA@mail.gmail.com>
+In-Reply-To: <CAF6-1L6sjGc1VySi=oQGzOEm-e5jauznh+jzmdDgmJQWLbA_pA@mail.gmail.com>
+References: <CAF6-1L6sjGc1VySi=oQGzOEm-e5jauznh+jzmdDgmJQWLbA_pA@mail.gmail.com>
+Message-ID: <20150628223039.GV7557@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Sun, Jun 28, 2015 at 10:40:03PM +0200, Sylvain Munaut wrote:
+> I'm working on a DMA driver that uses the the streaming DMA API to
+> synchronize the access between host and device. The data flow is
+> exclusively from the device to the host (video grabber).
+> 
+> As such, I call dma_sync_single_for_cpu when the hardware is done
+> writing a frame to make sure that the cpu gets up to date data when
+> accessing the zone.
+> 
+> However this call takes a _long_ time to complete. For a 6 Megabytes
+> buffer, it takes about 13 ms which is just crazy ... at that rate it'd
+> be faster to just read random data from a random buffer to trash the
+> measly 512k of cache ...
 
+Flushing a large chunk of memory one cache line at a time takes a long
+time, there's really nothing "new" about that.
 
-I'm working on a DMA driver that uses the the streaming DMA API to
-synchronize the access between host and device. The data flow is
-exclusively from the device to the host (video grabber).
+It's the expense that has to be paid for using cacheable mappings on a
+CPU which is not DMA coherent - something which I've brought up over
+the years with ARM, but it's not something that ARM believe is wanted
+by their silicon partners.
 
-As such, I call dma_sync_single_for_cpu when the hardware is done
-writing a frame to make sure that the cpu gets up to date data when
-accessing the zone.
+What we _could_ do is decide that if the buffer is larger than some
+factor of the cache size, to just flush the entire cache.  However, that
+penalises the case where none of the data is in the cache - and in all
+probably  very little of the frame is actually sitting in the cache at
+that moment.
 
-However this call takes a _long_ time to complete. For a 6 Megabytes
-buffer, it takes about 13 ms which is just crazy ... at that rate it'd
-be faster to just read random data from a random buffer to trash the
-measly 512k of cache ...
+However, if you're going to read the entire frame through a cacheable
+mapping, you're probably going to end up flushing your cache several
+times over through doing that - but that's probably something you're
+doing in userspace, and so the kernel doesn't have the knowledge to know
+that's what userspace will be doing (nor should it.)
 
-Is there any alternative that's faster when dealing with large buffers ?
+There isn't a trivial solution to this problem, and I wish that ARM had
+solved this issue by becoming a DMA-coherent architecture.
 
-(The platform is a Zynq 7000 - Dual Cortex A9).
-
-
-Cheers,
-
-   Sylvain
+-- 
+FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
+according to speedtest.net.
