@@ -1,38 +1,35 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Mon, 29 Jun 2015 11:23:54 +0200
-Subject: [PATCH v3 3/6] rtc: mxc: use a second rtc clock
-In-Reply-To: <1434820360-21935-4-git-send-email-tremyfr@gmail.com>
-References: <1434820360-21935-1-git-send-email-tremyfr@gmail.com>
- <1434820360-21935-4-git-send-email-tremyfr@gmail.com>
-Message-ID: <20150629092354.GW485@piout.net>
+From: tglx@linutronix.de (Thomas Gleixner)
+Date: Mon, 29 Jun 2015 11:24:36 +0200 (CEST)
+Subject: [RESEND PATCH v3] clocksource: exynos_mct: fix for sleeping in
+ atomic ctx handling cpu hotplug notif.
+In-Reply-To: <55910DA6.4070404@linaro.org>
+References: <1426151496-5509-1-git-send-email-d.eppel@samsung.com>
+ <1435324984-7328-1-git-send-email-d.eppel@samsung.com>
+ <55910DA6.4070404@linaro.org>
+Message-ID: <alpine.DEB.2.11.1506291123320.4037@nanos>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Mon, 29 Jun 2015, Daniel Lezcano wrote:
 
-On 20/06/2015 at 19:12:37 +0200, Philippe Reynes wrote :
-> -	rate = clk_get_rate(pdata->clk);
-> +	pdata->clk_rtc = devm_clk_get(&pdev->dev, "rtc");
-> +	if (IS_ERR(pdata->clk_rtc)) {
-> +		dev_err(&pdev->dev, "unable to get rtc clock!\n");
-> +		ret = PTR_ERR(pdata->clk_rtc);
-> +		goto exit_put_clk;
-> +	}
-> +
-> +	rate = clk_get_rate(pdata->clk_rtc);
->  
+> On 06/26/2015 03:23 PM, Damian Eppel wrote:
+> > This is to fix an issue of sleeping in atomic context when processing
+> > hotplug notifications in Exynos MCT(Multi-Core Timer).
+> > The issue was reproducible on Exynos 3250 (Rinato board) and Exynos 5420
+> > (Arndale Octa board).
+> > 
+> > Whilst testing cpu hotplug events on kernel configured with DEBUG_PREEMPT
+> > and DEBUG_ATOMIC_SLEEP we get following BUG message, caused by calling
+> > request_irq() and free_irq() in the context of hotplug notification
+> > (which is in this case atomic context).
+> 
+> Applied as a 4.2 fix.
+> 
+> Should it be tagged stable@ ?
 
-You have to prepare_enable() before using get_rate(). Else, it is not
-guaranteed to work:
-"clk_get_rate - obtain the current clock rate (in Hz) for a clock source.
-                This is only valid once the clock source has been enabled."
-http://lxr.free-electrons.com/source/include/linux/clk.h#L269
+I have that one queued in tip/timers/urgent already. Please check my
+branches before picking up stuff.
 
-It may work right now because the clock is enabled elsewhere. But that
-may change at some point in time (we had the issue on at91).
+Thanks,
 
-
--- 
-Alexandre Belloni, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+	tglx
