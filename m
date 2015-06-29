@@ -1,85 +1,72 @@
-From: simon.guinot@sequanux.org (Simon Guinot)
-Date: Mon, 29 Jun 2015 16:41:23 +0200
-Subject: [RESEND PATCH 3/4] leds: leds-ns2: handle can_sleep GPIOs
-In-Reply-To: <55915549.60106@samsung.com>
-References: <1434640650-28086-1-git-send-email-simon.guinot@sequanux.org>
- <1434640650-28086-4-git-send-email-simon.guinot@sequanux.org>
- <558ABC35.1010801@samsung.com>
- <20150626171028.GL4853@kw.sim.vm.gnt> <55915549.60106@samsung.com>
-Message-ID: <20150629144123.GM4853@kw.sim.vm.gnt>
+From: andre.przywara@arm.com (Andre Przywara)
+Date: Mon, 29 Jun 2015 15:53:12 +0100
+Subject: [PATCH 02/13] KVM: extend struct kvm_msi to hold a 32-bit device
+ ID
+In-Reply-To: <20150628191234.GI28244@cbox>
+References: <1432893209-27313-1-git-send-email-andre.przywara@arm.com>
+ <1432893209-27313-3-git-send-email-andre.przywara@arm.com>
+ <20150628191234.GI28244@cbox>
+Message-ID: <55915BD8.4050103@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 29, 2015 at 04:25:13PM +0200, Jacek Anaszewski wrote:
-> On 06/26/2015 07:10 PM, Simon Guinot wrote:
-> >On Wed, Jun 24, 2015 at 04:18:29PM +0200, Jacek Anaszewski wrote:
-> >>On 06/18/2015 05:17 PM, Simon Guinot wrote:
-> >>>On the board n090401 (Seagate NAS 4-Bay), some of the LEDs are handled
-> >>>by the leds-ns2 driver. This LEDs are connected to an I2C GPIO expander
-> >>>(PCA95554PW) which means that GPIO access may sleep. This patch makes
-> >>>leds-ns2 compatible with such GPIOs by using the *_cansleep() variant of
-> >>>the GPIO functions. As a drawback this functions can't be used safely in
-> >>>a timer context (with the timer LED trigger for example). To fix this
-> >>>issue, a workqueue mechanism (copied from the leds-gpio driver) is used.
-> >>>
-> >>>Note that this patch also updates slightly the ns2_led_sata_store
-> >>>function. The LED state is now retrieved from cached values instead of
-> >>>reading the GPIOs previously. This prevents ns2_led_sata_store from
-> >>>working with a stale LED state (which may happen when a delayed work
-> >>>is pending).
-> >>>
-> >>>Signed-off-by: Simon Guinot <simon.guinot@sequanux.org>
-> >>>Signed-off-by: Vincent Donnefort <vdonnefort@gmail.com>
-> >>>---
-> >>>  drivers/leds/leds-ns2.c | 56 ++++++++++++++++++++++++++++++++++++-------------
-> >>>  1 file changed, 42 insertions(+), 14 deletions(-)
-> >>>
-> >>
-> >>>
-> >>>+static void ns2_led_work(struct work_struct *work)
-> >>>+{
-> >>>+	struct ns2_led_data *led_dat =
-> >>>+		container_of(work, struct ns2_led_data, work);
-> >>>+	int i = led_dat->new_mode_index;
-> >>>+
-> >>>+	write_lock(&led_dat->rw_lock);
-> >>>+
-> >>>+	gpio_set_value_cansleep(led_dat->cmd, led_dat->modval[i].cmd_level);
-> >>>+	gpio_set_value_cansleep(led_dat->slow, led_dat->modval[i].slow_level);
-> >>>+
-> >>>+	write_unlock(&led_dat->rw_lock);
-> >>>+}
-> >>>+
-> >>
-> >>I've just realized that this can break one of the basic rules:
-> >>no sleeping should occur while holding a spinlock. Did you
-> >>consider this?
-> >
-> >Well, if I did, I can't say I have done a good job here :/
-> >
-> >You have to know that this code is used on a large number of boards.
-> >Thus, I have to thank you for spotting this bug.As a relief, this don't
-> >actually lead to a bug with the configuration we are using: UP machine
-> >and !CONFIG_SMP.
-> >
-> >It should be simple to fix it because using a spinlock in ns2_led_work()
-> >is not needed. The GPIO writing calls are protected by the workqueue
-> >itself: a single instance is running at a time. We are only let with the
-> >new_mode_index reading which must be made coherent.
-> >
-> >Note that the very same issue also applies to ns2_led_get_mode(). And
-> >again using a lock here is not needed either. This function is only
-> >called once at probe time and there is no possible concurrency.
+Hi Christoffer,
+
+thanks for your time to reviewing this! Was probably no pleasure ;-)
+
+On 28/06/15 20:12, Christoffer Dall wrote:
+> On Fri, May 29, 2015 at 10:53:18AM +0100, Andre Przywara wrote:
+>> The ARM GICv3 ITS MSI controller requires a device ID to be able to
+>> assign the proper interrupt vector. On real hardware, this ID is
+>> sampled from the bus. To be able to emulate an ITS controller, extend
+>> the KVM MSI interface to let userspace provide such a device ID. For
+>> PCI devices, the device ID is simply the 16-bit bus-device-function
+>> triplet, which should be easily available to the userland tool.
+>>
+>> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
+>> ---
+>>  Documentation/virtual/kvm/api.txt | 8 ++++++--
+>>  include/uapi/linux/kvm.h          | 4 +++-
+>>  2 files changed, 9 insertions(+), 3 deletions(-)
+>>
+>> diff --git a/Documentation/virtual/kvm/api.txt b/Documentation/virtual/kvm/api.txt
+>> index 9fa2bf8..891d64a 100644
+>> --- a/Documentation/virtual/kvm/api.txt
+>> +++ b/Documentation/virtual/kvm/api.txt
+>> @@ -2121,10 +2121,14 @@ struct kvm_msi {
+>>  	__u32 address_hi;
+>>  	__u32 data;
+>>  	__u32 flags;
+>> -	__u8  pad[16];
+>> +	__u32 devid;
+>> +	__u8  pad[12];
+>>  };
+>>  
+>> -No flags are defined so far. The corresponding field must be 0.
+>> +flags: KVM_MSI_VALID_DEVID: devid is valid, otherwise ignored.
 > 
-> Switching to gpio_get_value_cansleep would be nice there too.
+> I don't see what the 'otherwise ignored' part of the sentence here is
+> meant to say, that the flags field is otherwise ignored for other value?
 
-It is already the case.
+No, that the devid field is ignored if this bit isn't set. I can
+rephrase this to be more explicit.
 
-Simon
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 181 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150629/d1395546/attachment.sig>
+> That's not what the current API doc specifies, it specifies that the
+> remainder of the field must be 0.
+> 
+>> +devid: If KVM_MSI_VALID_DEVID is set, contains a value to identify the device
+>> +       that wrote the MSI message. For PCI, this is usually a BFD
+>> +       identifier in the lower 16 bits.
+> 
+> I assume plus something else that uniquely identifies the PCI
+> controller?
+
+Well yes, the device ID is a unique device identifier within a system,
+the BFD use case was just to illustrate this and give a hint to
+userspace what to fill in there. I will explain this better in v2.
+
+So are you OK with that extension of the API in general? Just asking
+because there is a lot that depends on it.
+
+Cheers,
+Andre.
