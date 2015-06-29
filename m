@@ -1,33 +1,45 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 29 Jun 2015 11:10:05 +0100
-Subject: [PATCH] kvmtool: don't use PCI config space IRQ line field
-In-Reply-To: <5582FDB9.3020700@arm.com>
-References: <1433431245-23227-1-git-send-email-andre.przywara@arm.com>
- <20150605164158.GL7420@arm.com> <557EACD2.1030500@arm.com>
- <20150616170657.GO30522@arm.com> <5582FDB9.3020700@arm.com>
-Message-ID: <20150629101004.GB17474@arm.com>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Mon, 29 Jun 2015 12:14:27 +0200
+Subject: [RESEND PATCH v3] clocksource: exynos_mct: fix for sleeping in
+ atomic ctx handling cpu hotplug notif.
+In-Reply-To: <alpine.DEB.2.11.1506291123320.4037@nanos>
+References: <1426151496-5509-1-git-send-email-d.eppel@samsung.com>
+ <1435324984-7328-1-git-send-email-d.eppel@samsung.com>
+ <55910DA6.4070404@linaro.org> <alpine.DEB.2.11.1506291123320.4037@nanos>
+Message-ID: <55911A83.1080404@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Andre,
+On 06/29/2015 11:24 AM, Thomas Gleixner wrote:
+> On Mon, 29 Jun 2015, Daniel Lezcano wrote:
+>
+>> On 06/26/2015 03:23 PM, Damian Eppel wrote:
+>>> This is to fix an issue of sleeping in atomic context when processing
+>>> hotplug notifications in Exynos MCT(Multi-Core Timer).
+>>> The issue was reproducible on Exynos 3250 (Rinato board) and Exynos 5420
+>>> (Arndale Octa board).
+>>>
+>>> Whilst testing cpu hotplug events on kernel configured with DEBUG_PREEMPT
+>>> and DEBUG_ATOMIC_SLEEP we get following BUG message, caused by calling
+>>> request_irq() and free_irq() in the context of hotplug notification
+>>> (which is in this case atomic context).
+>>
+>> Applied as a 4.2 fix.
+>>
+>> Should it be tagged stable@ ?
+>
+> I have that one queued in tip/timers/urgent already. Please check my
+> branches before picking up stuff.
 
-On Thu, Jun 18, 2015 at 06:19:53PM +0100, Andre Przywara wrote:
-> I am tempted to remove shmem, since it's broken:
-> a) there is no upstream driver, only some out-of-tree uio driver module
-> in some Github repo
+Mmmh, yep. I thought I refreshed my branch. Now I see it.
 
-Right, but that's the same for qemu and we've already made the jump of
-merging the driver, so I don't think that's a good argument for throwing
-it out of the tree.
+Thanks for the heads up.
 
-> b) the PCI device BARs do not match what QEMU implements and what the
-> uio driver expects (IO BAR vs. MMIO BAR)
+   -- Daniel
 
-In what way? A quick look suggests that kvmtool is at least aligned with
-said github repo.
+-- 
+  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
 
-> c) there is (at least one) bug in kvmtool (easily fixed, though)
-
-Care to elaborate?
-
-Will
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
