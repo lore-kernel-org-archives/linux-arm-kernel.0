@@ -1,56 +1,135 @@
-From: leilk.liu@mediatek.com (Leilk Liu)
-Date: Mon, 29 Jun 2015 21:04:28 +0800
-Subject: [PATCH v2 2/4] dt-bindings: ARM: Mediatek: Document devicetree
- bindings for spi bus
-In-Reply-To: <1435583070-9600-1-git-send-email-leilk.liu@mediatek.com>
-References: <1435583070-9600-1-git-send-email-leilk.liu@mediatek.com>
-Message-ID: <1435583070-9600-3-git-send-email-leilk.liu@mediatek.com>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Mon, 29 Jun 2015 15:04:56 +0200
+Subject: [PATCH v2 2/3] ARM: mvebu: update Ethernet compatible string
+ for Armada XP
+In-Reply-To: <1434547162-6275-3-git-send-email-simon.guinot@sequanux.org>
+References: <1434547162-6275-1-git-send-email-simon.guinot@sequanux.org>
+ <1434547162-6275-3-git-send-email-simon.guinot@sequanux.org>
+Message-ID: <55914278.5070106@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Leilk Liu <leilk.liu@mediatek.com>
----
- .../devicetree/bindings/spi/spi-mt65xx.txt         | 32 ++++++++++++++++++++++
- 1 file changed, 32 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/spi/spi-mt65xx.txt
+Hi Simon,
 
-diff --git a/Documentation/devicetree/bindings/spi/spi-mt65xx.txt b/Documentation/devicetree/bindings/spi/spi-mt65xx.txt
-new file mode 100644
-index 0000000..04c28fd
---- /dev/null
-+++ b/Documentation/devicetree/bindings/spi/spi-mt65xx.txt
-@@ -0,0 +1,32 @@
-+MTK SPI device
-+
-+Required properties:
-+- compatible: should be one of the following.
-+    - mediatek,mt8173-spi: for mt8173 platforms
-+    - mediatek,mt8135-spi: for mt8135 platforms
-+    - mediatek,mt6589-spi: for mt6589 platforms
-+
-+- reg: Address and length of the register set for the device
-+
-+- interrupts: Should contain spi interrupt
-+
-+- clock-names: tuple listing input clock names.
-+	Required elements: "main"
-+
-+- clocks: phandles to input clocks.
-+
-+- pad-select: should specify spi pad used, only required for MT8173.
-+	This value should be 0~3.
-+
-+Example:
-+
-+- SoC Specific Portion:
-+spi: spi at 1100a000 {
-+	compatible = "mediatek,mt8173-spi";
-+	reg = <0 0x1100a000 0 0x1000>;
-+	interrupts = <GIC_SPI 110 IRQ_TYPE_LEVEL_LOW>;
-+	clocks = <&pericfg PERI_SPI0>;
-+	clock-names = "main";
-+	pad-select = <1>;
-+	status = "disabled";
-+};
+> This patch updates the Ethernet DT nodes for Armada XP SoCs with the
+> compatible string "marvell,armada-xp-neta".
+> 
+> Signed-off-by: Simon Guinot <simon.guinot@sequanux.org>
+> Cc: <stable@vger.kernel.org> # v3.8+
+
+Acked-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+
+
+Thanks,
+
+Gregory
+
+> ---
+>  arch/arm/boot/dts/armada-370-xp.dtsi     |  2 --
+>  arch/arm/boot/dts/armada-370.dtsi        |  8 ++++++++
+>  arch/arm/boot/dts/armada-xp-mv78260.dtsi |  2 +-
+>  arch/arm/boot/dts/armada-xp-mv78460.dtsi |  2 +-
+>  arch/arm/boot/dts/armada-xp.dtsi         | 10 +++++++++-
+>  5 files changed, 19 insertions(+), 5 deletions(-)
+> 
+> diff --git a/arch/arm/boot/dts/armada-370-xp.dtsi b/arch/arm/boot/dts/armada-370-xp.dtsi
+> index ec96f0b36346..06a2f2ae9d1e 100644
+> --- a/arch/arm/boot/dts/armada-370-xp.dtsi
+> +++ b/arch/arm/boot/dts/armada-370-xp.dtsi
+> @@ -270,7 +270,6 @@
+>  			};
+>  
+>  			eth0: ethernet at 70000 {
+> -				compatible = "marvell,armada-370-neta";
+>  				reg = <0x70000 0x4000>;
+>  				interrupts = <8>;
+>  				clocks = <&gateclk 4>;
+> @@ -286,7 +285,6 @@
+>  			};
+>  
+>  			eth1: ethernet at 74000 {
+> -				compatible = "marvell,armada-370-neta";
+>  				reg = <0x74000 0x4000>;
+>  				interrupts = <10>;
+>  				clocks = <&gateclk 3>;
+> diff --git a/arch/arm/boot/dts/armada-370.dtsi b/arch/arm/boot/dts/armada-370.dtsi
+> index 00b50db57c9c..ca4257b2f77d 100644
+> --- a/arch/arm/boot/dts/armada-370.dtsi
+> +++ b/arch/arm/boot/dts/armada-370.dtsi
+> @@ -307,6 +307,14 @@
+>  					dmacap,memset;
+>  				};
+>  			};
+> +
+> +			ethernet at 70000 {
+> +				compatible = "marvell,armada-370-neta";
+> +			};
+> +
+> +			ethernet at 74000 {
+> +				compatible = "marvell,armada-370-neta";
+> +			};
+>  		};
+>  	};
+>  };
+> diff --git a/arch/arm/boot/dts/armada-xp-mv78260.dtsi b/arch/arm/boot/dts/armada-xp-mv78260.dtsi
+> index 8479fdc9e9c2..c5fdc99f0dbe 100644
+> --- a/arch/arm/boot/dts/armada-xp-mv78260.dtsi
+> +++ b/arch/arm/boot/dts/armada-xp-mv78260.dtsi
+> @@ -318,7 +318,7 @@
+>  			};
+>  
+>  			eth3: ethernet at 34000 {
+> -				compatible = "marvell,armada-370-neta";
+> +				compatible = "marvell,armada-xp-neta";
+>  				reg = <0x34000 0x4000>;
+>  				interrupts = <14>;
+>  				clocks = <&gateclk 1>;
+> diff --git a/arch/arm/boot/dts/armada-xp-mv78460.dtsi b/arch/arm/boot/dts/armada-xp-mv78460.dtsi
+> index 661d54c81580..0e24f1a38540 100644
+> --- a/arch/arm/boot/dts/armada-xp-mv78460.dtsi
+> +++ b/arch/arm/boot/dts/armada-xp-mv78460.dtsi
+> @@ -356,7 +356,7 @@
+>  			};
+>  
+>  			eth3: ethernet at 34000 {
+> -				compatible = "marvell,armada-370-neta";
+> +				compatible = "marvell,armada-xp-neta";
+>  				reg = <0x34000 0x4000>;
+>  				interrupts = <14>;
+>  				clocks = <&gateclk 1>;
+> diff --git a/arch/arm/boot/dts/armada-xp.dtsi b/arch/arm/boot/dts/armada-xp.dtsi
+> index 013d63f69e36..8fdd6d7c0ab1 100644
+> --- a/arch/arm/boot/dts/armada-xp.dtsi
+> +++ b/arch/arm/boot/dts/armada-xp.dtsi
+> @@ -177,7 +177,7 @@
+>  			};
+>  
+>  			eth2: ethernet at 30000 {
+> -				compatible = "marvell,armada-370-neta";
+> +				compatible = "marvell,armada-xp-neta";
+>  				reg = <0x30000 0x4000>;
+>  				interrupts = <12>;
+>  				clocks = <&gateclk 2>;
+> @@ -220,6 +220,14 @@
+>  				};
+>  			};
+>  
+> +			ethernet at 70000 {
+> +				compatible = "marvell,armada-xp-neta";
+> +			};
+> +
+> +			ethernet at 74000 {
+> +				compatible = "marvell,armada-xp-neta";
+> +			};
+> +
+>  			xor at f0900 {
+>  				compatible = "marvell,orion-xor";
+>  				reg = <0xF0900 0x100
+> 
+
+
 -- 
-1.8.1.1.dirty
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
