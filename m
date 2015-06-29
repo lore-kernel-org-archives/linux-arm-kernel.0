@@ -1,54 +1,74 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 29 Jun 2015 18:30:50 +0100
-Subject: [PATCH] arm64/kvm: Add generic v8 KVM target
-In-Reply-To: <F37C68A5-E48F-462C-AD18-0F3C096348C7@caviumnetworks.com>
-References: <1434531646-4873-1-git-send-email-suzuki.poulose@arm.com>
- <CAFEAcA92uymQ3LjPQnuFiwvjSgc+jY54VrfK_Sh4v1DJ+=OPpw@mail.gmail.com>
- <558A6A84.5020603@arm.com> <20150624085128.GA22785@cbox>
- <558A7936.7020109@arm.com> <20150625123034.GE28244@cbox>
- <558BF6C9.3000009@arm.com> <558C05A9.8080201@arm.com>
- <CAFEAcA_ULz=ugQW=NmthzqYRtvcfwteQTh0DonHRN6U5NykEtQ@mail.gmail.com>
- <20150626095318.GG28244@cbox>
- <F37C68A5-E48F-462C-AD18-0F3C096348C7@caviumnetworks.com>
-Message-ID: <559180CA.3050905@arm.com>
+From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
+Date: Mon, 29 Jun 2015 19:29:38 +0200
+Subject: [PATCH] clk: samsung: fix cpu clock's flags checking
+Message-ID: <1435598978-21800-1-git-send-email-b.zolnierkie@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 29/06/15 18:13, Chalamarla, Tirumalesh wrote:
-> 
->> On Jun 26, 2015, at 2:53 AM, Christoffer Dall <christoffer.dall@linaro.org> wrote:
->>
->> On Thu, Jun 25, 2015 at 02:49:08PM +0100, Peter Maydell wrote:
->>> On 25 June 2015 at 14:44, Marc Zyngier <marc.zyngier@arm.com> wrote:
->>>> It should always be possible to emulate a "known" CPU on a generic host,
->>>> and it should be able to migrate. The case we can't migrate is when we
->>>> let the guest be generic (which I guess should really be unknown, and
->>>> not generic).
->>>>
->>>> So if the user specify "-cpu cortex-a57" on the command line, the guest
->>>> should be able to migrate from an A72 to an A53. if the user specified
->>>> "-cpu host", the resulting guest won't be able to migrate.
->>>>
->>>> Does it make sense?
->>>
->>> Yes. We've always said "-cpu host" won't be cross-host migratable
->>> from a QEMU point of view.
->>>
->> ok, this makes sense.  It's basically up to userspace to mandate that
->> trying to migrate something that used unknown cpu (via -cpu host or
->> whatever) cannot be migrated.
->>
-> 
-> Will this also prevents migrating between same implementations, if no how is this identified.
+CLK_CPU_HAS_DIV1 and CLK_CPU_NEEDS_DEBUG_ALT_DIV masks were
+incorrectly used as a bit numbers.  Fix it.
 
-This shouldn't. It is pretty easy to look at the incoming guest's MIDR,
-and verify that it matches the default MIDR on the receiving system. Any
-difference, and the migration should abort.
+Tested on Exynos4210 based Origen board and on Exynos5250 based
+Arndale board.
 
-> This seems to be making emulation a requirment for ARM64 KVM. 
+Cc: Tomasz Figa <tomasz.figa@gmail.com>
+Cc: Michael Turquette <mturquette@baylibre.com>
+Cc: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
+Cc: Thomas Abraham <thomas.ab@samsung.com>
+Reported-by: Dan Carpenter <dan.carpenter@oracle.com>
+Signed-off-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
+---
+ drivers/clk/samsung/clk-cpu.c | 10 +++++-----
+ 1 file changed, 5 insertions(+), 5 deletions(-)
 
-I don't believe so. Care to elaborate?
-
-	M.
+diff --git a/drivers/clk/samsung/clk-cpu.c b/drivers/clk/samsung/clk-cpu.c
+index 3a1fe07..dd02356 100644
+--- a/drivers/clk/samsung/clk-cpu.c
++++ b/drivers/clk/samsung/clk-cpu.c
+@@ -161,7 +161,7 @@ static int exynos_cpuclk_pre_rate_change(struct clk_notifier_data *ndata,
+ 	 * the values for DIV_COPY and DIV_HPM dividers need not be set.
+ 	 */
+ 	div0 = cfg_data->div0;
+-	if (test_bit(CLK_CPU_HAS_DIV1, &cpuclk->flags)) {
++	if (cpuclk->flags & CLK_CPU_HAS_DIV1) {
+ 		div1 = cfg_data->div1;
+ 		if (readl(base + E4210_SRC_CPU) & E4210_MUX_HPM_MASK)
+ 			div1 = readl(base + E4210_DIV_CPU1) &
+@@ -182,7 +182,7 @@ static int exynos_cpuclk_pre_rate_change(struct clk_notifier_data *ndata,
+ 		alt_div = DIV_ROUND_UP(alt_prate, tmp_rate) - 1;
+ 		WARN_ON(alt_div >= MAX_DIV);
+ 
+-		if (test_bit(CLK_CPU_NEEDS_DEBUG_ALT_DIV, &cpuclk->flags)) {
++		if (cpuclk->flags & CLK_CPU_NEEDS_DEBUG_ALT_DIV) {
+ 			/*
+ 			 * In Exynos4210, ATB clock parent is also mout_core. So
+ 			 * ATB clock also needs to be mantained at safe speed.
+@@ -203,7 +203,7 @@ static int exynos_cpuclk_pre_rate_change(struct clk_notifier_data *ndata,
+ 	writel(div0, base + E4210_DIV_CPU0);
+ 	wait_until_divider_stable(base + E4210_DIV_STAT_CPU0, DIV_MASK_ALL);
+ 
+-	if (test_bit(CLK_CPU_HAS_DIV1, &cpuclk->flags)) {
++	if (cpuclk->flags & CLK_CPU_HAS_DIV1) {
+ 		writel(div1, base + E4210_DIV_CPU1);
+ 		wait_until_divider_stable(base + E4210_DIV_STAT_CPU1,
+ 				DIV_MASK_ALL);
+@@ -222,7 +222,7 @@ static int exynos_cpuclk_post_rate_change(struct clk_notifier_data *ndata,
+ 	unsigned long mux_reg;
+ 
+ 	/* find out the divider values to use for clock data */
+-	if (test_bit(CLK_CPU_NEEDS_DEBUG_ALT_DIV, &cpuclk->flags)) {
++	if (cpuclk->flags & CLK_CPU_NEEDS_DEBUG_ALT_DIV) {
+ 		while ((cfg_data->prate * 1000) != ndata->new_rate) {
+ 			if (cfg_data->prate == 0)
+ 				return -EINVAL;
+@@ -237,7 +237,7 @@ static int exynos_cpuclk_post_rate_change(struct clk_notifier_data *ndata,
+ 	writel(mux_reg & ~(1 << 16), base + E4210_SRC_CPU);
+ 	wait_until_mux_stable(base + E4210_STAT_CPU, 16, 1);
+ 
+-	if (test_bit(CLK_CPU_NEEDS_DEBUG_ALT_DIV, &cpuclk->flags)) {
++	if (cpuclk->flags & CLK_CPU_NEEDS_DEBUG_ALT_DIV) {
+ 		div |= (cfg_data->div0 & E4210_DIV0_ATB_MASK);
+ 		div_mask |= E4210_DIV0_ATB_MASK;
+ 	}
 -- 
-Jazz is not dead. It just smells funny...
+1.9.1
