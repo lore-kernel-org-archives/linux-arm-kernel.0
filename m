@@ -1,68 +1,118 @@
-From: s.munaut@whatever-company.com (Sylvain Munaut)
-Date: Mon, 29 Jun 2015 15:06:23 +0200
-Subject: dma_sync_single_for_cpu takes a really long time
-In-Reply-To: <5590E6B1.90206@topic.nl>
-References: <CAF6-1L6sjGc1VySi=oQGzOEm-e5jauznh+jzmdDgmJQWLbA_pA@mail.gmail.com>
- <5590E6B1.90206@topic.nl>
-Message-ID: <CAF6-1L7CY7HYr8RPeisW5rVGzftOcX8mRUev-Mqp1-EVB03pCQ@mail.gmail.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Mon, 29 Jun 2015 15:06:53 +0200
+Subject: [PATCH RFC v2 03/16] PM / Domains: Support IRQ safe PM domains
+In-Reply-To: <1435374156-19214-4-git-send-email-lina.iyer@linaro.org>
+References: <1435374156-19214-1-git-send-email-lina.iyer@linaro.org>
+ <1435374156-19214-4-git-send-email-lina.iyer@linaro.org>
+Message-ID: <CAMuHMdXmH6idtZNm0cBuV4HQSQjYenxiwFJ9qya=PiOVZ9Cr4A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-@ Mike & @ Arnd :
+Hi Lina,
 
-Thanks for your suggestions.
+On Sat, Jun 27, 2015 at 5:02 AM, Lina Iyer <lina.iyer@linaro.org> wrote:
+> Generic Power Domains currently support turning on/off only in process
+> context. This prevents the usage of PM domains for domains that could be
+> powered on/off in a context where IRQs are disabled. Many such domains
+> exist today and do not get powered off, when the IRQ safe devices in
+> that domain are powered off, because of this limitation.
 
+[...]
 
-> I have the same experience: The cache flush is so slow, that it is about as
-> fast to just memcpy() the whole region.
+Thanks for your patch!
 
-So far it even looks like invalidating L1 takes 8 ms and L2 4 ms.
-Which is pretty weird since the L1 inval is a pretty tight loop, and
-invalidating something smaller and closer to the CPU takes more time ?
-:
+> --- a/Documentation/power/devices.txt
+> +++ b/Documentation/power/devices.txt
+> @@ -600,7 +600,16 @@ individually.  Instead, a set of devices sharing a power resource can be put
+>  into a low-power state together at the same time by turning off the shared
+>  power resource.  Of course, they also need to be put into the full-power state
+>  together, by turning the shared power resource on.  A set of devices with this
+> -property is often referred to as a power domain.
+> +property is often referred to as a power domain. A power domain may also be
+> +nested inside another domain.
 
-1:
-        mcr     p15, 0, r0, c7, c6, 1           @ invalidate D / U line
-        add     r0, r0, r2
-        cmp     r0, r1
-        blo     1b
+"... another power domain"?
 
+> +Devices, by default, operate in process context and if a device can operate in
+> +IRQ safe context, has to be explicitly set as IRQ safe. PM domains by default,
 
-Unless somehow I end up having high mem page in there and the
-dma_cache_maint_page loops has more work than I think.
+This isn't exactly your fault, but this section is the only one inside this
+document that talks about "power domains". All other sections talk about
+"PM domains".
+You're adding a paragraph about "PM domains" inside this section.
 
-
-> You're on a Zynq, and that has an ACP port. Connect through that instead of
-> an HP port (interface is almost the same), add "dma-coherent" to the
-> devicetree and also add my patch that properly maps this into userspace.
+> +operate in process context but could have devices that are IRQ safe. Such PM
+> +domains cannot be powered on/off during runtime PM. On the other hand, an IRQ
+> +safe PM domain that can be powered on/off and suspend or resumed in an atomic
+> +context, may contain IRQ safe devices. Such domain may only contain only IRQ
+> +safe devices or IRQ safe sub-domains.
 >
-> The penalty of the ACP port is that it will write a lot slower to the memory
-> (about half the speed of the 600MB/s you get from the HP port) because of
-> all the cache administration. The good news is that all memory will be
-> cacheable once more, and all the dma_sync_... calls will turn into no-ops.
-> You don't have to change your driver and the logic also remains the same.
+>  Support for power domains is provided through the pm_domain field of struct
+>  device.  This field is a pointer to an object of type struct dev_pm_domain,
+> diff --git a/drivers/base/power/domain.c b/drivers/base/power/domain.c
+> index e9b7cfb..42ffb8b 100644
+> --- a/drivers/base/power/domain.c
+> +++ b/drivers/base/power/domain.c
+> @@ -50,6 +50,74 @@
+>  static LIST_HEAD(gpd_list);
+>  static DEFINE_MUTEX(gpd_list_lock);
+>
+> +static inline int genpd_lock_noirq(struct generic_pm_domain *genpd,
+> +                                       unsigned int subclass)
+> +       __acquires(&genpd->slock)
+> +{
+> +       unsigned long flags;
+> +
+> +       if (unlikely(subclass > 0))
 
-That's a pretty big downside. 600 M/s write speed is already pretty
-low (I mean, DDR raw bw should be close to 4G/s, sure it's DDR so you
-can never reach that but still for large purely sequential access I
-expected to get closer than that).
+In general, using "unlikely" is frowned upon.
+And in this case, the compiler already knows the exact value of subclass,
+as it's passed as a constant from one of the functions below.
 
-Also, doesn't that impact the ARM access performance too much to have to share ?
+> +static inline int genpd_lock_irq(struct generic_pm_domain *genpd,
+> +                                       unsigned int subclass)
+> +       __acquires(&genpd->mlock)
+> +{
+> +       if (unlikely(subclass > 0))
 
-I guess the best flags to use for this are coherent write request
-without L2 allocation.
+Same here.
 
+> @@ -1277,11 +1356,18 @@ int __pm_genpd_add_device(struct generic_pm_domain *genpd, struct device *dev,
+>         if (IS_ERR_OR_NULL(genpd) || IS_ERR_OR_NULL(dev))
+>                 return -EINVAL;
+>
+> +       /* Devices in an IRQ safe PM domain have to be IRQ safe too */
 
-> Another approach is to make your software uncached-memory friendly. If you
-> process the frames sequentially and use NEON instructions to fetch large
-> aligned chunks for further processing, the absense of caching won't matter
-> much.
+Do you really need this comment? It's identical to the error message below.
 
-Yes, that was the next thing I was going to try.
+> +       if (genpd->irq_safe && !dev->power.irq_safe) {
+> +               dev_err(dev,
+> +                       "Devices in an IRQ safe domain have to be IRQ safe.\n");
 
-Does using pre-load make anysense for uncached ? I guess not.
+> @@ -1385,12 +1471,23 @@ int pm_genpd_add_subdomain(struct generic_pm_domain *genpd,
+>             || genpd == subdomain)
+>                 return -EINVAL;
+>
+> +       /*
+> +        * If the domain can be powered on/off in an IRQ safe
+> +        * context, ensure that the subdomain can also be
+> +        * powered on/off in that context.
+> +        */
+> +       if (genpd->irq_safe && !subdomain->irq_safe) {
+> +               WARN("Incompatible sub-domain %s of IRQ safe domain %s\n",
+> +                               subdomain->name, genpd->name);
 
+If you change the error message to "Subdomains in an IRQ safe domain have
+to be IRQ safe", it's (a) consistent with the one for devices, and (b) you
+can remove the comment.
 
-Cheers,
+Gr{oetje,eeting}s,
 
-   Sylvain
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
