@@ -1,34 +1,33 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 29 Jun 2015 11:08:04 +0100
-Subject: dma-mapping: support for DMA_ATTR_NON_CONSISTENT DMA attribute
-In-Reply-To: <CAF6-1L584tp5o8U7S-w4-_XSjH4uXdMJSY89grLyFuwrJF3UyA@mail.gmail.com>
-References: <CAF6-1L5c-PbK_wfpvz1xdRkquXyuQDv4mvKfYp8fwA1LK9ZOyw@mail.gmail.com>
- <20150628224543.GW7557@n2100.arm.linux.org.uk>
- <CAF6-1L4g0W6kboZt52fHBUPxGYWYn9-9vmm=0-WQVv1-YdfOEA@mail.gmail.com>
- <5590E962.4020700@topic.nl>
- <CAF6-1L584tp5o8U7S-w4-_XSjH4uXdMJSY89grLyFuwrJF3UyA@mail.gmail.com>
-Message-ID: <20150629100804.GA7557@n2100.arm.linux.org.uk>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 29 Jun 2015 11:10:05 +0100
+Subject: [PATCH] kvmtool: don't use PCI config space IRQ line field
+In-Reply-To: <5582FDB9.3020700@arm.com>
+References: <1433431245-23227-1-git-send-email-andre.przywara@arm.com>
+ <20150605164158.GL7420@arm.com> <557EACD2.1030500@arm.com>
+ <20150616170657.GO30522@arm.com> <5582FDB9.3020700@arm.com>
+Message-ID: <20150629101004.GB17474@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 29, 2015 at 12:05:09PM +0200, Sylvain Munaut wrote:
-> Well that can't be since the dma_sync_* are part of streaming API and
-> the dma_alloc_attrs is part of the "coherent" API (even though you
-> have the NON_COHERENT flag in it ... that's a bit weird).
-> 
-> But I don't see the alternative, unless the doc is suggesting I
-> basically do all the cache invalidation myself manually and doing arch
-> specific stuff directly in the driver ?
+Hi Andre,
 
-Maybe someone with this problem should work on a solution - augmenting
-the coherent API with a set of functions to do what you want?
+On Thu, Jun 18, 2015 at 06:19:53PM +0100, Andre Przywara wrote:
+> I am tempted to remove shmem, since it's broken:
+> a) there is no upstream driver, only some out-of-tree uio driver module
+> in some Github repo
 
-Please, if you find something lacking like this, make a proposal and
-send a patch - but bear in mind that such an extension is not a matter
-for just ARM, but every other architecture that the kernel supports,
-so merely sending it to ARM mailing lists isn't going to get you very
-far.
+Right, but that's the same for qemu and we've already made the jump of
+merging the driver, so I don't think that's a good argument for throwing
+it out of the tree.
 
--- 
-FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
-according to speedtest.net.
+> b) the PCI device BARs do not match what QEMU implements and what the
+> uio driver expects (IO BAR vs. MMIO BAR)
+
+In what way? A quick look suggests that kvmtool is at least aligned with
+said github repo.
+
+> c) there is (at least one) bug in kvmtool (easily fixed, though)
+
+Care to elaborate?
+
+Will
