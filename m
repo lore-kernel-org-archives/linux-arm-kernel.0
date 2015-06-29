@@ -1,53 +1,34 @@
-From: tomeu.vizoso@collabora.com (Tomeu Vizoso)
-Date: Mon, 29 Jun 2015 11:18:49 +0200
-Subject: [PATCH v3] ARM: tegra: cpuidle: implement
- cpuidle_state.enter_freeze()
-In-Reply-To: <20150629090050.GD5431@ulmo>
-References: <1432046953-12945-1-git-send-email-tomeu.vizoso@collabora.com>
- <1773599.T1QStsTFTH@vostro.rjw.lan>
- <CAAObsKCURyo-ujcA7r+UYqSw6ie-aBxKiYEdTKwe-HrL14RkBw@mail.gmail.com>
- <20150629090050.GD5431@ulmo>
-Message-ID: <CAAObsKDD8juE3VuM94Z+d0Z8Gs0c2SWTg61uMa-9jQ+X1-FAVQ@mail.gmail.com>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Mon, 29 Jun 2015 11:19:34 +0200
+Subject: [RESEND PATCH v3] clocksource: exynos_mct: fix for sleeping in
+ atomic ctx handling cpu hotplug notif.
+In-Reply-To: <1435324984-7328-1-git-send-email-d.eppel@samsung.com>
+References: <1426151496-5509-1-git-send-email-d.eppel@samsung.com>
+ <1435324984-7328-1-git-send-email-d.eppel@samsung.com>
+Message-ID: <55910DA6.4070404@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 29 June 2015 at 11:00, Thierry Reding <thierry.reding@gmail.com> wrote:
-> On Thu, Jun 18, 2015 at 09:09:29AM +0200, Tomeu Vizoso wrote:
->> On 21 May 2015 at 03:02, Rafael J. Wysocki <rjw@rjwysocki.net> wrote:
->> > On Tuesday, May 19, 2015 04:49:12 PM Tomeu Vizoso wrote:
->> >> This callback is expected to do the same as enter() but it has to
->> >> guarantee that interrupts aren't enabled at any point in its execution,
->> >> as the tick is frozen.
->> >>
->> >> It will be called when the system goes to suspend-to-idle and will
->> >> reduce power usage because CPUs won't be awaken for unnecessary IRQs.
->> >>
->> >> By setting the CPUIDLE_FLAG_TIMER_STOP flag, we can reuse the same code
->> >> for both the enter() and enter_freeze() callbacks.
->> >>
->> >> Signed-off-by: Tomeu Vizoso <tomeu.vizoso@collabora.com>
->> >> Cc: Rafael J. Wysocki <rafael.j.wysocki@intel.com>
->> >
->> > Makes sense to me, but I suppose it should go in via arm-soc.
->>
->> Hi Thierry,
->>
->> what's the plan regarding merging of this patch?
->>
->> It needs df8d9ee ("cpuidle: Run tick_broadcast_exit() with disabled
->> interrupts") so it doesn't break boot.
+On 06/26/2015 03:23 PM, Damian Eppel wrote:
+> This is to fix an issue of sleeping in atomic context when processing
+> hotplug notifications in Exynos MCT(Multi-Core Timer).
+> The issue was reproducible on Exynos 3250 (Rinato board) and Exynos 5420
+> (Arndale Octa board).
 >
-> By the looks of it the above patch was merged in 4.1, so I can easily
-> take this through the Tegra tree. The commit message doesn't say whether
-> or not this fixes a bug. Is this urgent? Should it go into 4.2? It
-> sounds more like it's a power-saving feature, so 4.3 is probably more
-> appropriate.
+> Whilst testing cpu hotplug events on kernel configured with DEBUG_PREEMPT
+> and DEBUG_ATOMIC_SLEEP we get following BUG message, caused by calling
+> request_irq() and free_irq() in the context of hotplug notification
+> (which is in this case atomic context).
 
-Yeah, it doesn't fix any bug and its effect should only be reduced
-power consumption when in suspend-to-idle.
+Applied as a 4.2 fix.
 
-Thanks,
+Should it be tagged stable@ ?
 
-Tomeu
 
-> Thierry
+
+-- 
+  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
