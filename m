@@ -1,56 +1,50 @@
-From: andre.przywara@arm.com (Andre Przywara)
-Date: Mon, 29 Jun 2015 14:48:08 +0100
-Subject: [PATCH] kvmtool: don't use PCI config space IRQ line field
-In-Reply-To: <20150629101004.GB17474@arm.com>
-References: <1433431245-23227-1-git-send-email-andre.przywara@arm.com>
- <20150605164158.GL7420@arm.com> <557EACD2.1030500@arm.com>
- <20150616170657.GO30522@arm.com> <5582FDB9.3020700@arm.com>
- <20150629101004.GB17474@arm.com>
-Message-ID: <55914C98.1070507@arm.com>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Mon, 29 Jun 2015 15:43:43 +0200
+Subject: [PATCH v2 2/2] ARM: dts: add buffalo linkstation ls-wvl/vl
+In-Reply-To: <559146B0.1010905@free-electrons.com>
+References: <1434713319-8691-3-git-send-email-rogershimizu@gmail.com>
+ <1434985351-6678-1-git-send-email-rogershimizu@gmail.com>
+ <559146B0.1010905@free-electrons.com>
+Message-ID: <20150629134343.GB4535@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Will,
-
-On 29/06/15 11:10, Will Deacon wrote:
-> Hi Andre,
+On Mon, Jun 29, 2015 at 03:22:56PM +0200, Gregory CLEMENT wrote:
+> Hi Roger,
 > 
-> On Thu, Jun 18, 2015 at 06:19:53PM +0100, Andre Przywara wrote:
->> I am tempted to remove shmem, since it's broken:
->> a) there is no upstream driver, only some out-of-tree uio driver module
->> in some Github repo
+> On 22/06/2015 17:02, Roger Shimizu wrote:
+> > Add dts file to support Buffalo Linkstation LS-WVL and LS-VL,
+> > which are 3.5" HDD NAS in 2-bay and 1-bay respectively.
+> > 
+> > Signed-off-by: Roger Shimizu <rogershimizu@gmail.com>
+> > Reviewed-by: Nobuhiro Iwamatsu <iwamatsu@nigauri.org>
 > 
-> Right, but that's the same for qemu and we've already made the jump of
-> merging the driver, so I don't think that's a good argument for throwing
-> it out of the tree.
-
-If this driver has some future in the Linux tree, I agree it's worth to
-keep it in, though I didn't see any effort to merge it lately.
-
->> b) the PCI device BARs do not match what QEMU implements and what the
->> uio driver expects (IO BAR vs. MMIO BAR)
+> it seems that you addressed Andrew's remarks too, so
 > 
-> In what way? A quick look suggests that kvmtool is at least aligned with
-> said github repo.
+> Acked-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+> 
+> 
+> However I will wait for Andrew's formal acked-by before applying it.
 
-The first BAR holds the control registers, QEMU and the UIO driver
-require an MMIO region, kvmtool uses PIO :-(
+Hi Gregory
 
->> c) there is (at least one) bug in kvmtool (easily fixed, though)
+One minor nit pick. Maybe you can fix it while committing?
 
-The size of the control register region in BAR0 is set to the size of
-the shared memory region, where it should be some constant size (at
-least 16 Bytes, QEMU uses 256, the spec says 1K, pick one ;-)
-As PIO on x86 is at most 64K, this BAR gets ignored by the kernel with
-any shmem size above that (it defaults to 4M).
-As said the fix is easy, but ...
+> > +			pmx_led_alarm: pmx-led-alarm {
+> > +				marvell,pins = "mpp36";
+> > +				marvell,function = "gpio";
+> > +			};
+> > +			pmx_led_function_red: pmx-led-function_red {
 
-Those two bugs alone make we wonder if that ever worked on kvmtool,
-obviously not with that UIO driver (which seems to work on QEMU).
-I have fixes for both issues, but I haven't had a chance of testing this
-in real action (just the driver loaded and lspci looking sensible). I
-may send the patches later, but this doesn't have high priority for me
-(unless someone bugs me ;-)
+Second _red should be -red.
 
-Cheers,
-Andre.
+> > +				marvell,pins = "mpp37";
+> > +				marvell,function = "gpio";
+> > +			};
+
+Other than that,
+
+Acked-by: Andrew Lunn <andrew@lunn.ch>
+
+	  Thanks
+		Andrew
