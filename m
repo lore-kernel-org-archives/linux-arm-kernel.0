@@ -1,87 +1,72 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Mon, 29 Jun 2015 14:46:51 +0200
-Subject: [PATCH 1/3] ARM: at91/soc: add basic support for new sama5d2 SoC
-In-Reply-To: <20150618152105.GK27492@piout.net>
-References: <cover.1434632966.git.nicolas.ferre@atmel.com>
- <fe6d862c640a3708e80c0cc4c694ab5d9079060b.1434632966.git.nicolas.ferre@atmel.com>
- <20150618152105.GK27492@piout.net>
-Message-ID: <55913E3B.6060009@atmel.com>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Mon, 29 Jun 2015 14:50:22 +0200
+Subject: [PATCH 2/3] ARM: mvebu: update EEPROM description of Armada 388 GP
+In-Reply-To: <1434631121-32014-3-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1434631121-32014-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1434631121-32014-3-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <55913F0E.6080604@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le 18/06/2015 17:21, Alexandre Belloni a ?crit :
-> Hi,
+Hi Thomas,
+
+On 18/06/2015 14:38, Thomas Petazzoni wrote:
+> Contrary to what the Device Tree indicates, the EEPROM at 0x54 is not
+> populated, so we get rid of this comment.
 > 
-> On 18/06/2015 at 15:18:28 +0200, Nicolas Ferre wrote :
->> diff --git a/Documentation/arm/Atmel/README b/Documentation/arm/Atmel/README
->> index c53a19b4aab2..6650a8ffaa64 100644
->> --- a/Documentation/arm/Atmel/README
->> +++ b/Documentation/arm/Atmel/README
->> @@ -90,6 +90,12 @@ the Atmel website: http://www.atmel.com.
->>          + Datasheet
->>            http://www.atmel.com/Images/Atmel-11238-32-bit-Cortex-A5-Microcontroller-SAMA5D4_Datasheet.pdf
->>  
->> +    * ARM Cortex-A5 + NEON based SoCs
->> +      - sama5d2 family
->> +        - sama5d27
->> +        + Datasheet
->> +          Coming soon
+> However, there is an EEPROM at 0x57, so we add support for this
+> AT24C64 EEPROM:
 > 
-> Shouldn't that go directly before or after the sama5d4 family ?
-
-This is "after" sama5d4: I sorted this file according to SoC release
-date whereas I sorted the other entries in alpa-numerial order (sama5d2
-placed before sama5d3).
-
-Is it what you answered?
-
->> diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
->> index f1b157971366..140228d033c2 100644
->> --- a/arch/arm/Kconfig.debug
->> +++ b/arch/arm/Kconfig.debug
->> @@ -141,6 +141,12 @@ choice
->>  		depends on ARCH_AT91
->>  		depends on SOC_SAMA5
->>  
->> +	config AT91_DEBUG_LL_DBGU3
->> +		bool "Kernel low-level debugging on sama5d2"
->> +		select DEBUG_AT91_UART
->> +		depends on ARCH_AT91
->> +		depends on SOC_SAMA5
->> +
+> $ hexdump -C /sys/bus/i2c/devices/0-0057/eeprom
+> 00000000  0c ff f3 ff ff ff ff ff  ff ff ff ff ff ff ff ff  |................|
+> 00000010  ff ff ff ff ff ff ff ff  ff ff ff ff ff ff ff ff  |................|
+> *
+> 00002000
 > 
-> I think that at some point we'll have to kill those AT91_DEBUG_LL_*
-> which are actually board specific and not soc specific. I already have a
-> patch for that that I need to rebase.
+> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 
-Ok, it could definitively simplify the last weird bits of our
-sub-architecture ;-)
+Acked-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
 
 
->> diff --git a/arch/arm/mach-at91/Kconfig b/arch/arm/mach-at91/Kconfig
->> index 43ec794d1057..e53780a28605 100644
->> --- a/arch/arm/mach-at91/Kconfig
->> +++ b/arch/arm/mach-at91/Kconfig
->> @@ -8,6 +8,18 @@ menuconfig ARCH_AT91
->>  	select SOC_BUS
->>  
->>  if ARCH_AT91
->> +config SOC_SAMA5D2
->> +	bool "SAMA5D2 family" if ARCH_MULTI_V7
->> +	select SOC_SAMA5
->> +	select CACHE_L2X0
->> +	select HAVE_FB_ATMEL
->> +	select HAVE_AT91_UTMI
->> +	select HAVE_AT91_USB_CLK
->> +	select HAVE_AT91_H32MX
->> +	select HAVE_AT91_GENERATED
+Thanks,
+
+Gregory
+
+> ---
+>  arch/arm/boot/dts/armada-388-gp.dts | 8 ++++----
+>  1 file changed, 4 insertions(+), 4 deletions(-)
 > 
-> Seeing that, I think HAVE_AT91_GENERATED should include CLK somewhere in
-> the name as this is only related to clocks.
+> diff --git a/arch/arm/boot/dts/armada-388-gp.dts b/arch/arm/boot/dts/armada-388-gp.dts
+> index 5164b9a..fc1ee3e 100644
+> --- a/arch/arm/boot/dts/armada-388-gp.dts
+> +++ b/arch/arm/boot/dts/armada-388-gp.dts
+> @@ -81,10 +81,6 @@
+>  				pinctrl-0 = <&i2c0_pins>;
+>  				status = "okay";
+>  				clock-frequency = <100000>;
+> -				/*
+> -				 * The EEPROM located at adresse 54 is needed
+> -				 * for the boot - DO NOT ERASE IT -
+> -				 */
+>  
+>  				expander0: pca9555 at 20 {
+>  					compatible = "nxp,pca9555";
+> @@ -111,6 +107,10 @@
+>  					reg = <0x21>;
+>  				};
+>  
+> +				eeprom at 57 {
+> +					compatible = "atmel,24c64";
+> +					reg = <0x57>;
+> +				};
+>  			};
+>  
+>  			serial at 12000 {
+> 
 
-Absolutely, I changed it to HAVE_AT91_GENERATED_CLK which is somehow
-better. Also changed in my "generated clock" series sent to Boris.
 
-Thanks for your review. Bye,
 -- 
-Nicolas Ferre
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
