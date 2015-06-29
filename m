@@ -1,58 +1,51 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Mon, 29 Jun 2015 11:27:27 +0200
-Subject: [PATCH v2 2/2] pwm: add MediaTek display PWM driver support
-In-Reply-To: <1434635939.22029.7.camel@mtksdaap41>
-References: <1432214964-40644-1-git-send-email-yh.huang@mediatek.com>
- <1432214964-40644-3-git-send-email-yh.huang@mediatek.com>
- <20150612102046.GF19400@ulmo.nvidia.com>
- <1434622784.18278.39.camel@mtksdaap41>
- <1434635939.22029.7.camel@mtksdaap41>
-Message-ID: <20150629092726.GG5431@ulmo>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Mon, 29 Jun 2015 10:36:19 +0100
+Subject: dma_sync_single_for_cpu takes a really long time
+In-Reply-To: <20150629090804.GX7557@n2100.arm.linux.org.uk>
+References: <CAF6-1L6sjGc1VySi=oQGzOEm-e5jauznh+jzmdDgmJQWLbA_pA@mail.gmail.com>
+ <20150628223039.GV7557@n2100.arm.linux.org.uk>
+ <CAF6-1L6Xhsk3CwTvu6rAvYGYX3XvcwbmP582tVPEuiVaDnFpRA@mail.gmail.com>
+ <20150629090804.GX7557@n2100.arm.linux.org.uk>
+Message-ID: <20150629093619.GB29907@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 18, 2015 at 09:58:59PM +0800, Yingjoe Chen wrote:
-> On Thu, 2015-06-18 at 18:19 +0800, YH Huang wrote:
-> > On Fri, 2015-06-12 at 12:20 +0200, Thierry Reding wrote:
-> > > > +/* Shift log2(PWM_PERIOD_MAX + 1) as divisor */
-> > > > +#define PWM_PERIOD_BIT_SHIFT	12
-> > > 
-> > > I wasn't very clear about this in my earlier review, so let me try to
-> > > explain why I think this is confusing. You use this as a divisor, but
-> > > you encode it as a shift. It's also PWM_PERIOD_MAX + 1, so I think it
-> > > would make more sense to drop this, keep PWM_PERIOD_MAX as above and
-> > > then replace the
-> > > 
-> > > 	>> PWM_PERIOD_BIT_SHIFT
-> > > 	
-> > > below by
-> > > 
-> > > 	/ (PWM_PERIOD_MAX + 1)
-> > > 
+On Mon, Jun 29, 2015 at 10:08:04AM +0100, Russell King - ARM Linux wrote:
+> On Mon, Jun 29, 2015 at 08:07:52AM +0200, Sylvain Munaut wrote:
+> > > However, if you're going to read the entire frame through a cacheable
+> > > mapping, you're probably going to end up flushing your cache several
+> > > times over through doing that
 > > 
-> > Maybe I can change in this way:
-> > Remove this: #define PWM_PERIOD_MAX		0x00000fff
-> > Using ">> PWM_PERIOD_BIT_SHIFT" is faster than "/ (PWM_PERIOD_MAX + 1)"
-> > Is this right?
+> > Isn't there some intermediary between coherent and cacheable, a bit like
+> > write combine for read ?
 > 
-> 
-> The place which use this shift is:
-> 
-> 	clk_div = div_u64(rate * period_ns, NSEC_PER_SEC) >> 
-> 			  PWM_PERIOD_BIT_SHIFT;
-> 
-> div_u64 return u64. If we change >> to /, and somehow compiler didn't
-> optimize that div into shift, it will cause build error.
+> Unfortunately not.  IIRC, some CPUs like PXA had a "read buffer" which
+> would do that, but that was a PXA specific extension, and never became
+> part of the ARM architecture itself.
 
-Good point. I think every compiler should be able to optimize this, but
-the shift isn't any worse than a divide and if we can proactively avoid
-portability issues, let's go with the shift.
+I'm not familiar with the PXA implementation but on A9, in combination
+with the ACP, you can get "cacheable read no-allocate, write
+no-allocate" accesses from the device side. This allows the CPU to just
+use cacheable accesses.
 
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150629/62cd1c2a/attachment-0001.sig>
+If you don't want read-allocate for PL310, you can configure the ACP
+outer cacheability attributes as shareable, non-cacheable and leave bit
+22 in the PL310 aux ctrl register cleared. However, the latter requires
+that all DMA goes through the ACP.
+
+> > The Zynq TRM mention something about having independent control on inner
+> > and outer cacheability for instance. If only one was enabled, then at least
+> > the other wouldn't have to be invalidated ?
+> 
+> We then start running into other problems: there are only 8 memory types,
+> 7 of which are usable (one is "implementation specific").  All of these
+> are already used by Linux...
+
+With the ACP, it's just hardware configuration so we wouldn't need
+additional memory types in the kernel.
+
+(as for the memory types, some of them are never used at the same time:
+writeback, writealloc, writethrough)
+
+-- 
+Catalin
