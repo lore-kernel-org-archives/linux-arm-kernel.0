@@ -1,79 +1,71 @@
-From: vaibhav.hiremath@linaro.org (Vaibhav Hiremath)
-Date: Mon, 29 Jun 2015 21:01:17 +0530
-Subject: [PATCH-V5 4/4] mfd: devicetree: bindings: Add new 88pm800 mfd binding
-In-Reply-To: <1435591877-18214-1-git-send-email-vaibhav.hiremath@linaro.org>
-References: <1435591877-18214-1-git-send-email-vaibhav.hiremath@linaro.org>
-Message-ID: <1435591877-18214-5-git-send-email-vaibhav.hiremath@linaro.org>
+From: eric.auger@linaro.org (Eric Auger)
+Date: Mon, 29 Jun 2015 17:37:10 +0200
+Subject: [PATCH 0/7] KVM: arm/arm64: gsi routing support
+Message-ID: <1435592237-17924-1-git-send-email-eric.auger@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-With addition of DT support to 88pm800 mfd driver, this patch
-adds new DT binding documentation along with respective properties.
+With the advent of GICv3 ITS in-kernel emulation, KVM GSI routing
+appears to be requested. More specifically MSI routing is needed.
+irqchip routing does not sound to be really useful on arm but usage of
+MSI routing also mandates to integrate irqchip routing. The initial
+implementation of irqfd on arm must be upgraded with the integration
+of kvm irqchip.c code and the implementation of its standard hooks
+in the architecture specific part.
 
-Signed-off-by: Vaibhav Hiremath <vaibhav.hiremath@linaro.org>
----
- Documentation/devicetree/bindings/mfd/88pm800.txt | 53 +++++++++++++++++++++++
- 1 file changed, 53 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/mfd/88pm800.txt
+In case KVM_SET_GSI_ROUTING ioctl is not called, a default routing
+table with flat irqchip routing entries is built enabling to inject gsi
+corresponding to the SPI indexes seen by the guest.
 
-diff --git a/Documentation/devicetree/bindings/mfd/88pm800.txt b/Documentation/devicetree/bindings/mfd/88pm800.txt
-new file mode 100644
-index 0000000..dec842f
---- /dev/null
-+++ b/Documentation/devicetree/bindings/mfd/88pm800.txt
-@@ -0,0 +1,53 @@
-+* Marvell 88PM80x Power Management IC
-+
-+Required parent device properties:
-+- compatible		: "marvell,88pm800", "marvell,88pm805", "marvell,88pm860"
-+- reg			: the I2C slave address for the 88pm80x family chip
-+- interrupts		: IRQ line for the 88pm80x family chip
-+- interrupt-controller	: describes the 88pm80x family chip as an interrupt
-+			  controller
-+- #interrupt-cells 	: should be 1.
-+			  The cell is the 88pm80x local IRQ number
-+
-+88pm80x family of devices consists of varied group of sub-devices:
-+
-+Device		 	Supply Names	 Description
-+------		 	------------	 -----------
-+88pm80x-onkey		:		: On key
-+88pm80x-rtc		:		: RTC
-+88pm80x-regulator	:		: Regulators
-+
-+Example:
-+
-+	pmic: 88pm800 at 30 {
-+		compatible = "marvell,88pm800";
-+		reg = <0x30>;
-+		interrupts = <GIC_SPI 77 IRQ_TYPE_LEVEL_HIGH>;
-+		interrupt-parent = <&gic>;
-+		interrupt-controller;
-+		#interrupt-cells = <1>;
-+
-+		regulators {
-+			compatible = "marvell,88pm80x-regulator";
-+
-+			buck1a: BUCK1A {
-+				regulator-name = "BUCK1A";
-+				regulator-min-microvolt = <600000>;
-+				regulator-max-microvolt = <1800000>;
-+				regulator-boot-on;
-+				regulator-always-on;
-+			};
-+
-+			ldo1: LDO1 {
-+				regulator-name = "LDO1";
-+				regulator-min-microvolt = <1700000>;
-+				regulator-max-microvolt = <3300000>;
-+				regulator-boot-on;
-+				regulator-always-on;
-+			};
-+		};
-+
-+		rtc {
-+			compatible = "marvell,88pm80x-rtc";
-+		};
-+	};
+As soon as KVM_SET_GSI_ROUTING is called, user-space overwrites this
+default routing table and is responsible for building the whole routing
+table.
+
+for arm/arm64 KVM_SET_GSI_ROUTING has a limited support:
+- only applies to KVM_IRQFD and not to KVM_IRQ_LINE
+
+- irqchip routing was tested on Calxeda midway (VFIO with irqfd)
+- MSI routing without GICv3 ITS was tested using APM Xgene-I
+  (qemu VIRTIO-PCI vhost net without gsi_direct_mapping).
+- MSI routing with GICv2 ITS is NOT yet tested.
+
+Code can be found at https://git.linaro.org/people/eric.auger/linux.git/shortlog/refs/heads/v4.1-gsi-routing-patch
+
+It applies on Andre's [PATCH 00/13] arm64: KVM: GICv3 ITS emulation
+(http://www.spinics.net/lists/kvm/msg117402.html)
+
+History:
+
+RFC -> PATCH:
+- clearly state limited support on arm/arm64:
+  KVM_IRQ_LINE not impacted by GSI routing
+- add default routing table feature (new patch file)
+- changed uapi to use padding field area
+- reword api.txt
+
+
+Eric Auger (7):
+  KVM: api: add kvm_irq_routing_extended_msi
+  KVM: kvm_host: add kvm_extended_msi
+  KVM: irqchip: convey devid to kvm_set_msi
+  KVM: arm/arm64: enable irqchip routing
+  KVM: arm/arm64: build a default routing table
+  KVM: arm/arm64: enable MSI routing
+  KVM: arm: implement kvm_set_msi by gsi direct mapping
+
+ Documentation/virtual/kvm/api.txt |  30 ++++++++--
+ arch/arm/include/asm/kvm_host.h   |   2 +
+ arch/arm/kvm/Kconfig              |   3 +
+ arch/arm/kvm/Makefile             |   2 +-
+ arch/arm64/include/asm/kvm_host.h |   1 +
+ arch/arm64/kvm/Kconfig            |   2 +
+ arch/arm64/kvm/Makefile           |   2 +-
+ include/kvm/arm_vgic.h            |   9 ---
+ include/linux/kvm_host.h          |  10 ++++
+ include/uapi/linux/kvm.h          |   6 +-
+ virt/kvm/arm/vgic.c               | 117 ++++++++++++++++++++++++++++----------
+ virt/kvm/irqchip.c                |  20 +++++--
+ 12 files changed, 154 insertions(+), 50 deletions(-)
+
 -- 
 1.9.1
