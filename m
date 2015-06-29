@@ -1,37 +1,20 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Mon, 29 Jun 2015 10:54:51 +0200
-Subject: [GIT PULL 4/8] clk: tegra: Changes for v4.2-rc1
-In-Reply-To: <20150620204104.9112.83328@quantum>
-References: <1431524980-13599-1-git-send-email-thierry.reding@gmail.com>
- <1431524980-13599-5-git-send-email-thierry.reding@gmail.com>
- <20150520195459.GU31753@codeaurora.org>
- <555D7A5B.1070901@nvidia.com>
- <20150527195021.GA24204@codeaurora.org>
- <5566BDA5.5080104@nvidia.com> <20150618234126.9112.80705@quantum>
- <20150620204104.9112.83328@quantum>
-Message-ID: <20150629085450.GC5431@ulmo>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Mon, 29 Jun 2015 16:59:54 +0800
+Subject: [PATCH v3 1/2] ARM: dts: nitrogen6x: add CAN support
+In-Reply-To: <1433272037-6744-1-git-send-email-ps.report@gmx.net>
+References: <1433272037-6744-1-git-send-email-ps.report@gmx.net>
+Message-ID: <20150629085954.GJ10332@tiger>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Jun 20, 2015 at 01:41:04PM -0700, Michael Turquette wrote:
-[...]
-> I've decided to pull this in the interest of fairness. I'm taking the
-> Exynos cpu clock patches, which will need to be updated in the future to
-> use some new infrastructure for coordinating rate changes across
-> multiple clock nodes. I'm merging the EMC stuff with the same
-> expectation that it will need to migrate to the new infrastructure when
-> it becomes available and we'll get rid of clk_hw_reparent.
+On Tue, Jun 02, 2015 at 09:07:16PM +0200, Peter Seiderer wrote:
+> Regulator stuff copied from imx6qdl-tx6.dtsi, pin configuration
+> taken from Boundary Devices linux kernel tree ([1] and [2]).
 > 
-> Sound good?
+> [1] https://github.com/boundarydevices/linux-imx6/blob/boundary-imx_3.10.17_1.0.2_ga/arch/arm/boot/dts/imx6qdl-nitrogen6x.dtsi
+> [2] https://github.com/boundarydevices/linux-imx6/blob/boundary-imx_3.10.17_1.0.2_ga/arch/arm/boot/dts/imx6qdl.dtsi
+> 
+> Signed-off-by: Peter Seiderer <ps.report@gmx.net>
+> Tested-by: Eric Nelson <eric.nelson@boundarydevices.com>
 
-Sounds good, thanks Mike. I'm sure we'll find someone to update this
-when the framework changes are ready.
-
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150629/757c7b10/attachment.sig>
+Applied both, thanks.
