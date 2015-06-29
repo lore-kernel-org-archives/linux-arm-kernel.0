@@ -1,35 +1,47 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Sun, 28 Jun 2015 23:47:17 -0700
-Subject: [PATCH 2/3] ARM: dts: configure regulators for Gumstix Pepper
-In-Reply-To: <1433441299-18887-3-git-send-email-arun@gumstix.com>
-References: <1433441299-18887-1-git-send-email-arun@gumstix.com>
- <1433441299-18887-3-git-send-email-arun@gumstix.com>
-Message-ID: <20150629064717.GR4156@atomide.com>
+From: zhaoshenglong@huawei.com (Shannon Zhao)
+Date: Mon, 29 Jun 2015 16:02:40 +0800
+Subject: [PATCH] arm64: perf: fix unassigned cpu_pmu->plat_device when probing
+ PMU PPIs
+Message-ID: <1435564960-9516-1-git-send-email-zhaoshenglong@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Arun Bharadwaj <arun@gumstix.com> [150604 11:10]:
-> From: Adam YH Lee <adam.yh.lee@gmail.com>
-> 
-> Boot process is halting in midway because some of the necessary voltage
-> regulators are deemed unused and subsequently powered off, leading to
-> a completely unresponsive system.
+From: Shannon Zhao <shannon.zhao@linaro.org>
 
-OK that needs to be fixed for v4.2-rc series.
+Commit d795ef9aa831 ("arm64: perf: don't warn about missing
+interrupt-affinity property for PPIs") added a check for PPIs so that
+we avoid parsing the interrupt-affinity property for these naturally
+affine interrupts.
+
+Unfortunately, this check can trigger an early (successful) return and
+we will not assign the value of cpu_pmu->plat_device. This patch fixes
+the issue.
+
+Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
+---
+ arch/arm64/kernel/perf_event.c | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
+
+diff --git a/arch/arm64/kernel/perf_event.c b/arch/arm64/kernel/perf_event.c
+index 702591f..fd26e57 100644
+--- a/arch/arm64/kernel/perf_event.c
++++ b/arch/arm64/kernel/perf_event.c
+@@ -1318,7 +1318,7 @@ static int armpmu_device_probe(struct platform_device *pdev)
+ 	/* Don't bother with PPIs; they're already affine */
+ 	irq = platform_get_irq(pdev, 0);
+ 	if (irq >= 0 && irq_is_percpu(irq))
+-		return 0;
++		goto out;
  
-> Most of the device nodes had correct voltage regulator attachments.
-> Yet these nodes had to set stricter enforcement on them through
-> 'regulator-boot-on' and 'regulator-always-on' to function correctly.
-
-That's a lot of regulators marked as regulator-always-on. Could
-you please update the description what consumers are using them
-so we know why they are all needed always-on?
+ 	irqs = kcalloc(pdev->num_resources, sizeof(*irqs), GFP_KERNEL);
+ 	if (!irqs)
+@@ -1355,6 +1355,7 @@ static int armpmu_device_probe(struct platform_device *pdev)
+ 	else
+ 		kfree(irqs);
  
-> Signed-off-by: Ash Charles <ashcharles@gmail.com>
-
->From Adam, sent by Arun, signed by Ash? Can you please check
-that too.
-
-Regards,
-
-Tony
++out:
+ 	cpu_pmu->plat_device = pdev;
+ 	return 0;
+ }
+-- 
+2.0.4
