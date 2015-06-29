@@ -1,301 +1,85 @@
-From: mathieu.poirier@linaro.org (Mathieu Poirier)
-Date: Mon, 29 Jun 2015 08:36:06 -0600
-Subject: [PATCH V2 1/1] ARM: dts: imx7d: add cortex-a7 coresight component
-In-Reply-To: <20150628133953.GE10332@tiger>
-References: <1433192081-1131-1-git-send-email-Frank.Li@freescale.com>
- <20150628133953.GE10332@tiger>
-Message-ID: <CANLsYkydQWTLn8LaOrHc0F=ESzS8k+2qxxpqoGeF4JVOUGC1Jg@mail.gmail.com>
+From: simon.guinot@sequanux.org (Simon Guinot)
+Date: Mon, 29 Jun 2015 16:41:23 +0200
+Subject: [RESEND PATCH 3/4] leds: leds-ns2: handle can_sleep GPIOs
+In-Reply-To: <55915549.60106@samsung.com>
+References: <1434640650-28086-1-git-send-email-simon.guinot@sequanux.org>
+ <1434640650-28086-4-git-send-email-simon.guinot@sequanux.org>
+ <558ABC35.1010801@samsung.com>
+ <20150626171028.GL4853@kw.sim.vm.gnt> <55915549.60106@samsung.com>
+Message-ID: <20150629144123.GM4853@kw.sim.vm.gnt>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 28 June 2015 at 07:39, Shawn Guo <shawnguo@kernel.org> wrote:
-> On Tue, Jun 02, 2015 at 04:54:41AM +0800, Frank.Li at freescale.com wrote:
->> From: Frank Li <Frank.Li@freescale.com>
->>
->> Added etm, etb, funnel and replicator
->>
->> usage example:
->>
->>     echo 1 >/sys/bus/coresight/devices/30086000.etr/enable_sink
->>     echo 1 >/sys/bus/coresight/devices/3007c000.etm/enable_source
->>
->>         coresight-tmc 30086000.etr: TMC enabled
->>         coresight-replicator replicator.1: REPLICATOR enabled
->>         coresight-tmc 30084000.tmc: TMC enabled
->>         coresight-funnel 30083000.funnel: FUNNEL inport 0 enabled
->>         coresight-funnel 30041000.funnel: FUNNEL inport 0 enabled
->>         coresight-etm3x 3007c000.etm: ETM tracing enabled
->>
->>     etm enable here.
->>     trace data save at /dev/30086000.etr
->>
->>     cat /dev/30086000.etr > trace.data
->>
->>         coresight-tmc 30086000.etr: TMC read start
->>         coresight-tmc 30086000.etr: TMC read end
->>
->>     use ptm2human(https://github.com/hwangcc23/ptm2human) to show trace data
->>
->>     ptm2human -i trace.data
->>
->> Signed-off-by: Frank Li <Frank.Li@freescale.com>
->> ---
->> Change from V1 to V2
->>  - remove "0" after @
->>  - add comments about unused funnel input port
->>  - add comments about add  arm,primecell-periphid
->>
->>  arch/arm/boot/dts/imx7d.dtsi | 202 +++++++++++++++++++++++++++++++++++++++++++
->>  1 file changed, 202 insertions(+)
->>
->> diff --git a/arch/arm/boot/dts/imx7d.dtsi b/arch/arm/boot/dts/imx7d.dtsi
->> index b4cd8fd..d715501 100644
->> --- a/arch/arm/boot/dts/imx7d.dtsi
->> +++ b/arch/arm/boot/dts/imx7d.dtsi
->> @@ -121,6 +121,208 @@
->>               clock-output-names = "osc";
->>       };
->>
->> +     etr at 30086000 {
->> +             compatible = "arm,coresight-tmc", "arm,primecell";
->> +             reg = <0x30086000 0x1000>;
->> +
->
-> Drop this new line.
->
->> +             clocks = <&clks IMX7D_MAIN_AXI_ROOT_CLK>;
->> +             clock-names = "apb_pclk";
->> +
->> +             port {
->> +                     etr_in_port: endpoint {
->> +                             slave-mode;
->> +                             remote-endpoint = <&replicator_out_port1>;
->> +                     };
->> +             };
->> +     };
->> +
->> +     tpiu at 30087000 {
->> +             compatible = "arm,coresight-tpiu", "arm,primecell";
->> +             reg = <0x30087000 0x1000>;
->> +
->
-> Ditto
->
->> +             clocks = <&clks IMX7D_MAIN_AXI_ROOT_CLK>;
->> +             clock-names = "apb_pclk";
->
-> Have a new line here.
->
->> +             port {
->> +                     tpiu_in_port: endpoint at 0 {
->
-> Why do we need a @unit-address here?
+On Mon, Jun 29, 2015 at 04:25:13PM +0200, Jacek Anaszewski wrote:
+> On 06/26/2015 07:10 PM, Simon Guinot wrote:
+> >On Wed, Jun 24, 2015 at 04:18:29PM +0200, Jacek Anaszewski wrote:
+> >>On 06/18/2015 05:17 PM, Simon Guinot wrote:
+> >>>On the board n090401 (Seagate NAS 4-Bay), some of the LEDs are handled
+> >>>by the leds-ns2 driver. This LEDs are connected to an I2C GPIO expander
+> >>>(PCA95554PW) which means that GPIO access may sleep. This patch makes
+> >>>leds-ns2 compatible with such GPIOs by using the *_cansleep() variant of
+> >>>the GPIO functions. As a drawback this functions can't be used safely in
+> >>>a timer context (with the timer LED trigger for example). To fix this
+> >>>issue, a workqueue mechanism (copied from the leds-gpio driver) is used.
+> >>>
+> >>>Note that this patch also updates slightly the ns2_led_sata_store
+> >>>function. The LED state is now retrieved from cached values instead of
+> >>>reading the GPIOs previously. This prevents ns2_led_sata_store from
+> >>>working with a stale LED state (which may happen when a delayed work
+> >>>is pending).
+> >>>
+> >>>Signed-off-by: Simon Guinot <simon.guinot@sequanux.org>
+> >>>Signed-off-by: Vincent Donnefort <vdonnefort@gmail.com>
+> >>>---
+> >>>  drivers/leds/leds-ns2.c | 56 ++++++++++++++++++++++++++++++++++++-------------
+> >>>  1 file changed, 42 insertions(+), 14 deletions(-)
+> >>>
+> >>
+> >>>
+> >>>+static void ns2_led_work(struct work_struct *work)
+> >>>+{
+> >>>+	struct ns2_led_data *led_dat =
+> >>>+		container_of(work, struct ns2_led_data, work);
+> >>>+	int i = led_dat->new_mode_index;
+> >>>+
+> >>>+	write_lock(&led_dat->rw_lock);
+> >>>+
+> >>>+	gpio_set_value_cansleep(led_dat->cmd, led_dat->modval[i].cmd_level);
+> >>>+	gpio_set_value_cansleep(led_dat->slow, led_dat->modval[i].slow_level);
+> >>>+
+> >>>+	write_unlock(&led_dat->rw_lock);
+> >>>+}
+> >>>+
+> >>
+> >>I've just realized that this can break one of the basic rules:
+> >>no sleeping should occur while holding a spinlock. Did you
+> >>consider this?
+> >
+> >Well, if I did, I can't say I have done a good job here :/
+> >
+> >You have to know that this code is used on a large number of boards.
+> >Thus, I have to thank you for spotting this bug.As a relief, this don't
+> >actually lead to a bug with the configuration we are using: UP machine
+> >and !CONFIG_SMP.
+> >
+> >It should be simple to fix it because using a spinlock in ns2_led_work()
+> >is not needed. The GPIO writing calls are protected by the workqueue
+> >itself: a single instance is running at a time. We are only let with the
+> >new_mode_index reading which must be made coherent.
+> >
+> >Note that the very same issue also applies to ns2_led_get_mode(). And
+> >again using a lock here is not needed either. This function is only
+> >called once at probe time and there is no possible concurrency.
+> 
+> Switching to gpio_get_value_cansleep would be nice there too.
 
-Good catch - The "@0" is indeed not required.
+It is already the case.
 
->
->> +                             slave-mode;
->> +                             remote-endpoint = <&replicator_out_port1>;
->> +                     };
->> +             };
->> +     };
->> +
->> +     replicator {
->> +             /* non-configurable replicators don't show up on the
->> +              * AMBA bus.  As such no need to add "arm,primecell"
->> +              */
->
->                 /*
->                  * Multiple-line comment
->                  */
->
->> +             compatible = "arm,coresight-replicator";
->> +
->> +             ports {
->> +                     #address-cells = <1>;
->> +                     #size-cells = <0>;
->> +
->> +                     /* replicator output ports */
->> +                     port at 0 {
->> +                             reg = <0>;
->> +                             replicator_out_port0: endpoint {
->> +                                     remote-endpoint = <&tpiu_in_port>;
->> +                             };
->> +                     };
->> +
->> +                     port at 1 {
->> +                             reg = <1>;
->> +                             replicator_out_port1: endpoint {
->> +                                     remote-endpoint = <&etr_in_port>;
->> +                             };
->> +                     };
->> +
->> +                     /* replicator input port */
->> +                     port at 2 {
->> +                             reg = <0>;
->> +                             replicator_in_port0: endpoint {
->> +                                     slave-mode;
->> +                                     remote-endpoint = <&etf_out_port>;
->> +                             };
->> +                     };
->> +             };
->> +     };
->> +
->> +     etf at 30084000 {
->> +             compatible = "arm,coresight-tmc", "arm,primecell";
->> +             reg = <0x30084000 0x1000>;
->> +             clocks = <&clks IMX7D_MAIN_AXI_ROOT_CLK>;
->> +             clock-names = "apb_pclk";
->> +
->> +             ports {
->> +                     #address-cells = <1>;
->> +                     #size-cells = <0>;
->> +
->> +                     port at 0 {
->> +                             reg = <0>;
->> +                             etf_in_port: endpoint {
->> +                                     slave-mode;
->> +                                     remote-endpoint = <&hugo_funnel_out_port0>;
->> +                             };
->> +                     };
->> +
->> +                     port at 1 {
->> +                             reg = <0>;
->> +                             etf_out_port: endpoint {
->> +                                     remote-endpoint = <&replicator_in_port0>;
->> +                             };
->> +                     };
->> +             };
->> +     };
->> +
->> +     funnel at 30083000 {
->> +             compatible = "arm,coresight-funnel", "arm,primecell";
->> +             reg = <0x30083000 0x1000>;
->> +             clocks = <&clks IMX7D_MAIN_AXI_ROOT_CLK>;
->> +             clock-names = "apb_pclk";
->> +
->> +             ports {
->> +                     #address-cells = <1>;
->> +                     #size-cells = <0>;
->> +
->> +                     /* funnel input ports */
->> +                     port at 0 {
->> +                             reg = <0>;
->> +                             hugo_funnel_in_port0: endpoint {
->> +                                     slave-mode;
->> +                                     remote-endpoint = <&ca_funnel_out_port0>;
->> +                             };
->> +                     };
->> +
->> +                     port at 1 {
->> +                             reg = <1>;
->> +                             hugo_funnel_in_port1: endpoint {
->> +                                     slave-mode; /* M4 input */
->> +                             };
->> +                     };
->> +
->> +                     port at 2 {
->> +                             reg = <0>;
->> +                             hugo_funnel_out_port0: endpoint {
->> +                                     remote-endpoint = <&etf_in_port>;
->> +                             };
->> +                     };
->> +
->> +                     /* the other input ports are not connect to anything */
->> +             };
->> +     };
->> +
->> +     funnel at 30041000 {
->> +             compatible = "arm,coresight-funnel", "arm,primecell";
->> +             reg = <0x30041000 0x1000>;
->> +             clocks = <&clks IMX7D_MAIN_AXI_ROOT_CLK>;
->> +             clock-names = "apb_pclk";
->> +
->> +             ports {
->> +                     #address-cells = <1>;
->> +                     #size-cells = <0>;
->> +
->> +                     /* funnel input ports */
->> +                     port at 0 {
->> +                             reg = <0>;
->> +                             ca_funnel_in_port0: endpoint {
->> +                                     slave-mode;
->> +                                     remote-endpoint = <&etm0_out_port>;
->> +                             };
->> +                     };
->> +
->> +                     port at 1 {
->> +                             reg = <1>;
->> +                             ca_funnel_in_port1: endpoint {
->> +                                     slave-mode;
->> +                                     remote-endpoint = <&etm1_out_port>;
->> +                             };
->> +                     };
->> +
->> +                     /* funnel output port */
->> +                     port at 2 {
->> +                             reg = <0>;
->> +                             ca_funnel_out_port0: endpoint {
->> +                                     remote-endpoint = <&hugo_funnel_in_port0>;
->> +                             };
->> +                     };
->> +
->> +                     /* the other input ports are not connect to anything */
->> +             };
->> +     };
->> +
->> +     etm at 3007c000 {
->> +             compatible = "arm,coresight-etm3x", "arm,primecell";
->> +             reg = <0x3007c000 0x1000>;
->> +             cpu = <&cpu0>;
->> +             clocks = <&clks IMX7D_MAIN_AXI_ROOT_CLK>;
->> +             clock-names = "apb_pclk";
->> +
->> +             port {
->> +                     etm0_out_port: endpoint {
->> +                             remote-endpoint = <&ca_funnel_in_port0>;
->> +                     };
->> +             };
->> +     };
->> +
->> +     etm at 3007d000 {
->> +             compatible = "arm,coresight-etm3x", "arm,primecell";
->> +             reg = <0x3007d000 0x1000>;
->> +
->> +             /* System will hang if added nosmp in kernel command line
->> +              * without arm,primecell-periphid because amba bus try to
->> +              * read id and core1 power off at this time.
->> +              */
->
->                 /*
->                  * Multiple-line comment
->                  */
->
->> +             arm,primecell-periphid =  <0xbb956>;
->
-> One space after '='
->
-> Shawn
->
->> +             cpu = <&cpu1>;
->> +             clocks = <&clks IMX7D_MAIN_AXI_ROOT_CLK>;
->> +             clock-names = "apb_pclk";
->> +
->> +             port {
->> +                     etm1_out_port: endpoint {
->> +                             remote-endpoint = <&ca_funnel_in_port1>;
->> +                     };
->> +             };
->> +     };
->> +
->>       soc {
->>               #address-cells = <1>;
->>               #size-cells = <1>;
->> --
->> 1.9.1
->>
->>
->> _______________________________________________
->> linux-arm-kernel mailing list
->> linux-arm-kernel at lists.infradead.org
->> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+Simon
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 181 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150629/d1395546/attachment.sig>
