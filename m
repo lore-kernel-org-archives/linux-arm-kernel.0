@@ -1,121 +1,58 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 29 Jun 2015 10:08:04 +0100
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Mon, 29 Jun 2015 10:09:14 +0100
 Subject: dma_sync_single_for_cpu takes a really long time
-In-Reply-To: <CAF6-1L6Xhsk3CwTvu6rAvYGYX3XvcwbmP582tVPEuiVaDnFpRA@mail.gmail.com>
+In-Reply-To: <20150628223039.GV7557@n2100.arm.linux.org.uk>
 References: <CAF6-1L6sjGc1VySi=oQGzOEm-e5jauznh+jzmdDgmJQWLbA_pA@mail.gmail.com>
  <20150628223039.GV7557@n2100.arm.linux.org.uk>
- <CAF6-1L6Xhsk3CwTvu6rAvYGYX3XvcwbmP582tVPEuiVaDnFpRA@mail.gmail.com>
-Message-ID: <20150629090804.GX7557@n2100.arm.linux.org.uk>
+Message-ID: <20150629090914.GA29907@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 29, 2015 at 08:07:52AM +0200, Sylvain Munaut wrote:
-> Hi,
+On Sun, Jun 28, 2015 at 11:30:40PM +0100, Russell King - ARM Linux wrote:
+> On Sun, Jun 28, 2015 at 10:40:03PM +0200, Sylvain Munaut wrote:
+> > I'm working on a DMA driver that uses the the streaming DMA API to
+> > synchronize the access between host and device. The data flow is
+> > exclusively from the device to the host (video grabber).
+> > 
+> > As such, I call dma_sync_single_for_cpu when the hardware is done
+> > writing a frame to make sure that the cpu gets up to date data when
+> > accessing the zone.
+> > 
+> > However this call takes a _long_ time to complete. For a 6 Megabytes
+> > buffer, it takes about 13 ms which is just crazy ... at that rate it'd
+> > be faster to just read random data from a random buffer to trash the
+> > measly 512k of cache ...
 > 
+> Flushing a large chunk of memory one cache line at a time takes a long
+> time, there's really nothing "new" about that.
 > 
-> Thanks for the quick and detailed answer.
-> 
-> 
-> > Flushing a large chunk of memory one cache line at a time takes a long
-> > time, there's really nothing "new" about that.
-> 
-> So when invalidating cache, you have to do it for every possible cache line
-> address ? There is not an instruction to invalidate a whole range ?
+> It's the expense that has to be paid for using cacheable mappings on a
+> CPU which is not DMA coherent - something which I've brought up over
+> the years with ARM, but it's not something that ARM believe is wanted
+> by their silicon partners.
 
-Correct.
+You are slightly mistaken here. Over the years ARM introduced ACP, AMBA4
+ACE, AMBA5 CHI. See Mike's reply in this thread about the presence of
+the ACP on this system and some of its drawbacks. But even if there are
+options to make a device coherent, vendors may decide not to for various
+reasons (cache look-up latency, increased power, cache thrashing; the
+latter was actually a case for introducing bit 22 in PL310 aux ctrl).
+But it's definitely worth testing.
 
-ARM did "have a go" at providing an instruction which operated on a cache
-range in hardware, but it was a disaster, and was removed later on.  The
-disaster about it is if you got an exception (eg, interrupt) while the
-instruction was executing, it would stop doing the cache maintanence, and
-jump to the exception handler.  When the exception handler returned, it
-would restart the instruction, not from where it left off, but from the
-very beginning.
+> What we _could_ do is decide that if the buffer is larger than some
+> factor of the cache size, to just flush the entire cache.
 
-With a sufficiently frequent interrupt rate and a large enough area, the
-result is very effective at preventing the CPU from making any progress.
+This is not a safe operation for the inner cache in an SMP system unless
+you disable the MMUs (some kind of stop_machine call with temporary loss
+of coherency). The set/way ops are not broadcast to the other CPUs.
 
-> Also, I noticed that dma_sync_single_for_device takes a while too even
-> though I would have expected it to be a no-op for the FROM_DEVICE case.
+> However, if you're going to read the entire frame through a cacheable
+> mapping, you're probably going to end up flushing your cache several
+> times over through doing that - but that's probably something you're
+> doing in userspace, and so the kernel doesn't have the knowledge to know
+> that's what userspace will be doing (nor should it.)
 
-In the FROM_DEVICE case, we perform cache maintanence before the DMA
-starts, to ensure that there are no dirty cache lines which may get
-evicted and overwrite the newly DMA'd data.
-
-However, we also need to perform cache maintanence after DMA has finished
-to ensure that the data in the cache is up to date with the newly DMA'd
-data.  During the DMA operation, the CPU can speculatively load data into
-its caches, which may or may not be the newly DMA'd data - we just don't
-know.
-
-> I can guarantee that I never wrote to this memory zone, so there is nothing
-> in any write-back buffer, is there anyway to convey this guarantee to the
-> API ? Or should I just not call dma_sync_single_for_device at all ?
-
-It's not about whether you wrote to it.  It's whether the CPU speculatively
-loaded data into its cache.
-
-This is one of the penalties of having a non-coherent CPU cache with
-features such as speculative prefetching to give a performance boost for
-non-DMA cases - the DMA use case gets even worse, because the necessary
-cache maintanence overheads double.  You can no longer rely on "this
-memory area hasn't been touched by the program, so no data will be loaded
-into the cache prior to my access" which you can with non-speculative
-prefetching CPUs.
-
-> > It's the expense that has to be paid for using cacheable mappings on a
-> > CPU which is not DMA coherent - something which I've brought up over
-> > the years with ARM, but it's not something that ARM believe is wanted
-> > by their silicon partners.
-> >
-> > What we _could_ do is decide that if the buffer is larger than some
-> > factor of the cache size, to just flush the entire cache.  However, that
-> > penalises the case where none of the data is in the cache - and in all
-> > probably  very little of the frame is actually sitting in the cache at
-> > that moment.
-> 
-> If I wanted to give that a shot, how would I do that in my module ?
-> 
-> As a start, I tried calling outer_inv_all() instead of outer_inv_range(),
-> but it turned out to be a really bad idea (just freezes the system)
-
-_Invalidating_ the L2 destroyes data in the cache which may not have been
-written back - it's effectively undoing the data modifications that have
-yet to be written back to memory.  That's will cause things to break.
-
-Also, the L2 cache has problems if you use the _all() functions (which
-operate on cache set/way) and another CPU also wants to do some other
-operation (like a sync, as part of a barrier.)
-
-The trade-off is either never to use the _all() functions while other CPUs
-are running, or pay a heavy penalty on every IO access and Linux memory
-barrier caused by having to spinlock every L2 cache operation, and run
-all L2 operations with interrupts disabled.
-
-> > However, if you're going to read the entire frame through a cacheable
-> > mapping, you're probably going to end up flushing your cache several
-> > times over through doing that
-> 
-> Isn't there some intermediary between coherent and cacheable, a bit like
-> write combine for read ?
-
-Unfortunately not.  IIRC, some CPUs like PXA had a "read buffer" which
-would do that, but that was a PXA specific extension, and never became
-part of the ARM architecture itself.
-
-> The Zynq TRM mention something about having independent control on inner
-> and outer cacheability for instance. If only one was enabled, then at least
-> the other wouldn't have to be invalidated ?
-
-We then start running into other problems: there are only 8 memory types,
-7 of which are usable (one is "implementation specific").  All of these
-are already used by Linux...
-
-I do feel your pain in this.  I think there has been some pressure on this
-issue, because ARM finally made a coherent bus available on SMP systems,
-which silicon vendors can use to maintain coherency with the caches.  It's
-then up to silicon vendors to use that facility.
+Alternatively, create a non-cacheable mapping for this buffer.
 
 -- 
-FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
-according to speedtest.net.
+Catalin
