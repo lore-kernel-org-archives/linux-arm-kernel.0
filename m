@@ -1,39 +1,66 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 29 Jun 2015 12:25:53 +0200
-Subject: dma_sync_single_for_cpu takes a really long time
-In-Reply-To: <CAF6-1L6sjGc1VySi=oQGzOEm-e5jauznh+jzmdDgmJQWLbA_pA@mail.gmail.com>
-References: <CAF6-1L6sjGc1VySi=oQGzOEm-e5jauznh+jzmdDgmJQWLbA_pA@mail.gmail.com>
-Message-ID: <2697205.Fh05irTfqN@wuerfel>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Mon, 29 Jun 2015 11:37:37 +0100
+Subject: [RFC PATCH v3] arm DMA: Fix allocation from CMA for coherent DMA
+In-Reply-To: <CAE=W-e3YUjT=KbYTizBwg+3huvFLDqHvhzZN-oPqEnOKUXAtoQ@mail.gmail.com>
+References: <1434663862-17858-1-git-send-email-lorenx4@gmail.com>
+ <20150626162549.GK3078@e104818-lin.cambridge.arm.com>
+ <CAE=W-e3YUjT=KbYTizBwg+3huvFLDqHvhzZN-oPqEnOKUXAtoQ@mail.gmail.com>
+Message-ID: <20150629103737.GC29907@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sunday 28 June 2015 22:40:03 Sylvain Munaut wrote:
-> Hi,
-> 
-> 
-> I'm working on a DMA driver that uses the the streaming DMA API to
-> synchronize the access between host and device. The data flow is
-> exclusively from the device to the host (video grabber).
-> 
-> As such, I call dma_sync_single_for_cpu when the hardware is done
-> writing a frame to make sure that the cpu gets up to date data when
-> accessing the zone.
-> 
-> However this call takes a _long_ time to complete. For a 6 Megabytes
-> buffer, it takes about 13 ms which is just crazy ... at that rate it'd
-> be faster to just read random data from a random buffer to trash the
-> measly 512k of cache ...
-> 
-> Is there any alternative that's faster when dealing with large buffers ?
-> 
-> (The platform is a Zynq 7000 - Dual Cortex A9).
+On Sun, Jun 28, 2015 at 10:14:43PM +0200, Lorenzo Nava wrote:
+> On Fri, Jun 26, 2015 at 6:25 PM, Catalin Marinas
+> <catalin.marinas@arm.com> wrote:
+> > On Thu, Jun 18, 2015 at 11:44:22PM +0200, Lorenzo Nava wrote:
+> >> @@ -680,9 +694,14 @@ void *arm_dma_alloc(struct device *dev, size_t size, dma_addr_t *handle,
+> >>  static void *arm_coherent_dma_alloc(struct device *dev, size_t size,
+> >>       dma_addr_t *handle, gfp_t gfp, struct dma_attrs *attrs)
+> >>  {
+> >> -     pgprot_t prot = __get_dma_pgprot(attrs, PAGE_KERNEL);
+> >> +     pgprot_t prot;
+> >>       void *memory;
+> >>
+> >> +     if (attrs == NULL)
+> >> +              prot  = PAGE_KERNEL;
+> >> +     else
+> >> +              prot  = __get_dma_pgprot(attrs, PAGE_KERNEL);
+> >> +
+> >>       if (dma_alloc_from_coherent(dev, size, handle, &memory))
+> >>               return memory;
+> >
+> > I still think this is the wrong way to fix. It doesn't address the
+> > coherent dma mmap operation. I already replied on the previous version
+> > that we should rather have an extra argument "coherent" to
+> > __get_dma_pgprot().
+>
+> I avoided touching the __get_dma_pgprot() function because it affects
+> a lot of different functions.
+> If you think that the implementation you suggested in previous reply
+> was ok and doesn't introduce problems on the other functions using the
+> __get_dma_pgprot(), for me it's of course ok as well.
 
-?f the frame grabber is implemented in the FPGA, try using the
-coherency port instead of the noncoherent port to memory and mark
-the device as "dma-coherent", to avoid the explicit flushes.
+I forgot about the arm_dma_mmap fix here:
 
-Another alternative would be to use uncached memory for the buffer
-and then read it using an optimized loop from the CPU, but that may
-not fit your usage pattern.
+https://lkml.org/lkml/2015/5/7/512
 
-	Arnd
+So we either fix both cases by changing __get_dma_pgprot() or just go
+for Mike's and your patches as above. It's up to Russell.
+
+At some point, we could do with some more clean-up in the dma-mapping.c.
+For example, both __alloc_simple_buffer() and __alloc_from_contiguous()
+end up calling __dma_clear_buffer() even when not necessary (cacheable
+mapping). Not too bad though as this is only done when setting up the
+buffer.
+
+> Do you see any code that maybe need a double check: I'm thinking, for
+> example, at the function arm_iommu_alloc_attrs() and
+> arm_iommu_mmap_attrs()?
+
+I think this has bigger problems. The code seems to only be right for
+non-cacheable mappings. For cacheable/coherent iommu mappings, I don't
+see any use of the IOMMU_CACHE attribute (should it be returned by
+__dma_direction_to_prot?).
+
+-- 
+Catalin
