@@ -1,107 +1,51 @@
-From: vitalya@ti.com (Vitaly Andrianov)
-Date: Mon, 29 Jun 2015 14:43:44 -0400
-Subject: [PATCH] keystone: adds cpu_die implementation
-In-Reply-To: <20150629175223.GC19863@leverpostej>
-References: <1435600352-32733-1-git-send-email-vitalya@ti.com>
- <20150629175223.GC19863@leverpostej>
-Message-ID: <559191E0.4080808@ti.com>
+From: Tirumalesh.Chalamarla@caviumnetworks.com (Chalamarla, Tirumalesh)
+Date: Mon, 29 Jun 2015 18:39:54 +0000
+Subject: [PATCH] arm64/kvm: Add generic v8 KVM target
+In-Reply-To: <559185D4.7060308@arm.com>
+References: <1434531646-4873-1-git-send-email-suzuki.poulose@arm.com>
+ <CAFEAcA92uymQ3LjPQnuFiwvjSgc+jY54VrfK_Sh4v1DJ+=OPpw@mail.gmail.com>
+ <558A6A84.5020603@arm.com> <20150624085128.GA22785@cbox>
+ <558A7936.7020109@arm.com> <20150625123034.GE28244@cbox>
+ <558BF6C9.3000009@arm.com> <558C05A9.8080201@arm.com>
+ <CAFEAcA_ULz=ugQW=NmthzqYRtvcfwteQTh0DonHRN6U5NykEtQ@mail.gmail.com>
+ <20150626095318.GG28244@cbox>
+ <F37C68A5-E48F-462C-AD18-0F3C096348C7@caviumnetworks.com>
+ <559180CA.3050905@arm.com>
+ <CAFEAcA-E+KdiL4suQ0DoEvB-zGpNZ7-dq46FegC_iXYRPvo9jA@mail.gmail.com>
+ <559185D4.7060308@arm.com>
+Message-ID: <85D36B67-643B-407F-944F-D18D54FF9909@caviumnetworks.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
-
-On 06/29/2015 01:52 PM, Mark Rutland wrote:
-> On Mon, Jun 29, 2015 at 06:52:32PM +0100, Vitaly Andrianov wrote:
->> This commit add cpu_die implementation
->>
->> Signed-off-by: Vitaly Andrianov <vitalya@ti.com>
->> ---
->>
->> The discussion of the "keystone: psci: adds cpu_die implementation" commit
->> shows that if PCSI is enabled platform code doesn't need that implementation
->> at all. Having PSCI commands in DTB should be sufficient. Unfortunately
->> Keystone with LPAE enable requires some additional development.
->
-> I don't follow.
->
-> What do you need to implement for LPAE?
-Hi Mark,
-
-The Keystone platform needs to set ttbr1 when it boots secondary core.
-It is done in the keystone_smp_secondary_initmem(), which is 
-.smp_secondary_init member of the keystone_smp_ops. I couldn't find a 
-way how I can add similar function to psci_smp_ops.
-
-Do you have any idea?
-
->
-> Why not implement that rather than adding more platform code that you'll
-> likely want to remove later anyway?
-
-If I can solve the above problem, I will not add this code.
+> On Jun 29, 2015, at 10:52 AM, Marc Zyngier <marc.zyngier@arm.com> wrote:
+> 
+> On 29/06/15 18:38, Peter Maydell wrote:
+>> On 29 June 2015 at 18:30, Marc Zyngier <marc.zyngier@arm.com> wrote:
+>>> On 29/06/15 18:13, Chalamarla, Tirumalesh wrote:
+>>>> Will this also prevents migrating between same implementations,
+>>>> if no how is this identified.
+>>> 
+>>> This shouldn't. It is pretty easy to look at the incoming guest's MIDR,
+>>> and verify that it matches the default MIDR on the receiving system. Any
+>>> difference, and the migration should abort.
+>> 
+>> Do you really want to forbid migration between (say)
+>> Cortex-A57 r3p0 and Cortex-A57 r3p1 ?
+>> 
+>> That seems pretty harsh.
+> 
+> I think we may need to allow for some flexibility (same major version
+> only, or +/- 1 minor version...). The idea I'm trying to convey is that
+> with "generic CPI", migration is not guaranteed unless we're on
+> extremely similar hardware.
+> 
+yes, this is the point i am trying to make, we need some flexibility. so that it works with same chips with different passes may be. 
+if we are allowing this, then we are not putting emulation as a requirement. 
 
 Thanks,
-Vitaly
+Tirumalesh. 
 
->
-> Thanks,
-> Mark.
->
->> To support HOTPLUG_CPU w/o PSCI we need platform implementation of
->> the cpu_die(), which is added by this patch.
->>
->>   arch/arm/mach-keystone/keystone.h |  1 +
->>   arch/arm/mach-keystone/platsmp.c  | 24 ++++++++++++++++++++++++
->>   2 files changed, 25 insertions(+)
->>
->> diff --git a/arch/arm/mach-keystone/keystone.h b/arch/arm/mach-keystone/keystone.h
->> index cd04a1c..93549cf 100644
->> --- a/arch/arm/mach-keystone/keystone.h
->> +++ b/arch/arm/mach-keystone/keystone.h
->> @@ -12,6 +12,7 @@
->>   #define __KEYSTONE_H__
->>
->>   #define KEYSTONE_MON_CPU_UP_IDX		0x00
->> +#define KEYSTONE_MON_CPU_DIE_IDX	0x84000002
->>
->>   #ifndef __ASSEMBLER__
->>
->> diff --git a/arch/arm/mach-keystone/platsmp.c b/arch/arm/mach-keystone/platsmp.c
->> index 5f46a7c..4e5bdde 100644
->> --- a/arch/arm/mach-keystone/platsmp.c
->> +++ b/arch/arm/mach-keystone/platsmp.c
->> @@ -51,7 +51,31 @@ static inline void __cpuinit keystone_smp_secondary_initmem(unsigned int cpu)
->>   {}
->>   #endif
->>
->> +
->> +#ifdef CONFIG_HOTPLUG_CPU
->> +static void keystone_cpu_die(unsigned int cpu)
->> +{
->> +	int error;
->> +
->> +	pr_debug("keystone-smp: cpu_die %d\n", cpu);
->> +
->> +	error = keystone_cpu_smc(KEYSTONE_MON_CPU_DIE_IDX, cpu, 0);
->> +	if (error)
->> +		pr_err("CPU %d die failed with %d\n", cpu, error);
->> +
->> +	/*
->> +	 * we shouldn't come here. But in case something went
->> +	 * wrong the code below prevents kernel from crush
->> +	 */
->> +	while (1)
->> +		cpu_do_idle();
->> +}
->> +#endif
->> +
->>   struct smp_operations keystone_smp_ops __initdata = {
->>   	.smp_boot_secondary	= keystone_smp_boot_secondary,
->>   	.smp_secondary_init     = keystone_smp_secondary_initmem,
->> +#ifdef CONFIG_HOTPLUG_CPU
->> +	.cpu_die		= keystone_cpu_die,
->> +#endif
->>   };
->> --
->> 1.9.1
->>
+> 	M.
+> -- 
+> Jazz is not dead. It just smells funny...
