@@ -1,44 +1,105 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 29 Jun 2015 11:46:04 +0100
-Subject: [RFC PATCH v3] arm DMA: Fix allocation from CMA for coherent DMA
-In-Reply-To: <20150629103737.GC29907@e104818-lin.cambridge.arm.com>
-References: <1434663862-17858-1-git-send-email-lorenx4@gmail.com>
- <20150626162549.GK3078@e104818-lin.cambridge.arm.com>
- <CAE=W-e3YUjT=KbYTizBwg+3huvFLDqHvhzZN-oPqEnOKUXAtoQ@mail.gmail.com>
- <20150629103737.GC29907@e104818-lin.cambridge.arm.com>
-Message-ID: <20150629104604.GB7557@n2100.arm.linux.org.uk>
+From: elfring@users.sourceforge.net (SF Markus Elfring)
+Date: Mon, 29 Jun 2015 12:48:16 +0200
+Subject: [PATCH] net-Liquidio: Delete unnecessary checks before the function
+ call "vfree"
+In-Reply-To: <5317A59D.4@users.sourceforge.net>
+References: <5307CAA2.8060406@users.sourceforge.net>
+ <alpine.DEB.2.02.1402212321410.2043@localhost6.localdomain6>
+ <530A086E.8010901@users.sourceforge.net>
+ <alpine.DEB.2.02.1402231635510.1985@localhost6.localdomain6>
+ <530A72AA.3000601@users.sourceforge.net>
+ <alpine.DEB.2.02.1402240658210.2090@localhost6.localdomain6>
+ <530B5FB6.6010207@users.sourceforge.net>
+ <alpine.DEB.2.10.1402241710370.2074@hadrien>
+ <530C5E18.1020800@users.sourceforge.net>
+ <alpine.DEB.2.10.1402251014170.2080@hadrien>
+ <530CD2C4.4050903@users.sourceforge.net>
+ <alpine.DEB.2.10.1402251840450.7035@hadrien>
+ <530CF8FF.8080600@users.sourceforge.net>
+ <alpine.DEB.2.02.1402252117150.2047@localhost6.localdomain6>
+ <530DD06F.4090703@users.sourceforge.net>
+ <alpine.DEB.2.02.1402262129250.2221@localhost6.localdomain6>
+ <5317A59D.4@users.sourceforge.net>
+Message-ID: <55912270.4030201@users.sourceforge.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 29, 2015 at 11:37:37AM +0100, Catalin Marinas wrote:
-> I forgot about the arm_dma_mmap fix here:
-> 
-> https://lkml.org/lkml/2015/5/7/512
-> 
-> So we either fix both cases by changing __get_dma_pgprot() or just go
-> for Mike's and your patches as above. It's up to Russell.
+From: Markus Elfring <elfring@users.sourceforge.net>
+Date: Mon, 29 Jun 2015 12:22:24 +0200
 
-I'd prefer the "least code" option. :)
+The vfree() function performs also input parameter validation.
+Thus the test around the call is not needed.
 
-> At some point, we could do with some more clean-up in the dma-mapping.c.
-> For example, both __alloc_simple_buffer() and __alloc_from_contiguous()
-> end up calling __dma_clear_buffer() even when not necessary (cacheable
-> mapping). Not too bad though as this is only done when setting up the
-> buffer.
+This issue was detected by using the Coccinelle software.
 
-The reason we always clear the buffer is that we can't be sure that a
-driver will not map a buffer allocated by dma_alloc_coherent() into
-userspace without it first being initialised.  There have been drivers
-which do this (ALSA in particular.)  I haven't checked whether this
-instance still does this, but it used to - and the problem is once
-one instance exists, it gets copied...
+Signed-off-by: Markus Elfring <elfring@users.sourceforge.net>
+---
+ drivers/net/ethernet/cavium/liquidio/octeon_device.c   | 11 +++--------
+ drivers/net/ethernet/cavium/liquidio/octeon_droq.c     |  4 +---
+ drivers/net/ethernet/cavium/liquidio/request_manager.c |  3 +--
+ 3 files changed, 5 insertions(+), 13 deletions(-)
 
-If it isn't initialised, userspace gets access to whatever data was in
-that page prior to the allocation, which could be something like your
-root password, or bank details, some other sensitive data.
-
-So, removing the clearing probably opens a rather large security hole.
-
+diff --git a/drivers/net/ethernet/cavium/liquidio/octeon_device.c b/drivers/net/ethernet/cavium/liquidio/octeon_device.c
+index 0d3106b..f67641a 100644
+--- a/drivers/net/ethernet/cavium/liquidio/octeon_device.c
++++ b/drivers/net/ethernet/cavium/liquidio/octeon_device.c
+@@ -650,14 +650,12 @@ void octeon_free_device_mem(struct octeon_device *oct)
+ 
+ 	for (i = 0; i < MAX_OCTEON_OUTPUT_QUEUES; i++) {
+ 		/* could check  mask as well */
+-		if (oct->droq[i])
+-			vfree(oct->droq[i]);
++		vfree(oct->droq[i]);
+ 	}
+ 
+ 	for (i = 0; i < MAX_OCTEON_INSTR_QUEUES; i++) {
+ 		/* could check mask as well */
+-		if (oct->instr_queue[i])
+-			vfree(oct->instr_queue[i]);
++		vfree(oct->instr_queue[i]);
+ 	}
+ 
+ 	i = oct->octeon_id;
+@@ -1078,10 +1076,7 @@ octeon_unregister_dispatch_fn(struct octeon_device *oct, u16 opcode,
+ 		oct->dispatch.count--;
+ 
+ 	spin_unlock_bh(&oct->dispatch.lock);
+-
+-	if (dfree)
+-		vfree(dfree);
+-
++	vfree(dfree);
+ 	return retval;
+ }
+ 
+diff --git a/drivers/net/ethernet/cavium/liquidio/octeon_droq.c b/drivers/net/ethernet/cavium/liquidio/octeon_droq.c
+index 94b502a..4dba86e 100644
+--- a/drivers/net/ethernet/cavium/liquidio/octeon_droq.c
++++ b/drivers/net/ethernet/cavium/liquidio/octeon_droq.c
+@@ -216,9 +216,7 @@ int octeon_delete_droq(struct octeon_device *oct, u32 q_no)
+ 	dev_dbg(&oct->pci_dev->dev, "%s[%d]\n", __func__, q_no);
+ 
+ 	octeon_droq_destroy_ring_buffers(oct, droq);
+-
+-	if (droq->recv_buf_list)
+-		vfree(droq->recv_buf_list);
++	vfree(droq->recv_buf_list);
+ 
+ 	if (droq->info_base_addr)
+ 		cnnic_free_aligned_dma(oct->pci_dev, droq->info_list,
+diff --git a/drivers/net/ethernet/cavium/liquidio/request_manager.c b/drivers/net/ethernet/cavium/liquidio/request_manager.c
+index 356796b..a2a2465 100644
+--- a/drivers/net/ethernet/cavium/liquidio/request_manager.c
++++ b/drivers/net/ethernet/cavium/liquidio/request_manager.c
+@@ -175,8 +175,7 @@ int octeon_delete_instr_queue(struct octeon_device *oct, u32 iq_no)
+ 		desc_size =
+ 		    CFG_GET_IQ_INSTR_TYPE(CHIP_FIELD(oct, cn6xxx, conf));
+ 
+-	if (iq->request_list)
+-		vfree(iq->request_list);
++	vfree(iq->request_list);
+ 
+ 	if (iq->base_addr) {
+ 		q_size = iq->max_count * desc_size;
 -- 
-FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
-according to speedtest.net.
+2.4.5
