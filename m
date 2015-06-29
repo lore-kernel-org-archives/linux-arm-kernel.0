@@ -1,44 +1,52 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 29 Jun 2015 18:11:13 +0100
-Subject: [PATCH] arm64: KVM: Enable minimalistic support for Thunder
-In-Reply-To: <AED13EAB-D578-451F-AC35-A45A21816076@caviumnetworks.com>
-References: <1435348284-32132-1-git-send-email-tchalamarla@caviumnetworks.com>
- <55910794.6000107@arm.com>
- <AED13EAB-D578-451F-AC35-A45A21816076@caviumnetworks.com>
-Message-ID: <55917C31.4060107@arm.com>
+From: Tirumalesh.Chalamarla@caviumnetworks.com (Chalamarla, Tirumalesh)
+Date: Mon, 29 Jun 2015 17:13:37 +0000
+Subject: [PATCH] arm64/kvm: Add generic v8 KVM target
+In-Reply-To: <20150626095318.GG28244@cbox>
+References: <1434531646-4873-1-git-send-email-suzuki.poulose@arm.com>
+ <CAFEAcA92uymQ3LjPQnuFiwvjSgc+jY54VrfK_Sh4v1DJ+=OPpw@mail.gmail.com>
+ <558A6A84.5020603@arm.com> <20150624085128.GA22785@cbox>
+ <558A7936.7020109@arm.com> <20150625123034.GE28244@cbox>
+ <558BF6C9.3000009@arm.com> <558C05A9.8080201@arm.com>
+ <CAFEAcA_ULz=ugQW=NmthzqYRtvcfwteQTh0DonHRN6U5NykEtQ@mail.gmail.com>
+ <20150626095318.GG28244@cbox>
+Message-ID: <F37C68A5-E48F-462C-AD18-0F3C096348C7@caviumnetworks.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 29/06/15 18:06, Chalamarla, Tirumalesh wrote:
-> 
->> On Jun 29, 2015, at 1:53 AM, Marc Zyngier <marc.zyngier@arm.com> wrote:
->>
->> On 26/06/15 20:51, Tirumalesh Chalamarla wrote:
->>> In order to allow KVM to run on Thunder implementations, add the
->>> minimal support required.
->>>
->>> Signed-off-by: Tirumalesh Chalamarla <tchalamarla@caviumnetworks.com>
->>
->> CCing the KVM/ARM maintainers should be the first course of action.
->>
-> thanks. 
-> 
->> Also, you may want to try Suzuki's patch instead:
->>
->> http://www.spinics.net/lists/kvm/msg117703.html
->>
-> will try with this.
-> 
->> Constantly adding new CPUs without providing any insight as to how they
->> should be emulated only brings churn, and not much benefit.
->>
-> we are not planning(at this point) to emulate Thunder with QEMU/others.   
 
-Fair enough. If cross-cpu VM migration is none of your concern, then
-Suzuki's patch should be enough.
+> On Jun 26, 2015, at 2:53 AM, Christoffer Dall <christoffer.dall@linaro.org> wrote:
+> 
+> On Thu, Jun 25, 2015 at 02:49:08PM +0100, Peter Maydell wrote:
+>> On 25 June 2015 at 14:44, Marc Zyngier <marc.zyngier@arm.com> wrote:
+>>> It should always be possible to emulate a "known" CPU on a generic host,
+>>> and it should be able to migrate. The case we can't migrate is when we
+>>> let the guest be generic (which I guess should really be unknown, and
+>>> not generic).
+>>> 
+>>> So if the user specify "-cpu cortex-a57" on the command line, the guest
+>>> should be able to migrate from an A72 to an A53. if the user specified
+>>> "-cpu host", the resulting guest won't be able to migrate.
+>>> 
+>>> Does it make sense?
+>> 
+>> Yes. We've always said "-cpu host" won't be cross-host migratable
+>> from a QEMU point of view.
+>> 
+> ok, this makes sense.  It's basically up to userspace to mandate that
+> trying to migrate something that used unknown cpu (via -cpu host or
+> whatever) cannot be migrated.
+> 
+
+Will this also prevents migrating between same implementations, if no how is this identified.
+This seems to be making emulation a requirment for ARM64 KVM. 
+
 
 Thanks,
+Tirumalesh. 
+ 
 
-	M.
--- 
-Jazz is not dead. It just smells funny...
+> -Christoffer
+> _______________________________________________
+> kvmarm mailing list
+> kvmarm at lists.cs.columbia.edu
+> https://lists.cs.columbia.edu/mailman/listinfo/kvmarm
