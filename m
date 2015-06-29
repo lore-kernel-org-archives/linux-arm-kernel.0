@@ -1,26 +1,242 @@
-From: davem@davemloft.net (David Miller)
-Date: Mon, 29 Jun 2015 09:28:23 -0700 (PDT)
-Subject: [PATCH] net-Liquidio: Delete unnecessary checks before the
- function call "vfree"
-In-Reply-To: <55912270.4030201@users.sourceforge.net>
-References: <alpine.DEB.2.02.1402262129250.2221@localhost6.localdomain6>
- <5317A59D.4@users.sourceforge.net>
- <55912270.4030201@users.sourceforge.net>
-Message-ID: <20150629.092823.165902372857729782.davem@davemloft.net>
+From: lina.iyer@linaro.org (Lina Iyer)
+Date: Mon, 29 Jun 2015 10:32:01 -0600
+Subject: [PATCH RFC v2 09/16] arm: domain: Add platform callbacks for
+ domain power on/off
+In-Reply-To: <CAMuHMdULThWEZmyLEK_9WeK6DSNhrQdiZQLWNhi1Q6dwZTkkMg@mail.gmail.com>
+References: <1435374156-19214-1-git-send-email-lina.iyer@linaro.org>
+ <1435374156-19214-10-git-send-email-lina.iyer@linaro.org>
+ <CAMuHMdULThWEZmyLEK_9WeK6DSNhrQdiZQLWNhi1Q6dwZTkkMg@mail.gmail.com>
+Message-ID: <20150629163201.GA1524@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: SF Markus Elfring <elfring@users.sourceforge.net>
-Date: Mon, 29 Jun 2015 12:48:16 +0200
+On Mon, Jun 29 2015 at 07:36 -0600, Geert Uytterhoeven wrote:
+>Hi Lina, Kevin,
+>
+>On Sat, Jun 27, 2015 at 5:02 AM, Lina Iyer <lina.iyer@linaro.org> wrote:
+>> Platform drivers may have additional setup inorder before the domain can
+>> be powered off. Allow, platform drivers to register power on/off
+>
+>Bogus comma.
+>
+Will fix.
 
-> From: Markus Elfring <elfring@users.sourceforge.net>
-> Date: Mon, 29 Jun 2015 12:22:24 +0200
-> 
-> The vfree() function performs also input parameter validation.
-> Thus the test around the call is not needed.
-> 
-> This issue was detected by using the Coccinelle software.
-> 
-> Signed-off-by: Markus Elfring <elfring@users.sourceforge.net>
+>> callbacks against a domain provider.
+>>
+>> While registering the callback ensure that the domain is neither in
+>> power on/off state. The domain should be active. To ensure that the
+>> platform callback registration doesntrace with genpd power on/off,
+>
+>doesn't race
+>
+Argh, thanks.
 
-Applied.
+>> execute the registration from a CPU on that domain.
+>>
+>> Signed-off-by: Lina Iyer <lina.iyer@linaro.org>
+>
+>> --- /dev/null
+>> +++ b/arch/arm/include/asm/pm_domain.h
+>> @@ -0,0 +1,27 @@
+>> +/*
+>> + *  arch/arm/include/asm/pm_domain.h
+>> + *
+>> + *  Copyright (C) 2015 Linaro Ltd.
+>> + *
+>> + * This program is free software; you can redistribute it and/or modify
+>> + * it under the terms of the GNU General Public License version 2 as
+>> + * published by the Free Software Foundation.
+>> + */
+>> +#ifndef __ASM_ARM_PM_DOMAIN_H
+>> +#define __ASM_ARM_PM_DOMAIN_H
+>> +
+>> +#include <linux/pm_domain.h>
+>> +
+>> +#if IS_ENABLED(CONFIG_PM_GENERIC_DOMAINS)
+>> +extern int register_platform_domain_handlers(struct of_phandle_args *args,
+>> +               int (*pd_down)(struct generic_pm_domain *),
+>> +               int (*pd_up)(struct generic_pm_domain *));
+>
+>This looks a bit convoluted to me...
+>
+>> --- a/arch/arm/kernel/domains.c
+>> +++ b/arch/arm/kernel/domains.c
+>> @@ -9,10 +9,19 @@
+>>  #include <linux/module.h>
+>>  #include <linux/platform_device.h>
+>>
+>> +#include <asm/pm_domain.h>
+>> +
+>>  #define NAME_MAX 16
+>>
+>> +struct platform_cb {
+>> +       int (*power_off)(struct generic_pm_domain *);
+>> +       int (*power_on)(struct generic_pm_domain *);
+>> +};
+>> +
+>>  struct arm_pm_domain {
+>>         struct generic_pm_domain genpd;
+>> +       struct platform_cb plat_handler;
+>> +       struct spinlock_t lock;
+>>  };
+>>
+>>  static inline
+>> @@ -23,16 +32,85 @@ struct arm_pm_domain *to_arm_pd(struct generic_pm_domain *d)
+>>
+>>  static int arm_pd_power_down(struct generic_pm_domain *genpd)
+>>  {
+>> +       struct arm_pm_domain *arm_pd = to_arm_pd(genpd);
+>> +
+>> +       if (arm_pd->plat_handler.power_off)
+>> +               return arm_pd->plat_handler.power_off(genpd);
+>> +
+>>         /* pr_info("KJH: %s: %s\n", __func__, genpd->name); */
+>>         return 0;
+>>  }
+>>
+>>  static int arm_pd_power_up(struct generic_pm_domain *genpd)
+>>  {
+>> +       struct arm_pm_domain *arm_pd = to_arm_pd(genpd);
+>> +
+>> +       if (arm_pd->plat_handler.power_on)
+>> +               return arm_pd->plat_handler.power_on(genpd);
+>> +
+>>         /* pr_info("KJH: %s: %s\n", __func__, genpd->name); */
+>>         return 0;
+>>  }
+>
+>> @@ -152,6 +230,7 @@ static int arm_domain_init(void)
+>>                 pd->genpd.power_off = arm_pd_power_down;
+>>                 pd->genpd.power_on = arm_pd_power_up;
+>
+>Shouldn't these .power_off() and .power_on() be set up from platform code
+>instead, in the platform-specific code that creates the PM domain?
+>
+>The PM Domain containing the CPU may contain other devices, in which
+>case it's already set up from platform-specific code, which would conflict
+>with arm_domain_init()?
+>
+In my first RFC, the platform code was creating a domain. In this RFC,
+we are flaunting an idea that a generic code could setup the domains
+without any intervention from platform code. It will do everything
+common on most ARM platforms. Architectures that do not have anything
+specific in their domain, would benefit from such an initialization.
+
+If we were to export this genpd and then platform code could attach more
+devices to the genpd, or make it a sub of another genpd, would that
+work?
+
+>Cfr. arch/arm/mach-shmobile/pm-rmobile.c, which handles all PM domains
+>(both for devices and CPUs) on R-Mobile, and
+>arch/arm/boot/dts/{r8a73a4,r8a7740,sh73a0}.dtsi.
+>
+>R8a73a4 is the most advanced of these three: it has 2 big.LITTLE clusters,
+>with separate PM Domains for L2/SCU and sub-domains for the CPUs.
+
+If you could get the CPU genpd from the ARM common code, you could embed
+that in the L2 domain.
+
+On QCOM's big.LITTLE SoC, there would a PM domain for each of the CPUs
+and then there would be a coherency PM domain that would contain the big
+and LITTLE cluster domains. In that case, the platform code would create
+and initialize the coherency domain and make the CPU domains a sub of
+the coherency domain. Would something like that work?
+
+>Unfortunately we don't have SMP support for it, so currently dtsi describes
+>the first cpu core only. The full structure should look like this
+>
+>        cpus {
+>                cpu0: cpu at 0 {
+>                        compatible = "arm,cortex-a15";
+>                        power-domains = <&pd_a2sl>;
+>                        next-level-cache = <&L2_CA15>;
+>                };
+>
+>                cpu1: cpu at 1 {
+>                        compatible = "arm,cortex-a15";
+>                        power-domains = <&pd_a2sl>;
+>                        next-level-cache = <&L2_CA15>;
+>                };
+>
+>                cpu2: cpu at 2 {
+>                        compatible = "arm,cortex-a15";
+>                        power-domains = <&pd_a2sl>;
+>                        next-level-cache = <&L2_CA15>;
+>                };
+>
+>                cpu3: cpu at 3 {
+>                        compatible = "arm,cortex-a15";
+>                        power-domains = <&pd_a2sl>;
+>                        next-level-cache = <&L2_CA15>;
+>                };
+>
+>                cpu4: cpu at 4 {
+>                        compatible = "arm,cortex-a7";
+>                        power-domains = <&pd_a2kl>;
+>                        next-level-cache = <&L2_CA7>;
+>                };
+>
+>                cpu5: cpu at 5 {
+>                        compatible = "arm,cortex-a7";
+>                        power-domains = <&pd_a2kl>;
+>                        next-level-cache = <&L2_CA7>;
+>                };
+>
+>                cpu6: cpu at 6 {
+>                        compatible = "arm,cortex-a7";
+>                        power-domains = <&pd_a2kl>;
+>                        next-level-cache = <&L2_CA7>;
+>                };
+>
+>                cpu7: cpu at 7 {
+>                        compatible = "arm,cortex-a7";
+>                        power-domains = <&pd_a2kl>;
+>                        next-level-cache = <&L2_CA7>;
+>                };
+>        };
+>
+>        L2_CA15: cache-controller at 0 {
+>                compatible = "cache";
+>                power-domains = <&pd_a3sm>;
+>        };
+>
+>        L2_CA7: cache-controller at 1 {
+>                compatible = "cache";
+>                power-domains = <&pd_a3km>;
+>        };
+>
+>And the PM Domain part (which is complete in upstream):
+>
+>        pd_c4: c4 at 0 {
+>                #power-domain-cells = <0>;
+>
+>                pd_a3sm: a3sm at 20 {
+>                        reg = <20>;
+>                        #power-domain-cells = <0>;
+>
+>                        pd_a2sl: a2sl at 21 {
+>                                reg = <21>;
+>                                #power-domain-cells = <0>;
+>                        };
+>                };
+>
+>                pd_a3km: a3km at 22 {
+>                        reg = <22>;
+>                        #size-cells = <0>;
+>                        #power-domain-cells = <0>;
+>
+>                        pd_a2kl: a2kl at 23 {
+>                                reg = <23>;
+>                                #power-domain-cells = <0>;
+>                        };
+>                };
+>        };
+>
+Thanks for the example. Would it work, if the platform code initalizes
+the pd_a3sm, pd_a3km and pd_c4 and set up the hierarchy and to add the
+CPU domains, you could query the ARM and then add the domains to the
+pd_a3sm and pd_a3km?
+
+Thanks for looking through the patch.
+
+-- Lina
