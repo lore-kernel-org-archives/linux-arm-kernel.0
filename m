@@ -1,25 +1,32 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 29 Jun 2015 12:53:04 +0200
-Subject: [PATCH RFC 0/4] PL08x DT bindings and LPC18xx DMA support
-In-Reply-To: <1434280937-8369-1-git-send-email-manabian@gmail.com>
-References: <1434280937-8369-1-git-send-email-manabian@gmail.com>
-Message-ID: <CACRpkdZZBGzioO25-Sov0CVK8JuRp1uuJDEZKFtLxg9WwsSzww@mail.gmail.com>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Mon, 29 Jun 2015 18:55:43 +0800
+Subject: [PATCH] clocksource: imx: define clocksource for mx27
+In-Reply-To: <55910E14.5020906@linaro.org>
+References: <1435439504-406-1-git-send-email-tremyfr@gmail.com>
+ <20150628044434.GC10332@tiger> <55910E14.5020906@linaro.org>
+Message-ID: <20150629105543.GK10332@tiger>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jun 14, 2015 at 1:22 PM, Joachim Eastwood <manabian@gmail.com> wrote:
+On Mon, Jun 29, 2015 at 11:21:24AM +0200, Daniel Lezcano wrote:
+> On 06/28/2015 06:44 AM, Shawn Guo wrote:
+> >On Sat, Jun 27, 2015 at 11:11:44PM +0200, Philippe Reynes wrote:
+> >>The clocksource imx27 wasn't defined in timer-imx-gpt.c,
+> >>so the kernel no longer boot on imx27. Just define
+> >>clocksource imx27 as an imx21.
+> >>
+> >>Signed-off-by: Philippe Reynes <tremyfr@gmail.com>
+> >
+> >Acked-by: Shawn Guo <shawnguo@kernel.org>
+> >
+> >Daniel,
+> >
+> >Please help send this as a fix for 4.2-rc, thanks.
+> 
+> Ok.
+> 
+> stable@ ?
 
-> This patch set aims to add support for DMA on the NXP LPC18xx/43xx
-> (Cortex-M3/M4) platform. The platform has a PL080 controller with a
-> mux in front of the DMA request lines. This setup is quite common
-> and can be found on most other, if not all, NXP LPC devices.
+No.  The regression was introduced only in 4.2 merge window.
 
-Nice!
-
->  - remove channel sub-nodes from driver and dt doc.
-
-Why? It was a good approach for the Nomadik. Well I'll look
-how you do it for NXP, I guess it makes total sense for you.
-
-N?ras,
-Linus Walleij
+Shawn
