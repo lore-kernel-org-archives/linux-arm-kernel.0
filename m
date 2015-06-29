@@ -1,14 +1,15 @@
 From: gary.bisson@boundarydevices.com (Gary Bisson)
-Date: Mon, 29 Jun 2015 20:14:05 +0200
-Subject: [PATCH 1/3] ARM: dts: imx6qdl-sabrelite: Allow HDMI and LVDS to
+Date: Mon, 29 Jun 2015 20:14:44 +0200
+Subject: [PATCH 2/3] ARM: dts: imx6qdl-nitrogen6x: Allow HDMI and LVDS to
  work simultaneously
-In-Reply-To: <1435594615-9570-1-git-send-email-fabio.estevam@freescale.com>
+In-Reply-To: <1435594615-9570-2-git-send-email-fabio.estevam@freescale.com>
 References: <1435594615-9570-1-git-send-email-fabio.estevam@freescale.com>
-Message-ID: <CAAMH-yu=C=haGN33r0p3sxsqT97Emq3Ge2pyfYRMSmEU7LYBSQ@mail.gmail.com>
+ <1435594615-9570-2-git-send-email-fabio.estevam@freescale.com>
+Message-ID: <CAAMH-yv6jFSMpOg2ogXY9vFoam_OnAEOKVAgVFz=S2g_Hr3wkQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Fabio, all,
+Fabio, All,
 
 On Mon, Jun 29, 2015 at 6:16 PM, Fabio Estevam
 <fabio.estevam@freescale.com> wrote:
@@ -23,14 +24,14 @@ On Mon, Jun 29, 2015 at 6:16 PM, Fabio Estevam
 >
 > Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
 > ---
->  arch/arm/boot/dts/imx6qdl-sabrelite.dtsi | 7 +++++++
+>  arch/arm/boot/dts/imx6qdl-nitrogen6x.dtsi | 7 +++++++
 >  1 file changed, 7 insertions(+)
 >
-> diff --git a/arch/arm/boot/dts/imx6qdl-sabrelite.dtsi b/arch/arm/boot/dts/imx6qdl-sabrelite.dtsi
-> index e00c44f..d87e71c 100644
-> --- a/arch/arm/boot/dts/imx6qdl-sabrelite.dtsi
-> +++ b/arch/arm/boot/dts/imx6qdl-sabrelite.dtsi
-> @@ -148,6 +148,13 @@
+> diff --git a/arch/arm/boot/dts/imx6qdl-nitrogen6x.dtsi b/arch/arm/boot/dts/imx6qdl-nitrogen6x.dtsi
+> index 3af16df..1cba390 100644
+> --- a/arch/arm/boot/dts/imx6qdl-nitrogen6x.dtsi
+> +++ b/arch/arm/boot/dts/imx6qdl-nitrogen6x.dtsi
+> @@ -149,6 +149,13 @@
 >         status = "okay";
 >  };
 >
@@ -48,7 +49,7 @@ On Mon, Jun 29, 2015 at 6:16 PM, Fabio Estevam
 > 1.9.1
 >
 
-Tested using linux-next 20150629 on Sabrelite with either Hannstar 7"
+Tested using linux-next 20150629 on Nitrogen6x with either Hannstar 7"
 or 10" + HDMI monitor.
 This patch relies on previous clk-imx6q patch from Fabio:
 https://patchwork.kernel.org/patch/6682561/
