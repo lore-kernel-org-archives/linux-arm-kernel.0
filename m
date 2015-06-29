@@ -1,45 +1,220 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Mon, 29 Jun 2015 15:34:54 +0200
-Subject: [PATCH linux-next v2 1/1] dmaengine: at_hdmac: fix residue
- computation
-In-Reply-To: <558428D6.2080405@aksignal.cz>
-References: <cover.1434626239.git.cyrille.pitchen@atmel.com>
- <b9630cef4224b93939138b3a8c1950ea44cbcf59.1434626239.git.cyrille.pitchen@atmel.com>
- <5582B4EC.7030805@aksignal.cz> <55841767.7010608@atmel.com>
- <558428D6.2080405@aksignal.cz>
-Message-ID: <5591497E.4080906@atmel.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Mon, 29 Jun 2015 15:36:13 +0200
+Subject: [PATCH RFC v2 09/16] arm: domain: Add platform callbacks for
+ domain power on/off
+In-Reply-To: <1435374156-19214-10-git-send-email-lina.iyer@linaro.org>
+References: <1435374156-19214-1-git-send-email-lina.iyer@linaro.org>
+ <1435374156-19214-10-git-send-email-lina.iyer@linaro.org>
+Message-ID: <CAMuHMdULThWEZmyLEK_9WeK6DSNhrQdiZQLWNhi1Q6dwZTkkMg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le 19/06/2015 16:36, Ji?? Prchal a ?crit :
-> 
-> 
-> On 19.6.2015 15:21, Nicolas Ferre wrote:
->> Le 18/06/2015 14:09, Ji?? Prchal a ?crit :
->>>
->>>
->>> On 18.6.2015 13:25, Cyrille Pitchen wrote:
->>>>
->>>> Signed-off-by: Cyrille Pitchen <cyrille.pitchen@atmel.com>
->>>
->>> Tested-by: Ji?? Prchal <jiri.prchal@aksignal.cz>
-> 
-> It's already here.
-> 
->>>
->>> Manually applied to 4.1-rc7 and it WORKS!
->>
->> Good piece of new indeed.
->>
->> Can you add your "Tested-by" tag?
->>
->> Bye,
->>
+Hi Lina, Kevin,
 
-Hehe: didn't see it and even didn't put my own tag: all wrong ;-)
+On Sat, Jun 27, 2015 at 5:02 AM, Lina Iyer <lina.iyer@linaro.org> wrote:
+> Platform drivers may have additional setup inorder before the domain can
+> be powered off. Allow, platform drivers to register power on/off
 
-Sorry for the noise and thanks a lot!
+Bogus comma.
 
-Bye,
--- 
-Nicolas Ferre
+> callbacks against a domain provider.
+>
+> While registering the callback ensure that the domain is neither in
+> power on/off state. The domain should be active. To ensure that the
+> platform callback registration doesntrace with genpd power on/off,
+
+doesn't race
+
+> execute the registration from a CPU on that domain.
+>
+> Signed-off-by: Lina Iyer <lina.iyer@linaro.org>
+
+> --- /dev/null
+> +++ b/arch/arm/include/asm/pm_domain.h
+> @@ -0,0 +1,27 @@
+> +/*
+> + *  arch/arm/include/asm/pm_domain.h
+> + *
+> + *  Copyright (C) 2015 Linaro Ltd.
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> + */
+> +#ifndef __ASM_ARM_PM_DOMAIN_H
+> +#define __ASM_ARM_PM_DOMAIN_H
+> +
+> +#include <linux/pm_domain.h>
+> +
+> +#if IS_ENABLED(CONFIG_PM_GENERIC_DOMAINS)
+> +extern int register_platform_domain_handlers(struct of_phandle_args *args,
+> +               int (*pd_down)(struct generic_pm_domain *),
+> +               int (*pd_up)(struct generic_pm_domain *));
+
+This looks a bit convoluted to me...
+
+> --- a/arch/arm/kernel/domains.c
+> +++ b/arch/arm/kernel/domains.c
+> @@ -9,10 +9,19 @@
+>  #include <linux/module.h>
+>  #include <linux/platform_device.h>
+>
+> +#include <asm/pm_domain.h>
+> +
+>  #define NAME_MAX 16
+>
+> +struct platform_cb {
+> +       int (*power_off)(struct generic_pm_domain *);
+> +       int (*power_on)(struct generic_pm_domain *);
+> +};
+> +
+>  struct arm_pm_domain {
+>         struct generic_pm_domain genpd;
+> +       struct platform_cb plat_handler;
+> +       struct spinlock_t lock;
+>  };
+>
+>  static inline
+> @@ -23,16 +32,85 @@ struct arm_pm_domain *to_arm_pd(struct generic_pm_domain *d)
+>
+>  static int arm_pd_power_down(struct generic_pm_domain *genpd)
+>  {
+> +       struct arm_pm_domain *arm_pd = to_arm_pd(genpd);
+> +
+> +       if (arm_pd->plat_handler.power_off)
+> +               return arm_pd->plat_handler.power_off(genpd);
+> +
+>         /* pr_info("KJH: %s: %s\n", __func__, genpd->name); */
+>         return 0;
+>  }
+>
+>  static int arm_pd_power_up(struct generic_pm_domain *genpd)
+>  {
+> +       struct arm_pm_domain *arm_pd = to_arm_pd(genpd);
+> +
+> +       if (arm_pd->plat_handler.power_on)
+> +               return arm_pd->plat_handler.power_on(genpd);
+> +
+>         /* pr_info("KJH: %s: %s\n", __func__, genpd->name); */
+>         return 0;
+>  }
+
+> @@ -152,6 +230,7 @@ static int arm_domain_init(void)
+>                 pd->genpd.power_off = arm_pd_power_down;
+>                 pd->genpd.power_on = arm_pd_power_up;
+
+Shouldn't these .power_off() and .power_on() be set up from platform code
+instead, in the platform-specific code that creates the PM domain?
+
+The PM Domain containing the CPU may contain other devices, in which
+case it's already set up from platform-specific code, which would conflict
+with arm_domain_init()?
+
+Cfr. arch/arm/mach-shmobile/pm-rmobile.c, which handles all PM domains
+(both for devices and CPUs) on R-Mobile, and
+arch/arm/boot/dts/{r8a73a4,r8a7740,sh73a0}.dtsi.
+
+R8a73a4 is the most advanced of these three: it has 2 big.LITTLE clusters,
+with separate PM Domains for L2/SCU and sub-domains for the CPUs.
+Unfortunately we don't have SMP support for it, so currently dtsi describes
+the first cpu core only. The full structure should look like this
+
+        cpus {
+                cpu0: cpu at 0 {
+                        compatible = "arm,cortex-a15";
+                        power-domains = <&pd_a2sl>;
+                        next-level-cache = <&L2_CA15>;
+                };
+
+                cpu1: cpu at 1 {
+                        compatible = "arm,cortex-a15";
+                        power-domains = <&pd_a2sl>;
+                        next-level-cache = <&L2_CA15>;
+                };
+
+                cpu2: cpu at 2 {
+                        compatible = "arm,cortex-a15";
+                        power-domains = <&pd_a2sl>;
+                        next-level-cache = <&L2_CA15>;
+                };
+
+                cpu3: cpu at 3 {
+                        compatible = "arm,cortex-a15";
+                        power-domains = <&pd_a2sl>;
+                        next-level-cache = <&L2_CA15>;
+                };
+
+                cpu4: cpu at 4 {
+                        compatible = "arm,cortex-a7";
+                        power-domains = <&pd_a2kl>;
+                        next-level-cache = <&L2_CA7>;
+                };
+
+                cpu5: cpu at 5 {
+                        compatible = "arm,cortex-a7";
+                        power-domains = <&pd_a2kl>;
+                        next-level-cache = <&L2_CA7>;
+                };
+
+                cpu6: cpu at 6 {
+                        compatible = "arm,cortex-a7";
+                        power-domains = <&pd_a2kl>;
+                        next-level-cache = <&L2_CA7>;
+                };
+
+                cpu7: cpu at 7 {
+                        compatible = "arm,cortex-a7";
+                        power-domains = <&pd_a2kl>;
+                        next-level-cache = <&L2_CA7>;
+                };
+        };
+
+        L2_CA15: cache-controller at 0 {
+                compatible = "cache";
+                power-domains = <&pd_a3sm>;
+        };
+
+        L2_CA7: cache-controller at 1 {
+                compatible = "cache";
+                power-domains = <&pd_a3km>;
+        };
+
+And the PM Domain part (which is complete in upstream):
+
+        pd_c4: c4 at 0 {
+                #power-domain-cells = <0>;
+
+                pd_a3sm: a3sm at 20 {
+                        reg = <20>;
+                        #power-domain-cells = <0>;
+
+                        pd_a2sl: a2sl at 21 {
+                                reg = <21>;
+                                #power-domain-cells = <0>;
+                        };
+                };
+
+                pd_a3km: a3km at 22 {
+                        reg = <22>;
+                        #size-cells = <0>;
+                        #power-domain-cells = <0>;
+
+                        pd_a2kl: a2kl at 23 {
+                                reg = <23>;
+                                #power-domain-cells = <0>;
+                        };
+                };
+        };
+
+Thanks!
+
+Gr{oetje,eeting}s,
+
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
