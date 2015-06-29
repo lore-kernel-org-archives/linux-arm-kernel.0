@@ -1,50 +1,98 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Mon, 29 Jun 2015 19:47:09 +0800
-Subject: [PATCH] ARM: dts: imx6qdl-sabreauto: Add HDMI support
-In-Reply-To: <1433277693-10767-1-git-send-email-festevam@gmail.com>
-References: <1433277693-10767-1-git-send-email-festevam@gmail.com>
-Message-ID: <20150629114709.GL10332@tiger>
+From: eddie.huang@mediatek.com (Eddie Huang)
+Date: Mon, 29 Jun 2015 19:47:45 +0800
+Subject: [PATCH v6 4/7] arm64: dts: mediatek: Add MT8173 MMC dts
+In-Reply-To: <CAGS+omBi88UtEcyyUX6N4OfO9Frwxbsr1Aap1b6uRBKvB=zsrg@mail.gmail.com>
+References: <1434367253-26577-1-git-send-email-chaotian.jing@mediatek.com>
+ <1434367253-26577-5-git-send-email-chaotian.jing@mediatek.com>
+ <CAGS+omCwxH5vTTKNOEcN9C9s=1yBpYEqbMz1NygYoLY9OFKchg@mail.gmail.com>
+ <CAGS+omDMprTvjwpXfdh7mg9i=WXdzO_Fv-oEop3z6AEVCG=DFQ@mail.gmail.com>
+ <1434593063.23303.3.camel@mtksdaap41> <1434594513.26032.6.camel@mtksdaap41>
+ <CAGS+omBi88UtEcyyUX6N4OfO9Frwxbsr1Aap1b6uRBKvB=zsrg@mail.gmail.com>
+Message-ID: <1435578465.12509.4.camel@mtksdaap41>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 02, 2015 at 05:41:33PM -0300, Fabio Estevam wrote:
-> From: Fabio Estevam <fabio.estevam@freescale.com>
-> 
-> Add HDMI support. As the DDC I2C pins are not connected due to
-> pin conflicts, we do not pass the 'ddc-i2c-bus' property in 
-> this case.
+Hi Dan,
 
-HDMI works without 'ddc-i2c-bus' property and I2C pins?  If not, what's
-point of this patch.
+On Mon, 2015-06-29 at 19:24 +0800, Daniel Kurtz wrote:
+> On Thu, Jun 18, 2015 at 10:28 AM, Eddie Huang <eddie.huang@mediatek.com> wrote:
+> >> On Thu, 2015-06-18 at 10:04 +0800, Eddie Huang wrote:
+> > > On Tue, 2015-06-16 at 20:20 +0800, Daniel Kurtz wrote:
+> > > > On Tue, Jun 16, 2015 at 7:39 PM, Daniel Kurtz <djkurtz@chromium.org> wrote:
+> > > > > On Mon, Jun 15, 2015 at 7:20 PM, Chaotian Jing
+> > > > > <chaotian.jing@mediatek.com> wrote:
+> > > > >> From: Eddie Huang <eddie.huang@mediatek.com>
+> > > > >>
+> > > > >> Add node mmc0 ~ mmc3 for mt8173.dtsi
+> > > > >> Add node mmc0, mmc1 for mt8173-evb.dts
+> > > > >>
+> > > > >> Signed-off-by: Chaotian Jing <chaotian.jing@mediatek.com>
+> > > > >> Signed-off-by: Eddie Huang <eddie.huang@mediatek.com>
+> > > > >> ---
+> > > > >>  arch/arm64/boot/dts/mediatek/mt8173-evb.dts | 126 ++++++++++++++++++++++++++++
+> > > > >>  arch/arm64/boot/dts/mediatek/mt8173.dtsi    |  45 +++++++++-
+> > > > >>  2 files changed, 170 insertions(+), 1 deletion(-)
+> > > > >>
+> > > > >> diff --git a/arch/arm64/boot/dts/mediatek/mt8173-evb.dts b/arch/arm64/boot/dts/mediatek/mt8173-evb.dts
+> > > > >> index b1560c9..762ec61 100644
+> > > > >> --- a/arch/arm64/boot/dts/mediatek/mt8173-evb.dts
+> > > > >> +++ b/arch/arm64/boot/dts/mediatek/mt8173-evb.dts
+> > > > >> @@ -33,6 +33,132 @@
+> > > > >>         chosen { };
+> > > > >>  };
+> > > > >>
+> > > > >> +&mmc0 {
+> > > > >> +       pinctrl-names = "default", "state_uhs";
+> > > > >> +       pinctrl-0 = <&mmc0_pins_default>;
+> > > > >> +       pinctrl-1 = <&mmc0_pins_uhs>;
+> > > > >> +       status = "okay";
+> > > > >> +       bus-width = <8>;
+> > > > >> +       max-frequency = <50000000>;
+> > > > >> +       cap-mmc-highspeed;
+> > > > >> +       vmmc-supply = <&mt6397_vemc_3v3_reg>;
+> > > > >> +       vqmmc-supply = <&mt6397_vio18_reg>;
+> > > >
+> > > > I also can't find phandles for these regulators.
+> > > >
+> > > > >> +       non-removable;
+> > > > >> +};
+> > > > >> +
+> > > > >> +&mmc1 {
+> > > > >> +       pinctrl-names = "default", "state_uhs";
+> > > > >> +       pinctrl-0 = <&mmc1_pins_default>;
+> > > > >> +       pinctrl-1 = <&mmc1_pins_uhs>;
+> > > > >> +       status = "okay";
+> > > > >> +       bus-width = <4>;
+> > > > >> +       max-frequency = <50000000>;
+> > > > >> +       cap-sd-highspeed;
+> > > > >> +       sd-uhs-sdr25;
+> > > > >> +       cd-gpios = <&pio 132 0>;
+> > > > >> +       vmmc-supply = <&mt6397_vmch_reg>;
+> > > > >> +       vqmmc-supply = <&mt6397_vmc_reg>;
+> > > >
+> > > > nor these regulators.
+> > > >
+> > > > Which kernel branch are you basing your patch set on?
+> > > >
+> > > It is based on 4.1-rc1, and Sascha's regulator dts patch.
+> > > [3/4] ARM: dts: mt8135-evbp1: Add PMIC support:
+> > > https://patchwork.kernel.org/patch/6261161/
+> > >
+> > My mistake, we only sent mt8135-evbp1.dts, but this patch need
+> > mt8173-evb.dts, we will send this.
+> 
+> 
+> Hi Eddie,
+> 
+> When do you plan to send an updated mmc patch set?
+> 
 
-Shawn
+This patch depends on clock_null patch [0] that James still working on
+it. We will send new patch after [0] clarify.
 
-> 
-> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
-> ---
->  arch/arm/boot/dts/imx6qdl-sabreauto.dtsi | 4 ++++
->  1 file changed, 4 insertions(+)
-> 
-> diff --git a/arch/arm/boot/dts/imx6qdl-sabreauto.dtsi b/arch/arm/boot/dts/imx6qdl-sabreauto.dtsi
-> index 46b2fed..48ccfee 100644
-> --- a/arch/arm/boot/dts/imx6qdl-sabreauto.dtsi
-> +++ b/arch/arm/boot/dts/imx6qdl-sabreauto.dtsi
-> @@ -76,6 +76,10 @@
->  	status = "okay";
->  };
->  
-> +&hdmi {
-> +	status = "okay";
-> +};
-> +
->  &i2c2 {
->  	clock-frequency = <100000>;
->  	pinctrl-names = "default";
-> -- 
-> 1.9.1
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+[0]:
+http://lists.infradead.org/pipermail/linux-arm-kernel/2015-June/351255.html
+
+
+Thanks
+Eddie
