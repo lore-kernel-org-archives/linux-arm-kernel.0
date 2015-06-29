@@ -1,60 +1,53 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Mon, 29 Jun 2015 17:04:21 +0200
-Subject: [PATCH 1/3] ARM: at91/soc: add basic support for new sama5d2 SoC
-In-Reply-To: <55913E3B.6060009@atmel.com>
-References: <cover.1434632966.git.nicolas.ferre@atmel.com>
- <fe6d862c640a3708e80c0cc4c694ab5d9079060b.1434632966.git.nicolas.ferre@atmel.com>
- <20150618152105.GK27492@piout.net> <55913E3B.6060009@atmel.com>
-Message-ID: <20150629150421.GB485@piout.net>
+From: yh.huang@mediatek.com (YH Huang)
+Date: Mon, 29 Jun 2015 23:03:30 +0800
+Subject: [PATCH v3 1/2] dt-bindings: pwm: add MediaTek display PWM bindings
+In-Reply-To: <1435590211-38854-1-git-send-email-yh.huang@mediatek.com>
+References: <1435590211-38854-1-git-send-email-yh.huang@mediatek.com>
+Message-ID: <1435590211-38854-2-git-send-email-yh.huang@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 29/06/2015 at 14:46:51 +0200, Nicolas Ferre wrote :
-> Le 18/06/2015 17:21, Alexandre Belloni a ?crit :
-> > Hi,
-> > 
-> > On 18/06/2015 at 15:18:28 +0200, Nicolas Ferre wrote :
-> >> diff --git a/Documentation/arm/Atmel/README b/Documentation/arm/Atmel/README
-> >> index c53a19b4aab2..6650a8ffaa64 100644
-> >> --- a/Documentation/arm/Atmel/README
-> >> +++ b/Documentation/arm/Atmel/README
-> >> @@ -90,6 +90,12 @@ the Atmel website: http://www.atmel.com.
-> >>          + Datasheet
-> >>            http://www.atmel.com/Images/Atmel-11238-32-bit-Cortex-A5-Microcontroller-SAMA5D4_Datasheet.pdf
-> >>  
-> >> +    * ARM Cortex-A5 + NEON based SoCs
-> >> +      - sama5d2 family
-> >> +        - sama5d27
-> >> +        + Datasheet
-> >> +          Coming soon
-> > 
-> > Shouldn't that go directly before or after the sama5d4 family ?
-> 
-> This is "after" sama5d4: I sorted this file according to SoC release
-> date whereas I sorted the other entries in alpa-numerial order (sama5d2
-> placed before sama5d3).
-> 
-> Is it what you answered?
-> 
+Document the device-tree binding of MediatTek display PWM.
+The clock "main" and "mm" are used to generate PWM signals.
+The PWM has one channel to control the backlight brightness for display.
+It supports MT8173 and MT6595.
 
-No, I meant doing something like:
+Change-Id: I194ca88b4e4cd01a28b8701e07e86ea6941e5292
+Signed-off-by: YH Huang <yh.huang@mediatek.com>
+---
+ .../devicetree/bindings/pwm/pwm-mtk-disp.txt       | 24 ++++++++++++++++++++++
+ 1 file changed, 24 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/pwm/pwm-mtk-disp.txt
 
-    * ARM Cortex-A5 + NEON based SoCs
-      - sama5d4 family
-        - sama5d41
-        - sama5d42
-        - sama5d43
-        - sama5d44 (device superset)
-        + Datasheet
-          http://www.atmel.com/Images/Atmel-11238-32-bit-Cortex-A5-Microcontroller-SAMA5D4_Datasheet.pdf
-      - sama5d2 family
-        - sama5d27
-        + Datasheet
-          Coming soon
-
-Else, you end up with two "ARM Cortex-A5 + NEON based SoCs" sections.
-
+diff --git a/Documentation/devicetree/bindings/pwm/pwm-mtk-disp.txt b/Documentation/devicetree/bindings/pwm/pwm-mtk-disp.txt
+new file mode 100644
+index 0000000..355b755
+--- /dev/null
++++ b/Documentation/devicetree/bindings/pwm/pwm-mtk-disp.txt
+@@ -0,0 +1,24 @@
++MediaTek display PWM controller
++
++Required properties:
++ - compatible: should be "mediatek,<name>-disp-pwm"
++   - "mediatek,mt8173-disp-pwm": found on mt8173 SoC
++   - "mediatek,mt6595-disp-pwm": found on mt6595 SoC
++ - reg: physical base address and length of the controller's registers
++ - #pwm-cells: must be 2. See pwm.txt in this directory for a description of
++   the cell format
++ - clocks: phandle and clock specifier of the PWM reference clock
++ - clock-names: must contain the following
++   - "main": clock used to generate PWM signals
++   - "mm": sync signals from the modules of mmsys
++
++Example:
++	pwm0: pwm at 1401e000 {
++		compatible = "mediatek,mt8173-disp-pwm",
++			     "mediatek,mt6595-disp-pwm";
++		reg = <0 0x1401e000 0 0x1000>;
++		#pwm-cells = <2>;
++		clocks = <&mmsys MM_DISP_PWM026M>,
++			 <&mmsys MM_DISP_PWM0MM>;
++		clock-names = "main", "mm";
++	};
 -- 
-Alexandre Belloni, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+1.8.1.1.dirty
