@@ -1,33 +1,41 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Mon, 29 Jun 2015 12:51:49 -0500
-Subject: [PATCH] watchdog: omap: fix build error
-Message-ID: <1435600310-5511-1-git-send-email-balbi@ti.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Mon, 29 Jun 2015 18:52:20 +0100
+Subject: [PATCH] arm64/kvm: Add generic v8 KVM target
+In-Reply-To: <CAFEAcA-E+KdiL4suQ0DoEvB-zGpNZ7-dq46FegC_iXYRPvo9jA@mail.gmail.com>
+References: <1434531646-4873-1-git-send-email-suzuki.poulose@arm.com>
+ <CAFEAcA92uymQ3LjPQnuFiwvjSgc+jY54VrfK_Sh4v1DJ+=OPpw@mail.gmail.com>
+ <558A6A84.5020603@arm.com> <20150624085128.GA22785@cbox>
+ <558A7936.7020109@arm.com> <20150625123034.GE28244@cbox>
+ <558BF6C9.3000009@arm.com> <558C05A9.8080201@arm.com>
+ <CAFEAcA_ULz=ugQW=NmthzqYRtvcfwteQTh0DonHRN6U5NykEtQ@mail.gmail.com>
+ <20150626095318.GG28244@cbox>
+ <F37C68A5-E48F-462C-AD18-0F3C096348C7@caviumnetworks.com>
+ <559180CA.3050905@arm.com>
+ <CAFEAcA-E+KdiL4suQ0DoEvB-zGpNZ7-dq46FegC_iXYRPvo9jA@mail.gmail.com>
+Message-ID: <559185D4.7060308@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Fix reference to unexistent variable in omap_wdt_probe()
-caused by commit 387ee4d26e5f (watchdog: omap_wdt:
-early_enable module parameter)
+On 29/06/15 18:38, Peter Maydell wrote:
+> On 29 June 2015 at 18:30, Marc Zyngier <marc.zyngier@arm.com> wrote:
+>> On 29/06/15 18:13, Chalamarla, Tirumalesh wrote:
+>>> Will this also prevents migrating between same implementations,
+>>> if no how is this identified.
+>>
+>> This shouldn't. It is pretty easy to look at the incoming guest's MIDR,
+>> and verify that it matches the default MIDR on the receiving system. Any
+>> difference, and the migration should abort.
+> 
+> Do you really want to forbid migration between (say)
+> Cortex-A57 r3p0 and Cortex-A57 r3p1 ?
+> 
+> That seems pretty harsh.
 
-Reported-by: Mark Brown <broonie@kernel.org>
-Fixes: 387ee4d26e5f (watchdog: omap_wdt: early_enable module parameter)
-Signed-off-by: Felipe Balbi <balbi@ti.com>
----
- drivers/watchdog/omap_wdt.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+I think we may need to allow for some flexibility (same major version
+only, or +/- 1 minor version...). The idea I'm trying to convey is that
+with "generic CPI", migration is not guaranteed unless we're on
+extremely similar hardware.
 
-diff --git a/drivers/watchdog/omap_wdt.c b/drivers/watchdog/omap_wdt.c
-index 21ca96ab2a90..de911c7e477c 100644
---- a/drivers/watchdog/omap_wdt.c
-+++ b/drivers/watchdog/omap_wdt.c
-@@ -285,7 +285,7 @@ static int omap_wdt_probe(struct platform_device *pdev)
- 	pm_runtime_put_sync(wdev->dev);
- 
- 	if (early_enable)
--		omap_wdt_start(omap_wdt);
-+		omap_wdt_start(&wdev->wdog);
- 
- 	return 0;
- }
+	M.
 -- 
-2.4.4
+Jazz is not dead. It just smells funny...
