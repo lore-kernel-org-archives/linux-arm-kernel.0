@@ -1,55 +1,53 @@
 From: mike.looijmans@topic.nl (Mike Looijmans)
-Date: Mon, 29 Jun 2015 08:33:21 +0200
-Subject: dma_sync_single_for_cpu takes a really long time
-In-Reply-To: <CAF6-1L6sjGc1VySi=oQGzOEm-e5jauznh+jzmdDgmJQWLbA_pA@mail.gmail.com>
-References: <CAF6-1L6sjGc1VySi=oQGzOEm-e5jauznh+jzmdDgmJQWLbA_pA@mail.gmail.com>
-Message-ID: <5590E6B1.90206@topic.nl>
+Date: Mon, 29 Jun 2015 08:44:50 +0200
+Subject: dma-mapping: support for DMA_ATTR_NON_CONSISTENT DMA attribute
+In-Reply-To: <CAF6-1L4g0W6kboZt52fHBUPxGYWYn9-9vmm=0-WQVv1-YdfOEA@mail.gmail.com>
+References: <CAF6-1L5c-PbK_wfpvz1xdRkquXyuQDv4mvKfYp8fwA1LK9ZOyw@mail.gmail.com>
+ <20150628224543.GW7557@n2100.arm.linux.org.uk>
+ <CAF6-1L4g0W6kboZt52fHBUPxGYWYn9-9vmm=0-WQVv1-YdfOEA@mail.gmail.com>
+Message-ID: <5590E962.4020700@topic.nl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-?On 28-06-15 22:40, Sylvain Munaut wrote:
-> Hi,
+?On 29-06-15 07:24, Sylvain Munaut wrote:
+>> ... and then using the *streaming* API dma_sync_* calls on it.  That
+>> is invalid, and will lead to undefined results on implementations of
+>> dma_alloc_coherent() which return remapped memory (as for older ARMs.)
+>> This is an abuse of the API.
 >
+> Ok, fine, but then
 >
-> I'm working on a DMA driver that uses the the streaming DMA API to
-> synchronize the access between host and device. The data flow is
-> exclusively from the device to the host (video grabber).
+> _How_ do I do it properly ?  From a driver module, how do I allocate a
+> large chunk ( > 4M so no alloc_pages and no kmalloc ) of contiguous
+> memory that's cacheable and that I can use with the streaming API ?
+
+To the best of my knowledge, and after asking around here, the only answer 
+I've so far been able to get is that alloc_pages (and hence, kmalloc) is the 
+method to call.
+
+It would be nice if there were a dma_alloc_streaming() interface, which might 
+just translate to kalloc directly, but it would at least get rid of all the 
+obscurities of allocating DMA memory.
+
+I fell into the same pit as Sylvain here, initially I was also allocating with 
+dma_alloc_...
+
+I submitted a patch to amend the dma documentation a while ago, but never got 
+a response, so I probably sent it to the wrong group.
+
+> Or alternatively, what are the correct "sync points" that the doc refers to ?
 >
-> As such, I call dma_sync_single_for_cpu when the hardware is done
-> writing a frame to make sure that the cpu gets up to date data when
-> accessing the zone.
+> """ By using this API, you are guaranteeing to the platform that you
+> have all the correct and necessary sync points for this memory in the
+> driver should it choose to return non-consistent memory."""
 >
-> However this call takes a _long_ time to complete. For a 6 Megabytes
-> buffer, it takes about 13 ms which is just crazy ... at that rate it'd
-> be faster to just read random data from a random buffer to trash the
-> measly 512k of cache ...
+> I had assumed it was the dma_sync_* calls, but apparently not.
 
-I have the same experience: The cache flush is so slow, that it is about as 
-fast to just memcpy() the whole region.
+I think the answer is "the dma_sync_* calls plus whatever it is your DMA 
+controller hardware needs to do"
 
+If that's the case, where should I send the documentation patch?
 
-> Is there any alternative that's faster when dealing with large buffers ?
->
-> (The platform is a Zynq 7000 - Dual Cortex A9).
-
-Yes.
-
-You're on a Zynq, and that has an ACP port. Connect through that instead of an 
-HP port (interface is almost the same), add "dma-coherent" to the devicetree 
-and also add my patch that properly maps this into userspace.
-
-The penalty of the ACP port is that it will write a lot slower to the memory 
-(about half the speed of the 600MB/s you get from the HP port) because of all 
-the cache administration. The good news is that all memory will be cacheable 
-once more, and all the dma_sync_... calls will turn into no-ops. You don't 
-have to change your driver and the logic also remains the same.
-
-
-Another approach is to make your software uncached-memory friendly. If you 
-process the frames sequentially and use NEON instructions to fetch large 
-aligned chunks for further processing, the absense of caching won't matter much.
-
-M.
 
 
 Kind regards,
