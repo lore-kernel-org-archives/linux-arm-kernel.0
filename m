@@ -1,312 +1,384 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Mon, 29 Jun 2015 15:38:20 +0200
-Subject: [PATCH linux-next v2 1/1] dmaengine: at_hdmac: fix residue
- computation
-In-Reply-To: <b9630cef4224b93939138b3a8c1950ea44cbcf59.1434626239.git.cyrille.pitchen@atmel.com>
-References: <cover.1434626239.git.cyrille.pitchen@atmel.com>
- <b9630cef4224b93939138b3a8c1950ea44cbcf59.1434626239.git.cyrille.pitchen@atmel.com>
-Message-ID: <55914A4C.9030503@atmel.com>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Mon, 29 Jun 2015 15:38:16 +0200
+Subject: [PATCH v2 1/2] ARM: dts: add buffalo linkstation ls-wxl/wsxl
+In-Reply-To: <559146AD.4040602@free-electrons.com>
+References: <1434713319-8691-2-git-send-email-rogershimizu@gmail.com>
+ <1434985216-6409-1-git-send-email-rogershimizu@gmail.com>
+ <559146AD.4040602@free-electrons.com>
+Message-ID: <20150629133816.GA4535@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le 18/06/2015 13:25, Cyrille Pitchen a ?crit :
-> As claimed by the programmer datasheet and confirmed by the IP designer,
-> the Block Transfer Size (BTSIZE) bitfield of the Channel x Control A
-> Register (CTRLAx) always refers to a number of Source Width (SRC_WIDTH)
-> transfers.
+On Mon, Jun 29, 2015 at 03:22:53PM +0200, Gregory CLEMENT wrote:
+> Hi Roger,
 > 
-> Both the SRC_WIDTH and BTSIZE bitfields can be extacted from the CTRLAx
-> register to compute the DMA residue. So the 'tx_width' field is useless
-> and can be removed from the struct at_desc.
+> On 22/06/2015 17:00, Roger Shimizu wrote:
+> > Add dts file to support Buffalo Linkstation LS-WXL and LS-WSXL,
+> > which are 2-bay NAS with 3.5" and 2.5" HDD respectively.
+> > 
+> > Signed-off-by: Roger Shimizu <rogershimizu@gmail.com>
+> > Reviewed-by: Nobuhiro Iwamatsu <iwamatsu@nigauri.org>
 > 
-> Before this patch, atc_prep_slave_sg() was not consistent: BTSIZE was
-> correctly initialized according to the SRC_WIDTH but 'tx_width' was always
-> set to reg_width, which was incorrect for MEM_TO_DEV transfers. It led to
-> bad DMA residue when 'tx_width' != SRC_WIDTH.
+> it seems that you addressed Andrew's remarks too, so
 > 
-> Also the 'tx_width' field was mostly set only in the first and last
-> descriptors. Depending on the kind of DMA transfer, this field remained
-> uninitialized for intermediate descriptors. The accurate DMA residue was
-> computed only when the currently processed descriptor was the first or the
-> last of the chain. This algorithm was a little bit odd. An accurate DMA
-> residue can always be computed using the SRC_WIDTH and BTSIZE bitfields
-> in the CTRLAx register.
-> 
-> Finally, the test to check whether the currently processed descriptor is
-> the last of the chain was wrong: for cyclic transfer, last_desc->lli.dscr
-> is NOT equal to zero, since set_desc_eol() is never called, but logically
-> equal to first_desc->txd.phys. This bug has a side effect on the
-> drivers/tty/serial/atmel_serial.c driver, which uses cyclic DMA transfer
-> to receive data. Since the DMA residue was wrong each time the DMA
-> transfer reaches the second (and last) period of the transfer, no more
-> data were received by the USART driver till the cyclic DMA transfer loops
-> back to the first period.
-> 
-> Signed-off-by: Cyrille Pitchen <cyrille.pitchen@atmel.com>
+> Acked-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+>
+> However I will wait for Andrew's formal acked-by before applying it.
 
-Yes:
-Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+Thanks for the reminder:
 
-It turns out that some information that I gave to Torsten for his
-previous patch were wrong. Thank you Cyrille for having dig this issue
-and proposed a fix.
+Acked-by: Andrew Lunn <andrew@lunn.ch>
 
-Bye,
-
-> ---
->  drivers/dma/at_hdmac.c      | 132 +++++++++++++++++++++++++++++---------------
->  drivers/dma/at_hdmac_regs.h |   3 +-
->  2 files changed, 88 insertions(+), 47 deletions(-)
-> 
-> diff --git a/drivers/dma/at_hdmac.c b/drivers/dma/at_hdmac.c
-> index 59892126..d3629b7 100644
-> --- a/drivers/dma/at_hdmac.c
-> +++ b/drivers/dma/at_hdmac.c
-> @@ -48,6 +48,8 @@
->  	BIT(DMA_SLAVE_BUSWIDTH_2_BYTES) |\
->  	BIT(DMA_SLAVE_BUSWIDTH_4_BYTES))
->  
-> +#define ATC_MAX_DSCR_TRIALS	10
-> +
->  /*
->   * Initial number of descriptors to allocate for each channel. This could
->   * be increased during dma usage.
-> @@ -285,28 +287,19 @@ static struct at_desc *atc_get_desc_by_cookie(struct at_dma_chan *atchan,
->   *
->   * @current_len: the number of bytes left before reading CTRLA
->   * @ctrla: the value of CTRLA
-> - * @desc: the descriptor containing the transfer width
->   */
-> -static inline int atc_calc_bytes_left(int current_len, u32 ctrla,
-> -					struct at_desc *desc)
-> +static inline int atc_calc_bytes_left(int current_len, u32 ctrla)
->  {
-> -	return current_len - ((ctrla & ATC_BTSIZE_MAX) << desc->tx_width);
-> -}
-> +	u32 btsize = (ctrla & ATC_BTSIZE_MAX);
-> +	u32 src_width = ATC_REG_TO_SRC_WIDTH(ctrla);
->  
-> -/**
-> - * atc_calc_bytes_left_from_reg - calculates the number of bytes left according
-> - * to the current value of CTRLA.
-> - *
-> - * @current_len: the number of bytes left before reading CTRLA
-> - * @atchan: the channel to read CTRLA for
-> - * @desc: the descriptor containing the transfer width
-> - */
-> -static inline int atc_calc_bytes_left_from_reg(int current_len,
-> -			struct at_dma_chan *atchan, struct at_desc *desc)
-> -{
-> -	u32 ctrla = channel_readl(atchan, CTRLA);
-> -
-> -	return atc_calc_bytes_left(current_len, ctrla, desc);
-> +	/*
-> +	 * According to the datasheet, when reading the Control A Register
-> +	 * (ctrla), the Buffer Transfer Size (btsize) bitfield refers to the
-> +	 * number of transfers completed on the Source Interface.
-> +	 * So btsize is always a number of source width transfers.
-> +	 */
-> +	return current_len - (btsize << src_width);
->  }
->  
->  /**
-> @@ -320,7 +313,7 @@ static int atc_get_bytes_left(struct dma_chan *chan, dma_cookie_t cookie)
->  	struct at_desc *desc_first = atc_first_active(atchan);
->  	struct at_desc *desc;
->  	int ret;
-> -	u32 ctrla, dscr;
-> +	u32 ctrla, dscr, trials;
->  
->  	/*
->  	 * If the cookie doesn't match to the currently running transfer then
-> @@ -346,15 +339,82 @@ static int atc_get_bytes_left(struct dma_chan *chan, dma_cookie_t cookie)
->  		 * the channel's DSCR register and compare it against the value
->  		 * of the hardware linked list structure of each child
->  		 * descriptor.
-> +		 *
-> +		 * The CTRLA register provides us with the amount of data
-> +		 * already read from the source for the current child
-> +		 * descriptor. So we can compute a more accurate residue by also
-> +		 * removing the number of bytes corresponding to this amount of
-> +		 * data.
-> +		 *
-> +		 * However, the DSCR and CTRLA registers cannot be read both
-> +		 * atomically. Hence a race condition may occur: the first read
-> +		 * register may refer to one child descriptor whereas the second
-> +		 * read may refer to a later child descriptor in the list
-> +		 * because of the DMA transfer progression inbetween the two
-> +		 * reads.
-> +		 *
-> +		 * One solution could have been to pause the DMA transfer, read
-> +		 * the DSCR and CTRLA then resume the DMA transfer. Nonetheless,
-> +		 * this approach presents some drawbacks:
-> +		 * - If the DMA transfer is paused, RX overruns or TX underruns
-> +		 *   are more likey to occur depending on the system latency.
-> +		 *   Taking the USART driver as an example, it uses a cyclic DMA
-> +		 *   transfer to read data from the Receive Holding Register
-> +		 *   (RHR) to avoid RX overruns since the RHR is not protected
-> +		 *   by any FIFO on most Atmel SoCs. So pausing the DMA transfer
-> +		 *   to compute the residue would break the USART driver design.
-> +		 * - The atc_pause() function masks interrupts but we'd rather
-> +		 *   avoid to do so for system latency purpose.
-> +		 *
-> +		 * Then we'd rather use another solution: the DSCR is read a
-> +		 * first time, the CTRLA is read in turn, next the DSCR is read
-> +		 * a second time. If the two consecutive read values of the DSCR
-> +		 * are the same then we assume both refers to the very same
-> +		 * child descriptor as well as the CTRLA value read inbetween
-> +		 * does. For cyclic tranfers, the assumption is that a full loop
-> +		 * is "not so fast".
-> +		 * If the two DSCR values are different, we read again the CTRLA
-> +		 * then the DSCR till two consecutive read values from DSCR are
-> +		 * equal or till the maxium trials is reach.
-> +		 * This algorithm is very unlikely not to find a stable value for
-> +		 * DSCR.
->  		 */
->  
-> -		ctrla = channel_readl(atchan, CTRLA);
-> -		rmb(); /* ensure CTRLA is read before DSCR */
->  		dscr = channel_readl(atchan, DSCR);
-> +		rmb(); /* ensure DSCR is read before CTRLA */
-> +		ctrla = channel_readl(atchan, CTRLA);
-> +		for (trials = 0; trials < ATC_MAX_DSCR_TRIALS; ++trials) {
-> +			u32 new_dscr;
-> +
-> +			rmb(); /* ensure DSCR is read after CTRLA */
-> +			new_dscr = channel_readl(atchan, DSCR);
-> +
-> +			/*
-> +			 * If the DSCR register value has not changed inside the
-> +			 * DMA controller since the previous read, we assume
-> +			 * that both the dscr and ctrla values refers to the
-> +			 * very same descriptor.
-> +			 */
-> +			if (likely(new_dscr == dscr))
-> +				break;
-> +
-> +			/*
-> +			 * DSCR has changed inside the DMA controller, so the
-> +			 * previouly read value of CTRLA may refer to an already
-> +			 * processed descriptor hence could be outdated.
-> +			 * We need to update ctrla to match the current
-> +			 * descriptor.
-> +			 */
-> +			dscr = new_dscr;
-> +			rmb(); /* ensure DSCR is read before CTRLA */
-> +			ctrla = channel_readl(atchan, CTRLA);
-> +		}
-> +		if (unlikely(trials >= ATC_MAX_DSCR_TRIALS))
-> +			return -ETIMEDOUT;
->  
->  		/* for the first descriptor we can be more accurate */
->  		if (desc_first->lli.dscr == dscr)
-> -			return atc_calc_bytes_left(ret, ctrla, desc_first);
-> +			return atc_calc_bytes_left(ret, ctrla);
->  
->  		ret -= desc_first->len;
->  		list_for_each_entry(desc, &desc_first->tx_list, desc_node) {
-> @@ -365,16 +425,14 @@ static int atc_get_bytes_left(struct dma_chan *chan, dma_cookie_t cookie)
->  		}
->  
->  		/*
-> -		 * For the last descriptor in the chain we can calculate
-> +		 * For the current descriptor in the chain we can calculate
->  		 * the remaining bytes using the channel's register.
-> -		 * Note that the transfer width of the first and last
-> -		 * descriptor may differ.
->  		 */
-> -		if (!desc->lli.dscr)
-> -			ret = atc_calc_bytes_left_from_reg(ret, atchan, desc);
-> +		ret = atc_calc_bytes_left(ret, ctrla);
->  	} else {
->  		/* single transfer */
-> -		ret = atc_calc_bytes_left_from_reg(ret, atchan, desc_first);
-> +		ctrla = channel_readl(atchan, CTRLA);
-> +		ret = atc_calc_bytes_left(ret, ctrla);
->  	}
->  
->  	return ret;
-> @@ -726,7 +784,6 @@ atc_prep_dma_interleaved(struct dma_chan *chan,
->  
->  	desc->txd.cookie = -EBUSY;
->  	desc->total_len = desc->len = len;
-> -	desc->tx_width = dwidth;
->  
->  	/* set end-of-link to the last link descriptor of list*/
->  	set_desc_eol(desc);
-> @@ -804,10 +861,6 @@ atc_prep_dma_memcpy(struct dma_chan *chan, dma_addr_t dest, dma_addr_t src,
->  	first->txd.cookie = -EBUSY;
->  	first->total_len = len;
->  
-> -	/* set transfer width for the calculation of the residue */
-> -	first->tx_width = src_width;
-> -	prev->tx_width = src_width;
-> -
->  	/* set end-of-link to the last link descriptor of list*/
->  	set_desc_eol(desc);
->  
-> @@ -956,10 +1009,6 @@ atc_prep_slave_sg(struct dma_chan *chan, struct scatterlist *sgl,
->  	first->txd.cookie = -EBUSY;
->  	first->total_len = total_len;
->  
-> -	/* set transfer width for the calculation of the residue */
-> -	first->tx_width = reg_width;
-> -	prev->tx_width = reg_width;
-> -
->  	/* first link descriptor of list is responsible of flags */
->  	first->txd.flags = flags; /* client is in control of this ack */
->  
-> @@ -1077,12 +1126,6 @@ atc_prep_dma_sg(struct dma_chan *chan,
->  		desc->txd.cookie = 0;
->  		desc->len = len;
->  
-> -		/*
-> -		 * Although we only need the transfer width for the first and
-> -		 * the last descriptor, its easier to set it to all descriptors.
-> -		 */
-> -		desc->tx_width = src_width;
-> -
->  		atc_desc_chain(&first, &prev, desc);
->  
->  		/* update the lengths and addresses for the next loop cycle */
-> @@ -1256,7 +1299,6 @@ atc_prep_dma_cyclic(struct dma_chan *chan, dma_addr_t buf_addr, size_t buf_len,
->  	/* First descriptor of the chain embedds additional information */
->  	first->txd.cookie = -EBUSY;
->  	first->total_len = buf_len;
-> -	first->tx_width = reg_width;
->  
->  	return &first->txd;
->  
-> diff --git a/drivers/dma/at_hdmac_regs.h b/drivers/dma/at_hdmac_regs.h
-> index bc8d5eb..7f5a082 100644
-> --- a/drivers/dma/at_hdmac_regs.h
-> +++ b/drivers/dma/at_hdmac_regs.h
-> @@ -112,6 +112,7 @@
->  #define		ATC_SRC_WIDTH_BYTE	(0x0 << 24)
->  #define		ATC_SRC_WIDTH_HALFWORD	(0x1 << 24)
->  #define		ATC_SRC_WIDTH_WORD	(0x2 << 24)
-> +#define		ATC_REG_TO_SRC_WIDTH(r)	(((r) >> 24) & 0x3)
->  #define	ATC_DST_WIDTH_MASK	(0x3 << 28)	/* Destination Single Transfer Size */
->  #define		ATC_DST_WIDTH(x)	((x) << 28)
->  #define		ATC_DST_WIDTH_BYTE	(0x0 << 28)
-> @@ -182,7 +183,6 @@ struct at_lli {
->   * @txd: support for the async_tx api
->   * @desc_node: node on the channed descriptors list
->   * @len: descriptor byte count
-> - * @tx_width: transfer width
->   * @total_len: total transaction byte count
->   */
->  struct at_desc {
-> @@ -194,7 +194,6 @@ struct at_desc {
->  	struct dma_async_tx_descriptor	txd;
->  	struct list_head		desc_node;
->  	size_t				len;
-> -	u32				tx_width;
->  	size_t				total_len;
->  
->  	/* Interleaved data */
-> 
+	  Andrew
 
 
--- 
-Nicolas Ferre
+> 
+> Thanks,
+> 
+> Gregory
+> > ---
+> >  .../devicetree/bindings/arm/marvell,kirkwood.txt   |   1 +
+> >  arch/arm/boot/dts/Makefile                         |   1 +
+> >  arch/arm/boot/dts/kirkwood-lswxl.dts               | 301 +++++++++++++++++++++
+> >  3 files changed, 303 insertions(+)
+> >  create mode 100644 arch/arm/boot/dts/kirkwood-lswxl.dts
+> > 
+> > diff --git a/Documentation/devicetree/bindings/arm/marvell,kirkwood.txt b/Documentation/devicetree/bindings/arm/marvell,kirkwood.txt
+> > index 4f40ff3..b79212f 100644
+> > --- a/Documentation/devicetree/bindings/arm/marvell,kirkwood.txt
+> > +++ b/Documentation/devicetree/bindings/arm/marvell,kirkwood.txt
+> > @@ -20,6 +20,7 @@ And in addition, the compatible shall be extended with the specific
+> >  board. Currently known boards are:
+> >  
+> >  "buffalo,lschlv2"
+> > +"buffalo,lswxl"
+> >  "buffalo,lsxhl"
+> >  "buffalo,lsxl"
+> >  "dlink,dns-320"
+> > diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+> > index a8bf702..b45c974 100644
+> > --- a/arch/arm/boot/dts/Makefile
+> > +++ b/arch/arm/boot/dts/Makefile
+> > @@ -176,6 +176,7 @@ dtb-$(CONFIG_MACH_KIRKWOOD) += \
+> >  	kirkwood-km_kirkwood.dtb \
+> >  	kirkwood-laplug.dtb \
+> >  	kirkwood-lschlv2.dtb \
+> > +	kirkwood-lswxl.dtb \
+> >  	kirkwood-lsxhl.dtb \
+> >  	kirkwood-mplcec4.dtb \
+> >  	kirkwood-mv88f6281gtw-ge.dtb \
+> > diff --git a/arch/arm/boot/dts/kirkwood-lswxl.dts b/arch/arm/boot/dts/kirkwood-lswxl.dts
+> > new file mode 100644
+> > index 0000000..f5db16a
+> > --- /dev/null
+> > +++ b/arch/arm/boot/dts/kirkwood-lswxl.dts
+> > @@ -0,0 +1,301 @@
+> > +/*
+> > + * Device Tree file for Buffalo Linkstation LS-WXL/WSXL
+> > + *
+> > + * Copyright (C) 2015, rogershimizu at gmail.com
+> > + *
+> > + * This program is free software; you can redistribute it and/or
+> > + * modify it under the terms of the GNU General Public License
+> > + * as published by the Free Software Foundation; either version
+> > + * 2 of the License, or (at your option) any later version.
+> > + */
+> > +
+> > +/dts-v1/;
+> > +
+> > +#include "kirkwood.dtsi"
+> > +#include "kirkwood-6281.dtsi"
+> > +
+> > +/ {
+> > +	model = "Buffalo Linkstation LS-WXL/WSXL";
+> > +	compatible = "buffalo,lswxl", "marvell,kirkwood-88f6281", "marvell,kirkwood";
+> > +
+> > +	memory { /* 128 MB */
+> > +		device_type = "memory";
+> > +		reg = <0x00000000 0x8000000>;
+> > +	};
+> > +
+> > +	chosen {
+> > +		bootargs = "console=ttyS0,115200n8 earlyprintk";
+> > +		stdout-path = &uart0;
+> > +	};
+> > +
+> > +	mbus {
+> > +		pcie-controller {
+> > +			status = "okay";
+> > +			pcie at 1,0 {
+> > +				status = "okay";
+> > +			};
+> > +		};
+> > +	};
+> > +
+> > +	ocp at f1000000 {
+> > +		pinctrl: pin-controller at 10000 {
+> > +			pmx_power_hdd0: pmx-power-hdd0 {
+> > +				marvell,pins = "mpp28";
+> > +				marvell,function = "gpio";
+> > +			};
+> > +			pmx_power_hdd1: pmx-power-hdd1 {
+> > +				marvell,pins = "mpp29";
+> > +				marvell,function = "gpio";
+> > +			};
+> > +			pmx_usb_vbus: pmx-usb-vbus {
+> > +				marvell,pins = "mpp37";
+> > +				marvell,function = "gpio";
+> > +			};
+> > +			pmx_fan_high: pmx-fan-high {
+> > +				marvell,pins = "mpp47";
+> > +				marvell,function = "gpio";
+> > +			};
+> > +			pmx_fan_low: pmx-fan-low {
+> > +				marvell,pins = "mpp48";
+> > +				marvell,function = "gpio";
+> > +			};
+> > +			pmx_led_hdderr0: pmx-led-hdderr0 {
+> > +				marvell,pins = "mpp8";
+> > +				marvell,function = "gpio";
+> > +			};
+> > +			pmx_led_hdderr1: pmx-led-hdderr1 {
+> > +				marvell,pins = "mpp46";
+> > +				marvell,function = "gpio";
+> > +			};
+> > +			pmx_led_alarm: pmx-led-alarm {
+> > +				marvell,pins = "mpp49";
+> > +				marvell,function = "gpio";
+> > +			};
+> > +			pmx_led_function_red: pmx-led-function-red {
+> > +				marvell,pins = "mpp34";
+> > +				marvell,function = "gpio";
+> > +			};
+> > +			pmx_led_function_blue: pmx-led-function-blue {
+> > +				marvell,pins = "mpp36";
+> > +				marvell,function = "gpio";
+> > +			};
+> > +			pmx_led_info: pmx-led-info {
+> > +				marvell,pins = "mpp38";
+> > +				marvell,function = "gpio";
+> > +			};
+> > +			pmx_led_power: pmx-led-power {
+> > +				marvell,pins = "mpp39";
+> > +				marvell,function = "gpio";
+> > +			};
+> > +			pmx_fan_lock: pmx-fan-lock {
+> > +				marvell,pins = "mpp40";
+> > +				marvell,function = "gpio";
+> > +			};
+> > +			pmx_button_function: pmx-button-function {
+> > +				marvell,pins = "mpp41";
+> > +				marvell,function = "gpio";
+> > +			};
+> > +			pmx_power_switch: pmx-power-switch {
+> > +				marvell,pins = "mpp42";
+> > +				marvell,function = "gpio";
+> > +			};
+> > +			pmx_power_auto_switch: pmx-power-auto-switch {
+> > +				marvell,pins = "mpp43";
+> > +				marvell,function = "gpio";
+> > +			};
+> > +		};
+> > +
+> > +		serial at 12000 {
+> > +			status = "okay";
+> > +		};
+> > +
+> > +		sata at 80000 {
+> > +			status = "okay";
+> > +			nr-ports = <2>;
+> > +		};
+> > +
+> > +		spi at 10600 {
+> > +			status = "okay";
+> > +
+> > +			m25p40 at 0 {
+> > +				#address-cells = <1>;
+> > +				#size-cells = <1>;
+> > +				compatible = "st,m25p40", "jedec,spi-nor";
+> > +				reg = <0>;
+> > +				spi-max-frequency = <25000000>;
+> > +				mode = <0>;
+> > +
+> > +				partition at 0 {
+> > +					reg = <0x0 0x60000>;
+> > +					label = "uboot";
+> > +					read-only;
+> > +				};
+> > +
+> > +				partition at 60000 {
+> > +					reg = <0x60000 0x10000>;
+> > +					label = "dtb";
+> > +					read-only;
+> > +				};
+> > +
+> > +				partition at 70000 {
+> > +					reg = <0x70000 0x10000>;
+> > +					label = "uboot_env";
+> > +				};
+> > +			};
+> > +		};
+> > +	};
+> > +
+> > +	gpio_keys {
+> > +		compatible = "gpio-keys";
+> > +		#address-cells = <1>;
+> > +		#size-cells = <0>;
+> > +		pinctrl-0 = <&pmx_button_function &pmx_power_switch
+> > +			     &pmx_power_auto_switch>;
+> > +		pinctrl-names = "default";
+> > +
+> > +		button at 1 {
+> > +			label = "Function Button";
+> > +			linux,code = <KEY_OPTION>;
+> > +			gpios = <&gpio1 41 GPIO_ACTIVE_LOW>;
+> > +		};
+> > +
+> > +		button at 2 {
+> > +			label = "Power-on Switch";
+> > +			linux,code = <KEY_RESERVED>;
+> > +			linux,input-type = <5>;
+> > +			gpios = <&gpio1 42 GPIO_ACTIVE_LOW>;
+> > +		};
+> > +
+> > +		button at 3 {
+> > +			label = "Power-auto Switch";
+> > +			linux,code = <KEY_ESC>;
+> > +			linux,input-type = <5>;
+> > +			gpios = <&gpio1 43 GPIO_ACTIVE_LOW>;
+> > +		};
+> > +	};
+> > +
+> > +	gpio_leds {
+> > +		compatible = "gpio-leds";
+> > +		pinctrl-0 = <&pmx_led_function_red &pmx_led_alarm
+> > +			     &pmx_led_info &pmx_led_power
+> > +			     &pmx_led_function_blue
+> > +			     &pmx_led_hdderr0
+> > +			     &pmx_led_hdderr1>;
+> > +		pinctrl-names = "default";
+> > +
+> > +		led at 1 {
+> > +			label = "lswxl:blue:func";
+> > +			gpios = <&gpio1 36 GPIO_ACTIVE_LOW>;
+> > +		};
+> > +
+> > +		led at 2 {
+> > +			label = "lswxl:red:alarm";
+> > +			gpios = <&gpio1 49 GPIO_ACTIVE_LOW>;
+> > +		};
+> > +
+> > +		led at 3 {
+> > +			label = "lswxl:amber:info";
+> > +			gpios = <&gpio1 6 GPIO_ACTIVE_LOW>;
+> > +		};
+> > +
+> > +		led at 4 {
+> > +			label = "lswxl:blue:power";
+> > +			gpios = <&gpio1 8 GPIO_ACTIVE_LOW>;
+> > +		};
+> > +
+> > +		led at 5 {
+> > +			label = "lswxl:red:func";
+> > +			gpios = <&gpio1 5 GPIO_ACTIVE_LOW>;
+> > +			default-state = "keep";
+> > +		};
+> > +
+> > +		led at 6 {
+> > +			label = "lswxl:red:hdderr0";
+> > +			gpios = <&gpio1 2 GPIO_ACTIVE_LOW>;
+> > +		};
+> > +
+> > +		led at 7 {
+> > +			label = "lswxl:red:hdderr1";
+> > +			gpios = <&gpio1 3 GPIO_ACTIVE_LOW>;
+> > +		};
+> > +	};
+> > +
+> > +	gpio_fan {
+> > +		compatible = "gpio-fan";
+> > +		pinctrl-0 = <&pmx_fan_low &pmx_fan_high &pmx_fan_lock>;
+> > +		pinctrl-names = "default";
+> > +
+> > +		gpios = <&gpio0 47 GPIO_ACTIVE_LOW
+> > +			 &gpio0 48 GPIO_ACTIVE_LOW>;
+> > +
+> > +		gpio-fan,speed-map = <0 3
+> > +				1500 2
+> > +				3250 1
+> > +				5000 0>;
+> > +
+> > +		alarm-gpios = <&gpio1 49 GPIO_ACTIVE_HIGH>;
+> > +	};
+> > +
+> > +	restart_poweroff {
+> > +		compatible = "restart-poweroff";
+> > +	};
+> > +
+> > +	regulators {
+> > +		compatible = "simple-bus";
+> > +		#address-cells = <1>;
+> > +		#size-cells = <0>;
+> > +		pinctrl-0 = <&pmx_power_hdd0 &pmx_power_hdd1 &pmx_usb_vbus>;
+> > +		pinctrl-names = "default";
+> > +
+> > +		usb_power: regulator at 1 {
+> > +			compatible = "regulator-fixed";
+> > +			reg = <1>;
+> > +			regulator-name = "USB Power";
+> > +			regulator-min-microvolt = <5000000>;
+> > +			regulator-max-microvolt = <5000000>;
+> > +			enable-active-high;
+> > +			regulator-always-on;
+> > +			regulator-boot-on;
+> > +			gpio = <&gpio0 37 GPIO_ACTIVE_HIGH>;
+> > +		};
+> > +		hdd_power0: regulator at 2 {
+> > +			compatible = "regulator-fixed";
+> > +			reg = <2>;
+> > +			regulator-name = "HDD0 Power";
+> > +			regulator-min-microvolt = <5000000>;
+> > +			regulator-max-microvolt = <5000000>;
+> > +			enable-active-high;
+> > +			regulator-always-on;
+> > +			regulator-boot-on;
+> > +			gpio = <&gpio0 28 GPIO_ACTIVE_HIGH>;
+> > +		};
+> > +		hdd_power1: regulator at 3 {
+> > +			compatible = "regulator-fixed";
+> > +			reg = <3>;
+> > +			regulator-name = "HDD1 Power";
+> > +			regulator-min-microvolt = <5000000>;
+> > +			regulator-max-microvolt = <5000000>;
+> > +			enable-active-high;
+> > +			regulator-always-on;
+> > +			regulator-boot-on;
+> > +			gpio = <&gpio0 29 GPIO_ACTIVE_HIGH>;
+> > +		};
+> > +	};
+> > +};
+> > +
+> > +&mdio {
+> > +	status = "okay";
+> > +
+> > +	ethphy1: ethernet-phy at 8 {
+> > +		device_type = "ethernet-phy";
+> > +		reg = <8>;
+> > +	};
+> > +};
+> > +
+> > +&eth1 {
+> > +	status = "okay";
+> > +
+> > +	ethernet1-port at 0 {
+> > +		phy-handle = <&ethphy1>;
+> > +	};
+> > +};
+> > 
+> 
+> 
+> -- 
+> Gregory Clement, Free Electrons
+> Kernel, drivers, real-time and embedded Linux
+> development, consulting, training and support.
+> http://free-electrons.com
