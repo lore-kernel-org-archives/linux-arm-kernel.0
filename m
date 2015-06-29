@@ -1,36 +1,45 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 29 Jun 2015 10:45:57 +0100
-Subject: dma-mapping: support for DMA_ATTR_NON_CONSISTENT DMA attribute
-In-Reply-To: <5590E962.4020700@topic.nl>
-References: <CAF6-1L5c-PbK_wfpvz1xdRkquXyuQDv4mvKfYp8fwA1LK9ZOyw@mail.gmail.com>
- <20150628224543.GW7557@n2100.arm.linux.org.uk>
- <CAF6-1L4g0W6kboZt52fHBUPxGYWYn9-9vmm=0-WQVv1-YdfOEA@mail.gmail.com>
- <5590E962.4020700@topic.nl>
-Message-ID: <20150629094557.GY7557@n2100.arm.linux.org.uk>
+Date: Mon, 29 Jun 2015 11:02:51 +0100
+Subject: [PATCH] ARM64: smp: Silence suspicious RCU usage with ipi
+ tracepoints
+In-Reply-To: <1435176858-9568-1-git-send-email-sboyd@codeaurora.org>
+References: <1435176858-9568-1-git-send-email-sboyd@codeaurora.org>
+Message-ID: <20150629100251.GZ7557@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 29, 2015 at 08:44:50AM +0200, Mike Looijmans wrote:
-> ?On 29-06-15 07:24, Sylvain Munaut wrote:
-> >""" By using this API, you are guaranteeing to the platform that you
-> >have all the correct and necessary sync points for this memory in the
-> >driver should it choose to return non-consistent memory."""
-> >
-> >I had assumed it was the dma_sync_* calls, but apparently not.
+On Wed, Jun 24, 2015 at 01:14:18PM -0700, Stephen Boyd wrote:
+> John Stultz reported an RCU splat on ARM with ipi trace events
+> enabled. It looks like the same problem exists on ARM64.
 > 
-> I think the answer is "the dma_sync_* calls plus whatever it is your DMA
-> controller hardware needs to do"
+> At this point in the IPI handling path we haven't called
+> irq_enter() yet, so RCU doesn't know that we're about to exit
+> idle and properly warns that we're using RCU from an idle CPU.
+> Use trace_ipi_entry_rcuidle() instead of trace_ipi_entry() so
+> that RCU is informed about our exit from idle.
+> 
+> Cc: John Stultz <john.stultz@linaro.org>
+> Cc: Steven Rostedt <rostedt@goodmis.org>
+> Cc: Paul E. McKenney <paulmck@linux.vnet.ibm.com>
+> Cc: Nicolas Pitre <nicolas.pitre@linaro.org>
+> Fixes: 45ed695ac10a "ARM64: add IPI tracepoints"
+> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
 
-No it is not.  When something is clearly the wrong API, you do not go
-around telling people to use it.  I'm pretty disgusted that you think
-that is an appropraite way to behave.
+I can find no trace of your equivalent ARM patch in my mailbox, but my
+comment is as relevant to that message as it is to this one.
 
-> If that's the case, where should I send the documentation patch?
+The Fixes: line has a standard format, which is not the formatting above.
+Please see Documentation/SubmittingPatches section 2.  Thanks.
 
-It's not for me to say whether your patch is correct or not, it's for
-the wider community to do so.  As there is no one "responsible" for
-that documentation, I'd suggest sending it to Andrew Morton as nothing
-else happened with it.
+I've fixed it when applying the ARM version of this patch.  However, I'm
+left wondering whether the lack of update to change the "Silence" to "Fix"
+which I _stumbled_ over later in this thread is laziness on your part -
+had it not been for the malformed Fixes: line, I would not have known to
+update that.
+
+We all gets lots of email every day, expecting people to remember some
+comment in the dim and distant past made to a similar but different patch
+is not really on.  Please ensure that you update your patches in future.
 
 -- 
 FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
