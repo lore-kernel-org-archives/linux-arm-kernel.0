@@ -1,30 +1,30 @@
 From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Mon, 29 Jun 2015 11:19:34 +0200
-Subject: [RESEND PATCH v3] clocksource: exynos_mct: fix for sleeping in
- atomic ctx handling cpu hotplug notif.
-In-Reply-To: <1435324984-7328-1-git-send-email-d.eppel@samsung.com>
-References: <1426151496-5509-1-git-send-email-d.eppel@samsung.com>
- <1435324984-7328-1-git-send-email-d.eppel@samsung.com>
-Message-ID: <55910DA6.4070404@linaro.org>
+Date: Mon, 29 Jun 2015 11:21:24 +0200
+Subject: [PATCH] clocksource: imx: define clocksource for mx27
+In-Reply-To: <20150628044434.GC10332@tiger>
+References: <1435439504-406-1-git-send-email-tremyfr@gmail.com>
+ <20150628044434.GC10332@tiger>
+Message-ID: <55910E14.5020906@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/26/2015 03:23 PM, Damian Eppel wrote:
-> This is to fix an issue of sleeping in atomic context when processing
-> hotplug notifications in Exynos MCT(Multi-Core Timer).
-> The issue was reproducible on Exynos 3250 (Rinato board) and Exynos 5420
-> (Arndale Octa board).
+On 06/28/2015 06:44 AM, Shawn Guo wrote:
+> On Sat, Jun 27, 2015 at 11:11:44PM +0200, Philippe Reynes wrote:
+>> The clocksource imx27 wasn't defined in timer-imx-gpt.c,
+>> so the kernel no longer boot on imx27. Just define
+>> clocksource imx27 as an imx21.
+>>
+>> Signed-off-by: Philippe Reynes <tremyfr@gmail.com>
 >
-> Whilst testing cpu hotplug events on kernel configured with DEBUG_PREEMPT
-> and DEBUG_ATOMIC_SLEEP we get following BUG message, caused by calling
-> request_irq() and free_irq() in the context of hotplug notification
-> (which is in this case atomic context).
+> Acked-by: Shawn Guo <shawnguo@kernel.org>
+>
+> Daniel,
+>
+> Please help send this as a fix for 4.2-rc, thanks.
 
-Applied as a 4.2 fix.
+Ok.
 
-Should it be tagged stable@ ?
-
-
+stable@ ?
 
 -- 
   <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
