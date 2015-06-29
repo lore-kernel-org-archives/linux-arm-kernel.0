@@ -1,45 +1,46 @@
-From: mike.looijmans@topic.nl (Mike Looijmans)
-Date: Mon, 29 Jun 2015 15:08:48 +0200
-Subject: dma-mapping: support for DMA_ATTR_NON_CONSISTENT DMA attribute
-In-Reply-To: <20150629094557.GY7557@n2100.arm.linux.org.uk>
-References: <CAF6-1L5c-PbK_wfpvz1xdRkquXyuQDv4mvKfYp8fwA1LK9ZOyw@mail.gmail.com>
- <20150628224543.GW7557@n2100.arm.linux.org.uk>
- <CAF6-1L4g0W6kboZt52fHBUPxGYWYn9-9vmm=0-WQVv1-YdfOEA@mail.gmail.com>
- <5590E962.4020700@topic.nl> <20150629094557.GY7557@n2100.arm.linux.org.uk>
-Message-ID: <55914360.6050709@topic.nl>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Mon, 29 Jun 2015 15:10:52 +0200
+Subject: [PATCH RFC v2 03/16] PM / Domains: Support IRQ safe PM domains
+In-Reply-To: <1435374156-19214-4-git-send-email-lina.iyer@linaro.org>
+References: <1435374156-19214-1-git-send-email-lina.iyer@linaro.org>
+ <1435374156-19214-4-git-send-email-lina.iyer@linaro.org>
+Message-ID: <CAMuHMdUQy7b2UWJVe6oc2r3EpiAur3BChOYWeGY61NYUJNPFow@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 29-06-15 11:45, Russell King - ARM Linux wrote:
-> On Mon, Jun 29, 2015 at 08:44:50AM +0200, Mike Looijmans wrote:
->> ?On 29-06-15 07:24, Sylvain Munaut wrote:
->>> """ By using this API, you are guaranteeing to the platform that you
->>> have all the correct and necessary sync points for this memory in the
->>> driver should it choose to return non-consistent memory."""
->>>
->>> I had assumed it was the dma_sync_* calls, but apparently not.
->>
->> I think the answer is "the dma_sync_* calls plus whatever it is your DMA
->> controller hardware needs to do"
+Sorry, I forgot a few comments...
+
+On Sat, Jun 27, 2015 at 5:02 AM, Lina Iyer <lina.iyer@linaro.org> wrote:
+> --- a/Documentation/power/devices.txt
+> +++ b/Documentation/power/devices.txt
+
+> +context, may contain IRQ safe devices. Such domain may only contain only IRQ
+
+Double "only".
+
+> +safe devices or IRQ safe sub-domains.
+
+> @@ -532,15 +608,18 @@ static int pm_genpd_runtime_resume(struct device *dev)
+>         if (IS_ERR(genpd))
+>                 return -EINVAL;
 >
-> No it is not.  When something is clearly the wrong API, you do not go
-> around telling people to use it.  I'm pretty disgusted that you think
-> that is an appropraite way to behave.
+> -       /* If power.irq_safe, the PM domain is never powered off. */
+> -       if (dev->power.irq_safe) {
+> +       /*
+> +        * As we dont power off a non IRQ safe domain, which holds a
 
-I trying to merely refer to the "correct and necessary sync points" part, once 
-the decision to (properly) use the streaming API has been made.
+Bogus "a" at the end.
 
-To the best of my knowledge, the dma_sync_... methods take care of things from 
-the ARM (CPU) side.
+> +        * an IRQ safe device, we dont need to restore power to it.
+> +        */
 
-That leaves only the device side, you need to make sure that for example its 
-FIFOs are empty before starting to flush caches. Something that the API cannot 
-do for you, but your driver and hardware (or logic in the case of a Zynq) must 
-do a proper job too.
+Gr{oetje,eeting}s,
 
-Saying something about those things would make the documentation a lot less 
-cryptic than just dropping a "correct and necessary sync points" bomb into the 
-text and then offering no advise on where one could hope to find some clay 
-tablets with engravings explaining what is "correct and necessary".
+                        Geert
 
-M.
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
