@@ -1,41 +1,46 @@
-From: manabian@gmail.com (Joachim Eastwood)
-Date: Mon, 29 Jun 2015 13:06:47 +0200
-Subject: [PATCH RFC 0/4] PL08x DT bindings and LPC18xx DMA support
-In-Reply-To: <CACRpkdZZBGzioO25-Sov0CVK8JuRp1uuJDEZKFtLxg9WwsSzww@mail.gmail.com>
-References: <1434280937-8369-1-git-send-email-manabian@gmail.com>
- <CACRpkdZZBGzioO25-Sov0CVK8JuRp1uuJDEZKFtLxg9WwsSzww@mail.gmail.com>
-Message-ID: <CAGhQ9VxXHdPwUR0AWC8SVA9iRV8pazVC1atmrEKzP5dJx81MBw@mail.gmail.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Mon, 29 Jun 2015 12:23:35 +0100
+Subject: [PATCH] ARM64: smp: Silence suspicious RCU usage with ipi
+ tracepoints
+In-Reply-To: <20150629100251.GZ7557@n2100.arm.linux.org.uk>
+References: <1435176858-9568-1-git-send-email-sboyd@codeaurora.org>
+ <20150629100251.GZ7557@n2100.arm.linux.org.uk>
+Message-ID: <20150629112335.GE29907@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Linus,
+On Mon, Jun 29, 2015 at 11:02:51AM +0100, Russell King - ARM Linux wrote:
+> On Wed, Jun 24, 2015 at 01:14:18PM -0700, Stephen Boyd wrote:
+> > John Stultz reported an RCU splat on ARM with ipi trace events
+> > enabled. It looks like the same problem exists on ARM64.
+> > 
+> > At this point in the IPI handling path we haven't called
+> > irq_enter() yet, so RCU doesn't know that we're about to exit
+> > idle and properly warns that we're using RCU from an idle CPU.
+> > Use trace_ipi_entry_rcuidle() instead of trace_ipi_entry() so
+> > that RCU is informed about our exit from idle.
+> > 
+> > Cc: John Stultz <john.stultz@linaro.org>
+> > Cc: Steven Rostedt <rostedt@goodmis.org>
+> > Cc: Paul E. McKenney <paulmck@linux.vnet.ibm.com>
+> > Cc: Nicolas Pitre <nicolas.pitre@linaro.org>
+> > Fixes: 45ed695ac10a "ARM64: add IPI tracepoints"
+[...]
+> The Fixes: line has a standard format, which is not the formatting above.
+> Please see Documentation/SubmittingPatches section 2.  Thanks.
 
-On 29 June 2015 at 12:53, Linus Walleij <linus.walleij@linaro.org> wrote:
-> On Sun, Jun 14, 2015 at 1:22 PM, Joachim Eastwood <manabian@gmail.com> wrote:
->
->> This patch set aims to add support for DMA on the NXP LPC18xx/43xx
->> (Cortex-M3/M4) platform. The platform has a PL080 controller with a
->> mux in front of the DMA request lines. This setup is quite common
->> and can be found on most other, if not all, NXP LPC devices.
->
-> Nice!
->
->>  - remove channel sub-nodes from driver and dt doc.
->
-> Why? It was a good approach for the Nomadik. Well I'll look
-> how you do it for NXP, I guess it makes total sense for you.
+I re-wrote it in this instance. What's not clear to me is whether cc:
+stable is still necessary with a Fixes: tag (I add it just in case).
 
-Since the bus specifier (AHB1 / AHB2) property has been moved into the
-DMA cell, I don't see a reason to keep channel sub-nodes stuff.
+Anyway, to simplify the process, I came up with a .gitconfig alias:
 
-And I also agree with Arnd's other comments on the subject here:
-https://www.marc.info/?l=linux-arm-kernel&m=141088461506806&w=2
-(see at the bottom)
+[alias]
+        show-fixes = !git show --pretty=format:\"Fixes: %h (\\\"%s\\\")\nCc: <stable@vger.kernel.org> "#" $(git describe --match="v*" --contains $1 | cut -d - -f -1)+\n\n%b\" $1 "#"
 
-Summary:
-* No other driver does this.
-* Removing it make the driver a bit simpler.
+And another for .vimrc (to replace a Fixes: line):
 
+command! GitFixes
+	\ :.!read tagname commit; git show-fixes $commit 2> /dev/null | head -n 2
 
-regards,
-Joachim Eastwood
+-- 
+Catalin
