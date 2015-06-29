@@ -1,81 +1,33 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 29 Jun 2015 18:49:09 +0100
-Subject: [PATCH 8/8] iommu/arm-smmu: suppress fault information about
- CMD_PREFETCH_CONFIG execution
-In-Reply-To: <1435307584-9812-9-git-send-email-thunder.leizhen@huawei.com>
-References: <1435307584-9812-1-git-send-email-thunder.leizhen@huawei.com>
- <1435307584-9812-9-git-send-email-thunder.leizhen@huawei.com>
-Message-ID: <20150629174909.GN17474@arm.com>
+From: balbi@ti.com (Felipe Balbi)
+Date: Mon, 29 Jun 2015 12:51:49 -0500
+Subject: [PATCH] watchdog: omap: fix build error
+Message-ID: <1435600310-5511-1-git-send-email-balbi@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 26, 2015 at 09:33:04AM +0100, Zhen Lei wrote:
-> Some broken SMMUv3 devices treat CMD_PREFETCH_CONFIG as illegal command,
-> it's ugly to print error information. CMD_PREFETCH_CONFIG is just used to
-> prefetch the configuration for a specified StreamID, without this command
-> will not impact SMMUv3 function.
-> 
-> Signed-off-by: Zhen Lei <thunder.leizhen@huawei.com>
-> ---
->  drivers/iommu/arm-smmu-v3.c | 18 ++++++++++++++----
->  1 file changed, 14 insertions(+), 4 deletions(-)
-> 
-> diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
-> index d799feb..3971aef 100644
-> --- a/drivers/iommu/arm-smmu-v3.c
-> +++ b/drivers/iommu/arm-smmu-v3.c
-> @@ -813,6 +813,7 @@ static void arm_smmu_cmdq_skip_err(struct arm_smmu_device *smmu)
->  	};
-> 
->  	int i;
-> +	u32 opcode;
->  	u64 cmd[CMDQ_ENT_DWORDS];
->  	struct arm_smmu_queue *q = &smmu->cmdq.q;
->  	u32 cons = readl_relaxed(q->cons_reg);
-> @@ -821,15 +822,14 @@ static void arm_smmu_cmdq_skip_err(struct arm_smmu_device *smmu)
->  		.opcode = CMDQ_OP_CMD_SYNC,
->  	};
-> 
-> -	dev_err(smmu->dev, "CMDQ error (cons 0x%08x): %s\n", cons,
-> -		cerror_str[idx]);
-> -
->  	switch (idx) {
->  	case CMDQ_ERR_CERROR_ILL_IDX:
->  		break;
->  	case CMDQ_ERR_CERROR_ABT_IDX:
-> -		dev_err(smmu->dev, "retrying command fetch\n");
->  	case CMDQ_ERR_CERROR_NONE_IDX:
-> +		dev_err(smmu->dev, "CMDQ error (cons 0x%08x): %s\n", cons,
-> +			cerror_str[idx]);
-> +		dev_err(smmu->dev, "retrying command execution\n");
+Fix reference to unexistent variable in omap_wdt_probe()
+caused by commit 387ee4d26e5f (watchdog: omap_wdt:
+early_enable module parameter)
 
-Why are you making this (unrelated) change?
+Reported-by: Mark Brown <broonie@kernel.org>
+Fixes: 387ee4d26e5f (watchdog: omap_wdt: early_enable module parameter)
+Signed-off-by: Felipe Balbi <balbi@ti.com>
+---
+ drivers/watchdog/omap_wdt.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-Out of interest, did the gerror code manage to turn the prefetch into
-a SYNC, as intended?
-
->  		return;
->  	}
-> 
-> @@ -838,10 +838,20 @@ static void arm_smmu_cmdq_skip_err(struct arm_smmu_device *smmu)
->  	 * not to touch any of the shadow cmdq state.
->  	 */
->  	queue_read(cmd, Q_ENT(q, idx), q->ent_dwords);
-> +
-> +	/*
-> +	 * Some broken SMMUv3 devices treat CMD_PREFETCH_CONFIG as illegal
-> +	 * command, it's ugly to print error information.
-> +	 */
-> +	opcode = (cmd[0] >> CMDQ_0_OP_SHIFT) & CMDQ_0_OP_MASK;
-> +	if (opcode == CMDQ_OP_PREFETCH_CFG)
-> +		goto skip_error_command;
-> +
-
-I think a better way to fix this would be to add a quick to the device-tree
-along the lines of "hisilicon,broken-prefetch-cmd" which we could check
-before issuing the prefetch command in arm_smmu_write_strtab_ent.
-
-Something along the lines of the arm_smmu_options in arm-smmu.c would be
-a good basis for quirks.
-
-Will
+diff --git a/drivers/watchdog/omap_wdt.c b/drivers/watchdog/omap_wdt.c
+index 21ca96ab2a90..de911c7e477c 100644
+--- a/drivers/watchdog/omap_wdt.c
++++ b/drivers/watchdog/omap_wdt.c
+@@ -285,7 +285,7 @@ static int omap_wdt_probe(struct platform_device *pdev)
+ 	pm_runtime_put_sync(wdev->dev);
+ 
+ 	if (early_enable)
+-		omap_wdt_start(omap_wdt);
++		omap_wdt_start(&wdev->wdog);
+ 
+ 	return 0;
+ }
+-- 
+2.4.4
