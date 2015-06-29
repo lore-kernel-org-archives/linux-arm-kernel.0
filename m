@@ -1,35 +1,28 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Mon, 29 Jun 2015 20:50:19 +0900
-Subject: [RESEND PATCH v3] clocksource: exynos_mct: fix for sleeping in
- atomic ctx handling cpu hotplug notif.
-In-Reply-To: <55910DA6.4070404@linaro.org>
-References: <1426151496-5509-1-git-send-email-d.eppel@samsung.com>
- <1435324984-7328-1-git-send-email-d.eppel@samsung.com>
- <55910DA6.4070404@linaro.org>
-Message-ID: <CAJKOXPdcBOqW=X8bhodQwO-qBoeTdh7NznmC8NXpB-LB_dPY5g@mail.gmail.com>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Mon, 29 Jun 2015 08:55:57 -0300
+Subject: [PATCH] ARM: dts: imx6qdl-sabreauto: Add HDMI support
+In-Reply-To: <20150629114709.GL10332@tiger>
+References: <1433277693-10767-1-git-send-email-festevam@gmail.com>
+ <20150629114709.GL10332@tiger>
+Message-ID: <CAOMZO5C1D05JYU-3kc9KDW5bf1YiS9+_CfipV54uzpUJCfaKBg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2015-06-29 18:19 GMT+09:00 Daniel Lezcano <daniel.lezcano@linaro.org>:
-> On 06/26/2015 03:23 PM, Damian Eppel wrote:
+On Mon, Jun 29, 2015 at 8:47 AM, Shawn Guo <shawnguo@kernel.org> wrote:
+> On Tue, Jun 02, 2015 at 05:41:33PM -0300, Fabio Estevam wrote:
+>> From: Fabio Estevam <fabio.estevam@freescale.com>
 >>
->> This is to fix an issue of sleeping in atomic context when processing
->> hotplug notifications in Exynos MCT(Multi-Core Timer).
->> The issue was reproducible on Exynos 3250 (Rinato board) and Exynos 5420
->> (Arndale Octa board).
->>
->> Whilst testing cpu hotplug events on kernel configured with DEBUG_PREEMPT
->> and DEBUG_ATOMIC_SLEEP we get following BUG message, caused by calling
->> request_irq() and free_irq() in the context of hotplug notification
->> (which is in this case atomic context).
+>> Add HDMI support. As the DDC I2C pins are not connected due to
+>> pin conflicts, we do not pass the 'ddc-i2c-bus' property in
+>> this case.
 >
->
-> Applied as a 4.2 fix.
->
-> Should it be tagged stable@ ?
+> HDMI works without 'ddc-i2c-bus' property and I2C pins?  If not, what's
+> point of this patch.
 
-The patch and commit in tip have cc-stable and fixes tags, so
-everything is fine.
+Yes, HDMI works fine without 'ddc-i2c-bus' property.
 
-Thanks!
-Krzysztof
+'ddc-i2c-bus' property is not mandatory to get HDMI functional.
+
+Regards,
+
+Fabio Estevam
