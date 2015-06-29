@@ -1,41 +1,44 @@
-From: pali.rohar@gmail.com (Pali =?utf-8?B?Um9ow6Fy?=)
-Date: Mon, 29 Jun 2015 12:45:53 +0200
-Subject: n900 in 4.2-rc0: repeating oopses
-In-Reply-To: <20150629091146.GA5103@amd>
-References: <20150416093234.GA17423@amd>
- <20150629091146.GA5103@amd>
-Message-ID: <20150629104553.GD16230@pali>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 29 Jun 2015 11:46:04 +0100
+Subject: [RFC PATCH v3] arm DMA: Fix allocation from CMA for coherent DMA
+In-Reply-To: <20150629103737.GC29907@e104818-lin.cambridge.arm.com>
+References: <1434663862-17858-1-git-send-email-lorenx4@gmail.com>
+ <20150626162549.GK3078@e104818-lin.cambridge.arm.com>
+ <CAE=W-e3YUjT=KbYTizBwg+3huvFLDqHvhzZN-oPqEnOKUXAtoQ@mail.gmail.com>
+ <20150629103737.GC29907@e104818-lin.cambridge.arm.com>
+Message-ID: <20150629104604.GB7557@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi!
-
-On Monday 29 June 2015 11:11:46 Pavel Machek wrote:
-> Hi!
+On Mon, Jun 29, 2015 at 11:37:37AM +0100, Catalin Marinas wrote:
+> I forgot about the arm_dma_mmap fix here:
 > 
-> Just tried booting 4.2-rc0 on n900 (commit
-> 4a10a91756ef381bced7b88cfb9232f660b92d93) and it is broken. Previous
-> -rc0 version worked. This time, there's some output on console, but
-> too fast for me to read.
+> https://lkml.org/lkml/2015/5/7/512
 > 
+> So we either fix both cases by changing __get_dma_pgprot() or just go
+> for Mike's and your patches as above. It's up to Russell.
 
-What happen after errors are reported? Maybe you can enable R&D mode and
-disable HW watchdogs to prevent device reboots...
+I'd prefer the "least code" option. :)
 
-> It seems oopses happen before mounting root. If you have serial
-> console, they should be easy to see.
-> 
-> I tried booting same kernel in qemu, but it seems to work ok there.
-> 
+> At some point, we could do with some more clean-up in the dma-mapping.c.
+> For example, both __alloc_simple_buffer() and __alloc_from_contiguous()
+> end up calling __dma_clear_buffer() even when not necessary (cacheable
+> mapping). Not too bad though as this is only done when setting up the
+> buffer.
 
-Hm... Maybe problem with HS code?
+The reason we always clear the buffer is that we can't be sure that a
+driver will not map a buffer allocated by dma_alloc_coherent() into
+userspace without it first being initialised.  There have been drivers
+which do this (ALSA in particular.)  I haven't checked whether this
+instance still does this, but it used to - and the problem is once
+one instance exists, it gets copied...
 
-By chance, can you try to disable (omap) sham node in n900 DT file?
-(same way like omap aes is disabled)
+If it isn't initialised, userspace gets access to whatever data was in
+that page prior to the allocation, which could be something like your
+root password, or bank details, some other sensitive data.
 
-> Any ideas? Thanks,
-> 									Pavel
+So, removing the clearing probably opens a rather large security hole.
 
 -- 
-Pali Roh?r
-pali.rohar at gmail.com
+FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
+according to speedtest.net.
