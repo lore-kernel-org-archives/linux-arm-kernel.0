@@ -1,220 +1,312 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Mon, 29 Jun 2015 15:36:13 +0200
-Subject: [PATCH RFC v2 09/16] arm: domain: Add platform callbacks for
- domain power on/off
-In-Reply-To: <1435374156-19214-10-git-send-email-lina.iyer@linaro.org>
-References: <1435374156-19214-1-git-send-email-lina.iyer@linaro.org>
- <1435374156-19214-10-git-send-email-lina.iyer@linaro.org>
-Message-ID: <CAMuHMdULThWEZmyLEK_9WeK6DSNhrQdiZQLWNhi1Q6dwZTkkMg@mail.gmail.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Mon, 29 Jun 2015 15:38:20 +0200
+Subject: [PATCH linux-next v2 1/1] dmaengine: at_hdmac: fix residue
+ computation
+In-Reply-To: <b9630cef4224b93939138b3a8c1950ea44cbcf59.1434626239.git.cyrille.pitchen@atmel.com>
+References: <cover.1434626239.git.cyrille.pitchen@atmel.com>
+ <b9630cef4224b93939138b3a8c1950ea44cbcf59.1434626239.git.cyrille.pitchen@atmel.com>
+Message-ID: <55914A4C.9030503@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Lina, Kevin,
+Le 18/06/2015 13:25, Cyrille Pitchen a ?crit :
+> As claimed by the programmer datasheet and confirmed by the IP designer,
+> the Block Transfer Size (BTSIZE) bitfield of the Channel x Control A
+> Register (CTRLAx) always refers to a number of Source Width (SRC_WIDTH)
+> transfers.
+> 
+> Both the SRC_WIDTH and BTSIZE bitfields can be extacted from the CTRLAx
+> register to compute the DMA residue. So the 'tx_width' field is useless
+> and can be removed from the struct at_desc.
+> 
+> Before this patch, atc_prep_slave_sg() was not consistent: BTSIZE was
+> correctly initialized according to the SRC_WIDTH but 'tx_width' was always
+> set to reg_width, which was incorrect for MEM_TO_DEV transfers. It led to
+> bad DMA residue when 'tx_width' != SRC_WIDTH.
+> 
+> Also the 'tx_width' field was mostly set only in the first and last
+> descriptors. Depending on the kind of DMA transfer, this field remained
+> uninitialized for intermediate descriptors. The accurate DMA residue was
+> computed only when the currently processed descriptor was the first or the
+> last of the chain. This algorithm was a little bit odd. An accurate DMA
+> residue can always be computed using the SRC_WIDTH and BTSIZE bitfields
+> in the CTRLAx register.
+> 
+> Finally, the test to check whether the currently processed descriptor is
+> the last of the chain was wrong: for cyclic transfer, last_desc->lli.dscr
+> is NOT equal to zero, since set_desc_eol() is never called, but logically
+> equal to first_desc->txd.phys. This bug has a side effect on the
+> drivers/tty/serial/atmel_serial.c driver, which uses cyclic DMA transfer
+> to receive data. Since the DMA residue was wrong each time the DMA
+> transfer reaches the second (and last) period of the transfer, no more
+> data were received by the USART driver till the cyclic DMA transfer loops
+> back to the first period.
+> 
+> Signed-off-by: Cyrille Pitchen <cyrille.pitchen@atmel.com>
 
-On Sat, Jun 27, 2015 at 5:02 AM, Lina Iyer <lina.iyer@linaro.org> wrote:
-> Platform drivers may have additional setup inorder before the domain can
-> be powered off. Allow, platform drivers to register power on/off
+Yes:
+Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
 
-Bogus comma.
+It turns out that some information that I gave to Torsten for his
+previous patch were wrong. Thank you Cyrille for having dig this issue
+and proposed a fix.
 
-> callbacks against a domain provider.
->
-> While registering the callback ensure that the domain is neither in
-> power on/off state. The domain should be active. To ensure that the
-> platform callback registration doesntrace with genpd power on/off,
+Bye,
 
-doesn't race
-
-> execute the registration from a CPU on that domain.
->
-> Signed-off-by: Lina Iyer <lina.iyer@linaro.org>
-
-> --- /dev/null
-> +++ b/arch/arm/include/asm/pm_domain.h
-> @@ -0,0 +1,27 @@
-> +/*
-> + *  arch/arm/include/asm/pm_domain.h
-> + *
-> + *  Copyright (C) 2015 Linaro Ltd.
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
-> + */
-> +#ifndef __ASM_ARM_PM_DOMAIN_H
-> +#define __ASM_ARM_PM_DOMAIN_H
+> ---
+>  drivers/dma/at_hdmac.c      | 132 +++++++++++++++++++++++++++++---------------
+>  drivers/dma/at_hdmac_regs.h |   3 +-
+>  2 files changed, 88 insertions(+), 47 deletions(-)
+> 
+> diff --git a/drivers/dma/at_hdmac.c b/drivers/dma/at_hdmac.c
+> index 59892126..d3629b7 100644
+> --- a/drivers/dma/at_hdmac.c
+> +++ b/drivers/dma/at_hdmac.c
+> @@ -48,6 +48,8 @@
+>  	BIT(DMA_SLAVE_BUSWIDTH_2_BYTES) |\
+>  	BIT(DMA_SLAVE_BUSWIDTH_4_BYTES))
+>  
+> +#define ATC_MAX_DSCR_TRIALS	10
 > +
-> +#include <linux/pm_domain.h>
-> +
-> +#if IS_ENABLED(CONFIG_PM_GENERIC_DOMAINS)
-> +extern int register_platform_domain_handlers(struct of_phandle_args *args,
-> +               int (*pd_down)(struct generic_pm_domain *),
-> +               int (*pd_up)(struct generic_pm_domain *));
-
-This looks a bit convoluted to me...
-
-> --- a/arch/arm/kernel/domains.c
-> +++ b/arch/arm/kernel/domains.c
-> @@ -9,10 +9,19 @@
->  #include <linux/module.h>
->  #include <linux/platform_device.h>
->
-> +#include <asm/pm_domain.h>
-> +
->  #define NAME_MAX 16
->
-> +struct platform_cb {
-> +       int (*power_off)(struct generic_pm_domain *);
-> +       int (*power_on)(struct generic_pm_domain *);
-> +};
-> +
->  struct arm_pm_domain {
->         struct generic_pm_domain genpd;
-> +       struct platform_cb plat_handler;
-> +       struct spinlock_t lock;
->  };
->
->  static inline
-> @@ -23,16 +32,85 @@ struct arm_pm_domain *to_arm_pd(struct generic_pm_domain *d)
->
->  static int arm_pd_power_down(struct generic_pm_domain *genpd)
+>  /*
+>   * Initial number of descriptors to allocate for each channel. This could
+>   * be increased during dma usage.
+> @@ -285,28 +287,19 @@ static struct at_desc *atc_get_desc_by_cookie(struct at_dma_chan *atchan,
+>   *
+>   * @current_len: the number of bytes left before reading CTRLA
+>   * @ctrla: the value of CTRLA
+> - * @desc: the descriptor containing the transfer width
+>   */
+> -static inline int atc_calc_bytes_left(int current_len, u32 ctrla,
+> -					struct at_desc *desc)
+> +static inline int atc_calc_bytes_left(int current_len, u32 ctrla)
 >  {
-> +       struct arm_pm_domain *arm_pd = to_arm_pd(genpd);
-> +
-> +       if (arm_pd->plat_handler.power_off)
-> +               return arm_pd->plat_handler.power_off(genpd);
-> +
->         /* pr_info("KJH: %s: %s\n", __func__, genpd->name); */
->         return 0;
+> -	return current_len - ((ctrla & ATC_BTSIZE_MAX) << desc->tx_width);
+> -}
+> +	u32 btsize = (ctrla & ATC_BTSIZE_MAX);
+> +	u32 src_width = ATC_REG_TO_SRC_WIDTH(ctrla);
+>  
+> -/**
+> - * atc_calc_bytes_left_from_reg - calculates the number of bytes left according
+> - * to the current value of CTRLA.
+> - *
+> - * @current_len: the number of bytes left before reading CTRLA
+> - * @atchan: the channel to read CTRLA for
+> - * @desc: the descriptor containing the transfer width
+> - */
+> -static inline int atc_calc_bytes_left_from_reg(int current_len,
+> -			struct at_dma_chan *atchan, struct at_desc *desc)
+> -{
+> -	u32 ctrla = channel_readl(atchan, CTRLA);
+> -
+> -	return atc_calc_bytes_left(current_len, ctrla, desc);
+> +	/*
+> +	 * According to the datasheet, when reading the Control A Register
+> +	 * (ctrla), the Buffer Transfer Size (btsize) bitfield refers to the
+> +	 * number of transfers completed on the Source Interface.
+> +	 * So btsize is always a number of source width transfers.
+> +	 */
+> +	return current_len - (btsize << src_width);
 >  }
->
->  static int arm_pd_power_up(struct generic_pm_domain *genpd)
->  {
-> +       struct arm_pm_domain *arm_pd = to_arm_pd(genpd);
+>  
+>  /**
+> @@ -320,7 +313,7 @@ static int atc_get_bytes_left(struct dma_chan *chan, dma_cookie_t cookie)
+>  	struct at_desc *desc_first = atc_first_active(atchan);
+>  	struct at_desc *desc;
+>  	int ret;
+> -	u32 ctrla, dscr;
+> +	u32 ctrla, dscr, trials;
+>  
+>  	/*
+>  	 * If the cookie doesn't match to the currently running transfer then
+> @@ -346,15 +339,82 @@ static int atc_get_bytes_left(struct dma_chan *chan, dma_cookie_t cookie)
+>  		 * the channel's DSCR register and compare it against the value
+>  		 * of the hardware linked list structure of each child
+>  		 * descriptor.
+> +		 *
+> +		 * The CTRLA register provides us with the amount of data
+> +		 * already read from the source for the current child
+> +		 * descriptor. So we can compute a more accurate residue by also
+> +		 * removing the number of bytes corresponding to this amount of
+> +		 * data.
+> +		 *
+> +		 * However, the DSCR and CTRLA registers cannot be read both
+> +		 * atomically. Hence a race condition may occur: the first read
+> +		 * register may refer to one child descriptor whereas the second
+> +		 * read may refer to a later child descriptor in the list
+> +		 * because of the DMA transfer progression inbetween the two
+> +		 * reads.
+> +		 *
+> +		 * One solution could have been to pause the DMA transfer, read
+> +		 * the DSCR and CTRLA then resume the DMA transfer. Nonetheless,
+> +		 * this approach presents some drawbacks:
+> +		 * - If the DMA transfer is paused, RX overruns or TX underruns
+> +		 *   are more likey to occur depending on the system latency.
+> +		 *   Taking the USART driver as an example, it uses a cyclic DMA
+> +		 *   transfer to read data from the Receive Holding Register
+> +		 *   (RHR) to avoid RX overruns since the RHR is not protected
+> +		 *   by any FIFO on most Atmel SoCs. So pausing the DMA transfer
+> +		 *   to compute the residue would break the USART driver design.
+> +		 * - The atc_pause() function masks interrupts but we'd rather
+> +		 *   avoid to do so for system latency purpose.
+> +		 *
+> +		 * Then we'd rather use another solution: the DSCR is read a
+> +		 * first time, the CTRLA is read in turn, next the DSCR is read
+> +		 * a second time. If the two consecutive read values of the DSCR
+> +		 * are the same then we assume both refers to the very same
+> +		 * child descriptor as well as the CTRLA value read inbetween
+> +		 * does. For cyclic tranfers, the assumption is that a full loop
+> +		 * is "not so fast".
+> +		 * If the two DSCR values are different, we read again the CTRLA
+> +		 * then the DSCR till two consecutive read values from DSCR are
+> +		 * equal or till the maxium trials is reach.
+> +		 * This algorithm is very unlikely not to find a stable value for
+> +		 * DSCR.
+>  		 */
+>  
+> -		ctrla = channel_readl(atchan, CTRLA);
+> -		rmb(); /* ensure CTRLA is read before DSCR */
+>  		dscr = channel_readl(atchan, DSCR);
+> +		rmb(); /* ensure DSCR is read before CTRLA */
+> +		ctrla = channel_readl(atchan, CTRLA);
+> +		for (trials = 0; trials < ATC_MAX_DSCR_TRIALS; ++trials) {
+> +			u32 new_dscr;
 > +
-> +       if (arm_pd->plat_handler.power_on)
-> +               return arm_pd->plat_handler.power_on(genpd);
+> +			rmb(); /* ensure DSCR is read after CTRLA */
+> +			new_dscr = channel_readl(atchan, DSCR);
 > +
->         /* pr_info("KJH: %s: %s\n", __func__, genpd->name); */
->         return 0;
->  }
+> +			/*
+> +			 * If the DSCR register value has not changed inside the
+> +			 * DMA controller since the previous read, we assume
+> +			 * that both the dscr and ctrla values refers to the
+> +			 * very same descriptor.
+> +			 */
+> +			if (likely(new_dscr == dscr))
+> +				break;
+> +
+> +			/*
+> +			 * DSCR has changed inside the DMA controller, so the
+> +			 * previouly read value of CTRLA may refer to an already
+> +			 * processed descriptor hence could be outdated.
+> +			 * We need to update ctrla to match the current
+> +			 * descriptor.
+> +			 */
+> +			dscr = new_dscr;
+> +			rmb(); /* ensure DSCR is read before CTRLA */
+> +			ctrla = channel_readl(atchan, CTRLA);
+> +		}
+> +		if (unlikely(trials >= ATC_MAX_DSCR_TRIALS))
+> +			return -ETIMEDOUT;
+>  
+>  		/* for the first descriptor we can be more accurate */
+>  		if (desc_first->lli.dscr == dscr)
+> -			return atc_calc_bytes_left(ret, ctrla, desc_first);
+> +			return atc_calc_bytes_left(ret, ctrla);
+>  
+>  		ret -= desc_first->len;
+>  		list_for_each_entry(desc, &desc_first->tx_list, desc_node) {
+> @@ -365,16 +425,14 @@ static int atc_get_bytes_left(struct dma_chan *chan, dma_cookie_t cookie)
+>  		}
+>  
+>  		/*
+> -		 * For the last descriptor in the chain we can calculate
+> +		 * For the current descriptor in the chain we can calculate
+>  		 * the remaining bytes using the channel's register.
+> -		 * Note that the transfer width of the first and last
+> -		 * descriptor may differ.
+>  		 */
+> -		if (!desc->lli.dscr)
+> -			ret = atc_calc_bytes_left_from_reg(ret, atchan, desc);
+> +		ret = atc_calc_bytes_left(ret, ctrla);
+>  	} else {
+>  		/* single transfer */
+> -		ret = atc_calc_bytes_left_from_reg(ret, atchan, desc_first);
+> +		ctrla = channel_readl(atchan, CTRLA);
+> +		ret = atc_calc_bytes_left(ret, ctrla);
+>  	}
+>  
+>  	return ret;
+> @@ -726,7 +784,6 @@ atc_prep_dma_interleaved(struct dma_chan *chan,
+>  
+>  	desc->txd.cookie = -EBUSY;
+>  	desc->total_len = desc->len = len;
+> -	desc->tx_width = dwidth;
+>  
+>  	/* set end-of-link to the last link descriptor of list*/
+>  	set_desc_eol(desc);
+> @@ -804,10 +861,6 @@ atc_prep_dma_memcpy(struct dma_chan *chan, dma_addr_t dest, dma_addr_t src,
+>  	first->txd.cookie = -EBUSY;
+>  	first->total_len = len;
+>  
+> -	/* set transfer width for the calculation of the residue */
+> -	first->tx_width = src_width;
+> -	prev->tx_width = src_width;
+> -
+>  	/* set end-of-link to the last link descriptor of list*/
+>  	set_desc_eol(desc);
+>  
+> @@ -956,10 +1009,6 @@ atc_prep_slave_sg(struct dma_chan *chan, struct scatterlist *sgl,
+>  	first->txd.cookie = -EBUSY;
+>  	first->total_len = total_len;
+>  
+> -	/* set transfer width for the calculation of the residue */
+> -	first->tx_width = reg_width;
+> -	prev->tx_width = reg_width;
+> -
+>  	/* first link descriptor of list is responsible of flags */
+>  	first->txd.flags = flags; /* client is in control of this ack */
+>  
+> @@ -1077,12 +1126,6 @@ atc_prep_dma_sg(struct dma_chan *chan,
+>  		desc->txd.cookie = 0;
+>  		desc->len = len;
+>  
+> -		/*
+> -		 * Although we only need the transfer width for the first and
+> -		 * the last descriptor, its easier to set it to all descriptors.
+> -		 */
+> -		desc->tx_width = src_width;
+> -
+>  		atc_desc_chain(&first, &prev, desc);
+>  
+>  		/* update the lengths and addresses for the next loop cycle */
+> @@ -1256,7 +1299,6 @@ atc_prep_dma_cyclic(struct dma_chan *chan, dma_addr_t buf_addr, size_t buf_len,
+>  	/* First descriptor of the chain embedds additional information */
+>  	first->txd.cookie = -EBUSY;
+>  	first->total_len = buf_len;
+> -	first->tx_width = reg_width;
+>  
+>  	return &first->txd;
+>  
+> diff --git a/drivers/dma/at_hdmac_regs.h b/drivers/dma/at_hdmac_regs.h
+> index bc8d5eb..7f5a082 100644
+> --- a/drivers/dma/at_hdmac_regs.h
+> +++ b/drivers/dma/at_hdmac_regs.h
+> @@ -112,6 +112,7 @@
+>  #define		ATC_SRC_WIDTH_BYTE	(0x0 << 24)
+>  #define		ATC_SRC_WIDTH_HALFWORD	(0x1 << 24)
+>  #define		ATC_SRC_WIDTH_WORD	(0x2 << 24)
+> +#define		ATC_REG_TO_SRC_WIDTH(r)	(((r) >> 24) & 0x3)
+>  #define	ATC_DST_WIDTH_MASK	(0x3 << 28)	/* Destination Single Transfer Size */
+>  #define		ATC_DST_WIDTH(x)	((x) << 28)
+>  #define		ATC_DST_WIDTH_BYTE	(0x0 << 28)
+> @@ -182,7 +183,6 @@ struct at_lli {
+>   * @txd: support for the async_tx api
+>   * @desc_node: node on the channed descriptors list
+>   * @len: descriptor byte count
+> - * @tx_width: transfer width
+>   * @total_len: total transaction byte count
+>   */
+>  struct at_desc {
+> @@ -194,7 +194,6 @@ struct at_desc {
+>  	struct dma_async_tx_descriptor	txd;
+>  	struct list_head		desc_node;
+>  	size_t				len;
+> -	u32				tx_width;
+>  	size_t				total_len;
+>  
+>  	/* Interleaved data */
+> 
 
-> @@ -152,6 +230,7 @@ static int arm_domain_init(void)
->                 pd->genpd.power_off = arm_pd_power_down;
->                 pd->genpd.power_on = arm_pd_power_up;
 
-Shouldn't these .power_off() and .power_on() be set up from platform code
-instead, in the platform-specific code that creates the PM domain?
-
-The PM Domain containing the CPU may contain other devices, in which
-case it's already set up from platform-specific code, which would conflict
-with arm_domain_init()?
-
-Cfr. arch/arm/mach-shmobile/pm-rmobile.c, which handles all PM domains
-(both for devices and CPUs) on R-Mobile, and
-arch/arm/boot/dts/{r8a73a4,r8a7740,sh73a0}.dtsi.
-
-R8a73a4 is the most advanced of these three: it has 2 big.LITTLE clusters,
-with separate PM Domains for L2/SCU and sub-domains for the CPUs.
-Unfortunately we don't have SMP support for it, so currently dtsi describes
-the first cpu core only. The full structure should look like this
-
-        cpus {
-                cpu0: cpu at 0 {
-                        compatible = "arm,cortex-a15";
-                        power-domains = <&pd_a2sl>;
-                        next-level-cache = <&L2_CA15>;
-                };
-
-                cpu1: cpu at 1 {
-                        compatible = "arm,cortex-a15";
-                        power-domains = <&pd_a2sl>;
-                        next-level-cache = <&L2_CA15>;
-                };
-
-                cpu2: cpu at 2 {
-                        compatible = "arm,cortex-a15";
-                        power-domains = <&pd_a2sl>;
-                        next-level-cache = <&L2_CA15>;
-                };
-
-                cpu3: cpu at 3 {
-                        compatible = "arm,cortex-a15";
-                        power-domains = <&pd_a2sl>;
-                        next-level-cache = <&L2_CA15>;
-                };
-
-                cpu4: cpu at 4 {
-                        compatible = "arm,cortex-a7";
-                        power-domains = <&pd_a2kl>;
-                        next-level-cache = <&L2_CA7>;
-                };
-
-                cpu5: cpu at 5 {
-                        compatible = "arm,cortex-a7";
-                        power-domains = <&pd_a2kl>;
-                        next-level-cache = <&L2_CA7>;
-                };
-
-                cpu6: cpu at 6 {
-                        compatible = "arm,cortex-a7";
-                        power-domains = <&pd_a2kl>;
-                        next-level-cache = <&L2_CA7>;
-                };
-
-                cpu7: cpu at 7 {
-                        compatible = "arm,cortex-a7";
-                        power-domains = <&pd_a2kl>;
-                        next-level-cache = <&L2_CA7>;
-                };
-        };
-
-        L2_CA15: cache-controller at 0 {
-                compatible = "cache";
-                power-domains = <&pd_a3sm>;
-        };
-
-        L2_CA7: cache-controller at 1 {
-                compatible = "cache";
-                power-domains = <&pd_a3km>;
-        };
-
-And the PM Domain part (which is complete in upstream):
-
-        pd_c4: c4 at 0 {
-                #power-domain-cells = <0>;
-
-                pd_a3sm: a3sm at 20 {
-                        reg = <20>;
-                        #power-domain-cells = <0>;
-
-                        pd_a2sl: a2sl at 21 {
-                                reg = <21>;
-                                #power-domain-cells = <0>;
-                        };
-                };
-
-                pd_a3km: a3km at 22 {
-                        reg = <22>;
-                        #size-cells = <0>;
-                        #power-domain-cells = <0>;
-
-                        pd_a2kl: a2kl at 23 {
-                                reg = <23>;
-                                #power-domain-cells = <0>;
-                        };
-                };
-        };
-
-Thanks!
-
-Gr{oetje,eeting}s,
-
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+-- 
+Nicolas Ferre
