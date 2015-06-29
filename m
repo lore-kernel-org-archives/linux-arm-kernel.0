@@ -1,22 +1,41 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 29 Jun 2015 18:28:31 +0100
-Subject: [PATCH 6/8] iommu/arm-smmu: add support for non-pci devices
-In-Reply-To: <1435307584-9812-7-git-send-email-thunder.leizhen@huawei.com>
-References: <1435307584-9812-1-git-send-email-thunder.leizhen@huawei.com>
- <1435307584-9812-7-git-send-email-thunder.leizhen@huawei.com>
-Message-ID: <20150629172831.GL17474@arm.com>
+From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
+Date: Mon, 29 Jun 2015 19:26:11 +0200
+Subject: [PATCH v2 3/4] ARM: Exynos: switch to using generic cpufreq driver for
+ Exynos5250
+In-Reply-To: <1435598772-21708-1-git-send-email-b.zolnierkie@samsung.com>
+References: <1435598772-21708-1-git-send-email-b.zolnierkie@samsung.com>
+Message-ID: <1435598772-21708-4-git-send-email-b.zolnierkie@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 26, 2015 at 09:33:02AM +0100, Zhen Lei wrote:
-> Now, we only support a master with only one stream id. It will cover most
-> hardware platforms and coding so easy.
-> 
-> Please refer Documentation\devicetree\bindings\iommu\iommu.txt on how to
-> bind device tree.
+From: Thomas Abraham <thomas.ab@samsung.com>
 
-Can you build this on top of Laurent's series, please?
+The new CPU clock type allows the use of generic CPUfreq driver.
+Switch Exynos5250 to using generic cpufreq driver.
 
-  http://lists.infradead.org/pipermail/linux-arm-kernel/2015-May/343686.html
+Changes by Bartlomiej:
+- split Exynos5250 support from the original patch
 
-Will
+Cc: Tomasz Figa <tomasz.figa@gmail.com>
+Cc: Kukjin Kim <kgene.kim@samsung.com>
+Cc: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
+Signed-off-by: Thomas Abraham <thomas.ab@samsung.com>
+Signed-off-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
+---
+ arch/arm/mach-exynos/exynos.c | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/arch/arm/mach-exynos/exynos.c b/arch/arm/mach-exynos/exynos.c
+index 5f8ddcd..4015ec3 100644
+--- a/arch/arm/mach-exynos/exynos.c
++++ b/arch/arm/mach-exynos/exynos.c
+@@ -226,6 +226,7 @@ static void __init exynos_init_irq(void)
+ 
+ static const struct of_device_id exynos_cpufreq_matches[] = {
+ 	{ .compatible = "samsung,exynos4210", .data = "cpufreq-dt" },
++	{ .compatible = "samsung,exynos5250", .data = "cpufreq-dt" },
+ 	{ /* sentinel */ }
+ };
+ 
+-- 
+1.9.1
