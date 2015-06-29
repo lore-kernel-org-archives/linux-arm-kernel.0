@@ -1,46 +1,100 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Mon, 29 Jun 2015 12:23:35 +0100
-Subject: [PATCH] ARM64: smp: Silence suspicious RCU usage with ipi
- tracepoints
-In-Reply-To: <20150629100251.GZ7557@n2100.arm.linux.org.uk>
-References: <1435176858-9568-1-git-send-email-sboyd@codeaurora.org>
- <20150629100251.GZ7557@n2100.arm.linux.org.uk>
-Message-ID: <20150629112335.GE29907@e104818-lin.cambridge.arm.com>
+From: djkurtz@chromium.org (Daniel Kurtz)
+Date: Mon, 29 Jun 2015 19:24:12 +0800
+Subject: [PATCH v6 4/7] arm64: dts: mediatek: Add MT8173 MMC dts
+In-Reply-To: <1434594513.26032.6.camel@mtksdaap41>
+References: <1434367253-26577-1-git-send-email-chaotian.jing@mediatek.com>
+ <1434367253-26577-5-git-send-email-chaotian.jing@mediatek.com>
+ <CAGS+omCwxH5vTTKNOEcN9C9s=1yBpYEqbMz1NygYoLY9OFKchg@mail.gmail.com>
+ <CAGS+omDMprTvjwpXfdh7mg9i=WXdzO_Fv-oEop3z6AEVCG=DFQ@mail.gmail.com>
+ <1434593063.23303.3.camel@mtksdaap41> <1434594513.26032.6.camel@mtksdaap41>
+Message-ID: <CAGS+omBi88UtEcyyUX6N4OfO9Frwxbsr1Aap1b6uRBKvB=zsrg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 29, 2015 at 11:02:51AM +0100, Russell King - ARM Linux wrote:
-> On Wed, Jun 24, 2015 at 01:14:18PM -0700, Stephen Boyd wrote:
-> > John Stultz reported an RCU splat on ARM with ipi trace events
-> > enabled. It looks like the same problem exists on ARM64.
-> > 
-> > At this point in the IPI handling path we haven't called
-> > irq_enter() yet, so RCU doesn't know that we're about to exit
-> > idle and properly warns that we're using RCU from an idle CPU.
-> > Use trace_ipi_entry_rcuidle() instead of trace_ipi_entry() so
-> > that RCU is informed about our exit from idle.
-> > 
-> > Cc: John Stultz <john.stultz@linaro.org>
-> > Cc: Steven Rostedt <rostedt@goodmis.org>
-> > Cc: Paul E. McKenney <paulmck@linux.vnet.ibm.com>
-> > Cc: Nicolas Pitre <nicolas.pitre@linaro.org>
-> > Fixes: 45ed695ac10a "ARM64: add IPI tracepoints"
-[...]
-> The Fixes: line has a standard format, which is not the formatting above.
-> Please see Documentation/SubmittingPatches section 2.  Thanks.
+On Thu, Jun 18, 2015 at 10:28 AM, Eddie Huang <eddie.huang@mediatek.com> wrote:
+>
+> Hi Dan,
+>
+> On Thu, 2015-06-18 at 10:04 +0800, Eddie Huang wrote:
+> > Hi Dan,
+> >
+> > On Tue, 2015-06-16 at 20:20 +0800, Daniel Kurtz wrote:
+> > > On Tue, Jun 16, 2015 at 7:39 PM, Daniel Kurtz <djkurtz@chromium.org> wrote:
+> > > > On Mon, Jun 15, 2015 at 7:20 PM, Chaotian Jing
+> > > > <chaotian.jing@mediatek.com> wrote:
+> > > >> From: Eddie Huang <eddie.huang@mediatek.com>
+> > > >>
+> > > >> Add node mmc0 ~ mmc3 for mt8173.dtsi
+> > > >> Add node mmc0, mmc1 for mt8173-evb.dts
+> > > >>
+> > > >> Signed-off-by: Chaotian Jing <chaotian.jing@mediatek.com>
+> > > >> Signed-off-by: Eddie Huang <eddie.huang@mediatek.com>
+> > > >> ---
+> > > >>  arch/arm64/boot/dts/mediatek/mt8173-evb.dts | 126 ++++++++++++++++++++++++++++
+> > > >>  arch/arm64/boot/dts/mediatek/mt8173.dtsi    |  45 +++++++++-
+> > > >>  2 files changed, 170 insertions(+), 1 deletion(-)
+> > > >>
+> > > >> diff --git a/arch/arm64/boot/dts/mediatek/mt8173-evb.dts b/arch/arm64/boot/dts/mediatek/mt8173-evb.dts
+> > > >> index b1560c9..762ec61 100644
+> > > >> --- a/arch/arm64/boot/dts/mediatek/mt8173-evb.dts
+> > > >> +++ b/arch/arm64/boot/dts/mediatek/mt8173-evb.dts
+> > > >> @@ -33,6 +33,132 @@
+> > > >>         chosen { };
+> > > >>  };
+> > > >>
+> > > >> +&mmc0 {
+> > > >> +       pinctrl-names = "default", "state_uhs";
+> > > >> +       pinctrl-0 = <&mmc0_pins_default>;
+> > > >> +       pinctrl-1 = <&mmc0_pins_uhs>;
+> > > >> +       status = "okay";
+> > > >> +       bus-width = <8>;
+> > > >> +       max-frequency = <50000000>;
+> > > >> +       cap-mmc-highspeed;
+> > > >> +       vmmc-supply = <&mt6397_vemc_3v3_reg>;
+> > > >> +       vqmmc-supply = <&mt6397_vio18_reg>;
+> > >
+> > > I also can't find phandles for these regulators.
+> > >
+> > > >> +       non-removable;
+> > > >> +};
+> > > >> +
+> > > >> +&mmc1 {
+> > > >> +       pinctrl-names = "default", "state_uhs";
+> > > >> +       pinctrl-0 = <&mmc1_pins_default>;
+> > > >> +       pinctrl-1 = <&mmc1_pins_uhs>;
+> > > >> +       status = "okay";
+> > > >> +       bus-width = <4>;
+> > > >> +       max-frequency = <50000000>;
+> > > >> +       cap-sd-highspeed;
+> > > >> +       sd-uhs-sdr25;
+> > > >> +       cd-gpios = <&pio 132 0>;
+> > > >> +       vmmc-supply = <&mt6397_vmch_reg>;
+> > > >> +       vqmmc-supply = <&mt6397_vmc_reg>;
+> > >
+> > > nor these regulators.
+> > >
+> > > Which kernel branch are you basing your patch set on?
+> > >
+> > It is based on 4.1-rc1, and Sascha's regulator dts patch.
+> > [3/4] ARM: dts: mt8135-evbp1: Add PMIC support:
+> > https://patchwork.kernel.org/patch/6261161/
+> >
+> My mistake, we only sent mt8135-evbp1.dts, but this patch need
+> mt8173-evb.dts, we will send this.
 
-I re-wrote it in this instance. What's not clear to me is whether cc:
-stable is still necessary with a Fixes: tag (I add it just in case).
 
-Anyway, to simplify the process, I came up with a .gitconfig alias:
+Hi Eddie,
 
-[alias]
-        show-fixes = !git show --pretty=format:\"Fixes: %h (\\\"%s\\\")\nCc: <stable@vger.kernel.org> "#" $(git describe --match="v*" --contains $1 | cut -d - -f -1)+\n\n%b\" $1 "#"
+When do you plan to send an updated mmc patch set?
 
-And another for .vimrc (to replace a Fixes: line):
+Thanks,
+-Dan
 
-command! GitFixes
-	\ :.!read tagname commit; git show-fixes $commit 2> /dev/null | head -n 2
-
--- 
-Catalin
+>
+>
+> Eddie
+> Thanks
+>
+>
+>
+>
