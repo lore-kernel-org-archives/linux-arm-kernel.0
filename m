@@ -1,74 +1,81 @@
-From: vitalya@ti.com (Vitaly Andrianov)
-Date: Mon, 29 Jun 2015 13:52:32 -0400
-Subject: [PATCH] keystone: adds cpu_die implementation
-Message-ID: <1435600352-32733-1-git-send-email-vitalya@ti.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 29 Jun 2015 18:49:09 +0100
+Subject: [PATCH 8/8] iommu/arm-smmu: suppress fault information about
+ CMD_PREFETCH_CONFIG execution
+In-Reply-To: <1435307584-9812-9-git-send-email-thunder.leizhen@huawei.com>
+References: <1435307584-9812-1-git-send-email-thunder.leizhen@huawei.com>
+ <1435307584-9812-9-git-send-email-thunder.leizhen@huawei.com>
+Message-ID: <20150629174909.GN17474@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This commit add cpu_die implementation
+On Fri, Jun 26, 2015 at 09:33:04AM +0100, Zhen Lei wrote:
+> Some broken SMMUv3 devices treat CMD_PREFETCH_CONFIG as illegal command,
+> it's ugly to print error information. CMD_PREFETCH_CONFIG is just used to
+> prefetch the configuration for a specified StreamID, without this command
+> will not impact SMMUv3 function.
+> 
+> Signed-off-by: Zhen Lei <thunder.leizhen@huawei.com>
+> ---
+>  drivers/iommu/arm-smmu-v3.c | 18 ++++++++++++++----
+>  1 file changed, 14 insertions(+), 4 deletions(-)
+> 
+> diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
+> index d799feb..3971aef 100644
+> --- a/drivers/iommu/arm-smmu-v3.c
+> +++ b/drivers/iommu/arm-smmu-v3.c
+> @@ -813,6 +813,7 @@ static void arm_smmu_cmdq_skip_err(struct arm_smmu_device *smmu)
+>  	};
+> 
+>  	int i;
+> +	u32 opcode;
+>  	u64 cmd[CMDQ_ENT_DWORDS];
+>  	struct arm_smmu_queue *q = &smmu->cmdq.q;
+>  	u32 cons = readl_relaxed(q->cons_reg);
+> @@ -821,15 +822,14 @@ static void arm_smmu_cmdq_skip_err(struct arm_smmu_device *smmu)
+>  		.opcode = CMDQ_OP_CMD_SYNC,
+>  	};
+> 
+> -	dev_err(smmu->dev, "CMDQ error (cons 0x%08x): %s\n", cons,
+> -		cerror_str[idx]);
+> -
+>  	switch (idx) {
+>  	case CMDQ_ERR_CERROR_ILL_IDX:
+>  		break;
+>  	case CMDQ_ERR_CERROR_ABT_IDX:
+> -		dev_err(smmu->dev, "retrying command fetch\n");
+>  	case CMDQ_ERR_CERROR_NONE_IDX:
+> +		dev_err(smmu->dev, "CMDQ error (cons 0x%08x): %s\n", cons,
+> +			cerror_str[idx]);
+> +		dev_err(smmu->dev, "retrying command execution\n");
 
-Signed-off-by: Vitaly Andrianov <vitalya@ti.com>
----
+Why are you making this (unrelated) change?
 
-The discussion of the "keystone: psci: adds cpu_die implementation" commit
-shows that if PCSI is enabled platform code doesn't need that implementation
-at all. Having PSCI commands in DTB should be sufficient. Unfortunately 
-Keystone with LPAE enable requires some additional development.
+Out of interest, did the gerror code manage to turn the prefetch into
+a SYNC, as intended?
 
-To support HOTPLUG_CPU w/o PSCI we need platform implementation of
-the cpu_die(), which is added by this patch.
+>  		return;
+>  	}
+> 
+> @@ -838,10 +838,20 @@ static void arm_smmu_cmdq_skip_err(struct arm_smmu_device *smmu)
+>  	 * not to touch any of the shadow cmdq state.
+>  	 */
+>  	queue_read(cmd, Q_ENT(q, idx), q->ent_dwords);
+> +
+> +	/*
+> +	 * Some broken SMMUv3 devices treat CMD_PREFETCH_CONFIG as illegal
+> +	 * command, it's ugly to print error information.
+> +	 */
+> +	opcode = (cmd[0] >> CMDQ_0_OP_SHIFT) & CMDQ_0_OP_MASK;
+> +	if (opcode == CMDQ_OP_PREFETCH_CFG)
+> +		goto skip_error_command;
+> +
 
- arch/arm/mach-keystone/keystone.h |  1 +
- arch/arm/mach-keystone/platsmp.c  | 24 ++++++++++++++++++++++++
- 2 files changed, 25 insertions(+)
+I think a better way to fix this would be to add a quick to the device-tree
+along the lines of "hisilicon,broken-prefetch-cmd" which we could check
+before issuing the prefetch command in arm_smmu_write_strtab_ent.
 
-diff --git a/arch/arm/mach-keystone/keystone.h b/arch/arm/mach-keystone/keystone.h
-index cd04a1c..93549cf 100644
---- a/arch/arm/mach-keystone/keystone.h
-+++ b/arch/arm/mach-keystone/keystone.h
-@@ -12,6 +12,7 @@
- #define __KEYSTONE_H__
- 
- #define KEYSTONE_MON_CPU_UP_IDX		0x00
-+#define KEYSTONE_MON_CPU_DIE_IDX	0x84000002
- 
- #ifndef __ASSEMBLER__
- 
-diff --git a/arch/arm/mach-keystone/platsmp.c b/arch/arm/mach-keystone/platsmp.c
-index 5f46a7c..4e5bdde 100644
---- a/arch/arm/mach-keystone/platsmp.c
-+++ b/arch/arm/mach-keystone/platsmp.c
-@@ -51,7 +51,31 @@ static inline void __cpuinit keystone_smp_secondary_initmem(unsigned int cpu)
- {}
- #endif
- 
-+
-+#ifdef CONFIG_HOTPLUG_CPU
-+static void keystone_cpu_die(unsigned int cpu)
-+{
-+	int error;
-+
-+	pr_debug("keystone-smp: cpu_die %d\n", cpu);
-+
-+	error = keystone_cpu_smc(KEYSTONE_MON_CPU_DIE_IDX, cpu, 0);
-+	if (error)
-+		pr_err("CPU %d die failed with %d\n", cpu, error);
-+
-+	/*
-+	 * we shouldn't come here. But in case something went
-+	 * wrong the code below prevents kernel from crush
-+	 */
-+	while (1)
-+		cpu_do_idle();
-+}
-+#endif
-+
- struct smp_operations keystone_smp_ops __initdata = {
- 	.smp_boot_secondary	= keystone_smp_boot_secondary,
- 	.smp_secondary_init     = keystone_smp_secondary_initmem,
-+#ifdef CONFIG_HOTPLUG_CPU
-+	.cpu_die		= keystone_cpu_die,
-+#endif
- };
--- 
-1.9.1
+Something along the lines of the arm_smmu_options in arm-smmu.c would be
+a good basis for quirks.
+
+Will
