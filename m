@@ -1,68 +1,68 @@
-From: s.munaut@whatever-company.com (Sylvain Munaut)
-Date: Mon, 29 Jun 2015 08:07:52 +0200
+From: mike.looijmans@topic.nl (Mike Looijmans)
+Date: Mon, 29 Jun 2015 08:33:21 +0200
 Subject: dma_sync_single_for_cpu takes a really long time
-In-Reply-To: <20150628223039.GV7557@n2100.arm.linux.org.uk>
+In-Reply-To: <CAF6-1L6sjGc1VySi=oQGzOEm-e5jauznh+jzmdDgmJQWLbA_pA@mail.gmail.com>
 References: <CAF6-1L6sjGc1VySi=oQGzOEm-e5jauznh+jzmdDgmJQWLbA_pA@mail.gmail.com>
- <20150628223039.GV7557@n2100.arm.linux.org.uk>
-Message-ID: <CAF6-1L6Xhsk3CwTvu6rAvYGYX3XvcwbmP582tVPEuiVaDnFpRA@mail.gmail.com>
+Message-ID: <5590E6B1.90206@topic.nl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-
-Thanks for the quick and detailed answer.
-
-
-> Flushing a large chunk of memory one cache line at a time takes a long
-> time, there's really nothing "new" about that.
-
-So when invalidating cache, you have to do it for every possible cache line
-address ? There is not an instruction to invalidate a whole range ?
-
-
-Also, I noticed that dma_sync_single_for_device takes a while too even
-though I would have expected it to be a no-op for the FROM_DEVICE case.
-
-I can guarantee that I never wrote to this memory zone, so there is nothing
-in any write-back buffer, is there anyway to convey this guarantee to the
-API ? Or should I just not call dma_sync_single_for_device at all ?
-
-
-
-> It's the expense that has to be paid for using cacheable mappings on a
-> CPU which is not DMA coherent - something which I've brought up over
-> the years with ARM, but it's not something that ARM believe is wanted
-> by their silicon partners.
+?On 28-06-15 22:40, Sylvain Munaut wrote:
+> Hi,
 >
-> What we _could_ do is decide that if the buffer is larger than some
-> factor of the cache size, to just flush the entire cache.  However, that
-> penalises the case where none of the data is in the cache - and in all
-> probably  very little of the frame is actually sitting in the cache at
-> that moment.
+>
+> I'm working on a DMA driver that uses the the streaming DMA API to
+> synchronize the access between host and device. The data flow is
+> exclusively from the device to the host (video grabber).
+>
+> As such, I call dma_sync_single_for_cpu when the hardware is done
+> writing a frame to make sure that the cpu gets up to date data when
+> accessing the zone.
+>
+> However this call takes a _long_ time to complete. For a 6 Megabytes
+> buffer, it takes about 13 ms which is just crazy ... at that rate it'd
+> be faster to just read random data from a random buffer to trash the
+> measly 512k of cache ...
 
-If I wanted to give that a shot, how would I do that in my module ?
-
-As a start, I tried calling outer_inv_all() instead of outer_inv_range(),
-but it turned out to be a really bad idea (just freezes the system)
-
-
-> However, if you're going to read the entire frame through a cacheable
-> mapping, you're probably going to end up flushing your cache several
-> times over through doing that
-
-Isn't there some intermediary between coherent and cacheable, a bit like
-write combine for read ?
-
-After all, I don't really care if data ends up in cache, I'd even probably
-prefer it didn't. But when reading a word I'd want it to be fetched by block
-with prefetching and all that stuff.
-
-The Zynq TRM mention something about having independent control on inner
-and outer cacheability for instance. If only one was enabled, then at least
-the other wouldn't have to be invalidated ?
+I have the same experience: The cache flush is so slow, that it is about as 
+fast to just memcpy() the whole region.
 
 
-Cheers,
+> Is there any alternative that's faster when dealing with large buffers ?
+>
+> (The platform is a Zynq 7000 - Dual Cortex A9).
 
-    Sylvain
+Yes.
+
+You're on a Zynq, and that has an ACP port. Connect through that instead of an 
+HP port (interface is almost the same), add "dma-coherent" to the devicetree 
+and also add my patch that properly maps this into userspace.
+
+The penalty of the ACP port is that it will write a lot slower to the memory 
+(about half the speed of the 600MB/s you get from the HP port) because of all 
+the cache administration. The good news is that all memory will be cacheable 
+once more, and all the dma_sync_... calls will turn into no-ops. You don't 
+have to change your driver and the logic also remains the same.
+
+
+Another approach is to make your software uncached-memory friendly. If you 
+process the frames sequentially and use NEON instructions to fetch large 
+aligned chunks for further processing, the absense of caching won't matter much.
+
+M.
+
+
+Kind regards,
+
+Mike Looijmans
+System Expert
+
+TOPIC Embedded Products
+Eindhovenseweg 32-C, NL-5683 KH Best
+Postbus 440, NL-5680 AK Best
+Telefoon: +31 (0) 499 33 69 79
+Telefax: +31 (0) 499 33 69 70
+E-mail: mike.looijmans at topicproducts.com
+Website: www.topicproducts.com
+
+Please consider the environment before printing this e-mail
