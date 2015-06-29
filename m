@@ -1,88 +1,59 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon, 29 Jun 2015 18:52:23 +0100
-Subject: [PATCH] keystone: adds cpu_die implementation
-In-Reply-To: <1435600352-32733-1-git-send-email-vitalya@ti.com>
-References: <1435600352-32733-1-git-send-email-vitalya@ti.com>
-Message-ID: <20150629175223.GC19863@leverpostej>
+From: gary.bisson@boundarydevices.com (Gary Bisson)
+Date: Mon, 29 Jun 2015 20:14:05 +0200
+Subject: [PATCH 1/3] ARM: dts: imx6qdl-sabrelite: Allow HDMI and LVDS to
+ work simultaneously
+In-Reply-To: <1435594615-9570-1-git-send-email-fabio.estevam@freescale.com>
+References: <1435594615-9570-1-git-send-email-fabio.estevam@freescale.com>
+Message-ID: <CAAMH-yu=C=haGN33r0p3sxsqT97Emq3Ge2pyfYRMSmEU7LYBSQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 29, 2015 at 06:52:32PM +0100, Vitaly Andrianov wrote:
-> This commit add cpu_die implementation
-> 
-> Signed-off-by: Vitaly Andrianov <vitalya@ti.com>
+Fabio, all,
+
+On Mon, Jun 29, 2015 at 6:16 PM, Fabio Estevam
+<fabio.estevam@freescale.com> wrote:
+> Currently it is not possible to have HDMI and LVDS working simultaneously,
+> because both ports try to use PLL5.
+>
+> Move the LVDS clock parent to PLL3_USB_OTG, so that HDMI and LVDS can be
+> driven from independent sources.
+>
+> With this change the LDB pixel clock goes to 68.57 MHz, which is still
+> within the valid range for the HSD100PXN1 LVDS panel.
+>
+> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
 > ---
-> 
-> The discussion of the "keystone: psci: adds cpu_die implementation" commit
-> shows that if PCSI is enabled platform code doesn't need that implementation
-> at all. Having PSCI commands in DTB should be sufficient. Unfortunately 
-> Keystone with LPAE enable requires some additional development.
-
-I don't follow.
-
-What do you need to implement for LPAE?
-
-Why not implement that rather than adding more platform code that you'll
-likely want to remove later anyway?
-
-Thanks,
-Mark.
-
-> To support HOTPLUG_CPU w/o PSCI we need platform implementation of
-> the cpu_die(), which is added by this patch.
-> 
->  arch/arm/mach-keystone/keystone.h |  1 +
->  arch/arm/mach-keystone/platsmp.c  | 24 ++++++++++++++++++++++++
->  2 files changed, 25 insertions(+)
-> 
-> diff --git a/arch/arm/mach-keystone/keystone.h b/arch/arm/mach-keystone/keystone.h
-> index cd04a1c..93549cf 100644
-> --- a/arch/arm/mach-keystone/keystone.h
-> +++ b/arch/arm/mach-keystone/keystone.h
-> @@ -12,6 +12,7 @@
->  #define __KEYSTONE_H__
->  
->  #define KEYSTONE_MON_CPU_UP_IDX		0x00
-> +#define KEYSTONE_MON_CPU_DIE_IDX	0x84000002
->  
->  #ifndef __ASSEMBLER__
->  
-> diff --git a/arch/arm/mach-keystone/platsmp.c b/arch/arm/mach-keystone/platsmp.c
-> index 5f46a7c..4e5bdde 100644
-> --- a/arch/arm/mach-keystone/platsmp.c
-> +++ b/arch/arm/mach-keystone/platsmp.c
-> @@ -51,7 +51,31 @@ static inline void __cpuinit keystone_smp_secondary_initmem(unsigned int cpu)
->  {}
->  #endif
->  
-> +
-> +#ifdef CONFIG_HOTPLUG_CPU
-> +static void keystone_cpu_die(unsigned int cpu)
-> +{
-> +	int error;
-> +
-> +	pr_debug("keystone-smp: cpu_die %d\n", cpu);
-> +
-> +	error = keystone_cpu_smc(KEYSTONE_MON_CPU_DIE_IDX, cpu, 0);
-> +	if (error)
-> +		pr_err("CPU %d die failed with %d\n", cpu, error);
-> +
-> +	/*
-> +	 * we shouldn't come here. But in case something went
-> +	 * wrong the code below prevents kernel from crush
-> +	 */
-> +	while (1)
-> +		cpu_do_idle();
-> +}
-> +#endif
-> +
->  struct smp_operations keystone_smp_ops __initdata = {
->  	.smp_boot_secondary	= keystone_smp_boot_secondary,
->  	.smp_secondary_init     = keystone_smp_secondary_initmem,
-> +#ifdef CONFIG_HOTPLUG_CPU
-> +	.cpu_die		= keystone_cpu_die,
-> +#endif
+>  arch/arm/boot/dts/imx6qdl-sabrelite.dtsi | 7 +++++++
+>  1 file changed, 7 insertions(+)
+>
+> diff --git a/arch/arm/boot/dts/imx6qdl-sabrelite.dtsi b/arch/arm/boot/dts/imx6qdl-sabrelite.dtsi
+> index e00c44f..d87e71c 100644
+> --- a/arch/arm/boot/dts/imx6qdl-sabrelite.dtsi
+> +++ b/arch/arm/boot/dts/imx6qdl-sabrelite.dtsi
+> @@ -148,6 +148,13 @@
+>         status = "okay";
 >  };
-> -- 
+>
+> +&clks {
+> +       assigned-clocks = <&clks IMX6QDL_CLK_LDB_DI0_SEL>,
+> +                         <&clks IMX6QDL_CLK_LDB_DI1_SEL>;
+> +       assigned-clock-parents = <&clks IMX6QDL_CLK_PLL3_USB_OTG>,
+> +                                <&clks IMX6QDL_CLK_PLL3_USB_OTG>;
+> +};
+> +
+>  &ecspi1 {
+>         fsl,spi-num-chipselects = <1>;
+>         cs-gpios = <&gpio3 19 0>;
+> --
 > 1.9.1
-> 
+>
+
+Tested using linux-next 20150629 on Sabrelite with either Hannstar 7"
+or 10" + HDMI monitor.
+This patch relies on previous clk-imx6q patch from Fabio:
+https://patchwork.kernel.org/patch/6682561/
+
+Tested-by: Gary Bisson <gary.bisson@boundarydevices.com>
+
+Regards,
+Gary
