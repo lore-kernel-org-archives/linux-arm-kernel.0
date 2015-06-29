@@ -1,38 +1,56 @@
 From: leilk.liu@mediatek.com (Leilk Liu)
-Date: Mon, 29 Jun 2015 21:04:26 +0800
-Subject: [PATCH v2 0/4] Add Mediatek SPI bus driver 
-Message-ID: <1435583070-9600-1-git-send-email-leilk.liu@mediatek.com>
+Date: Mon, 29 Jun 2015 21:04:28 +0800
+Subject: [PATCH v2 2/4] dt-bindings: ARM: Mediatek: Document devicetree
+ bindings for spi bus
+In-Reply-To: <1435583070-9600-1-git-send-email-leilk.liu@mediatek.com>
+References: <1435583070-9600-1-git-send-email-leilk.liu@mediatek.com>
+Message-ID: <1435583070-9600-3-git-send-email-leilk.liu@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Mediatek SPI BUS controller has 3 hardware restrictions:
-1. Hw has the restriction that in one transfer, length must be a multiple of
-   1024, when it's greater than 1024bytes.
-2. Hw tx/rx have 4bytes aligned restriction.
-3. For MT8173 IC: RX must enable TX, then TX transfer dummy data; TX don't need
-   to enable RX.
-Some workarounds are done in SPI driver code base on v4.1-rc1.
-
-Change in v2:
-1. Remove spi bitbang framwork, use can_dma() and transfer_one().
-2. Add PM functions.
-3. Fix Mark Brown review comment.
-
-Leilk Liu (4):
-  spi: support spi without dma channel to use can_dma()
-  dt-bindings: ARM: Mediatek: Document devicetree bindings for spi bus
-  spi: mediatek: Add spi bus for Mediatek MT8173
-  arm64: dts: Add spi bus dts
-
- .../devicetree/bindings/spi/spi-mt65xx.txt         |  32 +
- arch/arm64/boot/dts/mediatek/mt8173.dtsi           |   9 +
- drivers/spi/Kconfig                                |   9 +
- drivers/spi/Makefile                               |   1 +
- drivers/spi/spi-mt65xx.c                           | 656 +++++++++++++++++++++
- drivers/spi/spi.c                                  |  22 +-
- 6 files changed, 725 insertions(+), 4 deletions(-)
+Signed-off-by: Leilk Liu <leilk.liu@mediatek.com>
+---
+ .../devicetree/bindings/spi/spi-mt65xx.txt         | 32 ++++++++++++++++++++++
+ 1 file changed, 32 insertions(+)
  create mode 100644 Documentation/devicetree/bindings/spi/spi-mt65xx.txt
- create mode 100644 drivers/spi/spi-mt65xx.c
 
---
+diff --git a/Documentation/devicetree/bindings/spi/spi-mt65xx.txt b/Documentation/devicetree/bindings/spi/spi-mt65xx.txt
+new file mode 100644
+index 0000000..04c28fd
+--- /dev/null
++++ b/Documentation/devicetree/bindings/spi/spi-mt65xx.txt
+@@ -0,0 +1,32 @@
++MTK SPI device
++
++Required properties:
++- compatible: should be one of the following.
++    - mediatek,mt8173-spi: for mt8173 platforms
++    - mediatek,mt8135-spi: for mt8135 platforms
++    - mediatek,mt6589-spi: for mt6589 platforms
++
++- reg: Address and length of the register set for the device
++
++- interrupts: Should contain spi interrupt
++
++- clock-names: tuple listing input clock names.
++	Required elements: "main"
++
++- clocks: phandles to input clocks.
++
++- pad-select: should specify spi pad used, only required for MT8173.
++	This value should be 0~3.
++
++Example:
++
++- SoC Specific Portion:
++spi: spi at 1100a000 {
++	compatible = "mediatek,mt8173-spi";
++	reg = <0 0x1100a000 0 0x1000>;
++	interrupts = <GIC_SPI 110 IRQ_TYPE_LEVEL_LOW>;
++	clocks = <&pericfg PERI_SPI0>;
++	clock-names = "main";
++	pad-select = <1>;
++	status = "disabled";
++};
+-- 
 1.8.1.1.dirty
