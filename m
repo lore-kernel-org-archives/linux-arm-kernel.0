@@ -1,65 +1,93 @@
-From: mike.looijmans@topic.nl (Mike Looijmans)
-Date: Mon, 29 Jun 2015 15:24:58 +0200
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 29 Jun 2015 14:29:27 +0100
 Subject: dma_sync_single_for_cpu takes a really long time
-In-Reply-To: <CAF6-1L7CY7HYr8RPeisW5rVGzftOcX8mRUev-Mqp1-EVB03pCQ@mail.gmail.com>
-References: <CAF6-1L6sjGc1VySi=oQGzOEm-e5jauznh+jzmdDgmJQWLbA_pA@mail.gmail.com>	<5590E6B1.90206@topic.nl>
- <CAF6-1L7CY7HYr8RPeisW5rVGzftOcX8mRUev-Mqp1-EVB03pCQ@mail.gmail.com>
-Message-ID: <5591472A.4080707@topic.nl>
+In-Reply-To: <CAF6-1L6xn6-6FxPivSvC5Wwyjr-YjO5QEL1ep4rLZML9xZx2RA@mail.gmail.com>
+References: <CAF6-1L6sjGc1VySi=oQGzOEm-e5jauznh+jzmdDgmJQWLbA_pA@mail.gmail.com>
+ <20150628223039.GV7557@n2100.arm.linux.org.uk>
+ <CAF6-1L6Xhsk3CwTvu6rAvYGYX3XvcwbmP582tVPEuiVaDnFpRA@mail.gmail.com>
+ <20150629090804.GX7557@n2100.arm.linux.org.uk>
+ <CAF6-1L6xn6-6FxPivSvC5Wwyjr-YjO5QEL1ep4rLZML9xZx2RA@mail.gmail.com>
+Message-ID: <20150629132927.GD7557@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
->> You're on a Zynq, and that has an ACP port. Connect through that instead of
->> an HP port (interface is almost the same), add "dma-coherent" to the
->> devicetree and also add my patch that properly maps this into userspace.
->>
->> The penalty of the ACP port is that it will write a lot slower to the memory
->> (about half the speed of the 600MB/s you get from the HP port) because of
->> all the cache administration. The good news is that all memory will be
->> cacheable once more, and all the dma_sync_... calls will turn into no-ops.
->> You don't have to change your driver and the logic also remains the same.
->
-> That's a pretty big downside. 600 M/s write speed is already pretty
-> low (I mean, DDR raw bw should be close to 4G/s, sure it's DDR so you
-> can never reach that but still for large purely sequential access I
-> expected to get closer than that).
+On Mon, Jun 29, 2015 at 02:30:19PM +0200, Sylvain Munaut wrote:
+> >> I can guarantee that I never wrote to this memory zone, so there is nothing
+> >> in any write-back buffer, is there anyway to convey this guarantee to the
+> >> API ? Or should I just not call dma_sync_single_for_device at all ?
+> >
+> > It's not about whether you wrote to it.  It's whether the CPU speculatively
+> > loaded data into its cache.
+> 
+> That I don't understand.
+> 
+> I see how that zone can be in cache (even though if it's on page
+> boundaries, it should never have been speculatively prefetched right
+> ?). But if I never wrote to that buffer, the cache lines for it can't
+> possibly be marked as 'dirty'.
 
-I just repeat what's in the Zynq documentation. I did measure 599 M/s 
-(simultaneously reading and writing at that speed), so it lives up to that.
-The 600MB/s appears to be a limitation of the HP port, not the DDR controller.
+Any cache line can be speculatively prefetched, and remember that cache
+lines are naturally aligned, there's nothing special about page boundaries
+as such (a page boundary is also a cache line boundary.)  So it's possible
+the cache lines either side of a page boundary to be speculated if there
+is a cacheable mapping present.
 
-Xilinx also mentions 1200MB/s for the ACP port in the same document, but 
-that's only the case when reading/writing the L2 cache data.
+> So doing a 'clean' on them should end up doing nothing. and the
+> sequence for a FROM_DMA exchange should be :
+> 
+> while (<transfer in progress>) {
+>    - Give the buffer to DMA ( dma_sync_single_for_device ) : Should be
+> no-op, but is not <===
+>    - Let the DMA do the write
+>    - Invalidate cache ( dma_sync_single_for_cpu )
+>    - Let the CPU do its thing on the data
+> }
+> 
+> Now I _do_ see that on the very first usage of the buffer I'd need to
+> do a clean. Because that memory could have been used for something
+> else before. But if I keep re-using that buffer and never write to it,
+> that only need to be done once.
 
-> Also, doesn't that impact the ARM access performance too much to have to share ?
+Hmm...  I _guess_ there is no reason why:
 
-That I haven't tested. I don't know if the snoop unit may become a bottleneck 
-here. I'd expect not, since the CPU interface is a lot faster than when the 
-ACP uses.
+	addr = dma_map_single(dev, virt, size, DMA_FROM_DEVICE);
+	while (whatever) {
+		let device DMA to addr
+		dma_sync_single_for_cpu(dev, addr, size, DMA_FROM_DEVICE);
+		let CPU _read_ the buffer
+	}
+	dma_unmap_single(dev, addr, size, DMA_FROM_DEVICE);
 
-> I guess the best flags to use for this are coherent write request
-> without L2 allocation.
+would not be safe - there are places in the DMA API documentation that
+suggest that is valid (Documentation/DMA-API-HOWTO.txt), provided the
+CPU does not write to the buffer.
 
-That's the situation where you'll get about half the HP performance. Its the 
-ACP-DDR path that is slow.
+The implication in the above document is that a driver can eliminate the
+dma_sync_single_for_device() call _iff_ the code does not write to the
+buffer.  In other words, it's up to the driver to omit that call depending
+on the driver's coded behaviour, but it's not the architecture's decision
+to make dma_sync_single_for_device(..., DMA_FROM_DEVICE) be a no-op
+(since the architecture code can't know whether the driver wrote to the
+buffer for some reason.)
 
-If you want to process the data fast, use smaller chunks (32k or 64k works 
-well) so that all data fits in the L2 cache. Use a bit less than 512k (the L2 
-cache size) of buffer memory (for example 6x64k) and have the CPU process it 
-in those small chunks as it arrives. Let the CPU "touch" all buffers so that 
-they are present in the L2 cache before the logic reads or writes them.
-Simply put: Process scan lines, not whole frames. That would make the data 
-never hit DDR at all, and raise the processing speed by a significant factor.
+There is a final point to remember when dealing with the above, and that
+is whether you have cache lines overlapping at the beginning and/or end
+of the buffer which may be written to, which could then be evicted,
+overwriting the DMA'd data.
 
+The above should work with the existing implementation, so I'd encourage
+you to try it and report back.
 
->> Another approach is to make your software uncached-memory friendly. If you
->> process the frames sequentially and use NEON instructions to fetch large
->> aligned chunks for further processing, the absense of caching won't matter
->> much.
->
-> Yes, that was the next thing I was going to try.
->
-> Does using pre-load make anysense for uncached ? I guess not.
+> > Also, the L2 cache has problems if you use the _all() functions (which
+> > operate on cache set/way) and another CPU also wants to do some other
+> > operation (like a sync, as part of a barrier.)
+> 
+> Oh so even outer_flush_all() is not usable ?
 
-You could do some "preloading" by interleaving fetch and process instructions, 
-so the CPU has some work to do while waiting for the DDR data. I haven't 
-experimented with that either.
+Correct - there are only three users of outer_flush_all() and all those
+users only call the function in paths where the other CPUs have already
+been shut down and IRQs are disabled.
+
+-- 
+FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
+according to speedtest.net.
