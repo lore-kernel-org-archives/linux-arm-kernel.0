@@ -1,172 +1,145 @@
 From: steve.capper@linaro.org (Steve Capper)
-Date: Mon, 29 Jun 2015 18:23:40 +0100
-Subject: [PATCH v7 1/7] arm64: Add HAVE_REGS_AND_STACK_ACCESS_API feature
-In-Reply-To: <1434395229-6654-2-git-send-email-dave.long@linaro.org>
+Date: Mon, 29 Jun 2015 18:23:58 +0100
+Subject: [PATCH v7 2/7] arm64: Add more test functions to insn.c
+In-Reply-To: <1434395229-6654-3-git-send-email-dave.long@linaro.org>
 References: <1434395229-6654-1-git-send-email-dave.long@linaro.org>
- <1434395229-6654-2-git-send-email-dave.long@linaro.org>
-Message-ID: <CAPvkgC37gFJjU__jubnJ1xJA_9ktCgBJ3wzWMAZN=93rvu3+Ew@mail.gmail.com>
+ <1434395229-6654-3-git-send-email-dave.long@linaro.org>
+Message-ID: <CAPvkgC3epBSKmPPMxkrfiouFOr_1F=DLHGZ6ELSuDvZuFnQ_vg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
+
+Hi David,
+Some comments below.
 
 On 15 June 2015 at 20:07, David Long <dave.long@linaro.org> wrote:
 > From: "David A. Long" <dave.long@linaro.org>
 >
-> Add HAVE_REGS_AND_STACK_ACCESS_API feature for arm64.
+> Certain instructions are hard to execute correctly out-of-line (as in
+> kprobes).  Test functions are added to insn.[hc] to identify these.  The
+> instructions include any that use PC-relative addressing, change the PC,
+> or change interrupt masking. For efficiency and simplicity test
+> functions are also added for small collections of related instructions.
 >
 > Signed-off-by: David A. Long <dave.long@linaro.org>
 > ---
->  arch/arm64/Kconfig              |  1 +
->  arch/arm64/include/asm/ptrace.h | 25 +++++++++++++
->  arch/arm64/kernel/ptrace.c      | 77 +++++++++++++++++++++++++++++++++++++++++
->  3 files changed, 103 insertions(+)
+>  arch/arm64/include/asm/insn.h | 18 ++++++++++++++++++
+>  arch/arm64/kernel/insn.c      | 28 ++++++++++++++++++++++++++++
+>  2 files changed, 46 insertions(+)
 >
-> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-> index 7796af4..966091f 100644
-> --- a/arch/arm64/Kconfig
-> +++ b/arch/arm64/Kconfig
-> @@ -68,6 +68,7 @@ config ARM64
->         select HAVE_PERF_EVENTS
->         select HAVE_PERF_REGS
->         select HAVE_PERF_USER_STACK_DUMP
-> +       select HAVE_REGS_AND_STACK_ACCESS_API
->         select HAVE_RCU_TABLE_FREE
->         select HAVE_SYSCALL_TRACEPOINTS
->         select IRQ_DOMAIN
-> diff --git a/arch/arm64/include/asm/ptrace.h b/arch/arm64/include/asm/ptrace.h
-> index d6dd9fd..8f440e9 100644
-> --- a/arch/arm64/include/asm/ptrace.h
-> +++ b/arch/arm64/include/asm/ptrace.h
-> @@ -118,6 +118,8 @@ struct pt_regs {
->         u64 syscallno;
->  };
+> diff --git a/arch/arm64/include/asm/insn.h b/arch/arm64/include/asm/insn.h
+> index f81b328..1fdd237 100644
+> --- a/arch/arm64/include/asm/insn.h
+> +++ b/arch/arm64/include/asm/insn.h
+> @@ -223,8 +223,13 @@ static __always_inline bool aarch64_insn_is_##abbr(u32 code) \
+>  static __always_inline u32 aarch64_insn_get_##abbr##_value(void) \
+>  { return (val); }
 >
-> +#define MAX_REG_OFFSET (sizeof(struct user_pt_regs) - sizeof(u64))
-> +
->  #define arch_has_single_step() (1)
+> +__AARCH64_INSN_FUNCS(adr_adrp, 0x1F000000, 0x10000000)
+> +__AARCH64_INSN_FUNCS(prfm_lit, 0xFF000000, 0xD8000000)
+>  __AARCH64_INSN_FUNCS(str_reg,  0x3FE0EC00, 0x38206800)
+>  __AARCH64_INSN_FUNCS(ldr_reg,  0x3FE0EC00, 0x38606800)
+> +__AARCH64_INSN_FUNCS(ldr_lit,  0xBF000000, 0x18000000)
+> +__AARCH64_INSN_FUNCS(ldrsw_lit,        0xFF000000, 0x98000000)
+> +__AARCH64_INSN_FUNCS(exclusive,        0x3F000000, 0x08000000)
+
+Going one step back, if we're worried about the exclusive monitors
+then we'll be worried about instructions in-between the monitor pairs
+too?
+
+
+>  __AARCH64_INSN_FUNCS(stp_post, 0x7FC00000, 0x28800000)
+>  __AARCH64_INSN_FUNCS(ldp_post, 0x7FC00000, 0x28C00000)
+>  __AARCH64_INSN_FUNCS(stp_pre,  0x7FC00000, 0x29800000)
+> @@ -264,19 +269,29 @@ __AARCH64_INSN_FUNCS(ands,        0x7F200000, 0x6A000000)
+>  __AARCH64_INSN_FUNCS(bics,     0x7F200000, 0x6A200000)
+>  __AARCH64_INSN_FUNCS(b,                0xFC000000, 0x14000000)
+>  __AARCH64_INSN_FUNCS(bl,       0xFC000000, 0x94000000)
+> +__AARCH64_INSN_FUNCS(b_bl,     0x7C000000, 0x14000000)
+> +__AARCH64_INSN_FUNCS(cb,       0x7E000000, 0x34000000)
+>  __AARCH64_INSN_FUNCS(cbz,      0x7F000000, 0x34000000)
+>  __AARCH64_INSN_FUNCS(cbnz,     0x7F000000, 0x35000000)
+> +__AARCH64_INSN_FUNCS(tb,       0x7E000000, 0x36000000)
+>  __AARCH64_INSN_FUNCS(tbz,      0x7F000000, 0x36000000)
+>  __AARCH64_INSN_FUNCS(tbnz,     0x7F000000, 0x37000000)
+> +__AARCH64_INSN_FUNCS(b_bl_cb_tb, 0x5C000000, 0x14000000)
+>  __AARCH64_INSN_FUNCS(bcond,    0xFF000010, 0x54000000)
+>  __AARCH64_INSN_FUNCS(svc,      0xFFE0001F, 0xD4000001)
+>  __AARCH64_INSN_FUNCS(hvc,      0xFFE0001F, 0xD4000002)
+>  __AARCH64_INSN_FUNCS(smc,      0xFFE0001F, 0xD4000003)
+>  __AARCH64_INSN_FUNCS(brk,      0xFFE0001F, 0xD4200000)
+> +__AARCH64_INSN_FUNCS(exception,        0xFF000000, 0xD4000000)
+>  __AARCH64_INSN_FUNCS(hint,     0xFFFFF01F, 0xD503201F)
+>  __AARCH64_INSN_FUNCS(br,       0xFFFFFC1F, 0xD61F0000)
+>  __AARCH64_INSN_FUNCS(blr,      0xFFFFFC1F, 0xD63F0000)
+> +__AARCH64_INSN_FUNCS(br_blr,   0xFFDFFC1F, 0xD61F0000)
+>  __AARCH64_INSN_FUNCS(ret,      0xFFFFFC1F, 0xD65F0000)
+> +__AARCH64_INSN_FUNCS(msr_imm,  0xFFF8F000, 0xD5004000)
+
+Should this not be:
+__AARCH64_INSN_FUNCS(msr_imm,  0xFFF8F01F, 0xD500401F)
+As the lower 5 bits of an MSR (immediate) are all 1?
+
+> +__AARCH64_INSN_FUNCS(msr_reg,  0xFFF00000, 0xD5100000)
+> +__AARCH64_INSN_FUNCS(set_clr_daif, 0xFFFFF0DF, 0xD50340DF)
+
+Looks good, just an MSR immediate with either DAIFSet or DAIFClr.
+
+> +__AARCH64_INSN_FUNCS(rd_wr_daif, 0xFFDFFFE0, 0xD51B4220)
+
+Looks good, either MRS or MSR (register) where systemreg = DAIF.
+
 >
->  #ifdef CONFIG_COMPAT
-> @@ -146,6 +148,29 @@ struct pt_regs {
->  #define user_stack_pointer(regs) \
->         (!compat_user_mode(regs) ? (regs)->sp : (regs)->compat_sp)
+>  #undef __AARCH64_INSN_FUNCS
 >
-> +/**
-> + * regs_get_register() - get register value from its offset
-> + * @regs:         pt_regs from which register value is gotten
-> + * @offset:    offset number of the register.
-> + *
-> + * regs_get_register returns the value of a register whose offset from @regs.
-> + * The @offset is the offset of the register in struct pt_regs.
-> + * If @offset is bigger than MAX_REG_OFFSET, this returns 0.
-> + */
-> +static inline u64 regs_get_register(struct pt_regs *regs,
-> +                                             unsigned int offset)
+> @@ -285,6 +300,9 @@ bool aarch64_insn_is_nop(u32 insn);
+>  int aarch64_insn_read(void *addr, u32 *insnp);
+>  int aarch64_insn_write(void *addr, u32 insn);
+>  enum aarch64_insn_encoding_class aarch64_get_insn_class(u32 insn);
+> +bool aarch64_insn_uses_literal(u32 insn);
+> +bool aarch64_insn_is_branch(u32 insn);
+> +bool aarch64_insn_is_daif_access(u32 insn);
+>  u64 aarch64_insn_decode_immediate(enum aarch64_insn_imm_type type, u32 insn);
+>  u32 aarch64_insn_encode_immediate(enum aarch64_insn_imm_type type,
+>                                   u32 insn, u64 imm);
+> diff --git a/arch/arm64/kernel/insn.c b/arch/arm64/kernel/insn.c
+> index 9249020..ecd8882 100644
+> --- a/arch/arm64/kernel/insn.c
+> +++ b/arch/arm64/kernel/insn.c
+> @@ -155,6 +155,34 @@ static bool __kprobes __aarch64_insn_hotpatch_safe(u32 insn)
+>                 aarch64_insn_is_nop(insn);
+>  }
+>
+> +bool __kprobes aarch64_insn_uses_literal(u32 insn)
 > +{
-> +       if (unlikely(offset > MAX_REG_OFFSET))
-> +               return 0;
-> +       return *(u64 *)((u64)regs + offset);
-
-Why not:
-return regs->regs[offset];
-
+> +       /* ldr/ldrsw (literal), prfm */
+> +
+> +       return aarch64_insn_is_ldr_lit(insn) ||
+> +               aarch64_insn_is_ldrsw_lit(insn) ||
+> +               aarch64_insn_is_adr_adrp(insn) ||
+> +               aarch64_insn_is_prfm_lit(insn);
 > +}
 > +
-> +/* Valid only for Kernel mode traps. */
-> +static inline unsigned long kernel_stack_pointer(struct pt_regs *regs)
+> +bool __kprobes aarch64_insn_is_branch(u32 insn)
 > +{
-> +       return regs->sp;
+> +       /* b, bl, cb*, tb*, b.cond, br, blr */
+> +
+> +       return aarch64_insn_is_b_bl_cb_tb(insn) ||
+> +               aarch64_insn_is_br_blr(insn) ||
+> +               aarch64_insn_is_ret(insn) ||
+> +               aarch64_insn_is_bcond(insn);
 > +}
 > +
->  static inline unsigned long regs_return_value(struct pt_regs *regs)
->  {
->         return regs->regs[0];
-> diff --git a/arch/arm64/kernel/ptrace.c b/arch/arm64/kernel/ptrace.c
-> index d882b83..f6199a5 100644
-> --- a/arch/arm64/kernel/ptrace.c
-> +++ b/arch/arm64/kernel/ptrace.c
-> @@ -48,6 +48,83 @@
->  #define CREATE_TRACE_POINTS
->  #include <trace/events/syscalls.h>
->
-> +#define ARM_pstate     pstate
-> +#define ARM_pc         pc
-> +#define ARM_sp         sp
-> +#define ARM_x30                regs[30]
-> +#define ARM_x29                regs[29]
-> +#define ARM_x28                regs[28]
-> +#define ARM_x27                regs[27]
-> +#define ARM_x26                regs[26]
-> +#define ARM_x25                regs[25]
-> +#define ARM_x24                regs[24]
-> +#define ARM_x23                regs[23]
-> +#define ARM_x22                regs[22]
-> +#define ARM_x21                regs[21]
-> +#define ARM_x20                regs[20]
-> +#define ARM_x19                regs[19]
-> +#define ARM_x18                regs[18]
-> +#define ARM_x17                regs[17]
-> +#define ARM_x16                regs[16]
-> +#define ARM_x15                regs[15]
-> +#define ARM_x14                regs[14]
-> +#define ARM_x13                regs[13]
-> +#define ARM_x12                regs[12]
-> +#define ARM_x11                regs[11]
-> +#define ARM_x10                regs[10]
-> +#define ARM_x9         regs[9]
-> +#define ARM_x8         regs[8]
-> +#define ARM_x7         regs[7]
-> +#define ARM_x6         regs[6]
-> +#define ARM_x5         regs[5]
-> +#define ARM_x4         regs[4]
-> +#define ARM_x3         regs[3]
-> +#define ARM_x2         regs[2]
-> +#define ARM_x1         regs[1]
-> +#define ARM_x0         regs[0]
+> +bool __kprobes aarch64_insn_is_daif_access(u32 insn)
+> +{
+> +       /* msr daif, mrs daif, msr daifset, msr daifclr */
 > +
-> +#define REG_OFFSET_NAME(r) \
-> +       {.name = #r, .offset = offsetof(struct pt_regs, ARM_##r)}
-> +#define REG_OFFSET_END {.name = NULL, .offset = 0}
-> +
-> +const struct pt_regs_offset regs_offset_table[] = {
-> +       REG_OFFSET_NAME(x0),
-> +       REG_OFFSET_NAME(x1),
-> +       REG_OFFSET_NAME(x2),
-> +       REG_OFFSET_NAME(x3),
-> +       REG_OFFSET_NAME(x4),
-> +       REG_OFFSET_NAME(x5),
-> +       REG_OFFSET_NAME(x6),
-> +       REG_OFFSET_NAME(x7),
-> +       REG_OFFSET_NAME(x8),
-> +       REG_OFFSET_NAME(x9),
-> +       REG_OFFSET_NAME(x10),
-> +       REG_OFFSET_NAME(x11),
-> +       REG_OFFSET_NAME(x12),
-> +       REG_OFFSET_NAME(x13),
-> +       REG_OFFSET_NAME(x14),
-> +       REG_OFFSET_NAME(x15),
-> +       REG_OFFSET_NAME(x16),
-> +       REG_OFFSET_NAME(x17),
-> +       REG_OFFSET_NAME(x18),
-> +       REG_OFFSET_NAME(x19),
-> +       REG_OFFSET_NAME(x20),
-> +       REG_OFFSET_NAME(x21),
-> +       REG_OFFSET_NAME(x22),
-> +       REG_OFFSET_NAME(x23),
-> +       REG_OFFSET_NAME(x24),
-> +       REG_OFFSET_NAME(x25),
-> +       REG_OFFSET_NAME(x26),
-> +       REG_OFFSET_NAME(x27),
-> +       REG_OFFSET_NAME(x28),
-> +       REG_OFFSET_NAME(x29),
-> +       REG_OFFSET_NAME(x30),
-> +       REG_OFFSET_NAME(sp),
-> +       REG_OFFSET_NAME(pc),
-> +       REG_OFFSET_NAME(pstate),
-> +       REG_OFFSET_END,
-> +};
+> +       return aarch64_insn_is_rd_wr_daif(insn) ||
+> +               aarch64_insn_is_set_clr_daif(insn);
+> +}
 > +
 >  /*
->   * TODO: does not yet catch signals sent when the child dies.
->   * in exit.c or in signal.c.
+>   * ARM Architecture Reference Manual for ARMv8 Profile-A, Issue A.a
+>   * Section B2.6.5 "Concurrent modification and execution of instructions":
 > --
 > 1.8.1.2
 >
