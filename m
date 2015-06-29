@@ -1,86 +1,98 @@
 From: vaibhav.hiremath@linaro.org (Vaibhav Hiremath)
-Date: Mon, 29 Jun 2015 21:01:13 +0530
-Subject: [PATCH-V5 0/4] mfd: 88pm800: Add Device tree support
-Message-ID: <1435591877-18214-1-git-send-email-vaibhav.hiremath@linaro.org>
+Date: Mon, 29 Jun 2015 21:01:14 +0530
+Subject: [PATCH-V5 1/4] mfd: 88pm800: Add device tree support
+In-Reply-To: <1435591877-18214-1-git-send-email-vaibhav.hiremath@linaro.org>
+References: <1435591877-18214-1-git-send-email-vaibhav.hiremath@linaro.org>
+Message-ID: <1435591877-18214-2-git-send-email-vaibhav.hiremath@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch-series adds support for Device tree to 88PM800 mfd driver.
-It also sets default configuration of irq clear method if board file
-doesn't exist.
+Add DT support to the 88pm800 driver, along with compatible
+field for it's sub-devices (rtc, onkey and regulator)
 
-Testing::
- - Boot tested on PXA1928 based platform.
- - probe of mfd, rtc and regulator function passing successfully.
- - Basic read operations on registers
- - irq clear configuration
+Signed-off-by: Chao Xie <chao.xie@marvell.com>
+Signed-off-by: Vaibhav Hiremath <vaibhav.hiremath@linaro.org>
+---
+ drivers/mfd/88pm800.c | 23 +++++++++++++++++++++++
+ 1 file changed, 23 insertions(+)
 
-V4 => V5
-=======
-Link to V4: https://lkml.org/lkml/2015/6/25/67
-
-  - Renamed binding back again to 88pm800, as 'Yi Zhang' already started
-    submitting 88pm88x, so 88pm8xx won't make sense. Better name would be to
-    stick with 88pm80x.
-  - Added new patch to series PATCH 2/4, to remove unwanted protection around
-    padata
-  - As suggested by Lee, added macro based implementation for CLEAR_ON_WRITE
-    and CLEAR_ON_READ.
-  - and fixed other trivial comments.
-
-V3 => V4
-=======
-Link to V3: https://lkml.org/lkml/2015/6/24/143
-
-   -  irq clear method is 88PM800 feature, which is not dependent on board or
-      doesn't require any wiring changes, so DT is not the way.
-      Hardcoded to "irq clear on write" if board file doesn't exist.
-   - Updated binding patch (PATCH 3/3) to remove irq-clr-on-wr entry.
-   - Since PATCH 3/3 changed from original, removed Rob's Acked-by.
-
-V2 => V3
-=======
-Link to V2: https://www.mail-archive.com/linux-kernel at vger.kernel.org/msg914299.html
-
-   - Replaced deprecated "regulator-compatible" property with "regulator-name".
-   - Added Rob's Acked-by  to [PATCH 3/3]
-
-V1 => V2
-=======
-Link to V1: http://lkml.iu.edu/hypermail/linux/kernel/1505.3/04386.html
-
-  - Split binding changes from original commit
-  - Updated binding info as per Rob's suggestion
-  - Dropped PATCH 4/4, as discussed during review
-  - Dropped PATCH 3/4, as it is independent RTC code change,
-    so will submit it separately to ease merging.
-  - Fixed all other minor comments
-
-Attempt has been made to push some of the patches to the list sometime
-back in 2013.
-
-Link to previous patch submission:
-        https://lkml.org/lkml/2013/8/14/86
-
-
-TODO:
-=====
-   - init config for 88PM860 device
-   - Rgulator driver changes to add support for 88PM860 device
-
-
-
-Vaibhav Hiremath (4):
-  mfd: 88pm800: Add device tree support
-  mfd: 88pm800: Remove unnecessary protection around pdata
-  mfd: 88pm800: Set default interrupt clear method
-  mfd: devicetree: bindings: Add new 88pm800 mfd binding
-
- Documentation/devicetree/bindings/mfd/88pm800.txt | 53 +++++++++++++++++++++++
- drivers/mfd/88pm800.c                             | 52 ++++++++++++++++------
- include/linux/mfd/88pm80x.h                       | 10 ++++-
- 3 files changed, 100 insertions(+), 15 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/mfd/88pm800.txt
-
+diff --git a/drivers/mfd/88pm800.c b/drivers/mfd/88pm800.c
+index 841717a..40fd014 100644
+--- a/drivers/mfd/88pm800.c
++++ b/drivers/mfd/88pm800.c
+@@ -27,6 +27,7 @@
+ #include <linux/mfd/core.h>
+ #include <linux/mfd/88pm80x.h>
+ #include <linux/slab.h>
++#include <linux/of_device.h>
+ 
+ /* Interrupt Registers */
+ #define PM800_INT_STATUS1		(0x05)
+@@ -121,6 +122,11 @@ static const struct i2c_device_id pm80x_id_table[] = {
+ };
+ MODULE_DEVICE_TABLE(i2c, pm80x_id_table);
+ 
++static const struct of_device_id pm80x_of_match_table[] = {
++	{ .compatible = "marvell,88pm800", },
++	{},
++};
++
+ static struct resource rtc_resources[] = {
+ 	{
+ 	 .name = "88pm80x-rtc",
+@@ -133,6 +139,7 @@ static struct resource rtc_resources[] = {
+ static struct mfd_cell rtc_devs[] = {
+ 	{
+ 	 .name = "88pm80x-rtc",
++	 .of_compatible = "marvell,88pm80x-rtc",
+ 	 .num_resources = ARRAY_SIZE(rtc_resources),
+ 	 .resources = &rtc_resources[0],
+ 	 .id = -1,
+@@ -151,6 +158,7 @@ static struct resource onkey_resources[] = {
+ static const struct mfd_cell onkey_devs[] = {
+ 	{
+ 	 .name = "88pm80x-onkey",
++	 .of_compatible = "marvell,88pm80x-onkey",
+ 	 .num_resources = 1,
+ 	 .resources = &onkey_resources[0],
+ 	 .id = -1,
+@@ -160,6 +168,7 @@ static const struct mfd_cell onkey_devs[] = {
+ static const struct mfd_cell regulator_devs[] = {
+ 	{
+ 	 .name = "88pm80x-regulator",
++	 .of_compatible = "marvell,88pm80x-regulator",
+ 	 .id = -1,
+ 	},
+ };
+@@ -544,8 +553,21 @@ static int pm800_probe(struct i2c_client *client,
+ 	int ret = 0;
+ 	struct pm80x_chip *chip;
+ 	struct pm80x_platform_data *pdata = dev_get_platdata(&client->dev);
++	struct device_node *np = client->dev.of_node;
+ 	struct pm80x_subchip *subchip;
+ 
++	if (!pdata && !np) {
++		dev_err(&client->dev,
++			"pm80x requires platform data or of_node\n");
++		return -EINVAL;
++	}
++
++	if (!pdata) {
++		pdata = devm_kzalloc(&client->dev, sizeof(*pdata), GFP_KERNEL);
++		if (!pdata)
++			return -ENOMEM;
++	}
++
+ 	ret = pm80x_init(client);
+ 	if (ret) {
+ 		dev_err(&client->dev, "pm800_init fail\n");
+@@ -611,6 +633,7 @@ static struct i2c_driver pm800_driver = {
+ 		.name = "88PM800",
+ 		.owner = THIS_MODULE,
+ 		.pm = &pm80x_pm_ops,
++		.of_match_table	= pm80x_of_match_table,
+ 		},
+ 	.probe = pm800_probe,
+ 	.remove = pm800_remove,
 -- 
 1.9.1
