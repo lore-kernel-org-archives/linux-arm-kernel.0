@@ -1,339 +1,278 @@
 From: steve.capper@linaro.org (Steve Capper)
-Date: Mon, 29 Jun 2015 18:24:36 +0100
-Subject: [PATCH v7 3/7] arm64: Kprobes with single stepping support
-In-Reply-To: <1434395229-6654-4-git-send-email-dave.long@linaro.org>
+Date: Mon, 29 Jun 2015 18:25:01 +0100
+Subject: [PATCH v7 4/7] arm64: kprobes instruction simulation support
+In-Reply-To: <1434395229-6654-5-git-send-email-dave.long@linaro.org>
 References: <1434395229-6654-1-git-send-email-dave.long@linaro.org>
- <1434395229-6654-4-git-send-email-dave.long@linaro.org>
-Message-ID: <CAPvkgC1PqzUkLiudwq-d5pd+h86dqnmwJb6qYKJD5Q_WhTz5Gw@mail.gmail.com>
+ <1434395229-6654-5-git-send-email-dave.long@linaro.org>
+Message-ID: <CAPvkgC060QzLdSyRrd6=pS8emgxYqGTiV0eyJkjTUPqegyJaOQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On 15 June 2015 at 20:07, David Long <dave.long@linaro.org> wrote:
 > From: Sandeepa Prabhu <sandeepa.prabhu@linaro.org>
 >
-> Add support for basic kernel probes(kprobes) and jump probes
-> (jprobes) for ARM64.
+> Kprobes needs simulation of instructions that cannot be stepped
+> from different memory location, e.g.: those instructions
+> that uses PC-relative addressing. In simulation, the behaviour
+> of the instruction is implemented using a copy of pt_regs.
 >
-> Kprobes utilizes software breakpoint and single step debug
-> exceptions supported on ARM v8.
+> Following instruction catagories are simulated:
+>  - All branching instructions(conditional, register, and immediate)
+>  - Literal access instructions(load-literal, adr/adrp)
 >
-> A software breakpoint is placed at the probe address to trap the
-> kernel execution into the kprobe handler.
+> Conditional execution is limited to branching instructions in
+> ARM v8. If conditions at PSTATE do not match the condition fields
+> of opcode, the instruction is effectively NOP. Kprobes considers
+> this case as 'miss'.
 >
-> ARM v8 supports enabling single stepping before the break exception
-> return (ERET), with next PC in exception return address (ELR_EL1). The
-> kprobe handler prepares an executable memory slot for out-of-line
-> execution with a copy of the original instruction being probed, and
-> enables single stepping. The PC is set to the out-of-line slot address
-> before the ERET. With this scheme, the instruction is executed with the
-> exact same register context except for the PC (and DAIF) registers.
->
-> Debug mask (PSTATE.D) is enabled only when single stepping a recursive
-> kprobe, e.g.: during kprobes reenter so that probed instruction can be
-> single stepped within the kprobe handler -exception- context.
-> The recursion depth of kprobe is always 2, i.e. upon probe re-entry,
-> any further re-entry is prevented by not calling handlers and the case
-> counted as a missed kprobe).
->
-> Single stepping from the x-o-l slot has a drawback for PC-relative accesses
-> like branching and symbolic literals access as the offset from the new PC
-> (slot address) may not be ensured to fit in the immediate value of
-> the opcode. Such instructions need simulation, so reject
-> probing them.
->
-> Instructions generating exceptions or cpu mode change are rejected
-> for probing.
->
-> Instructions using Exclusive Monitor are rejected too.
->
-> System instructions are mostly enabled for stepping, except MSR/MRS
-> accesses to "DAIF" flags in PSTATE, which are not safe for
-> probing.
->
-> Thanks to Steve Capper and Pratyush Anand for several suggested
-> Changes.
+> Thanks to Will Cohen for assorted suggested changes.
 >
 > Signed-off-by: Sandeepa Prabhu <sandeepa.prabhu@linaro.org>
-> Signed-off-by: Steve Capper <steve.capper@linaro.org>
+> Signed-off-by: William Cohen <wcohen@redhat.com>
 > Signed-off-by: David A. Long <dave.long@linaro.org>
 > ---
->  arch/arm64/Kconfig                      |   1 +
->  arch/arm64/include/asm/debug-monitors.h |   5 +
->  arch/arm64/include/asm/kprobes.h        |  62 ++++
->  arch/arm64/include/asm/probes.h         |  50 +++
->  arch/arm64/include/asm/ptrace.h         |   3 +-
->  arch/arm64/kernel/Makefile              |   1 +
->  arch/arm64/kernel/debug-monitors.c      |  35 ++-
->  arch/arm64/kernel/kprobes-arm64.c       |  68 ++++
->  arch/arm64/kernel/kprobes-arm64.h       |  28 ++
->  arch/arm64/kernel/kprobes.c             | 537 ++++++++++++++++++++++++++++++++
->  arch/arm64/kernel/kprobes.h             |  24 ++
->  arch/arm64/kernel/vmlinux.lds.S         |   1 +
->  arch/arm64/mm/fault.c                   |  25 ++
->  13 files changed, 829 insertions(+), 11 deletions(-)
->  create mode 100644 arch/arm64/include/asm/kprobes.h
->  create mode 100644 arch/arm64/include/asm/probes.h
->  create mode 100644 arch/arm64/kernel/kprobes-arm64.c
->  create mode 100644 arch/arm64/kernel/kprobes-arm64.h
->  create mode 100644 arch/arm64/kernel/kprobes.c
->  create mode 100644 arch/arm64/kernel/kprobes.h
+>  arch/arm64/kernel/Makefile               |   4 +-
+>  arch/arm64/kernel/kprobes-arm64.c        |  98 +++++++++++++++++
+>  arch/arm64/kernel/kprobes-arm64.h        |   2 +
+>  arch/arm64/kernel/kprobes.c              |  35 ++++++-
+>  arch/arm64/kernel/probes-condn-check.c   | 122 ++++++++++++++++++++++
+>  arch/arm64/kernel/probes-simulate-insn.c | 174 +++++++++++++++++++++++++++++++
+>  arch/arm64/kernel/probes-simulate-insn.h |  33 ++++++
+>  7 files changed, 464 insertions(+), 4 deletions(-)
+>  create mode 100644 arch/arm64/kernel/probes-condn-check.c
+>  create mode 100644 arch/arm64/kernel/probes-simulate-insn.c
+>  create mode 100644 arch/arm64/kernel/probes-simulate-insn.h
 >
-> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-> index 966091f..45a9bd81 100644
-> --- a/arch/arm64/Kconfig
-> +++ b/arch/arm64/Kconfig
-> @@ -71,6 +71,7 @@ config ARM64
->         select HAVE_REGS_AND_STACK_ACCESS_API
->         select HAVE_RCU_TABLE_FREE
->         select HAVE_SYSCALL_TRACEPOINTS
-> +       select HAVE_KPROBES
->         select IRQ_DOMAIN
->         select MODULES_USE_ELF_RELA
->         select NO_BOOTMEM
-> diff --git a/arch/arm64/include/asm/debug-monitors.h b/arch/arm64/include/asm/debug-monitors.h
-> index 40ec68a..92d7cea 100644
-> --- a/arch/arm64/include/asm/debug-monitors.h
-> +++ b/arch/arm64/include/asm/debug-monitors.h
-> @@ -90,6 +90,11 @@
->
->  #define CACHE_FLUSH_IS_SAFE            1
->
-> +/* kprobes BRK opcodes with ESR encoding  */
-> +#define BRK64_ESR_MASK         0xFFFF
-> +#define BRK64_ESR_KPROBES      0x0004
-> +#define BRK64_OPCODE_KPROBES   (AARCH64_BREAK_MON | (BRK64_ESR_KPROBES << 5))
-> +
->  /* AArch32 */
->  #define DBG_ESR_EVT_BKPT       0x4
->  #define DBG_ESR_EVT_VECC       0x5
-> diff --git a/arch/arm64/include/asm/kprobes.h b/arch/arm64/include/asm/kprobes.h
-> new file mode 100644
-> index 0000000..af31c4d
-> --- /dev/null
-> +++ b/arch/arm64/include/asm/kprobes.h
-> @@ -0,0 +1,62 @@
-> +/*
-> + * arch/arm64/include/asm/kprobes.h
-> + *
-> + * Copyright (C) 2013 Linaro Limited
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
-> + *
-> + * This program is distributed in the hope that it will be useful,
-> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
-> + * General Public License for more details.
-> + */
-> +
-> +#ifndef _ARM_KPROBES_H
-> +#define _ARM_KPROBES_H
-> +
-> +#include <linux/types.h>
-> +#include <linux/ptrace.h>
-> +#include <linux/percpu.h>
-> +
-> +#define __ARCH_WANT_KPROBES_INSN_SLOT
-> +#define MAX_INSN_SIZE                  1
-> +#define MAX_STACK_SIZE                 128
-> +
-> +#define flush_insn_slot(p)             do { } while (0)
-> +#define kretprobe_blacklist_size       0
-> +
-> +#include <asm/probes.h>
-> +
-> +struct prev_kprobe {
-> +       struct kprobe *kp;
-> +       unsigned int status;
-> +};
-> +
-> +/* Single step context for kprobe */
-> +struct kprobe_step_ctx {
-> +#define KPROBES_STEP_NONE      0x0
-> +#define KPROBES_STEP_PENDING   0x1
-> +       unsigned long ss_status;
-> +       unsigned long match_addr;
-> +};
-> +
-> +/* per-cpu kprobe control block */
-> +struct kprobe_ctlblk {
-> +       unsigned int kprobe_status;
-> +       unsigned long saved_irqflag;
-> +       struct prev_kprobe prev_kprobe;
-> +       struct kprobe_step_ctx ss_ctx;
-> +       struct pt_regs jprobe_saved_regs;
-> +       char jprobes_stack[MAX_STACK_SIZE];
-> +};
-> +
-> +void arch_remove_kprobe(struct kprobe *);
-> +int kprobe_fault_handler(struct pt_regs *regs, unsigned int fsr);
-> +int kprobe_exceptions_notify(struct notifier_block *self,
-> +                            unsigned long val, void *data);
-> +int kprobe_breakpoint_handler(struct pt_regs *regs, unsigned int esr);
-> +int kprobe_single_step_handler(struct pt_regs *regs, unsigned int esr);
-> +
-> +#endif /* _ARM_KPROBES_H */
-> diff --git a/arch/arm64/include/asm/probes.h b/arch/arm64/include/asm/probes.h
-> new file mode 100644
-> index 0000000..7f5a27f
-> --- /dev/null
-> +++ b/arch/arm64/include/asm/probes.h
-> @@ -0,0 +1,50 @@
-> +/*
-> + * arch/arm64/include/asm/probes.h
-> + *
-> + * Copyright (C) 2013 Linaro Limited
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
-> + *
-> + * This program is distributed in the hope that it will be useful,
-> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
-> + * General Public License for more details.
-> + */
-> +#ifndef _ARM_PROBES_H
-> +#define _ARM_PROBES_H
-> +
-> +struct kprobe;
-> +struct arch_specific_insn;
-> +
-> +typedef u32 kprobe_opcode_t;
-> +typedef unsigned long (kprobes_pstate_check_t)(unsigned long);
-> +typedef unsigned long
-> +(probes_condition_check_t)(struct kprobe *p, struct pt_regs *);
-> +typedef void
-> +(probes_prepare_t)(struct kprobe *, struct arch_specific_insn *);
-> +typedef void (kprobes_handler_t) (u32 opcode, long addr, struct pt_regs *);
-> +
-> +enum pc_restore_type {
-> +       NO_RESTORE,
-> +       RESTORE_PC,
-> +};
-> +
-> +struct kprobe_pc_restore {
-> +       enum pc_restore_type type;
-> +       unsigned long addr;
-> +};
-> +
-> +/* architecture specific copy of original instruction */
-> +struct arch_specific_insn {
-> +       kprobe_opcode_t *insn;
-> +       kprobes_pstate_check_t *pstate_cc;
-> +       probes_condition_check_t *check_condn;
-> +       probes_prepare_t *prepare;
-> +       kprobes_handler_t *handler;
-> +       /* restore address after step xol */
-> +       struct kprobe_pc_restore restore;
-> +};
-> +
-> +#endif
-> diff --git a/arch/arm64/include/asm/ptrace.h b/arch/arm64/include/asm/ptrace.h
-> index 8f440e9..aadf61a 100644
-> --- a/arch/arm64/include/asm/ptrace.h
-> +++ b/arch/arm64/include/asm/ptrace.h
-> @@ -206,7 +206,8 @@ static inline int valid_user_regs(struct user_pt_regs *regs)
->         return 0;
->  }
->
-> -#define instruction_pointer(regs)      ((unsigned long)(regs)->pc)
-> +#define instruction_pointer(regs)      ((regs)->pc)
-> +#define stack_pointer(regs)            ((regs)->sp)
->
->  #ifdef CONFIG_SMP
->  extern unsigned long profile_pc(struct pt_regs *regs);
 > diff --git a/arch/arm64/kernel/Makefile b/arch/arm64/kernel/Makefile
-> index 426d076..1319872 100644
+> index 1319872..5e9d54f 100644
 > --- a/arch/arm64/kernel/Makefile
 > +++ b/arch/arm64/kernel/Makefile
-> @@ -32,6 +32,7 @@ arm64-obj-$(CONFIG_CPU_PM)            += sleep.o suspend.o
+> @@ -32,7 +32,9 @@ arm64-obj-$(CONFIG_CPU_PM)            += sleep.o suspend.o
 >  arm64-obj-$(CONFIG_CPU_IDLE)           += cpuidle.o
 >  arm64-obj-$(CONFIG_JUMP_LABEL)         += jump_label.o
 >  arm64-obj-$(CONFIG_KGDB)               += kgdb.o
-> +arm64-obj-$(CONFIG_KPROBES)            += kprobes.o kprobes-arm64.o
+> -arm64-obj-$(CONFIG_KPROBES)            += kprobes.o kprobes-arm64.o
+> +arm64-obj-$(CONFIG_KPROBES)            += kprobes.o kprobes-arm64.o            \
+> +                                          probes-simulate-insn.o               \
+> +                                          probes-condn-check.o
 >  arm64-obj-$(CONFIG_EFI)                        += efi.o efi-stub.o efi-entry.o
 >  arm64-obj-$(CONFIG_PCI)                        += pci.o
 >  arm64-obj-$(CONFIG_ARMV8_DEPRECATED)   += armv8_deprecated.o
-> diff --git a/arch/arm64/kernel/debug-monitors.c b/arch/arm64/kernel/debug-monitors.c
-> index b056369..486ee94 100644
-> --- a/arch/arm64/kernel/debug-monitors.c
-> +++ b/arch/arm64/kernel/debug-monitors.c
-> @@ -23,6 +23,7 @@
->  #include <linux/hardirq.h>
->  #include <linux/init.h>
->  #include <linux/ptrace.h>
-> +#include <linux/kprobes.h>
->  #include <linux/stat.h>
->  #include <linux/uaccess.h>
+> diff --git a/arch/arm64/kernel/kprobes-arm64.c b/arch/arm64/kernel/kprobes-arm64.c
+> index f958c52..8a7e6b0 100644
+> --- a/arch/arm64/kernel/kprobes-arm64.c
+> +++ b/arch/arm64/kernel/kprobes-arm64.c
+> @@ -20,6 +20,76 @@
+>  #include <asm/insn.h>
 >
-> @@ -228,6 +229,7 @@ static int single_step_handler(unsigned long addr, unsigned int esr,
->                                struct pt_regs *regs)
->  {
->         siginfo_t info;
-> +       bool handler_found = false;
->
->         /*
->          * If we are stepping a pending breakpoint, call the hw_breakpoint
-> @@ -251,15 +253,21 @@ static int single_step_handler(unsigned long addr, unsigned int esr,
->                  */
->                 user_rewind_single_step(current);
->         } else {
-> +#ifdef CONFIG_KPROBES
-> +               if (kprobe_single_step_handler(regs, esr) == DBG_HOOK_HANDLED)
-> +                       handler_found = true;
-> +#endif
->                 if (call_step_hook(regs, esr) == DBG_HOOK_HANDLED)
-> -                       return 0;
-> -
-> -               pr_warning("Unexpected kernel single-step exception at EL1\n");
-> -               /*
-> -                * Re-enable stepping since we know that we will be
-> -                * returning to regs.
-> -                */
-> -               set_regs_spsr_ss(regs);
-> +                       handler_found = true;
+>  #include "kprobes-arm64.h"
+> +#include "probes-simulate-insn.h"
 > +
-> +               if (!handler_found) {
-> +                       pr_warn("Unexpected kernel single-step exception at EL1\n");
-> +                       /*
-> +                        * Re-enable stepping since we know that we will be
-> +                        * returning to regs.
-> +                        */
-> +                       set_regs_spsr_ss(regs);
-> +               }
->         }
+> +/*
+> + * condition check functions for kprobes simulation
+> + */
+> +static unsigned long __kprobes
+> +__check_pstate(struct kprobe *p, struct pt_regs *regs)
+> +{
+> +       struct arch_specific_insn *asi = &p->ainsn;
+> +       unsigned long pstate = regs->pstate & 0xffffffff;
+> +
+> +       return asi->pstate_cc(pstate);
+> +}
+> +
+> +static unsigned long __kprobes
+> +__check_cbz(struct kprobe *p, struct pt_regs *regs)
+> +{
+> +       return check_cbz((u32)p->opcode, regs);
+> +}
+> +
+> +static unsigned long __kprobes
+> +__check_cbnz(struct kprobe *p, struct pt_regs *regs)
+> +{
+> +       return check_cbnz((u32)p->opcode, regs);
+> +}
+> +
+> +static unsigned long __kprobes
+> +__check_tbz(struct kprobe *p, struct pt_regs *regs)
+> +{
+> +       return check_tbz((u32)p->opcode, regs);
+> +}
+> +
+> +static unsigned long __kprobes
+> +__check_tbnz(struct kprobe *p, struct pt_regs *regs)
+> +{
+> +       return check_tbnz((u32)p->opcode, regs);
+> +}
+> +
+> +/*
+> + * prepare functions for instruction simulation
+> + */
+> +static void __kprobes
+> +prepare_none(struct kprobe *p, struct arch_specific_insn *asi)
+> +{
+> +}
+> +
+> +static void __kprobes
+> +prepare_bcond(struct kprobe *p, struct arch_specific_insn *asi)
+> +{
+> +       kprobe_opcode_t insn = p->opcode;
+> +
+> +       asi->check_condn = __check_pstate;
+> +       asi->pstate_cc = kprobe_condition_checks[insn & 0xf];
+> +}
+> +
+> +static void __kprobes
+> +prepare_cbz_cbnz(struct kprobe *p, struct arch_specific_insn *asi)
+> +{
+> +       kprobe_opcode_t insn = p->opcode;
+> +
+> +       asi->check_condn = (insn & (1 << 24)) ? __check_cbnz : __check_cbz;
+> +}
+> +
+> +static void __kprobes
+> +prepare_tbz_tbnz(struct kprobe *p, struct arch_specific_insn *asi)
+> +{
+> +       kprobe_opcode_t insn = p->opcode;
+> +
+> +       asi->check_condn = (insn & (1 << 24)) ? __check_tbnz : __check_tbz;
+> +}
+>
+>  static bool __kprobes aarch64_insn_is_steppable(u32 insn)
+>  {
+> @@ -63,6 +133,34 @@ arm_kprobe_decode_insn(kprobe_opcode_t insn, struct arch_specific_insn *asi)
+>          */
+>         if (aarch64_insn_is_steppable(insn))
+>                 return INSN_GOOD;
+> +
+> +       asi->prepare = prepare_none;
+> +
+> +       if (aarch64_insn_is_bcond(insn)) {
+> +               asi->prepare = prepare_bcond;
+> +               asi->handler = simulate_b_cond;
+> +       } else if (aarch64_insn_is_cb(insn)) {
+> +               asi->prepare = prepare_cbz_cbnz;
+> +               asi->handler = simulate_cbz_cbnz;
+> +       } else if (aarch64_insn_is_tb(insn)) {
+> +               asi->prepare = prepare_tbz_tbnz;
+> +               asi->handler = simulate_tbz_tbnz;
+> +       } else if (aarch64_insn_is_adr_adrp(insn))
+> +               asi->handler = simulate_adr_adrp;
+> +       else if (aarch64_insn_is_b_bl(insn))
+> +               asi->handler = simulate_b_bl;
+> +       else if (aarch64_insn_is_br_blr(insn) || aarch64_insn_is_ret(insn))
+> +               asi->handler = simulate_br_blr_ret;
+> +       else if (aarch64_insn_is_ldr_lit(insn))
+> +               asi->handler = simulate_ldr_literal;
+> +       else if (aarch64_insn_is_ldrsw_lit(insn))
+> +               asi->handler = simulate_ldrsw_literal;
+>         else
+> +               /*
+> +                * Instruction cannot be stepped out-of-line and we don't
+> +                * (yet) simulate it.
+> +                */
+>                 return INSN_REJECTED;
+> +
+> +       return INSN_GOOD_NO_SLOT;
+>  }
+> diff --git a/arch/arm64/kernel/kprobes-arm64.h b/arch/arm64/kernel/kprobes-arm64.h
+> index 87e7891..ff8a55f 100644
+> --- a/arch/arm64/kernel/kprobes-arm64.h
+> +++ b/arch/arm64/kernel/kprobes-arm64.h
+> @@ -22,6 +22,8 @@ enum kprobe_insn {
+>         INSN_GOOD,
+>  };
+>
+> +extern kprobes_pstate_check_t * const kprobe_condition_checks[16];
+> +
+>  enum kprobe_insn __kprobes
+>  arm_kprobe_decode_insn(kprobe_opcode_t insn, struct arch_specific_insn *asi);
+>
+> diff --git a/arch/arm64/kernel/kprobes.c b/arch/arm64/kernel/kprobes.c
+> index 601d2c6..6255814 100644
+> --- a/arch/arm64/kernel/kprobes.c
+> +++ b/arch/arm64/kernel/kprobes.c
+> @@ -38,6 +38,9 @@
+>  DEFINE_PER_CPU(struct kprobe *, current_kprobe) = NULL;
+>  DEFINE_PER_CPU(struct kprobe_ctlblk, kprobe_ctlblk);
+>
+> +static void __kprobes
+> +post_kprobe_handler(struct kprobe_ctlblk *, struct pt_regs *);
+> +
+>  static void __kprobes arch_prepare_ss_slot(struct kprobe *p)
+>  {
+>         /* prepare insn slot */
+> @@ -54,6 +57,27 @@ static void __kprobes arch_prepare_ss_slot(struct kprobe *p)
+>         p->ainsn.restore.type = RESTORE_PC;
+>  }
+>
+> +static void __kprobes arch_prepare_simulate(struct kprobe *p)
+> +{
+> +       if (p->ainsn.prepare)
+> +               p->ainsn.prepare(p, &p->ainsn);
+> +
+> +       /* This instructions is not executed xol. No need to adjust the PC */
+> +       p->ainsn.restore.addr = 0;
+> +       p->ainsn.restore.type = NO_RESTORE;
+> +}
+> +
+> +static void __kprobes arch_simulate_insn(struct kprobe *p, struct pt_regs *regs)
+> +{
+> +       struct kprobe_ctlblk *kcb = get_kprobe_ctlblk();
+> +
+> +       if (p->ainsn.handler)
+> +               p->ainsn.handler((u32)p->opcode, (long)p->addr, regs);
+> +
+> +       /* single step simulated, now go for post processing */
+> +       post_kprobe_handler(kcb, regs);
+> +}
+> +
+>  int __kprobes arch_prepare_kprobe(struct kprobe *p)
+>  {
+>         kprobe_opcode_t insn;
+> @@ -72,7 +96,8 @@ int __kprobes arch_prepare_kprobe(struct kprobe *p)
+>                 return -EINVAL;
+>
+>         case INSN_GOOD_NO_SLOT: /* insn need simulation */
+> -               return -EINVAL;
+> +               p->ainsn.insn = NULL;
+> +               break;
+>
+>         case INSN_GOOD: /* instruction uses slot */
+>                 p->ainsn.insn = get_insn_slot();
+> @@ -82,7 +107,10 @@ int __kprobes arch_prepare_kprobe(struct kprobe *p)
+>         };
+>
+>         /* prepare the instruction */
+> -       arch_prepare_ss_slot(p);
+> +       if (p->ainsn.insn)
+> +               arch_prepare_ss_slot(p);
+> +       else
+> +               arch_prepare_simulate(p);
 >
 >         return 0;
-> @@ -315,8 +323,15 @@ static int brk_handler(unsigned long addr, unsigned int esr,
->                 };
->
->                 force_sig_info(SIGTRAP, &info, current);
-> -       } else if (call_break_hook(regs, esr) != DBG_HOOK_HANDLED) {
-> -               pr_warning("Unexpected kernel BRK exception at EL1\n");
-> +       }
-> +#ifdef CONFIG_KPROBES
-> +       else if ((esr & BRK64_ESR_MASK) == BRK64_ESR_KPROBES) {
-> +               if (kprobe_breakpoint_handler(regs, esr) != DBG_HOOK_HANDLED)
-> +                       return -EFAULT;
-> +       }
-> +#endif
-> +       else if (call_break_hook(regs, esr) != DBG_HOOK_HANDLED) {
-> +               pr_warn("Unexpected kernel BRK exception at EL1\n");
->                 return -EFAULT;
+>  }
+> @@ -231,7 +259,8 @@ static void __kprobes setup_singlestep(struct kprobe *p,
+>                 kernel_enable_single_step(regs);
+>                 instruction_pointer(regs) = slot;
+>         } else  {
+> -               BUG();
+> +               /* insn simulation */
+> +               arch_simulate_insn(p, regs);
 >         }
+>  }
 >
-> diff --git a/arch/arm64/kernel/kprobes-arm64.c b/arch/arm64/kernel/kprobes-arm64.c
+> diff --git a/arch/arm64/kernel/probes-condn-check.c b/arch/arm64/kernel/probes-condn-check.c
 > new file mode 100644
-> index 0000000..f958c52
+> index 0000000..e68aa0c
 > --- /dev/null
-> +++ b/arch/arm64/kernel/kprobes-arm64.c
-> @@ -0,0 +1,68 @@
+> +++ b/arch/arm64/kernel/probes-condn-check.c
+> @@ -0,0 +1,122 @@
 > +/*
-> + * arch/arm64/kernel/kprobes-arm64.c
+> + * arch/arm64/kernel/probes-condn-check.c
 > + *
-> + * Copyright (C) 2013 Linaro Limited.
+> + * Copyright (C) 2013 Linaro Limited
+> + *
+> + * Copied from: arch/arm/kernel/kprobes-common.c
 > + *
 > + * This program is free software; you can redistribute it and/or modify
 > + * it under the terms of the GNU General Public License version 2 as
@@ -343,108 +282,123 @@ On 15 June 2015 at 20:07, David Long <dave.long@linaro.org> wrote:
 > + * but WITHOUT ANY WARRANTY; without even the implied warranty of
 > + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
 > + * General Public License for more details.
+> + *
+> + * Description:
+> + *
+> + *  AArch64 and AArch32 shares same conditional(CNZV) flags encoding.
+> + *  This file implements conditional check helpers compatible with
+> + *  both AArch64 and AArch32 modes. Uprobes on v8 can handle both 32-bit
+> + *  & 64-bit user-space instructions, so we abstract the common functions
+> + *  in this file. While AArch64 and AArch32 specific instruction handling
+> + *  are implemented in separate files, this file contains common bits.
 > + */
-> +
 > +#include <linux/kernel.h>
-> +#include <linux/kprobes.h>
 > +#include <linux/module.h>
-> +#include <asm/kprobes.h>
-> +#include <asm/insn.h>
+> +#include <asm/probes.h>
 > +
-> +#include "kprobes-arm64.h"
-> +
-> +static bool __kprobes aarch64_insn_is_steppable(u32 insn)
+> +static unsigned long __kprobes __check_eq(unsigned long pstate)
 > +{
-> +       if (aarch64_get_insn_class(insn) == AARCH64_INSN_CLS_BR_SYS) {
-> +               if (aarch64_insn_is_branch(insn))
-> +                       return false;
+> +       return pstate & PSR_Z_BIT;
+> +}
 > +
-> +               /* modification of daif creates issues */
-> +               if (aarch64_insn_is_daif_access(insn))
-> +                       return false;
+> +static unsigned long __kprobes __check_ne(unsigned long pstate)
+> +{
+> +       return (~pstate) & PSR_Z_BIT;
+> +}
 > +
-> +               if (aarch64_insn_is_exception(insn))
-> +                       return false;
+> +static unsigned long __kprobes __check_cs(unsigned long pstate)
+> +{
+> +       return pstate & PSR_C_BIT;
+> +}
 > +
-> +               if (aarch64_insn_is_hint(insn))
-> +                       return aarch64_insn_is_nop(insn);
+> +static unsigned long __kprobes __check_cc(unsigned long pstate)
+> +{
+> +       return (~pstate) & PSR_C_BIT;
+> +}
 > +
-> +               return true;
-> +       }
+> +static unsigned long __kprobes __check_mi(unsigned long pstate)
+> +{
+> +       return pstate & PSR_N_BIT;
+> +}
 > +
-> +       if (aarch64_insn_uses_literal(insn))
-> +               return false;
+> +static unsigned long __kprobes __check_pl(unsigned long pstate)
+> +{
+> +       return (~pstate) & PSR_N_BIT;
+> +}
 > +
-> +       if (aarch64_insn_is_exclusive(insn))
-> +               return false;
+> +static unsigned long __kprobes __check_vs(unsigned long pstate)
+> +{
+> +       return pstate & PSR_V_BIT;
+> +}
 > +
+> +static unsigned long __kprobes __check_vc(unsigned long pstate)
+> +{
+> +       return (~pstate) & PSR_V_BIT;
+> +}
+> +
+> +static unsigned long __kprobes __check_hi(unsigned long pstate)
+> +{
+> +       pstate &= ~(pstate >> 1);       /* PSR_C_BIT &= ~PSR_Z_BIT */
+> +       return pstate & PSR_C_BIT;
+> +}
+> +
+> +static unsigned long __kprobes __check_ls(unsigned long pstate)
+> +{
+> +       pstate &= ~(pstate >> 1);       /* PSR_C_BIT &= ~PSR_Z_BIT */
+> +       return (~pstate) & PSR_C_BIT;
+> +}
+> +
+> +static unsigned long __kprobes __check_ge(unsigned long pstate)
+> +{
+> +       pstate ^= (pstate << 3);        /* PSR_N_BIT ^= PSR_V_BIT */
+> +       return (~pstate) & PSR_N_BIT;
+> +}
+> +
+> +static unsigned long __kprobes __check_lt(unsigned long pstate)
+> +{
+> +       pstate ^= (pstate << 3);        /* PSR_N_BIT ^= PSR_V_BIT */
+> +       return pstate & PSR_N_BIT;
+> +}
+> +
+> +static unsigned long __kprobes __check_gt(unsigned long pstate)
+> +{
+> +       /*PSR_N_BIT ^= PSR_V_BIT */
+> +       unsigned long temp = pstate ^ (pstate << 3);
+> +
+> +       temp |= (pstate << 1);  /*PSR_N_BIT |= PSR_Z_BIT */
+> +       return (~temp) & PSR_N_BIT;
+> +}
+> +
+> +static unsigned long __kprobes __check_le(unsigned long pstate)
+> +{
+> +       /*PSR_N_BIT ^= PSR_V_BIT */
+> +       unsigned long temp = pstate ^ (pstate << 3);
+> +
+> +       temp |= (pstate << 1);  /*PSR_N_BIT |= PSR_Z_BIT */
+> +       return temp & PSR_N_BIT;
+> +}
+> +
+> +static unsigned long __kprobes __check_al(unsigned long pstate)
+> +{
 > +       return true;
 > +}
 > +
-> +/* Return:
-> + *   INSN_REJECTED     If instruction is one not allowed to kprobe,
-> + *   INSN_GOOD         If instruction is supported and uses instruction slot,
-> + *   INSN_GOOD_NO_SLOT If instruction is supported but doesn't use its slot.
-> + */
-> +enum kprobe_insn __kprobes
-> +arm_kprobe_decode_insn(kprobe_opcode_t insn, struct arch_specific_insn *asi)
-> +{
-> +       /*
-> +        * Instructions reading or modifying the PC won't work from the XOL
-> +        * slot.
-> +        */
-> +       if (aarch64_insn_is_steppable(insn))
-> +               return INSN_GOOD;
-> +       else
-> +               return INSN_REJECTED;
-> +}
-> diff --git a/arch/arm64/kernel/kprobes-arm64.h b/arch/arm64/kernel/kprobes-arm64.h
-> new file mode 100644
-> index 0000000..87e7891
-> --- /dev/null
-> +++ b/arch/arm64/kernel/kprobes-arm64.h
-> @@ -0,0 +1,28 @@
-> +/*
-> + * arch/arm64/kernel/kprobes-arm64.h
-> + *
-> + * Copyright (C) 2013 Linaro Limited.
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
-> + *
-> + * This program is distributed in the hope that it will be useful,
-> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
-> + * General Public License for more details.
-> + */
-> +
-> +#ifndef _ARM_KERNEL_KPROBES_ARM64_H
-> +#define _ARM_KERNEL_KPROBES_ARM64_H
-> +
-> +enum kprobe_insn {
-> +       INSN_REJECTED,
-> +       INSN_GOOD_NO_SLOT,
-> +       INSN_GOOD,
+> +kprobes_pstate_check_t * const kprobe_condition_checks[16] = {
+> +       &__check_eq, &__check_ne, &__check_cs, &__check_cc,
+> +       &__check_mi, &__check_pl, &__check_vs, &__check_vc,
+> +       &__check_hi, &__check_ls, &__check_ge, &__check_lt,
+> +       &__check_gt, &__check_le, &__check_al, &__check_al
 > +};
-> +
-> +enum kprobe_insn __kprobes
-> +arm_kprobe_decode_insn(kprobe_opcode_t insn, struct arch_specific_insn *asi);
-> +
-> +#endif /* _ARM_KERNEL_KPROBES_ARM64_H */
-> diff --git a/arch/arm64/kernel/kprobes.c b/arch/arm64/kernel/kprobes.c
+> diff --git a/arch/arm64/kernel/probes-simulate-insn.c b/arch/arm64/kernel/probes-simulate-insn.c
 > new file mode 100644
-> index 0000000..601d2c6
+> index 0000000..a224c91
 > --- /dev/null
-> +++ b/arch/arm64/kernel/kprobes.c
-> @@ -0,0 +1,537 @@
+> +++ b/arch/arm64/kernel/probes-simulate-insn.c
+> @@ -0,0 +1,174 @@
 > +/*
-> + * arch/arm64/kernel/kprobes.c
-> + *
-> + * Kprobes support for ARM64
+> + * arch/arm64/kernel/probes-simulate-insn.c
 > + *
 > + * Copyright (C) 2013 Linaro Limited.
-> + * Author: Sandeepa Prabhu <sandeepa.prabhu@linaro.org>
 > + *
 > + * This program is free software; you can redistribute it and/or modify
 > + * it under the terms of the GNU General Public License version 2 as
@@ -454,577 +408,188 @@ On 15 June 2015 at 20:07, David Long <dave.long@linaro.org> wrote:
 > + * but WITHOUT ANY WARRANTY; without even the implied warranty of
 > + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
 > + * General Public License for more details.
-> + *
 > + */
+> +
 > +#include <linux/kernel.h>
 > +#include <linux/kprobes.h>
 > +#include <linux/module.h>
-> +#include <linux/slab.h>
-> +#include <linux/stop_machine.h>
-> +#include <linux/stringify.h>
-> +#include <asm/traps.h>
-> +#include <asm/ptrace.h>
-> +#include <asm/cacheflush.h>
-> +#include <asm/debug-monitors.h>
-> +#include <asm/system_misc.h>
-> +#include <asm/insn.h>
 > +
-> +#include "kprobes.h"
-> +#include "kprobes-arm64.h"
+> +#include "probes-simulate-insn.h"
 > +
-> +#define MIN_STACK_SIZE(addr)   min((unsigned long)MAX_STACK_SIZE,      \
-> +       (unsigned long)current_thread_info() + THREAD_START_SP - (addr))
+> +#define sign_extend(x, signbit)                \
+> +       ((x) | (0 - ((x) & (1 << (signbit)))))
 > +
-> +DEFINE_PER_CPU(struct kprobe *, current_kprobe) = NULL;
-> +DEFINE_PER_CPU(struct kprobe_ctlblk, kprobe_ctlblk);
+> +#define bbl_displacement(insn)         \
+> +       sign_extend(((insn) & 0x3ffffff) << 2, 27)
 > +
-> +static void __kprobes arch_prepare_ss_slot(struct kprobe *p)
+> +#define bcond_displacement(insn)       \
+> +       sign_extend(((insn >> 5) & 0x7ffff) << 2, 21)
+> +
+> +#define cbz_displacement(insn) \
+> +       sign_extend(((insn >> 5) & 0x7ffff) << 2, 21)
+> +
+> +#define tbz_displacement(insn) \
+> +       sign_extend(((insn >> 5) & 0x3fff) << 2, 15)
+> +
+> +#define ldr_displacement(insn) \
+> +       sign_extend(((insn >> 5) & 0x7ffff) << 2, 21)
+> +
+> +
+> +unsigned long __kprobes check_cbz(u32 opcode, struct pt_regs *regs)
 > +{
-> +       /* prepare insn slot */
-> +       p->ainsn.insn[0] = p->opcode;
+> +       int xn = opcode & 0x1f;
 > +
-> +       flush_icache_range((uintptr_t) (p->ainsn.insn),
-> +                          (uintptr_t) (p->ainsn.insn) + MAX_INSN_SIZE);
-> +
-> +       /*
-> +        * Needs restoring of return address after stepping xol.
-> +        */
-> +       p->ainsn.restore.addr = (unsigned long) p->addr +
-> +         sizeof(kprobe_opcode_t);
-> +       p->ainsn.restore.type = RESTORE_PC;
+> +       return (opcode & (1 << 31)) ?
+> +           !(regs->regs[xn]) : !(regs->regs[xn] & 0xffffffff);
 > +}
 > +
-> +int __kprobes arch_prepare_kprobe(struct kprobe *p)
+> +unsigned long __kprobes check_cbnz(u32 opcode, struct pt_regs *regs)
 > +{
-> +       kprobe_opcode_t insn;
-> +       unsigned long probe_addr = (unsigned long)p->addr;
+> +       int xn = opcode & 0x1f;
 > +
-> +       /* copy instruction */
-> +       insn = *p->addr;
-> +       p->opcode = insn;
-> +
-> +       if (in_exception_text(probe_addr))
-> +               return -EINVAL;
-> +
-> +       /* decode instruction */
-> +       switch (arm_kprobe_decode_insn(insn, &p->ainsn)) {
-> +       case INSN_REJECTED:     /* insn not supported */
-> +               return -EINVAL;
-> +
-> +       case INSN_GOOD_NO_SLOT: /* insn need simulation */
-> +               return -EINVAL;
-> +
-> +       case INSN_GOOD: /* instruction uses slot */
-> +               p->ainsn.insn = get_insn_slot();
-> +               if (!p->ainsn.insn)
-> +                       return -ENOMEM;
-> +               break;
-> +       };
-> +
-> +       /* prepare the instruction */
-> +       arch_prepare_ss_slot(p);
-> +
-> +       return 0;
+> +       return (opcode & (1 << 31)) ?
+> +           (regs->regs[xn]) : (regs->regs[xn] & 0xffffffff);
 > +}
 > +
-> +static int __kprobes patch_text(kprobe_opcode_t *addr, u32 opcode)
+> +unsigned long __kprobes check_tbz(u32 opcode, struct pt_regs *regs)
 > +{
-> +       void *addrs[1];
-> +       u32 insns[1];
+> +       int xn = opcode & 0x1f;
+> +       int bit_pos = ((opcode & (1 << 31)) >> 26) | ((opcode >> 19) & 0x1f);
 > +
-> +       addrs[0] = (void *)addr;
-> +       insns[0] = (u32)opcode;
-> +
-> +       return aarch64_insn_patch_text_sync(addrs, insns, 1);
+> +       return ~((regs->regs[xn] >> bit_pos) & 0x1);
 > +}
 > +
-> +/* arm kprobe: install breakpoint in text */
-> +void __kprobes arch_arm_kprobe(struct kprobe *p)
+> +unsigned long __kprobes check_tbnz(u32 opcode, struct pt_regs *regs)
 > +{
-> +       patch_text(p->addr, BRK64_OPCODE_KPROBES);
-> +}
+> +       int xn = opcode & 0x1f;
+> +       int bit_pos = ((opcode & (1 << 31)) >> 26) | ((opcode >> 19) & 0x1f);
 > +
-> +/* disarm kprobe: remove breakpoint from text */
-> +void __kprobes arch_disarm_kprobe(struct kprobe *p)
-> +{
-> +       patch_text(p->addr, p->opcode);
-> +}
-> +
-> +void __kprobes arch_remove_kprobe(struct kprobe *p)
-> +{
-> +       if (p->ainsn.insn) {
-> +               free_insn_slot(p->ainsn.insn, 0);
-> +               p->ainsn.insn = NULL;
-> +       }
-> +}
-> +
-> +static void __kprobes save_previous_kprobe(struct kprobe_ctlblk *kcb)
-> +{
-> +       kcb->prev_kprobe.kp = kprobe_running();
-> +       kcb->prev_kprobe.status = kcb->kprobe_status;
-> +}
-> +
-> +static void __kprobes restore_previous_kprobe(struct kprobe_ctlblk *kcb)
-> +{
-> +       __this_cpu_write(current_kprobe, kcb->prev_kprobe.kp);
-> +       kcb->kprobe_status = kcb->prev_kprobe.status;
-> +}
-> +
-> +static void __kprobes set_current_kprobe(struct kprobe *p)
-> +{
-> +       __this_cpu_write(current_kprobe, p);
+> +       return (regs->regs[xn] >> bit_pos) & 0x1;
 > +}
 > +
 > +/*
-> + * The D-flag (Debug mask) is set (masked) upon exception entry.
-> + * Kprobes needs to clear (unmask) D-flag -ONLY- in case of recursive
-> + * probe i.e. when probe hit from kprobe handler context upon
-> + * executing the pre/post handlers. In this case we return with
-> + * D-flag clear so that single-stepping can be carried-out.
-> + *
-> + * Leave D-flag set in all other cases.
+> + * instruction simulate functions
 > + */
-> +static void __kprobes
-> +spsr_set_debug_flag(struct pt_regs *regs, int mask)
+> +void __kprobes simulate_none(u32 opcode, long addr, struct pt_regs *regs)
 > +{
-> +       unsigned long spsr = regs->pstate;
+> +}
+
+I can't see anything that references simulate_none?
+
 > +
-> +       if (mask)
-> +               spsr |= PSR_D_BIT;
+> +void __kprobes
+> +simulate_adr_adrp(u32 opcode, long addr, struct pt_regs *regs)
+> +{
+> +       long imm, xn, val;
+> +
+> +       xn = opcode & 0x1f;
+> +       imm = ((opcode >> 3) & 0x1ffffc) | ((opcode >> 29) & 0x3);
+> +       imm = sign_extend(imm, 20);
+> +       if (opcode & 0x80000000)
+> +               val = (imm<<12) + (addr & 0xfffffffffffff000);
 > +       else
-> +               spsr &= ~PSR_D_BIT;
+> +               val = imm + addr;
 > +
-> +       regs->pstate = spsr;
+> +       regs->regs[xn] = val;
+> +
+> +       instruction_pointer(regs) += 4;
 > +}
 > +
-> +/*
-> + * Interrupts need to be disabled before single-step mode is set, and not
-> + * reenabled until after single-step mode ends.
-> + * Without disabling interrupt on local CPU, there is a chance of
-> + * interrupt occurrence in the period of exception return and  start of
-> + * out-of-line single-step, that result in wrongly single stepping
-> + * the interrupt handler.
-> + */
-> +static void __kprobes kprobes_save_local_irqflag(struct pt_regs *regs)
+> +void __kprobes
+> +simulate_b_bl(u32 opcode, long addr, struct pt_regs *regs)
 > +{
-> +       struct kprobe_ctlblk *kcb = get_kprobe_ctlblk();
+> +       int disp = bbl_displacement(opcode);
 > +
-> +       kcb->saved_irqflag = regs->pstate;
-> +       regs->pstate |= PSR_I_BIT;
+> +       /* Link register is x30 */
+> +       if (opcode & (1 << 31))
+> +               regs->regs[30] = addr + 4;
+> +
+> +       instruction_pointer(regs) = addr + disp;
 > +}
 > +
-> +static void __kprobes kprobes_restore_local_irqflag(struct pt_regs *regs)
+> +void __kprobes
+> +simulate_b_cond(u32 opcode, long addr, struct pt_regs *regs)
 > +{
-> +       struct kprobe_ctlblk *kcb = get_kprobe_ctlblk();
+> +       int disp = bcond_displacement(opcode);
 > +
-> +       if (kcb->saved_irqflag & PSR_I_BIT)
-> +               regs->pstate |= PSR_I_BIT;
-> +       else
-> +               regs->pstate &= ~PSR_I_BIT;
+> +       instruction_pointer(regs) = addr + disp;
 > +}
 > +
-> +static void __kprobes
-> +set_ss_context(struct kprobe_ctlblk *kcb, unsigned long addr)
+> +void __kprobes
+> +simulate_br_blr_ret(u32 opcode, long addr, struct pt_regs *regs)
 > +{
-> +       kcb->ss_ctx.ss_status = KPROBES_STEP_PENDING;
-> +       kcb->ss_ctx.match_addr = addr + sizeof(kprobe_opcode_t);
+> +       int xn = (opcode >> 5) & 0x1f;
+> +
+> +       /* Link register is x30 */
+> +       if (((opcode >> 21) & 0x3) == 1)
+> +               regs->regs[30] = addr + 4;
+> +
+> +       instruction_pointer(regs) = regs->regs[xn];
 > +}
 > +
-> +static void __kprobes clear_ss_context(struct kprobe_ctlblk *kcb)
+> +void __kprobes
+> +simulate_cbz_cbnz(u32 opcode, long addr, struct pt_regs *regs)
 > +{
-> +       kcb->ss_ctx.ss_status = KPROBES_STEP_NONE;
-> +       kcb->ss_ctx.match_addr = 0;
+> +       int disp = cbz_displacement(opcode);
+> +
+> +       instruction_pointer(regs) = addr + disp;
 > +}
 > +
-> +static void __kprobes
-> +skip_singlestep_missed(struct kprobe_ctlblk *kcb, struct pt_regs *regs)
+> +void __kprobes
+> +simulate_tbz_tbnz(u32 opcode, long addr, struct pt_regs *regs)
 > +{
-> +       /* set return addr to next pc to continue */
-> +       instruction_pointer(regs) += sizeof(kprobe_opcode_t);
+> +       int disp = tbz_displacement(opcode);
+> +
+> +       instruction_pointer(regs) = addr + disp;
 > +}
+> +
+> +void __kprobes
+> +simulate_ldr_literal(u32 opcode, long addr, struct pt_regs *regs)
+> +{
+> +       u64 *load_addr;
+> +       int xn = opcode & 0x1f;
+> +       int disp = ldr_displacement(opcode);
+> +
+> +       load_addr = (u64 *) (addr + disp);
+> +
+> +       if (opcode & (1 << 30)) /* x0-x31 */
+> +               regs->regs[xn] = *load_addr;
+> +       else                    /* w0-w31 */
+> +               *(u32 *) (&regs->regs[xn]) = (*(u32 *) (load_addr));
 
-I'm not sure if this is the best approach for skip_singlestep_missed?
-If the condition check fails, we have very little to simulate :-), but
-I think the user will expect the kprobe to fire?
+This looks wrong to me. The casting on the LHS will mean we set the
+bottom 32 bits of regs[xn] whilst leaving the upper-bits preserved.
+Loading into a w register should clear the upper 32 bits.
 
-For instance I have the following memcpy in my kernel:
-
-ffffffc0003b6500 <memcpy>:
-ffffffc0003b6500:       aa0003e6        mov     x6, x0
-ffffffc0003b6504:       f100405f        cmp     x2, #0x10
-ffffffc0003b6508:       540003c3        b.cc    ffffffc0003b6580 <memcpy+0x80>
-ffffffc0003b650c:       cb0103e4        neg     x4, x1
-ffffffc0003b6510:       f2400c84        ands    x4, x4, #0xf
-ffffffc0003b6514:       540001c0        b.eq    ffffffc0003b654c <memcpy+0x4c>
-
-If I set the following kprobes:
-p:kprobes/memcpy1 0xffffffc0003b6500
-p:kprobes/memcpy2 0xffffffc0003b6508
-
-So the second kprobe is placed on a conditional instruction.
-
-I get the following statistics from perf:
-perf stat -e kprobes:memcpy1 -e kprobes:memcpy2 -a sleep 10
-
- Performance counter stats for 'system wide':
-
-             2,001      kprobes:memcpy1
-               (100.00%)
-             1,563      kprobes:memcpy2
-
-      10.001287601 seconds time elapsed
-
-I (maybe naively) would expect the event counts to be the same? (as
-both pc values are "hit").
-For a case where the condition check fails, I think we should do something like:
-
-set_current_probe(p);
-instruction_pointer(regs) += sizeof(kprobe_opcode_t);
-post_kprobe_handler(kcb, regs);
+I think we want instead something like:
+regs->regs[xn] = (u32) (*load_addr);
 
 > +
-> +static void __kprobes setup_singlestep(struct kprobe *p,
-> +                                      struct pt_regs *regs,
-> +                                      struct kprobe_ctlblk *kcb, int reenter)
-> +{
-> +       unsigned long slot;
-> +
-> +       if (reenter) {
-> +               save_previous_kprobe(kcb);
-> +               set_current_kprobe(p);
-> +               kcb->kprobe_status = KPROBE_REENTER;
-> +       } else {
-> +               kcb->kprobe_status = KPROBE_HIT_SS;
-> +       }
-> +
-> +       if (p->ainsn.insn) {
-> +               /* prepare for single stepping */
-> +               slot = (unsigned long)p->ainsn.insn;
-> +
-> +               set_ss_context(kcb, slot);      /* mark pending ss */
-> +
-> +               if (kcb->kprobe_status == KPROBE_REENTER)
-> +                       spsr_set_debug_flag(regs, 0);
-> +
-> +               /* IRQs and single stepping do not mix well. */
-> +               kprobes_save_local_irqflag(regs);
-> +               kernel_enable_single_step(regs);
-> +               instruction_pointer(regs) = slot;
-> +       } else  {
-> +               BUG();
-> +       }
+> +       instruction_pointer(regs) += 4;
 > +}
 > +
-> +static int __kprobes reenter_kprobe(struct kprobe *p,
-> +                                   struct pt_regs *regs,
-> +                                   struct kprobe_ctlblk *kcb)
+> +void __kprobes
+> +simulate_ldrsw_literal(u32 opcode, long addr, struct pt_regs *regs)
 > +{
-> +       switch (kcb->kprobe_status) {
-> +       case KPROBE_HIT_SSDONE:
-> +       case KPROBE_HIT_ACTIVE:
-> +               if (!p->ainsn.check_condn || p->ainsn.check_condn(p, regs)) {
-> +                       kprobes_inc_nmissed_count(p);
-> +                       setup_singlestep(p, regs, kcb, 1);
-> +               } else  {
-> +                       /* condition check failed, skip stepping */
-> +                       skip_singlestep_missed(kcb, regs);
-> +               }
-> +               break;
-> +       case KPROBE_HIT_SS:
-> +       case KPROBE_REENTER:
-> +               pr_warn("Unrecoverable kprobe detected at %p.\n", p->addr);
-> +               dump_kprobe(p);
-> +               BUG();
-> +               break;
-> +       default:
-> +               WARN_ON(1);
-> +               return 0;
-> +       }
+> +       s32 *load_addr;
+> +       int xn = opcode & 0x1f;
+> +       int disp = ldr_displacement(opcode);
 > +
-> +       return 1;
+> +       load_addr = (s32 *) (addr + disp);
+> +       regs->regs[xn] = *load_addr;
+> +
+> +       instruction_pointer(regs) += 4;
 > +}
-> +
-> +static void __kprobes
-> +post_kprobe_handler(struct kprobe_ctlblk *kcb, struct pt_regs *regs)
-> +{
-> +       struct kprobe *cur = kprobe_running();
-> +
-> +       if (!cur)
-> +               return;
-> +
-> +       /* return addr restore if non-branching insn */
-> +       if (cur->ainsn.restore.type == RESTORE_PC) {
-> +               instruction_pointer(regs) = cur->ainsn.restore.addr;
-> +               if (!instruction_pointer(regs))
-> +                       BUG();
-> +       }
-> +
-> +       /* restore back original saved kprobe variables and continue */
-> +       if (kcb->kprobe_status == KPROBE_REENTER) {
-> +               restore_previous_kprobe(kcb);
-> +               return;
-> +       }
-> +       /* call post handler */
-> +       kcb->kprobe_status = KPROBE_HIT_SSDONE;
-> +       if (cur->post_handler)  {
-> +               /* post_handler can hit breakpoint and single step
-> +                * again, so we enable D-flag for recursive exception.
-> +                */
-> +               cur->post_handler(cur, regs, 0);
-> +       }
-> +
-> +       reset_current_kprobe();
-> +}
-> +
-> +int __kprobes kprobe_fault_handler(struct pt_regs *regs, unsigned int fsr)
-> +{
-> +       struct kprobe *cur = kprobe_running();
-> +       struct kprobe_ctlblk *kcb = get_kprobe_ctlblk();
-> +
-> +       switch (kcb->kprobe_status) {
-> +       case KPROBE_HIT_SS:
-> +       case KPROBE_REENTER:
-> +               /*
-> +                * We are here because the instruction being single
-> +                * stepped caused a page fault. We reset the current
-> +                * kprobe and the ip points back to the probe address
-> +                * and allow the page fault handler to continue as a
-> +                * normal page fault.
-> +                */
-> +               instruction_pointer(regs) = (unsigned long)cur->addr;
-> +               if (!instruction_pointer(regs))
-> +                       BUG();
-> +               if (kcb->kprobe_status == KPROBE_REENTER)
-> +                       restore_previous_kprobe(kcb);
-> +               else
-> +                       reset_current_kprobe();
-> +
-> +               break;
-> +       case KPROBE_HIT_ACTIVE:
-> +       case KPROBE_HIT_SSDONE:
-> +               /*
-> +                * We increment the nmissed count for accounting,
-> +                * we can also use npre/npostfault count for accounting
-> +                * these specific fault cases.
-> +                */
-> +               kprobes_inc_nmissed_count(cur);
-> +
-> +               /*
-> +                * We come here because instructions in the pre/post
-> +                * handler caused the page_fault, this could happen
-> +                * if handler tries to access user space by
-> +                * copy_from_user(), get_user() etc. Let the
-> +                * user-specified handler try to fix it first.
-> +                */
-> +               if (cur->fault_handler && cur->fault_handler(cur, regs, fsr))
-> +                       return 1;
-> +
-> +               /*
-> +                * In case the user-specified fault handler returned
-> +                * zero, try to fix up.
-> +                */
-> +               if (fixup_exception(regs))
-> +                       return 1;
-> +
-> +               break;
-> +       }
-> +       return 0;
-> +}
-> +
-> +int __kprobes kprobe_exceptions_notify(struct notifier_block *self,
-> +                                      unsigned long val, void *data)
-> +{
-> +       return NOTIFY_DONE;
-> +}
-> +
-> +void __kprobes kprobe_handler(struct pt_regs *regs)
-> +{
-> +       struct kprobe *p, *cur;
-> +       struct kprobe_ctlblk *kcb;
-> +       unsigned long addr = instruction_pointer(regs);
-> +
-> +       kcb = get_kprobe_ctlblk();
-> +       cur = kprobe_running();
-> +
-> +       p = get_kprobe((kprobe_opcode_t *) addr);
-> +
-> +       if (p) {
-> +               if (cur) {
-> +                       if (reenter_kprobe(p, regs, kcb))
-> +                               return;
-> +               } else if (!p->ainsn.check_condn ||
-> +                          p->ainsn.check_condn(p, regs)) {
-> +                       /* Probe hit and conditional execution check ok. */
-> +                       set_current_kprobe(p);
-> +                       kcb->kprobe_status = KPROBE_HIT_ACTIVE;
-> +
-> +                       /*
-> +                        * If we have no pre-handler or it returned 0, we
-> +                        * continue with normal processing.  If we have a
-> +                        * pre-handler and it returned non-zero, it prepped
-> +                        * for calling the break_handler below on re-entry,
-> +                        * so get out doing nothing more here.
-> +                        *
-> +                        * pre_handler can hit a breakpoint and can step thru
-> +                        * before return, keep PSTATE D-flag enabled until
-> +                        * pre_handler return back.
-> +                        */
-> +                       if (!p->pre_handler || !p->pre_handler(p, regs)) {
-> +                               kcb->kprobe_status = KPROBE_HIT_SS;
-> +                               setup_singlestep(p, regs, kcb, 0);
-> +                               return;
-> +                       }
-> +               } else {
-> +                       /*
-> +                        * Breakpoint hit but conditional check failed,
-> +                        * so just skip the instruction (NOP behaviour)
-> +                        */
-> +                       skip_singlestep_missed(kcb, regs);
-> +                       return;
-> +               }
-> +       } else if (*(kprobe_opcode_t *) addr != BRK64_OPCODE_KPROBES) {
-> +               /*
-> +                * The breakpoint instruction was removed right
-> +                * after we hit it.  Another cpu has removed
-> +                * either a probepoint or a debugger breakpoint
-> +                * at this address.  In either case, no further
-> +                * handling of this interrupt is appropriate.
-> +                * Return back to original instruction, and continue.
-> +                */
-> +               return;
-> +       } else if (cur) {
-> +               /* We probably hit a jprobe.  Call its break handler. */
-> +               if (cur->break_handler && cur->break_handler(cur, regs)) {
-> +                       kcb->kprobe_status = KPROBE_HIT_SS;
-> +                       setup_singlestep(cur, regs, kcb, 0);
-> +                       return;
-> +               }
-> +       } else {
-> +               /* breakpoint is removed, now in a race
-> +                * Return back to original instruction & continue.
-> +                */
-> +       }
-> +}
-> +
-> +static int __kprobes
-> +kprobe_ss_hit(struct kprobe_ctlblk *kcb, unsigned long addr)
-> +{
-> +       if ((kcb->ss_ctx.ss_status == KPROBES_STEP_PENDING)
-> +           && (kcb->ss_ctx.match_addr == addr)) {
-> +               clear_ss_context(kcb);  /* clear pending ss */
-> +               return DBG_HOOK_HANDLED;
-> +       }
-> +       /* not ours, kprobes should ignore it */
-> +       return DBG_HOOK_ERROR;
-> +}
-> +
-> +int __kprobes
-> +kprobe_single_step_handler(struct pt_regs *regs, unsigned int esr)
-> +{
-> +       struct kprobe_ctlblk *kcb = get_kprobe_ctlblk();
-> +       int retval;
-> +
-> +       /* return error if this is not our step */
-> +       retval = kprobe_ss_hit(kcb, instruction_pointer(regs));
-> +
-> +       if (retval == DBG_HOOK_HANDLED) {
-> +               kprobes_restore_local_irqflag(regs);
-> +               kernel_disable_single_step();
-> +
-> +               if (kcb->kprobe_status == KPROBE_REENTER)
-> +                       spsr_set_debug_flag(regs, 1);
-> +
-> +               post_kprobe_handler(kcb, regs);
-> +       }
-> +
-> +       return retval;
-> +}
-> +
-> +int __kprobes
-> +kprobe_breakpoint_handler(struct pt_regs *regs, unsigned int esr)
-> +{
-> +       kprobe_handler(regs);
-> +       return DBG_HOOK_HANDLED;
-> +}
-> +
-> +int __kprobes setjmp_pre_handler(struct kprobe *p, struct pt_regs *regs)
-> +{
-> +       struct jprobe *jp = container_of(p, struct jprobe, kp);
-> +       struct kprobe_ctlblk *kcb = get_kprobe_ctlblk();
-> +       long stack_ptr = stack_pointer(regs);
-> +
-> +       kcb->jprobe_saved_regs = *regs;
-> +       memcpy(kcb->jprobes_stack, (void *)stack_ptr,
-> +              MIN_STACK_SIZE(stack_ptr));
-> +
-> +       instruction_pointer(regs) = (long)jp->entry;
-> +       preempt_disable();
-> +       return 1;
-> +}
-> +
-> +void __kprobes jprobe_return(void)
-> +{
-> +       struct kprobe_ctlblk *kcb = get_kprobe_ctlblk();
-> +
-> +       /*
-> +        * Jprobe handler return by entering break exception,
-> +        * encoded same as kprobe, but with following conditions
-> +        * -a magic number in x0 to identify from rest of other kprobes.
-> +        * -restore stack addr to original saved pt_regs
-> +        */
-> +       asm volatile ("ldr x0, [%0]\n\t"
-> +                     "mov sp, x0\n\t"
-> +                     "ldr x0, =" __stringify(JPROBES_MAGIC_NUM) "\n\t"
-> +                     "BRK %1\n\t"
-> +                     "NOP\n\t"
-> +                     :
-> +                     : "r"(&kcb->jprobe_saved_regs.sp),
-> +                     "I"(BRK64_ESR_KPROBES)
-> +                     : "memory");
-> +}
-> +
-> +int __kprobes longjmp_break_handler(struct kprobe *p, struct pt_regs *regs)
-> +{
-> +       struct kprobe_ctlblk *kcb = get_kprobe_ctlblk();
-> +       long stack_addr = kcb->jprobe_saved_regs.sp;
-> +       long orig_sp = stack_pointer(regs);
-> +       struct jprobe *jp = container_of(p, struct jprobe, kp);
-> +
-> +       if (regs->regs[0] == JPROBES_MAGIC_NUM) {
-> +               if (orig_sp != stack_addr) {
-> +                       struct pt_regs *saved_regs =
-> +                           (struct pt_regs *)kcb->jprobe_saved_regs.sp;
-> +                       pr_err("current sp %lx does not match saved sp %lx\n",
-> +                              orig_sp, stack_addr);
-> +                       pr_err("Saved registers for jprobe %p\n", jp);
-> +                       show_regs(saved_regs);
-> +                       pr_err("Current registers\n");
-> +                       show_regs(regs);
-> +                       BUG();
-> +               }
-> +               *regs = kcb->jprobe_saved_regs;
-> +               memcpy((void *)stack_addr, kcb->jprobes_stack,
-> +                      MIN_STACK_SIZE(stack_addr));
-> +               preempt_enable_no_resched();
-> +               return 1;
-> +       }
-> +       return 0;
-> +}
-> +
-> +int __init arch_init_kprobes(void)
-> +{
-> +       return 0;
-> +}
-> diff --git a/arch/arm64/kernel/kprobes.h b/arch/arm64/kernel/kprobes.h
+> diff --git a/arch/arm64/kernel/probes-simulate-insn.h b/arch/arm64/kernel/probes-simulate-insn.h
 > new file mode 100644
-> index 0000000..e98ad60
+> index 0000000..406f5c2
 > --- /dev/null
-> +++ b/arch/arm64/kernel/kprobes.h
-> @@ -0,0 +1,24 @@
+> +++ b/arch/arm64/kernel/probes-simulate-insn.h
+> @@ -0,0 +1,33 @@
 > +/*
-> + * arch/arm64/kernel/kprobes.h
+> + * arch/arm64/kernel/probes-simulate-insn.h
 > + *
-> + * Copyright (C) 2013 Linaro Limited.
+> + * Copyright (C) 2013 Linaro Limited
 > + *
 > + * This program is free software; you can redistribute it and/or modify
 > + * it under the terms of the GNU General Public License version 2 as
@@ -1036,70 +601,24 @@ post_kprobe_handler(kcb, regs);
 > + * General Public License for more details.
 > + */
 > +
-> +#ifndef _ARM_KERNEL_KPROBES_H
-> +#define _ARM_KERNEL_KPROBES_H
+> +#ifndef _ARM_KERNEL_PROBES_SIMULATE_INSN_H
+> +#define _ARM_KERNEL_PROBES_SIMULATE_INSN_H
 > +
-> +#define JPROBES_MAGIC_NUM      0xa5a5a5a5a5a5a5a5
+> +unsigned long check_cbz(u32 opcode, struct pt_regs *regs);
+> +unsigned long check_cbnz(u32 opcode, struct pt_regs *regs);
+> +unsigned long check_tbz(u32 opcode, struct pt_regs *regs);
+> +unsigned long check_tbnz(u32 opcode, struct pt_regs *regs);
+> +void simulate_none(u32 opcode, long addr, struct pt_regs *regs);
+> +void simulate_adr_adrp(u32 opcode, long addr, struct pt_regs *regs);
+> +void simulate_b_bl(u32 opcode, long addr, struct pt_regs *regs);
+> +void simulate_b_cond(u32 opcode, long addr, struct pt_regs *regs);
+> +void simulate_br_blr_ret(u32 opcode, long addr, struct pt_regs *regs);
+> +void simulate_cbz_cbnz(u32 opcode, long addr, struct pt_regs *regs);
+> +void simulate_tbz_tbnz(u32 opcode, long addr, struct pt_regs *regs);
+> +void simulate_ldr_literal(u32 opcode, long addr, struct pt_regs *regs);
+> +void simulate_ldrsw_literal(u32 opcode, long addr, struct pt_regs *regs);
 > +
-> +/* Move this out to appropriate header file */
-> +int fixup_exception(struct pt_regs *regs);
-> +
-> +#endif /* _ARM_KERNEL_KPROBES_H */
-> diff --git a/arch/arm64/kernel/vmlinux.lds.S b/arch/arm64/kernel/vmlinux.lds.S
-> index a2c2986..2da5f4e 100644
-> --- a/arch/arm64/kernel/vmlinux.lds.S
-> +++ b/arch/arm64/kernel/vmlinux.lds.S
-> @@ -94,6 +94,7 @@ SECTIONS
->                         TEXT_TEXT
->                         SCHED_TEXT
->                         LOCK_TEXT
-> +                       KPROBES_TEXT
->                         HYPERVISOR_TEXT
->                         *(.fixup)
->                         *(.gnu.warning)
-> diff --git a/arch/arm64/mm/fault.c b/arch/arm64/mm/fault.c
-> index 96da131..4c13dfb 100644
-> --- a/arch/arm64/mm/fault.c
-> +++ b/arch/arm64/mm/fault.c
-> @@ -39,6 +39,28 @@
->
->  static const char *fault_name(unsigned int esr);
->
-> +#ifdef CONFIG_KPROBES
-> +static inline int notify_page_fault(struct pt_regs *regs, unsigned int esr)
-> +{
-> +       int ret = 0;
-> +
-> +       /* kprobe_running() needs smp_processor_id() */
-> +       if (!user_mode(regs)) {
-> +               preempt_disable();
-> +               if (kprobe_running() && kprobe_fault_handler(regs, esr))
-> +                       ret = 1;
-> +               preempt_enable();
-> +       }
-> +
-> +       return ret;
-> +}
-> +#else
-> +static inline int notify_page_fault(struct pt_regs *regs, unsigned int esr)
-> +{
-> +       return 0;
-> +}
-> +#endif
-> +
->  /*
->   * Dump out the page tables associated with 'addr' in mm 'mm'.
->   */
-> @@ -200,6 +222,9 @@ static int __kprobes do_page_fault(unsigned long addr, unsigned int esr,
->         unsigned long vm_flags = VM_READ | VM_WRITE | VM_EXEC;
->         unsigned int mm_flags = FAULT_FLAG_ALLOW_RETRY | FAULT_FLAG_KILLABLE;
->
-> +       if (notify_page_fault(regs, esr))
-> +               return 0;
-> +
->         tsk = current;
->         mm  = tsk->mm;
->
+> +#endif /* _ARM_KERNEL_PROBES_SIMULATE_INSN_H */
 > --
 > 1.8.1.2
 >
