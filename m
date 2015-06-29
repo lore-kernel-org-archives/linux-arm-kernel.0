@@ -1,41 +1,28 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 29 Jun 2015 18:17:55 +0100
-Subject: [PATCH 2/8] iommu/arm-smmu: fix the index calculation of strtab
-In-Reply-To: <1435307584-9812-3-git-send-email-thunder.leizhen@huawei.com>
-References: <1435307584-9812-1-git-send-email-thunder.leizhen@huawei.com>
- <1435307584-9812-3-git-send-email-thunder.leizhen@huawei.com>
-Message-ID: <20150629171755.GI17474@arm.com>
+From: peter.maydell@linaro.org (Peter Maydell)
+Date: Mon, 29 Jun 2015 18:17:51 +0100
+Subject: [PATCH] arm64: KVM: Enable minimalistic support for Thunder
+In-Reply-To: <55917C31.4060107@arm.com>
+References: <1435348284-32132-1-git-send-email-tchalamarla@caviumnetworks.com>
+ <55910794.6000107@arm.com>
+ <AED13EAB-D578-451F-AC35-A45A21816076@caviumnetworks.com>
+ <55917C31.4060107@arm.com>
+Message-ID: <CAFEAcA-uDyWko_TA+thCqZ-N8200n9b_ACcSQZvw1QX-PWCLBg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 26, 2015 at 09:32:58AM +0100, Zhen Lei wrote:
-> The element size of cfg->strtab is just one DWORD, should use multiply
-> operation.
+On 29 June 2015 at 18:11, Marc Zyngier <marc.zyngier@arm.com> wrote:
+> On 29/06/15 18:06, Chalamarla, Tirumalesh wrote:
+>>
+>>> On Jun 29, 2015, at 1:53 AM, Marc Zyngier <marc.zyngier@arm.com> wrote:
+>>> Constantly adding new CPUs without providing any insight as to how they
+>>> should be emulated only brings churn, and not much benefit.
+>>>
+>> we are not planning(at this point) to emulate Thunder with QEMU/others.
+>
+> Fair enough. If cross-cpu VM migration is none of your concern, then
+> Suzuki's patch should be enough.
 
-Nice catch. Turns out all my emulated PCI devices sit on bus 0, so this
-didn't show up in testing.
+"Emulate with QEMU" is a completely different thing from
+"support cross-cpu VM migration" !
 
-Will
-
-> Signed-off-by: Zhen Lei <thunder.leizhen@huawei.com>
-> ---
->  drivers/iommu/arm-smmu-v3.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
-> index ba7fe2d..2a5f810 100644
-> --- a/drivers/iommu/arm-smmu-v3.c
-> +++ b/drivers/iommu/arm-smmu-v3.c
-> @@ -1064,7 +1064,7 @@ static int arm_smmu_init_l2_strtab(struct arm_smmu_device *smmu, u32 sid)
->  		return 0;
-> 
->  	size = 1 << (STRTAB_SPLIT + ilog2(STRTAB_STE_DWORDS) + 3);
-> -	strtab = &cfg->strtab[sid >> STRTAB_SPLIT << STRTAB_L1_DESC_DWORDS];
-> +	strtab = &cfg->strtab[(sid >> STRTAB_SPLIT) * STRTAB_L1_DESC_DWORDS];
-> 
->  	desc->span = STRTAB_SPLIT + 1;
->  	desc->l2ptr = dma_zalloc_coherent(smmu->dev, size, &desc->l2ptr_dma,
-> --
-> 1.8.0
-> 
-> 
+-- PMM
