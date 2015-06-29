@@ -1,27 +1,30 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Mon, 29 Jun 2015 20:12:36 +0800
-Subject: [PATCH] ARM: dts: ventana: add UHS-I support for Ventana boards
-In-Reply-To: <1433446346-7382-1-git-send-email-tharvey@gateworks.com>
-References: <1433446346-7382-1-git-send-email-tharvey@gateworks.com>
-Message-ID: <20150629121236.GN10332@tiger>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Mon, 29 Jun 2015 09:16:38 -0300
+Subject: [PATCH] ARM: dts: imx6qdl-sabreauto: Add HDMI support
+In-Reply-To: <CAOMZO5C1D05JYU-3kc9KDW5bf1YiS9+_CfipV54uzpUJCfaKBg@mail.gmail.com>
+References: <1433277693-10767-1-git-send-email-festevam@gmail.com>
+ <20150629114709.GL10332@tiger>
+ <CAOMZO5C1D05JYU-3kc9KDW5bf1YiS9+_CfipV54uzpUJCfaKBg@mail.gmail.com>
+Message-ID: <CAOMZO5A0+S_q3WNbXEPZ3K0Yr=ea_dYe=WvgAKtdwFqqH6WhAw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 04, 2015 at 12:32:26PM -0700, Tim Harvey wrote:
-> UHS-I support is available on Ventana boards with micro-SD sockets depending
-> on the board revision. To support this pinctl states for 100Mhz and 200MHz
-> must be added as well as pinmux of the VSELECT signal. In order to support
-> UHS-I the I/O rail of the 4-bit data bus must be switchable between 1.8V
-> and 3.3V.
-> 
-> By adding the no-1-8-v property, which disables UHS-I support, we allow the
-> bootloader to be in charge of selecting which boards have this capability
-> by removing that property if the board model/revision implement the support.
-> 
-> Additionally we will remove NANDF_CS1 here from the nand pinmux group as the
-> second chip-select is not used on any ventana boards and this is the pad
-> that is used for SD3_VELECT.
-> 
-> Signed-off-by: Tim Harvey <tharvey@gateworks.com>
+On Mon, Jun 29, 2015 at 8:55 AM, Fabio Estevam <festevam@gmail.com> wrote:
+> On Mon, Jun 29, 2015 at 8:47 AM, Shawn Guo <shawnguo@kernel.org> wrote:
+>> On Tue, Jun 02, 2015 at 05:41:33PM -0300, Fabio Estevam wrote:
+>>> From: Fabio Estevam <fabio.estevam@freescale.com>
+>>>
+>>> Add HDMI support. As the DDC I2C pins are not connected due to
+>>> pin conflicts, we do not pass the 'ddc-i2c-bus' property in
+>>> this case.
+>>
+>> HDMI works without 'ddc-i2c-bus' property and I2C pins?  If not, what's
+>> point of this patch.
+>
+> Yes, HDMI works fine without 'ddc-i2c-bus' property.
+>
+> 'ddc-i2c-bus' property is not mandatory to get HDMI functional.
 
-Applied, thanks.
+You can also refer to
+Documentation/devicetree/bindings/drm/imx/hdmi.txt, which states that
+ddc-i2c-bus is an optional property.
