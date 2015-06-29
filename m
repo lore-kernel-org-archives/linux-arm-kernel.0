@@ -1,49 +1,109 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sun, 28 Jun 2015 23:45:43 +0100
-Subject: dma-mapping: support for DMA_ATTR_NON_CONSISTENT DMA attribute
-In-Reply-To: <CAF6-1L5c-PbK_wfpvz1xdRkquXyuQDv4mvKfYp8fwA1LK9ZOyw@mail.gmail.com>
-References: <CAF6-1L5c-PbK_wfpvz1xdRkquXyuQDv4mvKfYp8fwA1LK9ZOyw@mail.gmail.com>
-Message-ID: <20150628224543.GW7557@n2100.arm.linux.org.uk>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Mon, 29 Jun 2015 09:26:27 +0900
+Subject: [PATCH RFC v2 01/16] PM / Domains: Allocate memory outside domain
+ locks
+In-Reply-To: <1435374156-19214-2-git-send-email-lina.iyer@linaro.org>
+References: <1435374156-19214-1-git-send-email-lina.iyer@linaro.org>
+ <1435374156-19214-2-git-send-email-lina.iyer@linaro.org>
+Message-ID: <559090B3.4040502@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jun 28, 2015 at 10:32:41PM +0200, Sylvain Munaut wrote:
-> I've found this patch from several month ago :
+On 27.06.2015 12:02, Lina Iyer wrote:
+> In preparation for supporting IRQ-safe domains, allocate domain data
+> outside the domain locks. These functions are not called in an atomic
+> context, so we can always allocate memory using GFP_KERNEL. By
+> allocating memory before the locks, we can safely lock the domain using
+> spinlocks instead of mutexes.
 > 
-> http://lists.infradead.org/pipermail/linux-arm-kernel/2015-February/325489.html
+> Cc: Ulf Hansson <ulf.hansson@linaro.org>
+> Cc: Rafael J. Wysocki <rjw@rjwysocki.net>
+> Cc: Kevin Hilman <khilman@linaro.org>
+> Signed-off-by: Lina Iyer <lina.iyer@linaro.org>
+> ---
+> Changes in v2:
+> 	- Modify commit text
+> ---
+>  drivers/base/power/domain.c | 27 +++++++++++++--------------
+>  1 file changed, 13 insertions(+), 14 deletions(-)
 > 
-> And I find it very useful, but I couldn't find why it wasn't merged ?
+> diff --git a/drivers/base/power/domain.c b/drivers/base/power/domain.c
+> index 87d405a..44af889 100644
+> --- a/drivers/base/power/domain.c
+> +++ b/drivers/base/power/domain.c
+> @@ -1379,13 +1379,17 @@ int pm_genpd_remove_device(struct generic_pm_domain *genpd,
+>  int pm_genpd_add_subdomain(struct generic_pm_domain *genpd,
+>  			   struct generic_pm_domain *subdomain)
+>  {
+> -	struct gpd_link *link;
+> +	struct gpd_link *link, *itr;
+>  	int ret = 0;
+>  
+>  	if (IS_ERR_OR_NULL(genpd) || IS_ERR_OR_NULL(subdomain)
+>  	    || genpd == subdomain)
+>  		return -EINVAL;
+>  
+> +	link = kzalloc(sizeof(*link), GFP_KERNEL);
+> +	if (!link)
+> +		return -ENOMEM;
+> +
+>  	mutex_lock(&genpd->lock);
+>  	mutex_lock_nested(&subdomain->lock, SINGLE_DEPTH_NESTING);
+>  
+> @@ -1395,18 +1399,13 @@ int pm_genpd_add_subdomain(struct generic_pm_domain *genpd,
+>  		goto out;
+>  	}
+>  
+> -	list_for_each_entry(link, &genpd->master_links, master_node) {
+> -		if (link->slave == subdomain && link->master == genpd) {
+> +	list_for_each_entry(itr, &genpd->master_links, master_node) {
+> +		if (itr->slave == subdomain && itr->master == genpd) {
+>  			ret = -EINVAL;
+>  			goto out;
 
-It's wrong.
+The same comment as in previous version - where is the kfree()? You
+moved the allocation so all error paths have to be checked and adjusted.
+Not just one that I pointed in previous review.
 
-> What was the problem with it ?
+>  		}
+>  	}
+>  
+> -	link = kzalloc(sizeof(*link), GFP_KERNEL);
+> -	if (!link) {
+> -		ret = -ENOMEM;
+> -		goto out;
+> -	}
+>  	link->master = genpd;
+>  	list_add_tail(&link->master_node, &genpd->master_links);
+>  	link->slave = subdomain;
+> @@ -1508,17 +1507,17 @@ int pm_genpd_attach_cpuidle(struct generic_pm_domain *genpd, int state)
+>  	if (IS_ERR_OR_NULL(genpd) || state < 0)
+>  		return -EINVAL;
+>  
+> +	cpuidle_data = kzalloc(sizeof(*cpuidle_data), GFP_KERNEL);
+> +	if (!cpuidle_data)
+> +		return -ENOMEM;
+> +
+>  	mutex_lock(&genpd->lock);
+>  
+>  	if (genpd->cpuidle_data) {
+>  		ret = -EEXIST;
+> -		goto out;
+> -	}
+> -	cpuidle_data = kzalloc(sizeof(*cpuidle_data), GFP_KERNEL);
+> -	if (!cpuidle_data) {
+> -		ret = -ENOMEM;
+> -		goto out;
+> +		goto err_drv;
 
-It's based on a bad assumption, the same bad assumption that you seem to
-be making below, which is an abuse of the DMA API.
+Is the mutex freed in this exit path?
 
-> In my use case, I need to allocate fairly large buffers (holding video
-> data) and the hardware requires them to be contiguous.
+Best regards,
+Krzysztof
 
-So, you're allocating the buffers using the *coherent* DMA API...
-
-> I ensure the consistency by using the DMA streaming API
-> (dma_sync_single_for_{cpu,device}) and so when the buffer is "owned"
-> by the CPU, I definitely want cached access because coherent memory
-> speed is just abysmal ... (about 10x slower to read the whole buffer
-> sequentially).
-
-... and then using the *streaming* API dma_sync_* calls on it.  That
-is invalid, and will lead to undefined results on implementations of
-dma_alloc_coherent() which return remapped memory (as for older ARMs.)
-This is an abuse of the API.
-
-See Documentation/DMA-API.txt.  The API is split into two separate major
-chunks, the coherent API, and the streaming API.  It is not permissible
-to use functions from one API with memory obtained from the other API.
-
-Enable DMA debug (part III of that document) to have the kernel tell you
-that you're abusing the API. :)
-
--- 
-FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
-according to speedtest.net.
+>  	}
+> +
+>  	cpuidle_drv = cpuidle_driver_ref();
+>  	if (!cpuidle_drv) {
+>  		ret = -ENODEV;
+> 
