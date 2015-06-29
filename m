@@ -1,48 +1,173 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 29 Jun 2015 22:37:37 +0100
-Subject: [PATCH] keystone: adds cpu_die implementation
-In-Reply-To: <20150629212814.GE7557@n2100.arm.linux.org.uk>
-References: <1435600352-32733-1-git-send-email-vitalya@ti.com>
- <20150629175223.GC19863@leverpostej> <559191E0.4080808@ti.com>
- <20150629212814.GE7557@n2100.arm.linux.org.uk>
-Message-ID: <20150629213737.GF7557@n2100.arm.linux.org.uk>
+From: mturquette@baylibre.com (Michael Turquette)
+Date: Mon, 29 Jun 2015 14:53:40 -0700
+Subject: [PATCH 1/2] dt-bindings: mediatek: Add MT8173 cpufreq driver
+ binding
+In-Reply-To: <20150624010621.GB6424@linux>
+References: <1433766561-1330-1-git-send-email-pi-cheng.chen@linaro.org>
+ <1433766561-1330-2-git-send-email-pi-cheng.chen@linaro.org>
+ <CALx668UShfd3HW1ptzHnMr9xAUVyLGt=q2CmYHn3vqASZug6kw@mail.gmail.com>
+ <20150624010621.GB6424@linux>
+Message-ID: <20150629215340.9112.43917@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 29, 2015 at 10:28:14PM +0100, Russell King - ARM Linux wrote:
-> On Mon, Jun 29, 2015 at 02:43:44PM -0400, Vitaly Andrianov wrote:
-> > 
-> > 
-> > On 06/29/2015 01:52 PM, Mark Rutland wrote:
-> > >On Mon, Jun 29, 2015 at 06:52:32PM +0100, Vitaly Andrianov wrote:
-> > >>This commit add cpu_die implementation
-> > >>
-> > >>Signed-off-by: Vitaly Andrianov <vitalya@ti.com>
-> > >>---
-> > >>
-> > >>The discussion of the "keystone: psci: adds cpu_die implementation" commit
-> > >>shows that if PCSI is enabled platform code doesn't need that implementation
-> > >>at all. Having PSCI commands in DTB should be sufficient. Unfortunately
-> > >>Keystone with LPAE enable requires some additional development.
-> > >
-> > >I don't follow.
-> > >
-> > >What do you need to implement for LPAE?
-> > Hi Mark,
-> > 
-> > The Keystone platform needs to set ttbr1 when it boots secondary core.
-> > It is done in the keystone_smp_secondary_initmem(), which is
-> > .smp_secondary_init member of the keystone_smp_ops. I couldn't find a way
-> > how I can add similar function to psci_smp_ops.
+Quoting Viresh Kumar (2015-06-23 18:06:21)
+> Adding Mike's new email address..
 > 
-> TTBR1 will be set by generic code.  You don't need to do anything special
-> now that my fixes for TI's horrid physical address space switch are in.
-> (you may remember, you tested the patches...)
+> On 23-06-15, 23:31, Pi-Cheng Chen wrote:
+> > On Mon, Jun 8, 2015 at 8:29 PM, Pi-Cheng Chen <pi-cheng.chen@linaro.org> wrote:
+> > > This patch adds device tree binding document for MT8173 cpufreq driver.
+> > >
+> > > Signed-off-by: Pi-Cheng Chen <pi-cheng.chen@linaro.org>
+> > > ---
+> > >  .../devicetree/bindings/cpufreq/cpufreq-mt8173.txt | 127 +++++++++++++++++++++
+> > >  1 file changed, 127 insertions(+)
+> > >  create mode 100644 Documentation/devicetree/bindings/cpufreq/cpufreq-mt8173.txt
+> > >
+> > > diff --git a/Documentation/devicetree/bindings/cpufreq/cpufreq-mt8173.txt b/Documentation/devicetree/bindings/cpufreq/cpufreq-mt8173.txt
+> > > new file mode 100644
+> > > index 0000000..7708a65
+> > > --- /dev/null
+> > > +++ b/Documentation/devicetree/bindings/cpufreq/cpufreq-mt8173.txt
+> > > @@ -0,0 +1,127 @@
+> > > +
+> > > +Mediatek MT8173 cpufreq driver
+> > > +-------------------
+> 
+> Few more ---- required.
+> 
+> > > +
+> > > +Mediatek MT8173 cpufreq driver for CPU frequency scaling.
+> > > +
+> > > +Required properties:
+> > > +- clocks: A list of phandle + clock-specifier pairs for the clocks listed in clock names.
+> > > +- clock-names: Should contain the following:
+> > > +       "cpu"           - The multiplexer for clock input of CPU cluster.
+> > > +       "intermediate"  - A parent of "cpu" clock which is used as "intermediate" clock
+> > > +                         source (usually MAINPLL) when the original CPU PLL is under
+> > > +                         transition and not stable yet.
+> 
+> These belong to Mike.
 
-Oh, it was Murali who tested it, not yourself.  Sorry.  Suggest you
-dig out the patches either from mainline (they're in Linus' tip) or
-ask Murali for them...
+Everything looks good. This is a typical clock consumer based on the
+generic clock-binding. You might want to reference that this cpufreq
+binding uses the "Clock consumers" portion of the clock binding and
+reference its location:
 
--- 
-FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
-according to speedtest.net.
+Documentation/devicetree/bindings/clock/clock-bindings.txt
+
+Please add,
+
+Reviewed-by: Michael Turquette <mturquette@baylibre.com>
+
+Thanks,
+Mike
+
+> 
+> > > +- operating-points: Table of frequencies and voltage CPU could be transitioned into,
+> > > +                   Frequency should be in KHz units and voltage should be in microvolts.
+> 
+> That's not complete. You should just mention the path to opp bindings
+> here. And that's it.
+> 
+> > > +- proc-supply: Regulator for Vproc of CPU cluster.
+> > > +
+> > > +Optional properties:
+> > > +- sram-supply: Regulator for Vsram of CPU cluster. When present, the cpufreq driver
+> > > +              needs to do "voltage trace" to step by step scale up/down Vproc and
+> > > +              Vsram to fit SoC specific needs. When absent, the voltage scaling
+> > > +              flow is handled by hardware, hence no software "voltage trace" is
+> > > +              needed.
+> > > +
+> > > +Example:
+> > > +--------
+> > > +       cpu0: cpu at 0 {
+> > > +               device_type = "cpu";
+> > > +               compatible = "arm,cortex-a53";
+> > > +               reg = <0x000>;
+> > > +               enable-method = "psci";
+> > > +               cpu-idle-states = <&CPU_SLEEP_0>;
+> > > +               clocks = <&infracfg CLK_INFRA_CA53SEL>,
+> > > +                        <&apmixedsys CLK_APMIXED_MAINPLL>;
+> > > +               clock-names = "cpu", "intermediate";
+> > > +               operating-points = <
+> > > +                       507000  859000
+> > > +                       702000  908000
+> > > +                       1001000 983000
+> > > +                       1105000 1009000
+> > > +                       1183000 1028000
+> > > +                       1404000 1083000
+> > > +                       1508000 1109000
+> > > +                       1573000 1125000
+> > > +               >;
+> > > +       };
+> > > +
+> > > +       cpu1: cpu at 1 {
+> > > +               device_type = "cpu";
+> > > +               compatible = "arm,cortex-a53";
+> > > +               reg = <0x001>;
+> > > +               enable-method = "psci";
+> > > +               cpu-idle-states = <&CPU_SLEEP_0>;
+> > > +               clocks = <&infracfg CLK_INFRA_CA53SEL>,
+> > > +                        <&apmixedsys CLK_APMIXED_MAINPLL>;
+> > > +               clock-names = "cpu", "intermediate";
+> > > +               operating-points = <
+> > > +                       507000  859000
+> > > +                       702000  908000
+> > > +                       1001000 983000
+> > > +                       1105000 1009000
+> > > +                       1183000 1028000
+> > > +                       1404000 1083000
+> > > +                       1508000 1109000
+> > > +                       1573000 1125000
+> > > +               >;
+> > > +       };
+> > > +
+> > > +       cpu2: cpu at 100 {
+> > > +               device_type = "cpu";
+> > > +               compatible = "arm,cortex-a57";
+> > > +               reg = <0x100>;
+> > > +               enable-method = "psci";
+> > > +               cpu-idle-states = <&CPU_SLEEP_0>;
+> > > +               clocks = <&infracfg CLK_INFRA_CA57SEL>,
+> > > +                        <&apmixedsys CLK_APMIXED_MAINPLL>;
+> > > +               clock-names = "cpu", "intermediate";
+> > > +               operating-points = <
+> > > +                       507000  828000
+> > > +                       702000  867000
+> > > +                       1001000 927000
+> > > +                       1209000 968000
+> > > +                       1404000 1007000
+> > > +                       1612000 1049000
+> > > +                       1807000 1089000
+> > > +                       1989000 1125000
+> > > +               >;
+> > > +       };
+> > > +
+> > > +       cpu3: cpu at 101 {
+> > > +               device_type = "cpu";
+> > > +               compatible = "arm,cortex-a57";
+> > > +               reg = <0x101>;
+> > > +               enable-method = "psci";
+> > > +               cpu-idle-states = <&CPU_SLEEP_0>;
+> > > +               clocks = <&infracfg CLK_INFRA_CA57SEL>,
+> > > +                        <&apmixedsys CLK_APMIXED_MAINPLL>;
+> > > +               clock-names = "cpu", "intermediate";
+> > > +               operating-points = <
+> > > +                       507000  828000
+> > > +                       702000  867000
+> > > +                       1001000 927000
+> > > +                       1209000 968000
+> > > +                       1404000 1007000
+> > > +                       1612000 1049000
+> > > +                       1807000 1089000
+> > > +                       1989000 1125000
+> > > +               >;
+> > > +       };
+> 
+> I remember Mark Rutland asking you about the replicated stuff for all
+> CPUs, but happened to his comments later on ? Were you asked to put
+> these for all the CPUs ?
+> 
+> -- 
+> viresh
