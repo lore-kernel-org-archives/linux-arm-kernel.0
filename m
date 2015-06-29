@@ -1,10 +1,10 @@
 From: fabio.estevam@freescale.com (Fabio Estevam)
-Date: Mon, 29 Jun 2015 13:16:55 -0300
-Subject: [PATCH 3/3] ARM: dts: imx6qdl-sabreauto: Allow HDMI and LVDS to work
+Date: Mon, 29 Jun 2015 13:16:54 -0300
+Subject: [PATCH 2/3] ARM: dts: imx6qdl-nitrogen6x: Allow HDMI and LVDS to work
  simultaneously
 In-Reply-To: <1435594615-9570-1-git-send-email-fabio.estevam@freescale.com>
 References: <1435594615-9570-1-git-send-email-fabio.estevam@freescale.com>
-Message-ID: <1435594615-9570-3-git-send-email-fabio.estevam@freescale.com>
+Message-ID: <1435594615-9570-2-git-send-email-fabio.estevam@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -19,15 +19,15 @@ within the valid range for the HSD100PXN1 LVDS panel.
 
 Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
 ---
- arch/arm/boot/dts/imx6qdl-sabreauto.dtsi | 7 +++++++
+ arch/arm/boot/dts/imx6qdl-nitrogen6x.dtsi | 7 +++++++
  1 file changed, 7 insertions(+)
 
-diff --git a/arch/arm/boot/dts/imx6qdl-sabreauto.dtsi b/arch/arm/boot/dts/imx6qdl-sabreauto.dtsi
-index bd0707f..8acf319 100644
---- a/arch/arm/boot/dts/imx6qdl-sabreauto.dtsi
-+++ b/arch/arm/boot/dts/imx6qdl-sabreauto.dtsi
-@@ -45,6 +45,13 @@
- 	};
+diff --git a/arch/arm/boot/dts/imx6qdl-nitrogen6x.dtsi b/arch/arm/boot/dts/imx6qdl-nitrogen6x.dtsi
+index 3af16df..1cba390 100644
+--- a/arch/arm/boot/dts/imx6qdl-nitrogen6x.dtsi
++++ b/arch/arm/boot/dts/imx6qdl-nitrogen6x.dtsi
+@@ -149,6 +149,13 @@
+ 	status = "okay";
  };
  
 +&clks {
