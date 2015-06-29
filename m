@@ -1,115 +1,21 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 29 Jun 2015 09:39:28 +0100
-Subject: [PATCH v2 6/9] irqchip / gic: Add stacked irqdomain support for
- ACPI based GICv2 init
-In-Reply-To: <558E1DEE.3090900@linaro.org>
-References: <1434703572-26221-1-git-send-email-hanjun.guo@linaro.org>
- <1434703572-26221-7-git-send-email-hanjun.guo@linaro.org>
- <20150622172014.GB26129@red-moon> <5589772A.8070708@linaro.org>
- <20150623173845.GC31466@red-moon> <558E1DEE.3090900@linaro.org>
-Message-ID: <55910440.8070702@arm.com>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Mon, 29 Jun 2015 16:42:55 +0800
+Subject: [PATCH v5 0/6] Change snvs rtc and poweroff to use syscon add
+ pwrkey driver
+In-Reply-To: <CAHrpEqQ9BTtRtRNwKafHwWpQ7x_+zQ670sbuLZJMj=FFjMCZNQ@mail.gmail.com>
+References: <1432657562-5592-1-git-send-email-Frank.Li@freescale.com>
+ <20150527121052.GH16165@dragon> <20150528121353.GP2185@piout.net>
+ <CAHrpEqShyPKeKYdVZ05_qsbx0cC387a2QPCdbhR5C968n=ED0A@mail.gmail.com>
+ <20150601194552.GD30024@dtor-ws>
+ <CAHrpEqQ9BTtRtRNwKafHwWpQ7x_+zQ670sbuLZJMj=FFjMCZNQ@mail.gmail.com>
+Message-ID: <20150629084255.GI10332@tiger>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 27/06/15 04:52, Hanjun Guo wrote:
-> On 06/24/2015 01:38 AM, Lorenzo Pieralisi wrote:
->> On Tue, Jun 23, 2015 at 04:11:38PM +0100, Hanjun Guo wrote:
->>
->> [...]
->>
->>>>> diff --git a/drivers/irqchip/irq-gic.c b/drivers/irqchip/irq-gic.c
->>>>> index 8fc67bc..d1b2131 100644
->>>>> --- a/drivers/irqchip/irq-gic.c
->>>>> +++ b/drivers/irqchip/irq-gic.c
->>>>> @@ -851,15 +851,22 @@ static struct notifier_block gic_cpu_notifier = {
->>>>>    static int gic_irq_domain_alloc(struct irq_domain *domain, unsigned int virq,
->>>>>    				unsigned int nr_irqs, void *arg)
->>>>>    {
->>>>> -	int i, ret;
->>>>> +	int i;
->>>>>    	irq_hw_number_t hwirq;
->>>>> -	unsigned int type = IRQ_TYPE_NONE;
->>>>> -	struct of_phandle_args *irq_data = arg;
->>>>>
->>>>> -	ret = gic_irq_domain_xlate(domain, irq_data->np, irq_data->args,
->>>>> -				   irq_data->args_count, &hwirq, &type);
->>>>> -	if (ret)
->>>>> -		return ret;
->>>>> +	if (domain->of_node) {	/* DT case */
->>>>> +		int ret;
->>>>> +		unsigned int type = IRQ_TYPE_NONE;
->>>>> +		struct of_phandle_args *irq_data = arg;
->>>>> +
->>>>> +		ret = gic_irq_domain_xlate(domain, irq_data->np,
->>>>> +					irq_data->args,
->>>>> +					irq_data->args_count, &hwirq, &type);
->>>>> +		if (ret)
->>>>> +			return ret;
->>>>> +	} else {	/* ACPI case */
->>>>> +		hwirq = (irq_hw_number_t)*(u32 *)arg;
->>>>> +	}
->>>>
->>>> If domain->of_node is NULL and system booted with DT the code above
->>>> does not fail (and if it fails almost certainly that won't be graceful)
->>>> but it should.
->>>
->>> how about the following logic?
->>>
->>> if (!domain->of_node && acpi_disabled)
->>> 	return -ENODEV;
->>> else if (domain->of_node)
->>> 	dt related code;
->>> else
->>> 	ACPI related code;
->>
->> Code is not checking the node at present so:
->>
->> if (acpi_disabled)
->> 	dt code;
->> else
->> 	ACPI code;
->>
->> would do, but that's a nit.
->>
->>>>>    	for (i = 0; i < nr_irqs; i++)
->>>>>    		gic_irq_domain_map(domain, virq + i, hwirq + i);
->>>>> @@ -945,11 +952,11 @@ void __init gic_init_bases(unsigned int gic_nr, int irq_start,
->>>>>    		gic_irqs = 1020;
->>>>>    	gic->gic_irqs = gic_irqs;
->>>>>
->>>>> -	if (node) {		/* DT case */
->>>>> +	if (node || !acpi_disabled) {		/* DT or ACPI case */
->>>>>    		gic->domain = irq_domain_add_linear(node, gic_irqs,
->>>>>    						    &gic_irq_domain_hierarchy_ops,
->>>>>    						    gic);
->>
->> I think this is a bit more worrying, I mean passing a NULL node pointer to
->> the irqdomain layer which basically means you are booting out of ACPI
+On Mon, Jun 01, 2015 at 03:24:11PM -0500, Zhi Li wrote:
+> Shawn:
 > 
-> I'm little confused here, would you mind explaining more for your
-> worrying? To me, node pointer is optional and it's ok for ACPI
-> case.
-> 
->> (for you, if that's true for the irq_domain_add_linear implementation
->> that's another story), the node pointer should be optional but you
->> need feedback from IRQ layer maintainers here.
-> 
-> Sure.
+>          Everyone agree merge through your tree.
+>          Please help pick whole patches
 
-Frankly, I'd really like to see ACPI using the "node" parameter for
-something useful. This would save having to cache pointers all over the
-place, will make find_irq_host() work as expected... etc.
-
-See the comment at the top of linux/irqdomain.h :
-
-"... This code could thus be used on other architectures by replacing
-those two by some sort of arch-specific void * "token" used to identify
-interrupt controllers."
-
-Maybe it is time to bite the bullet.
-
-Thanks,
-
-	M.
--- 
-Jazz is not dead. It just smells funny...
+Applied, thanks.
