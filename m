@@ -1,59 +1,86 @@
-From: yh.huang@mediatek.com (YH Huang)
-Date: Mon, 29 Jun 2015 23:24:43 +0800
-Subject: [PATCH v3 1/2] dt-bindings: pwm: add MediaTek display PWM bindings
-In-Reply-To: <1435590211-38854-2-git-send-email-yh.huang@mediatek.com>
-References: <1435590211-38854-1-git-send-email-yh.huang@mediatek.com>
- <1435590211-38854-2-git-send-email-yh.huang@mediatek.com>
-Message-ID: <1435591483.21804.2.camel@mtksdaap41>
+From: vaibhav.hiremath@linaro.org (Vaibhav Hiremath)
+Date: Mon, 29 Jun 2015 21:01:13 +0530
+Subject: [PATCH-V5 0/4] mfd: 88pm800: Add Device tree support
+Message-ID: <1435591877-18214-1-git-send-email-vaibhav.hiremath@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-I am sorry for forgetting to remove Change-Id in [PATCH v3 1/2] and
-[PATCH v3 1/2].
+This patch-series adds support for Device tree to 88PM800 mfd driver.
+It also sets default configuration of irq clear method if board file
+doesn't exist.
 
-Regards,
-YH Huang
+Testing::
+ - Boot tested on PXA1928 based platform.
+ - probe of mfd, rtc and regulator function passing successfully.
+ - Basic read operations on registers
+ - irq clear configuration
 
-On Mon, 2015-06-29 at 23:03 +0800, YH Huang wrote:
-> Document the device-tree binding of MediatTek display PWM.
-> The clock "main" and "mm" are used to generate PWM signals.
-> The PWM has one channel to control the backlight brightness for display.
-> It supports MT8173 and MT6595.
-> 
-> Change-Id: I194ca88b4e4cd01a28b8701e07e86ea6941e5292
-> Signed-off-by: YH Huang <yh.huang@mediatek.com>
-> ---
->  .../devicetree/bindings/pwm/pwm-mtk-disp.txt       | 24 ++++++++++++++++++++++
->  1 file changed, 24 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/pwm/pwm-mtk-disp.txt
-> 
-> diff --git a/Documentation/devicetree/bindings/pwm/pwm-mtk-disp.txt b/Documentation/devicetree/bindings/pwm/pwm-mtk-disp.txt
-> new file mode 100644
-> index 0000000..355b755
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/pwm/pwm-mtk-disp.txt
-> @@ -0,0 +1,24 @@
-> +MediaTek display PWM controller
-> +
-> +Required properties:
-> + - compatible: should be "mediatek,<name>-disp-pwm"
-> +   - "mediatek,mt8173-disp-pwm": found on mt8173 SoC
-> +   - "mediatek,mt6595-disp-pwm": found on mt6595 SoC
-> + - reg: physical base address and length of the controller's registers
-> + - #pwm-cells: must be 2. See pwm.txt in this directory for a description of
-> +   the cell format
-> + - clocks: phandle and clock specifier of the PWM reference clock
-> + - clock-names: must contain the following
-> +   - "main": clock used to generate PWM signals
-> +   - "mm": sync signals from the modules of mmsys
-> +
-> +Example:
-> +	pwm0: pwm at 1401e000 {
-> +		compatible = "mediatek,mt8173-disp-pwm",
-> +			     "mediatek,mt6595-disp-pwm";
-> +		reg = <0 0x1401e000 0 0x1000>;
-> +		#pwm-cells = <2>;
-> +		clocks = <&mmsys MM_DISP_PWM026M>,
-> +			 <&mmsys MM_DISP_PWM0MM>;
-> +		clock-names = "main", "mm";
-> +	};
+V4 => V5
+=======
+Link to V4: https://lkml.org/lkml/2015/6/25/67
+
+  - Renamed binding back again to 88pm800, as 'Yi Zhang' already started
+    submitting 88pm88x, so 88pm8xx won't make sense. Better name would be to
+    stick with 88pm80x.
+  - Added new patch to series PATCH 2/4, to remove unwanted protection around
+    padata
+  - As suggested by Lee, added macro based implementation for CLEAR_ON_WRITE
+    and CLEAR_ON_READ.
+  - and fixed other trivial comments.
+
+V3 => V4
+=======
+Link to V3: https://lkml.org/lkml/2015/6/24/143
+
+   -  irq clear method is 88PM800 feature, which is not dependent on board or
+      doesn't require any wiring changes, so DT is not the way.
+      Hardcoded to "irq clear on write" if board file doesn't exist.
+   - Updated binding patch (PATCH 3/3) to remove irq-clr-on-wr entry.
+   - Since PATCH 3/3 changed from original, removed Rob's Acked-by.
+
+V2 => V3
+=======
+Link to V2: https://www.mail-archive.com/linux-kernel at vger.kernel.org/msg914299.html
+
+   - Replaced deprecated "regulator-compatible" property with "regulator-name".
+   - Added Rob's Acked-by  to [PATCH 3/3]
+
+V1 => V2
+=======
+Link to V1: http://lkml.iu.edu/hypermail/linux/kernel/1505.3/04386.html
+
+  - Split binding changes from original commit
+  - Updated binding info as per Rob's suggestion
+  - Dropped PATCH 4/4, as discussed during review
+  - Dropped PATCH 3/4, as it is independent RTC code change,
+    so will submit it separately to ease merging.
+  - Fixed all other minor comments
+
+Attempt has been made to push some of the patches to the list sometime
+back in 2013.
+
+Link to previous patch submission:
+        https://lkml.org/lkml/2013/8/14/86
+
+
+TODO:
+=====
+   - init config for 88PM860 device
+   - Rgulator driver changes to add support for 88PM860 device
+
+
+
+Vaibhav Hiremath (4):
+  mfd: 88pm800: Add device tree support
+  mfd: 88pm800: Remove unnecessary protection around pdata
+  mfd: 88pm800: Set default interrupt clear method
+  mfd: devicetree: bindings: Add new 88pm800 mfd binding
+
+ Documentation/devicetree/bindings/mfd/88pm800.txt | 53 +++++++++++++++++++++++
+ drivers/mfd/88pm800.c                             | 52 ++++++++++++++++------
+ include/linux/mfd/88pm80x.h                       | 10 ++++-
+ 3 files changed, 100 insertions(+), 15 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/mfd/88pm800.txt
+
+-- 
+1.9.1
