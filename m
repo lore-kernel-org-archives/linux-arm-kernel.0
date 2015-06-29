@@ -1,44 +1,41 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Mon, 29 Jun 2015 12:05:33 +0100
-Subject: [RFC PATCH v3] arm DMA: Fix allocation from CMA for coherent DMA
-In-Reply-To: <20150629104604.GB7557@n2100.arm.linux.org.uk>
-References: <1434663862-17858-1-git-send-email-lorenx4@gmail.com>
- <20150626162549.GK3078@e104818-lin.cambridge.arm.com>
- <CAE=W-e3YUjT=KbYTizBwg+3huvFLDqHvhzZN-oPqEnOKUXAtoQ@mail.gmail.com>
- <20150629103737.GC29907@e104818-lin.cambridge.arm.com>
- <20150629104604.GB7557@n2100.arm.linux.org.uk>
-Message-ID: <20150629110532.GD29907@e104818-lin.cambridge.arm.com>
+From: manabian@gmail.com (Joachim Eastwood)
+Date: Mon, 29 Jun 2015 13:06:47 +0200
+Subject: [PATCH RFC 0/4] PL08x DT bindings and LPC18xx DMA support
+In-Reply-To: <CACRpkdZZBGzioO25-Sov0CVK8JuRp1uuJDEZKFtLxg9WwsSzww@mail.gmail.com>
+References: <1434280937-8369-1-git-send-email-manabian@gmail.com>
+ <CACRpkdZZBGzioO25-Sov0CVK8JuRp1uuJDEZKFtLxg9WwsSzww@mail.gmail.com>
+Message-ID: <CAGhQ9VxXHdPwUR0AWC8SVA9iRV8pazVC1atmrEKzP5dJx81MBw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 29, 2015 at 11:46:04AM +0100, Russell King - ARM Linux wrote:
-> On Mon, Jun 29, 2015 at 11:37:37AM +0100, Catalin Marinas wrote:
-> > I forgot about the arm_dma_mmap fix here:
-> > 
-> > https://lkml.org/lkml/2015/5/7/512
-> > 
-> > So we either fix both cases by changing __get_dma_pgprot() or just go
-> > for Mike's and your patches as above. It's up to Russell.
-> 
-> I'd prefer the "least code" option. :)
-> 
-> > At some point, we could do with some more clean-up in the dma-mapping.c.
-> > For example, both __alloc_simple_buffer() and __alloc_from_contiguous()
-> > end up calling __dma_clear_buffer() even when not necessary (cacheable
-> > mapping). Not too bad though as this is only done when setting up the
-> > buffer.
-> 
-> The reason we always clear the buffer is that we can't be sure that a
-> driver will not map a buffer allocated by dma_alloc_coherent() into
-> userspace without it first being initialised.  There have been drivers
-> which do this (ALSA in particular.)  I haven't checked whether this
-> instance still does this, but it used to - and the problem is once
-> one instance exists, it gets copied...
+Hi Linus,
 
-You are right, the memset'ing is probably still necessary to patch
-potential security holes. The cache flushing is not for coherent buffers
-(sometimes this may be more expensive than the memset itself, though
-lost in the noise if only done once).
+On 29 June 2015 at 12:53, Linus Walleij <linus.walleij@linaro.org> wrote:
+> On Sun, Jun 14, 2015 at 1:22 PM, Joachim Eastwood <manabian@gmail.com> wrote:
+>
+>> This patch set aims to add support for DMA on the NXP LPC18xx/43xx
+>> (Cortex-M3/M4) platform. The platform has a PL080 controller with a
+>> mux in front of the DMA request lines. This setup is quite common
+>> and can be found on most other, if not all, NXP LPC devices.
+>
+> Nice!
+>
+>>  - remove channel sub-nodes from driver and dt doc.
+>
+> Why? It was a good approach for the Nomadik. Well I'll look
+> how you do it for NXP, I guess it makes total sense for you.
 
--- 
-Catalin
+Since the bus specifier (AHB1 / AHB2) property has been moved into the
+DMA cell, I don't see a reason to keep channel sub-nodes stuff.
+
+And I also agree with Arnd's other comments on the subject here:
+https://www.marc.info/?l=linux-arm-kernel&m=141088461506806&w=2
+(see at the bottom)
+
+Summary:
+* No other driver does this.
+* Removing it make the driver a bit simpler.
+
+
+regards,
+Joachim Eastwood
