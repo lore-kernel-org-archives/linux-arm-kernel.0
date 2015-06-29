@@ -1,68 +1,38 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Mon, 29 Jun 2015 15:03:59 +0200
-Subject: [PATCH v2 1/3] net: mvneta: introduce compatible string "marvell,
- armada-xp-neta"
-In-Reply-To: <1434547162-6275-2-git-send-email-simon.guinot@sequanux.org>
-References: <1434547162-6275-1-git-send-email-simon.guinot@sequanux.org>
- <1434547162-6275-2-git-send-email-simon.guinot@sequanux.org>
-Message-ID: <5591423F.8060804@free-electrons.com>
+From: leilk.liu@mediatek.com (Leilk Liu)
+Date: Mon, 29 Jun 2015 21:04:26 +0800
+Subject: [PATCH v2 0/4] Add Mediatek SPI bus driver 
+Message-ID: <1435583070-9600-1-git-send-email-leilk.liu@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Simon,
+Mediatek SPI BUS controller has 3 hardware restrictions:
+1. Hw has the restriction that in one transfer, length must be a multiple of
+   1024, when it's greater than 1024bytes.
+2. Hw tx/rx have 4bytes aligned restriction.
+3. For MT8173 IC: RX must enable TX, then TX transfer dummy data; TX don't need
+   to enable RX.
+Some workarounds are done in SPI driver code base on v4.1-rc1.
 
-On 17/06/2015 15:19, Simon Guinot wrote:
-> The mvneta driver supports the Ethernet IP found in the Armada 370, XP,
-> 380 and 385 SoCs. Since at least one more hardware feature is available
-> for the Armada XP SoCs then a way to identify them is needed.
-> 
-> This patch introduces a new compatible string "marvell,armada-xp-neta".
-> 
-> Signed-off-by: Simon Guinot <simon.guinot@sequanux.org>
-> Cc: <stable@vger.kernel.org> # v3.8+
+Change in v2:
+1. Remove spi bitbang framwork, use can_dma() and transfer_one().
+2. Add PM functions.
+3. Fix Mark Brown review comment.
 
-Acked-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+Leilk Liu (4):
+  spi: support spi without dma channel to use can_dma()
+  dt-bindings: ARM: Mediatek: Document devicetree bindings for spi bus
+  spi: mediatek: Add spi bus for Mediatek MT8173
+  arm64: dts: Add spi bus dts
 
+ .../devicetree/bindings/spi/spi-mt65xx.txt         |  32 +
+ arch/arm64/boot/dts/mediatek/mt8173.dtsi           |   9 +
+ drivers/spi/Kconfig                                |   9 +
+ drivers/spi/Makefile                               |   1 +
+ drivers/spi/spi-mt65xx.c                           | 656 +++++++++++++++++++++
+ drivers/spi/spi.c                                  |  22 +-
+ 6 files changed, 725 insertions(+), 4 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/spi/spi-mt65xx.txt
+ create mode 100644 drivers/spi/spi-mt65xx.c
 
-Thanks,
-
-Gregory
-
-> ---
->  Documentation/devicetree/bindings/net/marvell-armada-370-neta.txt | 2 +-
->  drivers/net/ethernet/marvell/mvneta.c                             | 1 +
->  2 files changed, 2 insertions(+), 1 deletion(-)
-> 
-> diff --git a/Documentation/devicetree/bindings/net/marvell-armada-370-neta.txt b/Documentation/devicetree/bindings/net/marvell-armada-370-neta.txt
-> index 750d577e8083..f5a8ca29aff0 100644
-> --- a/Documentation/devicetree/bindings/net/marvell-armada-370-neta.txt
-> +++ b/Documentation/devicetree/bindings/net/marvell-armada-370-neta.txt
-> @@ -1,7 +1,7 @@
->  * Marvell Armada 370 / Armada XP Ethernet Controller (NETA)
->  
->  Required properties:
-> -- compatible: should be "marvell,armada-370-neta".
-> +- compatible: "marvell,armada-370-neta" or "marvell,armada-xp-neta".
->  - reg: address and length of the register set for the device.
->  - interrupts: interrupt for the device
->  - phy: See ethernet.txt file in the same directory.
-> diff --git a/drivers/net/ethernet/marvell/mvneta.c b/drivers/net/ethernet/marvell/mvneta.c
-> index ce5f7f9cff06..aceb977b104d 100644
-> --- a/drivers/net/ethernet/marvell/mvneta.c
-> +++ b/drivers/net/ethernet/marvell/mvneta.c
-> @@ -3179,6 +3179,7 @@ static int mvneta_remove(struct platform_device *pdev)
->  
->  static const struct of_device_id mvneta_match[] = {
->  	{ .compatible = "marvell,armada-370-neta" },
-> +	{ .compatible = "marvell,armada-xp-neta" },
->  	{ }
->  };
->  MODULE_DEVICE_TABLE(of, mvneta_match);
-> 
-
-
--- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+--
+1.8.1.1.dirty
