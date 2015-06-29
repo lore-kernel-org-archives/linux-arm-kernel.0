@@ -1,52 +1,27 @@
-From: Tirumalesh.Chalamarla@caviumnetworks.com (Chalamarla, Tirumalesh)
-Date: Mon, 29 Jun 2015 17:13:37 +0000
-Subject: [PATCH] arm64/kvm: Add generic v8 KVM target
-In-Reply-To: <20150626095318.GG28244@cbox>
-References: <1434531646-4873-1-git-send-email-suzuki.poulose@arm.com>
- <CAFEAcA92uymQ3LjPQnuFiwvjSgc+jY54VrfK_Sh4v1DJ+=OPpw@mail.gmail.com>
- <558A6A84.5020603@arm.com> <20150624085128.GA22785@cbox>
- <558A7936.7020109@arm.com> <20150625123034.GE28244@cbox>
- <558BF6C9.3000009@arm.com> <558C05A9.8080201@arm.com>
- <CAFEAcA_ULz=ugQW=NmthzqYRtvcfwteQTh0DonHRN6U5NykEtQ@mail.gmail.com>
- <20150626095318.GG28244@cbox>
-Message-ID: <F37C68A5-E48F-462C-AD18-0F3C096348C7@caviumnetworks.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Mon, 29 Jun 2015 18:15:41 +0100
+Subject: next-20150629 build: 1 failures 74 warnings (next-20150629)
+In-Reply-To: <E1Z9WQC-000356-Bd@optimist>
+References: <E1Z9WQC-000356-Bd@optimist>
+Message-ID: <20150629171541.GK11162@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Mon, Jun 29, 2015 at 11:36:17AM +0100, Build bot for Mark Brown wrote:
 
-> On Jun 26, 2015, at 2:53 AM, Christoffer Dall <christoffer.dall@linaro.org> wrote:
-> 
-> On Thu, Jun 25, 2015 at 02:49:08PM +0100, Peter Maydell wrote:
->> On 25 June 2015 at 14:44, Marc Zyngier <marc.zyngier@arm.com> wrote:
->>> It should always be possible to emulate a "known" CPU on a generic host,
->>> and it should be able to migrate. The case we can't migrate is when we
->>> let the guest be generic (which I guess should really be unknown, and
->>> not generic).
->>> 
->>> So if the user specify "-cpu cortex-a57" on the command line, the guest
->>> should be able to migrate from an A72 to an A53. if the user specified
->>> "-cpu host", the resulting guest won't be able to migrate.
->>> 
->>> Does it make sense?
->> 
->> Yes. We've always said "-cpu host" won't be cross-host migratable
->> from a QEMU point of view.
->> 
-> ok, this makes sense.  It's basically up to userspace to mandate that
-> trying to migrate something that used unknown cpu (via -cpu host or
-> whatever) cannot be migrated.
-> 
+Today's -next fails to build an ARM allmodconfig due to:
 
-Will this also prevents migrating between same implementations, if no how is this identified.
-This seems to be making emulation a requirment for ARM64 KVM. 
+> ../drivers/watchdog/omap_wdt.c:288:18: error: 'omap_wdt' undeclared (first use in this function)
 
-
-Thanks,
-Tirumalesh. 
- 
-
-> -Christoffer
-> _______________________________________________
-> kvmarm mailing list
-> kvmarm at lists.cs.columbia.edu
-> https://lists.cs.columbia.edu/mailman/listinfo/kvmarm
+which is introduced by "watchdog: omap_wdt: early_enable module
+parameter" which adds the above reference to a nonexistant variable.
+Presumably the patch was generated against something sufficiently old to
+lack "watchdog: omap: put struct watchdog_device into driver data" which
+appears to be where it was removed.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150629/b636df07/attachment.sig>
