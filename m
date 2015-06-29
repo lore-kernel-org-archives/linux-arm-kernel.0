@@ -1,49 +1,46 @@
-From: milo.kim@ti.com (Milo Kim)
-Date: Mon, 29 Jun 2015 13:38:34 +0900
-Subject: [PATCH] ARM: versatile: enable RTC DS1338 driver in defconfig
-Message-ID: <1435552714-536-1-git-send-email-milo.kim@ti.com>
+From: michal.simek@xilinx.com (Michal Simek)
+Date: Mon, 29 Jun 2015 07:02:08 +0200
+Subject: [PATCH] arm64: defconfig: Add Ceva ahci to the defconfig
+Message-ID: <457a921583db64bf74ae13b227bedf79cf86cff8.1435554123.git.michal.simek@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Versatile platform boards[*] support external RTC device, DS1338.
-It is compatible with rtc-ds1307 device driver.
-This driver requires not only RTC subsystem configuration but also I2C host
-bus support.
+From: Suneel Garapati <suneel.garapati@xilinx.com>
 
-QEMU[**] also supports this device by default.
+The Ceva ahci controller is available on the Xilinx Zynq UltraScale+
+MPSoC.
 
-[*]  arch/arm/mach-versatile/core.c
-[**] hw/arm/versatilepb.c
-
-Cc: Liviu Dudau <liviu.dudau@arm.com>
-Cc: Sudeep Holla <sudeep.holla@arm.com>
-Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-Signed-off-by: Milo Kim <milo.kim@ti.com>
+Signed-off-by: Suneel Garapati <suneel.garapati@xilinx.com>
+Signed-off-by: Michal Simek <michal.simek@xilinx.com>
 ---
- arch/arm/configs/versatile_defconfig | 4 ++++
- 1 file changed, 4 insertions(+)
 
-diff --git a/arch/arm/configs/versatile_defconfig b/arch/arm/configs/versatile_defconfig
-index ea49d37..550500f 100644
---- a/arch/arm/configs/versatile_defconfig
-+++ b/arch/arm/configs/versatile_defconfig
-@@ -47,6 +47,7 @@ CONFIG_SERIAL_AMBA_PL011=y
- CONFIG_SERIAL_AMBA_PL011_CONSOLE=y
- CONFIG_I2C=y
- CONFIG_I2C_CHARDEV=m
-+CONFIG_I2C_VERSATILE=y
- CONFIG_GPIOLIB=y
- CONFIG_GPIO_PL061=y
- # CONFIG_HWMON is not set
-@@ -66,6 +67,9 @@ CONFIG_LEDS_VERSATILE=y
- CONFIG_LEDS_TRIGGERS=y
- CONFIG_LEDS_TRIGGER_HEARTBEAT=y
- CONFIG_LEDS_TRIGGER_CPU=y
-+CONFIG_RTC_LIB=y
-+CONFIG_RTC_CLASS=y
-+CONFIG_RTC_DRV_DS1307=y
- CONFIG_EXT2_FS=y
- CONFIG_VFAT_FS=m
- CONFIG_JFFS2_FS=y
+ arch/arm64/configs/defconfig | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/arch/arm64/configs/defconfig b/arch/arm64/configs/defconfig
+index f38c94f1d898..ef5b5d27a226 100644
+--- a/arch/arm64/configs/defconfig
++++ b/arch/arm64/configs/defconfig
+@@ -35,10 +35,10 @@ CONFIG_ARCH_EXYNOS7=y
+ CONFIG_ARCH_FSL_LS2085A=y
+ CONFIG_ARCH_HISI=y
+ CONFIG_ARCH_MEDIATEK=y
++CONFIG_ARCH_QCOM=y
+ CONFIG_ARCH_SEATTLE=y
+ CONFIG_ARCH_TEGRA=y
+ CONFIG_ARCH_TEGRA_132_SOC=y
+-CONFIG_ARCH_QCOM=y
+ CONFIG_ARCH_SPRD=y
+ CONFIG_ARCH_THUNDER=y
+ CONFIG_ARCH_VEXPRESS=y
+@@ -82,7 +82,7 @@ CONFIG_BLK_DEV_SD=y
+ # CONFIG_SCSI_LOWLEVEL is not set
+ CONFIG_ATA=y
+ CONFIG_SATA_AHCI=y
+-CONFIG_SATA_AHCI_PLATFORM=y
++CONFIG_AHCI_CEVA=y
+ CONFIG_AHCI_XGENE=y
+ CONFIG_PATA_PLATFORM=y
+ CONFIG_PATA_OF_PLATFORM=y
 -- 
-1.9.1
+2.3.5
