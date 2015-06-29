@@ -1,54 +1,56 @@
-From: s.munaut@whatever-company.com (Sylvain Munaut)
-Date: Mon, 29 Jun 2015 15:22:38 +0200
-Subject: dma-mapping: support for DMA_ATTR_NON_CONSISTENT DMA attribute
-In-Reply-To: <20150629100804.GA7557@n2100.arm.linux.org.uk>
-References: <CAF6-1L5c-PbK_wfpvz1xdRkquXyuQDv4mvKfYp8fwA1LK9ZOyw@mail.gmail.com>
- <20150628224543.GW7557@n2100.arm.linux.org.uk>
- <CAF6-1L4g0W6kboZt52fHBUPxGYWYn9-9vmm=0-WQVv1-YdfOEA@mail.gmail.com>
- <5590E962.4020700@topic.nl>
- <CAF6-1L584tp5o8U7S-w4-_XSjH4uXdMJSY89grLyFuwrJF3UyA@mail.gmail.com>
- <20150629100804.GA7557@n2100.arm.linux.org.uk>
-Message-ID: <CAF6-1L4Lt2wH8fmUQv=p4M8GAQ0bdMZGkr8CiiZfyaJo15w+tQ@mail.gmail.com>
+From: r.baldyga@samsung.com (Robert Baldyga)
+Date: Mon, 29 Jun 2015 15:22:34 +0200
+Subject: [PATCH] ARM: dts: exynos4: add DMA support for serial ports
+Message-ID: <1435584154-4969-1-git-send-email-r.baldyga@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Russell,
+Enable DMA transfers for serial ports.
 
+Signed-off-by: Robert Baldyga <r.baldyga@samsung.com>
+---
+ arch/arm/boot/dts/exynos4.dtsi | 8 ++++++++
+ 1 file changed, 8 insertions(+)
 
-On Mon, Jun 29, 2015 at 12:08 PM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> On Mon, Jun 29, 2015 at 12:05:09PM +0200, Sylvain Munaut wrote:
->> Well that can't be since the dma_sync_* are part of streaming API and
->> the dma_alloc_attrs is part of the "coherent" API (even though you
->> have the NON_COHERENT flag in it ... that's a bit weird).
->>
->> But I don't see the alternative, unless the doc is suggesting I
->> basically do all the cache invalidation myself manually and doing arch
->> specific stuff directly in the driver ?
->
-> Maybe someone with this problem should work on a solution - augmenting
-> the coherent API with a set of functions to do what you want?
->
-> Please, if you find something lacking like this, make a proposal and
-> send a patch - but bear in mind that such an extension is not a matter
-> for just ARM, but every other architecture that the kernel supports,
-> so merely sending it to ARM mailing lists isn't going to get you very
-> far.
-
-I think I'd do it the other way, and augment the streaming API with a
-method to allocate memory (either using kmalloc for small size or from
-the CMA for large chunks).
-
-This seems to be much less architecture dependent.
-
-Would that be acceptable ?
-
-
-All in all, the DMA_ATTR_NON_CONSISTENT flag seems to be used by only
-2 drivers (and I couldn't really trace easily how they handle the
-sync).
-
-
-Cheers,
-
-   Sylvain
+diff --git a/arch/arm/boot/dts/exynos4.dtsi b/arch/arm/boot/dts/exynos4.dtsi
+index e20cdc2..21b839b 100644
+--- a/arch/arm/boot/dts/exynos4.dtsi
++++ b/arch/arm/boot/dts/exynos4.dtsi
+@@ -426,6 +426,8 @@
+ 		interrupts = <0 52 0>;
+ 		clocks = <&clock CLK_UART0>, <&clock CLK_SCLK_UART0>;
+ 		clock-names = "uart", "clk_uart_baud0";
++		dmas = <&pdma0 15>, <&pdma0 16>;
++		dma-names = "rx", "tx";
+ 		status = "disabled";
+ 	};
+ 
+@@ -435,6 +437,8 @@
+ 		interrupts = <0 53 0>;
+ 		clocks = <&clock CLK_UART1>, <&clock CLK_SCLK_UART1>;
+ 		clock-names = "uart", "clk_uart_baud0";
++		dmas = <&pdma1 15>, <&pdma1 16>;
++		dma-names = "rx", "tx";
+ 		status = "disabled";
+ 	};
+ 
+@@ -444,6 +448,8 @@
+ 		interrupts = <0 54 0>;
+ 		clocks = <&clock CLK_UART2>, <&clock CLK_SCLK_UART2>;
+ 		clock-names = "uart", "clk_uart_baud0";
++		dmas = <&pdma0 17>, <&pdma0 18>;
++		dma-names = "rx", "tx";
+ 		status = "disabled";
+ 	};
+ 
+@@ -453,6 +459,8 @@
+ 		interrupts = <0 55 0>;
+ 		clocks = <&clock CLK_UART3>, <&clock CLK_SCLK_UART3>;
+ 		clock-names = "uart", "clk_uart_baud0";
++		dmas = <&pdma1 17>, <&pdma1 18>;
++		dma-names = "rx", "tx";
+ 		status = "disabled";
+ 	};
+ 
+-- 
+1.9.1
