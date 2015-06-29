@@ -1,33 +1,32 @@
 From: peter.maydell@linaro.org (Peter Maydell)
-Date: Mon, 29 Jun 2015 18:38:49 +0100
-Subject: [PATCH] arm64/kvm: Add generic v8 KVM target
-In-Reply-To: <559180CA.3050905@arm.com>
-References: <1434531646-4873-1-git-send-email-suzuki.poulose@arm.com>
- <CAFEAcA92uymQ3LjPQnuFiwvjSgc+jY54VrfK_Sh4v1DJ+=OPpw@mail.gmail.com>
- <558A6A84.5020603@arm.com> <20150624085128.GA22785@cbox>
- <558A7936.7020109@arm.com>
- <20150625123034.GE28244@cbox> <558BF6C9.3000009@arm.com>
- <558C05A9.8080201@arm.com>
- <CAFEAcA_ULz=ugQW=NmthzqYRtvcfwteQTh0DonHRN6U5NykEtQ@mail.gmail.com>
- <20150626095318.GG28244@cbox>
- <F37C68A5-E48F-462C-AD18-0F3C096348C7@caviumnetworks.com>
- <559180CA.3050905@arm.com>
-Message-ID: <CAFEAcA-E+KdiL4suQ0DoEvB-zGpNZ7-dq46FegC_iXYRPvo9jA@mail.gmail.com>
+Date: Mon, 29 Jun 2015 18:37:33 +0100
+Subject: [RFC PATCH] KVM: arm/arm64: Don't let userspace update CNTVOFF
+ once guest is running
+In-Reply-To: <55917E5B.3030401@huawei.com>
+References: <1435157697-28579-1-git-send-email-marc.zyngier@arm.com>
+ <20150625080457.GD28244@cbox> <558BC2F5.9010303@huawei.com>
+ <CAFEAcA_RzWSppaYA9vuAaL-MO6sQV1SgpXf3w-LScUdaarpOEQ@mail.gmail.com>
+ <558BC90B.4060806@huawei.com> <558CD9DE.3010609@web.de>
+ <55917E5B.3030401@huawei.com>
+Message-ID: <CAFEAcA-vS8B8pJUSseFw0OaKJFPe-0rMT-XHxjNbSvyxaZ+9Tg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 29 June 2015 at 18:30, Marc Zyngier <marc.zyngier@arm.com> wrote:
-> On 29/06/15 18:13, Chalamarla, Tirumalesh wrote:
->> Will this also prevents migrating between same implementations,
->> if no how is this identified.
+On 29 June 2015 at 18:20, Claudio Fontana <claudio.fontana@huawei.com> wrote:
+> On 26.06.2015 06:49, Jan Kiszka wrote:
+>> QEMU has the concept of write-back levels: KVM_PUT_RUNTIME_STATE,
+>> KVM_PUT_RESET_STATE and KVM_PUT_FULL_STATE. I suspect this registers is
+>> just sorted into the wrong category, thus written as part of the
+>> RUNTIME_STATE. We had such bug patterns during the x86 maturing phase as
+>> well.
+
+> It seems that QEMU target-arm ignores the level parameter to
+> kvm_arch_put_registers completely.
 >
-> This shouldn't. It is pretty easy to look at the incoming guest's MIDR,
-> and verify that it matches the default MIDR on the receiving system. Any
-> difference, and the migration should abort.
+> Is it intended?
 
-Do you really want to forbid migration between (say)
-Cortex-A57 r3p0 and Cortex-A57 r3p1 ?
-
-That seems pretty harsh.
+Yes, sort of. We don't in general know anything about the semantics
+of most of the system registers. It should always be safe to
+read them all out of the kernel and write them back...
 
 -- PMM
