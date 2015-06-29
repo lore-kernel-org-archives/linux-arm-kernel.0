@@ -1,75 +1,43 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Mon, 29 Jun 2015 15:52:09 +0200
-Subject: [PATCH v2 2/2] ARM: dts: add buffalo linkstation ls-wvl/vl
-In-Reply-To: <20150629134343.GB4535@lunn.ch>
-References: <1434713319-8691-3-git-send-email-rogershimizu@gmail.com>
- <1434985351-6678-1-git-send-email-rogershimizu@gmail.com>
- <559146B0.1010905@free-electrons.com> <20150629134343.GB4535@lunn.ch>
-Message-ID: <55914D89.2010208@free-electrons.com>
+From: matthias.bgg@gmail.com (Matthias Brugger)
+Date: Mon, 29 Jun 2015 16:13:05 +0200
+Subject: [PATCH v4] ARM: dts: mt8173: support arm64 cpuidle-dt
+In-Reply-To: <5590FF5C.10408@linaro.org>
+References: <1433402017-7711-1-git-send-email-howard.chen@linaro.org>
+ <5590FF5C.10408@linaro.org>
+Message-ID: <CABuKBe+VF+SEm6UfjQ6OTCz1mw6mT8ut3nbm_bj7UXsdTtirJA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Andrew, Roger,
-
-
-
-On 29/06/2015 15:43, Andrew Lunn wrote:
-> On Mon, Jun 29, 2015 at 03:22:56PM +0200, Gregory CLEMENT wrote:
->> Hi Roger,
+2015-06-29 10:18 GMT+02:00 Daniel Lezcano <daniel.lezcano@linaro.org>:
+> On 06/04/2015 09:13 AM, Howard Chen wrote:
 >>
->> On 22/06/2015 17:02, Roger Shimizu wrote:
->>> Add dts file to support Buffalo Linkstation LS-WVL and LS-VL,
->>> which are 3.5" HDD NAS in 2-bay and 1-bay respectively.
->>>
->>> Signed-off-by: Roger Shimizu <rogershimizu@gmail.com>
->>> Reviewed-by: Nobuhiro Iwamatsu <iwamatsu@nigauri.org>
+>> This patch adds an idle-states node to describe the mt8173 idle states and
+>> also adds references to the idle-states node in all CPU nodes.
 >>
->> it seems that you addressed Andrew's remarks too, so
+>> Changes:
 >>
->> Acked-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+>> v4:
+>> - Refine the property ordering.
 >>
+>> v3:
+>> - Add the local-timer-stop property.
 >>
->> However I will wait for Andrew's formal acked-by before applying it.
-> 
-> Hi Gregory
-> 
-> One minor nit pick. Maybe you can fix it while committing?
-> 
->>> +			pmx_led_alarm: pmx-led-alarm {
->>> +				marvell,pins = "mpp36";
->>> +				marvell,function = "gpio";
->>> +			};
->>> +			pmx_led_function_red: pmx-led-function_red {
-> 
-> Second _red should be -red.
+>> v2:
+>> - Remove the change to the PSCI version.
+>> - Remove the cluster idle state.
+>> - Fine tune the latency properties of the idle state.
+>>
+>> Signed-off-by: Howard Chen <howard.chen@linaro.org>
+>> Acked-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+>
+>
+> A bit late but ...
+>
+> Sounds good.
+>
+> Acked-by: Daniel Lezcano <daniel.lezcano@linaro.org>
 
-OK I will take care of it.
-
-
-Roger, you wont have to send a new version for fixing it.
-
+I deleted the change log part and applied it to v4.2-next/arm64
 
 Thanks,
-
-Gregory
-
-
-> 
->>> +				marvell,pins = "mpp37";
->>> +				marvell,function = "gpio";
->>> +			};
-> 
-> Other than that,
-> 
-> Acked-by: Andrew Lunn <andrew@lunn.ch>
-> 
-> 	  Thanks
-> 		Andrew
-> 
-
-
--- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+Matthias
