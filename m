@@ -1,32 +1,25 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 29 Jun 2015 12:49:27 +0200
-Subject: [PATCH 00/34] pinctrl: mvebu: numerous fixes,
- cleanups and improvements
-In-Reply-To: <557C51F3.7060707@free-electrons.com>
-References: <1433868446-11028-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <CACRpkda7mOYoh0QpxYR-EppshnZPOU2BUSs6t_Hv86aZoQY-MQ@mail.gmail.com>
- <557C51F3.7060707@free-electrons.com>
-Message-ID: <CACRpkdZ7AOh7M_9yx0PPbPVLRxgihNMhf14JkCoytx8+SAnTmg@mail.gmail.com>
+Date: Mon, 29 Jun 2015 12:53:04 +0200
+Subject: [PATCH RFC 0/4] PL08x DT bindings and LPC18xx DMA support
+In-Reply-To: <1434280937-8369-1-git-send-email-manabian@gmail.com>
+References: <1434280937-8369-1-git-send-email-manabian@gmail.com>
+Message-ID: <CACRpkdZZBGzioO25-Sov0CVK8JuRp1uuJDEZKFtLxg9WwsSzww@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Jun 13, 2015 at 5:53 PM, Gregory CLEMENT
-<gregory.clement@free-electrons.com> wrote:
-> Hi Linus,
->
-> On 10/06/2015 14:39, Linus Walleij wrote:
->> On Tue, Jun 9, 2015 at 6:46 PM, Thomas Petazzoni
->> <thomas.petazzoni@free-electrons.com> wrote:
->>
->>> This fairly long series of patches implement numerous fixes, cleanups
->>> and improvements to the description of the MPP pins on Armada 370,
->>> 375, 38x, 39x and XP.
->>
->> I have simply applied all of them, I trust you.
->
-> Does it means that it will be part of 4.2 ?
+On Sun, Jun 14, 2015 at 1:22 PM, Joachim Eastwood <manabian@gmail.com> wrote:
 
-Yes. They are already in Torvalds' tree by the way :)
+> This patch set aims to add support for DMA on the NXP LPC18xx/43xx
+> (Cortex-M3/M4) platform. The platform has a PL080 controller with a
+> mux in front of the DMA request lines. This setup is quite common
+> and can be found on most other, if not all, NXP LPC devices.
 
-Yours,
+Nice!
+
+>  - remove channel sub-nodes from driver and dt doc.
+
+Why? It was a good approach for the Nomadik. Well I'll look
+how you do it for NXP, I guess it makes total sense for you.
+
+N?ras,
 Linus Walleij
