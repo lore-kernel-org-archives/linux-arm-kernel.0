@@ -1,182 +1,107 @@
-From: dave.long@linaro.org (David Long)
-Date: Mon, 29 Jun 2015 14:36:45 -0400
-Subject: [PATCH v7 1/7] arm64: Add HAVE_REGS_AND_STACK_ACCESS_API feature
-In-Reply-To: <CAPvkgC37gFJjU__jubnJ1xJA_9ktCgBJ3wzWMAZN=93rvu3+Ew@mail.gmail.com>
-References: <1434395229-6654-1-git-send-email-dave.long@linaro.org>	<1434395229-6654-2-git-send-email-dave.long@linaro.org>
- <CAPvkgC37gFJjU__jubnJ1xJA_9ktCgBJ3wzWMAZN=93rvu3+Ew@mail.gmail.com>
-Message-ID: <5591903D.7090108@linaro.org>
+From: vitalya@ti.com (Vitaly Andrianov)
+Date: Mon, 29 Jun 2015 14:43:44 -0400
+Subject: [PATCH] keystone: adds cpu_die implementation
+In-Reply-To: <20150629175223.GC19863@leverpostej>
+References: <1435600352-32733-1-git-send-email-vitalya@ti.com>
+ <20150629175223.GC19863@leverpostej>
+Message-ID: <559191E0.4080808@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/29/15 13:23, Steve Capper wrote:
-> On 15 June 2015 at 20:07, David Long <dave.long@linaro.org> wrote:
->> From: "David A. Long" <dave.long@linaro.org>
+
+
+On 06/29/2015 01:52 PM, Mark Rutland wrote:
+> On Mon, Jun 29, 2015 at 06:52:32PM +0100, Vitaly Andrianov wrote:
+>> This commit add cpu_die implementation
 >>
->> Add HAVE_REGS_AND_STACK_ACCESS_API feature for arm64.
->>
->> Signed-off-by: David A. Long <dave.long@linaro.org>
+>> Signed-off-by: Vitaly Andrianov <vitalya@ti.com>
 >> ---
->>   arch/arm64/Kconfig              |  1 +
->>   arch/arm64/include/asm/ptrace.h | 25 +++++++++++++
->>   arch/arm64/kernel/ptrace.c      | 77 +++++++++++++++++++++++++++++++++++++++++
->>   3 files changed, 103 insertions(+)
 >>
->> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
->> index 7796af4..966091f 100644
->> --- a/arch/arm64/Kconfig
->> +++ b/arch/arm64/Kconfig
->> @@ -68,6 +68,7 @@ config ARM64
->>          select HAVE_PERF_EVENTS
->>          select HAVE_PERF_REGS
->>          select HAVE_PERF_USER_STACK_DUMP
->> +       select HAVE_REGS_AND_STACK_ACCESS_API
->>          select HAVE_RCU_TABLE_FREE
->>          select HAVE_SYSCALL_TRACEPOINTS
->>          select IRQ_DOMAIN
->> diff --git a/arch/arm64/include/asm/ptrace.h b/arch/arm64/include/asm/ptrace.h
->> index d6dd9fd..8f440e9 100644
->> --- a/arch/arm64/include/asm/ptrace.h
->> +++ b/arch/arm64/include/asm/ptrace.h
->> @@ -118,6 +118,8 @@ struct pt_regs {
->>          u64 syscallno;
->>   };
->>
->> +#define MAX_REG_OFFSET (sizeof(struct user_pt_regs) - sizeof(u64))
->> +
->>   #define arch_has_single_step() (1)
->>
->>   #ifdef CONFIG_COMPAT
->> @@ -146,6 +148,29 @@ struct pt_regs {
->>   #define user_stack_pointer(regs) \
->>          (!compat_user_mode(regs) ? (regs)->sp : (regs)->compat_sp)
->>
->> +/**
->> + * regs_get_register() - get register value from its offset
->> + * @regs:         pt_regs from which register value is gotten
->> + * @offset:    offset number of the register.
->> + *
->> + * regs_get_register returns the value of a register whose offset from @regs.
->> + * The @offset is the offset of the register in struct pt_regs.
->> + * If @offset is bigger than MAX_REG_OFFSET, this returns 0.
->> + */
->> +static inline u64 regs_get_register(struct pt_regs *regs,
->> +                                             unsigned int offset)
->> +{
->> +       if (unlikely(offset > MAX_REG_OFFSET))
->> +               return 0;
->> +       return *(u64 *)((u64)regs + offset);
+>> The discussion of the "keystone: psci: adds cpu_die implementation" commit
+>> shows that if PCSI is enabled platform code doesn't need that implementation
+>> at all. Having PSCI commands in DTB should be sufficient. Unfortunately
+>> Keystone with LPAE enable requires some additional development.
 >
-> Why not:
-> return regs->regs[offset];
+> I don't follow.
 >
+> What do you need to implement for LPAE?
+Hi Mark,
 
-This would not be correct.  The offset is a byte offset and your code 
-would index eight times that amount into the structure.  The offset 
-needs to remain a byte offset so architecture-independent code does not 
-need to know the architecture-specific layout of the structure.
+The Keystone platform needs to set ttbr1 when it boots secondary core.
+It is done in the keystone_smp_secondary_initmem(), which is 
+.smp_secondary_init member of the keystone_smp_ops. I couldn't find a 
+way how I can add similar function to psci_smp_ops.
 
->> +}
->> +
->> +/* Valid only for Kernel mode traps. */
->> +static inline unsigned long kernel_stack_pointer(struct pt_regs *regs)
->> +{
->> +       return regs->sp;
->> +}
->> +
->>   static inline unsigned long regs_return_value(struct pt_regs *regs)
->>   {
->>          return regs->regs[0];
->> diff --git a/arch/arm64/kernel/ptrace.c b/arch/arm64/kernel/ptrace.c
->> index d882b83..f6199a5 100644
->> --- a/arch/arm64/kernel/ptrace.c
->> +++ b/arch/arm64/kernel/ptrace.c
->> @@ -48,6 +48,83 @@
->>   #define CREATE_TRACE_POINTS
->>   #include <trace/events/syscalls.h>
->>
->> +#define ARM_pstate     pstate
->> +#define ARM_pc         pc
->> +#define ARM_sp         sp
->> +#define ARM_x30                regs[30]
->> +#define ARM_x29                regs[29]
->> +#define ARM_x28                regs[28]
->> +#define ARM_x27                regs[27]
->> +#define ARM_x26                regs[26]
->> +#define ARM_x25                regs[25]
->> +#define ARM_x24                regs[24]
->> +#define ARM_x23                regs[23]
->> +#define ARM_x22                regs[22]
->> +#define ARM_x21                regs[21]
->> +#define ARM_x20                regs[20]
->> +#define ARM_x19                regs[19]
->> +#define ARM_x18                regs[18]
->> +#define ARM_x17                regs[17]
->> +#define ARM_x16                regs[16]
->> +#define ARM_x15                regs[15]
->> +#define ARM_x14                regs[14]
->> +#define ARM_x13                regs[13]
->> +#define ARM_x12                regs[12]
->> +#define ARM_x11                regs[11]
->> +#define ARM_x10                regs[10]
->> +#define ARM_x9         regs[9]
->> +#define ARM_x8         regs[8]
->> +#define ARM_x7         regs[7]
->> +#define ARM_x6         regs[6]
->> +#define ARM_x5         regs[5]
->> +#define ARM_x4         regs[4]
->> +#define ARM_x3         regs[3]
->> +#define ARM_x2         regs[2]
->> +#define ARM_x1         regs[1]
->> +#define ARM_x0         regs[0]
->> +
->> +#define REG_OFFSET_NAME(r) \
->> +       {.name = #r, .offset = offsetof(struct pt_regs, ARM_##r)}
->> +#define REG_OFFSET_END {.name = NULL, .offset = 0}
->> +
->> +const struct pt_regs_offset regs_offset_table[] = {
->> +       REG_OFFSET_NAME(x0),
->> +       REG_OFFSET_NAME(x1),
->> +       REG_OFFSET_NAME(x2),
->> +       REG_OFFSET_NAME(x3),
->> +       REG_OFFSET_NAME(x4),
->> +       REG_OFFSET_NAME(x5),
->> +       REG_OFFSET_NAME(x6),
->> +       REG_OFFSET_NAME(x7),
->> +       REG_OFFSET_NAME(x8),
->> +       REG_OFFSET_NAME(x9),
->> +       REG_OFFSET_NAME(x10),
->> +       REG_OFFSET_NAME(x11),
->> +       REG_OFFSET_NAME(x12),
->> +       REG_OFFSET_NAME(x13),
->> +       REG_OFFSET_NAME(x14),
->> +       REG_OFFSET_NAME(x15),
->> +       REG_OFFSET_NAME(x16),
->> +       REG_OFFSET_NAME(x17),
->> +       REG_OFFSET_NAME(x18),
->> +       REG_OFFSET_NAME(x19),
->> +       REG_OFFSET_NAME(x20),
->> +       REG_OFFSET_NAME(x21),
->> +       REG_OFFSET_NAME(x22),
->> +       REG_OFFSET_NAME(x23),
->> +       REG_OFFSET_NAME(x24),
->> +       REG_OFFSET_NAME(x25),
->> +       REG_OFFSET_NAME(x26),
->> +       REG_OFFSET_NAME(x27),
->> +       REG_OFFSET_NAME(x28),
->> +       REG_OFFSET_NAME(x29),
->> +       REG_OFFSET_NAME(x30),
->> +       REG_OFFSET_NAME(sp),
->> +       REG_OFFSET_NAME(pc),
->> +       REG_OFFSET_NAME(pstate),
->> +       REG_OFFSET_END,
->> +};
->> +
->>   /*
->>    * TODO: does not yet catch signals sent when the child dies.
->>    * in exit.c or in signal.c.
->> --
->> 1.8.1.2
->>
+Do you have any idea?
+
+>
+> Why not implement that rather than adding more platform code that you'll
+> likely want to remove later anyway?
+
+If I can solve the above problem, I will not add this code.
 
 Thanks,
--dl
+Vitaly
+
+>
+> Thanks,
+> Mark.
+>
+>> To support HOTPLUG_CPU w/o PSCI we need platform implementation of
+>> the cpu_die(), which is added by this patch.
+>>
+>>   arch/arm/mach-keystone/keystone.h |  1 +
+>>   arch/arm/mach-keystone/platsmp.c  | 24 ++++++++++++++++++++++++
+>>   2 files changed, 25 insertions(+)
+>>
+>> diff --git a/arch/arm/mach-keystone/keystone.h b/arch/arm/mach-keystone/keystone.h
+>> index cd04a1c..93549cf 100644
+>> --- a/arch/arm/mach-keystone/keystone.h
+>> +++ b/arch/arm/mach-keystone/keystone.h
+>> @@ -12,6 +12,7 @@
+>>   #define __KEYSTONE_H__
+>>
+>>   #define KEYSTONE_MON_CPU_UP_IDX		0x00
+>> +#define KEYSTONE_MON_CPU_DIE_IDX	0x84000002
+>>
+>>   #ifndef __ASSEMBLER__
+>>
+>> diff --git a/arch/arm/mach-keystone/platsmp.c b/arch/arm/mach-keystone/platsmp.c
+>> index 5f46a7c..4e5bdde 100644
+>> --- a/arch/arm/mach-keystone/platsmp.c
+>> +++ b/arch/arm/mach-keystone/platsmp.c
+>> @@ -51,7 +51,31 @@ static inline void __cpuinit keystone_smp_secondary_initmem(unsigned int cpu)
+>>   {}
+>>   #endif
+>>
+>> +
+>> +#ifdef CONFIG_HOTPLUG_CPU
+>> +static void keystone_cpu_die(unsigned int cpu)
+>> +{
+>> +	int error;
+>> +
+>> +	pr_debug("keystone-smp: cpu_die %d\n", cpu);
+>> +
+>> +	error = keystone_cpu_smc(KEYSTONE_MON_CPU_DIE_IDX, cpu, 0);
+>> +	if (error)
+>> +		pr_err("CPU %d die failed with %d\n", cpu, error);
+>> +
+>> +	/*
+>> +	 * we shouldn't come here. But in case something went
+>> +	 * wrong the code below prevents kernel from crush
+>> +	 */
+>> +	while (1)
+>> +		cpu_do_idle();
+>> +}
+>> +#endif
+>> +
+>>   struct smp_operations keystone_smp_ops __initdata = {
+>>   	.smp_boot_secondary	= keystone_smp_boot_secondary,
+>>   	.smp_secondary_init     = keystone_smp_secondary_initmem,
+>> +#ifdef CONFIG_HOTPLUG_CPU
+>> +	.cpu_die		= keystone_cpu_die,
+>> +#endif
+>>   };
+>> --
+>> 1.9.1
+>>
