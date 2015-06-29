@@ -1,757 +1,292 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Mon, 29 Jun 2015 14:12:18 -0500
-Subject: Regression with today's next
-Message-ID: <20150629191218.GB1019@saruman.tx.rr.com>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Mon, 29 Jun 2015 21:43:34 +0200
+Subject: [PATCH v3 04/11] KVM: arm: common infrastructure for handling
+ AArch32 CP14/CP15
+In-Reply-To: <1434969694-7432-5-git-send-email-zhichao.huang@linaro.org>
+References: <1434969694-7432-1-git-send-email-zhichao.huang@linaro.org>
+ <1434969694-7432-5-git-send-email-zhichao.huang@linaro.org>
+Message-ID: <20150629194334.GN11332@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Mon, Jun 22, 2015 at 06:41:27PM +0800, Zhichao Huang wrote:
+> As we're about to trap a bunch of CP14 registers, let's rework
+> the CP15 handling so it can be generalized and work with multiple
+> tables.
+> 
+> Signed-off-by: Zhichao Huang <zhichao.huang@linaro.org>
+> ---
+>  arch/arm/kvm/coproc.c          | 176 ++++++++++++++++++++++++++---------------
+>  arch/arm/kvm/interrupts_head.S |   2 +-
+>  2 files changed, 112 insertions(+), 66 deletions(-)
+> 
+> diff --git a/arch/arm/kvm/coproc.c b/arch/arm/kvm/coproc.c
+> index 9d283d9..d23395b 100644
+> --- a/arch/arm/kvm/coproc.c
+> +++ b/arch/arm/kvm/coproc.c
+> @@ -375,6 +375,9 @@ static const struct coproc_reg cp15_regs[] = {
+>  	{ CRn(15), CRm( 0), Op1( 4), Op2( 0), is32, access_cbar},
+>  };
+>  
+> +static const struct coproc_reg cp14_regs[] = {
+> +};
+> +
+>  /* Target specific emulation tables */
+>  static struct kvm_coproc_target_table *target_tables[KVM_ARM_NUM_TARGETS];
+>  
+> @@ -424,47 +427,75 @@ static const struct coproc_reg *find_reg(const struct coproc_params *params,
+>  	return NULL;
+>  }
+>  
+> -static int emulate_cp15(struct kvm_vcpu *vcpu,
+> -			const struct coproc_params *params)
+> +/*
+> + * emulate_cp --  tries to match a cp14/cp15 access in a handling table,
+> + *                and call the corresponding trap handler.
+> + *
+> + * @params: pointer to the descriptor of the access
+> + * @table: array of trap descriptors
+> + * @num: size of the trap descriptor array
+> + *
+> + * Return 0 if the access has been handled, and -1 if not.
+> + */
+> +static int emulate_cp(struct kvm_vcpu *vcpu,
+> +			const struct coproc_params *params,
+> +			const struct coproc_reg *table,
+> +			size_t num)
+>  {
+> -	size_t num;
+> -	const struct coproc_reg *table, *r;
+> -
+> -	trace_kvm_emulate_cp15_imp(params->Op1, params->Rt1, params->CRn,
+> -				   params->CRm, params->Op2, params->is_write);
+> +	const struct coproc_reg *r;
+>  
+> -	table = get_target_table(vcpu->arch.target, &num);
+> +	if (!table)
+> +		return -1;	/* Not handled */
+>  
+> -	/* Search target-specific then generic table. */
+>  	r = find_reg(params, table, num);
+> -	if (!r)
+> -		r = find_reg(params, cp15_regs, ARRAY_SIZE(cp15_regs));
+>  
+> -	if (likely(r)) {
+> +	if (r) {
+>  		/* If we don't have an accessor, we should never get here! */
+>  		BUG_ON(!r->access);
+>  
+>  		if (likely(r->access(vcpu, params, r))) {
+>  			/* Skip instruction, since it was emulated */
+>  			kvm_skip_instr(vcpu, kvm_vcpu_trap_il_is32bit(vcpu));
+> -			return 1;
+>  		}
+> -		/* If access function fails, it should complain. */
+> -	} else {
+> -		kvm_err("Unsupported guest CP15 access at: %08lx\n",
+> -			*vcpu_pc(vcpu));
+> -		print_cp_instr(params);
+> +
+> +		/* Handled */
+> +		return 0;
+>  	}
+> +
+> +	/* Not handled */
+> +	return -1;
+> +}
+> +
+> +static void unhandled_cp_access(struct kvm_vcpu *vcpu,
+> +				const struct coproc_params *params)
+> +{
+> +	u8 hsr_ec = kvm_vcpu_trap_get_class(vcpu);
+> +	int cp;
+> +
+> +	switch (hsr_ec) {
+> +	case HSR_EC_CP15_32:
+> +	case HSR_EC_CP15_64:
+> +		cp = 15;
+> +		break;
+> +	case HSR_EC_CP14_MR:
+> +	case HSR_EC_CP14_64:
+> +		cp = 14;
+> +		break;
+> +	default:
+> +		WARN_ON((cp = -1));
+> +	}
+> +
+> +	kvm_err("Unsupported guest CP%d access at: %08lx\n",
+> +		cp, *vcpu_pc(vcpu));
+> +	print_cp_instr(params);
+>  	kvm_inject_undefined(vcpu);
+> -	return 1;
+>  }
+>  
+> -/**
+> - * kvm_handle_cp15_64 -- handles a mrrc/mcrr trap on a guest CP15 access
+> - * @vcpu: The VCPU pointer
+> - * @run:  The kvm_run struct
+> - */
+> -int kvm_handle_cp15_64(struct kvm_vcpu *vcpu, struct kvm_run *run)
+> +int kvm_handle_cp_64(struct kvm_vcpu *vcpu,
+> +			const struct coproc_reg *global,
+> +			size_t nr_global,
+> +			const struct coproc_reg *target_specific,
+> +			size_t nr_specific)
+>  {
+>  	struct coproc_params params;
+>  
+> @@ -478,7 +509,13 @@ int kvm_handle_cp15_64(struct kvm_vcpu *vcpu, struct kvm_run *run)
+>  	params.Rt2 = (kvm_vcpu_get_hsr(vcpu) >> 10) & 0xf;
+>  	params.CRm = 0;
+>  
+> -	return emulate_cp15(vcpu, &params);
+> +	if (!emulate_cp(vcpu, &params, target_specific, nr_specific))
+> +		return 1;
+> +	if (!emulate_cp(vcpu, &params, global, nr_global))
+> +		return 1;
+> +
+> +	unhandled_cp_access(vcpu, &params);
+> +	return 1;
+>  }
+>  
+>  static void reset_coproc_regs(struct kvm_vcpu *vcpu,
+> @@ -491,12 +528,11 @@ static void reset_coproc_regs(struct kvm_vcpu *vcpu,
+>  			table[i].reset(vcpu, &table[i]);
+>  }
+>  
+> -/**
+> - * kvm_handle_cp15_32 -- handles a mrc/mcr trap on a guest CP15 access
+> - * @vcpu: The VCPU pointer
+> - * @run:  The kvm_run struct
+> - */
+> -int kvm_handle_cp15_32(struct kvm_vcpu *vcpu, struct kvm_run *run)
+> +int kvm_handle_cp_32(struct kvm_vcpu *vcpu,
+> +			const struct coproc_reg *global,
+> +			size_t nr_global,
+> +			const struct coproc_reg *target_specific,
+> +			size_t nr_specific)
+>  {
+>  	struct coproc_params params;
+>  
+> @@ -510,33 +546,57 @@ int kvm_handle_cp15_32(struct kvm_vcpu *vcpu, struct kvm_run *run)
+>  	params.Op2 = (kvm_vcpu_get_hsr(vcpu) >> 17) & 0x7;
+>  	params.Rt2 = 0;
+>  
+> -	return emulate_cp15(vcpu, &params);
+> +	if (!emulate_cp(vcpu, &params, target_specific, nr_specific))
+> +		return 1;
+> +	if (!emulate_cp(vcpu, &params, global, nr_global))
+> +		return 1;
+> +
+> +	unhandled_cp_access(vcpu, &params);
+> +	return 1;
+>  }
+>  
+>  /**
+> - * kvm_handle_cp14_64 -- handles a mrrc/mcrr trap on a guest CP14 access
+> + * kvm_handle_cp15_64 -- handles a mrrc/mcrr trap on a guest CP15 access
+>   * @vcpu: The VCPU pointer
+>   * @run:  The kvm_run struct
+>   */
+> -int kvm_handle_cp14_64(struct kvm_vcpu *vcpu, struct kvm_run *run)
+> +int kvm_handle_cp15_64(struct kvm_vcpu *vcpu, struct kvm_run *run)
+>  {
+> -	struct coproc_params params;
+> +	const struct coproc_reg *target_specific;
+> +	size_t num;
+>  
+> -	params.CRn = (kvm_vcpu_get_hsr(vcpu) >> 1) & 0xf;
+> -	params.Rt1 = (kvm_vcpu_get_hsr(vcpu) >> 5) & 0xf;
+> -	params.is_write = ((kvm_vcpu_get_hsr(vcpu) & 1) == 0);
+> -	params.is_64bit = true;
+> +	target_specific = get_target_table(vcpu->arch.target, &num);
+> +	return kvm_handle_cp_64(vcpu,
+> +				cp15_regs, ARRAY_SIZE(cp15_regs),
+> +				target_specific, num);
+> +}
+>  
+> -	params.Op1 = (kvm_vcpu_get_hsr(vcpu) >> 16) & 0xf;
+> -	params.Op2 = 0;
+> -	params.Rt2 = (kvm_vcpu_get_hsr(vcpu) >> 10) & 0xf;
+> -	params.CRm = 0;
+> +/**
+> + * kvm_handle_cp15_32 -- handles a mrc/mcr trap on a guest CP15 access
+> + * @vcpu: The VCPU pointer
+> + * @run:  The kvm_run struct
+> + */
+> +int kvm_handle_cp15_32(struct kvm_vcpu *vcpu, struct kvm_run *run)
+> +{
+> +	const struct coproc_reg *target_specific;
+> +	size_t num;
+>  
+> -	(void)trap_raz_wi(vcpu, &params, NULL);
+> +	target_specific = get_target_table(vcpu->arch.target, &num);
+> +	return kvm_handle_cp_32(vcpu,
+> +				cp15_regs, ARRAY_SIZE(cp15_regs),
+> +				target_specific, num);
+> +}
+>  
+> -	/* handled */
+> -	kvm_skip_instr(vcpu, kvm_vcpu_trap_il_is32bit(vcpu));
+> -	return 1;
+> +/**
+> + * kvm_handle_cp14_64 -- handles a mrrc/mcrr trap on a guest CP14 access
+> + * @vcpu: The VCPU pointer
+> + * @run:  The kvm_run struct
+> + */
+> +int kvm_handle_cp14_64(struct kvm_vcpu *vcpu, struct kvm_run *run)
+> +{
+> +	return kvm_handle_cp_64(vcpu,
+> +				cp14_regs, ARRAY_SIZE(cp14_regs),
+> +				NULL, 0);
+>  }
+>  
+>  /**
+> @@ -546,23 +606,9 @@ int kvm_handle_cp14_64(struct kvm_vcpu *vcpu, struct kvm_run *run)
+>   */
+>  int kvm_handle_cp14_32(struct kvm_vcpu *vcpu, struct kvm_run *run)
+>  {
+> -	struct coproc_params params;
+> -
+> -	params.CRm = (kvm_vcpu_get_hsr(vcpu) >> 1) & 0xf;
+> -	params.Rt1 = (kvm_vcpu_get_hsr(vcpu) >> 5) & 0xf;
+> -	params.is_write = ((kvm_vcpu_get_hsr(vcpu) & 1) == 0);
+> -	params.is_64bit = false;
+> -
+> -	params.CRn = (kvm_vcpu_get_hsr(vcpu) >> 10) & 0xf;
+> -	params.Op1 = (kvm_vcpu_get_hsr(vcpu) >> 14) & 0x7;
+> -	params.Op2 = (kvm_vcpu_get_hsr(vcpu) >> 17) & 0x7;
+> -	params.Rt2 = 0;
+> -
+> -	(void)trap_raz_wi(vcpu, &params, NULL);
+> -
+> -	/* handled */
+> -	kvm_skip_instr(vcpu, kvm_vcpu_trap_il_is32bit(vcpu));
+> -	return 1;
+> +	return kvm_handle_cp_32(vcpu,
+> +				cp14_regs, ARRAY_SIZE(cp14_regs),
+> +				NULL, 0);
+>  }
+>  
+>  /******************************************************************************
+> diff --git a/arch/arm/kvm/interrupts_head.S b/arch/arm/kvm/interrupts_head.S
+> index f85c447..a20b9ad 100644
+> --- a/arch/arm/kvm/interrupts_head.S
+> +++ b/arch/arm/kvm/interrupts_head.S
+> @@ -618,7 +618,7 @@ ARM_BE8(rev	r6, r6  )
+>   * (hardware reset value is 0) */
+>  .macro set_hdcr operation
+>  	mrc	p15, 4, r2, c1, c1, 1
+> -	ldr	r3, =(HDCR_TPM|HDCR_TPMCR|HDCR_TDRA|HDCR_TDOSA|HDCR_TDA)
+> +	ldr	r3, =(HDCR_TPM|HDCR_TPMCR)
 
-commit 736e60ddc215b85e73bbf7da26e1cde84cc9500f (OMAPDSS: componentize
-omapdss) caused a regression at least on AM437x SK board where Display
-doesn't work anymore. Below you can find bisection log and a git show of
-commit. I have tested that reverting said commit makes it work again.
+why do we stop trapping accesses here?
 
-Please fix, or revert.
+-Christoffer
 
-
-
-git bisect start
-# good: [b953c0d234bc72e8489d3bf51a276c5c4ec85345] Linux 4.1
-git bisect good b953c0d234bc72e8489d3bf51a276c5c4ec85345
-# bad: [e3984319760987beee59b1d017416671ebb89b4c] Add linux-next specific files for 20150629
-git bisect bad e3984319760987beee59b1d017416671ebb89b4c
-# bad: [0db9723cacf4d62bc3685fb15179b39ee4e17679] Merge branch 'next' of git://git.kernel.org/pub/scm/linux/kernel/git/rzhang/linux
-git bisect bad 0db9723cacf4d62bc3685fb15179b39ee4e17679
-# bad: [e3d8238d7f5c3f539a29f5ac596cd342d847e099] Merge tag 'arm64-upstream' of git://git.kernel.org/pub/scm/linux/kernel/git/arm64/linux
-git bisect bad e3d8238d7f5c3f539a29f5ac596cd342d847e099
-# good: [c70c5fb2b96dae0996fb0877d996458d3ca57eda] Merge tag 'pwm/for-4.2-rc1' of git://git.kernel.org/pub/scm/linux/kernel/git/thierry.reding/linux-pwm
-git bisect good c70c5fb2b96dae0996fb0877d996458d3ca57eda
-# good: [acd53127c4adbd34570b221e7ea1f7fc94aea923] Merge tag 'scsi-misc' of git://git.kernel.org/pub/scm/linux/kernel/git/jejb/scsi
-git bisect good acd53127c4adbd34570b221e7ea1f7fc94aea923
-# bad: [54245ed870c8cf9ff87fdf78955ffbc93b261e9f] Merge tag 'for-linus-20150623' of git://git.infradead.org/linux-mtd
-git bisect bad 54245ed870c8cf9ff87fdf78955ffbc93b261e9f
-# bad: [5a602e157a9d91d5ce98d07c404097edba8ec9f3] Merge tag 'spi-v4.2' of git://git.kernel.org/pub/scm/linux/kernel/git/broonie/spi
-git bisect bad 5a602e157a9d91d5ce98d07c404097edba8ec9f3
-# bad: [1a13e36a79f25f4cf506258637e96a07ac1451f2] Merge tag 'fbdev-4.2' of git://git.kernel.org/pub/scm/linux/kernel/git/tomba/linux
-git bisect bad 1a13e36a79f25f4cf506258637e96a07ac1451f2
-# good: [9f5ddefdc979d7b71aa4d3d7cc456c76fee80fda] fbdev: propagate result of fb_videomode_from_videomode()
-git bisect good 9f5ddefdc979d7b71aa4d3d7cc456c76fee80fda
-# good: [e31cd7824d054d30ffc9f45550343123bc437e17] power_supply: bq24257: use flags argument of devm_gpiod_get
-git bisect good e31cd7824d054d30ffc9f45550343123bc437e17
-# good: [a9fad6886f5229fc9989ac6cdd7ddecbf570a58f] OMAPDSS: HDMI: wait for framedone when stopping video
-git bisect good a9fad6886f5229fc9989ac6cdd7ddecbf570a58f
-# bad: [a9bd32a8b4c4c2670f9ed8cae63f9378b6df3ded] msm: msm_fb: Remove dead code
-git bisect bad a9bd32a8b4c4c2670f9ed8cae63f9378b6df3ded
-# good: [ede9269572da9206249f02ebe031ded025b84fd3] OMAPDSS: remove uses of __init/__exit
-git bisect good ede9269572da9206249f02ebe031ded025b84fd3
-# bad: [736e60ddc215b85e73bbf7da26e1cde84cc9500f] OMAPDSS: componentize omapdss
-git bisect bad 736e60ddc215b85e73bbf7da26e1cde84cc9500f
-# good: [606ae4865a1947c04d52b97b5109cda90aebe892] OMAPDSS: reorder uninit calls
-git bisect good 606ae4865a1947c04d52b97b5109cda90aebe892
-# first bad commit: [736e60ddc215b85e73bbf7da26e1cde84cc9500f] OMAPDSS: componentize omapdss
-
-
-commit 736e60ddc215b85e73bbf7da26e1cde84cc9500f
-Author: Tomi Valkeinen <tomi.valkeinen@ti.com>
-Date:   Thu Jun 4 15:22:23 2015 +0300
-
-    OMAPDSS: componentize omapdss
-    
-    omapdss kernel module contains drivers for multiple devices, one for
-    each DSS submodule. The probing we have at the moment is a mess, and
-    doesn't give us proper deferred probing nor ensure that all the devices
-    are probed before omapfb/omapdrm start using omapdss.
-    
-    This patch solves the mess by using the component system for DSS
-    submodules.
-    
-    The changes to all DSS submodules (dispc, dpi, dsi, hdmi4/5, rfbi, sdi,
-    venc) are the same: probe & remove functions are changed to bind &
-    unbind, and new probe & remove functions are added which call
-    component_add/del.
-    
-    The dss_core driver (dss.c) acts as a component master. Adding and
-    matching the components is simple: all dss device's child devices are
-    added as components.
-    
-    However, we do have some dependencies between the drivers. The order in
-    which they should be probed is reflected by the list in core.c
-    (dss_output_drv_reg_funcs). The drivers are registered in that order,
-    which causes the components to be added in that order, which makes the
-    components to be bound in that order. This feels a bit fragile, and we
-    probably should improve the code to manage binds in random order.
-    However, for now, this works fine.
-    
-    Signed-off-by: Tomi Valkeinen <tomi.valkeinen@ti.com>
-    Acked-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
-
-diff --git a/drivers/video/fbdev/omap2/dss/dispc.c b/drivers/video/fbdev/omap2/dss/dispc.c
-index e3417af63451..c8e34163211a 100644
---- a/drivers/video/fbdev/omap2/dss/dispc.c
-+++ b/drivers/video/fbdev/omap2/dss/dispc.c
-@@ -39,6 +39,7 @@
- #include <linux/mfd/syscon.h>
- #include <linux/regmap.h>
- #include <linux/of.h>
-+#include <linux/component.h>
- 
- #include <video/omapdss.h>
- 
-@@ -3882,8 +3883,9 @@ void dispc_free_irq(void *dev_id)
- EXPORT_SYMBOL(dispc_free_irq);
- 
- /* DISPC HW IP initialisation */
--static int omap_dispchw_probe(struct platform_device *pdev)
-+static int dispc_bind(struct device *dev, struct device *master, void *data)
- {
-+	struct platform_device *pdev = to_platform_device(dev);
- 	u32 rev;
- 	int r = 0;
- 	struct resource *dispc_mem;
-@@ -3955,12 +3957,27 @@ err_runtime_get:
- 	return r;
- }
- 
--static int omap_dispchw_remove(struct platform_device *pdev)
-+static void dispc_unbind(struct device *dev, struct device *master,
-+			       void *data)
- {
--	pm_runtime_disable(&pdev->dev);
-+	pm_runtime_disable(dev);
- 
- 	dss_uninit_overlay_managers();
-+}
-+
-+static const struct component_ops dispc_component_ops = {
-+	.bind	= dispc_bind,
-+	.unbind	= dispc_unbind,
-+};
- 
-+static int dispc_probe(struct platform_device *pdev)
-+{
-+	return component_add(&pdev->dev, &dispc_component_ops);
-+}
-+
-+static int dispc_remove(struct platform_device *pdev)
-+{
-+	component_del(&pdev->dev, &dispc_component_ops);
- 	return 0;
- }
- 
-@@ -4013,7 +4030,8 @@ static const struct of_device_id dispc_of_match[] = {
- };
- 
- static struct platform_driver omap_dispchw_driver = {
--	.remove         = omap_dispchw_remove,
-+	.probe		= dispc_probe,
-+	.remove         = dispc_remove,
- 	.driver         = {
- 		.name   = "omapdss_dispc",
- 		.pm	= &dispc_pm_ops,
-@@ -4024,7 +4042,7 @@ static struct platform_driver omap_dispchw_driver = {
- 
- int __init dispc_init_platform_driver(void)
- {
--	return platform_driver_probe(&omap_dispchw_driver, omap_dispchw_probe);
-+	return platform_driver_register(&omap_dispchw_driver);
- }
- 
- void dispc_uninit_platform_driver(void)
-diff --git a/drivers/video/fbdev/omap2/dss/dpi.c b/drivers/video/fbdev/omap2/dss/dpi.c
-index a06e7558280f..fb45b6432968 100644
---- a/drivers/video/fbdev/omap2/dss/dpi.c
-+++ b/drivers/video/fbdev/omap2/dss/dpi.c
-@@ -32,6 +32,7 @@
- #include <linux/string.h>
- #include <linux/of.h>
- #include <linux/clk.h>
-+#include <linux/component.h>
- 
- #include <video/omapdss.h>
- 
-@@ -783,8 +784,9 @@ static void dpi_uninit_output_port(struct device_node *port)
- 	omapdss_unregister_output(out);
- }
- 
--static int omap_dpi_probe(struct platform_device *pdev)
-+static int dpi_bind(struct device *dev, struct device *master, void *data)
- {
-+	struct platform_device *pdev = to_platform_device(dev);
- 	struct dpi_data *dpi;
- 
- 	dpi = devm_kzalloc(&pdev->dev, sizeof(*dpi), GFP_KERNEL);
-@@ -802,16 +804,32 @@ static int omap_dpi_probe(struct platform_device *pdev)
- 	return 0;
- }
- 
--static int omap_dpi_remove(struct platform_device *pdev)
-+static void dpi_unbind(struct device *dev, struct device *master, void *data)
- {
-+	struct platform_device *pdev = to_platform_device(dev);
-+
- 	dpi_uninit_output(pdev);
-+}
-+
-+static const struct component_ops dpi_component_ops = {
-+	.bind	= dpi_bind,
-+	.unbind	= dpi_unbind,
-+};
- 
-+static int dpi_probe(struct platform_device *pdev)
-+{
-+	return component_add(&pdev->dev, &dpi_component_ops);
-+}
-+
-+static int dpi_remove(struct platform_device *pdev)
-+{
-+	component_del(&pdev->dev, &dpi_component_ops);
- 	return 0;
- }
- 
- static struct platform_driver omap_dpi_driver = {
--	.probe		= omap_dpi_probe,
--	.remove         = omap_dpi_remove,
-+	.probe		= dpi_probe,
-+	.remove		= dpi_remove,
- 	.driver         = {
- 		.name   = "omapdss_dpi",
- 		.suppress_bind_attrs = true,
-diff --git a/drivers/video/fbdev/omap2/dss/dsi.c b/drivers/video/fbdev/omap2/dss/dsi.c
-index c4c27c09c62f..b3606def5b7b 100644
---- a/drivers/video/fbdev/omap2/dss/dsi.c
-+++ b/drivers/video/fbdev/omap2/dss/dsi.c
-@@ -40,6 +40,7 @@
- #include <linux/pm_runtime.h>
- #include <linux/of.h>
- #include <linux/of_platform.h>
-+#include <linux/component.h>
- 
- #include <video/omapdss.h>
- #include <video/mipi_display.h>
-@@ -5274,8 +5275,9 @@ static int dsi_init_pll_data(struct platform_device *dsidev)
- }
- 
- /* DSI1 HW IP initialisation */
--static int omap_dsihw_probe(struct platform_device *dsidev)
-+static int dsi_bind(struct device *dev, struct device *master, void *data)
- {
-+	struct platform_device *dsidev = to_platform_device(dev);
- 	u32 rev;
- 	int r, i;
- 	struct dsi_data *dsi;
-@@ -5484,8 +5486,9 @@ err_runtime_get:
- 	return r;
- }
- 
--static int omap_dsihw_remove(struct platform_device *dsidev)
-+static void dsi_unbind(struct device *dev, struct device *master, void *data)
- {
-+	struct platform_device *dsidev = to_platform_device(dev);
- 	struct dsi_data *dsi = dsi_get_dsidrv_data(dsidev);
- 
- 	of_platform_depopulate(&dsidev->dev);
-@@ -5502,7 +5505,21 @@ static int omap_dsihw_remove(struct platform_device *dsidev)
- 		regulator_disable(dsi->vdds_dsi_reg);
- 		dsi->vdds_dsi_enabled = false;
- 	}
-+}
-+
-+static const struct component_ops dsi_component_ops = {
-+	.bind	= dsi_bind,
-+	.unbind	= dsi_unbind,
-+};
- 
-+static int dsi_probe(struct platform_device *pdev)
-+{
-+	return component_add(&pdev->dev, &dsi_component_ops);
-+}
-+
-+static int dsi_remove(struct platform_device *pdev)
-+{
-+	component_del(&pdev->dev, &dsi_component_ops);
- 	return 0;
- }
- 
-@@ -5569,8 +5586,8 @@ static const struct of_device_id dsi_of_match[] = {
- };
- 
- static struct platform_driver omap_dsihw_driver = {
--	.probe		= omap_dsihw_probe,
--	.remove         = omap_dsihw_remove,
-+	.probe		= dsi_probe,
-+	.remove		= dsi_remove,
- 	.driver         = {
- 		.name   = "omapdss_dsi",
- 		.pm	= &dsi_pm_ops,
-diff --git a/drivers/video/fbdev/omap2/dss/dss.c b/drivers/video/fbdev/omap2/dss/dss.c
-index 3397cbf484b0..612b093831d5 100644
---- a/drivers/video/fbdev/omap2/dss/dss.c
-+++ b/drivers/video/fbdev/omap2/dss/dss.c
-@@ -39,6 +39,7 @@
- #include <linux/of.h>
- #include <linux/regulator/consumer.h>
- #include <linux/suspend.h>
-+#include <linux/component.h>
- 
- #include <video/omapdss.h>
- 
-@@ -1088,8 +1089,9 @@ static int dss_video_pll_probe(struct platform_device *pdev)
- }
- 
- /* DSS HW IP initialisation */
--static int omap_dsshw_probe(struct platform_device *pdev)
-+static int dss_bind(struct device *dev)
- {
-+	struct platform_device *pdev = to_platform_device(dev);
- 	struct resource *dss_mem;
- 	u32 rev;
- 	int r;
-@@ -1159,6 +1161,10 @@ static int omap_dsshw_probe(struct platform_device *pdev)
- 
- 	dss_runtime_put();
- 
-+	r = component_bind_all(&pdev->dev, NULL);
-+	if (r)
-+		goto err_component;
-+
- 	dss_debugfs_create_file("dss", dss_dump_regs);
- 
- 	pm_set_vt_switch(0);
-@@ -1167,6 +1173,7 @@ static int omap_dsshw_probe(struct platform_device *pdev)
- 
- 	return 0;
- 
-+err_component:
- err_runtime_get:
- 	pm_runtime_disable(&pdev->dev);
- 	dss_uninit_ports(pdev);
-@@ -1182,10 +1189,14 @@ err_setup_clocks:
- 	return r;
- }
- 
--static int omap_dsshw_remove(struct platform_device *pdev)
-+static void dss_unbind(struct device *dev)
- {
-+	struct platform_device *pdev = to_platform_device(dev);
-+
- 	dss_initialized = false;
- 
-+	component_unbind_all(&pdev->dev, NULL);
-+
- 	if (dss.video1_pll)
- 		dss_video_pll_uninit(dss.video1_pll);
- 
-@@ -1197,7 +1208,46 @@ static int omap_dsshw_remove(struct platform_device *pdev)
- 	pm_runtime_disable(&pdev->dev);
- 
- 	dss_put_clocks();
-+}
-+
-+static const struct component_master_ops dss_component_ops = {
-+	.bind = dss_bind,
-+	.unbind = dss_unbind,
-+};
- 
-+static int dss_component_compare(struct device *dev, void *data)
-+{
-+	struct device *child = data;
-+	return dev == child;
-+}
-+
-+static int dss_add_child_component(struct device *dev, void *data)
-+{
-+	struct component_match **match = data;
-+
-+	component_match_add(dev->parent, match, dss_component_compare, dev);
-+
-+	return 0;
-+}
-+
-+static int dss_probe(struct platform_device *pdev)
-+{
-+	struct component_match *match = NULL;
-+	int r;
-+
-+	/* add all the child devices as components */
-+	device_for_each_child(&pdev->dev, &match, dss_add_child_component);
-+
-+	r = component_master_add_with_match(&pdev->dev, &dss_component_ops, match);
-+	if (r)
-+		return r;
-+
-+	return 0;
-+}
-+
-+static int dss_remove(struct platform_device *pdev)
-+{
-+	component_master_del(&pdev->dev, &dss_component_ops);
- 	return 0;
- }
- 
-@@ -1243,7 +1293,8 @@ static const struct of_device_id dss_of_match[] = {
- MODULE_DEVICE_TABLE(of, dss_of_match);
- 
- static struct platform_driver omap_dsshw_driver = {
--	.remove         = omap_dsshw_remove,
-+	.probe		= dss_probe,
-+	.remove		= dss_remove,
- 	.driver         = {
- 		.name   = "omapdss_dss",
- 		.pm	= &dss_pm_ops,
-@@ -1254,7 +1305,7 @@ static struct platform_driver omap_dsshw_driver = {
- 
- int __init dss_init_platform_driver(void)
- {
--	return platform_driver_probe(&omap_dsshw_driver, omap_dsshw_probe);
-+	return platform_driver_register(&omap_dsshw_driver);
- }
- 
- void dss_uninit_platform_driver(void)
-diff --git a/drivers/video/fbdev/omap2/dss/hdmi4.c b/drivers/video/fbdev/omap2/dss/hdmi4.c
-index 31deebbc32dc..d35312d69025 100644
---- a/drivers/video/fbdev/omap2/dss/hdmi4.c
-+++ b/drivers/video/fbdev/omap2/dss/hdmi4.c
-@@ -32,6 +32,7 @@
- #include <linux/clk.h>
- #include <linux/gpio.h>
- #include <linux/regulator/consumer.h>
-+#include <linux/component.h>
- #include <video/omapdss.h>
- #include <sound/omap-hdmi-audio.h>
- 
-@@ -646,8 +647,9 @@ static int hdmi_audio_register(struct device *dev)
- }
- 
- /* HDMI HW IP initialisation */
--static int omapdss_hdmihw_probe(struct platform_device *pdev)
-+static int hdmi4_bind(struct device *dev, struct device *master, void *data)
- {
-+	struct platform_device *pdev = to_platform_device(dev);
- 	int r;
- 	int irq;
- 
-@@ -713,8 +715,10 @@ err:
- 	return r;
- }
- 
--static int omapdss_hdmihw_remove(struct platform_device *pdev)
-+static void hdmi4_unbind(struct device *dev, struct device *master, void *data)
- {
-+	struct platform_device *pdev = to_platform_device(dev);
-+
- 	if (hdmi.audio_pdev)
- 		platform_device_unregister(hdmi.audio_pdev);
- 
-@@ -723,7 +727,21 @@ static int omapdss_hdmihw_remove(struct platform_device *pdev)
- 	hdmi_pll_uninit(&hdmi.pll);
- 
- 	pm_runtime_disable(&pdev->dev);
-+}
-+
-+static const struct component_ops hdmi4_component_ops = {
-+	.bind	= hdmi4_bind,
-+	.unbind	= hdmi4_unbind,
-+};
- 
-+static int hdmi4_probe(struct platform_device *pdev)
-+{
-+	return component_add(&pdev->dev, &hdmi4_component_ops);
-+}
-+
-+static int hdmi4_remove(struct platform_device *pdev)
-+{
-+	component_del(&pdev->dev, &hdmi4_component_ops);
- 	return 0;
- }
- 
-@@ -756,8 +774,8 @@ static const struct of_device_id hdmi_of_match[] = {
- };
- 
- static struct platform_driver omapdss_hdmihw_driver = {
--	.probe		= omapdss_hdmihw_probe,
--	.remove         = omapdss_hdmihw_remove,
-+	.probe		= hdmi4_probe,
-+	.remove		= hdmi4_remove,
- 	.driver         = {
- 		.name   = "omapdss_hdmi",
- 		.pm	= &hdmi_pm_ops,
-diff --git a/drivers/video/fbdev/omap2/dss/hdmi5.c b/drivers/video/fbdev/omap2/dss/hdmi5.c
-index a57f5e8f9aea..7f875788edbc 100644
---- a/drivers/video/fbdev/omap2/dss/hdmi5.c
-+++ b/drivers/video/fbdev/omap2/dss/hdmi5.c
-@@ -37,6 +37,7 @@
- #include <linux/clk.h>
- #include <linux/gpio.h>
- #include <linux/regulator/consumer.h>
-+#include <linux/component.h>
- #include <video/omapdss.h>
- #include <sound/omap-hdmi-audio.h>
- 
-@@ -681,8 +682,9 @@ static int hdmi_audio_register(struct device *dev)
- }
- 
- /* HDMI HW IP initialisation */
--static int omapdss_hdmihw_probe(struct platform_device *pdev)
-+static int hdmi5_bind(struct device *dev, struct device *master, void *data)
- {
-+	struct platform_device *pdev = to_platform_device(dev);
- 	int r;
- 	int irq;
- 
-@@ -748,8 +750,10 @@ err:
- 	return r;
- }
- 
--static int omapdss_hdmihw_remove(struct platform_device *pdev)
-+static void hdmi5_unbind(struct device *dev, struct device *master, void *data)
- {
-+	struct platform_device *pdev = to_platform_device(dev);
-+
- 	if (hdmi.audio_pdev)
- 		platform_device_unregister(hdmi.audio_pdev);
- 
-@@ -758,7 +762,21 @@ static int omapdss_hdmihw_remove(struct platform_device *pdev)
- 	hdmi_pll_uninit(&hdmi.pll);
- 
- 	pm_runtime_disable(&pdev->dev);
-+}
-+
-+static const struct component_ops hdmi5_component_ops = {
-+	.bind	= hdmi5_bind,
-+	.unbind	= hdmi5_unbind,
-+};
- 
-+static int hdmi5_probe(struct platform_device *pdev)
-+{
-+	return component_add(&pdev->dev, &hdmi5_component_ops);
-+}
-+
-+static int hdmi5_remove(struct platform_device *pdev)
-+{
-+	component_del(&pdev->dev, &hdmi5_component_ops);
- 	return 0;
- }
- 
-@@ -792,8 +810,8 @@ static const struct of_device_id hdmi_of_match[] = {
- };
- 
- static struct platform_driver omapdss_hdmihw_driver = {
--	.probe		= omapdss_hdmihw_probe,
--	.remove         = omapdss_hdmihw_remove,
-+	.probe		= hdmi5_probe,
-+	.remove		= hdmi5_remove,
- 	.driver         = {
- 		.name   = "omapdss_hdmi5",
- 		.pm	= &hdmi_pm_ops,
-diff --git a/drivers/video/fbdev/omap2/dss/rfbi.c b/drivers/video/fbdev/omap2/dss/rfbi.c
-index 8ec810bce0b6..1525a494d057 100644
---- a/drivers/video/fbdev/omap2/dss/rfbi.c
-+++ b/drivers/video/fbdev/omap2/dss/rfbi.c
-@@ -36,6 +36,7 @@
- #include <linux/semaphore.h>
- #include <linux/platform_device.h>
- #include <linux/pm_runtime.h>
-+#include <linux/component.h>
- 
- #include <video/omapdss.h>
- #include "dss.h"
-@@ -946,8 +947,9 @@ static void rfbi_uninit_output(struct platform_device *pdev)
- }
- 
- /* RFBI HW IP initialisation */
--static int omap_rfbihw_probe(struct platform_device *pdev)
-+static int rfbi_bind(struct device *dev, struct device *master, void *data)
- {
-+	struct platform_device *pdev = to_platform_device(dev);
- 	u32 rev;
- 	struct resource *rfbi_mem;
- 	struct clk *clk;
-@@ -1005,8 +1007,10 @@ err_runtime_get:
- 	return r;
- }
- 
--static int omap_rfbihw_remove(struct platform_device *pdev)
-+static void rfbi_unbind(struct device *dev, struct device *master, void *data)
- {
-+	struct platform_device *pdev = to_platform_device(dev);
-+
- 	rfbi_uninit_output(pdev);
- 
- 	pm_runtime_disable(&pdev->dev);
-@@ -1014,6 +1018,22 @@ static int omap_rfbihw_remove(struct platform_device *pdev)
- 	return 0;
- }
- 
-+static const struct component_ops rfbi_component_ops = {
-+	.bind	= rfbi_bind,
-+	.unbind	= rfbi_unbind,
-+};
-+
-+static int rfbi_probe(struct platform_device *pdev)
-+{
-+	return component_add(&pdev->dev, &rfbi_component_ops);
-+}
-+
-+static int rfbi_remove(struct platform_device *pdev)
-+{
-+	component_del(&pdev->dev, &rfbi_component_ops);
-+	return 0;
-+}
-+
- static int rfbi_runtime_suspend(struct device *dev)
- {
- 	dispc_runtime_put();
-@@ -1038,8 +1058,8 @@ static const struct dev_pm_ops rfbi_pm_ops = {
- };
- 
- static struct platform_driver omap_rfbihw_driver = {
--	.probe		= omap_rfbihw_probe,
--	.remove         = omap_rfbihw_remove,
-+	.probe		= rfbi_probe,
-+	.remove         = rfbi_remove,
- 	.driver         = {
- 		.name   = "omapdss_rfbi",
- 		.pm	= &rfbi_pm_ops,
-diff --git a/drivers/video/fbdev/omap2/dss/sdi.c b/drivers/video/fbdev/omap2/dss/sdi.c
-index a873118f1e0e..5843580a1deb 100644
---- a/drivers/video/fbdev/omap2/dss/sdi.c
-+++ b/drivers/video/fbdev/omap2/dss/sdi.c
-@@ -27,6 +27,7 @@
- #include <linux/platform_device.h>
- #include <linux/string.h>
- #include <linux/of.h>
-+#include <linux/component.h>
- 
- #include <video/omapdss.h>
- #include "dss.h"
-@@ -357,8 +358,10 @@ static void sdi_uninit_output(struct platform_device *pdev)
- 	omapdss_unregister_output(out);
- }
- 
--static int omap_sdi_probe(struct platform_device *pdev)
-+static int sdi_bind(struct device *dev, struct device *master, void *data)
- {
-+	struct platform_device *pdev = to_platform_device(dev);
-+
- 	sdi.pdev = pdev;
- 
- 	sdi_init_output(pdev);
-@@ -366,16 +369,32 @@ static int omap_sdi_probe(struct platform_device *pdev)
- 	return 0;
- }
- 
--static int omap_sdi_remove(struct platform_device *pdev)
-+static void sdi_unbind(struct device *dev, struct device *master, void *data)
- {
-+	struct platform_device *pdev = to_platform_device(dev);
-+
- 	sdi_uninit_output(pdev);
-+}
-+
-+static const struct component_ops sdi_component_ops = {
-+	.bind	= sdi_bind,
-+	.unbind	= sdi_unbind,
-+};
- 
-+static int sdi_probe(struct platform_device *pdev)
-+{
-+	return component_add(&pdev->dev, &sdi_component_ops);
-+}
-+
-+static int sdi_remove(struct platform_device *pdev)
-+{
-+	component_del(&pdev->dev, &sdi_component_ops);
- 	return 0;
- }
- 
- static struct platform_driver omap_sdi_driver = {
--	.probe		= omap_sdi_probe,
--	.remove         = omap_sdi_remove,
-+	.probe		= sdi_probe,
-+	.remove         = sdi_remove,
- 	.driver         = {
- 		.name   = "omapdss_sdi",
- 		.suppress_bind_attrs = true,
-diff --git a/drivers/video/fbdev/omap2/dss/venc.c b/drivers/video/fbdev/omap2/dss/venc.c
-index e7fad0e19d43..99ca268c1cdd 100644
---- a/drivers/video/fbdev/omap2/dss/venc.c
-+++ b/drivers/video/fbdev/omap2/dss/venc.c
-@@ -35,6 +35,7 @@
- #include <linux/regulator/consumer.h>
- #include <linux/pm_runtime.h>
- #include <linux/of.h>
-+#include <linux/component.h>
- 
- #include <video/omapdss.h>
- 
-@@ -852,8 +853,9 @@ err:
- }
- 
- /* VENC HW IP initialisation */
--static int omap_venchw_probe(struct platform_device *pdev)
-+static int venc_bind(struct device *dev, struct device *master, void *data)
- {
-+	struct platform_device *pdev = to_platform_device(dev);
- 	u8 rev_id;
- 	struct resource *venc_mem;
- 	int r;
-@@ -912,12 +914,28 @@ err_runtime_get:
- 	return r;
- }
- 
--static int omap_venchw_remove(struct platform_device *pdev)
-+static void venc_unbind(struct device *dev, struct device *master, void *data)
- {
-+	struct platform_device *pdev = to_platform_device(dev);
-+
- 	venc_uninit_output(pdev);
- 
- 	pm_runtime_disable(&pdev->dev);
-+}
- 
-+static const struct component_ops venc_component_ops = {
-+	.bind	= venc_bind,
-+	.unbind	= venc_unbind,
-+};
-+
-+static int venc_probe(struct platform_device *pdev)
-+{
-+	return component_add(&pdev->dev, &venc_component_ops);
-+}
-+
-+static int venc_remove(struct platform_device *pdev)
-+{
-+	component_del(&pdev->dev, &venc_component_ops);
- 	return 0;
- }
- 
-@@ -950,7 +968,6 @@ static const struct dev_pm_ops venc_pm_ops = {
- 	.runtime_resume = venc_runtime_resume,
- };
- 
--
- static const struct of_device_id venc_of_match[] = {
- 	{ .compatible = "ti,omap2-venc", },
- 	{ .compatible = "ti,omap3-venc", },
-@@ -959,8 +976,8 @@ static const struct of_device_id venc_of_match[] = {
- };
- 
- static struct platform_driver omap_venchw_driver = {
--	.probe		= omap_venchw_probe,
--	.remove         = omap_venchw_remove,
-+	.probe		= venc_probe,
-+	.remove		= venc_remove,
- 	.driver         = {
- 		.name   = "omapdss_venc",
- 		.pm	= &venc_pm_ops,
-
--- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150629/8fad3458/attachment.sig>
+>  	.if \operation == vmentry
+>  	orr	r2, r2, r3		@ Trap some perfmon accesses
+>  	.else
+> -- 
+> 1.7.12.4
+> 
