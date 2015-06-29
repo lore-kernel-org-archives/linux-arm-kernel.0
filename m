@@ -1,64 +1,51 @@
-From: s.munaut@whatever-company.com (Sylvain Munaut)
-Date: Mon, 29 Jun 2015 14:30:19 +0200
-Subject: dma_sync_single_for_cpu takes a really long time
-In-Reply-To: <20150629090804.GX7557@n2100.arm.linux.org.uk>
-References: <CAF6-1L6sjGc1VySi=oQGzOEm-e5jauznh+jzmdDgmJQWLbA_pA@mail.gmail.com>
- <20150628223039.GV7557@n2100.arm.linux.org.uk>
- <CAF6-1L6Xhsk3CwTvu6rAvYGYX3XvcwbmP582tVPEuiVaDnFpRA@mail.gmail.com>
- <20150629090804.GX7557@n2100.arm.linux.org.uk>
-Message-ID: <CAF6-1L6xn6-6FxPivSvC5Wwyjr-YjO5QEL1ep4rLZML9xZx2RA@mail.gmail.com>
+From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
+Date: Mon, 29 Jun 2015 14:31:17 +0200
+Subject: [PATCH v2 0/4] arm64: add initial support for the Rockchip rk3368
+Message-ID: <3333434.ZKWQ6GxgtB@diego>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
->> I can guarantee that I never wrote to this memory zone, so there is nothing
->> in any write-back buffer, is there anyway to convey this guarantee to the
->> API ? Or should I just not call dma_sync_single_for_device at all ?
->
-> It's not about whether you wrote to it.  It's whether the CPU speculatively
-> loaded data into its cache.
+This adds initial support for the new rk3368 ARM64 soc from Rockchip.
 
-That I don't understand.
+Overall it looks like someone dropped some A53 cores into a rk3288, so
+it shares a lot of peripherals that only differ in details. Therefore
+stuff like the mmc, usb, spi, i2c controllers work out of the box.
+The support for the gmac already made it into the merge window as well
+as the pinctrl support.
 
-I see how that zone can be in cache (even though if it's on page
-boundaries, it should never have been speculatively prefetched right
-?). But if I never wrote to that buffer, the cache lines for it can't
-possibly be marked as 'dirty'.
-
-So doing a 'clean' on them should end up doing nothing. and the
-sequence for a FROM_DMA exchange should be :
-
-while (<transfer in progress>) {
-   - Give the buffer to DMA ( dma_sync_single_for_device ) : Should be
-no-op, but is not <===
-   - Let the DMA do the write
-   - Invalidate cache ( dma_sync_single_for_cpu )
-   - Let the CPU do its thing on the data
-}
-
-Now I _do_ see that on the very first usage of the buffer I'd need to
-do a clean. Because that memory could have been used for something
-else before. But if I keep re-using that buffer and never write to it,
-that only need to be done once.
+Interestingly, in its core the rk3368 seems trying to be a model student
+with psci for smp and using scpi for ddr frequency scaling, although I
+currently do not understand how the mailbox works yet. The display
+controllers also are only minimally different so I'm hopefully to have
+working graphics in the near-ish future :-)
 
 
->> As a start, I tried calling outer_inv_all() instead of outer_inv_range(),
->> but it turned out to be a really bad idea (just freezes the system)
->
-> _Invalidating_ the L2 destroyes data in the cache which may not have been
-> written back - it's effectively undoing the data modifications that have
-> yet to be written back to memory.  That's will cause things to break.
+As mentioned in the dts patch, this series depends on the dt-binding
+header for the clock ids, so will need a shared branch once this is ready.
 
-Yeah, that was a really dumb thing to try ... after reading up last
-night on how caching works in ARM A9 and the PL310 L2, I see that.
+changes since v1:
+- add missing device_type = "memeory", as found by Mark Rutland
+- fix patch subject for patch4 (the board is called R88),
+  found by Naoki Fukaumi
 
+Heiko Stuebner (4):
+  arm64: add Rockchip architecture entry
+  arm64: defconfig: enable ARCH_ROCKCHIP
+  arm64: dts: add Rockchip rk3368 core dtsi and board dts for the r88
+    board
+  dt-bindings: document rk3368 R89 board from Rockchip
 
-> Also, the L2 cache has problems if you use the _all() functions (which
-> operate on cache set/way) and another CPU also wants to do some other
-> operation (like a sync, as part of a barrier.)
+ Documentation/devicetree/bindings/arm/rockchip.txt |   4 +
+ arch/arm64/Kconfig                                 |  10 +
+ arch/arm64/boot/dts/Makefile                       |   1 +
+ arch/arm64/boot/dts/rockchip/Makefile              |   5 +
+ arch/arm64/boot/dts/rockchip/rk3368-r88.dts        | 353 ++++++++
+ arch/arm64/boot/dts/rockchip/rk3368.dtsi           | 900 +++++++++++++++++++++
+ arch/arm64/configs/defconfig                       |   2 +
+ 7 files changed, 1275 insertions(+)
+ create mode 100644 arch/arm64/boot/dts/rockchip/Makefile
+ create mode 100644 arch/arm64/boot/dts/rockchip/rk3368-r88.dts
+ create mode 100644 arch/arm64/boot/dts/rockchip/rk3368.dtsi
 
-Oh so even outer_flush_all() is not usable ?
-
-
-Cheers,
-
-    Sylvain
+-- 
+2.1.4
