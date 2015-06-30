@@ -1,49 +1,72 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 30 Jun 2015 15:54:13 +0100
-Subject: [PATCH] keystone: adds cpu_die implementation
-In-Reply-To: <55929E0B.9070704@ti.com>
-References: <1435600352-32733-1-git-send-email-vitalya@ti.com>
- <20150629175223.GC19863@leverpostej> <559191E0.4080808@ti.com>
- <20150629212814.GE7557@n2100.arm.linux.org.uk>
- <20150629213737.GF7557@n2100.arm.linux.org.uk>
- <55929E0B.9070704@ti.com>
-Message-ID: <20150630145412.GG7557@n2100.arm.linux.org.uk>
+From: tomeu.vizoso@collabora.com (Tomeu Vizoso)
+Date: Tue, 30 Jun 2015 17:00:53 +0200
+Subject: [PATCH 08/13] gpio: sysfs: implement class.get_dependencies()
+In-Reply-To: <20150617174009.GZ14071@sirena.org.uk>
+References: <1434548543-22949-1-git-send-email-tomeu.vizoso@collabora.com>
+ <1434548543-22949-9-git-send-email-tomeu.vizoso@collabora.com>
+ <20150617174009.GZ14071@sirena.org.uk>
+Message-ID: <CAAObsKDYvgxuxH0ZpXaTrsjLYOaZ-W_evOWfLLTNFRFYMra5LQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 30, 2015 at 09:47:55AM -0400, Vitaly Andrianov wrote:
-> 
-> 
-> On 06/29/2015 05:37 PM, Russell King - ARM Linux wrote:
-> >Oh, it was Murali who tested it, not yourself.  Sorry.  Suggest you
-> >dig out the patches either from mainline (they're in Linus' tip) or
-> >ask Murali for them...
-> >
-> Thanks Russell,
-> 
-> Excellent. I'll test how it will work using PSCI framework.
+On 17 June 2015 at 19:40, Mark Brown <broonie@kernel.org> wrote:
+> On Wed, Jun 17, 2015 at 03:42:18PM +0200, Tomeu Vizoso wrote:
+>
+>> +static bool strends(const char *str, const char *postfix)
+>> +{
+>> +     if (strlen(str) < strlen(postfix))
+>> +             return false;
+>> +
+>> +     return strcmp(str + strlen(str) - strlen(postfix), postfix) == 0;
+>> +}
+>
+> This is named like (and looks like) a generic fuction, shouldn't it be
+> in string.h or something?
 
-The commits in mainline are:
+Yeah, will put it there.
 
-b2c3e38a5471 ARM: redo TTBR setup code for LPAE
-1221ed10f2a5 ARM: cleanup early_paging_init() calling
-d8dc7fbd53ee ARM: re-implement physical address space switching
-c0b759d87eab ARM: keystone2: rename init_meminfo to pv_fixup
-39b74fe82f73 ARM: keystone2: move address space switch printk into generic code
-c8ca2b4b2928 ARM: keystone2: move update of the phys-to-virt constants into generic code
-30b5f4d6128e ARM: keystone2: move platform notifier initialisation into platform init
+>> +static void add_dependency(struct fwnode_handle *fwnode,
+>> +                        struct list_head *list)
+>> +{
+>> +     struct fwnode_dependency *dep;
+>> +
+>> +     dep = kzalloc(sizeof(*dep), GFP_KERNEL);
+>> +     if (!dep)
+>> +             return;
+>> +
+>> +     INIT_LIST_HEAD(&dep->dependency);
+>> +     dep->fwnode = fwnode;
+>> +
+>> +     list_add_tail(&dep->dependency, list);
+>> +}
+>
+> Might be worth putting this in generic code, it looks pretty generic?  I
+> have to say I'm unclear what frees the returned list.
 
-There are an additional three which are worthwhile testing with them as
-they clean up this same code (and fix a subtle but very minor bug in the
-errata code paths):
+Agreed.
 
-c76f238e261b ARM: proc-v7: sanitise and document registers around errata
-4419496884ed ARM: proc-v7: clean up MIDR access
-17e7bf86690e ARM: proc-v7: move CPU errata out of line
+>> +     if (!is_of_node(fwnode))
+>> +             return NULL;
+>> +
+>> +     np = of_node(fwnode);
+>> +     if (!np)
+>> +             return NULL;
+>
+> Presumably the first check could be dropped?
 
-So, picking the range b787f68c36d4..c76f238e261b will get all of them.
-(That's v4.1-rc1 to the tip of the branch holding those commits.)
+That's right.
 
--- 
-FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
-according to speedtest.net.
+>> +     list = kzalloc(sizeof(*list), GFP_KERNEL);
+>> +     if (!list)
+>> +             return NULL;
+>
+> Might it make sense for the core to allocate the head of the list and
+> just ask the classes to add to the list?  We're going to want to merge
+> the dependencies from multiple subsystems and that saves allocating
+> heads that may never get anything added to them.
+
+Yes, I have gone with that advice and it looks better that way.
+
+Thanks,
+
+Tomeu
