@@ -1,21 +1,30 @@
-From: davem@davemloft.net (David Miller)
-Date: Tue, 30 Jun 2015 09:37:38 -0700 (PDT)
-Subject: [PATCH v4 0/3] Fix Ethernet jumbo frames support for Armada
- 370 and 38x
-In-Reply-To: <1435674022-13295-1-git-send-email-simon.guinot@sequanux.org>
-References: <1435674022-13295-1-git-send-email-simon.guinot@sequanux.org>
-Message-ID: <20150630.093738.48589191219422826.davem@davemloft.net>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Tue, 30 Jun 2015 22:14:17 +0530
+Subject: [PATCH 00/10] OPP: Add code to support operating-points-v2
+ bindings
+In-Reply-To: <cover.1434369079.git.viresh.kumar@linaro.org>
+References: <cover.1434369079.git.viresh.kumar@linaro.org>
+Message-ID: <CAKohpokaiCq8kq5xALyW-q1QXvUJo2uv2ZbbFYfVFMT0XAqdzA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Simon Guinot <simon.guinot@sequanux.org>
-Date: Tue, 30 Jun 2015 16:20:19 +0200
+On 15 June 2015 at 17:27, Viresh Kumar <viresh.kumar@linaro.org> wrote:
+> Hi Guys,
+>
+> This adds code to support operating-points-v2 bindings. Not everything
+> is supported yet, but most of the basic stuff is.
+>
+> Tested with: Exynos 5250, dual cortex A15 board. With both old and new
+> bindings.
+>
+> Bindings are already frozen:
+> http://marc.info/?i=cover.1433434659.git.viresh.kumar%40linaro.org
+>
+> Pushed here as well for reference:
+> ssh://git at git.linaro.org/people/viresh.kumar/linux.git opp/v2
 
-> This patch series fixes the Ethernet jumbo frames support for the SoCs
-> Armada 370, 380 and 385. Unlike Armada XP, the Ethernet controller for
-> this SoCs don't support TCP/IP checksumming with a frame size larger
-> than 1600 bytes.
-> 
-> This patches should be applied to the -stable kernels 3.8 and onwards.
+I am really hoping to get all basic stuff pushed in for 4.3, can we have
+some review of the code please?
 
-Series applied, thanks.
+--
+viresh
