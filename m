@@ -1,103 +1,58 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 30 Jun 2015 22:43:52 +0200
-Subject: [PATCH v2 4/9] arm: twr-k70f120m: timer driver for Kinetis SoC
-In-Reply-To: <1435667250-28299-5-git-send-email-pawelo@king.net.pl>
-References: <1435667250-28299-1-git-send-email-pawelo@king.net.pl>
- <1435667250-28299-5-git-send-email-pawelo@king.net.pl>
-Message-ID: <2939807.q7WvOoYzDX@wuerfel>
+From: marvin24@gmx.de (Marc Dietrich)
+Date: Tue, 30 Jun 2015 22:44:40 +0200
+Subject: [PATCH v2] ARM: tegra: paz00: use con_id's to refer GPIO's in
+ gpiod_lookup table
+In-Reply-To: <1435673759-11996-1-git-send-email-digetx@gmail.com>
+References: <1435673759-11996-1-git-send-email-digetx@gmail.com>
+Message-ID: <3628722.nhXkFk5ghW@ax5200p>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 30 June 2015 14:27:25 Paul Osmialowski wrote:
+Am Dienstag 30 Juni 2015, 17:15:50 schrieb Dmitry Osipenko:
+> Commit 72daceb9a10a ("net: rfkill: gpio: Add default GPIO driver mappings
+> for ACPI") removed possibility to request GPIO by table index for non-ACPI
+> platforms without changing it users. As result "shutdown" GPIO request
+> will fail if request for "reset" GPIO succeeded or "reset" will be
+> requested instead of "shutdown" if "reset" wasn't defined. Fix it by
+> making gpiod_lookup_table use con_id's instead of indexes.
+> 
+> Signed-off-by: Dmitry Osipenko <digetx@gmail.com>
+> Fixes: 72daceb (net: rfkill: gpio: Add default GPIO driver mappings for
+> ACPI) Cc: <stable@vger.kernel.org> # v3.19+
+> Acked-by: Alexandre Courbot <acourbot@nvidia.com>
 
-> +Example:
-> +
-> +aliases {
-> +	pit0 = &pit0;
-> +	pit1 = &pit1;
-> +	pit2 = &pit2;
-> +	pit3 = &pit3;
-> +};
-> +
-> +pit at 40037000 {
-> +	compatible = "fsl,kinetis-pit-timer";
-> +	reg = <0x40037000 0x100>;
-> +	clocks = <&mcg_pclk_gate 5 23>;
-> +	#address-cells = <1>;
-> +	#size-cells = <1>;
-> +	ranges;
+beside a small typo in the commit message (is users -> its users) this looks 
+good now. I can confirm that the gpio's are all available now.
 
-All the subnodes seem to fall inside of the device's own register
-area, so I think it would be nicer to use a specific 'ranges'
-property that only translates the registers in question.
+Reviewed-by: Marc Dietrich <marvin24@gmx.de>
 
->  / {
-> +	aliases {
-> +		pit0 = &pit0;
-> +		pit1 = &pit1;
-> +		pit2 = &pit2;
-> +		pit3 = &pit3;
-> +	};
-> +
->  	soc {
-> +		pit at 40037000 {
-> +			compatible = "fsl,kinetis-pit-timer";
-> +			reg = <0x40037000 0x100>;
-> +			clocks = <&mcg_pclk_gate 5 23>;
-> +			#address-cells = <1>;
-> +			#size-cells = <1>;
-> +			ranges;
-> +
-> +			pit0: timer at 40037100 {
-> +				reg = <0x40037100 0x10>;
-> +				interrupts = <68>;
-> +				status = "disabled";
-> +			};
-
-I don't think it's necessary to have both an alias
-and a label here. What do you use the alias for?
-
-> +
-> +#define KINETIS_PITMCR_PTR(base, reg) \
-> +	(&(((struct kinetis_pit_mcr_regs *)(base))->reg))
-> +#define KINETIS_PITMCR_RD(be, base, reg) \
-> +		((be) ? ioread32be(KINETIS_PITMCR_PTR(base, reg)) \
-> +		      : ioread32(KINETIS_PITMCR_PTR(base, reg)))
-> +#define KINETIS_PITMCR_WR(be, base, reg, val) do { \
-> +		if (be) \
-> +			iowrite32be((val), KINETIS_PITMCR_PTR(base, reg)); \
-> +		else \
-> +			iowrite32((val), KINETIS_PITMCR_PTR(base, reg)); \
-> +	} while (0)
-
-These should really be written as inline functions. Can you
-explain why you need to deal with a big-endian version of this
-hardware? Can you configure the endianess of this register block
-and just set it to one of the two at boot time?
-
-> +#define KINETIS_PIT_PTR(base, reg) \
-> +	(&(((struct kinetis_pit_channel_regs *)(base))->reg))
-> +#define KINETIS_PIT_RD(be, base, reg) \
-> +		((be) ? ioread32be(KINETIS_PIT_PTR(base, reg)) \
-> +		      : ioread32(KINETIS_PIT_PTR(base, reg)))
-> +#define KINETIS_PIT_WR(be, base, reg, val) do { \
-> +		if (be) \
-> +			iowrite32be((val), KINETIS_PIT_PTR(base, reg)); \
-> +		else \
-> +			iowrite32((val), KINETIS_PIT_PTR(base, reg)); \
-> +	} while (0)
-> +#define KINETIS_PIT_SET(be, base, reg, mask) \
-> +		KINETIS_PIT_WR(be, base, reg, \
-> +			KINETIS_PIT_RD(be, base, reg) | (mask))
-> +#define KINETIS_PIT_RESET(be, base, reg, mask) \
-> +		KINETIS_PIT_WR(be, base, reg, \
-> +			KINETIS_PIT_RD(be, base, reg) & (~(mask)))
-
-
-Functions again. Also, just pass a pointer to your own data structure
-into the function, instead of the 'be' and 'base' values.
-
-The 'set' and 'reset' functions look like they need a spinlock
-to avoid races.
-
-	Arnd
+> ---
+> 
+> v2: s/GPIO_LOOKUP_IDX/GPIO_LOOKUP/, otherwise "shutdown" GPIO won't be
+> requested
+> 
+>  arch/arm/mach-tegra/board-paz00.c | 4 ++--
+>  1 file changed, 2 insertions(+), 2 deletions(-)
+> 
+> diff --git a/arch/arm/mach-tegra/board-paz00.c
+> b/arch/arm/mach-tegra/board-paz00.c index fbe74c6..49d1110 100644
+> --- a/arch/arm/mach-tegra/board-paz00.c
+> +++ b/arch/arm/mach-tegra/board-paz00.c
+> @@ -39,8 +39,8 @@ static struct platform_device wifi_rfkill_device = {
+>  static struct gpiod_lookup_table wifi_gpio_lookup = {
+>  	.dev_id = "rfkill_gpio",
+>  	.table = {
+> -		GPIO_LOOKUP_IDX("tegra-gpio", 25, NULL, 0, 0),
+> -		GPIO_LOOKUP_IDX("tegra-gpio", 85, NULL, 1, 0),
+> +		GPIO_LOOKUP("tegra-gpio", 25, "reset", 0),
+> +		GPIO_LOOKUP("tegra-gpio", 85, "shutdown", 0),
+>  		{ },
+>  	},
+>  };
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 490 bytes
+Desc: This is a digitally signed message part.
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150630/47b9577a/attachment.sig>
