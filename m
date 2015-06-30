@@ -1,28 +1,42 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 30 Jun 2015 08:26:45 +0200
-Subject: [PATCH v3 2/2] arm64: dts: mt8173: Add I2C device node
-In-Reply-To: <1863259.t4daGE7nbQ@ubix>
-References: <1434101229-32695-1-git-send-email-eddie.huang@mediatek.com>
- <1434101229-32695-3-git-send-email-eddie.huang@mediatek.com>
- <CAGS+omB1UadXeKZLmMdhSamsPpipQLmoH_PhbUPvszrYTq68fA@mail.gmail.com>
- <1863259.t4daGE7nbQ@ubix>
-Message-ID: <CACRpkdY4=SSZQRQY_ydcsv-S8ezrYbzp2rdD4qRuHkF8oowOEw@mail.gmail.com>
+From: javier@dowhile0.org (Javier Martinez Canillas)
+Date: Tue, 30 Jun 2015 08:27:36 +0200
+Subject: [PATCH] clk: samsung: fix cpu clock's flags checking
+In-Reply-To: <5591DD9B.4030507@samsung.com>
+References: <1435598978-21800-1-git-send-email-b.zolnierkie@samsung.com>
+ <5591DD9B.4030507@samsung.com>
+Message-ID: <CABxcv=kVL94rdFgNKcxx2JOi9WRFnvhMWrpjEDcEmx7q7cEsgQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 12, 2015 at 7:13 PM, Matthias Brugger
-<matthias.bgg@gmail.com> wrote:
+On Tue, Jun 30, 2015 at 2:06 AM, Krzysztof Kozlowski
+<k.kozlowski@samsung.com> wrote:
+> On 30.06.2015 02:29, Bartlomiej Zolnierkiewicz wrote:
+>> CLK_CPU_HAS_DIV1 and CLK_CPU_NEEDS_DEBUG_ALT_DIV masks were
+>> incorrectly used as a bit numbers.  Fix it.
+>>
+>> Tested on Exynos4210 based Origen board and on Exynos5250 based
+>> Arndale board.
+>>
+>> Cc: Tomasz Figa <tomasz.figa@gmail.com>
+>> Cc: Michael Turquette <mturquette@baylibre.com>
+>> Cc: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
+>> Cc: Thomas Abraham <thomas.ab@samsung.com>
+>> Reported-by: Dan Carpenter <dan.carpenter@oracle.com>
+>> Signed-off-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
+>> ---
+>>  drivers/clk/samsung/clk-cpu.c | 10 +++++-----
+>>  1 file changed, 5 insertions(+), 5 deletions(-)
+>
+> Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+>
 
-> In the future when all the device drivers are implemented, this gets you a
-> really huge dtsi. AFAIK this can cause a somewhat long parsing time of the dtb
-> when booting the system.
+Looks good to me as well.
 
-Boot time claims need to be backed up with ftrace logs or something. One of
-the arguments against device tree in the beginning was parse time and then
-we made measurements and it proved moot.
+Reviewed-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
 
-However being unable to manage the dts[i] sources is a valid argument for
-simplifying and splitting up stuff.
+> Best regards,
+> Krzysztof
+>
 
-Yours,
-Linus Walleij
+Best regards,
+Javier
