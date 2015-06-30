@@ -1,62 +1,123 @@
 From: geert+renesas@glider.be (Geert Uytterhoeven)
-Date: Tue, 30 Jun 2015 09:45:22 +0200
-Subject: [PATCH 2/7] ARM: shmobile: r8a7740 dtsi: Add missing "gpio-ranges" to
- gpio node
+Date: Tue, 30 Jun 2015 09:45:27 +0200
+Subject: [PATCH 7/7] pinctrl: sh-pfc: Confine legacy function GPIOs to SH
 In-Reply-To: <1435650327-2542-1-git-send-email-geert+renesas@glider.be>
 References: <1435650327-2542-1-git-send-email-geert+renesas@glider.be>
-Message-ID: <1435650327-2542-3-git-send-email-geert+renesas@glider.be>
+Message-ID: <1435650327-2542-8-git-send-email-geert+renesas@glider.be>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-If a GPIO driver uses gpiochip_add_pin_range() (which is usually the
-case for GPIO/PFC combos), the GPIO hogging mechanism configured from DT
-doesn't work:
-
-    requesting hog GPIO lcd0 (chip r8a7740_pfc, offset 176) failed
-
-The actual error code is -517 == -EPROBE_DEFER.
-
-The problem is that PFC+GPIO registration is handled in multiple steps:
-  1. pinctrl_register(),
-  2. gpiochip_add(),
-  3. gpiochip_add_pin_range().
-
-Configuration of the hogs is handled in gpiochip_add():
-
-    gpiochip_add
-        of_gpiochip_add
-            of_gpiochip_scan_hogs
-                gpiod_hog
-                    gpiochip_request_own_desc
-                        __gpiod_request
-                            chip->request
-                                pinctrl_request_gpio
-                                    pinctrl_get_device_gpio_range
-
-However, at this point the GPIO controller hasn't been added to
-pinctrldev_list yet, so the range can't be found, and the operation fails
-with -EPROBE_DEFER.
-
-To fix this, add a "gpio-ranges" property to the gpio device node, so
-the range is added by of_gpiochip_add_pin_range(), which is called by
-of_gpiochip_add() before the call to of_gpiochip_scan_hogs().
+Legacy function GPIOs are no longer used on ARM since commit
+a27c5cd1a08cc95c ("sh-pfc: sh73a0: Remove function GPIOs").
+Extract its setup code into a separate function, and make all function
+GPIO related code and data depend on CONFIG_SUPERH.
 
 Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
 ---
- arch/arm/boot/dts/r8a7740.dtsi | 1 +
- 1 file changed, 1 insertion(+)
+Compile-tested on sh using se7724_defconfig.
+---
+ drivers/pinctrl/sh-pfc/core.h   |  2 ++
+ drivers/pinctrl/sh-pfc/gpio.c   | 39 ++++++++++++++++++++++++++++-----------
+ drivers/pinctrl/sh-pfc/sh_pfc.h |  2 ++
+ 3 files changed, 32 insertions(+), 11 deletions(-)
 
-diff --git a/arch/arm/boot/dts/r8a7740.dtsi b/arch/arm/boot/dts/r8a7740.dtsi
-index 3aaab195132bfc2c..15977b5834de9579 100644
---- a/arch/arm/boot/dts/r8a7740.dtsi
-+++ b/arch/arm/boot/dts/r8a7740.dtsi
-@@ -316,6 +316,7 @@
- 		      <0xe605800c 0x20>;
- 		gpio-controller;
- 		#gpio-cells = <2>;
-+		gpio-ranges = <&pfc 0 0 212>;
- 		interrupts-extended =
- 			<&irqpin0 0 0>, <&irqpin0 1 0>, <&irqpin0 2 0>, <&irqpin0 3 0>,
- 			<&irqpin0 4 0>, <&irqpin0 5 0>, <&irqpin0 6 0>, <&irqpin0 7 0>,
+diff --git a/drivers/pinctrl/sh-pfc/core.h b/drivers/pinctrl/sh-pfc/core.h
+index 4c3c37bf7161804d..c38ace46d7111b0d 100644
+--- a/drivers/pinctrl/sh-pfc/core.h
++++ b/drivers/pinctrl/sh-pfc/core.h
+@@ -46,7 +46,9 @@ struct sh_pfc {
+ 	unsigned int nr_gpio_pins;
+ 
+ 	struct sh_pfc_chip *gpio;
++#ifdef CONFIG_SUPERH
+ 	struct sh_pfc_chip *func;
++#endif
+ 
+ 	struct sh_pfc_pinctrl *pinctrl;
+ };
+diff --git a/drivers/pinctrl/sh-pfc/gpio.c b/drivers/pinctrl/sh-pfc/gpio.c
+index 30654e800580524d..15f4eea186e2ba56 100644
+--- a/drivers/pinctrl/sh-pfc/gpio.c
++++ b/drivers/pinctrl/sh-pfc/gpio.c
+@@ -290,6 +290,7 @@ static int gpio_pin_setup(struct sh_pfc_chip *chip)
+  * Function GPIOs
+  */
+ 
++#ifdef CONFIG_SUPERH
+ static int gpio_function_request(struct gpio_chip *gc, unsigned offset)
+ {
+ 	static bool __print_once;
+@@ -330,6 +331,31 @@ static int gpio_function_setup(struct sh_pfc_chip *chip)
+ 	return 0;
+ }
+ 
++static int sh_pfc_add_function_gpios(struct sh_pfc *pfc)
++{
++	struct sh_pfc_chip *chip;
++
++	if (!pfc->info->nr_func_gpios)
++		return 0;
++
++	chip = sh_pfc_add_gpiochip(pfc, gpio_function_setup, NULL);
++	if (IS_ERR(chip))
++		return PTR_ERR(chip);
++
++	pfc->func = chip;
++
++	return 0;
++}
++
++static void sh_pfc_remove_function_gpios(struct sh_pfc *pfc)
++{
++	gpiochip_remove(&pfc->func->gpio_chip);
++}
++#else
++static inline int sh_pfc_add_function_gpios(struct sh_pfc *pfc) { return 0; }
++static inline int sh_pfc_remove_function_gpios(struct sh_pfc *pfc) { return 0; }
++#endif
++
+ /* -----------------------------------------------------------------------------
+  * Register/unregister
+  */
+@@ -397,22 +423,13 @@ int sh_pfc_register_gpiochip(struct sh_pfc *pfc)
+ 	}
+ 
+ 	/* Register the function GPIOs chip. */
+-	if (pfc->info->nr_func_gpios == 0)
+-		return 0;
+-
+-	chip = sh_pfc_add_gpiochip(pfc, gpio_function_setup, NULL);
+-	if (IS_ERR(chip))
+-		return PTR_ERR(chip);
+-
+-	pfc->func = chip;
+-
+-	return 0;
++	return sh_pfc_add_function_gpios(pfc);
+ }
+ 
+ int sh_pfc_unregister_gpiochip(struct sh_pfc *pfc)
+ {
+ 	gpiochip_remove(&pfc->gpio->gpio_chip);
+-	gpiochip_remove(&pfc->func->gpio_chip);
++	sh_pfc_remove_function_gpios(pfc);
+ 
+ 	return 0;
+ }
+diff --git a/drivers/pinctrl/sh-pfc/sh_pfc.h b/drivers/pinctrl/sh-pfc/sh_pfc.h
+index c7508d5f688613b2..c6f9163b3e23041f 100644
+--- a/drivers/pinctrl/sh-pfc/sh_pfc.h
++++ b/drivers/pinctrl/sh-pfc/sh_pfc.h
+@@ -138,8 +138,10 @@ struct sh_pfc_soc_info {
+ 	const struct sh_pfc_function *functions;
+ 	unsigned int nr_functions;
+ 
++#ifdef CONFIG_SUPERH
+ 	const struct pinmux_func *func_gpios;
+ 	unsigned int nr_func_gpios;
++#endif
+ 
+ 	const struct pinmux_cfg_reg *cfg_regs;
+ 	const struct pinmux_data_reg *data_regs;
 -- 
 1.9.1
