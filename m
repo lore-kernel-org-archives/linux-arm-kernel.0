@@ -1,80 +1,59 @@
-From: al.stone@linaro.org (Al Stone)
-Date: Tue, 30 Jun 2015 15:15:14 -0600
-Subject: [PATCH v2 1/3] ACPI : introduce macros for using the ACPI
- specification version
-In-Reply-To: <CAJZ5v0hO_nmccyGR58CO3rEy55E3PNJXWSmGxtimVsZHfPzQnw@mail.gmail.com>
-References: <1434666968-1543-1-git-send-email-al.stone@linaro.org>	<1434666968-1543-2-git-send-email-al.stone@linaro.org>
- <CAJZ5v0hO_nmccyGR58CO3rEy55E3PNJXWSmGxtimVsZHfPzQnw@mail.gmail.com>
-Message-ID: <559306E2.7000901@linaro.org>
+From: timur@codeaurora.org (Timur Tabi)
+Date: Tue, 30 Jun 2015 16:23:05 -0500
+Subject: [PATCH 2/4] hvc_dcc: don't ignore errors during initialization
+In-Reply-To: <1435699387-32591-1-git-send-email-timur@codeaurora.org>
+References: <1435699387-32591-1-git-send-email-timur@codeaurora.org>
+Message-ID: <1435699387-32591-2-git-send-email-timur@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/30/2015 02:12 PM, Rafael J. Wysocki wrote:
-> Hi Al,
-> 
-> On Fri, Jun 19, 2015 at 12:36 AM, Al Stone <al.stone@linaro.org> wrote:
->> Add the ACPI_SPEC_VERSION() macro to build a proper version number from
->> a major and minor revision number.  Add also the ACPI_FADT_SPEC_VERSION
->> that constructs a proper version number from the entries in the current
->> FADT.
->>
->> These macros are added in order to simplify retrieving and comparing ACPI
->> specification version numbers, since this is becoming a more frequent need.
->> In particular, there are some architectures that require at least a certain
->> version of the spec, and there are differences in some structure sizes that
->> have changed with recent versions but can only be tracked by spec version
->> number.
->>
->> Signed-off-by: Al Stone <al.stone@linaro.org>
->> ---
->>  include/linux/acpi.h | 5 +++++
->>  1 file changed, 5 insertions(+)
->>
->> diff --git a/include/linux/acpi.h b/include/linux/acpi.h
->> index a4acb55..33ed313 100644
->> --- a/include/linux/acpi.h
->> +++ b/include/linux/acpi.h
->> @@ -48,6 +48,11 @@
->>  #include <acpi/acpi_io.h>
->>  #include <asm/acpi.h>
->>
->> +#define ACPI_SPEC_VERSION(major, minor)        ((major<<8)|minor)
-> 
-> One nit here.
-> 
-> acpi_gbl_FADT.header.revision is of type u8 originally, so shifting it
-> by 8 bit positions only works due to some implicit type casting I
-> suppose.
+hvc_instantiate() and hvc_alloc() return errors if they fail, so don't
+ignore them.
 
-Bah.  That was being sloppy on my part.  Sorry about that.  Will fix.
+Signed-off-by: Timur Tabi <timur@codeaurora.org>
+---
+ drivers/tty/hvc/hvc_dcc.c | 17 +++++++++++++----
+ 1 file changed, 13 insertions(+), 4 deletions(-)
 
-> Moreover, it is not entirely clear why the macro is specific to the
-> computation of the ACPI spec version.
-
-As far as I know, that's the only way to extract the spec version from
-tables; I don't recall there being any other table with that info.  Since
-I will likely use this again, it seemed to make sense at the time.
-
-> So I'd drop ACPI_SPEC_VERSION and only define ACPI_FADT_SPEC_VERSION
-> as something like
-> 
-> #define ACPI_FADT_SPEC_VERSION (((unsigned
-> int)acpi_gbl_FADT.header.revision << 8) | (unsigned
-> int)acpi_gbl_FADT.minor_revision)
-> 
-> Thanks,
-> Rafael
-> 
-
-Sure.  That makes sense.  It makes it clearer that this is the version
-just from the FADT.  I'll do that.
-
+diff --git a/drivers/tty/hvc/hvc_dcc.c b/drivers/tty/hvc/hvc_dcc.c
+index 33657dc..f8b8cf2 100644
+--- a/drivers/tty/hvc/hvc_dcc.c
++++ b/drivers/tty/hvc/hvc_dcc.c
+@@ -225,20 +225,29 @@ static const struct hv_ops hvc_dcc_get_put_ops = {
+ 
+ static int __init hvc_dcc_console_init(void)
+ {
++	int ret;
++
++	/* This always runs on boot core */
+ 	if (!hvc_dcc_check())
+ 		return -ENODEV;
+ 
+-	hvc_instantiate(0, 0, &hvc_dcc_get_put_ops);
+-	return 0;
++	/* Returns -1 if error */
++	ret = hvc_instantiate(0, 0, &hvc_dcc_get_put_ops);
++
++	return ret < 0 ? -ENODEV : 0;
+ }
+ console_initcall(hvc_dcc_console_init);
+ 
+ static int __init hvc_dcc_init(void)
+ {
++	struct hvc_struct *p;
++
++	/* This can run on any core */
+ 	if (!hvc_dcc_check())
+ 		return -ENODEV;
+ 
+-	hvc_alloc(0, 0, &hvc_dcc_get_put_ops, 128);
+-	return 0;
++	p = hvc_alloc(0, 0, &hvc_dcc_get_put_ops, 128);
++
++	return IS_ERR(p) ? PTR_ERR(p) : 0;
+ }
+ device_initcall(hvc_dcc_init);
 -- 
-ciao,
-al
------------------------------------
-Al Stone
-Software Engineer
-Linaro Enterprise Group
-al.stone at linaro.org
------------------------------------
+Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+a Linux Foundation Collaborative Project.
