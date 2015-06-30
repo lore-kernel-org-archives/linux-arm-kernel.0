@@ -1,50 +1,54 @@
-From: thunder.leizhen@huawei.com (leizhen)
-Date: Tue, 30 Jun 2015 12:40:33 +0800
-Subject: [PATCH 4/8] iommu/arm-smmu: set EPD1 to disable TT1 translation
- table walk
-In-Reply-To: <20150629172622.GK17474@arm.com>
-References: <1435307584-9812-1-git-send-email-thunder.leizhen@huawei.com>
- <1435307584-9812-5-git-send-email-thunder.leizhen@huawei.com>
- <20150629172622.GK17474@arm.com>
-Message-ID: <55921DC1.7060606@huawei.com>
+From: djkurtz@chromium.org (Daniel Kurtz)
+Date: Tue, 30 Jun 2015 12:43:16 +0800
+Subject: [PATCH v2 4/4] arm64: dts: Add spi bus dts
+In-Reply-To: <1435583070-9600-5-git-send-email-leilk.liu@mediatek.com>
+References: <1435583070-9600-1-git-send-email-leilk.liu@mediatek.com>
+ <1435583070-9600-5-git-send-email-leilk.liu@mediatek.com>
+Message-ID: <CAGS+omDOU9UwtNVPA5YCWXgWQKjeskX-3uK_vxmeAgLzb9sxXg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2015/6/30 1:26, Will Deacon wrote:
-> On Fri, Jun 26, 2015 at 09:33:00AM +0100, Zhen Lei wrote:
->> Now we only use TT0 translation, disable TT1 translation will safer.
->>
->> Signed-off-by: Zhen Lei <thunder.leizhen@huawei.com>
->> ---
->>  drivers/iommu/arm-smmu-v3.c | 3 ++-
->>  1 file changed, 2 insertions(+), 1 deletion(-)
->>
->> diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
->> index 43120ad..6d6712e 100644
->> --- a/drivers/iommu/arm-smmu-v3.c
->> +++ b/drivers/iommu/arm-smmu-v3.c
->> @@ -285,6 +285,7 @@
->>  #define ARM64_TCR_EPD1_MASK		0x1UL
->>
->>  #define CTXDESC_CD_0_ENDI		(1UL << 15)
->> +#define CTXDESC_CD_0_EPD1		(1UL << 30)
->>  #define CTXDESC_CD_0_V			(1UL << 31)
->>
->>  #define CTXDESC_CD_0_TCR_IPS_SHIFT	32
->> @@ -893,7 +894,7 @@ static void arm_smmu_write_ctx_desc(struct arm_smmu_device *smmu,
->>  #endif
->>  	      CTXDESC_CD_0_R | CTXDESC_CD_0_A | CTXDESC_CD_0_ASET_PRIVATE |
->>  	      CTXDESC_CD_0_AA64 | (u64)cfg->cd.asid << CTXDESC_CD_0_ASID_SHIFT |
->> -	      CTXDESC_CD_0_V;
->> +	      CTXDESC_CD_0_EPD1 | CTXDESC_CD_0_V;
-> 
-> 
-> This is redundant. EPD1 is already set by the io-pgtable code.
+Hi Leilk,
 
-OK, I will drop this patch. I made a mistake.
+On Mon, Jun 29, 2015 at 9:04 PM, Leilk Liu <leilk.liu@mediatek.com> wrote:
+> This patch adds MT8173 spi bus controllers into device tree.
+>
+> Signed-off-by: Leilk Liu <leilk.liu@mediatek.com>
+> ---
+>  arch/arm64/boot/dts/mediatek/mt8173.dtsi | 9 +++++++++
+>  1 file changed, 9 insertions(+)
+>
+> diff --git a/arch/arm64/boot/dts/mediatek/mt8173.dtsi b/arch/arm64/boot/dts/mediatek/mt8173.dtsi
+> index 512e4eb..923d2eb 100644
+> --- a/arch/arm64/boot/dts/mediatek/mt8173.dtsi
+> +++ b/arch/arm64/boot/dts/mediatek/mt8173.dtsi
+> @@ -259,6 +259,15 @@
+>                         status = "disabled";
+>                 };
+>
+> +               spi: spi at 1100a000 {
 
-> 
-> Will
-> 
-> .
-> 
+This should be between i2c2: i2c at 11009000 and i2c3: i2c3 at 11010000.
+
+Thanks,
+-Dan
+
+> +                       compatible = "mediatek,mt8173-spi";
+> +                       reg = <0 0x1100a000 0 0x1000>;
+> +                       interrupts = <GIC_SPI 110 IRQ_TYPE_LEVEL_LOW>;
+> +                       clocks = <&pericfg CLK_PERI_SPI0>;
+> +                       clock-names = "main";
+> +                       status = "disabled";
+> +               };
+> +
+>                 mmsys: mmsys at 14000000 {
+>                         compatible = "mediatek,mt8173-mmsys", "syscon";
+>                         reg = <0 0x14000000 0 0x1000>;
+> --
+> 1.8.1.1.dirty
+>
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> Please read the FAQ at  http://www.tux.org/lkml/
