@@ -1,92 +1,48 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Tue, 30 Jun 2015 12:13:12 +0200
-Subject: [PATCH 1/1] dmaengine: at_xdmac: fix transfer data width in
- at_xdmac_prep_slave_sg()
-In-Reply-To: <517fa6d6bc0038308863d3dc0ed2d5ab14d59454.1435656769.git.cyrille.pitchen@atmel.com>
-References: <517fa6d6bc0038308863d3dc0ed2d5ab14d59454.1435656769.git.cyrille.pitchen@atmel.com>
-Message-ID: <55926BB8.70901@atmel.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Tue, 30 Jun 2015 12:17:21 +0200
+Subject: [PATCH 0/2] arm64/efi: adapt to UEFI 2.5 properties table changes
+Message-ID: <1435659443-17625-1-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le 30/06/2015 11:36, Cyrille Pitchen a ?crit :
-> This patch adds a missing part in commit
-> 6d3a7d9e3ada345948f72564ce638c412ccd8c4a:
-> dmaengine: at_xdmac: allow muliple dwidths when doing slave transfers
+First of all, I am aware that it is not customary to send non-trivial series
+during the merge window. However, since a parallel discussion is currently
+taking place on the edk2-devel mailing list, I think it makes sense to make
+an exception for this series.
 
-Instead of doing it here ^^^^....
+Version 2.5 of the UEFI spec introduces a new Properties Table feature
+that splits the memory regions covered by PE/COFF executable images
+into regions with the appropriate permissions for the underlying segment
+(i.e., RuntimeServicesCode/R-X for .text and RuntimeServiceData/rw- for
+.data)
 
-> 
-> Indeed, for each item in the scatter-gather list, we check whether the
-> transfer length is aligned with the data width provided by
-> dmaengine_slave_config(). If so, we directly use this data width for the
-> current part of the transfer we are preparing. Otherwise, the data width
-> is reduced to 8 bits (1 byte). Of course, the actual number of register
-> accesses must also be updated to match the new data width.
-> 
-> So one chunk was missing in the original patch: the number of register
-> accesses was correctly set to (len >> fixed_dwidth) in mbr_ubc but the
-> real data width was not updated in mbr_cfg. Since mbr_cfg may change for
-> each part of the scatter-gather transfer this also explains why the
-> original patch used the Descriptor View 2 instead of the Descriptor
-> View 1.
-> 
-> Let's take the example of a DMA transfer to write 8bit data into an Atmel
-> USART with FIFOs. When FIFOs are enabled in the USART, its Transmit
-> Holding Register (THR) works in multidata mode, that is to say that up to
-> 4 8bit data can be written into the THR in a single 32bit access and it is
-> still possible to write only one data with a 8bit access. To take
-> advantage of this new feature, the DMA driver was modified to allow
-> multiple dwidths when doing slave transfers.
-> For instance, when the total length is 22 bytes, the USART driver splits
-> the transfer into 2 parts:
-> 
-> First part: 20 bytes transferred through 5 32bit writes into THR
-> Second part: 2 bytes transferred though 2 8bit writes into THR
-> 
-> For the second part, the data width was first set to 4_BYTES by the USART
-> driver thanks to dmaengine_slave_config() then at_xdmac_prep_slave_sg()
-> reduces this data width to 1_BYTE because the 2 byte length is not aligned
-> with the original 4_BYTES data width. Since the data width is modified,
-> the actual number of writes into THR must be set accordingly.
-> 
-> Signed-off-by: Cyrille Pitchen <cyrille.pitchen@atmel.com>
+Unfortunately, this feature is built on the backwards incompatible assumption
+that the OS always maps all RuntimeServicesCode and RuntimeServiceData regions
+in a way that keeps adjacent code and data regions adjacent. Since this is
+not what we are currently doing for arm64, some changes are required.
 
-... add the reference here as a "Fixes:" tag + add the "Cc: stable" tag
-as well.
+The first patch makes the mapping permission logic compliant with the spec,
+by mapping all RuntimeServicesCode *and* RuntimeServicesData regions RWX,
+(formerly, we were using RW- for data regions), unless any of the
+EFI_MEMORY_RO and EFI_MEMORY_XP attributes are set, and the region is fully
+aligned to the page size (which may not always be the case on 64k pages)
 
-Bye,
+Then, in patch #2, we change the virtual remapping logic to keep adjacent
+EFI_MEMORY_RUNTIME regions together. This requires us to sort the incoming
+memory map, since the UEFI spec does not guarantee that it is sorted (although
+it usually is).
 
+This series applies on top of the patch that introduces the EFI_MEMORY_RO
+region attribute, which can be found here:
+http://article.gmane.org/gmane.linux.kernel.efi/5819
 
-> ---
->  drivers/dma/at_xdmac.c | 7 ++++---
->  1 file changed, 4 insertions(+), 3 deletions(-)
-> 
-> diff --git a/drivers/dma/at_xdmac.c b/drivers/dma/at_xdmac.c
-> index cf1213d..931b218 100644
-> --- a/drivers/dma/at_xdmac.c
-> +++ b/drivers/dma/at_xdmac.c
-> @@ -681,15 +681,16 @@ at_xdmac_prep_slave_sg(struct dma_chan *chan, struct scatterlist *sgl,
->  			desc->lld.mbr_sa = mem;
->  			desc->lld.mbr_da = atchan->sconfig.dst_addr;
->  		}
-> -		desc->lld.mbr_cfg = atchan->cfg;
-> -		dwidth = at_xdmac_get_dwidth(desc->lld.mbr_cfg);
-> +		dwidth = at_xdmac_get_dwidth(atchan->cfg);
->  		fixed_dwidth = IS_ALIGNED(len, 1 << dwidth)
-> -			       ? at_xdmac_get_dwidth(desc->lld.mbr_cfg)
-> +			       ? dwidth
->  			       : AT_XDMAC_CC_DWIDTH_BYTE;
->  		desc->lld.mbr_ubc = AT_XDMAC_MBR_UBC_NDV2			/* next descriptor view */
->  			| AT_XDMAC_MBR_UBC_NDEN					/* next descriptor dst parameter update */
->  			| AT_XDMAC_MBR_UBC_NSEN					/* next descriptor src parameter update */
->  			| (len >> fixed_dwidth);				/* microblock length */
-> +		desc->lld.mbr_cfg = (atchan->cfg & ~AT_XDMAC_CC_DWIDTH_MASK) |
-> +				    AT_XDMAC_CC_DWIDTH(fixed_dwidth);
->  		dev_dbg(chan2dev(chan),
->  			 "%s: lld: mbr_sa=%pad, mbr_da=%pad, mbr_ubc=0x%08x\n",
->  			 __func__, &desc->lld.mbr_sa, &desc->lld.mbr_da, desc->lld.mbr_ubc);
-> 
+Ard Biesheuvel (2):
+  arm64/efi: base UEFI mapping permissions on region attributes
+  arm64/efi: don't pad between EFI_MEMORY_RUNTIME regions
 
+ arch/arm64/kernel/efi.c                 | 32 +++++++----
+ drivers/firmware/efi/libstub/arm-stub.c | 58 +++++++++++++++-----
+ 2 files changed, 64 insertions(+), 26 deletions(-)
 
 -- 
-Nicolas Ferre
+1.9.1
