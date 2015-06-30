@@ -1,108 +1,76 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Tue, 30 Jun 2015 12:35:29 +0300
-Subject: [PATCH 6/7] pinctrl: sh-pfc: Move sh_pfc_add_gpiochip() up
-In-Reply-To: <1435650327-2542-7-git-send-email-geert+renesas@glider.be>
-References: <1435650327-2542-1-git-send-email-geert+renesas@glider.be>
- <1435650327-2542-7-git-send-email-geert+renesas@glider.be>
-Message-ID: <2241869.R00PfnOgEO@avalon>
+From: cyrille.pitchen@atmel.com (Cyrille Pitchen)
+Date: Tue, 30 Jun 2015 11:36:41 +0200
+Subject: [PATCH 1/1] dmaengine: at_xdmac: fix transfer data width in
+ at_xdmac_prep_slave_sg()
+Message-ID: <517fa6d6bc0038308863d3dc0ed2d5ab14d59454.1435656769.git.cyrille.pitchen@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Geert,
+This patch adds a missing part in commit
+6d3a7d9e3ada345948f72564ce638c412ccd8c4a:
+dmaengine: at_xdmac: allow muliple dwidths when doing slave transfers
 
-Thank you for the patch.
+Indeed, for each item in the scatter-gather list, we check whether the
+transfer length is aligned with the data width provided by
+dmaengine_slave_config(). If so, we directly use this data width for the
+current part of the transfer we are preparing. Otherwise, the data width
+is reduced to 8 bits (1 byte). Of course, the actual number of register
+accesses must also be updated to match the new data width.
 
-On Tuesday 30 June 2015 09:45:26 Geert Uytterhoeven wrote:
-> Move sh_pfc_add_gpiochip() to the generic helper section at the top of
-> the file, so it can be called from the "Function GPIOs" section later.
-> 
-> Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+So one chunk was missing in the original patch: the number of register
+accesses was correctly set to (len >> fixed_dwidth) in mbr_ubc but the
+real data width was not updated in mbr_cfg. Since mbr_cfg may change for
+each part of the scatter-gather transfer this also explains why the
+original patch used the Descriptor View 2 instead of the Descriptor
+View 1.
 
-Acked-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+Let's take the example of a DMA transfer to write 8bit data into an Atmel
+USART with FIFOs. When FIFOs are enabled in the USART, its Transmit
+Holding Register (THR) works in multidata mode, that is to say that up to
+4 8bit data can be written into the THR in a single 32bit access and it is
+still possible to write only one data with a 8bit access. To take
+advantage of this new feature, the DMA driver was modified to allow
+multiple dwidths when doing slave transfers.
+For instance, when the total length is 22 bytes, the USART driver splits
+the transfer into 2 parts:
 
-> ---
->  drivers/pinctrl/sh-pfc/gpio.c | 58  +++++++++++++++++++--------------------
->  1 file changed, 29 insertions(+), 29 deletions(-)
-> 
-> diff --git a/drivers/pinctrl/sh-pfc/gpio.c b/drivers/pinctrl/sh-pfc/gpio.c
-> index b8929b5e2fa26c53..30654e800580524d 100644
-> --- a/drivers/pinctrl/sh-pfc/gpio.c
-> +++ b/drivers/pinctrl/sh-pfc/gpio.c
-> @@ -131,6 +131,35 @@ static int gpio_setup_data_regs(struct sh_pfc_chip
-> *chip) return 0;
->  }
-> 
-> +static struct sh_pfc_chip *
-> +sh_pfc_add_gpiochip(struct sh_pfc *pfc, int(*setup)(struct sh_pfc_chip *),
-> +		    struct sh_pfc_window *mem)
-> +{
-> +	struct sh_pfc_chip *chip;
-> +	int ret;
-> +
-> +	chip = devm_kzalloc(pfc->dev, sizeof(*chip), GFP_KERNEL);
-> +	if (unlikely(!chip))
-> +		return ERR_PTR(-ENOMEM);
-> +
-> +	chip->mem = mem;
-> +	chip->pfc = pfc;
-> +
-> +	ret = setup(chip);
-> +	if (ret < 0)
-> +		return ERR_PTR(ret);
-> +
-> +	ret = gpiochip_add(&chip->gpio_chip);
-> +	if (unlikely(ret < 0))
-> +		return ERR_PTR(ret);
-> +
-> +	dev_info(pfc->dev, "%s handling gpio %u -> %u\n",
-> +		 chip->gpio_chip.label, chip->gpio_chip.base,
-> +		 chip->gpio_chip.base + chip->gpio_chip.ngpio - 1);
-> +
-> +	return chip;
-> +}
-> +
->  /*
-> ---------------------------------------------------------------------------
-> -- * Pin GPIOs
->   */
-> @@ -305,35 +334,6 @@ static int gpio_function_setup(struct sh_pfc_chip
-> *chip) * Register/unregister
->   */
-> 
-> -static struct sh_pfc_chip *
-> -sh_pfc_add_gpiochip(struct sh_pfc *pfc, int(*setup)(struct sh_pfc_chip *),
-> -		    struct sh_pfc_window *mem)
-> -{
-> -	struct sh_pfc_chip *chip;
-> -	int ret;
-> -
-> -	chip = devm_kzalloc(pfc->dev, sizeof(*chip), GFP_KERNEL);
-> -	if (unlikely(!chip))
-> -		return ERR_PTR(-ENOMEM);
-> -
-> -	chip->mem = mem;
-> -	chip->pfc = pfc;
-> -
-> -	ret = setup(chip);
-> -	if (ret < 0)
-> -		return ERR_PTR(ret);
-> -
-> -	ret = gpiochip_add(&chip->gpio_chip);
-> -	if (unlikely(ret < 0))
-> -		return ERR_PTR(ret);
-> -
-> -	dev_info(pfc->dev, "%s handling gpio %u -> %u\n",
-> -		 chip->gpio_chip.label, chip->gpio_chip.base,
-> -		 chip->gpio_chip.base + chip->gpio_chip.ngpio - 1);
-> -
-> -	return chip;
-> -}
-> -
->  int sh_pfc_register_gpiochip(struct sh_pfc *pfc)
->  {
->  	struct sh_pfc_chip *chip;
+First part: 20 bytes transferred through 5 32bit writes into THR
+Second part: 2 bytes transferred though 2 8bit writes into THR
 
+For the second part, the data width was first set to 4_BYTES by the USART
+driver thanks to dmaengine_slave_config() then at_xdmac_prep_slave_sg()
+reduces this data width to 1_BYTE because the 2 byte length is not aligned
+with the original 4_BYTES data width. Since the data width is modified,
+the actual number of writes into THR must be set accordingly.
+
+Signed-off-by: Cyrille Pitchen <cyrille.pitchen@atmel.com>
+---
+ drivers/dma/at_xdmac.c | 7 ++++---
+ 1 file changed, 4 insertions(+), 3 deletions(-)
+
+diff --git a/drivers/dma/at_xdmac.c b/drivers/dma/at_xdmac.c
+index cf1213d..931b218 100644
+--- a/drivers/dma/at_xdmac.c
++++ b/drivers/dma/at_xdmac.c
+@@ -681,15 +681,16 @@ at_xdmac_prep_slave_sg(struct dma_chan *chan, struct scatterlist *sgl,
+ 			desc->lld.mbr_sa = mem;
+ 			desc->lld.mbr_da = atchan->sconfig.dst_addr;
+ 		}
+-		desc->lld.mbr_cfg = atchan->cfg;
+-		dwidth = at_xdmac_get_dwidth(desc->lld.mbr_cfg);
++		dwidth = at_xdmac_get_dwidth(atchan->cfg);
+ 		fixed_dwidth = IS_ALIGNED(len, 1 << dwidth)
+-			       ? at_xdmac_get_dwidth(desc->lld.mbr_cfg)
++			       ? dwidth
+ 			       : AT_XDMAC_CC_DWIDTH_BYTE;
+ 		desc->lld.mbr_ubc = AT_XDMAC_MBR_UBC_NDV2			/* next descriptor view */
+ 			| AT_XDMAC_MBR_UBC_NDEN					/* next descriptor dst parameter update */
+ 			| AT_XDMAC_MBR_UBC_NSEN					/* next descriptor src parameter update */
+ 			| (len >> fixed_dwidth);				/* microblock length */
++		desc->lld.mbr_cfg = (atchan->cfg & ~AT_XDMAC_CC_DWIDTH_MASK) |
++				    AT_XDMAC_CC_DWIDTH(fixed_dwidth);
+ 		dev_dbg(chan2dev(chan),
+ 			 "%s: lld: mbr_sa=%pad, mbr_da=%pad, mbr_ubc=0x%08x\n",
+ 			 __func__, &desc->lld.mbr_sa, &desc->lld.mbr_da, desc->lld.mbr_ubc);
 -- 
-Regards,
-
-Laurent Pinchart
+1.8.2.2
