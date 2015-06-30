@@ -1,65 +1,81 @@
-From: lorenx4@gmail.com (Lorenzo Nava)
-Date: Tue, 30 Jun 2015 13:40:40 +0200
-Subject: [PATCH v4] arm DMA: Fix allocation from CMA for coherent DMA
-In-Reply-To: <20150630110521.GA7445@e104818-lin.cambridge.arm.com>
-References: <1435597845-19811-1-git-send-email-lorenx4@gmail.com>
- <20150630110521.GA7445@e104818-lin.cambridge.arm.com>
-Message-ID: <CAE=W-e3GSo67T5f7UsmdESAp9nhttFVJMnRFdJ+uKAOrxTNf0A@mail.gmail.com>
+From: hanjun.guo@linaro.org (Hanjun Guo)
+Date: Tue, 30 Jun 2015 19:50:56 +0800
+Subject: [PATCH v2 6/9] irqchip / gic: Add stacked irqdomain support for
+ ACPI based GICv2 init
+In-Reply-To: <55910440.8070702@arm.com>
+References: <1434703572-26221-1-git-send-email-hanjun.guo@linaro.org>
+ <1434703572-26221-7-git-send-email-hanjun.guo@linaro.org>
+ <20150622172014.GB26129@red-moon> <5589772A.8070708@linaro.org>
+ <20150623173845.GC31466@red-moon> <558E1DEE.3090900@linaro.org>
+ <55910440.8070702@arm.com>
+Message-ID: <559282A0.8090601@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 30, 2015 at 1:05 PM, Catalin Marinas
-<catalin.marinas@arm.com> wrote:
->
-> On Mon, Jun 29, 2015 at 07:10:45PM +0200, Lorenzo Nava wrote:
-> > This patch allows the use of CMA for DMA coherent memory allocation.
-> > At the moment if the input parameter "is_coherent" is set to true
-> > the allocation is not made using the CMA, which I think is not the
-> > desired behaviour.
-> >
-> > Signed-off-by: Lorenzo Nava <lorenx4@xxxxxxxx>
->
-> It's nice to have a proper email address here.
+Hi Marc,
 
-oops, sorry I thought it was made to avoid spam. This is an easy fix :-)
+On 06/29/2015 04:39 PM, Marc Zyngier wrote:
+> On 27/06/15 04:52, Hanjun Guo wrote:
+>> On 06/24/2015 01:38 AM, Lorenzo Pieralisi wrote:
+>>> On Tue, Jun 23, 2015 at 04:11:38PM +0100, Hanjun Guo wrote:
+[...]
+>>>
+>>>>>>     	for (i = 0; i < nr_irqs; i++)
+>>>>>>     		gic_irq_domain_map(domain, virq + i, hwirq + i);
+>>>>>> @@ -945,11 +952,11 @@ void __init gic_init_bases(unsigned int gic_nr, int irq_start,
+>>>>>>     		gic_irqs = 1020;
+>>>>>>     	gic->gic_irqs = gic_irqs;
+>>>>>>
+>>>>>> -	if (node) {		/* DT case */
+>>>>>> +	if (node || !acpi_disabled) {		/* DT or ACPI case */
+>>>>>>     		gic->domain = irq_domain_add_linear(node, gic_irqs,
+>>>>>>     						    &gic_irq_domain_hierarchy_ops,
+>>>>>>     						    gic);
+>>>
+>>> I think this is a bit more worrying, I mean passing a NULL node pointer to
+>>> the irqdomain layer which basically means you are booting out of ACPI
+>>
+>> I'm little confused here, would you mind explaining more for your
+>> worrying? To me, node pointer is optional and it's ok for ACPI
+>> case.
+>>
+>>> (for you, if that's true for the irq_domain_add_linear implementation
+>>> that's another story), the node pointer should be optional but you
+>>> need feedback from IRQ layer maintainers here.
+>>
+>> Sure.
+>
+> Frankly, I'd really like to see ACPI using the "node" parameter for
+> something useful. This would save having to cache pointers all over the
+> place, will make find_irq_host() work as expected... etc.
+>
+> See the comment at the top of linux/irqdomain.h :
+>
+> "... This code could thus be used on other architectures by replacing
+> those two by some sort of arch-specific void * "token" used to identify
+> interrupt controllers."
+
+To init GIC in ACPI, we can only use the table entry pointer as
+the token, but the ACPI static tables are early mem/io remapped
+memory at boot stage, and it will be not available after boot,
+also we need muti types of MADT enties to init GIC (GICC and GICD
+for GICv2, GICC or GICR and GICD for GICv3), not as DT, just
+one single node to include all the information needed to init
+the GIC.
+
+We use ACPI handle for devices as node for DT when the namespace
+is available, but that's pretty late in the boot stage which GIC,
+SMP and timers were already initialized, so ACPI handle can not
+use as the token too.
+
+I see multi places just pass NULL as the pointer directly for
+irq_domain_add_linear() which works fine, and for ACPI, we tested
+this patch and also it works.
 
 >
-> > @@ -680,9 +684,14 @@ void *arm_dma_alloc(struct device *dev, size_t size, dma_addr_t *handle,
-> >  static void *arm_coherent_dma_alloc(struct device *dev, size_t size,
-> >       dma_addr_t *handle, gfp_t gfp, struct dma_attrs *attrs)
-> >  {
-> > -     pgprot_t prot = __get_dma_pgprot(attrs, PAGE_KERNEL);
-> > +     pgprot_t prot;
-> >       void *memory;
-> >
-> > +     if (attrs == NULL)
-> > +              prot  = PAGE_KERNEL;
-> > +     else
-> > +              prot  = __get_dma_pgprot(attrs, PAGE_KERNEL);
-> > +
-> >       if (dma_alloc_from_coherent(dev, size, handle, &memory))
-> >               return memory;
->
-> We have a slight inconsistency with commit 55af8a91640d (ARM: 8387/1:
-> arm/mm/dma-mapping.c: Add arm_coherent_dma_mmap) where the attrs are not
-> honoured for the coherent ops. That is, DMA_ATTRS_WRITE_COMBINE
-> doesn't have any effect for mmap but with your patch it still has an
-> effect on alloc.
->
-> I think we could just ignore it, the WRITE_COMBINE attr is a hint that
-> the arch may or may not implement and I haven't seen it used with
-> coherent mappings. So in this case just pass PAGE_KERNEL to
-> __dma_alloc() directly without calling __get_dma_pgprot().
->
-> (it also looks like commit 55af8a91640d left an unused attrs argument
-> for __arm_dma_mmap that can be removed as well)
->
+> Maybe it is time to bite the bullet.
 
-Right: ok I just pass PAGE_KERNEL to the alloc function, so we are
-coherent with the mmap.
+Hope comment above explains :)
 
-> Apart from the above, you can add:
->
-> Reviewed-by: Catalin Marinas <catalin.marinas@arm.com>
-
-Thanks.
+Thanks
+Hanjun
