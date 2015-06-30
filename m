@@ -1,29 +1,70 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 30 Jun 2015 17:20:11 +0100
-Subject: Regular oops on shutdown of KVM/ARM64 machines with VGA device
-In-Reply-To: <CAL5wTH4H7DiE-Z-YHCs7mLRPoixOOxi=yMk-j8yC1np1m=9sYw@mail.gmail.com>
-References: <CAL5wTH4MtybHBk22r593HmVX+2jqCDm4fb2MyT2L0TMkHrD7pg@mail.gmail.com>	<20150629100304.GB18931@leverpostej>	<55914033.5060008@arm.com>	<CAL5wTH7EUh0ciutXKs2s-4VjKnRM65QmrUQQiRdM=R+_VXi6DA@mail.gmail.com>	<559270D3.8030305@arm.com>
- <CAL5wTH4H7DiE-Z-YHCs7mLRPoixOOxi=yMk-j8yC1np1m=9sYw@mail.gmail.com>
-Message-ID: <5592C1BB.9090106@arm.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 30 Jun 2015 17:23:10 +0100
+Subject: [PATCH] XOR implementation for ARMv8
+In-Reply-To: <20150630160117.GQ27725@arm.com>
+References: <463b2fe9.7d02.14e245e3541.Coremail.liuxiaodong@nudt.edu.cn>
+ <20150630160117.GQ27725@arm.com>
+Message-ID: <20150630162309.GT27725@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 30/06/15 17:16, Dirk M?ller wrote:
-> Hi Marc,
+On Tue, Jun 30, 2015 at 05:01:17PM +0100, Will Deacon wrote:
+> On Wed, Jun 24, 2015 at 08:00:30AM +0100, ??? wrote:
+> > diff -pruN -X dontdiff linux-4.0.5-orig/arch/arm64/lib/xor.S linux-4.0.5-mod/arch/arm64/lib/xor.S
+> > --- linux-4.0.5-orig/arch/arm64/lib/xor.S       1970-01-01 08:00:00.000000000 +0800
+> > +++ linux-4.0.5-mod/arch/arm64/lib/xor.S        2015-06-24 09:25:49.969256540 +0800
+> > @@ -0,0 +1,228 @@
+> > +/*
+> > + * arch/arm64/lib/xor.S
+> > + *
+> > + * Copyright (C) Xiaodong Liu <liuxiaodong@nudt.edu.cn>, Changsha, P.R. China
+> > + *
+> > + * This program is free software; you can redistribute it and/or modify
+> > + * it under the terms of the GNU General Public License version 2 as
+> > + * published by the Free Software Foundation.
+> > + */
+> > +
+> > +#include <linux/linkage.h>
+> > +#include <asm/assembler.h>
+> > +.macro xor_vectorregs16
+> > +    eor v24.16b, v24.16b, v16.16b
+> > +    eor v25.16b, v25.16b, v17.16b
+> > +    eor v26.16b, v26.16b, v18.16b
+> > +    eor v27.16b, v27.16b, v19.16b
+> > +    eor v28.16b, v28.16b, v20.16b
+> > +    eor v29.16b, v29.16b, v21.16b
+> > +    eor v30.16b, v30.16b, v22.16b
+> > +    eor v31.16b, v31.16b, v23.16b
+> > +.endm
+> > +
+> > +.align 4
+> > +
+> > +/*
+> > + * void xor_arm64ldpregs16_2(unsigned long size, unsigned long * dst, unsigned long *src);
+> > + *
+> > + * Parameters:
+> > + *     x0 - size
+> > + *     x1 - dst
+> > + *     x2 - src
+> > + */
+> > +ENTRY(xor_arm64ldpregs16_2)
+> > +
+> > +    lsr x0, x0, #10
+> > +
+> > +.p2align 4
+> > +Loop23:
+> > +    ldp q16, q17, [x2], #32
+> > +    ldp q18, q19, [x2], #32
+> > +    ldp q20, q21, [x2], #32
+> > +    ldp q22, q23, [x2], #32
 > 
->> Can try the following patch?
+> Have you tried using immediate offsets instead of post-index addressing?
+> E.g.
 > 
-> [..]
-> 
-> Thanks a lot for the quick patch, from a brief testing this seems to
-> fix the issue (on a 4k kernel). I'll retest this in our original
-> configuration (which was 64k) but so far I don't see a reason why it
-> shouldn't fix the issue.
+> 	ldp q16, q17, [x2]
+> 	ldp q18, q19, [x2, #32], #32
+> 	ldp q20, q21, [x2, #64], #32
 
-Awesome. Mind if I put your Tested-by on the patch?
+Without the post-index offsets, of course ;)
 
-Thanks,
-
-	M.
--- 
-Jazz is not dead. It just smells funny...
+Will
