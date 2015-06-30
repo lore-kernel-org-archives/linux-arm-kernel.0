@@ -1,65 +1,25 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 30 Jun 2015 21:25:37 +0100
-Subject: [PATCH] ARM: psci: boot_secondary: replace __pa with virt_to_idmap
-In-Reply-To: <20150630161836.GC28372@leverpostej>
-References: <1435661062-4127-1-git-send-email-grygorii.strashko@ti.com>
- <20150630161836.GC28372@leverpostej>
-Message-ID: <20150630202537.GI7557@n2100.arm.linux.org.uk>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 30 Jun 2015 22:28:42 +0200
+Subject: [PATCH v3 2/4] tty/serial: at91: fix some macro definitions to
+ fit coding style
+In-Reply-To: <9f0f19d2fe05ea95572b467ec49ecd11389e3be9.1435672649.git.cyrille.pitchen@atmel.com>
+References: <cover.1435672649.git.cyrille.pitchen@atmel.com>
+ <9f0f19d2fe05ea95572b467ec49ecd11389e3be9.1435672649.git.cyrille.pitchen@atmel.com>
+Message-ID: <11308515.NsBzDiA1lH@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 30, 2015 at 05:18:37PM +0100, Mark Rutland wrote:
-> Hi,
+On Tuesday 30 June 2015 16:05:15 Cyrille Pitchen wrote:
+> +#define UART_PUT_CR(port, v)   __raw_writel(v, (port)->membase + ATMEL_US_CR)
+> +#define UART_GET_MR(port)      __raw_readl((port)->membase + ATMEL_US_MR)
+> +#define UART_PUT_MR(port, v)   __raw_writel(v, (port)->membase + ATMEL_US_MR)
+> +#define UART_PUT_IER(port, v)  __raw_writel(v, (port)->membase + ATMEL_US_IER)
 > 
-> On Tue, Jun 30, 2015 at 11:44:22AM +0100, Grygorii Strashko wrote:
-> > On some PAE systems (e.g. TI Keystone), memory is above the 32-bit
-> > addressable limit, and the interconnect provides an aliased view of
-> > parts of physical memory in the 32-bit addressable space. This alias
-> > is strictly for boot time usage, and is not otherwise usable because
-> > of coherency limitations.
-> > 
-> > On such systems, the idmap mechanism has to be used to pass correct
-> > boot address of secondary CPU to FW.
-> > virt_to_idmap() will fall-back to existing virt_to_phys() macro if
-> > such conversation is not required.
-> > 
-> > Cc: Mark Rutland <mark.rutland@arm.com>
-> > Cc: Nicolas Pitre <nico@linaro.org>
-> > Cc: Santosh Shilimkar <ssantosh@kernel.org>
-> > Cc: Vitaly Andrianov <vitalya@ti.com>
-> > Signed-off-by: Grygorii Strashko <grygorii.strashko@ti.com>
-> > ---
-> >  arch/arm/kernel/psci_smp.c | 2 +-
-> >  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> The code itself looks sane to me, though the commit message would be
-> better with Russell's suggested rewording.
-> 
-> This will also conflict with my migration to a common PSCI client
-> implementation [1,2] (especially given the absence of virt_to_idmap on
-> arm64), but I'm happy to fold it in or rebase atop of it.
-> 
-> Russell, are you able to take a look at the migration patch [2]? How
-> would you prefer for the two patches to be taken?
 
-Well, the first thing that stands out about patch [2] is that it's
-introducing a load of magic hex numbers, where before we had a struct
-with nice definitions.  (I'm thinking about highbank_suspend_finish()
-and calxeda_idle_finish().)  This seems to be a backwards step.
+How about removing these macros entirely? I'm not aware of other drivers
+doing it like this, and it does not seem to add any value?
 
-There's two options on how to handle this.  Either accept the
-virt_to_idmap() change first, and then sort out the resulting difference,
-maybe by having ARM64 grow a virt_to_idmap() of its own (which is just
-a virt_to_phys()) or we do it the other way around.  Either way, we
-need a new macro, and the established name for it is virt_to_idmap().
-The order doesn't matter as the end result would be the same.
+At the same time, you could use readl_relaxed() to make the driver
+endian-safe.
 
-> Thanks,
-> Mark.
-> 
-> [1] http://lists.infradead.org/pipermail/linux-arm-kernel/2015-May/346492.html
-> [2] http://lists.infradead.org/pipermail/linux-arm-kernel/2015-May/346503.html
-
--- 
-FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
-according to speedtest.net.
+	Arnd
