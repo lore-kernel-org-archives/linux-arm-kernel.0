@@ -1,65 +1,55 @@
-From: ahs3@redhat.com (Al Stone)
-Date: Tue, 30 Jun 2015 11:29:35 -0600
-Subject: [PATCH v2 0/3] Correct for ACPI 5.1->6.0 spec changes in MADT
- GICC entries
-In-Reply-To: <5592CCE6.6040604@arm.com>
-References: <1434666968-1543-1-git-send-email-al.stone@linaro.org>
- <5592CCE6.6040604@arm.com>
-Message-ID: <5592D1FF.7040208@redhat.com>
+From: javier.martinez@collabora.co.uk (Javier Martinez Canillas)
+Date: Tue, 30 Jun 2015 19:45:15 +0200
+Subject: [PATCH] clk: samsung: fix cpu clock's flags checking
+In-Reply-To: <7416838.2ZUPGjSqFp@amdc1976>
+References: <1435598978-21800-1-git-send-email-b.zolnierkie@samsung.com>
+ <5591DD9B.4030507@samsung.com>
+ <CABxcv=kVL94rdFgNKcxx2JOi9WRFnvhMWrpjEDcEmx7q7cEsgQ@mail.gmail.com>
+ <7416838.2ZUPGjSqFp@amdc1976>
+Message-ID: <5592D5AB.2020802@collabora.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/30/2015 11:07 AM, Sudeep Holla wrote:
-> Hi Al,
+Hello Bartlomiej,
+
+On 06/30/2015 07:17 PM, Bartlomiej Zolnierkiewicz wrote:
 > 
-> On 18/06/15 23:36, Al Stone wrote:
->> In the ACPI 5.1 version of the spec, the struct for the GICC subtable
->> (struct acpi_madt_generic_interrupt) of the MADT is 76 bytes long; in
->> ACPI 6.0, the struct is 80 bytes long.  But, there is only one definition
->> in ACPICA for this struct -- and that is the 6.0 version.  Hence, when
->> BAD_MADT_ENTRY() compares the struct size to the length in the GICC
->> subtable, it fails if 5.1 structs are in use, and there are systems in
->> the wild that have them.
->>
->> Note that this was found in linux-next and these patches apply against
->> that tree and the arm64 kernel tree; 4.1-rc8 does not appear to have this
->> problem since it still has the 5.1 struct definition.
->>
->> Even though there is precendent in ia64 code for ignoring the changes in
->> size, this patch set instead tries to verify correctness.  The first patch
->> in the set adds macros for easily using the ACPI spec version.  The second
->> patch adds the BAD_MADT_GICC_ENTRY() macro that uses the version macros to
->> check the GICC subtable only, accounting for the difference in specification
->> versions that are possible.  The final patch replaces BAD_MADT_ENTRY usage
->> with the BAD_MADT_GICC_ENTRY macro in arm64 code, which is currently the
->> only architecture affected.  The BAD_MADT_ENTRY() will continue to work as
->> is for all other MADT subtables.
->>
+> Hi,
 > 
-> We need to get this series or a patch to remove the check(similar to
-> ia64) based on what Rafael prefers. Without that, platforms using ACPI
-> on ARM64 fails to boot with latest mainline. This blocks any testing on
-> ARM64/ACPI systems.
+> On Tuesday, June 30, 2015 08:27:36 AM Javier Martinez Canillas wrote:
+>> On Tue, Jun 30, 2015 at 2:06 AM, Krzysztof Kozlowski
+>> <k.kozlowski@samsung.com> wrote:
+>> > On 30.06.2015 02:29, Bartlomiej Zolnierkiewicz wrote:
+>> >> CLK_CPU_HAS_DIV1 and CLK_CPU_NEEDS_DEBUG_ALT_DIV masks were
+>> >> incorrectly used as a bit numbers.  Fix it.
+>> >>
+>> >> Tested on Exynos4210 based Origen board and on Exynos5250 based
+>> >> Arndale board.
+>> >>
+>> >> Cc: Tomasz Figa <tomasz.figa@gmail.com>
+>> >> Cc: Michael Turquette <mturquette@baylibre.com>
+>> >> Cc: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
+>> >> Cc: Thomas Abraham <thomas.ab@samsung.com>
+>> >> Reported-by: Dan Carpenter <dan.carpenter@oracle.com>
+>> >> Signed-off-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
+>> >> ---
+>> >>  drivers/clk/samsung/clk-cpu.c | 10 +++++-----
+>> >>  1 file changed, 5 insertions(+), 5 deletions(-)
+>> >
+>> > Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+>> >
+>> 
+>> Looks good to me as well.
+>> 
+>> Reviewed-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
 > 
-> Regards,
-> Sudeep
+> Krzysztof has noted that I should use your @dowhile0.org e-mail address
+> instead of @collabora.co.uk one, is this right?
+>
 
-I have not received any other feedback than some Reviewed-bys from
-Hanjun and an ACK from Will for the arm64 patch.
+I don't know what is the policy for tags but Krzysztof is correct that
+this email address is going away this week so for future patches please
+use my personal @dowhile0.org address instead.
 
-And absolutely agreed: this is a blocker for arm64/ACPI, starting with
-the ACPICA 20150515 patches which appear to have gone in with 4.2-rc1.
-
-Rafael?  Ping?  Do we need these to go through your tree or the arm64
-tree?  Without this series (or an ia64-like solution), we have ACPI
-systems in the field that cannot boot.
-
--- 
-ciao,
-al
------------------------------------
-Al Stone
-Software Engineer
-Red Hat, Inc.
-ahs3 at redhat.com
------------------------------------
+Best regards,
+Javier
