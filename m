@@ -1,50 +1,105 @@
-From: michael@ellerman.id.au (Michael Ellerman)
-Date: Tue, 30 Jun 2015 13:29:05 +1000
-Subject: [PATCH 1/2] Move the pt_regs_offset struct definition from arch
- to common include file
-In-Reply-To: <5581BCD0.2040405@linaro.org>
-References: <1434386579-6045-1-git-send-email-dave.long@linaro.org>
- <1434386579-6045-2-git-send-email-dave.long@linaro.org>
- <CAL_JsqK3L9Hv9bhAtwAAXVYjLJBTOG9=4ddOo-SFqnD-_KieCQ@mail.gmail.com>
- <5581BCD0.2040405@linaro.org>
-Message-ID: <1435634945.24866.2.camel@ellerman.id.au>
+From: thunder.leizhen@huawei.com (leizhen)
+Date: Tue, 30 Jun 2015 11:47:38 +0800
+Subject: [PATCH 1/8] iommu/arm-smmu: fix the assignment of log2size field
+In-Reply-To: <20150629170517.GH17474@arm.com>
+References: <1435307584-9812-1-git-send-email-thunder.leizhen@huawei.com>
+ <1435307584-9812-2-git-send-email-thunder.leizhen@huawei.com>
+ <20150629170517.GH17474@arm.com>
+Message-ID: <5592115A.8000502@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2015-06-17 at 14:30 -0400, David Long wrote:
-> On 06/16/15 09:17, Rob Herring wrote:
-> > On Mon, Jun 15, 2015 at 11:42 AM, David Long <dave.long@linaro.org> wrote:
-> >>
-> >>   #define REG_OFFSET_NAME(r) \
-> >>          {.name = #r, .offset = offsetof(struct pt_regs, ARM_##r)}
-> >>   #define REG_OFFSET_END {.name = NULL, .offset = 0}
-> >
-> > Can't you also move these? ARM is complicated with the "ARM_"
-> > prefixing, but the others appear to be the same. Maybe you can remove
-> > the prefix or redefine the macro for ARM.
+On 2015/6/30 1:05, Will Deacon wrote:
+> Hi Zhen Lei,
 > 
-> That would mandate that all the architecture-specific pt_regs structures 
-> would have to use a top-level named field for each named register.
+> On Fri, Jun 26, 2015 at 09:32:57AM +0100, Zhen Lei wrote:
+>> Add a new local variable to store the value of log2size, so that it will
+>> not be overridden by L1 table size.
+>>
+>> Signed-off-by: Zhen Lei <thunder.leizhen@huawei.com>
+>> ---
+>>  drivers/iommu/arm-smmu-v3.c | 14 +++++++-------
+>>  1 file changed, 7 insertions(+), 7 deletions(-)
+>>
+>> diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
+>> index f141301..ba7fe2d 100644
+>> --- a/drivers/iommu/arm-smmu-v3.c
+>> +++ b/drivers/iommu/arm-smmu-v3.c
+>> @@ -2021,19 +2021,19 @@ static int arm_smmu_init_strtab_2lvl(struct arm_smmu_device *smmu)
+>>  {
+>>  	void *strtab;
+>>  	u64 reg;
+>> -	u32 size;
+>> +	u32 size, log2size;
+>>  	int ret;
+>>  	struct arm_smmu_strtab_cfg *cfg = &smmu->strtab_cfg;
+>>
+>>  	/* Calculate the L1 size, capped to the SIDSIZE */
+>> -	size = STRTAB_L1_SZ_SHIFT - (ilog2(STRTAB_L1_DESC_DWORDS) + 3);
+>> -	size = min(size, smmu->sid_bits - STRTAB_SPLIT);
+>> -	if (size + STRTAB_SPLIT < smmu->sid_bits)
+>> +	log2size = STRTAB_L1_SZ_SHIFT - (ilog2(STRTAB_L1_DESC_DWORDS) + 3);
+>> +	log2size = min(log2size, smmu->sid_bits - STRTAB_SPLIT);
+>> +	if (log2size + STRTAB_SPLIT < smmu->sid_bits)
+> 
+> I still think this is wrong. LOG2SIZE should correspond to the whole
+> stream-table, not just the first level. How about the (totally untested)
+> patch below, instead?
 
-Why does it mandate that?
+I tested the patch below, It's passed.
 
-See eg. powerpc where we use REG_OFFSET_NAME for the top-level named fields and
-then a different macro for the array elements:
+I use log2size, because this is the field name in SMMU_STRTAB_BASE_CFG. In fact,
+it means log2(entries). Yes, I also think log2size is confused. So, I prefer yours.
 
-  #define REG_OFFSET_NAME(r) {.name = #r, .offset = offsetof(struct pt_regs, r)}
-  #define GPR_OFFSET_NAME(num)	\
-  	{.name = STR(gpr##num), .offset = offsetof(struct pt_regs, gpr[num])}
-  
-  static const struct pt_regs_offset regoffset_table[] = {
-  	GPR_OFFSET_NAME(0),
-  	GPR_OFFSET_NAME(1),
-  	GPR_OFFSET_NAME(2),
-  	GPR_OFFSET_NAME(3),
-  	...
-  	REG_OFFSET_NAME(nip),
-  	REG_OFFSET_NAME(msr),
-
-
-So I don't see why REG_OFFSET_NAME couldn't be common.
-
-cheers
+> 
+> Will
+> 
+> --->8
+> 
+> diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
+> index 8e9ec81ce4bb..1942a45f68b2 100644
+> --- a/drivers/iommu/arm-smmu-v3.c
+> +++ b/drivers/iommu/arm-smmu-v3.c
+> @@ -2020,21 +2020,23 @@ static int arm_smmu_init_strtab_2lvl(struct arm_smmu_device *smmu)
+>  {
+>  	void *strtab;
+>  	u64 reg;
+> -	u32 size;
+> +	u32 size, l1size;
+>  	int ret;
+>  	struct arm_smmu_strtab_cfg *cfg = &smmu->strtab_cfg;
+>  
+>  	/* Calculate the L1 size, capped to the SIDSIZE */
+>  	size = STRTAB_L1_SZ_SHIFT - (ilog2(STRTAB_L1_DESC_DWORDS) + 3);
+>  	size = min(size, smmu->sid_bits - STRTAB_SPLIT);
+> -	if (size + STRTAB_SPLIT < smmu->sid_bits)
+> +	cfg->num_l1_ents = 1 << size;
+> +
+> +	size += STRTAB_SPLIT;
+> +	if (size < smmu->sid_bits)
+>  		dev_warn(smmu->dev,
+>  			 "2-level strtab only covers %u/%u bits of SID\n",
+> -			 size + STRTAB_SPLIT, smmu->sid_bits);
+> +			 size, smmu->sid_bits);
+>  
+> -	cfg->num_l1_ents = 1 << size;
+> -	size = cfg->num_l1_ents * (STRTAB_L1_DESC_DWORDS << 3);
+> -	strtab = dma_zalloc_coherent(smmu->dev, size, &cfg->strtab_dma,
+> +	l1size = cfg->num_l1_ents * (STRTAB_L1_DESC_DWORDS << 3);
+> +	strtab = dma_zalloc_coherent(smmu->dev, l1size, &cfg->strtab_dma,
+>  				     GFP_KERNEL);
+>  	if (!strtab) {
+>  		dev_err(smmu->dev,
+> @@ -2055,8 +2057,7 @@ static int arm_smmu_init_strtab_2lvl(struct arm_smmu_device *smmu)
+>  	ret = arm_smmu_init_l1_strtab(smmu);
+>  	if (ret)
+>  		dma_free_coherent(smmu->dev,
+> -				  cfg->num_l1_ents *
+> -				  (STRTAB_L1_DESC_DWORDS << 3),
+> +				  l1size,
+>  				  strtab,
+>  				  cfg->strtab_dma);
+>  	return ret;
+> 
+> .
+> 
