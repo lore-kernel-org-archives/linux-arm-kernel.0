@@ -1,47 +1,55 @@
-From: gnurou@gmail.com (Alexandre Courbot)
-Date: Tue, 30 Jun 2015 22:42:55 +0900
-Subject: [PATCH] ARM: tegra: paz00: set gpiod_lookup table conn_id's
-In-Reply-To: <1435520160-16862-1-git-send-email-digetx@gmail.com>
-References: <1435520160-16862-1-git-send-email-digetx@gmail.com>
-Message-ID: <CAAVeFuKcaz1C9OV26+8A+LypScqDcufR+X99KDJwVui39Nq7xA@mail.gmail.com>
+From: vitalya@ti.com (Vitaly Andrianov)
+Date: Tue, 30 Jun 2015 09:47:55 -0400
+Subject: [PATCH] keystone: adds cpu_die implementation
+In-Reply-To: <20150629213737.GF7557@n2100.arm.linux.org.uk>
+References: <1435600352-32733-1-git-send-email-vitalya@ti.com>
+ <20150629175223.GC19863@leverpostej> <559191E0.4080808@ti.com>
+ <20150629212814.GE7557@n2100.arm.linux.org.uk>
+ <20150629213737.GF7557@n2100.arm.linux.org.uk>
+Message-ID: <55929E0B.9070704@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 29, 2015 at 4:34 AM, Dmitry Osipenko <digetx@gmail.com> wrote:
-> Commit 72daceb9a10a ("net: rfkill: gpio: Add default GPIO driver mappings
-> for ACPI") removed possibility to request GPIO by table index for non-ACPI
-> platforms without changing it users. As result "shutdown" GPIO request
-> will fail if request for "reset" GPIO succeeded or "reset" will be
-> requested instead of "shutdown" if "reset" wasn't defined. Fix it by
-> setting conn_id's in gpiod_lookup_table.
 
-Yep, and using con_ids is a good idea anyway.
 
-Acked-by: Alexandre Courbot <acourbot@nvidia.com>
+On 06/29/2015 05:37 PM, Russell King - ARM Linux wrote:
+> On Mon, Jun 29, 2015 at 10:28:14PM +0100, Russell King - ARM Linux wrote:
+>> On Mon, Jun 29, 2015 at 02:43:44PM -0400, Vitaly Andrianov wrote:
+>>>
+>>>
+>>> On 06/29/2015 01:52 PM, Mark Rutland wrote:
+>>>> On Mon, Jun 29, 2015 at 06:52:32PM +0100, Vitaly Andrianov wrote:
+>>>>> This commit add cpu_die implementation
+>>>>>
+>>>>> Signed-off-by: Vitaly Andrianov <vitalya@ti.com>
+>>>>> ---
+>>>>>
+>>>>> The discussion of the "keystone: psci: adds cpu_die implementation" commit
+>>>>> shows that if PCSI is enabled platform code doesn't need that implementation
+>>>>> at all. Having PSCI commands in DTB should be sufficient. Unfortunately
+>>>>> Keystone with LPAE enable requires some additional development.
+>>>>
+>>>> I don't follow.
+>>>>
+>>>> What do you need to implement for LPAE?
+>>> Hi Mark,
+>>>
+>>> The Keystone platform needs to set ttbr1 when it boots secondary core.
+>>> It is done in the keystone_smp_secondary_initmem(), which is
+>>> .smp_secondary_init member of the keystone_smp_ops. I couldn't find a way
+>>> how I can add similar function to psci_smp_ops.
+>>
+>> TTBR1 will be set by generic code.  You don't need to do anything special
+>> now that my fixes for TI's horrid physical address space switch are in.
+>> (you may remember, you tested the patches...)
+>
+> Oh, it was Murali who tested it, not yourself.  Sorry.  Suggest you
+> dig out the patches either from mainline (they're in Linus' tip) or
+> ask Murali for them...
+>
+Thanks Russell,
 
->
-> Signed-off-by: Dmitry Osipenko <digetx@gmail.com>
-> Fixes: 72daceb (net: rfkill: gpio: Add default GPIO driver mappings for ACPI)
-> Cc: <stable@vger.kernel.org> # v3.19+
-> ---
->  arch/arm/mach-tegra/board-paz00.c | 4 ++--
->  1 file changed, 2 insertions(+), 2 deletions(-)
->
-> diff --git a/arch/arm/mach-tegra/board-paz00.c b/arch/arm/mach-tegra/board-paz00.c
-> index fbe74c6..67024f3 100644
-> --- a/arch/arm/mach-tegra/board-paz00.c
-> +++ b/arch/arm/mach-tegra/board-paz00.c
-> @@ -39,8 +39,8 @@ static struct platform_device wifi_rfkill_device = {
->  static struct gpiod_lookup_table wifi_gpio_lookup = {
->         .dev_id = "rfkill_gpio",
->         .table = {
-> -               GPIO_LOOKUP_IDX("tegra-gpio", 25, NULL, 0, 0),
-> -               GPIO_LOOKUP_IDX("tegra-gpio", 85, NULL, 1, 0),
-> +               GPIO_LOOKUP_IDX("tegra-gpio", 25, "reset", 0, 0),
-> +               GPIO_LOOKUP_IDX("tegra-gpio", 85, "shutdown", 1, 0),
->                 { },
->         },
->  };
-> --
-> 2.4.4
->
+Excellent. I'll test how it will work using PSCI framework.
+
+Regards,
+Vitaly
