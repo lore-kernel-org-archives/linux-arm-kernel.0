@@ -1,252 +1,55 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Tue, 30 Jun 2015 17:10:36 +0200
-Subject: [PATCH RFC v2 09/16] arm: domain: Add platform callbacks for
- domain power on/off
-In-Reply-To: <20150629163201.GA1524@linaro.org>
-References: <1435374156-19214-1-git-send-email-lina.iyer@linaro.org>
- <1435374156-19214-10-git-send-email-lina.iyer@linaro.org>
- <CAMuHMdULThWEZmyLEK_9WeK6DSNhrQdiZQLWNhi1Q6dwZTkkMg@mail.gmail.com>
- <20150629163201.GA1524@linaro.org>
-Message-ID: <CAMuHMdWL09Loe2EFUMc-kRML7Ckn7a6G1_hvPnaqkDYnhkXjog@mail.gmail.com>
+From: andrew@ncrmnt.org (Andrew Andrianov)
+Date: Tue, 30 Jun 2015 18:15:02 +0300
+Subject: [PATCH v2 0/5] [New SoC] Add support for RC Module's K1879XB1YA
+In-Reply-To: <CAL_JsqKTUM8-ufR8gGJBsNtbc94LyS7o-7v=R2Fit3+0=-SofA@mail.gmail.com>
+Message-ID: <1435677307-6526-1-git-send-email-andrew@ncrmnt.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Lina,
+Rob, Russel, thanks for your reviews, I'm now sending in the fixed patchset. 
+Everything's now ARCH_MULTI_V6-friendly, the config is updated as well. 
 
-On Mon, Jun 29, 2015 at 6:32 PM, Lina Iyer <lina.iyer@linaro.org> wrote:
-> On Mon, Jun 29 2015 at 07:36 -0600, Geert Uytterhoeven wrote:
->>> --- /dev/null
->>> +++ b/arch/arm/include/asm/pm_domain.h
->>> @@ -0,0 +1,27 @@
->>> +/*
->>> + *  arch/arm/include/asm/pm_domain.h
->>> + *
->>> + *  Copyright (C) 2015 Linaro Ltd.
->>> + *
->>> + * This program is free software; you can redistribute it and/or modify
->>> + * it under the terms of the GNU General Public License version 2 as
->>> + * published by the Free Software Foundation.
->>> + */
->>> +#ifndef __ASM_ARM_PM_DOMAIN_H
->>> +#define __ASM_ARM_PM_DOMAIN_H
->>> +
->>> +#include <linux/pm_domain.h>
->>> +
->>> +#if IS_ENABLED(CONFIG_PM_GENERIC_DOMAINS)
->>> +extern int register_platform_domain_handlers(struct of_phandle_args
->>> *args,
->>> +               int (*pd_down)(struct generic_pm_domain *),
->>> +               int (*pd_up)(struct generic_pm_domain *));
->>
->>
->> This looks a bit convoluted to me...
->>
->>> --- a/arch/arm/kernel/domains.c
->>> +++ b/arch/arm/kernel/domains.c
->>> @@ -9,10 +9,19 @@
->>>  #include <linux/module.h>
->>>  #include <linux/platform_device.h>
->>>
->>> +#include <asm/pm_domain.h>
->>> +
->>>  #define NAME_MAX 16
->>>
->>> +struct platform_cb {
->>> +       int (*power_off)(struct generic_pm_domain *);
->>> +       int (*power_on)(struct generic_pm_domain *);
->>> +};
->>> +
->>>  struct arm_pm_domain {
->>>         struct generic_pm_domain genpd;
->>> +       struct platform_cb plat_handler;
->>> +       struct spinlock_t lock;
->>>  };
->>>
->>>  static inline
->>> @@ -23,16 +32,85 @@ struct arm_pm_domain *to_arm_pd(struct
->>> generic_pm_domain *d)
->>>
->>>  static int arm_pd_power_down(struct generic_pm_domain *genpd)
->>>  {
->>> +       struct arm_pm_domain *arm_pd = to_arm_pd(genpd);
->>> +
->>> +       if (arm_pd->plat_handler.power_off)
->>> +               return arm_pd->plat_handler.power_off(genpd);
->>> +
->>>         /* pr_info("KJH: %s: %s\n", __func__, genpd->name); */
->>>         return 0;
->>>  }
->>>
->>>  static int arm_pd_power_up(struct generic_pm_domain *genpd)
->>>  {
->>> +       struct arm_pm_domain *arm_pd = to_arm_pd(genpd);
->>> +
->>> +       if (arm_pd->plat_handler.power_on)
->>> +               return arm_pd->plat_handler.power_on(genpd);
->>> +
->>>         /* pr_info("KJH: %s: %s\n", __func__, genpd->name); */
->>>         return 0;
->>>  }
->>
->>
->>> @@ -152,6 +230,7 @@ static int arm_domain_init(void)
->>>                 pd->genpd.power_off = arm_pd_power_down;
->>>                 pd->genpd.power_on = arm_pd_power_up;
->>
->>
->> Shouldn't these .power_off() and .power_on() be set up from platform code
->> instead, in the platform-specific code that creates the PM domain?
->>
->> The PM Domain containing the CPU may contain other devices, in which
->> case it's already set up from platform-specific code, which would conflict
->> with arm_domain_init()?
->>
-> In my first RFC, the platform code was creating a domain. In this RFC,
-> we are flaunting an idea that a generic code could setup the domains
-> without any intervention from platform code. It will do everything
-> common on most ARM platforms. Architectures that do not have anything
-> specific in their domain, would benefit from such an initialization.
->
-> If we were to export this genpd and then platform code could attach more
-> devices to the genpd, or make it a sub of another genpd, would that
-> work?
->
->> Cfr. arch/arm/mach-shmobile/pm-rmobile.c, which handles all PM domains
->> (both for devices and CPUs) on R-Mobile, and
->> arch/arm/boot/dts/{r8a73a4,r8a7740,sh73a0}.dtsi.
->>
->> R8a73a4 is the most advanced of these three: it has 2 big.LITTLE clusters,
->> with separate PM Domains for L2/SCU and sub-domains for the CPUs.
->
->
-> If you could get the CPU genpd from the ARM common code, you could embed
-> that in the L2 domain.
->
-> On QCOM's big.LITTLE SoC, there would a PM domain for each of the CPUs
-> and then there would be a coherency PM domain that would contain the big
-> and LITTLE cluster domains. In that case, the platform code would create
-> and initialize the coherency domain and make the CPU domains a sub of
-> the coherency domain. Would something like that work?
->
->
->> Unfortunately we don't have SMP support for it, so currently dtsi
->> describes
->> the first cpu core only. The full structure should look like this
->>
->>        cpus {
->>                cpu0: cpu at 0 {
->>                        compatible = "arm,cortex-a15";
->>                        power-domains = <&pd_a2sl>;
->>                        next-level-cache = <&L2_CA15>;
->>                };
->>
->>                cpu1: cpu at 1 {
->>                        compatible = "arm,cortex-a15";
->>                        power-domains = <&pd_a2sl>;
->>                        next-level-cache = <&L2_CA15>;
->>                };
->>
->>                cpu2: cpu at 2 {
->>                        compatible = "arm,cortex-a15";
->>                        power-domains = <&pd_a2sl>;
->>                        next-level-cache = <&L2_CA15>;
->>                };
->>
->>                cpu3: cpu at 3 {
->>                        compatible = "arm,cortex-a15";
->>                        power-domains = <&pd_a2sl>;
->>                        next-level-cache = <&L2_CA15>;
->>                };
->>
->>                cpu4: cpu at 4 {
->>                        compatible = "arm,cortex-a7";
->>                        power-domains = <&pd_a2kl>;
->>                        next-level-cache = <&L2_CA7>;
->>                };
->>
->>                cpu5: cpu at 5 {
->>                        compatible = "arm,cortex-a7";
->>                        power-domains = <&pd_a2kl>;
->>                        next-level-cache = <&L2_CA7>;
->>                };
->>
->>                cpu6: cpu at 6 {
->>                        compatible = "arm,cortex-a7";
->>                        power-domains = <&pd_a2kl>;
->>                        next-level-cache = <&L2_CA7>;
->>                };
->>
->>                cpu7: cpu at 7 {
->>                        compatible = "arm,cortex-a7";
->>                        power-domains = <&pd_a2kl>;
->>                        next-level-cache = <&L2_CA7>;
->>                };
->>        };
->>
->>        L2_CA15: cache-controller at 0 {
->>                compatible = "cache";
->>                power-domains = <&pd_a3sm>;
->>        };
->>
->>        L2_CA7: cache-controller at 1 {
->>                compatible = "cache";
->>                power-domains = <&pd_a3km>;
->>        };
->>
->> And the PM Domain part (which is complete in upstream):
->>
->>        pd_c4: c4 at 0 {
->>                #power-domain-cells = <0>;
->>
->>                pd_a3sm: a3sm at 20 {
->>                        reg = <20>;
->>                        #power-domain-cells = <0>;
->>
->>                        pd_a2sl: a2sl at 21 {
->>                                reg = <21>;
->>                                #power-domain-cells = <0>;
->>                        };
->>                };
->>
->>                pd_a3km: a3km at 22 {
->>                        reg = <22>;
->>                        #size-cells = <0>;
->>                        #power-domain-cells = <0>;
->>
->>                        pd_a2kl: a2kl at 23 {
->>                                reg = <23>;
->>                                #power-domain-cells = <0>;
->>                        };
->>                };
->>        };
->>
-> Thanks for the example. Would it work, if the platform code initalizes
-> the pd_a3sm, pd_a3km and pd_c4 and set up the hierarchy and to add the
-> CPU domains, you could query the ARM and then add the domains to the
-> pd_a3sm and pd_a3km?
+Since I got no feedback on how to properly implement that i2c workaround it 
+remains as is, I only rewrote the code to take the fixup-id and adresses from 
+devicetree instead.
 
-Yes, it could work. But then I have to add _more_ code to ignore the a2sl
-and a2kl code in pm-rmobile.c, and call register_platform_domain_handlers(),
-as in the end it's pm-rmobile that knows how to power up those PM domains.
+The only alternative to this workaround I see - would be implementing a 
+'proxy' irqchip that will take care of clearing the relevant bits. But it 
+looks way more messy. I'm open to suggestions here.
 
-I'm a bit reluctant to split responsibility across two drivers: a
-platform-specific
-one handling PM domains with non-cpu devices, and a generic one handling
-PM domains with cpu-devices.
+The patchset has been tested to compile and boot against v4.1 tag  
 
-Perhaps the generic one can be optional, and provide helpers for common
-CPU operations? Then the platform-specific driver can handle all PM domains,
-and delegate to the generic CPU helpers where appropriate.
+Andrew Andrianov (5):
+  ARM: rcm-k1879xb1: Add support for K1879XB1 SoC
+  of: Add vendor prefix for RC Module
+  ARM: dts: rcm-k1879xb1: Add dts files for K1879XB1YA
+  ARM: Add defconfig for RC Module K1879XB1YA SoC
+  cpuidle: ARM: Add cpuidle driver for K1879XB1YA
 
-Does that make sense?
+ .../devicetree/bindings/vendor-prefixes.txt        |    1 +
+ arch/arm/Kconfig                                   |    2 +
+ arch/arm/Kconfig.debug                             |    3 +-
+ arch/arm/Makefile                                  |    1 +
+ arch/arm/boot/dts/Makefile                         |    1 +
+ arch/arm/boot/dts/rcm-k1879xb1-mb7707.dts          |  146 ++
+ arch/arm/boot/dts/rcm-k1879xb1.dtsi                |  518 ++++
+ arch/arm/configs/rcm_k1879xb1ya_defconfig          | 2678 ++++++++++++++++++++
+ arch/arm/mach-rcm-k1879xb1/Kconfig                 |   10 +
+ arch/arm/mach-rcm-k1879xb1/Makefile                |    2 +
+ arch/arm/mach-rcm-k1879xb1/board-dt.c              |  146 ++
+ arch/arm/mach-rcm-k1879xb1/hardware.h              |   48 +
+ drivers/cpuidle/Kconfig.arm                        |    6 +
+ drivers/cpuidle/Makefile                           |    1 +
+ drivers/cpuidle/cpuidle-rcm-k1879xb1.c             |   48 +
+ 15 files changed, 3610 insertions(+), 1 deletion(-)
+ create mode 100644 arch/arm/boot/dts/rcm-k1879xb1-mb7707.dts
+ create mode 100644 arch/arm/boot/dts/rcm-k1879xb1.dtsi
+ create mode 100644 arch/arm/configs/rcm_k1879xb1ya_defconfig
+ create mode 100644 arch/arm/mach-rcm-k1879xb1/Kconfig
+ create mode 100644 arch/arm/mach-rcm-k1879xb1/Makefile
+ create mode 100644 arch/arm/mach-rcm-k1879xb1/board-dt.c
+ create mode 100644 arch/arm/mach-rcm-k1879xb1/hardware.h
+ create mode 100644 drivers/cpuidle/cpuidle-rcm-k1879xb1.c
 
-Gr{oetje,eeting}s,
-
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+-- 
+2.1.4
