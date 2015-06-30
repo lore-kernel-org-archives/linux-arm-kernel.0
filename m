@@ -1,75 +1,127 @@
 From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Tue, 30 Jun 2015 12:17:22 +0200
-Subject: [PATCH 1/2] arm64/efi: base UEFI mapping permissions on region
- attributes
+Date: Tue, 30 Jun 2015 12:17:23 +0200
+Subject: [PATCH 2/2] arm64/efi: don't pad between EFI_MEMORY_RUNTIME regions
 In-Reply-To: <1435659443-17625-1-git-send-email-ard.biesheuvel@linaro.org>
 References: <1435659443-17625-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <1435659443-17625-2-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <1435659443-17625-3-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently, we infer the UEFI memory region mapping permissions
-from the memory region type (i.e., runtime services code are
-mapped RWX and runtime services data mapped RW-). This appears to
-work fine but is not entirely UEFI spec compliant. So instead, use
-the designated permission attributes to decide how these regions
-should be mapped.
+The new Properties Table feature introduced in UEFIv2.5 may split
+memory regions that cover PE/COFF memory images into separate code
+and data regions.
 
-Since UEFIv2.5 introduces a new EFI_MEMORY_RO permission attribute,
-and redefines EFI_MEMORY_WP as a cacheability attribute, use only
-the former as a read-only attribute. For setting the PXN bit, the
-corresponding EFI_MEMORY_XP attribute is used.
+Since the relative offset of PE/COFF .text and .data segments cannot
+be changed on the fly, this means that we can no longer pad out those
+regions to be mappable using 64 KB pages.
+Unfortunately, there is no annotation in the UEFI memory map that
+identifies data regions that were split off from a code region, so we
+must apply this logic to all runtime code and data regions.
+
+So instead of rounding each memory region to 64 KB alignment at both
+ends, only round down regions that are not directly preceded by another
+runtime region. Since the UEFI spec does not mandate that the memory map
+be sorted, this means we also need to sort it first.
 
 Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 ---
- arch/arm64/kernel/efi.c | 32 +++++++++++++-------
- 1 file changed, 21 insertions(+), 11 deletions(-)
+ drivers/firmware/efi/libstub/arm-stub.c | 58 +++++++++++++++-----
+ 1 file changed, 43 insertions(+), 15 deletions(-)
 
-diff --git a/arch/arm64/kernel/efi.c b/arch/arm64/kernel/efi.c
-index ab21e0d58278..5dcab58d5d30 100644
---- a/arch/arm64/kernel/efi.c
-+++ b/arch/arm64/kernel/efi.c
-@@ -247,20 +247,30 @@ static bool __init efi_virtmap_init(void)
- 		memrange_efi_to_native(&paddr, &npages);
- 		size = npages << PAGE_SHIFT;
+diff --git a/drivers/firmware/efi/libstub/arm-stub.c b/drivers/firmware/efi/libstub/arm-stub.c
+index e29560e6b40b..dd9e2addc9fb 100644
+--- a/drivers/firmware/efi/libstub/arm-stub.c
++++ b/drivers/firmware/efi/libstub/arm-stub.c
+@@ -13,6 +13,7 @@
+  */
  
--		pr_info("  EFI remap 0x%016llx => %p\n",
--			md->phys_addr, (void *)md->virt_addr);
+ #include <linux/efi.h>
++#include <linux/sort.h>
+ #include <asm/efi.h>
+ 
+ #include "efistub.h"
+@@ -305,6 +306,13 @@ fail:
+  */
+ #define EFI_RT_VIRTUAL_BASE	0x40000000
+ 
++static int cmp_mem_desc(const void *a, const void *b)
++{
++	efi_memory_desc_t const *left = a, *right = b;
++
++	return (left->phys_addr > right->phys_addr) ? 1 : -1;
++}
++
+ /*
+  * efi_get_virtmap() - create a virtual mapping for the EFI memory map
+  *
+@@ -317,33 +325,53 @@ void efi_get_virtmap(efi_memory_desc_t *memory_map, unsigned long map_size,
+ 		     int *count)
+ {
+ 	u64 efi_virt_base = EFI_RT_VIRTUAL_BASE;
+-	efi_memory_desc_t *out = runtime_map;
++	efi_memory_desc_t *in, *prev = NULL, *out = runtime_map;
+ 	int l;
+ 
+-	for (l = 0; l < map_size; l += desc_size) {
+-		efi_memory_desc_t *in = (void *)memory_map + l;
++	/*
++	 * To work around potential issues with the Properties Table feature
++	 * introduced in UEFI 2.5 (which may split PE/COFF memory images
++	 * into several RuntimeServicesCode and RuntimeServicesData regions
++	 * whose relative offset in memory needs to be retained), we need to
++	 * sort the memory map before traversing it, and avoid padding out those
++	 * regions to 64 KB granularity.
++	 */
++	sort(memory_map, map_size / desc_size, desc_size, cmp_mem_desc, NULL);
++
++	for (l = 0; l < map_size; l += desc_size, prev = in) {
+ 		u64 paddr, size;
+ 
++		in = (void *)memory_map + l;
+ 		if (!(in->attribute & EFI_MEMORY_RUNTIME))
+ 			continue;
+ 
++		paddr = in->phys_addr;
++		size = in->num_pages * EFI_PAGE_SIZE;
++
+ 		/*
+ 		 * Make the mapping compatible with 64k pages: this allows
+ 		 * a 4k page size kernel to kexec a 64k page size kernel and
+ 		 * vice versa.
+ 		 */
+-		paddr = round_down(in->phys_addr, SZ_64K);
+-		size = round_up(in->num_pages * EFI_PAGE_SIZE +
+-				in->phys_addr - paddr, SZ_64K);
 -
 -		/*
--		 * Only regions of type EFI_RUNTIME_SERVICES_CODE need to be
--		 * executable, everything else can be mapped with the XN bits
--		 * set.
+-		 * Avoid wasting memory on PTEs by choosing a virtual base that
+-		 * is compatible with section mappings if this region has the
+-		 * appropriate size and physical alignment. (Sections are 2 MB
+-		 * on 4k granule kernels)
 -		 */
- 		if (!is_normal_ram(md))
- 			prot = __pgprot(PROT_DEVICE_nGnRE);
--		else if (md->type == EFI_RUNTIME_SERVICES_CODE)
--			prot = PAGE_KERNEL_EXEC;
- 		else
--			prot = PAGE_KERNEL;
-+			prot = PAGE_KERNEL_EXEC;
+-		if (IS_ALIGNED(in->phys_addr, SZ_2M) && size >= SZ_2M)
+-			efi_virt_base = round_up(efi_virt_base, SZ_2M);
++		if (!prev ||
++		    !(paddr == (prev->phys_addr +
++				prev->num_pages * EFI_PAGE_SIZE) &&
++		      (prev->attribute & EFI_MEMORY_RUNTIME))) {
 +
-+		/*
-+		 * On 64 KB granule kernels, only use strict permissions when
-+		 * the region does not share a 64 KB page frame with another
-+		 * region at either end.
-+		 */
-+		if (!IS_ENABLED(CONFIG_ARM64_64K_PAGES) ||
-+		    !(md->virt_addr % PAGE_SIZE ||
-+		      (md->phys_addr + md->num_pages * EFI_PAGE_SIZE) % PAGE_SIZE)) {
++			paddr = round_down(in->phys_addr, SZ_64K);
++			size += in->phys_addr - paddr;
 +
-+			if (md->attribute & EFI_MEMORY_RO)
-+				prot |= __pgprot(PTE_RDONLY);
-+			if (md->attribute & EFI_MEMORY_XP)
-+				prot |= __pgprot(PTE_PXN);
++			/*
++			 * Avoid wasting memory on PTEs by choosing a virtual
++			 * base that is compatible with section mappings if this
++			 * region has the appropriate size and physical
++			 * alignment. (Sections are 2 MB on 4k granule kernels)
++			 */
++			if (IS_ALIGNED(in->phys_addr, SZ_2M) && size >= SZ_2M)
++				efi_virt_base = round_up(efi_virt_base, SZ_2M);
++			else
++				efi_virt_base = round_up(efi_virt_base, SZ_64K);
 +		}
-+
-+		pr_info("  EFI remap 0x%016llx => %p (R%c%c)\n",
-+			md->phys_addr, (void *)md->virt_addr,
-+			prot & __pgprot(PTE_RDONLY) ? '-' : 'W',
-+			prot & __pgprot(PTE_PXN) ? '-' : 'X');
  
- 		create_pgd_mapping(&efi_mm, paddr, md->virt_addr, size, prot);
- 	}
+ 		in->virt_addr = efi_virt_base + in->phys_addr - paddr;
+ 		efi_virt_base += size;
 -- 
 1.9.1
