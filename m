@@ -1,55 +1,52 @@
-From: vitalya@ti.com (Vitaly Andrianov)
-Date: Tue, 30 Jun 2015 09:47:55 -0400
-Subject: [PATCH] keystone: adds cpu_die implementation
-In-Reply-To: <20150629213737.GF7557@n2100.arm.linux.org.uk>
-References: <1435600352-32733-1-git-send-email-vitalya@ti.com>
- <20150629175223.GC19863@leverpostej> <559191E0.4080808@ti.com>
- <20150629212814.GE7557@n2100.arm.linux.org.uk>
- <20150629213737.GF7557@n2100.arm.linux.org.uk>
-Message-ID: <55929E0B.9070704@ti.com>
+From: gnurou@gmail.com (Alexandre Courbot)
+Date: Tue, 30 Jun 2015 22:46:53 +0900
+Subject: [PATCH] gpio: zynq: Fix problem with unbalanced pm_runtime_enable
+In-Reply-To: <b4b2bb2d7747f8c9223fb50fd2868f77a7c7f63a.1435220957.git.michal.simek@xilinx.com>
+References: <b4b2bb2d7747f8c9223fb50fd2868f77a7c7f63a.1435220957.git.michal.simek@xilinx.com>
+Message-ID: <CAAVeFu+Ur_3ZKsRJh2hH1fzsAouNPxOvqdU_hqDUVu26U5EkDg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On 06/29/2015 05:37 PM, Russell King - ARM Linux wrote:
-> On Mon, Jun 29, 2015 at 10:28:14PM +0100, Russell King - ARM Linux wrote:
->> On Mon, Jun 29, 2015 at 02:43:44PM -0400, Vitaly Andrianov wrote:
->>>
->>>
->>> On 06/29/2015 01:52 PM, Mark Rutland wrote:
->>>> On Mon, Jun 29, 2015 at 06:52:32PM +0100, Vitaly Andrianov wrote:
->>>>> This commit add cpu_die implementation
->>>>>
->>>>> Signed-off-by: Vitaly Andrianov <vitalya@ti.com>
->>>>> ---
->>>>>
->>>>> The discussion of the "keystone: psci: adds cpu_die implementation" commit
->>>>> shows that if PCSI is enabled platform code doesn't need that implementation
->>>>> at all. Having PSCI commands in DTB should be sufficient. Unfortunately
->>>>> Keystone with LPAE enable requires some additional development.
->>>>
->>>> I don't follow.
->>>>
->>>> What do you need to implement for LPAE?
->>> Hi Mark,
->>>
->>> The Keystone platform needs to set ttbr1 when it boots secondary core.
->>> It is done in the keystone_smp_secondary_initmem(), which is
->>> .smp_secondary_init member of the keystone_smp_ops. I couldn't find a way
->>> how I can add similar function to psci_smp_ops.
->>
->> TTBR1 will be set by generic code.  You don't need to do anything special
->> now that my fixes for TI's horrid physical address space switch are in.
->> (you may remember, you tested the patches...)
+On Thu, Jun 25, 2015 at 5:29 PM, Michal Simek <michal.simek@xilinx.com> wrote:
+> Add missing pm_runtime_disabled to remove().
 >
-> Oh, it was Murali who tested it, not yourself.  Sorry.  Suggest you
-> dig out the patches either from mainline (they're in Linus' tip) or
-> ask Murali for them...
+> Error log:
+> root at zynqmp:~# modprobe gpio_zynq
+> root at zynqmp:~# lsmod
+>     Not tainted
+> gpio_zynq 7086 0 - Live 0xffffffbffc00a000
+> root at zynqmp:~# rmmod gpio_zynq
+> root at zynqmp:~# lsmod
+>     Not tainted
+> root at zynqmp:~# modprobe gpio_zynq
+> [  246.924438] zynq-gpio ff0a0000.gpio: Unbalanced pm_runtime_enable!
+> root at zynqmp:~# rmmod gpio_zynq
+> root at zynqmp:~# lsmod
+>     Not tainted
+
+Yup, this was missing indeed.
+
+Reviewed-by: Alexandre Courbot <acourbot@nvidia.com>
+
 >
-Thanks Russell,
-
-Excellent. I'll test how it will work using PSCI framework.
-
-Regards,
-Vitaly
+> Signed-off-by: Michal Simek <michal.simek@xilinx.com>
+> ---
+>
+>  drivers/gpio/gpio-zynq.c | 1 +
+>  1 file changed, 1 insertion(+)
+>
+> diff --git a/drivers/gpio/gpio-zynq.c b/drivers/gpio/gpio-zynq.c
+> index 2e87c4b8da26..a78882389836 100644
+> --- a/drivers/gpio/gpio-zynq.c
+> +++ b/drivers/gpio/gpio-zynq.c
+> @@ -757,6 +757,7 @@ static int zynq_gpio_remove(struct platform_device *pdev)
+>         gpiochip_remove(&gpio->chip);
+>         clk_disable_unprepare(gpio->clk);
+>         device_set_wakeup_capable(&pdev->dev, 0);
+> +       pm_runtime_disable(&pdev->dev);
+>         return 0;
+>  }
+>
+> --
+> 2.3.5
+>
