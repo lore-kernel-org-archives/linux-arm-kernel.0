@@ -1,207 +1,95 @@
-From: mars.cheng@mediatek.com (Mars Cheng)
-Date: Tue, 30 Jun 2015 15:02:31 +0800
-Subject: [PATCH v2 2/2] ARM: dts: mediatek: add 6580 support
-In-Reply-To: <1435647751-20422-1-git-send-email-mars.cheng@mediatek.com>
-References: <1435647751-20422-1-git-send-email-mars.cheng@mediatek.com>
-Message-ID: <1435647751-20422-3-git-send-email-mars.cheng@mediatek.com>
+From: geert+renesas@glider.be (Geert Uytterhoeven)
+Date: Tue, 30 Jun 2015 09:45:26 +0200
+Subject: [PATCH 6/7] pinctrl: sh-pfc: Move sh_pfc_add_gpiochip() up
+In-Reply-To: <1435650327-2542-1-git-send-email-geert+renesas@glider.be>
+References: <1435650327-2542-1-git-send-email-geert+renesas@glider.be>
+Message-ID: <1435650327-2542-7-git-send-email-geert+renesas@glider.be>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This adds basic chip support for Mediatek 6580.
+Move sh_pfc_add_gpiochip() to the generic helper section at the top of
+the file, so it can be called from the "Function GPIOs" section later.
 
-Change-Id: Ic5c93eb5d1e6e23503dabd28d41c30a7f02e9c18
-Signed-off-by: Mars Cheng <mars.cheng@mediatek.com>
+Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
 ---
- arch/arm/boot/dts/Makefile         |   1 +
- arch/arm/boot/dts/mt6580-evbp1.dts |  35 +++++++++++
- arch/arm/boot/dts/mt6580.dtsi      | 125 +++++++++++++++++++++++++++++++++++++
- 3 files changed, 161 insertions(+)
- create mode 100644 arch/arm/boot/dts/mt6580-evbp1.dts
- create mode 100644 arch/arm/boot/dts/mt6580.dtsi
+ drivers/pinctrl/sh-pfc/gpio.c | 58 +++++++++++++++++++++----------------------
+ 1 file changed, 29 insertions(+), 29 deletions(-)
 
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index 86217db..9298531 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -656,6 +656,7 @@ dtb-$(CONFIG_MACH_DOVE) += \
- 	dove-d3plug.dtb \
- 	dove-dove-db.dtb
- dtb-$(CONFIG_ARCH_MEDIATEK) += \
-+	mt6580-evbp1.dtb \
- 	mt6589-aquaris5.dtb \
- 	mt6592-evb.dtb \
- 	mt8127-moose.dtb \
-diff --git a/arch/arm/boot/dts/mt6580-evbp1.dts b/arch/arm/boot/dts/mt6580-evbp1.dts
-new file mode 100644
-index 0000000..8c42335
---- /dev/null
-+++ b/arch/arm/boot/dts/mt6580-evbp1.dts
-@@ -0,0 +1,35 @@
-+/*
-+ * Copyright (c) 2015 MediaTek Inc.
-+ * Author: Mars.C <mars.cheng@mediatek.com>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ */
+diff --git a/drivers/pinctrl/sh-pfc/gpio.c b/drivers/pinctrl/sh-pfc/gpio.c
+index b8929b5e2fa26c53..30654e800580524d 100644
+--- a/drivers/pinctrl/sh-pfc/gpio.c
++++ b/drivers/pinctrl/sh-pfc/gpio.c
+@@ -131,6 +131,35 @@ static int gpio_setup_data_regs(struct sh_pfc_chip *chip)
+ 	return 0;
+ }
+ 
++static struct sh_pfc_chip *
++sh_pfc_add_gpiochip(struct sh_pfc *pfc, int(*setup)(struct sh_pfc_chip *),
++		    struct sh_pfc_window *mem)
++{
++	struct sh_pfc_chip *chip;
++	int ret;
 +
-+/dts-v1/;
-+#include "mt6580.dtsi"
++	chip = devm_kzalloc(pfc->dev, sizeof(*chip), GFP_KERNEL);
++	if (unlikely(!chip))
++		return ERR_PTR(-ENOMEM);
 +
-+/ {
-+	model = "MediaTek MT6580 evaluation board";
-+	compatible = "mediatek,mt6580-evbp1", "mediatek,mt6580";
++	chip->mem = mem;
++	chip->pfc = pfc;
 +
-+	chosen {
-+		bootargs = "console=ttyS0,921600n8 earlyprintk";
-+		stdout-path = &uart0;
-+	};
++	ret = setup(chip);
++	if (ret < 0)
++		return ERR_PTR(ret);
 +
-+	memory {
-+		reg = <0x80000000 0x20000000>;
-+	};
-+};
++	ret = gpiochip_add(&chip->gpio_chip);
++	if (unlikely(ret < 0))
++		return ERR_PTR(ret);
 +
-+&uart0 {
-+	status = "okay";
-+};
++	dev_info(pfc->dev, "%s handling gpio %u -> %u\n",
++		 chip->gpio_chip.label, chip->gpio_chip.base,
++		 chip->gpio_chip.base + chip->gpio_chip.ngpio - 1);
 +
-diff --git a/arch/arm/boot/dts/mt6580.dtsi b/arch/arm/boot/dts/mt6580.dtsi
-new file mode 100644
-index 0000000..ac97d64
---- /dev/null
-+++ b/arch/arm/boot/dts/mt6580.dtsi
-@@ -0,0 +1,125 @@
-+/*
-+ * Copyright (c) 2015 MediaTek Inc.
-+ * Author: Mars.C <mars.cheng@mediatek.com>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ */
++	return chip;
++}
 +
-+#include <dt-bindings/interrupt-controller/irq.h>
-+#include <dt-bindings/interrupt-controller/arm-gic.h>
-+#include "skeleton.dtsi"
-+
-+/ {
-+	compatible = "mediatek,mt6580";
-+	#address-cells = <1>;
-+	#size-cells = <1>;
-+	interrupt-parent = <&sysirq>;
-+
-+	cpus {
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+
-+		cpu at 0 {
-+			device_type = "cpu";
-+			compatible = "arm,cortex-a7";
-+			reg = <0x0>;
-+		};
-+		cpu at 1 {
-+			device_type = "cpu";
-+			compatible = "arm,cortex-a7";
-+			reg = <0x1>;
-+		};
-+		cpu at 2 {
-+			device_type = "cpu";
-+			compatible = "arm,cortex-a7";
-+			reg = <0x2>;
-+		};
-+		cpu at 3 {
-+			device_type = "cpu";
-+			compatible = "arm,cortex-a7";
-+			reg = <0x3>;
-+		};
-+
-+	};
-+
-+	clocks {
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+		compatible = "simple-bus";
-+		ranges;
-+
-+		system_clk: dummy13m {
-+			compatible = "fixed-clock";
-+			clock-frequency = <13000000>;
-+			#clock-cells = <0>;
-+		};
-+
-+		rtc_clk: dummy32k {
-+			compatible = "fixed-clock";
-+			clock-frequency = <32000>;
-+			#clock-cells = <0>;
-+		};
-+
-+		uart_clk: dummy26m {
-+			compatible = "fixed-clock";
-+			clock-frequency = <26000000>;
-+			#clock-cells = <0>;
-+		};
-+	};
-+
-+	timer: timer at 10008000 {
-+		compatible = "mediatek,mt6580-timer",
-+			     "mediatek,mt6577-timer";
-+		reg = <0x10008000 0x80>;
-+		interrupts = <GIC_SPI 92 IRQ_TYPE_LEVEL_LOW>;
-+		clocks = <&system_clk>, <&rtc_clk>;
-+		clock-names = "system-clk", "rtc-clk";
-+	};
-+
-+	sysirq: interrupt-controller at 10200100 {
-+		compatible = "mediatek,mt6580-sysirq",
-+			     "mediatek,mt6577-sysirq";
-+		interrupt-controller;
-+		#interrupt-cells = <3>;
-+		interrupt-parent = <&gic>;
-+		reg = <0x10200100 0x1c>;
-+	};
-+
-+	gic: interrupt-controller at 10211000 {
-+		compatible = "arm,cortex-a7-gic";
-+		interrupt-controller;
-+		#interrupt-cells = <3>;
-+		interrupt-parent = <&gic>;
-+		reg = <0x10211000 0x1000>,
-+		      <0x10212000 0x1000>,
-+		      <0x10214000 0x2000>,
-+		      <0x10216000 0x2000>;
-+	};
-+
-+	uart0: serial at 11005000 {
-+		compatible = "mediatek,mt6580-uart",
-+			     "mediatek,mt6577-uart";
-+		reg = <0x11005000 0x400>;
-+		interrupts = <GIC_SPI 44 IRQ_TYPE_LEVEL_LOW>;
-+		clocks = <&uart_clk>;
-+		clock-names = "baud";
-+		status = "disabled";
-+	};
-+
-+	uart1: serial at 11006000 {
-+		compatible = "mediatek,mt6580-uart",
-+			     "mediatek,mt6577-uart";
-+		reg = <0x11006000 0x400>;
-+		interrupts = <GIC_SPI 45 IRQ_TYPE_LEVEL_LOW>;
-+		clocks = <&uart_clk>;
-+		clock-names = "baud";
-+		status = "disabled";
-+	};
-+};
+ /* -----------------------------------------------------------------------------
+  * Pin GPIOs
+  */
+@@ -305,35 +334,6 @@ static int gpio_function_setup(struct sh_pfc_chip *chip)
+  * Register/unregister
+  */
+ 
+-static struct sh_pfc_chip *
+-sh_pfc_add_gpiochip(struct sh_pfc *pfc, int(*setup)(struct sh_pfc_chip *),
+-		    struct sh_pfc_window *mem)
+-{
+-	struct sh_pfc_chip *chip;
+-	int ret;
+-
+-	chip = devm_kzalloc(pfc->dev, sizeof(*chip), GFP_KERNEL);
+-	if (unlikely(!chip))
+-		return ERR_PTR(-ENOMEM);
+-
+-	chip->mem = mem;
+-	chip->pfc = pfc;
+-
+-	ret = setup(chip);
+-	if (ret < 0)
+-		return ERR_PTR(ret);
+-
+-	ret = gpiochip_add(&chip->gpio_chip);
+-	if (unlikely(ret < 0))
+-		return ERR_PTR(ret);
+-
+-	dev_info(pfc->dev, "%s handling gpio %u -> %u\n",
+-		 chip->gpio_chip.label, chip->gpio_chip.base,
+-		 chip->gpio_chip.base + chip->gpio_chip.ngpio - 1);
+-
+-	return chip;
+-}
+-
+ int sh_pfc_register_gpiochip(struct sh_pfc *pfc)
+ {
+ 	struct sh_pfc_chip *chip;
 -- 
-1.8.1.1.dirty
+1.9.1
