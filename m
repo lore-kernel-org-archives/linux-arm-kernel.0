@@ -1,38 +1,60 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Tue, 30 Jun 2015 16:08:29 +0200
-Subject: [PATCH v3 3/3] ARM: mvebu: disable IP checksum with jumbo
- frames for Armada 370
-In-Reply-To: <1435673149-12599-4-git-send-email-simon.guinot@sequanux.org>
-References: <1435673149-12599-1-git-send-email-simon.guinot@sequanux.org>
- <1435673149-12599-4-git-send-email-simon.guinot@sequanux.org>
-Message-ID: <20150630160829.7bec1a8f@free-electrons.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 30 Jun 2015 15:11:56 +0100
+Subject: [PATCH 3/8] iommu/arm-smmu: fix the values of
+ ARM64_TCR_IRGN0_SHIFT and ARM64_TCR_ORGN0_SHIFT
+In-Reply-To: <559213AE.6060206@huawei.com>
+References: <1435307584-9812-1-git-send-email-thunder.leizhen@huawei.com>
+ <1435307584-9812-4-git-send-email-thunder.leizhen@huawei.com>
+ <20150629172531.GJ17474@arm.com> <559213AE.6060206@huawei.com>
+Message-ID: <20150630141156.GN27725@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Simon Guinot,
-
-On Tue, 30 Jun 2015 16:05:49 +0200, Simon Guinot wrote:
-> The Ethernet controller found in the Armada 370, 380 and 385 SoCs don't
-> support TCP/IP checksumming with frame sizes larger than 1600 bytes.
+On Tue, Jun 30, 2015 at 04:57:34AM +0100, leizhen wrote:
+> On 2015/6/30 1:25, Will Deacon wrote:
+> > On Fri, Jun 26, 2015 at 09:32:59AM +0100, Zhen Lei wrote:
+> >> In context descriptor, the offset of IR0 is 8, the offset of OR0 is 10.
+> >>
+> >> Signed-off-by: Zhen Lei <thunder.leizhen@huawei.com>
+> >> ---
+> >>  drivers/iommu/arm-smmu-v3.c | 4 ++--
+> >>  1 file changed, 2 insertions(+), 2 deletions(-)
+> >>
+> >> diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
+> >> index 2a5f810..43120ad 100644
+> >> --- a/drivers/iommu/arm-smmu-v3.c
+> >> +++ b/drivers/iommu/arm-smmu-v3.c
+> >> @@ -269,10 +269,10 @@
+> >>  #define ARM64_TCR_TG0_SHIFT		14
+> >>  #define ARM64_TCR_TG0_MASK		0x3UL
+> >>  #define CTXDESC_CD_0_TCR_IRGN0_SHIFT	8
+> >> -#define ARM64_TCR_IRGN0_SHIFT		24
+> >> +#define ARM64_TCR_IRGN0_SHIFT		8
+> >>  #define ARM64_TCR_IRGN0_MASK		0x3UL
+> >>  #define CTXDESC_CD_0_TCR_ORGN0_SHIFT	10
+> >> -#define ARM64_TCR_ORGN0_SHIFT		26
+> >> +#define ARM64_TCR_ORGN0_SHIFT		10
+> >>  #define ARM64_TCR_ORGN0_MASK		0x3UL
+> >>  #define CTXDESC_CD_0_TCR_SH0_SHIFT	12
+> >>  #define ARM64_TCR_SH0_SHIFT		12
+> > 
+> > I don't understand this patch.
+> > 
+> > The ARM64_* definitions correspond to the CPU architecture, whilst the
+> > CTXDESC_* definitions correspond to the SMMUv3 CD description.
+> > 
+> > What problem are you seeing?
 > 
-> This patch fixes the issue by disabling the features NETIF_F_IP_CSUM and
-> NETIF_F_TSO for the Armada 370 and compatibles SoCs when the MTU is set
-> to a value greater than 1600 bytes.
+> Oh, I'm sorry. My description was incorrect.
 > 
-> Signed-off-by: Simon Guinot <simon.guinot@sequanux.org>
-> Fixes: c5aff18204da ("net: mvneta: driver for Marvell Armada 370/XP network unit")
-> Cc: <stable@vger.kernel.org> # v3.8+
+> In io-pgtable-arm.c:
+> #define ARM_LPAE_TCR_ORGN0_SHIFT	10
+> #define ARM_LPAE_TCR_IRGN0_SHIFT	8
+> 
+> So, the description should be modified as below:
+> In SMMU_CBn_TCR when LPAE enabled, the offset of IRGN0 is 8, the offset of
+> ORGN0 is 10.
 
-The title of this patch should be:
+Gotcha, thanks.
 
-	net: mvneta: disable IP checksum with jumbo frames for Armada 370
-
-because it is touching the network driver, and not the mvebu ARM core code.
-
-Thanks,
-
-Thomas
--- 
-Thomas Petazzoni, CTO, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+Will
