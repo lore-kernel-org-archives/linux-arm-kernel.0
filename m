@@ -1,65 +1,29 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Tue, 30 Jun 2015 17:18:37 +0100
-Subject: [PATCH] ARM: psci: boot_secondary: replace __pa with virt_to_idmap
-In-Reply-To: <1435661062-4127-1-git-send-email-grygorii.strashko@ti.com>
-References: <1435661062-4127-1-git-send-email-grygorii.strashko@ti.com>
-Message-ID: <20150630161836.GC28372@leverpostej>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Tue, 30 Jun 2015 17:20:11 +0100
+Subject: Regular oops on shutdown of KVM/ARM64 machines with VGA device
+In-Reply-To: <CAL5wTH4H7DiE-Z-YHCs7mLRPoixOOxi=yMk-j8yC1np1m=9sYw@mail.gmail.com>
+References: <CAL5wTH4MtybHBk22r593HmVX+2jqCDm4fb2MyT2L0TMkHrD7pg@mail.gmail.com>	<20150629100304.GB18931@leverpostej>	<55914033.5060008@arm.com>	<CAL5wTH7EUh0ciutXKs2s-4VjKnRM65QmrUQQiRdM=R+_VXi6DA@mail.gmail.com>	<559270D3.8030305@arm.com>
+ <CAL5wTH4H7DiE-Z-YHCs7mLRPoixOOxi=yMk-j8yC1np1m=9sYw@mail.gmail.com>
+Message-ID: <5592C1BB.9090106@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Tue, Jun 30, 2015 at 11:44:22AM +0100, Grygorii Strashko wrote:
-> On some PAE systems (e.g. TI Keystone), memory is above the 32-bit
-> addressable limit, and the interconnect provides an aliased view of
-> parts of physical memory in the 32-bit addressable space. This alias
-> is strictly for boot time usage, and is not otherwise usable because
-> of coherency limitations.
+On 30/06/15 17:16, Dirk M?ller wrote:
+> Hi Marc,
 > 
-> On such systems, the idmap mechanism has to be used to pass correct
-> boot address of secondary CPU to FW.
-> virt_to_idmap() will fall-back to existing virt_to_phys() macro if
-> such conversation is not required.
+>> Can try the following patch?
 > 
-> Cc: Mark Rutland <mark.rutland@arm.com>
-> Cc: Nicolas Pitre <nico@linaro.org>
-> Cc: Santosh Shilimkar <ssantosh@kernel.org>
-> Cc: Vitaly Andrianov <vitalya@ti.com>
-> Signed-off-by: Grygorii Strashko <grygorii.strashko@ti.com>
-> ---
->  arch/arm/kernel/psci_smp.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
+> [..]
+> 
+> Thanks a lot for the quick patch, from a brief testing this seems to
+> fix the issue (on a 4k kernel). I'll retest this in our original
+> configuration (which was 64k) but so far I don't see a reason why it
+> shouldn't fix the issue.
 
-The code itself looks sane to me, though the commit message would be
-better with Russell's suggested rewording.
-
-This will also conflict with my migration to a common PSCI client
-implementation [1,2] (especially given the absence of virt_to_idmap on
-arm64), but I'm happy to fold it in or rebase atop of it.
-
-Russell, are you able to take a look at the migration patch [2]? How
-would you prefer for the two patches to be taken?
+Awesome. Mind if I put your Tested-by on the patch?
 
 Thanks,
-Mark.
 
-[1] http://lists.infradead.org/pipermail/linux-arm-kernel/2015-May/346492.html
-[2] http://lists.infradead.org/pipermail/linux-arm-kernel/2015-May/346503.html
-
-> 
-> diff --git a/arch/arm/kernel/psci_smp.c b/arch/arm/kernel/psci_smp.c
-> index 28a1db4..244aadd 100644
-> --- a/arch/arm/kernel/psci_smp.c
-> +++ b/arch/arm/kernel/psci_smp.c
-> @@ -51,7 +51,7 @@ static int psci_boot_secondary(unsigned int cpu, struct task_struct *idle)
->  {
->  	if (psci_ops.cpu_on)
->  		return psci_ops.cpu_on(cpu_logical_map(cpu),
-> -				       __pa(secondary_startup));
-> +					virt_to_idmap(&secondary_startup));
->  	return -ENODEV;
->  }
->  
-> -- 
-> 2.4.5
-> 
+	M.
+-- 
+Jazz is not dead. It just smells funny...
