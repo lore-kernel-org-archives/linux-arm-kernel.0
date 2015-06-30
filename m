@@ -1,81 +1,119 @@
-From: andre.przywara@arm.com (Andre Przywara)
-Date: Tue, 30 Jun 2015 17:27:26 +0100
-Subject: [PATCH v4 07/10] limit number of VCPUs on demand
-In-Reply-To: <20150630160949.GR27725@arm.com>
-References: <1435324578-21832-1-git-send-email-andre.przywara@arm.com>
- <1435324578-21832-8-git-send-email-andre.przywara@arm.com>
- <20150630160949.GR27725@arm.com>
-Message-ID: <5592C36E.1070209@arm.com>
+From: vitalya@ti.com (Vitaly Andrianov)
+Date: Tue, 30 Jun 2015 12:38:13 -0400
+Subject: [PATCH] keystone: adds cpu_die implementation
+In-Reply-To: <20150630145412.GG7557@n2100.arm.linux.org.uk>
+References: <1435600352-32733-1-git-send-email-vitalya@ti.com>
+ <20150629175223.GC19863@leverpostej> <559191E0.4080808@ti.com>
+ <20150629212814.GE7557@n2100.arm.linux.org.uk>
+ <20150629213737.GF7557@n2100.arm.linux.org.uk> <55929E0B.9070704@ti.com>
+ <20150630145412.GG7557@n2100.arm.linux.org.uk>
+Message-ID: <5592C5F5.4020307@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
 
-On 30/06/15 17:09, Will Deacon wrote:
-> On Fri, Jun 26, 2015 at 02:16:15PM +0100, Andre Przywara wrote:
->> Currently the ARM GIC checks the number of VCPUs against a fixed
->> limit, which is GICv2 specific. Don't pretend we know better than the
->> kernel and let's get rid of that explicit check.
->> Instead be more relaxed about KVM_CREATE_VCPU failing with EINVAL,
->> which is the way the kernel communicates having reached a VCPU limit.
->> If we see this and have at least brought up one VCPU already
->> successfully, then don't panic, but limit the number of VCPUs instead.
+
+On 06/30/2015 10:54 AM, Russell King - ARM Linux wrote:
+> On Tue, Jun 30, 2015 at 09:47:55AM -0400, Vitaly Andrianov wrote:
 >>
->> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
->> ---
->>  arm/gic.c     | 6 ------
->>  arm/kvm-cpu.c | 7 ++++++-
->>  kvm-cpu.c     | 7 +++++++
->>  3 files changed, 13 insertions(+), 7 deletions(-)
 >>
->> diff --git a/arm/gic.c b/arm/gic.c
->> index 99f0d2b..05f85a2 100644
->> --- a/arm/gic.c
->> +++ b/arm/gic.c
->> @@ -84,12 +84,6 @@ int gic__create(struct kvm *kvm)
->>  {
->>  	int err;
->>  
->> -	if (kvm->nrcpus > GIC_MAX_CPUS) {
->> -		pr_warning("%d CPUS greater than maximum of %d -- truncating\n",
->> -				kvm->nrcpus, GIC_MAX_CPUS);
->> -		kvm->nrcpus = GIC_MAX_CPUS;
->> -	}
->> -
->>  	/* Try the new way first, and fallback on legacy method otherwise */
->>  	err = gic__create_device(kvm);
->>  	if (err)
->> diff --git a/arm/kvm-cpu.c b/arm/kvm-cpu.c
->> index 7780251..b2fd6ed 100644
->> --- a/arm/kvm-cpu.c
->> +++ b/arm/kvm-cpu.c
->> @@ -51,8 +51,13 @@ struct kvm_cpu *kvm_cpu__arch_init(struct kvm *kvm, unsigned long cpu_id)
->>  		return NULL;
->>  
->>  	vcpu->vcpu_fd = ioctl(kvm->vm_fd, KVM_CREATE_VCPU, cpu_id);
->> -	if (vcpu->vcpu_fd < 0)
->> +	if (vcpu->vcpu_fd < 0) {
->> +		if (errno == EINVAL) {
->> +			free(vcpu);
->> +			return NULL;
->> +		}
-> 
-> Hmm, but EINVAL can mean all sorts of other failures too, surely?
+>> On 06/29/2015 05:37 PM, Russell King - ARM Linux wrote:
+>>> Oh, it was Murali who tested it, not yourself.  Sorry.  Suggest you
+>>> dig out the patches either from mainline (they're in Linus' tip) or
+>>> ask Murali for them...
+>>>
+>> Thanks Russell,
+>>
+>> Excellent. I'll test how it will work using PSCI framework.
+>
+> The commits in mainline are:
+>
+> b2c3e38a5471 ARM: redo TTBR setup code for LPAE
+> 1221ed10f2a5 ARM: cleanup early_paging_init() calling
+> d8dc7fbd53ee ARM: re-implement physical address space switching
+> c0b759d87eab ARM: keystone2: rename init_meminfo to pv_fixup
+> 39b74fe82f73 ARM: keystone2: move address space switch printk into generic code
+> c8ca2b4b2928 ARM: keystone2: move update of the phys-to-virt constants into generic code
+> 30b5f4d6128e ARM: keystone2: move platform notifier initialisation into platform init
+>
+> There are an additional three which are worthwhile testing with them as
+> they clean up this same code (and fix a subtle but very minor bug in the
+> errata code paths):
+>
+> c76f238e261b ARM: proc-v7: sanitise and document registers around errata
+> 4419496884ed ARM: proc-v7: clean up MIDR access
+> 17e7bf86690e ARM: proc-v7: move CPU errata out of line
+>
+> So, picking the range b787f68c36d4..c76f238e261b will get all of them.
+> (That's v4.1-rc1 to the tip of the branch holding those commits.)
+>
+I just finished testing. Here is what I did.
 
-Not for ARM, at least not at the moment. I went through all the cases -
-I think up to 8 levels deep - and exceeding the number of VCPUs is the
-only case where we return EINVAL for KVM_CREATE_VCPU.
+1) checkout commit c76f238e261b
+2) applied Grygorii's "ARM: psci: boot_secondary: replace __pa with 
+virt_to_idmap"
+3) applied "keystone: dts: add psci command definition" commit.
+This commit is not posted yet. So, here it's content:
 
-> I'm
-> not against removing the nrcpus check, but I think we should die if ioctls
-> start failing rather than silently ignore them.
+diff --git a/arch/arm/boot/dts/keystone.dtsi 
+b/arch/arm/boot/dts/keystone.dtsi
+index c06542b..ab60fca 100644
+--- a/arch/arm/boot/dts/keystone.dtsi
++++ b/arch/arm/boot/dts/keystone.dtsi
+@@ -58,6 +58,14 @@
+                              <GIC_SPI 23 IRQ_TYPE_EDGE_RISING>;
+         };
 
-I see your point, but at least we don't fail silently: if we exit the
-loop prematurely, we print the warning about limiting the number of VCPUs.
-I agree that the proper solution would be to just explicitly ask the
-kernel about the number of VCPUs, but on ARM this is not reliable at the
-moment due to kernel behaviour, and any fix there would still not affect
-older kernels.
++       psci {
++               compatible      = "arm,psci";
++               method          = "smc";
++               cpu_suspend     = <0x84000001>;
++               cpu_off         = <0x84000002>;
++               cpu_on          = <0x84000003>;
++       };
++
+         soc {
+                 #address-cells = <1>;
+                 #size-cells = <1>;
 
-Cheers,
-Andre.
+4) excluded platsmp.c from build
+
+diff --git a/arch/arm/mach-keystone/Makefile 
+b/arch/arm/mach-keystone/Makefile
+index 25d9239..5cc5ca4 100644
+--- a/arch/arm/mach-keystone/Makefile
++++ b/arch/arm/mach-keystone/Makefile
+@@ -3,7 +3,9 @@ obj-y                                   := keystone.o smc.o
+  plus_sec := $(call as-instr,.arch_extension sec,+sec)
+  AFLAGS_smc.o                           :=-Wa,-march=armv7-a$(plus_sec)
+
++ifneq ($(CONFIG_ARM_PSCI),y)
+  obj-$(CONFIG_SMP)                      += platsmp.o
++endif
+
+  # PM domain driver for Keystone SOCs
+  obj-$(CONFIG_ARCH_KEYSTONE)            += pm_domain.o
+diff --git a/arch/arm/mach-keystone/keystone.c 
+b/arch/arm/mach-keystone/keystone.c
+index e2880105..9cc489c 100644
+--- a/arch/arm/mach-keystone/keystone.c
++++ b/arch/arm/mach-keystone/keystone.c
+@@ -105,7 +105,9 @@ DT_MACHINE_START(KEYSTONE, "Keystone")
+  #if defined(CONFIG_ZONE_DMA) && defined(CONFIG_ARM_LPAE)
+         .dma_zone_size  = SZ_2G,
+  #endif
++#ifndef CONFIG_ARM_PSCI
+         .smp            = smp_ops(keystone_smp_ops),
++#endif
+         .init_machine   = keystone_init,
+         .dt_compat      = keystone_match,
+         .pv_fixup       = keystone_pv_fixup,
+
+5) enabled CONFIG_ARM_PSCI and CONFIG_HOTPLUG_CPU
+
+The K2HK EVM booted fine with all 4 CPUs on.
+The HOTPLUG also works fine. I was able to get CPUs off and on multiple 
+times.
+
+Thanks,
+Vitaly
