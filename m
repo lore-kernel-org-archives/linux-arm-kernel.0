@@ -1,196 +1,178 @@
 From: steve.capper@linaro.org (Steve Capper)
-Date: Tue, 30 Jun 2015 11:51:13 +0100
-Subject: [PATCH v7 1/7] arm64: Add HAVE_REGS_AND_STACK_ACCESS_API feature
-In-Reply-To: <5591903D.7090108@linaro.org>
+Date: Tue, 30 Jun 2015 12:04:20 +0100
+Subject: [PATCH v7 5/7] arm64: Add trampoline code for kretprobes
+In-Reply-To: <55918B68.7030900@redhat.com>
 References: <1434395229-6654-1-git-send-email-dave.long@linaro.org>
- <1434395229-6654-2-git-send-email-dave.long@linaro.org>
- <CAPvkgC37gFJjU__jubnJ1xJA_9ktCgBJ3wzWMAZN=93rvu3+Ew@mail.gmail.com>
- <5591903D.7090108@linaro.org>
-Message-ID: <CAPvkgC0We2ZTxotsaYtABQ4_909fRVj-1WvtPtSkX63rex_XVw@mail.gmail.com>
+ <1434395229-6654-6-git-send-email-dave.long@linaro.org>
+ <CAPvkgC1hSRrzp_pR98qwnKvBspg1WizCm_Pzt0c1=dPWci1pjg@mail.gmail.com>
+ <55918B68.7030900@redhat.com>
+Message-ID: <CAPvkgC1zL9V1Oab+YnG8wOGymt_T-chPJ5irRa9sBg6Ri=UL=g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 29 June 2015 at 19:36, David Long <dave.long@linaro.org> wrote:
-> On 06/29/15 13:23, Steve Capper wrote:
->>
+On 29 June 2015 at 19:16, William Cohen <wcohen@redhat.com> wrote:
+> On 06/29/2015 01:25 PM, Steve Capper wrote:
 >> On 15 June 2015 at 20:07, David Long <dave.long@linaro.org> wrote:
+>>> From: William Cohen <wcohen@redhat.com>
 >>>
->>> From: "David A. Long" <dave.long@linaro.org>
+>>> The trampoline code is used by kretprobes to capture a return from a probed
+>>> function.  This is done by saving the registers, calling the handler, and
+>>> restoring the registers.  The code then returns to the roginal saved caller
+>>> return address.  It is necessary to do this directly instead of using a
+>>> software breakpoint because the code used in processing that breakpoint
+>>> could itself be kprobe'd and cause a problematic reentry into the debug
+>>> exception handler.
 >>>
->>> Add HAVE_REGS_AND_STACK_ACCESS_API feature for arm64.
->>>
+>>> Signed-off-by: William Cohen <wcohen@redhat.com>
 >>> Signed-off-by: David A. Long <dave.long@linaro.org>
 >>> ---
->>>   arch/arm64/Kconfig              |  1 +
->>>   arch/arm64/include/asm/ptrace.h | 25 +++++++++++++
->>>   arch/arm64/kernel/ptrace.c      | 77
->>> +++++++++++++++++++++++++++++++++++++++++
->>>   3 files changed, 103 insertions(+)
+>>>  arch/arm64/include/asm/kprobes.h  |  1 +
+>>>  arch/arm64/kernel/kprobes-arm64.h | 41 +++++++++++++++++++++++++++++++++++++++
+>>>  arch/arm64/kernel/kprobes.c       | 26 +++++++++++++++++++++++++
+>>>  3 files changed, 68 insertions(+)
 >>>
->>> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
->>> index 7796af4..966091f 100644
->>> --- a/arch/arm64/Kconfig
->>> +++ b/arch/arm64/Kconfig
->>> @@ -68,6 +68,7 @@ config ARM64
->>>          select HAVE_PERF_EVENTS
->>>          select HAVE_PERF_REGS
->>>          select HAVE_PERF_USER_STACK_DUMP
->>> +       select HAVE_REGS_AND_STACK_ACCESS_API
->>>          select HAVE_RCU_TABLE_FREE
->>>          select HAVE_SYSCALL_TRACEPOINTS
->>>          select IRQ_DOMAIN
->>> diff --git a/arch/arm64/include/asm/ptrace.h
->>> b/arch/arm64/include/asm/ptrace.h
->>> index d6dd9fd..8f440e9 100644
->>> --- a/arch/arm64/include/asm/ptrace.h
->>> +++ b/arch/arm64/include/asm/ptrace.h
->>> @@ -118,6 +118,8 @@ struct pt_regs {
->>>          u64 syscallno;
->>>   };
+>>> diff --git a/arch/arm64/include/asm/kprobes.h b/arch/arm64/include/asm/kprobes.h
+>>> index af31c4d..d081f49 100644
+>>> --- a/arch/arm64/include/asm/kprobes.h
+>>> +++ b/arch/arm64/include/asm/kprobes.h
+>>> @@ -58,5 +58,6 @@ int kprobe_exceptions_notify(struct notifier_block *self,
+>>>                              unsigned long val, void *data);
+>>>  int kprobe_breakpoint_handler(struct pt_regs *regs, unsigned int esr);
+>>>  int kprobe_single_step_handler(struct pt_regs *regs, unsigned int esr);
+>>> +void kretprobe_trampoline(void);
 >>>
->>> +#define MAX_REG_OFFSET (sizeof(struct user_pt_regs) - sizeof(u64))
+>>>  #endif /* _ARM_KPROBES_H */
+>>> diff --git a/arch/arm64/kernel/kprobes-arm64.h b/arch/arm64/kernel/kprobes-arm64.h
+>>> index ff8a55f..bdcfa62 100644
+>>> --- a/arch/arm64/kernel/kprobes-arm64.h
+>>> +++ b/arch/arm64/kernel/kprobes-arm64.h
+>>> @@ -27,4 +27,45 @@ extern kprobes_pstate_check_t * const kprobe_condition_checks[16];
+>>>  enum kprobe_insn __kprobes
+>>>  arm_kprobe_decode_insn(kprobe_opcode_t insn, struct arch_specific_insn *asi);
+>>>
+>>> +#define SAVE_REGS_STRING\
+>>> +       "       stp x0, x1, [sp, #16 * 0]\n"    \
+>>> +       "       stp x2, x3, [sp, #16 * 1]\n"    \
+>>> +       "       stp x4, x5, [sp, #16 * 2]\n"    \
+>>> +       "       stp x6, x7, [sp, #16 * 3]\n"    \
+>>> +       "       stp x8, x9, [sp, #16 * 4]\n"    \
+>>> +       "       stp x10, x11, [sp, #16 * 5]\n"  \
+>>> +       "       stp x12, x13, [sp, #16 * 6]\n"  \
+>>> +       "       stp x14, x15, [sp, #16 * 7]\n"  \
+>>> +       "       stp x16, x17, [sp, #16 * 8]\n"  \
+>>> +       "       stp x18, x19, [sp, #16 * 9]\n"  \
+>>> +       "       stp x20, x21, [sp, #16 * 10]\n" \
+>>> +       "       stp x22, x23, [sp, #16 * 11]\n" \
+>>> +       "       stp x24, x25, [sp, #16 * 12]\n" \
+>>> +       "       stp x26, x27, [sp, #16 * 13]\n" \
+>>> +       "       stp x28, x29, [sp, #16 * 14]\n" \
+>>> +       "       str x30,   [sp, #16 * 15]\n"    \
+>>> +       "       mrs x0, nzcv\n"                 \
+>>> +       "       str x0, [sp, #8 * 33]\n"
 >>> +
->>>   #define arch_has_single_step() (1)
+>>> +
+>>> +#define RESTORE_REGS_STRING\
+>>> +       "       ldr x0, [sp, #8 * 33]\n"        \
+>>> +       "       msr nzcv, x0\n"                 \
+>>> +       "       ldp x0, x1, [sp, #16 * 0]\n"    \
+>>> +       "       ldp x2, x3, [sp, #16 * 1]\n"    \
+>>> +       "       ldp x4, x5, [sp, #16 * 2]\n"    \
+>>> +       "       ldp x6, x7, [sp, #16 * 3]\n"    \
+>>> +       "       ldp x8, x9, [sp, #16 * 4]\n"    \
+>>> +       "       ldp x10, x11, [sp, #16 * 5]\n"  \
+>>> +       "       ldp x12, x13, [sp, #16 * 6]\n"  \
+>>> +       "       ldp x14, x15, [sp, #16 * 7]\n"  \
+>>> +       "       ldp x16, x17, [sp, #16 * 8]\n"  \
+>>> +       "       ldp x18, x19, [sp, #16 * 9]\n"  \
+>>> +       "       ldp x20, x21, [sp, #16 * 10]\n" \
+>>> +       "       ldp x22, x23, [sp, #16 * 11]\n" \
+>>> +       "       ldp x24, x25, [sp, #16 * 12]\n" \
+>>> +       "       ldp x26, x27, [sp, #16 * 13]\n" \
+>>> +       "       ldp x28, x29, [sp, #16 * 14]\n" \
+>>> +       "       ldr x30,   [sp, #16 * 15]\n"
+>>
+>> Do we need to restore x19..x28 as they are callee-saved?
+>
+> Hi Steve,
+>
+> The goal was to make the trampoline not affect the values in any of the registers, so if the calling conventions ever change the code will still work. Figured it was safer and clearer just to save everything rather than assuming that the compiler's code generated for trampoline_probe_handler is going to save certain registers.
+>
+>>
+>> Okay this all matches up with the definitions of the pt_regs struct.
+>> So regs->regs[xn] are all set as is regs->pstate.
+>>
+>> The hard coded constant offsets make me nervous though, as does the
+>> uncertain state of the other elements of the pt_regs struct.
+>
+> The macros in this patch are modelled after the kernel_entry and kernel_exit macros in arch/arm64/kernel/entry.S.  What other elements of the pt_regs struct are of concern? The sp value will be unchanged and the pc value is going to be overwritten in the handler.  Concerned about some portion of the pstate (#8 *33) not be saved/restored?
+
+pstate looks good to me. I was just worried that sp, pc orig_x0 and
+syscallno may have uncertain values as their containing structure is
+hosted on the stack. It's probably me just being overly paranoid
+though.
+
+
+>
+>>
+>>> +
+>>>  #endif /* _ARM_KERNEL_KPROBES_ARM64_H */
+>>> diff --git a/arch/arm64/kernel/kprobes.c b/arch/arm64/kernel/kprobes.c
+>>> index 6255814..570218c 100644
+>>> --- a/arch/arm64/kernel/kprobes.c
+>>> +++ b/arch/arm64/kernel/kprobes.c
+>>> @@ -560,6 +560,32 @@ int __kprobes longjmp_break_handler(struct kprobe *p, struct pt_regs *regs)
+>>>         return 0;
+>>>  }
 >>>
->>>   #ifdef CONFIG_COMPAT
->>> @@ -146,6 +148,29 @@ struct pt_regs {
->>>   #define user_stack_pointer(regs) \
->>>          (!compat_user_mode(regs) ? (regs)->sp : (regs)->compat_sp)
->>>
->>> +/**
->>> + * regs_get_register() - get register value from its offset
->>> + * @regs:         pt_regs from which register value is gotten
->>> + * @offset:    offset number of the register.
->>> + *
->>> + * regs_get_register returns the value of a register whose offset from
->>> @regs.
->>> + * The @offset is the offset of the register in struct pt_regs.
->>> + * If @offset is bigger than MAX_REG_OFFSET, this returns 0.
+>>> +/*
+>>> + * When a retprobed function returns, this code saves registers and
+>>> + * calls trampoline_handler() runs, which calls the kretprobe's handler.
 >>> + */
->>> +static inline u64 regs_get_register(struct pt_regs *regs,
->>> +                                             unsigned int offset)
+>>> +static void __used __kprobes kretprobe_trampoline_holder(void)
 >>> +{
->>> +       if (unlikely(offset > MAX_REG_OFFSET))
->>> +               return 0;
->>> +       return *(u64 *)((u64)regs + offset);
+>>> +       asm volatile (".global kretprobe_trampoline\n"
+>>> +                       "kretprobe_trampoline:\n"
+>>> +                       "sub sp, sp, %0\n"
+>>> +                       SAVE_REGS_STRING
+>>> +                       "mov x0, sp\n"
+>>> +                       "bl trampoline_probe_handler\n"
+>>> +                       /* Replace trampoline address in lr with actual
+>>> +                          orig_ret_addr return address. */
+>>> +                       "str x0, [sp, #16 * 15]\n"
+>>> +                       RESTORE_REGS_STRING
+>>> +                       "add sp, sp, %0\n"
+>>> +                       "ret\n"
+>>> +                     : : "I"(sizeof(struct pt_regs)) : "memory");
 >>
+>> I would consider placing something like:
+>> BUILD_BUG_ON(offsetof(struct pt_regs, regs) != 0);
+>> BUILD_BUG_ON(offsetof(struct pt_regs, pstate) != 264);
 >>
->> Why not:
->> return regs->regs[offset];
+>> here to catch changes in pt_regs.
+>>
+>> Or...
+>>
+>> Perhaps it makes sense to pull kretprobe_trampoline out into its own .S file?
+>> That way you could pull in asm-offsets.h and make use of:
+>> S_X0, S_PSTATE and S_FRAME_SIZE.
+>>
+>> Or something else :-).
 >>
 >
-> This would not be correct.  The offset is a byte offset and your code would
-> index eight times that amount into the structure.  The offset needs to
-> remain a byte offset so architecture-independent code does not need to know
-> the architecture-specific layout of the structure.
-
-Ahh, apologies. Thank you, I substituted offset as index in my head.
-
+> The asm-offsets.h would make the register save and restore clearer with the symbolic names.  asm-offsets.h only defines S_X0-S_X7. Other defines would be needed for the rest of the general purpose registers.
 >
->
+> -Will
 >>> +}
 >>> +
->>> +/* Valid only for Kernel mode traps. */
->>> +static inline unsigned long kernel_stack_pointer(struct pt_regs *regs)
+>>> +static void __kprobes __used *trampoline_probe_handler(struct pt_regs *regs)
 >>> +{
->>> +       return regs->sp;
+>>> +       return (void *) 0;
 >>> +}
 >>> +
->>>   static inline unsigned long regs_return_value(struct pt_regs *regs)
->>>   {
->>>          return regs->regs[0];
->>> diff --git a/arch/arm64/kernel/ptrace.c b/arch/arm64/kernel/ptrace.c
->>> index d882b83..f6199a5 100644
->>> --- a/arch/arm64/kernel/ptrace.c
->>> +++ b/arch/arm64/kernel/ptrace.c
->>> @@ -48,6 +48,83 @@
->>>   #define CREATE_TRACE_POINTS
->>>   #include <trace/events/syscalls.h>
->>>
->>> +#define ARM_pstate     pstate
->>> +#define ARM_pc         pc
->>> +#define ARM_sp         sp
->>> +#define ARM_x30                regs[30]
->>> +#define ARM_x29                regs[29]
->>> +#define ARM_x28                regs[28]
->>> +#define ARM_x27                regs[27]
->>> +#define ARM_x26                regs[26]
->>> +#define ARM_x25                regs[25]
->>> +#define ARM_x24                regs[24]
->>> +#define ARM_x23                regs[23]
->>> +#define ARM_x22                regs[22]
->>> +#define ARM_x21                regs[21]
->>> +#define ARM_x20                regs[20]
->>> +#define ARM_x19                regs[19]
->>> +#define ARM_x18                regs[18]
->>> +#define ARM_x17                regs[17]
->>> +#define ARM_x16                regs[16]
->>> +#define ARM_x15                regs[15]
->>> +#define ARM_x14                regs[14]
->>> +#define ARM_x13                regs[13]
->>> +#define ARM_x12                regs[12]
->>> +#define ARM_x11                regs[11]
->>> +#define ARM_x10                regs[10]
->>> +#define ARM_x9         regs[9]
->>> +#define ARM_x8         regs[8]
->>> +#define ARM_x7         regs[7]
->>> +#define ARM_x6         regs[6]
->>> +#define ARM_x5         regs[5]
->>> +#define ARM_x4         regs[4]
->>> +#define ARM_x3         regs[3]
->>> +#define ARM_x2         regs[2]
->>> +#define ARM_x1         regs[1]
->>> +#define ARM_x0         regs[0]
->>> +
->>> +#define REG_OFFSET_NAME(r) \
->>> +       {.name = #r, .offset = offsetof(struct pt_regs, ARM_##r)}
->>> +#define REG_OFFSET_END {.name = NULL, .offset = 0}
->>> +
->>> +const struct pt_regs_offset regs_offset_table[] = {
->>> +       REG_OFFSET_NAME(x0),
->>> +       REG_OFFSET_NAME(x1),
->>> +       REG_OFFSET_NAME(x2),
->>> +       REG_OFFSET_NAME(x3),
->>> +       REG_OFFSET_NAME(x4),
->>> +       REG_OFFSET_NAME(x5),
->>> +       REG_OFFSET_NAME(x6),
->>> +       REG_OFFSET_NAME(x7),
->>> +       REG_OFFSET_NAME(x8),
->>> +       REG_OFFSET_NAME(x9),
->>> +       REG_OFFSET_NAME(x10),
->>> +       REG_OFFSET_NAME(x11),
->>> +       REG_OFFSET_NAME(x12),
->>> +       REG_OFFSET_NAME(x13),
->>> +       REG_OFFSET_NAME(x14),
->>> +       REG_OFFSET_NAME(x15),
->>> +       REG_OFFSET_NAME(x16),
->>> +       REG_OFFSET_NAME(x17),
->>> +       REG_OFFSET_NAME(x18),
->>> +       REG_OFFSET_NAME(x19),
->>> +       REG_OFFSET_NAME(x20),
->>> +       REG_OFFSET_NAME(x21),
->>> +       REG_OFFSET_NAME(x22),
->>> +       REG_OFFSET_NAME(x23),
->>> +       REG_OFFSET_NAME(x24),
->>> +       REG_OFFSET_NAME(x25),
->>> +       REG_OFFSET_NAME(x26),
->>> +       REG_OFFSET_NAME(x27),
->>> +       REG_OFFSET_NAME(x28),
->>> +       REG_OFFSET_NAME(x29),
->>> +       REG_OFFSET_NAME(x30),
->>> +       REG_OFFSET_NAME(sp),
->>> +       REG_OFFSET_NAME(pc),
->>> +       REG_OFFSET_NAME(pstate),
->>> +       REG_OFFSET_END,
->>> +};
->>> +
->>>   /*
->>>    * TODO: does not yet catch signals sent when the child dies.
->>>    * in exit.c or in signal.c.
+>>>  int __init arch_init_kprobes(void)
+>>>  {
+>>>         return 0;
 >>> --
 >>> 1.8.1.2
 >>>
->
-> Thanks,
-> -dl
 >
