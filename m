@@ -1,48 +1,58 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 30 Jun 2015 09:52:26 +0100
-Subject: [PATCH] arm: perf: Set affinity for PPI based PMUs
-In-Reply-To: <1435615126-16492-1-git-send-email-sboyd@codeaurora.org>
-References: <1435615126-16492-1-git-send-email-sboyd@codeaurora.org>
-Message-ID: <20150630085225.GA25828@arm.com>
+From: thunder.leizhen@huawei.com (leizhen)
+Date: Tue, 30 Jun 2015 16:51:23 +0800
+Subject: [PATCH 6/8] iommu/arm-smmu: add support for non-pci devices
+In-Reply-To: <20150629172831.GL17474@arm.com>
+References: <1435307584-9812-1-git-send-email-thunder.leizhen@huawei.com>
+ <1435307584-9812-7-git-send-email-thunder.leizhen@huawei.com>
+ <20150629172831.GL17474@arm.com>
+Message-ID: <5592588B.9090706@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Stephen,
-
-On Mon, Jun 29, 2015 at 10:58:46PM +0100, Stephen Boyd wrote:
-> For PPI based PMUs, we bail out early in of_pmu_irq_cfg() without
-> setting the PMU's supported_cpus bitmap. This causes the
-> smp_call_function_any() in armv7_probe_num_events() to fail. Set
-> the bitmap to be all CPUs so that we properly probe PMUs that use
-> PPIs.
+On 2015/6/30 1:28, Will Deacon wrote:
+> On Fri, Jun 26, 2015 at 09:33:02AM +0100, Zhen Lei wrote:
+>> Now, we only support a master with only one stream id. It will cover most
+>> hardware platforms and coding so easy.
+>>
+>> Please refer Documentation\devicetree\bindings\iommu\iommu.txt on how to
+>> bind device tree.
 > 
-> Fixes: cc88116da0d1 ("arm: perf: treat PMUs as CPU affine")
-> Cc: Mark Rutland <mark.rutland@arm.com>
-> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
-> ---
->  arch/arm/kernel/perf_event.c | 4 +++-
->  1 file changed, 3 insertions(+), 1 deletion(-)
+> Can you build this on top of Laurent's series, please?
 > 
-> diff --git a/arch/arm/kernel/perf_event.c b/arch/arm/kernel/perf_event.c
-> index 54272e0be713..7d5379c1c443 100644
-> --- a/arch/arm/kernel/perf_event.c
-> +++ b/arch/arm/kernel/perf_event.c
-> @@ -795,8 +795,10 @@ static int of_pmu_irq_cfg(struct arm_pmu *pmu)
->  
->  	/* Don't bother with PPIs; they're already affine */
->  	irq = platform_get_irq(pdev, 0);
-> -	if (irq >= 0 && irq_is_percpu(irq))
-> +	if (irq >= 0 && irq_is_percpu(irq)) {
-> +		cpumask_setall(&pmu->supported_cpus);
->  		return 0;
-> +	}
+>   http://lists.infradead.org/pipermail/linux-arm-kernel/2015-May/343686.html
 
-Looks good to me as a fix, but I'm currently working on extending the
-interrupt-affinity property to work with both SPIs and PPIs so that we
-can use it to identify PMU affinity on multi-cluster systems.
+Sorry, I have a meeting for a long time. So my email writing was interrupted.
 
-  https://git.kernel.org/cgit/linux/kernel/git/will/linux.git/commit/?h=perf/updates&id=633fa0b629d86e58d68aff295f92031877dd0294
+Because Laurent's series has not been upstreamed. So this patch can not work correctly
+after patched Laurent's series. It should modified slightly as below:
+Should I merge these two patches as one after Laurent's series, or send two times
+(one before Laurent's series, and one after). What's your opinion?
 
-Any chance you could take that for a spin on your platform, please?
+diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
+index 2e09f10..c940522 100644
+--- a/drivers/iommu/arm-smmu-v3.c
++++ b/drivers/iommu/arm-smmu-v3.c
+@@ -1953,7 +1953,7 @@ static int arm_smmu_of_xlate(struct device *dev, struct of_phandle_args *args)
+        dev->archdata.of_smmu = args->np;
+        dev->archdata.sid = args->args[0];
 
-Will
+-   return 0;
++ return arm_smmu_add_device(dev);
+ }
+
+ static struct iommu_ops arm_smmu_ops = {
+@@ -1966,7 +1966,6 @@ static struct iommu_ops arm_smmu_ops = {
+        .map                    = arm_smmu_map,
+        .unmap                  = arm_smmu_unmap,
+        .iova_to_phys           = arm_smmu_iova_to_phys,
+-   .add_device             = arm_smmu_add_device,
+        .remove_device          = arm_smmu_remove_device,
+        .domain_get_attr        = arm_smmu_domain_get_attr,
+        .domain_set_attr        = arm_smmu_domain_set_attr,
+
+
+> 
+> Will
+> 
+> .
+> 
