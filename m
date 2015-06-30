@@ -1,163 +1,196 @@
-From: szabolcs.nagy@arm.com (Szabolcs Nagy)
-Date: Tue, 30 Jun 2015 11:48:29 +0100
-Subject: [PATCH] ARM: fix vdsomunge not to depend on glibc specific error.h
-Message-ID: <559273FD.2030508@arm.com>
+From: steve.capper@linaro.org (Steve Capper)
+Date: Tue, 30 Jun 2015 11:51:13 +0100
+Subject: [PATCH v7 1/7] arm64: Add HAVE_REGS_AND_STACK_ACCESS_API feature
+In-Reply-To: <5591903D.7090108@linaro.org>
+References: <1434395229-6654-1-git-send-email-dave.long@linaro.org>
+ <1434395229-6654-2-git-send-email-dave.long@linaro.org>
+ <CAPvkgC37gFJjU__jubnJ1xJA_9ktCgBJ3wzWMAZN=93rvu3+Ew@mail.gmail.com>
+ <5591903D.7090108@linaro.org>
+Message-ID: <CAPvkgC0We2ZTxotsaYtABQ4_909fRVj-1WvtPtSkX63rex_XVw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-If the host toolchain is not glibc based then the arm kernel build
-fails with
+On 29 June 2015 at 19:36, David Long <dave.long@linaro.org> wrote:
+> On 06/29/15 13:23, Steve Capper wrote:
+>>
+>> On 15 June 2015 at 20:07, David Long <dave.long@linaro.org> wrote:
+>>>
+>>> From: "David A. Long" <dave.long@linaro.org>
+>>>
+>>> Add HAVE_REGS_AND_STACK_ACCESS_API feature for arm64.
+>>>
+>>> Signed-off-by: David A. Long <dave.long@linaro.org>
+>>> ---
+>>>   arch/arm64/Kconfig              |  1 +
+>>>   arch/arm64/include/asm/ptrace.h | 25 +++++++++++++
+>>>   arch/arm64/kernel/ptrace.c      | 77
+>>> +++++++++++++++++++++++++++++++++++++++++
+>>>   3 files changed, 103 insertions(+)
+>>>
+>>> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+>>> index 7796af4..966091f 100644
+>>> --- a/arch/arm64/Kconfig
+>>> +++ b/arch/arm64/Kconfig
+>>> @@ -68,6 +68,7 @@ config ARM64
+>>>          select HAVE_PERF_EVENTS
+>>>          select HAVE_PERF_REGS
+>>>          select HAVE_PERF_USER_STACK_DUMP
+>>> +       select HAVE_REGS_AND_STACK_ACCESS_API
+>>>          select HAVE_RCU_TABLE_FREE
+>>>          select HAVE_SYSCALL_TRACEPOINTS
+>>>          select IRQ_DOMAIN
+>>> diff --git a/arch/arm64/include/asm/ptrace.h
+>>> b/arch/arm64/include/asm/ptrace.h
+>>> index d6dd9fd..8f440e9 100644
+>>> --- a/arch/arm64/include/asm/ptrace.h
+>>> +++ b/arch/arm64/include/asm/ptrace.h
+>>> @@ -118,6 +118,8 @@ struct pt_regs {
+>>>          u64 syscallno;
+>>>   };
+>>>
+>>> +#define MAX_REG_OFFSET (sizeof(struct user_pt_regs) - sizeof(u64))
+>>> +
+>>>   #define arch_has_single_step() (1)
+>>>
+>>>   #ifdef CONFIG_COMPAT
+>>> @@ -146,6 +148,29 @@ struct pt_regs {
+>>>   #define user_stack_pointer(regs) \
+>>>          (!compat_user_mode(regs) ? (regs)->sp : (regs)->compat_sp)
+>>>
+>>> +/**
+>>> + * regs_get_register() - get register value from its offset
+>>> + * @regs:         pt_regs from which register value is gotten
+>>> + * @offset:    offset number of the register.
+>>> + *
+>>> + * regs_get_register returns the value of a register whose offset from
+>>> @regs.
+>>> + * The @offset is the offset of the register in struct pt_regs.
+>>> + * If @offset is bigger than MAX_REG_OFFSET, this returns 0.
+>>> + */
+>>> +static inline u64 regs_get_register(struct pt_regs *regs,
+>>> +                                             unsigned int offset)
+>>> +{
+>>> +       if (unlikely(offset > MAX_REG_OFFSET))
+>>> +               return 0;
+>>> +       return *(u64 *)((u64)regs + offset);
+>>
+>>
+>> Why not:
+>> return regs->regs[offset];
+>>
+>
+> This would not be correct.  The offset is a byte offset and your code would
+> index eight times that amount into the structure.  The offset needs to
+> remain a byte offset so architecture-independent code does not need to know
+> the architecture-specific layout of the structure.
 
- arch/arm/vdso/vdsomunge.c:53:19: fatal error: error.h: No such file or directory
+Ahh, apologies. Thank you, I substituted offset as index in my head.
 
-error.h is a glibc only header (ie not available in musl, newlib and
-bsd libcs).  Changed the error reporting to standard conforming code
-to avoid depending on specific C implementations.
-
-Signed-off-by: Szabolcs Nagy <szabolcs.nagy@arm.com>
----
- arch/arm/vdso/vdsomunge.c |   56 ++++++++++++++++++++++++++-------------------
- 1 file changed, 33 insertions(+), 23 deletions(-)
-
-diff --git a/arch/arm/vdso/vdsomunge.c b/arch/arm/vdso/vdsomunge.c
-index 9005b07..aedec81 100644
---- a/arch/arm/vdso/vdsomunge.c
-+++ b/arch/arm/vdso/vdsomunge.c
-@@ -45,13 +45,11 @@
-  * it does.
-  */
-
--#define _GNU_SOURCE
--
- #include <byteswap.h>
- #include <elf.h>
- #include <errno.h>
--#include <error.h>
- #include <fcntl.h>
-+#include <stdarg.h>
- #include <stdbool.h>
- #include <stdio.h>
- #include <stdlib.h>
-@@ -82,11 +80,25 @@
- #define EF_ARM_ABI_FLOAT_HARD 0x400
- #endif
-
-+static int failed;
-+static const char *argv0;
- static const char *outfile;
-
-+static void fail(const char *fmt, ...)
-+{
-+	va_list ap;
-+
-+	failed = 1;
-+	fprintf(stderr, "%s: ", argv0);
-+	va_start(ap, fmt);
-+	vfprintf(stderr, fmt, ap);
-+	va_end(ap);
-+	exit(EXIT_FAILURE);
-+}
-+
- static void cleanup(void)
- {
--	if (error_message_count > 0 && outfile != NULL)
-+	if (failed && outfile != NULL)
- 		unlink(outfile);
- }
-
-@@ -119,68 +131,66 @@ int main(int argc, char **argv)
- 	int infd;
-
- 	atexit(cleanup);
-+	argv0 = argv[0];
-
- 	if (argc != 3)
--		error(EXIT_FAILURE, 0, "Usage: %s [infile] [outfile]", argv[0]);
-+		fail("Usage: %s [infile] [outfile]\n", argv[0]);
-
- 	infile = argv[1];
- 	outfile = argv[2];
-
- 	infd = open(infile, O_RDONLY);
- 	if (infd < 0)
--		error(EXIT_FAILURE, errno, "Cannot open %s", infile);
-+		fail("Cannot open %s: %s\n", infile, strerror(errno));
-
- 	if (fstat(infd, &stat) != 0)
--		error(EXIT_FAILURE, errno, "Failed stat for %s", infile);
-+		fail("Failed stat for %s: %s\n", infile, strerror(errno));
-
- 	inbuf = mmap(NULL, stat.st_size, PROT_READ, MAP_PRIVATE, infd, 0);
- 	if (inbuf == MAP_FAILED)
--		error(EXIT_FAILURE, errno, "Failed to map %s", infile);
-+		fail("Failed to map %s: %s\n", infile, strerror(errno));
-
- 	close(infd);
-
- 	inhdr = inbuf;
-
- 	if (memcmp(&inhdr->e_ident, ELFMAG, SELFMAG) != 0)
--		error(EXIT_FAILURE, 0, "Not an ELF file");
-+		fail("Not an ELF file\n");
-
- 	if (inhdr->e_ident[EI_CLASS] != ELFCLASS32)
--		error(EXIT_FAILURE, 0, "Unsupported ELF class");
-+		fail("Unsupported ELF class\n");
-
- 	swap = inhdr->e_ident[EI_DATA] != HOST_ORDER;
-
- 	if (read_elf_half(inhdr->e_type, swap) != ET_DYN)
--		error(EXIT_FAILURE, 0, "Not a shared object");
-+		fail("Not a shared object\n");
-
--	if (read_elf_half(inhdr->e_machine, swap) != EM_ARM) {
--		error(EXIT_FAILURE, 0, "Unsupported architecture %#x",
--		      inhdr->e_machine);
--	}
-+	if (read_elf_half(inhdr->e_machine, swap) != EM_ARM)
-+		fail("Unsupported architecture %#x\n", inhdr->e_machine);
-
- 	e_flags = read_elf_word(inhdr->e_flags, swap);
-
- 	if (EF_ARM_EABI_VERSION(e_flags) != EF_ARM_EABI_VER5) {
--		error(EXIT_FAILURE, 0, "Unsupported EABI version %#x",
--		      EF_ARM_EABI_VERSION(e_flags));
-+		fail("Unsupported EABI version %#x\n",
-+		     EF_ARM_EABI_VERSION(e_flags));
- 	}
-
- 	if (e_flags & EF_ARM_ABI_FLOAT_HARD)
--		error(EXIT_FAILURE, 0,
--		      "Unexpected hard-float flag set in e_flags");
-+		fail("Unexpected hard-float flag set in e_flags\n");
-
- 	clear_soft_float = !!(e_flags & EF_ARM_ABI_FLOAT_SOFT);
-
- 	outfd = open(outfile, O_RDWR | O_CREAT | O_TRUNC, S_IRUSR | S_IWUSR);
- 	if (outfd < 0)
--		error(EXIT_FAILURE, errno, "Cannot open %s", outfile);
-+		fail("Cannot open %s: %s\n", outfile, strerror(errno));
-
- 	if (ftruncate(outfd, stat.st_size) != 0)
--		error(EXIT_FAILURE, errno, "Cannot truncate %s", outfile);
-+		fail("Cannot truncate %s: %s\n", outfile, strerror(errno));
-
- 	outbuf = mmap(NULL, stat.st_size, PROT_READ | PROT_WRITE, MAP_SHARED,
- 		      outfd, 0);
- 	if (outbuf == MAP_FAILED)
--		error(EXIT_FAILURE, errno, "Failed to map %s", outfile);
-+		fail("Failed to map %s: %s\n", outfile, strerror(errno));
-
- 	close(outfd);
-
-@@ -195,7 +205,7 @@ int main(int argc, char **argv)
- 	}
-
- 	if (msync(outbuf, stat.st_size, MS_SYNC) != 0)
--		error(EXIT_FAILURE, errno, "Failed to sync %s", outfile);
-+		fail("Failed to sync %s: %s\n", outfile, strerror(errno));
-
- 	return EXIT_SUCCESS;
- }
--- 
-1.7.9.5
+>
+>
+>>> +}
+>>> +
+>>> +/* Valid only for Kernel mode traps. */
+>>> +static inline unsigned long kernel_stack_pointer(struct pt_regs *regs)
+>>> +{
+>>> +       return regs->sp;
+>>> +}
+>>> +
+>>>   static inline unsigned long regs_return_value(struct pt_regs *regs)
+>>>   {
+>>>          return regs->regs[0];
+>>> diff --git a/arch/arm64/kernel/ptrace.c b/arch/arm64/kernel/ptrace.c
+>>> index d882b83..f6199a5 100644
+>>> --- a/arch/arm64/kernel/ptrace.c
+>>> +++ b/arch/arm64/kernel/ptrace.c
+>>> @@ -48,6 +48,83 @@
+>>>   #define CREATE_TRACE_POINTS
+>>>   #include <trace/events/syscalls.h>
+>>>
+>>> +#define ARM_pstate     pstate
+>>> +#define ARM_pc         pc
+>>> +#define ARM_sp         sp
+>>> +#define ARM_x30                regs[30]
+>>> +#define ARM_x29                regs[29]
+>>> +#define ARM_x28                regs[28]
+>>> +#define ARM_x27                regs[27]
+>>> +#define ARM_x26                regs[26]
+>>> +#define ARM_x25                regs[25]
+>>> +#define ARM_x24                regs[24]
+>>> +#define ARM_x23                regs[23]
+>>> +#define ARM_x22                regs[22]
+>>> +#define ARM_x21                regs[21]
+>>> +#define ARM_x20                regs[20]
+>>> +#define ARM_x19                regs[19]
+>>> +#define ARM_x18                regs[18]
+>>> +#define ARM_x17                regs[17]
+>>> +#define ARM_x16                regs[16]
+>>> +#define ARM_x15                regs[15]
+>>> +#define ARM_x14                regs[14]
+>>> +#define ARM_x13                regs[13]
+>>> +#define ARM_x12                regs[12]
+>>> +#define ARM_x11                regs[11]
+>>> +#define ARM_x10                regs[10]
+>>> +#define ARM_x9         regs[9]
+>>> +#define ARM_x8         regs[8]
+>>> +#define ARM_x7         regs[7]
+>>> +#define ARM_x6         regs[6]
+>>> +#define ARM_x5         regs[5]
+>>> +#define ARM_x4         regs[4]
+>>> +#define ARM_x3         regs[3]
+>>> +#define ARM_x2         regs[2]
+>>> +#define ARM_x1         regs[1]
+>>> +#define ARM_x0         regs[0]
+>>> +
+>>> +#define REG_OFFSET_NAME(r) \
+>>> +       {.name = #r, .offset = offsetof(struct pt_regs, ARM_##r)}
+>>> +#define REG_OFFSET_END {.name = NULL, .offset = 0}
+>>> +
+>>> +const struct pt_regs_offset regs_offset_table[] = {
+>>> +       REG_OFFSET_NAME(x0),
+>>> +       REG_OFFSET_NAME(x1),
+>>> +       REG_OFFSET_NAME(x2),
+>>> +       REG_OFFSET_NAME(x3),
+>>> +       REG_OFFSET_NAME(x4),
+>>> +       REG_OFFSET_NAME(x5),
+>>> +       REG_OFFSET_NAME(x6),
+>>> +       REG_OFFSET_NAME(x7),
+>>> +       REG_OFFSET_NAME(x8),
+>>> +       REG_OFFSET_NAME(x9),
+>>> +       REG_OFFSET_NAME(x10),
+>>> +       REG_OFFSET_NAME(x11),
+>>> +       REG_OFFSET_NAME(x12),
+>>> +       REG_OFFSET_NAME(x13),
+>>> +       REG_OFFSET_NAME(x14),
+>>> +       REG_OFFSET_NAME(x15),
+>>> +       REG_OFFSET_NAME(x16),
+>>> +       REG_OFFSET_NAME(x17),
+>>> +       REG_OFFSET_NAME(x18),
+>>> +       REG_OFFSET_NAME(x19),
+>>> +       REG_OFFSET_NAME(x20),
+>>> +       REG_OFFSET_NAME(x21),
+>>> +       REG_OFFSET_NAME(x22),
+>>> +       REG_OFFSET_NAME(x23),
+>>> +       REG_OFFSET_NAME(x24),
+>>> +       REG_OFFSET_NAME(x25),
+>>> +       REG_OFFSET_NAME(x26),
+>>> +       REG_OFFSET_NAME(x27),
+>>> +       REG_OFFSET_NAME(x28),
+>>> +       REG_OFFSET_NAME(x29),
+>>> +       REG_OFFSET_NAME(x30),
+>>> +       REG_OFFSET_NAME(sp),
+>>> +       REG_OFFSET_NAME(pc),
+>>> +       REG_OFFSET_NAME(pstate),
+>>> +       REG_OFFSET_END,
+>>> +};
+>>> +
+>>>   /*
+>>>    * TODO: does not yet catch signals sent when the child dies.
+>>>    * in exit.c or in signal.c.
+>>> --
+>>> 1.8.1.2
+>>>
+>
+> Thanks,
+> -dl
+>
