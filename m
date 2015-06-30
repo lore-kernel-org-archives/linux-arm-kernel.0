@@ -1,37 +1,58 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Tue, 30 Jun 2015 16:26:19 +0200
-Subject: [PATCH v4 3/3] net: mvneta: disable IP checksum with jumbo
- frames for Armada 370
-In-Reply-To: <1435674022-13295-4-git-send-email-simon.guinot@sequanux.org>
-References: <1435674022-13295-1-git-send-email-simon.guinot@sequanux.org>
- <1435674022-13295-4-git-send-email-simon.guinot@sequanux.org>
-Message-ID: <20150630162619.7b7cd078@free-electrons.com>
+Date: Tue, 30 Jun 2015 16:36:51 +0200
+Subject: [PATCH v3 0/6] dmaengine: mv_xor fixes and improvements
+Message-ID: <1435675017-875-1-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Simon Guinot,
+Hello,
 
-On Tue, 30 Jun 2015 16:20:22 +0200, Simon Guinot wrote:
-> The Ethernet controller found in the Armada 370, 380 and 385 SoCs don't
-> support TCP/IP checksumming with frame sizes larger than 1600 bytes.
-> 
-> This patch fixes the issue by disabling the features NETIF_F_IP_CSUM and
-> NETIF_F_TSO for the Armada 370 and compatibles SoCs when the MTU is set
-> to a value greater than 1600 bytes.
-> 
-> Signed-off-by: Simon Guinot <simon.guinot@sequanux.org>
-> Fixes: c5aff18204da ("net: mvneta: driver for Marvell Armada 370/XP network unit")
-> Cc: <stable@vger.kernel.org> # v3.8+
-> ---
->  drivers/net/ethernet/marvell/mvneta.c | 26 +++++++++++++++++++++++++-
->  1 file changed, 25 insertions(+), 1 deletion(-)
+Here is a v3 of the series making some fixes and improvements to the
+mv_xor driver.
 
-Acked-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+Changes v2 -> v3:
+
+ * Added Reviewed-by from Maxime Ripard on patches 1, 3, 4 and 5.
+
+ * Added an additional patch improving the performance of the XOR
+   engine by only using a subset of the available channels depending
+   on the number of CPUs in the system.
+
+Changes v1 -> v2:
+
+ * Device Tree related changes omitted, since they have been applied
+   by one of the ARM mach-mvebu maintainer.
+
+ * Addition of one commit, "dmaengine: mv_xor: fix big endian
+   operation in register mode", fixing a regression introduced by one
+   the patches currently in the 'next' branch of Vinod's
+   repository. It should be merged as part of 4.2.
+
+ * Addition of two cleanup patches:
+
+    dmaengine: mv_xor: remove mv_xor_chan->current_type field
+    dmaengine: mv_xor: de-duplicate mv_chan_set_mode*()
+
+   These patches, like the two other non-fixes, can either go in 4.2
+   if it's not too late, or in 4.3.
 
 Thanks,
 
 Thomas
+
+Thomas Petazzoni (6):
+  dmaengine: mv_xor: fix big endian operation in register mode
+  dmaengine: mv_xor: add suspend/resume support
+  dmaengine: mv_xor: remove support for dmacap,* DT properties
+  dmaengine: mv_xor: remove mv_xor_chan->current_type field
+  dmaengine: mv_xor: de-duplicate mv_chan_set_mode*()
+  dmaengine: mv_xor: optimize performance by using a subset of the XOR
+    channels
+
+ Documentation/devicetree/bindings/dma/mv-xor.txt |  10 +-
+ drivers/dma/mv_xor.c                             | 121 ++++++++++++++---------
+ drivers/dma/mv_xor.h                             |   2 +-
+ 3 files changed, 81 insertions(+), 52 deletions(-)
+
 -- 
-Thomas Petazzoni, CTO, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+2.4.5
