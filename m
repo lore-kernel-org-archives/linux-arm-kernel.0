@@ -1,154 +1,151 @@
 From: pawelo@king.net.pl (Paul Osmialowski)
-Date: Tue, 30 Jun 2015 14:27:30 +0200
-Subject: [PATCH v2 9/9] arm: twr-k70f120m: use Freescale lpuart driver with
+Date: Tue, 30 Jun 2015 14:27:28 +0200
+Subject: [PATCH v2 7/9] arm: twr-k70f120m: use Freescale eDMA driver with
  Kinetis SoC
 In-Reply-To: <1435667250-28299-1-git-send-email-pawelo@king.net.pl>
 References: <1435667250-28299-1-git-send-email-pawelo@king.net.pl>
-Message-ID: <1435667250-28299-10-git-send-email-pawelo@king.net.pl>
+Message-ID: <1435667250-28299-8-git-send-email-pawelo@king.net.pl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Note that enabling tx DMA resulted in messy output, so I didn't configure
-it in the .dts file - however nothing in the code prevents one from doing
-so. Also note that original reference UART driver from Emcraft did not
-implement tx DMA at all.
+Note that <mach/memory.h> is needed (which is denoted by
+CONFIG_NEED_MACH_MEMORY_H) as it provides macros required for proper
+operation of DMA allocation functions.
 
 Signed-off-by: Paul Osmialowski <pawelo@king.net.pl>
 ---
- arch/arm/boot/dts/kinetis-twr-k70f120m.dts | 23 +++++++++
- arch/arm/boot/dts/kinetis.dtsi             | 78 ++++++++++++++++++++++++++++++
- 2 files changed, 101 insertions(+)
+ arch/arm/Kconfig                            |  4 ++
+ arch/arm/boot/dts/kinetis.dtsi              | 34 ++++++++++++++++
+ arch/arm/mach-kinetis/include/mach/memory.h | 61 +++++++++++++++++++++++++++++
+ 3 files changed, 99 insertions(+)
+ create mode 100644 arch/arm/mach-kinetis/include/mach/memory.h
 
-diff --git a/arch/arm/boot/dts/kinetis-twr-k70f120m.dts b/arch/arm/boot/dts/kinetis-twr-k70f120m.dts
-index a6efc29..5d8470a 100644
---- a/arch/arm/boot/dts/kinetis-twr-k70f120m.dts
-+++ b/arch/arm/boot/dts/kinetis-twr-k70f120m.dts
-@@ -10,11 +10,34 @@
- 	model = "Freescale TWR-K70F120M Development Kit";
- 	compatible = "fsl,kinetis-twr-k70f120m";
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index b21592b..8ccffee 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -971,6 +971,10 @@ config ARCH_KINETIS
+ 	select CLKSRC_KINETIS
+ 	select PINCTRL
+ 	select PINCTRL_KINETIS
++	select DMADEVICES
++	select FSL_EDMA
++	select DMA_OF
++	select NEED_MACH_MEMORY_H
+ 	help
+ 	  This enables support for the Freescale Kinetis MCUs
  
-+	chosen {
-+		bootargs = "console=ttyLP2,115200";
-+	};
-+
- 	memory {
- 		reg = <0x8000000 0x8000000>;
- 	};
- };
- 
-+&uart2 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&uart2_pins>;
-+	status = "ok";
-+};
-+
-+&portE {
-+	status = "ok";
-+
-+	uart2 {
-+		uart2_pins: pinmux_uart2_pins {
-+			fsl,pins = <
-+				16	0x300 /* E.16 = UART2_TX */
-+				17	0x300 /* E.17 = UART2_RX */
-+			>;
-+		};
-+	};
-+};
-+
- &pit0 {
- 	status = "ok";
- };
 diff --git a/arch/arm/boot/dts/kinetis.dtsi b/arch/arm/boot/dts/kinetis.dtsi
-index c2861f5..fedafe3 100644
+index 5ff1d3b..c2861f5 100644
 --- a/arch/arm/boot/dts/kinetis.dtsi
 +++ b/arch/arm/boot/dts/kinetis.dtsi
-@@ -16,9 +16,87 @@
- 		pmx3 = &portD;
- 		pmx4 = &portE;
- 		pmx5 = &portF;
-+		serial0 = &uart0;
-+		serial1 = &uart1;
-+		serial2 = &uart2;
-+		serial3 = &uart3;
-+		serial4 = &uart4;
-+		serial5 = &uart5;
+@@ -19,6 +19,40 @@
  	};
  
  	soc {
-+		uart0: serial at 4006a000 {
-+			compatible = "fsl,kinetis-lpuart";
-+			reg = <0x4006a000 0x1000>;
-+			interrupts = <45>, <46>;
-+			interrupt-names = "uart-stat", "uart-err";
-+			clocks = <&mcg_cclk_gate 3 10>;
-+			clock-names = "ipg";
-+			dmas = <&edma 0 2>;
-+			dma-names = "rx";
-+			status = "disabled";
++		edma: dma-controller at 40008000 {
++			compatible = "fsl,kinetis-edma";
++			reg = <0x40008000 0x2000>, /* DMAC */
++				<0x40021000 0x1000>, /* DMAMUX0 */
++				<0x40022000 0x1000>; /* DMAMUX1 */
++			#dma-cells = <2>;
++			dma-channels = <32>;
++			interrupts =	 <0>,  <1>,  <2>,  <3>,
++					 <4>,  <5>,  <6>,  <7>,
++					 <8>,  <9>, <10>, <11>,
++					<12>, <13>, <14>, <15>,
++					<16>;
++			interrupt-names = "edma-tx-0,16",
++					  "edma-tx-1,17",
++					  "edma-tx-2,18",
++					  "edma-tx-3,19",
++					  "edma-tx-4,20",
++					  "edma-tx-5,21",
++					  "edma-tx-6,22",
++					  "edma-tx-7,23",
++					  "edma-tx-8,24",
++					  "edma-tx-9,25",
++					  "edma-tx-10,26",
++					  "edma-tx-11,27",
++					  "edma-tx-12,28",
++					  "edma-tx-13,29",
++					  "edma-tx-14,30",
++					  "edma-tx-15,31",
++					  "edma-err";
++			clocks = <&mcg_cclk_gate 6 1>,
++				 <&mcg_pclk_gate 5 1>, <&mcg_pclk_gate 5 2>;
++			clock-names = "edma", "dmamux0", "dmamux1";
 +		};
 +
-+		uart1: serial at 4006b000 {
-+			compatible = "fsl,kinetis-lpuart";
-+			reg = <0x4006b000 0x1000>;
-+			interrupts = <47>, <48>;
-+			interrupt-names = "uart-stat", "uart-err";
-+			clocks = <&mcg_cclk_gate 3 11>;
-+			clock-names = "ipg";
-+			dmas = <&edma 0 4>;
-+			dma-names = "rx";
-+			status = "disabled";
-+		};
+ 		portA: pinmux at 40049000 {
+ 			compatible = "fsl,kinetis-padconf";
+ 			reg = <0x40049000 0x1000>;
+diff --git a/arch/arm/mach-kinetis/include/mach/memory.h b/arch/arm/mach-kinetis/include/mach/memory.h
+new file mode 100644
+index 0000000..8bad034
+--- /dev/null
++++ b/arch/arm/mach-kinetis/include/mach/memory.h
+@@ -0,0 +1,61 @@
++/*
++ * Based on original code by Alexander Potashev <aspotashev@emcraft.com>
++ *
++ * (C) Copyright 2011, 2012
++ * Emcraft Systems, <www.emcraft.com>
++ * Alexander Potashev <aspotashev@emcraft.com>
++ *
++ * Copyright (C) 2015 Paul Osmialowski <pawelo@king.net.pl>
++ *
++ * This program is free software; you can redistribute it and/or modify it under
++ * the terms of the GNU General Public License version 2 as published by the
++ * Free Software Foundation.
++ */
 +
-+		uart2: serial at 4006c000 {
-+			compatible = "fsl,kinetis-lpuart";
-+			reg = <0x4006c000 0x1000>;
-+			interrupts = <49>, <50>;
-+			interrupt-names = "uart-stat", "uart-err";
-+			clocks = <&mcg_pclk_gate 3 12>;
-+			clock-names = "ipg";
-+			dmas = <&edma 0 6>;
-+			dma-names = "rx";
-+			status = "disabled";
-+		};
++#ifndef _MACH_KINETIS_MEMORY_H
++#define _MACH_KINETIS_MEMORY_H
 +
-+		uart3: serial at 4006d000 {
-+			compatible = "fsl,kinetis-lpuart";
-+			reg = <0x4006d000 0x1000>;
-+			interrupts = <51>, <52>;
-+			interrupt-names = "uart-stat", "uart-err";
-+			clocks = <&mcg_pclk_gate 3 13>;
-+			clock-names = "ipg";
-+			dmas = <&edma 0 8>;
-+			dma-names = "rx";
-+			status = "disabled";
-+		};
++#ifndef __ASSEMBLY__
 +
-+		uart4: serial at 400ea000 {
-+			compatible = "fsl,kinetis-lpuart";
-+			reg = <0x400ea000 0x1000>;
-+			interrupts = <53>, <54>;
-+			interrupt-names = "uart-stat", "uart-err";
-+			clocks = <&mcg_pclk_gate 0 10>;
-+			clock-names = "ipg";
-+			dmas = <&edma 0 10>;
-+			dma-names = "rx";
-+			status = "disabled";
-+		};
++/*
++ * On Kinetis K70, consistent DMA memory resides in a special
++ * DDRAM alias region (non-cacheable DDRAM at 0x80000000).
++ *
++ */
++#define KINETIS_PHYS_DMA_OFFSET UL(0x80000000)
 +
-+		uart5: serial at 400eb000 {
-+			compatible = "fsl,kinetis-lpuart";
-+			reg = <0x400eb000 0x1000>;
-+			interrupts = <55>, <56>;
-+			interrupt-names = "uart-stat", "uart-err";
-+			clocks = <&mcg_pclk_gate 0 11>;
-+			clock-names = "ipg";
-+			dmas = <&edma 0 12>;
-+			dma-names = "rx";
-+			status = "disabled";
-+		};
++/*
++ * Mask of the field used to distinguish DDRAM aliases
++ */
++#define KINETIS_DRAM_ALIAS_MASK UL(0xf8000000)
 +
- 		edma: dma-controller at 40008000 {
- 			compatible = "fsl,kinetis-edma";
- 			reg = <0x40008000 0x2000>, /* DMAC */
++/*
++ * This macro converts an address in the kernel run-time memory
++ * to an alias in the non-cacheable memory region
++ */
++#define KINETIS_DMA_ALIAS_ADDR(addr)					\
++		(((unsigned long)(addr) & ~KINETIS_DRAM_ALIAS_MASK) |	\
++		(KINETIS_PHYS_DMA_OFFSET & KINETIS_DRAM_ALIAS_MASK))
++
++/*
++ * This macro converts an address in the kernel code or
++ * in the non-cacheable DMA region to an alias in
++ * the run-time kernel memory region
++ */
++#define KINETIS_PHYS_ALIAS_ADDR(addr) \
++		((unsigned long)(addr) & ~KINETIS_DRAM_ALIAS_MASK)
++
++#define __arch_dma_to_pfn(dev, addr) __phys_to_pfn(addr)
++
++#define __arch_pfn_to_dma(dev, pfn) \
++		((dma_addr_t)KINETIS_DMA_ALIAS_ADDR(__pfn_to_phys(pfn)))
++
++#define __arch_dma_to_virt(dev, addr) \
++		((void *)KINETIS_PHYS_ALIAS_ADDR(addr))
++
++#define __arch_virt_to_dma(dev, addr) \
++		((dma_addr_t)KINETIS_DMA_ALIAS_ADDR(addr))
++
++#endif /* __ASSEMBLY__ */
++
++#endif /*_MACH_KINETIS_MEMORY_H */
 -- 
 2.3.6
