@@ -1,120 +1,47 @@
 From: simon.guinot@sequanux.org (Simon Guinot)
-Date: Tue, 30 Jun 2015 16:05:48 +0200
-Subject: [PATCH v3 2/3] ARM: mvebu: update Ethernet compatible string for
- Armada XP
-In-Reply-To: <1435673149-12599-1-git-send-email-simon.guinot@sequanux.org>
-References: <1435673149-12599-1-git-send-email-simon.guinot@sequanux.org>
-Message-ID: <1435673149-12599-3-git-send-email-simon.guinot@sequanux.org>
+Date: Tue, 30 Jun 2015 16:05:46 +0200
+Subject: [PATCH v3 0/3] Fix Ethernet jumbo frames support for Armada 370 and
+ 38x
+Message-ID: <1435673149-12599-1-git-send-email-simon.guinot@sequanux.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch updates the Ethernet DT nodes for Armada XP SoCs with the
-compatible string "marvell,armada-xp-neta".
+Hello,
 
-Signed-off-by: Simon Guinot <simon.guinot@sequanux.org>
-Fixes: 77916519cba3 ("arm: mvebu: Armada XP MV78230 has only three Ethernet interfaces")
-Cc: <stable@vger.kernel.org> # v3.8+
-Acked-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
----
- arch/arm/boot/dts/armada-370-xp.dtsi     |  2 --
- arch/arm/boot/dts/armada-370.dtsi        |  8 ++++++++
- arch/arm/boot/dts/armada-xp-mv78260.dtsi |  2 +-
- arch/arm/boot/dts/armada-xp-mv78460.dtsi |  2 +-
- arch/arm/boot/dts/armada-xp.dtsi         | 10 +++++++++-
- 5 files changed, 19 insertions(+), 5 deletions(-)
+This patch series fixes the Ethernet jumbo frames support for the SoCs
+Armada 370, 380 and 385. Unlike Armada XP, the Ethernet controller for
+this SoCs don't support TCP/IP checksumming with a frame size larger
+than 1600 bytes.
 
-diff --git a/arch/arm/boot/dts/armada-370-xp.dtsi b/arch/arm/boot/dts/armada-370-xp.dtsi
-index ec96f0b36346..06a2f2ae9d1e 100644
---- a/arch/arm/boot/dts/armada-370-xp.dtsi
-+++ b/arch/arm/boot/dts/armada-370-xp.dtsi
-@@ -270,7 +270,6 @@
- 			};
- 
- 			eth0: ethernet at 70000 {
--				compatible = "marvell,armada-370-neta";
- 				reg = <0x70000 0x4000>;
- 				interrupts = <8>;
- 				clocks = <&gateclk 4>;
-@@ -286,7 +285,6 @@
- 			};
- 
- 			eth1: ethernet at 74000 {
--				compatible = "marvell,armada-370-neta";
- 				reg = <0x74000 0x4000>;
- 				interrupts = <10>;
- 				clocks = <&gateclk 3>;
-diff --git a/arch/arm/boot/dts/armada-370.dtsi b/arch/arm/boot/dts/armada-370.dtsi
-index 00b50db57c9c..ca4257b2f77d 100644
---- a/arch/arm/boot/dts/armada-370.dtsi
-+++ b/arch/arm/boot/dts/armada-370.dtsi
-@@ -307,6 +307,14 @@
- 					dmacap,memset;
- 				};
- 			};
-+
-+			ethernet at 70000 {
-+				compatible = "marvell,armada-370-neta";
-+			};
-+
-+			ethernet at 74000 {
-+				compatible = "marvell,armada-370-neta";
-+			};
- 		};
- 	};
- };
-diff --git a/arch/arm/boot/dts/armada-xp-mv78260.dtsi b/arch/arm/boot/dts/armada-xp-mv78260.dtsi
-index 8479fdc9e9c2..c5fdc99f0dbe 100644
---- a/arch/arm/boot/dts/armada-xp-mv78260.dtsi
-+++ b/arch/arm/boot/dts/armada-xp-mv78260.dtsi
-@@ -318,7 +318,7 @@
- 			};
- 
- 			eth3: ethernet at 34000 {
--				compatible = "marvell,armada-370-neta";
-+				compatible = "marvell,armada-xp-neta";
- 				reg = <0x34000 0x4000>;
- 				interrupts = <14>;
- 				clocks = <&gateclk 1>;
-diff --git a/arch/arm/boot/dts/armada-xp-mv78460.dtsi b/arch/arm/boot/dts/armada-xp-mv78460.dtsi
-index 661d54c81580..0e24f1a38540 100644
---- a/arch/arm/boot/dts/armada-xp-mv78460.dtsi
-+++ b/arch/arm/boot/dts/armada-xp-mv78460.dtsi
-@@ -356,7 +356,7 @@
- 			};
- 
- 			eth3: ethernet at 34000 {
--				compatible = "marvell,armada-370-neta";
-+				compatible = "marvell,armada-xp-neta";
- 				reg = <0x34000 0x4000>;
- 				interrupts = <14>;
- 				clocks = <&gateclk 1>;
-diff --git a/arch/arm/boot/dts/armada-xp.dtsi b/arch/arm/boot/dts/armada-xp.dtsi
-index 013d63f69e36..8fdd6d7c0ab1 100644
---- a/arch/arm/boot/dts/armada-xp.dtsi
-+++ b/arch/arm/boot/dts/armada-xp.dtsi
-@@ -177,7 +177,7 @@
- 			};
- 
- 			eth2: ethernet at 30000 {
--				compatible = "marvell,armada-370-neta";
-+				compatible = "marvell,armada-xp-neta";
- 				reg = <0x30000 0x4000>;
- 				interrupts = <12>;
- 				clocks = <&gateclk 2>;
-@@ -220,6 +220,14 @@
- 				};
- 			};
- 
-+			ethernet at 70000 {
-+				compatible = "marvell,armada-xp-neta";
-+			};
-+
-+			ethernet at 74000 {
-+				compatible = "marvell,armada-xp-neta";
-+			};
-+
- 			xor at f0900 {
- 				compatible = "marvell,orion-xor";
- 				reg = <0xF0900 0x100
+This patches should be applied to the -stable kernels 3.8 and onwards.
+
+Changes since v1:
+- Use a new compatible string for the Ethernet IP found in Armada XP
+  SoCs (instead of using an optional property).
+- Fix the issue for the Armada 380 and 385 SoCs as well.
+
+Changes since v2:
+- Add Acked-by from Gregory Clement.
+- Add "Fixes:" tag to each commits.
+
+Regards,
+
+Simon
+
+
+Simon Guinot (3):
+  net: mvneta: introduce compatible string "marvell,armada-xp-neta"
+  ARM: mvebu: update Ethernet compatible string for Armada XP
+  ARM: mvebu: disable IP checksum with jumbo frames for Armada 370
+
+ .../bindings/net/marvell-armada-370-neta.txt       |  2 +-
+ arch/arm/boot/dts/armada-370-xp.dtsi               |  2 --
+ arch/arm/boot/dts/armada-370.dtsi                  |  8 +++++++
+ arch/arm/boot/dts/armada-xp-mv78260.dtsi           |  2 +-
+ arch/arm/boot/dts/armada-xp-mv78460.dtsi           |  2 +-
+ arch/arm/boot/dts/armada-xp.dtsi                   | 10 +++++++-
+ drivers/net/ethernet/marvell/mvneta.c              | 27 +++++++++++++++++++++-
+ 7 files changed, 46 insertions(+), 7 deletions(-)
+
 -- 
 2.1.4
