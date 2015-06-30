@@ -1,34 +1,34 @@
-From: gpkulkarni@gmail.com (Ganapatrao Kulkarni)
-Date: Tue, 30 Jun 2015 19:52:05 +0530
-Subject: [RFC PATCH v4 0/4] arm64:numa: Add numa support for arm64
- platforms.
-In-Reply-To: <20150630140123.GL27725@arm.com>
-References: <1421924755-26029-1-git-send-email-gkulkarni@caviumnetworks.com>
- <CAFpQJXXZc0sop601wrmTe5Ng0SiSGfT9AA2Dpf=X9bgGN9srrA@mail.gmail.com>
- <20150630140123.GL27725@arm.com>
-Message-ID: <CAFpQJXX5yscE02QLcyBDcC+ccsTOBVMQJwOdMnritozRN7ysWA@mail.gmail.com>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Tue, 30 Jun 2015 16:22:27 +0200
+Subject: [PATCH v4 1/3] net: mvneta: introduce compatible string
+ "marvell,armada-xp-neta"
+In-Reply-To: <1435674022-13295-2-git-send-email-simon.guinot@sequanux.org>
+References: <1435674022-13295-1-git-send-email-simon.guinot@sequanux.org>
+ <1435674022-13295-2-git-send-email-simon.guinot@sequanux.org>
+Message-ID: <20150630162227.6c45c953@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi DT maintainers,
+Dear Simon Guinot,
 
-On Tue, Jun 30, 2015 at 7:31 PM, Will Deacon <will.deacon@arm.com> wrote:
-> On Mon, Jun 29, 2015 at 11:57:49AM +0100, Ganapatrao Kulkarni wrote:
->> Hi Catalin, Will, Mark,
->>
->> can you please have a look of numa patches and share your review comments.
->
-> Nothing has changed since the last time you poked me about this series:
->
->   - There are open comments from Hanjun
-IIRC, already taken care, if any open points still, it will be taker
-in next version.
->   - The device-tree part hasn't been reviewed by a DT maintainer
-please review!
->
-> so I can't merge anything other than the Kconfig change atm.
->
-> Will
+On Tue, 30 Jun 2015 16:20:20 +0200, Simon Guinot wrote:
+> The mvneta driver supports the Ethernet IP found in the Armada 370, XP,
+> 380 and 385 SoCs. Since at least one more hardware feature is available
+> for the Armada XP SoCs then a way to identify them is needed.
+> 
+> This patch introduces a new compatible string "marvell,armada-xp-neta".
+> 
+> Signed-off-by: Simon Guinot <simon.guinot@sequanux.org>
+> Fixes: c5aff18204da ("net: mvneta: driver for Marvell Armada 370/XP network unit")
+> Cc: <stable@vger.kernel.org> # v3.8+
+> Acked-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
 
-thanks
-Ganapat
+Acked-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+
+Thanks,
+
+Thomas
+-- 
+Thomas Petazzoni, CTO, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
