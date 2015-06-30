@@ -1,7 +1,7 @@
 From: lorenx4@gmail.com (Lorenzo Nava)
-Date: Tue, 30 Jun 2015 23:21:26 +0200
+Date: Tue, 30 Jun 2015 23:29:06 +0200
 Subject: [PATCH v5] arm DMA: Fix allocation from CMA for coherent DMA
-Message-ID: <1435699286-21245-1-git-send-email-lorenx4@gmail.com>
+Message-ID: <1435699746-21395-1-git-send-email-lorenx4@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
