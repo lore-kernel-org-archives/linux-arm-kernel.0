@@ -1,88 +1,89 @@
-From: elfring@users.sourceforge.net (SF Markus Elfring)
-Date: Tue, 30 Jun 2015 14:10:33 +0200
-Subject: [PATCH] ARM: OMAP2: Delete unnecessary checks before three function
- calls
-In-Reply-To: <54705EC3.90708@users.sourceforge.net>
-References: <5307CAA2.8060406@users.sourceforge.net>
- <alpine.DEB.2.02.1402212321410.2043@localhost6.localdomain6>
- <530A086E.8010901@users.sourceforge.net>
- <alpine.DEB.2.02.1402231635510.1985@localhost6.localdomain6>
- <530A72AA.3000601@users.sourceforge.net>
- <alpine.DEB.2.02.1402240658210.2090@localhost6.localdomain6>
- <530B5FB6.6010207@users.sourceforge.net>
- <alpine.DEB.2.10.1402241710370.2074@hadrien>
- <530C5E18.1020800@users.sourceforge.net>
- <alpine.DEB.2.10.1402251014170.2080@hadrien>
- <530CD2C4.4050903@users.sourceforge.net>
- <alpine.DEB.2.10.1402251840450.7035@hadrien>
- <530CF8FF.8080600@users.sourceforge.net>
- <alpine.DEB.2.02.1402252117150.2047@localhost6.localdomain6>
- <530DD06F.4090703@users.sourceforge.net>
- <alpine.DEB.2.02.1402262129250.2221@localhost6.localdomain6>
- <5317A59D.4@users.sourceforge.net> <54705EC3.90708@users.sourceforge.net>
-Message-ID: <55928739.5040809@users.sourceforge.net>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Tue, 30 Jun 2015 13:17:14 +0100
+Subject: [PATCH v2 6/9] irqchip / gic: Add stacked irqdomain support for
+ ACPI based GICv2 init
+In-Reply-To: <559282A0.8090601@linaro.org>
+References: <1434703572-26221-1-git-send-email-hanjun.guo@linaro.org>
+ <1434703572-26221-7-git-send-email-hanjun.guo@linaro.org>
+ <20150622172014.GB26129@red-moon> <5589772A.8070708@linaro.org>
+ <20150623173845.GC31466@red-moon> <558E1DEE.3090900@linaro.org>
+ <55910440.8070702@arm.com> <559282A0.8090601@linaro.org>
+Message-ID: <559288CA.40605@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Markus Elfring <elfring@users.sourceforge.net>
-Date: Tue, 30 Jun 2015 14:00:16 +0200
+On 30/06/15 12:50, Hanjun Guo wrote:
+> Hi Marc,
+> 
+> On 06/29/2015 04:39 PM, Marc Zyngier wrote:
+>> On 27/06/15 04:52, Hanjun Guo wrote:
+>>> On 06/24/2015 01:38 AM, Lorenzo Pieralisi wrote:
+>>>> On Tue, Jun 23, 2015 at 04:11:38PM +0100, Hanjun Guo wrote:
+> [...]
+>>>>
+>>>>>>>     	for (i = 0; i < nr_irqs; i++)
+>>>>>>>     		gic_irq_domain_map(domain, virq + i, hwirq + i);
+>>>>>>> @@ -945,11 +952,11 @@ void __init gic_init_bases(unsigned int gic_nr, int irq_start,
+>>>>>>>     		gic_irqs = 1020;
+>>>>>>>     	gic->gic_irqs = gic_irqs;
+>>>>>>>
+>>>>>>> -	if (node) {		/* DT case */
+>>>>>>> +	if (node || !acpi_disabled) {		/* DT or ACPI case */
+>>>>>>>     		gic->domain = irq_domain_add_linear(node, gic_irqs,
+>>>>>>>     						    &gic_irq_domain_hierarchy_ops,
+>>>>>>>     						    gic);
+>>>>
+>>>> I think this is a bit more worrying, I mean passing a NULL node pointer to
+>>>> the irqdomain layer which basically means you are booting out of ACPI
+>>>
+>>> I'm little confused here, would you mind explaining more for your
+>>> worrying? To me, node pointer is optional and it's ok for ACPI
+>>> case.
+>>>
+>>>> (for you, if that's true for the irq_domain_add_linear implementation
+>>>> that's another story), the node pointer should be optional but you
+>>>> need feedback from IRQ layer maintainers here.
+>>>
+>>> Sure.
+>>
+>> Frankly, I'd really like to see ACPI using the "node" parameter for
+>> something useful. This would save having to cache pointers all over the
+>> place, will make find_irq_host() work as expected... etc.
+>>
+>> See the comment at the top of linux/irqdomain.h :
+>>
+>> "... This code could thus be used on other architectures by replacing
+>> those two by some sort of arch-specific void * "token" used to identify
+>> interrupt controllers."
+> 
+> To init GIC in ACPI, we can only use the table entry pointer as
+> the token, but the ACPI static tables are early mem/io remapped
+> memory at boot stage, and it will be not available after boot,
+> also we need muti types of MADT enties to init GIC (GICC and GICD
+> for GICv2, GICC or GICR and GICD for GICv3), not as DT, just
+> one single node to include all the information needed to init
+> the GIC.
 
-The functions clk_disable(), of_node_put() and omap_device_delete() test
-whether their argument is NULL and then return immediately.
-Thus the test around the call is not needed.
+A single pointer would be enough, you don't need all of them.
 
-This issue was detected by using the Coccinelle software.
+> We use ACPI handle for devices as node for DT when the namespace
+> is available, but that's pretty late in the boot stage which GIC,
+> SMP and timers were already initialized, so ACPI handle can not
+> use as the token too.
+> 
+> I see multi places just pass NULL as the pointer directly for
+> irq_domain_add_linear() which works fine, and for ACPI, we tested
+> this patch and also it works.
 
-Signed-off-by: Markus Elfring <elfring@users.sourceforge.net>
----
- arch/arm/mach-omap2/omap_device.c | 3 +--
- arch/arm/mach-omap2/omap_hwmod.c  | 5 +----
- arch/arm/mach-omap2/timer.c       | 3 +--
- 3 files changed, 3 insertions(+), 8 deletions(-)
+Yes it works. But you're reinventing the wheel by keeping references
+outside of the normal framework, which is simply going to make the code
+more difficult to maintain in the long run.
 
-diff --git a/arch/arm/mach-omap2/omap_device.c b/arch/arm/mach-omap2/omap_device.c
-index 4cb8fd9..196366e 100644
---- a/arch/arm/mach-omap2/omap_device.c
-+++ b/arch/arm/mach-omap2/omap_device.c
-@@ -193,8 +193,7 @@ static int _omap_device_notifier_call(struct notifier_block *nb,
- 
- 	switch (event) {
- 	case BUS_NOTIFY_DEL_DEVICE:
--		if (pdev->archdata.od)
--			omap_device_delete(pdev->archdata.od);
-+		omap_device_delete(pdev->archdata.od);
- 		break;
- 	case BUS_NOTIFY_ADD_DEVICE:
- 		if (pdev->dev.of_node)
-diff --git a/arch/arm/mach-omap2/omap_hwmod.c b/arch/arm/mach-omap2/omap_hwmod.c
-index d78c12e..1091ee7 100644
---- a/arch/arm/mach-omap2/omap_hwmod.c
-+++ b/arch/arm/mach-omap2/omap_hwmod.c
-@@ -921,10 +921,7 @@ static int _disable_clocks(struct omap_hwmod *oh)
- 	int i = 0;
- 
- 	pr_debug("omap_hwmod: %s: disabling clocks\n", oh->name);
--
--	if (oh->_clk)
--		clk_disable(oh->_clk);
--
-+	clk_disable(oh->_clk);
- 	p = oh->slave_ports.next;
- 
- 	while (i < oh->slaves_cnt) {
-diff --git a/arch/arm/mach-omap2/timer.c b/arch/arm/mach-omap2/timer.c
-index cac46d8..15448221 100644
---- a/arch/arm/mach-omap2/timer.c
-+++ b/arch/arm/mach-omap2/timer.c
-@@ -208,8 +208,7 @@ static void __init omap_dmtimer_init(void)
- 	/* If we are a secure device, remove any secure timer nodes */
- 	if ((omap_type() != OMAP2_DEVICE_TYPE_GP)) {
- 		np = omap_get_timer_dt(omap_timer_match, "ti,timer-secure");
--		if (np)
--			of_node_put(np);
-+		of_node_put(np);
- 	}
- }
- 
+Putting NULL as the device_node parameter really means "this is a domain
+I don't need to look up later". In your case, you will have to lookup
+that domain, all the time. You're just doing it in your own little
+corner, which is what bothers me.
+
+	M.
 -- 
-2.4.5
+Jazz is not dead. It just smells funny...
