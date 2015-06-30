@@ -1,76 +1,141 @@
-From: cyrille.pitchen@atmel.com (Cyrille Pitchen)
-Date: Tue, 30 Jun 2015 11:36:41 +0200
-Subject: [PATCH 1/1] dmaengine: at_xdmac: fix transfer data width in
- at_xdmac_prep_slave_sg()
-Message-ID: <517fa6d6bc0038308863d3dc0ed2d5ab14d59454.1435656769.git.cyrille.pitchen@atmel.com>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Tue, 30 Jun 2015 12:38:15 +0300
+Subject: [PATCH 7/7] pinctrl: sh-pfc: Confine legacy function GPIOs to SH
+In-Reply-To: <1435650327-2542-8-git-send-email-geert+renesas@glider.be>
+References: <1435650327-2542-1-git-send-email-geert+renesas@glider.be>
+ <1435650327-2542-8-git-send-email-geert+renesas@glider.be>
+Message-ID: <10481403.sNoQCGtpkA@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds a missing part in commit
-6d3a7d9e3ada345948f72564ce638c412ccd8c4a:
-dmaengine: at_xdmac: allow muliple dwidths when doing slave transfers
+Hi Geert,
 
-Indeed, for each item in the scatter-gather list, we check whether the
-transfer length is aligned with the data width provided by
-dmaengine_slave_config(). If so, we directly use this data width for the
-current part of the transfer we are preparing. Otherwise, the data width
-is reduced to 8 bits (1 byte). Of course, the actual number of register
-accesses must also be updated to match the new data width.
+Thank you for the patch.
 
-So one chunk was missing in the original patch: the number of register
-accesses was correctly set to (len >> fixed_dwidth) in mbr_ubc but the
-real data width was not updated in mbr_cfg. Since mbr_cfg may change for
-each part of the scatter-gather transfer this also explains why the
-original patch used the Descriptor View 2 instead of the Descriptor
-View 1.
+On Tuesday 30 June 2015 09:45:27 Geert Uytterhoeven wrote:
+> Legacy function GPIOs are no longer used on ARM since commit
+> a27c5cd1a08cc95c ("sh-pfc: sh73a0: Remove function GPIOs").
+> Extract its setup code into a separate function, and make all function
+> GPIO related code and data depend on CONFIG_SUPERH.
+> 
+> Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+> ---
+> Compile-tested on sh using se7724_defconfig.
+> ---
+>  drivers/pinctrl/sh-pfc/core.h   |  2 ++
+>  drivers/pinctrl/sh-pfc/gpio.c   | 39 ++++++++++++++++++++++++++----------
+>  drivers/pinctrl/sh-pfc/sh_pfc.h |  2 ++
+>  3 files changed, 32 insertions(+), 11 deletions(-)
+> 
+> diff --git a/drivers/pinctrl/sh-pfc/core.h b/drivers/pinctrl/sh-pfc/core.h
+> index 4c3c37bf7161804d..c38ace46d7111b0d 100644
+> --- a/drivers/pinctrl/sh-pfc/core.h
+> +++ b/drivers/pinctrl/sh-pfc/core.h
+> @@ -46,7 +46,9 @@ struct sh_pfc {
+>  	unsigned int nr_gpio_pins;
+> 
+>  	struct sh_pfc_chip *gpio;
+> +#ifdef CONFIG_SUPERH
+>  	struct sh_pfc_chip *func;
+> +#endif
+> 
+>  	struct sh_pfc_pinctrl *pinctrl;
+>  };
+> diff --git a/drivers/pinctrl/sh-pfc/gpio.c b/drivers/pinctrl/sh-pfc/gpio.c
+> index 30654e800580524d..15f4eea186e2ba56 100644
+> --- a/drivers/pinctrl/sh-pfc/gpio.c
+> +++ b/drivers/pinctrl/sh-pfc/gpio.c
+> @@ -290,6 +290,7 @@ static int gpio_pin_setup(struct sh_pfc_chip *chip)
+>   * Function GPIOs
+>   */
+> 
+> +#ifdef CONFIG_SUPERH
+>  static int gpio_function_request(struct gpio_chip *gc, unsigned offset)
+>  {
+>  	static bool __print_once;
+> @@ -330,6 +331,31 @@ static int gpio_function_setup(struct sh_pfc_chip
+> *chip) return 0;
+>  }
+> 
+> +static int sh_pfc_add_function_gpios(struct sh_pfc *pfc)
+> +{
+> +	struct sh_pfc_chip *chip;
+> +
+> +	if (!pfc->info->nr_func_gpios)
+> +		return 0;
+> +
+> +	chip = sh_pfc_add_gpiochip(pfc, gpio_function_setup, NULL);
+> +	if (IS_ERR(chip))
+> +		return PTR_ERR(chip);
+> +
+> +	pfc->func = chip;
+> +
+> +	return 0;
+> +}
+> +
+> +static void sh_pfc_remove_function_gpios(struct sh_pfc *pfc)
+> +{
+> +	gpiochip_remove(&pfc->func->gpio_chip);
+> +}
+> +#else
+> +static inline int sh_pfc_add_function_gpios(struct sh_pfc *pfc) { return 0;
+> }
+> +static inline int sh_pfc_remove_function_gpios(struct sh_pfc *pfc) {
+> return 0; }
 
-Let's take the example of a DMA transfer to write 8bit data into an Atmel
-USART with FIFOs. When FIFOs are enabled in the USART, its Transmit
-Holding Register (THR) works in multidata mode, that is to say that up to
-4 8bit data can be written into the THR in a single 32bit access and it is
-still possible to write only one data with a 8bit access. To take
-advantage of this new feature, the DMA driver was modified to allow
-multiple dwidths when doing slave transfers.
-For instance, when the total length is 22 bytes, the USART driver splits
-the transfer into 2 parts:
+Given that those functions are only called from a single location, would it 
+make sense to just compile the calls conditionally instead ? I would find that 
+slightly more readable as it would be more explicit.
 
-First part: 20 bytes transferred through 5 32bit writes into THR
-Second part: 2 bytes transferred though 2 8bit writes into THR
+> +#endif
+> +
+>  /*
+> ---------------------------------------------------------------------------
+> -- * Register/unregister
+>   */
+> @@ -397,22 +423,13 @@ int sh_pfc_register_gpiochip(struct sh_pfc *pfc)
+>  	}
+> 
+>  	/* Register the function GPIOs chip. */
+> -	if (pfc->info->nr_func_gpios == 0)
+> -		return 0;
+> -
+> -	chip = sh_pfc_add_gpiochip(pfc, gpio_function_setup, NULL);
+> -	if (IS_ERR(chip))
+> -		return PTR_ERR(chip);
+> -
+> -	pfc->func = chip;
+> -
+> -	return 0;
+> +	return sh_pfc_add_function_gpios(pfc);
+>  }
+> 
+>  int sh_pfc_unregister_gpiochip(struct sh_pfc *pfc)
+>  {
+>  	gpiochip_remove(&pfc->gpio->gpio_chip);
+> -	gpiochip_remove(&pfc->func->gpio_chip);
+> +	sh_pfc_remove_function_gpios(pfc);
+> 
+>  	return 0;
+>  }
+> diff --git a/drivers/pinctrl/sh-pfc/sh_pfc.h
+> b/drivers/pinctrl/sh-pfc/sh_pfc.h index c7508d5f688613b2..c6f9163b3e23041f
+> 100644
+> --- a/drivers/pinctrl/sh-pfc/sh_pfc.h
+> +++ b/drivers/pinctrl/sh-pfc/sh_pfc.h
+> @@ -138,8 +138,10 @@ struct sh_pfc_soc_info {
+>  	const struct sh_pfc_function *functions;
+>  	unsigned int nr_functions;
+> 
+> +#ifdef CONFIG_SUPERH
+>  	const struct pinmux_func *func_gpios;
+>  	unsigned int nr_func_gpios;
+> +#endif
+> 
+>  	const struct pinmux_cfg_reg *cfg_regs;
+>  	const struct pinmux_data_reg *data_regs;
 
-For the second part, the data width was first set to 4_BYTES by the USART
-driver thanks to dmaengine_slave_config() then at_xdmac_prep_slave_sg()
-reduces this data width to 1_BYTE because the 2 byte length is not aligned
-with the original 4_BYTES data width. Since the data width is modified,
-the actual number of writes into THR must be set accordingly.
-
-Signed-off-by: Cyrille Pitchen <cyrille.pitchen@atmel.com>
----
- drivers/dma/at_xdmac.c | 7 ++++---
- 1 file changed, 4 insertions(+), 3 deletions(-)
-
-diff --git a/drivers/dma/at_xdmac.c b/drivers/dma/at_xdmac.c
-index cf1213d..931b218 100644
---- a/drivers/dma/at_xdmac.c
-+++ b/drivers/dma/at_xdmac.c
-@@ -681,15 +681,16 @@ at_xdmac_prep_slave_sg(struct dma_chan *chan, struct scatterlist *sgl,
- 			desc->lld.mbr_sa = mem;
- 			desc->lld.mbr_da = atchan->sconfig.dst_addr;
- 		}
--		desc->lld.mbr_cfg = atchan->cfg;
--		dwidth = at_xdmac_get_dwidth(desc->lld.mbr_cfg);
-+		dwidth = at_xdmac_get_dwidth(atchan->cfg);
- 		fixed_dwidth = IS_ALIGNED(len, 1 << dwidth)
--			       ? at_xdmac_get_dwidth(desc->lld.mbr_cfg)
-+			       ? dwidth
- 			       : AT_XDMAC_CC_DWIDTH_BYTE;
- 		desc->lld.mbr_ubc = AT_XDMAC_MBR_UBC_NDV2			/* next descriptor view */
- 			| AT_XDMAC_MBR_UBC_NDEN					/* next descriptor dst parameter update */
- 			| AT_XDMAC_MBR_UBC_NSEN					/* next descriptor src parameter update */
- 			| (len >> fixed_dwidth);				/* microblock length */
-+		desc->lld.mbr_cfg = (atchan->cfg & ~AT_XDMAC_CC_DWIDTH_MASK) |
-+				    AT_XDMAC_CC_DWIDTH(fixed_dwidth);
- 		dev_dbg(chan2dev(chan),
- 			 "%s: lld: mbr_sa=%pad, mbr_da=%pad, mbr_ubc=0x%08x\n",
- 			 __func__, &desc->lld.mbr_sa, &desc->lld.mbr_da, desc->lld.mbr_ubc);
 -- 
-1.8.2.2
+Regards,
+
+Laurent Pinchart
