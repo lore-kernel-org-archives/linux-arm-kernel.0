@@ -1,159 +1,182 @@
 From: pawelo@king.net.pl (Paul Osmialowski)
-Date: Tue, 30 Jun 2015 14:27:24 +0200
-Subject: [PATCH v2 3/9] arm: twr-k70f120m: clock driver for Kinetis SoC
+Date: Tue, 30 Jun 2015 14:27:26 +0200
+Subject: [PATCH v2 5/9] arm: twr-k70f120m: IOMUX driver for Kinetis SoC
 In-Reply-To: <1435667250-28299-1-git-send-email-pawelo@king.net.pl>
 References: <1435667250-28299-1-git-send-email-pawelo@king.net.pl>
-Message-ID: <1435667250-28299-4-git-send-email-pawelo@king.net.pl>
+Message-ID: <1435667250-28299-6-git-send-email-pawelo@king.net.pl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Based on K70P256M150SF3RM.pdf K70 Sub-Family Reference Manual, Rev. 3.
+This is a very cheap and simple implementation of pinctrl driver
+for Kinetis SoC - its primary role is to provide means for enabling UART
+fuctionality on I/O PORT_E which will be utilized by the commits
+yet to come.
 
 Signed-off-by: Paul Osmialowski <pawelo@king.net.pl>
 ---
- .../devicetree/bindings/clock/kinetis-clock.txt    |  63 +++
- arch/arm/boot/dts/kinetis.dtsi                     |  36 ++
- drivers/clk/Makefile                               |   1 +
- drivers/clk/clk-kinetis.c                          | 463 +++++++++++++++++++++
- 4 files changed, 563 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/clock/kinetis-clock.txt
- create mode 100644 drivers/clk/clk-kinetis.c
+ .../bindings/pinctrl/fsl,kinetis-pinctrl.txt       |  31 ++
+ arch/arm/Kconfig                                   |   2 +
+ arch/arm/boot/dts/kinetis.dtsi                     |  48 ++
+ drivers/pinctrl/freescale/Kconfig                  |   8 +
+ drivers/pinctrl/freescale/Makefile                 |   1 +
+ drivers/pinctrl/freescale/pinctrl-kinetis.c        | 541 +++++++++++++++++++++
+ 6 files changed, 631 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/pinctrl/fsl,kinetis-pinctrl.txt
+ create mode 100644 drivers/pinctrl/freescale/pinctrl-kinetis.c
 
-diff --git a/Documentation/devicetree/bindings/clock/kinetis-clock.txt b/Documentation/devicetree/bindings/clock/kinetis-clock.txt
+diff --git a/Documentation/devicetree/bindings/pinctrl/fsl,kinetis-pinctrl.txt b/Documentation/devicetree/bindings/pinctrl/fsl,kinetis-pinctrl.txt
 new file mode 100644
-index 0000000..63af6a5
+index 0000000..a351ce4
 --- /dev/null
-+++ b/Documentation/devicetree/bindings/clock/kinetis-clock.txt
-@@ -0,0 +1,63 @@
-+* Clock bindings for Freescale Kinetis SoC
++++ b/Documentation/devicetree/bindings/pinctrl/fsl,kinetis-pinctrl.txt
+@@ -0,0 +1,31 @@
++Freescale Kinetis IOMUX Controller
++
++This controller is largely based on i.MX IOMUX Controller. Please refer to
++fsl,imx-pinctrl.txt in this directory for more detailed description.
 +
 +Required properties:
-+- compatible: Should be "fsl,kinetis-cmu".
-+- reg: Two address ranges, one for the Clock Genetator register set,
-+	one for System Integration Module register set.
-+- Set of clock devices: one fixed-rate-root, fixed-rate clocks and clock-gates.
-+
-+For clock-gate addresses see K70 Sub-Family Reference Manual, Rev. 3 pg. 341
-+and later. Notice that addresses are zero-based, so SIM_SCGC1 has address 0,
-+SIM_SCGC2 has address 1 and so on. The second address component is the bit
-+index.
++- compatible: Should be "fsl,kinetis-iomuxc".
++- reg: Should contain the physical address and length of the gpio/pinmux
++  register range.
++- clocks: Clock that drives this I/O port.
++- fsl,pins: Two integers array, represents a group of pins mux and config
++  setting. The format is fsl,pins = <PIN_FUNC_ID CONFIG>, PIN_FUNC_ID is
++  a pin working on a specific function, CONFIG is the pad setting value
++  such as pull enable, pull select, drive strength enable. Please refer to
++  Kinetis datasheet for the valid pad config settings.
 +
 +Example:
 +
-+cmu at 40064000 {
-+	compatible = "fsl,kinetis-cmu";
-+	reg = <0x40064000 0x14>, <0x40047000 0x1100>;
-+
-+	mcg_outclk: fixed-rate-root at mcgout {
-+		device_type = "mcgout";
-+		#clock-cells = <0>;
-+	};
-+
-+	mcg_cclk: fixed-rate at cclk {
-+		device_type = "cclk";
-+		#clock-cells = <0>;
-+		clocks = <&mcg_outclk>;
-+	};
-+
-+	mcg_pclk: fixed-rate at pclk {
-+		device_type = "pclk";
-+		#clock-cells = <0>;
-+		clocks = <&mcg_outclk>;
-+	};
-+
-+	mcg_cclk_gate: clock-gate at cclk {
-+		#clock-cells = <2>;
-+		clocks = <&mcg_cclk>;
-+	};
-+
-+	mcg_pclk_gate: clock-gate at pclk {
-+		#clock-cells = <2>;
-+		clocks = <&mcg_pclk>;
-+	};
-+};
-+
-+mcg: cmu at 40064000 {
-+	compatible = "fsl,kinetis-cmu";
-+	reg = <0x40064000 0x14>;
-+	#clock-cells = <1>;
-+};
-+
-+uart1: serial at 4006b000 {
-+	compatible = "fsl,kinetis-lpuart";
-+	reg = <0x4006b000 0x1000>;
-+	interrupts = <47>, <48>;
-+	interrupt-names = "uart-stat", "uart-err";
-+	clocks = <&mcg_cclk_gate 3 11>;
-+	clock-names = "ipg";
-+	dmas = <&edma 0 4>;
-+	dma-names = "rx";
-+};
-diff --git a/arch/arm/boot/dts/kinetis.dtsi b/arch/arm/boot/dts/kinetis.dtsi
-index 93d2a8a..ae0cf00 100644
---- a/arch/arm/boot/dts/kinetis.dtsi
-+++ b/arch/arm/boot/dts/kinetis.dtsi
-@@ -3,3 +3,39 @@
-  *
-  */
- #include "armv7-m.dtsi"
-+
-+/ {
-+	soc {
-+		cmu at 40064000 {
-+			compatible = "fsl,kinetis-cmu";
-+			reg = <0x40064000 0x14>, <0x40047000 0x1100>;
-+
-+			mcg_outclk: fixed-rate-root at mcgout {
-+				device_type = "mcgout";
-+				#clock-cells = <0>;
-+			};
-+
-+			mcg_cclk: fixed-rate at cclk {
-+				device_type = "cclk";
-+				#clock-cells = <0>;
-+				clocks = <&mcg_outclk>;
-+			};
-+
-+			mcg_pclk: fixed-rate at pclk {
-+				device_type = "pclk";
-+				#clock-cells = <0>;
-+				clocks = <&mcg_outclk>;
-+			};
-+
-+			mcg_cclk_gate: clock-gate at cclk {
-+				#clock-cells = <2>;
-+				clocks = <&mcg_cclk>;
-+			};
-+
-+			mcg_pclk_gate: clock-gate at pclk {
-+				#clock-cells = <2>;
-+				clocks = <&mcg_pclk>;
-+			};
++portE: pinmux at 4004d000 {
++	compatible = "fsl,kinetis-padconf";
++	reg = <0x4004d000 0x1000>;
++	clocks = <&mcg_pclk_gate 4 13>;
++	uart2 {
++		uart2_pins: pinmux_uart2_pins {
++			fsl,pins = <
++				16	0x300 /* E.16 = UART2_TX */
++				17	0x300 /* E.17 = UART2_RX */
++			>;
 +		};
 +	};
 +};
-diff --git a/drivers/clk/Makefile b/drivers/clk/Makefile
-index 63418cf..412d76b 100644
---- a/drivers/clk/Makefile
-+++ b/drivers/clk/Makefile
-@@ -24,6 +24,7 @@ obj-$(CONFIG_COMMON_CLK_CDCE706)	+= clk-cdce706.o
- obj-$(CONFIG_ARCH_CLPS711X)		+= clk-clps711x.o
- obj-$(CONFIG_ARCH_EFM32)		+= clk-efm32gg.o
- obj-$(CONFIG_ARCH_HIGHBANK)		+= clk-highbank.o
-+obj-$(CONFIG_ARCH_KINETIS)		+= clk-kinetis.o
- obj-$(CONFIG_MACH_LOONGSON32)		+= clk-ls1x.o
- obj-$(CONFIG_COMMON_CLK_MAX_GEN)	+= clk-max-gen.o
- obj-$(CONFIG_COMMON_CLK_MAX77686)	+= clk-max77686.o
-diff --git a/drivers/clk/clk-kinetis.c b/drivers/clk/clk-kinetis.c
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index 96ddaae..b21592b 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -969,6 +969,8 @@ config ARCH_KINETIS
+ 	depends on ARM_SINGLE_ARMV7M
+ 	select ARMV7M_SYSTICK
+ 	select CLKSRC_KINETIS
++	select PINCTRL
++	select PINCTRL_KINETIS
+ 	help
+ 	  This enables support for the Freescale Kinetis MCUs
+ 
+diff --git a/arch/arm/boot/dts/kinetis.dtsi b/arch/arm/boot/dts/kinetis.dtsi
+index 0c572a5..5ff1d3b 100644
+--- a/arch/arm/boot/dts/kinetis.dtsi
++++ b/arch/arm/boot/dts/kinetis.dtsi
+@@ -10,9 +10,57 @@
+ 		pit1 = &pit1;
+ 		pit2 = &pit2;
+ 		pit3 = &pit3;
++		pmx0 = &portA;
++		pmx1 = &portB;
++		pmx2 = &portC;
++		pmx3 = &portD;
++		pmx4 = &portE;
++		pmx5 = &portF;
+ 	};
+ 
+ 	soc {
++		portA: pinmux at 40049000 {
++			compatible = "fsl,kinetis-padconf";
++			reg = <0x40049000 0x1000>;
++			clocks = <&mcg_pclk_gate 4 9>;
++			status = "disabled";
++		};
++
++		portB: pinmux at 4004a000 {
++			compatible = "fsl,kinetis-padconf";
++			reg = <0x4004a000 0x1000>;
++			clocks = <&mcg_pclk_gate 4 10>;
++			status = "disabled";
++		};
++
++		portC: pinmux at 4004b000 {
++			compatible = "fsl,kinetis-padconf";
++			reg = <0x4004b000 0x1000>;
++			clocks = <&mcg_pclk_gate 4 11>;
++			status = "disabled";
++		};
++
++		portD: pinmux at 4004c000 {
++			compatible = "fsl,kinetis-padconf";
++			reg = <0x4004c000 0x1000>;
++			clocks = <&mcg_pclk_gate 4 12>;
++			status = "disabled";
++		};
++
++		portE: pinmux at 4004d000 {
++			compatible = "fsl,kinetis-padconf";
++			reg = <0x4004d000 0x1000>;
++			clocks = <&mcg_pclk_gate 4 13>;
++			status = "disabled";
++		};
++
++		portF: pinmux at 4004e000 {
++			compatible = "fsl,kinetis-padconf";
++			reg = <0x4004e000 0x1000>;
++			clocks = <&mcg_pclk_gate 4 14>;
++			status = "disabled";
++		};
++
+ 		pit at 40037000 {
+ 			compatible = "fsl,kinetis-pit-timer";
+ 			reg = <0x40037000 0x100>;
+diff --git a/drivers/pinctrl/freescale/Kconfig b/drivers/pinctrl/freescale/Kconfig
+index 12ef544..c547aa9 100644
+--- a/drivers/pinctrl/freescale/Kconfig
++++ b/drivers/pinctrl/freescale/Kconfig
+@@ -94,6 +94,14 @@ config PINCTRL_IMX7D
+ 	help
+ 	  Say Y here to enable the imx7d pinctrl driver
+ 
++config PINCTRL_KINETIS
++	tristate "Kinetis pinctrl driver"
++	depends on OF
++	depends on ARCH_KINETIS
++	select PINMUX
++	help
++	  Say Y here to enable the Kinetis pinctrl driver
++
+ config PINCTRL_VF610
+ 	bool "Freescale Vybrid VF610 pinctrl driver"
+ 	depends on SOC_VF610
+diff --git a/drivers/pinctrl/freescale/Makefile b/drivers/pinctrl/freescale/Makefile
+index 343cb43..8db5f4c 100644
+--- a/drivers/pinctrl/freescale/Makefile
++++ b/drivers/pinctrl/freescale/Makefile
+@@ -13,6 +13,7 @@ obj-$(CONFIG_PINCTRL_IMX6Q)	+= pinctrl-imx6dl.o
+ obj-$(CONFIG_PINCTRL_IMX6SL)	+= pinctrl-imx6sl.o
+ obj-$(CONFIG_PINCTRL_IMX6SX)	+= pinctrl-imx6sx.o
+ obj-$(CONFIG_PINCTRL_IMX7D)	+= pinctrl-imx7d.o
++obj-$(CONFIG_PINCTRL_KINETIS)	+= pinctrl-kinetis.o
+ obj-$(CONFIG_PINCTRL_VF610)	+= pinctrl-vf610.o
+ obj-$(CONFIG_PINCTRL_MXS)	+= pinctrl-mxs.o
+ obj-$(CONFIG_PINCTRL_IMX23)	+= pinctrl-imx23.o
+diff --git a/drivers/pinctrl/freescale/pinctrl-kinetis.c b/drivers/pinctrl/freescale/pinctrl-kinetis.c
 new file mode 100644
-index 0000000..611e2e9
+index 0000000..4f0f36f
 --- /dev/null
-+++ b/drivers/clk/clk-kinetis.c
-@@ -0,0 +1,463 @@
++++ b/drivers/pinctrl/freescale/pinctrl-kinetis.c
+@@ -0,0 +1,541 @@
 +/*
-+ * clk-kinetis.c - Clock driver for Kinetis K70 MCG
++ * pinctrl-kinetis.c - iomux for Kinetis MCUs
 + *
-+ * Based on legacy pre-OF code by Alexander Potashev <aspotashev@emcraft.com>
++ * Based on pinctrl-imx.c by Dong Aisheng <dong.aisheng@linaro.org>
 + *
 + * Copyright (C) 2015 Paul Osmialowski <pawelo@king.net.pl>
 + *
@@ -162,456 +185,534 @@ index 0000000..611e2e9
 + * Free Software Foundation.
 + */
 +
-+#include <linux/io.h>
-+#include <linux/list.h>
-+#include <linux/slab.h>
 +#include <linux/err.h>
-+#include <linux/clk-provider.h>
++#include <linux/init.h>
++#include <linux/io.h>
++#include <linux/module.h>
++#include <linux/device.h>
++#include <linux/clk.h>
 +#include <linux/of.h>
-+#include <linux/of_address.h>
 +#include <linux/of_device.h>
++#include <linux/pinctrl/machine.h>
++#include <linux/pinctrl/pinctrl.h>
++#include <linux/pinctrl/pinmux.h>
++#include <linux/slab.h>
 +
-+/*
-+ * Frequencies on OSC0 (EXTAL0/XTAL0) and OSC1 (EXTAL1/XTAL1)
-+ *
-+ * These frequencies should be set to the same values as in U-Boot.
++/**
++ * struct kinetis_pin_group - describes a single pin
++ * @mux_reg: the mux register for this pin.
++ * @mux_mode: the mux mode for this pin.
 + */
-+#define KINETIS_OSC0_RATE	50000000	/* 50 MHz */
-+#define KINETIS_OSC1_RATE	12000000	/* 12 MHz */
++struct kinetis_pin {
++	u32 mux_reg;
++	u32 mux_mode;
++};
 +
-+#define KINETIS_SIM_CG_NUMREGS	7
-+
-+/*
-+ * System Integration Module (SIM) register map
-+ *
-+ * This map actually covers two hardware modules:
-+ *     1. SIM low-power logic, at 0x40047000
-+ *     2. System integration module (SIM), at 0x40048000
++/**
++ * struct kinetis_pin_group - describes a pin group
++ * @name: the name of this specific pin group
++ * @npins: the number of pins in this group array, i.e. the number of
++ *	elements in .pins so we can iterate over that array
++ * @pins: array of pins
 + */
-+struct kinetis_sim_regs {
-+	u32 sopt1;	/* System Options Register 1 */
-+	u32 rsv0[1024];
-+	u32 sopt2;	/* System Options Register 2 */
-+	u32 rsv1;
-+	u32 sopt4;	/* System Options Register 4 */
-+	u32 sopt5;	/* System Options Register 5 */
-+	u32 sopt6;	/* System Options Register 6 */
-+	u32 sopt7;	/* System Options Register 7 */
-+	u32 rsv2[2];
-+	u32 sdid;	/* System Device Identification Register */
-+	u32 scgc[KINETIS_SIM_CG_NUMREGS];	/* Clock Gating Regs 1...7 */
-+	u32 clkdiv1;	/* System Clock Divider Register 1 */
-+	u32 clkdiv2;	/* System Clock Divider Register 2 */
-+	u32 fcfg1;	/* Flash Configuration Register 1 */
-+	u32 fcfg2;	/* Flash Configuration Register 2 */
-+	u32 uidh;	/* Unique Identification Register High */
-+	u32 uidmh;	/* Unique Identification Register Mid-High */
-+	u32 uidml;	/* Unique Identification Register Mid Low */
-+	u32 uidl;	/* Unique Identification Register Low */
-+	u32 clkdiv3;	/* System Clock Divider Register 3 */
-+	u32 clkdiv4;	/* System Clock Divider Register 4 */
-+	u32 mcr;	/* Misc Control Register */
++struct kinetis_pin_group {
++	const char *name;
++	unsigned npins;
++	struct kinetis_pin *pins;
++};
++
++/**
++ * struct kinetis_pmx_func - describes pinmux functions
++ * @name: the name of this specific function
++ * @groups: corresponding pin groups
++ * @num_groups: the number of groups
++ */
++struct kinetis_pmx_func {
++	const char *name;
++	const char **groups;
++	unsigned num_groups;
++};
++
++struct kinetis_pinctrl_soc_info {
++	struct device			*dev;
++	struct kinetis_pin_group	*groups;
++	unsigned int			ngroups;
++	struct kinetis_pmx_func		*functions;
++	unsigned int			nfunctions;
++};
++
++struct kinetis_pinctrl {
++	int				port_id;
++	struct device			*dev;
++	struct pinctrl_dev		*pctl;
++	void __iomem			*base;
++	struct clk			*clk;
++	struct kinetis_pinctrl_soc_info	info;
++	bool				big_endian;
++};
++
++static const struct of_device_id kinetis_pinctrl_of_match[] = {
++	{ .compatible = "fsl,kinetis-padconf", },
++	{ /* sentinel */ }
 +};
 +
 +/*
-+ * SIM registers base
++ * PORTx register map
 + */
-+#define KINETIS_SIM_PTR(base, reg) \
-+	(&(((struct kinetis_sim_regs *)(base))->reg))
-+#define KINETIS_SIM_RD(be, base, reg) \
-+		((be) ? ioread32be(KINETIS_SIM_PTR(base, reg)) \
-+		      : ioread32(KINETIS_SIM_PTR(base, reg)))
-+#define KINETIS_SIM_WR(be, base, reg, val) do { \
++struct kinetis_port_regs {
++	u32 pcr[32];	/* Pin Control Registers */
++	u32 gpclr;	/* Global Pin Control Low Register */
++	u32 gpchr;	/* Global Pin Control High Register */
++	u32 rsv0[6];
++	u32 isfr;	/* Interrupt Status Flag Register */
++	u32 rsv1[7];
++	u32 dfer;	/* Digital Filter Enable Register */
++	u32 dfcr;	/* Digital Filter Clock Register */
++	u32 dfwr;	/* Digital Filter Width Register */
++};
++
++/*
++ * PORTx registers base
++ */
++#define KINETIS_PORT_PTR(base, reg) \
++	(&(((struct kinetis_port_regs *)(base))->reg))
++#define KINETIS_PORT_RD(be, base, reg) \
++		((be) ? ioread32be(KINETIS_PORT_PTR(base, reg)) \
++		      : ioread32(KINETIS_PORT_PTR(base, reg)))
++#define KINETIS_PORT_WR(be, base, reg, val) do { \
 +		if (be) \
-+			iowrite32be((val), KINETIS_SIM_PTR(base, reg)); \
++			iowrite32be((val), KINETIS_PORT_PTR(base, reg)); \
 +		else \
-+			iowrite32((val), KINETIS_SIM_PTR(base, reg)); \
++			iowrite32((val), KINETIS_PORT_PTR(base, reg)); \
 +	} while (0)
-+#define KINETIS_SIM_SET(be, base, reg, mask) \
-+		KINETIS_SIM_WR(be, base, reg, \
-+			KINETIS_SIM_RD(be, base, reg) | (mask))
-+#define KINETIS_SIM_RESET(be, base, reg, mask) \
-+		KINETIS_SIM_WR(be, base, reg, \
-+			KINETIS_SIM_RD(be, base, reg) & (~(mask)))
++#define KINETIS_PORT_SET(be, base, reg, mask) \
++		KINETIS_PORT_WR(be, base, reg, \
++			KINETIS_PORT_RD(be, base, reg) | (mask))
++#define KINETIS_PORT_RESET(be, base, reg, mask) \
++		KINETIS_PORT_WR(be, base, reg, \
++			KINETIS_PORT_RD(be, base, reg) & (~(mask)))
 +
-+/*
-+ * System Clock Divider Register 1
-+ */
-+/* Clock 1 output divider value (for the core/system clock) */
-+#define KINETIS_SIM_CLKDIV1_OUTDIV1_BITS	28
-+#define KINETIS_SIM_CLKDIV1_OUTDIV1_MSK \
-+	(((1 << 4) - 1) << KINETIS_SIM_CLKDIV1_OUTDIV1_BITS)
-+/* Clock 2 output divider value (for the peripheral clock) */
-+#define KINETIS_SIM_CLKDIV1_OUTDIV2_BITS	24
-+#define KINETIS_SIM_CLKDIV1_OUTDIV2_MSK \
-+	(((1 << 4) - 1) << KINETIS_SIM_CLKDIV1_OUTDIV2_BITS)
-+
-+/*
-+ * System Clock Divider Register 2
-+ */
-+/* USB HS clock divider fraction */
-+#define KINETIS_SIM_CLKDIV2_USBHSFRAC_BIT	8
-+#define KINETIS_SIM_CLKDIV2_USBHSFRAC_MSK \
-+	(1 << KINETIS_SIM_CLKDIV2_USBHSFRAC_BIT)
-+/* USB HS clock divider divisor */
-+#define KINETIS_SIM_CLKDIV2_USBHSDIV_BIT	9
-+#define KINETIS_SIM_CLKDIV2_USBHSDIV_MSK \
-+	(7 << KINETIS_SIM_CLKDIV2_USBHSDIV_BIT)
-+
-+/*
-+ * MCG Control 5 Register
-+ */
-+/* PLL External Reference Divider */
-+#define KINETIS_MCG_C5_PRDIV_BITS	0
-+#define KINETIS_MCG_C5_PRDIV_MSK \
-+	(((1 << 3) - 1) << KINETIS_MCG_C5_PRDIV_BITS)
-+/* PLL Stop Enable */
-+#define KINETIS_MCG_C5_PLLSTEN_MSK	(1 << 5)
-+/* PLL Clock Enable */
-+#define KINETIS_MCG_C5_PLLCLKEN_MSK	(1 << 6)
-+/* PLL External Reference Select (for K70 at 120MHz) */
-+#define KINETIS_MCG_C5_PLLREFSEL_BIT	7
-+#define KINETIS_MCG_C5_PLLREFSEL_MSK	(1 << KINETIS_MCG_C5_PLLREFSEL_BIT)
-+/*
-+ * MCG Control 6 Register
-+ */
-+/* VCO Divider */
-+#define KINETIS_MCG_C6_VDIV_BITS	0
-+#define KINETIS_MCG_C6_VDIV_MSK \
-+	(((1 << 5) - 1) << KINETIS_MCG_C6_VDIV_BITS)
-+/* PLL Select */
-+#define KINETIS_MCG_C6_PLLS_MSK		(1 << 6)
-+/*
-+ * MCG Control 11 Register
-+ */
-+/* PLL1 External Reference Divider */
-+#define KINETIS_MCG_C11_PRDIV_BITS	0
-+#define KINETIS_MCG_C11_PRDIV_MSK \
-+	(((1 << 3) - 1) << KINETIS_MCG_C11_PRDIV_BITS)
-+/* PLL Clock Select: PLL0 or PLL1 */
-+#define KINETIS_MCG_C11_PLLCS_MSK	(1 << 4)
-+/* PLL1 Stop Enable */
-+#define KINETIS_MCG_C11_PLLSTEN1_MSK	(1 << 5)
-+/* PLL1 Clock Enable */
-+#define KINETIS_MCG_C11_PLLCLKEN1_MSK	(1 << 6)
-+/* PLL1 External Reference Select (for K70@120MHz) */
-+#define KINETIS_MCG_C11_PLLREFSEL1_BIT	7
-+#define KINETIS_MCG_C11_PLLREFSEL1_MSK	(1 << KINETIS_MCG_C11_PLLREFSEL1_BIT)
-+/*
-+ * MCG Control 12 Register
-+ */
-+/* VCO1 Divider */
-+#define KINETIS_MCG_C12_VDIV1_BITS	0
-+#define KINETIS_MCG_C12_VDIV1_MSK \
-+	(((1 << 5) - 1) << KINETIS_MCG_C12_VDIV1_BITS)
-+
-+/*
-+ * Multipurpose Clock Generator (MCG) register map
-+ *
-+ * See Chapter 25 of the K70 Reference Manual
-+ */
-+struct kinetis_mcg_regs {
-+	u8 c1;		/* MCG Control 1 Register */
-+	u8 c2;		/* MCG Control 2 Register */
-+	u8 c3;		/* MCG Control 3 Register */
-+	u8 c4;		/* MCG Control 4 Register */
-+	u8 c5;		/* MCG Control 5 Register */
-+	u8 c6;		/* MCG Control 6 Register */
-+	u8 status;	/* MCG Status Register */
-+	u8 rsv0;
-+	u8 atc;		/* MCG Auto Trim Control Register */
-+	u8 rsv1;
-+	u8 atcvh;	/* MCG Auto Trim Compare Value High Register */
-+	u8 atcvl;	/* MCG Auto Trim Compare Value Low Register */
-+	u8 c7;		/* MCG Control 7 Register */
-+	u8 c8;		/* MCG Control 8 Register */
-+	u8 rsv2;
-+	u8 c10;		/* MCG Control 10 Register */
-+	u8 c11;		/* MCG Control 11 Register */
-+	u8 c12;		/* MCG Control 12 Register */
-+	u8 status2;	/* MCG Status 2 Register */
-+	u8 rsv3;
-+};
-+
-+#define KINETIS_MCG_PTR(base, reg) \
-+	(&(((struct kinetis_mcg_regs *)(base))->reg))
-+#define KINETIS_MCG_RD(base, reg) readb_relaxed(KINETIS_MCG_PTR(base, reg))
-+#define KINETIS_MCG_WR(base, reg, val) \
-+	writeb_relaxed((val), KINETIS_MCG_PTR(base, reg))
-+#define KINETIS_MCG_ISSET(base, reg, mask) \
-+	(KINETIS_MCG_RD(base, reg) & (mask))
-+
-+struct kinetis_clk_gate {
-+	const char *clk_gate_name;
-+	struct clk *clk;
-+	u32 reg;
-+	u32 idx;
-+	struct list_head clk_list;
-+};
-+
-+struct kinetis_clk_gate_data {
-+	const char *clk_parent_name;
-+	void __iomem *sim;
-+	struct list_head clk_gate_list;
-+};
-+
-+static struct clk *kinetis_find_clk_gate(
-+		struct kinetis_clk_gate_data *clk_gate_data, u32 reg, u32 idx)
++static const struct kinetis_pin_group *kinetis_pinctrl_find_group_by_name(
++				const struct kinetis_pinctrl_soc_info *info,
++				const char *name)
 +{
-+	struct kinetis_clk_gate *gate;
++	const struct kinetis_pin_group *grp = NULL;
++	int i;
 +
-+	list_for_each_entry(gate, &clk_gate_data->clk_gate_list, clk_list)
-+		if ((gate->reg == reg) && (gate->idx == idx))
-+			return gate->clk;
-+
-+	return NULL;
-+}
-+
-+static struct clk *kinetis_clk_gate_get(struct of_phandle_args *clkspec,
-+					void *data)
-+{
-+	struct kinetis_clk_gate_data *clk_gate_data = data;
-+	struct kinetis_clk_gate *gate;
-+	u32 reg = clkspec->args[0];
-+	u32 idx = clkspec->args[1];
-+	struct clk *clk;
-+
-+	clk = kinetis_find_clk_gate(clk_gate_data, reg, idx);
-+	if (clk)
-+		return clk;
-+
-+	gate = kzalloc(sizeof(struct kinetis_clk_gate), GFP_KERNEL);
-+	if (!gate)
-+		return ERR_PTR(-ENOMEM);
-+	gate->clk_gate_name = kasprintf(GFP_KERNEL, "%s:%u:%u",
-+				clkspec->np->full_name, reg, idx);
-+
-+	clk = clk_register_gate(NULL, gate->clk_gate_name,
-+				clk_gate_data->clk_parent_name, 0,
-+				KINETIS_SIM_PTR(clk_gate_data->sim, scgc[reg]),
-+				idx, 0, NULL);
-+	if (IS_ERR(clk)) {
-+		pr_err("Cannot register gate to clock %s\n",
-+				clk_gate_data->clk_parent_name);
-+		kfree_const(gate->clk_gate_name);
-+		kfree(gate);
-+		return clk;
++	for (i = 0; i < info->ngroups; i++) {
++		if (!strcmp(info->groups[i].name, name)) {
++			grp = &info->groups[i];
++			break;
++		}
 +	}
 +
-+	gate->clk = clk;
-+	gate->reg = reg;
-+	gate->idx = idx;
-+
-+	list_add(&gate->clk_list, &clk_gate_data->clk_gate_list);
-+
-+	return clk;
++	return grp;
 +}
 +
-+static const char *kinetis_of_clk_get_name(struct device_node *np)
++static int kinetis_get_groups_count(struct pinctrl_dev *pctldev)
 +{
-+	struct of_phandle_args clkspec;
-+	int ret;
-+	const char *retval;
++	struct kinetis_pinctrl *kpctl = pinctrl_dev_get_drvdata(pctldev);
++	const struct kinetis_pinctrl_soc_info *info = &kpctl->info;
 +
-+	ret = of_parse_phandle_with_args(np, "clocks", "#clock-cells", 0,
-+					&clkspec);
-+	if (ret)
-+		return ERR_PTR(ret);
-+
-+	retval = clkspec.np->full_name;
-+
-+	of_node_put(clkspec.np);
-+
-+	return retval;
++	return info->ngroups;
 +}
 +
-+static void __init kinetis_mcg_init(struct device_node *np)
++static const char *kinetis_get_group_name(struct pinctrl_dev *pctldev,
++				unsigned selector)
 +{
-+	const int vco_div = 2;
-+	const int vdiv_min = 16;
-+	u32 clock_val_mcgout;
-+	u32 clock_val_cclk;
-+	u32 clock_val_pclk;
-+	u32 clock_val;
-+	void __iomem *base;
-+	void __iomem *sim;
-+	int pll_sel;
-+	int osc_sel;
-+	unsigned long mcgout;
-+	struct clk *clk;
-+	const char *clk_parent_name;
-+	struct kinetis_clk_gate_data *clk_gate;
++	struct kinetis_pinctrl *kpctl = pinctrl_dev_get_drvdata(pctldev);
++	const struct kinetis_pinctrl_soc_info *info = &kpctl->info;
++
++	return info->groups[selector].name;
++}
++
++static int kinetis_dt_node_to_map(struct pinctrl_dev *pctldev,
++			struct device_node *np,
++			struct pinctrl_map **map, unsigned *num_maps)
++{
++	struct kinetis_pinctrl *kpctl = pinctrl_dev_get_drvdata(pctldev);
++	const struct kinetis_pinctrl_soc_info *info = &kpctl->info;
++	const struct kinetis_pin_group *grp;
++	struct pinctrl_map *new_map;
++	struct device_node *parent;
++
++	/*
++	 * first find the group of this node and check if we need create
++	 * config maps for pins
++	 */
++	grp = kinetis_pinctrl_find_group_by_name(info, np->name);
++	if (!grp) {
++		dev_err(info->dev, "unable to find group for node %s\n",
++			np->name);
++		return -EINVAL;
++	}
++
++	new_map = kmalloc(sizeof(struct pinctrl_map), GFP_KERNEL);
++	if (!new_map)
++		return -ENOMEM;
++
++	*map = new_map;
++	*num_maps = 1;
++
++	/* create mux map */
++	parent = of_get_parent(np);
++	if (!parent) {
++		dev_err(info->dev, "%s has no parent\n", np->name);
++		kfree(new_map);
++		return -EINVAL;
++	}
++	new_map[0].type = PIN_MAP_TYPE_MUX_GROUP;
++	new_map[0].data.mux.function = parent->name;
++	new_map[0].data.mux.group = np->name;
++	of_node_put(parent);
++
++	dev_dbg(info->dev, "maps: function %s group %s\n",
++		(*map)->data.mux.function, (*map)->data.mux.group);
++
++	return 0;
++}
++
++static void kinetis_dt_free_map(struct pinctrl_dev *pctldev,
++				struct pinctrl_map *map, unsigned num_maps)
++{
++	kfree(map);
++}
++
++static int kinetis_get_functions_count(struct pinctrl_dev *pctldev)
++{
++	struct kinetis_pinctrl *kpctl = pinctrl_dev_get_drvdata(pctldev);
++	const struct kinetis_pinctrl_soc_info *info = &kpctl->info;
++
++	return info->nfunctions;
++}
++
++static const char *kinetis_get_function_name(struct pinctrl_dev *pctldev,
++				unsigned selector)
++{
++	struct kinetis_pinctrl *kpctl = pinctrl_dev_get_drvdata(pctldev);
++	const struct kinetis_pinctrl_soc_info *info = &kpctl->info;
++
++	return info->functions[selector].name;
++}
++
++static int kinetis_get_function_groups(struct pinctrl_dev *pctldev,
++				unsigned selector,
++				const char * const **groups,
++				unsigned * const num_groups)
++{
++	struct kinetis_pinctrl *kpctl = pinctrl_dev_get_drvdata(pctldev);
++	const struct kinetis_pinctrl_soc_info *info = &kpctl->info;
++
++	*groups = info->functions[selector].groups;
++	*num_groups = info->functions[selector].num_groups;
++
++	return 0;
++}
++
++static int kinetis_set_mux(struct pinctrl_dev *pctldev, unsigned selector,
++				unsigned group)
++{
++	struct kinetis_pinctrl *kpctl = pinctrl_dev_get_drvdata(pctldev);
++	const struct kinetis_pinctrl_soc_info *info = &kpctl->info;
++	struct kinetis_pin_group *grp = &info->groups[group];
++	unsigned int npins = grp->npins;
++	struct kinetis_pin *pin;
++	int i;
++
++	for (i = 0; i < npins; i++) {
++		pin = &grp->pins[i];
++		KINETIS_PORT_WR(kpctl->big_endian, kpctl->base,
++				pcr[pin->mux_reg], pin->mux_mode);
++	}
++
++	return 0;
++}
++
++static const struct pinctrl_ops kinetis_pctrl_ops = {
++	.get_groups_count = kinetis_get_groups_count,
++	.get_group_name = kinetis_get_group_name,
++	.dt_node_to_map = kinetis_dt_node_to_map,
++	.dt_free_map = kinetis_dt_free_map,
++};
++
++static const struct pinmux_ops kinetis_pmx_ops = {
++	.get_functions_count = kinetis_get_functions_count,
++	.get_function_name = kinetis_get_function_name,
++	.get_function_groups = kinetis_get_function_groups,
++	.set_mux = kinetis_set_mux,
++};
++
++static struct pinctrl_desc kinetis_pinctrl_desc = {
++	.pctlops = &kinetis_pctrl_ops,
++	.pmxops = &kinetis_pmx_ops,
++	.owner = THIS_MODULE,
++};
++
++#define KINETIS_PIN_SIZE 8
++
++static int kinetis_pinctrl_parse_groups(struct device_node *np,
++				    struct kinetis_pin_group *grp,
++				    struct kinetis_pinctrl_soc_info *info,
++				    u32 index)
++{
++	int size;
++	const int pin_size = KINETIS_PIN_SIZE;
++	const __be32 *list;
++	int i;
++
++	dev_dbg(info->dev, "group(%d): %s\n", index, np->name);
++
++	/* Initialise group */
++	grp->name = np->name;
++
++	list = of_get_property(np, "fsl,pins", &size);
++	if (!list) {
++		dev_err(info->dev, "no fsl,pins property in node %s\n",
++					np->full_name);
++		return -EINVAL;
++	}
++
++	/* we do not check return since it's safe node passed down */
++	if (!size || size % pin_size) {
++		dev_err(info->dev, "Invalid fsl,pins property in node %s\n",
++					np->full_name);
++		return -EINVAL;
++	}
++
++	grp->npins = size / pin_size;
++	grp->pins = devm_kzalloc(info->dev,
++				grp->npins * sizeof(struct kinetis_pin),
++				GFP_KERNEL);
++	if (!grp->pins)
++		return -ENOMEM;
++
++	for (i = 0; i < grp->npins; i++) {
++		grp->pins[i].mux_reg = be32_to_cpu(*list++);
++		grp->pins[i].mux_mode = be32_to_cpu(*list++);
++	}
++
++	return 0;
++}
++
++static int kinetis_pinctrl_parse_functions(struct device_node *np,
++				       struct kinetis_pinctrl_soc_info *info,
++				       u32 index)
++{
 +	struct device_node *child;
-+	bool big_endian;
-+	int ret;
++	struct kinetis_pmx_func *func;
++	struct kinetis_pin_group *grp;
++	static u32 grp_index;
++	u32 i = 0;
 +
-+	big_endian = of_property_read_bool(np, "big-endian");
++	dev_dbg(info->dev, "parse function(%d): %s\n", index, np->name);
 +
-+	base = of_iomap(np, 0);
-+	if (!base) {
-+		pr_err("Failed to map address range for kinetis,mcg node\n");
-+		return;
++	func = &info->functions[index];
++
++	/* Initialise function */
++	func->name = np->name;
++	func->num_groups = of_get_child_count(np);
++	if (func->num_groups == 0) {
++		dev_err(info->dev, "no groups defined in %s\n", np->full_name);
++		return -EINVAL;
 +	}
-+
-+	sim = of_iomap(np, 1);
-+	if (!sim) {
-+		pr_err("Failed to map address range for kinetis SIM module\n");
-+		iounmap(base);
-+		return;
-+	}
-+
-+	/*
-+	 * Check whether PLL0 or PLL1 is used for MCGOUTCLK
-+	 */
-+	pll_sel = !!(KINETIS_MCG_ISSET(base, c11, KINETIS_MCG_C11_PLLCS_MSK));
-+
-+	/*
-+	 * Check whether OSC0 or OSC1 is used to source the main PLL
-+	 */
-+	if (pll_sel)
-+		osc_sel = !!(KINETIS_MCG_ISSET(base, c11,
-+				KINETIS_MCG_C11_PLLREFSEL1_MSK));
-+	else
-+		osc_sel = !!(KINETIS_MCG_ISSET(base, c5,
-+				KINETIS_MCG_C5_PLLREFSEL_MSK));
-+
-+	/*
-+	 * Start with the MCG input clock
-+	 */
-+	mcgout = osc_sel ? KINETIS_OSC1_RATE : KINETIS_OSC0_RATE;
-+
-+	/*
-+	 * Apply dividers and multipliers of the selected PLL
-+	 */
-+	if (pll_sel) {
-+		/*
-+		 * PLL1 internal divider (PRDIV)
-+		 */
-+		mcgout /= ((KINETIS_MCG_RD(base, c11) &
-+		  KINETIS_MCG_C11_PRDIV_MSK) >> KINETIS_MCG_C11_PRDIV_BITS) + 1;
-+		/*
-+		 * PLL1 multiplication factor (VDIV)
-+		 */
-+		mcgout *= ((KINETIS_MCG_RD(base, c12) &
-+		  KINETIS_MCG_C12_VDIV1_MSK) >> KINETIS_MCG_C12_VDIV1_BITS) +
-+								    vdiv_min;
-+	} else {
-+		/*
-+		 * PLL0 internal divider (PRDIV)
-+		 */
-+		mcgout /= ((KINETIS_MCG_RD(base, c5) &
-+			KINETIS_MCG_C5_PRDIV_MSK) >>
-+			KINETIS_MCG_C5_PRDIV_BITS) + 1;
-+		/*
-+		 * PLL0 multiplication factor (VDIV)
-+		 */
-+		mcgout *= ((KINETIS_MCG_RD(base, c6) &
-+			KINETIS_MCG_C6_VDIV_MSK) >>
-+			KINETIS_MCG_C6_VDIV_BITS) + vdiv_min;
-+	}
-+
-+	/*
-+	 * Apply the PLL output divider
-+	 */
-+	mcgout /= vco_div;
-+
-+	clock_val_mcgout = mcgout;
-+
-+	clock_val_cclk = mcgout /
-+		(((KINETIS_SIM_RD(big_endian, sim, clkdiv1) &
-+			KINETIS_SIM_CLKDIV1_OUTDIV1_MSK) >>
-+				KINETIS_SIM_CLKDIV1_OUTDIV1_BITS) + 1);
-+
-+	/*
-+	 * Peripheral (bus) clock
-+	 */
-+	clock_val_pclk = mcgout /
-+		(((KINETIS_SIM_RD(big_endian, sim, clkdiv1) &
-+			KINETIS_SIM_CLKDIV1_OUTDIV2_MSK) >>
-+				KINETIS_SIM_CLKDIV1_OUTDIV2_BITS) + 1);
++	func->groups = devm_kzalloc(info->dev,
++			func->num_groups * sizeof(char *), GFP_KERNEL);
 +
 +	for_each_child_of_node(np, child) {
-+		if (!of_device_is_available(child))
-+			continue;
-+
-+		clock_val = 0;
-+		if (child->type) {
-+			if (!of_node_cmp(child->type, "mcgout"))
-+				clock_val = clock_val_mcgout;
-+			else if (!of_node_cmp(child->type, "cclk"))
-+				clock_val = clock_val_cclk;
-+			else if (!of_node_cmp(child->type, "pclk"))
-+				clock_val = clock_val_pclk;
-+		}
-+
-+		if (!of_node_cmp(child->name, "fixed-rate-root")) {
-+			clk = clk_register_fixed_rate(NULL, child->full_name,
-+						NULL, CLK_IS_ROOT, clock_val);
-+			if (IS_ERR(clk)) {
-+				pr_err("Could not register clock %s\n",
-+							child->full_name);
-+				continue;
-+			}
-+
-+			ret = of_clk_add_provider(child, of_clk_src_simple_get,
-+							clk);
-+			if (ret < 0) {
-+				pr_err("Could not add clock provider %s\n",
-+							child->full_name);
-+				continue;
-+			}
-+		} else if (!of_node_cmp(child->name, "fixed-rate")) {
-+			clk_parent_name = kinetis_of_clk_get_name(child);
-+			if (IS_ERR(clk_parent_name)) {
-+				pr_err("Could not get parent clk name for %s\n",
-+							child->full_name);
-+			}
-+
-+			clk = clk_register_fixed_rate(NULL, child->full_name,
-+						clk_parent_name, 0, clock_val);
-+			if (IS_ERR(clk)) {
-+				pr_err("Could not register clock %s\n",
-+							child->full_name);
-+				continue;
-+			}
-+
-+			ret = of_clk_add_provider(child, of_clk_src_simple_get,
-+							clk);
-+			if (ret < 0) {
-+				pr_err("Could not add clock provider %s\n",
-+							child->full_name);
-+				continue;
-+			}
-+		} else if (!of_node_cmp(child->name, "clock-gate")) {
-+			clk_parent_name = kinetis_of_clk_get_name(child);
-+			if (IS_ERR(clk_parent_name)) {
-+				pr_err("Could not get parent clk name for %s\n",
-+							child->full_name);
-+			}
-+
-+			clk_gate = kzalloc(sizeof(struct kinetis_clk_gate_data),
-+								    GFP_KERNEL);
-+			if (!clk_gate)
-+				continue;
-+
-+			clk_gate->clk_parent_name = clk_parent_name;
-+			clk_gate->sim = sim;
-+			INIT_LIST_HEAD(&clk_gate->clk_gate_list);
-+
-+			ret = of_clk_add_provider(child, kinetis_clk_gate_get,
-+							clk_gate);
-+			if (ret < 0) {
-+				pr_err("Could not add clock provider %s\n",
-+							child->full_name);
-+				continue;
-+			}
-+		} else {
-+			pr_err("Unknown clock name\n");
-+			continue;
-+		}
++		func->groups[i] = child->name;
++		grp = &info->groups[grp_index++];
++		kinetis_pinctrl_parse_groups(child, grp, info, i++);
 +	}
++
++	return 0;
 +}
 +
-+CLK_OF_DECLARE(kinetis_mcg, "fsl,kinetis-cmu", kinetis_mcg_init);
++/*
++ * Check if the DT contains pins in the direct child nodes. This indicates the
++ * newer DT format to store pins. This function returns true if the first found
++ * fsl,pins property is in a child of np. Otherwise false is returned.
++ */
++static bool kinetis_pinctrl_dt_is_flat_functions(struct device_node *np)
++{
++	struct device_node *function_np;
++	struct device_node *pinctrl_np;
++
++	for_each_child_of_node(np, function_np) {
++		if (of_property_read_bool(function_np, "fsl,pins"))
++			return true;
++
++		for_each_child_of_node(function_np, pinctrl_np) {
++			if (of_property_read_bool(pinctrl_np, "fsl,pins"))
++				return false;
++		}
++	}
++
++	return true;
++}
++
++static int kinetis_pinctrl_probe_dt(struct platform_device *pdev,
++				struct kinetis_pinctrl_soc_info *info)
++{
++	struct device_node *np = pdev->dev.of_node;
++	struct device_node *child;
++	u32 nfuncs = 0;
++	u32 i = 0;
++	bool flat_funcs;
++
++	if (!np)
++		return -ENODEV;
++
++	flat_funcs = kinetis_pinctrl_dt_is_flat_functions(np);
++	if (flat_funcs) {
++		nfuncs = 1;
++	} else {
++		nfuncs = of_get_child_count(np);
++		if (nfuncs <= 0) {
++			dev_err(&pdev->dev, "no functions defined\n");
++			return -EINVAL;
++		}
++	}
++
++	info->nfunctions = nfuncs;
++	info->functions = devm_kzalloc(&pdev->dev,
++				nfuncs * sizeof(struct kinetis_pmx_func),
++				GFP_KERNEL);
++	if (!info->functions)
++		return -ENOMEM;
++
++	if (flat_funcs) {
++		info->ngroups = of_get_child_count(np);
++	} else {
++		info->ngroups = 0;
++		for_each_child_of_node(np, child)
++			info->ngroups += of_get_child_count(child);
++	}
++	if (!(info->ngroups)) {
++		dev_err(&pdev->dev, "no groups found\n");
++		return -EINVAL;
++	}
++	info->groups = devm_kzalloc(&pdev->dev,
++			info->ngroups * sizeof(struct kinetis_pin_group),
++			GFP_KERNEL);
++	if (!info->groups)
++		return -ENOMEM;
++
++	if (flat_funcs) {
++		kinetis_pinctrl_parse_functions(np, info, 0);
++	} else {
++		for_each_child_of_node(np, child)
++			kinetis_pinctrl_parse_functions(child, info, i++);
++	}
++
++	return 0;
++}
++
++static int kinetis_pinctrl_probe(struct platform_device *pdev)
++{
++	struct device_node *np = pdev->dev.of_node;
++	struct kinetis_pinctrl *kpctl;
++	struct resource *res;
++	int ret;
++
++	kpctl = devm_kzalloc(&pdev->dev, sizeof(struct kinetis_pinctrl),
++					GFP_KERNEL);
++	if (!kpctl)
++		return -ENOMEM;
++
++	kpctl->big_endian = of_property_read_bool(np, "big-endian");
++
++	ret = of_alias_get_id(np, "pmx");
++	if (ret < 0) {
++		dev_err(&pdev->dev, "failed to get alias id, errno %d\n", ret);
++		return ret;
++	}
++	kpctl->port_id = ret;
++
++	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
++	kpctl->base = devm_ioremap_resource(&pdev->dev, res);
++	if (IS_ERR(kpctl->base))
++		return PTR_ERR(kpctl->base);
++
++	kpctl->clk = of_clk_get(np, 0);
++	if (IS_ERR(kpctl->clk)) {
++		dev_err(&pdev->dev, "failed to get clock for PORT_%c\n",
++					'A' + kpctl->port_id);
++		return PTR_ERR(kpctl->clk);
++	}
++
++	ret = clk_prepare_enable(kpctl->clk);
++	if (ret) {
++		dev_err(&pdev->dev, "failed to enable clock for PORT_%c\n",
++					'A' + kpctl->port_id);
++		goto err_clk_enable;
++	}
++
++	kpctl->info.dev = &pdev->dev;
++	ret = kinetis_pinctrl_probe_dt(pdev, &kpctl->info);
++	if (ret) {
++		dev_err(&pdev->dev, "failed to probe dt properties\n");
++		return ret;
++	}
++
++	kpctl->dev = &pdev->dev;
++	kinetis_pinctrl_desc.name = dev_name(&pdev->dev);
++
++	platform_set_drvdata(pdev, kpctl);
++	kpctl->pctl = pinctrl_register(&kinetis_pinctrl_desc,
++					&pdev->dev, kpctl);
++	if (IS_ERR(kpctl->pctl)) {
++		dev_err(&pdev->dev, "could not register Kinetis I/O PORT_%c\n",
++					'A' + kpctl->port_id);
++		ret = PTR_ERR(kpctl->pctl);
++		goto err_pinctrl_register;
++	}
++
++	dev_info(&pdev->dev, "initialized Kinetis I/O PORT_%c\n",
++					'A' + kpctl->port_id);
++
++	return 0;
++
++err_pinctrl_register:
++
++err_clk_enable:
++
++	clk_put(kpctl->clk);
++
++	return ret;
++}
++
++static int kinetis_pinctrl_remove(struct platform_device *pdev)
++{
++	struct kinetis_pinctrl *kpctl = platform_get_drvdata(pdev);
++
++	pinctrl_unregister(kpctl->pctl);
++	clk_disable_unprepare(kpctl->clk);
++	clk_put(kpctl->clk);
++	return 0;
++}
++
++static struct platform_driver kinetis_pinctrl_driver = {
++	.driver = {
++		.name = "kinetis-pinctrl",
++		.of_match_table = kinetis_pinctrl_of_match,
++	},
++	.probe = kinetis_pinctrl_probe,
++	.remove = kinetis_pinctrl_remove,
++};
++
++static int __init kinetis_pinctrl_init(void)
++{
++	return platform_driver_register(&kinetis_pinctrl_driver);
++}
++module_init(kinetis_pinctrl_init);
++
++static void __exit kinetis_pinctrl_exit(void)
++{
++	platform_driver_unregister(&kinetis_pinctrl_driver);
++}
++module_exit(kinetis_pinctrl_exit);
++
++MODULE_DESCRIPTION("Freescale Kinetis pinctrl driver");
++MODULE_LICENSE("GPL v2");
 -- 
 2.3.6
