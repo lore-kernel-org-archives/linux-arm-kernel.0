@@ -1,98 +1,85 @@
-From: tomeu.vizoso@collabora.com (Tomeu Vizoso)
-Date: Tue, 30 Jun 2015 17:18:07 +0200
-Subject: [PATCH 13/13] driver-core: probe dependencies before probing
-In-Reply-To: <20150617181359.GA14071@sirena.org.uk>
-References: <1434548543-22949-1-git-send-email-tomeu.vizoso@collabora.com>
- <1434548543-22949-14-git-send-email-tomeu.vizoso@collabora.com>
- <20150617181359.GA14071@sirena.org.uk>
-Message-ID: <CAAObsKAw3m0_iasSJiuVZnCF+uNrf+36K6NbRg4p1c6VE_mAqA@mail.gmail.com>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Tue, 30 Jun 2015 11:59:40 -0400 (EDT)
+Subject: [PATCH] ARM: psci: boot_secondary: replace __pa with virt_to_idmap
+In-Reply-To: <20150630150541.GH7557@n2100.arm.linux.org.uk>
+References: <1435661062-4127-1-git-send-email-grygorii.strashko@ti.com>
+ <20150630150541.GH7557@n2100.arm.linux.org.uk>
+Message-ID: <alpine.LFD.2.11.1506301153230.2617@knanqh.ubzr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 17 June 2015 at 20:13, Mark Brown <broonie@kernel.org> wrote:
-> On Wed, Jun 17, 2015 at 03:42:23PM +0200, Tomeu Vizoso wrote:
->> Before actually probing a device, find out what dependencies it has and
->> do our best to ensure that they are available at this point.
->
->> This is accomplished by finding out what platform devices need to be
->> probed so the dependencies are available.
->
-> ...and then trying to probe them first.
->
->> If any dependencies are still unavailable after that (most probably a
->> missing driver or an error in the HW description from the firmware), we
->> print a nice error message so that people don't have to add a zillion of
->> printks to find out why a device asked for its probe to be deferred.
->
-> So, I think I like this approach though I've not done a full pass
-> through and I'm not sure how expensive it gets (there's definitely room
-> for optimisation as the patch notes).
+On Tue, 30 Jun 2015, Russell King - ARM Linux wrote:
 
-Have measured it and the overhead doesn't seem to be much, in the
-version that I'm close to send.
+> On Tue, Jun 30, 2015 at 01:44:22PM +0300, Grygorii Strashko wrote:
+> > On some PAE systems (e.g. TI Keystone), memory is above the 32-bit
+> > addressable limit, and the interconnect provides an aliased view of
+> > parts of physical memory in the 32-bit addressable space. This alias
+> > is strictly for boot time usage, and is not otherwise usable because
+> > of coherency limitations.
+> > 
+> > On such systems, the idmap mechanism has to be used to pass correct
+> > boot address of secondary CPU to FW.
+> > virt_to_idmap() will fall-back to existing virt_to_phys() macro if
+> > such conversation is not required.
+> 
+> I think this could do with improvement so that those who aren't aware of
+> the issue can understand better.  The idmap mechanism is always used for
+> secondary booting anyway.
+> 
+> "In this case, virt_to_phys(secondary_startup) would return the
+> physical address of the secondary CPU boot entry point, but on such
+> systems, this would be above the 4GB limit.
+> 
+> A separate function, virt_to_idmap(), has been provided to return a
+> usable physical address for functions in the identity mapping, and
+> this must be used in preference to virt_to_phys() or __pa() to find
+> the physical entry point for functions in the identity mapping range.
+> 
+> For other systems, virt_to_idmap() and virt_to_phys() return identical
+> physical addresses."
+> 
+> > 
+> > Cc: Mark Rutland <mark.rutland@arm.com>
+> > Cc: Nicolas Pitre <nico@linaro.org>
+> > Cc: Santosh Shilimkar <ssantosh@kernel.org>
+> > Cc: Vitaly Andrianov <vitalya@ti.com>
+> > Signed-off-by: Grygorii Strashko <grygorii.strashko@ti.com>
+> 
+> Code-wise, this looks correct to me - but as it's PSCI stuff, I'd like
+> to see Nico ack it.
 
-> I'm not 100% sure I see what
-> prints this error message you're referring to (I'm just seeing debug
-> prints).
+I cannot pretend to be the authority on PSCI stuff. 
 
-Right, so far I have left them as debug messages because I have so far
-tested the series on just one platform and I'm not sure if there
-wouldn't be lots of noise in others.
+But this looks correct to me as well, assuming the amended commit 
+message.
 
->> +static struct fwnode_handle *get_enclosing_platform_dev(
->> +                                             struct fwnode_handle *fwnode)
->
-> Only platform devices?
+Acked-by: Nicolas Pitre <nico@linaro.org>
 
-Yes, this code assumes that devices on other buses will be registered
-and probed when their enclosing platform devices are.
-
->> +static void check_dependencies_per_class(struct class *class, void *data)
->> +{
->> +     struct fwnode_handle *fwnode = data;
->> +     struct list_head *deps;
->> +     struct fwnode_dependency *dep, *tmp;
->> +
->> +     if (!class->get_dependencies)
->> +             return;
->> +
->> +     deps = class->get_dependencies(fwnode);
->> +     if (!deps)
->> +             return;
->> +
->> +     list_for_each_entry_safe(dep, tmp, deps, dependency) {
->> +             if (!check_dependency(dep->fwnode))
->> +                     pr_debug("Dependency '%s' not available\n",
->> +                              fwnode_get_name(dep->fwnode));
->> +
->> +             list_del(&dep->dependency);
->> +             kfree(dep);
->> +     }
->> +
->> +     kfree(deps);
->
-> OK, so the caller is responsible for freeing everything and the class
-> must allocate - this definitely suggests that
->
-> I'm not sure there's any benefit in having deps be dynamically allocated
-> here, just put it on the stack and iterate through the list - the
-> iteration is going to be cheap if we get nothing back (probably the
-> common case) and probably cheaper than the alloc/free.
-
-Have done this and I like it more.
-
-> One thing here is that I was under the impression classes were supposed
-> to be going away...
-
-Actually, while looking at more firmware node properties to parse for
-dependencies, I found a rather common case in which the bindings are
-implemented by individual drivers and not subsystems. Some examples
-are nvidia,dpaux, nvidia,panel and nvidia,ddc-i2c-bus.
-
-So in my next version I have dropped class callbacks and have gone
-with a way for classes, drivers, whatever to just register a function
-to extract dependencies.
-
-Thanks,
-
-Tomeu
+> Thanks.
+> 
+> > ---
+> >  arch/arm/kernel/psci_smp.c | 2 +-
+> >  1 file changed, 1 insertion(+), 1 deletion(-)
+> > 
+> > diff --git a/arch/arm/kernel/psci_smp.c b/arch/arm/kernel/psci_smp.c
+> > index 28a1db4..244aadd 100644
+> > --- a/arch/arm/kernel/psci_smp.c
+> > +++ b/arch/arm/kernel/psci_smp.c
+> > @@ -51,7 +51,7 @@ static int psci_boot_secondary(unsigned int cpu, struct task_struct *idle)
+> >  {
+> >  	if (psci_ops.cpu_on)
+> >  		return psci_ops.cpu_on(cpu_logical_map(cpu),
+> > -				       __pa(secondary_startup));
+> > +					virt_to_idmap(&secondary_startup));
+> >  	return -ENODEV;
+> >  }
+> >  
+> > -- 
+> > 2.4.5
+> > 
+> 
+> -- 
+> FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
+> according to speedtest.net.
+> 
+> 
