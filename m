@@ -1,86 +1,86 @@
 From: rric@kernel.org (Robert Richter)
-Date: Tue, 30 Jun 2015 16:14:02 +0200
-Subject: [PATCH 3/4] irqchip, gicv3: Implement Cavium ThunderX erratum 23154
+Date: Tue, 30 Jun 2015 16:14:03 +0200
+Subject: [PATCH 4/4] irqchip, gicv3-its: Implement Cavium ThunderX errata 22375,
+ 24313
 In-Reply-To: <1435673643-31676-1-git-send-email-rric@kernel.org>
 References: <1435673643-31676-1-git-send-email-rric@kernel.org>
-Message-ID: <1435673643-31676-4-git-send-email-rric@kernel.org>
+Message-ID: <1435673643-31676-5-git-send-email-rric@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Robert Richter <rrichter@cavium.com>
 
-This patch implements Cavium ThunderX erratum 23154.
+This implements two gicv3-its errata for ThunderX. Both with small
+impact affecting only ITS table allocation.
 
-The gicv3 of ThunderX requires a modified version for reading the IAR
-status to ensure data synchronization. Since this is in the fast-path
-and called with each interrupt, runtime patching is used using jump
-label patching for smallest overhead (no-op). This is the same
-technique as used for tracepoints.
+ erratum 22375: only alloc 8MB table size
+ erratum 24313: ignore memory access type
+
+The fixes are in ITS initialization and basically ignore memory access
+type and table size provided by the TYPER and BASER registers.
 
 Signed-off-by: Robert Richter <rrichter@cavium.com>
 ---
- drivers/irqchip/irq-gic-v3.c | 37 ++++++++++++++++++++++++++++++++++++-
- 1 file changed, 36 insertions(+), 1 deletion(-)
+ drivers/irqchip/irq-gic-v3-its.c | 35 +++++++++++++++++++++++++++++++----
+ 1 file changed, 31 insertions(+), 4 deletions(-)
 
-diff --git a/drivers/irqchip/irq-gic-v3.c b/drivers/irqchip/irq-gic-v3.c
-index f4bafc69cc18..57bb69686ec6 100644
---- a/drivers/irqchip/irq-gic-v3.c
-+++ b/drivers/irqchip/irq-gic-v3.c
-@@ -107,14 +107,38 @@ static void gic_redist_wait_for_rwp(void)
+diff --git a/drivers/irqchip/irq-gic-v3-its.c b/drivers/irqchip/irq-gic-v3-its.c
+index de2fc82bba83..049ef761fbc3 100644
+--- a/drivers/irqchip/irq-gic-v3-its.c
++++ b/drivers/irqchip/irq-gic-v3-its.c
+@@ -39,7 +39,8 @@
+ #include "irq-gic-common.h"
+ #include "irqchip.h"
+ 
+-#define ITS_FLAGS_CMDQ_NEEDS_FLUSHING		(1 << 0)
++#define ITS_FLAGS_CMDQ_NEEDS_FLUSHING		(1ULL << 0)
++#define ITS_FLAGS_CAVIUM_THUNDERX		(1ULL << 1)
+ 
+ #define RDIST_FLAGS_PROPBASE_NEEDS_FLUSHING	(1 << 0)
+ 
+@@ -803,9 +804,22 @@ static int its_alloc_tables(struct its_node *its)
+ 	int i;
+ 	int psz = SZ_64K;
+ 	u64 shr = GITS_BASER_InnerShareable;
+-	u64 cache = GITS_BASER_WaWb;
+-	u64 typer = readq_relaxed(its->base + GITS_TYPER);
+-	u32 ids = GITS_TYPER_DEVBITS(typer);
++	u64 cache;
++	u64 typer;
++	u32 ids;
++
++	if (its->flags & ITS_FLAGS_CAVIUM_THUNDERX) {
++		/*
++		 * erratum 22375: only alloc 8MB table size
++		 * erratum 24313: ignore memory access type
++		 */
++		cache	= 0;
++		ids	= 0x13;			/* 20 bits, 8MB */
++	} else {
++		cache	= GITS_BASER_WaWb;
++		typer	= readq_relaxed(its->base + GITS_TYPER);
++		ids	= GITS_TYPER_DEVBITS(typer);
++	}
+ 
+ 	for (i = 0; i < GITS_BASER_NR_REGS; i++) {
+ 		u64 val = readq_relaxed(its->base + GITS_BASER + i * 8);
+@@ -1382,8 +1396,21 @@ static int its_force_quiescent(void __iomem *base)
+ 	}
  }
  
- /* Low level accessors */
--static u64 __maybe_unused gic_read_iar(void)
-+static u64 gic_read_iar_common(void)
++static void its_enable_cavium_thunderx(void *data)
 +{
-+	u64 irqstat;
++	struct its_node *its = data;
 +
-+	asm volatile("mrs_s %0, " __stringify(ICC_IAR1_EL1) : "=r" (irqstat));
-+	return irqstat;
++	its->flags |= ITS_FLAGS_CAVIUM_THUNDERX;
 +}
 +
-+/* Cavium ThunderX erratum 23154 */
-+static u64 gic_read_iar_cavium_thunderx(void)
- {
- 	u64 irqstat;
- 
-+	asm volatile("nop;nop;nop;nop;");
-+	asm volatile("nop;nop;nop;nop;");
- 	asm volatile("mrs_s %0, " __stringify(ICC_IAR1_EL1) : "=r" (irqstat));
-+	asm volatile("nop;nop;nop;nop;");
-+	mb();
-+
- 	return irqstat;
- }
- 
-+struct static_key is_cavium_thunderx = STATIC_KEY_INIT_FALSE;
-+
-+static u64 __maybe_unused gic_read_iar(void)
-+{
-+	if (static_key_false(&is_cavium_thunderx))
-+		return gic_read_iar_common();
-+	else
-+		return gic_read_iar_cavium_thunderx();
-+}
-+
- static void __maybe_unused gic_write_pmr(u64 val)
- {
- 	asm volatile("msr_s " __stringify(ICC_PMR_EL1) ", %0" : : "r" (val));
-@@ -765,8 +789,19 @@ static const struct irq_domain_ops gic_irq_domain_ops = {
- 	.free = gic_irq_domain_free,
- };
- 
-+static void gicv3_enable_cavium_thunderx(void *data)
-+{
-+	static_key_slow_inc(&is_cavium_thunderx);
-+}
-+
- static const struct gic_capabilities gicv3_errata[] = {
+ static const struct gic_capabilities its_errata[] = {
  	{
-+		.desc	= "GIC: Cavium erratum 23154",
++		.desc	= "ITS: Cavium errata 22375, 24313",
 +		.id	= 0xa100034c,	/* ThunderX pass 1.x */
 +		.mask	= 0xffff0fff,
-+		.init	= gicv3_enable_cavium_thunderx,
++		.init	= its_enable_cavium_thunderx,
 +	},
 +	{
  	}
