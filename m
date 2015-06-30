@@ -1,72 +1,73 @@
-From: tomeu.vizoso@collabora.com (Tomeu Vizoso)
-Date: Tue, 30 Jun 2015 17:00:53 +0200
-Subject: [PATCH 08/13] gpio: sysfs: implement class.get_dependencies()
-In-Reply-To: <20150617174009.GZ14071@sirena.org.uk>
-References: <1434548543-22949-1-git-send-email-tomeu.vizoso@collabora.com>
- <1434548543-22949-9-git-send-email-tomeu.vizoso@collabora.com>
- <20150617174009.GZ14071@sirena.org.uk>
-Message-ID: <CAAObsKDYvgxuxH0ZpXaTrsjLYOaZ-W_evOWfLLTNFRFYMra5LQ@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 30 Jun 2015 16:05:41 +0100
+Subject: [PATCH] ARM: psci: boot_secondary: replace __pa with virt_to_idmap
+In-Reply-To: <1435661062-4127-1-git-send-email-grygorii.strashko@ti.com>
+References: <1435661062-4127-1-git-send-email-grygorii.strashko@ti.com>
+Message-ID: <20150630150541.GH7557@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 17 June 2015 at 19:40, Mark Brown <broonie@kernel.org> wrote:
-> On Wed, Jun 17, 2015 at 03:42:18PM +0200, Tomeu Vizoso wrote:
->
->> +static bool strends(const char *str, const char *postfix)
->> +{
->> +     if (strlen(str) < strlen(postfix))
->> +             return false;
->> +
->> +     return strcmp(str + strlen(str) - strlen(postfix), postfix) == 0;
->> +}
->
-> This is named like (and looks like) a generic fuction, shouldn't it be
-> in string.h or something?
+On Tue, Jun 30, 2015 at 01:44:22PM +0300, Grygorii Strashko wrote:
+> On some PAE systems (e.g. TI Keystone), memory is above the 32-bit
+> addressable limit, and the interconnect provides an aliased view of
+> parts of physical memory in the 32-bit addressable space. This alias
+> is strictly for boot time usage, and is not otherwise usable because
+> of coherency limitations.
+> 
+> On such systems, the idmap mechanism has to be used to pass correct
+> boot address of secondary CPU to FW.
+> virt_to_idmap() will fall-back to existing virt_to_phys() macro if
+> such conversation is not required.
 
-Yeah, will put it there.
+I think this could do with improvement so that those who aren't aware of
+the issue can understand better.  The idmap mechanism is always used for
+secondary booting anyway.
 
->> +static void add_dependency(struct fwnode_handle *fwnode,
->> +                        struct list_head *list)
->> +{
->> +     struct fwnode_dependency *dep;
->> +
->> +     dep = kzalloc(sizeof(*dep), GFP_KERNEL);
->> +     if (!dep)
->> +             return;
->> +
->> +     INIT_LIST_HEAD(&dep->dependency);
->> +     dep->fwnode = fwnode;
->> +
->> +     list_add_tail(&dep->dependency, list);
->> +}
->
-> Might be worth putting this in generic code, it looks pretty generic?  I
-> have to say I'm unclear what frees the returned list.
+"In this case, virt_to_phys(secondary_startup) would return the
+physical address of the secondary CPU boot entry point, but on such
+systems, this would be above the 4GB limit.
 
-Agreed.
+A separate function, virt_to_idmap(), has been provided to return a
+usable physical address for functions in the identity mapping, and
+this must be used in preference to virt_to_phys() or __pa() to find
+the physical entry point for functions in the identity mapping range.
 
->> +     if (!is_of_node(fwnode))
->> +             return NULL;
->> +
->> +     np = of_node(fwnode);
->> +     if (!np)
->> +             return NULL;
->
-> Presumably the first check could be dropped?
+For other systems, virt_to_idmap() and virt_to_phys() return identical
+physical addresses."
 
-That's right.
+> 
+> Cc: Mark Rutland <mark.rutland@arm.com>
+> Cc: Nicolas Pitre <nico@linaro.org>
+> Cc: Santosh Shilimkar <ssantosh@kernel.org>
+> Cc: Vitaly Andrianov <vitalya@ti.com>
+> Signed-off-by: Grygorii Strashko <grygorii.strashko@ti.com>
 
->> +     list = kzalloc(sizeof(*list), GFP_KERNEL);
->> +     if (!list)
->> +             return NULL;
->
-> Might it make sense for the core to allocate the head of the list and
-> just ask the classes to add to the list?  We're going to want to merge
-> the dependencies from multiple subsystems and that saves allocating
-> heads that may never get anything added to them.
+Code-wise, this looks correct to me - but as it's PSCI stuff, I'd like
+to see Nico ack it.
 
-Yes, I have gone with that advice and it looks better that way.
+Thanks.
 
-Thanks,
+> ---
+>  arch/arm/kernel/psci_smp.c | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm/kernel/psci_smp.c b/arch/arm/kernel/psci_smp.c
+> index 28a1db4..244aadd 100644
+> --- a/arch/arm/kernel/psci_smp.c
+> +++ b/arch/arm/kernel/psci_smp.c
+> @@ -51,7 +51,7 @@ static int psci_boot_secondary(unsigned int cpu, struct task_struct *idle)
+>  {
+>  	if (psci_ops.cpu_on)
+>  		return psci_ops.cpu_on(cpu_logical_map(cpu),
+> -				       __pa(secondary_startup));
+> +					virt_to_idmap(&secondary_startup));
+>  	return -ENODEV;
+>  }
+>  
+> -- 
+> 2.4.5
+> 
 
-Tomeu
+-- 
+FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
+according to speedtest.net.
