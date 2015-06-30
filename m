@@ -1,233 +1,169 @@
 From: jamesjj.liao@mediatek.com (James Liao)
-Date: Tue, 30 Jun 2015 10:58:47 +0800
-Subject: [PATCH v2 4/4] clk: mediatek: Add USB clock support in MT8173
- APMIXEDSYS
+Date: Tue, 30 Jun 2015 10:58:45 +0800
+Subject: [PATCH v2 2/4] dt-bindings: ARM: Mediatek: Document devicetree
+ bindings for clock controllers
 In-Reply-To: <1435633127-31952-1-git-send-email-jamesjj.liao@mediatek.com>
 References: <1435633127-31952-1-git-send-email-jamesjj.liao@mediatek.com>
-Message-ID: <1435633127-31952-5-git-send-email-jamesjj.liao@mediatek.com>
+Message-ID: <1435633127-31952-3-git-send-email-jamesjj.liao@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add REF2USB_TX clock support into MT8173 APMIXEDSYS. This clock
-is needed by USB 3.0.
+This adds the binding documentation for the mmsys, imgsys, vdecsys,
+vencsys and vencltsys controllers found on Mediatek SoCs.
 
 Signed-off-by: James Liao <jamesjj.liao@mediatek.com>
 ---
- drivers/clk/mediatek/clk-mt8173.c      | 143 +++++++++++++++++++++++++++++++++
- drivers/clk/mediatek/clk-pll.c         |   7 +-
- include/dt-bindings/clock/mt8173-clk.h |   3 +-
- 3 files changed, 146 insertions(+), 7 deletions(-)
+ .../bindings/arm/mediatek/mediatek,imgsys.txt      | 22 ++++++++++++++++++++++
+ .../bindings/arm/mediatek/mediatek,mmsys.txt       | 22 ++++++++++++++++++++++
+ .../bindings/arm/mediatek/mediatek,vdecsys.txt     | 22 ++++++++++++++++++++++
+ .../bindings/arm/mediatek/mediatek,vencltsys.txt   | 22 ++++++++++++++++++++++
+ .../bindings/arm/mediatek/mediatek,vencsys.txt     | 22 ++++++++++++++++++++++
+ 5 files changed, 110 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/arm/mediatek/mediatek,imgsys.txt
+ create mode 100644 Documentation/devicetree/bindings/arm/mediatek/mediatek,mmsys.txt
+ create mode 100644 Documentation/devicetree/bindings/arm/mediatek/mediatek,vdecsys.txt
+ create mode 100644 Documentation/devicetree/bindings/arm/mediatek/mediatek,vencltsys.txt
+ create mode 100644 Documentation/devicetree/bindings/arm/mediatek/mediatek,vencsys.txt
 
-diff --git a/drivers/clk/mediatek/clk-mt8173.c b/drivers/clk/mediatek/clk-mt8173.c
-index 75be757..333b6af 100644
---- a/drivers/clk/mediatek/clk-mt8173.c
-+++ b/drivers/clk/mediatek/clk-mt8173.c
-@@ -12,6 +12,7 @@
-  * GNU General Public License for more details.
-  */
- 
-+#include <linux/delay.h>
- #include <linux/of.h>
- #include <linux/of_address.h>
- #include <linux/slab.h>
-@@ -968,6 +969,141 @@ static void __init mtk_pericfg_init(struct device_node *node)
- }
- CLK_OF_DECLARE(mtk_pericfg, "mediatek,mt8173-pericfg", mtk_pericfg_init);
- 
-+#define REF2USB_TX_EN		BIT(0)
-+#define REF2USB_TX_LPF_EN	BIT(1)
-+#define REF2USB_TX_OUT_EN	BIT(2)
-+#define REF2USB_EN_MASK		(REF2USB_TX_EN | REF2USB_TX_LPF_EN | \
-+				 REF2USB_TX_OUT_EN)
+diff --git a/Documentation/devicetree/bindings/arm/mediatek/mediatek,imgsys.txt b/Documentation/devicetree/bindings/arm/mediatek/mediatek,imgsys.txt
+new file mode 100644
+index 0000000..7612bac
+--- /dev/null
++++ b/Documentation/devicetree/bindings/arm/mediatek/mediatek,imgsys.txt
+@@ -0,0 +1,22 @@
++Mediatek imgsys controller
++============================
 +
-+struct mtk_ref2usb_tx {
-+	struct clk_hw	hw;
-+	void __iomem	*base_addr;
++The Mediatek imgsys controller provides various clocks to the system.
++
++Required Properties:
++
++- compatible: Should be:
++	- "mediatek,mt8173-imgsys", "syscon"
++- #clock-cells: Must be 1
++
++The imgsys controller uses the common clk binding from
++Documentation/devicetree/bindings/clock/clock-bindings.txt
++The available clocks are defined in dt-bindings/clock/mt*-clk.h.
++
++Example:
++
++imgsys: imgsys at 15000000 {
++	compatible = "mediatek,mt8173-imgsys", "syscon";
++	reg = <0 0x15000000 0 0x1000>;
++	#clock-cells = <1>;
 +};
+diff --git a/Documentation/devicetree/bindings/arm/mediatek/mediatek,mmsys.txt b/Documentation/devicetree/bindings/arm/mediatek/mediatek,mmsys.txt
+new file mode 100644
+index 0000000..b51e417
+--- /dev/null
++++ b/Documentation/devicetree/bindings/arm/mediatek/mediatek,mmsys.txt
+@@ -0,0 +1,22 @@
++Mediatek mmsys controller
++============================
 +
-+static inline struct mtk_ref2usb_tx *to_mtk_ref2usb_tx(struct clk_hw *hw)
-+{
-+	return container_of(hw, struct mtk_ref2usb_tx, hw);
-+}
++The Mediatek mmsys controller provides various clocks to the system.
 +
-+static int mtk_ref2usb_tx_is_prepared(struct clk_hw *hw)
-+{
-+	struct mtk_ref2usb_tx *tx = to_mtk_ref2usb_tx(hw);
++Required Properties:
 +
-+	return (readl(tx->base_addr) & REF2USB_EN_MASK) == REF2USB_EN_MASK;
-+}
++- compatible: Should be:
++	- "mediatek,mt8173-mmsys", "syscon"
++- #clock-cells: Must be 1
 +
-+static int mtk_ref2usb_tx_prepare(struct clk_hw *hw)
-+{
-+	struct mtk_ref2usb_tx *tx = to_mtk_ref2usb_tx(hw);
-+	u32 val;
++The mmsys controller uses the common clk binding from
++Documentation/devicetree/bindings/clock/clock-bindings.txt
++The available clocks are defined in dt-bindings/clock/mt*-clk.h.
 +
-+	val = readl(tx->base_addr);
++Example:
 +
-+	val |= REF2USB_TX_EN;
-+	writel(val, tx->base_addr);
-+	udelay(100);
-+
-+	val |= REF2USB_TX_LPF_EN;
-+	writel(val, tx->base_addr);
-+
-+	val |= REF2USB_TX_OUT_EN;
-+	writel(val, tx->base_addr);
-+
-+	return 0;
-+}
-+
-+static void mtk_ref2usb_tx_unprepare(struct clk_hw *hw)
-+{
-+	struct mtk_ref2usb_tx *tx = to_mtk_ref2usb_tx(hw);
-+	u32 val;
-+
-+	val = readl(tx->base_addr);
-+	val &= ~REF2USB_EN_MASK;
-+	writel(val, tx->base_addr);
-+}
-+
-+static const struct clk_ops mtk_ref2usb_tx_ops = {
-+	.is_prepared	= mtk_ref2usb_tx_is_prepared,
-+	.prepare	= mtk_ref2usb_tx_prepare,
-+	.unprepare	= mtk_ref2usb_tx_unprepare,
++mmsys: mmsys at 14000000 {
++	compatible = "mediatek,mt8173-mmsys", "syscon";
++	reg = <0 0x14000000 0 0x1000>;
++	#clock-cells = <1>;
 +};
+diff --git a/Documentation/devicetree/bindings/arm/mediatek/mediatek,vdecsys.txt b/Documentation/devicetree/bindings/arm/mediatek/mediatek,vdecsys.txt
+new file mode 100644
+index 0000000..a5b94a7
+--- /dev/null
++++ b/Documentation/devicetree/bindings/arm/mediatek/mediatek,vdecsys.txt
+@@ -0,0 +1,22 @@
++Mediatek vdecsys controller
++============================
 +
-+static struct clk *mtk_clk_register_ref2usb_tx(const char *name,
-+			const char *parent_name, void __iomem *reg)
-+{
-+	struct mtk_ref2usb_tx *tx;
-+	struct clk_init_data init = {};
-+	struct clk *clk;
++The Mediatek vdecsys controller provides various clocks to the system.
 +
-+	tx = kzalloc(sizeof(*tx), GFP_KERNEL);
-+	if (!tx)
-+		return ERR_PTR(-ENOMEM);
++Required Properties:
 +
-+	tx->base_addr = reg;
-+	tx->hw.init = &init;
++- compatible: Should be:
++	- "mediatek,mt8173-vdecsys", "syscon"
++- #clock-cells: Must be 1
 +
-+	init.name = name;
-+	init.ops = &mtk_ref2usb_tx_ops;
-+	init.parent_names = &parent_name;
-+	init.num_parents = 1;
++The vdecsys controller uses the common clk binding from
++Documentation/devicetree/bindings/clock/clock-bindings.txt
++The available clocks are defined in dt-bindings/clock/mt*-clk.h.
 +
-+	clk = clk_register(NULL, &tx->hw);
++Example:
 +
-+	if (IS_ERR(clk)) {
-+		pr_err("Failed to register clk %s: %ld\n", name, PTR_ERR(clk));
-+		kfree(tx);
-+	}
-+
-+	return clk;
-+}
-+
-+struct mtk_apmixed_ex {
-+	int id;
-+	const char *name;
-+	const char *parent;
-+	u32 reg_ofs;
++vdecsys: vdecsys at 16000000 {
++	compatible = "mediatek,mt8173-vdecsys", "syscon";
++	reg = <0 0x16000000 0 0x1000>;
++	#clock-cells = <1>;
 +};
+diff --git a/Documentation/devicetree/bindings/arm/mediatek/mediatek,vencltsys.txt b/Documentation/devicetree/bindings/arm/mediatek/mediatek,vencltsys.txt
+new file mode 100644
+index 0000000..3d4e8d8
+--- /dev/null
++++ b/Documentation/devicetree/bindings/arm/mediatek/mediatek,vencltsys.txt
+@@ -0,0 +1,22 @@
++Mediatek vencltsys controller
++============================
 +
-+#define APMIXED_EX(_id, _name, _parent, _reg_ofs) {			\
-+		.id = _id,						\
-+		.name = _name,						\
-+		.parent = _parent,					\
-+		.reg_ofs = _reg_ofs,					\
-+	}
++The Mediatek vencltsys controller provides various clocks to the system.
 +
-+static const struct mtk_apmixed_ex apmixed_ex[] = {
-+	APMIXED_EX(CLK_APMIXED_REF2USB_TX, "ref2usb_tx", "clk26m", 0x8),
++Required Properties:
++
++- compatible: Should be:
++	- "mediatek,mt8173-vencltsys", "syscon"
++- #clock-cells: Must be 1
++
++The vencltsys controller uses the common clk binding from
++Documentation/devicetree/bindings/clock/clock-bindings.txt
++The available clocks are defined in dt-bindings/clock/mt*-clk.h.
++
++Example:
++
++vencltsys: vencltsys at 19000000 {
++	compatible = "mediatek,mt8173-vencltsys", "syscon";
++	reg = <0 0x19000000 0 0x1000>;
++	#clock-cells = <1>;
 +};
+diff --git a/Documentation/devicetree/bindings/arm/mediatek/mediatek,vencsys.txt b/Documentation/devicetree/bindings/arm/mediatek/mediatek,vencsys.txt
+new file mode 100644
+index 0000000..e5b72f5
+--- /dev/null
++++ b/Documentation/devicetree/bindings/arm/mediatek/mediatek,vencsys.txt
+@@ -0,0 +1,22 @@
++Mediatek vencsys controller
++============================
 +
-+static void __init mtk_clk_register_apmixedsys_special(struct device_node *node,
-+			struct clk_onecell_data *clk_data)
-+{
-+	void __iomem *base;
-+	struct clk *clk;
-+	int i;
++The Mediatek vencsys controller provides various clocks to the system.
 +
-+	base = of_iomap(node, 0);
-+	if (!base) {
-+		pr_err("%s(): ioremap failed\n", __func__);
-+		return;
-+	}
++Required Properties:
 +
-+	for (i = 0; i < ARRAY_SIZE(apmixed_ex); i++) {
-+		const struct mtk_apmixed_ex *ape = &apmixed_ex[i];
++- compatible: Should be:
++	- "mediatek,mt8173-vencsys", "syscon"
++- #clock-cells: Must be 1
 +
-+		clk = mtk_clk_register_ref2usb_tx(ape->name, ape->parent,
-+							base + ape->reg_ofs);
++The vencsys controller uses the common clk binding from
++Documentation/devicetree/bindings/clock/clock-bindings.txt
++The available clocks are defined in dt-bindings/clock/mt*-clk.h.
 +
-+		if (IS_ERR(clk)) {
-+			pr_err("Failed to register clk %s: %ld\n", ape->name,
-+					PTR_ERR(clk));
-+			continue;
-+		}
++Example:
 +
-+		clk_data->clks[CLK_APMIXED_REF2USB_TX] = clk;
-+	}
-+}
-+
- #define MT8173_PLL_FMAX		(3000UL * MHZ)
- 
- #define CON0_MT8173_RST_BAR	BIT(24)
-@@ -1010,12 +1146,19 @@ static const struct mtk_pll_data plls[] = {
- static void __init mtk_apmixedsys_init(struct device_node *node)
- {
- 	struct clk_onecell_data *clk_data;
-+	int r;
- 
- 	mt8173_pll_clk_data = clk_data = mtk_alloc_clk_data(CLK_APMIXED_NR_CLK);
- 	if (!clk_data)
- 		return;
- 
- 	mtk_clk_register_plls(node, plls, ARRAY_SIZE(plls), clk_data);
-+	mtk_clk_register_apmixedsys_special(node, clk_data);
-+
-+	r = of_clk_add_provider(node, of_clk_src_onecell_get, clk_data);
-+	if (r)
-+		pr_err("%s(): could not register clock provider: %d\n",
-+			__func__, r);
- 
- 	mtk_clk_enable_critical();
- }
-diff --git a/drivers/clk/mediatek/clk-pll.c b/drivers/clk/mediatek/clk-pll.c
-index 44409e9..813f0c7 100644
---- a/drivers/clk/mediatek/clk-pll.c
-+++ b/drivers/clk/mediatek/clk-pll.c
-@@ -302,7 +302,7 @@ void __init mtk_clk_register_plls(struct device_node *node,
- 		const struct mtk_pll_data *plls, int num_plls, struct clk_onecell_data *clk_data)
- {
- 	void __iomem *base;
--	int r, i;
-+	int i;
- 	struct clk *clk;
- 
- 	base = of_iomap(node, 0);
-@@ -324,9 +324,4 @@ void __init mtk_clk_register_plls(struct device_node *node,
- 
- 		clk_data->clks[pll->id] = clk;
- 	}
--
--	r = of_clk_add_provider(node, of_clk_src_onecell_get, clk_data);
--	if (r)
--		pr_err("%s(): could not register clock provider: %d\n",
--			__func__, r);
- }
-diff --git a/include/dt-bindings/clock/mt8173-clk.h b/include/dt-bindings/clock/mt8173-clk.h
-index 6ce88bf..7b7c555 100644
---- a/include/dt-bindings/clock/mt8173-clk.h
-+++ b/include/dt-bindings/clock/mt8173-clk.h
-@@ -172,7 +172,8 @@
- #define CLK_APMIXED_APLL2		12
- #define CLK_APMIXED_LVDSPLL		13
- #define CLK_APMIXED_MSDCPLL2		14
--#define CLK_APMIXED_NR_CLK		15
-+#define CLK_APMIXED_REF2USB_TX		15
-+#define CLK_APMIXED_NR_CLK		16
- 
- /* INFRA_SYS */
- 
++vencsys: vencsys at 18000000 {
++	compatible = "mediatek,mt8173-vencsys", "syscon";
++	reg = <0 0x18000000 0 0x1000>;
++	#clock-cells = <1>;
++};
 -- 
 1.8.1.1.dirty
