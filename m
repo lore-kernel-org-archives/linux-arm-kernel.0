@@ -1,52 +1,79 @@
-From: djkurtz@chromium.org (Daniel Kurtz)
-Date: Tue, 30 Jun 2015 15:55:33 +0800
-Subject: [PATCH v2 4/4] arm64: dts: Add spi bus dts
-In-Reply-To: <1435583070-9600-5-git-send-email-leilk.liu@mediatek.com>
-References: <1435583070-9600-1-git-send-email-leilk.liu@mediatek.com>
- <1435583070-9600-5-git-send-email-leilk.liu@mediatek.com>
-Message-ID: <CAGS+omAyzGpZE2SDN45dD1PrLr00d=3Tu8BCAL09N8ih6W+yiA@mail.gmail.com>
+From: vaibhav.hiremath@linaro.org (Vaibhav Hiremath)
+Date: Tue, 30 Jun 2015 13:28:15 +0530
+Subject: Use of pinctrl-single for external device over I2C
+In-Reply-To: <55924953.80802@linaro.org>
+References: <55893B2C.1070800@linaro.org> <558A9CC7.6070409@linaro.org>
+ <20150624133349.GI4156@atomide.com> <558AE478.2080802@linaro.org>
+ <20150625043838.GK4156@atomide.com> <558B95CA.9070105@linaro.org>
+ <55924953.80802@linaro.org>
+Message-ID: <55924C17.6090604@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Leilk,
 
-On Mon, Jun 29, 2015 at 9:04 PM, Leilk Liu <leilk.liu@mediatek.com> wrote:
-> This patch adds MT8173 spi bus controllers into device tree.
->
-> Signed-off-by: Leilk Liu <leilk.liu@mediatek.com>
-> ---
->  arch/arm64/boot/dts/mediatek/mt8173.dtsi | 9 +++++++++
->  1 file changed, 9 insertions(+)
->
-> diff --git a/arch/arm64/boot/dts/mediatek/mt8173.dtsi b/arch/arm64/boot/dts/mediatek/mt8173.dtsi
-> index 512e4eb..923d2eb 100644
-> --- a/arch/arm64/boot/dts/mediatek/mt8173.dtsi
-> +++ b/arch/arm64/boot/dts/mediatek/mt8173.dtsi
-> @@ -259,6 +259,15 @@
->                         status = "disabled";
->                 };
->
-> +               spi: spi at 1100a000 {
-> +                       compatible = "mediatek,mt8173-spi";
-> +                       reg = <0 0x1100a000 0 0x1000>;
-> +                       interrupts = <GIC_SPI 110 IRQ_TYPE_LEVEL_LOW>;
-> +                       clocks = <&pericfg CLK_PERI_SPI0>;
-> +                       clock-names = "main";
 
-Please also add the spi pinctl node, and set it as the default pinctl
-for this spi node.
-
-> +                       status = "disabled";
-> +               };
-> +
->                 mmsys: mmsys at 14000000 {
->                         compatible = "mediatek,mt8173-mmsys", "syscon";
->                         reg = <0 0x14000000 0 0x1000>;
-> --
-> 1.8.1.1.dirty
+On Tuesday 30 June 2015 01:16 PM, Vaibhav Hiremath wrote:
 >
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> Please read the FAQ at  http://www.tux.org/lkml/
+>
+> On Thursday 25 June 2015 11:16 AM, Vaibhav Hiremath wrote:
+>>
+>>
+>> On Thursday 25 June 2015 10:08 AM, Tony Lindgren wrote:
+>>> * Vaibhav Hiremath <vaibhav.hiremath@linaro.org> [150624 10:12]:
+>>>>
+>>>> I do not like this, as this is not HW feature, so DT may not be right
+>>>> approach.
+>>>>
+>>>> So I will dig more from either runtime or Compile time option to use
+>>>> regmap_ Vs raw read/writes.
+>>>
+>>> Can't you just check if the pinctrl node has compatible = "syscon"
+>>> property?
+>>>
+>>> A compile time option won't work for sure. I don't know what you
+>>> would check at runtime as you do not know what the bus is behind
+>>> syscon.
+>>>
+>>
+>> Although, I haven't gone through syscon, but not sure whether syscon
+>> would be useful.
+>>
+>> As you rightly stated, we need to know the bus behind regmap.
+>>
+>
+> Trying to understand what is the right way of doing pinctrl of external
+> device on board,
+>
+> I feel it would not be good idea to pollute pinctrl-single driver, and
+> also I am still not able to figure out how can I have access to bus
+> behind regmap.
+>
+>
+> How about having separate driver (generic for all I2C), say pinctrl-
+> i2c.c, which is i2c_client driver and would support pinctrl and pinmux
+> on I2C client device.
+>
+
+I mean, part of mfd here (mfd_cell)
+
+>
+> The current usecase which I have is pretty simple in nature,
+>
+> 88PM860 has few GPIO pins which can be configured to different
+> functionality, based on board design.
+> In most of the cases they are one/init/boot time settings.
+>
+> GPIO_0:
+> =======
+>    000 = GPIO input mode
+>    001 = GPIO output mode
+>    010 = SLEEPOUTN mirror mode
+>    011 = Buck4 FPWM enable
+>    100 = 32 Khz output buffer mode
+>    101 = PMICINTN output mode
+>    110 = HW_RESET1 mode
+>    111 = HW_RESET2 mode
+>
+>
+> Thanks,
+> Vaibhav
