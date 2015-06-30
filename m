@@ -1,127 +1,73 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Tue, 30 Jun 2015 12:17:23 +0200
-Subject: [PATCH 2/2] arm64/efi: don't pad between EFI_MEMORY_RUNTIME regions
-In-Reply-To: <1435659443-17625-1-git-send-email-ard.biesheuvel@linaro.org>
-References: <1435659443-17625-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <1435659443-17625-3-git-send-email-ard.biesheuvel@linaro.org>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Tue, 30 Jun 2015 11:34:59 +0100
+Subject: Regular oops on shutdown of KVM/ARM64 machines with VGA device
+In-Reply-To: <CAL5wTH7EUh0ciutXKs2s-4VjKnRM65QmrUQQiRdM=R+_VXi6DA@mail.gmail.com>
+References: <CAL5wTH4MtybHBk22r593HmVX+2jqCDm4fb2MyT2L0TMkHrD7pg@mail.gmail.com>	<20150629100304.GB18931@leverpostej>	<55914033.5060008@arm.com>
+ <CAL5wTH7EUh0ciutXKs2s-4VjKnRM65QmrUQQiRdM=R+_VXi6DA@mail.gmail.com>
+Message-ID: <559270D3.8030305@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The new Properties Table feature introduced in UEFIv2.5 may split
-memory regions that cover PE/COFF memory images into separate code
-and data regions.
+On 30/06/15 08:54, Dirk M?ller wrote:
+> Hi Marc,
+> 
+>> Also, care to provide some hints about your kernel configuration?
+> 
+> I believe the relevant parameters are:
+> 
+> CONFIG_PGTABLE_LEVELS=4
+> # CONFIG_ARM64_64K_PAGES is not set
+> # CONFIG_ARM64_VA_BITS_39 is not set
+> CONFIG_ARM64_VA_BITS_48=y
+> CONFIG_ARM64_VA_BITS=48
+> CONFIG_KVM_MMIO=y
+> CONFIG_KVM_GENERIC_DIRTYLOG_READ_PROTECT=y
+> CONFIG_KVM_COMPAT=y
+> CONFIG_VIRTUALIZATION=y
+> CONFIG_KVM=y
+> CONFIG_KVM_ARM_HOST=y
+> CONFIG_KVM_ARM_MAX_VCPUS=4
+> 
+> 
+> the full config is here: http://pastebin.com/raw.php?i=GKAaVLYE
+> 
+>> What is the VGA device you mention in $subject?
+>> A QEMU command line so that we can try and reproduce the issue you're
+>> seeing?
+> 
+> with qemu 2.3.0:
+> 
+> qemu-system-aarch64 --enable-kvm -M virt -cpu host -vnc :4 -bios
+> /usr/share/qemu/qemu-uefi-aarch64.bin -m 1G -device VGA
+> 
+> then connecting to the vnc to cause the VGA device to be initialized,
+> and then simply ctrl-c'ing the qemu process, you'll get this crash
+> 100% of each and every time. If you want additional debug output or
+> try out something, just let me know and I'll be happy to provide you
+> with it.
 
-Since the relative offset of PE/COFF .text and .data segments cannot
-be changed on the fly, this means that we can no longer pad out those
-regions to be mappable using 64 KB pages.
-Unfortunately, there is no annotation in the UEFI memory map that
-identifies data regions that were split off from a code region, so we
-must apply this logic to all runtime code and data regions.
+Can try the following patch?
 
-So instead of rounding each memory region to 64 KB alignment at both
-ends, only round down regions that are not directly preceded by another
-runtime region. Since the UEFI spec does not mandate that the memory map
-be sorted, this means we also need to sort it first.
-
-Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
----
- drivers/firmware/efi/libstub/arm-stub.c | 58 +++++++++++++++-----
- 1 file changed, 43 insertions(+), 15 deletions(-)
-
-diff --git a/drivers/firmware/efi/libstub/arm-stub.c b/drivers/firmware/efi/libstub/arm-stub.c
-index e29560e6b40b..dd9e2addc9fb 100644
---- a/drivers/firmware/efi/libstub/arm-stub.c
-+++ b/drivers/firmware/efi/libstub/arm-stub.c
-@@ -13,6 +13,7 @@
+diff --git a/arch/arm/kvm/mmu.c b/arch/arm/kvm/mmu.c
+index 7b42012..d902a53 100644
+--- a/arch/arm/kvm/mmu.c
++++ b/arch/arm/kvm/mmu.c
+@@ -109,7 +109,7 @@ static void kvm_flush_dcache_pud(pud_t pud)
   */
- 
- #include <linux/efi.h>
-+#include <linux/sort.h>
- #include <asm/efi.h>
- 
- #include "efistub.h"
-@@ -305,6 +306,13 @@ fail:
-  */
- #define EFI_RT_VIRTUAL_BASE	0x40000000
- 
-+static int cmp_mem_desc(const void *a, const void *b)
-+{
-+	efi_memory_desc_t const *left = a, *right = b;
-+
-+	return (left->phys_addr > right->phys_addr) ? 1 : -1;
-+}
-+
- /*
-  * efi_get_virtmap() - create a virtual mapping for the EFI memory map
-  *
-@@ -317,33 +325,53 @@ void efi_get_virtmap(efi_memory_desc_t *memory_map, unsigned long map_size,
- 		     int *count)
+ static void stage2_dissolve_pmd(struct kvm *kvm, phys_addr_t addr, pmd_t *pmd)
  {
- 	u64 efi_virt_base = EFI_RT_VIRTUAL_BASE;
--	efi_memory_desc_t *out = runtime_map;
-+	efi_memory_desc_t *in, *prev = NULL, *out = runtime_map;
- 	int l;
+-	if (!kvm_pmd_huge(*pmd))
++	if (pmd_none(*pmd) || !kvm_pmd_huge(*pmd))
+ 		return;
  
--	for (l = 0; l < map_size; l += desc_size) {
--		efi_memory_desc_t *in = (void *)memory_map + l;
-+	/*
-+	 * To work around potential issues with the Properties Table feature
-+	 * introduced in UEFI 2.5 (which may split PE/COFF memory images
-+	 * into several RuntimeServicesCode and RuntimeServicesData regions
-+	 * whose relative offset in memory needs to be retained), we need to
-+	 * sort the memory map before traversing it, and avoid padding out those
-+	 * regions to 64 KB granularity.
-+	 */
-+	sort(memory_map, map_size / desc_size, desc_size, cmp_mem_desc, NULL);
-+
-+	for (l = 0; l < map_size; l += desc_size, prev = in) {
- 		u64 paddr, size;
- 
-+		in = (void *)memory_map + l;
- 		if (!(in->attribute & EFI_MEMORY_RUNTIME))
- 			continue;
- 
-+		paddr = in->phys_addr;
-+		size = in->num_pages * EFI_PAGE_SIZE;
-+
- 		/*
- 		 * Make the mapping compatible with 64k pages: this allows
- 		 * a 4k page size kernel to kexec a 64k page size kernel and
- 		 * vice versa.
- 		 */
--		paddr = round_down(in->phys_addr, SZ_64K);
--		size = round_up(in->num_pages * EFI_PAGE_SIZE +
--				in->phys_addr - paddr, SZ_64K);
--
--		/*
--		 * Avoid wasting memory on PTEs by choosing a virtual base that
--		 * is compatible with section mappings if this region has the
--		 * appropriate size and physical alignment. (Sections are 2 MB
--		 * on 4k granule kernels)
--		 */
--		if (IS_ALIGNED(in->phys_addr, SZ_2M) && size >= SZ_2M)
--			efi_virt_base = round_up(efi_virt_base, SZ_2M);
-+		if (!prev ||
-+		    !(paddr == (prev->phys_addr +
-+				prev->num_pages * EFI_PAGE_SIZE) &&
-+		      (prev->attribute & EFI_MEMORY_RUNTIME))) {
-+
-+			paddr = round_down(in->phys_addr, SZ_64K);
-+			size += in->phys_addr - paddr;
-+
-+			/*
-+			 * Avoid wasting memory on PTEs by choosing a virtual
-+			 * base that is compatible with section mappings if this
-+			 * region has the appropriate size and physical
-+			 * alignment. (Sections are 2 MB on 4k granule kernels)
-+			 */
-+			if (IS_ALIGNED(in->phys_addr, SZ_2M) && size >= SZ_2M)
-+				efi_virt_base = round_up(efi_virt_base, SZ_2M);
-+			else
-+				efi_virt_base = round_up(efi_virt_base, SZ_64K);
-+		}
- 
- 		in->virt_addr = efi_virt_base + in->phys_addr - paddr;
- 		efi_virt_base += size;
+ 	pmd_clear(pmd);
+
+
+It seems to fix the issue for me, though with a relatively different
+configuration.
+
+Thanks,
+
+	M.
 -- 
-1.9.1
+Jazz is not dead. It just smells funny...
