@@ -1,55 +1,72 @@
-From: javier.martinez@collabora.co.uk (Javier Martinez Canillas)
-Date: Tue, 30 Jun 2015 19:45:15 +0200
-Subject: [PATCH] clk: samsung: fix cpu clock's flags checking
-In-Reply-To: <7416838.2ZUPGjSqFp@amdc1976>
-References: <1435598978-21800-1-git-send-email-b.zolnierkie@samsung.com>
- <5591DD9B.4030507@samsung.com>
- <CABxcv=kVL94rdFgNKcxx2JOi9WRFnvhMWrpjEDcEmx7q7cEsgQ@mail.gmail.com>
- <7416838.2ZUPGjSqFp@amdc1976>
-Message-ID: <5592D5AB.2020802@collabora.co.uk>
+From: stefan.wahren@i2se.com (Stefan Wahren)
+Date: Tue, 30 Jun 2015 19:47:09 +0200 (CEST)
+Subject: [PATCH v6 0/9] Add simple NVMEM Framework via regmap.
+In-Reply-To: <558AFC0B.1050400@linaro.org>
+References: <1435014459-26138-1-git-send-email-srinivas.kandagatla@linaro.org>
+ <235181230.251177.1435088854197.JavaMail.open-xchange@oxbsltgw00.schlund.de>
+ <558A7C92.2040102@linaro.org> <558AA2E2.1010606@i2se.com>
+ <558AAA8D.8030209@linaro.org>
+ <1641569650.41238.1435168054323.JavaMail.open-xchange@oxbsltgw35.schlund.de>
+ <558AFC0B.1050400@linaro.org>
+Message-ID: <1183639717.72990.1435686429623.JavaMail.open-xchange@oxbsltgw03.schlund.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Bartlomiej,
+Hi Srinivas,
 
-On 06/30/2015 07:17 PM, Bartlomiej Zolnierkiewicz wrote:
-> 
-> Hi,
-> 
-> On Tuesday, June 30, 2015 08:27:36 AM Javier Martinez Canillas wrote:
->> On Tue, Jun 30, 2015 at 2:06 AM, Krzysztof Kozlowski
->> <k.kozlowski@samsung.com> wrote:
->> > On 30.06.2015 02:29, Bartlomiej Zolnierkiewicz wrote:
->> >> CLK_CPU_HAS_DIV1 and CLK_CPU_NEEDS_DEBUG_ALT_DIV masks were
->> >> incorrectly used as a bit numbers.  Fix it.
->> >>
->> >> Tested on Exynos4210 based Origen board and on Exynos5250 based
->> >> Arndale board.
->> >>
->> >> Cc: Tomasz Figa <tomasz.figa@gmail.com>
->> >> Cc: Michael Turquette <mturquette@baylibre.com>
->> >> Cc: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
->> >> Cc: Thomas Abraham <thomas.ab@samsung.com>
->> >> Reported-by: Dan Carpenter <dan.carpenter@oracle.com>
->> >> Signed-off-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
->> >> ---
->> >>  drivers/clk/samsung/clk-cpu.c | 10 +++++-----
->> >>  1 file changed, 5 insertions(+), 5 deletions(-)
->> >
->> > Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
->> >
->> 
->> Looks good to me as well.
->> 
->> Reviewed-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
-> 
-> Krzysztof has noted that I should use your @dowhile0.org e-mail address
-> instead of @collabora.co.uk one, is this right?
+> Srinivas Kandagatla <srinivas.kandagatla@linaro.org> hat am 24. Juni 2015 um
+> 20:50 geschrieben:
+>
+>
+>
+>
+> On 24/06/15 18:47, Stefan Wahren wrote:
+> > Hi Srinivas,
+> >
+> >> Srinivas Kandagatla <srinivas.kandagatla@linaro.org> hat am 24. Juni 2015
+> >> um
+> >> 15:03 geschrieben:
+> >>
+> >>
+> >>
+> >>
+> >> On 24/06/15 13:30, Stefan Wahren wrote:
+> >>>>> If the question is just about hexdump, then hexdump itself can read
+> >>>>> file from given offset and size.
+> >>> yes, this is my question at first. Let me show the difference between
+> >>> the current implementation and my expectations as a user.
+> >>>
+> >>> $ hexdump /sys/class/nvmem/mxs-ocotp/nvmem
+> >>>
+> >>> Current implementation: dump the complete register range defined in DT
+> >>>
+> >> Its dumping the range which is specified in the provider regmap. If the
+> >> requirement is to dump only particular range, this has to be made
+> >> explicit while creating regmap, which is to specify the base address to
+> >> start from "First data register" and max_register to be "Last data
+> >> register "- "First data register"
+> >
+> > i know about max_register, but i can't find the base address in
+> > regmap_config.
+> >
+> Base is not in the regmap config, its the value which you pass to the
 >
 
-I don't know what is the policy for tags but Krzysztof is correct that
-this email address is going away this week so for future patches please
-use my personal @dowhile0.org address instead.
+thanks for you explanation. I was confused by the word base because in your
+example
+it is the context variable.
 
-Best regards,
-Javier
+Now i've successful tested my first version of the OCOTP driver based on NVMEM
+framework [1].
+
+Currently only the raw sysfs access is working. So i have another question:
+
+How do i get the cell info from the devicetree for the nvmem_config?
+
+I expected a function like of_nvmem_cell_info_get() .
+
+Regards
+Stefan
+
+[1] -
+https://github.com/lategoodbye/fsl_ocotp/commit/7c98e19755b69f761885b0e1ceb2c258a7c47ade
