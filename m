@@ -1,79 +1,63 @@
-From: vaibhav.hiremath@linaro.org (Vaibhav Hiremath)
-Date: Tue, 30 Jun 2015 13:28:15 +0530
-Subject: Use of pinctrl-single for external device over I2C
-In-Reply-To: <55924953.80802@linaro.org>
-References: <55893B2C.1070800@linaro.org> <558A9CC7.6070409@linaro.org>
- <20150624133349.GI4156@atomide.com> <558AE478.2080802@linaro.org>
- <20150625043838.GK4156@atomide.com> <558B95CA.9070105@linaro.org>
- <55924953.80802@linaro.org>
-Message-ID: <55924C17.6090604@linaro.org>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Tue, 30 Jun 2015 10:08:38 +0200
+Subject: [PATCH] Add dts info for wandboard GPIO lines.
+In-Reply-To: <1375306847-14340-2-git-send-email-panetta.mike@gmail.com>
+References: <1375306847-14340-1-git-send-email-panetta.mike@gmail.com>
+ <1375306847-14340-2-git-send-email-panetta.mike@gmail.com>
+Message-ID: <20150630080838.GA18829@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hello,
 
+while starting to use the GPIO lines being available on the JP4
+connector of the wand board I stumbled over this patch on the linux arm
+kernel mailing list:
 
-On Tuesday 30 June 2015 01:16 PM, Vaibhav Hiremath wrote:
->
->
-> On Thursday 25 June 2015 11:16 AM, Vaibhav Hiremath wrote:
->>
->>
->> On Thursday 25 June 2015 10:08 AM, Tony Lindgren wrote:
->>> * Vaibhav Hiremath <vaibhav.hiremath@linaro.org> [150624 10:12]:
->>>>
->>>> I do not like this, as this is not HW feature, so DT may not be right
->>>> approach.
->>>>
->>>> So I will dig more from either runtime or Compile time option to use
->>>> regmap_ Vs raw read/writes.
->>>
->>> Can't you just check if the pinctrl node has compatible = "syscon"
->>> property?
->>>
->>> A compile time option won't work for sure. I don't know what you
->>> would check at runtime as you do not know what the bus is behind
->>> syscon.
->>>
->>
->> Although, I haven't gone through syscon, but not sure whether syscon
->> would be useful.
->>
->> As you rightly stated, we need to know the bus behind regmap.
->>
->
-> Trying to understand what is the right way of doing pinctrl of external
-> device on board,
->
-> I feel it would not be good idea to pollute pinctrl-single driver, and
-> also I am still not able to figure out how can I have access to bus
-> behind regmap.
->
->
-> How about having separate driver (generic for all I2C), say pinctrl-
-> i2c.c, which is i2c_client driver and would support pinctrl and pinmux
-> on I2C client device.
->
+On Wed, Jul 31, 2013 at 05:40:47PM -0400, Michael Panetta wrote:
+> diff --git a/arch/arm/boot/dts/imx6qdl-wandboard.dtsi b/arch/arm/boot/dts/imx6qdl-wandboard.dtsi
+> index a55113e..b40bbe1 100644
+> --- a/arch/arm/boot/dts/imx6qdl-wandboard.dtsi
+> +++ b/arch/arm/boot/dts/imx6qdl-wandboard.dtsi
+> @@ -84,6 +84,23 @@
+>  			>;
+>  		};
+>  	};
+> +
+> +	gpio {
+> +		pinctrl_gpio: gpiogrp {
+> +			fsl,pins = <
+> +				MX6QDL_PAD_EIM_DA12__GPIO3_IO12   0x80000000 /* GPIO3_12 EDM pin 255 */
 
-I mean, part of mfd here (mfd_cell)
+Looking at the "Wandboard User Guide, Revision B1"[1] I'd say EDM pin
+255 on the board drives the signal GPIO3_11 and so TP128 on the board.
+Instead it's pad MX6QDL_PAD_EIM_DA11 (and so GPIO3_IO11) that is
+connected to EDM pin 256 which is called GPIO3_12 for the Wandboard.
 
->
-> The current usecase which I have is pretty simple in nature,
->
-> 88PM860 has few GPIO pins which can be configured to different
-> functionality, based on board design.
-> In most of the cases they are one/init/boot time settings.
->
-> GPIO_0:
-> =======
->    000 = GPIO input mode
->    001 = GPIO output mode
->    010 = SLEEPOUTN mirror mode
->    011 = Buck4 FPWM enable
->    100 = 32 Khz output buffer mode
->    101 = PMICINTN output mode
->    110 = HW_RESET1 mode
->    111 = HW_RESET2 mode
->
->
-> Thanks,
-> Vaibhav
+Unless I'm failing to read the schematics, this is an unfortunate naming
+mismatch that someone might want to fix?!
+
+Best regards
+Uwe
+
+PS: The patch was never applied to the mainline kernel.
+
+[1] http://www.wandboard.org/images/downloads/wbquad-revb1-userguide.pdf
+
+> +				MX6QDL_PAD_EIM_DA11__GPIO3_IO11   0x80000000 /* GPIO3_11 EDM pin 256 */
+> +				MX6QDL_PAD_EIM_DA10__GPIO3_IO10   0x80000000 /* GPIO3_10 EDM pin 257 */
+> +				MX6QDL_PAD_EIM_D27__GPIO3_IO27    0x80000000 /* GPIO3_27 EDM pin 258 */
+> +				MX6QDL_PAD_EIM_D26__GPIO3_IO26    0x80000000 /* GPIO3_26 EDM pin 259 */
+> +				MX6QDL_PAD_EIM_BCLK__GPIO6_IO31   0x80000000 /* GPIO6_31 EDM pin 260 */
+> +				MX6QDL_PAD_EIM_DA8__GPIO3_IO08    0x80000000 /* GPIO3_8  EDM pin 261 */
+> +				MX6QDL_PAD_ENET_RX_ER__GPIO1_IO24 0x80000000 /* GPIO1_24 EDM pin 262 */
+> +				MX6QDL_PAD_GPIO_19__GPIO4_IO05    0x80000000 /* GPIO4_5  EDM pin 263 */
+> +				MX6QDL_PAD_SD3_RST__GPIO7_IO08    0x80000000 /* GPIO7_8  EDM pin 264 */
+> +			>;
+> +		};
+> +	};
+>  };
+
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
