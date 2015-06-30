@@ -1,68 +1,31 @@
-From: geert+renesas@glider.be (Geert Uytterhoeven)
-Date: Tue, 30 Jun 2015 09:45:21 +0200
-Subject: [PATCH 1/7] ARM: shmobile: r8a73a4 dtsi: Add missing "gpio-ranges" to
- gpio node
-In-Reply-To: <1435650327-2542-1-git-send-email-geert+renesas@glider.be>
-References: <1435650327-2542-1-git-send-email-geert+renesas@glider.be>
-Message-ID: <1435650327-2542-2-git-send-email-geert+renesas@glider.be>
+From: dirk@dmllr.de (=?UTF-8?B?RGlyayBNw7xsbGVy?=)
+Date: Tue, 30 Jun 2015 09:46:28 +0200
+Subject: Regular oops on shutdown of KVM/ARM64 machines with VGA device
+In-Reply-To: <20150629100304.GB18931@leverpostej>
+References: <CAL5wTH4MtybHBk22r593HmVX+2jqCDm4fb2MyT2L0TMkHrD7pg@mail.gmail.com>
+ <20150629100304.GB18931@leverpostej>
+Message-ID: <CAL5wTH4wBF5e8T4Tqy1aWWAgVsM9Z-yv5mu2YrTZCg2pyW5Pog@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-If a GPIO driver uses gpiochip_add_pin_range() (which is usually the
-case for GPIO/PFC combos), the GPIO hogging mechanism configured from DT
-doesn't work:
+Hi Mark,
 
-    requesting hog GPIO led1-high (chip r8a73a4_pfc, offset 28) failed
+> I've seen issues with prior FW versions where the ethernet controller
+> was erroneously left active after ExitBootServices(), and would DMA
+> braodcast packets over the kernel. That resulted in similar failures to
+> what you're reporting.
+>
+> Can you reproduce the issue with all ethernet cables unplugged?
 
-The actual error code is -517 == -EPROBE_DEFER.
+not with ethernet cables unplugged, but I did ifdown on all interfaces
+and was able to trigger the issue just fine. Please note it is 100%
+reproducible in one sequence each and every time, which imho makes it
+unlikely to be a DMA scatter issue.
 
-The problem is that PFC+GPIO registration is handled in multiple steps:
-  1. pinctrl_register(),
-  2. gpiochip_add(),
-  3. gpiochip_add_pin_range().
+> You can also try enabling CONFIG_MEMTEST (and pass memtest on the
+> command line) at boot time, which may happen to catch DMA in the act.
 
-Configuration of the hogs is handled in gpiochip_add():
+Did not try this.
 
-    gpiochip_add
-        of_gpiochip_add
-            of_gpiochip_scan_hogs
-                gpiod_hog
-                    gpiochip_request_own_desc
-                        __gpiod_request
-                            chip->request
-                                pinctrl_request_gpio
-                                    pinctrl_get_device_gpio_range
-
-However, at this point the GPIO controller hasn't been added to
-pinctrldev_list yet, so the range can't be found, and the operation fails
-with -EPROBE_DEFER.
-
-To fix this, add a "gpio-ranges" property to the gpio device node, so
-the ranges are added by of_gpiochip_add_pin_range(), which is called by
-of_gpiochip_add() before the call to of_gpiochip_scan_hogs().
-
-Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
----
- arch/arm/boot/dts/r8a73a4.dtsi | 7 +++++++
- 1 file changed, 7 insertions(+)
-
-diff --git a/arch/arm/boot/dts/r8a73a4.dtsi b/arch/arm/boot/dts/r8a73a4.dtsi
-index 5090d1a8f652e8be..cb4f7b2798fe23be 100644
---- a/arch/arm/boot/dts/r8a73a4.dtsi
-+++ b/arch/arm/boot/dts/r8a73a4.dtsi
-@@ -207,6 +207,13 @@
- 		reg = <0 0xe6050000 0 0x9000>;
- 		gpio-controller;
- 		#gpio-cells = <2>;
-+		gpio-ranges =
-+			<&pfc 0 0 31>, <&pfc 32 32 9>,
-+			<&pfc 64 64 22>, <&pfc 96 96 31>,
-+			<&pfc 128 128 7>, <&pfc 160 160 19>,
-+			<&pfc 192 192 31>, <&pfc 224 224 27>,
-+			<&pfc 256 256 28>, <&pfc 288 288 21>,
-+			<&pfc 320 320 10>;
- 		interrupts-extended =
- 			<&irqc0  0 0>, <&irqc0  1 0>, <&irqc0  2 0>, <&irqc0  3 0>,
- 			<&irqc0  4 0>, <&irqc0  5 0>, <&irqc0  6 0>, <&irqc0  7 0>,
--- 
-1.9.1
+Thanks,
+Dirk
