@@ -1,11 +1,11 @@
 From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Tue, 30 Jun 2015 12:48:37 +0300
-Subject: [PATCH 3/7] ARM: shmobile: sh73a0 dtsi: Add missing "gpio-ranges"
- to gpio node
-In-Reply-To: <1435650327-2542-4-git-send-email-geert+renesas@glider.be>
+Date: Tue, 30 Jun 2015 12:49:47 +0300
+Subject: [PATCH 1/7] ARM: shmobile: r8a73a4 dtsi: Add missing
+ "gpio-ranges" to gpio node
+In-Reply-To: <1435650327-2542-2-git-send-email-geert+renesas@glider.be>
 References: <1435650327-2542-1-git-send-email-geert+renesas@glider.be>
- <1435650327-2542-4-git-send-email-geert+renesas@glider.be>
-Message-ID: <2477426.ekHmTUkfBY@avalon>
+ <1435650327-2542-2-git-send-email-geert+renesas@glider.be>
+Message-ID: <32630741.rNENluEsDE@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -13,12 +13,12 @@ Hi Geert,
 
 Thank you for the patch.
 
-On Tuesday 30 June 2015 09:45:23 Geert Uytterhoeven wrote:
+On Tuesday 30 June 2015 09:45:21 Geert Uytterhoeven wrote:
 > If a GPIO driver uses gpiochip_add_pin_range() (which is usually the
 > case for GPIO/PFC combos), the GPIO hogging mechanism configured from DT
 > doesn't work:
 > 
->     requesting hog GPIO led1-high (chip sh73a0_pfc, offset 20) failed
+>     requesting hog GPIO led1-high (chip r8a73a4_pfc, offset 28) failed
 > 
 > The actual error code is -517 == -EPROBE_DEFER.
 > 
@@ -55,23 +55,27 @@ dodgy. I'll let Linus comment on that, but for the implementation itself,
 Acked-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
 
 > ---
->  arch/arm/boot/dts/sh73a0.dtsi | 3 +++
->  1 file changed, 3 insertions(+)
+>  arch/arm/boot/dts/r8a73a4.dtsi | 7 +++++++
+>  1 file changed, 7 insertions(+)
 > 
-> diff --git a/arch/arm/boot/dts/sh73a0.dtsi b/arch/arm/boot/dts/sh73a0.dtsi
-> index 11e17c5f26e2cae2..ff7c8f298f30a58d 100644
-> --- a/arch/arm/boot/dts/sh73a0.dtsi
-> +++ b/arch/arm/boot/dts/sh73a0.dtsi
-> @@ -392,6 +392,9 @@
->  		      <0xe605801c 0x1c>;
+> diff --git a/arch/arm/boot/dts/r8a73a4.dtsi b/arch/arm/boot/dts/r8a73a4.dtsi
+> index 5090d1a8f652e8be..cb4f7b2798fe23be 100644
+> --- a/arch/arm/boot/dts/r8a73a4.dtsi
+> +++ b/arch/arm/boot/dts/r8a73a4.dtsi
+> @@ -207,6 +207,13 @@
+>  		reg = <0 0xe6050000 0 0x9000>;
 >  		gpio-controller;
 >  		#gpio-cells = <2>;
 > +		gpio-ranges =
-> +			<&pfc 0 0 119>, <&pfc 128 128 37>, <&pfc 192 192 91>,
-> +			<&pfc 288 288 22>;
+> +			<&pfc 0 0 31>, <&pfc 32 32 9>,
+> +			<&pfc 64 64 22>, <&pfc 96 96 31>,
+> +			<&pfc 128 128 7>, <&pfc 160 160 19>,
+> +			<&pfc 192 192 31>, <&pfc 224 224 27>,
+> +			<&pfc 256 256 28>, <&pfc 288 288 21>,
+> +			<&pfc 320 320 10>;
 >  		interrupts-extended =
->  			<&irqpin0 0 0>, <&irqpin0 1 0>, <&irqpin0 2 0>, <&irqpin0 3 0>,
->  			<&irqpin0 4 0>, <&irqpin0 5 0>, <&irqpin0 6 0>, <&irqpin0 7 0>,
+>  			<&irqc0  0 0>, <&irqc0  1 0>, <&irqc0  2 0>, <&irqc0  3 0>,
+>  			<&irqc0  4 0>, <&irqc0  5 0>, <&irqc0  6 0>, <&irqc0  7 0>,
 
 -- 
 Regards,
