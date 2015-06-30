@@ -1,65 +1,128 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 30 Jun 2015 22:49:11 +0200
-Subject: [PATCH v2 7/9] arm: twr-k70f120m: use Freescale eDMA driver with
- Kinetis SoC
-In-Reply-To: <1435667250-28299-8-git-send-email-pawelo@king.net.pl>
-References: <1435667250-28299-1-git-send-email-pawelo@king.net.pl>
- <1435667250-28299-8-git-send-email-pawelo@king.net.pl>
-Message-ID: <1650263.FfdEQKm1Bu@wuerfel>
+Date: Tue, 30 Jun 2015 23:01:49 +0200
+Subject: arnRe: [PATCH v2 1/5] ARM: rcm-k1879xb1: Add support for K1879XB1 SoC
+In-Reply-To: <1435677307-6526-2-git-send-email-andrew@ncrmnt.org>
+References: <1435677307-6526-1-git-send-email-andrew@ncrmnt.org>
+ <1435677307-6526-2-git-send-email-andrew@ncrmnt.org>
+Message-ID: <1814286.cdle2p4xha@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 30 June 2015 14:27:28 Paul Osmialowski wrote:
-> Note that <mach/memory.h> is needed (which is denoted by
-> CONFIG_NEED_MACH_MEMORY_H) as it provides macros required for proper
-> operation of DMA allocation functions.
+On Tuesday 30 June 2015 18:15:03 Andrew Andrianov wrote:
+> --- a/arch/arm/Makefile
+> +++ b/arch/arm/Makefile
+> @@ -185,6 +185,7 @@ machine-$(CONFIG_ARCH_ORION5X)		+= orion5x
+>  machine-$(CONFIG_ARCH_PICOXCELL)	+= picoxcell
+>  machine-$(CONFIG_ARCH_PXA)		+= pxa
+>  machine-$(CONFIG_ARCH_QCOM)		+= qcom
+> +machine-$(CONFIG_ARCH_RCM_K1879XB1)	+= rcm-k1879xb1
 
-You can't do this, it breaks compilation when multiple platforms
-are enabled.
+Could this be a bit shorter, e.g. 'mach-rcm' or 'mach-k1879xb1'?
 
-> Signed-off-by: Paul Osmialowski <pawelo@king.net.pl>
-> ---
->  arch/arm/Kconfig                            |  4 ++
->  arch/arm/boot/dts/kinetis.dtsi              | 34 ++++++++++++++++
->  arch/arm/mach-kinetis/include/mach/memory.h | 61 +++++++++++++++++++++++++++++
->  3 files changed, 99 insertions(+)
->  create mode 100644 arch/arm/mach-kinetis/include/mach/memory.h
-> 
-> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-> index b21592b..8ccffee 100644
-> --- a/arch/arm/Kconfig
-> +++ b/arch/arm/Kconfig
-> @@ -971,6 +971,10 @@ config ARCH_KINETIS
->  	select CLKSRC_KINETIS
->  	select PINCTRL
->  	select PINCTRL_KINETIS
-> +	select DMADEVICES
-> +	select FSL_EDMA
-> +	select DMA_OF
-> +	select NEED_MACH_MEMORY_H
+The directories contain very few files for new platforms these days,
+so we just tend to lump everything together by manufacturer.
 
-I think DMA_OF is implied by dmaengine support in combination with CONFIG_OF
-
-> +
-> +#ifndef _MACH_KINETIS_MEMORY_H
-> +#define _MACH_KINETIS_MEMORY_H
-> +
-> +#ifndef __ASSEMBLY__
-> +
+> diff --git a/arch/arm/mach-rcm-k1879xb1/board-dt.c b/arch/arm/mach-rcm-k1879xb1/board-dt.c
+> new file mode 100644
+> index 0000000..48d3835
+> --- /dev/null
+> +++ b/arch/arm/mach-rcm-k1879xb1/board-dt.c
+> @@ -0,0 +1,145 @@
 > +/*
-> + * On Kinetis K70, consistent DMA memory resides in a special
-> + * DDRAM alias region (non-cacheable DDRAM at 0x80000000).
-> + *
-> + */
-> +#define KINETIS_PHYS_DMA_OFFSET UL(0x80000000)
-> +
-> +/*
-> + * Mask of the field used to distinguish DDRAM aliases
-> + */
-> +#define KINETIS_DRAM_ALIAS_MASK UL(0xf8000000)
+> + *  arch/arm/mach-rcm-k1879/board-dt.c
 
-This should be expressed using the 'dma-ranges' properties in the
-bus nodes above any DMA master, the normal DMA mapping code will
-then do the right thing.
+Generally speaking, please avoid comments that only contain the file
+names. Also, 'board-dt' is not a particularly useful name if that is
+used to handle all machines. Maybe call it the same as the platform.
+
+> +
+> +static void __iomem *k1879_sctl_base(void)
+> +{
+> +	return (void __iomem *)RCM_K1879_SCTL_VIRT_BASE;
+> +}
+
+Please don't hardcode virtual addresses like this. Instead read it from
+DT at boot time using of_iomap or similar.
+
+> +static void k1879_level_irq_i2c0_fixup(unsigned int irq, struct irq_desc *desc)
+> +{
+> +	writel(1, k1879_mif_base() + RCM_K1879_MIF_I2C_INT_STAT);
+> +	handle_level_irq(irq, desc);
+> +}
+> +
+> +static void k1879_level_irq_i2c1_fixup(unsigned int irq, struct irq_desc *desc)
+> +{
+> +	writel(1 << 0, k1879_sctl_base() + RCM_K1879_SCTL_INT_P_OUT);
+> +	handle_level_irq(irq, desc);
+> +}
+> +
+> +static void k1879_level_irq_i2c2_fixup(unsigned int irq, struct irq_desc *desc)
+> +{
+> +	writel(1 << 1, k1879_sctl_base() + RCM_K1879_SCTL_INT_P_OUT);
+> +	handle_level_irq(irq, desc);
+> +}
+> +
+> +static void k1879_level_irq_i2c3_fixup(unsigned int irq, struct irq_desc *desc)
+> +{
+> +	writel(1 << 2, k1879_sctl_base() + RCM_K1879_SCTL_INT_P_OUT);
+> +	handle_level_irq(irq, desc);
+> +}
+> +
+> +static void (*k1879_i2c_fixups[])(unsigned int irq, struct irq_desc *desc) = {
+> +	k1879_level_irq_i2c0_fixup,
+> +	k1879_level_irq_i2c1_fixup,
+> +	k1879_level_irq_i2c2_fixup,
+> +	k1879_level_irq_i2c3_fixup
+> +};
+
+It looks to me like this could be implemented as a nested irq domain with
+its own irqchip driver rather than a hack in platform code.
+
+> +static void __init k1879_dt_mach_init(void)
+> +{
+> +	struct device_node *np;
+> +
+> +	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
+> +	k1879_mif = ioremap(RCM_K1879_MIF_PHYS_BASE,
+> +			    RCM_K1879_MIF_SIZE);
+> +	BUG_ON(!k1879_mif);
+> +
+> +	np = of_find_compatible_node(NULL, NULL, "arm,sp805");
+> +	WARN_ON(!np);
+> +	if (np)
+> +		k1879_wdt = of_iomap(np, 0);
+
+Please move this into the watchdog driver as a reboot handler.
+
+> +	/* Setup i2c interrupt fixups */
+> +	setup_i2c_fixups();
+> +
+> +	/* I2C0 (Internal, HDMI) needs some extra love */
+> +	do {
+> +		void __iomem *mif;
+> +
+> +		mif = k1879_mif_base();
+> +		writel(1, mif + RCM_K1879_MIF_I2C_INT_TYPE_ENA);
+> +		writel(1, mif + RCM_K1879_MIF_I2C_INT_TYPE);
+> +		writel(1, mif + RCM_K1879_MIF_I2C_INT_ENA);
+> +	} while (0);
+> +}
+
+It would be nice if this could be moved to some driver as well, ideally
+the one that already maps k1879_mif_base. Does this need to be
+done really early at boot time?
+
+
+> diff --git a/arch/arm/mach-rcm-k1879xb1/hardware.h b/arch/arm/mach-rcm-k1879xb1/hardware.h
+> new file mode 100644
+> index 0000000..2977ed7
+> --- /dev/null
+> +++ b/arch/arm/mach-rcm-k1879xb1/hardware.h
+> @@ -0,0 +1,48 @@
+> +/*
+> + *  arch/arm/mach-rcm-k1879/board-dt.c
+
+;-)
+
 
 	Arnd
