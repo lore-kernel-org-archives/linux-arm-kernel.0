@@ -1,109 +1,96 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Tue, 30 Jun 2015 16:36:57 +0200
-Subject: [PATCH v3 6/6] dmaengine: mv_xor: optimize performance by using a
- subset of the XOR channels
-In-Reply-To: <1435675017-875-1-git-send-email-thomas.petazzoni@free-electrons.com>
-References: <1435675017-875-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1435675017-875-7-git-send-email-thomas.petazzoni@free-electrons.com>
+From: msalter@redhat.com (Mark Salter)
+Date: Tue, 30 Jun 2015 10:50:48 -0400
+Subject: [PATCH 1/2] arm64/efi: base UEFI mapping permissions on region
+ attributes
+In-Reply-To: <1435659443-17625-2-git-send-email-ard.biesheuvel@linaro.org>
+References: <1435659443-17625-1-git-send-email-ard.biesheuvel@linaro.org>
+ <1435659443-17625-2-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <1435675848.21009.10.camel@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Due to how async_tx behaves internally, having more XOR channels than
-CPUs is actually hurting performance more than it improves it, because
-memcpy requests get scheduled on a different channel than the XOR
-requests, but async_tx will still wait for the completion of the
-memcpy requests before scheduling the XOR requests.
+On Tue, 2015-06-30 at 12:17 +0200, Ard Biesheuvel wrote:
 
-It is in fact more efficient to have at most one channel per CPU,
-which this patch implements by limiting the number of channels per
-engine, and the number of engines registered depending on the number
-of availables CPUs.
+> Currently, we infer the UEFI memory region mapping permissions
+> from the memory region type (i.e., runtime services code are
+> mapped RWX and runtime services data mapped RW-). This appears to
+> work fine but is not entirely UEFI spec compliant. So instead, use
+> the designated permission attributes to decide how these regions
+> should be mapped.
+> 
+> Since UEFIv2.5 introduces a new EFI_MEMORY_RO permission attribute,
+> and redefines EFI_MEMORY_WP as a cacheability attribute, use only
+> the former as a read-only attribute. For setting the PXN bit, the
+> corresponding EFI_MEMORY_XP attribute is used.
+> 
+> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> ---
+>  arch/arm64/kernel/efi.c | 32 +++++++++++++-------
+>  1 file changed, 21 insertions(+), 11 deletions(-)
+> 
+> diff --git a/arch/arm64/kernel/efi.c b/arch/arm64/kernel/efi.c
+> index ab21e0d58278..5dcab58d5d30 100644
+> --- a/arch/arm64/kernel/efi.c
+> +++ b/arch/arm64/kernel/efi.c
+> @@ -247,20 +247,30 @@ static bool __init efi_virtmap_init(void)
+>  		memrange_efi_to_native(&paddr, &npages);
+>  		size = npages << PAGE_SHIFT;
+>  
+> -		pr_info("  EFI remap 0x%016llx => %p\n",
+> -			md->phys_addr, (void *)md->virt_addr);
+> -
+> -		/*
+> -		 * Only regions of type EFI_RUNTIME_SERVICES_CODE need to be
+> -		 * executable, everything else can be mapped with the XN bits
+> -		 * set.
+> -		 */
+>  		if (!is_normal_ram(md))
+>  			prot = __pgprot(PROT_DEVICE_nGnRE);
+> -		else if (md->type == EFI_RUNTIME_SERVICES_CODE)
+> -			prot = PAGE_KERNEL_EXEC;
+>  		else
+> -			prot = PAGE_KERNEL;
+> +			prot = PAGE_KERNEL_EXEC;
+> +
+> +		/*
+> +		 * On 64 KB granule kernels, only use strict permissions when
+> +		 * the region does not share a 64 KB page frame with another
+> +		 * region at either end.
+> +		 */
+> +		if (!IS_ENABLED(CONFIG_ARM64_64K_PAGES) ||
+> +		    !(md->virt_addr % PAGE_SIZE ||
+> +		      (md->phys_addr + md->num_pages * EFI_PAGE_SIZE) % PAGE_SIZE)) {
 
-Marvell platforms are currently available in one CPU, two CPUs and
-four CPUs configurations:
+I think this would read easier with:
 
- - in the configurations with one CPU, only one channel from one
-   engine is used.
+		    (PAGE_ALIGNED(md->virt_addr) &&
+		      PAGE_ALIGNED(md->phys_addr + md->num_pages * EFI_PAGE_SIZE))) {
 
- - in the configurations with two CPUs, only one channel from each
-   engine is used (they are two XOR engines)
+> +
+> +			if (md->attribute & EFI_MEMORY_RO)
+> +				prot |= __pgprot(PTE_RDONLY);
+> +			if (md->attribute & EFI_MEMORY_XP)
+> +				prot |= __pgprot(PTE_PXN);
+> +		}
+> +
+> +		pr_info("  EFI remap 0x%016llx => %p (R%c%c)\n",
+> +			md->phys_addr, (void *)md->virt_addr,
+> +			prot & __pgprot(PTE_RDONLY) ? '-' : 'W',
+> +			prot & __pgprot(PTE_PXN) ? '-' : 'X');
 
- - in the configurations with four CPUs, both channels of both engines
-   are used.
+You can't maninulate pgprot_t directly like that. It will
+break STRICT_MM_TYPECHECKS. You need to use __pgprot_modify()
+and/or pgprot_val().
 
-Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
----
- drivers/dma/mv_xor.c | 24 +++++++++++++++++++++++-
- 1 file changed, 23 insertions(+), 1 deletion(-)
+arch/arm64/kernel/efi.c: In function ?efi_virtmap_init?:
+arch/arm64/kernel/efi.c:266:10: error: invalid operands to binary | (have ?pgprot_t? and ?pgprot_t?)
+     prot |= __pgprot(PTE_RDONLY);
+          ^
+   ...
+   
+(In trying that, I see there are a number of other places which
+need some STRICT_MM_TYPECHECKS fixing)
 
-diff --git a/drivers/dma/mv_xor.c b/drivers/dma/mv_xor.c
-index 6e09d59..2cdfca7 100644
---- a/drivers/dma/mv_xor.c
-+++ b/drivers/dma/mv_xor.c
-@@ -26,6 +26,7 @@
- #include <linux/of.h>
- #include <linux/of_irq.h>
- #include <linux/irqdomain.h>
-+#include <linux/cpumask.h>
- #include <linux/platform_data/dma-mv_xor.h>
- 
- #include "dmaengine.h"
-@@ -1137,12 +1138,15 @@ static const struct of_device_id mv_xor_dt_ids[] = {
- };
- MODULE_DEVICE_TABLE(of, mv_xor_dt_ids);
- 
-+static unsigned int mv_xor_engine_count;
-+
- static int mv_xor_probe(struct platform_device *pdev)
- {
- 	const struct mbus_dram_target_info *dram;
- 	struct mv_xor_device *xordev;
- 	struct mv_xor_platform_data *pdata = dev_get_platdata(&pdev->dev);
- 	struct resource *res;
-+	unsigned int max_engines, max_channels;
- 	int i, ret;
- 	int op_in_desc;
- 
-@@ -1186,6 +1190,21 @@ static int mv_xor_probe(struct platform_device *pdev)
- 	if (!IS_ERR(xordev->clk))
- 		clk_prepare_enable(xordev->clk);
- 
-+	/*
-+	 * We don't want to have more than one channel per CPU in
-+	 * order for async_tx to perform well. So we limit the number
-+	 * of engines and channels so that we take into account this
-+	 * constraint. Note that we also want to use channels from
-+	 * separate engines when possible.
-+	 */
-+	max_engines = num_present_cpus();
-+	max_channels = min_t(unsigned int,
-+			     MV_XOR_MAX_CHANNELS,
-+			     DIV_ROUND_UP(num_present_cpus(), 2));
-+
-+	if (mv_xor_engine_count >= max_engines)
-+		return 0;
-+
- 	if (pdev->dev.of_node) {
- 		struct device_node *np;
- 		int i = 0;
-@@ -1199,6 +1218,9 @@ static int mv_xor_probe(struct platform_device *pdev)
- 			int irq;
- 			op_in_desc = (int)of_id->data;
- 
-+			if (i >= max_channels)
-+				continue;
-+
- 			dma_cap_zero(cap_mask);
- 			dma_cap_set(DMA_MEMCPY, cap_mask);
- 			dma_cap_set(DMA_XOR, cap_mask);
-@@ -1222,7 +1244,7 @@ static int mv_xor_probe(struct platform_device *pdev)
- 			i++;
- 		}
- 	} else if (pdata && pdata->channels) {
--		for (i = 0; i < MV_XOR_MAX_CHANNELS; i++) {
-+		for (i = 0; i < max_channels; i++) {
- 			struct mv_xor_channel_data *cd;
- 			struct mv_xor_chan *chan;
- 			int irq;
--- 
-2.4.5
+>  
+>  		create_pgd_mapping(&efi_mm, paddr, md->virt_addr, size, prot);
+>  	}
