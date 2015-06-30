@@ -1,38 +1,38 @@
-From: timur@codeaurora.org (Timur Tabi)
-Date: Tue, 30 Jun 2015 09:07:54 -0500
-Subject: [PATCH 1/3] hvc_dcc: bind driver to core0 for reads and writes
-In-Reply-To: <20150630135815.GK27725@arm.com>
-References: <1435344756-20901-1-git-send-email-timur@codeaurora.org>
- <20150630135815.GK27725@arm.com>
-Message-ID: <5592A2BA.7010604@codeaurora.org>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Tue, 30 Jun 2015 16:08:29 +0200
+Subject: [PATCH v3 3/3] ARM: mvebu: disable IP checksum with jumbo
+ frames for Armada 370
+In-Reply-To: <1435673149-12599-4-git-send-email-simon.guinot@sequanux.org>
+References: <1435673149-12599-1-git-send-email-simon.guinot@sequanux.org>
+ <1435673149-12599-4-git-send-email-simon.guinot@sequanux.org>
+Message-ID: <20150630160829.7bec1a8f@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Will Deacon wrote:
->> >Selecting this option will enable code that serializes all console
->> >input and output to core 0.  The DCC driver will create input and
->> >output FIFOs that all cores will use.  Reads and writes from/to DCC
->> >are handled by a workqueue that runs only core 0.
+Dear Simon Guinot,
 
-> What happens if CPU0 is hotplugged off?
+On Tue, 30 Jun 2015 16:05:49 +0200, Simon Guinot wrote:
+> The Ethernet controller found in the Armada 370, 380 and 385 SoCs don't
+> support TCP/IP checksumming with frame sizes larger than 1600 bytes.
+> 
+> This patch fixes the issue by disabling the features NETIF_F_IP_CSUM and
+> NETIF_F_TSO for the Armada 370 and compatibles SoCs when the MTU is set
+> to a value greater than 1600 bytes.
+> 
+> Signed-off-by: Simon Guinot <simon.guinot@sequanux.org>
+> Fixes: c5aff18204da ("net: mvneta: driver for Marvell Armada 370/XP network unit")
+> Cc: <stable@vger.kernel.org> # v3.8+
 
-I guess the whole thing just breaks.
+The title of this patch should be:
 
-I don't know what to say.  Trace32's DCC window is latched to CPU0.  If 
-that CPU is hotplugged off, then I don't think there's a mechanism for 
-Trace32 to migrate to another CPU.  It will broken no matter what.
+	net: mvneta: disable IP checksum with jumbo frames for Armada 370
 
-That's why this feature is disabled by default.  If you're working on an 
-SMP ARM system and using Trace32, you will need this patch.  It might be 
-possible for Lauterbach to fix Trace32 to provide this feature 
-internally in some situations (e.g. SMP mode where there's one window 
-for all cores), but not in every situation.
+because it is touching the network driver, and not the mvebu ARM core code.
 
-I can add a "depends on !CPU_HOTPLUG" to the Kconfig, but I think that's 
-overkill.  This is really a "use it if you need it" patch, and DCC is 
-used mostly for debugging.
+Thanks,
 
+Thomas
 -- 
-Sent by an employee of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the
-Code Aurora Forum, hosted by The Linux Foundation.
+Thomas Petazzoni, CTO, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
