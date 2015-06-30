@@ -1,33 +1,48 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Tue, 30 Jun 2015 10:28:53 +0200
-Subject: [PATCH 02/41] clocksource: cadence_ttc: Migrate to new 'set-state'
- interface
-In-Reply-To: <effe1fbb8239a26043a7e7bc5340f9ddd9aabd81.1434622147.git.viresh.kumar@linaro.org>
-References: <cover.1434622147.git.viresh.kumar@linaro.org>
- <effe1fbb8239a26043a7e7bc5340f9ddd9aabd81.1434622147.git.viresh.kumar@linaro.org>
-Message-ID: <55925345.8080207@linaro.org>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 30 Jun 2015 09:52:26 +0100
+Subject: [PATCH] arm: perf: Set affinity for PPI based PMUs
+In-Reply-To: <1435615126-16492-1-git-send-email-sboyd@codeaurora.org>
+References: <1435615126-16492-1-git-send-email-sboyd@codeaurora.org>
+Message-ID: <20150630085225.GA25828@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/18/2015 12:54 PM, Viresh Kumar wrote:
-> Migrate cadence_ttc driver to the new 'set-state' interface provided by
-> clockevents core, the earlier 'set-mode' interface is marked obsolete
-> now.
->
-> This also enables us to implement callbacks for new states of clockevent
-> devices, for example: ONESHOT_STOPPED.
->
-> Cc: Michal Simek <michal.simek@xilinx.com>
-> Cc: S?ren Brinkmann <soren.brinkmann@xilinx.com>
-> Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
+Hi Stephen,
+
+On Mon, Jun 29, 2015 at 10:58:46PM +0100, Stephen Boyd wrote:
+> For PPI based PMUs, we bail out early in of_pmu_irq_cfg() without
+> setting the PMU's supported_cpus bitmap. This causes the
+> smp_call_function_any() in armv7_probe_num_events() to fail. Set
+> the bitmap to be all CPUs so that we properly probe PMUs that use
+> PPIs.
+> 
+> Fixes: cc88116da0d1 ("arm: perf: treat PMUs as CPU affine")
+> Cc: Mark Rutland <mark.rutland@arm.com>
+> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
 > ---
+>  arch/arm/kernel/perf_event.c | 4 +++-
+>  1 file changed, 3 insertions(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm/kernel/perf_event.c b/arch/arm/kernel/perf_event.c
+> index 54272e0be713..7d5379c1c443 100644
+> --- a/arch/arm/kernel/perf_event.c
+> +++ b/arch/arm/kernel/perf_event.c
+> @@ -795,8 +795,10 @@ static int of_pmu_irq_cfg(struct arm_pmu *pmu)
+>  
+>  	/* Don't bother with PPIs; they're already affine */
+>  	irq = platform_get_irq(pdev, 0);
+> -	if (irq >= 0 && irq_is_percpu(irq))
+> +	if (irq >= 0 && irq_is_percpu(irq)) {
+> +		cpumask_setall(&pmu->supported_cpus);
+>  		return 0;
+> +	}
 
-Sounds good.
+Looks good to me as a fix, but I'm currently working on extending the
+interrupt-affinity property to work with both SPIs and PPIs so that we
+can use it to identify PMU affinity on multi-cluster systems.
 
+  https://git.kernel.org/cgit/linux/kernel/git/will/linux.git/commit/?h=perf/updates&id=633fa0b629d86e58d68aff295f92031877dd0294
 
--- 
-  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+Any chance you could take that for a spin on your platform, please?
 
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+Will
