@@ -1,88 +1,265 @@
 From: pawelo@king.net.pl (Paul Osmialowski)
-Date: Tue, 30 Jun 2015 14:27:22 +0200
-Subject: [PATCH v2 1/9] arm: allow copying of vector table to internal SRAM
- memory
+Date: Tue, 30 Jun 2015 14:27:27 +0200
+Subject: [PATCH v2 6/9] arm: twr-k70f120m: extend Freescale eDMA driver with
+ the ability to support Kinetis SoC
 In-Reply-To: <1435667250-28299-1-git-send-email-pawelo@king.net.pl>
 References: <1435667250-28299-1-git-send-email-pawelo@king.net.pl>
-Message-ID: <1435667250-28299-2-git-send-email-pawelo@king.net.pl>
+Message-ID: <1435667250-28299-7-git-send-email-pawelo@king.net.pl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Based on part of the commit published on Emcraft git repo:
-
-https://github.com/EmcraftSystems/linux-emcraft.git
-
-2ce1841b590d014d8738215fb1ffe05f53c8d9f0 "some commit"
-
-by: Dmitry Cherkassov <d_cherkasov@emcraft.com>
-
-The ARM v7M allows setting the vector table either in
-the boot memory or in the internal SRAM memory, controlled
-by Bit 29 in the Vector Table Base register. This implies
-that the OS vector table needs to be copied to the internal RAM.
-
-New option CONFIG_COPY_VECTOR_TABLE_TO_SRAM_ADDR allows specification
-of the desired destination for the OS vector table.
+Surprisingly small amount of work was required in order to extend already
+existing eDMA driver with the support for Kinetis SoC architecture.
 
 Signed-off-by: Paul Osmialowski <pawelo@king.net.pl>
 ---
- arch/arm/Kconfig-nommu      | 11 +++++++++++
- arch/arm/kernel/entry-v7m.S |  3 +++
- arch/arm/mm/proc-v7m.S      | 11 +++++++++++
- 3 files changed, 25 insertions(+)
+ Documentation/devicetree/bindings/dma/fsl-edma.txt |  38 ++++++-
+ drivers/dma/fsl-edma.c                             | 114 ++++++++++++++++-----
+ 2 files changed, 125 insertions(+), 27 deletions(-)
 
-diff --git a/arch/arm/Kconfig-nommu b/arch/arm/Kconfig-nommu
-index aed66d5..d081fcb 100644
---- a/arch/arm/Kconfig-nommu
-+++ b/arch/arm/Kconfig-nommu
-@@ -62,3 +62,14 @@ config ARM_MPU
+diff --git a/Documentation/devicetree/bindings/dma/fsl-edma.txt b/Documentation/devicetree/bindings/dma/fsl-edma.txt
+index 191d7bd..88c3e20 100644
+--- a/Documentation/devicetree/bindings/dma/fsl-edma.txt
++++ b/Documentation/devicetree/bindings/dma/fsl-edma.txt
+@@ -9,6 +9,7 @@ group, DMAMUX0 or DMAMUX1, but not both.
+ Required properties:
+ - compatible :
+ 	- "fsl,vf610-edma" for eDMA used similar to that on Vybrid vf610 SoC
++	- "fsl,kinetis-edma" for eDMA used similar to that on Kinetis SoC
+ - reg : Specifies base physical address(s) and size of the eDMA registers.
+ 	The 1st region is eDMA control register's address and size.
+ 	The 2nd and the 3rd regions are programmable channel multiplexing
+@@ -16,7 +17,8 @@ Required properties:
+ - interrupts : A list of interrupt-specifiers, one for each entry in
+ 	interrupt-names.
+ - interrupt-names : Should contain:
+-	"edma-tx" - the transmission interrupt
++	"edma-tx" - the transmission interrupt (Vybrid)
++	"edma-tx-n,m" - interrupt for channels n (0-15) and m (16-31) (Kinetis)
+ 	"edma-err" - the error interrupt
+ - #dma-cells : Must be <2>.
+ 	The 1st cell specifies the DMAMUX(0 for DMAMUX0 and 1 for DMAMUX1).
+@@ -28,6 +30,7 @@ Required properties:
+ - clock-names : A list of channel group clock names. Should contain:
+ 	"dmamux0" - clock name of mux0 group
+ 	"dmamux1" - clock name of mux1 group
++	"edma"    - clock gate for whole controller (Kinetis only)
+ - clocks : A list of phandle and clock-specifier pairs, one for each entry in
+ 	clock-names.
  
-          If your CPU has an MPU then you should choose 'y' here unless you
-          know that you do not want to use the MPU.
+@@ -54,6 +57,39 @@ edma0: dma-controller at 40018000 {
+ 		<&clks VF610_CLK_DMAMUX1>;
+ };
+ 
++edma: dma-controller at 40008000 {
++	compatible = "fsl,kinetis-edma";
++	reg = <0x40008000 0x2000>, /* DMAC */
++		<0x40021000 0x1000>, /* DMAMUX0 */
++		<0x40022000 0x1000>; /* DMAMUX1 */
++	#dma-cells = <2>;
++	dma-channels = <32>;
++	interrupts =	 <0>,  <1>,  <2>,  <3>,
++			 <4>,  <5>,  <6>,  <7>,
++			 <8>,  <9>, <10>, <11>,
++			<12>, <13>, <14>, <15>,
++			<16>;
++	interrupt-names = "edma-tx-0,16",
++			  "edma-tx-1,17",
++			  "edma-tx-2,18",
++			  "edma-tx-3,19",
++			  "edma-tx-4,20",
++			  "edma-tx-5,21",
++			  "edma-tx-6,22",
++			  "edma-tx-7,23",
++			  "edma-tx-8,24",
++			  "edma-tx-9,25",
++			  "edma-tx-10,26",
++			  "edma-tx-11,27",
++			  "edma-tx-12,28",
++			  "edma-tx-13,29",
++			  "edma-tx-14,30",
++			  "edma-tx-15,31",
++			  "edma-err";
++	clocks = <&mcg_cclk_gate 6 1>,
++		 <&mcg_pclk_gate 5 1>, <&mcg_pclk_gate 5 2>;
++	clock-names = "edma", "dmamux0", "dmamux1";
++};
+ 
+ * DMA clients
+ DMA client drivers that uses the DMA function must use the format described
+diff --git a/drivers/dma/fsl-edma.c b/drivers/dma/fsl-edma.c
+index 915eec3..e41a3b9 100644
+--- a/drivers/dma/fsl-edma.c
++++ b/drivers/dma/fsl-edma.c
+@@ -164,13 +164,13 @@ struct fsl_edma_desc {
+ struct fsl_edma_engine {
+ 	struct dma_device	dma_dev;
+ 	void __iomem		*membase;
++	struct clk		*clk;
+ 	void __iomem		*muxbase[DMAMUX_NR];
+ 	struct clk		*muxclk[DMAMUX_NR];
+ 	struct mutex		fsl_edma_mutex;
+ 	u32			n_chans;
+-	int			txirq;
+-	int			errirq;
+ 	bool			big_endian;
++	bool			kinetis;
+ 	struct fsl_edma_chan	chans[];
+ };
+ 
+@@ -788,42 +788,85 @@ static void fsl_edma_free_chan_resources(struct dma_chan *chan)
+ }
+ 
+ static int
+-fsl_edma_irq_init(struct platform_device *pdev, struct fsl_edma_engine *fsl_edma)
++fsl_edma_irq_init(struct platform_device *pdev,
++		  struct fsl_edma_engine *fsl_edma)
+ {
++	struct device_node *np = pdev->dev.of_node;
++	int irq, errirq;
+ 	int ret;
+ 
+-	fsl_edma->txirq = platform_get_irq_byname(pdev, "edma-tx");
+-	if (fsl_edma->txirq < 0) {
+-		dev_err(&pdev->dev, "Can't get edma-tx irq.\n");
+-		return fsl_edma->txirq;
+-	}
+-
+-	fsl_edma->errirq = platform_get_irq_byname(pdev, "edma-err");
+-	if (fsl_edma->errirq < 0) {
++	errirq = platform_get_irq_byname(pdev, "edma-err");
++	if (errirq < 0) {
+ 		dev_err(&pdev->dev, "Can't get edma-err irq.\n");
+-		return fsl_edma->errirq;
++		return irq;
+ 	}
+ 
+-	if (fsl_edma->txirq == fsl_edma->errirq) {
+-		ret = devm_request_irq(&pdev->dev, fsl_edma->txirq,
+-				fsl_edma_irq_handler, 0, "eDMA", fsl_edma);
+-		if (ret) {
+-			dev_err(&pdev->dev, "Can't register eDMA IRQ.\n");
+-			 return  ret;
++	if (fsl_edma->kinetis) {
++		int i;
++		int irqs = of_irq_count(np);
 +
-+config COPY_VECTOR_TABLE_TO_SRAM_ADDR
-+	hex 'If non-zero, copy Vector Table to this SRAM Address' if CPU_V7M
-+	default 0x00000000
-+	depends on CPU_V7M
-+	help
-+	  The ARM v7M allows setting the vector table either in
-+	  the boot memory or in the internal SRAM memory, controlled
-+	  by Bit 29 in the Vector Table Base register.
-+	  This implies that the OS vector table needs to be copied to
-+	  the internal RAM.
-diff --git a/arch/arm/kernel/entry-v7m.S b/arch/arm/kernel/entry-v7m.S
-index b6c8bb9..114096e 100644
---- a/arch/arm/kernel/entry-v7m.S
-+++ b/arch/arm/kernel/entry-v7m.S
-@@ -146,3 +146,6 @@ ENTRY(vector_table)
- 	.rept	CONFIG_CPU_V7M_NUM_IRQ
- 	.long	__irq_entry		@ External Interrupts
- 	.endr
-+#if CONFIG_COPY_VECTOR_TABLE_TO_SRAM_ADDR > 0x00000000
-+ENTRY(vector_table_end)
-+#endif
-diff --git a/arch/arm/mm/proc-v7m.S b/arch/arm/mm/proc-v7m.S
-index 67d9209..ded9504 100644
---- a/arch/arm/mm/proc-v7m.S
-+++ b/arch/arm/mm/proc-v7m.S
-@@ -83,7 +83,18 @@ ENDPROC(cpu_v7m_do_resume)
- __v7m_setup:
- 	@ Configure the vector table base address
- 	ldr	r0, =BASEADDR_V7M_SCB
-+#if CONFIG_COPY_VECTOR_TABLE_TO_SRAM_ADDR > 0x00000000
-+	ldr	r12, =CONFIG_COPY_VECTOR_TABLE_TO_SRAM_ADDR
-+	mov	r5, r12			@ Copy the kernel vector_table to
-+	ldr	r6, =vector_table	@ the in-SRAM vector table
-+	ldr	r4, =vector_table_end
-+1:	ldr	r3, [r6], #4
-+	str	r3, [r5], #4
-+	cmp	r6, r4
-+	bne	1b			@ End of the copy code
-+#else
- 	ldr	r12, =vector_table
-+#endif
- 	str	r12, [r0, V7M_SCB_VTOR]
++		if (irqs <= 1) {
++			dev_err(&pdev->dev, "Wrong eDMA irq count %d\n", irqs);
++			return -EINVAL;
+ 		}
+-	} else {
+-		ret = devm_request_irq(&pdev->dev, fsl_edma->txirq,
++
++		for (i = 0; i < (irqs - 1); i++) {
++			char irq_name[32];
++
++			sprintf(irq_name, "edma-tx-%d,%d", i, 16 + i);
++			irq = platform_get_irq_byname(pdev, irq_name);
++			if (irq < 0) {
++				dev_err(&pdev->dev, "Can't get %s irq.\n",
++							irq_name);
++				return irq;
++			}
++
++			ret = devm_request_irq(&pdev->dev, irq,
+ 				fsl_edma_tx_handler, 0, "eDMA tx", fsl_edma);
+-		if (ret) {
+-			dev_err(&pdev->dev, "Can't register eDMA tx IRQ.\n");
+-			return  ret;
++			if (ret) {
++				dev_err(&pdev->dev, "Can't register %s IRQ.\n",
++							irq_name);
++				return  ret;
++			}
+ 		}
  
- 	@ enable UsageFault, BusFault and MemManage fault.
+-		ret = devm_request_irq(&pdev->dev, fsl_edma->errirq,
+-				fsl_edma_err_handler, 0, "eDMA err", fsl_edma);
++		ret = devm_request_irq(&pdev->dev, errirq,
++			fsl_edma_err_handler, 0, "eDMA err", fsl_edma);
+ 		if (ret) {
+ 			dev_err(&pdev->dev, "Can't register eDMA err IRQ.\n");
+-			return  ret;
++		return  ret;
++		}
++	} else {
++		irq = platform_get_irq_byname(pdev, "edma-tx");
++		if (irq < 0) {
++			dev_err(&pdev->dev, "Can't get edma-tx irq.\n");
++			return irq;
++		}
++
++		if (irq == errirq) {
++			ret = devm_request_irq(&pdev->dev, irq,
++				fsl_edma_irq_handler, 0, "eDMA", fsl_edma);
++			if (ret) {
++				dev_err(&pdev->dev,
++						"Can't register eDMA IRQ.\n");
++				return  ret;
++			}
++		} else {
++			ret = devm_request_irq(&pdev->dev, irq,
++				fsl_edma_tx_handler, 0, "eDMA tx", fsl_edma);
++			if (ret) {
++				dev_err(&pdev->dev,
++					    "Can't register eDMA tx IRQ.\n");
++				return  ret;
++			}
++
++			ret = devm_request_irq(&pdev->dev, errirq,
++				fsl_edma_err_handler, 0, "eDMA err", fsl_edma);
++			if (ret) {
++				dev_err(&pdev->dev,
++					    "Can't register eDMA err IRQ.\n");
++				return  ret;
++			}
+ 		}
+ 	}
+ 
+@@ -851,6 +894,7 @@ static int fsl_edma_probe(struct platform_device *pdev)
+ 		return -ENOMEM;
+ 
+ 	fsl_edma->n_chans = chans;
++	fsl_edma->kinetis = of_device_is_compatible(np, "fsl,kinetis-edma");
+ 	mutex_init(&fsl_edma->fsl_edma_mutex);
+ 
+ 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+@@ -858,6 +902,20 @@ static int fsl_edma_probe(struct platform_device *pdev)
+ 	if (IS_ERR(fsl_edma->membase))
+ 		return PTR_ERR(fsl_edma->membase);
+ 
++	if (fsl_edma->kinetis) {
++		fsl_edma->clk = devm_clk_get(&pdev->dev, "edma");
++		if (IS_ERR(fsl_edma->clk)) {
++			dev_err(&pdev->dev, "Missing EDMA clock.\n");
++			return PTR_ERR(fsl_edma->clk);
++		}
++
++		ret = clk_prepare_enable(fsl_edma->clk);
++		if (ret) {
++			dev_err(&pdev->dev, "EDMA clk failed.\n");
++			return ret;
++		}
++	}
++
+ 	for (i = 0; i < DMAMUX_NR; i++) {
+ 		char clkname[32];
+ 
+@@ -956,10 +1014,14 @@ static int fsl_edma_remove(struct platform_device *pdev)
+ 	for (i = 0; i < DMAMUX_NR; i++)
+ 		clk_disable_unprepare(fsl_edma->muxclk[i]);
+ 
++	if (fsl_edma->kinetis)
++		clk_disable_unprepare(fsl_edma->clk);
++
+ 	return 0;
+ }
+ 
+ static const struct of_device_id fsl_edma_dt_ids[] = {
++	{ .compatible = "fsl,kinetis-edma", },
+ 	{ .compatible = "fsl,vf610-edma", },
+ 	{ /* sentinel */ }
+ };
 -- 
 2.3.6
