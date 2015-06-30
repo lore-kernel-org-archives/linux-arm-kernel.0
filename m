@@ -1,8 +1,8 @@
 From: gerg@uclinux.org (Greg Ungerer)
-Date: Tue, 30 Jun 2015 23:52:54 +1000
-Subject: [PATCH for 3.14.y] bus: mvebu: pass the coherency availability
+Date: Tue, 30 Jun 2015 23:54:34 +1000
+Subject: [PATCH for 3.10.y v2] bus: mvebu: pass the coherency availability
  information at init time
-Message-ID: <1435672374-29209-1-git-send-email-gerg@uclinux.org>
+Message-ID: <1435672474-29252-1-git-send-email-gerg@uclinux.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -26,7 +26,7 @@ Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 Link: https://lkml.kernel.org/r/1397483228-25625-4-git-send-email-thomas.petazzoni at free-electrons.com
 Signed-off-by: Jason Cooper <jason@lakedaemon.net>
 
-[ Greg Ungerer: back ported to linux-3.14.y
+[ Greg Ungerer: back ported to linux-3.10.y
   Back port necessary due to large code differences in affected files.
   This change in combination with commit e553554536 ("ARM: mvebu: disable
   I/O coherency on non-SMP situations on Armada 370/375/38x/XP") is
@@ -36,60 +36,86 @@ Signed-off-by: Jason Cooper <jason@lakedaemon.net>
   this causes rare unreliable system behavior including oops. ]
 
 Signed-off-by: Greg Ungerer <gerg@uclinux.org>
+Acked-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
 ---
- arch/arm/mach-dove/board-dt.c       |  2 +-
- arch/arm/mach-kirkwood/board-dt.c   |  2 +-
- arch/arm/mach-mvebu/armada-370-xp.c |  2 +-
+v2:
+* rebase on top of 3.10.82
+* include all of original commit mesage
+
+ arch/arm/mach-dove/common.c         |  2 +-
+ arch/arm/mach-kirkwood/common.c     |  2 +-
+ arch/arm/mach-mv78xx0/common.c      |  4 ++--
+ arch/arm/mach-mvebu/armada-370-xp.c |  3 ++-
  arch/arm/mach-mvebu/coherency.c     | 15 +++++++++++++++
  arch/arm/mach-mvebu/coherency.h     |  1 +
- drivers/bus/mvebu-mbus.c            | 11 +++--------
+ arch/arm/mach-orion5x/common.c      |  2 +-
+ drivers/bus/mvebu-mbus.c            |  5 ++---
  include/linux/mbus.h                |  2 +-
- 7 files changed, 23 insertions(+), 12 deletions(-)
+ 9 files changed, 26 insertions(+), 10 deletions(-)
 
-diff --git a/arch/arm/mach-dove/board-dt.c b/arch/arm/mach-dove/board-dt.c
-index 49fa9ab..7a7a09a5 100644
---- a/arch/arm/mach-dove/board-dt.c
-+++ b/arch/arm/mach-dove/board-dt.c
-@@ -26,7 +26,7 @@ static void __init dove_dt_init(void)
- #ifdef CONFIG_CACHE_TAUROS2
- 	tauros2_init(0);
- #endif
--	BUG_ON(mvebu_mbus_dt_init());
-+	BUG_ON(mvebu_mbus_dt_init(false));
- 	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
+diff --git a/arch/arm/mach-dove/common.c b/arch/arm/mach-dove/common.c
+index e2b5da0..8d4f5dc 100644
+--- a/arch/arm/mach-dove/common.c
++++ b/arch/arm/mach-dove/common.c
+@@ -226,7 +226,7 @@ void __init dove_init_early(void)
+ 	orion_time_set_base(TIMER_VIRT_BASE);
+ 	mvebu_mbus_init("marvell,dove-mbus",
+ 			BRIDGE_WINS_BASE, BRIDGE_WINS_SZ,
+-			DOVE_MC_WINS_BASE, DOVE_MC_WINS_SZ);
++			DOVE_MC_WINS_BASE, DOVE_MC_WINS_SZ, 0);
  }
  
-diff --git a/arch/arm/mach-kirkwood/board-dt.c b/arch/arm/mach-kirkwood/board-dt.c
-index 7818815..79e629d 100644
---- a/arch/arm/mach-kirkwood/board-dt.c
-+++ b/arch/arm/mach-kirkwood/board-dt.c
-@@ -116,7 +116,7 @@ static void __init kirkwood_dt_init(void)
- 	 */
- 	writel(readl(CPU_CONFIG) & ~CPU_CONFIG_ERROR_PROP, CPU_CONFIG);
+ static int __init dove_find_tclk(void)
+diff --git a/arch/arm/mach-kirkwood/common.c b/arch/arm/mach-kirkwood/common.c
+index f389228..4f6831e 100644
+--- a/arch/arm/mach-kirkwood/common.c
++++ b/arch/arm/mach-kirkwood/common.c
+@@ -530,7 +530,7 @@ void __init kirkwood_init_early(void)
  
--	BUG_ON(mvebu_mbus_dt_init());
-+	BUG_ON(mvebu_mbus_dt_init(false));
+ 	mvebu_mbus_init("marvell,kirkwood-mbus",
+ 			BRIDGE_WINS_BASE, BRIDGE_WINS_SZ,
+-			DDR_WINDOW_CPU_BASE, DDR_WINDOW_CPU_SZ);
++			DDR_WINDOW_CPU_BASE, DDR_WINDOW_CPU_SZ, 0);
+ }
  
- 	kirkwood_l2_init();
+ int kirkwood_tclk;
+diff --git a/arch/arm/mach-mv78xx0/common.c b/arch/arm/mach-mv78xx0/common.c
+index 749a7f8..4722c98 100644
+--- a/arch/arm/mach-mv78xx0/common.c
++++ b/arch/arm/mach-mv78xx0/common.c
+@@ -337,11 +337,11 @@ void __init mv78xx0_init_early(void)
+ 	if (mv78xx0_core_index() == 0)
+ 		mvebu_mbus_init("marvell,mv78xx0-mbus",
+ 				BRIDGE_WINS_CPU0_BASE, BRIDGE_WINS_SZ,
+-				DDR_WINDOW_CPU0_BASE, DDR_WINDOW_CPU_SZ);
++				DDR_WINDOW_CPU0_BASE, DDR_WINDOW_CPU_SZ, 0);
+ 	else
+ 		mvebu_mbus_init("marvell,mv78xx0-mbus",
+ 				BRIDGE_WINS_CPU1_BASE, BRIDGE_WINS_SZ,
+-				DDR_WINDOW_CPU1_BASE, DDR_WINDOW_CPU_SZ);
++				DDR_WINDOW_CPU1_BASE, DDR_WINDOW_CPU_SZ, 0);
+ }
  
+ void __init_refok mv78xx0_timer_init(void)
 diff --git a/arch/arm/mach-mvebu/armada-370-xp.c b/arch/arm/mach-mvebu/armada-370-xp.c
-index f6c9d1d..79c3766a 100644
+index 1c48890..4377c34 100644
 --- a/arch/arm/mach-mvebu/armada-370-xp.c
 +++ b/arch/arm/mach-mvebu/armada-370-xp.c
-@@ -41,7 +41,7 @@ static void __init armada_370_xp_timer_and_clk_init(void)
- 	of_clk_init(NULL);
- 	clocksource_of_init();
- 	coherency_init();
--	BUG_ON(mvebu_mbus_dt_init());
-+	BUG_ON(mvebu_mbus_dt_init(coherency_available()));
+@@ -66,7 +66,8 @@ void __init armada_370_xp_init_early(void)
+ 			ARMADA_370_XP_MBUS_WINS_BASE,
+ 			ARMADA_370_XP_MBUS_WINS_SIZE,
+ 			ARMADA_370_XP_SDRAM_WINS_BASE,
+-			ARMADA_370_XP_SDRAM_WINS_SIZE);
++			ARMADA_370_XP_SDRAM_WINS_SIZE,
++			coherency_available());
+ 
  #ifdef CONFIG_CACHE_L2X0
  	l2x0_of_init(0, ~0UL);
- #endif
 diff --git a/arch/arm/mach-mvebu/coherency.c b/arch/arm/mach-mvebu/coherency.c
-index c295c10..49bad4d 100644
+index 3ee701f..ea26ebb 100644
 --- a/arch/arm/mach-mvebu/coherency.c
 +++ b/arch/arm/mach-mvebu/coherency.c
-@@ -121,6 +121,20 @@ static struct notifier_block mvebu_hwcc_platform_nb = {
+@@ -137,6 +137,20 @@ static struct notifier_block mvebu_hwcc_platform_nb = {
  	.notifier_call = mvebu_hwcc_platform_notifier,
  };
  
@@ -110,79 +136,72 @@ index c295c10..49bad4d 100644
  int __init coherency_init(void)
  {
  	struct device_node *np;
-@@ -164,6 +178,7 @@ int __init coherency_init(void)
+@@ -170,6 +184,7 @@ int __init coherency_init(void)
  		coherency_base = of_iomap(np, 0);
  		coherency_cpu_base = of_iomap(np, 1);
  		set_cpu_coherent(cpu_logical_map(smp_processor_id()), 0);
 +		coherency_enabled = 1;
- 		of_node_put(np);
+ 		bus_register_notifier(&platform_bus_type,
+ 					&mvebu_hwcc_platform_nb);
  	}
- 
 diff --git a/arch/arm/mach-mvebu/coherency.h b/arch/arm/mach-mvebu/coherency.h
-index 760226c..63e18c6 100644
+index 2f42813..1501a4e 100644
 --- a/arch/arm/mach-mvebu/coherency.h
 +++ b/arch/arm/mach-mvebu/coherency.h
-@@ -17,6 +17,7 @@
- extern unsigned long coherency_phys_base;
+@@ -19,6 +19,7 @@ int coherency_get_cpu_count(void);
+ #endif
  
- int set_cpu_coherent(unsigned int cpu_id, int smp_group_id);
+ int set_cpu_coherent(int cpu_id, int smp_group_id);
 +int coherency_available(void);
  int coherency_init(void);
  
  #endif	/* __MACH_370_XP_COHERENCY_H */
+diff --git a/arch/arm/mach-orion5x/common.c b/arch/arm/mach-orion5x/common.c
+index f8a6db9..04877392 100644
+--- a/arch/arm/mach-orion5x/common.c
++++ b/arch/arm/mach-orion5x/common.c
+@@ -213,7 +213,7 @@ void __init orion5x_init_early(void)
+ 		mbus_soc_name = NULL;
+ 	mvebu_mbus_init(mbus_soc_name, ORION5X_BRIDGE_WINS_BASE,
+ 			ORION5X_BRIDGE_WINS_SZ,
+-			ORION5X_DDR_WINS_BASE, ORION5X_DDR_WINS_SZ);
++			ORION5X_DDR_WINS_BASE, ORION5X_DDR_WINS_SZ, 0);
+ }
+ 
+ void orion5x_setup_wins(void)
 diff --git a/drivers/bus/mvebu-mbus.c b/drivers/bus/mvebu-mbus.c
-index e990dee..1aa0130 100644
+index 711dcf4..7c43782 100644
 --- a/drivers/bus/mvebu-mbus.c
 +++ b/drivers/bus/mvebu-mbus.c
-@@ -701,7 +701,6 @@ static int __init mvebu_mbus_common_init(struct mvebu_mbus_state *mbus,
- 					 phys_addr_t sdramwins_phys_base,
- 					 size_t sdramwins_size)
+@@ -838,7 +838,7 @@ fs_initcall(mvebu_mbus_debugfs_init);
+ int __init mvebu_mbus_init(const char *soc, phys_addr_t mbuswins_phys_base,
+ 			   size_t mbuswins_size,
+ 			   phys_addr_t sdramwins_phys_base,
+-			   size_t sdramwins_size)
++			   size_t sdramwins_size, int is_coherent)
  {
--	struct device_node *np;
- 	int win;
- 
- 	mbus->mbuswins_base = ioremap(mbuswins_phys_base, mbuswins_size);
-@@ -714,12 +713,6 @@ static int __init mvebu_mbus_common_init(struct mvebu_mbus_state *mbus,
+ 	struct mvebu_mbus_state *mbus = &mbus_state;
+ 	const struct of_device_id *of_id;
+@@ -865,8 +865,7 @@ int __init mvebu_mbus_init(const char *soc, phys_addr_t mbuswins_phys_base,
  		return -ENOMEM;
  	}
  
--	np = of_find_compatible_node(NULL, NULL, "marvell,coherency-fabric");
--	if (np) {
+-	if (of_find_compatible_node(NULL, NULL, "marvell,coherency-fabric"))
 -		mbus->hw_io_coherency = 1;
--		of_node_put(np);
--	}
--
++	mbus->hw_io_coherency = is_coherent;
+ 
  	for (win = 0; win < mbus->soc->num_wins; win++)
  		mvebu_mbus_disable_window(mbus, win);
- 
-@@ -889,7 +882,7 @@ static void __init mvebu_mbus_get_pcie_resources(struct device_node *np,
- 	}
- }
- 
--int __init mvebu_mbus_dt_init(void)
-+int __init mvebu_mbus_dt_init(bool is_coherent)
- {
- 	struct resource mbuswins_res, sdramwins_res;
- 	struct device_node *np, *controller;
-@@ -928,6 +921,8 @@ int __init mvebu_mbus_dt_init(void)
- 		return -EINVAL;
- 	}
- 
-+	mbus_state.hw_io_coherency = is_coherent;
-+
- 	/* Get optional pcie-{mem,io}-aperture properties */
- 	mvebu_mbus_get_pcie_resources(np, &mbus_state.pcie_mem_aperture,
- 					  &mbus_state.pcie_io_aperture);
 diff --git a/include/linux/mbus.h b/include/linux/mbus.h
-index 345b8c5..550c88f 100644
+index dba482e..e80b9c7 100644
 --- a/include/linux/mbus.h
 +++ b/include/linux/mbus.h
-@@ -73,6 +73,6 @@ int mvebu_mbus_del_window(phys_addr_t base, size_t size);
+@@ -67,6 +67,6 @@ int mvebu_mbus_add_window(const char *devname, phys_addr_t base,
+ int mvebu_mbus_del_window(phys_addr_t base, size_t size);
  int mvebu_mbus_init(const char *soc, phys_addr_t mbus_phys_base,
  		    size_t mbus_size, phys_addr_t sdram_phys_base,
- 		    size_t sdram_size);
--int mvebu_mbus_dt_init(void);
-+int mvebu_mbus_dt_init(bool is_coherent);
+-		    size_t sdram_size);
++		    size_t sdram_size, int is_coherent);
  
  #endif /* __LINUX_MBUS_H */
 -- 
