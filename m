@@ -1,96 +1,252 @@
-From: gg@slimlogic.co.uk (Graeme Gregory)
-Date: Tue, 30 Jun 2015 16:07:19 +0100
-Subject: [PATCH v2 6/9] irqchip / gic: Add stacked irqdomain support for
- ACPI based GICv2 init
-In-Reply-To: <559288CA.40605@arm.com>
-References: <1434703572-26221-1-git-send-email-hanjun.guo@linaro.org>
- <1434703572-26221-7-git-send-email-hanjun.guo@linaro.org>
- <20150622172014.GB26129@red-moon> <5589772A.8070708@linaro.org>
- <20150623173845.GC31466@red-moon> <558E1DEE.3090900@linaro.org>
- <55910440.8070702@arm.com> <559282A0.8090601@linaro.org>
- <559288CA.40605@arm.com>
-Message-ID: <20150630150719.GC12142@xora-haswell.xora.org.uk>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Tue, 30 Jun 2015 17:10:36 +0200
+Subject: [PATCH RFC v2 09/16] arm: domain: Add platform callbacks for
+ domain power on/off
+In-Reply-To: <20150629163201.GA1524@linaro.org>
+References: <1435374156-19214-1-git-send-email-lina.iyer@linaro.org>
+ <1435374156-19214-10-git-send-email-lina.iyer@linaro.org>
+ <CAMuHMdULThWEZmyLEK_9WeK6DSNhrQdiZQLWNhi1Q6dwZTkkMg@mail.gmail.com>
+ <20150629163201.GA1524@linaro.org>
+Message-ID: <CAMuHMdWL09Loe2EFUMc-kRML7Ckn7a6G1_hvPnaqkDYnhkXjog@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 30, 2015 at 01:17:14PM +0100, Marc Zyngier wrote:
-> On 30/06/15 12:50, Hanjun Guo wrote:
-> > Hi Marc,
-> > 
-> > On 06/29/2015 04:39 PM, Marc Zyngier wrote:
-> >> On 27/06/15 04:52, Hanjun Guo wrote:
-> >>> On 06/24/2015 01:38 AM, Lorenzo Pieralisi wrote:
-> >>>> On Tue, Jun 23, 2015 at 04:11:38PM +0100, Hanjun Guo wrote:
-> > [...]
-> >>>>
-> >>>>>>>     	for (i = 0; i < nr_irqs; i++)
-> >>>>>>>     		gic_irq_domain_map(domain, virq + i, hwirq + i);
-> >>>>>>> @@ -945,11 +952,11 @@ void __init gic_init_bases(unsigned int gic_nr, int irq_start,
-> >>>>>>>     		gic_irqs = 1020;
-> >>>>>>>     	gic->gic_irqs = gic_irqs;
-> >>>>>>>
-> >>>>>>> -	if (node) {		/* DT case */
-> >>>>>>> +	if (node || !acpi_disabled) {		/* DT or ACPI case */
-> >>>>>>>     		gic->domain = irq_domain_add_linear(node, gic_irqs,
-> >>>>>>>     						    &gic_irq_domain_hierarchy_ops,
-> >>>>>>>     						    gic);
-> >>>>
-> >>>> I think this is a bit more worrying, I mean passing a NULL node pointer to
-> >>>> the irqdomain layer which basically means you are booting out of ACPI
-> >>>
-> >>> I'm little confused here, would you mind explaining more for your
-> >>> worrying? To me, node pointer is optional and it's ok for ACPI
-> >>> case.
-> >>>
-> >>>> (for you, if that's true for the irq_domain_add_linear implementation
-> >>>> that's another story), the node pointer should be optional but you
-> >>>> need feedback from IRQ layer maintainers here.
-> >>>
-> >>> Sure.
-> >>
-> >> Frankly, I'd really like to see ACPI using the "node" parameter for
-> >> something useful. This would save having to cache pointers all over the
-> >> place, will make find_irq_host() work as expected... etc.
-> >>
-> >> See the comment at the top of linux/irqdomain.h :
-> >>
-> >> "... This code could thus be used on other architectures by replacing
-> >> those two by some sort of arch-specific void * "token" used to identify
-> >> interrupt controllers."
-> > 
-> > To init GIC in ACPI, we can only use the table entry pointer as
-> > the token, but the ACPI static tables are early mem/io remapped
-> > memory at boot stage, and it will be not available after boot,
-> > also we need muti types of MADT enties to init GIC (GICC and GICD
-> > for GICv2, GICC or GICR and GICD for GICv3), not as DT, just
-> > one single node to include all the information needed to init
-> > the GIC.
-> 
-> A single pointer would be enough, you don't need all of them.
-> 
-> > We use ACPI handle for devices as node for DT when the namespace
-> > is available, but that's pretty late in the boot stage which GIC,
-> > SMP and timers were already initialized, so ACPI handle can not
-> > use as the token too.
-> > 
-> > I see multi places just pass NULL as the pointer directly for
-> > irq_domain_add_linear() which works fine, and for ACPI, we tested
-> > this patch and also it works.
-> 
-> Yes it works. But you're reinventing the wheel by keeping references
-> outside of the normal framework, which is simply going to make the code
-> more difficult to maintain in the long run.
-> 
-> Putting NULL as the device_node parameter really means "this is a domain
-> I don't need to look up later". In your case, you will have to lookup
-> that domain, all the time. You're just doing it in your own little
-> corner, which is what bothers me.
-> 
-Hanjun, I think it should be possible that instead of looking up the
-domains in our own bit of code. We can instead use a ptr to the
-appropriate information as the token instead.
+Hi Lina,
 
-I don't think we have to replicate the behaviour of node, in the DT
-case, but just do what is sensible for ACPI in this case.
+On Mon, Jun 29, 2015 at 6:32 PM, Lina Iyer <lina.iyer@linaro.org> wrote:
+> On Mon, Jun 29 2015 at 07:36 -0600, Geert Uytterhoeven wrote:
+>>> --- /dev/null
+>>> +++ b/arch/arm/include/asm/pm_domain.h
+>>> @@ -0,0 +1,27 @@
+>>> +/*
+>>> + *  arch/arm/include/asm/pm_domain.h
+>>> + *
+>>> + *  Copyright (C) 2015 Linaro Ltd.
+>>> + *
+>>> + * This program is free software; you can redistribute it and/or modify
+>>> + * it under the terms of the GNU General Public License version 2 as
+>>> + * published by the Free Software Foundation.
+>>> + */
+>>> +#ifndef __ASM_ARM_PM_DOMAIN_H
+>>> +#define __ASM_ARM_PM_DOMAIN_H
+>>> +
+>>> +#include <linux/pm_domain.h>
+>>> +
+>>> +#if IS_ENABLED(CONFIG_PM_GENERIC_DOMAINS)
+>>> +extern int register_platform_domain_handlers(struct of_phandle_args
+>>> *args,
+>>> +               int (*pd_down)(struct generic_pm_domain *),
+>>> +               int (*pd_up)(struct generic_pm_domain *));
+>>
+>>
+>> This looks a bit convoluted to me...
+>>
+>>> --- a/arch/arm/kernel/domains.c
+>>> +++ b/arch/arm/kernel/domains.c
+>>> @@ -9,10 +9,19 @@
+>>>  #include <linux/module.h>
+>>>  #include <linux/platform_device.h>
+>>>
+>>> +#include <asm/pm_domain.h>
+>>> +
+>>>  #define NAME_MAX 16
+>>>
+>>> +struct platform_cb {
+>>> +       int (*power_off)(struct generic_pm_domain *);
+>>> +       int (*power_on)(struct generic_pm_domain *);
+>>> +};
+>>> +
+>>>  struct arm_pm_domain {
+>>>         struct generic_pm_domain genpd;
+>>> +       struct platform_cb plat_handler;
+>>> +       struct spinlock_t lock;
+>>>  };
+>>>
+>>>  static inline
+>>> @@ -23,16 +32,85 @@ struct arm_pm_domain *to_arm_pd(struct
+>>> generic_pm_domain *d)
+>>>
+>>>  static int arm_pd_power_down(struct generic_pm_domain *genpd)
+>>>  {
+>>> +       struct arm_pm_domain *arm_pd = to_arm_pd(genpd);
+>>> +
+>>> +       if (arm_pd->plat_handler.power_off)
+>>> +               return arm_pd->plat_handler.power_off(genpd);
+>>> +
+>>>         /* pr_info("KJH: %s: %s\n", __func__, genpd->name); */
+>>>         return 0;
+>>>  }
+>>>
+>>>  static int arm_pd_power_up(struct generic_pm_domain *genpd)
+>>>  {
+>>> +       struct arm_pm_domain *arm_pd = to_arm_pd(genpd);
+>>> +
+>>> +       if (arm_pd->plat_handler.power_on)
+>>> +               return arm_pd->plat_handler.power_on(genpd);
+>>> +
+>>>         /* pr_info("KJH: %s: %s\n", __func__, genpd->name); */
+>>>         return 0;
+>>>  }
+>>
+>>
+>>> @@ -152,6 +230,7 @@ static int arm_domain_init(void)
+>>>                 pd->genpd.power_off = arm_pd_power_down;
+>>>                 pd->genpd.power_on = arm_pd_power_up;
+>>
+>>
+>> Shouldn't these .power_off() and .power_on() be set up from platform code
+>> instead, in the platform-specific code that creates the PM domain?
+>>
+>> The PM Domain containing the CPU may contain other devices, in which
+>> case it's already set up from platform-specific code, which would conflict
+>> with arm_domain_init()?
+>>
+> In my first RFC, the platform code was creating a domain. In this RFC,
+> we are flaunting an idea that a generic code could setup the domains
+> without any intervention from platform code. It will do everything
+> common on most ARM platforms. Architectures that do not have anything
+> specific in their domain, would benefit from such an initialization.
+>
+> If we were to export this genpd and then platform code could attach more
+> devices to the genpd, or make it a sub of another genpd, would that
+> work?
+>
+>> Cfr. arch/arm/mach-shmobile/pm-rmobile.c, which handles all PM domains
+>> (both for devices and CPUs) on R-Mobile, and
+>> arch/arm/boot/dts/{r8a73a4,r8a7740,sh73a0}.dtsi.
+>>
+>> R8a73a4 is the most advanced of these three: it has 2 big.LITTLE clusters,
+>> with separate PM Domains for L2/SCU and sub-domains for the CPUs.
+>
+>
+> If you could get the CPU genpd from the ARM common code, you could embed
+> that in the L2 domain.
+>
+> On QCOM's big.LITTLE SoC, there would a PM domain for each of the CPUs
+> and then there would be a coherency PM domain that would contain the big
+> and LITTLE cluster domains. In that case, the platform code would create
+> and initialize the coherency domain and make the CPU domains a sub of
+> the coherency domain. Would something like that work?
+>
+>
+>> Unfortunately we don't have SMP support for it, so currently dtsi
+>> describes
+>> the first cpu core only. The full structure should look like this
+>>
+>>        cpus {
+>>                cpu0: cpu at 0 {
+>>                        compatible = "arm,cortex-a15";
+>>                        power-domains = <&pd_a2sl>;
+>>                        next-level-cache = <&L2_CA15>;
+>>                };
+>>
+>>                cpu1: cpu at 1 {
+>>                        compatible = "arm,cortex-a15";
+>>                        power-domains = <&pd_a2sl>;
+>>                        next-level-cache = <&L2_CA15>;
+>>                };
+>>
+>>                cpu2: cpu at 2 {
+>>                        compatible = "arm,cortex-a15";
+>>                        power-domains = <&pd_a2sl>;
+>>                        next-level-cache = <&L2_CA15>;
+>>                };
+>>
+>>                cpu3: cpu at 3 {
+>>                        compatible = "arm,cortex-a15";
+>>                        power-domains = <&pd_a2sl>;
+>>                        next-level-cache = <&L2_CA15>;
+>>                };
+>>
+>>                cpu4: cpu at 4 {
+>>                        compatible = "arm,cortex-a7";
+>>                        power-domains = <&pd_a2kl>;
+>>                        next-level-cache = <&L2_CA7>;
+>>                };
+>>
+>>                cpu5: cpu at 5 {
+>>                        compatible = "arm,cortex-a7";
+>>                        power-domains = <&pd_a2kl>;
+>>                        next-level-cache = <&L2_CA7>;
+>>                };
+>>
+>>                cpu6: cpu at 6 {
+>>                        compatible = "arm,cortex-a7";
+>>                        power-domains = <&pd_a2kl>;
+>>                        next-level-cache = <&L2_CA7>;
+>>                };
+>>
+>>                cpu7: cpu at 7 {
+>>                        compatible = "arm,cortex-a7";
+>>                        power-domains = <&pd_a2kl>;
+>>                        next-level-cache = <&L2_CA7>;
+>>                };
+>>        };
+>>
+>>        L2_CA15: cache-controller at 0 {
+>>                compatible = "cache";
+>>                power-domains = <&pd_a3sm>;
+>>        };
+>>
+>>        L2_CA7: cache-controller at 1 {
+>>                compatible = "cache";
+>>                power-domains = <&pd_a3km>;
+>>        };
+>>
+>> And the PM Domain part (which is complete in upstream):
+>>
+>>        pd_c4: c4 at 0 {
+>>                #power-domain-cells = <0>;
+>>
+>>                pd_a3sm: a3sm at 20 {
+>>                        reg = <20>;
+>>                        #power-domain-cells = <0>;
+>>
+>>                        pd_a2sl: a2sl at 21 {
+>>                                reg = <21>;
+>>                                #power-domain-cells = <0>;
+>>                        };
+>>                };
+>>
+>>                pd_a3km: a3km at 22 {
+>>                        reg = <22>;
+>>                        #size-cells = <0>;
+>>                        #power-domain-cells = <0>;
+>>
+>>                        pd_a2kl: a2kl at 23 {
+>>                                reg = <23>;
+>>                                #power-domain-cells = <0>;
+>>                        };
+>>                };
+>>        };
+>>
+> Thanks for the example. Would it work, if the platform code initalizes
+> the pd_a3sm, pd_a3km and pd_c4 and set up the hierarchy and to add the
+> CPU domains, you could query the ARM and then add the domains to the
+> pd_a3sm and pd_a3km?
 
-Graeme
+Yes, it could work. But then I have to add _more_ code to ignore the a2sl
+and a2kl code in pm-rmobile.c, and call register_platform_domain_handlers(),
+as in the end it's pm-rmobile that knows how to power up those PM domains.
+
+I'm a bit reluctant to split responsibility across two drivers: a
+platform-specific
+one handling PM domains with non-cpu devices, and a generic one handling
+PM domains with cpu-devices.
+
+Perhaps the generic one can be optional, and provide helpers for common
+CPU operations? Then the platform-specific driver can handle all PM domains,
+and delegate to the generic CPU helpers where appropriate.
+
+Does that make sense?
+
+Gr{oetje,eeting}s,
+
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
