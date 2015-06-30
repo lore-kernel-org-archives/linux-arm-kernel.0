@@ -1,94 +1,41 @@
-From: thunder.leizhen@huawei.com (leizhen)
-Date: Tue, 30 Jun 2015 17:18:29 +0800
-Subject: [PATCH 8/8] iommu/arm-smmu: suppress fault information about
- CMD_PREFETCH_CONFIG execution
-In-Reply-To: <20150629174909.GN17474@arm.com>
-References: <1435307584-9812-1-git-send-email-thunder.leizhen@huawei.com>
- <1435307584-9812-9-git-send-email-thunder.leizhen@huawei.com>
- <20150629174909.GN17474@arm.com>
-Message-ID: <55925EE5.9080105@huawei.com>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Tue, 30 Jun 2015 11:24:04 +0200
+Subject: n900 in 4.2-rc0: repeating oopses
+In-Reply-To: <20150629091146.GA5103@amd>
+References: <20150416093234.GA17423@amd>
+ <20150629091146.GA5103@amd>
+Message-ID: <20150630092404.GA19285@amd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2015/6/30 1:49, Will Deacon wrote:
-> On Fri, Jun 26, 2015 at 09:33:04AM +0100, Zhen Lei wrote:
->> Some broken SMMUv3 devices treat CMD_PREFETCH_CONFIG as illegal command,
->> it's ugly to print error information. CMD_PREFETCH_CONFIG is just used to
->> prefetch the configuration for a specified StreamID, without this command
->> will not impact SMMUv3 function.
->>
->> Signed-off-by: Zhen Lei <thunder.leizhen@huawei.com>
->> ---
->>  drivers/iommu/arm-smmu-v3.c | 18 ++++++++++++++----
->>  1 file changed, 14 insertions(+), 4 deletions(-)
->>
->> diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
->> index d799feb..3971aef 100644
->> --- a/drivers/iommu/arm-smmu-v3.c
->> +++ b/drivers/iommu/arm-smmu-v3.c
->> @@ -813,6 +813,7 @@ static void arm_smmu_cmdq_skip_err(struct arm_smmu_device *smmu)
->>  	};
->>
->>  	int i;
->> +	u32 opcode;
->>  	u64 cmd[CMDQ_ENT_DWORDS];
->>  	struct arm_smmu_queue *q = &smmu->cmdq.q;
->>  	u32 cons = readl_relaxed(q->cons_reg);
->> @@ -821,15 +822,14 @@ static void arm_smmu_cmdq_skip_err(struct arm_smmu_device *smmu)
->>  		.opcode = CMDQ_OP_CMD_SYNC,
->>  	};
->>
->> -	dev_err(smmu->dev, "CMDQ error (cons 0x%08x): %s\n", cons,
->> -		cerror_str[idx]);
->> -
->>  	switch (idx) {
->>  	case CMDQ_ERR_CERROR_ILL_IDX:
->>  		break;
->>  	case CMDQ_ERR_CERROR_ABT_IDX:
->> -		dev_err(smmu->dev, "retrying command fetch\n");
->>  	case CMDQ_ERR_CERROR_NONE_IDX:
->> +		dev_err(smmu->dev, "CMDQ error (cons 0x%08x): %s\n", cons,
->> +			cerror_str[idx]);
->> +		dev_err(smmu->dev, "retrying command execution\n");
-> 
-> Why are you making this (unrelated) change?
-> 
-> Out of interest, did the gerror code manage to turn the prefetch into
-> a SYNC, as intended?
+Hi!
 
-Yes, It worked fine. The program can continue to run normally, that's why I don't want to
-print these error information. Because this problem is known on my platform, and can sliently
-ignored.
+> Just tried booting 4.2-rc0 on n900 (commit
+> 4a10a91756ef381bced7b88cfb9232f660b92d93) and it is broken. Previous
+> -rc0 version worked. This time, there's some output on console, but
+> too fast for me to read.
+> 
+> It seems oopses happen before mounting root. If you have serial
+> console, they should be easy to see.
 
-> 
->>  		return;
->>  	}
->>
->> @@ -838,10 +838,20 @@ static void arm_smmu_cmdq_skip_err(struct arm_smmu_device *smmu)
->>  	 * not to touch any of the shadow cmdq state.
->>  	 */
->>  	queue_read(cmd, Q_ENT(q, idx), q->ent_dwords);
->> +
->> +	/*
->> +	 * Some broken SMMUv3 devices treat CMD_PREFETCH_CONFIG as illegal
->> +	 * command, it's ugly to print error information.
->> +	 */
->> +	opcode = (cmd[0] >> CMDQ_0_OP_SHIFT) & CMDQ_0_OP_MASK;
->> +	if (opcode == CMDQ_OP_PREFETCH_CFG)
->> +		goto skip_error_command;
->> +
-> 
-> I think a better way to fix this would be to add a quick to the device-tree
-> along the lines of "hisilicon,broken-prefetch-cmd" which we could check
-> before issuing the prefetch command in arm_smmu_write_strtab_ent.
-> 
-> Something along the lines of the arm_smmu_options in arm-smmu.c would be
-> a good basis for quirks.
+I tried again according to pali's instructions, and it is still
+broken the same way. Any other ideas? Does it work for you?
 
-It's a good idea. I known the arm_smmu_options, I will rewrite this patch in V2.
+diff --git a/arch/arm/boot/dts/omap3.dtsi b/arch/arm/boot/dts/omap3.dtsi
+index 69a40cf..ff6f2bf 100644
+--- a/arch/arm/boot/dts/omap3.dtsi
++++ b/arch/arm/boot/dts/omap3.dtsi
+@@ -570,6 +570,7 @@
+ 			interrupts = <49>;
+ 			dmas = <&sdma 69>;
+ 			dma-names = "rx";
++			status = "disabled";
+ 		};
+ 
+ 		smartreflex_core: smartreflex at 480cb000 {
 
-> 
-> Will
-> 
-> .
-> 
+									Pavel
+
+-- 
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
