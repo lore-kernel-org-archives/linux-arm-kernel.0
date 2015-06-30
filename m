@@ -1,50 +1,51 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Tue, 30 Jun 2015 15:57:15 +0200
-Subject: [GIT PULL] ARM: mvebu: fixes for v4.2
-Message-ID: <5592A03B.5020900@free-electrons.com>
+From: timur@codeaurora.org (Timur Tabi)
+Date: Tue, 30 Jun 2015 08:58:14 -0500
+Subject: [PATCH] ARM64: TTY: hvc_dcc: Add support for ARM64 dcc
+In-Reply-To: <20150630135153.GJ27725@arm.com>
+References: <1434751734-2178-1-git-send-email-timur@codeaurora.org>
+ <20150622131228.GE1583@arm.com> <558B0EEC.9040504@codeaurora.org>
+ <20150630135153.GJ27725@arm.com>
+Message-ID: <5592A076.8090603@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Will Deacon wrote:
+> Well, it's up to you to figure out the details, but I'd start by adding
+> some static inlines to the arch-specific header files for enabling/disabling
+> userspace access.
+>
+>  From there, I think I'd get the architecture init code to reset the thing
+> to "disabled" (so it's disabled regardless of whether we build the hvc_dcc
+> driver) and then if you wanted to go all-out, we could have a sysfs entry
+> provided by the driver to toggle it on and off.
+>
+>> >static int __init hvc_dcc_console_init(void)
+>> >{
+>> >#ifdef CONFIG_ARM64
+>> >	u32 val;
+>> >
+>> >	asm("msr mdscr_el1, %0	"
+>> >	"orr %0, %0, #4096	" /* TDCC */
+>> >	"msr %0, mdscr_el1	"
+>> >	: "=r" (val));
+>> >#endif
+>> >
+>> >But this seems clunky.
+> Yeah, that's super ugly.
+>
+>> >I am concerned about KVM, though.  There appears to be code in KVM in
+>> >hyp.s and sys_regs.c that touches and/or emulates MDSCR_EL1.
+>> >
+>> >On a side note, it does not appear that ARM32 blocks userspace DCC.  I
+>> >don't see where DBGDSCR.UDCCdis is set.
+> That's a bug imo.
 
-Here is a small pull request for fixes for mvebu for v4.2.
-It would be nice to have them in v4.2-rc1. It combines two signed
-tags: the new one mvebu-fixes-4.2-0 and the previous one which has not
-been pulled for 4.1: mvebu-fixes-4.1-4
-
-Gregory
-
-The following changes since commit 885dbd154b2f2ee305cec6fd0a162e1a77ae2b06:
-
-  Revert "bus: mvebu-mbus: make sure SDRAM CS for DMA don't overlap the MBus bridge window" (2015-05-28 11:14:31 +0200)
-
-are available in the git repository at:
-
-  git://git.infradead.org/linux-mvebu.git tags/mvebu-fixes-4.2-0
-
-for you to fetch changes up to 5d6bed2a9c8bc161bff4cc7cede00f2e0e27a7e7:
-
-  ARM: dove: fix legacy dove IRQ numbers (2015-06-24 11:05:57 +0200)
-
-----------------------------------------------------------------
-mvebu fixes for 4.2 (part 0)
-
-Fix legacy dove IRQ numbers
-
-----------------------------------------------------------------
-Russell King (1):
-      ARM: dove: fix legacy dove IRQ numbers
-
-Thomas Petazzoni (1):
-      ARM: mvebu: fix suspend to RAM on big-endian configurations
-
- arch/arm/mach-dove/include/mach/irqs.h | 118 +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++-----------------------------------------------------------
- arch/arm/mach-dove/irq.c               |   8 ++++----
- arch/arm/mach-mvebu/pm-board.c         |   3 +++
- 3 files changed, 66 insertions(+), 63 deletions(-)
+So wouldn't it be more appropriate to have a separate patch that handles 
+disabling of user-space DCC for ARM32 and ARM64?  All I really want to 
+do at this point is provide basic DCC support for ARM64, just like we 
+have for ARM32.
 
 -- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+Sent by an employee of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the
+Code Aurora Forum, hosted by The Linux Foundation.
