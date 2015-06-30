@@ -1,64 +1,55 @@
-From: ludovic.desroches@atmel.com (Ludovic Desroches)
-Date: Tue, 30 Jun 2015 15:03:07 +0200
-Subject: [PATCH] dmaengine: at_xdmac: fix bug about channel configuration
-In-Reply-To: <1434550946-27750-1-git-send-email-ludovic.desroches@atmel.com>
-References: <1434550946-27750-1-git-send-email-ludovic.desroches@atmel.com>
-Message-ID: <20150630130307.GO18384@odux.rfo.atmel.com>
+From: gerg@uclinux.org (Greg Ungerer)
+Date: Tue, 30 Jun 2015 23:09:03 +1000
+Subject: [PATCH] ARM: mvebu: pass the coherency availability information
+ at init time
+In-Reply-To: <20150630003105.GF6430@kroah.com>
+References: <1433992764-12753-1-git-send-email-gerg@uclinux.org>
+ <20150611034521.GA12809@kroah.com> <557908C2.4090302@uclinux.org>
+ <20150611092549.2276beb8@free-electrons.com>
+ <20150611145129.GA3777@kroah.com> <557A33AF.9030101@uclinux.org>
+ <20150630003105.GF6430@kroah.com>
+Message-ID: <559294EF.9040906@uclinux.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Vinod,
 
-If you have no objection about his patch, could you take it?
 
-Thanks
+On 30/06/15 10:31, Greg KH wrote:
+> On Fri, Jun 12, 2015 at 11:19:43AM +1000, Greg Ungerer wrote:
+>> On 12/06/15 00:51, Greg KH wrote:
+>>> On Thu, Jun 11, 2015 at 09:25:49AM +0200, Thomas Petazzoni wrote:
+>>>> Greg, Greg,
+>>>>
+>>>> On Thu, 11 Jun 2015 14:04:18 +1000, Greg Ungerer wrote:
+>>>>
+>>>>>> Why?  What's wrong with taking the exact specific upstream patches
+>>>>>> instead?
+>>>>> The exact patch mentioned below ("5686a1e5aa4") will not apply.
+>>>>> Too much of the code around it has changed. This does the same
+>>>>> thing in the same away taking into account the changes around it.
+>>>> As the original author of 5686a1e5aa4 ("bus: mvebu: pass the coherency
+>>>> availability information at init time"), I can confirm that it will
+>>>> clearly not apply as is on 3.10. What Greg Ungerer is proposing here is
+>>>> a backport of 5686a1e5aa4 to 3.10.
+>>> What about 3.14-stable?
+>> As Thomas pointed out, yes. Due to file movements and other changes
+>> neither this patch (for 3.10.y) or the original commit 5686a1e5aa4
+>> apply cleanly to 3.14.y.
+>>
+>> How do you want to handle that for 3.14.y?
+> I need a backport for 3.14.y as well.
+>
+> And I need a signed-off-by: from the subsystem maintainers that this
+> backport is acceptable, as it's so different from what is in Linus's
+> tree, before I can take it.
 
-Ludovic
+Ok, I will prepare a 3.14 port. I will send to all recipients of this mail,
+that should catch all those who need to sign off on it.
 
-On Wed, Jun 17, 2015 at 04:22:26PM +0200, Ludovic Desroches wrote:
-> When using descriptor view 2 or higher, we don't write the configuration
-> into AT_XDMAC_CC register because this configuration will be fetch from
-> the descriptor. Unfortunately, the PROT bit is not updated with this
-> method, we have to do it manually before enabling the channel.
-> 
-> Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com>
-> ---
->  drivers/dma/at_xdmac.c | 19 ++++++++++---------
->  1 file changed, 10 insertions(+), 9 deletions(-)
-> 
-> diff --git a/drivers/dma/at_xdmac.c b/drivers/dma/at_xdmac.c
-> index cf1213d..52ca1cc 100644
-> --- a/drivers/dma/at_xdmac.c
-> +++ b/drivers/dma/at_xdmac.c
-> @@ -359,18 +359,19 @@ static void at_xdmac_start_xfer(struct at_xdmac_chan *atchan,
->  	 * descriptor view 2 since some fields of the configuration register
->  	 * depend on transfer size and src/dest addresses.
->  	 */
-> -	if (at_xdmac_chan_is_cyclic(atchan)) {
-> +	if (at_xdmac_chan_is_cyclic(atchan))
->  		reg = AT_XDMAC_CNDC_NDVIEW_NDV1;
-> -		at_xdmac_chan_write(atchan, AT_XDMAC_CC, first->lld.mbr_cfg);
-> -	} else if (first->lld.mbr_ubc & AT_XDMAC_MBR_UBC_NDV3) {
-> +	else if (first->lld.mbr_ubc & AT_XDMAC_MBR_UBC_NDV3)
->  		reg = AT_XDMAC_CNDC_NDVIEW_NDV3;
-> -	} else {
-> -		/*
-> -		 * No need to write AT_XDMAC_CC reg, it will be done when the
-> -		 * descriptor is fecthed.
-> -		 */
-> +	else
->  		reg = AT_XDMAC_CNDC_NDVIEW_NDV2;
-> -	}
-> +	/*
-> +	 * Even if the register will be updated from the configuration in the
-> +	 * descriptor when using view 2 or higher, the PROT bit won't be set
-> +	 * properly. This bit can be modified only by using the channel
-> +	 * configuration register.
-> +	 */
-> +	at_xdmac_chan_write(atchan, AT_XDMAC_CC, first->lld.mbr_cfg);
->  
->  	reg |= AT_XDMAC_CNDC_NDDUP
->  	       | AT_XDMAC_CNDC_NDSUP
-> -- 
-> 2.2.0
-> 
+I have generated a version 2 of the original 3.10 patch. No change to
+the code diffs, but it changes the commit message to include all of the
+original commit followed by a brief description of the back port. Perhaps
+this is better?
+
+Regards
+Greg
