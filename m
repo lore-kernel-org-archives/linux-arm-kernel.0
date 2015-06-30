@@ -1,78 +1,88 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Tue, 30 Jun 2015 16:36:52 +0200
-Subject: [PATCH v3 1/6] dmaengine: mv_xor: fix big endian operation in
- register mode
+Date: Tue, 30 Jun 2015 16:36:54 +0200
+Subject: [PATCH v3 3/6] dmaengine: mv_xor: remove support for dmacap,
+ * DT properties
 In-Reply-To: <1435675017-875-1-git-send-email-thomas.petazzoni@free-electrons.com>
 References: <1435675017-875-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1435675017-875-2-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1435675017-875-4-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit 6f166312c6ea2 ("dmaengine: mv_xor: add support for a38x command
-in descriptor mode") introduced the support for a feature that
-appeared in Armada 38x: specifying the operation to be performed in a
-per-descriptor basis rather than globally per channel.
+The only reason why we had dmacap,* properties is because back when
+DMA_MEMSET was supported, only one out of the two channels per engine
+could do a memset operation. But this is something that the driver
+already knows anyway, and since then, the DMA_MEMSET support has been
+removed.
 
-However, when doing so, it changed the function mv_chan_set_mode() to
-use:
+The driver is already well aware of what each channel supports and the
+one to one mapping between Linux specific implementation details (such
+as dmacap,interrupt enabling DMA_INTERRUPT) and DT properties is a
+good indication that these DT properties are wrong.
 
-  if (IS_ENABLED(__BIG_ENDIAN))
-
-instead of:
-
-  #if defined(__BIG_ENDIAN)
-
-While IS_ENABLED() is perfectly fine for CONFIG_* symbols, it is not
-for other symbols such as __BIG_ENDIAN that is provided directly by
-the compiler. Consequently, the commit broke support for big-endian,
-as the XOR_DESCRIPTOR_SWAP flag was not set in the XOR channel
-configuration register.
-
-The primarily visible effect was some nasty warnings and failures
-appearing during the self-test of the XOR unit:
-
-[    1.197368] mv_xor d0060900.xor: error on chan 0. intr cause 0x00000082
-[    1.197393] mv_xor d0060900.xor: config       0x00008440
-[    1.197410] mv_xor d0060900.xor: activation   0x00000000
-[    1.197427] mv_xor d0060900.xor: intr cause   0x00000082
-[    1.197443] mv_xor d0060900.xor: intr mask    0x000003f7
-[    1.197460] mv_xor d0060900.xor: error cause  0x00000000
-[    1.197477] mv_xor d0060900.xor: error addr   0x00000000
-[    1.197491] ------------[ cut here ]------------
-[    1.197513] WARNING: CPU: 0 PID: 1 at ../drivers/dma/mv_xor.c:664 mv_xor_interrupt_handler+0x14c/0x170()
-
-See also:
-
-  http://storage.kernelci.org/next/next-20150617/arm-mvebu_v7_defconfig+CONFIG_CPU_BIG_ENDIAN=y/lab-khilman/boot-armada-xp-openblocks-ax3-4.txt
+Therefore, this commit simply gets rid of these dmacap,* properties,
+they are now ignored, and the driver is responsible for knowing the
+capabilities of the hardware with regard to the dmaengine subsystem
+expectations.
 
 Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-Fixes: 6f166312c6ea2 ("dmaengine: mv_xor: add support for a38x command in descriptor mode")
 Reviewed-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 ---
-This fix should go in for 4.2.
----
- drivers/dma/mv_xor.c | 9 +++++----
- 1 file changed, 5 insertions(+), 4 deletions(-)
+ Documentation/devicetree/bindings/dma/mv-xor.txt | 10 ++++------
+ drivers/dma/mv_xor.c                             |  9 +++------
+ 2 files changed, 7 insertions(+), 12 deletions(-)
 
+diff --git a/Documentation/devicetree/bindings/dma/mv-xor.txt b/Documentation/devicetree/bindings/dma/mv-xor.txt
+index cc29c35..276ef81 100644
+--- a/Documentation/devicetree/bindings/dma/mv-xor.txt
++++ b/Documentation/devicetree/bindings/dma/mv-xor.txt
+@@ -12,10 +12,13 @@ XOR engine has. Those sub-nodes have the following required
+ properties:
+ - interrupts: interrupt of the XOR channel
+ 
+-And the following optional properties:
++The sub-nodes used to contain one or several of the following
++properties, but they are now deprecated:
+ - dmacap,memcpy to indicate that the XOR channel is capable of memcpy operations
+ - dmacap,memset to indicate that the XOR channel is capable of memset operations
+ - dmacap,xor to indicate that the XOR channel is capable of xor operations
++- dmacap,interrupt to indicate that the XOR channel is capable of
++  generating interrupts
+ 
+ Example:
+ 
+@@ -28,13 +31,8 @@ xor at d0060900 {
+ 
+ 	xor00 {
+ 	      interrupts = <51>;
+-	      dmacap,memcpy;
+-	      dmacap,xor;
+ 	};
+ 	xor01 {
+ 	      interrupts = <52>;
+-	      dmacap,memcpy;
+-	      dmacap,xor;
+-	      dmacap,memset;
+ 	};
+ };
 diff --git a/drivers/dma/mv_xor.c b/drivers/dma/mv_xor.c
-index fbaf1ea..f1325f6 100644
+index 0a3ddc2..6aedc36 100644
 --- a/drivers/dma/mv_xor.c
 +++ b/drivers/dma/mv_xor.c
-@@ -162,10 +162,11 @@ static void mv_chan_set_mode(struct mv_xor_chan *chan,
- 	config &= ~0x7;
- 	config |= op_mode;
+@@ -1236,12 +1236,9 @@ static int mv_xor_probe(struct platform_device *pdev)
+ 			op_in_desc = (int)of_id->data;
  
--	if (IS_ENABLED(__BIG_ENDIAN))
--		config |= XOR_DESCRIPTOR_SWAP;
--	else
--		config &= ~XOR_DESCRIPTOR_SWAP;
-+#if defined(__BIG_ENDIAN)
-+	config |= XOR_DESCRIPTOR_SWAP;
-+#else
-+	config &= ~XOR_DESCRIPTOR_SWAP;
-+#endif
+ 			dma_cap_zero(cap_mask);
+-			if (of_property_read_bool(np, "dmacap,memcpy"))
+-				dma_cap_set(DMA_MEMCPY, cap_mask);
+-			if (of_property_read_bool(np, "dmacap,xor"))
+-				dma_cap_set(DMA_XOR, cap_mask);
+-			if (of_property_read_bool(np, "dmacap,interrupt"))
+-				dma_cap_set(DMA_INTERRUPT, cap_mask);
++			dma_cap_set(DMA_MEMCPY, cap_mask);
++			dma_cap_set(DMA_XOR, cap_mask);
++			dma_cap_set(DMA_INTERRUPT, cap_mask);
  
- 	writel_relaxed(config, XOR_CONFIG(chan));
- 	chan->current_type = type;
+ 			irq = irq_of_parse_and_map(np, 0);
+ 			if (!irq) {
 -- 
 2.4.5
