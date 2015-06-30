@@ -1,52 +1,31 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Tue, 30 Jun 2015 12:05:22 +0100
-Subject: [PATCH v4] arm DMA: Fix allocation from CMA for coherent DMA
-In-Reply-To: <1435597845-19811-1-git-send-email-lorenx4@gmail.com>
-References: <1435597845-19811-1-git-send-email-lorenx4@gmail.com>
-Message-ID: <20150630110521.GA7445@e104818-lin.cambridge.arm.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 30 Jun 2015 12:05:57 +0100
+Subject: [PATCH] ARM: fix vdsomunge not to depend on glibc specific error.h
+In-Reply-To: <559273FD.2030508@arm.com>
+References: <559273FD.2030508@arm.com>
+Message-ID: <20150630110557.GG27725@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 29, 2015 at 07:10:45PM +0200, Lorenzo Nava wrote:
-> This patch allows the use of CMA for DMA coherent memory allocation.
-> At the moment if the input parameter "is_coherent" is set to true
-> the allocation is not made using the CMA, which I think is not the
-> desired behaviour.
+On Tue, Jun 30, 2015 at 11:48:29AM +0100, Szabolcs Nagy wrote:
+> If the host toolchain is not glibc based then the arm kernel build
+> fails with
 > 
-> Signed-off-by: Lorenzo Nava <lorenx4@xxxxxxxx>
+>  arch/arm/vdso/vdsomunge.c:53:19: fatal error: error.h: No such file or directory
+> 
+> error.h is a glibc only header (ie not available in musl, newlib and
+> bsd libcs).  Changed the error reporting to standard conforming code
+> to avoid depending on specific C implementations.
+> 
+> Signed-off-by: Szabolcs Nagy <szabolcs.nagy@arm.com>
+> ---
+>  arch/arm/vdso/vdsomunge.c |   56 ++++++++++++++++++++++++++-------------------
+>  1 file changed, 33 insertions(+), 23 deletions(-)
 
-It's nice to have a proper email address here.
+Looks fine to me:
 
-> @@ -680,9 +684,14 @@ void *arm_dma_alloc(struct device *dev, size_t size, dma_addr_t *handle,
->  static void *arm_coherent_dma_alloc(struct device *dev, size_t size,
->  	dma_addr_t *handle, gfp_t gfp, struct dma_attrs *attrs)
->  {
-> -	pgprot_t prot = __get_dma_pgprot(attrs, PAGE_KERNEL);
-> +	pgprot_t prot;
->  	void *memory;
->  
-> +	if (attrs == NULL)
-> +		 prot  = PAGE_KERNEL;
-> +	else
-> +		 prot  = __get_dma_pgprot(attrs, PAGE_KERNEL);
-> +
->  	if (dma_alloc_from_coherent(dev, size, handle, &memory))
->  		return memory;
+  Acked-by: Will Deacon <will.deacon@arm.com>
 
-We have a slight inconsistency with commit 55af8a91640d (ARM: 8387/1:
-arm/mm/dma-mapping.c: Add arm_coherent_dma_mmap) where the attrs are not
-honoured for the coherent ops. That is, DMA_ATTRS_WRITE_COMBINE
-doesn't have any effect for mmap but with your patch it still has an
-effect on alloc.
+Probably worth a Cc stable too.
 
-I think we could just ignore it, the WRITE_COMBINE attr is a hint that
-the arch may or may not implement and I haven't seen it used with
-coherent mappings. So in this case just pass PAGE_KERNEL to
-__dma_alloc() directly without calling __get_dma_pgprot().
-
-(it also looks like commit 55af8a91640d left an unused attrs argument
-for __arm_dma_mmap that can be removed as well)
-
-Apart from the above, you can add:
-
-Reviewed-by: Catalin Marinas <catalin.marinas@arm.com>
+Will
