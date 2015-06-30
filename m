@@ -1,103 +1,95 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Tue, 30 Jun 2015 16:36:53 +0200
-Subject: [PATCH v3 2/6] dmaengine: mv_xor: add suspend/resume support
+Date: Tue, 30 Jun 2015 16:36:56 +0200
+Subject: [PATCH v3 5/6] dmaengine: mv_xor: de-duplicate mv_chan_set_mode*()
 In-Reply-To: <1435675017-875-1-git-send-email-thomas.petazzoni@free-electrons.com>
 References: <1435675017-875-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1435675017-875-3-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1435675017-875-6-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This commit adds suspend/resume support to the mv_xor driver. The
-config and interrupt mask registers must be saved and restored, and
-upon resume, the MBus windows configuration must also be done again.
+When commit 6f166312c6ea2 ("dmaengine: mv_xor: add support for a38x
+command in descriptor mode") added support for the descriptor mode
+available in Marvell Armada 38x and later SoCs, it added a new
+function mv_chan_set_mode_to_desc() which allows to configure a XOR
+channel to get the specific operation to be done from each individual
+DMA descriptor.
 
-Tested on Armada 388 GP, with a RAID 5 array, accessed before and
-after a suspend to RAM cycle.
+However, this function was mainly a duplicate of the existing
+mv_chan_set_mode(), with just the operation being different.
 
-Based on work from Ofer Heifetz and Lior Amsalem.
+This commit re-organizes the code into a single mv_chan_set_mode()
+function, which takes the operation mode as argument, and the
+mv_xor_channel_add() function decides whether to use
+XOR_OPERATION_MODE_IN_DESC or XOR_OPERATION_MODE_XOR.
 
 Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+Reviewed-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 ---
- drivers/dma/mv_xor.c | 47 +++++++++++++++++++++++++++++++++++++++++++++++
- drivers/dma/mv_xor.h |  1 +
- 2 files changed, 48 insertions(+)
+ drivers/dma/mv_xor.c | 41 +++--------------------------------------
+ 1 file changed, 3 insertions(+), 38 deletions(-)
 
 diff --git a/drivers/dma/mv_xor.c b/drivers/dma/mv_xor.c
-index f1325f6..0a3ddc2 100644
+index 1fe3e33..6e09d59 100644
 --- a/drivers/dma/mv_xor.c
 +++ b/drivers/dma/mv_xor.c
-@@ -1121,6 +1121,51 @@ mv_xor_conf_mbus_windows(struct mv_xor_device *xordev,
- 	writel(0, base + WINDOW_OVERRIDE_CTRL(1));
+@@ -139,45 +139,10 @@ static void mv_chan_clear_err_status(struct mv_xor_chan *chan)
  }
  
-+static int mv_xor_suspend(struct platform_device *pdev, pm_message_t state)
-+{
-+	struct mv_xor_device *xordev = platform_get_drvdata(pdev);
-+	int i;
-+
-+	for (i = 0; i < MV_XOR_MAX_CHANNELS; i++) {
-+		struct mv_xor_chan *mv_chan = xordev->channels[i];
-+
-+		if (!mv_chan)
-+			continue;
-+
-+		mv_chan->saved_config_reg =
-+			readl_relaxed(XOR_CONFIG(mv_chan));
-+		mv_chan->saved_int_mask_reg =
-+			readl_relaxed(XOR_INTR_MASK(mv_chan));
-+	}
-+
-+	return 0;
-+}
-+
-+static int mv_xor_resume(struct platform_device *dev)
-+{
-+	struct mv_xor_device *xordev = platform_get_drvdata(dev);
-+	const struct mbus_dram_target_info *dram;
-+	int i;
-+
-+	for (i = 0; i < MV_XOR_MAX_CHANNELS; i++) {
-+		struct mv_xor_chan *mv_chan = xordev->channels[i];
-+
-+		if (!mv_chan)
-+			continue;
-+
-+		writel_relaxed(mv_chan->saved_config_reg,
-+			       XOR_CONFIG(mv_chan));
-+		writel_relaxed(mv_chan->saved_int_mask_reg,
-+			       XOR_INTR_MASK(mv_chan));
-+	}
-+
-+	dram = mv_mbus_dram_info();
-+	if (dram)
-+		mv_xor_conf_mbus_windows(xordev, dram);
-+
-+	return 0;
-+}
-+
- static const struct of_device_id mv_xor_dt_ids[] = {
- 	{ .compatible = "marvell,orion-xor", .data = (void *)XOR_MODE_IN_REG },
- 	{ .compatible = "marvell,armada-380-xor", .data = (void *)XOR_MODE_IN_DESC },
-@@ -1284,6 +1329,8 @@ static int mv_xor_remove(struct platform_device *pdev)
- static struct platform_driver mv_xor_driver = {
- 	.probe		= mv_xor_probe,
- 	.remove		= mv_xor_remove,
-+	.suspend        = mv_xor_suspend,
-+	.resume         = mv_xor_resume,
- 	.driver		= {
- 		.name	        = MV_XOR_NAME,
- 		.of_match_table = of_match_ptr(mv_xor_dt_ids),
-diff --git a/drivers/dma/mv_xor.h b/drivers/dma/mv_xor.h
-index b7455b4..41a2e8d 100644
---- a/drivers/dma/mv_xor.h
-+++ b/drivers/dma/mv_xor.h
-@@ -126,6 +126,7 @@ struct mv_xor_chan {
- 	char			dummy_src[MV_XOR_MIN_BYTE_COUNT];
- 	char			dummy_dst[MV_XOR_MIN_BYTE_COUNT];
- 	dma_addr_t		dummy_src_addr, dummy_dst_addr;
-+	u32                     saved_config_reg, saved_int_mask_reg;
- };
+ static void mv_chan_set_mode(struct mv_xor_chan *chan,
+-			     enum dma_transaction_type type)
++			     u32 op_mode)
+ {
+-	u32 op_mode;
+ 	u32 config = readl_relaxed(XOR_CONFIG(chan));
  
- /**
+-	switch (type) {
+-	case DMA_XOR:
+-		op_mode = XOR_OPERATION_MODE_XOR;
+-		break;
+-	case DMA_MEMCPY:
+-		op_mode = XOR_OPERATION_MODE_MEMCPY;
+-		break;
+-	default:
+-		dev_err(mv_chan_to_devp(chan),
+-			"error: unsupported operation %d\n",
+-			type);
+-		BUG();
+-		return;
+-	}
+-
+-	config &= ~0x7;
+-	config |= op_mode;
+-
+-#if defined(__BIG_ENDIAN)
+-	config |= XOR_DESCRIPTOR_SWAP;
+-#else
+-	config &= ~XOR_DESCRIPTOR_SWAP;
+-#endif
+-
+-	writel_relaxed(config, XOR_CONFIG(chan));
+-}
+-
+-static void mv_chan_set_mode_to_desc(struct mv_xor_chan *chan)
+-{
+-	u32 op_mode;
+-	u32 config = readl_relaxed(XOR_CONFIG(chan));
+-
+-	op_mode = XOR_OPERATION_MODE_IN_DESC;
+-
+ 	config &= ~0x7;
+ 	config |= op_mode;
+ 
+@@ -1042,9 +1007,9 @@ mv_xor_channel_add(struct mv_xor_device *xordev,
+ 	mv_chan_unmask_interrupts(mv_chan);
+ 
+ 	if (mv_chan->op_in_desc == XOR_MODE_IN_DESC)
+-		mv_chan_set_mode_to_desc(mv_chan);
++		mv_chan_set_mode(mv_chan, XOR_OPERATION_MODE_IN_DESC);
+ 	else
+-		mv_chan_set_mode(mv_chan, DMA_XOR);
++		mv_chan_set_mode(mv_chan, XOR_OPERATION_MODE_XOR);
+ 
+ 	spin_lock_init(&mv_chan->lock);
+ 	INIT_LIST_HEAD(&mv_chan->chain);
 -- 
 2.4.5
