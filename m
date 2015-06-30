@@ -1,47 +1,92 @@
-From: pali.rohar@gmail.com (Pali =?utf-8?B?Um9ow6Fy?=)
-Date: Tue, 30 Jun 2015 11:53:10 +0200
-Subject: n900 in 4.2-rc0: repeating oopses
-In-Reply-To: <20150630092404.GA19285@amd>
-References: <20150416093234.GA17423@amd> <20150629091146.GA5103@amd>
- <20150630092404.GA19285@amd>
-Message-ID: <20150630095310.GF27720@pali>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Tue, 30 Jun 2015 12:54:26 +0300
+Subject: [PATCH 4/7] pinctrl: sh-pfc: Stop calling
+ gpiochip_add_pin_range() on DT platforms
+In-Reply-To: <CAMuHMdWTQrhFeuoiCUM==xkHv4RednxB+-Eb8_zVUiESAaTbYQ@mail.gmail.com>
+References: <1435650327-2542-1-git-send-email-geert+renesas@glider.be>
+ <3655225.qDiVN00LS0@avalon>
+ <CAMuHMdWTQrhFeuoiCUM==xkHv4RednxB+-Eb8_zVUiESAaTbYQ@mail.gmail.com>
+Message-ID: <3279913.JTNeygRbFq@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 30 June 2015 11:24:04 Pavel Machek wrote:
-> Hi!
-> 
-> > Just tried booting 4.2-rc0 on n900 (commit
-> > 4a10a91756ef381bced7b88cfb9232f660b92d93) and it is broken. Previous
-> > -rc0 version worked. This time, there's some output on console, but
-> > too fast for me to read.
+Hi Geert,
+
+On Tuesday 30 June 2015 11:44:24 Geert Uytterhoeven wrote:
+> On Tue, Jun 30, 2015 at 11:30 AM, Laurent Pinchart wrote:
+> > On Tuesday 30 June 2015 09:45:24 Geert Uytterhoeven wrote:
+> >> On platforms where the PFC/GPIO controller is instantiated from DT, the
+> >> mapping between GPIOs and pins is set up using the "gpio-ranges"
+> >> property in DT.
+> >> 
+> >> Hence stop setting up the mapping from C code on DT platforms.
+> >> This code is still used for SH or ARM-legacy platforms.
+> >> 
+> >> Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+> >> ---
+> >> 
+> >>  drivers/pinctrl/sh-pfc/gpio.c | 36 ++++++++++++++++++++----------------
+> >>  1 file changed, 20 insertions(+), 16 deletions(-)
+> >> 
+> >> diff --git a/drivers/pinctrl/sh-pfc/gpio.c
+> >> b/drivers/pinctrl/sh-pfc/gpio.c
+> >> index ba353735ecf2be9a..1be118e4865fd3f8 100644
+> >> --- a/drivers/pinctrl/sh-pfc/gpio.c
+> >> +++ b/drivers/pinctrl/sh-pfc/gpio.c
+> >> @@ -379,22 +379,26 @@ int sh_pfc_register_gpiochip(struct sh_pfc *pfc)
+> >> 
+> >>       pfc->gpio = chip;
+> >> 
+> >> -     /* Register the GPIO to pin mappings. As pins with GPIO ports must
+> >> come
+> >> -      * first in the ranges, skip the pins without GPIO ports by
+> >> stopping at
+> >> -      * the first range that contains such a pin.
+> >> -      */
+> >> -     for (i = 0; i < pfc->nr_ranges; ++i) {
+> >> -             const struct sh_pfc_pin_range *range = &pfc->ranges[i];
+> >> -
+> >> -             if (range->start >= pfc->nr_gpio_pins)
+> >> -                     break;
+> >> -
+> >> -             ret = gpiochip_add_pin_range(&chip->gpio_chip,
+> >> -                                          dev_name(pfc->dev),
+> >> -                                          range->start, range->start,
+> >> -                                          range->end - range->start +
+> >> 1);
+> >> -             if (ret < 0)
+> >> -                     return ret;
+> >> +     if (IS_ENABLED(CONFIG_SUPERH) ||
+> >> +         IS_ENABLED(CONFIG_ARCH_SHMOBILE_LEGACY)) {
 > > 
-> > It seems oopses happen before mounting root. If you have serial
-> > console, they should be easy to see.
+> > I'd prefer checking IS_ENABLED(CONFIG_OF) && pfc->dev->of_node as that
+> > doesn't explicitly depend on the platform type.
 > 
-> I tried again according to pali's instructions, and it is still
-> broken the same way. Any other ideas? Does it work for you?
+> Note that CONFIG_OF is also set for ARM-legacy (and soon for SH). But that's
+> a minor problem. But due to the runtime check on pfc->dev->of_node, the
+> unused code below won't be left out by the compiler, and I want to get rid
+> of that code.
 > 
-> diff --git a/arch/arm/boot/dts/omap3.dtsi b/arch/arm/boot/dts/omap3.dtsi
-> index 69a40cf..ff6f2bf 100644
-> --- a/arch/arm/boot/dts/omap3.dtsi
-> +++ b/arch/arm/boot/dts/omap3.dtsi
-> @@ -570,6 +570,7 @@
->  			interrupts = <49>;
->  			dmas = <&sdma 69>;
->  			dma-names = "rx";
-> +			status = "disabled";
->  		};
->  
->  		smartreflex_core: smartreflex at 480cb000 {
-> 
-> 									Pavel
-> 
+> The platform check make it clear when the code can be removed.
 
-Ok, then it is not problem with omap crypto and HS device...
+Not any time soon I'm afraid as arch/sh won't fully move to DT in the near 
+future, but ARCH_SHMOBILE_LEGACY should go away soon, so I'm fine with 
+compile-time optimization.
 
-I will try 4.2 at the end of week.
+> > As the code after this if block also don't need to run on non-DT
+> > platforms,
+> > how about just using
+> > 
+> >         if (IS_ENABLED(CONFIG_OF) && pfc->dev->of_node)
+> >         
+> >                 return 0;
+> > 
+> > ?
+> 
+> Early return is indeed an option, as we don't need the function GPIOs on
+> DT platforms.
 
 -- 
-Pali Roh?r
-pali.rohar at gmail.com
+Regards,
+
+Laurent Pinchart
