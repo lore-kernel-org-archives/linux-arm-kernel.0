@@ -1,14 +1,14 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Tue, 30 Jun 2015 14:49:37 +0200
+From: ludovic.desroches@atmel.com (Ludovic Desroches)
+Date: Tue, 30 Jun 2015 15:01:34 +0200
 Subject: [PATCH v2 1/1] dmaengine: at_xdmac: fix transfer data width in
  at_xdmac_prep_slave_sg()
 In-Reply-To: <32f90f9820ddf6412a637cdf3fda4e284a7854d1.1435667600.git.cyrille.pitchen@atmel.com>
 References: <32f90f9820ddf6412a637cdf3fda4e284a7854d1.1435667600.git.cyrille.pitchen@atmel.com>
-Message-ID: <55929061.2090905@atmel.com>
+Message-ID: <20150630130134.GN18384@odux.rfo.atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le 30/06/2015 14:36, Cyrille Pitchen a ?crit :
+On Tue, Jun 30, 2015 at 02:36:57PM +0200, Cyrille Pitchen wrote:
 > This patch adds the missing update of the transfer data width in
 > at_xdmac_prep_slave_sg().
 > 
@@ -46,11 +46,13 @@ Le 30/06/2015 14:36, Cyrille Pitchen a ?crit :
 > the actual number of writes into THR must be set accordingly.
 > 
 > Signed-off-by: Cyrille Pitchen <cyrille.pitchen@atmel.com>
+
+Acked-by: Ludovic Desroches <ludovic.desroches@atmel.com>
+
+Thanks Cyrille
+
 > Fixes: 6d3a7d9e3ada ("dmaengine: at_xdmac: allow muliple dwidths when doing slave transfers")
 > Cc: stable at vger.kernel.org #4.0 and later
-
-Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
-
 > ---
 > ChangeLog
 > 
@@ -86,8 +88,6 @@ Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
 >  		dev_dbg(chan2dev(chan),
 >  			 "%s: lld: mbr_sa=%pad, mbr_da=%pad, mbr_ubc=0x%08x\n",
 >  			 __func__, &desc->lld.mbr_sa, &desc->lld.mbr_da, desc->lld.mbr_ubc);
+> -- 
+> 1.8.2.2
 > 
-
-
--- 
-Nicolas Ferre
