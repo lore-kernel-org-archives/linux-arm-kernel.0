@@ -1,47 +1,41 @@
 From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Tue, 30 Jun 2015 19:18:57 +0200
-Subject: [PATCH v2 1/4] ARM: mvebu: Use __init for the PM initialization
- functions
+Date: Tue, 30 Jun 2015 19:19:00 +0200
+Subject: [PATCH v2 4/4] ARM: mvebu: Warn about the wake-up sources not taken
+ into account in suspend
 In-Reply-To: <1435684740-24912-1-git-send-email-gregory.clement@free-electrons.com>
 References: <1435684740-24912-1-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <1435684740-24912-2-git-send-email-gregory.clement@free-electrons.com>
+Message-ID: <1435684740-24912-5-git-send-email-gregory.clement@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-mvebu_pm_init and mvebu_armada_pm_init are only called during boot, so
-flag them with __init and save some memory.
+On the Armada 370/XP/38x/39x SoCs when the suspend to ram feature is
+supported, the SoC is shutdown and will be waken up by an external
+micro-controller, so there is no possibility to setup wake-up source
+from Linux. However, in standby mode, the SoCs stay powered and it is
+possible to wake-up from any interrupt sources. As, when user decide to
+setup a wake-up source, there is no way to know if they will be
+wake-up source from suspend or from standby, then we chose allowing to
+setup all the interrupt as wake-up sources.
+
+The purpose of this patch is to inform the user that in suspend to ram
+mode, the wake-up sources won't be taken into consideration.
 
 Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
 ---
- arch/arm/mach-mvebu/pm-board.c | 2 +-
- arch/arm/mach-mvebu/pm.c       | 2 +-
- 2 files changed, 2 insertions(+), 2 deletions(-)
+ arch/arm/mach-mvebu/pm.c | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/arch/arm/mach-mvebu/pm-board.c b/arch/arm/mach-mvebu/pm-board.c
-index 0f471fad214a..acc69e369c8b 100644
---- a/arch/arm/mach-mvebu/pm-board.c
-+++ b/arch/arm/mach-mvebu/pm-board.c
-@@ -76,7 +76,7 @@ static void mvebu_armada_pm_enter(void __iomem *sdram_reg, u32 srcmd)
- 		  [ackcmd] "r" (ackcmd), [gpio_ctrl] "r" (gpio_ctrl) : "r1");
- }
- 
--static int mvebu_armada_pm_init(void)
-+static int __init mvebu_armada_pm_init(void)
- {
- 	struct device_node *np;
- 	struct device_node *gpio_ctrl_np;
 diff --git a/arch/arm/mach-mvebu/pm.c b/arch/arm/mach-mvebu/pm.c
-index 90d85ef75d54..f249c8e04bd4 100644
+index 264073a777d8..4402dcfa7c56 100644
 --- a/arch/arm/mach-mvebu/pm.c
 +++ b/arch/arm/mach-mvebu/pm.c
-@@ -235,7 +235,7 @@ static const struct platform_suspend_ops mvebu_pm_ops = {
- 	.valid = suspend_valid_only_mem,
- };
- 
--int mvebu_pm_init(void (*board_pm_enter)(void __iomem *sdram_reg, u32 srcmd))
-+int __init mvebu_pm_init(void (*board_pm_enter)(void __iomem *sdram_reg, u32 srcmd))
- {
- 	struct device_node *np;
- 	struct resource res;
+@@ -235,6 +235,7 @@ static int mvebu_pm_enter(suspend_state_t state)
+ 		cpu_do_idle();
+ 		break;
+ 	case PM_SUSPEND_MEM:
++		pr_warn("None of the wakeup sources will be taken into account in suspend to ram\n");
+ 		return mvebu_enter_suspend();
+ 	default:
+ 		return -EINVAL;
 -- 
 2.1.0
