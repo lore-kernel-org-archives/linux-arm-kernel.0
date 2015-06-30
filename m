@@ -1,55 +1,393 @@
-From: gerg@uclinux.org (Greg Ungerer)
-Date: Tue, 30 Jun 2015 23:09:03 +1000
-Subject: [PATCH] ARM: mvebu: pass the coherency availability information
- at init time
-In-Reply-To: <20150630003105.GF6430@kroah.com>
-References: <1433992764-12753-1-git-send-email-gerg@uclinux.org>
- <20150611034521.GA12809@kroah.com> <557908C2.4090302@uclinux.org>
- <20150611092549.2276beb8@free-electrons.com>
- <20150611145129.GA3777@kroah.com> <557A33AF.9030101@uclinux.org>
- <20150630003105.GF6430@kroah.com>
-Message-ID: <559294EF.9040906@uclinux.org>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Tue, 30 Jun 2015 15:15:22 +0200
+Subject: [PATCH v3 09/11] KVM: arm: implement lazy world switch for debug
+ registers
+In-Reply-To: <1434969694-7432-10-git-send-email-zhichao.huang@linaro.org>
+References: <1434969694-7432-1-git-send-email-zhichao.huang@linaro.org>
+ <1434969694-7432-10-git-send-email-zhichao.huang@linaro.org>
+Message-ID: <20150630131522.GQ11332@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Mon, Jun 22, 2015 at 06:41:32PM +0800, Zhichao Huang wrote:
+> Implement switching of the debug registers. While the number
+> of registers is massive, CPUs usually don't implement them all
+> (A15 has 6 breakpoints and 4 watchpoints, which gives us a total
+> of 22 registers "only").
+> 
+> Notice that, for ARMv7, if the CONFIG_HAVE_HW_BREAKPOINT is set in
+> the guest, debug is always actively in use (ARM_DSCR_MDBGEN set).
+> 
+> We have to do the save/restore dance in this case, because the host
+> and the guest might use their respective debug registers at any moment.
 
+this sounds expensive, and I suggested an alternative approach in the
+previsou patch.  In any case, measuring the impact on this on hardware
+would be a great idea...
 
-On 30/06/15 10:31, Greg KH wrote:
-> On Fri, Jun 12, 2015 at 11:19:43AM +1000, Greg Ungerer wrote:
->> On 12/06/15 00:51, Greg KH wrote:
->>> On Thu, Jun 11, 2015 at 09:25:49AM +0200, Thomas Petazzoni wrote:
->>>> Greg, Greg,
->>>>
->>>> On Thu, 11 Jun 2015 14:04:18 +1000, Greg Ungerer wrote:
->>>>
->>>>>> Why?  What's wrong with taking the exact specific upstream patches
->>>>>> instead?
->>>>> The exact patch mentioned below ("5686a1e5aa4") will not apply.
->>>>> Too much of the code around it has changed. This does the same
->>>>> thing in the same away taking into account the changes around it.
->>>> As the original author of 5686a1e5aa4 ("bus: mvebu: pass the coherency
->>>> availability information at init time"), I can confirm that it will
->>>> clearly not apply as is on 3.10. What Greg Ungerer is proposing here is
->>>> a backport of 5686a1e5aa4 to 3.10.
->>> What about 3.14-stable?
->> As Thomas pointed out, yes. Due to file movements and other changes
->> neither this patch (for 3.10.y) or the original commit 5686a1e5aa4
->> apply cleanly to 3.14.y.
->>
->> How do you want to handle that for 3.14.y?
-> I need a backport for 3.14.y as well.
->
-> And I need a signed-off-by: from the subsystem maintainers that this
-> backport is acceptable, as it's so different from what is in Linus's
-> tree, before I can take it.
+> 
+> If the CONFIG_HAVE_HW_BREAKPOINT is not set, and if no one flagged
+> the debug registers as dirty, we only save/resotre DBGDSCR.
 
-Ok, I will prepare a 3.14 port. I will send to all recipients of this mail,
-that should catch all those who need to sign off on it.
+restore
 
-I have generated a version 2 of the original 3.10 patch. No change to
-the code diffs, but it changes the commit message to include all of the
-original commit followed by a brief description of the back port. Perhaps
-this is better?
+> 
+> Signed-off-by: Zhichao Huang <zhichao.huang@linaro.org>
+> ---
+>  arch/arm/kvm/interrupts.S      |  16 +++
+>  arch/arm/kvm/interrupts_head.S | 249 ++++++++++++++++++++++++++++++++++++++++-
+>  2 files changed, 263 insertions(+), 2 deletions(-)
+> 
+> diff --git a/arch/arm/kvm/interrupts.S b/arch/arm/kvm/interrupts.S
+> index 79caf79..d626275 100644
+> --- a/arch/arm/kvm/interrupts.S
+> +++ b/arch/arm/kvm/interrupts.S
+> @@ -116,6 +116,12 @@ ENTRY(__kvm_vcpu_run)
+>  	read_cp15_state store_to_vcpu = 0
+>  	write_cp15_state read_from_vcpu = 1
+>  
+> +	@ Store hardware CP14 state and load guest state
+> +	compute_debug_state 1f
+> +	bl __save_host_debug_regs
+> +	bl __restore_guest_debug_regs
+> +
+> +1:
+>  	@ If the host kernel has not been configured with VFPv3 support,
+>  	@ then it is safer if we deny guests from using it as well.
+>  #ifdef CONFIG_VFPv3
+> @@ -201,6 +207,16 @@ after_vfp_restore:
+>  	mrc	p15, 0, r2, c0, c0, 5
+>  	mcr	p15, 4, r2, c0, c0, 5
+>  
+> +	@ Store guest CP14 state and restore host state
+> +	skip_debug_state 1f
+> +	bl __save_guest_debug_regs
+> +	bl __restore_host_debug_regs
+> +	/* Clear the dirty flag for the next run, as all the state has
+> +	 * already been saved. Note that we nuke the whole 32bit word.
+> +	 * If we ever add more flags, we'll have to be more careful...
+> +	 */
+> +	clear_debug_dirty_bit
+> +1:
+>  	@ Store guest CP15 state and restore host state
+>  	read_cp15_state store_to_vcpu = 1
+>  	write_cp15_state read_from_vcpu = 0
+> diff --git a/arch/arm/kvm/interrupts_head.S b/arch/arm/kvm/interrupts_head.S
+> index 5662c39..ed406be 100644
+> --- a/arch/arm/kvm/interrupts_head.S
+> +++ b/arch/arm/kvm/interrupts_head.S
+> @@ -7,6 +7,7 @@
+>  #define VCPU_USR_SP		(VCPU_USR_REG(13))
+>  #define VCPU_USR_LR		(VCPU_USR_REG(14))
+>  #define CP15_OFFSET(_cp15_reg_idx) (VCPU_CP15 + (_cp15_reg_idx * 4))
+> +#define CP14_OFFSET(_cp14_reg_idx) (VCPU_CP14 + ((_cp14_reg_idx) * 4))
+>  
+>  /*
+>   * Many of these macros need to access the VCPU structure, which is always
+> @@ -168,8 +169,7 @@ vcpu	.req	r0		@ vcpu pointer always in r0
+>   * Clobbers *all* registers.
+>   */
+>  .macro restore_guest_regs
+> -	/* reset DBGDSCR to disable debug mode */
+> -	mov	r2, #0
+> +	ldr	r2, [vcpu, #CP14_OFFSET(cp14_DBGDSCRext)]
+>  	mcr	p14, 0, r2, c0, c2, 2
+>  
+>  	restore_guest_regs_mode svc, #VCPU_SVC_REGS
+> @@ -250,6 +250,10 @@ vcpu	.req	r0		@ vcpu pointer always in r0
+>  	save_guest_regs_mode abt, #VCPU_ABT_REGS
+>  	save_guest_regs_mode und, #VCPU_UND_REGS
+>  	save_guest_regs_mode irq, #VCPU_IRQ_REGS
+> +
+> +	/* DBGDSCR reg */
+> +	mrc	p14, 0, r2, c0, c1, 0
+> +	str	r2, [vcpu, #CP14_OFFSET(cp14_DBGDSCRext)]
+>  .endm
+>  
+>  /* Reads cp15 registers from hardware and stores them in memory
+> @@ -449,6 +453,231 @@ vcpu	.req	r0		@ vcpu pointer always in r0
+>  	str	r5, [vcpu, #VCPU_DEBUG_FLAGS]
+>  .endm
+>  
+> +/* Assume r11/r12 in used, clobbers r2-r10 */
+> +.macro cp14_read_and_push Op2 skip_num
+> +	cmp	\skip_num, #8
+> +	// if (skip_num >= 8) then skip c8-c15 directly
+> +	bge	1f
+> +	adr	r2, 9998f
+> +	add	r2, r2, \skip_num, lsl #2
+> +	bx	r2
+> +1:
+> +	adr	r2, 9999f
+> +	sub	r3, \skip_num, #8
+> +	add	r2, r2, r3, lsl #2
+> +	bx	r2
+> +9998:
+> +	mrc	p14, 0, r10, c0, c15, \Op2
+> +	mrc	p14, 0, r9, c0, c14, \Op2
+> +	mrc	p14, 0, r8, c0, c13, \Op2
+> +	mrc	p14, 0, r7, c0, c12, \Op2
+> +	mrc	p14, 0, r6, c0, c11, \Op2
+> +	mrc	p14, 0, r5, c0, c10, \Op2
+> +	mrc	p14, 0, r4, c0, c9, \Op2
+> +	mrc	p14, 0, r3, c0, c8, \Op2
+> +	push	{r3-r10}
 
-Regards
-Greg
+you probably don't want to do more stores to memory than required
+
+> +9999:
+> +	mrc	p14, 0, r10, c0, c7, \Op2
+> +	mrc	p14, 0, r9, c0, c6, \Op2
+> +	mrc	p14, 0, r8, c0, c5, \Op2
+> +	mrc	p14, 0, r7, c0, c4, \Op2
+> +	mrc	p14, 0, r6, c0, c3, \Op2
+> +	mrc	p14, 0, r5, c0, c2, \Op2
+> +	mrc	p14, 0, r4, c0, c1, \Op2
+> +	mrc	p14, 0, r3, c0, c0, \Op2
+> +	push	{r3-r10}
+
+same
+
+> +.endm
+> +
+> +/* Assume r11/r12 in used, clobbers r2-r10 */
+> +.macro cp14_pop_and_write Op2 skip_num
+> +	cmp	\skip_num, #8
+> +	// if (skip_num >= 8) then skip c8-c15 directly
+> +	bge	1f
+> +	adr	r2, 9998f
+> +	add	r2, r2, \skip_num, lsl #2
+> +	pop	{r3-r10}
+
+you probably don't want to do more loads from memory than required
+
+> +	bx	r2
+> +1:
+> +	adr	r2, 9999f
+> +	sub	r3, \skip_num, #8
+> +	add	r2, r2, r3, lsl #2
+> +	pop	{r3-r10}
+
+same
+
+> +	bx	r2
+> +
+> +9998:
+> +	mcr	p14, 0, r10, c0, c15, \Op2
+> +	mcr	p14, 0, r9, c0, c14, \Op2
+> +	mcr	p14, 0, r8, c0, c13, \Op2
+> +	mcr	p14, 0, r7, c0, c12, \Op2
+> +	mcr	p14, 0, r6, c0, c11, \Op2
+> +	mcr	p14, 0, r5, c0, c10, \Op2
+> +	mcr	p14, 0, r4, c0, c9, \Op2
+> +	mcr	p14, 0, r3, c0, c8, \Op2
+> +
+> +	pop	{r3-r10}
+> +9999:
+> +	mcr	p14, 0, r10, c0, c7, \Op2
+> +	mcr	p14, 0, r9, c0, c6, \Op2
+> +	mcr	p14, 0, r8, c0, c5, \Op2
+> +	mcr	p14, 0, r7, c0, c4, \Op2
+> +	mcr	p14, 0, r6, c0, c3, \Op2
+> +	mcr	p14, 0, r5, c0, c2, \Op2
+> +	mcr	p14, 0, r4, c0, c1, \Op2
+> +	mcr	p14, 0, r3, c0, c0, \Op2
+> +.endm
+> +
+> +/* Assume r11/r12 in used, clobbers r2-r3 */
+> +.macro cp14_read_and_str Op2 cp14_reg0 skip_num
+> +	adr	r3, 1f
+> +	add	r3, r3, \skip_num, lsl #3
+> +	bx	r3
+> +1:
+> +	mrc	p14, 0, r2, c0, c15, \Op2
+> +	str     r2, [vcpu, #CP14_OFFSET(\cp14_reg0+15)]
+> +	mrc	p14, 0, r2, c0, c14, \Op2
+> +	str     r2, [vcpu, #CP14_OFFSET(\cp14_reg0+14)]
+> +	mrc	p14, 0, r2, c0, c13, \Op2
+> +	str     r2, [vcpu, #CP14_OFFSET(\cp14_reg0+13)]
+> +	mrc	p14, 0, r2, c0, c12, \Op2
+> +	str     r2, [vcpu, #CP14_OFFSET(\cp14_reg0+12)]
+> +	mrc	p14, 0, r2, c0, c11, \Op2
+> +	str     r2, [vcpu, #CP14_OFFSET(\cp14_reg0+11)]
+> +	mrc	p14, 0, r2, c0, c10, \Op2
+> +	str     r2, [vcpu, #CP14_OFFSET(\cp14_reg0+10)]
+> +	mrc	p14, 0, r2, c0, c9, \Op2
+> +	str     r2, [vcpu, #CP14_OFFSET(\cp14_reg0+9)]
+> +	mrc	p14, 0, r2, c0, c8, \Op2
+> +	str     r2, [vcpu, #CP14_OFFSET(\cp14_reg0+8)]
+> +	mrc	p14, 0, r2, c0, c7, \Op2
+> +	str     r2, [vcpu, #CP14_OFFSET(\cp14_reg0+7)]
+> +	mrc	p14, 0, r2, c0, c6, \Op2
+> +	str     r2, [vcpu, #CP14_OFFSET(\cp14_reg0+6)]
+> +	mrc	p14, 0, r2, c0, c5, \Op2
+> +	str     r2, [vcpu, #CP14_OFFSET(\cp14_reg0+5)]
+> +	mrc	p14, 0, r2, c0, c4, \Op2
+> +	str     r2, [vcpu, #CP14_OFFSET(\cp14_reg0+4)]
+> +	mrc	p14, 0, r2, c0, c3, \Op2
+> +	str     r2, [vcpu, #CP14_OFFSET(\cp14_reg0+3)]
+> +	mrc	p14, 0, r2, c0, c2, \Op2
+> +	str     r2, [vcpu, #CP14_OFFSET(\cp14_reg0+2)]
+> +	mrc	p14, 0, r2, c0, c1, \Op2
+> +	str     r2, [vcpu, #CP14_OFFSET(\cp14_reg0+1)]
+> +	mrc	p14, 0, r2, c0, c0, \Op2
+> +	str     r2, [vcpu, #CP14_OFFSET(\cp14_reg0)]
+> +.endm
+> +
+> +/* Assume r11/r12 in used, clobbers r2-r3 */
+> +.macro cp14_ldr_and_write Op2 cp14_reg0 skip_num
+> +	adr	r3, 1f
+> +	add	r3, r3, \skip_num, lsl #3
+> +	bx	r3
+> +1:
+> +	ldr     r2, [vcpu, #CP14_OFFSET(\cp14_reg0+15)]
+> +	mcr	p14, 0, r2, c0, c15, \Op2
+> +	ldr     r2, [vcpu, #CP14_OFFSET(\cp14_reg0+14)]
+> +	mcr	p14, 0, r2, c0, c14, \Op2
+> +	ldr     r2, [vcpu, #CP14_OFFSET(\cp14_reg0+13)]
+> +	mcr	p14, 0, r2, c0, c13, \Op2
+> +	ldr     r2, [vcpu, #CP14_OFFSET(\cp14_reg0+12)]
+> +	mcr	p14, 0, r2, c0, c12, \Op2
+> +	ldr     r2, [vcpu, #CP14_OFFSET(\cp14_reg0+11)]
+> +	mcr	p14, 0, r2, c0, c11, \Op2
+> +	ldr     r2, [vcpu, #CP14_OFFSET(\cp14_reg0+10)]
+> +	mcr	p14, 0, r2, c0, c10, \Op2
+> +	ldr     r2, [vcpu, #CP14_OFFSET(\cp14_reg0+9)]
+> +	mcr	p14, 0, r2, c0, c9, \Op2
+> +	ldr     r2, [vcpu, #CP14_OFFSET(\cp14_reg0+8)]
+> +	mcr	p14, 0, r2, c0, c8, \Op2
+> +	ldr     r2, [vcpu, #CP14_OFFSET(\cp14_reg0+7)]
+> +	mcr	p14, 0, r2, c0, c7, \Op2
+> +	ldr     r2, [vcpu, #CP14_OFFSET(\cp14_reg0+6)]
+> +	mcr	p14, 0, r2, c0, c6, \Op2
+> +	ldr     r2, [vcpu, #CP14_OFFSET(\cp14_reg0+5)]
+> +	mcr	p14, 0, r2, c0, c5, \Op2
+> +	ldr     r2, [vcpu, #CP14_OFFSET(\cp14_reg0+4)]
+> +	mcr	p14, 0, r2, c0, c4, \Op2
+> +	ldr     r2, [vcpu, #CP14_OFFSET(\cp14_reg0+3)]
+> +	mcr	p14, 0, r2, c0, c3, \Op2
+> +	ldr     r2, [vcpu, #CP14_OFFSET(\cp14_reg0+2)]
+> +	mcr	p14, 0, r2, c0, c2, \Op2
+> +	ldr     r2, [vcpu, #CP14_OFFSET(\cp14_reg0+1)]
+> +	mcr	p14, 0, r2, c0, c1, \Op2
+> +	ldr     r2, [vcpu, #CP14_OFFSET(\cp14_reg0)]
+> +	mcr	p14, 0, r2, c0, c0, \Op2
+> +.endm
+
+can you not find some way of unifying cp14_pop_and_write with
+cp14_ldr_and_write and cp14_read_and_push with cp14_read_and_str ?
+
+Probably having two separate structs for the VFP state on the vcpu struct
+for both the guest and the host state is one possible way of doing so.
+
+> +
+> +/* Get extract number of BRPs and WRPs. Saved in r11/r12 */
+> +.macro read_hw_dbg_num
+> +	mrc	p14, 0, r2, c0, c0, 0
+> +	ubfx	r11, r2, #24, #4
+> +	add	r11, r11, #1		// Extract BRPs
+> +	ubfx	r12, r2, #28, #4
+> +	add	r12, r12, #1		// Extract WRPs
+> +	mov	r2, #16
+> +	sub	r11, r2, r11		// How many BPs to skip
+> +	sub	r12, r2, r12		// How many WPs to skip
+> +.endm
+> +
+> +/* Reads cp14 registers from hardware.
+
+You have a lot of multi-line comments in these patches which don't start
+with a separate '/*' line, as dictated by the Linux kernel coding style.
+So far, I've ignored this, but please fix all these throughout the
+series when you respin.
+
+> + * Writes cp14 registers in-order to the stack.
+> + *
+> + * Assumes vcpu pointer in vcpu reg
+> + *
+> + * Clobbers r2-r12
+> + */
+> +.macro save_host_debug_regs
+> +	read_hw_dbg_num
+> +	cp14_read_and_push #4, r11	@ DBGBVR
+> +	cp14_read_and_push #5, r11	@ DBGBCR
+> +	cp14_read_and_push #6, r12	@ DBGWVR
+> +	cp14_read_and_push #7, r12	@ DBGWCR
+> +.endm
+> +
+> +/* Reads cp14 registers from hardware.
+> + * Writes cp14 registers in-order to the VCPU struct pointed to by vcpup.
+> + *
+> + * Assumes vcpu pointer in vcpu reg
+> + *
+> + * Clobbers r2-r12
+> + */
+> +.macro save_guest_debug_regs
+> +	read_hw_dbg_num
+> +	cp14_read_and_str #4, cp14_DBGBVR0, r11
+
+why do you need the has before the op2 field?
+
+> +	cp14_read_and_str #5, cp14_DBGBCR0, r11
+> +	cp14_read_and_str #6, cp14_DBGWVR0, r12
+> +	cp14_read_and_str #7, cp14_DBGWCR0, r12
+> +.endm
+> +
+> +/* Reads cp14 registers in-order from the stack.
+> + * Writes cp14 registers to hardware.
+> + *
+> + * Assumes vcpu pointer in vcpu reg
+> + *
+> + * Clobbers r2-r12
+> + */
+> +.macro restore_host_debug_regs
+> +	read_hw_dbg_num
+> +	cp14_pop_and_write #4, r11	@ DBGBVR
+> +	cp14_pop_and_write #5, r11	@ DBGBCR
+> +	cp14_pop_and_write #6, r12	@ DBGWVR
+> +	cp14_pop_and_write #7, r12	@ DBGWCR
+> +.endm
+> +
+> +/* Reads cp14 registers in-order from the VCPU struct pointed to by vcpup
+> + * Writes cp14 registers to hardware.
+> + *
+> + * Assumes vcpu pointer in vcpu reg
+> + *
+> + * Clobbers r2-r12
+> + */
+> +.macro restore_guest_debug_regs
+> +	read_hw_dbg_num
+> +	cp14_ldr_and_write #4, cp14_DBGBVR0, r11
+> +	cp14_ldr_and_write #5, cp14_DBGBCR0, r11
+> +	cp14_ldr_and_write #6, cp14_DBGWVR0, r12
+> +	cp14_ldr_and_write #7, cp14_DBGWCR0, r12
+> +.endm
+> +
+>  /*
+>   * Save the VGIC CPU state into memory
+>   *
+> @@ -684,3 +913,19 @@ ARM_BE8(rev	r6, r6  )
+>  .macro load_vcpu
+>  	mrc	p15, 4, vcpu, c13, c0, 2	@ HTPIDR
+>  .endm
+> +
+> +__save_host_debug_regs:
+> +	save_host_debug_regs
+> +	bx	lr
+> +
+> +__save_guest_debug_regs:
+> +	save_guest_debug_regs
+> +	bx	lr
+> +
+> +__restore_host_debug_regs:
+> +	restore_host_debug_regs
+> +	bx	lr
+> +
+> +__restore_guest_debug_regs:
+> +	restore_guest_debug_regs
+> +	bx	lr
+> -- 
+> 1.7.12.4
+> 
+
+Thanks,
+-Christoffer
