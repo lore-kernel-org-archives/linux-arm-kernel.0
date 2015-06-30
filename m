@@ -1,95 +1,258 @@
-From: simon.guinot@sequanux.org (Simon Guinot)
-Date: Tue, 30 Jun 2015 16:05:49 +0200
-Subject: [PATCH v3 3/3] ARM: mvebu: disable IP checksum with jumbo frames for
- Armada 370
-In-Reply-To: <1435673149-12599-1-git-send-email-simon.guinot@sequanux.org>
-References: <1435673149-12599-1-git-send-email-simon.guinot@sequanux.org>
-Message-ID: <1435673149-12599-4-git-send-email-simon.guinot@sequanux.org>
+From: cyrille.pitchen@atmel.com (Cyrille Pitchen)
+Date: Tue, 30 Jun 2015 16:05:16 +0200
+Subject: [PATCH v3 3/4] tty/serial: at91: add support to FIFOs
+In-Reply-To: <cover.1435672649.git.cyrille.pitchen@atmel.com>
+References: <cover.1435672649.git.cyrille.pitchen@atmel.com>
+Message-ID: <3d02083b34cdd8b37f6cface84d677be5044cd23.1435672649.git.cyrille.pitchen@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Ethernet controller found in the Armada 370, 380 and 385 SoCs don't
-support TCP/IP checksumming with frame sizes larger than 1600 bytes.
+Depending on the hardware, TX and RX FIFOs may be available. The RX
+FIFO can avoid receive overruns, especially when DMA transfers are
+not used to read data from the Receive Holding Register. For heavy
+system load, The CPU is likely not be able to fetch data fast enough
+from the RHR.
 
-This patch fixes the issue by disabling the features NETIF_F_IP_CSUM and
-NETIF_F_TSO for the Armada 370 and compatibles SoCs when the MTU is set
-to a value greater than 1600 bytes.
+In addition, the RX FIFO can supersede the DMA/PDC to control the RTS
+line when the Hardware Handshaking mode is enabled. Two thresholds
+are to be set for that purpose:
+- When the number of data in the RX FIFO crosses and becomes lower
+  than or equal to the low threshold, the RTS line is set to low
+  level: the remote peer is requested to send data.
+- When the number of data in the RX FIFO crosses and becomes greater
+  than or equal to the high threshold, the RTS line is set to high
+  level: the remote peer should stop sending new data.
+- low threshold <= high threshold
+Once these two thresholds are set properly, this new feature is
+enabled by setting the FIFO RTS Control bit of the FIFO Mode Register.
 
-Signed-off-by: Simon Guinot <simon.guinot@sequanux.org>
-Fixes: c5aff18204da ("net: mvneta: driver for Marvell Armada 370/XP network unit")
-Cc: <stable@vger.kernel.org> # v3.8+
+FIFOs also introduce a new multiple data mode: the USART works either
+in multiple data mode or in single data (legacy) mode.
+
+If MODE9 bit is set into the Mode Register or if USMODE is set to
+either LIN_MASTER, LIN_SLAVE or LON_MODE, FIFOs operate in single
+data mode. Otherwise, they operate in multiple data mode.
+
+In this new multiple data mode, accesses to the Receive Holding
+Register or Transmit Holding Register slightly change.
+
+Since this driver implements neither the 9bit data feature (MODE9 bit
+set into the Mode Register) nor LIN modes, the USART works in
+multiple data mode whenever FIFOs are available and enabled. We also
+assume that data are 8bit wide.
+
+In single data mode, 32bit access CAN be used to read a single data
+from RHR or write a single data into THR.
+However in multiple data mode, a 32bit access to RHR now allows us to
+read four consecutive data from RX FIFO. Also a 32bit access to THR
+now allows to write four consecutive data into TX FIFO. So we MUST
+use 8bit access whenever only one data have to be read/written at a
+time.
+
+Signed-off-by: Cyrille Pitchen <cyrille.pitchen@atmel.com>
 ---
- drivers/net/ethernet/marvell/mvneta.c | 26 +++++++++++++++++++++++++-
- 1 file changed, 25 insertions(+), 1 deletion(-)
+ drivers/tty/serial/atmel_serial.c | 92 ++++++++++++++++++++++++++++++++++++++-
+ include/linux/atmel_serial.h      | 36 +++++++++++++++
+ 2 files changed, 126 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/net/ethernet/marvell/mvneta.c b/drivers/net/ethernet/marvell/mvneta.c
-index aceb977b104d..9b2b7478fe47 100644
---- a/drivers/net/ethernet/marvell/mvneta.c
-+++ b/drivers/net/ethernet/marvell/mvneta.c
-@@ -310,6 +310,7 @@ struct mvneta_port {
- 	unsigned int link;
- 	unsigned int duplex;
- 	unsigned int speed;
-+	unsigned int tx_csum_limit;
- 	int use_inband_status:1;
- };
+diff --git a/drivers/tty/serial/atmel_serial.c b/drivers/tty/serial/atmel_serial.c
+index 112e74b61f1f..e3082d912a52 100644
+--- a/drivers/tty/serial/atmel_serial.c
++++ b/drivers/tty/serial/atmel_serial.c
+@@ -56,6 +56,15 @@
+ /* Revisit: We should calculate this based on the actual port settings */
+ #define PDC_RX_TIMEOUT		(3 * 10)		/* 3 bytes */
  
-@@ -2502,8 +2503,10 @@ static int mvneta_change_mtu(struct net_device *dev, int mtu)
- 
- 	dev->mtu = mtu;
- 
--	if (!netif_running(dev))
-+	if (!netif_running(dev)) {
-+		netdev_update_features(dev);
- 		return 0;
-+	}
- 
- 	/* The interface is running, so we have to force a
- 	 * reallocation of the queues
-@@ -2532,9 +2535,26 @@ static int mvneta_change_mtu(struct net_device *dev, int mtu)
- 	mvneta_start_dev(pp);
- 	mvneta_port_up(pp);
- 
-+	netdev_update_features(dev);
++/* The minium number of data FIFOs should be able to contain */
++#define ATMEL_MIN_FIFO_SIZE	8
++/*
++ * These two offsets are substracted from the RX FIFO size to define the RTS
++ * high and low thresholds
++ */
++#define ATMEL_RTS_HIGH_OFFSET	8
++#define ATMEL_RTS_LOW_OFFSET	16
 +
+ #if defined(CONFIG_SERIAL_ATMEL_CONSOLE) && defined(CONFIG_MAGIC_SYSRQ)
+ #define SUPPORT_SYSRQ
+ #endif
+@@ -96,8 +105,8 @@ static void atmel_stop_rx(struct uart_port *port);
+ #define UART_PUT_IDR(port, v)  __raw_writel(v, (port)->membase + ATMEL_US_IDR)
+ #define UART_GET_IMR(port)     __raw_readl((port)->membase + ATMEL_US_IMR)
+ #define UART_GET_CSR(port)     __raw_readl((port)->membase + ATMEL_US_CSR)
+-#define UART_GET_CHAR(port)    __raw_readl((port)->membase + ATMEL_US_RHR)
+-#define UART_PUT_CHAR(port, v) __raw_writel(v, (port)->membase + ATMEL_US_THR)
++#define UART_GET_CHAR(port)    __raw_readb((port)->membase + ATMEL_US_RHR)
++#define UART_PUT_CHAR(port, v) __raw_writeb(v, (port)->membase + ATMEL_US_THR)
+ #define UART_GET_BRGR(port)    __raw_readl((port)->membase + ATMEL_US_BRGR)
+ #define UART_PUT_BRGR(port, v) __raw_writel(v, (port)->membase + ATMEL_US_BRGR)
+ #define UART_PUT_RTOR(port, v) __raw_writel(v, (port)->membase + ATMEL_US_RTOR)
+@@ -119,6 +128,16 @@ static void atmel_stop_rx(struct uart_port *port);
+ #define UART_PUT_TCR(port, v)  __raw_writel(v, (port)->membase + ATMEL_PDC_TCR)
+ #define UART_GET_TCR(port)     __raw_readl((port)->membase + ATMEL_PDC_TCR)
+ 
++/* FIFO registers */
++#define UART_PUT_FMR(port, v)  __raw_writel(v, (port)->membase + ATMEL_US_FMR)
++#define UART_GET_FMR(port)     __raw_readl((port)->membase + ATMEL_US_FMR)
++#define UART_GET_FESR(port)    __raw_readl((port)->membase + ATMEL_US_FESR)
++#define UART_PUT_FIER(port, v) __raw_writel(v, (port)->membase + ATMEL_US_FIER)
++#define UART_PUT_FIDR(port, v) __raw_writel(v, (port)->membase + ATMEL_US_FIDR)
++#define UART_GET_FIMR(port)    __raw_readl((port)->membase + ATMEL_US_FIMR)
++#define UART_GET_FLR(port)     __raw_readl((port)->membase + ATMEL_US_FLR)
++
++
+ struct atmel_dma_buffer {
+ 	unsigned char	*buf;
+ 	dma_addr_t	dma_addr;
+@@ -172,6 +191,9 @@ struct atmel_uart_port {
+ 	struct mctrl_gpios	*gpios;
+ 	int			gpio_irq[UART_GPIO_MAX];
+ 	unsigned int		tx_done_mask;
++	u32			fifo_size;
++	u32			rts_high;
++	u32			rts_low;
+ 	bool			ms_irq_enabled;
+ 	bool			is_usart;	/* usart or uart */
+ 	struct timer_list	uart_timer;	/* uart timer */
+@@ -1797,6 +1819,29 @@ static int atmel_startup(struct uart_port *port)
+ 			atmel_set_ops(port);
+ 	}
+ 
++	/*
++	 * Enable FIFO when available
++	 */
++	if (atmel_port->fifo_size) {
++		unsigned int txrdym = ATMEL_US_ONE_DATA;
++		unsigned int rxrdym = ATMEL_US_ONE_DATA;
++		unsigned int fmr;
++
++		UART_PUT_CR(port,
++			    ATMEL_US_FIFOEN |
++			    ATMEL_US_RXFCLR |
++			    ATMEL_US_TXFLCLR);
++
++		fmr = ATMEL_US_TXRDYM(txrdym) | ATMEL_US_RXRDYM(rxrdym);
++		if (atmel_port->rts_high &&
++		    atmel_port->rts_low)
++			fmr |=	ATMEL_US_FRTSC |
++				ATMEL_US_RXFTHRES(atmel_port->rts_high) |
++				ATMEL_US_RXFTHRES2(atmel_port->rts_low);
++
++		UART_PUT_FMR(port, fmr);
++	}
++
+ 	/* Save current CSR for comparison in atmel_tasklet_func() */
+ 	atmel_port->irq_status_prev = atmel_get_lines_status(port);
+ 	atmel_port->irq_status = atmel_port->irq_status_prev;
+@@ -2599,6 +2644,48 @@ static int atmel_init_gpios(struct atmel_uart_port *p, struct device *dev)
  	return 0;
  }
  
-+static netdev_features_t mvneta_fix_features(struct net_device *dev,
-+					     netdev_features_t features)
++static void atmel_serial_probe_fifos(struct atmel_uart_port *port,
++				     struct platform_device *pdev)
 +{
-+	struct mvneta_port *pp = netdev_priv(dev);
++	port->fifo_size = 0;
++	port->rts_low = 0;
++	port->rts_high = 0;
 +
-+	if (pp->tx_csum_limit && dev->mtu > pp->tx_csum_limit) {
-+		features &= ~(NETIF_F_IP_CSUM | NETIF_F_TSO);
-+		netdev_info(dev,
-+			    "Disable IP checksum for MTU greater than %dB\n",
-+			    pp->tx_csum_limit);
++	if (of_property_read_u32(pdev->dev.of_node,
++				 "atmel,fifo-size",
++				 &port->fifo_size))
++		return;
++
++	if (!port->fifo_size)
++		return;
++
++	if (port->fifo_size < ATMEL_MIN_FIFO_SIZE) {
++		port->fifo_size = 0;
++		dev_err(&pdev->dev, "Invalid FIFO size\n");
++		return;
 +	}
 +
-+	return features;
++	/*
++	 * 0 <= rts_low <= rts_high <= fifo_size
++	 * Once their CTS line asserted by the remote peer, some x86 UARTs tend
++	 * to flush their internal TX FIFO, commonly up to 8 data, before
++	 * actually stopping to send new data. So we try to set the RTS High
++	 * Threshold to a reasonably high value respecting this 8 data empirical
++	 * rule when possible.
++	 */
++	port->rts_high = max_t(int, port->fifo_size >> 1,
++			       port->fifo_size - ATMEL_RTS_HIGH_OFFSET);
++	port->rts_low  = max_t(int, port->fifo_size >> 2,
++			       port->fifo_size - ATMEL_RTS_LOW_OFFSET);
++
++	dev_info(&pdev->dev, "Using FIFO (%u data)\n",
++		 port->fifo_size);
++	dev_info(&pdev->dev, "RTS High Threshold : %2u data\n",
++		 port->rts_high);
++	dev_info(&pdev->dev, "RTS Low Threshold  : %2u data\n",
++		 port->rts_low);
 +}
 +
- /* Get mac address */
- static void mvneta_get_mac_addr(struct mvneta_port *pp, unsigned char *addr)
+ static int atmel_serial_probe(struct platform_device *pdev)
  {
-@@ -2856,6 +2876,7 @@ static const struct net_device_ops mvneta_netdev_ops = {
- 	.ndo_set_rx_mode     = mvneta_set_rx_mode,
- 	.ndo_set_mac_address = mvneta_set_mac_addr,
- 	.ndo_change_mtu      = mvneta_change_mtu,
-+	.ndo_fix_features    = mvneta_fix_features,
- 	.ndo_get_stats64     = mvneta_get_stats64,
- 	.ndo_do_ioctl        = mvneta_ioctl,
- };
-@@ -3101,6 +3122,9 @@ static int mvneta_probe(struct platform_device *pdev)
- 		}
- 	}
+ 	struct atmel_uart_port *port;
+@@ -2635,6 +2722,7 @@ static int atmel_serial_probe(struct platform_device *pdev)
+ 	port = &atmel_ports[ret];
+ 	port->backup_imr = 0;
+ 	port->uart.line = ret;
++	atmel_serial_probe_fifos(port, pdev);
  
-+	if (of_device_is_compatible(dn, "marvell,armada-370-neta"))
-+		pp->tx_csum_limit = 1600;
+ 	spin_lock_init(&port->lock_suspended);
+ 
+diff --git a/include/linux/atmel_serial.h b/include/linux/atmel_serial.h
+index c384c21d65f0..ee696d7e8a43 100644
+--- a/include/linux/atmel_serial.h
++++ b/include/linux/atmel_serial.h
+@@ -35,6 +35,11 @@
+ #define	ATMEL_US_DTRDIS		BIT(17)	/* Data Terminal Ready Disable */
+ #define	ATMEL_US_RTSEN		BIT(18)	/* Request To Send Enable */
+ #define	ATMEL_US_RTSDIS		BIT(19)	/* Request To Send Disable */
++#define	ATMEL_US_TXFCLR		BIT(24)	/* Transmit FIFO Clear */
++#define	ATMEL_US_RXFCLR		BIT(25)	/* Receive FIFO Clear */
++#define	ATMEL_US_TXFLCLR	BIT(26)	/* Transmit FIFO Lock Clear */
++#define	ATMEL_US_FIFOEN		BIT(30)	/* FIFO enable */
++#define	ATMEL_US_FIFODIS	BIT(31)	/* FIFO disable */
+ 
+ #define ATMEL_US_MR		0x04	/* Mode Register */
+ #define	ATMEL_US_USMODE		GENMASK(3, 0)	/* Mode of the USART */
+@@ -124,6 +129,37 @@
+ #define ATMEL_US_NER		0x44	/* Number of Errors Register */
+ #define ATMEL_US_IF		0x4c	/* IrDA Filter Register */
+ 
++#define ATMEL_US_CMPR		0x90	/* Comparaison Register */
++#define ATMEL_US_FMR		0xa0	/* FIFO Mode Register */
++#define	ATMEL_US_TXRDYM(data)	(((data) & 0x3) << 0)	/* TX Ready Mode */
++#define	ATMEL_US_RXRDYM(data)	(((data) & 0x3) << 4)	/* RX Ready Mode */
++#define		ATMEL_US_ONE_DATA	0x0
++#define		ATMEL_US_TWO_DATA	0x1
++#define		ATMEL_US_FOUR_DATA	0x2
++#define	ATMEL_US_FRTSC		BIT(7)	/* FIFO RTS pin Control */
++#define	ATMEL_US_TXFTHRES(thr)	(((thr) & 0x3f) << 8)	/* TX FIFO Threshold */
++#define	ATMEL_US_RXFTHRES(thr)	(((thr) & 0x3f) << 16)	/* RX FIFO Threshold */
++#define	ATMEL_US_RXFTHRES2(thr)	(((thr) & 0x3f) << 24)	/* RX FIFO Threshold2 */
 +
- 	pp->tx_ring_size = MVNETA_MAX_TXD;
- 	pp->rx_ring_size = MVNETA_MAX_RXD;
++#define ATMEL_US_FLR		0xa4	/* FIFO Level Register */
++#define	ATMEL_US_TXFL(reg)	(((reg) >> 0) & 0x3f)	/* TX FIFO Level */
++#define	ATMEL_US_RXFL(reg)	(((reg) >> 16) & 0x3f)	/* RX FIFO Level */
++
++#define ATMEL_US_FIER		0xa8	/* FIFO Interrupt Enable Register */
++#define ATMEL_US_FIDR		0xac	/* FIFO Interrupt Disable Register */
++#define ATMEL_US_FIMR		0xb0	/* FIFO Interrupt Mask Register */
++#define ATMEL_US_FESR		0xb4	/* FIFO Event Status Register */
++#define	ATMEL_US_TXFEF		BIT(0)	/* Transmit FIFO Empty Flag */
++#define	ATMEL_US_TXFFF		BIT(1)	/* Transmit FIFO Full Flag */
++#define	ATMEL_US_TXFTHF		BIT(2)	/* Transmit FIFO Threshold Flag */
++#define	ATMEL_US_RXFEF		BIT(3)	/* Receive FIFO Empty Flag */
++#define	ATMEL_US_RXFFF		BIT(4)	/* Receive FIFO Full Flag */
++#define	ATMEL_US_RXFTHF		BIT(5)	/* Receive FIFO Threshold Flag */
++#define	ATMEL_US_TXFPTEF	BIT(6)	/* Transmit FIFO Pointer Error Flag */
++#define	ATMEL_US_RXFPTEF	BIT(7)	/* Receive FIFO Pointer Error Flag */
++#define	ATMEL_US_TXFLOCK	BIT(8)	/* Transmit FIFO Lock (FESR only) */
++#define	ATMEL_US_RXFTHF2	BIT(9)	/* Receive FIFO Threshold Flag 2 */
++
+ #define ATMEL_US_NAME		0xf0	/* Ip Name */
+ #define ATMEL_US_VERSION	0xfc	/* Ip Version */
  
 -- 
-2.1.4
+1.8.2.2
