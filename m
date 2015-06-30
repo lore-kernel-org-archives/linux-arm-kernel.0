@@ -1,42 +1,34 @@
-From: djkurtz@chromium.org (Daniel Kurtz)
-Date: Tue, 30 Jun 2015 14:35:42 +0800
-Subject: [PATCH v3 0/2] Add MediaTek display PWM driver
-In-Reply-To: <1435590211-38854-1-git-send-email-yh.huang@mediatek.com>
-References: <1435590211-38854-1-git-send-email-yh.huang@mediatek.com>
-Message-ID: <CAGS+omANeUxcRdY-qQzxjtBY5Yhx56mSneuuXh+bGjbahKhDeA@mail.gmail.com>
+From: maitysanchayan@gmail.com (Sanchayan Maity)
+Date: Tue, 30 Jun 2015 12:24:44 +0530
+Subject: [PATCH v1 0/4] Add support for touchscreen on Colibri VF50
+Message-ID: <cover.1435646447.git.maitysanchayan@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi YH,
+Hello,
 
-Please also include a patch that adds PWM bindings to mt8173.dtsi.
-The clock definitions (CLK_MM_DISP_PWM*) are added by James LIao's patch:
-  clk: mediatek: Add subsystem clocks of MT8173
+The patchset adds support for 4 wire touchscreen on Toradex Colibri
+VF50 modules. Patches are based on top of shawn's branch.
 
-I think it is ok to mention in the cover-letter that the PWM .dtsi
-change depends on that other patch.
+Thanks & Regards,
+Sanchayan.
 
-Also, cover-letters usually contain a "shortlog" and diffstatm that
-gives summary of patches and changed files, generated along with the
-patches using:
- git format-patch --cover-letter
+Sanchayan Maity (4):
+  ARM: dts: vfxxx: Add io-channel-cells property for ADC node
+  ARM: dts: vf500-colibri: Add device tree node for touchscreen support
+  touchscreen: colibri-vf50-ts: Add touchscreen support for Colibri VF50
+  input: Add DT binding documentation for Colibri VF50 touchscreen
 
-Thanks,
--Daniel
+ .../bindings/input/touchscreen/colibri-vf50-ts.txt |  34 ++
+ arch/arm/boot/dts/vf500-colibri-eval-v3.dts        |   4 +
+ arch/arm/boot/dts/vf500-colibri.dtsi               |  46 ++
+ arch/arm/boot/dts/vfxxx.dtsi                       |   2 +
+ drivers/input/touchscreen/Kconfig                  |  12 +
+ drivers/input/touchscreen/Makefile                 |   1 +
+ drivers/input/touchscreen/colibri-vf50-ts.c        | 466 +++++++++++++++++++++
+ 7 files changed, 565 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/input/touchscreen/colibri-vf50-ts.txt
+ create mode 100644 drivers/input/touchscreen/colibri-vf50-ts.c
 
-On Mon, Jun 29, 2015 at 11:03 PM, YH Huang <yh.huang@mediatek.com> wrote:
-> This patch series add the use of display PWM driver and documentation
-> for Mediatek SoCs. The driver is used to support the backlight of
-> the panel. This is based on v4.1-rc1.
->
-> Change in v3:
-> 1. Add suspend/resume function
-> 2. Fix the formula for high_width calculation
-> 3. Rewrite some code to make it easier to read
-> 4. Add more information in the commit message
->
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> Please read the FAQ at  http://www.tux.org/lkml/
+-- 
+2.4.5
