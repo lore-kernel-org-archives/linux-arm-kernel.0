@@ -1,33 +1,43 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Tue, 30 Jun 2015 23:53:19 +0200
-Subject: [PATCH v3 2/4] tty/serial: at91: fix some macro definitions to
- fit coding style
-In-Reply-To: <11308515.NsBzDiA1lH@wuerfel>
-References: <cover.1435672649.git.cyrille.pitchen@atmel.com>
- <9f0f19d2fe05ea95572b467ec49ecd11389e3be9.1435672649.git.cyrille.pitchen@atmel.com>
- <11308515.NsBzDiA1lH@wuerfel>
-Message-ID: <20150630215319.GM485@piout.net>
+From: nikolas@gnu.org (Nik Nyby)
+Date: Tue, 30 Jun 2015 18:56:29 -0400
+Subject: [PATCH] ARM: tegra: fix typo in address end
+Message-ID: <1435704989-23831-1-git-send-email-nikolas@gnu.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 30/06/2015 at 22:28:42 +0200, Arnd Bergmann wrote :
-> On Tuesday 30 June 2015 16:05:15 Cyrille Pitchen wrote:
-> > +#define UART_PUT_CR(port, v)   __raw_writel(v, (port)->membase + ATMEL_US_CR)
-> > +#define UART_GET_MR(port)      __raw_readl((port)->membase + ATMEL_US_MR)
-> > +#define UART_PUT_MR(port, v)   __raw_writel(v, (port)->membase + ATMEL_US_MR)
-> > +#define UART_PUT_IER(port, v)  __raw_writel(v, (port)->membase + ATMEL_US_IER)
-> > 
-> 
-> How about removing these macros entirely? I'm not aware of other drivers
-> doing it like this, and it does not seem to add any value?
-> 
-> At the same time, you could use readl_relaxed() to make the driver
-> endian-safe.
-> 
+This fixes a misspelling of "address" as "adress".
 
-I think using readl_relaxed() would break avr32.
+Signed-off-by: Nik Nyby <nikolas@gnu.org>
+---
+ arch/arm/mach-tegra/sleep-tegra30.S | 6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
 
+diff --git a/arch/arm/mach-tegra/sleep-tegra30.S b/arch/arm/mach-tegra/sleep-tegra30.S
+index 9a2f0b0..3191929 100644
+--- a/arch/arm/mach-tegra/sleep-tegra30.S
++++ b/arch/arm/mach-tegra/sleep-tegra30.S
+@@ -559,7 +559,7 @@ tegra114_sdram_pad_address:
+ 	.word	TEGRA_EMC1_BASE + EMC_AUTO_CAL_INTERVAL			@0x28
+ 	.word	TEGRA_EMC1_BASE + EMC_XM2VTTGENPADCTRL			@0x2c
+ 	.word	TEGRA_EMC1_BASE + EMC_XM2VTTGENPADCTRL2			@0x30
+-tegra114_sdram_pad_adress_end:
++tegra114_sdram_pad_address_end:
+ 
+ tegra124_sdram_pad_address:
+ 	.word	TEGRA124_EMC_BASE + EMC_CFG				@0x0
+@@ -576,11 +576,11 @@ tegra30_sdram_pad_size:
+ 	.word	tegra30_sdram_pad_address_end - tegra30_sdram_pad_address
+ 
+ tegra114_sdram_pad_size:
+-	.word	tegra114_sdram_pad_adress_end - tegra114_sdram_pad_address
++	.word	tegra114_sdram_pad_address_end - tegra114_sdram_pad_address
+ 
+ 	.type	tegra_sdram_pad_save, %object
+ tegra_sdram_pad_save:
+-	.rept (tegra114_sdram_pad_adress_end - tegra114_sdram_pad_address) / 4
++	.rept (tegra114_sdram_pad_address_end - tegra114_sdram_pad_address) / 4
+ 	.long	0
+ 	.endr
+ 
 -- 
-Alexandre Belloni, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+2.1.4
