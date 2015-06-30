@@ -1,75 +1,79 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Tue, 30 Jun 2015 11:48:23 +0200
-Subject: [PATCH 7/7] pinctrl: sh-pfc: Confine legacy function GPIOs to SH
-In-Reply-To: <10481403.sNoQCGtpkA@avalon>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Tue, 30 Jun 2015 12:48:37 +0300
+Subject: [PATCH 3/7] ARM: shmobile: sh73a0 dtsi: Add missing "gpio-ranges"
+ to gpio node
+In-Reply-To: <1435650327-2542-4-git-send-email-geert+renesas@glider.be>
 References: <1435650327-2542-1-git-send-email-geert+renesas@glider.be>
- <1435650327-2542-8-git-send-email-geert+renesas@glider.be>
- <10481403.sNoQCGtpkA@avalon>
-Message-ID: <CAMuHMdX9xK7SWvEacOx4+7QAXJ=oRREAvCBQ5X8cjv+4XeeRrg@mail.gmail.com>
+ <1435650327-2542-4-git-send-email-geert+renesas@glider.be>
+Message-ID: <2477426.ekHmTUkfBY@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Laurent,
+Hi Geert,
 
-On Tue, Jun 30, 2015 at 11:38 AM, Laurent Pinchart
-<laurent.pinchart@ideasonboard.com> wrote:
->> --- a/drivers/pinctrl/sh-pfc/gpio.c
->> +++ b/drivers/pinctrl/sh-pfc/gpio.c
->> @@ -290,6 +290,7 @@ static int gpio_pin_setup(struct sh_pfc_chip *chip)
->>   * Function GPIOs
->>   */
->>
->> +#ifdef CONFIG_SUPERH
->>  static int gpio_function_request(struct gpio_chip *gc, unsigned offset)
->>  {
->>       static bool __print_once;
->> @@ -330,6 +331,31 @@ static int gpio_function_setup(struct sh_pfc_chip
->> *chip) return 0;
->>  }
->>
->> +static int sh_pfc_add_function_gpios(struct sh_pfc *pfc)
->> +{
->> +     struct sh_pfc_chip *chip;
->> +
->> +     if (!pfc->info->nr_func_gpios)
->> +             return 0;
->> +
->> +     chip = sh_pfc_add_gpiochip(pfc, gpio_function_setup, NULL);
->> +     if (IS_ERR(chip))
->> +             return PTR_ERR(chip);
->> +
->> +     pfc->func = chip;
->> +
->> +     return 0;
->> +}
->> +
->> +static void sh_pfc_remove_function_gpios(struct sh_pfc *pfc)
->> +{
->> +     gpiochip_remove(&pfc->func->gpio_chip);
->> +}
->> +#else
->> +static inline int sh_pfc_add_function_gpios(struct sh_pfc *pfc) { return 0;
->> }
->> +static inline int sh_pfc_remove_function_gpios(struct sh_pfc *pfc) {
->> return 0; }
->
-> Given that those functions are only called from a single location, would it
-> make sense to just compile the calls conditionally instead ? I would find that
-> slightly more readable as it would be more explicit.
+Thank you for the patch.
 
-If that's acceptable for you, that would be fine for me, too. One (or two) more
-visual cues for future removal of legacy code.
+On Tuesday 30 June 2015 09:45:23 Geert Uytterhoeven wrote:
+> If a GPIO driver uses gpiochip_add_pin_range() (which is usually the
+> case for GPIO/PFC combos), the GPIO hogging mechanism configured from DT
+> doesn't work:
+> 
+>     requesting hog GPIO led1-high (chip sh73a0_pfc, offset 20) failed
+> 
+> The actual error code is -517 == -EPROBE_DEFER.
+> 
+> The problem is that PFC+GPIO registration is handled in multiple steps:
+>   1. pinctrl_register(),
+>   2. gpiochip_add(),
+>   3. gpiochip_add_pin_range().
+> 
+> Configuration of the hogs is handled in gpiochip_add():
+> 
+>     gpiochip_add
+>         of_gpiochip_add
+>             of_gpiochip_scan_hogs
+>                 gpiod_hog
+>                     gpiochip_request_own_desc
+>                         __gpiod_request
+>                             chip->request
+>                                 pinctrl_request_gpio
+>                                     pinctrl_get_device_gpio_range
+> 
+> However, at this point the GPIO controller hasn't been added to
+> pinctrldev_list yet, so the range can't be found, and the operation fails
+> with -EPROBE_DEFER.
+> 
+> To fix this, add a "gpio-ranges" property to the gpio device node, so
+> the ranges are added by of_gpiochip_add_pin_range(), which is called by
+> of_gpiochip_add() before the call to of_gpiochip_scan_hogs().
+> 
+> Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
 
-And then I can drop "[PATCH 6/7] pinctrl: sh-pfc: Move sh_pfc_add_gpiochip()
-up".
+This looks sane to me, even though referencing the same DT node seems a bit 
+dodgy. I'll let Linus comment on that, but for the implementation itself,
 
-Gr{oetje,eeting}s,
+Acked-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
 
-                        Geert
+> ---
+>  arch/arm/boot/dts/sh73a0.dtsi | 3 +++
+>  1 file changed, 3 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/sh73a0.dtsi b/arch/arm/boot/dts/sh73a0.dtsi
+> index 11e17c5f26e2cae2..ff7c8f298f30a58d 100644
+> --- a/arch/arm/boot/dts/sh73a0.dtsi
+> +++ b/arch/arm/boot/dts/sh73a0.dtsi
+> @@ -392,6 +392,9 @@
+>  		      <0xe605801c 0x1c>;
+>  		gpio-controller;
+>  		#gpio-cells = <2>;
+> +		gpio-ranges =
+> +			<&pfc 0 0 119>, <&pfc 128 128 37>, <&pfc 192 192 91>,
+> +			<&pfc 288 288 22>;
+>  		interrupts-extended =
+>  			<&irqpin0 0 0>, <&irqpin0 1 0>, <&irqpin0 2 0>, <&irqpin0 3 0>,
+>  			<&irqpin0 4 0>, <&irqpin0 5 0>, <&irqpin0 6 0>, <&irqpin0 7 0>,
 
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+-- 
+Regards,
 
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+Laurent Pinchart
