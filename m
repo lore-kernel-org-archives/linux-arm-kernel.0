@@ -1,90 +1,89 @@
-From: vitalya@ti.com (Vitaly Andrianov)
-Date: Tue, 30 Jun 2015 12:28:15 -0400
-Subject: [PATCH] ARM: psci: boot_secondary: replace __pa with virt_to_idmap
-In-Reply-To: <alpine.LFD.2.11.1506301153230.2617@knanqh.ubzr>
-References: <1435661062-4127-1-git-send-email-grygorii.strashko@ti.com>
- <20150630150541.GH7557@n2100.arm.linux.org.uk>
- <alpine.LFD.2.11.1506301153230.2617@knanqh.ubzr>
-Message-ID: <5592C39F.4010901@ti.com>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Tue, 30 Jun 2015 17:24:31 +0100
+Subject: [PATCH v2 5/5] cpuidle: ARM: Add cpuidle driver for K1879XB1YA
+In-Reply-To: <1435677307-6526-6-git-send-email-andrew@ncrmnt.org>
+References: <1435677307-6526-1-git-send-email-andrew@ncrmnt.org>
+ <1435677307-6526-6-git-send-email-andrew@ncrmnt.org>
+Message-ID: <5592C2BF.10200@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
 
-On 06/30/2015 11:59 AM, Nicolas Pitre wrote:
-> On Tue, 30 Jun 2015, Russell King - ARM Linux wrote:
+On 30/06/15 16:15, Andrew Andrianov wrote:
+> Signed-off-by: Andrew Andrianov <andrew@ncrmnt.org>
+> ---
+>   drivers/cpuidle/Kconfig.arm            |  6 +++++
+>   drivers/cpuidle/Makefile               |  1 +
+>   drivers/cpuidle/cpuidle-rcm-k1879xb1.c | 48 ++++++++++++++++++++++++++++++++++
+>   3 files changed, 55 insertions(+)
+>   create mode 100644 drivers/cpuidle/cpuidle-rcm-k1879xb1.c
 >
->> On Tue, Jun 30, 2015 at 01:44:22PM +0300, Grygorii Strashko wrote:
->>> On some PAE systems (e.g. TI Keystone), memory is above the 32-bit
->>> addressable limit, and the interconnect provides an aliased view of
->>> parts of physical memory in the 32-bit addressable space. This alias
->>> is strictly for boot time usage, and is not otherwise usable because
->>> of coherency limitations.
->>>
->>> On such systems, the idmap mechanism has to be used to pass correct
->>> boot address of secondary CPU to FW.
->>> virt_to_idmap() will fall-back to existing virt_to_phys() macro if
->>> such conversation is not required.
->>
->> I think this could do with improvement so that those who aren't aware of
->> the issue can understand better.  The idmap mechanism is always used for
->> secondary booting anyway.
->>
->> "In this case, virt_to_phys(secondary_startup) would return the
->> physical address of the secondary CPU boot entry point, but on such
->> systems, this would be above the 4GB limit.
->>
->> A separate function, virt_to_idmap(), has been provided to return a
->> usable physical address for functions in the identity mapping, and
->> this must be used in preference to virt_to_phys() or __pa() to find
->> the physical entry point for functions in the identity mapping range.
->>
->> For other systems, virt_to_idmap() and virt_to_phys() return identical
->> physical addresses."
->>
->>>
->>> Cc: Mark Rutland <mark.rutland@arm.com>
->>> Cc: Nicolas Pitre <nico@linaro.org>
->>> Cc: Santosh Shilimkar <ssantosh@kernel.org>
->>> Cc: Vitaly Andrianov <vitalya@ti.com>
->>> Signed-off-by: Grygorii Strashko <grygorii.strashko@ti.com>
->>
->> Code-wise, this looks correct to me - but as it's PSCI stuff, I'd like
->> to see Nico ack it.
+> diff --git a/drivers/cpuidle/Kconfig.arm b/drivers/cpuidle/Kconfig.arm
+> index 21340e0..988bfa3 100644
+> --- a/drivers/cpuidle/Kconfig.arm
+> +++ b/drivers/cpuidle/Kconfig.arm
+> @@ -74,3 +74,9 @@ config ARM_MVEBU_V7_CPUIDLE
+>   	depends on ARCH_MVEBU && !ARM64
+>   	help
+>   	  Select this to enable cpuidle on Armada 370, 38x and XP processors.
+> +
+> +config ARM_RCM_K1879XB1_CPUIDLE
+> +	bool "CPU Idle Driver for RC Module's K1879XB1YA SoC"
+> +	depends on ARCH_RCM_K1879XB1 && !ARM64
+> +	help
+> +	  Select this to enable cpuidle on K1879XB1YA SoC.
+> diff --git a/drivers/cpuidle/Makefile b/drivers/cpuidle/Makefile
+> index 3ba81b1..71b7e16 100644
+> --- a/drivers/cpuidle/Makefile
+> +++ b/drivers/cpuidle/Makefile
+> @@ -17,6 +17,7 @@ obj-$(CONFIG_ARM_ZYNQ_CPUIDLE)		+= cpuidle-zynq.o
+>   obj-$(CONFIG_ARM_U8500_CPUIDLE)         += cpuidle-ux500.o
+>   obj-$(CONFIG_ARM_AT91_CPUIDLE)          += cpuidle-at91.o
+>   obj-$(CONFIG_ARM_EXYNOS_CPUIDLE)        += cpuidle-exynos.o
+> +obj-$(CONFIG_ARM_RCM_K1879XB1_CPUIDLE)  += cpuidle-rcm-k1879xb1.o
+>   obj-$(CONFIG_ARM_CPUIDLE)		+= cpuidle-arm.o
 >
-> I cannot pretend to be the authority on PSCI stuff.
->
-> But this looks correct to me as well, assuming the amended commit
-> message.
->
-> Acked-by: Nicolas Pitre <nico@linaro.org>
->
->> Thanks.
->>
->>> ---
->>>   arch/arm/kernel/psci_smp.c | 2 +-
->>>   1 file changed, 1 insertion(+), 1 deletion(-)
->>>
->>> diff --git a/arch/arm/kernel/psci_smp.c b/arch/arm/kernel/psci_smp.c
->>> index 28a1db4..244aadd 100644
->>> --- a/arch/arm/kernel/psci_smp.c
->>> +++ b/arch/arm/kernel/psci_smp.c
->>> @@ -51,7 +51,7 @@ static int psci_boot_secondary(unsigned int cpu, struct task_struct *idle)
->>>   {
->>>   	if (psci_ops.cpu_on)
->>>   		return psci_ops.cpu_on(cpu_logical_map(cpu),
->>> -				       __pa(secondary_startup));
->>> +					virt_to_idmap(&secondary_startup));
->>>   	return -ENODEV;
->>>   }
->>>
->>> --
->>> 2.4.5
->>>
->>
->> --
->> FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
->> according to speedtest.net.
->>
->>
-Tested-by Vitaly Andrianov <vitalya@ti.com>
+>   ###############################################################################
+> diff --git a/drivers/cpuidle/cpuidle-rcm-k1879xb1.c b/drivers/cpuidle/cpuidle-rcm-k1879xb1.c
+> new file mode 100644
+> index 0000000..7c621b6
+> --- /dev/null
+> +++ b/drivers/cpuidle/cpuidle-rcm-k1879xb1.c
+> @@ -0,0 +1,48 @@
+> +/*
+> + * CPU idle for RC Module K1879XB1YA SoC
+> + *
+> + * Copyright (C) 2015 RC Module.
+> + * http://www.module.ru/
+> + *
+> + * Andrew Andrianov <andrew@ncrmnt.org>
+> + *
+> + * Based on Davinci CPU idle code
+> + * (arch/arm/mach-davinci/cpuidle.c)
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> + */
+> +
+> +#include <linux/io.h>
+> +#include <linux/platform_device.h>
+> +#include <linux/cpuidle.h>
+> +#include <asm/cpuidle.h>
+> +
+> +/*
+> + * We only enable WFI here, since DDR will enter self-refresh
+> + * on it's own when it can (bootloader takes care to configure that)
+> + */
+> +
+> +static struct cpuidle_driver rcm_idle_driver = {
+> +	.name			= "rcm_k1879xb1_idle",
+> +	.states[0]		= ARM_CPUIDLE_WFI_STATE,
+
+Do you plan to add more states in future ?
+Otherwise default_idle_call will be sufficient to enter WFI
+and you need not register any cpuidle driver.
+
+Regards,
+Sudeep
