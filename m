@@ -1,96 +1,263 @@
 From: timur@codeaurora.org (Timur Tabi)
-Date: Tue, 30 Jun 2015 16:23:06 -0500
-Subject: [PATCH 3/4] [v3] ARM64: TTY: hvc_dcc: Add support for ARM64 dcc
-In-Reply-To: <1435699387-32591-1-git-send-email-timur@codeaurora.org>
-References: <1435699387-32591-1-git-send-email-timur@codeaurora.org>
-Message-ID: <1435699387-32591-3-git-send-email-timur@codeaurora.org>
+Date: Tue, 30 Jun 2015 16:23:04 -0500
+Subject: [PATCH 1/4] hvc_dcc: bind driver to core0 for reads and writes
+Message-ID: <1435699387-32591-1-git-send-email-timur@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Abhimanyu Kapur <abhimany@codeaurora.org>
+From: Shanker Donthineni <shankerd@codeaurora.org>
 
-Add support for debug communications channel based
-hvc console for arm64 cpus.
+Some debuggers, such as Trace32 from Lauterbach GmbH, do not handle
+reads/writes from/to DCC on secondary cores.  Each core has its
+own DCC device registers, so when a core reads or writes from/to DCC,
+it only accesses its own DCC device.  Since kernel code can run on
+any core, every time the kernel wants to write to the console, it
+might write to a different DCC.
 
-Signed-off-by: Abhimanyu Kapur <abhimany@codeaurora.org>
+In SMP mode, Trace32 only uses the DCC on core 0.  In AMP mode, it
+creates multiple windows, and each window shows the DCC output
+only from that core's DCC.  The result is that console output is
+either lost or scattered across windows.
+
+Selecting this option will enable code that serializes all console
+input and output to core 0.  The DCC driver will create input and
+output FIFOs that all cores will use.  Reads and writes from/to DCC
+are handled by a workqueue that runs only core 0.
+
+Signed-off-by: Shanker Donthineni <shankerd@codeaurora.org>
+Acked-by: Adam Wallis <awallis@codeaurora.org>
 Signed-off-by: Timur Tabi <timur@codeaurora.org>
 ---
- arch/arm64/include/asm/dcc.h | 52 ++++++++++++++++++++++++++++++++++++++++++++
- drivers/tty/hvc/Kconfig      |  2 +-
- 2 files changed, 53 insertions(+), 1 deletion(-)
- create mode 100644 arch/arm64/include/asm/dcc.h
+ drivers/tty/hvc/Kconfig   |  21 +++++++
+ drivers/tty/hvc/hvc_dcc.c | 157 +++++++++++++++++++++++++++++++++++++++++++++-
+ 2 files changed, 177 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm64/include/asm/dcc.h b/arch/arm64/include/asm/dcc.h
-new file mode 100644
-index 0000000..fcb8d7d
---- /dev/null
-+++ b/arch/arm64/include/asm/dcc.h
-@@ -0,0 +1,52 @@
-+/* Copyright (c) 2014-2015 The Linux Foundation. All rights reserved.
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 and
-+ * only version 2 as published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ *
-+ * A call to __dcc_getchar() or __dcc_putchar() is typically followed by
-+ * a call to __dcc_getstatus().  We want to make sure that the CPU does
-+ * not speculative read the DCC status before executing the read or write
-+ * instruction.  That's what the ISBs are for.
-+ *
-+ * The 'volatile' ensures that the compiler does not cache the status bits,
-+ * and instead reads the DCC register every time.
-+ */
-+#ifndef __ASM_DCC_H
-+#define __ASM_DCC_H
-+
-+#include <asm/barrier.h>
-+
-+static inline u32 __dcc_getstatus(void)
-+{
-+	u32 ret;
-+
-+	asm volatile("mrs %0, mdccsr_el0" : "=r" (ret));
-+
-+	return ret;
-+}
-+
-+static inline char __dcc_getchar(void)
-+{
-+	char c;
-+
-+	asm volatile("mrs %0, dbgdtrrx_el0" : "=r" (c));
-+	isb();
-+
-+	return c;
-+}
-+
-+static inline void __dcc_putchar(char c)
-+{
-+	asm volatile("msr dbgdtrtx_el0, %0"
-+			: /* No output register */
-+			: "r" (c));
-+	isb();
-+}
-+
-+#endif
 diff --git a/drivers/tty/hvc/Kconfig b/drivers/tty/hvc/Kconfig
-index 2c6883c..9a60d18 100644
+index 8902f9b..2c6883c 100644
 --- a/drivers/tty/hvc/Kconfig
 +++ b/drivers/tty/hvc/Kconfig
-@@ -88,7 +88,7 @@ config HVC_UDBG
+@@ -95,6 +95,27 @@ config HVC_DCC
+ 	 driver. This console is used through a JTAG only on ARM. If you don't have
+ 	 a JTAG then you probably don't want this option.
  
- config HVC_DCC
-        bool "ARM JTAG DCC console"
--       depends on ARM
-+       depends on ARM || ARM64
-        select HVC_DRIVER
-        help
-          This console uses the JTAG DCC on ARM to create a console under the HVC
++config HVC_DCC_SERIALIZE_SMP
++	bool "Use DCC only on core 0"
++	depends on SMP && HVC_DCC
++	help
++	  Some debuggers, such as Trace32 from Lauterbach GmbH, do not handle
++	  reads/writes from/to DCC on more than one core.  Each core has its
++	  own DCC device registers, so when a core reads or writes from/to DCC,
++	  it only accesses its own DCC device.  Since kernel code can run on
++	  any core, every time the kernel wants to write to the console, it
++	  might write to a different DCC.
++
++	  In SMP mode, Trace32 only uses the DCC on core 0.  In AMP mode, it
++	  creates multiple windows, and each window shows the DCC output
++	  only from that core's DCC.  The result is that console output is
++	  either lost or scattered across windows.
++
++	  Selecting this option will enable code that serializes all console
++	  input and output to core 0.  The DCC driver will create input and
++	  output FIFOs that all cores will use.  Reads and writes from/to DCC
++	  are handled by a workqueue that runs only core 0.
++
+ config HVC_BFIN_JTAG
+ 	bool "Blackfin JTAG console"
+ 	depends on BLACKFIN
+diff --git a/drivers/tty/hvc/hvc_dcc.c b/drivers/tty/hvc/hvc_dcc.c
+index 809920d..33657dc 100644
+--- a/drivers/tty/hvc/hvc_dcc.c
++++ b/drivers/tty/hvc/hvc_dcc.c
+@@ -11,6 +11,10 @@
+  */
+ 
+ #include <linux/init.h>
++#include <linux/kfifo.h>
++#include <linux/spinlock.h>
++#include <linux/moduleparam.h>
++#include <linux/console.h>
+ 
+ #include <asm/dcc.h>
+ #include <asm/processor.h>
+@@ -48,26 +52,177 @@ static int hvc_dcc_get_chars(uint32_t vt, char *buf, int count)
+ 	return i;
+ }
+ 
++/*
++ * Check if the DCC is enabled.  If CONFIG_HVC_DCC_SERIALIZE_SMP is enabled,
++ * then we assume then this function will be called first on core 0.  That
++ * way, dcc_core0_available will be true only if it's available on core 0.
++ */
+ static bool hvc_dcc_check(void)
+ {
+ 	unsigned long time = jiffies + (HZ / 10);
+ 
++#ifdef CONFIG_HVC_DCC_SERIALIZE_SMP
++	static bool dcc_core0_available;
++
++	/*
++	 * If we're not on core 0, but we previously confirmed that DCC is
++	 * active, then just return true.
++	 */
++	if (smp_processor_id() && dcc_core0_available)
++		return true;
++#endif
++
+ 	/* Write a test character to check if it is handled */
+ 	__dcc_putchar('\n');
+ 
+ 	while (time_is_after_jiffies(time)) {
+-		if (!(__dcc_getstatus() & DCC_STATUS_TX))
++		if (!(__dcc_getstatus() & DCC_STATUS_TX)) {
++#ifdef CONFIG_HVC_DCC_SERIALIZE_SMP
++			dcc_core0_available = true;
++#endif
+ 			return true;
++		}
+ 	}
+ 
+ 	return false;
+ }
+ 
++#ifdef CONFIG_HVC_DCC_SERIALIZE_SMP
++
++static void dcc_put_work_fn(struct work_struct *work);
++static void dcc_get_work_fn(struct work_struct *work);
++static DECLARE_WORK(dcc_pwork, dcc_put_work_fn);
++static DECLARE_WORK(dcc_gwork, dcc_get_work_fn);
++static DEFINE_SPINLOCK(dcc_lock);
++static DEFINE_KFIFO(inbuf, unsigned char, 128);
++static DEFINE_KFIFO(outbuf, unsigned char, 1024);
++
++/*
++ * Workqueue function that writes the output FIFO to the DCC on core 0.
++ */
++static void dcc_put_work_fn(struct work_struct *work)
++{
++	unsigned char ch;
++
++	spin_lock(&dcc_lock);
++
++	/* While there's data in the output FIFO, write it to the DCC */
++	while (kfifo_get(&outbuf, &ch))
++		hvc_dcc_put_chars(0, &ch, 1);
++
++	/* While we're at it, check for any input characters */
++	while (!kfifo_is_full(&inbuf)) {
++		if (!hvc_dcc_get_chars(0, &ch, 1))
++			break;
++		kfifo_put(&inbuf, ch);
++	}
++
++	spin_unlock(&dcc_lock);
++}
++
++/*
++ * Workqueue function that reads characters from DCC and puts them into the
++ * input FIFO.
++ */
++static void dcc_get_work_fn(struct work_struct *work)
++{
++	unsigned char ch;
++
++	/*
++	 * Read characters from DCC and put them into the input FIFO, as
++	 * long as there is room and we have characters to read.
++	 */
++	spin_lock(&dcc_lock);
++
++	while (!kfifo_is_full(&inbuf)) {
++		if (!hvc_dcc_get_chars(0, &ch, 1))
++			break;
++		kfifo_put(&inbuf, ch);
++	}
++	spin_unlock(&dcc_lock);
++}
++
++/*
++ * Write characters directly to the DCC if we're on core 0 and the FIFO
++ * is empty, or write them to the FIFO if we're not.
++ */
++static int hvc_dcc0_put_chars(uint32_t vt, const char *buf,
++					     int count)
++{
++	int len;
++
++	spin_lock(&dcc_lock);
++	if (smp_processor_id() || (!kfifo_is_empty(&outbuf))) {
++		len = kfifo_in(&outbuf, buf, count);
++		spin_unlock(&dcc_lock);
++		/*
++		 * We just push data to the output FIFO, so schedule the
++		 * workqueue that will actually write that data to DCC.
++		 */
++		schedule_work_on(0, &dcc_pwork);
++		return len;
++	}
++
++	/*
++	 * If we're already on core 0, and the FIFO is empty, then just
++	 * write the data to DCC.
++	 */
++	len = hvc_dcc_put_chars(vt, buf, count);
++	spin_unlock(&dcc_lock);
++
++	return len;
++}
++
++/*
++ * Read characters directly from the DCC if we're on core 0 and the FIFO
++ * is empty, or read them from the FIFO if we're not.
++ */
++static int hvc_dcc0_get_chars(uint32_t vt, char *buf, int count)
++{
++	int len;
++
++	spin_lock(&dcc_lock);
++
++	if (smp_processor_id() || (!kfifo_is_empty(&inbuf))) {
++		len = kfifo_out(&inbuf, buf, count);
++		spin_unlock(&dcc_lock);
++
++		/*
++		 * If the FIFO was empty, there may be characters in the DCC
++		 * that we haven't read yet.  Schedule a workqueue to fill
++		 * the input FIFO, so that the next time this function is
++		 * called, we'll have data.
++		*/
++		if (!len)
++			schedule_work_on(0, &dcc_gwork);
++
++		return len;
++	}
++
++	/*
++	 * If we're already on core 0, and the FIFO is empty, then just
++	 * read the data from DCC.
++	 */
++	len = hvc_dcc_get_chars(vt, buf, count);
++	spin_unlock(&dcc_lock);
++
++	return len;
++}
++
++static const struct hv_ops hvc_dcc_get_put_ops = {
++	.get_chars = hvc_dcc0_get_chars,
++	.put_chars = hvc_dcc0_put_chars,
++};
++
++#else
++
+ static const struct hv_ops hvc_dcc_get_put_ops = {
+ 	.get_chars = hvc_dcc_get_chars,
+ 	.put_chars = hvc_dcc_put_chars,
+ };
+ 
++#endif
++
+ static int __init hvc_dcc_console_init(void)
+ {
+ 	if (!hvc_dcc_check())
 -- 
 Qualcomm Innovation Center, Inc.
 The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
