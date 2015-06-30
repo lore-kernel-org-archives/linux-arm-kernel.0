@@ -1,63 +1,68 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Tue, 30 Jun 2015 10:08:38 +0200
-Subject: [PATCH] Add dts info for wandboard GPIO lines.
-In-Reply-To: <1375306847-14340-2-git-send-email-panetta.mike@gmail.com>
-References: <1375306847-14340-1-git-send-email-panetta.mike@gmail.com>
- <1375306847-14340-2-git-send-email-panetta.mike@gmail.com>
-Message-ID: <20150630080838.GA18829@pengutronix.de>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Tue, 30 Jun 2015 10:25:12 +0200
+Subject: [PATCH 01/41] clocksource: asm9260: Migrate to new 'set-state'
+ interface
+In-Reply-To: <57ae9434bbb7218961c3ad45a26fbe1fffe40cbd.1434622147.git.viresh.kumar@linaro.org>
+References: <cover.1434622147.git.viresh.kumar@linaro.org>
+ <57ae9434bbb7218961c3ad45a26fbe1fffe40cbd.1434622147.git.viresh.kumar@linaro.org>
+Message-ID: <55925268.4050109@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+On 06/18/2015 12:54 PM, Viresh Kumar wrote:
+> Migrate asm9260 driver to the new 'set-state' interface provided by
+> clockevents core, the earlier 'set-mode' interface is marked obsolete
+> now.
+>
+> This also enables us to implement callbacks for new states of clockevent
+> devices, for example: ONESHOT_STOPPED.
 
-while starting to use the GPIO lines being available on the JP4
-connector of the wand board I stumbled over this patch on the linux arm
-kernel mailing list:
+Could you add in the changelog the subtle change with set_mode(RESUME) 
+and this code. As a default the timer was stopped when entering in the 
+set_mode function, now with the new API, this is done explicitly.
 
-On Wed, Jul 31, 2013 at 05:40:47PM -0400, Michael Panetta wrote:
-> diff --git a/arch/arm/boot/dts/imx6qdl-wandboard.dtsi b/arch/arm/boot/dts/imx6qdl-wandboard.dtsi
-> index a55113e..b40bbe1 100644
-> --- a/arch/arm/boot/dts/imx6qdl-wandboard.dtsi
-> +++ b/arch/arm/boot/dts/imx6qdl-wandboard.dtsi
-> @@ -84,6 +84,23 @@
->  			>;
->  		};
->  	};
+> Cc: Oleksij Rempel <linux@rempel-privat.de>
+> Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
+> ---
+
+[ ... ]
+
+> +static int asm9260_timer_shutdown(struct clock_event_device *evt)
+>   {
+>   	/* stop timer0 */
+>   	writel_relaxed(BM_C0_EN, priv.base + HW_TCR + CLR_REG);
+> +	return 0;
+> +}
 > +
-> +	gpio {
-> +		pinctrl_gpio: gpiogrp {
-> +			fsl,pins = <
-> +				MX6QDL_PAD_EIM_DA12__GPIO3_IO12   0x80000000 /* GPIO3_12 EDM pin 255 */
+> +static int asm9260_timer_set_oneshot(struct clock_event_device *evt)
+> +{
+> +	/* stop timer0 */
+> +	writel_relaxed(BM_C0_EN, priv.base + HW_TCR + CLR_REG);
 
-Looking at the "Wandboard User Guide, Revision B1"[1] I'd say EDM pin
-255 on the board drives the signal GPIO3_11 and so TP128 on the board.
-Instead it's pad MX6QDL_PAD_EIM_DA11 (and so GPIO3_IO11) that is
-connected to EDM pin 256 which is called GPIO3_12 for the Wandboard.
+Can you replace this line with a call to asm9260_timer_shutdown ?
 
-Unless I'm failing to read the schematics, this is an unfortunate naming
-mismatch that someone might want to fix?!
+> +	/* enable reset and stop on match */
+> +	writel_relaxed(BM_MCR_RES_EN(0) | BM_MCR_STOP_EN(0),
+> +		       priv.base + HW_MCR + SET_REG);
+> +	return 0;
+> +}
 
-Best regards
-Uwe
+[ ... ]
 
-PS: The patch was never applied to the mainline kernel.
+> +static int asm9260_timer_set_periodic(struct clock_event_device *evt)
+> +{
+> +	/* stop timer0 */
+> +	writel_relaxed(BM_C0_EN, priv.base + HW_TCR + CLR_REG);
 
-[1] http://www.wandboard.org/images/downloads/wbquad-revb1-userguide.pdf
+idem.
 
-> +				MX6QDL_PAD_EIM_DA11__GPIO3_IO11   0x80000000 /* GPIO3_11 EDM pin 256 */
-> +				MX6QDL_PAD_EIM_DA10__GPIO3_IO10   0x80000000 /* GPIO3_10 EDM pin 257 */
-> +				MX6QDL_PAD_EIM_D27__GPIO3_IO27    0x80000000 /* GPIO3_27 EDM pin 258 */
-> +				MX6QDL_PAD_EIM_D26__GPIO3_IO26    0x80000000 /* GPIO3_26 EDM pin 259 */
-> +				MX6QDL_PAD_EIM_BCLK__GPIO6_IO31   0x80000000 /* GPIO6_31 EDM pin 260 */
-> +				MX6QDL_PAD_EIM_DA8__GPIO3_IO08    0x80000000 /* GPIO3_8  EDM pin 261 */
-> +				MX6QDL_PAD_ENET_RX_ER__GPIO1_IO24 0x80000000 /* GPIO1_24 EDM pin 262 */
-> +				MX6QDL_PAD_GPIO_19__GPIO4_IO05    0x80000000 /* GPIO4_5  EDM pin 263 */
-> +				MX6QDL_PAD_SD3_RST__GPIO7_IO08    0x80000000 /* GPIO7_8  EDM pin 264 */
-> +			>;
-> +		};
-> +	};
->  };
+Thanks
+
+   -- Daniel
 
 -- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
