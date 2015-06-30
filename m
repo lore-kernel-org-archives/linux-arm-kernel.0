@@ -1,18 +1,17 @@
-From: rafael@kernel.org (Rafael J. Wysocki)
-Date: Tue, 30 Jun 2015 20:35:59 +0200
+From: ahs3@redhat.com (Al Stone)
+Date: Tue, 30 Jun 2015 12:39:41 -0600
 Subject: [PATCH v2 0/3] Correct for ACPI 5.1->6.0 spec changes in MADT
  GICC entries
 In-Reply-To: <CAJZ5v0gF6JZ8uVNMnro0bdD0g+QMoTeEzB99j6RcKUt3LjmiXw@mail.gmail.com>
-References: <1434666968-1543-1-git-send-email-al.stone@linaro.org>
- <5592CCE6.6040604@arm.com> <5592D1FF.7040208@redhat.com>
+References: <1434666968-1543-1-git-send-email-al.stone@linaro.org>	<5592CCE6.6040604@arm.com>	<5592D1FF.7040208@redhat.com>
  <CAJZ5v0gF6JZ8uVNMnro0bdD0g+QMoTeEzB99j6RcKUt3LjmiXw@mail.gmail.com>
-Message-ID: <CAJZ5v0hea5xJL3p1L=-Z1azP2wfx8Mu113JC8SgPwP06c58mQg@mail.gmail.com>
+Message-ID: <5592E26D.4070200@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 30, 2015 at 8:25 PM, Rafael J. Wysocki <rafael@kernel.org> wrote:
+On 06/30/2015 12:25 PM, Rafael J. Wysocki wrote:
 > Hi Al,
->
+> 
 > On Tue, Jun 30, 2015 at 7:29 PM, Al Stone <ahs3@redhat.com> wrote:
 >> On 06/30/2015 11:07 AM, Sudeep Holla wrote:
 >>> Hi Al,
@@ -56,21 +55,35 @@ On Tue, Jun 30, 2015 at 8:25 PM, Rafael J. Wysocki <rafael@kernel.org> wrote:
 >> the ACPICA 20150515 patches which appear to have gone in with 4.2-rc1.
 >>
 >> Rafael?  Ping?
->
+> 
 > I overlooked the fact that this was needed to fix a recent regression,
 > sorry about that.
->
+> 
 > Actually, if your patch fixes an error introduced by a specific
 > commit, it is good to use the Fixes: tag to indicate that.  Which I
 > still would like to do, so which commit is fixed by this?
->
+> 
 >> Do we need these to go through your tree or the arm64
 >> tree?  Without this series (or an ia64-like solution), we have ACPI
 >> systems in the field that cannot boot.
->
+> 
 > I'm not quite sure why the definition of BAD_MADT_GICC_ENTRY has to go
 > into include/linux/acpi.h.  Why is it necessary in there?
 
-Like what about defining it in linux/irqchip/arm-gic-acpi.h for example?
+I only placed it there since it seemed to make sense, and the issue is
+generic to ACPI, not just ARM.  Granted ARM is the only arch using the
+GICC subtable in MADT, but this is fixing how ACPICA implemented the
+spec, which in turn was ambiguous (and an errata is forthcoming to fix
+that).
 
-Rafael
+That being said, though, I'm definitely open to other possibilities.
+
+-- 
+ciao,
+al
+-----------------------------------
+Al Stone
+Software Engineer
+Red Hat, Inc.
+ahs3 at redhat.com
+-----------------------------------
