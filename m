@@ -1,72 +1,49 @@
-From: vaibhav.hiremath@linaro.org (Vaibhav Hiremath)
-Date: Tue, 30 Jun 2015 13:16:27 +0530
-Subject: Use of pinctrl-single for external device over I2C
-In-Reply-To: <558B95CA.9070105@linaro.org>
-References: <55893B2C.1070800@linaro.org> <558A9CC7.6070409@linaro.org>
- <20150624133349.GI4156@atomide.com> <558AE478.2080802@linaro.org>
- <20150625043838.GK4156@atomide.com> <558B95CA.9070105@linaro.org>
-Message-ID: <55924953.80802@linaro.org>
+From: dirk@dmllr.de (=?UTF-8?B?RGlyayBNw7xsbGVy?=)
+Date: Tue, 30 Jun 2015 09:54:02 +0200
+Subject: Regular oops on shutdown of KVM/ARM64 machines with VGA device
+In-Reply-To: <55914033.5060008@arm.com>
+References: <CAL5wTH4MtybHBk22r593HmVX+2jqCDm4fb2MyT2L0TMkHrD7pg@mail.gmail.com>
+ <20150629100304.GB18931@leverpostej> <55914033.5060008@arm.com>
+Message-ID: <CAL5wTH7EUh0ciutXKs2s-4VjKnRM65QmrUQQiRdM=R+_VXi6DA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Marc,
+
+> Also, care to provide some hints about your kernel configuration?
+
+I believe the relevant parameters are:
+
+CONFIG_PGTABLE_LEVELS=4
+# CONFIG_ARM64_64K_PAGES is not set
+# CONFIG_ARM64_VA_BITS_39 is not set
+CONFIG_ARM64_VA_BITS_48=y
+CONFIG_ARM64_VA_BITS=48
+CONFIG_KVM_MMIO=y
+CONFIG_KVM_GENERIC_DIRTYLOG_READ_PROTECT=y
+CONFIG_KVM_COMPAT=y
+CONFIG_VIRTUALIZATION=y
+CONFIG_KVM=y
+CONFIG_KVM_ARM_HOST=y
+CONFIG_KVM_ARM_MAX_VCPUS=4
 
 
-On Thursday 25 June 2015 11:16 AM, Vaibhav Hiremath wrote:
->
->
-> On Thursday 25 June 2015 10:08 AM, Tony Lindgren wrote:
->> * Vaibhav Hiremath <vaibhav.hiremath@linaro.org> [150624 10:12]:
->>>
->>> I do not like this, as this is not HW feature, so DT may not be right
->>> approach.
->>>
->>> So I will dig more from either runtime or Compile time option to use
->>> regmap_ Vs raw read/writes.
->>
->> Can't you just check if the pinctrl node has compatible = "syscon"
->> property?
->>
->> A compile time option won't work for sure. I don't know what you
->> would check at runtime as you do not know what the bus is behind
->> syscon.
->>
->
-> Although, I haven't gone through syscon, but not sure whether syscon
-> would be useful.
->
-> As you rightly stated, we need to know the bus behind regmap.
->
+the full config is here: http://pastebin.com/raw.php?i=GKAaVLYE
 
-Trying to understand what is the right way of doing pinctrl of external
-device on board,
+> What is the VGA device you mention in $subject?
+> A QEMU command line so that we can try and reproduce the issue you're
+> seeing?
 
-I feel it would not be good idea to pollute pinctrl-single driver, and 
-also I am still not able to figure out how can I have access to bus
-behind regmap.
+with qemu 2.3.0:
 
+qemu-system-aarch64 --enable-kvm -M virt -cpu host -vnc :4 -bios
+/usr/share/qemu/qemu-uefi-aarch64.bin -m 1G -device VGA
 
-How about having separate driver (generic for all I2C), say pinctrl-
-i2c.c, which is i2c_client driver and would support pinctrl and pinmux
-on I2C client device.
+then connecting to the vnc to cause the VGA device to be initialized,
+and then simply ctrl-c'ing the qemu process, you'll get this crash
+100% of each and every time. If you want additional debug output or
+try out something, just let me know and I'll be happy to provide you
+with it.
 
-
-The current usecase which I have is pretty simple in nature,
-
-88PM860 has few GPIO pins which can be configured to different
-functionality, based on board design.
-In most of the cases they are one/init/boot time settings.
-
-GPIO_0:
-=======
-   000 = GPIO input mode
-   001 = GPIO output mode
-   010 = SLEEPOUTN mirror mode
-   011 = Buck4 FPWM enable
-   100 = 32 Khz output buffer mode
-   101 = PMICINTN output mode
-   110 = HW_RESET1 mode
-   111 = HW_RESET2 mode
-
-
-Thanks,
-Vaibhav
+Greetings,
+Dirk
