@@ -1,81 +1,31 @@
-From: hanjun.guo@linaro.org (Hanjun Guo)
-Date: Tue, 30 Jun 2015 19:50:56 +0800
-Subject: [PATCH v2 6/9] irqchip / gic: Add stacked irqdomain support for
- ACPI based GICv2 init
-In-Reply-To: <55910440.8070702@arm.com>
-References: <1434703572-26221-1-git-send-email-hanjun.guo@linaro.org>
- <1434703572-26221-7-git-send-email-hanjun.guo@linaro.org>
- <20150622172014.GB26129@red-moon> <5589772A.8070708@linaro.org>
- <20150623173845.GC31466@red-moon> <558E1DEE.3090900@linaro.org>
- <55910440.8070702@arm.com>
-Message-ID: <559282A0.8090601@linaro.org>
+From: tomi.valkeinen@ti.com (Tomi Valkeinen)
+Date: Tue, 30 Jun 2015 15:04:54 +0300
+Subject: [PATCH] ARM: dts: am4372.dtsi: disable rfbi
+Message-ID: <1435665894-28491-1-git-send-email-tomi.valkeinen@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Marc,
+When DSS nodes were added to am4372.dtsi, the rfbi node was not marked
+as disabled. This should have been done, as the rule of thumb is to
+disable all DSS nodes that are not used, and especially rfbi, as we
+don't have a driver for rfbi.
 
-On 06/29/2015 04:39 PM, Marc Zyngier wrote:
-> On 27/06/15 04:52, Hanjun Guo wrote:
->> On 06/24/2015 01:38 AM, Lorenzo Pieralisi wrote:
->>> On Tue, Jun 23, 2015 at 04:11:38PM +0100, Hanjun Guo wrote:
-[...]
->>>
->>>>>>     	for (i = 0; i < nr_irqs; i++)
->>>>>>     		gic_irq_domain_map(domain, virq + i, hwirq + i);
->>>>>> @@ -945,11 +952,11 @@ void __init gic_init_bases(unsigned int gic_nr, int irq_start,
->>>>>>     		gic_irqs = 1020;
->>>>>>     	gic->gic_irqs = gic_irqs;
->>>>>>
->>>>>> -	if (node) {		/* DT case */
->>>>>> +	if (node || !acpi_disabled) {		/* DT or ACPI case */
->>>>>>     		gic->domain = irq_domain_add_linear(node, gic_irqs,
->>>>>>     						    &gic_irq_domain_hierarchy_ops,
->>>>>>     						    gic);
->>>
->>> I think this is a bit more worrying, I mean passing a NULL node pointer to
->>> the irqdomain layer which basically means you are booting out of ACPI
->>
->> I'm little confused here, would you mind explaining more for your
->> worrying? To me, node pointer is optional and it's ok for ACPI
->> case.
->>
->>> (for you, if that's true for the irq_domain_add_linear implementation
->>> that's another story), the node pointer should be optional but you
->>> need feedback from IRQ layer maintainers here.
->>
->> Sure.
->
-> Frankly, I'd really like to see ACPI using the "node" parameter for
-> something useful. This would save having to cache pointers all over the
-> place, will make find_irq_host() work as expected... etc.
->
-> See the comment at the top of linux/irqdomain.h :
->
-> "... This code could thus be used on other architectures by replacing
-> those two by some sort of arch-specific void * "token" used to identify
-> interrupt controllers."
+Signed-off-by: Tomi Valkeinen <tomi.valkeinen@ti.com>
+---
+ arch/arm/boot/dts/am4372.dtsi | 1 +
+ 1 file changed, 1 insertion(+)
 
-To init GIC in ACPI, we can only use the table entry pointer as
-the token, but the ACPI static tables are early mem/io remapped
-memory at boot stage, and it will be not available after boot,
-also we need muti types of MADT enties to init GIC (GICC and GICD
-for GICv2, GICC or GICR and GICD for GICv3), not as DT, just
-one single node to include all the information needed to init
-the GIC.
-
-We use ACPI handle for devices as node for DT when the namespace
-is available, but that's pretty late in the boot stage which GIC,
-SMP and timers were already initialized, so ACPI handle can not
-use as the token too.
-
-I see multi places just pass NULL as the pointer directly for
-irq_domain_add_linear() which works fine, and for ACPI, we tested
-this patch and also it works.
-
->
-> Maybe it is time to bite the bullet.
-
-Hope comment above explains :)
-
-Thanks
-Hanjun
+diff --git a/arch/arm/boot/dts/am4372.dtsi b/arch/arm/boot/dts/am4372.dtsi
+index c80a3e233792..75831e556741 100644
+--- a/arch/arm/boot/dts/am4372.dtsi
++++ b/arch/arm/boot/dts/am4372.dtsi
+@@ -941,6 +941,7 @@
+ 				ti,hwmods = "dss_rfbi";
+ 				clocks = <&disp_clk>;
+ 				clock-names = "fck";
++				status = "disabled";
+ 			};
+ 		};
+ 
+-- 
+2.1.4
