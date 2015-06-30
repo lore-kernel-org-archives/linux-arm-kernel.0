@@ -1,42 +1,163 @@
-From: grygorii.strashko@ti.com (Grygorii Strashko)
-Date: Tue, 30 Jun 2015 13:44:22 +0300
-Subject: [PATCH] ARM: psci: boot_secondary: replace __pa with virt_to_idmap
-Message-ID: <1435661062-4127-1-git-send-email-grygorii.strashko@ti.com>
+From: szabolcs.nagy@arm.com (Szabolcs Nagy)
+Date: Tue, 30 Jun 2015 11:48:29 +0100
+Subject: [PATCH] ARM: fix vdsomunge not to depend on glibc specific error.h
+Message-ID: <559273FD.2030508@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On some PAE systems (e.g. TI Keystone), memory is above the 32-bit
-addressable limit, and the interconnect provides an aliased view of
-parts of physical memory in the 32-bit addressable space. This alias
-is strictly for boot time usage, and is not otherwise usable because
-of coherency limitations.
+If the host toolchain is not glibc based then the arm kernel build
+fails with
 
-On such systems, the idmap mechanism has to be used to pass correct
-boot address of secondary CPU to FW.
-virt_to_idmap() will fall-back to existing virt_to_phys() macro if
-such conversation is not required.
+ arch/arm/vdso/vdsomunge.c:53:19: fatal error: error.h: No such file or directory
 
-Cc: Mark Rutland <mark.rutland@arm.com>
-Cc: Nicolas Pitre <nico@linaro.org>
-Cc: Santosh Shilimkar <ssantosh@kernel.org>
-Cc: Vitaly Andrianov <vitalya@ti.com>
-Signed-off-by: Grygorii Strashko <grygorii.strashko@ti.com>
+error.h is a glibc only header (ie not available in musl, newlib and
+bsd libcs).  Changed the error reporting to standard conforming code
+to avoid depending on specific C implementations.
+
+Signed-off-by: Szabolcs Nagy <szabolcs.nagy@arm.com>
 ---
- arch/arm/kernel/psci_smp.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ arch/arm/vdso/vdsomunge.c |   56 ++++++++++++++++++++++++++-------------------
+ 1 file changed, 33 insertions(+), 23 deletions(-)
 
-diff --git a/arch/arm/kernel/psci_smp.c b/arch/arm/kernel/psci_smp.c
-index 28a1db4..244aadd 100644
---- a/arch/arm/kernel/psci_smp.c
-+++ b/arch/arm/kernel/psci_smp.c
-@@ -51,7 +51,7 @@ static int psci_boot_secondary(unsigned int cpu, struct task_struct *idle)
+diff --git a/arch/arm/vdso/vdsomunge.c b/arch/arm/vdso/vdsomunge.c
+index 9005b07..aedec81 100644
+--- a/arch/arm/vdso/vdsomunge.c
++++ b/arch/arm/vdso/vdsomunge.c
+@@ -45,13 +45,11 @@
+  * it does.
+  */
+
+-#define _GNU_SOURCE
+-
+ #include <byteswap.h>
+ #include <elf.h>
+ #include <errno.h>
+-#include <error.h>
+ #include <fcntl.h>
++#include <stdarg.h>
+ #include <stdbool.h>
+ #include <stdio.h>
+ #include <stdlib.h>
+@@ -82,11 +80,25 @@
+ #define EF_ARM_ABI_FLOAT_HARD 0x400
+ #endif
+
++static int failed;
++static const char *argv0;
+ static const char *outfile;
+
++static void fail(const char *fmt, ...)
++{
++	va_list ap;
++
++	failed = 1;
++	fprintf(stderr, "%s: ", argv0);
++	va_start(ap, fmt);
++	vfprintf(stderr, fmt, ap);
++	va_end(ap);
++	exit(EXIT_FAILURE);
++}
++
+ static void cleanup(void)
  {
- 	if (psci_ops.cpu_on)
- 		return psci_ops.cpu_on(cpu_logical_map(cpu),
--				       __pa(secondary_startup));
-+					virt_to_idmap(&secondary_startup));
- 	return -ENODEV;
+-	if (error_message_count > 0 && outfile != NULL)
++	if (failed && outfile != NULL)
+ 		unlink(outfile);
  }
- 
+
+@@ -119,68 +131,66 @@ int main(int argc, char **argv)
+ 	int infd;
+
+ 	atexit(cleanup);
++	argv0 = argv[0];
+
+ 	if (argc != 3)
+-		error(EXIT_FAILURE, 0, "Usage: %s [infile] [outfile]", argv[0]);
++		fail("Usage: %s [infile] [outfile]\n", argv[0]);
+
+ 	infile = argv[1];
+ 	outfile = argv[2];
+
+ 	infd = open(infile, O_RDONLY);
+ 	if (infd < 0)
+-		error(EXIT_FAILURE, errno, "Cannot open %s", infile);
++		fail("Cannot open %s: %s\n", infile, strerror(errno));
+
+ 	if (fstat(infd, &stat) != 0)
+-		error(EXIT_FAILURE, errno, "Failed stat for %s", infile);
++		fail("Failed stat for %s: %s\n", infile, strerror(errno));
+
+ 	inbuf = mmap(NULL, stat.st_size, PROT_READ, MAP_PRIVATE, infd, 0);
+ 	if (inbuf == MAP_FAILED)
+-		error(EXIT_FAILURE, errno, "Failed to map %s", infile);
++		fail("Failed to map %s: %s\n", infile, strerror(errno));
+
+ 	close(infd);
+
+ 	inhdr = inbuf;
+
+ 	if (memcmp(&inhdr->e_ident, ELFMAG, SELFMAG) != 0)
+-		error(EXIT_FAILURE, 0, "Not an ELF file");
++		fail("Not an ELF file\n");
+
+ 	if (inhdr->e_ident[EI_CLASS] != ELFCLASS32)
+-		error(EXIT_FAILURE, 0, "Unsupported ELF class");
++		fail("Unsupported ELF class\n");
+
+ 	swap = inhdr->e_ident[EI_DATA] != HOST_ORDER;
+
+ 	if (read_elf_half(inhdr->e_type, swap) != ET_DYN)
+-		error(EXIT_FAILURE, 0, "Not a shared object");
++		fail("Not a shared object\n");
+
+-	if (read_elf_half(inhdr->e_machine, swap) != EM_ARM) {
+-		error(EXIT_FAILURE, 0, "Unsupported architecture %#x",
+-		      inhdr->e_machine);
+-	}
++	if (read_elf_half(inhdr->e_machine, swap) != EM_ARM)
++		fail("Unsupported architecture %#x\n", inhdr->e_machine);
+
+ 	e_flags = read_elf_word(inhdr->e_flags, swap);
+
+ 	if (EF_ARM_EABI_VERSION(e_flags) != EF_ARM_EABI_VER5) {
+-		error(EXIT_FAILURE, 0, "Unsupported EABI version %#x",
+-		      EF_ARM_EABI_VERSION(e_flags));
++		fail("Unsupported EABI version %#x\n",
++		     EF_ARM_EABI_VERSION(e_flags));
+ 	}
+
+ 	if (e_flags & EF_ARM_ABI_FLOAT_HARD)
+-		error(EXIT_FAILURE, 0,
+-		      "Unexpected hard-float flag set in e_flags");
++		fail("Unexpected hard-float flag set in e_flags\n");
+
+ 	clear_soft_float = !!(e_flags & EF_ARM_ABI_FLOAT_SOFT);
+
+ 	outfd = open(outfile, O_RDWR | O_CREAT | O_TRUNC, S_IRUSR | S_IWUSR);
+ 	if (outfd < 0)
+-		error(EXIT_FAILURE, errno, "Cannot open %s", outfile);
++		fail("Cannot open %s: %s\n", outfile, strerror(errno));
+
+ 	if (ftruncate(outfd, stat.st_size) != 0)
+-		error(EXIT_FAILURE, errno, "Cannot truncate %s", outfile);
++		fail("Cannot truncate %s: %s\n", outfile, strerror(errno));
+
+ 	outbuf = mmap(NULL, stat.st_size, PROT_READ | PROT_WRITE, MAP_SHARED,
+ 		      outfd, 0);
+ 	if (outbuf == MAP_FAILED)
+-		error(EXIT_FAILURE, errno, "Failed to map %s", outfile);
++		fail("Failed to map %s: %s\n", outfile, strerror(errno));
+
+ 	close(outfd);
+
+@@ -195,7 +205,7 @@ int main(int argc, char **argv)
+ 	}
+
+ 	if (msync(outbuf, stat.st_size, MS_SYNC) != 0)
+-		error(EXIT_FAILURE, errno, "Failed to sync %s", outfile);
++		fail("Failed to sync %s: %s\n", outfile, strerror(errno));
+
+ 	return EXIT_SUCCESS;
+ }
 -- 
-2.4.5
+1.7.9.5
