@@ -1,27 +1,26 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Tue, 30 Jun 2015 09:34:21 +0900
-Subject: [PATCH-V5 2/4] mfd: 88pm800: Remove unnecessary protection around
- pdata
-In-Reply-To: <1435591877-18214-3-git-send-email-vaibhav.hiremath@linaro.org>
-References: <1435591877-18214-1-git-send-email-vaibhav.hiremath@linaro.org>
- <1435591877-18214-3-git-send-email-vaibhav.hiremath@linaro.org>
-Message-ID: <CAJKOXPduM_7vjiyFOtzqDyULSgk+ZG3rnn5qmm+ON+-uTJs_HA@mail.gmail.com>
+From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
+Date: Mon, 29 Jun 2015 17:39:16 -0700
+Subject: [PATCH] ARM: dts: sunxi: Adjust touchscreen compatible for sun5i
+ and later
+In-Reply-To: <CAKLfuV1DHGQT=ejXfPYnNB6U_BoZqO0OpTsKY3NCrmL+1Yus5Q@mail.gmail.com>
+References: <1435322859-27760-1-git-send-email-hdegoede@redhat.com>
+ <20150626164241.GD13320@kroah.com>
+ <CAKLfuV1DHGQT=ejXfPYnNB6U_BoZqO0OpTsKY3NCrmL+1Yus5Q@mail.gmail.com>
+Message-ID: <20150630003916.GI6430@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2015-06-30 0:31 GMT+09:00 Vaibhav Hiremath <vaibhav.hiremath@linaro.org>:
-> With addition of proper checks in place in pm800_probe function,
-> which makes sure that pdata would never become NULL.
-> So remove all unnecessary protection around pdata in whole
-> driver code.
->
-> Signed-off-by: Vaibhav Hiremath <vaibhav.hiremath@linaro.org>
-> ---
->  drivers/mfd/88pm800.c | 14 ++++++--------
->  1 file changed, 6 insertions(+), 8 deletions(-)
->
+On Sat, Jun 27, 2015 at 10:20:23AM +0200, Timo S. wrote:
+> Sorry, once again in plain text mode:
+> 
+> On Fri, Jun 26, 2015 at 6:42 PM, Greg Kroah-Hartman
+> <gregkh@linuxfoundation.org> wrote:
+> > What is the git commit id of it?  I can't do anything with this until it
+> > hits Linus's tree.
+> 
+> It's in Linus' tree now:
+> https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=8bf1b9b3d90194a174493febc731f7783f2adf1a
 
-Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+Thanks, now queued up.
 
-Best regards,
-Krzysztof
+greg k-h
