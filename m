@@ -1,40 +1,172 @@
-From: hanjun.guo@linaro.org (Hanjun Guo)
-Date: Wed,  1 Jul 2015 21:37:23 +0800
-Subject: [PATCH] ARM64 / SMP: Switch pr_err() to pr_debug() for disabled GICC
- entry
-Message-ID: <1435757843-13236-1-git-send-email-hanjun.guo@linaro.org>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Wed, 1 Jul 2015 15:46:49 +0200
+Subject: [PATCH v3 1/2] arm64: KVM: Optimize arm64 skip 30-50% vfp/simd
+ save/restore on exits
+In-Reply-To: <1435190652-5831-2-git-send-email-m.smarduch@samsung.com>
+References: <1435190652-5831-1-git-send-email-m.smarduch@samsung.com>
+ <1435190652-5831-2-git-send-email-m.smarduch@samsung.com>
+Message-ID: <20150701134649.GG11332@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-It is normal that firmware presents GICC entry or entries (processors)
-with disabled flag in ACPI MADT, taking a system of 16 cpus for example,
-ACPI firmware may present 8 enabled first with another 8 cpus disabled
-in MADT, the disabled cpus can be hot-added later.
+On Wed, Jun 24, 2015 at 05:04:11PM -0700, Mario Smarduch wrote:
+> This patch only saves and restores FP/SIMD registers on Guest access. To do
+> this cptr_el2 FP/SIMD trap is set on Guest entry and later checked on exit.
+> lmbench, hackbench show significant improvements, for 30-50% exits FP/SIMD
+> context is not saved/restored
+> 
+> Signed-off-by: Mario Smarduch <m.smarduch@samsung.com>
+> ---
+>  arch/arm64/include/asm/kvm_arm.h |    5 ++++-
+>  arch/arm64/kvm/hyp.S             |   46 +++++++++++++++++++++++++++++++++++---
+>  2 files changed, 47 insertions(+), 4 deletions(-)
+> 
+> diff --git a/arch/arm64/include/asm/kvm_arm.h b/arch/arm64/include/asm/kvm_arm.h
+> index ac6fafb..7605e09 100644
+> --- a/arch/arm64/include/asm/kvm_arm.h
+> +++ b/arch/arm64/include/asm/kvm_arm.h
+> @@ -171,10 +171,13 @@
+>  #define HSTR_EL2_TTEE	(1 << 16)
+>  #define HSTR_EL2_T(x)	(1 << x)
+>  
+> +/* Hyp Coproccessor Trap Register Shifts */
+> +#define CPTR_EL2_TFP_SHIFT 10
+> +
+>  /* Hyp Coprocessor Trap Register */
+>  #define CPTR_EL2_TCPAC	(1 << 31)
+>  #define CPTR_EL2_TTA	(1 << 20)
+> -#define CPTR_EL2_TFP	(1 << 10)
+> +#define CPTR_EL2_TFP	(1 << CPTR_EL2_TFP_SHIFT)
+>  
+>  /* Hyp Debug Configuration Register bits */
+>  #define MDCR_EL2_TDRA		(1 << 11)
+> diff --git a/arch/arm64/kvm/hyp.S b/arch/arm64/kvm/hyp.S
+> index 5befd01..de0788f 100644
+> --- a/arch/arm64/kvm/hyp.S
+> +++ b/arch/arm64/kvm/hyp.S
+> @@ -673,6 +673,15 @@
+>  	tbz	\tmp, #KVM_ARM64_DEBUG_DIRTY_SHIFT, \target
+>  .endm
+>  
+> +/*
+> + * Check cptr VFP/SIMD accessed bit, if set VFP/SIMD not accessed by guest.
 
-Firmware may also present more cpus than the hardware actually has, but
-disabled the unused ones, and easily enable it when the hardware has such
-cpus to make the firmware code scalable.
+This comment doesn't really help me understand the function, may I
+suggest:
 
-So that's not an error for disabled cpus in MADT, we can switch
-pr_err() to pr_debug() instead.
+Branch to target if CPTR_EL2.TFP bit is set (VFP/SIMD trapping enabled)
 
-Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
----
- arch/arm64/kernel/smp.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+> + */
+> +.macro skip_fpsimd_state tmp, target
+> +	mrs	\tmp, cptr_el2
+> +	tbnz	\tmp, #CPTR_EL2_TFP_SHIFT, \target
+> +.endm
+> +
+> +
+>  .macro compute_debug_state target
+>  	// Compute debug state: If any of KDE, MDE or KVM_ARM64_DEBUG_DIRTY
+>  	// is set, we do a full save/restore cycle and disable trapping.
+> @@ -763,6 +772,7 @@
+>  	ldr     x2, [x0, #VCPU_HCR_EL2]
+>  	msr     hcr_el2, x2
+>  	mov	x2, #CPTR_EL2_TTA
+> +	orr     x2, x2, #CPTR_EL2_TFP
+>  	msr	cptr_el2, x2
+>  
+>  	mov	x2, #(1 << 15)	// Trap CP15 Cr=15
+> @@ -785,7 +795,6 @@
+>  .macro deactivate_traps
+>  	mov	x2, #HCR_RW
+>  	msr	hcr_el2, x2
+> -	msr	cptr_el2, xzr
+>  	msr	hstr_el2, xzr
+>  
+>  	mrs	x2, mdcr_el2
+> @@ -912,6 +921,28 @@ __restore_fpsimd:
+>  	restore_fpsimd
+>  	ret
+>  
+> +switch_to_guest_fpsimd:
+> +	push	x4, lr
+> +
+> +	mrs	x2, cptr_el2
+> +	bic	x2, x2, #CPTR_EL2_TFP
+> +	msr	cptr_el2, x2
+> +
+> +	mrs	x0, tpidr_el2
+> +
+> +	ldr	x2, [x0, #VCPU_HOST_CONTEXT]
+> +	kern_hyp_va x2
+> +	bl __save_fpsimd
+> +
+> +	add	x2, x0, #VCPU_CONTEXT
+> +	bl __restore_fpsimd
+> +
+> +	pop	x4, lr
+> +	pop	x2, x3
+> +	pop	x0, x1
+> +
+> +	eret
+> +
+>  /*
+>   * u64 __kvm_vcpu_run(struct kvm_vcpu *vcpu);
+>   *
+> @@ -932,7 +963,6 @@ ENTRY(__kvm_vcpu_run)
+>  	kern_hyp_va x2
+>  
+>  	save_host_regs
+> -	bl __save_fpsimd
+>  	bl __save_sysregs
+>  
+>  	compute_debug_state 1f
+> @@ -948,7 +978,6 @@ ENTRY(__kvm_vcpu_run)
+>  	add	x2, x0, #VCPU_CONTEXT
+>  
+>  	bl __restore_sysregs
+> -	bl __restore_fpsimd
+>  
+>  	skip_debug_state x3, 1f
+>  	bl	__restore_debug
+> @@ -967,7 +996,9 @@ __kvm_vcpu_return:
+>  	add	x2, x0, #VCPU_CONTEXT
+>  
+>  	save_guest_regs
+> +	skip_fpsimd_state x3, 1f
+>  	bl __save_fpsimd
+> +1:
+>  	bl __save_sysregs
+>  
+>  	skip_debug_state x3, 1f
+> @@ -986,7 +1017,11 @@ __kvm_vcpu_return:
+>  	kern_hyp_va x2
+>  
+>  	bl __restore_sysregs
+> +	skip_fpsimd_state x3, 1f
+>  	bl __restore_fpsimd
+> +1:
+> +	/* Clear FPSIMD and Trace trapping */
+> +	msr     cptr_el2, xzr
 
-diff --git a/arch/arm64/kernel/smp.c b/arch/arm64/kernel/smp.c
-index 4b2121b..5caf04a 100644
---- a/arch/arm64/kernel/smp.c
-+++ b/arch/arm64/kernel/smp.c
-@@ -402,7 +402,7 @@ acpi_map_gic_cpu_interface(struct acpi_madt_generic_interrupt *processor)
- 	}
- 
- 	if (!(processor->flags & ACPI_MADT_ENABLED)) {
--		pr_err("skipping disabled CPU entry with 0x%llx MPIDR\n", hwid);
-+		pr_debug("skipping disabled CPU entry with 0x%llx MPIDR\n", hwid);
- 		return;
- 	}
- 
--- 
-1.9.1
+why not simply move the deactivate_traps down here instead?
+
+>  
+>  	skip_debug_state x3, 1f
+>  	// Clear the dirty flag for the next run, as all the state has
+> @@ -1201,6 +1236,11 @@ el1_trap:
+>  	 * x1: ESR
+>  	 * x2: ESR_EC
+>  	 */
+> +
+> +	/* Guest accessed VFP/SIMD registers, save host, restore Guest */
+> +	cmp	x2, #ESR_ELx_EC_FP_ASIMD
+> +	b.eq	switch_to_guest_fpsimd
+> +
+>  	cmp	x2, #ESR_ELx_EC_DABT_LOW
+>  	mov	x0, #ESR_ELx_EC_IABT_LOW
+>  	ccmp	x2, x0, #4, ne
+> -- 
+> 1.7.9.5
+> 
+
+Otherwise looks good,
+-Christoffer
