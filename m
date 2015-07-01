@@ -1,39 +1,29 @@
 From: khilman@kernel.org (Kevin Hilman)
-Date: Wed, 01 Jul 2015 13:35:10 -0700
-Subject: [RESEND PATCH 2/2] ARM: at91/dt: update udc compatible strings
-In-Reply-To: <8ec182ab7c5186a64d605d0e174e750994586f02.1434530650.git.nicolas.ferre@atmel.com>
- (Nicolas Ferre's message of "Wed, 17 Jun 2015 10:59:05 +0200")
-References: <99dc2e0ec98342632b6e3adad3861f4dd0fcde41.1434530650.git.nicolas.ferre@atmel.com>
- <8ec182ab7c5186a64d605d0e174e750994586f02.1434530650.git.nicolas.ferre@atmel.com>
-Message-ID: <7h8uazmxa9.fsf@deeprootsystems.com>
+Date: Wed, 01 Jul 2015 13:40:16 -0700
+Subject: [PATCH 0/2] ARM: BCM: Do not select MTD_NAND_BRCMNAND
+In-Reply-To: <1435422344-31059-1-git-send-email-f.fainelli@gmail.com> (Florian
+ Fainelli's message of "Sat, 27 Jun 2015 09:25:42 -0700")
+References: <1435422344-31059-1-git-send-email-f.fainelli@gmail.com>
+Message-ID: <7h4mlnmx1r.fsf@deeprootsystems.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Nicolas Ferre <nicolas.ferre@atmel.com> writes:
+Florian Fainelli <f.fainelli@gmail.com> writes:
 
-> From: Boris Brezillon <boris.brezillon@free-electrons.com>
+> Hi Arnd, Kevin, Olof,
 >
-> at91sam9g45, at91sam9x5 and sama5 SoCs should not use
-> "atmel,at91sam9rl-udc" for their USB device compatible property since
-> this compatible is attached to a specific hardware bug fix.
+> This two patches fix a linking failure when ARCH_BCM_IPROC is selected
+> for the BRCMNAND driver since we end-up selecting this driver without
+> its proper depdendencies. Instead do not do this select driver which is
+> user-selectable, but add it to the multi_v7_defconfig.
 >
-> Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
-> Acked-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
-> Tested-by: Bo Shen <voice.shen@atmel.com>
-> Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
-> Cc: <stable@vger.kernel.org>  #4.0+
-> ---
-> Hi,
->
-> This patch was forgotten while dealing with the series "usb: atmel_usba_udc:
-> Rework errata handling". This patch and the previous one should be added to
-> mainline as fixes, the soonest. In fact, the errata handling is now broken
-> because of this desynchronization.
->
-> We'll try to queue it during 4.2-rc phase for inclusion in arm-soc tree.
+> Let me know if you would prefer a pull request for this rather than
+> individual patches. Thanks!
 
-I've picked both of these up for the arm-soc/late branch which I'll try
-to get in before -rc1, if not it will make it for -rc2.
+Individual patches are fine.
+
+I've picked these up for the arm-soc/late branch which I'll try to get
+in before -rc1, but if not it will make it for -rc2.
 
 Thanks,
 
