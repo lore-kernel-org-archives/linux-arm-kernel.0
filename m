@@ -1,45 +1,46 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Wed,  1 Jul 2015 14:08:31 +0200
-Subject: [PATCH] arm64: Don't report clear pmds and puds as huge
-Message-ID: <1435752511-7079-1-git-send-email-christoffer.dall@linaro.org>
+From: vitalya@ti.com (Vitaly Andrianov)
+Date: Wed, 1 Jul 2015 08:13:03 -0400
+Subject: [PATCH] ARM: psci: keystone: remove keystone_smp_ops code if psci is
+ supported
+Message-ID: <1435752784-30639-1-git-send-email-vitalya@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The current pmd_huge() and pud_huge() functions simply check if the table
-bit is not set and reports the entries as huge in that case.  This is
-counter-intuitive as a clear pmd/pud cannot also be a huge pmd/pud, and
-it is inconsistent with at least arm and x86.
+If we enable psci support we don't need keystone_smp_ops anymore.
 
-To prevent others from making the same mistake as me in looking at code
-that calls these functions and to fix an issue with KVM on arm64 that
-causes memory corruption due to incorrect page reference counting
-resulting from this mistake, let's change the behavior.
-
-Cc: stable at vger.kernel.org
-Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
+Signed-off-by: Vitaly Andrianov <vitalya@ti.com>
 ---
- arch/arm64/mm/hugetlbpage.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+ arch/arm/mach-keystone/Makefile   | 2 ++
+ arch/arm/mach-keystone/keystone.c | 2 ++
+ 2 files changed, 4 insertions(+)
 
-diff --git a/arch/arm64/mm/hugetlbpage.c b/arch/arm64/mm/hugetlbpage.c
-index 2de9d2e..0eeb4f09 100644
---- a/arch/arm64/mm/hugetlbpage.c
-+++ b/arch/arm64/mm/hugetlbpage.c
-@@ -40,13 +40,13 @@ int huge_pmd_unshare(struct mm_struct *mm, unsigned long *addr, pte_t *ptep)
+diff --git a/arch/arm/mach-keystone/Makefile b/arch/arm/mach-keystone/Makefile
+index 25d9239..5cc5ca4 100644
+--- a/arch/arm/mach-keystone/Makefile
++++ b/arch/arm/mach-keystone/Makefile
+@@ -3,7 +3,9 @@ obj-y					:= keystone.o smc.o
+ plus_sec := $(call as-instr,.arch_extension sec,+sec)
+ AFLAGS_smc.o				:=-Wa,-march=armv7-a$(plus_sec)
  
- int pmd_huge(pmd_t pmd)
- {
--	return !(pmd_val(pmd) & PMD_TABLE_BIT);
-+	return pmd_val(pmd) && !(pmd_val(pmd) & PMD_TABLE_BIT);
- }
++ifneq ($(CONFIG_ARM_PSCI),y)
+ obj-$(CONFIG_SMP)			+= platsmp.o
++endif
  
- int pud_huge(pud_t pud)
- {
- #ifndef __PAGETABLE_PMD_FOLDED
--	return !(pud_val(pud) & PUD_TABLE_BIT);
-+	return pud_val(pud) && !(pud_val(pud) & PUD_TABLE_BIT);
- #else
- 	return 0;
+ # PM domain driver for Keystone SOCs
+ obj-$(CONFIG_ARCH_KEYSTONE)		+= pm_domain.o
+diff --git a/arch/arm/mach-keystone/keystone.c b/arch/arm/mach-keystone/keystone.c
+index e2880105..9cc489c 100644
+--- a/arch/arm/mach-keystone/keystone.c
++++ b/arch/arm/mach-keystone/keystone.c
+@@ -105,7 +105,9 @@ DT_MACHINE_START(KEYSTONE, "Keystone")
+ #if defined(CONFIG_ZONE_DMA) && defined(CONFIG_ARM_LPAE)
+ 	.dma_zone_size	= SZ_2G,
  #endif
++#ifndef CONFIG_ARM_PSCI
+ 	.smp		= smp_ops(keystone_smp_ops),
++#endif
+ 	.init_machine	= keystone_init,
+ 	.dt_compat	= keystone_match,
+ 	.pv_fixup	= keystone_pv_fixup,
 -- 
-2.1.2.330.g565301e.dirty
+1.9.1
