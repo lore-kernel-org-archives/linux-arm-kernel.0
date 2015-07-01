@@ -1,74 +1,40 @@
-From: p.fedin@samsung.com (Pavel Fedin)
-Date: Wed, 01 Jul 2015 16:36:22 +0300
-Subject: [PATCH 4/4] irqchip, gicv3-its: Implement Cavium ThunderX errata
- 22375, 24313
-In-Reply-To: <1435673643-31676-5-git-send-email-rric@kernel.org>
-References: <1435673643-31676-1-git-send-email-rric@kernel.org>
- <1435673643-31676-5-git-send-email-rric@kernel.org>
-Message-ID: <023101d0b402$eba41e00$c2ec5a00$@samsung.com>
+From: hanjun.guo@linaro.org (Hanjun Guo)
+Date: Wed,  1 Jul 2015 21:37:23 +0800
+Subject: [PATCH] ARM64 / SMP: Switch pr_err() to pr_debug() for disabled GICC
+ entry
+Message-ID: <1435757843-13236-1-git-send-email-hanjun.guo@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
- Hello!
+It is normal that firmware presents GICC entry or entries (processors)
+with disabled flag in ACPI MADT, taking a system of 16 cpus for example,
+ACPI firmware may present 8 enabled first with another 8 cpus disabled
+in MADT, the disabled cpus can be hot-added later.
 
-> This implements two gicv3-its errata for ThunderX. Both with small
-> impact affecting only ITS table allocation.
-> 
->  erratum 22375: only alloc 8MB table size
+Firmware may also present more cpus than the hardware actually has, but
+disabled the unused ones, and easily enable it when the hardware has such
+cpus to make the firmware code scalable.
 
- I have a simpler solution to this one:
+So that's not an error for disabled cpus in MADT, we can switch
+pr_err() to pr_debug() instead.
+
+Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
 ---
-For some reason on ThunderX GITS_BASER reports entry size == 8 for ITT,
-while real size, reported by GITS_TYPER is 4. Consequently, allocated
-table size appears twice bigger than expected. And, if we set
-GITS_BASER.SIZE accordingly (the value appears to be 0xFF instead of 0x7F)
-the ITS will not work.
+ arch/arm64/kernel/smp.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-Signed-off-by: Pavel Fedin <p.fedin@samsung.com>
----
- drivers/irqchip/irq-gic-v3-its.c   | 3 ++-
- include/linux/irqchip/arm-gic-v3.h | 2 ++
- 2 files changed, 4 insertions(+), 1 deletion(-)
-
-diff --git a/drivers/irqchip/irq-gic-v3-its.c b/drivers/irqchip/irq-gic-v3-its.c
-index ed70163..c420f17 100644
---- a/drivers/irqchip/irq-gic-v3-its.c
-+++ b/drivers/irqchip/irq-gic-v3-its.c
-@@ -827,6 +827,7 @@ static int its_alloc_tables(struct its_node *its)
- 		if (type == GITS_BASER_TYPE_DEVICE) {
- 			u64 typer = readq_relaxed(its->base + GITS_TYPER);
- 			u32 ids = GITS_TYPER_DEVBITS(typer);
-+			u32 itte_size = GITS_TYPER_ITTE_SIZE(typer);
+diff --git a/arch/arm64/kernel/smp.c b/arch/arm64/kernel/smp.c
+index 4b2121b..5caf04a 100644
+--- a/arch/arm64/kernel/smp.c
++++ b/arch/arm64/kernel/smp.c
+@@ -402,7 +402,7 @@ acpi_map_gic_cpu_interface(struct acpi_madt_generic_interrupt *processor)
+ 	}
  
- 			/*
- 			 * 'order' was initialized earlier to the default page
-@@ -834,7 +835,7 @@ static int its_alloc_tables(struct its_node *its)
- 			 * smaller than that.  If the requested allocation
- 			 * is smaller, round up to the default page granule.
- 			 */
--			order = max(get_order((1UL << ids) * entry_size),
-+			order = max(get_order((1UL << ids) * itte_size),
- 				    order);
- 			if (order >= MAX_ORDER) {
- 				order = MAX_ORDER - 1;
-diff --git a/include/linux/irqchip/arm-gic-v3.h b/include/linux/irqchip/arm-gic-v3.h
-index ffbc034..7f515e6 100644
---- a/include/linux/irqchip/arm-gic-v3.h
-+++ b/include/linux/irqchip/arm-gic-v3.h
-@@ -184,6 +184,8 @@
- #define GITS_CTLR_ENABLE		(1U << 0)
- #define GITS_CTLR_QUIESCENT		(1U << 31)
+ 	if (!(processor->flags & ACPI_MADT_ENABLED)) {
+-		pr_err("skipping disabled CPU entry with 0x%llx MPIDR\n", hwid);
++		pr_debug("skipping disabled CPU entry with 0x%llx MPIDR\n", hwid);
+ 		return;
+ 	}
  
-+#define GITS_TYPER_ITTE_SIZE_SHIFT	4
-+#define GITS_TYPER_ITTE_SIZE(r)		((((r) >> GITS_TYPER_ITTE_SIZE_SHIFT) & 0xf) + 1)
- #define GITS_TYPER_DEVBITS_SHIFT	13
- #define GITS_TYPER_DEVBITS(r)		((((r) >> GITS_TYPER_DEVBITS_SHIFT) & 0x1f) + 1)
- #define GITS_TYPER_PTA			(1UL << 19)
 -- 
-2.4.4
-
-
-Kind regards,
-Pavel Fedin
-Expert Engineer
-Samsung Electronics Research center Russia
+1.9.1
