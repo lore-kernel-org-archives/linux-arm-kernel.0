@@ -1,38 +1,45 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 1 Jul 2015 19:48:43 +0100
-Subject: [PATCH] ARM: keystone: allow FORCE_MAX_ZONEORDER to be
- configurable on Keystone
-In-Reply-To: <1435773182-23074-1-git-send-email-m-karicheri2@ti.com>
-References: <1435773182-23074-1-git-send-email-m-karicheri2@ti.com>
-Message-ID: <20150701184842.GM7557@n2100.arm.linux.org.uk>
+Date: Wed, 1 Jul 2015 19:57:22 +0100
+Subject: Oops at boot after commit 965278dcb8ab... when using split
+ memory region
+In-Reply-To: <20150701180618.GI2310@leverpostej>
+References: <CAGGh5h061qpus=RK-iDyzbc9xG+dJXy8AosuN=aryEVZCPPhtw@mail.gmail.com>
+ <20150701144612.GG2310@leverpostej>
+ <20150701145354.GL7557@n2100.arm.linux.org.uk>
+ <20150701154007.GH2310@leverpostej>
+ <20150701180618.GI2310@leverpostej>
+Message-ID: <20150701185722.GN7557@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 01, 2015 at 01:53:02PM -0400, Murali Karicheri wrote:
-> Currently for Keystone devices, user can't change the
-> value of CONFIG_FORCE_MAX_ZONEORDER option in defconfig.
-> Users require capability to tune the value of this option on a target
-> board. So this patch adds this capability
+On Wed, Jul 01, 2015 at 07:06:19PM +0100, Mark Rutland wrote:
+> On Wed, Jul 01, 2015 at 04:40:07PM +0100, Mark Rutland wrote:
+> > Certainly. I did not mean to imply otherwise.
+> > 
+> > Using a similar command line I can reproduce the issue on TC2, getting a
+> > hang when freeing unused kernel memory. I'm digging into that now.
+> 
+> If I pass mem=56316K at 0${MY_MEM_BASE} (i.e. 55M - 4K), I get hangs with
+> and without commit 965278dcb8ab. It looks like we have a latent bug when
+> a bank is insufficiently aligned, and my patch increased that necessary
+> alignment from 1M to 2M.
 
-No they shouldn't.  If we do permit this, it should not be unrestricted -
-it's a power-of-2 of the page size, so specifying something like 32768 is
-insane.
+It's not a latent bug.  I've _always_ said that memory banks _must_ be
+aligned to a section boundary, because that's what the ARM MM layer has
+been coded for.
 
-In any case, it's well known that the Linux MM system fragments memory,
-and the higher order allocations will fail soon after boot - and the
-larger the order, the greater chance of it failing.
+Yes, we've recently been _trying_ to relax that restriction, and what
+we're finding is that it's not trivial to do - we're constantly running
+into these "it causes the kernel to stop booting on X" bugs, or worse
+"fixing X causes plaforms Y to work but causes platforms Z to break."
 
-The only case that you want large allocations is for things like DMA, and
-we have a separate allocator for that called CMA, which is able to grab
-large chunks of memory, provided it's configured with a large enough zone.
+Maybe we should just stop trying, and instead go back to the old
+requirement of requiring banks of memory aligned to a section, and be
+done with it.
 
-Please check whether CMA can be used _before_ considering using this
-option.  If you need to increase the order, it should be justified, and
-it should be done on a per SoC basis in a static way, not left to the
-user to dream up some power-of-2 figure.
-
-Most importantly, please explain in the commit message why CMA doesn't
-provide you with what you need.
+In any case, to call this a "latent bug" is incorrect - we've merely
+been trying so far _unsuccessfully_ to extend the ARM MM layer to accept
+something that it's never accepted before.
 
 -- 
 FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
