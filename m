@@ -1,38 +1,43 @@
-From: tglx@linutronix.de (Thomas Gleixner)
-Date: Wed, 1 Jul 2015 15:28:08 +0200 (CEST)
-Subject: [PATCH v2 4/9] arm: twr-k70f120m: timer driver for Kinetis SoC
-In-Reply-To: <alpine.LNX.2.00.1507011031050.9009@localhost.localdomain>
-References: <1435667250-28299-1-git-send-email-pawelo@king.net.pl>
- <1435667250-28299-5-git-send-email-pawelo@king.net.pl>
- <alpine.DEB.2.11.1507010944580.3916@nanos>
- <alpine.LNX.2.00.1507011031050.9009@localhost.localdomain>
-Message-ID: <alpine.DEB.2.11.1507011527380.3916@nanos>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Wed, 1 Jul 2015 14:28:38 +0100
+Subject: [PATCH] arm64: Don't report clear pmds and puds as huge
+In-Reply-To: <20150701131831.GD21981@e104818-lin.cambridge.arm.com>
+References: <1435752511-7079-1-git-send-email-christoffer.dall@linaro.org>
+ <20150701131831.GD21981@e104818-lin.cambridge.arm.com>
+Message-ID: <20150701132838.GE21981@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 1 Jul 2015, Paul Osmialowski wrote:
-
-> Hi Thomas,
+On Wed, Jul 01, 2015 at 02:18:31PM +0100, Catalin Marinas wrote:
+> On Wed, Jul 01, 2015 at 02:08:31PM +0200, Christoffer Dall wrote:
+> > diff --git a/arch/arm64/mm/hugetlbpage.c b/arch/arm64/mm/hugetlbpage.c
+> > index 2de9d2e..0eeb4f09 100644
+> > --- a/arch/arm64/mm/hugetlbpage.c
+> > +++ b/arch/arm64/mm/hugetlbpage.c
+> > @@ -40,13 +40,13 @@ int huge_pmd_unshare(struct mm_struct *mm, unsigned long *addr, pte_t *ptep)
+> >  
+> >  int pmd_huge(pmd_t pmd)
+> >  {
+> > -	return !(pmd_val(pmd) & PMD_TABLE_BIT);
+> > +	return pmd_val(pmd) && !(pmd_val(pmd) & PMD_TABLE_BIT);
+> >  }
+> >  
+> >  int pud_huge(pud_t pud)
+> >  {
+> >  #ifndef __PAGETABLE_PMD_FOLDED
+> > -	return !(pud_val(pud) & PUD_TABLE_BIT);
+> > +	return pud_val(pud) && !(pud_val(pud) & PUD_TABLE_BIT);
+> >  #else
+> >  	return 0;
+> >  #endif
 > 
-> On Wed, 1 Jul 2015, Thomas Gleixner wrote:
+> Thanks for the patch, I'll add the acks/reviews and Fixes: tags.
 > 
-> > > +		clockevents_register_device(
-> > > +				&kinetis_clockevent_tmrs[chan].evtdev);
-> > > +
-> > > +		kinetis_pit_init(&kinetis_clockevent_tmrs[chan],
-> > > +						(rate / HZ) - 1);
-> > > +		kinetis_pit_enable(&kinetis_clockevent_tmrs[chan], 1);
-> > 
-> > No point doing this. The core code has invoked the set_periodic call
-> > back via clockevents_register_device() already.
-> > 
-> 
-> As I removed this kinetis_pit_enable() line, the timer did not start,
-> therefore the system became unusable. What could be possible reason for that?
+> (and I think I'll change pmd_val to pmd_present, same for pud; no
+> functional difference)
 
-Well, you need to move both, the init and the enable into
-set_periodic().
+A related question - can we ever have PROT_NONE on a huge pmd? I'll
+leave this patch with pmd_val for now, it matches pmd_trans_huge().
 
-Thanks,
-
-	tglx
+-- 
+Catalin
