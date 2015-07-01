@@ -1,43 +1,39 @@
-From: alex.bennee@linaro.org (=?UTF-8?q?Alex=20Benn=C3=A9e?=)
-Date: Wed,  1 Jul 2015 19:29:02 +0100
-Subject: [PATCH v7 10/11] KVM: arm64: enable KVM_CAP_SET_GUEST_DEBUG
-In-Reply-To: <1435775343-20034-1-git-send-email-alex.bennee@linaro.org>
-References: <1435775343-20034-1-git-send-email-alex.bennee@linaro.org>
-Message-ID: <1435775343-20034-11-git-send-email-alex.bennee@linaro.org>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 1 Jul 2015 19:48:43 +0100
+Subject: [PATCH] ARM: keystone: allow FORCE_MAX_ZONEORDER to be
+ configurable on Keystone
+In-Reply-To: <1435773182-23074-1-git-send-email-m-karicheri2@ti.com>
+References: <1435773182-23074-1-git-send-email-m-karicheri2@ti.com>
+Message-ID: <20150701184842.GM7557@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Finally advertise the KVM capability for SET_GUEST_DEBUG. Once arm
-support is added this check can be moved to the common
-kvm_vm_ioctl_check_extension() code.
+On Wed, Jul 01, 2015 at 01:53:02PM -0400, Murali Karicheri wrote:
+> Currently for Keystone devices, user can't change the
+> value of CONFIG_FORCE_MAX_ZONEORDER option in defconfig.
+> Users require capability to tune the value of this option on a target
+> board. So this patch adds this capability
 
-Signed-off-by: Alex Benn?e <alex.bennee@linaro.org>
-Acked-by: Christoffer Dall <christoffer.dall@linaro.org>
+No they shouldn't.  If we do permit this, it should not be unrestricted -
+it's a power-of-2 of the page size, so specifying something like 32768 is
+insane.
 
----
+In any case, it's well known that the Linux MM system fragments memory,
+and the higher order allocations will fail soon after boot - and the
+larger the order, the greater chance of it failing.
 
-v3:
- - separated capability check from previous patches
- - moved into arm64 specific ioctl handler.
-v4:
- - add a-b-tag
----
- arch/arm64/kvm/reset.c | 3 +++
- 1 file changed, 3 insertions(+)
+The only case that you want large allocations is for things like DMA, and
+we have a separate allocator for that called CMA, which is able to grab
+large chunks of memory, provided it's configured with a large enough zone.
 
-diff --git a/arch/arm64/kvm/reset.c b/arch/arm64/kvm/reset.c
-index 21d5a62..88e5331 100644
---- a/arch/arm64/kvm/reset.c
-+++ b/arch/arm64/kvm/reset.c
-@@ -76,6 +76,9 @@ int kvm_arch_dev_ioctl_check_extension(long ext)
- 	case KVM_CAP_GUEST_DEBUG_HW_WPS:
- 		r  = get_num_wrps();
- 		break;
-+	case KVM_CAP_SET_GUEST_DEBUG:
-+		r = 1;
-+		break;
- 	default:
- 		r = 0;
- 	}
+Please check whether CMA can be used _before_ considering using this
+option.  If you need to increase the order, it should be justified, and
+it should be done on a per SoC basis in a static way, not left to the
+user to dream up some power-of-2 figure.
+
+Most importantly, please explain in the commit message why CMA doesn't
+provide you with what you need.
+
 -- 
-2.4.5
+FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
+according to speedtest.net.
