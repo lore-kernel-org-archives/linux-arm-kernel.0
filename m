@@ -1,102 +1,95 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 01 Jul 2015 19:18:40 +0100
-Subject: [PATCH 05/10] KVM: arm/arm64: vgic: Relax vgic_can_sample_irq
- for edge IRQs
-In-Reply-To: <20150701115820.GC17890@cbox>
-References: <1433783045-8002-1-git-send-email-marc.zyngier@arm.com>
- <1433783045-8002-6-git-send-email-marc.zyngier@arm.com>
- <20150630201933.GA11332@cbox> <5593B040.6050208@arm.com>
- <20150701115820.GC17890@cbox>
-Message-ID: <55942F00.6000306@arm.com>
+From: alex.bennee@linaro.org (=?UTF-8?q?Alex=20Benn=C3=A9e?=)
+Date: Wed,  1 Jul 2015 19:28:54 +0100
+Subject: [PATCH v7 02/11] KVM: arm64: guest debug, define API headers
+In-Reply-To: <1435775343-20034-1-git-send-email-alex.bennee@linaro.org>
+References: <1435775343-20034-1-git-send-email-alex.bennee@linaro.org>
+Message-ID: <1435775343-20034-3-git-send-email-alex.bennee@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/07/15 12:58, Christoffer Dall wrote:
-> On Wed, Jul 01, 2015 at 10:17:52AM +0100, Marc Zyngier wrote:
->> On 30/06/15 21:19, Christoffer Dall wrote:
->>> On Mon, Jun 08, 2015 at 06:04:00PM +0100, Marc Zyngier wrote:
->>>> We only set the irq_queued flag for level interrupts, meaning
->>>> that "!vgic_irq_is_queued(vcpu, irq)" is a good enough predicate
->>>> for all interrupts.
->>>>
->>>> This will allow us to inject edge HW interrupts, for which the
->>>> state ACTIVE+PENDING is not allowed.
->>>
->>> I don't understand this; ACTIVE+PENDING is allowed for edge interrupts.
->>> Do you mean that if we set the HW bit in the LR, then we are linking to
->>> an HW interrupt where we don't allow that to be ACTIVE+PENDING on the HW
->>> GIC side?
->>>
->>> Why is this relevant here?  I feel like I'm missing context.
->>
->> I've probably taken a shortcut here - bear with me while I'm trying to
->> explain the issue.
->>
->> For HW interrupts, we shouldn't even try to use the state bits in the
->> LR, because that state is contained in the physical distributor. Setting
->> the HW bit really means "there is something going on at the distributor
->> level, just go there".
-> 
-> ok, so by "HW interrupts" you mean virtual interrupts with the HW bit in
-> the LR set, correct?
+This commit defines the API headers for guest debugging. There are two
+architecture specific debug structures:
 
-Yes, sorry.
+  - kvm_guest_debug_arch, allows us to pass in HW debug registers
+  - kvm_debug_exit_arch, signals exception and possible faulting address
 
->>
->> If we were to inject a ACTIVE+PENDING interrupt at the LR level, we'd
->> basically loose the second interrupt because that state is simply not
->> considered.
-> 
-> Huh?  Which second interrupt.  I looked at the spec and it says don't
-> use the state bits for HW interrupts, so isn't it simply not supported
-> to set these bits at all and that's it?
+The type of debugging being used is controlled by the architecture
+specific control bits of the kvm_guest_debug->control flags in the ioctl
+structure.
 
-I managed to confuse myself reading the same bit. It says (GICv3 spec):
+Signed-off-by: Alex Benn?e <alex.bennee@linaro.org>
+Reviewed-by: David Hildenbrand <dahi@linux.vnet.ibm.com>
+Reviewed-by: Andrew Jones <drjones@redhat.com>
+Acked-by: Christoffer Dall <christoffer.dall@linaro.org>
 
-"A hypervisor must only use the pending and active state for software
-originated interrupts, which are typically associated with virtual
-devices, or SGIs."
+---
+v2
+   - expose hsr and pc directly to user-space
+v3
+   - s/control/controlled/ in commit message
+   - add v8 to ARM ARM comment (ARM Architecture Reference Manual)
+   - add rb tag
+   - rm pc, add far
+   - re-word comments on alignment
+   - rename KVM_ARM_NDBG_REGS -> KVM_ARM_MAX_DBG_REGS
+v4
+   - now uses common HW/SW BP define
+   - add a-b-tag
+   - use u32 for control regs
+v5
+   - revert to have arch specific KVM_GUESTDBG_USE_SW/HW_BP
+   - rm stale comments dbgctrl was stored as u64
+v6
+   - mv far comment from later patch
+   - KVM_GUESTDBG_USE_HW_BP -> KVM_GUESTDBG_USE_HW
+   - revert control regs to u64 (parity with GET/SET_ONE_REG)
+---
+ arch/arm64/include/uapi/asm/kvm.h | 27 +++++++++++++++++++++++++++
+ 1 file changed, 27 insertions(+)
 
-That's the PENDING+ACTIVE state, and not the pending and active bits
-like I read it initially.
-
-Now consider the following scenario:
-
-- We inject a virtual edge interrupt
-- We mark the corresponding physical interrupt as active.
-- Queue interrupt in an LR
-- Resume vcpu
-
-Now, we inject another edge interrupt, the vcpu exits for whatever
-reason, and the previously injected interrupt is still active.
-
-The normal vGIC flow would be to mark the interrupt as ACTIVE+PENDING in
-the LR, and resume the vcpu. But the above states that this is invalid
-for HW generated interrupts.
-
->>
->> So the trick we're using is to only inject the active interrupt, and
->> prevent anything else from being injected until we can confirm that the
->> active state has been cleared at the physical level.
->>
->> Does it make any sense?
->>
-> Sort of, but what I don't understand now is how the guest ever sees the
-> interrupt then.  If we always inject the virtual interrupt by setting
-> the active state on the physical distributor, and we can't inject this
-> as active+pending, and the guest doesn't see the state in the LR, then
-> how does this ever raise a virtual interrupt and how does the guest see
-> an interrupt which is only PENDING so that it can ack it etc. etc.?
-> 
-> Maybe I don't fully understand how the HW bit works after all...
-
-The way the spec is written is slightly misleading. But the gist of it
-is that we still signal the guest using the PENDING bit in the LR, and
-switch the LR as usual. it is just that we can't use the PENDING+ACTIVE
-state (apparently, this can lead to a double deactivation).
-
-Not sure the above makes sense. Beer time, I suppose.
-
-	M.
+diff --git a/arch/arm64/include/uapi/asm/kvm.h b/arch/arm64/include/uapi/asm/kvm.h
+index d268320..d82f3f3 100644
+--- a/arch/arm64/include/uapi/asm/kvm.h
++++ b/arch/arm64/include/uapi/asm/kvm.h
+@@ -100,12 +100,39 @@ struct kvm_sregs {
+ struct kvm_fpu {
+ };
+ 
++/*
++ * See v8 ARM ARM D7.3: Debug Registers
++ *
++ * The architectural limit is 16 debug registers of each type although
++ * in practice there are usually less (see ID_AA64DFR0_EL1).
++ *
++ * Although the control registers are architecturally defined as 32
++ * bits wide we use a 64 bit structure here to keep parity with
++ * KVM_GET/SET_ONE_REG behaviour which treats all system registers as
++ * 64 bit values. It also allows for the possibility of the
++ * architecture expanding the control registers without having to
++ * change the userspace ABI.
++ */
++#define KVM_ARM_MAX_DBG_REGS 16
+ struct kvm_guest_debug_arch {
++	__u64 dbg_bcr[KVM_ARM_MAX_DBG_REGS];
++	__u64 dbg_bvr[KVM_ARM_MAX_DBG_REGS];
++	__u64 dbg_wcr[KVM_ARM_MAX_DBG_REGS];
++	__u64 dbg_wvr[KVM_ARM_MAX_DBG_REGS];
+ };
+ 
+ struct kvm_debug_exit_arch {
++	__u32 hsr;
++	__u64 far;	/* used for watchpoints */
+ };
+ 
++/*
++ * Architecture specific defines for kvm_guest_debug->control
++ */
++
++#define KVM_GUESTDBG_USE_SW_BP		(1 << 16)
++#define KVM_GUESTDBG_USE_HW		(1 << 17)
++
+ struct kvm_sync_regs {
+ };
+ 
 -- 
-Jazz is not dead. It just smells funny...
+2.4.5
