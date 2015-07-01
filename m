@@ -1,23 +1,33 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Wed, 01 Jul 2015 10:40:25 -0700
-Subject: [PATCH] gpio: msm: Remove empty msm_gpio_{request,free}()
-In-Reply-To: <1435753639-13627-1-git-send-email-geert+renesas@glider.be>
-References: <1435753639-13627-1-git-send-email-geert+renesas@glider.be>
-Message-ID: <55942609.6020804@codeaurora.org>
+From: m-karicheri2@ti.com (Murali Karicheri)
+Date: Wed, 1 Jul 2015 13:53:02 -0400
+Subject: [PATCH] ARM: keystone: allow FORCE_MAX_ZONEORDER to be configurable
+ on Keystone
+Message-ID: <1435773182-23074-1-git-send-email-m-karicheri2@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/01/2015 05:27 AM, Geert Uytterhoeven wrote:
-> gpio_chip.request() and gpio_chip.free() are optional, and can just be
-> left unimplemented.
->
-> Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
-> ---
-> Untested due to lack of hardware.
+Currently for Keystone devices, user can't change the
+value of CONFIG_FORCE_MAX_ZONEORDER option in defconfig.
+Users require capability to tune the value of this option on a target
+board. So this patch adds this capability
 
-Actually we should just delete this driver now that we have an msm8660
-pinctrl implementation.
+Signed-off-by: Murali Karicheri <m-karicheri2@ti.com>
+---
+ arch/arm/Kconfig | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index a750c14..9b5f8bc 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -1731,7 +1731,7 @@ config ARM_MODULE_PLTS
+ source "mm/Kconfig"
+ 
+ config FORCE_MAX_ZONEORDER
+-	int "Maximum zone order" if ARCH_SHMOBILE_LEGACY
++	int "Maximum zone order" if ARCH_SHMOBILE_LEGACY || ARCH_KEYSTONE
+ 	range 11 64 if ARCH_SHMOBILE_LEGACY
+ 	default "12" if SOC_AM33XX
+ 	default "9" if SA1111 || ARCH_EFM32
 -- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+1.9.1
