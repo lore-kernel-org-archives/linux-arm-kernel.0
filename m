@@ -1,28 +1,28 @@
-From: pali.rohar@gmail.com (Pali =?utf-8?B?Um9ow6Fy?=)
-Date: Wed, 1 Jul 2015 09:22:55 +0200
-Subject: n900 in 4.2-rc0: repeating oopses
-In-Reply-To: <20150701065932.GS4156@atomide.com>
-References: <20150416093234.GA17423@amd> <20150629091146.GA5103@amd>
- <20150630092404.GA19285@amd> <20150630095310.GF27720@pali>
- <20150701065932.GS4156@atomide.com>
-Message-ID: <20150701072255.GA17577@pali>
+From: hch@lst.de (Christoph Hellwig)
+Date: Wed, 1 Jul 2015 09:28:28 +0200
+Subject: [PATCH v5 2/6] arch: unify ioremap prototypes and macro aliases
+In-Reply-To: <CAMuHMdXqjmo2T3V=msZySVSu2j4YjyE7FnVXWTjySEyfYLSg1A@mail.gmail.com>
+References: <20150622081028.35954.89885.stgit@dwillia2-desk3.jf.intel.com>
+ <20150622082427.35954.73529.stgit@dwillia2-desk3.jf.intel.com>
+ <20150622161002.GB8240@lst.de>
+ <CAPcyv4h5OXyRvZvLGD5ZknO-YUPn675YGv0XdtW1QOO9qmZsug@mail.gmail.com>
+ <20150701062352.GA3739@lst.de>
+ <CAMuHMdUO4uSWH1Qc0SfDTLuXbiG2N9fq8Tf6j+3RoqVKdPugbA@mail.gmail.com>
+ <20150701065948.GA4355@lst.de>
+ <CAMuHMdXqjmo2T3V=msZySVSu2j4YjyE7FnVXWTjySEyfYLSg1A@mail.gmail.com>
+Message-ID: <20150701072828.GA4881@lst.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 30 June 2015 23:59:33 Tony Lindgren wrote:
-> * Pali Roh?r <pali.rohar@gmail.com> [150630 02:55]:
-> > 
-> > I will try 4.2 at the end of week.
+On Wed, Jul 01, 2015 at 09:19:29AM +0200, Geert Uytterhoeven wrote:
+> >> So it would be the responsibility of the caller to fall back from
+> >> ioremap(..., CACHED) to ioremap(..., UNCACHED)?
+> >> I.e. all drivers using it should be changed...
+> >
+> > All of the zero users we currently have will need to be changed, yes.
 > 
-> At least today's 4.1.0-11549-g05a8256 boots just fine on my n900.
-> 
-> Regards,
-> 
-> Tony
+> Good. Less work to convert all of these ;-)
 
-So, Pavel can you re-test? Maybe there can be problem with some driver
-which Tony did not compiled into zImage? Just speculation...
-
--- 
-Pali Roh?r
-pali.rohar at gmail.com
+And I didn't have enough coffee yet.  We of course have a few users of
+ioremap_cache(), and two implememantions but no users of ioremap_cached().
+Looks like the implementations can't even agree on the name.
