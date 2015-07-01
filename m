@@ -1,50 +1,32 @@
-From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Wed, 01 Jul 2015 23:57:57 +0200
-Subject: [RFC PATCH 00/15] pwm: add support for atomic update
-In-Reply-To: <1435738921-25027-1-git-send-email-boris.brezillon@free-electrons.com>
-References: <1435738921-25027-1-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <3250976.mr9RMtjrdC@diego>
+From: Nathan_Lynch@mentor.com (Nathan Lynch)
+Date: Wed, 1 Jul 2015 17:11:14 -0500
+Subject: [PATCH] ARM: fix vdsomunge not to depend on glibc specific error.h
+In-Reply-To: <20150630110557.GG27725@arm.com>
+References: <559273FD.2030508@arm.com> <20150630110557.GG27725@arm.com>
+Message-ID: <55946582.4010602@mentor.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Boris,
+On 06/30/2015 06:05 AM, Will Deacon wrote:
+> On Tue, Jun 30, 2015 at 11:48:29AM +0100, Szabolcs Nagy wrote:
+>> If the host toolchain is not glibc based then the arm kernel build
+>> fails with
+>>
+>>  arch/arm/vdso/vdsomunge.c:53:19: fatal error: error.h: No such file or directory
+>>
+>> error.h is a glibc only header (ie not available in musl, newlib and
+>> bsd libcs).  Changed the error reporting to standard conforming code
+>> to avoid depending on specific C implementations.
+>>
+>> Signed-off-by: Szabolcs Nagy <szabolcs.nagy@arm.com>
+>> ---
+>>  arch/arm/vdso/vdsomunge.c |   56 ++++++++++++++++++++++++++-------------------
+>>  1 file changed, 33 insertions(+), 23 deletions(-)
+> 
+> Looks fine to me:
+> 
+>   Acked-by: Will Deacon <will.deacon@arm.com>
+> 
+> Probably worth a Cc stable too.
 
-Am Mittwoch, 1. Juli 2015, 10:21:46 schrieb Boris Brezillon:
-> Hello Thierry,
-> 
-> This series adds support for atomic PWM update, or ITO, the capability
-> to update all the parameters of a PWM device (enabled/disabled, period,
-> duty and polarity) in one go.
-> 
-> This implementation is still experimental, and I may have missed some key
-> aspect, so any feedback are welcome.
-> 
-> Also note that I haven't protected the state update with any locking.
-> That's because the existing config does not protect against concurrent
-> access to a requested PWM device (see the pwm_config implementation).
-> I guess the PWM framework assume the user will implement the proper locking
-> scheme if it has to concurrently access the device.
-> 
-> The 5 first patches prepare the addition of the pwm_state concept, which
-> will be used to allow atomic updates.
-> The following patches introduce the pwm_state struct, initial state
-> retrieval and atomic update concepts.
-> 
-> Patches 12 and 13 are showing how one can implement the initial state
-> retrieval and atomic update features in a PWM driver (in this specific
-> case I implemented it in the rockchip driver).
-> 
-> The last 2 patches are making use of those changes to improve the
-> pwm-regulator driver (initializing the regulator state based on the
-> initial PWM state).
-
-at first I got very strange readings (very wrong values and wrong polarity), 
-which resulted from the issues I pointed out in the replies to individual 
-patches. After fixing these, the pwm read-back now returns exactly the expected 
-values :-) .
-
-And with the original voltage table from the Chromeos-devicetrees, the pwm-
-regulator also returns the expected 1.2V that coreboot initially set.
-
-
-Heiko
+Agreed and thanks; submitted to Russell's patch system as 8397/1.
