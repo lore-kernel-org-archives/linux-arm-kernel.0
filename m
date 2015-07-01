@@ -1,232 +1,71 @@
 From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Wed,  1 Jul 2015 10:21:57 +0200
-Subject: [RFC PATCH 11/15] pwm: add the core infrastructure to allow atomic
- update
+Date: Wed,  1 Jul 2015 10:22:01 +0200
+Subject: [RFC PATCH 15/15] regulator: pwm: properly initialize the ->state
+ field
 In-Reply-To: <1435738921-25027-1-git-send-email-boris.brezillon@free-electrons.com>
 References: <1435738921-25027-1-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <1435738921-25027-12-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <1435738921-25027-16-git-send-email-boris.brezillon@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add an ->apply() method to the pwm_ops struct to allow PWM drivers to
-implement atomic update.
-This method will be prefered over the ->enable(), ->disable() and
-->config() methods if available.
-
-Add the pwm_get_state(), pwm_get_default_state() and pwm_apply_state()
-functions for PWM users to be able to use the atomic update feature.
-
-Note that the pwm_apply_state() does not guarantee the atomicity of the
-update operation, it all depends on the availability and implementation
-of the ->apply() method.
+The ->state field is currently initialized to 0, thus referencing the
+voltage selector at index 0, which might not reflect the current voltage
+value.
+If possible, retrieve the current voltage selector from the PWM state, else
+return -EINVAL.
 
 Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
 ---
- drivers/pwm/core.c  | 110 ++++++++++++++++++++++++++++++++++++++++++++++------
- include/linux/pwm.h |  26 +++++++++++++
- 2 files changed, 124 insertions(+), 12 deletions(-)
+ drivers/regulator/pwm-regulator.c | 26 ++++++++++++++++++++++++++
+ 1 file changed, 26 insertions(+)
 
-diff --git a/drivers/pwm/core.c b/drivers/pwm/core.c
-index 30631f5..6dafd8e 100644
---- a/drivers/pwm/core.c
-+++ b/drivers/pwm/core.c
-@@ -238,8 +238,9 @@ int pwmchip_add_with_polarity(struct pwm_chip *chip,
- 	unsigned int i;
- 	int ret;
+diff --git a/drivers/regulator/pwm-regulator.c b/drivers/regulator/pwm-regulator.c
+index 8159518..4e29717 100644
+--- a/drivers/regulator/pwm-regulator.c
++++ b/drivers/regulator/pwm-regulator.c
+@@ -31,10 +31,35 @@ struct pwm_voltages {
+ 	unsigned int dutycycle;
+ };
  
--	if (!chip || !chip->dev || !chip->ops || !chip->ops->config ||
--	    !chip->ops->enable || !chip->ops->disable || !chip->npwm)
-+	if (!chip || !chip->dev || !chip->ops || (!chip->ops->apply &&
-+	    (!chip->ops->config || !chip->ops->enable ||
-+	     !chip->ops->disable)) || !chip->npwm)
- 		return -EINVAL;
- 
- 	mutex_lock(&pwm_lock);
-@@ -430,7 +431,17 @@ int pwm_config(struct pwm_device *pwm, int duty_ns, int period_ns)
- 	if (!pwm || duty_ns < 0 || period_ns <= 0 || duty_ns > period_ns)
- 		return -EINVAL;
- 
--	err = pwm->chip->ops->config(pwm->chip, pwm, duty_ns, period_ns);
-+	if (pwm->chip->ops->apply) {
-+		struct pwm_state state = pwm->state;
++static void pwm_regulator_init_state(struct regulator_dev *rdev)
++{
++	struct pwm_regulator_data *drvdata = rdev_get_drvdata(rdev);
++	struct pwm_state pwm_state;
++	unsigned int dutycycle;
++	int i;
 +
-+		state.period = period_ns;
-+		state.duty_cycle = duty_ns;
++	pwm_get_state(drvdata->pwm, &pwm_state);
 +
-+		err = pwm->chip->ops->apply(pwm->chip, pwm, &state);
-+	} else {
-+		err = pwm->chip->ops->config(pwm->chip, pwm, duty_ns, period_ns);
-+	}
-+
- 	if (err)
- 		return err;
- 
-@@ -455,6 +466,17 @@ int pwm_set_polarity(struct pwm_device *pwm, enum pwm_polarity polarity)
- 	if (!pwm || !pwm->chip->ops)
- 		return -EINVAL;
- 
-+	if (pwm->chip->ops->apply) {
-+		struct pwm_state state = pwm->state;
-+
-+		state.polarity = polarity;
-+		err = pwm->chip->ops->apply(pwm->chip, pwm, &state);
-+		if (!err)
-+			pwm->state.polarity = polarity;
-+
-+		return err;
-+	}
-+
- 	if (!pwm->chip->ops->set_polarity)
- 		return -ENOSYS;
- 
-@@ -477,17 +499,27 @@ EXPORT_SYMBOL_GPL(pwm_set_polarity);
-  */
- int pwm_enable(struct pwm_device *pwm)
- {
--	if (pwm && !pwm_is_enabled(pwm)) {
--		int err;
-+	int err;
- 
--		err = pwm->chip->ops->enable(pwm->chip, pwm);
--		if (!err)
--			pwm->state.enabled = true;
-+	if (!pwm)
-+		return -EINVAL;
- 
--		return err;
-+	if (pwm_is_enabled(pwm))
-+		return 0;
-+
-+	if (pwm->chip->ops->apply) {
-+		struct pwm_state state = pwm->state;
-+
-+		state.enabled = true;
-+		err = pwm->chip->ops->apply(pwm->chip, pwm, &state);
-+	} else {
-+		err = pwm->chip->ops->enable(pwm->chip, pwm);
- 	}
- 
--	return pwm ? 0 : -EINVAL;
-+	if (!err)
-+		pwm->state.enabled = true;
-+
-+	return err;
- }
- EXPORT_SYMBOL_GPL(pwm_enable);
- 
-@@ -497,13 +529,67 @@ EXPORT_SYMBOL_GPL(pwm_enable);
-  */
- void pwm_disable(struct pwm_device *pwm)
- {
--	if (pwm && pwm_is_enabled(pwm)) {
-+	if (!pwm || !pwm_is_enabled(pwm))
++	if (!pwm_state.period)
 +		return;
 +
-+	if (pwm->chip->ops->apply) {
-+		struct pwm_state state = pwm->state;
++	dutycycle = (pwm_state.duty_cycle * 100) / pwm_state.period;
 +
-+		state.enabled = false;
-+		pwm->chip->ops->apply(pwm->chip, pwm, &state);
-+	} else {
- 		pwm->chip->ops->disable(pwm->chip, pwm);
--		pwm->state.enabled = false;
- 	}
-+
-+	pwm->state.enabled = false;
- }
- EXPORT_SYMBOL_GPL(pwm_disable);
- 
-+int pwm_apply_state(struct pwm_device *pwm, const struct pwm_state *state)
-+{
-+	int err = 0;
-+
-+	if (!pwm)
-+		return -EINVAL;
-+
-+	if (!memcmp(state, &pwm->state, sizeof(*state)))
-+		return 0;
-+
-+	if (pwm->chip->ops->apply) {
-+		err = pwm->chip->ops->apply(pwm->chip, pwm, state);
-+		if (!err)
-+			pwm->state = *state;
-+	} else {
-+		/*
-+		 * FIXME: restore the initial state in case of error.
-+		 */
-+		if (state->polarity != pwm->state.polarity) {
-+			pwm_disable(pwm);
-+			err = pwm_set_polarity(pwm, state->polarity);
-+			if (err)
-+				goto out;
-+		}
-+
-+		if (state->period != pwm->state.period ||
-+		    state->duty_cycle != pwm->state.duty_cycle) {
-+			err = pwm_config(pwm, state->period, state->duty_cycle);
-+			if (err)
-+				goto out;
-+		}
-+
-+		if (state->enabled != pwm->state.enabled) {
-+			if (state->enabled)
-+				err = pwm_enable(pwm);
-+			else
-+				pwm_disable(pwm);
++	for (i = 0; i < rdev->desc->n_voltages; i++) {
++		if (dutycycle == drvdata->duty_cycle_table[i].dutycycle) {
++			drvdata->state = i;
++			return;
 +		}
 +	}
-+
-+out:
-+	return err;
 +}
-+EXPORT_SYMBOL_GPL(pwm_apply_state);
 +
- static struct pwm_chip *of_node_to_pwmchip(struct device_node *np)
+ static int pwm_regulator_get_voltage_sel(struct regulator_dev *rdev)
  {
- 	struct pwm_chip *chip;
-diff --git a/include/linux/pwm.h b/include/linux/pwm.h
-index b47244a..7e99679 100644
---- a/include/linux/pwm.h
-+++ b/include/linux/pwm.h
-@@ -151,6 +151,29 @@ static inline enum pwm_polarity pwm_get_polarity(const struct pwm_device *pwm)
- 	return pwm ? pwm->state.polarity : PWM_POLARITY_NORMAL;
+ 	struct pwm_regulator_data *drvdata = rdev_get_drvdata(rdev);
+ 
++	if (drvdata->state < 0)
++		pwm_regulator_init_state(rdev);
++
+ 	return drvdata->state;
  }
  
-+/*
-+ * pwm_apply_state - apply a new state to the PWM device
-+ */
-+int pwm_apply_state(struct pwm_device *pwm, const struct pwm_state *state);
-+
-+/*
-+ * pwm_get_state - retrieve the current PWM state
-+ */
-+static inline void pwm_get_state(struct pwm_device *pwm,
-+				 struct pwm_state *state)
-+{
-+	*state = pwm->state;
-+}
-+
-+/*
-+ * pwm_get_default_state - retrieve the default PWM state
-+ */
-+static inline void pwm_get_default_state(struct pwm_device *pwm,
-+					 struct pwm_state *state)
-+{
-+	*state = pwm->default_state;
-+}
-+
- /**
-  * struct pwm_ops - PWM controller operations
-  * @request: optional hook for requesting a PWM
-@@ -177,6 +200,9 @@ struct pwm_ops {
- 					  struct pwm_device *pwm);
- 	void			(*disable)(struct pwm_chip *chip,
- 					   struct pwm_device *pwm);
-+	int			(*apply)(struct pwm_chip *chip,
-+					 struct pwm_device *pwm,
-+					 const struct pwm_state *state);
- 	void			(*init_state)(struct pwm_chip *chip,
- 					      struct pwm_device *pwm);
- #ifdef CONFIG_DEBUG_FS
+@@ -170,6 +195,7 @@ static int pwm_regulator_probe(struct platform_device *pdev)
+ 	config.of_node = np;
+ 	config.dev = &pdev->dev;
+ 	config.driver_data = drvdata;
++	drvdata->state = -EINVAL;
+ 
+ 	drvdata->pwm = devm_pwm_get(&pdev->dev, NULL);
+ 	if (IS_ERR(drvdata->pwm)) {
 -- 
 1.9.1
