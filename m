@@ -1,144 +1,36 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Wed, 1 Jul 2015 14:54:04 +0200
-Subject: [PATCH V2 4/5] drivers/rtc/rtc-ds1307.c: Support optional wakeup
- interrupt source
-In-Reply-To: <20150624162654.GA29259@kahuna>
-References: <1435076114-12416-1-git-send-email-nm@ti.com>
- <1435076114-12416-5-git-send-email-nm@ti.com>
- <558ACE87.6040509@ti.com> <558AD5B1.8030406@ti.com>
- <20150624162654.GA29259@kahuna>
-Message-ID: <20150701125404.GR485@piout.net>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Wed, 1 Jul 2015 14:59:44 +0200
+Subject: [PATCH] arm64: Don't report clear pmds and puds as huge
+In-Reply-To: <CAPvkgC3qJEca1cL8DSuz5=7_xnmyKO2AQ0g+XyF+D-KmYNs9=A@mail.gmail.com>
+References: <1435752511-7079-1-git-send-email-christoffer.dall@linaro.org>
+ <CAPvkgC3qJEca1cL8DSuz5=7_xnmyKO2AQ0g+XyF+D-KmYNs9=A@mail.gmail.com>
+Message-ID: <20150701125944.GA7625@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On 24/06/2015 at 11:26:54 -0500, Nishanth Menon wrote :
-> I am wrong here - code just returns 0 and ignores err. So, how about
-> the following patch instead: (Alexandre, please do let me know if the
-> entire series needs to be reposted):
-
-Can you resend just that one as v3? I'll take it right away. Thanks!
-
->  - improvement as suggested
->  - Picked up previous acks
->  - cleanup in probe does not need dev_pm_clear_wake_irq.
-> -->8<---
-> From 12367f8edffc25613f6f920d9bd7b69dfed57ce1 Mon Sep 17 00:00:00 2001
-> From: Nishanth Menon <nm@ti.com>
-> Date: Mon, 22 Jun 2015 14:13:19 -0500
-> Subject: [PATCH V3] drivers/rtc/rtc-ds1307.c: Support optional wakeup interrupt
->  source
+On Wed, Jul 01, 2015 at 01:24:34PM +0100, Steve Capper wrote:
+> On 1 July 2015 at 13:08, Christoffer Dall <christoffer.dall@linaro.org> wrote:
+> > The current pmd_huge() and pud_huge() functions simply check if the table
+> > bit is not set and reports the entries as huge in that case.  This is
+> > counter-intuitive as a clear pmd/pud cannot also be a huge pmd/pud, and
+> > it is inconsistent with at least arm and x86.
+> >
+> > To prevent others from making the same mistake as me in looking at code
+> > that calls these functions and to fix an issue with KVM on arm64 that
+> > causes memory corruption due to incorrect page reference counting
+> > resulting from this mistake, let's change the behavior.
+> >
+> > Cc: stable at vger.kernel.org
 > 
-> With the recent pinctrl-single changes, SoCs such as Texas
-> Instrument's OMAP processors can treat wake-up events from deeper idle
-> states as interrupts.
+> Thanks Christoffer.
 > 
-> Let's add support for the optional second interrupt for wake-up using
-> the generic wakeirq support added in commit 4990d4fe327b ("PM /
-> Wakeirq: Add automated device wake IRQ handling")
+> It may be worth adding:
 > 
-> Finally, to pass the wake-up interrupt in the dts file,
-> interrupts-extended property needs to be passed.
+> Fixes: 084bd29810a5 ("ARM64: mm: HugeTLB support.")
 > 
-> This is similar in approach to commit 2a0b965cfb6e ("serial: omap: Add
-> support for optional wake-up") + ee83bd3b6483 ("serial: omap: Switch
-> wake-up interrupt to generic wakeirq")
+> And, please feel free to add:
 > 
-> Acked-by: Tony Lindgren <tony@atomide.com>
-> Acked-by: Felipe Balbi <balbi@ti.com>
-> Signed-off-by: Nishanth Menon <nm@ti.com>
-> ---
->  drivers/rtc/rtc-ds1307.c |   36 +++++++++++++++++++++++++++++++++---
->  1 file changed, 33 insertions(+), 3 deletions(-)
+> Reviewed-by: Steve Capper <steve.capper@linaro.org>
 > 
-> diff --git a/drivers/rtc/rtc-ds1307.c b/drivers/rtc/rtc-ds1307.c
-> index b03880fc32b5..e16989c48a90 100644
-> --- a/drivers/rtc/rtc-ds1307.c
-> +++ b/drivers/rtc/rtc-ds1307.c
-> @@ -15,6 +15,9 @@
->  #include <linux/i2c.h>
->  #include <linux/init.h>
->  #include <linux/module.h>
-> +#include <linux/of_device.h>
-> +#include <linux/of_irq.h>
-> +#include <linux/pm_wakeirq.h>
->  #include <linux/rtc/ds1307.h>
->  #include <linux/rtc.h>
->  #include <linux/slab.h>
-> @@ -114,6 +117,7 @@ struct ds1307 {
->  #define HAS_ALARM	1		/* bit 1 == irq claimed */
->  	struct i2c_client	*client;
->  	struct rtc_device	*rtc;
-> +	int			wakeirq;
->  	s32 (*read_block_data)(const struct i2c_client *client, u8 command,
->  			       u8 length, u8 *values);
->  	s32 (*write_block_data)(const struct i2c_client *client, u8 command,
-> @@ -1156,6 +1160,8 @@ read_rtc:
->  	}
->  
->  	if (want_irq) {
-> +		struct device_node *node = client->dev.of_node;
-> +
->  		err = devm_request_threaded_irq(&client->dev,
->  						client->irq, NULL, irq_handler,
->  						IRQF_SHARED | IRQF_ONESHOT,
-> @@ -1163,13 +1169,34 @@ read_rtc:
->  		if (err) {
->  			client->irq = 0;
->  			dev_err(&client->dev, "unable to request IRQ!\n");
-> -		} else {
-> +			goto no_irq;
-> +		}
->  
-> -			set_bit(HAS_ALARM, &ds1307->flags);
-> -			dev_dbg(&client->dev, "got IRQ %d\n", client->irq);
-> +		set_bit(HAS_ALARM, &ds1307->flags);
-> +		dev_dbg(&client->dev, "got IRQ %d\n", client->irq);
-> +
-> +		/* Currently supported by OF code only! */
-> +		if (!node)
-> +			goto no_irq;
-> +
-> +		err = of_irq_get(node, 1);
-> +		if (err <= 0) {
-> +			if (err == -EPROBE_DEFER)
-> +				goto exit;
-> +			goto no_irq;
-> +		}
-> +		ds1307->wakeirq = err;
-> +
-> +		err = dev_pm_set_dedicated_wake_irq(&client->dev,
-> +						    ds1307->wakeirq);
-> +		if (err) {
-> +			dev_err(&client->dev, "unable to setup wakeIRQ %d!\n",
-> +				err);
-> +			goto exit;
->  		}
->  	}
->  
-> +no_irq:
->  	if (chip->nvram_size) {
->  
->  		ds1307->nvram = devm_kzalloc(&client->dev,
-> @@ -1213,6 +1240,9 @@ static int ds1307_remove(struct i2c_client *client)
->  {
->  	struct ds1307 *ds1307 = i2c_get_clientdata(client);
->  
-> +	if (ds1307->wakeirq)
-> +		dev_pm_clear_wake_irq(&client->dev);
-> +
->  	if (test_and_clear_bit(HAS_NVRAM, &ds1307->flags))
->  		sysfs_remove_bin_file(&client->dev.kobj, ds1307->nvram);
->  
-> -- 
-> 1.7.9.5
-> 
-> -- 
-> Regards,
-> Nishanth Menon
-
--- 
-Alexandre Belloni, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+Thanks!
+-Christoffer
