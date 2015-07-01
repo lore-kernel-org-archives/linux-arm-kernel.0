@@ -1,36 +1,67 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Wed, 1 Jul 2015 14:59:44 +0200
-Subject: [PATCH] arm64: Don't report clear pmds and puds as huge
-In-Reply-To: <CAPvkgC3qJEca1cL8DSuz5=7_xnmyKO2AQ0g+XyF+D-KmYNs9=A@mail.gmail.com>
-References: <1435752511-7079-1-git-send-email-christoffer.dall@linaro.org>
- <CAPvkgC3qJEca1cL8DSuz5=7_xnmyKO2AQ0g+XyF+D-KmYNs9=A@mail.gmail.com>
-Message-ID: <20150701125944.GA7625@cbox>
+From: vitalya@ti.com (Vitaly Andrianov)
+Date: Wed, 1 Jul 2015 09:05:31 -0400
+Subject: [PATCH] keystone: dts: add psci command definition
+In-Reply-To: <20150701124101.GB2310@leverpostej>
+References: <1435752784-30639-1-git-send-email-vitalya@ti.com>
+ <1435752784-30639-2-git-send-email-vitalya@ti.com>
+ <20150701124101.GB2310@leverpostej>
+Message-ID: <5593E59B.9090304@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 01, 2015 at 01:24:34PM +0100, Steve Capper wrote:
-> On 1 July 2015 at 13:08, Christoffer Dall <christoffer.dall@linaro.org> wrote:
-> > The current pmd_huge() and pud_huge() functions simply check if the table
-> > bit is not set and reports the entries as huge in that case.  This is
-> > counter-intuitive as a clear pmd/pud cannot also be a huge pmd/pud, and
-> > it is inconsistent with at least arm and x86.
-> >
-> > To prevent others from making the same mistake as me in looking at code
-> > that calls these functions and to fix an issue with KVM on arm64 that
-> > causes memory corruption due to incorrect page reference counting
-> > resulting from this mistake, let's change the behavior.
-> >
-> > Cc: stable at vger.kernel.org
-> 
-> Thanks Christoffer.
-> 
-> It may be worth adding:
-> 
-> Fixes: 084bd29810a5 ("ARM64: mm: HugeTLB support.")
-> 
-> And, please feel free to add:
-> 
-> Reviewed-by: Steve Capper <steve.capper@linaro.org>
-> 
-Thanks!
--Christoffer
+
+
+On 07/01/2015 08:41 AM, Mark Rutland wrote:
+> On Wed, Jul 01, 2015 at 01:13:04PM +0100, Vitaly Andrianov wrote:
+>> This commit adds definition for cpu_on, cpu_off and cpu_suspend commands.
+>> These definitions must match the corresponding PSCI definitions in
+>> boot monitor.
+>>
+>> Signed-off-by: Vitaly Andrianov <vitalya@ti.com>
+>> ---
+>>   arch/arm/boot/dts/keystone.dtsi | 8 ++++++++
+>>   1 file changed, 8 insertions(+)
+>>
+>> diff --git a/arch/arm/boot/dts/keystone.dtsi b/arch/arm/boot/dts/keystone.dtsi
+>> index c06542b..ab60fca 100644
+>> --- a/arch/arm/boot/dts/keystone.dtsi
+>> +++ b/arch/arm/boot/dts/keystone.dtsi
+>> @@ -58,6 +58,14 @@
+>>   			     <GIC_SPI 23 IRQ_TYPE_EDGE_RISING>;
+>>   	};
+>>
+>> +	psci {
+>> +		compatible	= "arm,psci";
+>> +		method		= "smc";
+>> +		cpu_suspend	= <0x84000001>;
+>> +		cpu_off		= <0x84000002>;
+>> +		cpu_on		= <0x84000003>;
+>> +	};
+>
+> It would be nice to have this injected automatically by the bootlaoder
+> when PSCI is present, as that way users of existing systems can upgrade
+> their DTB and still have things boot.
+>
+> Thanks,
+> Mark.
+>
+
+So, KS2 kernel doesn't need that commit and has to wait this from 
+u-boot? Actually PSCI support is a part of KS2 boot-monitor. U-boot is 
+just responsible to load and start it, but doesn't know whether PSCI is 
+supported.
+
+In any case you are right. The DTS also doesn't know whether boot- 
+monitor supports PSCI. It is better to make u-boot to fix up the dts.
+Let's forget about this patch. I'll work on dts fix-up in u-boot.
+
+Thanks,
+Vitaly
+
+>> +
+>>   	soc {
+>>   		#address-cells = <1>;
+>>   		#size-cells = <1>;
+>> --
+>> 1.9.1
+>>
