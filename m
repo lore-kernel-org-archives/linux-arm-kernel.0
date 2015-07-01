@@ -1,47 +1,79 @@
 From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Wed,  1 Jul 2015 10:21:56 +0200
-Subject: [RFC PATCH 10/15] pwm: add the PWM initial state retrieval infra
+Date: Wed,  1 Jul 2015 10:22:00 +0200
+Subject: [RFC PATCH 14/15] regulator: pwm: implement ->enable(),
+ ->disable() and ->is_enabled methods
 In-Reply-To: <1435738921-25027-1-git-send-email-boris.brezillon@free-electrons.com>
 References: <1435738921-25027-1-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <1435738921-25027-11-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <1435738921-25027-15-git-send-email-boris.brezillon@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add a ->init_state() function to the pwm_ops struct to let PWM drivers
-initialize the PWM state attached to a PWM device.
+Implement the ->enable(), ->disable() and ->is_enabled methods and remove
+the PWM call in ->set_voltage_sel().
+This is particularly important for critical regulators tagged as always-on,
+because not claiming the PWM (and its dependencies) might lead to
+unpredictable behavior (like a system hang because the PWM clk is only
+claimed when the PWM device is enabled).
 
 Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
 ---
- drivers/pwm/core.c  | 3 +++
- include/linux/pwm.h | 2 ++
- 2 files changed, 5 insertions(+)
+ drivers/regulator/pwm-regulator.c | 32 ++++++++++++++++++++++++++------
+ 1 file changed, 26 insertions(+), 6 deletions(-)
 
-diff --git a/drivers/pwm/core.c b/drivers/pwm/core.c
-index 3e830ce..30631f5 100644
---- a/drivers/pwm/core.c
-+++ b/drivers/pwm/core.c
-@@ -264,6 +264,9 @@ int pwmchip_add_with_polarity(struct pwm_chip *chip,
- 		pwm->hwpwm = i;
- 		pwm_set_default_polarity(pwm, polarity);
+diff --git a/drivers/regulator/pwm-regulator.c b/drivers/regulator/pwm-regulator.c
+index 12b4d9d..8159518 100644
+--- a/drivers/regulator/pwm-regulator.c
++++ b/drivers/regulator/pwm-regulator.c
+@@ -59,12 +59,6 @@ static int pwm_regulator_set_voltage_sel(struct regulator_dev *rdev,
  
-+		if (chip->ops->init_state)
-+			chip->ops->init_state(chip, pwm);
+ 	drvdata->state = selector;
+ 
+-	ret = pwm_enable(drvdata->pwm);
+-	if (ret) {
+-		dev_err(&rdev->dev, "Failed to enable PWM\n");
+-		return ret;
+-	}
+-
+ 	return 0;
+ }
+ 
+@@ -79,11 +73,37 @@ static int pwm_regulator_list_voltage(struct regulator_dev *rdev,
+ 	return drvdata->duty_cycle_table[selector].uV;
+ }
+ 
++static int pwm_regulator_enable(struct regulator_dev *dev)
++{
++	struct pwm_regulator_data *drvdata = rdev_get_drvdata(dev);
 +
- 		radix_tree_insert(&pwm_tree, pwm->pwm, pwm);
- 	}
++	return pwm_enable(drvdata->pwm);
++}
++
++static int pwm_regulator_disable(struct regulator_dev *dev)
++{
++	struct pwm_regulator_data *drvdata = rdev_get_drvdata(dev);
++
++	pwm_disable(drvdata->pwm);
++
++	return 0;
++}
++
++static int pwm_regulator_is_enabled(struct regulator_dev *dev)
++{
++       struct pwm_regulator_data *drvdata = rdev_get_drvdata(dev);
++
++       return pwm_is_enabled(drvdata->pwm);
++}
++
+ static struct regulator_ops pwm_regulator_voltage_ops = {
+ 	.set_voltage_sel = pwm_regulator_set_voltage_sel,
+ 	.get_voltage_sel = pwm_regulator_get_voltage_sel,
+ 	.list_voltage    = pwm_regulator_list_voltage,
+ 	.map_voltage     = regulator_map_voltage_iterate,
++	.enable          = pwm_regulator_enable,
++	.disable         = pwm_regulator_disable,
++	.is_enabled      = pwm_regulator_is_enabled,
+ };
  
-diff --git a/include/linux/pwm.h b/include/linux/pwm.h
-index 0f36a06..b47244a 100644
---- a/include/linux/pwm.h
-+++ b/include/linux/pwm.h
-@@ -177,6 +177,8 @@ struct pwm_ops {
- 					  struct pwm_device *pwm);
- 	void			(*disable)(struct pwm_chip *chip,
- 					   struct pwm_device *pwm);
-+	void			(*init_state)(struct pwm_chip *chip,
-+					      struct pwm_device *pwm);
- #ifdef CONFIG_DEBUG_FS
- 	void			(*dbg_show)(struct pwm_chip *chip,
- 					    struct seq_file *s);
+ static struct regulator_desc pwm_regulator_desc = {
 -- 
 1.9.1
