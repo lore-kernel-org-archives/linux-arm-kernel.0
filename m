@@ -1,129 +1,56 @@
-From: gabriele.paoloni@huawei.com (Gabriele Paoloni)
-Date: Wed, 1 Jul 2015 16:47:51 +0000
-Subject: [PATCH v3 2/5] PCI: designware: Add ARM64 support
-In-Reply-To: <5593F899.6050306@arm.com>
-References: <1435743817-19083-1-git-send-email-wangzhou1@hisilicon.com>
- <1435743817-19083-3-git-send-email-wangzhou1@hisilicon.com>
- <EE11001F9E5DDD47B7634E2F8A612F2E01D4E4BB@lhreml503-mbs>
- <5593F899.6050306@arm.com>
-Message-ID: <EE11001F9E5DDD47B7634E2F8A612F2E01D4E6A2@lhreml503-mbs>
+From: ahs3@redhat.com (Al Stone)
+Date: Wed, 01 Jul 2015 11:02:25 -0600
+Subject: [PATCH] ARM64 / SMP: Switch pr_err() to pr_debug() for disabled
+ GICC entry
+In-Reply-To: <1435757843-13236-1-git-send-email-hanjun.guo@linaro.org>
+References: <1435757843-13236-1-git-send-email-hanjun.guo@linaro.org>
+Message-ID: <55941D21.5030604@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> -----Original Message-----
-> From: linux-pci-owner at vger.kernel.org [mailto:linux-pci-
-> owner at vger.kernel.org] On Behalf Of James Morse
-> Sent: Wednesday, July 01, 2015 3:27 PM
-> To: Gabriele Paoloni; Wangzhou (B); Bjorn Helgaas; Jingoo Han; Pratyush
-> Anand; Arnd Bergmann; Liviu Dudau; kishon at ti.com; xobs at kosagi.com; m-
-> karicheri2 at ti.com; Minghuan.Lian at freescale.com
-> Cc: linux-pci at vger.kernel.org; linux-arm-kernel at lists.infradead.org;
-> devicetree at vger.kernel.org; Yuanzhichang; Zhudacai; zhangjukuo;
-> qiuzhenfa; Liguozhu (Kenneth)
-> Subject: Re: [PATCH v3 2/5] PCI: designware: Add ARM64 support
+On 07/01/2015 07:37 AM, Hanjun Guo wrote:
+> It is normal that firmware presents GICC entry or entries (processors)
+> with disabled flag in ACPI MADT, taking a system of 16 cpus for example,
+> ACPI firmware may present 8 enabled first with another 8 cpus disabled
+> in MADT, the disabled cpus can be hot-added later.
 > 
-> Zhou Wang wrote:
-> > I tested this patch on D02 board of Hisilicon. It works well.
-> > I have compiled the driver with multi_v7_defconfig. However, I don't
-> > have
-> > ARM32 PCIe related board to do test. It will be appreciated if
-> someone
-> > could
-> > help to test it.
-> >
-> > Signed-off-by: Zhou Wang <wangzhou1@hisilicon.com>
-> > Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> > Signed-off-by: Gabriele Paoloni <gabriele.paoloni@huawei.com>
-> > Tested-by: Fabrice Gasnier <fabrice.gasnier@st.com>
-> > Tested-by: James Morse <james.morse@arm.com>
+> Firmware may also present more cpus than the hardware actually has, but
+> disabled the unused ones, and easily enable it when the hardware has such
+> cpus to make the firmware code scalable.
 > 
-> Tests on this new series, using the same i.MX 6Quad board, are not
-> working.
+> So that's not an error for disabled cpus in MADT, we can switch
+> pr_err() to pr_debug() instead.
 > 
-> The network card is no longer detected, and I get a lockup when
-> removing
-> the root bridge and rescanning.
+> Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
+> ---
+>  arch/arm64/kernel/smp.c | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
 > 
-> Partial dmesg output below. Significantly, the lines:
-> > [    0.152128] PCI host bridge /soc/pcie at 0x01000000 ranges:
-> > [    0.152142]   No bus range found for /soc/pcie at 0x01000000, using
-> [bus
-> 00-ff]
-> are new.
+> diff --git a/arch/arm64/kernel/smp.c b/arch/arm64/kernel/smp.c
+> index 4b2121b..5caf04a 100644
+> --- a/arch/arm64/kernel/smp.c
+> +++ b/arch/arm64/kernel/smp.c
+> @@ -402,7 +402,7 @@ acpi_map_gic_cpu_interface(struct acpi_madt_generic_interrupt *processor)
+>  	}
+>  
+>  	if (!(processor->flags & ACPI_MADT_ENABLED)) {
+> -		pr_err("skipping disabled CPU entry with 0x%llx MPIDR\n", hwid);
+> +		pr_debug("skipping disabled CPU entry with 0x%llx MPIDR\n", hwid);
+>  		return;
+>  	}
+>  
 > 
-> Both series are applied to v4.1, use the same .config file, and the
-> same dtb.
-> I will investigate further.
-> 
-> (Re-testing v2 works, so this isn't an interim hardware failure)
 
-This is a bit weird....
+Yeah, good point.  I'm all for making the boot a little quieter by default.
 
-Patch 2/5 is the only one that affect platforms different from Hisilicon
+Reviewed-by: Al Stone <ahs3@redhat.com>
 
-The only difference between V3 patch[2/5] and v2 patch[2/4] is
-
-*************
-diff --git a/drivers/pci/host/pci-keystone-dw.c b/drivers/pci/host/pci-keystone-dw.c
-index f34892e..b1e4135 100644
---- a/drivers/pci/host/pci-keystone-dw.c
-+++ b/drivers/pci/host/pci-keystone-dw.c
-@@ -327,7 +327,7 @@ static void ks_dw_pcie_clear_dbi_mode(void __iomem *reg_virt)
- void ks_dw_pcie_setup_rc_app_regs(struct keystone_pcie *ks_pcie)
- {
- 	struct pcie_port *pp = &ks_pcie->pp;
--	u32 start = pp->mem.start, end = pp->mem.end;
-+	u32 start = pp->mem->start, end = pp->mem->end;
- 	int i, tr_size;
- 
- 	/* Disable BARs for inbound access */
-**************
-That is present in v3 but not in v2. And it should affect keystone only....so using patch v3 on the same branch where you applied patch v2 I would expect the same results...
-
-> 
-> Thanks,
-> 
-> James
-> 
-> 
-> 
-> root at localhost:~# dmesg | grep -i pci
-> [    0.126184] PCI: CLS 0 bytes, default 64
-> [    0.152128] PCI host bridge /soc/pcie at 0x01000000 ranges:
-> [    0.152142]   No bus range found for /soc/pcie at 0x01000000, using
-> [bus 00-ff]
-> [    0.154183] imx6q-pcie 1ffc000.pcie: PCI host bridge to bus 0000:00
-> [    0.154201] pci_bus 0000:00: root bus resource [bus 00-ff]
-> [    0.154215] pci_bus 0000:00: root bus resource [???
-> 0x01f00000-0x01f7ffff flags 0x0]
-> [    0.154228] pci_bus 0000:00: root bus resource [io  0x0000-0xffff]
-> [    0.154270] pci_bus 0000:00: root bus resource [mem 0x01000000-
-> 0x01efffff]
-> [    0.154306] pci 0000:00:00.0: [16c3:abcd] type 01 class 0x060400
-> [    0.154333] pci 0000:00:00.0: reg 0x10: [mem 0x00000000-0x000fffff]
-> [    0.154352] pci 0000:00:00.0: reg 0x38: [mem 0x00000000-0x0000ffff
-> pref]
-> [    0.154377] pci 0000:00:00.0: IOMMU is currently not supported for
-> PCI
-> [    0.154429] pci 0000:00:00.0: supports D1
-> [    0.154440] pci 0000:00:00.0: PME# supported from D0 D1 D3hot D3cold
-> [    0.154683] PCI: bus0: Fast back to back transfers disabled
-> [    0.154806] PCI: bus1: Fast back to back transfers enabled
-> [    0.154884] pci 0000:00:00.0: BAR 0: assigned [mem 0x01000000-
-> 0x010fffff]
-> [    0.154903] pci 0000:00:00.0: BAR 6: assigned [mem 0x01100000-
-> 0x0110ffff
-> pref]
-> [    0.154917] pci 0000:00:00.0: PCI bridge to [bus 01]
-> [    0.155145] pcieport 0000:00:00.0: Signaling PME through PCIe PME
-> interrupt
-> [    0.155161] pcie_pme 0000:00:00.0:pcie01: service driver pcie_pme
-> loaded
-> [    0.155279] aer 0000:00:00.0:pcie02: service driver aer loaded
-> [    1.188840] ehci-pci: EHCI PCI platform driver
-> [    1.232518] ohci-pci: OHCI PCI platform driver
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-pci" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+-- 
+ciao,
+al
+-----------------------------------
+Al Stone
+Software Engineer
+Red Hat, Inc.
+ahs3 at redhat.com
+-----------------------------------
