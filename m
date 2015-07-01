@@ -1,39 +1,88 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Wed, 1 Jul 2015 17:54:36 +0200
-Subject: [PATCH v2 3/4] ARM: mvebu: Allow using the GIC for wakeup in
- standby mode
-In-Reply-To: <1435684740-24912-4-git-send-email-gregory.clement@free-electrons.com>
-References: <1435684740-24912-1-git-send-email-gregory.clement@free-electrons.com>
- <1435684740-24912-4-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <20150701175436.7dff0754@free-electrons.com>
+From: geert+renesas@glider.be (Geert Uytterhoeven)
+Date: Wed,  1 Jul 2015 17:58:05 +0200
+Subject: [PATCH v3 11/16] ARM: shmobile: r8a7793 dtsi: Add CPG/MSTP Clock
+ Domain
+In-Reply-To: <1435766290-3005-1-git-send-email-geert+renesas@glider.be>
+References: <1435766290-3005-1-git-send-email-geert+renesas@glider.be>
+Message-ID: <1435766290-3005-12-git-send-email-geert+renesas@glider.be>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Gregory CLEMENT,
+Add an appropriate "#power-domain-cells" property to the cpg_clocks
+device node, to create the CPG/MSTP Clock Domain.
 
-On Tue, 30 Jun 2015 19:18:59 +0200, Gregory CLEMENT wrote:
+Add "power-domains" properties to all device nodes for devices that are
+part of the CPG/MSTP Clock Domain and can be power-managed through an
+MSTP clock.  This applies to most on-SoC devices, which have a
+one-to-one mapping from SoC device to DT device node.
 
->  static void __init mvebu_init_irq(void)
->  {
-> +	if (of_machine_is_compatible("marvell,armada375") ||
-> +	    of_machine_is_compatible("marvell,armada380") ||
-> +	    of_machine_is_compatible("marvell,armada390"))
+Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+---
+v3:
+  - New.
+---
+ arch/arm/boot/dts/r8a7793.dtsi | 7 +++++++
+ 1 file changed, 7 insertions(+)
 
-What we really want to know is if we're using the GIC, so what about
-instead:
-
-	np = of_find_compatible_node(NULL, NULL, "arm,cortex-a9-gic");
-	if (np)
-		gic_set_irqchip_flags(IRQCHIP_SKIP_SET_WAKE |
-				      IRQCHIP_MASK_ON_SUSPEND);
-	of_node_put(np);
-
-(Not even compile-tested).
-
-Thanks,
-
-Thomas
+diff --git a/arch/arm/boot/dts/r8a7793.dtsi b/arch/arm/boot/dts/r8a7793.dtsi
+index 3355c487d108360f..c4654047e684ff09 100644
+--- a/arch/arm/boot/dts/r8a7793.dtsi
++++ b/arch/arm/boot/dts/r8a7793.dtsi
+@@ -68,6 +68,7 @@
+ 			     <0 143 IRQ_TYPE_LEVEL_HIGH>;
+ 		clocks = <&mstp1_clks R8A7793_CLK_CMT0>;
+ 		clock-names = "fck";
++		power-domains = <&cpg_clocks>;
+ 
+ 		renesas,channels-mask = <0x60>;
+ 
+@@ -87,6 +88,7 @@
+ 			     <0 127 IRQ_TYPE_LEVEL_HIGH>;
+ 		clocks = <&mstp3_clks R8A7793_CLK_CMT1>;
+ 		clock-names = "fck";
++		power-domains = <&cpg_clocks>;
+ 
+ 		renesas,channels-mask = <0xff>;
+ 
+@@ -109,6 +111,7 @@
+ 			     <0 16 IRQ_TYPE_LEVEL_HIGH>,
+ 			     <0 17 IRQ_TYPE_LEVEL_HIGH>;
+ 		clocks = <&mstp4_clks R8A7793_CLK_IRQC>;
++		power-domains = <&cpg_clocks>;
+ 	};
+ 
+ 	scif0: serial at e6e60000 {
+@@ -117,6 +120,7 @@
+ 		interrupts = <0 152 IRQ_TYPE_LEVEL_HIGH>;
+ 		clocks = <&mstp7_clks R8A7793_CLK_SCIF0>;
+ 		clock-names = "sci_ick";
++		power-domains = <&cpg_clocks>;
+ 		status = "disabled";
+ 	};
+ 
+@@ -126,6 +130,7 @@
+ 		interrupts = <0 153 IRQ_TYPE_LEVEL_HIGH>;
+ 		clocks = <&mstp7_clks R8A7793_CLK_SCIF1>;
+ 		clock-names = "sci_ick";
++		power-domains = <&cpg_clocks>;
+ 		status = "disabled";
+ 	};
+ 
+@@ -134,6 +139,7 @@
+ 		reg = <0 0xee700000 0 0x400>;
+ 		interrupts = <0 162 IRQ_TYPE_LEVEL_HIGH>;
+ 		clocks = <&mstp8_clks R8A7793_CLK_ETHER>;
++		power-domains = <&cpg_clocks>;
+ 		phy-mode = "rmii";
+ 		#address-cells = <1>;
+ 		#size-cells = <0>;
+@@ -164,6 +170,7 @@
+ 			clock-output-names = "main", "pll0", "pll1", "pll3",
+ 					     "lb", "qspi", "sdh", "sd0", "z",
+ 					     "rcan", "adsp";
++			#power-domain-cells = <0>;
+ 		};
+ 
+ 		/* Variable factor clocks */
 -- 
-Thomas Petazzoni, CTO, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+1.9.1
