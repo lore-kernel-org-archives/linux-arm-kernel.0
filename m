@@ -1,185 +1,76 @@
-From: pi-cheng.chen@linaro.org (Pi-Cheng Chen)
-Date: Wed, 1 Jul 2015 10:01:12 +0800
-Subject: [PATCH 1/2] dt-bindings: mediatek: Add MT8173 cpufreq driver
- binding
-In-Reply-To: <20150629215340.9112.43917@quantum>
-References: <1433766561-1330-1-git-send-email-pi-cheng.chen@linaro.org>
- <1433766561-1330-2-git-send-email-pi-cheng.chen@linaro.org>
- <CALx668UShfd3HW1ptzHnMr9xAUVyLGt=q2CmYHn3vqASZug6kw@mail.gmail.com>
- <20150624010621.GB6424@linux> <20150629215340.9112.43917@quantum>
-Message-ID: <CALx668Up_xPy3W9uF5XCh9dW9iMp-6wRg27bOoG=HMvAKV3usA@mail.gmail.com>
+From: guohanjun@huawei.com (Hanjun Guo)
+Date: Wed, 1 Jul 2015 10:06:53 +0800
+Subject: [PATCH v2 0/3] Correct for ACPI 5.1->6.0 spec changes in MADT
+ GICC entries
+In-Reply-To: <CAJZ5v0hea5xJL3p1L=-Z1azP2wfx8Mu113JC8SgPwP06c58mQg@mail.gmail.com>
+References: <1434666968-1543-1-git-send-email-al.stone@linaro.org>	<5592CCE6.6040604@arm.com>	<5592D1FF.7040208@redhat.com>	<CAJZ5v0gF6JZ8uVNMnro0bdD0g+QMoTeEzB99j6RcKUt3LjmiXw@mail.gmail.com>
+ <CAJZ5v0hea5xJL3p1L=-Z1azP2wfx8Mu113JC8SgPwP06c58mQg@mail.gmail.com>
+Message-ID: <55934B3D.6060106@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mike,
-
-On Tue, Jun 30, 2015 at 5:53 AM, Michael Turquette
-<mturquette@baylibre.com> wrote:
-> Quoting Viresh Kumar (2015-06-23 18:06:21)
->> Adding Mike's new email address..
+On 2015/7/1 2:35, Rafael J. Wysocki wrote:
+> On Tue, Jun 30, 2015 at 8:25 PM, Rafael J. Wysocki <rafael@kernel.org> wrote:
+>> Hi Al,
 >>
->> On 23-06-15, 23:31, Pi-Cheng Chen wrote:
->> > On Mon, Jun 8, 2015 at 8:29 PM, Pi-Cheng Chen <pi-cheng.chen@linaro.org> wrote:
->> > > This patch adds device tree binding document for MT8173 cpufreq driver.
->> > >
->> > > Signed-off-by: Pi-Cheng Chen <pi-cheng.chen@linaro.org>
->> > > ---
->> > >  .../devicetree/bindings/cpufreq/cpufreq-mt8173.txt | 127 +++++++++++++++++++++
->> > >  1 file changed, 127 insertions(+)
->> > >  create mode 100644 Documentation/devicetree/bindings/cpufreq/cpufreq-mt8173.txt
->> > >
->> > > diff --git a/Documentation/devicetree/bindings/cpufreq/cpufreq-mt8173.txt b/Documentation/devicetree/bindings/cpufreq/cpufreq-mt8173.txt
->> > > new file mode 100644
->> > > index 0000000..7708a65
->> > > --- /dev/null
->> > > +++ b/Documentation/devicetree/bindings/cpufreq/cpufreq-mt8173.txt
->> > > @@ -0,0 +1,127 @@
->> > > +
->> > > +Mediatek MT8173 cpufreq driver
->> > > +-------------------
+>> On Tue, Jun 30, 2015 at 7:29 PM, Al Stone <ahs3@redhat.com> wrote:
+>>> On 06/30/2015 11:07 AM, Sudeep Holla wrote:
+>>>> Hi Al,
+>>>>
+>>>> On 18/06/15 23:36, Al Stone wrote:
+>>>>> In the ACPI 5.1 version of the spec, the struct for the GICC subtable
+>>>>> (struct acpi_madt_generic_interrupt) of the MADT is 76 bytes long; in
+>>>>> ACPI 6.0, the struct is 80 bytes long.  But, there is only one definition
+>>>>> in ACPICA for this struct -- and that is the 6.0 version.  Hence, when
+>>>>> BAD_MADT_ENTRY() compares the struct size to the length in the GICC
+>>>>> subtable, it fails if 5.1 structs are in use, and there are systems in
+>>>>> the wild that have them.
+>>>>>
+>>>>> Note that this was found in linux-next and these patches apply against
+>>>>> that tree and the arm64 kernel tree; 4.1-rc8 does not appear to have this
+>>>>> problem since it still has the 5.1 struct definition.
+>>>>>
+>>>>> Even though there is precendent in ia64 code for ignoring the changes in
+>>>>> size, this patch set instead tries to verify correctness.  The first patch
+>>>>> in the set adds macros for easily using the ACPI spec version.  The second
+>>>>> patch adds the BAD_MADT_GICC_ENTRY() macro that uses the version macros to
+>>>>> check the GICC subtable only, accounting for the difference in specification
+>>>>> versions that are possible.  The final patch replaces BAD_MADT_ENTRY usage
+>>>>> with the BAD_MADT_GICC_ENTRY macro in arm64 code, which is currently the
+>>>>> only architecture affected.  The BAD_MADT_ENTRY() will continue to work as
+>>>>> is for all other MADT subtables.
+>>>>>
+>>>> We need to get this series or a patch to remove the check(similar to
+>>>> ia64) based on what Rafael prefers. Without that, platforms using ACPI
+>>>> on ARM64 fails to boot with latest mainline. This blocks any testing on
+>>>> ARM64/ACPI systems.
+>>>>
+>>>> Regards,
+>>>> Sudeep
+>>> I have not received any other feedback than some Reviewed-bys from
+>>> Hanjun and an ACK from Will for the arm64 patch.
+>>>
+>>> And absolutely agreed: this is a blocker for arm64/ACPI, starting with
+>>> the ACPICA 20150515 patches which appear to have gone in with 4.2-rc1.
+>>>
+>>> Rafael?  Ping?
+>> I overlooked the fact that this was needed to fix a recent regression,
+>> sorry about that.
 >>
->> Few more ---- required.
+>> Actually, if your patch fixes an error introduced by a specific
+>> commit, it is good to use the Fixes: tag to indicate that.  Which I
+>> still would like to do, so which commit is fixed by this?
 >>
->> > > +
->> > > +Mediatek MT8173 cpufreq driver for CPU frequency scaling.
->> > > +
->> > > +Required properties:
->> > > +- clocks: A list of phandle + clock-specifier pairs for the clocks listed in clock names.
->> > > +- clock-names: Should contain the following:
->> > > +       "cpu"           - The multiplexer for clock input of CPU cluster.
->> > > +       "intermediate"  - A parent of "cpu" clock which is used as "intermediate" clock
->> > > +                         source (usually MAINPLL) when the original CPU PLL is under
->> > > +                         transition and not stable yet.
->>
->> These belong to Mike.
+>>> Do we need these to go through your tree or the arm64
+>>> tree?  Without this series (or an ia64-like solution), we have ACPI
+>>> systems in the field that cannot boot.
+>> I'm not quite sure why the definition of BAD_MADT_GICC_ENTRY has to go
+>> into include/linux/acpi.h.  Why is it necessary in there?
+> Like what about defining it in linux/irqchip/arm-gic-acpi.h for example?
 >
-> Everything looks good. This is a typical clock consumer based on the
-> generic clock-binding. You might want to reference that this cpufreq
-> binding uses the "Clock consumers" portion of the clock binding and
-> reference its location:
->
-> Documentation/devicetree/bindings/clock/clock-bindings.txt
 
-I will add it.
+This BAD_MADT_GICC_ENTRY is both used by SMP init and GIC irqchip init for
+ARM64, would it be good to put BAD_MADT_GICC_ENTRY in arch/arm64/include/asm/acpi.h?
 
->
-> Please add,
->
-> Reviewed-by: Michael Turquette <mturquette@baylibre.com>
-
-Thanks for reviewing.
-
-Pi-Cheng
-
->
-> Thanks,
-> Mike
->
->>
->> > > +- operating-points: Table of frequencies and voltage CPU could be transitioned into,
->> > > +                   Frequency should be in KHz units and voltage should be in microvolts.
->>
->> That's not complete. You should just mention the path to opp bindings
->> here. And that's it.
->>
->> > > +- proc-supply: Regulator for Vproc of CPU cluster.
->> > > +
->> > > +Optional properties:
->> > > +- sram-supply: Regulator for Vsram of CPU cluster. When present, the cpufreq driver
->> > > +              needs to do "voltage trace" to step by step scale up/down Vproc and
->> > > +              Vsram to fit SoC specific needs. When absent, the voltage scaling
->> > > +              flow is handled by hardware, hence no software "voltage trace" is
->> > > +              needed.
->> > > +
->> > > +Example:
->> > > +--------
->> > > +       cpu0: cpu at 0 {
->> > > +               device_type = "cpu";
->> > > +               compatible = "arm,cortex-a53";
->> > > +               reg = <0x000>;
->> > > +               enable-method = "psci";
->> > > +               cpu-idle-states = <&CPU_SLEEP_0>;
->> > > +               clocks = <&infracfg CLK_INFRA_CA53SEL>,
->> > > +                        <&apmixedsys CLK_APMIXED_MAINPLL>;
->> > > +               clock-names = "cpu", "intermediate";
->> > > +               operating-points = <
->> > > +                       507000  859000
->> > > +                       702000  908000
->> > > +                       1001000 983000
->> > > +                       1105000 1009000
->> > > +                       1183000 1028000
->> > > +                       1404000 1083000
->> > > +                       1508000 1109000
->> > > +                       1573000 1125000
->> > > +               >;
->> > > +       };
->> > > +
->> > > +       cpu1: cpu at 1 {
->> > > +               device_type = "cpu";
->> > > +               compatible = "arm,cortex-a53";
->> > > +               reg = <0x001>;
->> > > +               enable-method = "psci";
->> > > +               cpu-idle-states = <&CPU_SLEEP_0>;
->> > > +               clocks = <&infracfg CLK_INFRA_CA53SEL>,
->> > > +                        <&apmixedsys CLK_APMIXED_MAINPLL>;
->> > > +               clock-names = "cpu", "intermediate";
->> > > +               operating-points = <
->> > > +                       507000  859000
->> > > +                       702000  908000
->> > > +                       1001000 983000
->> > > +                       1105000 1009000
->> > > +                       1183000 1028000
->> > > +                       1404000 1083000
->> > > +                       1508000 1109000
->> > > +                       1573000 1125000
->> > > +               >;
->> > > +       };
->> > > +
->> > > +       cpu2: cpu at 100 {
->> > > +               device_type = "cpu";
->> > > +               compatible = "arm,cortex-a57";
->> > > +               reg = <0x100>;
->> > > +               enable-method = "psci";
->> > > +               cpu-idle-states = <&CPU_SLEEP_0>;
->> > > +               clocks = <&infracfg CLK_INFRA_CA57SEL>,
->> > > +                        <&apmixedsys CLK_APMIXED_MAINPLL>;
->> > > +               clock-names = "cpu", "intermediate";
->> > > +               operating-points = <
->> > > +                       507000  828000
->> > > +                       702000  867000
->> > > +                       1001000 927000
->> > > +                       1209000 968000
->> > > +                       1404000 1007000
->> > > +                       1612000 1049000
->> > > +                       1807000 1089000
->> > > +                       1989000 1125000
->> > > +               >;
->> > > +       };
->> > > +
->> > > +       cpu3: cpu at 101 {
->> > > +               device_type = "cpu";
->> > > +               compatible = "arm,cortex-a57";
->> > > +               reg = <0x101>;
->> > > +               enable-method = "psci";
->> > > +               cpu-idle-states = <&CPU_SLEEP_0>;
->> > > +               clocks = <&infracfg CLK_INFRA_CA57SEL>,
->> > > +                        <&apmixedsys CLK_APMIXED_MAINPLL>;
->> > > +               clock-names = "cpu", "intermediate";
->> > > +               operating-points = <
->> > > +                       507000  828000
->> > > +                       702000  867000
->> > > +                       1001000 927000
->> > > +                       1209000 968000
->> > > +                       1404000 1007000
->> > > +                       1612000 1049000
->> > > +                       1807000 1089000
->> > > +                       1989000 1125000
->> > > +               >;
->> > > +       };
->>
->> I remember Mark Rutland asking you about the replicated stuff for all
->> CPUs, but happened to his comments later on ? Were you asked to put
->> these for all the CPUs ?
->>
->> --
->> viresh
+Thanks
+Hanjun
