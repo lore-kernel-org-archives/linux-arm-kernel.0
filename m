@@ -1,46 +1,37 @@
-From: khilman@kernel.org (Kevin Hilman)
-Date: Wed, 01 Jul 2015 13:44:14 -0700
-Subject: [GIT PULL] ARM: mvebu: fixes for v4.2
-In-Reply-To: <5592A03B.5020900@free-electrons.com> (Gregory CLEMENT's message
- of "Tue, 30 Jun 2015 15:57:15 +0200")
-References: <5592A03B.5020900@free-electrons.com>
-Message-ID: <7hr3orliap.fsf@deeprootsystems.com>
+From: ariel@vanguardiasur.com.ar (Ariel D'Alessandro)
+Date: Wed,  1 Jul 2015 17:52:08 -0300
+Subject: [PATCH v2 0/2] Add support for NXP LPC18xx Watchdog timer
+Message-ID: <1435783930-20184-1-git-send-email-ariel@vanguardiasur.com.ar>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Gregory CLEMENT <gregory.clement@free-electrons.com> writes:
+This patch series adds support for the watchdog timer found in NXP LPC
+SoCs family which includes LPC18xx/LPC43xx. Other SoCs in that family may
+share the same watchdog hardware.
 
-> Hi,
->
-> Here is a small pull request for fixes for mvebu for v4.2.
-> It would be nice to have them in v4.2-rc1. It combines two signed
-> tags: the new one mvebu-fixes-4.2-0 and the previous one which has not
-> been pulled for 4.1: mvebu-fixes-4.1-4
->
-> Gregory
->
-> The following changes since commit 885dbd154b2f2ee305cec6fd0a162e1a77ae2b06:
->
->   Revert "bus: mvebu-mbus: make sure SDRAM CS for DMA don't overlap the MBus bridge window" (2015-05-28 11:14:31 +0200)
->
-> are available in the git repository at:
->
->   git://git.infradead.org/linux-mvebu.git tags/mvebu-fixes-4.2-0
->
-> for you to fetch changes up to 5d6bed2a9c8bc161bff4cc7cede00f2e0e27a7e7:
->
->   ARM: dove: fix legacy dove IRQ numbers (2015-06-24 11:05:57 +0200)
->
-> ----------------------------------------------------------------
-> mvebu fixes for 4.2 (part 0)
->
-> Fix legacy dove IRQ numbers
->
-> ----------------------------------------------------------------
+Patchset is based on tag next-20150624 of the linux-next repository.
+It has been successfully tested on a Hitex LPC4350 Evaluation Board and
+on a CIAA NXP LPC4337 Board.
 
-Pulled into next/late, which might make it for -rc1, but if not, will
-make it into -rc2.
+Changes since v1:
+* Dropped "Windowed" term in Watchdog's name.
+* Changed default timeout value from 1 to 5 because it was too tight.
+* Fixed module remove function, since it was keeping the timer enabled. Warning
+  message was added.
+* Changed dt compatible string to "nxp,lpc1850-wdt".
+* Renamed clocks matching most of the other lpc18xx drivers.
 
-Thanks,
+Ariel D'Alessandro (2):
+  watchdog: NXP LPC18xx Watchdog Timer Driver
+  DT: watchdog: Add NXP LPC18xx Watchdog Timer binding documentation
 
-Kevin
+ .../devicetree/bindings/watchdog/lpc18xx-wdt.txt   |  19 ++
+ drivers/watchdog/Kconfig                           |  11 +
+ drivers/watchdog/Makefile                          |   1 +
+ drivers/watchdog/lpc18xx_wdt.c                     | 342 +++++++++++++++++++++
+ 4 files changed, 373 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/watchdog/lpc18xx-wdt.txt
+ create mode 100644 drivers/watchdog/lpc18xx_wdt.c
+
+-- 
+1.9.1
