@@ -1,49 +1,98 @@
-From: geert+renesas@glider.be (Geert Uytterhoeven)
-Date: Wed,  1 Jul 2015 14:27:19 +0200
-Subject: [PATCH] gpio: msm: Remove empty msm_gpio_{request,free}()
-Message-ID: <1435753639-13627-1-git-send-email-geert+renesas@glider.be>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Wed, 1 Jul 2015 13:31:46 +0100
+Subject: [PATCH v2 7/9] ARM: multi_v7_defconfig: Enable support for PWM
+ Regulators
+In-Reply-To: <CABxcv==dWX_J_+zhqjn61QXGtxCKmK62_HEj4R7wsMAWcC=H=Q@mail.gmail.com>
+References: <1435154348-28840-1-git-send-email-lee.jones@linaro.org>
+ <1435154348-28840-8-git-send-email-lee.jones@linaro.org>
+ <CABxcv==J2hi0y+=s3nK_U=-jkjTW3L9jCC2JfebnWwRfpDGLAQ@mail.gmail.com>
+ <20150625084204.GW15013@x1>
+ <CABxcv==_YZ7BCCzfbLXYxwUL_kKLtBxOVTCvcUnvGVnrD4bVpg@mail.gmail.com>
+ <20150625150255.GE23990@x1>
+ <CABxcv==dWX_J_+zhqjn61QXGtxCKmK62_HEj4R7wsMAWcC=H=Q@mail.gmail.com>
+Message-ID: <20150701123146.GK3210@x1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-gpio_chip.request() and gpio_chip.free() are optional, and can just be
-left unimplemented.
+On Thu, 25 Jun 2015, Javier Martinez Canillas wrote:
+> On Thu, Jun 25, 2015 at 5:02 PM, Lee Jones <lee.jones@linaro.org> wrote:
+> > On Thu, 25 Jun 2015, Javier Martinez Canillas wrote:
+> >> On Thu, Jun 25, 2015 at 10:42 AM, Lee Jones <lee.jones@linaro.org> wrote:
+> >> > On Wed, 24 Jun 2015, Javier Martinez Canillas wrote:
+> >>
+> >> [...]
+> >>
+> >> >> > diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
+> >> >> > index f632af0..6666973 100644
+> >> >> > --- a/arch/arm/configs/multi_v7_defconfig
+> >> >> > +++ b/arch/arm/configs/multi_v7_defconfig
+> >> >> > @@ -365,6 +365,7 @@ CONFIG_REGULATOR_MAX8907=y
+> >> >> >  CONFIG_REGULATOR_MAX8973=y
+> >> >> >  CONFIG_REGULATOR_MAX77686=y
+> >> >> >  CONFIG_REGULATOR_PALMAS=y
+> >> >> > +CONFIG_REGULATOR_PWM=y
+> >> >>
+> >> >> The current policy is to build as much as possible as a module in
+> >> >> multi_v7_defconfig. Since this is a tristate Kconfig symbol, could you
+> >> >> please change it to =m ?
+> >> >
+> >> > I would prefer that it stays built-in.
+> >> >
+> >>
+> >> Ok, I've no strong opinion on this. I was just mentioning what arm-soc
+> >> maintainers prefer nowadays.
+> >>
+> >> May I ask what's the rationale for leaving this option built-in?
+> >
+> > My view is that multi_v7 is used for prototyping, testing and to
+> > ensure all of the vendors are playing nice together.  Hopefully
+> > vendors aren't actually releasing kernels built with this defconfig!
+> 
+> Agreed and same for the per SoC family defconfigs, vendors should ship
+> kernels with a customized defconfig.
 
-Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
----
-Untested due to lack of hardware.
----
- drivers/gpio/gpio-msm-v2.c | 12 ------------
- 1 file changed, 12 deletions(-)
+Right.
 
-diff --git a/drivers/gpio/gpio-msm-v2.c b/drivers/gpio/gpio-msm-v2.c
-index 52ff18229fdc874a..d9ea0c8e5f0aa82d 100644
---- a/drivers/gpio/gpio-msm-v2.c
-+++ b/drivers/gpio/gpio-msm-v2.c
-@@ -169,16 +169,6 @@ static int msm_gpio_direction_output(struct gpio_chip *chip,
- 	return 0;
- }
- 
--static int msm_gpio_request(struct gpio_chip *chip, unsigned offset)
--{
--	return 0;
--}
--
--static void msm_gpio_free(struct gpio_chip *chip, unsigned offset)
--{
--	return;
--}
--
- static int msm_gpio_to_irq(struct gpio_chip *chip, unsigned offset)
- {
- 	struct msm_gpio_dev *g_dev = to_msm_gpio_dev(chip);
-@@ -404,8 +394,6 @@ static int msm_gpio_probe(struct platform_device *pdev)
- 	msm_gpio.gpio_chip.get = msm_gpio_get;
- 	msm_gpio.gpio_chip.set = msm_gpio_set;
- 	msm_gpio.gpio_chip.to_irq = msm_gpio_to_irq;
--	msm_gpio.gpio_chip.request = msm_gpio_request;
--	msm_gpio.gpio_chip.free = msm_gpio_free;
- 
- 	ret = gpiochip_add(&msm_gpio.gpio_chip);
- 	if (ret < 0) {
+> > During testing/prototyping time; installing and messing around with
+> > modules is an over-head I can do without.
+> 
+> Right but my question wasn't whether multi_v7 should have the options
+> as built-in or as modules. That has already been decided by the
+> arm-soc maintainers who want to have as much as possible as modules.
+> In fact, there have been patches posted recently to change the current
+> multi_v7 options from built-in to modules.
+
+Then I need to either stop using multi_v7 or write a pre-build script
+to turn it into something useful I guess.
+
+Thanks for the heads-up.
+
+> Instead my question was what makes this driver special to not follow
+> the current convention.
+
+There is nothing special about this particular driver to warrant that.
+
+> I agree that there is a trade off between having options as built-in
+> or modules and I believe that is why most SoC specific defconfigs have
+> the opposite policy,  that is to enable everything as built-in so one
+> doesn't have to mess with modules as you said.
+
+Precisely.
+
+> But again, I don't have a strong opinion on this. What I think though
+> is that this should be documented somewhere so the options are enabled
+> following a documented rule instead of just whatever fits in someone
+> workflow.
+
+News of this new convention is new to me.  As I said, this driver
+isn't in any way "special".  I was merely enabling it to make it
+useful to everyone, rather than only people who are currently
+supporting module support in their builds.  Which as a low-level guy,
+I currently have no requirement for -- it just adds time, complexity
+and more things to debug.
+
 -- 
-1.9.1
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
