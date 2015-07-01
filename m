@@ -1,54 +1,55 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Wed, 1 Jul 2015 14:18:31 +0100
-Subject: [PATCH] arm64: Don't report clear pmds and puds as huge
-In-Reply-To: <1435752511-7079-1-git-send-email-christoffer.dall@linaro.org>
-References: <1435752511-7079-1-git-send-email-christoffer.dall@linaro.org>
-Message-ID: <20150701131831.GD21981@e104818-lin.cambridge.arm.com>
+From: cw00.choi@samsung.com (Chanwoo Choi)
+Date: Wed, 01 Jul 2015 22:21:14 +0900
+Subject: [PATCH v5 0/3] cpufreq: Use cpufreq-dt driver for Exynos3250
+Message-ID: <1435756877-26736-1-git-send-email-cw00.choi@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 01, 2015 at 02:08:31PM +0200, Christoffer Dall wrote:
-> The current pmd_huge() and pud_huge() functions simply check if the table
-> bit is not set and reports the entries as huge in that case.  This is
-> counter-intuitive as a clear pmd/pud cannot also be a huge pmd/pud, and
-> it is inconsistent with at least arm and x86.
-> 
-> To prevent others from making the same mistake as me in looking at code
-> that calls these functions and to fix an issue with KVM on arm64 that
-> causes memory corruption due to incorrect page reference counting
-> resulting from this mistake, let's change the behavior.
-> 
-> Cc: stable at vger.kernel.org
-> Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
-> ---
->  arch/arm64/mm/hugetlbpage.c | 4 ++--
->  1 file changed, 2 insertions(+), 2 deletions(-)
-> 
-> diff --git a/arch/arm64/mm/hugetlbpage.c b/arch/arm64/mm/hugetlbpage.c
-> index 2de9d2e..0eeb4f09 100644
-> --- a/arch/arm64/mm/hugetlbpage.c
-> +++ b/arch/arm64/mm/hugetlbpage.c
-> @@ -40,13 +40,13 @@ int huge_pmd_unshare(struct mm_struct *mm, unsigned long *addr, pte_t *ptep)
->  
->  int pmd_huge(pmd_t pmd)
->  {
-> -	return !(pmd_val(pmd) & PMD_TABLE_BIT);
-> +	return pmd_val(pmd) && !(pmd_val(pmd) & PMD_TABLE_BIT);
->  }
->  
->  int pud_huge(pud_t pud)
->  {
->  #ifndef __PAGETABLE_PMD_FOLDED
-> -	return !(pud_val(pud) & PUD_TABLE_BIT);
-> +	return pud_val(pud) && !(pud_val(pud) & PUD_TABLE_BIT);
->  #else
->  	return 0;
->  #endif
+This patchset use cpufreq-dt driver to support Exynos3250 cpufreq and tested it
+on Exynos3250-based Rinato board.
 
-Thanks for the patch, I'll add the acks/reviews and Fixes: tags.
+Depends on:
+- next-20150701 tag (master branch) of linux-next kernel tree
+- This patch-set is based on Exynos5250 patch-set[1] because two patch-set
+  modify the 'arch/arm/mach-exynos/exynos.c' to add the compatible string.
+  [1] https://lkml.org/lkml/2015/6/29/361
+  : [PATCH v2 0/4] cpufreq: use generic cpufreq drivers for Exynos5250 platform
 
-(and I think I'll change pmd_val to pmd_present, same for pud; no
-functional difference)
+Changes from v4:
+(https://lkml.org/lkml/2014/10/20/215)
+- Rebased on latest linux-next git repository.
+- Remove unnecessary divider clock flag from divider of DIV_CPU0/DIV_CPU1 register
+
+Changes from v3:
+- This patchset is based on 3.18-rc1 with new patchset[3] of Thomas Abraham
+  [3] [PATCH v11 0/6] cpufreq: use generic cpufreq drivers for exynos platforms
+  - http://www.spinics.net/lists/arm-kernel/msg370412.html
+
+Changes from v2:
+- Rebased on new patchset of Thomas Abraham
+  and for-next branch of samsunc-clk.git of Tomasz Figa
+
+Changes from v1:
+- Rebased on new patchset[1] by Thomas Abraham
+  [1] [PATCH v10 0/6] cpufreq: use generic cpufreq drivers for exynos platforms
+  - http://www.spinics.net/lists/arm-kernel/msg364790.html
+- Modify clk-cpu.c to support Exynos3250
+- Drop documentation patch on previous patchset[2]
+  [2] http://www.spinics.net/lists/cpufreq/msg10265.html
+- Add only operating-points for Exynos3250 without armclk-divider-table
+
+Chanwoo Choi (3):
+  clk: samsung: exynos3250: Add cpu clock configuration data and instaniate cpu clock
+  ARM: dts: Add CPU OPP and regulator supply property for Exynos3250
+  ARM: exynos: Add exynos3250 compatible to use generic cpufreq driver
+
+ arch/arm/boot/dts/exynos3250-monk.dts   |  4 ++++
+ arch/arm/boot/dts/exynos3250-rinato.dts |  4 ++++
+ arch/arm/boot/dts/exynos3250.dtsi       | 15 +++++++++++++++
+ arch/arm/mach-exynos/exynos.c           |  1 +
+ drivers/clk/samsung/clk-exynos3250.c    | 32 ++++++++++++++++++++++++++++++--
+ include/dt-bindings/clock/exynos3250.h  |  1 +
+ 6 files changed, 55 insertions(+), 2 deletions(-)
 
 -- 
-Catalin
+1.8.5.5
