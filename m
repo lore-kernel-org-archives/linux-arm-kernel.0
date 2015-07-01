@@ -1,28 +1,40 @@
 From: khilman@kernel.org (Kevin Hilman)
-Date: Wed, 01 Jul 2015 13:33:20 -0700
-Subject: [PATCH RESEND v0] arm64: dts: Add APM X-Gene standby GPIO
- controller DTS entries
-In-Reply-To: <CACRpkdajRMBBs1SN3vz81hCnr6isTSsuHejiZBJkTAXeG8M4og@mail.gmail.com>
- (Linus Walleij's message of "Tue, 30 Jun 2015 08:34:54 +0200")
-References: <1434448184-10584-1-git-send-email-yvo@apm.com>
- <CACRpkdajRMBBs1SN3vz81hCnr6isTSsuHejiZBJkTAXeG8M4og@mail.gmail.com>
-Message-ID: <7hd20bmxdb.fsf@deeprootsystems.com>
+Date: Wed, 01 Jul 2015 13:35:10 -0700
+Subject: [RESEND PATCH 2/2] ARM: at91/dt: update udc compatible strings
+In-Reply-To: <8ec182ab7c5186a64d605d0e174e750994586f02.1434530650.git.nicolas.ferre@atmel.com>
+ (Nicolas Ferre's message of "Wed, 17 Jun 2015 10:59:05 +0200")
+References: <99dc2e0ec98342632b6e3adad3861f4dd0fcde41.1434530650.git.nicolas.ferre@atmel.com>
+ <8ec182ab7c5186a64d605d0e174e750994586f02.1434530650.git.nicolas.ferre@atmel.com>
+Message-ID: <7h8uazmxa9.fsf@deeprootsystems.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Linus Walleij <linus.walleij@linaro.org> writes:
+Nicolas Ferre <nicolas.ferre@atmel.com> writes:
 
-> On Tue, Jun 16, 2015 at 11:49 AM, Y Vo <yvo@apm.com> wrote:
+> From: Boris Brezillon <boris.brezillon@free-electrons.com>
 >
->> Add standby domain gpio controller for APM X-Gene SoC platform.
->>
->> Signed-off-by: Y Vo <yvo@apm.com>
+> at91sam9g45, at91sam9x5 and sama5 SoCs should not use
+> "atmel,at91sam9rl-udc" for their USB device compatible property since
+> this compatible is attached to a specific hardware bug fix.
 >
-> Acked-by: Linus Walleij <linus.walleij@linaro.org>
+> Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+> Acked-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+> Tested-by: Bo Shen <voice.shen@atmel.com>
+> Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+> Cc: <stable@vger.kernel.org>  #4.0+
+> ---
+> Hi,
 >
-> Please funnel this through the ARM SoC tree.
+> This patch was forgotten while dealing with the series "usb: atmel_usba_udc:
+> Rework errata handling". This patch and the previous one should be added to
+> mainline as fixes, the soonest. In fact, the errata handling is now broken
+> because of this desynchronization.
+>
+> We'll try to queue it during 4.2-rc phase for inclusion in arm-soc tree.
 
-Picking this up with Linus' ack for the arm-soc/late branch, which might
-make it before -rc1, if not will make it for -rc2.
+I've picked both of these up for the arm-soc/late branch which I'll try
+to get in before -rc1, if not it will make it for -rc2.
+
+Thanks,
 
 Kevin
