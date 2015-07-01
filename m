@@ -1,106 +1,71 @@
-From: vaibhav.hiremath@linaro.org (Vaibhav Hiremath)
-Date: Wed, 01 Jul 2015 21:51:17 +0530
-Subject: [PATCH-V5 4/4] mfd: devicetree: bindings: Add new 88pm800 mfd
- binding
-In-Reply-To: <CAL_JsqKCyRZyWR3DzuOuDu7+psDWH_4hOQvMK1PSOJS09btUkw@mail.gmail.com>
-References: <1435591877-18214-1-git-send-email-vaibhav.hiremath@linaro.org>
- <1435591877-18214-5-git-send-email-vaibhav.hiremath@linaro.org>
- <CAL_JsqKCyRZyWR3DzuOuDu7+psDWH_4hOQvMK1PSOJS09btUkw@mail.gmail.com>
-Message-ID: <5594137D.6070106@linaro.org>
+From: dan.j.williams@intel.com (Dan Williams)
+Date: Wed, 1 Jul 2015 09:47:31 -0700
+Subject: [PATCH v5 2/6] arch: unify ioremap prototypes and macro aliases
+In-Reply-To: <20150701080915.GJ7557@n2100.arm.linux.org.uk>
+References: <20150622081028.35954.89885.stgit@dwillia2-desk3.jf.intel.com>
+ <20150622082427.35954.73529.stgit@dwillia2-desk3.jf.intel.com>
+ <20150622161002.GB8240@lst.de>
+ <CAPcyv4h5OXyRvZvLGD5ZknO-YUPn675YGv0XdtW1QOO9qmZsug@mail.gmail.com>
+ <20150701062352.GA3739@lst.de>
+ <CAMuHMdUO4uSWH1Qc0SfDTLuXbiG2N9fq8Tf6j+3RoqVKdPugbA@mail.gmail.com>
+ <20150701080915.GJ7557@n2100.arm.linux.org.uk>
+Message-ID: <CAPcyv4iaf77KMffTseMbYEcK_BJTpGsY=PmeJyDGR9N2yBAKVg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On Wednesday 01 July 2015 09:40 PM, Rob Herring wrote:
-> On Mon, Jun 29, 2015 at 10:31 AM, Vaibhav Hiremath
-> <vaibhav.hiremath@linaro.org> wrote:
->> With addition of DT support to 88pm800 mfd driver, this patch
->> adds new DT binding documentation along with respective properties.
+On Wed, Jul 1, 2015 at 1:09 AM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Wed, Jul 01, 2015 at 08:55:57AM +0200, Geert Uytterhoeven wrote:
+>> On Wed, Jul 1, 2015 at 8:23 AM, Christoph Hellwig <hch@lst.de> wrote:
+>> >> One useful feature of the ifdef mess as implemented in the patch is
+>> >> that you could test for whether ioremap_cache() is actually
+>> >> implemented or falls back to default ioremap().  I think for
+>> >> completeness archs should publish an ioremap type capabilities mask
+>> >> for drivers that care... (I can imagine pmem caring), or default to
+>> >> being permissive if something like IOREMAP_STRICT is not set.  There's
+>> >> also the wrinkle of archs that can only support certain types of
+>> >> mappings at a given alignment.
+>> >
+>> > I think doing this at runtime might be a better idea.  E.g. a
+>> > ioremap_flags with the CACHED argument will return -EOPNOTSUP unless
+>> > actually implemented.  On various architectures different CPUs or
+>> > boards will have different capabilities in this area.
 >>
->> Signed-off-by: Vaibhav Hiremath <vaibhav.hiremath@linaro.org>
+>> So it would be the responsibility of the caller to fall back from
+>> ioremap(..., CACHED) to ioremap(..., UNCACHED)?
+>> I.e. all drivers using it should be changed...
 >
-> Didn't I ack this already? You should add it when you send subsequent
-> versions. The maintainer will add it if there aren't any subsequent
-> versions.
+> Another important point here is to define what the properties of the
+> mappings are.  It's no good just saying "uncached".
 >
-> Acked-by: Rob Herring <robh@kernel.org>
+> We've recently been around this over the PMEM driver and the broken
+> addition of ioremap_wt() on ARM...
 >
+> By "properties" I mean stuff like whether unaligned accesses permitted,
+> any kind of atomic access (eg, xchg, cmpxchg, etc).
+>
+> This matters: on ARM, a mapping suitable for a device does not support
+> unaligned accesses or atomic accesses - only "memory-like" mappings
+> support those.  However, memory-like mappings are not required to
+> preserve access size, number of accesses, etc which makes them unsuitable
+> for device registers.
 
-Sorry Rob. Infact I did ask you as well. Probably you missed it.
+I'm proposing that we explicitly switch "memory-like" use cases over
+to a separate set of "memremap()" apis, as these are no longer
+"__iomem" [1].
 
-Patch got changed after your ack, I did some changes based on few
-review comments, from Lee and others.
+> The problem with ioremap_uncached() in particular is that we have LDD
+> and other documentation telling people to use it to map device registers,
+> so we can't define ioremap_uncached() on ARM to have memory-like
+> properties, and it doesn't support unaligned accesses.
+>
+> I have a series of patches which fix up 32-bit ARM for the broken
+> ioremap_wt() stuff that was merged during this merge window, which I
+> intend to push out into linux-next at some point (possibly during the
+> merge window, if not after -rc1) which also move ioremap*() out of line
+> on ARM but more importantly, adds a load of documentation about the
+> properties of the resulting mapping on ARM.
 
-Anyway, thanks for ack. Can you please queue this?
+Sounds good, I'll look for that before proceeding on this clean up.
 
-Thanks,
-Vaibhav
-
->> ---
->>   Documentation/devicetree/bindings/mfd/88pm800.txt | 53 +++++++++++++++++++++++
->>   1 file changed, 53 insertions(+)
->>   create mode 100644 Documentation/devicetree/bindings/mfd/88pm800.txt
->>
->> diff --git a/Documentation/devicetree/bindings/mfd/88pm800.txt b/Documentation/devicetree/bindings/mfd/88pm800.txt
->> new file mode 100644
->> index 0000000..dec842f
->> --- /dev/null
->> +++ b/Documentation/devicetree/bindings/mfd/88pm800.txt
->> @@ -0,0 +1,53 @@
->> +* Marvell 88PM80x Power Management IC
->> +
->> +Required parent device properties:
->> +- compatible           : "marvell,88pm800", "marvell,88pm805", "marvell,88pm860"
->> +- reg                  : the I2C slave address for the 88pm80x family chip
->> +- interrupts           : IRQ line for the 88pm80x family chip
->> +- interrupt-controller : describes the 88pm80x family chip as an interrupt
->> +                         controller
->> +- #interrupt-cells     : should be 1.
->> +                         The cell is the 88pm80x local IRQ number
->> +
->> +88pm80x family of devices consists of varied group of sub-devices:
->> +
->> +Device                 Supply Names     Description
->> +------                 ------------     -----------
->> +88pm80x-onkey          :               : On key
->> +88pm80x-rtc            :               : RTC
->> +88pm80x-regulator      :               : Regulators
->> +
->> +Example:
->> +
->> +       pmic: 88pm800 at 30 {
->> +               compatible = "marvell,88pm800";
->> +               reg = <0x30>;
->> +               interrupts = <GIC_SPI 77 IRQ_TYPE_LEVEL_HIGH>;
->> +               interrupt-parent = <&gic>;
->> +               interrupt-controller;
->> +               #interrupt-cells = <1>;
->> +
->> +               regulators {
->> +                       compatible = "marvell,88pm80x-regulator";
->> +
->> +                       buck1a: BUCK1A {
->> +                               regulator-name = "BUCK1A";
->> +                               regulator-min-microvolt = <600000>;
->> +                               regulator-max-microvolt = <1800000>;
->> +                               regulator-boot-on;
->> +                               regulator-always-on;
->> +                       };
->> +
->> +                       ldo1: LDO1 {
->> +                               regulator-name = "LDO1";
->> +                               regulator-min-microvolt = <1700000>;
->> +                               regulator-max-microvolt = <3300000>;
->> +                               regulator-boot-on;
->> +                               regulator-always-on;
->> +                       };
->> +               };
->> +
->> +               rtc {
->> +                       compatible = "marvell,88pm80x-rtc";
->> +               };
->> +       };
->> --
->> 1.9.1
->>
+[1]: https://lists.01.org/pipermail/linux-nvdimm/2015-June/001331.html
