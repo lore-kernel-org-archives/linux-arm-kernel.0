@@ -1,33 +1,51 @@
 From: acourbot@nvidia.com (Alexandre Courbot)
-Date: Wed, 1 Jul 2015 18:13:44 +0900
-Subject: [PATCH 0/4] ARM: tegra: enable Nouveau for Jetson TK1 and Venice 2
-Message-ID: <1435742028-8237-1-git-send-email-acourbot@nvidia.com>
+Date: Wed, 1 Jul 2015 18:13:46 +0900
+Subject: [PATCH 2/4] ARM: tegra: venice2: Add GK20A GPU DT node
+In-Reply-To: <1435742028-8237-1-git-send-email-acourbot@nvidia.com>
+References: <1435742028-8237-1-git-send-email-acourbot@nvidia.com>
+Message-ID: <1435742028-8237-3-git-send-email-acourbot@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-With all essential kernel driver and user-space patches merged, GK20A can now
-be enabled safely on Tegra124 devices. This series makes small device tree
-and configuration adjustments to allow this.
+From: Thierry Reding <treding@nvidia.com>
 
-It leaves the GK20A nodes ready to be used, but still disabled. Enabling the
-nodes is the work of the bootloader, after it has configured VPR properly.
+Add the device-tree node for the GK20A GPU and leave it disabled.
+It is the responsability of the bootloader to enable it if the
+VPR registers have been programmed such as the GPU can operate.
 
-U-boot patches that do this are in the work. In the meantime, it is safe to
-merge this kernel support.
+Signed-off-by: Thierry Reding <treding@nvidia.com>
+Signed-off-by: Alexandre Courbot <acourbot@nvidia.com>
+---
+ arch/arm/boot/dts/tegra124-venice2.dts | 10 +++++++++-
+ 1 file changed, 9 insertions(+), 1 deletion(-)
 
-Alexandre Courbot (3):
-  ARM: tegra: Add IOMMU node to GK20A
-  ARM: tegra: jetson-tk1: Add GK20A GPU DT node
-  ARM: tegra: Enable Nouveau in defconfig
-
-Thierry Reding (1):
-  ARM: tegra: venice2: Add GK20A GPU DT node
-
- arch/arm/boot/dts/tegra124-jetson-tk1.dts | 10 +++++++++-
- arch/arm/boot/dts/tegra124-venice2.dts    | 10 +++++++++-
- arch/arm/boot/dts/tegra124.dtsi           |  3 +++
- arch/arm/configs/tegra_defconfig          |  3 +++
- 4 files changed, 24 insertions(+), 2 deletions(-)
-
+diff --git a/arch/arm/boot/dts/tegra124-venice2.dts b/arch/arm/boot/dts/tegra124-venice2.dts
+index 5c3f7813360d..497a50ebfe44 100644
+--- a/arch/arm/boot/dts/tegra124-venice2.dts
++++ b/arch/arm/boot/dts/tegra124-venice2.dts
+@@ -43,6 +43,14 @@
+ 		};
+ 	};
+ 
++	gpu at 0,57000000 {
++		/*
++		 * Node left disabled on purpose - the bootloader will enable
++		 * it after having set the VPR up
++		 */
++		vdd-supply = <&vdd_gpu>;
++	};
++
+ 	pinmux: pinmux at 0,70000868 {
+ 		pinctrl-names = "boot";
+ 		pinctrl-0 = <&pinmux_boot>;
+@@ -735,7 +743,7 @@
+ 					regulator-always-on;
+ 				};
+ 
+-				sd6 {
++				vdd_gpu: sd6 {
+ 					regulator-name = "+VDD_GPU_AP";
+ 					regulator-min-microvolt = <650000>;
+ 					regulator-max-microvolt = <1200000>;
 -- 
 2.4.4
