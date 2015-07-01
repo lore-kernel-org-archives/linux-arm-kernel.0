@@ -1,577 +1,232 @@
-From: pi-cheng.chen@linaro.org (Pi-Cheng Chen)
-Date: Wed,  1 Jul 2015 10:16:45 +0800
-Subject: [PATCH v5 2/2] cpufreq: mediatek: Add MT8173 cpufreq driver
-In-Reply-To: <1435717005-20012-1-git-send-email-pi-cheng.chen@linaro.org>
-References: <1435717005-20012-1-git-send-email-pi-cheng.chen@linaro.org>
-Message-ID: <1435717005-20012-3-git-send-email-pi-cheng.chen@linaro.org>
+From: thunder.leizhen@huawei.com (leizhen)
+Date: Wed, 1 Jul 2015 10:16:32 +0800
+Subject: [PATCH 6/8] iommu/arm-smmu: add support for non-pci devices
+In-Reply-To: <55927CEC.4090900@arm.com>
+References: <1435307584-9812-1-git-send-email-thunder.leizhen@huawei.com>
+ <1435307584-9812-7-git-send-email-thunder.leizhen@huawei.com>
+ <55927CEC.4090900@arm.com>
+Message-ID: <55934D80.2040503@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch implements MT8173 cpufreq driver.
+On 2015/6/30 19:26, Robin Murphy wrote:
+> On 26/06/15 09:33, Zhen Lei wrote:
+>> Now, we only support a master with only one stream id. It will cover most
+>> hardware platforms and coding so easy.
+>>
+>> Please refer Documentation\devicetree\bindings\iommu\iommu.txt on how to
+>> bind device tree.
+>>
+>> Signed-off-by: Zhen Lei <thunder.leizhen@huawei.com>
+>> ---
+>>   arch/arm64/include/asm/device.h |  2 +
+>>   drivers/iommu/arm-smmu-v3.c     | 88 +++++++++++++++++++++++++++++++++++++++--
+>>   2 files changed, 87 insertions(+), 3 deletions(-)
+>>
+>> diff --git a/arch/arm64/include/asm/device.h b/arch/arm64/include/asm/device.h
+>> index 243ef25..225e4f9 100644
+>> --- a/arch/arm64/include/asm/device.h
+>> +++ b/arch/arm64/include/asm/device.h
+>> @@ -20,6 +20,8 @@ struct dev_archdata {
+>>       struct dma_map_ops *dma_ops;
+>>   #ifdef CONFIG_IOMMU_API
+>>       void *iommu;            /* private IOMMU data */
+> 
+> There's already a perfectly good place to store driver-private data right here.
+> 
+>> +    struct device_node *of_smmu;
+>> +    u32 sid;
+> 
+> This looks far too specific to be in core code. It doesn't seem extensible for e.g. ACPI platform devices; it doesn't seem extensible for platform devices with multiple stream IDs e.g. PL330; it also
+> doesn't seem (sensibly) extensible for IOMMUs with #iommu-cells > 1.
+> 
+> Just allocate an SMMU-private struct for this and stash it in archdata.iommu - that way we can change things as much as we like in the driver with zero churn in core code.
 
-Signed-off-by: Pi-Cheng Chen <pi-cheng.chen@linaro.org>
----
- drivers/cpufreq/Kconfig.arm      |   7 +
- drivers/cpufreq/Makefile         |   1 +
- drivers/cpufreq/mt8173-cpufreq.c | 520 +++++++++++++++++++++++++++++++++++++++
- 3 files changed, 528 insertions(+)
- create mode 100644 drivers/cpufreq/mt8173-cpufreq.c
+OK. If platform devices with multiple stream IDs exist, I will support it in patch V2.
 
-diff --git a/drivers/cpufreq/Kconfig.arm b/drivers/cpufreq/Kconfig.arm
-index 611cb09..2a305c0 100644
---- a/drivers/cpufreq/Kconfig.arm
-+++ b/drivers/cpufreq/Kconfig.arm
-@@ -141,6 +141,13 @@ config ARM_KIRKWOOD_CPUFREQ
- 	  This adds the CPUFreq driver for Marvell Kirkwood
- 	  SoCs.
- 
-+config ARM_MT8173_CPUFREQ
-+	bool "Mediatek MT8173 CPUFreq support"
-+	depends on ARCH_MEDIATEK && REGULATOR
-+	select PM_OPP
-+	help
-+	  This adds the CPUFreq driver support for Mediatek MT8173 SoC.
-+
- config ARM_OMAP2PLUS_CPUFREQ
- 	bool "TI OMAP2+"
- 	depends on ARCH_OMAP2PLUS
-diff --git a/drivers/cpufreq/Makefile b/drivers/cpufreq/Makefile
-index cdce92a..97f9a9b 100644
---- a/drivers/cpufreq/Makefile
-+++ b/drivers/cpufreq/Makefile
-@@ -63,6 +63,7 @@ obj-$(CONFIG_ARM_HISI_ACPU_CPUFREQ)	+= hisi-acpu-cpufreq.o
- obj-$(CONFIG_ARM_IMX6Q_CPUFREQ)		+= imx6q-cpufreq.o
- obj-$(CONFIG_ARM_INTEGRATOR)		+= integrator-cpufreq.o
- obj-$(CONFIG_ARM_KIRKWOOD_CPUFREQ)	+= kirkwood-cpufreq.o
-+obj-$(CONFIG_ARM_MT8173_CPUFREQ)	+= mt8173-cpufreq.o
- obj-$(CONFIG_ARM_OMAP2PLUS_CPUFREQ)	+= omap-cpufreq.o
- obj-$(CONFIG_ARM_PXA2xx_CPUFREQ)	+= pxa2xx-cpufreq.o
- obj-$(CONFIG_PXA3xx)			+= pxa3xx-cpufreq.o
-diff --git a/drivers/cpufreq/mt8173-cpufreq.c b/drivers/cpufreq/mt8173-cpufreq.c
-new file mode 100644
-index 0000000..6284e67
---- /dev/null
-+++ b/drivers/cpufreq/mt8173-cpufreq.c
-@@ -0,0 +1,520 @@
-+/*
-+ * Copyright (c) 2015 Linaro Ltd.
-+ * Author: Pi-Cheng Chen <pi-cheng.chen@linaro.org>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ */
-+
-+#include <linux/clk.h>
-+#include <linux/cpu.h>
-+#include <linux/cpu_cooling.h>
-+#include <linux/cpufreq.h>
-+#include <linux/cpumask.h>
-+#include <linux/of.h>
-+#include <linux/platform_device.h>
-+#include <linux/pm_opp.h>
-+#include <linux/regulator/consumer.h>
-+#include <linux/slab.h>
-+#include <linux/thermal.h>
-+
-+#define MIN_VOLT_SHIFT		(100000)
-+#define MAX_VOLT_SHIFT		(200000)
-+#define MAX_VOLT_LIMIT		(1150000)
-+#define VOLT_TOL		(10000)
-+
-+/*
-+ * The struct mtk_cpu_dvfs_info holds necessary information for doing CPU DVFS
-+ * on each CPU power/clock domain of Mediatek SoCs. Each CPU cluster in
-+ * Mediatek SoCs has two voltage inputs, Vproc and Vsram. In some cases the two
-+ * voltage inputs need to be controlled under a hardware limitation:
-+ * 100mV < Vsram - Vproc < 200mV
-+ *
-+ * When scaling the clock frequency of a CPU clock domain, the clock source
-+ * needs to be switched to another stable PLL clock temporarily until
-+ * the original PLL becomes stable@target frequency.
-+ */
-+struct mtk_cpu_dvfs_info {
-+	struct device *cpu_dev;
-+	struct regulator *proc_reg;
-+	struct regulator *sram_reg;
-+	struct clk *cpu_clk;
-+	struct clk *inter_clk;
-+	struct thermal_cooling_device *cdev;
-+	int intermediate_voltage;
-+	bool need_voltage_trace;
-+};
-+
-+static int mtk_cpufreq_voltage_trace(struct mtk_cpu_dvfs_info *info,
-+				     int new_vproc)
-+{
-+	struct regulator *proc_reg = info->proc_reg;
-+	struct regulator *sram_reg = info->sram_reg;
-+	int old_vproc, old_vsram, new_vsram, vsram, vproc, ret;
-+
-+	old_vproc = regulator_get_voltage(proc_reg);
-+	old_vsram = regulator_get_voltage(sram_reg);
-+	/* Vsram should not exceed the maximum allowed voltage of SoC. */
-+	new_vsram = min(new_vproc + MIN_VOLT_SHIFT, MAX_VOLT_LIMIT);
-+
-+	if (old_vproc < new_vproc) {
-+		/*
-+		 * When scaling up voltages, Vsram and Vproc scale up step
-+		 * by step. At each step, set Vsram to (Vproc + 200mV) first,
-+		 * then set Vproc to (Vsram - 100mV).
-+		 * Keep doing it until Vsram and Vproc hit target voltages.
-+		 */
-+		do {
-+			old_vsram = regulator_get_voltage(sram_reg);
-+			old_vproc = regulator_get_voltage(proc_reg);
-+
-+			vsram = min(new_vsram, old_vproc + MAX_VOLT_SHIFT);
-+
-+			if (vsram + VOLT_TOL >= MAX_VOLT_LIMIT) {
-+				vsram = MAX_VOLT_LIMIT;
-+
-+				/*
-+				 * If the target Vsram hits the maximum voltage,
-+				 * try to set the exact voltage value first.
-+				 */
-+				ret = regulator_set_voltage(sram_reg, vsram,
-+							    vsram);
-+				if (ret)
-+					ret = regulator_set_voltage(sram_reg,
-+							vsram - VOLT_TOL,
-+							vsram);
-+
-+				vproc = new_vproc;
-+			} else {
-+				ret = regulator_set_voltage(sram_reg, vsram,
-+							    vsram + VOLT_TOL);
-+
-+				vproc = vsram - MIN_VOLT_SHIFT;
-+			}
-+			if (ret)
-+				return ret;
-+
-+			ret = regulator_set_voltage(proc_reg, vproc,
-+						    vproc + VOLT_TOL);
-+			if (ret) {
-+				regulator_set_voltage(sram_reg, old_vsram,
-+						      old_vsram);
-+				return ret;
-+			}
-+		} while (vproc < new_vproc || vsram < new_vsram);
-+	} else if (old_vproc > new_vproc) {
-+		/*
-+		 * When scaling down voltages, Vsram and Vproc scale down step
-+		 * by step. At each step, set Vproc to (Vsram - 200mV) first,
-+		 * then set Vproc to (Vproc + 100mV).
-+		 * Keep doing it until Vsram and Vproc hit target voltages.
-+		 */
-+		do {
-+			old_vproc = regulator_get_voltage(proc_reg);
-+			old_vsram = regulator_get_voltage(sram_reg);
-+
-+			vproc = max(new_vproc, old_vsram - MAX_VOLT_SHIFT);
-+			ret = regulator_set_voltage(proc_reg, vproc,
-+						    vproc + VOLT_TOL);
-+			if (ret)
-+				return ret;
-+
-+			if (vproc == new_vproc)
-+				vsram = new_vsram;
-+			else
-+				vsram = max(new_vsram, vproc + MIN_VOLT_SHIFT);
-+
-+			if (vsram + VOLT_TOL >= MAX_VOLT_LIMIT) {
-+				vsram = MAX_VOLT_LIMIT;
-+
-+				/*
-+				 * If the target Vsram hits the maximum voltage,
-+				 * try to set the exact voltage value first.
-+				 */
-+				ret = regulator_set_voltage(sram_reg, vsram,
-+							    vsram);
-+				if (ret)
-+					ret = regulator_set_voltage(sram_reg,
-+							vsram - VOLT_TOL,
-+							vsram);
-+			} else {
-+				ret = regulator_set_voltage(sram_reg, vsram,
-+							    vsram + VOLT_TOL);
-+			}
-+
-+			if (ret) {
-+				regulator_set_voltage(proc_reg, old_vproc,
-+						      old_vproc);
-+				return ret;
-+			}
-+		} while (vproc > new_vproc + VOLT_TOL ||
-+			 vsram > new_vsram + VOLT_TOL);
-+	}
-+
-+	return 0;
-+}
-+
-+static int mtk_cpufreq_set_voltage(struct mtk_cpu_dvfs_info *info, int vproc)
-+{
-+	if (info->need_voltage_trace)
-+		return mtk_cpufreq_voltage_trace(info, vproc);
-+	else
-+		return regulator_set_voltage(info->proc_reg, vproc,
-+					     vproc + VOLT_TOL);
-+}
-+
-+static int mtk_cpufreq_set_target(struct cpufreq_policy *policy,
-+				  unsigned int index)
-+{
-+	struct cpufreq_frequency_table *freq_table = policy->freq_table;
-+	struct clk *cpu_clk = policy->clk;
-+	struct clk *armpll = clk_get_parent(cpu_clk);
-+	struct mtk_cpu_dvfs_info *info = policy->driver_data;
-+	struct device *cpu_dev = info->cpu_dev;
-+	struct dev_pm_opp *opp;
-+	long freq_hz, old_freq_hz;
-+	int vproc, old_vproc, inter_vproc, target_vproc, ret;
-+
-+	inter_vproc = info->intermediate_voltage;
-+
-+	old_freq_hz = clk_get_rate(cpu_clk);
-+	old_vproc = regulator_get_voltage(info->proc_reg);
-+
-+	freq_hz = freq_table[index].frequency * 1000;
-+
-+	rcu_read_lock();
-+	opp = dev_pm_opp_find_freq_ceil(cpu_dev, &freq_hz);
-+	if (IS_ERR(opp)) {
-+		rcu_read_unlock();
-+		pr_err("cpu%d: failed to find OPP for %ld\n",
-+		       policy->cpu, freq_hz);
-+		return PTR_ERR(opp);
-+	}
-+	vproc = dev_pm_opp_get_voltage(opp);
-+	rcu_read_unlock();
-+
-+	/*
-+	 * If the new voltage or the intermediate voltage is higher than the
-+	 * current voltage, scale up voltage first.
-+	 */
-+	target_vproc = (inter_vproc > vproc) ? inter_vproc : vproc;
-+	if (old_vproc < target_vproc) {
-+		ret = mtk_cpufreq_set_voltage(info, target_vproc);
-+		if (ret) {
-+			pr_err("cpu%d: failed to scale up voltage!\n",
-+			       policy->cpu);
-+			mtk_cpufreq_set_voltage(info, old_vproc);
-+			return ret;
-+		}
-+	}
-+
-+	/* Reparent the CPU clock to intermediate clock. */
-+	ret = clk_set_parent(cpu_clk, info->inter_clk);
-+	if (ret) {
-+		pr_err("cpu%d: failed to re-parent cpu clock!\n",
-+		       policy->cpu);
-+		mtk_cpufreq_set_voltage(info, old_vproc);
-+		WARN_ON(1);
-+		return ret;
-+	}
-+
-+	/* Set the original PLL to target rate. */
-+	ret = clk_set_rate(armpll, freq_hz);
-+	if (ret) {
-+		pr_err("cpu%d: failed to scale cpu clock rate!\n",
-+		       policy->cpu);
-+		clk_set_parent(cpu_clk, armpll);
-+		mtk_cpufreq_set_voltage(info, old_vproc);
-+		return ret;
-+	}
-+
-+	/* Set parent of CPU clock back to the original PLL. */
-+	ret = clk_set_parent(cpu_clk, armpll);
-+	if (ret) {
-+		pr_err("cpu%d: failed to re-parent cpu clock!\n",
-+		       policy->cpu);
-+		mtk_cpufreq_set_voltage(info, inter_vproc);
-+		WARN_ON(1);
-+		return ret;
-+	}
-+
-+	/*
-+	 * If the new voltage is lower than the intermediate voltage or the
-+	 * original voltage, scale down to the new voltage.
-+	 */
-+	if (vproc < inter_vproc || vproc < old_vproc) {
-+		ret = mtk_cpufreq_set_voltage(info, vproc);
-+		if (ret) {
-+			pr_err("cpu%d: failed to scale down voltage!\n",
-+			       policy->cpu);
-+			clk_set_parent(cpu_clk, info->inter_clk);
-+			clk_set_rate(armpll, old_freq_hz);
-+			clk_set_parent(cpu_clk, armpll);
-+			return ret;
-+		}
-+	}
-+
-+	return 0;
-+}
-+
-+static void mtk_cpufreq_ready(struct cpufreq_policy *policy)
-+{
-+	struct mtk_cpu_dvfs_info *info = policy->driver_data;
-+	struct device_node *np = of_node_get(info->cpu_dev->of_node);
-+
-+	if (WARN_ON(!np))
-+		return;
-+
-+	if (of_find_property(np, "#cooling-cells", NULL)) {
-+		info->cdev = of_cpufreq_cooling_register(np,
-+							 policy->related_cpus);
-+
-+		if (IS_ERR(info->cdev)) {
-+			dev_err(info->cpu_dev,
-+				"running cpufreq without cooling device: %ld\n",
-+				PTR_ERR(info->cdev));
-+
-+			info->cdev = NULL;
-+		}
-+	}
-+
-+	of_node_put(np);
-+}
-+
-+static int mtk_cpu_dvfs_info_init(struct mtk_cpu_dvfs_info *info, int cpu)
-+{
-+	struct device *cpu_dev;
-+	struct regulator *proc_reg = ERR_PTR(-ENODEV);
-+	struct regulator *sram_reg = ERR_PTR(-ENODEV);
-+	struct clk *cpu_clk = ERR_PTR(-ENODEV);
-+	struct clk *inter_clk = ERR_PTR(-ENODEV);
-+	struct dev_pm_opp *opp;
-+	unsigned long rate;
-+	int ret;
-+
-+	cpu_dev = get_cpu_device(cpu);
-+	if (!cpu_dev) {
-+		pr_err("failed to get cpu%d device\n", cpu);
-+		return -ENODEV;
-+	}
-+
-+	ret = of_init_opp_table(cpu_dev);
-+	if (ret) {
-+		pr_warn("no OPP table for cpu%d\n", cpu);
-+		return ret;
-+	}
-+
-+	cpu_clk = clk_get(cpu_dev, "cpu");
-+	if (IS_ERR(cpu_clk)) {
-+		if (PTR_ERR(cpu_clk) == -EPROBE_DEFER)
-+			pr_warn("cpu clk for cpu%d not ready, retry.\n", cpu);
-+		else
-+			pr_err("failed to get cpu clk for cpu%d\n", cpu);
-+
-+		ret = PTR_ERR(cpu_clk);
-+		goto out_free_opp_table;
-+	}
-+
-+	inter_clk = clk_get(cpu_dev, "intermediate");
-+	if (IS_ERR(inter_clk)) {
-+		if (PTR_ERR(inter_clk) == -EPROBE_DEFER)
-+			pr_warn("intermediate clk for cpu%d not ready, retry.\n",
-+				cpu);
-+		else
-+			pr_err("failed to get intermediate clk for cpu%d\n",
-+			       cpu);
-+
-+		ret = PTR_ERR(inter_clk);
-+		goto out_free_resources;
-+	}
-+
-+	proc_reg = regulator_get_exclusive(cpu_dev, "proc");
-+	if (IS_ERR(proc_reg)) {
-+		if (PTR_ERR(proc_reg) == -EPROBE_DEFER)
-+			pr_warn("proc regulator for cpu%d not ready, retry.\n",
-+				cpu);
-+		else
-+			pr_err("failed to get proc regulator for cpu%d\n",
-+			       cpu);
-+
-+		ret = PTR_ERR(proc_reg);
-+		goto out_free_resources;
-+	}
-+
-+	/* Both presence and absence of sram regulator are valid cases. */
-+	sram_reg = regulator_get_exclusive(cpu_dev, "sram");
-+
-+	/* Search a safe voltage for intermediate frequency. */
-+	rate = clk_get_rate(inter_clk);
-+	rcu_read_lock();
-+	opp = dev_pm_opp_find_freq_ceil(cpu_dev, &rate);
-+	if (IS_ERR(opp)) {
-+		pr_err("failed to get intermediate opp for cpu%d\n", cpu);
-+		ret = PTR_ERR(opp);
-+		goto out_free_resources;
-+	}
-+	info->intermediate_voltage = dev_pm_opp_get_voltage(opp);
-+	rcu_read_unlock();
-+
-+	info->cpu_dev = cpu_dev;
-+	info->proc_reg = proc_reg;
-+	info->sram_reg = IS_ERR(sram_reg) ? NULL : sram_reg;
-+	info->cpu_clk = cpu_clk;
-+	info->inter_clk = inter_clk;
-+
-+	/*
-+	 * If SRAM regulator is present, software "voltage trace" is needed
-+	 * for this CPU power domain.
-+	 */
-+	info->need_voltage_trace = !IS_ERR(sram_reg);
-+
-+	return 0;
-+
-+out_free_resources:
-+	if (!IS_ERR(proc_reg))
-+		regulator_put(proc_reg);
-+	if (!IS_ERR(sram_reg))
-+		regulator_put(sram_reg);
-+	if (!IS_ERR(cpu_clk))
-+		clk_put(cpu_clk);
-+	if (!IS_ERR(inter_clk))
-+		clk_put(inter_clk);
-+
-+out_free_opp_table:
-+	of_free_opp_table(cpu_dev);
-+
-+	return ret;
-+}
-+
-+static void mtk_cpu_dvfs_info_release(struct mtk_cpu_dvfs_info *info)
-+{
-+	if (!IS_ERR(info->proc_reg))
-+		regulator_put(info->proc_reg);
-+	if (!IS_ERR(info->sram_reg))
-+		regulator_put(info->sram_reg);
-+	if (!IS_ERR(info->cpu_clk))
-+		clk_put(info->cpu_clk);
-+	if (!IS_ERR(info->inter_clk))
-+		clk_put(info->inter_clk);
-+
-+	of_free_opp_table(info->cpu_dev);
-+}
-+
-+static int mtk_cpufreq_init(struct cpufreq_policy *policy)
-+{
-+	struct mtk_cpu_dvfs_info *info;
-+	struct cpufreq_frequency_table *freq_table;
-+	int ret;
-+
-+	info = kzalloc(sizeof(*info), GFP_KERNEL);
-+	if (!info)
-+		return -ENOMEM;
-+
-+	ret = mtk_cpu_dvfs_info_init(info, policy->cpu);
-+	if (ret) {
-+		pr_err("%s failed to initialize dvfs info for cpu%d\n",
-+		       __func__, policy->cpu);
-+		goto out_free_dvfs_info;
-+	}
-+
-+	ret = dev_pm_opp_init_cpufreq_table(info->cpu_dev, &freq_table);
-+	if (ret) {
-+		pr_err("failed to init cpufreq table for cpu%d: %d\n",
-+		       policy->cpu, ret);
-+		goto out_release_dvfs_info;
-+	}
-+
-+	ret = cpufreq_table_validate_and_show(policy, freq_table);
-+	if (ret) {
-+		pr_err("%s: invalid frequency table: %d\n", __func__, ret);
-+		goto out_free_cpufreq_table;
-+	}
-+
-+	/* CPUs in the same cluster share a clock and power domain. */
-+	cpumask_copy(policy->cpus, &cpu_topology[policy->cpu].core_sibling);
-+	policy->driver_data = info;
-+	policy->clk = info->cpu_clk;
-+
-+	return 0;
-+
-+out_free_cpufreq_table:
-+	dev_pm_opp_free_cpufreq_table(info->cpu_dev, &freq_table);
-+
-+out_release_dvfs_info:
-+	mtk_cpu_dvfs_info_release(info);
-+
-+out_free_dvfs_info:
-+	kfree(info);
-+
-+	return ret;
-+}
-+
-+static int mtk_cpufreq_exit(struct cpufreq_policy *policy)
-+{
-+	struct mtk_cpu_dvfs_info *info = policy->driver_data;
-+
-+	cpufreq_cooling_unregister(info->cdev);
-+	dev_pm_opp_free_cpufreq_table(info->cpu_dev, &policy->freq_table);
-+	mtk_cpu_dvfs_info_release(info);
-+	kfree(info);
-+
-+	return 0;
-+}
-+
-+static struct cpufreq_driver mt8173_cpufreq_driver = {
-+	.flags = CPUFREQ_STICKY | CPUFREQ_NEED_INITIAL_FREQ_CHECK,
-+	.verify = cpufreq_generic_frequency_table_verify,
-+	.target_index = mtk_cpufreq_set_target,
-+	.get = cpufreq_generic_get,
-+	.init = mtk_cpufreq_init,
-+	.exit = mtk_cpufreq_exit,
-+	.ready = mtk_cpufreq_ready,
-+	.name = "mtk-cpufreq",
-+	.attr = cpufreq_generic_attr,
-+};
-+
-+static int mt8173_cpufreq_probe(struct platform_device *pdev)
-+{
-+	int ret;
-+
-+	ret = cpufreq_register_driver(&mt8173_cpufreq_driver);
-+	if (ret)
-+		pr_err("failed to register mtk cpufreq driver\n");
-+
-+	return ret;
-+}
-+
-+static struct platform_driver mt8173_cpufreq_platdrv = {
-+	.driver = {
-+		.name	= "mt8173-cpufreq",
-+	},
-+	.probe		= mt8173_cpufreq_probe,
-+};
-+
-+static int mt8173_cpufreq_driver_init(void)
-+{
-+	struct platform_device *pdev;
-+	int err;
-+
-+	if (!of_machine_is_compatible("mediatek,mt8173"))
-+		return -ENODEV;
-+
-+	err = platform_driver_register(&mt8173_cpufreq_platdrv);
-+	if (err)
-+		return err;
-+
-+	pdev = platform_device_register_simple("mt8173-cpufreq", -1, NULL, 0);
-+	if (IS_ERR(pdev)) {
-+		pr_err("failed to register mtk-cpufreq platform device\n");
-+		return PTR_ERR(pdev);
-+	}
-+
-+	return 0;
-+}
-+device_initcall(mt8173_cpufreq_driver_init);
--- 
-1.9.1
+> 
+>>   #endif
+>>       bool dma_coherent;
+>>   };
+>> diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
+>> index 483c918..87c3d9b 100644
+>> --- a/drivers/iommu/arm-smmu-v3.c
+>> +++ b/drivers/iommu/arm-smmu-v3.c
+>> @@ -30,9 +30,14 @@
+>>   #include <linux/of_address.h>
+>>   #include <linux/pci.h>
+>>   #include <linux/platform_device.h>
+>> +#include <linux/amba/bus.h>
+>> +#include <linux/of_iommu.h>
+>>
+>>   #include "io-pgtable.h"
+>>
+>> +/* Maximum number of stream IDs assigned to a single device */
+>> +#define MAX_MASTER_STREAMIDS        1
+>> +
+>>   /* MMIO registers */
+>>   #define ARM_SMMU_IDR0            0x0
+>>   #define IDR0_ST_LVL_SHIFT        27
+>> @@ -608,6 +613,22 @@ static struct arm_smmu_domain *to_smmu_domain(struct iommu_domain *dom)
+>>       return container_of(dom, struct arm_smmu_domain, domain);
+>>   }
+>>
+>> +static struct arm_smmu_device *find_smmu_for_device(struct device *dev)
+>> +{
+>> +    struct arm_smmu_device *smmu;
+>> +
+>> +    spin_lock(&arm_smmu_devices_lock);
+>> +    list_for_each_entry(smmu, &arm_smmu_devices, list) {
+>> +        if (smmu->dev->of_node == dev->archdata.of_smmu) {
+>> +            spin_unlock(&arm_smmu_devices_lock);
+>> +            return smmu;
+>> +        }
+>> +    }
+>> +    spin_unlock(&arm_smmu_devices_lock);
+>> +
+>> +    return NULL;
+>> +}
+>> +
+> 
+> This should be unnecessary with the right probe order, see below...
+> 
+>>   /* Low-level queue manipulation functions */
+>>   static bool queue_full(struct arm_smmu_queue *q)
+>>   {
+>> @@ -1760,9 +1781,36 @@ static int arm_smmu_add_device(struct device *dev)
+>>       struct arm_smmu_group *smmu_group;
+>>       struct arm_smmu_device *smmu;
+>>
+>> -    /* We only support PCI, for now */
+>> -    if (!dev_is_pci(dev))
+>> -        return -ENODEV;
+>> +    if (!dev_is_pci(dev)) {
+>> +        smmu = find_smmu_for_device(dev);
+>> +        if (!smmu)
+>> +            return -ENODEV;
+>> +
+>> +        group = iommu_group_alloc();
+>> +        if (IS_ERR(group)) {
+>> +            dev_err(dev, "Failed to allocate IOMMU group\n");
+>> +            return PTR_ERR(group);
+>> +        }
+>> +
+>> +        ret = iommu_group_add_device(group, dev);
+>> +        if (ret)
+>> +            goto out_put_group;
+>> +
+>> +        smmu_group = kzalloc(sizeof(*smmu_group), GFP_KERNEL);
+>> +        if (!smmu_group) {
+>> +            ret = -ENOMEM;
+>> +            goto out_put_group;
+>> +        }
+>> +
+>> +        smmu_group->ste.valid = true;
+>> +        smmu_group->smmu = smmu;
+>> +        iommu_group_set_iommudata(group, smmu_group,
+>> +                        __arm_smmu_release_iommudata);
+>> +
+>> +        sid = dev->archdata.sid;
+>> +
+>> +        goto handle_stream_id;
+>> +    }
+>>
+>>       pdev = to_pci_dev(dev);
+>>       group = iommu_group_get_for_dev(dev);
+>> @@ -1793,6 +1841,8 @@ static int arm_smmu_add_device(struct device *dev)
+>>
+>>       /* Assume SID == RID until firmware tells us otherwise */
+>>       pci_for_each_dma_alias(pdev, __arm_smmu_get_pci_sid, &sid);
+>> +
+>> +handle_stream_id:
+> 
+> This is going to get messy quickly - how about breaking out the "platform device" and "PCI device" specifics above into their own functions that return the group and sid data to the common code here?
+> 
+>>       for (i = 0; i < smmu_group->num_sids; ++i) {
+>>           /* If we already know about this SID, then we're done */
+>>           if (smmu_group->sids[i] == sid)
+>> @@ -1881,7 +1931,23 @@ out_unlock:
+>>       return ret;
+>>   }
+>>
+>> +static int arm_smmu_of_xlate(struct device *dev, struct of_phandle_args *args)
+>> +{
+>> +    if (args->args_count > MAX_MASTER_STREAMIDS) {
+>> +        dev_err(dev,
+>> +            "reached maximum number (%d) of stream IDs for master device %s\n",
+>> +            MAX_MASTER_STREAMIDS, dev->of_node->name);
+>> +        return -ENOSPC;
+>> +    }
+>> +
+>> +    dev->archdata.of_smmu = args->np;
+>> +    dev->archdata.sid = args->args[0];
+>> +
+>> +    return 0;
+>> +}
+> 
+> This isn't going to work the way you expect: the way the binding is defined, a master with multiple stream IDs should look like so:
+> 
+>     iommus = <&smmu 0>, <&smmu 1>,...
+> 
+> so you'd get multiple calls, never hit the warning, and just end up with whichever ID came last.
+> 
+> Secondly, as mentioned above, it would be nicer to just associate the arm_smmu_device directly here and obviate the indirect lookup. That would depend on having correct probe ordering, but you need to
+> enforce that anyway, since any add_device callbacks before the SMMU itself has been probed will break. Laurent's probe deferral series that Will pointed to is the ultimate goal, but for a stop-gap
+> solution which works with the current code I'd suggest taking a look at patches 16 and 17 of Marek's Exynos SysMMU series[1]
+
+OK, thanks. I will consider these in patch v2.
+
+> 
+> Robin.
+> 
+> [1]:http://thread.gmane.org/gmane.linux.kernel.samsung-soc/45416
+> 
+>> +
+>>   static struct iommu_ops arm_smmu_ops = {
+>> +    .of_xlate        = arm_smmu_of_xlate,
+>>       .capable        = arm_smmu_capable,
+>>       .domain_alloc        = arm_smmu_domain_alloc,
+>>       .domain_free        = arm_smmu_domain_free,
+>> @@ -2655,6 +2721,14 @@ static int __init arm_smmu_init(void)
+>>       if (ret)
+>>           return ret;
+>>
+>> +    if (!iommu_present(&platform_bus_type))
+>> +        bus_set_iommu(&platform_bus_type, &arm_smmu_ops);
+>> +
+>> +#ifdef CONFIG_ARM_AMBA
+>> +    if (!iommu_present(&amba_bustype))
+>> +        bus_set_iommu(&amba_bustype, &arm_smmu_ops);
+>> +#endif
+>> +
+>>       return bus_set_iommu(&pci_bus_type, &arm_smmu_ops);
+>>   }
+>>
+>> @@ -2666,6 +2740,14 @@ static void __exit arm_smmu_exit(void)
+>>   subsys_initcall(arm_smmu_init);
+>>   module_exit(arm_smmu_exit);
+>>
+>> +static int arm_smmu_of_iommu_init(struct device_node *np)
+>> +{
+>> +    of_iommu_set_ops(np, &arm_smmu_ops);
+>> +
+>> +    return 0;
+>> +}
+>> +IOMMU_OF_DECLARE(arm_smmu_v3, "arm,smmu-v3", arm_smmu_of_iommu_init);
+>> +
+>>   MODULE_DESCRIPTION("IOMMU API for ARM architected SMMUv3 implementations");
+>>   MODULE_AUTHOR("Will Deacon <will.deacon@arm.com>");
+>>   MODULE_LICENSE("GPL v2");
+>> -- 
+>> 1.8.0
+>>
+>>
+>> _______________________________________________
+>> iommu mailing list
+>> iommu at lists.linux-foundation.org
+>> https://lists.linuxfoundation.org/mailman/listinfo/iommu
+>>
+> 
+> 
+> .
+> 
