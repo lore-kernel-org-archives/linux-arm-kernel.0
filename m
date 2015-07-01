@@ -1,45 +1,36 @@
-From: pi-cheng.chen@linaro.org (Pi-Cheng Chen)
-Date: Wed,  1 Jul 2015 12:13:14 +0800
-Subject: [PATCH] thermal: cpu_cooling: Iterate over all CPUs in clip_cpu mask
- to get frequency table
-In-Reply-To: <1435723647-3354-1-git-send-email-pi-cheng.chen@linaro.org>
-References: <1435723647-3354-1-git-send-email-pi-cheng.chen@linaro.org>
-Message-ID: <1435723994-3882-1-git-send-email-pi-cheng.chen@linaro.org>
+From: zajec5@gmail.com (=?UTF-8?B?UmFmYcWCIE1pxYJlY2tp?=)
+Date: Wed, 1 Jul 2015 06:45:28 +0200
+Subject: [PATCH] bcma: populate bus DT subnodes as platform_device-s
+In-Reply-To: <55930E01.6070909@hauke-m.de>
+References: <1435504633-20831-1-git-send-email-zajec5@gmail.com>
+ <55930E01.6070909@hauke-m.de>
+Message-ID: <CACna6rz4zoDbhK48cRcRUrPpV+DXrGA0Lq-cRGOeB=A=ZnCbvg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Sorry for the mistake I made when cherry-picking the patch. Fix and resend
-again.
+On 30 June 2015 at 23:45, Hauke Mehrtens <hauke@hauke-m.de> wrote:
+> On 06/28/2015 05:17 PM, Rafa? Mi?ecki wrote:
+>> Our bus should allow defining children nodes as we may want to specify
+>> devices attached to the bus. This is required e.g. to specify NAND or
+>> ChipCommon cores and use bus's address and IRQ mappings.
+>>
+>> Signed-off-by: Rafa? Mi?ecki <zajec5@gmail.com>
+>> ---
+>>  drivers/bcma/main.c | 8 ++++++++
+>>  1 file changed, 8 insertions(+)
+>
+> Rafa? have you solved the IRQ problem? Is it possible to assign all the
+> sub devices the same IRQ number as the chipcommon core?
 
-__cpufreq_cooling_register() might fail if some CPU other than first one in
-clip_cpu mask is present earlier e.g. CPU hotplug. Iterate all CPUs in the mask
-to handle this case.
+Not yet. The only working solution I have so far is:
+serial0: serial at 0300 {
+        compatible = "ns16550";
+        reg = <0x0300 0x100>;
+        interrupt-parent = <&gic>;
+        interrupts = <GIC_SPI 85 IRQ_TYPE_LEVEL_HIGH>;
+        clock-frequency = <100000000>;
+};
+(plus adding compatible = "simple-bus" to the chipcommon).
 
-Signed-off-by: Pi-Cheng Chen <pi-cheng.chen@linaro.org>
----
- drivers/thermal/cpu_cooling.c | 9 +++++++--
- 1 file changed, 7 insertions(+), 2 deletions(-)
-
-diff --git a/drivers/thermal/cpu_cooling.c b/drivers/thermal/cpu_cooling.c
-index 6509c61..5e90eb6 100644
---- a/drivers/thermal/cpu_cooling.c
-+++ b/drivers/thermal/cpu_cooling.c
-@@ -776,9 +776,14 @@ __cpufreq_cooling_register(struct device_node *np,
- 	char dev_name[THERMAL_NAME_LENGTH];
- 	struct cpufreq_frequency_table *pos, *table;
- 	unsigned int freq, i, num_cpus;
--	int ret;
-+	int ret, cpu;
-+
-+	for_each_cpu(cpu, clip_cpus) {
-+		table = cpufreq_frequency_get_table(cpu);
-+		if (table)
-+			break;
-+	}
- 
--	table = cpufreq_frequency_get_table(cpumask_first(clip_cpus));
- 	if (!table) {
- 		pr_debug("%s: CPUFreq table not found\n", __func__);
- 		return ERR_PTR(-EPROBE_DEFER);
 -- 
-1.9.1
+Rafa?
