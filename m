@@ -1,94 +1,64 @@
-From: javier@dowhile0.org (Javier Martinez Canillas)
-Date: Wed, 1 Jul 2015 10:09:29 +0200
-Subject: [PATCH] arm: Update memblock limit after mapping lowmem
-In-Reply-To: <558B463F.5050200@redhat.com>
-References: <1433445349-12497-1-git-send-email-labbott@fedoraproject.org>
- <20150611130700.GA8153@leverpostej> <558B463F.5050200@redhat.com>
-Message-ID: <CABxcv=kqkyYgS=vbUGwO5w7UOjBHF+OpZw-YnVhGFiMoZUo_xQ@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 1 Jul 2015 09:09:15 +0100
+Subject: [PATCH v5 2/6] arch: unify ioremap prototypes and macro aliases
+In-Reply-To: <CAMuHMdUO4uSWH1Qc0SfDTLuXbiG2N9fq8Tf6j+3RoqVKdPugbA@mail.gmail.com>
+References: <20150622081028.35954.89885.stgit@dwillia2-desk3.jf.intel.com>
+ <20150622082427.35954.73529.stgit@dwillia2-desk3.jf.intel.com>
+ <20150622161002.GB8240@lst.de>
+ <CAPcyv4h5OXyRvZvLGD5ZknO-YUPn675YGv0XdtW1QOO9qmZsug@mail.gmail.com>
+ <20150701062352.GA3739@lst.de>
+ <CAMuHMdUO4uSWH1Qc0SfDTLuXbiG2N9fq8Tf6j+3RoqVKdPugbA@mail.gmail.com>
+Message-ID: <20150701080915.GJ7557@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Laura,
+On Wed, Jul 01, 2015 at 08:55:57AM +0200, Geert Uytterhoeven wrote:
+> On Wed, Jul 1, 2015 at 8:23 AM, Christoph Hellwig <hch@lst.de> wrote:
+> >> One useful feature of the ifdef mess as implemented in the patch is
+> >> that you could test for whether ioremap_cache() is actually
+> >> implemented or falls back to default ioremap().  I think for
+> >> completeness archs should publish an ioremap type capabilities mask
+> >> for drivers that care... (I can imagine pmem caring), or default to
+> >> being permissive if something like IOREMAP_STRICT is not set.  There's
+> >> also the wrinkle of archs that can only support certain types of
+> >> mappings at a given alignment.
+> >
+> > I think doing this at runtime might be a better idea.  E.g. a
+> > ioremap_flags with the CACHED argument will return -EOPNOTSUP unless
+> > actually implemented.  On various architectures different CPUs or
+> > boards will have different capabilities in this area.
+> 
+> So it would be the responsibility of the caller to fall back from
+> ioremap(..., CACHED) to ioremap(..., UNCACHED)?
+> I.e. all drivers using it should be changed...
 
-On Thu, Jun 25, 2015 at 2:07 AM, Laura Abbott <labbott@redhat.com> wrote:
-> On 06/11/2015 06:07 AM, Mark Rutland wrote:
->>
->> On Thu, Jun 04, 2015 at 08:15:49PM +0100, Laura Abbott wrote:
->>>
->>>
->>> The memblock limit is currently used in find_limits
->>> to find the bounds for ZONE_NORMAL. The memblock
->>> limit may need to be rounded down a PMD size to ensure
->>> allocations are fully mapped though. This has the side
->>> effect of reducing the amount of memory in ZONE_NORMAL.
->>> Once all lowmem is mapped, it's safe to change the memblock
->>> limit back to include the unaligned section. Adjust the
->>> memblock limit after lowmem mapping is complete.
->>>
->>> Before:
->>>   # cat /proc/zoneinfo | grep managed
->>>          managed  62907
->>>          managed  424
->>>
->>> After:
->>>   # cat /proc/zoneinfo | grep managed
->>>          managed  63331
->>>
->>> Signed-off-by: Laura Abbott <labbott@fedoraproject.org>
->>> ---
->>> This is a replacement for
->>> 'arm: Don't use memblock limit for the lowmem bound' which
->>> doesn't actually work on NOMMU systems.
->>
->>
->> Works for me on TC2, atop v4.1-rc7. Before this patch, with a few byes
->> carved out of the memory node I would see:
->>
->> Memory: 1030380K/1046528K available (4832K kernel code, 154K rwdata, 1376K
->> rodata, 260K init, 147K bss, 16148K reserved, 0K cma-reserved)
->>
->> $ cat /proc/zoneinfo | grep managed
->>          managed  257660
->>
->> With the patch I see:
->>
->> Memory: 1032424K/1048572K available (4832K kernel code, 154K rwdata, 1376K
->> rodata, 260K init, 147K bss, 16148K reserved, 0K cma-reserved)
->>
->> $ cat /proc/zoneinfo | grep managed
->>          managed  258171
->>
->> The patch itself looks good to me.
->>
->> Reviewed-by: Mark Rutland <mark.rutland@arm.com>
->> Tested-by: Mark Rutland <mark.rutland@arm.com>
->>
->> Thanks,
->> Mark.
->>
->
-> FYI, I put this in the patch tracker. I was on vacation when the
-> Reviewed-by/Tested-by
-> came in so I'm only getting to it now.
->
+Another important point here is to define what the properties of the
+mappings are.  It's no good just saying "uncached".
 
-Maybe is a little late but just for reference, this patch fixes a boot
-hang that was reported [0] for the Exynos Chromebooks that was in
-v4.1.
+We've recently been around this over the PMEM driver and the broken
+addition of ioremap_wt() on ARM...
 
-So on an Exynos5420 Peach Pit Chromebook:
+By "properties" I mean stuff like whether unaligned accesses permitted,
+any kind of atomic access (eg, xchg, cmpxchg, etc).
 
-Tested-by: Javier Martinez Canillas <javier@dowhile0.org>
+This matters: on ARM, a mapping suitable for a device does not support
+unaligned accesses or atomic accesses - only "memory-like" mappings
+support those.  However, memory-like mappings are not required to
+preserve access size, number of accesses, etc which makes them unsuitable
+for device registers.
 
-The patch also looks good to me:
+The problem with ioremap_uncached() in particular is that we have LDD
+and other documentation telling people to use it to map device registers,
+so we can't define ioremap_uncached() on ARM to have memory-like
+properties, and it doesn't support unaligned accesses.
 
-Reviewed-by: Javier Martinez Canillas <javier@dowhile0.org>
+I have a series of patches which fix up 32-bit ARM for the broken
+ioremap_wt() stuff that was merged during this merge window, which I
+intend to push out into linux-next at some point (possibly during the
+merge window, if not after -rc1) which also move ioremap*() out of line
+on ARM but more importantly, adds a load of documentation about the
+properties of the resulting mapping on ARM.
 
-> Thanks,
-> Laura
->
-
-Best regards,
-Javier
-
-[0]: http://archive.arm.linux.org.uk/lurker/message/20150630.100102.22c9c1d9.en.html
+-- 
+FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
+according to speedtest.net.
