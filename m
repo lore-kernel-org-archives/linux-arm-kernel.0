@@ -1,56 +1,60 @@
-From: ahs3@redhat.com (Al Stone)
-Date: Wed, 01 Jul 2015 11:02:25 -0600
-Subject: [PATCH] ARM64 / SMP: Switch pr_err() to pr_debug() for disabled
- GICC entry
-In-Reply-To: <1435757843-13236-1-git-send-email-hanjun.guo@linaro.org>
-References: <1435757843-13236-1-git-send-email-hanjun.guo@linaro.org>
-Message-ID: <55941D21.5030604@redhat.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Wed, 1 Jul 2015 18:56:29 +0200
+Subject: [PATCH v2 3/4] ARM: mvebu: Allow using the GIC for wakeup in
+ standby mode
+In-Reply-To: <55940FCD.5070901@arm.com>
+References: <1435684740-24912-1-git-send-email-gregory.clement@free-electrons.com>
+ <1435684740-24912-4-git-send-email-gregory.clement@free-electrons.com>
+ <55940FCD.5070901@arm.com>
+Message-ID: <CAMuHMdW1BaJ8rsd9LQMSJusgG=4jrWm1C=UwioK_fM2bj3nX5w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/01/2015 07:37 AM, Hanjun Guo wrote:
-> It is normal that firmware presents GICC entry or entries (processors)
-> with disabled flag in ACPI MADT, taking a system of 16 cpus for example,
-> ACPI firmware may present 8 enabled first with another 8 cpus disabled
-> in MADT, the disabled cpus can be hot-added later.
-> 
-> Firmware may also present more cpus than the hardware actually has, but
-> disabled the unused ones, and easily enable it when the hardware has such
-> cpus to make the firmware code scalable.
-> 
-> So that's not an error for disabled cpus in MADT, we can switch
-> pr_err() to pr_debug() instead.
-> 
-> Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
-> ---
->  arch/arm64/kernel/smp.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm64/kernel/smp.c b/arch/arm64/kernel/smp.c
-> index 4b2121b..5caf04a 100644
-> --- a/arch/arm64/kernel/smp.c
-> +++ b/arch/arm64/kernel/smp.c
-> @@ -402,7 +402,7 @@ acpi_map_gic_cpu_interface(struct acpi_madt_generic_interrupt *processor)
->  	}
->  
->  	if (!(processor->flags & ACPI_MADT_ENABLED)) {
-> -		pr_err("skipping disabled CPU entry with 0x%llx MPIDR\n", hwid);
-> +		pr_debug("skipping disabled CPU entry with 0x%llx MPIDR\n", hwid);
->  		return;
->  	}
->  
-> 
+On Wed, Jul 1, 2015 at 6:05 PM, Sudeep Holla <sudeep.holla@arm.com> wrote:
+> On 30/06/15 18:18, Gregory CLEMENT wrote:
+>> On the Armada 375/38x/39x SoCs, in standby mode the SoCs stay powered
+>> and it is possible to wake-up from any interrupt sources. This patch
+>> adds flag to the GIC irqchip driver to let linux know this.
+>>
+>> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+>> ---
+>>   arch/arm/mach-mvebu/board-v7.c | 7 +++++++
+>>   1 file changed, 7 insertions(+)
+>>
+>> diff --git a/arch/arm/mach-mvebu/board-v7.c
+>> b/arch/arm/mach-mvebu/board-v7.c
+>> index e5911defccac..f446230e7416 100644
+>> --- a/arch/arm/mach-mvebu/board-v7.c
+>> +++ b/arch/arm/mach-mvebu/board-v7.c
 
-Yeah, good point.  I'm all for making the boot a little quieter by default.
+>> @@ -129,6 +131,11 @@ static int armada_375_external_abort_wa(unsigned long
+>> addr, unsigned int fsr,
+>>
+>>   static void __init mvebu_init_irq(void)
+>>   {
+>> +       if (of_machine_is_compatible("marvell,armada375") ||
+>> +           of_machine_is_compatible("marvell,armada380") ||
+>> +           of_machine_is_compatible("marvell,armada390"))
+>> +               gic_set_irqchip_flags(IRQCHIP_SKIP_SET_WAKE |
+>> +                                     IRQCHIP_MASK_ON_SUSPEND);
+>
+>
+> I am planning to add these flags in the GIC driver itself and remove
+> this function. I will post the patch next week once merge window closes
+> next, so based on how that discussion proceeds you may have drop this
+> patch, just heads up.
 
-Reviewed-by: Al Stone <ahs3@redhat.com>
+Tried that before...
 
--- 
-ciao,
-al
------------------------------------
-Al Stone
-Software Engineer
-Red Hat, Inc.
-ahs3 at redhat.com
------------------------------------
+http://lists.infradead.org/pipermail/linux-arm-kernel/2015-March/331813.html
+
+Gr{oetje,eeting}s,
+
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
