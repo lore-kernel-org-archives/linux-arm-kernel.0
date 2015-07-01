@@ -1,132 +1,46 @@
-From: pawelo@king.net.pl (Paul Osmialowski)
-Date: Wed, 1 Jul 2015 13:44:46 +0200 (CEST)
-Subject: [PATCH v2 4/9] arm: twr-k70f120m: timer driver for Kinetis SoC
-In-Reply-To: <2939807.q7WvOoYzDX@wuerfel>
-References: <1435667250-28299-1-git-send-email-pawelo@king.net.pl>
- <1435667250-28299-5-git-send-email-pawelo@king.net.pl>
- <2939807.q7WvOoYzDX@wuerfel>
-Message-ID: <alpine.LNX.2.00.1507011330070.11339@localhost.localdomain>
+From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
+Date: Wed, 01 Jul 2015 13:52:22 +0200
+Subject: [PATCH] drm/rockchip: vop: remove hardware cursor window
+In-Reply-To: <1435744173-23112-1-git-send-email-mark.yao@rock-chips.com>
+References: <1435744173-23112-1-git-send-email-mark.yao@rock-chips.com>
+Message-ID: <1617606.rtBNOYcypX@diego>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
+Hi Mark,
 
-Again, thanks for your remarks. I'm attaching timer patch candidate for 
-the third iteration.
+Am Mittwoch, 1. Juli 2015, 17:49:33 schrieb Mark Yao:
+> hardware cursor windows only have some fixed size, and not support
+> width virtual, when move hardware cursor windows outside of left,
+> the display would be wrong, so this window can't for cursor now.
+> 
+> And Tag hardware cursor window as a overlay is wrong, will make
+> userspace wrong behaviour.
+> 
+> So just remove the hardware cursor window
+> 
+> Signed-off-by: Mark Yao <mark.yao@rock-chips.com>
+> ---
+>  drivers/gpu/drm/rockchip/rockchip_drm_vop.c |    1 -
+>  1 file changed, 1 deletion(-)
+> 
+> diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
+> b/drivers/gpu/drm/rockchip/rockchip_drm_vop.c index 4603412..7373ba1 100644
+> --- a/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
+> +++ b/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
+> @@ -368,7 +368,6 @@ static const struct vop_win_data rk3288_vop_win_data[] =
+> { { .base = 0x40, .phy = &win01_data, .type = DRM_PLANE_TYPE_OVERLAY }, {
+> .base = 0x00, .phy = &win23_data, .type = DRM_PLANE_TYPE_OVERLAY }, { .base
+> = 0x50, .phy = &win23_data, .type = DRM_PLANE_TYPE_CURSOR }, -	{ .base =
+> 0x00, .phy = &cursor_data, .type = DRM_PLANE_TYPE_OVERLAY }, };
+> 
+>  static const struct vop_data rk3288_vop = {
 
-Following your advices, I've changed following things:
+you should probably also remove the
 
-- not abusing aliases (same goes to pinctrl driver)
-- ranges for addressing particular timers (no change in code though, it's
-   just up to the .dts implementor)
-- *_RD and *_WR macros removed; whole this big-endian issue was a mistake,
-   I guess I overdid it a bit trying to make my drivers as universal as
-   fsl-edma driver...
-- *_SET and *_RESET macros removed - they were giving false sense of
-   security hiding potential race.
+	static const struct vop_win_phy cursor_data
 
-Any comments are welcome.
+completely then, as it is now unused?
 
-On Tue, 30 Jun 2015, Arnd Bergmann wrote:
 
-> On Tuesday 30 June 2015 14:27:25 Paul Osmialowski wrote:
->
->> +Example:
->> +
->> +aliases {
->> +	pit0 = &pit0;
->> +	pit1 = &pit1;
->> +	pit2 = &pit2;
->> +	pit3 = &pit3;
->> +};
->> +
->> +pit at 40037000 {
->> +	compatible = "fsl,kinetis-pit-timer";
->> +	reg = <0x40037000 0x100>;
->> +	clocks = <&mcg_pclk_gate 5 23>;
->> +	#address-cells = <1>;
->> +	#size-cells = <1>;
->> +	ranges;
->
-> All the subnodes seem to fall inside of the device's own register
-> area, so I think it would be nicer to use a specific 'ranges'
-> property that only translates the registers in question.
->
->>  / {
->> +	aliases {
->> +		pit0 = &pit0;
->> +		pit1 = &pit1;
->> +		pit2 = &pit2;
->> +		pit3 = &pit3;
->> +	};
->> +
->>  	soc {
->> +		pit at 40037000 {
->> +			compatible = "fsl,kinetis-pit-timer";
->> +			reg = <0x40037000 0x100>;
->> +			clocks = <&mcg_pclk_gate 5 23>;
->> +			#address-cells = <1>;
->> +			#size-cells = <1>;
->> +			ranges;
->> +
->> +			pit0: timer at 40037100 {
->> +				reg = <0x40037100 0x10>;
->> +				interrupts = <68>;
->> +				status = "disabled";
->> +			};
->
-> I don't think it's necessary to have both an alias
-> and a label here. What do you use the alias for?
->
->> +
->> +#define KINETIS_PITMCR_PTR(base, reg) \
->> +	(&(((struct kinetis_pit_mcr_regs *)(base))->reg))
->> +#define KINETIS_PITMCR_RD(be, base, reg) \
->> +		((be) ? ioread32be(KINETIS_PITMCR_PTR(base, reg)) \
->> +		      : ioread32(KINETIS_PITMCR_PTR(base, reg)))
->> +#define KINETIS_PITMCR_WR(be, base, reg, val) do { \
->> +		if (be) \
->> +			iowrite32be((val), KINETIS_PITMCR_PTR(base, reg)); \
->> +		else \
->> +			iowrite32((val), KINETIS_PITMCR_PTR(base, reg)); \
->> +	} while (0)
->
-> These should really be written as inline functions. Can you
-> explain why you need to deal with a big-endian version of this
-> hardware? Can you configure the endianess of this register block
-> and just set it to one of the two at boot time?
->
->> +#define KINETIS_PIT_PTR(base, reg) \
->> +	(&(((struct kinetis_pit_channel_regs *)(base))->reg))
->> +#define KINETIS_PIT_RD(be, base, reg) \
->> +		((be) ? ioread32be(KINETIS_PIT_PTR(base, reg)) \
->> +		      : ioread32(KINETIS_PIT_PTR(base, reg)))
->> +#define KINETIS_PIT_WR(be, base, reg, val) do { \
->> +		if (be) \
->> +			iowrite32be((val), KINETIS_PIT_PTR(base, reg)); \
->> +		else \
->> +			iowrite32((val), KINETIS_PIT_PTR(base, reg)); \
->> +	} while (0)
->> +#define KINETIS_PIT_SET(be, base, reg, mask) \
->> +		KINETIS_PIT_WR(be, base, reg, \
->> +			KINETIS_PIT_RD(be, base, reg) | (mask))
->> +#define KINETIS_PIT_RESET(be, base, reg, mask) \
->> +		KINETIS_PIT_WR(be, base, reg, \
->> +			KINETIS_PIT_RD(be, base, reg) & (~(mask)))
->
->
-> Functions again. Also, just pass a pointer to your own data structure
-> into the function, instead of the 'be' and 'base' values.
->
-> The 'set' and 'reset' functions look like they need a spinlock
-> to avoid races.
->
-> 	Arnd
->
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: 0004-arm-twr-k70f120m-timer-driver-for-Kinetis-SoC.patch
-Type: text/x-diff
-Size: 12866 bytes
-Desc: 
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150701/0a4754cf/attachment-0001.bin>
+Heiko
