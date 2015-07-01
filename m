@@ -1,233 +1,81 @@
 From: wangzhou1@hisilicon.com (Zhou Wang)
-Date: Wed, 1 Jul 2015 17:43:33 +0800
-Subject: [PATCH v3 1/5] ARM/PCI: remove align_resource callback in
- pcibios_align_resource
-In-Reply-To: <1435743817-19083-1-git-send-email-wangzhou1@hisilicon.com>
-References: <1435743817-19083-1-git-send-email-wangzhou1@hisilicon.com>
-Message-ID: <1435743817-19083-2-git-send-email-wangzhou1@hisilicon.com>
+Date: Wed, 1 Jul 2015 17:43:32 +0800
+Subject: [PATCH v3 0/5] PCI: hisi: Add PCIe host support for Hisilicon Soc
+ Hip05
+Message-ID: <1435743817-19083-1-git-send-email-wangzhou1@hisilicon.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch had added by Arnd Bergmann during last reviewing of v1 patchset[1].
+This patchset adds PCIe host support for Hisilicon Soc Hip05. The PCIe hosts
+use PCIe IP core from Synopsys, So this driver is base on designware PCIe driver.
 
-PCI core codes call pcibios_align_resource(). In ARM specific one, it will
-dereference pci_sys_data and call sys->align_resource. If we try to unify ARM
-and ARM64 PCIe API in pcie-designware. it will bring kernel crash when run into
-this dereferencing.
+Hip05 is an ARMv8 architecture Soc. It should be able to use ARM64 PCIe API in
+designeware PCIe driver. So this patch also adds ARM64 support for designware
+pcie.
 
-However, in ARM there is only pci-mvebu which implements align_resource. So
-add align_resource call back in pci_host_bridge structure and override
-pcibios_align_resource with it.
+I tested this patchset on D02 board of Hisilicon with Intel 82599 networking
+card. It works well.
 
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Signed-off-by: Zhou Wang <wangzhou1@hisilicon.com>
-Tested-by: Fabrice Gasnier <fabrice.gasnier@st.com>
+This patchset is based on v4.1-rc8.
 
-[1] http://www.spinics.net/lists/linux-pci/msg41671.html
----
- arch/arm/kernel/bios32.c     |  6 ------
- drivers/pci/host/pci-mvebu.c | 47 ++++++++++++++++++++++++++++----------------
- drivers/pci/setup-res.c      | 27 ++++++++++++++++++++-----
- include/linux/pci.h          |  3 +++
- 4 files changed, 55 insertions(+), 28 deletions(-)
+Change from v2:
+- move struct pci_dev *dev and struct pci_sys_data *sys in
+  pcibios_align_resource in 1/5.
+- Add Gabriele's codes in 2/5 which delete unnecessary information parse and
+  use of_pci_get_host_bridge_resources for both ARM32 and ARM64.
+- Add maintainer patch 5/5.
 
-diff --git a/arch/arm/kernel/bios32.c b/arch/arm/kernel/bios32.c
-index fcbbbb1..b01189f 100644
---- a/arch/arm/kernel/bios32.c
-+++ b/arch/arm/kernel/bios32.c
-@@ -468,7 +468,6 @@ static void pcibios_init_hw(struct device *parent, struct hw_pci *hw,
- 		sys->busnr   = busnr;
- 		sys->swizzle = hw->swizzle;
- 		sys->map_irq = hw->map_irq;
--		sys->align_resource = hw->align_resource;
- 		INIT_LIST_HEAD(&sys->resources);
- 
- 		if (hw->private_data)
-@@ -588,8 +587,6 @@ char * __init pcibios_setup(char *str)
- resource_size_t pcibios_align_resource(void *data, const struct resource *res,
- 				resource_size_t size, resource_size_t align)
- {
--	struct pci_dev *dev = data;
--	struct pci_sys_data *sys = dev->sysdata;
- 	resource_size_t start = res->start;
- 
- 	if (res->flags & IORESOURCE_IO && start & 0x300)
-@@ -597,9 +594,6 @@ resource_size_t pcibios_align_resource(void *data, const struct resource *res,
- 
- 	start = (start + align - 1) & ~(align - 1);
- 
--	if (sys->align_resource)
--		return sys->align_resource(dev, res, start, size, align);
--
- 	return start;
- }
- 
-diff --git a/drivers/pci/host/pci-mvebu.c b/drivers/pci/host/pci-mvebu.c
-index 1ab8635..155d05f 100644
---- a/drivers/pci/host/pci-mvebu.c
-+++ b/drivers/pci/host/pci-mvebu.c
-@@ -22,6 +22,8 @@
- #include <linux/of_pci.h>
- #include <linux/of_platform.h>
- 
-+#include "../pci.h" /* HACK to see pci_find_host_bridge */
-+
- /*
-  * PCIe unit register offsets.
-  */
-@@ -751,27 +753,20 @@ static int mvebu_pcie_setup(int nr, struct pci_sys_data *sys)
- 	return 1;
- }
- 
--static struct pci_bus *mvebu_pcie_scan_bus(int nr, struct pci_sys_data *sys)
-+static resource_size_t mvebu_pcie_align_resource(void *data,
-+						 const struct resource *res,
-+						 resource_size_t size,
-+						 resource_size_t align)
- {
--	struct mvebu_pcie *pcie = sys_to_pcie(sys);
--	struct pci_bus *bus;
-+	struct pci_dev *dev = data;
- 
--	bus = pci_create_root_bus(&pcie->pdev->dev, sys->busnr,
--				  &mvebu_pcie_ops, sys, &sys->resources);
--	if (!bus)
--		return NULL;
-+	resource_size_t start = res->start;
- 
--	pci_scan_child_bus(bus);
-+	if (res->flags & IORESOURCE_IO && start & 0x300)
-+		start = (start + 0x3ff) & ~0x3ff;
- 
--	return bus;
--}
-+	start = (start + align - 1) & ~(align - 1);
- 
--static resource_size_t mvebu_pcie_align_resource(struct pci_dev *dev,
--						 const struct resource *res,
--						 resource_size_t start,
--						 resource_size_t size,
--						 resource_size_t align)
--{
- 	if (dev->bus->number != 0)
- 		return start;
- 
-@@ -796,6 +791,25 @@ static resource_size_t mvebu_pcie_align_resource(struct pci_dev *dev,
- 		return start;
- }
- 
-+static struct pci_bus *mvebu_pcie_scan_bus(int nr, struct pci_sys_data *sys)
-+{
-+	struct mvebu_pcie *pcie = sys_to_pcie(sys);
-+	struct pci_host_bridge *phb;
-+	struct pci_bus *bus;
-+
-+	bus = pci_create_root_bus(&pcie->pdev->dev, sys->busnr,
-+				  &mvebu_pcie_ops, sys, &sys->resources);
-+	if (!bus)
-+		return NULL;
-+
-+	phb = pci_find_host_bridge(bus);
-+	phb->align_resource = mvebu_pcie_align_resource;
-+
-+	pci_scan_child_bus(bus);
-+
-+	return bus;
-+}
-+
- static void mvebu_pcie_enable(struct mvebu_pcie *pcie)
- {
- 	struct hw_pci hw;
-@@ -812,7 +826,6 @@ static void mvebu_pcie_enable(struct mvebu_pcie *pcie)
- 	hw.scan           = mvebu_pcie_scan_bus;
- 	hw.map_irq        = of_irq_parse_and_map_pci;
- 	hw.ops            = &mvebu_pcie_ops;
--	hw.align_resource = mvebu_pcie_align_resource;
- 
- 	pci_common_init(&hw);
- }
-diff --git a/drivers/pci/setup-res.c b/drivers/pci/setup-res.c
-index 232f925..73abca7 100644
---- a/drivers/pci/setup-res.c
-+++ b/drivers/pci/setup-res.c
-@@ -200,7 +200,11 @@ static int pci_revert_fw_address(struct resource *res, struct pci_dev *dev,
- }
- 
- static int __pci_assign_resource(struct pci_bus *bus, struct pci_dev *dev,
--		int resno, resource_size_t size, resource_size_t align)
-+		int resno, resource_size_t size, resource_size_t align,
-+		resource_size_t (*alignf)(void *,
-+					  const struct resource *,
-+					  resource_size_t,
-+					  resource_size_t))
- {
- 	struct resource *res = dev->resource + resno;
- 	resource_size_t min;
-@@ -217,7 +221,7 @@ static int __pci_assign_resource(struct pci_bus *bus, struct pci_dev *dev,
- 	 */
- 	ret = pci_bus_alloc_resource(bus, res, size, align, min,
- 				     IORESOURCE_PREFETCH | IORESOURCE_MEM_64,
--				     pcibios_align_resource, dev);
-+				     alignf, dev);
- 	if (ret == 0)
- 		return 0;
- 
-@@ -229,7 +233,7 @@ static int __pci_assign_resource(struct pci_bus *bus, struct pci_dev *dev,
- 	     (IORESOURCE_PREFETCH | IORESOURCE_MEM_64)) {
- 		ret = pci_bus_alloc_resource(bus, res, size, align, min,
- 					     IORESOURCE_PREFETCH,
--					     pcibios_align_resource, dev);
-+					     alignf, dev);
- 		if (ret == 0)
- 			return 0;
- 	}
-@@ -242,7 +246,7 @@ static int __pci_assign_resource(struct pci_bus *bus, struct pci_dev *dev,
- 	 */
- 	if (res->flags & (IORESOURCE_PREFETCH | IORESOURCE_MEM_64))
- 		ret = pci_bus_alloc_resource(bus, res, size, align, min, 0,
--					     pcibios_align_resource, dev);
-+					     alignf, dev);
- 
- 	return ret;
- }
-@@ -251,10 +255,23 @@ static int _pci_assign_resource(struct pci_dev *dev, int resno,
- 				resource_size_t size, resource_size_t min_align)
- {
- 	struct pci_bus *bus;
-+	struct pci_host_bridge *phb;
-+	resource_size_t (*alignf)(void *,
-+				  const struct resource *,
-+				  resource_size_t,
-+				  resource_size_t);
- 	int ret;
- 
- 	bus = dev->bus;
--	while ((ret = __pci_assign_resource(bus, dev, resno, size, min_align))) {
-+	phb = pci_find_host_bridge(bus);
-+
-+	if (phb->align_resource)
-+		alignf = phb->align_resource;
-+	else
-+		alignf = pcibios_align_resource;
-+
-+	while ((ret = __pci_assign_resource(bus, dev, resno, size,
-+					    min_align, alignf))) {
- 		if (!bus->parent || !bus->self->transparent)
- 			break;
- 		bus = bus->parent;
-diff --git a/include/linux/pci.h b/include/linux/pci.h
-index 353db8d..39e48fc 100644
---- a/include/linux/pci.h
-+++ b/include/linux/pci.h
-@@ -404,6 +404,9 @@ struct pci_host_bridge {
- 	struct device dev;
- 	struct pci_bus *bus;		/* root bus */
- 	struct list_head windows;	/* resource_entry */
-+	resource_size_t (*align_resource)(void *data,
-+			 const struct resource *res,
-+			 resource_size_t size, resource_size_t align);
- 	void (*release_fn)(struct pci_host_bridge *);
- 	void *release_data;
- 	unsigned int ignore_reset_delay:1;	/* for entire hierarchy */
+Change from RFC v1:
+- Add 1/4 patch by Arnd which removes align_resource callback in ARM
+  pcibios_align_resource.
+- Change head file in pcie-designware from asm/hardirq.h to linux/hardirq.h.
+- Set pp->root_bus_nr = 0 in dra7xx, exynos, imx6, keystone, layerscape,
+  spear13xx.
+- Remove unnecessary parentheses of some macros in pcie-hisi.
+- Use macro to replace some magic values.
+- Merge two loops together and add some comments about it in context_config
+  function in pcie-hisi.
+- Modify some value of items in pcie node example in binding document. 
+
+Change from RFC:
+- delete dw_pcie_setup, dw_pcie_scan_bus, dw_pcie_map_irq and struct hw_pci,
+  merge related operations into dw_pcie_host_init.
+
+Link of v2:
+- http://www.spinics.net/lists/linux-pci/msg41844.html
+Link of RFC v1:
+- http://www.spinics.net/lists/linux-pci/msg41305.html
+Link of RFC:
+- http://www.spinics.net/lists/linux-pci/msg40434.html
+
+Zhou Wang (5):
+  ARM/PCI: remove align_resource callback in pcibios_align_resource
+  PCI: designware: Add ARM64 support
+  PCI: hisi: Add PCIe host support for Hisilicon Soc Hip05
+  Documentation: DT: Add Hisilicon PCIe host binding
+  MAINTAINERS: Add pcie-hisi maintainer
+
+ .../devicetree/bindings/pci/hisilicon-pcie.txt     |  46 ++++
+ MAINTAINERS                                        |   7 +
+ arch/arm/kernel/bios32.c                           |   6 -
+ drivers/pci/host/Kconfig                           |   5 +
+ drivers/pci/host/Makefile                          |   1 +
+ drivers/pci/host/pci-dra7xx.c                      |   1 +
+ drivers/pci/host/pci-exynos.c                      |   2 +-
+ drivers/pci/host/pci-imx6.c                        |   2 +-
+ drivers/pci/host/pci-keystone-dw.c                 |   2 +-
+ drivers/pci/host/pci-keystone.c                    |   2 +-
+ drivers/pci/host/pci-layerscape.c                  |   2 +-
+ drivers/pci/host/pci-mvebu.c                       |  47 ++--
+ drivers/pci/host/pcie-designware.c                 | 242 ++++++++-----------
+ drivers/pci/host/pcie-designware.h                 |  10 +-
+ drivers/pci/host/pcie-hisi.c                       | 258 +++++++++++++++++++++
+ drivers/pci/host/pcie-spear13xx.c                  |   2 +-
+ drivers/pci/setup-res.c                            |  27 ++-
+ include/linux/pci.h                                |   3 +
+ 18 files changed, 482 insertions(+), 183 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/pci/hisilicon-pcie.txt
+ create mode 100644 drivers/pci/host/pcie-hisi.c
+
 -- 
 1.9.1
