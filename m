@@ -1,38 +1,61 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 1 Jul 2015 15:12:12 +0100
-Subject: [PATCH] ARM: psci: keystone: remove keystone_smp_ops code if
- psci is supported
-In-Reply-To: <1435752784-30639-1-git-send-email-vitalya@ti.com>
-References: <1435752784-30639-1-git-send-email-vitalya@ti.com>
-Message-ID: <20150701141211.GK7557@n2100.arm.linux.org.uk>
+From: ohad@wizery.com (Ohad Ben-Cohen)
+Date: Wed, 1 Jul 2015 17:14:48 +0300
+Subject: [GIT PULL] remoteproc for 4.2
+Message-ID: <CAK=Wgba9Jst3xJ_EQf+zenZSqedzhvSw8ZVMZ_YmsQM70mMbPA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 01, 2015 at 08:13:03AM -0400, Vitaly Andrianov wrote:
-> If we enable psci support we don't need keystone_smp_ops anymore.
-> 
-> Signed-off-by: Vitaly Andrianov <vitalya@ti.com>
+The following changes since commit b787f68c36d49bb1d9236f403813641efa74a031:
 
-However, this is not necessary.  If you look at arch/arm/kernel/setup.c,
-it contains this:
+  Linux 4.1-rc1 (2015-04-26 17:59:10 -0700)
 
-        psci_init();
-#ifdef CONFIG_SMP
-        if (is_smp()) {
-                if (!mdesc->smp_init || !mdesc->smp_init()) {
-                        if (psci_smp_available())
-                                smp_set_ops(&psci_smp_ops);
-                        else if (mdesc->smp)
-                                smp_set_ops(mdesc->smp);
-                }
-                smp_init_cpus();
-                smp_build_mpidr_hash();
-        }
-#endif
+are available in the git repository at:
 
-So, the platforms' SMP ops won't be used even if they're provided
-when PSCI is available.
+  git://git.kernel.org/pub/scm/linux/kernel/git/ohad/remoteproc.git
+tags/remoteproc-4.2
 
--- 
-FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
-according to speedtest.net.
+for you to fetch changes up to 8de3dbd0895bebe52d069a82feae8e3fb51c1bdf:
+
+  remoteproc: fix !CONFIG_OF build breakage (2015-06-18 11:44:41 +0300)
+
+----------------------------------------------------------------
+- remoteproc fixes/cleanups from Suman Anna
+- new remoteproc TI Wakeup M3 driver from Dave Gerlach
+- remoteproc core support for TI's Wakeup M3 driver from both Dave and Suman
+- tiny remoteproc build fix from myself
+
+----------------------------------------------------------------
+Dave Gerlach (3):
+      remoteproc: introduce rproc_get_by_phandle API
+      Documentation: dt: add bindings for TI Wakeup M3 processor
+      remoteproc/wkup_m3: add a remoteproc driver for TI Wakeup M3
+
+Ohad Ben-Cohen (1):
+      remoteproc: fix !CONFIG_OF build breakage
+
+Suman Anna (4):
+      remoteproc/ste: add blank lines after declarations
+      remoteproc/davinci: fix quoted split string checkpatch warning
+      remoteproc: fix various checkpatch warnings
+      remoteproc: add a rproc ops for performing address translation
+
+ Documentation/devicetree/bindings/remoteproc/wkup_m3_rproc.txt |  52
+++++++++++++++++++++++
+ Documentation/remoteproc.txt                                   |   6 +++
+ drivers/remoteproc/Kconfig                                     |  13 ++++++
+ drivers/remoteproc/Makefile                                    |   1 +
+ drivers/remoteproc/da8xx_remoteproc.c                          |   3 +-
+ drivers/remoteproc/remoteproc_core.c                           | 115
++++++++++++++++++++++++++++++++++++++----------
+ drivers/remoteproc/remoteproc_internal.h                       |   2 +-
+ drivers/remoteproc/ste_modem_rproc.c                           |   4 +-
+ drivers/remoteproc/wkup_m3_rproc.c                             | 257
++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+ include/linux/platform_data/wkup_m3.h                          |  30
++++++++++++++
+ include/linux/remoteproc.h                                     |   9 ++--
+ 11 files changed, 460 insertions(+), 32 deletions(-)
+ create mode 100644
+Documentation/devicetree/bindings/remoteproc/wkup_m3_rproc.txt
+ create mode 100644 drivers/remoteproc/wkup_m3_rproc.c
+ create mode 100644 include/linux/platform_data/wkup_m3.h
