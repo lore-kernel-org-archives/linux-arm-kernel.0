@@ -1,35 +1,57 @@
-From: eddie.huang@mediatek.com (Eddie Huang)
-Date: Mon, 1 Jun 2015 14:29:12 +0800
-Subject: [PATCH 1/2] arm64: dts: mt8173: Add watchdog device node
-In-Reply-To: <1433140153-22436-1-git-send-email-eddie.huang@mediatek.com>
-References: <1433140153-22436-1-git-send-email-eddie.huang@mediatek.com>
-Message-ID: <1433140153-22436-2-git-send-email-eddie.huang@mediatek.com>
+From: stripathi@apm.com (Suman Tripathi)
+Date: Wed, 1 Jul 2015 12:33:20 +0530
+Subject: [PATCH net-next v1 1/1] drivers: net: xgene: Fix the compilation
+ error "error: implicit declaration of function
+ 'acpi_evaluate_integer'" in APM X-Gene ethernet driver.
+In-Reply-To: <1435134100-12460-2-git-send-email-stripathi@apm.com>
+References: <1435134100-12460-1-git-send-email-stripathi@apm.com>
+ <1435134100-12460-2-git-send-email-stripathi@apm.com>
+Message-ID: <CAOHikRDY1dx4DiDD_Lny228t+sQdmUiu_NmTGoPS_Y6NPXNRLg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add MT8173 watchdog device node.
+Hi ,
 
-Signed-off-by: Eddie Huang <eddie.huang@mediatek.com>
----
- arch/arm64/boot/dts/mediatek/mt8173.dtsi | 6 ++++++
- 1 file changed, 6 insertions(+)
+Any comments on this patch .
 
-diff --git a/arch/arm64/boot/dts/mediatek/mt8173.dtsi b/arch/arm64/boot/dts/mediatek/mt8173.dtsi
-index 30ac8dd..b52ec43 100644
---- a/arch/arm64/boot/dts/mediatek/mt8173.dtsi
-+++ b/arch/arm64/boot/dts/mediatek/mt8173.dtsi
-@@ -160,6 +160,12 @@
- 						<GIC_SPI 147 IRQ_TYPE_LEVEL_HIGH>;
- 		};
- 
-+		watchdog: watchdog at 10007000 {
-+			compatible = "mediatek,mt8173-wdt",
-+				     "mediatek,mt6589-wdt";
-+			reg = <0 0x10007000 0 0x100>;
-+		};
-+
- 		sysirq: intpol-controller at 10200620 {
- 			compatible = "mediatek,mt8173-sysirq",
- 					"mediatek,mt6577-sysirq";
+On Wed, Jun 24, 2015 at 1:51 PM, Suman Tripathi <stripathi@apm.com> wrote:
+> This patch guards the acpi_evaluate_interger function as it fails
+> the build for NON_ACPI CONFIG.
+>
+> Signed-off-by: Iyappan Subramanian <isubramanian@apm.com>
+> Signed-off-by: Suman Tripathi <stripathi@apm.com>
+> Reported-by: kbuild test robot <fengguang.wu@intel.com>
+> ---
+>  drivers/net/ethernet/apm/xgene/xgene_enet_main.c | 2 ++
+>  1 file changed, 2 insertions(+)
+>
+> diff --git a/drivers/net/ethernet/apm/xgene/xgene_enet_main.c b/drivers/net/ethernet/apm/xgene/xgene_enet_main.c
+> index 4e83d4c..70b9ef6 100644
+> --- a/drivers/net/ethernet/apm/xgene/xgene_enet_main.c
+> +++ b/drivers/net/ethernet/apm/xgene/xgene_enet_main.c
+> @@ -871,6 +871,7 @@ static const struct net_device_ops xgene_ndev_ops = {
+>         .ndo_set_mac_address = xgene_enet_set_mac_address,
+>  };
+>
+> +#ifdef CONFIG_ACPI
+>  static int xgene_get_port_id_acpi(struct device *dev,
+>                                   struct xgene_enet_pdata *pdata)
+>  {
+> @@ -886,6 +887,7 @@ static int xgene_get_port_id_acpi(struct device *dev,
+>
+>         return 0;
+>  }
+> +#endif
+>
+>  static int xgene_get_port_id_dt(struct device *dev, struct xgene_enet_pdata *pdata)
+>  {
+> --
+> 1.8.2.1
+>
+
+
+
 -- 
-1.8.1.1.dirty
+Thanks,
+with regards,
+Suman Tripathi
