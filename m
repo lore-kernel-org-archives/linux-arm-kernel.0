@@ -1,43 +1,69 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Thu, 02 Jul 2015 08:53:55 +0900
-Subject: [PATCH v3 2/4] ARM: dts: Exynos5250: add CPU OPP and regulator
- supply property
-In-Reply-To: <1435756238-845-3-git-send-email-b.zolnierkie@samsung.com>
-References: <1435756238-845-1-git-send-email-b.zolnierkie@samsung.com>
- <1435756238-845-3-git-send-email-b.zolnierkie@samsung.com>
-Message-ID: <55947D93.3090606@samsung.com>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Wed, 01 Jul 2015 16:54:53 -0700
+Subject: [PATCH 2/4] hvc_dcc: don't ignore errors during initialization
+In-Reply-To: <1435699387-32591-2-git-send-email-timur@codeaurora.org>
+References: <1435699387-32591-1-git-send-email-timur@codeaurora.org>
+ <1435699387-32591-2-git-send-email-timur@codeaurora.org>
+Message-ID: <55947DCD.1020605@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01.07.2015 22:10, Bartlomiej Zolnierkiewicz wrote:
-> From: Thomas Abraham <thomas.ab@samsung.com>
-> 
-> For Exynos5250 platforms, add CPU operating points and CPU
-> regulator supply properties for migrating from Exynos specific
-> cpufreq driver to using generic cpufreq driver.
-> 
-> Changes by Bartlomiej:
-> - split Exynos5250 support from the original patch
-> - added CPU regulator supply property for Google Spring board
-> - put the new cpu nodes in alphabetical order
-> 
-> Cc: Kukjin Kim <kgene.kim@samsung.com>
-> Cc: Doug Anderson <dianders@chromium.org>
-> Cc: Javier Martinez Canillas <javier@dowhile0.org>
-> Cc: Andreas Faerber <afaerber@suse.de>
-> Signed-off-by: Thomas Abraham <thomas.ab@samsung.com>
-> Signed-off-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
+On 06/30/2015 02:23 PM, Timur Tabi wrote:
+> hvc_instantiate() and hvc_alloc() return errors if they fail, so don't
+> ignore them.
+>
+> Signed-off-by: Timur Tabi <timur@codeaurora.org>
 > ---
->  arch/arm/boot/dts/exynos5250-arndale.dts  |  4 ++++
->  arch/arm/boot/dts/exynos5250-smdk5250.dts |  4 ++++
->  arch/arm/boot/dts/exynos5250-snow.dts     |  4 ++++
->  arch/arm/boot/dts/exynos5250-spring.dts   |  4 ++++
->  arch/arm/boot/dts/exynos5250.dtsi         | 22 ++++++++++++++++++++++
->  5 files changed, 38 insertions(+)
+>  drivers/tty/hvc/hvc_dcc.c | 17 +++++++++++++----
+>  1 file changed, 13 insertions(+), 4 deletions(-)
+>
+> diff --git a/drivers/tty/hvc/hvc_dcc.c b/drivers/tty/hvc/hvc_dcc.c
+> index 33657dc..f8b8cf2 100644
+> --- a/drivers/tty/hvc/hvc_dcc.c
+> +++ b/drivers/tty/hvc/hvc_dcc.c
+> @@ -225,20 +225,29 @@ static const struct hv_ops hvc_dcc_get_put_ops = {
+>  
+>  static int __init hvc_dcc_console_init(void)
+>  {
+> +	int ret;
+> +
+> +	/* This always runs on boot core */
+>  	if (!hvc_dcc_check())
+>  		return -ENODEV;
+>  
+> -	hvc_instantiate(0, 0, &hvc_dcc_get_put_ops);
+> -	return 0;
+> +	/* Returns -1 if error */
+> +	ret = hvc_instantiate(0, 0, &hvc_dcc_get_put_ops);
+> +
+> +	return ret < 0 ? -ENODEV : 0;
 
-Looks good, thanks!
+Why not just return the value that hvc_instantiate returns? And maybe we
+should change those -1 in hvc_instantiate into -EPERM?
 
-Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+>  }
+>  console_initcall(hvc_dcc_console_init);
+>  
+>  static int __init hvc_dcc_init(void)
+>  {
+> +	struct hvc_struct *p;
+> +
+> +	/* This can run on any core */
+>  	if (!hvc_dcc_check())
+>  		return -ENODEV;
+>  
+> -	hvc_alloc(0, 0, &hvc_dcc_get_put_ops, 128);
+> -	return 0;
+> +	p = hvc_alloc(0, 0, &hvc_dcc_get_put_ops, 128);
+> +
+> +	return IS_ERR(p) ? PTR_ERR(p) : 0;
 
-Best regards,
-Krzysztof
+return PTR_ERR_OR_ZERO()?
+
+>  }
+>  device_initcall(hvc_dcc_init);
+
+
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
