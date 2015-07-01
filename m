@@ -1,54 +1,66 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Wed, 1 Jul 2015 15:09:03 +0200
-Subject: n900 in 4.2-rc0: repeating oopses
-In-Reply-To: <20150701103421.GV4156@atomide.com>
-References: <20150416093234.GA17423@amd> <20150629091146.GA5103@amd>
- <20150630092404.GA19285@amd> <20150630095310.GF27720@pali>
- <20150701065932.GS4156@atomide.com> <20150701072255.GA17577@pali>
- <20150701095954.GD7969@amd> <20150701103421.GV4156@atomide.com>
-Message-ID: <20150701130903.GG7969@amd>
+From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
+Date: Wed, 01 Jul 2015 15:10:34 +0200
+Subject: [PATCH v3 0/4] cpufreq: use generic cpufreq drivers for Exynos5250
+ platform
+Message-ID: <1435756238-845-1-git-send-email-b.zolnierkie@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed 2015-07-01 03:34:22, Tony Lindgren wrote:
-> * Pavel Machek <pavel@ucw.cz> [150701 03:02]:
-> > On Wed 2015-07-01 09:22:55, Pali Roh?r wrote:
-> > > On Tuesday 30 June 2015 23:59:33 Tony Lindgren wrote:
-> > > > * Pali Roh?r <pali.rohar@gmail.com> [150630 02:55]:
-> > > > > 
-> > > > > I will try 4.2 at the end of week.
-> > > > 
-> > > > At least today's 4.1.0-11549-g05a8256 boots just fine on my n900.
-> > > > 
-> > > > Regards,
-> > > > 
-> > > > Tony
-> > > 
-> > > So, Pavel can you re-test? Maybe there can be problem with some driver
-> > > which Tony did not compiled into zImage? Just speculation...
-> > 
-> > I re-tested with today's git, and it seems to boot. Thanks for help...
-> 
-> OK good to hear.
->  
-> > Now. "echo mem > /sys/power/state" is broken, as in "returns
-> > immediately in about 50% cases". The messages are
-> > 
-> > Powerdomain (per_pwrdm) didn't enter target state 1
-> > Powerdomain (core_pwerdm) didn't enter target state 1
-> > 
-> > Any ideas? Thanks,
-> 
-> Works for me after enabling the idle timeouts with the following
-> script and blanking the screen and disconnecting USB:
+Hi,
 
-Um. I'm forcing suspend with "echo mem > /sys/power/state" . (It
-worked in 4.1). That should just make it sleep, no autosuspend-related
-trickery... (But yes, I guess I should set up the leds and try
-autosuspend, too.)
+This patch series removes the use of Exynos5250 specific support
+from cpufreq-exynos driver and enables the use of cpufreq-dt driver
+for this platform.
 
-Regards,
-									Pavel
+This patch series has been tested on Exynos5250 based Arndale board.
+
+Changes since v1 (http://lkml.org/lkml/2015/4/13/611):
+- rebased on top of next-20150629 branch of linux-next kernel tree
+- dropped dependency on "[PATCH 0/6] cpufreq: use generic cpufreq
+  drivers for Exynos4x12 platform" patch series as it needs more
+  work (Viresh has requested porting of cpufreq-dt's boost mode
+  support over opp-v2 patches)
+
+Changes since v2 (http://lkml.org/lkml/2015/6/29/361):
+- put the new cpu nodes in alphabetical order
+- updated Javier's and Mike's e-mail adresses
+- removed Cc: tag with stale Sachin's e-mail adress
+- added Reviewed-by: tag from Krzysztof to patches #3 and #4
+
+Depends on:
+- next-20150629 branch of linux-next kernel tree
+
+Best regards,
+--
+Bartlomiej Zolnierkiewicz
+Samsung R&D Institute Poland
+Samsung Electronics
+
+
+Bartlomiej Zolnierkiewicz (1):
+  cpufreq: exynos: remove Exynos5250 specific cpufreq driver support
+
+Thomas Abraham (3):
+  clk: samsung: exynos5250: add cpu clock configuration data and
+    instantiate cpu clock
+  ARM: dts: Exynos5250: add CPU OPP and regulator supply property
+  ARM: Exynos: switch to using generic cpufreq driver for Exynos5250
+
+ arch/arm/boot/dts/exynos5250-arndale.dts  |   4 +
+ arch/arm/boot/dts/exynos5250-smdk5250.dts |   4 +
+ arch/arm/boot/dts/exynos5250-snow.dts     |   4 +
+ arch/arm/boot/dts/exynos5250-spring.dts   |   4 +
+ arch/arm/boot/dts/exynos5250.dtsi         |  22 ++++
+ arch/arm/mach-exynos/exynos.c             |   1 +
+ drivers/clk/samsung/clk-exynos5250.c      |  31 +++++
+ drivers/cpufreq/Kconfig.arm               |  11 --
+ drivers/cpufreq/Makefile                  |   1 -
+ drivers/cpufreq/exynos-cpufreq.c          |   3 -
+ drivers/cpufreq/exynos-cpufreq.h          |  17 ---
+ drivers/cpufreq/exynos5250-cpufreq.c      | 210 ------------------------------
+ include/dt-bindings/clock/exynos5250.h    |   1 +
+ 13 files changed, 71 insertions(+), 242 deletions(-)
+ delete mode 100644 drivers/cpufreq/exynos5250-cpufreq.c
+
 -- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+1.9.1
