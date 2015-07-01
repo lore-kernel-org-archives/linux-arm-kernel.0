@@ -1,213 +1,230 @@
 From: geert+renesas@glider.be (Geert Uytterhoeven)
-Date: Wed,  1 Jul 2015 17:58:01 +0200
-Subject: [PATCH v3 07/16] ARM: shmobile: r8a7778 dtsi: Add CPG/MSTP Clock
- Domain
-In-Reply-To: <1435766290-3005-1-git-send-email-geert+renesas@glider.be>
-References: <1435766290-3005-1-git-send-email-geert+renesas@glider.be>
-Message-ID: <1435766290-3005-8-git-send-email-geert+renesas@glider.be>
+Date: Wed,  1 Jul 2015 17:57:54 +0200
+Subject: [PATCH v3 00/16] ARM: shmobile: Add CPG/MSTP Clock Domain
+Message-ID: <1435766290-3005-1-git-send-email-geert+renesas@glider.be>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add an appropriate "#power-domain-cells" property to the cpg_clocks
-device node, to create the CPG/MSTP Clock Domain.
+	Hi all,
 
-Add "power-domains" properties to all device nodes for devices that are
-part of the CPG/MSTP Clock Domain and can be power-managed through an
-MSTP clock.  This applies to most on-SoC devices, which have a
-one-to-one mapping from SoC device to DT device node.  A notable
-exception is the "sound" node, which represents multiple SoC devices,
-each having their own MSTP clocks.
+This patch series adds Clock Domain support to the Clock Pulse Generator
+(CPG) Module Stop (MSTP) Clocks driver using the generic PM Domain, to
+be used on shmobile SoCs without device power domains (R-Car Gen1 and
+Gen2, RZ).  This allows to power-manage the module clocks of SoC devices
+that are part of the CPG/MSTP Clock Domain using Runtime PM, or for
+system suspend/resume, similar to SoCs with device power domains
+(SH-Mobile and R-Mobile).
 
-Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
----
-v3:
+SoC devices that are part of the CPG/MSTP Clock Domain and can be
+power-managed through an MSTP clock are tagged in DT with a proper
+"power-domains" property, also serving as a visual clue. This applies to
+most on-SoC devices, which have a one-to-one mapping from SoC device to
+DT device node.  Notable exceptions are "display" and "sound" device
+nodes, which represent multiple SoC devices, each having their own MSTP
+clocks. Hence drivers for such devices still have to manage their
+(multiple module) clocks themselves.
+
+The (MSTP) clock to use for power-management is found by scanning for
+clocks that are compatible with "renesas,cpg-mstp-clocks".
+In V1, the "first" clock tied to each device (con_id NULL) was used,
+being a bit ad-hoc. It was suggested to use the "fck" clock instead,
+but this may conflict with DT bindings for devices we don't control
+(e.g. GIC-400 plans to mandate "clk" for the clk-name of its single
+clock). Looking for real MSTP clocks avoids this problem.
+
+Logically, the CPG/MSTP Clock Domain operates on the SoC CPG/MSTP block.
+As there's no single device node in DT representing this block (there
+are separate device nodes for the CPG and for the individual MSTP
+clocks), I bound the logic to the CPG device node.  Perhaps this is
+something we should change for future SoCs?
+
+Finally, the legacy default PM domain hack in drivers/sh/pm_runtime.c
+is no longer needed when running an ARM multi-platform kernel on an
+shmobile SoC with genpd support. Please note that this hack is still
+needed for legacy (SH/ARM) platforms, and for the CONFIG_PM=n case.
+Perhaps we should unconditionally enable PM when building shmobile
+multi-platform kernels?
+
+Compared to the legacy default PM domain hack, the CPG/MSTP Clock Domain
+has several advantages:
+  - It only affects on-SoC devices, not all platform devices,
+  - It only affects the on-SoC devices we want, as specified in DT,
+  - Allmost all module clocks of all on-SoC devices (barring devices
+    needed for wake-up) are now gated during s2ram, saving more power.
+
+By adding a small quirk to the CPG/MSTP Clock Domain code, its functions
+to attach/detach devices to a PM Domain can be reused by the pm-rmobile
+driver, reducing code duplication.
+
+Here's a list of all devices in the CPG/MSTP Clock Domain on r8a7791:
+
+root at koelsch:~# cat /sys/kernel/debug/pm_genpd/pm_genpd_summary
+    domain                      status         slaves
+           /device                                      runtime status
+----------------------------------------------------------------------
+cpg_clocks                      on               
+    /devices/platform/e61c0000.interrupt-controller     active
+    /devices/platform/e60b0000.i2c                      suspended
+    /devices/platform/ffca0000.timer                    suspended
+    /devices/platform/e6590100.usb-phy                  unsupported
+    /devices/platform/e6050000.gpio                     active
+    /devices/platform/e6051000.gpio                     active
+    /devices/platform/e6052000.gpio                     active
+    /devices/platform/e6053000.gpio                     active
+    /devices/platform/e6054000.gpio                     active
+    /devices/platform/e6055000.gpio                     active
+    /devices/platform/e6055400.gpio                     active
+    /devices/platform/e6055800.gpio                     active
+    /devices/platform/ee090000.pci                      active
+    /devices/platform/ee0d0000.pci                      active
+    /devices/platform/fe000000.pcie                     unsupported
+    /devices/platform/e6700000.dma-controller           active
+    /devices/platform/e6720000.dma-controller           active
+    /devices/platform/ec700000.dma-controller           active
+    /devices/platform/ec720000.dma-controller           suspended
+    /devices/platform/e65a0000.dma-controller           suspended
+    /devices/platform/e65b0000.dma-controller           suspended
+    /devices/platform/e6e60000.serial                   active
+    /devices/platform/e6e68000.serial                   active
+    /devices/platform/ee300000.sata                     unsupported
+    /devices/platform/e6b10000.spi                      suspended
+    /devices/platform/e6e20000.spi                      suspended
+    /devices/platform/ee700000.ethernet                 active
+    /devices/platform/e6530000.i2c                      suspended
+    /devices/platform/e6ef1000.video                    suspended
+    /devices/platform/e61f0000.thermal                  active
+    /devices/platform/ee100000.sd                       active
+    /devices/platform/ee140000.sd                       active
+    /devices/platform/ee160000.sd                       active
+root at koelsch:~# 
+
+Patch overview:
+  - Patch 1 adds the core CPG/MSTP Clock Domain code to the CPG MSTP
+    driver,
+  - Patches 2-5 adds CPG/MSTP Clock Domain driver support for all
+    Renesas SoCs that have MSTP clocks, but no device power domains, and
+    updates the DT binding documentation accordingly,
+  - Patches 6-12 add CPG/MSTP Clock Domains to the dtsi files,
+  - Patches 13 and 14 disable the legacy default PM domain hack on all
+    ARM multi-platform builds with genpd support, now it's no longer
+    needed nor wanted,
+  - Patch 15 adds a quirk for r8a73a4 and sh73a0, where the Bus State
+    Controller is not power-managed by an MSTP clock, but by a plain
+    CPG clock,
+  - Patch 16 makes the R-Mobile PM Domain driver use the CPG/MSTP Clock
+    Domain attach/detach helpers, as they're more future-proof, and to
+    reduce code duplication.
+
+Changes compared to v2 ("[PATCH v2 00/14] ARM: shmobile: Add CPG Clock
+Domains", https://lkml.org/lkml/2015/5/28/590):
+  - Add Acked-by,
   - Use "CPG/MSTP Clock Domain" instead of "CPG Clock Domain",
+  - Drop bogus addition of #includes to clk-rcar-gen2.c,
+  - Call pm_clk_destroy() from cpg_mstp_detach_dev() only if
+    cpg_mstp_attach_dev() actually added a clock,
+  - Add "power-domains" property to recently introduced Ethernet AVB
+    device node,
+  - Add CPG/MSTP Clock Domain to recently introduced r8a7793 SoC,
+  - The legacy default PM Domain runtime check must stay for the ARM
+    multiplatform CONFIG_PM=n case, to prevent the code from running on
+    non-shmobile machines,
+  - Provide backwards-compatibility with old DTs (mainly for R-Car
+    Gen2),
+  - Extract EMMA Mobile EV2 removal into a separate patch,
+  - Replace explicit platform checks in the legacy default PM Domain
+    code by a check for the presence of MSTP clocks,
+  - Drop references to legacy r8a7740/sh73a0, which are gone.
 
-v2:
-  - New.
----
- arch/arm/boot/dts/r8a7778.dtsi | 22 ++++++++++++++++++++++
- 1 file changed, 22 insertions(+)
+Changes compared to v1 ("[PATCH/RFC 0/5] ARM: shmobile: rcar-gen2: Add
+CPG Clock Domain",
+https://www.marc.info/?l=linux-pm&m=142670805530085&w=3):
+  - Add Acked-by and Reviewed-by.
+  - Move core CPG Clock Domain code from the R-Car Gen2 driver to the
+    CPG MSTP Clocks driver, as it's generic, and can be used on other
+    Renesas SoCs that have a CPG/MSTP block,
+  - Scan for an MSTP clock instead of using the first clock tied to the
+    device (con_id NULL),
+  - Add support for R-Car Gen1 and RZ, in addition to R-Car Gen2,
+    allowing to drop the legacy default PM domain hack completely in
+    multi-platform builds,
+  - Reuse the CPG Clock Domain attach/detach helpers for pm-rmobile.
+More detailed change logs are available in the individual patches.
 
-diff --git a/arch/arm/boot/dts/r8a7778.dtsi b/arch/arm/boot/dts/r8a7778.dtsi
-index 7ce9f5fd586504f2..4b1fa9f42ad5457b 100644
---- a/arch/arm/boot/dts/r8a7778.dtsi
-+++ b/arch/arm/boot/dts/r8a7778.dtsi
-@@ -53,6 +53,7 @@
- 		reg = <0xfde00000 0x400>;
- 		interrupts = <0 105 IRQ_TYPE_LEVEL_HIGH>;
- 		clocks = <&mstp1_clks R8A7778_CLK_ETHER>;
-+		power-domains = <&cpg_clocks>;
- 		phy-mode = "rmii";
- 		#address-cells = <1>;
- 		#size-cells = <0>;
-@@ -152,6 +153,7 @@
- 		reg = <0xffc70000 0x1000>;
- 		interrupts = <0 67 IRQ_TYPE_LEVEL_HIGH>;
- 		clocks = <&mstp0_clks R8A7778_CLK_I2C0>;
-+		power-domains = <&cpg_clocks>;
- 		status = "disabled";
- 	};
- 
-@@ -162,6 +164,7 @@
- 		reg = <0xffc71000 0x1000>;
- 		interrupts = <0 78 IRQ_TYPE_LEVEL_HIGH>;
- 		clocks = <&mstp0_clks R8A7778_CLK_I2C1>;
-+		power-domains = <&cpg_clocks>;
- 		status = "disabled";
- 	};
- 
-@@ -172,6 +175,7 @@
- 		reg = <0xffc72000 0x1000>;
- 		interrupts = <0 76 IRQ_TYPE_LEVEL_HIGH>;
- 		clocks = <&mstp0_clks R8A7778_CLK_I2C2>;
-+		power-domains = <&cpg_clocks>;
- 		status = "disabled";
- 	};
- 
-@@ -182,6 +186,7 @@
- 		reg = <0xffc73000 0x1000>;
- 		interrupts = <0 77 IRQ_TYPE_LEVEL_HIGH>;
- 		clocks = <&mstp0_clks R8A7778_CLK_I2C3>;
-+		power-domains = <&cpg_clocks>;
- 		status = "disabled";
- 	};
- 
-@@ -193,6 +198,7 @@
- 			     <0 34 IRQ_TYPE_LEVEL_HIGH>;
- 		clocks = <&mstp0_clks R8A7778_CLK_TMU0>;
- 		clock-names = "fck";
-+		power-domains = <&cpg_clocks>;
- 
- 		#renesas,channels = <3>;
- 
-@@ -207,6 +213,7 @@
- 			     <0 38 IRQ_TYPE_LEVEL_HIGH>;
- 		clocks = <&mstp0_clks R8A7778_CLK_TMU1>;
- 		clock-names = "fck";
-+		power-domains = <&cpg_clocks>;
- 
- 		#renesas,channels = <3>;
- 
-@@ -221,6 +228,7 @@
- 			     <0 42 IRQ_TYPE_LEVEL_HIGH>;
- 		clocks = <&mstp0_clks R8A7778_CLK_TMU2>;
- 		clock-names = "fck";
-+		power-domains = <&cpg_clocks>;
- 
- 		#renesas,channels = <3>;
- 
-@@ -288,6 +296,7 @@
- 		interrupts = <0 70 IRQ_TYPE_LEVEL_HIGH>;
- 		clocks = <&mstp0_clks R8A7778_CLK_SCIF0>;
- 		clock-names = "sci_ick";
-+		power-domains = <&cpg_clocks>;
- 		status = "disabled";
- 	};
- 
-@@ -297,6 +306,7 @@
- 		interrupts = <0 71 IRQ_TYPE_LEVEL_HIGH>;
- 		clocks = <&mstp0_clks R8A7778_CLK_SCIF1>;
- 		clock-names = "sci_ick";
-+		power-domains = <&cpg_clocks>;
- 		status = "disabled";
- 	};
- 
-@@ -306,6 +316,7 @@
- 		interrupts = <0 72 IRQ_TYPE_LEVEL_HIGH>;
- 		clocks = <&mstp0_clks R8A7778_CLK_SCIF2>;
- 		clock-names = "sci_ick";
-+		power-domains = <&cpg_clocks>;
- 		status = "disabled";
- 	};
- 
-@@ -315,6 +326,7 @@
- 		interrupts = <0 73 IRQ_TYPE_LEVEL_HIGH>;
- 		clocks = <&mstp0_clks R8A7778_CLK_SCIF3>;
- 		clock-names = "sci_ick";
-+		power-domains = <&cpg_clocks>;
- 		status = "disabled";
- 	};
- 
-@@ -324,6 +336,7 @@
- 		interrupts = <0 74 IRQ_TYPE_LEVEL_HIGH>;
- 		clocks = <&mstp0_clks R8A7778_CLK_SCIF4>;
- 		clock-names = "sci_ick";
-+		power-domains = <&cpg_clocks>;
- 		status = "disabled";
- 	};
- 
-@@ -333,6 +346,7 @@
- 		interrupts = <0 75 IRQ_TYPE_LEVEL_HIGH>;
- 		clocks = <&mstp0_clks R8A7778_CLK_SCIF5>;
- 		clock-names = "sci_ick";
-+		power-domains = <&cpg_clocks>;
- 		status = "disabled";
- 	};
- 
-@@ -341,6 +355,7 @@
- 		reg = <0xffe4e000 0x100>;
- 		interrupts = <0 61 IRQ_TYPE_LEVEL_HIGH>;
- 		clocks = <&mstp3_clks R8A7778_CLK_MMC>;
-+		power-domains = <&cpg_clocks>;
- 		status = "disabled";
- 	};
- 
-@@ -349,6 +364,7 @@
- 		reg = <0xffe4c000 0x100>;
- 		interrupts = <0 87 IRQ_TYPE_LEVEL_HIGH>;
- 		clocks = <&mstp3_clks R8A7778_CLK_SDHI0>;
-+		power-domains = <&cpg_clocks>;
- 		status = "disabled";
- 	};
- 
-@@ -357,6 +373,7 @@
- 		reg = <0xffe4d000 0x100>;
- 		interrupts = <0 88 IRQ_TYPE_LEVEL_HIGH>;
- 		clocks = <&mstp3_clks R8A7778_CLK_SDHI1>;
-+		power-domains = <&cpg_clocks>;
- 		status = "disabled";
- 	};
- 
-@@ -365,6 +382,7 @@
- 		reg = <0xffe4f000 0x100>;
- 		interrupts = <0 86 IRQ_TYPE_LEVEL_HIGH>;
- 		clocks = <&mstp3_clks R8A7778_CLK_SDHI2>;
-+		power-domains = <&cpg_clocks>;
- 		status = "disabled";
- 	};
- 
-@@ -373,6 +391,7 @@
- 		reg = <0xfffc7000 0x18>;
- 		interrupts = <0 63 IRQ_TYPE_LEVEL_HIGH>;
- 		clocks = <&mstp0_clks R8A7778_CLK_HSPI>;
-+		power-domains = <&cpg_clocks>;
- 		#address-cells = <1>;
- 		#size-cells = <0>;
- 		status = "disabled";
-@@ -383,6 +402,7 @@
- 		reg = <0xfffc8000 0x18>;
- 		interrupts = <0 84 IRQ_TYPE_LEVEL_HIGH>;
- 		clocks = <&mstp0_clks R8A7778_CLK_HSPI>;
-+		power-domains = <&cpg_clocks>;
- 		#address-cells = <1>;
- 		#size-cells = <0>;
- 		status = "disabled";
-@@ -393,6 +413,7 @@
- 		reg = <0xfffc6000 0x18>;
- 		interrupts = <0 85 IRQ_TYPE_LEVEL_HIGH>;
- 		clocks = <&mstp0_clks R8A7778_CLK_HSPI>;
-+		power-domains = <&cpg_clocks>;
- 		#address-cells = <1>;
- 		#size-cells = <0>;
- 		status = "disabled";
-@@ -419,6 +440,7 @@
- 			clocks = <&extal_clk>;
- 			clock-output-names = "plla", "pllb", "b",
- 					     "out", "p", "s", "s1";
-+			#power-domain-cells = <0>;
- 		};
- 
- 		/* Audio clocks; frequencies are set by boards if applicable. */
+Dependencies:
+  - This series is against renesas-drivers-2015-06-29-v4.1, i.e. it
+    depends on the removal of legacy r8a7740/sh73a0 support,
+  - As usual when involving clocks and/or PM Domains, there are stringent
+    dependencies between the (subsets of) patches:
+      - Patches 2-5 depend on patch 1,
+      - Patches 6-12 depend on patches 2-5,
+      - Patch 14 depends on patches 6-13,
+      - Patch 15 depends on patch 1 only,
+      - Patch 16 depends on patch 15.
+
+All of this was tested on:
+  - r8a73a4/ape6evm,
+  - r8a7740/armadillo,
+  - r8a7791/koelsch (with and without CONFIG_PM),
+  - sh73a0/kzm9g.
+
+Testing on other shmobile platforms (esp. R-Car Gen1 and RZ) would be
+appreciated.
+
+I think this series goes best in through Simon's shmobile tree.
+
+Thanks for applying!
+
+Geert Uytterhoeven (16):
+  [1] clk: shmobile: Add CPG/MSTP Clock Domain support
+  [2] clk: shmobile: r8a7778: Add CPG/MSTP Clock Domain support
+  [3] clk: shmobile: r8a7779: Add CPG/MSTP Clock Domain support
+  [4] clk: shmobile: rcar-gen2: Add CPG/MSTP Clock Domain support
+  [5] clk: shmobile: rz: Add CPG/MSTP Clock Domain support
+  [6] ARM: shmobile: r7s72100 dtsi: Add CPG/MSTP Clock Domain
+  [7] ARM: shmobile: r8a7778 dtsi: Add CPG/MSTP Clock Domain
+  [8] ARM: shmobile: r8a7779 dtsi: Add CPG/MSTP Clock Domain
+  [9] ARM: shmobile: r8a7790 dtsi: Add CPG/MSTP Clock Domain
+  [10] ARM: shmobile: r8a7791 dtsi: Add CPG/MSTP Clock Domain
+  [11] ARM: shmobile: r8a7793 dtsi: Add CPG/MSTP Clock Domain
+  [12] ARM: shmobile: r8a7794 dtsi: Add CPG/MSTP Clock Domain
+  [13] drivers: sh: Disable legacy default PM Domain on emev2
+  [14] drivers: sh: Disable PM runtime for multi-platform ARM with genpd
+  [15] clk: shmobile: mstp: Consider "zb_clk" suitable for power management
+  [16] ARM: shmobile: R-Mobile: Use CPG/MSTP Clock Domain attach/detach
+    helpers
+
+ .../bindings/clock/renesas,r8a7778-cpg-clocks.txt  | 29 ++++++-
+ .../bindings/clock/renesas,r8a7779-cpg-clocks.txt  | 30 +++++++-
+ .../clock/renesas,rcar-gen2-cpg-clocks.txt         | 26 ++++++-
+ .../bindings/clock/renesas,rz-cpg-clocks.txt       | 29 ++++++-
+ arch/arm/boot/dts/r7s72100.dtsi                    | 19 +++++
+ arch/arm/boot/dts/r8a7778.dtsi                     | 22 ++++++
+ arch/arm/boot/dts/r8a7779.dtsi                     | 23 ++++++
+ arch/arm/boot/dts/r8a7790.dtsi                     | 79 +++++++++++++++++--
+ arch/arm/boot/dts/r8a7791.dtsi                     | 81 +++++++++++++++++--
+ arch/arm/boot/dts/r8a7793.dtsi                     |  7 ++
+ arch/arm/boot/dts/r8a7794.dtsi                     | 28 +++++++
+ arch/arm/mach-shmobile/Kconfig                     |  2 +
+ arch/arm/mach-shmobile/pm-rmobile.c                | 35 +--------
+ drivers/clk/shmobile/clk-mstp.c                    | 90 ++++++++++++++++++++++
+ drivers/clk/shmobile/clk-r8a7778.c                 |  2 +
+ drivers/clk/shmobile/clk-r8a7779.c                 |  2 +
+ drivers/clk/shmobile/clk-rcar-gen2.c               |  2 +
+ drivers/clk/shmobile/clk-rz.c                      |  3 +
+ drivers/sh/pm_runtime.c                            | 19 ++---
+ include/linux/clk/shmobile.h                       | 12 +++
+ 20 files changed, 472 insertions(+), 68 deletions(-)
+
 -- 
 1.9.1
+
+Gr{oetje,eeting}s,
+
+						Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+							    -- Linus Torvalds
