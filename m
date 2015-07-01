@@ -1,42 +1,84 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Wed, 1 Jul 2015 08:55:57 +0200
-Subject: [PATCH v5 2/6] arch: unify ioremap prototypes and macro aliases
-In-Reply-To: <20150701062352.GA3739@lst.de>
-References: <20150622081028.35954.89885.stgit@dwillia2-desk3.jf.intel.com>
- <20150622082427.35954.73529.stgit@dwillia2-desk3.jf.intel.com>
- <20150622161002.GB8240@lst.de>
- <CAPcyv4h5OXyRvZvLGD5ZknO-YUPn675YGv0XdtW1QOO9qmZsug@mail.gmail.com>
- <20150701062352.GA3739@lst.de>
-Message-ID: <CAMuHMdUO4uSWH1Qc0SfDTLuXbiG2N9fq8Tf6j+3RoqVKdPugbA@mail.gmail.com>
+From: pawelo@king.net.pl (Paul Osmialowski)
+Date: Wed, 1 Jul 2015 08:54:56 +0200 (CEST)
+Subject: [PATCH v2 7/9] arm: twr-k70f120m: use Freescale eDMA driver with
+ Kinetis SoC
+In-Reply-To: <1650263.FfdEQKm1Bu@wuerfel>
+References: <1435667250-28299-1-git-send-email-pawelo@king.net.pl>
+ <1435667250-28299-8-git-send-email-pawelo@king.net.pl>
+ <1650263.FfdEQKm1Bu@wuerfel>
+Message-ID: <alpine.LNX.2.00.1507010849390.8255@localhost.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 1, 2015 at 8:23 AM, Christoph Hellwig <hch@lst.de> wrote:
->> One useful feature of the ifdef mess as implemented in the patch is
->> that you could test for whether ioremap_cache() is actually
->> implemented or falls back to default ioremap().  I think for
->> completeness archs should publish an ioremap type capabilities mask
->> for drivers that care... (I can imagine pmem caring), or default to
->> being permissive if something like IOREMAP_STRICT is not set.  There's
->> also the wrinkle of archs that can only support certain types of
->> mappings at a given alignment.
+Hi Arnd,
+
+Thanks for pointing this - dma-ranges seem to work properly. This makes 
+the patch much simpler. To be included to the next iteration.
+
+I also removed DMA_OF from Kconfig and CONFIG_DMA_OF from my defconfig and 
+it was automatically added during preparation of .cofing for build.
+
+On Tue, 30 Jun 2015, Arnd Bergmann wrote:
+
+> On Tuesday 30 June 2015 14:27:28 Paul Osmialowski wrote:
+>> Note that <mach/memory.h> is needed (which is denoted by
+>> CONFIG_NEED_MACH_MEMORY_H) as it provides macros required for proper
+>> operation of DMA allocation functions.
 >
-> I think doing this at runtime might be a better idea.  E.g. a
-> ioremap_flags with the CACHED argument will return -EOPNOTSUP unless
-> actually implemented.  On various architectures different CPUs or
-> boards will have different capabilities in this area.
-
-So it would be the responsibility of the caller to fall back from
-ioremap(..., CACHED) to ioremap(..., UNCACHED)?
-I.e. all drivers using it should be changed...
-
-Gr{oetje,eeting}s,
-
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+> You can't do this, it breaks compilation when multiple platforms
+> are enabled.
+>
+>> Signed-off-by: Paul Osmialowski <pawelo@king.net.pl>
+>> ---
+>>  arch/arm/Kconfig                            |  4 ++
+>>  arch/arm/boot/dts/kinetis.dtsi              | 34 ++++++++++++++++
+>>  arch/arm/mach-kinetis/include/mach/memory.h | 61 +++++++++++++++++++++++++++++
+>>  3 files changed, 99 insertions(+)
+>>  create mode 100644 arch/arm/mach-kinetis/include/mach/memory.h
+>>
+>> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+>> index b21592b..8ccffee 100644
+>> --- a/arch/arm/Kconfig
+>> +++ b/arch/arm/Kconfig
+>> @@ -971,6 +971,10 @@ config ARCH_KINETIS
+>>  	select CLKSRC_KINETIS
+>>  	select PINCTRL
+>>  	select PINCTRL_KINETIS
+>> +	select DMADEVICES
+>> +	select FSL_EDMA
+>> +	select DMA_OF
+>> +	select NEED_MACH_MEMORY_H
+>
+> I think DMA_OF is implied by dmaengine support in combination with CONFIG_OF
+>
+>> +
+>> +#ifndef _MACH_KINETIS_MEMORY_H
+>> +#define _MACH_KINETIS_MEMORY_H
+>> +
+>> +#ifndef __ASSEMBLY__
+>> +
+>> +/*
+>> + * On Kinetis K70, consistent DMA memory resides in a special
+>> + * DDRAM alias region (non-cacheable DDRAM at 0x80000000).
+>> + *
+>> + */
+>> +#define KINETIS_PHYS_DMA_OFFSET UL(0x80000000)
+>> +
+>> +/*
+>> + * Mask of the field used to distinguish DDRAM aliases
+>> + */
+>> +#define KINETIS_DRAM_ALIAS_MASK UL(0xf8000000)
+>
+> This should be expressed using the 'dma-ranges' properties in the
+> bus nodes above any DMA master, the normal DMA mapping code will
+> then do the right thing.
+>
+> 	Arnd
+>
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: 0007-arm-twr-k70f120m-use-Freescale-eDMA-driver-with-Kine.patch
+Type: text/x-diff
+Size: 2182 bytes
+Desc: 
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150701/b3e0ff39/attachment.bin>
