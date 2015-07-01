@@ -1,183 +1,76 @@
-From: djkurtz@chromium.org (Daniel Kurtz)
-Date: Wed, 1 Jul 2015 21:47:11 +0800
-Subject: [PATCH v2 2/4] dt-bindings: ARM: Mediatek: Document devicetree
- bindings for clock controllers
-In-Reply-To: <1435633127-31952-3-git-send-email-jamesjj.liao@mediatek.com>
-References: <1435633127-31952-1-git-send-email-jamesjj.liao@mediatek.com>
- <1435633127-31952-3-git-send-email-jamesjj.liao@mediatek.com>
-Message-ID: <CAGS+omD9Mvz0-RQMc5TsWCPct80S5fyqMn3+-zR7HB9yb7KoDQ@mail.gmail.com>
+From: ohad@wizery.com (Ohad Ben-Cohen)
+Date: Wed, 1 Jul 2015 16:48:20 +0300
+Subject: [GIT PULL] hwspinlock for 4.2
+Message-ID: <CAK=WgbbH9SZF-Ysr4--6usvLdv7+H2x7VKs+jg_LD2-UMkRarw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 30, 2015 at 10:58 AM, James Liao <jamesjj.liao@mediatek.com> wrote:
->
-> This adds the binding documentation for the mmsys, imgsys, vdecsys,
-> vencsys and vencltsys controllers found on Mediatek SoCs.
->
-> Signed-off-by: James Liao <jamesjj.liao@mediatek.com>
-> ---
->  .../bindings/arm/mediatek/mediatek,imgsys.txt      | 22 ++++++++++++++++++++++
->  .../bindings/arm/mediatek/mediatek,mmsys.txt       | 22 ++++++++++++++++++++++
->  .../bindings/arm/mediatek/mediatek,vdecsys.txt     | 22 ++++++++++++++++++++++
->  .../bindings/arm/mediatek/mediatek,vencltsys.txt   | 22 ++++++++++++++++++++++
->  .../bindings/arm/mediatek/mediatek,vencsys.txt     | 22 ++++++++++++++++++++++
->  5 files changed, 110 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/arm/mediatek/mediatek,imgsys.txt
->  create mode 100644 Documentation/devicetree/bindings/arm/mediatek/mediatek,mmsys.txt
->  create mode 100644 Documentation/devicetree/bindings/arm/mediatek/mediatek,vdecsys.txt
->  create mode 100644 Documentation/devicetree/bindings/arm/mediatek/mediatek,vencltsys.txt
->  create mode 100644 Documentation/devicetree/bindings/arm/mediatek/mediatek,vencsys.txt
->
-> diff --git a/Documentation/devicetree/bindings/arm/mediatek/mediatek,imgsys.txt b/Documentation/devicetree/bindings/arm/mediatek/mediatek,imgsys.txt
-> new file mode 100644
-> index 0000000..7612bac
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/arm/mediatek/mediatek,imgsys.txt
-> @@ -0,0 +1,22 @@
-> +Mediatek imgsys controller
-> +============================
-> +
-> +The Mediatek imgsys controller provides various clocks to the system.
-> +
-> +Required Properties:
-> +
-> +- compatible: Should be:
-> +       - "mediatek,mt8173-imgsys", "syscon"
-> +- #clock-cells: Must be 1
-> +
-> +The imgsys controller uses the common clk binding from
-> +Documentation/devicetree/bindings/clock/clock-bindings.txt
-> +The available clocks are defined in dt-bindings/clock/mt*-clk.h.
-> +
-> +Example:
-> +
-> +imgsys: imgsys at 15000000 {
+The following changes since commit b787f68c36d49bb1d9236f403813641efa74a031:
 
-Since these nodes will be supplying clocks to the rest of the system,
-I think the "name" part of each of these should all be
-"clock-controller", like topckgen and apmixedsys:
+  Linux 4.1-rc1 (2015-04-26 17:59:10 -0700)
 
-  imgsys: clock-controller at 15000000 {
+are available in the git repository at:
 
--Dan
+  git://git.kernel.org/pub/scm/linux/kernel/git/ohad/hwspinlock.git
+tags/hwspinlock-4.2
 
->
-> +       compatible = "mediatek,mt8173-imgsys", "syscon";
-> +       reg = <0 0x15000000 0 0x1000>;
-> +       #clock-cells = <1>;
-> +};
-> diff --git a/Documentation/devicetree/bindings/arm/mediatek/mediatek,mmsys.txt b/Documentation/devicetree/bindings/arm/mediatek/mediatek,mmsys.txt
-> new file mode 100644
-> index 0000000..b51e417
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/arm/mediatek/mediatek,mmsys.txt
-> @@ -0,0 +1,22 @@
-> +Mediatek mmsys controller
-> +============================
-> +
-> +The Mediatek mmsys controller provides various clocks to the system.
-> +
-> +Required Properties:
-> +
-> +- compatible: Should be:
-> +       - "mediatek,mt8173-mmsys", "syscon"
-> +- #clock-cells: Must be 1
-> +
-> +The mmsys controller uses the common clk binding from
-> +Documentation/devicetree/bindings/clock/clock-bindings.txt
-> +The available clocks are defined in dt-bindings/clock/mt*-clk.h.
-> +
-> +Example:
-> +
-> +mmsys: mmsys at 14000000 {
-> +       compatible = "mediatek,mt8173-mmsys", "syscon";
-> +       reg = <0 0x14000000 0 0x1000>;
-> +       #clock-cells = <1>;
-> +};
-> diff --git a/Documentation/devicetree/bindings/arm/mediatek/mediatek,vdecsys.txt b/Documentation/devicetree/bindings/arm/mediatek/mediatek,vdecsys.txt
-> new file mode 100644
-> index 0000000..a5b94a7
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/arm/mediatek/mediatek,vdecsys.txt
-> @@ -0,0 +1,22 @@
-> +Mediatek vdecsys controller
-> +============================
-> +
-> +The Mediatek vdecsys controller provides various clocks to the system.
-> +
-> +Required Properties:
-> +
-> +- compatible: Should be:
-> +       - "mediatek,mt8173-vdecsys", "syscon"
-> +- #clock-cells: Must be 1
-> +
-> +The vdecsys controller uses the common clk binding from
-> +Documentation/devicetree/bindings/clock/clock-bindings.txt
-> +The available clocks are defined in dt-bindings/clock/mt*-clk.h.
-> +
-> +Example:
-> +
-> +vdecsys: vdecsys at 16000000 {
-> +       compatible = "mediatek,mt8173-vdecsys", "syscon";
-> +       reg = <0 0x16000000 0 0x1000>;
-> +       #clock-cells = <1>;
-> +};
-> diff --git a/Documentation/devicetree/bindings/arm/mediatek/mediatek,vencltsys.txt b/Documentation/devicetree/bindings/arm/mediatek/mediatek,vencltsys.txt
-> new file mode 100644
-> index 0000000..3d4e8d8
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/arm/mediatek/mediatek,vencltsys.txt
-> @@ -0,0 +1,22 @@
-> +Mediatek vencltsys controller
-> +============================
-> +
-> +The Mediatek vencltsys controller provides various clocks to the system.
-> +
-> +Required Properties:
-> +
-> +- compatible: Should be:
-> +       - "mediatek,mt8173-vencltsys", "syscon"
-> +- #clock-cells: Must be 1
-> +
-> +The vencltsys controller uses the common clk binding from
-> +Documentation/devicetree/bindings/clock/clock-bindings.txt
-> +The available clocks are defined in dt-bindings/clock/mt*-clk.h.
-> +
-> +Example:
-> +
-> +vencltsys: vencltsys at 19000000 {
-> +       compatible = "mediatek,mt8173-vencltsys", "syscon";
-> +       reg = <0 0x19000000 0 0x1000>;
-> +       #clock-cells = <1>;
-> +};
-> diff --git a/Documentation/devicetree/bindings/arm/mediatek/mediatek,vencsys.txt b/Documentation/devicetree/bindings/arm/mediatek/mediatek,vencsys.txt
-> new file mode 100644
-> index 0000000..e5b72f5
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/arm/mediatek/mediatek,vencsys.txt
-> @@ -0,0 +1,22 @@
-> +Mediatek vencsys controller
-> +============================
-> +
-> +The Mediatek vencsys controller provides various clocks to the system.
-> +
-> +Required Properties:
-> +
-> +- compatible: Should be:
-> +       - "mediatek,mt8173-vencsys", "syscon"
-> +- #clock-cells: Must be 1
-> +
-> +The vencsys controller uses the common clk binding from
-> +Documentation/devicetree/bindings/clock/clock-bindings.txt
-> +The available clocks are defined in dt-bindings/clock/mt*-clk.h.
-> +
-> +Example:
-> +
-> +vencsys: vencsys at 18000000 {
-> +       compatible = "mediatek,mt8173-vencsys", "syscon";
-> +       reg = <0 0x18000000 0 0x1000>;
-> +       #clock-cells = <1>;
-> +};
-> --
-> 1.8.1.1.dirty
->
+for you to fetch changes up to bd5717a4632cdecafe82d03de7dcb3b1876e2828:
+
+  hwspinlock: qcom: Correct msb in regmap_field (2015-07-01 16:15:05 +0300)
+
+----------------------------------------------------------------
+- hwspinlock core DT support from Suman Anna
+- OMAP hwspinlock DT support from Suman Anna
+- QCOM hwspinlock DT support from Bjorn Andersson
+- a new CSR atlas7 hwspinlock driver from Wei Chen
+- CSR atlas7 hwspinlock DT binding document from Wei Chen
+- a tiny QCOM hwspinlock driver fix from Bjorn Andersson
+
+----------------------------------------------------------------
+Bjorn Andersson (3):
+      DT: hwspinlock: Add binding documentation for Qualcomm hwmutex
+      hwspinlock: qcom: Add support for Qualcomm HW Mutex block
+      hwspinlock: qcom: Correct msb in regmap_field
+
+Suman Anna (4):
+      Documentation: dt: add common bindings for hwspinlock
+      hwspinlock/core: add device tree support
+      Documentation: dt: add the omap hwspinlock bindings document
+      hwspinlock/omap: add support for dt nodes
+
+Wei Chen (2):
+      hwspinlock: add a CSR atlas7 driver
+      DT: hwspinlock: add the CSR atlas7 hwspinlock bindings document
+
+ Documentation/devicetree/bindings/hwlock/hwlock.txt          |  59
++++++++++++++++++++++++++++++++++++
+ Documentation/devicetree/bindings/hwlock/omap-hwspinlock.txt |  26
+++++++++++++++++
+ Documentation/devicetree/bindings/hwlock/qcom-hwspinlock.txt |  39
++++++++++++++++++++++++
+ Documentation/devicetree/bindings/hwlock/sirf,hwspinlock.txt |  28
++++++++++++++++++
+ Documentation/hwspinlock.txt                                 |  10 ++++++
+ MAINTAINERS                                                  |   1 -
+ arch/arm/mach-omap2/Makefile                                 |   3 --
+ arch/arm/mach-omap2/hwspinlock.c                             |  60
+------------------------------------
+ drivers/hwspinlock/Kconfig                                   |  24
++++++++++++++++
+ drivers/hwspinlock/Makefile                                  |   2 ++
+ drivers/hwspinlock/hwspinlock_core.c                         |  79
++++++++++++++++++++++++++++++++++++++++++++++++
+ drivers/hwspinlock/omap_hwspinlock.c                         |  18 ++++++++---
+ drivers/hwspinlock/qcom_hwspinlock.c                         | 181
++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+ drivers/hwspinlock/sirf_hwspinlock.c                         | 136
+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+ include/linux/hwspinlock.h                                   |   7 +++++
+ 15 files changed, 605 insertions(+), 68 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/hwlock/hwlock.txt
+ create mode 100644 Documentation/devicetree/bindings/hwlock/omap-hwspinlock.txt
+ create mode 100644 Documentation/devicetree/bindings/hwlock/qcom-hwspinlock.txt
+ create mode 100644 Documentation/devicetree/bindings/hwlock/sirf,hwspinlock.txt
+ delete mode 100644 arch/arm/mach-omap2/hwspinlock.c
+ create mode 100644 drivers/hwspinlock/qcom_hwspinlock.c
+ create mode 100644 drivers/hwspinlock/sirf_hwspinlock.c
