@@ -1,100 +1,77 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Wed, 1 Jul 2015 08:43:08 +0100
-Subject: [PATCH-V5 4/4] mfd: devicetree: bindings: Add new 88pm800 mfd
- binding
-In-Reply-To: <CAJKOXPfijVCgudEZXX+53zAaHiXsbL-eM4RHmP35cwgvxHr_XA@mail.gmail.com>
-References: <1435591877-18214-1-git-send-email-vaibhav.hiremath@linaro.org>
- <1435591877-18214-5-git-send-email-vaibhav.hiremath@linaro.org>
- <CAJKOXPfijVCgudEZXX+53zAaHiXsbL-eM4RHmP35cwgvxHr_XA@mail.gmail.com>
-Message-ID: <20150701074308.GD3210@x1>
+From: zhichao.huang@linaro.org (Zhichao Huang)
+Date: Wed, 01 Jul 2015 15:43:53 +0800
+Subject: [PATCH v3 07/11] KVM: arm: add trap handlers for 64-bit debug
+ registers
+In-Reply-To: <20150630132029.GV11332@cbox>
+References: <1434969694-7432-1-git-send-email-zhichao.huang@linaro.org>
+ <1434969694-7432-8-git-send-email-zhichao.huang@linaro.org>
+ <20150630132029.GV11332@cbox>
+Message-ID: <D99B53D5-38B0-4448-A97A-D96F4C01104C@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 30 Jun 2015, Krzysztof Koz?owski wrote:
 
-> 2015-06-30 0:31 GMT+09:00 Vaibhav Hiremath <vaibhav.hiremath@linaro.org>:
-> > With addition of DT support to 88pm800 mfd driver, this patch
-> > adds new DT binding documentation along with respective properties.
-> >
-> > Signed-off-by: Vaibhav Hiremath <vaibhav.hiremath@linaro.org>
-> 
-> Looks okay,
 
-You forgot to add your *-by.
+On June 30, 2015 9:20:29 PM GMT+08:00, Christoffer Dall <christoffer.dall@linaro.org> wrote:
+>On Mon, Jun 22, 2015 at 06:41:30PM +0800, Zhichao Huang wrote:
+>> Add handlers for all the 64-bit debug registers.
+>> 
+>> There is an overlap between 32 and 64bit registers. Make sure that
+>> 64-bit registers preceding 32-bit ones.
+>> 
+>> Signed-off-by: Zhichao Huang <zhichao.huang@linaro.org>
+>> ---
+>>  arch/arm/kvm/coproc.c | 12 ++++++++++++
+>>  1 file changed, 12 insertions(+)
+>> 
+>> diff --git a/arch/arm/kvm/coproc.c b/arch/arm/kvm/coproc.c
+>> index 59b65b7..eeee648 100644
+>> --- a/arch/arm/kvm/coproc.c
+>> +++ b/arch/arm/kvm/coproc.c
+>> @@ -435,9 +435,17 @@ static const struct coproc_reg cp15_regs[] = {
+>>  	{ CRn( 1), CRm((n)), Op1( 0), Op2( 1), is32, trap_raz_wi }
+>>  
+>>  /*
+>> + * Architected CP14 registers.
+>> + *
+>
+>belongs in other patch?
 
-> > ---
-> >  Documentation/devicetree/bindings/mfd/88pm800.txt | 53 +++++++++++++++++++++++
-> >  1 file changed, 53 insertions(+)
-> >  create mode 100644 Documentation/devicetree/bindings/mfd/88pm800.txt
-> >
-> > diff --git a/Documentation/devicetree/bindings/mfd/88pm800.txt b/Documentation/devicetree/bindings/mfd/88pm800.txt
-> > new file mode 100644
-> > index 0000000..dec842f
-> > --- /dev/null
-> > +++ b/Documentation/devicetree/bindings/mfd/88pm800.txt
-> > @@ -0,0 +1,53 @@
-> > +* Marvell 88PM80x Power Management IC
-> > +
-> > +Required parent device properties:
-> > +- compatible           : "marvell,88pm800", "marvell,88pm805", "marvell,88pm860"
-> > +- reg                  : the I2C slave address for the 88pm80x family chip
-> > +- interrupts           : IRQ line for the 88pm80x family chip
-> > +- interrupt-controller : describes the 88pm80x family chip as an interrupt
-> > +                         controller
-> > +- #interrupt-cells     : should be 1.
-> > +                         The cell is the 88pm80x local IRQ number
-> > +
-> > +88pm80x family of devices consists of varied group of sub-devices:
-> > +
-> > +Device                 Supply Names     Description
-> > +------                 ------------     -----------
-> > +88pm80x-onkey          :               : On key
-> > +88pm80x-rtc            :               : RTC
-> > +88pm80x-regulator      :               : Regulators
-> > +
-> > +Example:
-> > +
-> > +       pmic: 88pm800 at 30 {
-> > +               compatible = "marvell,88pm800";
-> > +               reg = <0x30>;
-> > +               interrupts = <GIC_SPI 77 IRQ_TYPE_LEVEL_HIGH>;
-> > +               interrupt-parent = <&gic>;
-> > +               interrupt-controller;
-> > +               #interrupt-cells = <1>;
-> > +
-> > +               regulators {
-> > +                       compatible = "marvell,88pm80x-regulator";
-> > +
-> > +                       buck1a: BUCK1A {
-> > +                               regulator-name = "BUCK1A";
-> > +                               regulator-min-microvolt = <600000>;
-> > +                               regulator-max-microvolt = <1800000>;
-> > +                               regulator-boot-on;
-> > +                               regulator-always-on;
-> > +                       };
-> > +
-> > +                       ldo1: LDO1 {
-> > +                               regulator-name = "LDO1";
-> > +                               regulator-min-microvolt = <1700000>;
-> > +                               regulator-max-microvolt = <3300000>;
-> > +                               regulator-boot-on;
-> > +                               regulator-always-on;
-> > +                       };
-> > +               };
-> > +
-> > +               rtc {
-> > +                       compatible = "marvell,88pm80x-rtc";
-> > +               };
-> > +       };
-> >
-> >
-> > _______________________________________________
-> > linux-arm-kernel mailing list
-> > linux-arm-kernel at lists.infradead.org
-> > http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+OK, I will move it to the patch [06/11].
+>
+>>   * Trapped cp14 registers. We generally ignore most of the external
+>>   * debug, on the principle that they don't really make sense to a
+>>   * guest. Revisit this one day, whould this principle change.
+>> + *
+>> + * CRn denotes the primary register number, but is copied to the CRm in the
+>> + * user space API for 64-bit register access in line with the terminology used
+>> + * in the ARM ARM.
+>> + * Important: Must be sorted ascending by CRn, CRM, Op1, Op2 and
+>with 64-bit
+>> + *            registers preceding 32-bit ones.
+>>   */
+>>  static const struct coproc_reg cp14_regs[] = {
+>>  	/* DBGIDR */
+>> @@ -445,10 +453,14 @@ static const struct coproc_reg cp14_regs[] = {
+>>  	/* DBGDTRRXext */
+>>  	{ CRn( 0), CRm( 0), Op1( 0), Op2( 2), is32, trap_raz_wi },
+>>  	DBG_BCR_BVR_WCR_WVR(0),
+>> +	/* DBGDRAR (64bit) */
+>> +	{ CRn( 0), CRm( 1), Op1( 0), Op2( 0), is64, trap_raz_wi},
+>>  	/* DBGDSCRint */
+>>  	{ CRn( 0), CRm( 1), Op1( 0), Op2( 0), is32, trap_dbgdscr,
+>>  				NULL, cp14_DBGDSCRext },
+>>  	DBG_BCR_BVR_WCR_WVR(1),
+>> +	/* DBGDSAR (64bit) */
+>> +	{ CRn( 0), CRm( 2), Op1( 0), Op2( 0), is64, trap_raz_wi},
+>>  	/* DBGDSCRext */
+>>  	{ CRn( 0), CRm( 2), Op1( 0), Op2( 2), is32, trap_debug32,
+>>  				reset_val, cp14_DBGDSCRext, 0 },
+>> -- 
+>> 1.7.12.4
+>> 
+>Otherwise:
+>Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
 
 -- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Zhichao Huang
