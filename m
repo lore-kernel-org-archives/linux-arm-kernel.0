@@ -1,32 +1,35 @@
-From: Nathan_Lynch@mentor.com (Nathan Lynch)
-Date: Wed, 1 Jul 2015 17:11:14 -0500
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 1 Jul 2015 23:27:14 +0100
 Subject: [PATCH] ARM: fix vdsomunge not to depend on glibc specific error.h
-In-Reply-To: <20150630110557.GG27725@arm.com>
-References: <559273FD.2030508@arm.com> <20150630110557.GG27725@arm.com>
-Message-ID: <55946582.4010602@mentor.com>
+In-Reply-To: <559273FD.2030508@arm.com>
+References: <559273FD.2030508@arm.com>
+Message-ID: <20150701222713.GO7557@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/30/2015 06:05 AM, Will Deacon wrote:
-> On Tue, Jun 30, 2015 at 11:48:29AM +0100, Szabolcs Nagy wrote:
->> If the host toolchain is not glibc based then the arm kernel build
->> fails with
->>
->>  arch/arm/vdso/vdsomunge.c:53:19: fatal error: error.h: No such file or directory
->>
->> error.h is a glibc only header (ie not available in musl, newlib and
->> bsd libcs).  Changed the error reporting to standard conforming code
->> to avoid depending on specific C implementations.
->>
->> Signed-off-by: Szabolcs Nagy <szabolcs.nagy@arm.com>
->> ---
->>  arch/arm/vdso/vdsomunge.c |   56 ++++++++++++++++++++++++++-------------------
->>  1 file changed, 33 insertions(+), 23 deletions(-)
+On Tue, Jun 30, 2015 at 11:48:29AM +0100, Szabolcs Nagy wrote:
+> @@ -82,11 +80,25 @@
+>  #define EF_ARM_ABI_FLOAT_HARD 0x400
+>  #endif
 > 
-> Looks fine to me:
+> +static int failed;
+> +static const char *argv0;
+>  static const char *outfile;
 > 
->   Acked-by: Will Deacon <will.deacon@arm.com>
-> 
-> Probably worth a Cc stable too.
+> +static void fail(const char *fmt, ...)
+> +{
+> +	va_list ap;
+> +
+> +	failed = 1;
+> +	fprintf(stderr, "%s: ", argv0);
+> +	va_start(ap, fmt);
+> +	vfprintf(stderr, fmt, ap);
+> +	va_end(ap);
+> +	exit(EXIT_FAILURE);
 
-Agreed and thanks; submitted to Russell's patch system as 8397/1.
+What purpose does "failed" serve?  Reading through this patch, it
+seems to be a write-only variable.
+
+-- 
+FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
+according to speedtest.net.
