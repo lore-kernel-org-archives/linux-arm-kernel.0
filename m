@@ -1,61 +1,102 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Wed, 1 Jul 2015 19:06:19 +0100
-Subject: Oops at boot after commit 965278dcb8ab... when using split
- memory region
-In-Reply-To: <20150701154007.GH2310@leverpostej>
-References: <CAGGh5h061qpus=RK-iDyzbc9xG+dJXy8AosuN=aryEVZCPPhtw@mail.gmail.com>
- <20150701144612.GG2310@leverpostej>
- <20150701145354.GL7557@n2100.arm.linux.org.uk>
- <20150701154007.GH2310@leverpostej>
-Message-ID: <20150701180618.GI2310@leverpostej>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Wed, 01 Jul 2015 19:18:40 +0100
+Subject: [PATCH 05/10] KVM: arm/arm64: vgic: Relax vgic_can_sample_irq
+ for edge IRQs
+In-Reply-To: <20150701115820.GC17890@cbox>
+References: <1433783045-8002-1-git-send-email-marc.zyngier@arm.com>
+ <1433783045-8002-6-git-send-email-marc.zyngier@arm.com>
+ <20150630201933.GA11332@cbox> <5593B040.6050208@arm.com>
+ <20150701115820.GC17890@cbox>
+Message-ID: <55942F00.6000306@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 01, 2015 at 04:40:07PM +0100, Mark Rutland wrote:
-> On Wed, Jul 01, 2015 at 03:53:54PM +0100, Russell King - ARM Linux wrote:
-> > On Wed, Jul 01, 2015 at 03:46:12PM +0100, Mark Rutland wrote:
-> > > On Wed, Jul 01, 2015 at 03:15:33PM +0100, jean-philippe francois wrote:
-> > > > Hi,
-> > > 
-> > > Hi,
-> > > 
-> > > > commit 965278dcb8ab0b1f666cc47937933c4be4aea48d, (ARM: 8356/1: mm:
-> > > > handle non-pmd-aligned end of RAM) causes my dm3730 based board to
-> > > > oops at boot when using a split memory description.
-> > > > The kernel command line parameter is :
-> > > > mem=55M at 0x80000000 mem=128M at 0x88000000
-> > > > 
-> > > > If the same board is booted without the mem argument, it boots to userspace.
-> > > 
-> > > Thanks for the report.
-> > > 
-> > > Javier reported a similar issue [1], which was somehow fixed by Laura's
-> > > patch to update the memblock limit [2,3].
-> > > 
-> > > I don't yet understand why, but if that works for you it would be an
-> > > interesting data point.
-> > > 
-> > > > Below is the bootlog.
-> > > 
-> > > Interesting. That blows up a lot later than I'd expect. I'll see if I
-> > > can reproduce the issue locally.
-> > 
-> > Yes, I think we need to understand what's going on here, and what's
-> > causing these failures, rather than blindly applying a patch which
-> > seems to solve the problem.
+On 01/07/15 12:58, Christoffer Dall wrote:
+> On Wed, Jul 01, 2015 at 10:17:52AM +0100, Marc Zyngier wrote:
+>> On 30/06/15 21:19, Christoffer Dall wrote:
+>>> On Mon, Jun 08, 2015 at 06:04:00PM +0100, Marc Zyngier wrote:
+>>>> We only set the irq_queued flag for level interrupts, meaning
+>>>> that "!vgic_irq_is_queued(vcpu, irq)" is a good enough predicate
+>>>> for all interrupts.
+>>>>
+>>>> This will allow us to inject edge HW interrupts, for which the
+>>>> state ACTIVE+PENDING is not allowed.
+>>>
+>>> I don't understand this; ACTIVE+PENDING is allowed for edge interrupts.
+>>> Do you mean that if we set the HW bit in the LR, then we are linking to
+>>> an HW interrupt where we don't allow that to be ACTIVE+PENDING on the HW
+>>> GIC side?
+>>>
+>>> Why is this relevant here?  I feel like I'm missing context.
+>>
+>> I've probably taken a shortcut here - bear with me while I'm trying to
+>> explain the issue.
+>>
+>> For HW interrupts, we shouldn't even try to use the state bits in the
+>> LR, because that state is contained in the physical distributor. Setting
+>> the HW bit really means "there is something going on at the distributor
+>> level, just go there".
 > 
-> Certainly. I did not mean to imply otherwise.
+> ok, so by "HW interrupts" you mean virtual interrupts with the HW bit in
+> the LR set, correct?
+
+Yes, sorry.
+
+>>
+>> If we were to inject a ACTIVE+PENDING interrupt at the LR level, we'd
+>> basically loose the second interrupt because that state is simply not
+>> considered.
 > 
-> Using a similar command line I can reproduce the issue on TC2, getting a
-> hang when freeing unused kernel memory. I'm digging into that now.
+> Huh?  Which second interrupt.  I looked at the spec and it says don't
+> use the state bits for HW interrupts, so isn't it simply not supported
+> to set these bits at all and that's it?
 
-If I pass mem=56316K at 0${MY_MEM_BASE} (i.e. 55M - 4K), I get hangs with
-and without commit 965278dcb8ab. It looks like we have a latent bug when
-a bank is insufficiently aligned, and my patch increased that necessary
-alignment from 1M to 2M.
+I managed to confuse myself reading the same bit. It says (GICv3 spec):
 
-I don't yet have a full explanation, and I'm still investigating, but as
-far as I can tell the logic in sanity_check_meminfo is sound.
+"A hypervisor must only use the pending and active state for software
+originated interrupts, which are typically associated with virtual
+devices, or SGIs."
 
-Thanks,
-Mark.
+That's the PENDING+ACTIVE state, and not the pending and active bits
+like I read it initially.
+
+Now consider the following scenario:
+
+- We inject a virtual edge interrupt
+- We mark the corresponding physical interrupt as active.
+- Queue interrupt in an LR
+- Resume vcpu
+
+Now, we inject another edge interrupt, the vcpu exits for whatever
+reason, and the previously injected interrupt is still active.
+
+The normal vGIC flow would be to mark the interrupt as ACTIVE+PENDING in
+the LR, and resume the vcpu. But the above states that this is invalid
+for HW generated interrupts.
+
+>>
+>> So the trick we're using is to only inject the active interrupt, and
+>> prevent anything else from being injected until we can confirm that the
+>> active state has been cleared at the physical level.
+>>
+>> Does it make any sense?
+>>
+> Sort of, but what I don't understand now is how the guest ever sees the
+> interrupt then.  If we always inject the virtual interrupt by setting
+> the active state on the physical distributor, and we can't inject this
+> as active+pending, and the guest doesn't see the state in the LR, then
+> how does this ever raise a virtual interrupt and how does the guest see
+> an interrupt which is only PENDING so that it can ack it etc. etc.?
+> 
+> Maybe I don't fully understand how the HW bit works after all...
+
+The way the spec is written is slightly misleading. But the gist of it
+is that we still signal the guest using the PENDING bit in the LR, and
+switch the LR as usual. it is just that we can't use the PENDING+ACTIVE
+state (apparently, this can lead to a double deactivation).
+
+Not sure the above makes sense. Beer time, I suppose.
+
+	M.
+-- 
+Jazz is not dead. It just smells funny...
