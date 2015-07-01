@@ -1,79 +1,295 @@
-From: ezequiel@vanguardiasur.com.ar (Ezequiel Garcia)
-Date: Wed, 1 Jul 2015 12:22:12 -0300
-Subject: [PATCH 1/2] watchdog: NXP LPC18XX Windowed Watchdog Timer Driver
-In-Reply-To: <5593F10D.5000507@roeck-us.net>
-References: <1435343072-8753-1-git-send-email-ariel@vanguardiasur.com.ar>
- <1435343072-8753-2-git-send-email-ariel@vanguardiasur.com.ar>
- <20150626190700.GC23078@roeck-us.net>
- <55903943.10309@vanguardiasur.com.ar>
- <5590CDF6.7000103@roeck-us.net> <5593CF3F.9040206@santafe.gov.ar>
- <5593D6CC.10201@vanguardiasur.com.ar>
- <5593F10D.5000507@roeck-us.net>
-Message-ID: <CAAEAJfCz23VKA49CJN51KwF8WFsjYuaCiHFcXfyWxonK-Qty6g@mail.gmail.com>
+From: djkurtz@chromium.org (Daniel Kurtz)
+Date: Wed, 1 Jul 2015 23:22:35 +0800
+Subject: [PATCH v2 4/4] clk: mediatek: Add USB clock support in MT8173
+ APMIXEDSYS
+In-Reply-To: <CAGS+omBRAJVN3uPYn9YdKZ3VBj61c-rpY_cNgnK6x9U0uJBPYw@mail.gmail.com>
+References: <1435633127-31952-1-git-send-email-jamesjj.liao@mediatek.com>
+ <1435633127-31952-5-git-send-email-jamesjj.liao@mediatek.com>
+ <CAGS+omBRAJVN3uPYn9YdKZ3VBj61c-rpY_cNgnK6x9U0uJBPYw@mail.gmail.com>
+Message-ID: <CAGS+omBsu3zkBf0C_QECBP7NShFhkMih36z1vynvVQ5wCLfZ8w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Guenter,
+Hi James,
 
-First of all, thanks a lot for your feedback.
+This looks like 3 separate gate clocks in a chain, with a timing
+constraint: USB_LPF must be enabled 100 us after USB_TX.
 
-On 1 July 2015 at 10:54, Guenter Roeck <linux@roeck-us.net> wrote:
-> On 07/01/2015 05:02 AM, Ariel D'Alessandro wrote:
+  26MHz--> [GATE] --USB_TX--> [LPF] --USB_LPF--> [GATE] --USB_OUT-->
+            ^                  ^                  ^
+            +--------------+   |                  |
+AP_PLL_CON2.REF2USB_TX_EN -+   |                  |
+AP_PLL_CON2.REF2USB_TX_LPF_EN -+                  |
+AP_PLL_CON2.REF2USB_TX_OUT_EN --------------------+
+
+
+I think we can model the gate parts using a proper clock tree model
+and the existing clock gate semantics.
+I'm not sure the best way to model the delay; but in theory that could
+be handled by the clock user (USB driver).
+
+-Dan
+
+On Wed, Jul 1, 2015 at 11:22 PM, Daniel Kurtz <djkurtz@chromium.org> wrote:
+> Hi James,
+>
+> This looks like 3 separate gate clocks in a chain, with a timing constraint:
+> USB_LPF must be enabled 100 us after USB_TX.
+>
+>   26MHz--> [GATE] --USB_TX--> [LPF] --USB_LPF--> [GATE] --USB_OUT-->
+>             ^                  ^                  ^
+>             +--------------+   |                  |
+> AP_PLL_CON2.REF2USB_TX_EN -+   |                  |
+> AP_PLL_CON2.REF2USB_TX_LPF_EN -+                  |
+> AP_PLL_CON2.REF2USB_TX_OUT_EN --------------------+
+>
+>
+> I think we can model the gate parts using a proper clock tree model and the
+> existing clock gate semantics.
+> I'm not sure the best way to model the delay; but in theory that could be
+> handled by the clock user (USB driver).
+>
+> -Dan
+>
+> On Tue, Jun 30, 2015 at 10:58 AM, James Liao <jamesjj.liao@mediatek.com>
+> wrote:
+>> Add REF2USB_TX clock support into MT8173 APMIXEDSYS. This clock
+>> is needed by USB 3.0.
 >>
->> (Sorry, I sent the last mail with an incorrect mail account)
+>> Signed-off-by: James Liao <jamesjj.liao@mediatek.com>
+>> ---
+>>  drivers/clk/mediatek/clk-mt8173.c      | 143
+>> +++++++++++++++++++++++++++++++++
+>>  drivers/clk/mediatek/clk-pll.c         |   7 +-
+>>  include/dt-bindings/clock/mt8173-clk.h |   3 +-
+>>  3 files changed, 146 insertions(+), 7 deletions(-)
 >>
->> El 01/07/15 a las 08:30, adalessandro escibi?:
->>>
->>>
->>> El 29/06/15 a las 01:47, Guenter Roeck escibi?:
->>>>
->>>> On 06/28/2015 11:13 AM, Ariel D'Alessandro wrote:
->>>>>>>
->>>>>>> +/* Timeout values in seconds */
->>>>>>> +#define LPC_WDT_DEF_TIMEOUT        1
->>>>>>> +
->>>>>>
->>>>>>
->>>>>> One second ? This is highly unusual. 30 or 60 seconds is more common,
->>>>>> and one second would be very challenging for user space.
->>>>>>
->>>>>> Any special reason for using such a tight default ?
->>>>>
->>>>>
->>>>> Considering that LPC18xx Watchdog has a fixed divide-by-4 clock
->>>>> pre-scaler and a 24-bit counter and that Watchdog clock runs at a fixed
->>>>> frequency of 12MHz, timeout range goes from 1 to 5 seconds.
->>>>>
->>>>> I think you're right, 1 sec is very challenging, so it's 5 secs then.
->>>>>
->>>> Ultimately you might want to consider a soft timer as backup to the
->>>> system
->>>> timeout. But that can be done later if/when needed.
->>>
->>>
->>> I understand your point, but just to be sure, what do mean by soft timer?
->>>
+>> diff --git a/drivers/clk/mediatek/clk-mt8173.c
+>> b/drivers/clk/mediatek/clk-mt8173.c
+>> index 75be757..333b6af 100644
+>> --- a/drivers/clk/mediatek/clk-mt8173.c
+>> +++ b/drivers/clk/mediatek/clk-mt8173.c
+>> @@ -12,6 +12,7 @@
+>>   * GNU General Public License for more details.
+>>   */
+>>
+>> +#include <linux/delay.h>
+>>  #include <linux/of.h>
+>>  #include <linux/of_address.h>
+>>  #include <linux/slab.h>
+>> @@ -968,6 +969,141 @@ static void __init mtk_pericfg_init(struct
+>> device_node *node)
+>>  }
+>>  CLK_OF_DECLARE(mtk_pericfg, "mediatek,mt8173-pericfg", mtk_pericfg_init);
+>>
+>> +#define REF2USB_TX_EN          BIT(0)
+>> +#define REF2USB_TX_LPF_EN      BIT(1)
+>> +#define REF2USB_TX_OUT_EN      BIT(2)
+>> +#define REF2USB_EN_MASK                (REF2USB_TX_EN | REF2USB_TX_LPF_EN
+>> | \
+>> +                                REF2USB_TX_OUT_EN)
+>> +
+>> +struct mtk_ref2usb_tx {
+>> +       struct clk_hw   hw;
+>> +       void __iomem    *base_addr;
+>> +};
+>> +
+>> +static inline struct mtk_ref2usb_tx *to_mtk_ref2usb_tx(struct clk_hw *hw)
+>> +{
+>> +       return container_of(hw, struct mtk_ref2usb_tx, hw);
+>> +}
+>> +
+>> +static int mtk_ref2usb_tx_is_prepared(struct clk_hw *hw)
+>> +{
+>> +       struct mtk_ref2usb_tx *tx = to_mtk_ref2usb_tx(hw);
+>> +
+>> +       return (readl(tx->base_addr) & REF2USB_EN_MASK) ==
+>> REF2USB_EN_MASK;
+>> +}
+>> +
+>> +static int mtk_ref2usb_tx_prepare(struct clk_hw *hw)
+>> +{
+>> +       struct mtk_ref2usb_tx *tx = to_mtk_ref2usb_tx(hw);
+>> +       u32 val;
+>> +
+>> +       val = readl(tx->base_addr);
+>> +
+>> +       val |= REF2USB_TX_EN;
+>> +       writel(val, tx->base_addr);
+>> +       udelay(100);
+>> +
+>> +       val |= REF2USB_TX_LPF_EN;
+>> +       writel(val, tx->base_addr);
+>> +
+>> +       val |= REF2USB_TX_OUT_EN;
+>> +       writel(val, tx->base_addr);
+>> +
+>> +       return 0;
+>> +}
+>> +
+>> +static void mtk_ref2usb_tx_unprepare(struct clk_hw *hw)
+>> +{
+>> +       struct mtk_ref2usb_tx *tx = to_mtk_ref2usb_tx(hw);
+>> +       u32 val;
+>> +
+>> +       val = readl(tx->base_addr);
+>> +       val &= ~REF2USB_EN_MASK;
+>> +       writel(val, tx->base_addr);
+>> +}
+>> +
+>> +static const struct clk_ops mtk_ref2usb_tx_ops = {
+>> +       .is_prepared    = mtk_ref2usb_tx_is_prepared,
+>> +       .prepare        = mtk_ref2usb_tx_prepare,
+>> +       .unprepare      = mtk_ref2usb_tx_unprepare,
+>> +};
+>> +
+>> +static struct clk *mtk_clk_register_ref2usb_tx(const char *name,
+>> +                       const char *parent_name, void __iomem *reg)
+>> +{
+>> +       struct mtk_ref2usb_tx *tx;
+>> +       struct clk_init_data init = {};
+>> +       struct clk *clk;
+>> +
+>> +       tx = kzalloc(sizeof(*tx), GFP_KERNEL);
+>> +       if (!tx)
+>> +               return ERR_PTR(-ENOMEM);
+>> +
+>> +       tx->base_addr = reg;
+>> +       tx->hw.init = &init;
+>> +
+>> +       init.name = name;
+>> +       init.ops = &mtk_ref2usb_tx_ops;
+>> +       init.parent_names = &parent_name;
+>> +       init.num_parents = 1;
+>> +
+>> +       clk = clk_register(NULL, &tx->hw);
+>> +
+>> +       if (IS_ERR(clk)) {
+>> +               pr_err("Failed to register clk %s: %ld\n", name,
+>> PTR_ERR(clk));
+>> +               kfree(tx);
+>> +       }
+>> +
+>> +       return clk;
+>> +}
+>> +
+>> +struct mtk_apmixed_ex {
+>> +       int id;
+>> +       const char *name;
+>> +       const char *parent;
+>> +       u32 reg_ofs;
+>> +};
+>> +
+>> +#define APMIXED_EX(_id, _name, _parent, _reg_ofs) {                    \
+>> +               .id = _id,                                              \
+>> +               .name = _name,                                          \
+>> +               .parent = _parent,                                      \
+>> +               .reg_ofs = _reg_ofs,                                    \
+>> +       }
+>> +
+>> +static const struct mtk_apmixed_ex apmixed_ex[] = {
+>> +       APMIXED_EX(CLK_APMIXED_REF2USB_TX, "ref2usb_tx", "clk26m", 0x8),
+>> +};
+>> +
+>> +static void __init mtk_clk_register_apmixedsys_special(struct device_node
+>> *node,
+>> +                       struct clk_onecell_data *clk_data)
+>> +{
+>> +       void __iomem *base;
+>> +       struct clk *clk;
+>> +       int i;
+>> +
+>> +       base = of_iomap(node, 0);
+>> +       if (!base) {
+>> +               pr_err("%s(): ioremap failed\n", __func__);
+>> +               return;
+>> +       }
+>> +
+>> +       for (i = 0; i < ARRAY_SIZE(apmixed_ex); i++) {
+>> +               const struct mtk_apmixed_ex *ape = &apmixed_ex[i];
+>> +
+>> +               clk = mtk_clk_register_ref2usb_tx(ape->name, ape->parent,
+>> +                                                       base +
+>> ape->reg_ofs);
+>> +
+>> +               if (IS_ERR(clk)) {
+>> +                       pr_err("Failed to register clk %s: %ld\n",
+>> ape->name,
+>> +                                       PTR_ERR(clk));
+>> +                       continue;
+>> +               }
+>> +
+>> +               clk_data->clks[CLK_APMIXED_REF2USB_TX] = clk;
+>> +       }
+>> +}
+>> +
+>>  #define MT8173_PLL_FMAX                (3000UL * MHZ)
+>>
+>>  #define CON0_MT8173_RST_BAR    BIT(24)
+>> @@ -1010,12 +1146,19 @@ static const struct mtk_pll_data plls[] = {
+>>  static void __init mtk_apmixedsys_init(struct device_node *node)
+>>  {
+>>         struct clk_onecell_data *clk_data;
+>> +       int r;
+>>
+>>         mt8173_pll_clk_data = clk_data =
+>> mtk_alloc_clk_data(CLK_APMIXED_NR_CLK);
+>>         if (!clk_data)
+>>                 return;
+>>
+>>         mtk_clk_register_plls(node, plls, ARRAY_SIZE(plls), clk_data);
+>> +       mtk_clk_register_apmixedsys_special(node, clk_data);
+>> +
+>> +       r = of_clk_add_provider(node, of_clk_src_onecell_get, clk_data);
+>> +       if (r)
+>> +               pr_err("%s(): could not register clock provider: %d\n",
+>> +                       __func__, r);
+>>
+>>         mtk_clk_enable_critical();
+>>  }
+>> diff --git a/drivers/clk/mediatek/clk-pll.c
+>> b/drivers/clk/mediatek/clk-pll.c
+>> index 44409e9..813f0c7 100644
+>> --- a/drivers/clk/mediatek/clk-pll.c
+>> +++ b/drivers/clk/mediatek/clk-pll.c
+>> @@ -302,7 +302,7 @@ void __init mtk_clk_register_plls(struct device_node
+>> *node,
+>>                 const struct mtk_pll_data *plls, int num_plls, struct
+>> clk_onecell_data *clk_data)
+>>  {
+>>         void __iomem *base;
+>> -       int r, i;
+>> +       int i;
+>>         struct clk *clk;
+>>
+>>         base = of_iomap(node, 0);
+>> @@ -324,9 +324,4 @@ void __init mtk_clk_register_plls(struct device_node
+>> *node,
+>>
+>>                 clk_data->clks[pll->id] = clk;
+>>         }
+>> -
+>> -       r = of_clk_add_provider(node, of_clk_src_onecell_get, clk_data);
+>> -       if (r)
+>> -               pr_err("%s(): could not register clock provider: %d\n",
+>> -                       __func__, r);
+>>  }
+>> diff --git a/include/dt-bindings/clock/mt8173-clk.h
+>> b/include/dt-bindings/clock/mt8173-clk.h
+>> index 6ce88bf..7b7c555 100644
+>> --- a/include/dt-bindings/clock/mt8173-clk.h
+>> +++ b/include/dt-bindings/clock/mt8173-clk.h
+>> @@ -172,7 +172,8 @@
+>>  #define CLK_APMIXED_APLL2              12
+>>  #define CLK_APMIXED_LVDSPLL            13
+>>  #define CLK_APMIXED_MSDCPLL2           14
+>> -#define CLK_APMIXED_NR_CLK             15
+>> +#define CLK_APMIXED_REF2USB_TX         15
+>> +#define CLK_APMIXED_NR_CLK             16
+>>
+>>  /* INFRA_SYS */
+>>
+>> --
+>> 1.8.1.1.dirty
+>>
 >
-> A kernel function which pings the watchdog periodically even if the
-> watchdog is open.
->
-> Example: Timeout is set to 30 seconds. Since the HW watchdog times out
-> earlier than that, it needs to be pinged regularly (eg every 2.5 seconds).
-> The kernel does that with a timer unless user space does not ping the
-> watchdog within the configured interval of 30 seconds.
->
-
-Do we really need this? It sounds like bloat to me. Considering this watchdog
-controller is included in cortex-M MCUs, you wouldn't expect the
-scheduler to be under so much pressure.
-
-I realize that 1-5 seconds is challenging for userspace, but having a soft timer
-in the kernel side sounds like making the system heavier instead of lighter.
-
-Not sure I'm making sense here, but I would think twice before adding bloat.
-
-Maybe Ariel can submit his v2 (with basic watchdog support, which BTW also
-provides a reset handler) now and we can pospone this discussion.
--- 
-Ezequiel Garc?a, VanguardiaSur
-www.vanguardiasur.com.ar
