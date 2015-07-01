@@ -1,81 +1,44 @@
-From: cory.tusar@pid1solutions.com (Cory Tusar)
-Date: Wed,  1 Jul 2015 16:20:10 -0400
-Subject: [RFC PATCH 7/7] ARM: dts: vf610-twr: Enable QSPI and map flash
- devices.
-In-Reply-To: <1435782010-9809-1-git-send-email-cory.tusar@pid1solutions.com>
-References: <1435782010-9809-1-git-send-email-cory.tusar@pid1solutions.com>
-Message-ID: <1435782010-9809-9-git-send-email-cory.tusar@pid1solutions.com>
+From: khilman@kernel.org (Kevin Hilman)
+Date: Wed, 01 Jul 2015 13:24:33 -0700
+Subject: [GIT PULL] omap generic wakeirq for v4.2 merge window
+In-Reply-To: <20150629060409.GQ4156@atomide.com> (Tony Lindgren's message of
+ "Sun, 28 Jun 2015 23:04:09 -0700")
+References: <20150616114645.GA4156@atomide.com>
+ <20150629060409.GQ4156@atomide.com>
+Message-ID: <7hh9pnmxry.fsf@deeprootsystems.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This commit enables the qspi0 functional block, and maps the two
-flash devices connected to QSPI0_A_CS0 and QSPI0_B_CS0 to individual MTD
-devices.
+Tony Lindgren <tony@atomide.com> writes:
 
-Tested using mtd_readtest, mtd_speedtest, and mtd_stresstest on a Rev. H
-TWR board.
+> Hi,
+>
+> * Tony Lindgren <tony@atomide.com> [150616 04:48]:
+>> Hi,
+>> 
+>> Here's a late pull request that would be good to get into v4.2.
+>> This series mostly just drops code that's now unnecessary, and
+>> also fixes potential interrupt re-entrancy issues that the old
+>> handling has.
+>> 
+>> The series changes omap hsmmc, 8250_omap and omap-serial to use
+>> the Linux generic wakeirq. I had to redo the branch last week on
+>> recent tty-next branch because of a merge conflict. Other than
+>> that, these patches were already in Linux next earlier.
+>> 
+>> The pull request below also shows the related patches in Rafael's
+>> pm-wakeirq branch as I did not create a separate merge commit to
+>> base patches on.
+>> 
+>> This branch depends on both Rafael's pm-wakeirq and Greg's
+>> tty-next, so it should be sent separately towards the end of the
+>> merge window.
+>
+> This one is OK to merge now, both pm-wakeirq and tty-next
+> dependencies have been merged. This leaves the following
+> diffstat for thees changes:
 
-Signed-off-by: Cory Tusar <cory.tusar@pid1solutions.com>
----
- arch/arm/boot/dts/vf610-twr.dts | 39 +++++++++++++++++++++++++++++++++++++++
- 1 file changed, 39 insertions(+)
+OK, thanks.  I'm collecting a few remaining things for a "late" branch,
+but if I miss the merge window, I'll queue it up for -rc2.
 
-diff --git a/arch/arm/boot/dts/vf610-twr.dts b/arch/arm/boot/dts/vf610-twr.dts
-index 375ab23..6ae2e7c 100644
---- a/arch/arm/boot/dts/vf610-twr.dts
-+++ b/arch/arm/boot/dts/vf610-twr.dts
-@@ -246,6 +246,23 @@
- 			>;
- 		};
- 
-+		pinctrl_qspi0: qspi0grp {
-+			fsl,pins = <
-+				VF610_PAD_PTD0__QSPI0_A_QSCK		0x31e2
-+				VF610_PAD_PTD1__QSPI0_A_CS0		0x31e2
-+				VF610_PAD_PTD2__QSPI0_A_DATA3		0x31e3
-+				VF610_PAD_PTD3__QSPI0_A_DATA2		0x31e3
-+				VF610_PAD_PTD4__QSPI0_A_DATA1		0x31e3
-+				VF610_PAD_PTD5__QSPI0_A_DATA0		0x31e3
-+				VF610_PAD_PTD7__QSPI0_B_QSCK		0x31e2
-+				VF610_PAD_PTD8__QSPI0_B_CS0		0x31e2
-+				VF610_PAD_PTD9__QSPI0_B_DATA3		0x31e3
-+				VF610_PAD_PTD10__QSPI0_B_DATA2		0x31e3
-+				VF610_PAD_PTD11__QSPI0_B_DATA1		0x31e3
-+				VF610_PAD_PTD12__QSPI0_B_DATA0		0x31e3
-+			>;
-+		};
-+
- 		pinctrl_sai2: sai2grp {
- 			fsl,pins = <
- 				VF610_PAD_PTA16__SAI2_TX_BCLK		0x02ed
-@@ -280,6 +297,28 @@
- 	status = "okay";
- };
- 
-+&qspi0 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_qspi0>;
-+	status = "okay";
-+
-+	flash0: s25fl128s at 0 {
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+		compatible = "spansion,s25fl128s";
-+		spi-max-frequency = <66000000>;
-+		reg = <0>;
-+	};
-+
-+	flash1: s25fl128s at 2 {
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+		compatible = "spansion,s25fl128s";
-+		spi-max-frequency = <66000000>;
-+		reg = <2>;
-+	};
-+};
-+
- &sai2 {
- 	#sound-dai-cells = <0>;
- 	pinctrl-names = "default";
--- 
-2.3.6
+Kevin
