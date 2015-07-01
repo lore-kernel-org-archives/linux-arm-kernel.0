@@ -1,64 +1,31 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 1 Jul 2015 09:09:15 +0100
-Subject: [PATCH v5 2/6] arch: unify ioremap prototypes and macro aliases
-In-Reply-To: <CAMuHMdUO4uSWH1Qc0SfDTLuXbiG2N9fq8Tf6j+3RoqVKdPugbA@mail.gmail.com>
-References: <20150622081028.35954.89885.stgit@dwillia2-desk3.jf.intel.com>
- <20150622082427.35954.73529.stgit@dwillia2-desk3.jf.intel.com>
- <20150622161002.GB8240@lst.de>
- <CAPcyv4h5OXyRvZvLGD5ZknO-YUPn675YGv0XdtW1QOO9qmZsug@mail.gmail.com>
- <20150701062352.GA3739@lst.de>
- <CAMuHMdUO4uSWH1Qc0SfDTLuXbiG2N9fq8Tf6j+3RoqVKdPugbA@mail.gmail.com>
-Message-ID: <20150701080915.GJ7557@n2100.arm.linux.org.uk>
+From: javier@dowhile0.org (Javier Martinez Canillas)
+Date: Wed, 1 Jul 2015 10:13:48 +0200
+Subject: [PATCH] ARM: mm: handle non-pmd-aligned end of RAM
+In-Reply-To: <CABxcv=noPD1vdY5V-G+M16S0y20VO2_s6XbQJG_qM+=dOKtZxg@mail.gmail.com>
+References: <a865bd68d706f8c4c9e82a374ff6adc4@agner.ch>
+ <20150511103130.GA3490@leverpostej>
+ <CABxcv=noPD1vdY5V-G+M16S0y20VO2_s6XbQJG_qM+=dOKtZxg@mail.gmail.com>
+Message-ID: <CABxcv=mAEOdnChTCMaOttk1swtRSvuO6XzDY6M8GRg9EL119LA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 01, 2015 at 08:55:57AM +0200, Geert Uytterhoeven wrote:
-> On Wed, Jul 1, 2015 at 8:23 AM, Christoph Hellwig <hch@lst.de> wrote:
-> >> One useful feature of the ifdef mess as implemented in the patch is
-> >> that you could test for whether ioremap_cache() is actually
-> >> implemented or falls back to default ioremap().  I think for
-> >> completeness archs should publish an ioremap type capabilities mask
-> >> for drivers that care... (I can imagine pmem caring), or default to
-> >> being permissive if something like IOREMAP_STRICT is not set.  There's
-> >> also the wrinkle of archs that can only support certain types of
-> >> mappings at a given alignment.
-> >
-> > I think doing this at runtime might be a better idea.  E.g. a
-> > ioremap_flags with the CACHED argument will return -EOPNOTSUP unless
-> > actually implemented.  On various architectures different CPUs or
-> > boards will have different capabilities in this area.
-> 
-> So it would be the responsibility of the caller to fall back from
-> ioremap(..., CACHED) to ioremap(..., UNCACHED)?
-> I.e. all drivers using it should be changed...
+On Tue, Jun 30, 2015 at 12:01 PM, Javier Martinez Canillas
+<javier@dowhile0.org> wrote:
 
-Another important point here is to define what the properties of the
-mappings are.  It's no good just saying "uncached".
+[...]
 
-We've recently been around this over the PMEM driver and the broken
-addition of ioremap_wt() on ARM...
+>
+> There were reports of 4.1 not booting on the Exynos Chromebooks. I did
+> a bisect on an Exynos5420 Peach Pit Chromebook and tracked it down to
+> $subject as the cause. Reverting this commit makes it to boot again.
+>
 
-By "properties" I mean stuff like whether unaligned accesses permitted,
-any kind of atomic access (eg, xchg, cmpxchg, etc).
+I found that the following posted patch by Laura Abbot makes the
+system to boot again:
 
-This matters: on ARM, a mapping suitable for a device does not support
-unaligned accesses or atomic accesses - only "memory-like" mappings
-support those.  However, memory-like mappings are not required to
-preserve access size, number of accesses, etc which makes them unsuitable
-for device registers.
+[PATCH] arm: Update memblock limit after mapping lowmem [0].
 
-The problem with ioremap_uncached() in particular is that we have LDD
-and other documentation telling people to use it to map device registers,
-so we can't define ioremap_uncached() on ARM to have memory-like
-properties, and it doesn't support unaligned accesses.
+Best regards,
+Javier
 
-I have a series of patches which fix up 32-bit ARM for the broken
-ioremap_wt() stuff that was merged during this merge window, which I
-intend to push out into linux-next at some point (possibly during the
-merge window, if not after -rc1) which also move ioremap*() out of line
-on ARM but more importantly, adds a load of documentation about the
-properties of the resulting mapping on ARM.
-
--- 
-FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
-according to speedtest.net.
+[0]: https://lkml.org/lkml/2015/6/4/606
