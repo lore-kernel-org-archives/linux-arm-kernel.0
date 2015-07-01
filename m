@@ -1,37 +1,64 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Wed,  1 Jul 2015 13:36:00 +0100
-Subject: [PATCH 0/3] arm/arm64: vexpress: DT updates for v4.2
-Message-ID: <1435754163-17929-1-git-send-email-sudeep.holla@arm.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Wed, 1 Jul 2015 13:39:08 +0100
+Subject: [PATCH] ARM: psci: keystone: remove keystone_smp_ops code if
+ psci is supported
+In-Reply-To: <1435752784-30639-1-git-send-email-vitalya@ti.com>
+References: <1435752784-30639-1-git-send-email-vitalya@ti.com>
+Message-ID: <20150701123908.GA2310@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi ARM-SoC guys,
+On Wed, Jul 01, 2015 at 01:13:03PM +0100, Vitaly Andrianov wrote:
+> If we enable psci support we don't need keystone_smp_ops anymore.
 
-Here are couple of fixes for adding missing nodes(CCI and A7 PMUs) in
-TC2 device tree. The third patch is addition of support for FPGA based
-dual core A53 SMM  platform. All the patches are posted on the list
-already, just putting them together. Let me know if you prefer a pull
-request.
+You need them for existing users.
 
-Regards,
-Sudeep
+> 
+> Signed-off-by: Vitaly Andrianov <vitalya@ti.com>
+> ---
+>  arch/arm/mach-keystone/Makefile   | 2 ++
+>  arch/arm/mach-keystone/keystone.c | 2 ++
+>  2 files changed, 4 insertions(+)
+> 
+> diff --git a/arch/arm/mach-keystone/Makefile b/arch/arm/mach-keystone/Makefile
+> index 25d9239..5cc5ca4 100644
+> --- a/arch/arm/mach-keystone/Makefile
+> +++ b/arch/arm/mach-keystone/Makefile
+> @@ -3,7 +3,9 @@ obj-y					:= keystone.o smc.o
+>  plus_sec := $(call as-instr,.arch_extension sec,+sec)
+>  AFLAGS_smc.o				:=-Wa,-march=armv7-a$(plus_sec)
+>  
+> +ifneq ($(CONFIG_ARM_PSCI),y)
+>  obj-$(CONFIG_SMP)			+= platsmp.o
+> +endif
+>  
+>  # PM domain driver for Keystone SOCs
+>  obj-$(CONFIG_ARCH_KEYSTONE)		+= pm_domain.o
+> diff --git a/arch/arm/mach-keystone/keystone.c b/arch/arm/mach-keystone/keystone.c
+> index e2880105..9cc489c 100644
+> --- a/arch/arm/mach-keystone/keystone.c
+> +++ b/arch/arm/mach-keystone/keystone.c
+> @@ -105,7 +105,9 @@ DT_MACHINE_START(KEYSTONE, "Keystone")
+>  #if defined(CONFIG_ZONE_DMA) && defined(CONFIG_ARM_LPAE)
+>  	.dma_zone_size	= SZ_2G,
+>  #endif
+> +#ifndef CONFIG_ARM_PSCI
+>  	.smp		= smp_ops(keystone_smp_ops),
+> +#endif
 
-Kristina Martsenko (1):
-  arm64: dts: add device tree for ARM SMM-A53x2 on LogicTile Express
-    20MG
+This will prevent building a kernel that supports PSCI and your legacy
+SMP bringup.
 
-Mark Rutland (1):
-  arm: dts: vexpress: describe all PMUs in TC2 dts
+I don't think this is necessary, given the code in setup_arch and the
+absence of mdesc->smp_init for keystone. A single kernel can support
+both, and it should support both.
 
-Sudeep Holla (1):
-  arm: dts: vexpress: add missing CCI PMU device node to TC2
+Thanks,
+Mark.
 
- MAINTAINERS                                        |   1 +
- arch/arm/boot/dts/vexpress-v2p-ca15_a7.dts         |  25 ++-
- arch/arm64/boot/dts/arm/Makefile                   |   1 +
- .../boot/dts/arm/vexpress-v2f-1xv7-ca53x2.dts      | 191 +++++++++++++++++++++
- 4 files changed, 216 insertions(+), 2 deletions(-)
- create mode 100644 arch/arm64/boot/dts/arm/vexpress-v2f-1xv7-ca53x2.dts
-
--- 
-1.9.1
+>  	.init_machine	= keystone_init,
+>  	.dt_compat	= keystone_match,
+>  	.pv_fixup	= keystone_pv_fixup,
+> -- 
+> 1.9.1
+> 
