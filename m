@@ -1,61 +1,39 @@
-From: vaibhav.hiremath@linaro.org (Vaibhav Hiremath)
-Date: Wed, 01 Jul 2015 22:54:41 +0530
-Subject: [PATCH-V5 4/4] mfd: devicetree: bindings: Add new 88pm800 mfd
- binding
-In-Reply-To: <CAL_JsqKgxPK3oBJifAn9-S8pB8Ew7JRmi9cJE4qO1b=aRC4N+w@mail.gmail.com>
-References: <1435591877-18214-1-git-send-email-vaibhav.hiremath@linaro.org>
- <1435591877-18214-5-git-send-email-vaibhav.hiremath@linaro.org>
- <CAL_JsqKCyRZyWR3DzuOuDu7+psDWH_4hOQvMK1PSOJS09btUkw@mail.gmail.com>
- <5594137D.6070106@linaro.org>
- <CAL_JsqKgxPK3oBJifAn9-S8pB8Ew7JRmi9cJE4qO1b=aRC4N+w@mail.gmail.com>
-Message-ID: <55942259.9090804@linaro.org>
+From: james.morse@arm.com (James Morse)
+Date: Wed, 01 Jul 2015 18:32:49 +0100
+Subject: [PATCH v3 2/5] PCI: designware: Add ARM64 support
+In-Reply-To: <EE11001F9E5DDD47B7634E2F8A612F2E01D4E6A2@lhreml503-mbs>
+References: <1435743817-19083-1-git-send-email-wangzhou1@hisilicon.com>
+ <1435743817-19083-3-git-send-email-wangzhou1@hisilicon.com>
+ <EE11001F9E5DDD47B7634E2F8A612F2E01D4E4BB@lhreml503-mbs>
+ <5593F899.6050306@arm.com>
+ <EE11001F9E5DDD47B7634E2F8A612F2E01D4E6A2@lhreml503-mbs>
+Message-ID: <55942441.3050705@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On Wednesday 01 July 2015 10:47 PM, Rob Herring wrote:
-> On Wed, Jul 1, 2015 at 11:21 AM, Vaibhav Hiremath
-> <vaibhav.hiremath@linaro.org> wrote:
+Gabriele Paoloni wrote:
+>> Both series are applied to v4.1, use the same .config file, and the
+>> same dtb.
+>> I will investigate further.
 >>
->>
->> On Wednesday 01 July 2015 09:40 PM, Rob Herring wrote:
->>>
->>> On Mon, Jun 29, 2015 at 10:31 AM, Vaibhav Hiremath
->>> <vaibhav.hiremath@linaro.org> wrote:
->>>>
->>>> With addition of DT support to 88pm800 mfd driver, this patch
->>>> adds new DT binding documentation along with respective properties.
->>>>
->>>> Signed-off-by: Vaibhav Hiremath <vaibhav.hiremath@linaro.org>
->>>
->>>
->>> Didn't I ack this already? You should add it when you send subsequent
->>> versions. The maintainer will add it if there aren't any subsequent
->>> versions.
->>>
->>> Acked-by: Rob Herring <robh@kernel.org>
->>>
->>
->> Sorry Rob. Infact I did ask you as well. Probably you missed it.
->>
->> Patch got changed after your ack, I did some changes based on few
->> review comments, from Lee and others.
+>> (Re-testing v2 works, so this isn't an interim hardware failure)
 >
-> Ok, then it is up to your judgement whether the ack should still
-> apply. If not, you should note that.
+> This is a bit weird....
 >
-
-I did.
-
-I did mention it in my cover letter.
-
->> Anyway, thanks for ack. Can you please queue this?
+> Patch 2/5 is the only one that affect platforms different from Hisilicon
 >
-> I'm assuming Lee is taking the whole series.
->
+> The only difference between V3 patch[2/5] and v2 patch[2/4] is
 
-Ok.
+Between v3:2/5 and your replacement for v2:2/4, which arrived after I had
+tested the v2 series. As the patch has been replaced with a different one -
+neither 'tested-by' is true any more.
+
+It looks like the BAR containing the bridge window is not being assigned,
+so no devices on bus 1 are discovered.
+
+I will send the full v2 and v3 dmesg output separately.
+
 
 Thanks,
-Vaibhav
+
+James
