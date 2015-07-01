@@ -1,70 +1,67 @@
-From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Wed, 01 Jul 2015 13:58:09 +0200
-Subject: [RFC PATCH 14/15] regulator: pwm: implement ->enable(),
- ->disable() and ->is_enabled methods
-In-Reply-To: <1435738921-25027-15-git-send-email-boris.brezillon@free-electrons.com>
-References: <1435738921-25027-1-git-send-email-boris.brezillon@free-electrons.com>
- <1435738921-25027-15-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <3495901.qMzLCVWCDl@diego>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Wed, 1 Jul 2015 13:58:20 +0200
+Subject: [PATCH 05/10] KVM: arm/arm64: vgic: Relax vgic_can_sample_irq
+ for edge IRQs
+In-Reply-To: <5593B040.6050208@arm.com>
+References: <1433783045-8002-1-git-send-email-marc.zyngier@arm.com>
+ <1433783045-8002-6-git-send-email-marc.zyngier@arm.com>
+ <20150630201933.GA11332@cbox> <5593B040.6050208@arm.com>
+Message-ID: <20150701115820.GC17890@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Mittwoch, 1. Juli 2015, 10:22:00 schrieb Boris Brezillon:
-> Implement the ->enable(), ->disable() and ->is_enabled methods and remove
-> the PWM call in ->set_voltage_sel().
-> This is particularly important for critical regulators tagged as always-on,
-> because not claiming the PWM (and its dependencies) might lead to
-> unpredictable behavior (like a system hang because the PWM clk is only
-> claimed when the PWM device is enabled).
+On Wed, Jul 01, 2015 at 10:17:52AM +0100, Marc Zyngier wrote:
+> On 30/06/15 21:19, Christoffer Dall wrote:
+> > On Mon, Jun 08, 2015 at 06:04:00PM +0100, Marc Zyngier wrote:
+> >> We only set the irq_queued flag for level interrupts, meaning
+> >> that "!vgic_irq_is_queued(vcpu, irq)" is a good enough predicate
+> >> for all interrupts.
+> >>
+> >> This will allow us to inject edge HW interrupts, for which the
+> >> state ACTIVE+PENDING is not allowed.
+> > 
+> > I don't understand this; ACTIVE+PENDING is allowed for edge interrupts.
+> > Do you mean that if we set the HW bit in the LR, then we are linking to
+> > an HW interrupt where we don't allow that to be ACTIVE+PENDING on the HW
+> > GIC side?
+> > 
+> > Why is this relevant here?  I feel like I'm missing context.
 > 
-> Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
-> ---
->  drivers/regulator/pwm-regulator.c | 32 ++++++++++++++++++++++++++------
->  1 file changed, 26 insertions(+), 6 deletions(-)
+> I've probably taken a shortcut here - bear with me while I'm trying to
+> explain the issue.
 > 
-> diff --git a/drivers/regulator/pwm-regulator.c
-> b/drivers/regulator/pwm-regulator.c index 12b4d9d..8159518 100644
-> --- a/drivers/regulator/pwm-regulator.c
-> +++ b/drivers/regulator/pwm-regulator.c
-> @@ -59,12 +59,6 @@ static int pwm_regulator_set_voltage_sel(struct
-> regulator_dev *rdev,
-> 
->  	drvdata->state = selector;
-> 
-> -	ret = pwm_enable(drvdata->pwm);
-> -	if (ret) {
-> -		dev_err(&rdev->dev, "Failed to enable PWM\n");
-> -		return ret;
-> -	}
-> -
->  	return 0;
->  }
-> 
-> @@ -79,11 +73,37 @@ static int pwm_regulator_list_voltage(struct
-> regulator_dev *rdev, return drvdata->duty_cycle_table[selector].uV;
->  }
-> 
-> +static int pwm_regulator_enable(struct regulator_dev *dev)
-> +{
-> +	struct pwm_regulator_data *drvdata = rdev_get_drvdata(dev);
-> +
-> +	return pwm_enable(drvdata->pwm);
-> +}
-> +
-> +static int pwm_regulator_disable(struct regulator_dev *dev)
-> +{
-> +	struct pwm_regulator_data *drvdata = rdev_get_drvdata(dev);
-> +
-> +	pwm_disable(drvdata->pwm);
-> +
-> +	return 0;
-> +}
-> +
-> +static int pwm_regulator_is_enabled(struct regulator_dev *dev)
-> +{
-> +       struct pwm_regulator_data *drvdata = rdev_get_drvdata(dev);
-> +
-> +       return pwm_is_enabled(drvdata->pwm);
-> +}
+> For HW interrupts, we shouldn't even try to use the state bits in the
+> LR, because that state is contained in the physical distributor. Setting
+> the HW bit really means "there is something going on at the distributor
+> level, just go there".
 
-nit: indentation is wrong in pwm_regulator_is_enabled (spaces instead of tabs)
+ok, so by "HW interrupts" you mean virtual interrupts with the HW bit in
+the LR set, correct?
+
+> 
+> If we were to inject a ACTIVE+PENDING interrupt at the LR level, we'd
+> basically loose the second interrupt because that state is simply not
+> considered.
+
+Huh?  Which second interrupt.  I looked at the spec and it says don't
+use the state bits for HW interrupts, so isn't it simply not supported
+to set these bits at all and that's it?
+
+> 
+> So the trick we're using is to only inject the active interrupt, and
+> prevent anything else from being injected until we can confirm that the
+> active state has been cleared at the physical level.
+> 
+> Does it make any sense?
+> 
+Sort of, but what I don't understand now is how the guest ever sees the
+interrupt then.  If we always inject the virtual interrupt by setting
+the active state on the physical distributor, and we can't inject this
+as active+pending, and the guest doesn't see the state in the LR, then
+how does this ever raise a virtual interrupt and how does the guest see
+an interrupt which is only PENDING so that it can ack it etc. etc.?
+
+Maybe I don't fully understand how the HW bit works after all...
+
+Thanks,
+-Christoffer
