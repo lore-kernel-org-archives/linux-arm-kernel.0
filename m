@@ -1,10 +1,10 @@
 From: khilman@kernel.org (Kevin Hilman)
-Date: Wed, 01 Jul 2015 13:42:13 -0700
-Subject: [GIT PULL] ARM: mvebu: fixes changes for v4.1
-In-Reply-To: <55832147.1020202@free-electrons.com> (Gregory CLEMENT's message
- of "Thu, 18 Jun 2015 21:51:35 +0200")
-References: <55832147.1020202@free-electrons.com>
-Message-ID: <7hzj3flie2.fsf@deeprootsystems.com>
+Date: Wed, 01 Jul 2015 13:42:56 -0700
+Subject: [GIT PULL] ARM: mvebu: dt changes for v4.2
+In-Reply-To: <5583214D.6020205@free-electrons.com> (Gregory CLEMENT's message
+ of "Thu, 18 Jun 2015 21:51:41 +0200")
+References: <5583214D.6020205@free-electrons.com>
+Message-ID: <7hvbe3licv.fsf@deeprootsystems.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -12,34 +12,36 @@ Gregory CLEMENT <gregory.clement@free-electrons.com> writes:
 
 > Hi,
 >
-> Here is the forth pull request for fixes for mvebu for v4.1.
->
-> Actually this bug can happen only on one board: the Armada XP GP,
-> so if you can't pull it for 4.1, I will send it again once 4.2-rc1
-> will be released.
+> Here is the third pull request for cleanup for mvebu for v4.2.
+> This pull request came very late, but as explained in the signed tag,
+> without it spi muxing will be broken in 4.2-rc1 for Armada XP.
 >
 > Gregory
 >
-> The following changes since commit 885dbd154b2f2ee305cec6fd0a162e1a77ae2b06:
+> The following changes since commit 2d2959286017f5501187cfa47d3854f955c4beae:
 >
->   Revert "bus: mvebu-mbus: make sure SDRAM CS for DMA don't overlap the MBus bridge window" (2015-05-28 11:14:31 +0200)
+>   ARM: mvebu: use improved armada spi device tree compatible name for each SoC (2015-05-27 12:04:45 +0200)
 >
 > are available in the git repository at:
 >
->   git://git.infradead.org/linux-mvebu.git tags/mvebu-fixes-4.1-4
+>   git://git.infradead.org/linux-mvebu.git tags/mvebu-dt-4.2-3
 >
-> for you to fetch changes up to 2f5bc307be2480ba89e4c5d118f406f04a4a7299:
+> for you to fetch changes up to 8c19a731a1a8b1f447a972174d2b2fe30d625518:
 >
->   ARM: mvebu: fix suspend to RAM on big-endian configurations (2015-06-17 17:23:36 +0200)
+>   ARM: mvebu: adjust Armada XP DT spi muxing after pinctrl function rename (2015-06-17 15:42:15 +0200)
 >
 > ----------------------------------------------------------------
-> mvebu fixes for 4.1 (part 4)
+> mvebu dt changes for v4.2 (part #3)
 >
-> Fix suspend to RAM on big-endian configurations on Armada XP GP board
+> Update Armada XP DT spi muxing after pinctrl function rename which was
+> merged in the pinctrl subsystem for 4.2. Without it the spi muxing
+> will be broken in 4.2-rc1 for Armada XP.
 >
 > ----------------------------------------------------------------
 
-Ignoring this one as I see you have an updated pull which includes this
-and another patch.
+Pulled this into next/late and will try to get in for -rc1, but if not
+it will make it for -rc2.
+
+Thanks,
 
 Kevin
