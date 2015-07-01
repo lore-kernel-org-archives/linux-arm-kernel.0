@@ -1,83 +1,75 @@
 From: alex.bennee@linaro.org (=?UTF-8?q?Alex=20Benn=C3=A9e?=)
-Date: Wed,  1 Jul 2015 19:28:53 +0100
-Subject: [PATCH v7 01/11] KVM: add comments for kvm_debug_exit_arch struct
-In-Reply-To: <1435775343-20034-1-git-send-email-alex.bennee@linaro.org>
-References: <1435775343-20034-1-git-send-email-alex.bennee@linaro.org>
-Message-ID: <1435775343-20034-2-git-send-email-alex.bennee@linaro.org>
+Date: Wed,  1 Jul 2015 19:28:52 +0100
+Subject: [PATCH v7 00/11] KVM Guest Debug support for arm64
+Message-ID: <1435775343-20034-1-git-send-email-alex.bennee@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Bring into line with the comments for the other structures and their
-KVM_EXIT_* cases. Also update api.txt to reflect use in kvm_run
-documentation.
+Here is V7 of the KVM Guest Debug support for arm64.
 
-Signed-off-by: Alex Benn?e <alex.bennee@linaro.org>
-Reviewed-by: David Hildenbrand <dahi@linux.vnet.ibm.com>
-Reviewed-by: Andrew Jones <drjones@redhat.com>
-Acked-by: Christoffer Dall <christoffer.dall@linaro.org>
+The fixes are fairly minor aside from the re-factoring of sys_regs.c
+to have individual trap functions for each debug register. There is a
+lot of boiler plate but it does make the ugliness of the previous
+offset hacks go away.
 
----
+On top of that I've fixed some build failures on v7 which were not
+apparent on my defconfig build. I've also been helped with
+kernelci.org doing the heavy lifting for me:
 
-v2
-  - add comments for other exit types
-v3
-  - s/commentary/comments/
-  - add rb tags
-  - update api.txt kvm_run to include KVM_EXIT_DEBUG desc
-v4
-  - sp fixes
-  - add a-b
----
- Documentation/virtual/kvm/api.txt | 4 +++-
- include/uapi/linux/kvm.h          | 3 +++
- 2 files changed, 6 insertions(+), 1 deletion(-)
+    http://kernelci.org/boot/all/job/alex/
 
-diff --git a/Documentation/virtual/kvm/api.txt b/Documentation/virtual/kvm/api.txt
-index 9fa2bf8..c34c32d 100644
---- a/Documentation/virtual/kvm/api.txt
-+++ b/Documentation/virtual/kvm/api.txt
-@@ -3070,11 +3070,13 @@ data_offset describes where the data is located (KVM_EXIT_IO_OUT) or
- where kvm expects application code to place the data for the next
- KVM_RUN invocation (KVM_EXIT_IO_IN).  Data format is a packed array.
- 
-+		/* KVM_EXIT_DEBUG */
- 		struct {
- 			struct kvm_debug_exit_arch arch;
- 		} debug;
- 
--Unused.
-+If the exit_reason is KVM_EXIT_DEBUG, then a vcpu is processing a debug event
-+for which architecture specific information is returned.
- 
- 		/* KVM_EXIT_MMIO */
- 		struct {
-diff --git a/include/uapi/linux/kvm.h b/include/uapi/linux/kvm.h
-index 4b60056..70ac641 100644
---- a/include/uapi/linux/kvm.h
-+++ b/include/uapi/linux/kvm.h
-@@ -237,6 +237,7 @@ struct kvm_run {
- 			__u32 count;
- 			__u64 data_offset; /* relative to kvm_run start */
- 		} io;
-+		/* KVM_EXIT_DEBUG */
- 		struct {
- 			struct kvm_debug_exit_arch arch;
- 		} debug;
-@@ -285,6 +286,7 @@ struct kvm_run {
- 			__u32 data;
- 			__u8  is_write;
- 		} dcr;
-+		/* KVM_EXIT_INTERNAL_ERROR */
- 		struct {
- 			__u32 suberror;
- 			/* Available with KVM_CAP_INTERNAL_ERROR_DATA: */
-@@ -295,6 +297,7 @@ struct kvm_run {
- 		struct {
- 			__u64 gprs[32];
- 		} osi;
-+		/* KVM_EXIT_PAPR_HCALL */
- 		struct {
- 			__u64 nr;
- 			__u64 ret;
+For full details see the changelog on each of the patches.
+
+GIT Repos:
+
+The patches for this series are based off v4.1 and can be found
+at:
+
+Kernel:
+https://git.linaro.org/people/alex.bennee/linux.git
+branch: guest-debug/4.1-v7
+describe: v4.1-11-g2a10438
+
+QEMU:
+https://github.com/stsquad/qemu
+branch: kvm/guest-debug-v6
+
+
+Alex Benn?e (11):
+  KVM: add comments for kvm_debug_exit_arch struct
+  KVM: arm64: guest debug, define API headers
+  KVM: arm: guest debug, add stub KVM_SET_GUEST_DEBUG ioctl
+  KVM: arm: introduce kvm_arm_init/setup/clear_debug
+  KVM: arm64: guest debug, add SW break point support
+  KVM: arm64: guest debug, add support for single-step
+  KVM: arm64: re-factor hyp.S debug register code
+  KVM: arm64: introduce vcpu->arch.debug_ptr
+  KVM: arm64: guest debug, HW assisted debug support
+  KVM: arm64: enable KVM_CAP_SET_GUEST_DEBUG
+  KVM: arm64: add trace points for guest_debug debug
+
+ Documentation/virtual/kvm/api.txt      |  15 +-
+ arch/arm/include/asm/kvm_host.h        |   4 +
+ arch/arm/kvm/arm.c                     |  18 +-
+ arch/arm/kvm/guest.c                   |   6 +
+ arch/arm64/include/asm/hw_breakpoint.h |   4 +
+ arch/arm64/include/asm/kvm_asm.h       |  26 +-
+ arch/arm64/include/asm/kvm_host.h      |  37 ++-
+ arch/arm64/include/uapi/asm/kvm.h      |  27 ++
+ arch/arm64/kernel/asm-offsets.c        |   7 +
+ arch/arm64/kernel/hw_breakpoint.c      |   4 +-
+ arch/arm64/kvm/Makefile                |   2 +-
+ arch/arm64/kvm/debug.c                 | 216 +++++++++++++
+ arch/arm64/kvm/guest.c                 |  40 +++
+ arch/arm64/kvm/handle_exit.c           |  44 +++
+ arch/arm64/kvm/hyp.S                   | 544 ++++++++++-----------------------
+ arch/arm64/kvm/reset.c                 |  15 +
+ arch/arm64/kvm/sys_regs.c              | 299 ++++++++++++++++--
+ arch/arm64/kvm/sys_regs.h              |   6 +
+ arch/arm64/kvm/trace.h                 | 123 ++++++++
+ include/uapi/linux/kvm.h               |   5 +
+ 20 files changed, 996 insertions(+), 446 deletions(-)
+ create mode 100644 arch/arm64/kvm/debug.c
+
 -- 
 2.4.5
