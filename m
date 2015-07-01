@@ -1,60 +1,79 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 01 Jul 2015 16:18:41 +0100
-Subject: [PATCH 4/4] irqchip, gicv3-its: Implement Cavium ThunderX errata
- 22375, 24313
-In-Reply-To: <023101d0b402$eba41e00$c2ec5a00$@samsung.com>
-References: <1435673643-31676-1-git-send-email-rric@kernel.org>
- <1435673643-31676-5-git-send-email-rric@kernel.org>
- <023101d0b402$eba41e00$c2ec5a00$@samsung.com>
-Message-ID: <559404D1.3030909@arm.com>
+From: ezequiel@vanguardiasur.com.ar (Ezequiel Garcia)
+Date: Wed, 1 Jul 2015 12:22:12 -0300
+Subject: [PATCH 1/2] watchdog: NXP LPC18XX Windowed Watchdog Timer Driver
+In-Reply-To: <5593F10D.5000507@roeck-us.net>
+References: <1435343072-8753-1-git-send-email-ariel@vanguardiasur.com.ar>
+ <1435343072-8753-2-git-send-email-ariel@vanguardiasur.com.ar>
+ <20150626190700.GC23078@roeck-us.net>
+ <55903943.10309@vanguardiasur.com.ar>
+ <5590CDF6.7000103@roeck-us.net> <5593CF3F.9040206@santafe.gov.ar>
+ <5593D6CC.10201@vanguardiasur.com.ar>
+ <5593F10D.5000507@roeck-us.net>
+Message-ID: <CAAEAJfCz23VKA49CJN51KwF8WFsjYuaCiHFcXfyWxonK-Qty6g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/07/15 14:36, Pavel Fedin wrote:
->  Hello!
-> 
->> This implements two gicv3-its errata for ThunderX. Both with small
->> impact affecting only ITS table allocation.
+Hi Guenter,
+
+First of all, thanks a lot for your feedback.
+
+On 1 July 2015 at 10:54, Guenter Roeck <linux@roeck-us.net> wrote:
+> On 07/01/2015 05:02 AM, Ariel D'Alessandro wrote:
 >>
->>  erratum 22375: only alloc 8MB table size
-> 
->  I have a simpler solution to this one:
-> ---
-> For some reason on ThunderX GITS_BASER reports entry size == 8 for ITT,
-> while real size, reported by GITS_TYPER is 4. Consequently, allocated
-> table size appears twice bigger than expected. And, if we set
-> GITS_BASER.SIZE accordingly (the value appears to be 0xFF instead of 0x7F)
-> the ITS will not work.
-> 
-> Signed-off-by: Pavel Fedin <p.fedin@samsung.com>
-> ---
->  drivers/irqchip/irq-gic-v3-its.c   | 3 ++-
->  include/linux/irqchip/arm-gic-v3.h | 2 ++
->  2 files changed, 4 insertions(+), 1 deletion(-)
-> 
-> diff --git a/drivers/irqchip/irq-gic-v3-its.c b/drivers/irqchip/irq-gic-v3-its.c
-> index ed70163..c420f17 100644
-> --- a/drivers/irqchip/irq-gic-v3-its.c
-> +++ b/drivers/irqchip/irq-gic-v3-its.c
-> @@ -827,6 +827,7 @@ static int its_alloc_tables(struct its_node *its)
->  		if (type == GITS_BASER_TYPE_DEVICE) {
->  			u64 typer = readq_relaxed(its->base + GITS_TYPER);
->  			u32 ids = GITS_TYPER_DEVBITS(typer);
-> +			u32 itte_size = GITS_TYPER_ITTE_SIZE(typer);
->  
->  			/*
->  			 * 'order' was initialized earlier to the default page
-> @@ -834,7 +835,7 @@ static int its_alloc_tables(struct its_node *its)
->  			 * smaller than that.  If the requested allocation
->  			 * is smaller, round up to the default page granule.
->  			 */
-> -			order = max(get_order((1UL << ids) * entry_size),
-> +			order = max(get_order((1UL << ids) * itte_size),
+>> (Sorry, I sent the last mail with an incorrect mail account)
+>>
+>> El 01/07/15 a las 08:30, adalessandro escibi?:
+>>>
+>>>
+>>> El 29/06/15 a las 01:47, Guenter Roeck escibi?:
+>>>>
+>>>> On 06/28/2015 11:13 AM, Ariel D'Alessandro wrote:
+>>>>>>>
+>>>>>>> +/* Timeout values in seconds */
+>>>>>>> +#define LPC_WDT_DEF_TIMEOUT        1
+>>>>>>> +
+>>>>>>
+>>>>>>
+>>>>>> One second ? This is highly unusual. 30 or 60 seconds is more common,
+>>>>>> and one second would be very challenging for user space.
+>>>>>>
+>>>>>> Any special reason for using such a tight default ?
+>>>>>
+>>>>>
+>>>>> Considering that LPC18xx Watchdog has a fixed divide-by-4 clock
+>>>>> pre-scaler and a 24-bit counter and that Watchdog clock runs at a fixed
+>>>>> frequency of 12MHz, timeout range goes from 1 to 5 seconds.
+>>>>>
+>>>>> I think you're right, 1 sec is very challenging, so it's 5 secs then.
+>>>>>
+>>>> Ultimately you might want to consider a soft timer as backup to the
+>>>> system
+>>>> timeout. But that can be done later if/when needed.
+>>>
+>>>
+>>> I understand your point, but just to be sure, what do mean by soft timer?
+>>>
+>
+> A kernel function which pings the watchdog periodically even if the
+> watchdog is open.
+>
+> Example: Timeout is set to 30 seconds. Since the HW watchdog times out
+> earlier than that, it needs to be pinged regularly (eg every 2.5 seconds).
+> The kernel does that with a timer unless user space does not ping the
+> watchdog within the configured interval of 30 seconds.
+>
 
-What makes you think that an entry in the device table is the same size
-as a translation entry? Just because one contains a pointer to the other
-doesn't imply they have the same size.
+Do we really need this? It sounds like bloat to me. Considering this watchdog
+controller is included in cortex-M MCUs, you wouldn't expect the
+scheduler to be under so much pressure.
 
-	M.
+I realize that 1-5 seconds is challenging for userspace, but having a soft timer
+in the kernel side sounds like making the system heavier instead of lighter.
+
+Not sure I'm making sense here, but I would think twice before adding bloat.
+
+Maybe Ariel can submit his v2 (with basic watchdog support, which BTW also
+provides a reset handler) now and we can pospone this discussion.
 -- 
-Jazz is not dead. It just smells funny...
+Ezequiel Garc?a, VanguardiaSur
+www.vanguardiasur.com.ar
