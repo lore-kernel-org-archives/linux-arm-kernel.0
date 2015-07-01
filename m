@@ -1,30 +1,49 @@
-From: acourbot@nvidia.com (Alexandre Courbot)
-Date: Wed, 1 Jul 2015 18:13:48 +0900
-Subject: [PATCH 4/4] ARM: tegra: Enable Nouveau in defconfig
-In-Reply-To: <1435742028-8237-1-git-send-email-acourbot@nvidia.com>
-References: <1435742028-8237-1-git-send-email-acourbot@nvidia.com>
-Message-ID: <1435742028-8237-5-git-send-email-acourbot@nvidia.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Wed, 01 Jul 2015 10:17:52 +0100
+Subject: [PATCH 05/10] KVM: arm/arm64: vgic: Relax vgic_can_sample_irq
+ for edge IRQs
+In-Reply-To: <20150630201933.GA11332@cbox>
+References: <1433783045-8002-1-git-send-email-marc.zyngier@arm.com>
+ <1433783045-8002-6-git-send-email-marc.zyngier@arm.com>
+ <20150630201933.GA11332@cbox>
+Message-ID: <5593B040.6050208@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since Nouveau support is complete, enable it in the Tegra configuration
-so supported boards can take advantage of it.
+On 30/06/15 21:19, Christoffer Dall wrote:
+> On Mon, Jun 08, 2015 at 06:04:00PM +0100, Marc Zyngier wrote:
+>> We only set the irq_queued flag for level interrupts, meaning
+>> that "!vgic_irq_is_queued(vcpu, irq)" is a good enough predicate
+>> for all interrupts.
+>>
+>> This will allow us to inject edge HW interrupts, for which the
+>> state ACTIVE+PENDING is not allowed.
+> 
+> I don't understand this; ACTIVE+PENDING is allowed for edge interrupts.
+> Do you mean that if we set the HW bit in the LR, then we are linking to
+> an HW interrupt where we don't allow that to be ACTIVE+PENDING on the HW
+> GIC side?
+> 
+> Why is this relevant here?  I feel like I'm missing context.
 
-Signed-off-by: Alexandre Courbot <acourbot@nvidia.com>
----
- arch/arm/configs/tegra_defconfig | 3 +++
- 1 file changed, 3 insertions(+)
+I've probably taken a shortcut here - bear with me while I'm trying to
+explain the issue.
 
-diff --git a/arch/arm/configs/tegra_defconfig b/arch/arm/configs/tegra_defconfig
-index d199eb249151..a5ef73116fdd 100644
---- a/arch/arm/configs/tegra_defconfig
-+++ b/arch/arm/configs/tegra_defconfig
-@@ -292,3 +292,6 @@ CONFIG_EARLY_PRINTK=y
- CONFIG_CRYPTO_TWOFISH=y
- # CONFIG_CRYPTO_ANSI_CPRNG is not set
- CONFIG_CRC_CCITT=y
-+CONFIG_DRM_NOUVEAU=m
-+CONFIG_NOUVEAU_DEBUG=5
-+CONFIG_NOUVEAU_DEBUG_DEFAULT=3
+For HW interrupts, we shouldn't even try to use the state bits in the
+LR, because that state is contained in the physical distributor. Setting
+the HW bit really means "there is something going on at the distributor
+level, just go there".
+
+If we were to inject a ACTIVE+PENDING interrupt at the LR level, we'd
+basically loose the second interrupt because that state is simply not
+considered.
+
+So the trick we're using is to only inject the active interrupt, and
+prevent anything else from being injected until we can confirm that the
+active state has been cleared at the physical level.
+
+Does it make any sense?
+
+	M.
 -- 
-2.4.4
+Jazz is not dead. It just smells funny...
