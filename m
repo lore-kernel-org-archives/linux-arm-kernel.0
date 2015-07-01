@@ -1,72 +1,56 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Wed, 1 Jul 2015 15:50:41 +0200
-Subject: [PATCH v3 2/2] arm: KVM: keep arm vfp/simd exit handling
- consistent with arm64
-In-Reply-To: <1435190652-5831-3-git-send-email-m.smarduch@samsung.com>
-References: <1435190652-5831-1-git-send-email-m.smarduch@samsung.com>
- <1435190652-5831-3-git-send-email-m.smarduch@samsung.com>
-Message-ID: <20150701135041.GH11332@cbox>
+From: steve.capper@linaro.org (Steve Capper)
+Date: Wed, 1 Jul 2015 14:56:36 +0100
+Subject: [PATCH] arm64: Don't report clear pmds and puds as huge
+In-Reply-To: <20150701132838.GE21981@e104818-lin.cambridge.arm.com>
+References: <1435752511-7079-1-git-send-email-christoffer.dall@linaro.org>
+ <20150701131831.GD21981@e104818-lin.cambridge.arm.com>
+ <20150701132838.GE21981@e104818-lin.cambridge.arm.com>
+Message-ID: <CAPvkgC3y0jEbQBOYdB1xztiFq3b6+6QrWJKF=3rHjr7fP38gDg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 24, 2015 at 05:04:12PM -0700, Mario Smarduch wrote:
-> After enhancing arm64 FP/SIMD exit handling, ARMv7 VFP exit branch is moved
-> to guest trap handling. This allows us to keep exit handling flow between both
-> architectures consistent.
-> 
-> Signed-off-by: Mario Smarduch <m.smarduch@samsung.com>
-> ---
->  arch/arm/kvm/interrupts.S |   14 ++++++++------
->  1 file changed, 8 insertions(+), 6 deletions(-)
-> 
-> diff --git a/arch/arm/kvm/interrupts.S b/arch/arm/kvm/interrupts.S
-> index 79caf79..b245b4e 100644
-> --- a/arch/arm/kvm/interrupts.S
-> +++ b/arch/arm/kvm/interrupts.S
-> @@ -363,10 +363,6 @@ hyp_hvc:
->  	@ Check syndrome register
->  	mrc	p15, 4, r1, c5, c2, 0	@ HSR
->  	lsr	r0, r1, #HSR_EC_SHIFT
-> -#ifdef CONFIG_VFPv3
-> -	cmp	r0, #HSR_EC_CP_0_13
-> -	beq	switch_to_guest_vfp
-> -#endif
->  	cmp	r0, #HSR_EC_HVC
->  	bne	guest_trap		@ Not HVC instr.
->  
-> @@ -380,7 +376,10 @@ hyp_hvc:
->  	cmp     r2, #0
->  	bne	guest_trap		@ Guest called HVC
->  
-> -host_switch_to_hyp:
-> +	/*
-> +	 * Getting here means host called HVC, we shift parameters and branch
-> +	 * to Hyp function.
-> +	 */
->  	pop	{r0, r1, r2}
->  
->  	/* Check for __hyp_get_vectors */
-> @@ -411,6 +410,10 @@ guest_trap:
->  
->  	@ Check if we need the fault information
->  	lsr	r1, r1, #HSR_EC_SHIFT
-> +#ifdef CONFIG_VFPv3
-> +	cmp	r1, #HSR_EC_CP_0_13
-> +	beq	switch_to_guest_vfp
-> +#endif
->  	cmp	r1, #HSR_EC_IABT
->  	mrceq	p15, 4, r2, c6, c0, 2	@ HIFAR
->  	beq	2f
-> @@ -479,7 +482,6 @@ guest_trap:
->   */
->  #ifdef CONFIG_VFPv3
->  switch_to_guest_vfp:
-> -	load_vcpu			@ Load VCPU pointer to r0
->  	push	{r3-r7}
->  
->  	@ NEON/VFP used.  Turn on VFP access.
-> -- 
-> 1.7.9.5
-> 
+On 1 July 2015 at 14:28, Catalin Marinas <catalin.marinas@arm.com> wrote:
+> On Wed, Jul 01, 2015 at 02:18:31PM +0100, Catalin Marinas wrote:
+>> On Wed, Jul 01, 2015 at 02:08:31PM +0200, Christoffer Dall wrote:
+>> > diff --git a/arch/arm64/mm/hugetlbpage.c b/arch/arm64/mm/hugetlbpage.c
+>> > index 2de9d2e..0eeb4f09 100644
+>> > --- a/arch/arm64/mm/hugetlbpage.c
+>> > +++ b/arch/arm64/mm/hugetlbpage.c
+>> > @@ -40,13 +40,13 @@ int huge_pmd_unshare(struct mm_struct *mm, unsigned long *addr, pte_t *ptep)
+>> >
+>> >  int pmd_huge(pmd_t pmd)
+>> >  {
+>> > -   return !(pmd_val(pmd) & PMD_TABLE_BIT);
+>> > +   return pmd_val(pmd) && !(pmd_val(pmd) & PMD_TABLE_BIT);
+>> >  }
+>> >
+>> >  int pud_huge(pud_t pud)
+>> >  {
+>> >  #ifndef __PAGETABLE_PMD_FOLDED
+>> > -   return !(pud_val(pud) & PUD_TABLE_BIT);
+>> > +   return pud_val(pud) && !(pud_val(pud) & PUD_TABLE_BIT);
+>> >  #else
+>> >     return 0;
+>> >  #endif
+>>
+>> Thanks for the patch, I'll add the acks/reviews and Fixes: tags.
+>>
+>> (and I think I'll change pmd_val to pmd_present, same for pud; no
+>> functional difference)
+>
+> A related question - can we ever have PROT_NONE on a huge pmd? I'll
+> leave this patch with pmd_val for now, it matches pmd_trans_huge().
 
-Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
+Yes PROT_NONE can be used. I have a test case for it in libhugetlbfs
+(for HugeTLB) and for THP at:
+https://git.linaro.org/people/steve.capper/memory-tests.git
+
+They worked last time I touched them ;-).
+
+Cheers,
+--
+Steve
+
+>
+> --
+> Catalin
