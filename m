@@ -1,75 +1,37 @@
-From: tomeu.vizoso@collabora.com (Tomeu Vizoso)
-Date: Wed,  1 Jul 2015 14:45:53 +0200
-Subject: [PATCH v1 3/3] ARM: tegra: Add gpio-ranges property
-In-Reply-To: <1435754753-31307-1-git-send-email-tomeu.vizoso@collabora.com>
-References: <1435754753-31307-1-git-send-email-tomeu.vizoso@collabora.com>
-Message-ID: <1435754753-31307-4-git-send-email-tomeu.vizoso@collabora.com>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Wed, 01 Jul 2015 14:48:03 +0200
+Subject: [PATCH] arm: dma-mapping: fix off-by-one error in bitmap size check
+Message-ID: <1435754903-25108-1-git-send-email-m.szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Specify how the GPIOs map to the pins in Tegra SoCs, so the dependency is
-explicit.
+nr_bitmaps member of mapping structure stores the number of already
+allocated bitmaps and it is interpreted as loop iterator (it starts from
+0 not from 1), so a comparison against number of possible bitmap
+extensions should include this fact. This patch fixes this by changing
+the extension failure condition. This issue has been introduced by
+commit 4d852ef8c2544ce21ae41414099a7504c61164a0 ("arm: dma-mapping: Add
+support to extend DMA IOMMU mappings").
 
-This currently will add a duplicated entry in the map from pins to gpios
-in the pinmux controller but it should be harmless and will be fixed in a
-later commit.
-
-Signed-off-by: Tomeu Vizoso <tomeu.vizoso@collabora.com>
+Reported-by: Hyungwon Hwang <human.hwang@samsung.com>
+Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
+CC: stable at vger.kernel.org  # v3.15+
 ---
+ arch/arm/mm/dma-mapping.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
- arch/arm/boot/dts/tegra114.dtsi | 1 +
- arch/arm/boot/dts/tegra124.dtsi | 1 +
- arch/arm/boot/dts/tegra20.dtsi  | 1 +
- arch/arm/boot/dts/tegra30.dtsi  | 1 +
- 4 files changed, 4 insertions(+)
-
-diff --git a/arch/arm/boot/dts/tegra114.dtsi b/arch/arm/boot/dts/tegra114.dtsi
-index f58a3d9..7e1e171 100644
---- a/arch/arm/boot/dts/tegra114.dtsi
-+++ b/arch/arm/boot/dts/tegra114.dtsi
-@@ -234,6 +234,7 @@
- 		gpio-controller;
- 		#interrupt-cells = <2>;
- 		interrupt-controller;
-+		gpio-ranges = <&pinmux 0 0 246>;
- 	};
+diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
+index a64b7f621067..05619542a1c0 100644
+--- a/arch/arm/mm/dma-mapping.c
++++ b/arch/arm/mm/dma-mapping.c
+@@ -2015,7 +2015,7 @@ static int extend_iommu_mapping(struct dma_iommu_mapping *mapping)
+ {
+ 	int next_bitmap;
  
- 	apbmisc at 70000800 {
-diff --git a/arch/arm/boot/dts/tegra124.dtsi b/arch/arm/boot/dts/tegra124.dtsi
-index 87318a7..4779df3 100644
---- a/arch/arm/boot/dts/tegra124.dtsi
-+++ b/arch/arm/boot/dts/tegra124.dtsi
-@@ -255,6 +255,7 @@
- 		gpio-controller;
- 		#interrupt-cells = <2>;
- 		interrupt-controller;
-+		gpio-ranges = <&pinmux 0 0 251>;
- 	};
+-	if (mapping->nr_bitmaps > mapping->extensions)
++	if (mapping->nr_bitmaps => mapping->extensions)
+ 		return -EINVAL;
  
- 	apbdma: dma at 0,60020000 {
-diff --git a/arch/arm/boot/dts/tegra20.dtsi b/arch/arm/boot/dts/tegra20.dtsi
-index f444b67..b44277c 100644
---- a/arch/arm/boot/dts/tegra20.dtsi
-+++ b/arch/arm/boot/dts/tegra20.dtsi
-@@ -244,6 +244,7 @@
- 		gpio-controller;
- 		#interrupt-cells = <2>;
- 		interrupt-controller;
-+		gpio-ranges = <&pinmux 0 0 224>;
- 	};
- 
- 	apbmisc at 70000800 {
-diff --git a/arch/arm/boot/dts/tegra30.dtsi b/arch/arm/boot/dts/tegra30.dtsi
-index 782b11b..28c547f 100644
---- a/arch/arm/boot/dts/tegra30.dtsi
-+++ b/arch/arm/boot/dts/tegra30.dtsi
-@@ -349,6 +349,7 @@
- 		gpio-controller;
- 		#interrupt-cells = <2>;
- 		interrupt-controller;
-+		gpio-ranges = <&pinmux 0 0 248>;
- 	};
- 
- 	apbmisc at 70000800 {
+ 	next_bitmap = mapping->nr_bitmaps;
 -- 
-2.4.1
+1.9.2
