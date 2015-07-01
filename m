@@ -1,35 +1,41 @@
-From: mark.yao@rock-chips.com (Mark Yao)
-Date: Wed,  1 Jul 2015 17:49:33 +0800
-Subject: [PATCH] drm/rockchip: vop: remove hardware cursor window
-Message-ID: <1435744173-23112-1-git-send-email-mark.yao@rock-chips.com>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Wed, 1 Jul 2015 11:59:54 +0200
+Subject: n900 in 4.2-rc0: repeating oopses
+In-Reply-To: <20150701072255.GA17577@pali>
+References: <20150416093234.GA17423@amd> <20150629091146.GA5103@amd>
+ <20150630092404.GA19285@amd> <20150630095310.GF27720@pali>
+ <20150701065932.GS4156@atomide.com> <20150701072255.GA17577@pali>
+Message-ID: <20150701095954.GD7969@amd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-hardware cursor windows only have some fixed size, and not support
-width virtual, when move hardware cursor windows outside of left,
-the display would be wrong, so this window can't for cursor now.
+On Wed 2015-07-01 09:22:55, Pali Roh?r wrote:
+> On Tuesday 30 June 2015 23:59:33 Tony Lindgren wrote:
+> > * Pali Roh?r <pali.rohar@gmail.com> [150630 02:55]:
+> > > 
+> > > I will try 4.2 at the end of week.
+> > 
+> > At least today's 4.1.0-11549-g05a8256 boots just fine on my n900.
+> > 
+> > Regards,
+> > 
+> > Tony
+> 
+> So, Pavel can you re-test? Maybe there can be problem with some driver
+> which Tony did not compiled into zImage? Just speculation...
 
-And Tag hardware cursor window as a overlay is wrong, will make
-userspace wrong behaviour.
+I re-tested with today's git, and it seems to boot. Thanks for help...
 
-So just remove the hardware cursor window
+Now. "echo mem > /sys/power/state" is broken, as in "returns
+immediately in about 50% cases". The messages are
 
-Signed-off-by: Mark Yao <mark.yao@rock-chips.com>
----
- drivers/gpu/drm/rockchip/rockchip_drm_vop.c |    1 -
- 1 file changed, 1 deletion(-)
+Powerdomain (per_pwrdm) didn't enter target state 1
+Powerdomain (core_pwerdm) didn't enter target state 1
 
-diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_vop.c b/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
-index 4603412..7373ba1 100644
---- a/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
-+++ b/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
-@@ -368,7 +368,6 @@ static const struct vop_win_data rk3288_vop_win_data[] = {
- 	{ .base = 0x40, .phy = &win01_data, .type = DRM_PLANE_TYPE_OVERLAY },
- 	{ .base = 0x00, .phy = &win23_data, .type = DRM_PLANE_TYPE_OVERLAY },
- 	{ .base = 0x50, .phy = &win23_data, .type = DRM_PLANE_TYPE_CURSOR },
--	{ .base = 0x00, .phy = &cursor_data, .type = DRM_PLANE_TYPE_OVERLAY },
- };
- 
- static const struct vop_data rk3288_vop = {
+Any ideas? Thanks,
+
+									Pavel
+
 -- 
-1.7.9.5
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
