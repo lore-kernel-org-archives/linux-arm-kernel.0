@@ -1,122 +1,69 @@
-From: djkurtz@chromium.org (Daniel Kurtz)
-Date: Wed, 1 Jul 2015 22:21:55 +0800
-Subject: [PATCH v2 1/4] clk: mediatek: mt8173: Fix enabling of critical
- clocks
-In-Reply-To: <1435633127-31952-2-git-send-email-jamesjj.liao@mediatek.com>
-References: <1435633127-31952-1-git-send-email-jamesjj.liao@mediatek.com>
- <1435633127-31952-2-git-send-email-jamesjj.liao@mediatek.com>
-Message-ID: <CAGS+omDqSEn_WnUYz0XmeRpejhthb0J_qa4H9VEfihtA0Axorg@mail.gmail.com>
+From: pawelo@king.net.pl (Paul Osmialowski)
+Date: Wed, 1 Jul 2015 16:20:48 +0200 (CEST)
+Subject: [PATCH v2 4/9] arm: twr-k70f120m: timer driver for Kinetis SoC
+In-Reply-To: <alpine.DEB.2.11.1507011527380.3916@nanos>
+References: <1435667250-28299-1-git-send-email-pawelo@king.net.pl>
+ <1435667250-28299-5-git-send-email-pawelo@king.net.pl>
+ <alpine.DEB.2.11.1507010944580.3916@nanos>
+ <alpine.LNX.2.00.1507011031050.9009@localhost.localdomain>
+ <alpine.DEB.2.11.1507011527380.3916@nanos>
+Message-ID: <alpine.LNX.2.00.1507011619250.13307@localhost.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi James,
 
-To be precise, it is the CLK_TOP clocks that have CLK_APMIXED PLLs as
-their parents, so we cannot enable the CLK_TOP critical clocks until
-the CLK_APMIXED clocks have all been registered.
 
-Please add something like the above to the commit message.
+On Wed, 1 Jul 2015, Thomas Gleixner wrote:
 
-More comments inline...
+>>
+>> As I removed this kinetis_pit_enable() line, the timer did not start,
+>> therefore the system became unusable. What could be possible reason for that?
+>
+> Well, you need to move both, the init and the enable into
+> set_periodic().
+>
 
-On Tue, Jun 30, 2015 at 10:58 AM, James Liao <jamesjj.liao@mediatek.com> wrote:
-> From: Sascha Hauer <s.hauer@pengutronix.de>
->
-> On the MT8173 the clocks are provided by different units. To enable
-> the critical clocks we must be sure that all parent clocks are already
-> registered, otherwise the parents of the critical clocks end up being
-> unused and get disabled later. To find a place where all parents are
-> registered we try each time after we've registered some clocks if
-> all known providers are present now and only then we enable the critical
-> clocks
->
-> Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
-> Signed-off-by: James Liao <jamesjj.liao@mediatek.com>
-> ---
->  drivers/clk/mediatek/clk-mt8173.c | 26 +++++++++++++++++++++-----
->  1 file changed, 21 insertions(+), 5 deletions(-)
->
-> diff --git a/drivers/clk/mediatek/clk-mt8173.c b/drivers/clk/mediatek/clk-mt8173.c
-> index 4b9e04c..c483336 100644
-> --- a/drivers/clk/mediatek/clk-mt8173.c
-> +++ b/drivers/clk/mediatek/clk-mt8173.c
-> @@ -700,6 +700,22 @@ static const struct mtk_composite peri_clks[] __initconst = {
->         MUX(CLK_PERI_UART3_SEL, "uart3_ck_sel", uart_ck_sel_parents, 0x40c, 3, 1),
->  };
->
-> +static struct clk_onecell_data *mt8173_top_clk_data;
-> +static struct clk_onecell_data *mt8173_pll_clk_data;
+Indeed, something like this worked:
 
-These globals can be:
-__initdata
+diff --git a/drivers/clocksource/timer-kinetis.c 
+b/drivers/clocksource/timer-kinetis.c
+index 1424308..41ef94f 100644
+--- a/drivers/clocksource/timer-kinetis.c
++++ b/drivers/clocksource/timer-kinetis.c
+@@ -61,6 +61,7 @@ struct kinetis_clock_event_ddata {
+         struct clock_event_device evtdev;
+         void __iomem *base;
+         void __iomem *mcr;
++       unsigned long rate;
+         spinlock_t lock;
+  };
 
-> +
-> +static void mtk_clk_enable_critical(void)
+@@ -115,6 +116,7 @@ static int kinetis_clockevent_tmr_set_state_periodic(
+         struct kinetis_clock_event_ddata *pit =
+                 container_of(evt, struct kinetis_clock_event_ddata, 
+evtdev);
 
-And this function is:
++       kinetis_pit_init(pit, (pit->rate / HZ) - 1);
+         kinetis_pit_enable(pit, 1);
 
-static void __init
+         return 0;
+@@ -235,6 +237,7 @@ static void __init kinetis_clockevent_init(struct 
+device_node *np)
+                                 kinetis_clockevent_tmr_set_state_oneshot;
+                 kinetis_tmr->base = base;
+                 kinetis_tmr->mcr = mcr;
++               kinetis_tmr->rate = rate;
+                 spin_lock_init(&kinetis_tmr->lock);
 
-Other than the above, this one is:
+                 /*
+@@ -250,9 +253,6 @@ static void __init kinetis_clockevent_init(struct 
+device_node *np)
 
-Reviewed-by: Daniel Kurtz <djkurtz@chromium.org>
+                 clockevents_register_device(&kinetis_tmr->evtdev);
 
--Dan
-
-> +{
-> +       if (!mt8173_top_clk_data || !mt8173_pll_clk_data)
-> +               return;
-> +
-> +       clk_prepare_enable(mt8173_pll_clk_data->clks[CLK_APMIXED_ARMCA15PLL]);
-> +       clk_prepare_enable(mt8173_pll_clk_data->clks[CLK_APMIXED_ARMCA7PLL]);
-> +       clk_prepare_enable(mt8173_top_clk_data->clks[CLK_TOP_MEM_SEL]);
-> +       clk_prepare_enable(mt8173_top_clk_data->clks[CLK_TOP_DDRPHYCFG_SEL]);
-> +       clk_prepare_enable(mt8173_top_clk_data->clks[CLK_TOP_CCI400_SEL]);
-> +       clk_prepare_enable(mt8173_top_clk_data->clks[CLK_TOP_RTC_SEL]);
-> +}
-> +
->  static void __init mtk_topckgen_init(struct device_node *node)
->  {
->         struct clk_onecell_data *clk_data;
-> @@ -712,19 +728,19 @@ static void __init mtk_topckgen_init(struct device_node *node)
->                 return;
->         }
->
-> -       clk_data = mtk_alloc_clk_data(CLK_TOP_NR_CLK);
-> +       mt8173_top_clk_data = clk_data = mtk_alloc_clk_data(CLK_TOP_NR_CLK);
->
->         mtk_clk_register_factors(root_clk_alias, ARRAY_SIZE(root_clk_alias), clk_data);
->         mtk_clk_register_factors(top_divs, ARRAY_SIZE(top_divs), clk_data);
->         mtk_clk_register_composites(top_muxes, ARRAY_SIZE(top_muxes), base,
->                         &mt8173_clk_lock, clk_data);
->
-> -       clk_prepare_enable(clk_data->clks[CLK_TOP_CCI400_SEL]);
-> -
->         r = of_clk_add_provider(node, of_clk_src_onecell_get, clk_data);
->         if (r)
->                 pr_err("%s(): could not register clock provider: %d\n",
->                         __func__, r);
-> +
-> +       mtk_clk_enable_critical();
->  }
->  CLK_OF_DECLARE(mtk_topckgen, "mediatek,mt8173-topckgen", mtk_topckgen_init);
->
-> @@ -818,13 +834,13 @@ static void __init mtk_apmixedsys_init(struct device_node *node)
->  {
->         struct clk_onecell_data *clk_data;
->
-> -       clk_data = mtk_alloc_clk_data(CLK_APMIXED_NR_CLK);
-> +       mt8173_pll_clk_data = clk_data = mtk_alloc_clk_data(CLK_APMIXED_NR_CLK);
->         if (!clk_data)
->                 return;
->
->         mtk_clk_register_plls(node, plls, ARRAY_SIZE(plls), clk_data);
->
-> -       clk_prepare_enable(clk_data->clks[CLK_APMIXED_ARMCA15PLL]);
-> +       mtk_clk_enable_critical();
->  }
->  CLK_OF_DECLARE(mtk_apmixedsys, "mediatek,mt8173-apmixedsys",
->                 mtk_apmixedsys_init);
-> --
-> 1.8.1.1.dirty
->
+-               kinetis_pit_init(kinetis_tmr, (rate / HZ) - 1);
+-               kinetis_pit_enable(kinetis_tmr, 1);
+-
+                 if (request_irq(irq, kinetis_clockevent_tmr_irq_handler,
+                                         IRQF_TIMER | IRQF_IRQPOLL,
+                                         "kinetis-timer",
