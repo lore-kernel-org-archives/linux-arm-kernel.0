@@ -1,50 +1,132 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Wed, 1 Jul 2015 13:45:19 +0200
-Subject: [PATCH 06/10] KVM: arm/arm64: vgic: Allow dynamic mapping of
- physical/virtual interrupts
-In-Reply-To: <5593BEFD.4030608@arm.com>
-References: <1433783045-8002-1-git-send-email-marc.zyngier@arm.com>
- <1433783045-8002-7-git-send-email-marc.zyngier@arm.com>
- <20150630201942.GB11332@cbox> <5593BEFD.4030608@arm.com>
-Message-ID: <20150701114519.GB17890@cbox>
+From: pawelo@king.net.pl (Paul Osmialowski)
+Date: Wed, 1 Jul 2015 13:44:46 +0200 (CEST)
+Subject: [PATCH v2 4/9] arm: twr-k70f120m: timer driver for Kinetis SoC
+In-Reply-To: <2939807.q7WvOoYzDX@wuerfel>
+References: <1435667250-28299-1-git-send-email-pawelo@king.net.pl>
+ <1435667250-28299-5-git-send-email-pawelo@king.net.pl>
+ <2939807.q7WvOoYzDX@wuerfel>
+Message-ID: <alpine.LNX.2.00.1507011330070.11339@localhost.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 01, 2015 at 11:20:45AM +0100, Marc Zyngier wrote:
-> On 30/06/15 21:19, Christoffer Dall wrote:
-> > On Mon, Jun 08, 2015 at 06:04:01PM +0100, Marc Zyngier wrote:
-> >> In order to be able to feed physical interrupts to a guest, we need
-> >> to be able to establish the virtual-physical mapping between the two
-> >> worlds.
-> >>
-> >> The mapping is kept in a rbtree, indexed by virtual interrupts.
-> > 
-> > how many of these do you expect there will be?  Is the extra code and
-> > complexity of an rbtree really warranted?
-> > 
-> > I would assume that you'll have one PPI for each CPU in the default case
-> > plus potentially a few more for an assigned network adapter, let's say a
-> > couple of handfulls.  Am I missing something obvious or is this
-> > optimization of traversing a list of 10-12 mappings in the typical case
-> > not likely to be measurable?
-> > 
-> > I would actually be more concerned about the additional locking and
-> > would look at RCU for protecting a list instead.  Can you protect an
-> > rbtree with RCU easily?
-> 
-> Not very easily. There was some work done a while ago for the dentry
-> cache IIRC, but I doubt that's reusable directly, and probably overkill.
-> 
-> RCU protected lists are, on the other hand, readily available. Bah. I'll
-> switch to this. By the time it becomes the bottleneck, the world will
-> have moved on. Or so I hope.
-> 
-We can also move to RB trees if we have some data to show us it's worth
-the hassle later on, but I assume that since these structs are fairly
-small and overhead like this is mostly to show up on a hot path, a
-better optimization would be to allocate a bunch of these structures
-contiguously for cache locality, but again, I feel like this is all
-premature and we should measure the beast first.
+Hi Arnd,
 
-Thanks,
--Christoffer
+Again, thanks for your remarks. I'm attaching timer patch candidate for 
+the third iteration.
+
+Following your advices, I've changed following things:
+
+- not abusing aliases (same goes to pinctrl driver)
+- ranges for addressing particular timers (no change in code though, it's
+   just up to the .dts implementor)
+- *_RD and *_WR macros removed; whole this big-endian issue was a mistake,
+   I guess I overdid it a bit trying to make my drivers as universal as
+   fsl-edma driver...
+- *_SET and *_RESET macros removed - they were giving false sense of
+   security hiding potential race.
+
+Any comments are welcome.
+
+On Tue, 30 Jun 2015, Arnd Bergmann wrote:
+
+> On Tuesday 30 June 2015 14:27:25 Paul Osmialowski wrote:
+>
+>> +Example:
+>> +
+>> +aliases {
+>> +	pit0 = &pit0;
+>> +	pit1 = &pit1;
+>> +	pit2 = &pit2;
+>> +	pit3 = &pit3;
+>> +};
+>> +
+>> +pit at 40037000 {
+>> +	compatible = "fsl,kinetis-pit-timer";
+>> +	reg = <0x40037000 0x100>;
+>> +	clocks = <&mcg_pclk_gate 5 23>;
+>> +	#address-cells = <1>;
+>> +	#size-cells = <1>;
+>> +	ranges;
+>
+> All the subnodes seem to fall inside of the device's own register
+> area, so I think it would be nicer to use a specific 'ranges'
+> property that only translates the registers in question.
+>
+>>  / {
+>> +	aliases {
+>> +		pit0 = &pit0;
+>> +		pit1 = &pit1;
+>> +		pit2 = &pit2;
+>> +		pit3 = &pit3;
+>> +	};
+>> +
+>>  	soc {
+>> +		pit at 40037000 {
+>> +			compatible = "fsl,kinetis-pit-timer";
+>> +			reg = <0x40037000 0x100>;
+>> +			clocks = <&mcg_pclk_gate 5 23>;
+>> +			#address-cells = <1>;
+>> +			#size-cells = <1>;
+>> +			ranges;
+>> +
+>> +			pit0: timer at 40037100 {
+>> +				reg = <0x40037100 0x10>;
+>> +				interrupts = <68>;
+>> +				status = "disabled";
+>> +			};
+>
+> I don't think it's necessary to have both an alias
+> and a label here. What do you use the alias for?
+>
+>> +
+>> +#define KINETIS_PITMCR_PTR(base, reg) \
+>> +	(&(((struct kinetis_pit_mcr_regs *)(base))->reg))
+>> +#define KINETIS_PITMCR_RD(be, base, reg) \
+>> +		((be) ? ioread32be(KINETIS_PITMCR_PTR(base, reg)) \
+>> +		      : ioread32(KINETIS_PITMCR_PTR(base, reg)))
+>> +#define KINETIS_PITMCR_WR(be, base, reg, val) do { \
+>> +		if (be) \
+>> +			iowrite32be((val), KINETIS_PITMCR_PTR(base, reg)); \
+>> +		else \
+>> +			iowrite32((val), KINETIS_PITMCR_PTR(base, reg)); \
+>> +	} while (0)
+>
+> These should really be written as inline functions. Can you
+> explain why you need to deal with a big-endian version of this
+> hardware? Can you configure the endianess of this register block
+> and just set it to one of the two at boot time?
+>
+>> +#define KINETIS_PIT_PTR(base, reg) \
+>> +	(&(((struct kinetis_pit_channel_regs *)(base))->reg))
+>> +#define KINETIS_PIT_RD(be, base, reg) \
+>> +		((be) ? ioread32be(KINETIS_PIT_PTR(base, reg)) \
+>> +		      : ioread32(KINETIS_PIT_PTR(base, reg)))
+>> +#define KINETIS_PIT_WR(be, base, reg, val) do { \
+>> +		if (be) \
+>> +			iowrite32be((val), KINETIS_PIT_PTR(base, reg)); \
+>> +		else \
+>> +			iowrite32((val), KINETIS_PIT_PTR(base, reg)); \
+>> +	} while (0)
+>> +#define KINETIS_PIT_SET(be, base, reg, mask) \
+>> +		KINETIS_PIT_WR(be, base, reg, \
+>> +			KINETIS_PIT_RD(be, base, reg) | (mask))
+>> +#define KINETIS_PIT_RESET(be, base, reg, mask) \
+>> +		KINETIS_PIT_WR(be, base, reg, \
+>> +			KINETIS_PIT_RD(be, base, reg) & (~(mask)))
+>
+>
+> Functions again. Also, just pass a pointer to your own data structure
+> into the function, instead of the 'be' and 'base' values.
+>
+> The 'set' and 'reset' functions look like they need a spinlock
+> to avoid races.
+>
+> 	Arnd
+>
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: 0004-arm-twr-k70f120m-timer-driver-for-Kinetis-SoC.patch
+Type: text/x-diff
+Size: 12866 bytes
+Desc: 
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150701/0a4754cf/attachment-0001.bin>
