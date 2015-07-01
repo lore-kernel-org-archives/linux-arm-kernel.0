@@ -1,38 +1,56 @@
 From: rmk+kernel@arm.linux.org.uk (Russell King)
-Date: Wed, 01 Jul 2015 22:45:44 +0100
-Subject: [PATCH] ARM: fix DEBUG_SET_MODULE_RONX build dependencies
-Message-ID: <E1ZAPpA-0003NT-8H@rmk-PC.arm.linux.org.uk>
+Date: Wed, 01 Jul 2015 22:45:54 +0100
+Subject: [PATCH] ARM: add helpful message when truncating physical memory
+Message-ID: <E1ZAPpK-0003Nf-Fm@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-randconfig testing reveals that DEBUG_SET_MODULE_RONX needs to depend on
-MMU otherwise these build errors are observed:
-
-kernel/built-in.o: In function `set_section_ro_nx':
-kernel/module.c:1738: undefined reference to `set_memory_nx'
-kernel/built-in.o: In function `set_page_attributes':
-kernel/module.c:1709: undefined reference to `set_memory_ro'
-
-This is because the pageattr functions are not built for !MMU configs as
-they don't have page tables.
+Add a nmessage to suggest that HIGHMEM is enabled when physical memory
+is truncated due to lack of virtual address space to map it in the low
+memory mapping.
 
 Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 ---
- arch/arm/Kconfig.debug | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ arch/arm/mm/mmu.c | 6 ++++++
+ 1 file changed, 6 insertions(+)
 
-diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
-index 0c12ffb155a2..dfa21cb58f36 100644
---- a/arch/arm/Kconfig.debug
-+++ b/arch/arm/Kconfig.debug
-@@ -1590,7 +1590,7 @@ config PID_IN_CONTEXTIDR
+diff --git a/arch/arm/mm/mmu.c b/arch/arm/mm/mmu.c
+index 904d1532e6d0..79de062c6077 100644
+--- a/arch/arm/mm/mmu.c
++++ b/arch/arm/mm/mmu.c
+@@ -1072,6 +1072,7 @@ void __init sanity_check_meminfo(void)
+ 	int highmem = 0;
+ 	phys_addr_t vmalloc_limit = __pa(vmalloc_min - 1) + 1;
+ 	struct memblock_region *reg;
++	bool should_use_highmem = false;
  
- config DEBUG_SET_MODULE_RONX
- 	bool "Set loadable kernel module data as NX and text as RO"
--	depends on MODULES
-+	depends on MODULES && MMU
- 	---help---
- 	  This option helps catch unintended modifications to loadable
- 	  kernel module's text and read-only data. It also prevents execution
+ 	for_each_memblock(memory, reg) {
+ 		phys_addr_t block_start = reg->base;
+@@ -1090,6 +1091,7 @@ void __init sanity_check_meminfo(void)
+ 				pr_notice("Ignoring RAM at %pa-%pa (!CONFIG_HIGHMEM)\n",
+ 					  &block_start, &block_end);
+ 				memblock_remove(reg->base, reg->size);
++				should_use_highmem = true;
+ 				continue;
+ 			}
+ 
+@@ -1100,6 +1102,7 @@ void __init sanity_check_meminfo(void)
+ 					  &block_start, &block_end, &vmalloc_limit);
+ 				memblock_remove(vmalloc_limit, overlap_size);
+ 				block_end = vmalloc_limit;
++				should_use_highmem = true;
+ 			}
+ 		}
+ 
+@@ -1134,6 +1137,9 @@ void __init sanity_check_meminfo(void)
+ 		}
+ 	}
+ 
++	if (should_use_highmem)
++		pr_notice("Consider using a HIGHMEM enabled kernel.\n");
++
+ 	high_memory = __va(arm_lowmem_limit - 1) + 1;
+ 
+ 	/*
 -- 
 2.1.0
