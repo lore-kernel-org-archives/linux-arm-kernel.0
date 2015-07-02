@@ -1,67 +1,30 @@
-From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Thu, 2 Jul 2015 09:55:20 +0200
-Subject: [RFC PATCH 00/15] pwm: add support for atomic update
-In-Reply-To: <3250976.mr9RMtjrdC@diego>
-References: <1435738921-25027-1-git-send-email-boris.brezillon@free-electrons.com>
- <3250976.mr9RMtjrdC@diego>
-Message-ID: <20150702095520.3088852f@bbrezillon>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Thu, 02 Jul 2015 10:07:11 +0200
+Subject: [RFC] arm: psci: implement cpuidle_ops
+In-Reply-To: <20150702111031.05f04184@xhacker>
+References: <20150702111031.05f04184@xhacker>
+Message-ID: <5594F12F.6050401@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 01 Jul 2015 23:57:57 +0200
-Heiko St?bner <heiko@sntech.de> wrote:
+On 07/02/2015 05:10 AM, Jisheng Zhang wrote:
+> Hi all,
+>
+> we'd like to use cpuidle-arm.c for both arm and arm64 with psci as backend. For
+> arm64, it works. But for arm, we miss cpuidle_ops. I want to add cpuidle_ops for
+> arm psci, I dunno whether this is the correct direction, could you please give
+> suggestions?
 
-> Hi Boris,
-> 
-> Am Mittwoch, 1. Juli 2015, 10:21:46 schrieb Boris Brezillon:
-> > Hello Thierry,
-> > 
-> > This series adds support for atomic PWM update, or ITO, the capability
-> > to update all the parameters of a PWM device (enabled/disabled, period,
-> > duty and polarity) in one go.
-> > 
-> > This implementation is still experimental, and I may have missed some key
-> > aspect, so any feedback are welcome.
-> > 
-> > Also note that I haven't protected the state update with any locking.
-> > That's because the existing config does not protect against concurrent
-> > access to a requested PWM device (see the pwm_config implementation).
-> > I guess the PWM framework assume the user will implement the proper locking
-> > scheme if it has to concurrently access the device.
-> > 
-> > The 5 first patches prepare the addition of the pwm_state concept, which
-> > will be used to allow atomic updates.
-> > The following patches introduce the pwm_state struct, initial state
-> > retrieval and atomic update concepts.
-> > 
-> > Patches 12 and 13 are showing how one can implement the initial state
-> > retrieval and atomic update features in a PWM driver (in this specific
-> > case I implemented it in the rockchip driver).
-> > 
-> > The last 2 patches are making use of those changes to improve the
-> > pwm-regulator driver (initializing the regulator state based on the
-> > initial PWM state).
-> 
-> at first I got very strange readings (very wrong values and wrong polarity), 
-> which resulted from the issues I pointed out in the replies to individual 
-> patches. After fixing these, the pwm read-back now returns exactly the expected 
-> values :-) .
+You should look at the macro
 
-Sorry about that, as I said I only compile tested the series :-/.
-Anyway, thanks for providing fixes for these bugs, they'll be applied
-in the next version.
+arch/arm/include/asm/cpuidle.h:
 
-> 
-> And with the original voltage table from the Chromeos-devicetrees, the pwm-
-> regulator also returns the expected 1.2V that coreboot initially set.
+#define CPUIDLE_METHOD_OF_DECLARE(name, _method, _ops)
 
-Great! And thanks for testing the patches.
-
-Best Regards,
-
-Boris
 
 -- 
-Boris Brezillon, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
