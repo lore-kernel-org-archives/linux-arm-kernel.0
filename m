@@ -1,75 +1,79 @@
 From: peter.ujfalusi@ti.com (Peter Ujfalusi)
-Date: Thu, 2 Jul 2015 17:06:24 +0300
-Subject: [PATCH v2 09/20] ARM: DTS: am437x-gp-evm: Add gpio-hog for
- configuring the display/audio mux
+Date: Thu, 2 Jul 2015 17:06:23 +0300
+Subject: [PATCH v2 08/20] ARM: DTS: am43xx-epos-evm: Enable analog audio via
+ simple-card
 In-Reply-To: <1435845995-19085-1-git-send-email-peter.ujfalusi@ti.com>
 References: <1435845995-19085-1-git-send-email-peter.ujfalusi@ti.com>
-Message-ID: <1435845995-19085-10-git-send-email-peter.ujfalusi@ti.com>
+Message-ID: <1435845995-19085-9-git-send-email-peter.ujfalusi@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-GPIO5_8 is used as a mux switch between LCD and HDMI displays. This mux
-affects audio routing as well since in LCD mode HDMI audio is not possible
-and when HDMI is selected analog audio is not working.
+Use simple card for audio support on ePOS-EVM.
+The audio on the board is: McASP1 <-> tlv320aic3111 codec.
 
 Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
 ---
- arch/arm/boot/dts/am437x-gp-evm.dts | 27 +++++++++++++++------------
- 1 file changed, 15 insertions(+), 12 deletions(-)
+ arch/arm/boot/dts/am43x-epos-evm.dts | 34 ++++++++++++++++++++++++++++++++++
+ 1 file changed, 34 insertions(+)
 
-diff --git a/arch/arm/boot/dts/am437x-gp-evm.dts b/arch/arm/boot/dts/am437x-gp-evm.dts
-index 84aa30c3235a..e2fb2713333d 100644
---- a/arch/arm/boot/dts/am437x-gp-evm.dts
-+++ b/arch/arm/boot/dts/am437x-gp-evm.dts
-@@ -83,17 +83,6 @@
- 		compatible = "osddisplays,osd057T0559-34ts", "panel-dpi";
- 		label = "lcd";
- 
--		pinctrl-names = "default";
--		pinctrl-0 = <&lcd_pins>;
--
--		/*
--		 * SelLCDorHDMI, LOW to select HDMI. This is not really the
--		 * panel's enable GPIO, but we don't have HDMI driver support nor
--		 * support to switch between two displays, so using this gpio as
--		 * panel's enable should be safe.
--		 */
--		enable-gpios = <&gpio5 8 GPIO_ACTIVE_HIGH>;
--
- 		panel-timing {
- 			clock-frequency = <33000000>;
- 			hactive = <800>;
-@@ -270,7 +259,7 @@
- 		>;
+diff --git a/arch/arm/boot/dts/am43x-epos-evm.dts b/arch/arm/boot/dts/am43x-epos-evm.dts
+index d171e734d3cf..86c2dfbe8875 100644
+--- a/arch/arm/boot/dts/am43x-epos-evm.dts
++++ b/arch/arm/boot/dts/am43x-epos-evm.dts
+@@ -106,6 +106,38 @@
+ 		brightness-levels = <0 51 53 56 62 75 101 152 255>;
+ 		default-brightness-level = <8>;
  	};
- 
--	lcd_pins: lcd_pins {
-+	display_mux_pins: display_mux_pins {
- 		pinctrl-single,pins = <
- 			/* GPIO 5_8 to select LCD / HDMI */
- 			0x238 (PIN_OUTPUT_PULLUP | MUX_MODE7)
-@@ -558,8 +547,22 @@
- };
- 
- &gpio5 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&display_mux_pins>;
- 	status = "okay";
- 	ti,no-reset-on-init;
 +
-+	p8 {
-+		/*
-+		 * SelLCDorHDMI selects between display and audio paths:
-+		 * Low: HDMI display with audio via HDMI
-+		 * High: LCD display with analog audio via aic3111 codec
-+		 */
-+		gpio-hog;
-+		gpios = <8 GPIO_ACTIVE_HIGH>;
-+		output-high;
-+		line-name = "SelLCDorHDMI";
++	sound0: sound at 0 {
++		compatible = "simple-audio-card";
++		simple-audio-card,name = "AM43-EPOS-EVM";
++		simple-audio-card,widgets =
++			"Microphone", "Microphone Jack",
++			"Headphone", "Headphone Jack",
++			"Speaker", "Speaker";
++		simple-audio-card,routing =
++			"MIC1LP", "Microphone Jack",
++			"MIC1RP", "Microphone Jack",
++			"MIC1LP", "MICBIAS",
++			"MIC1RP", "MICBIAS",
++			"Headphone Jack", "HPL",
++			"Headphone Jack", "HPR",
++			"Speaker", "SPL",
++			"Speaker", "SPR";
++		simple-audio-card,format = "dsp_b";
++		simple-audio-card,bitclock-master = <&sound0_master>;
++		simple-audio-card,frame-master = <&sound0_master>;
++		simple-audio-card,bitclock-inversion;
++
++		simple-audio-card,cpu {
++			sound-dai = <&mcasp1>;
++			system-clock-frequency = <12000000>;
++		};
++
++		sound0_master: simple-audio-card,codec {
++			sound-dai = <&tlv320aic3111>;
++			system-clock-frequency = <12000000>;
++		};
 +	};
  };
  
- &mmc1 {
+ &am43xx_pinmux {
+@@ -468,6 +500,7 @@
+ 	};
+ 
+ 	tlv320aic3111: tlv320aic3111 at 18 {
++		#sound-dai-cells = <0>;
+ 		compatible = "ti,tlv320aic3111";
+ 		reg = <0x18>;
+ 		status = "okay";
+@@ -743,6 +776,7 @@
+ };
+ 
+ &mcasp1 {
++	#sound-dai-cells = <0>;
+ 	pinctrl-names = "default", "sleep";
+ 	pinctrl-0 = <&mcasp1_pins>;
+ 	pinctrl-1 = <&mcasp1_sleep_pins>;
 -- 
 2.4.5
