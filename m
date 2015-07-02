@@ -1,44 +1,32 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Thu, 2 Jul 2015 16:32:53 +0100
-Subject: [RFC] arm: psci: implement cpuidle_ops
-In-Reply-To: <20150702161820.15dc9770@xhacker>
-References: <20150702111031.05f04184@xhacker> <5594F12F.6050401@linaro.org>
- <20150702161820.15dc9770@xhacker>
-Message-ID: <20150702153253.GB14244@leverpostej>
+From: p.fedin@samsung.com (Pavel Fedin)
+Date: Thu, 02 Jul 2015 18:37:55 +0300
+Subject: [PATCH 7/7] KVM: arm: implement kvm_set_msi by gsi direct mapping
+In-Reply-To: <55955290.1030009@linaro.org>
+References: <1435592237-17924-1-git-send-email-eric.auger@linaro.org>
+ <1435592237-17924-8-git-send-email-eric.auger@linaro.org>
+ <015501d0b49c$1f1349c0$5d39dd40$@samsung.com> <55955290.1030009@linaro.org>
+Message-ID: <02ea01d0b4dd$1186e690$3494b3b0$@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 02, 2015 at 09:18:20AM +0100, Jisheng Zhang wrote:
-> Dear Daniel,
-> 
-> On Thu, 2 Jul 2015 10:07:11 +0200
-> Daniel Lezcano <daniel.lezcano@linaro.org> wrote:
-> 
-> > On 07/02/2015 05:10 AM, Jisheng Zhang wrote:
-> > > Hi all,
-> > >
-> > > we'd like to use cpuidle-arm.c for both arm and arm64 with psci as backend. For
-> > > arm64, it works. But for arm, we miss cpuidle_ops. I want to add cpuidle_ops for
-> > > arm psci, I dunno whether this is the correct direction, could you please give
-> > > suggestions?
-> > 
-> > You should look at the macro
-> > 
-> > arch/arm/include/asm/cpuidle.h:
-> > 
-> > #define CPUIDLE_METHOD_OF_DECLARE(name, _method, _ops)
-> 
-> Yep, this is what I want to use. I want to use this MACRO to implement cpuidle_ops
-> for arm, but I dunno whether this is the correct direction. And I'd like to
-> reuse cpu_psci_cpu_init_idle() function in arch/arm64/kernel/psci.c to parse
-> the DT, but I'm not sure where to put cpu_psci_cpu_init_idle() so that can
-> be shared between arm and arm64. Also I noticed that there's a psci unification
-> work from Mark Rutland, does it make sense to put it in drivers/firmware/psci.c?
+ Hello!
 
-I think cpu_psci_cpu_init_idle() should live in drivers/firmware/psci.c.
-I also think that Lorenzo had an idea as to what should be done
-regarding unifying the arm and arm64 approaches, but he's currently away
-and I'm not all that familiar with cpuidle.
+> >  Given API change i suggest (using KVM_MSI_VALID_DEVID flag), we could get rid of all these
+if()'s
+> > here. Just forward all parameters to vGIC implementation code and let it do its checks.
+> I don't understand this comment. Here this is the kernel struct that is
+> used (struct kvm_kernel_irq_routing_entry) and not the user one
+> (kvm_irq_routing_entry). The kernel struct does not have the flag field.
 
-Thanks,
-Mark.
+  Easy. ARM code can always use struct kvm_extended_msi, and flags can go to this structure.
+
+> Another reason I think to keep using the type for homogeneity.
+
+ Homogeneity is perfect IMHO.
+ If that would be simpler for you, i could post a patch for this which i made on top of your series.
+Sorry, i don't have time to respin the whole thing, busy with qemu GICv3 fight :)
+
+Kind regards,
+Pavel Fedin
+Expert Engineer
+Samsung Electronics Research center Russia
