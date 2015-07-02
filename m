@@ -1,31 +1,30 @@
 From: richardcochran@gmail.com (Richard Cochran)
-Date: Thu, 2 Jul 2015 16:20:59 +0200
+Date: Thu, 2 Jul 2015 16:26:01 +0200
 Subject: [PATCH 1/2] gpio: dwapb: Use human understandable gpio numbering.
-In-Reply-To: <267A46E7-C5C5-4696-90CC-D44F4130B3EF@smart-africa.com>
+In-Reply-To: <5594E9F6.7040701@linutronix.de>
 References: <cover.1435777856.git.rcochran@linutronix.de>
  <d6b5ce85a17164970d454583560e07f7aed7b8ca.1435777856.git.rcochran@linutronix.de>
- <267A46E7-C5C5-4696-90CC-D44F4130B3EF@smart-africa.com>
-Message-ID: <20150702142058.GA9349@localhost.localdomain>
+ <5594E9F6.7040701@linutronix.de>
+Message-ID: <20150702142601.GB9349@localhost.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 02, 2015 at 08:05:26AM +0100, Michael van der Westhuizen wrote:
-> Ultimately, the numbering is inconsequential to users in kernel-space when DT is
-> in use.  It?s the userland users we?re trying to help.
+On Thu, Jul 02, 2015 at 09:36:22AM +0200, Sebastian Andrzej Siewior wrote:
+> If you are in a specific SoC you could do
+> 	base = of_alias_get_id(np, "gpio") * num_of_gpio_per_chip
+> and get consistent numbers / sane.
 
-Yes.  Lets help the users!
- 
-> In my case, I have quite a lot of vendor-supplied code that needs the numbers to
-> be stable and backward compatible.  This quickly devolves into a discussion of
-> GPIOs in sysfs as an ABI, which is not a discussion I want to have :)
+And what about /sys/class/gpio ?
 
-In the present state, the gpio numbers on the Altera socfpga change
-with changing kernel releases.  Not only does that suck, but it also
-proves that the gpio numbering is not any kind of ABI.  Rather, it is
-some kind of oversight.
+> I think this is the one reason why there is no generic binding for the
+> starting address. The other reason might be that this is simply a user
+> space problem. To get consistent numbers all you need to do to lookup
+> each gpio's memory address and decide if this is the one you look for.
 
-Anyhow, the whole point is, when the data sheet says that the SoC has
-GPIO0 to GPION, then those numbers should be exposed to user space.
+The user should be able to simply look up a GPIO in the data sheet,
+and then use it from a shell script.  Why not make that easy to do?
+
+(Other gpio controllers are doing that, too, BTW.)
 
 Thanks,
 Richard
