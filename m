@@ -1,68 +1,30 @@
 From: eric.auger@linaro.org (Eric Auger)
-Date: Thu,  2 Jul 2015 15:17:23 +0200
-Subject: [RFC 13/17] KVM: introduce kvm_arch functions for IRQ bypass
+Date: Thu,  2 Jul 2015 15:17:21 +0200
+Subject: [RFC 11/17] VFIO: platform: select IRQ_BYPASS_MANAGER
 In-Reply-To: <1435843047-6327-1-git-send-email-eric.auger@linaro.org>
 References: <1435843047-6327-1-git-send-email-eric.auger@linaro.org>
-Message-ID: <1435843047-6327-14-git-send-email-eric.auger@linaro.org>
+Message-ID: <1435843047-6327-12-git-send-email-eric.auger@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch introduces
-- kvm_arch_add_producer
-- kvm_arch_del_producer
-- kvm_arch_stop_consumer
-- kvm_arch_resume_consumer
-
-They make possible to specialize the KVM IRQ bypass consumer.
+Select IRQ_BYPASS_MANAGER when CONFIG_VFIO_PLATFORM is set
 
 Signed-off-by: Eric Auger <eric.auger@linaro.org>
 ---
- include/linux/kvm_host.h | 27 +++++++++++++++++++++++++++
- 1 file changed, 27 insertions(+)
+ drivers/vfio/platform/Kconfig | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/include/linux/kvm_host.h b/include/linux/kvm_host.h
-index 9564fd7..8e981e9 100644
---- a/include/linux/kvm_host.h
-+++ b/include/linux/kvm_host.h
-@@ -24,6 +24,7 @@
- #include <linux/err.h>
- #include <linux/irqflags.h>
- #include <linux/context_tracking.h>
-+#include <linux/irqbypass.h>
- #include <asm/signal.h>
- 
- #include <linux/kvm.h>
-@@ -1133,5 +1134,31 @@ static inline void kvm_vcpu_set_dy_eligible(struct kvm_vcpu *vcpu, bool val)
- {
- }
- #endif /* CONFIG_HAVE_KVM_CPU_RELAX_INTERCEPT */
-+
-+#ifdef CONFIG_IRQ_BYPASS_MANAGER
-+
-+void kvm_arch_add_producer(struct irq_bypass_consumer *,
-+			   struct irq_bypass_producer *);
-+void kvm_arch_del_producer(struct irq_bypass_consumer *,
-+			   struct irq_bypass_producer *);
-+void kvm_arch_stop_consumer(struct irq_bypass_consumer *);
-+void kvm_arch_resume_consumer(struct irq_bypass_consumer *);
-+
-+#else
-+void kvm_arch_add_producer(struct irq_bypass_consumer *,
-+			   struct irq_bypass_producer *)
-+{
-+}
-+void kvm_arch_del_producer(struct irq_bypass_consumer *,
-+			   struct irq_bypass_producer *)
-+{
-+}
-+void kvm_arch_stop_consumer(struct irq_bypass_consumer *)
-+{
-+}
-+void kvm_arch_resume_consumer(struct irq_bypass_consumer *)
-+{
-+}
-+#endif /* CONFIG_IRQ_BYPASS_MANAGER */
- #endif
- 
+diff --git a/drivers/vfio/platform/Kconfig b/drivers/vfio/platform/Kconfig
+index bb30128..c2f3dce 100644
+--- a/drivers/vfio/platform/Kconfig
++++ b/drivers/vfio/platform/Kconfig
+@@ -2,6 +2,7 @@ config VFIO_PLATFORM
+ 	tristate "VFIO support for platform devices"
+ 	depends on VFIO && EVENTFD && (ARM || ARM64)
+ 	select VFIO_VIRQFD
++	select IRQ_BYPASS_MANAGER
+ 	help
+ 	  Support for platform devices with VFIO. This is required to make
+ 	  use of platform devices present on the system using the VFIO
 -- 
 1.9.1
