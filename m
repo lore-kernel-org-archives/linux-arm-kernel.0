@@ -1,73 +1,124 @@
-From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
-Date: Thu, 02 Jul 2015 18:13:22 +0200
-Subject: [PATCH v6 0/3] cpufreq: Use cpufreq-dt driver for Exynos3250
-In-Reply-To: <1435797761-3339-1-git-send-email-cw00.choi@samsung.com>
-References: <1435797761-3339-1-git-send-email-cw00.choi@samsung.com>
-Message-ID: <4464631.oZyVO4Z0Ov@amdc1976>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Thu, 2 Jul 2015 18:23:59 +0200
+Subject: [PATCH 05/10] KVM: arm/arm64: vgic: Relax vgic_can_sample_irq
+ for edge IRQs
+In-Reply-To: <55942F00.6000306@arm.com>
+References: <1433783045-8002-1-git-send-email-marc.zyngier@arm.com>
+ <1433783045-8002-6-git-send-email-marc.zyngier@arm.com>
+ <20150630201933.GA11332@cbox> <5593B040.6050208@arm.com>
+ <20150701115820.GC17890@cbox> <55942F00.6000306@arm.com>
+Message-ID: <20150702162359.GJ11332@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Wed, Jul 01, 2015 at 07:18:40PM +0100, Marc Zyngier wrote:
+> On 01/07/15 12:58, Christoffer Dall wrote:
+> > On Wed, Jul 01, 2015 at 10:17:52AM +0100, Marc Zyngier wrote:
+> >> On 30/06/15 21:19, Christoffer Dall wrote:
+> >>> On Mon, Jun 08, 2015 at 06:04:00PM +0100, Marc Zyngier wrote:
+> >>>> We only set the irq_queued flag for level interrupts, meaning
+> >>>> that "!vgic_irq_is_queued(vcpu, irq)" is a good enough predicate
+> >>>> for all interrupts.
+> >>>>
+> >>>> This will allow us to inject edge HW interrupts, for which the
+> >>>> state ACTIVE+PENDING is not allowed.
+> >>>
+> >>> I don't understand this; ACTIVE+PENDING is allowed for edge interrupts.
+> >>> Do you mean that if we set the HW bit in the LR, then we are linking to
+> >>> an HW interrupt where we don't allow that to be ACTIVE+PENDING on the HW
+> >>> GIC side?
+> >>>
+> >>> Why is this relevant here?  I feel like I'm missing context.
+> >>
+> >> I've probably taken a shortcut here - bear with me while I'm trying to
+> >> explain the issue.
+> >>
+> >> For HW interrupts, we shouldn't even try to use the state bits in the
+> >> LR, because that state is contained in the physical distributor. Setting
+> >> the HW bit really means "there is something going on at the distributor
+> >> level, just go there".
+> > 
+> > ok, so by "HW interrupts" you mean virtual interrupts with the HW bit in
+> > the LR set, correct?
+> 
+> Yes, sorry.
+> 
+> >>
+> >> If we were to inject a ACTIVE+PENDING interrupt at the LR level, we'd
+> >> basically loose the second interrupt because that state is simply not
+> >> considered.
+> > 
+> > Huh?  Which second interrupt.  I looked at the spec and it says don't
+> > use the state bits for HW interrupts, so isn't it simply not supported
+> > to set these bits at all and that's it?
+> 
+> I managed to confuse myself reading the same bit. It says (GICv3 spec):
+> 
+> "A hypervisor must only use the pending and active state for software
+> originated interrupts, which are typically associated with virtual
+> devices, or SGIs."
+> 
+> That's the PENDING+ACTIVE state, and not the pending and active bits
+> like I read it initially.
+> 
+> Now consider the following scenario:
+> 
+> - We inject a virtual edge interrupt
+> - We mark the corresponding physical interrupt as active.
+> - Queue interrupt in an LR
+> - Resume vcpu
+> 
+> Now, we inject another edge interrupt, the vcpu exits for whatever
+> reason, and the previously injected interrupt is still active.
+> 
+> The normal vGIC flow would be to mark the interrupt as ACTIVE+PENDING in
+> the LR, and resume the vcpu. But the above states that this is invalid
+> for HW generated interrupts.
 
-Hi,
+Right, ok, so we must resample the pending state even for an
+edge-triggered interrupt once it's EOIed, because we cannot put it in
+the LR despite it being pending on the physical distributor?
 
-On Thursday, July 02, 2015 09:42:38 AM Chanwoo Choi wrote:
-> This patchset use cpufreq-dt driver to support Exynos3250 cpufreq and tested it
-> on Exynos3250-based Rinato board.
-> 
-> Depends on:
-> - next-20150701 tag (master branch) of linux-next kernel tree
-> - This patch-set is based on Exynos5250 patch-set[1] because two patch-set
->   modify the 'arch/arm/mach-exynos/exynos.c' to add the compatible string.
->   [1] https://lkml.org/lkml/2015/6/29/361
->   : [PATCH v2 0/4] cpufreq: use generic cpufreq drivers for Exynos5250 platform
-> 
-> Changes from v5:
-> (https://lkml.org/lkml/2015/7/1/324)
-> - Reorder the cpu dt node in exynos3250-rinato/monk.dts alpabetically.
-> - Add reviewed-by tag of Krzysztof Kozlowski <k.kozlowski@samsung.com>
-> 
-> Changes from v4:
-> (https://lkml.org/lkml/2014/10/20/215)
-> - Rebased on latest linux-next git repository.
-> - Remove unnecessary divider clock flag from divider of DIV_CPU0/DIV_CPU1 register
-> 
-> Changes from v3:
-> - This patchset is based on 3.18-rc1 with new patchset[3] of Thomas Abraham
->   [3] [PATCH v11 0/6] cpufreq: use generic cpufreq drivers for exynos platforms
->   - http://www.spinics.net/lists/arm-kernel/msg370412.html
-> 
-> Changes from v2:
-> - Rebased on new patchset of Thomas Abraham
->   and for-next branch of samsunc-clk.git of Tomasz Figa
-> 
-> Changes from v1:
-> - Rebased on new patchset[1] by Thomas Abraham
->   [1] [PATCH v10 0/6] cpufreq: use generic cpufreq drivers for exynos platforms
->   - http://www.spinics.net/lists/arm-kernel/msg364790.html
-> - Modify clk-cpu.c to support Exynos3250
-> - Drop documentation patch on previous patchset[2]
->   [2] http://www.spinics.net/lists/cpufreq/msg10265.html
-> - Add only operating-points for Exynos3250 without armclk-divider-table
-> 
-> Chanwoo Choi (3):
->   clk: samsung: exynos3250: Add cpu clock configuration data and instaniate cpu clock
->   ARM: dts: Add CPU OPP and regulator supply property for Exynos3250
->   ARM: exynos: Add exynos3250 compatible to use generic cpufreq driver
-> 
->  arch/arm/boot/dts/exynos3250-monk.dts   |  4 ++++
->  arch/arm/boot/dts/exynos3250-rinato.dts |  4 ++++
->  arch/arm/boot/dts/exynos3250.dtsi       | 15 +++++++++++++++
->  arch/arm/mach-exynos/exynos.c           |  1 +
->  drivers/clk/samsung/clk-exynos3250.c    | 32 ++++++++++++++++++++++++++++++--
->  include/dt-bindings/clock/exynos3250.h  |  1 +
->  6 files changed, 55 insertions(+), 2 deletions(-)
+Incidentally, we do not need to set the EOI_INT bit, becuase when the
+guest EOIs the interrupt, it will also deactivate it on the physical
+distributor and the hardware will then take the pending physical
+interrupt, we will handle it in the host, etc. etc.
 
-Reviewed-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
+If we had a different *shared* device than the timer which is
+edge-triggered, don't we then also need to capture the physical
+distributor's pending state along with the state of the device unless we
+assume that upon restoring the state for the device count on the device
+to have another rising/falling edge to trigger the interrupt again? (I
+assume the line would always go high for a level-triggered interrupt in
+this case).
 
-Thank you for working on this.
+> 
+> >>
+> >> So the trick we're using is to only inject the active interrupt, and
+> >> prevent anything else from being injected until we can confirm that the
+> >> active state has been cleared at the physical level.
+> >>
+> >> Does it make any sense?
+> >>
+> > Sort of, but what I don't understand now is how the guest ever sees the
+> > interrupt then.  If we always inject the virtual interrupt by setting
+> > the active state on the physical distributor, and we can't inject this
+> > as active+pending, and the guest doesn't see the state in the LR, then
+> > how does this ever raise a virtual interrupt and how does the guest see
+> > an interrupt which is only PENDING so that it can ack it etc. etc.?
+> > 
+> > Maybe I don't fully understand how the HW bit works after all...
+> 
+> The way the spec is written is slightly misleading. But the gist of it
+> is that we still signal the guest using the PENDING bit in the LR, and
+> switch the LR as usual. it is just that we can't use the PENDING+ACTIVE
+> state (apparently, this can lead to a double deactivation).
+> 
+> Not sure the above makes sense. Beer time, I suppose.
+> 
+It does make sense, I just had to sleep on it and see the code as a
+whole instead of trying to understand it by just looking at this patch
+individually.
 
-Best regards,
---
-Bartlomiej Zolnierkiewicz
-Samsung R&D Institute Poland
-Samsung Electronics
+Thanks,
+-Christoffer
