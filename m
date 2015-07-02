@@ -1,71 +1,112 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Thu, 02 Jul 2015 09:16:59 +0200
-Subject: MUSB dual-role on AM335x behaving weirdly
-In-Reply-To: <20150527094205.GO3199@piout.net>
-References: <20150514190429.GT24269@saruman.tx.rr.com>
- <CADYTM3Zso8bV_8yFyx1-ATbL5AgkKBjvWWR4AsoZUNuLvFe1bQ@mail.gmail.com>
- <20150514192125.GU24269@saruman.tx.rr.com>
- <CADYTM3bbEAVefFZtivJf5Z+2Q+1zDZEvNhqE5ytsOxDX7hjbdA@mail.gmail.com>
- <20150514192946.GV24269@saruman.tx.rr.com>
- <CADYTM3Zk2iD8YMj75CoLJn=4kpoXoXEKUWj2QzdXKGCJjtfG2A@mail.gmail.com>
- <CADYTM3a1QWnec1D=wT=fgZ-RCXAx_qZYYoFg5gWOy0yT4vovHA@mail.gmail.com>
- <20150514212653.GC3338@piout.net>
- <CADYTM3baVqoEBdWoQb5JFyGR2_GKm1FHMYWST1YkZV=m=ZdycQ@mail.gmail.com>
- <20150526145118.GD26599@saruman.tx.rr.com> <20150527094205.GO3199@piout.net>
-Message-ID: <5594E56B.3040200@free-electrons.com>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Thu, 02 Jul 2015 16:17:16 +0900
+Subject: [PATCH] ARM: dts: Add CPU cooling binding for Exynos3250-based
+ Rinato/Monk board
+In-Reply-To: <5594D5F4.3060508@samsung.com>
+References: <1435815465-501-1-git-send-email-cw00.choi@samsung.com>
+ <5594D22C.4040206@samsung.com> <5594D5F4.3060508@samsung.com>
+Message-ID: <5594E57C.2010300@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Felipe,
-
-On 27/05/2015 11:42, Alexandre Belloni wrote:
-> Hi,
-> 
-> On 26/05/2015 at 09:51:18 -0500, Felipe Balbi wrote :
->> On Thu, May 14, 2015 at 04:36:33PM -0500, Bin Liu wrote:
->>> Alexandre,
+On 02.07.2015 15:11, Chanwoo Choi wrote:
+> On 07/02/2015 02:54 PM, Krzysztof Kozlowski wrote:
+>> On 02.07.2015 14:37, Chanwoo Choi wrote:
+>>> This patch add the cooling device to control the overheating issue on
+>>> Exynos3250-based Rinato/Monk board.
 >>>
->>> On Thu, May 14, 2015 at 4:26 PM, Alexandre Belloni
->>> <alexandre.belloni@free-electrons.com> wrote:
->>>> On 14/05/2015 at 16:16:12 -0500, Bin Liu wrote :
->>>>> I think I found the root cause of the problem: board design issue - I
->>>>> bet the custom board has too much cap on VBUS line. It should be <
->>>>> 10uF.
->>>>>
->>>>
->>>> We have a custom board that exhibits the issue but it only has a 100nF
->>>> cap on VBUS.
+>>> Cc: Kukjin Kim <kgene@kernel.org>
+>>> Cc: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+>>> Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
+>>> Acked-by: Kyungmin Park <kyungmin.park@samsung.com>
+>>> ---
+>>> Depends on:
+>>> This patch needs the cpufreq support of Exynos3250 SoC. So, this patch has the
+>>> dependency on patch[1] which support the generic cpufreq for Exynos3250 SoC.
+>>> [1] https://lkml.org/lkml/2015/7/1/696
+>>>     : [PATCH v6 0/3] cpufreq: Use cpufreq-dt driver for Exynos3250
 >>>
->>> Have you measured the VBUS discharging? Is there any way to share your
->>> schematics?
+>>>  arch/arm/boot/dts/exynos3250-monk.dts   | 15 +++++++++++++++
+>>>  arch/arm/boot/dts/exynos3250-rinato.dts | 15 +++++++++++++++
+>>>  arch/arm/boot/dts/exynos3250.dtsi       |  1 +
+>>>  3 files changed, 31 insertions(+)
+>>>
+>>> diff --git a/arch/arm/boot/dts/exynos3250-monk.dts b/arch/arm/boot/dts/exynos3250-monk.dts
+>>> index 7863265d4868..540a0adf2be6 100644
+>>> --- a/arch/arm/boot/dts/exynos3250-monk.dts
+>>> +++ b/arch/arm/boot/dts/exynos3250-monk.dts
+>>> @@ -116,6 +116,21 @@
+>>>  		min-microvolt = <1100000>;
+>>>  		max-microvolt = <2700000>;
+>>>  	};
+>>> +
+>>> +	thermal-zones {
+>>> +		cpu_thermal: cpu-thermal {
+>>> +			cooling-maps {
+>>> +				map0 {
+>>> +					/* Correspond to 500MHz at freq_table */
+>>> +					cooling-device = <&cpu0 5 5>;
+>>> +				};
+>>> +				map1 {
+>>> +					/* Correspond to 200MHz at freq_table */
+>>> +					cooling-device = <&cpu0 8 8>;
+>>> +				};
+>>> +			};
+>>> +		};
+>>> +	};
+>>>  };
+>>>  
+>>>  &adc {
+>>> diff --git a/arch/arm/boot/dts/exynos3250-rinato.dts b/arch/arm/boot/dts/exynos3250-rinato.dts
+>>> index ddd7ac283045..0e62a6435e07 100644
+>>> --- a/arch/arm/boot/dts/exynos3250-rinato.dts
+>>> +++ b/arch/arm/boot/dts/exynos3250-rinato.dts
+>>> @@ -107,6 +107,21 @@
+>>>  		min-microvolt = <1100000>;
+>>>  		max-microvolt = <2700000>;
+>>>  	};
+>>> +
+>>> +	thermal-zones {
+>>> +		cpu_thermal: cpu-thermal {
+>>> +			cooling-maps {
+>>> +				map0 {
+>>> +					/* Corresponds to 500MHz */
+>>> +					cooling-device = <&cpu0 5 5>;
+>>> +				};
+>>> +				map1 {
+>>> +					/* Corresponds to 200MHz */
+>>> +					cooling-device = <&cpu0 8 8>;
+>>> +				};
+>>> +			};
+>>> +		};
+>>> +	};
+>>>  };
+>>>  
+>>>  &adc {
+>>> diff --git a/arch/arm/boot/dts/exynos3250.dtsi b/arch/arm/boot/dts/exynos3250.dtsi
+>>> index e0f3b2ed41a3..a4931b660ddb 100644
+>>> --- a/arch/arm/boot/dts/exynos3250.dtsi
+>>> +++ b/arch/arm/boot/dts/exynos3250.dtsi
+>>> @@ -55,6 +55,7 @@
+>>>  			clock-frequency = <1000000000>;
+>>>  			clocks = <&cmu CLK_ARM_CLK>;
+>>>  			clock-names = "cpu";
+>>> +			#cooling-cells = <2>;
+>>>  
 >>
->> Alexandre, any further comments ?
->>
+>> Don't you need also cooling-{min,max}-state properties?
 > 
-> Yeah, I have just got more info.
+> Yes, it is well working without cooling-{min,max}-state or cooling-{min,max}-level.
 > 
-> This is the relevant part of the schematic:
-> http://free-electrons.com/~alexandre/usb.png
+> I look for the some code to parse "cooling-{min,max}-state or cooling-{min,max}-level"
+> in drivers/thermal/*. But, there are no any code to parse it.
 > 
-> The total VBUS capacitance is 200nF and the USB0 pins are connected
-> directly to the AM3358 pins. U1 is actually not fitted.
+> But, Documentation/devicetree/bindings/thermal/thermal.txt contains just the 'cooling-{min,max}-state.
 > 
-> We didn't measure VBUS discharging but we observe the OTG pin sensing
-> stops when plugging an OTG cable without any device.
+> I think that there are mismatch between document and thermal core driver.
 
-Do you have any news about this topic?
+Thanks for explanation, looks good.
+Acked-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
 
-
-Is there something else that we can do to help solving this issue?
-
-
-Thanks,
-
-Gregory
-
-
--- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+Best regards,
+Krzysztof
