@@ -1,116 +1,142 @@
 From: eric.auger@linaro.org (Eric Auger)
-Date: Thu,  2 Jul 2015 15:17:16 +0200
-Subject: [RFC 06/17] VFIO: add vfio_external_{mask|is_active|set_automasked}
+Date: Thu,  2 Jul 2015 15:17:17 +0200
+Subject: [RFC 07/17] KVM: arm: rename pause into power_off
 In-Reply-To: <1435843047-6327-1-git-send-email-eric.auger@linaro.org>
 References: <1435843047-6327-1-git-send-email-eric.auger@linaro.org>
-Message-ID: <1435843047-6327-7-git-send-email-eric.auger@linaro.org>
+Message-ID: <1435843047-6327-8-git-send-email-eric.auger@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Introduces 3 new external functions aimed at doing actions
-on VFIO devices:
-- mask VFIO IRQ
-- get the active status of VFIO IRQ (active at interrupt
-  controller level or masked by the level-sensitive automasking).
-- change the automasked property and switch the IRQ handler
-  (between automasked/ non automasked)
-
-Their implementation is based on bus specific callbacks.
-
-Note there is no way to discriminate between user-space
-masking and automasked handler masking. As a consequence, is_active
-will return true in case the IRQ was masked by the user-space.
+The kvm_vcpu_arch pause field is renamed into power_off to prepare
+for the introduction of a new pause field.
 
 Signed-off-by: Eric Auger <eric.auger@linaro.org>
 
+v4 -> v5:
+- fix compilation issue on arm64 (add power_off field in kvm_host.h)
 ---
+ arch/arm/include/asm/kvm_host.h   |  4 ++--
+ arch/arm/kvm/arm.c                | 10 +++++-----
+ arch/arm/kvm/psci.c               | 10 +++++-----
+ arch/arm64/include/asm/kvm_host.h |  4 ++--
+ 4 files changed, 14 insertions(+), 14 deletions(-)
 
-v5 -> v6:
-- implementation now uses external ops
-- prototype changed (index, start, count) and returns int
-
-V4: creation
----
- drivers/vfio/vfio.c  | 39 +++++++++++++++++++++++++++++++++++++++
- include/linux/vfio.h | 16 ++++++++++++++++
- 2 files changed, 55 insertions(+)
-
-diff --git a/drivers/vfio/vfio.c b/drivers/vfio/vfio.c
-index 2fb29df..af6901e 100644
---- a/drivers/vfio/vfio.c
-+++ b/drivers/vfio/vfio.c
-@@ -1527,6 +1527,45 @@ long vfio_external_check_extension(struct vfio_group *group, unsigned long arg)
+diff --git a/arch/arm/include/asm/kvm_host.h b/arch/arm/include/asm/kvm_host.h
+index e896d2c..304004d 100644
+--- a/arch/arm/include/asm/kvm_host.h
++++ b/arch/arm/include/asm/kvm_host.h
+@@ -129,8 +129,8 @@ struct kvm_vcpu_arch {
+ 	 * here.
+ 	 */
+ 
+-	/* Don't run the guest on this vcpu */
+-	bool pause;
++	/* vcpu power-off state */
++	bool power_off;
+ 
+ 	/* IO related fields */
+ 	struct kvm_decode mmio_decode;
+diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
+index bcdf799..7537e68 100644
+--- a/arch/arm/kvm/arm.c
++++ b/arch/arm/kvm/arm.c
+@@ -475,7 +475,7 @@ static void vcpu_pause(struct kvm_vcpu *vcpu)
+ {
+ 	wait_queue_head_t *wq = kvm_arch_vcpu_wq(vcpu);
+ 
+-	wait_event_interruptible(*wq, !vcpu->arch.pause);
++	wait_event_interruptible(*wq, !vcpu->arch.power_off);
  }
- EXPORT_SYMBOL_GPL(vfio_external_check_extension);
  
-+int vfio_external_mask(struct vfio_device *vdev, unsigned index,
-+			unsigned start, unsigned count)
-+{
-+	if (vdev->ops->external_ops &&
-+		vdev->ops->external_ops->mask)
-+		return vdev->ops->external_ops->mask(vdev->device_data,
-+						     index, start, count);
-+	else
-+		return -ENXIO;
-+}
-+EXPORT_SYMBOL_GPL(vfio_external_mask);
-+
-+int vfio_external_is_active(struct vfio_device *vdev, unsigned index,
-+			     unsigned start, unsigned count)
-+{
-+	if (vdev->ops->external_ops &&
-+		vdev->ops->external_ops->is_active)
-+		return vdev->ops->external_ops->is_active(vdev->device_data,
-+							  index, start, count);
-+	else
-+		return -ENXIO;
-+}
-+EXPORT_SYMBOL_GPL(vfio_external_is_active);
-+
-+int vfio_external_set_automasked(struct vfio_device *vdev,
-+				  unsigned index, unsigned start,
-+				  unsigned count, bool automasked)
-+{
-+	if (vdev->ops->external_ops &&
-+		vdev->ops->external_ops->set_automasked)
-+		return vdev->ops->external_ops->set_automasked(
-+							vdev->device_data,
-+							index, start,
-+							count, automasked);
-+	else
-+		return -ENXIO;
-+}
-+EXPORT_SYMBOL_GPL(vfio_external_set_automasked);
-+
- /**
-  * Module/class support
-  */
-diff --git a/include/linux/vfio.h b/include/linux/vfio.h
-index d79e8a9..31d3c95 100644
---- a/include/linux/vfio.h
-+++ b/include/linux/vfio.h
-@@ -107,6 +107,22 @@ extern int vfio_external_user_iommu_id(struct vfio_group *group);
- extern long vfio_external_check_extension(struct vfio_group *group,
- 					  unsigned long arg);
+ static int kvm_vcpu_initialized(struct kvm_vcpu *vcpu)
+@@ -525,7 +525,7 @@ int kvm_arch_vcpu_ioctl_run(struct kvm_vcpu *vcpu, struct kvm_run *run)
  
-+extern int vfio_external_mask(struct vfio_device *vdev, unsigned index,
-+			       unsigned start, unsigned count);
-+/*
-+ * returns whether the VFIO IRQ is active:
-+ * true if not yet deactivated at interrupt controller level or if
-+ * automasked (level sensitive IRQ). Unfortunately there is no way to
-+ * discriminate between handler auto-masking and user-space masking
-+ */
-+extern int vfio_external_is_active(struct vfio_device *vdev,
-+				    unsigned index, unsigned start,
-+				    unsigned count);
-+
-+extern int vfio_external_set_automasked(struct vfio_device *vdev,
-+					 unsigned index, unsigned start,
-+					 unsigned count, bool automasked);
-+
- struct pci_dev;
- #ifdef CONFIG_EEH
- extern void vfio_spapr_pci_eeh_open(struct pci_dev *pdev);
+ 		update_vttbr(vcpu->kvm);
+ 
+-		if (vcpu->arch.pause)
++		if (vcpu->arch.power_off)
+ 			vcpu_pause(vcpu);
+ 
+ 		/*
+@@ -766,12 +766,12 @@ static int kvm_arch_vcpu_ioctl_vcpu_init(struct kvm_vcpu *vcpu,
+ 	vcpu_reset_hcr(vcpu);
+ 
+ 	/*
+-	 * Handle the "start in power-off" case by marking the VCPU as paused.
++	 * Handle the "start in power-off" case.
+ 	 */
+ 	if (test_bit(KVM_ARM_VCPU_POWER_OFF, vcpu->arch.features))
+-		vcpu->arch.pause = true;
++		vcpu->arch.power_off = true;
+ 	else
+-		vcpu->arch.pause = false;
++		vcpu->arch.power_off = false;
+ 
+ 	return 0;
+ }
+diff --git a/arch/arm/kvm/psci.c b/arch/arm/kvm/psci.c
+index 4b94b51..134971a 100644
+--- a/arch/arm/kvm/psci.c
++++ b/arch/arm/kvm/psci.c
+@@ -63,7 +63,7 @@ static unsigned long kvm_psci_vcpu_suspend(struct kvm_vcpu *vcpu)
+ 
+ static void kvm_psci_vcpu_off(struct kvm_vcpu *vcpu)
+ {
+-	vcpu->arch.pause = true;
++	vcpu->arch.power_off = true;
+ }
+ 
+ static unsigned long kvm_psci_vcpu_on(struct kvm_vcpu *source_vcpu)
+@@ -87,7 +87,7 @@ static unsigned long kvm_psci_vcpu_on(struct kvm_vcpu *source_vcpu)
+ 	 */
+ 	if (!vcpu)
+ 		return PSCI_RET_INVALID_PARAMS;
+-	if (!vcpu->arch.pause) {
++	if (!vcpu->arch.power_off) {
+ 		if (kvm_psci_version(source_vcpu) != KVM_ARM_PSCI_0_1)
+ 			return PSCI_RET_ALREADY_ON;
+ 		else
+@@ -115,7 +115,7 @@ static unsigned long kvm_psci_vcpu_on(struct kvm_vcpu *source_vcpu)
+ 	 * the general puspose registers are undefined upon CPU_ON.
+ 	 */
+ 	*vcpu_reg(vcpu, 0) = context_id;
+-	vcpu->arch.pause = false;
++	vcpu->arch.power_off = false;
+ 	smp_mb();		/* Make sure the above is visible */
+ 
+ 	wq = kvm_arch_vcpu_wq(vcpu);
+@@ -152,7 +152,7 @@ static unsigned long kvm_psci_vcpu_affinity_info(struct kvm_vcpu *vcpu)
+ 	kvm_for_each_vcpu(i, tmp, kvm) {
+ 		mpidr = kvm_vcpu_get_mpidr_aff(tmp);
+ 		if (((mpidr & target_affinity_mask) == target_affinity) &&
+-		    !tmp->arch.pause) {
++		    !tmp->arch.power_off) {
+ 			return PSCI_0_2_AFFINITY_LEVEL_ON;
+ 		}
+ 	}
+@@ -175,7 +175,7 @@ static void kvm_prepare_system_event(struct kvm_vcpu *vcpu, u32 type)
+ 	 * re-initialized.
+ 	 */
+ 	kvm_for_each_vcpu(i, tmp, vcpu->kvm) {
+-		tmp->arch.pause = true;
++		tmp->arch.power_off = true;
+ 		kvm_vcpu_kick(tmp);
+ 	}
+ 
+diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
+index 2709db2..009da6b 100644
+--- a/arch/arm64/include/asm/kvm_host.h
++++ b/arch/arm64/include/asm/kvm_host.h
+@@ -122,8 +122,8 @@ struct kvm_vcpu_arch {
+ 	 * here.
+ 	 */
+ 
+-	/* Don't run the guest */
+-	bool pause;
++	/* vcpu power-off state */
++	bool power_off;
+ 
+ 	/* IO related fields */
+ 	struct kvm_decode mmio_decode;
 -- 
 1.9.1
