@@ -1,41 +1,42 @@
-From: bigeasy@linutronix.de (Sebastian Andrzej Siewior)
-Date: Thu, 02 Jul 2015 16:30:47 +0200
-Subject: [PATCH 1/2] gpio: dwapb: Use human understandable gpio numbering.
-In-Reply-To: <20150702142601.GB9349@localhost.localdomain>
-References: <cover.1435777856.git.rcochran@linutronix.de>
- <d6b5ce85a17164970d454583560e07f7aed7b8ca.1435777856.git.rcochran@linutronix.de>
- <5594E9F6.7040701@linutronix.de>
- <20150702142601.GB9349@localhost.localdomain>
-Message-ID: <55954B17.3020303@linutronix.de>
+From: peter.ujfalusi@ti.com (Peter Ujfalusi)
+Date: Thu, 2 Jul 2015 17:06:26 +0300
+Subject: [PATCH v2 11/20] ARM: DTS: am437x-gp-evm: Add node for tlv320aic3106
+ audio codec
+In-Reply-To: <1435845995-19085-1-git-send-email-peter.ujfalusi@ti.com>
+References: <1435845995-19085-1-git-send-email-peter.ujfalusi@ti.com>
+Message-ID: <1435845995-19085-12-git-send-email-peter.ujfalusi@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/02/2015 04:26 PM, Richard Cochran wrote:
-> On Thu, Jul 02, 2015 at 09:36:22AM +0200, Sebastian Andrzej Siewior wrote:
->> If you are in a specific SoC you could do
->> 	base = of_alias_get_id(np, "gpio") * num_of_gpio_per_chip
->> and get consistent numbers / sane.
-> 
-> And what about /sys/class/gpio ?
+Analog audio is using this codec on the board.
 
-What about it?
+Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
+---
+ arch/arm/boot/dts/am437x-gp-evm.dts | 12 ++++++++++++
+ 1 file changed, 12 insertions(+)
 
-> 
->> I think this is the one reason why there is no generic binding for the
->> starting address. The other reason might be that this is simply a user
->> space problem. To get consistent numbers all you need to do to lookup
->> each gpio's memory address and decide if this is the one you look for.
-> 
-> The user should be able to simply look up a GPIO in the data sheet,
-> and then use it from a shell script.  Why not make that easy to do?
-> 
-> (Other gpio controllers are doing that, too, BTW.)
-
-I'm not saying that you should not do so. There is _no_ generic binding
-for this and this is what I suggest.
-
-> 
-> Thanks,
-> Richard
-> 
-Sebastian
+diff --git a/arch/arm/boot/dts/am437x-gp-evm.dts b/arch/arm/boot/dts/am437x-gp-evm.dts
+index e0ce7ce0a201..32446c079fd3 100644
+--- a/arch/arm/boot/dts/am437x-gp-evm.dts
++++ b/arch/arm/boot/dts/am437x-gp-evm.dts
+@@ -510,6 +510,18 @@
+ 			};
+ 		};
+ 	};
++
++	tlv320aic3106: tlv320aic3106 at 1b {
++		compatible = "ti,tlv320aic3106";
++		reg = <0x1b>;
++		status = "okay";
++
++		/* Regulators */
++		IOVDD-supply = <&evm_v3_3d>; /* V3_3D -> <tps63031> EN: V1_8D -> VBAT */
++		AVDD-supply = <&evm_v3_3d>; /* v3_3AUD -> V3_3D -> ... */
++		DRVDD-supply = <&evm_v3_3d>; /* v3_3AUD -> V3_3D -> ... */
++		DVDD-supply = <&ldo1>; /* V1_8D -> LDO1 */
++	};
+ };
+ 
+ &epwmss0 {
+-- 
+2.4.5
