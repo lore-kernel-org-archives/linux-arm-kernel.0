@@ -1,42 +1,67 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Thu, 2 Jul 2015 09:53:39 +0200
-Subject: [RESEND PATCH 2/2] ARM: at91/dt: update udc compatible strings
-In-Reply-To: <7h8uazmxa9.fsf@deeprootsystems.com>
-References: <99dc2e0ec98342632b6e3adad3861f4dd0fcde41.1434530650.git.nicolas.ferre@atmel.com>	<8ec182ab7c5186a64d605d0e174e750994586f02.1434530650.git.nicolas.ferre@atmel.com>
- <7h8uazmxa9.fsf@deeprootsystems.com>
-Message-ID: <5594EE03.5030606@atmel.com>
+From: boris.brezillon@free-electrons.com (Boris Brezillon)
+Date: Thu, 2 Jul 2015 09:55:20 +0200
+Subject: [RFC PATCH 00/15] pwm: add support for atomic update
+In-Reply-To: <3250976.mr9RMtjrdC@diego>
+References: <1435738921-25027-1-git-send-email-boris.brezillon@free-electrons.com>
+ <3250976.mr9RMtjrdC@diego>
+Message-ID: <20150702095520.3088852f@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le 01/07/2015 22:35, Kevin Hilman a ?crit :
-> Nicolas Ferre <nicolas.ferre@atmel.com> writes:
-> 
->> From: Boris Brezillon <boris.brezillon@free-electrons.com>
->>
->> at91sam9g45, at91sam9x5 and sama5 SoCs should not use
->> "atmel,at91sam9rl-udc" for their USB device compatible property since
->> this compatible is attached to a specific hardware bug fix.
->>
->> Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
->> Acked-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
->> Tested-by: Bo Shen <voice.shen@atmel.com>
->> Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
->> Cc: <stable@vger.kernel.org>  #4.0+
->> ---
->> Hi,
->>
->> This patch was forgotten while dealing with the series "usb: atmel_usba_udc:
->> Rework errata handling". This patch and the previous one should be added to
->> mainline as fixes, the soonest. In fact, the errata handling is now broken
->> because of this desynchronization.
->>
->> We'll try to queue it during 4.2-rc phase for inclusion in arm-soc tree.
-> 
-> I've picked both of these up for the arm-soc/late branch which I'll try
-> to get in before -rc1, if not it will make it for -rc2.
+On Wed, 01 Jul 2015 23:57:57 +0200
+Heiko St?bner <heiko@sntech.de> wrote:
 
-Brilliant! Thanks a lot Kevin.
+> Hi Boris,
+> 
+> Am Mittwoch, 1. Juli 2015, 10:21:46 schrieb Boris Brezillon:
+> > Hello Thierry,
+> > 
+> > This series adds support for atomic PWM update, or ITO, the capability
+> > to update all the parameters of a PWM device (enabled/disabled, period,
+> > duty and polarity) in one go.
+> > 
+> > This implementation is still experimental, and I may have missed some key
+> > aspect, so any feedback are welcome.
+> > 
+> > Also note that I haven't protected the state update with any locking.
+> > That's because the existing config does not protect against concurrent
+> > access to a requested PWM device (see the pwm_config implementation).
+> > I guess the PWM framework assume the user will implement the proper locking
+> > scheme if it has to concurrently access the device.
+> > 
+> > The 5 first patches prepare the addition of the pwm_state concept, which
+> > will be used to allow atomic updates.
+> > The following patches introduce the pwm_state struct, initial state
+> > retrieval and atomic update concepts.
+> > 
+> > Patches 12 and 13 are showing how one can implement the initial state
+> > retrieval and atomic update features in a PWM driver (in this specific
+> > case I implemented it in the rockchip driver).
+> > 
+> > The last 2 patches are making use of those changes to improve the
+> > pwm-regulator driver (initializing the regulator state based on the
+> > initial PWM state).
+> 
+> at first I got very strange readings (very wrong values and wrong polarity), 
+> which resulted from the issues I pointed out in the replies to individual 
+> patches. After fixing these, the pwm read-back now returns exactly the expected 
+> values :-) .
 
-Bye,
+Sorry about that, as I said I only compile tested the series :-/.
+Anyway, thanks for providing fixes for these bugs, they'll be applied
+in the next version.
+
+> 
+> And with the original voltage table from the Chromeos-devicetrees, the pwm-
+> regulator also returns the expected 1.2V that coreboot initially set.
+
+Great! And thanks for testing the patches.
+
+Best Regards,
+
+Boris
+
 -- 
-Nicolas Ferre
+Boris Brezillon, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
