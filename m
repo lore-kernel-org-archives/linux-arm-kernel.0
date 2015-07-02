@@ -1,49 +1,41 @@
-From: mars.cheng@mediatek.com (Mars Cheng)
-Date: Thu, 2 Jul 2015 11:29:01 +0800
-Subject: [PATCH 2/2] ARM: dts: mediatek: add mt6580 basic support
-In-Reply-To: <1435191308.28046.1.camel@mtkswgap22>
-References: <1433319533-24803-1-git-send-email-mars.cheng@mediatek.com>
- <3799922.TWv12CPu81@ubix> <1435147153.3792.9.camel@mtkswgap22>
- <2753320.5M4yQIm8Im@ubix> <1435191308.28046.1.camel@mtkswgap22>
-Message-ID: <1435807741.28791.6.camel@mtkswgap22>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Thu, 2 Jul 2015 12:59:44 +0900
+Subject: [PATCH v2] arm64: cpuidle: add __init section marker to
+ arm_cpuidle_init
+In-Reply-To: <1435803288-1478-1-git-send-email-jszhang@marvell.com>
+References: <1435803288-1478-1-git-send-email-jszhang@marvell.com>
+Message-ID: <CAJKOXPceoV2jk=Go+ZoJZbP1MXx-HDLJpCFK9mrR9JLRU4x8Bg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Matthias
+2015-07-02 11:14 GMT+09:00 Jisheng Zhang <jszhang@marvell.com>:
+> It is not needed after booting, this patch moves the arm_cpuidle_init()
+> function to the __init section.
+>
+> Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
+> ---
+>  arch/arm64/include/asm/cpuidle.h | 2 +-
+>  arch/arm64/kernel/cpuidle.c      | 2 +-
+>  2 files changed, 2 insertions(+), 2 deletions(-)
+>
+> diff --git a/arch/arm64/include/asm/cpuidle.h b/arch/arm64/include/asm/cpuidle.h
+> index 0f74f05..5748d3b 100644
+> --- a/arch/arm64/include/asm/cpuidle.h
+> +++ b/arch/arm64/include/asm/cpuidle.h
+> @@ -4,7 +4,7 @@
+>  #include <asm/proc-fns.h>
+>
+>  #ifdef CONFIG_CPU_IDLE
+> -extern int arm_cpuidle_init(unsigned int cpu);
+> +extern int __init arm_cpuidle_init(unsigned int cpu);
 
-May I double confirm with you that soc node is MUST removed?
-If yes, we will upstream dtsi with this format for other new chips.
+No, not here but...
 
-Thanks.
+>  extern int arm_cpuidle_suspend(int index);
+>  #else
+>  static inline int arm_cpuidle_init(unsigned int cpu)
 
-On Thu, 2015-06-25 at 08:15 +0800, Mars Cheng wrote:
-> On Wed, 2015-06-24 at 22:25 +0200, Matthias Brugger wrote:
-> > On Wednesday, June 24, 2015 07:59:13 PM Mars Cheng wrote:
-> > > On Tue, 2015-06-23 at 21:45 +0200, Matthias Brugger wrote:
-> > > > > +	soc {
-> > > > 
-> > > > Please drop the soc node as well and just add the components directly.
-> > > > 
-> > > > Thanks,
-> > > > Matthias
-> > > 
-> > > May I know the reason to remove the soc node? I follow other xxxx.dtsi
-> > > to add this node.
-> > 
-> > The device tree is reflecting the hardware, if you add a soc node like this, it 
-> > is seen like a bus, but there is not really a bus.
-> > 
-> > I think point of view about this has change over time and nowadays it is 
-> > preferred not to add a soc node.
-> > 
-> > Regards,
-> > Matthias
-> Got it. Will remove the soc node and prepare the new patch.
-> 
-> Thanks a lot.
-> 
-> 
-> _______________________________________________
-> Linux-mediatek mailing list
-> Linux-mediatek at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-mediatek
+... here so the stub for !CONFIG_CPU_IDLE would be marked as well.
+
+Best regards,
+Krzysztof
