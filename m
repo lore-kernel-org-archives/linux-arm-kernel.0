@@ -1,67 +1,41 @@
 From: peter.ujfalusi@ti.com (Peter Ujfalusi)
-Date: Thu, 2 Jul 2015 17:06:15 +0300
-Subject: [PATCH v2 00/20] ARM: DTS: am335x/am43xx: Audio support and fixes for
- audio
-Message-ID: <1435845995-19085-1-git-send-email-peter.ujfalusi@ti.com>
+Date: Thu, 2 Jul 2015 17:06:16 +0300
+Subject: [PATCH v2 01/20] ARM: omap2plus_defconfig: Enable audio related
+ config options
+In-Reply-To: <1435845995-19085-1-git-send-email-peter.ujfalusi@ti.com>
+References: <1435845995-19085-1-git-send-email-peter.ujfalusi@ti.com>
+Message-ID: <1435845995-19085-2-git-send-email-peter.ujfalusi@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+More and more boards are moving to have audio support via simple-card.
+At the same time enable options needed for most am335x and am43xx board for
+audio support: McASP and TLV320AIC3X codecs.
+The later two has been selected by the CONFIG_SND_AM33XX_SOC_EVM option, but
+the aim is to convert all boards to use simple card.
 
-Changes since v1:
-- Add patch for omap2plus_defconfig to enable needed audio drivers
-- Included other board patches since they all need the change in
-  omap2plus_defconfig
-
-Enable the simple card in omap2plus_defconfig as more boards are using that for
-audio support.
-
-am437x-sk-evm, am335x-evmsk and am335x-evm:
-There is no reason to use the davinci-evm machine driver's compatible for audio
-support since the setup is simple and the common simple-audio-card can handle it
-just fine.
-
-am43xx-epos-evm, am437x-gp-evm:
-Add audio support via simple-card
-
-Regards,
-Peter
+Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
 ---
-Peter Ujfalusi (20):
-  ARM: omap2plus_defconfig: Enable audio related config options
-  ARM: DTS: am437x-sk-evm: Add sleep pin settings for mcasp1
-  ARM: DTS: am437x-sk-evm: Switch using simple-audio-card for audio
-    support
-  ARM: DTS: am43xx-epos-evm: Add gpio-hog for configuring the
-    display/audio mux
-  ARM: DTS: am43xx-epos-evm: Add regulator for VBAT and DCDC4 of
-    tps65218
-  ARM: DTS: am43xx-epos-evm: McASP1 node for audio support
-  ARM: DTS: am43xx-epos-evm: Add node for tlv320aic3111 audio codec
-  ARM: DTS: am43xx-epos-evm: Enable analog audio via simple-card
-  ARM: DTS: am437x-gp-evm: Add gpio-hog for configuring the
-    display/audio mux
-  ARM: DTS: am437x-gp-evm: Rename fixed regulator vmmcsd_fixed to
-    evm_v3_3d
-  ARM: DTS: am437x-gp-evm: Add node for tlv320aic3106 audio codec
-  ARM: DTS: am437x-gp-evm: McASP1 node for audio support
-  ARM: DTS: am437x-gp-evm: Enable analog audio via simple-card
-  ARM: DTS: am335x-evmsk: Fix mcasp1 node's indentation
-  ARM: DTS: am335x-evmsk: Add sleep pin settings for mcasp1
-  ARM: DTS: am335x-evmsk: Switch using simple-audio-card for audio
-    support
-  ARM: DTS: am335x-evm: Fix mcasp1 node's indentation
-  ARM: DTS: am335x-evm: Rename pinctrl section for McASP1
-  ARM: DTS: am335x-evm: Add sleep pin settings for mcasp1
-  ARM: DTS: am335x-evm: Switch using simple-audio-card for audio support
+ arch/arm/configs/omap2plus_defconfig | 3 +++
+ 1 file changed, 3 insertions(+)
 
- arch/arm/boot/dts/am335x-evm.dts     |  69 +++++++++++++------
- arch/arm/boot/dts/am335x-evmsk.dts   |  62 ++++++++++++-----
- arch/arm/boot/dts/am437x-gp-evm.dts  | 108 +++++++++++++++++++++++++----
- arch/arm/boot/dts/am437x-sk-evm.dts  |  45 +++++++++---
- arch/arm/boot/dts/am43x-epos-evm.dts | 130 +++++++++++++++++++++++++++++++----
- arch/arm/configs/omap2plus_defconfig |   3 +
- 6 files changed, 340 insertions(+), 77 deletions(-)
-
+diff --git a/arch/arm/configs/omap2plus_defconfig b/arch/arm/configs/omap2plus_defconfig
+index ac521e764d10..b001f7ae67f3 100644
+--- a/arch/arm/configs/omap2plus_defconfig
++++ b/arch/arm/configs/omap2plus_defconfig
+@@ -324,10 +324,13 @@ CONFIG_SND_USB_AUDIO=m
+ CONFIG_SND_SOC=m
+ CONFIG_SND_EDMA_SOC=m
+ CONFIG_SND_AM33XX_SOC_EVM=m
++CONFIG_SND_DAVINCI_SOC_MCASP=m
+ CONFIG_SND_OMAP_SOC=m
+ CONFIG_SND_OMAP_SOC_OMAP_TWL4030=m
+ CONFIG_SND_OMAP_SOC_OMAP_ABE_TWL6040=m
+ CONFIG_SND_OMAP_SOC_OMAP3_PANDORA=m
++CONFIG_SND_SIMPLE_CARD=m
++CONFIG_SND_SOC_TLV320AIC3X=m
+ CONFIG_HID_GENERIC=m
+ CONFIG_USB_HIDDEV=y
+ CONFIG_USB_KBD=m
 -- 
 2.4.5
