@@ -1,52 +1,56 @@
-From: james.morse@arm.com (James Morse)
-Date: Thu, 02 Jul 2015 18:40:32 +0100
-Subject: [PATCH v3 2/5] PCI: designware: Add ARM64 support
-In-Reply-To: <EE11001F9E5DDD47B7634E2F8A612F2E01D4EC38@lhreml503-mbs>
-References: <1435743817-19083-1-git-send-email-wangzhou1@hisilicon.com>
- <1435743817-19083-3-git-send-email-wangzhou1@hisilicon.com>
- <EE11001F9E5DDD47B7634E2F8A612F2E01D4E4BB@lhreml503-mbs>
- <5593F899.6050306@arm.com>
- <EE11001F9E5DDD47B7634E2F8A612F2E01D4E6A2@lhreml503-mbs>
- <55942441.3050705@arm.com>
- <EE11001F9E5DDD47B7634E2F8A612F2E01D4EC38@lhreml503-mbs>
-Message-ID: <55957790.9060802@arm.com>
+From: m.smarduch@samsung.com (Mario Smarduch)
+Date: Thu, 02 Jul 2015 10:49:03 -0700
+Subject: [PATCH v3 0/2] arm/arm64: KVM: Optimize arm64 fp/simd,
+ saves 30-50% on exits
+In-Reply-To: <20150701094910.GF11332@cbox>
+References: <1435190652-5831-1-git-send-email-m.smarduch@samsung.com>
+ <20150701094910.GF11332@cbox>
+Message-ID: <5595798F.5060307@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/07/15 08:24, Gabriele Paoloni wrote:
->> It looks like the BAR containing the bridge window is not being assigned,
->> so no devices on bus 1 are discovered.
+On 07/01/2015 02:49 AM, Christoffer Dall wrote:
+> On Wed, Jun 24, 2015 at 05:04:10PM -0700, Mario Smarduch wrote:
+>> Currently we save/restore fp/simd on each exit. Fist  patch optimizes arm64
+>> save/restore, we only do so on Guest access. hackbench and
+>> several lmbench tests show anywhere from 30% to above 50% optimzation
+>> achieved.
+>>
+>> In second patch 32-bit handler is updated to keep exit handling consistent
+>> with 64-bit code.
 > 
-> Can you confirm the dtsi you are using..."imx6qdl.dtsi" ?
+> 30-50% of what?  The overhead or overall performance?
 
-Yes, that looks right.
+Yes, so considering all exits to Host KVM anywhere from 30 to 50%
+didn't require an fp/simd switch.
 
-The on-disk file was 'imx6q-sabrelite.dtb' when I received the board, I
-replaced it with the one from the v4.1 kernel tree.
-
-Decompiled from /sys/firmware/fdt (to eliminate bootloader trickery), the
-pcie section reads:
-pcie at 0x01000000 {
-	compatible = "fsl,imx6q-pcie", "snps,dw-pcie";
-	reg = <0x1ffc000 0x4000 0x1f00000 0x80000>;
-	reg-names = "dbi", "config";
-	#address-cells = <0x3>;
-	#size-cells = <0x2>;
-	device_type = "pci";
-	ranges = <0x800 0x0 0x1f00000 0x1f00000 0x0 0x80000 0x81000000 0x0 0x0
-0x1f80000 0x0 0x10000 0x82000000 0x0 0x1000000 0x1000000 0x0 0xf00000>;
-	num-lanes = <0x1>;
-	interrupts = <0x0 0x78 0x4>;
-	interrupt-names = "msi";
-	#interrupt-cells = <0x1>;
-	interrupt-map-mask = <0x0 0x0 0x0 0x7>;
-	interrupt-map = <0x0 0x0 0x0 0x1 0x1 0x0 0x7b 0x4 0x0 0x0 0x0 0x2 0x1 0x0
-0x7a 0x4 0x0 0x0 0x0 0x3 0x1 0x0 0x79 0x4 0x0 0x0 0x0 0x4 0x1 0x0 0x78 0x4>;
-	clocks = <0x3 0x90 0x3 0xce 0x3 0xbd>;
-	clock-names = "pcie", "pcie_bus", "pcie_phy";
-	status = "okay";
-};
-
-
-
-James
+Anything else you like to see added here?
+> 
+>>
+>> Changes since v1:
+>> - Addressed Marcs comments
+>> - Verified optimization improvements with lmbench and hackbench, updated 
+>>   commit message
+>>
+>> Changes since v2:
+>> - only for patch 2/2
+>>   - Reworked trapping to vfp access handler
+>>
+>> Changes since v3:
+>> - Only for patch 2/2
+>>   - Removed load_vcpu in switch_to_guest_vfp per Marcs comment
+>>   - Got another chance to replace an unreferenced label with a comment
+>>
+>>
+>> Mario Smarduch (2):
+>>   Optimize arm64 skip 30-50% vfp/simd save/restore on exits
+>>   keep arm vfp/simd exit handling consistent with arm64
+>>
+>>  arch/arm/kvm/interrupts.S        |   14 +++++++-----
+>>  arch/arm64/include/asm/kvm_arm.h |    5 ++++-
+>>  arch/arm64/kvm/hyp.S             |   46 +++++++++++++++++++++++++++++++++++---
+>>  3 files changed, 55 insertions(+), 10 deletions(-)
+>>
+>> -- 
+>> 1.7.9.5
+>>
