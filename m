@@ -1,89 +1,53 @@
-From: pbonzini@redhat.com (Paolo Bonzini)
-Date: Thu, 2 Jul 2015 15:42:07 +0200
-Subject: [RFC 16/17] KVM: eventfd: add irq bypass consumer management
-In-Reply-To: <1435843047-6327-17-git-send-email-eric.auger@linaro.org>
-References: <1435843047-6327-1-git-send-email-eric.auger@linaro.org>
- <1435843047-6327-17-git-send-email-eric.auger@linaro.org>
-Message-ID: <55953FAF.2060401@redhat.com>
+From: stefan@agner.ch (Stefan Agner)
+Date: Thu, 02 Jul 2015 15:44:20 +0200
+Subject: [RFC PATCH 2/7] ARM: dts: vfxxx: Include support for qspi1
+ functionality.
+In-Reply-To: <1435782010-9809-4-git-send-email-cory.tusar@pid1solutions.com>
+References: <1435782010-9809-1-git-send-email-cory.tusar@pid1solutions.com>
+ <1435782010-9809-4-git-send-email-cory.tusar@pid1solutions.com>
+Message-ID: <0d7c39d4b78fec56adc8a8d66301a3ad@agner.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On 02/07/2015 15:17, Eric Auger wrote:
-> This patch adds the registration/unregistration of an
-> irq_bypass_consumer on irqfd assignment/deassignment.
+On 2015-07-01 22:20, Cory Tusar wrote:
+> This commit extends the existing Vybrid QSPI devicetree implementation
+> to also describe the qspi1 functional block.
 > 
-> Signed-off-by: Eric Auger <eric.auger@linaro.org>
+> Signed-off-by: Cory Tusar <cory.tusar@pid1solutions.com>
 > ---
->  virt/kvm/eventfd.c | 22 +++++++++++++++++++---
->  1 file changed, 19 insertions(+), 3 deletions(-)
+>  arch/arm/boot/dts/vfxxx.dtsi | 13 +++++++++++++
+>  1 file changed, 13 insertions(+)
 > 
-> diff --git a/virt/kvm/eventfd.c b/virt/kvm/eventfd.c
-> index f3da161..425a47b 100644
-> --- a/virt/kvm/eventfd.c
-> +++ b/virt/kvm/eventfd.c
-> @@ -34,6 +34,7 @@
->  #include <linux/srcu.h>
->  #include <linux/slab.h>
->  #include <linux/seqlock.h>
-> +#include <linux/irqbypass.h>
->  #include <trace/events/kvm.h>
+> diff --git a/arch/arm/boot/dts/vfxxx.dtsi b/arch/arm/boot/dts/vfxxx.dtsi
+> index 089a263..a7c370e 100644
+> --- a/arch/arm/boot/dts/vfxxx.dtsi
+> +++ b/arch/arm/boot/dts/vfxxx.dtsi
+> @@ -251,6 +251,19 @@
+>  				status = "disabled";
+>  			};
 >  
->  #include <kvm/iodev.h>
-> @@ -93,6 +94,7 @@ struct _irqfd {
->  	struct list_head list;
->  	poll_table pt;
->  	struct work_struct shutdown;
-> +	struct irq_bypass_consumer *cons;
->  };
->  
->  static struct workqueue_struct *irqfd_cleanup_wq;
-> @@ -429,7 +431,21 @@ kvm_irqfd_assign(struct kvm *kvm, struct kvm_irqfd *args)
->  	 */
->  	fdput(f);
->  
-> -	/* irq_bypass_register_consumer(); */
-> +	irqfd->cons = kzalloc(sizeof(struct irq_bypass_consumer),
-> +			      GFP_KERNEL);
+> +			qspi1: quadspi at 400c4000 {
+> +				#address-cells = <1>;
+> +				#size-cells = <0>;
+> +				compatible = "fsl,vf610-qspi";
+> +				reg = <0x400c4000 0x1000>, <0x50000000 0x10000000>;
+> +				reg-names = "QuadSPI", "QuadSPI-memory";
+> +				interrupts = <25 IRQ_TYPE_LEVEL_HIGH>;
+> +				clocks = <&clks VF610_CLK_QSPI1_EN>,
+> +					<&clks VF610_CLK_QSPI1>;
+> +				clock-names = "qspi_en", "qspi";
+> +				status = "disabled";
+> +			};
+> +
+>  			iomuxc: iomuxc at 40048000 {
+>  				compatible = "fsl,vf610-iomuxc";
+>  				reg = <0x40048000 0x1000>;
 
-Apart from the struct embedding technique I suggested in patch 12, this
-looks very reasonable.  Thanks!
+This seem to be at the wrong place under aips0. qspi1 should be under
+aips1. just before fec0. But other than that, I checked the addresses
+looks good to me. Hence with that change applied you can include:
 
-Paolo
+Reviewed-by: Stefan Agner <stefan@agner.ch>
 
-> +	if (!irqfd->cons) {
-> +		ret = -ENOMEM;
-> +		goto fail;
-> +	}
-> +	irqfd->cons->token = (void *)irqfd->eventfd;
-> +	irqfd->cons->gsi = irqfd->gsi;
-> +	irqfd->cons->kvm = kvm;
-> +	irqfd->cons->add_producer = kvm_arch_add_producer;
-> +	irqfd->cons->del_producer = kvm_arch_del_producer;
-> +	irqfd->cons->stop_consumer = kvm_arch_stop_consumer;
-> +	irqfd->cons->resume_consumer = kvm_arch_resume_consumer;
-> +	ret = irq_bypass_register_consumer(irqfd->cons);
-> +	WARN_ON(ret);
->  
->  	return 0;
->  
-> @@ -530,8 +546,6 @@ kvm_irqfd_deassign(struct kvm *kvm, struct kvm_irqfd *args)
->  	struct _irqfd *irqfd, *tmp;
->  	struct eventfd_ctx *eventfd;
->  
-> -	/* irq_bypass_unregister_consumer() */
-> -
->  	eventfd = eventfd_ctx_fdget(args->fd);
->  	if (IS_ERR(eventfd))
->  		return PTR_ERR(eventfd);
-> @@ -550,6 +564,8 @@ kvm_irqfd_deassign(struct kvm *kvm, struct kvm_irqfd *args)
->  			irqfd->irq_entry.type = 0;
->  			write_seqcount_end(&irqfd->irq_entry_sc);
->  			irqfd_deactivate(irqfd);
-> +			irq_bypass_unregister_consumer(irqfd->cons);
-> +			kfree(irqfd->cons);
->  		}
->  	}
->  
-> 
+--
+Stefan
