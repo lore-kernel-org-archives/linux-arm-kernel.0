@@ -1,75 +1,73 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Thu, 02 Jul 2015 09:07:14 -0700
-Subject: [PATCH 05/10] opp: Add support to parse "operating-points-v2"
- bindings
-In-Reply-To: <20150702063820.GE31684@linux>
-References: <cover.1434369079.git.viresh.kumar@linaro.org>
- <1b5a393f2162752cbb773956dff15739e7525a1d.1434369079.git.viresh.kumar@linaro.org>
- <55949037.80305@codeaurora.org> <20150702063820.GE31684@linux>
-Message-ID: <559561B2.8010902@codeaurora.org>
+From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
+Date: Thu, 02 Jul 2015 18:13:22 +0200
+Subject: [PATCH v6 0/3] cpufreq: Use cpufreq-dt driver for Exynos3250
+In-Reply-To: <1435797761-3339-1-git-send-email-cw00.choi@samsung.com>
+References: <1435797761-3339-1-git-send-email-cw00.choi@samsung.com>
+Message-ID: <4464631.oZyVO4Z0Ov@amdc1976>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/01/2015 11:38 PM, Viresh Kumar wrote:
-> On 01-07-15, 18:13, Stephen Boyd wrote:
->> On 06/15/2015 04:57 AM, Viresh Kumar wrote:
->>> ---
->>>  drivers/base/power/opp.c | 238 ++++++++++++++++++++++++++++++++++++++++++-----
->>>  1 file changed, 213 insertions(+), 25 deletions(-)
->>>
->>> diff --git a/drivers/base/power/opp.c b/drivers/base/power/opp.c
->>> index 2ac48ff9c1ef..3198c3e77224 100644
->>> --- a/drivers/base/power/opp.c
->>> +++ b/drivers/base/power/opp.c
->>> @@ -49,12 +49,17 @@
->>>   *		are protected by the dev_opp_list_lock for integrity.
->>>   *		IMPORTANT: the opp nodes should be maintained in increasing
->>>   *		order.
->>> - * @dynamic:	not-created from static DT entries.
->>>   * @available:	true/false - marks if this OPP as available or not
->>> + * @dynamic:	not-created from static DT entries.
->> Why move dynamic?
-> To match its position, as it is present in the struct below. Yes it
-> could have been done in a separate patch, but its also fine to fix
-> such silly mistakes in another patch :)
->
->
 
-Oh I thought kernel-doc didn't care what order things were documented
-in, so moving it around doesn't really help unless someone cares that
-they match the struct ordering.
+Hi,
 
->>> +
->>> +	new_opp->np = np;
->>> +	new_opp->dynamic = false;
->>> +	new_opp->available = true;
->>> +
->>> +	/*
->>> +	 * TODO: Support multiple regulators
->>> +	 *
->>> +	 * read opp-microvolt array
->>> +	 */
->>> +	ret = of_property_count_u32_elems(np, "opp-microvolt");
->>> +	if (ret == 1 || ret == 3) {
->>> +		/* There can be one or three elements here */
->>> +		ret = of_property_read_u32_array(np, "opp-microvolt",
->>> +						 (u32 *)&new_opp->u_volt, ret);
->> It seems fragile to rely on the struct packing here. Maybe the same
->> comment in the struct should be copied here, and possibly some better
->> way of doing this so the code can't be subtly broken?
-> Any example of how things will break? Aren't these guaranteed to be
-> present at 3 consecutive 32 bit positions ?
+On Thursday, July 02, 2015 09:42:38 AM Chanwoo Choi wrote:
+> This patchset use cpufreq-dt driver to support Exynos3250 cpufreq and tested it
+> on Exynos3250-based Rinato board.
+> 
+> Depends on:
+> - next-20150701 tag (master branch) of linux-next kernel tree
+> - This patch-set is based on Exynos5250 patch-set[1] because two patch-set
+>   modify the 'arch/arm/mach-exynos/exynos.c' to add the compatible string.
+>   [1] https://lkml.org/lkml/2015/6/29/361
+>   : [PATCH v2 0/4] cpufreq: use generic cpufreq drivers for Exynos5250 platform
+> 
+> Changes from v5:
+> (https://lkml.org/lkml/2015/7/1/324)
+> - Reorder the cpu dt node in exynos3250-rinato/monk.dts alpabetically.
+> - Add reviewed-by tag of Krzysztof Kozlowski <k.kozlowski@samsung.com>
+> 
+> Changes from v4:
+> (https://lkml.org/lkml/2014/10/20/215)
+> - Rebased on latest linux-next git repository.
+> - Remove unnecessary divider clock flag from divider of DIV_CPU0/DIV_CPU1 register
+> 
+> Changes from v3:
+> - This patchset is based on 3.18-rc1 with new patchset[3] of Thomas Abraham
+>   [3] [PATCH v11 0/6] cpufreq: use generic cpufreq drivers for exynos platforms
+>   - http://www.spinics.net/lists/arm-kernel/msg370412.html
+> 
+> Changes from v2:
+> - Rebased on new patchset of Thomas Abraham
+>   and for-next branch of samsunc-clk.git of Tomasz Figa
+> 
+> Changes from v1:
+> - Rebased on new patchset[1] by Thomas Abraham
+>   [1] [PATCH v10 0/6] cpufreq: use generic cpufreq drivers for exynos platforms
+>   - http://www.spinics.net/lists/arm-kernel/msg364790.html
+> - Modify clk-cpu.c to support Exynos3250
+> - Drop documentation patch on previous patchset[2]
+>   [2] http://www.spinics.net/lists/cpufreq/msg10265.html
+> - Add only operating-points for Exynos3250 without armclk-divider-table
+> 
+> Chanwoo Choi (3):
+>   clk: samsung: exynos3250: Add cpu clock configuration data and instaniate cpu clock
+>   ARM: dts: Add CPU OPP and regulator supply property for Exynos3250
+>   ARM: exynos: Add exynos3250 compatible to use generic cpufreq driver
+> 
+>  arch/arm/boot/dts/exynos3250-monk.dts   |  4 ++++
+>  arch/arm/boot/dts/exynos3250-rinato.dts |  4 ++++
+>  arch/arm/boot/dts/exynos3250.dtsi       | 15 +++++++++++++++
+>  arch/arm/mach-exynos/exynos.c           |  1 +
+>  drivers/clk/samsung/clk-exynos3250.c    | 32 ++++++++++++++++++++++++++++++--
+>  include/dt-bindings/clock/exynos3250.h  |  1 +
+>  6 files changed, 55 insertions(+), 2 deletions(-)
 
-I'm mostly worried about someone jumbling fields in the struct. Maybe
-I'm too paranoid... Maybe we can have some sort of BUILD_BUG_ON() check
-here?
+Reviewed-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
 
-BUILD_BUG_ON(offsetof(struct dev_pm_opp, u_volt_max) - offsetof(struct
-dev_pm_opp, u_volt) != sizeof(u32) * 3);
+Thank you for working on this.
 
-Have you tried compiling that on 64-bit? sizeof(unsigned long) !=
-sizeof(u32).
-
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+Best regards,
+--
+Bartlomiej Zolnierkiewicz
+Samsung R&D Institute Poland
+Samsung Electronics
