@@ -1,122 +1,313 @@
 From: eric.auger@linaro.org (Eric Auger)
-Date: Thu,  2 Jul 2015 15:17:18 +0200
-Subject: [RFC 08/17] kvm: arm/arm64: implement kvm_arm_[halt,resume]_guest
+Date: Thu,  2 Jul 2015 15:17:19 +0200
+Subject: [RFC 09/17] bypass: IRQ bypass manager proto by Alex
 In-Reply-To: <1435843047-6327-1-git-send-email-eric.auger@linaro.org>
 References: <1435843047-6327-1-git-send-email-eric.auger@linaro.org>
-Message-ID: <1435843047-6327-9-git-send-email-eric.auger@linaro.org>
+Message-ID: <1435843047-6327-10-git-send-email-eric.auger@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On halt, the guest is forced to exit and prevented from being
-re-entered. This is synchronous.
+From: Alex Williamson <alex.williamson@redhat.com>
 
-Those two operations will be needed for IRQ forwarding setting.
+There are plenty of details to be filled in, but I think the basics
+looks something like the code below.  The IRQ bypass manager just
+defines a pair of structures, one for interrupt producers and one for
+interrupt consumers.  I'm certain that we'll need more callbacks than
+I've defined below, but figuring out what those should be for the best
+abstraction is the hardest part of this idea.  The manager provides both
+registration and de-registration interfaces for both types of objects
+and keeps lists for each, protected by a lock.  The manager doesn't even
+really need to know what the match token is, but I assume for our
+purposes it will be an eventfd_ctx.
 
-Signed-off-by: Eric Auger <eric.auger@linaro.org>
+On the vfio side, the producer struct would be embedded in the
+vfio_pci_irq_ctx struct.  KVM would probably embed the consumer struct
+in _irqfd.  As I've coded below, the IRQ bypass manager calls the
+consumer callbacks, so the producer struct would need fields or
+callbacks to provide the consumer the info it needs.  AIUI the Posted
+Interrupt model, VFIO only needs to provide data to the consumer.  For
+IRQ Forwarding, I think the producer needs to be informed when bypass is
+active to model the incoming interrupt as edge vs level.
 
+I've prototyped the base IRQ bypass manager here as static, but I don't
+see any reason it couldn't be a module that's loaded by dependency when
+either vfio-pci or kvm-intel is loaded (or other producer/consumer
+objects).
+
+Is this a reasonable starting point to craft the additional fields and
+callbacks and interaction of who calls who that we need to support
+Posted Interrupts and IRQ Forwarding?  Is the AMD version of this still
+alive?  Thanks,
+
+Alex
 ---
+ arch/x86/kvm/Kconfig              |   1 +
+ drivers/vfio/pci/Kconfig          |   1 +
+ drivers/vfio/pci/vfio_pci_intrs.c |   6 ++
+ include/linux/irqbypass.h         |  23 ++++++++
+ kernel/irq/Kconfig                |   3 +
+ kernel/irq/Makefile               |   1 +
+ kernel/irq/bypass.c               | 116 ++++++++++++++++++++++++++++++++++++++
+ virt/kvm/eventfd.c                |   4 ++
+ 8 files changed, 155 insertions(+)
+ create mode 100644 include/linux/irqbypass.h
+ create mode 100644 kernel/irq/bypass.c
 
-RFC:
-- rename the function and this latter becomes static
-- remove __KVM_HAVE_ARCH_HALT_GUEST
-
-v4 -> v5: add arm64 support
-- also defines __KVM_HAVE_ARCH_HALT_GUEST for arm64
-- add pause field
----
- arch/arm/include/asm/kvm_host.h   |  3 +++
- arch/arm/kvm/arm.c                | 32 +++++++++++++++++++++++++++++---
- arch/arm64/include/asm/kvm_host.h |  3 +++
- 3 files changed, 35 insertions(+), 3 deletions(-)
-
-diff --git a/arch/arm/include/asm/kvm_host.h b/arch/arm/include/asm/kvm_host.h
-index 304004d..899ae27 100644
---- a/arch/arm/include/asm/kvm_host.h
-+++ b/arch/arm/include/asm/kvm_host.h
-@@ -132,6 +132,9 @@ struct kvm_vcpu_arch {
- 	/* vcpu power-off state */
- 	bool power_off;
+diff --git a/arch/x86/kvm/Kconfig b/arch/x86/kvm/Kconfig
+index d8a1d56..86d0d77 100644
+--- a/arch/x86/kvm/Kconfig
++++ b/arch/x86/kvm/Kconfig
+@@ -61,6 +61,7 @@ config KVM_INTEL
+ 	depends on KVM
+ 	# for perf_guest_get_msrs():
+ 	depends on CPU_SUP_INTEL
++	select IRQ_BYPASS_MANAGER
+ 	---help---
+ 	  Provides support for KVM on Intel processors equipped with the VT
+ 	  extensions.
+diff --git a/drivers/vfio/pci/Kconfig b/drivers/vfio/pci/Kconfig
+index 579d83b..02912f1 100644
+--- a/drivers/vfio/pci/Kconfig
++++ b/drivers/vfio/pci/Kconfig
+@@ -2,6 +2,7 @@ config VFIO_PCI
+ 	tristate "VFIO support for PCI devices"
+ 	depends on VFIO && PCI && EVENTFD
+ 	select VFIO_VIRQFD
++	select IRQ_BYPASS_MANAGER
+ 	help
+ 	  Support for the PCI VFIO bus driver.  This is required to make
+ 	  use of PCI drivers using the VFIO framework.
+diff --git a/drivers/vfio/pci/vfio_pci_intrs.c b/drivers/vfio/pci/vfio_pci_intrs.c
+index 1f577b4..4e053be 100644
+--- a/drivers/vfio/pci/vfio_pci_intrs.c
++++ b/drivers/vfio/pci/vfio_pci_intrs.c
+@@ -181,6 +181,7 @@ static int vfio_intx_set_signal(struct vfio_pci_device *vdev, int fd)
  
-+	/* Don't run the guest */
-+	bool pause;
+ 	if (vdev->ctx[0].trigger) {
+ 		free_irq(pdev->irq, vdev);
++		/* irq_bypass_unregister_producer(); */
+ 		kfree(vdev->ctx[0].name);
+ 		eventfd_ctx_put(vdev->ctx[0].trigger);
+ 		vdev->ctx[0].trigger = NULL;
+@@ -214,6 +215,8 @@ static int vfio_intx_set_signal(struct vfio_pci_device *vdev, int fd)
+ 		return ret;
+ 	}
+ 
++	/* irq_bypass_register_producer(); */
 +
- 	/* IO related fields */
- 	struct kvm_decode mmio_decode;
+ 	/*
+ 	 * INTx disable will stick across the new irq setup,
+ 	 * disable_irq won't.
+@@ -319,6 +322,7 @@ static int vfio_msi_set_vector_signal(struct vfio_pci_device *vdev,
  
-diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
-index 7537e68..4be6715 100644
---- a/arch/arm/kvm/arm.c
-+++ b/arch/arm/kvm/arm.c
-@@ -471,11 +471,36 @@ bool kvm_arch_intc_initialized(struct kvm *kvm)
- 	return vgic_initialized(kvm);
- }
+ 	if (vdev->ctx[vector].trigger) {
+ 		free_irq(irq, vdev->ctx[vector].trigger);
++		/* irq_bypass_unregister_producer(); */
+ 		kfree(vdev->ctx[vector].name);
+ 		eventfd_ctx_put(vdev->ctx[vector].trigger);
+ 		vdev->ctx[vector].trigger = NULL;
+@@ -360,6 +364,8 @@ static int vfio_msi_set_vector_signal(struct vfio_pci_device *vdev,
+ 		return ret;
+ 	}
  
-+static void kvm_arm_halt_guest(struct kvm *kvm)
++	/* irq_bypass_register_producer(); */
++
+ 	vdev->ctx[vector].trigger = trigger;
+ 
+ 	return 0;
+diff --git a/include/linux/irqbypass.h b/include/linux/irqbypass.h
+new file mode 100644
+index 0000000..718508e
+--- /dev/null
++++ b/include/linux/irqbypass.h
+@@ -0,0 +1,23 @@
++#ifndef IRQBYPASS_H
++#define IRQBYPASS_H
++
++#include <linux/list.h>
++
++struct irq_bypass_producer {
++	struct list_head node;
++	void *token;
++	/* TBD */
++};
++
++struct irq_bypass_consumer {
++	struct list_head node;
++	void *token;
++	void (*add_producer)(struct irq_bypass_producer *);
++	void (*del_producer)(struct irq_bypass_producer *);
++};
++
++int irq_bypass_register_producer(struct irq_bypass_producer *);
++void irq_bypass_unregister_producer(struct irq_bypass_producer *);
++int irq_bypass_register_consumer(struct irq_bypass_consumer *);
++void irq_bypass_unregister_consumer(struct irq_bypass_consumer *);
++#endif /* IRQBYPASS_H */
+diff --git a/kernel/irq/Kconfig b/kernel/irq/Kconfig
+index 9a76e3b..4502cdc 100644
+--- a/kernel/irq/Kconfig
++++ b/kernel/irq/Kconfig
+@@ -100,4 +100,7 @@ config SPARSE_IRQ
+ 
+ 	  If you don't know what to do here, say N.
+ 
++config IRQ_BYPASS_MANAGER
++	bool
++
+ endmenu
+diff --git a/kernel/irq/Makefile b/kernel/irq/Makefile
+index d121235..a30ed77 100644
+--- a/kernel/irq/Makefile
++++ b/kernel/irq/Makefile
+@@ -7,3 +7,4 @@ obj-$(CONFIG_PROC_FS) += proc.o
+ obj-$(CONFIG_GENERIC_PENDING_IRQ) += migration.o
+ obj-$(CONFIG_PM_SLEEP) += pm.o
+ obj-$(CONFIG_GENERIC_MSI_IRQ) += msi.o
++obj-$(CONFIG_IRQ_BYPASS_MANAGER) += bypass.o
+diff --git a/kernel/irq/bypass.c b/kernel/irq/bypass.c
+new file mode 100644
+index 0000000..5d0f92b
+--- /dev/null
++++ b/kernel/irq/bypass.c
+@@ -0,0 +1,116 @@
++/*
++ * IRQ offload/bypass manager
++ *
++ * Various virtualization hardware acceleration techniques allow bypassing
++ * or offloading interrupts receieved from devices around the host kernel.
++ * Posted Interrupts on Intel VT-d systems can allow interrupts to be
++ * recieved directly by a virtual machine.  ARM IRQ Forwarding can allow
++ * level triggered device interrupts to be de-asserted directly by the VM.
++ * This manager allows interrupt producers and consumers to find each other
++ * to enable this sort of bypass.
++ */
++
++#include <linux/irqbypass.h>
++#include <linux/list.h>
++#include <linux/module.h>
++#include <linux/mutex.h>
++
++static LIST_HEAD(producers);
++static LIST_HEAD(consumers);
++static DEFINE_MUTEX(lock);
++
++int irq_bypass_register_producer(struct irq_bypass_producer *producer)
 +{
-+	int i;
-+	struct kvm_vcpu *vcpu;
++	struct irq_bypass_producer *tmp;
++	struct irq_bypass_consumer *consumer;
++	int ret = 0;
 +
-+	kvm_for_each_vcpu(i, vcpu, kvm)
-+		vcpu->arch.pause = true;
-+	force_vm_exit(cpu_all_mask);
-+}
++	mutex_lock(&lock);
 +
-+static void kvm_arm_resume_guest(struct kvm *kvm)
-+{
-+	int i;
-+	struct kvm_vcpu *vcpu;
-+
-+	kvm_for_each_vcpu(i, vcpu, kvm) {
-+		wait_queue_head_t *wq = kvm_arch_vcpu_wq(vcpu);
-+
-+		vcpu->arch.pause = false;
-+		wake_up_interruptible(wq);
++	list_for_each_entry(tmp, &producers, node) {
++		if (tmp->token == producer->token) {
++			ret = -EINVAL;
++			goto unlock;
++		}
 +	}
++
++	list_add(&producer->node, &producers);
++
++	list_for_each_entry(consumer, &consumers, node) {
++		if (consumer->token == producer->token) {
++			consumer->add_producer(producer);
++			break;
++		}
++	}
++unlock:
++	mutex_unlock(&lock);
++	return ret;
 +}
++EXPORT_SYMBOL_GPL(irq_bypass_register_producer);
 +
++void irq_bypass_unregister_producer(struct irq_bypass_producer *producer)
++{
++	struct irq_bypass_consumer *consumer;
 +
- static void vcpu_pause(struct kvm_vcpu *vcpu)
- {
- 	wait_queue_head_t *wq = kvm_arch_vcpu_wq(vcpu);
- 
--	wait_event_interruptible(*wq, !vcpu->arch.power_off);
-+	wait_event_interruptible(*wq, ((!vcpu->arch.power_off) &&
-+				       (!vcpu->arch.pause)));
- }
- 
- static int kvm_vcpu_initialized(struct kvm_vcpu *vcpu)
-@@ -525,7 +550,7 @@ int kvm_arch_vcpu_ioctl_run(struct kvm_vcpu *vcpu, struct kvm_run *run)
- 
- 		update_vttbr(vcpu->kvm);
- 
--		if (vcpu->arch.power_off)
-+		if (vcpu->arch.power_off || vcpu->arch.pause)
- 			vcpu_pause(vcpu);
- 
- 		/*
-@@ -551,7 +576,8 @@ int kvm_arch_vcpu_ioctl_run(struct kvm_vcpu *vcpu, struct kvm_run *run)
- 			run->exit_reason = KVM_EXIT_INTR;
- 		}
- 
--		if (ret <= 0 || need_new_vmid_gen(vcpu->kvm)) {
-+		if (ret <= 0 || need_new_vmid_gen(vcpu->kvm) ||
-+		    vcpu->arch.pause) {
- 			local_irq_enable();
- 			preempt_enable();
- 			kvm_vgic_sync_hwstate(vcpu);
-diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
-index 009da6b..69e3785 100644
---- a/arch/arm64/include/asm/kvm_host.h
-+++ b/arch/arm64/include/asm/kvm_host.h
-@@ -125,6 +125,9 @@ struct kvm_vcpu_arch {
- 	/* vcpu power-off state */
- 	bool power_off;
- 
-+	/* Don't run the guest */
-+	bool pause;
++	mutex_lock(&lock);
 +
- 	/* IO related fields */
- 	struct kvm_decode mmio_decode;
++	list_for_each_entry(consumer, &consumers, node) {
++		if (consumer->token == producer->token) {
++			consumer->del_producer(producer);
++			break;
++		}
++	}
++
++	list_del(&producer->node);
++
++	mutex_unlock(&lock);
++}
++EXPORT_SYMBOL_GPL(irq_bypass_unregister_producer);
++
++int irq_bypass_register_consumer(struct irq_bypass_consumer *consumer)
++{
++	struct irq_bypass_consumer *tmp;
++	struct irq_bypass_producer *producer;
++	int ret = 0;
++
++	mutex_lock(&lock);
++
++	list_for_each_entry(tmp, &consumers, node) {
++		if (tmp->token == consumer->token) {
++			ret = -EINVAL;
++			goto unlock;
++		}
++	}
++
++	list_add(&consumer->node, &consumers);
++
++	list_for_each_entry(producer, &producers, node) {
++		if (producer->token == consumer->token) {
++			consumer->add_producer(producer);
++			break;
++		}
++	}
++unlock:
++	mutex_unlock(&lock);
++	return ret;
++}
++EXPORT_SYMBOL_GPL(irq_bypass_register_consumer);
++
++void irq_bypass_unregister_consumer(struct irq_bypass_consumer *consumer)
++{
++	struct irq_bypass_producer *producer;
++
++	mutex_lock(&lock);
++
++	list_for_each_entry(producer, &producers, node) {
++		if (producer->token == consumer->token) {
++			consumer->del_producer(producer);
++			break;
++		}
++	}
++
++	list_del(&consumer->node);
++
++	mutex_unlock(&lock);
++}
++EXPORT_SYMBOL_GPL(irq_bypass_unregister_consumer);
+diff --git a/virt/kvm/eventfd.c b/virt/kvm/eventfd.c
+index 9ff4193..f3da161 100644
+--- a/virt/kvm/eventfd.c
++++ b/virt/kvm/eventfd.c
+@@ -429,6 +429,8 @@ kvm_irqfd_assign(struct kvm *kvm, struct kvm_irqfd *args)
+ 	 */
+ 	fdput(f);
  
++	/* irq_bypass_register_consumer(); */
++
+ 	return 0;
+ 
+ fail:
+@@ -528,6 +530,8 @@ kvm_irqfd_deassign(struct kvm *kvm, struct kvm_irqfd *args)
+ 	struct _irqfd *irqfd, *tmp;
+ 	struct eventfd_ctx *eventfd;
+ 
++	/* irq_bypass_unregister_consumer() */
++
+ 	eventfd = eventfd_ctx_fdget(args->fd);
+ 	if (IS_ERR(eventfd))
+ 		return PTR_ERR(eventfd);
 -- 
 1.9.1
