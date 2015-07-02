@@ -1,40 +1,44 @@
-From: wnhuang@chromium.org (Wei-Ning Huang)
-Date: Thu,  2 Jul 2015 16:36:56 +0800
-Subject: [PATCH] rtc-mt6397: enable wakeup before registering rtc device
-Message-ID: <1435826216-11982-1-git-send-email-wnhuang@google.com>
+From: weigelt@melag.de (Enrico Weigelt, metux IT consult)
+Date: Thu, 2 Jul 2015 10:38:03 +0200
+Subject: [GIT PULL] remoteproc for 4.2
+In-Reply-To: <CAK=Wgba9Jst3xJ_EQf+zenZSqedzhvSw8ZVMZ_YmsQM70mMbPA@mail.gmail.com>
+References: <CAK=Wgba9Jst3xJ_EQf+zenZSqedzhvSw8ZVMZ_YmsQM70mMbPA@mail.gmail.com>
+Message-ID: <5594F86B.1040801@melag.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-rtc_sysfs_add_device checks if device can wakeup before creating the
-wakealarm file in sysfs. Thus the driver must set wakeup capability
-before registering the rtc device.
+Am 01.07.2015 um 16:14 schrieb Ohad Ben-Cohen:
+> The following changes since commit b787f68c36d49bb1d9236f403813641efa74a031:
+>
+>    Linux 4.1-rc1 (2015-04-26 17:59:10 -0700)
+>
+> are available in the git repository at:
+>
+>    git://git.kernel.org/pub/scm/linux/kernel/git/ohad/remoteproc.git
+> tags/remoteproc-4.2
+>
+> for you to fetch changes up to 8de3dbd0895bebe52d069a82feae8e3fb51c1bdf:
+>
+>    remoteproc: fix !CONFIG_OF build breakage (2015-06-18 11:44:41 +0300)
 
-Signed-off-by: Wei-Ning Huang <wnhuang@google.com>
----
- drivers/rtc/rtc-mt6397.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+Just curious: could this rproc framework also be used for more specific
+coprocessors like the VPUs found on various SoCs ? (eg. CODA on imx53)
 
-diff --git a/drivers/rtc/rtc-mt6397.c b/drivers/rtc/rtc-mt6397.c
-index c0090b6..eab230b 100644
---- a/drivers/rtc/rtc-mt6397.c
-+++ b/drivers/rtc/rtc-mt6397.c
-@@ -343,6 +343,8 @@ static int mtk_rtc_probe(struct platform_device *pdev)
- 		goto out_dispose_irq;
- 	}
- 
-+	device_init_wakeup(&pdev->dev, 1);
-+
- 	rtc->rtc_dev = rtc_device_register("mt6397-rtc", &pdev->dev,
- 					   &mtk_rtc_ops, THIS_MODULE);
- 	if (IS_ERR(rtc->rtc_dev)) {
-@@ -351,8 +353,6 @@ static int mtk_rtc_probe(struct platform_device *pdev)
- 		goto out_free_irq;
- 	}
- 
--	device_init_wakeup(&pdev->dev, 1);
--
- 	return 0;
- 
- out_free_irq:
--- 
-2.1.2
+
+--mtx
+
+
+--
+Enrico Weigelt, metux IT consult
++49-151-27565287
+--
+
+
+https://www.facebook.com/MELAG.Medizintechnik
+
+[http://www.melag.de/fbbanner.png]<https://www.facebook.com/MELAG.Medizintechnik>
+
+MELAG Medizintechnik oHG Sitz Berlin Registergericht AG Charlottenburg HRA 21333 B
+
+Wichtiger Hinweis: Diese Nachricht kann vertrauliche oder nur f?r einen begrenzten Personenkreis bestimmte Informationen enthalten. Sie ist ausschlie?lich f?r denjenigen bestimmt, an den sie gerichtet worden ist. Wenn Sie nicht der Adressat dieser E-Mail sind, d?rfen Sie diese nicht kopieren, weiterleiten, weitergeben oder sie ganz oder teilweise in irgendeiner Weise nutzen. Sollten Sie diese E-Mail irrt?mlich erhalten haben, so benachrichtigen Sie bitte den Absender, indem Sie auf diese Nachricht antworten. Bitte l?schen Sie in diesem Fall diese Nachricht und alle Anh?nge, ohne eine Kopie zu behalten.
+Important Notice: This message may contain confidential or privileged information. It is intended only for the person it was addressed to. If you are not the intended recipient of this email you may not copy, forward, disclose or otherwise use it or any part of it in any form whatsoever. If you received this email in error please notify the sender by replying and delete this message and any attachments without retaining a copy.
