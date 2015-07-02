@@ -1,84 +1,52 @@
-From: djkurtz@chromium.org (Daniel Kurtz)
-Date: Thu, 2 Jul 2015 12:26:45 +0800
-Subject: [PATCH v2 2/4] dt-bindings: ARM: Mediatek: Document devicetree
- bindings for clock controllers
-In-Reply-To: <1435805534.3526.23.camel@mtksdaap41>
-References: <1435633127-31952-1-git-send-email-jamesjj.liao@mediatek.com>
- <1435633127-31952-3-git-send-email-jamesjj.liao@mediatek.com>
- <CAGS+omD9Mvz0-RQMc5TsWCPct80S5fyqMn3+-zR7HB9yb7KoDQ@mail.gmail.com>
- <1435805534.3526.23.camel@mtksdaap41>
-Message-ID: <CAGS+omCgNstb+NPmRdbngnLm754hDPLO28KRc4RanCD2Myv7dQ@mail.gmail.com>
+From: jszhang@marvell.com (Jisheng Zhang)
+Date: Thu, 2 Jul 2015 12:58:49 +0800
+Subject: [PATCH v2] arm64: cpuidle: add __init section marker to
+ arm_cpuidle_init
+In-Reply-To: <CAJKOXPceoV2jk=Go+ZoJZbP1MXx-HDLJpCFK9mrR9JLRU4x8Bg@mail.gmail.com>
+References: <1435803288-1478-1-git-send-email-jszhang@marvell.com>
+ <CAJKOXPceoV2jk=Go+ZoJZbP1MXx-HDLJpCFK9mrR9JLRU4x8Bg@mail.gmail.com>
+Message-ID: <20150702125849.67160aa9@xhacker>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 2, 2015 at 10:52 AM, James Liao <jamesjj.liao@mediatek.com> wrote:
-> Hi Daniel,
->
->> > +Required Properties:
->> > +
->> > +- compatible: Should be:
->> > +       - "mediatek,mt8173-imgsys", "syscon"
->> > +- #clock-cells: Must be 1
->> > +
->> > +The imgsys controller uses the common clk binding from
->> > +Documentation/devicetree/bindings/clock/clock-bindings.txt
->> > +The available clocks are defined in dt-bindings/clock/mt*-clk.h.
->> > +
->> > +Example:
->> > +
->> > +imgsys: imgsys at 15000000 {
->>
->> Since these nodes will be supplying clocks to the rest of the system,
->> I think the "name" part of each of these should all be
->> "clock-controller", like topckgen and apmixedsys:
->>
->>   imgsys: clock-controller at 15000000 {
->
-> These subsystems (and topckgen also) also contains other functions such
-> as reset controller, which may be implemented in clk/mediatek/ in the
-> future. It is suitable to use "clock-controller" as their name?
+Dear Krzysztof,
 
-Hmm,
+On Thu, 2 Jul 2015 12:59:44 +0900
+Krzysztof Kozlowski <k.kozlowski@samsung.com> wrote:
 
-I don't know the "right way" to do this either.
-Pardon me if you've already had these discussions.
-I only recently started looking at these clock nodes in detail :-).
+> 2015-07-02 11:14 GMT+09:00 Jisheng Zhang <jszhang@marvell.com>:
+> > It is not needed after booting, this patch moves the arm_cpuidle_init()
+> > function to the __init section.
+> >
+> > Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
+> > ---
+> >  arch/arm64/include/asm/cpuidle.h | 2 +-
+> >  arch/arm64/kernel/cpuidle.c      | 2 +-
+> >  2 files changed, 2 insertions(+), 2 deletions(-)
+> >
+> > diff --git a/arch/arm64/include/asm/cpuidle.h b/arch/arm64/include/asm/cpuidle.h
+> > index 0f74f05..5748d3b 100644
+> > --- a/arch/arm64/include/asm/cpuidle.h
+> > +++ b/arch/arm64/include/asm/cpuidle.h
+> > @@ -4,7 +4,7 @@
+> >  #include <asm/proc-fns.h>
+> >
+> >  #ifdef CONFIG_CPU_IDLE
+> > -extern int arm_cpuidle_init(unsigned int cpu);
+> > +extern int __init arm_cpuidle_init(unsigned int cpu);
+> 
+> No, not here but...
+> 
+> >  extern int arm_cpuidle_suspend(int index);
+> >  #else
+> >  static inline int arm_cpuidle_init(unsigned int cpu)
+> 
+> ... here so the stub for !CONFIG_CPU_IDLE would be marked as well.
 
-I think what we really have in register space is a "syscon", as
-described in [0]:
-[0] Documentation/devicetree/bindings/mfd/syscon.txt
+when !CONFIG_CPU_IDLE, arm_cpuidle_init() is inlined, and just return -EOPNOTSUPP;
+Per my understanding, it will be optimized out by compiler. I'm not sure whether
+there is any benefit to mark inlined function as __init. But Per my check, all
+other inlined functions in linux kernel have no __init. What do you think?
 
-So, we can define this block of registers as a syscon:
-
-mmsys_syscon: syscon at 14000000 {
-       compatible = "mediatek,mt8173-mmsys", "syscon";
-       reg = <0 0x14000000 0 0x1000>;
-};
-
-
-Then for the clock controller functionality, we create a node with a
-"clock-controller" name and a "-clock" compatible, like this:
-
-mmsys_clock: clock-controller {
-       compatible = "mediatek,mt8173-mmsys-clock";
-       #clock-cells = <1>;
-       mediatek,syscon = <&mmsys_syscon>;
-};
-
-You could then do:
-CLK_OF_DECLARE(mtk_mmsys, "mediatek,mt8173-mmsys-clock", mtk_mmsys_init);
-
-
-If you want to reuse the same register range for some other
-functionality, we could then use a different node, with a different
-compatible:
-
-mmsys: reset-controller {
-       compatible = "mediatek,mt8173-mmsys-reset";
-       mediatek,syscon = <&mmsys_syscon>;
-};
-
-What do you think of this approach?
-
-Thanks!
--Dan
+Thanks,
+Jisheng
