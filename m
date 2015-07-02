@@ -1,56 +1,58 @@
-From: eric.auger@linaro.org (Eric Auger)
-Date: Thu,  2 Jul 2015 15:17:11 +0200
-Subject: [RFC 01/17] VFIO: platform: test forwarded state when selecting IRQ
- handler
-In-Reply-To: <1435843047-6327-1-git-send-email-eric.auger@linaro.org>
-References: <1435843047-6327-1-git-send-email-eric.auger@linaro.org>
-Message-ID: <1435843047-6327-2-git-send-email-eric.auger@linaro.org>
+From: cyrille.pitchen@atmel.com (Cyrille Pitchen)
+Date: Thu, 2 Jul 2015 15:18:09 +0200
+Subject: [PATCH v4 1/5] ARM: at91/dt: add a new DT property to support FIFOs
+ on Atmel USARTs
+In-Reply-To: <cover.1435842688.git.cyrille.pitchen@atmel.com>
+References: <cover.1435842688.git.cyrille.pitchen@atmel.com>
+Message-ID: <600fa97640902a0a222901db18305749f57984e5.1435842688.git.cyrille.pitchen@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In case the IRQ is forwarded, the VFIO platform IRQ handler does not
-need to disable the IRQ anymore.
+This patch adds a new DT property, "atmel,fifo-size", to enable and set
+the maximum number of data the RX and TX FIFOs can store on FIFO capable
+USARTs.
 
-When setting the IRQ handler we now also test the forwarded state. In
-case the IRQ is forwarded we select the vfio_irq_handler.
+Please be aware that the VERSION register can not be used to guess the
+size of FIFOs. Indeed, for a given hardware version, the USARTs can be
+integrated on Atmel SoCs with different FIFO sizes. Also the
+"atmel,fifo-size" property is optional as older USARTs don't embed FIFO at
+all.
 
-Signed-off-by: Eric Auger <eric.auger@linaro.org>
+Besides, the FIFO size can not be read or guessed from other registers:
+When designing the FIFO feature, no dedicated registers were added to
+store this size. Unsed spaces in the I/O register range are limited and
+better reserved for future usages. Instead, the FIFO size of each
+peripheral is documented in the programmer datasheet.
 
+Finally, on a given SoC, there can be several instances of USART with
+different FIFO sizes. This explain why we'd rather use a dedicated DT
+property than use the "compatible" property.
+
+Signed-off-by: Cyrille Pitchen <cyrille.pitchen@atmel.com>
+Acked-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
 ---
+ Documentation/devicetree/bindings/serial/atmel-usart.txt | 3 +++
+ 1 file changed, 3 insertions(+)
 
-v3 -> v4:
-- change title
-
-v2 -> v3:
-- forwarded state was tested in the handler. Now the forwarded state
-  is tested before setting the handler. This definitively limits
-  the dynamics of forwarded state changes but I don't think there is
-  a use case where we need to be able to change the state at any time.
-
-Conflicts:
-	drivers/vfio/platform/vfio_platform_irq.c
----
- drivers/vfio/platform/vfio_platform_irq.c | 7 ++++++-
- 1 file changed, 6 insertions(+), 1 deletion(-)
-
-diff --git a/drivers/vfio/platform/vfio_platform_irq.c b/drivers/vfio/platform/vfio_platform_irq.c
-index 88bba57..132bb3f 100644
---- a/drivers/vfio/platform/vfio_platform_irq.c
-+++ b/drivers/vfio/platform/vfio_platform_irq.c
-@@ -229,8 +229,13 @@ static int vfio_platform_set_irq_trigger(struct vfio_platform_device *vdev,
- {
- 	struct vfio_platform_irq *irq = &vdev->irqs[index];
- 	irq_handler_t handler;
-+	struct irq_data *d;
-+	bool is_forwarded;
+diff --git a/Documentation/devicetree/bindings/serial/atmel-usart.txt b/Documentation/devicetree/bindings/serial/atmel-usart.txt
+index 90787aa2e648..e6e6142e33ac 100644
+--- a/Documentation/devicetree/bindings/serial/atmel-usart.txt
++++ b/Documentation/devicetree/bindings/serial/atmel-usart.txt
+@@ -22,6 +22,8 @@ Optional properties:
+ 		memory peripheral interface and USART DMA channel ID, FIFO configuration.
+ 		Refer to dma.txt and atmel-dma.txt for details.
+ 	- dma-names: "rx" for RX channel, "tx" for TX channel.
++- atmel,fifo-size: maximum number of data the RX and TX FIFOs can store for FIFO
++  capable USARTs.
  
--	if (vdev->irqs[index].flags & VFIO_IRQ_INFO_AUTOMASKED)
-+	d = irq_get_irq_data(irq->hwirq);
-+	is_forwarded = irqd_irq_forwarded(d);
-+
-+	if (vdev->irqs[index].flags & VFIO_IRQ_INFO_AUTOMASKED && !is_forwarded)
- 		handler = vfio_automasked_irq_handler;
- 	else
- 		handler = vfio_irq_handler;
+ <chip> compatible description:
+ - at91rm9200:  legacy USART support
+@@ -57,4 +59,5 @@ Example:
+ 		dmas = <&dma0 2 0x3>,
+ 		       <&dma0 2 0x204>;
+ 		dma-names = "tx", "rx";
++		atmel,fifo-size = <32>;
+ 	};
 -- 
-1.9.1
+1.8.2.2
