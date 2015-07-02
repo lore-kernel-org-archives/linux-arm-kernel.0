@@ -1,188 +1,154 @@
-From: m.smarduch@samsung.com (Mario Smarduch)
-Date: Thu, 02 Jul 2015 14:51:57 -0700
-Subject: [PATCH v3 1/2] arm64: KVM: Optimize arm64 skip 30-50% vfp/simd
- save/restore on exits
-In-Reply-To: <20150701134649.GG11332@cbox>
-References: <1435190652-5831-1-git-send-email-m.smarduch@samsung.com>
- <1435190652-5831-2-git-send-email-m.smarduch@samsung.com>
- <20150701134649.GG11332@cbox>
-Message-ID: <5595B27D.90201@samsung.com>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Thu, 2 Jul 2015 14:52:03 -0700
+Subject: [PATCH v2 5/9] clk: rockchip: add support for phase inverters
+In-Reply-To: <1434637116-17124-6-git-send-email-heiko@sntech.de>
+References: <1434637116-17124-1-git-send-email-heiko@sntech.de>
+ <1434637116-17124-6-git-send-email-heiko@sntech.de>
+Message-ID: <20150702215203.GI4301@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/01/2015 06:46 AM, Christoffer Dall wrote:
-> On Wed, Jun 24, 2015 at 05:04:11PM -0700, Mario Smarduch wrote:
->> This patch only saves and restores FP/SIMD registers on Guest access. To do
->> this cptr_el2 FP/SIMD trap is set on Guest entry and later checked on exit.
->> lmbench, hackbench show significant improvements, for 30-50% exits FP/SIMD
->> context is not saved/restored
->>
->> Signed-off-by: Mario Smarduch <m.smarduch@samsung.com>
->> ---
->>  arch/arm64/include/asm/kvm_arm.h |    5 ++++-
->>  arch/arm64/kvm/hyp.S             |   46 +++++++++++++++++++++++++++++++++++---
->>  2 files changed, 47 insertions(+), 4 deletions(-)
->>
->> diff --git a/arch/arm64/include/asm/kvm_arm.h b/arch/arm64/include/asm/kvm_arm.h
->> index ac6fafb..7605e09 100644
->> --- a/arch/arm64/include/asm/kvm_arm.h
->> +++ b/arch/arm64/include/asm/kvm_arm.h
->> @@ -171,10 +171,13 @@
->>  #define HSTR_EL2_TTEE	(1 << 16)
->>  #define HSTR_EL2_T(x)	(1 << x)
->>  
->> +/* Hyp Coproccessor Trap Register Shifts */
->> +#define CPTR_EL2_TFP_SHIFT 10
->> +
->>  /* Hyp Coprocessor Trap Register */
->>  #define CPTR_EL2_TCPAC	(1 << 31)
->>  #define CPTR_EL2_TTA	(1 << 20)
->> -#define CPTR_EL2_TFP	(1 << 10)
->> +#define CPTR_EL2_TFP	(1 << CPTR_EL2_TFP_SHIFT)
->>  
->>  /* Hyp Debug Configuration Register bits */
->>  #define MDCR_EL2_TDRA		(1 << 11)
->> diff --git a/arch/arm64/kvm/hyp.S b/arch/arm64/kvm/hyp.S
->> index 5befd01..de0788f 100644
->> --- a/arch/arm64/kvm/hyp.S
->> +++ b/arch/arm64/kvm/hyp.S
->> @@ -673,6 +673,15 @@
->>  	tbz	\tmp, #KVM_ARM64_DEBUG_DIRTY_SHIFT, \target
->>  .endm
->>  
->> +/*
->> + * Check cptr VFP/SIMD accessed bit, if set VFP/SIMD not accessed by guest.
-> 
-> This comment doesn't really help me understand the function, may I
-> suggest:
-> 
-> Branch to target if CPTR_EL2.TFP bit is set (VFP/SIMD trapping enabled)
+On 06/18, Heiko Stuebner wrote:
+> Most Rockchip socs have optional phase inverters connected to some
+> clocks that move the clock-phase by 180 degrees.
+> While not having any actual influence on the rate, the inverter
+> provides its own simple recalc_rate callback as relying on the
+> fallback in the framework is for "lazy developers" according
 
-Yes actually describes what it does.
+I don't have a problem with being lazy. We should update the
+documentation to encourage less code by omitting recalc_rate if
+possible instead.
 
-> 
->> + */
->> +.macro skip_fpsimd_state tmp, target
->> +	mrs	\tmp, cptr_el2
->> +	tbnz	\tmp, #CPTR_EL2_TFP_SHIFT, \target
->> +.endm
->> +
->> +
->>  .macro compute_debug_state target
->>  	// Compute debug state: If any of KDE, MDE or KVM_ARM64_DEBUG_DIRTY
->>  	// is set, we do a full save/restore cycle and disable trapping.
->> @@ -763,6 +772,7 @@
->>  	ldr     x2, [x0, #VCPU_HCR_EL2]
->>  	msr     hcr_el2, x2
->>  	mov	x2, #CPTR_EL2_TTA
->> +	orr     x2, x2, #CPTR_EL2_TFP
->>  	msr	cptr_el2, x2
->>  
->>  	mov	x2, #(1 << 15)	// Trap CP15 Cr=15
->> @@ -785,7 +795,6 @@
->>  .macro deactivate_traps
->>  	mov	x2, #HCR_RW
->>  	msr	hcr_el2, x2
->> -	msr	cptr_el2, xzr
->>  	msr	hstr_el2, xzr
->>  
->>  	mrs	x2, mdcr_el2
->> @@ -912,6 +921,28 @@ __restore_fpsimd:
->>  	restore_fpsimd
->>  	ret
->>  
->> +switch_to_guest_fpsimd:
->> +	push	x4, lr
->> +
->> +	mrs	x2, cptr_el2
->> +	bic	x2, x2, #CPTR_EL2_TFP
->> +	msr	cptr_el2, x2
->> +
->> +	mrs	x0, tpidr_el2
->> +
->> +	ldr	x2, [x0, #VCPU_HOST_CONTEXT]
->> +	kern_hyp_va x2
->> +	bl __save_fpsimd
->> +
->> +	add	x2, x0, #VCPU_CONTEXT
->> +	bl __restore_fpsimd
->> +
->> +	pop	x4, lr
->> +	pop	x2, x3
->> +	pop	x0, x1
->> +
->> +	eret
->> +
->>  /*
->>   * u64 __kvm_vcpu_run(struct kvm_vcpu *vcpu);
->>   *
->> @@ -932,7 +963,6 @@ ENTRY(__kvm_vcpu_run)
->>  	kern_hyp_va x2
->>  
->>  	save_host_regs
->> -	bl __save_fpsimd
->>  	bl __save_sysregs
->>  
->>  	compute_debug_state 1f
->> @@ -948,7 +978,6 @@ ENTRY(__kvm_vcpu_run)
->>  	add	x2, x0, #VCPU_CONTEXT
->>  
->>  	bl __restore_sysregs
->> -	bl __restore_fpsimd
->>  
->>  	skip_debug_state x3, 1f
->>  	bl	__restore_debug
->> @@ -967,7 +996,9 @@ __kvm_vcpu_return:
->>  	add	x2, x0, #VCPU_CONTEXT
->>  
->>  	save_guest_regs
->> +	skip_fpsimd_state x3, 1f
->>  	bl __save_fpsimd
->> +1:
->>  	bl __save_sysregs
->>  
->>  	skip_debug_state x3, 1f
->> @@ -986,7 +1017,11 @@ __kvm_vcpu_return:
->>  	kern_hyp_va x2
->>  
->>  	bl __restore_sysregs
->> +	skip_fpsimd_state x3, 1f
->>  	bl __restore_fpsimd
->> +1:
->> +	/* Clear FPSIMD and Trace trapping */
->> +	msr     cptr_el2, xzr
-> 
-> why not simply move the deactivate_traps down here instead?
+> diff --git a/drivers/clk/rockchip/clk-inverter.c b/drivers/clk/rockchip/clk-inverter.c
+> new file mode 100644
+> index 0000000..db852cd
+> --- /dev/null
+> +++ b/drivers/clk/rockchip/clk-inverter.c
+> @@ -0,0 +1,126 @@
+> +/*
+> + * Copyright 2015 Heiko Stuebner <heiko@sntech.de>
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License as published by
+> + * the Free Software Foundation; either version 2 of the License, or
+> + * (at your option) any later version.
+> + *
+> + * This program is distributed in the hope that it will be useful,
+> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + * GNU General Public License for more details.
+> + */
+> +
+> +#include <linux/slab.h>
+> +#include <linux/clk-provider.h>
 
-Putting deactivate_traps there  trashes x2, setup earlier
-to restore debug, host registers from host context
+#include <linux/io.h> ?
+#include <linux/spinlock.h> ?
+#include <linux/kernel.h> ? // for container_of
 
-Do we want deactivate_traps to use another register and
-move the macro there? Or leave as is?
+> +#include "clk.h"
+> +
+> +struct rockchip_inv_clock {
+> +	struct clk_hw	hw;
+> +	void __iomem	*reg;
+> +	int		shift;
+> +	int		flags;
+> +	spinlock_t	*lock;
+> +};
+> +
+> +#define to_inv_clock(_hw) container_of(_hw, struct rockchip_inv_clock, hw)
+> +
+> +#define INVERTER_MASK 0x1
+> +
+> +static unsigned long rockchip_inv_recalc(struct clk_hw *hw,
+> +					 unsigned long parent_rate)
+> +{
+> +	return parent_rate;
+> +}
+> +
+> +static int rockchip_inv_get_phase(struct clk_hw *hw)
+> +{
+> +	struct rockchip_inv_clock *inv_clock = to_inv_clock(hw);
+> +	u32 val;
+> +
+> +	val = readl(inv_clock->reg) >> (inv_clock->shift) & INVERTER_MASK;
 
-- Mario
+What's the parentheses for? Is it supposed to be around the
+readl() and the shift?
 
+> +	return val ? 180 : 0;
+> +}
+> +
+> +static int rockchip_inv_set_phase(struct clk_hw *hw, int degrees)
+> +{
 
-> 
->>  
->>  	skip_debug_state x3, 1f
->>  	// Clear the dirty flag for the next run, as all the state has
->> @@ -1201,6 +1236,11 @@ el1_trap:
->>  	 * x1: ESR
->>  	 * x2: ESR_EC
->>  	 */
->> +
->> +	/* Guest accessed VFP/SIMD registers, save host, restore Guest */
->> +	cmp	x2, #ESR_ELx_EC_FP_ASIMD
->> +	b.eq	switch_to_guest_fpsimd
->> +
->>  	cmp	x2, #ESR_ELx_EC_DABT_LOW
->>  	mov	x0, #ESR_ELx_EC_IABT_LOW
->>  	ccmp	x2, x0, #4, ne
->> -- 
->> 1.7.9.5
->>
-> 
-> Otherwise looks good,
-> -Christoffer
-> 
+I'm not too familiar with phase api, but the range of degrees
+would be 0 to 360.
+
+> +	struct rockchip_inv_clock *inv_clock = to_inv_clock(hw);
+> +	u32 val;
+> +
+> +	switch (degrees) {
+> +	case 0:
+> +		val = 0;
+> +		break;
+> +	case 180:
+> +		val = 1;
+> +		break;
+> +	default:
+> +		pr_err("%s: unsupported phase %d for %s\n",
+> +		       __func__, degrees, __clk_get_name(hw->clk));
+> +		return -EINVAL;
+> +	}
+
+So this could be
+
+	if (degrees % 180 == 0) {
+		val = !!degrees;
+	} else {
+		pr_err("%s: unsupported phase %d for %s\n",
+		       __func__, degrees, __clk_get_name(hw->clk));
+		return -EINVAL;
+	}
+
+and save some lines?
+
+> +
+> +static const struct clk_ops rockchip_inv_clk_ops = {
+> +	.recalc_rate	= rockchip_inv_recalc,
+> +	.get_phase	= rockchip_inv_get_phase,
+> +	.set_phase	= rockchip_inv_set_phase,
+> +};
+> +
+> +struct clk *rockchip_clk_register_inverter(const char *name,
+> +				const char *const *parent_names, u8 num_parents,
+> +				void __iomem *reg, int shift, int flags,
+> +				spinlock_t *lock)
+> +{
+> +	struct clk_init_data init;
+> +	struct rockchip_inv_clock *inv_clock;
+> +	struct clk *clk;
+> +
+> +	inv_clock = kmalloc(sizeof(*inv_clock), GFP_KERNEL);
+> +	if (!inv_clock)
+> +		return NULL;
+> +
+> +	init.num_parents = num_parents;
+> +	init.flags = CLK_SET_RATE_PARENT;
+> +	init.parent_names = parent_names;
+> +	init.ops = &rockchip_inv_clk_ops;
+> +
+> +	inv_clock->hw.init = &init;
+> +	inv_clock->reg = reg;
+> +	inv_clock->shift = shift;
+> +	inv_clock->flags = flags;
+> +	inv_clock->lock = lock;
+> +
+> +	if (name)
+> +		init.name = name;
+
+And if name is NULL? init.name is junk?
+
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
