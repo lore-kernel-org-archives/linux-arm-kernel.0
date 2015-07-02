@@ -1,48 +1,76 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Thu, 2 Jul 2015 09:42:43 +0200
-Subject: [RFC PATCH 00/15] pwm: add support for atomic update
-In-Reply-To: <5594E56C.3010908@ti.com>
+From: boris.brezillon@free-electrons.com (Boris Brezillon)
+Date: Thu, 2 Jul 2015 09:43:19 +0200
+Subject: [RFC PATCH 13/15] pwm: rockchip: add support for atomic update
+In-Reply-To: <1709826.dVqTms8REP@diego>
 References: <1435738921-25027-1-git-send-email-boris.brezillon@free-electrons.com>
- <20150702070343.GD11824@pengutronix.de> <5594E56C.3010908@ti.com>
-Message-ID: <20150702074243.GE11824@pengutronix.de>
+ <1435738921-25027-14-git-send-email-boris.brezillon@free-electrons.com>
+ <1709826.dVqTms8REP@diego>
+Message-ID: <20150702094319.11794da8@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 02, 2015 at 10:17:00AM +0300, Tomi Valkeinen wrote:
+Hi Heiko,
+
+On Wed, 01 Jul 2015 23:48:31 +0200
+Heiko St?bner <heiko@sntech.de> wrote:
+
+> Hi Boris,
 > 
 > 
-> On 02/07/15 10:03, Uwe Kleine-K?nig wrote:
-> > Hello Boris,
+> Am Mittwoch, 1. Juli 2015, 10:21:59 schrieb Boris Brezillon:
+> > Implement the ->apply() function to add support for atomic update.
 > > 
-> > On Wed, Jul 01, 2015 at 10:21:46AM +0200, Boris Brezillon wrote:
-> >> This series adds support for atomic PWM update, or ITO, the capability
-> >> to update all the parameters of a PWM device (enabled/disabled, period,
-> >> duty and polarity) in one go.
-> > on first reading the subject of your series I thought it was about
-> > asserting that the newly set config is active before the call to
-> > pwm_config (et al) returns. That's a problem I addressed a few times in
-> > the past. I wonder if it's only me or if a different wording should be
-> > used for "update all parameters with a single function call".
+> > Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+> > ---
+> > @@ -110,6 +113,26 @@ static void rockchip_pwm_set_enable_v2(struct pwm_chip
+> > *chip, writel_relaxed(val, pc->base + pc->data->regs.ctrl);
+> >  }
+> > 
+> > +static void rockchip_pwm_init_v2(struct pwm_chip *chip, struct pwm_device
+> > *pwm) +{
+> > +	struct rockchip_pwm_chip *pc = to_rockchip_pwm_chip(chip);
+> > +	u32 enable_conf = PWM_OUTPUT_LEFT | PWM_LP_DISABLE | PWM_ENABLE |
+> > +			  PWM_CONTINUOUS;
+> > +	u32 val;
+> > +
+> > +	val = readl(pc->base + pc->data->regs.ctrl);
+> > +
+> > +	if ((val & enable_conf) != enable_conf)
+> > +		return;
+> > +
+> > +	pwm->state.enabled = true;
+> > +
+> > +	enable_conf = PWM_DUTY_NEGATIVE | PWM_INACTIVE_POSITIVE;
+> > +
+> > +	if ((val & enable_conf) == enable_conf)
+> > +		pwm->state.polarity = PWM_POLARITY_INVERSED;
 > 
-> In my vocabulary "blocking" means that the work is done before the
-> function returns, and "atomic" means the work is done in one step.
-blocking is IMHO something slightly different, maybe "synchronous" is a
-good term for "done when the call returns".
+> the inactive setting does not affect the polarity of the running pwm, only what 
+> to do when it gets turned off. Also PWM_DUTY_NEGATIVE is the "0" value for the 
+> bit so also is bad to compare against (and results in wrong readings). So I 
+> would suggest changing this like
 
-For write(2) I'd say
- - blocking means to only return when the write request has reached the
-   kernel, but not necessarily the medium. I.e. the caller doesn't need
-   to care further; and
- - atomic means that the contents of two concurrent writers don't mix in
-   the resulting file content; and
- - synchronous means that once write() returns the data is on the
-   medium.
+Indeed
 
-So atomic seems to be fine to use here.
+> 
+> -       enable_conf = PWM_DUTY_NEGATIVE | PWM_INACTIVE_POSITIVE;
+> +       enable_conf = PWM_DUTY_POSITIVE;
+>  
+> -       if ((val & enable_conf) == enable_conf)
+> +       if ((val & enable_conf) != enable_conf)
 
-Best regards
-Uwe
+Or just:
+
+	if(val & PWM_DUTY_POSITIVE)
+
+
+Thanks for the fix.
+
+Best Regards,
+
+Boris
 
 -- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Boris Brezillon, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
