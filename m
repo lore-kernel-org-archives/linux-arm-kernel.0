@@ -1,44 +1,33 @@
-From: weigelt@melag.de (Enrico Weigelt, metux IT consult)
-Date: Thu, 2 Jul 2015 10:38:03 +0200
-Subject: [GIT PULL] remoteproc for 4.2
-In-Reply-To: <CAK=Wgba9Jst3xJ_EQf+zenZSqedzhvSw8ZVMZ_YmsQM70mMbPA@mail.gmail.com>
-References: <CAK=Wgba9Jst3xJ_EQf+zenZSqedzhvSw8ZVMZ_YmsQM70mMbPA@mail.gmail.com>
-Message-ID: <5594F86B.1040801@melag.de>
+From: p.fedin@samsung.com (Pavel Fedin)
+Date: Thu, 02 Jul 2015 11:41:07 +0300
+Subject: [PATCH 1/7] KVM: api: add kvm_irq_routing_extended_msi
+In-Reply-To: <011f01d0b498$6a17aeb0$3e470c10$@samsung.com>
+References: <1435592237-17924-1-git-send-email-eric.auger@linaro.org>
+ <1435592237-17924-2-git-send-email-eric.auger@linaro.org>
+ <011f01d0b498$6a17aeb0$3e470c10$@samsung.com>
+Message-ID: <018f01d0b4a2$d74e29f0$85ea7dd0$@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am 01.07.2015 um 16:14 schrieb Ohad Ben-Cohen:
-> The following changes since commit b787f68c36d49bb1d9236f403813641efa74a031:
->
->    Linux 4.1-rc1 (2015-04-26 17:59:10 -0700)
->
-> are available in the git repository at:
->
->    git://git.kernel.org/pub/scm/linux/kernel/git/ohad/remoteproc.git
-> tags/remoteproc-4.2
->
-> for you to fetch changes up to 8de3dbd0895bebe52d069a82feae8e3fb51c1bdf:
->
->    remoteproc: fix !CONFIG_OF build breakage (2015-06-18 11:44:41 +0300)
+ Hello!
 
-Just curious: could this rproc framework also be used for more specific
-coprocessors like the VPUs found on various SoCs ? (eg. CODA on imx53)
+> What if we use KVM_MSI_VALID_DEVID flag instead of new KVM_IRQ_ROUTING_EXTENDED_MSI
+> definition? I
+> believe this would make an API more consistent and introduce less new definitions.
 
+ I have just found one more flaw in your implementation. If you take a look at irqfd_wakeup()...
+--- cut ---
+		/* An event has been signaled, inject an interrupt */
+		if (irq.type == KVM_IRQ_ROUTING_MSI)
+			kvm_set_msi(&irq, kvm, KVM_USERSPACE_IRQ_SOURCE_ID, 1,
+					false);
+		else
+			schedule_work(&irqfd->inject);
+--- cut ---
+ You apparently missed KVM_IRQ_ROUTING_EXTENDED_MSI here, as well as in irqfd_update(). But, if you
+accept my API proposal, this becomes irrelevant.
 
---mtx
-
-
---
-Enrico Weigelt, metux IT consult
-+49-151-27565287
---
-
-
-https://www.facebook.com/MELAG.Medizintechnik
-
-[http://www.melag.de/fbbanner.png]<https://www.facebook.com/MELAG.Medizintechnik>
-
-MELAG Medizintechnik oHG Sitz Berlin Registergericht AG Charlottenburg HRA 21333 B
-
-Wichtiger Hinweis: Diese Nachricht kann vertrauliche oder nur f?r einen begrenzten Personenkreis bestimmte Informationen enthalten. Sie ist ausschlie?lich f?r denjenigen bestimmt, an den sie gerichtet worden ist. Wenn Sie nicht der Adressat dieser E-Mail sind, d?rfen Sie diese nicht kopieren, weiterleiten, weitergeben oder sie ganz oder teilweise in irgendeiner Weise nutzen. Sollten Sie diese E-Mail irrt?mlich erhalten haben, so benachrichtigen Sie bitte den Absender, indem Sie auf diese Nachricht antworten. Bitte l?schen Sie in diesem Fall diese Nachricht und alle Anh?nge, ohne eine Kopie zu behalten.
-Important Notice: This message may contain confidential or privileged information. It is intended only for the person it was addressed to. If you are not the intended recipient of this email you may not copy, forward, disclose or otherwise use it or any part of it in any form whatsoever. If you received this email in error please notify the sender by replying and delete this message and any attachments without retaining a copy.
+Kind regards,
+Pavel Fedin
+Expert Engineer
+Samsung Electronics Research center Russia
