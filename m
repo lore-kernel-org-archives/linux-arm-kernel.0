@@ -1,44 +1,49 @@
-From: jamesjj.liao@mediatek.com (James Liao)
-Date: Thu, 2 Jul 2015 10:18:09 +0800
-Subject: [PATCH v2 1/4] clk: mediatek: mt8173: Fix enabling of critical
- clocks
-In-Reply-To: <CAGS+omDqSEn_WnUYz0XmeRpejhthb0J_qa4H9VEfihtA0Axorg@mail.gmail.com>
-References: <1435633127-31952-1-git-send-email-jamesjj.liao@mediatek.com>
- <1435633127-31952-2-git-send-email-jamesjj.liao@mediatek.com>
- <CAGS+omDqSEn_WnUYz0XmeRpejhthb0J_qa4H9VEfihtA0Axorg@mail.gmail.com>
-Message-ID: <1435803489.3526.18.camel@mtksdaap41>
+From: punnaiah.choudary.kalluri@xilinx.com (Punnaiah Choudary Kalluri)
+Date: Thu, 2 Jul 2015 02:33:14 +0000
+Subject: macb: zynq: why is SG disabled?
+In-Reply-To: <55941D80.2090904@atmel.com>
+References: <559403E3.3050900@certsign.ro> <55941D80.2090904@atmel.com>
+Message-ID: <03CA77BA8AF6F1469AEDFBDA1322A7B7495B9EE3@XAP-PVEXMBX02.xlnx.xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Daniel,
+Hi Nicolae and Cyrille,
 
-On Wed, 2015-07-01 at 22:21 +0800, Daniel Kurtz wrote:
-> To be precise, it is the CLK_TOP clocks that have CLK_APMIXED PLLs as
-> their parents, so we cannot enable the CLK_TOP critical clocks until
-> the CLK_APMIXED clocks have all been registered.
+   SG feature was not tested for Zynq using macb driver but tested it using the
+ emacps Driver in Xilinx tree (this driver is deprecated recently)
+
+We will test and enable this feature in driver for Zynq.
+
+Regards,
+Punnaiah
+
+> -----Original Message-----
+> From: Cyrille Pitchen [mailto:cyrille.pitchen at atmel.com]
+> Sent: Wednesday, July 01, 2015 10:34 PM
+> To: Nicolae Rosia; Michal Simek; Punnaiah Choudary Kalluri;
+> netdev at vger.kernel.org; Nicolas Ferre; linux-arm-kernel at lists.infradead.org
+> Subject: Re: macb: zynq: why is SG disabled?
 > 
-> Please add something like the above to the commit message.
-
-OK. I'll add them.
-
-> 
+> Le 01/07/2015 17:14, Nicolae Rosia a ?crit :
+> > Hello,
 > >
-> > +static struct clk_onecell_data *mt8173_top_clk_data;
-> > +static struct clk_onecell_data *mt8173_pll_clk_data;
+> > After reading the GEM part of Zynq7000 Technical Reference Manual [0], I
+> think that SG should be supported.
+> > Is there a reason why SG is disabled in macb for Zynq?
+> >
+> > Best regards,
+> > Nicolae Rosia
 > 
-> These globals can be:
-> __initdata
+> Hi Nicolae,
 > 
-> > +
-> > +static void mtk_clk_enable_critical(void)
+> when the scatter-gather patch was introduced, the feature was enabled only
+> on tested boards to avoid regressions on other boards.
+> So SG is enabled on sama5d4x and sama5d2x SoCs. SG is disabled on purpose
+> on sama5d3x.
 > 
-> And this function is:
+> For Zynq, I think the feature is still disabled just because it has never been
+> tested.
 > 
-> static void __init
-
-I'll add them in next patch.
-
-
-Best regards,
-
-James
+> Best regards,
+> 
+> Cyrille
