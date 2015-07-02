@@ -1,60 +1,96 @@
-From: tharvey@gateworks.com (Tim Harvey)
-Date: Thu, 2 Jul 2015 09:49:20 -0700
-Subject: [PATCH v2 1/2] watchdog: imx2_wdt: add external reset support via
- 'ext-reset-output' dt prop
-In-Reply-To: <20150629011737.GG10332@tiger>
-References: <1432853677-5150-1-git-send-email-tharvey@gateworks.com>
- <1433448960-9257-1-git-send-email-tharvey@gateworks.com>
- <1433448960-9257-2-git-send-email-tharvey@gateworks.com>
- <20150629011737.GG10332@tiger>
-Message-ID: <CAJ+vNU3me-qBZT7h1e+54UNRJw-2SH=nofnTRM4GEn0j9jh3ig@mail.gmail.com>
+From: vaibhav.hiremath@linaro.org (Vaibhav Hiremath)
+Date: Thu, 02 Jul 2015 22:24:51 +0530
+Subject: [PATCH-V2 00/12] i2c: pxa: Fixes, cleanup and support for pxa910
+ family
+In-Reply-To: <55910741.9020106@linaro.org>
+References: <vaibhav.hiremath@linaro.org>
+ <1434383399-2370-1-git-send-email-vaibhav.hiremath@linaro.org>
+ <55910741.9020106@linaro.org>
+Message-ID: <55956CDB.90309@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jun 28, 2015 at 6:17 PM, Shawn Guo <shawnguo@kernel.org> wrote:
-> On Thu, Jun 04, 2015 at 01:15:59PM -0700, Tim Harvey wrote:
->> @@ -90,6 +92,11 @@ static int imx2_restart_handler(struct notifier_block *this, unsigned long mode,
->>       struct imx2_wdt_device *wdev = container_of(this,
->>                                                   struct imx2_wdt_device,
->>                                                   restart_handler);
->> +
->> +     /* Use external reset */
->> +     if (wdev->ext_reset)
->> +             wcr_enable |= IMX2_WDT_WCR_SRS;
->> +
+
+
+On Monday 29 June 2015 02:22 PM, Vaibhav Hiremath wrote:
 >
-> The existing code simply writes the register with only WDE (Watchdog
-> Enable) bit set.  That said, bit WDA and SRS are cleared at the same
-> time.  What's the result of that?  Both internal reset and external
-> reset will be asserted?  If this is the case, it's unsafe per your reply
-> to Frank's comment, right?  So we should only clear one bit between
-> these two based on ext_reset flag to avoid asserting both internal and
-> external reset?
 >
-> Shawn
+> On Monday 15 June 2015 09:19 PM, Vaibhav Hiremath wrote:
+>> This patch series fixes bugs/warnings, cleans up the code and adds
+>> support for PXA910 family of devices to PXA I2C bus driver.
+>>
+>> There has been one attempt made sometime back in 2012 to upstream
+>> some of the patches from below list, but did not get follow up later.
+>> I have consolidated all the patches, cleaned them up, splited into
+>> logical changes, added new patches and submitting it now.
+>>
+>> I tried to maintain authorship & Signoff except where I did some
+>> significant changes to the code/logic.
+>>
+>> Link to previous post:
+>> http://permalink.gmane.org/gmane.linux.drivers.i2c/13557
+>>
+>> Testing:
+>>    - Basic testing on PMIC device on I2C-0 interface
+>>    - Boot tested on platform based on PXA1928
+>>    - Probe is successfully passing
+>>    - Read few registers of PMIC (RTC, ID, etc...) during boot
+>>
+>>
+>> V1 => V2:
+>> ========
+>
+> Ping !!!
+>
 
-Shawn,
+If there are no review comments on this series, can it be merged?
 
-Correct.
-
-Are you saying that you think we should change the above to something
-like the following to ensure in the internal reset case external reset
-is not also being asserted?:
-
-+     /* Use external reset */
-+     if (wdev->ext_reset)
-+             wcr_enable |= IMX2_WDT_WCR_SRS; /* do not assert
-internal system reset */
-+     else
-+             wcr_enable |= IMX2_WDT_WCR_WDA; /* do not assert external reset */
-
-I was not worried about the else case above because if you hit that
-path your device-tree is saying you are not using external reset
-anyway.
-
-Tim
+Thanks,
+Vaibhav
 
 >
->>       /* Assert SRS signal */
->>       regmap_write(wdev->regmap, 0, wcr_enable);
->>       /*
+> Thanks,
+> Vaibhav
+>
+>
+>
+>> Link to V1 -
+>> http://lists.infradead.org/pipermail/linux-arm-kernel/2015-May/347012.html
+>>
+>>
+>>    - Fixed all comments from "Robert Jarzmik" and "Wolfram Sang"
+>>    - Dropped Patch
+>>     05/12: using core bus reset implementation - under work.
+>>                 Will submit shortly.
+>>     08/12: NAKed and dropped
+>>    - Seperated DT binding patch from driver changes, for easy merge
+>>
+>>
+>> Leilei Shang (1):
+>>    i2c: pxa: keep i2c irq ON in suspend
+>>
+>> Shouming Wang (1):
+>>    i2c: pxa: Return I2C_RETRY when timeout in pio mode
+>>
+>> Vaibhav Hiremath (8):
+>>    i2c: pxa: No need to set slave addr for i2c master mode reset
+>>    i2c: pxa: Reset i2c controller on timeout in interrupt and pio mode
+>>    i2c: pxa: Update debug function to dump more info on error
+>>    i2c:pxa: Use devm_ variants in probe function
+>>    Documentation: binding: add new property 'disable_after_xfer' to
+>>      i2c-pxa
+>>    i2c: pxa: Add support for pxa910/988 & new configuration features
+>>    i2c: pxa: Add ILCR (tLow & tHigh) configuration support
+>>    Documentation: binding: add sclk adjustment properties to i2c-pxa
+>>
+>> Yi Zhang (1):
+>>    i2c: pxa: enable/disable i2c module across msg xfer
+>>
+>> Yipeng Yao (1):
+>>    i2c: pxa: Remove compile warnning in 64bit mode
+>>
+>>   Documentation/devicetree/bindings/i2c/i2c-pxa.txt |  18 ++
+>>   drivers/i2c/busses/i2c-pxa.c                      | 267
+>> ++++++++++++++++------
+>>   2 files changed, 220 insertions(+), 65 deletions(-)
+>>
