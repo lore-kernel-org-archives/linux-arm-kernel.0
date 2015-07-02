@@ -1,84 +1,65 @@
-From: binmlist@gmail.com (Bin Liu)
-Date: Thu, 2 Jul 2015 12:05:36 -0500
-Subject: MUSB dual-role on AM335x behaving weirdly
-In-Reply-To: <5594E56B.3040200@free-electrons.com>
-References: <20150514190429.GT24269@saruman.tx.rr.com>
- <CADYTM3Zso8bV_8yFyx1-ATbL5AgkKBjvWWR4AsoZUNuLvFe1bQ@mail.gmail.com>
- <20150514192125.GU24269@saruman.tx.rr.com>
- <CADYTM3bbEAVefFZtivJf5Z+2Q+1zDZEvNhqE5ytsOxDX7hjbdA@mail.gmail.com>
- <20150514192946.GV24269@saruman.tx.rr.com>
- <CADYTM3Zk2iD8YMj75CoLJn=4kpoXoXEKUWj2QzdXKGCJjtfG2A@mail.gmail.com>
- <CADYTM3a1QWnec1D=wT=fgZ-RCXAx_qZYYoFg5gWOy0yT4vovHA@mail.gmail.com>
- <20150514212653.GC3338@piout.net>
- <CADYTM3baVqoEBdWoQb5JFyGR2_GKm1FHMYWST1YkZV=m=ZdycQ@mail.gmail.com>
- <20150526145118.GD26599@saruman.tx.rr.com>
- <20150527094205.GO3199@piout.net>
- <5594E56B.3040200@free-electrons.com>
-Message-ID: <CADYTM3ZF5m++N1NqmOJoH5agbYrzpvSbLnuLVgttxwzdzwmGwQ@mail.gmail.com>
+From: andre.przywara@arm.com (Andre Przywara)
+Date: Thu, 2 Jul 2015 18:10:04 +0100
+Subject: [PATCH 7/7] KVM: arm: implement kvm_set_msi by gsi direct mapping
+In-Reply-To: <1435592237-17924-8-git-send-email-eric.auger@linaro.org>
+References: <1435592237-17924-1-git-send-email-eric.auger@linaro.org>
+ <1435592237-17924-8-git-send-email-eric.auger@linaro.org>
+Message-ID: <5595706C.9010108@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Eric,
 
-On Thu, Jul 2, 2015 at 2:16 AM, Gregory CLEMENT
-<gregory.clement@free-electrons.com> wrote:
-> Hi Felipe,
->
-> On 27/05/2015 11:42, Alexandre Belloni wrote:
->> Hi,
->>
->> On 26/05/2015 at 09:51:18 -0500, Felipe Balbi wrote :
->>> On Thu, May 14, 2015 at 04:36:33PM -0500, Bin Liu wrote:
->>>> Alexandre,
->>>>
->>>> On Thu, May 14, 2015 at 4:26 PM, Alexandre Belloni
->>>> <alexandre.belloni@free-electrons.com> wrote:
->>>>> On 14/05/2015 at 16:16:12 -0500, Bin Liu wrote :
->>>>>> I think I found the root cause of the problem: board design issue - I
->>>>>> bet the custom board has too much cap on VBUS line. It should be <
->>>>>> 10uF.
->>>>>>
->>>>>
->>>>> We have a custom board that exhibits the issue but it only has a 100nF
->>>>> cap on VBUS.
->>>>
->>>> Have you measured the VBUS discharging? Is there any way to share your
->>>> schematics?
->>>
->>> Alexandre, any further comments ?
->>>
->>
->> Yeah, I have just got more info.
->>
->> This is the relevant part of the schematic:
->> http://free-electrons.com/~alexandre/usb.png
->>
->> The total VBUS capacitance is 200nF and the USB0 pins are connected
->> directly to the AM3358 pins. U1 is actually not fitted.
->>
->> We didn't measure VBUS discharging but we observe the OTG pin sensing
->> stops when plugging an OTG cable without any device.
->
-> Do you have any news about this topic?
->
->
-> Is there something else that we can do to help solving this issue?
+On 29/06/15 16:37, Eric Auger wrote:
+> If the ITS modality is not available, let's simply support MSI
+> injection by transforming the MSI.data into an SPI ID.
+> 
+> This becomes possible to use KVM_SIGNAL_MSI ioctl for arm too.
+> 
+> Signed-off-by: Eric Auger <eric.auger@linaro.org>
+> ---
+>  arch/arm/kvm/Kconfig | 1 +
+>  virt/kvm/arm/vgic.c  | 5 +++++
+>  2 files changed, 6 insertions(+)
+> 
+> diff --git a/arch/arm/kvm/Kconfig b/arch/arm/kvm/Kconfig
+> index 151e710..0f58baf 100644
+> --- a/arch/arm/kvm/Kconfig
+> +++ b/arch/arm/kvm/Kconfig
+> @@ -31,6 +31,7 @@ config KVM
+>  	select KVM_VFIO
+>  	select HAVE_KVM_EVENTFD
+>  	select HAVE_KVM_IRQFD
+> +	select HAVE_KVM_MSI
+>  	select HAVE_KVM_IRQCHIP
+>  	select HAVE_KVM_IRQ_ROUTING
+>  	depends on ARM_VIRT_EXT && ARM_LPAE && ARM_ARCH_TIMER
+> diff --git a/virt/kvm/arm/vgic.c b/virt/kvm/arm/vgic.c
+> index 0b4c48c..b3c10dc 100644
+> --- a/virt/kvm/arm/vgic.c
+> +++ b/virt/kvm/arm/vgic.c
+> @@ -2314,6 +2314,11 @@ int kvm_set_msi(struct kvm_kernel_irq_routing_entry *e,
+>  			return kvm->arch.vgic.vm_ops.inject_msi(kvm, &msi);
+>  		else
+>  			return -ENODEV;
+> +	case KVM_IRQ_ROUTING_MSI:
+> +		if (kvm->arch.vgic.vm_ops.inject_msi)
+> +			return -EINVAL;
+> +		else
+> +			return kvm_vgic_inject_irq(kvm, 0, e->msi.data, level);
 
-In the case of CONFIG_USB_MUSB_DUAL_ROLE=y and dr_mode=otg, how is the
-gadget driver configured? It has to be a module not built-in.
+If you add:
 
-Regards,
--Bin.
+static int vgic_v2m_inject_msi(struct kvm *kvm, struct kvm_msi *msi)
+{
+	return kvm_vgic_inject_irq(kvm, 0, msi->data, 1);
+}
 
->
->
-> Thanks,
->
-> Gregory
->
->
-> --
-> Gregory Clement, Free Electrons
-> Kernel, drivers, real-time and embedded Linux
-> development, consulting, training and support.
-> http://free-electrons.com
+to vgic-v2-emul.c and wire it up accordingly, you can simplify the above
+kvm_set_msi, getting rid of all those extra case handling.
+This also helps merging KVM_IRQ_ROUTING_MSI and the extended case.
+
+I have hacked this up and it seems to work for me.
+
+Cheers,
+Andre.
