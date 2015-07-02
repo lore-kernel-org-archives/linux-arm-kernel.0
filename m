@@ -1,58 +1,33 @@
-From: mark.yao@rock-chips.com (Mark yao)
-Date: Thu, 02 Jul 2015 14:13:11 +0800
-Subject: [PATCH v2 1/5] drm/rockchip: vop: optimize virtual stride
- calculate
-In-Reply-To: <CAAFQd5B-W2uWFXo9me_MPdp0LDp0CK+mG6Rsbro9+JQSUBA4bw@mail.gmail.com>
-References: <1435313249-4549-1-git-send-email-mark.yao@rock-chips.com>
- <1435313249-4549-2-git-send-email-mark.yao@rock-chips.com>
- <CAAFQd5B-W2uWFXo9me_MPdp0LDp0CK+mG6Rsbro9+JQSUBA4bw@mail.gmail.com>
-Message-ID: <5594D677.20202@rock-chips.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 1 Jul 2015 23:16:21 -0700
+Subject: n900 in 4.2-rc0: repeating oopses
+In-Reply-To: <20150701130903.GG7969@amd>
+References: <20150416093234.GA17423@amd> <20150629091146.GA5103@amd>
+ <20150630092404.GA19285@amd> <20150630095310.GF27720@pali>
+ <20150701065932.GS4156@atomide.com> <20150701072255.GA17577@pali>
+ <20150701095954.GD7969@amd> <20150701103421.GV4156@atomide.com>
+ <20150701130903.GG7969@amd>
+Message-ID: <20150702061620.GY4156@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2015?07?02? 12:59, Tomasz Figa wrote:
-> On Fri, Jun 26, 2015 at 7:07 PM, Mark Yao <mark.yao@rock-chips.com> wrote:
->> vir_stride need number words of the virtual width, and fb->pitches
->> save bytes_per_pixel, so just div 4 switch to stride.
->>
->> Signed-off-by: Mark Yao <mark.yao@rock-chips.com>
->> ---
->> Changes in v2: None
->>
->>   drivers/gpu/drm/rockchip/rockchip_drm_vop.c |    2 +-
->>   1 file changed, 1 insertion(+), 1 deletion(-)
->>
->> diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_vop.c b/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
->> index 6188221..3c9f4f3 100644
->> --- a/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
->> +++ b/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
->> @@ -644,7 +644,7 @@ static int vop_update_plane_event(struct drm_plane *plane,
->>          offset += (src.y1 >> 16) * fb->pitches[0];
->>          yrgb_mst = rk_obj->dma_addr + offset;
->>
->> -       y_vir_stride = fb->pitches[0] / (fb->bits_per_pixel >> 3);
->> +       y_vir_stride = fb->pitches[0] >> 2;
-> If the unit of y_vir_stride is words then doesn't it mean that the
-> calculation before this patch was just invalid? If yes, shouldn't the
-> subject actually say "Fix virtual stride calculation"?
->
-> Best regards,
-> Tomasz
->
->
->
-Hi Tomasz
-     the calculation thinking before is that:
-        fb->pitches[0] = surface_width * bytes_per_pixel
-        surface_width = fb->pitches[0] / bytes_per_pixel
-                               = fb->pitches[0] / (fb->bits_per_pixel >> 3)
+* Pavel Machek <pavel@ucw.cz> [150701 06:11]:
+> On Wed 2015-07-01 03:34:22, Tony Lindgren wrote:
+> > 
+> > Works for me after enabling the idle timeouts with the following
+> > script and blanking the screen and disconnecting USB:
+> 
+> Um. I'm forcing suspend with "echo mem > /sys/power/state" . (It
+> worked in 4.1). That should just make it sleep, no autosuspend-related
+> trickery... (But yes, I guess I should set up the leds and try
+> autosuspend, too.)
 
-    means that "y_vir_stride = surface_width",
+That too works just fine for me with omap2plus_defconfig after
+echo enabled > /sys/class/tty/ttyO2/power/wakeup as I have n900
+in my test rack.
 
-ARGB888 one pixel is word size, So that is right for ARGB888, but wrong for other formats.
+You probably have some additional drivers enabled?
 
-You are right, subject say "Fix virtual stride calculation" is suitable.
+Regards,
 
-Best regards,
--- 
-?ark Yao
+Tony
