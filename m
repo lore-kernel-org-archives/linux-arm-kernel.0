@@ -1,57 +1,69 @@
-From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Thu, 2 Jul 2015 15:01:41 +0200
-Subject: [RFC PATCH 16/15] pwm: add informations about polarity, duty
- cycle and period to debugfs
-In-Reply-To: <3365087.n2eEES60JK@diego>
-References: <1435738921-25027-1-git-send-email-boris.brezillon@free-electrons.com>
- <3365087.n2eEES60JK@diego>
-Message-ID: <20150702150141.5018a791@bbrezillon>
+From: cyrille.pitchen@atmel.com (Cyrille Pitchen)
+Date: Thu, 2 Jul 2015 15:18:08 +0200
+Subject: [PATCH v4 0/5] tty/serial: at91: add support to FIFOs
+Message-ID: <cover.1435842688.git.cyrille.pitchen@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 01 Jul 2015 23:50:46 +0200
-Heiko St?bner <heiko@sntech.de> wrote:
+ChangeLog
 
-> The pwm-states make it possible to also output the polarity, duty cycle
-> and period information in the debugfs pwm summary-outout.
-> This makes it easier to gather overview information about pwms without
-> needing to walk through the sysfs attributes of every pwm.
-> 
-> Signed-off-by: Heiko Stuebner <heiko@sntech.de>
-> ---
-> might be nice to have too ;-)
+v4:
+- insert a new patch in the series to remove UART_PUT_* and UART_GET_*
+  macros. replace them by atmel_uart_writel() and atmel_uart_readl().
 
-Yes.
+v3:
+- add "Acked-by" tags on patches 1, 2 and 4.
+- define macros check the FIFO size and to configure the high and low RTS
+  thresholds in patch 3.
+- fix a spelling mistake in patch 3: s/raisonable/reasonably/
 
-> 
->  drivers/pwm/core.c | 11 ++++++++++-
->  1 file changed, 10 insertions(+), 1 deletion(-)
-> 
-> diff --git a/drivers/pwm/core.c b/drivers/pwm/core.c
-> index 6dafd8e..79037a2 100644
-> --- a/drivers/pwm/core.c
-> +++ b/drivers/pwm/core.c
-> @@ -951,9 +951,18 @@ static void pwm_dbg_show(struct pwm_chip *chip, struct seq_file *s)
->  		if (test_bit(PWMF_REQUESTED, &pwm->flags))
->  			seq_puts(s, " requested");
->  
-> -		if (pwm_is_enabled(pwm))
-> +		if (pwm_is_enabled(pwm)) {
->  			seq_puts(s, " enabled");
->  
-> +			seq_printf(s, " period:%uns",
-> +				   pwm_get_period(pwm));
-> +			seq_printf(s, " duty:%uns",
-> +				   pwm_get_duty_cycle(pwm));
-> +			seq_printf(s, " polarity:%s",
-> +				   pwm_get_polarity(pwm) ? "inverse"
-> +							 : "normal");
+v2:
+- remove "atmel,rts-high-threshold" and "atmel,rts-low-threshold" from new
+  DT properties. For now these two thresholds are set once for all during the
+  probe but a later patch might allow to configure them at run time.
+- reword the commit message of the DT property patch to better explain why we
+  have chosen to introduce the new property "atmel,fifo-size".
+- add a missing chunk in the FIFO patch: as the commit message explains, we
+  need to use 8bit accesses when dealing with the Transmit/Receive Holding
+  Registers.
 
-I would print those values even if the PWM is not enabled.
+v1:
+This series of patches add support to FIFOs which will be introduced with Atmel
+sama5d2x SoC.
 
+FIFOs allow to reduce the number of I/O access. Indeed depending on the data
+size and the USART mode, FIFOs work in either single or multiple data. For
+multiple data, up to 4 data can be written into the Transmit Holding Register
+or read from the Receive Holding Register in a single word access.
 
+Also the RX FIFO allows to reduce the risk of receive overrun and data loss,
+especially when the DMA controller is not used.
+
+Finally, when the hardware handshake mode is selected, the RTS line can now be
+controlled by two thresholds on the RX FIFO. When FIFO level (the number of
+data available to be read) crosses the high threshold, the RTS line is set to
+high level telling the peer that it should stop sending new data. Data are read
+from the RX FIFO and when the FIFO level crosses the low threshold, the RTS
+is set back to low level telling the remote peer that it can send data again.
+
+This new feature resolves a long time hardware limitation where the RTS line
+was directly controlled by a PDC signal. There is no equivalent of that signal
+for the DMA controller so for all SoCs without PDC for USART there was no mean
+to control the RTS line properly: once the hardware handshake mode selected,
+the RTS line remains high level. Next SoCs with FIFOs will be able to use the
+hardware handshake mode thanks to the RX FIFO.
+
+Cyrille Pitchen (5):
+  ARM: at91/dt: add a new DT property to support FIFOs on Atmel USARTs
+  tty/serial: at91: fix some macro definitions to fit coding style
+  tty/serial: at91: remove bunch of macros to access UART registers
+  tty/serial: at91: add support to FIFOs
+  tty/serial: at91: use 32bit writes into TX FIFO when DMA is enabled
+
+ .../devicetree/bindings/serial/atmel-usart.txt     |   3 +
+ drivers/tty/serial/atmel_serial.c                  | 467 +++++++++++++--------
+ include/linux/atmel_serial.h                       | 240 ++++++-----
+ 3 files changed, 439 insertions(+), 271 deletions(-)
 
 -- 
-Boris Brezillon, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+1.8.2.2
