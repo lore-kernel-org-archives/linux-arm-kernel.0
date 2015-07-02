@@ -1,215 +1,48 @@
 From: simon.guinot@sequanux.org (Simon Guinot)
-Date: Thu,  2 Jul 2015 19:56:42 +0200
-Subject: [PATCH v2 3/4] leds: leds-ns2: handle can_sleep GPIOs
+Date: Thu,  2 Jul 2015 19:56:43 +0200
+Subject: [PATCH v2 4/4] leds: leds-ns2: depends on MACH_ARMADA_370
 In-Reply-To: <1435859803-19583-1-git-send-email-simon.guinot@sequanux.org>
 References: <1435859803-19583-1-git-send-email-simon.guinot@sequanux.org>
-Message-ID: <1435859803-19583-4-git-send-email-simon.guinot@sequanux.org>
+Message-ID: <1435859803-19583-5-git-send-email-simon.guinot@sequanux.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On the board n090401 (Seagate NAS 4-Bay), some of the LEDs are handled
-by the leds-ns2 driver. This LEDs are connected to an I2C GPIO expander
-(PCA95554PW) which means that GPIO access may sleep. This patch makes
-leds-ns2 compatible with such GPIOs by using the *_cansleep() variant of
-the GPIO functions. As a drawback this functions can't be used safely in
-a timer context (with the timer LED trigger for example). To fix this
-issue, a workqueue mechanism (copied from the leds-gpio driver) is used.
+The leds-ns2 driver is also used by the n090401 board (Seagate NAS
+4-Bay), which is based on the Marvell Armada-370 SoC.
 
-Note that this patch also updates slightly the ns2_led_sata_store
-function. The LED state is now retrieved from cached values instead of
-reading the GPIOs previously. This prevents ns2_led_sata_store from
-working with a stale LED state (which may happen when a delayed work
-is pending).
+Then this patch allows to select the leds-ns2 driver if MACH_ARMADA_370
+is enabled. Additionally, this also updates the Kconfig help message.
 
 Signed-off-by: Simon Guinot <simon.guinot@sequanux.org>
-Signed-off-by: Vincent Donnefort <vdonnefort@gmail.com>
+Acked-by: Jacek Anaszewski <j.anaszewski@samsung.com>
 ---
- drivers/leds/leds-ns2.c | 75 +++++++++++++++++++++++++++++++++----------------
- 1 file changed, 51 insertions(+), 24 deletions(-)
+ drivers/leds/Kconfig | 12 ++++++++----
+ 1 file changed, 8 insertions(+), 4 deletions(-)
 
-Changes for v2:
-- Fix gpio_{get,set}_*_cansleep() usage while holding a spinlock:
-  Holding a spinlock at this places was not needed.
-
-diff --git a/drivers/leds/leds-ns2.c b/drivers/leds/leds-ns2.c
-index b0bc03539dbb..b33514d9f427 100644
---- a/drivers/leds/leds-ns2.c
-+++ b/drivers/leds/leds-ns2.c
-@@ -31,6 +31,7 @@
- #include <linux/platform_data/leds-kirkwood-ns2.h>
- #include <linux/of.h>
- #include <linux/of_gpio.h>
-+#include "leds.h"
- 
- /*
-  * The Network Space v2 dual-GPIO LED is wired to a CPLD. Three different LED
-@@ -43,12 +44,25 @@ struct ns2_led_data {
- 	struct led_classdev	cdev;
- 	unsigned		cmd;
- 	unsigned		slow;
-+	bool			can_sleep;
-+	int			mode_index;
- 	unsigned char		sata; /* True when SATA mode active. */
- 	rwlock_t		rw_lock; /* Lock GPIOs. */
-+	struct work_struct	work;
- 	int			num_modes;
- 	struct ns2_led_modval	*modval;
- };
- 
-+static void ns2_led_work(struct work_struct *work)
-+{
-+	struct ns2_led_data *led_dat =
-+		container_of(work, struct ns2_led_data, work);
-+	int i = led_dat->mode_index;
+diff --git a/drivers/leds/Kconfig b/drivers/leds/Kconfig
+index 966b9605f5f0..68fd6b2b12be 100644
+--- a/drivers/leds/Kconfig
++++ b/drivers/leds/Kconfig
+@@ -431,12 +431,16 @@ config LEDS_MC13783
+ config LEDS_NS2
+ 	tristate "LED support for Network Space v2 GPIO LEDs"
+ 	depends on LEDS_CLASS
+-	depends on MACH_KIRKWOOD
++	depends on MACH_KIRKWOOD || MACH_ARMADA_370
+ 	default y
+ 	help
+-	  This option enable support for the dual-GPIO LED found on the
+-	  Network Space v2 board (and parents). This include Internet Space v2,
+-	  Network Space (Max) v2 and d2 Network v2 boards.
++	  This option enables support for the dual-GPIO LEDs found on the
++	  following LaCie/Seagate boards:
 +
-+	gpio_set_value_cansleep(led_dat->cmd, led_dat->modval[i].cmd_level);
-+	gpio_set_value_cansleep(led_dat->slow, led_dat->modval[i].slow_level);
-+}
-+
- static int ns2_led_get_mode(struct ns2_led_data *led_dat,
- 			    enum ns2_led_modes *mode)
- {
-@@ -57,10 +71,8 @@ static int ns2_led_get_mode(struct ns2_led_data *led_dat,
- 	int cmd_level;
- 	int slow_level;
++		Network Space v2 (and parents: Max, Mini)
++		Internet Space v2
++		d2 Network v2
++		n090401 (Seagate NAS 4-Bay)
  
--	read_lock_irq(&led_dat->rw_lock);
--
--	cmd_level = gpio_get_value(led_dat->cmd);
--	slow_level = gpio_get_value(led_dat->slow);
-+	cmd_level = gpio_get_value_cansleep(led_dat->cmd);
-+	slow_level = gpio_get_value_cansleep(led_dat->slow);
- 
- 	for (i = 0; i < led_dat->num_modes; i++) {
- 		if (cmd_level == led_dat->modval[i].cmd_level &&
-@@ -71,8 +83,6 @@ static int ns2_led_get_mode(struct ns2_led_data *led_dat,
- 		}
- 	}
- 
--	read_unlock_irq(&led_dat->rw_lock);
--
- 	return ret;
- }
- 
-@@ -80,19 +90,32 @@ static void ns2_led_set_mode(struct ns2_led_data *led_dat,
- 			     enum ns2_led_modes mode)
- {
- 	int i;
-+	bool found = false;
- 	unsigned long flags;
- 
--	write_lock_irqsave(&led_dat->rw_lock, flags);
--
--	for (i = 0; i < led_dat->num_modes; i++) {
-+	for (i = 0; i < led_dat->num_modes; i++)
- 		if (mode == led_dat->modval[i].mode) {
--			gpio_set_value(led_dat->cmd,
--				       led_dat->modval[i].cmd_level);
--			gpio_set_value(led_dat->slow,
--				       led_dat->modval[i].slow_level);
-+			found = true;
-+			break;
- 		}
-+
-+	if (!found)
-+		return;
-+
-+	write_lock_irqsave(&led_dat->rw_lock, flags);
-+
-+	if (!led_dat->can_sleep) {
-+		gpio_set_value(led_dat->cmd,
-+			       led_dat->modval[i].cmd_level);
-+		gpio_set_value(led_dat->slow,
-+			       led_dat->modval[i].slow_level);
-+		goto exit_unlock;
- 	}
- 
-+	led_dat->mode_index = i;
-+	schedule_work(&led_dat->work);
-+
-+exit_unlock:
- 	write_unlock_irqrestore(&led_dat->rw_lock, flags);
- }
- 
-@@ -122,7 +145,6 @@ static ssize_t ns2_led_sata_store(struct device *dev,
- 		container_of(led_cdev, struct ns2_led_data, cdev);
- 	int ret;
- 	unsigned long enable;
--	enum ns2_led_modes mode;
- 
- 	ret = kstrtoul(buff, 10, &enable);
- 	if (ret < 0)
-@@ -131,19 +153,19 @@ static ssize_t ns2_led_sata_store(struct device *dev,
- 	enable = !!enable;
- 
- 	if (led_dat->sata == enable)
--		return count;
-+		goto exit;
- 
--	ret = ns2_led_get_mode(led_dat, &mode);
--	if (ret < 0)
--		return ret;
-+	led_dat->sata = enable;
-+
-+	if (!led_get_brightness(led_cdev))
-+		goto exit;
- 
--	if (enable && mode == NS_V2_LED_ON)
-+	if (enable)
- 		ns2_led_set_mode(led_dat, NS_V2_LED_SATA);
--	if (!enable && mode == NS_V2_LED_SATA)
-+	else
- 		ns2_led_set_mode(led_dat, NS_V2_LED_ON);
- 
--	led_dat->sata = enable;
--
-+exit:
- 	return count;
- }
- 
-@@ -173,7 +195,7 @@ create_ns2_led(struct platform_device *pdev, struct ns2_led_data *led_dat,
- 	enum ns2_led_modes mode;
- 
- 	ret = devm_gpio_request_one(&pdev->dev, template->cmd,
--			gpio_get_value(template->cmd) ?
-+			gpio_get_value_cansleep(template->cmd) ?
- 			GPIOF_OUT_INIT_HIGH : GPIOF_OUT_INIT_LOW,
- 			template->name);
- 	if (ret) {
-@@ -183,7 +205,7 @@ create_ns2_led(struct platform_device *pdev, struct ns2_led_data *led_dat,
- 	}
- 
- 	ret = devm_gpio_request_one(&pdev->dev, template->slow,
--			gpio_get_value(template->slow) ?
-+			gpio_get_value_cansleep(template->slow) ?
- 			GPIOF_OUT_INIT_HIGH : GPIOF_OUT_INIT_LOW,
- 			template->name);
- 	if (ret) {
-@@ -202,6 +224,8 @@ create_ns2_led(struct platform_device *pdev, struct ns2_led_data *led_dat,
- 	led_dat->cdev.groups = ns2_led_groups;
- 	led_dat->cmd = template->cmd;
- 	led_dat->slow = template->slow;
-+	led_dat->can_sleep = gpio_cansleep(led_dat->cmd) |
-+				gpio_cansleep(led_dat->slow);
- 	led_dat->modval = template->modval;
- 	led_dat->num_modes = template->num_modes;
- 
-@@ -214,6 +238,8 @@ create_ns2_led(struct platform_device *pdev, struct ns2_led_data *led_dat,
- 	led_dat->cdev.brightness =
- 		(mode == NS_V2_LED_OFF) ? LED_OFF : LED_FULL;
- 
-+	INIT_WORK(&led_dat->work, ns2_led_work);
-+
- 	ret = led_classdev_register(&pdev->dev, &led_dat->cdev);
- 	if (ret < 0)
- 		return ret;
-@@ -224,6 +250,7 @@ create_ns2_led(struct platform_device *pdev, struct ns2_led_data *led_dat,
- static void delete_ns2_led(struct ns2_led_data *led_dat)
- {
- 	led_classdev_unregister(&led_dat->cdev);
-+	cancel_work_sync(&led_dat->work);
- }
- 
- #ifdef CONFIG_OF_GPIO
+ config LEDS_NETXBIG
+ 	tristate "LED support for Big Network series LEDs"
 -- 
 2.1.4
