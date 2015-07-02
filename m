@@ -1,60 +1,93 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Thu, 02 Jul 2015 14:23:48 +0900
-Subject: [PATCH v2] arm64: cpuidle: add __init section marker to
- arm_cpuidle_init
-In-Reply-To: <20150702125849.67160aa9@xhacker>
-References: <1435803288-1478-1-git-send-email-jszhang@marvell.com>
- <CAJKOXPceoV2jk=Go+ZoJZbP1MXx-HDLJpCFK9mrR9JLRU4x8Bg@mail.gmail.com>
- <20150702125849.67160aa9@xhacker>
-Message-ID: <5594CAE4.1070607@samsung.com>
+From: cw00.choi@samsung.com (Chanwoo Choi)
+Date: Thu, 02 Jul 2015 14:37:45 +0900
+Subject: [PATCH] ARM: dts: Add CPU cooling binding for Exynos3250-based
+ Rinato/Monk board
+Message-ID: <1435815465-501-1-git-send-email-cw00.choi@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02.07.2015 13:58, Jisheng Zhang wrote:
-> Dear Krzysztof,
-> 
-> On Thu, 2 Jul 2015 12:59:44 +0900
-> Krzysztof Kozlowski <k.kozlowski@samsung.com> wrote:
-> 
->> 2015-07-02 11:14 GMT+09:00 Jisheng Zhang <jszhang@marvell.com>:
->>> It is not needed after booting, this patch moves the arm_cpuidle_init()
->>> function to the __init section.
->>>
->>> Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
->>> ---
->>>  arch/arm64/include/asm/cpuidle.h | 2 +-
->>>  arch/arm64/kernel/cpuidle.c      | 2 +-
->>>  2 files changed, 2 insertions(+), 2 deletions(-)
->>>
->>> diff --git a/arch/arm64/include/asm/cpuidle.h b/arch/arm64/include/asm/cpuidle.h
->>> index 0f74f05..5748d3b 100644
->>> --- a/arch/arm64/include/asm/cpuidle.h
->>> +++ b/arch/arm64/include/asm/cpuidle.h
->>> @@ -4,7 +4,7 @@
->>>  #include <asm/proc-fns.h>
->>>
->>>  #ifdef CONFIG_CPU_IDLE
->>> -extern int arm_cpuidle_init(unsigned int cpu);
->>> +extern int __init arm_cpuidle_init(unsigned int cpu);
->>
->> No, not here but...
->>
->>>  extern int arm_cpuidle_suspend(int index);
->>>  #else
->>>  static inline int arm_cpuidle_init(unsigned int cpu)
->>
->> ... here so the stub for !CONFIG_CPU_IDLE would be marked as well.
-> 
-> when !CONFIG_CPU_IDLE, arm_cpuidle_init() is inlined, and just return -EOPNOTSUPP;
-> Per my understanding, it will be optimized out by compiler. I'm not sure whether
-> there is any benefit to mark inlined function as __init. But Per my check, all
-> other inlined functions in linux kernel have no __init. What do you think?
+This patch add the cooling device to control the overheating issue on
+Exynos3250-based Rinato/Monk board.
 
-Yes, you're right, the inline is sufficient so this means that actually
-the first patch was correct. The __init is not needed in extern
-declaration. For both versions then:
+Cc: Kukjin Kim <kgene@kernel.org>
+Cc: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
+Acked-by: Kyungmin Park <kyungmin.park@samsung.com>
+---
+Depends on:
+This patch needs the cpufreq support of Exynos3250 SoC. So, this patch has the
+dependency on patch[1] which support the generic cpufreq for Exynos3250 SoC.
+[1] https://lkml.org/lkml/2015/7/1/696
+    : [PATCH v6 0/3] cpufreq: Use cpufreq-dt driver for Exynos3250
 
-Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+ arch/arm/boot/dts/exynos3250-monk.dts   | 15 +++++++++++++++
+ arch/arm/boot/dts/exynos3250-rinato.dts | 15 +++++++++++++++
+ arch/arm/boot/dts/exynos3250.dtsi       |  1 +
+ 3 files changed, 31 insertions(+)
 
-Best regards,
-Krzysztof
+diff --git a/arch/arm/boot/dts/exynos3250-monk.dts b/arch/arm/boot/dts/exynos3250-monk.dts
+index 7863265d4868..540a0adf2be6 100644
+--- a/arch/arm/boot/dts/exynos3250-monk.dts
++++ b/arch/arm/boot/dts/exynos3250-monk.dts
+@@ -116,6 +116,21 @@
+ 		min-microvolt = <1100000>;
+ 		max-microvolt = <2700000>;
+ 	};
++
++	thermal-zones {
++		cpu_thermal: cpu-thermal {
++			cooling-maps {
++				map0 {
++					/* Correspond to 500MHz at freq_table */
++					cooling-device = <&cpu0 5 5>;
++				};
++				map1 {
++					/* Correspond to 200MHz at freq_table */
++					cooling-device = <&cpu0 8 8>;
++				};
++			};
++		};
++	};
+ };
+ 
+ &adc {
+diff --git a/arch/arm/boot/dts/exynos3250-rinato.dts b/arch/arm/boot/dts/exynos3250-rinato.dts
+index ddd7ac283045..0e62a6435e07 100644
+--- a/arch/arm/boot/dts/exynos3250-rinato.dts
++++ b/arch/arm/boot/dts/exynos3250-rinato.dts
+@@ -107,6 +107,21 @@
+ 		min-microvolt = <1100000>;
+ 		max-microvolt = <2700000>;
+ 	};
++
++	thermal-zones {
++		cpu_thermal: cpu-thermal {
++			cooling-maps {
++				map0 {
++					/* Corresponds to 500MHz */
++					cooling-device = <&cpu0 5 5>;
++				};
++				map1 {
++					/* Corresponds to 200MHz */
++					cooling-device = <&cpu0 8 8>;
++				};
++			};
++		};
++	};
+ };
+ 
+ &adc {
+diff --git a/arch/arm/boot/dts/exynos3250.dtsi b/arch/arm/boot/dts/exynos3250.dtsi
+index e0f3b2ed41a3..a4931b660ddb 100644
+--- a/arch/arm/boot/dts/exynos3250.dtsi
++++ b/arch/arm/boot/dts/exynos3250.dtsi
+@@ -55,6 +55,7 @@
+ 			clock-frequency = <1000000000>;
+ 			clocks = <&cmu CLK_ARM_CLK>;
+ 			clock-names = "cpu";
++			#cooling-cells = <2>;
+ 
+ 			operating-points = <
+ 				1000000 1150000
+-- 
+1.8.5.5
