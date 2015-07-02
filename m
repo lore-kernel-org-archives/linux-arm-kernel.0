@@ -1,93 +1,28 @@
 From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Thu, 02 Jul 2015 09:01:41 +0900
-Subject: [PATCH v5 2/3] ARM: dts: Add CPU OPP and regulator supply property
- for Exynos3250
-In-Reply-To: <1435756877-26736-3-git-send-email-cw00.choi@samsung.com>
+Date: Thu, 02 Jul 2015 09:05:04 +0900
+Subject: [PATCH v5 1/3] clk: samsung: exynos3250: Add cpu clock
+ configuration data and instaniate cpu clock
+In-Reply-To: <1435756877-26736-2-git-send-email-cw00.choi@samsung.com>
 References: <1435756877-26736-1-git-send-email-cw00.choi@samsung.com>
- <1435756877-26736-3-git-send-email-cw00.choi@samsung.com>
-Message-ID: <55947F65.8010404@samsung.com>
+ <1435756877-26736-2-git-send-email-cw00.choi@samsung.com>
+Message-ID: <55948030.3010700@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On 01.07.2015 22:21, Chanwoo Choi wrote:
-> This patch add CPU operating points which include CPU frequency and regulator
-> voltage to use generic cpufreq drivers.
+> This patch add CPU clock configuration data and instantiate the CPU clock type
+> for Exynos3250 to support Samsung specific cpu-clock type.
 > 
-> Cc: Kukjin Kim <kgene@kernel.org>
-> Cc: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+> Cc: Sylwester Nawrocki <s.nawrocki@samsung.com>
+> Cc: Tomasz Figa <tomasz.figa@gmail.com>
 > Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
 > Acked-by: Kyungmin Park <kyungmin.park@samsung.com>
 > ---
->  arch/arm/boot/dts/exynos3250-monk.dts   |  4 ++++
->  arch/arm/boot/dts/exynos3250-rinato.dts |  4 ++++
->  arch/arm/boot/dts/exynos3250.dtsi       | 15 +++++++++++++++
->  3 files changed, 23 insertions(+)
+>  drivers/clk/samsung/clk-exynos3250.c   | 32 ++++++++++++++++++++++++++++++--
+>  include/dt-bindings/clock/exynos3250.h |  1 +
+>  2 files changed, 31 insertions(+), 2 deletions(-)
 
-The patch looks good. Could you put the 'cpu' nodes in alphabetical
-order? The order for Rinato board is already broken but still putting it
-after 'adc' node would be better.
-
-With the change above:
 Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
 
 Best regards,
 Krzysztof
-
-> 
-> diff --git a/arch/arm/boot/dts/exynos3250-monk.dts b/arch/arm/boot/dts/exynos3250-monk.dts
-> index a5863acc5fff..fc6604d68864 100644
-> --- a/arch/arm/boot/dts/exynos3250-monk.dts
-> +++ b/arch/arm/boot/dts/exynos3250-monk.dts
-> @@ -118,6 +118,10 @@
->  	};
->  };
->  
-> +&cpu0 {
-> +	cpu0-supply = <&buck2_reg>;
-> +};
-> +
->  &adc {
->  	vdd-supply = <&ldo3_reg>;
->  	status = "okay";
-> diff --git a/arch/arm/boot/dts/exynos3250-rinato.dts b/arch/arm/boot/dts/exynos3250-rinato.dts
-> index 031853b75528..c8a083b376c9 100644
-> --- a/arch/arm/boot/dts/exynos3250-rinato.dts
-> +++ b/arch/arm/boot/dts/exynos3250-rinato.dts
-> @@ -109,6 +109,10 @@
->  	};
->  };
->  
-> +&cpu0 {
-> +	cpu0-supply = <&buck2_reg>;
-> +};
-> +
->  &adc {
->  	vdd-supply = <&ldo3_reg>;
->  	status = "okay";
-> diff --git a/arch/arm/boot/dts/exynos3250.dtsi b/arch/arm/boot/dts/exynos3250.dtsi
-> index d7201333e3bc..e0f3b2ed41a3 100644
-> --- a/arch/arm/boot/dts/exynos3250.dtsi
-> +++ b/arch/arm/boot/dts/exynos3250.dtsi
-> @@ -53,6 +53,21 @@
->  			compatible = "arm,cortex-a7";
->  			reg = <0>;
->  			clock-frequency = <1000000000>;
-> +			clocks = <&cmu CLK_ARM_CLK>;
-> +			clock-names = "cpu";
-> +
-> +			operating-points = <
-> +				1000000 1150000
-> +				900000  1112500
-> +				800000  1075000
-> +				700000  1037500
-> +				600000  1000000
-> +				500000  962500
-> +				400000  925000
-> +				300000  887500
-> +				200000  850000
-> +				100000  850000
-> +			>;
->  		};
->  
->  		cpu1: cpu at 1 {
-> 
