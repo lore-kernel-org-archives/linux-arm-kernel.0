@@ -1,37 +1,72 @@
-From: tomi.valkeinen@ti.com (Tomi Valkeinen)
-Date: Thu, 2 Jul 2015 10:17:00 +0300
-Subject: [RFC PATCH 00/15] pwm: add support for atomic update
-In-Reply-To: <20150702070343.GD11824@pengutronix.de>
-References: <1435738921-25027-1-git-send-email-boris.brezillon@free-electrons.com>
- <20150702070343.GD11824@pengutronix.de>
-Message-ID: <5594E56C.3010908@ti.com>
+From: gabriele.paoloni@huawei.com (Gabriele Paoloni)
+Date: Thu, 2 Jul 2015 07:24:40 +0000
+Subject: [PATCH v3 2/5] PCI: designware: Add ARM64 support
+In-Reply-To: <55942441.3050705@arm.com>
+References: <1435743817-19083-1-git-send-email-wangzhou1@hisilicon.com>
+ <1435743817-19083-3-git-send-email-wangzhou1@hisilicon.com>
+ <EE11001F9E5DDD47B7634E2F8A612F2E01D4E4BB@lhreml503-mbs>
+ <5593F899.6050306@arm.com>
+ <EE11001F9E5DDD47B7634E2F8A612F2E01D4E6A2@lhreml503-mbs>
+ <55942441.3050705@arm.com>
+Message-ID: <EE11001F9E5DDD47B7634E2F8A612F2E01D4EC38@lhreml503-mbs>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
 
-On 02/07/15 10:03, Uwe Kleine-K?nig wrote:
-> Hello Boris,
+> -----Original Message-----
+> From: linux-pci-owner at vger.kernel.org [mailto:linux-pci-
+> owner at vger.kernel.org] On Behalf Of James Morse
+> Sent: 01 July 2015 18:33
+> To: Gabriele Paoloni; Wangzhou (B); Bjorn Helgaas; Jingoo Han; Pratyush
+> Anand; Arnd Bergmann; Liviu Dudau; kishon at ti.com; xobs at kosagi.com; m-
+> karicheri2 at ti.com; Minghuan.Lian at freescale.com
+> Cc: linux-pci at vger.kernel.org; linux-arm-kernel at lists.infradead.org;
+> devicetree at vger.kernel.org; Yuanzhichang; Zhudacai; zhangjukuo;
+> qiuzhenfa; Liguozhu (Kenneth)
+> Subject: Re: [PATCH v3 2/5] PCI: designware: Add ARM64 support
 > 
-> On Wed, Jul 01, 2015 at 10:21:46AM +0200, Boris Brezillon wrote:
->> This series adds support for atomic PWM update, or ITO, the capability
->> to update all the parameters of a PWM device (enabled/disabled, period,
->> duty and polarity) in one go.
-> on first reading the subject of your series I thought it was about
-> asserting that the newly set config is active before the call to
-> pwm_config (et al) returns. That's a problem I addressed a few times in
-> the past. I wonder if it's only me or if a different wording should be
-> used for "update all parameters with a single function call".
+> Gabriele Paoloni wrote:
+> >> Both series are applied to v4.1, use the same .config file, and the
+> >> same dtb.
+> >> I will investigate further.
+> >>
+> >> (Re-testing v2 works, so this isn't an interim hardware failure)
+> >
+> > This is a bit weird....
+> >
+> > Patch 2/5 is the only one that affect platforms different from
+> Hisilicon
+> >
+> > The only difference between V3 patch[2/5] and v2 patch[2/4] is
+> 
+> Between v3:2/5 and your replacement for v2:2/4, which arrived after I
+> had
+> tested the v2 series. As the patch has been replaced with a different
+> one -
+> neither 'tested-by' is true any more.
 
-In my vocabulary "blocking" means that the work is done before the
-function returns, and "atomic" means the work is done in one step.
+Sorry I misread your previous email
 
- Tomi
+> 
+> It looks like the BAR containing the bridge window is not being assigned,
+> so no devices on bus 1 are discovered.
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150702/6327f9f4/attachment.sig>
+Can you confirm the dtsi you are using..."imx6qdl.dtsi" ?
+
+Thanks
+
+Gab
+
+> 
+> I will send the full v2 and v3 dmesg output separately.
+> 
+> 
+> Thanks,
+> 
+> James
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-pci" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
