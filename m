@@ -1,57 +1,31 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Thu, 2 Jul 2015 09:20:58 -0500
-Subject: [PATCH v2 01/20] ARM: omap2plus_defconfig: Enable audio related
- config options
-In-Reply-To: <1435845995-19085-2-git-send-email-peter.ujfalusi@ti.com>
-References: <1435845995-19085-1-git-send-email-peter.ujfalusi@ti.com>
- <1435845995-19085-2-git-send-email-peter.ujfalusi@ti.com>
-Message-ID: <20150702142058.GK5837@saruman.tx.rr.com>
+From: richardcochran@gmail.com (Richard Cochran)
+Date: Thu, 2 Jul 2015 16:20:59 +0200
+Subject: [PATCH 1/2] gpio: dwapb: Use human understandable gpio numbering.
+In-Reply-To: <267A46E7-C5C5-4696-90CC-D44F4130B3EF@smart-africa.com>
+References: <cover.1435777856.git.rcochran@linutronix.de>
+ <d6b5ce85a17164970d454583560e07f7aed7b8ca.1435777856.git.rcochran@linutronix.de>
+ <267A46E7-C5C5-4696-90CC-D44F4130B3EF@smart-africa.com>
+Message-ID: <20150702142058.GA9349@localhost.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 02, 2015 at 05:06:16PM +0300, Peter Ujfalusi wrote:
-> More and more boards are moving to have audio support via simple-card.
-> At the same time enable options needed for most am335x and am43xx board for
-> audio support: McASP and TLV320AIC3X codecs.
-> The later two has been selected by the CONFIG_SND_AM33XX_SOC_EVM option, but
-> the aim is to convert all boards to use simple card.
-> 
-> Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
+On Thu, Jul 02, 2015 at 08:05:26AM +0100, Michael van der Westhuizen wrote:
+> Ultimately, the numbering is inconsequential to users in kernel-space when DT is
+> in use.  It?s the userland users we?re trying to help.
 
-Acked-by: Felipe Balbi <balbi@ti.com>
+Yes.  Lets help the users!
+ 
+> In my case, I have quite a lot of vendor-supplied code that needs the numbers to
+> be stable and backward compatible.  This quickly devolves into a discussion of
+> GPIOs in sysfs as an ABI, which is not a discussion I want to have :)
 
-> ---
->  arch/arm/configs/omap2plus_defconfig | 3 +++
->  1 file changed, 3 insertions(+)
-> 
-> diff --git a/arch/arm/configs/omap2plus_defconfig b/arch/arm/configs/omap2plus_defconfig
-> index ac521e764d10..b001f7ae67f3 100644
-> --- a/arch/arm/configs/omap2plus_defconfig
-> +++ b/arch/arm/configs/omap2plus_defconfig
-> @@ -324,10 +324,13 @@ CONFIG_SND_USB_AUDIO=m
->  CONFIG_SND_SOC=m
->  CONFIG_SND_EDMA_SOC=m
->  CONFIG_SND_AM33XX_SOC_EVM=m
-> +CONFIG_SND_DAVINCI_SOC_MCASP=m
->  CONFIG_SND_OMAP_SOC=m
->  CONFIG_SND_OMAP_SOC_OMAP_TWL4030=m
->  CONFIG_SND_OMAP_SOC_OMAP_ABE_TWL6040=m
->  CONFIG_SND_OMAP_SOC_OMAP3_PANDORA=m
-> +CONFIG_SND_SIMPLE_CARD=m
-> +CONFIG_SND_SOC_TLV320AIC3X=m
->  CONFIG_HID_GENERIC=m
->  CONFIG_USB_HIDDEV=y
->  CONFIG_USB_KBD=m
-> -- 
-> 2.4.5
-> 
+In the present state, the gpio numbers on the Altera socfpga change
+with changing kernel releases.  Not only does that suck, but it also
+proves that the gpio numbering is not any kind of ABI.  Rather, it is
+some kind of oversight.
 
--- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150702/df40b30d/attachment.sig>
+Anyhow, the whole point is, when the data sheet says that the SoC has
+GPIO0 to GPION, then those numbers should be exposed to user space.
+
+Thanks,
+Richard
