@@ -1,82 +1,93 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Wed, 01 Jul 2015 17:00:28 -0700
-Subject: [PATCH 4/4] hvc_dcc: disable user-space access to DCC
-In-Reply-To: <1435699387-32591-4-git-send-email-timur@codeaurora.org>
-References: <1435699387-32591-1-git-send-email-timur@codeaurora.org>
- <1435699387-32591-4-git-send-email-timur@codeaurora.org>
-Message-ID: <55947F1C.3020904@codeaurora.org>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Thu, 02 Jul 2015 09:01:41 +0900
+Subject: [PATCH v5 2/3] ARM: dts: Add CPU OPP and regulator supply property
+ for Exynos3250
+In-Reply-To: <1435756877-26736-3-git-send-email-cw00.choi@samsung.com>
+References: <1435756877-26736-1-git-send-email-cw00.choi@samsung.com>
+ <1435756877-26736-3-git-send-email-cw00.choi@samsung.com>
+Message-ID: <55947F65.8010404@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/30/2015 02:23 PM, Timur Tabi wrote:
-> diff --git a/arch/arm/include/asm/dcc.h b/arch/arm/include/asm/dcc.h
-> index b74899d..c50056b 100644
-> --- a/arch/arm/include/asm/dcc.h
-> +++ b/arch/arm/include/asm/dcc.h
-> @@ -9,8 +9,11 @@
->   * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
->   * GNU General Public License for more details.
->   */
-> +#ifndef __ASM_DCC_H
-> +#define __ASM_DCC_H
+On 01.07.2015 22:21, Chanwoo Choi wrote:
+> This patch add CPU operating points which include CPU frequency and regulator
+> voltage to use generic cpufreq drivers.
+> 
+> Cc: Kukjin Kim <kgene@kernel.org>
+> Cc: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+> Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
+> Acked-by: Kyungmin Park <kyungmin.park@samsung.com>
+> ---
+>  arch/arm/boot/dts/exynos3250-monk.dts   |  4 ++++
+>  arch/arm/boot/dts/exynos3250-rinato.dts |  4 ++++
+>  arch/arm/boot/dts/exynos3250.dtsi       | 15 +++++++++++++++
+>  3 files changed, 23 insertions(+)
+
+The patch looks good. Could you put the 'cpu' nodes in alphabetical
+order? The order for Rinato board is already broken but still putting it
+after 'adc' node would be better.
+
+With the change above:
+Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+
+Best regards,
+Krzysztof
+
+> 
+> diff --git a/arch/arm/boot/dts/exynos3250-monk.dts b/arch/arm/boot/dts/exynos3250-monk.dts
+> index a5863acc5fff..fc6604d68864 100644
+> --- a/arch/arm/boot/dts/exynos3250-monk.dts
+> +++ b/arch/arm/boot/dts/exynos3250-monk.dts
+> @@ -118,6 +118,10 @@
+>  	};
+>  };
 >  
->  #include <asm/barrier.h>
-> +#include <asm/hardware/cp14.h>
-
-That's new.
-
+> +&cpu0 {
+> +	cpu0-supply = <&buck2_reg>;
+> +};
+> +
+>  &adc {
+>  	vdd-supply = <&ldo3_reg>;
+>  	status = "okay";
+> diff --git a/arch/arm/boot/dts/exynos3250-rinato.dts b/arch/arm/boot/dts/exynos3250-rinato.dts
+> index 031853b75528..c8a083b376c9 100644
+> --- a/arch/arm/boot/dts/exynos3250-rinato.dts
+> +++ b/arch/arm/boot/dts/exynos3250-rinato.dts
+> @@ -109,6 +109,10 @@
+>  	};
+>  };
 >  
->  static inline u32 __dcc_getstatus(void)
->  {
-> @@ -39,3 +42,15 @@ static inline void __dcc_putchar(char c)
->  		: "r" (c));
->  	isb();
->  }
+> +&cpu0 {
+> +	cpu0-supply = <&buck2_reg>;
+> +};
 > +
-> +static inline void __dcc_initialize(void)
-> +{
-> +	u32 val;
+>  &adc {
+>  	vdd-supply = <&ldo3_reg>;
+>  	status = "okay";
+> diff --git a/arch/arm/boot/dts/exynos3250.dtsi b/arch/arm/boot/dts/exynos3250.dtsi
+> index d7201333e3bc..e0f3b2ed41a3 100644
+> --- a/arch/arm/boot/dts/exynos3250.dtsi
+> +++ b/arch/arm/boot/dts/exynos3250.dtsi
+> @@ -53,6 +53,21 @@
+>  			compatible = "arm,cortex-a7";
+>  			reg = <0>;
+>  			clock-frequency = <1000000000>;
+> +			clocks = <&cmu CLK_ARM_CLK>;
+> +			clock-names = "cpu";
 > +
-> +	/* Disable user-space access to DCC */
-> +	val = MRC14(0, c0, c1, 0);
-> +	val |= 1 << 12; /* DSCR[Comms] */
-> +	MCR14(val, 0, c0, c1, 0);
-> +}
-
-Nitpick: We do raw cp14 accesses for other functions in this file, so it
-would be nice to be consistent throughout.
-
-> +
-> +#endif
-> diff --git a/arch/arm64/include/asm/dcc.h b/arch/arm64/include/asm/dcc.h
-> index fcb8d7d..7843e62 100644
-> --- a/arch/arm64/include/asm/dcc.h
-> +++ b/arch/arm64/include/asm/dcc.h
-> @@ -49,4 +49,15 @@ static inline void __dcc_putchar(char c)
->  	isb();
->  }
+> +			operating-points = <
+> +				1000000 1150000
+> +				900000  1112500
+> +				800000  1075000
+> +				700000  1037500
+> +				600000  1000000
+> +				500000  962500
+> +				400000  925000
+> +				300000  887500
+> +				200000  850000
+> +				100000  850000
+> +			>;
+>  		};
 >  
-> +static inline void __dcc_initialize(void)
-> +{
-> +	u32 val;
-> +
-> +	/* Disable user-space access to DCC */
-> +	asm ("mrs %0, mdscr_el1\n"
-
-shouldn't this be volatile?
-
-> +		"	orr %0, %0, #4096\n" /* Set the TDCC bit */
-
-arm64 has some #defines in debug-monitors.h which we should probably
-extend to have this bit as a #define too.
-
-> +		"	msr mdscr_el1, %0\n"
-> +		: "=r" (val));
-> +}
-> +
->  #endif
->
-
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+>  		cpu1: cpu at 1 {
+> 
