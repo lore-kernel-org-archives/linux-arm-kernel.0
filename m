@@ -1,50 +1,75 @@
 From: peter.ujfalusi@ti.com (Peter Ujfalusi)
-Date: Thu, 2 Jul 2015 14:58:05 +0300
-Subject: [PATCH 1/2] ARM: DTS: am437x-sk-evm: Add sleep pin settings for mcasp1
+Date: Thu, 2 Jul 2015 14:58:06 +0300
+Subject: [PATCH 2/2] ARM: DTS: am437x-sk-evm: Switch using simple-audio-card
+ for audio support
 In-Reply-To: <1435838286-30491-1-git-send-email-peter.ujfalusi@ti.com>
 References: <1435838286-30491-1-git-send-email-peter.ujfalusi@ti.com>
-Message-ID: <1435838286-30491-2-git-send-email-peter.ujfalusi@ti.com>
+Message-ID: <1435838286-30491-3-git-send-email-peter.ujfalusi@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When McASP is not in use the pins can be put to sleep mode to conserve
-power.
+The sound support consist only Headset output on the board and can be
+handled by "simple-audio-card"
 
 Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
 ---
- arch/arm/boot/dts/am437x-sk-evm.dts | 12 +++++++++++-
- 1 file changed, 11 insertions(+), 1 deletion(-)
+ arch/arm/boot/dts/am437x-sk-evm.dts | 30 ++++++++++++++++++++++--------
+ 1 file changed, 22 insertions(+), 8 deletions(-)
 
 diff --git a/arch/arm/boot/dts/am437x-sk-evm.dts b/arch/arm/boot/dts/am437x-sk-evm.dts
-index c17097d2c167..b5de6b0d622c 100644
+index b5de6b0d622c..e09216cb14df 100644
 --- a/arch/arm/boot/dts/am437x-sk-evm.dts
 +++ b/arch/arm/boot/dts/am437x-sk-evm.dts
-@@ -364,6 +364,15 @@
- 		>;
+@@ -32,14 +32,26 @@
  	};
  
-+	mcasp1_pins_sleep: mcasp1_pins_sleep {
-+		pinctrl-single,pins = <
-+			0x10c (PIN_INPUT_PULLDOWN | MUX_MODE7)
-+			0x110 (PIN_INPUT_PULLDOWN | MUX_MODE7)
-+			0x108 (PIN_INPUT_PULLDOWN | MUX_MODE7)
-+			0x144 (PIN_INPUT_PULLDOWN | MUX_MODE7)
-+		>;
-+	};
+ 	sound {
+-		compatible = "ti,da830-evm-audio";
+-		ti,model = "AM437x-SK-EVM";
+-		ti,audio-codec = <&tlv320aic3106>;
+-		ti,mcasp-controller = <&mcasp1>;
+-		ti,codec-clock-rate = <24000000>;
+-		ti,audio-routing =
+-			"Headphone Jack",       "HPLOUT",
+-			"Headphone Jack",       "HPROUT";
++		compatible = "simple-audio-card";
++		simple-audio-card,name = "AM437x-SK-EVM";
++		simple-audio-card,widgets =
++			"Headphone", "Headphone Jack";
++		simple-audio-card,routing =
++			"Headphone Jack",	"HPLOUT",
++			"Headphone Jack",	"HPROUT";
++		simple-audio-card,format = "dsp_b";
++		simple-audio-card,bitclock-master = <&sound_master>;
++		simple-audio-card,frame-master = <&sound_master>;
++		simple-audio-card,bitclock-inversion;
 +
- 	lcd_pins: lcd_pins {
- 		pinctrl-single,pins = <
- 			0x1c (PIN_OUTPUT_PULLDOWN | MUX_MODE7) /* gpcm_ad7.gpio1_7 */
-@@ -640,8 +649,9 @@
++		simple-audio-card,cpu {
++			sound-dai = <&mcasp1>;
++		};
++
++		sound_master: simple-audio-card,codec {
++			sound-dai = <&tlv320aic3106>;
++			system-clock-frequency = <24000000>;
++		};
+ 	};
+ 
+ 	matrix_keypad: matrix_keypad at 0 {
+@@ -489,6 +501,7 @@
+ 	};
+ 
+ 	tlv320aic3106: tlv320aic3106 at 1b {
++		#sound-dai-cells = <0>;
+ 		compatible = "ti,tlv320aic3106";
+ 		reg = <0x1b>;
+ 		status = "okay";
+@@ -649,6 +662,7 @@
  };
  
  &mcasp1 {
--	pinctrl-names = "default";
-+	pinctrl-names = "default", "sleep";
++	#sound-dai-cells = <0>;
+ 	pinctrl-names = "default", "sleep";
  	pinctrl-0 = <&mcasp1_pins>;
-+	pinctrl-1 = <&mcasp1_pins_sleep>;
- 
- 	status = "okay";
- 
+ 	pinctrl-1 = <&mcasp1_pins_sleep>;
 -- 
 2.4.5
