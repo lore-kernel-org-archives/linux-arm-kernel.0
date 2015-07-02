@@ -1,41 +1,32 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Fri, 3 Jul 2015 00:47:28 +0200
-Subject: [PATCH V2 0/5] drivers/rtc/rtc-ds1307.c: Basic cleanups and
- support for wakeupirq
-In-Reply-To: <1435076114-12416-1-git-send-email-nm@ti.com>
-References: <1435076114-12416-1-git-send-email-nm@ti.com>
-Message-ID: <20150702224728.GF3467@piout.net>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Thu, 2 Jul 2015 15:51:22 -0700
+Subject: [PATCH v2 1/9] clk: rockchip: rk3288: add CLK_SET_RATE_PARENT to
+ sclk_mac
+In-Reply-To: <1434637116-17124-2-git-send-email-heiko@sntech.de>
+References: <1434637116-17124-1-git-send-email-heiko@sntech.de>
+ <1434637116-17124-2-git-send-email-heiko@sntech.de>
+Message-ID: <20150702225122.GK4301@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On 23/06/2015 at 11:15:09 -0500, Nishanth Menon wrote :
-> NOTE1: I have only tested in mcp79410 device, and not on other
-> ds1307-rtc driver compatbile devices as I dont have any other.
-> additional testing might be nice to have.
-
-Patchwork picked up V3 of 4/5 correctly so I have applied the series and
-pushed it in rtc-next. It will land in linux-next tomorrow so hopefully,
-this will see more testing.
-
-> NOTE2: there are additional fixes that linux-next seems to need but
-> those are in omap-rtc, cpufreq etc, but those are not related by the
-> ds-1307.
+On 06/18, Heiko Stuebner wrote:
+> The dwmac ethernet controller on the rk3288 supports phys connected
+> via rgmii and rmii. With rgmii phys it is expected that the mac clock
+> is provided externally while with rmii phys the clock can be external
+> but also generated from the plls. In the later case it of course needs
+> be at 50MHz, which gets set from the dwmac_rk driver.
+> As most devices use a rgmii phy it never surfaced so far that the mac
+> clk mux, doesn't go up one lever to the pll clock in the rmii case with
+> internal clock generation, as it is missing the CLK_SET_RATE_PARENT flag,
+> and thus will not set the correct frequency in most cases.
 > 
-> V1: https://patchwork.kernel.org/patch/4759171/
-> 
-> NOTE: Patch 5/5 of the series is meant to indicate the usage, and will
-> be reposted along with other wakeup sources to be enabled once the
-> driver changes are accepted.
-> 
+> Fixes: b9e4ba541607 ("clk: rockchip: add clock controller for rk3288")
+> Cc: stable at vger.kernel.org
+> Signed-off-by: Heiko Stuebner <heiko@sntech.de>
+> ---
 
-I've left that one out so you can send it to the omap maintainers when
-ready.
-
-Thanks!
+Applied to clk-rk3368
 
 -- 
-Alexandre Belloni, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
