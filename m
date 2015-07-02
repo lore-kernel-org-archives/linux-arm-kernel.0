@@ -1,100 +1,52 @@
-From: eric.auger@linaro.org (Eric Auger)
-Date: Thu, 02 Jul 2015 15:53:27 +0200
-Subject: [RFC 16/17] KVM: eventfd: add irq bypass consumer management
-In-Reply-To: <55953FAF.2060401@redhat.com>
-References: <1435843047-6327-1-git-send-email-eric.auger@linaro.org>
- <1435843047-6327-17-git-send-email-eric.auger@linaro.org>
- <55953FAF.2060401@redhat.com>
-Message-ID: <55954257.2020102@linaro.org>
+From: peter.ujfalusi@ti.com (Peter Ujfalusi)
+Date: Thu, 2 Jul 2015 17:06:17 +0300
+Subject: [PATCH v2 02/20] ARM: DTS: am437x-sk-evm: Add sleep pin settings for
+ mcasp1
+In-Reply-To: <1435845995-19085-1-git-send-email-peter.ujfalusi@ti.com>
+References: <1435845995-19085-1-git-send-email-peter.ujfalusi@ti.com>
+Message-ID: <1435845995-19085-3-git-send-email-peter.ujfalusi@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/02/2015 03:42 PM, Paolo Bonzini wrote:
-> 
-> 
-> On 02/07/2015 15:17, Eric Auger wrote:
->> This patch adds the registration/unregistration of an
->> irq_bypass_consumer on irqfd assignment/deassignment.
->>
->> Signed-off-by: Eric Auger <eric.auger@linaro.org>
->> ---
->>  virt/kvm/eventfd.c | 22 +++++++++++++++++++---
->>  1 file changed, 19 insertions(+), 3 deletions(-)
->>
->> diff --git a/virt/kvm/eventfd.c b/virt/kvm/eventfd.c
->> index f3da161..425a47b 100644
->> --- a/virt/kvm/eventfd.c
->> +++ b/virt/kvm/eventfd.c
->> @@ -34,6 +34,7 @@
->>  #include <linux/srcu.h>
->>  #include <linux/slab.h>
->>  #include <linux/seqlock.h>
->> +#include <linux/irqbypass.h>
->>  #include <trace/events/kvm.h>
->>  
->>  #include <kvm/iodev.h>
->> @@ -93,6 +94,7 @@ struct _irqfd {
->>  	struct list_head list;
->>  	poll_table pt;
->>  	struct work_struct shutdown;
->> +	struct irq_bypass_consumer *cons;
->>  };
->>  
->>  static struct workqueue_struct *irqfd_cleanup_wq;
->> @@ -429,7 +431,21 @@ kvm_irqfd_assign(struct kvm *kvm, struct kvm_irqfd *args)
->>  	 */
->>  	fdput(f);
->>  
->> -	/* irq_bypass_register_consumer(); */
->> +	irqfd->cons = kzalloc(sizeof(struct irq_bypass_consumer),
->> +			      GFP_KERNEL);
-> 
-> Apart from the struct embedding technique I suggested in patch 12, this
-> looks very reasonable.  Thanks!
+When McASP is not in use the pins can be put to sleep mode to conserve
+power.
 
-Hi Paolo,
+Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
+Tested-by: Felipe Balbi <balbi@ti.com>
+---
+ arch/arm/boot/dts/am437x-sk-evm.dts | 12 +++++++++++-
+ 1 file changed, 11 insertions(+), 1 deletion(-)
 
-thanks for the swift feedback. I will respin shortly with the advised
-embedding technique.
-
-Best Regards
-
-Eric
-> 
-> Paolo
-> 
->> +	if (!irqfd->cons) {
->> +		ret = -ENOMEM;
->> +		goto fail;
->> +	}
->> +	irqfd->cons->token = (void *)irqfd->eventfd;
->> +	irqfd->cons->gsi = irqfd->gsi;
->> +	irqfd->cons->kvm = kvm;
->> +	irqfd->cons->add_producer = kvm_arch_add_producer;
->> +	irqfd->cons->del_producer = kvm_arch_del_producer;
->> +	irqfd->cons->stop_consumer = kvm_arch_stop_consumer;
->> +	irqfd->cons->resume_consumer = kvm_arch_resume_consumer;
->> +	ret = irq_bypass_register_consumer(irqfd->cons);
->> +	WARN_ON(ret);
->>  
->>  	return 0;
->>  
->> @@ -530,8 +546,6 @@ kvm_irqfd_deassign(struct kvm *kvm, struct kvm_irqfd *args)
->>  	struct _irqfd *irqfd, *tmp;
->>  	struct eventfd_ctx *eventfd;
->>  
->> -	/* irq_bypass_unregister_consumer() */
->> -
->>  	eventfd = eventfd_ctx_fdget(args->fd);
->>  	if (IS_ERR(eventfd))
->>  		return PTR_ERR(eventfd);
->> @@ -550,6 +564,8 @@ kvm_irqfd_deassign(struct kvm *kvm, struct kvm_irqfd *args)
->>  			irqfd->irq_entry.type = 0;
->>  			write_seqcount_end(&irqfd->irq_entry_sc);
->>  			irqfd_deactivate(irqfd);
->> +			irq_bypass_unregister_consumer(irqfd->cons);
->> +			kfree(irqfd->cons);
->>  		}
->>  	}
->>  
->>
+diff --git a/arch/arm/boot/dts/am437x-sk-evm.dts b/arch/arm/boot/dts/am437x-sk-evm.dts
+index c17097d2c167..b5de6b0d622c 100644
+--- a/arch/arm/boot/dts/am437x-sk-evm.dts
++++ b/arch/arm/boot/dts/am437x-sk-evm.dts
+@@ -364,6 +364,15 @@
+ 		>;
+ 	};
+ 
++	mcasp1_pins_sleep: mcasp1_pins_sleep {
++		pinctrl-single,pins = <
++			0x10c (PIN_INPUT_PULLDOWN | MUX_MODE7)
++			0x110 (PIN_INPUT_PULLDOWN | MUX_MODE7)
++			0x108 (PIN_INPUT_PULLDOWN | MUX_MODE7)
++			0x144 (PIN_INPUT_PULLDOWN | MUX_MODE7)
++		>;
++	};
++
+ 	lcd_pins: lcd_pins {
+ 		pinctrl-single,pins = <
+ 			0x1c (PIN_OUTPUT_PULLDOWN | MUX_MODE7) /* gpcm_ad7.gpio1_7 */
+@@ -640,8 +649,9 @@
+ };
+ 
+ &mcasp1 {
+-	pinctrl-names = "default";
++	pinctrl-names = "default", "sleep";
+ 	pinctrl-0 = <&mcasp1_pins>;
++	pinctrl-1 = <&mcasp1_pins_sleep>;
+ 
+ 	status = "okay";
+ 
+-- 
+2.4.5
