@@ -1,41 +1,54 @@
 From: peter.ujfalusi@ti.com (Peter Ujfalusi)
-Date: Thu, 2 Jul 2015 17:06:16 +0300
-Subject: [PATCH v2 01/20] ARM: omap2plus_defconfig: Enable audio related
- config options
+Date: Thu, 2 Jul 2015 17:06:20 +0300
+Subject: [PATCH v2 05/20] ARM: DTS: am43xx-epos-evm: Add regulator for VBAT
+ and DCDC4 of tps65218
 In-Reply-To: <1435845995-19085-1-git-send-email-peter.ujfalusi@ti.com>
 References: <1435845995-19085-1-git-send-email-peter.ujfalusi@ti.com>
-Message-ID: <1435845995-19085-2-git-send-email-peter.ujfalusi@ti.com>
+Message-ID: <1435845995-19085-6-git-send-email-peter.ujfalusi@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-More and more boards are moving to have audio support via simple-card.
-At the same time enable options needed for most am335x and am43xx board for
-audio support: McASP and TLV320AIC3X codecs.
-The later two has been selected by the CONFIG_SND_AM33XX_SOC_EVM option, but
-the aim is to convert all boards to use simple card.
+The VBAT and DCDC4 regulator is needed for audio support (tlv320aic3111)
 
 Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
 ---
- arch/arm/configs/omap2plus_defconfig | 3 +++
- 1 file changed, 3 insertions(+)
+ arch/arm/boot/dts/am43x-epos-evm.dts | 17 +++++++++++++++++
+ 1 file changed, 17 insertions(+)
 
-diff --git a/arch/arm/configs/omap2plus_defconfig b/arch/arm/configs/omap2plus_defconfig
-index ac521e764d10..b001f7ae67f3 100644
---- a/arch/arm/configs/omap2plus_defconfig
-+++ b/arch/arm/configs/omap2plus_defconfig
-@@ -324,10 +324,13 @@ CONFIG_SND_USB_AUDIO=m
- CONFIG_SND_SOC=m
- CONFIG_SND_EDMA_SOC=m
- CONFIG_SND_AM33XX_SOC_EVM=m
-+CONFIG_SND_DAVINCI_SOC_MCASP=m
- CONFIG_SND_OMAP_SOC=m
- CONFIG_SND_OMAP_SOC_OMAP_TWL4030=m
- CONFIG_SND_OMAP_SOC_OMAP_ABE_TWL6040=m
- CONFIG_SND_OMAP_SOC_OMAP3_PANDORA=m
-+CONFIG_SND_SIMPLE_CARD=m
-+CONFIG_SND_SOC_TLV320AIC3X=m
- CONFIG_HID_GENERIC=m
- CONFIG_USB_HIDDEV=y
- CONFIG_USB_KBD=m
+diff --git a/arch/arm/boot/dts/am43x-epos-evm.dts b/arch/arm/boot/dts/am43x-epos-evm.dts
+index 77919c570fe1..9b584d1e0232 100644
+--- a/arch/arm/boot/dts/am43x-epos-evm.dts
++++ b/arch/arm/boot/dts/am43x-epos-evm.dts
+@@ -31,6 +31,14 @@
+ 		enable-active-high;
+ 	};
+ 
++	vbat: fixedregulator at 0 {
++		compatible = "regulator-fixed";
++		regulator-name = "vbat";
++		regulator-min-microvolt = <5000000>;
++		regulator-max-microvolt = <5000000>;
++		regulator-boot-on;
++	};
++
+ 	lcd0: display {
+ 		compatible = "osddisplays,osd057T0559-34ts", "panel-dpi";
+ 		label = "lcd";
+@@ -388,6 +396,15 @@
+ 			regulator-always-on;
+ 		};
+ 
++		dcdc4: regulator-dcdc4 {
++			compatible = "ti,tps65218-dcdc4";
++			regulator-name = "vdcdc4";
++			regulator-min-microvolt = <3300000>;
++			regulator-max-microvolt = <3300000>;
++			regulator-boot-on;
++			regulator-always-on;
++		};
++
+ 		dcdc5: regulator-dcdc5 {
+ 			compatible = "ti,tps65218-dcdc5";
+ 			regulator-name = "v1_0bat";
 -- 
 2.4.5
