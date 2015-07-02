@@ -1,49 +1,137 @@
 From: simon.guinot@sequanux.org (Simon Guinot)
-Date: Thu,  2 Jul 2015 19:56:39 +0200
-Subject: [PATCH v2 0/4] Allow to use leds-ns2 with n090401 boards
-Message-ID: <1435859803-19583-1-git-send-email-simon.guinot@sequanux.org>
+Date: Thu,  2 Jul 2015 19:56:41 +0200
+Subject: [PATCH v2 2/4] ARM: Kirkwood: add modes-map property to ns2-leds nodes
+In-Reply-To: <1435859803-19583-1-git-send-email-simon.guinot@sequanux.org>
+References: <1435859803-19583-1-git-send-email-simon.guinot@sequanux.org>
+Message-ID: <1435859803-19583-3-git-send-email-simon.guinot@sequanux.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+From: Vincent Donnefort <vdonnefort@gmail.com>
 
-This patch series allows to use the leds-ns2 driver with the n090401
-boards (Seagate NAS 4-Bay), based on an Armada-370 SoC.
+Since the LED modes mapping is no longer hardcoded inside the leds-ns2
+driver, then it must be provided through the modes-map property in the
+ns2-leds nodes.
 
-Here is the list changes:
+Signed-off-by: Vincent Donnefort <vdonnefort@gmail.com>
+---
+ arch/arm/boot/dts/kirkwood-d2net.dts   | 5 +++++
+ arch/arm/boot/dts/kirkwood-is2.dts     | 5 +++++
+ arch/arm/boot/dts/kirkwood-ns2.dts     | 5 +++++
+ arch/arm/boot/dts/kirkwood-ns2max.dts  | 5 +++++
+ arch/arm/boot/dts/kirkwood-ns2mini.dts | 5 +++++
+ 5 files changed, 25 insertions(+)
 
-- Allow to configure the LED mode mapping.
-- Handle can_sleep GPIOs. On n090401, the LEDs are connected to an I2C
-  GPIO expander.
-- Make leds-ns2 depends on MACH_ARMADA_370.
-
-Changes for v2:
-- Fix gpio_{get,set}_*_cansleep() usage while holding a spinlock:
-  Holding a spinlock at this places was not needed.
-- Add Acked-by from Jacek Anaszewski for patch 4.
-
-Simon
-
-Simon Guinot (2):
-  leds: leds-ns2: handle can_sleep GPIOs
-  leds: leds-ns2: depends on MACH_ARMADA_370
-
-Vincent Donnefort (2):
-  leds: leds-ns2: move LED modes mapping outside of the driver
-  ARM: Kirkwood: add modes-map property to ns2-leds nodes
-
- .../devicetree/bindings/leds/leds-ns2.txt          |   9 ++
- arch/arm/boot/dts/kirkwood-d2net.dts               |   5 +
- arch/arm/boot/dts/kirkwood-is2.dts                 |   5 +
- arch/arm/boot/dts/kirkwood-ns2.dts                 |   5 +
- arch/arm/boot/dts/kirkwood-ns2max.dts              |   5 +
- arch/arm/boot/dts/kirkwood-ns2mini.dts             |   5 +
- drivers/leds/Kconfig                               |  12 +-
- drivers/leds/leds-ns2.c                            | 169 ++++++++++++---------
- include/dt-bindings/leds/leds-ns2.h                |   8 +
- include/linux/platform_data/leds-kirkwood-ns2.h    |  14 ++
- 10 files changed, 165 insertions(+), 72 deletions(-)
- create mode 100644 include/dt-bindings/leds/leds-ns2.h
-
+diff --git a/arch/arm/boot/dts/kirkwood-d2net.dts b/arch/arm/boot/dts/kirkwood-d2net.dts
+index 6b7856025001..e1c25c35e9ce 100644
+--- a/arch/arm/boot/dts/kirkwood-d2net.dts
++++ b/arch/arm/boot/dts/kirkwood-d2net.dts
+@@ -10,6 +10,7 @@
+ 
+ /dts-v1/;
+ 
++#include <dt-bindings/leds/leds-ns2.h>
+ #include "kirkwood-netxbig.dtsi"
+ 
+ / {
+@@ -28,6 +29,10 @@
+ 			label = "d2net_v2:blue:sata";
+ 			slow-gpio = <&gpio0 29 GPIO_ACTIVE_HIGH>;
+ 			cmd-gpio = <&gpio0 30 GPIO_ACTIVE_HIGH>;
++			modes-map = <NS_V2_LED_OFF  1 0
++				     NS_V2_LED_ON   0 1
++				     NS_V2_LED_ON   1 1
++				     NS_V2_LED_SATA 0 0>;
+ 		};
+ 	};
+ 
+diff --git a/arch/arm/boot/dts/kirkwood-is2.dts b/arch/arm/boot/dts/kirkwood-is2.dts
+index da674bbd49a8..4121674abd1c 100644
+--- a/arch/arm/boot/dts/kirkwood-is2.dts
++++ b/arch/arm/boot/dts/kirkwood-is2.dts
+@@ -1,5 +1,6 @@
+ /dts-v1/;
+ 
++#include <dt-bindings/leds/leds-ns2.h>
+ #include "kirkwood-ns2-common.dtsi"
+ 
+ / {
+@@ -27,6 +28,10 @@
+ 			label = "ns2:blue:sata";
+ 			slow-gpio = <&gpio0 29 0>;
+ 			cmd-gpio = <&gpio0 30 0>;
++			modes-map = <NS_V2_LED_OFF  1 0
++				     NS_V2_LED_ON   0 1
++				     NS_V2_LED_ON   1 1
++				     NS_V2_LED_SATA 0 0>;
+ 		};
+ 	};
+ };
+diff --git a/arch/arm/boot/dts/kirkwood-ns2.dts b/arch/arm/boot/dts/kirkwood-ns2.dts
+index 53368d1022cc..190189d235e6 100644
+--- a/arch/arm/boot/dts/kirkwood-ns2.dts
++++ b/arch/arm/boot/dts/kirkwood-ns2.dts
+@@ -1,5 +1,6 @@
+ /dts-v1/;
+ 
++#include <dt-bindings/leds/leds-ns2.h>
+ #include "kirkwood-ns2-common.dtsi"
+ 
+ / {
+@@ -27,6 +28,10 @@
+ 			label = "ns2:blue:sata";
+ 			slow-gpio = <&gpio0 29 0>;
+ 			cmd-gpio = <&gpio0 30 0>;
++			modes-map = <NS_V2_LED_OFF  1 0
++				     NS_V2_LED_ON   0 1
++				     NS_V2_LED_ON   1 1
++				     NS_V2_LED_SATA 0 0>;
+ 		};
+ 	};
+ };
+diff --git a/arch/arm/boot/dts/kirkwood-ns2max.dts b/arch/arm/boot/dts/kirkwood-ns2max.dts
+index 72c78d0b1116..55cc41d9c80c 100644
+--- a/arch/arm/boot/dts/kirkwood-ns2max.dts
++++ b/arch/arm/boot/dts/kirkwood-ns2max.dts
+@@ -1,5 +1,6 @@
+ /dts-v1/;
+ 
++#include <dt-bindings/leds/leds-ns2.h>
+ #include "kirkwood-ns2-common.dtsi"
+ 
+ / {
+@@ -46,6 +47,10 @@
+ 			label = "ns2:blue:sata";
+ 			slow-gpio = <&gpio0 29 0>;
+ 			cmd-gpio = <&gpio0 30 0>;
++			modes-map = <NS_V2_LED_OFF  1 0
++				     NS_V2_LED_ON   0 1
++				     NS_V2_LED_ON   1 1
++				     NS_V2_LED_SATA 0 0>;
+ 		};
+ 	};
+ };
+diff --git a/arch/arm/boot/dts/kirkwood-ns2mini.dts b/arch/arm/boot/dts/kirkwood-ns2mini.dts
+index c441bf62c09f..9935f3ec29b4 100644
+--- a/arch/arm/boot/dts/kirkwood-ns2mini.dts
++++ b/arch/arm/boot/dts/kirkwood-ns2mini.dts
+@@ -1,5 +1,6 @@
+ /dts-v1/;
+ 
++#include <dt-bindings/leds/leds-ns2.h>
+ #include "kirkwood-ns2-common.dtsi"
+ 
+ / {
+@@ -47,6 +48,10 @@
+ 			label = "ns2:blue:sata";
+ 			slow-gpio = <&gpio0 29 0>;
+ 			cmd-gpio = <&gpio0 30 0>;
++			modes-map = <NS_V2_LED_OFF  1 0
++				     NS_V2_LED_ON   0 1
++				     NS_V2_LED_ON   1 1
++				     NS_V2_LED_SATA 0 0>;
+ 		};
+ 	};
+ };
 -- 
 2.1.4
