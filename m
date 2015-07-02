@@ -1,175 +1,32 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Thu, 2 Jul 2015 12:08:20 +0530
-Subject: [PATCH 05/10] opp: Add support to parse "operating-points-v2"
- bindings
-In-Reply-To: <55949037.80305@codeaurora.org>
-References: <cover.1434369079.git.viresh.kumar@linaro.org>
- <1b5a393f2162752cbb773956dff15739e7525a1d.1434369079.git.viresh.kumar@linaro.org>
- <55949037.80305@codeaurora.org>
-Message-ID: <20150702063820.GE31684@linux>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Thu, 2 Jul 2015 08:44:45 +0200
+Subject: [RFC PATCH 05/15] pwm: introduce default period and polarity
+ concepts
+In-Reply-To: <1435738921-25027-6-git-send-email-boris.brezillon@free-electrons.com>
+References: <1435738921-25027-1-git-send-email-boris.brezillon@free-electrons.com>
+ <1435738921-25027-6-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <20150702064445.GC11824@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01-07-15, 18:13, Stephen Boyd wrote:
-> On 06/15/2015 04:57 AM, Viresh Kumar wrote:
-> > ---
-> >  drivers/base/power/opp.c | 238 ++++++++++++++++++++++++++++++++++++++++++-----
-> >  1 file changed, 213 insertions(+), 25 deletions(-)
-> >
-> > diff --git a/drivers/base/power/opp.c b/drivers/base/power/opp.c
-> > index 2ac48ff9c1ef..3198c3e77224 100644
-> > --- a/drivers/base/power/opp.c
-> > +++ b/drivers/base/power/opp.c
-> > @@ -49,12 +49,17 @@
-> >   *		are protected by the dev_opp_list_lock for integrity.
-> >   *		IMPORTANT: the opp nodes should be maintained in increasing
-> >   *		order.
-> > - * @dynamic:	not-created from static DT entries.
-> >   * @available:	true/false - marks if this OPP as available or not
-> > + * @dynamic:	not-created from static DT entries.
+On Wed, Jul 01, 2015 at 10:21:51AM +0200, Boris Brezillon wrote:
+> When requested by a user, the PWM is assigned a default period and polarity
+> extracted from the DT, the platform data or statically set by the driver.
+> Those default values are currently stored in the period and polarity
+> fields of the pwm_device struct, but they will be stored somewhere else
+> once we have introduced the architecture allowing for hardware state
+> retrieval.
 > 
-> Why move dynamic?
+> The pwm_set_default_polarity and pwm_set_default_period should only be
+> used by PWM drivers or the PWM core infrastructure to specify the
+> default period and polarity values.
+Would it make sense to put the prototypes of
+pwm_set_default_p{olarity,eriod} into (say) drivers/pwm/pwm-private.h
+then?
 
-To match its position, as it is present in the struct below. Yes it
-could have been done in a separate patch, but its also fine to fix
-such silly mistakes in another patch :)
-
-> > + * @turbo:	true if turbo (boost) OPP
-> >   * @rate:	Frequency in hertz
-> > - * @u_volt:	Nominal voltage in microvolts corresponding to this OPP
-> > + * @u_volt:	Target voltage in microvolts corresponding to this OPP
-> > + * @u_volt_min:	Minimum voltage in microvolts corresponding to this OPP
-> > + * @u_volt_max:	Maximum voltage in microvolts corresponding to this OPP
-> > + * @u_amp:	Maximum current drawn by the device in microamperes
-> >   * @dev_opp:	points back to the device_opp struct this opp belongs to
-> >   * @rcu_head:	RCU callback head used for deferred freeing
-> > + * @np:		OPP's device node.
-> >   *
-> >   * This structure stores the OPP information for a given device.
-> >   */
-> > @@ -63,11 +68,22 @@ struct dev_pm_opp {
-> >  
-> >  	bool available;
-> >  	bool dynamic;
-> > +	bool turbo;
-> >  	unsigned long rate;
-> > +
-> > +	/*
-> > +	 * Order in which u_volt{_min|_max} are present in this structure
-> > +	 * shouldn't be changed.
-> > +	 */
-> >  	unsigned long u_volt;
-> > +	unsigned long u_volt_min;
-> > +	unsigned long u_volt_max;
-> > +	unsigned long u_amp;
-> >  
-> >  	struct device_opp *dev_opp;
-> >  	struct rcu_head rcu_head;
-> > +
-> > +	struct device_node *np;
-> >  };
-> >  
-> >  /**
-> > @@ -501,6 +517,7 @@ static void _opp_remove(struct device_opp *dev_opp,
-> >  	 */
-> >  	if (notify)
-> >  		srcu_notifier_call_chain(&dev_opp->srcu_head, OPP_EVENT_REMOVE, opp);
-> > +
-> >  	list_del_rcu(&opp->node);
-> >  	call_srcu(&dev_opp->srcu_head.srcu, &opp->rcu_head, _kfree_opp_rcu);
-> >  
-> 
-> Please remove this hunk of noise.
-
-Sigh
-
-> > @@ -675,6 +692,100 @@ static int _opp_add_dynamic(struct device *dev, unsigned long freq,
-> >  }
-> >  
-> >  /**
-> > + * _opp_add_static_v2() - Allocate static OPPs (As per 'v2' DT bindings)
-> > + * @dev:	device for which we do this operation
-> > + * @np:		device node
-> > + *
-> > + * This function adds an opp definition to the opp list and returns status. The
-> > + * opp can be controlled using dev_pm_opp_enable/disable functions and may be
-> > + * removed by dev_pm_opp_remove.
-> > + *
-> > + * Locking: The internal device_opp and opp structures are RCU protected.
-> > + * Hence this function internally uses RCU updater strategy with mutex locks
-> > + * to keep the integrity of the internal data structures. Callers should ensure
-> > + * that this function is *NOT* called under RCU protection or in contexts where
-> > + * mutex cannot be locked.
-> > + *
-> > + * Return:
-> > + * 0		On success OR
-> > + *		Duplicate OPPs (both freq and volt are same) and opp->available
-> > + * -EEXIST	Freq are same and volt are different OR
-> > + *		Duplicate OPPs (both freq and volt are same) and !opp->available
-> > + * -ENOMEM	Memory allocation failure
-> > + * -EINVAL	Failed parsing the OPP node
-> > + */
-> > +static int _opp_add_static_v2(struct device *dev, struct device_node *np)
-> > +{
-> > +	struct device_opp *dev_opp;
-> > +	struct dev_pm_opp *new_opp;
-> > +	int ret;
-> > +
-> > +	/* Hold our list modification lock here */
-> > +	mutex_lock(&dev_opp_list_lock);
-> > +
-> > +	new_opp = _allocate_opp(dev, &dev_opp);
-> > +	if (!new_opp) {
-> > +		ret = -ENOMEM;
-> > +		goto unlock;
-> > +	}
-> > +
-> > +	ret = of_property_read_u32(np, "opp-hz", (u32 *)&new_opp->rate);
-> > +	if (ret < 0) {
-> > +		dev_err(dev, "%s: opp-hz not found\n", __func__);
-> > +		goto free_opp;
-> > +	}
-> > +
-> > +	if (of_get_property(np, "turbo-mode", NULL))
-> > +		new_opp->turbo = true;
-> 
-> new_opp->turbo = of_property_read_bool(np, "turbo-mode");
-
-Sure.
-
-> > +
-> > +	new_opp->np = np;
-> > +	new_opp->dynamic = false;
-> > +	new_opp->available = true;
-> > +
-> > +	/*
-> > +	 * TODO: Support multiple regulators
-> > +	 *
-> > +	 * read opp-microvolt array
-> > +	 */
-> > +	ret = of_property_count_u32_elems(np, "opp-microvolt");
-> > +	if (ret == 1 || ret == 3) {
-> > +		/* There can be one or three elements here */
-> > +		ret = of_property_read_u32_array(np, "opp-microvolt",
-> > +						 (u32 *)&new_opp->u_volt, ret);
-> 
-> It seems fragile to rely on the struct packing here. Maybe the same
-> comment in the struct should be copied here, and possibly some better
-> way of doing this so the code can't be subtly broken?
-
-Any example of how things will break? Aren't these guaranteed to be
-present at 3 consecutive 32 bit positions ?
-
-> > +
-> > +	pr_debug("%s: turbo:%d rate:%lu uv:%lu uvmin:%lu uvmax:%lu\n",
-> > +		 __func__, new_opp->turbo, new_opp->rate, new_opp->u_volt,
-> > +		 new_opp->u_volt_min, new_opp->u_volt_max);
-> > +
-> > +	mutex_unlock(&dev_opp_list_lock);
-> 
-> We can pr_debug after the unlock?
-
-Okay
+Best regards
+Uwe
 
 -- 
-viresh
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
