@@ -1,97 +1,58 @@
 From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Thu, 02 Jul 2015 16:40:12 -0700
-Subject: [PATCH v2 2/4] dt-bindings: ARM: Mediatek: Document devicetree
- bindings for clock controllers
-In-Reply-To: <CAGS+omCgNstb+NPmRdbngnLm754hDPLO28KRc4RanCD2Myv7dQ@mail.gmail.com>
-References: <1435633127-31952-1-git-send-email-jamesjj.liao@mediatek.com>
- <1435633127-31952-3-git-send-email-jamesjj.liao@mediatek.com>
- <CAGS+omD9Mvz0-RQMc5TsWCPct80S5fyqMn3+-zR7HB9yb7KoDQ@mail.gmail.com>
- <1435805534.3526.23.camel@mtksdaap41>
- <CAGS+omCgNstb+NPmRdbngnLm754hDPLO28KRc4RanCD2Myv7dQ@mail.gmail.com>
-Message-ID: <5595CBDC.7090101@codeaurora.org>
+Date: Thu, 02 Jul 2015 16:46:48 -0700
+Subject: [PATCH 03/10] OPP: Allocate dev_opp from _add_device_opp()
+In-Reply-To: <20150702062455.GD31684@linux>
+References: <cover.1434369079.git.viresh.kumar@linaro.org>
+ <83bd3b9837b30bab62f41aed3dd2cdf52cc21688.1434369079.git.viresh.kumar@linaro.org>
+ <55948DB0.8060500@codeaurora.org> <20150702062455.GD31684@linux>
+Message-ID: <5595CD68.9040701@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/01/2015 09:26 PM, Daniel Kurtz wrote:
-> On Thu, Jul 2, 2015 at 10:52 AM, James Liao <jamesjj.liao@mediatek.com> wrote:
->> Hi Daniel,
->>
->>>> +Required Properties:
->>>> +
->>>> +- compatible: Should be:
->>>> +       - "mediatek,mt8173-imgsys", "syscon"
->>>> +- #clock-cells: Must be 1
->>>> +
->>>> +The imgsys controller uses the common clk binding from
->>>> +Documentation/devicetree/bindings/clock/clock-bindings.txt
->>>> +The available clocks are defined in dt-bindings/clock/mt*-clk.h.
->>>> +
->>>> +Example:
->>>> +
->>>> +imgsys: imgsys at 15000000 {
->>> Since these nodes will be supplying clocks to the rest of the system,
->>> I think the "name" part of each of these should all be
->>> "clock-controller", like topckgen and apmixedsys:
->>>
->>>   imgsys: clock-controller at 15000000 {
->> These subsystems (and topckgen also) also contains other functions such
->> as reset controller, which may be implemented in clk/mediatek/ in the
->> future. It is suitable to use "clock-controller" as their name?
-> Hmm,
->
-> I don't know the "right way" to do this either.
-> Pardon me if you've already had these discussions.
-> I only recently started looking at these clock nodes in detail :-).
->
-> I think what we really have in register space is a "syscon", as
-> described in [0]:
-> [0] Documentation/devicetree/bindings/mfd/syscon.txt
->
-> So, we can define this block of registers as a syscon:
->
-> mmsys_syscon: syscon at 14000000 {
->        compatible = "mediatek,mt8173-mmsys", "syscon";
->        reg = <0 0x14000000 0 0x1000>;
-> };
->
->
-> Then for the clock controller functionality, we create a node with a
-> "clock-controller" name and a "-clock" compatible, like this:
->
-> mmsys_clock: clock-controller {
->        compatible = "mediatek,mt8173-mmsys-clock";
->        #clock-cells = <1>;
->        mediatek,syscon = <&mmsys_syscon>;
-> };
->
-> You could then do:
-> CLK_OF_DECLARE(mtk_mmsys, "mediatek,mt8173-mmsys-clock", mtk_mmsys_init);
->
->
-> If you want to reuse the same register range for some other
-> functionality, we could then use a different node, with a different
-> compatible:
->
-> mmsys: reset-controller {
->        compatible = "mediatek,mt8173-mmsys-reset";
->        mediatek,syscon = <&mmsys_syscon>;
-> };
->
-> What do you think of this approach?
+On 07/01/2015 11:24 PM, Viresh Kumar wrote:
+> On 01-07-15, 18:02, Stephen Boyd wrote:
+>> On 06/15/2015 04:57 AM, Viresh Kumar wrote:
+>>>  	/* Duplicate OPPs ? */
+>>> -	if (new_opp->rate == opp->rate) {
+>>> +	if (opp && new_opp->rate == opp->rate) {
+>> Isn't opp always non-NULL at this point? Maybe this if statement should
+>> be moved into the list_for_each_entry_rcu() loop.
+> when the dev_opp was getting created for the first time, before this
+> patch, we used to do a 'goto list_add'. And so control never reached
+> here, but now we might find a empty list of OPPs and so 'opp' can be
+> NULL here.
 
-DT nodes typically have a reg property. Not having a reg property is a
-good indicator of a problem with the binding. A syscon is used when you
-have a DT node with a reg property and some driver attached to it, but
-you need to poke some bits in another register region that isn't part of
-the reg property. Instead of having multiple nodes with two reg
-properties where the second one is the same, we use a phandle and a syscon.
+Yes, but doesn't list_for_each_entry_rcu() always assign opp to be at
+least &dev_opp->opp_list->next which will be pointing at
+&dev_opp->opp_list if the list is empty (modulo ->member)?
 
-If clock-controller isn't acceptable maybe clock-reset-contoller would
-work? Or "power-controller"? We certainly shouldn't be making up
-multiple nodes for one hardware block. Of course, the subject of the
-patch is "bindings for clock controllers", so it may be that the
-registers are predominantly clock related and so the name is appropriate
-already.
+> Not sure about moving this to the loop, as we are already taking
+> 'dev_opp_list_lock' in this routine.
+
+Sorry, I lost you here. How does that matter? I was suggesting moving
+the duplicate OPP check into the list_for_each_entry_rcu() loop so that
+this NULL check doesn't matter.
+
+>
+>>> +remove_dev_opp:
+>>> +	_remove_device_opp(dev_opp);
+>> Doesn't this just return early because dev_opp has something in it?
+> Hmm, it isn't required probably.
+>
+> ---------------------8<-----------------------
+>
+> Message-Id: <b13057f196330d0e08f3c517676cc3116b1be4ae.1435818265.git.viresh.kumar@linaro.org>
+> From: Viresh Kumar <viresh.kumar@linaro.org>
+> Date: Fri, 12 Jun 2015 12:43:14 +0530
+> Subject: [PATCH] OPP: Allocate dev_opp from _add_device_opp()
+>
+> There is no need to complicate _opp_add_dynamic() with allocation of
+> dev_opp as well. Allocate it from _add_device_opp() instead.
+>
+> Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
+>
+
+Looking better.
 
 -- 
 Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
