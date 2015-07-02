@@ -1,33 +1,38 @@
-From: linux@roeck-us.net (Guenter Roeck)
-Date: Wed, 01 Jul 2015 17:14:39 -0700
-Subject: [PATCH v2 1/2] watchdog: NXP LPC18xx Watchdog Timer Driver
-In-Reply-To: <CAGhQ9VzLX_hy2Z=jUH6on0_sOZBp_mg5cC0JXkHntWxxrr2K6A@mail.gmail.com>
-References: <1435783930-20184-1-git-send-email-ariel@vanguardiasur.com.ar>	<1435783930-20184-2-git-send-email-ariel@vanguardiasur.com.ar>
- <CAGhQ9VzLX_hy2Z=jUH6on0_sOZBp_mg5cC0JXkHntWxxrr2K6A@mail.gmail.com>
-Message-ID: <5594826F.6090203@roeck-us.net>
+From: cw00.choi@samsung.com (Chanwoo Choi)
+Date: Thu, 02 Jul 2015 09:29:49 +0900
+Subject: [PATCH v5 2/3] ARM: dts: Add CPU OPP and regulator supply property
+ for Exynos3250
+In-Reply-To: <55947F65.8010404@samsung.com>
+References: <1435756877-26736-1-git-send-email-cw00.choi@samsung.com>
+ <1435756877-26736-3-git-send-email-cw00.choi@samsung.com>
+ <55947F65.8010404@samsung.com>
+Message-ID: <559485FD.7030805@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/01/2015 04:04 PM, Joachim Eastwood wrote:
-> Hi Ariel,
->
+On 07/02/2015 09:01 AM, Krzysztof Kozlowski wrote:
+> On 01.07.2015 22:21, Chanwoo Choi wrote:
+>> This patch add CPU operating points which include CPU frequency and regulator
+>> voltage to use generic cpufreq drivers.
+>>
+>> Cc: Kukjin Kim <kgene@kernel.org>
+>> Cc: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+>> Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
+>> Acked-by: Kyungmin Park <kyungmin.park@samsung.com>
+>> ---
+>>  arch/arm/boot/dts/exynos3250-monk.dts   |  4 ++++
+>>  arch/arm/boot/dts/exynos3250-rinato.dts |  4 ++++
+>>  arch/arm/boot/dts/exynos3250.dtsi       | 15 +++++++++++++++
+>>  3 files changed, 23 insertions(+)
+> 
+> The patch looks good. Could you put the 'cpu' nodes in alphabetical
+> order? The order for Rinato board is already broken but still putting it
+> after 'adc' node would be better.
+> 
+> With the change above:
+> Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
 
->> +/*
->> + * NXP LPC18xx Watchdog Timer (WDT)
->
-> I think you should use "Windowed Watchdog Timer (WWDT)" here since
-> that is name from the user manual, even though the driver doesn't have
-> window functionality.
-> At least use wwdt for the compatible string, ie: "nxp,lpc1850-wwdt".
->
-> I don't think Guenter asked you to remove the "Windowed" part last
-> time, but only asked what it meant.
+OK. I'll resend it.
 
-I did, separately, but I don't want to start a war of words either.
-No one will know what that term means, and I am personally not too hot
-having to explain it to others.
-
-If you insist using the term, please add a comment into the code
-explaining what it is and that the driver does not support it.
-
-Guenter
+Thanks,
+Chanwoo Choi
