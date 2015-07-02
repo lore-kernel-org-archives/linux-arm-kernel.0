@@ -1,31 +1,42 @@
-From: eric.auger@linaro.org (Eric Auger)
-Date: Thu, 02 Jul 2015 17:41:12 +0200
-Subject: [PATCH 1/7] KVM: api: add kvm_irq_routing_extended_msi
-In-Reply-To: <02eb01d0b4dd$50b25160$f216f420$@samsung.com>
-References: <1435592237-17924-1-git-send-email-eric.auger@linaro.org>
- <1435592237-17924-2-git-send-email-eric.auger@linaro.org>
- <011f01d0b498$6a17aeb0$3e470c10$@samsung.com> <55954F6E.5030008@linaro.org>
- <55955542.6000809@arm.com> <55955728.3080506@linaro.org>
- <02eb01d0b4dd$50b25160$f216f420$@samsung.com>
-Message-ID: <55955B98.1000504@linaro.org>
+From: bigeasy@linutronix.de (Sebastian Andrzej Siewior)
+Date: Thu, 02 Jul 2015 17:54:29 +0200
+Subject: [PATCH 1/2] gpio: dwapb: Use human understandable gpio numbering.
+In-Reply-To: <20150702152147.GA10111@localhost.localdomain>
+References: <cover.1435777856.git.rcochran@linutronix.de>
+ <d6b5ce85a17164970d454583560e07f7aed7b8ca.1435777856.git.rcochran@linutronix.de>
+ <5594E9F6.7040701@linutronix.de>
+ <20150702142601.GB9349@localhost.localdomain>
+ <55954B17.3020303@linutronix.de>
+ <20150702152147.GA10111@localhost.localdomain>
+Message-ID: <55955EB5.4090400@linutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/02/2015 05:39 PM, Pavel Fedin wrote:
->  Hello!
+On 07/02/2015 05:21 PM, Richard Cochran wrote:
+> On Thu, Jul 02, 2015 at 04:30:47PM +0200, Sebastian Andrzej Siewior wrote:
+>> On 07/02/2015 04:26 PM, Richard Cochran wrote:
+>>> On Thu, Jul 02, 2015 at 09:36:22AM +0200, Sebastian Andrzej Siewior wrote:
+>>>> If you are in a specific SoC you could do
+>>>> 	base = of_alias_get_id(np, "gpio") * num_of_gpio_per_chip
+>>>> and get consistent numbers / sane.
+>>>
+>>> And what about /sys/class/gpio ?
+>>
+>> What about it?
 > 
->> OK thanks for sharing. I need some more time to study qemu code too.
-> 
->  I am currently working on supporting this in qemu. Not ready yet, need some time. But, with API i
-> suggest, things are really much-much simpler.
+> The poor users of that interface cannot use "of_alias_get_id" as you suggest.
 
-OK so both of you say the same thing. Will respin accordingly
+You do that in the driver. The only problem with that is that the
+synopsys controller can have between one and four banks and a bank can
+have 1-32 GPIOs if I remember correctly. That means you can't have a
+static number of GPIOs like others do.
+Therefore I think a starting property is the only way and I would
+prefer a generic one.
 
-Eric
+What confuses me a little: Why is there a snps,nr-gpios property?
+Doesn't the snps' IP-Core expose this information?
+
+> Thanks,
+> Richard
 > 
-> Kind regards,
-> Pavel Fedin
-> Expert Engineer
-> Samsung Electronics Research center Russia
-> 
-> 
+Sebastian
