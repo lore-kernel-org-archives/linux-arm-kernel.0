@@ -1,210 +1,52 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Thu, 2 Jul 2015 10:23:10 -0700
-Subject: [PATCH v4 3/8] clk: add support for clocks provided by
- SCP(System Control Processor)
-In-Reply-To: <1433760002-24120-4-git-send-email-sudeep.holla@arm.com>
-References: <1433760002-24120-1-git-send-email-sudeep.holla@arm.com>
- <1433760002-24120-4-git-send-email-sudeep.holla@arm.com>
-Message-ID: <20150702172310.GF4301@codeaurora.org>
+From: msalter@redhat.com (Mark Salter)
+Date: Thu, 02 Jul 2015 13:38:36 -0400
+Subject: [PATCH] ARM64 / SMP: Switch pr_err() to pr_debug() for disabled
+ GICC entry
+In-Reply-To: <1435757843-13236-1-git-send-email-hanjun.guo@linaro.org>
+References: <1435757843-13236-1-git-send-email-hanjun.guo@linaro.org>
+Message-ID: <1435858716.24502.8.camel@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/08, Sudeep Holla wrote:
-> diff --git a/drivers/clk/Kconfig b/drivers/clk/Kconfig
-> index 9897f353bf1a..0fe8daefc105 100644
-> --- a/drivers/clk/Kconfig
-> +++ b/drivers/clk/Kconfig
-> @@ -59,6 +59,16 @@ config COMMON_CLK_RK808
->  	  clocked at 32KHz each. Clkout1 is always on, Clkout2 can off
->  	  by control register.
+On Wed, 2015-07-01 at 21:37 +0800, Hanjun Guo wrote:
+
+> It is normal that firmware presents GICC entry or entries (processors)
+> with disabled flag in ACPI MADT, taking a system of 16 cpus for example,
+> ACPI firmware may present 8 enabled first with another 8 cpus disabled
+> in MADT, the disabled cpus can be hot-added later.
+> 
+> Firmware may also present more cpus than the hardware actually has, but
+> disabled the unused ones, and easily enable it when the hardware has such
+> cpus to make the firmware code scalable.
+> 
+> So that's not an error for disabled cpus in MADT, we can switch
+> pr_err() to pr_debug() instead.
+>
+
+I agree with pr_debug instead of pr_err, but for hotplug to work
+I think we need to continue to parse the MADT instead of bailing
+out altogether, right? We need to know at init time how many
+possible cpus there are and that number never changes as cpus
+are plugged/unplugged. Right now, set_cpu_possible() only gets
+called if smp_cpu_setup() gets called and smp_cpu_setup() only
+gets called if the cpu is in the cpu_logical_map.
+
+
+> Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
+> ---
+>  arch/arm64/kernel/smp.c | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm64/kernel/smp.c b/arch/arm64/kernel/smp.c
+> index 4b2121b..5caf04a 100644
+> --- a/arch/arm64/kernel/smp.c
+> +++ b/arch/arm64/kernel/smp.c
+> @@ -402,7 +402,7 @@ acpi_map_gic_cpu_interface(struct acpi_madt_generic_interrupt *processor)
+>  	}
 >  
-> +config COMMON_CLK_SCPI
-> +        tristate "Clock driver controlled via SCPI interface"
-> +        depends on ARM_SCPI_PROTOCOL || COMPILE_TEST
-> +        ---help---
-> +          This driver provides support for clocks that are controlled
-> +          by firmware that implements the SCPI interface.
-> +
-> +	  This driver uses SCPI Message Protocol to interact with the
-> +	  firmware providing all the clock controls.
-
-The tabbing is weird here. Both paragraphs should have the same
-alignment.
-
-> diff --git a/drivers/clk/clk-scpi.c b/drivers/clk/clk-scpi.c
-> new file mode 100644
-> index 000000000000..707b3430c55f
-> --- /dev/null
-> +++ b/drivers/clk/clk-scpi.c
-> +
-> +#include <linux/clk-provider.h>
-> +#include <linux/device.h>
-> +#include <linux/err.h>
-> +#include <linux/of.h>
-> +#include <linux/module.h>
-> +#include <linux/of_platform.h>
-> +#include <linux/scpi_protocol.h>
-
-Please include <linux/platform_device.h> as well.
-
-> +
-> +struct scpi_clk {
-> +	u32 id;
-> +	const char *name;
-
-Do you need this? Or can you just use __clk_get_name() in places
-where the name is used?
-
-> +	struct clk_hw hw;
-> +	struct scpi_dvfs_info *info;
-> +	struct scpi_ops *scpi_ops;
-> +};
-> +
-> +#define to_scpi_clk(clk) container_of(clk, struct scpi_clk, hw)
-> +
-> +static unsigned long scpi_clk_recalc_rate(struct clk_hw *hw,
-> +					  unsigned long parent_rate)
-> +{
-> +	struct scpi_clk *clk = to_scpi_clk(hw);
-> +
-> +	return clk->scpi_ops->clk_get_val(clk->id);
-> +}
-> +
-> +static long scpi_clk_round_rate(struct clk_hw *hw, unsigned long rate,
-> +				unsigned long *parent_rate)
-> +{
-
-Maybe a comment here like:
-
-/*
- * We can't figure out what rate it will be, so just return the rate
- * back to the caller. scpi_clk_recalc_rate() will be called
- * after the rate is set and we'll know what rate the clock is
- * running at then.
- */
-
-> +	return rate;
-> +}
-> +
-> +static int scpi_clk_set_rate(struct clk_hw *hw, unsigned long rate,
-> +			     unsigned long parent_rate)
-> +{
-> +	struct scpi_clk *clk = to_scpi_clk(hw);
-> +
-> +	return clk->scpi_ops->clk_set_val(clk->id, rate);
-> +}
-> +
-> +static void scpi_clk_disable(struct clk_hw *hw)
-> +{
-> +	scpi_clk_set_rate(hw, 0, 0);
-
-Does this mean you have to set a rate to enable the clock? Are
-you relying on drivers to call clk_set_rate() to implicitly
-enable the clock? If so, it would be better to cache the rate of
-the clock in set_rate if the clock isn't enabled in software and
-then send the cached rate during enable.
-
-> +}
-> +
-[..]
-> +/* find closest match to given frequency in OPP table */
-> +static int __scpi_dvfs_round_rate(struct scpi_clk *clk, unsigned long rate)
-> +{
-> +	int idx;
-> +	u32 fmin = 0, fmax = ~0, ftmp;
-> +	struct scpi_opp *opp = clk->info->opps;
-> +
-
-const?
-
-> +	for (idx = 0; idx < clk->info->count; idx++, opp++) {
-> +		ftmp = opp->freq;
-> +		if (ftmp >= (u32)rate) {
-> +			if (ftmp <= fmax)
-> +				fmax = ftmp;
-> +			break;
-> +		} else if (ftmp >= fmin) {
-> +			fmin = ftmp;
-> +		}
-> +	}
-> +	return fmax != ~0 ? fmax : fmin;
-> +}
-> +
-> +static unsigned long scpi_dvfs_recalc_rate(struct clk_hw *hw,
-> +					   unsigned long parent_rate)
-> +{
-> +	struct scpi_clk *clk = to_scpi_clk(hw);
-> +	int idx = clk->scpi_ops->dvfs_get_idx(clk->id);
-> +	struct scpi_opp *opp;
-
-const?
-
-> +
-> +	if (idx < 0)
-> +		return 0;
-> +
-> +	opp = clk->info->opps + idx;
-> +	return opp->freq;
-> +}
-> +
-> +static long scpi_dvfs_round_rate(struct clk_hw *hw, unsigned long rate,
-> +				 unsigned long *parent_rate)
-> +{
-> +	struct scpi_clk *clk = to_scpi_clk(hw);
-> +
-> +	return __scpi_dvfs_round_rate(clk, rate);
-> +}
-> +
-> +static int __scpi_find_dvfs_index(struct scpi_clk *clk, unsigned long rate)
-> +{
-> +	int idx, max_opp = clk->info->count;
-> +	struct scpi_opp *opp = clk->info->opps;
-
-const?
-
-> +
-> +	for (idx = 0; idx < max_opp; idx++, opp++)
-> +		if (opp->freq == rate)
-> +			return idx;
-> +	return -EINVAL;
-> +}
-> +
-[..]
-> +static struct clk *
-> +scpi_clk_ops_init(struct device *dev, const struct of_device_id *match,
-> +		  struct scpi_clk *sclk)
-> +{
-> +	struct clk_init_data init;
-> +	struct clk *clk;
-> +	unsigned long min = 0, max = 0;
-> +
-> +	init.name = sclk->name;
-> +	init.flags = CLK_IS_ROOT;
-> +	init.num_parents = 0;
-> +	init.ops = match->data;
-> +	sclk->hw.init = &init;
-> +	sclk->scpi_ops = get_scpi_ops();
-> +
-> +	if (init.ops == &scpi_dvfs_ops) {
-> +		sclk->info = sclk->scpi_ops->dvfs_get_info(sclk->id);
-> +		if (IS_ERR(sclk->info))
-> +			return NULL;
-> +	} else if (init.ops == &scpi_clk_ops) {
-> +		if (sclk->scpi_ops->clk_get_range(sclk->id, &min, &max) || !max)
-> +			return NULL;
-> +	} else {
-> +		return NULL;
-> +	}
-> +
-> +	clk = devm_clk_register(dev, &sclk->hw);
-> +	if (!IS_ERR(clk) && max)
-> +		clk_set_rate_range(clk, min, max);
-
-Hm.. we're planning to make clk_register() return a struct
-clk_hw, so this will block that. We need some sort of clk_hw API
-that allows us to setup min/max limits on the clock from the
-provider side. Care to add that?
-
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+>  	if (!(processor->flags & ACPI_MADT_ENABLED)) {
+> -		pr_err("skipping disabled CPU entry with 0x%llx MPIDR\n", hwid);
+> +		pr_debug("skipping disabled CPU entry with 0x%llx MPIDR\n", hwid);
+>  		return;
+>  	}
+>  
