@@ -1,51 +1,52 @@
-From: msalter@redhat.com (Mark Salter)
-Date: Thu, 02 Jul 2015 13:40:22 -0400
-Subject: [PATCH] ARM64 / SMP: Switch pr_err() to pr_debug() for disabled
- GICC entry
-In-Reply-To: <20150702162940.GF1354@e104818-lin.cambridge.arm.com>
-References: <1435757843-13236-1-git-send-email-hanjun.guo@linaro.org>
- <20150702162940.GF1354@e104818-lin.cambridge.arm.com>
-Message-ID: <1435858822.24502.10.camel@redhat.com>
+From: james.morse@arm.com (James Morse)
+Date: Thu, 02 Jul 2015 18:40:32 +0100
+Subject: [PATCH v3 2/5] PCI: designware: Add ARM64 support
+In-Reply-To: <EE11001F9E5DDD47B7634E2F8A612F2E01D4EC38@lhreml503-mbs>
+References: <1435743817-19083-1-git-send-email-wangzhou1@hisilicon.com>
+ <1435743817-19083-3-git-send-email-wangzhou1@hisilicon.com>
+ <EE11001F9E5DDD47B7634E2F8A612F2E01D4E4BB@lhreml503-mbs>
+ <5593F899.6050306@arm.com>
+ <EE11001F9E5DDD47B7634E2F8A612F2E01D4E6A2@lhreml503-mbs>
+ <55942441.3050705@arm.com>
+ <EE11001F9E5DDD47B7634E2F8A612F2E01D4EC38@lhreml503-mbs>
+Message-ID: <55957790.9060802@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2015-07-02 at 17:29 +0100, Catalin Marinas wrote:
-
-> On Wed, Jul 01, 2015 at 09:37:23PM +0800, Hanjun Guo wrote:
-
-> > It is normal that firmware presents GICC entry or entries (processors)
-> > with disabled flag in ACPI MADT, taking a system of 16 cpus for example,
-> > ACPI firmware may present 8 enabled first with another 8 cpus disabled
-> > in MADT, the disabled cpus can be hot-added later.
-> > 
-> > Firmware may also present more cpus than the hardware actually has, but
-> > disabled the unused ones, and easily enable it when the hardware has such
-> > cpus to make the firmware code scalable.
-> > 
-> > So that's not an error for disabled cpus in MADT, we can switch
-> > pr_err() to pr_debug() instead.
-> > 
-> > Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
-> > ---
-> >  arch/arm64/kernel/smp.c | 2 +-
-> >  1 file changed, 1 insertion(+), 1 deletion(-)
-> > 
-> > diff --git a/arch/arm64/kernel/smp.c b/arch/arm64/kernel/smp.c
-> > index 4b2121b..5caf04a 100644
-> > --- a/arch/arm64/kernel/smp.c
-> > +++ b/arch/arm64/kernel/smp.c
-> > @@ -402,7 +402,7 @@ acpi_map_gic_cpu_interface(struct acpi_madt_generic_interrupt *processor)
-> >  	}
-> >  
-> >  	if (!(processor->flags & ACPI_MADT_ENABLED)) {
-> > -		pr_err("skipping disabled CPU entry with 0x%llx MPIDR\n", hwid);
-> > +		pr_debug("skipping disabled CPU entry with 0x%llx MPIDR\n", hwid);
+On 02/07/15 08:24, Gabriele Paoloni wrote:
+>> It looks like the BAR containing the bridge window is not being assigned,
+>> so no devices on bus 1 are discovered.
 > 
-> That's a pretty harmless change. But looking at the use-case, would we
-> expect the disabled entries to have a valid hwid? I guess such hwid is
-> not known, especially if we can hot-plug some CPU at a later time. If
-> that's the case, can we also move this check before the hwid one?
-> 
+> Can you confirm the dtsi you are using..."imx6qdl.dtsi" ?
 
-Heh, I should have read ahead. I just made the same point in a
-mail I just sent.
+Yes, that looks right.
+
+The on-disk file was 'imx6q-sabrelite.dtb' when I received the board, I
+replaced it with the one from the v4.1 kernel tree.
+
+Decompiled from /sys/firmware/fdt (to eliminate bootloader trickery), the
+pcie section reads:
+pcie at 0x01000000 {
+	compatible = "fsl,imx6q-pcie", "snps,dw-pcie";
+	reg = <0x1ffc000 0x4000 0x1f00000 0x80000>;
+	reg-names = "dbi", "config";
+	#address-cells = <0x3>;
+	#size-cells = <0x2>;
+	device_type = "pci";
+	ranges = <0x800 0x0 0x1f00000 0x1f00000 0x0 0x80000 0x81000000 0x0 0x0
+0x1f80000 0x0 0x10000 0x82000000 0x0 0x1000000 0x1000000 0x0 0xf00000>;
+	num-lanes = <0x1>;
+	interrupts = <0x0 0x78 0x4>;
+	interrupt-names = "msi";
+	#interrupt-cells = <0x1>;
+	interrupt-map-mask = <0x0 0x0 0x0 0x7>;
+	interrupt-map = <0x0 0x0 0x0 0x1 0x1 0x0 0x7b 0x4 0x0 0x0 0x0 0x2 0x1 0x0
+0x7a 0x4 0x0 0x0 0x0 0x3 0x1 0x0 0x79 0x4 0x0 0x0 0x0 0x4 0x1 0x0 0x78 0x4>;
+	clocks = <0x3 0x90 0x3 0xce 0x3 0xbd>;
+	clock-names = "pcie", "pcie_bus", "pcie_phy";
+	status = "okay";
+};
+
+
+
+James
