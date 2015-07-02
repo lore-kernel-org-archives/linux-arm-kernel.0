@@ -1,69 +1,127 @@
-From: cyrille.pitchen@atmel.com (Cyrille Pitchen)
-Date: Thu, 2 Jul 2015 15:18:08 +0200
-Subject: [PATCH v4 0/5] tty/serial: at91: add support to FIFOs
-Message-ID: <cover.1435842688.git.cyrille.pitchen@atmel.com>
+From: eric.auger@linaro.org (Eric Auger)
+Date: Thu,  2 Jul 2015 15:17:10 +0200
+Subject: [RFC 00/17] ARM IRQ forward control based on IRQ bypass manager
+Message-ID: <1435843047-6327-1-git-send-email-eric.auger@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-ChangeLog
+This series allows to set ARM IRQ forwarding between a VFIO platform
+device physical IRQ and a guest virtual IRQ.
 
-v4:
-- insert a new patch in the series to remove UART_PUT_* and UART_GET_*
-  macros. replace them by atmel_uart_writel() and atmel_uart_readl().
+The setting is coordinated by the prototype IRQ bypass manager.
+This kernel integration seems now prefered to previous kvm-vfio device
+user api:
+- [RFC v6 00/16] KVM-VFIO IRQ forward control,
+  https://lkml.org/lkml/2015/4/13/353).
 
-v3:
-- add "Acked-by" tags on patches 1, 2 and 4.
-- define macros check the FIFO size and to configure the high and low RTS
-  thresholds in patch 3.
-- fix a spelling mistake in patch 3: s/raisonable/reasonably/
+Some rationale can be found in IRQ bypass manager thread:
+https://lkml.org/lkml/2015/6/29/268
 
-v2:
-- remove "atmel,rts-high-threshold" and "atmel,rts-low-threshold" from new
-  DT properties. For now these two thresholds are set once for all during the
-  probe but a later patch might allow to configure them at run time.
-- reword the commit message of the DT property patch to better explain why we
-  have chosen to introduce the new property "atmel,fifo-size".
-- add a missing chunk in the FIFO patch: as the commit message explains, we
-  need to use 8bit accesses when dealing with the Transmit/Receive Holding
-  Registers.
+The principle is the VFIO platform driver registers a producer struct
+on VFIO_IRQ_SET_ACTION_TRIGGER while KVM irqfd registers a consumer struct
+on the irqfd assignment. This leads to a handshake based on the eventfd
+context (used as token) match.
 
-v1:
-This series of patches add support to FIFOs which will be introduced with Atmel
-sama5d2x SoC.
+When either of the producer/consumer module disappears, this leads to
+an unregistration and the link is disconnected.
 
-FIFOs allow to reduce the number of I/O access. Indeed depending on the data
-size and the USART mode, FIFOs work in either single or multiple data. For
-multiple data, up to 4 data can be written into the Transmit Holding Register
-or read from the Receive Holding Register in a single word access.
+Structure of the series:
+[1-6] Modifications in the VFIO (platform) driver to prepare for dynamic
+      switch between automasked/masked mode
+[7-8] Introduce halt/resume guest capability
+[9] irq bypass manager proto as sent by Alex
+[10-17] Adaptations to support forwarding on top of IRQ bypass manager
 
-Also the RX FIFO allows to reduce the risk of receive overrun and data loss,
-especially when the DMA controller is not used.
+Dependencies:
+1- [PATCH 00/10] arm/arm64: KVM: Active interrupt state switching for
+   shared devices (http://www.spinics.net/lists/kvm/msg117411.html)
+2- RFC "ARM: Forwarding physical interrupts to a guest VM"
+   (http://lwn.net/Articles/603514/)
+3- IRQ bypass manager proto: https://lkml.org/lkml/2015/6/29/268
+4- [RFC v2 0/4] chip/vgic adaptations for forwarded irq
+   http://lists.infradead.org/pipermail/linux-arm-kernel/2015-February/323183.html
 
-Finally, when the hardware handshake mode is selected, the RTS line can now be
-controlled by two thresholds on the RX FIFO. When FIFO level (the number of
-data available to be read) crosses the high threshold, the RTS line is set to
-high level telling the peer that it should stop sending new data. Data are read
-from the RX FIFO and when the FIFO level crosses the low threshold, the RTS
-is set back to low level telling the remote peer that it can send data again.
+All those pieces can be found at:
+https://git.linaro.org/people/eric.auger/linux.git/shortlog/refs/heads/v4.2-rc1-bypass-fwd
 
-This new feature resolves a long time hardware limitation where the RTS line
-was directly controlled by a PDC signal. There is no equivalent of that signal
-for the DMA controller so for all SoCs without PDC for USART there was no mean
-to control the RTS line properly: once the hardware handshake mode selected,
-the RTS line remains high level. Next SoCs with FIFOs will be able to use the
-hardware handshake mode thanks to the RX FIFO.
+More backgroung on ARM IRQ forwarding in the text below and at
+http://www.linux-kvm.org/images/a/a8/01x04-ARMdevice.pdf.
 
-Cyrille Pitchen (5):
-  ARM: at91/dt: add a new DT property to support FIFOs on Atmel USARTs
-  tty/serial: at91: fix some macro definitions to fit coding style
-  tty/serial: at91: remove bunch of macros to access UART registers
-  tty/serial: at91: add support to FIFOs
-  tty/serial: at91: use 32bit writes into TX FIFO when DMA is enabled
+A forwarded IRQ is deactivated by the guest and not by the host.
+When the guest deactivates the associated virtual IRQ, the interrupt
+controller automatically completes the physical IRQ. Obviously
+this requires some HW support in the interrupt controller. This is
+the case for ARM GICv2.
 
- .../devicetree/bindings/serial/atmel-usart.txt     |   3 +
- drivers/tty/serial/atmel_serial.c                  | 467 +++++++++++++--------
- include/linux/atmel_serial.h                       | 240 ++++++-----
- 3 files changed, 439 insertions(+), 271 deletions(-)
+The direct benefit is that, for a level sensitive IRQ, a VM exit
+can be avoided on forwarded IRQ completion.
+
+When the IRQ is forwarded, the VFIO platform driver does not need to
+mask the physical IRQ anymore before signaling the eventfd. Indeed
+genirq lowers the running priority, enabling other physical IRQ to hit
+except that one.
+
+Besides, the injection still is based on irqfd triggering. The only
+impact on irqfd process is resamplefd is not called anymore on
+virtual IRQ completion since deactivation is not trapped by KVM.
+
+This was tested on Calxeda Midway, assigning the xgmac main IRQ
+
+kvm-vfio v6 -> rfc based on IRQ bypass manager
+see previous history in https://lkml.org/lkml/2015/4/13/353).
+
+Best Regards
+
+Eric
+
+
+Alex Williamson (1):
+  bypass: IRQ bypass manager proto by Alex
+
+Eric Auger (16):
+  VFIO: platform: test forwarded state when selecting IRQ handler
+  VFIO: platform: single handler using function pointer
+  VFIO: Introduce vfio_device_external_ops
+  VFIO: pci: initialize vfio_device_external_ops
+  VFIO: platform: implement vfio_device_external_ops callbacks
+  VFIO: add vfio_external_{mask|is_active|set_automasked}
+  KVM: arm: rename pause into power_off
+  kvm: arm/arm64: implement kvm_arm_[halt,resume]_guest
+  KVM: arm: select IRQ_BYPASS_MANAGER
+  VFIO: platform: select IRQ_BYPASS_MANAGER
+  irq: bypass: Extend skeleton for ARM forwarding control
+  KVM: introduce kvm_arch functions for IRQ bypass
+  KVM: arm/arm64: vgic: forwarding control
+  KVM: arm/arm64: implement IRQ bypass consumer functions
+  KVM: eventfd: add irq bypass consumer management
+  VFIO: platform: add irq bypass producer management
+
+ arch/arm/include/asm/kvm_host.h               |   5 +-
+ arch/arm/kvm/Kconfig                          |   1 +
+ arch/arm/kvm/arm.c                            |  60 +++++++-
+ arch/arm/kvm/psci.c                           |  10 +-
+ arch/arm64/include/asm/kvm_host.h             |   3 +
+ arch/x86/kvm/Kconfig                          |   1 +
+ drivers/vfio/pci/Kconfig                      |   1 +
+ drivers/vfio/pci/vfio_pci.c                   |   1 +
+ drivers/vfio/pci/vfio_pci_intrs.c             |   6 +
+ drivers/vfio/platform/Kconfig                 |   1 +
+ drivers/vfio/platform/vfio_platform_common.c  |   9 ++
+ drivers/vfio/platform/vfio_platform_irq.c     | 160 ++++++++++++++++++++-
+ drivers/vfio/platform/vfio_platform_private.h |  14 ++
+ drivers/vfio/vfio.c                           |  39 ++++++
+ include/kvm/arm_vgic.h                        |   7 +
+ include/linux/irqbypass.h                     |  43 ++++++
+ include/linux/kvm_host.h                      |  27 ++++
+ include/linux/vfio.h                          |  34 +++++
+ kernel/irq/Kconfig                            |   3 +
+ kernel/irq/Makefile                           |   1 +
+ kernel/irq/bypass.c                           | 156 +++++++++++++++++++++
+ virt/kvm/arm/vgic.c                           | 195 ++++++++++++++++++++++++++
+ virt/kvm/eventfd.c                            |  20 +++
+ 23 files changed, 778 insertions(+), 19 deletions(-)
+ create mode 100644 include/linux/irqbypass.h
+ create mode 100644 kernel/irq/bypass.c
 
 -- 
-1.8.2.2
+1.9.1
