@@ -1,82 +1,56 @@
-From: cw00.choi@samsung.com (Chanwoo Choi)
-Date: Thu, 02 Jul 2015 09:42:40 +0900
-Subject: [PATCH v6 2/3] ARM: dts: Add CPU OPP and regulator supply property for
- Exynos3250
-In-Reply-To: <1435797761-3339-1-git-send-email-cw00.choi@samsung.com>
-References: <1435797761-3339-1-git-send-email-cw00.choi@samsung.com>
-Message-ID: <1435797761-3339-3-git-send-email-cw00.choi@samsung.com>
+From: human.hwang@samsung.com (Hyungwon Hwang)
+Date: Thu, 02 Jul 2015 09:50:07 +0900
+Subject: [PATCH v2] arm: dma-mapping: fix off-by-one error in bitmap size
+ check
+In-Reply-To: <1435758406-6989-1-git-send-email-m.szyprowski@samsung.com>
+References: <1435754903-25108-1-git-send-email-m.szyprowski@samsung.com>
+ <1435758406-6989-1-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <20150702095007.1d20ed75@hwh-ubuntu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch add CPU operating points which include CPU frequency and regulator
-voltage to use generic cpufreq drivers.
+Dear Marek,
 
-Cc: Kukjin Kim <kgene@kernel.org>
-Cc: Krzysztof Kozlowski <k.kozlowski@samsung.com>
-Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
-Acked-by: Kyungmin Park <kyungmin.park@samsung.com>
-Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
----
- arch/arm/boot/dts/exynos3250-monk.dts   |  4 ++++
- arch/arm/boot/dts/exynos3250-rinato.dts |  4 ++++
- arch/arm/boot/dts/exynos3250.dtsi       | 15 +++++++++++++++
- 3 files changed, 23 insertions(+)
+On Wed, 01 Jul 2015 15:46:38 +0200
+Marek Szyprowski <m.szyprowski@samsung.com> wrote:
 
-diff --git a/arch/arm/boot/dts/exynos3250-monk.dts b/arch/arm/boot/dts/exynos3250-monk.dts
-index a5863acc5fff..7863265d4868 100644
---- a/arch/arm/boot/dts/exynos3250-monk.dts
-+++ b/arch/arm/boot/dts/exynos3250-monk.dts
-@@ -141,6 +141,10 @@
- 	};
- };
- 
-+&cpu0 {
-+	cpu0-supply = <&buck2_reg>;
-+};
-+
- &exynos_usbphy {
- 	status = "okay";
- };
-diff --git a/arch/arm/boot/dts/exynos3250-rinato.dts b/arch/arm/boot/dts/exynos3250-rinato.dts
-index 031853b75528..ddd7ac283045 100644
---- a/arch/arm/boot/dts/exynos3250-rinato.dts
-+++ b/arch/arm/boot/dts/exynos3250-rinato.dts
-@@ -132,6 +132,10 @@
- 	};
- };
- 
-+&cpu0 {
-+	cpu0-supply = <&buck2_reg>;
-+};
-+
- &exynos_usbphy {
- 	status = "okay";
- };
-diff --git a/arch/arm/boot/dts/exynos3250.dtsi b/arch/arm/boot/dts/exynos3250.dtsi
-index d7201333e3bc..e0f3b2ed41a3 100644
---- a/arch/arm/boot/dts/exynos3250.dtsi
-+++ b/arch/arm/boot/dts/exynos3250.dtsi
-@@ -53,6 +53,21 @@
- 			compatible = "arm,cortex-a7";
- 			reg = <0>;
- 			clock-frequency = <1000000000>;
-+			clocks = <&cmu CLK_ARM_CLK>;
-+			clock-names = "cpu";
-+
-+			operating-points = <
-+				1000000 1150000
-+				900000  1112500
-+				800000  1075000
-+				700000  1037500
-+				600000  1000000
-+				500000  962500
-+				400000  925000
-+				300000  887500
-+				200000  850000
-+				100000  850000
-+			>;
- 		};
- 
- 		cpu1: cpu at 1 {
--- 
-1.8.5.5
+> nr_bitmaps member of mapping structure stores the number of already
+> allocated bitmaps and it is interpreted as loop iterator (it starts
+> from 0 not from 1), so a comparison against number of possible bitmap
+> extensions should include this fact. This patch fixes this by changing
+> the extension failure condition. This issue has been introduced by
+> commit 4d852ef8c2544ce21ae41414099a7504c61164a0 ("arm: dma-mapping:
+> Add support to extend DMA IOMMU mappings").
+> 
+> Reported-by: Hyungwon Hwang <human.hwang@samsung.com>
+> Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
+> CC: stable at vger.kernel.org  # v3.15+
+> ---
+> V2 fixed build problem caused by a hurry in patch preparation. My
+> fault. I'm really sorry for the noise.
+> 
+> Best regards
+> Marek Szyprowski, PhD
+> Samsung R&D Institute Poland
+> ---
+>  arch/arm/mm/dma-mapping.c | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
+> index a64b7f621067..05619542a1c0 100644
+> --- a/arch/arm/mm/dma-mapping.c
+> +++ b/arch/arm/mm/dma-mapping.c
+> @@ -2015,7 +2015,7 @@ static int extend_iommu_mapping(struct
+> dma_iommu_mapping *mapping) {
+>  	int next_bitmap;
+>  
+> -	if (mapping->nr_bitmaps > mapping->extensions)
+> +	if (mapping->nr_bitmaps >= mapping->extensions)
+>  		return -EINVAL;
+>  
+>  	next_bitmap = mapping->nr_bitmaps;
+
+With this patch, the error disappeared on my private arm board. Also,
+the fix is clearly reasonable.
+
+Reviewed-by: Hyungwon Hwang <human.hwang@samsung.com>
