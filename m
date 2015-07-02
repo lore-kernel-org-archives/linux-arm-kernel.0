@@ -1,84 +1,60 @@
-From: cory.tusar@pid1solutions.com (Cory Tusar)
-Date: Thu, 02 Jul 2015 12:49:02 -0400
-Subject: [RFC PATCH 2/7] ARM: dts: vfxxx: Include support for qspi1
- functionality.
-In-Reply-To: <0d7c39d4b78fec56adc8a8d66301a3ad@agner.ch>
-References: <1435782010-9809-1-git-send-email-cory.tusar@pid1solutions.com>
- <1435782010-9809-4-git-send-email-cory.tusar@pid1solutions.com>
- <0d7c39d4b78fec56adc8a8d66301a3ad@agner.ch>
-Message-ID: <55956B7E.9010606@pid1solutions.com>
+From: tharvey@gateworks.com (Tim Harvey)
+Date: Thu, 2 Jul 2015 09:49:20 -0700
+Subject: [PATCH v2 1/2] watchdog: imx2_wdt: add external reset support via
+ 'ext-reset-output' dt prop
+In-Reply-To: <20150629011737.GG10332@tiger>
+References: <1432853677-5150-1-git-send-email-tharvey@gateworks.com>
+ <1433448960-9257-1-git-send-email-tharvey@gateworks.com>
+ <1433448960-9257-2-git-send-email-tharvey@gateworks.com>
+ <20150629011737.GG10332@tiger>
+Message-ID: <CAJ+vNU3me-qBZT7h1e+54UNRJw-2SH=nofnTRM4GEn0j9jh3ig@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
------BEGIN PGP SIGNED MESSAGE-----
-Hash: SHA1
-
-On 07/02/2015 09:44 AM, Stefan Agner wrote:
-> On 2015-07-01 22:20, Cory Tusar wrote:
->> This commit extends the existing Vybrid QSPI devicetree implementation
->> to also describe the qspi1 functional block.
->>
->> Signed-off-by: Cory Tusar <cory.tusar@pid1solutions.com>
->> ---
->>  arch/arm/boot/dts/vfxxx.dtsi | 13 +++++++++++++
->>  1 file changed, 13 insertions(+)
->>
->> diff --git a/arch/arm/boot/dts/vfxxx.dtsi b/arch/arm/boot/dts/vfxxx.dtsi
->> index 089a263..a7c370e 100644
->> --- a/arch/arm/boot/dts/vfxxx.dtsi
->> +++ b/arch/arm/boot/dts/vfxxx.dtsi
->> @@ -251,6 +251,19 @@
->>  				status = "disabled";
->>  			};
->>  
->> +			qspi1: quadspi at 400c4000 {
->> +				#address-cells = <1>;
->> +				#size-cells = <0>;
->> +				compatible = "fsl,vf610-qspi";
->> +				reg = <0x400c4000 0x1000>, <0x50000000 0x10000000>;
->> +				reg-names = "QuadSPI", "QuadSPI-memory";
->> +				interrupts = <25 IRQ_TYPE_LEVEL_HIGH>;
->> +				clocks = <&clks VF610_CLK_QSPI1_EN>,
->> +					<&clks VF610_CLK_QSPI1>;
->> +				clock-names = "qspi_en", "qspi";
->> +				status = "disabled";
->> +			};
+On Sun, Jun 28, 2015 at 6:17 PM, Shawn Guo <shawnguo@kernel.org> wrote:
+> On Thu, Jun 04, 2015 at 01:15:59PM -0700, Tim Harvey wrote:
+>> @@ -90,6 +92,11 @@ static int imx2_restart_handler(struct notifier_block *this, unsigned long mode,
+>>       struct imx2_wdt_device *wdev = container_of(this,
+>>                                                   struct imx2_wdt_device,
+>>                                                   restart_handler);
 >> +
->>  			iomuxc: iomuxc at 40048000 {
->>  				compatible = "fsl,vf610-iomuxc";
->>  				reg = <0x40048000 0x1000>;
-> 
-> This seem to be at the wrong place under aips0. qspi1 should be under
-> aips1. just before fec0. But other than that, I checked the addresses
-> looks good to me. Hence with that change applied you can include:
-> 
-> Reviewed-by: Stefan Agner <stefan@agner.ch>
+>> +     /* Use external reset */
+>> +     if (wdev->ext_reset)
+>> +             wcr_enable |= IMX2_WDT_WCR_SRS;
+>> +
+>
+> The existing code simply writes the register with only WDE (Watchdog
+> Enable) bit set.  That said, bit WDA and SRS are cleared at the same
+> time.  What's the result of that?  Both internal reset and external
+> reset will be asserted?  If this is the case, it's unsafe per your reply
+> to Frank's comment, right?  So we should only clear one bit between
+> these two based on ext_reset flag to avoid asserting both internal and
+> external reset?
+>
+> Shawn
 
-Hi Stefan,
+Shawn,
 
-Thanks for the review.  Will update for the next version.
+Correct.
 
-You'd think I would've checked that after making the same goof with
-i2c... :/
+Are you saying that you think we should change the above to something
+like the following to ensure in the internal reset case external reset
+is not also being asserted?:
 
-- -Cory
++     /* Use external reset */
++     if (wdev->ext_reset)
++             wcr_enable |= IMX2_WDT_WCR_SRS; /* do not assert
+internal system reset */
++     else
++             wcr_enable |= IMX2_WDT_WCR_WDA; /* do not assert external reset */
 
+I was not worried about the else case above because if you hit that
+path your device-tree is saying you are not using external reset
+anyway.
 
-- -- 
-Cory Tusar
-Principal
-PID 1 Solutions, Inc.
+Tim
 
-
-"There are two ways of constructing a software design.  One way is to
- make it so simple that there are obviously no deficiencies, and the
- other way is to make it so complicated that there are no obvious
- deficiencies."  --Sir Charles Anthony Richard Hoare
-
------BEGIN PGP SIGNATURE-----
-Version: GnuPG v2
-
-iEYEARECAAYFAlWVa34ACgkQHT1tsfGwHJ/yCwCfU0jadwpYzOmZ86jDqSvtht+A
-XvkAoKqfQJQmwVSibjxRDe57DcCWYlXd
-=+QPB
------END PGP SIGNATURE-----
+>
+>>       /* Assert SRS signal */
+>>       regmap_write(wdev->regmap, 0, wcr_enable);
+>>       /*
