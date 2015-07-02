@@ -1,49 +1,42 @@
-From: punnaiah.choudary.kalluri@xilinx.com (Punnaiah Choudary Kalluri)
-Date: Thu, 2 Jul 2015 02:33:14 +0000
-Subject: macb: zynq: why is SG disabled?
-In-Reply-To: <55941D80.2090904@atmel.com>
-References: <559403E3.3050900@certsign.ro> <55941D80.2090904@atmel.com>
-Message-ID: <03CA77BA8AF6F1469AEDFBDA1322A7B7495B9EE3@XAP-PVEXMBX02.xlnx.xilinx.com>
+From: jamesjj.liao@mediatek.com (James Liao)
+Date: Thu, 2 Jul 2015 10:52:14 +0800
+Subject: [PATCH v2 2/4] dt-bindings: ARM: Mediatek: Document devicetree
+ bindings for clock controllers
+In-Reply-To: <CAGS+omD9Mvz0-RQMc5TsWCPct80S5fyqMn3+-zR7HB9yb7KoDQ@mail.gmail.com>
+References: <1435633127-31952-1-git-send-email-jamesjj.liao@mediatek.com>
+ <1435633127-31952-3-git-send-email-jamesjj.liao@mediatek.com>
+ <CAGS+omD9Mvz0-RQMc5TsWCPct80S5fyqMn3+-zR7HB9yb7KoDQ@mail.gmail.com>
+Message-ID: <1435805534.3526.23.camel@mtksdaap41>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Nicolae and Cyrille,
+Hi Daniel,
 
-   SG feature was not tested for Zynq using macb driver but tested it using the
- emacps Driver in Xilinx tree (this driver is deprecated recently)
+> > +Required Properties:
+> > +
+> > +- compatible: Should be:
+> > +       - "mediatek,mt8173-imgsys", "syscon"
+> > +- #clock-cells: Must be 1
+> > +
+> > +The imgsys controller uses the common clk binding from
+> > +Documentation/devicetree/bindings/clock/clock-bindings.txt
+> > +The available clocks are defined in dt-bindings/clock/mt*-clk.h.
+> > +
+> > +Example:
+> > +
+> > +imgsys: imgsys at 15000000 {
+> 
+> Since these nodes will be supplying clocks to the rest of the system,
+> I think the "name" part of each of these should all be
+> "clock-controller", like topckgen and apmixedsys:
+> 
+>   imgsys: clock-controller at 15000000 {
 
-We will test and enable this feature in driver for Zynq.
+These subsystems (and topckgen also) also contains other functions such
+as reset controller, which may be implemented in clk/mediatek/ in the
+future. It is suitable to use "clock-controller" as their name?
 
-Regards,
-Punnaiah
 
-> -----Original Message-----
-> From: Cyrille Pitchen [mailto:cyrille.pitchen at atmel.com]
-> Sent: Wednesday, July 01, 2015 10:34 PM
-> To: Nicolae Rosia; Michal Simek; Punnaiah Choudary Kalluri;
-> netdev at vger.kernel.org; Nicolas Ferre; linux-arm-kernel at lists.infradead.org
-> Subject: Re: macb: zynq: why is SG disabled?
-> 
-> Le 01/07/2015 17:14, Nicolae Rosia a ?crit :
-> > Hello,
-> >
-> > After reading the GEM part of Zynq7000 Technical Reference Manual [0], I
-> think that SG should be supported.
-> > Is there a reason why SG is disabled in macb for Zynq?
-> >
-> > Best regards,
-> > Nicolae Rosia
-> 
-> Hi Nicolae,
-> 
-> when the scatter-gather patch was introduced, the feature was enabled only
-> on tested boards to avoid regressions on other boards.
-> So SG is enabled on sama5d4x and sama5d2x SoCs. SG is disabled on purpose
-> on sama5d3x.
-> 
-> For Zynq, I think the feature is still disabled just because it has never been
-> tested.
-> 
-> Best regards,
-> 
-> Cyrille
+Best regards,
+
+James
