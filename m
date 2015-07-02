@@ -1,30 +1,97 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Thu, 02 Jul 2015 10:07:11 +0200
-Subject: [RFC] arm: psci: implement cpuidle_ops
-In-Reply-To: <20150702111031.05f04184@xhacker>
-References: <20150702111031.05f04184@xhacker>
-Message-ID: <5594F12F.6050401@linaro.org>
+From: djkurtz@chromium.org (Daniel Kurtz)
+Date: Thu, 2 Jul 2015 16:14:28 +0800
+Subject: [PATCH v3 2/2] pwm: add MediaTek display PWM driver support
+In-Reply-To: <1435590211-38854-3-git-send-email-yh.huang@mediatek.com>
+References: <1435590211-38854-1-git-send-email-yh.huang@mediatek.com>
+ <1435590211-38854-3-git-send-email-yh.huang@mediatek.com>
+Message-ID: <CAGS+omBYZ8LJrCwV=21_z33yjWfh9dqU5uve7SqMc9yB033wqg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/02/2015 05:10 AM, Jisheng Zhang wrote:
-> Hi all,
+On Mon, Jun 29, 2015 at 11:03 PM, YH Huang <yh.huang@mediatek.com> wrote:
+> Add display PWM driver support to modify backlight for MT8173 and MT6595.
+> The PWM has one channel to control the brightness of the display.
+> When the (high_width / period) is closer to 1, the screen is brighter; otherwise, it is darker.
 >
-> we'd like to use cpuidle-arm.c for both arm and arm64 with psci as backend. For
-> arm64, it works. But for arm, we miss cpuidle_ops. I want to add cpuidle_ops for
-> arm psci, I dunno whether this is the correct direction, could you please give
-> suggestions?
+> Change-Id: Ie85b295e2dddd90b4163af1c906df977f79b59d6
+> Signed-off-by: YH Huang <yh.huang@mediatek.com>
+> ---
+>  drivers/pwm/Kconfig        |  10 ++
+>  drivers/pwm/Makefile       |   1 +
+>  drivers/pwm/pwm-mtk-disp.c | 256 +++++++++++++++++++++++++++++++++++++++++++++
+>  3 files changed, 267 insertions(+)
+>  create mode 100644 drivers/pwm/pwm-mtk-disp.c
+>
+> diff --git a/drivers/pwm/Kconfig b/drivers/pwm/Kconfig
+> index b1541f4..90e3c079 100644
+> --- a/drivers/pwm/Kconfig
+> +++ b/drivers/pwm/Kconfig
+> @@ -211,6 +211,16 @@ config PWM_LPSS_PLATFORM
+>           To compile this driver as a module, choose M here: the module
+>           will be called pwm-lpss-platform.
+>
+> +config PWM_MTK_DISP
+> +       tristate "MediaTek display PWM driver"
+> +       depends on HAS_IOMEM
 
-You should look at the macro
+depends on ARCH_MEDIATEK || COMPILE_TEST
 
-arch/arm/include/asm/cpuidle.h:
+> +       help
+> +         Generic PWM framework driver for MediaTek disp-pwm device.
+> +         The PWM is used to control the backlight brightness for display.
+> +
+> +         To compile this driver as a module, choose M here: the module
+> +         will be called pwm-mtk-disp.
+> +
+>  config PWM_MXS
+>         tristate "Freescale MXS PWM support"
+>         depends on ARCH_MXS && OF
+> diff --git a/drivers/pwm/Makefile b/drivers/pwm/Makefile
+> index ec50eb5..99c9e75 100644
+> --- a/drivers/pwm/Makefile
+> +++ b/drivers/pwm/Makefile
+> @@ -18,6 +18,7 @@ obj-$(CONFIG_PWM_LPC32XX)     += pwm-lpc32xx.o
+>  obj-$(CONFIG_PWM_LPSS)         += pwm-lpss.o
+>  obj-$(CONFIG_PWM_LPSS_PCI)     += pwm-lpss-pci.o
+>  obj-$(CONFIG_PWM_LPSS_PLATFORM)        += pwm-lpss-platform.o
+> +obj-$(CONFIG_PWM_MTK_DISP)     += pwm-mtk-disp.o
+>  obj-$(CONFIG_PWM_MXS)          += pwm-mxs.o
+>  obj-$(CONFIG_PWM_PCA9685)      += pwm-pca9685.o
+>  obj-$(CONFIG_PWM_PUV3)         += pwm-puv3.o
+> diff --git a/drivers/pwm/pwm-mtk-disp.c b/drivers/pwm/pwm-mtk-disp.c
+> new file mode 100644
+> index 0000000..fb3a42e
+> --- /dev/null
+> +++ b/drivers/pwm/pwm-mtk-disp.c
+> @@ -0,0 +1,256 @@
+> +/*
+> + * MediaTek display pulse-width-modulation controller driver.
+> + * Copyright (c) 2015 MediaTek Inc.
+> + * Author: YH Huang <yh.huang@mediatek.com>
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> + *
+> + * This program is distributed in the hope that it will be useful,
+> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + * GNU General Public License for more details.
+> + */
+> +
+> +#include <linux/clk.h>
+> +#include <linux/err.h>
+> +#include <linux/io.h>
+> +#include <linux/module.h>
+> +#include <linux/of.h>
+> +#include <linux/pwm.h>
+> +#include <linux/platform_device.h>
+> +#include <linux/slab.h>
+> +
+> +#define DISP_PWM_EN            0x0
+> +#define PWM_ENABLE_MASK                0x1
 
-#define CPUIDLE_METHOD_OF_DECLARE(name, _method, _ops)
+For one bit fields like this, it is nicer to use: BIT()
 
-
--- 
-  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
-
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+Thanks!
+-Dan
