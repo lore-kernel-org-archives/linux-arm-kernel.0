@@ -1,80 +1,74 @@
 From: peter.ujfalusi@ti.com (Peter Ujfalusi)
-Date: Thu, 2 Jul 2015 17:06:18 +0300
-Subject: [PATCH v2 03/20] ARM: DTS: am437x-sk-evm: Switch using
- simple-audio-card for audio support
+Date: Thu, 2 Jul 2015 17:06:19 +0300
+Subject: [PATCH v2 04/20] ARM: DTS: am43xx-epos-evm: Add gpio-hog for
+ configuring the display/audio mux
 In-Reply-To: <1435845995-19085-1-git-send-email-peter.ujfalusi@ti.com>
 References: <1435845995-19085-1-git-send-email-peter.ujfalusi@ti.com>
-Message-ID: <1435845995-19085-4-git-send-email-peter.ujfalusi@ti.com>
+Message-ID: <1435845995-19085-5-git-send-email-peter.ujfalusi@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The sound support consist only Headset output on the board and can be
-handled by "simple-audio-card".
-Also enable the Line-In route as the board has support for it.
+GPIO2_1 is used as a mux switch between LCD and HDMI displays. This mux
+affects audio routing as well since in LCD mode HDMI audio is not possible
+and when HDMI is selected analog audio is not working.
 
 Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
-Tested-by: Felipe Balbi <balbi@ti.com>
 ---
- arch/arm/boot/dts/am437x-sk-evm.dts | 33 +++++++++++++++++++++++++--------
- 1 file changed, 25 insertions(+), 8 deletions(-)
+ arch/arm/boot/dts/am43x-epos-evm.dts | 27 +++++++++++++++------------
+ 1 file changed, 15 insertions(+), 12 deletions(-)
 
-diff --git a/arch/arm/boot/dts/am437x-sk-evm.dts b/arch/arm/boot/dts/am437x-sk-evm.dts
-index b5de6b0d622c..22af44894c66 100644
---- a/arch/arm/boot/dts/am437x-sk-evm.dts
-+++ b/arch/arm/boot/dts/am437x-sk-evm.dts
-@@ -32,14 +32,29 @@
- 	};
+diff --git a/arch/arm/boot/dts/am43x-epos-evm.dts b/arch/arm/boot/dts/am43x-epos-evm.dts
+index 795d68af6df9..77919c570fe1 100644
+--- a/arch/arm/boot/dts/am43x-epos-evm.dts
++++ b/arch/arm/boot/dts/am43x-epos-evm.dts
+@@ -35,17 +35,6 @@
+ 		compatible = "osddisplays,osd057T0559-34ts", "panel-dpi";
+ 		label = "lcd";
  
- 	sound {
--		compatible = "ti,da830-evm-audio";
--		ti,model = "AM437x-SK-EVM";
--		ti,audio-codec = <&tlv320aic3106>;
--		ti,mcasp-controller = <&mcasp1>;
--		ti,codec-clock-rate = <24000000>;
--		ti,audio-routing =
--			"Headphone Jack",       "HPLOUT",
--			"Headphone Jack",       "HPROUT";
-+		compatible = "simple-audio-card";
-+		simple-audio-card,name = "AM437x-SK-EVM";
-+		simple-audio-card,widgets =
-+			"Headphone", "Headphone Jack",
-+			"Line", "Line In";
-+		simple-audio-card,routing =
-+			"Headphone Jack",	"HPLOUT",
-+			"Headphone Jack",	"HPROUT",
-+			"LINE1L",		"Line In",
-+			"LINE1R",		"Line In";
-+		simple-audio-card,format = "dsp_b";
-+		simple-audio-card,bitclock-master = <&sound_master>;
-+		simple-audio-card,frame-master = <&sound_master>;
-+		simple-audio-card,bitclock-inversion;
-+
-+		simple-audio-card,cpu {
-+			sound-dai = <&mcasp1>;
-+		};
-+
-+		sound_master: simple-audio-card,codec {
-+			sound-dai = <&tlv320aic3106>;
-+			system-clock-frequency = <24000000>;
-+		};
- 	};
+-		pinctrl-names = "default";
+-		pinctrl-0 = <&lcd_pins>;
+-
+-		/*
+-		 * SelLCDorHDMI, LOW to select HDMI. This is not really the
+-		 * panel's enable GPIO, but we don't have HDMI driver support nor
+-		 * support to switch between two displays, so using this gpio as
+-		 * panel's enable should be safe.
+-		 */
+-		enable-gpios = <&gpio2 1 GPIO_ACTIVE_HIGH>;
+-
+ 		panel-timing {
+ 			clock-frequency = <33000000>;
+ 			hactive = <800>;
+@@ -278,7 +267,7 @@
+ 			>;
+ 		};
  
- 	matrix_keypad: matrix_keypad at 0 {
-@@ -489,6 +504,7 @@
- 	};
- 
- 	tlv320aic3106: tlv320aic3106 at 1b {
-+		#sound-dai-cells = <0>;
- 		compatible = "ti,tlv320aic3106";
- 		reg = <0x1b>;
- 		status = "okay";
-@@ -649,6 +665,7 @@
+-		lcd_pins: lcd_pins {
++		display_mux_pins: display_mux_pins {
+ 			pinctrl-single,pins = <
+ 				/* GPMC CLK -> GPIO 2_1 to select LCD / HDMI */
+ 				0x08C (PIN_OUTPUT_PULLUP | MUX_MODE7)
+@@ -458,7 +447,21 @@
  };
  
- &mcasp1 {
-+	#sound-dai-cells = <0>;
- 	pinctrl-names = "default", "sleep";
- 	pinctrl-0 = <&mcasp1_pins>;
- 	pinctrl-1 = <&mcasp1_pins_sleep>;
+ &gpio2 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&display_mux_pins>;
+ 	status = "okay";
++
++	p1 {
++		/*
++		 * SelLCDorHDMI selects between display and audio paths:
++		 * Low: HDMI display with audio via HDMI
++		 * High: LCD display with analog audio via aic3111 codec
++		 */
++		gpio-hog;
++		gpios = <1 GPIO_ACTIVE_HIGH>;
++		output-high;
++		line-name = "SelLCDorHDMI";
++	};
+ };
+ 
+ &gpio3 {
 -- 
 2.4.5
