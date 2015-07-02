@@ -1,82 +1,138 @@
-From: michael@smart-africa.com (Michael van der Westhuizen)
-Date: Thu, 2 Jul 2015 08:05:26 +0100
-Subject: [PATCH 1/2] gpio: dwapb: Use human understandable gpio numbering.
-In-Reply-To: <d6b5ce85a17164970d454583560e07f7aed7b8ca.1435777856.git.rcochran@linutronix.de>
-References: <cover.1435777856.git.rcochran@linutronix.de>
- <d6b5ce85a17164970d454583560e07f7aed7b8ca.1435777856.git.rcochran@linutronix.de>
-Message-ID: <267A46E7-C5C5-4696-90CC-D44F4130B3EF@smart-africa.com>
+From: tfiga@chromium.org (Tomasz Figa)
+Date: Thu, 2 Jul 2015 16:07:01 +0900
+Subject: [PATCH v2 2/5] drm/rockchip: vop: fix yuv plane support
+In-Reply-To: <5594DFF2.8020609@rock-chips.com>
+References: <1435313249-4549-1-git-send-email-mark.yao@rock-chips.com>
+ <1435313249-4549-3-git-send-email-mark.yao@rock-chips.com>
+ <CAAFQd5AAYSMNRtJBVU+2LHhA=JhJQVTEGmf2+pVt5JMXbbmg-g@mail.gmail.com>
+ <5594DFF2.8020609@rock-chips.com>
+Message-ID: <CAAFQd5AgaWNaYgkL9HebgeiXf0n1t79nAq0CYpb9ASY88gf4Gg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-I have a very similar patch in my tree, and I?ve substituted this patch for mine,
-tested it and it works correctly.  However, there are administrative issues with
-this change.
+On Thu, Jul 2, 2015 at 3:53 PM, Mark yao <mark.yao@rock-chips.com> wrote:
+> Hi Tomasz
+>     Thanks for your review, I will fix it soon.
+>
+> On 2015?07?02? 14:00, Tomasz Figa wrote:
+>>
+>> Hi Mark,
+>>
+>> Please see my comments inline.
+>>
+>> On Fri, Jun 26, 2015 at 7:07 PM, Mark Yao <mark.yao@rock-chips.com> wrote:
+>>>
+>>> vop support yuv with NV12, NV16 and NV24, only 2 plane yuv.
+>>>
+>>> Signed-off-by: Mark Yao <mark.yao@rock-chips.com>
+>>>
+>>> Changes in v2:
+>>> - Uv buffer not support odd offset, align it.
+>>> - Fix error display when move yuv image.
+>>>
+>>> ---
+>>>   drivers/gpu/drm/rockchip/rockchip_drm_vop.c |   63
+>>> ++++++++++++++++++++++++---
+>>>   1 file changed, 57 insertions(+), 6 deletions(-)
+>>>
+>>> diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
+>>> b/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
+>>> index 3c9f4f3..6ca08f8 100644
+>>> --- a/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
+>>> +++ b/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
+>>> @@ -373,6 +373,18 @@ static enum vop_data_format
+>>> vop_convert_format(uint32_t format)
+>>>          }
+>>>   }
+>>>
+>>> +static bool is_yuv_support(uint32_t format)
+>>> +{
+>>> +       switch (format) {
+>>> +       case DRM_FORMAT_NV12:
+>>> +       case DRM_FORMAT_NV16:
+>>> +       case DRM_FORMAT_NV24:
+>>> +               return true;
+>>> +       default:
+>>> +               return false;
+>>> +       }
+>>> +}
+>>> +
+>>>   static bool is_alpha_support(uint32_t format)
+>>>   {
+>>>          switch (format) {
+>>> @@ -577,16 +589,21 @@ static int vop_update_plane_event(struct drm_plane
+>>> *plane,
+>>>          struct vop *vop = to_vop(crtc);
+>>>          struct drm_gem_object *obj;
+>>>          struct rockchip_gem_object *rk_obj;
+>>> +       struct drm_gem_object *uv_obj;
+>>> +       struct rockchip_gem_object *rk_uv_obj;
+>>>          unsigned long offset;
+>>>          unsigned int actual_w;
+>>>          unsigned int actual_h;
+>>>          unsigned int dsp_stx;
+>>>          unsigned int dsp_sty;
+>>>          unsigned int y_vir_stride;
+>>> +       unsigned int uv_vir_stride;
+>>>          dma_addr_t yrgb_mst;
+>>> +       dma_addr_t uv_mst;
+>>>          enum vop_data_format format;
+>>>          uint32_t val;
+>>>          bool is_alpha;
+>>> +       bool is_yuv;
+>>>          bool visible;
+>>>          int ret;
+>>>          struct drm_rect dest = {
+>>> @@ -608,6 +625,12 @@ static int vop_update_plane_event(struct drm_plane
+>>> *plane,
+>>>          };
+>>>          bool can_position = plane->type != DRM_PLANE_TYPE_PRIMARY;
+>>>
+>>> +       if (drm_format_num_planes(fb->pixel_format) > 2) {
+>>> +               DRM_ERROR("unsupport more than 2 plane format[%08x]\n",
+>>> +                         fb->pixel_format);
+>>> +               return -EINVAL;
+>>> +       }
+>>
+>> Hmm, do you need to check this? Doesn't the core guarantee that with
+>> given pixel_format you always get the right plane count? (Possibly at
+>> fb creation time, but I haven't checked that.)
+>
+>
+> I just want to point out that update_plane can't handle buffer number > 2
+> case.
+>
+> But since all windows can't support 3 buffer count format, this check can
+> remove.
+>
 
-> On 01 Jul 2015, at 8:34 PM, Richard Cochran <richardcochran@gmail.com> wrote:
-> 
-> The system-on-chips using this IP core have well defined gpio numbers.
-> Instead of using random numbers, this patch lets the device tree specify
-> the correct gpio numbering.
+Even if some windows could support 3 planes, I think this check is
+unnecessary, because before calling .update_plane(), the DRM core
+actually checks if given format is supported by particular plane, so
+inside the callback you can be sure that fb->pixel_format is supported
+by given plane. Now, plane count is implied by fourcc, so again it is
+impossible to have .update_plane() called with, for example, NV12 and
+1 or 3 planes.
 
-The subject should not end with a full-stop.
+>>>
+>>> +       if (is_yuv) {
+>>> +               src.x1 &= (~1) << 16;
+>>> +               src.y1 &= (~1) << 16;
+>>
+>> Hmm, if you align x1 and y1, shouldn't you also offset x2 and y2, so
+>> the width and height of the rectangle are preserved? Also I couldn't
+>> find any details on this, but what are the semantics of
+>> .update_plane(), should it really align the values or maybe just fail?
+>
+>
+> for yuv format, the buffer start point need align, can't be odd.
+>
+> OK, I will fix the x2 and y2 offset.
+>
 
-Also, the commit message should explain why the change is needed, not what
-it does.  While the message is accurate, the problem is not that humans can?t
-really make sense of the GPIO numbering, its that the GPIO numbering exposed
-to userland is often important for backward compatibility with a vendor BSP and
-it can be important (conceptually) to tie this numbering to the vendor documentation.
+I'd actually wait for someone else to comment on this, because I'm not
+sure what's the correct handling of such rounding in DRM. Dave,
+Daniel, Rob?
 
-Ultimately, the numbering is inconsequential to users in kernel-space when DT is
-in use.  It?s the userland users we?re trying to help.
-
-In my case, I have quite a lot of vendor-supplied code that needs the numbers to
-be stable and backward compatible.  This quickly devolves into a discussion of
-GPIOs in sysfs as an ABI, which is not a discussion I want to have :)
-
-> 
-> Signed-off-by: Richard Cochran <rcochran@linutronix.de>
-> ---
-> Documentation/devicetree/bindings/gpio/snps-dwapb-gpio.txt | 2 ++
-> drivers/gpio/gpio-dwapb.c                                  | 8 +++++++-
-> 2 files changed, 9 insertions(+), 1 deletion(-)
-> 
-> diff --git a/Documentation/devicetree/bindings/gpio/snps-dwapb-gpio.txt b/Documentation/devicetree/bindings/gpio/snps-dwapb-gpio.txt
-> index dd5d2c0..5c9effd 100644
-> --- a/Documentation/devicetree/bindings/gpio/snps-dwapb-gpio.txt
-> +++ b/Documentation/devicetree/bindings/gpio/snps-dwapb-gpio.txt
-> @@ -28,6 +28,7 @@ controller.
-> - interrupt-parent : The parent interrupt controller.
-> - interrupts : The interrupt to the parent controller raised when GPIOs
->   generate the interrupts.
-> +- snps,base : The base gpio number.
-> - snps,nr-gpios : The number of pins in the port, a single cell.
-> 
-> Example:
-> @@ -42,6 +43,7 @@ gpio: gpio at 20000 {
-> 		compatible = "snps,dw-apb-gpio-port";
-> 		gpio-controller;
-> 		#gpio-cells = <2>;
-> +		snps,base = <8>;
-> 		snps,nr-gpios = <8>;
-> 		reg = <0>;
-> 		interrupt-controller;
-
-This bindings change need to be in a separate patch for review by the devicetree maintainers.
-
-> diff --git a/drivers/gpio/gpio-dwapb.c b/drivers/gpio/gpio-dwapb.c
-> index 58faf04..b7e7977 100644
-> --- a/drivers/gpio/gpio-dwapb.c
-> +++ b/drivers/gpio/gpio-dwapb.c
-> @@ -491,6 +491,13 @@ dwapb_gpio_get_pdata_of(struct device *dev)
-> 			return ERR_PTR(-EINVAL);
-> 		}
-> 
-> +		if (of_property_read_u32(port_np, "snps,base",
-> +					 &pp->gpio_base)) {
-> +			dev_info(dev, "no base gpio specified for %s\n",
-> +				 port_np->full_name);
-
-This should be dev_dbg, or should just be removed.  This is not a problem, as it is simply
-maintaining existing behaviour.
-
-Michael
+Best regards,
+Tomasz
