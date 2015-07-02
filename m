@@ -1,65 +1,67 @@
-From: andre.przywara@arm.com (Andre Przywara)
-Date: Thu, 2 Jul 2015 18:10:04 +0100
-Subject: [PATCH 7/7] KVM: arm: implement kvm_set_msi by gsi direct mapping
-In-Reply-To: <1435592237-17924-8-git-send-email-eric.auger@linaro.org>
-References: <1435592237-17924-1-git-send-email-eric.auger@linaro.org>
- <1435592237-17924-8-git-send-email-eric.auger@linaro.org>
-Message-ID: <5595706C.9010108@arm.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Thu,  2 Jul 2015 18:12:32 +0100
+Subject: [PATCHv4 0/5] arm/arm64: Unify PSCI client support	
+Message-ID: <1435857157-24952-1-git-send-email-mark.rutland@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Eric,
+This series unifies the 32-bit and 64-bit PSCI client code, moving the bulk of
+the FW invocation and probing out to a common location in drivers/firmware. The
+bulk of the PSCI 0.2 cleanups have hit mainline now, so this is just the
+unification portion.
 
-On 29/06/15 16:37, Eric Auger wrote:
-> If the ITS modality is not available, let's simply support MSI
-> injection by transforming the MSI.data into an SPI ID.
-> 
-> This becomes possible to use KVM_SIGNAL_MSI ioctl for arm too.
-> 
-> Signed-off-by: Eric Auger <eric.auger@linaro.org>
-> ---
->  arch/arm/kvm/Kconfig | 1 +
->  virt/kvm/arm/vgic.c  | 5 +++++
->  2 files changed, 6 insertions(+)
-> 
-> diff --git a/arch/arm/kvm/Kconfig b/arch/arm/kvm/Kconfig
-> index 151e710..0f58baf 100644
-> --- a/arch/arm/kvm/Kconfig
-> +++ b/arch/arm/kvm/Kconfig
-> @@ -31,6 +31,7 @@ config KVM
->  	select KVM_VFIO
->  	select HAVE_KVM_EVENTFD
->  	select HAVE_KVM_IRQFD
-> +	select HAVE_KVM_MSI
->  	select HAVE_KVM_IRQCHIP
->  	select HAVE_KVM_IRQ_ROUTING
->  	depends on ARM_VIRT_EXT && ARM_LPAE && ARM_ARCH_TIMER
-> diff --git a/virt/kvm/arm/vgic.c b/virt/kvm/arm/vgic.c
-> index 0b4c48c..b3c10dc 100644
-> --- a/virt/kvm/arm/vgic.c
-> +++ b/virt/kvm/arm/vgic.c
-> @@ -2314,6 +2314,11 @@ int kvm_set_msi(struct kvm_kernel_irq_routing_entry *e,
->  			return kvm->arch.vgic.vm_ops.inject_msi(kvm, &msi);
->  		else
->  			return -ENODEV;
-> +	case KVM_IRQ_ROUTING_MSI:
-> +		if (kvm->arch.vgic.vm_ops.inject_msi)
-> +			return -EINVAL;
-> +		else
-> +			return kvm_vgic_inject_irq(kvm, 0, e->msi.data, level);
+This results in a reasonable saving in terms of lines of code, and will allow
+for PSCI 1.0 support to be unified form the beginning, avoiding further
+duplication.
 
-If you add:
+Since v3 [1]:
+* Drop the PSCI 0.2 patches as they're in mainline
+* s/__pa/virt_to_idmap/ from Grygorii Strashko
+* Use macros for Calxeda CPU_SUSPEND parameters
 
-static int vgic_v2m_inject_msi(struct kvm *kvm, struct kvm_msi *msi)
-{
-	return kvm_vgic_inject_irq(kvm, 0, msi->data, 1);
-}
+Russell, are you happy with the penultimate patch? If so, how would you prefer
+that this be merged?
 
-to vgic-v2-emul.c and wire it up accordingly, you can simplify the above
-kvm_set_msi, getting rid of all those extra case handling.
-This also helps merging KVM_IRQ_ROUTING_MSI and the extended case.
+Rob, are you happy with the Highbank PM and Calxeda cpuidle changes?
 
-I have hacked this up and it seems to work for me.
+Thanks,
+Mark.
 
-Cheers,
-Andre.
+[1] http://lists.infradead.org/pipermail/linux-arm-kernel/2015-May/346492.html
+
+Grygorii Strashko (1):
+  ARM: psci: boot_secondary: replace __pa with virt_to_idmap
+
+Mark Rutland (4):
+  arm64: psci: factor invocation code to drivers
+  drivers: psci: support native SMC{32,64} calls
+  ARM: migrate to common PSCI client code
+  MAINTAINERS: add PSCI entry
+
+ MAINTAINERS                       |   9 +
+ arch/arm/Kconfig                  |   1 +
+ arch/arm/include/asm/psci.h       |  23 ---
+ arch/arm/kernel/Makefile          |   2 +-
+ arch/arm/kernel/psci.c            | 299 -----------------------------
+ arch/arm/kernel/psci_smp.c        |  31 ++-
+ arch/arm/kernel/setup.c           |   3 +-
+ arch/arm/mach-highbank/highbank.c |   2 +-
+ arch/arm/mach-highbank/pm.c       |  16 +-
+ arch/arm64/Kconfig                |   1 +
+ arch/arm64/include/asm/acpi.h     |   4 +-
+ arch/arm64/include/asm/psci.h     |  28 ---
+ arch/arm64/kernel/psci.c          | 361 +----------------------------------
+ arch/arm64/kernel/setup.c         |   2 +-
+ drivers/cpuidle/cpuidle-calxeda.c |  15 +-
+ drivers/firmware/Kconfig          |   3 +
+ drivers/firmware/Makefile         |   1 +
+ drivers/firmware/psci.c           | 383 ++++++++++++++++++++++++++++++++++++++
+ include/linux/psci.h              |  52 ++++++
+ 19 files changed, 501 insertions(+), 735 deletions(-)
+ delete mode 100644 arch/arm/kernel/psci.c
+ delete mode 100644 arch/arm64/include/asm/psci.h
+ create mode 100644 drivers/firmware/psci.c
+ create mode 100644 include/linux/psci.h
+
+-- 
+1.9.1
