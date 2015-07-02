@@ -1,54 +1,73 @@
 From: peter.ujfalusi@ti.com (Peter Ujfalusi)
-Date: Thu, 2 Jul 2015 17:06:22 +0300
-Subject: [PATCH v2 07/20] ARM: DTS: am43xx-epos-evm: Add node for
- tlv320aic3111 audio codec
+Date: Thu, 2 Jul 2015 17:06:28 +0300
+Subject: [PATCH v2 13/20] ARM: DTS: am437x-gp-evm: Enable analog audio via
+ simple-card
 In-Reply-To: <1435845995-19085-1-git-send-email-peter.ujfalusi@ti.com>
 References: <1435845995-19085-1-git-send-email-peter.ujfalusi@ti.com>
-Message-ID: <1435845995-19085-8-git-send-email-peter.ujfalusi@ti.com>
+Message-ID: <1435845995-19085-14-git-send-email-peter.ujfalusi@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Analog audio is using this codec on the board.
+The board uses McASP1 <-> tlv320aic3106 for analog audio and has
+Headphone out and Line in connectors.
 
 Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
 ---
- arch/arm/boot/dts/am43x-epos-evm.dts | 17 +++++++++++++++++
- 1 file changed, 17 insertions(+)
+ arch/arm/boot/dts/am437x-gp-evm.dts | 28 ++++++++++++++++++++++++++++
+ 1 file changed, 28 insertions(+)
 
-diff --git a/arch/arm/boot/dts/am43x-epos-evm.dts b/arch/arm/boot/dts/am43x-epos-evm.dts
-index 11fced01975d..d171e734d3cf 100644
---- a/arch/arm/boot/dts/am43x-epos-evm.dts
-+++ b/arch/arm/boot/dts/am43x-epos-evm.dts
-@@ -14,6 +14,7 @@
- #include <dt-bindings/pinctrl/am43xx.h>
- #include <dt-bindings/gpio/gpio.h>
- #include <dt-bindings/pwm/pwm.h>
-+#include <dt-bindings/sound/tlv320aic31xx-micbias.h>
- 
- / {
- 	model = "TI AM43x EPOS EVM";
-@@ -465,6 +466,22 @@
- 		touchscreen-size-x = <1024>;
- 		touchscreen-size-y = <600>;
+diff --git a/arch/arm/boot/dts/am437x-gp-evm.dts b/arch/arm/boot/dts/am437x-gp-evm.dts
+index 98fcf6f17961..8e6ada75c428 100644
+--- a/arch/arm/boot/dts/am437x-gp-evm.dts
++++ b/arch/arm/boot/dts/am437x-gp-evm.dts
+@@ -113,6 +113,32 @@
+ 		clock-frequency = <12000000>;
  	};
+ 
++	sound0: sound at 0 {
++		compatible = "simple-audio-card";
++		simple-audio-card,name = "AM437x-GP-EVM";
++		simple-audio-card,widgets =
++			"Headphone", "Headphone Jack",
++			"Line", "Line In";
++		simple-audio-card,routing =
++			"Headphone Jack",	"HPLOUT",
++			"Headphone Jack",	"HPROUT",
++			"LINE1L",		"Line In",
++			"LINE1R",		"Line In";
++		simple-audio-card,format = "dsp_b";
++		simple-audio-card,bitclock-master = <&sound0_master>;
++		simple-audio-card,frame-master = <&sound0_master>;
++		simple-audio-card,bitclock-inversion;
 +
-+	tlv320aic3111: tlv320aic3111 at 18 {
-+		compatible = "ti,tlv320aic3111";
-+		reg = <0x18>;
-+		status = "okay";
++		simple-audio-card,cpu {
++			sound-dai = <&mcasp1>;
++			system-clock-frequency = <12000000>;
++		};
 +
-+		ai31xx-micbias-vg = <MICBIAS_2_0V>;
-+
-+		/* Regulators */
-+		HPVDD-supply = <&dcdc4>; /* v3_3AUD -> V3_3D -> DCDC4 */
-+		SPRVDD-supply = <&vbat>; /* vbat */
-+		SPLVDD-supply = <&vbat>; /* vbat */
-+		AVDD-supply = <&dcdc4>; /* v3_3AUD -> V3_3D -> DCDC4 */
-+		IOVDD-supply = <&dcdc4>; /* V3_3D -> DCDC4 */
-+		DVDD-supply = <&ldo1>; /* V1_8AUD -> V1_8D -> LDO1 */
++		sound0_master: simple-audio-card,codec {
++			sound-dai = <&tlv320aic3106>;
++			system-clock-frequency = <12000000>;
++		};
 +	};
  };
  
- &i2c2 {
+ &am43xx_pinmux {
+@@ -530,6 +556,7 @@
+ 	};
+ 
+ 	tlv320aic3106: tlv320aic3106 at 1b {
++		#sound-dai-cells = <0>;
+ 		compatible = "ti,tlv320aic3106";
+ 		reg = <0x1b>;
+ 		status = "okay";
+@@ -825,6 +852,7 @@
+ };
+ 
+ &mcasp1 {
++	#sound-dai-cells = <0>;
+ 	pinctrl-names = "default", "sleep";
+ 	pinctrl-0 = <&mcasp1_pins>;
+ 	pinctrl-1 = <&mcasp1_sleep_pins>;
 -- 
 2.4.5
