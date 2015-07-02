@@ -1,108 +1,58 @@
-From: cw00.choi@samsung.com (Chanwoo Choi)
-Date: Thu, 02 Jul 2015 15:11:00 +0900
-Subject: [PATCH] ARM: dts: Add CPU cooling binding for Exynos3250-based
- Rinato/Monk board
-In-Reply-To: <5594D22C.4040206@samsung.com>
-References: <1435815465-501-1-git-send-email-cw00.choi@samsung.com>
- <5594D22C.4040206@samsung.com>
-Message-ID: <5594D5F4.3060508@samsung.com>
+From: mark.yao@rock-chips.com (Mark yao)
+Date: Thu, 02 Jul 2015 14:13:11 +0800
+Subject: [PATCH v2 1/5] drm/rockchip: vop: optimize virtual stride
+ calculate
+In-Reply-To: <CAAFQd5B-W2uWFXo9me_MPdp0LDp0CK+mG6Rsbro9+JQSUBA4bw@mail.gmail.com>
+References: <1435313249-4549-1-git-send-email-mark.yao@rock-chips.com>
+ <1435313249-4549-2-git-send-email-mark.yao@rock-chips.com>
+ <CAAFQd5B-W2uWFXo9me_MPdp0LDp0CK+mG6Rsbro9+JQSUBA4bw@mail.gmail.com>
+Message-ID: <5594D677.20202@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/02/2015 02:54 PM, Krzysztof Kozlowski wrote:
-> On 02.07.2015 14:37, Chanwoo Choi wrote:
->> This patch add the cooling device to control the overheating issue on
->> Exynos3250-based Rinato/Monk board.
+On 2015?07?02? 12:59, Tomasz Figa wrote:
+> On Fri, Jun 26, 2015 at 7:07 PM, Mark Yao <mark.yao@rock-chips.com> wrote:
+>> vir_stride need number words of the virtual width, and fb->pitches
+>> save bytes_per_pixel, so just div 4 switch to stride.
 >>
->> Cc: Kukjin Kim <kgene@kernel.org>
->> Cc: Krzysztof Kozlowski <k.kozlowski@samsung.com>
->> Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
->> Acked-by: Kyungmin Park <kyungmin.park@samsung.com>
+>> Signed-off-by: Mark Yao <mark.yao@rock-chips.com>
 >> ---
->> Depends on:
->> This patch needs the cpufreq support of Exynos3250 SoC. So, this patch has the
->> dependency on patch[1] which support the generic cpufreq for Exynos3250 SoC.
->> [1] https://lkml.org/lkml/2015/7/1/696
->>     : [PATCH v6 0/3] cpufreq: Use cpufreq-dt driver for Exynos3250
+>> Changes in v2: None
 >>
->>  arch/arm/boot/dts/exynos3250-monk.dts   | 15 +++++++++++++++
->>  arch/arm/boot/dts/exynos3250-rinato.dts | 15 +++++++++++++++
->>  arch/arm/boot/dts/exynos3250.dtsi       |  1 +
->>  3 files changed, 31 insertions(+)
+>>   drivers/gpu/drm/rockchip/rockchip_drm_vop.c |    2 +-
+>>   1 file changed, 1 insertion(+), 1 deletion(-)
 >>
->> diff --git a/arch/arm/boot/dts/exynos3250-monk.dts b/arch/arm/boot/dts/exynos3250-monk.dts
->> index 7863265d4868..540a0adf2be6 100644
->> --- a/arch/arm/boot/dts/exynos3250-monk.dts
->> +++ b/arch/arm/boot/dts/exynos3250-monk.dts
->> @@ -116,6 +116,21 @@
->>  		min-microvolt = <1100000>;
->>  		max-microvolt = <2700000>;
->>  	};
->> +
->> +	thermal-zones {
->> +		cpu_thermal: cpu-thermal {
->> +			cooling-maps {
->> +				map0 {
->> +					/* Correspond to 500MHz at freq_table */
->> +					cooling-device = <&cpu0 5 5>;
->> +				};
->> +				map1 {
->> +					/* Correspond to 200MHz at freq_table */
->> +					cooling-device = <&cpu0 8 8>;
->> +				};
->> +			};
->> +		};
->> +	};
->>  };
->>  
->>  &adc {
->> diff --git a/arch/arm/boot/dts/exynos3250-rinato.dts b/arch/arm/boot/dts/exynos3250-rinato.dts
->> index ddd7ac283045..0e62a6435e07 100644
->> --- a/arch/arm/boot/dts/exynos3250-rinato.dts
->> +++ b/arch/arm/boot/dts/exynos3250-rinato.dts
->> @@ -107,6 +107,21 @@
->>  		min-microvolt = <1100000>;
->>  		max-microvolt = <2700000>;
->>  	};
->> +
->> +	thermal-zones {
->> +		cpu_thermal: cpu-thermal {
->> +			cooling-maps {
->> +				map0 {
->> +					/* Corresponds to 500MHz */
->> +					cooling-device = <&cpu0 5 5>;
->> +				};
->> +				map1 {
->> +					/* Corresponds to 200MHz */
->> +					cooling-device = <&cpu0 8 8>;
->> +				};
->> +			};
->> +		};
->> +	};
->>  };
->>  
->>  &adc {
->> diff --git a/arch/arm/boot/dts/exynos3250.dtsi b/arch/arm/boot/dts/exynos3250.dtsi
->> index e0f3b2ed41a3..a4931b660ddb 100644
->> --- a/arch/arm/boot/dts/exynos3250.dtsi
->> +++ b/arch/arm/boot/dts/exynos3250.dtsi
->> @@ -55,6 +55,7 @@
->>  			clock-frequency = <1000000000>;
->>  			clocks = <&cmu CLK_ARM_CLK>;
->>  			clock-names = "cpu";
->> +			#cooling-cells = <2>;
->>  
-> 
-> Don't you need also cooling-{min,max}-state properties?
+>> diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_vop.c b/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
+>> index 6188221..3c9f4f3 100644
+>> --- a/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
+>> +++ b/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
+>> @@ -644,7 +644,7 @@ static int vop_update_plane_event(struct drm_plane *plane,
+>>          offset += (src.y1 >> 16) * fb->pitches[0];
+>>          yrgb_mst = rk_obj->dma_addr + offset;
+>>
+>> -       y_vir_stride = fb->pitches[0] / (fb->bits_per_pixel >> 3);
+>> +       y_vir_stride = fb->pitches[0] >> 2;
+> If the unit of y_vir_stride is words then doesn't it mean that the
+> calculation before this patch was just invalid? If yes, shouldn't the
+> subject actually say "Fix virtual stride calculation"?
+>
+> Best regards,
+> Tomasz
+>
+>
+>
+Hi Tomasz
+     the calculation thinking before is that:
+        fb->pitches[0] = surface_width * bytes_per_pixel
+        surface_width = fb->pitches[0] / bytes_per_pixel
+                               = fb->pitches[0] / (fb->bits_per_pixel >> 3)
 
-Yes, it is well working without cooling-{min,max}-state or cooling-{min,max}-level.
+    means that "y_vir_stride = surface_width",
 
-I look for the some code to parse "cooling-{min,max}-state or cooling-{min,max}-level"
-in drivers/thermal/*. But, there are no any code to parse it.
+ARGB888 one pixel is word size, So that is right for ARGB888, but wrong for other formats.
 
-But, Documentation/devicetree/bindings/thermal/thermal.txt contains just the 'cooling-{min,max}-state.
+You are right, subject say "Fix virtual stride calculation" is suitable.
 
-I think that there are mismatch between document and thermal core driver.
-
-Thanks,
-Chanwoo Choi
+Best regards,
+-- 
+?ark Yao
