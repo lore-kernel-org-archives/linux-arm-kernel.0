@@ -1,16 +1,18 @@
 From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Wed, 1 Jul 2015 18:25:38 -0700
-Subject: [PATCH 02/10] OPP: Create _remove_device_opp() for freeing dev_opp
-In-Reply-To: <fba1ec728e2ecf9303e13372a2557d886aa7e49c.1434369079.git.viresh.kumar@linaro.org>
+Date: Wed, 1 Jul 2015 18:27:18 -0700
+Subject: [PATCH 06/10] OPP: Add clock-latency-ns support
+In-Reply-To: <1376f9ac3f955e67bd56327ea0ac9aecd06a6070.1434369079.git.viresh.kumar@linaro.org>
 References: <cover.1434369079.git.viresh.kumar@linaro.org>
- <fba1ec728e2ecf9303e13372a2557d886aa7e49c.1434369079.git.viresh.kumar@linaro.org>
-Message-ID: <20150702012538.GB7143@codeaurora.org>
+ <1376f9ac3f955e67bd56327ea0ac9aecd06a6070.1434369079.git.viresh.kumar@linaro.org>
+Message-ID: <20150702012718.GC7143@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On 06/15, Viresh Kumar wrote:
-> This will be used from multiple places later. Lets create a separate
-> routine for that.
+> With "operating-points-v2" bindings, clock-latency is defined per OPP.
+> Users of this value expect a single value which defines the latency to
+> switch to any clock rate. Find maximum clock-latency-ns from the OPP
+> table to service requests from such users.
 > 
 > Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
 > ---
