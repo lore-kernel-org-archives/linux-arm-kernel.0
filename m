@@ -1,45 +1,51 @@
-From: eddie.huang@mediatek.com (Eddie Huang)
-Date: Thu, 2 Jul 2015 16:49:15 +0800
-Subject: [PATCH] rtc-mt6397: enable wakeup before registering rtc device
-In-Reply-To: <1435826216-11982-1-git-send-email-wnhuang@google.com>
-References: <1435826216-11982-1-git-send-email-wnhuang@google.com>
-Message-ID: <1435826955.21679.2.camel@mtksdaap41>
+From: manabian@gmail.com (Joachim Eastwood)
+Date: Thu, 2 Jul 2015 11:03:10 +0200
+Subject: [PATCH v2 1/2] watchdog: NXP LPC18xx Watchdog Timer Driver
+In-Reply-To: <5594826F.6090203@roeck-us.net>
+References: <1435783930-20184-1-git-send-email-ariel@vanguardiasur.com.ar>
+ <1435783930-20184-2-git-send-email-ariel@vanguardiasur.com.ar>
+ <CAGhQ9VzLX_hy2Z=jUH6on0_sOZBp_mg5cC0JXkHntWxxrr2K6A@mail.gmail.com>
+ <5594826F.6090203@roeck-us.net>
+Message-ID: <CAGhQ9VwXnc9+QfCWG785UCuKtdg9AJ_R24dVcUF17tkxXu0bpA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2015-07-02 at 16:36 +0800, Wei-Ning Huang wrote:
-> rtc_sysfs_add_device checks if device can wakeup before creating the
-> wakealarm file in sysfs. Thus the driver must set wakeup capability
-> before registering the rtc device.
-> 
-> Signed-off-by: Wei-Ning Huang <wnhuang@google.com>
-> ---
->  drivers/rtc/rtc-mt6397.c | 4 ++--
->  1 file changed, 2 insertions(+), 2 deletions(-)
-> 
-> diff --git a/drivers/rtc/rtc-mt6397.c b/drivers/rtc/rtc-mt6397.c
-> index c0090b6..eab230b 100644
-> --- a/drivers/rtc/rtc-mt6397.c
-> +++ b/drivers/rtc/rtc-mt6397.c
-> @@ -343,6 +343,8 @@ static int mtk_rtc_probe(struct platform_device *pdev)
->  		goto out_dispose_irq;
->  	}
->  
-> +	device_init_wakeup(&pdev->dev, 1);
-> +
->  	rtc->rtc_dev = rtc_device_register("mt6397-rtc", &pdev->dev,
->  					   &mtk_rtc_ops, THIS_MODULE);
->  	if (IS_ERR(rtc->rtc_dev)) {
-> @@ -351,8 +353,6 @@ static int mtk_rtc_probe(struct platform_device *pdev)
->  		goto out_free_irq;
->  	}
->  
-> -	device_init_wakeup(&pdev->dev, 1);
-> -
->  	return 0;
->  
->  out_free_irq:
+On 2 July 2015 at 02:14, Guenter Roeck <linux@roeck-us.net> wrote:
+> On 07/01/2015 04:04 PM, Joachim Eastwood wrote:
+>>
+>> Hi Ariel,
+>>
+>
+>>> +/*
+>>> + * NXP LPC18xx Watchdog Timer (WDT)
+>>
+>>
+>> I think you should use "Windowed Watchdog Timer (WWDT)" here since
+>> that is name from the user manual, even though the driver doesn't have
+>> window functionality.
+>> At least use wwdt for the compatible string, ie: "nxp,lpc1850-wwdt".
+>>
+>> I don't think Guenter asked you to remove the "Windowed" part last
+>> time, but only asked what it meant.
+>
+>
+> I did, separately, but I don't want to start a war of words either.
+> No one will know what that term means, and I am personally not too hot
+> having to explain it to others.
 
-Thanks your correction.
+Fine.
 
-Acked-by: Eddie Huang <eddie.huang@mediatek.com>
+My only request then is to make the compatible string
+"nxp,lpc1850-wwdt", to leave the WWDT name somewhere. As this is the
+name you will find through out the user manual for this hw block.
+
+
+regards,
+Joachim Eastwood
+
+
+> If you insist using the term, please add a comment into the code
+> explaining what it is and that the driver does not support it.
+>
+> Guenter
+>
