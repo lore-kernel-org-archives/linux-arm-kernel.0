@@ -1,32 +1,25 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Thu, 2 Jul 2015 08:44:45 +0200
-Subject: [RFC PATCH 05/15] pwm: introduce default period and polarity
- concepts
-In-Reply-To: <1435738921-25027-6-git-send-email-boris.brezillon@free-electrons.com>
-References: <1435738921-25027-1-git-send-email-boris.brezillon@free-electrons.com>
- <1435738921-25027-6-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <20150702064445.GC11824@pengutronix.de>
+From: p.fedin@samsung.com (Pavel Fedin)
+Date: Thu, 02 Jul 2015 09:45:00 +0300
+Subject: [PATCH 4/4] irqchip, gicv3-its: Implement Cavium ThunderX errata
+ 22375, 24313
+In-Reply-To: <559404D1.3030909@arm.com>
+References: <1435673643-31676-1-git-send-email-rric@kernel.org>
+ <1435673643-31676-5-git-send-email-rric@kernel.org>
+ <023101d0b402$eba41e00$c2ec5a00$@samsung.com> <559404D1.3030909@arm.com>
+Message-ID: <00c601d0b492$9eda83d0$dc8f8b70$@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 01, 2015 at 10:21:51AM +0200, Boris Brezillon wrote:
-> When requested by a user, the PWM is assigned a default period and polarity
-> extracted from the DT, the platform data or statically set by the driver.
-> Those default values are currently stored in the period and polarity
-> fields of the pwm_device struct, but they will be stored somewhere else
-> once we have introduced the architecture allowing for hardware state
-> retrieval.
-> 
-> The pwm_set_default_polarity and pwm_set_default_period should only be
-> used by PWM drivers or the PWM core infrastructure to specify the
-> default period and polarity values.
-Would it make sense to put the prototypes of
-pwm_set_default_p{olarity,eriod} into (say) drivers/pwm/pwm-private.h
-then?
+ Hello!
 
-Best regards
-Uwe
+> What makes you think that an entry in the device table is the same size
+> as a translation entry? Just because one contains a pointer to the other
+> doesn't imply they have the same size.
 
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+ Oops... I didn't have GICv3 arch reference manual back then, so i was confused. Ignore this then.
+:)
+
+Kind regards,
+Pavel Fedin
+Expert Engineer
+Samsung Electronics Research center Russia
