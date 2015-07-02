@@ -1,80 +1,178 @@
 From: eric.auger@linaro.org (Eric Auger)
-Date: Thu,  2 Jul 2015 15:17:26 +0200
-Subject: [RFC 16/17] KVM: eventfd: add irq bypass consumer management
+Date: Thu,  2 Jul 2015 15:17:27 +0200
+Subject: [RFC 17/17] VFIO: platform: add irq bypass producer management
 In-Reply-To: <1435843047-6327-1-git-send-email-eric.auger@linaro.org>
 References: <1435843047-6327-1-git-send-email-eric.auger@linaro.org>
-Message-ID: <1435843047-6327-17-git-send-email-eric.auger@linaro.org>
+Message-ID: <1435843047-6327-18-git-send-email-eric.auger@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds the registration/unregistration of an
-irq_bypass_consumer on irqfd assignment/deassignment.
+This patch adds irq_bypass_producer registration/unregistration.
+VFIO producer callbacks are populated:
+- stop/resume producer simply consist in disabling/enabling the host irq
+- add/del consumer: basically set the automasked flag to false/true
+
+The vfio_platform_device pointer is passed as producer opaque.
+
+We also cache the device handle in vfio_platform_device. This
+makes possible to easily retrieve the vfio_device at registration.
 
 Signed-off-by: Eric Auger <eric.auger@linaro.org>
 ---
- virt/kvm/eventfd.c | 22 +++++++++++++++++++---
- 1 file changed, 19 insertions(+), 3 deletions(-)
+ drivers/vfio/platform/vfio_platform_common.c  |  2 +
+ drivers/vfio/platform/vfio_platform_irq.c     | 83 +++++++++++++++++++++++++++
+ drivers/vfio/platform/vfio_platform_private.h |  2 +
+ 3 files changed, 87 insertions(+)
 
-diff --git a/virt/kvm/eventfd.c b/virt/kvm/eventfd.c
-index f3da161..425a47b 100644
---- a/virt/kvm/eventfd.c
-+++ b/virt/kvm/eventfd.c
-@@ -34,6 +34,7 @@
- #include <linux/srcu.h>
- #include <linux/slab.h>
- #include <linux/seqlock.h>
+diff --git a/drivers/vfio/platform/vfio_platform_common.c b/drivers/vfio/platform/vfio_platform_common.c
+index 9acfca6..12d4540 100644
+--- a/drivers/vfio/platform/vfio_platform_common.c
++++ b/drivers/vfio/platform/vfio_platform_common.c
+@@ -546,6 +546,8 @@ int vfio_platform_probe_common(struct vfio_platform_device *vdev,
+ 	if (!vdev)
+ 		return -EINVAL;
+ 
++	vdev->dev = dev;
++
+ 	group = iommu_group_get(dev);
+ 	if (!group) {
+ 		pr_err("VFIO: No IOMMU group for device %s\n", vdev->name);
+diff --git a/drivers/vfio/platform/vfio_platform_irq.c b/drivers/vfio/platform/vfio_platform_irq.c
+index f6d83ed..0061e6e 100644
+--- a/drivers/vfio/platform/vfio_platform_irq.c
++++ b/drivers/vfio/platform/vfio_platform_irq.c
+@@ -20,6 +20,7 @@
+ #include <linux/types.h>
+ #include <linux/vfio.h>
+ #include <linux/irq.h>
 +#include <linux/irqbypass.h>
- #include <trace/events/kvm.h>
  
- #include <kvm/iodev.h>
-@@ -93,6 +94,7 @@ struct _irqfd {
- 	struct list_head list;
- 	poll_table pt;
- 	struct work_struct shutdown;
-+	struct irq_bypass_consumer *cons;
- };
+ #include "vfio_platform_private.h"
  
- static struct workqueue_struct *irqfd_cleanup_wq;
-@@ -429,7 +431,21 @@ kvm_irqfd_assign(struct kvm *kvm, struct kvm_irqfd *args)
- 	 */
- 	fdput(f);
+@@ -185,6 +186,70 @@ static irqreturn_t vfio_handler(int irq, void *dev_id)
+ 	return ret;
+ }
  
--	/* irq_bypass_register_consumer(); */
-+	irqfd->cons = kzalloc(sizeof(struct irq_bypass_consumer),
-+			      GFP_KERNEL);
-+	if (!irqfd->cons) {
-+		ret = -ENOMEM;
-+		goto fail;
++static void vfio_platform_stop_producer(struct irq_bypass_producer *prod)
++{
++	pr_info("%s disable %d\n", __func__, prod->irq);
++	disable_irq(prod->irq);
++}
++
++static void vfio_platform_resume_producer(struct irq_bypass_producer *prod)
++{
++	pr_info("%s enable %d\n", __func__, prod->irq);
++	enable_irq(prod->irq);
++}
++
++static void vfio_platform_add_consumer(struct irq_bypass_producer *prod,
++				       struct irq_bypass_consumer *cons)
++{
++	int i, ret;
++	struct vfio_platform_device *vdev =
++		(struct vfio_platform_device *)prod->opaque;
++
++	pr_info("%s irq=%d gsi =%d\n", __func__, prod->irq, cons->gsi);
++
++	for (i = 0; i < vdev->num_irqs; i++) {
++		if (vdev->irqs[i].prod == prod)
++			break;
 +	}
-+	irqfd->cons->token = (void *)irqfd->eventfd;
-+	irqfd->cons->gsi = irqfd->gsi;
-+	irqfd->cons->kvm = kvm;
-+	irqfd->cons->add_producer = kvm_arch_add_producer;
-+	irqfd->cons->del_producer = kvm_arch_del_producer;
-+	irqfd->cons->stop_consumer = kvm_arch_stop_consumer;
-+	irqfd->cons->resume_consumer = kvm_arch_resume_consumer;
-+	ret = irq_bypass_register_consumer(irqfd->cons);
++	WARN_ON(i == vdev->num_irqs);
++
++	//TODO
++	/*
++	 * if the IRQ is active at irqchip level or VFIO (auto)masked
++	 * this means the host IRQ is already under injection in the
++	 * guest and this not safe to change the forwarding state at
++	 * that stage.
++	 * It is not possible to differentiate user-space masking
++	 * from auto-masking, leading to possible false detection of
++	 * active state.
++	 */
++	prod->active = vfio_external_is_active(prod->vdev, i, 0, 0);
++
++	ret = vfio_external_set_automasked(prod->vdev, i, 0, 0, false);
 +	WARN_ON(ret);
++}
++
++static void vfio_platform_del_consumer(struct irq_bypass_producer *prod,
++				       struct irq_bypass_consumer *cons)
++{
++	int i;
++	struct vfio_platform_device *vdev =
++		(struct vfio_platform_device *)prod->opaque;
++
++	pr_info("%s irq=%d gsi =%d\n", __func__, prod->irq, cons->gsi);
++
++	for (i = 0; i < vdev->num_irqs; i++) {
++		if (vdev->irqs[i].prod == prod)
++			break;
++	}
++	WARN_ON(i == vdev->num_irqs);
++
++	if (prod->active)
++		vfio_external_mask(prod->vdev, i, 0, 0);
++
++	vfio_external_set_automasked(prod->vdev, i, 0, 0, true);
++}
++
+ static int vfio_set_trigger(struct vfio_platform_device *vdev, int index,
+ 			    int fd, irq_handler_t handler)
+ {
+@@ -192,8 +257,11 @@ static int vfio_set_trigger(struct vfio_platform_device *vdev, int index,
+ 	struct eventfd_ctx *trigger;
+ 	int ret;
  
- 	return 0;
- 
-@@ -530,8 +546,6 @@ kvm_irqfd_deassign(struct kvm *kvm, struct kvm_irqfd *args)
- 	struct _irqfd *irqfd, *tmp;
- 	struct eventfd_ctx *eventfd;
- 
--	/* irq_bypass_unregister_consumer() */
--
- 	eventfd = eventfd_ctx_fdget(args->fd);
- 	if (IS_ERR(eventfd))
- 		return PTR_ERR(eventfd);
-@@ -550,6 +564,8 @@ kvm_irqfd_deassign(struct kvm *kvm, struct kvm_irqfd *args)
- 			irqfd->irq_entry.type = 0;
- 			write_seqcount_end(&irqfd->irq_entry_sc);
- 			irqfd_deactivate(irqfd);
-+			irq_bypass_unregister_consumer(irqfd->cons);
-+			kfree(irqfd->cons);
- 		}
++
+ 	if (irq->trigger) {
+ 		free_irq(irq->hwirq, irq);
++		irq_bypass_unregister_producer(irq->prod);
++		kfree(irq->prod);
+ 		kfree(irq->name);
+ 		eventfd_ctx_put(irq->trigger);
+ 		irq->trigger = NULL;
+@@ -225,6 +293,21 @@ static int vfio_set_trigger(struct vfio_platform_device *vdev, int index,
+ 		return ret;
  	}
  
++	irq->prod = kzalloc(sizeof(struct irq_bypass_producer),
++			    GFP_KERNEL);
++	if (!irq->prod)
++		return -ENOMEM;
++	irq->prod->token = (void *)trigger;
++	irq->prod->irq = irq->hwirq;
++	irq->prod->vdev = vfio_device_get_from_dev(vdev->dev);
++	irq->prod->opaque = (void *)vdev;
++	irq->prod->add_consumer = vfio_platform_add_consumer;
++	irq->prod->del_consumer = vfio_platform_del_consumer;
++	irq->prod->stop_producer = vfio_platform_stop_producer;
++	irq->prod->resume_producer = vfio_platform_resume_producer;
++	ret = irq_bypass_register_producer(irq->prod);
++	WARN_ON(ret);
++
+ 	if (!irq->masked)
+ 		enable_irq(irq->hwirq);
+ 
+diff --git a/drivers/vfio/platform/vfio_platform_private.h b/drivers/vfio/platform/vfio_platform_private.h
+index 5f46c68..1255306 100644
+--- a/drivers/vfio/platform/vfio_platform_private.h
++++ b/drivers/vfio/platform/vfio_platform_private.h
+@@ -38,6 +38,7 @@ struct vfio_platform_irq {
+ 	struct virqfd		*unmask;
+ 	struct virqfd		*mask;
+ 	irqreturn_t (*handler)(int irq, void *dev_id);
++	struct irq_bypass_producer *prod;
+ };
+ 
+ struct vfio_platform_region {
+@@ -57,6 +58,7 @@ struct vfio_platform_device {
+ 	u32				num_irqs;
+ 	int				refcnt;
+ 	struct mutex			igate;
++	struct device			*dev;
+ 
+ 	/*
+ 	 * These fields should be filled by the bus specific binder
 -- 
 1.9.1
