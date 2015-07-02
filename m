@@ -1,29 +1,34 @@
 From: tommyhebb@gmail.com (Thomas Hebb)
-Date: Thu, 2 Jul 2015 01:04:16 -0400
-Subject: [PATCH 0/4] phy: berlin-usb: PLL divider fixes
-Message-ID: <5594C650.8000405@gmail.com>
+Date: Thu, 2 Jul 2015 01:04:18 -0400
+Subject: [PATCH 1/4] phy: berlin-usb: fix divider for BG2CD
+Message-ID: <5594C652.2020901@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The USB PLL dividers currently set by phy-berlin-usb are incorrect for
-BG2 and BG2CD (i.e. all Berlin variants but BG2Q). This series fixes the
-divider values for those two chips and additionally corrects the name of
-the of_match table to no longer contain "sata" (which was presumably
-mistakenly carried over from phy-berlin-sata).
+The marvell,berlin2cd-usb-phy compatible incorrectly sets the PLL
+divider to BG2's value instead of BG2CD/BG2Q's. Change it to the right
+value.
 
-I have verified that the new divider values work on BG2CD and Antoine
-Tenart has verified that they work on BG2Q. The divider value for BG2
-was taken from bootloader source but has not been tested.
+Signed-off-by: Thomas Hebb <tommyhebb@gmail.com>
+Cc: stable at vger.kernel.org
+---
+ drivers/phy/phy-berlin-usb.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-Thomas Hebb (4):
-  phy: berlin-usb: fix divider for BG2CD
-  ARM: dts: berlin: change BG2Q's USB PHY compatible
-  phy: berlin-usb: fix divider for BG2
-  phy: berlin-usb: rename table copied from SATA PHY
-
- arch/arm/boot/dts/berlin2q.dtsi |  6 +++---
- drivers/phy/phy-berlin-usb.c    | 12 ++++++------
- 2 files changed, 9 insertions(+), 9 deletions(-)
-
+diff --git a/drivers/phy/phy-berlin-usb.c b/drivers/phy/phy-berlin-usb.c
+index c6fc95b..ab54f28 100644
+--- a/drivers/phy/phy-berlin-usb.c
++++ b/drivers/phy/phy-berlin-usb.c
+@@ -106,8 +106,8 @@
+ static const u32 phy_berlin_pll_dividers[] = {
+ 	/* Berlin 2 */
+ 	CLK_REF_DIV(0xc) | FEEDBACK_CLK_DIV(0x54),
+-	/* Berlin 2CD */
+-	CLK_REF_DIV(0x6) | FEEDBACK_CLK_DIV(0x55),
++	/* Berlin 2CD/Q */
++	CLK_REF_DIV(0xc) | FEEDBACK_CLK_DIV(0x54),
+ };
+ 
+ struct phy_berlin_usb_priv {
 -- 
 2.4.4
