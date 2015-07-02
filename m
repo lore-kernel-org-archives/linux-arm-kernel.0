@@ -1,86 +1,91 @@
-From: khilman@kernel.org (Kevin Hilman)
-Date: Thu,  2 Jul 2015 11:02:11 -0700
-Subject: [GIT PULL] ARM: SoC: late fixes and dependencies
-Message-ID: <1435860131-32747-1-git-send-email-khilman@kernel.org>
+From: ahs3@redhat.com (Al Stone)
+Date: Thu, 02 Jul 2015 12:25:21 -0600
+Subject: [PATCH v2 0/3] Correct for ACPI 5.1->6.0 spec changes in MADT
+ GICC entries
+In-Reply-To: <55934B3D.6060106@huawei.com>
+References: <1434666968-1543-1-git-send-email-al.stone@linaro.org>	<5592CCE6.6040604@arm.com>	<5592D1FF.7040208@redhat.com>	<CAJZ5v0gF6JZ8uVNMnro0bdD0g+QMoTeEzB99j6RcKUt3LjmiXw@mail.gmail.com>
+ <CAJZ5v0hea5xJL3p1L=-Z1azP2wfx8Mu113JC8SgPwP06c58mQg@mail.gmail.com>
+ <55934B3D.6060106@huawei.com>
+Message-ID: <55958211.5010607@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This is a collection of a few late fixes and other misc. stuff that
-had dependencies on things being merged from other trees.
+On 06/30/2015 08:06 PM, Hanjun Guo wrote:
+> On 2015/7/1 2:35, Rafael J. Wysocki wrote:
+>> On Tue, Jun 30, 2015 at 8:25 PM, Rafael J. Wysocki <rafael@kernel.org> wrote:
+>>> Hi Al,
+>>>
+>>> On Tue, Jun 30, 2015 at 7:29 PM, Al Stone <ahs3@redhat.com> wrote:
+>>>> On 06/30/2015 11:07 AM, Sudeep Holla wrote:
+>>>>> Hi Al,
+>>>>>
+>>>>> On 18/06/15 23:36, Al Stone wrote:
+>>>>>> In the ACPI 5.1 version of the spec, the struct for the GICC subtable
+>>>>>> (struct acpi_madt_generic_interrupt) of the MADT is 76 bytes long; in
+>>>>>> ACPI 6.0, the struct is 80 bytes long.  But, there is only one definition
+>>>>>> in ACPICA for this struct -- and that is the 6.0 version.  Hence, when
+>>>>>> BAD_MADT_ENTRY() compares the struct size to the length in the GICC
+>>>>>> subtable, it fails if 5.1 structs are in use, and there are systems in
+>>>>>> the wild that have them.
+>>>>>>
+>>>>>> Note that this was found in linux-next and these patches apply against
+>>>>>> that tree and the arm64 kernel tree; 4.1-rc8 does not appear to have this
+>>>>>> problem since it still has the 5.1 struct definition.
+>>>>>>
+>>>>>> Even though there is precendent in ia64 code for ignoring the changes in
+>>>>>> size, this patch set instead tries to verify correctness.  The first patch
+>>>>>> in the set adds macros for easily using the ACPI spec version.  The second
+>>>>>> patch adds the BAD_MADT_GICC_ENTRY() macro that uses the version macros to
+>>>>>> check the GICC subtable only, accounting for the difference in specification
+>>>>>> versions that are possible.  The final patch replaces BAD_MADT_ENTRY usage
+>>>>>> with the BAD_MADT_GICC_ENTRY macro in arm64 code, which is currently the
+>>>>>> only architecture affected.  The BAD_MADT_ENTRY() will continue to work as
+>>>>>> is for all other MADT subtables.
+>>>>>>
+>>>>> We need to get this series or a patch to remove the check(similar to
+>>>>> ia64) based on what Rafael prefers. Without that, platforms using ACPI
+>>>>> on ARM64 fails to boot with latest mainline. This blocks any testing on
+>>>>> ARM64/ACPI systems.
+>>>>>
+>>>>> Regards,
+>>>>> Sudeep
+>>>> I have not received any other feedback than some Reviewed-bys from
+>>>> Hanjun and an ACK from Will for the arm64 patch.
+>>>>
+>>>> And absolutely agreed: this is a blocker for arm64/ACPI, starting with
+>>>> the ACPICA 20150515 patches which appear to have gone in with 4.2-rc1.
+>>>>
+>>>> Rafael?  Ping?
+>>> I overlooked the fact that this was needed to fix a recent regression,
+>>> sorry about that.
+>>>
+>>> Actually, if your patch fixes an error introduced by a specific
+>>> commit, it is good to use the Fixes: tag to indicate that.  Which I
+>>> still would like to do, so which commit is fixed by this?
+>>>
+>>>> Do we need these to go through your tree or the arm64
+>>>> tree?  Without this series (or an ia64-like solution), we have ACPI
+>>>> systems in the field that cannot boot.
+>>> I'm not quite sure why the definition of BAD_MADT_GICC_ENTRY has to go
+>>> into include/linux/acpi.h.  Why is it necessary in there?
+>> Like what about defining it in linux/irqchip/arm-gic-acpi.h for example?
+>>
+> 
+> This BAD_MADT_GICC_ENTRY is both used by SMP init and GIC irqchip init for
+> ARM64, would it be good to put BAD_MADT_GICC_ENTRY in arch/arm64/include/asm/acpi.h?
+> 
+> Thanks
+> Hanjun
 
-Other than the fixes, the primary feature being added is the
-conversion of some OMAP drivers to the new generic wakeirq interface.
+Ah, right.  Good point.  Let me try it in that file, then.  It is -- for the
+time being -- arm64 specific.
 
-----------------------------------------------------------------
-
-The following changes since commit 7adf12b87f45a77d364464018fb8e9e1ac875152:
-
-  Merge tag 'for-linus-4.2-rc0-tag' of git://git.kernel.org/pub/scm/linux/kernel/git/xen/tip
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc.git tags/armsoc-late
-
-for you to fetch changes up to ae41a0b7ed7740009b9ec87c7dc05b23f01d361a:
-
-  ARM: multi_v7_defconfig: Enable BRCMNAND driver
-
-----------------------------------------------------------------
-
-Boris Brezillon (1):
-      ARM: at91/dt: update udc compatible strings
-
-Florian Fainelli (2):
-      ARM: BCM: Do not select CONFIG_MTD_NAND_BRCMNAND
-      ARM: multi_v7_defconfig: Enable BRCMNAND driver
-
-Kevin Hilman (8):
-      Merge tag 'armsoc-cleanup' into test-merge
-      Merge tag 'armsoc-soc' into test-merge
-      Merge tag 'armsoc-dt' into test-merge
-      Merge tag 'armsoc-drivers' into test-merge
-      Merge tag 'armsoc-defconfig' into test-merge
-      Merge tag 'omap-for-v4.2/wakeirq-drivers-v2' of git://git.kernel.org/.../tmlind/linux-omap into next/late
-      Merge tag 'mvebu-dt-4.2-3' of git://git.infradead.org/linux-mvebu into next/late
-      Merge tag 'mvebu-fixes-4.2-0' of git://git.infradead.org/linux-mvebu into next/late
-
-Nicolas Ferre (1):
-      ARM: at91/dt: trivial: fix USB udc compatible string
-
-Russell King (1):
-      ARM: dove: fix legacy dove IRQ numbers
-
-Stephen Boyd (1):
-      soc: qcom: spm: Fix idle on THUMB2 kernels
-
-Thomas Petazzoni (2):
-      ARM: mvebu: adjust Armada XP DT spi muxing after pinctrl function rename
-      ARM: mvebu: fix suspend to RAM on big-endian configurations
-
-Tony Lindgren (4):
-      mmc: omap_hsmmc: Change wake-up interrupt to use generic wakeirq
-      serial: omap: Switch wake-up interrupt to generic wakeirq
-      serial: 8250_omap: Move wake-up interrupt to generic wakeirq
-      Merge branch 'wakeirq-8250' into omap-for-v4.2/wakeirq-v2
-
-Y Vo (1):
-      arm64: dts: Add APM X-Gene standby GPIO controller DTS entries
-
-
- .../devicetree/bindings/usb/atmel-usb.txt       |   6 +-
- arch/arm/boot/dts/armada-xp.dtsi                |   2 +-
- arch/arm/boot/dts/at91sam9g45.dtsi              |   2 +-
- arch/arm/boot/dts/at91sam9x5.dtsi               |   2 +-
- arch/arm/boot/dts/sama5d3.dtsi                  |   2 +-
- arch/arm/boot/dts/sama5d4.dtsi                  |   2 +-
- arch/arm/configs/multi_v7_defconfig             |   1 +
- arch/arm/mach-bcm/Kconfig                       |   1 -
- arch/arm/mach-dove/include/mach/irqs.h          | 118 +++++++++----------
- arch/arm/mach-dove/irq.c                        |   8 +-
- arch/arm/mach-mvebu/pm-board.c                  |   3 +
- arch/arm64/boot/dts/apm/apm-storm.dtsi          |  13 ++
- drivers/mmc/host/omap_hsmmc.c                   |  49 +-------
- drivers/soc/qcom/spm.c                          |   2 +-
- drivers/tty/serial/8250/8250_omap.c             |  58 +--------
- drivers/tty/serial/omap-serial.c                |  35 +-----
- 16 files changed, 103 insertions(+), 201 deletions(-)
+-- 
+ciao,
+al
+-----------------------------------
+Al Stone
+Software Engineer
+Red Hat, Inc.
+ahs3 at redhat.com
+-----------------------------------
