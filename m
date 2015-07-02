@@ -1,52 +1,39 @@
-From: jszhang@marvell.com (Jisheng Zhang)
-Date: Thu, 2 Jul 2015 12:58:49 +0800
-Subject: [PATCH v2] arm64: cpuidle: add __init section marker to
- arm_cpuidle_init
-In-Reply-To: <CAJKOXPceoV2jk=Go+ZoJZbP1MXx-HDLJpCFK9mrR9JLRU4x8Bg@mail.gmail.com>
-References: <1435803288-1478-1-git-send-email-jszhang@marvell.com>
- <CAJKOXPceoV2jk=Go+ZoJZbP1MXx-HDLJpCFK9mrR9JLRU4x8Bg@mail.gmail.com>
-Message-ID: <20150702125849.67160aa9@xhacker>
+From: tfiga@chromium.org (Tomasz Figa)
+Date: Thu, 2 Jul 2015 13:59:04 +0900
+Subject: [PATCH v2 1/5] drm/rockchip: vop: optimize virtual stride
+ calculate
+In-Reply-To: <1435313249-4549-2-git-send-email-mark.yao@rock-chips.com>
+References: <1435313249-4549-1-git-send-email-mark.yao@rock-chips.com>
+ <1435313249-4549-2-git-send-email-mark.yao@rock-chips.com>
+Message-ID: <CAAFQd5B-W2uWFXo9me_MPdp0LDp0CK+mG6Rsbro9+JQSUBA4bw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Krzysztof,
+On Fri, Jun 26, 2015 at 7:07 PM, Mark Yao <mark.yao@rock-chips.com> wrote:
+> vir_stride need number words of the virtual width, and fb->pitches
+> save bytes_per_pixel, so just div 4 switch to stride.
+>
+> Signed-off-by: Mark Yao <mark.yao@rock-chips.com>
+> ---
+> Changes in v2: None
+>
+>  drivers/gpu/drm/rockchip/rockchip_drm_vop.c |    2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+>
+> diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_vop.c b/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
+> index 6188221..3c9f4f3 100644
+> --- a/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
+> +++ b/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
+> @@ -644,7 +644,7 @@ static int vop_update_plane_event(struct drm_plane *plane,
+>         offset += (src.y1 >> 16) * fb->pitches[0];
+>         yrgb_mst = rk_obj->dma_addr + offset;
+>
+> -       y_vir_stride = fb->pitches[0] / (fb->bits_per_pixel >> 3);
+> +       y_vir_stride = fb->pitches[0] >> 2;
 
-On Thu, 2 Jul 2015 12:59:44 +0900
-Krzysztof Kozlowski <k.kozlowski@samsung.com> wrote:
+If the unit of y_vir_stride is words then doesn't it mean that the
+calculation before this patch was just invalid? If yes, shouldn't the
+subject actually say "Fix virtual stride calculation"?
 
-> 2015-07-02 11:14 GMT+09:00 Jisheng Zhang <jszhang@marvell.com>:
-> > It is not needed after booting, this patch moves the arm_cpuidle_init()
-> > function to the __init section.
-> >
-> > Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
-> > ---
-> >  arch/arm64/include/asm/cpuidle.h | 2 +-
-> >  arch/arm64/kernel/cpuidle.c      | 2 +-
-> >  2 files changed, 2 insertions(+), 2 deletions(-)
-> >
-> > diff --git a/arch/arm64/include/asm/cpuidle.h b/arch/arm64/include/asm/cpuidle.h
-> > index 0f74f05..5748d3b 100644
-> > --- a/arch/arm64/include/asm/cpuidle.h
-> > +++ b/arch/arm64/include/asm/cpuidle.h
-> > @@ -4,7 +4,7 @@
-> >  #include <asm/proc-fns.h>
-> >
-> >  #ifdef CONFIG_CPU_IDLE
-> > -extern int arm_cpuidle_init(unsigned int cpu);
-> > +extern int __init arm_cpuidle_init(unsigned int cpu);
-> 
-> No, not here but...
-> 
-> >  extern int arm_cpuidle_suspend(int index);
-> >  #else
-> >  static inline int arm_cpuidle_init(unsigned int cpu)
-> 
-> ... here so the stub for !CONFIG_CPU_IDLE would be marked as well.
-
-when !CONFIG_CPU_IDLE, arm_cpuidle_init() is inlined, and just return -EOPNOTSUPP;
-Per my understanding, it will be optimized out by compiler. I'm not sure whether
-there is any benefit to mark inlined function as __init. But Per my check, all
-other inlined functions in linux kernel have no __init. What do you think?
-
-Thanks,
-Jisheng
+Best regards,
+Tomasz
