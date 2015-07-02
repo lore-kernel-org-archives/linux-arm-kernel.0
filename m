@@ -1,34 +1,50 @@
 From: tommyhebb@gmail.com (Thomas Hebb)
-Date: Thu, 2 Jul 2015 01:04:18 -0400
-Subject: [PATCH 1/4] phy: berlin-usb: fix divider for BG2CD
-Message-ID: <5594C652.2020901@gmail.com>
+Date: Thu, 2 Jul 2015 01:04:24 -0400
+Subject: [PATCH 2/4] ARM: dts: berlin: change BG2Q's USB PHY compatible
+Message-ID: <5594C658.5030105@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The marvell,berlin2cd-usb-phy compatible incorrectly sets the PLL
-divider to BG2's value instead of BG2CD/BG2Q's. Change it to the right
-value.
+Currently, BG2Q shares a compatible with BG2. This is incorrect, since
+BG2 and BG2Q use different USB PLL dividers. In reality, BG2Q shares a
+divider with BG2CD. Change BG2Q's USB PHY compatible string to reflect
+that.
 
 Signed-off-by: Thomas Hebb <tommyhebb@gmail.com>
-Cc: stable at vger.kernel.org
 ---
- drivers/phy/phy-berlin-usb.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+ arch/arm/boot/dts/berlin2q.dtsi | 6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
 
-diff --git a/drivers/phy/phy-berlin-usb.c b/drivers/phy/phy-berlin-usb.c
-index c6fc95b..ab54f28 100644
---- a/drivers/phy/phy-berlin-usb.c
-+++ b/drivers/phy/phy-berlin-usb.c
-@@ -106,8 +106,8 @@
- static const u32 phy_berlin_pll_dividers[] = {
- 	/* Berlin 2 */
- 	CLK_REF_DIV(0xc) | FEEDBACK_CLK_DIV(0x54),
--	/* Berlin 2CD */
--	CLK_REF_DIV(0x6) | FEEDBACK_CLK_DIV(0x55),
-+	/* Berlin 2CD/Q */
-+	CLK_REF_DIV(0xc) | FEEDBACK_CLK_DIV(0x54),
- };
+diff --git a/arch/arm/boot/dts/berlin2q.dtsi b/arch/arm/boot/dts/berlin2q.dtsi
+index 63a4849..d4dbd28 100644
+--- a/arch/arm/boot/dts/berlin2q.dtsi
++++ b/arch/arm/boot/dts/berlin2q.dtsi
+@@ -152,7 +152,7 @@
+ 		};
  
- struct phy_berlin_usb_priv {
+ 		usb_phy2: phy at a2f400 {
+-			compatible = "marvell,berlin2-usb-phy";
++			compatible = "marvell,berlin2cd-usb-phy";
+ 			reg = <0xa2f400 0x128>;
+ 			#phy-cells = <0>;
+ 			resets = <&chip_rst 0x104 14>;
+@@ -170,7 +170,7 @@
+ 		};
+ 
+ 		usb_phy0: phy at b74000 {
+-			compatible = "marvell,berlin2-usb-phy";
++			compatible = "marvell,berlin2cd-usb-phy";
+ 			reg = <0xb74000 0x128>;
+ 			#phy-cells = <0>;
+ 			resets = <&chip_rst 0x104 12>;
+@@ -178,7 +178,7 @@
+ 		};
+ 
+ 		usb_phy1: phy at b78000 {
+-			compatible = "marvell,berlin2-usb-phy";
++			compatible = "marvell,berlin2cd-usb-phy";
+ 			reg = <0xb78000 0x128>;
+ 			#phy-cells = <0>;
+ 			resets = <&chip_rst 0x104 13>;
 -- 
 2.4.4
