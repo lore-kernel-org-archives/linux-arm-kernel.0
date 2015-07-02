@@ -1,111 +1,76 @@
-From: pawelo@king.net.pl (Paul Osmialowski)
-Date: Thu, 2 Jul 2015 12:08:39 +0200 (CEST)
-Subject: [PATCH v2 3/9] arm: twr-k70f120m: clock driver for Kinetis SoC
-In-Reply-To: <alpine.LNX.2.00.1507011756140.14440@localhost.localdomain>
-References: <1435667250-28299-1-git-send-email-pawelo@king.net.pl>
- <1435667250-28299-4-git-send-email-pawelo@king.net.pl>
- <28154735.0HeJqZBqop@wuerfel>
- <alpine.LNX.2.00.1507011756140.14440@localhost.localdomain>
-Message-ID: <alpine.LNX.2.00.1507021206410.13210@localhost.localdomain>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Thu, 2 Jul 2015 11:29:37 +0100
+Subject: [PATCH] ARM: psci: boot_secondary: replace __pa with virt_to_idmap
+In-Reply-To: <20150630202537.GI7557@n2100.arm.linux.org.uk>
+References: <1435661062-4127-1-git-send-email-grygorii.strashko@ti.com>
+ <20150630161836.GC28372@leverpostej>
+ <20150630202537.GI7557@n2100.arm.linux.org.uk>
+Message-ID: <20150702102937.GA13036@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Nah, I've found this code hard to maintain. I'm attaching simplified 
-version.
+On Tue, Jun 30, 2015 at 09:25:37PM +0100, Russell King - ARM Linux wrote:
+> On Tue, Jun 30, 2015 at 05:18:37PM +0100, Mark Rutland wrote:
+> > Hi,
+> > 
+> > On Tue, Jun 30, 2015 at 11:44:22AM +0100, Grygorii Strashko wrote:
+> > > On some PAE systems (e.g. TI Keystone), memory is above the 32-bit
+> > > addressable limit, and the interconnect provides an aliased view of
+> > > parts of physical memory in the 32-bit addressable space. This alias
+> > > is strictly for boot time usage, and is not otherwise usable because
+> > > of coherency limitations.
+> > > 
+> > > On such systems, the idmap mechanism has to be used to pass correct
+> > > boot address of secondary CPU to FW.
+> > > virt_to_idmap() will fall-back to existing virt_to_phys() macro if
+> > > such conversation is not required.
+> > > 
+> > > Cc: Mark Rutland <mark.rutland@arm.com>
+> > > Cc: Nicolas Pitre <nico@linaro.org>
+> > > Cc: Santosh Shilimkar <ssantosh@kernel.org>
+> > > Cc: Vitaly Andrianov <vitalya@ti.com>
+> > > Signed-off-by: Grygorii Strashko <grygorii.strashko@ti.com>
+> > > ---
+> > >  arch/arm/kernel/psci_smp.c | 2 +-
+> > >  1 file changed, 1 insertion(+), 1 deletion(-)
+> > 
+> > The code itself looks sane to me, though the commit message would be
+> > better with Russell's suggested rewording.
+> > 
+> > This will also conflict with my migration to a common PSCI client
+> > implementation [1,2] (especially given the absence of virt_to_idmap on
+> > arm64), but I'm happy to fold it in or rebase atop of it.
+> > 
+> > Russell, are you able to take a look at the migration patch [2]? How
+> > would you prefer for the two patches to be taken?
+> 
+> Well, the first thing that stands out about patch [2] is that it's
+> introducing a load of magic hex numbers, where before we had a struct
+> with nice definitions.  (I'm thinking about highbank_suspend_finish()
+> and calxeda_idle_finish().)  This seems to be a backwards step.
+
+The existing suspend parameter packing/unpacking didn't work now that
+there are multiple possible formats for the suspend parameter from
+PSCIv1.0 onwards, and the core PSCI code won't do any more
+packing/unpacking, treating the suspend parameter as a mostly opaque
+token.
+
+I could retain the struct and packing functions for the two cases you
+mention, but it seemed somewhat misleading. I'll see if I can figure out
+something better than a raw hex value.
+
+Other than that, were you happy with the arch/arm changes?
+
+> There's two options on how to handle this.  Either accept the
+> virt_to_idmap() change first, and then sort out the resulting difference,
+> maybe by having ARM64 grow a virt_to_idmap() of its own (which is just
+> a virt_to_phys()) or we do it the other way around.  Either way, we
+> need a new macro, and the established name for it is virt_to_idmap().
+> The order doesn't matter as the end result would be the same.
+
+Ok. I guess it's easier to take Grygorii's patch first (with updated
+commit message), and I'll fix the rest of my patches to cater for that.
+I'll add that to the front of my series for the moment.
 
 Thanks,
-Paul
-
-On Wed, 1 Jul 2015, Paul Osmialowski wrote:
-
-> Hi Arnd,
->
-> Can you look at attached candidate for the third iteration? Is it any better 
-> now?
->
-> Thanks,
-> Paul
->
-> On Tue, 30 Jun 2015, Arnd Bergmann wrote:
->
->>  On Tuesday 30 June 2015 14:27:24 Paul Osmialowski wrote:
->> >  Based on K70P256M150SF3RM.pdf K70 Sub-Family Reference Manual, Rev. 3.
->> > 
->> >  Signed-off-by: Paul Osmialowski <pawelo@king.net.pl>
->> >  ---
->> >   .../devicetree/bindings/clock/kinetis-clock.txt    |  63 +++
->> >   arch/arm/boot/dts/kinetis.dtsi                     |  36 ++
->> >   drivers/clk/Makefile                               |   1 +
->> >   drivers/clk/clk-kinetis.c                          | 463 
->> >   +++++++++++++++++++++
->> >   4 files changed, 563 insertions(+)
->> >   create mode 100644 
->> >   Documentation/devicetree/bindings/clock/kinetis-clock.txt
->> >   create mode 100644 drivers/clk/clk-kinetis.c
->> > 
->> >  diff --git a/Documentation/devicetree/bindings/clock/kinetis-clock.txt 
->> >  b/Documentation/devicetree/bindings/clock/kinetis-clock.txt
->> >  new file mode 100644
->> >  index 0000000..63af6a5
->> >  --- /dev/null
->> >  +++ b/Documentation/devicetree/bindings/clock/kinetis-clock.txt
->> >  @@ -0,0 +1,63 @@
->> >  +* Clock bindings for Freescale Kinetis SoC
->> >  +
->> >  +Required properties:
->> >  +- compatible: Should be "fsl,kinetis-cmu".
->> >  +- reg: Two address ranges, one for the Clock Genetator register set,
->> >  +	one for System Integration Module register set.
->> >  +- Set of clock devices: one fixed-rate-root, fixed-rate clocks and 
->> >  clock-gates.
->> >  +
->> >  +For clock-gate addresses see K70 Sub-Family Reference Manual, Rev. 3 
->> >  pg. 341
->> >  +and later. Notice that addresses are zero-based, so SIM_SCGC1 has 
->> >  address 0,
->> >  +SIM_SCGC2 has address 1 and so on. The second address component is the 
->> >  bit
->> >  +index.
->>
->>  Please document the sub-nodes that are allowed, and the format
->>  of the clock specifiers.
->> 
->> >  +
->> >  +Example:
->> >  +
->> >  +cmu at 40064000 {
->> >  +	compatible = "fsl,kinetis-cmu";
->> >  +	reg = <0x40064000 0x14>, <0x40047000 0x1100>;
->> >  +
->> >  +	mcg_outclk: fixed-rate-root at mcgout {
->> >  +		device_type = "mcgout";
->> >  +		#clock-cells = <0>;
->> >  +	};
->> >  +
->> >  +	mcg_cclk: fixed-rate at cclk {
->>
->>  '@' is a reserved character here that is used before the address
->>  of the device, so this has to be a hexadecimal number without leading
->>  '0x', and it should match the 'reg' property of the device.
->> 
->> >  +		device_type = "cclk";
->> >  +		#clock-cells = <0>;
->> >  +		clocks = <&mcg_outclk>;
->> >  +	};
->>
->>  The device_type property here is not a standard identifier,
->>  and you don't list it as an optional or mandatory property.
->>
->>  Please remove it and instead use the compatible property, the
->>  name or the address.
->>
->>   Arnd
->> 
->
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: 0003-arm-twr-k70f120m-clock-driver-for-Kinetis-SoC.patch
-Type: text/x-diff
-Size: 17977 bytes
-Desc: 
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150702/d7ac194b/attachment-0001.bin>
+Mark.
