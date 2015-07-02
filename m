@@ -1,39 +1,40 @@
-From: jszhang@marvell.com (Jisheng Zhang)
-Date: Thu, 2 Jul 2015 16:21:08 +0800
-Subject: [RFC] arm: psci: implement cpuidle_ops
-In-Reply-To: <5594F348.4050709@linaro.org>
-References: <20150702111031.05f04184@xhacker> <5594F12F.6050401@linaro.org>
- <5594F348.4050709@linaro.org>
-Message-ID: <20150702162108.38c82ca2@xhacker>
+From: wnhuang@chromium.org (Wei-Ning Huang)
+Date: Thu,  2 Jul 2015 16:36:56 +0800
+Subject: [PATCH] rtc-mt6397: enable wakeup before registering rtc device
+Message-ID: <1435826216-11982-1-git-send-email-wnhuang@google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2 Jul 2015 10:16:08 +0200
-Daniel Lezcano <daniel.lezcano@linaro.org> wrote:
+rtc_sysfs_add_device checks if device can wakeup before creating the
+wakealarm file in sysfs. Thus the driver must set wakeup capability
+before registering the rtc device.
 
-> On 07/02/2015 10:07 AM, Daniel Lezcano wrote:
-> > On 07/02/2015 05:10 AM, Jisheng Zhang wrote:
-> >> Hi all,
-> >>
-> >> we'd like to use cpuidle-arm.c for both arm and arm64 with psci as
-> >> backend. For
-> >> arm64, it works. But for arm, we miss cpuidle_ops. I want to add
-> >> cpuidle_ops for
-> >> arm psci, I dunno whether this is the correct direction, could you
-> >> please give
-> >> suggestions?
-> >
-> > You should look at the macro
-> >
-> > arch/arm/include/asm/cpuidle.h:
-> >
-> > #define CPUIDLE_METHOD_OF_DECLARE(name, _method, _ops)
-> 
-> And more precisely, you can look at the code using it.
-> 
-> https://git.kernel.org/cgit/linux/kernel/git/galak/linux-qcom.git/tree/drivers/soc/qcom/spm.c?h=qcom/all#n282
-> 
+Signed-off-by: Wei-Ning Huang <wnhuang@google.com>
+---
+ drivers/rtc/rtc-mt6397.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-Thanks for this URL. I'll cook similar patches for arm psci cpuidle_ops.
-
-Thanks
+diff --git a/drivers/rtc/rtc-mt6397.c b/drivers/rtc/rtc-mt6397.c
+index c0090b6..eab230b 100644
+--- a/drivers/rtc/rtc-mt6397.c
++++ b/drivers/rtc/rtc-mt6397.c
+@@ -343,6 +343,8 @@ static int mtk_rtc_probe(struct platform_device *pdev)
+ 		goto out_dispose_irq;
+ 	}
+ 
++	device_init_wakeup(&pdev->dev, 1);
++
+ 	rtc->rtc_dev = rtc_device_register("mt6397-rtc", &pdev->dev,
+ 					   &mtk_rtc_ops, THIS_MODULE);
+ 	if (IS_ERR(rtc->rtc_dev)) {
+@@ -351,8 +353,6 @@ static int mtk_rtc_probe(struct platform_device *pdev)
+ 		goto out_free_irq;
+ 	}
+ 
+-	device_init_wakeup(&pdev->dev, 1);
+-
+ 	return 0;
+ 
+ out_free_irq:
+-- 
+2.1.2
