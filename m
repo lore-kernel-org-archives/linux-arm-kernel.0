@@ -1,33 +1,44 @@
-From: jszhang@marvell.com (Jisheng Zhang)
-Date: Thu, 2 Jul 2015 10:16:34 +0800
-Subject: [PATCH] arm64: cpuidle: add __init section marker to
- arm_cpuidle_init
-In-Reply-To: <CAJKOXPdmuP6Tfn1r0o6c7WUT+rLYGqFtJddXsM8x4mkxvH_sPw@mail.gmail.com>
-References: <1435800787-696-1-git-send-email-jszhang@marvell.com>
- <CAJKOXPdmuP6Tfn1r0o6c7WUT+rLYGqFtJddXsM8x4mkxvH_sPw@mail.gmail.com>
-Message-ID: <20150702101634.6a5c9f00@xhacker>
+From: jamesjj.liao@mediatek.com (James Liao)
+Date: Thu, 2 Jul 2015 10:18:09 +0800
+Subject: [PATCH v2 1/4] clk: mediatek: mt8173: Fix enabling of critical
+ clocks
+In-Reply-To: <CAGS+omDqSEn_WnUYz0XmeRpejhthb0J_qa4H9VEfihtA0Axorg@mail.gmail.com>
+References: <1435633127-31952-1-git-send-email-jamesjj.liao@mediatek.com>
+ <1435633127-31952-2-git-send-email-jamesjj.liao@mediatek.com>
+ <CAGS+omDqSEn_WnUYz0XmeRpejhthb0J_qa4H9VEfihtA0Axorg@mail.gmail.com>
+Message-ID: <1435803489.3526.18.camel@mtksdaap41>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Krzysztof,
+Hi Daniel,
 
-On Thu, 2 Jul 2015 10:56:47 +0900
-Krzysztof Kozlowski <k.kozlowski@samsung.com> wrote:
+On Wed, 2015-07-01 at 22:21 +0800, Daniel Kurtz wrote:
+> To be precise, it is the CLK_TOP clocks that have CLK_APMIXED PLLs as
+> their parents, so we cannot enable the CLK_TOP critical clocks until
+> the CLK_APMIXED clocks have all been registered.
+> 
+> Please add something like the above to the commit message.
 
-> 2015-07-02 10:33 GMT+09:00 Jisheng Zhang <jszhang@marvell.com>:
-> > It is not needed after booting, this patch moves the arm_cpuidle_init()
-> > function to the __init section.
+OK. I'll add them.
+
+> 
 > >
-> > Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
-> > ---
-> >  arch/arm64/kernel/cpuidle.c | 2 +-
-> >  1 file changed, 1 insertion(+), 1 deletion(-)
+> > +static struct clk_onecell_data *mt8173_top_clk_data;
+> > +static struct clk_onecell_data *mt8173_pll_clk_data;
 > 
-> This looks good but I think you can also mark the stub in
-> arch/arm64/include/asm/cpuidle.h.
+> These globals can be:
+> __initdata
 > 
+> > +
+> > +static void mtk_clk_enable_critical(void)
+> 
+> And this function is:
+> 
+> static void __init
 
-Thanks for review. Has adopted your suggestion in v2.
+I'll add them in next patch.
 
-Thanks,
-Jisheng
+
+Best regards,
+
+James
