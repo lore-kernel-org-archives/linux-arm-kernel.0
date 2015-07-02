@@ -1,29 +1,54 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Thu, 2 Jul 2015 09:03:43 +0200
-Subject: [RFC PATCH 00/15] pwm: add support for atomic update
-In-Reply-To: <1435738921-25027-1-git-send-email-boris.brezillon@free-electrons.com>
-References: <1435738921-25027-1-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <20150702070343.GD11824@pengutronix.de>
+From: mark.yao@rock-chips.com (Mark yao)
+Date: Thu, 02 Jul 2015 15:03:34 +0800
+Subject: [PATCH] drm/rockchip: vop: remove hardware cursor window
+In-Reply-To: <1617606.rtBNOYcypX@diego>
+References: <1435744173-23112-1-git-send-email-mark.yao@rock-chips.com>
+ <1617606.rtBNOYcypX@diego>
+Message-ID: <5594E246.6090500@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Boris,
-
-On Wed, Jul 01, 2015 at 10:21:46AM +0200, Boris Brezillon wrote:
-> This series adds support for atomic PWM update, or ITO, the capability
-> to update all the parameters of a PWM device (enabled/disabled, period,
-> duty and polarity) in one go.
-on first reading the subject of your series I thought it was about
-asserting that the newly set config is active before the call to
-pwm_config (et al) returns. That's a problem I addressed a few times in
-the past. I wonder if it's only me or if a different wording should be
-used for "update all parameters with a single function call".
-
-But other than that I like the series.
-
-Best regards
-Uwe
+On 2015?07?01? 19:52, Heiko St?bner wrote:
+> Hi Mark,
+>
+> Am Mittwoch, 1. Juli 2015, 17:49:33 schrieb Mark Yao:
+>> hardware cursor windows only have some fixed size, and not support
+>> width virtual, when move hardware cursor windows outside of left,
+>> the display would be wrong, so this window can't for cursor now.
+>>
+>> And Tag hardware cursor window as a overlay is wrong, will make
+>> userspace wrong behaviour.
+>>
+>> So just remove the hardware cursor window
+>>
+>> Signed-off-by: Mark Yao <mark.yao@rock-chips.com>
+>> ---
+>>   drivers/gpu/drm/rockchip/rockchip_drm_vop.c |    1 -
+>>   1 file changed, 1 deletion(-)
+>>
+>> diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
+>> b/drivers/gpu/drm/rockchip/rockchip_drm_vop.c index 4603412..7373ba1 100644
+>> --- a/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
+>> +++ b/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
+>> @@ -368,7 +368,6 @@ static const struct vop_win_data rk3288_vop_win_data[] =
+>> { { .base = 0x40, .phy = &win01_data, .type = DRM_PLANE_TYPE_OVERLAY }, {
+>> .base = 0x00, .phy = &win23_data, .type = DRM_PLANE_TYPE_OVERLAY }, { .base
+>> = 0x50, .phy = &win23_data, .type = DRM_PLANE_TYPE_CURSOR }, -	{ .base =
+>> 0x00, .phy = &cursor_data, .type = DRM_PLANE_TYPE_OVERLAY }, };
+>>
+>>   static const struct vop_data rk3288_vop = {
+> you should probably also remove the
+>
+> 	static const struct vop_win_phy cursor_data
+>
+> completely then, as it is now unused?
+>
+>
+> Heiko
+>
+>
+>
+OK
 
 -- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+?ark
