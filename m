@@ -1,59 +1,42 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Thu, 2 Jul 2015 09:48:34 +0200
-Subject: macb: zynq: why is SG disabled?
-In-Reply-To: <03CA77BA8AF6F1469AEDFBDA1322A7B7495B9EE3@XAP-PVEXMBX02.xlnx.xilinx.com>
-References: <559403E3.3050900@certsign.ro> <55941D80.2090904@atmel.com>
- <03CA77BA8AF6F1469AEDFBDA1322A7B7495B9EE3@XAP-PVEXMBX02.xlnx.xilinx.com>
-Message-ID: <5594ECD2.7090701@atmel.com>
+From: boris.brezillon@free-electrons.com (Boris Brezillon)
+Date: Thu, 2 Jul 2015 09:49:55 +0200
+Subject: [RFC PATCH 05/15] pwm: introduce default period and polarity
+ concepts
+In-Reply-To: <20150702064445.GC11824@pengutronix.de>
+References: <1435738921-25027-1-git-send-email-boris.brezillon@free-electrons.com>
+ <1435738921-25027-6-git-send-email-boris.brezillon@free-electrons.com>
+ <20150702064445.GC11824@pengutronix.de>
+Message-ID: <20150702094955.4b1c9254@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le 02/07/2015 04:33, Punnaiah Choudary Kalluri a ?crit :
-> Hi Nicolae and Cyrille,
+On Thu, 2 Jul 2015 08:44:45 +0200
+Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de> wrote:
+
+> On Wed, Jul 01, 2015 at 10:21:51AM +0200, Boris Brezillon wrote:
+> > When requested by a user, the PWM is assigned a default period and polarity
+> > extracted from the DT, the platform data or statically set by the driver.
+> > Those default values are currently stored in the period and polarity
+> > fields of the pwm_device struct, but they will be stored somewhere else
+> > once we have introduced the architecture allowing for hardware state
+> > retrieval.
+> > 
+> > The pwm_set_default_polarity and pwm_set_default_period should only be
+> > used by PWM drivers or the PWM core infrastructure to specify the
+> > default period and polarity values.
+> Would it make sense to put the prototypes of
+> pwm_set_default_p{olarity,eriod} into (say) drivers/pwm/pwm-private.h
+> then?
 > 
->    SG feature was not tested for Zynq using macb driver but tested it using the
->  emacps Driver in Xilinx tree (this driver is deprecated recently)
-> 
-> We will test and enable this feature in driver for Zynq.
 
-Ok, fine: we will be glad to merge patches that would enable this
-feature on Zynq.
+Yes, definitely. I was thinking about moving those functions/prototypes
+into include/linux/pwm-provider.h, but I'm fine with
+drivers/pwm/pwm-private.h too.
 
-Bye,
-
-
->> -----Original Message-----
->> From: Cyrille Pitchen [mailto:cyrille.pitchen at atmel.com]
->> Sent: Wednesday, July 01, 2015 10:34 PM
->> To: Nicolae Rosia; Michal Simek; Punnaiah Choudary Kalluri;
->> netdev at vger.kernel.org; Nicolas Ferre; linux-arm-kernel at lists.infradead.org
->> Subject: Re: macb: zynq: why is SG disabled?
->>
->> Le 01/07/2015 17:14, Nicolae Rosia a ?crit :
->>> Hello,
->>>
->>> After reading the GEM part of Zynq7000 Technical Reference Manual [0], I
->> think that SG should be supported.
->>> Is there a reason why SG is disabled in macb for Zynq?
->>>
->>> Best regards,
->>> Nicolae Rosia
->>
->> Hi Nicolae,
->>
->> when the scatter-gather patch was introduced, the feature was enabled only
->> on tested boards to avoid regressions on other boards.
->> So SG is enabled on sama5d4x and sama5d2x SoCs. SG is disabled on purpose
->> on sama5d3x.
->>
->> For Zynq, I think the feature is still disabled just because it has never been
->> tested.
->>
->> Best regards,
->>
->> Cyrille
-> 
+Thierry, any opinion ?
 
 
 -- 
-Nicolas Ferre
+Boris Brezillon, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
