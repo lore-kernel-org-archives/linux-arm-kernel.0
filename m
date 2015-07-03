@@ -1,139 +1,182 @@
 From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Fri,  3 Jul 2015 08:11:56 +0200
-Subject: [PATCH RFC 4/5] ARM: mvebu: Armada 38x: Add dynamic frequency scaling
- support in pmsu
+Date: Fri,  3 Jul 2015 08:11:54 +0200
+Subject: [PATCH RFC 2/5] ARM: mvebu: Use shorter register definition in pmsu.c
 In-Reply-To: <1435903917-20486-1-git-send-email-gregory.clement@free-electrons.com>
 References: <1435903917-20486-1-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <1435903917-20486-5-git-send-email-gregory.clement@free-electrons.com>
+Message-ID: <1435903917-20486-3-git-send-email-gregory.clement@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This commit add the last missing piece of code enabling dynamic
-frequency scaling support for Armada 38x.
-
-The main difference with Armada XP is that the Cortex A9 CPU
-frequencies of the Armada 38x SoCs are not independent. Even if a SoC
-contains a single CPU, some specific initialization has to be done at
-pmsu level: this unit must not wait for the second CPU when the
-frequency is modified.
+The register definition were too verbose. Shorten them in order to
+have something more readable and avoiding having most of the
+instruction on two lines.
 
 Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
 ---
- arch/arm/mach-mvebu/pmsu.c | 67 +++++++++++++++++++++++++++++++++++++++++-----
- 1 file changed, 61 insertions(+), 6 deletions(-)
+ arch/arm/mach-mvebu/pmsu.c | 102 +++++++++++++++++++++++----------------------
+ 1 file changed, 52 insertions(+), 50 deletions(-)
 
 diff --git a/arch/arm/mach-mvebu/pmsu.c b/arch/arm/mach-mvebu/pmsu.c
-index f19be0ac0068..a2ced0b7fa0a 100644
+index 4f4e22206ae5..d207f5fc13a6 100644
 --- a/arch/arm/mach-mvebu/pmsu.c
 +++ b/arch/arm/mach-mvebu/pmsu.c
-@@ -352,6 +352,13 @@ void mvebu_v7_pmsu_idle_exit(void)
- 	/* cancel ask HW to power down the L2 Cache if possible */
- 	reg = readl(pmsu_mp_base + PMSU_CTL_CFG(hw_cpu));
- 	reg &= ~PMSU_CTL_CFG_L2_PWDDN;
+@@ -46,27 +46,29 @@
+ #define PMSU_REG_SIZE	    0x1000
+ 
+ /* PMSU MP registers */
+-#define PMSU_CONTROL_AND_CONFIG(cpu)	    ((cpu * 0x100) + 0x104)
+-#define PMSU_CONTROL_AND_CONFIG_DFS_REQ		BIT(18)
+-#define PMSU_CONTROL_AND_CONFIG_PWDDN_REQ	BIT(16)
+-#define PMSU_CONTROL_AND_CONFIG_L2_PWDDN	BIT(20)
++#define PMSU_CTL_CFG(cpu)		((cpu * 0x100) + 0x104)
++#define PMSU_CTL_CFG_CPU0_FRQ_ID_SFT		4
++#define PMSU_CTL_CFG_CPU0_FRQ_ID_MSK		0xF
++#define PMSU_CTL_CFG_DFS_REQ			BIT(18)
++#define PMSU_CTL_CFG_PWDDN_REQ			BIT(16)
++#define PMSU_CTL_CFG_L2_PWDDN			BIT(20)
+ 
+ #define PMSU_CPU_POWER_DOWN_CONTROL(cpu)    ((cpu * 0x100) + 0x108)
+ 
+ #define PMSU_CPU_POWER_DOWN_DIS_SNP_Q_SKIP	BIT(0)
+ 
+-#define PMSU_STATUS_AND_MASK(cpu)	    ((cpu * 0x100) + 0x10c)
+-#define PMSU_STATUS_AND_MASK_CPU_IDLE_WAIT	BIT(16)
+-#define PMSU_STATUS_AND_MASK_SNP_Q_EMPTY_WAIT	BIT(17)
+-#define PMSU_STATUS_AND_MASK_IRQ_WAKEUP		BIT(20)
+-#define PMSU_STATUS_AND_MASK_FIQ_WAKEUP		BIT(21)
+-#define PMSU_STATUS_AND_MASK_DBG_WAKEUP		BIT(22)
+-#define PMSU_STATUS_AND_MASK_IRQ_MASK		BIT(24)
+-#define PMSU_STATUS_AND_MASK_FIQ_MASK		BIT(25)
++#define PMSU_STATUS_MSK(cpu)	    ((cpu * 0x100) + 0x10c)
++#define PMSU_STATUS_MSK_CPU_IDLE_WAIT		BIT(16)
++#define PMSU_STATUS_MSK_SNP_Q_EMPTY_WAIT	BIT(17)
++#define PMSU_STATUS_MSK_IRQ_WAKEUP		BIT(20)
++#define PMSU_STATUS_MSK_FIQ_WAKEUP		BIT(21)
++#define PMSU_STATUS_MSK_DBG_WAKEUP		BIT(22)
++#define PMSU_STATUS_MSK_IRQ_MASK		BIT(24)
++#define PMSU_STATUS_MSK_FIQ_MASK		BIT(25)
+ 
+-#define PMSU_EVENT_STATUS_AND_MASK(cpu)     ((cpu * 0x100) + 0x120)
+-#define PMSU_EVENT_STATUS_AND_MASK_DFS_DONE        BIT(1)
+-#define PMSU_EVENT_STATUS_AND_MASK_DFS_DONE_MASK   BIT(17)
++#define PMSU_EVENT_STATUS_MSK(cpu)     ((cpu * 0x100) + 0x120)
++#define PMSU_EVENT_STATUS_MSK_DFS_DONE        BIT(1)
++#define PMSU_EVENT_STATUS_MSK_DFS_DONE_MASK   BIT(17)
+ 
+ #define PMSU_BOOT_ADDR_REDIRECT_OFFSET(cpu) ((cpu * 0x100) + 0x124)
+ 
+@@ -238,23 +240,23 @@ static int mvebu_v7_pmsu_idle_prepare(unsigned long flags)
+ 	 * IRQ and FIQ as wakeup events, set wait for snoop queue empty
+ 	 * indication and mask IRQ and FIQ from CPU
+ 	 */
+-	reg = readl(pmsu_mp_base + PMSU_STATUS_AND_MASK(hw_cpu));
+-	reg |= PMSU_STATUS_AND_MASK_CPU_IDLE_WAIT    |
+-	       PMSU_STATUS_AND_MASK_IRQ_WAKEUP       |
+-	       PMSU_STATUS_AND_MASK_FIQ_WAKEUP       |
+-	       PMSU_STATUS_AND_MASK_SNP_Q_EMPTY_WAIT |
+-	       PMSU_STATUS_AND_MASK_IRQ_MASK         |
+-	       PMSU_STATUS_AND_MASK_FIQ_MASK;
+-	writel(reg, pmsu_mp_base + PMSU_STATUS_AND_MASK(hw_cpu));
+-
+-	reg = readl(pmsu_mp_base + PMSU_CONTROL_AND_CONFIG(hw_cpu));
++	reg = readl(pmsu_mp_base + PMSU_STATUS_MSK(hw_cpu));
++	reg |= PMSU_STATUS_MSK_CPU_IDLE_WAIT    |
++	       PMSU_STATUS_MSK_IRQ_WAKEUP       |
++	       PMSU_STATUS_MSK_FIQ_WAKEUP       |
++	       PMSU_STATUS_MSK_SNP_Q_EMPTY_WAIT |
++	       PMSU_STATUS_MSK_IRQ_MASK         |
++	       PMSU_STATUS_MSK_FIQ_MASK;
++	writel(reg, pmsu_mp_base + PMSU_STATUS_MSK(hw_cpu));
 +
-+	/*
-+	 * When exiting from idle state such as cpuidle or hotplug,
-+	 * Enable PMU wait for the CPU to enter WFI when doing DFS
-+	 * by setting CPUx Frequency ID to 1
-+	 */
-+	reg |= 1 << PMSU_CTL_CFG_CPU0_FRQ_ID_SFT;
- 	writel(reg, pmsu_mp_base + PMSU_CTL_CFG(hw_cpu));
++	reg = readl(pmsu_mp_base + PMSU_CTL_CFG(hw_cpu));
+ 	/* ask HW to power down the L2 Cache if needed */
+ 	if (flags & PMSU_PREPARE_DEEP_IDLE)
+-		reg |= PMSU_CONTROL_AND_CONFIG_L2_PWDDN;
++		reg |= PMSU_CTL_CFG_L2_PWDDN;
+ 
+ 	/* request power down */
+-	reg |= PMSU_CONTROL_AND_CONFIG_PWDDN_REQ;
+-	writel(reg, pmsu_mp_base + PMSU_CONTROL_AND_CONFIG(hw_cpu));
++	reg |= PMSU_CTL_CFG_PWDDN_REQ;
++	writel(reg, pmsu_mp_base + PMSU_CTL_CFG(hw_cpu));
+ 
+ 	if (flags & PMSU_PREPARE_SNOOP_DISABLE) {
+ 		/* Disable snoop disable by HW - SW is taking care of it */
+@@ -347,17 +349,17 @@ void mvebu_v7_pmsu_idle_exit(void)
+ 	if (pmsu_mp_base == NULL)
+ 		return;
+ 	/* cancel ask HW to power down the L2 Cache if possible */
+-	reg = readl(pmsu_mp_base + PMSU_CONTROL_AND_CONFIG(hw_cpu));
+-	reg &= ~PMSU_CONTROL_AND_CONFIG_L2_PWDDN;
+-	writel(reg, pmsu_mp_base + PMSU_CONTROL_AND_CONFIG(hw_cpu));
++	reg = readl(pmsu_mp_base + PMSU_CTL_CFG(hw_cpu));
++	reg &= ~PMSU_CTL_CFG_L2_PWDDN;
++	writel(reg, pmsu_mp_base + PMSU_CTL_CFG(hw_cpu));
  
  	/* cancel Enable wakeup events and mask interrupts */
-@@ -586,6 +593,38 @@ int armada_xp_pmsu_dfs_request(int cpu)
- 	return 0;
+-	reg = readl(pmsu_mp_base + PMSU_STATUS_AND_MASK(hw_cpu));
+-	reg &= ~(PMSU_STATUS_AND_MASK_IRQ_WAKEUP | PMSU_STATUS_AND_MASK_FIQ_WAKEUP);
+-	reg &= ~PMSU_STATUS_AND_MASK_CPU_IDLE_WAIT;
+-	reg &= ~PMSU_STATUS_AND_MASK_SNP_Q_EMPTY_WAIT;
+-	reg &= ~(PMSU_STATUS_AND_MASK_IRQ_MASK | PMSU_STATUS_AND_MASK_FIQ_MASK);
+-	writel(reg, pmsu_mp_base + PMSU_STATUS_AND_MASK(hw_cpu));
++	reg = readl(pmsu_mp_base + PMSU_STATUS_MSK(hw_cpu));
++	reg &= ~(PMSU_STATUS_MSK_IRQ_WAKEUP | PMSU_STATUS_MSK_FIQ_WAKEUP);
++	reg &= ~PMSU_STATUS_MSK_CPU_IDLE_WAIT;
++	reg &= ~PMSU_STATUS_MSK_SNP_Q_EMPTY_WAIT;
++	reg &= ~(PMSU_STATUS_MSK_IRQ_MASK | PMSU_STATUS_MSK_FIQ_MASK);
++	writel(reg, pmsu_mp_base + PMSU_STATUS_MSK(hw_cpu));
  }
  
-+void mvebu_v7_pmsu_disable_dfs_cpu(int hw_cpu)
-+{
-+	u32 reg;
-+
-+	if (pmsu_mp_base == NULL)
-+		return;
-+	/*
-+	 * Disable PMU wait for the CPU to enter WFI when doing DFS
-+	 * by setting CPUx Frequency ID to 0
-+	 */
-+	reg = readl(pmsu_mp_base + PMSU_CTL_CFG(hw_cpu));
-+	reg &= ~(PMSU_CTL_CFG_CPU0_FRQ_ID_MSK << PMSU_CTL_CFG_CPU0_FRQ_ID_SFT);
-+	writel(reg, pmsu_mp_base + PMSU_CTL_CFG(hw_cpu));
-+}
-+
-+int armada_38x_pmsu_dfs_request(int cpu)
-+{
-+	/*
-+	 * Protect CPU DFS from changing the number of online cpus number during
-+	 * frequency transition by temporarily disable cpu hotplug
-+	 */
-+	cpu_hotplug_disable();
-+
-+	/* Trigger the DFS on all the CPUs */
-+	on_each_cpu(mvebu_pmsu_dfs_request_local,
-+		    NULL, false);
-+
-+	cpu_hotplug_enable();
-+
-+	return 0;
-+}
-+
- int mvebu_pmsu_dfs_request(int cpu)
- {
- 	return mvebu_pmsu_dfs_request_ptr(cpu);
-@@ -595,15 +634,19 @@ struct cpufreq_dt_platform_data armada_xp_cpufreq_dt_pd = {
- 	.independent_clocks = true,
- };
+ static int mvebu_v7_cpu_pm_notify(struct notifier_block *self,
+@@ -521,16 +523,16 @@ static void mvebu_pmsu_dfs_request_local(void *data)
+ 	local_irq_save(flags);
  
-+struct cpufreq_dt_platform_data armada_38x_cpufreq_dt_pd = {
-+	.independent_clocks = false,
-+};
-+
- static int __init mvebu_pmsu_cpufreq_init(void)
- {
- 	struct device_node *np;
- 	struct resource res;
- 	int ret, cpu;
+ 	/* Prepare to enter idle */
+-	reg = readl(pmsu_mp_base + PMSU_STATUS_AND_MASK(cpu));
+-	reg |= PMSU_STATUS_AND_MASK_CPU_IDLE_WAIT |
+-	       PMSU_STATUS_AND_MASK_IRQ_MASK     |
+-	       PMSU_STATUS_AND_MASK_FIQ_MASK;
+-	writel(reg, pmsu_mp_base + PMSU_STATUS_AND_MASK(cpu));
++	reg = readl(pmsu_mp_base + PMSU_STATUS_MSK(cpu));
++	reg |= PMSU_STATUS_MSK_CPU_IDLE_WAIT |
++	       PMSU_STATUS_MSK_IRQ_MASK     |
++	       PMSU_STATUS_MSK_FIQ_MASK;
++	writel(reg, pmsu_mp_base + PMSU_STATUS_MSK(cpu));
  
--	if (!of_machine_is_compatible("marvell,armadaxp"))
-+	if (!of_machine_is_compatible("marvell,armadaxp") &&
-+	    !of_machine_is_compatible("marvell,armada380"))
- 		return 0;
--
- 	/*
- 	 * In order to have proper cpufreq handling, we need to ensure
- 	 * that the Device Tree description of the CPU clock includes
-@@ -648,6 +691,8 @@ static int __init mvebu_pmsu_cpufreq_init(void)
- 			return PTR_ERR(clk);
- 		}
+ 	/* Request the DFS transition */
+-	reg = readl(pmsu_mp_base + PMSU_CONTROL_AND_CONFIG(cpu));
+-	reg |= PMSU_CONTROL_AND_CONFIG_DFS_REQ;
+-	writel(reg, pmsu_mp_base + PMSU_CONTROL_AND_CONFIG(cpu));
++	reg = readl(pmsu_mp_base + PMSU_CTL_CFG(cpu));
++	reg |= PMSU_CTL_CFG_DFS_REQ;
++	writel(reg, pmsu_mp_base + PMSU_CTL_CFG(cpu));
  
-+		clk_prepare_enable(clk);
-+
- 		/*
- 		 * In case of a failure of dev_pm_opp_add(), we don't
- 		 * bother with cleaning up the registered OPP (there's
-@@ -666,10 +711,20 @@ static int __init mvebu_pmsu_cpufreq_init(void)
- 			return ret;
- 		}
+ 	/* The fact of entering idle will trigger the DFS transition */
+ 	wfi();
+@@ -539,9 +541,9 @@ static void mvebu_pmsu_dfs_request_local(void *data)
+ 	 * We're back from idle, the DFS transition has completed,
+ 	 * clear the idle wait indication.
+ 	 */
+-	reg = readl(pmsu_mp_base + PMSU_STATUS_AND_MASK(cpu));
+-	reg &= ~PMSU_STATUS_AND_MASK_CPU_IDLE_WAIT;
+-	writel(reg, pmsu_mp_base + PMSU_STATUS_AND_MASK(cpu));
++	reg = readl(pmsu_mp_base + PMSU_STATUS_MSK(cpu));
++	reg &= ~PMSU_STATUS_MSK_CPU_IDLE_WAIT;
++	writel(reg, pmsu_mp_base + PMSU_STATUS_MSK(cpu));
+ 
+ 	local_irq_restore(flags);
+ }
+@@ -569,8 +571,8 @@ int mvebu_pmsu_dfs_request(int cpu)
+ 	/* Poll until the DFS done event is generated */
+ 	timeout = jiffies + HZ;
+ 	while (time_before(jiffies, timeout)) {
+-		reg = readl(pmsu_mp_base + PMSU_EVENT_STATUS_AND_MASK(hwcpu));
+-		if (reg & PMSU_EVENT_STATUS_AND_MASK_DFS_DONE)
++		reg = readl(pmsu_mp_base + PMSU_EVENT_STATUS_MSK(hwcpu));
++		if (reg & PMSU_EVENT_STATUS_MSK_DFS_DONE)
+ 			break;
+ 		udelay(10);
  	}
--	mvebu_pmsu_dfs_request_ptr = armada_xp_pmsu_dfs_request;
--	platform_device_register_data(NULL, "cpufreq-dt", -1,
--				      &armada_xp_cpufreq_dt_pd,
--				      sizeof(armada_xp_cpufreq_dt_pd));
-+	if (of_machine_is_compatible("marvell,armada380")) {
-+		if (num_online_cpus() == 1)
-+			mvebu_v7_pmsu_disable_dfs_cpu(1);
-+
-+		mvebu_pmsu_dfs_request_ptr = armada_38x_pmsu_dfs_request;
-+		platform_device_register_data(NULL, "cpufreq-dt", -1,
-+					      &armada_38x_cpufreq_dt_pd,
-+					      sizeof(armada_38x_cpufreq_dt_pd));
-+	} else if (of_machine_is_compatible("marvell,armadaxp")) {
-+		mvebu_pmsu_dfs_request_ptr = armada_xp_pmsu_dfs_request;
-+		platform_device_register_data(NULL, "cpufreq-dt", -1,
-+					      &armada_xp_cpufreq_dt_pd,
-+					      sizeof(armada_xp_cpufreq_dt_pd));
-+	}
- 	return 0;
- }
- 
 -- 
 2.1.0
