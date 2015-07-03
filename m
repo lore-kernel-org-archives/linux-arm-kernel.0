@@ -1,39 +1,35 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 3 Jul 2015 11:55:26 +0100
-Subject: [PATCH 1/2] gpio: dwapb: Use human understandable gpio numbering.
-In-Reply-To: <20150703103626.GA18893@localhost.localdomain>
-References: <cover.1435777856.git.rcochran@linutronix.de>
- <d6b5ce85a17164970d454583560e07f7aed7b8ca.1435777856.git.rcochran@linutronix.de>
- <267A46E7-C5C5-4696-90CC-D44F4130B3EF@smart-africa.com>
- <20150703091347.GA17808@localhost.localdomain>
- <C1BD6DA3-F32E-4CAD-8DA9-6F74A7966DBE@smart-africa.com>
- <20150703103626.GA18893@localhost.localdomain>
-Message-ID: <20150703105525.GU7557@n2100.arm.linux.org.uk>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Fri, 3 Jul 2015 12:01:37 +0100
+Subject: [PATCH v2] ARM64 / SMP: Switch pr_err() to pr_debug() for
+ disabled GICC entry
+In-Reply-To: <1435908546-11457-1-git-send-email-hanjun.guo@linaro.org>
+References: <1435908546-11457-1-git-send-email-hanjun.guo@linaro.org>
+Message-ID: <20150703110136.GJ25907@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 03, 2015 at 12:36:26PM +0200, Richard Cochran wrote:
-> On Fri, Jul 03, 2015 at 10:18:28AM +0100, Michael van der Westhuizen wrote:
-> > The subject should be:
-> >   gpio: dwapb: Use human understandable gpio numbering
-> > Not:
-> >   gpio: dwapb: Use human understandable gpio numbering.
+On Fri, Jul 03, 2015 at 03:29:06PM +0800, Hanjun Guo wrote:
+> It is normal that firmware presents GICC entry or entries (processors)
+> with disabled flag in ACPI MADT, taking a system of 16 cpus for example,
+> ACPI firmware may present 8 ebabled first with another 8 cpus disabled
+> in MADT, the disabled cpus can be hot-added later.
 > 
-> Ok, I see.  I would call that dot a "period", not a full-stop.
+> Firmware may also present more cpus than the hardware actually has, but
+> disabled the unused ones, and easily enable it when the hardware has such
+> cpus to make the firmware code scalable.
 > 
-> Must be a British thing...
+> So that's not an error for disabled cpus in MADT, we can switch pr_err()
+> to pr_debug() to make the boot a little quieter by default.
+> 
+> Since hwid for disabled cpus often are invalid, and we check invalid hwid
+> fisrt in the code, for use case that hot add cpus later will be filtered
+> out and will not be counted in possible cups, so move this check before
+> the hwid one to prepare the code to count for disabeld cpus when cpu
+> hot-plug is introduced.
+> 
+> Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
 
-https://en.wikipedia.org/wiki/Full_stop
-
-says that '.' is a period in both American and British English, but when
-used at the end of a sentence, the period is called a "full stop" in both.
-(A full stop is a period used to end a sentence.)
-
-It also says that in British English, '.' used elsewhere has also become
-known as a "full stop" (I regard that as incorrect, despite myself being
-British - it's a dilution of terms, and we'd now be in need of a new term
-to describe the '.' at the end of a sentence because of this.)
+Applied. Thanks.
 
 -- 
-FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
-according to speedtest.net.
+Catalin
