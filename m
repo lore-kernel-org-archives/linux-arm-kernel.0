@@ -1,152 +1,142 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Fri,  3 Jul 2015 13:55:51 +0200
-Subject: [PATCH v3 2/4] ARM: mvebu: Add standby support
-In-Reply-To: <1435924553-22428-1-git-send-email-gregory.clement@free-electrons.com>
-References: <1435924553-22428-1-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <1435924553-22428-3-git-send-email-gregory.clement@free-electrons.com>
+From: eric.auger@linaro.org (Eric Auger)
+Date: Fri, 03 Jul 2015 13:55:52 +0200
+Subject: [RFC 08/17] kvm: arm/arm64: implement kvm_arm_[halt, resume]_guest
+In-Reply-To: <1435843047-6327-9-git-send-email-eric.auger@linaro.org>
+References: <1435843047-6327-1-git-send-email-eric.auger@linaro.org>
+ <1435843047-6327-9-git-send-email-eric.auger@linaro.org>
+Message-ID: <55967848.5050204@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Until now only one Armada XP and one Armada 388 based board supported
-suspend to ram. However, most of the recent mvebu SoCs can support the
-standby mode. Unlike for the suspend to ram, nothing special has to be
-done for these SoCs. This patch allows the system to use the standby
-mode on Armada 370, 38x, 39x and XP SoCs. There are issues with the
-Armada 375, and the support might be added (if possible) in a future
-patch.
+Christoffer, Marc,
+On 07/02/2015 03:17 PM, Eric Auger wrote:
+> On halt, the guest is forced to exit and prevented from being
+> re-entered. This is synchronous.
+> 
+> Those two operations will be needed for IRQ forwarding setting.
+> 
+> Signed-off-by: Eric Auger <eric.auger@linaro.org>
+would you agree to handle this ARM functionality separately from the
+forwarding series?
 
-Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
----
- arch/arm/mach-mvebu/common.h   |  4 ++--
- arch/arm/mach-mvebu/pm-board.c | 12 ++++++++--
- arch/arm/mach-mvebu/pm.c       | 52 +++++++++++++++++++++++++++++++++++-------
- 3 files changed, 56 insertions(+), 12 deletions(-)
+This includes 2 patch files, that one +
+https://lkml.org/lkml/2015/7/2/288. This functionality is needed for
+forwarding control since when changing the forwarding state we need to
+"freeze" the state of the physical/virtual IRQ to undertake proper
+actions. Stopping the guest makes sure it won't deactivate the virtual
+IRQ while we are doing state change actions.
 
-diff --git a/arch/arm/mach-mvebu/common.h b/arch/arm/mach-mvebu/common.h
-index 3e0aca1f288a..6b775492cfad 100644
---- a/arch/arm/mach-mvebu/common.h
-+++ b/arch/arm/mach-mvebu/common.h
-@@ -25,6 +25,6 @@ int mvebu_system_controller_get_soc_id(u32 *dev, u32 *rev);
- 
- void __iomem *mvebu_get_scu_base(void);
- 
--int mvebu_pm_init(void (*board_pm_enter)(void __iomem *sdram_reg, u32 srcmd));
--
-+int mvebu_pm_suspend_init(void (*board_pm_enter)(void __iomem *sdram_reg,
-+							u32 srcmd));
- #endif
-diff --git a/arch/arm/mach-mvebu/pm-board.c b/arch/arm/mach-mvebu/pm-board.c
-index acc69e369c8b..16a4b480c16a 100644
---- a/arch/arm/mach-mvebu/pm-board.c
-+++ b/arch/arm/mach-mvebu/pm-board.c
-@@ -135,11 +135,19 @@ static int __init mvebu_armada_pm_init(void)
- 	if (!gpio_ctrl)
- 		return -ENOMEM;
- 
--	mvebu_pm_init(mvebu_armada_pm_enter);
-+	mvebu_pm_suspend_init(mvebu_armada_pm_enter);
- 
- out:
- 	of_node_put(np);
- 	return ret;
- }
- 
--late_initcall(mvebu_armada_pm_init);
-+/*
-+ * Registering the mvebu_board_pm_enter callback must be done before
-+ * the platform_suspend_ops will be registered. In the same time we
-+ * also need to have the gpio devices registered. That's why we use a
-+ * device_initcall_sync which is called after all the device_initcall
-+ * (used by the gpio device) but before the late_initcall (used to
-+ * register the platform_suspend_ops)
-+ */
-+device_initcall_sync(mvebu_armada_pm_init);
-diff --git a/arch/arm/mach-mvebu/pm.c b/arch/arm/mach-mvebu/pm.c
-index f249c8e04bd4..db31cbb6e2c8 100644
---- a/arch/arm/mach-mvebu/pm.c
-+++ b/arch/arm/mach-mvebu/pm.c
-@@ -204,13 +204,10 @@ static int mvebu_pm_store_bootinfo(void)
- 	return 0;
- }
- 
--static int mvebu_pm_enter(suspend_state_t state)
-+static int mvebu_enter_suspend(void)
- {
- 	int ret;
- 
--	if (state != PM_SUSPEND_MEM)
--		return -EINVAL;
--
- 	ret = mvebu_pm_store_bootinfo();
- 	if (ret)
- 		return ret;
-@@ -226,16 +223,57 @@ static int mvebu_pm_enter(suspend_state_t state)
- 	set_cpu_coherent();
- 
- 	cpu_pm_exit();
-+	return 0;
-+}
-+
-+static int mvebu_pm_enter(suspend_state_t state)
-+{
-+	switch (state) {
-+	case PM_SUSPEND_STANDBY:
-+		cpu_do_idle();
-+		break;
-+	case PM_SUSPEND_MEM:
-+		return mvebu_enter_suspend();
-+	default:
-+		return -EINVAL;
-+	}
-+	return 0;
-+}
-+
-+static int mvebu_pm_valid(suspend_state_t state)
-+{
-+	if (state == PM_SUSPEND_STANDBY)
-+		return 1;
-+
-+	if (state == PM_SUSPEND_MEM && mvebu_board_pm_enter != NULL)
-+		return 1;
- 
- 	return 0;
- }
- 
- static const struct platform_suspend_ops mvebu_pm_ops = {
- 	.enter = mvebu_pm_enter,
--	.valid = suspend_valid_only_mem,
-+	.valid = mvebu_pm_valid,
- };
- 
--int __init mvebu_pm_init(void (*board_pm_enter)(void __iomem *sdram_reg, u32 srcmd))
-+static int __init mvebu_pm_init(void)
-+{
-+	if (!of_machine_is_compatible("marvell,armadaxp") &&
-+	    !of_machine_is_compatible("marvell,armada370") &&
-+	    !of_machine_is_compatible("marvell,armada380") &&
-+	    !of_machine_is_compatible("marvell,armada390"))
-+		return -ENODEV;
-+
-+	suspend_set_ops(&mvebu_pm_ops);
-+
-+	return 0;
-+}
-+
-+
-+late_initcall(mvebu_pm_init);
-+
-+int __init mvebu_pm_suspend_init(void (*board_pm_enter)(void __iomem *sdram_reg,
-+							u32 srcmd))
- {
- 	struct device_node *np;
- 	struct resource res;
-@@ -267,7 +305,5 @@ int __init mvebu_pm_init(void (*board_pm_enter)(void __iomem *sdram_reg, u32 src
- 
- 	mvebu_board_pm_enter = board_pm_enter;
- 
--	suspend_set_ops(&mvebu_pm_ops);
--
- 	return 0;
- }
--- 
-2.1.0
+The forwarding series is quite heterogeneous (VFIO platform driver,
+vgic, irq bypass manager) and I think it would simplify the review process.
+
+Please let me know if you agree. If yes, I will post a separate series.
+
+Best Regards
+
+Eric
+> 
+> ---
+> 
+> RFC:
+> - rename the function and this latter becomes static
+> - remove __KVM_HAVE_ARCH_HALT_GUEST
+> 
+> v4 -> v5: add arm64 support
+> - also defines __KVM_HAVE_ARCH_HALT_GUEST for arm64
+> - add pause field
+> ---
+>  arch/arm/include/asm/kvm_host.h   |  3 +++
+>  arch/arm/kvm/arm.c                | 32 +++++++++++++++++++++++++++++---
+>  arch/arm64/include/asm/kvm_host.h |  3 +++
+>  3 files changed, 35 insertions(+), 3 deletions(-)
+> 
+> diff --git a/arch/arm/include/asm/kvm_host.h b/arch/arm/include/asm/kvm_host.h
+> index 304004d..899ae27 100644
+> --- a/arch/arm/include/asm/kvm_host.h
+> +++ b/arch/arm/include/asm/kvm_host.h
+> @@ -132,6 +132,9 @@ struct kvm_vcpu_arch {
+>  	/* vcpu power-off state */
+>  	bool power_off;
+>  
+> +	/* Don't run the guest */
+> +	bool pause;
+> +
+>  	/* IO related fields */
+>  	struct kvm_decode mmio_decode;
+>  
+> diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
+> index 7537e68..4be6715 100644
+> --- a/arch/arm/kvm/arm.c
+> +++ b/arch/arm/kvm/arm.c
+> @@ -471,11 +471,36 @@ bool kvm_arch_intc_initialized(struct kvm *kvm)
+>  	return vgic_initialized(kvm);
+>  }
+>  
+> +static void kvm_arm_halt_guest(struct kvm *kvm)
+> +{
+> +	int i;
+> +	struct kvm_vcpu *vcpu;
+> +
+> +	kvm_for_each_vcpu(i, vcpu, kvm)
+> +		vcpu->arch.pause = true;
+> +	force_vm_exit(cpu_all_mask);
+> +}
+> +
+> +static void kvm_arm_resume_guest(struct kvm *kvm)
+> +{
+> +	int i;
+> +	struct kvm_vcpu *vcpu;
+> +
+> +	kvm_for_each_vcpu(i, vcpu, kvm) {
+> +		wait_queue_head_t *wq = kvm_arch_vcpu_wq(vcpu);
+> +
+> +		vcpu->arch.pause = false;
+> +		wake_up_interruptible(wq);
+> +	}
+> +}
+> +
+> +
+>  static void vcpu_pause(struct kvm_vcpu *vcpu)
+>  {
+>  	wait_queue_head_t *wq = kvm_arch_vcpu_wq(vcpu);
+>  
+> -	wait_event_interruptible(*wq, !vcpu->arch.power_off);
+> +	wait_event_interruptible(*wq, ((!vcpu->arch.power_off) &&
+> +				       (!vcpu->arch.pause)));
+>  }
+>  
+>  static int kvm_vcpu_initialized(struct kvm_vcpu *vcpu)
+> @@ -525,7 +550,7 @@ int kvm_arch_vcpu_ioctl_run(struct kvm_vcpu *vcpu, struct kvm_run *run)
+>  
+>  		update_vttbr(vcpu->kvm);
+>  
+> -		if (vcpu->arch.power_off)
+> +		if (vcpu->arch.power_off || vcpu->arch.pause)
+>  			vcpu_pause(vcpu);
+>  
+>  		/*
+> @@ -551,7 +576,8 @@ int kvm_arch_vcpu_ioctl_run(struct kvm_vcpu *vcpu, struct kvm_run *run)
+>  			run->exit_reason = KVM_EXIT_INTR;
+>  		}
+>  
+> -		if (ret <= 0 || need_new_vmid_gen(vcpu->kvm)) {
+> +		if (ret <= 0 || need_new_vmid_gen(vcpu->kvm) ||
+> +		    vcpu->arch.pause) {
+>  			local_irq_enable();
+>  			preempt_enable();
+>  			kvm_vgic_sync_hwstate(vcpu);
+> diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
+> index 009da6b..69e3785 100644
+> --- a/arch/arm64/include/asm/kvm_host.h
+> +++ b/arch/arm64/include/asm/kvm_host.h
+> @@ -125,6 +125,9 @@ struct kvm_vcpu_arch {
+>  	/* vcpu power-off state */
+>  	bool power_off;
+>  
+> +	/* Don't run the guest */
+> +	bool pause;
+> +
+>  	/* IO related fields */
+>  	struct kvm_decode mmio_decode;
+>  
+> 
