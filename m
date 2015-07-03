@@ -1,37 +1,33 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Fri, 3 Jul 2015 19:02:22 +0200
-Subject: Possible regression due to "tick: broadcast: Prevent livelock
- from event handler"
-In-Reply-To: <20150703143703.GB19284@katana>
-References: <20150703024044.GB24695@verge.net.au>
- <20150703105441.GF1521@katana>
- <alpine.DEB.2.11.1507031511180.3916@nanos>
- <20150703133245.GA19284@katana>
- <alpine.DEB.2.11.1507031612410.3916@nanos>
- <20150703143703.GB19284@katana>
-Message-ID: <CAMuHMdWQeYA=LrYcsD8W_0ZQUp3BKYVxedhBDpD5kPQp++yu1A@mail.gmail.com>
+From: pbonzini@redhat.com (Paolo Bonzini)
+Date: Fri, 3 Jul 2015 19:20:15 +0200
+Subject: [RFC 12/17] irq: bypass: Extend skeleton for ARM forwarding
+ control
+In-Reply-To: <55968A34.5010409@linaro.org>
+References: <1435843047-6327-1-git-send-email-eric.auger@linaro.org>
+ <1435843047-6327-13-git-send-email-eric.auger@linaro.org>
+ <55953F5F.9090203@redhat.com> <55968A34.5010409@linaro.org>
+Message-ID: <5596C44F.8070903@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Wolfram,
 
-On Fri, Jul 3, 2015 at 4:37 PM, Wolfram Sang <wsa@the-dreams.de> wrote:
->> So this is a single core machine and uses the em_sti timer w/o the
->> broadcast nonsense. In Simons case it looks like em_sti is used as
->> broadcast device.
->
-> We use the same board. Just my kernel has SMP=n.
 
-Unlike our other multi-core A9 SoCs, emev2.dtsi doesn't have a node
-for the arm,cortex-a9-twd-timer?
+On 03/07/2015 15:12, Eric Auger wrote:
+>> > Linux IRQ and active should be okay.  As to the vfio_device handle, you
+>> > should link it from the vfio_platform_device instead.  And for the
+>> > vfio_platform_device, you can link it from the vfio_platform_irq instead.
+> For this last one, I don't think this is achievable since if I store the
+> vfio_platform_irq in the opaque, it matches irqs[i] of
+> vfio_platform_device and I don't have any mean to retrieve "i" when
+> calling container_of.
 
-Gr{oetje,eeting}s,
+Right, notice I said "link it":
 
-                        Geert
+	struct vfio_platform_irq *irq =
+		container_of(prod, struct vfio_platform_irq, producer);
+	struct vfio_platform_device *vpdev = irq->vpdev;
+	struct vfio_device *vdev = vpdev->vdev;
 
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+Would this be okay?
 
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+Paolo
