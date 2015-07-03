@@ -1,35 +1,91 @@
-From: eric.auger@linaro.org (Eric Auger)
-Date: Fri, 03 Jul 2015 17:42:08 +0200
-Subject: [PATCH 1/7] KVM: api: add kvm_irq_routing_extended_msi
-In-Reply-To: <018401d0b5a5$10576a60$31063f20$@samsung.com>
-References: <1435592237-17924-1-git-send-email-eric.auger@linaro.org>
- <1435592237-17924-2-git-send-email-eric.auger@linaro.org>
- <011f01d0b498$6a17aeb0$3e470c10$@samsung.com> <55954F6E.5030008@linaro.org>
- <55955542.6000809@arm.com> <55955728.3080506@linaro.org>
- <02eb01d0b4dd$50b25160$f216f420$@samsung.com> <55955B98.1000504@linaro.org>
- <018401d0b5a5$10576a60$31063f20$@samsung.com>
-Message-ID: <5596AD50.70103@linaro.org>
+From: matthias.bgg@gmail.com (Matthias Brugger)
+Date: Fri, 03 Jul 2015 17:51:34 +0200
+Subject: [PATCH v2 4/9] clocksource: mediatek: Use GPT as sched clock
+ source
+In-Reply-To: <CAGS+omDa4X7daAYD6SDuEM6bMQwojNUCnGMGiUwnJ6M_yBTRLg@mail.gmail.com>
+References: <1431763110-443-1-git-send-email-yingjoe.chen@mediatek.com>
+ <CABuKBeJhdRBBw1v1kj8J0YFVWZ27vzx5W=XU8jiwePVgL_7g_g@mail.gmail.com>
+ <CAGS+omDa4X7daAYD6SDuEM6bMQwojNUCnGMGiUwnJ6M_yBTRLg@mail.gmail.com>
+Message-ID: <1551938.VHQvCCENeg@ubix>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/03/2015 05:29 PM, Pavel Fedin wrote:
->  Hi!
+On Friday, July 03, 2015 09:48:42 PM Daniel Kurtz wrote:
+> On Wed, May 20, 2015 at 7:02 PM, Matthias Brugger
 > 
->> OK so both of you say the same thing. Will respin accordingly
+> <matthias.bgg@gmail.com> wrote:
+> > 2015-05-16 9:58 GMT+02:00 Yingjoe Chen <yingjoe.chen@mediatek.com>:
+> >> When cpu is in deep idle, arch timer will stop counting. Setup GPT as
+> >> sched clock source so it can keep counting in idle.
+> >> 
+> >> Signed-off-by: Yingjoe Chen <yingjoe.chen@mediatek.com>
+> >> ---
+> >> 
+> >>  drivers/clocksource/mtk_timer.c | 10 ++++++++++
+> >>  1 file changed, 10 insertions(+)
+> >> 
+> >> diff --git a/drivers/clocksource/mtk_timer.c
+> >> b/drivers/clocksource/mtk_timer.c index 91206f9..fe7cf72 100644
+> >> --- a/drivers/clocksource/mtk_timer.c
+> >> +++ b/drivers/clocksource/mtk_timer.c
+> >> @@ -24,6 +24,7 @@
+> >> 
+> >>  #include <linux/of.h>
+> >>  #include <linux/of_address.h>
+> >>  #include <linux/of_irq.h>
+> >> 
+> >> +#include <linux/sched_clock.h>
+> >> 
+> >>  #include <linux/slab.h>
+> >>  
+> >>  #define GPT_IRQ_EN_REG         0x00
+> >> 
+> >> @@ -59,6 +60,13 @@ struct mtk_clock_event_device {
+> >> 
+> >>         struct clock_event_device dev;
+> >>  
+> >>  };
+> >> 
+> >> +static void __iomem *gpt_base __read_mostly;
+> >> +
+> >> +static u64 notrace mtk_read_sched_clock(void)
+> >> +{
+> >> +       return readl_relaxed(gpt_base + TIMER_CNT_REG(GPT_CLK_SRC));
+> >> +}
+> >> +
+> >> 
+> >>  static inline struct mtk_clock_event_device *to_mtk_clk(
+> >>  
+> >>                                 struct clock_event_device *c)
+> >>  
+> >>  {
+> >> 
+> >> @@ -243,6 +251,8 @@ static void __init mtk_timer_init(struct device_node
+> >> *node)>> 
+> >>         mtk_timer_setup(evt, GPT_CLK_SRC, TIMER_CTRL_OP_FREERUN, 1);
+> >>         clocksource_mmio_init(evt->gpt_base + TIMER_CNT_REG(GPT_CLK_SRC),
+> >>         
+> >>                         node->name, rate, 300, 32,
+> >>                         clocksource_mmio_readl_up);
+> >> 
+> >> +       gpt_base = evt->gpt_base;
+> > 
+> > This is really hacky. We should clean up the code and provide
+> > mtk_clock_event_device globally.
+> > Please add the patch below, which does exactly this.
 > 
->  You may also want to add this:
-> Tested-by: Pavel Fedin <p.fedin@samsung.com>
+> I don't think this is so hacky.
+> In light of Stephen's comment about the benefit of using
+> container_of() to extract gpt_base from the passed in struct
+> clock_event_device in the other routines, what is the benefit of
+> making more of mtk_clock_event_device global?
+> I think what Yingjoe has implemented is short and sweet.
+> 
 
-Thanks Pavel for the intent. However since I am going to change the uapi
-and correct the bug you spotted out, this will need to be tested again.
-T-b is applied when the code is stable and bug-free I think ;-)
+Huh, this patch got somehow forgotten.
+Ok, just one comment. I would prefer to rename the global gpt_base to 
+gpt_sched_base or something similar and set the pointer + offset directly 
+mtk_timer_init.
 
-Best Regards
-
-Eric
-> 
-> Kind regards,
-> Pavel Fedin
-> Expert Engineer
-> Samsung Electronics Research center Russia
-> 
+Thanks,
+Matthias
