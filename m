@@ -1,71 +1,45 @@
-From: tglx@linutronix.de (Thomas Gleixner)
-Date: Fri, 3 Jul 2015 11:23:12 +0200 (CEST)
-Subject: Possible regression due to "tick: broadcast: Prevent livelock
- from event handler"
-In-Reply-To: <CAMuHMdW_JxdN9Bb3aii2rcrgS2Jbvmj3PmyDE-9LjN18rfKTTw@mail.gmail.com>
-References: <20150703024044.GB24695@verge.net.au>
- <CAMuHMdW_JxdN9Bb3aii2rcrgS2Jbvmj3PmyDE-9LjN18rfKTTw@mail.gmail.com>
-Message-ID: <alpine.DEB.2.11.1507031041570.3916@nanos>
+From: will.deacon@arm.com (Will Deacon)
+Date: Fri, 3 Jul 2015 10:23:23 +0100
+Subject: [PATCH v7 09/11] KVM: arm64: guest debug, HW assisted debug
+ support
+In-Reply-To: <87pp4asm6u.fsf@linaro.org>
+References: <1435775343-20034-1-git-send-email-alex.bennee@linaro.org>
+ <1435775343-20034-10-git-send-email-alex.bennee@linaro.org>
+ <20150702084847.GB3418@arm.com> <87pp4asm6u.fsf@linaro.org>
+Message-ID: <20150703092323.GA1588@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 3 Jul 2015, Geert Uytterhoeven wrote:
-> Hi Simon,
-> 
-> On Fri, Jul 3, 2015 at 4:40 AM, Simon Horman <horms@verge.net.au> wrote:
-> > I have observed what appears to be a regression while testing next-20150702
-> > which seems to be caused by 2951d5c031a3 ("tick: broadcast: Prevent
-> > livelock from event handler").
-> >
-> > The problem manifests on the emev2/kzm9d board as per the boot log below.
-> >
-> > The problem manifests when booting using the shmobile_defconfig,
-> > which uses multiplatform and enables all devices using DT.
-> >
-> > The problem does not appear to always manifest but anecdotally it
-> > seems to manifest more often of late (yes, I know that is vague).
-> 
-> > hctosys: unable to open rtc device (rtc0)
-> >
-> > The boot hangs here.
-> > The next line should be:
-> >
-> > smsc911x 20000000.ethernet eth0: SMSC911x/921x identified at 0xc8880000, IRQ: 33
-> 
-> As you can reproduce it, can you please try enabling lockdep debugging?
+Hi Alex,
 
-Just looking at the em_sti driver. It calls clk_prepare/unprepare from
-interrupt disabled regions ...
+On Thu, Jul 02, 2015 at 02:50:33PM +0100, Alex Benn?e wrote:
+> Are you happy with this?:
 
-But that's not the problem at hand I think. The above commit is moving
-the call to the event handler on the local cpu out of the broadcast
-lock region to prevent a live lock. The only real change is the
-timing.
+[...]
 
-Before:
+> +/**
+> + * kvm_arch_dev_ioctl_check_extension
+> + *
+> + * We currently assume that the number of HW registers is uniform
+> + * across all CPUs (see cpuinfo_sanity_check).
+> + */
+>  int kvm_arch_dev_ioctl_check_extension(long ext)
+>  {
+>         int r;
+> @@ -64,6 +71,12 @@ int kvm_arch_dev_ioctl_check_extension(long ext)
+>         case KVM_CAP_ARM_EL1_32BIT:
+>                 r = cpu_has_32bit_el1();
+>                 break;
+> +       case KVM_CAP_GUEST_DEBUG_HW_BPS:
+> +               r = hw_breakpoint_slots(TYPE_INST);
+> +               break;
+> +       case KVM_CAP_GUEST_DEBUG_HW_WPS:
+> +               r  = hw_breakpoint_slots(TYPE_DATA);
+> +               break;
 
-	bc_handler()
-	  lock(bc_lock);
-	  call_local_handler();
-	  send_ipis();
-	  reprogramm_bc_device();
-	  unlock(bc_lock);
+Whilst I much prefer this code, it actually adds an unwanted dependency
+on PERF_EVENTS that I didn't think about to start with. Sorry to keep
+messing you about -- I guess your original patch is the best thing after
+all.
 
-After:
-
-	bc_handler()
-	  lock(bc_lock);
-	  send_ipis();
-	  reprogramm_bc_device();
-	  unlock(bc_lock);
-	  call_local_handler();
-
-As this runs in hard interrupt context with interrupts disabled, I
-really cannot figure out how that makes a difference.
-
-Can you add some debugging to figure out whether the broadcast timer
-interrupt still fires?
-
-Thanks,
-
-	tglx
+Will
