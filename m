@@ -1,66 +1,32 @@
-From: eric.auger@linaro.org (Eric Auger)
-Date: Fri, 03 Jul 2015 15:12:20 +0200
-Subject: [RFC 12/17] irq: bypass: Extend skeleton for ARM forwarding
- control
-In-Reply-To: <55953F5F.9090203@redhat.com>
-References: <1435843047-6327-1-git-send-email-eric.auger@linaro.org>
- <1435843047-6327-13-git-send-email-eric.auger@linaro.org>
- <55953F5F.9090203@redhat.com>
-Message-ID: <55968A34.5010409@linaro.org>
+From: tglx@linutronix.de (Thomas Gleixner)
+Date: Fri, 3 Jul 2015 15:19:40 +0200 (CEST)
+Subject: Possible regression due to "tick: broadcast: Prevent livelock
+ from event handler"
+In-Reply-To: <20150703105441.GF1521@katana>
+References: <20150703024044.GB24695@verge.net.au>
+ <20150703105441.GF1521@katana>
+Message-ID: <alpine.DEB.2.11.1507031511180.3916@nanos>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Paolo,
-On 07/02/2015 03:40 PM, Paolo Bonzini wrote:
+On Fri, 3 Jul 2015, Wolfram Sang wrote:
+> Hi Simon,
 > 
+> > I have observed what appears to be a regression while testing next-20150702
+> > which seems to be caused by 2951d5c031a3 ("tick: broadcast: Prevent
+> > livelock from event handler").
 > 
-> On 02/07/2015 15:17, Eric Auger wrote:
->> - new fields are added on producer side: linux irq, vfio_device handle,
->>   active which reflects whether the source is active (at interrupt
->>   controller level or at VFIO level - automasked -) and finally an
->>   opaque pointer which will be used to point to the vfio_platform_device
->>   in this series.
-> 
-> Linux IRQ and active should be okay.  As to the vfio_device handle, you
-> should link it from the vfio_platform_device instead.  And for the
-> vfio_platform_device, you can link it from the vfio_platform_irq instead.
-For this last one, I don't think this is achievable since if I store the
-vfio_platform_irq in the opaque, it matches irqs[i] of
-vfio_platform_device and I don't have any mean to retrieve "i" when
-calling container_of.
+> Does reverting help? I see a similar case with your branch
+> renesas-devel-20150629-v4.1 which does not include both commits.
 
+This branch has actually none of the clockevent/tick related changes
+which are in next/linus tree. So 2951d5c031a3 is hardly the culprit.
 
-	struct vfio_platform_irq *irq =
-		container_of(prod, struct vfio_platform_irq, producer);
-	struct vfio_platform_device *vpdev =
-		container_of(irq, struct vfio_platform_device,  irqs[i?]);
+> For this branch, if I select CONFIG_NO_HZ_IDLE and *no* CONFIG_HIGH_RES_TIMERS,
 
+So with high res timers it boots. Can you please provide the output of
+/proc/timer_list for that case?
 
-struct vfio_platform_device {
-../..
-        struct vfio_platform_irq        *irqs;
-../..
-}
-So I think I still need to pass vfio_platform_device in the opaque and
-look on irqs array to identify the right vfio_platform_irq *.
+Thanks,
 
-Do I miss sthg?
-
-- Eric
-
-
-> 
-> Once you've done this, embed the irq_bypass_producer struct in the
-> vfio_platform_irq struct; in the new kvm_arch_* functions, go back to
-> the vfio_platform_irq struct via container_of.  From there you can
-> retrieve pointers to the vfio_platform_device and the vfio_device.
-> 
->> - new fields on consumer side: the kvm handle, the gsi
-> 
-> You do not need to add these.  Instead, add the kvm handle to irqfd
-> only.  Like above, embed the irq_bypass_consumer struct in the irqfd
-> struct; in the new kvm_arch_* functions, go back to the
-> vfio_platform_irq struct via container_of.
-> 
-> Paolo
-> 
+	tglx
