@@ -1,24 +1,28 @@
 From: robert.jarzmik@free.fr (Robert Jarzmik)
-Date: Fri, 03 Jul 2015 22:53:47 +0200
-Subject: [PATCH] ARM: mact-pxa: Use module_platform_driver
-References: <20150703114656.GA6871@vaishali-Ideapad-Z570>
-Message-ID: <871tgparok.fsf@belgarion.home>
+Date: Fri, 03 Jul 2015 22:58:38 +0200
+Subject: [PATCH-V2 02/12] i2c: pxa: No need to set slave addr for i2c
+ master mode reset
+In-Reply-To: <1434383399-2370-3-git-send-email-vaibhav.hiremath@linaro.org>
+ (Vaibhav Hiremath's message of "Mon, 15 Jun 2015 21:19:49 +0530")
+References: <vaibhav.hiremath@linaro.org>
+ <1434383399-2370-1-git-send-email-vaibhav.hiremath@linaro.org>
+ <1434383399-2370-3-git-send-email-vaibhav.hiremath@linaro.org>
+Message-ID: <87wpyh9cw1.fsf@belgarion.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Vaishali Thakkar <vthakkar1994@gmail.com> writes:
+Vaibhav Hiremath <vaibhav.hiremath@linaro.org> writes:
 
-> Use module_platform_driver for drivers whose init and exit functions
-> only register and unregister, respectively.
+> Normally i2c controller works as master, so slave addr is not needed, or it
+> will impact some slave device (eg. ST NFC chip) i2c accesses, because it has
+> the same i2c address with controller.
 >
-> A simplified version of the Coccinelle semantic patch that performs
-> this transformation is as follows:
-
-Applied to pxa/for-next, thanks.
-For next time, please use the "ARM: pxa:" subject prefix for arch/arm/mach-pxa
-patches. I fixed this for this submission.
+> Signed-off-by: Jett.Zhou <jtzhou@marvell.com>
+> Signed-off-by: Vaibhav Hiremath <vaibhav.hiremath@linaro.org>
+> Cc: Wolfram Sang <wsa@the-dreams.de>
+Acked-by: Robert Jarzmik <robert.jarzmik@free.fr>
 
 Cheers.
 
---
+-- 
 Robert
