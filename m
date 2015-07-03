@@ -1,73 +1,56 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Fri, 3 Jul 2015 15:54:53 +0200
-Subject: [PATCH RFC 1/5] clk: mvebu: Add Armada 38x support for clk-cpu
-In-Reply-To: <1435903917-20486-2-git-send-email-gregory.clement@free-electrons.com>
-References: <1435903917-20486-1-git-send-email-gregory.clement@free-electrons.com>
- <1435903917-20486-2-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <20150703135453.GI13481@lunn.ch>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Fri, 3 Jul 2015 15:06:01 +0100
+Subject: [PATCH v3 2/3] ACPI / ARM64: add BAD_MADT_GICC_ENTRY() macro
+In-Reply-To: <1435880916-2153-3-git-send-email-al.stone@linaro.org>
+References: <1435880916-2153-1-git-send-email-al.stone@linaro.org>
+ <1435880916-2153-3-git-send-email-al.stone@linaro.org>
+Message-ID: <20150703140601.GL25907@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 03, 2015 at 08:11:53AM +0200, Gregory CLEMENT wrote:
-> This patch first shortens the registers definition and also introduces
-> difference between Armada XP value and Armada 38x value.
-> 
-> Then it adds specific functions for Armada 38x in order to support cpu
-> freq on these SoCs.
-
-Hi Gregory
-
-I would suggest splitting this into two. Because of the #define
-changes, it is not easy to see the new functions from #define changes.
-
-> 
-> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
-> ---
->  .../devicetree/bindings/clock/mvebu-cpu-clock.txt  |  27 ++-
->  drivers/clk/mvebu/clk-cpu.c                        | 220 ++++++++++++++++-----
->  2 files changed, 201 insertions(+), 46 deletions(-)
-> 
-> diff --git a/Documentation/devicetree/bindings/clock/mvebu-cpu-clock.txt b/Documentation/devicetree/bindings/clock/mvebu-cpu-clock.txt
-> index 99c214660bdc..9272b3464ab1 100644
-> --- a/Documentation/devicetree/bindings/clock/mvebu-cpu-clock.txt
-> +++ b/Documentation/devicetree/bindings/clock/mvebu-cpu-clock.txt
-> @@ -1,10 +1,13 @@
->  Device Tree Clock bindings for cpu clock of Marvell EBU platforms
-
-Maybe i'm reading the following hunk wrong, but....
-  
->  Required properties:
-> -- compatible : shall be one of the following:
-> +- compatible : shall be the following:
-
-"one of the following" is grammatically better.
-
->  	"marvell,armada-xp-cpu-clock" - cpu clocks for Armada XP
-> +	"marvell,armada-38x-cpu-clock", "marvell,armada-xp-cpu-clock" - cpu
-> +	clocks for Armada 38x
-
-and don't we now have marvell,armada-xp-cpu-clock twice?
-
->  - reg : Address and length of the clock complex register set, followed
-> -        by address and length of the PMU DFS registers
-> +	by address and length of the PMU DFS registers, for Armada 38x
-> +	a third register set must be addeed: DFX server.
->  - #clock-cells : should be set to 1.
->  - clocks : shall be the input parent clock phandle for the clock.
+On Thu, Jul 02, 2015 at 05:48:35PM -0600, Al Stone wrote:
+> diff --git a/arch/arm64/include/asm/acpi.h b/arch/arm64/include/asm/acpi.h
+> index 39248d3..a3c26a4 100644
+> --- a/arch/arm64/include/asm/acpi.h
+> +++ b/arch/arm64/include/asm/acpi.h
+> @@ -19,6 +19,17 @@
+>  #include <asm/psci.h>
+>  #include <asm/smp_plat.h>
 >  
-> @@ -20,3 +23,23 @@ cpu at 0 {
->  	reg = <0>;
->  	clocks = <&cpuclk 0>;
->  };
+> +/* Macros for consistency checks of the GICC subtable of MADT */
+> +#define ACPI_MADT_GICC_51_LENGTH       76
+> +#define ACPI_MADT_GICC_60_LENGTH       80
 > +
-> +or for Armada38x
-> +
-> +cpuclk: clock-complex at 18700 {
-> +	compatible = "marvell,armada-380-cpu-clock",
-> +	"marvell,armada-xp-cpu-clock";
-> +	reg = <0x18700 0xA0>, <0x1c054 0x40>,
-> +	<0xe4260 0x8>;
+> +#define BAD_MADT_GICC_ENTRY(entry, end) (                                   \
+> +		(!entry) || (unsigned long)entry + sizeof(*entry) > end ||  \
+> +		((ACPI_FADT_SPEC_VERSION == ACPI_FADT_SPEC_VERSION_51) &&   \
+> +		 (entry->header.length != ACPI_MADT_GICC_51_LENGTH))    ||  \
+> +		((ACPI_FADT_SPEC_VERSION == ACPI_FADT_SPEC_VERSION_60) &&   \
+> +		 (entry->header.length != ACPI_MADT_GICC_60_LENGTH)))
 
-Maybe this third address property could be better indented?
+This looks ugly but, well, we could live with this.
 
-      Andrew
+However, I'd like to avoid having to extend this macro every time we get
+a new spec released, like 6.1 defining another 80 or 84 etc. So, how
+about we only update this when there is an actual change in the length?
+Something like:
+
+#define ACPI_MADT_GICC_LENGTH	({					\
+	u8 length;							\
+	if (ACPI_FADT_SPEC_VERSION < ACPI_FADT_SPEC_VERSION_6_0)	\
+		length = 76;						\
+	else								\
+		length = 80;						\
+	length;								\
+})
+
+or just:
+
+#define ACPI_MADT_GICC_LENGTH	\
+	(ACPI_FADT_SPEC_VERSION < ACPI_FADT_SPEC_VERSION_6_0 ? 76 : 80)
+
+(the latter is simpler but may not look nice if we change it again in
+6.1; though we could re-write this macro when needed, not a problem)
+
+-- 
+Catalin
