@@ -1,58 +1,92 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri, 03 Jul 2015 09:28:23 +0100
-Subject: [PATCH] arm64/kvm: Add generic v8 KVM target
-In-Reply-To: <CAFEAcA8nt7yr0K4QesJjWqEwBgziWOt2DViY70E=z2wjt=X7XA@mail.gmail.com>
-References: <1434531646-4873-1-git-send-email-suzuki.poulose@arm.com>
- <CAFEAcA92uymQ3LjPQnuFiwvjSgc+jY54VrfK_Sh4v1DJ+=OPpw@mail.gmail.com>
- <558A6A84.5020603@arm.com> <20150624085128.GA22785@cbox>
- <558A7936.7020109@arm.com> <20150625123034.GE28244@cbox>
- <558BF6C9.3000009@arm.com> <558C05A9.8080201@arm.com>
- <CAFEAcA_ULz=ugQW=NmthzqYRtvcfwteQTh0DonHRN6U5NykEtQ@mail.gmail.com>
- <20150626095318.GG28244@cbox>
- <F37C68A5-E48F-462C-AD18-0F3C096348C7@caviumnetworks.com>
- <559180CA.3050905@arm.com>
- <CAFEAcA-E+KdiL4suQ0DoEvB-zGpNZ7-dq46FegC_iXYRPvo9jA@mail.gmail.com>
- <559185D4.7060308@arm.com>
- <85D36B67-643B-407F-944F-D18D54FF9909@caviumnetworks.com>
- <D805D093-CCFE-4835-853A-B2654DAA10A1@caviumnetworks.com>
- <559642EE.1050605@arm.com>
- <CAFEAcA8nt7yr0K4QesJjWqEwBgziWOt2DViY70E=z2wjt=X7XA@mail.gmail.com>
-Message-ID: <559647A7.7010309@arm.com>
+From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
+Date: Fri, 03 Jul 2015 10:38:09 +0200
+Subject: [PATCH] arm64: dts: mt8173: add clock_null
+In-Reply-To: <1435909512.3526.71.camel@mtksdaap41>
+References: <1434605351-64592-1-git-send-email-eddie.huang@mediatek.com>
+ <CAGS+omCk50Q5b=ey5v1z2gha5Ybc+Fus0Ls+S=5n08xu7Svacw@mail.gmail.com>
+ <1435909512.3526.71.camel@mtksdaap41>
+Message-ID: <4128666.7Kmsrhssyu@diego>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/07/15 09:12, Peter Maydell wrote:
-> On 3 July 2015 at 09:08, Marc Zyngier <marc.zyngier@arm.com> wrote:
->> On 02/07/15 21:29, Chalamarla, Tirumalesh wrote:
->>> is there a chance that this get merged in to 4.2? if not is it possible
->>> to accept the other patches like adding implementations explicitly(like
->>> Thunder).
->>
->> We first need to reach a conclusion on this. Until then, I don't plan to
->> get anything in. As for 4.2, it feels way too late (the merge window is
->> almost closed now).
+Am Freitag, 3. Juli 2015, 15:45:12 schrieb James Liao:
+> On Thu, 2015-07-02 at 12:23 +0800, Daniel Kurtz wrote:
+> > On Thu, Jul 2, 2015 at 11:06 AM, James Liao <jamesjj.liao@mediatek.com> 
+wrote:
+> > > These clocks such as clkph_mck_o are configured by other modules before
+> > > kernel init, and their rates may different among platforms.
+> > 
+> > What other modules?
+> > Do you mean the rates are configured by firmware?
+> > How are the rates set?
+> > Are there registers that configure its rate?
+> > If so, why can't the kernel read these registers and compute the current
+> > rate?
+> CLKPH_MCK_O for example, it's a DRAM related clock, and initialized in
+> preloader (before kernel init). It's setting may be different because
+> using different DRAM module. And the setting may be changed dynamically
+> in runtime.
+
+If it's set in the preloader (and maybe changed at runtime) this means, its 
+setting can also be read back to determine its current clock rate, so this is 
+a non-argument here ;-)
+
+
+> We don't care CLKPH_MCK_O's rate in CCF because we don't need to change
+> mem_sel's setting in kernel, and there is not driver need to know
+> mem_sel's rate.
+
+As Daniel said, some of these clocks may be parents of other clocks, and not 
+knowing their rate might hurt in the future - especially when it's easy after 
+all to get its actual value like in your CLKPH_MCK_O example above.
+
+
+Heiko
+
+
+> > For mt8173, we are essentially discussing the following clocks (whose
+> > sole parent is clk_null):
+> > 
+> > FACTOR(CLK_TOP_CLKPH_MCK_O, "clkph_mck_o", "clk_null", 1, 1),
+> > FACTOR(CLK_TOP_DPI, "dpi_ck", "clk_null", 1, 1),
+> > FACTOR(CLK_TOP_USB_SYSPLL_125M, "usb_syspll_125m", "clk_null", 1, 1),
+> > FACTOR(CLK_TOP_HDMITX_DIG_CTS, "hdmitx_dig_cts", "clk_null", 1, 1),
+> > GATE_ICG(CLK_INFRA_CPUM, "infra_cpum", "clk_null", 15),
+> > GATE_MM1(CLK_MM_DSI0_DIGITAL, "mm_dsi0_digital", "clk_null", 5),
+> > GATE_MM1(CLK_MM_DSI1_DIGITAL, "mm_dsi1_digital", "clk_null", 7),
+> > GATE_MM1(CLK_MM_DPI1_PIXEL, "mm_dpi1_pixel", "clk_null", 10),
+> > GATE_MM1(CLK_MM_LVDS_PIXEL, "mm_lvds_pixel", "clk_null", 16),
+> > GATE_MM1(CLK_MM_LVDS_CTS, "mm_lvds_cts", "clk_null", 17),
+> > 
+> > clkph_mck_o - This is the parent for dmpll_*, which are themselves
+> > (potential) parent clocks for nearly every subsystem.
+> > In fact, as shown above, the dmpll_* is the selected parent for
+> > several other clocks, which all end up with an unknown rate.
+> > So, I think it is worth investigating a little more how to properly
+> > read or otherwise specify the rate for clkph_mck_o.
 > 
-> I would still like to see the proponents of this patch say
-> what their model is for userspace support of cross-host migration,
-> if we're abandoning the model the current API envisages.
-
-I thought we had discussed this above, and don't really see this as a
-departure from the current model:
-
-- "-cpu host" results in "GENERIC" being used: VM can only be migrated
-to the exact same HW (no cross-host migration). MIDR should probably
-become RO.
-- "-cpu host" results in "A57" (for example): VM can be migrated to a
-variety of A57 platforms, and allow for some fuzzing on the revision (or
-accept any revision).
-- "-cpu a57" forces an A57 model to be emulated, always. It is always
-possible to migrate such a VM on any host.
-
-I think only the first point is new, but the last two are what we have
-(or what we should have).
-
-Does it answer your concerns, or did you have something else in mind?
-
-	M.
--- 
-Jazz is not dead. It just smells funny...
+> Please see above.
+> 
+> > dpi_ck, infra_cpum, mm_dsi0_digital, mm_dsi1_digital, mm_lvds_cts -
+> > These are a dead-end (internal?) clock.
+> > It is probably fine if their rates are unknown (0 Hz).
+> > 
+> > usb_syspll_125m - This sounds like a fixed 125 MHz clock.  It is also
+> > a possible parent usb30 clock, so its value will propagate.
+> > 
+> > hdmitx_dig_cts - This is the root clock for the tree leading to
+> > mm_hdmi_pllck, which includes hdmitxpll_d* and hdmi_sel.
+> > However, I don't know how "mm_hdmi_pllck" is used.
+> > 
+> > mm_dpi1_pixel, mm_lvds_pixel - These two look very suspicious.  The
+> > similar "mm_dpi0_pixel" and "mm_hdmi_pixel" have parent dpi0_sel.
+> > It looks like maybe they should have "dpi1_sel" or "dpilvds_sel" as
+> > parents, but the _sel are not hooked up.
+> 
+> Subsystem clocks with parent clk_null may have different reasons. I'll
+> get back to you later.
+> 
+> 
+> Best regards,
+> 
+> James
