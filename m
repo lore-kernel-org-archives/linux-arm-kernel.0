@@ -1,53 +1,118 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Fri,  3 Jul 2015 17:42:34 +0100
-Subject: [PATCH] ARM: davinci: cp_intc: use IRQCHIP_SKIP_SET_WAKE instead of
- irq_set_wake callback
-Message-ID: <1435941754-21102-1-git-send-email-sudeep.holla@arm.com>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Fri, 03 Jul 2015 17:44:03 +0100
+Subject: [PATCH v2 2/4] iommu: Implement common IOMMU ops for DMA mapping
+In-Reply-To: <1435915649.21346.11.camel@mhfsdcap03>
+References: <cover.1434036796.git.robin.murphy@arm.com>	
+ <bf63d80c36533aa4dcc401b5a4b312ba00237e1c.1434036796.git.robin.murphy@arm.com>
+ <1435915649.21346.11.camel@mhfsdcap03>
+Message-ID: <5596BBD3.1040708@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit 60f96b41f71d ("genirq: Add IRQCHIP_SKIP_SET_WAKE flag")
-introduced a new flag to skip the irq_set_wake callback in the irqchip
-core to avoid adding dummy irq_set_wake in the irqchip implementations.
+On 03/07/15 10:27, Yong Wu wrote:
+[...]
+>> +/**
+>> + * iommu_dma_alloc - Allocate and map a buffer contiguous in IOVA space
+>> + * @dev: Device to allocate memory for. Must be a real device
+>> + *	 attached to an iommu_dma_domain
+>> + * @size: Size of buffer in bytes
+>> + * @gfp: Allocation flags
+>> + * @prot: IOMMU mapping flags
+>> + * @coherent: Which dma_mask to base IOVA allocation on
+>> + * @handle: Out argument for allocated DMA handle
+>> + * @flush_page: Arch callback to flush a single page from caches as
+>> + *		necessary. May be NULL for coherent allocations
+>> + *
+>> + * If @size is less than PAGE_SIZE, then a full CPU page will be allocated,
+>> + * but an IOMMU which supports smaller pages might not map the whole thing.
+>> + * For now, the buffer is unconditionally zeroed for compatibility
+>> + *
+>> + * Return: Array of struct page pointers describing the buffer,
+>> + *	   or NULL on failure.
+>> + */
+>> +struct page **iommu_dma_alloc(struct device *dev, size_t size, gfp_t gfp,
+>> +		int prot, bool coherent, dma_addr_t *handle,
+>> +		void (*flush_page)(const void *, phys_addr_t))
+>> +{
+>> +	struct iommu_dma_domain *dom = arch_get_dma_domain(dev);
+>> +	struct iova_domain *iovad = dom->iovad;
+>> +	struct iova *iova;
+>> +	struct page **pages;
+>> +	struct sg_table sgt;
+>> +	struct sg_mapping_iter miter;
+>> +	dma_addr_t dma_addr;
+>> +	unsigned int count = PAGE_ALIGN(size) >> PAGE_SHIFT;
+>> +
+>> +	*handle = DMA_ERROR_CODE;
+>
+> Hi Robin,
+>
+>    Compare with the dma before, You delete this line here.
+>
+>            size = PAGE_ALIGN(size);
+>
+>    Do you expect the user should make sure the size must be aligned?
+>
+>    so do __iommu_free_attrs.
 
-This patch removes the dummy callback and sets the IRQCHIP_SKIP_SET_WAKE
-flags.
+Yeah, there is an oversight here due to some back-and-forth refactoring 
+- both the page allocation and the IOVA allocation do get suitably 
+aligned as they should, but the segments of the temporary scatterlist 
+don't. Somehow I managed not to hit an iommu_map_sg failure due to that 
+until some time after this posting (it seems most of the drivers I test 
+with only make page-sized allocations...)
 
-Cc: Sekhar Nori <nsekhar@ti.com>
-Cc: Kevin Hilman <khilman@deeprootsystems.com>
-Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
----
- arch/arm/mach-davinci/cp_intc.c | 12 +-----------
- 1 file changed, 1 insertion(+), 11 deletions(-)
+I've currently got the fixup below waiting for the next posting.
 
-diff --git a/arch/arm/mach-davinci/cp_intc.c b/arch/arm/mach-davinci/cp_intc.c
-index 006dae8dfe44..9fda75c18c04 100644
---- a/arch/arm/mach-davinci/cp_intc.c
-+++ b/arch/arm/mach-davinci/cp_intc.c
-@@ -85,23 +85,13 @@ static int cp_intc_set_irq_type(struct irq_data *d, unsigned int flow_type)
- 	return 0;
- }
- 
--/*
-- * Faking this allows us to to work with suspend functions of
-- * generic drivers which call {enable|disable}_irq_wake for
-- * wake up interrupt sources (eg RTC on DA850).
-- */
--static int cp_intc_set_wake(struct irq_data *d, unsigned int on)
--{
--	return 0;
--}
--
- static struct irq_chip cp_intc_irq_chip = {
- 	.name		= "cp_intc",
- 	.irq_ack	= cp_intc_ack_irq,
- 	.irq_mask	= cp_intc_mask_irq,
- 	.irq_unmask	= cp_intc_unmask_irq,
- 	.irq_set_type	= cp_intc_set_irq_type,
--	.irq_set_wake	= cp_intc_set_wake,
-+	.flags		= IRQCHIP_SKIP_SET_WAKE,
- };
- 
- static struct irq_domain *cp_intc_domain;
--- 
-1.9.1
+Robin.
+
+>> +
+>> +	/* IOMMU can map any pages, so himem can also be used here */
+>> +	gfp |= __GFP_NOWARN | __GFP_HIGHMEM;
+>> +	pages = __iommu_dma_alloc_pages(count, gfp);
+>> +	if (!pages)
+>> +		return NULL;
+>> +
+>> +	iova = __alloc_iova(dev, size, coherent);
+>> +	if (!iova)
+>> +		goto out_free_pages;
+>> +
+
++	size = iova_align(iovad, size);
+
+>> +	if (sg_alloc_table_from_pages(&sgt, pages, count, 0, size, GFP_KERNEL))
+>> +		goto out_free_iova;
+>> +
+>> +	dma_addr = iova_dma_addr(iovad, iova);
+>> +	if (iommu_map_sg(dom->domain, dma_addr, sgt.sgl, sgt.orig_nents, prot)
+>> +			< size)
+>> +		goto out_free_sg;
+>> +
+>> +	/* Using the non-flushing flag since we're doing our own */
+>> +	sg_miter_start(&miter, sgt.sgl, sgt.orig_nents, SG_MITER_FROM_SG);
+>> +	while (sg_miter_next(&miter)) {
+>> +		memset(miter.addr, 0, PAGE_SIZE);
+>> +		if (flush_page)
+>> +			flush_page(miter.addr, page_to_phys(miter.page));
+>> +	}
+>> +	sg_miter_stop(&miter);
+>> +	sg_free_table(&sgt);
+>> +
+>> +	*handle = dma_addr;
+>> +	return pages;
+>> +
+>> +out_free_sg:
+>> +	sg_free_table(&sgt);
+>> +out_free_iova:
+>> +	__free_iova(iovad, iova);
+>> +out_free_pages:
+>> +	__iommu_dma_free_pages(pages, count);
+>> +	return NULL;
+>> +}
+>> +
+> [...]
+>> +
+>> +#endif	/* __KERNEL__ */
+>> +#endif	/* __DMA_IOMMU_H */
+>
+>
