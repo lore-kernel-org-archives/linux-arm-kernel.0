@@ -1,58 +1,38 @@
-From: timur@codeaurora.org (Timur Tabi)
-Date: Fri, 3 Jul 2015 10:53:12 -0400
-Subject: [PATCH 4/4] hvc_dcc: disable user-space access to DCC
-In-Reply-To: <55947F1C.3020904@codeaurora.org>
-References: <1435699387-32591-1-git-send-email-timur@codeaurora.org>
- <1435699387-32591-4-git-send-email-timur@codeaurora.org>
- <55947F1C.3020904@codeaurora.org>
-Message-ID: <830CD79F-C263-4C3B-A27F-77A4DA55236F@codeaurora.org>
+From: tglx@linutronix.de (Thomas Gleixner)
+Date: Fri, 3 Jul 2015 16:53:49 +0200 (CEST)
+Subject: Possible regression due to "tick: broadcast: Prevent livelock
+ from event handler"
+In-Reply-To: <20150703143703.GB19284@katana>
+References: <20150703024044.GB24695@verge.net.au>
+ <20150703105441.GF1521@katana> <alpine.DEB.2.11.1507031511180.3916@nanos>
+ <20150703133245.GA19284@katana> <alpine.DEB.2.11.1507031612410.3916@nanos>
+ <20150703143703.GB19284@katana>
+Message-ID: <alpine.DEB.2.11.1507031640060.3916@nanos>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-On Jul 1, 2015, at 8:00 PM, Stephen Boyd wrote:
-
->> 
->> #include <asm/barrier.h>
->> +#include <asm/hardware/cp14.h>
+On Fri, 3 Jul 2015, Wolfram Sang wrote:
+> > So this is a single core machine and uses the em_sti timer w/o the
+> > broadcast nonsense. In Simons case it looks like em_sti is used as
+> > broadcast device.
 > 
-> That's new.
-
-And no one else is using it either.
-
->> 
->> +
->> +static inline void __dcc_initialize(void)
->> +{
->> +	u32 val;
->> +
->> +	/* Disable user-space access to DCC */
->> +	val = MRC14(0, c0, c1, 0);
->> +	val |= 1 << 12; /* DSCR[Comms] */
->> +	MCR14(val, 0, c0, c1, 0);
->> +}
+> We use the same board. Just my kernel has SMP=n.
 > 
-> Nitpick: We do raw cp14 accesses for other functions in this file, so it
-> would be nice to be consistent throughout.
-
-I agree, but I didn't want to expand the scope of this patch beyond what it's supposed to do.
-
->> 
->> +static inline void __dcc_initialize(void)
->> +{
->> +	u32 val;
->> +
->> +	/* Disable user-space access to DCC */
->> +	asm ("mrs %0, mdscr_el1\n"
+> > Though the issues you see in the highres=n case might be the same as
+> > the ones Simon is observing.
 > 
-> shouldn't this be volatile?
-
-Well, I figured it wasn't important exactly why these instructions are executed, since it just disables user-space.  I usually get chewed out by someone if I add volatile where it's not needed, so I didn't add it this time.
-
+> I hope so. One good thing about the issue I see is that it is 100%
+> reproducable.
 > 
->> +		"	orr %0, %0, #4096\n" /* Set the TDCC bit */
+> > So in that nohz=y highres=n case, does adding idle=poll on the command
+> > line fix the issue?
 > 
-> arm64 has some #defines in debug-monitors.h which we should probably
-> extend to have this bit as a #define too.
+> Nope, still hangs.
 
-Hmmm, the only thing I see in debug_monitors.h that seems applicable are the mdscr_write() and mdscr_read() functions, which seem to overlap cp14.h.
+Ok. So it's unrelated to deep idle states. Any chance of poking with
+JTAG at the frozen box? If not, are there GPIOs which you could use to
+monitor certain state?
+
+Thanks,
+
+	tglx
