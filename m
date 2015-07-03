@@ -1,90 +1,44 @@
-From: sjg@chromium.org (Simon Glass)
-Date: Fri,  3 Jul 2015 17:07:01 -0600
-Subject: [PATCH v2] tegra: Enable TPM on tegra124 nyan boards
-Message-ID: <1435964821-15251-1-git-send-email-sjg@chromium.org>
+From: tremyfr@gmail.com (Philippe Reynes)
+Date: Sat,  4 Jul 2015 01:15:13 +0200
+Subject: [PATCH v4 0/7] add device tree support for mxc rtc
+Message-ID: <1435965320-1478-1-git-send-email-tremyfr@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Regenerate the pinmux from the latest tegra-pinmux-scripts. This adds the
-pinmux settings for the TPM.
+This serie add the device tree support for the mxc rtc driver.
+To do this, three steps are required :
+- define two rtc clocks for imx31 and imx35
+- enhance mxc rtc driver to use two clocks (rtc and ipg)
+- add device tree support to mxc rtc driver
 
-Signed-off-by: Simon Glass <sjg@chromium.org>
----
+Changelog:
+v4: (thanks Alexandre Belloni)
+- add prepare_clock for rtc clock
+- split apf27: dt: enable support in two patches
+v3: (thanks Fabio Estevam)
+- fix typo in imx35 clock comment
+v2: (thanks Shawn Guo and Alexandre Belloni)
+- add a second clock to imx35
+- split the add of clock in a separate patches
+- split the dt documentation in a separate patch
 
-Changes in v2:
-- Correct USB changes in nyan-blaze
+Philippe Reynes (7):
+  imx31: add a second rtc clock
+  imx35: define two clocks for rtc
+  rtc: mxc: use a second rtc clock
+  rtc: mxc: add support of device tree
+  dt-binding: document the binding for mxc rtc
+  imx27: dt: add support of internal rtc
+  apf27: dt: enable support of internal rtc
 
- arch/arm/boot/dts/tegra124-nyan-big.dts   | 20 ++++++++++----------
- arch/arm/boot/dts/tegra124-nyan-blaze.dts | 20 ++++++++++----------
- 2 files changed, 20 insertions(+), 20 deletions(-)
+ Documentation/devicetree/bindings/rtc/rtc-mxc.txt |   27 +++++++++
+ arch/arm/boot/dts/imx27-apf27.dts                 |    4 ++
+ arch/arm/boot/dts/imx27.dtsi                      |   10 ++++
+ drivers/clk/imx/clk-imx31.c                       |    3 +-
+ drivers/clk/imx/clk-imx35.c                       |    6 ++-
+ drivers/rtc/rtc-mxc.c                             |   60 ++++++++++++++++-----
+ 6 files changed, 94 insertions(+), 16 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/rtc/rtc-mxc.txt
 
-diff --git a/arch/arm/boot/dts/tegra124-nyan-big.dts b/arch/arm/boot/dts/tegra124-nyan-big.dts
-index 2d21253..c2955c9 100644
---- a/arch/arm/boot/dts/tegra124-nyan-big.dts
-+++ b/arch/arm/boot/dts/tegra124-nyan-big.dts
-@@ -1098,19 +1098,19 @@
- 			};
- 			cam_i2c_scl_pbb1 {
- 				nvidia,pins = "cam_i2c_scl_pbb1";
--				nvidia,function = "rsvd3";
--				nvidia,pull = <TEGRA_PIN_PULL_DOWN>;
--				nvidia,tristate = <TEGRA_PIN_ENABLE>;
--				nvidia,enable-input = <TEGRA_PIN_DISABLE>;
--				nvidia,open-drain = <TEGRA_PIN_DISABLE>;
-+				nvidia,function = "i2c3";
-+				nvidia,pull = <TEGRA_PIN_PULL_NONE>;
-+				nvidia,tristate = <TEGRA_PIN_DISABLE>;
-+				nvidia,enable-input = <TEGRA_PIN_ENABLE>;
-+				nvidia,open-drain = <TEGRA_PIN_ENABLE>;
- 			};
- 			cam_i2c_sda_pbb2 {
- 				nvidia,pins = "cam_i2c_sda_pbb2";
--				nvidia,function = "rsvd3";
--				nvidia,pull = <TEGRA_PIN_PULL_DOWN>;
--				nvidia,tristate = <TEGRA_PIN_ENABLE>;
--				nvidia,enable-input = <TEGRA_PIN_DISABLE>;
--				nvidia,open-drain = <TEGRA_PIN_DISABLE>;
-+				nvidia,function = "i2c3";
-+				nvidia,pull = <TEGRA_PIN_PULL_NONE>;
-+				nvidia,tristate = <TEGRA_PIN_DISABLE>;
-+				nvidia,enable-input = <TEGRA_PIN_ENABLE>;
-+				nvidia,open-drain = <TEGRA_PIN_ENABLE>;
- 			};
- 			pbb3 {
- 				nvidia,pins = "pbb3";
-diff --git a/arch/arm/boot/dts/tegra124-nyan-blaze.dts b/arch/arm/boot/dts/tegra124-nyan-blaze.dts
-index 0d30c51..bef31a8 100644
---- a/arch/arm/boot/dts/tegra124-nyan-blaze.dts
-+++ b/arch/arm/boot/dts/tegra124-nyan-blaze.dts
-@@ -1094,19 +1094,19 @@
- 			};
- 			cam_i2c_scl_pbb1 {
- 				nvidia,pins = "cam_i2c_scl_pbb1";
--				nvidia,function = "rsvd3";
--				nvidia,pull = <TEGRA_PIN_PULL_DOWN>;
--				nvidia,tristate = <TEGRA_PIN_ENABLE>;
--				nvidia,enable-input = <TEGRA_PIN_DISABLE>;
--				nvidia,open-drain = <TEGRA_PIN_DISABLE>;
-+				nvidia,function = "i2c3";
-+				nvidia,pull = <TEGRA_PIN_PULL_NONE>;
-+				nvidia,tristate = <TEGRA_PIN_DISABLE>;
-+				nvidia,enable-input = <TEGRA_PIN_ENABLE>;
-+				nvidia,open-drain = <TEGRA_PIN_ENABLE>;
- 			};
- 			cam_i2c_sda_pbb2 {
- 				nvidia,pins = "cam_i2c_sda_pbb2";
--				nvidia,function = "rsvd3";
--				nvidia,pull = <TEGRA_PIN_PULL_DOWN>;
--				nvidia,tristate = <TEGRA_PIN_ENABLE>;
--				nvidia,enable-input = <TEGRA_PIN_DISABLE>;
--				nvidia,open-drain = <TEGRA_PIN_DISABLE>;
-+				nvidia,function = "i2c3";
-+				nvidia,pull = <TEGRA_PIN_PULL_NONE>;
-+				nvidia,tristate = <TEGRA_PIN_DISABLE>;
-+				nvidia,enable-input = <TEGRA_PIN_ENABLE>;
-+				nvidia,open-drain = <TEGRA_PIN_ENABLE>;
- 			};
- 			pbb3 {
- 				nvidia,pins = "pbb3";
 -- 
-2.4.3.573.g4eafbef
+1.7.4.4
