@@ -1,91 +1,83 @@
-From: stefan@agner.ch (Stefan Agner)
-Date: Fri, 03 Jul 2015 10:10:12 +0200
-Subject: [PATCH 39/41] clocksource: vf_pit: Migrate to new 'set-state'
- interface
-In-Reply-To: <c9f030f57a10c1be00f8732ae2190fcc55248db5.1434622147.git.viresh.kumar@linaro.org>
-References: <cover.1434622147.git.viresh.kumar@linaro.org>
- <c9f030f57a10c1be00f8732ae2190fcc55248db5.1434622147.git.viresh.kumar@linaro.org>
-Message-ID: <19859bd18fb69fa1f10c07de01b2259d@agner.ch>
+From: mark.yao@rock-chips.com (Mark yao)
+Date: Fri, 03 Jul 2015 16:19:11 +0800
+Subject: [PATCH v2 5/5] drm/rockchip: default enable win2/3 area0 bit
+In-Reply-To: <CAAFQd5D4W1+ShB4zpSJrBiFYWh21axJoGoQ77NwXzhSRapysgA@mail.gmail.com>
+References: <1435313249-4549-1-git-send-email-mark.yao@rock-chips.com>
+ <1435313432-4923-1-git-send-email-mark.yao@rock-chips.com>
+ <CAAFQd5D4W1+ShB4zpSJrBiFYWh21axJoGoQ77NwXzhSRapysgA@mail.gmail.com>
+Message-ID: <5596457F.5090601@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2015-06-18 12:54, Viresh Kumar wrote:
-> Migrate vf_pit driver to the new 'set-state' interface provided by
-> clockevents core, the earlier 'set-mode' interface is marked obsolete
-> now.
-> 
-> This also enables us to implement callbacks for new states of clockevent
-> devices, for example: ONESHOT_STOPPED.
-> 
-> Cc: Jingchang Lu <b35083@freescale.com>
-> Cc: Stefan Agner <stefan@agner.ch>
-> Cc: Shawn Guo <shawn.guo@linaro.org>
-> Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
-> ---
->  drivers/clocksource/vf_pit_timer.c | 27 ++++++++++++---------------
->  1 file changed, 12 insertions(+), 15 deletions(-)
-> 
-> diff --git a/drivers/clocksource/vf_pit_timer.c
-> b/drivers/clocksource/vf_pit_timer.c
-> index b45ac6229b57..f07ba9932171 100644
-> --- a/drivers/clocksource/vf_pit_timer.c
-> +++ b/drivers/clocksource/vf_pit_timer.c
-> @@ -86,20 +86,16 @@ static int pit_set_next_event(unsigned long delta,
->  	return 0;
->  }
->  
-> -static void pit_set_mode(enum clock_event_mode mode,
-> -				struct clock_event_device *evt)
-> +static int pit_shutdown(struct clock_event_device *evt)
->  {
-> -	switch (mode) {
-> -	case CLOCK_EVT_MODE_PERIODIC:
-> -		pit_set_next_event(cycle_per_jiffy, evt);
-> -		break;
-> -	case CLOCK_EVT_MODE_SHUTDOWN:
-> -	case CLOCK_EVT_MODE_UNUSED:
-> -		pit_timer_disable();
-> -		break;
-> -	default:
-> -		break;
-> -	}
-> +	pit_timer_disable();
-> +	return 0;
-> +}
-> +
-> +static int pit_set_periodic(struct clock_event_device *evt)
-> +{
-> +	pit_set_next_event(cycle_per_jiffy, evt);
-> +	return 0;
->  }
->  
->  static irqreturn_t pit_timer_interrupt(int irq, void *dev_id)
-> @@ -114,7 +110,7 @@ static irqreturn_t pit_timer_interrupt(int irq,
-> void *dev_id)
->  	 * and start the counter again. So software need to disable the timer
->  	 * to stop the counter loop in ONESHOT mode.
->  	 */
-> -	if (likely(evt->mode == CLOCK_EVT_MODE_ONESHOT))
-> +	if (likely(clockevent_state_oneshot(evt)))
->  		pit_timer_disable();
->  
->  	evt->event_handler(evt);
-> @@ -125,7 +121,8 @@ static irqreturn_t pit_timer_interrupt(int irq,
-> void *dev_id)
->  static struct clock_event_device clockevent_pit = {
->  	.name		= "VF pit timer",
->  	.features	= CLOCK_EVT_FEAT_PERIODIC | CLOCK_EVT_FEAT_ONESHOT,
-> -	.set_mode	= pit_set_mode,
-> +	.set_state_shutdown = pit_shutdown,
-> +	.set_state_periodic = pit_set_periodic,
+On 2015?07?03? 16:02, Tomasz Figa wrote:
+> Hi Mark,
+>
+> Please see my comments inline.
+>
+> On Fri, Jun 26, 2015 at 7:10 PM, Mark Yao <mark.yao@rock-chips.com> wrote:
+>> Win2/3 support 4 area display, but now havn't found a suitable
+>> way to use it, and it enable by win gate and area gate,
+>> so default enable area0 gate, so that its behaviour just like a
+>> win.
+> So I assume this means that currently, without those bits set, win2
+> and win3 do not work? This would make this patch a fix maybe even with
+> a potential backportability.
 
-I'm not really familiar with the interface, but given that we announce
-the feature CLOCK_EVT_FEAT_ONESHOT shouldn't we add a set_state_oneshot
-callback here?
+Yes, without this patch, all win2/3 area gate default disabled.
+vop_update_plane_event call win enable only enable the win gate.
 
---
-Stefan
+>
+>> Signed-off-by: Mark Yao <mark.yao@rock-chips.com>
+>> ---
+>> Changes in v2: None
+>>
+>>   drivers/gpu/drm/rockchip/rockchip_drm_vop.c |    6 ++++++
+>>   1 file changed, 6 insertions(+)
+>>
+>> diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_vop.c b/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
+>> index 40107bb..e001d26 100644
+>> --- a/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
+>> +++ b/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
+>> @@ -337,6 +337,12 @@ static const struct vop_reg_data vop_init_reg_table[] = {
+>>          {DSP_CTRL0, 0x00000000},
+>>          {WIN0_CTRL0, 0x00000080},
+>>          {WIN1_CTRL0, 0x00000080},
+>> +       /*
+>> +        * Todo: win2/3 support area func, but now havn't found a suitable
+>> +        * way to use it, so default enable area0 as a win display.
+> TODO: Win2/3 support multiple area function, but we haven't found
+> a suitable way to use it yet, so let's just use them as other windows
+> with only area 0 enabled.
+>
+>> +        */
+>> +       {WIN2_CTRL0, 0x00000010},
+>> +       {WIN3_CTRL0, 0x00000010},
+> Anyway, is it enough to program those registers one time in
+> vop_initial()? Won't they get cleared when VOP is power cycled, e.g.
+> in case of DPMS off and on? Maybe instead this could be done in
+> vop_update_plane_event() for windows that need it?
+There are two gate for Win2/3,
+at VOP_WIN3_CTRL0:
+         bit[0], "win3_en"
+             this gating all the area.
 
->  	.set_next_event	= pit_set_next_event,
->  	.rating		= 300,
->  };
+         bit[4], win3_mst0_en
+         bit[5], win3_mst1_en
+         bit[6], win3_mst2_en
+         bit[7], win3_mst3_en
+             those gate each area.
+
+This patch default enable win3_mst0_en, so control bit[0]"win3_en" that 
+cat power on/off this window.
+
+vop_update_plane_event()/ vop_disable_plane() only can control bit[0]"win3_en".
+
+
+So this patch is enough to enable window2/3 area 0.
+
+
+> Best regards,
+> Tomasz
+
+-- 
+?ark
