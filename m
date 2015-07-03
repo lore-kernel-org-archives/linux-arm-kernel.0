@@ -1,137 +1,44 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Fri, 3 Jul 2015 12:15:54 +0530
-Subject: [PATCH 03/10] OPP: Allocate dev_opp from _add_device_opp()
-In-Reply-To: <5595CD68.9040701@codeaurora.org>
-References: <cover.1434369079.git.viresh.kumar@linaro.org>
- <83bd3b9837b30bab62f41aed3dd2cdf52cc21688.1434369079.git.viresh.kumar@linaro.org>
- <55948DB0.8060500@codeaurora.org> <20150702062455.GD31684@linux>
- <5595CD68.9040701@codeaurora.org>
-Message-ID: <20150703064554.GB4564@linux>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Fri, 3 Jul 2015 08:46:21 +0200
+Subject: Possible regression due to "tick: broadcast: Prevent livelock
+ from event handler"
+In-Reply-To: <20150703024044.GB24695@verge.net.au>
+References: <20150703024044.GB24695@verge.net.au>
+Message-ID: <CAMuHMdW_JxdN9Bb3aii2rcrgS2Jbvmj3PmyDE-9LjN18rfKTTw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02-07-15, 16:46, Stephen Boyd wrote:
-> Looking better.
+Hi Simon,
 
-And does this look perfect ? :)
+On Fri, Jul 3, 2015 at 4:40 AM, Simon Horman <horms@verge.net.au> wrote:
+> I have observed what appears to be a regression while testing next-20150702
+> which seems to be caused by 2951d5c031a3 ("tick: broadcast: Prevent
+> livelock from event handler").
+>
+> The problem manifests on the emev2/kzm9d board as per the boot log below.
+>
+> The problem manifests when booting using the shmobile_defconfig,
+> which uses multiplatform and enables all devices using DT.
+>
+> The problem does not appear to always manifest but anecdotally it
+> seems to manifest more often of late (yes, I know that is vague).
 
-------------------8<----------------
+> hctosys: unable to open rtc device (rtc0)
+>
+> The boot hangs here.
+> The next line should be:
+>
+> smsc911x 20000000.ethernet eth0: SMSC911x/921x identified at 0xc8880000, IRQ: 33
 
-Message-Id: <7c23b93b6b328e0b14b5c5096c3c3322e3d8ee4b.1435905782.git.viresh.kumar@linaro.org>
-From: Viresh Kumar <viresh.kumar@linaro.org>
-Date: Fri, 12 Jun 2015 12:43:14 +0530
-Subject: [PATCH] OPP: Allocate dev_opp from _add_device_opp()
+As you can reproduce it, can you please try enabling lockdep debugging?
 
-There is no need to complicate _opp_add_dynamic() with allocation of
-dev_opp as well. Allocate it from _add_device_opp() instead.
+Gr{oetje,eeting}s,
 
-Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
----
- drivers/base/power/opp.c | 60 +++++++++++++++++++++++-------------------------
- 1 file changed, 29 insertions(+), 31 deletions(-)
+                        Geert
 
-diff --git a/drivers/base/power/opp.c b/drivers/base/power/opp.c
-index 7895fdd64192..5869a8524244 100644
---- a/drivers/base/power/opp.c
-+++ b/drivers/base/power/opp.c
-@@ -408,11 +408,11 @@ struct dev_pm_opp *dev_pm_opp_find_freq_floor(struct device *dev,
- EXPORT_SYMBOL_GPL(dev_pm_opp_find_freq_floor);
- 
- /**
-- * _add_device_opp() - Allocate a new device OPP table
-+ * _add_device_opp() - Find device OPP table or allocate a new one
-  * @dev:	device for which we do this operation
-  *
-- * New device node which uses OPPs - used when multiple devices with OPP tables
-- * are maintained.
-+ * It tries to find an existing table first, if it couldn't find one, it
-+ * allocates a new OPP table and returns that.
-  *
-  * Return: valid device_opp pointer if success, else NULL.
-  */
-@@ -420,6 +420,11 @@ static struct device_opp *_add_device_opp(struct device *dev)
- {
- 	struct device_opp *dev_opp;
- 
-+	/* Check for existing list for 'dev' first */
-+	dev_opp = _find_device_opp(dev);
-+	if (!IS_ERR(dev_opp))
-+		return dev_opp;
-+
- 	/*
- 	 * Allocate a new device OPP table. In the infrequent case where a new
- 	 * device is needed to be added, we pay this penalty.
-@@ -575,7 +580,7 @@ EXPORT_SYMBOL_GPL(dev_pm_opp_remove);
- static int _opp_add_dynamic(struct device *dev, unsigned long freq,
- 			    long u_volt, bool dynamic)
- {
--	struct device_opp *dev_opp = NULL;
-+	struct device_opp *dev_opp;
- 	struct dev_pm_opp *opp, *new_opp;
- 	struct list_head *head;
- 	int ret;
-@@ -592,19 +597,11 @@ static int _opp_add_dynamic(struct device *dev, unsigned long freq,
- 	new_opp->rate = freq;
- 	new_opp->u_volt = u_volt;
- 	new_opp->available = true;
--	new_opp->dynamic = dynamic;
--
--	/* Check for existing list for 'dev' */
--	dev_opp = _find_device_opp(dev);
--	if (IS_ERR(dev_opp)) {
--		dev_opp = _add_device_opp(dev);
--		if (!dev_opp) {
--			ret = -ENOMEM;
--			goto free_opp;
--		}
- 
--		head = &dev_opp->opp_list;
--		goto list_add;
-+	dev_opp = _add_device_opp(dev);
-+	if (!dev_opp) {
-+		ret = -ENOMEM;
-+		goto free_opp;
- 	}
- 
- 	/*
-@@ -613,24 +610,25 @@ static int _opp_add_dynamic(struct device *dev, unsigned long freq,
- 	 */
- 	head = &dev_opp->opp_list;
- 	list_for_each_entry_rcu(opp, &dev_opp->opp_list, node) {
--		if (new_opp->rate <= opp->rate)
--			break;
--		else
-+		if (new_opp->rate > opp->rate) {
- 			head = &opp->node;
-+		} else if (new_opp->rate < opp->rate) {
-+			break;
-+		} else {
-+			/* Duplicate OPPs */
-+			ret = opp->available && new_opp->u_volt == opp->u_volt ?
-+				0 : -EEXIST;
-+
-+			dev_warn(dev,
-+				 "%s: duplicate OPPs detected. Existing: freq: %lu, volt: %lu, enabled: %d. New: freq: %lu, volt: %lu, enabled: %d\n",
-+				 __func__, opp->rate, opp->u_volt,
-+				 opp->available, new_opp->rate, new_opp->u_volt,
-+				 new_opp->available);
-+			goto free_opp;
-+		}
- 	}
- 
--	/* Duplicate OPPs ? */
--	if (new_opp->rate == opp->rate) {
--		ret = opp->available && new_opp->u_volt == opp->u_volt ?
--			0 : -EEXIST;
--
--		dev_warn(dev, "%s: duplicate OPPs detected. Existing: freq: %lu, volt: %lu, enabled: %d. New: freq: %lu, volt: %lu, enabled: %d\n",
--			 __func__, opp->rate, opp->u_volt, opp->available,
--			 new_opp->rate, new_opp->u_volt, new_opp->available);
--		goto free_opp;
--	}
--
--list_add:
-+	new_opp->dynamic = dynamic;
- 	new_opp->dev_opp = dev_opp;
- 	list_add_rcu(&new_opp->node, head);
- 	mutex_unlock(&dev_opp_list_lock);
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
