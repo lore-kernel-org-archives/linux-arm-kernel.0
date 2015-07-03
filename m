@@ -1,27 +1,21 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 3 Jul 2015 12:13:58 +0100
-Subject: Possible regression due to "tick: broadcast: Prevent livelock
- from event handler"
-In-Reply-To: <20150703110730.GG1521@katana>
-References: <20150703024044.GB24695@verge.net.au>
- <20150703105441.GF1521@katana>
- <20150703110249.GV7557@n2100.arm.linux.org.uk>
- <20150703110730.GG1521@katana>
-Message-ID: <20150703111358.GW7557@n2100.arm.linux.org.uk>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Fri, 3 Jul 2015 19:10:18 +0800
+Subject: [PATCH 2/6] mmc: sdhci-esdhc-imx: add tuning-step seting support
+In-Reply-To: <1433926244-29244-3-git-send-email-haibo.chen@freescale.com>
+References: <1433926244-29244-1-git-send-email-haibo.chen@freescale.com>
+ <1433926244-29244-3-git-send-email-haibo.chen@freescale.com>
+Message-ID: <20150703111017.GA17553@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 03, 2015 at 01:07:31PM +0200, Wolfram Sang wrote:
-> > Please share your .config file for this case.  Thanks.
-> 
-> Here it goes...
+On Wed, Jun 10, 2015 at 04:50:40PM +0800, Haibo Chen wrote:
+> @@ -969,6 +976,8 @@ sdhci_esdhc_imx_probe_dt(struct platform_device *pdev,
+>  
+>  	of_property_read_u32(np, "max-frequency", &boarddata->f_max);
+>  
+> +	of_property_read_u32(np, "tuning-step", &boarddata->tuning_step);
+> +
 
-Please try:
+Where is the binding doc for this device tree property?
 
-sed -i s/IRQSOFF_TRACER/TRACE_IRQFLAGS/ arch/arm/kernel/entry-armv.S
-
-Thanks.
-
--- 
-FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
-according to speedtest.net.
+Shawn
