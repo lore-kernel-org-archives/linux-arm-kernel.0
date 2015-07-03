@@ -1,24 +1,29 @@
-From: p.fedin@samsung.com (Pavel Fedin)
-Date: Fri, 03 Jul 2015 18:29:32 +0300
-Subject: [PATCH 1/7] KVM: api: add kvm_irq_routing_extended_msi
-In-Reply-To: <55955B98.1000504@linaro.org>
-References: <1435592237-17924-1-git-send-email-eric.auger@linaro.org>
- <1435592237-17924-2-git-send-email-eric.auger@linaro.org>
- <011f01d0b498$6a17aeb0$3e470c10$@samsung.com> <55954F6E.5030008@linaro.org>
- <55955542.6000809@arm.com> <55955728.3080506@linaro.org>
- <02eb01d0b4dd$50b25160$f216f420$@samsung.com> <55955B98.1000504@linaro.org>
-Message-ID: <018401d0b5a5$10576a60$31063f20$@samsung.com>
+From: robert.jarzmik@free.fr (Robert Jarzmik)
+Date: Fri, 03 Jul 2015 17:27:25 +0200
+Subject: [PATCH-V2 04/12] i2c: pxa: Reset i2c controller on timeout in
+ interrupt and pio mode
+References: <vaibhav.hiremath@linaro.org>
+ <1434383399-2370-1-git-send-email-vaibhav.hiremath@linaro.org>
+ <1434383399-2370-5-git-send-email-vaibhav.hiremath@linaro.org>
+Message-ID: <87fv55clcy.fsf@belgarion.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
- Hi!
+Vaibhav Hiremath <vaibhav.hiremath@linaro.org> writes:
 
-> OK so both of you say the same thing. Will respin accordingly
+> In case of timeout during msg xfer assert reset to
+> i2c controller for both interrupt and PIO mode of operation.
+>
+> Signed-off-by: Jett.Zhou <jtzhou@marvell.com>
+> [vaibhav.hiremath at linaro.org: Split & merge patches into logical changes
+> and update the Changelog]
+> Signed-off-by: Vaibhav Hiremath <vaibhav.hiremath@linaro.org>
 
- You may also want to add this:
-Tested-by: Pavel Fedin <p.fedin@samsung.com>
+I already said it previously, I'm against an unconditional reset in a timeout
+path. Make it a quirk or whatever, but in the current status, I'm against.
 
-Kind regards,
-Pavel Fedin
-Expert Engineer
-Samsung Electronics Research center Russia
+The previous behavior looks correct to me : upon timeout, retry, no need to
+reset.
+
+--
+Robert
