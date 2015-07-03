@@ -1,31 +1,35 @@
-From: wsa@the-dreams.de (Wolfram Sang)
-Date: Fri, 3 Jul 2015 17:40:36 +0200
-Subject: Possible regression due to "tick: broadcast: Prevent livelock
- from event handler"
-In-Reply-To: <alpine.DEB.2.11.1507031721390.3916@nanos>
-References: <20150703024044.GB24695@verge.net.au>
- <20150703105441.GF1521@katana>
- <alpine.DEB.2.11.1507031511180.3916@nanos>
- <20150703133245.GA19284@katana>
- <alpine.DEB.2.11.1507031612410.3916@nanos>
- <20150703143703.GB19284@katana>
- <alpine.DEB.2.11.1507031640060.3916@nanos>
- <20150703150951.GC19284@katana>
- <alpine.DEB.2.11.1507031721390.3916@nanos>
-Message-ID: <20150703154036.GD19284@katana>
+From: eric.auger@linaro.org (Eric Auger)
+Date: Fri, 03 Jul 2015 17:42:08 +0200
+Subject: [PATCH 1/7] KVM: api: add kvm_irq_routing_extended_msi
+In-Reply-To: <018401d0b5a5$10576a60$31063f20$@samsung.com>
+References: <1435592237-17924-1-git-send-email-eric.auger@linaro.org>
+ <1435592237-17924-2-git-send-email-eric.auger@linaro.org>
+ <011f01d0b498$6a17aeb0$3e470c10$@samsung.com> <55954F6E.5030008@linaro.org>
+ <55955542.6000809@arm.com> <55955728.3080506@linaro.org>
+ <02eb01d0b4dd$50b25160$f216f420$@samsung.com> <55955B98.1000504@linaro.org>
+ <018401d0b5a5$10576a60$31063f20$@samsung.com>
+Message-ID: <5596AD50.70103@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On 07/03/2015 05:29 PM, Pavel Fedin wrote:
+>  Hi!
+> 
+>> OK so both of you say the same thing. Will respin accordingly
+> 
+>  You may also want to add this:
+> Tested-by: Pavel Fedin <p.fedin@samsung.com>
 
-> Ok. One more check please. Does nohz=off on the command line fix/hide
-> the issue as well?
+Thanks Pavel for the intent. However since I am going to change the uapi
+and correct the bug you spotted out, this will need to be tested again.
+T-b is applied when the code is stable and bug-free I think ;-)
 
-Yes, it does. It boots to the prompt then.
+Best Regards
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150703/35b1fe30/attachment.sig>
+Eric
+> 
+> Kind regards,
+> Pavel Fedin
+> Expert Engineer
+> Samsung Electronics Research center Russia
+> 
