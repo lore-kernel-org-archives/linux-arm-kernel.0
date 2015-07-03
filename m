@@ -1,82 +1,60 @@
-From: feng.wu@intel.com (Wu, Feng)
-Date: Fri, 3 Jul 2015 02:24:04 +0000
-Subject: [RFC 12/17] irq: bypass: Extend skeleton for ARM forwarding
- control
-In-Reply-To: <E959C4978C3B6342920538CF579893F0025E6C23@SHSMSX104.ccr.corp.intel.com>
-References: <1435843047-6327-1-git-send-email-eric.auger@linaro.org>
- <1435843047-6327-13-git-send-email-eric.auger@linaro.org>
- <55953F5F.9090203@redhat.com>
- <E959C4978C3B6342920538CF579893F0025E6C23@SHSMSX104.ccr.corp.intel.com>
-Message-ID: <E959C4978C3B6342920538CF579893F0025E6C38@SHSMSX104.ccr.corp.intel.com>
+From: henryc.chen@mediatek.com (Henry Chen)
+Date: Fri, 3 Jul 2015 10:28:26 +0800
+Subject: [PATCH] dts: mt8173-evb: Add da9211 to i2c1
+Message-ID: <1435890506-25425-1-git-send-email-henryc.chen@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Add a DA9211 dual-channel BUCK regulator to i2c1.
+This regulator supplies GPU and DVFS1 voltages.
 
+Signed-off-by: Henry Chen <henryc.chen@mediatek.com>
+---
+This patch based on https://github.com/mbgg/linux-mediatek.git branch/v4.2-next/arm64
+---
+ arch/arm64/boot/dts/mediatek/mt8173-evb.dts | 30 +++++++++++++++++++++++++++++
+ 1 file changed, 30 insertions(+)
 
-> -----Original Message-----
-> From: Wu, Feng
-> Sent: Friday, July 03, 2015 10:20 AM
-> To: Paolo Bonzini; Eric Auger; eric.auger at st.com;
-> linux-arm-kernel at lists.infradead.org; kvmarm at lists.cs.columbia.edu;
-> kvm at vger.kernel.org; christoffer.dall at linaro.org; marc.zyngier at arm.com;
-> alex.williamson at redhat.com; avi.kivity at gmail.com; mtosatti at redhat.com;
-> joro at 8bytes.org; b.reynal at virtualopensystems.com
-> Cc: linux-kernel at vger.kernel.org; patches at linaro.org; Wu, Feng
-> Subject: RE: [RFC 12/17] irq: bypass: Extend skeleton for ARM forwarding
-> control
-> 
-> 
-> 
-> > -----Original Message-----
-> > From: Paolo Bonzini [mailto:pbonzini at redhat.com]
-> > Sent: Thursday, July 02, 2015 9:41 PM
-> > To: Eric Auger; eric.auger at st.com; linux-arm-kernel at lists.infradead.org;
-> > kvmarm at lists.cs.columbia.edu; kvm at vger.kernel.org;
-> > christoffer.dall at linaro.org; marc.zyngier at arm.com;
-> > alex.williamson at redhat.com; avi.kivity at gmail.com; mtosatti at redhat.com;
-> > Wu, Feng; joro at 8bytes.org; b.reynal at virtualopensystems.com
-> > Cc: linux-kernel at vger.kernel.org; patches at linaro.org
-> > Subject: Re: [RFC 12/17] irq: bypass: Extend skeleton for ARM forwarding
-> > control
-> >
-> >
-> >
-> > On 02/07/2015 15:17, Eric Auger wrote:
-> > > - new fields are added on producer side: linux irq, vfio_device handle,
-> > >   active which reflects whether the source is active (at interrupt
-> > >   controller level or at VFIO level - automasked -) and finally an
-> > >   opaque pointer which will be used to point to the vfio_platform_device
-> > >   in this series.
-> >
-> > Linux IRQ and active should be okay.  As to the vfio_device handle, you
-> > should link it from the vfio_platform_device instead.  And for the
-> > vfio_platform_device, you can link it from the vfio_platform_irq instead.
-> >
-> > Once you've done this, embed the irq_bypass_producer struct in the
-> > vfio_platform_irq struct; in the new kvm_arch_* functions, go back to
-> > the vfio_platform_irq struct via container_of.  From there you can
-> > retrieve pointers to the vfio_platform_device and the vfio_device.
-> >
-> > > - new fields on consumer side: the kvm handle, the gsi
-> >
-> > You do not need to add these.  Instead, add the kvm handle to irqfd
-> > only.  Like above, embed the irq_bypass_consumer struct in the irqfd
-> > struct; in the new kvm_arch_* functions, go back to the
-> > vfio_platform_irq struct via container_of.
-> >
-> 
-> I also need the gsi field here, for posted-interrupts, I need 'gsi', 'irq' to
-> update the IRTE.
-
-Oh... we can get gsi from irq_bypass_consumer -> _irqfd -> gsi, so it
-is not needed in irq_bypass_consumer. Got it! :)
-
-Thanks,
-Feng
-
-> 
-> Thanks,
-> Feng
-> 
-> 
-> > Paolo
+diff --git a/arch/arm64/boot/dts/mediatek/mt8173-evb.dts b/arch/arm64/boot/dts/mediatek/mt8173-evb.dts
+index d0ab012..7f583bd 100644
+--- a/arch/arm64/boot/dts/mediatek/mt8173-evb.dts
++++ b/arch/arm64/boot/dts/mediatek/mt8173-evb.dts
+@@ -34,6 +34,36 @@
+ 	chosen { };
+ };
+ 
++&i2c1 {
++	status = "okay";
++
++	buck: da9211 at 68 {
++		compatible = "dlg,da9211";
++		reg = <0x68>;
++
++		regulators {
++			da9211_vcpu_reg: BUCKA {
++				regulator-name = "VBUCKA";
++				regulator-min-microvolt = < 700000>;
++				regulator-max-microvolt = <1310000>;
++				regulator-min-microamp	= <2000000>;
++				regulator-max-microamp	= <4400000>;
++				regulator-ramp-delay = <10000>;
++				regulator-always-on;
++			};
++
++			da9211_vgpu_reg: BUCKB {
++				regulator-name = "VBUCKB";
++				regulator-min-microvolt = < 700000>;
++				regulator-max-microvolt = <1310000>;
++				regulator-min-microamp	= <2000000>;
++				regulator-max-microamp	= <3000000>;
++				regulator-ramp-delay = <10000>;
++			};
++		};
++	};
++};
++
+ &uart0 {
+ 	status = "okay";
+ };
+-- 
+1.8.1.1.dirty
