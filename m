@@ -1,48 +1,33 @@
-From: andre.przywara@arm.com (Andre Przywara)
-Date: Fri, 3 Jul 2015 16:57:04 +0100
-Subject: [PATCH 11/13] KVM: arm64: implement ITS command queue command
- handlers
-In-Reply-To: <20150628194148.GM28244@cbox>
-References: <1432893209-27313-1-git-send-email-andre.przywara@arm.com>
- <1432893209-27313-12-git-send-email-andre.przywara@arm.com>
- <20150628194148.GM28244@cbox>
-Message-ID: <5596B0D0.3080505@arm.com>
+From: wsa@the-dreams.de (Wolfram Sang)
+Date: Fri, 3 Jul 2015 18:00:22 +0200
+Subject: Possible regression due to "tick: broadcast: Prevent livelock
+ from event handler"
+In-Reply-To: <alpine.DEB.2.11.1507031746550.3916@nanos>
+References: <20150703105441.GF1521@katana>
+ <alpine.DEB.2.11.1507031511180.3916@nanos>
+ <20150703133245.GA19284@katana>
+ <alpine.DEB.2.11.1507031612410.3916@nanos>
+ <20150703143703.GB19284@katana>
+ <alpine.DEB.2.11.1507031640060.3916@nanos>
+ <20150703150951.GC19284@katana>
+ <alpine.DEB.2.11.1507031721390.3916@nanos>
+ <20150703154036.GD19284@katana>
+ <alpine.DEB.2.11.1507031746550.3916@nanos>
+Message-ID: <20150703160022.GE19284@katana>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Christoffer,
 
-....
+> Can you try the patch below, whether it makes a difference?
 
->> +
->> +static struct its_collection *vits_new_collection(struct kvm *kvm, u32 coll_id)
->> +{
->> +	struct its_collection *collection;
->> +
->> +	collection = kmalloc(sizeof(struct its_collection), GFP_KERNEL);
-> 
-> If I manage to understand the structure here, you're calling all these
-> handler functions with a spinlock held so any operation that may sleep
-> could cause your system to deadlock.
-> 
-> I'll stop looking for these and recommend you go over the whole series
-> for these.
+It doesn't. Board locks again.
 
-Do you reckon it would be sufficient to just avoid the kmallocs inside
-the lock? For this case above we could go with some storage space
-preallocated outside of the lock (I hope).
-
-> 
-> Perhaps the right thing to do is to synchronize access to your data
-> structure (why you hold the spinlock right?) with RCU if you can...
-
-Well, the point is that there is not one ITS data structure, but it's a
-mesh of lists connected to each other. I'd like to avoid going down with
-RCU there, so I'd like to keep it all under one lock.
-I wonder if this could be mutex_lock_interruptible, though. From the top
-of your head, is there anything that would prevent that? I reckon ITS
-access contention is rather rare (though possible), so a sleeping VCPU
-wouldn't harm us so much in practice, would it?
-
-Cheers,
-Andre.
+> -	clockevents_config_and_register(ced, 1, 2, 0xffffffff);
+> +	clockevents_config_and_register(ced, 1, 100, 0xffffffff);
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150703/38eaf954/attachment.sig>
