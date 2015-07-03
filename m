@@ -1,73 +1,54 @@
-From: feng.wu@intel.com (Wu, Feng)
-Date: Fri, 3 Jul 2015 07:16:17 +0000
-Subject: [RFC 12/17] irq: bypass: Extend skeleton for ARM forwarding
- control
-In-Reply-To: <55963469.9030805@redhat.com>
-References: <1435843047-6327-1-git-send-email-eric.auger@linaro.org>
- <1435843047-6327-13-git-send-email-eric.auger@linaro.org>
- <E959C4978C3B6342920538CF579893F0025E6C89@SHSMSX104.ccr.corp.intel.com>
- <5596311A.3010703@redhat.com>
- <E959C4978C3B6342920538CF579893F0025E70BF@SHSMSX104.ccr.corp.intel.com>
- <55963469.9030805@redhat.com>
-Message-ID: <E959C4978C3B6342920538CF579893F0025E7167@SHSMSX104.ccr.corp.intel.com>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Fri, 03 Jul 2015 09:18:48 +0200
+Subject: [PATCH v2 3/4] ARM: mvebu: Allow using the GIC for wakeup in
+ standby mode
+In-Reply-To: <20150701175436.7dff0754@free-electrons.com>
+References: <1435684740-24912-1-git-send-email-gregory.clement@free-electrons.com>	<1435684740-24912-4-git-send-email-gregory.clement@free-electrons.com>
+ <20150701175436.7dff0754@free-electrons.com>
+Message-ID: <55963758.30200@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Thomas,
 
+On 01/07/2015 17:54, Thomas Petazzoni wrote:
+> Dear Gregory CLEMENT,
+> 
+> On Tue, 30 Jun 2015 19:18:59 +0200, Gregory CLEMENT wrote:
+> 
+>>  static void __init mvebu_init_irq(void)
+>>  {
+>> +	if (of_machine_is_compatible("marvell,armada375") ||
+>> +	    of_machine_is_compatible("marvell,armada380") ||
+>> +	    of_machine_is_compatible("marvell,armada390"))
+> 
+> What we really want to know is if we're using the GIC, so what about
+> instead:
+> 
+> 	np = of_find_compatible_node(NULL, NULL, "arm,cortex-a9-gic");
+> 	if (np)
+> 		gic_set_irqchip_flags(IRQCHIP_SKIP_SET_WAKE |
+> 				      IRQCHIP_MASK_ON_SUSPEND);
+> 	of_node_put(np);
+> 
+> (Not even compile-tested).
 
-> -----Original Message-----
-> From: Paolo Bonzini [mailto:pbonzini at redhat.com]
-> Sent: Friday, July 03, 2015 3:06 PM
-> To: Wu, Feng; Eric Auger; eric.auger at st.com;
-> linux-arm-kernel at lists.infradead.org; kvmarm at lists.cs.columbia.edu;
-> kvm at vger.kernel.org; christoffer.dall at linaro.org; marc.zyngier at arm.com;
-> alex.williamson at redhat.com; avi.kivity at gmail.com; mtosatti at redhat.com;
-> joro at 8bytes.org; b.reynal at virtualopensystems.com
-> Cc: linux-kernel at vger.kernel.org; patches at linaro.org
-> Subject: Re: [RFC 12/17] irq: bypass: Extend skeleton for ARM forwarding
-> control
-> 
-> 
-> 
-> On 03/07/2015 09:00, Wu, Feng wrote:
-> >>> > > struct irq_bypass_consumer {
-> >>> > >        struct list_head node;
-> >>> > >        void *token;
-> >>> > > +      unsigned irq;	/*got from producer when registered*/
-> >>> > >        void (*add_producer)(struct irq_bypass_producer *,
-> >>> > >                             struct irq_bypass_consumer *);
-> >>> > >        void (*del_producer)(struct irq_bypass_producer *,
-> >>> > >                             struct irq_bypass_consumer *);
-> >>> > > +      void (*update)(struct irq_bypass_consumer *);
-> >>> > > };
-> >>> > >
-> >>> > > 'update' is used to update the IRTE, while irq is initialized when
-> >>> > > registered, which is used to find the right IRTE.
-> >> >
-> >> > Feel free to add "update" in your PI patches.  I am not sure if "irq"
-> >> > belongs here or in the containing struct.  You can play with both and
-> >> > submit the version that looks better to you.
-> > Thanks for your review, Paolo. In my understanding, irq comes from
-> > the producer side, while gsi belongs to the consumer, so we need
-> > to get the irq from the producer somewhere. I am not sure adding
-> > irq here is the good way, but what I need is in the 'update' function,
-> > I have irq, gsi in hand. :)
-> 
-> It's difficult to say without seeing the patches...  The IRQ is stored
-> in the producer already with Eric's changes.  If you need to store the
-> old IRQ value, because "update" needs to do something with it, then I
-> think "irq" belongs in the container struct.
-> 
-> Perhaps "update" needs to have a producer argument as well?
-
-I also consider this method, basically, I will call 'update' in irqfd_update(),
-but seems I need do extra things to get the producer structure (such as,
-iterate the producer list to find the one with the same 'token') before
-calling 'update' from consumer side. I am not sure it is worth doing
-that way.
+Indeed it is better. I will make the change.
 
 Thanks,
-Feng
+
+Gregory
+
 
 > 
-> Paolo
+> Thanks,
+> 
+> Thomas
+> 
+
+
+-- 
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
