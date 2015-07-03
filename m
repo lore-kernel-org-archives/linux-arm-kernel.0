@@ -1,55 +1,25 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Fri, 3 Jul 2015 11:26:08 +0100
-Subject: [PATCH v5] arm DMA: Fix allocation from CMA for coherent DMA
-In-Reply-To: <20150703090305.GR7557@n2100.arm.linux.org.uk>
-References: <1435699746-21395-1-git-send-email-lorenx4@gmail.com>
- <20150701111251.GA21981@e104818-lin.cambridge.arm.com>
- <20150703090305.GR7557@n2100.arm.linux.org.uk>
-Message-ID: <20150703102607.GI25907@e104818-lin.cambridge.arm.com>
+From: richardcochran@gmail.com (Richard Cochran)
+Date: Fri, 3 Jul 2015 12:36:26 +0200
+Subject: [PATCH 1/2] gpio: dwapb: Use human understandable gpio numbering.
+In-Reply-To: <C1BD6DA3-F32E-4CAD-8DA9-6F74A7966DBE@smart-africa.com>
+References: <cover.1435777856.git.rcochran@linutronix.de>
+ <d6b5ce85a17164970d454583560e07f7aed7b8ca.1435777856.git.rcochran@linutronix.de>
+ <267A46E7-C5C5-4696-90CC-D44F4130B3EF@smart-africa.com>
+ <20150703091347.GA17808@localhost.localdomain>
+ <C1BD6DA3-F32E-4CAD-8DA9-6F74A7966DBE@smart-africa.com>
+Message-ID: <20150703103626.GA18893@localhost.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 03, 2015 at 10:03:06AM +0100, Russell King - ARM Linux wrote:
-> On Wed, Jul 01, 2015 at 12:12:51PM +0100, Catalin Marinas wrote:
-> > On Tue, Jun 30, 2015 at 11:29:06PM +0200, Lorenzo Nava wrote:
-> > > This patch allows the use of CMA for DMA coherent memory allocation.
-> > > At the moment if the input parameter "is_coherent" is set to true
-> > > the allocation is not made using the CMA, which I think is not the
-> > > desired behaviour.
-> > > 
-> > > Signed-off-by: Lorenzo Nava <lorenx4@gmail.com>
-> > > Reviewed-by: Catalin Marinas <catalin.marinas@arm.com>
-> > 
-> > If Russell doesn't have any objections, you can send the patch to
-> > his patch system. See here for more information:
-> 
-> I'm left wondering whether this patch is really want Lorenzo wants.
-> From my reading of it, while this has the effect of allocating from
-> CMA for coherent devices, it's no different from the non-coherent
-> case, because by calling __alloc_from_contiguous(), we end up
-> remapping the allocated memory, removing the cacheability status
-> from the allocated pages.
+On Fri, Jul 03, 2015 at 10:18:28AM +0100, Michael van der Westhuizen wrote:
+> The subject should be:
+>   gpio: dwapb: Use human understandable gpio numbering
+> Not:
+>   gpio: dwapb: Use human understandable gpio numbering.
 
-The arm_coherent_dma_alloc() function is changed by this patch to pass
-PAGE_KERNEL as prot, so the cacheability attributes should be preserved.
-We have a superfluous __dma_remap() call for lowmem CMA pages which
-changes the protection from PAGE_KERNEL to PAGE_KERNEL but, as you
-mentioned in another reply, the overhead of CMA is big enough to not
-make this noticeable.
+Ok, I see.  I would call that dot a "period", not a full-stop.
 
-The alternative (as I suggested in one of the earlier versions of this
-patch) was to change __get_dma_pgprot() to take a "coherent" argument
-and return PAGE_KERNEL. But since the coherent mmap was fixed in a
-similar way to this patch (and merged already), I gave up on my initial
-suggestion.
+Must be a British thing...
 
-> This brings up an interesting point: presumably, it's been tested, and
-> people are happy with the performance it's giving, inspite of it not
-> returning cacheable memory... or maybe it hasn't been tested that much?
-
-It must cacheable memory, otherwise it's not a performance but a data
-corruption issue. For example, a cacheable device access may allocate in
-an outer cache but non-cacheable CPU access doesn't look into it.
-
--- 
-Catalin
+Thanks,
+Richard
