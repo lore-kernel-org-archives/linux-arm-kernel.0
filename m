@@ -1,26 +1,24 @@
-From: r.schwebel@pengutronix.de (Robert Schwebel)
-Date: Fri, 3 Jul 2015 22:24:33 +0200
-Subject: [GIT PULL] remoteproc for 4.2
-In-Reply-To: <5594F86B.1040801@melag.de>
-References: <CAK=Wgba9Jst3xJ_EQf+zenZSqedzhvSw8ZVMZ_YmsQM70mMbPA@mail.gmail.com>
- <5594F86B.1040801@melag.de>
-Message-ID: <20150703202433.GI21222@pengutronix.de>
+From: robert.jarzmik@free.fr (Robert Jarzmik)
+Date: Fri, 03 Jul 2015 22:53:47 +0200
+Subject: [PATCH] ARM: mact-pxa: Use module_platform_driver
+References: <20150703114656.GA6871@vaishali-Ideapad-Z570>
+Message-ID: <871tgparok.fsf@belgarion.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 02, 2015 at 10:38:03AM +0200, Enrico Weigelt, metux IT consult wrote:
-> >for you to fetch changes up to 8de3dbd0895bebe52d069a82feae8e3fb51c1bdf:
-> >
-> >   remoteproc: fix !CONFIG_OF build breakage (2015-06-18 11:44:41 +0300)
-> 
-> Just curious: could this rproc framework also be used for more specific
-> coprocessors like the VPUs found on various SoCs ? (eg. CODA on imx53)
+Vaishali Thakkar <vthakkar1994@gmail.com> writes:
 
-No. And there is already a driver in mainline that handles the VPU.
+> Use module_platform_driver for drivers whose init and exit functions
+> only register and unregister, respectively.
+>
+> A simplified version of the Coccinelle semantic patch that performs
+> this transformation is as follows:
 
-rsc
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Applied to pxa/for-next, thanks.
+For next time, please use the "ARM: pxa:" subject prefix for arch/arm/mach-pxa
+patches. I fixed this for this submission.
+
+Cheers.
+
+--
+Robert
