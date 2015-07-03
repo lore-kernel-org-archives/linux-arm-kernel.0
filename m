@@ -1,51 +1,64 @@
-From: al.stone@linaro.org (Al Stone)
-Date: Thu,  2 Jul 2015 17:48:34 -0600
-Subject: [PATCH v3 1/3] ACPI : introduce macros for using the ACPI
- specification version
-In-Reply-To: <1435880916-2153-1-git-send-email-al.stone@linaro.org>
-References: <1435880916-2153-1-git-send-email-al.stone@linaro.org>
-Message-ID: <1435880916-2153-2-git-send-email-al.stone@linaro.org>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Fri, 3 Jul 2015 09:02:31 +0800
+Subject: [PATCH v2 1/2] watchdog: imx2_wdt: add external reset support
+ via 'ext-reset-output' dt prop
+In-Reply-To: <CAJ+vNU3me-qBZT7h1e+54UNRJw-2SH=nofnTRM4GEn0j9jh3ig@mail.gmail.com>
+References: <1432853677-5150-1-git-send-email-tharvey@gateworks.com>
+ <1433448960-9257-1-git-send-email-tharvey@gateworks.com>
+ <1433448960-9257-2-git-send-email-tharvey@gateworks.com>
+ <20150629011737.GG10332@tiger>
+ <CAJ+vNU3me-qBZT7h1e+54UNRJw-2SH=nofnTRM4GEn0j9jh3ig@mail.gmail.com>
+Message-ID: <20150703010231.GA28488@tiger>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the __ACPI_FADT_SPEC_VERSION() helper macro to build a proper version
-number from a major and minor revision number.  Add also macros that use
-the helper to construct the current version from the values in the FADT
-(i.e., ACPI_FADT_SPEC_VERSION) and both the 5.1 and 6.0 versions.
+On Thu, Jul 02, 2015 at 09:49:20AM -0700, Tim Harvey wrote:
+> On Sun, Jun 28, 2015 at 6:17 PM, Shawn Guo <shawnguo@kernel.org> wrote:
+> > On Thu, Jun 04, 2015 at 01:15:59PM -0700, Tim Harvey wrote:
+> >> @@ -90,6 +92,11 @@ static int imx2_restart_handler(struct notifier_block *this, unsigned long mode,
+> >>       struct imx2_wdt_device *wdev = container_of(this,
+> >>                                                   struct imx2_wdt_device,
+> >>                                                   restart_handler);
+> >> +
+> >> +     /* Use external reset */
+> >> +     if (wdev->ext_reset)
+> >> +             wcr_enable |= IMX2_WDT_WCR_SRS;
+> >> +
+> >
+> > The existing code simply writes the register with only WDE (Watchdog
+> > Enable) bit set.  That said, bit WDA and SRS are cleared at the same
+> > time.  What's the result of that?  Both internal reset and external
+> > reset will be asserted?  If this is the case, it's unsafe per your reply
+> > to Frank's comment, right?  So we should only clear one bit between
+> > these two based on ext_reset flag to avoid asserting both internal and
+> > external reset?
+> >
+> > Shawn
+> 
+> Shawn,
+> 
+> Correct.
+> 
+> Are you saying that you think we should change the above to something
+> like the following to ensure in the internal reset case external reset
+> is not also being asserted?:
 
-These macros are added in order to simplify retrieving and comparing ACPI
-specification version numbers, since this is becoming a more frequent need.
-In particular, there are some architectures that require at least a certain
-version of the spec, and there are differences in some structure sizes that
-have changed with recent versions but can only be tracked by spec version
-number.
+Yes, that's what I'm saying.
 
-Fixes: aeb823bbacc2 (ACPICA: ACPI 6.0: Add changes for FADT table.)
-Signed-off-by: Al Stone <al.stone@linaro.org>
----
- include/linux/acpi.h | 10 ++++++++++
- 1 file changed, 10 insertions(+)
+> 
+> +     /* Use external reset */
+> +     if (wdev->ext_reset)
+> +             wcr_enable |= IMX2_WDT_WCR_SRS; /* do not assert
+> internal system reset */
+> +     else
+> +             wcr_enable |= IMX2_WDT_WCR_WDA; /* do not assert external reset */
+> 
+> I was not worried about the else case above because if you hit that
+> path your device-tree is saying you are not using external reset
+> anyway.
 
-diff --git a/include/linux/acpi.h b/include/linux/acpi.h
-index c471dfc..0e525e8 100644
---- a/include/linux/acpi.h
-+++ b/include/linux/acpi.h
-@@ -48,6 +48,16 @@
- #include <acpi/acpi_io.h>
- #include <asm/acpi.h>
- 
-+#define __ACPI_FADT_SPEC_VERSION(major, minor) \
-+	((unsigned int)major << 8 | (unsigned int)minor)
-+
-+#define ACPI_FADT_SPEC_VERSION	\
-+	__ACPI_FADT_SPEC_VERSION(acpi_gbl_FADT.header.revision, \
-+				 acpi_gbl_FADT.minor_revision)
-+
-+#define ACPI_FADT_SPEC_VERSION_51 __ACPI_FADT_SPEC_VERSION(5, 1)
-+#define ACPI_FADT_SPEC_VERSION_60 __ACPI_FADT_SPEC_VERSION(6, 0)
-+
- static inline acpi_handle acpi_device_handle(struct acpi_device *adev)
- {
- 	return adev ? adev->handle : NULL;
--- 
-2.4.3
+It's a safeguard for platforms which have WDOG_B signal routed to some
+hardware, while their device trees haven't specified ext_reset_output
+property.
+
+Shawn
