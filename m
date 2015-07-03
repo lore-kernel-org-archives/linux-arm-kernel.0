@@ -1,39 +1,168 @@
-From: wsa@the-dreams.de (Wolfram Sang)
-Date: Fri, 3 Jul 2015 13:41:29 +0200
-Subject: Possible regression due to "tick: broadcast: Prevent livelock
- from event handler"
-In-Reply-To: <20150703111358.GW7557@n2100.arm.linux.org.uk>
-References: <20150703024044.GB24695@verge.net.au>
- <20150703105441.GF1521@katana>
- <20150703110249.GV7557@n2100.arm.linux.org.uk>
- <20150703110730.GG1521@katana>
- <20150703111358.GW7557@n2100.arm.linux.org.uk>
-Message-ID: <20150703114129.GA10368@katana>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Fri, 3 Jul 2015 04:53:20 -0700
+Subject: [PATCH v3 1/2] arm64: KVM: Optimize arm64 skip 30-50% vfp/simd
+ save/restore on exits
+In-Reply-To: <5595B27D.90201@samsung.com>
+References: <1435190652-5831-1-git-send-email-m.smarduch@samsung.com>
+ <1435190652-5831-2-git-send-email-m.smarduch@samsung.com>
+ <20150701134649.GG11332@cbox> <5595B27D.90201@samsung.com>
+Message-ID: <20150703115320.GA14220@lvm>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 03, 2015 at 12:13:58PM +0100, Russell King - ARM Linux wrote:
-> On Fri, Jul 03, 2015 at 01:07:31PM +0200, Wolfram Sang wrote:
-> > > Please share your .config file for this case.  Thanks.
+On Thu, Jul 02, 2015 at 02:51:57PM -0700, Mario Smarduch wrote:
+> On 07/01/2015 06:46 AM, Christoffer Dall wrote:
+> > On Wed, Jun 24, 2015 at 05:04:11PM -0700, Mario Smarduch wrote:
+> >> This patch only saves and restores FP/SIMD registers on Guest access. To do
+> >> this cptr_el2 FP/SIMD trap is set on Guest entry and later checked on exit.
+> >> lmbench, hackbench show significant improvements, for 30-50% exits FP/SIMD
+> >> context is not saved/restored
+> >>
+> >> Signed-off-by: Mario Smarduch <m.smarduch@samsung.com>
+> >> ---
+> >>  arch/arm64/include/asm/kvm_arm.h |    5 ++++-
+> >>  arch/arm64/kvm/hyp.S             |   46 +++++++++++++++++++++++++++++++++++---
+> >>  2 files changed, 47 insertions(+), 4 deletions(-)
+> >>
+> >> diff --git a/arch/arm64/include/asm/kvm_arm.h b/arch/arm64/include/asm/kvm_arm.h
+> >> index ac6fafb..7605e09 100644
+> >> --- a/arch/arm64/include/asm/kvm_arm.h
+> >> +++ b/arch/arm64/include/asm/kvm_arm.h
+> >> @@ -171,10 +171,13 @@
+> >>  #define HSTR_EL2_TTEE	(1 << 16)
+> >>  #define HSTR_EL2_T(x)	(1 << x)
+> >>  
+> >> +/* Hyp Coproccessor Trap Register Shifts */
+> >> +#define CPTR_EL2_TFP_SHIFT 10
+> >> +
+> >>  /* Hyp Coprocessor Trap Register */
+> >>  #define CPTR_EL2_TCPAC	(1 << 31)
+> >>  #define CPTR_EL2_TTA	(1 << 20)
+> >> -#define CPTR_EL2_TFP	(1 << 10)
+> >> +#define CPTR_EL2_TFP	(1 << CPTR_EL2_TFP_SHIFT)
+> >>  
+> >>  /* Hyp Debug Configuration Register bits */
+> >>  #define MDCR_EL2_TDRA		(1 << 11)
+> >> diff --git a/arch/arm64/kvm/hyp.S b/arch/arm64/kvm/hyp.S
+> >> index 5befd01..de0788f 100644
+> >> --- a/arch/arm64/kvm/hyp.S
+> >> +++ b/arch/arm64/kvm/hyp.S
+> >> @@ -673,6 +673,15 @@
+> >>  	tbz	\tmp, #KVM_ARM64_DEBUG_DIRTY_SHIFT, \target
+> >>  .endm
+> >>  
+> >> +/*
+> >> + * Check cptr VFP/SIMD accessed bit, if set VFP/SIMD not accessed by guest.
 > > 
-> > Here it goes...
+> > This comment doesn't really help me understand the function, may I
+> > suggest:
+> > 
+> > Branch to target if CPTR_EL2.TFP bit is set (VFP/SIMD trapping enabled)
 > 
-> Please try:
+> Yes actually describes what it does.
 > 
-> sed -i s/IRQSOFF_TRACER/TRACE_IRQFLAGS/ arch/arm/kernel/entry-armv.S
+> > 
+> >> + */
+> >> +.macro skip_fpsimd_state tmp, target
+> >> +	mrs	\tmp, cptr_el2
+> >> +	tbnz	\tmp, #CPTR_EL2_TFP_SHIFT, \target
+> >> +.endm
+> >> +
+> >> +
+> >>  .macro compute_debug_state target
+> >>  	// Compute debug state: If any of KDE, MDE or KVM_ARM64_DEBUG_DIRTY
+> >>  	// is set, we do a full save/restore cycle and disable trapping.
+> >> @@ -763,6 +772,7 @@
+> >>  	ldr     x2, [x0, #VCPU_HCR_EL2]
+> >>  	msr     hcr_el2, x2
+> >>  	mov	x2, #CPTR_EL2_TTA
+> >> +	orr     x2, x2, #CPTR_EL2_TFP
+> >>  	msr	cptr_el2, x2
+> >>  
+> >>  	mov	x2, #(1 << 15)	// Trap CP15 Cr=15
+> >> @@ -785,7 +795,6 @@
+> >>  .macro deactivate_traps
+> >>  	mov	x2, #HCR_RW
+> >>  	msr	hcr_el2, x2
+> >> -	msr	cptr_el2, xzr
+> >>  	msr	hstr_el2, xzr
+> >>  
+> >>  	mrs	x2, mdcr_el2
+> >> @@ -912,6 +921,28 @@ __restore_fpsimd:
+> >>  	restore_fpsimd
+> >>  	ret
+> >>  
+> >> +switch_to_guest_fpsimd:
+> >> +	push	x4, lr
+> >> +
+> >> +	mrs	x2, cptr_el2
+> >> +	bic	x2, x2, #CPTR_EL2_TFP
+> >> +	msr	cptr_el2, x2
+> >> +
+> >> +	mrs	x0, tpidr_el2
+> >> +
+> >> +	ldr	x2, [x0, #VCPU_HOST_CONTEXT]
+> >> +	kern_hyp_va x2
+> >> +	bl __save_fpsimd
+> >> +
+> >> +	add	x2, x0, #VCPU_CONTEXT
+> >> +	bl __restore_fpsimd
+> >> +
+> >> +	pop	x4, lr
+> >> +	pop	x2, x3
+> >> +	pop	x0, x1
+> >> +
+> >> +	eret
+> >> +
+> >>  /*
+> >>   * u64 __kvm_vcpu_run(struct kvm_vcpu *vcpu);
+> >>   *
+> >> @@ -932,7 +963,6 @@ ENTRY(__kvm_vcpu_run)
+> >>  	kern_hyp_va x2
+> >>  
+> >>  	save_host_regs
+> >> -	bl __save_fpsimd
+> >>  	bl __save_sysregs
+> >>  
+> >>  	compute_debug_state 1f
+> >> @@ -948,7 +978,6 @@ ENTRY(__kvm_vcpu_run)
+> >>  	add	x2, x0, #VCPU_CONTEXT
+> >>  
+> >>  	bl __restore_sysregs
+> >> -	bl __restore_fpsimd
+> >>  
+> >>  	skip_debug_state x3, 1f
+> >>  	bl	__restore_debug
+> >> @@ -967,7 +996,9 @@ __kvm_vcpu_return:
+> >>  	add	x2, x0, #VCPU_CONTEXT
+> >>  
+> >>  	save_guest_regs
+> >> +	skip_fpsimd_state x3, 1f
+> >>  	bl __save_fpsimd
+> >> +1:
+> >>  	bl __save_sysregs
+> >>  
+> >>  	skip_debug_state x3, 1f
+> >> @@ -986,7 +1017,11 @@ __kvm_vcpu_return:
+> >>  	kern_hyp_va x2
+> >>  
+> >>  	bl __restore_sysregs
+> >> +	skip_fpsimd_state x3, 1f
+> >>  	bl __restore_fpsimd
+> >> +1:
+> >> +	/* Clear FPSIMD and Trace trapping */
+> >> +	msr     cptr_el2, xzr
+> > 
+> > why not simply move the deactivate_traps down here instead?
+> 
+> Putting deactivate_traps there  trashes x2, setup earlier
+> to restore debug, host registers from host context
+> 
+> Do we want deactivate_traps to use another register and
+> move the macro there? Or leave as is?
+> 
+There was some clean symmetry in the code by using deactivate traps, but
+given this, I don't care strongly which way we end up doing it.
 
-Yes, this fixes the lockdep issue with HRTIMERS.
-
-For completeness, it does not fix the freeze without HRTIMERS.
-
-Thanks Russell!
-
-Tested-by: Wolfram Sang <wsa+renesas@sang-engineering.com>
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150703/1b52aad7/attachment.sig>
+Thanks,
+-Christoffer
