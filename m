@@ -1,19 +1,141 @@
-From: matthias.bgg@gmail.com (Matthias Brugger)
-Date: Sat, 04 Jul 2015 00:15:43 +0200
-Subject: [PATCH v2 2/4] dt-bindings: ARM: Mediatek: Document devicetree
- bindings for spi bus
-In-Reply-To: <1435583070-9600-3-git-send-email-leilk.liu@mediatek.com>
-References: <1435583070-9600-1-git-send-email-leilk.liu@mediatek.com>
- <1435583070-9600-3-git-send-email-leilk.liu@mediatek.com>
-Message-ID: <1791305.A5zNADo8Wb@ubix>
+From: sjg@chromium.org (Simon Glass)
+Date: Fri, 3 Jul 2015 17:06:44 -0600
+Subject: [PATCH] ARM: tegra: Enable TPM on tegra124 nyan boards
+In-Reply-To: <CAPnjgZ1o-DvWjJqkEjwbxKxx_0L7p1k8Mc58boqjHQEGh=yj3A@mail.gmail.com>
+References: <1431526427-13340-1-git-send-email-sjg@chromium.org>
+ <5553637C.5010506@wwwdotorg.org>
+ <CAAObsKCxFJA=6kyHM5rtpJMVRZRDbBO3KSn+QdNoOQz1rXCWTQ@mail.gmail.com>
+ <5554AD0B.1060106@wwwdotorg.org>
+ <CAPnjgZ2QrTu=D_AapTded+_NR1waZTbNoN8rCtHnTdd0OdnwLA@mail.gmail.com>
+ <5554C399.4060807@wwwdotorg.org>
+ <CAPnjgZ1o-DvWjJqkEjwbxKxx_0L7p1k8Mc58boqjHQEGh=yj3A@mail.gmail.com>
+Message-ID: <CAPnjgZ2-BXqdee1WwRgj5nUkqdGdBJJ0Lz135J1FxdDUo4K-cQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday, June 29, 2015 09:04:28 PM Leilk Liu wrote:
-> Signed-off-by: Leilk Liu <leilk.liu@mediatek.com>
-> ---
+Hi,
 
-Please add a proper patch description.
+On 14 May 2015 at 10:30, Simon Glass <sjg@chromium.org> wrote:
+> Hi Stephen,
+>
+> On 14 May 2015 at 09:47, Stephen Warren <swarren@wwwdotorg.org> wrote:
+>>
+>> On 05/14/2015 08:28 AM, Simon Glass wrote:
+>>>
+>>> Hi Stephen,
+>>>
+>>> On 14 May 2015 at 08:11, Stephen Warren <swarren@wwwdotorg.org> wrote:
+>>>>
+>>>> On 05/14/2015 07:09 AM, Tomeu Vizoso wrote:
+>>>>>
+>>>>>
+>>>>> On 13 May 2015 at 16:45, Stephen Warren <swarren@wwwdotorg.org> wrote:
+>>>>>>
+>>>>>>
+>>>>>> On 05/13/2015 08:13 AM, Simon Glass wrote:
+>>>>>>>
+>>>>>>>
+>>>>>>>
+>>>>>>> Regenerate the pinmux from the latest tegra-pinmux-scripts.
+>>>>>>
+>>>>>>
+>>>>>>
+>>>>>>
+>>>>>> (Dropping most CCs; DT maintainers and lists generally don't get CC'd on
+>>>>>> simple DT content changes but rather on schema adds/changes and perhaps
+>>>>>> major DT content changes depending on context)
+>>>>>>
+>>>>>>> diff --git a/arch/arm/boot/dts/tegra124-nyan-big.dts
+>>>>>>> b/arch/arm/boot/dts/tegra124-nyan-big.dts
+>>>>>>
+>>>>>>
+>>>>>>
+>>>>>>
+>>>>>>>                   pinctrl-names = "default";
+>>>>>>>                   pinctrl-0 = <&pinmux_default>;
+>>>>>>>
+>>>>>>> -               pinmux_default: common {
+>>>>>>> +               state_default: pinmux {
+>>>>>>
+>>>>>>
+>>>>>>
+>>>>>>
+>>>>>> This change will break compilation, since it changes the label name, yet
+>>>>>> the
+>>>>>> old name is still referenced in pinctrl-0 above. Same applies in the
+>>>>>> other
+>>>>>> file too.
+>>>>>>
+>>>>>>> diff --git a/arch/arm/boot/dts/tegra124-nyan-blaze.dts
+>>>>>>> b/arch/arm/boot/dts/tegra124-nyan-blaze.dts
+>>>>>>
+>>>>>>
+>>>>>>
+>>>>>>
+>>>>>>> @@ -437,18 +437,18 @@
+>>>>>>>                           usb_vbus_en0_pn4 {
+>>>>>>>                                   nvidia,pins = "usb_vbus_en0_pn4";
+>>>>>>>                                   nvidia,function = "usb";
+>>>>>>> -                               nvidia,pull = <TEGRA_PIN_PULL_UP>;
+>>>>>>> +                               nvidia,pull = <TEGRA_PIN_PULL_NONE>;
+>>>>>>>                                   nvidia,tristate = <TEGRA_PIN_DISABLE>;
+>>>>>>>                                   nvidia,enable-input =
+>>>>>>> <TEGRA_PIN_ENABLE>;
+>>>>>>> -                               nvidia,open-drain = <TEGRA_PIN_DISABLE>;
+>>>>>>> +                               nvidia,open-drain = <TEGRA_PIN_ENABLE>;
+>>>>>>>                           };
+>>>>>>>                           usb_vbus_en1_pn5 {
+>>>>>>>                                   nvidia,pins = "usb_vbus_en1_pn5";
+>>>>>>>                                   nvidia,function = "usb";
+>>>>>>> -                               nvidia,pull = <TEGRA_PIN_PULL_UP>;
+>>>>>>> +                               nvidia,pull = <TEGRA_PIN_PULL_NONE>;
+>>>>>>>                                   nvidia,tristate = <TEGRA_PIN_DISABLE>;
+>>>>>>>                                   nvidia,enable-input =
+>>>>>>> <TEGRA_PIN_ENABLE>;
+>>>>>>> -                               nvidia,open-drain = <TEGRA_PIN_DISABLE>;
+>>>>>>> +                               nvidia,open-drain = <TEGRA_PIN_ENABLE>;
+>>>>>>>                           };
+>>>>>>
+>>>>>>
+>>>>>>
+>>>>>>
+>>>>>> Tomeu, can you comment on those changes? Evidently the pinmux
+>>>>>> configuration
+>>>>>> that's you added to the kernel doesn't exactly match the pinmux
+>>>>>> configuration that you added to tegra-pinmux-scripts.
+>>>>>
+>>>>>
+>>>>>
+>>>>> Are you sure? Just checked and what tegra-pinmux-scripts currently
+>>>>> generates matches what is currently in the kernel, for both nyans.
+>>>>
+>>>>
+>>>>
+>>>> My apologies; you're correct.
+>>>>
+>>>> This patch to the kernel DTs includes changes that aren't generated by
+>>>> either current tegra-pinmux-scripts, nor by tegra-pinmux-scripts with
+>>>> Simon's "[pinmux scripts PATCH] Support TPM on nyan boards" applied. Simon,
+>>>> can you double-check you didn't have any local patches to
+>>>> tegra-pinmux-scripts applied when you generated the DT content for this
+>>>> patch?
+>>>
+>>>
+>>> Yes. Apart from my patch the top commit is 39af.
+>>
+>>
+>> OK, did you paste the same DT content into both DTs then, instead of generating each DT separately?
+>>
+>
+> Not intentionally, but I wonder if I failed to change the board parameter?
+>
+>> When I re-generate the DT using commit 39af, I don't get any changes to usb_vbus_en*.
+>
+> I can't explain that. I'll try it again when I get a chance.
 
-Cheers,
-Matthias
+It doesn't seem to happen now, I must have done something wrong.
+
+I'll send a v2 patch.
+
+Regards,
+Simon
