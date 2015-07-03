@@ -1,39 +1,91 @@
-From: peter.maydell@linaro.org (Peter Maydell)
-Date: Fri, 3 Jul 2015 09:12:01 +0100
-Subject: [PATCH] arm64/kvm: Add generic v8 KVM target
-In-Reply-To: <559642EE.1050605@arm.com>
-References: <1434531646-4873-1-git-send-email-suzuki.poulose@arm.com>
- <CAFEAcA92uymQ3LjPQnuFiwvjSgc+jY54VrfK_Sh4v1DJ+=OPpw@mail.gmail.com>
- <558A6A84.5020603@arm.com> <20150624085128.GA22785@cbox>
- <558A7936.7020109@arm.com>
- <20150625123034.GE28244@cbox> <558BF6C9.3000009@arm.com>
- <558C05A9.8080201@arm.com>
- <CAFEAcA_ULz=ugQW=NmthzqYRtvcfwteQTh0DonHRN6U5NykEtQ@mail.gmail.com>
- <20150626095318.GG28244@cbox>
- <F37C68A5-E48F-462C-AD18-0F3C096348C7@caviumnetworks.com>
- <559180CA.3050905@arm.com>
- <CAFEAcA-E+KdiL4suQ0DoEvB-zGpNZ7-dq46FegC_iXYRPvo9jA@mail.gmail.com>
- <559185D4.7060308@arm.com>
- <85D36B67-643B-407F-944F-D18D54FF9909@caviumnetworks.com>
- <D805D093-CCFE-4835-853A-B2654DAA10A1@caviumnetworks.com>
- <559642EE.1050605@arm.com>
-Message-ID: <CAFEAcA8nt7yr0K4QesJjWqEwBgziWOt2DViY70E=z2wjt=X7XA@mail.gmail.com>
+From: stefan@agner.ch (Stefan Agner)
+Date: Fri, 03 Jul 2015 10:10:12 +0200
+Subject: [PATCH 39/41] clocksource: vf_pit: Migrate to new 'set-state'
+ interface
+In-Reply-To: <c9f030f57a10c1be00f8732ae2190fcc55248db5.1434622147.git.viresh.kumar@linaro.org>
+References: <cover.1434622147.git.viresh.kumar@linaro.org>
+ <c9f030f57a10c1be00f8732ae2190fcc55248db5.1434622147.git.viresh.kumar@linaro.org>
+Message-ID: <19859bd18fb69fa1f10c07de01b2259d@agner.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 3 July 2015 at 09:08, Marc Zyngier <marc.zyngier@arm.com> wrote:
-> On 02/07/15 21:29, Chalamarla, Tirumalesh wrote:
->> is there a chance that this get merged in to 4.2? if not is it possible
->> to accept the other patches like adding implementations explicitly(like
->> Thunder).
->
-> We first need to reach a conclusion on this. Until then, I don't plan to
-> get anything in. As for 4.2, it feels way too late (the merge window is
-> almost closed now).
+On 2015-06-18 12:54, Viresh Kumar wrote:
+> Migrate vf_pit driver to the new 'set-state' interface provided by
+> clockevents core, the earlier 'set-mode' interface is marked obsolete
+> now.
+> 
+> This also enables us to implement callbacks for new states of clockevent
+> devices, for example: ONESHOT_STOPPED.
+> 
+> Cc: Jingchang Lu <b35083@freescale.com>
+> Cc: Stefan Agner <stefan@agner.ch>
+> Cc: Shawn Guo <shawn.guo@linaro.org>
+> Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
+> ---
+>  drivers/clocksource/vf_pit_timer.c | 27 ++++++++++++---------------
+>  1 file changed, 12 insertions(+), 15 deletions(-)
+> 
+> diff --git a/drivers/clocksource/vf_pit_timer.c
+> b/drivers/clocksource/vf_pit_timer.c
+> index b45ac6229b57..f07ba9932171 100644
+> --- a/drivers/clocksource/vf_pit_timer.c
+> +++ b/drivers/clocksource/vf_pit_timer.c
+> @@ -86,20 +86,16 @@ static int pit_set_next_event(unsigned long delta,
+>  	return 0;
+>  }
+>  
+> -static void pit_set_mode(enum clock_event_mode mode,
+> -				struct clock_event_device *evt)
+> +static int pit_shutdown(struct clock_event_device *evt)
+>  {
+> -	switch (mode) {
+> -	case CLOCK_EVT_MODE_PERIODIC:
+> -		pit_set_next_event(cycle_per_jiffy, evt);
+> -		break;
+> -	case CLOCK_EVT_MODE_SHUTDOWN:
+> -	case CLOCK_EVT_MODE_UNUSED:
+> -		pit_timer_disable();
+> -		break;
+> -	default:
+> -		break;
+> -	}
+> +	pit_timer_disable();
+> +	return 0;
+> +}
+> +
+> +static int pit_set_periodic(struct clock_event_device *evt)
+> +{
+> +	pit_set_next_event(cycle_per_jiffy, evt);
+> +	return 0;
+>  }
+>  
+>  static irqreturn_t pit_timer_interrupt(int irq, void *dev_id)
+> @@ -114,7 +110,7 @@ static irqreturn_t pit_timer_interrupt(int irq,
+> void *dev_id)
+>  	 * and start the counter again. So software need to disable the timer
+>  	 * to stop the counter loop in ONESHOT mode.
+>  	 */
+> -	if (likely(evt->mode == CLOCK_EVT_MODE_ONESHOT))
+> +	if (likely(clockevent_state_oneshot(evt)))
+>  		pit_timer_disable();
+>  
+>  	evt->event_handler(evt);
+> @@ -125,7 +121,8 @@ static irqreturn_t pit_timer_interrupt(int irq,
+> void *dev_id)
+>  static struct clock_event_device clockevent_pit = {
+>  	.name		= "VF pit timer",
+>  	.features	= CLOCK_EVT_FEAT_PERIODIC | CLOCK_EVT_FEAT_ONESHOT,
+> -	.set_mode	= pit_set_mode,
+> +	.set_state_shutdown = pit_shutdown,
+> +	.set_state_periodic = pit_set_periodic,
 
-I would still like to see the proponents of this patch say
-what their model is for userspace support of cross-host migration,
-if we're abandoning the model the current API envisages.
+I'm not really familiar with the interface, but given that we announce
+the feature CLOCK_EVT_FEAT_ONESHOT shouldn't we add a set_state_oneshot
+callback here?
 
-thanks
--- PMM
+--
+Stefan
+
+>  	.set_next_event	= pit_set_next_event,
+>  	.rating		= 300,
+>  };
