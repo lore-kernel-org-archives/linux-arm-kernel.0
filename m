@@ -1,336 +1,110 @@
-From: tfiga@chromium.org (Tomasz Figa)
-Date: Fri, 3 Jul 2015 18:58:44 +0900
-Subject: [PATCH v2 3/5] drm/rockchip: vop: support plane scale
-In-Reply-To: <55965344.5050502@rock-chips.com>
+From: mark.yao@rock-chips.com (Mark yao)
+Date: Fri, 03 Jul 2015 18:08:31 +0800
+Subject: [PATCH v2 5/5] drm/rockchip: default enable win2/3 area0 bit
+In-Reply-To: <CAAFQd5BCT_j1ZxMaaA-qaFct6+-VTJs4mEsZzGuFc=nL9jGNDA@mail.gmail.com>
 References: <1435313249-4549-1-git-send-email-mark.yao@rock-chips.com>
- <1435313249-4549-4-git-send-email-mark.yao@rock-chips.com>
- <CAAFQd5A2j7MXrzOMVnsJr_WUKAFPaicv+r9LgwHccLim4fRk8g@mail.gmail.com>
- <55965344.5050502@rock-chips.com>
-Message-ID: <CAAFQd5B3NnUQRqdaXUz6BGCn-5rh1iXnfZXnQRDK3=nF_Ya7SA@mail.gmail.com>
+ <1435313432-4923-1-git-send-email-mark.yao@rock-chips.com>
+ <CAAFQd5D4W1+ShB4zpSJrBiFYWh21axJoGoQ77NwXzhSRapysgA@mail.gmail.com>
+ <5596457F.5090601@rock-chips.com>
+ <CAAFQd5BCT_j1ZxMaaA-qaFct6+-VTJs4mEsZzGuFc=nL9jGNDA@mail.gmail.com>
+Message-ID: <55965F1F.9090301@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 3, 2015 at 6:17 PM, Mark yao <mark.yao@rock-chips.com> wrote:
->>> +static void _vop_cal_scl_fac(struct vop *vop, const struct vop_win_data
->>> *win,
->>> +                            uint32_t src_w, uint32_t src_h, uint32_t
->>> dst_w,
->>> +                            uint32_t dst_h, uint32_t pixel_format)
->>> +{
->>> +       uint16_t yrgb_hor_scl_mode = SCALE_NONE;
->>> +       uint16_t yrgb_ver_scl_mode = SCALE_NONE;
->>> +       uint16_t cbr_hor_scl_mode = SCALE_NONE;
->>> +       uint16_t cbr_ver_scl_mode = SCALE_NONE;
->>> +       uint16_t yrgb_hsd_mode = SCALE_DOWN_BIL;
->>> +       uint16_t cbr_hsd_mode = SCALE_DOWN_BIL;
->>> +       uint16_t yrgb_vsd_mode = SCALE_DOWN_BIL;
->>> +       uint16_t cbr_vsd_mode = SCALE_DOWN_BIL;
->>
->> No code seems to be assigning the 4 variables above. Is some code
->> missing or they are simply constants and they (and code checking their
->> values) are not necessary?
->
-> those value directly write to the vop regs, it's necessary.
->
-
-Couldn't the constants (SCALE_DOWN_BIL) be written directly without
-introducing unnecessary variables?
-
->>> +       uint16_t yrgb_vsu_mode = SCALE_UP_BIL;
->>> +       uint16_t cbr_vsu_mode = SCALE_UP_BIL;
->>> +       uint16_t scale_yrgb_x = 1 << SCL_FT_DEFAULT_FIXPOINT_SHIFT;
->>> +       uint16_t scale_yrgb_y = 1 << SCL_FT_DEFAULT_FIXPOINT_SHIFT;
->>> +       uint16_t scale_cbcr_x = 1 << SCL_FT_DEFAULT_FIXPOINT_SHIFT;
->>> +       uint16_t scale_cbcr_y = 1 << SCL_FT_DEFAULT_FIXPOINT_SHIFT;
->>> +       int hsub = drm_format_horz_chroma_subsampling(pixel_format);
->>> +       int vsub = drm_format_vert_chroma_subsampling(pixel_format);
->>> +       bool is_yuv = is_yuv_support(pixel_format);
->>> +       uint16_t vsd_yrgb_gt4 = 0;
->>> +       uint16_t vsd_yrgb_gt2 = 0;
->>> +       uint16_t vsd_cbr_gt4 = 0;
->>> +       uint16_t vsd_cbr_gt2 = 0;
->>> +       uint16_t yrgb_src_w = src_w;
->>> +       uint16_t yrgb_src_h = src_h;
->>> +       uint16_t yrgb_dst_w = dst_w;
->>> +       uint16_t yrgb_dst_h = dst_h;
->>> +       uint16_t cbcr_src_w;
->>> +       uint16_t cbcr_src_h;
->>> +       uint16_t cbcr_dst_w;
->>> +       uint16_t cbcr_dst_h;
->>> +       uint32_t vdmult;
->>> +       uint16_t lb_mode;
->>
->> The amount of local variables suggests that this function needs to be
->> split into several smaller ones.
->>
->> By the way, do you need to initialize all of them? GCC will at least
->> warn (if not error out) if an unitialized variable is referenced, so
->> it's enough to make sure that the code correctly covers all branch
->> paths, which is actually better for the code than to rely on default
->> value.
->
-> Yeah, some value directly write to the vop, some value gcc report the warn,
-> so initialize them.
-
-IMHO in many cases it's better to make sure that the code properly
-assigns to them, because otherwise the default value might be used
-inadvertently.
-
+On 2015?07?03? 17:24, Tomasz Figa wrote:
+> On Fri, Jul 3, 2015 at 5:19 PM, Mark yao <mark.yao@rock-chips.com> wrote:
+>> On 2015?07?03? 16:02, Tomasz Figa wrote:
+>>> Hi Mark,
 >>>
->>> +
->>> +       if (((yrgb_dst_w << 3) <= yrgb_src_w) ||
->>> +           ((yrgb_dst_h << 3) <= yrgb_src_h) ||
+>>> Please see my comments inline.
+>>>
+>>> On Fri, Jun 26, 2015 at 7:10 PM, Mark Yao <mark.yao@rock-chips.com> wrote:
+>>>> Win2/3 support 4 area display, but now havn't found a suitable
+>>>> way to use it, and it enable by win gate and area gate,
+>>>> so default enable area0 gate, so that its behaviour just like a
+>>>> win.
+>>> So I assume this means that currently, without those bits set, win2
+>>> and win3 do not work? This would make this patch a fix maybe even with
+>>> a potential backportability.
 >>
->> Hmm, if this is enforcing the maximum downscaling factor, then
->> wouldn't it be more readable to write like this:
+>> Yes, without this patch, all win2/3 area gate default disabled.
+>> vop_update_plane_event call win enable only enable the win gate.
 >>
->> yrgb_src_w >= 8 * yrgb_dst_w
 >>
->> Also is >= correct here? Is the maximum factor less than 8?
->
-> yrgb_src_w >= 8 * yrgb_dst_w means we can't scale down exceed 8,
-> means that (src_w)1920->(dst_w)240 is wrong.
-
->= means that the factor exceeds _or_equals_ 8, which means that scale factor 8 is not allowed. However the value passed to drm_plane_helper_check_update() as max_scale is 8, which permits 8.
-
->>> +               if (cbcr_src_w < cbcr_dst_w)
->>> +                       cbr_hor_scl_mode = SCALE_UP;
->>> +               else if (cbcr_src_w > cbcr_dst_w)
->>> +                       cbr_hor_scl_mode = SCALE_DOWN;
->>> +
->>> +               if (cbcr_src_h < cbcr_dst_h)
->>> +                       cbr_ver_scl_mode = SCALE_UP;
->>> +               else if (cbcr_src_h > cbcr_dst_h)
->>> +                       cbr_ver_scl_mode = SCALE_DOWN;
+>>>> Signed-off-by: Mark Yao <mark.yao@rock-chips.com>
+>>>> ---
+>>>> Changes in v2: None
+>>>>
+>>>>    drivers/gpu/drm/rockchip/rockchip_drm_vop.c |    6 ++++++
+>>>>    1 file changed, 6 insertions(+)
+>>>>
+>>>> diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
+>>>> b/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
+>>>> index 40107bb..e001d26 100644
+>>>> --- a/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
+>>>> +++ b/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
+>>>> @@ -337,6 +337,12 @@ static const struct vop_reg_data
+>>>> vop_init_reg_table[] = {
+>>>>           {DSP_CTRL0, 0x00000000},
+>>>>           {WIN0_CTRL0, 0x00000080},
+>>>>           {WIN1_CTRL0, 0x00000080},
+>>>> +       /*
+>>>> +        * Todo: win2/3 support area func, but now havn't found a
+>>>> suitable
+>>>> +        * way to use it, so default enable area0 as a win display.
+>>> TODO: Win2/3 support multiple area function, but we haven't found
+>>> a suitable way to use it yet, so let's just use them as other windows
+>>> with only area 0 enabled.
+>>>
+>>>> +        */
+>>>> +       {WIN2_CTRL0, 0x00000010},
+>>>> +       {WIN3_CTRL0, 0x00000010},
+>>> Anyway, is it enough to program those registers one time in
+>>> vop_initial()? Won't they get cleared when VOP is power cycled, e.g.
+>>> in case of DPMS off and on? Maybe instead this could be done in
+>>> vop_update_plane_event() for windows that need it?
+>> There are two gate for Win2/3,
+>> at VOP_WIN3_CTRL0:
+>>          bit[0], "win3_en"
+>>              this gating all the area.
 >>
->> Aren't the scl_modes for CbCr planes always the same as for Y plane?
->
->
-> No, such as src(1920 x 1080) -> dst(1280x800), yuv format is NV12.
-> so Y plane horizontal and vertical is scale down.
->
-> but src_w = 1920 / 2 = 960 < 1280
->       src_h = 1080 / 2 = 540 < 800.
->
-> So Cbcr horizontal and vertical is scale up.
-
-Sorry, I don't follow.
-
-If we scale down Y plane in NV12 from 1920x1080 to 1280x800, then
-original CbCr plane will be 960x540 and destination CbCr plane will be
-640x400 (because CbCr plane of NV12 is subsampled 2x2, which is half
-the width and half the height of Y plane), so both planes are being
-scaled down.
-
->>> +
->>> +       switch (lb_mode) {
->>> +       case LB_YUV_3840X5:
->>> +       case LB_YUV_2560X8:
->>> +       case LB_RGB_1920X5:
->>> +       case LB_RGB_1280X8:
->>> +               yrgb_vsu_mode = SCALE_UP_BIC;
->>> +               cbr_vsu_mode  = SCALE_UP_BIC;
+>>          bit[4], win3_mst0_en
+>>          bit[5], win3_mst1_en
+>>          bit[6], win3_mst2_en
+>>          bit[7], win3_mst3_en
+>>              those gate each area.
 >>
->> I might be overlooking something, but don't  yrgb_vsu_mode and
->> cbr_vsu_mode always have the same values?
->
->
-> Hmm, yrgb_vsu_mode and cbr_vsu_mode mean different vop config, OK, I think
-> it can merge
-> together.
-
-Even though they are different registers bitfields, if they always
-have the same values, there is no need to create variables just
-because of that. IMHO the cleanest way would be to just create a
-single value called vsu_mode and use it for both planes.
-
->
->>> +               break;
->>> +       case LB_RGB_2560X4:
->>> +               yrgb_vsu_mode = SCALE_UP_BIL;
->>> +               cbr_vsu_mode  = SCALE_UP_BIL;
->>> +               break;
->>> +       default:
->>> +               DRM_ERROR("unsupport lb_mode:%d\n", lb_mode);
->>> +               break;
->>> +       }
+>> This patch default enable win3_mst0_en, so control bit[0]"win3_en" that cat
+>> power on/off this window.
 >>
->> Anyway, this whole switch is a candidate for a helper function.
->
->
-> This only use one time, it's ok to be a helper function?
->
-
-I think so, because it will make this function stay at reasonable
-length. (Please see Chapter 6: Functions of Documentation/CodingStyle
-for more details.)
-
->>> +                       break;
->>> +               }
->>> +               break;
->>> +       case SCALE_DOWN:
->>> +               switch (yrgb_vsd_mode) {
->>> +               case SCALE_DOWN_BIL:
->>> +                       vdmult = _get_vskiplines(yrgb_src_h, yrgb_dst_h);
->>> +                       scale_yrgb_y =
->>> GET_SCL_FT_BILI_DN_VSKIP(yrgb_src_h,
->>> +
->>> yrgb_dst_h,
->>> +                                                               vdmult);
->>> +                       if (vdmult == 4) {
->>> +                               vsd_yrgb_gt4 = 1;
->>> +                               vsd_yrgb_gt2 = 0;
->>> +                       } else if (vdmult == 2) {
->>> +                               vsd_yrgb_gt4 = 0;
->>> +                               vsd_yrgb_gt2 = 1;
->>> +                       }
+>> vop_update_plane_event()/ vop_disable_plane() only can control
+>> bit[0]"win3_en".
 >>
->> How about something like this:
 >>
->> vsd_yrgb_gt4 = (vdmult == 4);
->> vsd_yrgb_gt2 = (vdmult == 2);
+>> So this patch is enough to enable window2/3 area 0.
+> That's right. However, the vop_init_reg_table[] is only used at probe
+> time by vop_initial() and register settings listed there are not
+> applied any time later. If we call DPMS off, which will turn the VOP
+> off and in turn also the whole power domain off, won't the registers
+> be reset to default values (e.g. zeroed)?
+Right, the vop registers would be reset to default values when power 
+domain off.
+
+But the cursor can works after resume. because the initial value save to 
+the regbak cache,
+and cursor area gate, win gate are at the same regs, so it can be 
+restore when do cursor enable.
+
+But if we add other regs, this may cause bug, maybe no one restore them.
+So I think we need do like under to force restore all the regs when resume:
+     memcpy(vop->regs, vop->regsbak, vop->len);
+
+> Best regards,
+> Tomasz
 >
 >
-> But I think it's not easy to read.
 >
 
-OK. Either is fine for me.
 
-I thought this way of coding would represent more closely what the
-hardware seems to expect (gt4 for vdmult == 2 and gt2 for vdmult ==
-4).
-
->>> +       /*
->>> +        * (2.1)CBCR HOR SCALE FACTOR
->>> +        */
->>> +       switch (cbr_hor_scl_mode) {
->>> +       case SCALE_UP:
->>> +               scale_cbcr_x = GET_SCL_FT_BIC(cbcr_src_w, cbcr_dst_w);
->>> +               break;
->>> +       case SCALE_DOWN:
->>> +               switch (cbr_hsd_mode) {
->>> +               case SCALE_DOWN_BIL:
->>> +                       scale_cbcr_x = GET_SCL_FT_BILI_DN(cbcr_src_w,
->>> +                                                         cbcr_dst_w);
->>> +                       break;
->>> +               case SCALE_DOWN_AVG:
->>> +                       scale_cbcr_x = GET_SCL_FT_AVRG(cbcr_src_w,
->>> cbcr_dst_w);
->>> +                       break;
->>> +               default:
->>> +                       DRM_ERROR("unsupport cbr_hsd_mode:%d\n",
->>> cbr_hsd_mode);
->>
->> Error.
->>
->>> +                       break;
->>> +               }
->>> +               break;
->>> +       }
->>
->> Isn't this switch exactly the same as for Y plane just with different
->> widths used? Also, wouldn't the values for CbCr plane be the same as
->> for Y plane?
->
->
-> But Cbcr case is not same as Y plane case,  how to merge?
->
-
-Hmm, could you point the differences? I don't see anything else than
-simple s/yrgb/cbcr/ in both parts of the code. Please correct me if
-I'm missing something.
-
->
->>> +
->>> +       /*
->>> +        * (2.2)CBCR VER SCALE FACTOR
->>> +        */
->>> +       switch (cbr_ver_scl_mode) {
->>> +       case SCALE_UP:
->>> +               switch (cbr_vsu_mode) {
->>> +               case SCALE_UP_BIL:
->>> +                       scale_cbcr_y = GET_SCL_FT_BILI_UP(cbcr_src_h,
->>> +                                                         cbcr_dst_h);
->>> +                       break;
->>> +               case SCALE_UP_BIC:
->>> +                       if (cbcr_src_h < 3)
->>> +                               DRM_ERROR("cbcr_src_h need greater than 3
->>> !\n");
->>> +                       scale_cbcr_y = GET_SCL_FT_BIC(cbcr_src_h,
->>> cbcr_dst_h);
->>> +                       break;
->>> +               default:
->>> +                       DRM_ERROR("unsupport cbr_vsu_mode:%d\n",
->>> cbr_vsu_mode);
->>
->> Error.
->>
->>> +                       break;
->>> +               }
->>> +               break;
->>> +       case SCALE_DOWN:
->>> +               switch (cbr_vsd_mode) {
->>> +               case SCALE_DOWN_BIL:
->>> +                       vdmult = _get_vskiplines(cbcr_src_h, cbcr_dst_h);
->>> +                       scale_cbcr_y =
->>> GET_SCL_FT_BILI_DN_VSKIP(cbcr_src_h,
->>> +
->>> cbcr_dst_h,
->>> +                                                               vdmult);
->>> +                       if (vdmult == 4) {
->>> +                               vsd_cbr_gt4 = 1;
->>> +                               vsd_cbr_gt2 = 0;
->>> +                       } else if (vdmult == 2) {
->>> +                               vsd_cbr_gt4 = 0;
->>> +                               vsd_cbr_gt2 = 1;
->>> +                       }
->>> +                       break;
->>> +               case SCALE_DOWN_AVG:
->>> +                       scale_cbcr_y = GET_SCL_FT_AVRG(cbcr_src_h,
->>> cbcr_dst_h);
->>> +                       break;
->>> +               default:
->>> +                       DRM_ERROR("unsupport cbr_vsd_mode:%d\n",
->>> cbr_vsd_mode);
->>> +                       break;
->>> +               }
->>> +               break;
->>> +       }
->>
->> Again, this looks like the values for CbCr would be the same as for Y.
->> Are there actually cases when they differ?
->
->
-> Hmm, Actually the cbcr calculations have some different with Y.
->
-
-Again I don't see any differences between those two blocks of code
-other than simple s/yrgb/cbcr/. Please correct me if I'm missing
-something.
-
->>> +
->>> +#define SCL_OFFSET_FIXPOINT_SHIFT      8
->>> +#define SCL_OFFSET_FIXPOINT(x) \
->>> +               ((INT32)((x) * (1 << SCL_OFFSET_FIXPOINT_SHIFT)))
->>
->> All of the function macros above: static inline. This should also let
->> you remove the casts.
->
-> what the "casts" mean? Why do you thinking that "static inline" is better
-> than "#define"?
-
-I mean typecasting, such as (INT32).
-
-Static inline provides built in type checking by compiler. So you
-specify types of arguments and return values and have this enforced at
-compilation time. Moreover, inline functions are just functions so
-have all the goodness of C parser, helping to avoid strange mistakes,
-such as missing parentheses around macro argument and mixing operator
-precedence because of that.
-
-Of course sometimes you just can't get away without using macros (such
-as the need of argument concatenation or stringification), but this
-case doesn't seem to be such.
-
-Best regards,
-Tomasz
+-- 
+?ark
