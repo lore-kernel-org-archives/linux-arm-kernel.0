@@ -1,104 +1,73 @@
-From: stefan@agner.ch (Stefan Agner)
-Date: Fri, 03 Jul 2015 15:50:11 +0200
-Subject: [PATCH v1 2/4] ARM: dts: vf500-colibri: Add device tree node for
- touchscreen support
-In-Reply-To: <2fa8c45a15acc7fdcf75611d46530a643858115d.1435646447.git.maitysanchayan@gmail.com>
-References: <cover.1435646447.git.maitysanchayan@gmail.com>
- <2fa8c45a15acc7fdcf75611d46530a643858115d.1435646447.git.maitysanchayan@gmail.com>
-Message-ID: <347f8e8a9ec4c71bab9713bc2e980ebb@agner.ch>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Fri, 3 Jul 2015 15:54:53 +0200
+Subject: [PATCH RFC 1/5] clk: mvebu: Add Armada 38x support for clk-cpu
+In-Reply-To: <1435903917-20486-2-git-send-email-gregory.clement@free-electrons.com>
+References: <1435903917-20486-1-git-send-email-gregory.clement@free-electrons.com>
+ <1435903917-20486-2-git-send-email-gregory.clement@free-electrons.com>
+Message-ID: <20150703135453.GI13481@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2015-06-30 08:54, Sanchayan Maity wrote:
-> Add device tree node for touchscreen support on Colibri VF50. The
-> touchscreen functionality on VF50 uses the ADC channels of Vybrid
-> and some GPIOs. Also add pinctrl nodes for proper pinmux.
+On Fri, Jul 03, 2015 at 08:11:53AM +0200, Gregory CLEMENT wrote:
+> This patch first shortens the registers definition and also introduces
+> difference between Armada XP value and Armada 38x value.
 > 
-> Signed-off-by: Sanchayan Maity <maitysanchayan@gmail.com>
+> Then it adds specific functions for Armada 38x in order to support cpu
+> freq on these SoCs.
+
+Hi Gregory
+
+I would suggest splitting this into two. Because of the #define
+changes, it is not easy to see the new functions from #define changes.
+
+> 
+> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
 > ---
->  arch/arm/boot/dts/vf500-colibri-eval-v3.dts |  4 +++
->  arch/arm/boot/dts/vf500-colibri.dtsi        | 46 +++++++++++++++++++++++++++++
->  2 files changed, 50 insertions(+)
+>  .../devicetree/bindings/clock/mvebu-cpu-clock.txt  |  27 ++-
+>  drivers/clk/mvebu/clk-cpu.c                        | 220 ++++++++++++++++-----
+>  2 files changed, 201 insertions(+), 46 deletions(-)
 > 
-> diff --git a/arch/arm/boot/dts/vf500-colibri-eval-v3.dts
-> b/arch/arm/boot/dts/vf500-colibri-eval-v3.dts
-> index 7fc782c..c5efb57 100644
-> --- a/arch/arm/boot/dts/vf500-colibri-eval-v3.dts
-> +++ b/arch/arm/boot/dts/vf500-colibri-eval-v3.dts
-> @@ -15,3 +15,7 @@
->  	model = "Toradex Colibri VF50 on Colibri Evaluation Board";
->  	compatible = "toradex,vf500-colibri_vf50-on-eval",
-> "toradex,vf500-colibri_vf50", "fsl,vf500";
+> diff --git a/Documentation/devicetree/bindings/clock/mvebu-cpu-clock.txt b/Documentation/devicetree/bindings/clock/mvebu-cpu-clock.txt
+> index 99c214660bdc..9272b3464ab1 100644
+> --- a/Documentation/devicetree/bindings/clock/mvebu-cpu-clock.txt
+> +++ b/Documentation/devicetree/bindings/clock/mvebu-cpu-clock.txt
+> @@ -1,10 +1,13 @@
+>  Device Tree Clock bindings for cpu clock of Marvell EBU platforms
+
+Maybe i'm reading the following hunk wrong, but....
+  
+>  Required properties:
+> -- compatible : shall be one of the following:
+> +- compatible : shall be the following:
+
+"one of the following" is grammatically better.
+
+>  	"marvell,armada-xp-cpu-clock" - cpu clocks for Armada XP
+> +	"marvell,armada-38x-cpu-clock", "marvell,armada-xp-cpu-clock" - cpu
+> +	clocks for Armada 38x
+
+and don't we now have marvell,armada-xp-cpu-clock twice?
+
+>  - reg : Address and length of the clock complex register set, followed
+> -        by address and length of the PMU DFS registers
+> +	by address and length of the PMU DFS registers, for Armada 38x
+> +	a third register set must be addeed: DFX server.
+>  - #clock-cells : should be set to 1.
+>  - clocks : shall be the input parent clock phandle for the clock.
+>  
+> @@ -20,3 +23,23 @@ cpu at 0 {
+>  	reg = <0>;
+>  	clocks = <&cpuclk 0>;
 >  };
 > +
-> +&touchctrl {
-> +	status = "okay";
-> +};
-> diff --git a/arch/arm/boot/dts/vf500-colibri.dtsi
-> b/arch/arm/boot/dts/vf500-colibri.dtsi
-> index cee34a3..4807a32 100644
-> --- a/arch/arm/boot/dts/vf500-colibri.dtsi
-> +++ b/arch/arm/boot/dts/vf500-colibri.dtsi
-> @@ -17,4 +17,50 @@
->  	memory {
->  		reg = <0x80000000 0x8000000>;
->  	};
+> +or for Armada38x
 > +
-> +	touchctrl: vf50_touchctrl {
-> +		compatible = "toradex,vf50-touchctrl";
-> +		io-channels = <&adc1 0>,<&adc0 0>,
-> +				<&adc0 1>,<&adc1 2>;
-> +		xp-gpios = <&gpio0 13 GPIO_ACTIVE_LOW>;
-> +		xm-gpios = <&gpio2 29 GPIO_ACTIVE_HIGH>;
-> +		yp-gpios = <&gpio0 12 GPIO_ACTIVE_LOW>;
-> +		ym-gpios = <&gpio0 4 GPIO_ACTIVE_HIGH>;
-> +		pen-detect-gpios = <&gpio0 8 GPIO_ACTIVE_HIGH>;
-> +		pen-pullup-gpios = <&gpio0 9 GPIO_ACTIVE_HIGH>;
-> +		pinctrl-names = "idle","default","gpios";
-> +		pinctrl-0 = <&pinctrl_touchctrl_idle>;
-> +		pinctrl-1 = <&pinctrl_touchctrl_default>;
-> +		pinctrl-2 = <&pinctrl_touchctrl_gpios>;
-> +		status = "disabled";
-> +	};
-> +};
-> +
-> +&iomuxc {
-> +	vf610-colibri {
-> +		pinctrl_touchctrl_idle: touchctrl_idle {
-> +			fsl,pins = <
-> +				VF610_PAD_PTA18__GPIO_8		0x206d
+> +cpuclk: clock-complex at 18700 {
+> +	compatible = "marvell,armada-380-cpu-clock",
+> +	"marvell,armada-xp-cpu-clock";
+> +	reg = <0x18700 0xA0>, <0x1c054 0x40>,
+> +	<0xe4260 0x8>;
 
-I think the detect pin should be in Hi-Z, not be pulled up. Probably the
-resistance over the plates is much smaller on pen down, hence it doesn't
-matter too much.
+Maybe this third address property could be better indented?
 
-> +				VF610_PAD_PTA19__GPIO_9		0x206d
-> +				>;
-> +		};
-> +
-> +		pinctrl_touchctrl_default: touchctrl_default {
-> +			fsl,pins = <
-> +				VF610_PAD_PTA18__ADC0_SE0	0x2060
-> +				VF610_PAD_PTA19__ADC0_SE1	0x2060
-> +				VF610_PAD_PTA16__ADC1_SE0	0x2060
-> +				VF610_PAD_PTB2__ADC1_SE2	0x2060
-> +				>;
-> +		};
-> +
-> +		pinctrl_touchctrl_gpios: touchctrl_gpios {
-> +			fsl,pins = <
-> +				VF610_PAD_PTA23__GPIO_13	0x22ed
-> +				VF610_PAD_PTB23__GPIO_93	0x22ed
-> +				VF610_PAD_PTA22__GPIO_12	0x22ed
-> +				VF610_PAD_PTA11__GPIO_4		0x22ed
-> +				>;
-> +		};
-
-Hm, those have pull-ups on too, since you set them as output in the
-drivers open function, I don't think this is necessary.
-
-> +	};
->  };
-
---
-Stefan
+      Andrew
