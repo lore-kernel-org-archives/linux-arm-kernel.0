@@ -1,31 +1,34 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Fri, 03 Jul 2015 15:45:41 +0100
-Subject: Possible regression due to "tick: broadcast: Prevent livelock
- from event handler"
-In-Reply-To: <20150703143703.GB19284@katana>
-References: <20150703024044.GB24695@verge.net.au>
- <20150703105441.GF1521@katana> <alpine.DEB.2.11.1507031511180.3916@nanos>
- <20150703133245.GA19284@katana> <alpine.DEB.2.11.1507031612410.3916@nanos>
- <20150703143703.GB19284@katana>
-Message-ID: <5596A015.1030709@arm.com>
+From: timur@codeaurora.org (Timur Tabi)
+Date: Fri, 3 Jul 2015 10:46:11 -0400
+Subject: [PATCH 2/4] hvc_dcc: don't ignore errors during initialization
+In-Reply-To: <55947DCD.1020605@codeaurora.org>
+References: <1435699387-32591-1-git-send-email-timur@codeaurora.org>
+ <1435699387-32591-2-git-send-email-timur@codeaurora.org>
+ <55947DCD.1020605@codeaurora.org>
+Message-ID: <42D8621F-E36D-4F4F-9143-3F7773EC834E@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Jul 1, 2015, at 7:54 PM, Stephen Boyd wrote:
 
+>> 
+>> +	/* Returns -1 if error */
+>> +	ret = hvc_instantiate(0, 0, &hvc_dcc_get_put_ops);
+>> +
+>> +	return ret < 0 ? -ENODEV : 0;
+> 
+> Why not just return the value that hvc_instantiate returns? And maybe we
+> should change those -1 in hvc_instantiate into -EPERM?
 
-On 03/07/15 15:37, Wolfram Sang wrote:
->
->> So this is a single core machine and uses the em_sti timer w/o the
->> broadcast nonsense. In Simons case it looks like em_sti is used as
->> broadcast device.
->
-> We use the same board. Just my kernel has SMP=n.
->
+Well, I didn't want to change common HVC code.  I would have to change all the other drivers that call hvc_instatiate as well.  I agree that returning -1 is bad, but fixing that is something that should be done in another patch.
 
-If it's UP build, then GENERIC_CLOCKEVENTS_BROADCAST is disabled. You
-may be hitting the issue I reported[1] and is still under discussion.
+>> 
+>> -	hvc_alloc(0, 0, &hvc_dcc_get_put_ops, 128);
+>> -	return 0;
+>> +	p = hvc_alloc(0, 0, &hvc_dcc_get_put_ops, 128);
+>> +
+>> +	return IS_ERR(p) ? PTR_ERR(p) : 0;
+> 
+> return PTR_ERR_OR_ZERO()?
 
-Regards,
-Sudeep
-
-[1] https://lkml.org/lkml/2015/6/25/271
+Yes, thanks.  I'll change it.
