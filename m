@@ -1,42 +1,27 @@
-From: stefan@agner.ch (Stefan Agner)
-Date: Fri, 03 Jul 2015 13:11:04 +0200
-Subject: [PATCH 39/41] clocksource: vf_pit: Migrate to new 'set-state'
- interface
-In-Reply-To: <20150703085749.GE23297@linux>
-References: <cover.1434622147.git.viresh.kumar@linaro.org>
- <c9f030f57a10c1be00f8732ae2190fcc55248db5.1434622147.git.viresh.kumar@linaro.org>
- <19859bd18fb69fa1f10c07de01b2259d@agner.ch> <20150703085749.GE23297@linux>
-Message-ID: <6a6d4ec3156cb00537ed632f60430a37@agner.ch>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 3 Jul 2015 12:13:58 +0100
+Subject: Possible regression due to "tick: broadcast: Prevent livelock
+ from event handler"
+In-Reply-To: <20150703110730.GG1521@katana>
+References: <20150703024044.GB24695@verge.net.au>
+ <20150703105441.GF1521@katana>
+ <20150703110249.GV7557@n2100.arm.linux.org.uk>
+ <20150703110730.GG1521@katana>
+Message-ID: <20150703111358.GW7557@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2015-07-03 10:57, Viresh Kumar wrote:
-> On 03-07-15, 10:10, Stefan Agner wrote:
->> >  	.features	= CLOCK_EVT_FEAT_PERIODIC | CLOCK_EVT_FEAT_ONESHOT,
->> > -	.set_mode	= pit_set_mode,
->> > +	.set_state_shutdown = pit_shutdown,
->> > +	.set_state_periodic = pit_set_periodic,
->>
->> I'm not really familiar with the interface, but given that we announce
->> the feature CLOCK_EVT_FEAT_ONESHOT shouldn't we add a set_state_oneshot
->> callback here?
+On Fri, Jul 03, 2015 at 01:07:31PM +0200, Wolfram Sang wrote:
+> > Please share your .config file for this case.  Thanks.
 > 
-> We weren't doing anything in pit_set_mode(ONESHOT) and so that
-> callback is not implemented. In case you need to do something in
-> set_state_oneshot(), we can add it back.
+> Here it goes...
 
-True, weren't doing anything. I wonder if that is right. Afaik, we
-should set the same timer for oneshot too, hence call
-pit_set_next_event. With your change we can just reuse the same function
-(pit_set_periodic) for set_state_oneshot.
+Please try:
 
-To maintain the atomicity of the changes, this would need to be fixed in
-a separate patch anyway. So this change looks good to me:
+sed -i s/IRQSOFF_TRACER/TRACE_IRQFLAGS/ arch/arm/kernel/entry-armv.S
 
-Acked-by: Stefan Agner <stefan@agner.ch>
+Thanks.
 
-I guess "clockevents: Allow set-state callbacks to be optional" makes it
-before this patch? Otherwise we would call a null pointer...
-
---
-Stefan
+-- 
+FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
+according to speedtest.net.
