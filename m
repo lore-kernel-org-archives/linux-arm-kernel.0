@@ -1,178 +1,81 @@
-From: m.smarduch@samsung.com (Mario Smarduch)
-Date: Fri, 03 Jul 2015 11:56:36 -0700
-Subject: [PATCH v3 1/2] arm64: KVM: Optimize arm64 skip 30-50% vfp/simd
- save/restore on exits
-In-Reply-To: <20150703115320.GA14220@lvm>
-References: <1435190652-5831-1-git-send-email-m.smarduch@samsung.com>
- <1435190652-5831-2-git-send-email-m.smarduch@samsung.com>
- <20150701134649.GG11332@cbox> <5595B27D.90201@samsung.com>
- <20150703115320.GA14220@lvm>
-Message-ID: <5596DAE4.1070701@samsung.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 3 Jul 2015 20:09:24 +0100
+Subject: RFC: default ioremap_*() variant defintions
+In-Reply-To: <20150703181709.GD7021@wotan.suse.de>
+References: <20150703181709.GD7021@wotan.suse.de>
+Message-ID: <20150703190924.GZ7557@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/03/2015 04:53 AM, Christoffer Dall wrote:
-> On Thu, Jul 02, 2015 at 02:51:57PM -0700, Mario Smarduch wrote:
->> On 07/01/2015 06:46 AM, Christoffer Dall wrote:
->>> On Wed, Jun 24, 2015 at 05:04:11PM -0700, Mario Smarduch wrote:
->>>> This patch only saves and restores FP/SIMD registers on Guest access. To do
->>>> this cptr_el2 FP/SIMD trap is set on Guest entry and later checked on exit.
->>>> lmbench, hackbench show significant improvements, for 30-50% exits FP/SIMD
->>>> context is not saved/restored
->>>>
->>>> Signed-off-by: Mario Smarduch <m.smarduch@samsung.com>
->>>> ---
->>>>  arch/arm64/include/asm/kvm_arm.h |    5 ++++-
->>>>  arch/arm64/kvm/hyp.S             |   46 +++++++++++++++++++++++++++++++++++---
->>>>  2 files changed, 47 insertions(+), 4 deletions(-)
->>>>
->>>> diff --git a/arch/arm64/include/asm/kvm_arm.h b/arch/arm64/include/asm/kvm_arm.h
->>>> index ac6fafb..7605e09 100644
->>>> --- a/arch/arm64/include/asm/kvm_arm.h
->>>> +++ b/arch/arm64/include/asm/kvm_arm.h
->>>> @@ -171,10 +171,13 @@
->>>>  #define HSTR_EL2_TTEE	(1 << 16)
->>>>  #define HSTR_EL2_T(x)	(1 << x)
->>>>  
->>>> +/* Hyp Coproccessor Trap Register Shifts */
->>>> +#define CPTR_EL2_TFP_SHIFT 10
->>>> +
->>>>  /* Hyp Coprocessor Trap Register */
->>>>  #define CPTR_EL2_TCPAC	(1 << 31)
->>>>  #define CPTR_EL2_TTA	(1 << 20)
->>>> -#define CPTR_EL2_TFP	(1 << 10)
->>>> +#define CPTR_EL2_TFP	(1 << CPTR_EL2_TFP_SHIFT)
->>>>  
->>>>  /* Hyp Debug Configuration Register bits */
->>>>  #define MDCR_EL2_TDRA		(1 << 11)
->>>> diff --git a/arch/arm64/kvm/hyp.S b/arch/arm64/kvm/hyp.S
->>>> index 5befd01..de0788f 100644
->>>> --- a/arch/arm64/kvm/hyp.S
->>>> +++ b/arch/arm64/kvm/hyp.S
->>>> @@ -673,6 +673,15 @@
->>>>  	tbz	\tmp, #KVM_ARM64_DEBUG_DIRTY_SHIFT, \target
->>>>  .endm
->>>>  
->>>> +/*
->>>> + * Check cptr VFP/SIMD accessed bit, if set VFP/SIMD not accessed by guest.
->>>
->>> This comment doesn't really help me understand the function, may I
->>> suggest:
->>>
->>> Branch to target if CPTR_EL2.TFP bit is set (VFP/SIMD trapping enabled)
->>
->> Yes actually describes what it does.
->>
->>>
->>>> + */
->>>> +.macro skip_fpsimd_state tmp, target
->>>> +	mrs	\tmp, cptr_el2
->>>> +	tbnz	\tmp, #CPTR_EL2_TFP_SHIFT, \target
->>>> +.endm
->>>> +
->>>> +
->>>>  .macro compute_debug_state target
->>>>  	// Compute debug state: If any of KDE, MDE or KVM_ARM64_DEBUG_DIRTY
->>>>  	// is set, we do a full save/restore cycle and disable trapping.
->>>> @@ -763,6 +772,7 @@
->>>>  	ldr     x2, [x0, #VCPU_HCR_EL2]
->>>>  	msr     hcr_el2, x2
->>>>  	mov	x2, #CPTR_EL2_TTA
->>>> +	orr     x2, x2, #CPTR_EL2_TFP
->>>>  	msr	cptr_el2, x2
->>>>  
->>>>  	mov	x2, #(1 << 15)	// Trap CP15 Cr=15
->>>> @@ -785,7 +795,6 @@
->>>>  .macro deactivate_traps
->>>>  	mov	x2, #HCR_RW
->>>>  	msr	hcr_el2, x2
->>>> -	msr	cptr_el2, xzr
->>>>  	msr	hstr_el2, xzr
->>>>  
->>>>  	mrs	x2, mdcr_el2
->>>> @@ -912,6 +921,28 @@ __restore_fpsimd:
->>>>  	restore_fpsimd
->>>>  	ret
->>>>  
->>>> +switch_to_guest_fpsimd:
->>>> +	push	x4, lr
->>>> +
->>>> +	mrs	x2, cptr_el2
->>>> +	bic	x2, x2, #CPTR_EL2_TFP
->>>> +	msr	cptr_el2, x2
->>>> +
->>>> +	mrs	x0, tpidr_el2
->>>> +
->>>> +	ldr	x2, [x0, #VCPU_HOST_CONTEXT]
->>>> +	kern_hyp_va x2
->>>> +	bl __save_fpsimd
->>>> +
->>>> +	add	x2, x0, #VCPU_CONTEXT
->>>> +	bl __restore_fpsimd
->>>> +
->>>> +	pop	x4, lr
->>>> +	pop	x2, x3
->>>> +	pop	x0, x1
->>>> +
->>>> +	eret
->>>> +
->>>>  /*
->>>>   * u64 __kvm_vcpu_run(struct kvm_vcpu *vcpu);
->>>>   *
->>>> @@ -932,7 +963,6 @@ ENTRY(__kvm_vcpu_run)
->>>>  	kern_hyp_va x2
->>>>  
->>>>  	save_host_regs
->>>> -	bl __save_fpsimd
->>>>  	bl __save_sysregs
->>>>  
->>>>  	compute_debug_state 1f
->>>> @@ -948,7 +978,6 @@ ENTRY(__kvm_vcpu_run)
->>>>  	add	x2, x0, #VCPU_CONTEXT
->>>>  
->>>>  	bl __restore_sysregs
->>>> -	bl __restore_fpsimd
->>>>  
->>>>  	skip_debug_state x3, 1f
->>>>  	bl	__restore_debug
->>>> @@ -967,7 +996,9 @@ __kvm_vcpu_return:
->>>>  	add	x2, x0, #VCPU_CONTEXT
->>>>  
->>>>  	save_guest_regs
->>>> +	skip_fpsimd_state x3, 1f
->>>>  	bl __save_fpsimd
->>>> +1:
->>>>  	bl __save_sysregs
->>>>  
->>>>  	skip_debug_state x3, 1f
->>>> @@ -986,7 +1017,11 @@ __kvm_vcpu_return:
->>>>  	kern_hyp_va x2
->>>>  
->>>>  	bl __restore_sysregs
->>>> +	skip_fpsimd_state x3, 1f
->>>>  	bl __restore_fpsimd
->>>> +1:
->>>> +	/* Clear FPSIMD and Trace trapping */
->>>> +	msr     cptr_el2, xzr
->>>
->>> why not simply move the deactivate_traps down here instead?
->>
->> Putting deactivate_traps there  trashes x2, setup earlier
->> to restore debug, host registers from host context
->>
->> Do we want deactivate_traps to use another register and
->> move the macro there? Or leave as is?
->>
-> There was some clean symmetry in the code by using deactivate traps, but
-> given this, I don't care strongly which way we end up doing it.
+On Fri, Jul 03, 2015 at 08:17:09PM +0200, Luis R. Rodriguez wrote:
+> The 0-day build bot detected a build issue on a patch not upstream yet that
+> makes a driver use iorempa_uc(), this call is now upstream but we have no
+> drivers yet using it, the patch in question makes the atyfb framebuffer
+> driver use it. The build issue was the lack of the ioremap_uc() call being
+> implemented on some non-x86 architectures.
 
-I agree. Also it probably makes more sense to keep the trap disable
-code together to match the trap enables, without objection from
-Marc I'll rework the patch, repost it after Monday.
+You have to be careful here.  We've been through this with ioremap_wt()
+which is incorrect for ARM as things stand at the moment (I have patches
+which adds documentation on this issue, and fixes ioremap_wt().)
 
-Thanks,
-- Mario
+The question is whether the allocated memory may have unaligned accesses
+performed on it - either intentionally, or unintentionally (eg, by GCC
+inlining memcpy().)
+
+If the answer to that question is yes or possibly yes, neither ioremap()
+nor ioremap_nocache() (which is, unfortunately, the same as ioremap() due
+to various documentation telling people to use it for devices) can be used
+for the mapping on ARM.
+
+So we can't go around adding new ioremap() variants and hoping that
+ioremap_nocache() is a safe default everywhere.  It isn't.
+
+> I *thought* I had added boiler plate code to map
+> the ioremap_uc() call to ioremap_nocache() for archs that do not already define
+> their own iorempa_uc() call, but upon further investigation it seems that was
+> not the case but found that this may be a bit different issue altogether.
 > 
-> Thanks,
-> -Christoffer
+> The way include/asm-generic/io.h works for ioremap() calls and its variants is:
 > 
+> #ifndef CONFIG_MMU                                                              
+> #ifndef ioremap                                                                 
+> #define ioremap ioremap                                                         
+> static inline void __iomem *ioremap(phys_addr_t offset, size_t size)            
+> {                                                                               
+>         return (void __iomem *)(unsigned long)offset;                           
+> }                                                                               
+> #endif 
+> ...
+> #define iounmap iounmap                                                         
+>                                                                                 
+> static inline void iounmap(void __iomem *addr)                                  
+> {                                                                               
+> }                                                                               
+> #endif                                                                          
+> #endif /* CONFIG_MMU */  
+
+I see you've been bitten by the gnome-terminal cut'n'paste bug with all those
+space characters above. ;)
+
+> That's the gist of it, but the catch here is the ioremap_*() variants and where
+> they are defined. The first variant is ioremap_nocache() and then all other
+> variants by default map to this one. We've been stuffing the variant definitions
+> within the #ifndef CONFIG_MMU and I don't think we should be as otherwise each
+> and everyone's archs will have to add their own variant default map to the
+> default ioremap_nocache() or whatever. That's exaclty what we have to day, and
+> from what I gather the purpose of the variant boiler plate is lost. I think
+> we should keep the ioremap() and ioreunmap() tucked under the CONFIG_MMU
+> but not the variants. For instance to address the build issue for ioremap_uc()
+> we either define ioremap_uc() for all archs or do something like this:
+
+Surely, if architectures can support the different variants, then they
+should implement them?
+
+The only case where it makes sense to provide boilerplate for these is
+when architectures don't support the mapping type - and then we need help
+from architecture people to decide what is the appropriate mapping type
+(and therefore which ioremap() variant) to be used as a fallback.
+
+-- 
+FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
+according to speedtest.net.
