@@ -1,33 +1,66 @@
-From: wsa@the-dreams.de (Wolfram Sang)
-Date: Fri, 3 Jul 2015 18:00:22 +0200
-Subject: Possible regression due to "tick: broadcast: Prevent livelock
- from event handler"
-In-Reply-To: <alpine.DEB.2.11.1507031746550.3916@nanos>
-References: <20150703105441.GF1521@katana>
- <alpine.DEB.2.11.1507031511180.3916@nanos>
- <20150703133245.GA19284@katana>
- <alpine.DEB.2.11.1507031612410.3916@nanos>
- <20150703143703.GB19284@katana>
- <alpine.DEB.2.11.1507031640060.3916@nanos>
- <20150703150951.GC19284@katana>
- <alpine.DEB.2.11.1507031721390.3916@nanos>
- <20150703154036.GD19284@katana>
- <alpine.DEB.2.11.1507031746550.3916@nanos>
-Message-ID: <20150703160022.GE19284@katana>
+From: alex.bennee@linaro.org (Alex =?utf-8?Q?Benn=C3=A9e?=)
+Date: Fri, 03 Jul 2015 17:07:41 +0100
+Subject: [PATCH v7 09/11] KVM: arm64: guest debug,
+ HW assisted debug support
+In-Reply-To: <20150703092323.GA1588@arm.com>
+References: <1435775343-20034-1-git-send-email-alex.bennee@linaro.org>
+ <1435775343-20034-10-git-send-email-alex.bennee@linaro.org>
+ <20150702084847.GB3418@arm.com> <87pp4asm6u.fsf@linaro.org>
+ <20150703092323.GA1588@arm.com>
+Message-ID: <87h9plrzqq.fsf@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
-> Can you try the patch below, whether it makes a difference?
+Will Deacon <will.deacon@arm.com> writes:
 
-It doesn't. Board locks again.
+> Hi Alex,
+>
+> On Thu, Jul 02, 2015 at 02:50:33PM +0100, Alex Benn?e wrote:
+>> Are you happy with this?:
+>
+> [...]
+>
+>> +/**
+>> + * kvm_arch_dev_ioctl_check_extension
+>> + *
+>> + * We currently assume that the number of HW registers is uniform
+>> + * across all CPUs (see cpuinfo_sanity_check).
+>> + */
+>>  int kvm_arch_dev_ioctl_check_extension(long ext)
+>>  {
+>>         int r;
+>> @@ -64,6 +71,12 @@ int kvm_arch_dev_ioctl_check_extension(long ext)
+>>         case KVM_CAP_ARM_EL1_32BIT:
+>>                 r = cpu_has_32bit_el1();
+>>                 break;
+>> +       case KVM_CAP_GUEST_DEBUG_HW_BPS:
+>> +               r = hw_breakpoint_slots(TYPE_INST);
+>> +               break;
+>> +       case KVM_CAP_GUEST_DEBUG_HW_WPS:
+>> +               r  = hw_breakpoint_slots(TYPE_DATA);
+>> +               break;
+>
+> Whilst I much prefer this code, it actually adds an unwanted dependency
+> on PERF_EVENTS that I didn't think about to start with. Sorry to keep
+> messing you about -- I guess your original patch is the best thing after
+> all.
 
-> -	clockevents_config_and_register(ced, 1, 2, 0xffffffff);
-> +	clockevents_config_and_register(ced, 1, 100, 0xffffffff);
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150703/38eaf954/attachment.sig>
+Everything looks to be in hw_breakpoint.[ch] which does depend on
+CONFIG_HAVE_HW_BREAKPOINT which depends on PERF_EVENTS to be built.
+However the previous code depended on this behaviour as well.
+
+It would seem weird to enable guest debug using HW debug registers to
+debug the guest yet not allowing the host kernel to use them? Of course
+this is the only code they would share as all the magic of guest
+debugging is already mostly there for dirty guest handling.
+
+I'm not familiar with Kconfig but it looks like this is all part of
+arm64 defconfig. Are people really going to want to disable PERF_EVENTS
+but still debug their guests with HW support?
+
+>
+> Will
+
+-- 
+Alex Benn?e
