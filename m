@@ -1,46 +1,53 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Fri, 3 Jul 2015 14:33:19 +0200
-Subject: [PATCH v2 2/4] ARM: mvebu: Add standby support
-In-Reply-To: <55967E35.8050002@free-electrons.com>
-References: <1435684740-24912-1-git-send-email-gregory.clement@free-electrons.com>
- <1435684740-24912-3-git-send-email-gregory.clement@free-electrons.com>
- <20150701174709.2d55007d@free-electrons.com>
- <55967485.2010607@free-electrons.com>
- <20150703141716.785a27c5@free-electrons.com>
- <55967E35.8050002@free-electrons.com>
-Message-ID: <20150703143319.1af14c99@free-electrons.com>
+From: stefan@agner.ch (Stefan Agner)
+Date: Fri, 03 Jul 2015 14:57:45 +0200
+Subject: [PATCH v1 1/4] ARM: dts: vfxxx: Add io-channel-cells property for
+ ADC node
+In-Reply-To: <916569b56d60d41f9cd12c5244be3778857a971b.1435646447.git.maitysanchayan@gmail.com>
+References: <cover.1435646447.git.maitysanchayan@gmail.com>
+ <916569b56d60d41f9cd12c5244be3778857a971b.1435646447.git.maitysanchayan@gmail.com>
+Message-ID: <101a8c84fbe2063f6cf56737a5f9417f@agner.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+On 2015-06-30 08:54, Sanchayan Maity wrote:
+> This commit adds io-channel-cells property to the ADC node. This
+> property is required in order for an IIO consumer driver to work.
+> Especially required for Colibri VF50, as the touchscreen driver
+> uses ADC channels with the ADC driver based on IIO framework.
+> 
+> Signed-off-by: Sanchayan Maity <maitysanchayan@gmail.com>
+> ---
+>  arch/arm/boot/dts/vfxxx.dtsi | 2 ++
+>  1 file changed, 2 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/vfxxx.dtsi b/arch/arm/boot/dts/vfxxx.dtsi
+> index 2c20f3f..f7d8fb6 100644
+> --- a/arch/arm/boot/dts/vfxxx.dtsi
+> +++ b/arch/arm/boot/dts/vfxxx.dtsi
+> @@ -227,6 +227,7 @@
+>  				clocks = <&clks VF610_CLK_ADC0>;
+>  				clock-names = "adc";
+>  				status = "disabled";
+> +				#io-channel-cells = <1>;
+>  			};
+>  
+>  			tcon0: tcon at 4003d000 {
+> @@ -461,6 +462,7 @@
+>  				clocks = <&clks VF610_CLK_ADC1>;
+>  				clock-names = "adc";
+>  				status = "disabled";
+> +				#io-channel-cells = <1>;
+>  			};
+>  
+>  			esdhc1: esdhc at 400b2000 {
 
-On Fri, 03 Jul 2015 14:21:09 +0200, Gregory CLEMENT wrote:
+Minor nitpick: can you put the new property one line up? That way it
+would be sorted alphabetically and status is conveniently still at the
+end.
 
-> No it is called during boot and if the method is not there then it is no
-> more available for the user. I made te test and with a cat on /sys/power/state
-> I only got "freeze" and "standby" but not "mem".
+Otherwise:
 
-Argh, indeed it's called by suspend_set_ops() itself.
+Acked-by: Stefan Agner <stefan@agner.ch>
 
-So now, I wonder why the heck ->valid() is a function pointer in this
-case, rather than just an argument passed to suspend_set_ops(). Having
-a function pointer would precisely be useful to change at runtime which
-states are available, and which states are not available. It is being
-called again when actually entering the state, but apparently for no
-useful reason.
-
-Another option is to have ->valid() always say that suspend to RAM is
-available, and just make ->enter() return -EINVAL if we're trying to
-enter the PM_SUSPEND_MEM state and the mvebu_pm_board_enter pointer is
-NULL. The only drawback is that the kernel will have done all its
-suspend procedure (freezing processes, suspend devices) before telling
-the user that it is not possible to enter suspend to RAM. But it's
-probably not a big deal.
-
-Best regards,
-
-Thomas
--- 
-Thomas Petazzoni, CTO, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+--
+Stefan
