@@ -1,168 +1,55 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Fri, 3 Jul 2015 04:53:20 -0700
-Subject: [PATCH v3 1/2] arm64: KVM: Optimize arm64 skip 30-50% vfp/simd
- save/restore on exits
-In-Reply-To: <5595B27D.90201@samsung.com>
-References: <1435190652-5831-1-git-send-email-m.smarduch@samsung.com>
- <1435190652-5831-2-git-send-email-m.smarduch@samsung.com>
- <20150701134649.GG11332@cbox> <5595B27D.90201@samsung.com>
-Message-ID: <20150703115320.GA14220@lvm>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Fri,  3 Jul 2015 13:55:52 +0200
+Subject: [PATCH v3 3/4] ARM: mvebu: Allow using the GIC for wakeup in standby
+ mode
+In-Reply-To: <1435924553-22428-1-git-send-email-gregory.clement@free-electrons.com>
+References: <1435924553-22428-1-git-send-email-gregory.clement@free-electrons.com>
+Message-ID: <1435924553-22428-4-git-send-email-gregory.clement@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 02, 2015 at 02:51:57PM -0700, Mario Smarduch wrote:
-> On 07/01/2015 06:46 AM, Christoffer Dall wrote:
-> > On Wed, Jun 24, 2015 at 05:04:11PM -0700, Mario Smarduch wrote:
-> >> This patch only saves and restores FP/SIMD registers on Guest access. To do
-> >> this cptr_el2 FP/SIMD trap is set on Guest entry and later checked on exit.
-> >> lmbench, hackbench show significant improvements, for 30-50% exits FP/SIMD
-> >> context is not saved/restored
-> >>
-> >> Signed-off-by: Mario Smarduch <m.smarduch@samsung.com>
-> >> ---
-> >>  arch/arm64/include/asm/kvm_arm.h |    5 ++++-
-> >>  arch/arm64/kvm/hyp.S             |   46 +++++++++++++++++++++++++++++++++++---
-> >>  2 files changed, 47 insertions(+), 4 deletions(-)
-> >>
-> >> diff --git a/arch/arm64/include/asm/kvm_arm.h b/arch/arm64/include/asm/kvm_arm.h
-> >> index ac6fafb..7605e09 100644
-> >> --- a/arch/arm64/include/asm/kvm_arm.h
-> >> +++ b/arch/arm64/include/asm/kvm_arm.h
-> >> @@ -171,10 +171,13 @@
-> >>  #define HSTR_EL2_TTEE	(1 << 16)
-> >>  #define HSTR_EL2_T(x)	(1 << x)
-> >>  
-> >> +/* Hyp Coproccessor Trap Register Shifts */
-> >> +#define CPTR_EL2_TFP_SHIFT 10
-> >> +
-> >>  /* Hyp Coprocessor Trap Register */
-> >>  #define CPTR_EL2_TCPAC	(1 << 31)
-> >>  #define CPTR_EL2_TTA	(1 << 20)
-> >> -#define CPTR_EL2_TFP	(1 << 10)
-> >> +#define CPTR_EL2_TFP	(1 << CPTR_EL2_TFP_SHIFT)
-> >>  
-> >>  /* Hyp Debug Configuration Register bits */
-> >>  #define MDCR_EL2_TDRA		(1 << 11)
-> >> diff --git a/arch/arm64/kvm/hyp.S b/arch/arm64/kvm/hyp.S
-> >> index 5befd01..de0788f 100644
-> >> --- a/arch/arm64/kvm/hyp.S
-> >> +++ b/arch/arm64/kvm/hyp.S
-> >> @@ -673,6 +673,15 @@
-> >>  	tbz	\tmp, #KVM_ARM64_DEBUG_DIRTY_SHIFT, \target
-> >>  .endm
-> >>  
-> >> +/*
-> >> + * Check cptr VFP/SIMD accessed bit, if set VFP/SIMD not accessed by guest.
-> > 
-> > This comment doesn't really help me understand the function, may I
-> > suggest:
-> > 
-> > Branch to target if CPTR_EL2.TFP bit is set (VFP/SIMD trapping enabled)
-> 
-> Yes actually describes what it does.
-> 
-> > 
-> >> + */
-> >> +.macro skip_fpsimd_state tmp, target
-> >> +	mrs	\tmp, cptr_el2
-> >> +	tbnz	\tmp, #CPTR_EL2_TFP_SHIFT, \target
-> >> +.endm
-> >> +
-> >> +
-> >>  .macro compute_debug_state target
-> >>  	// Compute debug state: If any of KDE, MDE or KVM_ARM64_DEBUG_DIRTY
-> >>  	// is set, we do a full save/restore cycle and disable trapping.
-> >> @@ -763,6 +772,7 @@
-> >>  	ldr     x2, [x0, #VCPU_HCR_EL2]
-> >>  	msr     hcr_el2, x2
-> >>  	mov	x2, #CPTR_EL2_TTA
-> >> +	orr     x2, x2, #CPTR_EL2_TFP
-> >>  	msr	cptr_el2, x2
-> >>  
-> >>  	mov	x2, #(1 << 15)	// Trap CP15 Cr=15
-> >> @@ -785,7 +795,6 @@
-> >>  .macro deactivate_traps
-> >>  	mov	x2, #HCR_RW
-> >>  	msr	hcr_el2, x2
-> >> -	msr	cptr_el2, xzr
-> >>  	msr	hstr_el2, xzr
-> >>  
-> >>  	mrs	x2, mdcr_el2
-> >> @@ -912,6 +921,28 @@ __restore_fpsimd:
-> >>  	restore_fpsimd
-> >>  	ret
-> >>  
-> >> +switch_to_guest_fpsimd:
-> >> +	push	x4, lr
-> >> +
-> >> +	mrs	x2, cptr_el2
-> >> +	bic	x2, x2, #CPTR_EL2_TFP
-> >> +	msr	cptr_el2, x2
-> >> +
-> >> +	mrs	x0, tpidr_el2
-> >> +
-> >> +	ldr	x2, [x0, #VCPU_HOST_CONTEXT]
-> >> +	kern_hyp_va x2
-> >> +	bl __save_fpsimd
-> >> +
-> >> +	add	x2, x0, #VCPU_CONTEXT
-> >> +	bl __restore_fpsimd
-> >> +
-> >> +	pop	x4, lr
-> >> +	pop	x2, x3
-> >> +	pop	x0, x1
-> >> +
-> >> +	eret
-> >> +
-> >>  /*
-> >>   * u64 __kvm_vcpu_run(struct kvm_vcpu *vcpu);
-> >>   *
-> >> @@ -932,7 +963,6 @@ ENTRY(__kvm_vcpu_run)
-> >>  	kern_hyp_va x2
-> >>  
-> >>  	save_host_regs
-> >> -	bl __save_fpsimd
-> >>  	bl __save_sysregs
-> >>  
-> >>  	compute_debug_state 1f
-> >> @@ -948,7 +978,6 @@ ENTRY(__kvm_vcpu_run)
-> >>  	add	x2, x0, #VCPU_CONTEXT
-> >>  
-> >>  	bl __restore_sysregs
-> >> -	bl __restore_fpsimd
-> >>  
-> >>  	skip_debug_state x3, 1f
-> >>  	bl	__restore_debug
-> >> @@ -967,7 +996,9 @@ __kvm_vcpu_return:
-> >>  	add	x2, x0, #VCPU_CONTEXT
-> >>  
-> >>  	save_guest_regs
-> >> +	skip_fpsimd_state x3, 1f
-> >>  	bl __save_fpsimd
-> >> +1:
-> >>  	bl __save_sysregs
-> >>  
-> >>  	skip_debug_state x3, 1f
-> >> @@ -986,7 +1017,11 @@ __kvm_vcpu_return:
-> >>  	kern_hyp_va x2
-> >>  
-> >>  	bl __restore_sysregs
-> >> +	skip_fpsimd_state x3, 1f
-> >>  	bl __restore_fpsimd
-> >> +1:
-> >> +	/* Clear FPSIMD and Trace trapping */
-> >> +	msr     cptr_el2, xzr
-> > 
-> > why not simply move the deactivate_traps down here instead?
-> 
-> Putting deactivate_traps there  trashes x2, setup earlier
-> to restore debug, host registers from host context
-> 
-> Do we want deactivate_traps to use another register and
-> move the macro there? Or leave as is?
-> 
-There was some clean symmetry in the code by using deactivate traps, but
-given this, I don't care strongly which way we end up doing it.
+On the Armada 375/38x/39x SoCs, in standby mode the SoCs stay powered
+and it is possible to wake-up from any interrupt sources. This patch
+adds flag to the GIC irqchip driver to let linux know this.
 
-Thanks,
--Christoffer
+Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+---
+ arch/arm/mach-mvebu/board-v7.c | 9 +++++++++
+ 1 file changed, 9 insertions(+)
+
+diff --git a/arch/arm/mach-mvebu/board-v7.c b/arch/arm/mach-mvebu/board-v7.c
+index e5911defccac..b789f7037445 100644
+--- a/arch/arm/mach-mvebu/board-v7.c
++++ b/arch/arm/mach-mvebu/board-v7.c
+@@ -18,6 +18,7 @@
+ #include <linux/of_address.h>
+ #include <linux/of_fdt.h>
+ #include <linux/of_platform.h>
++#include <linux/irq.h>
+ #include <linux/io.h>
+ #include <linux/clocksource.h>
+ #include <linux/dma-mapping.h>
+@@ -26,6 +27,7 @@
+ #include <linux/signal.h>
+ #include <linux/slab.h>
+ #include <linux/irqchip.h>
++#include <linux/irqchip/arm-gic.h>
+ #include <asm/hardware/cache-l2x0.h>
+ #include <asm/mach/arch.h>
+ #include <asm/mach/map.h>
+@@ -129,6 +131,13 @@ static int armada_375_external_abort_wa(unsigned long addr, unsigned int fsr,
+ 
+ static void __init mvebu_init_irq(void)
+ {
++	struct device_node *np;
++
++	np = of_find_compatible_node(NULL, NULL, "arm,cortex-a9-gic");
++	if (np)
++		gic_set_irqchip_flags(IRQCHIP_SKIP_SET_WAKE |
++				      IRQCHIP_MASK_ON_SUSPEND);
++	of_node_put(np);
+ 	irqchip_init();
+ 	mvebu_scu_enable();
+ 	coherency_init();
+-- 
+2.1.0
