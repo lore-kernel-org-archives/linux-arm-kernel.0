@@ -1,48 +1,27 @@
-From: jamesjj.liao@mediatek.com (James Liao)
-Date: Fri, 3 Jul 2015 13:38:47 +0800
-Subject: [PATCH v2 4/4] clk: mediatek: Add USB clock support in MT8173
- APMIXEDSYS
-In-Reply-To: <CAGS+omBsu3zkBf0C_QECBP7NShFhkMih36z1vynvVQ5wCLfZ8w@mail.gmail.com>
-References: <1435633127-31952-1-git-send-email-jamesjj.liao@mediatek.com>
- <1435633127-31952-5-git-send-email-jamesjj.liao@mediatek.com>
- <CAGS+omBRAJVN3uPYn9YdKZ3VBj61c-rpY_cNgnK6x9U0uJBPYw@mail.gmail.com>
- <CAGS+omBsu3zkBf0C_QECBP7NShFhkMih36z1vynvVQ5wCLfZ8w@mail.gmail.com>
-Message-ID: <1435901927.3526.48.camel@mtksdaap41>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 2 Jul 2015 22:53:37 -0700
+Subject: [PATCH 2/3] ARM: dts: configure regulators for Gumstix Pepper
+In-Reply-To: <CAK8F28nYknKTxQm5rZ9SKGhrejkER2S1uDx2hiT5xCHOX_GJpA@mail.gmail.com>
+References: <1433441299-18887-1-git-send-email-arun@gumstix.com>
+ <1433441299-18887-3-git-send-email-arun@gumstix.com>
+ <20150629064717.GR4156@atomide.com>
+ <CAK8F28nYknKTxQm5rZ9SKGhrejkER2S1uDx2hiT5xCHOX_GJpA@mail.gmail.com>
+Message-ID: <20150703055337.GA10705@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Daniel,
+* Ash Charles <ashcharles@gmail.com> [150702 11:37]:
+> On Sun, Jun 28, 2015 at 11:47 PM, Tony Lindgren <tony@atomide.com> wrote:
+> >> Signed-off-by: Ash Charles <ashcharles@gmail.com>
+> >
+> > From Adam, sent by Arun, signed by Ash? Can you please check
+> > that too.
+> I reviewed Adam's original patch internally at Gumstix and my
+> Signed-off-by got carried along.  In future, would an 'Acked-by' from
+> me be more appropriate?
 
-On Wed, 2015-07-01 at 23:22 +0800, Daniel Kurtz wrote:
-> This looks like 3 separate gate clocks in a chain, with a timing
-> constraint: USB_LPF must be enabled 100 us after USB_TX.
-> 
->   26MHz--> [GATE] --USB_TX--> [LPF] --USB_LPF--> [GATE] --USB_OUT-->
->             ^                  ^                  ^
->             +--------------+   |                  |
-> AP_PLL_CON2.REF2USB_TX_EN -+   |                  |
-> AP_PLL_CON2.REF2USB_TX_LPF_EN -+                  |
-> AP_PLL_CON2.REF2USB_TX_OUT_EN --------------------+
-> 
-> 
-> I think we can model the gate parts using a proper clock tree model
-> and the existing clock gate semantics.
-> I'm not sure the best way to model the delay; but in theory that could
-> be handled by the clock user (USB driver).
+Yes Acked-by or Reviewed-by if you did not make changes to the patch.
 
-Do you mean to create 3 hierarchical clocks (may be clock gates) to
-model these clocks as the following ?
+Regards,
 
-EN -- LPF -- OUT_EN
-
-(EN is the parent of LPF, and LPF is the parent of EN)
-
-If we model these 3 clocks like above, we can't prevent clock users to
-enable OUT_EN directly, and there will be no delay between EN and LPF.
-
-Or you have other suggestions to model these 3 clcoks?
-
-
-Best regards,
-
-James
+Tony
