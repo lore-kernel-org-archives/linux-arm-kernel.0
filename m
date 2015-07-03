@@ -1,57 +1,75 @@
 From: tommyhebb@gmail.com (Thomas Hebb)
-Date: Fri, 3 Jul 2015 10:33:27 -0400
-Subject: [PATCH 1/4] phy: berlin-usb: fix divider for BG2CD
-In-Reply-To: <20150703092028.GC5634@kwain>
-References: <5594C652.2020901@gmail.com> <20150703092028.GC5634@kwain>
-Message-ID: <55969D37.7020804@gmail.com>
+Date: Fri, 3 Jul 2015 10:34:20 -0400
+Subject: [PATCH 4/4] phy: berlin-usb: rename table copied from SATA PHY
+In-Reply-To: <20150703091831.GB5634@kwain>
+References: <5594C65E.1030802@gmail.com> <20150703091831.GB5634@kwain>
+Message-ID: <55969D6C.1040309@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/03/2015 05:20 AM, Antoine Tenart wrote:
+On 07/03/2015 05:18 AM, Antoine Tenart wrote:
 > Thomas,
 > 
-> On Thu, Jul 02, 2015 at 01:04:18AM -0400, Thomas Hebb wrote:
->> The marvell,berlin2cd-usb-phy compatible incorrectly sets the PLL
->> divider to BG2's value instead of BG2CD/BG2Q's. Change it to the right
->> value.
->>
->> Signed-off-by: Thomas Hebb <tommyhebb@gmail.com>
->> Cc: stable at vger.kernel.org
+> On Thu, Jul 02, 2015 at 01:04:30AM -0400, Thomas Hebb wrote:
+>> We're not in a SATA PHY driver, so the of_match table shouldn't have
+>> "sata" in its name.
 > 
-> Only this one is sent to stable? The BG2 won't be fixed in stable?
+> There is already a patch fixing this (which was sent last week):
+> 
+> https://lkml.org/lkml/2015/6/24/103
+> 
+> You can drop this one from the series.
 > 
 > Antoine
 
-Since BG2 doesn't currently have its USB PHY enabled in device tree, I
-didn't see any reason to mark that fix for stable; we'd have to wait
-until next cycle for it to be of use anyway. This is the same division
-that Sebastian suggested.
-
-I admit it looks a bit odd to have both dividers be the same. If you
-want me to mark the other patches for stable for clarity reasons, I'm
-happy to do that.
+Acknowledged. Sorry for the noise.
 
 -Tom
 
+>>
+>> Signed-off-by: Thomas Hebb <tommyhebb@gmail.com>
+>> Suggested-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
 >> ---
->>  drivers/phy/phy-berlin-usb.c | 4 ++--
->>  1 file changed, 2 insertions(+), 2 deletions(-)
+>>  drivers/phy/phy-berlin-usb.c | 8 ++++----
+>>  1 file changed, 4 insertions(+), 4 deletions(-)
 >>
 >> diff --git a/drivers/phy/phy-berlin-usb.c b/drivers/phy/phy-berlin-usb.c
->> index c6fc95b..ab54f28 100644
+>> index 335e06d..7143cd3 100644
 >> --- a/drivers/phy/phy-berlin-usb.c
 >> +++ b/drivers/phy/phy-berlin-usb.c
->> @@ -106,8 +106,8 @@
->>  static const u32 phy_berlin_pll_dividers[] = {
->>  	/* Berlin 2 */
->>  	CLK_REF_DIV(0xc) | FEEDBACK_CLK_DIV(0x54),
->> -	/* Berlin 2CD */
->> -	CLK_REF_DIV(0x6) | FEEDBACK_CLK_DIV(0x55),
->> +	/* Berlin 2CD/Q */
->> +	CLK_REF_DIV(0xc) | FEEDBACK_CLK_DIV(0x54),
+>> @@ -152,7 +152,7 @@ static struct phy_ops phy_berlin_usb_ops = {
+>>  	.owner		= THIS_MODULE,
 >>  };
 >>  
->>  struct phy_berlin_usb_priv {
+>> -static const struct of_device_id phy_berlin_sata_of_match[] = {
+>> +static const struct of_device_id phy_berlin_usb_of_match[] = {
+>>  	{
+>>  		.compatible = "marvell,berlin2-usb-phy",
+>>  		.data = &phy_berlin_pll_dividers[0],
+>> @@ -163,12 +163,12 @@ static const struct of_device_id phy_berlin_sata_of_match[] = {
+>>  	},
+>>  	{ },
+>>  };
+>> -MODULE_DEVICE_TABLE(of, phy_berlin_sata_of_match);
+>> +MODULE_DEVICE_TABLE(of, phy_berlin_usb_of_match);
+>>  
+>>  static int phy_berlin_usb_probe(struct platform_device *pdev)
+>>  {
+>>  	const struct of_device_id *match =
+>> -		of_match_device(phy_berlin_sata_of_match, &pdev->dev);
+>> +		of_match_device(phy_berlin_usb_of_match, &pdev->dev);
+>>  	struct phy_berlin_usb_priv *priv;
+>>  	struct resource *res;
+>>  	struct phy *phy;
+>> @@ -208,7 +208,7 @@ static struct platform_driver phy_berlin_usb_driver = {
+>>  	.driver	= {
+>>  		.name		= "phy-berlin-usb",
+>>  		.owner		= THIS_MODULE,
+>> -		.of_match_table	= phy_berlin_sata_of_match,
+>> +		.of_match_table	= phy_berlin_usb_of_match,
+>>  	 },
+>>  };
+>>  module_platform_driver(phy_berlin_usb_driver);
 >> -- 
 >> 2.4.4
 >>
