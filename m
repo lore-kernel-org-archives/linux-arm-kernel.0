@@ -1,68 +1,46 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Fri, 03 Jul 2015 14:21:09 +0200
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Fri, 3 Jul 2015 14:33:19 +0200
 Subject: [PATCH v2 2/4] ARM: mvebu: Add standby support
-In-Reply-To: <20150703141716.785a27c5@free-electrons.com>
-References: <1435684740-24912-1-git-send-email-gregory.clement@free-electrons.com>	<1435684740-24912-3-git-send-email-gregory.clement@free-electrons.com>	<20150701174709.2d55007d@free-electrons.com>	<55967485.2010607@free-electrons.com>
+In-Reply-To: <55967E35.8050002@free-electrons.com>
+References: <1435684740-24912-1-git-send-email-gregory.clement@free-electrons.com>
+ <1435684740-24912-3-git-send-email-gregory.clement@free-electrons.com>
+ <20150701174709.2d55007d@free-electrons.com>
+ <55967485.2010607@free-electrons.com>
  <20150703141716.785a27c5@free-electrons.com>
-Message-ID: <55967E35.8050002@free-electrons.com>
+ <55967E35.8050002@free-electrons.com>
+Message-ID: <20150703143319.1af14c99@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Thomas,
+Hello,
 
-On 03/07/2015 14:17, Thomas Petazzoni wrote:
-> Gregory,
-> 
-> On Fri, 03 Jul 2015 13:39:49 +0200, Gregory CLEMENT wrote:
-> 
->> Having 2 initcall does not work because, there is a dependency between these
->> 2 calls. And actually the suspend_ops is registered before the board specific
->> hook. As soon as the suspend_ops is registered, mvebu_pm_valid() is called but
->> at this point mvebu_board_pm_enter is NULL so PM_SUSPEND_MEM is not available.
-> 
-> And? It will become available soon afterwards.
+On Fri, 03 Jul 2015 14:21:09 +0200, Gregory CLEMENT wrote:
 
-No it is called during boot and if the method is not there then it is no
-more available for the user. I made te test and with a cat on /sys/power/state
-I only got "freeze" and "standby" but not "mem".
+> No it is called during boot and if the method is not there then it is no
+> more available for the user. I made te test and with a cat on /sys/power/state
+> I only got "freeze" and "standby" but not "mem".
 
+Argh, indeed it's called by suspend_set_ops() itself.
 
-Thanks,
+So now, I wonder why the heck ->valid() is a function pointer in this
+case, rather than just an argument passed to suspend_set_ops(). Having
+a function pointer would precisely be useful to change at runtime which
+states are available, and which states are not available. It is being
+called again when actually entering the state, but apparently for no
+useful reason.
 
-Gregory
+Another option is to have ->valid() always say that suspend to RAM is
+available, and just make ->enter() return -EINVAL if we're trying to
+enter the PM_SUSPEND_MEM state and the mvebu_pm_board_enter pointer is
+NULL. The only drawback is that the kernel will have done all its
+suspend procedure (freezing processes, suspend devices) before telling
+the user that it is not possible to enter suspend to RAM. But it's
+probably not a big deal.
 
+Best regards,
 
-
-> 
->> All the complexity of the original patch was to allow registering a handler
->> without needed to get the resource(gpio device) that are not available when using
->> arch_initcall(). However the device_initcall_sync comes latter enough to
->> get all the devices registered but it still happens before the late_initcall,
->> so I will use this one and I will add a comment around it.
-> 
-> I don't think we care about the order in which the initcalls are called.
-> 
-> If the SoC level init call registering the suspend_ops gets called
-> first, then at the beginning there is only support for standby. The
-> support for suspend to RAM will be enabled once the board-level init
-> call gets called.
-> 
-> If the board level init call is called first, then it will set
-> mvebu_board_pm_enter. It is not useful at this point. Until the SoC
-> level init call registers the suspend_ops.
-> 
-> I believe that the ->valid() method of suspend_ops gets called when the
-> user actually enters the suspend state by writing to /sys/power/state.
-> And by that time, both init calls will have been called.
-> 
-> Best regards,
-> 
-> Thomas
-> 
-
-
+Thomas
 -- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
+Thomas Petazzoni, CTO, Free Electrons
+Embedded Linux, Kernel and Android engineering
 http://free-electrons.com
