@@ -1,45 +1,70 @@
-From: tglx@linutronix.de (Thomas Gleixner)
-Date: Fri, 3 Jul 2015 16:17:13 +0200 (CEST)
-Subject: Possible regression due to "tick: broadcast: Prevent livelock
- from event handler"
-In-Reply-To: <20150703133245.GA19284@katana>
-References: <20150703024044.GB24695@verge.net.au>
- <20150703105441.GF1521@katana> <alpine.DEB.2.11.1507031511180.3916@nanos>
- <20150703133245.GA19284@katana>
-Message-ID: <alpine.DEB.2.11.1507031612410.3916@nanos>
+From: boris.brezillon@free-electrons.com (Boris Brezillon)
+Date: Fri, 3 Jul 2015 16:19:10 +0200
+Subject: crypto: marvell/CESA: Issues with non cache-line aligned buffers
+In-Reply-To: <20150703131059.GX7557@n2100.arm.linux.org.uk>
+References: <20150703114305.15611807@bbrezillon>
+ <20150703131059.GX7557@n2100.arm.linux.org.uk>
+Message-ID: <20150703161910.5089bcb2@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 3 Jul 2015, Wolfram Sang wrote:
+Hi Russel,
+
+On Fri, 3 Jul 2015 14:10:59 +0100
+Russell King - ARM Linux <linux@arm.linux.org.uk> wrote:
+
+> BTW, off-topic for this thread... but I notice from Mark Brown's builder
+> that mv_cesa is causing build errors in mainline now:
+> 
+>         arm-allmodconfig
+> ../drivers/crypto/mv_cesa.c:1037:2: error: implicit declaration of function 'of_get_named_gen_pool' [-Werror=implicit-function-declaration]
+> 
+>         arm-multi_v5_defconfig
+> ../drivers/crypto/mv_cesa.c:1037:2: error: implicit declaration of function 'of_get_named_gen_pool' [-Werror=implicit-function-declaration]
+> 
+> It seems it was fine on July 2nd, but the above was introduced today.
+
+It has been fixed by Stephen in linux-next (see [1]).
 
 > 
-> > So with high res timers it boots. Can you please provide the output of
-> > /proc/timer_list for that case?
+> A few other things I notice when looking at this code:
+> 
+>         /* Not all platforms can gate the clock, so it is not
+>            an error if the clock does not exists. */
+>         cp->clk = clk_get(&pdev->dev, NULL);
+>         if (!IS_ERR(cp->clk))
+>                 clk_prepare_enable(cp->clk);
+> 
+> So, if clk_get() returns PTR_ERR(-EPROBE_DEFER) we treat that clock as
+> missing?  Is that really the behaviour you want there?
 
-> Tick Device: mode:     1
-> Per CPU device: 0
-> Clock Event Device: e0180000.timer
->  max_delta_ns:   131071523464982
->  min_delta_ns:   61035
->  mult:           70369
->  shift:          31
->  mode:           3
->  next_event:     40760000000 nsecs
->  set_next_event: em_sti_clock_event_next
->  set_mode:       em_sti_clock_event_mode
->  event_handler:  hrtimer_interrupt
->  retries:        0
+Nope, I'll fix that.
 
-So this is a single core machine and uses the em_sti timer w/o the
-broadcast nonsense. In Simons case it looks like em_sti is used as
-broadcast device.
+> 
+>         ret = request_irq(irq, crypto_int, 0, dev_name(&pdev->dev),
+>                         cp);
+> 
+> What happens if crypto_int() is called when request_irq() unlocks its
+> spinlock, before the clock has been found?  Eg, because we're booting
+> from a kexec'd kernel.
 
-Though the issues you see in the highres=n case might be the same as
-the ones Simon is observing.
+I don't know, and I agree that we should either request the clock
+before registering the irq, or disable the IRQ using the
+SEC_ACCEL_INT_MASK before calling request_irq. Ideally we should do
+both.
 
-So in that nohz=y highres=n case, does adding idle=poll on the command
-line fix the issue?
+Note that none of my patches changed the clk_get(), request_irq() calls
+order, or the clk_get() error path ;-).
 
-Thanks,
+Anyway, I'll propose a patch fixing the problem.
 
-	tglx
+Thanks for the feedback,
+
+Boris
+
+[1]https://git.kernel.org/cgit/linux/kernel/git/next/linux-next.git/commit/drivers/crypto/mv_cesa.c?id=7e6ce3db5329a32c83da9753bae162eb3f22dfca
+
+-- 
+Boris Brezillon, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
