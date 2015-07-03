@@ -1,29 +1,83 @@
-From: stefan@agner.ch (Stefan Agner)
-Date: Fri,  3 Jul 2015 10:06:39 +0200
-Subject: [PATCH] ARM: dts: vf-colibri: define stdout-path property
-Message-ID: <1435910799-11706-1-git-send-email-stefan@agner.ch>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Fri, 03 Jul 2015 09:08:14 +0100
+Subject: [PATCH] arm64/kvm: Add generic v8 KVM target
+In-Reply-To: <D805D093-CCFE-4835-853A-B2654DAA10A1@caviumnetworks.com>
+References: <1434531646-4873-1-git-send-email-suzuki.poulose@arm.com>
+ <CAFEAcA92uymQ3LjPQnuFiwvjSgc+jY54VrfK_Sh4v1DJ+=OPpw@mail.gmail.com>
+ <558A6A84.5020603@arm.com> <20150624085128.GA22785@cbox>
+ <558A7936.7020109@arm.com> <20150625123034.GE28244@cbox>
+ <558BF6C9.3000009@arm.com> <558C05A9.8080201@arm.com>
+ <CAFEAcA_ULz=ugQW=NmthzqYRtvcfwteQTh0DonHRN6U5NykEtQ@mail.gmail.com>
+ <20150626095318.GG28244@cbox>
+ <F37C68A5-E48F-462C-AD18-0F3C096348C7@caviumnetworks.com>
+ <559180CA.3050905@arm.com>
+ <CAFEAcA-E+KdiL4suQ0DoEvB-zGpNZ7-dq46FegC_iXYRPvo9jA@mail.gmail.com>
+ <559185D4.7060308@arm.com>
+ <85D36B67-643B-407F-944F-D18D54FF9909@caviumnetworks.com>
+ <D805D093-CCFE-4835-853A-B2654DAA10A1@caviumnetworks.com>
+Message-ID: <559642EE.1050605@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Define Vybrid's UART0, connected to the Colibri pinout UART_A, as
-standard output.
+On 02/07/15 21:29, Chalamarla, Tirumalesh wrote:
+> is there a chance that this get merged in to 4.2? if not is it possible
+> to accept the other patches like adding implementations explicitly(like
+> Thunder).
 
-Signed-off-by: Stefan Agner <stefan@agner.ch>
----
- arch/arm/boot/dts/vf-colibri-eval-v3.dtsi | 1 +
- 1 file changed, 1 insertion(+)
+We first need to reach a conclusion on this. Until then, I don't plan to
+get anything in. As for 4.2, it feels way too late (the merge window is
+almost closed now).
 
-diff --git a/arch/arm/boot/dts/vf-colibri-eval-v3.dtsi b/arch/arm/boot/dts/vf-colibri-eval-v3.dtsi
-index 2cbe663..cb199ae 100644
---- a/arch/arm/boot/dts/vf-colibri-eval-v3.dtsi
-+++ b/arch/arm/boot/dts/vf-colibri-eval-v3.dtsi
-@@ -10,6 +10,7 @@
- / {
- 	chosen {
- 		bootargs = "console=ttyLP0,115200";
-+		stdout-path = "serial0:115200n8";
- 	};
- 
- 	clk16m: clk16m {
+Thanks,
+
+	M.
+
+> 
+> Thanks,
+> Tirumalesh. 
+>> On Jun 29, 2015, at 11:39 AM, Chalamarla, Tirumalesh
+>> <Tirumalesh.Chalamarla@caviumnetworks.com
+>> <mailto:Tirumalesh.Chalamarla@caviumnetworks.com>> wrote:
+>>
+>>>
+>>> On Jun 29, 2015, at 10:52 AM, Marc Zyngier <marc.zyngier@arm.com
+>>> <mailto:marc.zyngier@arm.com>> wrote:
+>>>
+>>> On 29/06/15 18:38, Peter Maydell wrote:
+>>>> On 29 June 2015 at 18:30, Marc Zyngier <marc.zyngier@arm.com
+>>>> <mailto:marc.zyngier@arm.com>> wrote:
+>>>>> On 29/06/15 18:13, Chalamarla, Tirumalesh wrote:
+>>>>>> Will this also prevents migrating between same implementations,
+>>>>>> if no how is this identified.
+>>>>>
+>>>>> This shouldn't. It is pretty easy to look at the incoming guest's MIDR,
+>>>>> and verify that it matches the default MIDR on the receiving
+>>>>> system. Any
+>>>>> difference, and the migration should abort.
+>>>>
+>>>> Do you really want to forbid migration between (say)
+>>>> Cortex-A57 r3p0 and Cortex-A57 r3p1 ?
+>>>>
+>>>> That seems pretty harsh.
+>>>
+>>> I think we may need to allow for some flexibility (same major version
+>>> only, or +/- 1 minor version...). The idea I'm trying to convey is that
+>>> with "generic CPI", migration is not guaranteed unless we're on
+>>> extremely similar hardware.
+>>>
+>> yes, this is the point i am trying to make, we need some flexibility.
+>> so that it works with same chips with different passes may be. 
+>> if we are allowing this, then we are not putting emulation as a
+>> requirement. 
+>>
+>> Thanks,
+>> Tirumalesh. 
+>>
+>>> M.
+>>> -- 
+>>> Jazz is not dead. It just smells funny...
+> 
+
+
 -- 
-2.4.4
+Jazz is not dead. It just smells funny...
