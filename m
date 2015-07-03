@@ -1,76 +1,43 @@
-From: tommyhebb@gmail.com (Thomas Hebb)
-Date: Fri, 3 Jul 2015 10:34:20 -0400
-Subject: [PATCH 4/4] phy: berlin-usb: rename table copied from SATA PHY
-In-Reply-To: <20150703091831.GB5634@kwain>
-References: <5594C65E.1030802@gmail.com> <20150703091831.GB5634@kwain>
-Message-ID: <55969D6C.1040309@gmail.com>
+From: wsa@the-dreams.de (Wolfram Sang)
+Date: Fri, 3 Jul 2015 16:37:03 +0200
+Subject: Possible regression due to "tick: broadcast: Prevent livelock
+ from event handler"
+In-Reply-To: <alpine.DEB.2.11.1507031612410.3916@nanos>
+References: <20150703024044.GB24695@verge.net.au>
+ <20150703105441.GF1521@katana>
+ <alpine.DEB.2.11.1507031511180.3916@nanos>
+ <20150703133245.GA19284@katana>
+ <alpine.DEB.2.11.1507031612410.3916@nanos>
+Message-ID: <20150703143703.GB19284@katana>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/03/2015 05:18 AM, Antoine Tenart wrote:
-> Thomas,
-> 
-> On Thu, Jul 02, 2015 at 01:04:30AM -0400, Thomas Hebb wrote:
->> We're not in a SATA PHY driver, so the of_match table shouldn't have
->> "sata" in its name.
-> 
-> There is already a patch fixing this (which was sent last week):
-> 
-> https://lkml.org/lkml/2015/6/24/103
-> 
-> You can drop this one from the series.
-> 
-> Antoine
 
-Acknowledged. Sorry for the noise.
+> So this is a single core machine and uses the em_sti timer w/o the
+> broadcast nonsense. In Simons case it looks like em_sti is used as
+> broadcast device.
 
--Tom
+We use the same board. Just my kernel has SMP=n.
 
->>
->> Signed-off-by: Thomas Hebb <tommyhebb@gmail.com>
->> Suggested-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
->> ---
->>  drivers/phy/phy-berlin-usb.c | 8 ++++----
->>  1 file changed, 4 insertions(+), 4 deletions(-)
->>
->> diff --git a/drivers/phy/phy-berlin-usb.c b/drivers/phy/phy-berlin-usb.c
->> index 335e06d..7143cd3 100644
->> --- a/drivers/phy/phy-berlin-usb.c
->> +++ b/drivers/phy/phy-berlin-usb.c
->> @@ -152,7 +152,7 @@ static struct phy_ops phy_berlin_usb_ops = {
->>  	.owner		= THIS_MODULE,
->>  };
->>  
->> -static const struct of_device_id phy_berlin_sata_of_match[] = {
->> +static const struct of_device_id phy_berlin_usb_of_match[] = {
->>  	{
->>  		.compatible = "marvell,berlin2-usb-phy",
->>  		.data = &phy_berlin_pll_dividers[0],
->> @@ -163,12 +163,12 @@ static const struct of_device_id phy_berlin_sata_of_match[] = {
->>  	},
->>  	{ },
->>  };
->> -MODULE_DEVICE_TABLE(of, phy_berlin_sata_of_match);
->> +MODULE_DEVICE_TABLE(of, phy_berlin_usb_of_match);
->>  
->>  static int phy_berlin_usb_probe(struct platform_device *pdev)
->>  {
->>  	const struct of_device_id *match =
->> -		of_match_device(phy_berlin_sata_of_match, &pdev->dev);
->> +		of_match_device(phy_berlin_usb_of_match, &pdev->dev);
->>  	struct phy_berlin_usb_priv *priv;
->>  	struct resource *res;
->>  	struct phy *phy;
->> @@ -208,7 +208,7 @@ static struct platform_driver phy_berlin_usb_driver = {
->>  	.driver	= {
->>  		.name		= "phy-berlin-usb",
->>  		.owner		= THIS_MODULE,
->> -		.of_match_table	= phy_berlin_sata_of_match,
->> +		.of_match_table	= phy_berlin_usb_of_match,
->>  	 },
->>  };
->>  module_platform_driver(phy_berlin_usb_driver);
->> -- 
->> 2.4.4
->>
-> 
+> Though the issues you see in the highres=n case might be the same as
+> the ones Simon is observing.
+
+I hope so. One good thing about the issue I see is that it is 100%
+reproducable.
+
+> So in that nohz=y highres=n case, does adding idle=poll on the command
+> line fix the issue?
+
+Nope, still hangs.
+
+Thanks for assisting!
+
+   Wolfram
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150703/348e11fb/attachment.sig>
