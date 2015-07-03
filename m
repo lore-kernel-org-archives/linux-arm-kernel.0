@@ -1,35 +1,20 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Fri, 3 Jul 2015 12:01:37 +0100
-Subject: [PATCH v2] ARM64 / SMP: Switch pr_err() to pr_debug() for
- disabled GICC entry
-In-Reply-To: <1435908546-11457-1-git-send-email-hanjun.guo@linaro.org>
-References: <1435908546-11457-1-git-send-email-hanjun.guo@linaro.org>
-Message-ID: <20150703110136.GJ25907@e104818-lin.cambridge.arm.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 3 Jul 2015 12:02:49 +0100
+Subject: Possible regression due to "tick: broadcast: Prevent livelock
+ from event handler"
+In-Reply-To: <20150703105441.GF1521@katana>
+References: <20150703024044.GB24695@verge.net.au>
+ <20150703105441.GF1521@katana>
+Message-ID: <20150703110249.GV7557@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 03, 2015 at 03:29:06PM +0800, Hanjun Guo wrote:
-> It is normal that firmware presents GICC entry or entries (processors)
-> with disabled flag in ACPI MADT, taking a system of 16 cpus for example,
-> ACPI firmware may present 8 ebabled first with another 8 cpus disabled
-> in MADT, the disabled cpus can be hot-added later.
-> 
-> Firmware may also present more cpus than the hardware actually has, but
-> disabled the unused ones, and easily enable it when the hardware has such
-> cpus to make the firmware code scalable.
-> 
-> So that's not an error for disabled cpus in MADT, we can switch pr_err()
-> to pr_debug() to make the boot a little quieter by default.
-> 
-> Since hwid for disabled cpus often are invalid, and we check invalid hwid
-> fisrt in the code, for use case that hot add cpus later will be filtered
-> out and will not be counted in possible cups, so move this check before
-> the hwid one to prepare the code to count for disabeld cpus when cpu
-> hot-plug is introduced.
-> 
-> Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
+On Fri, Jul 03, 2015 at 12:54:41PM +0200, Wolfram Sang wrote:
+> Enabling all lockdep features doesn't show anything for the non-working
+> case. However, I get warning for the working case:
 
-Applied. Thanks.
+Please share your .config file for this case.  Thanks.
 
 -- 
-Catalin
+FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
+according to speedtest.net.
