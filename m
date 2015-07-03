@@ -1,63 +1,35 @@
-From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Fri, 3 Jul 2015 16:23:22 +0200
-Subject: crypto: marvell/CESA: Issues with non cache-line aligned buffers
-In-Reply-To: <20150703095807.GS7557@n2100.arm.linux.org.uk>
-References: <20150703114305.15611807@bbrezillon>
- <20150703095807.GS7557@n2100.arm.linux.org.uk>
-Message-ID: <20150703162322.1c02453a@bbrezillon>
+From: jszhang@marvell.com (Jisheng Zhang)
+Date: Fri, 3 Jul 2015 22:30:47 +0800
+Subject: [PATCH] clocksource: dw_apb_timer: add dynamic irq flag to the timer
+Message-ID: <1435933847-2069-1-git-send-email-jszhang@marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 3 Jul 2015 10:58:07 +0100
-Russell King - ARM Linux <linux@arm.linux.org.uk> wrote:
+Commit d2348fb6fdc6 ("tick: Dynamically set broadcast irq affinity")
+adds one execllent feature CLOCK_EVT_FEAT_DYNIRQ to let the core set the
+interrupt affinity of the broadcast interrupt to the cpu which has the
+earliest expiry time. This patch adds CLOCK_EVT_FEAT_DYNIRQ flag to
+avoid unnecessary wakeups and IPIs when the dw_apb_timer is used as
+broadcast timer.
 
-> On Fri, Jul 03, 2015 at 11:43:05AM +0200, Boris Brezillon wrote:
-> > Which led us to think that this could be related to a non cache-line
-> > aligned buffer problem: if we share the cache line with someone
-> > modifying its data during the DMA transfer, we could experience data
-> > loss when the cpu decide to flush the data from this cache line to the
-> > memory.
-> 
-> There's really only two options when you have an overlapping cache line
-> and the cache line contains CPU-dirty data, but the memory contains
-> DMA-dirty data.  One of those dirty data has to win out, and the other
-> has to be destroyed.  (Either you invalidate the CPU cache line, loosing
-> the CPU-dirty data, or you write-back the cache line, overwriting the DMA-
-> dirty data.)
-> 
-> What that means is that it's a _bug_ to end up in this situation, nothing
-> more, nothing less.  There's nothing that arch code can do about it, it's
-> a DMA-API user bug.
-> 
-> What you'll find is that this is well documented.  See
-> Documentation/DMA-API.txt, part Id (Streaming DMA mappings):
-> 
->   Warnings:  Memory coherency operates at a granularity called the cache
->   line width.  In order for memory mapped by this API to operate
->   correctly, the mapped region must begin exactly on a cache line
->   boundary and end exactly on one (to prevent two separately mapped
->   regions from sharing a single cache line).  Since the cache line size
->   may not be known at compile time, the API will not enforce this
->   requirement.  Therefore, it is recommended that driver writers who
->   don't take special care to determine the cache line size at run time
->   only map virtual regions that begin and end on page boundaries (which
->   are guaranteed also to be cache line boundaries).
-> 
-> The behaviour you're seeing here is not ARM specific - any CPU which
-> uses cache lines and doesn't have hardware coherency will suffer from
-> this problem.
-> 
+Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
+---
+ drivers/clocksource/dw_apb_timer.c | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
 
-That's pretty much the answer I was expecting :-).
-I'll wait for Herbert's feedback to know how this should be fixed (I
-guess using the <alg>_walk_xxx functions is the right this to do, but
-I'd like to be sure).
-
-Thanks,
-
-Boris
-
+diff --git a/drivers/clocksource/dw_apb_timer.c b/drivers/clocksource/dw_apb_timer.c
+index 35a8809..3381644 100644
+--- a/drivers/clocksource/dw_apb_timer.c
++++ b/drivers/clocksource/dw_apb_timer.c
+@@ -232,7 +232,8 @@ dw_apb_clockevent_init(int cpu, const char *name, unsigned rating,
+ 						       &dw_ced->ced);
+ 	dw_ced->ced.min_delta_ns = clockevent_delta2ns(5000, &dw_ced->ced);
+ 	dw_ced->ced.cpumask = cpumask_of(cpu);
+-	dw_ced->ced.features = CLOCK_EVT_FEAT_PERIODIC | CLOCK_EVT_FEAT_ONESHOT;
++	dw_ced->ced.features = CLOCK_EVT_FEAT_PERIODIC |
++			       CLOCK_EVT_FEAT_ONESHOT | CLOCK_EVT_FEAT_DYNIRQ;
+ 	dw_ced->ced.set_mode = apbt_set_mode;
+ 	dw_ced->ced.set_next_event = apbt_next_event;
+ 	dw_ced->ced.irq = dw_ced->timer.irq;
 -- 
-Boris Brezillon, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+2.1.4
