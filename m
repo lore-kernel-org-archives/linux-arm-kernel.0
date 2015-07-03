@@ -1,48 +1,53 @@
-From: nicoleotsuka@gmail.com (Nicolin Chen)
-Date: Fri, 3 Jul 2015 10:44:05 -0700
-Subject: [alsa-devel] [PATCH] ASoC: fsl-ssi: Fix bitclock calculation for
- master mode
-In-Reply-To: <1435919976-1667-1-git-send-email-jbe@pengutronix.de>
-References: <1435919976-1667-1-git-send-email-jbe@pengutronix.de>
-Message-ID: <20150703174404.GA9468@Asurada>
+From: pawelo@king.net.pl (Paul Osmialowski)
+Date: Fri, 3 Jul 2015 19:40:59 +0200 (CEST)
+Subject: [PATCH v2 3/9] arm: twr-k70f120m: clock driver for Kinetis SoC
+In-Reply-To: <alpine.DEB.2.11.1507030006280.3916@nanos>
+References: <1435667250-28299-1-git-send-email-pawelo@king.net.pl>
+ <alpine.LNX.2.00.1507011756140.14440@localhost.localdomain>
+ <alpine.LNX.2.00.1507021206410.13210@localhost.localdomain>
+ <1861313.aMcV1xHCIq@wuerfel>
+ <alpine.LNX.2.00.1507022338070.28322@localhost.localdomain>
+ <alpine.DEB.2.11.1507030006280.3916@nanos>
+Message-ID: <alpine.LNX.2.00.1507031932220.15294@localhost.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 03, 2015 at 12:39:36PM +0200, Juergen Borleis wrote:
-> According to the datasheet 'pm', 'psr' and 'div2' should never be all 0.
-> Since commit 541b03ad6cfe ("ASoC: fsl_ssi: Fix the incorrect limitation of
-> the bit clock rate") this can happen, because for some bitclock rates
-> 'pm' = 0 seems to be a valid choice but does not work due to hardware
-> restrictions. This results into a bad hardware behaviour (slow audio for
-> example). Feature tested on a i.MX25.
-> 
-> Signed-off-by: Juergen Borleis <jbe@pengutronix.de>
+Arnd, Thomas,
 
-Acked-by: Nicolin Chen <nicoleotsuka@gmail.com>
+Thanks for your valuable input and for your patience.
 
-Thank you!
+I'm attaching yet another proposal for this clock driver. I've 
+flattened the .dts and ensured register access protection. I've also added 
+one more clock source (osc0er) and clock gate to it.
 
-> ---
->  sound/soc/fsl/fsl_ssi.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/sound/soc/fsl/fsl_ssi.c b/sound/soc/fsl/fsl_ssi.c
-> index c7647e0..c0b940e 100644
-> --- a/sound/soc/fsl/fsl_ssi.c
-> +++ b/sound/soc/fsl/fsl_ssi.c
-> @@ -633,7 +633,7 @@ static int fsl_ssi_set_bclk(struct snd_pcm_substream *substream,
->  		sub *= 100000;
->  		do_div(sub, freq);
->  
-> -		if (sub < savesub) {
-> +		if (sub < savesub && !(i == 0 && psr == 0 && div2 == 0)) {
->  			baudrate = tmprate;
->  			savesub = sub;
->  			pm = i;
-> -- 
-> 2.1.4
-> 
-> _______________________________________________
-> Alsa-devel mailing list
-> Alsa-devel at alsa-project.org
-> http://mailman.alsa-project.org/mailman/listinfo/alsa-devel
+Can you comment this one too?
+
+On Fri, 3 Jul 2015, Thomas Gleixner wrote:
+
+> On Thu, 2 Jul 2015, Paul Osmialowski wrote:
+>> On Thu, 2 Jul 2015, Arnd Bergmann wrote:
+>>
+>>> I wonder if you could move out the fixed rate clocks into their own
+>>> nodes. Are they actually controlled by the same block? If they are
+>>> just fixed, you can use the normal binding for fixed rate clocks
+>>> and only describe the clocks that are related to the driver.
+>>
+>> In my view having these clocks grouped together looks more convincing. After
+>> all, they all share the same I/O regs in order to read configuration.
+>
+> The fact that they share a register is not making them a group. That's
+> just a HW design decision and you need to deal with that by protecting
+> the register access, but not by trying to group them artificially at
+> the functional level.
+>
+> Thanks,
+>
+> 	tglx
+>
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: 0003-arm-twr-k70f120m-clock-driver-for-Kinetis-SoC.patch
+Type: text/x-diff
+Size: 19961 bytes
+Desc: 
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150703/1ae55ef7/attachment-0001.bin>
