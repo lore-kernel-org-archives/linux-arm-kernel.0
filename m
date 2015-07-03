@@ -1,81 +1,93 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 3 Jul 2015 20:09:24 +0100
-Subject: RFC: default ioremap_*() variant defintions
-In-Reply-To: <20150703181709.GD7021@wotan.suse.de>
-References: <20150703181709.GD7021@wotan.suse.de>
-Message-ID: <20150703190924.GZ7557@n2100.arm.linux.org.uk>
+From: ahs3@redhat.com (Al Stone)
+Date: Fri, 03 Jul 2015 13:22:13 -0600
+Subject: [PATCH v3 1/3] ACPI : introduce macros for using the ACPI
+ specification version
+In-Reply-To: <55961C3A.8080907@huawei.com>
+References: <1435880916-2153-1-git-send-email-al.stone@linaro.org>
+ <1435880916-2153-2-git-send-email-al.stone@linaro.org>
+ <2553932.NLQ9D78ybW@vostro.rjw.lan> <55961C3A.8080907@huawei.com>
+Message-ID: <5596E0E5.9030300@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 03, 2015 at 08:17:09PM +0200, Luis R. Rodriguez wrote:
-> The 0-day build bot detected a build issue on a patch not upstream yet that
-> makes a driver use iorempa_uc(), this call is now upstream but we have no
-> drivers yet using it, the patch in question makes the atyfb framebuffer
-> driver use it. The build issue was the lack of the ioremap_uc() call being
-> implemented on some non-x86 architectures.
-
-You have to be careful here.  We've been through this with ioremap_wt()
-which is incorrect for ARM as things stand at the moment (I have patches
-which adds documentation on this issue, and fixes ioremap_wt().)
-
-The question is whether the allocated memory may have unaligned accesses
-performed on it - either intentionally, or unintentionally (eg, by GCC
-inlining memcpy().)
-
-If the answer to that question is yes or possibly yes, neither ioremap()
-nor ioremap_nocache() (which is, unfortunately, the same as ioremap() due
-to various documentation telling people to use it for devices) can be used
-for the mapping on ARM.
-
-So we can't go around adding new ioremap() variants and hoping that
-ioremap_nocache() is a safe default everywhere.  It isn't.
-
-> I *thought* I had added boiler plate code to map
-> the ioremap_uc() call to ioremap_nocache() for archs that do not already define
-> their own iorempa_uc() call, but upon further investigation it seems that was
-> not the case but found that this may be a bit different issue altogether.
+On 07/02/2015 11:23 PM, Hanjun Guo wrote:
+> Hi Rafael,
 > 
-> The way include/asm-generic/io.h works for ioremap() calls and its variants is:
+> On 2015/7/3 8:21, Rafael J. Wysocki wrote:
+>> On Thursday, July 02, 2015 05:48:34 PM Al Stone wrote:
+>>> Add the __ACPI_FADT_SPEC_VERSION() helper macro to build a proper version
+>>> number from a major and minor revision number.  Add also macros that use
+>>> the helper to construct the current version from the values in the FADT
+>>> (i.e., ACPI_FADT_SPEC_VERSION) and both the 5.1 and 6.0 versions.
+>>>
+>>> These macros are added in order to simplify retrieving and comparing ACPI
+>>> specification version numbers, since this is becoming a more frequent need.
+>>> In particular, there are some architectures that require at least a certain
+>>> version of the spec, and there are differences in some structure sizes that
+>>> have changed with recent versions but can only be tracked by spec version
+>>> number.
+>>>
+>>> Fixes: aeb823bbacc2 (ACPICA: ACPI 6.0: Add changes for FADT table.)
+>>> Signed-off-by: Al Stone <al.stone@linaro.org>
+>>> ---
+>>>  include/linux/acpi.h | 10 ++++++++++
+>>>  1 file changed, 10 insertions(+)
+>>>
+>>> diff --git a/include/linux/acpi.h b/include/linux/acpi.h
+>>> index c471dfc..0e525e8 100644
+>>> --- a/include/linux/acpi.h
+>>> +++ b/include/linux/acpi.h
+>>> @@ -48,6 +48,16 @@
+>>>  #include <acpi/acpi_io.h>
+>>>  #include <asm/acpi.h>
+>>>  
+>>> +#define __ACPI_FADT_SPEC_VERSION(major, minor) \
+>>> +	((unsigned int)major << 8 | (unsigned int)minor)
+>>> +
+>>> +#define ACPI_FADT_SPEC_VERSION	\
+>>> +	__ACPI_FADT_SPEC_VERSION(acpi_gbl_FADT.header.revision, \
+>>> +				 acpi_gbl_FADT.minor_revision)
+>>> +
+>>> +#define ACPI_FADT_SPEC_VERSION_51 __ACPI_FADT_SPEC_VERSION(5, 1)
+>>> +#define ACPI_FADT_SPEC_VERSION_60 __ACPI_FADT_SPEC_VERSION(6, 0)
+>> I'd add underscores here, eg. ACPI_FADT_SPEC_VERSION_6_0
 > 
-> #ifndef CONFIG_MMU                                                              
-> #ifndef ioremap                                                                 
-> #define ioremap ioremap                                                         
-> static inline void __iomem *ioremap(phys_addr_t offset, size_t size)            
-> {                                                                               
->         return (void __iomem *)(unsigned long)offset;                           
-> }                                                                               
-> #endif 
-> ...
-> #define iounmap iounmap                                                         
->                                                                                 
-> static inline void iounmap(void __iomem *addr)                                  
-> {                                                                               
-> }                                                                               
-> #endif                                                                          
-> #endif /* CONFIG_MMU */  
+> Agreed.
 
-I see you've been bitten by the gnome-terminal cut'n'paste bug with all those
-space characters above. ;)
+Will do.  This was a flip of the coin, on my part.
 
-> That's the gist of it, but the catch here is the ioremap_*() variants and where
-> they are defined. The first variant is ioremap_nocache() and then all other
-> variants by default map to this one. We've been stuffing the variant definitions
-> within the #ifndef CONFIG_MMU and I don't think we should be as otherwise each
-> and everyone's archs will have to add their own variant default map to the
-> default ioremap_nocache() or whatever. That's exaclty what we have to day, and
-> from what I gather the purpose of the variant boiler plate is lost. I think
-> we should keep the ioremap() and ioreunmap() tucked under the CONFIG_MMU
-> but not the variants. For instance to address the build issue for ioremap_uc()
-> we either define ioremap_uc() for all archs or do something like this:
+>> And what if there is 5.2 or even 5.3?
+> 
+> Hmm, do you mean in the future or just now? for both two cases,
+> only 5.1 and 5.1 errata (still has the same ACPI version with 5.1)
+> will be available, then jump to 6.0 and going forward if new versions
+> in the future.
+> 
+> I'm not sure if I understand your question correctly, if
+> not, please correct me :)
+> 
+> Thanks
+> Hanjun
 
-Surely, if architectures can support the different variants, then they
-should implement them?
+I'm not sure I understand the question, either.  Traditionally, the
+spec versioning has been exclusively linear -- i.e., now that 6.0
+has replaced 5.1, there will be no more 5.x.  There may be errata
+published (e.g., there was a 5.1A, and a 6.0A is forthcoming) but
+the errata are not encoded in tables anywhere since they are meant
+only as corrections to the base version.  This is unlikely to change,
+but not impossible, of course :).
 
-The only case where it makes sense to provide boilerplate for these is
-when architectures don't support the mapping type - and then we need help
-from architecture people to decide what is the appropriate mapping type
-(and therefore which ioremap() variant) to be used as a fallback.
+The only reason for putting in macros for 5.1 and 6.0 is that those
+are the versions that I'm concerned with for this particular fix and
+I know I will use them.  If others are needed, I'd have those that
+need them add them.
 
 -- 
-FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
-according to speedtest.net.
+ciao,
+al
+-----------------------------------
+Al Stone
+Software Engineer
+Red Hat, Inc.
+ahs3 at redhat.com
+-----------------------------------
