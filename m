@@ -1,65 +1,100 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Thu, 2 Jul 2015 23:43:30 -0500
-Subject: [RFC 1/3] of: make of_mutex public
-In-Reply-To: <1435700651-3543-2-git-send-email-wsa@the-dreams.de>
-References: <1435700651-3543-1-git-send-email-wsa@the-dreams.de>
- <1435700651-3543-2-git-send-email-wsa@the-dreams.de>
-Message-ID: <CAL_Jsq+-Tx=hwj9ScXBXeGxNwHhq-Lpe-5Kzd-Tu_SNue2aWTA@mail.gmail.com>
+From: jamesjj.liao@mediatek.com (James Liao)
+Date: Fri, 3 Jul 2015 13:15:31 +0800
+Subject: [PATCH v2 3/4] clk: mediatek: Add subsystem clocks of MT8173
+In-Reply-To: <CAGS+omDJtTcVvcL925LFxUSeunWONp188OOP-H42uQ=6BaY9FQ@mail.gmail.com>
+References: <1435633127-31952-1-git-send-email-jamesjj.liao@mediatek.com>
+ <1435633127-31952-4-git-send-email-jamesjj.liao@mediatek.com>
+ <CAGS+omDJtTcVvcL925LFxUSeunWONp188OOP-H42uQ=6BaY9FQ@mail.gmail.com>
+Message-ID: <1435900531.3526.41.camel@mtksdaap41>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-+Pantelis
+On Wed, 2015-07-01 at 22:54 +0800, Daniel Kurtz wrote:
+> On Tue, Jun 30, 2015 at 10:58 AM, James Liao <jamesjj.liao@mediatek.com> wrote:
+> >
+> > +static struct mtk_gate_regs cg_regs_4_8_0 = {
+> 
+> These should all be:
+> 
+> static const struct mtk_gate_regs ...
 
-On Tue, Jun 30, 2015 at 4:44 PM, Wolfram Sang <wsa@the-dreams.de> wrote:
-> From: Wolfram Sang <wsa+renesas@sang-engineering.com>
->
-> If we want to use OF_DYNAMIC features outside the of framework, we need
-> to access this lock. If OF maintainers don't like exporting, we can
-> maybe create accessor functions that we can use?
+OK, I'll fix it.
 
-It looks like you are just taking the mutex around various
-of_changeset_* calls. We should either split the mutex into of_mutex
-for core and changesets and an overlay mutex for overlays, or we need
-to do the typical pattern of having changeset functions having locked
-and unlocked versions for external and internal (overlays) use.
+> > +       .set_ofs = 0x0004,
+> > +       .clr_ofs = 0x0008,
+> > +       .sta_ofs = 0x0000,
+> > +};
+> > +
+> > +#define GATE_IMG(_id, _name, _parent, _shift) {                        \
+> > +               .id = _id,                                      \
+> > +               .name = _name,                                  \
+> > +               .parent_name = _parent,                         \
+> > +               .regs = &cg_regs_4_8_0,                         \
+> > +               .shift = _shift,                                \
+> > +               .ops = &mtk_clk_gate_ops_setclr,                \
+> > +       }
+> > +
+> > +static struct mtk_gate img_clks[] __initdata = {
+> 
+> These should all be:
+> 
+> static const ... __initconst = {
 
-Rob
+OK, I'll fix it.
 
-> Signed-off-by: Wolfram Sang <wsa+renesas@sang-engineering.com>
-> ---
->  drivers/of/of_private.h | 1 -
->  include/linux/of.h      | 2 ++
->  2 files changed, 2 insertions(+), 1 deletion(-)
->
-> diff --git a/drivers/of/of_private.h b/drivers/of/of_private.h
-> index 8e882e706cd8c6..f92ec41efb5dfd 100644
-> --- a/drivers/of/of_private.h
-> +++ b/drivers/of/of_private.h
-> @@ -31,7 +31,6 @@ struct alias_prop {
->         char stem[0];
->  };
->
-> -extern struct mutex of_mutex;
->  extern struct list_head aliases_lookup;
->  extern struct kset *of_kset;
->
-> diff --git a/include/linux/of.h b/include/linux/of.h
-> index b871ff9d81d720..f0464efcbdc5aa 100644
-> --- a/include/linux/of.h
-> +++ b/include/linux/of.h
-> @@ -32,6 +32,8 @@
->  typedef u32 phandle;
->  typedef u32 ihandle;
->
-> +extern struct mutex of_mutex;
-> +
->  struct property {
->         char    *name;
->         int     length;
-> --
-> 2.1.4
->
-> --
-> To unsubscribe from this list: send the line "unsubscribe devicetree" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> > +
+> > +static void __init mtk_imgsys_init(struct device_node *node)
+> > +{
+> > +       struct clk_onecell_data *clk_data;
+> > +       void __iomem *base;
+> 
+> I don't think you need base for any of these.
+> mtk_clk_register_gates() will use syscon_node_to_regmap() to lookup
+> the regmap by itself.
+
+OK, I'll remove it.
+
+> > +       int r;
+> > +
+> > +       base = of_iomap(node, 0);
+> > +       if (!base) {
+> > +               pr_err("%s(): ioremap failed\n", __func__);
+> > +               return;
+> > +       }
+> > +
+> > +       clk_data = mtk_alloc_clk_data(CLK_IMG_NR_CLK);
+> 
+> Unrelated to this patch, but:
+> I think each clock node should statically declare its
+> clk_onecell_data, and pass it to mtk_alloc_clk_data().
+> mtk_alloc_clk_data() should then just allocate and initialize the clks array.
+
+Is there any different from allocating clk_onecell_data and clks arary
+dynamically?
+
+
+> >  /* APMIXED_SYS */
+> >
+> > -#define CLK_APMIXED_ARMCA15PLL 1
+> > -#define CLK_APMIXED_ARMCA7PLL  2
+> > +#define CLK_APMIXED_ARMCA15PLL         1
+> > +#define CLK_APMIXED_ARMCA7PLL          2
+> >  #define CLK_APMIXED_MAINPLL            3
+> >  #define CLK_APMIXED_UNIVPLL            4
+> >  #define CLK_APMIXED_MMPLL              5
+> > @@ -232,4 +232,91 @@
+> >  #define CLK_PERI_UART3_SEL             39
+> >  #define CLK_PERI_NR_CLK                        40
+> 
+> Why do we count up from 1 instead of 0?
+> This means that for each clock-controller:
+>   clk_onecell_data->clk[0] == ERR_PTR(-ENOENT)
+
+It's a legacy implementation. I think it doesn't matter for function or
+size in this implementation. We may change clock index to start from 0
+in next SoC clock implementation.
+
+
+Best regards,
+
+James
