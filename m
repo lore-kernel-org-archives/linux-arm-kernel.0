@@ -1,54 +1,44 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Fri, 3 Jul 2015 16:47:47 +0530
-Subject: [PATCH 39/41] clocksource: vf_pit: Migrate to new 'set-state'
- interface
-In-Reply-To: <6a6d4ec3156cb00537ed632f60430a37@agner.ch>
-References: <cover.1434622147.git.viresh.kumar@linaro.org>
- <c9f030f57a10c1be00f8732ae2190fcc55248db5.1434622147.git.viresh.kumar@linaro.org>
- <19859bd18fb69fa1f10c07de01b2259d@agner.ch>
- <20150703085749.GE23297@linux>
- <6a6d4ec3156cb00537ed632f60430a37@agner.ch>
-Message-ID: <20150703111747.GG23297@linux>
+From: lorenx4@gmail.com (Lorenzo Nava)
+Date: Fri, 3 Jul 2015 13:23:24 +0200
+Subject: [PATCH v5] arm DMA: Fix allocation from CMA for coherent DMA
+In-Reply-To: <20150703090305.GR7557@n2100.arm.linux.org.uk>
+References: <1435699746-21395-1-git-send-email-lorenx4@gmail.com>
+ <20150701111251.GA21981@e104818-lin.cambridge.arm.com>
+ <20150703090305.GR7557@n2100.arm.linux.org.uk>
+Message-ID: <CAE=W-e0utnP2RyFrK1_ex8ZDjvuA2kUm0Z6wnGjUSeXZC302pQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03-07-15, 13:11, Stefan Agner wrote:
-> On 2015-07-03 10:57, Viresh Kumar wrote:
-> > On 03-07-15, 10:10, Stefan Agner wrote:
-> >> >  	.features	= CLOCK_EVT_FEAT_PERIODIC | CLOCK_EVT_FEAT_ONESHOT,
-> >> > -	.set_mode	= pit_set_mode,
-> >> > +	.set_state_shutdown = pit_shutdown,
-> >> > +	.set_state_periodic = pit_set_periodic,
-> >>
-> >> I'm not really familiar with the interface, but given that we announce
-> >> the feature CLOCK_EVT_FEAT_ONESHOT shouldn't we add a set_state_oneshot
-> >> callback here?
-> > 
-> > We weren't doing anything in pit_set_mode(ONESHOT) and so that
-> > callback is not implemented. In case you need to do something in
-> > set_state_oneshot(), we can add it back.
-> 
-> True, weren't doing anything. I wonder if that is right. Afaik, we
-> should set the same timer for oneshot too, hence call
-> pit_set_next_event. With your change we can just reuse the same function
-> (pit_set_periodic) for set_state_oneshot.
+On Fri, Jul 3, 2015 at 11:03 AM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Wed, Jul 01, 2015 at 12:12:51PM +0100, Catalin Marinas wrote:
+>> On Tue, Jun 30, 2015 at 11:29:06PM +0200, Lorenzo Nava wrote:
+>> > This patch allows the use of CMA for DMA coherent memory allocation.
+>> > At the moment if the input parameter "is_coherent" is set to true
+>> > the allocation is not made using the CMA, which I think is not the
+>> > desired behaviour.
+>> >
+>> > Signed-off-by: Lorenzo Nava <lorenx4@gmail.com>
+>> > Reviewed-by: Catalin Marinas <catalin.marinas@arm.com>
+>>
+>> If Russell doesn't have any objections, you can send the patch to
+>> his patch system. See here for more information:
+>
+> I'm left wondering whether this patch is really want Lorenzo wants.
+> From my reading of it, while this has the effect of allocating from
+> CMA for coherent devices, it's no different from the non-coherent
+> case, because by calling __alloc_from_contiguous(), we end up
+> remapping the allocated memory, removing the cacheability status
+> from the allocated pages.
+>
+> This brings up an interesting point: presumably, it's been tested, and
+> people are happy with the performance it's giving, inspite of it not
+> returning cacheable memory... or maybe it hasn't been tested that much?
+>
 
-pit_set_next_event() will be called by clockevents core directly after
-tying to set the device in oneshot mode. And so no changes are
-required.
+As Catalin correctly pointed out, I always consider that this patch:
 
-> To maintain the atomicity of the changes, this would need to be fixed in
-> a separate patch anyway. So this change looks good to me:
-> 
-> Acked-by: Stefan Agner <stefan@agner.ch>
 
-Thanks.
-
-> I guess "clockevents: Allow set-state callbacks to be optional" makes it
-> before this patch? Otherwise we would call a null pointer...
-
-Yeah, I have mentioned this in the cover-letter that there are
-dependencies over clockevent core's next branch.
-
--- 
-viresh
+> --
+> FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
+> according to speedtest.net.
