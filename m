@@ -1,127 +1,73 @@
-From: alex.bennee@linaro.org (Alex =?utf-8?Q?Benn=C3=A9e?=)
-Date: Fri, 03 Jul 2015 08:14:52 +0100
-Subject: [PATCH v7 08/11] KVM: arm64: introduce vcpu->arch.debug_ptr
-In-Reply-To: <20150702183440.GK11332@cbox>
-References: <1435775343-20034-1-git-send-email-alex.bennee@linaro.org>
- <1435775343-20034-9-git-send-email-alex.bennee@linaro.org>
- <20150702183440.GK11332@cbox>
-Message-ID: <87mvzdsoer.fsf@linaro.org>
+From: feng.wu@intel.com (Wu, Feng)
+Date: Fri, 3 Jul 2015 07:16:17 +0000
+Subject: [RFC 12/17] irq: bypass: Extend skeleton for ARM forwarding
+ control
+In-Reply-To: <55963469.9030805@redhat.com>
+References: <1435843047-6327-1-git-send-email-eric.auger@linaro.org>
+ <1435843047-6327-13-git-send-email-eric.auger@linaro.org>
+ <E959C4978C3B6342920538CF579893F0025E6C89@SHSMSX104.ccr.corp.intel.com>
+ <5596311A.3010703@redhat.com>
+ <E959C4978C3B6342920538CF579893F0025E70BF@SHSMSX104.ccr.corp.intel.com>
+ <55963469.9030805@redhat.com>
+Message-ID: <E959C4978C3B6342920538CF579893F0025E7167@SHSMSX104.ccr.corp.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
-Christoffer Dall <christoffer.dall@linaro.org> writes:
 
-> On Wed, Jul 01, 2015 at 07:29:00PM +0100, Alex Benn?e wrote:
->> This introduces a level of indirection for the debug registers. Instead
->> of using the sys_regs[] directly we store registers in a structure in
->> the vcpu. The new kvm_arm_reset_debug_ptr() sets the debug ptr to the
->> guest context.
->> 
->> This also entails updating the sys_regs code to access this new
->> structure. New access function have been added for each set of debug
->> registers. The generic functions are still used for the few registers
->> stored in the main context.
->> 
->> New access function pointers have been added to the sys_reg_desc
->> structure to support the GET/SET_ONE_REG ioctl operations.
->
-> Why is this needed?
+> -----Original Message-----
+> From: Paolo Bonzini [mailto:pbonzini at redhat.com]
+> Sent: Friday, July 03, 2015 3:06 PM
+> To: Wu, Feng; Eric Auger; eric.auger at st.com;
+> linux-arm-kernel at lists.infradead.org; kvmarm at lists.cs.columbia.edu;
+> kvm at vger.kernel.org; christoffer.dall at linaro.org; marc.zyngier at arm.com;
+> alex.williamson at redhat.com; avi.kivity at gmail.com; mtosatti at redhat.com;
+> joro at 8bytes.org; b.reynal at virtualopensystems.com
+> Cc: linux-kernel at vger.kernel.org; patches at linaro.org
+> Subject: Re: [RFC 12/17] irq: bypass: Extend skeleton for ARM forwarding
+> control
+> 
+> 
+> 
+> On 03/07/2015 09:00, Wu, Feng wrote:
+> >>> > > struct irq_bypass_consumer {
+> >>> > >        struct list_head node;
+> >>> > >        void *token;
+> >>> > > +      unsigned irq;	/*got from producer when registered*/
+> >>> > >        void (*add_producer)(struct irq_bypass_producer *,
+> >>> > >                             struct irq_bypass_consumer *);
+> >>> > >        void (*del_producer)(struct irq_bypass_producer *,
+> >>> > >                             struct irq_bypass_consumer *);
+> >>> > > +      void (*update)(struct irq_bypass_consumer *);
+> >>> > > };
+> >>> > >
+> >>> > > 'update' is used to update the IRTE, while irq is initialized when
+> >>> > > registered, which is used to find the right IRTE.
+> >> >
+> >> > Feel free to add "update" in your PI patches.  I am not sure if "irq"
+> >> > belongs here or in the containing struct.  You can play with both and
+> >> > submit the version that looks better to you.
+> > Thanks for your review, Paolo. In my understanding, irq comes from
+> > the producer side, while gsi belongs to the consumer, so we need
+> > to get the irq from the producer somewhere. I am not sure adding
+> > irq here is the good way, but what I need is in the 'update' function,
+> > I have irq, gsi in hand. :)
+> 
+> It's difficult to say without seeing the patches...  The IRQ is stored
+> in the producer already with Eric's changes.  If you need to store the
+> old IRQ value, because "update" needs to do something with it, then I
+> think "irq" belongs in the container struct.
+> 
+> Perhaps "update" needs to have a producer argument as well?
 
-Previously I had a hacky:
+I also consider this method, basically, I will call 'update' in irqfd_update(),
+but seems I need do extra things to get the producer structure (such as,
+iterate the producer list to find the one with the same 'token') before
+calling 'update' from consumer side. I am not sure it is worth doing
+that way.
 
-	if (r->access == trap_debug64)
-		return debug_get64(vcpu, r, reg, uaddr);
+Thanks,
+Feng
 
-Which used the same offset information. Now we have a cleaner:
-
-	if (r->set)
-		return (r->set)(vcpu, r, reg, uaddr);
-
-Which accesses the structure directly, as the trap functions do:
-
-	__u64 *r = &vcpu->arch.vcpu_debug_state.dbg_bvr[rd->reg];
-	if (copy_from_user(uaddr, r, KVM_REG_SIZE(reg->id)) != 0)
-		return -EFAULT;
-	return 0;
-
-<snip>
->> +#if 0
->> +static int debug_set64(struct kvm_vcpu *vcpu, const struct sys_reg_desc *rd,
->> +		const struct kvm_one_reg *reg, void __user *uaddr)
->> +{
->> +	__u64 *r = (__u64 *) ((void * )&vcpu->arch.vcpu_debug_state + rd->reg);
->> +	if (copy_from_user(uaddr, r, KVM_REG_SIZE(reg->id)) != 0)
->> +		return -EFAULT;
->> +	return 0;
->> +}
->> +
->> +static int debug_get64(struct kvm_vcpu *vcpu, const struct sys_reg_desc *rd,
->> +	const struct kvm_one_reg *reg, void __user *uaddr)
->> +{
->> +	__u64 *r = (__u64 *) ((void * )&vcpu->arch.vcpu_debug_state + rd->reg);
->> +	if (copy_to_user(uaddr, r, KVM_REG_SIZE(reg->id)) != 0)
->> +		return -EFAULT;
->> +	return 0;
->> +}
->> +#endif
->> +
->
-> what is this ifdef'ed block of code doing here?
-
-Oops. Yeah looks like I missed removing that after I finished the
-re-factor. These where the old get/set functions I used.
-
->
->>  int kvm_arm_sys_reg_get_reg(struct kvm_vcpu *vcpu, const struct kvm_one_reg *reg)
->>  {
->>  	const struct sys_reg_desc *r;
->> @@ -1303,6 +1530,9 @@ int kvm_arm_sys_reg_get_reg(struct kvm_vcpu *vcpu, const struct kvm_one_reg *reg
->>  	if (!r)
->>  		return get_invariant_sys_reg(reg->id, uaddr);
->>  
->> +	if (r->get)
->> +		return (r->get)(vcpu, r, reg, uaddr);
->> +
->>  	return reg_to_user(uaddr, &vcpu_sys_reg(vcpu, r->reg), reg->id);
->>  }
->>  
->> @@ -1321,6 +1551,9 @@ int kvm_arm_sys_reg_set_reg(struct kvm_vcpu *vcpu, const struct kvm_one_reg *reg
->>  	if (!r)
->>  		return set_invariant_sys_reg(reg->id, uaddr);
->>  
->> +	if (r->set)
->> +		return (r->set)(vcpu, r, reg, uaddr);
->> +
->>  	return reg_from_user(&vcpu_sys_reg(vcpu, r->reg), uaddr, reg->id);
->>  }
->>  
->> diff --git a/arch/arm64/kvm/sys_regs.h b/arch/arm64/kvm/sys_regs.h
->> index d411e25..9265e7d 100644
->> --- a/arch/arm64/kvm/sys_regs.h
->> +++ b/arch/arm64/kvm/sys_regs.h
->> @@ -55,6 +55,12 @@ struct sys_reg_desc {
->>  
->>  	/* Value (usually reset value) */
->>  	u64 val;
->> +
->> +	/* Get/Set functions, fallback if NULL */
->
-> Is this only meant for usersapce access or when should one use these?
-
-Yes for GET/SET
-
->
->> +	int (*get)(struct kvm_vcpu *vcpu, const struct sys_reg_desc *rd,
->> +		   const struct kvm_one_reg *reg, void __user *uaddr);
->> +	int (*set)(struct kvm_vcpu *vcpu, const struct sys_reg_desc *rd,
->> +		   const struct kvm_one_reg *reg, void __user *uaddr);
->>  };
->>  
->>  static inline void print_sys_reg_instr(const struct sys_reg_params *p)
->> -- 
->> 2.4.5
->> 
-
--- 
-Alex Benn?e
+> 
+> Paolo
