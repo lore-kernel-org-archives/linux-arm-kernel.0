@@ -1,108 +1,102 @@
-From: hanjun.guo@linaro.org (Hanjun Guo)
-Date: Fri, 03 Jul 2015 16:47:44 +0800
-Subject: [PATCH v2 6/9] irqchip / gic: Add stacked irqdomain support for
- ACPI based GICv2 init
-In-Reply-To: <20150630150719.GC12142@xora-haswell.xora.org.uk>
-References: <1434703572-26221-1-git-send-email-hanjun.guo@linaro.org>
- <1434703572-26221-7-git-send-email-hanjun.guo@linaro.org>
- <20150622172014.GB26129@red-moon> <5589772A.8070708@linaro.org>
- <20150623173845.GC31466@red-moon> <558E1DEE.3090900@linaro.org>
- <55910440.8070702@arm.com> <559282A0.8090601@linaro.org>
- <559288CA.40605@arm.com> <20150630150719.GC12142@xora-haswell.xora.org.uk>
-Message-ID: <55964C30.7020208@linaro.org>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Fri, 3 Jul 2015 14:24:35 +0530
+Subject: [PATCH 25/41] clocksource: tegra20: Migrate to new 'set-state'
+ interface
+In-Reply-To: <559593F3.5030802@linaro.org>
+References: <cover.1434622147.git.viresh.kumar@linaro.org>
+ <1888421925acbfbcc453488d254faa154cd0fc2b.1434622147.git.viresh.kumar@linaro.org>
+ <559593F3.5030802@linaro.org>
+Message-ID: <20150703085435.GC23297@linux>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/30/2015 11:07 PM, Graeme Gregory wrote:
-> On Tue, Jun 30, 2015 at 01:17:14PM +0100, Marc Zyngier wrote:
->> On 30/06/15 12:50, Hanjun Guo wrote:
->>> Hi Marc,
->>>
->>> On 06/29/2015 04:39 PM, Marc Zyngier wrote:
->>>> On 27/06/15 04:52, Hanjun Guo wrote:
->>>>> On 06/24/2015 01:38 AM, Lorenzo Pieralisi wrote:
->>>>>> On Tue, Jun 23, 2015 at 04:11:38PM +0100, Hanjun Guo wrote:
->>> [...]
->>>>>>
->>>>>>>>>      	for (i = 0; i < nr_irqs; i++)
->>>>>>>>>      		gic_irq_domain_map(domain, virq + i, hwirq + i);
->>>>>>>>> @@ -945,11 +952,11 @@ void __init gic_init_bases(unsigned int gic_nr, int irq_start,
->>>>>>>>>      		gic_irqs = 1020;
->>>>>>>>>      	gic->gic_irqs = gic_irqs;
->>>>>>>>>
->>>>>>>>> -	if (node) {		/* DT case */
->>>>>>>>> +	if (node || !acpi_disabled) {		/* DT or ACPI case */
->>>>>>>>>      		gic->domain = irq_domain_add_linear(node, gic_irqs,
->>>>>>>>>      						    &gic_irq_domain_hierarchy_ops,
->>>>>>>>>      						    gic);
->>>>>>
->>>>>> I think this is a bit more worrying, I mean passing a NULL node pointer to
->>>>>> the irqdomain layer which basically means you are booting out of ACPI
->>>>>
->>>>> I'm little confused here, would you mind explaining more for your
->>>>> worrying? To me, node pointer is optional and it's ok for ACPI
->>>>> case.
->>>>>
->>>>>> (for you, if that's true for the irq_domain_add_linear implementation
->>>>>> that's another story), the node pointer should be optional but you
->>>>>> need feedback from IRQ layer maintainers here.
->>>>>
->>>>> Sure.
->>>>
->>>> Frankly, I'd really like to see ACPI using the "node" parameter for
->>>> something useful. This would save having to cache pointers all over the
->>>> place, will make find_irq_host() work as expected... etc.
->>>>
->>>> See the comment at the top of linux/irqdomain.h :
->>>>
->>>> "... This code could thus be used on other architectures by replacing
->>>> those two by some sort of arch-specific void * "token" used to identify
->>>> interrupt controllers."
->>>
->>> To init GIC in ACPI, we can only use the table entry pointer as
->>> the token, but the ACPI static tables are early mem/io remapped
->>> memory at boot stage, and it will be not available after boot,
->>> also we need muti types of MADT enties to init GIC (GICC and GICD
->>> for GICv2, GICC or GICR and GICD for GICv3), not as DT, just
->>> one single node to include all the information needed to init
->>> the GIC.
->>
->> A single pointer would be enough, you don't need all of them.
->>
->>> We use ACPI handle for devices as node for DT when the namespace
->>> is available, but that's pretty late in the boot stage which GIC,
->>> SMP and timers were already initialized, so ACPI handle can not
->>> use as the token too.
->>>
->>> I see multi places just pass NULL as the pointer directly for
->>> irq_domain_add_linear() which works fine, and for ACPI, we tested
->>> this patch and also it works.
->>
->> Yes it works. But you're reinventing the wheel by keeping references
->> outside of the normal framework, which is simply going to make the code
->> more difficult to maintain in the long run.
->>
->> Putting NULL as the device_node parameter really means "this is a domain
->> I don't need to look up later". In your case, you will have to lookup
->> that domain, all the time. You're just doing it in your own little
->> corner, which is what bothers me.
->>
-> Hanjun, I think it should be possible that instead of looking up the
-> domains in our own bit of code. We can instead use a ptr to the
-> appropriate information as the token instead.
->
-> I don't think we have to replicate the behaviour of node, in the DT
-> case, but just do what is sensible for ACPI in this case.
+On 02-07-15, 21:41, Daniel Lezcano wrote:
+> >+	timer_writel(0, TIMER3_BASE + TIMER_PTV);
+> 
+> Replace with 'tegra_timer_shutdown'
 
-I'm trying to introduce a pointer which point to the GICD when GIC
-is initialized, this pointer will be used to match the irqdomain.
-In driver code, I will find this pointer with the gsi, then find the
-irqdomain match the pointer, then I hope I can remove acpi_irq_domain
-in the end.
+Looks fine now ?
 
-Marc, beyond this issue, do you have any more comments about this
-patch set? the framework of init GIC? and the code to init GICV3?
-if yes, I can address it along with this one together.
+---------------8<-----------------------
 
-Thanks
-Hanjun
+Message-Id: <2b6d1a867e100033f1f406fda39d358a4db80733.1435913653.git.viresh.kumar@linaro.org>
+From: Viresh Kumar <viresh.kumar@linaro.org>
+Date: Fri, 27 Feb 2015 13:39:52 +0530
+Subject: [PATCH] clocksource: tegra20: Migrate to new 'set-state' interface
+
+Migrate tegra20 driver to the new 'set-state' interface provided by
+clockevents core, the earlier 'set-mode' interface is marked obsolete
+now.
+
+This also enables us to implement callbacks for new states of clockevent
+devices, for example: ONESHOT_STOPPED.
+
+Cc: Thierry Reding <treding@nvidia.com>
+Cc: Stephen Warren <swarren@wwwdotorg.org>
+Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
+---
+ drivers/clocksource/tegra20_timer.c | 45 ++++++++++++++++++++-----------------
+ 1 file changed, 24 insertions(+), 21 deletions(-)
+
+diff --git a/drivers/clocksource/tegra20_timer.c b/drivers/clocksource/tegra20_timer.c
+index 5a112d72fc2d..6ebda1177e79 100644
+--- a/drivers/clocksource/tegra20_timer.c
++++ b/drivers/clocksource/tegra20_timer.c
+@@ -72,33 +72,36 @@ static int tegra_timer_set_next_event(unsigned long cycles,
+ 	return 0;
+ }
+ 
+-static void tegra_timer_set_mode(enum clock_event_mode mode,
+-				    struct clock_event_device *evt)
++static inline void timer_shutdown(struct clock_event_device *evt)
+ {
+-	u32 reg;
+-
+ 	timer_writel(0, TIMER3_BASE + TIMER_PTV);
++}
+ 
+-	switch (mode) {
+-	case CLOCK_EVT_MODE_PERIODIC:
+-		reg = 0xC0000000 | ((1000000/HZ)-1);
+-		timer_writel(reg, TIMER3_BASE + TIMER_PTV);
+-		break;
+-	case CLOCK_EVT_MODE_ONESHOT:
+-		break;
+-	case CLOCK_EVT_MODE_UNUSED:
+-	case CLOCK_EVT_MODE_SHUTDOWN:
+-	case CLOCK_EVT_MODE_RESUME:
+-		break;
+-	}
++static int tegra_timer_shutdown(struct clock_event_device *evt)
++{
++	timer_shutdown(evt);
++	return 0;
++}
++
++static int tegra_timer_set_periodic(struct clock_event_device *evt)
++{
++	u32 reg = 0xC0000000 | ((1000000 / HZ) - 1);
++
++	timer_shutdown(evt);
++	timer_writel(reg, TIMER3_BASE + TIMER_PTV);
++	return 0;
+ }
+ 
+ static struct clock_event_device tegra_clockevent = {
+-	.name		= "timer0",
+-	.rating		= 300,
+-	.features	= CLOCK_EVT_FEAT_ONESHOT | CLOCK_EVT_FEAT_PERIODIC,
+-	.set_next_event	= tegra_timer_set_next_event,
+-	.set_mode	= tegra_timer_set_mode,
++	.name			= "timer0",
++	.rating			= 300,
++	.features		= CLOCK_EVT_FEAT_ONESHOT |
++				  CLOCK_EVT_FEAT_PERIODIC,
++	.set_next_event		= tegra_timer_set_next_event,
++	.set_state_shutdown	= tegra_timer_shutdown,
++	.set_state_periodic	= tegra_timer_set_periodic,
++	.set_state_oneshot	= tegra_timer_shutdown,
++	.tick_resume		= tegra_timer_shutdown,
+ };
+ 
+ static u64 notrace tegra_read_sched_clock(void)
