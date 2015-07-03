@@ -1,37 +1,127 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 3 Jul 2015 10:03:06 +0100
-Subject: [PATCH v5] arm DMA: Fix allocation from CMA for coherent DMA
-In-Reply-To: <20150701111251.GA21981@e104818-lin.cambridge.arm.com>
-References: <1435699746-21395-1-git-send-email-lorenx4@gmail.com>
- <20150701111251.GA21981@e104818-lin.cambridge.arm.com>
-Message-ID: <20150703090305.GR7557@n2100.arm.linux.org.uk>
+From: andre.przywara@arm.com (Andre Przywara)
+Date: Fri, 3 Jul 2015 10:05:02 +0100
+Subject: [PATCH 1/7] KVM: api: add kvm_irq_routing_extended_msi
+In-Reply-To: <011f01d0b498$6a17aeb0$3e470c10$@samsung.com>
+References: <1435592237-17924-1-git-send-email-eric.auger@linaro.org>
+ <1435592237-17924-2-git-send-email-eric.auger@linaro.org>
+ <011f01d0b498$6a17aeb0$3e470c10$@samsung.com>
+Message-ID: <5596503E.6040902@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 01, 2015 at 12:12:51PM +0100, Catalin Marinas wrote:
-> On Tue, Jun 30, 2015 at 11:29:06PM +0200, Lorenzo Nava wrote:
-> > This patch allows the use of CMA for DMA coherent memory allocation.
-> > At the moment if the input parameter "is_coherent" is set to true
-> > the allocation is not made using the CMA, which I think is not the
-> > desired behaviour.
-> > 
-> > Signed-off-by: Lorenzo Nava <lorenx4@gmail.com>
-> > Reviewed-by: Catalin Marinas <catalin.marinas@arm.com>
+Hi Pavel,
+
+On 02/07/15 08:26, Pavel Fedin wrote:
+>  Hello!
 > 
-> If Russell doesn't have any objections, you can send the patch to
-> his patch system. See here for more information:
+>> -----Original Message-----
+>> From: kvm-owner at vger.kernel.org [mailto:kvm-owner at vger.kernel.org] On Behalf Of Eric Auger
+>> Sent: Monday, June 29, 2015 6:37 PM
+>> To: eric.auger at st.com; eric.auger at linaro.org; linux-arm-kernel at lists.infradead.org;
+>> marc.zyngier at arm.com; christoffer.dall at linaro.org; andre.przywara at arm.com;
+>> kvmarm at lists.cs.columbia.edu; kvm at vger.kernel.org
+>> Cc: linux-kernel at vger.kernel.org; patches at linaro.org; p.fedin at samsung.com; pbonzini at redhat.com
+>> Subject: [PATCH 1/7] KVM: api: add kvm_irq_routing_extended_msi
+>>
+>> On ARM, the MSI msg (address and data) comes along with
+>> out-of-band device ID information. The device ID encodes the device
+>> that composes the MSI msg. Let's create a new routing entry type,
+>> dubbed KVM_IRQ_ROUTING_EXTENDED_MSI and use the __u32 pad space
+>> to convey the device ID.
+>>
+>> Signed-off-by: Eric Auger <eric.auger@linaro.org>
+>>
+>> ---
+>>
+>> RFC -> PATCH
+>> - remove kvm_irq_routing_extended_msi and use union instead
+>> ---
+>>  Documentation/virtual/kvm/api.txt | 9 ++++++++-
+>>  include/uapi/linux/kvm.h          | 6 +++++-
+>>  2 files changed, 13 insertions(+), 2 deletions(-)
+>>
+>> diff --git a/Documentation/virtual/kvm/api.txt b/Documentation/virtual/kvm/api.txt
+>> index d20fd94..6426ae9 100644
+>> --- a/Documentation/virtual/kvm/api.txt
+>> +++ b/Documentation/virtual/kvm/api.txt
+>> @@ -1414,7 +1414,10 @@ struct kvm_irq_routing_entry {
+>>  	__u32 gsi;
+>>  	__u32 type;
+>>  	__u32 flags;
+>> -	__u32 pad;
+>> +	union {
+>> +		__u32 pad;
+>> +		__u32 devid;
+>> +	};
+>>  	union {
+>>  		struct kvm_irq_routing_irqchip irqchip;
+>>  		struct kvm_irq_routing_msi msi;
+> 
+>  devid is actually a part of MSI bunch. Shouldn't it be a part of struct kvm_irq_routing_msi then?
+> It also has reserved pad.
+> 
+>> @@ -1427,6 +1430,10 @@ struct kvm_irq_routing_entry {
+>>  #define KVM_IRQ_ROUTING_IRQCHIP 1
+>>  #define KVM_IRQ_ROUTING_MSI 2
+>>  #define KVM_IRQ_ROUTING_S390_ADAPTER 3
+>> +#define KVM_IRQ_ROUTING_EXTENDED_MSI 4
+>> +
+>> +In case of KVM_IRQ_ROUTING_EXTENDED_MSI routing type, devid is used to convey
+>> +the device ID.
+>>
+>>  No flags are specified so far, the corresponding field must be set to zero.
+> 
+> What if we use KVM_MSI_VALID_DEVID flag instead of new KVM_IRQ_ROUTING_EXTENDED_MSI definition? I
+> believe this would make an API more consistent and introduce less new definitions.
 
-I'm left wondering whether this patch is really want Lorenzo wants.
->From my reading of it, while this has the effect of allocating from
-CMA for coherent devices, it's no different from the non-coherent
-case, because by calling __alloc_from_contiguous(), we end up
-remapping the allocated memory, removing the cacheability status
-from the allocated pages.
+I like this approach, but it runs into problems:
+As you read above the current documentation says that the flags field
+must be zero and the current KVM_SET_GSI_ROUTING handler bails out if it
+isn't. So userland would need to know whether it's safe to set that
+field. Introducing a new KVM_CAP_... value seems overkill if we could
+just have a new routing entry type. So we could still reuse the existing
+struct kvm_irq_routing_msi (and extend that with the devid field), but
+we would have to add a new routing type number.
+Maybe we could collapse this into the existing MSI type + flag when
+handing it further down the kernel?
 
-This brings up an interesting point: presumably, it's been tested, and
-people are happy with the performance it's giving, inspite of it not
-returning cacheable memory... or maybe it hasn't been tested that much?
+Cheers,
+Andre.
 
--- 
-FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
-according to speedtest.net.
+> 
+>>
+>> diff --git a/include/uapi/linux/kvm.h b/include/uapi/linux/kvm.h
+>> index 2a23705..8484681 100644
+>> --- a/include/uapi/linux/kvm.h
+>> +++ b/include/uapi/linux/kvm.h
+>> @@ -841,12 +841,16 @@ struct kvm_irq_routing_s390_adapter {
+>>  #define KVM_IRQ_ROUTING_IRQCHIP 1
+>>  #define KVM_IRQ_ROUTING_MSI 2
+>>  #define KVM_IRQ_ROUTING_S390_ADAPTER 3
+>> +#define KVM_IRQ_ROUTING_EXTENDED_MSI 4
+>>
+>>  struct kvm_irq_routing_entry {
+>>  	__u32 gsi;
+>>  	__u32 type;
+>>  	__u32 flags;
+>> -	__u32 pad;
+>> +	union {
+>> +		__u32 pad;
+>> +		__u32 devid;
+>> +	};
+>>  	union {
+>>  		struct kvm_irq_routing_irqchip irqchip;
+>>  		struct kvm_irq_routing_msi msi;
+>> --
+>> 1.9.1
+>>
+>> --
+>> To unsubscribe from this list: send the line "unsubscribe kvm" in
+>> the body of a message to majordomo at vger.kernel.org
+>> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> 
+> Kind regards,
+> Pavel Fedin
+> Expert Engineer
+> Samsung Electronics Research center Russia
+> 
