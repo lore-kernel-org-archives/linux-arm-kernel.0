@@ -1,43 +1,127 @@
-From: pbonzini@redhat.com (Paolo Bonzini)
-Date: Fri, 3 Jul 2015 09:08:54 +0200
-Subject: [RFC 12/17] irq: bypass: Extend skeleton for ARM forwarding
- control
-In-Reply-To: <1435843047-6327-13-git-send-email-eric.auger@linaro.org>
-References: <1435843047-6327-1-git-send-email-eric.auger@linaro.org>
- <1435843047-6327-13-git-send-email-eric.auger@linaro.org>
-Message-ID: <55963506.8020200@redhat.com>
+From: alex.bennee@linaro.org (Alex =?utf-8?Q?Benn=C3=A9e?=)
+Date: Fri, 03 Jul 2015 08:14:52 +0100
+Subject: [PATCH v7 08/11] KVM: arm64: introduce vcpu->arch.debug_ptr
+In-Reply-To: <20150702183440.GK11332@cbox>
+References: <1435775343-20034-1-git-send-email-alex.bennee@linaro.org>
+ <1435775343-20034-9-git-send-email-alex.bennee@linaro.org>
+ <20150702183440.GK11332@cbox>
+Message-ID: <87mvzdsoer.fsf@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
+Christoffer Dall <christoffer.dall@linaro.org> writes:
 
-On 02/07/2015 15:17, Eric Auger wrote:
-> +	void (*stop_producer)(struct irq_bypass_producer *);
-> +	void (*resume_producer)(struct irq_bypass_producer *);
+> On Wed, Jul 01, 2015 at 07:29:00PM +0100, Alex Benn?e wrote:
+>> This introduces a level of indirection for the debug registers. Instead
+>> of using the sys_regs[] directly we store registers in a structure in
+>> the vcpu. The new kvm_arm_reset_debug_ptr() sets the debug ptr to the
+>> guest context.
+>> 
+>> This also entails updating the sys_regs code to access this new
+>> structure. New access function have been added for each set of debug
+>> registers. The generic functions are still used for the few registers
+>> stored in the main context.
+>> 
+>> New access function pointers have been added to the sys_reg_desc
+>> structure to support the GET/SET_ONE_REG ioctl operations.
+>
+> Why is this needed?
 
-Also, can you call these just "stop"/"resume" ...
+Previously I had a hacky:
 
-> +	void (*add_consumer)(struct irq_bypass_producer *,
-> +			     struct irq_bypass_consumer *);
-> +	void (*del_consumer)(struct irq_bypass_producer *,
-> +			     struct irq_bypass_consumer *);
->  };
->  
->  struct irq_bypass_consumer {
->  	struct list_head node;
->  	void *token;
-> -	void (*add_producer)(struct irq_bypass_producer *);
-> -	void (*del_producer)(struct irq_bypass_producer *);
-> +	unsigned int gsi;		/* the guest gsi */
-> +	struct kvm *kvm;
-> +	void (*stop_consumer)(struct irq_bypass_consumer *);
-> +	void (*resume_consumer)(struct irq_bypass_consumer *);
+	if (r->access == trap_debug64)
+		return debug_get64(vcpu, r, reg, uaddr);
 
-... and same here?  The KVM functions could be named
+Which used the same offset information. Now we have a cleaner:
 
-- kvm_arch_irq_bypass_add_producer
-- kvm_arch_irq_bypass_del_producer
-- kvm_arch_irq_bypass_stop
-- kvm_arch_irq_bypass_resume
+	if (r->set)
+		return (r->set)(vcpu, r, reg, uaddr);
 
-Paolo
+Which accesses the structure directly, as the trap functions do:
+
+	__u64 *r = &vcpu->arch.vcpu_debug_state.dbg_bvr[rd->reg];
+	if (copy_from_user(uaddr, r, KVM_REG_SIZE(reg->id)) != 0)
+		return -EFAULT;
+	return 0;
+
+<snip>
+>> +#if 0
+>> +static int debug_set64(struct kvm_vcpu *vcpu, const struct sys_reg_desc *rd,
+>> +		const struct kvm_one_reg *reg, void __user *uaddr)
+>> +{
+>> +	__u64 *r = (__u64 *) ((void * )&vcpu->arch.vcpu_debug_state + rd->reg);
+>> +	if (copy_from_user(uaddr, r, KVM_REG_SIZE(reg->id)) != 0)
+>> +		return -EFAULT;
+>> +	return 0;
+>> +}
+>> +
+>> +static int debug_get64(struct kvm_vcpu *vcpu, const struct sys_reg_desc *rd,
+>> +	const struct kvm_one_reg *reg, void __user *uaddr)
+>> +{
+>> +	__u64 *r = (__u64 *) ((void * )&vcpu->arch.vcpu_debug_state + rd->reg);
+>> +	if (copy_to_user(uaddr, r, KVM_REG_SIZE(reg->id)) != 0)
+>> +		return -EFAULT;
+>> +	return 0;
+>> +}
+>> +#endif
+>> +
+>
+> what is this ifdef'ed block of code doing here?
+
+Oops. Yeah looks like I missed removing that after I finished the
+re-factor. These where the old get/set functions I used.
+
+>
+>>  int kvm_arm_sys_reg_get_reg(struct kvm_vcpu *vcpu, const struct kvm_one_reg *reg)
+>>  {
+>>  	const struct sys_reg_desc *r;
+>> @@ -1303,6 +1530,9 @@ int kvm_arm_sys_reg_get_reg(struct kvm_vcpu *vcpu, const struct kvm_one_reg *reg
+>>  	if (!r)
+>>  		return get_invariant_sys_reg(reg->id, uaddr);
+>>  
+>> +	if (r->get)
+>> +		return (r->get)(vcpu, r, reg, uaddr);
+>> +
+>>  	return reg_to_user(uaddr, &vcpu_sys_reg(vcpu, r->reg), reg->id);
+>>  }
+>>  
+>> @@ -1321,6 +1551,9 @@ int kvm_arm_sys_reg_set_reg(struct kvm_vcpu *vcpu, const struct kvm_one_reg *reg
+>>  	if (!r)
+>>  		return set_invariant_sys_reg(reg->id, uaddr);
+>>  
+>> +	if (r->set)
+>> +		return (r->set)(vcpu, r, reg, uaddr);
+>> +
+>>  	return reg_from_user(&vcpu_sys_reg(vcpu, r->reg), uaddr, reg->id);
+>>  }
+>>  
+>> diff --git a/arch/arm64/kvm/sys_regs.h b/arch/arm64/kvm/sys_regs.h
+>> index d411e25..9265e7d 100644
+>> --- a/arch/arm64/kvm/sys_regs.h
+>> +++ b/arch/arm64/kvm/sys_regs.h
+>> @@ -55,6 +55,12 @@ struct sys_reg_desc {
+>>  
+>>  	/* Value (usually reset value) */
+>>  	u64 val;
+>> +
+>> +	/* Get/Set functions, fallback if NULL */
+>
+> Is this only meant for usersapce access or when should one use these?
+
+Yes for GET/SET
+
+>
+>> +	int (*get)(struct kvm_vcpu *vcpu, const struct sys_reg_desc *rd,
+>> +		   const struct kvm_one_reg *reg, void __user *uaddr);
+>> +	int (*set)(struct kvm_vcpu *vcpu, const struct sys_reg_desc *rd,
+>> +		   const struct kvm_one_reg *reg, void __user *uaddr);
+>>  };
+>>  
+>>  static inline void print_sys_reg_instr(const struct sys_reg_params *p)
+>> -- 
+>> 2.4.5
+>> 
+
+-- 
+Alex Benn?e
