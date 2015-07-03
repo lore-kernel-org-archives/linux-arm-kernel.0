@@ -1,43 +1,46 @@
-From: wsa@the-dreams.de (Wolfram Sang)
-Date: Fri, 3 Jul 2015 16:37:03 +0200
-Subject: Possible regression due to "tick: broadcast: Prevent livelock
- from event handler"
-In-Reply-To: <alpine.DEB.2.11.1507031612410.3916@nanos>
-References: <20150703024044.GB24695@verge.net.au>
- <20150703105441.GF1521@katana>
- <alpine.DEB.2.11.1507031511180.3916@nanos>
- <20150703133245.GA19284@katana>
- <alpine.DEB.2.11.1507031612410.3916@nanos>
-Message-ID: <20150703143703.GB19284@katana>
+From: tfiga@chromium.org (Tomasz Figa)
+Date: Fri, 3 Jul 2015 23:37:09 +0900
+Subject: [PATCH v2 3/5] drm/rockchip: vop: support plane scale
+In-Reply-To: <5596626F.5050003@rock-chips.com>
+References: <1435313249-4549-1-git-send-email-mark.yao@rock-chips.com>
+ <1435313249-4549-4-git-send-email-mark.yao@rock-chips.com>
+ <CAAFQd5A2j7MXrzOMVnsJr_WUKAFPaicv+r9LgwHccLim4fRk8g@mail.gmail.com>
+ <55965344.5050502@rock-chips.com>
+ <CAAFQd5B3NnUQRqdaXUz6BGCn-5rh1iXnfZXnQRDK3=nF_Ya7SA@mail.gmail.com>
+ <5596626F.5050003@rock-chips.com>
+Message-ID: <CAAFQd5AM1-w8ynyn_Usr8OitdXSUcU85scvcYCTEZebzLqLn0w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Fri, Jul 3, 2015 at 7:22 PM, Mark yao <mark.yao@rock-chips.com> wrote:
+> On 2015?07?03? 17:58, Tomasz Figa wrote:
+>>>>
+>>>> >>Aren't the scl_modes for CbCr planes always the same as for Y plane?
+>>>
+>>> >
+>>> >
+>>> >No, such as src(1920 x 1080) -> dst(1280x800), yuv format is NV12.
+>>> >so Y plane horizontal and vertical is scale down.
+>>> >
+>>> >but src_w = 1920 / 2 = 960 < 1280
+>>> >       src_h = 1080 / 2 = 540 < 800.
+>>> >
+>>> >So Cbcr horizontal and vertical is scale up.
+>>
+>> Sorry, I don't follow.
+>>
+>> If we scale down Y plane in NV12 from 1920x1080 to 1280x800, then
+>> original CbCr plane will be 960x540 and destination CbCr plane will be
+>> 640x400 (because CbCr plane of NV12 is subsampled 2x2, which is half
+>> the width and half the height of Y plane), so both planes are being
+>> scaled down.
+>>
+> destination CbCr plane is 1280x800, destination can't be subsample.
 
-> So this is a single core machine and uses the em_sti timer w/o the
-> broadcast nonsense. In Simons case it looks like em_sti is used as
-> broadcast device.
+Ah, I see, so internally it's always scalling to destination plane
+size. This means that calculation for both Y and CbCr must be done
+indeed, but even then you could use helper functions for that, since
+they differ only in parameters.
 
-We use the same board. Just my kernel has SMP=n.
-
-> Though the issues you see in the highres=n case might be the same as
-> the ones Simon is observing.
-
-I hope so. One good thing about the issue I see is that it is 100%
-reproducable.
-
-> So in that nohz=y highres=n case, does adding idle=poll on the command
-> line fix the issue?
-
-Nope, still hangs.
-
-Thanks for assisting!
-
-   Wolfram
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150703/348e11fb/attachment.sig>
+Best regards,
+Tomasz
