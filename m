@@ -1,34 +1,34 @@
-From: timur@codeaurora.org (Timur Tabi)
-Date: Fri, 3 Jul 2015 10:46:11 -0400
-Subject: [PATCH 2/4] hvc_dcc: don't ignore errors during initialization
-In-Reply-To: <55947DCD.1020605@codeaurora.org>
-References: <1435699387-32591-1-git-send-email-timur@codeaurora.org>
- <1435699387-32591-2-git-send-email-timur@codeaurora.org>
- <55947DCD.1020605@codeaurora.org>
-Message-ID: <42D8621F-E36D-4F4F-9143-3F7773EC834E@codeaurora.org>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Fri, 3 Jul 2015 16:41:16 +0200
+Subject: crypto: marvell/CESA: Issues with non cache-line aligned buffers
+In-Reply-To: <20150703131059.GX7557@n2100.arm.linux.org.uk>
+References: <20150703114305.15611807@bbrezillon>
+ <20150703131059.GX7557@n2100.arm.linux.org.uk>
+Message-ID: <20150703144116.GK13481@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Jul 1, 2015, at 7:54 PM, Stephen Boyd wrote:
-
->> 
->> +	/* Returns -1 if error */
->> +	ret = hvc_instantiate(0, 0, &hvc_dcc_get_put_ops);
->> +
->> +	return ret < 0 ? -ENODEV : 0;
+> A few other things I notice when looking at this code:
 > 
-> Why not just return the value that hvc_instantiate returns? And maybe we
-> should change those -1 in hvc_instantiate into -EPERM?
-
-Well, I didn't want to change common HVC code.  I would have to change all the other drivers that call hvc_instatiate as well.  I agree that returning -1 is bad, but fixing that is something that should be done in another patch.
-
->> 
->> -	hvc_alloc(0, 0, &hvc_dcc_get_put_ops, 128);
->> -	return 0;
->> +	p = hvc_alloc(0, 0, &hvc_dcc_get_put_ops, 128);
->> +
->> +	return IS_ERR(p) ? PTR_ERR(p) : 0;
+>         /* Not all platforms can gate the clock, so it is not
+>            an error if the clock does not exists. */
+>         cp->clk = clk_get(&pdev->dev, NULL);
+>         if (!IS_ERR(cp->clk))
+>                 clk_prepare_enable(cp->clk);
 > 
-> return PTR_ERR_OR_ZERO()?
+> So, if clk_get() returns PTR_ERR(-EPROBE_DEFER) we treat that clock as
+> missing?  Is that really the behaviour you want there?
 
-Yes, thanks.  I'll change it.
+Hi Russell
+
+I probably added that to the older driver and it got copied into the
+newer one.
+
+The clock it is using is added to the system using CLK_OF_DECLARE()
+This results in an entry in the __clk_of_table table. That table is
+walked in of_clk_init(), which is called by time_init() in
+arch/arc/kernel/time.c, early in the boot.
+
+If we get -EPROBE_DEFER, something is seriously wrong.
+
+   Andrew
