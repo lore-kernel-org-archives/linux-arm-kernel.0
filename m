@@ -1,44 +1,51 @@
-From: lorenx4@gmail.com (Lorenzo Nava)
-Date: Fri, 3 Jul 2015 13:23:24 +0200
-Subject: [PATCH v5] arm DMA: Fix allocation from CMA for coherent DMA
-In-Reply-To: <20150703090305.GR7557@n2100.arm.linux.org.uk>
-References: <1435699746-21395-1-git-send-email-lorenx4@gmail.com>
- <20150701111251.GA21981@e104818-lin.cambridge.arm.com>
- <20150703090305.GR7557@n2100.arm.linux.org.uk>
-Message-ID: <CAE=W-e0utnP2RyFrK1_ex8ZDjvuA2kUm0Z6wnGjUSeXZC302pQ@mail.gmail.com>
+From: andre.przywara@arm.com (Andre Przywara)
+Date: Fri,  3 Jul 2015 12:26:31 +0100
+Subject: [PATCH v5 03/10] irq: add irq__get_nr_allocated_lines
+In-Reply-To: <1435922798-14375-1-git-send-email-andre.przywara@arm.com>
+References: <1435922798-14375-1-git-send-email-andre.przywara@arm.com>
+Message-ID: <1435922798-14375-4-git-send-email-andre.przywara@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 3, 2015 at 11:03 AM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> On Wed, Jul 01, 2015 at 12:12:51PM +0100, Catalin Marinas wrote:
->> On Tue, Jun 30, 2015 at 11:29:06PM +0200, Lorenzo Nava wrote:
->> > This patch allows the use of CMA for DMA coherent memory allocation.
->> > At the moment if the input parameter "is_coherent" is set to true
->> > the allocation is not made using the CMA, which I think is not the
->> > desired behaviour.
->> >
->> > Signed-off-by: Lorenzo Nava <lorenx4@gmail.com>
->> > Reviewed-by: Catalin Marinas <catalin.marinas@arm.com>
->>
->> If Russell doesn't have any objections, you can send the patch to
->> his patch system. See here for more information:
->
-> I'm left wondering whether this patch is really want Lorenzo wants.
-> From my reading of it, while this has the effect of allocating from
-> CMA for coherent devices, it's no different from the non-coherent
-> case, because by calling __alloc_from_contiguous(), we end up
-> remapping the allocated memory, removing the cacheability status
-> from the allocated pages.
->
-> This brings up an interesting point: presumably, it's been tested, and
-> people are happy with the performance it's giving, inspite of it not
-> returning cacheable memory... or maybe it hasn't been tested that much?
->
+From: Marc Zyngier <marc.zyngier@arm.com>
 
-As Catalin correctly pointed out, I always consider that this patch:
+The ARM GIC emulation needs to be told the number of interrupts
+it has to support. As commit 1c262fa1dc7bc ("kvm tools: irq: make
+irq__alloc_line generic") made the interrupt counter private,
+add a new accessor returning the number of interrupt lines we've
+allocated so far.
 
+Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+Signed-off-by: Andre Przywara <andre.przywara@arm.com>
+---
+ include/kvm/irq.h | 1 +
+ irq.c             | 5 +++++
+ 2 files changed, 6 insertions(+)
 
-> --
-> FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
-> according to speedtest.net.
+diff --git a/include/kvm/irq.h b/include/kvm/irq.h
+index 4cec6f0..8a78e43 100644
+--- a/include/kvm/irq.h
++++ b/include/kvm/irq.h
+@@ -11,6 +11,7 @@
+ struct kvm;
+ 
+ int irq__alloc_line(void);
++int irq__get_nr_allocated_lines(void);
+ 
+ int irq__init(struct kvm *kvm);
+ int irq__exit(struct kvm *kvm);
+diff --git a/irq.c b/irq.c
+index 33ea8d2..71eaa05 100644
+--- a/irq.c
++++ b/irq.c
+@@ -7,3 +7,8 @@ int irq__alloc_line(void)
+ {
+ 	return next_line++;
+ }
++
++int irq__get_nr_allocated_lines(void)
++{
++	return next_line - KVM_IRQ_OFFSET;
++}
+-- 
+2.3.5
