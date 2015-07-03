@@ -1,55 +1,45 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Fri, 3 Jul 2015 10:57:56 +0100
-Subject: [PATCH] GICv3: Add ITS entry to THUNDER dts
-In-Reply-To: <D2BD6D7B-E4B2-46B8-A324-9261DCFA2642@caviumnetworks.com>
-References: <1435345943-31833-1-git-send-email-tchalamarla@caviumnetworks.com>
- <D2BD6D7B-E4B2-46B8-A324-9261DCFA2642@caviumnetworks.com>
-Message-ID: <20150703095755.GH25907@e104818-lin.cambridge.arm.com>
+From: peter.maydell@linaro.org (Peter Maydell)
+Date: Fri, 3 Jul 2015 10:57:59 +0100
+Subject: [PATCH 05/10] KVM: arm/arm64: vgic: Relax vgic_can_sample_irq for
+ edge IRQs
+In-Reply-To: <55965AFF.30509@arm.com>
+References: <1433783045-8002-1-git-send-email-marc.zyngier@arm.com>
+ <1433783045-8002-6-git-send-email-marc.zyngier@arm.com>
+ <20150630201933.GA11332@cbox>
+ <5593B040.6050208@arm.com> <20150701115820.GC17890@cbox>
+ <55942F00.6000306@arm.com>
+ <20150702162359.GJ11332@cbox> <55965AFF.30509@arm.com>
+Message-ID: <CAFEAcA_TrNQvR-fooGXSg=04CNAULEpNr54iwXjqA=qvqYuLZw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 02, 2015 at 08:26:02PM +0000, Chalamarla, Tirumalesh wrote:
-> > On Jun 26, 2015, at 12:12 PM, Tirumalesh Chalamarla <tchalamarla@caviumnetworks.com> wrote:
-> > 
-> > From: Tirumalesh Chalamarla <tchalamarla@cavium.com>
-> > 
-> > The PCIe host controller uses MSIs provided by GICv3 ITS. Enable it on
-> > Thunder SoCs by adding an entry to DT.
-> > 
-> > Signed-off-by: Tirumalesh Chalamarla <tchalamarla@cavium.com>
-> > Acked-by: Marc Zyngier <marc.zyngier@arm.com>
-> > ---
-> > arch/arm64/boot/dts/cavium/thunder-88xx.dtsi | 9 +++++++++
-> > 1 file changed, 9 insertions(+)
-> > 
-> > diff --git a/arch/arm64/boot/dts/cavium/thunder-88xx.dtsi b/arch/arm64/boot/dts/cavium/thunder-88xx.dtsi
-> > index d8c0bdc..9cb7cf9 100644
-> > --- a/arch/arm64/boot/dts/cavium/thunder-88xx.dtsi
-> > +++ b/arch/arm64/boot/dts/cavium/thunder-88xx.dtsi
-> > @@ -376,10 +376,19 @@
-> > 		gic0: interrupt-controller at 8010,00000000 {
-> > 			compatible = "arm,gic-v3";
-> > 			#interrupt-cells = <3>;
-> > +			#address-cells = <2>;
-> > +			#size-cells = <2>;
-> > +			ranges;
-> > 			interrupt-controller;
-> > 			reg = <0x8010 0x00000000 0x0 0x010000>, /* GICD */
-> > 			      <0x8010 0x80000000 0x0 0x600000>; /* GICR */
-> > 			interrupts = <1 9 0xf04>;
-> > +
-> > +			its: gic-its at 8010,00020000 {
-> > +				compatible = "arm,gic-v3-its";
-> > +				msi-controller;
-> > +				reg = <0x8010 0x20000 0x0 0x200000>;
-> > +			};
-> > 		};
-> > 
-> > 		uaa0: serial at 87e0,24000000 {
-> 
-> is it possible to pull this for 4.2?
+On 3 July 2015 at 10:50, Marc Zyngier <marc.zyngier@arm.com> wrote:
+> On 02/07/15 17:23, Christoffer Dall wrote:
+>> If we had a different *shared* device than the timer which is
+>> edge-triggered, don't we then also need to capture the physical
+>> distributor's pending state along with the state of the device unless we
+>> assume that upon restoring the state for the device count on the device
+>> to have another rising/falling edge to trigger the interrupt again? (I
+>> assume the line would always go high for a level-triggered interrupt in
+>> this case).
+>
+> I'd definitely assume that restoring the state of the device would make
+> it generate an interrupt. This has to be a property of the device,
+> otherwise it is not really shareable between vcpus.
 
-The dts files go in via the arm-soc tree (cc'ing arm at kernel.org).
+FWIW, QEMU's modelling approach to this is to say that devices
+do *not* generate interrupts on restore. If the device had
+previously generated an interrupt then this should be captured
+by the state of the interrupt controller (or whatever else
+it is connected to) and dealt with when the GIC state is restored.
 
--- 
-Catalin
+If you say that restoring the device state is supposed to
+generate an interrupt, you introduce an ordering requirement
+that the state of the interrupt controller is restored
+first and the device second (otherwise the incoming GIC
+state will overwrite the interrupt that the device just
+generated), which isn't ideal (especially since QEMU
+makes no guarantees about restore order between devices).
+
+thanks
+-- PMM
