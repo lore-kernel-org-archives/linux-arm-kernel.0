@@ -1,87 +1,55 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Fri, 03 Jul 2015 11:55:29 +0200
-Subject: [PATCH v2 4/4] ARM: mvebu: Warn about the wake-up sources not
- taken into account in suspend
-In-Reply-To: <20150701180429.3c3ef6de@free-electrons.com>
-References: <1435684740-24912-1-git-send-email-gregory.clement@free-electrons.com>	<1435684740-24912-5-git-send-email-gregory.clement@free-electrons.com>
- <20150701180429.3c3ef6de@free-electrons.com>
-Message-ID: <55965C11.3090707@free-electrons.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Fri, 3 Jul 2015 10:57:56 +0100
+Subject: [PATCH] GICv3: Add ITS entry to THUNDER dts
+In-Reply-To: <D2BD6D7B-E4B2-46B8-A324-9261DCFA2642@caviumnetworks.com>
+References: <1435345943-31833-1-git-send-email-tchalamarla@caviumnetworks.com>
+ <D2BD6D7B-E4B2-46B8-A324-9261DCFA2642@caviumnetworks.com>
+Message-ID: <20150703095755.GH25907@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Thu, Jul 02, 2015 at 08:26:02PM +0000, Chalamarla, Tirumalesh wrote:
+> > On Jun 26, 2015, at 12:12 PM, Tirumalesh Chalamarla <tchalamarla@caviumnetworks.com> wrote:
+> > 
+> > From: Tirumalesh Chalamarla <tchalamarla@cavium.com>
+> > 
+> > The PCIe host controller uses MSIs provided by GICv3 ITS. Enable it on
+> > Thunder SoCs by adding an entry to DT.
+> > 
+> > Signed-off-by: Tirumalesh Chalamarla <tchalamarla@cavium.com>
+> > Acked-by: Marc Zyngier <marc.zyngier@arm.com>
+> > ---
+> > arch/arm64/boot/dts/cavium/thunder-88xx.dtsi | 9 +++++++++
+> > 1 file changed, 9 insertions(+)
+> > 
+> > diff --git a/arch/arm64/boot/dts/cavium/thunder-88xx.dtsi b/arch/arm64/boot/dts/cavium/thunder-88xx.dtsi
+> > index d8c0bdc..9cb7cf9 100644
+> > --- a/arch/arm64/boot/dts/cavium/thunder-88xx.dtsi
+> > +++ b/arch/arm64/boot/dts/cavium/thunder-88xx.dtsi
+> > @@ -376,10 +376,19 @@
+> > 		gic0: interrupt-controller at 8010,00000000 {
+> > 			compatible = "arm,gic-v3";
+> > 			#interrupt-cells = <3>;
+> > +			#address-cells = <2>;
+> > +			#size-cells = <2>;
+> > +			ranges;
+> > 			interrupt-controller;
+> > 			reg = <0x8010 0x00000000 0x0 0x010000>, /* GICD */
+> > 			      <0x8010 0x80000000 0x0 0x600000>; /* GICR */
+> > 			interrupts = <1 9 0xf04>;
+> > +
+> > +			its: gic-its at 8010,00020000 {
+> > +				compatible = "arm,gic-v3-its";
+> > +				msi-controller;
+> > +				reg = <0x8010 0x20000 0x0 0x200000>;
+> > +			};
+> > 		};
+> > 
+> > 		uaa0: serial at 87e0,24000000 {
+> 
+> is it possible to pull this for 4.2?
 
-Thanks,
-
-Gregory
-On 01/07/2015 18:04, Thomas Petazzoni wrote:
-> Hello,
-> 
-> On Tue, 30 Jun 2015 19:19:00 +0200, Gregory CLEMENT wrote:
->> On the Armada 370/XP/38x/39x SoCs when the suspend to ram feature is
->> supported, the SoC is shutdown and will be waken up by an external
-> 
-> waken -> woken
-OK
-
-> 
->> micro-controller, so there is no possibility to setup wake-up source
-> 
-> source -> sources
-OK
-> 
->> from Linux. However, in standby mode, the SoCs stay powered and it is
-> 
-> stay powered -> stays powered on
-
-SoCs are plural (but maybe there is a special rule for acronym). However
-to be more coherent I will also make the previous SoC plural too.
-
-
-> 
->> possible to wake-up from any interrupt sources. As, when user decide to
->> setup a wake-up source, there is no way to know if they will be
->> wake-up source from suspend or from standby, then we chose allowing to
->> setup all the interrupt as wake-up sources.
-> 
-> Hum. "Since when the users configures the enabled wake-up sources there
-> is no way to know if the user will be doing suspend to RAM or standby,
-> we just allow all wake-up sources to be enabled, and only warn when
-> entering suspend to RAM".
-OK
-
-> 
->> diff --git a/arch/arm/mach-mvebu/pm.c b/arch/arm/mach-mvebu/pm.c
->> index 264073a777d8..4402dcfa7c56 100644
->> --- a/arch/arm/mach-mvebu/pm.c
->> +++ b/arch/arm/mach-mvebu/pm.c
->> @@ -235,6 +235,7 @@ static int mvebu_pm_enter(suspend_state_t state)
->>  		cpu_do_idle();
->>  		break;
->>  	case PM_SUSPEND_MEM:
->> +		pr_warn("None of the wakeup sources will be taken into account in suspend to ram\n");
-> 
-> We already had some discussion about this, and I believe this continue
-> to be confusing: there are some wake-up sources taken into account when
-> in suspend to RAM: the special button used by the micro-controller. It
-> is indeed not a wake-up source in the Linux sense, but it is still a
-> wake-up source. With such a message, the user may believe that there is
-> simply no way of resuming the platform.
-
-Yes you're right, I was speak about the linux wakeup source, but it is
-confusing for a "standard" user.
-
-> 
-> Maybe just:
-> 
-> 	pr_warn("Entering suspend to RAM. Only special wake-up sources will resume the system\n");
-I will take this.
-
-Thanks,
-
-Gregory
+The dts files go in via the arm-soc tree (cc'ing arm at kernel.org).
 
 -- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+Catalin
