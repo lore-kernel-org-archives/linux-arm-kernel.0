@@ -1,99 +1,146 @@
-From: tfiga@chromium.org (Tomasz Figa)
-Date: Fri, 3 Jul 2015 18:24:11 +0900
-Subject: [PATCH v2 5/5] drm/rockchip: default enable win2/3 area0 bit
-In-Reply-To: <5596457F.5090601@rock-chips.com>
-References: <1435313249-4549-1-git-send-email-mark.yao@rock-chips.com>
- <1435313432-4923-1-git-send-email-mark.yao@rock-chips.com>
- <CAAFQd5D4W1+ShB4zpSJrBiFYWh21axJoGoQ77NwXzhSRapysgA@mail.gmail.com>
- <5596457F.5090601@rock-chips.com>
-Message-ID: <CAAFQd5BCT_j1ZxMaaA-qaFct6+-VTJs4mEsZzGuFc=nL9jGNDA@mail.gmail.com>
+From: yong.wu@mediatek.com (Yong Wu)
+Date: Fri, 3 Jul 2015 17:27:29 +0800
+Subject: [PATCH v2 2/4] iommu: Implement common IOMMU ops for DMA mapping
+In-Reply-To: <bf63d80c36533aa4dcc401b5a4b312ba00237e1c.1434036796.git.robin.murphy@arm.com>
+References: <cover.1434036796.git.robin.murphy@arm.com>
+ <bf63d80c36533aa4dcc401b5a4b312ba00237e1c.1434036796.git.robin.murphy@arm.com>
+Message-ID: <1435915649.21346.11.camel@mhfsdcap03>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 3, 2015 at 5:19 PM, Mark yao <mark.yao@rock-chips.com> wrote:
-> On 2015?07?03? 16:02, Tomasz Figa wrote:
->>
->> Hi Mark,
->>
->> Please see my comments inline.
->>
->> On Fri, Jun 26, 2015 at 7:10 PM, Mark Yao <mark.yao@rock-chips.com> wrote:
->>>
->>> Win2/3 support 4 area display, but now havn't found a suitable
->>> way to use it, and it enable by win gate and area gate,
->>> so default enable area0 gate, so that its behaviour just like a
->>> win.
->>
->> So I assume this means that currently, without those bits set, win2
->> and win3 do not work? This would make this patch a fix maybe even with
->> a potential backportability.
->
->
-> Yes, without this patch, all win2/3 area gate default disabled.
-> vop_update_plane_event call win enable only enable the win gate.
->
->
->>
->>> Signed-off-by: Mark Yao <mark.yao@rock-chips.com>
->>> ---
->>> Changes in v2: None
->>>
->>>   drivers/gpu/drm/rockchip/rockchip_drm_vop.c |    6 ++++++
->>>   1 file changed, 6 insertions(+)
->>>
->>> diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
->>> b/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
->>> index 40107bb..e001d26 100644
->>> --- a/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
->>> +++ b/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
->>> @@ -337,6 +337,12 @@ static const struct vop_reg_data
->>> vop_init_reg_table[] = {
->>>          {DSP_CTRL0, 0x00000000},
->>>          {WIN0_CTRL0, 0x00000080},
->>>          {WIN1_CTRL0, 0x00000080},
->>> +       /*
->>> +        * Todo: win2/3 support area func, but now havn't found a
->>> suitable
->>> +        * way to use it, so default enable area0 as a win display.
->>
->> TODO: Win2/3 support multiple area function, but we haven't found
->> a suitable way to use it yet, so let's just use them as other windows
->> with only area 0 enabled.
->>
->>> +        */
->>> +       {WIN2_CTRL0, 0x00000010},
->>> +       {WIN3_CTRL0, 0x00000010},
->>
->> Anyway, is it enough to program those registers one time in
->> vop_initial()? Won't they get cleared when VOP is power cycled, e.g.
->> in case of DPMS off and on? Maybe instead this could be done in
->> vop_update_plane_event() for windows that need it?
->
-> There are two gate for Win2/3,
-> at VOP_WIN3_CTRL0:
->         bit[0], "win3_en"
->             this gating all the area.
->
->         bit[4], win3_mst0_en
->         bit[5], win3_mst1_en
->         bit[6], win3_mst2_en
->         bit[7], win3_mst3_en
->             those gate each area.
->
-> This patch default enable win3_mst0_en, so control bit[0]"win3_en" that cat
-> power on/off this window.
->
-> vop_update_plane_event()/ vop_disable_plane() only can control
-> bit[0]"win3_en".
->
->
-> So this patch is enough to enable window2/3 area 0.
+On Thu, 2015-06-11 at 16:54 +0100, Robin Murphy wrote:
+> Taking inspiration from the existing arch/arm code, break out some
+> generic functions to interface the DMA-API to the IOMMU-API. This will
+> do the bulk of the heavy lifting for IOMMU-backed dma-mapping.
+> 
+> Signed-off-by: Robin Murphy <robin.murphy@arm.com>
+> ---
+>  drivers/iommu/Kconfig     |   7 +
+>  drivers/iommu/Makefile    |   1 +
+>  drivers/iommu/dma-iommu.c | 560 ++++++++++++++++++++++++++++++++++++++++++++++
+>  include/linux/dma-iommu.h |  94 ++++++++
+>  4 files changed, 662 insertions(+)
+>  create mode 100644 drivers/iommu/dma-iommu.c
+>  create mode 100644 include/linux/dma-iommu.h
+> 
+> diff --git a/drivers/iommu/Kconfig b/drivers/iommu/Kconfig
+> index 1ae4e54..9107b6e 100644
+> --- a/drivers/iommu/Kconfig
+> +++ b/drivers/iommu/Kconfig
+> @@ -48,6 +48,13 @@ config OF_IOMMU
+>         def_bool y
+>         depends on OF && IOMMU_API
+>  
+> +# IOMMU-agnostic DMA-mapping layer
+> +config IOMMU_DMA
+> +	bool
+> +	depends on NEED_SG_DMA_LENGTH
+> +	select IOMMU_API
+> +	select IOMMU_IOVA
+> +
+>  config FSL_PAMU
+>  	bool "Freescale IOMMU support"
+>  	depends on PPC32
+> diff --git a/drivers/iommu/Makefile b/drivers/iommu/Makefile
+> index 080ffab..574b241 100644
+> --- a/drivers/iommu/Makefile
+> +++ b/drivers/iommu/Makefile
+> @@ -1,6 +1,7 @@
+>  obj-$(CONFIG_IOMMU_API) += iommu.o
+>  obj-$(CONFIG_IOMMU_API) += iommu-traces.o
+>  obj-$(CONFIG_IOMMU_API) += iommu-sysfs.o
+> +obj-$(CONFIG_IOMMU_DMA) += dma-iommu.o
+>  obj-$(CONFIG_IOMMU_IO_PGTABLE) += io-pgtable.o
+>  obj-$(CONFIG_IOMMU_IO_PGTABLE_LPAE) += io-pgtable-arm.o
+>  obj-$(CONFIG_IOMMU_IOVA) += iova.o
+[snip]
+> +
+> +/**
+> + * iommu_dma_alloc - Allocate and map a buffer contiguous in IOVA space
+> + * @dev: Device to allocate memory for. Must be a real device
+> + *	 attached to an iommu_dma_domain
+> + * @size: Size of buffer in bytes
+> + * @gfp: Allocation flags
+> + * @prot: IOMMU mapping flags
+> + * @coherent: Which dma_mask to base IOVA allocation on
+> + * @handle: Out argument for allocated DMA handle
+> + * @flush_page: Arch callback to flush a single page from caches as
+> + *		necessary. May be NULL for coherent allocations
+> + *
+> + * If @size is less than PAGE_SIZE, then a full CPU page will be allocated,
+> + * but an IOMMU which supports smaller pages might not map the whole thing.
+> + * For now, the buffer is unconditionally zeroed for compatibility
+> + *
+> + * Return: Array of struct page pointers describing the buffer,
+> + *	   or NULL on failure.
+> + */
+> +struct page **iommu_dma_alloc(struct device *dev, size_t size, gfp_t gfp,
+> +		int prot, bool coherent, dma_addr_t *handle,
+> +		void (*flush_page)(const void *, phys_addr_t))
+> +{
+> +	struct iommu_dma_domain *dom = arch_get_dma_domain(dev);
+> +	struct iova_domain *iovad = dom->iovad;
+> +	struct iova *iova;
+> +	struct page **pages;
+> +	struct sg_table sgt;
+> +	struct sg_mapping_iter miter;
+> +	dma_addr_t dma_addr;
+> +	unsigned int count = PAGE_ALIGN(size) >> PAGE_SHIFT;
+> +
+> +	*handle = DMA_ERROR_CODE;
 
-That's right. However, the vop_init_reg_table[] is only used at probe
-time by vop_initial() and register settings listed there are not
-applied any time later. If we call DPMS off, which will turn the VOP
-off and in turn also the whole power domain off, won't the registers
-be reset to default values (e.g. zeroed)?
+Hi Robin,
 
-Best regards,
-Tomasz
+  Compare with the dma before, You delete this line here.
+    
+          size = PAGE_ALIGN(size);
+
+  Do you expect the user should make sure the size must be aligned?
+
+  so do __iommu_free_attrs.
+
+> +
+> +	/* IOMMU can map any pages, so himem can also be used here */
+> +	gfp |= __GFP_NOWARN | __GFP_HIGHMEM;
+> +	pages = __iommu_dma_alloc_pages(count, gfp);
+> +	if (!pages)
+> +		return NULL;
+> +
+> +	iova = __alloc_iova(dev, size, coherent);
+> +	if (!iova)
+> +		goto out_free_pages;
+> +
+> +	if (sg_alloc_table_from_pages(&sgt, pages, count, 0, size, GFP_KERNEL))
+> +		goto out_free_iova;
+> +
+> +	dma_addr = iova_dma_addr(iovad, iova);
+> +	if (iommu_map_sg(dom->domain, dma_addr, sgt.sgl, sgt.orig_nents, prot)
+> +			< size)
+> +		goto out_free_sg;
+> +
+> +	/* Using the non-flushing flag since we're doing our own */
+> +	sg_miter_start(&miter, sgt.sgl, sgt.orig_nents, SG_MITER_FROM_SG);
+> +	while (sg_miter_next(&miter)) {
+> +		memset(miter.addr, 0, PAGE_SIZE);
+> +		if (flush_page)
+> +			flush_page(miter.addr, page_to_phys(miter.page));
+> +	}
+> +	sg_miter_stop(&miter);
+> +	sg_free_table(&sgt);
+> +
+> +	*handle = dma_addr;
+> +	return pages;
+> +
+> +out_free_sg:
+> +	sg_free_table(&sgt);
+> +out_free_iova:
+> +	__free_iova(iovad, iova);
+> +out_free_pages:
+> +	__iommu_dma_free_pages(pages, count);
+> +	return NULL;
+> +}
+> +
+[...]
+> +
+> +#endif	/* __KERNEL__ */
+> +#endif	/* __DMA_IOMMU_H */
