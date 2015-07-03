@@ -1,119 +1,75 @@
 From: tremyfr@gmail.com (Philippe Reynes)
-Date: Sat,  4 Jul 2015 01:15:16 +0200
-Subject: [PATCH v4 3/7] rtc: mxc: use a second rtc clock
+Date: Sat,  4 Jul 2015 01:15:17 +0200
+Subject: [PATCH v4 4/7] rtc: mxc: add support of device tree
 In-Reply-To: <1435965320-1478-1-git-send-email-tremyfr@gmail.com>
 References: <1435965320-1478-1-git-send-email-tremyfr@gmail.com>
-Message-ID: <1435965320-1478-4-git-send-email-tremyfr@gmail.com>
+Message-ID: <1435965320-1478-5-git-send-email-tremyfr@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The mxc RTC needs two clocks, one for the input
-reference, and one for the IP. But this driver
-was only using one clock (for the reference).
-This patch add the second clock (for the IP).
+Add device tree support for the mxc rtc driver.
 
+Acked-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
 Signed-off-by: Philippe Reynes <tremyfr@gmail.com>
 ---
- drivers/rtc/rtc-mxc.c |   41 ++++++++++++++++++++++++++++-------------
- 1 files changed, 28 insertions(+), 13 deletions(-)
+ drivers/rtc/rtc-mxc.c |   19 ++++++++++++++++++-
+ 1 files changed, 18 insertions(+), 1 deletions(-)
 
 diff --git a/drivers/rtc/rtc-mxc.c b/drivers/rtc/rtc-mxc.c
-index 5fc292c..4ce7e21 100644
+index 4ce7e21..4191a87 100644
 --- a/drivers/rtc/rtc-mxc.c
 +++ b/drivers/rtc/rtc-mxc.c
-@@ -79,7 +79,8 @@ struct rtc_plat_data {
- 	struct rtc_device *rtc;
- 	void __iomem *ioaddr;
- 	int irq;
--	struct clk *clk;
-+	struct clk *clk_rtc;
-+	struct clk *clk_ipg;
- 	struct rtc_time g_rtc_alarm;
- 	enum imx_rtc_type devtype;
+@@ -16,6 +16,8 @@
+ #include <linux/interrupt.h>
+ #include <linux/platform_device.h>
+ #include <linux/clk.h>
++#include <linux/of.h>
++#include <linux/of_device.h>
+ 
+ #define RTC_INPUT_CLK_32768HZ	(0x00 << 5)
+ #define RTC_INPUT_CLK_32000HZ	(0x01 << 5)
+@@ -98,6 +100,15 @@ static const struct platform_device_id imx_rtc_devtype[] = {
  };
-@@ -373,17 +374,28 @@ static int mxc_rtc_probe(struct platform_device *pdev)
- 	if (IS_ERR(pdata->ioaddr))
- 		return PTR_ERR(pdata->ioaddr);
+ MODULE_DEVICE_TABLE(platform, imx_rtc_devtype);
  
--	pdata->clk = devm_clk_get(&pdev->dev, NULL);
--	if (IS_ERR(pdata->clk)) {
--		dev_err(&pdev->dev, "unable to get clock!\n");
--		return PTR_ERR(pdata->clk);
-+	pdata->clk_ipg = devm_clk_get(&pdev->dev, "ipg");
-+	if (IS_ERR(pdata->clk_ipg)) {
-+		dev_err(&pdev->dev, "unable to get ipg clock!\n");
-+		return PTR_ERR(pdata->clk_ipg);
- 	}
- 
--	ret = clk_prepare_enable(pdata->clk);
-+	ret = clk_prepare_enable(pdata->clk_ipg);
- 	if (ret)
- 		return ret;
- 
--	rate = clk_get_rate(pdata->clk);
-+	pdata->clk_rtc = devm_clk_get(&pdev->dev, "rtc");
-+	if (IS_ERR(pdata->clk_rtc)) {
-+		dev_err(&pdev->dev, "unable to get rtc clock!\n");
-+		ret = PTR_ERR(pdata->clk_rtc);
-+		goto exit_put_clk_ipg;
-+	}
++#ifdef CONFIG_OF
++static const struct of_device_id imx_rtc_dt_ids[] = {
++	{ .compatible = "fsl,imx1-rtc", .data = (const void *)IMX1_RTC },
++	{ .compatible = "fsl,imx21-rtc", .data = (const void *)IMX21_RTC },
++	{}
++};
++MODULE_DEVICE_TABLE(of, imx_rtc_dt_ids);
++#endif
 +
-+	ret = clk_prepare_enable(pdata->clk_rtc);
-+	if (ret)
-+		goto exit_put_clk_ipg;
-+
-+	rate = clk_get_rate(pdata->clk_rtc);
- 
- 	if (rate == 32768)
- 		reg = RTC_INPUT_CLK_32768HZ;
-@@ -394,7 +406,7 @@ static int mxc_rtc_probe(struct platform_device *pdev)
- 	else {
- 		dev_err(&pdev->dev, "rtc clock is not valid (%lu)\n", rate);
- 		ret = -EINVAL;
--		goto exit_put_clk;
-+		goto exit_put_clk_rtc;
- 	}
- 
- 	reg |= RTC_ENABLE_BIT;
-@@ -402,7 +414,7 @@ static int mxc_rtc_probe(struct platform_device *pdev)
- 	if (((readw(pdata->ioaddr + RTC_RTCCTL)) & RTC_ENABLE_BIT) == 0) {
- 		dev_err(&pdev->dev, "hardware module can't be enabled!\n");
- 		ret = -EIO;
--		goto exit_put_clk;
-+		goto exit_put_clk_rtc;
- 	}
- 
- 	platform_set_drvdata(pdev, pdata);
-@@ -424,15 +436,17 @@ static int mxc_rtc_probe(struct platform_device *pdev)
- 				  THIS_MODULE);
- 	if (IS_ERR(rtc)) {
- 		ret = PTR_ERR(rtc);
--		goto exit_put_clk;
-+		goto exit_put_clk_rtc;
- 	}
- 
- 	pdata->rtc = rtc;
- 
- 	return 0;
- 
--exit_put_clk:
--	clk_disable_unprepare(pdata->clk);
-+exit_put_clk_rtc:
-+	clk_disable_unprepare(pdata->clk_rtc);
-+exit_put_clk_ipg:
-+	clk_disable_unprepare(pdata->clk_ipg);
- 
- 	return ret;
- }
-@@ -441,7 +455,8 @@ static int mxc_rtc_remove(struct platform_device *pdev)
+ static inline int is_imx1_rtc(struct rtc_plat_data *data)
  {
- 	struct rtc_plat_data *pdata = platform_get_drvdata(pdev);
+ 	return data->devtype == IMX1_RTC;
+@@ -362,12 +373,17 @@ static int mxc_rtc_probe(struct platform_device *pdev)
+ 	u32 reg;
+ 	unsigned long rate;
+ 	int ret;
++	const struct of_device_id *of_id;
  
--	clk_disable_unprepare(pdata->clk);
-+	clk_disable_unprepare(pdata->clk_rtc);
-+	clk_disable_unprepare(pdata->clk_ipg);
+ 	pdata = devm_kzalloc(&pdev->dev, sizeof(*pdata), GFP_KERNEL);
+ 	if (!pdata)
+ 		return -ENOMEM;
  
- 	return 0;
- }
+-	pdata->devtype = pdev->id_entry->driver_data;
++	of_id = of_match_device(imx_rtc_dt_ids, &pdev->dev);
++	if (of_id)
++		pdata->devtype = (enum imx_rtc_type)of_id->data;
++	else
++		pdata->devtype = pdev->id_entry->driver_data;
+ 
+ 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+ 	pdata->ioaddr = devm_ioremap_resource(&pdev->dev, res);
+@@ -488,6 +504,7 @@ static SIMPLE_DEV_PM_OPS(mxc_rtc_pm_ops, mxc_rtc_suspend, mxc_rtc_resume);
+ static struct platform_driver mxc_rtc_driver = {
+ 	.driver = {
+ 		   .name	= "mxc_rtc",
++		   .of_match_table = of_match_ptr(imx_rtc_dt_ids),
+ 		   .pm		= &mxc_rtc_pm_ops,
+ 	},
+ 	.id_table = imx_rtc_devtype,
 -- 
 1.7.4.4
