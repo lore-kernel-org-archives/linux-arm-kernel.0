@@ -1,64 +1,52 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Fri, 3 Jul 2015 09:02:31 +0800
-Subject: [PATCH v2 1/2] watchdog: imx2_wdt: add external reset support
- via 'ext-reset-output' dt prop
-In-Reply-To: <CAJ+vNU3me-qBZT7h1e+54UNRJw-2SH=nofnTRM4GEn0j9jh3ig@mail.gmail.com>
-References: <1432853677-5150-1-git-send-email-tharvey@gateworks.com>
- <1433448960-9257-1-git-send-email-tharvey@gateworks.com>
- <1433448960-9257-2-git-send-email-tharvey@gateworks.com>
- <20150629011737.GG10332@tiger>
- <CAJ+vNU3me-qBZT7h1e+54UNRJw-2SH=nofnTRM4GEn0j9jh3ig@mail.gmail.com>
-Message-ID: <20150703010231.GA28488@tiger>
+From: guohanjun@huawei.com (Hanjun Guo)
+Date: Fri, 3 Jul 2015 09:15:38 +0800
+Subject: [PATCH] ARM64 / SMP: Switch pr_err() to pr_debug() for disabled
+ GICC entry
+In-Reply-To: <20150702162940.GF1354@e104818-lin.cambridge.arm.com>
+References: <1435757843-13236-1-git-send-email-hanjun.guo@linaro.org>
+ <20150702162940.GF1354@e104818-lin.cambridge.arm.com>
+Message-ID: <5595E23A.9040901@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 02, 2015 at 09:49:20AM -0700, Tim Harvey wrote:
-> On Sun, Jun 28, 2015 at 6:17 PM, Shawn Guo <shawnguo@kernel.org> wrote:
-> > On Thu, Jun 04, 2015 at 01:15:59PM -0700, Tim Harvey wrote:
-> >> @@ -90,6 +92,11 @@ static int imx2_restart_handler(struct notifier_block *this, unsigned long mode,
-> >>       struct imx2_wdt_device *wdev = container_of(this,
-> >>                                                   struct imx2_wdt_device,
-> >>                                                   restart_handler);
-> >> +
-> >> +     /* Use external reset */
-> >> +     if (wdev->ext_reset)
-> >> +             wcr_enable |= IMX2_WDT_WCR_SRS;
-> >> +
-> >
-> > The existing code simply writes the register with only WDE (Watchdog
-> > Enable) bit set.  That said, bit WDA and SRS are cleared at the same
-> > time.  What's the result of that?  Both internal reset and external
-> > reset will be asserted?  If this is the case, it's unsafe per your reply
-> > to Frank's comment, right?  So we should only clear one bit between
-> > these two based on ext_reset flag to avoid asserting both internal and
-> > external reset?
-> >
-> > Shawn
-> 
-> Shawn,
-> 
-> Correct.
-> 
-> Are you saying that you think we should change the above to something
-> like the following to ensure in the internal reset case external reset
-> is not also being asserted?:
+On 2015/7/3 0:29, Catalin Marinas wrote:
+> On Wed, Jul 01, 2015 at 09:37:23PM +0800, Hanjun Guo wrote:
+>> It is normal that firmware presents GICC entry or entries (processors)
+>> with disabled flag in ACPI MADT, taking a system of 16 cpus for example,
+>> ACPI firmware may present 8 enabled first with another 8 cpus disabled
+>> in MADT, the disabled cpus can be hot-added later.
+>>
+>> Firmware may also present more cpus than the hardware actually has, but
+>> disabled the unused ones, and easily enable it when the hardware has such
+>> cpus to make the firmware code scalable.
+>>
+>> So that's not an error for disabled cpus in MADT, we can switch
+>> pr_err() to pr_debug() instead.
+>>
+>> Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
+>> ---
+>>  arch/arm64/kernel/smp.c | 2 +-
+>>  1 file changed, 1 insertion(+), 1 deletion(-)
+>>
+>> diff --git a/arch/arm64/kernel/smp.c b/arch/arm64/kernel/smp.c
+>> index 4b2121b..5caf04a 100644
+>> --- a/arch/arm64/kernel/smp.c
+>> +++ b/arch/arm64/kernel/smp.c
+>> @@ -402,7 +402,7 @@ acpi_map_gic_cpu_interface(struct acpi_madt_generic_interrupt *processor)
+>>  	}
+>>  
+>>  	if (!(processor->flags & ACPI_MADT_ENABLED)) {
+>> -		pr_err("skipping disabled CPU entry with 0x%llx MPIDR\n", hwid);
+>> +		pr_debug("skipping disabled CPU entry with 0x%llx MPIDR\n", hwid);
+> That's a pretty harmless change. But looking at the use-case, would we
+> expect the disabled entries to have a valid hwid? I guess such hwid is
+> not known, especially if we can hot-plug some CPU at a later time. If
 
-Yes, that's what I'm saying.
+Good point, usually it's invalid hwid.
 
-> 
-> +     /* Use external reset */
-> +     if (wdev->ext_reset)
-> +             wcr_enable |= IMX2_WDT_WCR_SRS; /* do not assert
-> internal system reset */
-> +     else
-> +             wcr_enable |= IMX2_WDT_WCR_WDA; /* do not assert external reset */
-> 
-> I was not worried about the else case above because if you hit that
-> path your device-tree is saying you are not using external reset
-> anyway.
+> that's the case, can we also move this check before the hwid one?
 
-It's a safeguard for platforms which have WDOG_B signal routed to some
-hardware, while their device trees haven't specified ext_reset_output
-property.
+Yes, fully agree, thanks for catching this, will update the patch.
 
-Shawn
+Thanks
+Hanjun
