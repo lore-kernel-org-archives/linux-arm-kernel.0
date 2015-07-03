@@ -1,54 +1,29 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Fri, 03 Jul 2015 09:18:48 +0200
-Subject: [PATCH v2 3/4] ARM: mvebu: Allow using the GIC for wakeup in
- standby mode
-In-Reply-To: <20150701175436.7dff0754@free-electrons.com>
-References: <1435684740-24912-1-git-send-email-gregory.clement@free-electrons.com>	<1435684740-24912-4-git-send-email-gregory.clement@free-electrons.com>
- <20150701175436.7dff0754@free-electrons.com>
-Message-ID: <55963758.30200@free-electrons.com>
+From: wsa@the-dreams.de (Wolfram Sang)
+Date: Fri, 3 Jul 2015 09:24:55 +0200
+Subject: [RFC 1/3] of: make of_mutex public
+In-Reply-To: <8FECDF89-828C-4F8F-A141-B2E1EF2E2B24@konsulko.com>
+References: <1435700651-3543-1-git-send-email-wsa@the-dreams.de>
+ <1435700651-3543-2-git-send-email-wsa@the-dreams.de>
+ <CAL_Jsq+-Tx=hwj9ScXBXeGxNwHhq-Lpe-5Kzd-Tu_SNue2aWTA@mail.gmail.com>
+ <8FECDF89-828C-4F8F-A141-B2E1EF2E2B24@konsulko.com>
+Message-ID: <20150703072455.GA1521@katana>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Thomas,
 
-On 01/07/2015 17:54, Thomas Petazzoni wrote:
-> Dear Gregory CLEMENT,
-> 
-> On Tue, 30 Jun 2015 19:18:59 +0200, Gregory CLEMENT wrote:
-> 
->>  static void __init mvebu_init_irq(void)
->>  {
->> +	if (of_machine_is_compatible("marvell,armada375") ||
->> +	    of_machine_is_compatible("marvell,armada380") ||
->> +	    of_machine_is_compatible("marvell,armada390"))
-> 
-> What we really want to know is if we're using the GIC, so what about
-> instead:
-> 
-> 	np = of_find_compatible_node(NULL, NULL, "arm,cortex-a9-gic");
-> 	if (np)
-> 		gic_set_irqchip_flags(IRQCHIP_SKIP_SET_WAKE |
-> 				      IRQCHIP_MASK_ON_SUSPEND);
-> 	of_node_put(np);
-> 
-> (Not even compile-tested).
+> What is it that we?re trying to do here? What is the use case?
 
-Indeed it is better. I will make the change.
+http://www.spinics.net/lists/devicetree/msg85462.html
+
+I'll bounce the mails to you as well.
 
 Thanks,
 
-Gregory
-
-
-> 
-> Thanks,
-> 
-> Thomas
-> 
-
-
--- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+   Wolfram
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150703/d690b338/attachment.sig>
