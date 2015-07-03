@@ -1,46 +1,60 @@
-From: tfiga@chromium.org (Tomasz Figa)
-Date: Fri, 3 Jul 2015 23:37:09 +0900
-Subject: [PATCH v2 3/5] drm/rockchip: vop: support plane scale
-In-Reply-To: <5596626F.5050003@rock-chips.com>
-References: <1435313249-4549-1-git-send-email-mark.yao@rock-chips.com>
- <1435313249-4549-4-git-send-email-mark.yao@rock-chips.com>
- <CAAFQd5A2j7MXrzOMVnsJr_WUKAFPaicv+r9LgwHccLim4fRk8g@mail.gmail.com>
- <55965344.5050502@rock-chips.com>
- <CAAFQd5B3NnUQRqdaXUz6BGCn-5rh1iXnfZXnQRDK3=nF_Ya7SA@mail.gmail.com>
- <5596626F.5050003@rock-chips.com>
-Message-ID: <CAAFQd5AM1-w8ynyn_Usr8OitdXSUcU85scvcYCTEZebzLqLn0w@mail.gmail.com>
+From: timur@codeaurora.org (Timur Tabi)
+Date: Fri, 3 Jul 2015 10:42:42 -0400
+Subject: [PATCH 1/4] hvc_dcc: bind driver to core0 for reads and writes
+In-Reply-To: <559479FA.5080300@codeaurora.org>
+References: <1435699387-32591-1-git-send-email-timur@codeaurora.org>
+ <5593443C.5070800@codeaurora.org> <55934919.8070703@codeaurora.org>
+ <559479FA.5080300@codeaurora.org>
+Message-ID: <58BCCF6C-6B42-4D4C-9D5B-EF5FFEC5DA3D@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 3, 2015 at 7:22 PM, Mark yao <mark.yao@rock-chips.com> wrote:
-> On 2015?07?03? 17:58, Tomasz Figa wrote:
->>>>
->>>> >>Aren't the scl_modes for CbCr planes always the same as for Y plane?
->>>
->>> >
->>> >
->>> >No, such as src(1920 x 1080) -> dst(1280x800), yuv format is NV12.
->>> >so Y plane horizontal and vertical is scale down.
->>> >
->>> >but src_w = 1920 / 2 = 960 < 1280
->>> >       src_h = 1080 / 2 = 540 < 800.
->>> >
->>> >So Cbcr horizontal and vertical is scale up.
->>
->> Sorry, I don't follow.
->>
->> If we scale down Y plane in NV12 from 1920x1080 to 1280x800, then
->> original CbCr plane will be 960x540 and destination CbCr plane will be
->> 640x400 (because CbCr plane of NV12 is subsampled 2x2, which is half
->> the width and half the height of Y plane), so both planes are being
->> scaled down.
->>
-> destination CbCr plane is 1280x800, destination can't be subsample.
+On Jul 1, 2015, at 7:38 PM, Stephen Boyd wrote:
 
-Ah, I see, so internally it's always scalling to destination plane
-size. This means that calculation for both Y and CbCr must be done
-indeed, but even then you could use helper functions for that, since
-they differ only in parameters.
+> It would at least fix the AMP case where you have one tty per CPU. If a
+> CPU goes offline, the tty would be removed at the same time. The user
+> could put the console on another CPU, or all of them, if they want to
+> offline CPUs.
 
-Best regards,
-Tomasz
+How would the user put the TTY on another CPU?  The command-line parameter is a boot-time configuration.  I'm okay with adding that parameter, but we still have the problem of losing the TTY altogether if that CPU goes offline.  I would like to see the TTY migrated to another CPU, but if I don't know if that makes sense either.  Is it possible for CPUs to go randomly offline temporarily to manage load?
+
+To be clear, I'm okay with adding a hotplug hook that shuts down the thread if the TTY CPU goes offline, so that we don't attempt to schedule a thread on a CPU that's offline.  I am concerned about whether hotplug can automatically offline the TTY CPU without warning, and suddenly we don't have TTY any more.
+
+Is there a way to prevent the TTY CPU from going offline via hotplug?  A way of saying, "if you want to offline a CPU,  don't offline this one?"
+
+> It sounds like in the SMP case the tool is broken and it should do
+> better about consolidating output from different CPUs into one place. If
+> it really only listens to the boot CPU then making a tty per-CPU would
+> work just the same as this patch even when the CPU goes offline.
+
+Yes, the tool is broken, but that's not the only problem.  Each CPU has its own DCC, and since the console driver can run on any thread, it will scatter console output across all the CPUs.  So any tool that listens on DCC is going to have this problem on an SMP system.  I'm pretty sure Trace32 isn't the only one.
+
+>> When CPU0 goes offline, what does schedule_work_on(0, actually do?  If
+>> it does nothing, then the output FIFO will fill up, and put_chars will
+>> return 0, and that's it.
+> 
+> schedule_work_on() shouldn't be used when a CPU can go offline (see the
+> comment above queue_work_on). I think it has to break affinity to run
+> the work item on some other CPU.
+
+So if I run schedule_work_on() on a CPU, and that CPU is offline, it will just schedule the workqueue on some other random CPU?
+
+>> Does CPU hotplug automatically take CPUs offline when the load is low?
+>> If so, then then thread could randomly bounce from CPU to CPU.
+> 
+> Sorry, I should have been clearer. The thread would be bound to the CPU
+> the tty corresponds to. No thread migration or bouncing. We would have
+> to tear down and restore the tty on hotplug as well. I guess one problem
+> here is that it doesn't do anything about the console. The console
+> doesn't go through the khvcd thread like the tty does so we would still
+> need some sort of dcc specific code to move the console writes to a
+> particular CPU. And the downside there is that consoles are supposed to
+> support atomic operations so that debugging information can always get
+> out to the user. When we need to migrate the write to a particular CPU
+> we might lose information if scheduling is broken or something.
+
+I'm not sure I understand all that.  What do you mean by the thread is bound to the CPU that the TTY correspond to?  When a kernel thread (running on some CPU) calls printk(), doesn't the call to the HVC driver occur also on that CPU? That's the whole reason behind this patch -- that each call to printk() results in a DCC write that occurs on a different CPU.
+
+> So can we fix the tool instead and keep writing out data on random CPUs?
+
+No, we can't.  The impression I got that Lauterbach is not responsive to feature requests like this one.  And again, this problem really occurs with any tool that listens to DCC on an SMP system.
