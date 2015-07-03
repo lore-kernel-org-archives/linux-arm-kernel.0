@@ -1,26 +1,37 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Fri, 03 Jul 2015 17:48:03 +0100
-Subject: [PATCH 0/3] arm/arm64: vexpress: DT updates for v4.2
-In-Reply-To: <1435754163-17929-1-git-send-email-sudeep.holla@arm.com>
-References: <1435754163-17929-1-git-send-email-sudeep.holla@arm.com>
-Message-ID: <5596BCC3.9070903@arm.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Fri, 3 Jul 2015 19:02:22 +0200
+Subject: Possible regression due to "tick: broadcast: Prevent livelock
+ from event handler"
+In-Reply-To: <20150703143703.GB19284@katana>
+References: <20150703024044.GB24695@verge.net.au>
+ <20150703105441.GF1521@katana>
+ <alpine.DEB.2.11.1507031511180.3916@nanos>
+ <20150703133245.GA19284@katana>
+ <alpine.DEB.2.11.1507031612410.3916@nanos>
+ <20150703143703.GB19284@katana>
+Message-ID: <CAMuHMdWQeYA=LrYcsD8W_0ZQUp3BKYVxedhBDpD5kPQp++yu1A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Kevin,
+Hi Wolfram,
 
-On 01/07/15 13:36, Sudeep Holla wrote:
-> Hi ARM-SoC guys,
+On Fri, Jul 3, 2015 at 4:37 PM, Wolfram Sang <wsa@the-dreams.de> wrote:
+>> So this is a single core machine and uses the em_sti timer w/o the
+>> broadcast nonsense. In Simons case it looks like em_sti is used as
+>> broadcast device.
 >
-> Here are couple of fixes for adding missing nodes(CCI and A7 PMUs) in
-> TC2 device tree. The third patch is addition of support for FPGA based
-> dual core A53 SMM  platform. All the patches are posted on the list
-> already, just putting them together. Let me know if you prefer a pull
-> request.
->
+> We use the same board. Just my kernel has SMP=n.
 
-I just realized that I copied this series to your Linaro email instead
-of kernel.org. Sorry for that, do you want me to repost ?
+Unlike our other multi-core A9 SoCs, emev2.dtsi doesn't have a node
+for the arm,cortex-a9-twd-timer?
 
-Regards,
-Sudeep
+Gr{oetje,eeting}s,
+
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
