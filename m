@@ -1,29 +1,33 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Fri, 03 Jul 2015 16:58:44 +0200
-Subject: [PATCH] clocksource: dw_apb_timer: add dynamic irq flag to the
- timer
-In-Reply-To: <1435933847-2069-1-git-send-email-jszhang@marvell.com>
-References: <1435933847-2069-1-git-send-email-jszhang@marvell.com>
-Message-ID: <5596A324.4040800@linaro.org>
+From: wsa@the-dreams.de (Wolfram Sang)
+Date: Fri, 3 Jul 2015 17:09:52 +0200
+Subject: Possible regression due to "tick: broadcast: Prevent livelock
+ from event handler"
+In-Reply-To: <alpine.DEB.2.11.1507031640060.3916@nanos>
+References: <20150703024044.GB24695@verge.net.au>
+ <20150703105441.GF1521@katana>
+ <alpine.DEB.2.11.1507031511180.3916@nanos>
+ <20150703133245.GA19284@katana>
+ <alpine.DEB.2.11.1507031612410.3916@nanos>
+ <20150703143703.GB19284@katana>
+ <alpine.DEB.2.11.1507031640060.3916@nanos>
+Message-ID: <20150703150951.GC19284@katana>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/03/2015 04:30 PM, Jisheng Zhang wrote:
-> Commit d2348fb6fdc6 ("tick: Dynamically set broadcast irq affinity")
-> adds one excelent feature CLOCK_EVT_FEAT_DYNIRQ to let the core set the
-> interrupt affinity of the broadcast interrupt to the cpu which has the
-> earliest expiry time. This patch adds CLOCK_EVT_FEAT_DYNIRQ flag to
-> avoid unnecessary wakeups and IPIs when the dw_apb_timer is used as
-> broadcast timer.
->
-> Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
-> ---
 
-I am glad this flag helps. Were you able to do some measurements ?
+> Ok. So it's unrelated to deep idle states. Any chance of poking with
+> JTAG at the frozen box? If not, are there GPIOs which you could use to
+> monitor certain state?
 
--- 
-  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+No JTAGger here at the moment. And no manual/schematics for this board
+:(
 
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+I'll ask around...
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150703/1815e4c8/attachment.sig>
