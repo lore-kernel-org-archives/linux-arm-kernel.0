@@ -1,38 +1,37 @@
-From: ezequiel@vanguardiasur.com.ar (Ezequiel Garcia)
-Date: Fri, 3 Jul 2015 11:56:14 -0300
-Subject: [PATCH v2 1/2] watchdog: NXP LPC18xx Watchdog Timer Driver
-In-Reply-To: <CAGhQ9VzLX_hy2Z=jUH6on0_sOZBp_mg5cC0JXkHntWxxrr2K6A@mail.gmail.com>
-References: <1435783930-20184-1-git-send-email-ariel@vanguardiasur.com.ar>
- <1435783930-20184-2-git-send-email-ariel@vanguardiasur.com.ar>
- <CAGhQ9VzLX_hy2Z=jUH6on0_sOZBp_mg5cC0JXkHntWxxrr2K6A@mail.gmail.com>
-Message-ID: <CAAEAJfDo9QNK5kNV8kHxmnwhfUm__xn3XuDyOBeCnLZQZy6OJA@mail.gmail.com>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Fri, 03 Jul 2015 15:57:24 +0100
+Subject: Possible regression due to "tick: broadcast: Prevent livelock
+ from event handler"
+In-Reply-To: <alpine.DEB.2.11.1507031654180.3916@nanos>
+References: <20150703024044.GB24695@verge.net.au>
+ <20150703105441.GF1521@katana> <alpine.DEB.2.11.1507031511180.3916@nanos>
+ <20150703133245.GA19284@katana> <alpine.DEB.2.11.1507031612410.3916@nanos>
+ <20150703143703.GB19284@katana> <5596A015.1030709@arm.com>
+ <alpine.DEB.2.11.1507031654180.3916@nanos>
+Message-ID: <5596A2D4.4080103@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Joachim,
 
-On 1 July 2015 at 20:04, Joachim  Eastwood <manabian@gmail.com> wrote:
-[..]
->> +static int lpc18xx_wdt_start(struct watchdog_device *wdt_dev)
->> +{
->> +       struct lpc18xx_wdt_dev *lpc18xx_wdt = watchdog_get_drvdata(wdt_dev);
->> +       unsigned int val;
->> +
->> +       if (timer_pending(&lpc18xx_wdt->timer))
->> +               del_timer(&lpc18xx_wdt->timer);
->> +
->> +       val = readl(lpc18xx_wdt->base + LPC18XX_WDT_MOD);
->> +       val |= LPC18XX_WDT_MOD_WDEN;
->> +       val |= LPC18XX_WDT_MOD_WDRESET;
->> +       writel(val, lpc18xx_wdt->base + LPC18XX_WDT_MOD);
+
+On 03/07/15 15:54, Thomas Gleixner wrote:
+> On Fri, 3 Jul 2015, Sudeep Holla wrote:
+>> On 03/07/15 15:37, Wolfram Sang wrote:
+>>>
+>>>> So this is a single core machine and uses the em_sti timer w/o the
+>>>> broadcast nonsense. In Simons case it looks like em_sti is used as
+>>>> broadcast device.
+>>>
+>>> We use the same board. Just my kernel has SMP=n.
+>>>
+>>
+>> If it's UP build, then GENERIC_CLOCKEVENTS_BROADCAST is disabled. You
+>> may be hitting the issue I reported[1] and is still under discussion.
 >
-> R-M-W sequence should probably be protect with a lock.
+> Nope. The UP version uses a non affected timer.
 >
 
-Notice the watchdog framework serializes this access (see the mutex in
-watchdog_dev.c). So we only need protection for the registers
-accessed in the timer and the restart handler.
+Ah OK, sorry for the noise then.
 
--- 
-Ezequiel Garc?a, VanguardiaSur
-www.vanguardiasur.com.ar
+Regards,
+Sudeep
