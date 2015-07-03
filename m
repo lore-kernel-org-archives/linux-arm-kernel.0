@@ -1,75 +1,48 @@
-From: eric.auger@linaro.org (Eric Auger)
-Date: Fri, 03 Jul 2015 07:34:07 +0200
-Subject: [PATCH 7/7] KVM: arm: implement kvm_set_msi by gsi direct mapping
-In-Reply-To: <5595706C.9010108@arm.com>
-References: <1435592237-17924-1-git-send-email-eric.auger@linaro.org>
- <1435592237-17924-8-git-send-email-eric.auger@linaro.org>
- <5595706C.9010108@arm.com>
-Message-ID: <55961ECF.4090208@linaro.org>
+From: jamesjj.liao@mediatek.com (James Liao)
+Date: Fri, 3 Jul 2015 13:38:47 +0800
+Subject: [PATCH v2 4/4] clk: mediatek: Add USB clock support in MT8173
+ APMIXEDSYS
+In-Reply-To: <CAGS+omBsu3zkBf0C_QECBP7NShFhkMih36z1vynvVQ5wCLfZ8w@mail.gmail.com>
+References: <1435633127-31952-1-git-send-email-jamesjj.liao@mediatek.com>
+ <1435633127-31952-5-git-send-email-jamesjj.liao@mediatek.com>
+ <CAGS+omBRAJVN3uPYn9YdKZ3VBj61c-rpY_cNgnK6x9U0uJBPYw@mail.gmail.com>
+ <CAGS+omBsu3zkBf0C_QECBP7NShFhkMih36z1vynvVQ5wCLfZ8w@mail.gmail.com>
+Message-ID: <1435901927.3526.48.camel@mtksdaap41>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Andre,
-On 07/02/2015 07:10 PM, Andre Przywara wrote:
-> Hi Eric,
-> 
-> On 29/06/15 16:37, Eric Auger wrote:
->> If the ITS modality is not available, let's simply support MSI
->> injection by transforming the MSI.data into an SPI ID.
->>
->> This becomes possible to use KVM_SIGNAL_MSI ioctl for arm too.
->>
->> Signed-off-by: Eric Auger <eric.auger@linaro.org>
->> ---
->>  arch/arm/kvm/Kconfig | 1 +
->>  virt/kvm/arm/vgic.c  | 5 +++++
->>  2 files changed, 6 insertions(+)
->>
->> diff --git a/arch/arm/kvm/Kconfig b/arch/arm/kvm/Kconfig
->> index 151e710..0f58baf 100644
->> --- a/arch/arm/kvm/Kconfig
->> +++ b/arch/arm/kvm/Kconfig
->> @@ -31,6 +31,7 @@ config KVM
->>  	select KVM_VFIO
->>  	select HAVE_KVM_EVENTFD
->>  	select HAVE_KVM_IRQFD
->> +	select HAVE_KVM_MSI
->>  	select HAVE_KVM_IRQCHIP
->>  	select HAVE_KVM_IRQ_ROUTING
->>  	depends on ARM_VIRT_EXT && ARM_LPAE && ARM_ARCH_TIMER
->> diff --git a/virt/kvm/arm/vgic.c b/virt/kvm/arm/vgic.c
->> index 0b4c48c..b3c10dc 100644
->> --- a/virt/kvm/arm/vgic.c
->> +++ b/virt/kvm/arm/vgic.c
->> @@ -2314,6 +2314,11 @@ int kvm_set_msi(struct kvm_kernel_irq_routing_entry *e,
->>  			return kvm->arch.vgic.vm_ops.inject_msi(kvm, &msi);
->>  		else
->>  			return -ENODEV;
->> +	case KVM_IRQ_ROUTING_MSI:
->> +		if (kvm->arch.vgic.vm_ops.inject_msi)
->> +			return -EINVAL;
->> +		else
->> +			return kvm_vgic_inject_irq(kvm, 0, e->msi.data, level);
-> 
-> If you add:
-> 
-> static int vgic_v2m_inject_msi(struct kvm *kvm, struct kvm_msi *msi)
-> {
-> 	return kvm_vgic_inject_irq(kvm, 0, msi->data, 1);
-> }
-> 
-> to vgic-v2-emul.c and wire it up accordingly, you can simplify the above
-> kvm_set_msi, getting rid of all those extra case handling.
-> This also helps merging KVM_IRQ_ROUTING_MSI and the extended case.
-> 
-> I have hacked this up and it seems to work for me.
+Hi Daniel,
 
-OK thanks I will respin either today or on monday.
-
-Best Regards
-
-Eric
+On Wed, 2015-07-01 at 23:22 +0800, Daniel Kurtz wrote:
+> This looks like 3 separate gate clocks in a chain, with a timing
+> constraint: USB_LPF must be enabled 100 us after USB_TX.
 > 
-> Cheers,
-> Andre.
+>   26MHz--> [GATE] --USB_TX--> [LPF] --USB_LPF--> [GATE] --USB_OUT-->
+>             ^                  ^                  ^
+>             +--------------+   |                  |
+> AP_PLL_CON2.REF2USB_TX_EN -+   |                  |
+> AP_PLL_CON2.REF2USB_TX_LPF_EN -+                  |
+> AP_PLL_CON2.REF2USB_TX_OUT_EN --------------------+
 > 
+> 
+> I think we can model the gate parts using a proper clock tree model
+> and the existing clock gate semantics.
+> I'm not sure the best way to model the delay; but in theory that could
+> be handled by the clock user (USB driver).
+
+Do you mean to create 3 hierarchical clocks (may be clock gates) to
+model these clocks as the following ?
+
+EN -- LPF -- OUT_EN
+
+(EN is the parent of LPF, and LPF is the parent of EN)
+
+If we model these 3 clocks like above, we can't prevent clock users to
+enable OUT_EN directly, and there will be no delay between EN and LPF.
+
+Or you have other suggestions to model these 3 clcoks?
+
+
+Best regards,
+
+James
