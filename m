@@ -1,83 +1,58 @@
-From: mark.yao@rock-chips.com (Mark yao)
-Date: Fri, 03 Jul 2015 16:19:11 +0800
-Subject: [PATCH v2 5/5] drm/rockchip: default enable win2/3 area0 bit
-In-Reply-To: <CAAFQd5D4W1+ShB4zpSJrBiFYWh21axJoGoQ77NwXzhSRapysgA@mail.gmail.com>
-References: <1435313249-4549-1-git-send-email-mark.yao@rock-chips.com>
- <1435313432-4923-1-git-send-email-mark.yao@rock-chips.com>
- <CAAFQd5D4W1+ShB4zpSJrBiFYWh21axJoGoQ77NwXzhSRapysgA@mail.gmail.com>
-Message-ID: <5596457F.5090601@rock-chips.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Fri, 03 Jul 2015 09:28:23 +0100
+Subject: [PATCH] arm64/kvm: Add generic v8 KVM target
+In-Reply-To: <CAFEAcA8nt7yr0K4QesJjWqEwBgziWOt2DViY70E=z2wjt=X7XA@mail.gmail.com>
+References: <1434531646-4873-1-git-send-email-suzuki.poulose@arm.com>
+ <CAFEAcA92uymQ3LjPQnuFiwvjSgc+jY54VrfK_Sh4v1DJ+=OPpw@mail.gmail.com>
+ <558A6A84.5020603@arm.com> <20150624085128.GA22785@cbox>
+ <558A7936.7020109@arm.com> <20150625123034.GE28244@cbox>
+ <558BF6C9.3000009@arm.com> <558C05A9.8080201@arm.com>
+ <CAFEAcA_ULz=ugQW=NmthzqYRtvcfwteQTh0DonHRN6U5NykEtQ@mail.gmail.com>
+ <20150626095318.GG28244@cbox>
+ <F37C68A5-E48F-462C-AD18-0F3C096348C7@caviumnetworks.com>
+ <559180CA.3050905@arm.com>
+ <CAFEAcA-E+KdiL4suQ0DoEvB-zGpNZ7-dq46FegC_iXYRPvo9jA@mail.gmail.com>
+ <559185D4.7060308@arm.com>
+ <85D36B67-643B-407F-944F-D18D54FF9909@caviumnetworks.com>
+ <D805D093-CCFE-4835-853A-B2654DAA10A1@caviumnetworks.com>
+ <559642EE.1050605@arm.com>
+ <CAFEAcA8nt7yr0K4QesJjWqEwBgziWOt2DViY70E=z2wjt=X7XA@mail.gmail.com>
+Message-ID: <559647A7.7010309@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2015?07?03? 16:02, Tomasz Figa wrote:
-> Hi Mark,
->
-> Please see my comments inline.
->
-> On Fri, Jun 26, 2015 at 7:10 PM, Mark Yao <mark.yao@rock-chips.com> wrote:
->> Win2/3 support 4 area display, but now havn't found a suitable
->> way to use it, and it enable by win gate and area gate,
->> so default enable area0 gate, so that its behaviour just like a
->> win.
-> So I assume this means that currently, without those bits set, win2
-> and win3 do not work? This would make this patch a fix maybe even with
-> a potential backportability.
-
-Yes, without this patch, all win2/3 area gate default disabled.
-vop_update_plane_event call win enable only enable the win gate.
-
->
->> Signed-off-by: Mark Yao <mark.yao@rock-chips.com>
->> ---
->> Changes in v2: None
+On 03/07/15 09:12, Peter Maydell wrote:
+> On 3 July 2015 at 09:08, Marc Zyngier <marc.zyngier@arm.com> wrote:
+>> On 02/07/15 21:29, Chalamarla, Tirumalesh wrote:
+>>> is there a chance that this get merged in to 4.2? if not is it possible
+>>> to accept the other patches like adding implementations explicitly(like
+>>> Thunder).
 >>
->>   drivers/gpu/drm/rockchip/rockchip_drm_vop.c |    6 ++++++
->>   1 file changed, 6 insertions(+)
->>
->> diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_vop.c b/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
->> index 40107bb..e001d26 100644
->> --- a/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
->> +++ b/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
->> @@ -337,6 +337,12 @@ static const struct vop_reg_data vop_init_reg_table[] = {
->>          {DSP_CTRL0, 0x00000000},
->>          {WIN0_CTRL0, 0x00000080},
->>          {WIN1_CTRL0, 0x00000080},
->> +       /*
->> +        * Todo: win2/3 support area func, but now havn't found a suitable
->> +        * way to use it, so default enable area0 as a win display.
-> TODO: Win2/3 support multiple area function, but we haven't found
-> a suitable way to use it yet, so let's just use them as other windows
-> with only area 0 enabled.
->
->> +        */
->> +       {WIN2_CTRL0, 0x00000010},
->> +       {WIN3_CTRL0, 0x00000010},
-> Anyway, is it enough to program those registers one time in
-> vop_initial()? Won't they get cleared when VOP is power cycled, e.g.
-> in case of DPMS off and on? Maybe instead this could be done in
-> vop_update_plane_event() for windows that need it?
-There are two gate for Win2/3,
-at VOP_WIN3_CTRL0:
-         bit[0], "win3_en"
-             this gating all the area.
+>> We first need to reach a conclusion on this. Until then, I don't plan to
+>> get anything in. As for 4.2, it feels way too late (the merge window is
+>> almost closed now).
+> 
+> I would still like to see the proponents of this patch say
+> what their model is for userspace support of cross-host migration,
+> if we're abandoning the model the current API envisages.
 
-         bit[4], win3_mst0_en
-         bit[5], win3_mst1_en
-         bit[6], win3_mst2_en
-         bit[7], win3_mst3_en
-             those gate each area.
+I thought we had discussed this above, and don't really see this as a
+departure from the current model:
 
-This patch default enable win3_mst0_en, so control bit[0]"win3_en" that 
-cat power on/off this window.
+- "-cpu host" results in "GENERIC" being used: VM can only be migrated
+to the exact same HW (no cross-host migration). MIDR should probably
+become RO.
+- "-cpu host" results in "A57" (for example): VM can be migrated to a
+variety of A57 platforms, and allow for some fuzzing on the revision (or
+accept any revision).
+- "-cpu a57" forces an A57 model to be emulated, always. It is always
+possible to migrate such a VM on any host.
 
-vop_update_plane_event()/ vop_disable_plane() only can control bit[0]"win3_en".
+I think only the first point is new, but the last two are what we have
+(or what we should have).
 
+Does it answer your concerns, or did you have something else in mind?
 
-So this patch is enough to enable window2/3 area 0.
-
-
-> Best regards,
-> Tomasz
-
+	M.
 -- 
-?ark
+Jazz is not dead. It just smells funny...
