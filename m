@@ -1,32 +1,21 @@
-From: tglx@linutronix.de (Thomas Gleixner)
-Date: Fri, 3 Jul 2015 15:19:40 +0200 (CEST)
-Subject: Possible regression due to "tick: broadcast: Prevent livelock
- from event handler"
-In-Reply-To: <20150703105441.GF1521@katana>
-References: <20150703024044.GB24695@verge.net.au>
- <20150703105441.GF1521@katana>
-Message-ID: <alpine.DEB.2.11.1507031511180.3916@nanos>
+From: matthias.bgg@gmail.com (Matthias Brugger)
+Date: Fri, 03 Jul 2015 15:30:17 +0200
+Subject: [PATCH 2/2] ARM: dts: mediatek: add mt6580 basic support
+In-Reply-To: <1435807741.28791.6.camel@mtkswgap22>
+References: <1433319533-24803-1-git-send-email-mars.cheng@mediatek.com>
+ <1435191308.28046.1.camel@mtkswgap22> <1435807741.28791.6.camel@mtkswgap22>
+Message-ID: <2083281.Cs3Ci8OBXK@ubix>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 3 Jul 2015, Wolfram Sang wrote:
-> Hi Simon,
+On Thursday, July 02, 2015 11:29:01 AM Mars Cheng wrote:
+> Hi Matthias
 > 
-> > I have observed what appears to be a regression while testing next-20150702
-> > which seems to be caused by 2951d5c031a3 ("tick: broadcast: Prevent
-> > livelock from event handler").
-> 
-> Does reverting help? I see a similar case with your branch
-> renesas-devel-20150629-v4.1 which does not include both commits.
+> May I double confirm with you that soc node is MUST removed?
+> If yes, we will upstream dtsi with this format for other new chips.
 
-This branch has actually none of the clockevent/tick related changes
-which are in next/linus tree. So 2951d5c031a3 is hardly the culprit.
+Please don't top post.
+Yes, soc node has to be removed.
 
-> For this branch, if I select CONFIG_NO_HZ_IDLE and *no* CONFIG_HIGH_RES_TIMERS,
-
-So with high res timers it boots. Can you please provide the output of
-/proc/timer_list for that case?
-
-Thanks,
-
-	tglx
+Cheers,
+Matthias
