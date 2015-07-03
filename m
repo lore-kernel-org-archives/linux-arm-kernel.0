@@ -1,45 +1,48 @@
-From: peter.maydell@linaro.org (Peter Maydell)
-Date: Fri, 3 Jul 2015 10:57:59 +0100
-Subject: [PATCH 05/10] KVM: arm/arm64: vgic: Relax vgic_can_sample_irq for
- edge IRQs
-In-Reply-To: <55965AFF.30509@arm.com>
-References: <1433783045-8002-1-git-send-email-marc.zyngier@arm.com>
- <1433783045-8002-6-git-send-email-marc.zyngier@arm.com>
- <20150630201933.GA11332@cbox>
- <5593B040.6050208@arm.com> <20150701115820.GC17890@cbox>
- <55942F00.6000306@arm.com>
- <20150702162359.GJ11332@cbox> <55965AFF.30509@arm.com>
-Message-ID: <CAFEAcA_TrNQvR-fooGXSg=04CNAULEpNr54iwXjqA=qvqYuLZw@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 3 Jul 2015 10:58:07 +0100
+Subject: crypto: marvell/CESA: Issues with non cache-line aligned buffers
+In-Reply-To: <20150703114305.15611807@bbrezillon>
+References: <20150703114305.15611807@bbrezillon>
+Message-ID: <20150703095807.GS7557@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 3 July 2015 at 10:50, Marc Zyngier <marc.zyngier@arm.com> wrote:
-> On 02/07/15 17:23, Christoffer Dall wrote:
->> If we had a different *shared* device than the timer which is
->> edge-triggered, don't we then also need to capture the physical
->> distributor's pending state along with the state of the device unless we
->> assume that upon restoring the state for the device count on the device
->> to have another rising/falling edge to trigger the interrupt again? (I
->> assume the line would always go high for a level-triggered interrupt in
->> this case).
->
-> I'd definitely assume that restoring the state of the device would make
-> it generate an interrupt. This has to be a property of the device,
-> otherwise it is not really shareable between vcpus.
+On Fri, Jul 03, 2015 at 11:43:05AM +0200, Boris Brezillon wrote:
+> Which led us to think that this could be related to a non cache-line
+> aligned buffer problem: if we share the cache line with someone
+> modifying its data during the DMA transfer, we could experience data
+> loss when the cpu decide to flush the data from this cache line to the
+> memory.
 
-FWIW, QEMU's modelling approach to this is to say that devices
-do *not* generate interrupts on restore. If the device had
-previously generated an interrupt then this should be captured
-by the state of the interrupt controller (or whatever else
-it is connected to) and dealt with when the GIC state is restored.
+There's really only two options when you have an overlapping cache line
+and the cache line contains CPU-dirty data, but the memory contains
+DMA-dirty data.  One of those dirty data has to win out, and the other
+has to be destroyed.  (Either you invalidate the CPU cache line, loosing
+the CPU-dirty data, or you write-back the cache line, overwriting the DMA-
+dirty data.)
 
-If you say that restoring the device state is supposed to
-generate an interrupt, you introduce an ordering requirement
-that the state of the interrupt controller is restored
-first and the device second (otherwise the incoming GIC
-state will overwrite the interrupt that the device just
-generated), which isn't ideal (especially since QEMU
-makes no guarantees about restore order between devices).
+What that means is that it's a _bug_ to end up in this situation, nothing
+more, nothing less.  There's nothing that arch code can do about it, it's
+a DMA-API user bug.
 
-thanks
--- PMM
+What you'll find is that this is well documented.  See
+Documentation/DMA-API.txt, part Id (Streaming DMA mappings):
+
+  Warnings:  Memory coherency operates at a granularity called the cache
+  line width.  In order for memory mapped by this API to operate
+  correctly, the mapped region must begin exactly on a cache line
+  boundary and end exactly on one (to prevent two separately mapped
+  regions from sharing a single cache line).  Since the cache line size
+  may not be known at compile time, the API will not enforce this
+  requirement.  Therefore, it is recommended that driver writers who
+  don't take special care to determine the cache line size at run time
+  only map virtual regions that begin and end on page boundaries (which
+  are guaranteed also to be cache line boundaries).
+
+The behaviour you're seeing here is not ARM specific - any CPU which
+uses cache lines and doesn't have hardware coherency will suffer from
+this problem.
+
+-- 
+FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
+according to speedtest.net.
