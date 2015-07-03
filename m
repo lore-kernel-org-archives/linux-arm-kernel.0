@@ -1,91 +1,47 @@
-From: matthias.bgg@gmail.com (Matthias Brugger)
-Date: Fri, 03 Jul 2015 17:51:34 +0200
-Subject: [PATCH v2 4/9] clocksource: mediatek: Use GPT as sched clock
- source
-In-Reply-To: <CAGS+omDa4X7daAYD6SDuEM6bMQwojNUCnGMGiUwnJ6M_yBTRLg@mail.gmail.com>
-References: <1431763110-443-1-git-send-email-yingjoe.chen@mediatek.com>
- <CABuKBeJhdRBBw1v1kj8J0YFVWZ27vzx5W=XU8jiwePVgL_7g_g@mail.gmail.com>
- <CAGS+omDa4X7daAYD6SDuEM6bMQwojNUCnGMGiUwnJ6M_yBTRLg@mail.gmail.com>
-Message-ID: <1551938.VHQvCCENeg@ubix>
+From: tglx@linutronix.de (Thomas Gleixner)
+Date: Fri, 3 Jul 2015 17:53:38 +0200 (CEST)
+Subject: Possible regression due to "tick: broadcast: Prevent livelock
+ from event handler"
+In-Reply-To: <20150703154036.GD19284@katana>
+References: <20150703024044.GB24695@verge.net.au>
+ <20150703105441.GF1521@katana> <alpine.DEB.2.11.1507031511180.3916@nanos>
+ <20150703133245.GA19284@katana> <alpine.DEB.2.11.1507031612410.3916@nanos>
+ <20150703143703.GB19284@katana> <alpine.DEB.2.11.1507031640060.3916@nanos>
+ <20150703150951.GC19284@katana> <alpine.DEB.2.11.1507031721390.3916@nanos>
+ <20150703154036.GD19284@katana>
+Message-ID: <alpine.DEB.2.11.1507031746550.3916@nanos>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday, July 03, 2015 09:48:42 PM Daniel Kurtz wrote:
-> On Wed, May 20, 2015 at 7:02 PM, Matthias Brugger
+On Fri, 3 Jul 2015, Wolfram Sang wrote:
+> > Ok. One more check please. Does nohz=off on the command line fix/hide
+> > the issue as well?
 > 
-> <matthias.bgg@gmail.com> wrote:
-> > 2015-05-16 9:58 GMT+02:00 Yingjoe Chen <yingjoe.chen@mediatek.com>:
-> >> When cpu is in deep idle, arch timer will stop counting. Setup GPT as
-> >> sched clock source so it can keep counting in idle.
-> >> 
-> >> Signed-off-by: Yingjoe Chen <yingjoe.chen@mediatek.com>
-> >> ---
-> >> 
-> >>  drivers/clocksource/mtk_timer.c | 10 ++++++++++
-> >>  1 file changed, 10 insertions(+)
-> >> 
-> >> diff --git a/drivers/clocksource/mtk_timer.c
-> >> b/drivers/clocksource/mtk_timer.c index 91206f9..fe7cf72 100644
-> >> --- a/drivers/clocksource/mtk_timer.c
-> >> +++ b/drivers/clocksource/mtk_timer.c
-> >> @@ -24,6 +24,7 @@
-> >> 
-> >>  #include <linux/of.h>
-> >>  #include <linux/of_address.h>
-> >>  #include <linux/of_irq.h>
-> >> 
-> >> +#include <linux/sched_clock.h>
-> >> 
-> >>  #include <linux/slab.h>
-> >>  
-> >>  #define GPT_IRQ_EN_REG         0x00
-> >> 
-> >> @@ -59,6 +60,13 @@ struct mtk_clock_event_device {
-> >> 
-> >>         struct clock_event_device dev;
-> >>  
-> >>  };
-> >> 
-> >> +static void __iomem *gpt_base __read_mostly;
-> >> +
-> >> +static u64 notrace mtk_read_sched_clock(void)
-> >> +{
-> >> +       return readl_relaxed(gpt_base + TIMER_CNT_REG(GPT_CLK_SRC));
-> >> +}
-> >> +
-> >> 
-> >>  static inline struct mtk_clock_event_device *to_mtk_clk(
-> >>  
-> >>                                 struct clock_event_device *c)
-> >>  
-> >>  {
-> >> 
-> >> @@ -243,6 +251,8 @@ static void __init mtk_timer_init(struct device_node
-> >> *node)>> 
-> >>         mtk_timer_setup(evt, GPT_CLK_SRC, TIMER_CTRL_OP_FREERUN, 1);
-> >>         clocksource_mmio_init(evt->gpt_base + TIMER_CNT_REG(GPT_CLK_SRC),
-> >>         
-> >>                         node->name, rate, 300, 32,
-> >>                         clocksource_mmio_readl_up);
-> >> 
-> >> +       gpt_base = evt->gpt_base;
-> > 
-> > This is really hacky. We should clean up the code and provide
-> > mtk_clock_event_device globally.
-> > Please add the patch below, which does exactly this.
-> 
-> I don't think this is so hacky.
-> In light of Stephen's comment about the benefit of using
-> container_of() to extract gpt_base from the passed in struct
-> clock_event_device in the other routines, what is the benefit of
-> making more of mtk_clock_event_device global?
-> I think what Yingjoe has implemented is short and sweet.
-> 
+> Yes, it does. It boots to the prompt then.
 
-Huh, this patch got somehow forgotten.
-Ok, just one comment. I would prefer to rename the global gpt_base to 
-gpt_sched_base or something similar and set the pointer + offset directly 
-mtk_timer_init.
+So something is fishy with this timer. In your UP setting we don't
+have any interaction with the broadcast stuff. It's just the single
+em_sti timer involved.
+
+Now looking at the code I notice, that this is one of the overly
+clever designed compare register based trainwrecks.
+
+Can you try the patch below, whether it makes a difference?
 
 Thanks,
-Matthias
+
+	tglx
+---
+diff --git a/drivers/clocksource/em_sti.c b/drivers/clocksource/em_sti.c
+index dc3c6ee04aaa..41d8035d294e 100644
+--- a/drivers/clocksource/em_sti.c
++++ b/drivers/clocksource/em_sti.c
+@@ -308,7 +308,7 @@ static void em_sti_register_clockevent(struct em_sti_priv *p)
+ 	dev_info(&p->pdev->dev, "used for clock events\n");
+ 
+ 	/* Register with dummy 1 Hz value, gets updated in ->set_mode() */
+-	clockevents_config_and_register(ced, 1, 2, 0xffffffff);
++	clockevents_config_and_register(ced, 1, 100, 0xffffffff);
+ }
+ 
+ static int em_sti_probe(struct platform_device *pdev)
