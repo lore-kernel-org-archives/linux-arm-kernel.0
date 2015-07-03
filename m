@@ -1,47 +1,51 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri, 03 Jul 2015 13:14:15 +0100
-Subject: [RFC 08/17] kvm: arm/arm64: implement kvm_arm_[halt, resume]_guest
-In-Reply-To: <55967848.5050204@linaro.org>
-References: <1435843047-6327-1-git-send-email-eric.auger@linaro.org>
- <1435843047-6327-9-git-send-email-eric.auger@linaro.org>
- <55967848.5050204@linaro.org>
-Message-ID: <55967C97.5010502@arm.com>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Fri, 3 Jul 2015 14:17:16 +0200
+Subject: [PATCH v2 2/4] ARM: mvebu: Add standby support
+In-Reply-To: <55967485.2010607@free-electrons.com>
+References: <1435684740-24912-1-git-send-email-gregory.clement@free-electrons.com>
+ <1435684740-24912-3-git-send-email-gregory.clement@free-electrons.com>
+ <20150701174709.2d55007d@free-electrons.com>
+ <55967485.2010607@free-electrons.com>
+Message-ID: <20150703141716.785a27c5@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/07/15 12:55, Eric Auger wrote:
-> Christoffer, Marc,
-> On 07/02/2015 03:17 PM, Eric Auger wrote:
->> On halt, the guest is forced to exit and prevented from being
->> re-entered. This is synchronous.
->>
->> Those two operations will be needed for IRQ forwarding setting.
->>
->> Signed-off-by: Eric Auger <eric.auger@linaro.org>
-> would you agree to handle this ARM functionality separately from the
-> forwarding series?
-> 
-> This includes 2 patch files, that one +
-> https://lkml.org/lkml/2015/7/2/288. This functionality is needed for
-> forwarding control since when changing the forwarding state we need to
-> "freeze" the state of the physical/virtual IRQ to undertake proper
-> actions. Stopping the guest makes sure it won't deactivate the virtual
-> IRQ while we are doing state change actions.
-> 
-> The forwarding series is quite heterogeneous (VFIO platform driver,
-> vgic, irq bypass manager) and I think it would simplify the review process.
-> 
-> Please let me know if you agree. If yes, I will post a separate series.
+Gregory,
 
-I don't mind, I trust you to do what's best for these series to be
-easily reviewed (if that is at all possible).
+On Fri, 03 Jul 2015 13:39:49 +0200, Gregory CLEMENT wrote:
 
-The only thing is that this patch implements a feature that will
-otherwise be unused, so annotating the functions with __maybe_unused
-would avoid warnings.
+> Having 2 initcall does not work because, there is a dependency between these
+> 2 calls. And actually the suspend_ops is registered before the board specific
+> hook. As soon as the suspend_ops is registered, mvebu_pm_valid() is called but
+> at this point mvebu_board_pm_enter is NULL so PM_SUSPEND_MEM is not available.
 
-Thanks,
+And? It will become available soon afterwards.
 
-	M.
+> All the complexity of the original patch was to allow registering a handler
+> without needed to get the resource(gpio device) that are not available when using
+> arch_initcall(). However the device_initcall_sync comes latter enough to
+> get all the devices registered but it still happens before the late_initcall,
+> so I will use this one and I will add a comment around it.
+
+I don't think we care about the order in which the initcalls are called.
+
+If the SoC level init call registering the suspend_ops gets called
+first, then at the beginning there is only support for standby. The
+support for suspend to RAM will be enabled once the board-level init
+call gets called.
+
+If the board level init call is called first, then it will set
+mvebu_board_pm_enter. It is not useful at this point. Until the SoC
+level init call registers the suspend_ops.
+
+I believe that the ->valid() method of suspend_ops gets called when the
+user actually enters the suspend state by writing to /sys/power/state.
+And by that time, both init calls will have been called.
+
+Best regards,
+
+Thomas
 -- 
-Jazz is not dead. It just smells funny...
+Thomas Petazzoni, CTO, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
