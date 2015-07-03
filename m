@@ -1,108 +1,49 @@
-From: andre.przywara@arm.com (Andre Przywara)
-Date: Fri,  3 Jul 2015 12:26:34 +0100
-Subject: [PATCH v5 06/10] arm: simplify MMIO dispatching
-In-Reply-To: <1435922798-14375-1-git-send-email-andre.przywara@arm.com>
-References: <1435922798-14375-1-git-send-email-andre.przywara@arm.com>
-Message-ID: <1435922798-14375-7-git-send-email-andre.przywara@arm.com>
+From: lorenx4@gmail.com (Lorenzo Nava)
+Date: Fri, 3 Jul 2015 13:27:42 +0200
+Subject: [PATCH v5] arm DMA: Fix allocation from CMA for coherent DMA
+In-Reply-To: <20150703090305.GR7557@n2100.arm.linux.org.uk>
+References: <1435699746-21395-1-git-send-email-lorenx4@gmail.com>
+ <20150701111251.GA21981@e104818-lin.cambridge.arm.com>
+ <20150703090305.GR7557@n2100.arm.linux.org.uk>
+Message-ID: <CAE=W-e1-Qr3Uzxe-V2mHv9PuFXZSL7jY-bS7y+OMcfVZHq7+7Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently we separate any incoming MMIO request into one of the ARM
-memory map regions and take care to spare the GIC.
-It turns out that this is unnecessary, as we only have one special
-region (the IO port area in the first 64 KByte). The MMIO rbtree
-takes care about unhandled MMIO ranges, so we can simply drop all the
-special range checking (except that for the IO range) in
-kvm_cpu__emulate_mmio().
-As the GIC is handled in the kernel, a GIC MMIO access should never
-reach userland (and we don't know what to do with it anyway).
-This lets us delete some more code and simplifies future extensions
-(like expanding the GIC regions).
-To be in line with the other architectures, move the now simpler
-code into a header file.
+On Fri, Jul 3, 2015 at 11:03 AM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Wed, Jul 01, 2015 at 12:12:51PM +0100, Catalin Marinas wrote:
+>> On Tue, Jun 30, 2015 at 11:29:06PM +0200, Lorenzo Nava wrote:
+>> > This patch allows the use of CMA for DMA coherent memory allocation.
+>> > At the moment if the input parameter "is_coherent" is set to true
+>> > the allocation is not made using the CMA, which I think is not the
+>> > desired behaviour.
+>> >
+>> > Signed-off-by: Lorenzo Nava <lorenx4@gmail.com>
+>> > Reviewed-by: Catalin Marinas <catalin.marinas@arm.com>
+>>
+>> If Russell doesn't have any objections, you can send the patch to
+>> his patch system. See here for more information:
+>
+> I'm left wondering whether this patch is really want Lorenzo wants.
+> From my reading of it, while this has the effect of allocating from
+> CMA for coherent devices, it's no different from the non-coherent
+> case, because by calling __alloc_from_contiguous(), we end up
+> remapping the allocated memory, removing the cacheability status
+> from the allocated pages.
+>
+> This brings up an interesting point: presumably, it's been tested, and
+> people are happy with the performance it's giving, inspite of it not
+> returning cacheable memory... or maybe it hasn't been tested that much?
+>
 
-Signed-off-by: Andre Przywara <andre.przywara@arm.com>
-Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
----
- arm/include/arm-common/kvm-arch.h     | 12 ------------
- arm/include/arm-common/kvm-cpu-arch.h | 14 ++++++++++++--
- arm/kvm-cpu.c                         | 16 ----------------
- 3 files changed, 12 insertions(+), 30 deletions(-)
+As Catalin correctly pointed out, I always consider that this patch:
 
-diff --git a/arm/include/arm-common/kvm-arch.h b/arm/include/arm-common/kvm-arch.h
-index 082131d..90d6733 100644
---- a/arm/include/arm-common/kvm-arch.h
-+++ b/arm/include/arm-common/kvm-arch.h
-@@ -45,18 +45,6 @@ static inline bool arm_addr_in_ioport_region(u64 phys_addr)
- 	return phys_addr >= KVM_IOPORT_AREA && phys_addr < limit;
- }
- 
--static inline bool arm_addr_in_virtio_mmio_region(u64 phys_addr)
--{
--	u64 limit = KVM_VIRTIO_MMIO_AREA + ARM_VIRTIO_MMIO_SIZE;
--	return phys_addr >= KVM_VIRTIO_MMIO_AREA && phys_addr < limit;
--}
--
--static inline bool arm_addr_in_pci_region(u64 phys_addr)
--{
--	u64 limit = KVM_PCI_CFG_AREA + ARM_PCI_CFG_SIZE + ARM_PCI_MMIO_SIZE;
--	return phys_addr >= KVM_PCI_CFG_AREA && phys_addr < limit;
--}
--
- struct kvm_arch {
- 	/*
- 	 * We may have to align the guest memory for virtio, so keep the
-diff --git a/arm/include/arm-common/kvm-cpu-arch.h b/arm/include/arm-common/kvm-cpu-arch.h
-index 36c7872..329979a 100644
---- a/arm/include/arm-common/kvm-cpu-arch.h
-+++ b/arm/include/arm-common/kvm-cpu-arch.h
-@@ -44,8 +44,18 @@ static inline bool kvm_cpu__emulate_io(struct kvm_cpu *vcpu, u16 port, void *dat
- 	return false;
- }
- 
--bool kvm_cpu__emulate_mmio(struct kvm_cpu *vcpu, u64 phys_addr, u8 *data,
--			   u32 len, u8 is_write);
-+static inline bool kvm_cpu__emulate_mmio(struct kvm_cpu *vcpu, u64 phys_addr,
-+					 u8 *data, u32 len, u8 is_write)
-+{
-+	if (arm_addr_in_ioport_region(phys_addr)) {
-+		int direction = is_write ? KVM_EXIT_IO_OUT : KVM_EXIT_IO_IN;
-+		u16 port = (phys_addr - KVM_IOPORT_AREA) & USHRT_MAX;
-+
-+		return kvm__emulate_io(vcpu, port, data, direction, len, 1);
-+	}
-+
-+	return kvm__emulate_mmio(vcpu, phys_addr, data, len, is_write);
-+}
- 
- unsigned long kvm_cpu__get_vcpu_mpidr(struct kvm_cpu *vcpu);
- 
-diff --git a/arm/kvm-cpu.c b/arm/kvm-cpu.c
-index ab08815..7780251 100644
---- a/arm/kvm-cpu.c
-+++ b/arm/kvm-cpu.c
-@@ -139,22 +139,6 @@ bool kvm_cpu__handle_exit(struct kvm_cpu *vcpu)
- 	return false;
- }
- 
--bool kvm_cpu__emulate_mmio(struct kvm_cpu *vcpu, u64 phys_addr, u8 *data,
--			   u32 len, u8 is_write)
--{
--	if (arm_addr_in_virtio_mmio_region(phys_addr)) {
--		return kvm__emulate_mmio(vcpu, phys_addr, data, len, is_write);
--	} else if (arm_addr_in_ioport_region(phys_addr)) {
--		int direction = is_write ? KVM_EXIT_IO_OUT : KVM_EXIT_IO_IN;
--		u16 port = (phys_addr - KVM_IOPORT_AREA) & USHRT_MAX;
--		return kvm__emulate_io(vcpu, port, data, direction, len, 1);
--	} else if (arm_addr_in_pci_region(phys_addr)) {
--		return kvm__emulate_mmio(vcpu, phys_addr, data, len, is_write);
--	}
--
--	return false;
--}
--
- void kvm_cpu__show_page_tables(struct kvm_cpu *vcpu)
- {
- }
--- 
-2.3.5
+https://lkml.org/lkml/2015/5/7/512
+
+has been applied. The memory returned by mmap is then cacheable and
+preserve the attributes used during allocation.
+Of course, without that patch, mine is not working at all.
+
+(Sorry for the previous mail which has been sent accidentally).
+
+Lorenzo
