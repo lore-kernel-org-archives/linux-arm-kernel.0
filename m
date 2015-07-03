@@ -1,54 +1,98 @@
-From: michael@smart-africa.com (Michael van der Westhuizen)
-Date: Fri, 3 Jul 2015 14:30:12 +0100
-Subject: [PATCH 1/2] gpio: dwapb: Use human understandable gpio numbering.
-In-Reply-To: <038289C9-2848-4545-B450-7D4EA074CD26@smart-africa.com>
-References: <cover.1435777856.git.rcochran@linutronix.de>
- <d6b5ce85a17164970d454583560e07f7aed7b8ca.1435777856.git.rcochran@linutronix.de>
- <5594E9F6.7040701@linutronix.de>
- <20150702142601.GB9349@localhost.localdomain>
- <55954B17.3020303@linutronix.de>
- <20150702152147.GA10111@localhost.localdomain>
- <55955EB5.4090400@linutronix.de>
- <038289C9-2848-4545-B450-7D4EA074CD26@smart-africa.com>
-Message-ID: <A32F9C0A-E306-44CE-A556-281FFF64865C@smart-africa.com>
+From: wsa@the-dreams.de (Wolfram Sang)
+Date: Fri, 3 Jul 2015 15:32:45 +0200
+Subject: Possible regression due to "tick: broadcast: Prevent livelock
+ from event handler"
+In-Reply-To: <alpine.DEB.2.11.1507031511180.3916@nanos>
+References: <20150703024044.GB24695@verge.net.au>
+ <20150703105441.GF1521@katana>
+ <alpine.DEB.2.11.1507031511180.3916@nanos>
+Message-ID: <20150703133245.GA19284@katana>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
-> On 02 Jul 2015, at 5:02 PM, Michael van der Westhuizen <michael@smart-africa.com> wrote:
-> 
-> 
->> On 02 Jul 2015, at 4:54 PM, Sebastian Andrzej Siewior <bigeasy@linutronix.de> wrote:
->> 
->> On 07/02/2015 05:21 PM, Richard Cochran wrote:
->>> On Thu, Jul 02, 2015 at 04:30:47PM +0200, Sebastian Andrzej Siewior wrote:
->>>> On 07/02/2015 04:26 PM, Richard Cochran wrote:
->>>>> On Thu, Jul 02, 2015 at 09:36:22AM +0200, Sebastian Andrzej Siewior wrote:
->>>>>> If you are in a specific SoC you could do
->>>>>> 	base = of_alias_get_id(np, "gpio") * num_of_gpio_per_chip
->>>>>> and get consistent numbers / sane.
->>>>> 
->>>>> And what about /sys/class/gpio ?
->>>> 
->>>> What about it?
->>> 
->>> The poor users of that interface cannot use "of_alias_get_id" as you suggest.
->> 
->> You do that in the driver. The only problem with that is that the
->> synopsys controller can have between one and four banks and a bank can
->> have 1-32 GPIOs if I remember correctly. That means you can't have a
->> static number of GPIOs like others do.
-> 
-> This is correct.
-> 
->> Therefore I think a starting property is the only way and I would
->> prefer a generic one.
-> 
-> I would prefer a generic property too.  I was rather surprised that one did not exist.
+> So with high res timers it boots. Can you please provide the output of
+> /proc/timer_list for that case?
 
-? looking into this more closely, by the time we get into gpiochip_add there?s no notion
-of the DT node that is associated to the gpiochip being added (and the gpiochip->dev
-points to the parent device, which is the generally the parent DT node), so this can?t be
-done generically without at least some churn in the individual drivers.
+Sure:
 
-Michael
+Timer List Version: v0.7
+HRTIMER_MAX_CLOCK_BASES: 4
+now at 40752899169 nsecs
+
+cpu: 0
+ clock 0:
+  .base:       c03aa990
+  .index:      0
+  .resolution: 1 nsecs
+  .get_time:   ktime_get
+  .offset:     0 nsecs
+active timers:
+ #0: tick_cpu_sched, tick_sched_timer, S:01
+ # expires at 40760000000-40760000000 nsecs [in 7100831 to 7100831 nsecs]
+ #1: sched_clock_timer, sched_clock_poll, S:01
+ # expires at 21474836475000000-21474836475000000 nsecs [in 21474795722100831 to 21474795722100831 nsecs]
+ clock 1:
+  .base:       c03aa9c8
+  .index:      1
+  .resolution: 1 nsecs
+  .get_time:   ktime_get_real
+  .offset:     0 nsecs
+active timers:
+ clock 2:
+  .base:       c03aaa00
+  .index:      2
+  .resolution: 1 nsecs
+  .get_time:   ktime_get_boottime
+  .offset:     0 nsecs
+active timers:
+ clock 3:
+  .base:       c03aaa38
+  .index:      3
+  .resolution: 1 nsecs
+  .get_time:   ktime_get_clocktai
+  .offset:     0 nsecs
+active timers:
+  .expires_next   : 40760000000 nsecs
+  .hres_active    : 1
+  .nr_events      : 770
+  .nr_retries     : 29
+  .nr_hangs       : 0
+  .max_hang_time  : 0 nsecs
+  .nohz_mode      : 2
+  .last_tick      : 40400000000 nsecs
+  .tick_stopped   : 0
+  .idle_jiffies   : 4294941337
+  .idle_calls     : 378
+  .idle_sleeps    : 354
+  .idle_entrytime : 40743316650 nsecs
+  .idle_waketime  : 40743316650 nsecs
+  .idle_exittime  : 40743377685 nsecs
+  .idle_sleeptime : 37586425789 nsecs
+  .iowait_sleeptime: 0 nsecs
+  .last_jiffies   : 4294941368
+  .next_jiffies   : 4294941389
+  .idle_expires   : 40930000000 nsecs
+jiffies: 4294941371
+
+Tick Device: mode:     1
+Per CPU device: 0
+Clock Event Device: e0180000.timer
+ max_delta_ns:   131071523464982
+ min_delta_ns:   61035
+ mult:           70369
+ shift:          31
+ mode:           3
+ next_event:     40760000000 nsecs
+ set_next_event: em_sti_clock_event_next
+ set_mode:       em_sti_clock_event_mode
+ event_handler:  hrtimer_interrupt
+ retries:        0
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150703/f70827a7/attachment.sig>
