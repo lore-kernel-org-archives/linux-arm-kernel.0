@@ -1,98 +1,155 @@
-From: rjw@rjwysocki.net (Rafael J. Wysocki)
-Date: Sat, 04 Jul 2015 01:54:15 +0200
-Subject: [PATCH v3 2/3] ACPI / ARM64: add BAD_MADT_GICC_ENTRY() macro
-In-Reply-To: <5596E7C8.7040809@redhat.com>
-References: <1435880916-2153-1-git-send-email-al.stone@linaro.org>
- <20150703140601.GL25907@e104818-lin.cambridge.arm.com>
- <5596E7C8.7040809@redhat.com>
-Message-ID: <15297999.EvgjakjXbx@vostro.rjw.lan>
+From: sasha.levin@oracle.com (Sasha Levin)
+Date: Fri,  3 Jul 2015 23:02:51 -0400
+Subject: [added to the 3.18 stable tree] clocksource: exynos_mct: Avoid
+ blocking calls in the cpu hotplug notifier
+In-Reply-To: <1435978997-14393-1-git-send-email-sasha.levin@oracle.com>
+References: <1435978997-14393-1-git-send-email-sasha.levin@oracle.com>
+Message-ID: <1435978997-14393-122-git-send-email-sasha.levin@oracle.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday, July 03, 2015 01:51:36 PM Al Stone wrote:
-> On 07/03/2015 08:06 AM, Catalin Marinas wrote:
-> > On Thu, Jul 02, 2015 at 05:48:35PM -0600, Al Stone wrote:
-> >> diff --git a/arch/arm64/include/asm/acpi.h b/arch/arm64/include/asm/acpi.h
-> >> index 39248d3..a3c26a4 100644
-> >> --- a/arch/arm64/include/asm/acpi.h
-> >> +++ b/arch/arm64/include/asm/acpi.h
-> >> @@ -19,6 +19,17 @@
-> >>  #include <asm/psci.h>
-> >>  #include <asm/smp_plat.h>
-> >>  
-> >> +/* Macros for consistency checks of the GICC subtable of MADT */
-> >> +#define ACPI_MADT_GICC_51_LENGTH       76
-> >> +#define ACPI_MADT_GICC_60_LENGTH       80
-> >> +
-> >> +#define BAD_MADT_GICC_ENTRY(entry, end) (                                   \
-> >> +		(!entry) || (unsigned long)entry + sizeof(*entry) > end ||  \
-> >> +		((ACPI_FADT_SPEC_VERSION == ACPI_FADT_SPEC_VERSION_51) &&   \
-> >> +		 (entry->header.length != ACPI_MADT_GICC_51_LENGTH))    ||  \
-> >> +		((ACPI_FADT_SPEC_VERSION == ACPI_FADT_SPEC_VERSION_60) &&   \
-> >> +		 (entry->header.length != ACPI_MADT_GICC_60_LENGTH)))
-> > 
-> > This looks ugly but, well, we could live with this.
-> 
-> Nod.  It's right at the hairy edge of becoming a function, I think.
-> 
-> > However, I'd like to avoid having to extend this macro every time we get
-> > a new spec released, like 6.1 defining another 80 or 84 etc. So, how
-> > about we only update this when there is an actual change in the length?
-> > Something like:
-> > 
-> > #define ACPI_MADT_GICC_LENGTH	({					\
-> > 	u8 length;							\
-> > 	if (ACPI_FADT_SPEC_VERSION < ACPI_FADT_SPEC_VERSION_6_0)	\
-> > 		length = 76;						\
-> > 	else								\
-> > 		length = 80;						\
-> > 	length;								\
-> > })
-> > 
-> > or just:
-> > 
-> > #define ACPI_MADT_GICC_LENGTH	\
-> > 	(ACPI_FADT_SPEC_VERSION < ACPI_FADT_SPEC_VERSION_6_0 ? 76 : 80)
-> > 
-> > (the latter is simpler but may not look nice if we change it again in
-> > 6.1; though we could re-write this macro when needed, not a problem)
-> > 
-> 
-> Perhaps the sanity checking for the MADT subtables needs to be revisited
-> and a more general solution provided -- this is not the only MADT subtable
-> with this problem and it may occur again.
-> 
-> Even the versions above are not technically compliant with the spec.  If
-> we implement what the spec currently says, it might look something like
-> this:
-> 
-> #define ACPI_MADT_GICC_LENGTH ({					\
-> 	u8 length;							\
-> 	switch (ACPI_FADT_SPEC_VERSION) {				\
-> 	case ACPI_FADT_SPEC_VERSION_5_0:				\
-> 		length = 40;						\
-> 		break;							\
-> 	case ACPI_FADT_SPEC_VERSION_5_1:				\
-> 		length = 76;						\
-> 		break;							\
-> 	default:	/* use 6.0 size */				\
-> 		length = 80;						\
-> 	}								\
-> 	length;								\
-> })
-> 
-> So it's just messy and there will be a need for change.  Let me think about
-> making this a function instead of a macro; it may make sense to really fix
-> BAD_MADT_ENTRY in general instead of just dealing with the GICC subtable,
-> but it could also be overkill.
+From: Damian Eppel <d.eppel@samsung.com>
 
-So here's my suggestion.
+This patch has been added to the 3.18 stable tree. If you have any
+objections, please let us know.
 
-First, make ARM64 boot with 4.2+ in the simplest way possible.
+===============
 
-Second, set out to fix BAD_MADT_ENTRY() etc.  Start with fixing ACPICA to
-distinguish between the different formats depending on the spec version and
-follow up from there.
+[ Upstream commit 56a94f13919c0db5958611b388e1581b4852f3c9 ]
 
-Thanks,
-Rafael
+Whilst testing cpu hotplug events on kernel configured with
+DEBUG_PREEMPT and DEBUG_ATOMIC_SLEEP we get following BUG message,
+caused by calling request_irq() and free_irq() in the context of
+hotplug notification (which is in this case atomic context).
+
+[   40.785859] CPU1: Software reset
+[   40.786660] BUG: sleeping function called from invalid context at mm/slub.c:1241
+[   40.786668] in_atomic(): 1, irqs_disabled(): 128, pid: 0, name: swapper/1
+[   40.786678] Preemption disabled at:[<  (null)>]   (null)
+[   40.786681]
+[   40.786692] CPU: 1 PID: 0 Comm: swapper/1 Not tainted 3.19.0-rc4-00024-g7dca860 #36
+[   40.786698] Hardware name: SAMSUNG EXYNOS (Flattened Device Tree)
+[   40.786728] [<c0014a00>] (unwind_backtrace) from [<c0011980>] (show_stack+0x10/0x14)
+[   40.786747] [<c0011980>] (show_stack) from [<c0449ba0>] (dump_stack+0x70/0xbc)
+[   40.786767] [<c0449ba0>] (dump_stack) from [<c00c6124>] (kmem_cache_alloc+0xd8/0x170)
+[   40.786785] [<c00c6124>] (kmem_cache_alloc) from [<c005d6f8>] (request_threaded_irq+0x64/0x128)
+[   40.786804] [<c005d6f8>] (request_threaded_irq) from [<c0350b8c>] (exynos4_local_timer_setup+0xc0/0x13c)
+[   40.786820] [<c0350b8c>] (exynos4_local_timer_setup) from [<c0350ca8>] (exynos4_mct_cpu_notify+0x30/0xa8)
+[   40.786838] [<c0350ca8>] (exynos4_mct_cpu_notify) from [<c003b330>] (notifier_call_chain+0x44/0x84)
+[   40.786857] [<c003b330>] (notifier_call_chain) from [<c0022fd4>] (__cpu_notify+0x28/0x44)
+[   40.786873] [<c0022fd4>] (__cpu_notify) from [<c0013714>] (secondary_start_kernel+0xec/0x150)
+[   40.786886] [<c0013714>] (secondary_start_kernel) from [<40008764>] (0x40008764)
+
+Interrupts cannot be requested/freed in the CPU_STARTING/CPU_DYING
+notifications which run on the hotplugged cpu with interrupts and
+preemption disabled.
+
+To avoid the issue, request the interrupts for all possible cpus in
+the boot code. The interrupts are marked NO_AUTOENABLE to avoid a racy
+request_irq/disable_irq() sequence. The flag prevents the
+request_irq() code from enabling the interrupt immediately.
+
+The interrupt is then enabled in the CPU_STARTING notifier of the
+hotplugged cpu and again disabled with disable_irq_nosync() in the
+CPU_DYING notifier.
+
+[ tglx: Massaged changelog to match the patch ]
+
+Fixes: 7114cd749a12 ("clocksource: exynos_mct: use (request/free)_irq calls for local timer registration")
+Reported-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+Tested-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+Tested-by: Marcin Jabrzyk <m.jabrzyk@samsung.com>
+Signed-off-by: Damian Eppel <d.eppel@samsung.com>
+Cc: m.szyprowski at samsung.com
+Cc: kyungmin.park at samsung.com
+Cc: daniel.lezcano at linaro.org
+Cc: kgene at kernel.org
+Cc: linux-arm-kernel at lists.infradead.org
+Link: http://lkml.kernel.org/r/1435324984-7328-1-git-send-email-d.eppel at samsung.com
+Signed-off-by: Thomas Gleixner <tglx@linutronix.de>
+Cc: <stable@vger.kernel.org>
+Signed-off-by: Sasha Levin <sasha.levin@oracle.com>
+---
+ drivers/clocksource/exynos_mct.c | 43 ++++++++++++++++++++++++++++------------
+ 1 file changed, 30 insertions(+), 13 deletions(-)
+
+diff --git a/drivers/clocksource/exynos_mct.c b/drivers/clocksource/exynos_mct.c
+index 83564c9..c844616 100644
+--- a/drivers/clocksource/exynos_mct.c
++++ b/drivers/clocksource/exynos_mct.c
+@@ -466,15 +466,12 @@ static int exynos4_local_timer_setup(struct clock_event_device *evt)
+ 	exynos4_mct_write(TICK_BASE_CNT, mevt->base + MCT_L_TCNTB_OFFSET);
+ 
+ 	if (mct_int_type == MCT_INT_SPI) {
+-		evt->irq = mct_irqs[MCT_L0_IRQ + cpu];
+-		if (request_irq(evt->irq, exynos4_mct_tick_isr,
+-				IRQF_TIMER | IRQF_NOBALANCING,
+-				evt->name, mevt)) {
+-			pr_err("exynos-mct: cannot register IRQ %d\n",
+-				evt->irq);
++
++		if (evt->irq == -1)
+ 			return -EIO;
+-		}
+-		irq_force_affinity(mct_irqs[MCT_L0_IRQ + cpu], cpumask_of(cpu));
++
++		irq_force_affinity(evt->irq, cpumask_of(cpu));
++		enable_irq(evt->irq);
+ 	} else {
+ 		enable_percpu_irq(mct_irqs[MCT_L0_IRQ], 0);
+ 	}
+@@ -487,10 +484,12 @@ static int exynos4_local_timer_setup(struct clock_event_device *evt)
+ static void exynos4_local_timer_stop(struct clock_event_device *evt)
+ {
+ 	evt->set_mode(CLOCK_EVT_MODE_UNUSED, evt);
+-	if (mct_int_type == MCT_INT_SPI)
+-		free_irq(evt->irq, this_cpu_ptr(&percpu_mct_tick));
+-	else
++	if (mct_int_type == MCT_INT_SPI) {
++		if (evt->irq != -1)
++			disable_irq_nosync(evt->irq);
++	} else {
+ 		disable_percpu_irq(mct_irqs[MCT_L0_IRQ]);
++	}
+ }
+ 
+ static int exynos4_mct_cpu_notify(struct notifier_block *self,
+@@ -522,7 +521,7 @@ static struct notifier_block exynos4_mct_cpu_nb = {
+ 
+ static void __init exynos4_timer_resources(struct device_node *np, void __iomem *base)
+ {
+-	int err;
++	int err, cpu;
+ 	struct mct_clock_event_device *mevt = this_cpu_ptr(&percpu_mct_tick);
+ 	struct clk *mct_clk, *tick_clk;
+ 
+@@ -549,7 +548,25 @@ static void __init exynos4_timer_resources(struct device_node *np, void __iomem
+ 		WARN(err, "MCT: can't request IRQ %d (%d)\n",
+ 		     mct_irqs[MCT_L0_IRQ], err);
+ 	} else {
+-		irq_set_affinity(mct_irqs[MCT_L0_IRQ], cpumask_of(0));
++		for_each_possible_cpu(cpu) {
++			int mct_irq = mct_irqs[MCT_L0_IRQ + cpu];
++			struct mct_clock_event_device *pcpu_mevt =
++				per_cpu_ptr(&percpu_mct_tick, cpu);
++
++			pcpu_mevt->evt.irq = -1;
++
++			irq_set_status_flags(mct_irq, IRQ_NOAUTOEN);
++			if (request_irq(mct_irq,
++					exynos4_mct_tick_isr,
++					IRQF_TIMER | IRQF_NOBALANCING,
++					pcpu_mevt->name, pcpu_mevt)) {
++				pr_err("exynos-mct: cannot register IRQ (cpu%d)\n",
++									cpu);
++
++				continue;
++			}
++			pcpu_mevt->evt.irq = mct_irq;
++		}
+ 	}
+ 
+ 	err = register_cpu_notifier(&exynos4_mct_cpu_nb);
+-- 
+2.1.0
