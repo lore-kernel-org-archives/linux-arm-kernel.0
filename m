@@ -1,38 +1,51 @@
 From: jszhang@marvell.com (Jisheng Zhang)
-Date: Sat, 4 Jul 2015 21:01:47 +0800
-Subject: [RFC PATCH 0/3] arm: psci: implement cpuidle_ops
-Message-ID: <1436014910-1201-1-git-send-email-jszhang@marvell.com>
+Date: Sat, 4 Jul 2015 21:01:49 +0800
+Subject: [RFC PATCH 2/3] arm: psci: enable PSCI on UP systems
+In-Reply-To: <1436014910-1201-1-git-send-email-jszhang@marvell.com>
+References: <1436014910-1201-1-git-send-email-jszhang@marvell.com>
+Message-ID: <1436014910-1201-3-git-send-email-jszhang@marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We'd like to use cpuidle-arm.c for both arm and arm64 with psci as backend.
-For arm64, it works. But for arm, we miss cpuidle_ops, these patches try to
-address this issue.
+This is to make calls like eg cpu_suspend can be made functional on UP too.
 
-Has been tested on Marvell Berlin SoCs. These patches are rebased on the Mark
-Rutland's latest psci unification work.
+Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
+---
+ arch/arm/kernel/Makefile | 5 +----
+ arch/arm/kernel/psci.c   | 2 ++
+ 2 files changed, 3 insertions(+), 4 deletions(-)
 
-[PATCH 1/3] renames psci_smp.c to psci.c to prepare for the next two changes.
-[PATCH 2/3] enables PSCI on UP systems so that some calls like cpu_suspend can
-be made functional on UP too
-[PATCH 3/3] add the cpuidle_ops for psci. Most code is stolen from arm64, which
-introduce duplicated psci code, that's why it's marked as "RFC", I dunno where
-to put cpu_psci_cpu_init_idle() related functions.
-
-Comments are welcome!
-
-
-Jisheng Zhang (3):
-  arm: psci: rename psci_smp.c to psci.c
-  arm: psci: enable PSCI on UP systems
-  arm: psci: add cpuidle_ops support
-
- arch/arm/kernel/Makefile   |   5 +-
- arch/arm/kernel/psci.c     | 248 +++++++++++++++++++++++++++++++++++++++++++++
- arch/arm/kernel/psci_smp.c | 130 ------------------------
- 3 files changed, 249 insertions(+), 134 deletions(-)
- create mode 100644 arch/arm/kernel/psci.c
- delete mode 100644 arch/arm/kernel/psci_smp.c
-
+diff --git a/arch/arm/kernel/Makefile b/arch/arm/kernel/Makefile
+index c57b2c0..2b1a60c 100644
+--- a/arch/arm/kernel/Makefile
++++ b/arch/arm/kernel/Makefile
+@@ -88,9 +88,6 @@ obj-$(CONFIG_DEBUG_LL)	+= debug.o
+ obj-$(CONFIG_EARLY_PRINTK)	+= early_printk.o
+ 
+ obj-$(CONFIG_ARM_VIRT_EXT)	+= hyp-stub.o
+-ifeq ($(CONFIG_ARM_PSCI),y)
+-obj-y				+= psci-call.o
+-obj-$(CONFIG_SMP)		+= psci.o
+-endif
++obj-$(CONFIG_ARM_PSCI)		+= psci-call.o psci.o
+ 
+ extra-y := $(head-y) vmlinux.lds
+diff --git a/arch/arm/kernel/psci.c b/arch/arm/kernel/psci.c
+index 61c04b0..7f6ff02 100644
+--- a/arch/arm/kernel/psci.c
++++ b/arch/arm/kernel/psci.c
+@@ -47,6 +47,7 @@
+  *
+  */
+ 
++#ifdef CONFIG_SMP
+ extern void secondary_startup(void);
+ 
+ static int psci_boot_secondary(unsigned int cpu, struct task_struct *idle)
+@@ -128,3 +129,4 @@ struct smp_operations __initdata psci_smp_ops = {
+ 	.cpu_kill		= psci_cpu_kill,
+ #endif
+ };
++#endif
 -- 
 2.1.4
