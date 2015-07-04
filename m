@@ -1,5 +1,5 @@
-From: jszhang@marvell.com (Jisheng Zhang)
-Date: Sat, 4 Jul 2015 18:33:21 +0800
+From: tglx@linutronix.de (Thomas Gleixner)
+Date: Sat, 4 Jul 2015 14:49:31 +0200 (CEST)
 Subject: [PATCH v2 2/2] irqchip: dw-apb-ictl: add irq_set_affinity support
 In-Reply-To: <20150704100827.GC7557@n2100.arm.linux.org.uk>
 References: <1435987170-3962-1-git-send-email-jszhang@marvell.com>
@@ -7,15 +7,11 @@ References: <1435987170-3962-1-git-send-email-jszhang@marvell.com>
  <20150704082623.GA7557@n2100.arm.linux.org.uk>
  <alpine.DEB.2.11.1507041151010.3916@nanos>
  <20150704100827.GC7557@n2100.arm.linux.org.uk>
-Message-ID: <20150704183321.565e2489@xhacker>
+Message-ID: <alpine.DEB.2.11.1507041437470.3916@nanos>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Russell, Thomas,
-
-On Sat, 4 Jul 2015 11:08:27 +0100
-Russell King - ARM Linux <linux@arm.linux.org.uk> wrote:
-
+On Sat, 4 Jul 2015, Russell King - ARM Linux wrote:
 > On Sat, Jul 04, 2015 at 11:53:57AM +0200, Thomas Gleixner wrote:
 > > On Sat, 4 Jul 2015, Russell King - ARM Linux wrote:
 > > 
@@ -48,18 +44,13 @@ Russell King - ARM Linux <linux@arm.linux.org.uk> wrote:
 > interrupt affinity of a chained interrupt, which really isn't a good thing
 > to do, because it migrates every interrupt on the child interrupt
 > controller.
-> 
 
-Yep, that's the problem although it doesn't matter in our case for other 
-interrupts don't care the affinity at all.
-I'm requesting our HW people to connect timer interrupt to GIC directly in
-future chips. But for the existing chips, this patch does really reduce
-power consumption, is there any elegant solution?
+Fair enough, I missed that chained hackery.
 
-PS: I noticed that exynos-combiner.c also migrated every interrupt on the
-child irq controller.
-
-Any suggestions are appreciated.
+For that powersaving scenario it's probably ok to move the all child
+irqs around, but we should at least make that an opt-in behaviour and
+not enabled by default.
 
 Thanks,
-Jisheng
+
+	tglx
