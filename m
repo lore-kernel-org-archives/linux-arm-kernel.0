@@ -1,156 +1,308 @@
 From: jszhang@marvell.com (Jisheng Zhang)
-Date: Sat, 4 Jul 2015 21:01:50 +0800
-Subject: [RFC PATCH 3/3] arm: psci: add cpuidle_ops support
+Date: Sat, 4 Jul 2015 21:01:48 +0800
+Subject: [RFC PATCH 1/3] arm: psci: rename psci_smp.c to psci.c
 In-Reply-To: <1436014910-1201-1-git-send-email-jszhang@marvell.com>
 References: <1436014910-1201-1-git-send-email-jszhang@marvell.com>
-Message-ID: <1436014910-1201-4-git-send-email-jszhang@marvell.com>
+Message-ID: <1436014910-1201-2-git-send-email-jszhang@marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch implement cpuidle_ops using psci, the code is stolen from
-arm64. Now we can use cpuidle-arm.c for both arm and arm64.
+This will prepare for next commit to enable PSCI for UP systems so that
+calls like cpu_suspend can be made functional on UP too.
 
 Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
 ---
- arch/arm/kernel/psci.c | 116 +++++++++++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 116 insertions(+)
+ arch/arm/kernel/Makefile   |   2 +-
+ arch/arm/kernel/psci.c     | 130 +++++++++++++++++++++++++++++++++++++++++++++
+ arch/arm/kernel/psci_smp.c | 130 ---------------------------------------------
+ 3 files changed, 131 insertions(+), 131 deletions(-)
+ create mode 100644 arch/arm/kernel/psci.c
+ delete mode 100644 arch/arm/kernel/psci_smp.c
 
+diff --git a/arch/arm/kernel/Makefile b/arch/arm/kernel/Makefile
+index 3b995f5..c57b2c0 100644
+--- a/arch/arm/kernel/Makefile
++++ b/arch/arm/kernel/Makefile
+@@ -90,7 +90,7 @@ obj-$(CONFIG_EARLY_PRINTK)	+= early_printk.o
+ obj-$(CONFIG_ARM_VIRT_EXT)	+= hyp-stub.o
+ ifeq ($(CONFIG_ARM_PSCI),y)
+ obj-y				+= psci-call.o
+-obj-$(CONFIG_SMP)		+= psci_smp.o
++obj-$(CONFIG_SMP)		+= psci.o
+ endif
+ 
+ extra-y := $(head-y) vmlinux.lds
 diff --git a/arch/arm/kernel/psci.c b/arch/arm/kernel/psci.c
-index 7f6ff02..7bf744d 100644
---- a/arch/arm/kernel/psci.c
+new file mode 100644
+index 0000000..61c04b0
+--- /dev/null
 +++ b/arch/arm/kernel/psci.c
-@@ -13,16 +13,132 @@
-  * Author: Will Deacon <will.deacon@arm.com>
-  */
- 
-+#include <linux/cpuidle.h>
- #include <linux/init.h>
- #include <linux/smp.h>
- #include <linux/of.h>
- #include <linux/delay.h>
- #include <linux/psci.h>
-+#include <linux/slab.h>
- 
- #include <uapi/linux/psci.h>
- 
-+#include <asm/cpuidle.h>
- #include <asm/psci.h>
- #include <asm/smp_plat.h>
-+#include <asm/suspend.h>
+@@ -0,0 +1,130 @@
++/*
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * Copyright (C) 2012 ARM Limited
++ *
++ * Author: Will Deacon <will.deacon@arm.com>
++ */
 +
-+#ifdef CONFIG_CPU_IDLE
-+static bool psci_power_state_loses_context(u32 state)
++#include <linux/init.h>
++#include <linux/smp.h>
++#include <linux/of.h>
++#include <linux/delay.h>
++#include <linux/psci.h>
++
++#include <uapi/linux/psci.h>
++
++#include <asm/psci.h>
++#include <asm/smp_plat.h>
++
++/*
++ * psci_smp assumes that the following is true about PSCI:
++ *
++ * cpu_suspend   Suspend the execution on a CPU
++ * @state        we don't currently describe affinity levels, so just pass 0.
++ * @entry_point  the first instruction to be executed on return
++ * returns 0  success, < 0 on failure
++ *
++ * cpu_off       Power down a CPU
++ * @state        we don't currently describe affinity levels, so just pass 0.
++ * no return on successful call
++ *
++ * cpu_on        Power up a CPU
++ * @cpuid        cpuid of target CPU, as from MPIDR
++ * @entry_point  the first instruction to be executed on return
++ * returns 0  success, < 0 on failure
++ *
++ * migrate       Migrate the context to a different CPU
++ * @cpuid        cpuid of target CPU, as from MPIDR
++ * returns 0  success, < 0 on failure
++ *
++ */
++
++extern void secondary_startup(void);
++
++static int psci_boot_secondary(unsigned int cpu, struct task_struct *idle)
 +{
-+	return state & PSCI_0_2_POWER_STATE_TYPE_MASK;
++	if (psci_ops.cpu_on)
++		return psci_ops.cpu_on(cpu_logical_map(cpu),
++					virt_to_idmap(&secondary_startup));
++	return -ENODEV;
 +}
 +
-+static bool psci_power_state_is_valid(u32 state)
++#ifdef CONFIG_HOTPLUG_CPU
++int psci_cpu_disable(unsigned int cpu)
 +{
-+	const u32 valid_mask = PSCI_0_2_POWER_STATE_ID_MASK |
-+			       PSCI_0_2_POWER_STATE_TYPE_MASK |
-+			       PSCI_0_2_POWER_STATE_AFFL_MASK;
-+
-+	return !(state & ~valid_mask);
-+}
-+
-+static DEFINE_PER_CPU_READ_MOSTLY(u32 *, psci_power_state);
-+
-+static int __init cpu_psci_cpu_init_idle(struct device_node *cpu_node,
-+					 int cpu)
-+{
-+	int i, ret, count = 0;
-+	u32 *psci_states;
-+	struct device_node *state_node;
-+
-+	/*
-+	 * If the PSCI cpu_suspend function hook has not been initialized
-+	 * idle states must not be enabled, so bail out
-+	 */
-+	if (!psci_ops.cpu_suspend)
++	/* Fail early if we don't have CPU_OFF support */
++	if (!psci_ops.cpu_off)
 +		return -EOPNOTSUPP;
 +
-+	/* Count idle states */
-+	while ((state_node = of_parse_phandle(cpu_node, "cpu-idle-states",
-+					      count))) {
-+		count++;
-+		of_node_put(state_node);
-+	}
++	/* Trusted OS will deny CPU_OFF */
++	if (psci_tos_resident_on(cpu))
++		return -EPERM;
 +
-+	if (!count)
-+		return -ENODEV;
-+
-+	psci_states = kcalloc(count, sizeof(*psci_states), GFP_KERNEL);
-+	if (!psci_states)
-+		return -ENOMEM;
-+
-+	for (i = 0; i < count; i++) {
-+		u32 state;
-+
-+		state_node = of_parse_phandle(cpu_node, "cpu-idle-states", i);
-+
-+		ret = of_property_read_u32(state_node,
-+					   "arm,psci-suspend-param",
-+					   &state);
-+		if (ret) {
-+			pr_warn(" * %s missing arm,psci-suspend-param property\n",
-+				state_node->full_name);
-+			of_node_put(state_node);
-+			goto free_mem;
-+		}
-+
-+		of_node_put(state_node);
-+		pr_warn("psci-power-state %#x index %d\n", state, i);
-+		if (!psci_power_state_is_valid(state)) {
-+			pr_warn("Invalid PSCI power state %#x\n", state);
-+			ret = -EINVAL;
-+			goto free_mem;
-+		}
-+		psci_states[i] = state;
-+	}
-+	/* Idle states parsed correctly, initialize per-cpu pointer */
-+	per_cpu(psci_power_state, cpu) = psci_states;
 +	return 0;
-+
-+free_mem:
-+	kfree(psci_states);
-+	return ret;
 +}
 +
-+static int psci_suspend_finisher(unsigned long index)
++void __ref psci_cpu_die(unsigned int cpu)
 +{
-+	u32 *state = __this_cpu_read(psci_power_state);
++	u32 state = PSCI_POWER_STATE_TYPE_POWER_DOWN <<
++		    PSCI_0_2_POWER_STATE_TYPE_SHIFT;
 +
-+	return psci_ops.cpu_suspend(state[index - 1],
-+				    virt_to_phys(cpu_resume));
++	if (psci_ops.cpu_off)
++		psci_ops.cpu_off(state);
++
++	/* We should never return */
++	panic("psci: cpu %d failed to shutdown\n", cpu);
 +}
 +
-+static int cpu_psci_cpu_suspend(int cpu, unsigned long index)
++int __ref psci_cpu_kill(unsigned int cpu)
 +{
-+	int ret;
-+	u32 *state = __this_cpu_read(psci_power_state);
++	int err, i;
++
++	if (!psci_ops.affinity_info)
++		return 1;
 +	/*
-+	 * idle state index 0 corresponds to wfi, should never be called
-+	 * from the cpu_suspend operations
++	 * cpu_kill could race with cpu_die and we can
++	 * potentially end up declaring this cpu undead
++	 * while it is dying. So, try again a few times.
 +	 */
-+	if (WARN_ON_ONCE(!index))
-+		return -EINVAL;
 +
-+	if (!psci_power_state_loses_context(state[index - 1]))
-+		ret = psci_ops.cpu_suspend(state[index - 1], 0);
-+	else
-+		ret = cpu_suspend(index, psci_suspend_finisher);
++	for (i = 0; i < 10; i++) {
++		err = psci_ops.affinity_info(cpu_logical_map(cpu), 0);
++		if (err == PSCI_0_2_AFFINITY_LEVEL_OFF) {
++			pr_info("CPU%d killed.\n", cpu);
++			return 1;
++		}
 +
-+	return ret;
++		msleep(10);
++		pr_info("Retrying again to check for CPU kill\n");
++	}
++
++	pr_warn("CPU%d may not have shut down cleanly (AFFINITY_INFO reports %d)\n",
++			cpu, err);
++	/* Make platform_cpu_kill() fail. */
++	return 0;
 +}
 +
-+static struct cpuidle_ops psci_cpuidle_ops __initdata = {
-+	.suspend = cpu_psci_cpu_suspend,
-+	.init = cpu_psci_cpu_init_idle,
-+};
-+CPUIDLE_METHOD_OF_DECLARE(psci_idle, "psci", &psci_cpuidle_ops);
 +#endif
- 
- /*
-  * psci_smp assumes that the following is true about PSCI:
++
++bool __init psci_smp_available(void)
++{
++	/* is cpu_on available at least? */
++	return (psci_ops.cpu_on != NULL);
++}
++
++struct smp_operations __initdata psci_smp_ops = {
++	.smp_boot_secondary	= psci_boot_secondary,
++#ifdef CONFIG_HOTPLUG_CPU
++	.cpu_disable		= psci_cpu_disable,
++	.cpu_die		= psci_cpu_die,
++	.cpu_kill		= psci_cpu_kill,
++#endif
++};
+diff --git a/arch/arm/kernel/psci_smp.c b/arch/arm/kernel/psci_smp.c
+deleted file mode 100644
+index 61c04b0..0000000
+--- a/arch/arm/kernel/psci_smp.c
++++ /dev/null
+@@ -1,130 +0,0 @@
+-/*
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License version 2 as
+- * published by the Free Software Foundation.
+- *
+- * This program is distributed in the hope that it will be useful,
+- * but WITHOUT ANY WARRANTY; without even the implied warranty of
+- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+- * GNU General Public License for more details.
+- *
+- * Copyright (C) 2012 ARM Limited
+- *
+- * Author: Will Deacon <will.deacon@arm.com>
+- */
+-
+-#include <linux/init.h>
+-#include <linux/smp.h>
+-#include <linux/of.h>
+-#include <linux/delay.h>
+-#include <linux/psci.h>
+-
+-#include <uapi/linux/psci.h>
+-
+-#include <asm/psci.h>
+-#include <asm/smp_plat.h>
+-
+-/*
+- * psci_smp assumes that the following is true about PSCI:
+- *
+- * cpu_suspend   Suspend the execution on a CPU
+- * @state        we don't currently describe affinity levels, so just pass 0.
+- * @entry_point  the first instruction to be executed on return
+- * returns 0  success, < 0 on failure
+- *
+- * cpu_off       Power down a CPU
+- * @state        we don't currently describe affinity levels, so just pass 0.
+- * no return on successful call
+- *
+- * cpu_on        Power up a CPU
+- * @cpuid        cpuid of target CPU, as from MPIDR
+- * @entry_point  the first instruction to be executed on return
+- * returns 0  success, < 0 on failure
+- *
+- * migrate       Migrate the context to a different CPU
+- * @cpuid        cpuid of target CPU, as from MPIDR
+- * returns 0  success, < 0 on failure
+- *
+- */
+-
+-extern void secondary_startup(void);
+-
+-static int psci_boot_secondary(unsigned int cpu, struct task_struct *idle)
+-{
+-	if (psci_ops.cpu_on)
+-		return psci_ops.cpu_on(cpu_logical_map(cpu),
+-					virt_to_idmap(&secondary_startup));
+-	return -ENODEV;
+-}
+-
+-#ifdef CONFIG_HOTPLUG_CPU
+-int psci_cpu_disable(unsigned int cpu)
+-{
+-	/* Fail early if we don't have CPU_OFF support */
+-	if (!psci_ops.cpu_off)
+-		return -EOPNOTSUPP;
+-
+-	/* Trusted OS will deny CPU_OFF */
+-	if (psci_tos_resident_on(cpu))
+-		return -EPERM;
+-
+-	return 0;
+-}
+-
+-void __ref psci_cpu_die(unsigned int cpu)
+-{
+-	u32 state = PSCI_POWER_STATE_TYPE_POWER_DOWN <<
+-		    PSCI_0_2_POWER_STATE_TYPE_SHIFT;
+-
+-	if (psci_ops.cpu_off)
+-		psci_ops.cpu_off(state);
+-
+-	/* We should never return */
+-	panic("psci: cpu %d failed to shutdown\n", cpu);
+-}
+-
+-int __ref psci_cpu_kill(unsigned int cpu)
+-{
+-	int err, i;
+-
+-	if (!psci_ops.affinity_info)
+-		return 1;
+-	/*
+-	 * cpu_kill could race with cpu_die and we can
+-	 * potentially end up declaring this cpu undead
+-	 * while it is dying. So, try again a few times.
+-	 */
+-
+-	for (i = 0; i < 10; i++) {
+-		err = psci_ops.affinity_info(cpu_logical_map(cpu), 0);
+-		if (err == PSCI_0_2_AFFINITY_LEVEL_OFF) {
+-			pr_info("CPU%d killed.\n", cpu);
+-			return 1;
+-		}
+-
+-		msleep(10);
+-		pr_info("Retrying again to check for CPU kill\n");
+-	}
+-
+-	pr_warn("CPU%d may not have shut down cleanly (AFFINITY_INFO reports %d)\n",
+-			cpu, err);
+-	/* Make platform_cpu_kill() fail. */
+-	return 0;
+-}
+-
+-#endif
+-
+-bool __init psci_smp_available(void)
+-{
+-	/* is cpu_on available@least? */
+-	return (psci_ops.cpu_on != NULL);
+-}
+-
+-struct smp_operations __initdata psci_smp_ops = {
+-	.smp_boot_secondary	= psci_boot_secondary,
+-#ifdef CONFIG_HOTPLUG_CPU
+-	.cpu_disable		= psci_cpu_disable,
+-	.cpu_die		= psci_cpu_die,
+-	.cpu_kill		= psci_cpu_kill,
+-#endif
+-};
 -- 
 2.1.4
