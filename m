@@ -1,155 +1,138 @@
-From: sasha.levin@oracle.com (Sasha Levin)
-Date: Fri,  3 Jul 2015 23:02:51 -0400
-Subject: [added to the 3.18 stable tree] clocksource: exynos_mct: Avoid
- blocking calls in the cpu hotplug notifier
-In-Reply-To: <1435978997-14393-1-git-send-email-sasha.levin@oracle.com>
-References: <1435978997-14393-1-git-send-email-sasha.levin@oracle.com>
-Message-ID: <1435978997-14393-122-git-send-email-sasha.levin@oracle.com>
+From: jszhang@marvell.com (Jisheng Zhang)
+Date: Sat, 4 Jul 2015 11:40:11 +0800
+Subject: [PATCH] clocksource: dw_apb_timer: add dynamic irq flag to the
+ timer
+In-Reply-To: <5596A324.4040800@linaro.org>
+References: <1435933847-2069-1-git-send-email-jszhang@marvell.com>
+ <5596A324.4040800@linaro.org>
+Message-ID: <20150704114011.21e45112@xhacker>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Damian Eppel <d.eppel@samsung.com>
+Dear Daniel,
 
-This patch has been added to the 3.18 stable tree. If you have any
-objections, please let us know.
+On Fri, 3 Jul 2015 16:58:44 +0200
+Daniel Lezcano <daniel.lezcano@linaro.org> wrote:
 
-===============
+> On 07/03/2015 04:30 PM, Jisheng Zhang wrote:
+> > Commit d2348fb6fdc6 ("tick: Dynamically set broadcast irq affinity")
+> > adds one excelent feature CLOCK_EVT_FEAT_DYNIRQ to let the core set the
+> > interrupt affinity of the broadcast interrupt to the cpu which has the
+> > earliest expiry time. This patch adds CLOCK_EVT_FEAT_DYNIRQ flag to
+> > avoid unnecessary wakeups and IPIs when the dw_apb_timer is used as
+> > broadcast timer.
+> >
+> > Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
+> > ---
+> 
+> I am glad this flag helps. Were you able to do some measurements ?
 
-[ Upstream commit 56a94f13919c0db5958611b388e1581b4852f3c9 ]
+Sure. Here is the rough measurement step:
 
-Whilst testing cpu hotplug events on kernel configured with
-DEBUG_PREEMPT and DEBUG_ATOMIC_SLEEP we get following BUG message,
-caused by calling request_irq() and free_irq() in the context of
-hotplug notification (which is in this case atomic context).
+~ # rm /tmp/test.sh
+~ # cat > /tmp/test.sh
+cat /proc/interrupts
+for i in `seq 10` ; do sleep $i; done
+cat /proc/interrupts
+~ # chmod +x /tmp/test.sh
+~ # taskset 0x2 /tmp/test.sh
 
-[   40.785859] CPU1: Software reset
-[   40.786660] BUG: sleeping function called from invalid context at mm/slub.c:1241
-[   40.786668] in_atomic(): 1, irqs_disabled(): 128, pid: 0, name: swapper/1
-[   40.786678] Preemption disabled at:[<  (null)>]   (null)
-[   40.786681]
-[   40.786692] CPU: 1 PID: 0 Comm: swapper/1 Not tainted 3.19.0-rc4-00024-g7dca860 #36
-[   40.786698] Hardware name: SAMSUNG EXYNOS (Flattened Device Tree)
-[   40.786728] [<c0014a00>] (unwind_backtrace) from [<c0011980>] (show_stack+0x10/0x14)
-[   40.786747] [<c0011980>] (show_stack) from [<c0449ba0>] (dump_stack+0x70/0xbc)
-[   40.786767] [<c0449ba0>] (dump_stack) from [<c00c6124>] (kmem_cache_alloc+0xd8/0x170)
-[   40.786785] [<c00c6124>] (kmem_cache_alloc) from [<c005d6f8>] (request_threaded_irq+0x64/0x128)
-[   40.786804] [<c005d6f8>] (request_threaded_irq) from [<c0350b8c>] (exynos4_local_timer_setup+0xc0/0x13c)
-[   40.786820] [<c0350b8c>] (exynos4_local_timer_setup) from [<c0350ca8>] (exynos4_mct_cpu_notify+0x30/0xa8)
-[   40.786838] [<c0350ca8>] (exynos4_mct_cpu_notify) from [<c003b330>] (notifier_call_chain+0x44/0x84)
-[   40.786857] [<c003b330>] (notifier_call_chain) from [<c0022fd4>] (__cpu_notify+0x28/0x44)
-[   40.786873] [<c0022fd4>] (__cpu_notify) from [<c0013714>] (secondary_start_kernel+0xec/0x150)
-[   40.786886] [<c0013714>] (secondary_start_kernel) from [<40008764>] (0x40008764)
+without the patch:
 
-Interrupts cannot be requested/freed in the CPU_STARTING/CPU_DYING
-notifications which run on the hotplugged cpu with interrupts and
-preemption disabled.
+           CPU0       CPU1       
+ 27:        115         36       GIC  27  arch_timer
+ 45:         62          0       GIC  45  mmc0
+160:         88          0  interrupt-controller   8  timer
+227:          0          0  interrupt-controller   4  f7e81400.i2c
+228:          0          0  interrupt-controller   5  f7e81800.i2c
+229:          0          0  interrupt-controller   7  dw_spi65535
+230:          0          0  interrupt-controller  21  f7e84000.i2c
+231:          0          0  interrupt-controller  20  f7e84800.i2c
+265:        445          0  interrupt-controller   8  serial
+IPI0:          0          0  CPU wakeup interrupts
+IPI1:          0         11  Timer broadcast interrupts
+IPI2:         56        104  Rescheduling interrupts
+IPI3:          0          0  Function call interrupts
+IPI4:          0          4  Single function call interrupts
+IPI5:          0          0  CPU stop interrupts
+IPI6:         25         27  IRQ work interrupts
+IPI7:          0          0  completion interrupts
+IPI8:          0          0  CPU backtrace
+Err:          0
+           CPU0       CPU1       
+ 27:        115         38       GIC  27  arch_timer
+ 45:         62          0       GIC  45  mmc0
+160:        160          0  interrupt-controller   8  timer
+227:          0          0  interrupt-controller   4  f7e81400.i2c
+228:          0          0  interrupt-controller   5  f7e81800.i2c
+229:          0          0  interrupt-controller   7  dw_spi65535
+230:          0          0  interrupt-controller  21  f7e84000.i2c
+231:          0          0  interrupt-controller  20  f7e84800.i2c
+265:        514          0  interrupt-controller   8  serial
+IPI0:          0          0  CPU wakeup interrupts
+IPI1:          0         83  Timer broadcast interrupts
+IPI2:         56        104  Rescheduling interrupts
+IPI3:          0          0  Function call interrupts
+IPI4:          0          4  Single function call interrupts
+IPI5:          0          0  CPU stop interrupts
+IPI6:         25         46  IRQ work interrupts
+IPI7:          0          0  completion interrupts
+IPI8:          0          0  CPU backtrace
+Err:          0
 
-To avoid the issue, request the interrupts for all possible cpus in
-the boot code. The interrupts are marked NO_AUTOENABLE to avoid a racy
-request_irq/disable_irq() sequence. The flag prevents the
-request_irq() code from enabling the interrupt immediately.
+cpu0 get 160-88=72 timer interrupts, CPU1 got 83-11=72 broadcast timer IPIs
+So, overall system got 72+72=144 wake ups and 72 broadcast timer IPIs
 
-The interrupt is then enabled in the CPU_STARTING notifier of the
-hotplugged cpu and again disabled with disable_irq_nosync() in the
-CPU_DYING notifier.
 
-[ tglx: Massaged changelog to match the patch ]
+With the patch:
+           CPU0       CPU1       
+ 27:        107         37       GIC  27  arch_timer
+ 45:         62          0       GIC  45  mmc0
+160:         66          7  interrupt-controller   8  timer
+227:          0          0  interrupt-controller   4  f7e81400.i2c
+228:          0          0  interrupt-controller   5  f7e81800.i2c
+229:          0          0  interrupt-controller   7  dw_spi65535
+230:          0          0  interrupt-controller  21  f7e84000.i2c
+231:          0          0  interrupt-controller  20  f7e84800.i2c
+265:        311          0  interrupt-controller   8  serial
+IPI0:          0          0  CPU wakeup interrupts
+IPI1:          2          4  Timer broadcast interrupts
+IPI2:         58        100  Rescheduling interrupts
+IPI3:          0          0  Function call interrupts
+IPI4:          0          4  Single function call interrupts
+IPI5:          0          0  CPU stop interrupts
+IPI6:         21         24  IRQ work interrupts
+IPI7:          0          0  completion interrupts
+IPI8:          0          0  CPU backtrace
+Err:          0
+           CPU0       CPU1       
+ 27:        107         39       GIC  27  arch_timer
+ 45:         62          0       GIC  45  mmc0
+160:         69         75  interrupt-controller   8  timer
+227:          0          0  interrupt-controller   4  f7e81400.i2c
+228:          0          0  interrupt-controller   5  f7e81800.i2c
+229:          0          0  interrupt-controller   7  dw_spi65535
+230:          0          0  interrupt-controller  21  f7e84000.i2c
+231:          0          0  interrupt-controller  20  f7e84800.i2c
+265:        380          0  interrupt-controller   8  serial
+IPI0:          0          0  CPU wakeup interrupts
+IPI1:          3          6  Timer broadcast interrupts
+IPI2:         60        100  Rescheduling interrupts
+IPI3:          0          0  Function call interrupts
+IPI4:          0          4  Single function call interrupts
+IPI5:          0          0  CPU stop interrupts
+IPI6:         21         45  IRQ work interrupts
+IPI7:          0          0  completion interrupts
+IPI8:          0          0  CPU backtrace
+Err:          0
 
-Fixes: 7114cd749a12 ("clocksource: exynos_mct: use (request/free)_irq calls for local timer registration")
-Reported-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
-Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
-Tested-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
-Tested-by: Marcin Jabrzyk <m.jabrzyk@samsung.com>
-Signed-off-by: Damian Eppel <d.eppel@samsung.com>
-Cc: m.szyprowski at samsung.com
-Cc: kyungmin.park at samsung.com
-Cc: daniel.lezcano at linaro.org
-Cc: kgene at kernel.org
-Cc: linux-arm-kernel at lists.infradead.org
-Link: http://lkml.kernel.org/r/1435324984-7328-1-git-send-email-d.eppel at samsung.com
-Signed-off-by: Thomas Gleixner <tglx@linutronix.de>
-Cc: <stable@vger.kernel.org>
-Signed-off-by: Sasha Levin <sasha.levin@oracle.com>
----
- drivers/clocksource/exynos_mct.c | 43 ++++++++++++++++++++++++++++------------
- 1 file changed, 30 insertions(+), 13 deletions(-)
+cpu0 got 69-66 = 3, cpu1 got 75-7=68 timer interrupts. cpu0 got 3-2 = 1
+broadcast timer IPIs, cpu1 got 6-4=2 broadcast timer IPIs.
+So, overall system got 3+68+1+2=74 wakeups and 1+2=3 broadcast timer IPIs
 
-diff --git a/drivers/clocksource/exynos_mct.c b/drivers/clocksource/exynos_mct.c
-index 83564c9..c844616 100644
---- a/drivers/clocksource/exynos_mct.c
-+++ b/drivers/clocksource/exynos_mct.c
-@@ -466,15 +466,12 @@ static int exynos4_local_timer_setup(struct clock_event_device *evt)
- 	exynos4_mct_write(TICK_BASE_CNT, mevt->base + MCT_L_TCNTB_OFFSET);
- 
- 	if (mct_int_type == MCT_INT_SPI) {
--		evt->irq = mct_irqs[MCT_L0_IRQ + cpu];
--		if (request_irq(evt->irq, exynos4_mct_tick_isr,
--				IRQF_TIMER | IRQF_NOBALANCING,
--				evt->name, mevt)) {
--			pr_err("exynos-mct: cannot register IRQ %d\n",
--				evt->irq);
-+
-+		if (evt->irq == -1)
- 			return -EIO;
--		}
--		irq_force_affinity(mct_irqs[MCT_L0_IRQ + cpu], cpumask_of(cpu));
-+
-+		irq_force_affinity(evt->irq, cpumask_of(cpu));
-+		enable_irq(evt->irq);
- 	} else {
- 		enable_percpu_irq(mct_irqs[MCT_L0_IRQ], 0);
- 	}
-@@ -487,10 +484,12 @@ static int exynos4_local_timer_setup(struct clock_event_device *evt)
- static void exynos4_local_timer_stop(struct clock_event_device *evt)
- {
- 	evt->set_mode(CLOCK_EVT_MODE_UNUSED, evt);
--	if (mct_int_type == MCT_INT_SPI)
--		free_irq(evt->irq, this_cpu_ptr(&percpu_mct_tick));
--	else
-+	if (mct_int_type == MCT_INT_SPI) {
-+		if (evt->irq != -1)
-+			disable_irq_nosync(evt->irq);
-+	} else {
- 		disable_percpu_irq(mct_irqs[MCT_L0_IRQ]);
-+	}
- }
- 
- static int exynos4_mct_cpu_notify(struct notifier_block *self,
-@@ -522,7 +521,7 @@ static struct notifier_block exynos4_mct_cpu_nb = {
- 
- static void __init exynos4_timer_resources(struct device_node *np, void __iomem *base)
- {
--	int err;
-+	int err, cpu;
- 	struct mct_clock_event_device *mevt = this_cpu_ptr(&percpu_mct_tick);
- 	struct clk *mct_clk, *tick_clk;
- 
-@@ -549,7 +548,25 @@ static void __init exynos4_timer_resources(struct device_node *np, void __iomem
- 		WARN(err, "MCT: can't request IRQ %d (%d)\n",
- 		     mct_irqs[MCT_L0_IRQ], err);
- 	} else {
--		irq_set_affinity(mct_irqs[MCT_L0_IRQ], cpumask_of(0));
-+		for_each_possible_cpu(cpu) {
-+			int mct_irq = mct_irqs[MCT_L0_IRQ + cpu];
-+			struct mct_clock_event_device *pcpu_mevt =
-+				per_cpu_ptr(&percpu_mct_tick, cpu);
-+
-+			pcpu_mevt->evt.irq = -1;
-+
-+			irq_set_status_flags(mct_irq, IRQ_NOAUTOEN);
-+			if (request_irq(mct_irq,
-+					exynos4_mct_tick_isr,
-+					IRQF_TIMER | IRQF_NOBALANCING,
-+					pcpu_mevt->name, pcpu_mevt)) {
-+				pr_err("exynos-mct: cannot register IRQ (cpu%d)\n",
-+									cpu);
-+
-+				continue;
-+			}
-+			pcpu_mevt->evt.irq = mct_irq;
-+		}
- 	}
- 
- 	err = register_cpu_notifier(&exynos4_mct_cpu_nb);
--- 
-2.1.0
+We removed 50% wakeups and almost 100% broadcast timer IPIs
+
+I will add these rough measurement's result into the commit msg.
+
+Thanks for your suggestion,
+Jisheng
