@@ -1,197 +1,150 @@
-From: jic23@kernel.org (Jonathan Cameron)
-Date: Sun, 05 Jul 2015 14:38:15 +0100
-Subject: [PATCH v2 1/2] iio: adc: Determine sampling frequencies by using
- minimum sample time
-In-Reply-To: <01b93ea50b59c93a783fac26b4671313b794bd24.1435134626.git.maitysanchayan@gmail.com>
-References: <cover.1435134626.git.maitysanchayan@gmail.com>
- <01b93ea50b59c93a783fac26b4671313b794bd24.1435134626.git.maitysanchayan@gmail.com>
-Message-ID: <55993347.7010002@kernel.org>
+From: parkch98@gmail.com (Chanho Park)
+Date: Sun,  5 Jul 2015 23:29:16 +0900
+Subject: [PATCHv4] ARM: dts: add exynos5422-cpus.dtsi to correct cpu order
+Message-ID: <1436106556-19134-1-git-send-email-chanho61.park@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 24/06/15 09:33, Sanchayan Maity wrote:
-> The driver currently does not take into account the minimum sample time
-> as per the Figure 6-8 Chapter 9.1.1 12-bit ADC electrical characteristics.
-> We set a static amount of cycles instead of considering the sample time
-> as a given value, which depends on hardware characteristics.
-> 
-> Determine sampling frequencies by first reading the device tree property
-> node and then calculating the required Long Sample Time Adder (LSTAdder)
-> value based on the ADC clock frequency and sample time value obtained
-> from the device tree, this LSTAdder value is then used for calculating
-> the sampling frequencies possible.
-> 
-> Signed-off-by: Sanchayan Maity <maitysanchayan@gmail.com>
-Looking for an Ack on this from Fugang. Device tree ack also good ;)
-> ---
->  .../devicetree/bindings/iio/adc/vf610-adc.txt      |  6 ++
->  drivers/iio/adc/vf610_adc.c                        | 74 ++++++++++++++++++++--
->  2 files changed, 76 insertions(+), 4 deletions(-)
-> 
-> diff --git a/Documentation/devicetree/bindings/iio/adc/vf610-adc.txt b/Documentation/devicetree/bindings/iio/adc/vf610-adc.txt
-> index 3eb40e2..39b86ea 100644
-> --- a/Documentation/devicetree/bindings/iio/adc/vf610-adc.txt
-> +++ b/Documentation/devicetree/bindings/iio/adc/vf610-adc.txt
-> @@ -17,6 +17,11 @@ Recommended properties:
->    - Frequency in normal mode (ADLPC=0, ADHSC=0)
->    - Frequency in high-speed mode (ADLPC=0, ADHSC=1)
->    - Frequency in low-power mode (ADLPC=1, ADHSC=0)
-> +  - min-sample-time: Minimum sampling time in nanoseconds. This value has
-> +    to be chosen according to the conversion mode and the connected analog
-> +	 source resistance (R_as) and capacitance (C_as). Refer the datasheet's
-> +	 operating requirements. A safe default across a wide range of R_as and
-> +	 C_as as well as conversion modes is 1000ns.
->  
->  Example:
->  adc0: adc at 4003b000 {
-> @@ -27,5 +32,6 @@ adc0: adc at 4003b000 {
->  	clock-names = "adc";
->  	fsl,adck-max-frequency = <30000000>, <40000000>,
->  				<20000000>;
-> +	min-sample-time = <1000>;
->  	vref-supply = <&reg_vcc_3v3_mcu>;
->  };
-> diff --git a/drivers/iio/adc/vf610_adc.c b/drivers/iio/adc/vf610_adc.c
-> index 480f335..8322027 100644
-> --- a/drivers/iio/adc/vf610_adc.c
-> +++ b/drivers/iio/adc/vf610_adc.c
-> @@ -68,6 +68,9 @@
->  #define VF610_ADC_CLK_DIV8		0x60
->  #define VF610_ADC_CLK_MASK		0x60
->  #define VF610_ADC_ADLSMP_LONG		0x10
-> +#define VF610_ADC_ADSTS_SHORT   0x100
-> +#define VF610_ADC_ADSTS_NORMAL  0x200
-> +#define VF610_ADC_ADSTS_LONG    0x300
->  #define VF610_ADC_ADSTS_MASK		0x300
->  #define VF610_ADC_ADLPC_EN		0x80
->  #define VF610_ADC_ADHSC_EN		0x400
-> @@ -124,6 +127,17 @@ enum conversion_mode_sel {
->  	VF610_ADC_CONV_LOW_POWER,
->  };
->  
-> +enum lst_adder_sel {
-> +	VF610_ADCK_CYCLES_3,
-> +	VF610_ADCK_CYCLES_5,
-> +	VF610_ADCK_CYCLES_7,
-> +	VF610_ADCK_CYCLES_9,
-> +	VF610_ADCK_CYCLES_13,
-> +	VF610_ADCK_CYCLES_17,
-> +	VF610_ADCK_CYCLES_21,
-> +	VF610_ADCK_CYCLES_25,
-> +};
-> +
->  struct vf610_adc_feature {
->  	enum clk_sel	clk_sel;
->  	enum vol_ref	vol_ref;
-> @@ -132,6 +146,8 @@ struct vf610_adc_feature {
->  	int	clk_div;
->  	int     sample_rate;
->  	int	res_mode;
-> +	u32 lst_adder_index;
-> +	u32 default_sample_time;
->  
->  	bool	calibration;
->  	bool	ovwren;
-> @@ -155,11 +171,13 @@ struct vf610_adc {
->  };
->  
->  static const u32 vf610_hw_avgs[] = { 1, 4, 8, 16, 32 };
-> +static const u32 vf610_lst_adder[] = { 3, 5, 7, 9, 13, 17, 21, 25 };
->  
->  static inline void vf610_adc_calculate_rates(struct vf610_adc *info)
->  {
->  	struct vf610_adc_feature *adc_feature = &info->adc_feature;
->  	unsigned long adck_rate, ipg_rate = clk_get_rate(info->clk);
-> +	u32 adck_period, lst_addr_min;
->  	int divisor, i;
->  
->  	adck_rate = info->max_adck_rate[adc_feature->conv_mode];
-> @@ -174,6 +192,19 @@ static inline void vf610_adc_calculate_rates(struct vf610_adc *info)
->  	}
->  
->  	/*
-> +	 * Determine the long sample time adder value to be used based
-> +	 * on the default minimum sample time provided.
-> +	 */
-> +	adck_period = NSEC_PER_SEC / adck_rate;
-> +	lst_addr_min = adc_feature->default_sample_time / adck_period;
-> +	for (i = 0; i < ARRAY_SIZE(vf610_lst_adder); i++) {
-> +		if (vf610_lst_adder[i] > lst_addr_min) {
-> +			adc_feature->lst_adder_index = i;
-> +			break;
-> +		}
-> +	}
-> +
-> +	/*
->  	 * Calculate ADC sample frequencies
->  	 * Sample time unit is ADCK cycles. ADCK clk source is ipg clock,
->  	 * which is the same as bus clock.
-> @@ -182,12 +213,13 @@ static inline void vf610_adc_calculate_rates(struct vf610_adc *info)
->  	 * SFCAdder: fixed to 6 ADCK cycles
->  	 * AverageNum: 1, 4, 8, 16, 32 samples for hardware average.
->  	 * BCT (Base Conversion Time): fixed to 25 ADCK cycles for 12 bit mode
-> -	 * LSTAdder(Long Sample Time): fixed to 3 ADCK cycles
-> +	 * LSTAdder(Long Sample Time): 3, 5, 7, 9, 13, 17, 21, 25 ADCK cycles
->  	 */
->  	adck_rate = ipg_rate / info->adc_feature.clk_div;
->  	for (i = 0; i < ARRAY_SIZE(vf610_hw_avgs); i++)
->  		info->sample_freq_avail[i] =
-> -			adck_rate / (6 + vf610_hw_avgs[i] * (25 + 3));
-> +			adck_rate / (6 + vf610_hw_avgs[i] *
-> +			 (25 + vf610_lst_adder[adc_feature->lst_adder_index]));
->  }
->  
->  static inline void vf610_adc_cfg_init(struct vf610_adc *info)
-> @@ -347,8 +379,40 @@ static void vf610_adc_sample_set(struct vf610_adc *info)
->  		break;
->  	}
->  
-> -	/* Use the short sample mode */
-> -	cfg_data &= ~(VF610_ADC_ADLSMP_LONG | VF610_ADC_ADSTS_MASK);
-> +	/*
-> +	 * Set ADLSMP and ADSTS based on the Long Sample Time Adder value
-> +	 * determined.
-> +	 */
-> +	switch (adc_feature->lst_adder_index) {
-> +	case VF610_ADCK_CYCLES_3:
-> +		break;
-> +	case VF610_ADCK_CYCLES_5:
-> +		cfg_data |= VF610_ADC_ADSTS_SHORT;
-> +		break;
-> +	case VF610_ADCK_CYCLES_7:
-> +		cfg_data |= VF610_ADC_ADSTS_NORMAL;
-> +		break;
-> +	case VF610_ADCK_CYCLES_9:
-> +		cfg_data |= VF610_ADC_ADSTS_LONG;
-> +		break;
-> +	case VF610_ADCK_CYCLES_13:
-> +		cfg_data |= VF610_ADC_ADLSMP_LONG;
-> +		break;
-> +	case VF610_ADCK_CYCLES_17:
-> +		cfg_data |= VF610_ADC_ADLSMP_LONG;
-> +		cfg_data |= VF610_ADC_ADSTS_SHORT;
-> +		break;
-> +	case VF610_ADCK_CYCLES_21:
-> +		cfg_data |= VF610_ADC_ADLSMP_LONG;
-> +		cfg_data |= VF610_ADC_ADSTS_NORMAL;
-> +		break;
-> +	case VF610_ADCK_CYCLES_25:
-> +		cfg_data |= VF610_ADC_ADLSMP_LONG;
-> +		cfg_data |= VF610_ADC_ADSTS_NORMAL;
-> +		break;
-> +	default:
-> +		dev_err(info->dev, "error in sample time select\n");
-> +	}
->  
->  	/* update hardware average selection */
->  	cfg_data &= ~VF610_ADC_AVGS_MASK;
-> @@ -712,6 +776,8 @@ static int vf610_adc_probe(struct platform_device *pdev)
->  
->  	of_property_read_u32_array(pdev->dev.of_node, "fsl,adck-max-frequency",
->  			info->max_adck_rate, 3);
-> +	of_property_read_u32(pdev->dev.of_node, "min-sample-time",
-> +			&info->adc_feature.default_sample_time);
->  
->  	platform_set_drvdata(pdev, indio_dev);
->  
-> 
+The odroid-xu3 board which is based on exynos5422 not exynos5800 is
+booted from cortex-a7 core unlike exynos5800. The odroid-xu3's cpu order
+is quite strange. cpu0 and cpu5-7 are cortex-a7 cores and cpu1-4 are
+cortex-a15 cores. To correct this mis-odering, I added exynos5422.dtsi
+and reversing cpu orders from exynos5420. Now, cpu0-3 are cortex-a7 and
+cpu4-7 are cortex-a15.
+
+Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+Signed-off-by: Chanho Park <chanho61.park@samsung.com>
+---
+Changes from v3:
+ - include this exynos5422-cpus.dtsi in the exynos5422-odroidxu3-common.dtsi
+
+Changes from v2:
+ - drop inclusion of exynos5420.dtsi from exynos5422-cpus.dtsi
+ - drop compatibles from exynos5422-cpus.dtsi
+
+Changes from v1:
+ - rename exynos5422.dtsi to exynos5422-cpus.dtsi
+ - include the dtsi file top of the exynos5422-odroidxu3.dts
+
+Secondary cpu booting problem[1] is not resolved yet. Below temporal patch is
+required to see 8 cores booting.
+
+--- a/arch/arm/mach-exynos/platsmp.c
++++ b/arch/arm/mach-exynos/platsmp.c
+@@ -124,6 +124,7 @@ void exynos_cpu_power_up(int cpu)
+        if (soc_is_exynos3250())
+                core_conf |= S5P_CORE_AUTOWAKEUP_EN;
+
++       pmu_raw_writel(1, S5P_PMU_SPARE2);
+        pmu_raw_writel(core_conf,
+                        EXYNOS_ARM_CORE_CONFIGURATION(cpu));
+ }
+
+[1]: http://www.spinics.net/lists/linux-samsung-soc/msg45525.html
+
+ arch/arm/boot/dts/exynos5422-cpus.dtsi             | 81 ++++++++++++++++++++++
+ arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi |  1 +
+ 2 files changed, 82 insertions(+)
+ create mode 100644 arch/arm/boot/dts/exynos5422-cpus.dtsi
+
+diff --git a/arch/arm/boot/dts/exynos5422-cpus.dtsi b/arch/arm/boot/dts/exynos5422-cpus.dtsi
+new file mode 100644
+index 0000000..b7f60c8
+--- /dev/null
++++ b/arch/arm/boot/dts/exynos5422-cpus.dtsi
+@@ -0,0 +1,81 @@
++/*
++ * SAMSUNG EXYNOS5422 SoC cpu device tree source
++ *
++ * Copyright (c) 2015 Samsung Electronics Co., Ltd.
++ *		http://www.samsung.com
++ *
++ * The only difference between EXYNOS5422 and EXYNOS5800 is cpu ordering. The
++ * EXYNOS5422 is booting from Cortex-A7 core while the EXYNOS5800 is booting
++ * from Cortex-A15 core.
++ *
++ * EXYNOS5422 based board files can include this file to provide cpu ordering
++ * which could boot a cortex-a7 from cpu0.
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ */
++
++&cpu0 {
++	device_type = "cpu";
++	compatible = "arm,cortex-a7";
++	reg = <0x100>;
++	clock-frequency = <1000000000>;
++	cci-control-port = <&cci_control0>;
++};
++
++&cpu1 {
++	device_type = "cpu";
++	compatible = "arm,cortex-a7";
++	reg = <0x101>;
++	clock-frequency = <1000000000>;
++	cci-control-port = <&cci_control0>;
++};
++
++&cpu2 {
++	device_type = "cpu";
++	compatible = "arm,cortex-a7";
++	reg = <0x102>;
++	clock-frequency = <1000000000>;
++	cci-control-port = <&cci_control0>;
++};
++
++&cpu3 {
++	device_type = "cpu";
++	compatible = "arm,cortex-a7";
++	reg = <0x103>;
++	clock-frequency = <1000000000>;
++	cci-control-port = <&cci_control0>;
++};
++
++&cpu4 {
++	device_type = "cpu";
++	compatible = "arm,cortex-a15";
++	reg = <0x0>;
++	clock-frequency = <1800000000>;
++	cci-control-port = <&cci_control1>;
++};
++
++&cpu5 {
++	device_type = "cpu";
++	compatible = "arm,cortex-a15";
++	reg = <0x1>;
++	clock-frequency = <1800000000>;
++	cci-control-port = <&cci_control1>;
++};
++
++&cpu6 {
++	device_type = "cpu";
++	compatible = "arm,cortex-a15";
++	reg = <0x2>;
++	clock-frequency = <1800000000>;
++	cci-control-port = <&cci_control1>;
++};
++
++&cpu7 {
++	device_type = "cpu";
++	compatible = "arm,cortex-a15";
++	reg = <0x3>;
++	clock-frequency = <1800000000>;
++	cci-control-port = <&cci_control1>;
++};
+diff --git a/arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi b/arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi
+index 8adf455..f603133 100644
+--- a/arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi
++++ b/arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi
+@@ -15,6 +15,7 @@
+ #include <dt-bindings/gpio/gpio.h>
+ #include <dt-bindings/sound/samsung-i2s.h>
+ #include "exynos5800.dtsi"
++#include "exynos5422-cpus.dtsi"
+ 
+ / {
+ 	memory {
+-- 
+2.1.0
