@@ -1,51 +1,103 @@
 From: heiko@sntech.de (Heiko Stuebner)
-Date: Sun,  5 Jul 2015 11:00:15 +0200
-Subject: [PATCH 2/7] clk: rockchip: fix issues in the mmc-phase clock
+Date: Sun,  5 Jul 2015 11:00:19 +0200
+Subject: [PATCH 6/7] clk: rockchip: add missing include guards
 In-Reply-To: <1436086820-3757-1-git-send-email-heiko@sntech.de>
 References: <1436086820-3757-1-git-send-email-heiko@sntech.de>
-Message-ID: <1436086820-3757-3-git-send-email-heiko@sntech.de>
+Message-ID: <1436086820-3757-7-git-send-email-heiko@sntech.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The review for the new inverter clock type uncovered some issues (missing
-headers and name handling) that are also present in the mmc-phase clock
-type, I got (to much) inspiration from. Fix these there too.
+Review for the rk3368 turned up that the clock header was missing include
+guards. This is also true for the already existing clock binding headers,
+so add them.
 
 Signed-off-by: Heiko Stuebner <heiko@sntech.de>
 ---
- drivers/clk/rockchip/clk-mmc-phase.c | 6 +++---
- 1 file changed, 3 insertions(+), 3 deletions(-)
+ include/dt-bindings/clock/rk3066a-cru.h       | 5 +++++
+ include/dt-bindings/clock/rk3188-cru-common.h | 5 +++++
+ include/dt-bindings/clock/rk3188-cru.h        | 5 +++++
+ include/dt-bindings/clock/rk3288-cru.h        | 5 +++++
+ 4 files changed, 20 insertions(+)
 
-diff --git a/drivers/clk/rockchip/clk-mmc-phase.c b/drivers/clk/rockchip/clk-mmc-phase.c
-index e9f8df32..f2c6889 100644
---- a/drivers/clk/rockchip/clk-mmc-phase.c
-+++ b/drivers/clk/rockchip/clk-mmc-phase.c
-@@ -15,6 +15,8 @@
+diff --git a/include/dt-bindings/clock/rk3066a-cru.h b/include/dt-bindings/clock/rk3066a-cru.h
+index bc1ed1d..d3a9824 100644
+--- a/include/dt-bindings/clock/rk3066a-cru.h
++++ b/include/dt-bindings/clock/rk3066a-cru.h
+@@ -13,6 +13,9 @@
+  * GNU General Public License for more details.
+  */
  
- #include <linux/slab.h>
- #include <linux/clk-provider.h>
-+#include <linux/io.h>
-+#include <linux/kernel.h>
- #include "clk.h"
++#ifndef _DT_BINDINGS_CLK_ROCKCHIP_RK3066A_H
++#define _DT_BINDINGS_CLK_ROCKCHIP_RK3066A_H
++
+ #include <dt-bindings/clock/rk3188-cru-common.h>
  
- struct rockchip_mmc_clock {
-@@ -131,6 +133,7 @@ struct clk *rockchip_clk_register_mmc(const char *name,
- 	if (!mmc_clock)
- 		return NULL;
+ /* soft-reset indices */
+@@ -33,3 +36,5 @@
+ #define SRST_HDMI		96
+ #define SRST_HDMI_APB		97
+ #define SRST_CIF1		111
++
++#endif
+diff --git a/include/dt-bindings/clock/rk3188-cru-common.h b/include/dt-bindings/clock/rk3188-cru-common.h
+index 6a37050..8df77a7 100644
+--- a/include/dt-bindings/clock/rk3188-cru-common.h
++++ b/include/dt-bindings/clock/rk3188-cru-common.h
+@@ -13,6 +13,9 @@
+  * GNU General Public License for more details.
+  */
  
-+	init.name = name;
- 	init.num_parents = num_parents;
- 	init.parent_names = parent_names;
- 	init.ops = &rockchip_mmc_clk_ops;
-@@ -139,9 +142,6 @@ struct clk *rockchip_clk_register_mmc(const char *name,
- 	mmc_clock->reg = reg;
- 	mmc_clock->shift = shift;
++#ifndef _DT_BINDINGS_CLK_ROCKCHIP_RK3188_COMMON_H
++#define _DT_BINDINGS_CLK_ROCKCHIP_RK3188_COMMON_H
++
+ /* core clocks from */
+ #define PLL_APLL		1
+ #define PLL_DPLL		2
+@@ -248,3 +251,5 @@
+ #define SRST_PTM1_ATB		141
+ #define SRST_CTM		142
+ #define SRST_TS			143
++
++#endif
+diff --git a/include/dt-bindings/clock/rk3188-cru.h b/include/dt-bindings/clock/rk3188-cru.h
+index 9fac8ed..9f2e631 100644
+--- a/include/dt-bindings/clock/rk3188-cru.h
++++ b/include/dt-bindings/clock/rk3188-cru.h
+@@ -13,6 +13,9 @@
+  * GNU General Public License for more details.
+  */
  
--	if (name)
--		init.name = name;
--
- 	clk = clk_register(NULL, &mmc_clock->hw);
- 	if (IS_ERR(clk))
- 		goto err_free;
++#ifndef _DT_BINDINGS_CLK_ROCKCHIP_RK3188_H
++#define _DT_BINDINGS_CLK_ROCKCHIP_RK3188_H
++
+ #include <dt-bindings/clock/rk3188-cru-common.h>
+ 
+ /* soft-reset indices */
+@@ -49,3 +52,5 @@
+ #define SRST_GPU_BRIDGE		121
+ #define SRST_CTI3		123
+ #define SRST_CTI3_APB		124
++
++#endif
+diff --git a/include/dt-bindings/clock/rk3288-cru.h b/include/dt-bindings/clock/rk3288-cru.h
+index dea4197..c719aac 100644
+--- a/include/dt-bindings/clock/rk3288-cru.h
++++ b/include/dt-bindings/clock/rk3288-cru.h
+@@ -13,6 +13,9 @@
+  * GNU General Public License for more details.
+  */
+ 
++#ifndef _DT_BINDINGS_CLK_ROCKCHIP_RK3288_H
++#define _DT_BINDINGS_CLK_ROCKCHIP_RK3288_H
++
+ /* core clocks */
+ #define PLL_APLL		1
+ #define PLL_DPLL		2
+@@ -376,3 +379,5 @@
+ #define SRST_TSP_CLKIN0		189
+ #define SRST_TSP_CLKIN1		190
+ #define SRST_TSP_27M		191
++
++#endif
 -- 
 2.1.4
