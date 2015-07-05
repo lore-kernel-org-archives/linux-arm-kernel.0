@@ -1,78 +1,76 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Sun, 5 Jul 2015 21:40:42 +0200
-Subject: [PATCH 0/7] KVM: arm/arm64: gsi routing support
-In-Reply-To: <1435592237-17924-1-git-send-email-eric.auger@linaro.org>
-References: <1435592237-17924-1-git-send-email-eric.auger@linaro.org>
-Message-ID: <20150705194042.GE3869@cbox>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Sun, 5 Jul 2015 22:34:29 +0200
+Subject: [GIT PULL] Allwinner late changes for 4.2
+Message-ID: <20150705203429.GA21927@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 29, 2015 at 05:37:10PM +0200, Eric Auger wrote:
-> With the advent of GICv3 ITS in-kernel emulation, KVM GSI routing
-> appears to be requested. More specifically MSI routing is needed.
-> irqchip routing does not sound to be really useful on arm but usage of
-> MSI routing also mandates to integrate irqchip routing. The initial
-> implementation of irqfd on arm must be upgraded with the integration
-> of kvm irqchip.c code and the implementation of its standard hooks
-> in the architecture specific part.
-> 
-> In case KVM_SET_GSI_ROUTING ioctl is not called, a default routing
-> table with flat irqchip routing entries is built enabling to inject gsi
-> corresponding to the SPI indexes seen by the guest.
-> 
-> As soon as KVM_SET_GSI_ROUTING is called, user-space overwrites this
-> default routing table and is responsible for building the whole routing
-> table.
-> 
-> for arm/arm64 KVM_SET_GSI_ROUTING has a limited support:
-> - only applies to KVM_IRQFD and not to KVM_IRQ_LINE
-> 
-> - irqchip routing was tested on Calxeda midway (VFIO with irqfd)
-> - MSI routing without GICv3 ITS was tested using APM Xgene-I
->   (qemu VIRTIO-PCI vhost net without gsi_direct_mapping).
-> - MSI routing with GICv2 ITS is NOT yet tested.
+Hi Arnd, Kevin, Olof,
 
-Do you mean GICv3 ITS here?
+Here is a bunch of late patches (because I forgot about them) for the
+4.2 merge window.
 
-> 
-> Code can be found at https://git.linaro.org/people/eric.auger/linux.git/shortlog/refs/heads/v4.1-gsi-routing-patch
-> 
-> It applies on Andre's [PATCH 00/13] arm64: KVM: GICv3 ITS emulation
-> (http://www.spinics.net/lists/kvm/msg117402.html)
-> 
-> History:
-> 
-> RFC -> PATCH:
-> - clearly state limited support on arm/arm64:
->   KVM_IRQ_LINE not impacted by GSI routing
-> - add default routing table feature (new patch file)
-> - changed uapi to use padding field area
-> - reword api.txt
-> 
-> 
-> Eric Auger (7):
->   KVM: api: add kvm_irq_routing_extended_msi
->   KVM: kvm_host: add kvm_extended_msi
->   KVM: irqchip: convey devid to kvm_set_msi
->   KVM: arm/arm64: enable irqchip routing
->   KVM: arm/arm64: build a default routing table
->   KVM: arm/arm64: enable MSI routing
->   KVM: arm: implement kvm_set_msi by gsi direct mapping
-> 
->  Documentation/virtual/kvm/api.txt |  30 ++++++++--
->  arch/arm/include/asm/kvm_host.h   |   2 +
->  arch/arm/kvm/Kconfig              |   3 +
->  arch/arm/kvm/Makefile             |   2 +-
->  arch/arm64/include/asm/kvm_host.h |   1 +
->  arch/arm64/kvm/Kconfig            |   2 +
->  arch/arm64/kvm/Makefile           |   2 +-
->  include/kvm/arm_vgic.h            |   9 ---
->  include/linux/kvm_host.h          |  10 ++++
->  include/uapi/linux/kvm.h          |   6 +-
->  virt/kvm/arm/vgic.c               | 117 ++++++++++++++++++++++++++++----------
->  virt/kvm/irqchip.c                |  20 +++++--
->  12 files changed, 154 insertions(+), 50 deletions(-)
-> 
-> -- 
-> 1.9.1
-> 
+They're not really controversial, are fixing some issues for the A33
+and H3 not having the reset controller initialised soon enough (by
+adding their compatible to the already existing DT machine), and the
+clock protection code not being run, resulting in the CPU (mainly)
+clock being shut down at the end of the boot.
+
+They've also been in linux-next for quite some time, so I don't expect
+any breakage from them.
+
+Thanks!
+Maxime
+
+The following changes since commit b787f68c36d49bb1d9236f403813641efa74a031:
+
+  Linux 4.1-rc1 (2015-04-26 17:59:10 -0700)
+
+are available in the git repository at:
+
+  https://git.kernel.org/pub/scm/linux/kernel/git/mripard/linux.git tags/sunxi-late-for-4.2
+
+for you to fetch changes up to 5738563bf6f2f1631dc71a35293b135f90969a35:
+
+  ARM: sunxi: Enable simplefb in the defconfig (2015-07-05 16:33:56 +0200)
+
+----------------------------------------------------------------
+Allwinner late changes for 4.2
+
+A bunch of defconfig changes, and some patches to make the Allwinner H3 and
+A33 boot properly.
+
+----------------------------------------------------------------
+Jens Kuske (2):
+      Documentation: sunxi: Update Allwinner SoC documentation
+      ARM: sunxi: Introduce Allwinner H3 support
+
+Maxime Ripard (1):
+      ARM: sunxi: Enable simplefb in the defconfig
+
+Timo Sigurdsson (1):
+      ARM: Remove deprecated symbol from defconfig files
+
+Vishnu Patekar (1):
+      ARM: sunxi: Add Machine support for A33
+
+ Documentation/arm/sunxi/README                  | 18 +++++++++++++++++-
+ Documentation/devicetree/bindings/arm/sunxi.txt |  2 ++
+ arch/arm/configs/multi_v7_defconfig             |  1 -
+ arch/arm/configs/sunxi_defconfig                |  6 +++++-
+ arch/arm/mach-sunxi/Kconfig                     |  2 +-
+ arch/arm/mach-sunxi/sunxi.c                     |  5 ++++-
+ drivers/clk/sunxi/clk-sunxi.c                   |  1 +
+ 7 files changed, 30 insertions(+), 5 deletions(-)
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150705/cbb3966f/attachment.sig>
