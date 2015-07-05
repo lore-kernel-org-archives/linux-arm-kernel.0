@@ -1,68 +1,65 @@
-From: k.kozlowski.k@gmail.com (Krzysztof Kozlowski)
-Date: Sun,  5 Jul 2015 11:56:51 +0900
-Subject: [PATCH] Documentation: ARM: EXYNOS: Extend boot loader interface
- documentation
-Message-ID: <1436065011-6999-1-git-send-email-k.kozlowski.k@gmail.com>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Sun, 5 Jul 2015 09:07:19 +0530
+Subject: [PATCH 16/41] clocksource: pxa: Migrate to new 'set-state'
+ interface
+In-Reply-To: <87h9pk9bfe.fsf@belgarion.home>
+References: <cover.1434622147.git.viresh.kumar@linaro.org>
+ <cover.1434622147.git.viresh.kumar@linaro.org>
+ <3aa5c1a740911258698769cbbb8f60ee02178848.1434622147.git.viresh.kumar@linaro.org>
+ <87h9pk9bfe.fsf@belgarion.home>
+Message-ID: <20150705033719.GC7510@linux>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Extend the kernel-bootloader interface documentation with usage of
-register INFORM1 (0x0804) and different CPU resume address on Exynos542x
-family (with Multi-Cluster Power Management enabled).
+Hi Robert,
 
-Additionally add glossary and reformat section titles.
+On 04-07-15, 17:42, Robert Jarzmik wrote:
+> > +	/* initializing, released, or preparing for suspend */
+> > +	timer_writel(timer_readl(OIER) & ~OIER_E0, OIER);
+> > +	timer_writel(OSSR_M0, OSSR);
+> > +	return 0;
+> For consistency, please leave an empty line before that return statement.
 
-Signed-off-by: Krzysztof Kozlowski <k.kozlowski.k@gmail.com>
----
- Documentation/arm/Samsung/Bootloader-interface.txt | 15 ++++++++++++++-
- 1 file changed, 14 insertions(+), 1 deletion(-)
+Its already applied by Daniel now, and the change is too trivial to
+request for an update to his tree. Maybe we should leave it as is for
+now.
 
-diff --git a/Documentation/arm/Samsung/Bootloader-interface.txt b/Documentation/arm/Samsung/Bootloader-interface.txt
-index b96ead9a6919..df8d4fb85939 100644
---- a/Documentation/arm/Samsung/Bootloader-interface.txt
-+++ b/Documentation/arm/Samsung/Bootloader-interface.txt
-@@ -15,6 +15,7 @@ executing kernel.
- 
- 
- 1. Non-Secure mode
-+
- Address:      sysram_ns_base_addr
- Offset        Value                                        Purpose
- =============================================================================
-@@ -28,6 +29,7 @@ Offset        Value                                        Purpose
- 
- 
- 2. Secure mode
-+
- Address:      sysram_base_addr
- Offset        Value                                        Purpose
- =============================================================================
-@@ -40,14 +42,25 @@ Offset        Value                                        Purpose
- Address:      pmu_base_addr
- Offset        Value                                        Purpose
- =============================================================================
--0x0800        exynos_cpu_resume                            AFTR
-+0x0800        exynos_cpu_resume                            AFTR, suspend
-+0x0800        mcpm_entry_point (Exynos542x with MCPM)      AFTR, suspend
-+0x0804        0xfcba0d10 (Magic cookie)                    AFTR
-+0x0804        0x00000bad (Magic cookie)                    System suspend
- 0x0814        exynos4_secondary_startup (Exynos4210 r1.1)  Secondary CPU boot
- 0x0818        0xfcba0d10 (Magic cookie, Exynos4210 r1.1)   AFTR
- 0x081C        exynos_cpu_resume (Exynos4210 r1.1)          AFTR
- 
- 
- 3. Other (regardless of secure/non-secure mode)
-+
- Address:      pmu_base_addr
- Offset        Value                           Purpose
- =============================================================================
- 0x0908        Non-zero (only Exynos3250)      Secondary CPU boot up indicator
-+
-+
-+4. Glossary
-+
-+AFTR - ARM Off Top Running, a low power mode, Cortex cores and many other
-+modules are power gated, except the TOP modules
-+MCPM - Multi-Cluster Power Management
+> > @@ -147,13 +133,14 @@ static void pxa_timer_resume(struct clock_event_device *cedev)
+> >  #endif
+> >  
+> >  static struct clock_event_device ckevt_pxa_osmr0 = {
+> > -	.name		= "osmr0",
+> > -	.features	= CLOCK_EVT_FEAT_ONESHOT,
+> > -	.rating		= 200,
+> > -	.set_next_event	= pxa_osmr0_set_next_event,
+> > -	.set_mode	= pxa_osmr0_set_mode,
+> > -	.suspend	= pxa_timer_suspend,
+> > -	.resume		= pxa_timer_resume,
+> > +	.name			= "osmr0",
+> > +	.features		= CLOCK_EVT_FEAT_ONESHOT,
+> > +	.rating			= 200,
+> > +	.set_next_event		= pxa_osmr0_set_next_event,
+> > +	.set_state_shutdown	= pxa_osmr0_shutdown,
+> > +	.set_state_oneshot	= pxa_osmr0_shutdown,
+> A bit weird to have a "set_state_oneshot" function to point to a function called
+> "X_shutdown".
+
+What's weird (or looks weird) is that we stop the timer when requested
+to switch to oneshot mode. But that's what we really wanted, because
+set_next_event is the one that will program the timer in oneshot mode.
+
+> As I don't have a clear idea on what's this new interface for,
+
+It just provides per-state API's for what's being done in set_mode()
+earlier.
+
+> I'll just hope it's the intended purpose. The code does look equivalent to me
+> anyway.
+> 
+> Apart from the cosmetic comment, once it is fixed :
+> Acked-by: Robert Jarzmik <robert.jarzmik@free.fr>
+
+Thanks.
+
 -- 
-2.1.4
+viresh
