@@ -1,97 +1,59 @@
 From: heiko@sntech.de (Heiko Stuebner)
-Date: Sun,  5 Jul 2015 11:00:16 +0200
-Subject: [PATCH 3/7] clk: rockchip: define the inverters of rk3066/rk3188 and
- rk3288
-In-Reply-To: <1436086820-3757-1-git-send-email-heiko@sntech.de>
-References: <1436086820-3757-1-git-send-email-heiko@sntech.de>
-Message-ID: <1436086820-3757-4-git-send-email-heiko@sntech.de>
+Date: Sun,  5 Jul 2015 11:00:13 +0200
+Subject: [PATCH v3 0/7] clk: rockchip: add support for the clock-tree of the
+ rk3368
+Message-ID: <1436086820-3757-1-git-send-email-heiko@sntech.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Both soc series' have inverters on the hsadc and camera interface clock
-paths. So define them using the newly added inverter type.
+This is the respin of the no-yet-applied parts of the rk3368 clock support.
 
-Signed-off-by: Heiko Stuebner <heiko@sntech.de>
----
- drivers/clk/rockchip/clk-rk3188.c | 9 ++++++++-
- drivers/clk/rockchip/clk-rk3288.c | 7 ++++++-
- 2 files changed, 14 insertions(+), 2 deletions(-)
+It definitly needs the clock-changes that went into the mainline kernel
+during the merge window (constifying stuff etc) and I'd need the
+dt-binding header in a stable branch to be included into armsoc too.
 
-diff --git a/drivers/clk/rockchip/clk-rk3188.c b/drivers/clk/rockchip/clk-rk3188.c
-index e4f9d47..a9ab4f9 100644
---- a/drivers/clk/rockchip/clk-rk3188.c
-+++ b/drivers/clk/rockchip/clk-rk3188.c
-@@ -235,6 +235,7 @@ static struct rockchip_pll_clock rk3188_pll_clks[] __initdata = {
- #define MFLAGS CLK_MUX_HIWORD_MASK
- #define DFLAGS CLK_DIVIDER_HIWORD_MASK
- #define GFLAGS (CLK_GATE_HIWORD_MASK | CLK_GATE_SET_TO_DISABLE)
-+#define IFLAGS ROCKCHIP_INVERTER_HIWORD_MASK
- 
- /* 2 ^ (val + 1) */
- static struct clk_div_table div_core_peri_t[] = {
-@@ -310,6 +311,8 @@ static struct rockchip_clk_branch common_clk_branches[] __initdata = {
- 
- 	GATE(0, "pclkin_cif0", "ext_cif0", 0,
- 			RK2928_CLKGATE_CON(3), 3, GFLAGS),
-+	INVERTER(0, "pclk_cif0", "pclkin_cif0",
-+			RK2928_CLKSEL_CON(30), 8, IFLAGS),
- 
- 	/*
- 	 * the 480m are generated inside the usb block from these clocks,
-@@ -334,8 +337,10 @@ static struct rockchip_clk_branch common_clk_branches[] __initdata = {
- 	COMPOSITE_FRAC(0, "hsadc_frac", "hsadc_src", 0,
- 			RK2928_CLKSEL_CON(23), 0,
- 			RK2928_CLKGATE_CON(2), 7, GFLAGS),
--	MUX(SCLK_HSADC, "sclk_hsadc", mux_sclk_hsadc_p, 0,
-+	MUX(0, "sclk_hsadc_out", mux_sclk_hsadc_p, 0,
- 			RK2928_CLKSEL_CON(22), 4, 2, MFLAGS),
-+	INVERTER(SCLK_HSADC, "sclk_hsadc", "sclk_hsadc_out",
-+			RK2928_CLKSEL_CON(22), 7, IFLAGS),
- 
- 	COMPOSITE_NOMUX(SCLK_SARADC, "sclk_saradc", "xin24m", 0,
- 			RK2928_CLKSEL_CON(24), 8, 8, DFLAGS,
-@@ -557,6 +562,8 @@ static struct rockchip_clk_branch rk3066a_clk_branches[] __initdata = {
- 
- 	GATE(0, "pclkin_cif1", "ext_cif1", 0,
- 			RK2928_CLKGATE_CON(3), 4, GFLAGS),
-+	INVERTER(0, "pclk_cif1", "pclkin_cif1",
-+			RK2928_CLKSEL_CON(30), 12, IFLAGS),
- 
- 	COMPOSITE(0, "aclk_gpu_src", mux_pll_src_cpll_gpll_p, 0,
- 			RK2928_CLKSEL_CON(33), 8, 1, MFLAGS, 0, 5, DFLAGS,
-diff --git a/drivers/clk/rockchip/clk-rk3288.c b/drivers/clk/rockchip/clk-rk3288.c
-index df9dc96..a8bad7d 100644
---- a/drivers/clk/rockchip/clk-rk3288.c
-+++ b/drivers/clk/rockchip/clk-rk3288.c
-@@ -223,6 +223,7 @@ static struct clk_div_table div_hclk_cpu_t[] = {
- #define MFLAGS CLK_MUX_HIWORD_MASK
- #define DFLAGS CLK_DIVIDER_HIWORD_MASK
- #define GFLAGS (CLK_GATE_HIWORD_MASK | CLK_GATE_SET_TO_DISABLE)
-+#define IFLAGS ROCKCHIP_INVERTER_HIWORD_MASK
- 
- static struct rockchip_clk_branch rk3288_clk_branches[] __initdata = {
- 	/*
-@@ -592,8 +593,10 @@ static struct rockchip_clk_branch rk3288_clk_branches[] __initdata = {
- 	COMPOSITE(0, "hsadc_src", mux_pll_src_cpll_gpll_p, 0,
- 			RK3288_CLKSEL_CON(22), 0, 1, MFLAGS, 8, 8, DFLAGS,
- 			RK3288_CLKGATE_CON(2), 6, GFLAGS),
--	MUX(SCLK_HSADC, "sclk_hsadc_out", mux_hsadcout_p, 0,
-+	MUX(0, "sclk_hsadc_out", mux_hsadcout_p, 0,
- 			RK3288_CLKSEL_CON(22), 4, 1, MFLAGS),
-+	INVERTER(SCLK_HSADC, "sclk_hsadc", "sclk_hsadc_out",
-+			RK3288_CLKSEL_CON(22), 7, IFLAGS),
- 
- 	GATE(0, "jtag", "ext_jtag", 0,
- 			RK3288_CLKGATE_CON(4), 14, GFLAGS),
-@@ -768,7 +771,9 @@ static struct rockchip_clk_branch rk3288_clk_branches[] __initdata = {
- 	 */
- 
- 	GATE(0, "pclk_vip_in", "ext_vip", 0, RK3288_CLKGATE_CON(16), 0, GFLAGS),
-+	INVERTER(0, "pclk_vip", "pclk_vip_in", RK3288_CLKSEL_CON(29), 4, IFLAGS),
- 	GATE(0, "pclk_isp_in", "ext_isp", 0, RK3288_CLKGATE_CON(16), 3, GFLAGS),
-+	INVERTER(0, "pclk_isp", "pclk_isp_in", RK3288_CLKSEL_CON(29), 3, IFLAGS),
- };
- 
- static const char *const rk3288_critical_clocks[] __initconst = {
+
+changes since v2:
+- drop patches already applied
+- address comments from Stephen Boyd:
+  - no dump recalc_rate callback
+  - missing header includes
+  - style issues (parentheses and saving some lines)
+- fix similar issues in the already included code
+changes since v1:
+- add CLK_SET_RATE_PARENT to sclk_mac to provide sane rates
+  when using a rmii phy with soc-side clock generation.
+  Both as fix for the 3288 and in the newly added rk3368.
+
+
+Heiko Stuebner (7):
+  clk: rockchip: add support for phase inverters
+  clk: rockchip: fix issues in the mmc-phase clock
+  clk: rockchip: define the inverters of rk3066/rk3188 and rk3288
+  dt-bindings: add documentation of rk3668 clock controller
+  clk: rockchip: add dt-binding header for rk3368
+  clk: rockchip: add missing include guards
+  clk: rockchip: add rk3368 clock controller
+
+ .../bindings/clock/rockchip,rk3368-cru.txt         |  61 ++
+ drivers/clk/rockchip/Makefile                      |   2 +
+ drivers/clk/rockchip/clk-inverter.c                | 116 +++
+ drivers/clk/rockchip/clk-mmc-phase.c               |   6 +-
+ drivers/clk/rockchip/clk-rk3188.c                  |   9 +-
+ drivers/clk/rockchip/clk-rk3288.c                  |   7 +-
+ drivers/clk/rockchip/clk-rk3368.c                  | 881 +++++++++++++++++++++
+ drivers/clk/rockchip/clk.c                         |   7 +
+ drivers/clk/rockchip/clk.h                         |  36 +
+ include/dt-bindings/clock/rk3066a-cru.h            |   5 +
+ include/dt-bindings/clock/rk3188-cru-common.h      |   5 +
+ include/dt-bindings/clock/rk3188-cru.h             |   5 +
+ include/dt-bindings/clock/rk3288-cru.h             |   5 +
+ include/dt-bindings/clock/rk3368-cru.h             | 384 +++++++++
+ 14 files changed, 1524 insertions(+), 5 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/clock/rockchip,rk3368-cru.txt
+ create mode 100644 drivers/clk/rockchip/clk-inverter.c
+ create mode 100644 drivers/clk/rockchip/clk-rk3368.c
+ create mode 100644 include/dt-bindings/clock/rk3368-cru.h
+
 -- 
 2.1.4
