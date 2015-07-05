@@ -1,116 +1,197 @@
-From: jungseoklee85@gmail.com (Jungseok Lee)
-Date: Sun, 5 Jul 2015 20:33:09 +0900
-Subject: Stack trace using ftrace
-Message-ID: <5580ED65-69A0-40F9-9626-31A0D066C507@gmail.com>
+From: jic23@kernel.org (Jonathan Cameron)
+Date: Sun, 05 Jul 2015 14:38:15 +0100
+Subject: [PATCH v2 1/2] iio: adc: Determine sampling frequencies by using
+ minimum sample time
+In-Reply-To: <01b93ea50b59c93a783fac26b4671313b794bd24.1435134626.git.maitysanchayan@gmail.com>
+References: <cover.1435134626.git.maitysanchayan@gmail.com>
+ <01b93ea50b59c93a783fac26b4671313b794bd24.1435134626.git.maitysanchayan@gmail.com>
+Message-ID: <55993347.7010002@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Greetings,
-
-As playing with ftrace to gather kernel stack data on ARM64 kernel,
-I've found out data from /sys/kernel/debug/tracing/stack_trace looks odd.
-
-One of example using 4.1 kernel + dragonboard410c is as follows.
-
-        Depth    Size   Location    (50 entries)
-        -----    ----   --------
-  0)     5256       0   notifier_call_chain+0x30/0x94
-  1)     5256       0   ftrace_call+0x0/0x4
-  2)     5256       0   notifier_call_chain+0x2c/0x94
-  3)     5256       0   raw_notifier_call_chain+0x34/0x44
-  4)     5256       0   timekeeping_update.constprop.9+0xb8/0x114
-  5)     5256       0   update_wall_time+0x408/0x6dc
-  6)     5256       0   tick_do_update_jiffies64+0xd8/0x154
-  7)     5256       0   tick_sched_do_timer+0x50/0x60
-  8)     5256       0   tick_sched_timer+0x34/0x90
-  9)     5256       0   __run_hrtimer+0x60/0x258
- 10)     5256       0   hrtimer_interrupt+0xe8/0x260
- 11)     5256       0   arch_timer_handler_virt+0x38/0x48
- 12)     5256       0   handle_percpu_devid_irq+0x84/0x188
- 13)     5256       0   generic_handle_irq+0x38/0x54
- 14)     5256       0   __handle_domain_irq+0x68/0xbc
- 15)     5256       0   gic_handle_irq+0x38/0x88
- 16)     5256       0   el1_irq+0x64/0xd8
- 17)     5256       0   kmem_cache_alloc+0x258/0x294
- 18)     5256       0   __alloc_skb+0x48/0x180
- 19)     5256       0   alloc_skb_with_frags+0x74/0x234
- 20)     5256       0   sock_alloc_send_pskb+0x1d0/0x294
- 21)     5256       0   sock_alloc_send_skb+0x44/0x54
- 22)     5256       0   __ip_append_data.isra.40+0x78c/0xb48
- 23)     5256       0   ip_append_data.part.42+0x98/0xe8
- 24)     5256       0   ip_append_data+0x68/0x7c
- 25)     5256       0   icmp_push_reply+0x7c/0x144
- 26)     5256       0   icmp_send+0x3c0/0x3c8
- 27)     5256       0   __udp4_lib_rcv+0x5b8/0x684
- 28)     5256       0   udp_rcv+0x2c/0x3c
- 29)     5256       0   ip_local_deliver+0xa0/0x224
- 30)     5256       0   ip_rcv+0x360/0x57c
- 31)     5256       0   __netif_receive_skb_core+0x4d0/0x80c
- 32)     5256       0   __netif_receive_skb+0x24/0x84
- 33)     5256       0   process_backlog+0x9c/0x15c
- 34)     5256       0   net_rx_action+0x1ec/0x32c
- 35)     5256       0   __do_softirq+0x114/0x2f0
- 36)     5256       0   do_softirq+0x60/0x68
- 37)     5256       0   __local_bh_enable_ip+0xb0/0xd4
- 38)     5256       0   ip_finish_output+0x1f4/0xabc
- 39)     5256       0   ip_output+0xf0/0x120
- 40)     5256       0   ip_local_out_sk+0x44/0x54
- 41)     5256       0   ip_send_skb+0x24/0xbc
- 42)     5256       0   udp_send_skb+0x1b4/0x2f4
- 43)     5256       0   udp_sendmsg+0x2a8/0x7a0
- 44)     5256       0   inet_sendmsg+0xa0/0xd0
- 45)     5256       0   sock_sendmsg+0x30/0x78
- 46)     5256       0   ___sys_sendmsg+0x15c/0x26c
- 47)     5256       0   __sys_sendmmsg+0x94/0x180
- 48)     5256       0   SyS_sendmmsg+0x38/0x54
- 49)     5256    5256   el0_svc_naked+0x20/0x28
-
-I think size *0* does not make sense.
-It does not match with Documentation/trace/ftrace.txt.
-
-Am I missing something?
-I attach additional information which might be helpful.
-
-1) Kernel configuration
-CONFIG_NOP_TRACER=y
-CONFIG_HAVE_FUNCTION_TRACER=y
-CONFIG_HAVE_FUNCTION_GRAPH_TRACER=y
-CONFIG_HAVE_DYNAMIC_FTRACE=y
-CONFIG_HAVE_FTRACE_MCOUNT_RECORD=y
-CONFIG_HAVE_SYSCALL_TRACEPOINTS=y
-CONFIG_HAVE_C_RECORDMCOUNT=y
-CONFIG_TRACE_CLOCK=y
-CONFIG_RING_BUFFER=y
-CONFIG_EVENT_TRACING=y
-CONFIG_CONTEXT_SWITCH_TRACER=y
-CONFIG_TRACING=y
-CONFIG_GENERIC_TRACER=y
-CONFIG_TRACING_SUPPORT=y
-CONFIG_FTRACE=y
-CONFIG_FUNCTION_TRACER=y
-CONFIG_FUNCTION_GRAPH_TRACER=y
-# CONFIG_IRQSOFF_TRACER is not set
-# CONFIG_PREEMPT_TRACER is not set
-# CONFIG_SCHED_TRACER is not set
-# CONFIG_FTRACE_SYSCALLS is not set
-# CONFIG_TRACER_SNAPSHOT is not set
-CONFIG_BRANCH_PROFILE_NONE=y
-# CONFIG_PROFILE_ANNOTATED_BRANCHES is not set
-# CONFIG_PROFILE_ALL_BRANCHES is not set
-CONFIG_STACK_TRACER=y
-# CONFIG_BLK_DEV_IO_TRACE is not set
-# CONFIG_PROBE_EVENTS is not set
-CONFIG_DYNAMIC_FTRACE=y
-# CONFIG_FUNCTION_PROFILER is not set
-CONFIG_FTRACE_MCOUNT_RECORD=y
-CONFIG_FTRACE_SELFTEST=y
-CONFIG_FTRACE_STARTUP_TEST=y
-
-2) Ftrace selftest result
-[  110.791609] Testing all events: OK
-[  110.999956] Testing ftrace filter: OK
-
-Thanks for any advice or help in advance!
-
-Best Regards
-Jungseok Lee
+On 24/06/15 09:33, Sanchayan Maity wrote:
+> The driver currently does not take into account the minimum sample time
+> as per the Figure 6-8 Chapter 9.1.1 12-bit ADC electrical characteristics.
+> We set a static amount of cycles instead of considering the sample time
+> as a given value, which depends on hardware characteristics.
+> 
+> Determine sampling frequencies by first reading the device tree property
+> node and then calculating the required Long Sample Time Adder (LSTAdder)
+> value based on the ADC clock frequency and sample time value obtained
+> from the device tree, this LSTAdder value is then used for calculating
+> the sampling frequencies possible.
+> 
+> Signed-off-by: Sanchayan Maity <maitysanchayan@gmail.com>
+Looking for an Ack on this from Fugang. Device tree ack also good ;)
+> ---
+>  .../devicetree/bindings/iio/adc/vf610-adc.txt      |  6 ++
+>  drivers/iio/adc/vf610_adc.c                        | 74 ++++++++++++++++++++--
+>  2 files changed, 76 insertions(+), 4 deletions(-)
+> 
+> diff --git a/Documentation/devicetree/bindings/iio/adc/vf610-adc.txt b/Documentation/devicetree/bindings/iio/adc/vf610-adc.txt
+> index 3eb40e2..39b86ea 100644
+> --- a/Documentation/devicetree/bindings/iio/adc/vf610-adc.txt
+> +++ b/Documentation/devicetree/bindings/iio/adc/vf610-adc.txt
+> @@ -17,6 +17,11 @@ Recommended properties:
+>    - Frequency in normal mode (ADLPC=0, ADHSC=0)
+>    - Frequency in high-speed mode (ADLPC=0, ADHSC=1)
+>    - Frequency in low-power mode (ADLPC=1, ADHSC=0)
+> +  - min-sample-time: Minimum sampling time in nanoseconds. This value has
+> +    to be chosen according to the conversion mode and the connected analog
+> +	 source resistance (R_as) and capacitance (C_as). Refer the datasheet's
+> +	 operating requirements. A safe default across a wide range of R_as and
+> +	 C_as as well as conversion modes is 1000ns.
+>  
+>  Example:
+>  adc0: adc at 4003b000 {
+> @@ -27,5 +32,6 @@ adc0: adc at 4003b000 {
+>  	clock-names = "adc";
+>  	fsl,adck-max-frequency = <30000000>, <40000000>,
+>  				<20000000>;
+> +	min-sample-time = <1000>;
+>  	vref-supply = <&reg_vcc_3v3_mcu>;
+>  };
+> diff --git a/drivers/iio/adc/vf610_adc.c b/drivers/iio/adc/vf610_adc.c
+> index 480f335..8322027 100644
+> --- a/drivers/iio/adc/vf610_adc.c
+> +++ b/drivers/iio/adc/vf610_adc.c
+> @@ -68,6 +68,9 @@
+>  #define VF610_ADC_CLK_DIV8		0x60
+>  #define VF610_ADC_CLK_MASK		0x60
+>  #define VF610_ADC_ADLSMP_LONG		0x10
+> +#define VF610_ADC_ADSTS_SHORT   0x100
+> +#define VF610_ADC_ADSTS_NORMAL  0x200
+> +#define VF610_ADC_ADSTS_LONG    0x300
+>  #define VF610_ADC_ADSTS_MASK		0x300
+>  #define VF610_ADC_ADLPC_EN		0x80
+>  #define VF610_ADC_ADHSC_EN		0x400
+> @@ -124,6 +127,17 @@ enum conversion_mode_sel {
+>  	VF610_ADC_CONV_LOW_POWER,
+>  };
+>  
+> +enum lst_adder_sel {
+> +	VF610_ADCK_CYCLES_3,
+> +	VF610_ADCK_CYCLES_5,
+> +	VF610_ADCK_CYCLES_7,
+> +	VF610_ADCK_CYCLES_9,
+> +	VF610_ADCK_CYCLES_13,
+> +	VF610_ADCK_CYCLES_17,
+> +	VF610_ADCK_CYCLES_21,
+> +	VF610_ADCK_CYCLES_25,
+> +};
+> +
+>  struct vf610_adc_feature {
+>  	enum clk_sel	clk_sel;
+>  	enum vol_ref	vol_ref;
+> @@ -132,6 +146,8 @@ struct vf610_adc_feature {
+>  	int	clk_div;
+>  	int     sample_rate;
+>  	int	res_mode;
+> +	u32 lst_adder_index;
+> +	u32 default_sample_time;
+>  
+>  	bool	calibration;
+>  	bool	ovwren;
+> @@ -155,11 +171,13 @@ struct vf610_adc {
+>  };
+>  
+>  static const u32 vf610_hw_avgs[] = { 1, 4, 8, 16, 32 };
+> +static const u32 vf610_lst_adder[] = { 3, 5, 7, 9, 13, 17, 21, 25 };
+>  
+>  static inline void vf610_adc_calculate_rates(struct vf610_adc *info)
+>  {
+>  	struct vf610_adc_feature *adc_feature = &info->adc_feature;
+>  	unsigned long adck_rate, ipg_rate = clk_get_rate(info->clk);
+> +	u32 adck_period, lst_addr_min;
+>  	int divisor, i;
+>  
+>  	adck_rate = info->max_adck_rate[adc_feature->conv_mode];
+> @@ -174,6 +192,19 @@ static inline void vf610_adc_calculate_rates(struct vf610_adc *info)
+>  	}
+>  
+>  	/*
+> +	 * Determine the long sample time adder value to be used based
+> +	 * on the default minimum sample time provided.
+> +	 */
+> +	adck_period = NSEC_PER_SEC / adck_rate;
+> +	lst_addr_min = adc_feature->default_sample_time / adck_period;
+> +	for (i = 0; i < ARRAY_SIZE(vf610_lst_adder); i++) {
+> +		if (vf610_lst_adder[i] > lst_addr_min) {
+> +			adc_feature->lst_adder_index = i;
+> +			break;
+> +		}
+> +	}
+> +
+> +	/*
+>  	 * Calculate ADC sample frequencies
+>  	 * Sample time unit is ADCK cycles. ADCK clk source is ipg clock,
+>  	 * which is the same as bus clock.
+> @@ -182,12 +213,13 @@ static inline void vf610_adc_calculate_rates(struct vf610_adc *info)
+>  	 * SFCAdder: fixed to 6 ADCK cycles
+>  	 * AverageNum: 1, 4, 8, 16, 32 samples for hardware average.
+>  	 * BCT (Base Conversion Time): fixed to 25 ADCK cycles for 12 bit mode
+> -	 * LSTAdder(Long Sample Time): fixed to 3 ADCK cycles
+> +	 * LSTAdder(Long Sample Time): 3, 5, 7, 9, 13, 17, 21, 25 ADCK cycles
+>  	 */
+>  	adck_rate = ipg_rate / info->adc_feature.clk_div;
+>  	for (i = 0; i < ARRAY_SIZE(vf610_hw_avgs); i++)
+>  		info->sample_freq_avail[i] =
+> -			adck_rate / (6 + vf610_hw_avgs[i] * (25 + 3));
+> +			adck_rate / (6 + vf610_hw_avgs[i] *
+> +			 (25 + vf610_lst_adder[adc_feature->lst_adder_index]));
+>  }
+>  
+>  static inline void vf610_adc_cfg_init(struct vf610_adc *info)
+> @@ -347,8 +379,40 @@ static void vf610_adc_sample_set(struct vf610_adc *info)
+>  		break;
+>  	}
+>  
+> -	/* Use the short sample mode */
+> -	cfg_data &= ~(VF610_ADC_ADLSMP_LONG | VF610_ADC_ADSTS_MASK);
+> +	/*
+> +	 * Set ADLSMP and ADSTS based on the Long Sample Time Adder value
+> +	 * determined.
+> +	 */
+> +	switch (adc_feature->lst_adder_index) {
+> +	case VF610_ADCK_CYCLES_3:
+> +		break;
+> +	case VF610_ADCK_CYCLES_5:
+> +		cfg_data |= VF610_ADC_ADSTS_SHORT;
+> +		break;
+> +	case VF610_ADCK_CYCLES_7:
+> +		cfg_data |= VF610_ADC_ADSTS_NORMAL;
+> +		break;
+> +	case VF610_ADCK_CYCLES_9:
+> +		cfg_data |= VF610_ADC_ADSTS_LONG;
+> +		break;
+> +	case VF610_ADCK_CYCLES_13:
+> +		cfg_data |= VF610_ADC_ADLSMP_LONG;
+> +		break;
+> +	case VF610_ADCK_CYCLES_17:
+> +		cfg_data |= VF610_ADC_ADLSMP_LONG;
+> +		cfg_data |= VF610_ADC_ADSTS_SHORT;
+> +		break;
+> +	case VF610_ADCK_CYCLES_21:
+> +		cfg_data |= VF610_ADC_ADLSMP_LONG;
+> +		cfg_data |= VF610_ADC_ADSTS_NORMAL;
+> +		break;
+> +	case VF610_ADCK_CYCLES_25:
+> +		cfg_data |= VF610_ADC_ADLSMP_LONG;
+> +		cfg_data |= VF610_ADC_ADSTS_NORMAL;
+> +		break;
+> +	default:
+> +		dev_err(info->dev, "error in sample time select\n");
+> +	}
+>  
+>  	/* update hardware average selection */
+>  	cfg_data &= ~VF610_ADC_AVGS_MASK;
+> @@ -712,6 +776,8 @@ static int vf610_adc_probe(struct platform_device *pdev)
+>  
+>  	of_property_read_u32_array(pdev->dev.of_node, "fsl,adck-max-frequency",
+>  			info->max_adck_rate, 3);
+> +	of_property_read_u32(pdev->dev.of_node, "min-sample-time",
+> +			&info->adc_feature.default_sample_time);
+>  
+>  	platform_set_drvdata(pdev, indio_dev);
+>  
+> 
