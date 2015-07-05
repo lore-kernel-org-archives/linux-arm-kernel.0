@@ -1,65 +1,145 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Sun, 5 Jul 2015 09:07:19 +0530
-Subject: [PATCH 16/41] clocksource: pxa: Migrate to new 'set-state'
- interface
-In-Reply-To: <87h9pk9bfe.fsf@belgarion.home>
-References: <cover.1434622147.git.viresh.kumar@linaro.org>
- <cover.1434622147.git.viresh.kumar@linaro.org>
- <3aa5c1a740911258698769cbbb8f60ee02178848.1434622147.git.viresh.kumar@linaro.org>
- <87h9pk9bfe.fsf@belgarion.home>
-Message-ID: <20150705033719.GC7510@linux>
+From: vinod.koul@intel.com (Vinod Koul)
+Date: Sun, 5 Jul 2015 12:15:46 +0530
+Subject: [PATCH v2 6/9] arm: twr-k70f120m: extend Freescale eDMA driver
+ with the ability to support Kinetis SoC
+In-Reply-To: <1435667250-28299-7-git-send-email-pawelo@king.net.pl>
+References: <1435667250-28299-1-git-send-email-pawelo@king.net.pl>
+ <1435667250-28299-7-git-send-email-pawelo@king.net.pl>
+Message-ID: <20150705064546.GY3246@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Robert,
+On Tue, Jun 30, 2015 at 02:27:27PM +0200, Paul Osmialowski wrote:
+The patch title is not per subsystem semantics, pls fix that
 
-On 04-07-15, 17:42, Robert Jarzmik wrote:
-> > +	/* initializing, released, or preparing for suspend */
-> > +	timer_writel(timer_readl(OIER) & ~OIER_E0, OIER);
-> > +	timer_writel(OSSR_M0, OSSR);
-> > +	return 0;
-> For consistency, please leave an empty line before that return statement.
+> Surprisingly small amount of work was required in order to extend already
+> existing eDMA driver with the support for Kinetis SoC architecture.
+And this doesn't tell me the stuff you added/removed/fixed in current driver
+to extend to Kinetis. Our changelog should tell what changed and why
 
-Its already applied by Daniel now, and the change is too trivial to
-request for an update to his tree. Maybe we should leave it as is for
-now.
+Btw is this patch dependent upon the rest of the series?
 
-> > @@ -147,13 +133,14 @@ static void pxa_timer_resume(struct clock_event_device *cedev)
-> >  #endif
-> >  
-> >  static struct clock_event_device ckevt_pxa_osmr0 = {
-> > -	.name		= "osmr0",
-> > -	.features	= CLOCK_EVT_FEAT_ONESHOT,
-> > -	.rating		= 200,
-> > -	.set_next_event	= pxa_osmr0_set_next_event,
-> > -	.set_mode	= pxa_osmr0_set_mode,
-> > -	.suspend	= pxa_timer_suspend,
-> > -	.resume		= pxa_timer_resume,
-> > +	.name			= "osmr0",
-> > +	.features		= CLOCK_EVT_FEAT_ONESHOT,
-> > +	.rating			= 200,
-> > +	.set_next_event		= pxa_osmr0_set_next_event,
-> > +	.set_state_shutdown	= pxa_osmr0_shutdown,
-> > +	.set_state_oneshot	= pxa_osmr0_shutdown,
-> A bit weird to have a "set_state_oneshot" function to point to a function called
-> "X_shutdown".
+>  
+>  static int
+> -fsl_edma_irq_init(struct platform_device *pdev, struct fsl_edma_engine *fsl_edma)
+> +fsl_edma_irq_init(struct platform_device *pdev,
+> +		  struct fsl_edma_engine *fsl_edma)
+please keep style changes in a separate patch
 
-What's weird (or looks weird) is that we stop the timer when requested
-to switch to oneshot mode. But that's what we really wanted, because
-set_next_event is the one that will program the timer in oneshot mode.
+>  {
+> +	struct device_node *np = pdev->dev.of_node;
+> +	int irq, errirq;
+>  	int ret;
+>  
+> -	fsl_edma->txirq = platform_get_irq_byname(pdev, "edma-tx");
+> -	if (fsl_edma->txirq < 0) {
+> -		dev_err(&pdev->dev, "Can't get edma-tx irq.\n");
+> -		return fsl_edma->txirq;
+> -	}
+> -
+> -	fsl_edma->errirq = platform_get_irq_byname(pdev, "edma-err");
+> -	if (fsl_edma->errirq < 0) {
+> +	errirq = platform_get_irq_byname(pdev, "edma-err");
+> +	if (errirq < 0) {
+>  		dev_err(&pdev->dev, "Can't get edma-err irq.\n");
+> -		return fsl_edma->errirq;
+> +		return irq;
+shouldn't this be errirq
 
-> As I don't have a clear idea on what's this new interface for,
+>  	}
+>  
+> -	if (fsl_edma->txirq == fsl_edma->errirq) {
+> -		ret = devm_request_irq(&pdev->dev, fsl_edma->txirq,
+> -				fsl_edma_irq_handler, 0, "eDMA", fsl_edma);
+> -		if (ret) {
+> -			dev_err(&pdev->dev, "Can't register eDMA IRQ.\n");
+> -			 return  ret;
+> +	if (fsl_edma->kinetis) {
+> +		int i;
+> +		int irqs = of_irq_count(np);
+> +
+> +		if (irqs <= 1) {
+> +			dev_err(&pdev->dev, "Wrong eDMA irq count %d\n", irqs);
+> +			return -EINVAL;
+why not return irqs?
 
-It just provides per-state API's for what's being done in set_mode()
-earlier.
+>  		}
+> -	} else {
+> -		ret = devm_request_irq(&pdev->dev, fsl_edma->txirq,
+> +
+> +		for (i = 0; i < (irqs - 1); i++) {
+> +			char irq_name[32];
+> +
+> +			sprintf(irq_name, "edma-tx-%d,%d", i, 16 + i);
+> +			irq = platform_get_irq_byname(pdev, irq_name);
+> +			if (irq < 0) {
+> +				dev_err(&pdev->dev, "Can't get %s irq.\n",
+> +							irq_name);
+> +				return irq;
+> +			}
+> +
+> +			ret = devm_request_irq(&pdev->dev, irq,
+>  				fsl_edma_tx_handler, 0, "eDMA tx", fsl_edma);
+> -		if (ret) {
+> -			dev_err(&pdev->dev, "Can't register eDMA tx IRQ.\n");
+> -			return  ret;
+> +			if (ret) {
+> +				dev_err(&pdev->dev, "Can't register %s IRQ.\n",
+> +							irq_name);
+> +				return  ret;
+> +			}
+>  		}
+>  
+> -		ret = devm_request_irq(&pdev->dev, fsl_edma->errirq,
+> -				fsl_edma_err_handler, 0, "eDMA err", fsl_edma);
+> +		ret = devm_request_irq(&pdev->dev, errirq,
+> +			fsl_edma_err_handler, 0, "eDMA err", fsl_edma);
+>  		if (ret) {
+>  			dev_err(&pdev->dev, "Can't register eDMA err IRQ.\n");
+> -			return  ret;
+> +		return  ret;
+> +		}
+> +	} else {
+> +		irq = platform_get_irq_byname(pdev, "edma-tx");
+> +		if (irq < 0) {
+> +			dev_err(&pdev->dev, "Can't get edma-tx irq.\n");
+> +			return irq;
+> +		}
+> +
+> +		if (irq == errirq) {
+> +			ret = devm_request_irq(&pdev->dev, irq,
+> +				fsl_edma_irq_handler, 0, "eDMA", fsl_edma);
+> +			if (ret) {
+> +				dev_err(&pdev->dev,
+> +						"Can't register eDMA IRQ.\n");
+> +				return  ret;
+> +			}
+> +		} else {
+> +			ret = devm_request_irq(&pdev->dev, irq,
+> +				fsl_edma_tx_handler, 0, "eDMA tx", fsl_edma);
+> +			if (ret) {
+> +				dev_err(&pdev->dev,
+> +					    "Can't register eDMA tx IRQ.\n");
+> +				return  ret;
+> +			}
+> +
+> +			ret = devm_request_irq(&pdev->dev, errirq,
+> +				fsl_edma_err_handler, 0, "eDMA err", fsl_edma);
+> +			if (ret) {
+> +				dev_err(&pdev->dev,
+> +					    "Can't register eDMA err IRQ.\n");
+> +				return  ret;
+> +			}
+>  		}
+>  	}
+Okay here we have a bunch of changes without explanation on why these are
+required and what are they supposed to do. So it is kind of very difficult to
+review!
 
-> I'll just hope it's the intended purpose. The code does look equivalent to me
-> anyway.
-> 
-> Apart from the cosmetic comment, once it is fixed :
-> Acked-by: Robert Jarzmik <robert.jarzmik@free.fr>
+So please split these up in sequence of patches where each patch does only
+ONE thing with right changelog messages
 
-Thanks.
+Thanks
 
 -- 
-viresh
+~Vinod
