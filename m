@@ -1,48 +1,57 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Sun, 5 Jul 2015 09:39:26 -0500
-Subject: [PATCH v2 4/9] arm: twr-k70f120m: timer driver for Kinetis SoC
-In-Reply-To: <2939807.q7WvOoYzDX@wuerfel>
-References: <1435667250-28299-1-git-send-email-pawelo@king.net.pl>
- <1435667250-28299-5-git-send-email-pawelo@king.net.pl>
- <2939807.q7WvOoYzDX@wuerfel>
-Message-ID: <CAL_Jsq+r9fNWqD9O8Kz7Tn7oCaiJv7fSjEJ5QNcf+YLO146wPw@mail.gmail.com>
+From: jogo@openwrt.org (Jonas Gorski)
+Date: Sun, 5 Jul 2015 18:55:18 +0200
+Subject: [PATCH v2 2/4] dt-bindings: ARM: Mediatek: Document devicetree
+ bindings for spi bus
+In-Reply-To: <1435583070-9600-3-git-send-email-leilk.liu@mediatek.com>
+References: <1435583070-9600-1-git-send-email-leilk.liu@mediatek.com>
+ <1435583070-9600-3-git-send-email-leilk.liu@mediatek.com>
+Message-ID: <CAOiHx=nLx14VTrm_buqbZX15Ry+YQnNfEmWuimUvk9_5zrgjng@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 30, 2015 at 3:43 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Tuesday 30 June 2015 14:27:25 Paul Osmialowski wrote:
+Hi,
+
+On Mon, Jun 29, 2015 at 3:04 PM, Leilk Liu <leilk.liu@mediatek.com> wrote:
+> Signed-off-by: Leilk Liu <leilk.liu@mediatek.com>
+> ---
+>  .../devicetree/bindings/spi/spi-mt65xx.txt         | 32 ++++++++++++++++++++++
+>  1 file changed, 32 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/spi/spi-mt65xx.txt
 >
+> diff --git a/Documentation/devicetree/bindings/spi/spi-mt65xx.txt b/Documentation/devicetree/bindings/spi/spi-mt65xx.txt
+> new file mode 100644
+> index 0000000..04c28fd
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/spi/spi-mt65xx.txt
+> @@ -0,0 +1,32 @@
+> +MTK SPI device
 
->>  / {
->> +     aliases {
->> +             pit0 = &pit0;
->> +             pit1 = &pit1;
->> +             pit2 = &pit2;
->> +             pit3 = &pit3;
->> +     };
->> +
->>       soc {
->> +             pit at 40037000 {
->> +                     compatible = "fsl,kinetis-pit-timer";
->> +                     reg = <0x40037000 0x100>;
->> +                     clocks = <&mcg_pclk_gate 5 23>;
->> +                     #address-cells = <1>;
->> +                     #size-cells = <1>;
->> +                     ranges;
->> +
->> +                     pit0: timer at 40037100 {
->> +                             reg = <0x40037100 0x10>;
->> +                             interrupts = <68>;
->> +                             status = "disabled";
->> +                     };
->
-> I don't think it's necessary to have both an alias
-> and a label here. What do you use the alias for?
+"SPI device" lets me think "SPI slave device", not "SPI master
+controller", so maybe call it "MTK SPI Controller"?
 
-Yes, don't use aliases. If you really need a specific timer to be used
-then there must be some feature it has or doesn't have (e.g. always
-on, output compare pin, specific clock, etc.) Put those those
-properties in DT if that is the case. See OMAP timers for a complex
-example of this.
+> +
+> +Required properties:
+> +- compatible: should be one of the following.
+> +    - mediatek,mt8173-spi: for mt8173 platforms
+> +    - mediatek,mt8135-spi: for mt8135 platforms
+> +    - mediatek,mt6589-spi: for mt6589 platforms
+> +
+> +- reg: Address and length of the register set for the device
+> +
+> +- interrupts: Should contain spi interrupt
+> +
+> +- clock-names: tuple listing input clock names.
+> +       Required elements: "main"
+> +
+> +- clocks: phandles to input clocks.
+> +
+> +- pad-select: should specify spi pad used, only required for MT8173.
+> +       This value should be 0~3.
 
-Rob
+AFAIK device-specific non-generic properties should be
+vendor-prefixed, i.e. it should be "mediatek,pad-select", not just
+"pad-select".
+
+
+Regards
+Jonas
