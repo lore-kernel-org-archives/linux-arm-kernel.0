@@ -1,76 +1,129 @@
-From: pawelo@king.net.pl (Paul Osmialowski)
-Date: Sat, 4 Jul 2015 23:50:03 +0200 (CEST)
-Subject: [PATCH v2 3/9] arm: twr-k70f120m: clock driver for Kinetis SoC
-In-Reply-To: <2009463.YLtdMegFel@wuerfel>
-References: <1435667250-28299-1-git-send-email-pawelo@king.net.pl>
- <alpine.LNX.2.00.1507022338070.28322@localhost.localdomain>
- <alpine.DEB.2.11.1507030006280.3916@nanos> <2009463.YLtdMegFel@wuerfel>
-Message-ID: <alpine.LNX.2.00.1507042327490.1296@localhost.localdomain>
+From: ariel@vanguardiasur.com.ar (Ariel D'Alessandro)
+Date: Sat, 04 Jul 2015 23:06:19 -0300
+Subject: [PATCH v2 1/2] watchdog: NXP LPC18xx Watchdog Timer Driver
+In-Reply-To: <CAGhQ9VzLX_hy2Z=jUH6on0_sOZBp_mg5cC0JXkHntWxxrr2K6A@mail.gmail.com>
+References: <1435783930-20184-1-git-send-email-ariel@vanguardiasur.com.ar>	<1435783930-20184-2-git-send-email-ariel@vanguardiasur.com.ar>
+ <CAGhQ9VzLX_hy2Z=jUH6on0_sOZBp_mg5cC0JXkHntWxxrr2K6A@mail.gmail.com>
+Message-ID: <5598911B.5020004@vanguardiasur.com.ar>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
+Hi Joachim,
 
-I'm attaching excerpt from Kinetis reference manual that may make 
-situation clearer.
-
-These MCG and SIM registers are used only to determine configuration 
-(clock fixed rates and clock signal origins) at run time.
-
-Namely, the real MCGOUTCLK source (in the middle) which is the parent for 
-core clock (CCLK) and peripheral clock (PCLK) is determined at run time by 
-reading MCG registers, let me quote commit message from Emcraft git repo:
-
-      * Determine in run-time what oscillator module (OSC0 or OSC1) is used
-     as clock source for the main PLL.
-      * When OSC1 is selected, assume its frequency to be 12 MHz on all
-     boards (there is a 12 MHz oscillator on XTAL1/EXTAL1 on K70-SOM and
-     TWR-K70F120M boards).
-
-In my .dts I'm trying to possibly follow real clock hierarchy, but to go 
-anywhere behind MCGOUTCLK would require ability to rewrite .dtb e.g. by 
-U-boot. But that's too demanding for any potential users of this BSP. So 
-let's asume that MCGOUTCLK is the root clock and a parent for CCLK and 
-PCLK.
-
-In my most recent version I added OSC0ERCLK explicitly as one more root 
-clock, since it is also used directly (through CG reg. 1 bit 0) by 
-Freescale fec network device whose in-tree driver I'm trying to make 
-usable for Kinetis.
-
-On Sat, 4 Jul 2015, Arnd Bergmann wrote:
-
-> On Friday 03 July 2015 00:08:27 Thomas Gleixner wrote:
->> On Thu, 2 Jul 2015, Paul Osmialowski wrote:
->>> On Thu, 2 Jul 2015, Arnd Bergmann wrote:
->>>
->>>> I wonder if you could move out the fixed rate clocks into their own
->>>> nodes. Are they actually controlled by the same block? If they are
->>>> just fixed, you can use the normal binding for fixed rate clocks
->>>> and only describe the clocks that are related to the driver.
->>>
->>> In my view having these clocks grouped together looks more convincing. After
->>> all, they all share the same I/O regs in order to read configuration.
+El 01/07/15 a las 20:04, Joachim Eastwood escibi?:
+> Hi Ariel,
+> 
+> On 1 July 2015 at 22:52, Ariel D'Alessandro <ariel@vanguardiasur.com.ar> wrote:
+>> diff --git a/drivers/watchdog/Kconfig b/drivers/watchdog/Kconfig
+>> index 742fbbc..31100c2 100644
+>> --- a/drivers/watchdog/Kconfig
+>> +++ b/drivers/watchdog/Kconfig
+>> @@ -547,6 +547,17 @@ config DIGICOLOR_WATCHDOG
+>>           To compile this driver as a module, choose M here: the
+>>           module will be called digicolor_wdt.
 >>
->> The fact that they share a register is not making them a group. That's
->> just a HW design decision and you need to deal with that by protecting
->> the register access, but not by trying to group them artificially at
->> the functional level.
->
-> I'd disagree with that: The clock controller is the device that owns the
-> registers and that should be one node in DT, as Paul's first version does.
->
-> The part I'm still struggling with is understanding how the fixed-rate
-> clocks are controlled through those registers. If they are indeed configured
-> through the registers, the name is probably wrong and should be changed
-> to whatever kind of non-fixed clock this is.
->
-> 	Arnd
->
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: kinetis-clkgen.gif
-Type: image/gif
-Size: 57514 bytes
-Desc: 
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150704/ab0f010e/attachment-0001.gif>
+>> +config LPC18XX_WATCHDOG
+>> +       tristate "LCP18XX Watchdog"
+> 
+> LPC18xx/43xx in tristate to indicate that is usable for both families.
+
+Ok, I'll do that.
+
+> 
+>> +       depends on ARCH_LPC18XX
+>> +       select WATCHDOG_CORE
+> 
+> Maybe add COMPILE_TEST. At least a couple of other watchdog drivers does that.
+
+Yes, that's correct. I'll add it in the next version.
+
+> 
+>> +       help
+>> +         Say Y here if to include support for the watchdog timer
+>> +         in NXP LPC SoCs family, which includes LPC18xx/LPC43xx
+>> +         processors.
+>> +         To compile this driver as a module, choose M here: the
+>> +         module will be called lpc18xx_wdt.
+>> +
+> [...]
+>> +static int lpc18xx_wdt_feed(struct watchdog_device *wdt_dev)
+>> +{
+>> +       struct lpc18xx_wdt_dev *lpc18xx_wdt = watchdog_get_drvdata(wdt_dev);
+>> +       unsigned long flags;
+>> +
+>> +       /*
+>> +        * An abort condition will occur if an interrupt happens during the feed
+>> +        * sequence.
+>> +        */
+>> +       raw_local_irq_save(flags);
+> 
+> Any particular reason why you are using the raw variant of
+> local_irq_save/restore?
+> raw_local_irq_save doesn't seem to be a common function for drivers to
+> call at all.
+
+No, you're right, raw variants don't seem to be necessary.
+
+> 
+> If you need a lock to protect register access as well you could use a
+> spin lock with irq save.
+
+Yes but, as Ezequiel said in his response, the watchdog framework
+serializes this access. So I think a lock isn't necessary.
+
+> 
+>> +       writel(LPC18XX_WDT_FEED_MAGIC1, lpc18xx_wdt->base + LPC18XX_WDT_FEED);
+>> +       writel(LPC18XX_WDT_FEED_MAGIC2, lpc18xx_wdt->base + LPC18XX_WDT_FEED);
+>> +       raw_local_irq_restore(flags);
+>> +
+>> +       return 0;
+>> +}
+> [...]
+>> +unsigned int lpc18xx_wdt_get_timeleft(struct watchdog_device *wdt_dev)
+>> +{
+>> +       struct lpc18xx_wdt_dev *lpc18xx_wdt = watchdog_get_drvdata(wdt_dev);
+>> +       unsigned long clk_rate = clk_get_rate(lpc18xx_wdt->wdt_clk);
+>> +       unsigned int val;
+>> +
+>> +       val = readl(lpc18xx_wdt->base + LPC18XX_WDT_TV);
+>> +       return ((val * LPC18XX_WDT_CLK_DIV) / clk_rate);
+> 
+> Outer parentheses on return is unnecessary.
+
+You're right, I'll fix it.
+
+> 
+>> +}
+>> +
+>> +static int lpc18xx_wdt_start(struct watchdog_device *wdt_dev)
+>> +{
+>> +       struct lpc18xx_wdt_dev *lpc18xx_wdt = watchdog_get_drvdata(wdt_dev);
+>> +       unsigned int val;
+>> +
+>> +       if (timer_pending(&lpc18xx_wdt->timer))
+>> +               del_timer(&lpc18xx_wdt->timer);
+>> +
+>> +       val = readl(lpc18xx_wdt->base + LPC18XX_WDT_MOD);
+>> +       val |= LPC18XX_WDT_MOD_WDEN;
+>> +       val |= LPC18XX_WDT_MOD_WDRESET;
+>> +       writel(val, lpc18xx_wdt->base + LPC18XX_WDT_MOD);
+> 
+> R-M-W sequence should probably be protect with a lock.
+
+We can continue discussing this point on Ezequiel's response.
+
+> 
+>> +       /*
+>> +        * Setting the WDEN bit in the WDMOD register is not sufficient to
+>> +        * enable the Watchdog. A valid feed sequence must be completed after
+>> +        * setting WDEN before the Watchdog is capable of generating a reset.
+>> +        */
+>> +       lpc18xx_wdt_feed(wdt_dev);
+>> +
+>> +       return 0;
+>> +}
+> 
+> 
+> regards,
+> Joachim Eastwood
+> 
