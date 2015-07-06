@@ -1,77 +1,69 @@
-From: panand@redhat.com (Pratyush Anand)
-Date: Mon,  6 Jul 2015 10:33:22 +0530
-Subject: [PATCH 2/2] arm64: Make all entry code as non-kprobe-able
-In-Reply-To: <cover.1436158027.git.panand@redhat.com>
-References: <cover.1436158027.git.panand@redhat.com>
-Message-ID: <683f80cef9b2b778be868e77b01a245585448a86.1436158027.git.panand@redhat.com>
+From: tomasz.figa@gmail.com (Tomasz Figa)
+Date: Mon, 6 Jul 2015 14:12:04 +0900
+Subject: [PATCH v2] clk: exynos4: Fix wrong clock for Exynos4x12 ADC
+In-Reply-To: <CAJKOXPeFxABcm27_tmriY6RreaRYZiEPvUvFav4DK-AoNbUs=Q@mail.gmail.com>
+References: <1434074005-18846-1-git-send-email-k.kozlowski@samsung.com>
+ <CABxcv=mQfcb3jsRzOcWXAbNRf-dumoHS8X-2TEeOdB2E_T5BMQ@mail.gmail.com>
+ <CAJKOXPeFxABcm27_tmriY6RreaRYZiEPvUvFav4DK-AoNbUs=Q@mail.gmail.com>
+Message-ID: <CA+Ln22HHpdKD8+_zSzX10FBM_aDByePfA3_vactLOxh_J961tA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Entry symbols are not kprobe safe. So blacklist them for kprobing.
+2015-07-06 13:03 GMT+09:00 Krzysztof Kozlowski <k.kozlowski@samsung.com>:
+> 2015-06-12 14:46 GMT+09:00 Javier Martinez Canillas <javier@dowhile0.org>:
+>> Hello Krzysztof,
+>>
+>> On Fri, Jun 12, 2015 at 3:53 AM, Krzysztof Kozlowski
+>> <k.kozlowski@samsung.com> wrote:
+>>> The TSADC gate clock was used in Exynos4x12 DTSI for exynos-adc driver.
+>>> However TSADC is present only on Exynos4210 so on Trats2 board (with
+>>> Exynos4412 SoC) the exynos-adc driver could not be probed:
+>>>    ERROR: could not get clock /adc at 126C0000:adc(0)
+>>>    exynos-adc 126c0000.adc: failed getting clock, err = -2
+>>>    exynos-adc: probe of 126c0000.adc failed with error -2
+>>>
+>>> Instead on Exynos4x12 SoCs the main clock used by Analog to Digital
+>>> Converter is located in different register and it is named in datasheet
+>>> as PCLK_ADC. Regardless of the name the purpose of this PCLK_ADC clock
+>>> is the same as purpose of TSADC from Exynos4210.
+>>>
+>>> The patch adds gate clock for Exynos4x12 using the proper register so
+>>> backward compatibility is preserved. This fixes the probe of exynos-adc
+>>> driver on Exynos4x12 boards and allows accessing sensors connected to it
+>>> on Trats2 board (ntc,ncp15wb473 AP and battery thermistors).
+>>>
+>>> Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+>>> Cc: <stable@vger.kernel.org>
+>>> Fixes: c63c57433003 ("ARM: dts: Add ADC's dt data to read raw data for exynos4x12")
+>>> Link: https://lkml.org/lkml/2015/6/11/85
+>>>
+>>> ---
+>>>
+>>> Changes since v1:
+>>> 1. After discussion on LKML this solution was chosen because it smaller,
+>>>    simpler, self-contained (one patch to fix issue) and maintains backward
+>>>    compatibility. Thanks to Javier Martinez Canillas and Tomasz Figa for
+>>>    valuable comments.
+>>> 2. Dropped patch 2/2 because now it is not needed. The clock id "TSADC"
+>>>    will be used on all Exynos4 boards.
+>>> 3. Added CC-stable.
+>>> ---
+>>>  drivers/clk/samsung/clk-exynos4.c | 2 ++
+>>>  1 file changed, 2 insertions(+)
+>>>
+>>
+>> Patch looks good to me.
+>>
+>> Reviewed-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
+>
+> Hi Tomasz and Sylwester,
+>
+> Any comments on this version of patch?
+> Tomasz, you gave me comments on previous version. Are their satisfied?
 
-Signed-off-by: Pratyush Anand <panand@redhat.com>
----
- arch/arm64/kernel/entry.S       | 3 +++
- arch/arm64/kernel/kprobes.c     | 9 +++++++++
- arch/arm64/kernel/vmlinux.lds.S | 1 +
- 3 files changed, 13 insertions(+)
+Acked-by: Tomasz Figa <tomasz.figa@gmail.com>
 
-diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
-index a7691a378668..2ea24f6bc06b 100644
---- a/arch/arm64/kernel/entry.S
-+++ b/arch/arm64/kernel/entry.S
-@@ -202,6 +202,7 @@ tsk	.req	x28		// current thread_info
-  * Exception vectors.
-  */
- 
-+	.section ".entry.text", "ax"
- 	.align	11
- ENTRY(vectors)
- 	ventry	el1_sync_invalid		// Synchronous EL1t
-@@ -737,3 +738,5 @@ ENTRY(sys_rt_sigreturn_wrapper)
- 	mov	x0, sp
- 	b	sys_rt_sigreturn
- ENDPROC(sys_rt_sigreturn_wrapper)
-+
-+	.section ".text", "ax"
-diff --git a/arch/arm64/kernel/kprobes.c b/arch/arm64/kernel/kprobes.c
-index 6c9f8b5f04ce..9bc02c151f7f 100644
---- a/arch/arm64/kernel/kprobes.c
-+++ b/arch/arm64/kernel/kprobes.c
-@@ -28,6 +28,7 @@
- #include <asm/debug-monitors.h>
- #include <asm/system_misc.h>
- #include <asm/insn.h>
-+#include <asm-generic/sections.h>
- 
- #include "kprobes.h"
- #include "kprobes-arm64.h"
-@@ -661,6 +662,14 @@ int __kprobes arch_trampoline_kprobe(struct kprobe *p)
- 	return 0;
- }
- 
-+bool arch_within_kprobe_blacklist(unsigned long addr)
-+{
-+	return  (addr >= (unsigned long)__kprobes_text_start &&
-+		 addr < (unsigned long)__kprobes_text_end) ||
-+		(addr >= (unsigned long)__entry_text_start &&
-+		 addr < (unsigned long)__entry_text_end);
-+}
-+
- int __init arch_init_kprobes(void)
- {
- 	return 0;
-diff --git a/arch/arm64/kernel/vmlinux.lds.S b/arch/arm64/kernel/vmlinux.lds.S
-index 1fa6adc7aa83..11fb2b0117d0 100644
---- a/arch/arm64/kernel/vmlinux.lds.S
-+++ b/arch/arm64/kernel/vmlinux.lds.S
-@@ -97,6 +97,7 @@ SECTIONS
- 			*(.exception.text)
- 			__exception_text_end = .;
- 			IRQENTRY_TEXT
-+			ENTRY_TEXT
- 			TEXT_TEXT
- 			SCHED_TEXT
- 			LOCK_TEXT
--- 
-2.4.3
+Thanks for pinging.
+
+Best regards,
+Tomasz
