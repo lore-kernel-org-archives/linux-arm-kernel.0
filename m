@@ -1,27 +1,33 @@
-From: otavio@ossystems.com.br (Otavio Salvador)
-Date: Mon, 6 Jul 2015 12:05:54 -0300
-Subject: [PATCH 1/2] ARM: dts: imx6sl-warp: Add changes for rev1.12
-In-Reply-To: <1435583143-4734-1-git-send-email-fabio.estevam@freescale.com>
-References: <1435583143-4734-1-git-send-email-fabio.estevam@freescale.com>
-Message-ID: <CAP9ODKpgPiW8KErKSX36GL0Td5rVBNzBFTfCo_BuvtN7d=o2Dw@mail.gmail.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Mon,  6 Jul 2015 17:08:09 +0200
+Subject: [PATCH] arm64: remove another unnecessary libfdt include path
+Message-ID: <1436195289-20904-1-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 29, 2015 at 10:05 AM, Fabio Estevam
-<fabio.estevam@freescale.com> wrote:
-> Warp board rev1.12 is the version of the hardware that will be publicly
-> available for the customers.
->
-> It uses UART5 as the Bluetooth serial port as well as some
-> additional signals for HOSTWAKE on Wifi and Bluetooth.
->
-> Make the changes to support the rev1.12 hardware.
->
-> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+Patch 63a4aea55670 ("of: clean-up unnecessary libfdt include paths")
+removed all explicit libfdt include paths, since those are no longer
+necessary after the latest dtc upgrade. However, this one snuck in
+during the same merge window. Remove it.
 
-Acked-by: Otavio Salvador <otavio@ossystems.com.br>
+Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+---
 
+This should go on top of 4.2-rc1, since the mentioned patch was merged
+through the DT tree.
+
+ arch/arm64/mm/Makefile | 2 --
+ 1 file changed, 2 deletions(-)
+
+diff --git a/arch/arm64/mm/Makefile b/arch/arm64/mm/Makefile
+index 9d84feb41a16..773d37a14039 100644
+--- a/arch/arm64/mm/Makefile
++++ b/arch/arm64/mm/Makefile
+@@ -4,5 +4,3 @@ obj-y				:= dma-mapping.o extable.o fault.o init.o \
+ 				   context.o proc.o pageattr.o
+ obj-$(CONFIG_HUGETLB_PAGE)	+= hugetlbpage.o
+ obj-$(CONFIG_ARM64_PTDUMP)	+= dump.o
+-
+-CFLAGS_mmu.o			:= -I$(srctree)/scripts/dtc/libfdt/
 -- 
-Otavio Salvador                             O.S. Systems
-http://www.ossystems.com.br        http://code.ossystems.com.br
-Mobile: +55 (53) 9981-7854            Mobile: +1 (347) 903-9750
+1.9.1
