@@ -1,124 +1,54 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Mon, 6 Jul 2015 10:08:48 +0900
-Subject: [PATCH] ARM: dts: Add CPU cooling binding for Exynos3250-based
- Rinato/Monk board
-In-Reply-To: <5594E57C.2010300@samsung.com>
-References: <1435815465-501-1-git-send-email-cw00.choi@samsung.com>
- <5594D22C.4040206@samsung.com> <5594D5F4.3060508@samsung.com>
- <5594E57C.2010300@samsung.com>
-Message-ID: <CAJKOXPfknRZ0ewSv=awo1ay4uWHAXM_kCiLPN4MpxN2-bSNq0g@mail.gmail.com>
+From: fugang.duan@freescale.com (Duan Andy)
+Date: Mon, 6 Jul 2015 01:26:30 +0000
+Subject: [PATCH v2 0/2] Implement sample time consideration for Vybrid's
+ ADC
+In-Reply-To: <cover.1435134626.git.maitysanchayan@gmail.com>
+References: <cover.1435134626.git.maitysanchayan@gmail.com>
+Message-ID: <BLUPR03MB37345F397DFF130F8FAFC58F5930@BLUPR03MB373.namprd03.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2015-07-02 16:17 GMT+09:00 Krzysztof Kozlowski <k.kozlowski@samsung.com>:
-> On 02.07.2015 15:11, Chanwoo Choi wrote:
->> On 07/02/2015 02:54 PM, Krzysztof Kozlowski wrote:
->>> On 02.07.2015 14:37, Chanwoo Choi wrote:
->>>> This patch add the cooling device to control the overheating issue on
->>>> Exynos3250-based Rinato/Monk board.
->>>>
->>>> Cc: Kukjin Kim <kgene@kernel.org>
->>>> Cc: Krzysztof Kozlowski <k.kozlowski@samsung.com>
->>>> Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
->>>> Acked-by: Kyungmin Park <kyungmin.park@samsung.com>
->>>> ---
->>>> Depends on:
->>>> This patch needs the cpufreq support of Exynos3250 SoC. So, this patch has the
->>>> dependency on patch[1] which support the generic cpufreq for Exynos3250 SoC.
->>>> [1] https://lkml.org/lkml/2015/7/1/696
->>>>     : [PATCH v6 0/3] cpufreq: Use cpufreq-dt driver for Exynos3250
->>>>
->>>>  arch/arm/boot/dts/exynos3250-monk.dts   | 15 +++++++++++++++
->>>>  arch/arm/boot/dts/exynos3250-rinato.dts | 15 +++++++++++++++
->>>>  arch/arm/boot/dts/exynos3250.dtsi       |  1 +
->>>>  3 files changed, 31 insertions(+)
->>>>
->>>> diff --git a/arch/arm/boot/dts/exynos3250-monk.dts b/arch/arm/boot/dts/exynos3250-monk.dts
->>>> index 7863265d4868..540a0adf2be6 100644
->>>> --- a/arch/arm/boot/dts/exynos3250-monk.dts
->>>> +++ b/arch/arm/boot/dts/exynos3250-monk.dts
->>>> @@ -116,6 +116,21 @@
->>>>             min-microvolt = <1100000>;
->>>>             max-microvolt = <2700000>;
->>>>     };
->>>> +
->>>> +   thermal-zones {
->>>> +           cpu_thermal: cpu-thermal {
->>>> +                   cooling-maps {
->>>> +                           map0 {
->>>> +                                   /* Correspond to 500MHz at freq_table */
->>>> +                                   cooling-device = <&cpu0 5 5>;
->>>> +                           };
->>>> +                           map1 {
->>>> +                                   /* Correspond to 200MHz at freq_table */
->>>> +                                   cooling-device = <&cpu0 8 8>;
->>>> +                           };
->>>> +                   };
->>>> +           };
->>>> +   };
->>>>  };
->>>>
->>>>  &adc {
->>>> diff --git a/arch/arm/boot/dts/exynos3250-rinato.dts b/arch/arm/boot/dts/exynos3250-rinato.dts
->>>> index ddd7ac283045..0e62a6435e07 100644
->>>> --- a/arch/arm/boot/dts/exynos3250-rinato.dts
->>>> +++ b/arch/arm/boot/dts/exynos3250-rinato.dts
->>>> @@ -107,6 +107,21 @@
->>>>             min-microvolt = <1100000>;
->>>>             max-microvolt = <2700000>;
->>>>     };
->>>> +
->>>> +   thermal-zones {
->>>> +           cpu_thermal: cpu-thermal {
->>>> +                   cooling-maps {
->>>> +                           map0 {
->>>> +                                   /* Corresponds to 500MHz */
->>>> +                                   cooling-device = <&cpu0 5 5>;
->>>> +                           };
->>>> +                           map1 {
->>>> +                                   /* Corresponds to 200MHz */
->>>> +                                   cooling-device = <&cpu0 8 8>;
->>>> +                           };
->>>> +                   };
->>>> +           };
->>>> +   };
->>>>  };
->>>>
->>>>  &adc {
->>>> diff --git a/arch/arm/boot/dts/exynos3250.dtsi b/arch/arm/boot/dts/exynos3250.dtsi
->>>> index e0f3b2ed41a3..a4931b660ddb 100644
->>>> --- a/arch/arm/boot/dts/exynos3250.dtsi
->>>> +++ b/arch/arm/boot/dts/exynos3250.dtsi
->>>> @@ -55,6 +55,7 @@
->>>>                     clock-frequency = <1000000000>;
->>>>                     clocks = <&cmu CLK_ARM_CLK>;
->>>>                     clock-names = "cpu";
->>>> +                   #cooling-cells = <2>;
->>>>
->>>
->>> Don't you need also cooling-{min,max}-state properties?
->>
->> Yes, it is well working without cooling-{min,max}-state or cooling-{min,max}-level.
->>
->> I look for the some code to parse "cooling-{min,max}-state or cooling-{min,max}-level"
->> in drivers/thermal/*. But, there are no any code to parse it.
->>
->> But, Documentation/devicetree/bindings/thermal/thermal.txt contains just the 'cooling-{min,max}-state.
->>
->> I think that there are mismatch between document and thermal core driver.
->
-> Thanks for explanation, looks good.
-> Acked-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
->
-> Best regards,
-> Krzysztof
+From: Sanchayan Maity <maitysanchayan@gmail.com> Sent: Wednesday, June 24, 2015 4:34 PM
+> To: jic23 at kernel.org
+> Cc: shawn.guo at linaro.org; kernel at pengutronix.de; robh+dt at kernel.org;
+> pawel.moll at arm.com; mark.rutland at arm.com; ijc+devicetree at hellion.org.uk;
+> galak at codeaurora.org; Duan Fugang-B38611; devicetree at vger.kernel.org;
+> linux-iio at vger.kernel.org; linux-arm-kernel at lists.infradead.org; linux-
+> kernel at vger.kernel.org; stefan at agner.ch; Sanchayan Maity
+> Subject: [PATCH v2 0/2] Implement sample time consideration for Vybrid's
+> ADC
+> 
+> Hello,
+> 
+> This patchset adds a dt binding for specifying sample time for the vybrid
+> adc driver and takes this into account for sampling frequency calculation
+> and related configuration in the driver.
+> 
+> The patchset is based on top of Stefan's patches here
+> http://lkml.iu.edu/hypermail/linux/kernel/1505.3/02043.html
+> 
+> which got recently applied. Tested with shawn's for-next branch.
+> 
+> Changes since v1:
+> 
+> Change from a vendor specific fsl,min-sample-time to non vendor specific
+> min-sample-time.
+> 
+> Version 1 of the patchset can be found here
+> http://lkml.iu.edu/hypermail/linux/kernel/1506.1/00026.html
+> 
+> - Sanchayan.
+> 
+> Sanchayan Maity (2):
+>   iio: adc: Determine sampling frequencies by using minimum sample time
+>   ARM: dts: vfxxx: Add property for minimum sample time
+> 
+>  .../devicetree/bindings/iio/adc/vf610-adc.txt      |  6 ++
+>  arch/arm/boot/dts/vfxxx.dtsi                       |  2 +
+>  drivers/iio/adc/vf610_adc.c                        | 74
+> ++++++++++++++++++++--
+>  3 files changed, 78 insertions(+), 4 deletions(-)
 
-Dear Kukjin,
+The patch set looks fine. Thanks Sanchayan add this new interface for user that is more options for user case.
 
-Recent four patchsets (4210 CPU OPP in DTS, cpufreq-dt 5250,
-cpufreq-dt 3250, this patch) are actually an one continuous chain.
-Dependencies are already in mainline. Are you gonna to pick up
-everything?
-
-Best regards,
-Krzysztof
+Acked-by: Fugang Duan <B38611@freescale.com>
