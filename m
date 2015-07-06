@@ -1,46 +1,85 @@
-From: baruch@tkos.co.il (Baruch Siach)
-Date: Mon, 6 Jul 2015 21:19:55 +0300
-Subject: VDSO build failure: collect2: fatal error: cannot find 'ld'
-In-Reply-To: <559A8570.6080602@mentor.com>
-References: <20150706065408.GI3139@tarshish>
- <559A8570.6080602@mentor.com>
-Message-ID: <20150706181955.GJ3139@tarshish>
+From: m.smarduch@samsung.com (Mario Smarduch)
+Date: Mon, 06 Jul 2015 11:35:56 -0700
+Subject: [PATCH 3/3] arm: KVM: Add VFP lazy switch hooks in Host KVM
+In-Reply-To: <20150705193745.GC3869@cbox>
+References: <1435203028-23142-1-git-send-email-m.smarduch@samsung.com>
+ <1435203028-23142-4-git-send-email-m.smarduch@samsung.com>
+ <20150705193745.GC3869@cbox>
+Message-ID: <559ACA8C.3080308@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Nathan,
-
-On Mon, Jul 06, 2015 at 08:41:04AM -0500, Nathan Lynch wrote:
-> On 07/06/2015 01:54 AM, Baruch Siach wrote:
-> > Reverting d2b30cd4b722 on v4.2-rc1 fixes the build failure.
+On 07/05/2015 12:37 PM, Christoffer Dall wrote:
+> On Wed, Jun 24, 2015 at 08:30:28PM -0700, Mario Smarduch wrote:
+>> This patch implements host KVM interface to Hyp mode VFP function to 
+>> switch out guest and switch in host.
+>>
+>> Signed-off-by: Mario Smarduch <m.smarduch@samsung.com>
+>> ---
+>>  arch/arm/kvm/arm.c |   15 +++++++++++++++
+>>  1 file changed, 15 insertions(+)
+>>
+>> diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
+>> index d9631ec..77b41f5 100644
+>> --- a/arch/arm/kvm/arm.c
+>> +++ b/arch/arm/kvm/arm.c
+>> @@ -105,6 +105,17 @@ void kvm_arch_check_processor_compat(void *rtn)
+>>  	*(int *)rtn = 0;
+>>  }
+>>  
+>> +/**
+>> + * kvm_switch_vp_regs() - switch guest/host VFP registers
+>> + * @vcpu:	pointer to vcpu structure.
+>> + *
+>> + * HYP interface functions to save guest and restore host VFP registers
 > 
-> Baruch, can you confirm the patch below fixes it for you?
+> Not sure I understand what you mean to say with this line, how about:
 > 
-> diff --git a/arch/arm/vdso/Makefile b/arch/arm/vdso/Makefile
-> index 9d259d94e429..1160434eece0 100644
-> --- a/arch/arm/vdso/Makefile
-> +++ b/arch/arm/vdso/Makefile
-> @@ -14,7 +14,7 @@ VDSO_LDFLAGS += -Wl,-z,max-page-size=4096
-> -Wl,-z,common-page-size=4096
->  VDSO_LDFLAGS += -nostdlib -shared
->  VDSO_LDFLAGS += $(call cc-ldoption, -Wl$(comma)--hash-style=sysv)
->  VDSO_LDFLAGS += $(call cc-ldoption, -Wl$(comma)--build-id)
-> -VDSO_LDFLAGS += $(call cc-option, -fuse-ld=bfd)
-> +VDSO_LDFLAGS += $(call cc-ldoption, -fuse-ld=bfd)
+> Calls an assembly routine in HYP mode to actually perform the state
+> save/restore.
 > 
->  obj-$(CONFIG_VDSO) += vdso.o
->  extra-$(CONFIG_VDSO) += vdso.lds
+> However, why do we actually need to do this in hyp mode?  Can't we just
+> as well do this in SVC mode or are we changing some trap settings here?
 
-With this patch applied kernel build using the Sourcery CodeBench Lite 2014.05 
-toolchain succeeds.
+Yes it should be since non hyp registers are accessed.
+I reuse it since all the code was there to do the switch.
 
-Tested-by: Baruch Siach <baruch@tkos.co.il>
+> 
+>> + */
+>> +static void kvm_switch_fp_regs(struct kvm_vcpu *vcpu)
+> 
+> should probalby be called kvm_vcpu_put_fp_regs
+> 
+>> +{
+>> +	if (vcpu->arch.vfp_guest_saved == 1)
+>> +		kvm_call_hyp(__kvm_restore_host_vfp_state, vcpu);
+>> +}
+>>  
+>>  /**
+>>   * kvm_arch_init_vm - initializes a VM data structure
+>> @@ -292,6 +303,10 @@ void kvm_arch_vcpu_load(struct kvm_vcpu *vcpu, int cpu)
+>>  
+>>  void kvm_arch_vcpu_put(struct kvm_vcpu *vcpu)
+>>  {
+>> +
+>> +	/* Check if Guest accessed VFP registers */
+>> +	kvm_switch_fp_regs(vcpu);
+>> +
+>>  	/*
+>>  	 * The arch-generic KVM code expects the cpu field of a vcpu to be -1
+>>  	 * if the vcpu is no longer assigned to a cpu.  This is used for the
+>> -- 
+>> 1.7.9.5
+> 
+> How are we sure that the kernel never touches VFP registers between VCPU
+> exit and kvm_arch_vcpu_put?  Can a kernel-side memcpy implementation use
+> the FP regs or something like that?
 
-Thanks for your prompt response.
+Exceptions, interrupts - don't save any VFP context, if
+these VFP registers are touched by the kernel they should
+be saved/restored. The x86 version appears to the same.
 
-baruch
-
--- 
-     http://baruch.siach.name/blog/                  ~. .~   Tk Open Systems
-=}------------------------------------------------ooO--U--Ooo------------{=
-   - baruch at tkos.co.il - tel: +972.2.679.5364, http://www.tkos.co.il -
+> 
+> Thanks,
+> -Christoffer
+> 
