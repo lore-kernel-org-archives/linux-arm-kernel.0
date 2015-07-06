@@ -1,70 +1,49 @@
-From: koro.chen@mediatek.com (Koro Chen)
-Date: Mon, 6 Jul 2015 14:52:10 +0800
-Subject: [PATCH] arm64: dts: mt8173: Add afe device node
-Message-ID: <1436165530-41963-1-git-send-email-koro.chen@mediatek.com>
+From: majun258@huawei.com (Ma Jun)
+Date: Mon, 6 Jul 2015 15:09:05 +0800
+Subject: [PATCH v3 0/3] IRQ/Gic-V3:Support Mbigen interrupt controller
+Message-ID: <1436166548-34920-1-git-send-email-majun258@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This adds afe (audio front end) device node to the MT8173 dtsi file.
+This patch set is applied to supprot the mbigen device.
 
-This patch is based on Matthias's tree:
-https://github.com/mbgg/linux-mediatek
-branch: v4.2-next/arm64
+Mbigen means Message Based Interrupt Generator.
+Its a kind of interrupt controller collects
+the interrupts from external devices and generate msi interrupt.
 
-Signed-off-by: Koro Chen <koro.chen@mediatek.com>
----
- arch/arm64/boot/dts/mediatek/mt8173.dtsi | 32 ++++++++++++++++++++++++++++++++
- 1 file changed, 32 insertions(+)
+Mbigen is applied to reduce the number of wire connected interrupts.
 
-diff --git a/arch/arm64/boot/dts/mediatek/mt8173.dtsi b/arch/arm64/boot/dts/mediatek/mt8173.dtsi
-index 0696f8f..f8afab4 100644
---- a/arch/arm64/boot/dts/mediatek/mt8173.dtsi
-+++ b/arch/arm64/boot/dts/mediatek/mt8173.dtsi
-@@ -14,6 +14,7 @@
- #include <dt-bindings/clock/mt8173-clk.h>
- #include <dt-bindings/interrupt-controller/irq.h>
- #include <dt-bindings/interrupt-controller/arm-gic.h>
-+#include <dt-bindings/power/mt8173-power.h>
- #include <dt-bindings/reset-controller/mt8173-resets.h>
- #include "mt8173-pinfunc.h"
- 
-@@ -393,6 +394,37 @@
- 			#size-cells = <0>;
- 			status = "disabled";
- 		};
-+
-+		afe: mt8173-afe-pcm at 11220000  {
-+			compatible = "mediatek,mt8173-afe-pcm";
-+			reg = <0 0x11220000 0 0x1000>;
-+			interrupts = <GIC_SPI 134 IRQ_TYPE_EDGE_FALLING>;
-+			power-domains = <&scpsys MT8173_POWER_DOMAIN_AUDIO>;
-+			clocks = <&infracfg CLK_INFRA_AUDIO>,
-+				 <&topckgen CLK_TOP_AUDIO_SEL>,
-+				 <&topckgen CLK_TOP_AUD_INTBUS_SEL>,
-+				 <&topckgen CLK_TOP_APLL1_DIV0>,
-+				 <&topckgen CLK_TOP_APLL2_DIV0>,
-+				 <&topckgen CLK_TOP_I2S0_M_SEL>,
-+				 <&topckgen CLK_TOP_I2S1_M_SEL>,
-+				 <&topckgen CLK_TOP_I2S2_M_SEL>,
-+				 <&topckgen CLK_TOP_I2S3_M_SEL>,
-+				 <&topckgen CLK_TOP_I2S3_B_SEL>;
-+			clock-names = "infra_sys_audio_clk",
-+				      "top_pdn_audio",
-+				      "top_pdn_aud_intbus",
-+				      "bck0",
-+				      "bck1",
-+				      "i2s0_m",
-+				      "i2s1_m",
-+				      "i2s2_m",
-+				      "i2s3_m",
-+				      "i2s3_b";
-+			assigned-clocks = <&topckgen CLK_TOP_AUD_1_SEL>,
-+					  <&topckgen CLK_TOP_AUD_2_SEL>;
-+			assigned-clock-parents = <&topckgen CLK_TOP_APLL1>,
-+						 <&topckgen CLK_TOP_APLL2>;
-+		};
- 	};
- };
- 
--- 
-1.8.1.1.dirty
+As the peripherals increasing, the interrupts lines needed is increasing
+much, especially on the Arm64 server soc.
+
+Therefore, the interrupt pin in gic is not enought for so many perpherals.
+
+Mbigen is designed to fix this problem.
+
+Mbigen chip locates in ITS or outside of ITS.
+
+The working flow of Mbigen shows as below:
+
+external devices ------> MBIGEN ------->ITS
+
+The devices connect to Mbigen chip through wire connecting way.
+Mbigen detects and collectes the interrupts from the these devices.
+
+Then, Mbigen generats the MBI interrupts by writting the ITS
+Translator register.
+
+Ma Jun (3):
+  Add mbigen driver to support mbigen interrupt controller
+  Change arm-gic-its to support the Mbigen interrupt
+  dt-binding:Documents the mbigen bindings
+
+ Documentation/devicetree/bindings/arm/mbigen.txt |   65 +++
+ drivers/irqchip/Kconfig                          |    8 +
+ drivers/irqchip/Makefile                         |    1 +
+ drivers/irqchip/irq-gic-v3-its.c                 |   60 ++-
+ drivers/irqchip/irq-mbigen.c                     |  486 ++++++++++++++++++++++
+ include/linux/mbi.h                              |   15 +
+ 6 files changed, 615 insertions(+), 20 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/arm/mbigen.txt
+ create mode 100644 drivers/irqchip/irq-mbigen.c
+ create mode 100644 include/linux/mbi.h
