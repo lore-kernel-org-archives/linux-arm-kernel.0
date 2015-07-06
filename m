@@ -1,56 +1,71 @@
-From: pali.rohar@gmail.com (Pali =?utf-8?q?Roh=C3=A1r?=)
-Date: Mon, 6 Jul 2015 18:36:03 +0200
-Subject: [RESEND] [PATCH v2 1/2] arm: devtree: Set system_rev from DT
- revision
-In-Reply-To: <201507061820.35789@pali>
-References: <1430902142-17035-1-git-send-email-pali.rohar@gmail.com>
- <CAL_Jsq+ysDqxTgfW1JvG5czHa4UkZQDv1BN63iK4jvV9kDXM8w@mail.gmail.com>
- <201507061820.35789@pali>
-Message-ID: <201507061836.03293@pali>
+From: matthias.bgg@gmail.com (Matthias Brugger)
+Date: Mon, 06 Jul 2015 18:39:59 +0200
+Subject: [PATCH] arm64: dts: mt8173-evb: Add PMIC support
+In-Reply-To: <1436168637.6986.6.camel@mtksdaap41>
+References: <1434979177-7575-1-git-send-email-henryc.chen@mediatek.com>
+ <1436168637.6986.6.camel@mtksdaap41>
+Message-ID: <1727643.5AqCaKisXT@ubix>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 06 July 2015 18:20:35 Pali Roh?r wrote:
-> > > "/chosen/linux,atags"
+On Monday, July 06, 2015 03:43:57 PM Eddie Huang wrote:
+> Hi Matthias,
+> 
+> On Mon, 2015-06-22 at 21:19 +0800, Henry Chen wrote:
+> > From: Eddie Huang <eddie.huang@mediatek.com>
 > > 
-> > This one. ATAGs are a Linux data struct.
+> > The MT8173 eval board contains a MT6397 PMIC. This adds the
+> > corresponding device node to the dts file.
 > > 
-> > Rob
+> > Signed-off-by: Henry Chen <henryc.chen@mediatek.com>
+> > Signed-off-by: Eddie Huang <eddie.huang@mediatek.com>
+> > ---
+> > Base on 4.1-rc1 and commit as following,
+> > ARM64: dts: Mediatek: MT8173 updates [1] and
+> > clk: Add common clock support for Mediatek MT8135 and MT8173 [2] patch
+> > 
+> > [1]
+> > http://lists.infradead.org/pipermail/linux-arm-kernel/2015-May/344751.htm
+> > l [2]
+> > http://lists.infradead.org/pipermail/linux-arm-kernel/2015-April/338763.h
+> > tml ---
+> > 
+> >  arch/arm64/boot/dts/mediatek/mt8173-evb.dts | 174
+> >  ++++++++++++++++++++++++++++ 1 file changed, 174 insertions(+)
+> > 
+> > diff --git a/arch/arm64/boot/dts/mediatek/mt8173-evb.dts
+> > b/arch/arm64/boot/dts/mediatek/mt8173-evb.dts index 43d5401..b967914
+> > 100644
+> > --- a/arch/arm64/boot/dts/mediatek/mt8173-evb.dts
+> > +++ b/arch/arm64/boot/dts/mediatek/mt8173-evb.dts
+> > @@ -33,6 +33,180 @@
+> > 
+> >  	chosen { };
+> >  
+> >  };
+> > 
+> > +&pwrap {
+> > +	pmic: mt6397 {
+> > +		compatible = "mediatek,mt6397";
+> > +		interrupt-parent = <&pio>;
+> > +		interrupts = <11 IRQ_TYPE_LEVEL_HIGH>;
+> > +		interrupt-controller;
+> > +		#interrupt-cells = <2>;
+> > +
+> > +		mt6397regulator: mt6397regulator {
+> > +			compatible = "mediatek,mt6397-regulator";
+> > +			mt6397_vpca15_reg: buck_vpca15 {
+> > +				regulator-compatible = "buck_vpca15";
+> > +				regulator-name = "vpca15";
+> > +				regulator-min-microvolt = < 700000>;
+> > +				regulator-max-microvolt = <1350000>;
+> > +				regulator-ramp-delay = <12500>;
+> > +				regulator-always-on;
 > 
-> Ok, and how read that property "/chosen/linux,atags" in function
-> setup_machine_fdt() from file arch/arm/kernel/devtree.c ?
-> 
-> of_get_flat_dt_prop() cannot be used unless somebody get me offset to
-> node "/chosen"...
-> 
-> Any idea?
-> 
+> I see you pull da9211 regulator dts patch, but not this one. How about
+> this patch ?
 
-fdt_path_offset() from libfdt.h seems to work...
+I inserted some new-lines and added it to v4.2-next/arm64
 
-Is solution like this one acceptable?
-
-#include <linux/libfdt.h>
-#include "atags.h"
-
-... setup_machine_fdt(unsigned int dt_phys) {
-
-dt_virt = phys_to_virt(dt_phys);
-dt_chosen = fdt_path_offset(dt_virt, "/chosen");
-atags = of_get_flat_dt_prop(dt_chosen, "linux,atags", NULL);
-save_atags(atags);
-
-}
-
-(this is without checks for errors)
-
--- 
-Pali Roh?r
-pali.rohar at gmail.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: This is a digitally signed message part.
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150706/320d18e1/attachment.sig>
+Thanks,
+Matthias
