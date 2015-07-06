@@ -1,82 +1,45 @@
-From: gabriel.fernandez@linaro.org (Gabriel Fernandez)
-Date: Mon, 6 Jul 2015 10:11:03 +0200
-Subject: [PATCH 1/9] drivers: clk: st: Incorrect clocks status
-In-Reply-To: <CAG374jAE78p_4=MYg9iNqo-4j8gE5OspzKwphfBUBtr5iOx-1g@mail.gmail.com>
-References: <1435068567-30995-1-git-send-email-gabriel.fernandez@linaro.org>
- <1435068567-30995-2-git-send-email-gabriel.fernandez@linaro.org>
- <558B0CD7.6040302@codeaurora.org>
- <CAG374jAE78p_4=MYg9iNqo-4j8gE5OspzKwphfBUBtr5iOx-1g@mail.gmail.com>
-Message-ID: <CAG374jAaK0X+ij3rSWqeN6hd7_-3hHQd+hFxNcDULVuXdY9gHg@mail.gmail.com>
+From: andre.przywara@arm.com (Andre Przywara)
+Date: Mon, 6 Jul 2015 09:30:20 +0100
+Subject: [PATCH 1/7] KVM: api: add kvm_irq_routing_extended_msi
+In-Reply-To: <00fd01d0b7b6$f6cf3550$e46d9ff0$@samsung.com>
+References: <1435592237-17924-1-git-send-email-eric.auger@linaro.org>
+ <1435592237-17924-2-git-send-email-eric.auger@linaro.org>
+ <011f01d0b498$6a17aeb0$3e470c10$@samsung.com> <5596503E.6040902@arm.com>
+ <00fd01d0b7b6$f6cf3550$e46d9ff0$@samsung.com>
+Message-ID: <559A3C9C.6050302@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Stephen,
+Hi Pavel,
 
-Can you drop also this patch because it's concerns an old platform and
-there no values to make more changes.
+On 06/07/15 07:42, Pavel Fedin wrote:
+>  Hello!
+> 
+>> I like this approach, but it runs into problems:
+>> As you read above the current documentation says that the flags field
+>> must be zero and the current KVM_SET_GSI_ROUTING handler bails out if it
+>> isn't. So userland would need to know whether it's safe to set that
+>> field.
+> 
+>  This problem does not exist because:
+> a) Older platforms do not need this flag, so they expect to get zero.
+> b) ARM64 + GICv3 platform cannot work without this flag.
+> 
+>  This is perfectly OK combination IMO. Userland just knows, whether it needs to supply device ID or
+> not. For example, my modified qemu now has kvm_msi_flags global variable which defaults to 0. ITS
+> code, then, if activated, changes it to KVM_MSI_VALID_DEVID, and qemu starts supplying device IDs to
+> the related calls.
 
-BR
-Gabriel.
+Well, I had this solution before in kvmtool: If ARM && ITS then set the
+flag. But I wasn't really happy with this, as the IRQ routing, setup and
+injection code is rather architecture agnostic (implementing the generic
+KVM interface), so spraying in some architecture hacks sounded not very
+elegant.
+Also as the flag describes a rather generic feature (provide an unique
+device ID), I'd rather avoid to make this an ARM hack.
 
-On 25 June 2015 at 10:41, Gabriel Fernandez
-<gabriel.fernandez@linaro.org> wrote:
-> Hi Stephen,
->
-> Thanks for reviewing
->
->
-> On 24 June 2015 at 22:02, Stephen Boyd <sboyd@codeaurora.org> wrote:
->> On 06/23/2015 07:09 AM, Gabriel Fernandez wrote:
->>> In the clk_summary output, the h/w status of DivMux is incorrect
->>> (Parent and Enable status), since the clk_mux_ops.get_parent()
->>> returns -ERRCODE when clock is OFF.
->>>
->>> Signed-off-by: Pankaj Dev <pankaj.dev@st.com>
->>> Signed-off-by: Gabriel Fernandez <gabriel.fernandez@linaro.org>
->>> ---
->>>  drivers/clk/st/clkgen-mux.c | 15 +++++++++------
->>>  1 file changed, 9 insertions(+), 6 deletions(-)
->>>
->>> diff --git a/drivers/clk/st/clkgen-mux.c b/drivers/clk/st/clkgen-mux.c
->>> index 4fbe6e0..c94b56b 100644
->>> --- a/drivers/clk/st/clkgen-mux.c
->>> +++ b/drivers/clk/st/clkgen-mux.c
->>> @@ -128,7 +128,7 @@ static int clkgena_divmux_is_enabled(struct clk_hw *hw)
->>>
->>>       __clk_hw_set_clk(mux_hw, hw);
->>>
->>> -     return (s8)clk_mux_ops.get_parent(mux_hw) > 0;
->>> +     return ((s8)clk_mux_ops.get_parent(mux_hw) >= 0);
->>
->> Useless parentheses around it all, please drop.
->>
-> Ok
->
->>>  }
->>>
->>>  static u8 clkgena_divmux_get_parent(struct clk_hw *hw)
->>> @@ -138,11 +138,13 @@ static u8 clkgena_divmux_get_parent(struct clk_hw *hw)
->>>
->>>       __clk_hw_set_clk(mux_hw, hw);
->>>
->>> -     genamux->muxsel = clk_mux_ops.get_parent(mux_hw);
->>> -     if ((s8)genamux->muxsel < 0) {
->>> -             pr_debug("%s: %s: Invalid parent, setting to default.\n",
->>> -                   __func__, __clk_get_name(hw->clk));
->>> -             genamux->muxsel = 0;
->>> +     if (genamux->muxsel == CKGAX_CLKOPSRC_SWITCH_OFF) {
->>> +             genamux->muxsel = clk_mux_ops.get_parent(mux_hw);
->>
->> Hm.. maybe we should fix clk_mux_ops to return 0 if it can't find the
->> parent? Or when this clock is registered we should read the hardware and
->> set a default parent so that we can't get an error code here.
->>
-> I 'll try the second solution.
->
-> Best regards
->
-> Gabriel
->> --
->> Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
->> a Linux Foundation Collaborative Project
->>
+That being said this is not a show stopper for me, so if the others are
+happy with this, I will go down your road.
+
+Cheers,
+Andre.
