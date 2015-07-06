@@ -1,82 +1,116 @@
 From: eric.auger@linaro.org (Eric Auger)
-Date: Mon,  6 Jul 2015 15:24:41 +0200
-Subject: [RFC v2 7/9] VFIO: platform: add irq bypass producer management
+Date: Mon,  6 Jul 2015 15:24:43 +0200
+Subject: [RFC v2 9/9] KVM: arm/arm64: implement IRQ bypass consumer functions
 In-Reply-To: <1436189083-32527-1-git-send-email-eric.auger@linaro.org>
 References: <1436189083-32527-1-git-send-email-eric.auger@linaro.org>
-Message-ID: <1436189083-32527-8-git-send-email-eric.auger@linaro.org>
+Message-ID: <1436189083-32527-10-git-send-email-eric.auger@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch populates the IRQ bypass callacks:
-- stop/resume producer simply consist in disabling/enabling the host irq
-- add/del consumer: basically set the automasked flag to false/true
-- update remains void
+Implement IRQ bypass callbacks for arm/arm64 IRQ forwarding:
+- kvm_arch_irq_bypass_add_producer: perform VGIC/irqchip
+  settings for forwarding
+- kvm_arch_irq_bypass_del_producer: same for inverse operation
+- kvm_arch_irq_bypass_stop: halt guest execution
+- kvm_arch_irq_bypass_resume: resume guest execution
+- void kvm_arch_irq_bypass_update
+
+and set CONFIG_HAVE_KVM_IRQ_BYPASS for arm/arm64.
 
 Signed-off-by: Eric Auger <eric.auger@linaro.org>
 
 ---
 
 v1 -> v2:
-- device handle caching in vfio_platform_device is introduced in a
-  separate patch
-- use container_of
+- struct kvm_kernel_irqfd is retrieved with container_of
+- function names changed
 ---
- drivers/vfio/platform/vfio_platform_irq.c | 27 +++++++++++++++++++++++++++
- 1 file changed, 27 insertions(+)
+ arch/arm/kvm/Kconfig   |  1 +
+ arch/arm/kvm/arm.c     | 40 ++++++++++++++++++++++++++++++++++++++++
+ arch/arm64/kvm/Kconfig |  1 +
+ 3 files changed, 42 insertions(+)
 
-diff --git a/drivers/vfio/platform/vfio_platform_irq.c b/drivers/vfio/platform/vfio_platform_irq.c
-index d00ed24..7dc17a6 100644
---- a/drivers/vfio/platform/vfio_platform_irq.c
-+++ b/drivers/vfio/platform/vfio_platform_irq.c
-@@ -222,22 +222,49 @@ static int vfio_platform_is_active(struct vfio_platform_irq *irq)
+diff --git a/arch/arm/kvm/Kconfig b/arch/arm/kvm/Kconfig
+index 7d38d25..19114a1 100644
+--- a/arch/arm/kvm/Kconfig
++++ b/arch/arm/kvm/Kconfig
+@@ -32,6 +32,7 @@ config KVM
+ 	select HAVE_KVM_EVENTFD
+ 	select HAVE_KVM_IRQFD
+ 	select IRQ_BYPASS_MANAGER
++	select HAVE_KVM_IRQ_BYPASS
+ 	depends on ARM_VIRT_EXT && ARM_LPAE && ARM_ARCH_TIMER
+ 	---help---
+ 	  Support hosting virtualized guest machines.
+diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
+index 46d4ef6..db8f040 100644
+--- a/arch/arm/kvm/arm.c
++++ b/arch/arm/kvm/arm.c
+@@ -27,6 +27,8 @@
+ #include <linux/mman.h>
+ #include <linux/sched.h>
+ #include <linux/kvm.h>
++#include <linux/kvm_irqfd.h>
++#include <linux/irqbypass.h>
+ #include <trace/events/kvm.h>
  
- static void vfio_platform_irq_bypass_stop(struct irq_bypass_producer *prod)
- {
-+	disable_irq(prod->irq);
+ #define CREATE_TRACE_POINTS
+@@ -1149,6 +1151,44 @@ struct kvm_vcpu *kvm_mpidr_to_vcpu(struct kvm *kvm, unsigned long mpidr)
+ 	return NULL;
  }
  
- static void vfio_platform_irq_bypass_resume(struct irq_bypass_producer *prod)
- {
-+	enable_irq(prod->irq);
- }
++void kvm_arch_irq_bypass_add_producer(struct irq_bypass_consumer *cons,
++				      struct irq_bypass_producer *prod)
++{
++	struct kvm_kernel_irqfd *irqfd =
++		container_of(cons, struct kvm_kernel_irqfd, consumer);
++
++	kvm_vgic_set_forward(irqfd->kvm, prod->irq, irqfd->gsi);
++}
++void kvm_arch_irq_bypass_del_producer(struct irq_bypass_consumer *cons,
++				      struct irq_bypass_producer *prod)
++{
++	struct kvm_kernel_irqfd *irqfd =
++		container_of(cons, struct kvm_kernel_irqfd, consumer);
++
++	kvm_vgic_unset_forward(irqfd->kvm, prod->irq, irqfd->gsi,
++			       &prod->active);
++}
++
++void kvm_arch_irq_bypass_stop(struct irq_bypass_consumer *cons)
++{
++	struct kvm_kernel_irqfd *irqfd =
++		container_of(cons, struct kvm_kernel_irqfd, consumer);
++
++	kvm_arm_halt_guest(irqfd->kvm);
++}
++
++void kvm_arch_irq_bypass_resume(struct irq_bypass_consumer *cons)
++{
++	struct kvm_kernel_irqfd *irqfd =
++		container_of(cons, struct kvm_kernel_irqfd, consumer);
++
++	kvm_arm_resume_guest(irqfd->kvm);
++}
++
++void kvm_arch_irq_bypass_update(struct irq_bypass_consumer *cons)
++{
++}
++
+ /**
+  * Initialize Hyp-mode and memory mappings on all CPUs.
+  */
+diff --git a/arch/arm64/kvm/Kconfig b/arch/arm64/kvm/Kconfig
+index dfaca85..822551c 100644
+--- a/arch/arm64/kvm/Kconfig
++++ b/arch/arm64/kvm/Kconfig
+@@ -32,6 +32,7 @@ config KVM
+ 	select HAVE_KVM_EVENTFD
+ 	select HAVE_KVM_IRQFD
+ 	select IRQ_BYPASS_MANAGER
++	select HAVE_KVM_IRQ_BYPASS
+ 	---help---
+ 	  Support hosting virtualized guest machines.
  
- static void vfio_platform_irq_bypass_add_consumer(
- 			struct irq_bypass_producer *prod,
- 			struct irq_bypass_consumer *cons)
- {
-+	int ret;
-+	struct vfio_platform_irq *irq =
-+		container_of(prod, struct vfio_platform_irq, producer);
-+
-+	//TODO
-+	/*
-+	 * if the IRQ is active at irqchip level or VFIO (auto)masked
-+	 * this means the host IRQ is already under injection in the
-+	 * guest and this not safe to change the forwarding state at
-+	 * that stage.
-+	 * It is not possible to differentiate user-space masking
-+	 * from auto-masking, leading to possible false detection of
-+	 * active state.
-+	 */
-+	prod->active = vfio_platform_is_active(irq);
-+
-+	ret = vfio_platform_set_automasked(irq, false);
-+	WARN_ON(ret);
- }
- 
- static void vfio_platform_irq_bypass_del_consumer(
- 			struct irq_bypass_producer *prod,
- 			struct irq_bypass_consumer *cons)
- {
-+	struct vfio_platform_irq *irq =
-+		container_of(prod, struct vfio_platform_irq, producer);
-+
-+	if (prod->active)
-+		vfio_platform_mask(irq);
-+
-+	vfio_platform_set_automasked(irq, true);
- }
- 
- static int vfio_set_trigger(struct vfio_platform_device *vdev, int index,
 -- 
 1.9.1
