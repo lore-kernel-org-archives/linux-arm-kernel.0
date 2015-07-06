@@ -1,36 +1,35 @@
 From: yamada.masahiro@socionext.com (Masahiro Yamada)
-Date: Mon,  6 Jul 2015 12:47:27 +0900
-Subject: [PATCH 0/3] ARM: add UART and EHCI support for UniPhier DTS and
- enable them.
-Message-ID: <1436154450-21102-1-git-send-email-yamada.masahiro@socionext.com>
+Date: Mon,  6 Jul 2015 12:47:28 +0900
+Subject: [PATCH 1/3] ARM: multi_v7_defconfig: enable UniPhier UART driver
+In-Reply-To: <1436154450-21102-1-git-send-email-yamada.masahiro@socionext.com>
+References: <1436154450-21102-1-git-send-email-yamada.masahiro@socionext.com>
+Message-ID: <1436154450-21102-2-git-send-email-yamada.masahiro@socionext.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+The UniPhier on-chip UART driver was merged into the mainline by
+commit 1a8d2903cb6a (serial: 8250_uniphier: add UniPhier serial
+driver).
 
-The basic support for UniPhier SoC family (arch/arm/mach-uniphier)
-was mainlined at Linux 4.1-rc1.
-I am now tackling some drivers to support them in the mainline.
+Enable it from multi_v7_defconfig.
 
-I've got UART and EHCI done, so I'd like to enable them from
-the ARM-SOC subsystem.
+Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
+---
 
+ arch/arm/configs/multi_v7_defconfig | 1 +
+ 1 file changed, 1 insertion(+)
 
-
-Masahiro Yamada (3):
-  ARM: multi_v7_defconfig: enable UniPhier UART driver
-  ARM: dts: UniPhier: add on-chip UART device nodes
-  ARM: dts: UniPhier: add USB EHCI device nodes
-
- arch/arm/boot/dts/uniphier-ph1-ld4-ref.dts  | 29 +++++++++++--
- arch/arm/boot/dts/uniphier-ph1-ld4.dtsi     | 63 +++++++++++++++++++++++++++++
- arch/arm/boot/dts/uniphier-ph1-pro4-ref.dts | 29 +++++++++++--
- arch/arm/boot/dts/uniphier-ph1-pro4.dtsi    | 56 +++++++++++++++++++++++++
- arch/arm/boot/dts/uniphier-ph1-sld3-ref.dts | 36 +++++++++++++++--
- arch/arm/boot/dts/uniphier-ph1-sld3.dtsi    | 61 ++++++++++++++++++++++++++++
- arch/arm/boot/dts/uniphier-ph1-sld8-ref.dts | 33 +++++++++++++--
- arch/arm/boot/dts/uniphier-ph1-sld8.dtsi    | 63 +++++++++++++++++++++++++++++
- arch/arm/configs/multi_v7_defconfig         |  1 +
- 9 files changed, 359 insertions(+), 12 deletions(-)
-
+diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
+index 6d83a1b..9311cd9 100644
+--- a/arch/arm/configs/multi_v7_defconfig
++++ b/arch/arm/configs/multi_v7_defconfig
+@@ -251,6 +251,7 @@ CONFIG_SERIAL_8250_CONSOLE=y
+ CONFIG_SERIAL_8250_DW=y
+ CONFIG_SERIAL_8250_EM=y
+ CONFIG_SERIAL_8250_MT6577=y
++CONFIG_SERIAL_8250_UNIPHIER=y
+ CONFIG_SERIAL_AMBA_PL011=y
+ CONFIG_SERIAL_AMBA_PL011_CONSOLE=y
+ CONFIG_SERIAL_ATMEL=y
 -- 
 1.9.1
