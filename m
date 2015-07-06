@@ -1,64 +1,63 @@
-From: parkch98@gmail.com (Chanho Park)
-Date: Mon, 6 Jul 2015 23:03:13 +0900
-Subject: [PATCHv4] ARM: dts: add exynos5422-cpus.dtsi to correct cpu order
-In-Reply-To: <5599D144.7040001@samsung.com>
-References: <1436106556-19134-1-git-send-email-chanho61.park@samsung.com>
- <5599D144.7040001@samsung.com>
-Message-ID: <CAPTzV16xOB6PiasmNXx7nwORd_OsLU_jRwzxhJDpWqhoS5Wz0A@mail.gmail.com>
+From: yh.huang@mediatek.com (YH Huang)
+Date: Mon, 6 Jul 2015 22:12:05 +0800
+Subject: [PATCH v4 3/3] arm64: dts: mt8173: add MT8173 display PWM
+ driver support dtsi
+In-Reply-To: <CAGS+omC_n3hVJ6P2R-9GMpJSBABeEDXk2drOu2oJvJfk6qC0dA@mail.gmail.com>
+References: <1436189368-1826-1-git-send-email-yh.huang@mediatek.com>
+ <1436189368-1826-4-git-send-email-yh.huang@mediatek.com>
+ <CAGS+omC_n3hVJ6P2R-9GMpJSBABeEDXk2drOu2oJvJfk6qC0dA@mail.gmail.com>
+Message-ID: <1436191925.7757.2.camel@mtksdaap41>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Mon, 2015-07-06 at 21:38 +0800, Daniel Kurtz wrote:
+> On Mon, Jul 6, 2015 at 9:29 PM, YH Huang <yh.huang@mediatek.com> wrote:
+> > Add display PWM node in mt8173.dtsi.
+> >
+> > Signed-off-by: YH Huang <yh.huang@mediatek.com>
+> > ---
+> >  arch/arm64/boot/dts/mediatek/mt8173.dtsi | 22 ++++++++++++++++++++++
+> >  1 file changed, 22 insertions(+)
+> >
+> > diff --git a/arch/arm64/boot/dts/mediatek/mt8173.dtsi b/arch/arm64/boot/dts/mediatek/mt8173.dtsi
+> > index 0696f8f..e4ffd9d 100644
+> > --- a/arch/arm64/boot/dts/mediatek/mt8173.dtsi
+> > +++ b/arch/arm64/boot/dts/mediatek/mt8173.dtsi
+> > @@ -393,6 +393,28 @@
+> >                         #size-cells = <0>;
+> >                         status = "disabled";
+> >                 };
+> > +
+> > +               pwm0: pwm at 1401e000 {
+> > +                       compatible = "mediatek,mt8173-disp-pwm",
+> > +                                    "mediatek,mt6595-disp-pwm";
+> > +                       reg = <0 0x1401e000 0 0x1000>;
+> > +                       #pwm-cells = <2>;
+> > +                       clocks = <&mmsys MM_DISP_PWM026M>,
+> > +                                <&mmsys MM_DISP_PWM0MM>;
+> 
+> CLK_MM_DISP_PWM026M
+> 
 
-On Mon, Jul 6, 2015 at 9:52 AM, Krzysztof Kozlowski
-<k.kozlowski@samsung.com> wrote:
-> On 05.07.2015 23:29, Chanho Park wrote:
->> The odroid-xu3 board which is based on exynos5422 not exynos5800 is
->> booted from cortex-a7 core unlike exynos5800. The odroid-xu3's cpu order
->> is quite strange. cpu0 and cpu5-7 are cortex-a7 cores and cpu1-4 are
->> cortex-a15 cores. To correct this mis-odering, I added exynos5422.dtsi
->> and reversing cpu orders from exynos5420. Now, cpu0-3 are cortex-a7 and
->> cpu4-7 are cortex-a15.
->>
->> Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
->> Signed-off-by: Chanho Park <chanho61.park@samsung.com>
->> ---
->> Changes from v3:
->>  - include this exynos5422-cpus.dtsi in the exynos5422-odroidxu3-common.dtsi
->>
->> Changes from v2:
->>  - drop inclusion of exynos5420.dtsi from exynos5422-cpus.dtsi
->>  - drop compatibles from exynos5422-cpus.dtsi
->>
->> Changes from v1:
->>  - rename exynos5422.dtsi to exynos5422-cpus.dtsi
->>  - include the dtsi file top of the exynos5422-odroidxu3.dts
->>
->> Secondary cpu booting problem[1] is not resolved yet. Below temporal patch is
->> required to see 8 cores booting.
->>
->> --- a/arch/arm/mach-exynos/platsmp.c
->> +++ b/arch/arm/mach-exynos/platsmp.c
->> @@ -124,6 +124,7 @@ void exynos_cpu_power_up(int cpu)
->>         if (soc_is_exynos3250())
->>                 core_conf |= S5P_CORE_AUTOWAKEUP_EN;
->>
->> +       pmu_raw_writel(1, S5P_PMU_SPARE2);
->>         pmu_raw_writel(core_conf,
->>                         EXYNOS_ARM_CORE_CONFIGURATION(cpu));
->>  }
->>
->> [1]: http://www.spinics.net/lists/linux-samsung-soc/msg45525.html
->
-> $ git am ...
-> Applying: ARM: dts: add exynos5422-cpus.dtsi to correct cpu order
-> error: patch failed: arch/arm/mach-exynos/platsmp.c:124
-> error: arch/arm/mach-exynos/platsmp.c: patch does not apply
->
-> The diff above confuses 'git am'.
+Sorry for this terrible mistake.
+CLK_MM_DISP_PWM026M
+CLK_MM_DISP_PWM0MM
 
-Oops. I'll re-send patch without the codes.
+> > +                       clock-names = "main", "mm";
+> > +                       status = "disabled";
+> > +               };
+> > +
+> > +               pwm1: pwm at 1401f000 {
+> > +                       compatible = "mediatek,mt8173-disp-pwm",
+> > +                                    "mediatek,mt6595-disp-pwm";
+> > +                       reg = <0 0x1401f000 0 0x1000>;
+> > +                       #pwm-cells = <2>;
+> > +                       clocks = <&mmsys MM_DISP_PWM126M>,
+> > +                                <&mmsys MM_DISP_PWM1MM>;
 
--- 
-Best Regards,
-Chanho Park
+Same here.
+CLK_MM_DISP_PWM126M
+CLK_MM_DISP_PWM1MM
+
+Regards,
+YH Huang
