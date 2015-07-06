@@ -1,41 +1,46 @@
-From: dvhart@infradead.org (Darren Hart)
-Date: Mon, 6 Jul 2015 11:18:14 -0700
-Subject: [PATCH] thermal: consistently use int for temperatures
-In-Reply-To: <1436167189-29835-1-git-send-email-s.hauer@pengutronix.de>
-References: <1436167189-29835-1-git-send-email-s.hauer@pengutronix.de>
-Message-ID: <20150706181814.GB40907@vmdeb7>
+From: baruch@tkos.co.il (Baruch Siach)
+Date: Mon, 6 Jul 2015 21:19:55 +0300
+Subject: VDSO build failure: collect2: fatal error: cannot find 'ld'
+In-Reply-To: <559A8570.6080602@mentor.com>
+References: <20150706065408.GI3139@tarshish>
+ <559A8570.6080602@mentor.com>
+Message-ID: <20150706181955.GJ3139@tarshish>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 06, 2015 at 09:19:49AM +0200, Sascha Hauer wrote:
-> The thermal code uses int, long and unsigned long for temperatures
-> in different places.
-> 
-> Using an unsigned type limits the thermal framework to positive
-> temperatures without need. Also several drivers currently will report
-> temperatures near UINT_MAX for temperatures below 0?C. This will probably
-> immediately shut the machine down due to overtemperature if started below
-> 0?C.
-> 
-> 'long' is 64bit on several architectures. This is not needed since INT_MAX ?mC
-> is above the melting point of all known materials.
-> 
-> Consistently use a plain 'int' for temperatures throughout the thermal code and
-> the drivers. This only changes the places in the drivers where the temperature
-> is passed around as pointer, when drivers internally use another type this is
-> not changed.
-> 
-> Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
+Hi Nathan,
 
-...
+On Mon, Jul 06, 2015 at 08:41:04AM -0500, Nathan Lynch wrote:
+> On 07/06/2015 01:54 AM, Baruch Siach wrote:
+> > Reverting d2b30cd4b722 on v4.2-rc1 fixes the build failure.
+> 
+> Baruch, can you confirm the patch below fixes it for you?
+> 
+> diff --git a/arch/arm/vdso/Makefile b/arch/arm/vdso/Makefile
+> index 9d259d94e429..1160434eece0 100644
+> --- a/arch/arm/vdso/Makefile
+> +++ b/arch/arm/vdso/Makefile
+> @@ -14,7 +14,7 @@ VDSO_LDFLAGS += -Wl,-z,max-page-size=4096
+> -Wl,-z,common-page-size=4096
+>  VDSO_LDFLAGS += -nostdlib -shared
+>  VDSO_LDFLAGS += $(call cc-ldoption, -Wl$(comma)--hash-style=sysv)
+>  VDSO_LDFLAGS += $(call cc-ldoption, -Wl$(comma)--build-id)
+> -VDSO_LDFLAGS += $(call cc-option, -fuse-ld=bfd)
+> +VDSO_LDFLAGS += $(call cc-ldoption, -fuse-ld=bfd)
+> 
+>  obj-$(CONFIG_VDSO) += vdso.o
+>  extra-$(CONFIG_VDSO) += vdso.lds
 
->  drivers/platform/x86/acerhdf.c                     |  9 ++++----
->  drivers/platform/x86/intel_mid_thermal.c           |  9 ++++----
+With this patch applied kernel build using the Sourcery CodeBench Lite 2014.05 
+toolchain succeeds.
 
-For these two:
+Tested-by: Baruch Siach <baruch@tkos.co.il>
 
-Reviewed-by: Darren Hart <dvhart@linux.intel.com>
+Thanks for your prompt response.
+
+baruch
 
 -- 
-Darren Hart
-Intel Open Source Technology Center
+     http://baruch.siach.name/blog/                  ~. .~   Tk Open Systems
+=}------------------------------------------------ooO--U--Ooo------------{=
+   - baruch at tkos.co.il - tel: +972.2.679.5364, http://www.tkos.co.il -
