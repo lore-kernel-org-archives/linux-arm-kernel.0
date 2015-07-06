@@ -1,43 +1,143 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 6 Jul 2015 05:16:10 -0700
-Subject: [PATCH] Revert "ARM: dts: am335x-boneblack: disable RTC-only
- sleep"
-In-Reply-To: <1434032318-3557-1-git-send-email-johan@kernel.org>
-References: <20150601200137.GC30984@atomide.com>
- <1434032318-3557-1-git-send-email-johan@kernel.org>
-Message-ID: <20150706121609.GD10705@atomide.com>
+From: feng.wu@intel.com (Wu, Feng)
+Date: Mon, 6 Jul 2015 12:17:50 +0000
+Subject: [RFC 16/17] KVM: eventfd: add irq bypass consumer management
+In-Reply-To: <559A6452.7030303@linaro.org>
+References: <1435843047-6327-1-git-send-email-eric.auger@linaro.org>
+ <1435843047-6327-17-git-send-email-eric.auger@linaro.org>
+ <E959C4978C3B6342920538CF579893F0025EB7C5@SHSMSX104.ccr.corp.intel.com>
+ <559A6452.7030303@linaro.org>
+Message-ID: <E959C4978C3B6342920538CF579893F0025EC96F@SHSMSX104.ccr.corp.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Johan Hovold <johan@kernel.org> [150611 07:20]:
-> This reverts commit 3d76be5b933e2a66d85a2f7444e68e99e8a48ad4.
-> 
-> The latest revision of Beaglebone Black does not support RTC-only mode.
-> 
-> To avoid potential hardware damage, RTC-only mode was disabled by
-> default by commit 7a6cb0abe1aa ("ARM: dts: am335x-boneblack: disable
-> RTC-only sleep to avoid hardware damage").
-> 
-> Unfortunately, an incorrect fix had already been applied, which instead
-> of just disabling RTC-only mode, prevents the Beaglebone from powering
-> down at all.
-> 
-> Revert this patch to fix the power-off regression.
-> 
-> Signed-off-by: Johan Hovold <johan@kernel.org>
-> ---
-> 
-> The offending patch was incorrectly applied after Matthijs initial fix
-> was posted and before the final fix (which only added some comments) was
-> applied.
-> 
-> Note that the final version of the fix 7a6cb0abe1aa ("ARM: dts:
-> am335x-boneblack: disable RTC-only sleep to avoid hardware damage")
-> indicates that it should be backported to 3.12 even though RTC-only mode
-> was first enabled in 3.19.
 
-Applying this now into omap-for-v4.2/fixes.
 
-Regards,
+> -----Original Message-----
+> From: Eric Auger [mailto:eric.auger at linaro.org]
+> Sent: Monday, July 06, 2015 7:20 PM
+> To: Wu, Feng; eric.auger at st.com; linux-arm-kernel at lists.infradead.org;
+> kvmarm at lists.cs.columbia.edu; kvm at vger.kernel.org;
+> christoffer.dall at linaro.org; marc.zyngier at arm.com;
+> alex.williamson at redhat.com; pbonzini at redhat.com; avi.kivity at gmail.com;
+> mtosatti at redhat.com; joro at 8bytes.org; b.reynal at virtualopensystems.com
+> Cc: linux-kernel at vger.kernel.org; patches at linaro.org
+> Subject: Re: [RFC 16/17] KVM: eventfd: add irq bypass consumer management
+> 
+> Hi Feng,
+> On 07/06/2015 09:55 AM, Wu, Feng wrote:
+> >
+> >
+> >> -----Original Message-----
+> >> From: Eric Auger [mailto:eric.auger at linaro.org]
+> >> Sent: Thursday, July 02, 2015 9:17 PM
+> >> To: eric.auger at st.com; eric.auger at linaro.org;
+> >> linux-arm-kernel at lists.infradead.org; kvmarm at lists.cs.columbia.edu;
+> >> kvm at vger.kernel.org; christoffer.dall at linaro.org; marc.zyngier at arm.com;
+> >> alex.williamson at redhat.com; pbonzini at redhat.com; avi.kivity at gmail.com;
+> >> mtosatti at redhat.com; Wu, Feng; joro at 8bytes.org;
+> >> b.reynal at virtualopensystems.com
+> >> Cc: linux-kernel at vger.kernel.org; patches at linaro.org
+> >> Subject: [RFC 16/17] KVM: eventfd: add irq bypass consumer management
+> >>
+> >> This patch adds the registration/unregistration of an
+> >> irq_bypass_consumer on irqfd assignment/deassignment.
+> >>
+> >> Signed-off-by: Eric Auger <eric.auger@linaro.org>
+> >> ---
+> >>  virt/kvm/eventfd.c | 22 +++++++++++++++++++---
+> >>  1 file changed, 19 insertions(+), 3 deletions(-)
+> >>
+> >> diff --git a/virt/kvm/eventfd.c b/virt/kvm/eventfd.c
+> >> index f3da161..425a47b 100644
+> >> --- a/virt/kvm/eventfd.c
+> >> +++ b/virt/kvm/eventfd.c
+> >> @@ -34,6 +34,7 @@
+> >>  #include <linux/srcu.h>
+> >>  #include <linux/slab.h>
+> >>  #include <linux/seqlock.h>
+> >> +#include <linux/irqbypass.h>
+> >>  #include <trace/events/kvm.h>
+> >>
+> >>  #include <kvm/iodev.h>
+> >> @@ -93,6 +94,7 @@ struct _irqfd {
+> >>  	struct list_head list;
+> >>  	poll_table pt;
+> >>  	struct work_struct shutdown;
+> >> +	struct irq_bypass_consumer *cons;
+> >>  };
+> >>
+> >>  static struct workqueue_struct *irqfd_cleanup_wq;
+> >> @@ -429,7 +431,21 @@ kvm_irqfd_assign(struct kvm *kvm, struct
+> kvm_irqfd
+> >> *args)
+> >>  	 */
+> >>  	fdput(f);
+> >>
+> >> -	/* irq_bypass_register_consumer(); */
+> >> +	irqfd->cons = kzalloc(sizeof(struct irq_bypass_consumer),
+> >> +			      GFP_KERNEL);
+> >> +	if (!irqfd->cons) {
+> >> +		ret = -ENOMEM;
+> >> +		goto fail;
+> >> +	}
+> >> +	irqfd->cons->token = (void *)irqfd->eventfd;
+> >> +	irqfd->cons->gsi = irqfd->gsi;
+> >> +	irqfd->cons->kvm = kvm;
+> >> +	irqfd->cons->add_producer = kvm_arch_add_producer;
+> >> +	irqfd->cons->del_producer = kvm_arch_del_producer;
+> >> +	irqfd->cons->stop_consumer = kvm_arch_stop_consumer;
+> >> +	irqfd->cons->resume_consumer = kvm_arch_resume_consumer;
+> >> +	ret = irq_bypass_register_consumer(irqfd->cons);
+> >> +	WARN_ON(ret);
+> >>
+> >>  	return 0;
+> >>
+> >> @@ -530,8 +546,6 @@ kvm_irqfd_deassign(struct kvm *kvm, struct
+> kvm_irqfd
+> >> *args)
+> >>  	struct _irqfd *irqfd, *tmp;
+> >>  	struct eventfd_ctx *eventfd;
+> >>
+> >> -	/* irq_bypass_unregister_consumer() */
+> >> -
+> >>  	eventfd = eventfd_ctx_fdget(args->fd);
+> >>  	if (IS_ERR(eventfd))
+> >>  		return PTR_ERR(eventfd);
+> >> @@ -550,6 +564,8 @@ kvm_irqfd_deassign(struct kvm *kvm, struct
+> kvm_irqfd
+> >> *args)
+> >>  			irqfd->irq_entry.type = 0;
+> >>  			write_seqcount_end(&irqfd->irq_entry_sc);
+> >>  			irqfd_deactivate(irqfd);
+> >> +			irq_bypass_unregister_consumer(irqfd->cons);
+> >> +			kfree(irqfd->cons);
+> >
+> > There may be an issue here. 'irqfd' is freed in irqfd_deactivate() --> ...
+> --.>irqfd_shutdown(),
+> > and irqfd_deactivate() can be called in the other two places below:
+> > 	- irqfd_wakeup()
+> > 	- kvm_irqfd_release()
+> > I think we also need to call irq_bypass_unregister_consumer() there, right?
+> yes you're right. what about doing the unregistration in irqfd_shutdown
+> then?
 
-Tony
+I am fine with this!
+
+Thanks,
+Feng
+> 
+> Thanks for spotting this.
+> 
+> Eric
+> 
+> >
+> > Thanks,
+> > Feng
+> >
+> >
+> >>  		}
+> >>  	}
+> >>
+> >> --
+> >> 1.9.1
+> >
