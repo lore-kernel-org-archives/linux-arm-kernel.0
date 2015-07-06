@@ -1,103 +1,56 @@
 From: eric.auger@linaro.org (Eric Auger)
-Date: Mon,  6 Jul 2015 15:24:35 +0200
-Subject: [RFC v2 1/9] VFIO: platform: registration of a dummy IRQ bypass
- producer
+Date: Mon,  6 Jul 2015 15:24:36 +0200
+Subject: [RFC v2 2/9] VFIO: platform: test forwarded state when selecting IRQ
+ handler
 In-Reply-To: <1436189083-32527-1-git-send-email-eric.auger@linaro.org>
 References: <1436189083-32527-1-git-send-email-eric.auger@linaro.org>
-Message-ID: <1436189083-32527-2-git-send-email-eric.auger@linaro.org>
+Message-ID: <1436189083-32527-3-git-send-email-eric.auger@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Register a dummy producer with void callbacks
+In case the IRQ is forwarded, the VFIO platform IRQ handler does not
+need to disable the IRQ anymore.
+
+When setting the IRQ handler we now also test the forwarded state. In
+case the IRQ is forwarded we select the vfio_irq_handler.
 
 Signed-off-by: Eric Auger <eric.auger@linaro.org>
+
 ---
- drivers/vfio/platform/vfio_platform_irq.c     | 31 +++++++++++++++++++++++++++
- drivers/vfio/platform/vfio_platform_private.h |  2 ++
- 2 files changed, 33 insertions(+)
+
+v3 -> v4:
+- change title
+
+v2 -> v3:
+- forwarded state was tested in the handler. Now the forwarded state
+  is tested before setting the handler. This definitively limits
+  the dynamics of forwarded state changes but I don't think there is
+  a use case where we need to be able to change the state at any time.
+
+Conflicts:
+	drivers/vfio/platform/vfio_platform_irq.c
+---
+ drivers/vfio/platform/vfio_platform_irq.c | 7 ++++++-
+ 1 file changed, 6 insertions(+), 1 deletion(-)
 
 diff --git a/drivers/vfio/platform/vfio_platform_irq.c b/drivers/vfio/platform/vfio_platform_irq.c
-index 88bba57..4b059bf 100644
+index 4b059bf..e39f795 100644
 --- a/drivers/vfio/platform/vfio_platform_irq.c
 +++ b/drivers/vfio/platform/vfio_platform_irq.c
-@@ -20,6 +20,7 @@
- #include <linux/types.h>
- #include <linux/vfio.h>
- #include <linux/irq.h>
-+#include <linux/irqbypass.h>
- 
- #include "vfio_platform_private.h"
- 
-@@ -177,6 +178,26 @@ static irqreturn_t vfio_irq_handler(int irq, void *dev_id)
- 	return IRQ_HANDLED;
- }
- 
-+static void vfio_platform_irq_bypass_stop(struct irq_bypass_producer *prod)
-+{
-+}
-+
-+static void vfio_platform_irq_bypass_resume(struct irq_bypass_producer *prod)
-+{
-+}
-+
-+static void vfio_platform_irq_bypass_add_consumer(
-+			struct irq_bypass_producer *prod,
-+			struct irq_bypass_consumer *cons)
-+{
-+}
-+
-+static void vfio_platform_irq_bypass_del_consumer(
-+			struct irq_bypass_producer *prod,
-+			struct irq_bypass_consumer *cons)
-+{
-+}
-+
- static int vfio_set_trigger(struct vfio_platform_device *vdev, int index,
- 			    int fd, irq_handler_t handler)
+@@ -260,8 +260,13 @@ static int vfio_platform_set_irq_trigger(struct vfio_platform_device *vdev,
  {
-@@ -186,6 +207,7 @@ static int vfio_set_trigger(struct vfio_platform_device *vdev, int index,
+ 	struct vfio_platform_irq *irq = &vdev->irqs[index];
+ 	irq_handler_t handler;
++	struct irq_data *d;
++	bool is_forwarded;
  
- 	if (irq->trigger) {
- 		free_irq(irq->hwirq, irq);
-+		irq_bypass_unregister_producer(&irq->producer);
- 		kfree(irq->name);
- 		eventfd_ctx_put(irq->trigger);
- 		irq->trigger = NULL;
-@@ -216,6 +238,15 @@ static int vfio_set_trigger(struct vfio_platform_device *vdev, int index,
- 		return ret;
- 	}
- 
-+	irq->producer.token = (void *)trigger;
-+	irq->producer.irq = irq->hwirq;
-+	irq->producer.add_consumer = vfio_platform_irq_bypass_add_consumer;
-+	irq->producer.del_consumer = vfio_platform_irq_bypass_del_consumer;
-+	irq->producer.stop = vfio_platform_irq_bypass_stop;
-+	irq->producer.resume = vfio_platform_irq_bypass_resume;
-+	ret = irq_bypass_register_producer(&irq->producer);
-+	WARN_ON(ret);
+-	if (vdev->irqs[index].flags & VFIO_IRQ_INFO_AUTOMASKED)
++	d = irq_get_irq_data(irq->hwirq);
++	is_forwarded = irqd_irq_forwarded(d);
 +
- 	if (!irq->masked)
- 		enable_irq(irq->hwirq);
- 
-diff --git a/drivers/vfio/platform/vfio_platform_private.h b/drivers/vfio/platform/vfio_platform_private.h
-index 1c9b3d5..1d2d4d6 100644
---- a/drivers/vfio/platform/vfio_platform_private.h
-+++ b/drivers/vfio/platform/vfio_platform_private.h
-@@ -17,6 +17,7 @@
- 
- #include <linux/types.h>
- #include <linux/interrupt.h>
-+#include <linux/irqbypass.h>
- 
- #define VFIO_PLATFORM_OFFSET_SHIFT   40
- #define VFIO_PLATFORM_OFFSET_MASK (((u64)(1) << VFIO_PLATFORM_OFFSET_SHIFT) - 1)
-@@ -37,6 +38,7 @@ struct vfio_platform_irq {
- 	spinlock_t		lock;
- 	struct virqfd		*unmask;
- 	struct virqfd		*mask;
-+	struct irq_bypass_producer producer;
- };
- 
- struct vfio_platform_region {
++	if (vdev->irqs[index].flags & VFIO_IRQ_INFO_AUTOMASKED && !is_forwarded)
+ 		handler = vfio_automasked_irq_handler;
+ 	else
+ 		handler = vfio_irq_handler;
 -- 
 1.9.1
