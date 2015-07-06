@@ -1,63 +1,142 @@
-From: yh.huang@mediatek.com (YH Huang)
-Date: Mon, 6 Jul 2015 22:12:05 +0800
-Subject: [PATCH v4 3/3] arm64: dts: mt8173: add MT8173 display PWM
- driver support dtsi
-In-Reply-To: <CAGS+omC_n3hVJ6P2R-9GMpJSBABeEDXk2drOu2oJvJfk6qC0dA@mail.gmail.com>
-References: <1436189368-1826-1-git-send-email-yh.huang@mediatek.com>
- <1436189368-1826-4-git-send-email-yh.huang@mediatek.com>
- <CAGS+omC_n3hVJ6P2R-9GMpJSBABeEDXk2drOu2oJvJfk6qC0dA@mail.gmail.com>
-Message-ID: <1436191925.7757.2.camel@mtksdaap41>
+From: parkch98@gmail.com (Chanho Park)
+Date: Mon,  6 Jul 2015 23:12:35 +0900
+Subject: [PATCHv5] ARM: dts: add exynos5422-cpus.dtsi to correct cpu order
+Message-ID: <1436191955-3650-1-git-send-email-chanho61.park@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2015-07-06 at 21:38 +0800, Daniel Kurtz wrote:
-> On Mon, Jul 6, 2015 at 9:29 PM, YH Huang <yh.huang@mediatek.com> wrote:
-> > Add display PWM node in mt8173.dtsi.
-> >
-> > Signed-off-by: YH Huang <yh.huang@mediatek.com>
-> > ---
-> >  arch/arm64/boot/dts/mediatek/mt8173.dtsi | 22 ++++++++++++++++++++++
-> >  1 file changed, 22 insertions(+)
-> >
-> > diff --git a/arch/arm64/boot/dts/mediatek/mt8173.dtsi b/arch/arm64/boot/dts/mediatek/mt8173.dtsi
-> > index 0696f8f..e4ffd9d 100644
-> > --- a/arch/arm64/boot/dts/mediatek/mt8173.dtsi
-> > +++ b/arch/arm64/boot/dts/mediatek/mt8173.dtsi
-> > @@ -393,6 +393,28 @@
-> >                         #size-cells = <0>;
-> >                         status = "disabled";
-> >                 };
-> > +
-> > +               pwm0: pwm at 1401e000 {
-> > +                       compatible = "mediatek,mt8173-disp-pwm",
-> > +                                    "mediatek,mt6595-disp-pwm";
-> > +                       reg = <0 0x1401e000 0 0x1000>;
-> > +                       #pwm-cells = <2>;
-> > +                       clocks = <&mmsys MM_DISP_PWM026M>,
-> > +                                <&mmsys MM_DISP_PWM0MM>;
-> 
-> CLK_MM_DISP_PWM026M
-> 
+The odroid-xu3 board which is based on exynos5422 not exynos5800 is
+booted from cortex-a7 core unlike exynos5800. The odroid-xu3's cpu order
+is quite strange. cpu0 and cpu5-7 are cortex-a7 cores and cpu1-4 are
+cortex-a15 cores. To correct this mis-odering, I added exynos5422.dtsi
+and reversing cpu orders from exynos5420. Now, cpu0-3 are cortex-a7 and
+cpu4-7 are cortex-a15.
 
-Sorry for this terrible mistake.
-CLK_MM_DISP_PWM026M
-CLK_MM_DISP_PWM0MM
+Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+Signed-off-by: Chanho Park <chanho61.park@samsung.com>
+---
+Changes from v4:
+ - Remove temporal patch in e-mail body
 
-> > +                       clock-names = "main", "mm";
-> > +                       status = "disabled";
-> > +               };
-> > +
-> > +               pwm1: pwm at 1401f000 {
-> > +                       compatible = "mediatek,mt8173-disp-pwm",
-> > +                                    "mediatek,mt6595-disp-pwm";
-> > +                       reg = <0 0x1401f000 0 0x1000>;
-> > +                       #pwm-cells = <2>;
-> > +                       clocks = <&mmsys MM_DISP_PWM126M>,
-> > +                                <&mmsys MM_DISP_PWM1MM>;
+Changes from v3:
+ - include this exynos5422-cpus.dtsi in the exynos5422-odroidxu3-common.dtsi
 
-Same here.
-CLK_MM_DISP_PWM126M
-CLK_MM_DISP_PWM1MM
+Changes from v2:
+ - drop inclusion of exynos5420.dtsi from exynos5422-cpus.dtsi
+ - drop compatibles from exynos5422-cpus.dtsi
 
-Regards,
-YH Huang
+Changes from v1:
+ - rename exynos5422.dtsi to exynos5422-cpus.dtsi
+ - include the dtsi file top of the exynos5422-odroidxu3.dts
+
+Secondary cpu booting problem[1] is not resolved yet. Need more investigations
+to work booting 8 cores correctly.
+
+[1]: http://www.spinics.net/lists/linux-samsung-soc/msg45525.html
+
+ arch/arm/boot/dts/exynos5422-cpus.dtsi             | 81 ++++++++++++++++++++++
+ arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi |  1 +
+ 2 files changed, 82 insertions(+)
+ create mode 100644 arch/arm/boot/dts/exynos5422-cpus.dtsi
+
+diff --git a/arch/arm/boot/dts/exynos5422-cpus.dtsi b/arch/arm/boot/dts/exynos5422-cpus.dtsi
+new file mode 100644
+index 0000000..b7f60c8
+--- /dev/null
++++ b/arch/arm/boot/dts/exynos5422-cpus.dtsi
+@@ -0,0 +1,81 @@
++/*
++ * SAMSUNG EXYNOS5422 SoC cpu device tree source
++ *
++ * Copyright (c) 2015 Samsung Electronics Co., Ltd.
++ *		http://www.samsung.com
++ *
++ * The only difference between EXYNOS5422 and EXYNOS5800 is cpu ordering. The
++ * EXYNOS5422 is booting from Cortex-A7 core while the EXYNOS5800 is booting
++ * from Cortex-A15 core.
++ *
++ * EXYNOS5422 based board files can include this file to provide cpu ordering
++ * which could boot a cortex-a7 from cpu0.
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ */
++
++&cpu0 {
++	device_type = "cpu";
++	compatible = "arm,cortex-a7";
++	reg = <0x100>;
++	clock-frequency = <1000000000>;
++	cci-control-port = <&cci_control0>;
++};
++
++&cpu1 {
++	device_type = "cpu";
++	compatible = "arm,cortex-a7";
++	reg = <0x101>;
++	clock-frequency = <1000000000>;
++	cci-control-port = <&cci_control0>;
++};
++
++&cpu2 {
++	device_type = "cpu";
++	compatible = "arm,cortex-a7";
++	reg = <0x102>;
++	clock-frequency = <1000000000>;
++	cci-control-port = <&cci_control0>;
++};
++
++&cpu3 {
++	device_type = "cpu";
++	compatible = "arm,cortex-a7";
++	reg = <0x103>;
++	clock-frequency = <1000000000>;
++	cci-control-port = <&cci_control0>;
++};
++
++&cpu4 {
++	device_type = "cpu";
++	compatible = "arm,cortex-a15";
++	reg = <0x0>;
++	clock-frequency = <1800000000>;
++	cci-control-port = <&cci_control1>;
++};
++
++&cpu5 {
++	device_type = "cpu";
++	compatible = "arm,cortex-a15";
++	reg = <0x1>;
++	clock-frequency = <1800000000>;
++	cci-control-port = <&cci_control1>;
++};
++
++&cpu6 {
++	device_type = "cpu";
++	compatible = "arm,cortex-a15";
++	reg = <0x2>;
++	clock-frequency = <1800000000>;
++	cci-control-port = <&cci_control1>;
++};
++
++&cpu7 {
++	device_type = "cpu";
++	compatible = "arm,cortex-a15";
++	reg = <0x3>;
++	clock-frequency = <1800000000>;
++	cci-control-port = <&cci_control1>;
++};
+diff --git a/arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi b/arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi
+index 8adf455..f603133 100644
+--- a/arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi
++++ b/arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi
+@@ -15,6 +15,7 @@
+ #include <dt-bindings/gpio/gpio.h>
+ #include <dt-bindings/sound/samsung-i2s.h>
+ #include "exynos5800.dtsi"
++#include "exynos5422-cpus.dtsi"
+ 
+ / {
+ 	memory {
+-- 
+2.1.0
