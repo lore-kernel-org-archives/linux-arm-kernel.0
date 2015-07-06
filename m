@@ -1,41 +1,79 @@
 From: vaibhav.hiremath@linaro.org (Vaibhav Hiremath)
-Date: Tue,  7 Jul 2015 00:54:48 +0530
-Subject: [PATCH-v3 04/11] i2c: pxa: Remove compile warnning in 64bit mode
+Date: Tue,  7 Jul 2015 00:54:49 +0530
+Subject: [PATCH-v3 05/11] i2c: pxa: Update debug function to dump more info on
+ error
 In-Reply-To: <1436210695-19159-1-git-send-email-vaibhav.hiremath@linaro.org>
 References: <1436210695-19159-1-git-send-email-vaibhav.hiremath@linaro.org>
-Message-ID: <1436210695-19159-5-git-send-email-vaibhav.hiremath@linaro.org>
+Message-ID: <1436210695-19159-6-git-send-email-vaibhav.hiremath@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Yipeng Yao <ypyao@marvell.com>
+Update i2c_pxa_scream_blue_murder() fn to print more information
+in case of error.
+Also, use dev_err variants instead of printk.
 
-Fix below warning message, coming from 64 bit toolchain.
-
-drivers/i2c/busses/i2c-pxa.c:1237:15: warning: cast from pointer to integer of different size [-Wpointer-to-int-cast]
-
-Signed-off-by: Yipeng Yao <ypyao@marvell.com>
-[vaibhav.hiremath at linaro.org: Updated Changelog]
+Signed-off-by: Jett.Zhou <jtzhou@marvell.com>
 Signed-off-by: Vaibhav Hiremath <vaibhav.hiremath@linaro.org>
 Cc: Wolfram Sang <wsa@the-dreams.de>
-Acked-by: Robert Jarzmik <robert.jarzmik@free.fr>
 ---
- drivers/i2c/busses/i2c-pxa.c | 4 +++-
- 1 file changed, 3 insertions(+), 1 deletion(-)
+ drivers/i2c/busses/i2c-pxa.c | 22 +++++++++++++++-------
+ 1 file changed, 15 insertions(+), 7 deletions(-)
 
 diff --git a/drivers/i2c/busses/i2c-pxa.c b/drivers/i2c/busses/i2c-pxa.c
-index 632008f..4c92694 100644
+index 4c92694..040effa 100644
 --- a/drivers/i2c/busses/i2c-pxa.c
 +++ b/drivers/i2c/busses/i2c-pxa.c
-@@ -1116,7 +1116,9 @@ static int i2c_pxa_probe_dt(struct platform_device *pdev, struct pxa_i2c *i2c,
- 		i2c->use_pio = 1;
- 	if (of_get_property(np, "mrvl,i2c-fast-mode", NULL))
- 		i2c->fast_mode = 1;
--	*i2c_types = (u32)(of_id->data);
+@@ -132,6 +132,7 @@ struct pxa_i2c {
+ 	unsigned int		msg_idx;
+ 	unsigned int		msg_ptr;
+ 	unsigned int		slave_addr;
++	unsigned int		req_slave_addr;
+ 
+ 	struct i2c_adapter	adap;
+ 	struct clk		*clk;
+@@ -253,15 +254,20 @@ static void i2c_pxa_show_state(struct pxa_i2c *i2c, int lno, const char *fname)
+ static void i2c_pxa_scream_blue_murder(struct pxa_i2c *i2c, const char *why)
+ {
+ 	unsigned int i;
+-	printk(KERN_ERR "i2c: error: %s\n", why);
+-	printk(KERN_ERR "i2c: msg_num: %d msg_idx: %d msg_ptr: %d\n",
++	struct device *dev = &i2c->adap.dev;
 +
-+	*i2c_types = (long)(of_id->data);
++	dev_err(dev, "slave_0x%x error: %s\n",
++		i2c->req_slave_addr >> 1, why);
++	dev_err(dev, "msg_num: %d msg_idx: %d msg_ptr: %d\n",
+ 		i2c->msg_num, i2c->msg_idx, i2c->msg_ptr);
+-	printk(KERN_ERR "i2c: ICR: %08x ISR: %08x\n",
+-	       readl(_ICR(i2c)), readl(_ISR(i2c)));
+-	printk(KERN_DEBUG "i2c: log: ");
++	dev_err(dev, "IBMR: %08x IDBR: %08x ICR: %08x ISR: %08x\n",
++		readl(_IBMR(i2c)), readl(_IDBR(i2c)), readl(_ICR(i2c)),
++		readl(_ISR(i2c)));
++	dev_dbg(dev, "log: ");
+ 	for (i = 0; i < i2c->irqlogidx; i++)
+-		printk("[%08x:%08x] ", i2c->isrlog[i], i2c->icrlog[i]);
+-	printk("\n");
++		pr_debug("[%08x:%08x] ", i2c->isrlog[i], i2c->icrlog[i]);
 +
- 	return 0;
++	pr_debug("\n");
  }
  
+ #else /* ifdef DEBUG */
+@@ -638,6 +644,7 @@ static inline void i2c_pxa_start_message(struct pxa_i2c *i2c)
+ 	 * Step 1: target slave address into IDBR
+ 	 */
+ 	writel(i2c_pxa_addr_byte(i2c->msg), _IDBR(i2c));
++	i2c->req_slave_addr = i2c_pxa_addr_byte(i2c->msg);
+ 
+ 	/*
+ 	 * Step 2: initiate the write.
+@@ -951,6 +958,7 @@ static void i2c_pxa_irq_txempty(struct pxa_i2c *i2c, u32 isr)
+ 		 * Write the next address.
+ 		 */
+ 		writel(i2c_pxa_addr_byte(i2c->msg), _IDBR(i2c));
++		i2c->req_slave_addr = i2c_pxa_addr_byte(i2c->msg);
+ 
+ 		/*
+ 		 * And trigger a repeated start, and send the byte.
 -- 
 1.9.1
