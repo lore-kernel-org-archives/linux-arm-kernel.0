@@ -1,84 +1,60 @@
 From: m.smarduch@samsung.com (Mario Smarduch)
-Date: Mon, 06 Jul 2015 11:35:56 -0700
-Subject: [PATCH 3/3] arm: KVM: Add VFP lazy switch hooks in Host KVM
-In-Reply-To: <20150705193745.GC3869@cbox>
+Date: Mon, 06 Jul 2015 11:43:05 -0700
+Subject: [PATCH 0/3] arm: KVM: VFP lazy switch in KVM Host Mode may save
+ upto 98%
+In-Reply-To: <20150705193758.GD3869@cbox>
 References: <1435203028-23142-1-git-send-email-m.smarduch@samsung.com>
- <1435203028-23142-4-git-send-email-m.smarduch@samsung.com>
- <20150705193745.GC3869@cbox>
-Message-ID: <559ACA8C.3080308@samsung.com>
+ <20150705193758.GD3869@cbox>
+Message-ID: <559ACC39.7030609@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On 07/05/2015 12:37 PM, Christoffer Dall wrote:
-> On Wed, Jun 24, 2015 at 08:30:28PM -0700, Mario Smarduch wrote:
->> This patch implements host KVM interface to Hyp mode VFP function to 
->> switch out guest and switch in host.
+> Hi Mario,
+> 
+> On Wed, Jun 24, 2015 at 08:30:25PM -0700, Mario Smarduch wrote:
+>> Currently we do a lazy VFP switch in Hyp mode, but once we exit and re-enter hyp
+>> mode we trap again on VFP access. This mode has shown around 30-50% improvement
+>> running hackbench and lmbench.
 >>
->> Signed-off-by: Mario Smarduch <m.smarduch@samsung.com>
->> ---
->>  arch/arm/kvm/arm.c |   15 +++++++++++++++
->>  1 file changed, 15 insertions(+)
+>> This patch series extends lazy VFP switch beyond Hyp mode to KVM host mode.
 >>
->> diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
->> index d9631ec..77b41f5 100644
->> --- a/arch/arm/kvm/arm.c
->> +++ b/arch/arm/kvm/arm.c
->> @@ -105,6 +105,17 @@ void kvm_arch_check_processor_compat(void *rtn)
->>  	*(int *)rtn = 0;
->>  }
->>  
->> +/**
->> + * kvm_switch_vp_regs() - switch guest/host VFP registers
->> + * @vcpu:	pointer to vcpu structure.
->> + *
->> + * HYP interface functions to save guest and restore host VFP registers
+>> 1 - On guest access we switch from host to guest and set a flag accessible to 
+>>     host
+>> 2 - On exit to KVM host, VFP state is restored on vcpu_put if flag is marked (1)
+>> 3 - Otherwise guest is resumed and continues to use its VFP registers. 
+>> 4 - In case of 2 on VM entry we set VFP trap flag to repeat 1.
+>>
+>> If guest does not access VFP registers them implemenation remains the same.
+>>
+>> Executing hackbench on Fast Models and Exynos arm32 board shows good
+>> results. Considering all exits 2% of the time KVM host lazy vfp switch is 
+>> invoked.
+>>
+>> Howeverr this patch set requires more burn in time and testing under various 
+>> loads.
+>>
+>> Currently ARM32 is addressed later ARM64.
+>>
+> I think Marc said that he experimented with a similar patch once, but
+> that it caused corruption on the host side somehow.
 > 
-> Not sure I understand what you mean to say with this line, how about:
-> 
-> Calls an assembly routine in HYP mode to actually perform the state
-> save/restore.
-> 
-> However, why do we actually need to do this in hyp mode?  Can't we just
-> as well do this in SVC mode or are we changing some trap settings here?
+> Am I remembering correctly?  If so, we would need to make sure this
+> doesn't happen with this patch set...
 
-Yes it should be since non hyp registers are accessed.
-I reuse it since all the code was there to do the switch.
+I think upstreaming the basic approach first (arm64, arm32 cleanups),
+and let this series get some good runtime - would be better
+and safer approach.
+
 
 > 
->> + */
->> +static void kvm_switch_fp_regs(struct kvm_vcpu *vcpu)
-> 
-> should probalby be called kvm_vcpu_put_fp_regs
-> 
->> +{
->> +	if (vcpu->arch.vfp_guest_saved == 1)
->> +		kvm_call_hyp(__kvm_restore_host_vfp_state, vcpu);
->> +}
->>  
->>  /**
->>   * kvm_arch_init_vm - initializes a VM data structure
->> @@ -292,6 +303,10 @@ void kvm_arch_vcpu_load(struct kvm_vcpu *vcpu, int cpu)
->>  
->>  void kvm_arch_vcpu_put(struct kvm_vcpu *vcpu)
->>  {
->> +
->> +	/* Check if Guest accessed VFP registers */
->> +	kvm_switch_fp_regs(vcpu);
->> +
->>  	/*
->>  	 * The arch-generic KVM code expects the cpu field of a vcpu to be -1
->>  	 * if the vcpu is no longer assigned to a cpu.  This is used for the
->> -- 
->> 1.7.9.5
-> 
-> How are we sure that the kernel never touches VFP registers between VCPU
-> exit and kvm_arch_vcpu_put?  Can a kernel-side memcpy implementation use
-> the FP regs or something like that?
+> Otherwise I think this sounds like a fairly good idea and I wonder if
+> the same could be done on arm64?
 
-Exceptions, interrupts - don't save any VFP context, if
-these VFP registers are touched by the kernel they should
-be saved/restored. The x86 version appears to the same.
+Yes that's the intent, doing both architectures at once would be preferable.
 
+Thanks,
+  Mario
 > 
 > Thanks,
 > -Christoffer
