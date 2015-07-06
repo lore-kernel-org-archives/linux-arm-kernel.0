@@ -1,38 +1,38 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Mon, 6 Jul 2015 12:49:50 +0200
-Subject: [PATCH] ARM: shmobile: kzm9g dts: Add adxl345-specific compatible
- property
-In-Reply-To: <1980362.9qv8Mc7ut7@avalon>
-References: <1436176746-10995-1-git-send-email-geert+renesas@glider.be>
- <1980362.9qv8Mc7ut7@avalon>
-Message-ID: <CAMuHMdWhSj5HZ+KYBkWbMpvUzFJGHS5-k8exhrxyCsAB+DJL3w@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 6 Jul 2015 11:48:12 +0100
+Subject: [PATCH 3/4] irqchip, gicv3: Implement Cavium ThunderX erratum
+ 23154
+In-Reply-To: <1435673643-31676-4-git-send-email-rric@kernel.org>
+References: <1435673643-31676-1-git-send-email-rric@kernel.org>
+ <1435673643-31676-4-git-send-email-rric@kernel.org>
+Message-ID: <20150706104812.GD7557@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 6, 2015 at 12:17 PM, Laurent Pinchart
-<laurent.pinchart@ideasonboard.com> wrote:
->> --- a/arch/arm/boot/dts/sh73a0-kzm9g.dts
->> +++ b/arch/arm/boot/dts/sh73a0-kzm9g.dts
->> @@ -206,7 +206,7 @@
->>       };
->>
->>       accelerometer at 1d {
->> -             compatible = "adi,adxl34x";
->> +             compatible = "adi,adxl345", "adi,adxl34x";
->
-> "adi,adxl34x" is deprecated and shouldn't be used in DT. You can just specify
-> "adi,adxl345".
+On Tue, Jun 30, 2015 at 04:14:02PM +0200, Robert Richter wrote:
+> +static u64 gic_read_iar_cavium_thunderx(void)
+>  {
+>  	u64 irqstat;
+>  
+> +	asm volatile("nop;nop;nop;nop;");
+> +	asm volatile("nop;nop;nop;nop;");
+>  	asm volatile("mrs_s %0, " __stringify(ICC_IAR1_EL1) : "=r" (irqstat));
+> +	asm volatile("nop;nop;nop;nop;");
+> +	mb();
 
-Right, we only care (sometimes ;-) about backward-compatibility,
-not about forward-compatibility.
+NAK.  Please read the GCC manual for proper use of asm().  Even with
+"volatile" there, it doesn't stop GCC from inserting instructions
+between these.
 
-Gr{oetje,eeting}s,
+If you need an instruction sequence to be consecutive, then it _must_
+be one single asm().
 
-                        Geert
+There should also be a comment explaining why that code is necessary
+here.  Please think about the future when you've forgotten why those
+nops are there.  The kernel is a long term project, and it's important
+that people understand why things are coded the way they are so that
+the kernel can be properly maintained into the future.
 
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+-- 
+FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
+according to speedtest.net.
