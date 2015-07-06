@@ -1,100 +1,113 @@
 From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Mon,  6 Jul 2015 16:24:23 +0530
-Subject: [PATCH 16/18] ARM/w90x900/time: Migrate to new 'set-state' interface
+Date: Mon,  6 Jul 2015 16:24:24 +0530
+Subject: [PATCH 17/18] ARM/iop/time: Migrate to new 'set-state' interface
 In-Reply-To: <cover.1436178990.git.viresh.kumar@linaro.org>
 References: <cover.1436178990.git.viresh.kumar@linaro.org>
-Message-ID: <284231e6d982e4f71f64aa24a6b26e1b02216f6e.1436178990.git.viresh.kumar@linaro.org>
+Message-ID: <3efefc53bcae3fa2173a3b95486c6199b57dd3be.1436178990.git.viresh.kumar@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Migrate w90x900 driver to the new 'set-state' interface provided by
+Migrate iop driver to the new 'set-state' interface provided by
 clockevents core, the earlier 'set-mode' interface is marked obsolete
 now.
 
 This also enables us to implement callbacks for new states of clockevent
 devices, for example: ONESHOT_STOPPED.
 
-Cc: Wan ZongShun <mcuos.com@gmail.com>
+Cc: Russell King <linux@arm.linux.org.uk>
 Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
 ---
- arch/arm/mach-w90x900/time.c | 51 ++++++++++++++++++++++++--------------------
- 1 file changed, 28 insertions(+), 23 deletions(-)
+ arch/arm/plat-iop/time.c | 70 +++++++++++++++++++++++++++++-------------------
+ 1 file changed, 43 insertions(+), 27 deletions(-)
 
-diff --git a/arch/arm/mach-w90x900/time.c b/arch/arm/mach-w90x900/time.c
-index 9230d3725599..cd1966ec9143 100644
---- a/arch/arm/mach-w90x900/time.c
-+++ b/arch/arm/mach-w90x900/time.c
-@@ -48,31 +48,32 @@
+diff --git a/arch/arm/plat-iop/time.c b/arch/arm/plat-iop/time.c
+index 6ad65d8ae237..101e8f2c7abe 100644
+--- a/arch/arm/plat-iop/time.c
++++ b/arch/arm/plat-iop/time.c
+@@ -77,41 +77,57 @@ static int iop_set_next_event(unsigned long delta,
  
- static unsigned int timer0_load;
+ static unsigned long ticks_per_jiffy;
  
--static void nuc900_clockevent_setmode(enum clock_event_mode mode,
--		struct clock_event_device *clk)
-+static int nuc900_clockevent_shutdown(struct clock_event_device *evt)
+-static void iop_set_mode(enum clock_event_mode mode,
+-			 struct clock_event_device *unused)
++static int iop_set_periodic(struct clock_event_device *evt)
  {
--	unsigned int val;
-+	unsigned int val = __raw_readl(REG_TCSR0) & ~(0x03 << 27);
- 
--	val = __raw_readl(REG_TCSR0);
--	val &= ~(0x03 << 27);
-+	__raw_writel(val, REG_TCSR0);
-+	return 0;
-+}
-+
-+static int nuc900_clockevent_set_oneshot(struct clock_event_device *evt)
-+{
-+	unsigned int val = __raw_readl(REG_TCSR0) & ~(0x03 << 27);
+ 	u32 tmr = read_tmr0();
  
 -	switch (mode) {
 -	case CLOCK_EVT_MODE_PERIODIC:
--		__raw_writel(timer0_load, REG_TICR0);
--		val |= (PERIOD | COUNTEN | INTEN | PRESCALE);
+-		write_tmr0(tmr & ~IOP_TMR_EN);
+-		write_tcr0(ticks_per_jiffy - 1);
+-		write_trr0(ticks_per_jiffy - 1);
+-		tmr |= (IOP_TMR_RELOAD | IOP_TMR_EN);
 -		break;
-+	val |= (ONESHOT | COUNTEN | INTEN | PRESCALE);
- 
 -	case CLOCK_EVT_MODE_ONESHOT:
--		val |= (ONESHOT | COUNTEN | INTEN | PRESCALE);
+-		/* ->set_next_event sets period and enables timer */
+-		tmr &= ~(IOP_TMR_RELOAD | IOP_TMR_EN);
 -		break;
-+	__raw_writel(val, REG_TCSR0);
-+	return 0;
-+}
- 
--	case CLOCK_EVT_MODE_UNUSED:
--	case CLOCK_EVT_MODE_SHUTDOWN:
 -	case CLOCK_EVT_MODE_RESUME:
+-		tmr |= IOP_TMR_EN;
+-		break;
+-	case CLOCK_EVT_MODE_SHUTDOWN:
+-	case CLOCK_EVT_MODE_UNUSED:
+-	default:
+-		tmr &= ~IOP_TMR_EN;
 -		break;
 -	}
-+static int nuc900_clockevent_set_periodic(struct clock_event_device *evt)
-+{
-+	unsigned int val = __raw_readl(REG_TCSR0) & ~(0x03 << 27);
++	write_tmr0(tmr & ~IOP_TMR_EN);
++	write_tcr0(ticks_per_jiffy - 1);
++	write_trr0(ticks_per_jiffy - 1);
++	tmr |= (IOP_TMR_RELOAD | IOP_TMR_EN);
  
-+	__raw_writel(timer0_load, REG_TICR0);
-+	val |= (PERIOD | COUNTEN | INTEN | PRESCALE);
- 	__raw_writel(val, REG_TCSR0);
+ 	write_tmr0(tmr);
++	return 0;
++}
++
++static int iop_set_oneshot(struct clock_event_device *evt)
++{
++	u32 tmr = read_tmr0();
++
++	/* ->set_next_event sets period and enables timer */
++	tmr &= ~(IOP_TMR_RELOAD | IOP_TMR_EN);
++	write_tmr0(tmr);
++	return 0;
++}
++
++static int iop_shutdown(struct clock_event_device *evt)
++{
++	u32 tmr = read_tmr0();
++
++	tmr &= ~IOP_TMR_EN;
++	write_tmr0(tmr);
++	return 0;
++}
++
++static int iop_resume(struct clock_event_device *evt)
++{
++	u32 tmr = read_tmr0();
++
++	tmr |= IOP_TMR_EN;
++	write_tmr0(tmr);
 +	return 0;
  }
  
- static int nuc900_clockevent_setnextevent(unsigned long evt,
-@@ -90,11 +91,15 @@ static int nuc900_clockevent_setnextevent(unsigned long evt,
- }
- 
- static struct clock_event_device nuc900_clockevent_device = {
--	.name		= "nuc900-timer0",
--	.features	= CLOCK_EVT_FEAT_PERIODIC | CLOCK_EVT_FEAT_ONESHOT,
--	.set_mode	= nuc900_clockevent_setmode,
--	.set_next_event	= nuc900_clockevent_setnextevent,
--	.rating		= 300,
-+	.name			= "nuc900-timer0",
+ static struct clock_event_device iop_clockevent = {
+-	.name		= "iop_timer0",
+-	.features       = CLOCK_EVT_FEAT_PERIODIC | CLOCK_EVT_FEAT_ONESHOT,
+-	.rating         = 300,
+-	.set_next_event	= iop_set_next_event,
+-	.set_mode	= iop_set_mode,
++	.name			= "iop_timer0",
 +	.features		= CLOCK_EVT_FEAT_PERIODIC |
 +				  CLOCK_EVT_FEAT_ONESHOT,
-+	.set_state_shutdown	= nuc900_clockevent_shutdown,
-+	.set_state_periodic	= nuc900_clockevent_set_periodic,
-+	.set_state_oneshot	= nuc900_clockevent_set_oneshot,
-+	.tick_resume		= nuc900_clockevent_shutdown,
-+	.set_next_event		= nuc900_clockevent_setnextevent,
 +	.rating			= 300,
++	.set_next_event		= iop_set_next_event,
++	.set_state_shutdown	= iop_shutdown,
++	.set_state_periodic	= iop_set_periodic,
++	.tick_resume		= iop_resume,
++	.set_state_oneshot	= iop_set_oneshot,
  };
  
- /*IRQ handler for the timer*/
+ static irqreturn_t
 -- 
 2.4.0
