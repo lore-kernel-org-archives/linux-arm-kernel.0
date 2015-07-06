@@ -1,96 +1,39 @@
-From: masami.hiramatsu.pt@hitachi.com (Masami Hiramatsu)
-Date: Mon, 06 Jul 2015 20:03:17 +0900
-Subject: [PATCH 2/2] arm64: Make all entry code as non-kprobe-able
-In-Reply-To: <683f80cef9b2b778be868e77b01a245585448a86.1436158027.git.panand@redhat.com>
-References: <cover.1436158027.git.panand@redhat.com>
- <683f80cef9b2b778be868e77b01a245585448a86.1436158027.git.panand@redhat.com>
-Message-ID: <559A6075.5070502@hitachi.com>
+From: pbonzini@redhat.com (Paolo Bonzini)
+Date: Mon, 6 Jul 2015 13:07:16 +0200
+Subject: [PATCH 1/7] KVM: api: add kvm_irq_routing_extended_msi
+In-Reply-To: <20150706103755.GC11590@cbox>
+References: <1435592237-17924-1-git-send-email-eric.auger@linaro.org>
+ <1435592237-17924-2-git-send-email-eric.auger@linaro.org>
+ <011f01d0b498$6a17aeb0$3e470c10$@samsung.com> <5596503E.6040902@arm.com>
+ <00fd01d0b7b6$f6cf3550$e46d9ff0$@samsung.com> <559A3C9C.6050302@arm.com>
+ <20150706093026.GA11590@cbox> <559A52E6.5050402@arm.com>
+ <20150706103755.GC11590@cbox>
+Message-ID: <559A6164.1000401@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2015/07/06 14:03, Pratyush Anand wrote:
-> Entry symbols are not kprobe safe. So blacklist them for kprobing.
 
-As I've said, you can also use _ASM_NOKPROBE().
-This patch itself looks good to me, but I'd like to ask arm64
-maintainers' opinion, whether they accept introducing entry-text
-section only for this purpose or not.
 
-Reviewed-by: Masami Hiramatsu <masami.hiramatsu.pt@hitachi.com>
-
-Thank you,
-
+On 06/07/2015 12:37, Christoffer Dall wrote:
+> I don't view it as 'the kernel requires this' but as 'the kernel will
+> not complain with arbitrary error code if you set the devid flag'
+> capability, and it's up to userspace (as usual) to provide the correct
+> arguments for things to work, and up to the kernel to ensure we don't
+> crash the system etc.
 > 
-> Signed-off-by: Pratyush Anand <panand@redhat.com>
-> ---
->  arch/arm64/kernel/entry.S       | 3 +++
->  arch/arm64/kernel/kprobes.c     | 9 +++++++++
->  arch/arm64/kernel/vmlinux.lds.S | 1 +
->  3 files changed, 13 insertions(+)
-> 
-> diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
-> index a7691a378668..2ea24f6bc06b 100644
-> --- a/arch/arm64/kernel/entry.S
-> +++ b/arch/arm64/kernel/entry.S
-> @@ -202,6 +202,7 @@ tsk	.req	x28		// current thread_info
->   * Exception vectors.
->   */
->  
-> +	.section ".entry.text", "ax"
->  	.align	11
->  ENTRY(vectors)
->  	ventry	el1_sync_invalid		// Synchronous EL1t
-> @@ -737,3 +738,5 @@ ENTRY(sys_rt_sigreturn_wrapper)
->  	mov	x0, sp
->  	b	sys_rt_sigreturn
->  ENDPROC(sys_rt_sigreturn_wrapper)
-> +
-> +	.section ".text", "ax"
-> diff --git a/arch/arm64/kernel/kprobes.c b/arch/arm64/kernel/kprobes.c
-> index 6c9f8b5f04ce..9bc02c151f7f 100644
-> --- a/arch/arm64/kernel/kprobes.c
-> +++ b/arch/arm64/kernel/kprobes.c
-> @@ -28,6 +28,7 @@
->  #include <asm/debug-monitors.h>
->  #include <asm/system_misc.h>
->  #include <asm/insn.h>
-> +#include <asm-generic/sections.h>
->  
->  #include "kprobes.h"
->  #include "kprobes-arm64.h"
-> @@ -661,6 +662,14 @@ int __kprobes arch_trampoline_kprobe(struct kprobe *p)
->  	return 0;
->  }
->  
-> +bool arch_within_kprobe_blacklist(unsigned long addr)
-> +{
-> +	return  (addr >= (unsigned long)__kprobes_text_start &&
-> +		 addr < (unsigned long)__kprobes_text_end) ||
-> +		(addr >= (unsigned long)__entry_text_start &&
-> +		 addr < (unsigned long)__entry_text_end);
-> +}
-> +
->  int __init arch_init_kprobes(void)
->  {
->  	return 0;
-> diff --git a/arch/arm64/kernel/vmlinux.lds.S b/arch/arm64/kernel/vmlinux.lds.S
-> index 1fa6adc7aa83..11fb2b0117d0 100644
-> --- a/arch/arm64/kernel/vmlinux.lds.S
-> +++ b/arch/arm64/kernel/vmlinux.lds.S
-> @@ -97,6 +97,7 @@ SECTIONS
->  			*(.exception.text)
->  			__exception_text_end = .;
->  			IRQENTRY_TEXT
-> +			ENTRY_TEXT
->  			TEXT_TEXT
->  			SCHED_TEXT
->  			LOCK_TEXT
-> 
+> Thus, if you want to advertise it as a capability, I would rather call
+> it KVM_CAP_MSI_DEVID.
 
+I agree.  Does userspace know that ITS guests always require devid?  I
+guess it's okay to return -EINVAL if the userspace doesn't set the flag
+but the virtual hardware requires it.
 
--- 
-Masami HIRAMATSU
-Linux Technology Research Center, System Productivity Research Dept.
-Center for Technology Innovation - Systems Engineering
-Hitachi, Ltd., Research & Development Group
-E-mail: masami.hiramatsu.pt at hitachi.com
+Paolo
+
+> The question is if userspace code that sets the devid flag will anyway
+> depend on some discovery mechanism of whether or not the kernel supports
+> arm64 irqfd etc. and if so, can we be sure to add the required support
+> at once in the kernel so that EINVAL never means 'you set the flags
+> field on the ioctl on an old kernel'?
+> 
+> This smells an awful lot like a capability to me.
