@@ -1,162 +1,49 @@
-From: rjw@rjwysocki.net (Rafael J. Wysocki)
-Date: Tue, 07 Jul 2015 01:13:21 +0200
-Subject: [PATCH] base: power: wakeirq: don't leak dev->power.wakeirq
-In-Reply-To: <1436205678-31640-1-git-send-email-balbi@ti.com>
-References: <1436205678-31640-1-git-send-email-balbi@ti.com>
-Message-ID: <2783932.o7RC7vMDHB@vostro.rjw.lan>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Mon, 06 Jul 2015 15:52:55 -0700
+Subject: [PATCH v2 1/4] clk: mediatek: mt8173: Fix enabling of critical
+ clocks
+In-Reply-To: <CAGS+omCwxLNha7EJ2nZ1++E-D5G1d-oRmh1C=m3OQWtbX0SH4w@mail.gmail.com>
+References: <1435633127-31952-1-git-send-email-jamesjj.liao@mediatek.com>
+ <1435633127-31952-2-git-send-email-jamesjj.liao@mediatek.com>
+ <20150702230300.GO4301@codeaurora.org>
+ <CAGS+omCwxLNha7EJ2nZ1++E-D5G1d-oRmh1C=m3OQWtbX0SH4w@mail.gmail.com>
+Message-ID: <559B06C7.80209@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday, July 06, 2015 01:01:18 PM Felipe Balbi wrote:
-> on a first call to dev_pm_attach_wake_irq(), if it
-> fails, it will leave dev->power.wakeirq set to a
-> dangling pointer. Instead, let's clear it to make
-> sure a subsequent call to dev_pm_attach_wake_irq()
-> has chance to succeed.
-> 
-> Cc: Tony Lindgren <tmlind@atomide.com>
-> Signed-off-by: Felipe Balbi <balbi@ti.com>
-> ---
->  drivers/base/power/wakeirq.c | 9 ++++++++-
->  1 file changed, 8 insertions(+), 1 deletion(-)
-> 
-> diff --git a/drivers/base/power/wakeirq.c b/drivers/base/power/wakeirq.c
-> index 7470004ca810..394d250a1ad8 100644
-> --- a/drivers/base/power/wakeirq.c
-> +++ b/drivers/base/power/wakeirq.c
-> @@ -50,9 +50,16 @@ static int dev_pm_attach_wake_irq(struct device *dev, int irq,
->  
->  	err = device_wakeup_attach_irq(dev, wirq);
->  	if (err)
-> -		return err;
-> +		goto err_cleanup;
->  
->  	return 0;
-> +
-> +err_cleanup:
-> +	spin_lock_irqsave(&dev->power.lock, flags);
-> +	dev->power.wakeirq = NULL;
-> +	spin_unlock_irqrestore(&dev->power.lock, flags);
-> +
-> +	return err;
->  }
+On 07/02/2015 11:29 PM, Daniel Kurtz wrote:
+> Hi Stephen,
+>
+> On Fri, Jul 3, 2015 at 7:03 AM, Stephen Boyd <sboyd@codeaurora.org> wrote:
+>> On 06/30, James Liao wrote:
+>>> From: Sascha Hauer <s.hauer@pengutronix.de>
+>>>
+>>> On the MT8173 the clocks are provided by different units. To enable
+>>> the critical clocks we must be sure that all parent clocks are already
+>>> registered, otherwise the parents of the critical clocks end up being
+>>> unused and get disabled later. To find a place where all parents are
+>>> registered we try each time after we've registered some clocks if
+>>> all known providers are present now and only then we enable the critical
+>>> clocks
+>>>
+>>> Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
+>>> Signed-off-by: James Liao <jamesjj.liao@mediatek.com>
+>>> ---
+>> Applied to clk-fixes
+> I think James plans to send an updated version of this patch.
+>
+>
 
-Too many labels for me and the fact that acquiring of the lock again in the error
-patch doesn't look good.
+Oh right. Well those comments are minor so I'll just fold them in given
+that I'm rewinding clk-fixes today. I see that comment in init.h about
+uninitialized variables and __initdata too. I found this 10 year old
+thread about that [1]. At least with my gcc-4.9 arm compiler I don't see
+uninitialized __initdata moved to bss. A workaround seems to be to
+initialize it to NULL in this case, but maybe that doesn't matter
+because compilers don't have that problem anymore.
 
-However, we can do the entire device_wakeup_attach_irq() under the lock (after
-removing the locking from it), because we're its only caller.
+[1] http://lkml.iu.edu/hypermail/linux/kernel/0512.0/1366.html
 
-So what about the below instead (build-tested only)?
-
-Rafael
-
-
----
- drivers/base/power/wakeirq.c |   12 +++++-------
- drivers/base/power/wakeup.c  |   31 ++++++++++---------------------
- 2 files changed, 15 insertions(+), 28 deletions(-)
-
-Index: linux-pm/drivers/base/power/wakeirq.c
-===================================================================
---- linux-pm.orig/drivers/base/power/wakeirq.c
-+++ linux-pm/drivers/base/power/wakeirq.c
-@@ -45,14 +45,12 @@ static int dev_pm_attach_wake_irq(struct
- 		return -EEXIST;
- 	}
- 
--	dev->power.wakeirq = wirq;
--	spin_unlock_irqrestore(&dev->power.lock, flags);
--
- 	err = device_wakeup_attach_irq(dev, wirq);
--	if (err)
--		return err;
-+	if (!err)
-+		dev->power.wakeirq = wirq;
- 
--	return 0;
-+	spin_unlock_irqrestore(&dev->power.lock, flags);
-+	return err;
- }
- 
- /**
-@@ -105,10 +103,10 @@ void dev_pm_clear_wake_irq(struct device
- 		return;
- 
- 	spin_lock_irqsave(&dev->power.lock, flags);
-+	device_wakeup_detach_irq(dev);
- 	dev->power.wakeirq = NULL;
- 	spin_unlock_irqrestore(&dev->power.lock, flags);
- 
--	device_wakeup_detach_irq(dev);
- 	if (wirq->dedicated_irq)
- 		free_irq(wirq->irq, wirq);
- 	kfree(wirq);
-Index: linux-pm/drivers/base/power/wakeup.c
-===================================================================
---- linux-pm.orig/drivers/base/power/wakeup.c
-+++ linux-pm/drivers/base/power/wakeup.c
-@@ -281,32 +281,25 @@ EXPORT_SYMBOL_GPL(device_wakeup_enable);
-  * Attach a device wakeirq to the wakeup source so the device
-  * wake IRQ can be configured automatically for suspend and
-  * resume.
-+ *
-+ * Call under the device's power.lock lock.
-  */
- int device_wakeup_attach_irq(struct device *dev,
- 			     struct wake_irq *wakeirq)
- {
- 	struct wakeup_source *ws;
--	int ret = 0;
- 
--	spin_lock_irq(&dev->power.lock);
- 	ws = dev->power.wakeup;
- 	if (!ws) {
- 		dev_err(dev, "forgot to call call device_init_wakeup?\n");
--		ret = -EINVAL;
--		goto unlock;
-+		return -EINVAL;
- 	}
- 
--	if (ws->wakeirq) {
--		ret = -EEXIST;
--		goto unlock;
--	}
-+	if (ws->wakeirq)
-+		return -EEXIST;
- 
- 	ws->wakeirq = wakeirq;
--
--unlock:
--	spin_unlock_irq(&dev->power.lock);
--
--	return ret;
-+	return 0;
- }
- 
- /**
-@@ -314,20 +307,16 @@ unlock:
-  * @dev: Device to handle
-  *
-  * Removes a device wakeirq from the wakeup source.
-+ *
-+ * Call under the device's power.lock lock.
-  */
- void device_wakeup_detach_irq(struct device *dev)
- {
- 	struct wakeup_source *ws;
- 
--	spin_lock_irq(&dev->power.lock);
- 	ws = dev->power.wakeup;
--	if (!ws)
--		goto unlock;
--
--	ws->wakeirq = NULL;
--
--unlock:
--	spin_unlock_irq(&dev->power.lock);
-+	if (ws)
-+		ws->wakeirq = NULL;
- }
- 
- /**
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
