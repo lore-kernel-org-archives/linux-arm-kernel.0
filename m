@@ -1,37 +1,30 @@
-From: linux@roeck-us.net (Guenter Roeck)
-Date: Mon, 06 Jul 2015 13:24:30 -0700
-Subject: [PATCH] watchdog: sunxi: fix activation of system reset
-In-Reply-To: <559AC20B.4090601@gmail.com>
-References: <559AC20B.4090601@gmail.com>
-Message-ID: <559AE3FE.7090202@roeck-us.net>
+From: pali.rohar@gmail.com (=?UTF-8?q?Pali=20Roh=C3=A1r?=)
+Date: Mon,  6 Jul 2015 22:26:08 +0200
+Subject: [PATCH 0/5] ATAGs to DT patches
+Message-ID: <1436214373-12969-1-git-send-email-pali.rohar@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/06/2015 10:59 AM, Francesco Lavra wrote:
-> Commit f2147de3 ("watchdog: sunxi: support parameterized compatible
-> strings") introduced a regression in sunxi_wdt_start(), by which
-> the system reset function of the watchdog is not enabled upon
-> starting the watchdog. Fix it.
->
-> Signed-off-by: Francesco Lavra <francescolavra.fl@gmail.com>
+This patch series converts some legacy ATAGs into DT and provide them to
+userspace. It is needed for userspace applications which needs some
+informations from legacy bootloaders which are not DT compatible.
 
-Reviewed-by: Guenter Roeck <linux@roeck-us.net>
+Patch series is for now without DT documentation files. It was tested in
+QEMU for Nokia N900. File /proc/cpuinfo contains correct "Revision" line
+from ATAG_REVISION and /proc/atags contains full ATAGs structure.
 
-> ---
->   drivers/watchdog/sunxi_wdt.c | 2 +-
->   1 file changed, 1 insertion(+), 1 deletion(-)
->
-> diff --git a/drivers/watchdog/sunxi_wdt.c b/drivers/watchdog/sunxi_wdt.c
-> index a29afb3..47bd8a1 100644
-> --- a/drivers/watchdog/sunxi_wdt.c
-> +++ b/drivers/watchdog/sunxi_wdt.c
-> @@ -184,7 +184,7 @@ static int sunxi_wdt_start(struct watchdog_device *wdt_dev)
->   	/* Set system reset function */
->   	reg = readl(wdt_base + regs->wdt_cfg);
->   	reg &= ~(regs->wdt_reset_mask);
-> -	reg |= ~(regs->wdt_reset_val);
-> +	reg |= regs->wdt_reset_val;
->   	writel(reg, wdt_base + regs->wdt_cfg);
->
->   	/* Enable watchdog */
->
+Pali Roh?r (5):
+  arm: devtree: Set system_rev from DT "/revision"
+  arm: boot: convert ATAG_REVISION to DT "/revision" entry
+  arm: atags: Fix declaration of function save_atags
+  arm: devtree: Read ATAGs structure from DT "/chosen/linux,atags"
+    entry
+  arm: boot: store ATAGs structure into DT "/chosen/linux,atags" entry
+
+ arch/arm/boot/compressed/atags_to_fdt.c |    8 ++++++-
+ arch/arm/kernel/atags.h                 |    4 ++--
+ arch/arm/kernel/devtree.c               |   36 ++++++++++++++++++++++++++++---
+ 3 files changed, 42 insertions(+), 6 deletions(-)
+
+-- 
+1.7.9.5
