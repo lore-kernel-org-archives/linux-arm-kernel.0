@@ -1,163 +1,132 @@
 From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Mon,  6 Jul 2015 15:39:18 +0530
-Subject: [PATCH 1/2] clockevents/drivers/timer-imx-gpt: Migrate to new
+Date: Mon,  6 Jul 2015 15:39:19 +0530
+Subject: [PATCH 2/2] clockevents/drivers/timer-sp804: Migrate to new
  'set-state' interface
 In-Reply-To: <cover.1436177111.git.viresh.kumar@linaro.org>
 References: <cover.1436177111.git.viresh.kumar@linaro.org>
-Message-ID: <e9e1301d9f4ec32949260f507369012a3ed60fef.1436177111.git.viresh.kumar@linaro.org>
+Message-ID: <124d673f1f2fbcb8c5e0955eab94f0dc138980ac.1436177111.git.viresh.kumar@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Migrate timer-imx-gpt driver to the new 'set-state' interface provided
-by clockevents core, the earlier 'set-mode' interface is marked obsolete
+Migrate timer-sp driver to the new 'set-state' interface provided by
+clockevents core, the earlier 'set-mode' interface is marked obsolete
 now.
 
 This also enables us to implement callbacks for new states of clockevent
 devices, for example: ONESHOT_STOPPED.
 
-Also drop:
-- 'imx_timer.cem': It was caching the last state of the clockevent
-  device. The same behavior can be achieved by using clockevents state
-  helpers. These helpers are only required for oneshot mode as
-  shutdown/resume wouldn't be done twice by the core.
+There are few more changes worth noticing:
 
-- 'clock_event_mode_label': CLOCK_EVT_MODE_* shouldn't be used anymore
-  by drivers. The prints are modified to print the set-state functions
-  name now to debug the driver.
+- The clockevent device was disabled by writing: 'TIMER_CTRL_32BIT |
+  TIMER_CTRL_IE' to ctrl register earlier. i.e. by un-setting the
+  TIMER_CTRL_ENABLE bit. Its done by writing zero now and should have
+  the same effect.
 
-Cc: Shawn Guo <shawn.guo@linaro.org>
+- For shutdown and resume we were writing the same value twice to the
+  register (to disable the timer), which is fixed now.
+
+- Switching to oneshot mode was divided into two parts earlier:
+  - Firstly set_mode() was writing:
+    'TIMER_CTRL_32BIT | TIMER_CTRL_IE | TIMER_CTRL_ONESHOT'
+    to ctrl register (device not enabled yet)
+  - Then sp804_set_next_event() was enabling the device by writing
+    'readl(ctrl) | TIMER_CTRL_ENABLE' to the ctrl register. This was
+    unnecessarily complicated.
+  - Change this to: Stop device on set_state_oneshot and configure it in
+    sp804_set_next_event().
+
 Cc: Daniel Lezcano <daniel.lezcano@linaro.org>
+Cc: Russell King <rmk+kernel@arm.linux.org.uk>
+Cc: Sudeep Holla <sudeep.holla@arm.com>
+Cc: Arnd Bergmann <arnd@arndb.de>
+Cc: Catalin Marinas <catalin.marinas@arm.com>
+Cc: Olof Johansson <olof@lixom.net>
 Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
 ---
- drivers/clocksource/timer-imx-gpt.c | 75 +++++++++++++++++++------------------
- 1 file changed, 38 insertions(+), 37 deletions(-)
+ drivers/clocksource/timer-sp804.c | 54 +++++++++++++++++++--------------------
+ 1 file changed, 27 insertions(+), 27 deletions(-)
 
-diff --git a/drivers/clocksource/timer-imx-gpt.c b/drivers/clocksource/timer-imx-gpt.c
-index 879c78423546..5a3ccb7f914f 100644
---- a/drivers/clocksource/timer-imx-gpt.c
-+++ b/drivers/clocksource/timer-imx-gpt.c
-@@ -83,7 +83,6 @@ struct imx_timer {
- 	struct clk *clk_ipg;
- 	const struct imx_gpt_data *gpt;
- 	struct clock_event_device ced;
--	enum clock_event_mode cem;
- 	struct irqaction act;
- };
- 
-@@ -212,18 +211,38 @@ static int v2_set_next_event(unsigned long evt,
- 				-ETIME : 0;
+diff --git a/drivers/clocksource/timer-sp804.c b/drivers/clocksource/timer-sp804.c
+index ca02503f17d1..5f45b9adef60 100644
+--- a/drivers/clocksource/timer-sp804.c
++++ b/drivers/clocksource/timer-sp804.c
+@@ -133,50 +133,50 @@ static irqreturn_t sp804_timer_interrupt(int irq, void *dev_id)
+ 	return IRQ_HANDLED;
  }
  
-+static int mxc_shutdown(struct clock_event_device *ced)
-+{
-+	struct imx_timer *imxtm = to_imx_timer(ced);
-+	unsigned long flags;
-+	u32 tcn;
-+
-+	/*
-+	 * The timer interrupt generation is disabled at least
-+	 * for enough time to call mxc_set_next_event()
-+	 */
-+	local_irq_save(flags);
-+
-+	/* Disable interrupt in GPT module */
-+	imxtm->gpt->gpt_irq_disable(imxtm);
-+
-+	tcn = readl_relaxed(imxtm->base + imxtm->gpt->reg_tcn);
-+	/* Set event time into far-far future */
-+	writel_relaxed(tcn - 3, imxtm->base + imxtm->gpt->reg_tcmp);
-+
-+	/* Clear pending interrupt */
-+	imxtm->gpt->gpt_irq_acknowledge(imxtm);
-+
- #ifdef DEBUG
--static const char *clock_event_mode_label[] = {
--	[CLOCK_EVT_MODE_PERIODIC] = "CLOCK_EVT_MODE_PERIODIC",
--	[CLOCK_EVT_MODE_ONESHOT]  = "CLOCK_EVT_MODE_ONESHOT",
--	[CLOCK_EVT_MODE_SHUTDOWN] = "CLOCK_EVT_MODE_SHUTDOWN",
--	[CLOCK_EVT_MODE_UNUSED]   = "CLOCK_EVT_MODE_UNUSED",
--	[CLOCK_EVT_MODE_RESUME]   = "CLOCK_EVT_MODE_RESUME",
--};
-+	printk(KERN_INFO "%s: changing mode\n", __func__);
- #endif /* DEBUG */
+-static void sp804_set_mode(enum clock_event_mode mode,
+-	struct clock_event_device *evt)
++static inline void timer_shutdown(struct clock_event_device *evt)
+ {
+-	unsigned long ctrl = TIMER_CTRL_32BIT | TIMER_CTRL_IE;
++	writel(0, clkevt_base + TIMER_CTRL);
++}
  
--static void mxc_set_mode(enum clock_event_mode mode,
--				struct clock_event_device *ced)
-+	local_irq_restore(flags);
-+
+-	writel(ctrl, clkevt_base + TIMER_CTRL);
++static int sp804_shutdown(struct clock_event_device *evt)
++{
++	timer_shutdown(evt);
 +	return 0;
 +}
-+
-+static int mxc_set_oneshot(struct clock_event_device *ced)
- {
- 	struct imx_timer *imxtm = to_imx_timer(ced);
- 	unsigned long flags;
-@@ -237,7 +256,7 @@ static void mxc_set_mode(enum clock_event_mode mode,
- 	/* Disable interrupt in GPT module */
- 	imxtm->gpt->gpt_irq_disable(imxtm);
  
--	if (mode != imxtm->cem) {
-+	if (!clockevent_state_oneshot(ced)) {
- 		u32 tcn = readl_relaxed(imxtm->base + imxtm->gpt->reg_tcn);
- 		/* Set event time into far-far future */
- 		writel_relaxed(tcn - 3, imxtm->base + imxtm->gpt->reg_tcmp);
-@@ -247,37 +266,19 @@ static void mxc_set_mode(enum clock_event_mode mode,
- 	}
- 
- #ifdef DEBUG
--	printk(KERN_INFO "mxc_set_mode: changing mode from %s to %s\n",
--		clock_event_mode_label[imxtm->cem],
--		clock_event_mode_label[mode]);
-+	printk(KERN_INFO "%s: changing mode\n", __func__);
- #endif /* DEBUG */
- 
--	/* Remember timer mode */
--	imxtm->cem = mode;
--	local_irq_restore(flags);
--
 -	switch (mode) {
 -	case CLOCK_EVT_MODE_PERIODIC:
--		printk(KERN_ERR"mxc_set_mode: Periodic mode is not "
--				"supported for i.MX\n");
+-		writel(clkevt_reload, clkevt_base + TIMER_LOAD);
+-		ctrl |= TIMER_CTRL_PERIODIC | TIMER_CTRL_ENABLE;
 -		break;
+-
 -	case CLOCK_EVT_MODE_ONESHOT:
- 	/*
- 	 * Do not put overhead of interrupt enable/disable into
- 	 * mxc_set_next_event(), the core has about 4 minutes
- 	 * to call mxc_set_next_event() or shutdown clock after
- 	 * mode switching
- 	 */
--		local_irq_save(flags);
--		imxtm->gpt->gpt_irq_enable(imxtm);
--		local_irq_restore(flags);
+-		/* period set, and timer enabled in 'next_event' hook */
+-		ctrl |= TIMER_CTRL_ONESHOT;
 -		break;
--	case CLOCK_EVT_MODE_SHUTDOWN:
+-
 -	case CLOCK_EVT_MODE_UNUSED:
--	case CLOCK_EVT_MODE_RESUME:
--		/* Left event sources disabled, no more interrupts appear */
+-	case CLOCK_EVT_MODE_SHUTDOWN:
+-	default:
 -		break;
 -	}
-+	imxtm->gpt->gpt_irq_enable(imxtm);
-+	local_irq_restore(flags);
-+
++static int sp804_set_periodic(struct clock_event_device *evt)
++{
++	unsigned long ctrl = TIMER_CTRL_32BIT | TIMER_CTRL_IE |
++			     TIMER_CTRL_PERIODIC | TIMER_CTRL_ENABLE;
+ 
++	timer_shutdown(evt);
++	writel(clkevt_reload, clkevt_base + TIMER_LOAD);
+ 	writel(ctrl, clkevt_base + TIMER_CTRL);
 +	return 0;
  }
  
- /*
-@@ -303,11 +304,11 @@ static int __init mxc_clockevent_init(struct imx_timer *imxtm)
- 	struct clock_event_device *ced = &imxtm->ced;
- 	struct irqaction *act = &imxtm->act;
+ static int sp804_set_next_event(unsigned long next,
+ 	struct clock_event_device *evt)
+ {
+-	unsigned long ctrl = readl(clkevt_base + TIMER_CTRL);
++	unsigned long ctrl = TIMER_CTRL_32BIT | TIMER_CTRL_IE |
++			     TIMER_CTRL_ONESHOT | TIMER_CTRL_ENABLE;
  
--	imxtm->cem = CLOCK_EVT_MODE_UNUSED;
--
- 	ced->name = "mxc_timer1";
- 	ced->features = CLOCK_EVT_FEAT_ONESHOT;
--	ced->set_mode = mxc_set_mode;
-+	ced->set_state_shutdown = mxc_shutdown;
-+	ced->set_state_oneshot = mxc_set_oneshot;
-+	ced->tick_resume = mxc_shutdown;
- 	ced->set_next_event = imxtm->gpt->set_next_event;
- 	ced->rating = 200;
- 	ced->cpumask = cpumask_of(0);
+ 	writel(next, clkevt_base + TIMER_LOAD);
+-	writel(ctrl | TIMER_CTRL_ENABLE, clkevt_base + TIMER_CTRL);
++	writel(ctrl, clkevt_base + TIMER_CTRL);
+ 
+ 	return 0;
+ }
+ 
+ static struct clock_event_device sp804_clockevent = {
+-	.features       = CLOCK_EVT_FEAT_PERIODIC | CLOCK_EVT_FEAT_ONESHOT |
+-		CLOCK_EVT_FEAT_DYNIRQ,
+-	.set_mode	= sp804_set_mode,
+-	.set_next_event	= sp804_set_next_event,
+-	.rating		= 300,
++	.features		= CLOCK_EVT_FEAT_PERIODIC |
++				  CLOCK_EVT_FEAT_ONESHOT |
++				  CLOCK_EVT_FEAT_DYNIRQ,
++	.set_state_shutdown	= sp804_shutdown,
++	.set_state_periodic	= sp804_set_periodic,
++	.set_state_oneshot	= sp804_shutdown,
++	.tick_resume		= sp804_shutdown,
++	.set_next_event		= sp804_set_next_event,
++	.rating			= 300,
+ };
+ 
+ static struct irqaction sp804_timer_irq = {
 -- 
 2.4.0
