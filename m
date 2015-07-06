@@ -1,62 +1,27 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Mon, 6 Jul 2015 10:22:58 -0500
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 6 Jul 2015 08:24:23 -0700
 Subject: [RESEND] [PATCH v2 1/2] arm: devtree: Set system_rev from DT
  revision
-In-Reply-To: <201507061512.27124@pali>
+In-Reply-To: <CAL_JsqK193CBPwvDpPvpDSbGFRfkpxpox45parCoC+ofWE4hUA@mail.gmail.com>
 References: <1430902142-17035-1-git-send-email-pali.rohar@gmail.com>
+ <20150506114417.GI30910@pali> <20150625050138.GL4156@atomide.com>
  <201507061423.23505@pali> <20150706123126.GG10705@atomide.com>
- <201507061512.27124@pali>
-Message-ID: <CAL_Jsq+ysDqxTgfW1JvG5czHa4UkZQDv1BN63iK4jvV9kDXM8w@mail.gmail.com>
+ <CAL_JsqK193CBPwvDpPvpDSbGFRfkpxpox45parCoC+ofWE4hUA@mail.gmail.com>
+Message-ID: <20150706152423.GK10705@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 6, 2015 at 8:12 AM, Pali Roh?r <pali.rohar@gmail.com> wrote:
-> On Monday 06 July 2015 14:31:27 Tony Lindgren wrote:
->> * Pali Roh?r <pali.rohar@gmail.com> [150706 05:25]:
->> > into which file should I put documentation about new DT properties?
->>
->> If it's Linux generic like linux,revision, then how about
->> Documentation/devicetree/bindings/revision.txt?
->>
->> For the ATAGs, Documentation/devicetree/bindings/arm/atag.txt?
->>
->> Regards,
->>
->> Tony
->
-> Hm... now I'm thinking into which DT field should I put atags and
-> revision. In previous emails you wrote to use "linux,atags", now
-> "arm,atags"? And put them into root node? Or other?
->
-> In arch/arm/boot/compressed/atags_to_fdt.c code I see that most atag
-> properties are converted into "/chosen" node in DT...
->
-> So what do you prefer for "revision" and what for "atags"?
->
-> Some mentioned examples:
->
-> "/revision"
+* Rob Herring <robherring2@gmail.com> [150706 08:23]:
+> On Mon, Jul 6, 2015 at 7:31 AM, Tony Lindgren <tony@atomide.com> wrote:
+> > * Pali Roh?r <pali.rohar@gmail.com> [150706 05:25]:
+> >>
+> >> into which file should I put documentation about new DT properties?
+> >
+> > If it's Linux generic like linux,revision, then how about
+> 
+> Just "revision" at the top level please. I'd prefer a string still,
+> but either is fine.
 
-This one. This is a top level h/w property.
+OK works for me thanks.
 
-> "/chosen/revision"
-> "/linux,revision"
-> "/chosen/linux,revision"
-> ...
->
-> "/atags"
-> "/chosen/atags"
-> "/linux,atags"
-> "/chosen/linux,atags"
-
-This one. ATAGs are a Linux data struct.
-
-Rob
-
-> "/arm,atags"
-> "/chosen/arm,atags"
-> ...
->
-> --
-> Pali Roh?r
-> pali.rohar at gmail.com
+Tony
