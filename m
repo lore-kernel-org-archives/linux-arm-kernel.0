@@ -1,56 +1,64 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Mon,  6 Jul 2015 09:58:32 +0100
-Subject: [RESEND 10/10] regulator: pwm-regulator: Don't assign structure
- attributes right away
-In-Reply-To: <1436173112-21397-1-git-send-email-lee.jones@linaro.org>
-References: <1436173112-21397-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1436173112-21397-11-git-send-email-lee.jones@linaro.org>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Mon, 6 Jul 2015 10:57:13 +0200
+Subject: [linux-sunxi] Re: [PATCH 2/3] ARM: dts: axp152: Add a dtsi file
+ for the axp152 pmic
+In-Reply-To: <558D0BC2.10004@redhat.com>
+References: <1435088503-20776-1-git-send-email-hdegoede@redhat.com>
+ <1435088503-20776-3-git-send-email-hdegoede@redhat.com>
+ <20150625174027.GF2266@lukather> <558D0BC2.10004@redhat.com>
+Message-ID: <20150706085713.GE3269@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Perhaps this is just personal preference, but ...
+Hi,
 
-This patch introduces a new local variable to receive and test regulator
-initialisation data.  It simplifies and cleans up the code making it
-that little bit easier to read and maintain.  The local value is assigned
-to the structure attribute when all the others are.  This is the way we
-usually do things.
+On Fri, Jun 26, 2015 at 10:22:26AM +0200, Hans de Goede wrote:
+> Hi,
+> 
+> On 25-06-15 19:40, Maxime Ripard wrote:
+> >Hi,
+> >
+> >On Tue, Jun 23, 2015 at 09:41:42PM +0200, Hans de Goede wrote:
+> >>From: Michal Suchanek <hramrach@gmail.com>
+> >>
+> >>Add a dtsi file for the axp152 pmic, this mirrors the way things are
+> >>handled for the axp202 pmic.
+> >>
+> >>Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+> >>---
+> >>  arch/arm/boot/dts/axp152.dtsi | 49 +++++++++++++++++++++++++++++++++++++++++++
+> >>  1 file changed, 49 insertions(+)
+> >>  create mode 100644 arch/arm/boot/dts/axp152.dtsi
+> >
+> >Unfortunately, Mark expressed clearly that he didn't want such files.
+> 
+> That is not how I remember the discussion, he said that he did not consider
+> them useful, we explained why we do consider them useful for the sunxi
+> case and then things went quiet.
+> 
+> And we do already have an axp209.dtsi, and I find having that useful
+> for enabling the regulators on axp209 using boards.
 
-Signed-off-by: Lee Jones <lee.jones@linaro.org>
----
- drivers/regulator/pwm-regulator.c | 8 +++++---
- 1 file changed, 5 insertions(+), 3 deletions(-)
+Hmmm, reading this discussion again, it indeed looks like I
+misremembered what he was saying.
 
-diff --git a/drivers/regulator/pwm-regulator.c b/drivers/regulator/pwm-regulator.c
-index d5cb267..cb48208 100644
---- a/drivers/regulator/pwm-regulator.c
-+++ b/drivers/regulator/pwm-regulator.c
-@@ -218,6 +218,7 @@ static int pwm_regulator_init_continuous(struct platform_device *pdev,
- 
- static int pwm_regulator_probe(struct platform_device *pdev)
- {
-+	const struct regulator_init_data *init_data;
- 	struct pwm_regulator_data *drvdata;
- 	struct regulator_dev *regulator;
- 	struct regulator_config config = { };
-@@ -240,14 +241,15 @@ static int pwm_regulator_probe(struct platform_device *pdev)
- 	if (ret)
- 		return ret;
- 
--	config.init_data = of_get_regulator_init_data(&pdev->dev, np,
--						      &pwm_regulator_desc);
--	if (!config.init_data)
-+	init_data = of_get_regulator_init_data(&pdev->dev, np,
-+					       &pwm_regulator_desc);
-+	if (!init_data)
- 		return -ENOMEM;
- 
- 	config.of_node = np;
- 	config.dev = &pdev->dev;
- 	config.driver_data = drvdata;
-+	config.init_data = init_data;
- 
- 	drvdata->pwm = devm_pwm_get(&pdev->dev, NULL);
- 	if (IS_ERR(drvdata->pwm)) {
+> Ultimately it is your call, but I really think we should be consistent
+> and add an axp152.dtsi to mirror how we do things with the axp209.
+
+Was there any other comments on this serie (and are you going to send
+a v2?) or should I apply this patch?
+
+Thanks,
+Maxime
+
 -- 
-1.9.1
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150706/92db4319/attachment.sig>
