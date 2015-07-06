@@ -1,41 +1,25 @@
-From: andre.przywara@arm.com (Andre Przywara)
-Date: Mon, 6 Jul 2015 17:08:26 +0100
-Subject: [PATCH 1/7] KVM: api: add kvm_irq_routing_extended_msi
-In-Reply-To: <559AA4CF.7060300@redhat.com>
-References: <1435592237-17924-1-git-send-email-eric.auger@linaro.org>
- <1435592237-17924-2-git-send-email-eric.auger@linaro.org>
- <011f01d0b498$6a17aeb0$3e470c10$@samsung.com> <5596503E.6040902@arm.com>
- <00fd01d0b7b6$f6cf3550$e46d9ff0$@samsung.com> <559A3C9C.6050302@arm.com>
- <20150706093026.GA11590@cbox> <559A52E6.5050402@arm.com>
- <20150706103755.GC11590@cbox> <559A6164.1000401@redhat.com>
- <559A6527.1040107@arm.com> <559A6BBC.2040901@redhat.com>
- <024301d0b7f0$2b13b410$813b1c30$@samsung.com> <559AA0D6.7070703@arm.com>
- <559AA4CF.7060300@redhat.com>
-Message-ID: <559AA7FA.5010804@arm.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Mon, 6 Jul 2015 17:15:31 +0100
+Subject: [PATCH] arm64: remove another unnecessary libfdt include path
+In-Reply-To: <1436195289-20904-1-git-send-email-ard.biesheuvel@linaro.org>
+References: <1436195289-20904-1-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <20150706161531.GF27723@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/07/15 16:54, Paolo Bonzini wrote:
+On Mon, Jul 06, 2015 at 05:08:09PM +0200, Ard Biesheuvel wrote:
+> Patch 63a4aea55670 ("of: clean-up unnecessary libfdt include paths")
+> removed all explicit libfdt include paths, since those are no longer
+> necessary after the latest dtc upgrade. However, this one snuck in
+> during the same merge window. Remove it.
 > 
+> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> ---
 > 
-> On 06/07/2015 17:37, Andre Przywara wrote:
->> Wouldn't:
->>     if (kvm_vm_check_extension(s, KVM_CAP_MSI_DEVID)) {
->>         kroute.flags = KVM_MSI_VALID_DEVID;
->>         kroute.u.msi.devid = (pci_bus_num(dev->bus) << 8) | dev->devfn;
->>     }
->>
->> be saner (without a global variable)?
->> That would make the interface more consistent, with a new flag being
->> protected by a new capability.
-> 
-> I agree that your version is niceer, but you still need to cache the
-> kvm_vm_check_extension result... in a global variable. :)
+> This should go on top of 4.2-rc1, since the mentioned patch was merged
+> through the DT tree.
 
-I used a static variable in a wrapper function in kvmtool ;-)
-TBH my argument wasn't so much about global variables (just saw that
-QEMU seems to use them already), but more about a consistent and
-architecture agnostic interface.
+Applied. Thanks.
 
-Ciao!
-Andre.
+-- 
+Catalin
