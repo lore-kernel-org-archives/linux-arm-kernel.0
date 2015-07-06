@@ -1,38 +1,31 @@
-From: masami.hiramatsu.pt@hitachi.com (Masami Hiramatsu)
-Date: Mon, 06 Jul 2015 20:37:49 +0900
-Subject: [PATCH 1/2] arm64: Blacklist non-kprobe-able symbols
-In-Reply-To: <20150706090323.GB30342@arm.com>
-References: <cover.1436158027.git.panand@redhat.com>
- <9994841a0b0a8194a6dcc1b6af148ba358488c62.1436158027.git.panand@redhat.com>
- <20150706090323.GB30342@arm.com>
-Message-ID: <559A688D.1040501@hitachi.com>
+From: baruch@tkos.co.il (Baruch Siach)
+Date: Mon,  6 Jul 2015 14:41:46 +0300
+Subject: [PATCH 4/4] MAINTAINERS: digicolor: add dts files
+In-Reply-To: <cover.1436182214.git.baruch@tkos.co.il>
+References: <cover.1436182214.git.baruch@tkos.co.il>
+Message-ID: <d28ee8b987e62ae4dd0332700f4a792ee8287065.1436182214.git.baruch@tkos.co.il>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2015/07/06 18:03, Will Deacon wrote:
-> On Mon, Jul 06, 2015 at 06:03:21AM +0100, Pratyush Anand wrote:
->> Add all function symbols which are called from do_debug_exception under
->> NOKPROBE_SYMBOL, as they can not kprobed.
-> 
-> It's a shame this has to be so manual, but I suppose it's done on a
-> best-effort basis to catch broken probe placement.
+The 'digicolor' regexp doesn't cover the dts files. Add a glob pattern for
+them.
 
-Ah, yes. You can use kprobe-tracer in ftrace by feeding all symbols to
-them and enabling it (and pray).
+Signed-off-by: Baruch Siach <baruch@tkos.co.il>
+---
+ MAINTAINERS | 1 +
+ 1 file changed, 1 insertion(+)
 
-
-> If we miss a function and somebody probes it, do we just get stuck in a
-> recursive exception, or could we print something suggesting that a symbol
-> be annotated as NOKPROBE?
-
-For some cases we can detect recursion, but usually, it may reset
-itself or infinite recursion loop before detecting it. :(
-
-Thank you,
-
+diff --git a/MAINTAINERS b/MAINTAINERS
+index 8133cefb6b6e..3961bc4b0ba6 100644
+--- a/MAINTAINERS
++++ b/MAINTAINERS
+@@ -1001,6 +1001,7 @@ ARM/CONEXANT DIGICOLOR MACHINE SUPPORT
+ M:	Baruch Siach <baruch@tkos.co.il>
+ L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
+ S:	Maintained
++F:	arch/arm/boot/dts/cx92755*
+ N:	digicolor
+ 
+ ARM/EBSA110 MACHINE SUPPORT
 -- 
-Masami HIRAMATSU
-Linux Technology Research Center, System Productivity Research Dept.
-Center for Technology Innovation - Systems Engineering
-Hitachi, Ltd., Research & Development Group
-E-mail: masami.hiramatsu.pt at hitachi.com
+2.1.4
