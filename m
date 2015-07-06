@@ -1,140 +1,96 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Mon,  6 Jul 2015 16:24:25 +0530
-Subject: [PATCH 18/18] ARM/orion/time: Migrate to new 'set-state' interface
-In-Reply-To: <cover.1436178990.git.viresh.kumar@linaro.org>
-References: <cover.1436178990.git.viresh.kumar@linaro.org>
-Message-ID: <8fb1a75b41a99d61172acba2446a66166639f741.1436178990.git.viresh.kumar@linaro.org>
+From: masami.hiramatsu.pt@hitachi.com (Masami Hiramatsu)
+Date: Mon, 06 Jul 2015 20:03:17 +0900
+Subject: [PATCH 2/2] arm64: Make all entry code as non-kprobe-able
+In-Reply-To: <683f80cef9b2b778be868e77b01a245585448a86.1436158027.git.panand@redhat.com>
+References: <cover.1436158027.git.panand@redhat.com>
+ <683f80cef9b2b778be868e77b01a245585448a86.1436158027.git.panand@redhat.com>
+Message-ID: <559A6075.5070502@hitachi.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Migrate orion driver to the new 'set-state' interface provided by
-clockevents core, the earlier 'set-mode' interface is marked obsolete
-now.
+On 2015/07/06 14:03, Pratyush Anand wrote:
+> Entry symbols are not kprobe safe. So blacklist them for kprobing.
 
-This also enables us to implement callbacks for new states of clockevent
-devices, for example: ONESHOT_STOPPED.
+As I've said, you can also use _ASM_NOKPROBE().
+This patch itself looks good to me, but I'd like to ask arm64
+maintainers' opinion, whether they accept introducing entry-text
+section only for this purpose or not.
 
-Cc: Jason Cooper <jason@lakedaemon.net>
-Cc: Andrew Lunn <andrew@lunn.ch>
-Cc: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
-Cc: Gregory Clement <gregory.clement@free-electrons.com>
-Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
----
- arch/arm/plat-orion/time.c | 93 ++++++++++++++++++++++++----------------------
- 1 file changed, 48 insertions(+), 45 deletions(-)
+Reviewed-by: Masami Hiramatsu <masami.hiramatsu.pt@hitachi.com>
 
-diff --git a/arch/arm/plat-orion/time.c b/arch/arm/plat-orion/time.c
-index 261258f717fc..8085a8aac812 100644
---- a/arch/arm/plat-orion/time.c
-+++ b/arch/arm/plat-orion/time.c
-@@ -106,60 +106,63 @@ orion_clkevt_next_event(unsigned long delta, struct clock_event_device *dev)
- 	return 0;
- }
- 
--static void
--orion_clkevt_mode(enum clock_event_mode mode, struct clock_event_device *dev)
-+static int orion_clkevt_shutdown(struct clock_event_device *evt)
- {
- 	unsigned long flags;
- 	u32 u;
- 
- 	local_irq_save(flags);
--	if (mode == CLOCK_EVT_MODE_PERIODIC) {
--		/*
--		 * Setup timer to fire at 1/HZ intervals.
--		 */
--		writel(ticks_per_jiffy - 1, timer_base + TIMER1_RELOAD_OFF);
--		writel(ticks_per_jiffy - 1, timer_base + TIMER1_VAL_OFF);
--
--		/*
--		 * Enable timer interrupt.
--		 */
--		u = readl(bridge_base + BRIDGE_MASK_OFF);
--		writel(u | BRIDGE_INT_TIMER1, bridge_base + BRIDGE_MASK_OFF);
--
--		/*
--		 * Enable timer.
--		 */
--		u = readl(timer_base + TIMER_CTRL_OFF);
--		writel(u | TIMER1_EN | TIMER1_RELOAD_EN,
--		       timer_base + TIMER_CTRL_OFF);
--	} else {
--		/*
--		 * Disable timer.
--		 */
--		u = readl(timer_base + TIMER_CTRL_OFF);
--		writel(u & ~TIMER1_EN, timer_base + TIMER_CTRL_OFF);
--
--		/*
--		 * Disable timer interrupt.
--		 */
--		u = readl(bridge_base + BRIDGE_MASK_OFF);
--		writel(u & ~BRIDGE_INT_TIMER1, bridge_base + BRIDGE_MASK_OFF);
--
--		/*
--		 * ACK pending timer interrupt.
--		 */
--		writel(bridge_timer1_clr_mask, bridge_base + BRIDGE_CAUSE_OFF);
--
--	}
-+
-+	/* Disable timer */
-+	u = readl(timer_base + TIMER_CTRL_OFF);
-+	writel(u & ~TIMER1_EN, timer_base + TIMER_CTRL_OFF);
-+
-+	/* Disable timer interrupt */
-+	u = readl(bridge_base + BRIDGE_MASK_OFF);
-+	writel(u & ~BRIDGE_INT_TIMER1, bridge_base + BRIDGE_MASK_OFF);
-+
-+	/* ACK pending timer interrupt */
-+	writel(bridge_timer1_clr_mask, bridge_base + BRIDGE_CAUSE_OFF);
-+
-+	local_irq_restore(flags);
-+
-+	return 0;
-+}
-+
-+static int orion_clkevt_set_periodic(struct clock_event_device *evt)
-+{
-+	unsigned long flags;
-+	u32 u;
-+
-+	local_irq_save(flags);
-+
-+	/* Setup timer to fire at 1/HZ intervals */
-+	writel(ticks_per_jiffy - 1, timer_base + TIMER1_RELOAD_OFF);
-+	writel(ticks_per_jiffy - 1, timer_base + TIMER1_VAL_OFF);
-+
-+	/* Enable timer interrupt */
-+	u = readl(bridge_base + BRIDGE_MASK_OFF);
-+	writel(u | BRIDGE_INT_TIMER1, bridge_base + BRIDGE_MASK_OFF);
-+
-+	/* Enable timer */
-+	u = readl(timer_base + TIMER_CTRL_OFF);
-+	writel(u | TIMER1_EN | TIMER1_RELOAD_EN, timer_base + TIMER_CTRL_OFF);
-+
- 	local_irq_restore(flags);
-+
-+	return 0;
- }
- 
- static struct clock_event_device orion_clkevt = {
--	.name		= "orion_tick",
--	.features	= CLOCK_EVT_FEAT_ONESHOT | CLOCK_EVT_FEAT_PERIODIC,
--	.rating		= 300,
--	.set_next_event	= orion_clkevt_next_event,
--	.set_mode	= orion_clkevt_mode,
-+	.name			= "orion_tick",
-+	.features		= CLOCK_EVT_FEAT_ONESHOT |
-+				  CLOCK_EVT_FEAT_PERIODIC,
-+	.rating			= 300,
-+	.set_next_event		= orion_clkevt_next_event,
-+	.set_state_shutdown	= orion_clkevt_shutdown,
-+	.set_state_periodic	= orion_clkevt_set_periodic,
-+	.set_state_oneshot	= orion_clkevt_shutdown,
-+	.tick_resume		= orion_clkevt_shutdown,
- };
- 
- static irqreturn_t orion_timer_interrupt(int irq, void *dev_id)
+Thank you,
+
+> 
+> Signed-off-by: Pratyush Anand <panand@redhat.com>
+> ---
+>  arch/arm64/kernel/entry.S       | 3 +++
+>  arch/arm64/kernel/kprobes.c     | 9 +++++++++
+>  arch/arm64/kernel/vmlinux.lds.S | 1 +
+>  3 files changed, 13 insertions(+)
+> 
+> diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
+> index a7691a378668..2ea24f6bc06b 100644
+> --- a/arch/arm64/kernel/entry.S
+> +++ b/arch/arm64/kernel/entry.S
+> @@ -202,6 +202,7 @@ tsk	.req	x28		// current thread_info
+>   * Exception vectors.
+>   */
+>  
+> +	.section ".entry.text", "ax"
+>  	.align	11
+>  ENTRY(vectors)
+>  	ventry	el1_sync_invalid		// Synchronous EL1t
+> @@ -737,3 +738,5 @@ ENTRY(sys_rt_sigreturn_wrapper)
+>  	mov	x0, sp
+>  	b	sys_rt_sigreturn
+>  ENDPROC(sys_rt_sigreturn_wrapper)
+> +
+> +	.section ".text", "ax"
+> diff --git a/arch/arm64/kernel/kprobes.c b/arch/arm64/kernel/kprobes.c
+> index 6c9f8b5f04ce..9bc02c151f7f 100644
+> --- a/arch/arm64/kernel/kprobes.c
+> +++ b/arch/arm64/kernel/kprobes.c
+> @@ -28,6 +28,7 @@
+>  #include <asm/debug-monitors.h>
+>  #include <asm/system_misc.h>
+>  #include <asm/insn.h>
+> +#include <asm-generic/sections.h>
+>  
+>  #include "kprobes.h"
+>  #include "kprobes-arm64.h"
+> @@ -661,6 +662,14 @@ int __kprobes arch_trampoline_kprobe(struct kprobe *p)
+>  	return 0;
+>  }
+>  
+> +bool arch_within_kprobe_blacklist(unsigned long addr)
+> +{
+> +	return  (addr >= (unsigned long)__kprobes_text_start &&
+> +		 addr < (unsigned long)__kprobes_text_end) ||
+> +		(addr >= (unsigned long)__entry_text_start &&
+> +		 addr < (unsigned long)__entry_text_end);
+> +}
+> +
+>  int __init arch_init_kprobes(void)
+>  {
+>  	return 0;
+> diff --git a/arch/arm64/kernel/vmlinux.lds.S b/arch/arm64/kernel/vmlinux.lds.S
+> index 1fa6adc7aa83..11fb2b0117d0 100644
+> --- a/arch/arm64/kernel/vmlinux.lds.S
+> +++ b/arch/arm64/kernel/vmlinux.lds.S
+> @@ -97,6 +97,7 @@ SECTIONS
+>  			*(.exception.text)
+>  			__exception_text_end = .;
+>  			IRQENTRY_TEXT
+> +			ENTRY_TEXT
+>  			TEXT_TEXT
+>  			SCHED_TEXT
+>  			LOCK_TEXT
+> 
+
+
 -- 
-2.4.0
+Masami HIRAMATSU
+Linux Technology Research Center, System Productivity Research Dept.
+Center for Technology Innovation - Systems Engineering
+Hitachi, Ltd., Research & Development Group
+E-mail: masami.hiramatsu.pt at hitachi.com
