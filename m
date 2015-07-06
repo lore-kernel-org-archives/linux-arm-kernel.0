@@ -1,52 +1,39 @@
 From: eric.auger@linaro.org (Eric Auger)
-Date: Mon,  6 Jul 2015 15:24:39 +0200
-Subject: [RFC v2 5/9] VFIO: platform: add vfio_platform_is_active
+Date: Mon,  6 Jul 2015 15:24:40 +0200
+Subject: [RFC v2 6/9] irq: bypass: add active field on producer side
 In-Reply-To: <1436189083-32527-1-git-send-email-eric.auger@linaro.org>
 References: <1436189083-32527-1-git-send-email-eric.auger@linaro.org>
-Message-ID: <1436189083-32527-6-git-send-email-eric.auger@linaro.org>
+Message-ID: <1436189083-32527-7-git-send-email-eric.auger@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This function returns whether the IRQ is active at irqchip level or
-VFIO masked. If either is true, it is considered the IRQ is active.
-Currently there is no way to differentiate userspace masked IRQ from
-automasked IRQ. There might be false detection of activity. However
-it is currently acceptable to have false detection.
+An active boolean is introduced on producer side: it reflects whether
+the source is active (at interrupt controller level or at VFIO level
+- automasked -).
+
+This is a temporary hack for ARM IRQ forwarding with vfio platform.
+I think the connect and disconnect should become callbacks too.
+This would make possible to handle error in the process. Typically
+active could be returned by producer->stop and analyzed before going
+further. in that case the list_add only if connect returns 0.
 
 Signed-off-by: Eric Auger <eric.auger@linaro.org>
-
 ---
----
- drivers/vfio/platform/vfio_platform_irq.c | 17 +++++++++++++++++
- 1 file changed, 17 insertions(+)
+ include/linux/irqbypass.h | 2 ++
+ 1 file changed, 2 insertions(+)
 
-diff --git a/drivers/vfio/platform/vfio_platform_irq.c b/drivers/vfio/platform/vfio_platform_irq.c
-index aa540db..d00ed24 100644
---- a/drivers/vfio/platform/vfio_platform_irq.c
-+++ b/drivers/vfio/platform/vfio_platform_irq.c
-@@ -203,6 +203,23 @@ static int vfio_platform_set_automasked(struct vfio_platform_irq *irq,
- 	return 0;
- }
- 
-+static int vfio_platform_is_active(struct vfio_platform_irq *irq)
-+{
-+	unsigned long flags;
-+	bool active, masked, outstanding;
-+	int ret;
-+
-+	spin_lock_irqsave(&irq->lock, flags);
-+
-+	ret = irq_get_irqchip_state(irq->hwirq, IRQCHIP_STATE_ACTIVE, &active);
-+	BUG_ON(ret);
-+	masked = irq->masked;
-+	outstanding = active || masked;
-+
-+	spin_unlock_irqrestore(&irq->lock, flags);
-+	return outstanding;
-+}
-+
- static void vfio_platform_irq_bypass_stop(struct irq_bypass_producer *prod)
- {
- }
+diff --git a/include/linux/irqbypass.h b/include/linux/irqbypass.h
+index 8f62235..c89c3a8 100644
+--- a/include/linux/irqbypass.h
++++ b/include/linux/irqbypass.h
+@@ -9,6 +9,8 @@ struct irq_bypass_producer {
+ 	struct list_head node;
+ 	void *token;
+ 	int irq; /* linux irq */
++	/* is irq active at irqchip or VFIO masked? */
++	bool active;
+ 	void (*stop)(struct irq_bypass_producer *);
+ 	void (*resume)(struct irq_bypass_producer *);
+ 	void (*add_consumer)(struct irq_bypass_producer *,
 -- 
 1.9.1
