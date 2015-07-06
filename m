@@ -1,115 +1,52 @@
-From: shannon.zhao@linaro.org (shannon.zhao at linaro.org)
-Date: Mon,  6 Jul 2015 10:17:48 +0800
-Subject: [PATCH 18/18] KVM: ARM64: Add KVM_CAP_ARM_PMU and KVM_ARM_PMU_SET_IRQ
-In-Reply-To: <1436149068-3784-1-git-send-email-shannon.zhao@linaro.org>
-References: <1436149068-3784-1-git-send-email-shannon.zhao@linaro.org>
-Message-ID: <1436149068-3784-19-git-send-email-shannon.zhao@linaro.org>
+From: 21cnbao@gmail.com (Barry Song)
+Date: Mon, 6 Jul 2015 10:35:12 +0800
+Subject: [GIT PULL] CSR atlas7 pinctrl descriptions for 4.2
+In-Reply-To: <CAGsJ_4x7rSFCJW6=9=WpGSUBf0yaCpcxXA22W5k+mZ=9qk5SGg@mail.gmail.com>
+References: <CAGsJ_4x7rSFCJW6=9=WpGSUBf0yaCpcxXA22W5k+mZ=9qk5SGg@mail.gmail.com>
+Message-ID: <CAGsJ_4yXsmB9tSpwaLYPLAJHXVRqgZeaAO_VirOX2F3XE_o8bA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Shannon Zhao <shannon.zhao@linaro.org>
+2015-06-10 15:35 GMT+08:00 Barry Song <21cnbao@gmail.com>:
+> Hi Arnd, Kevin, Olof,
+>
+> The following changes since commit b787f68c36d49bb1d9236f403813641efa74a031:
+>
+>   Linux 4.1-rc1 (2015-04-26 17:59:10 -0700)
+>
+> are available in the git repository at:
+>
+>   git://git.kernel.org/pub/scm/linux/kernel/git/baohua/linux.git
+> tags/atlas7-pinctrl-dts-for-4.2
+>
+> for you to fetch changes up to 27b0d37e4209f3fc40c65e2b7936ee4154f4070d:
+>
+>   ARM: dts: atlas7: add pinctrl and gpio descriptions (2015-06-10
+> 15:00:50 +0800)
 
-Add KVM_CAP_ARM_PMU for userspace to check whether KVM supports PMU. Add
-KVM_ARM_PMU_SET_IRQ for userspace to set PMU IRQ number.
+Hi Arnd, Kevin, Olof,
 
-Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
----
- arch/arm/kvm/arm.c       | 8 ++++++++
- include/kvm/arm_pmu.h    | 5 +++++
- include/uapi/linux/kvm.h | 4 ++++
- virt/kvm/arm/pmu.c       | 9 +++++++++
- 4 files changed, 26 insertions(+)
+have you missed this one? it is a follow-up patch to "pinctrl: sirf:
+add sirf atlas7 pinctrl and gpio support"
 
-diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
-index 41eb063..350866e 100644
---- a/arch/arm/kvm/arm.c
-+++ b/arch/arm/kvm/arm.c
-@@ -182,6 +182,7 @@ int kvm_vm_ioctl_check_extension(struct kvm *kvm, long ext)
- 	case KVM_CAP_ARM_PSCI_0_2:
- 	case KVM_CAP_READONLY_MEM:
- 	case KVM_CAP_MP_STATE:
-+	case KVM_CAP_ARM_PMU:
- 		r = 1;
- 		break;
- 	case KVM_CAP_COALESCED_MMIO:
-@@ -816,6 +817,13 @@ long kvm_arch_vcpu_ioctl(struct file *filp,
- 			return -E2BIG;
- 		return kvm_arm_copy_reg_indices(vcpu, user_list->reg);
- 	}
-+	case KVM_ARM_PMU_SET_IRQ: {
-+		uint32_t irq;
-+
-+		if (copy_from_user(&irq, argp, sizeof(irq)))
-+			return -EFAULT;
-+		return kvm_pmu_set_irq_num(vcpu, irq);
-+	}
- 	default:
- 		return -EINVAL;
- 	}
-diff --git a/include/kvm/arm_pmu.h b/include/kvm/arm_pmu.h
-index 5bcf27b..1a93f53 100644
---- a/include/kvm/arm_pmu.h
-+++ b/include/kvm/arm_pmu.h
-@@ -58,6 +58,7 @@ void kvm_pmu_enable_interrupt(struct kvm_vcpu *vcpu, unsigned long val);
- void kvm_pmu_software_increment(struct kvm_vcpu *vcpu, unsigned long val);
- void kvm_pmu_set_counter_event_type(struct kvm_vcpu *vcpu, unsigned long data,
- 				    unsigned long select_idx);
-+int kvm_pmu_set_irq_num(struct kvm_vcpu *vcpu, u32 irq);
- void kvm_pmu_init(struct kvm_vcpu *vcpu);
- #else
- void kvm_pmu_sync_hwstate(struct kvm_vcpu *vcpu) {}
-@@ -76,6 +77,10 @@ void kvm_pmu_enable_interrupt(struct kvm_vcpu *vcpu, unsigned long val) {}
- void kvm_pmu_software_increment(struct kvm_vcpu *vcpu, unsigned long val) {}
- void kvm_pmu_set_counter_event_type(struct kvm_vcpu *vcpu, unsigned long data,
- 				    unsigned long select_idx) {}
-+int kvm_pmu_set_irq_num(struct kvm_vcpu *vcpu, u32 irq)
-+{
-+	return -ENXIO;
-+}
- static inline void kvm_pmu_init(struct kvm_vcpu *vcpu) {}
- #endif
- 
-diff --git a/include/uapi/linux/kvm.h b/include/uapi/linux/kvm.h
-index 716ad4a..90f5e73 100644
---- a/include/uapi/linux/kvm.h
-+++ b/include/uapi/linux/kvm.h
-@@ -817,6 +817,7 @@ struct kvm_ppc_smmu_info {
- #define KVM_CAP_DISABLE_QUIRKS 116
- #define KVM_CAP_X86_SMM 117
- #define KVM_CAP_MULTI_ADDRESS_SPACE 118
-+#define KVM_CAP_ARM_PMU 119
- 
- #ifdef KVM_CAP_IRQ_ROUTING
- 
-@@ -1205,6 +1206,9 @@ struct kvm_s390_ucas_mapping {
- /* Available with KVM_CAP_X86_SMM */
- #define KVM_SMI                   _IO(KVMIO,   0xb7)
- 
-+/* Available with KVM_CAP_ARM_PMU */
-+#define KVM_ARM_PMU_SET_IRQ	  _IOW(KVMIO, 0xb8, __u32)
-+
- #define KVM_DEV_ASSIGN_ENABLE_IOMMU	(1 << 0)
- #define KVM_DEV_ASSIGN_PCI_2_3		(1 << 1)
- #define KVM_DEV_ASSIGN_MASK_INTX	(1 << 2)
-diff --git a/virt/kvm/arm/pmu.c b/virt/kvm/arm/pmu.c
-index f957b85..57585e1 100644
---- a/virt/kvm/arm/pmu.c
-+++ b/virt/kvm/arm/pmu.c
-@@ -381,6 +381,15 @@ void kvm_pmu_set_counter_event_type(struct kvm_vcpu *vcpu, unsigned long data,
- 	pmc->perf_event = event;
- }
- 
-+int kvm_pmu_set_irq_num(struct kvm_vcpu *vcpu, u32 irq)
-+{
-+	struct kvm_pmu *pmu = &vcpu->arch.pmu;
-+
-+	kvm_info("kvm_arm_set_pmu_irq: irq: %u\n", irq);
-+	pmu->irq_num = irq;
-+	return 0;
-+}
-+
- /**
-  * kvm_pmu_init - Initialize global PMU state for per vcpu
-  * @vcpu: The vcpu pointer
--- 
-2.1.0
+https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=f9367793293d2262460942b0a4904c21857a1a8b
+
+do we still have any chance to make it in 4.2?
+
+
+>
+> ----------------------------------------------------------------
+> add atlas7 pinctrl dts stuff
+>
+> add atlas7 pin groups and gpio/pin mapping descriptions
+>
+> ----------------------------------------------------------------
+> Wei Chen (1):
+>       ARM: dts: atlas7: add pinctrl and gpio descriptions
+>
+>  arch/arm/boot/dts/atlas7.dtsi | 1042 ++++++++++++++++++++++++++++++++++++++++-
+>  1 file changed, 1041 insertions(+), 1 deletion(-)
+>
+> -barry
+
+-barry
