@@ -1,135 +1,150 @@
 From: vaibhav.hiremath@linaro.org (Vaibhav Hiremath)
-Date: Tue,  7 Jul 2015 00:54:53 +0530
-Subject: [PATCH-v3 09/11] i2c: pxa: Add support for pxa910/988 & new
- configuration features
+Date: Tue,  7 Jul 2015 00:54:54 +0530
+Subject: [PATCH-v3 10/11] i2c: pxa: Add ILCR (tLow & tHigh) configuration
+ support
 In-Reply-To: <1436210695-19159-1-git-send-email-vaibhav.hiremath@linaro.org>
 References: <1436210695-19159-1-git-send-email-vaibhav.hiremath@linaro.org>
-Message-ID: <1436210695-19159-10-git-send-email-vaibhav.hiremath@linaro.org>
+Message-ID: <1436210695-19159-11-git-send-email-vaibhav.hiremath@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-TWSI_ILCR & TWSI_IWCR registers are used to adjust clock rate
-of standard & fast mode in pxa910/988; so this patch adds these two new
-entries to "struct pxa_reg_layout" and "struct pxa_i2c".
+With addition of PXA910 family of devices, the TWSI module supports
+SCL clock adjustment using ILCR register.
 
-As discussed in the previous patch-series, the idea here is to add standard
-DT properties for ilcr and iwcr configuration fields.
-In case of Master ilcr is used for low/high time and in case of slave mode
-of operation iwcr is used for setup/hold time.
+This patch enables the control and configuration of ICLR through DT
+properties,
 
+i2c-sclk-high-time-ns:
+  SCLK high time (tHigh), for standard/fast/high speed mode
+i2c-sclk-low-time-ns:
+  SCLK low time (tLow), for standard/fast/high speed mode
+
+Note that in case of standard and fast mod, the tLow and tHigh counters
+are same, and software will use tLow value.
+
+Also, brought up devm_clk_get() fn above i2c_pxa_probe_dt(), as it
+uses clk rate for timing calculations.
+
+Signed-off-by: Vaibhav Hiremath <vaibhav.hiremath@linaro.org>
 Signed-off-by: Jett.Zhou <jtzhou@marvell.com>
 Signed-off-by: Yi Zhang <yizhang@marvell.com>
-Signed-off-by: Vaibhav Hiremath <vaibhav.hiremath@linaro.org>
 ---
- drivers/i2c/busses/i2c-pxa.c | 42 +++++++++++++++++++++++++++++++++++++++++-
- 1 file changed, 41 insertions(+), 1 deletion(-)
+ drivers/i2c/busses/i2c-pxa.c | 68 +++++++++++++++++++++++++++++++++++++++-----
+ 1 file changed, 61 insertions(+), 7 deletions(-)
 
 diff --git a/drivers/i2c/busses/i2c-pxa.c b/drivers/i2c/busses/i2c-pxa.c
-index dfd1dd0..d5cf6f5 100644
+index d5cf6f5..537555a 100644
 --- a/drivers/i2c/busses/i2c-pxa.c
 +++ b/drivers/i2c/busses/i2c-pxa.c
-@@ -46,12 +46,15 @@ struct pxa_reg_layout {
- 	u32 icr;
- 	u32 isr;
- 	u32 isar;
-+	u32 ilcr;
-+	u32 iwcr;
- };
- 
- enum pxa_i2c_types {
- 	REGS_PXA2XX,
- 	REGS_PXA3XX,
- 	REGS_CE4100,
-+	REGS_PXA910,
- };
- 
- /*
-@@ -79,12 +82,22 @@ static struct pxa_reg_layout pxa_reg_layout[] = {
- 		.isr =	0x04,
- 		/* no isar register */
- 	},
-+	[REGS_PXA910] = {
-+		.ibmr = 0x00,
-+		.idbr = 0x08,
-+		.icr =	0x10,
-+		.isr =	0x18,
-+		.isar = 0x20,
-+		.ilcr = 0x28,
-+		.iwcr = 0x30,
-+	},
- };
- 
- static const struct platform_device_id i2c_pxa_id_table[] = {
- 	{ "pxa2xx-i2c",		REGS_PXA2XX },
- 	{ "pxa3xx-pwri2c",	REGS_PXA3XX },
- 	{ "ce4100-i2c",		REGS_CE4100 },
-+	{ "pxa910-i2c",		REGS_PXA910 },
- 	{ },
- };
- MODULE_DEVICE_TABLE(platform, i2c_pxa_id_table);
-@@ -124,6 +137,24 @@ MODULE_DEVICE_TABLE(platform, i2c_pxa_id_table);
- #define ISR_SAD		(1 << 9)	   /* slave address detected */
- #define ISR_BED		(1 << 10)	   /* bus error no ACK/NAK */
- 
-+/* bit field shift & mask */
-+#define ILCR_SLV_SHIFT		0
-+#define ILCR_SLV_MASK		(0x1FF << ILCR_SLV_SHIFT)
-+#define ILCR_FLV_SHIFT		9
-+#define ILCR_FLV_MASK		(0x1FF << ILCR_FLV_SHIFT)
-+#define ILCR_HLVL_SHIFT		18
-+#define ILCR_HLVL_MASK		(0x1FF << ILCR_HLVL_SHIFT)
-+#define ILCR_HLVH_SHIFT		27
-+#define ILCR_HLVH_MASK		(0x1F << ILCR_HLVH_SHIFT)
+@@ -195,6 +195,9 @@ struct pxa_i2c {
+ 	unsigned long		rate;
+ 	bool			highmode_enter;
+ 	bool			disable_after_xfer;
 +
-+#define IWCR_CNT_SHIFT		0
-+#define IWCR_CNT_MASK		(0x1F << IWCR_CNT_SHIFT)
-+#define IWCR_HS_CNT1_SHIFT	5
-+#define IWCR_HS_CNT1_MASK	(0x1F << IWCR_HS_CNT1_SHIFT)
-+#define IWCR_HS_CNT2_SHIFT	10
-+#define IWCR_HS_CNT2_MASK	(0x1F << IWCR_HS_CNT2_SHIFT)
-+
-+
- struct pxa_i2c {
- 	spinlock_t		lock;
- 	wait_queue_head_t	wait;
-@@ -150,6 +181,8 @@ struct pxa_i2c {
- 	void __iomem		*reg_icr;
- 	void __iomem		*reg_isr;
- 	void __iomem		*reg_isar;
-+	void __iomem		*reg_ilcr;
-+	void __iomem		*reg_iwcr;
- 
- 	unsigned long		iobase;
- 	unsigned long		iosize;
-@@ -169,6 +202,8 @@ struct pxa_i2c {
- #define _ICR(i2c)	((i2c)->reg_icr)
- #define _ISR(i2c)	((i2c)->reg_isr)
- #define _ISAR(i2c)	((i2c)->reg_isar)
-+#define _ILCR(i2c)	((i2c)->reg_ilcr)
-+#define _IWCR(i2c)	((i2c)->reg_iwcr)
- 
- /*
-  * I2C Slave mode address
-@@ -1135,7 +1170,7 @@ static const struct i2c_algorithm i2c_pxa_pio_algorithm = {
- static const struct of_device_id i2c_pxa_dt_ids[] = {
- 	{ .compatible = "mrvl,pxa-i2c", .data = (void *)REGS_PXA2XX },
- 	{ .compatible = "mrvl,pwri2c", .data = (void *)REGS_PXA3XX },
--	{ .compatible = "mrvl,mmp-twsi", .data = (void *)REGS_PXA2XX },
-+	{ .compatible = "mrvl,mmp-twsi", .data = (void *)REGS_PXA910 },
- 	{}
++	unsigned int		sclk_thigh_load_cnt;
++	unsigned int		sclk_tlow_load_cnt;
  };
- MODULE_DEVICE_TABLE(of, i2c_pxa_dt_ids);
-@@ -1250,6 +1285,11 @@ static int i2c_pxa_probe(struct platform_device *dev)
- 	if (i2c_type != REGS_CE4100)
- 		i2c->reg_isar = i2c->reg_base + pxa_reg_layout[i2c_type].isar;
  
-+	if (i2c_type == REGS_PXA910) {
-+		i2c->reg_ilcr = i2c->reg_base + pxa_reg_layout[i2c_type].ilcr;
-+		i2c->reg_iwcr = i2c->reg_base + pxa_reg_layout[i2c_type].iwcr;
+ #define _IBMR(i2c)	((i2c)->reg_ibmr)
+@@ -507,6 +510,33 @@ static void i2c_pxa_set_slave(struct pxa_i2c *i2c, int errcode)
+ #define i2c_pxa_set_slave(i2c, err)	do { } while (0)
+ #endif
+ 
++static void i2c_pxa_do_sclk_adj(struct pxa_i2c *i2c)
++{
++	unsigned int reg_ilcr;
++
++	reg_ilcr = readl(_ILCR(i2c));
++
++	/* For standard/fast mode tlow and thigh counters are same */
++	if (i2c->sclk_tlow_load_cnt) {
++		unsigned int mask, shift;
++
++		mask = i2c->high_mode ? ILCR_HLVL_MASK :
++			i2c->fast_mode ? ILCR_FLV_MASK : ILCR_SLV_MASK;
++		shift = i2c->high_mode ? ILCR_HLVL_SHIFT :
++			i2c->fast_mode ? ILCR_FLV_SHIFT : ILCR_SLV_SHIFT;
++
++		reg_ilcr &= ~mask;
++		reg_ilcr |= i2c->sclk_tlow_load_cnt << shift;
 +	}
 +
- 	i2c->iobase = res->start;
- 	i2c->iosize = resource_size(res);
++	if (i2c->high_mode && i2c->sclk_thigh_load_cnt) {
++		reg_ilcr &= ~ILCR_HLVH_MASK;
++		reg_ilcr |= i2c->sclk_thigh_load_cnt << ILCR_HLVH_SHIFT;
++	}
++
++	writel(reg_ilcr, _ILCR(i2c));
++}
++
+ static void i2c_pxa_reset(struct pxa_i2c *i2c)
+ {
+ 	pr_debug("Resetting I2C Controller Unit\n");
+@@ -526,6 +556,8 @@ static void i2c_pxa_reset(struct pxa_i2c *i2c)
+ 	writel(I2C_ICR_INIT | (i2c->fast_mode ? ICR_FM : 0), _ICR(i2c));
+ 	writel(readl(_ICR(i2c)) | (i2c->high_mode ? ICR_HS : 0), _ICR(i2c));
  
++	i2c_pxa_do_sclk_adj(i2c);
++
+ #ifdef CONFIG_I2C_PXA_SLAVE
+ 	dev_info(&i2c->adap.dev, "Enabling slave mode\n");
+ 	writel(readl(_ICR(i2c)) | ICR_SADIE | ICR_ALDIE | ICR_SSDIE, _ICR(i2c));
+@@ -1198,6 +1230,26 @@ static int i2c_pxa_probe_dt(struct platform_device *pdev, struct pxa_i2c *i2c,
+ 
+ 	*i2c_types = (long)(of_id->data);
+ 
++	/* optional properties */
++	if (of_device_is_compatible(np, "mrvl,mmp-twsi")) {
++		unsigned int tlow = 0, thigh = 0;
++		unsigned int clk_ns;
++
++		/* clock time in nsec */
++		clk_ns = 1000000 / (i2c->rate / 1000);
++
++		of_property_read_u32(np, "i2c-sclk-high-time-ns", &thigh);
++		i2c->sclk_thigh_load_cnt = thigh / clk_ns;
++
++		of_property_read_u32(np, "i2c-sclk-low-time-ns", &tlow);
++		i2c->sclk_tlow_load_cnt = tlow / clk_ns;
++
++		/* For std/fast mode tlow & thigh have same bit-fields */
++		if (!i2c->high_mode &&
++			(i2c->sclk_tlow_load_cnt != i2c->sclk_thigh_load_cnt))
++			dev_warn(&i2c->adap.dev,
++				"mismatch of tLow & tHigh values, using tLow\n");
++	}
+ 	return 0;
+ }
+ 
+@@ -1247,6 +1299,15 @@ static int i2c_pxa_probe(struct platform_device *dev)
+ 		return irq;
+ 	}
+ 
++	i2c->clk = devm_clk_get(&dev->dev, NULL);
++	if (IS_ERR(i2c->clk)) {
++		dev_err(&dev->dev, "failed to get the clk: %ld\n",
++			PTR_ERR(i2c->clk));
++		return PTR_ERR(i2c->clk);
++	}
++
++	i2c->rate = clk_get_rate(i2c->clk);
++
+ 	/* Default adapter num to device id; i2c_pxa_probe_dt can override. */
+ 	i2c->adap.nr = dev->id;
+ 
+@@ -1264,13 +1325,6 @@ static int i2c_pxa_probe(struct platform_device *dev)
+ 
+ 	strlcpy(i2c->adap.name, "pxa_i2c-i2c", sizeof(i2c->adap.name));
+ 
+-	i2c->clk = devm_clk_get(&dev->dev, NULL);
+-	if (IS_ERR(i2c->clk)) {
+-		dev_err(&dev->dev, "failed to get the clk: %ld\n",
+-			PTR_ERR(i2c->clk));
+-		return PTR_ERR(i2c->clk);
+-	}
+-
+ 	i2c->reg_base = devm_ioremap_resource(&dev->dev, res);
+ 	if (IS_ERR(i2c->reg_base)) {
+ 		dev_err(&dev->dev, "failed to map resource: %ld\n",
 -- 
 1.9.1
