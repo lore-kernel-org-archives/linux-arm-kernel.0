@@ -1,55 +1,52 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Mon, 06 Jul 2015 16:29:33 +0300
-Subject: [PATCH v2] ARM: shmobile: kzm9g dts: Use adxl345-specific
- compatible property
-In-Reply-To: <1436180132-26190-1-git-send-email-geert+renesas@glider.be>
-References: <1436180132-26190-1-git-send-email-geert+renesas@glider.be>
-Message-ID: <15966074.zDS67FO48r@avalon>
+From: yh.huang@mediatek.com (YH Huang)
+Date: Mon, 6 Jul 2015 21:29:28 +0800
+Subject: [PATCH v4 3/3] arm64: dts: mt8173: add MT8173 display PWM driver
+ support dtsi
+In-Reply-To: <1436189368-1826-1-git-send-email-yh.huang@mediatek.com>
+References: <1436189368-1826-1-git-send-email-yh.huang@mediatek.com>
+Message-ID: <1436189368-1826-4-git-send-email-yh.huang@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Geert,
+Add display PWM node in mt8173.dtsi.
 
-Thank you for the patch.
+Signed-off-by: YH Huang <yh.huang@mediatek.com>
+---
+ arch/arm64/boot/dts/mediatek/mt8173.dtsi | 22 ++++++++++++++++++++++
+ 1 file changed, 22 insertions(+)
 
-On Monday 06 July 2015 12:55:32 Geert Uytterhoeven wrote:
-> Replace the deprecated generic "adi,adxl34x" compatible value by the
-> adxl345-specific "adi,adxl345" value, cfr. commit e465bf6fc55d5ce2 ("DT:
-> i2c: Deprecate adi,adxl34x compatible string").
-> 
-> Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
-
-Acked-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
-
-> ---
-> Depends on commit 3a38958d2477b718 ("Input: adxl34x - add OF match
-> support"), which is in v4.2-rc1.
-> 
-> This is v2 of "ARM: shmobile: kzm9g dts: Add adxl345-specific compatible
-> property".
-> 
-> v2:
->   - Drop deprecated "adi,adxl34x"
-> ---
->  arch/arm/boot/dts/sh73a0-kzm9g.dts | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm/boot/dts/sh73a0-kzm9g.dts
-> b/arch/arm/boot/dts/sh73a0-kzm9g.dts index
-> 24b4cd24dceb2f9e..7fc5602810ad0da1 100644
-> --- a/arch/arm/boot/dts/sh73a0-kzm9g.dts
-> +++ b/arch/arm/boot/dts/sh73a0-kzm9g.dts
-> @@ -206,7 +206,7 @@
->  	};
-> 
->  	accelerometer at 1d {
-> -		compatible = "adi,adxl34x";
-> +		compatible = "adi,adxl345";
->  		reg = <0x1d>;
->  		interrupt-parent = <&irqpin3>;
->  		interrupts = <2 IRQ_TYPE_LEVEL_HIGH>,
-
+diff --git a/arch/arm64/boot/dts/mediatek/mt8173.dtsi b/arch/arm64/boot/dts/mediatek/mt8173.dtsi
+index 0696f8f..e4ffd9d 100644
+--- a/arch/arm64/boot/dts/mediatek/mt8173.dtsi
++++ b/arch/arm64/boot/dts/mediatek/mt8173.dtsi
+@@ -393,6 +393,28 @@
+ 			#size-cells = <0>;
+ 			status = "disabled";
+ 		};
++
++		pwm0: pwm at 1401e000 {
++			compatible = "mediatek,mt8173-disp-pwm",
++				     "mediatek,mt6595-disp-pwm";
++			reg = <0 0x1401e000 0 0x1000>;
++			#pwm-cells = <2>;
++			clocks = <&mmsys MM_DISP_PWM026M>,
++				 <&mmsys MM_DISP_PWM0MM>;
++			clock-names = "main", "mm";
++			status = "disabled";
++		};
++
++		pwm1: pwm at 1401f000 {
++			compatible = "mediatek,mt8173-disp-pwm",
++				     "mediatek,mt6595-disp-pwm";
++			reg = <0 0x1401f000 0 0x1000>;
++			#pwm-cells = <2>;
++			clocks = <&mmsys MM_DISP_PWM126M>,
++				 <&mmsys MM_DISP_PWM1MM>;
++			clock-names = "main", "mm";
++			status = "disabled";
++		};
+ 	};
+ };
+ 
 -- 
-Regards,
-
-Laurent Pinchart
+1.8.1.1.dirty
