@@ -1,40 +1,66 @@
-From: wcohen@redhat.com (William Cohen)
-Date: Mon, 6 Jul 2015 10:42:03 -0400
-Subject: [PATCH 1/2] arm64: Blacklist non-kprobe-able symbols
-In-Reply-To: <559A688D.1040501@hitachi.com>
-References: <cover.1436158027.git.panand@redhat.com>
- <9994841a0b0a8194a6dcc1b6af148ba358488c62.1436158027.git.panand@redhat.com>
- <20150706090323.GB30342@arm.com> <559A688D.1040501@hitachi.com>
-Message-ID: <559A93BB.7090007@redhat.com>
+From: holgerschurig@gmail.com (Holger Schurig)
+Date: Mon, 6 Jul 2015 16:48:38 +0200
+Subject: weird behavior of get/set_fiq_regs()
+Message-ID: <CAOpc7mHkynAfmZKJhbwF0q0rco+3t7=wzh9owf6Brz6fmPRHsw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/06/2015 07:37 AM, Masami Hiramatsu wrote:
-> On 2015/07/06 18:03, Will Deacon wrote:
->> On Mon, Jul 06, 2015 at 06:03:21AM +0100, Pratyush Anand wrote:
->>> Add all function symbols which are called from do_debug_exception under
->>> NOKPROBE_SYMBOL, as they can not kprobed.
->>
->> It's a shame this has to be so manual, but I suppose it's done on a
->> best-effort basis to catch broken probe placement.
-> 
-> Ah, yes. You can use kprobe-tracer in ftrace by feeding all symbols to
-> them and enabling it (and pray).
+Hi,
 
-Yes, this approach isn't guaranteed to find problem functions.  There could be problems hidden on conditional paths that are rarely called.  This was observed with the aarch64 kretprobe trampoline handler.  Most times it wouldn't call kfree and everything would run fine.  However, sometimes the kfree which was instrumented for a systemtap test would get called from inside the trampoline handler and trigger a recursive exception.  This is why aarch64 tramopline was rewritten avoid using kprobe.
+I'm trying to write a FIQ ISR handler. I wanted to use some registers
+to transfer information to/from the the FIQ ISR. But something changes
+the registers:
 
-Is there some tool that can generate a static call graph of the kernel?  Maybe use the output of that to get more complete list of which functions should be off limits for kprobes.  One complication is that some tools might not analyze functions written in assembly and miss some possible function calls.
+My_probe() does basically this:
 
--Will Cohen
-   
-> 
-> 
->> If we miss a function and somebody probes it, do we just get stuck in a
->> recursive exception, or could we print something suggesting that a symbol
->> be annotated as NOKPROBE?
-> 
-> For some cases we can detect recursion, but usually, it may reset
-> itself or infinite recursion loop before detecting it. :(
-> 
-> Thank you,
-> 
+    struct pt_regs regs;
+    set_fiq_handler(&flexfiq_start, &flexfiq_end - &flexfiq_start);
+    printk("##HS OCRAM %p", priv->ocram);
+    regs.ARM_r8 = (long)priv->ocram;
+    set_fiq_regs(&regs);
+    set_fiq_handler(&myfiq_start, &myfiq_end - &myfiq_start);
+    get_fiq_regs(&regs);
+    printk("##HS %s:%d r8 %08lx\n", __func__, __LINE__, regs.ARM_r8);
+    release_fiq(&fiq_handler);
+
+Directly there, inside the probe() function, a call to get_fiq_regs()
+will return what I have just set:
+
+[ 5443.830458] ##HS OCRAM f1800000
+[ 5444.956159] ##HS set_fiq_reqs
+[ 5443.830487] ##HS my_probe:380 r8 f1800000
+
+
+But not in my_remove():
+
+    get_fiq_regs(&regs);
+    printk("##HS %s:%d r8 %08lx\n", __func__, __LINE__, regs.ARM_r8);
+    release_fiq(&fiq_handler);
+
+[ 5444.956145] ##HS my_remove:401 r8 f1700000
+[ 5444.956159] ##HS set_fiq_reqs
+
+
+
+My FIQ ISR is currently a noop:
+
+myfiq_start:
+    subs pc, lr, #4
+myfiq_end:
+
+(My plan was to modify r8 intentionally in the ISR, so that I see
+if/that my FIQ isr was actually called)
+
+
+
+The output of this is:
+
+The output line "set_fiq_reqs is from printk in
+arch/arm/include/asm/fiq.h, I wanted to make sure that no-one else is
+calling set_fiq_reqs. Then 2nd output you see is from
+release_fiq(&fiq_handler) in my_remove(), so this is to be expected.
+
+
+Hardware is an i.MX6, Kernel is 3.18.17 (but even Linux-GIT doesn't
+show any FIQ related of importance: I don't think the "ret" macro to
+use "bx" on ARMv6 makes a difference).
