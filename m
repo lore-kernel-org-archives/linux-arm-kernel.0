@@ -1,25 +1,80 @@
-From: tglx@linutronix.de (Thomas Gleixner)
-Date: Mon, 6 Jul 2015 19:26:31 +0200 (CEST)
-Subject: [PATCH 00/18] ARM: Migrate clockevent drivers to 'set-state'
-In-Reply-To: <cover.1436178990.git.viresh.kumar@linaro.org>
-References: <cover.1436178990.git.viresh.kumar@linaro.org>
-Message-ID: <alpine.DEB.2.11.1507061925080.3916@nanos>
+From: soren.brinkmann@xilinx.com (=?utf-8?B?U8O2cmVu?= Brinkmann)
+Date: Mon, 6 Jul 2015 10:27:27 -0700
+Subject: [PATCHv6 1/2] dts: Adding docs for Xilinx LogiCORE IP mailbox
+ driver.
+In-Reply-To: <1436202963-16922-2-git-send-email-moritz.fischer@ettus.com>
+References: <1436202963-16922-1-git-send-email-moritz.fischer@ettus.com>
+ <1436202963-16922-2-git-send-email-moritz.fischer@ettus.com>
+Message-ID: <20150706172727.GH6550@xsjsorenbubuntu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 6 Jul 2015, Viresh Kumar wrote:
-> Following patches:
->   ARM/ks8695/time: Migrate to new 'set-state' interface
->   ARM/omap1/time: Migrate to new 'set-state' interface
+On Mon, 2015-07-06 at 10:16AM -0700, Moritz Fischer wrote:
+> Signed-off-by: Moritz Fischer <moritz.fischer@ettus.com>
+> Acked-by: Michal Simek <michal.simek@xilinx.com>
+> ---
+>  .../devicetree/bindings/mailbox/xilinx-mailbox.txt | 44 ++++++++++++++++++++++
+>  1 file changed, 44 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/mailbox/xilinx-mailbox.txt
 > 
-> must be integrated to mainline kernel via clockevents tree, because of
-> dependency on:
->   352370adb058 ("clockevents: Allow set-state callbacks to be optional")
+> diff --git a/Documentation/devicetree/bindings/mailbox/xilinx-mailbox.txt b/Documentation/devicetree/bindings/mailbox/xilinx-mailbox.txt
+> new file mode 100644
+> index 0000000..97b81f8
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/mailbox/xilinx-mailbox.txt
+> @@ -0,0 +1,44 @@
+> +Xilinx Mailbox Driver
+> +=====================
+> +
+> +Required properties:
+> +- compatible       : "xlnx,mailbox-2.1".
+> +- reg              :  physical base address of the mailbox and length of
+> +                      memory mapped region.
+> +- #mbox-cells      :  common mailbox binding property to identify the number
+> +                      of cells required for the mailbox specifier, should be 0
+> +- clocks           :  phandle to clock provider
+> +- clock-names      :  must be 'mbox'
+> +
+> +Optional properties:
+> +- interrupt-parent : interrupt source phandle
+> +- interrupts       : interrupt number, The interrupt specifier format
+> +                     depends on the interrupt controller parent.
+> +
+> +Example:
+> +	mbox: mailbox at 40400000 {
+> +		compatible = "xlnx,mailbox-2.1";
+> +		reg = <0x40400000 0x100>;
+> +		interrupt-parent = <&intc>;
+> +		interrupts = <5>;
+> +		#mbox-cells = <0>;
+> +		clocks = <&clkc 15>;
+> +		clock-names = "mbox";
+> +	};
+> +
+> +Mailbox client
+> +===============
+> +"mboxes" and the optional "mbox-names" (please see
+> +Documentation/devicetree/bindings/mailbox/mailbox.txt for details). Each value
+> +of the mboxes property should contain a phandle to the mailbox controller
+> +device node and second argument is the channel index. It must be 0 (hardware
+> +support only one channel). The equivalent "mbox-names" property value can be
+> +used to give a name to the communication channel to be used by the client user.
+> +
+> +Example:
+> +	mclient0: mclient0 at 400 {
+> +		compatible = "client-1.0";
+> +		reg = <0x400 0x10>;
+> +		mbox-names = "mbox";
+> +		mboxes = <&mbox 0>;
 
-That's bad. We really should get that commit into 4.2 and be done with
-it. I was expecting it to show up before rc1 as a pull request, but
-obviously that did not happen. We still can get it in.
+Sorry, to bring this up again, but I'm confused regarding the #mbox-cells
+thing. Above it says #mbox-cells is 0. In that case, shouldn't the
+'mboxes' property not only be '<&mbox>'?
 
-Thanks
+Moreover, the generic mailbox bindings
+(https://www.kernel.org/doc/Documentation/devicetree/bindings/mailbox/mailbox.txt)
+mandate #mbox-cells to be at least 1.
 
-	tglx
+Does something need to be aligned here?
+
+	S?ren
