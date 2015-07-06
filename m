@@ -1,62 +1,100 @@
-From: masami.hiramatsu.pt@hitachi.com (Masami Hiramatsu)
-Date: Mon, 06 Jul 2015 20:56:59 +0900
-Subject: [PATCH 1/2] arm64: Blacklist non-kprobe-able symbols
-In-Reply-To: <20150706104815.GA17305@dhcppc13.redhat.com>
-References: <cover.1436158027.git.panand@redhat.com>
- <9994841a0b0a8194a6dcc1b6af148ba358488c62.1436158027.git.panand@redhat.com>
- <20150706090323.GB30342@arm.com> <20150706104815.GA17305@dhcppc13.redhat.com>
-Message-ID: <559A6D0B.9040201@hitachi.com>
+From: vaibhav.hiremath@linaro.org (Vaibhav Hiremath)
+Date: Mon, 06 Jul 2015 17:32:37 +0530
+Subject: [RFC PATCH] pinctrl-single: Use of pinctrl-single for external
+ device over I2C
+In-Reply-To: <20150706063532.GB10705@atomide.com>
+References: <1435855992-10312-1-git-send-email-vaibhav.hiremath@linaro.org>
+ <20150706063532.GB10705@atomide.com>
+Message-ID: <559A6E5D.9040202@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2015/07/06 19:48, Pratyush Anand wrote:
-> On 06/07/2015:10:03:24 AM, Will Deacon wrote:
->> On Mon, Jul 06, 2015 at 06:03:21AM +0100, Pratyush Anand wrote:
->>> Add all function symbols which are called from do_debug_exception under
->>> NOKPROBE_SYMBOL, as they can not kprobed.
+
+
+On Monday 06 July 2015 12:05 PM, Tony Lindgren wrote:
+> * Vaibhav Hiremath <vaibhav.hiremath@linaro.org> [150702 09:58]:
+>> --- a/drivers/pinctrl/pinctrl-single.c
+>> +++ b/drivers/pinctrl/pinctrl-single.c
 >>
->> It's a shame this has to be so manual, but I suppose it's done on a
->> best-effort basis to catch broken probe placement.
+>> -static unsigned __maybe_unused pcs_readb(void __iomem *reg)
+>> +static unsigned pcs_read(struct regmap *map, unsigned int reg)
+>>   {
+>> -	return readb(reg);
+>> -}
+>> +	unsigned int val;
 >>
->> If we miss a function and somebody probes it, do we just get stuck in a
->> recursive exception, or could we print something suggesting that a symbol
->> be annotated as NOKPROBE?
-> 
-> In some cases we land into a recursive reenter_kprobe:
-> 
-> echo "p kfree" > /sys/kernel/debug/tracing/kprobe_events
-> echo "p single_step_handler" >> /sys/kernel/debug/tracing/kprobe_events
-> echo 1 >  /sys/kernel/debug/tracing/events/enable
-> 
-> [  116.904194] BUG: failure at
-> .../arch/arm64/kernel/kprobes.c:288/reenter_kprobe()!
-> 
-> In some other 
-> echo "p kfree" > /sys/kernel/debug/tracing/kprobe_events
-> echo "p el0_sync" >> /sys/kernel/debug/tracing/kprobe_events
-> echo 1 >  /sys/kernel/debug/tracing/events/enable
-> 
-> Infinite loop of:
-> [  142.731336] Unexpected kernel single-step exception at EL1
-> 
-> In 1st case currently only address is printed.
-> pr_warn("Unrecoverable kprobe detected at %p.\n", p->addr);
-> So, while in 1st case we may also print name of symbol, we can not do
-> much in second case.
+>> -static unsigned __maybe_unused pcs_readw(void __iomem *reg)
+>> -{
+>> -	return readw(reg);
+>> -}
+>> -
+>> -static unsigned __maybe_unused pcs_readl(void __iomem *reg)
+>> -{
+>> -	return readl(reg);
+>> -}
+>> -
+>> -static void __maybe_unused pcs_writeb(unsigned val, void __iomem *reg)
+>> -{
+>> -	writeb(val, reg);
+>> -}
+>> +	regmap_read(map, reg, &val);
+>
+> Sorry this won't work. Most platforms don't need regmap here, and I
+> certainly don't want to use regmap for toggling pins for runtime
+> PM because of the extra overhead.
+>
 
-Ah, that's a good point of aarch64 :)
+That's exactly my question was in my first email. It's ok.
 
-> Now, I am running some test with all the symbols in /proc/kallsyms and
-> I noticed that there might be few more symbols which may not allow
-> kprobing. So, may be I will resend this series with updates.
+What is your openion on overall code changes for regmap support ?
+Any other feedback or suggestions?
 
-Sounds good to me :)
+> It seems you need to stash the regmap pointer to struct pcs_device
+> and just the function pointers. As this driver is ioremapping the
+> region, we certainly want to keep things using void __iomem * too.
+> You can cast that to whatever regmap needs in the wrapper functions
+> for regmap. Note that the extra overhead there won't matter as we
+> are using regmap mostly for devices over I2C and so on.
+>
 
-Thank you for testing!
+The issue I have here with the signature of read/write fn
 
--- 
-Masami HIRAMATSU
-Linux Technology Research Center, System Productivity Research Dept.
-Center for Technology Innovation - Systems Engineering
-Hitachi, Ltd., Research & Development Group
-E-mail: masami.hiramatsu.pt at hitachi.com
+static unsigned __maybe_unused pcs_read(void __iomem *reg)
+static void __maybe_unused pcs_writeX(unsigned val, void __iomem *reg)
+
+
+For regmap, I need 2 arguments,
+
+1. Pointer to regmap
+2. Offset to register
+
+
+So I will have to change the signature to
+
+static unsigned __maybe_unused pcs_read(void __iomem *reg, unsigned int 
+offset)
+static void __maybe_unused pcs_write(void __iomem *reg, unsigned val, 
+unsigned int offset)
+
+
+And,
+On the same direction, will having separate functions for regmap.
+
+static unsigned pcs_read_regmap(void __iomem *reg, unsigned int offset)
+{
+	unsigned int val;
+
+	regmap_read((struct regmap *)reg, offset, &val);
+}
+
+static void pcs_write_regmap(void __iomem *reg, unsigned val, unsigned 
+int offset)
+{
+        regmap_write((struct regmap *)reg, offset, val);
+  }
+
+
+This functions will be initialized to pcs_device->read/write.
+
+I will have to do some more changes, specially around pcs_interrupt
+usage.
