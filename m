@@ -1,94 +1,112 @@
 From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Mon,  6 Jul 2015 16:24:11 +0530
-Subject: [PATCH 04/18] ARM/dc21285-timer: Migrate to new 'set-state' interface
+Date: Mon,  6 Jul 2015 16:24:12 +0530
+Subject: [PATCH 05/18] ARM/gemini/time: Migrate to new 'set-state' interface
 In-Reply-To: <cover.1436178990.git.viresh.kumar@linaro.org>
 References: <cover.1436178990.git.viresh.kumar@linaro.org>
-Message-ID: <f9a228913b3181b9317322c64c9ad59c0ea4c88c.1436178990.git.viresh.kumar@linaro.org>
+Message-ID: <43f4546a1b6bc8f0d50e3f22fb3cee071c51e157.1436178990.git.viresh.kumar@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Migrate footbridge driver to the new 'set-state' interface provided by
+Migrate gemini driver to the new 'set-state' interface provided by
 clockevents core, the earlier 'set-mode' interface is marked obsolete
 now.
 
 This also enables us to implement callbacks for new states of clockevent
 devices, for example: ONESHOT_STOPPED.
 
-Cc: Russell King <linux@arm.linux.org.uk>
+Cc: Hans Ulli Kroll <ulli.kroll@googlemail.com>
 Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
 ---
- arch/arm/mach-footbridge/dc21285-timer.c | 48 +++++++++++++++-----------------
- 1 file changed, 23 insertions(+), 25 deletions(-)
+ arch/arm/mach-gemini/time.c | 69 ++++++++++++++++++++++-----------------------
+ 1 file changed, 34 insertions(+), 35 deletions(-)
 
-diff --git a/arch/arm/mach-footbridge/dc21285-timer.c b/arch/arm/mach-footbridge/dc21285-timer.c
-index bf7aa7d298e7..810edc78c817 100644
---- a/arch/arm/mach-footbridge/dc21285-timer.c
-+++ b/arch/arm/mach-footbridge/dc21285-timer.c
-@@ -57,34 +57,32 @@ static int ckevt_dc21285_set_next_event(unsigned long delta,
+diff --git a/arch/arm/mach-gemini/time.c b/arch/arm/mach-gemini/time.c
+index 0a63c4d25b64..b57d367d21f1 100644
+--- a/arch/arm/mach-gemini/time.c
++++ b/arch/arm/mach-gemini/time.c
+@@ -59,49 +59,48 @@ static int gemini_timer_set_next_event(unsigned long cycles,
  	return 0;
  }
  
--static void ckevt_dc21285_set_mode(enum clock_event_mode mode,
--	struct clock_event_device *c)
-+static int ckevt_dc21285_shutdown(struct clock_event_device *c)
- {
--	switch (mode) {
--	case CLOCK_EVT_MODE_RESUME:
--	case CLOCK_EVT_MODE_PERIODIC:
--		*CSR_TIMER1_CLR = 0;
--		*CSR_TIMER1_LOAD = (mem_fclk_21285 + 8 * HZ) / (16 * HZ);
--		*CSR_TIMER1_CNTL = TIMER_CNTL_ENABLE | TIMER_CNTL_AUTORELOAD |
--				   TIMER_CNTL_DIV16;
--		break;
--
--	case CLOCK_EVT_MODE_ONESHOT:
--	case CLOCK_EVT_MODE_UNUSED:
--	case CLOCK_EVT_MODE_SHUTDOWN:
--		*CSR_TIMER1_CNTL = 0;
--		break;
--	}
-+	*CSR_TIMER1_CNTL = 0;
+-static void gemini_timer_set_mode(enum clock_event_mode mode,
+-				  struct clock_event_device *evt)
++static int gemini_timer_shutdown(struct clock_event_device *evt)
++{
++	u32 cr;
++
++	/*
++	 * Disable also for oneshot: the set_next() call will arm the timer
++	 * instead.
++	 */
++	cr = readl(TIMER_CR(IO_ADDRESS(GEMINI_TIMER_BASE)));
++	cr &= ~TIMER_2_CR_ENABLE;
++	cr &= ~TIMER_2_CR_INT;
++	writel(cr, TIMER_CR(IO_ADDRESS(GEMINI_TIMER_BASE)));
 +	return 0;
 +}
 +
-+static int ckevt_dc21285_set_periodic(struct clock_event_device *c)
-+{
-+	*CSR_TIMER1_CLR = 0;
-+	*CSR_TIMER1_LOAD = (mem_fclk_21285 + 8 * HZ) / (16 * HZ);
-+	*CSR_TIMER1_CNTL = TIMER_CNTL_ENABLE | TIMER_CNTL_AUTORELOAD |
-+			   TIMER_CNTL_DIV16;
++static int gemini_timer_set_periodic(struct clock_event_device *evt)
+ {
+ 	u32 period = DIV_ROUND_CLOSEST(tick_rate, HZ);
+ 	u32 cr;
+ 
+-	switch (mode) {
+-        case CLOCK_EVT_MODE_PERIODIC:
+-		/* Start the timer */
+-		writel(period,
+-		       TIMER_COUNT(IO_ADDRESS(GEMINI_TIMER2_BASE)));
+-		writel(period,
+-		       TIMER_LOAD(IO_ADDRESS(GEMINI_TIMER2_BASE)));
+-		cr = readl(TIMER_CR(IO_ADDRESS(GEMINI_TIMER_BASE)));
+-		cr |= TIMER_2_CR_ENABLE;
+-		cr |= TIMER_2_CR_INT;
+-		writel(cr, TIMER_CR(IO_ADDRESS(GEMINI_TIMER_BASE)));
+-		break;
+-	case CLOCK_EVT_MODE_ONESHOT:
+-	case CLOCK_EVT_MODE_UNUSED:
+-        case CLOCK_EVT_MODE_SHUTDOWN:
+-	case CLOCK_EVT_MODE_RESUME:
+-		/*
+-		 * Disable also for oneshot: the set_next() call will
+-		 * arm the timer instead.
+-		 */
+-		cr = readl(TIMER_CR(IO_ADDRESS(GEMINI_TIMER_BASE)));
+-		cr &= ~TIMER_2_CR_ENABLE;
+-		cr &= ~TIMER_2_CR_INT;
+-		writel(cr, TIMER_CR(IO_ADDRESS(GEMINI_TIMER_BASE)));
+-		break;
+-	default:
+-                break;
+-	}
++	/* Start the timer */
++	writel(period, TIMER_COUNT(IO_ADDRESS(GEMINI_TIMER2_BASE)));
++	writel(period, TIMER_LOAD(IO_ADDRESS(GEMINI_TIMER2_BASE)));
++	cr = readl(TIMER_CR(IO_ADDRESS(GEMINI_TIMER_BASE)));
++	cr |= TIMER_2_CR_ENABLE;
++	cr |= TIMER_2_CR_INT;
++	writel(cr, TIMER_CR(IO_ADDRESS(GEMINI_TIMER_BASE)));
 +	return 0;
  }
  
- static struct clock_event_device ckevt_dc21285 = {
--	.name		= "dc21285_timer1",
--	.features	= CLOCK_EVT_FEAT_PERIODIC |
--			  CLOCK_EVT_FEAT_ONESHOT,
--	.rating		= 200,
--	.irq		= IRQ_TIMER1,
--	.set_next_event	= ckevt_dc21285_set_next_event,
--	.set_mode	= ckevt_dc21285_set_mode,
-+	.name			= "dc21285_timer1",
+ /* Use TIMER2 as clock event */
+ static struct clock_event_device gemini_clockevent = {
+-	.name		= "TIMER2",
+-	.rating		= 300, /* Reasonably fast and accurate clock event */
+-	.features	= CLOCK_EVT_FEAT_PERIODIC | CLOCK_EVT_FEAT_ONESHOT,
+-	.set_next_event	= gemini_timer_set_next_event,
+-	.set_mode	= gemini_timer_set_mode,
++	.name			= "TIMER2",
++	/* Reasonably fast and accurate clock event */
++	.rating			= 300,
 +	.features		= CLOCK_EVT_FEAT_PERIODIC |
 +				  CLOCK_EVT_FEAT_ONESHOT,
-+	.rating			= 200,
-+	.irq			= IRQ_TIMER1,
-+	.set_next_event		= ckevt_dc21285_set_next_event,
-+	.set_state_shutdown	= ckevt_dc21285_shutdown,
-+	.set_state_periodic	= ckevt_dc21285_set_periodic,
-+	.set_state_oneshot	= ckevt_dc21285_shutdown,
-+	.tick_resume		= ckevt_dc21285_set_periodic,
++	.set_next_event		= gemini_timer_set_next_event,
++	.set_state_shutdown	= gemini_timer_shutdown,
++	.set_state_periodic	= gemini_timer_set_periodic,
++	.set_state_oneshot	= gemini_timer_shutdown,
++	.tick_resume		= gemini_timer_shutdown,
  };
  
- static irqreturn_t timer1_interrupt(int irq, void *dev_id)
-@@ -94,7 +92,7 @@ static irqreturn_t timer1_interrupt(int irq, void *dev_id)
- 	*CSR_TIMER1_CLR = 0;
- 
- 	/* Stop the timer if in one-shot mode */
--	if (ce->mode == CLOCK_EVT_MODE_ONESHOT)
-+	if (clockevent_state_oneshot(ce))
- 		*CSR_TIMER1_CNTL = 0;
- 
- 	ce->event_handler(ce);
+ /*
 -- 
 2.4.0
