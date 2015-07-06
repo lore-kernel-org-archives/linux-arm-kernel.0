@@ -1,113 +1,140 @@
 From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Mon,  6 Jul 2015 16:24:24 +0530
-Subject: [PATCH 17/18] ARM/iop/time: Migrate to new 'set-state' interface
+Date: Mon,  6 Jul 2015 16:24:25 +0530
+Subject: [PATCH 18/18] ARM/orion/time: Migrate to new 'set-state' interface
 In-Reply-To: <cover.1436178990.git.viresh.kumar@linaro.org>
 References: <cover.1436178990.git.viresh.kumar@linaro.org>
-Message-ID: <3efefc53bcae3fa2173a3b95486c6199b57dd3be.1436178990.git.viresh.kumar@linaro.org>
+Message-ID: <8fb1a75b41a99d61172acba2446a66166639f741.1436178990.git.viresh.kumar@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Migrate iop driver to the new 'set-state' interface provided by
+Migrate orion driver to the new 'set-state' interface provided by
 clockevents core, the earlier 'set-mode' interface is marked obsolete
 now.
 
 This also enables us to implement callbacks for new states of clockevent
 devices, for example: ONESHOT_STOPPED.
 
-Cc: Russell King <linux@arm.linux.org.uk>
+Cc: Jason Cooper <jason@lakedaemon.net>
+Cc: Andrew Lunn <andrew@lunn.ch>
+Cc: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+Cc: Gregory Clement <gregory.clement@free-electrons.com>
 Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
 ---
- arch/arm/plat-iop/time.c | 70 +++++++++++++++++++++++++++++-------------------
- 1 file changed, 43 insertions(+), 27 deletions(-)
+ arch/arm/plat-orion/time.c | 93 ++++++++++++++++++++++++----------------------
+ 1 file changed, 48 insertions(+), 45 deletions(-)
 
-diff --git a/arch/arm/plat-iop/time.c b/arch/arm/plat-iop/time.c
-index 6ad65d8ae237..101e8f2c7abe 100644
---- a/arch/arm/plat-iop/time.c
-+++ b/arch/arm/plat-iop/time.c
-@@ -77,41 +77,57 @@ static int iop_set_next_event(unsigned long delta,
+diff --git a/arch/arm/plat-orion/time.c b/arch/arm/plat-orion/time.c
+index 261258f717fc..8085a8aac812 100644
+--- a/arch/arm/plat-orion/time.c
++++ b/arch/arm/plat-orion/time.c
+@@ -106,60 +106,63 @@ orion_clkevt_next_event(unsigned long delta, struct clock_event_device *dev)
+ 	return 0;
+ }
  
- static unsigned long ticks_per_jiffy;
- 
--static void iop_set_mode(enum clock_event_mode mode,
--			 struct clock_event_device *unused)
-+static int iop_set_periodic(struct clock_event_device *evt)
+-static void
+-orion_clkevt_mode(enum clock_event_mode mode, struct clock_event_device *dev)
++static int orion_clkevt_shutdown(struct clock_event_device *evt)
  {
- 	u32 tmr = read_tmr0();
+ 	unsigned long flags;
+ 	u32 u;
  
--	switch (mode) {
--	case CLOCK_EVT_MODE_PERIODIC:
--		write_tmr0(tmr & ~IOP_TMR_EN);
--		write_tcr0(ticks_per_jiffy - 1);
--		write_trr0(ticks_per_jiffy - 1);
--		tmr |= (IOP_TMR_RELOAD | IOP_TMR_EN);
--		break;
--	case CLOCK_EVT_MODE_ONESHOT:
--		/* ->set_next_event sets period and enables timer */
--		tmr &= ~(IOP_TMR_RELOAD | IOP_TMR_EN);
--		break;
--	case CLOCK_EVT_MODE_RESUME:
--		tmr |= IOP_TMR_EN;
--		break;
--	case CLOCK_EVT_MODE_SHUTDOWN:
--	case CLOCK_EVT_MODE_UNUSED:
--	default:
--		tmr &= ~IOP_TMR_EN;
--		break;
+ 	local_irq_save(flags);
+-	if (mode == CLOCK_EVT_MODE_PERIODIC) {
+-		/*
+-		 * Setup timer to fire at 1/HZ intervals.
+-		 */
+-		writel(ticks_per_jiffy - 1, timer_base + TIMER1_RELOAD_OFF);
+-		writel(ticks_per_jiffy - 1, timer_base + TIMER1_VAL_OFF);
+-
+-		/*
+-		 * Enable timer interrupt.
+-		 */
+-		u = readl(bridge_base + BRIDGE_MASK_OFF);
+-		writel(u | BRIDGE_INT_TIMER1, bridge_base + BRIDGE_MASK_OFF);
+-
+-		/*
+-		 * Enable timer.
+-		 */
+-		u = readl(timer_base + TIMER_CTRL_OFF);
+-		writel(u | TIMER1_EN | TIMER1_RELOAD_EN,
+-		       timer_base + TIMER_CTRL_OFF);
+-	} else {
+-		/*
+-		 * Disable timer.
+-		 */
+-		u = readl(timer_base + TIMER_CTRL_OFF);
+-		writel(u & ~TIMER1_EN, timer_base + TIMER_CTRL_OFF);
+-
+-		/*
+-		 * Disable timer interrupt.
+-		 */
+-		u = readl(bridge_base + BRIDGE_MASK_OFF);
+-		writel(u & ~BRIDGE_INT_TIMER1, bridge_base + BRIDGE_MASK_OFF);
+-
+-		/*
+-		 * ACK pending timer interrupt.
+-		 */
+-		writel(bridge_timer1_clr_mask, bridge_base + BRIDGE_CAUSE_OFF);
+-
 -	}
-+	write_tmr0(tmr & ~IOP_TMR_EN);
-+	write_tcr0(ticks_per_jiffy - 1);
-+	write_trr0(ticks_per_jiffy - 1);
-+	tmr |= (IOP_TMR_RELOAD | IOP_TMR_EN);
- 
- 	write_tmr0(tmr);
++
++	/* Disable timer */
++	u = readl(timer_base + TIMER_CTRL_OFF);
++	writel(u & ~TIMER1_EN, timer_base + TIMER_CTRL_OFF);
++
++	/* Disable timer interrupt */
++	u = readl(bridge_base + BRIDGE_MASK_OFF);
++	writel(u & ~BRIDGE_INT_TIMER1, bridge_base + BRIDGE_MASK_OFF);
++
++	/* ACK pending timer interrupt */
++	writel(bridge_timer1_clr_mask, bridge_base + BRIDGE_CAUSE_OFF);
++
++	local_irq_restore(flags);
++
 +	return 0;
 +}
 +
-+static int iop_set_oneshot(struct clock_event_device *evt)
++static int orion_clkevt_set_periodic(struct clock_event_device *evt)
 +{
-+	u32 tmr = read_tmr0();
++	unsigned long flags;
++	u32 u;
 +
-+	/* ->set_next_event sets period and enables timer */
-+	tmr &= ~(IOP_TMR_RELOAD | IOP_TMR_EN);
-+	write_tmr0(tmr);
-+	return 0;
-+}
++	local_irq_save(flags);
 +
-+static int iop_shutdown(struct clock_event_device *evt)
-+{
-+	u32 tmr = read_tmr0();
++	/* Setup timer to fire at 1/HZ intervals */
++	writel(ticks_per_jiffy - 1, timer_base + TIMER1_RELOAD_OFF);
++	writel(ticks_per_jiffy - 1, timer_base + TIMER1_VAL_OFF);
 +
-+	tmr &= ~IOP_TMR_EN;
-+	write_tmr0(tmr);
-+	return 0;
-+}
++	/* Enable timer interrupt */
++	u = readl(bridge_base + BRIDGE_MASK_OFF);
++	writel(u | BRIDGE_INT_TIMER1, bridge_base + BRIDGE_MASK_OFF);
 +
-+static int iop_resume(struct clock_event_device *evt)
-+{
-+	u32 tmr = read_tmr0();
++	/* Enable timer */
++	u = readl(timer_base + TIMER_CTRL_OFF);
++	writel(u | TIMER1_EN | TIMER1_RELOAD_EN, timer_base + TIMER_CTRL_OFF);
 +
-+	tmr |= IOP_TMR_EN;
-+	write_tmr0(tmr);
+ 	local_irq_restore(flags);
++
 +	return 0;
  }
  
- static struct clock_event_device iop_clockevent = {
--	.name		= "iop_timer0",
--	.features       = CLOCK_EVT_FEAT_PERIODIC | CLOCK_EVT_FEAT_ONESHOT,
--	.rating         = 300,
--	.set_next_event	= iop_set_next_event,
--	.set_mode	= iop_set_mode,
-+	.name			= "iop_timer0",
-+	.features		= CLOCK_EVT_FEAT_PERIODIC |
-+				  CLOCK_EVT_FEAT_ONESHOT,
+ static struct clock_event_device orion_clkevt = {
+-	.name		= "orion_tick",
+-	.features	= CLOCK_EVT_FEAT_ONESHOT | CLOCK_EVT_FEAT_PERIODIC,
+-	.rating		= 300,
+-	.set_next_event	= orion_clkevt_next_event,
+-	.set_mode	= orion_clkevt_mode,
++	.name			= "orion_tick",
++	.features		= CLOCK_EVT_FEAT_ONESHOT |
++				  CLOCK_EVT_FEAT_PERIODIC,
 +	.rating			= 300,
-+	.set_next_event		= iop_set_next_event,
-+	.set_state_shutdown	= iop_shutdown,
-+	.set_state_periodic	= iop_set_periodic,
-+	.tick_resume		= iop_resume,
-+	.set_state_oneshot	= iop_set_oneshot,
++	.set_next_event		= orion_clkevt_next_event,
++	.set_state_shutdown	= orion_clkevt_shutdown,
++	.set_state_periodic	= orion_clkevt_set_periodic,
++	.set_state_oneshot	= orion_clkevt_shutdown,
++	.tick_resume		= orion_clkevt_shutdown,
  };
  
- static irqreturn_t
+ static irqreturn_t orion_timer_interrupt(int irq, void *dev_id)
 -- 
 2.4.0
