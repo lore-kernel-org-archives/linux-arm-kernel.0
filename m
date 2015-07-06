@@ -1,116 +1,55 @@
-From: eric.auger@linaro.org (Eric Auger)
-Date: Mon,  6 Jul 2015 15:24:43 +0200
-Subject: [RFC v2 9/9] KVM: arm/arm64: implement IRQ bypass consumer functions
-In-Reply-To: <1436189083-32527-1-git-send-email-eric.auger@linaro.org>
-References: <1436189083-32527-1-git-send-email-eric.auger@linaro.org>
-Message-ID: <1436189083-32527-10-git-send-email-eric.auger@linaro.org>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Mon, 06 Jul 2015 16:29:33 +0300
+Subject: [PATCH v2] ARM: shmobile: kzm9g dts: Use adxl345-specific
+ compatible property
+In-Reply-To: <1436180132-26190-1-git-send-email-geert+renesas@glider.be>
+References: <1436180132-26190-1-git-send-email-geert+renesas@glider.be>
+Message-ID: <15966074.zDS67FO48r@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Implement IRQ bypass callbacks for arm/arm64 IRQ forwarding:
-- kvm_arch_irq_bypass_add_producer: perform VGIC/irqchip
-  settings for forwarding
-- kvm_arch_irq_bypass_del_producer: same for inverse operation
-- kvm_arch_irq_bypass_stop: halt guest execution
-- kvm_arch_irq_bypass_resume: resume guest execution
-- void kvm_arch_irq_bypass_update
+Hi Geert,
 
-and set CONFIG_HAVE_KVM_IRQ_BYPASS for arm/arm64.
+Thank you for the patch.
 
-Signed-off-by: Eric Auger <eric.auger@linaro.org>
+On Monday 06 July 2015 12:55:32 Geert Uytterhoeven wrote:
+> Replace the deprecated generic "adi,adxl34x" compatible value by the
+> adxl345-specific "adi,adxl345" value, cfr. commit e465bf6fc55d5ce2 ("DT:
+> i2c: Deprecate adi,adxl34x compatible string").
+> 
+> Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
 
----
+Acked-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
 
-v1 -> v2:
-- struct kvm_kernel_irqfd is retrieved with container_of
-- function names changed
----
- arch/arm/kvm/Kconfig   |  1 +
- arch/arm/kvm/arm.c     | 40 ++++++++++++++++++++++++++++++++++++++++
- arch/arm64/kvm/Kconfig |  1 +
- 3 files changed, 42 insertions(+)
+> ---
+> Depends on commit 3a38958d2477b718 ("Input: adxl34x - add OF match
+> support"), which is in v4.2-rc1.
+> 
+> This is v2 of "ARM: shmobile: kzm9g dts: Add adxl345-specific compatible
+> property".
+> 
+> v2:
+>   - Drop deprecated "adi,adxl34x"
+> ---
+>  arch/arm/boot/dts/sh73a0-kzm9g.dts | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm/boot/dts/sh73a0-kzm9g.dts
+> b/arch/arm/boot/dts/sh73a0-kzm9g.dts index
+> 24b4cd24dceb2f9e..7fc5602810ad0da1 100644
+> --- a/arch/arm/boot/dts/sh73a0-kzm9g.dts
+> +++ b/arch/arm/boot/dts/sh73a0-kzm9g.dts
+> @@ -206,7 +206,7 @@
+>  	};
+> 
+>  	accelerometer at 1d {
+> -		compatible = "adi,adxl34x";
+> +		compatible = "adi,adxl345";
+>  		reg = <0x1d>;
+>  		interrupt-parent = <&irqpin3>;
+>  		interrupts = <2 IRQ_TYPE_LEVEL_HIGH>,
 
-diff --git a/arch/arm/kvm/Kconfig b/arch/arm/kvm/Kconfig
-index 7d38d25..19114a1 100644
---- a/arch/arm/kvm/Kconfig
-+++ b/arch/arm/kvm/Kconfig
-@@ -32,6 +32,7 @@ config KVM
- 	select HAVE_KVM_EVENTFD
- 	select HAVE_KVM_IRQFD
- 	select IRQ_BYPASS_MANAGER
-+	select HAVE_KVM_IRQ_BYPASS
- 	depends on ARM_VIRT_EXT && ARM_LPAE && ARM_ARCH_TIMER
- 	---help---
- 	  Support hosting virtualized guest machines.
-diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
-index 46d4ef6..db8f040 100644
---- a/arch/arm/kvm/arm.c
-+++ b/arch/arm/kvm/arm.c
-@@ -27,6 +27,8 @@
- #include <linux/mman.h>
- #include <linux/sched.h>
- #include <linux/kvm.h>
-+#include <linux/kvm_irqfd.h>
-+#include <linux/irqbypass.h>
- #include <trace/events/kvm.h>
- 
- #define CREATE_TRACE_POINTS
-@@ -1149,6 +1151,44 @@ struct kvm_vcpu *kvm_mpidr_to_vcpu(struct kvm *kvm, unsigned long mpidr)
- 	return NULL;
- }
- 
-+void kvm_arch_irq_bypass_add_producer(struct irq_bypass_consumer *cons,
-+				      struct irq_bypass_producer *prod)
-+{
-+	struct kvm_kernel_irqfd *irqfd =
-+		container_of(cons, struct kvm_kernel_irqfd, consumer);
-+
-+	kvm_vgic_set_forward(irqfd->kvm, prod->irq, irqfd->gsi);
-+}
-+void kvm_arch_irq_bypass_del_producer(struct irq_bypass_consumer *cons,
-+				      struct irq_bypass_producer *prod)
-+{
-+	struct kvm_kernel_irqfd *irqfd =
-+		container_of(cons, struct kvm_kernel_irqfd, consumer);
-+
-+	kvm_vgic_unset_forward(irqfd->kvm, prod->irq, irqfd->gsi,
-+			       &prod->active);
-+}
-+
-+void kvm_arch_irq_bypass_stop(struct irq_bypass_consumer *cons)
-+{
-+	struct kvm_kernel_irqfd *irqfd =
-+		container_of(cons, struct kvm_kernel_irqfd, consumer);
-+
-+	kvm_arm_halt_guest(irqfd->kvm);
-+}
-+
-+void kvm_arch_irq_bypass_resume(struct irq_bypass_consumer *cons)
-+{
-+	struct kvm_kernel_irqfd *irqfd =
-+		container_of(cons, struct kvm_kernel_irqfd, consumer);
-+
-+	kvm_arm_resume_guest(irqfd->kvm);
-+}
-+
-+void kvm_arch_irq_bypass_update(struct irq_bypass_consumer *cons)
-+{
-+}
-+
- /**
-  * Initialize Hyp-mode and memory mappings on all CPUs.
-  */
-diff --git a/arch/arm64/kvm/Kconfig b/arch/arm64/kvm/Kconfig
-index dfaca85..822551c 100644
---- a/arch/arm64/kvm/Kconfig
-+++ b/arch/arm64/kvm/Kconfig
-@@ -32,6 +32,7 @@ config KVM
- 	select HAVE_KVM_EVENTFD
- 	select HAVE_KVM_IRQFD
- 	select IRQ_BYPASS_MANAGER
-+	select HAVE_KVM_IRQ_BYPASS
- 	---help---
- 	  Support hosting virtualized guest machines.
- 
 -- 
-1.9.1
+Regards,
+
+Laurent Pinchart
