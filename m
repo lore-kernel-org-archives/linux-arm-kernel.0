@@ -1,70 +1,160 @@
-From: lznuaa@gmail.com (Zhi Li)
-Date: Mon, 6 Jul 2015 14:51:01 -0500
-Subject: [PATCH v2 0/8] add basic support for i.mx6 ul chip
-In-Reply-To: <1434727951-4852-1-git-send-email-Frank.Li@freescale.com>
-References: <1434727951-4852-1-git-send-email-Frank.Li@freescale.com>
-Message-ID: <CAHrpEqTu9_rkijU8E0Yjs5HwpFFFSCSSYRu=NYMW=y9cE9f-uA@mail.gmail.com>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Mon, 06 Jul 2015 12:52:52 -0700
+Subject: [PATCH v4 3/8] clk: add support for clocks provided by SCP(System
+ Control Processor)
+In-Reply-To: <5596A1B6.8020307@arm.com>
+References: <1433760002-24120-1-git-send-email-sudeep.holla@arm.com>
+ <1433760002-24120-4-git-send-email-sudeep.holla@arm.com>
+ <20150702172310.GF4301@codeaurora.org> <5596A1B6.8020307@arm.com>
+Message-ID: <559ADC94.4080505@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 19, 2015 at 10:32 AM,  <Frank.Li@freescale.com> wrote:
-> From: Frank Li <Frank.Li@freescale.com>
+On 07/03/2015 07:52 AM, Sudeep Holla wrote:
+> Hi Stephen,
 >
-> Add basic function support i.mx6ul.
-> add simple dts.
-> add full pin function define
-> add clock support.
-> add low level debug
 >
-> Change from v1 to v2:
->  - Remove unnecessary clk_register_clkdev for gpt
->  - use fat iomux in dts
->  - use macro GPIO_ACTIVE_LOW
+> Thanks for the review.
 >
-> Anson Huang (1):
->   ARM: imx: add low-level debug support for i.mx6ul
+> On 02/07/15 18:23, Stephen Boyd wrote:
+>> On 06/08, Sudeep Holla wrote:
+>>> diff --git a/drivers/clk/Kconfig b/drivers/clk/Kconfig
+>>> index 9897f353bf1a..0fe8daefc105 100644
+>>> --- a/drivers/clk/Kconfig
+>>> +++ b/drivers/clk/Kconfig
+>>> @@ -59,6 +59,16 @@ config COMMON_CLK_RK808
+>>>         clocked at 32KHz each. Clkout1 is always on, Clkout2 can off
+>>>         by control register.
+>>>
+>>> +config COMMON_CLK_SCPI
+>>> +        tristate "Clock driver controlled via SCPI interface"
+>>> +        depends on ARM_SCPI_PROTOCOL || COMPILE_TEST
+>>> +        ---help---
+>>> +          This driver provides support for clocks that are controlled
+>>> +          by firmware that implements the SCPI interface.
+>>> +
+>>> +      This driver uses SCPI Message Protocol to interact with the
+>>> +      firmware providing all the clock controls.
+>>
+>> The tabbing is weird here. Both paragraphs should have the same
+>> alignment.
+>>
 >
-> Frank Li (7):
->   ARM: imx: add i.mx6ul msl support
->   ARM: imx: add imx6ul clk tree support
->   Document: dt: binding: imx: update document for imx6ul support
->   ARM: pinctrl: imx: add i.mx6ul pinctrl driver
->   ARM: dts: add i.mx6ul pin function include file
->   ARM: dts: imx: add imx6ul and imx6ul evk board support
->   ARM: imx: imx_v6_v7_defconfig enable imx6ul support
+> Indeed, sorry for that, fixed now.
 >
->  .../devicetree/bindings/clock/imx6ul-clock.txt     |  13 +
->  .../bindings/pinctrl/fsl,imx6ul-pinctrl.txt        |  36 +
->  arch/arm/Kconfig.debug                             |   9 +
->  arch/arm/boot/dts/Makefile                         |   2 +
->  arch/arm/boot/dts/imx6ul-14x14-evk.dts             | 335 ++++++++
->  arch/arm/boot/dts/imx6ul-pinfunc.h                 | 938 +++++++++++++++++++++
->  arch/arm/boot/dts/imx6ul.dtsi                      | 645 ++++++++++++++
->  arch/arm/configs/imx_v6_v7_defconfig               |   1 +
->  arch/arm/include/debug/imx-uart.h                  |  13 +
->  arch/arm/mach-imx/Kconfig                          |   8 +
->  arch/arm/mach-imx/Makefile                         |   1 +
->  arch/arm/mach-imx/mach-imx6ul.c                    |  43 +
->  drivers/clk/imx/Makefile                           |   1 +
->  drivers/clk/imx/clk-imx6ul.c                       | 432 ++++++++++
->  drivers/pinctrl/freescale/Kconfig                  |   7 +
->  drivers/pinctrl/freescale/Makefile                 |   1 +
->  drivers/pinctrl/freescale/pinctrl-imx6ul.c         | 323 +++++++
->  include/dt-bindings/clock/imx6ul-clock.h           | 240 ++++++
->  18 files changed, 3048 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/clock/imx6ul-clock.txt
->  create mode 100644 Documentation/devicetree/bindings/pinctrl/fsl,imx6ul-pinctrl.txt
->  create mode 100644 arch/arm/boot/dts/imx6ul-14x14-evk.dts
->  create mode 100644 arch/arm/boot/dts/imx6ul-pinfunc.h
->  create mode 100644 arch/arm/boot/dts/imx6ul.dtsi
->  create mode 100644 arch/arm/mach-imx/mach-imx6ul.c
->  create mode 100644 drivers/clk/imx/clk-imx6ul.c
->  create mode 100644 drivers/pinctrl/freescale/pinctrl-imx6ul.c
->  create mode 100644 include/dt-bindings/clock/imx6ul-clock.h
+>>> diff --git a/drivers/clk/clk-scpi.c b/drivers/clk/clk-scpi.c
+>>> new file mode 100644
+>>> index 000000000000..707b3430c55f
+>>> --- /dev/null
+>>> +++ b/drivers/clk/clk-scpi.c
+>>> +
+>>> +#include <linux/clk-provider.h>
+>>> +#include <linux/device.h>
+>>> +#include <linux/err.h>
+>>> +#include <linux/of.h>
+>>> +#include <linux/module.h>
+>>> +#include <linux/of_platform.h>
+>>> +#include <linux/scpi_protocol.h>
+>>
+>> Please include <linux/platform_device.h> as well.
+>>
+>
+> Added now, didn't bother as of_platform.h includes it.
+>
+>>> +
+>>> +struct scpi_clk {
+>>> +    u32 id;
+>>> +    const char *name;
+>>
+>> Do you need this? Or can you just use __clk_get_name() in places
+>> where the name is used?
+>>
+>
+> Not used, so removed it.
+>
+>
+> [...]
+>
+>>> +static long scpi_clk_round_rate(struct clk_hw *hw, unsigned long rate,
+>>> +                unsigned long *parent_rate)
+>>> +{
+>>
+>> Maybe a comment here like:
+>>
+>> /*
+>>   * We can't figure out what rate it will be, so just return the rate
+>>   * back to the caller. scpi_clk_recalc_rate() will be called
+>>   * after the rate is set and we'll know what rate the clock is
+>>   * running at then.
+>>   */
+>>
+>
+> Done
+>
+>>> +    return rate;
+>>> +}
+>>> +
+>>> +static int scpi_clk_set_rate(struct clk_hw *hw, unsigned long rate,
+>>> +                 unsigned long parent_rate)
+>>> +{
+>>> +    struct scpi_clk *clk = to_scpi_clk(hw);
+>>> +
+>>> +    return clk->scpi_ops->clk_set_val(clk->id, rate);
+>>> +}
+>>> +
+>>> +static void scpi_clk_disable(struct clk_hw *hw)
+>>> +{
+>>> +    scpi_clk_set_rate(hw, 0, 0);
+>>
+>> Does this mean you have to set a rate to enable the clock? Are
+>> you relying on drivers to call clk_set_rate() to implicitly
+>> enable the clock? If so, it would be better to cache the rate of
+>> the clock in set_rate if the clock isn't enabled in software and
+>> then send the cached rate during enable.
+>>
+>
+> Agreed, I have asked the firmware/SCPI specification guys about
+> more details on what to expect from firmware. Once they get back,
+> will update the code considering your feedback.
+>
+> [...]
+>
+>>> +static int __scpi_find_dvfs_index(struct scpi_clk *clk, unsigned
+>>> long rate)
+>>> +{
+>>> +    int idx, max_opp = clk->info->count;
+>>> +    struct scpi_opp *opp = clk->info->opps;
+>>
+>> const?
+>>
+>
+> All the 3 above fixed now.
+>
+> [...]
+>
+>>> +
+>>> +    clk = devm_clk_register(dev, &sclk->hw);
+>>> +    if (!IS_ERR(clk) && max)
+>>> +        clk_set_rate_range(clk, min, max);
+>>
+>> Hm.. we're planning to make clk_register() return a struct
+>> clk_hw, so this will block that. We need some sort of clk_hw API
+>> that allows us to setup min/max limits on the clock from the
+>> provider side. Care to add that?
+>>
+>
+> Can you provide pointer to the patches or the tree containing those
+> changes ? Are they targeted for v4.3 ?
+>
 
-Ping!
+If I have time I may try to start doing the clk_register() conversion,
+but it will take a while so I doubt it will be in v4.3. I'm asking if
+you can add a clk_hw based API that does something like
+clk_set_rate_range() without requiring a struct clk pointer. i.e.
+clk_hw_set_rate_range(struct clk_hw *hw, min, max) that constraints the
+min/max rate of the clock. This way, the driver is only using clk
+provider APIs and not clk consumer APIs.
 
->
-> --
-> 1.9.1
->
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
