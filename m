@@ -1,23 +1,63 @@
-From: p.fedin@samsung.com (Pavel Fedin)
-Date: Mon, 06 Jul 2015 16:33:17 +0300
-Subject: [PATCH 1/7] KVM: api: add kvm_irq_routing_extended_msi
-In-Reply-To: <20150706120837.GA13530@cbox>
-References: <1435592237-17924-2-git-send-email-eric.auger@linaro.org>
- <011f01d0b498$6a17aeb0$3e470c10$@samsung.com> <5596503E.6040902@arm.com>
- <00fd01d0b7b6$f6cf3550$e46d9ff0$@samsung.com> <559A3C9C.6050302@arm.com>
- <20150706093026.GA11590@cbox> <559A52E6.5050402@arm.com>
- <20150706103755.GC11590@cbox> <559A6164.1000401@redhat.com>
- <559A6527.1040107@arm.com> <20150706120837.GA13530@cbox>
-Message-ID: <025301d0b7f0$5210a140$f631e3c0$@samsung.com>
+From: djkurtz@chromium.org (Daniel Kurtz)
+Date: Mon, 6 Jul 2015 21:38:59 +0800
+Subject: [PATCH v4 3/3] arm64: dts: mt8173: add MT8173 display PWM driver
+ support dtsi
+In-Reply-To: <1436189368-1826-4-git-send-email-yh.huang@mediatek.com>
+References: <1436189368-1826-1-git-send-email-yh.huang@mediatek.com>
+ <1436189368-1826-4-git-send-email-yh.huang@mediatek.com>
+Message-ID: <CAGS+omC_n3hVJ6P2R-9GMpJSBABeEDXk2drOu2oJvJfk6qC0dA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> Just so I'm sure I understand: The way the kernel differentiates between
-> no-devid and devid==0, is whether or not the devid flag is set, correct?
+On Mon, Jul 6, 2015 at 9:29 PM, YH Huang <yh.huang@mediatek.com> wrote:
+> Add display PWM node in mt8173.dtsi.
+>
+> Signed-off-by: YH Huang <yh.huang@mediatek.com>
+> ---
+>  arch/arm64/boot/dts/mediatek/mt8173.dtsi | 22 ++++++++++++++++++++++
+>  1 file changed, 22 insertions(+)
+>
+> diff --git a/arch/arm64/boot/dts/mediatek/mt8173.dtsi b/arch/arm64/boot/dts/mediatek/mt8173.dtsi
+> index 0696f8f..e4ffd9d 100644
+> --- a/arch/arm64/boot/dts/mediatek/mt8173.dtsi
+> +++ b/arch/arm64/boot/dts/mediatek/mt8173.dtsi
+> @@ -393,6 +393,28 @@
+>                         #size-cells = <0>;
+>                         status = "disabled";
+>                 };
+> +
+> +               pwm0: pwm at 1401e000 {
+> +                       compatible = "mediatek,mt8173-disp-pwm",
+> +                                    "mediatek,mt6595-disp-pwm";
+> +                       reg = <0 0x1401e000 0 0x1000>;
+> +                       #pwm-cells = <2>;
+> +                       clocks = <&mmsys MM_DISP_PWM026M>,
+> +                                <&mmsys MM_DISP_PWM0MM>;
 
- Yes, exactly.
+CLK_MM_DISP_PWM026M
 
-Kind regards,
-Pavel Fedin
-Expert Engineer
-Samsung Electronics Research center Russia
+> +                       clock-names = "main", "mm";
+> +                       status = "disabled";
+> +               };
+> +
+> +               pwm1: pwm at 1401f000 {
+> +                       compatible = "mediatek,mt8173-disp-pwm",
+> +                                    "mediatek,mt6595-disp-pwm";
+> +                       reg = <0 0x1401f000 0 0x1000>;
+> +                       #pwm-cells = <2>;
+> +                       clocks = <&mmsys MM_DISP_PWM126M>,
+> +                                <&mmsys MM_DISP_PWM1MM>;
+> +                       clock-names = "main", "mm";
+> +                       status = "disabled";
+> +               };
+>         };
+>  };
+>
+> --
+> 1.8.1.1.dirty
+>
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> Please read the FAQ at  http://www.tux.org/lkml/
