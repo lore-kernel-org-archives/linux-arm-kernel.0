@@ -1,71 +1,54 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Mon, 6 Jul 2015 11:31:14 +0200
-Subject: [PATCH v7 09/11] KVM: arm64: guest debug, HW assisted debug
- support
-In-Reply-To: <20150706085140.GA30342@arm.com>
-References: <1435775343-20034-1-git-send-email-alex.bennee@linaro.org>
- <1435775343-20034-10-git-send-email-alex.bennee@linaro.org>
- <20150702084847.GB3418@arm.com> <87pp4asm6u.fsf@linaro.org>
- <20150703092323.GA1588@arm.com> <87h9plrzqq.fsf@linaro.org>
- <20150706085140.GA30342@arm.com>
-Message-ID: <20150706093114.GB11590@cbox>
+From: jonathanh@nvidia.com (Jon Hunter)
+Date: Mon, 6 Jul 2015 10:41:03 +0100
+Subject: Tegra baseline test results for v4.1
+Message-ID: <559A4D2F.8030503@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 06, 2015 at 09:51:40AM +0100, Will Deacon wrote:
-> On Fri, Jul 03, 2015 at 05:07:41PM +0100, Alex Benn?e wrote:
-> > Will Deacon <will.deacon@arm.com> writes:
-> > > On Thu, Jul 02, 2015 at 02:50:33PM +0100, Alex Benn?e wrote:
-> > >> Are you happy with this?:
-> > >
-> > > [...]
-> > >
-> > >> +/**
-> > >> + * kvm_arch_dev_ioctl_check_extension
-> > >> + *
-> > >> + * We currently assume that the number of HW registers is uniform
-> > >> + * across all CPUs (see cpuinfo_sanity_check).
-> > >> + */
-> > >>  int kvm_arch_dev_ioctl_check_extension(long ext)
-> > >>  {
-> > >>         int r;
-> > >> @@ -64,6 +71,12 @@ int kvm_arch_dev_ioctl_check_extension(long ext)
-> > >>         case KVM_CAP_ARM_EL1_32BIT:
-> > >>                 r = cpu_has_32bit_el1();
-> > >>                 break;
-> > >> +       case KVM_CAP_GUEST_DEBUG_HW_BPS:
-> > >> +               r = hw_breakpoint_slots(TYPE_INST);
-> > >> +               break;
-> > >> +       case KVM_CAP_GUEST_DEBUG_HW_WPS:
-> > >> +               r  = hw_breakpoint_slots(TYPE_DATA);
-> > >> +               break;
-> > >
-> > > Whilst I much prefer this code, it actually adds an unwanted dependency
-> > > on PERF_EVENTS that I didn't think about to start with. Sorry to keep
-> > > messing you about -- I guess your original patch is the best thing after
-> > > all.
-> > 
-> > Everything looks to be in hw_breakpoint.[ch] which does depend on
-> > CONFIG_HAVE_HW_BREAKPOINT which depends on PERF_EVENTS to be built.
-> > However the previous code depended on this behaviour as well.
-> 
-> I think your original approach (of sticking stuff in the header file) works
-> regardless of the CONFIG option, no?
-> 
-> > It would seem weird to enable guest debug using HW debug registers to
-> > debug the guest yet not allowing the host kernel to use them? Of course
-> > this is the only code they would share as all the magic of guest
-> > debugging is already mostly there for dirty guest handling.
-> > 
-> > I'm not familiar with Kconfig but it looks like this is all part of
-> > arm64 defconfig. Are people really going to want to disable PERF_EVENTS
-> > but still debug their guests with HW support?
-> 
-> Then it's your call. I just find the host dependency on perf a bit weird
-> to get guest debug working (especially as the dependency is completely
-> "fake" because we don't use any perf infrastructure at all).
-> 
-Agreed, let's see if we can avoid this.
+Here are some basic Tegra test results for Linux v4.1.
+Logs and other details at:
 
-Thanks,
--Christoffer
+    http://nvtb.github.io/linux/test_v4.1/20150623180103/
+
+
+Test summary
+------------
+
+Build: zImage:
+    Pass: ( 2/ 2): multi_v7_defconfig, tegra_defconfig
+
+Build: Image:
+    Pass: ( 1/ 1): defconfig
+
+Boot to userspace: defconfig:
+    Pass: ( 1/ 1): qemu-vexpress64
+
+Boot to userspace: multi_v7_defconfig:
+    Pass: ( 4/ 4): tegra114-dalmore-a04, tegra124-jetson-tk1,
+		   tegra20-trimslice, tegra30-beaver
+
+Boot to userspace: tegra_defconfig:
+    Pass: ( 4/ 4): tegra114-dalmore-a04, tegra124-jetson-tk1,
+		   tegra20-trimslice, tegra30-beaver
+
+
+vmlinux object size
+(delta in bytes from test_v4.1-rc8 (0f57d86787d8b1076ea8f9cbdddda2a46d534a27)):
+   text     data      bss    total  kernel
+      0        0        0        0  defconfig
+    -56        0        0      -56  multi_v7_defconfig
+    -88        0        0      -88  tegra_defconfig
+
+
+Boot-time memory difference
+(delta in bytes from test_v4.1-rc8 (0f57d86787d8b1076ea8f9cbdddda2a46d534a27))
+    avail    rsrvd     high    freed                board              kconfig                  dtb
+        .        .        .        .      qemu-vexpress64            defconfig           __internal
+        .        .        .        . tegra114-dalmore-a04   multi_v7_defconfig     tegra114-dalmore
+        .        .        .        . tegra114-dalmore-a04      tegra_defconfig     tegra114-dalmore
+        .        .        .        .  tegra124-jetson-tk1   multi_v7_defconfig  tegra124-jetson-tk1
+        .        .        .        .  tegra124-jetson-tk1      tegra_defconfig  tegra124-jetson-tk1
+        .        .        .        .    tegra20-trimslice   multi_v7_defconfig    tegra20-trimslice
+        .        .        .        .    tegra20-trimslice      tegra_defconfig    tegra20-trimslice
+        .        .        .        .       tegra30-beaver   multi_v7_defconfig       tegra30-beaver
+        .        .        .        .       tegra30-beaver      tegra_defconfig       tegra30-beaver
