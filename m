@@ -1,113 +1,257 @@
-From: ahs3@redhat.com (Al Stone)
-Date: Mon, 06 Jul 2015 15:20:22 -0600
-Subject: [PATCH v3 2/3] ACPI / ARM64: add BAD_MADT_GICC_ENTRY() macro
-In-Reply-To: <15297999.EvgjakjXbx@vostro.rjw.lan>
-References: <1435880916-2153-1-git-send-email-al.stone@linaro.org>
- <20150703140601.GL25907@e104818-lin.cambridge.arm.com>
- <5596E7C8.7040809@redhat.com> <15297999.EvgjakjXbx@vostro.rjw.lan>
-Message-ID: <559AF116.4030208@redhat.com>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Mon, 6 Jul 2015 14:32:10 -0700
+Subject: [PATCH v4] clk: change clk_ops' ->determine_rate() prototype
+In-Reply-To: <1436202872-26533-1-git-send-email-boris.brezillon@free-electrons.com>
+References: <1436202872-26533-1-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <20150706213210.GB20866@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/03/2015 05:54 PM, Rafael J. Wysocki wrote:
-> On Friday, July 03, 2015 01:51:36 PM Al Stone wrote:
->> On 07/03/2015 08:06 AM, Catalin Marinas wrote:
->>> On Thu, Jul 02, 2015 at 05:48:35PM -0600, Al Stone wrote:
->>>> diff --git a/arch/arm64/include/asm/acpi.h b/arch/arm64/include/asm/acpi.h
->>>> index 39248d3..a3c26a4 100644
->>>> --- a/arch/arm64/include/asm/acpi.h
->>>> +++ b/arch/arm64/include/asm/acpi.h
->>>> @@ -19,6 +19,17 @@
->>>>  #include <asm/psci.h>
->>>>  #include <asm/smp_plat.h>
->>>>  
->>>> +/* Macros for consistency checks of the GICC subtable of MADT */
->>>> +#define ACPI_MADT_GICC_51_LENGTH       76
->>>> +#define ACPI_MADT_GICC_60_LENGTH       80
->>>> +
->>>> +#define BAD_MADT_GICC_ENTRY(entry, end) (                                   \
->>>> +		(!entry) || (unsigned long)entry + sizeof(*entry) > end ||  \
->>>> +		((ACPI_FADT_SPEC_VERSION == ACPI_FADT_SPEC_VERSION_51) &&   \
->>>> +		 (entry->header.length != ACPI_MADT_GICC_51_LENGTH))    ||  \
->>>> +		((ACPI_FADT_SPEC_VERSION == ACPI_FADT_SPEC_VERSION_60) &&   \
->>>> +		 (entry->header.length != ACPI_MADT_GICC_60_LENGTH)))
->>>
->>> This looks ugly but, well, we could live with this.
->>
->> Nod.  It's right at the hairy edge of becoming a function, I think.
->>
->>> However, I'd like to avoid having to extend this macro every time we get
->>> a new spec released, like 6.1 defining another 80 or 84 etc. So, how
->>> about we only update this when there is an actual change in the length?
->>> Something like:
->>>
->>> #define ACPI_MADT_GICC_LENGTH	({					\
->>> 	u8 length;							\
->>> 	if (ACPI_FADT_SPEC_VERSION < ACPI_FADT_SPEC_VERSION_6_0)	\
->>> 		length = 76;						\
->>> 	else								\
->>> 		length = 80;						\
->>> 	length;								\
->>> })
->>>
->>> or just:
->>>
->>> #define ACPI_MADT_GICC_LENGTH	\
->>> 	(ACPI_FADT_SPEC_VERSION < ACPI_FADT_SPEC_VERSION_6_0 ? 76 : 80)
->>>
->>> (the latter is simpler but may not look nice if we change it again in
->>> 6.1; though we could re-write this macro when needed, not a problem)
->>>
->>
->> Perhaps the sanity checking for the MADT subtables needs to be revisited
->> and a more general solution provided -- this is not the only MADT subtable
->> with this problem and it may occur again.
->>
->> Even the versions above are not technically compliant with the spec.  If
->> we implement what the spec currently says, it might look something like
->> this:
->>
->> #define ACPI_MADT_GICC_LENGTH ({					\
->> 	u8 length;							\
->> 	switch (ACPI_FADT_SPEC_VERSION) {				\
->> 	case ACPI_FADT_SPEC_VERSION_5_0:				\
->> 		length = 40;						\
->> 		break;							\
->> 	case ACPI_FADT_SPEC_VERSION_5_1:				\
->> 		length = 76;						\
->> 		break;							\
->> 	default:	/* use 6.0 size */				\
->> 		length = 80;						\
->> 	}								\
->> 	length;								\
->> })
->>
->> So it's just messy and there will be a need for change.  Let me think about
->> making this a function instead of a macro; it may make sense to really fix
->> BAD_MADT_ENTRY in general instead of just dealing with the GICC subtable,
->> but it could also be overkill.
+On 07/06, Boris Brezillon wrote:
+> Clock rates are stored in an unsigned long field, but ->determine_rate()
+> (which returns a rounded rate from a requested one) returns a long
+> value (errors are reported using negative error codes), which can lead
+> to long overflow if the clock rate exceed 2Ghz.
 > 
-> So here's my suggestion.
+> Change ->determine_rate() prototype to return 0 or an error code, and pass
+> a pointer to a clk_rate_request structure containing the expected target
+> rate and the rate constraints imposed by clk users.
 > 
-> First, make ARM64 boot with 4.2+ in the simplest way possible.
-
-ACK.
-
-> Second, set out to fix BAD_MADT_ENTRY() etc.  Start with fixing ACPICA to
-> distinguish between the different formats depending on the spec version and
-> follow up from there.
+> The clk_rate_request structure might be extended in the future to contain
+> other kind of constraints like the rounding policy, the maximum clock
+> inaccuracy or other things that are not yet supported by the CCF
+> (power consumption constraints ?).
 > 
-> Thanks,
-> Rafael
+> Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
 
-Yup, that's what I was thinking.
+Which files did you compile? 
+
+drivers/clk/mmp/clk-mix.c: In function ?mmp_clk_mix_determine_rate?:
+drivers/clk/mmp/clk-mix.c:221:13: error: ?rate? undeclared (first use in this function)
+
+> 
+> diff --git a/arch/arm/mach-omap2/dpll3xxx.c b/arch/arm/mach-omap2/dpll3xxx.c
+> index 44e57ec..cd27457 100644
+> --- a/arch/arm/mach-omap2/dpll3xxx.c
+> +++ b/arch/arm/mach-omap2/dpll3xxx.c
+> @@ -462,43 +462,38 @@ void omap3_noncore_dpll_disable(struct clk_hw *hw)
+>  /**
+>   * omap3_noncore_dpll_determine_rate - determine rate for a DPLL
+>   * @hw: pointer to the clock to determine rate for
+> - * @rate: target rate for the DPLL
+> - * @best_parent_rate: pointer for returning best parent rate
+> - * @best_parent_clk: pointer for returning best parent clock
+> + * @req: target rate request
+>   *
+>   * Determines which DPLL mode to use for reaching a desired target rate.
+>   * Checks whether the DPLL shall be in bypass or locked mode, and if
+>   * locked, calculates the M,N values for the DPLL via round-rate.
+> - * Returns a positive clock rate with success, negative error value
+> - * in failure.
+> + * Returns a 0 on success, negative error value in failure.
+>   */
+> -long omap3_noncore_dpll_determine_rate(struct clk_hw *hw, unsigned long rate,
+> -				       unsigned long min_rate,
+> -				       unsigned long max_rate,
+> -				       unsigned long *best_parent_rate,
+> -				       struct clk_hw **best_parent_clk)
+> +int omap3_noncore_dpll_determine_rate(struct clk_hw *hw,
+> +				      struct clk_rate_request *req)
+>  {
+>  	struct clk_hw_omap *clk = to_clk_hw_omap(hw);
+>  	struct dpll_data *dd;
+>  
+> -	if (!hw || !rate)
+> +	if (!hw || !req || !req->rate)
+
+Why do we need to check for req? It shouldn't be NULL.
+
+>  		return -EINVAL;
+>  
+>  	dd = clk->dpll_data;
+>  	if (!dd)
+>  		return -EINVAL;
+>  
+> -	if (__clk_get_rate(dd->clk_bypass) == rate &&
+> +	if (__clk_get_rate(dd->clk_bypass) == req->rate &&
+>  	    (dd->modes & (1 << DPLL_LOW_POWER_BYPASS))) {
+> -		*best_parent_clk = __clk_get_hw(dd->clk_bypass);
+> +		req->best_parent_hw = __clk_get_hw(dd->clk_bypass);
+>  	} else {
+> -		rate = omap2_dpll_round_rate(hw, rate, best_parent_rate);
+> -		*best_parent_clk = __clk_get_hw(dd->clk_ref);
+> +		req->rate = omap2_dpll_round_rate(hw, req->rate,
+> +					  &req->best_parent_rate);
+> +		req->best_parent_hw = __clk_get_hw(dd->clk_ref);
+>  	}
+>  
+> -	*best_parent_rate = rate;
+> +	req->best_parent_rate = req->rate;
+>  
+> -	return rate;
+> +	return 0;
+>  }
+>  
+>  /**
+> diff --git a/arch/arm/mach-omap2/dpll44xx.c b/arch/arm/mach-omap2/dpll44xx.c
+> index f231be0..d615571 100644
+> --- a/arch/arm/mach-omap2/dpll44xx.c
+> +++ b/arch/arm/mach-omap2/dpll44xx.c
+> @@ -191,42 +191,36 @@ out:
+>  /**
+>   * omap4_dpll_regm4xen_determine_rate - determine rate for a DPLL
+>   * @hw: pointer to the clock to determine rate for
+> - * @rate: target rate for the DPLL
+> - * @best_parent_rate: pointer for returning best parent rate
+> - * @best_parent_clk: pointer for returning best parent clock
+> + * @req: target rate request
+>   *
+>   * Determines which DPLL mode to use for reaching a desired rate.
+>   * Checks whether the DPLL shall be in bypass or locked mode, and if
+>   * locked, calculates the M,N values for the DPLL via round-rate.
+> - * Returns a positive clock rate with success, negative error value
+> - * in failure.
+> + * Returns 0 on success and a negative error value otherwise.
+>   */
+> -long omap4_dpll_regm4xen_determine_rate(struct clk_hw *hw, unsigned long rate,
+> -					unsigned long min_rate,
+> -					unsigned long max_rate,
+> -					unsigned long *best_parent_rate,
+> -					struct clk_hw **best_parent_clk)
+> +int omap4_dpll_regm4xen_determine_rate(struct clk_hw *hw,
+> +				       struct clk_rate_request *req)
+>  {
+>  	struct clk_hw_omap *clk = to_clk_hw_omap(hw);
+>  	struct dpll_data *dd;
+>  
+> -	if (!hw || !rate)
+> +	if (!hw || !req || !req->rate)
+
+Same comment here. And why would we care about hw being NULL
+either for that matter.
+
+>  		return -EINVAL;
+>  
+>  	dd = clk->dpll_data;
+>  	if (!dd)
+>  		return -EINVAL;
+>  
+> -	if (__clk_get_rate(dd->clk_bypass) == rate &&
+> +	if (__clk_get_rate(dd->clk_bypass) == req->rate &&
+>  	    (dd->modes & (1 << DPLL_LOW_POWER_BYPASS))) {
+> -		*best_parent_clk = __clk_get_hw(dd->clk_bypass);
+> +		req->best_parent_hw = __clk_get_hw(dd->clk_bypass);
+>  	} else {
+> -		rate = omap4_dpll_regm4xen_round_rate(hw, rate,
+> -						      best_parent_rate);
+> -		*best_parent_clk = __clk_get_hw(dd->clk_ref);
+> +		req->rate = omap4_dpll_regm4xen_round_rate(hw, req->rate,
+> +						&req->best_parent_rate);
+> +		req->best_parent_hw = __clk_get_hw(dd->clk_ref);
+>  	}
+>  
+> -	*best_parent_rate = rate;
+> +	req->best_parent_rate = req->rate;
+>  
+> -	return rate;
+> +	return 0;
+>  }
+> diff --git a/drivers/clk/hisilicon/clk-hi3620.c b/drivers/clk/hisilicon/clk-hi3620.c
+> index 715d34a..e1d72e6 100644
+> --- a/drivers/clk/hisilicon/clk-hi3620.c
+> +++ b/drivers/clk/hisilicon/clk-hi3620.c
+> @@ -294,34 +294,31 @@ static unsigned long mmc_clk_recalc_rate(struct clk_hw *hw,
+>  	}
+>  }
+>  
+> -static long mmc_clk_determine_rate(struct clk_hw *hw, unsigned long rate,
+> -			      unsigned long min_rate,
+> -			      unsigned long max_rate,
+> -			      unsigned long *best_parent_rate,
+> -			      struct clk_hw **best_parent_p)
+> +static int mmc_clk_determine_rate(struct clk_hw *hw,
+> +				  struct clk_rate_request *req)
+>  {
+>  	struct clk_mmc *mclk = to_mmc(hw);
+> -	unsigned long best = 0;
+>  
+> -	if ((rate <= 13000000) && (mclk->id == HI3620_MMC_CIUCLK1)) {
+> -		rate = 13000000;
+> -		best = 26000000;
+> -	} else if (rate <= 26000000) {
+> -		rate = 25000000;
+> -		best = 180000000;
+> -	} else if (rate <= 52000000) {
+> -		rate = 50000000;
+> -		best = 360000000;
+> -	} else if (rate <= 100000000) {
+> -		rate = 100000000;
+> -		best = 720000000;
+> +	req->best_parent_hw = __clk_get_hw(__clk_get_parent(hw->clk));
+> +
+
+Where did this come from? We weren't setting the best_parent_p
+pointer before.
+
+> +	if ((req->rate <= 13000000) && (mclk->id == HI3620_MMC_CIUCLK1)) {
+> +		req->rate = 13000000;
+> +		req->best_parent_rate = 26000000;
+> +	} else if (req->rate <= 26000000) {
+> +		req->rate = 25000000;
+> +		req->best_parent_rate = 180000000;
+> +	} else if (req->rate <= 52000000) {
+> +		req->rate = 50000000;
+> +		req->best_parent_rate = 360000000;
+> +	} else if (req->rate <= 100000000) {
+> +		req->rate = 100000000;
+> +		req->best_parent_rate = 720000000;
+>  	} else {
+>  		/* max is 180M */
+> -		rate = 180000000;
+> -		best = 1440000000;
+> +		req->rate = 180000000;
+> +		req->best_parent_rate = 1440000000;
+>  	}
+> -	*best_parent_rate = best;
+> -	return rate;
+> +	return 0;
+>  }
+>  
+>  static u32 mmc_clk_delay(u32 val, u32 para, u32 off, u32 len)
+> diff --git a/drivers/clk/qcom/clk-pll.c b/drivers/clk/qcom/clk-pll.c
+> index 245d506..f8f1d44 100644
+> --- a/drivers/clk/qcom/clk-pll.c
+> +++ b/drivers/clk/qcom/clk-pll.c
+> @@ -135,17 +135,21 @@ struct pll_freq_tbl *find_freq(const struct pll_freq_tbl *f, unsigned long rate)
+>  	return NULL;
+>  }
+>  
+> -static long
+> -clk_pll_determine_rate(struct clk_hw *hw, unsigned long rate,
+> -		       unsigned long min_rate, unsigned long max_rate,
+> -		       unsigned long *p_rate, struct clk_hw **p)
+> +static int
+> +clk_pll_determine_rate(struct clk_hw *hw, struct clk_rate_request *req)
+>  {
+> +	struct clk *parent = __clk_get_parent(hw->clk);
+>  	struct clk_pll *pll = to_clk_pll(hw);
+>  	const struct pll_freq_tbl *f;
+>  
+> -	f = find_freq(pll->freq_tbl, rate);
+> +	req->best_parent_hw = __clk_get_hw(parent);
+> +	req->best_parent_rate = __clk_get_rate(parent);
+> +
+> +	f = find_freq(pll->freq_tbl, req->rate);
+>  	if (!f)
+> -		return clk_pll_recalc_rate(hw, *p_rate);
+> +		req->rate = clk_pll_recalc_rate(hw, req->best_parent_rate);
+> +	else
+> +		req->rate = f->freq;
+>  
+>  	return f->freq;
+
+return 0?
 
 -- 
-ciao,
-al
------------------------------------
-Al Stone
-Software Engineer
-Red Hat, Inc.
-ahs3 at redhat.com
------------------------------------
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
