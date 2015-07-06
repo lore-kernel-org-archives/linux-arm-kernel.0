@@ -1,55 +1,55 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Mon, 6 Jul 2015 13:54:49 -0500
-Subject: [PATCH v5 1/3] musb: sunxi: Add support for the Allwinner sunxi
- musb controller
-In-Reply-To: <1434199330-22263-2-git-send-email-hdegoede@redhat.com>
-References: <1434199330-22263-1-git-send-email-hdegoede@redhat.com>
- <1434199330-22263-2-git-send-email-hdegoede@redhat.com>
-Message-ID: <20150706185449.GL20779@saruman.tx.rr.com>
+From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
+Date: Mon, 06 Jul 2015 21:07:49 +0200
+Subject: [PATCH] thermal: consistently use int for temperatures
+In-Reply-To: <1436167189-29835-1-git-send-email-s.hauer@pengutronix.de>
+References: <1436167189-29835-1-git-send-email-s.hauer@pengutronix.de>
+Message-ID: <14808775.AMIXvBTC8g@diego>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Jun 13, 2015 at 02:42:08PM +0200, Hans de Goede wrote:
-> This is based on initial code to get the Allwinner sunxi musb controller
-> supported by Chen-Yu Tsai and Roman Byshko.
+Am Montag, 6. Juli 2015, 09:19:49 schrieb Sascha Hauer:
+> The thermal code uses int, long and unsigned long for temperatures
+> in different places.
 > 
-> This adds support for the Allwinner sunxi musb controller in both host only
-> and otg mode. Peripheral only mode is not supported, as no boards use that.
+> Using an unsigned type limits the thermal framework to positive
+> temperatures without need. Also several drivers currently will report
+> temperatures near UINT_MAX for temperatures below 0?C. This will probably
+> immediately shut the machine down due to overtemperature if started below
+> 0?C.
 > 
-> This has been tested on a cubietruck (A20 SoC) and an UTOO P66 tablet
-> (A13 SoC) with a variety of devices in host mode and with the g_serial gadget
-> driver in peripheral mode, plugging otg / host cables in/out a lot of times
-> in all possible imaginable plug orders.
+> 'long' is 64bit on several architectures. This is not needed since INT_MAX
+> ?mC is above the melting point of all known materials.
 > 
-> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+> Consistently use a plain 'int' for temperatures throughout the thermal code
+> and the drivers. This only changes the places in the drivers where the
+> temperature is passed around as pointer, when drivers internally use
+> another type this is not changed.
+> 
+> Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
+> Cc: Zhang Rui <rui.zhang@intel.com>
+> Cc: Eduardo Valentin <edubezval@gmail.com>
+> Cc: linux-pm at vger.kernel.org
+> Cc: linux-kernel at vger.kernel.org
+> Cc: Jean Delvare <jdelvare@suse.de>
+> Cc: Peter Feuerer <peter@piie.net>
+> Cc: Heiko Stuebner <heiko@sntech.de>
+> Cc: Lukasz Majewski <l.majewski@samsung.com>
+> Cc: Stephen Warren <swarren@wwwdotorg.org>
+> Cc: Thierry Reding <thierry.reding@gmail.com>
+> Cc: linux-acpi at vger.kernel.org
+> Cc: platform-driver-x86 at vger.kernel.org
+> Cc: linux-arm-kernel at lists.infradead.org
+> Cc: linux-omap at vger.kernel.org
+> Cc: linux-samsung-soc at vger.kernel.org
+> Cc: Guenter Roeck <linux@roeck-us.net>
+> Cc: Rafael J. Wysocki <rjw@rjwysocki.net>
+> Cc: Maxime Ripard <maxime.ripard@free-electrons.com>
+> Cc: Darren Hart <dvhart@infradead.org>
+> Cc: lm-sensors at lm-sensors.org
 > ---
-> Changes in v2:
-> -Move polling of id and vbus-det gpio-s to the phy driver
-> -Use extcon to get id (USB_HOST mode) status changes from the phy driver
-> -Stop using syscon, instead use Maxime Ripard's sunxi SRAM controller driver
-> Changes in v3:
-> -Check that USB_MUSB_FOO config is compatible with the dr_mode setting from dt
-> Changes in v4:
-> -Squash in "musb: sunxi: Add pre/post root reset end platform functions" patch
-> -Adjust for sunxi_sram controller driver changes
-> -Stop musb work from turning vbus off again when in host mode
-> Changes in v5:
-> -Squash in "musb: sunxi: Remove special MUSB_SUN4I flag" patch, as it was
->  mostly revering changes done by this patch
-> -Adjust for extcon api changes landing in 4.2
 
-drivers/usb/musb/sunxi.c:75:13: warning: symbol 'sunxi_musb' was not declared. Should it be static?
-drivers/usb/musb/sunxi.c:151:6: warning: symbol 'sunxi_musb_pre_root_reset_end' was not declared. Should it be static?
-drivers/usb/musb/sunxi.c:158:6: warning: symbol 'sunxi_musb_post_root_reset_end' was not declared. Should it be static?
+For
 
-please fix.
+>  drivers/thermal/rockchip_thermal.c                 | 10 ++++----
 
--- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150706/c2e85a6c/attachment.sig>
+Reviewed-by: Heiko Stuebner <heiko@sntech.de>
