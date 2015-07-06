@@ -1,22 +1,35 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 6 Jul 2015 10:03:24 +0100
-Subject: [PATCH 1/2] arm64: Blacklist non-kprobe-able symbols
-In-Reply-To: <9994841a0b0a8194a6dcc1b6af148ba358488c62.1436158027.git.panand@redhat.com>
-References: <cover.1436158027.git.panand@redhat.com>
- <9994841a0b0a8194a6dcc1b6af148ba358488c62.1436158027.git.panand@redhat.com>
-Message-ID: <20150706090323.GB30342@arm.com>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Mon, 06 Jul 2015 11:06:22 +0200
+Subject: [RFC PATCH 1/3] arm: psci: rename psci_smp.c to psci.c
+In-Reply-To: <1436014910-1201-2-git-send-email-jszhang@marvell.com>
+References: <1436014910-1201-1-git-send-email-jszhang@marvell.com>
+ <1436014910-1201-2-git-send-email-jszhang@marvell.com>
+Message-ID: <559A450E.50801@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 06, 2015 at 06:03:21AM +0100, Pratyush Anand wrote:
-> Add all function symbols which are called from do_debug_exception under
-> NOKPROBE_SYMBOL, as they can not kprobed.
+On 07/04/2015 03:01 PM, Jisheng Zhang wrote:
+> This will prepare for next commit to enable PSCI for UP systems so that
+> calls like cpu_suspend can be made functional on UP too.
+>
+> Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
+> ---
+>   arch/arm/kernel/Makefile   |   2 +-
+>   arch/arm/kernel/psci.c     | 130 +++++++++++++++++++++++++++++++++++++++++++++
+>   arch/arm/kernel/psci_smp.c | 130 ---------------------------------------------
+>   3 files changed, 131 insertions(+), 131 deletions(-)
+>   create mode 100644 arch/arm/kernel/psci.c
+>   delete mode 100644 arch/arm/kernel/psci_smp.c
 
-It's a shame this has to be so manual, but I suppose it's done on a
-best-effort basis to catch broken probe placement.
+When you move or rename a file, use the -M option with git when sending 
+the email. Instead of providing a big diff file, it will just annotate 
+the renaming.
 
-If we miss a function and somebody probes it, do we just get stuck in a
-recursive exception, or could we print something suggesting that a symbol
-be annotated as NOKPROBE?
 
-Will
+
+-- 
+  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
