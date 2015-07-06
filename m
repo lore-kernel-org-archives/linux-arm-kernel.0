@@ -1,239 +1,185 @@
 From: daniel.thompson@linaro.org (Daniel Thompson)
-Date: Mon,  6 Jul 2015 14:13:56 +0100
-Subject: [PATCH 4.2-rc1 v21 4/6] printk: Simple implementation for NMI
- backtracing
+Date: Mon,  6 Jul 2015 14:13:57 +0100
+Subject: [PATCH 4.2-rc1 v21 5/6] x86/nmi: Use common printk functions
 In-Reply-To: <1436188438-9478-1-git-send-email-daniel.thompson@linaro.org>
 References: <1436188438-9478-1-git-send-email-daniel.thompson@linaro.org>
-Message-ID: <1436188438-9478-5-git-send-email-daniel.thompson@linaro.org>
+Message-ID: <1436188438-9478-6-git-send-email-daniel.thompson@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently there is a quite a pile of code sitting in
-arch/x86/kernel/apic/hw_nmi.c to support safe all-cpu backtracing from NMI.
-The code is inaccessible to backtrace implementations for other
-architectures, which is a shame because they would probably like to be
-safe too.
+Much of the code sitting in arch/x86/kernel/apic/hw_nmi.c to support safe
+all-cpu backtracing from NMI has been copied to printk.c to make it
+accessible to other architectures.
 
-Copy this code into printk, reworking it a little as we do so to make
-it easier to exploit as library code.
-
-We'll port the x86 NMI backtrace logic to it in a later patch.
+Port the x86 NMI backtrace to the generic code.
 
 Signed-off-by: Daniel Thompson <daniel.thompson@linaro.org>
 Cc: Steven Rostedt <rostedt@goodmis.org>
+Cc: Thomas Gleixner <tglx@linutronix.de>
+Acked-by: Ingo Molnar <mingo@redhat.com>
+Cc: "H. Peter Anvin" <hpa@zytor.com>
+Cc: x86 at kernel.org
 ---
- include/linux/printk.h        |  20 ++++++
- init/Kconfig                  |   3 +
- kernel/printk/Makefile        |   1 +
- kernel/printk/nmi_backtrace.c | 147 ++++++++++++++++++++++++++++++++++++++++++
- 4 files changed, 171 insertions(+)
- create mode 100644 kernel/printk/nmi_backtrace.c
+ arch/x86/Kconfig              |   1 +
+ arch/x86/kernel/apic/hw_nmi.c | 104 ++++--------------------------------------
+ 2 files changed, 10 insertions(+), 95 deletions(-)
 
-diff --git a/include/linux/printk.h b/include/linux/printk.h
-index 58b1fec40d37..07da23b10f57 100644
---- a/include/linux/printk.h
-+++ b/include/linux/printk.h
-@@ -230,6 +230,26 @@ static inline void show_regs_print_info(const char *log_lvl)
+diff --git a/arch/x86/Kconfig b/arch/x86/Kconfig
+index 55bced17dc95..efc3510a3930 100644
+--- a/arch/x86/Kconfig
++++ b/arch/x86/Kconfig
+@@ -149,6 +149,7 @@ config X86
+ 	select VIRT_TO_BUS
+ 	select X86_DEV_DMA_OPS			if X86_64
+ 	select X86_FEATURE_NAMES		if PROC_FS
++	select PRINTK_NMI_BACKTRACE if X86_LOCAL_APIC
+ 
+ config INSTRUCTION_DECODER
+ 	def_bool y
+diff --git a/arch/x86/kernel/apic/hw_nmi.c b/arch/x86/kernel/apic/hw_nmi.c
+index 6873ab925d00..7a682beac3a0 100644
+--- a/arch/x86/kernel/apic/hw_nmi.c
++++ b/arch/x86/kernel/apic/hw_nmi.c
+@@ -30,40 +30,17 @@ u64 hw_nmi_get_sample_period(int watchdog_thresh)
+ #ifdef arch_trigger_all_cpu_backtrace
+ /* For reliability, we're prepared to waste bits here. */
+ static DECLARE_BITMAP(backtrace_mask, NR_CPUS) __read_mostly;
+-static cpumask_t printtrace_mask;
+-
+-#define NMI_BUF_SIZE		4096
+-
+-struct nmi_seq_buf {
+-	unsigned char		buffer[NMI_BUF_SIZE];
+-	struct seq_buf		seq;
+-};
+-
+-/* Safe printing in NMI context */
+-static DEFINE_PER_CPU(struct nmi_seq_buf, nmi_print_seq);
+-
+-/* "in progress" flag of arch_trigger_all_cpu_backtrace */
+-static unsigned long backtrace_flag;
+-
+-static void print_seq_line(struct nmi_seq_buf *s, int start, int end)
+-{
+-	const char *buf = s->buffer + start;
+-
+-	printk("%.*s", (end - start) + 1, buf);
+-}
+ 
+ void arch_trigger_all_cpu_backtrace(bool include_self)
+ {
+-	struct nmi_seq_buf *s;
+-	int len;
+-	int cpu;
+-	int i;
++	int err, i;
+ 	int this_cpu = get_cpu();
+ 
+-	if (test_and_set_bit(0, &backtrace_flag)) {
++	err = printk_nmi_backtrace_prepare();
++	if (err) {
+ 		/*
+-		 * If there is already a trigger_all_cpu_backtrace() in progress
+-		 * (backtrace_flag == 1), don't output double cpu dump infos.
++		 * If there is already an nmi printk sequence in
++		 * progress then just give up...
+ 		 */
+ 		put_cpu();
+ 		return;
+@@ -73,16 +50,6 @@ void arch_trigger_all_cpu_backtrace(bool include_self)
+ 	if (!include_self)
+ 		cpumask_clear_cpu(this_cpu, to_cpumask(backtrace_mask));
+ 
+-	cpumask_copy(&printtrace_mask, to_cpumask(backtrace_mask));
+-	/*
+-	 * Set up per_cpu seq_buf buffers that the NMIs running on the other
+-	 * CPUs will write to.
+-	 */
+-	for_each_cpu(cpu, to_cpumask(backtrace_mask)) {
+-		s = &per_cpu(nmi_print_seq, cpu);
+-		seq_buf_init(&s->seq, s->buffer, NMI_BUF_SIZE);
+-	}
+-
+ 	if (!cpumask_empty(to_cpumask(backtrace_mask))) {
+ 		pr_info("sending NMI to %s CPUs:\n",
+ 			(include_self ? "all" : "other"));
+@@ -97,73 +64,20 @@ void arch_trigger_all_cpu_backtrace(bool include_self)
+ 		touch_softlockup_watchdog();
+ 	}
+ 
+-	/*
+-	 * Now that all the NMIs have triggered, we can dump out their
+-	 * back traces safely to the console.
+-	 */
+-	for_each_cpu(cpu, &printtrace_mask) {
+-		int last_i = 0;
+-
+-		s = &per_cpu(nmi_print_seq, cpu);
+-		len = seq_buf_used(&s->seq);
+-		if (!len)
+-			continue;
+-
+-		/* Print line by line. */
+-		for (i = 0; i < len; i++) {
+-			if (s->buffer[i] == '\n') {
+-				print_seq_line(s, last_i, i);
+-				last_i = i + 1;
+-			}
+-		}
+-		/* Check if there was a partial line. */
+-		if (last_i < len) {
+-			print_seq_line(s, last_i, len - 1);
+-			pr_cont("\n");
+-		}
+-	}
+-
+-	clear_bit(0, &backtrace_flag);
+-	smp_mb__after_atomic();
++	printk_nmi_backtrace_complete();
+ 	put_cpu();
  }
- #endif
  
-+#ifdef CONFIG_PRINTK_NMI_BACKTRACE
-+/*
-+ * printk_nmi_backtrace_prepare/complete are called to prepare the
-+ * system for some or all cores to issue trace from NMI.
-+ * printk_nmi_backtrace_complete will print buffered output and cannot
-+ * (safely) be called from NMI.
-+ */
-+extern int printk_nmi_backtrace_prepare(void);
-+extern void printk_nmi_backtrace_complete(void);
-+
-+/*
-+ * printk_nmi_backtrace_this_cpu_begin/end are used divert/restore printk
-+ * on this cpu. The result is the output of printk() (by this CPU) will be
-+ * stored in temporary buffers for later printing by
-+ * printk_nmi_backtrace_complete.
-+ */
-+extern void printk_nmi_backtrace_this_cpu_begin(void);
-+extern void printk_nmi_backtrace_this_cpu_end(void);
-+#endif
-+
- extern asmlinkage void dump_stack(void) __cold;
+-/*
+- * It is not safe to call printk() directly from NMI handlers.
+- * It may be fine if the NMI detected a lock up and we have no choice
+- * but to do so, but doing a NMI on all other CPUs to get a back trace
+- * can be done with a sysrq-l. We don't want that to lock up, which
+- * can happen if the NMI interrupts a printk in progress.
+- *
+- * Instead, we redirect the vprintk() to this nmi_vprintk() that writes
+- * the content into a per cpu seq_buf buffer. Then when the NMIs are
+- * all done, we can safely dump the contents of the seq_buf to a printk()
+- * from a non NMI context.
+- */
+-static int nmi_vprintk(const char *fmt, va_list args)
+-{
+-	struct nmi_seq_buf *s = this_cpu_ptr(&nmi_print_seq);
+-	unsigned int len = seq_buf_used(&s->seq);
+-
+-	seq_buf_vprintf(&s->seq, fmt, args);
+-	return seq_buf_used(&s->seq) - len;
+-}
+-
+ static int
+ arch_trigger_all_cpu_backtrace_handler(unsigned int cmd, struct pt_regs *regs)
+ {
+-	int cpu;
+-
+-	cpu = smp_processor_id();
++	int cpu = smp_processor_id();
  
- #ifndef pr_fmt
-diff --git a/init/Kconfig b/init/Kconfig
-index af09b4fb43d2..132e4f05253e 100644
---- a/init/Kconfig
-+++ b/init/Kconfig
-@@ -1439,6 +1439,9 @@ config PRINTK
- 	  very difficult to diagnose system problems, saying N here is
- 	  strongly discouraged.
+ 	if (cpumask_test_cpu(cpu, to_cpumask(backtrace_mask))) {
+-		printk_func_t printk_func_save = this_cpu_read(printk_func);
+-
+-		/* Replace printk to write into the NMI seq */
+-		this_cpu_write(printk_func, nmi_vprintk);
++		printk_nmi_backtrace_this_cpu_begin();
+ 		printk(KERN_WARNING "NMI backtrace for cpu %d\n", cpu);
+ 		show_regs(regs);
+-		this_cpu_write(printk_func, printk_func_save);
++		printk_nmi_backtrace_this_cpu_end();
  
-+config PRINTK_NMI_BACKTRACE
-+	bool
-+
- config BUG
- 	bool "BUG() support" if EXPERT
- 	default y
-diff --git a/kernel/printk/Makefile b/kernel/printk/Makefile
-index 85405bdcf2b3..1849b001384a 100644
---- a/kernel/printk/Makefile
-+++ b/kernel/printk/Makefile
-@@ -1,2 +1,3 @@
- obj-y	= printk.o
-+obj-$(CONFIG_PRINTK_NMI_BACKTRACE)	+= nmi_backtrace.o
- obj-$(CONFIG_A11Y_BRAILLE_CONSOLE)	+= braille.o
-diff --git a/kernel/printk/nmi_backtrace.c b/kernel/printk/nmi_backtrace.c
-new file mode 100644
-index 000000000000..f24761262756
---- /dev/null
-+++ b/kernel/printk/nmi_backtrace.c
-@@ -0,0 +1,147 @@
-+#include <linux/kernel.h>
-+#include <linux/seq_buf.h>
-+
-+#define NMI_BUF_SIZE		4096
-+
-+struct nmi_seq_buf {
-+	unsigned char		buffer[NMI_BUF_SIZE];
-+	struct seq_buf		seq;
-+};
-+
-+/* Safe printing in NMI context */
-+static DEFINE_PER_CPU(struct nmi_seq_buf, nmi_print_seq);
-+
-+static DEFINE_PER_CPU(printk_func_t, nmi_print_saved_print_func);
-+
-+/* "in progress" flag of NMI printing */
-+static unsigned long nmi_print_flag;
-+
-+static int __init printk_nmi_backtrace_init(void)
-+{
-+	struct nmi_seq_buf *s;
-+	int cpu;
-+
-+	for_each_possible_cpu(cpu) {
-+		s = &per_cpu(nmi_print_seq, cpu);
-+		seq_buf_init(&s->seq, s->buffer, NMI_BUF_SIZE);
-+	}
-+
-+	return 0;
-+}
-+pure_initcall(printk_nmi_backtrace_init);
-+
-+/*
-+ * It is not safe to call printk() directly from NMI handlers.
-+ * It may be fine if the NMI detected a lock up and we have no choice
-+ * but to do so, but doing a NMI on all other CPUs to get a back trace
-+ * can be done with a sysrq-l. We don't want that to lock up, which
-+ * can happen if the NMI interrupts a printk in progress.
-+ *
-+ * Instead, we redirect the vprintk() to this nmi_vprintk() that writes
-+ * the content into a per cpu seq_buf buffer. Then when the NMIs are
-+ * all done, we can safely dump the contents of the seq_buf to a printk()
-+ * from a non NMI context.
-+ *
-+ * This is not a generic printk() implementation and must be used with
-+ * great care. In particular there is a static limit on the quantity of
-+ * data that may be emitted during NMI, only one client can be active at
-+ * one time (arbitrated by the return value of printk_nmi_begin() and
-+ * it is required that something at task or interrupt context be scheduled
-+ * to issue the output.
-+ */
-+static int nmi_vprintk(const char *fmt, va_list args)
-+{
-+	struct nmi_seq_buf *s = this_cpu_ptr(&nmi_print_seq);
-+	unsigned int len = seq_buf_used(&s->seq);
-+
-+	seq_buf_vprintf(&s->seq, fmt, args);
-+	return seq_buf_used(&s->seq) - len;
-+}
-+
-+/*
-+ * Reserve the NMI printk mechanism. Return an error if some other component
-+ * is already using it.
-+ */
-+int printk_nmi_backtrace_prepare(void)
-+{
-+	if (test_and_set_bit(0, &nmi_print_flag)) {
-+		/*
-+		 * If something is already using the NMI print facility we
-+		 * can't allow a second one...
-+		 */
-+		return -EBUSY;
-+	}
-+
-+	return 0;
-+}
-+
-+static void print_seq_line(struct nmi_seq_buf *s, int start, int end)
-+{
-+	const char *buf = s->buffer + start;
-+
-+	printk("%.*s", (end - start) + 1, buf);
-+}
-+
-+void printk_nmi_backtrace_complete(void)
-+{
-+	struct nmi_seq_buf *s;
-+	int len, cpu, i, last_i;
-+
-+	/*
-+	 * Now that all the NMIs have triggered, we can dump out their
-+	 * back traces safely to the console.
-+	 */
-+	for_each_possible_cpu(cpu) {
-+		s = &per_cpu(nmi_print_seq, cpu);
-+		last_i = 0;
-+
-+		len = seq_buf_used(&s->seq);
-+		if (!len)
-+			continue;
-+
-+		/* Print line by line. */
-+		for (i = 0; i < len; i++) {
-+			if (s->buffer[i] == '\n') {
-+				print_seq_line(s, last_i, i);
-+				last_i = i + 1;
-+			}
-+		}
-+		/* Check if there was a partial line. */
-+		if (last_i < len) {
-+			print_seq_line(s, last_i, len - 1);
-+			pr_cont("\n");
-+		}
-+
-+		/* Wipe out the buffer ready for the next time around. */
-+		seq_buf_clear(&s->seq);
-+	}
-+
-+	clear_bit(0, &nmi_print_flag);
-+}
-+
-+void printk_nmi_backtrace_this_cpu_begin(void)
-+{
-+	/*
-+	 * Detect double-begins and report them. This code is unsafe (because
-+	 * it will print from NMI) but things are pretty badly damaged if the
-+	 * NMI re-enters and is somehow granted permission to use NMI printk,
-+	 * so how much worse can it get? Also since this code interferes with
-+	 * the operation of printk it is unlikely that any consequential
-+	 * failures will be able to log anything making this our last
-+	 * opportunity to tell anyone that something is wrong.
-+	 */
-+	if (this_cpu_read(nmi_print_saved_print_func)) {
-+		this_cpu_write(printk_func,
-+			       this_cpu_read(nmi_print_saved_print_func));
-+		BUG();
-+	}
-+
-+	this_cpu_write(nmi_print_saved_print_func, this_cpu_read(printk_func));
-+	this_cpu_write(printk_func, nmi_vprintk);
-+}
-+
-+void printk_nmi_backtrace_this_cpu_end(void)
-+{
-+	this_cpu_write(printk_func, this_cpu_read(nmi_print_saved_print_func));
-+	this_cpu_write(nmi_print_saved_print_func, NULL);
-+}
+ 		cpumask_clear_cpu(cpu, to_cpumask(backtrace_mask));
+ 		return NMI_HANDLED;
 -- 
 2.4.3
