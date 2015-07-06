@@ -1,138 +1,116 @@
 From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Mon,  6 Jul 2015 16:24:13 +0530
-Subject: [PATCH 06/18] ARM/imx/epit: Migrate to new 'set-state' interface
+Date: Mon,  6 Jul 2015 16:24:14 +0530
+Subject: [PATCH 07/18] ARM/ixp4xx/timer: Migrate to new 'set-state' interface
 In-Reply-To: <cover.1436178990.git.viresh.kumar@linaro.org>
 References: <cover.1436178990.git.viresh.kumar@linaro.org>
-Message-ID: <4c6c9bae16987a2f2b29af153d6db98f3cfa1b63.1436178990.git.viresh.kumar@linaro.org>
+Message-ID: <33e74a50c268fb18e80116443f603d1c205f1c0c.1436178990.git.viresh.kumar@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Migrate imx driver to the new 'set-state' interface provided by
+Migrate ixp4xx driver to the new 'set-state' interface provided by
 clockevents core, the earlier 'set-mode' interface is marked obsolete
 now.
 
 This also enables us to implement callbacks for new states of clockevent
 devices, for example: ONESHOT_STOPPED.
 
-Also drop 'clockevent_mode': It was caching the last state of the
-clockevent device. The same behavior can be achieved by using
-clockevents state helpers. These helpers are only required for oneshot
-mode as shutdown/resume wouldn't be done twice by the core.
+NOTE: ixp4xx_set_{oneshot|periodic} don't perform read operation on
+'IXP4XX_OSRT1' register anymore.
 
-Cc: Shawn Guo <shawnguo@kernel.org>
-Cc: Sascha Hauer <kernel@pengutronix.de>
+Cc: Imre Kaloz <kaloz@openwrt.org>
+Cc: Krzysztof Halasa <khalasa@piap.pl>
 Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
 ---
- arch/arm/mach-imx/epit.c | 67 +++++++++++++++++++++++++-----------------------
- 1 file changed, 35 insertions(+), 32 deletions(-)
+ arch/arm/mach-ixp4xx/common.c | 68 +++++++++++++++++++++++++------------------
+ 1 file changed, 40 insertions(+), 28 deletions(-)
 
-diff --git a/arch/arm/mach-imx/epit.c b/arch/arm/mach-imx/epit.c
-index 074b1a81ba76..08ce20771bb3 100644
---- a/arch/arm/mach-imx/epit.c
-+++ b/arch/arm/mach-imx/epit.c
-@@ -57,7 +57,6 @@
- #include "hardware.h"
- 
- static struct clock_event_device clockevent_epit;
--static enum clock_event_mode clockevent_mode = CLOCK_EVT_MODE_UNUSED;
- 
- static void __iomem *timer_base;
- 
-@@ -106,8 +105,8 @@ static int epit_set_next_event(unsigned long evt,
+diff --git a/arch/arm/mach-ixp4xx/common.c b/arch/arm/mach-ixp4xx/common.c
+index 8537d4c41e34..70773b948e7e 100644
+--- a/arch/arm/mach-ixp4xx/common.c
++++ b/arch/arm/mach-ixp4xx/common.c
+@@ -521,43 +521,55 @@ static int ixp4xx_set_next_event(unsigned long evt,
  	return 0;
  }
  
--static void epit_set_mode(enum clock_event_mode mode,
--				struct clock_event_device *evt)
-+/* Left event sources disabled, no more interrupts appear */
-+static int epit_shutdown(struct clock_event_device *evt)
+-static void ixp4xx_set_mode(enum clock_event_mode mode,
+-			    struct clock_event_device *evt)
++static int ixp4xx_shutdown(struct clock_event_device *evt)
  {
- 	unsigned long flags;
- 
-@@ -120,39 +119,41 @@ static void epit_set_mode(enum clock_event_mode mode,
- 	/* Disable interrupt in GPT module */
- 	epit_irq_disable();
- 
--	if (mode != clockevent_mode) {
--		/* Set event time into far-far future */
--
--		/* Clear pending interrupt */
--		epit_irq_acknowledge();
--	}
-+	/* Clear pending interrupt */
-+	epit_irq_acknowledge();
- 
--	/* Remember timer mode */
--	clockevent_mode = mode;
- 	local_irq_restore(flags);
+ 	unsigned long opts = *IXP4XX_OSRT1 & IXP4XX_OST_RELOAD_MASK;
+ 	unsigned long osrt = *IXP4XX_OSRT1 & ~IXP4XX_OST_RELOAD_MASK;
  
 -	switch (mode) {
 -	case CLOCK_EVT_MODE_PERIODIC:
--		printk(KERN_ERR "epit_set_mode: Periodic mode is not "
--				"supported for i.MX EPIT\n");
+-		osrt = IXP4XX_LATCH & ~IXP4XX_OST_RELOAD_MASK;
+- 		opts = IXP4XX_OST_ENABLE;
 -		break;
 -	case CLOCK_EVT_MODE_ONESHOT:
+-		/* period set by 'set next_event' */
+-		osrt = 0;
+-		opts = IXP4XX_OST_ENABLE | IXP4XX_OST_ONE_SHOT;
+-		break;
+-	case CLOCK_EVT_MODE_SHUTDOWN:
+-		opts &= ~IXP4XX_OST_ENABLE;
+-		break;
+-	case CLOCK_EVT_MODE_RESUME:
+-		opts |= IXP4XX_OST_ENABLE;
+-		break;
+-	case CLOCK_EVT_MODE_UNUSED:
+-	default:
+-		osrt = opts = 0;
+-		break;
+-	}
++	opts &= ~IXP4XX_OST_ENABLE;
++	*IXP4XX_OSRT1 = osrt | opts;
++	return 0;
++}
+ 
++static int ixp4xx_set_oneshot(struct clock_event_device *evt)
++{
++	unsigned long opts = IXP4XX_OST_ENABLE | IXP4XX_OST_ONE_SHOT;
++	unsigned long osrt = 0;
++
++	/* period set by 'set next_event' */
+ 	*IXP4XX_OSRT1 = osrt | opts;
 +	return 0;
 +}
 +
-+static int epit_set_oneshot(struct clock_event_device *evt)
++static int ixp4xx_set_periodic(struct clock_event_device *evt)
 +{
-+	unsigned long flags;
++	unsigned long opts = IXP4XX_OST_ENABLE;
++	unsigned long osrt = IXP4XX_LATCH & ~IXP4XX_OST_RELOAD_MASK;
 +
-+	/*
-+	 * The timer interrupt generation is disabled at least
-+	 * for enough time to call epit_set_next_event()
-+	 */
-+	local_irq_save(flags);
++	*IXP4XX_OSRT1 = osrt | opts;
++	return 0;
++}
 +
-+	/* Disable interrupt in GPT module */
-+	epit_irq_disable();
++static int ixp4xx_resume(struct clock_event_device *evt)
++{
++	unsigned long opts = *IXP4XX_OSRT1 & IXP4XX_OST_RELOAD_MASK;
++	unsigned long osrt = *IXP4XX_OSRT1 & ~IXP4XX_OST_RELOAD_MASK;
 +
-+	/* Clear pending interrupt, only while switching mode */
-+	if (!clockevent_state_oneshot(evt))
-+		epit_irq_acknowledge();
-+
- 	/*
- 	 * Do not put overhead of interrupt enable/disable into
- 	 * epit_set_next_event(), the core has about 4 minutes
- 	 * to call epit_set_next_event() or shutdown clock after
- 	 * mode switching
- 	 */
--		local_irq_save(flags);
--		epit_irq_enable();
--		local_irq_restore(flags);
--		break;
--	case CLOCK_EVT_MODE_SHUTDOWN:
--	case CLOCK_EVT_MODE_UNUSED:
--	case CLOCK_EVT_MODE_RESUME:
--		/* Left event sources disabled, no more interrupts appear */
--		break;
--	}
-+	epit_irq_enable();
-+	local_irq_restore(flags);
-+
++	opts |= IXP4XX_OST_ENABLE;
++	*IXP4XX_OSRT1 = osrt | opts;
 +	return 0;
  }
  
- /*
-@@ -176,11 +177,13 @@ static struct irqaction epit_timer_irq = {
- };
- 
- static struct clock_event_device clockevent_epit = {
--	.name		= "epit",
--	.features	= CLOCK_EVT_FEAT_ONESHOT,
--	.set_mode	= epit_set_mode,
--	.set_next_event	= epit_set_next_event,
--	.rating		= 200,
-+	.name			= "epit",
-+	.features		= CLOCK_EVT_FEAT_ONESHOT,
-+	.set_state_shutdown	= epit_shutdown,
-+	.tick_resume		= epit_shutdown,
-+	.set_state_oneshot	= epit_set_oneshot,
-+	.set_next_event		= epit_set_next_event,
+ static struct clock_event_device clockevent_ixp4xx = {
+-	.name		= "ixp4xx timer1",
+-	.features       = CLOCK_EVT_FEAT_PERIODIC | CLOCK_EVT_FEAT_ONESHOT,
+-	.rating         = 200,
+-	.set_mode	= ixp4xx_set_mode,
+-	.set_next_event	= ixp4xx_set_next_event,
++	.name			= "ixp4xx timer1",
++	.features		= CLOCK_EVT_FEAT_PERIODIC |
++				  CLOCK_EVT_FEAT_ONESHOT,
 +	.rating			= 200,
++	.set_state_shutdown	= ixp4xx_shutdown,
++	.set_state_periodic	= ixp4xx_set_periodic,
++	.set_state_oneshot	= ixp4xx_set_oneshot,
++	.tick_resume		= ixp4xx_resume,
++	.set_next_event		= ixp4xx_set_next_event,
  };
  
- static int __init epit_clockevent_init(struct clk *timer_clk)
+ static void __init ixp4xx_clockevent_init(void)
 -- 
 2.4.0
