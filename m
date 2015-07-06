@@ -1,10 +1,10 @@
 From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Mon, 6 Jul 2015 15:12:02 -0700
+Date: Mon, 6 Jul 2015 15:12:18 -0700
 Subject: [PATCH 6/7] clk: rockchip: add missing include guards
 In-Reply-To: <1436086820-3757-7-git-send-email-heiko@sntech.de>
 References: <1436086820-3757-1-git-send-email-heiko@sntech.de>
  <1436086820-3757-7-git-send-email-heiko@sntech.de>
-Message-ID: <20150706221202.GL20866@codeaurora.org>
+Message-ID: <20150706221218.GM20866@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
