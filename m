@@ -1,79 +1,112 @@
 From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Mon,  6 Jul 2015 16:24:16 +0530
-Subject: [PATCH 09/18] ARM/lpc32xx/timer: Migrate to new 'set-state' interface
+Date: Mon,  6 Jul 2015 16:24:18 +0530
+Subject: [PATCH 11/18] ARM/netx/time: Migrate to new 'set-state' interface
 In-Reply-To: <cover.1436178990.git.viresh.kumar@linaro.org>
 References: <cover.1436178990.git.viresh.kumar@linaro.org>
-Message-ID: <79792dd6257c2dbdde4f90a4abbdc742490843b7.1436178990.git.viresh.kumar@linaro.org>
+Message-ID: <a432603e24cec07ddd044810c56749acaf6a552b.1436178990.git.viresh.kumar@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Migrate lpc32xx driver to the new 'set-state' interface provided by
+Migrate netx driver to the new 'set-state' interface provided by
 clockevents core, the earlier 'set-mode' interface is marked obsolete
 now.
 
 This also enables us to implement callbacks for new states of clockevent
 devices, for example: ONESHOT_STOPPED.
 
-Cc: Roland Stigge <stigge@antcom.de>
+We aren't writing zero twice on the control register for shutdown or
+resume state now.
+
+Cc: Russell King <linux@arm.linux.org.uk>
 Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
 ---
- arch/arm/mach-lpc32xx/timer.c | 40 ++++++++++++++--------------------------
- 1 file changed, 14 insertions(+), 26 deletions(-)
+ arch/arm/mach-netx/time.c | 61 +++++++++++++++++++++++++----------------------
+ 1 file changed, 32 insertions(+), 29 deletions(-)
 
-diff --git a/arch/arm/mach-lpc32xx/timer.c b/arch/arm/mach-lpc32xx/timer.c
-index 4e5837299c04..ff3499d1fb1a 100644
---- a/arch/arm/mach-lpc32xx/timer.c
-+++ b/arch/arm/mach-lpc32xx/timer.c
-@@ -43,36 +43,24 @@ static int lpc32xx_clkevt_next_event(unsigned long delta,
- 	return 0;
- }
+diff --git a/arch/arm/mach-netx/time.c b/arch/arm/mach-netx/time.c
+index 5fb2a590ec17..054a8a61e379 100644
+--- a/arch/arm/mach-netx/time.c
++++ b/arch/arm/mach-netx/time.c
+@@ -34,40 +34,40 @@
+ #define TIMER_CLOCKEVENT 0
+ #define TIMER_CLOCKSOURCE 1
  
--static void lpc32xx_clkevt_mode(enum clock_event_mode mode,
--    struct clock_event_device *dev)
-+static int lpc32xx_shutdown(struct clock_event_device *evt)
+-static void netx_set_mode(enum clock_event_mode mode,
+-		struct clock_event_device *clk)
++static inline void timer_shutdown(struct clock_event_device *evt)
  {
+-	u32 tmode;
+-
+ 	/* disable timer */
+ 	writel(0, NETX_GPIO_COUNTER_CTRL(TIMER_CLOCKEVENT));
++}
++
++static int netx_shutdown(struct clock_event_device *evt)
++{
++	timer_shutdown(evt);
++
++	return 0;
++}
++
++static int netx_set_oneshot(struct clock_event_device *evt)
++{
++	u32 tmode = NETX_GPIO_COUNTER_CTRL_IRQ_EN | NETX_GPIO_COUNTER_CTRL_RUN;
++
++	timer_shutdown(evt);
++	writel(0, NETX_GPIO_COUNTER_MAX(TIMER_CLOCKEVENT));
++	writel(tmode, NETX_GPIO_COUNTER_CTRL(TIMER_CLOCKEVENT));
+ 
 -	switch (mode) {
 -	case CLOCK_EVT_MODE_PERIODIC:
--		WARN_ON(1);
+-		writel(NETX_LATCH, NETX_GPIO_COUNTER_MAX(TIMER_CLOCKEVENT));
+-		tmode = NETX_GPIO_COUNTER_CTRL_RST_EN |
+-			NETX_GPIO_COUNTER_CTRL_IRQ_EN |
+-			NETX_GPIO_COUNTER_CTRL_RUN;
 -		break;
 -
 -	case CLOCK_EVT_MODE_ONESHOT:
--	case CLOCK_EVT_MODE_SHUTDOWN:
--		/*
--		 * Disable the timer. When using oneshot, we must also
--		 * disable the timer to wait for the first call to
--		 * set_next_event().
--		 */
--		__raw_writel(0, LPC32XX_TIMER_TCR(LPC32XX_TIMER0_BASE));
+-		writel(0, NETX_GPIO_COUNTER_MAX(TIMER_CLOCKEVENT));
+-		tmode = NETX_GPIO_COUNTER_CTRL_IRQ_EN |
+-			NETX_GPIO_COUNTER_CTRL_RUN;
 -		break;
 -
+-	default:
+-		WARN(1, "%s: unhandled mode %d\n", __func__, mode);
+-		/* fall through */
+-
+-	case CLOCK_EVT_MODE_SHUTDOWN:
 -	case CLOCK_EVT_MODE_UNUSED:
 -	case CLOCK_EVT_MODE_RESUME:
+-		tmode = 0;
 -		break;
 -	}
-+	/*
-+	 * Disable the timer. When using oneshot, we must also
-+	 * disable the timer to wait for the first call to
-+	 * set_next_event().
-+	 */
-+	__raw_writel(0, LPC32XX_TIMER_TCR(LPC32XX_TIMER0_BASE));
++	return 0;
++}
+ 
++static int netx_set_periodic(struct clock_event_device *evt)
++{
++	u32 tmode = NETX_GPIO_COUNTER_CTRL_RST_EN |
++		    NETX_GPIO_COUNTER_CTRL_IRQ_EN | NETX_GPIO_COUNTER_CTRL_RUN;
++
++	timer_shutdown(evt);
++	writel(NETX_LATCH, NETX_GPIO_COUNTER_MAX(TIMER_CLOCKEVENT));
+ 	writel(tmode, NETX_GPIO_COUNTER_CTRL(TIMER_CLOCKEVENT));
++
 +	return 0;
  }
  
- static struct clock_event_device lpc32xx_clkevt = {
--	.name		= "lpc32xx_clkevt",
--	.features	= CLOCK_EVT_FEAT_ONESHOT,
--	.rating		= 300,
--	.set_next_event	= lpc32xx_clkevt_next_event,
--	.set_mode	= lpc32xx_clkevt_mode,
-+	.name			= "lpc32xx_clkevt",
-+	.features		= CLOCK_EVT_FEAT_ONESHOT,
-+	.rating			= 300,
-+	.set_next_event		= lpc32xx_clkevt_next_event,
-+	.set_state_shutdown	= lpc32xx_shutdown,
-+	.set_state_oneshot	= lpc32xx_shutdown,
+ static int netx_set_next_event(unsigned long evt,
+@@ -81,7 +81,10 @@ static struct clock_event_device netx_clockevent = {
+ 	.name = "netx-timer" __stringify(TIMER_CLOCKEVENT),
+ 	.features = CLOCK_EVT_FEAT_PERIODIC | CLOCK_EVT_FEAT_ONESHOT,
+ 	.set_next_event = netx_set_next_event,
+-	.set_mode = netx_set_mode,
++	.set_state_shutdown = netx_shutdown,
++	.set_state_periodic = netx_set_periodic,
++	.set_state_oneshot = netx_set_oneshot,
++	.tick_resume = netx_shutdown,
  };
  
- static irqreturn_t lpc32xx_timer_interrupt(int irq, void *dev_id)
+ /*
 -- 
 2.4.0
