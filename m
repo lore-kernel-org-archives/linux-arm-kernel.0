@@ -1,80 +1,50 @@
 From: eric.auger@linaro.org (Eric Auger)
-Date: Mon, 06 Jul 2015 19:02:30 +0200
-Subject: [PATCH 1/7] KVM: api: add kvm_irq_routing_extended_msi
-In-Reply-To: <559AA449.80705@arm.com>
-References: <1435592237-17924-1-git-send-email-eric.auger@linaro.org>
- <1435592237-17924-2-git-send-email-eric.auger@linaro.org>
- <011f01d0b498$6a17aeb0$3e470c10$@samsung.com> <5596503E.6040902@arm.com>
- <00fd01d0b7b6$f6cf3550$e46d9ff0$@samsung.com> <559A3C9C.6050302@arm.com>
- <20150706093026.GA11590@cbox> <559A52E6.5050402@arm.com>
- <20150706103755.GC11590@cbox> <559A6164.1000401@redhat.com>
- <559A6527.1040107@arm.com> <559A6BBC.2040901@redhat.com>
- <024301d0b7f0$2b13b410$813b1c30$@samsung.com> <559A9854.2090607@linaro.org>
- <559AA449.80705@arm.com>
-Message-ID: <559AB4A6.8050803@linaro.org>
+Date: Mon, 06 Jul 2015 19:09:00 +0200
+Subject: [RFC v2 3/6] irq: bypass: Extend skeleton for ARM forwarding
+ control
+In-Reply-To: <559AA552.3010400@redhat.com>
+References: <1436184692-20927-1-git-send-email-eric.auger@linaro.org>
+ <1436184692-20927-4-git-send-email-eric.auger@linaro.org>
+ <559A7425.4050506@redhat.com> <559AA02A.6060703@linaro.org>
+ <559AA552.3010400@redhat.com>
+Message-ID: <559AB62C.9000503@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/06/2015 05:52 PM, Andre Przywara wrote:
-> Salut Eric,
+On 07/06/2015 05:57 PM, Paolo Bonzini wrote:
 > 
-> ....
 > 
->>>  ITS code in qemu just does:
->>>
->>> ---cut ---
->>>     msi_supported = true;
->>>     kvm_msi_flags = KVM_MSI_VALID_DEVID;
->>>     kvm_msi_via_irqfd_allowed = kvm_has_gsi_routing();
->>>     kvm_gsi_routing_allowed = kvm_msi_via_irqfd_allowed;
->>> --- cut ---
->>>
->>>  I set KVM_MSI_VALID_DEVID unconditionally here just because it will never be checked if
->>> kvm_msi_via_irqfd_allowed is false, it's just qemu specifics. The more canonical form would perhaps
->>> be:
->>> --- cut ---
->>> if (kvm_has_gsi_routing()) {
->>>     kvm_msi_flags = KVM_MSI_VALID_DEVID;
->> Personally I prefer a capability rather than hardcoding a global
->> variable value in the qemu interrupt controller code. All the more so
->> typically there is KVM GSI routing cap that could/should? be queried
->> instead of hardcoding the value I think.
->>
->> So not sure whether we eventually concluded;-)
->> - introduce a KVM_CAP_MSI_DEVID capability? All OK except Pavel not
->> convinced?
+> On 06/07/2015 17:35, Eric Auger wrote:
+>>>> diff --git a/kernel/irq/bypass.c b/kernel/irq/bypass.c
+>>>>>> index 5d0f92b..efadbe5 100644
+>>>>>> --- a/kernel/irq/bypass.c
+>>>>>> +++ b/kernel/irq/bypass.c
+>>>>>> @@ -19,6 +19,42 @@ static LIST_HEAD(producers);
+>>>>>>  static LIST_HEAD(consumers);
+>>>>>>  static DEFINE_MUTEX(lock);
+>>>>>>  
+>>>>>> +/* lock must be hold when calling connect */
+>>>>
+>>>> If a lock must be held while callbacks are called, you have to document
+>>>> that producers and consumers must _not_ call back into the IRQ bypass
+>>>> manager.  (If they have to, you have to document explicitly "This
+>>>> function can be called from producer and consumer callbacks" whenever
+>>>> relevant).
+>> OK Thanks
 > 
-> OK for me.
+> Also, please document on functions that take the irq bypass mutex that
+> they can sleep.  In fact irq_bypass_{,un}register_{producer,consumer}
+> need kerneldoc comments.
 > 
->> - userspaces puts the devid in struct kvm_irq_routing_msi pad field:
->> consensus (we do not intrduce a new kvm_irq_routing_ext_msi)
-> 
-> OK for me.
-> 
->> - userspace tells it conveyed a devid by setting
->> A) the kvm_irq_routing_entry's field?
-> 
-> You mean kvm_irq_routing_entry's "flags" here?
-yes!!
-> 
->> B) the kvm_irq_routing_entry's type
-> 
-> So personally I don't like it so much to use the generic flags field to
-> specify the meaning within one particular type only. Using a new type
-> instead seems to be more consistent, reusing an existing struct for that
-> sounds even better.
-> As written before (and coded in my branch) we can collapse that into the
-> existing MSI type while translating that into the kernel internal
-> routing structure to make the kernel code changes minimal.
-> 
->> no consensus. If there is a cap, does it really matter?
-> 
-> I guess not. But I prefer the new type anyway, as it also has a known
-> error path for older kernels.
-I am fine with the new type too.
+> The good thing is that this helps a bit forming a lock hierarchy across
+> the subsystems, for example irq bypass mutex outside vfio_platform_irq
+> spinlock, because you cannot have a spinlock inside the mutex.  I think
+> that all of your six callbacks are fine.
+
+arghh, no that's wrong then. I have plenty of them in the KVM/arm vgic
+part :-(
 
 Eric
 > 
-> Cheers,
-> Andre.
+> Paolo
 > 
