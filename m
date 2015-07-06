@@ -1,64 +1,79 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 6 Jul 2015 10:57:13 +0200
-Subject: [linux-sunxi] Re: [PATCH 2/3] ARM: dts: axp152: Add a dtsi file
- for the axp152 pmic
-In-Reply-To: <558D0BC2.10004@redhat.com>
-References: <1435088503-20776-1-git-send-email-hdegoede@redhat.com>
- <1435088503-20776-3-git-send-email-hdegoede@redhat.com>
- <20150625174027.GF2266@lukather> <558D0BC2.10004@redhat.com>
-Message-ID: <20150706085713.GE3269@lukather>
+From: alex.bennee@linaro.org (Alex =?utf-8?Q?Benn=C3=A9e?=)
+Date: Mon, 06 Jul 2015 10:02:46 +0100
+Subject: [PATCH v7 09/11] KVM: arm64: guest debug,
+ HW assisted debug support
+In-Reply-To: <20150706085140.GA30342@arm.com>
+References: <1435775343-20034-1-git-send-email-alex.bennee@linaro.org>
+ <1435775343-20034-10-git-send-email-alex.bennee@linaro.org>
+ <20150702084847.GB3418@arm.com> <87pp4asm6u.fsf@linaro.org>
+ <20150703092323.GA1588@arm.com> <87h9plrzqq.fsf@linaro.org>
+ <20150706085140.GA30342@arm.com>
+Message-ID: <87vbdxacax.fsf@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
 
-On Fri, Jun 26, 2015 at 10:22:26AM +0200, Hans de Goede wrote:
-> Hi,
-> 
-> On 25-06-15 19:40, Maxime Ripard wrote:
-> >Hi,
-> >
-> >On Tue, Jun 23, 2015 at 09:41:42PM +0200, Hans de Goede wrote:
-> >>From: Michal Suchanek <hramrach@gmail.com>
-> >>
-> >>Add a dtsi file for the axp152 pmic, this mirrors the way things are
-> >>handled for the axp202 pmic.
-> >>
-> >>Signed-off-by: Hans de Goede <hdegoede@redhat.com>
-> >>---
-> >>  arch/arm/boot/dts/axp152.dtsi | 49 +++++++++++++++++++++++++++++++++++++++++++
-> >>  1 file changed, 49 insertions(+)
-> >>  create mode 100644 arch/arm/boot/dts/axp152.dtsi
-> >
-> >Unfortunately, Mark expressed clearly that he didn't want such files.
-> 
-> That is not how I remember the discussion, he said that he did not consider
-> them useful, we explained why we do consider them useful for the sunxi
-> case and then things went quiet.
-> 
-> And we do already have an axp209.dtsi, and I find having that useful
-> for enabling the regulators on axp209 using boards.
+Will Deacon <will.deacon@arm.com> writes:
 
-Hmmm, reading this discussion again, it indeed looks like I
-misremembered what he was saying.
+> On Fri, Jul 03, 2015 at 05:07:41PM +0100, Alex Benn?e wrote:
+>> Will Deacon <will.deacon@arm.com> writes:
+>> > On Thu, Jul 02, 2015 at 02:50:33PM +0100, Alex Benn?e wrote:
+>> >> Are you happy with this?:
+>> >
+>> > [...]
+>> >
+>> >> +/**
+>> >> + * kvm_arch_dev_ioctl_check_extension
+>> >> + *
+>> >> + * We currently assume that the number of HW registers is uniform
+>> >> + * across all CPUs (see cpuinfo_sanity_check).
+>> >> + */
+>> >>  int kvm_arch_dev_ioctl_check_extension(long ext)
+>> >>  {
+>> >>         int r;
+>> >> @@ -64,6 +71,12 @@ int kvm_arch_dev_ioctl_check_extension(long ext)
+>> >>         case KVM_CAP_ARM_EL1_32BIT:
+>> >>                 r = cpu_has_32bit_el1();
+>> >>                 break;
+>> >> +       case KVM_CAP_GUEST_DEBUG_HW_BPS:
+>> >> +               r = hw_breakpoint_slots(TYPE_INST);
+>> >> +               break;
+>> >> +       case KVM_CAP_GUEST_DEBUG_HW_WPS:
+>> >> +               r  = hw_breakpoint_slots(TYPE_DATA);
+>> >> +               break;
+>> >
+>> > Whilst I much prefer this code, it actually adds an unwanted dependency
+>> > on PERF_EVENTS that I didn't think about to start with. Sorry to keep
+>> > messing you about -- I guess your original patch is the best thing after
+>> > all.
+>> 
+>> Everything looks to be in hw_breakpoint.[ch] which does depend on
+>> CONFIG_HAVE_HW_BREAKPOINT which depends on PERF_EVENTS to be built.
+>> However the previous code depended on this behaviour as well.
+>
+> I think your original approach (of sticking stuff in the header file) works
+> regardless of the CONFIG option, no?
 
-> Ultimately it is your call, but I really think we should be consistent
-> and add an axp152.dtsi to mirror how we do things with the axp209.
+Ahh yeah I reverted that to an extern due to random compile breakage:
 
-Was there any other comments on this serie (and are you going to send
-a v2?) or should I apply this patch?
+http://storage.kernelci.org/alex/v4.1-12-gd38574dba3ec/arm64-allmodconfig/build.log
 
-Thanks,
-Maxime
+I'll see if I can fix that up.
+
+>> It would seem weird to enable guest debug using HW debug registers to
+>> debug the guest yet not allowing the host kernel to use them? Of course
+>> this is the only code they would share as all the magic of guest
+>> debugging is already mostly there for dirty guest handling.
+>> 
+>> I'm not familiar with Kconfig but it looks like this is all part of
+>> arm64 defconfig. Are people really going to want to disable PERF_EVENTS
+>> but still debug their guests with HW support?
+>
+> Then it's your call. I just find the host dependency on perf a bit weird
+> to get guest debug working (especially as the dependency is completely
+> "fake" because we don't use any perf infrastructure at all).
+>
+> Will
 
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150706/92db4319/attachment.sig>
+Alex Benn?e
