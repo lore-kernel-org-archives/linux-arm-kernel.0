@@ -1,64 +1,103 @@
-From: andre.przywara@arm.com (Andre Przywara)
-Date: Mon, 6 Jul 2015 16:09:12 +0100
-Subject: [PATCH 1/7] KVM: api: add kvm_irq_routing_extended_msi
-In-Reply-To: <20150706120837.GA13530@cbox>
-References: <1435592237-17924-2-git-send-email-eric.auger@linaro.org>
- <011f01d0b498$6a17aeb0$3e470c10$@samsung.com> <5596503E.6040902@arm.com>
- <00fd01d0b7b6$f6cf3550$e46d9ff0$@samsung.com> <559A3C9C.6050302@arm.com>
- <20150706093026.GA11590@cbox> <559A52E6.5050402@arm.com>
- <20150706103755.GC11590@cbox> <559A6164.1000401@redhat.com>
- <559A6527.1040107@arm.com> <20150706120837.GA13530@cbox>
-Message-ID: <559A9A18.806@arm.com>
+From: lina.iyer@linaro.org (Lina Iyer)
+Date: Mon, 6 Jul 2015 09:18:53 -0600
+Subject: [PATCH RFC v2 09/16] arm: domain: Add platform callbacks for
+ domain power on/off
+In-Reply-To: <CAMuHMdWQRy2RMfyeyNz=6AgTDem67a1VogN3RWSJ1Y+9yNFx6g@mail.gmail.com>
+References: <1435374156-19214-1-git-send-email-lina.iyer@linaro.org>
+ <1435374156-19214-10-git-send-email-lina.iyer@linaro.org>
+ <CAMuHMdULThWEZmyLEK_9WeK6DSNhrQdiZQLWNhi1Q6dwZTkkMg@mail.gmail.com>
+ <20150629163201.GA1524@linaro.org>
+ <CAMuHMdWL09Loe2EFUMc-kRML7Ckn7a6G1_hvPnaqkDYnhkXjog@mail.gmail.com>
+ <20150702193826.GA885@linaro.org>
+ <CAMuHMdWQRy2RMfyeyNz=6AgTDem67a1VogN3RWSJ1Y+9yNFx6g@mail.gmail.com>
+Message-ID: <20150706151853.GA1018@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/07/15 13:08, Christoffer Dall wrote:
-> On Mon, Jul 06, 2015 at 12:23:19PM +0100, Andre Przywara wrote:
->> Hi Paolo,
->>
->> thanks for looking at this!
->>
->> On 06/07/15 12:07, Paolo Bonzini wrote:
->>>
->>>
->>> On 06/07/2015 12:37, Christoffer Dall wrote:
->>>> I don't view it as 'the kernel requires this' but as 'the kernel will
->>>> not complain with arbitrary error code if you set the devid flag'
->>>> capability, and it's up to userspace (as usual) to provide the correct
->>>> arguments for things to work, and up to the kernel to ensure we don't
->>>> crash the system etc.
->>>>
->>>> Thus, if you want to advertise it as a capability, I would rather call
->>>> it KVM_CAP_MSI_DEVID.
->>>
->>> I agree.  Does userspace know that ITS guests always require devid?
->>
->> Well, as we are about to implement this: yes. But the issue is that MSI
->> injection and GSI routing code is generic PCI code in userland (at least
->> in kvmtool, guess in QEMU, too), so I don't want to pull in any kind of
->> ARM specific code in there. The idea is to always provide the device ID
->> from the PCI code (for PCI devices it's just the B/D/F triplet), but
->> only send it to the kernel if needed. Querying a KVM capability is
->> perfectly fine for this IMO.
->>
->>> I
->>> guess it's okay to return -EINVAL if the userspace doesn't set the flag
->>> but the virtual hardware requires it.
->>
->> Yes, that is what I do in the kernel implementation. And that is
->> perfectly fine: the ITS emulation does not work without a device ID, the
->> ITS driver in the guest assigns the very same payload (and address) to
->> different devices, so there is no way to tell the MSIs apart without a
->> unique device ID.
->>
-> Just so I'm sure I understand: The way the kernel differentiates between
-> no-devid and devid==0, is whether or not the devid flag is set, correct?
+On Fri, Jul 03 2015 at 05:36 -0600, Geert Uytterhoeven wrote:
+>Hi Lina,
+>
+>On Thu, Jul 2, 2015 at 9:38 PM, Lina Iyer <lina.iyer@linaro.org> wrote:
+>> On Tue, Jun 30 2015 at 09:10 -0600, Geert Uytterhoeven wrote:
+>>> On Mon, Jun 29, 2015 at 6:32 PM, Lina Iyer <lina.iyer@linaro.org> wrote:
+>>>> On Mon, Jun 29 2015 at 07:36 -0600, Geert Uytterhoeven wrote:
 
-Yes, that is the idea. The plan for the implementation is like this:
-1) If the kernel does not need the device ID (x86, GICv2M), it does not
-care about the flag or the value at all.
-2) In case for ITS on ARM64, the kernel returns an error is the flag is
-not set.
+[...]
 
-Cheers,
-Andre.
+>> With what you have suggested, the platform driver creates the genpd and
+>> would pass the CPU genpd to the common code for common operations. (This
+>> was what was done in [1]). The platform driver would set the power_on()
+>> and power_off() callbacks and that would have to be overriden in order
+>> handle common CPU domain suspend/resume activities. Overwriting members
+>> of an object allocated by the platform driver, is something we should
+>> avoid.
+>
+>Instead of letting the generic code override the .power_{on,off}() callbacks,
+>the platform code could call the generic CPU-related methods from its own
+>.power_{on,off}() callbacks?
+>
+We dont want to impose on platform drivers to call back into the CPU
+domain core code to do common domain power down activities. On a generic
+ARM CPU domain, we may not even need a platform specific domain
+callbacks. IMHO, this is not desirable.
+
+>struct rmobile_pm_domain already has .suspend() and .resume() methods.
+>The former is used to e.g. prevent the PM domains containing CPUs to be
+>powered down (in the absence of cpuidle integration). That requires scanning
+>the DT for CPUs, and it would indeed be good to have that scanning support
+>in generic code.
+>The latter became unused after the removal of sh7372 support, which did have
+>some cpuidle integration.
+>
+The CPUs may still be attached to domain, even if they are not powered
+off by CPUIdle. The code increases the reference count for every online
+CPU and any CPUs that may come online. The reference count, only goes
+down when the CPU powers down through CPUIdle or hotplug. So, if a CPU
+is not integrated with CPUIdle, it would remain in use (unless powered
+off by hotplug) and the domain would not be powered down.
+
+>> Or instead of allocating the memory in your platform driver for the CPU
+>> genpd, you could query and get the genpd and then add your additions on
+>> top. You could add other flags like GENPD_FLAG_PM_CLK, but *not*
+>> overwrite the power on/off callbacks in the genpd. They still have to be
+>> registered separately like in this patch. Again, not every elegant, IMO.
+>
+>Just wondering, can I set up the .attach_dev() and .detach_dev()?
+>
+I am presuming, you are concerned with the fore mentioned case of CPUs
+not participating in CPUIdle. With pm_runtime_put_sync() not happening
+for CPUs that do not power down, you should not have to worry about the
+domain being powered down.
+
+Please correct me if I misunderstood your point.
+
+>Actually, for R-Mobile hardware I don't have a need to set GENPD_FLAG_PM_CLK
+>or .attach_dev() and .detach_dev() for CPU PM domains, as they are only
+>needed for devices with MSTP clocks. CPU and L2 cache don't have these,
+>and there are no other devices in e.g. a3sm and a2sl.
+>
+>The GIC has an MSTP clock, but it's part of a different power domain.
+>
+Okay.
+
+[...]
+
+>> This the common code would get its own callbacks and when that genpd
+>> powers off, the platform genpd would power down. But no new code is
+>> needed in your platform driver. The benefit is that platform code and
+>> generic CPU domain code may exist and act in parallel and may only be
+>> related if specified in the DT and the problem with that approach is
+>> that this virtual PM domain is not a h/w domain, hence specifying in DT
+>> is questionable.
+>
+>Indeed, I don't like this option, as the DT would no longer describe HW,
+>but the Linux implementation.
+>
+>So let's continue with your approach, and see how it turns out. We can
+>always change and improvide code, while changing DT is more complicated.
+>
+Agreed.
+
+Thanks for your time, Geert.
+
+-- Lina
