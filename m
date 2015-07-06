@@ -1,40 +1,29 @@
-From: l.majewski@samsung.com (Lukasz Majewski)
-Date: Mon, 06 Jul 2015 12:26:40 +0200
-Subject: [PATCH] thermal: consistently use int for temperatures
-In-Reply-To: <1436167189-29835-1-git-send-email-s.hauer@pengutronix.de>
-References: <1436167189-29835-1-git-send-email-s.hauer@pengutronix.de>
-Message-ID: <20150706122640.2a61ca05@amdc2363>
+From: tglx@linutronix.de (Thomas Gleixner)
+Date: Mon, 6 Jul 2015 12:30:01 +0200 (CEST)
+Subject: [PATCH v3 2/2] irqchip: dw-apb-ictl: add irq_set_affinity support
+In-Reply-To: <1436156141-3674-3-git-send-email-jszhang@marvell.com>
+References: <1436156141-3674-1-git-send-email-jszhang@marvell.com>
+ <1436156141-3674-3-git-send-email-jszhang@marvell.com>
+Message-ID: <alpine.DEB.2.11.1507061228060.3916@nanos>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sascha,
+On Mon, 6 Jul 2015, Jisheng Zhang wrote:
+> +static int dw_apb_ictl_set_affinity(struct irq_data *d,
+> +				    const struct cpumask *mask_val,
+> +				    bool force)
+> +{
+> +	struct irq_chip_generic *gc = irq_data_get_irq_chip_data(d);
+> +	struct dw_apb_ictl_priv *priv = gc->private;
+> +	struct irq_chip *chip = irq_get_chip(priv->parent_irq);
+> +	struct irq_data *data = irq_get_irq_data(priv->parent_irq);
+> +
+> +	if (chip && chip->irq_set_affinity)
+> +		return chip->irq_set_affinity(data, mask_val, force);
 
-> The thermal code uses int, long and unsigned long for temperatures
-> in different places.
-> 
-> Using an unsigned type limits the thermal framework to positive
-> temperatures without need. Also several drivers currently will report
-> temperatures near UINT_MAX for temperatures below 0?C. This will
-> probably immediately shut the machine down due to overtemperature if
-> started below 0?C.
-> 
-> 'long' is 64bit on several architectures. This is not needed since
-> INT_MAX ?mC is above the melting point of all known materials.
-> 
-> Consistently use a plain 'int' for temperatures throughout the
-> thermal code and the drivers. This only changes the places in the
-> drivers where the temperature is passed around as pointer, when
-> drivers internally use another type this is not changed.
-> 
-> Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
+This is wrong as it lacks proper locking of the parent irq. That needs
+to be solved at the core code level in a clean way.
 
-Sascha, thanks for this cleanup work. 
+Thanks,
 
-Reviewed-by: Lukasz Majewski <l.majewski@samsung.com>
-
--- 
-Best regards,
-
-Lukasz Majewski
-
-Samsung R&D Institute Poland (SRPOL) | Linux Platform Group
+	tglx
