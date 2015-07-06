@@ -1,79 +1,62 @@
-From: santosh.shilimkar@oracle.com (santosh shilimkar)
-Date: Mon, 6 Jul 2015 08:21:00 -0700
-Subject: [PATCH 13/18] ARM/omap1/timer32: Migrate to new 'set-state'
- interface
-In-Reply-To: <e4a4fce79b8edf36384d1b352028fdc3244bc043.1436178990.git.viresh.kumar@linaro.org>
-References: <cover.1436178990.git.viresh.kumar@linaro.org>
- <e4a4fce79b8edf36384d1b352028fdc3244bc043.1436178990.git.viresh.kumar@linaro.org>
-Message-ID: <559A9CDC.1030908@oracle.com>
+From: robherring2@gmail.com (Rob Herring)
+Date: Mon, 6 Jul 2015 10:22:58 -0500
+Subject: [RESEND] [PATCH v2 1/2] arm: devtree: Set system_rev from DT
+ revision
+In-Reply-To: <201507061512.27124@pali>
+References: <1430902142-17035-1-git-send-email-pali.rohar@gmail.com>
+ <201507061423.23505@pali> <20150706123126.GG10705@atomide.com>
+ <201507061512.27124@pali>
+Message-ID: <CAL_Jsq+ysDqxTgfW1JvG5czHa4UkZQDv1BN63iK4jvV9kDXM8w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 7/6/2015 3:54 AM, Viresh Kumar wrote:
-> Migrate omap timer32 driver to the new 'set-state' interface provided by
-> clockevents core, the earlier 'set-mode' interface is marked obsolete
-> now.
+On Mon, Jul 6, 2015 at 8:12 AM, Pali Roh?r <pali.rohar@gmail.com> wrote:
+> On Monday 06 July 2015 14:31:27 Tony Lindgren wrote:
+>> * Pali Roh?r <pali.rohar@gmail.com> [150706 05:25]:
+>> > into which file should I put documentation about new DT properties?
+>>
+>> If it's Linux generic like linux,revision, then how about
+>> Documentation/devicetree/bindings/revision.txt?
+>>
+>> For the ATAGs, Documentation/devicetree/bindings/arm/atag.txt?
+>>
+>> Regards,
+>>
+>> Tony
 >
-> This also enables us to implement callbacks for new states of clockevent
-> devices, for example: ONESHOT_STOPPED.
+> Hm... now I'm thinking into which DT field should I put atags and
+> revision. In previous emails you wrote to use "linux,atags", now
+> "arm,atags"? And put them into root node? Or other?
 >
-> Cc: Santosh Shilimkar <ssantosh@kernel.org>
-> Cc: Tony Lindgren <tony@atomide.com>
-> Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
-> ---
-Acked-by: Santosh Shilimkar <ssantosh@kernel.org>
+> In arch/arm/boot/compressed/atags_to_fdt.c code I see that most atag
+> properties are converted into "/chosen" node in DT...
+>
+> So what do you prefer for "revision" and what for "atags"?
+>
+> Some mentioned examples:
+>
+> "/revision"
 
->   arch/arm/mach-omap1/timer32k.c | 33 ++++++++++++++++-----------------
->   1 file changed, 16 insertions(+), 17 deletions(-)
+This one. This is a top level h/w property.
+
+> "/chosen/revision"
+> "/linux,revision"
+> "/chosen/linux,revision"
+> ...
 >
-> diff --git a/arch/arm/mach-omap1/timer32k.c b/arch/arm/mach-omap1/timer32k.c
-> index 36bf174b3fac..0ae6c52a7d70 100644
-> --- a/arch/arm/mach-omap1/timer32k.c
-> +++ b/arch/arm/mach-omap1/timer32k.c
-> @@ -114,29 +114,28 @@ static int omap_32k_timer_set_next_event(unsigned long delta,
->   	return 0;
->   }
+> "/atags"
+> "/chosen/atags"
+> "/linux,atags"
+> "/chosen/linux,atags"
+
+This one. ATAGs are a Linux data struct.
+
+Rob
+
+> "/arm,atags"
+> "/chosen/arm,atags"
+> ...
 >
-> -static void omap_32k_timer_set_mode(enum clock_event_mode mode,
-> -				    struct clock_event_device *evt)
-> +static int omap_32k_timer_shutdown(struct clock_event_device *evt)
->   {
->   	omap_32k_timer_stop();
-> +	return 0;
-> +}
->
-> -	switch (mode) {
-> -	case CLOCK_EVT_MODE_PERIODIC:
-> -		omap_32k_timer_start(OMAP_32K_TIMER_TICK_PERIOD);
-> -		break;
-> -	case CLOCK_EVT_MODE_ONESHOT:
-> -	case CLOCK_EVT_MODE_UNUSED:
-> -	case CLOCK_EVT_MODE_SHUTDOWN:
-> -		break;
-> -	case CLOCK_EVT_MODE_RESUME:
-> -		break;
-> -	}
-> +static int omap_32k_timer_set_periodic(struct clock_event_device *evt)
-> +{
-> +	omap_32k_timer_stop();
-> +	omap_32k_timer_start(OMAP_32K_TIMER_TICK_PERIOD);
-> +	return 0;
->   }
->
->   static struct clock_event_device clockevent_32k_timer = {
-> -	.name		= "32k-timer",
-> -	.features       = CLOCK_EVT_FEAT_PERIODIC | CLOCK_EVT_FEAT_ONESHOT,
-> -	.set_next_event	= omap_32k_timer_set_next_event,
-> -	.set_mode	= omap_32k_timer_set_mode,
-> +	.name			= "32k-timer",
-> +	.features		= CLOCK_EVT_FEAT_PERIODIC |
-> +				  CLOCK_EVT_FEAT_ONESHOT,
-> +	.set_next_event		= omap_32k_timer_set_next_event,
-> +	.set_state_shutdown	= omap_32k_timer_shutdown,
-> +	.set_state_periodic	= omap_32k_timer_set_periodic,
-> +	.set_state_oneshot	= omap_32k_timer_shutdown,
-> +	.tick_resume		= omap_32k_timer_shutdown,
->   };
->
->   static irqreturn_t omap_32k_timer_interrupt(int irq, void *dev_id)
->
+> --
+> Pali Roh?r
+> pali.rohar at gmail.com
