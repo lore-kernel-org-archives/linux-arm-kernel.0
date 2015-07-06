@@ -1,160 +1,269 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Mon, 06 Jul 2015 12:52:52 -0700
-Subject: [PATCH v4 3/8] clk: add support for clocks provided by SCP(System
- Control Processor)
-In-Reply-To: <5596A1B6.8020307@arm.com>
-References: <1433760002-24120-1-git-send-email-sudeep.holla@arm.com>
- <1433760002-24120-4-git-send-email-sudeep.holla@arm.com>
- <20150702172310.GF4301@codeaurora.org> <5596A1B6.8020307@arm.com>
-Message-ID: <559ADC94.4080505@codeaurora.org>
+From: mathieu.poirier@linaro.org (Mathieu Poirier)
+Date: Mon,  6 Jul 2015 14:21:45 -0600
+Subject: [PATCH] arm64: Juno: Add support for coresight
+Message-ID: <1436214105-3147-1-git-send-email-mathieu.poirier@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/03/2015 07:52 AM, Sudeep Holla wrote:
-> Hi Stephen,
->
->
-> Thanks for the review.
->
-> On 02/07/15 18:23, Stephen Boyd wrote:
->> On 06/08, Sudeep Holla wrote:
->>> diff --git a/drivers/clk/Kconfig b/drivers/clk/Kconfig
->>> index 9897f353bf1a..0fe8daefc105 100644
->>> --- a/drivers/clk/Kconfig
->>> +++ b/drivers/clk/Kconfig
->>> @@ -59,6 +59,16 @@ config COMMON_CLK_RK808
->>>         clocked at 32KHz each. Clkout1 is always on, Clkout2 can off
->>>         by control register.
->>>
->>> +config COMMON_CLK_SCPI
->>> +        tristate "Clock driver controlled via SCPI interface"
->>> +        depends on ARM_SCPI_PROTOCOL || COMPILE_TEST
->>> +        ---help---
->>> +          This driver provides support for clocks that are controlled
->>> +          by firmware that implements the SCPI interface.
->>> +
->>> +      This driver uses SCPI Message Protocol to interact with the
->>> +      firmware providing all the clock controls.
->>
->> The tabbing is weird here. Both paragraphs should have the same
->> alignment.
->>
->
-> Indeed, sorry for that, fixed now.
->
->>> diff --git a/drivers/clk/clk-scpi.c b/drivers/clk/clk-scpi.c
->>> new file mode 100644
->>> index 000000000000..707b3430c55f
->>> --- /dev/null
->>> +++ b/drivers/clk/clk-scpi.c
->>> +
->>> +#include <linux/clk-provider.h>
->>> +#include <linux/device.h>
->>> +#include <linux/err.h>
->>> +#include <linux/of.h>
->>> +#include <linux/module.h>
->>> +#include <linux/of_platform.h>
->>> +#include <linux/scpi_protocol.h>
->>
->> Please include <linux/platform_device.h> as well.
->>
->
-> Added now, didn't bother as of_platform.h includes it.
->
->>> +
->>> +struct scpi_clk {
->>> +    u32 id;
->>> +    const char *name;
->>
->> Do you need this? Or can you just use __clk_get_name() in places
->> where the name is used?
->>
->
-> Not used, so removed it.
->
->
-> [...]
->
->>> +static long scpi_clk_round_rate(struct clk_hw *hw, unsigned long rate,
->>> +                unsigned long *parent_rate)
->>> +{
->>
->> Maybe a comment here like:
->>
->> /*
->>   * We can't figure out what rate it will be, so just return the rate
->>   * back to the caller. scpi_clk_recalc_rate() will be called
->>   * after the rate is set and we'll know what rate the clock is
->>   * running at then.
->>   */
->>
->
-> Done
->
->>> +    return rate;
->>> +}
->>> +
->>> +static int scpi_clk_set_rate(struct clk_hw *hw, unsigned long rate,
->>> +                 unsigned long parent_rate)
->>> +{
->>> +    struct scpi_clk *clk = to_scpi_clk(hw);
->>> +
->>> +    return clk->scpi_ops->clk_set_val(clk->id, rate);
->>> +}
->>> +
->>> +static void scpi_clk_disable(struct clk_hw *hw)
->>> +{
->>> +    scpi_clk_set_rate(hw, 0, 0);
->>
->> Does this mean you have to set a rate to enable the clock? Are
->> you relying on drivers to call clk_set_rate() to implicitly
->> enable the clock? If so, it would be better to cache the rate of
->> the clock in set_rate if the clock isn't enabled in software and
->> then send the cached rate during enable.
->>
->
-> Agreed, I have asked the firmware/SCPI specification guys about
-> more details on what to expect from firmware. Once they get back,
-> will update the code considering your feedback.
->
-> [...]
->
->>> +static int __scpi_find_dvfs_index(struct scpi_clk *clk, unsigned
->>> long rate)
->>> +{
->>> +    int idx, max_opp = clk->info->count;
->>> +    struct scpi_opp *opp = clk->info->opps;
->>
->> const?
->>
->
-> All the 3 above fixed now.
->
-> [...]
->
->>> +
->>> +    clk = devm_clk_register(dev, &sclk->hw);
->>> +    if (!IS_ERR(clk) && max)
->>> +        clk_set_rate_range(clk, min, max);
->>
->> Hm.. we're planning to make clk_register() return a struct
->> clk_hw, so this will block that. We need some sort of clk_hw API
->> that allows us to setup min/max limits on the clock from the
->> provider side. Care to add that?
->>
->
-> Can you provide pointer to the patches or the tree containing those
-> changes ? Are they targeted for v4.3 ?
->
+This patch adds support for coresight components.  More specifically
+it has definitions for the A53/57 tracers, the A53/57 cluster funnels,
+the main funnel and the ETF configured in circular buffer mode.
 
-If I have time I may try to start doing the clk_register() conversion,
-but it will take a while so I doubt it will be in v4.3. I'm asking if
-you can add a clk_hw based API that does something like
-clk_set_rate_range() without requiring a struct clk pointer. i.e.
-clk_hw_set_rate_range(struct clk_hw *hw, min, max) that constraints the
-min/max rate of the clock. This way, the driver is only using clk
-provider APIs and not clk consumer APIs.
+Support for other coresight IP blocks have not been addressed yet.
 
+Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
+---
+ arch/arm64/boot/dts/arm/juno-base.dtsi | 241 +++++++++++++++++++++++++++++++++
+ 1 file changed, 241 insertions(+)
+
+diff --git a/arch/arm64/boot/dts/arm/juno-base.dtsi b/arch/arm64/boot/dts/arm/juno-base.dtsi
+index e3ee96036eca..b787f8a9304d 100644
+--- a/arch/arm64/boot/dts/arm/juno-base.dtsi
++++ b/arch/arm64/boot/dts/arm/juno-base.dtsi
+@@ -152,3 +152,244 @@
+ 
+ 		/include/ "juno-motherboard.dtsi"
+ 	};
++
++	etf at 20010000 {
++		compatible = "arm,coresight-tmc", "arm,primecell";
++		reg = <0 0x20010000 0 0x1000>;
++
++		clocks = <&soc_smc50mhz>;
++		clock-names = "apb_pclk";
++		port {
++			etf_in_port: endpoint {
++				slave-mode;
++				remote-endpoint = <&main_funnel_out_port>;
++			};
++		};
++	};
++
++	main_funnel at 20040000 {
++		compatible = "arm,coresight-funnel", "arm,primecell";
++		reg = <0 0x20040000 0 0x1000>;
++
++		clocks = <&soc_smc50mhz>;
++		clock-names = "apb_pclk";
++		ports {
++			#address-cells = <1>;
++			#size-cells = <0>;
++
++			/* output port */
++			port at 0 {
++				reg = <0>;
++				main_funnel_out_port: endpoint {
++					remote-endpoint =
++						<&etf_in_port>;
++				};
++			};
++
++			/*
++			 * input ports:
++			 * port 0: Funnel Cortex-A57
++			 * port 1: Funnel Cortex-A53
++			 * port 2: STM
++			 * port 3: Funnel SCP
++			 * port 4: System profiler
++			 * port 5: ATB extension interfaces
++			 * port 6: ATB extension interfaces
++			 */
++			port at 1 {
++				reg = <0>;
++				main_funnel_in_port0: endpoint {
++					slave-mode;
++					remote-endpoint =
++							<&A57_funnel_out_port>;
++				};
++			};
++
++			port at 2 {
++				reg = <1>;
++				main_funnel_in_port1: endpoint {
++					slave-mode;
++					remote-endpoint = <&A53_etm0_out_port>;
++				};
++			};
++
++		};
++	};
++
++	A57_funnel at 220c0000 {
++		compatible = "arm,coresight-funnel", "arm,primecell";
++		reg = <0 0x220c0000 0 0x1000>;
++
++		clocks = <&soc_smc50mhz>;
++		clock-names = "apb_pclk";
++		ports {
++			#address-cells = <1>;
++			#size-cells = <0>;
++
++			/* output port */
++			port at 0 {
++				reg = <0>;
++				A57_funnel_out_port: endpoint {
++					remote-endpoint =
++						<&main_funnel_in_port0>;
++				};
++			};
++
++			/* input ports */
++			port at 1 {
++				reg = <0>;
++				A57_funnel_in_port0: endpoint {
++					slave-mode;
++					remote-endpoint = <&A57_etm0_out_port>;
++				};
++			};
++
++			port at 2 {
++				reg = <1>;
++				A57_funnel_in_port1: endpoint {
++					slave-mode;
++					remote-endpoint = <&A57_etm1_out_port>;
++				};
++			};
++
++			/* input port 2 to 6 are not connected */
++		};
++	};
++
++	A53_funnel at 220c0000 {
++		compatible = "arm,coresight-funnel", "arm,primecell";
++		reg = <0 0x230c0000 0 0x1000>;
++
++		clocks = <&soc_smc50mhz>;
++		clock-names = "apb_pclk";
++		ports {
++			#address-cells = <1>;
++			#size-cells = <0>;
++
++			/* output port */
++			port at 0 {
++				reg = <0>;
++				A53_funnel_out_port: endpoint {
++					remote-endpoint =
++						<&main_funnel_in_port1>;
++				};
++			};
++
++			/* input port */
++			port at 1 {
++				reg = <0>;
++				A53_funnel_in_port0: endpoint {
++					slave-mode;
++					remote-endpoint = <&A53_etm0_out_port>;
++				};
++			};
++
++			port at 2 {
++				reg = <1>;
++				A53_funnel_in_port1: endpoint {
++					slave-mode;
++					remote-endpoint = <&A53_etm1_out_port>;
++				};
++			};
++			port at 3 {
++				reg = <2>;
++				A53_funnel_in_port2: endpoint {
++					slave-mode;
++					remote-endpoint = <&A53_etm2_out_port>;
++				};
++			};
++			port at 4 {
++				reg = <3>;
++				A53_funnel_in_port3: endpoint {
++					slave-mode;
++					remote-endpoint = <&A53_etm3_out_port>;
++				};
++			};
++
++			/* input port 4 to 6 are not connected */
++		};
++	};
++
++	etm at 22040000 {
++		compatible = "arm,coresight-etm4x", "arm,primecell";
++		reg = <0 0x22040000 0 0x1000>;
++
++		cpu = <&A57_0>;
++		clocks = <&soc_smc50mhz>;
++		clock-names = "apb_pclk";
++		port {
++			A57_etm0_out_port: endpoint {
++				remote-endpoint = <&A57_funnel_in_port0>;
++			};
++		};
++	};
++
++	etm at 22140000 {
++		compatible = "arm,coresight-etm4x", "arm,primecell";
++		reg = <0 0x22140000 0 0x1000>;
++
++		cpu = <&A57_1>;
++		clocks = <&soc_smc50mhz>;
++		clock-names = "apb_pclk";
++		port {
++			A57_etm1_out_port: endpoint {
++				remote-endpoint = <&A57_funnel_in_port1>;
++			};
++		};
++	};
++
++	etm at 23040000 {
++		compatible = "arm,coresight-etm4x", "arm,primecell";
++		reg = <0 0x23040000 0 0x1000>;
++
++		cpu = <&A53_0>;
++		clocks = <&soc_smc50mhz>;
++		clock-names = "apb_pclk";
++		port {
++			A53_etm0_out_port: endpoint {
++				remote-endpoint = <&A53_funnel_in_port0>;
++			};
++		};
++	};
++
++	etm at 23140000 {
++		compatible = "arm,coresight-etm4x", "arm,primecell";
++		reg = <0 0x23140000 0 0x1000>;
++
++		cpu = <&A53_1>;
++		clocks = <&soc_smc50mhz>;
++		clock-names = "apb_pclk";
++		port {
++			A53_etm1_out_port: endpoint {
++				remote-endpoint = <&A53_funnel_in_port1>;
++			};
++		};
++	};
++
++	etm at 23240000 {
++		compatible = "arm,coresight-etm4x", "arm,primecell";
++		reg = <0 0x23240000 0 0x1000>;
++
++		cpu = <&A53_2>;
++		clocks = <&soc_smc50mhz>;
++		clock-names = "apb_pclk";
++		port {
++			A53_etm2_out_port: endpoint {
++				remote-endpoint = <&A53_funnel_in_port2>;
++			};
++		};
++	};
++
++	etm at 23340000 {
++		compatible = "arm,coresight-etm4x", "arm,primecell";
++		reg = <0 0x23340000 0 0x1000>;
++
++		cpu = <&A53_3>;
++		clocks = <&soc_smc50mhz>;
++		clock-names = "apb_pclk";
++		port {
++			A53_etm3_out_port: endpoint {
++				remote-endpoint = <&A53_funnel_in_port3>;
++			};
++		};
++	};
 -- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+1.9.1
