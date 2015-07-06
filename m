@@ -1,49 +1,73 @@
-From: koro.chen@mediatek.com (Koro Chen)
-Date: Mon, 6 Jul 2015 10:02:10 +0800
-Subject: [PATCH] ASoC: dpcm: Add checks of playback/capture before dpcm_get_be
-Message-ID: <1436148130-22739-1-git-send-email-koro.chen@mediatek.com>
+From: shannon.zhao@linaro.org (shannon.zhao at linaro.org)
+Date: Mon,  6 Jul 2015 10:17:30 +0800
+Subject: [PATCH 00/18] KVM: ARM64: Add guest PMU support
+Message-ID: <1436149068-3784-1-git-send-email-shannon.zhao@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In dpcm_get_be(), it looks for a BE rtd that has the DAI widget
-according to current stream type. Only playback_widgets are searched
-in the case of playback stream and vice versa. However, the DAI widget
-itself can be playback or capture.
+From: Shannon Zhao <shannon.zhao@linaro.org>
 
-If the DAI widget is capture, but current stream type is playback,
-dpcm_get_be() will always fail to find a rtd, print error messages,
-and continue to the next DAI widget in list. We can just skip this
-DAI widget to further suppress error messages. This happens in a
-special case when 2 codecs are inter-connected, and the 1st codec's
-"capture" widget is used to send data to the 2nd codec during "playback":
+This patchset adds guest PMU support for KVM on ARM64. It takes
+trap-and-emulate approach. When guest wants to monitor one event, it
+will be trapped by KVM and KVM will call perf_event API to create a perf
+event and call relevant perf_event APIs to get the count value of event.
 
-mtk-rt5650-rt5676 sound: ASoC: can't get playback BE for Sub AIF2 Capture
-rt5650_rt5676 Playback: ASoC: no BE found for Sub AIF2 Capture
+Use perf to test this patchset in guest. When using "perf list", it
+shows the list of the hardware events and hardware cache events perf
+supports. Then use "perf stat -e EVENT" to monitor some event. For
+example, use "perf stat -e cycles" to count cpu cycles and
+"perf stat -e cache-misses" to count cache misses.
 
-Add checks to continue to next DAI widget if current DAI widget's
-direction does not match the stream type.
+This can be fetched from [1] and the relevant QEMU version for test can
+be fetched from [2].
 
-Signed-off-by: Koro Chen <koro.chen@mediatek.com>
----
- sound/soc/soc-pcm.c | 5 +++++
- 1 file changed, 5 insertions(+)
+Thanks,
+Shannon
 
-diff --git a/sound/soc/soc-pcm.c b/sound/soc/soc-pcm.c
-index 256b9c9..a6d3313 100644
---- a/sound/soc/soc-pcm.c
-+++ b/sound/soc/soc-pcm.c
-@@ -1306,7 +1306,12 @@ static int dpcm_add_paths(struct snd_soc_pcm_runtime *fe, int stream,
- 
- 		switch (list->widgets[i]->id) {
- 		case snd_soc_dapm_dai_in:
-+			if (stream != SNDRV_PCM_STREAM_PLAYBACK)
-+				continue;
-+			break;
- 		case snd_soc_dapm_dai_out:
-+			if (stream != SNDRV_PCM_STREAM_CAPTURE)
-+				continue;
- 			break;
- 		default:
- 			continue;
+[1] https://git.linaro.org/people/shannon.zhao/linux-mainline.git  KVM_ARM64_PMU_v1
+[2] https://git.linaro.org/people/shannon.zhao/qemu.git  PMU
+
+Shannon Zhao (18):
+  ARM64: Move PMU register related defines to asm/pmu.h
+  KVM: ARM64: Add initial support for PMU
+  KVM: ARM64: Add offset defines for PMU registers
+  KVM: ARM64: Add reset and access handlers for PMCR_EL0 register
+  KVM: ARM64: Add reset and access handlers for PMSELR_EL0 register
+  KVM: ARM64: Add reset and access handlers for PMCEID0_EL0 and
+    PMCEID1_EL0 register
+  KVM: ARM64: PMU: Add perf event map and introduce perf event creating
+    function
+  KVM: ARM64: Add reset and access handlers for PMXEVTYPER_EL0 register
+  KVM: ARM64: Add reset and access handlers for PMXEVCNTR_EL0 register
+  KVM: ARM64: Add reset and access handlers for PMCCNTR_EL0 register
+  KVM: ARM64: Add reset and access handlers for PMCNTENSET_EL0 and
+    PMCNTENCLR_EL0 register
+  KVM: ARM64: Add reset and access handlers for PMINTENSET_EL1 and
+    PMINTENCLR_EL1 register
+  KVM: ARM64: Add reset and access handlers for PMOVSSET_EL0 and
+    PMOVSCLR_EL0 register
+  KVM: ARM64: Add reset and access handlers for PMUSERENR_EL0 register
+  KVM: ARM64: Add reset and access handlers for PMSWINC_EL0 register
+  KVM: ARM64: Add access handlers for PMEVCNTRn_EL0 and PMEVTYPERn_EL0
+    register
+  KVM: ARM64: Add PMU overflow interrupt routing
+  KVM: ARM64: Add KVM_CAP_ARM_PMU and KVM_ARM_PMU_SET_IRQ
+
+ arch/arm/kvm/arm.c                |  14 ++
+ arch/arm64/include/asm/kvm_asm.h  |  59 ++++-
+ arch/arm64/include/asm/kvm_host.h |   2 +
+ arch/arm64/include/asm/pmu.h      |  47 ++++
+ arch/arm64/kernel/perf_event.c    |  35 ---
+ arch/arm64/kvm/Kconfig            |   7 +
+ arch/arm64/kvm/Makefile           |   1 +
+ arch/arm64/kvm/reset.c            |   3 +
+ arch/arm64/kvm/sys_regs.c         | 448 ++++++++++++++++++++++++++++++++++++--
+ include/kvm/arm_pmu.h             |  87 ++++++++
+ include/uapi/linux/kvm.h          |   4 +
+ virt/kvm/arm/pmu.c                | 414 +++++++++++++++++++++++++++++++++++
+ 12 files changed, 1064 insertions(+), 57 deletions(-)
+ create mode 100644 include/kvm/arm_pmu.h
+ create mode 100644 virt/kvm/arm/pmu.c
+
 -- 
-1.8.1.1.dirty
+2.1.0
