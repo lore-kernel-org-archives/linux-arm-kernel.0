@@ -1,61 +1,109 @@
-From: eddie.huang@mediatek.com (Eddie Huang)
-Date: Mon, 6 Jul 2015 15:43:57 +0800
-Subject: [PATCH] arm64: dts: mt8173-evb: Add PMIC support
-In-Reply-To: <1434979177-7575-1-git-send-email-henryc.chen@mediatek.com>
-References: <1434979177-7575-1-git-send-email-henryc.chen@mediatek.com>
-Message-ID: <1436168637.6986.6.camel@mtksdaap41>
+From: feng.wu@intel.com (Wu, Feng)
+Date: Mon, 6 Jul 2015 07:55:35 +0000
+Subject: [RFC 16/17] KVM: eventfd: add irq bypass consumer management
+In-Reply-To: <1435843047-6327-17-git-send-email-eric.auger@linaro.org>
+References: <1435843047-6327-1-git-send-email-eric.auger@linaro.org>
+ <1435843047-6327-17-git-send-email-eric.auger@linaro.org>
+Message-ID: <E959C4978C3B6342920538CF579893F0025EB7C5@SHSMSX104.ccr.corp.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Matthias,
 
-On Mon, 2015-06-22 at 21:19 +0800, Henry Chen wrote:
-> From: Eddie Huang <eddie.huang@mediatek.com>
+
+> -----Original Message-----
+> From: Eric Auger [mailto:eric.auger at linaro.org]
+> Sent: Thursday, July 02, 2015 9:17 PM
+> To: eric.auger at st.com; eric.auger at linaro.org;
+> linux-arm-kernel at lists.infradead.org; kvmarm at lists.cs.columbia.edu;
+> kvm at vger.kernel.org; christoffer.dall at linaro.org; marc.zyngier at arm.com;
+> alex.williamson at redhat.com; pbonzini at redhat.com; avi.kivity at gmail.com;
+> mtosatti at redhat.com; Wu, Feng; joro at 8bytes.org;
+> b.reynal at virtualopensystems.com
+> Cc: linux-kernel at vger.kernel.org; patches at linaro.org
+> Subject: [RFC 16/17] KVM: eventfd: add irq bypass consumer management
 > 
-> The MT8173 eval board contains a MT6397 PMIC. This adds the
-> corresponding device node to the dts file.
+> This patch adds the registration/unregistration of an
+> irq_bypass_consumer on irqfd assignment/deassignment.
 > 
-> Signed-off-by: Henry Chen <henryc.chen@mediatek.com>
-> Signed-off-by: Eddie Huang <eddie.huang@mediatek.com>
+> Signed-off-by: Eric Auger <eric.auger@linaro.org>
 > ---
-> Base on 4.1-rc1 and commit as following,
-> ARM64: dts: Mediatek: MT8173 updates [1] and 
-> clk: Add common clock support for Mediatek MT8135 and MT8173 [2] patch
+>  virt/kvm/eventfd.c | 22 +++++++++++++++++++---
+>  1 file changed, 19 insertions(+), 3 deletions(-)
 > 
-> [1] http://lists.infradead.org/pipermail/linux-arm-kernel/2015-May/344751.html
-> [2] http://lists.infradead.org/pipermail/linux-arm-kernel/2015-April/338763.html
-> ---
->  arch/arm64/boot/dts/mediatek/mt8173-evb.dts | 174 ++++++++++++++++++++++++++++
->  1 file changed, 174 insertions(+)
+> diff --git a/virt/kvm/eventfd.c b/virt/kvm/eventfd.c
+> index f3da161..425a47b 100644
+> --- a/virt/kvm/eventfd.c
+> +++ b/virt/kvm/eventfd.c
+> @@ -34,6 +34,7 @@
+>  #include <linux/srcu.h>
+>  #include <linux/slab.h>
+>  #include <linux/seqlock.h>
+> +#include <linux/irqbypass.h>
+>  #include <trace/events/kvm.h>
 > 
-> diff --git a/arch/arm64/boot/dts/mediatek/mt8173-evb.dts b/arch/arm64/boot/dts/mediatek/mt8173-evb.dts
-> index 43d5401..b967914 100644
-> --- a/arch/arm64/boot/dts/mediatek/mt8173-evb.dts
-> +++ b/arch/arm64/boot/dts/mediatek/mt8173-evb.dts
-> @@ -33,6 +33,180 @@
->  	chosen { };
+>  #include <kvm/iodev.h>
+> @@ -93,6 +94,7 @@ struct _irqfd {
+>  	struct list_head list;
+>  	poll_table pt;
+>  	struct work_struct shutdown;
+> +	struct irq_bypass_consumer *cons;
 >  };
->  
-> +&pwrap {
-> +	pmic: mt6397 {
-> +		compatible = "mediatek,mt6397";
-> +		interrupt-parent = <&pio>;
-> +		interrupts = <11 IRQ_TYPE_LEVEL_HIGH>;
-> +		interrupt-controller;
-> +		#interrupt-cells = <2>;
-> +
-> +		mt6397regulator: mt6397regulator {
-> +			compatible = "mediatek,mt6397-regulator";
-> +			mt6397_vpca15_reg: buck_vpca15 {
-> +				regulator-compatible = "buck_vpca15";
-> +				regulator-name = "vpca15";
-> +				regulator-min-microvolt = < 700000>;
-> +				regulator-max-microvolt = <1350000>;
-> +				regulator-ramp-delay = <12500>;
-> +				regulator-always-on;
+> 
+>  static struct workqueue_struct *irqfd_cleanup_wq;
+> @@ -429,7 +431,21 @@ kvm_irqfd_assign(struct kvm *kvm, struct kvm_irqfd
+> *args)
+>  	 */
+>  	fdput(f);
+> 
+> -	/* irq_bypass_register_consumer(); */
+> +	irqfd->cons = kzalloc(sizeof(struct irq_bypass_consumer),
+> +			      GFP_KERNEL);
+> +	if (!irqfd->cons) {
+> +		ret = -ENOMEM;
+> +		goto fail;
+> +	}
+> +	irqfd->cons->token = (void *)irqfd->eventfd;
+> +	irqfd->cons->gsi = irqfd->gsi;
+> +	irqfd->cons->kvm = kvm;
+> +	irqfd->cons->add_producer = kvm_arch_add_producer;
+> +	irqfd->cons->del_producer = kvm_arch_del_producer;
+> +	irqfd->cons->stop_consumer = kvm_arch_stop_consumer;
+> +	irqfd->cons->resume_consumer = kvm_arch_resume_consumer;
+> +	ret = irq_bypass_register_consumer(irqfd->cons);
+> +	WARN_ON(ret);
+> 
+>  	return 0;
+> 
+> @@ -530,8 +546,6 @@ kvm_irqfd_deassign(struct kvm *kvm, struct kvm_irqfd
+> *args)
+>  	struct _irqfd *irqfd, *tmp;
+>  	struct eventfd_ctx *eventfd;
+> 
+> -	/* irq_bypass_unregister_consumer() */
+> -
+>  	eventfd = eventfd_ctx_fdget(args->fd);
+>  	if (IS_ERR(eventfd))
+>  		return PTR_ERR(eventfd);
+> @@ -550,6 +564,8 @@ kvm_irqfd_deassign(struct kvm *kvm, struct kvm_irqfd
+> *args)
+>  			irqfd->irq_entry.type = 0;
+>  			write_seqcount_end(&irqfd->irq_entry_sc);
+>  			irqfd_deactivate(irqfd);
+> +			irq_bypass_unregister_consumer(irqfd->cons);
+> +			kfree(irqfd->cons);
 
-I see you pull da9211 regulator dts patch, but not this one. How about
-this patch ?
+There may be an issue here. 'irqfd' is freed in irqfd_deactivate() --> ... --.>irqfd_shutdown(),
+and irqfd_deactivate() can be called in the other two places below:
+	- irqfd_wakeup()
+	- kvm_irqfd_release()
+I think we also need to call irq_bypass_unregister_consumer() there, right?
 
-Thanks
-Eddie
+Thanks,
+Feng
+
+
+>  		}
+>  	}
+> 
+> --
+> 1.9.1
