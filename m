@@ -1,85 +1,40 @@
-From: pali.rohar@gmail.com (Pali =?utf-8?q?Roh=C3=A1r?=)
-Date: Mon, 6 Jul 2015 18:20:35 +0200
-Subject: [RESEND] [PATCH v2 1/2] arm: devtree: Set system_rev from DT
- revision
-In-Reply-To: <CAL_Jsq+ysDqxTgfW1JvG5czHa4UkZQDv1BN63iK4jvV9kDXM8w@mail.gmail.com>
-References: <1430902142-17035-1-git-send-email-pali.rohar@gmail.com>
- <201507061512.27124@pali>
- <CAL_Jsq+ysDqxTgfW1JvG5czHa4UkZQDv1BN63iK4jvV9kDXM8w@mail.gmail.com>
-Message-ID: <201507061820.35789@pali>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Mon, 6 Jul 2015 17:26:45 +0100
+Subject: [PATCH] arm64: defconfig: Add Ceva ahci to the defconfig
+In-Reply-To: <457a921583db64bf74ae13b227bedf79cf86cff8.1435554123.git.michal.simek@xilinx.com>
+References: <457a921583db64bf74ae13b227bedf79cf86cff8.1435554123.git.michal.simek@xilinx.com>
+Message-ID: <20150706162645.GG27723@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 06 July 2015 17:22:58 Rob Herring wrote:
-> On Mon, Jul 6, 2015 at 8:12 AM, Pali Roh?r <pali.rohar@gmail.com> wrote:
-> > On Monday 06 July 2015 14:31:27 Tony Lindgren wrote:
-> >> * Pali Roh?r <pali.rohar@gmail.com> [150706 05:25]:
-> >> > into which file should I put documentation about new DT
-> >> > properties?
-> >> 
-> >> If it's Linux generic like linux,revision, then how about
-> >> Documentation/devicetree/bindings/revision.txt?
-> >> 
-> >> For the ATAGs, Documentation/devicetree/bindings/arm/atag.txt?
-> >> 
-> >> Regards,
-> >> 
-> >> Tony
-> > 
-> > Hm... now I'm thinking into which DT field should I put atags and
-> > revision. In previous emails you wrote to use "linux,atags", now
-> > "arm,atags"? And put them into root node? Or other?
-> > 
-> > In arch/arm/boot/compressed/atags_to_fdt.c code I see that most
-> > atag properties are converted into "/chosen" node in DT...
-> > 
-> > So what do you prefer for "revision" and what for "atags"?
-> > 
-> > Some mentioned examples:
-> > 
-> > "/revision"
+On Mon, Jun 29, 2015 at 07:02:08AM +0200, Michal Simek wrote:
+> From: Suneel Garapati <suneel.garapati@xilinx.com>
 > 
-> This one. This is a top level h/w property.
+> The Ceva ahci controller is available on the Xilinx Zynq UltraScale+
+> MPSoC.
 > 
-> > "/chosen/revision"
-> > "/linux,revision"
-> > "/chosen/linux,revision"
-> > ...
-> > 
-> > "/atags"
-> > "/chosen/atags"
-> > "/linux,atags"
-> > "/chosen/linux,atags"
+> Signed-off-by: Suneel Garapati <suneel.garapati@xilinx.com>
+> Signed-off-by: Michal Simek <michal.simek@xilinx.com>
+> ---
 > 
-> This one. ATAGs are a Linux data struct.
+>  arch/arm64/configs/defconfig | 4 ++--
+>  1 file changed, 2 insertions(+), 2 deletions(-)
 > 
-> Rob
-> 
+> diff --git a/arch/arm64/configs/defconfig b/arch/arm64/configs/defconfig
+> index f38c94f1d898..ef5b5d27a226 100644
+> --- a/arch/arm64/configs/defconfig
+> +++ b/arch/arm64/configs/defconfig
+> @@ -82,7 +82,7 @@ CONFIG_BLK_DEV_SD=y
+>  # CONFIG_SCSI_LOWLEVEL is not set
+>  CONFIG_ATA=y
+>  CONFIG_SATA_AHCI=y
+> -CONFIG_SATA_AHCI_PLATFORM=y
+> +CONFIG_AHCI_CEVA=y
 
-Ok, and how read that property "/chosen/linux,atags" in function
-setup_machine_fdt() from file arch/arm/kernel/devtree.c ?
+Any reason why CONFIG_SATA_AHCI_PLATFORM is removed by this patch?
 
-of_get_flat_dt_prop() cannot be used unless somebody get me offset to
-node "/chosen"...
-
-Any idea?
-
-> > "/arm,atags"
-> > "/chosen/arm,atags"
-> > ...
-> > 
-> > --
-> > Pali Roh?r
-> > pali.rohar at gmail.com
-
+I merged the patch but modified it to only add CONFIG_AHCI_CEVA without
+changing any other lines.
 
 -- 
-Pali Roh?r
-pali.rohar at gmail.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: This is a digitally signed message part.
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150706/4b4fe11c/attachment-0001.sig>
+Catalin
