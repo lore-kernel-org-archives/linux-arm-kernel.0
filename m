@@ -1,25 +1,25 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 6 Jul 2015 22:35:35 +0100
-Subject: weird behavior of get/set_fiq_regs()
-In-Reply-To: <CAOpc7mE5oJFzHXH2bOGRnEDfQ3Go-QpROSZ7KJeTsPxG0ibqZw@mail.gmail.com>
-References: <CAOpc7mHkynAfmZKJhbwF0q0rco+3t7=wzh9owf6Brz6fmPRHsw@mail.gmail.com>
- <20150706160230.GG7557@n2100.arm.linux.org.uk>
- <CAOpc7mE5oJFzHXH2bOGRnEDfQ3Go-QpROSZ7KJeTsPxG0ibqZw@mail.gmail.com>
-Message-ID: <20150706213535.GH7557@n2100.arm.linux.org.uk>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Mon, 06 Jul 2015 14:50:31 -0700
+Subject: [PATCH 1/9] drivers: clk: st: Incorrect clocks status
+In-Reply-To: <CAG374jAaK0X+ij3rSWqeN6hd7_-3hHQd+hFxNcDULVuXdY9gHg@mail.gmail.com>
+References: <1435068567-30995-1-git-send-email-gabriel.fernandez@linaro.org>
+ <1435068567-30995-2-git-send-email-gabriel.fernandez@linaro.org>
+ <558B0CD7.6040302@codeaurora.org>
+ <CAG374jAE78p_4=MYg9iNqo-4j8gE5OspzKwphfBUBtr5iOx-1g@mail.gmail.com>
+ <CAG374jAaK0X+ij3rSWqeN6hd7_-3hHQd+hFxNcDULVuXdY9gHg@mail.gmail.com>
+Message-ID: <559AF827.3090308@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 06, 2015 at 11:04:45PM +0200, Holger Schurig wrote:
-> Why?  I was under the impression that the assembly code from my *.S
-> routine get's copied directly after the exception vectors. Why would
-> it matter if the bytes between myfiq_start and myfiq_end come from a
-> module or from somewhere else?
+On 07/06/2015 01:11 AM, Gabriel Fernandez wrote:
+> Hi Stephen,
+>
+> Can you drop also this patch because it's concerns an old platform and
+> there no values to make more changes.
 
-By "FIQ handlers in module code", I mean executing them in module code.
-Using the provided function to copy the code out of the module means
-that any problems associated with lazy page table propagation are
-avoided.
+Ok, so I think this series is all applied then. Let me know if anything
+is missing from -next.
 
 -- 
-FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
-according to speedtest.net.
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
