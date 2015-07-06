@@ -1,53 +1,88 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 6 Jul 2015 12:30:14 +0200
-Subject: [PATCH v3 3/4] mfd: axp20x: Add a cell for the usb power_supply
- part of the axp20x PMICs
-In-Reply-To: <1435316357-26606-3-git-send-email-hdegoede@redhat.com>
-References: <1435316357-26606-1-git-send-email-hdegoede@redhat.com>
- <1435316357-26606-3-git-send-email-hdegoede@redhat.com>
-Message-ID: <20150706103014.GH3269@lukather>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Mon, 6 Jul 2015 12:37:55 +0200
+Subject: [PATCH 1/7] KVM: api: add kvm_irq_routing_extended_msi
+In-Reply-To: <559A52E6.5050402@arm.com>
+References: <1435592237-17924-1-git-send-email-eric.auger@linaro.org>
+ <1435592237-17924-2-git-send-email-eric.auger@linaro.org>
+ <011f01d0b498$6a17aeb0$3e470c10$@samsung.com>
+ <5596503E.6040902@arm.com>
+ <00fd01d0b7b6$f6cf3550$e46d9ff0$@samsung.com>
+ <559A3C9C.6050302@arm.com> <20150706093026.GA11590@cbox>
+ <559A52E6.5050402@arm.com>
+Message-ID: <20150706103755.GC11590@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 26, 2015 at 12:59:16PM +0200, Hans de Goede wrote:
-> Add a cell for the usb power_supply part of the axp20x PMICs.
+On Mon, Jul 06, 2015 at 11:05:26AM +0100, Andre Przywara wrote:
+> Hi Christoffer,
 > 
-> Note that this cell is only for the usb power_supply part and not the
-> ac-power / battery-charger / rtc-backup-bat-charger bits.
+> On 06/07/15 10:30, Christoffer Dall wrote:
+> > On Mon, Jul 06, 2015 at 09:30:20AM +0100, Andre Przywara wrote:
+> >> Hi Pavel,
+> >>
+> >> On 06/07/15 07:42, Pavel Fedin wrote:
+> >>>  Hello!
+> >>>
+> >>>> I like this approach, but it runs into problems:
+> >>>> As you read above the current documentation says that the flags field
+> >>>> must be zero and the current KVM_SET_GSI_ROUTING handler bails out if it
+> >>>> isn't. So userland would need to know whether it's safe to set that
+> >>>> field.
+> >>>
+> >>>  This problem does not exist because:
+> >>> a) Older platforms do not need this flag, so they expect to get zero.
+> >>> b) ARM64 + GICv3 platform cannot work without this flag.
+> >>>
+> >>>  This is perfectly OK combination IMO. Userland just knows, whether it needs to supply device ID or
+> >>> not. For example, my modified qemu now has kvm_msi_flags global variable which defaults to 0. ITS
+> >>> code, then, if activated, changes it to KVM_MSI_VALID_DEVID, and qemu starts supplying device IDs to
+> >>> the related calls.
+> >>
+> >> Well, I had this solution before in kvmtool: If ARM && ITS then set the
+> >> flag. But I wasn't really happy with this, as the IRQ routing, setup and
+> >> injection code is rather architecture agnostic (implementing the generic
+> >> KVM interface), so spraying in some architecture hacks sounded not very
+> >> elegant.
+> >> Also as the flag describes a rather generic feature (provide an unique
+> >> device ID), I'd rather avoid to make this an ARM hack.
+> >>
+> >> That being said this is not a show stopper for me, so if the others are
+> >> happy with this, I will go down your road.
+> >>
+> > There must be some way for userspace to discover if it's valid to set
+> > the flag or not; either through a well-defined error-code probing
+> > mechanism for KVM_SET_GSI_ROUTING or through advertising a capability.
 > 
-> Depending on the board each of those must be enabled / disabled separately
-> in devicetree as most boards do not use all 4. So in dt each one needs its
-> own child-node of the axp20x node. Another reason for using separate child
-> nodes for each is so that other devicetree nodes can have a power-supply
-> property with a phandle referencing a node representing a single
-> power-supply.
+> Right, makes sense, I was wondering about this requirement earlier, but
+> couldn't find really good prior art in the code (KVM_GET_VCPU_EVENTS
+> seems to be bad example).
+> So I think we get along with a new VM specific capability like
+> KVM_CAP_MSIS_REQUIRE_DEVID. This isn't strictly a "capability" (as it's
+> more a requirement), but I guess it fits here anyway. It has to be
+> per-VM, as a GICv2M guest does not need it, but an ITS guest does.
+> We can use this very flag for both the KVM_SIGNAL_MSI and the
+> KVM_SET_GSI_ROUTING ioctl, so interface churn is kept minimal.
 > 
-> The decision to use a separate devicetree node for each is reflected on
-> the kernel side by each getting its own mfd-cell / platform_device and
-> platform-driver.
+> Does that make sense?
 > 
-> Note this commit also makes some whitespace changes to the intialization
-> of existing cells in axp20x_cells, these are pure whitespace changes,
-> functionally nothing changes.
+> Actually I have implemented this already last week, I will send it out
+> along with a v2 of the ITS emulation later this week.
 > 
-> Cc: Bruno Pr?mont <bonbons@linux-vserver.org>
-> Acked-by: Lee Jones <lee.jones@linaro.org>
-> Signed-off-by: Bruno Pr?mont <bonbons@linux-vserver.org>
-> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+I don't view it as 'the kernel requires this' but as 'the kernel will
+not complain with arbitrary error code if you set the devid flag'
+capability, and it's up to userspace (as usual) to provide the correct
+arguments for things to work, and up to the kernel to ensure we don't
+crash the system etc.
 
-Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+Thus, if you want to advertise it as a capability, I would rather call
+it KVM_CAP_MSI_DEVID.
 
-Thanks!
-Maxime
+The question is if userspace code that sets the devid flag will anyway
+depend on some discovery mechanism of whether or not the kernel supports
+arm64 irqfd etc. and if so, can we be sure to add the required support
+at once in the kernel so that EINVAL never means 'you set the flags
+field on the ioctl on an old kernel'?
 
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150706/70906e2c/attachment.sig>
+This smells an awful lot like a capability to me.
+
+-Christoffer
