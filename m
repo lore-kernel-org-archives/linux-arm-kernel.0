@@ -1,145 +1,92 @@
 From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Mon,  6 Jul 2015 16:24:22 +0530
-Subject: [PATCH 15/18] ARM/SPEAr/time: Migrate to new 'set-state' interface
+Date: Mon,  6 Jul 2015 16:24:21 +0530
+Subject: [PATCH 14/18] ARM/omap2/timer: Migrate to new 'set-state' interface
 In-Reply-To: <cover.1436178990.git.viresh.kumar@linaro.org>
 References: <cover.1436178990.git.viresh.kumar@linaro.org>
-Message-ID: <881ee850c3898eb9bdd85f4027c243fd33eebd6f.1436178990.git.viresh.kumar@linaro.org>
+Message-ID: <9231fc8eb977888f780a2bdc35681cf76b09ea42.1436178990.git.viresh.kumar@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Migrate SPEAr driver to the new 'set-state' interface provided by
+Migrate omap2 driver to the new 'set-state' interface provided by
 clockevents core, the earlier 'set-mode' interface is marked obsolete
 now.
 
 This also enables us to implement callbacks for new states of clockevent
 devices, for example: ONESHOT_STOPPED.
 
-Also kill the unnecessary forward declaration of set-mode routine by
-moving 'struct clock_event_device clkevt' towards the bottom of the file.
-
-Cc: Shiraz Hashim <shiraz.linux.kernel@gmail.com>
+Cc: Santosh Shilimkar <ssantosh@kernel.org>
+Cc: Tony Lindgren <tony@atomide.com>
 Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
 ---
- arch/arm/mach-spear/time.c | 89 ++++++++++++++++++++++++++--------------------
- 1 file changed, 50 insertions(+), 39 deletions(-)
+ arch/arm/mach-omap2/timer.c | 48 ++++++++++++++++++++++-----------------------
+ 1 file changed, 24 insertions(+), 24 deletions(-)
 
-diff --git a/arch/arm/mach-spear/time.c b/arch/arm/mach-spear/time.c
-index 26fda4ed4d51..94342a0966e3 100644
---- a/arch/arm/mach-spear/time.c
-+++ b/arch/arm/mach-spear/time.c
-@@ -66,8 +66,6 @@
- static __iomem void *gpt_base;
- static struct clk *gpt_clk;
- 
--static void clockevent_set_mode(enum clock_event_mode mode,
--				struct clock_event_device *clk_event_dev);
- static int clockevent_next_event(unsigned long evt,
- 				 struct clock_event_device *clk_event_dev);
- 
-@@ -95,54 +93,67 @@ static void __init spear_clocksource_init(void)
- 		200, 16, clocksource_mmio_readw_up);
+diff --git a/arch/arm/mach-omap2/timer.c b/arch/arm/mach-omap2/timer.c
+index cac46d852da1..16b37e7196f5 100644
+--- a/arch/arm/mach-omap2/timer.c
++++ b/arch/arm/mach-omap2/timer.c
+@@ -102,38 +102,38 @@ static int omap2_gp_timer_set_next_event(unsigned long cycles,
+ 	return 0;
  }
  
--static struct clock_event_device clkevt = {
--	.name = "tmr0",
--	.features = CLOCK_EVT_FEAT_PERIODIC | CLOCK_EVT_FEAT_ONESHOT,
--	.set_mode = clockevent_set_mode,
--	.set_next_event = clockevent_next_event,
--	.shift = 0,	/* to be computed */
--};
-+static inline void timer_shutdown(struct clock_event_device *evt)
+-static void omap2_gp_timer_set_mode(enum clock_event_mode mode,
+-				    struct clock_event_device *evt)
++static int omap2_gp_timer_shutdown(struct clock_event_device *evt)
 +{
-+	u16 val = readw(gpt_base + CR(CLKEVT));
-+
-+	/* stop the timer */
-+	val &= ~CTRL_ENABLE;
-+	writew(val, gpt_base + CR(CLKEVT));
-+}
-+
-+static int spear_shutdown(struct clock_event_device *evt)
-+{
-+	timer_shutdown(evt);
-+
++	__omap_dm_timer_stop(&clkev, OMAP_TIMER_POSTED, clkev.rate);
 +	return 0;
 +}
 +
-+static int spear_set_oneshot(struct clock_event_device *evt)
-+{
-+	u16 val;
- 
--static void clockevent_set_mode(enum clock_event_mode mode,
--				struct clock_event_device *clk_event_dev)
-+	/* stop the timer */
-+	timer_shutdown(evt);
-+
-+	val = readw(gpt_base + CR(CLKEVT));
-+	val |= CTRL_ONE_SHOT;
-+	writew(val, gpt_base + CR(CLKEVT));
-+
-+	return 0;
-+}
-+
-+static int spear_set_periodic(struct clock_event_device *evt)
++static int omap2_gp_timer_set_periodic(struct clock_event_device *evt)
  {
  	u32 period;
- 	u16 val;
  
- 	/* stop the timer */
-+	timer_shutdown(evt);
-+
-+	period = clk_get_rate(gpt_clk) / HZ;
-+	period >>= CTRL_PRESCALER16;
-+	writew(period, gpt_base + LOAD(CLKEVT));
-+
- 	val = readw(gpt_base + CR(CLKEVT));
--	val &= ~CTRL_ENABLE;
-+	val &= ~CTRL_ONE_SHOT;
-+	val |= CTRL_ENABLE | CTRL_INT_ENABLE;
- 	writew(val, gpt_base + CR(CLKEVT));
+ 	__omap_dm_timer_stop(&clkev, OMAP_TIMER_POSTED, clkev.rate);
  
 -	switch (mode) {
 -	case CLOCK_EVT_MODE_PERIODIC:
--		period = clk_get_rate(gpt_clk) / HZ;
--		period >>= CTRL_PRESCALER16;
--		writew(period, gpt_base + LOAD(CLKEVT));
--
--		val = readw(gpt_base + CR(CLKEVT));
--		val &= ~CTRL_ONE_SHOT;
--		val |= CTRL_ENABLE | CTRL_INT_ENABLE;
--		writew(val, gpt_base + CR(CLKEVT));
--
+-		period = clkev.rate / HZ;
+-		period -= 1;
+-		/* Looks like we need to first set the load value separately */
+-		__omap_dm_timer_write(&clkev, OMAP_TIMER_LOAD_REG,
+-				      0xffffffff - period, OMAP_TIMER_POSTED);
+-		__omap_dm_timer_load_start(&clkev,
+-					OMAP_TIMER_CTRL_AR | OMAP_TIMER_CTRL_ST,
+-					0xffffffff - period, OMAP_TIMER_POSTED);
 -		break;
 -	case CLOCK_EVT_MODE_ONESHOT:
--		val = readw(gpt_base + CR(CLKEVT));
--		val |= CTRL_ONE_SHOT;
--		writew(val, gpt_base + CR(CLKEVT));
--
 -		break;
 -	case CLOCK_EVT_MODE_UNUSED:
 -	case CLOCK_EVT_MODE_SHUTDOWN:
 -	case CLOCK_EVT_MODE_RESUME:
--
--		break;
--	default:
--		pr_err("Invalid mode requested\n");
 -		break;
 -	}
++	period = clkev.rate / HZ;
++	period -= 1;
++	/* Looks like we need to first set the load value separately */
++	__omap_dm_timer_write(&clkev, OMAP_TIMER_LOAD_REG, 0xffffffff - period,
++			      OMAP_TIMER_POSTED);
++	__omap_dm_timer_load_start(&clkev,
++				   OMAP_TIMER_CTRL_AR | OMAP_TIMER_CTRL_ST,
++				   0xffffffff - period, OMAP_TIMER_POSTED);
 +	return 0;
  }
  
-+static struct clock_event_device clkevt = {
-+	.name = "tmr0",
-+	.features = CLOCK_EVT_FEAT_PERIODIC | CLOCK_EVT_FEAT_ONESHOT,
-+	.set_state_shutdown = spear_shutdown,
-+	.set_state_periodic = spear_set_periodic,
-+	.set_state_oneshot = spear_set_oneshot,
-+	.tick_resume = spear_shutdown,
-+	.set_next_event = clockevent_next_event,
-+	.shift = 0,	/* to be computed */
-+};
-+
- static int clockevent_next_event(unsigned long cycles,
- 				 struct clock_event_device *clk_event_dev)
- {
+ static struct clock_event_device clockevent_gpt = {
+-	.features       = CLOCK_EVT_FEAT_PERIODIC | CLOCK_EVT_FEAT_ONESHOT,
+-	.rating		= 300,
+-	.set_next_event	= omap2_gp_timer_set_next_event,
+-	.set_mode	= omap2_gp_timer_set_mode,
++	.features		= CLOCK_EVT_FEAT_PERIODIC |
++				  CLOCK_EVT_FEAT_ONESHOT,
++	.rating			= 300,
++	.set_next_event		= omap2_gp_timer_set_next_event,
++	.set_state_shutdown	= omap2_gp_timer_shutdown,
++	.set_state_periodic	= omap2_gp_timer_set_periodic,
++	.set_state_oneshot	= omap2_gp_timer_shutdown,
++	.tick_resume		= omap2_gp_timer_shutdown,
+ };
+ 
+ static struct property device_disabled = {
 -- 
 2.4.0
