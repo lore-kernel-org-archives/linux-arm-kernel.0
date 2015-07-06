@@ -1,66 +1,44 @@
-From: holgerschurig@gmail.com (Holger Schurig)
-Date: Mon, 6 Jul 2015 16:48:38 +0200
-Subject: weird behavior of get/set_fiq_regs()
-Message-ID: <CAOpc7mHkynAfmZKJhbwF0q0rco+3t7=wzh9owf6Brz6fmPRHsw@mail.gmail.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Mon, 06 Jul 2015 15:53:01 +0100
+Subject: [PATCH v5 1/2] arm64: kvm: allows kvm cpu hotplug
+In-Reply-To: <557729A0.1030700@arm.com>
+References: <1432877920-12527-1-git-send-email-takahiro.akashi@linaro.org>
+ <1432877920-12527-2-git-send-email-takahiro.akashi@linaro.org>
+ <557729A0.1030700@arm.com>
+Message-ID: <559A964D.30500@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On 09/06/15 19:00, Marc Zyngier wrote:
+> Hi Takahiro,
+> 
+> On 29/05/15 06:38, AKASHI Takahiro wrote:
+>> The current kvm implementation on arm64 does cpu-specific initialization
+>> at system boot, and has no way to gracefully shutdown a core in terms of
+>> kvm. This prevents, especially, kexec from rebooting the system on a boot
+>> core in EL2.
+>>
+>> This patch adds a cpu tear-down function and also puts an existing cpu-init
+>> code into a separate function, kvm_arch_hardware_disable() and
+>> kvm_arch_hardware_enable() respectively.
+>> We don't need arm64-specific cpu hotplug hook any more.
+>>
+>> Since this patch modifies common part of code between arm and arm64, one
+>> stub definition, __cpu_reset_hyp_mode(), is added on arm side to avoid
+>> compiling errors.
+>>
+>> Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
+> 
+> This is starting to look good. Any chance you or Geoff could repost the
+> whole series? This would help getting a better view of the whole thing,
+> and hopefully put it on track for 4.3.
 
-I'm trying to write a FIQ ISR handler. I wanted to use some registers
-to transfer information to/from the the FIQ ISR. But something changes
-the registers:
+So this has now been a whole month since I reviewed this, and I haven't
+seen any repost of this series. Any hope to see this within a reasonable
+time frame? Or is it considered dead already?
 
-My_probe() does basically this:
+Thanks,
 
-    struct pt_regs regs;
-    set_fiq_handler(&flexfiq_start, &flexfiq_end - &flexfiq_start);
-    printk("##HS OCRAM %p", priv->ocram);
-    regs.ARM_r8 = (long)priv->ocram;
-    set_fiq_regs(&regs);
-    set_fiq_handler(&myfiq_start, &myfiq_end - &myfiq_start);
-    get_fiq_regs(&regs);
-    printk("##HS %s:%d r8 %08lx\n", __func__, __LINE__, regs.ARM_r8);
-    release_fiq(&fiq_handler);
-
-Directly there, inside the probe() function, a call to get_fiq_regs()
-will return what I have just set:
-
-[ 5443.830458] ##HS OCRAM f1800000
-[ 5444.956159] ##HS set_fiq_reqs
-[ 5443.830487] ##HS my_probe:380 r8 f1800000
-
-
-But not in my_remove():
-
-    get_fiq_regs(&regs);
-    printk("##HS %s:%d r8 %08lx\n", __func__, __LINE__, regs.ARM_r8);
-    release_fiq(&fiq_handler);
-
-[ 5444.956145] ##HS my_remove:401 r8 f1700000
-[ 5444.956159] ##HS set_fiq_reqs
-
-
-
-My FIQ ISR is currently a noop:
-
-myfiq_start:
-    subs pc, lr, #4
-myfiq_end:
-
-(My plan was to modify r8 intentionally in the ISR, so that I see
-if/that my FIQ isr was actually called)
-
-
-
-The output of this is:
-
-The output line "set_fiq_reqs is from printk in
-arch/arm/include/asm/fiq.h, I wanted to make sure that no-one else is
-calling set_fiq_reqs. Then 2nd output you see is from
-release_fiq(&fiq_handler) in my_remove(), so this is to be expected.
-
-
-Hardware is an i.MX6, Kernel is 3.18.17 (but even Linux-GIT doesn't
-show any FIQ related of importance: I don't think the "ret" macro to
-use "bx" on ARMv6 makes a difference).
+	M.
+-- 
+Jazz is not dead. It just smells funny...
