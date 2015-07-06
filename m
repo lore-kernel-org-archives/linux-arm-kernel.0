@@ -1,54 +1,70 @@
-From: lorenx4@gmail.com (Lorenzo Nava)
-Date: Mon, 6 Jul 2015 21:49:57 +0200
-Subject: [PATCH v5] arm DMA: Fix allocation from CMA for coherent DMA
-In-Reply-To: <20150703090305.GR7557@n2100.arm.linux.org.uk>
-References: <1435699746-21395-1-git-send-email-lorenx4@gmail.com>
- <20150701111251.GA21981@e104818-lin.cambridge.arm.com>
- <20150703090305.GR7557@n2100.arm.linux.org.uk>
-Message-ID: <CAE=W-e1Tvvwpb67rLzETtkzh3nLN_3dquvj8Wn9aKfXXzndFmg@mail.gmail.com>
+From: lznuaa@gmail.com (Zhi Li)
+Date: Mon, 6 Jul 2015 14:51:01 -0500
+Subject: [PATCH v2 0/8] add basic support for i.mx6 ul chip
+In-Reply-To: <1434727951-4852-1-git-send-email-Frank.Li@freescale.com>
+References: <1434727951-4852-1-git-send-email-Frank.Li@freescale.com>
+Message-ID: <CAHrpEqTu9_rkijU8E0Yjs5HwpFFFSCSSYRu=NYMW=y9cE9f-uA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 3, 2015 at 11:03 AM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> On Wed, Jul 01, 2015 at 12:12:51PM +0100, Catalin Marinas wrote:
->> On Tue, Jun 30, 2015 at 11:29:06PM +0200, Lorenzo Nava wrote:
->> > This patch allows the use of CMA for DMA coherent memory allocation.
->> > At the moment if the input parameter "is_coherent" is set to true
->> > the allocation is not made using the CMA, which I think is not the
->> > desired behaviour.
->> >
->> > Signed-off-by: Lorenzo Nava <lorenx4@gmail.com>
->> > Reviewed-by: Catalin Marinas <catalin.marinas@arm.com>
->>
->> If Russell doesn't have any objections, you can send the patch to
->> his patch system. See here for more information:
+On Fri, Jun 19, 2015 at 10:32 AM,  <Frank.Li@freescale.com> wrote:
+> From: Frank Li <Frank.Li@freescale.com>
 >
-> I'm left wondering whether this patch is really want Lorenzo wants.
-> From my reading of it, while this has the effect of allocating from
-> CMA for coherent devices, it's no different from the non-coherent
-> case, because by calling __alloc_from_contiguous(), we end up
-> remapping the allocated memory, removing the cacheability status
-> from the allocated pages.
+> Add basic function support i.mx6ul.
+> add simple dts.
+> add full pin function define
+> add clock support.
+> add low level debug
 >
-> This brings up an interesting point: presumably, it's been tested, and
-> people are happy with the performance it's giving, inspite of it not
-> returning cacheable memory... or maybe it hasn't been tested that much?
+> Change from v1 to v2:
+>  - Remove unnecessary clk_register_clkdev for gpt
+>  - use fat iomux in dts
+>  - use macro GPIO_ACTIVE_LOW
+>
+> Anson Huang (1):
+>   ARM: imx: add low-level debug support for i.mx6ul
+>
+> Frank Li (7):
+>   ARM: imx: add i.mx6ul msl support
+>   ARM: imx: add imx6ul clk tree support
+>   Document: dt: binding: imx: update document for imx6ul support
+>   ARM: pinctrl: imx: add i.mx6ul pinctrl driver
+>   ARM: dts: add i.mx6ul pin function include file
+>   ARM: dts: imx: add imx6ul and imx6ul evk board support
+>   ARM: imx: imx_v6_v7_defconfig enable imx6ul support
+>
+>  .../devicetree/bindings/clock/imx6ul-clock.txt     |  13 +
+>  .../bindings/pinctrl/fsl,imx6ul-pinctrl.txt        |  36 +
+>  arch/arm/Kconfig.debug                             |   9 +
+>  arch/arm/boot/dts/Makefile                         |   2 +
+>  arch/arm/boot/dts/imx6ul-14x14-evk.dts             | 335 ++++++++
+>  arch/arm/boot/dts/imx6ul-pinfunc.h                 | 938 +++++++++++++++++++++
+>  arch/arm/boot/dts/imx6ul.dtsi                      | 645 ++++++++++++++
+>  arch/arm/configs/imx_v6_v7_defconfig               |   1 +
+>  arch/arm/include/debug/imx-uart.h                  |  13 +
+>  arch/arm/mach-imx/Kconfig                          |   8 +
+>  arch/arm/mach-imx/Makefile                         |   1 +
+>  arch/arm/mach-imx/mach-imx6ul.c                    |  43 +
+>  drivers/clk/imx/Makefile                           |   1 +
+>  drivers/clk/imx/clk-imx6ul.c                       | 432 ++++++++++
+>  drivers/pinctrl/freescale/Kconfig                  |   7 +
+>  drivers/pinctrl/freescale/Makefile                 |   1 +
+>  drivers/pinctrl/freescale/pinctrl-imx6ul.c         | 323 +++++++
+>  include/dt-bindings/clock/imx6ul-clock.h           | 240 ++++++
+>  18 files changed, 3048 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/clock/imx6ul-clock.txt
+>  create mode 100644 Documentation/devicetree/bindings/pinctrl/fsl,imx6ul-pinctrl.txt
+>  create mode 100644 arch/arm/boot/dts/imx6ul-14x14-evk.dts
+>  create mode 100644 arch/arm/boot/dts/imx6ul-pinfunc.h
+>  create mode 100644 arch/arm/boot/dts/imx6ul.dtsi
+>  create mode 100644 arch/arm/mach-imx/mach-imx6ul.c
+>  create mode 100644 drivers/clk/imx/clk-imx6ul.c
+>  create mode 100644 drivers/pinctrl/freescale/pinctrl-imx6ul.c
+>  create mode 100644 include/dt-bindings/clock/imx6ul-clock.h
 
-In the weekend I've run the test once again and what I got is that:
+Ping!
 
-allocation non-coherent memory (CMA) -> prot = 0x647 (bufferable, non cacheable)
-allocation coherent memory (with patch, CMA) -> prot = 0x65F (writealloc)
-
-mmap of coherent memory (without mmap patched) -> prot = 0x707
-(bufferable, non cacheable) -> ERROR
-mmap of coherent memory (with mmap patch) -> prot = 0x71F (writealloc) -> OK
-
-So, it looks like the page attributes are ok from the test I ran. I
-didn't repeat the performance tests on the mapped memory, but they
-were ok for me as well.
-
-I've submitted the patch to your system.
-If you have any other objections or any feedback, please let me know.
-
-Lorenzo
+>
+> --
+> 1.9.1
+>
