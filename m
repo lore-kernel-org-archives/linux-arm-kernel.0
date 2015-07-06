@@ -1,61 +1,55 @@
-From: m.smarduch@samsung.com (Mario Smarduch)
-Date: Mon, 06 Jul 2015 11:43:05 -0700
-Subject: [PATCH 0/3] arm: KVM: VFP lazy switch in KVM Host Mode may save
- upto 98%
-In-Reply-To: <20150705193758.GD3869@cbox>
-References: <1435203028-23142-1-git-send-email-m.smarduch@samsung.com>
- <20150705193758.GD3869@cbox>
-Message-ID: <559ACC39.7030609@samsung.com>
+From: balbi@ti.com (Felipe Balbi)
+Date: Mon, 6 Jul 2015 13:54:49 -0500
+Subject: [PATCH v5 1/3] musb: sunxi: Add support for the Allwinner sunxi
+ musb controller
+In-Reply-To: <1434199330-22263-2-git-send-email-hdegoede@redhat.com>
+References: <1434199330-22263-1-git-send-email-hdegoede@redhat.com>
+ <1434199330-22263-2-git-send-email-hdegoede@redhat.com>
+Message-ID: <20150706185449.GL20779@saruman.tx.rr.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/05/2015 12:37 PM, Christoffer Dall wrote:
-> Hi Mario,
+On Sat, Jun 13, 2015 at 02:42:08PM +0200, Hans de Goede wrote:
+> This is based on initial code to get the Allwinner sunxi musb controller
+> supported by Chen-Yu Tsai and Roman Byshko.
 > 
-> On Wed, Jun 24, 2015 at 08:30:25PM -0700, Mario Smarduch wrote:
->> Currently we do a lazy VFP switch in Hyp mode, but once we exit and re-enter hyp
->> mode we trap again on VFP access. This mode has shown around 30-50% improvement
->> running hackbench and lmbench.
->>
->> This patch series extends lazy VFP switch beyond Hyp mode to KVM host mode.
->>
->> 1 - On guest access we switch from host to guest and set a flag accessible to 
->>     host
->> 2 - On exit to KVM host, VFP state is restored on vcpu_put if flag is marked (1)
->> 3 - Otherwise guest is resumed and continues to use its VFP registers. 
->> 4 - In case of 2 on VM entry we set VFP trap flag to repeat 1.
->>
->> If guest does not access VFP registers them implemenation remains the same.
->>
->> Executing hackbench on Fast Models and Exynos arm32 board shows good
->> results. Considering all exits 2% of the time KVM host lazy vfp switch is 
->> invoked.
->>
->> Howeverr this patch set requires more burn in time and testing under various 
->> loads.
->>
->> Currently ARM32 is addressed later ARM64.
->>
-> I think Marc said that he experimented with a similar patch once, but
-> that it caused corruption on the host side somehow.
+> This adds support for the Allwinner sunxi musb controller in both host only
+> and otg mode. Peripheral only mode is not supported, as no boards use that.
 > 
-> Am I remembering correctly?  If so, we would need to make sure this
-> doesn't happen with this patch set...
-
-I think upstreaming the basic approach first (arm64, arm32 cleanups),
-and let this series get some good runtime - would be better
-and safer approach.
-
-
+> This has been tested on a cubietruck (A20 SoC) and an UTOO P66 tablet
+> (A13 SoC) with a variety of devices in host mode and with the g_serial gadget
+> driver in peripheral mode, plugging otg / host cables in/out a lot of times
+> in all possible imaginable plug orders.
 > 
-> Otherwise I think this sounds like a fairly good idea and I wonder if
-> the same could be done on arm64?
+> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+> ---
+> Changes in v2:
+> -Move polling of id and vbus-det gpio-s to the phy driver
+> -Use extcon to get id (USB_HOST mode) status changes from the phy driver
+> -Stop using syscon, instead use Maxime Ripard's sunxi SRAM controller driver
+> Changes in v3:
+> -Check that USB_MUSB_FOO config is compatible with the dr_mode setting from dt
+> Changes in v4:
+> -Squash in "musb: sunxi: Add pre/post root reset end platform functions" patch
+> -Adjust for sunxi_sram controller driver changes
+> -Stop musb work from turning vbus off again when in host mode
+> Changes in v5:
+> -Squash in "musb: sunxi: Remove special MUSB_SUN4I flag" patch, as it was
+>  mostly revering changes done by this patch
+> -Adjust for extcon api changes landing in 4.2
 
-Yes that's the intent, doing both architectures at once would be preferable.
+drivers/usb/musb/sunxi.c:75:13: warning: symbol 'sunxi_musb' was not declared. Should it be static?
+drivers/usb/musb/sunxi.c:151:6: warning: symbol 'sunxi_musb_pre_root_reset_end' was not declared. Should it be static?
+drivers/usb/musb/sunxi.c:158:6: warning: symbol 'sunxi_musb_post_root_reset_end' was not declared. Should it be static?
 
-Thanks,
-  Mario
-> 
-> Thanks,
-> -Christoffer
-> 
+please fix.
+
+-- 
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150706/c2e85a6c/attachment.sig>
