@@ -1,91 +1,61 @@
-From: eric.auger@linaro.org (Eric Auger)
-Date: Mon,  6 Jul 2015 14:11:32 +0200
-Subject: [RFC v2 6/6] KVM: eventfd: add irq bypass consumer management
-In-Reply-To: <1436184692-20927-1-git-send-email-eric.auger@linaro.org>
-References: <1436184692-20927-1-git-send-email-eric.auger@linaro.org>
-Message-ID: <1436184692-20927-7-git-send-email-eric.auger@linaro.org>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Mon, 6 Jul 2015 14:12:38 +0200
+Subject: [linux-sunxi] Re: [PATCH 2/3] ARM: dts: axp152: Add a dtsi file
+ for the axp152 pmic
+In-Reply-To: <20150706085713.GE3269@lukather>
+References: <1435088503-20776-1-git-send-email-hdegoede@redhat.com>
+ <1435088503-20776-3-git-send-email-hdegoede@redhat.com>
+ <20150625174027.GF2266@lukather> <558D0BC2.10004@redhat.com>
+ <20150706085713.GE3269@lukather>
+Message-ID: <559A70B6.3010101@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds the registration/unregistration of an
-irq_bypass_consumer on irqfd assignment/deassignment.
+Hi,
 
-Signed-off-by: Eric Auger <eric.auger@linaro.org>
+On 06-07-15 10:57, Maxime Ripard wrote:
+> Hi,
+>
+> On Fri, Jun 26, 2015 at 10:22:26AM +0200, Hans de Goede wrote:
+>> Hi,
+>>
+>> On 25-06-15 19:40, Maxime Ripard wrote:
+>>> Hi,
+>>>
+>>> On Tue, Jun 23, 2015 at 09:41:42PM +0200, Hans de Goede wrote:
+>>>> From: Michal Suchanek <hramrach@gmail.com>
+>>>>
+>>>> Add a dtsi file for the axp152 pmic, this mirrors the way things are
+>>>> handled for the axp202 pmic.
+>>>>
+>>>> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+>>>> ---
+>>>>   arch/arm/boot/dts/axp152.dtsi | 49 +++++++++++++++++++++++++++++++++++++++++++
+>>>>   1 file changed, 49 insertions(+)
+>>>>   create mode 100644 arch/arm/boot/dts/axp152.dtsi
+>>>
+>>> Unfortunately, Mark expressed clearly that he didn't want such files.
+>>
+>> That is not how I remember the discussion, he said that he did not consider
+>> them useful, we explained why we do consider them useful for the sunxi
+>> case and then things went quiet.
+>>
+>> And we do already have an axp209.dtsi, and I find having that useful
+>> for enabling the regulators on axp209 using boards.
+>
+> Hmmm, reading this discussion again, it indeed looks like I
+> misremembered what he was saying.
+>
+>> Ultimately it is your call, but I really think we should be consistent
+>> and add an axp152.dtsi to mirror how we do things with the axp209.
+>
+> Was there any other comments on this serie (and are you going to send
+> a v2?) or should I apply this patch?
 
----
+There were some comments on the actual mfd bits of this series, and
+I will send a v2 for that sometime this week. The dts patches however
+are good to go, so please apply this one.
 
-v1 -> v2:
-- populate of kvm and gsi removed
-- unregister the consumer on irqfd_shutdown
----
- include/linux/kvm_irqfd.h |  1 +
- virt/kvm/eventfd.c        | 14 +++++++++++---
- 2 files changed, 12 insertions(+), 3 deletions(-)
+Regards,
 
-diff --git a/include/linux/kvm_irqfd.h b/include/linux/kvm_irqfd.h
-index f926b39..3c0bd07 100644
---- a/include/linux/kvm_irqfd.h
-+++ b/include/linux/kvm_irqfd.h
-@@ -64,6 +64,7 @@ struct kvm_kernel_irqfd {
- 	struct list_head list;
- 	poll_table pt;
- 	struct work_struct shutdown;
-+	struct irq_bypass_consumer consumer;
- };
- 
- #endif /* __LINUX_KVM_IRQFD_H */
-diff --git a/virt/kvm/eventfd.c b/virt/kvm/eventfd.c
-index b79dc61..9452754 100644
---- a/virt/kvm/eventfd.c
-+++ b/virt/kvm/eventfd.c
-@@ -35,6 +35,7 @@
- #include <linux/srcu.h>
- #include <linux/slab.h>
- #include <linux/seqlock.h>
-+#include <linux/irqbypass.h>
- #include <trace/events/kvm.h>
- 
- #include <kvm/iodev.h>
-@@ -140,6 +141,7 @@ irqfd_shutdown(struct work_struct *work)
- 	/*
- 	 * It is now safe to release the object's resources
- 	 */
-+	irq_bypass_unregister_consumer(&irqfd->consumer);
- 	eventfd_ctx_put(irqfd->eventfd);
- 	kfree(irqfd);
- }
-@@ -380,7 +382,14 @@ kvm_irqfd_assign(struct kvm *kvm, struct kvm_irqfd *args)
- 	 */
- 	fdput(f);
- 
--	/* irq_bypass_register_consumer(); */
-+	irqfd->consumer.token = (void *)irqfd->eventfd;
-+	irqfd->consumer.add_producer = kvm_arch_irq_bypass_add_producer;
-+	irqfd->consumer.del_producer = kvm_arch_irq_bypass_del_producer;
-+	irqfd->consumer.stop = kvm_arch_irq_bypass_stop;
-+	irqfd->consumer.resume = kvm_arch_irq_bypass_resume;
-+	irqfd->consumer.update = kvm_arch_irq_bypass_update;
-+	ret = irq_bypass_register_consumer(&irqfd->consumer);
-+	WARN_ON(ret);
- 
- 	return 0;
- 
-@@ -481,8 +490,6 @@ kvm_irqfd_deassign(struct kvm *kvm, struct kvm_irqfd *args)
- 	struct kvm_kernel_irqfd *irqfd, *tmp;
- 	struct eventfd_ctx *eventfd;
- 
--	/* irq_bypass_unregister_consumer() */
--
- 	eventfd = eventfd_ctx_fdget(args->fd);
- 	if (IS_ERR(eventfd))
- 		return PTR_ERR(eventfd);
-@@ -501,6 +508,7 @@ kvm_irqfd_deassign(struct kvm *kvm, struct kvm_irqfd *args)
- 			irqfd->irq_entry.type = 0;
- 			write_seqcount_end(&irqfd->irq_entry_sc);
- 			irqfd_deactivate(irqfd);
-+			irq_bypass_unregister_consumer(&irqfd->consumer);
- 		}
- 	}
- 
--- 
-1.9.1
+Hans
