@@ -1,42 +1,31 @@
-From: magnus.damm@gmail.com (Magnus Damm)
-Date: Mon, 6 Jul 2015 13:45:05 +0900
-Subject: Possible regression due to "tick: broadcast: Prevent livelock
- from event handler"
-In-Reply-To: <CAMuHMdWQeYA=LrYcsD8W_0ZQUp3BKYVxedhBDpD5kPQp++yu1A@mail.gmail.com>
-References: <20150703024044.GB24695@verge.net.au>
- <20150703105441.GF1521@katana>
- <alpine.DEB.2.11.1507031511180.3916@nanos>
- <20150703133245.GA19284@katana>
- <alpine.DEB.2.11.1507031612410.3916@nanos>
- <20150703143703.GB19284@katana>
- <CAMuHMdWQeYA=LrYcsD8W_0ZQUp3BKYVxedhBDpD5kPQp++yu1A@mail.gmail.com>
-Message-ID: <CANqRtoQpfJUKM7LMEDeGNFY6hfQieL32cPTnCNqzYg+qrbzxSQ@mail.gmail.com>
+From: panand@redhat.com (Pratyush Anand)
+Date: Mon,  6 Jul 2015 10:33:20 +0530
+Subject: [PATCH 0/2] arm64: some symbols blacklisted for kprobing
+Message-ID: <cover.1436158027.git.panand@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Geert,
+Functions which are called from do_debug_execptions and all entry routines
+must not allow to insert kprobe in it, otherwise we may witness a system hang.
 
-On Sat, Jul 4, 2015 at 2:02 AM, Geert Uytterhoeven <geert@linux-m68k.org> wrote:
-> Hi Wolfram,
->
-> On Fri, Jul 3, 2015 at 4:37 PM, Wolfram Sang <wsa@the-dreams.de> wrote:
->>> So this is a single core machine and uses the em_sti timer w/o the
->>> broadcast nonsense. In Simons case it looks like em_sti is used as
->>> broadcast device.
->>
->> We use the same board. Just my kernel has SMP=n.
->
-> Unlike our other multi-core A9 SoCs, emev2.dtsi doesn't have a node
-> for the arm,cortex-a9-twd-timer?
+This patch set blacklist such symbols.
 
-That's right, the TWD was never enabled on upstream EMEV2. I believe
-it is documented in the data sheet though, however the actual
-vendor-specific glue is a bit different compared to other SoCs from
-Renesas Electronics - this most likely since EMEV2 was initially made
-by NEC Electronics instead of Renesas. I've been told that it was one
-of the earlier Cortex-A9 designs around so some special surprises may
-exist!
+Patches should be applied on top of arm64 kprobe patches [1].
 
-Cheers,
+[1] https://lkml.org/lkml/2015/6/15/514
 
-/ magnus
+Pratyush Anand (2):
+  arm64: Blacklist non-kprobe-able symbols
+  arm64: Make all entry code as non-kprobe-able
+
+ arch/arm64/kernel/debug-monitors.c | 18 ++++++++++++++++++
+ arch/arm64/kernel/entry.S          |  3 +++
+ arch/arm64/kernel/hw_breakpoint.c  |  8 ++++++++
+ arch/arm64/kernel/kgdb.c           |  4 ++++
+ arch/arm64/kernel/kprobes.c        |  9 +++++++++
+ arch/arm64/kernel/vmlinux.lds.S    |  1 +
+ arch/arm64/mm/fault.c              |  1 +
+ 7 files changed, 44 insertions(+)
+
+-- 
+2.4.3
