@@ -1,31 +1,34 @@
 From: baruch@tkos.co.il (Baruch Siach)
-Date: Mon,  6 Jul 2015 14:41:46 +0300
-Subject: [PATCH 4/4] MAINTAINERS: digicolor: add dts files
+Date: Mon,  6 Jul 2015 14:41:43 +0300
+Subject: [PATCH 1/4] ARM: digicolor: enable watchdog device
 In-Reply-To: <cover.1436182214.git.baruch@tkos.co.il>
 References: <cover.1436182214.git.baruch@tkos.co.il>
-Message-ID: <d28ee8b987e62ae4dd0332700f4a792ee8287065.1436182214.git.baruch@tkos.co.il>
+Message-ID: <08bb4d52b29825487958034e41d4a28cd9bf62e5.1436182214.git.baruch@tkos.co.il>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The 'digicolor' regexp doesn't cover the dts files. Add a glob pattern for
-them.
-
 Signed-off-by: Baruch Siach <baruch@tkos.co.il>
 ---
- MAINTAINERS | 1 +
- 1 file changed, 1 insertion(+)
+ arch/arm/boot/dts/cx92755.dtsi | 7 +++++++
+ 1 file changed, 7 insertions(+)
 
-diff --git a/MAINTAINERS b/MAINTAINERS
-index 8133cefb6b6e..3961bc4b0ba6 100644
---- a/MAINTAINERS
-+++ b/MAINTAINERS
-@@ -1001,6 +1001,7 @@ ARM/CONEXANT DIGICOLOR MACHINE SUPPORT
- M:	Baruch Siach <baruch@tkos.co.il>
- L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
- S:	Maintained
-+F:	arch/arm/boot/dts/cx92755*
- N:	digicolor
+diff --git a/arch/arm/boot/dts/cx92755.dtsi b/arch/arm/boot/dts/cx92755.dtsi
+index af333261d046..df4c6f1f93f9 100644
+--- a/arch/arm/boot/dts/cx92755.dtsi
++++ b/arch/arm/boot/dts/cx92755.dtsi
+@@ -88,6 +88,13 @@
+ 		interrupts = <25>;
+ 	};
  
- ARM/EBSA110 MACHINE SUPPORT
++	watchdog at f0000fc0 {
++		compatible = "cnxt,cx92755-wdt";
++		reg = <0xf0000fc0 0x8>;
++		clocks = <&main_clk>;
++		timeout-sec = <15>;
++	};
++
+ 	uc_regs: syscon at f00003a0 {
+ 		compatible = "cnxt,cx92755-uc", "syscon";
+ 		reg = <0xf00003a0 0x10>;
 -- 
 2.1.4
