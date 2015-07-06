@@ -1,310 +1,99 @@
 From: eric.auger@linaro.org (Eric Auger)
-Date: Mon,  6 Jul 2015 14:11:30 +0200
-Subject: [RFC v2 4/6] KVM: create kvm_irqfd.h
+Date: Mon,  6 Jul 2015 14:11:31 +0200
+Subject: [RFC v2 5/6] KVM: introduce kvm_arch functions for IRQ bypass
 In-Reply-To: <1436184692-20927-1-git-send-email-eric.auger@linaro.org>
 References: <1436184692-20927-1-git-send-email-eric.auger@linaro.org>
-Message-ID: <1436184692-20927-5-git-send-email-eric.auger@linaro.org>
+Message-ID: <1436184692-20927-6-git-send-email-eric.auger@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Move _irqfd_resampler and _irqfd struct declarations in a new
-public header: kvm_irqfd.h. They are respectively renamed into
-kvm_kernel_irqfd_resampler and kvm_kernel_irqfd. Those datatypes
-will be used by architecture specific code, in the context of
-IRQ bypass manager integration.
+This patch introduces
+- kvm_arch_irq_bypass_add_producer
+- kvm_arch_irq_bypass_del_producer
+- kvm_arch_irq_bypass_stop
+- kvm_arch_irq_bypass_resume
+- kvm_arch_irq_bypass_update
+
+They make possible to specialize the KVM IRQ bypass consumer in
+case CONFIG_KVM_HAVE_IRQ_BYPASS is set.
 
 Signed-off-by: Eric Auger <eric.auger@linaro.org>
----
- include/linux/kvm_irqfd.h | 69 ++++++++++++++++++++++++++++++++++
- virt/kvm/eventfd.c        | 95 ++++++++++++-----------------------------------
- 2 files changed, 92 insertions(+), 72 deletions(-)
- create mode 100644 include/linux/kvm_irqfd.h
 
-diff --git a/include/linux/kvm_irqfd.h b/include/linux/kvm_irqfd.h
-new file mode 100644
-index 0000000..f926b39
---- /dev/null
-+++ b/include/linux/kvm_irqfd.h
-@@ -0,0 +1,69 @@
-+/*
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License as published by
-+ * the Free Software Foundation; either version 2 of the License.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ *
-+ * irqfd: Allows an fd to be used to inject an interrupt to the guest
-+ * Credit goes to Avi Kivity for the original idea.
-+ */
-+
-+#ifndef __LINUX_KVM_IRQFD_H
-+#define __LINUX_KVM_IRQFD_H
-+
-+#include <linux/kvm_host.h>
-+#include <linux/poll.h>
-+
-+/*
-+ * Resampling irqfds are a special variety of irqfds used to emulate
-+ * level triggered interrupts.  The interrupt is asserted on eventfd
-+ * trigger.  On acknowledgment through the irq ack notifier, the
-+ * interrupt is de-asserted and userspace is notified through the
-+ * resamplefd.  All resamplers on the same gsi are de-asserted
-+ * together, so we don't need to track the state of each individual
-+ * user.  We can also therefore share the same irq source ID.
-+ */
-+struct kvm_kernel_irqfd_resampler {
-+	struct kvm *kvm;
-+	/*
-+	 * List of resampling struct _irqfd objects sharing this gsi.
-+	 * RCU list modified under kvm->irqfds.resampler_lock
-+	 */
-+	struct list_head list;
-+	struct kvm_irq_ack_notifier notifier;
-+	/*
-+	 * Entry in list of kvm->irqfd.resampler_list.  Use for sharing
-+	 * resamplers among irqfds on the same gsi.
-+	 * Accessed and modified under kvm->irqfds.resampler_lock
-+	 */
-+	struct list_head link;
-+};
-+
-+struct kvm_kernel_irqfd {
-+	/* Used for MSI fast-path */
-+	struct kvm *kvm;
-+	wait_queue_t wait;
-+	/* Update side is protected by irqfds.lock */
-+	struct kvm_kernel_irq_routing_entry irq_entry;
-+	seqcount_t irq_entry_sc;
-+	/* Used for level IRQ fast-path */
-+	int gsi;
-+	struct work_struct inject;
-+	/* The resampler used by this irqfd (resampler-only) */
-+	struct kvm_kernel_irqfd_resampler *resampler;
-+	/* Eventfd notified on resample (resampler-only) */
-+	struct eventfd_ctx *resamplefd;
-+	/* Entry in list of irqfds for a resampler (resampler-only) */
-+	struct list_head resampler_link;
-+	/* Used for setup/shutdown */
-+	struct eventfd_ctx *eventfd;
-+	struct list_head list;
-+	poll_table pt;
-+	struct work_struct shutdown;
-+};
-+
-+#endif /* __LINUX_KVM_IRQFD_H */
-diff --git a/virt/kvm/eventfd.c b/virt/kvm/eventfd.c
-index f3da161..b79dc61 100644
---- a/virt/kvm/eventfd.c
-+++ b/virt/kvm/eventfd.c
-@@ -23,6 +23,7 @@
+---
+
+v1 -> v2:
+- use CONFIG_KVM_HAVE_IRQ_BYPASS instead CONFIG_IRQ_BYPASS_MANAGER
+- rename all functions according to Paolo's proposal
+- add kvm_arch_irq_bypass_update according to Feng's need
+---
+ include/linux/kvm_host.h | 37 +++++++++++++++++++++++++++++++++++++
+ virt/kvm/Kconfig         |  3 +++
+ 2 files changed, 40 insertions(+)
+
+diff --git a/include/linux/kvm_host.h b/include/linux/kvm_host.h
+index 9564fd7..91a5734 100644
+--- a/include/linux/kvm_host.h
++++ b/include/linux/kvm_host.h
+@@ -24,6 +24,7 @@
+ #include <linux/err.h>
+ #include <linux/irqflags.h>
+ #include <linux/context_tracking.h>
++#include <linux/irqbypass.h>
+ #include <asm/signal.h>
  
- #include <linux/kvm_host.h>
  #include <linux/kvm.h>
-+#include <linux/kvm_irqfd.h>
- #include <linux/workqueue.h>
- #include <linux/syscalls.h>
- #include <linux/wait.h>
-@@ -39,68 +40,14 @@
- #include <kvm/iodev.h>
- 
- #ifdef CONFIG_HAVE_KVM_IRQFD
--/*
-- * --------------------------------------------------------------------
-- * irqfd: Allows an fd to be used to inject an interrupt to the guest
-- *
-- * Credit goes to Avi Kivity for the original idea.
-- * --------------------------------------------------------------------
-- */
--
--/*
-- * Resampling irqfds are a special variety of irqfds used to emulate
-- * level triggered interrupts.  The interrupt is asserted on eventfd
-- * trigger.  On acknowledgement through the irq ack notifier, the
-- * interrupt is de-asserted and userspace is notified through the
-- * resamplefd.  All resamplers on the same gsi are de-asserted
-- * together, so we don't need to track the state of each individual
-- * user.  We can also therefore share the same irq source ID.
-- */
--struct _irqfd_resampler {
--	struct kvm *kvm;
--	/*
--	 * List of resampling struct _irqfd objects sharing this gsi.
--	 * RCU list modified under kvm->irqfds.resampler_lock
--	 */
--	struct list_head list;
--	struct kvm_irq_ack_notifier notifier;
--	/*
--	 * Entry in list of kvm->irqfd.resampler_list.  Use for sharing
--	 * resamplers among irqfds on the same gsi.
--	 * Accessed and modified under kvm->irqfds.resampler_lock
--	 */
--	struct list_head link;
--};
--
--struct _irqfd {
--	/* Used for MSI fast-path */
--	struct kvm *kvm;
--	wait_queue_t wait;
--	/* Update side is protected by irqfds.lock */
--	struct kvm_kernel_irq_routing_entry irq_entry;
--	seqcount_t irq_entry_sc;
--	/* Used for level IRQ fast-path */
--	int gsi;
--	struct work_struct inject;
--	/* The resampler used by this irqfd (resampler-only) */
--	struct _irqfd_resampler *resampler;
--	/* Eventfd notified on resample (resampler-only) */
--	struct eventfd_ctx *resamplefd;
--	/* Entry in list of irqfds for a resampler (resampler-only) */
--	struct list_head resampler_link;
--	/* Used for setup/shutdown */
--	struct eventfd_ctx *eventfd;
--	struct list_head list;
--	poll_table pt;
--	struct work_struct shutdown;
--};
- 
- static struct workqueue_struct *irqfd_cleanup_wq;
- 
- static void
- irqfd_inject(struct work_struct *work)
+@@ -1133,5 +1134,41 @@ static inline void kvm_vcpu_set_dy_eligible(struct kvm_vcpu *vcpu, bool val)
  {
--	struct _irqfd *irqfd = container_of(work, struct _irqfd, inject);
-+	struct kvm_kernel_irqfd *irqfd =
-+		container_of(work, struct kvm_kernel_irqfd, inject);
- 	struct kvm *kvm = irqfd->kvm;
- 
- 	if (!irqfd->resampler) {
-@@ -121,12 +68,13 @@ irqfd_inject(struct work_struct *work)
- static void
- irqfd_resampler_ack(struct kvm_irq_ack_notifier *kian)
- {
--	struct _irqfd_resampler *resampler;
-+	struct kvm_kernel_irqfd_resampler *resampler;
- 	struct kvm *kvm;
--	struct _irqfd *irqfd;
-+	struct kvm_kernel_irqfd *irqfd;
- 	int idx;
- 
--	resampler = container_of(kian, struct _irqfd_resampler, notifier);
-+	resampler = container_of(kian,
-+			struct kvm_kernel_irqfd_resampler, notifier);
- 	kvm = resampler->kvm;
- 
- 	kvm_set_irq(kvm, KVM_IRQFD_RESAMPLE_IRQ_SOURCE_ID,
-@@ -141,9 +89,9 @@ irqfd_resampler_ack(struct kvm_irq_ack_notifier *kian)
  }
+ #endif /* CONFIG_HAVE_KVM_CPU_RELAX_INTERCEPT */
++
++#ifdef CONFIG_HAVE_KVM_IRQ_BYPASS
++
++void kvm_arch_irq_bypass_add_producer(struct irq_bypass_consumer *,
++			   struct irq_bypass_producer *);
++void kvm_arch_irq_bypass_del_producer(struct irq_bypass_consumer *,
++			   struct irq_bypass_producer *);
++void kvm_arch_irq_bypass_stop(struct irq_bypass_consumer *);
++void kvm_arch_irq_bypass_resume(struct irq_bypass_consumer *);
++void kvm_arch_irq_bypass_update(struct irq_bypass_consumer *);
++
++#else
++
++static inline void kvm_arch_irq_bypass_add_producer(
++			struct irq_bypass_consumer *cons,
++			struct irq_bypass_producer *prod)
++{
++}
++static inline void kvm_arch_irq_bypass_del_producer(
++			struct irq_bypass_consumer *cons,
++			struct irq_bypass_producer *prod)
++{
++}
++static inline void kvm_arch_irq_bypass_stop(
++			struct irq_bypass_consumer *cons)
++{
++}
++static inline void kvm_arch_irq_bypass_resume(
++			struct irq_bypass_consumer *cons)
++{
++}
++static inline void kvm_arch_irq_bypass_update(
++			struct irq_bypass_consumer *cons)
++{
++}
++#endif /* CONFIG_HAVE_KVM_IRQ_BYPASS */
+ #endif
  
- static void
--irqfd_resampler_shutdown(struct _irqfd *irqfd)
-+irqfd_resampler_shutdown(struct kvm_kernel_irqfd *irqfd)
- {
--	struct _irqfd_resampler *resampler = irqfd->resampler;
-+	struct kvm_kernel_irqfd_resampler *resampler = irqfd->resampler;
- 	struct kvm *kvm = resampler->kvm;
- 
- 	mutex_lock(&kvm->irqfds.resampler_lock);
-@@ -168,7 +116,8 @@ irqfd_resampler_shutdown(struct _irqfd *irqfd)
- static void
- irqfd_shutdown(struct work_struct *work)
- {
--	struct _irqfd *irqfd = container_of(work, struct _irqfd, shutdown);
-+	struct kvm_kernel_irqfd *irqfd =
-+		container_of(work, struct kvm_kernel_irqfd, shutdown);
- 	u64 cnt;
- 
- 	/*
-@@ -198,7 +147,7 @@ irqfd_shutdown(struct work_struct *work)
- 
- /* assumes kvm->irqfds.lock is held */
- static bool
--irqfd_is_active(struct _irqfd *irqfd)
-+irqfd_is_active(struct kvm_kernel_irqfd *irqfd)
- {
- 	return list_empty(&irqfd->list) ? false : true;
- }
-@@ -209,7 +158,7 @@ irqfd_is_active(struct _irqfd *irqfd)
-  * assumes kvm->irqfds.lock is held
-  */
- static void
--irqfd_deactivate(struct _irqfd *irqfd)
-+irqfd_deactivate(struct kvm_kernel_irqfd *irqfd)
- {
- 	BUG_ON(!irqfd_is_active(irqfd));
- 
-@@ -224,7 +173,8 @@ irqfd_deactivate(struct _irqfd *irqfd)
- static int
- irqfd_wakeup(wait_queue_t *wait, unsigned mode, int sync, void *key)
- {
--	struct _irqfd *irqfd = container_of(wait, struct _irqfd, wait);
-+	struct kvm_kernel_irqfd *irqfd =
-+		container_of(wait, struct kvm_kernel_irqfd, wait);
- 	unsigned long flags = (unsigned long)key;
- 	struct kvm_kernel_irq_routing_entry irq;
- 	struct kvm *kvm = irqfd->kvm;
-@@ -274,12 +224,13 @@ static void
- irqfd_ptable_queue_proc(struct file *file, wait_queue_head_t *wqh,
- 			poll_table *pt)
- {
--	struct _irqfd *irqfd = container_of(pt, struct _irqfd, pt);
-+	struct kvm_kernel_irqfd *irqfd =
-+		container_of(pt, struct kvm_kernel_irqfd, pt);
- 	add_wait_queue(wqh, &irqfd->wait);
- }
- 
- /* Must be called under irqfds.lock */
--static void irqfd_update(struct kvm *kvm, struct _irqfd *irqfd)
-+static void irqfd_update(struct kvm *kvm, struct kvm_kernel_irqfd *irqfd)
- {
- 	struct kvm_kernel_irq_routing_entry *e;
- 	struct kvm_kernel_irq_routing_entry entries[KVM_NR_IRQCHIPS];
-@@ -304,7 +255,7 @@ static void irqfd_update(struct kvm *kvm, struct _irqfd *irqfd)
- static int
- kvm_irqfd_assign(struct kvm *kvm, struct kvm_irqfd *args)
- {
--	struct _irqfd *irqfd, *tmp;
-+	struct kvm_kernel_irqfd *irqfd, *tmp;
- 	struct fd f;
- 	struct eventfd_ctx *eventfd = NULL, *resamplefd = NULL;
- 	int ret;
-@@ -340,7 +291,7 @@ kvm_irqfd_assign(struct kvm *kvm, struct kvm_irqfd *args)
- 	irqfd->eventfd = eventfd;
- 
- 	if (args->flags & KVM_IRQFD_FLAG_RESAMPLE) {
--		struct _irqfd_resampler *resampler;
-+		struct kvm_kernel_irqfd_resampler *resampler;
- 
- 		resamplefd = eventfd_ctx_fdget(args->resamplefd);
- 		if (IS_ERR(resamplefd)) {
-@@ -527,7 +478,7 @@ kvm_eventfd_init(struct kvm *kvm)
- static int
- kvm_irqfd_deassign(struct kvm *kvm, struct kvm_irqfd *args)
- {
--	struct _irqfd *irqfd, *tmp;
-+	struct kvm_kernel_irqfd *irqfd, *tmp;
- 	struct eventfd_ctx *eventfd;
- 
- 	/* irq_bypass_unregister_consumer() */
-@@ -585,7 +536,7 @@ kvm_irqfd(struct kvm *kvm, struct kvm_irqfd *args)
- void
- kvm_irqfd_release(struct kvm *kvm)
- {
--	struct _irqfd *irqfd, *tmp;
-+	struct kvm_kernel_irqfd *irqfd, *tmp;
- 
- 	spin_lock_irq(&kvm->irqfds.lock);
- 
-@@ -608,7 +559,7 @@ kvm_irqfd_release(struct kvm *kvm)
-  */
- void kvm_irq_routing_update(struct kvm *kvm)
- {
--	struct _irqfd *irqfd;
-+	struct kvm_kernel_irqfd *irqfd;
- 
- 	spin_lock_irq(&kvm->irqfds.lock);
- 
+diff --git a/virt/kvm/Kconfig b/virt/kvm/Kconfig
+index e2c876d..9f8014d 100644
+--- a/virt/kvm/Kconfig
++++ b/virt/kvm/Kconfig
+@@ -47,3 +47,6 @@ config KVM_GENERIC_DIRTYLOG_READ_PROTECT
+ config KVM_COMPAT
+        def_bool y
+        depends on COMPAT && !S390
++
++config HAVE_KVM_IRQ_BYPASS
++       bool
 -- 
 1.9.1
