@@ -1,36 +1,58 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 6 Jul 2015 06:53:18 -0700
-Subject: USB Ethernet gadget on Nokia n900
-In-Reply-To: <201507061524.44999@pali>
-References: <20141019090107.GA19132@amd> <20141028222123.GA17518@amd>
- <20141028222641.GW2542@atomide.com> <201507061524.44999@pali>
-Message-ID: <20150706135317.GH10705@atomide.com>
+Date: Mon, 6 Jul 2015 06:55:06 -0700
+Subject: [RESEND] [PATCH v2 1/2] arm: devtree: Set system_rev from DT
+ revision
+In-Reply-To: <201507061512.27124@pali>
+References: <1430902142-17035-1-git-send-email-pali.rohar@gmail.com>
+ <201507061423.23505@pali> <20150706123126.GG10705@atomide.com>
+ <201507061512.27124@pali>
+Message-ID: <20150706135506.GI10705@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Pali Roh?r <pali.rohar@gmail.com> [150706 06:27]:
-> On Tuesday 28 October 2014 23:26:41 Tony Lindgren wrote:
-> > * Pavel Machek <pavel@ucw.cz> [141028 15:22]:
-> > > On Tue 2014-10-28 23:04:50, Pavel Machek wrote:
-> > > > 
-> > > > Networking now works against 3.17-based kernel. Thanks!
-> > > 
-> > > It works on 3.18-rc1 kernel, too. (I had to hand-modify patch to
-> > > apply to 3.17, no changes needed for 3.18-rc1.)
-> > > 
-> > > Tested-by: Pavel Machek <pavel@ucw.cz>
+* Pali Roh?r <pali.rohar@gmail.com> [150706 06:14]:
+> On Monday 06 July 2015 14:31:27 Tony Lindgren wrote:
+> > * Pali Roh?r <pali.rohar@gmail.com> [150706 05:25]:
+> > > into which file should I put documentation about new DT properties?
 > > 
-> > Whatever we decice to do to fix this regression, it should probably
-> > be backported to at least v3.16 stable for distro use, maybe earlier
-> > too. I'd assume this is broken on multiple platforms currently.
+> > If it's Linux generic like linux,revision, then how about
+> > Documentation/devicetree/bindings/revision.txt?
 > > 
-> it looks like this patch was not included into any kernel version... I'm 
-> still using it on top of 4.x kernels. Are you going to send this patch 
-> into upstream? Or do you have another fix for this problem?
+> > For the ATAGs, Documentation/devicetree/bindings/arm/atag.txt?
+>
+> Hm... now I'm thinking into which DT field should I put atags and 
+> revision. In previous emails you wrote to use "linux,atags", now 
+> "arm,atags"? And put them into root node? Or other?
+> 
+> In arch/arm/boot/compressed/atags_to_fdt.c code I see that most atag 
+> properties are converted into "/chosen" node in DT...
+> 
+> So what do you prefer for "revision" and what for "atags"?
 
-I think Felipe mentioned a better built-in gether fix that's been
-reviewed on linux-usb list.
+I'd prefer linux,revision and arm,atags. Chances are the ATAGs
+won't be used on other architectures. I'm find with linux,atags
+too if people prefer that.
 
 Regards,
 
 Tony
+ 
+> Some mentioned examples:
+> 
+> "/revision"
+> "/chosen/revision"
+> "/linux,revision"
+> "/chosen/linux,revision"
+> ...
+> 
+> "/atags"
+> "/chosen/atags"
+> "/linux,atags"
+> "/chosen/linux,atags"
+> "/arm,atags"
+> "/chosen/arm,atags"
+> ...
+> 
+> -- 
+> Pali Roh?r
+> pali.rohar at gmail.com
