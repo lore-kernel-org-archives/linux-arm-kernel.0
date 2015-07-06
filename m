@@ -1,59 +1,68 @@
-From: pali.rohar@gmail.com (Pali =?utf-8?q?Roh=C3=A1r?=)
-Date: Mon, 6 Jul 2015 15:12:27 +0200
-Subject: [RESEND] [PATCH v2 1/2] arm: devtree: Set system_rev from DT
- revision
-In-Reply-To: <20150706123126.GG10705@atomide.com>
-References: <1430902142-17035-1-git-send-email-pali.rohar@gmail.com>
- <201507061423.23505@pali> <20150706123126.GG10705@atomide.com>
-Message-ID: <201507061512.27124@pali>
+From: daniel.thompson@linaro.org (Daniel Thompson)
+Date: Mon,  6 Jul 2015 14:13:52 +0100
+Subject: [PATCH 4.2-rc1 v21 0/6] irq/arm: Implement
+ arch_trigger_all_cpu_backtrace
+Message-ID: <1436188438-9478-1-git-send-email-daniel.thompson@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 06 July 2015 14:31:27 Tony Lindgren wrote:
-> * Pali Roh?r <pali.rohar@gmail.com> [150706 05:25]:
-> > into which file should I put documentation about new DT properties?
-> 
-> If it's Linux generic like linux,revision, then how about
-> Documentation/devicetree/bindings/revision.txt?
-> 
-> For the ATAGs, Documentation/devicetree/bindings/arm/atag.txt?
-> 
-> Regards,
-> 
-> Tony
+This patchset modifies the GIC driver to allow it, on supported
+platforms, to route IPI interrupts to FIQ. It then uses this
+feature to implement arch_trigger_all_cpu_backtrace for arm.
+In order to neatly deliver the changes for the arm we also
+rearrange some of the existing x86 NMI code to make it architecture
+neutral.
 
-Hm... now I'm thinking into which DT field should I put atags and 
-revision. In previous emails you wrote to use "linux,atags", now 
-"arm,atags"? And put them into root node? Or other?
+The patches have been runtime tested on both a system capable of
+supporting FIQ (Freescale i.MX6) and one that cannot (Qualcomm
+Snapdragon 600). In addition older versions of this patchset
+have been tested on STiH416 and vexpress-a9. The changes to the x86
+logic were tested using qemu.
 
-In arch/arm/boot/compressed/atags_to_fdt.c code I see that most atag 
-properties are converted into "/chosen" node in DT...
+v21:
 
-So what do you prefer for "revision" and what for "atags"?
+* Change the way SGIs are raised to try to increase robustness starting
+  secondary cores. This is a theoretic fix for a regression reported
+  by Mark Rutland on vexpress-tc2 but it also allows us to remove
+  igroup0_shadow entirely since it is no longer needed.
 
-Some mentioned examples:
+* Fix a couple of variable names and add comments to describe the
+  hardware behavior better (Mark Rutland).
 
-"/revision"
-"/chosen/revision"
-"/linux,revision"
-"/chosen/linux,revision"
-...
+* Improved MULTI_IRQ_HANDLER support by clearing FIQs using
+  handle_arch_irq (Marc Zygnier).
 
-"/atags"
-"/chosen/atags"
-"/linux,atags"
-"/chosen/linux,atags"
-"/arm,atags"
-"/chosen/arm,atags"
-...
+* Fix gic_cpu_if_down() to ensure group 1 interrupts are disabled
+  then the interface is brought down.
 
--- 
-Pali Roh?r
-pali.rohar at gmail.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: This is a digitally signed message part.
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150706/a874ec87/attachment.sig>
+For changes in v20 and earlier see:
+  http://thread.gmane.org/gmane.linux.kernel/1928465
+
+
+Daniel Thompson (6):
+  irqchip: gic: Optimize locking in gic_raise_softirq
+  irqchip: gic: Make gic_raise_softirq FIQ-safe
+  irqchip: gic: Introduce plumbing for IPI FIQ
+  printk: Simple implementation for NMI backtracing
+  x86/nmi: Use common printk functions
+  ARM: Add support for on-demand backtrace of other CPUs
+
+ arch/arm/Kconfig                |   1 +
+ arch/arm/include/asm/hardirq.h  |   2 +-
+ arch/arm/include/asm/irq.h      |   5 +
+ arch/arm/include/asm/smp.h      |   3 +
+ arch/arm/kernel/smp.c           |  82 +++++++++++++++
+ arch/arm/kernel/traps.c         |  13 ++-
+ arch/x86/Kconfig                |   1 +
+ arch/x86/kernel/apic/hw_nmi.c   | 104 ++-----------------
+ drivers/irqchip/irq-gic.c       | 220 +++++++++++++++++++++++++++++++++++++---
+ include/linux/irqchip/arm-gic.h |   6 ++
+ include/linux/printk.h          |  20 ++++
+ init/Kconfig                    |   3 +
+ kernel/printk/Makefile          |   1 +
+ kernel/printk/nmi_backtrace.c   | 147 +++++++++++++++++++++++++++
+ 14 files changed, 495 insertions(+), 113 deletions(-)
+ create mode 100644 kernel/printk/nmi_backtrace.c
+
+--
+2.4.3
