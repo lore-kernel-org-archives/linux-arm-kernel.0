@@ -1,169 +1,51 @@
 From: stefan@agner.ch (Stefan Agner)
-Date: Mon, 06 Jul 2015 08:42:46 +0200
-Subject: [PATCH] pwm: ftm: fix clock enable/disable when using PM
-In-Reply-To: <1432932519-13295-1-git-send-email-stefan@agner.ch>
-References: <1432932519-13295-1-git-send-email-stefan@agner.ch>
-Message-ID: <f0ae399196d0d009bb58b7166ec80add@agner.ch>
+Date: Mon, 06 Jul 2015 08:45:47 +0200
+Subject: [PATCH v4] ARM: early fixmap support for earlycon
+In-Reply-To: <20150617194329.GA7557@n2100.arm.linux.org.uk>
+References: <1434491507-6208-1-git-send-email-stefan@agner.ch>
+ <20150616223258.GW7557@n2100.arm.linux.org.uk>
+ <a2c7da075d7d1207f1316ee3069f59a2@agner.ch>
+ <20150617194329.GA7557@n2100.arm.linux.org.uk>
+Message-ID: <65c3b12d8a802e3f8a19724e77b85917@agner.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Thierry,
+On 2015-06-17 21:43, Russell King - ARM Linux wrote:
+> On Wed, Jun 17, 2015 at 01:43:17PM +0200, Stefan Agner wrote:
+>> On 2015-06-17 00:32, Russell King - ARM Linux wrote:
+>> > On Tue, Jun 16, 2015 at 11:51:47PM +0200, Stefan Agner wrote:
+>> >> Add early fixmap support, initially to support permanent, fixed
+>> >> mapping support for early console. A temporary, early pte is
+>> >> created which is migrated to a permanent mapping in paging_init.
+>> >> This is also needed since the attributes may change as the memory
+>> >> types are initialized. The 3MiB range of fixmap spans two pte
+>> >> tables, but currently only one pte is created for early fixmap
+>> >> support.
+>> >>
+>> >> Re-add FIX_KMAP_BEGIN to the index calculation in highmem.c since
+>> >> the index for kmap does not start at zero anymore. This reverts
+>> >> 4221e2e6b316 ("ARM: 8031/1: fixmap: remove FIX_KMAP_BEGIN and
+>> >> FIX_KMAP_END") to some extent.
+>> >
+>> > Sorry, this isn't going to make the next merge window, I've closed my
+>> > tree at the end of last week to new submissions (because it got too
+>> > painful to maintain the for-next branch due to the number of cross-
+>> > dependencies between branches.)  The only patches I'll entertain this
+>> > week and throughout the merge window are bug fixes.
+>>
+>> Ok no problem, I guess it's anyway a good idea to add it early in the
+>> development cycle so the change gets a bit more testing coverage. Shall
+>> I rebase the patch just after the merge window and send it out again or
+>> add the patch in its current state to your patch tracker?
+> 
+> Please rebase (if necessary) on -rc1 and send to the patch tracker if
+> there are no significant changes to it (I doubt there will be.)  If
+> everything during the merge window works as it should, -rc1 should
+> basically be the contents of linux-next just before the merge window
+> opens, plus any fixes that are needed along the way.
 
-On 2015-05-29 22:48, Stefan Agner wrote:
-> The driver has multiple issues when enabling/disabling clocks. A given
-> instance enables/disables three clocks: the bus clock, the counter
-> clock and the PWM clock. The bus clock gets enabled on pwm_request,
-> whereas the counter and PWM clocks will be enabled upon pwm_enable.
-> 
-> When entering suspend, the current behavior relies on the FTM_OUTMASK
-> register: If a PWM output is unmasked, the driver assumes the clocks
-> are enabled. However, some PWM instances, e.g. Vybrid's FTM1, only
-> have 2 channels connected. In that case, the FTM_OUTMASK reads only
-> 0x3, even when it was initialized with 0xff. Hence for those PWM
-> instances, the current approach does not work at all.
-> 
-> A second issue is that the three clocks are not treated differently
-> regarding PWM's enabled/requested state. This can lead to clocks
-> getting disabled which have not been enabled in the first place (a PWM
-> channel which only has been requested).
-> 
-> A third issue applies to the bus clock only, which can get enabled
-> multiple times (once for each PWM channel of a PWM chip). This is
-> fine, however when entering suspend mode, the clock only gets disabled
-> once.
-> 
-> To fix the issues this change introduces a different approach by
-> relying on the enable/prepared counters of the clock framework. Clocks
-> get disabled during suspend and back enabled on resume regarding to
-> the PWM channels individual state. However, since we do not count the
-> clocks locally, this change no longer clears the Status and Control
-> registers Clock Source Selection (FTM_SC[CLKS]). There have not
-> observed issues with that approach so far.
-
-
-Any comment on that?
+Added with the additional Tested-by tags to the patch tracker (ID
+8399/1). No updates were required.
 
 --
 Stefan
-
-> 
-> Signed-off-by: Stefan Agner <stefan@agner.ch>
-> ---
->  drivers/pwm/pwm-fsl-ftm.c | 58 ++++++++++++++++++++---------------------------
->  1 file changed, 25 insertions(+), 33 deletions(-)
-> 
-> diff --git a/drivers/pwm/pwm-fsl-ftm.c b/drivers/pwm/pwm-fsl-ftm.c
-> index f9dfc8b..5e1dd96 100644
-> --- a/drivers/pwm/pwm-fsl-ftm.c
-> +++ b/drivers/pwm/pwm-fsl-ftm.c
-> @@ -80,7 +80,6 @@ struct fsl_pwm_chip {
->  
->  	struct mutex lock;
->  
-> -	unsigned int use_count;
->  	unsigned int cnt_select;
->  	unsigned int clk_ps;
->  
-> @@ -300,9 +299,6 @@ static int fsl_counter_clock_enable(struct
-> fsl_pwm_chip *fpc)
->  {
->  	int ret;
->  
-> -	if (fpc->use_count++ != 0)
-> -		return 0;
-> -
->  	/* select counter clock source */
->  	regmap_update_bits(fpc->regmap, FTM_SC, FTM_SC_CLK_MASK,
->  			   FTM_SC_CLK(fpc->cnt_select));
-> @@ -334,25 +330,6 @@ static int fsl_pwm_enable(struct pwm_chip *chip,
-> struct pwm_device *pwm)
->  	return ret;
->  }
->  
-> -static void fsl_counter_clock_disable(struct fsl_pwm_chip *fpc)
-> -{
-> -	/*
-> -	 * already disabled, do nothing
-> -	 */
-> -	if (fpc->use_count == 0)
-> -		return;
-> -
-> -	/* there are still users, so can't disable yet */
-> -	if (--fpc->use_count > 0)
-> -		return;
-> -
-> -	/* no users left, disable PWM counter clock */
-> -	regmap_update_bits(fpc->regmap, FTM_SC, FTM_SC_CLK_MASK, 0);
-> -
-> -	clk_disable_unprepare(fpc->clk[FSL_PWM_CLK_CNTEN]);
-> -	clk_disable_unprepare(fpc->clk[fpc->cnt_select]);
-> -}
-> -
->  static void fsl_pwm_disable(struct pwm_chip *chip, struct pwm_device *pwm)
->  {
->  	struct fsl_pwm_chip *fpc = to_fsl_chip(chip);
-> @@ -362,7 +339,8 @@ static void fsl_pwm_disable(struct pwm_chip *chip,
-> struct pwm_device *pwm)
->  	regmap_update_bits(fpc->regmap, FTM_OUTMASK, BIT(pwm->hwpwm),
->  			   BIT(pwm->hwpwm));
->  
-> -	fsl_counter_clock_disable(fpc);
-> +	clk_disable_unprepare(fpc->clk[FSL_PWM_CLK_CNTEN]);
-> +	clk_disable_unprepare(fpc->clk[fpc->cnt_select]);
->  
->  	regmap_read(fpc->regmap, FTM_OUTMASK, &val);
->  	if ((val & 0xFF) == 0xFF)
-> @@ -492,17 +470,24 @@ static int fsl_pwm_remove(struct platform_device *pdev)
->  static int fsl_pwm_suspend(struct device *dev)
->  {
->  	struct fsl_pwm_chip *fpc = dev_get_drvdata(dev);
-> -	u32 val;
-> +	int i;
->  
->  	regcache_cache_only(fpc->regmap, true);
->  	regcache_mark_dirty(fpc->regmap);
->  
-> -	/* read from cache */
-> -	regmap_read(fpc->regmap, FTM_OUTMASK, &val);
-> -	if ((val & 0xFF) != 0xFF) {
-> +	for (i = 0; i < fpc->chip.npwm; i++) {
-> +		struct pwm_device *pwm = &fpc->chip.pwms[i];
-> +
-> +		if (!test_bit(PWMF_REQUESTED, &pwm->flags))
-> +			continue;
-> +
-> +		clk_disable_unprepare(fpc->clk[FSL_PWM_CLK_SYS]);
-> +
-> +		if (!test_bit(PWMF_ENABLED, &pwm->flags))
-> +			continue;
-> +
->  		clk_disable_unprepare(fpc->clk[FSL_PWM_CLK_CNTEN]);
->  		clk_disable_unprepare(fpc->clk[fpc->cnt_select]);
-> -		clk_disable_unprepare(fpc->clk[FSL_PWM_CLK_SYS]);
->  	}
->  
->  	return 0;
-> @@ -511,12 +496,19 @@ static int fsl_pwm_suspend(struct device *dev)
->  static int fsl_pwm_resume(struct device *dev)
->  {
->  	struct fsl_pwm_chip *fpc = dev_get_drvdata(dev);
-> -	u32 val;
-> +	int i;
-> +
-> +	for (i = 0; i < fpc->chip.npwm; i++) {
-> +		struct pwm_device *pwm = &fpc->chip.pwms[i];
-> +
-> +		if (!test_bit(PWMF_REQUESTED, &pwm->flags))
-> +			continue;
->  
-> -	/* read from cache */
-> -	regmap_read(fpc->regmap, FTM_OUTMASK, &val);
-> -	if ((val & 0xFF) != 0xFF) {
->  		clk_prepare_enable(fpc->clk[FSL_PWM_CLK_SYS]);
-> +
-> +		if (!test_bit(PWMF_ENABLED, &pwm->flags))
-> +			continue;
-> +
->  		clk_prepare_enable(fpc->clk[fpc->cnt_select]);
->  		clk_prepare_enable(fpc->clk[FSL_PWM_CLK_CNTEN]);
->  	}
