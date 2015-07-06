@@ -1,40 +1,55 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 6 Jul 2015 05:24:42 -0700
-Subject: [PATCH] ARM: dts: am4372.dtsi: disable rfbi
-In-Reply-To: <1435665894-28491-1-git-send-email-tomi.valkeinen@ti.com>
-References: <1435665894-28491-1-git-send-email-tomi.valkeinen@ti.com>
-Message-ID: <20150706122442.GF10705@atomide.com>
+From: pbonzini@redhat.com (Paolo Bonzini)
+Date: Mon, 6 Jul 2015 14:24:50 +0200
+Subject: [RFC v2 1/6] KVM: arm/arm64: select IRQ_BYPASS_MANAGER
+In-Reply-To: <1436184692-20927-2-git-send-email-eric.auger@linaro.org>
+References: <1436184692-20927-1-git-send-email-eric.auger@linaro.org>
+ <1436184692-20927-2-git-send-email-eric.auger@linaro.org>
+Message-ID: <559A7392.9020002@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Tomi Valkeinen <tomi.valkeinen@ti.com> [150630 05:07]:
-> When DSS nodes were added to am4372.dtsi, the rfbi node was not marked
-> as disabled. This should have been done, as the rule of thumb is to
-> disable all DSS nodes that are not used, and especially rfbi, as we
-> don't have a driver for rfbi.
+
+
+On 06/07/2015 14:11, Eric Auger wrote:
+> Select IRQ_BYPASS_MANAGER when CONFIG_KVM is set
 > 
-> Signed-off-by: Tomi Valkeinen <tomi.valkeinen@ti.com>
-
-Applying into omap-for-v4.2/fixes thanks.
-
-Tony
-
+> Signed-off-by: Eric Auger <eric.auger@linaro.org>
+> 
 > ---
->  arch/arm/boot/dts/am4372.dtsi | 1 +
->  1 file changed, 1 insertion(+)
+> v1 -> v2:
+> - also set IRQ_BYPASS_MANAGER for arm64
+> ---
+>  arch/arm/kvm/Kconfig   | 1 +
+>  arch/arm64/kvm/Kconfig | 1 +
+>  2 files changed, 2 insertions(+)
 > 
-> diff --git a/arch/arm/boot/dts/am4372.dtsi b/arch/arm/boot/dts/am4372.dtsi
-> index c80a3e233792..75831e556741 100644
-> --- a/arch/arm/boot/dts/am4372.dtsi
-> +++ b/arch/arm/boot/dts/am4372.dtsi
-> @@ -941,6 +941,7 @@
->  				ti,hwmods = "dss_rfbi";
->  				clocks = <&disp_clk>;
->  				clock-names = "fck";
-> +				status = "disabled";
->  			};
->  		};
+> diff --git a/arch/arm/kvm/Kconfig b/arch/arm/kvm/Kconfig
+> index bfb915d..7d38d25 100644
+> --- a/arch/arm/kvm/Kconfig
+> +++ b/arch/arm/kvm/Kconfig
+> @@ -31,6 +31,7 @@ config KVM
+>  	select KVM_VFIO
+>  	select HAVE_KVM_EVENTFD
+>  	select HAVE_KVM_IRQFD
+> +	select IRQ_BYPASS_MANAGER
+>  	depends on ARM_VIRT_EXT && ARM_LPAE && ARM_ARCH_TIMER
+>  	---help---
+>  	  Support hosting virtualized guest machines.
+> diff --git a/arch/arm64/kvm/Kconfig b/arch/arm64/kvm/Kconfig
+> index bfffe8f..d1922b4 100644
+> --- a/arch/arm64/kvm/Kconfig
+> +++ b/arch/arm64/kvm/Kconfig
+> @@ -31,6 +31,7 @@ config KVM
+>  	select KVM_VFIO
+>  	select HAVE_KVM_EVENTFD
+>  	select HAVE_KVM_IRQFD
+> +	select HAVE_KVM_IRQFD
+
+Obvious pasto. :)
+
+Paolo
+
+>  	---help---
+>  	  Support hosting virtualized guest machines.
 >  
-> -- 
-> 2.1.4
 > 
