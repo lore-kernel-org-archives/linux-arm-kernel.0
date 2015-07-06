@@ -1,105 +1,103 @@
 From: eric.auger@linaro.org (Eric Auger)
-Date: Mon,  6 Jul 2015 15:24:34 +0200
-Subject: [RFC v2 0/9] ARM IRQ forward control based on IRQ bypass manager
-Message-ID: <1436189083-32527-1-git-send-email-eric.auger@linaro.org>
+Date: Mon,  6 Jul 2015 15:24:35 +0200
+Subject: [RFC v2 1/9] VFIO: platform: registration of a dummy IRQ bypass
+ producer
+In-Reply-To: <1436189083-32527-1-git-send-email-eric.auger@linaro.org>
+References: <1436189083-32527-1-git-send-email-eric.auger@linaro.org>
+Message-ID: <1436189083-32527-2-git-send-email-eric.auger@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This series allows to set ARM IRQ forwarding between a VFIO platform
-device physical IRQ and a guest virtual IRQ. the link now is coordinated
-by the IRQ bypass manager. This kernel integration deprecates kvm-vfio
-approach (https://lkml.org/lkml/2015/4/13/353).
+Register a dummy producer with void callbacks
 
-Some rationale about that change can be found in IRQ bypass manager thread:
-https://lkml.org/lkml/2015/6/29/268
+Signed-off-by: Eric Auger <eric.auger@linaro.org>
+---
+ drivers/vfio/platform/vfio_platform_irq.c     | 31 +++++++++++++++++++++++++++
+ drivers/vfio/platform/vfio_platform_private.h |  2 ++
+ 2 files changed, 33 insertions(+)
 
-The principle is the VFIO platform driver registers an IRQ bypass producer
-struct on VFIO_IRQ_SET_ACTION_TRIGGER while KVM irqfd registers a consumer
-struct on the irqfd assignment. This leads to a handshake based on the
-eventfd context (used as token) match.
-
-When either of the producer/consumer module disappears, this leads to
-an unregistration and the link is disconnected.
-
-The series transforms the vfio platform driver into an IRQ bypass manager
-producer and implements the KVM IRQ bypass callbacks.
-
-Dependencies:
-1- [PATCH 00/10] arm/arm64: KVM: Active interrupt state switching for
-   shared devices (http://www.spinics.net/lists/kvm/msg117411.html)
-2- RFC "ARM: Forwarding physical interrupts to a guest VM"
-   (http://lwn.net/Articles/603514/)
-3- [RFC v2 0/6] IRQ bypass manager and irqfd consumer
-   including Alex's IRQ bypass manager sent by email
-   (https://lkml.org/lkml/2015/6/29/268)
-   http://www.spinics.net/lists/kernel/msg2026011.html
-4- [RFC v2 0/4] chip/vgic adaptations for forwarded irq
-   http://lists.infradead.org/pipermail/linux-arm-kernel/2015-February/323183.html
-
-All those pieces can be found at:
-https://git.linaro.org/people/eric.auger/linux.git/shortlog/refs/heads/v4.2-rc1-bypass-fwd-v2.1
-
-More backgroung on ARM IRQ forwarding in the text below and at
-http://www.linux-kvm.org/images/a/a8/01x04-ARMdevice.pdf.
-
-A forwarded IRQ is deactivated by the guest and not by the host.
-When the guest deactivates the associated virtual IRQ, the interrupt
-controller automatically completes the physical IRQ. Obviously
-this requires some HW support in the interrupt controller. This is
-the case for ARM GICv2.
-
-The direct benefit is that, for a level sensitive IRQ, a VM exit
-can be avoided on forwarded IRQ completion.
-
-When the IRQ is forwarded, the VFIO platform driver does not need to
-mask the physical IRQ anymore before signaling the eventfd. Indeed
-genirq lowers the running priority, enabling other physical IRQ to hit
-except that one.
-
-Besides, the injection still is based on irqfd triggering. The only
-impact on irqfd process is resamplefd is not called anymore on
-virtual IRQ completion since deactivation is not trapped by KVM.
-
-This was tested on Calxeda Midway, assigning the xgmac main IRQ
-
-History:
-
-v1 -> v2:
-- irq bypass manager and irqfd consumer moved in a separate patch
-- kvm_arm_[halt,resume]_guest moved in a separate patch
-- remove VFIO external functions since we do not need them anymore
-- apply container_of strategy advised by Paolo. Only active field
-  remains and discussions will tell whether we get rid of it.
-- renamed kvm_arch functions
-
-- kvm-vfio v6 -> RFC v1 based on IRQ bypass manager
-  see previous history in https://lkml.org/lkml/2015/4/13/353).
-
-Best Regards
-
-Eric
-
-
-Eric Auger (9):
-  VFIO: platform: registration of a dummy IRQ bypass producer
-  VFIO: platform: test forwarded state when selecting IRQ handler
-  VFIO: platform: single handler using function pointer
-  VFIO: platform: add vfio_platform_set_automasked
-  VFIO: platform: add vfio_platform_is_active
-  irq: bypass: add active field on producer side
-  VFIO: platform: add irq bypass producer management
-  KVM: arm/arm64: vgic: forwarding control
-  KVM: arm/arm64: implement IRQ bypass consumer functions
-
- arch/arm/kvm/Kconfig                          |   1 +
- arch/arm/kvm/arm.c                            |  40 ++++++
- arch/arm64/kvm/Kconfig                        |   1 +
- drivers/vfio/platform/vfio_platform_irq.c     | 120 +++++++++++++++-
- drivers/vfio/platform/vfio_platform_private.h |   3 +
- include/kvm/arm_vgic.h                        |   7 +
- include/linux/irqbypass.h                     |   2 +
- virt/kvm/arm/vgic.c                           | 195 ++++++++++++++++++++++++++
- 8 files changed, 362 insertions(+), 7 deletions(-)
-
+diff --git a/drivers/vfio/platform/vfio_platform_irq.c b/drivers/vfio/platform/vfio_platform_irq.c
+index 88bba57..4b059bf 100644
+--- a/drivers/vfio/platform/vfio_platform_irq.c
++++ b/drivers/vfio/platform/vfio_platform_irq.c
+@@ -20,6 +20,7 @@
+ #include <linux/types.h>
+ #include <linux/vfio.h>
+ #include <linux/irq.h>
++#include <linux/irqbypass.h>
+ 
+ #include "vfio_platform_private.h"
+ 
+@@ -177,6 +178,26 @@ static irqreturn_t vfio_irq_handler(int irq, void *dev_id)
+ 	return IRQ_HANDLED;
+ }
+ 
++static void vfio_platform_irq_bypass_stop(struct irq_bypass_producer *prod)
++{
++}
++
++static void vfio_platform_irq_bypass_resume(struct irq_bypass_producer *prod)
++{
++}
++
++static void vfio_platform_irq_bypass_add_consumer(
++			struct irq_bypass_producer *prod,
++			struct irq_bypass_consumer *cons)
++{
++}
++
++static void vfio_platform_irq_bypass_del_consumer(
++			struct irq_bypass_producer *prod,
++			struct irq_bypass_consumer *cons)
++{
++}
++
+ static int vfio_set_trigger(struct vfio_platform_device *vdev, int index,
+ 			    int fd, irq_handler_t handler)
+ {
+@@ -186,6 +207,7 @@ static int vfio_set_trigger(struct vfio_platform_device *vdev, int index,
+ 
+ 	if (irq->trigger) {
+ 		free_irq(irq->hwirq, irq);
++		irq_bypass_unregister_producer(&irq->producer);
+ 		kfree(irq->name);
+ 		eventfd_ctx_put(irq->trigger);
+ 		irq->trigger = NULL;
+@@ -216,6 +238,15 @@ static int vfio_set_trigger(struct vfio_platform_device *vdev, int index,
+ 		return ret;
+ 	}
+ 
++	irq->producer.token = (void *)trigger;
++	irq->producer.irq = irq->hwirq;
++	irq->producer.add_consumer = vfio_platform_irq_bypass_add_consumer;
++	irq->producer.del_consumer = vfio_platform_irq_bypass_del_consumer;
++	irq->producer.stop = vfio_platform_irq_bypass_stop;
++	irq->producer.resume = vfio_platform_irq_bypass_resume;
++	ret = irq_bypass_register_producer(&irq->producer);
++	WARN_ON(ret);
++
+ 	if (!irq->masked)
+ 		enable_irq(irq->hwirq);
+ 
+diff --git a/drivers/vfio/platform/vfio_platform_private.h b/drivers/vfio/platform/vfio_platform_private.h
+index 1c9b3d5..1d2d4d6 100644
+--- a/drivers/vfio/platform/vfio_platform_private.h
++++ b/drivers/vfio/platform/vfio_platform_private.h
+@@ -17,6 +17,7 @@
+ 
+ #include <linux/types.h>
+ #include <linux/interrupt.h>
++#include <linux/irqbypass.h>
+ 
+ #define VFIO_PLATFORM_OFFSET_SHIFT   40
+ #define VFIO_PLATFORM_OFFSET_MASK (((u64)(1) << VFIO_PLATFORM_OFFSET_SHIFT) - 1)
+@@ -37,6 +38,7 @@ struct vfio_platform_irq {
+ 	spinlock_t		lock;
+ 	struct virqfd		*unmask;
+ 	struct virqfd		*mask;
++	struct irq_bypass_producer producer;
+ };
+ 
+ struct vfio_platform_region {
 -- 
 1.9.1
