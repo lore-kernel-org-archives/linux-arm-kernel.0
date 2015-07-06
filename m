@@ -1,98 +1,100 @@
 From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Mon,  6 Jul 2015 16:24:07 +0530
-Subject: [PATCH 00/18] ARM: Migrate clockevent drivers to 'set-state'
-Message-ID: <cover.1436178990.git.viresh.kumar@linaro.org>
+Date: Mon,  6 Jul 2015 16:24:08 +0530
+Subject: [PATCH 01/18] ARM/smp_twd: Migrate to new 'set-state' interface
+In-Reply-To: <cover.1436178990.git.viresh.kumar@linaro.org>
+References: <cover.1436178990.git.viresh.kumar@linaro.org>
+Message-ID: <a233191233da66120addb835054fcda91b5207d9.1436178990.git.viresh.kumar@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Guys,
+Migrate smp_twd driver to the new 'set-state' interface provided by
+clockevents core, the earlier 'set-mode' interface is marked obsolete
+now.
 
-This series migrates ARM clockevent drivers (present in arch/arm/
-directory), to the new set-state interface. This would enable these
-drivers to use new states (like: ONESHOT_STOPPED, etc.) of a clockevent
-device (if required), as the set-mode interface is marked obsolete now
-and wouldn't be expanded to handle new states.
+This also enables us to implement callbacks for new states of clockevent
+devices, for example: ONESHOT_STOPPED.
 
-Rebased over: v4.2-rc1
+Cc: Russell King <linux@arm.linux.org.uk>
+Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
+---
+ arch/arm/kernel/smp_twd.c | 48 +++++++++++++++++++++++++----------------------
+ 1 file changed, 26 insertions(+), 22 deletions(-)
 
-Following patches:
-  ARM/ks8695/time: Migrate to new 'set-state' interface
-  ARM/omap1/time: Migrate to new 'set-state' interface
-
-must be integrated to mainline kernel via clockevents tree, because of
-dependency on:
-  352370adb058 ("clockevents: Allow set-state callbacks to be optional")
-
-
-Other patches don't have this dependency and so can be pushed via
-platform specific trees if Maintainers want it that way.
-
-This has been build/boot tested by two bots on various platforms for few
-days now:
-
-- kernelci, http://kernelci.org/
-- 0-DAY kernel test infrastructure, kbuild test robot
-
-
-Cc: Andrew Lunn <andrew@lunn.ch>
-Cc: Eric Miao <eric.y.miao@gmail.com>
-Cc: Gregory Clement <gregory.clement@free-electrons.com>
-Cc: Greg Ungerer <gerg@uclinux.org>
-Cc: Hans Ulli Kroll <ulli.kroll@googlemail.com>
-Cc: Haojian Zhuang <haojian.zhuang@gmail.com>
-Cc: Imre Kaloz <kaloz@openwrt.org>
-Cc: Jason Cooper <jason@lakedaemon.net>
-Cc: Kevin Hilman <khilman@deeprootsystems.com>
-Cc: Krzysztof Halasa <khalasa@piap.pl>
-Cc: Roland Stigge <stigge@antcom.de>
-Cc: Santosh Shilimkar <ssantosh@kernel.org>
-Cc: Sascha Hauer <kernel@pengutronix.de>
-Cc: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
-Cc: Sekhar Nori <nsekhar@ti.com>
-Cc: Shawn Guo <shawnguo@kernel.org>
-Cc: Shiraz Hashim <shiraz.linux.kernel@gmail.com>
-Cc: Tony Lindgren <tony@atomide.com>
-Cc: Wan ZongShun <mcuos.com@gmail.com>
-
-Viresh Kumar (18):
-  ARM/smp_twd: Migrate to new 'set-state' interface
-  ARM/cns3xxx/timer: Migrate to new 'set-state' interface
-  ARM/davinci/time: Migrate to new 'set-state' interface
-  ARM/dc21285-timer: Migrate to new 'set-state' interface
-  ARM/gemini/time: Migrate to new 'set-state' interface
-  ARM/imx/epit: Migrate to new 'set-state' interface
-  ARM/ixp4xx/timer: Migrate to new 'set-state' interface
-  ARM/ks8695/time: Migrate to new 'set-state' interface
-  ARM/lpc32xx/timer: Migrate to new 'set-state' interface
-  ARM/mmp/time: Migrate to new 'set-state' interface
-  ARM/netx/time: Migrate to new 'set-state' interface
-  ARM/omap1/time: Migrate to new 'set-state' interface
-  ARM/omap1/timer32: Migrate to new 'set-state' interface
-  ARM/omap2/timer: Migrate to new 'set-state' interface
-  ARM/SPEAr/time: Migrate to new 'set-state' interface
-  ARM/w90x900/time: Migrate to new 'set-state' interface
-  ARM/iop/time: Migrate to new 'set-state' interface
-  ARM/orion/time: Migrate to new 'set-state' interface
-
- arch/arm/kernel/smp_twd.c                | 48 +++++++++--------
- arch/arm/mach-cns3xxx/core.c             | 55 ++++++++++---------
- arch/arm/mach-davinci/time.c             | 54 ++++++++++---------
- arch/arm/mach-footbridge/dc21285-timer.c | 48 ++++++++---------
- arch/arm/mach-gemini/time.c              | 69 ++++++++++++------------
- arch/arm/mach-imx/epit.c                 | 67 ++++++++++++-----------
- arch/arm/mach-ixp4xx/common.c            | 68 +++++++++++++----------
- arch/arm/mach-ks8695/time.c              | 43 ++++++++-------
- arch/arm/mach-lpc32xx/timer.c            | 40 +++++---------
- arch/arm/mach-mmp/time.c                 | 29 ++++------
- arch/arm/mach-netx/time.c                | 61 +++++++++++----------
- arch/arm/mach-omap1/time.c               | 35 ++++++------
- arch/arm/mach-omap1/timer32k.c           | 33 ++++++------
- arch/arm/mach-omap2/timer.c              | 48 ++++++++---------
- arch/arm/mach-spear/time.c               | 89 ++++++++++++++++--------------
- arch/arm/mach-w90x900/time.c             | 51 ++++++++++--------
- arch/arm/plat-iop/time.c                 | 70 ++++++++++++++----------
- arch/arm/plat-orion/time.c               | 93 ++++++++++++++++----------------
- 18 files changed, 522 insertions(+), 479 deletions(-)
-
+diff --git a/arch/arm/kernel/smp_twd.c b/arch/arm/kernel/smp_twd.c
+index 172c6a05d27f..e9035cda1485 100644
+--- a/arch/arm/kernel/smp_twd.c
++++ b/arch/arm/kernel/smp_twd.c
+@@ -36,29 +36,30 @@ static DEFINE_PER_CPU(bool, percpu_setup_called);
+ static struct clock_event_device __percpu *twd_evt;
+ static int twd_ppi;
+ 
+-static void twd_set_mode(enum clock_event_mode mode,
+-			struct clock_event_device *clk)
++static int twd_shutdown(struct clock_event_device *clk)
+ {
+-	unsigned long ctrl;
+-
+-	switch (mode) {
+-	case CLOCK_EVT_MODE_PERIODIC:
+-		ctrl = TWD_TIMER_CONTROL_ENABLE | TWD_TIMER_CONTROL_IT_ENABLE
+-			| TWD_TIMER_CONTROL_PERIODIC;
+-		writel_relaxed(DIV_ROUND_CLOSEST(twd_timer_rate, HZ),
+-			twd_base + TWD_TIMER_LOAD);
+-		break;
+-	case CLOCK_EVT_MODE_ONESHOT:
+-		/* period set, and timer enabled in 'next_event' hook */
+-		ctrl = TWD_TIMER_CONTROL_IT_ENABLE | TWD_TIMER_CONTROL_ONESHOT;
+-		break;
+-	case CLOCK_EVT_MODE_UNUSED:
+-	case CLOCK_EVT_MODE_SHUTDOWN:
+-	default:
+-		ctrl = 0;
+-	}
++	writel_relaxed(0, twd_base + TWD_TIMER_CONTROL);
++	return 0;
++}
+ 
++static int twd_set_oneshot(struct clock_event_device *clk)
++{
++	/* period set, and timer enabled in 'next_event' hook */
++	writel_relaxed(TWD_TIMER_CONTROL_IT_ENABLE | TWD_TIMER_CONTROL_ONESHOT,
++		       twd_base + TWD_TIMER_CONTROL);
++	return 0;
++}
++
++static int twd_set_periodic(struct clock_event_device *clk)
++{
++	unsigned long ctrl = TWD_TIMER_CONTROL_ENABLE |
++			     TWD_TIMER_CONTROL_IT_ENABLE |
++			     TWD_TIMER_CONTROL_PERIODIC;
++
++	writel_relaxed(DIV_ROUND_CLOSEST(twd_timer_rate, HZ),
++		       twd_base + TWD_TIMER_LOAD);
+ 	writel_relaxed(ctrl, twd_base + TWD_TIMER_CONTROL);
++	return 0;
+ }
+ 
+ static int twd_set_next_event(unsigned long evt,
+@@ -94,7 +95,7 @@ static void twd_timer_stop(void)
+ {
+ 	struct clock_event_device *clk = raw_cpu_ptr(twd_evt);
+ 
+-	twd_set_mode(CLOCK_EVT_MODE_UNUSED, clk);
++	twd_shutdown(clk);
+ 	disable_percpu_irq(clk->irq);
+ }
+ 
+@@ -296,7 +297,10 @@ static void twd_timer_setup(void)
+ 	clk->features = CLOCK_EVT_FEAT_PERIODIC | CLOCK_EVT_FEAT_ONESHOT |
+ 			CLOCK_EVT_FEAT_C3STOP;
+ 	clk->rating = 350;
+-	clk->set_mode = twd_set_mode;
++	clk->set_state_shutdown = twd_shutdown;
++	clk->set_state_periodic = twd_set_periodic;
++	clk->set_state_oneshot = twd_set_oneshot;
++	clk->tick_resume = twd_shutdown;
+ 	clk->set_next_event = twd_set_next_event;
+ 	clk->irq = twd_ppi;
+ 	clk->cpumask = cpumask_of(cpu);
 -- 
 2.4.0
