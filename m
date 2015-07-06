@@ -1,33 +1,64 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Mon,  6 Jul 2015 17:08:09 +0200
-Subject: [PATCH] arm64: remove another unnecessary libfdt include path
-Message-ID: <1436195289-20904-1-git-send-email-ard.biesheuvel@linaro.org>
+From: andre.przywara@arm.com (Andre Przywara)
+Date: Mon, 6 Jul 2015 16:09:12 +0100
+Subject: [PATCH 1/7] KVM: api: add kvm_irq_routing_extended_msi
+In-Reply-To: <20150706120837.GA13530@cbox>
+References: <1435592237-17924-2-git-send-email-eric.auger@linaro.org>
+ <011f01d0b498$6a17aeb0$3e470c10$@samsung.com> <5596503E.6040902@arm.com>
+ <00fd01d0b7b6$f6cf3550$e46d9ff0$@samsung.com> <559A3C9C.6050302@arm.com>
+ <20150706093026.GA11590@cbox> <559A52E6.5050402@arm.com>
+ <20150706103755.GC11590@cbox> <559A6164.1000401@redhat.com>
+ <559A6527.1040107@arm.com> <20150706120837.GA13530@cbox>
+Message-ID: <559A9A18.806@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Patch 63a4aea55670 ("of: clean-up unnecessary libfdt include paths")
-removed all explicit libfdt include paths, since those are no longer
-necessary after the latest dtc upgrade. However, this one snuck in
-during the same merge window. Remove it.
+On 06/07/15 13:08, Christoffer Dall wrote:
+> On Mon, Jul 06, 2015 at 12:23:19PM +0100, Andre Przywara wrote:
+>> Hi Paolo,
+>>
+>> thanks for looking at this!
+>>
+>> On 06/07/15 12:07, Paolo Bonzini wrote:
+>>>
+>>>
+>>> On 06/07/2015 12:37, Christoffer Dall wrote:
+>>>> I don't view it as 'the kernel requires this' but as 'the kernel will
+>>>> not complain with arbitrary error code if you set the devid flag'
+>>>> capability, and it's up to userspace (as usual) to provide the correct
+>>>> arguments for things to work, and up to the kernel to ensure we don't
+>>>> crash the system etc.
+>>>>
+>>>> Thus, if you want to advertise it as a capability, I would rather call
+>>>> it KVM_CAP_MSI_DEVID.
+>>>
+>>> I agree.  Does userspace know that ITS guests always require devid?
+>>
+>> Well, as we are about to implement this: yes. But the issue is that MSI
+>> injection and GSI routing code is generic PCI code in userland (at least
+>> in kvmtool, guess in QEMU, too), so I don't want to pull in any kind of
+>> ARM specific code in there. The idea is to always provide the device ID
+>> from the PCI code (for PCI devices it's just the B/D/F triplet), but
+>> only send it to the kernel if needed. Querying a KVM capability is
+>> perfectly fine for this IMO.
+>>
+>>> I
+>>> guess it's okay to return -EINVAL if the userspace doesn't set the flag
+>>> but the virtual hardware requires it.
+>>
+>> Yes, that is what I do in the kernel implementation. And that is
+>> perfectly fine: the ITS emulation does not work without a device ID, the
+>> ITS driver in the guest assigns the very same payload (and address) to
+>> different devices, so there is no way to tell the MSIs apart without a
+>> unique device ID.
+>>
+> Just so I'm sure I understand: The way the kernel differentiates between
+> no-devid and devid==0, is whether or not the devid flag is set, correct?
 
-Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
----
+Yes, that is the idea. The plan for the implementation is like this:
+1) If the kernel does not need the device ID (x86, GICv2M), it does not
+care about the flag or the value at all.
+2) In case for ITS on ARM64, the kernel returns an error is the flag is
+not set.
 
-This should go on top of 4.2-rc1, since the mentioned patch was merged
-through the DT tree.
-
- arch/arm64/mm/Makefile | 2 --
- 1 file changed, 2 deletions(-)
-
-diff --git a/arch/arm64/mm/Makefile b/arch/arm64/mm/Makefile
-index 9d84feb41a16..773d37a14039 100644
---- a/arch/arm64/mm/Makefile
-+++ b/arch/arm64/mm/Makefile
-@@ -4,5 +4,3 @@ obj-y				:= dma-mapping.o extable.o fault.o init.o \
- 				   context.o proc.o pageattr.o
- obj-$(CONFIG_HUGETLB_PAGE)	+= hugetlbpage.o
- obj-$(CONFIG_ARM64_PTDUMP)	+= dump.o
--
--CFLAGS_mmu.o			:= -I$(srctree)/scripts/dtc/libfdt/
--- 
-1.9.1
+Cheers,
+Andre.
