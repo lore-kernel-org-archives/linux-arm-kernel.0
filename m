@@ -1,58 +1,64 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 6 Jul 2015 06:55:06 -0700
-Subject: [RESEND] [PATCH v2 1/2] arm: devtree: Set system_rev from DT
- revision
-In-Reply-To: <201507061512.27124@pali>
-References: <1430902142-17035-1-git-send-email-pali.rohar@gmail.com>
- <201507061423.23505@pali> <20150706123126.GG10705@atomide.com>
- <201507061512.27124@pali>
-Message-ID: <20150706135506.GI10705@atomide.com>
+From: parkch98@gmail.com (Chanho Park)
+Date: Mon, 6 Jul 2015 23:03:13 +0900
+Subject: [PATCHv4] ARM: dts: add exynos5422-cpus.dtsi to correct cpu order
+In-Reply-To: <5599D144.7040001@samsung.com>
+References: <1436106556-19134-1-git-send-email-chanho61.park@samsung.com>
+ <5599D144.7040001@samsung.com>
+Message-ID: <CAPTzV16xOB6PiasmNXx7nwORd_OsLU_jRwzxhJDpWqhoS5Wz0A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Pali Roh?r <pali.rohar@gmail.com> [150706 06:14]:
-> On Monday 06 July 2015 14:31:27 Tony Lindgren wrote:
-> > * Pali Roh?r <pali.rohar@gmail.com> [150706 05:25]:
-> > > into which file should I put documentation about new DT properties?
-> > 
-> > If it's Linux generic like linux,revision, then how about
-> > Documentation/devicetree/bindings/revision.txt?
-> > 
-> > For the ATAGs, Documentation/devicetree/bindings/arm/atag.txt?
+Hi,
+
+On Mon, Jul 6, 2015 at 9:52 AM, Krzysztof Kozlowski
+<k.kozlowski@samsung.com> wrote:
+> On 05.07.2015 23:29, Chanho Park wrote:
+>> The odroid-xu3 board which is based on exynos5422 not exynos5800 is
+>> booted from cortex-a7 core unlike exynos5800. The odroid-xu3's cpu order
+>> is quite strange. cpu0 and cpu5-7 are cortex-a7 cores and cpu1-4 are
+>> cortex-a15 cores. To correct this mis-odering, I added exynos5422.dtsi
+>> and reversing cpu orders from exynos5420. Now, cpu0-3 are cortex-a7 and
+>> cpu4-7 are cortex-a15.
+>>
+>> Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+>> Signed-off-by: Chanho Park <chanho61.park@samsung.com>
+>> ---
+>> Changes from v3:
+>>  - include this exynos5422-cpus.dtsi in the exynos5422-odroidxu3-common.dtsi
+>>
+>> Changes from v2:
+>>  - drop inclusion of exynos5420.dtsi from exynos5422-cpus.dtsi
+>>  - drop compatibles from exynos5422-cpus.dtsi
+>>
+>> Changes from v1:
+>>  - rename exynos5422.dtsi to exynos5422-cpus.dtsi
+>>  - include the dtsi file top of the exynos5422-odroidxu3.dts
+>>
+>> Secondary cpu booting problem[1] is not resolved yet. Below temporal patch is
+>> required to see 8 cores booting.
+>>
+>> --- a/arch/arm/mach-exynos/platsmp.c
+>> +++ b/arch/arm/mach-exynos/platsmp.c
+>> @@ -124,6 +124,7 @@ void exynos_cpu_power_up(int cpu)
+>>         if (soc_is_exynos3250())
+>>                 core_conf |= S5P_CORE_AUTOWAKEUP_EN;
+>>
+>> +       pmu_raw_writel(1, S5P_PMU_SPARE2);
+>>         pmu_raw_writel(core_conf,
+>>                         EXYNOS_ARM_CORE_CONFIGURATION(cpu));
+>>  }
+>>
+>> [1]: http://www.spinics.net/lists/linux-samsung-soc/msg45525.html
 >
-> Hm... now I'm thinking into which DT field should I put atags and 
-> revision. In previous emails you wrote to use "linux,atags", now 
-> "arm,atags"? And put them into root node? Or other?
-> 
-> In arch/arm/boot/compressed/atags_to_fdt.c code I see that most atag 
-> properties are converted into "/chosen" node in DT...
-> 
-> So what do you prefer for "revision" and what for "atags"?
+> $ git am ...
+> Applying: ARM: dts: add exynos5422-cpus.dtsi to correct cpu order
+> error: patch failed: arch/arm/mach-exynos/platsmp.c:124
+> error: arch/arm/mach-exynos/platsmp.c: patch does not apply
+>
+> The diff above confuses 'git am'.
 
-I'd prefer linux,revision and arm,atags. Chances are the ATAGs
-won't be used on other architectures. I'm find with linux,atags
-too if people prefer that.
+Oops. I'll re-send patch without the codes.
 
-Regards,
-
-Tony
- 
-> Some mentioned examples:
-> 
-> "/revision"
-> "/chosen/revision"
-> "/linux,revision"
-> "/chosen/linux,revision"
-> ...
-> 
-> "/atags"
-> "/chosen/atags"
-> "/linux,atags"
-> "/chosen/linux,atags"
-> "/arm,atags"
-> "/chosen/arm,atags"
-> ...
-> 
-> -- 
-> Pali Roh?r
-> pali.rohar at gmail.com
+-- 
+Best Regards,
+Chanho Park
