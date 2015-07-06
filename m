@@ -1,52 +1,46 @@
-From: yh.huang@mediatek.com (YH Huang)
-Date: Mon, 6 Jul 2015 20:43:31 +0800
-Subject: [PATCH v3 0/2] Add MediaTek display PWM driver
-In-Reply-To: <CAGS+omANeUxcRdY-qQzxjtBY5Yhx56mSneuuXh+bGjbahKhDeA@mail.gmail.com>
-References: <1435590211-38854-1-git-send-email-yh.huang@mediatek.com>
- <CAGS+omANeUxcRdY-qQzxjtBY5Yhx56mSneuuXh+bGjbahKhDeA@mail.gmail.com>
-Message-ID: <1436186611.32512.3.camel@mtksdaap41>
+From: eric.auger@linaro.org (Eric Auger)
+Date: Mon,  6 Jul 2015 14:49:54 +0200
+Subject: [PATCH 0/2] KVM: arm/arm64: Guest synchronous halt/resume
+Message-ID: <1436186996-22528-1-git-send-email-eric.auger@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Daniel,
+This series introduces the capability to synchronously exit the guest
+and prevent it from being re-entered.
 
-I will add PWM dtsi in the next patch and also fix the code with your
-suggestions in other mails.
+This functionality is requested for IRQ forwarding where we need to make
+sure the guest has exited and is prevented from being rescheduled until
+we complete the forwarding state change.
 
-Regards,
-YH Huang
+This series does not introduce any user of the functionality. First user
+will be IRQ forwarding. The split is done to ease the review process.
 
-On Tue, 2015-06-30 at 14:35 +0800, Daniel Kurtz wrote:
-> Hi YH,
-> 
-> Please also include a patch that adds PWM bindings to mt8173.dtsi.
-> The clock definitions (CLK_MM_DISP_PWM*) are added by James LIao's patch:
->   clk: mediatek: Add subsystem clocks of MT8173
-> 
-> I think it is ok to mention in the cover-letter that the PWM .dtsi
-> change depends on that other patch.
-> 
-> Also, cover-letters usually contain a "shortlog" and diffstatm that
-> gives summary of patches and changed files, generated along with the
-> patches using:
->  git format-patch --cover-letter
-> 
-> Thanks,
-> -Daniel
-> 
-> On Mon, Jun 29, 2015 at 11:03 PM, YH Huang <yh.huang@mediatek.com> wrote:
-> > This patch series add the use of display PWM driver and documentation
-> > for Mediatek SoCs. The driver is used to support the backlight of
-> > the panel. This is based on v4.1-rc1.
-> >
-> > Change in v3:
-> > 1. Add suspend/resume function
-> > 2. Fix the formula for high_width calculation
-> > 3. Rewrite some code to make it easier to read
-> > 4. Add more information in the commit message
-> >
-> > --
-> > To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
-> > the body of a message to majordomo at vger.kernel.org
-> > More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> > Please read the FAQ at  http://www.tux.org/lkml/
+can be found at:
+https://git.linaro.org/people/eric.auger/linux.git/shortlog/refs/heads/v4.2-rc1-bypass-fwd-v2
+
+Best Regards
+
+Eric
+
+History:
+
+PATCH:
+- just added __maybe_unused following Marc's advice
+
+RFC life before:
+- originally part of [RFC 00/17] ARM IRQ forward control based on IRQ
+  bypass manager (https://lkml.org/lkml/2015/7/2/268) and isolated in
+  this series.
+
+Eric Auger (2):
+  KVM: arm: rename pause into power_off
+  kvm: arm/arm64: implement kvm_arm_[halt,resume]_guest
+
+ arch/arm/include/asm/kvm_host.h   |  5 ++++-
+ arch/arm/kvm/arm.c                | 41 +++++++++++++++++++++++++++++++++------
+ arch/arm/kvm/psci.c               | 10 +++++-----
+ arch/arm64/include/asm/kvm_host.h |  3 +++
+ 4 files changed, 47 insertions(+), 12 deletions(-)
+
+-- 
+1.9.1
